@@ -168,14 +168,12 @@ fn auto_detect_device() -> DeviceType {
 /// Always includes CPU. Checks for CUDA/CoreML/DirectML/TensorRT availability
 /// based on enabled features.
 pub fn list_devices() -> Vec<DeviceInfo> {
-    let mut devices = Vec::new();
-
-    // CPU is always available
-    devices.push(DeviceInfo {
+    #[allow(unused_mut)]
+    let mut devices = vec![DeviceInfo {
         name: "CPU".to_string(),
         device_type: DeviceType::Cpu,
         available: true,
-    });
+    }];
 
     #[cfg(feature = "cuda")]
     {

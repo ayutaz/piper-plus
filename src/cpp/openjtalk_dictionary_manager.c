@@ -163,6 +163,20 @@ static const char* get_data_dir() {
         GetCurrentDirectoryA(sizeof(data_dir) - 10, data_dir);
         strcat(data_dir, "\\data");
     }
+#elif defined(__ANDROID__)
+    // Android: use app-specific external files dir if set, otherwise /data/local/tmp
+    const char* xdg_data = getenv("XDG_DATA_HOME");
+    if (xdg_data) {
+        snprintf(data_dir, sizeof(data_dir), "%s/piper", xdg_data);
+    } else {
+        const char* ext_files = getenv("PIPER_DATA_DIR");
+        if (ext_files) {
+            snprintf(data_dir, sizeof(data_dir), "%s/piper", ext_files);
+        } else {
+            // Fallback: /data/local/tmp is writable on most devices
+            strcpy(data_dir, "/data/local/tmp/piper");
+        }
+    }
 #else
     // On Unix-like systems, use XDG_DATA_HOME or ~/.local/share
     const char* xdg_data = getenv("XDG_DATA_HOME");
@@ -272,6 +286,9 @@ const char* get_openjtalk_dictionary_path() {
 #ifdef _WIN32
         "C:\\Program Files\\open_jtalk\\dic",
         "C:\\Program Files (x86)\\open_jtalk\\dic",
+#elif defined(__ANDROID__)
+        // Android: app assets or data directory (set by host app via env or dict_dir)
+        "/data/local/tmp/open_jtalk/dic",
 #else
         "/usr/share/open_jtalk/dic",
         "/usr/local/share/open_jtalk/dic",
@@ -382,6 +399,14 @@ int ensure_openjtalk_dictionary() {
         fprintf(stderr, "Failed to ensure OpenJTalk dictionary: Offline mode is enabled. Please download and install the dictionary manually.\n");
         return -1;
     }
+
+#ifdef __ANDROID__
+    // Android: system()/popen() for curl/wget is not available.
+    // The host app must provide the dictionary via dict_dir or OPENJTALK_DICTIONARY_PATH.
+    fprintf(stderr, "Failed to ensure OpenJTalk dictionary: Auto-download is not supported on Android. "
+                    "Please provide the dictionary via OPENJTALK_DICTIONARY_PATH or the dict_dir API parameter.\n");
+    return -1;
+#endif
     
     // Check if auto-download is disabled
     const char* auto_download = getenv("PIPER_AUTO_DOWNLOAD_DICT");

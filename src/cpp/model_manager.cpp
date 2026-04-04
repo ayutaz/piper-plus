@@ -10,15 +10,12 @@
 #include <cctype>
 #include <unordered_set>
 
+#include "library_path.h"
+
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
 #include <windows.h>
-#elif defined(__APPLE__)
-#include <mach-o/dyld.h>
-#include <climits>
-#else
-#include <climits>
 #endif
 
 #include <spdlog/spdlog.h>
@@ -93,27 +90,13 @@ static const char* PIPER_PLUS_CATALOG_JSON = R"JSON(
 // Internal helpers
 // ---------------------------------------------------------------------------
 
-// Get the directory containing the running executable
+// Get the directory containing the running executable.
+// Delegates to piper_plus_get_exe_dir() in library_path.c.
 static fs::path getExeDir() {
-#ifdef _WIN32
-    wchar_t wbuf[MAX_PATH] = {0};
-    DWORD len = GetModuleFileNameW(nullptr, wbuf, MAX_PATH);
-    if (len > 0 && len < MAX_PATH) {
-        return fs::path(wbuf).parent_path();
+    char buf[4096];
+    if (piper_plus_get_exe_dir(buf, sizeof(buf)) == 0) {
+        return fs::path(buf);
     }
-#elif defined(__APPLE__)
-    char buf[PATH_MAX] = {0};
-    uint32_t size = sizeof(buf);
-    if (_NSGetExecutablePath(buf, &size) == 0) {
-        return fs::path(buf).parent_path();
-    }
-#else
-    try {
-        return fs::canonical("/proc/self/exe").parent_path();
-    } catch (...) {
-        // fall through
-    }
-#endif
     return fs::current_path();
 }
 

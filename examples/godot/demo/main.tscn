@@ -1,0 +1,65 @@
+[gd_scene load_steps=2 format=3 uid="uid://demo_main"]
+
+[ext_resource type="Script" path="res://main.gd" id="1"]
+
+[node name="Main" type="VBoxContainer"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 16.0
+offset_top = 16.0
+offset_right = -16.0
+offset_bottom = -16.0
+
+[node name="Title" type="Label" parent="."]
+text = "PiperTTS Demo"
+horizontal_alignment = 1
+
+[node name="ModelPath" type="HBoxContainer" parent="."]
+
+[node name="Label" type="Label" parent="ModelPath"]
+text = "Model:"
+
+[node name="ModelLineEdit" type="LineEdit" parent="ModelPath"]
+unique_name_in_owner = true
+size_flags_horizontal = 3
+placeholder_text = "Path to .onnx model file"
+
+[node name="TextInput" type="HBoxContainer" parent="."]
+
+[node name="Label" type="Label" parent="TextInput"]
+text = "Text:"
+
+[node name="TextLineEdit" type="LineEdit" parent="TextInput"]
+unique_name_in_owner = true
+size_flags_horizontal = 3
+text = "Hello, this is a piper-plus GDExtension demo."
+placeholder_text = "Enter text to synthesize"
+
+[node name="Buttons" type="HBoxContainer" parent="."]
+alignment = 1
+
+[node name="LoadButton" type="Button" parent="Buttons"]
+unique_name_in_owner = true
+text = "Load Model"
+
+[node name="SpeakButton" type="Button" parent="Buttons"]
+unique_name_in_owner = true
+text = "Speak"
+disabled = true
+
+[node name="StreamButton" type="Button" parent="Buttons"]
+unique_name_in_owner = true
+text = "Speak (Streaming)"
+disabled = true
+
+[node name="Status" type="Label" parent="."]
+unique_name_in_owner = true
+text = "Status: No model loaded"
+horizontal_alignment = 1
+
+[node name="PiperTTS" type="PiperTTS" parent="."]
+unique_name_in_owner = true
+
+[node name="Main" type="Node" parent="."]
+script = ExtResource("1")

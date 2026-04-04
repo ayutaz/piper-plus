@@ -147,14 +147,22 @@ void terminate(PiperConfig &config);
 // Load Onnx model and JSON config file
 void loadVoice(PiperConfig &config, std::string modelPath,
                std::string modelConfigPath, Voice &voice,
-               std::optional<SpeakerId> &speakerId, bool useCuda,
-               int gpuDeviceId = 0);
+               std::optional<SpeakerId> &speakerId,
+               const std::string &provider = "cpu",
+               int gpuDeviceId = 0, int numThreads = 0);
 
 // Phonemize text and synthesize audio
 void textToAudio(PiperConfig &config, Voice &voice, std::string text,
                  std::vector<int16_t> &audioBuffer, SynthesisResult &result,
                  const std::function<void()> &audioCallback,
                  const std::vector<ProsodyFeature> *externalProsody = nullptr);
+
+// Float32 output variant — avoids int16 intermediate conversion.
+// Audio samples are normalized to [-1.0, 1.0].
+void textToAudioFloat(PiperConfig &config, Voice &voice, std::string text,
+                      std::vector<float> &audioBuffer, SynthesisResult &result,
+                      const std::function<void()> &audioCallback = nullptr,
+                      const std::vector<ProsodyFeature> *externalProsody = nullptr);
 
 // Phonemize text and synthesize audio to WAV file
 void textToWavFile(PiperConfig &config, Voice &voice, std::string text,
@@ -196,6 +204,28 @@ void outputTimingsAsJSON(const std::vector<PhonemeInfo> &timings,
 // Output phoneme timing information as TSV
 void outputTimingsAsTSV(const std::vector<PhonemeInfo> &timings,
                         std::ostream &output);
+
+// Phonemize result (extracted from textToAudio)
+struct PhonemizeResult {
+    std::vector<std::vector<Phoneme>> phonemes;        // Phonemes per sentence
+    std::vector<std::vector<ProsodyFeature>> prosody;   // Prosody per sentence (optional)
+    std::optional<int64_t> detectedLanguageId;          // Auto-detected dominant language ID
+};
+
+/// Phonemize text into per-sentence phoneme sequences.
+/// Pure: does not modify voice.  Auto-detected language is returned
+/// in result.detectedLanguageId.
+void phonemizeText(const Voice &voice, const std::string &text,
+                   PhonemizeResult &result,
+                   const std::vector<ProsodyFeature> *externalProsody = nullptr);
+
+/// Split text into sentences at natural boundaries.
+/// @param phonemeType  Used to select Japanese vs English regex
+/// @param maxChunkSize Maximum chunk size (0 = default 50)
+std::vector<std::string> splitTextToSentences(
+    const std::string &text,
+    PhonemeType phonemeType,
+    size_t maxChunkSize = 0);
 
 } // namespace piper
 

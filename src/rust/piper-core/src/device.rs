@@ -246,16 +246,14 @@ impl std::fmt::Display for DeviceSelection {
 pub fn enumerate_devices() -> &'static [DeviceInfo] {
     static DEVICES: OnceLock<Vec<DeviceInfo>> = OnceLock::new();
     DEVICES.get_or_init(|| {
-        let mut devices = Vec::new();
-
-        // CPU is always available
-        devices.push(DeviceInfo {
+        #[allow(unused_mut)]
+        let mut devices = vec![DeviceInfo {
             kind: DeviceKind::Cpu,
             device_id: 0,
             name: "CPU".to_string(),
             available: true,
             memory_bytes: None,
-        });
+        }];
 
         // CUDA devices
         #[cfg(feature = "cuda")]

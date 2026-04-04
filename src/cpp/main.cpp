@@ -278,9 +278,10 @@ int main(int argc, char *argv[]) {
                 runConfig.modelConfigPath.string());
 
   auto startTime = chrono::steady_clock::now();
+  std::string provider = runConfig.useCuda ? "cuda" : "cpu";
   loadVoice(piperConfig, runConfig.modelPath.string(),
             runConfig.modelConfigPath.string(), voice, runConfig.speakerId,
-            runConfig.useCuda, runConfig.gpuDeviceId);
+            provider, runConfig.gpuDeviceId);
   auto endTime = chrono::steady_clock::now();
   spdlog::info("Loaded voice in {} second(s)",
                chrono::duration<double>(endTime - startTime).count());

@@ -11,6 +11,15 @@
 #include <regex>
 
 #include <onnxruntime_cxx_api.h>
+#ifdef __APPLE__
+#include <coreml_provider_factory.h>
+#endif
+#ifdef _WIN32
+#if __has_include(<dml_provider_factory.h>)
+#include <dml_provider_factory.h>
+#define PIPER_HAS_DIRECTML 1
+#endif
+#endif
 #include <spdlog/spdlog.h>
 
 // Self-contained phoneme ID conversion
@@ -35,15 +44,13 @@
 #include "audio_neon.hpp"
 #endif
 
+#include "library_path.h"
+
 #ifdef _WIN32
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
 #include <windows.h>
-#elif defined(__APPLE__)
-#include <mach-o/dyld.h>
-#else
-#include <unistd.h>
 #endif
 
 using json = nlohmann::json;
@@ -402,7 +409,9 @@ void terminate(PiperConfig &config) {
   spdlog::info("Terminated piper");
 }
 
-void loadModel(std::string modelPath, ModelSession &session, bool useCuda, int gpuDeviceId = 0) {
+void loadModel(std::string modelPath, ModelSession &session,
+               const std::string &provider, int gpuDeviceId = 0,
+               int numThreads = 0) {
   spdlog::debug("loadModel called with path: {}", modelPath);
   spdlog::debug("Creating ONNX Runtime environment");
   try {
@@ -414,17 +423,40 @@ void loadModel(std::string modelPath, ModelSession &session, bool useCuda, int g
     throw;
   }
 
-  if (useCuda) {
+  // Execution provider selection
+  if (provider == "cuda") {
     // Use CUDA provider
     OrtCUDAProviderOptions cuda_options{};
     cuda_options.device_id = gpuDeviceId;
     cuda_options.cudnn_conv_algo_search = OrtCudnnConvAlgoSearchHeuristic;
     session.options.AppendExecutionProvider_CUDA(cuda_options);
     spdlog::info("Using CUDA execution provider with GPU device ID: {}", gpuDeviceId);
+  } else if (provider == "coreml") {
+#ifdef __APPLE__
+    Ort::ThrowOnError(OrtSessionOptionsAppendExecutionProvider_CoreML(session.options, 0));
+    spdlog::info("Using CoreML execution provider");
+#else
+    throw std::runtime_error("CoreML is only available on macOS/iOS");
+#endif
+  } else if (provider == "directml") {
+#ifdef PIPER_HAS_DIRECTML
+    Ort::ThrowOnError(OrtSessionOptionsAppendExecutionProvider_DML(session.options, gpuDeviceId));
+    spdlog::info("Using DirectML execution provider with device ID: {}", gpuDeviceId);
+#elif defined(_WIN32)
+    throw std::runtime_error("DirectML support requires the DirectML ONNX Runtime package");
+#else
+    throw std::runtime_error("DirectML is only available on Windows");
+#endif
+  } else if (!provider.empty() && provider != "cpu") {
+    throw std::runtime_error("Unknown provider: " + provider);
   }
 
-  // Slows down performance by ~2x
-  // session.options.SetIntraOpNumThreads(1);
+  // Set number of intra-op threads if requested (clamp negative to 0)
+  int effectiveThreads = (numThreads < 0) ? 0 : numThreads;
+  if (effectiveThreads > 0) {
+    session.options.SetIntraOpNumThreads(effectiveThreads);
+    spdlog::info("Set IntraOpNumThreads to {}", effectiveThreads);
+  }
 
   // Roughly doubles load time for no visible inference benefit
   // session.options.SetGraphOptimizationLevel(
@@ -488,32 +520,14 @@ void loadModel(std::string modelPath, ModelSession &session, bool useCuda, int g
 }
 
 // Get the directory containing the running executable.
+// Delegates to piper_plus_get_exe_dir() in library_path.c.
 // Returns empty path on failure.
 static std::filesystem::path getExeDir() {
-#ifdef _WIN32
-  wchar_t wpath[MAX_PATH];
-  DWORD len = GetModuleFileNameW(NULL, wpath, MAX_PATH);
-  if (len == 0 || len >= MAX_PATH) return {};
-  return std::filesystem::path(wpath).parent_path();
-#elif defined(__APPLE__)
-  uint32_t size = 0;
-  _NSGetExecutablePath(nullptr, &size); // query required size
-  std::vector<char> buf(size);
-  if (_NSGetExecutablePath(buf.data(), &size) != 0) return {};
-  return std::filesystem::path(buf.data()).parent_path();
-#else
-  // Try with a reasonable initial buffer, then grow if needed
-  std::vector<char> buf(1024);
-  while (true) {
-    ssize_t len = readlink("/proc/self/exe", buf.data(), buf.size());
-    if (len <= 0) return {};
-    if (static_cast<size_t>(len) < buf.size()) {
-      buf[len] = '\0';
-      return std::filesystem::path(buf.data()).parent_path();
-    }
-    buf.resize(buf.size() * 2);
+  char buf[4096];
+  if (piper_plus_get_exe_dir(buf, sizeof(buf)) == 0) {
+    return std::filesystem::path(buf);
   }
-#endif
+  return {};
 }
 
 // Search for a dictionary file in multiple locations:
@@ -562,8 +576,9 @@ static std::string findDictionaryFile(const std::string &filename,
 // Load Onnx model and JSON config file
 void loadVoice(PiperConfig &config, std::string modelPath,
                std::string modelConfigPath, Voice &voice,
-               std::optional<SpeakerId> &speakerId, bool useCuda,
-               int gpuDeviceId) {
+               std::optional<SpeakerId> &speakerId,
+               const std::string &provider,
+               int gpuDeviceId, int numThreads) {
   spdlog::debug("loadVoice called with modelPath={}, configPath={}", modelPath, modelConfigPath);
   spdlog::debug("Parsing voice config at {}", modelConfigPath);
   std::ifstream modelConfigFile(modelConfigPath);
@@ -631,7 +646,7 @@ void loadVoice(PiperConfig &config, std::string modelPath,
 
   spdlog::debug("Voice contains {} speaker(s)", voice.modelConfig.numSpeakers);
 
-  loadModel(modelPath, voice.session, useCuda, gpuDeviceId);
+  loadModel(modelPath, voice.session, provider, gpuDeviceId, numThreads);
 
 } /* loadVoice */
 
@@ -821,6 +836,188 @@ void synthesize(std::vector<PhonemeId> &phonemeIds,
       );
       result.hasTimingInfo = true;
       
+      spdlog::debug("Extracted timing for {} phonemes", result.phonemeTimings.size());
+    }
+  }
+
+  // Clean up
+  for (std::size_t i = 0; i < outputTensors.size(); i++) {
+    Ort::detail::OrtRelease(outputTensors[i].release());
+  }
+
+  for (std::size_t i = 0; i < inputTensors.size(); i++) {
+    Ort::detail::OrtRelease(inputTensors[i].release());
+  }
+}
+
+// Float32 variant of synthesize — outputs normalized [-1.0, 1.0] samples
+// instead of converting to int16.
+void synthesizeFloat(std::vector<PhonemeId> &phonemeIds,
+                     SynthesisConfig &synthesisConfig, ModelSession &session,
+                     std::vector<float> &audioBuffer, SynthesisResult &result,
+                     Voice *voice = nullptr,
+                     std::vector<int64_t> *prosodyFeatures = nullptr) {
+  spdlog::debug("Synthesizing audio (float32) for {} phoneme id(s)", phonemeIds.size());
+
+  auto memoryInfo = Ort::MemoryInfo::CreateCpu(
+      OrtAllocatorType::OrtArenaAllocator, OrtMemType::OrtMemTypeDefault);
+
+  // Allocate
+  std::vector<int64_t> phonemeIdLengths{(int64_t)phonemeIds.size()};
+  std::vector<float> scales{synthesisConfig.noiseScale,
+                            synthesisConfig.lengthScale,
+                            synthesisConfig.noiseW};
+
+  std::vector<Ort::Value> inputTensors;
+  std::vector<int64_t> phonemeIdsShape{1, (int64_t)phonemeIds.size()};
+  inputTensors.push_back(Ort::Value::CreateTensor<int64_t>(
+      memoryInfo, phonemeIds.data(), phonemeIds.size(), phonemeIdsShape.data(),
+      phonemeIdsShape.size()));
+
+  std::vector<int64_t> phomemeIdLengthsShape{(int64_t)phonemeIdLengths.size()};
+  inputTensors.push_back(Ort::Value::CreateTensor<int64_t>(
+      memoryInfo, phonemeIdLengths.data(), phonemeIdLengths.size(),
+      phomemeIdLengthsShape.data(), phomemeIdLengthsShape.size()));
+
+  std::vector<int64_t> scalesShape{(int64_t)scales.size()};
+  inputTensors.push_back(
+      Ort::Value::CreateTensor<float>(memoryInfo, scales.data(), scales.size(),
+                                      scalesShape.data(), scalesShape.size()));
+
+  // Build input names dynamically based on model capabilities
+  std::vector<const char *> inputNamesVec = {"input", "input_lengths", "scales"};
+
+  // Add speaker id only for multi-speaker models
+  std::vector<int64_t> speakerId{
+      (int64_t)synthesisConfig.speakerId.value_or(0)};
+  std::vector<int64_t> speakerIdShape{(int64_t)speakerId.size()};
+
+  if (session.hasMultiSpeaker) {
+    inputTensors.push_back(Ort::Value::CreateTensor<int64_t>(
+        memoryInfo, speakerId.data(), speakerId.size(), speakerIdShape.data(),
+        speakerIdShape.size()));
+    inputNamesVec.push_back("sid");
+  }
+
+  // Add language id for multilingual models
+  auto lid = synthesisConfig.languageId.value_or(0);
+  if (voice && (lid < 0 || lid >= voice->modelConfig.numLanguages)) {
+    spdlog::warn("Language ID {} out of range [0, {}), using 0",
+                 lid, voice->modelConfig.numLanguages);
+    lid = 0;
+  }
+  std::vector<int64_t> languageId{(int64_t)lid};
+  std::vector<int64_t> languageIdShape{(int64_t)languageId.size()};
+
+  if (session.hasLidInput) {
+    inputTensors.push_back(Ort::Value::CreateTensor<int64_t>(
+        memoryInfo, languageId.data(), languageId.size(),
+        languageIdShape.data(), languageIdShape.size()));
+    inputNamesVec.push_back("lid");
+  }
+
+  // Add prosody features if model supports them and they are provided
+  std::vector<int64_t> zeroProsody;
+  if (session.hasProsodyInput) {
+    std::vector<int64_t> prosodyShape{1, (int64_t)phonemeIds.size(), 3};
+    if (prosodyFeatures && prosodyFeatures->size() == phonemeIds.size() * 3) {
+      inputTensors.push_back(Ort::Value::CreateTensor<int64_t>(
+          memoryInfo, prosodyFeatures->data(), prosodyFeatures->size(),
+          prosodyShape.data(), prosodyShape.size()));
+    } else {
+      zeroProsody.resize(phonemeIds.size() * 3, 0);
+      inputTensors.push_back(Ort::Value::CreateTensor<int64_t>(
+          memoryInfo, zeroProsody.data(), zeroProsody.size(),
+          prosodyShape.data(), prosodyShape.size()));
+    }
+    inputNamesVec.push_back("prosody_features");
+  }
+
+  // Check if we should get duration output
+  std::vector<const char *> outputNamesVec;
+  outputNamesVec.push_back("output");
+  if (session.hasDurationOutput) {
+    outputNamesVec.push_back("durations");
+  }
+
+  // Infer
+  auto startTime = std::chrono::steady_clock::now();
+  auto outputTensors = session.onnx.Run(
+      Ort::RunOptions{nullptr}, inputNamesVec.data(), inputTensors.data(),
+      inputTensors.size(), outputNamesVec.data(), outputNamesVec.size());
+  auto endTime = std::chrono::steady_clock::now();
+
+  if (outputTensors.empty() || (!outputTensors.front().IsTensor())) {
+    throw std::runtime_error("Invalid output tensors");
+  }
+  auto inferDuration = std::chrono::duration<double>(endTime - startTime);
+  result.inferSeconds = inferDuration.count();
+
+  const float *audio = outputTensors.front().GetTensorData<float>();
+  auto audioShape =
+      outputTensors.front().GetTensorTypeAndShapeInfo().GetShape();
+  int64_t audioCount = audioShape[audioShape.size() - 1];
+
+  result.audioSeconds = (double)audioCount / (double)synthesisConfig.sampleRate;
+  result.realTimeFactor = 0.0;
+  if (result.audioSeconds > 0) {
+    result.realTimeFactor = result.inferSeconds / result.audioSeconds;
+  }
+  spdlog::debug("Synthesized {} second(s) of audio in {} second(s)",
+                result.audioSeconds, result.inferSeconds);
+
+  // Get max audio value for normalization to [-1.0, 1.0]
+  float maxAudioValue = 0.01f;
+
+#ifdef USE_ARM64_NEON
+  maxAudioValue = findMaxAudioValueNEON(audio, audioCount);
+#else
+  for (int64_t i = 0; i < audioCount; i++) {
+    float audioValue = std::abs(audio[i]);
+    if (audioValue > maxAudioValue) {
+      maxAudioValue = audioValue;
+    }
+  }
+#endif
+
+  // We know the size up front
+  audioBuffer.reserve(audioBuffer.size() + audioCount);
+
+  // Normalize audio to [-1.0, 1.0] and copy directly as float
+  float invMax = 1.0f / std::max(0.01f, maxAudioValue);
+  for (int64_t i = 0; i < audioCount; i++) {
+    audioBuffer.push_back(
+        std::clamp(audio[i] * invMax, -1.0f, 1.0f));
+  }
+
+  // Extract phoneme timing information if available
+  if (session.hasDurationOutput && outputTensors.size() >= 2 && voice != nullptr) {
+    auto& durationTensor = outputTensors[1];
+    if (durationTensor.IsTensor()) {
+      const float *durations = durationTensor.GetTensorData<float>();
+      auto durationShape = durationTensor.GetTensorTypeAndShapeInfo().GetShape();
+      size_t durationCount = 1;
+      for (auto dim : durationShape) {
+        durationCount *= dim;
+      }
+
+      std::vector<float> durationVec(durations, durations + durationCount);
+
+      int hopSize = DEFAULT_HOP_SIZE;
+      if (voice->configRoot.contains("audio") &&
+          voice->configRoot["audio"].contains("hop_size")) {
+        hopSize = voice->configRoot["audio"]["hop_size"];
+      }
+
+      result.phonemeTimings = extractTimingsFromDurations(
+          durationVec, phonemeIds,
+          voice->phonemizeConfig.phonemeIdMap,
+          hopSize,
+          voice->synthesisConfig.sampleRate,
+          voice->phonemizeConfig.phonemeType
+      );
+      result.hasTimingInfo = true;
+
       spdlog::debug("Extracted timing for {} phonemes", result.phonemeTimings.size());
     }
   }
@@ -1052,11 +1249,6 @@ void textToAudio(PiperConfig &config, Voice &voice, std::string text,
                  const std::function<void()> &audioCallback,
                  const std::vector<ProsodyFeature> *externalProsody) {
 
-  // Save the original language ID to detect if the user explicitly set it.
-  // This prevents dominant-language auto-detection from overwriting an
-  // explicit user choice (M3 fix).
-  auto originalLanguageId = voice.synthesisConfig.languageId;
-
   std::size_t sentenceSilenceSamples = 0;
   if (voice.synthesisConfig.sentenceSilenceSeconds > 0) {
     sentenceSilenceSamples = (std::size_t)(
@@ -1064,256 +1256,17 @@ void textToAudio(PiperConfig &config, Voice &voice, std::string text,
         voice.synthesisConfig.sampleRate * voice.synthesisConfig.channels);
   }
 
-  // Parse text for [[ phonemes ]] notation
-  auto textSegments = parsePhonemeNotation(text);
-  
-  // Phonemes for each sentence
-  spdlog::debug("Phonemizing text: {}", text);
-  std::vector<std::vector<Phoneme>> phonemes;
+  // Phonemize text (pure -- does not modify voice).
+  PhonemizeResult phonResult;
+  phonemizeText(voice, text, phonResult, externalProsody);
+  auto &phonemes = phonResult.phonemes;
+  auto &allProsodyFeatures = phonResult.prosody;
+  bool useProsody = !allProsodyFeatures.empty();
 
-  // Prosody features for each sentence (only used for OpenJTalk with prosody-enabled models)
-  std::vector<std::vector<ProsodyFeature>> allProsodyFeatures;
-  bool useProsody = voice.session.hasProsodyInput &&
-                    usesOpenJTalk(voice.phonemizeConfig.phonemeType);
-
-  // Process each segment
-  for (const auto& segment : textSegments) {
-    if (segment.isPhonemes) {
-      // Direct phoneme input
-      spdlog::debug("Processing direct phoneme input: {}", segment.text);
-      auto parsedPhonemes = parsePhonemeString(segment.text, static_cast<int>(voice.phonemizeConfig.phonemeType));
-
-      // Add as a single "sentence"
-      phonemes.push_back(parsedPhonemes);
-
-      // Add empty prosody features for direct phoneme input
-      if (useProsody) {
-        std::vector<ProsodyFeature> emptyProsody(parsedPhonemes.size(), {0, 0, 0});
-        allProsodyFeatures.push_back(std::move(emptyProsody));
-      }
-    } else {
-      // Regular text - phonemize as usual
-      std::vector<std::vector<Phoneme>> segmentPhonemes;
-      std::vector<std::vector<ProsodyFeature>> segmentProsody;
-
-      if (voice.phonemizeConfig.phonemeType == OpenJTalkPhonemes) {
-        // Japanese OpenJTalk phonemizer
-        if (useProsody) {
-          phonemize_openjtalk_with_prosody(segment.text, segmentPhonemes, segmentProsody);
-        } else {
-          phonemize_openjtalk(segment.text, segmentPhonemes);
-        }
-
-        // If OpenJTalk failed, report error (eSpeak is no longer available)
-        if (segmentPhonemes.empty() && !segment.text.empty()) {
-          spdlog::error("OpenJTalk failed to process text; skipping segment");
-        }
-      } else if (voice.phonemizeConfig.phonemeType == MultilingualPhonemes) {
-        // Multilingual: segment text by language, phonemize each segment
-        // with the appropriate engine, strip BOS/EOS from JA segments.
-        std::vector<std::string> multiLangs;
-        if (voice.modelConfig.languageIdMap) {
-          for (const auto& [code, id] : *voice.modelConfig.languageIdMap) {
-            multiLangs.push_back(code);
-          }
-        } else {
-          multiLangs = {"ja", "en"};  // Default bilingual
-        }
-
-        // Determine default Latin language.
-        // If the user set --language, reverse-lookup the code and prefer it
-        // when it is a Latin-script language.
-        std::string defaultLatin = "en";
-        static const std::set<std::string> latinLangs = {"en", "es", "fr", "pt", "sv"};
-        bool defaultLatinSet = false;
-        if (voice.synthesisConfig.languageId && voice.modelConfig.languageIdMap) {
-          for (const auto& [code, id] : *voice.modelConfig.languageIdMap) {
-            if (id == *voice.synthesisConfig.languageId && latinLangs.count(code)) {
-              defaultLatin = code;
-              defaultLatinSet = true;
-              break;
-            }
-          }
-        }
-        // Fallback: pick the first available Latin language by priority
-        if (!defaultLatinSet) {
-          for (const auto& lang : {"en", "es", "fr", "pt", "sv"}) {
-            if (std::find(multiLangs.begin(), multiLangs.end(), lang) != multiLangs.end()) {
-              defaultLatin = lang;
-              break;
-            }
-          }
-        }
-
-        UnicodeLanguageDetector detector(multiLangs, defaultLatin);
-        auto langSegments = detector.segmentText(segment.text);
-
-        // BOS/EOS codepoints to strip from JA segments
-        std::set<Phoneme> bosEosTokens = {
-          0x5E,    // ^ (BOS)
-          0x24,    // $ (EOS)
-          0x3F,    // ? (question EOS)
-          0xE016,  // ?! (emphatic question)
-          0xE017,  // ?. (neutral question)
-          0xE018   // ?~ (tag question)
-        };
-
-        // Track last EOS for dynamic EOS selection
-        Phoneme lastEos = 0x24;  // Default: $
-
-        std::vector<Phoneme> allPhonemes;
-        std::vector<ProsodyFeature> allProsody;
-
-        for (const auto& langSeg : langSegments) {
-          std::vector<std::vector<Phoneme>> langPhonemes;
-          std::vector<std::vector<ProsodyFeature>> langProsody;
-
-          if (langSeg.lang == "ja") {
-            // Japanese: use OpenJTalk
-            if (voice.session.hasProsodyInput) {
-              phonemize_openjtalk_with_prosody(langSeg.text, langPhonemes, langProsody);
-            } else {
-              phonemize_openjtalk(langSeg.text, langPhonemes);
-            }
-
-            // Strip BOS/EOS from JA phonemes
-            for (size_t s = 0; s < langPhonemes.size(); s++) {
-              for (auto ph : langPhonemes[s]) {
-                if (bosEosTokens.count(ph)) {
-                  if (ph != 0x5E) {  // Not BOS
-                    lastEos = ph;    // Track EOS
-                  }
-                  continue;  // Skip BOS/EOS
-                }
-                allPhonemes.push_back(ph);
-                if (voice.session.hasProsodyInput && s < langProsody.size()) {
-                  // Find matching prosody index (approximate)
-                  // JA phonemizer produces 1:1 phoneme:prosody
-                }
-              }
-              // Add prosody for JA phonemes (after stripping)
-              if (voice.session.hasProsodyInput && s < langProsody.size()) {
-                // We need to rebuild prosody without BOS/EOS entries
-                for (size_t pi = 0; pi < langPhonemes[s].size(); pi++) {
-                  if (!bosEosTokens.count(langPhonemes[s][pi])) {
-                    if (pi < langProsody[s].size()) {
-                      allProsody.push_back(langProsody[s][pi]);
-                    } else {
-                      allProsody.push_back({0, 0, 0});
-                    }
-                  }
-                }
-              }
-            }
-          } else if (langSeg.lang == "es") {
-            // Spanish: native rule-based phonemizer
-            phonemize_spanish(langSeg.text, langPhonemes);
-          } else if (langSeg.lang == "fr") {
-            // French: native rule-based phonemizer
-            phonemize_french(langSeg.text, langPhonemes);
-          } else if (langSeg.lang == "pt") {
-            // Portuguese: native rule-based phonemizer
-            phonemize_portuguese(langSeg.text, langPhonemes);
-          } else if (langSeg.lang == "en") {
-            // English: CMU dictionary-based G2P
-            static bool warnedNoCmuDict = false;
-            if (voice.cmuDict.empty() && !warnedNoCmuDict) {
-              spdlog::warn("English CMU dictionary not loaded; English text may not be phonemized correctly");
-              warnedNoCmuDict = true;
-            }
-            phonemize_english(langSeg.text, langPhonemes, voice.cmuDict);
-            // Check if CMU dict produced any phonemes
-            bool hasAnyPhonemes = false;
-            for (const auto& s : langPhonemes) {
-              if (!s.empty()) { hasAnyPhonemes = true; break; }
-            }
-            if (!hasAnyPhonemes) {
-              spdlog::debug("English segment '{}' has no CMU dict matches; skipping", langSeg.text);
-            }
-          } else if (langSeg.lang == "zh") {
-            // Chinese: pypinyin-based G2P
-            static bool warnedNoPinyinDict = false;
-            if (voice.pinyinSingleDict.empty() && !warnedNoPinyinDict) {
-              spdlog::warn("Chinese pinyin dictionary not loaded; Chinese text may not be phonemized correctly");
-              warnedNoPinyinDict = true;
-            }
-            phonemize_chinese(langSeg.text, langPhonemes,
-                              voice.pinyinSingleDict, voice.pinyinPhraseDict);
-          } else if (langSeg.lang == "ko") {
-            // Korean: Hangul decomposition (no external data needed)
-            phonemize_korean(langSeg.text, langPhonemes);
-          } else if (langSeg.lang == "sv") {
-            // Swedish: native rule-based phonemizer
-            phonemize_swedish(langSeg.text, langPhonemes);
-          } else {
-            spdlog::warn("No native phonemizer for language '{}'; skipping segment", langSeg.lang);
-          }
-
-          // Add phonemes from non-JA segment with language-specific prosody
-          if (langSeg.lang != "ja") {
-            for (const auto& sentence : langPhonemes) {
-              if (voice.session.hasProsodyInput) {
-                auto sentenceProsody = computeNonJaProsody(sentence, langSeg.lang);
-                for (size_t pi = 0; pi < sentence.size(); pi++) {
-                  allPhonemes.push_back(sentence[pi]);
-                  allProsody.push_back(sentenceProsody[pi]);
-                }
-              } else {
-                for (auto ph : sentence) {
-                  allPhonemes.push_back(ph);
-                }
-              }
-            }
-          }
-        }
-
-        // Set dominant language for lid, but only if the user did not
-        // explicitly set a language ID before this call (M3 fix).
-        // originalLanguageId was captured at the start of textToAudio().
-        // If the current value still matches the original, auto-detect is safe.
-        if (!langSegments.empty() &&
-            voice.synthesisConfig.languageId == originalLanguageId) {
-          auto dominantLang = detectDominantLanguage(segment.text, detector);
-          if (voice.modelConfig.languageIdMap &&
-              voice.modelConfig.languageIdMap->count(dominantLang) > 0) {
-            voice.synthesisConfig.languageId =
-                (*voice.modelConfig.languageIdMap)[dominantLang];
-            spdlog::debug("Multilingual: auto-detected dominant language '{}' (lid={})",
-                          dominantLang, voice.synthesisConfig.languageId.value());
-          }
-        }
-
-        // Add as a single sentence
-        if (!allPhonemes.empty()) {
-          segmentPhonemes.push_back(std::move(allPhonemes));
-          if (voice.session.hasProsodyInput) {
-            segmentProsody.push_back(std::move(allProsody));
-          }
-        }
-      }
-
-      // Add all sentences from this segment
-      for (size_t i = 0; i < segmentPhonemes.size(); i++) {
-        phonemes.push_back(std::move(segmentPhonemes[i]));
-
-        if (useProsody) {
-          if (i < segmentProsody.size()) {
-            allProsodyFeatures.push_back(std::move(segmentProsody[i]));
-          } else {
-            // Fallback: create zero prosody features
-            std::vector<ProsodyFeature> zeroProsody(phonemes.back().size(), {0, 0, 0});
-            allProsodyFeatures.push_back(std::move(zeroProsody));
-          }
-        }
-      }
-    }
-  }
-
-  // Override prosody features with external data if provided
-  if (externalProsody && !externalProsody->empty() && useProsody) {
-    allProsodyFeatures.clear();
-    allProsodyFeatures.push_back(*externalProsody);
-    spdlog::debug("Using {} external prosody features", externalProsody->size());
+  // Apply auto-detected language only if the caller did not explicitly set one.
+  if (!voice.synthesisConfig.languageId.has_value() &&
+      phonResult.detectedLanguageId.has_value()) {
+    voice.synthesisConfig.languageId = phonResult.detectedLanguageId;
   }
 
   // Synthesize each sentence independently.
@@ -1514,6 +1467,206 @@ void textToAudio(PiperConfig &config, Voice &voice, std::string text,
 
 } /* textToAudio */
 
+// Float32 output variant — avoids int16 intermediate conversion.
+// Audio samples are normalized to [-1.0, 1.0].
+void textToAudioFloat(PiperConfig &config, Voice &voice, std::string text,
+                      std::vector<float> &audioBuffer, SynthesisResult &result,
+                      const std::function<void()> &audioCallback,
+                      const std::vector<ProsodyFeature> *externalProsody) {
+
+  std::size_t sentenceSilenceSamples = 0;
+  if (voice.synthesisConfig.sentenceSilenceSeconds > 0) {
+    sentenceSilenceSamples = (std::size_t)(
+        voice.synthesisConfig.sentenceSilenceSeconds *
+        voice.synthesisConfig.sampleRate * voice.synthesisConfig.channels);
+  }
+
+  // Phonemize text (pure -- does not modify voice).
+  PhonemizeResult phonResult;
+  phonemizeText(voice, text, phonResult, externalProsody);
+  auto &phonemes = phonResult.phonemes;
+  auto &allProsodyFeatures = phonResult.prosody;
+  bool useProsody = !allProsodyFeatures.empty();
+
+  // Apply auto-detected language only if the caller did not explicitly set one.
+  if (!voice.synthesisConfig.languageId.has_value() &&
+      phonResult.detectedLanguageId.has_value()) {
+    voice.synthesisConfig.languageId = phonResult.detectedLanguageId;
+  }
+
+  // Synthesize each sentence independently.
+  std::vector<PhonemeId> phonemeIds;
+  std::map<Phoneme, std::size_t> missingPhonemes;
+  size_t sentenceIdx = 0;
+  for (auto phonemesIter = phonemes.begin(); phonemesIter != phonemes.end();
+       ++phonemesIter, ++sentenceIdx) {
+    std::vector<Phoneme> &sentencePhonemes = *phonemesIter;
+
+    if (spdlog::should_log(spdlog::level::debug)) {
+      std::string phonemesStr;
+      for (auto phoneme : sentencePhonemes) {
+        phonemesStr += phonemeToString(phoneme);
+        phonemesStr += " ";
+      }
+      if (!phonemesStr.empty()) {
+        phonemesStr.pop_back();
+      }
+
+      spdlog::debug("Converting {} phoneme(s) to ids: {}",
+                    sentencePhonemes.size(), phonemesStr);
+    }
+
+    std::vector<std::shared_ptr<std::vector<Phoneme>>> phrasePhonemes;
+    std::vector<SynthesisResult> phraseResults;
+    std::vector<size_t> phraseSilenceSamples;
+
+    PhonemeIdConfig idConfig;
+    idConfig.phonemeIdMap =
+        std::make_shared<PhonemeIdMap>(voice.phonemizeConfig.phonemeIdMap);
+    idConfig.interspersePad = voice.phonemizeConfig.interspersePad;
+
+    if (usesOpenJTalk(voice.phonemizeConfig.phonemeType)) {
+        idConfig.addBos = false;
+        idConfig.addEos = false;
+    }
+
+    if (voice.synthesisConfig.phonemeSilenceSeconds) {
+      std::map<Phoneme, float> &phonemeSilenceSeconds =
+          *voice.synthesisConfig.phonemeSilenceSeconds;
+
+      auto currentPhrasePhonemes = std::make_shared<std::vector<Phoneme>>();
+      phrasePhonemes.push_back(currentPhrasePhonemes);
+
+      for (auto sentencePhonemesIter = sentencePhonemes.begin();
+           sentencePhonemesIter != sentencePhonemes.end();
+           sentencePhonemesIter++) {
+        Phoneme &currentPhoneme = *sentencePhonemesIter;
+        currentPhrasePhonemes->push_back(currentPhoneme);
+
+        if (phonemeSilenceSeconds.count(currentPhoneme) > 0) {
+          phraseSilenceSamples.push_back(
+              (std::size_t)(phonemeSilenceSeconds[currentPhoneme] *
+                            voice.synthesisConfig.sampleRate *
+                            voice.synthesisConfig.channels));
+
+          currentPhrasePhonemes = std::make_shared<std::vector<Phoneme>>();
+          phrasePhonemes.push_back(currentPhrasePhonemes);
+        }
+      }
+    } else {
+      phrasePhonemes.push_back(
+          std::make_shared<std::vector<Phoneme>>(sentencePhonemes));
+    }
+
+    while (phraseResults.size() < phrasePhonemes.size()) {
+      phraseResults.emplace_back();
+    }
+
+    while (phraseSilenceSamples.size() < phrasePhonemes.size()) {
+      phraseSilenceSamples.push_back(0);
+    }
+
+    // phonemes -> ids -> audio
+    for (size_t phraseIdx = 0; phraseIdx < phrasePhonemes.size(); phraseIdx++) {
+      if (phrasePhonemes[phraseIdx]->size() <= 0) {
+        continue;
+      }
+
+      phonemes_to_ids(*(phrasePhonemes[phraseIdx]), idConfig, phonemeIds,
+                      missingPhonemes);
+      if (spdlog::should_log(spdlog::level::debug)) {
+        std::stringstream phonemeIdsStr;
+        for (auto phonemeId : phonemeIds) {
+          phonemeIdsStr << phonemeId << ", ";
+        }
+
+        spdlog::debug("Converted {} phoneme(s) to {} phoneme id(s): {}",
+                      phrasePhonemes[phraseIdx]->size(), phonemeIds.size(),
+                      phonemeIdsStr.str());
+      }
+
+      // ids -> audio (float32)
+      std::vector<int64_t> *prosodyPtr = nullptr;
+      std::vector<int64_t> prosodyFlat;
+
+      if (useProsody && sentenceIdx < allProsodyFeatures.size()) {
+        const auto &sentenceProsody = allProsodyFeatures[sentenceIdx];
+
+        size_t numPhonemeIds = phonemeIds.size();
+        prosodyFlat.resize(numPhonemeIds * 3, 0);
+
+        spdlog::debug("Prosody mapping: {} phonemeIds, {} prosody features, interspersePad={}",
+                      phonemeIds.size(), sentenceProsody.size(),
+                      voice.phonemizeConfig.interspersePad);
+
+        if (voice.phonemizeConfig.interspersePad) {
+          size_t prosodyIdx = 0;
+          for (size_t i = 1; i < numPhonemeIds && prosodyIdx < sentenceProsody.size(); i += 2) {
+            prosodyFlat[i * 3 + 0] = sentenceProsody[prosodyIdx].a1;
+            prosodyFlat[i * 3 + 1] = sentenceProsody[prosodyIdx].a2;
+            prosodyFlat[i * 3 + 2] = sentenceProsody[prosodyIdx].a3;
+            prosodyIdx++;
+          }
+        } else {
+          for (size_t i = 0; i < numPhonemeIds && i < sentenceProsody.size(); i++) {
+            prosodyFlat[i * 3 + 0] = sentenceProsody[i].a1;
+            prosodyFlat[i * 3 + 1] = sentenceProsody[i].a2;
+            prosodyFlat[i * 3 + 2] = sentenceProsody[i].a3;
+          }
+        }
+
+        prosodyPtr = &prosodyFlat;
+        spdlog::debug("Using prosody features: {} phoneme IDs, {} original prosody values",
+                      numPhonemeIds, sentenceProsody.size());
+      }
+
+      synthesizeFloat(phonemeIds, voice.synthesisConfig, voice.session, audioBuffer,
+                      phraseResults[phraseIdx], &voice, prosodyPtr);
+
+      // Add end of phrase silence (float 0.0)
+      for (std::size_t i = 0; i < phraseSilenceSamples[phraseIdx]; i++) {
+        audioBuffer.push_back(0.0f);
+      }
+
+      result.audioSeconds += phraseResults[phraseIdx].audioSeconds;
+      result.inferSeconds += phraseResults[phraseIdx].inferSeconds;
+
+      phonemeIds.clear();
+    }
+
+    // Add end of sentence silence (float 0.0)
+    if (sentenceSilenceSamples > 0) {
+      for (std::size_t i = 0; i < sentenceSilenceSamples; i++) {
+        audioBuffer.push_back(0.0f);
+      }
+    }
+
+    if (audioCallback) {
+      audioCallback();
+      audioBuffer.clear();
+    }
+
+    phonemeIds.clear();
+  }
+
+  if (missingPhonemes.size() > 0) {
+    spdlog::warn("Missing {} phoneme(s) from phoneme/id map!",
+                 missingPhonemes.size());
+
+    for (auto phonemeCount : missingPhonemes) {
+      std::string phonemeStr;
+      utf8::append(phonemeCount.first, std::back_inserter(phonemeStr));
+      spdlog::warn("Missing \"{}\" (\\u{:04X}): {} time(s)", phonemeStr,
+                   (uint32_t)phonemeCount.first, phonemeCount.second);
+    }
+  }
+
+  if (result.audioSeconds > 0) {
+    result.realTimeFactor = result.inferSeconds / result.audioSeconds;
+  }
+
+} /* textToAudioFloat */
+
 // Phonemize text and synthesize audio to WAV file
 void textToWavFile(PiperConfig &config, Voice &voice, std::string text,
                    std::ostream &audioFile, SynthesisResult &result,
@@ -1623,244 +1776,392 @@ static size_t calculateDynamicChunkSize(const std::string& text, size_t baseSize
   return baseSize * 2;  // Medium density
 }
 
-// Helper function for audio crossfade to reduce chunk boundary artifacts
-static void crossfadeAudioChunks(
-    const std::vector<int16_t>& prevChunk,
-    const std::vector<int16_t>& newChunk,
-    std::vector<int16_t>& output,
-    size_t overlapSamples = 220  // 10ms @ 22050Hz
-) {
-  if (prevChunk.empty() || newChunk.empty() || overlapSamples == 0) {
-    // No crossfade possible, just append
-    output.insert(output.end(), newChunk.begin(), newChunk.end());
-    return;
+// Split text into sentences at natural boundaries (public API)
+std::vector<std::string> splitTextToSentences(
+    const std::string &text,
+    PhonemeType phonemeType,
+    size_t maxChunkSize) {
+
+  if (text.empty()) {
+    return {};
   }
-  
-  // Ensure we don't exceed chunk boundaries
-  size_t actualOverlap = std::min({overlapSamples, prevChunk.size() / 4, newChunk.size() / 4});
-  if (actualOverlap < 44) {  // Less than 2ms - not worth crossfading
-    output.insert(output.end(), newChunk.begin(), newChunk.end());
-    return;
+
+  size_t baseSize = maxChunkSize > 0 ? maxChunkSize : 50;
+  size_t dynamicChunkSize = calculateDynamicChunkSize(text, baseSize);
+
+  static const std::regex japaneseSentenceBoundary(u8"([。！？、]+)");
+  static const std::regex englishSentenceBoundary("([.!?,;:]+|\\s+(?:and|or|but|because|while|when|if|that|which)\\s+)");
+
+  // Multilingual pattern: JA/ZH fullwidth + EN/ES/FR/PT ASCII sentence-end punctuation.
+  // Note: usesOpenJTalk() returns true for MultilingualPhonemes too, so we must
+  // check phonemeType directly to avoid falling into the JA-only branch.
+  static const std::regex multilingualSentenceEnd(
+      u8"([。！？.!?]+|[…]+|[\\.]{3,})"
+  );
+
+  const std::regex& sentenceBoundary =
+    (phonemeType == MultilingualPhonemes)
+    ? multilingualSentenceEnd
+    : (usesOpenJTalk(phonemeType))
+      ? japaneseSentenceBoundary
+      : englishSentenceBoundary;
+
+  std::vector<std::string> chunks;
+  std::sregex_token_iterator iter(text.begin(), text.end(), sentenceBoundary, {-1, 1});
+  std::sregex_token_iterator end;
+
+  std::string currentChunk;
+  for (; iter != end; ++iter) {
+    std::string token = *iter;
+    if (token.empty()) continue;
+
+    if (std::regex_match(token, sentenceBoundary)) {
+      currentChunk += token;
+      if (!currentChunk.empty() &&
+          (token.find_first_of(u8"。！？.!?") != std::string::npos ||
+           currentChunk.length() > dynamicChunkSize)) {
+        chunks.push_back(currentChunk);
+        currentChunk.clear();
+      }
+    } else {
+      currentChunk += token;
+    }
   }
-  
-  // Remove the overlap from the output (it was already added with prevChunk)
-  if (output.size() >= actualOverlap) {
-    output.resize(output.size() - actualOverlap);
+
+  if (!currentChunk.empty()) {
+    chunks.push_back(currentChunk);
   }
-  
-  // Perform crossfade
-  for (size_t i = 0; i < actualOverlap; ++i) {
-    float fadeOut = 1.0f - (static_cast<float>(i) / actualOverlap);
-    float fadeIn = static_cast<float>(i) / actualOverlap;
-    
-    size_t prevIdx = prevChunk.size() - actualOverlap + i;
-    int16_t mixed = static_cast<int16_t>(
-      prevChunk[prevIdx] * fadeOut + newChunk[i] * fadeIn
-    );
-    output.push_back(mixed);
-  }
-  
-  // Append the rest of the new chunk
-  output.insert(output.end(), newChunk.begin() + actualOverlap, newChunk.end());
+
+  return chunks;
 }
 
-// Streaming text-to-audio synthesis with reduced latency
+// Phonemize text into per-sentence phoneme sequences (public API).
+// Pure: does not modify voice.  Auto-detected language is returned
+// in result.detectedLanguageId.
+void phonemizeText(const Voice &voice, const std::string &text,
+                   PhonemizeResult &result,
+                   const std::vector<ProsodyFeature> *externalProsody) {
+
+  result.phonemes.clear();
+  result.prosody.clear();
+  result.detectedLanguageId = std::nullopt;
+
+  // Parse text for [[ phonemes ]] notation
+  auto textSegments = parsePhonemeNotation(text);
+
+  // Phonemes for each sentence
+  spdlog::debug("Phonemizing text: {}", text);
+
+  // Prosody features for each sentence (only used for OpenJTalk with prosody-enabled models)
+  bool useProsody = voice.session.hasProsodyInput &&
+                    usesOpenJTalk(voice.phonemizeConfig.phonemeType);
+
+  // Process each segment
+  for (const auto& segment : textSegments) {
+    if (segment.isPhonemes) {
+      // Direct phoneme input
+      spdlog::debug("Processing direct phoneme input: {}", segment.text);
+      auto parsedPhonemes = parsePhonemeString(segment.text, static_cast<int>(voice.phonemizeConfig.phonemeType));
+
+      // Add as a single "sentence"
+      result.phonemes.push_back(parsedPhonemes);
+
+      // Add empty prosody features for direct phoneme input
+      if (useProsody) {
+        std::vector<ProsodyFeature> emptyProsody(parsedPhonemes.size(), {0, 0, 0});
+        result.prosody.push_back(std::move(emptyProsody));
+      }
+    } else {
+      // Regular text - phonemize as usual
+      std::vector<std::vector<Phoneme>> segmentPhonemes;
+      std::vector<std::vector<ProsodyFeature>> segmentProsody;
+
+      if (voice.phonemizeConfig.phonemeType == OpenJTalkPhonemes) {
+        // Japanese OpenJTalk phonemizer
+        if (useProsody) {
+          phonemize_openjtalk_with_prosody(segment.text, segmentPhonemes, segmentProsody);
+        } else {
+          phonemize_openjtalk(segment.text, segmentPhonemes);
+        }
+
+        // If OpenJTalk failed, report error (eSpeak is no longer available)
+        if (segmentPhonemes.empty() && !segment.text.empty()) {
+          spdlog::error("OpenJTalk failed to process text; skipping segment");
+        }
+      } else if (voice.phonemizeConfig.phonemeType == MultilingualPhonemes) {
+        // Multilingual: segment text by language, phonemize each segment
+        // with the appropriate engine, strip BOS/EOS from JA segments.
+        std::vector<std::string> multiLangs;
+        if (voice.modelConfig.languageIdMap) {
+          for (const auto& [code, id] : *voice.modelConfig.languageIdMap) {
+            multiLangs.push_back(code);
+          }
+        } else {
+          multiLangs = {"ja", "en"};  // Default bilingual
+        }
+
+        // Determine default Latin language.
+        // If the user set --language, reverse-lookup the code and prefer it
+        // when it is a Latin-script language.
+        std::string defaultLatin = "en";
+        static const std::set<std::string> latinLangs = {"en", "es", "fr", "pt", "sv"};
+        bool defaultLatinSet = false;
+        if (voice.synthesisConfig.languageId && voice.modelConfig.languageIdMap) {
+          for (const auto& [code, id] : *voice.modelConfig.languageIdMap) {
+            if (id == *voice.synthesisConfig.languageId && latinLangs.count(code)) {
+              defaultLatin = code;
+              defaultLatinSet = true;
+              break;
+            }
+          }
+        }
+        // Fallback: pick the first available Latin language by priority
+        if (!defaultLatinSet) {
+          for (const auto& lang : {"en", "es", "fr", "pt", "sv"}) {
+            if (std::find(multiLangs.begin(), multiLangs.end(), lang) != multiLangs.end()) {
+              defaultLatin = lang;
+              break;
+            }
+          }
+        }
+
+        UnicodeLanguageDetector detector(multiLangs, defaultLatin);
+        auto langSegments = detector.segmentText(segment.text);
+
+        // BOS/EOS codepoints to strip from JA segments
+        std::set<Phoneme> bosEosTokens = {
+          0x5E,    // ^ (BOS)
+          0x24,    // $ (EOS)
+          0x3F,    // ? (question EOS)
+          0xE016,  // ?! (emphatic question)
+          0xE017,  // ?. (neutral question)
+          0xE018   // ?~ (tag question)
+        };
+
+        // Track last EOS for dynamic EOS selection
+        Phoneme lastEos = 0x24;  // Default: $
+
+        std::vector<Phoneme> allPhonemes;
+        std::vector<ProsodyFeature> allProsody;
+
+        for (const auto& langSeg : langSegments) {
+          std::vector<std::vector<Phoneme>> langPhonemes;
+          std::vector<std::vector<ProsodyFeature>> langProsody;
+
+          if (langSeg.lang == "ja") {
+            // Japanese: use OpenJTalk
+            if (voice.session.hasProsodyInput) {
+              phonemize_openjtalk_with_prosody(langSeg.text, langPhonemes, langProsody);
+            } else {
+              phonemize_openjtalk(langSeg.text, langPhonemes);
+            }
+
+            // Strip BOS/EOS from JA phonemes
+            for (size_t s = 0; s < langPhonemes.size(); s++) {
+              for (auto ph : langPhonemes[s]) {
+                if (bosEosTokens.count(ph)) {
+                  if (ph != 0x5E) {  // Not BOS
+                    lastEos = ph;    // Track EOS
+                  }
+                  continue;  // Skip BOS/EOS
+                }
+                allPhonemes.push_back(ph);
+                if (voice.session.hasProsodyInput && s < langProsody.size()) {
+                  // Find matching prosody index (approximate)
+                  // JA phonemizer produces 1:1 phoneme:prosody
+                }
+              }
+              // Add prosody for JA phonemes (after stripping)
+              if (voice.session.hasProsodyInput && s < langProsody.size()) {
+                // We need to rebuild prosody without BOS/EOS entries
+                for (size_t pi = 0; pi < langPhonemes[s].size(); pi++) {
+                  if (!bosEosTokens.count(langPhonemes[s][pi])) {
+                    if (pi < langProsody[s].size()) {
+                      allProsody.push_back(langProsody[s][pi]);
+                    } else {
+                      allProsody.push_back({0, 0, 0});
+                    }
+                  }
+                }
+              }
+            }
+          } else if (langSeg.lang == "es") {
+            // Spanish: native rule-based phonemizer
+            phonemize_spanish(langSeg.text, langPhonemes);
+          } else if (langSeg.lang == "fr") {
+            // French: native rule-based phonemizer
+            phonemize_french(langSeg.text, langPhonemes);
+          } else if (langSeg.lang == "pt") {
+            // Portuguese: native rule-based phonemizer
+            phonemize_portuguese(langSeg.text, langPhonemes);
+          } else if (langSeg.lang == "en") {
+            // English: CMU dictionary-based G2P
+            static bool warnedNoCmuDict = false;
+            if (voice.cmuDict.empty() && !warnedNoCmuDict) {
+              spdlog::warn("English CMU dictionary not loaded; English text may not be phonemized correctly");
+              warnedNoCmuDict = true;
+            }
+            phonemize_english(langSeg.text, langPhonemes, voice.cmuDict);
+            // Check if CMU dict produced any phonemes
+            bool hasAnyPhonemes = false;
+            for (const auto& s : langPhonemes) {
+              if (!s.empty()) { hasAnyPhonemes = true; break; }
+            }
+            if (!hasAnyPhonemes) {
+              spdlog::debug("English segment '{}' has no CMU dict matches; skipping", langSeg.text);
+            }
+          } else if (langSeg.lang == "zh") {
+            // Chinese: pypinyin-based G2P
+            static bool warnedNoPinyinDict = false;
+            if (voice.pinyinSingleDict.empty() && !warnedNoPinyinDict) {
+              spdlog::warn("Chinese pinyin dictionary not loaded; Chinese text may not be phonemized correctly");
+              warnedNoPinyinDict = true;
+            }
+            phonemize_chinese(langSeg.text, langPhonemes,
+                              voice.pinyinSingleDict, voice.pinyinPhraseDict);
+          } else if (langSeg.lang == "ko") {
+            // Korean: Hangul decomposition (no external data needed)
+            phonemize_korean(langSeg.text, langPhonemes);
+          } else if (langSeg.lang == "sv") {
+            // Swedish: native rule-based phonemizer
+            phonemize_swedish(langSeg.text, langPhonemes);
+          } else {
+            spdlog::warn("No native phonemizer for language '{}'; skipping segment", langSeg.lang);
+          }
+
+          // Add phonemes from non-JA segment with language-specific prosody
+          if (langSeg.lang != "ja") {
+            for (const auto& sentence : langPhonemes) {
+              if (voice.session.hasProsodyInput) {
+                auto sentenceProsody = computeNonJaProsody(sentence, langSeg.lang);
+                for (size_t pi = 0; pi < sentence.size(); pi++) {
+                  allPhonemes.push_back(sentence[pi]);
+                  allProsody.push_back(sentenceProsody[pi]);
+                }
+              } else {
+                for (auto ph : sentence) {
+                  allPhonemes.push_back(ph);
+                }
+              }
+            }
+          }
+        }
+
+        // Detect dominant language and store in result (no side effect on voice).
+        if (!langSegments.empty()) {
+          auto dominantLang = detectDominantLanguage(segment.text, detector);
+          if (voice.modelConfig.languageIdMap &&
+              voice.modelConfig.languageIdMap->count(dominantLang) > 0) {
+            result.detectedLanguageId =
+                voice.modelConfig.languageIdMap->at(dominantLang);
+            spdlog::debug("Multilingual: auto-detected dominant language '{}' (lid={})",
+                          dominantLang, result.detectedLanguageId.value());
+          }
+        }
+
+        // Add as a single sentence
+        if (!allPhonemes.empty()) {
+          segmentPhonemes.push_back(std::move(allPhonemes));
+          if (voice.session.hasProsodyInput) {
+            segmentProsody.push_back(std::move(allProsody));
+          }
+        }
+      }
+
+      // Add all sentences from this segment
+      for (size_t i = 0; i < segmentPhonemes.size(); i++) {
+        result.phonemes.push_back(std::move(segmentPhonemes[i]));
+
+        if (useProsody) {
+          if (i < segmentProsody.size()) {
+            result.prosody.push_back(std::move(segmentProsody[i]));
+          } else {
+            // Fallback: create zero prosody features
+            std::vector<ProsodyFeature> zeroProsody(result.phonemes.back().size(), {0, 0, 0});
+            result.prosody.push_back(std::move(zeroProsody));
+          }
+        }
+      }
+    }
+  }
+
+  // Override prosody features with external data if provided
+  if (externalProsody && !externalProsody->empty() && useProsody) {
+    result.prosody.clear();
+    result.prosody.push_back(*externalProsody);
+    spdlog::debug("Using {} external prosody features", externalProsody->size());
+  }
+
+} /* phonemizeText */
+
+// Streaming text-to-audio synthesis with reduced latency.
+// Splits text into sentences via splitTextToSentences(), synthesizes each
+// sentence through textToAudio(), and delivers per-sentence audio via
+// chunkCallback.  This eliminates the duplicated phonemization logic that
+// previously existed here (including the dead MultilingualPhonemes branch).
 void textToAudioStreaming(PiperConfig &config, Voice &voice, std::string text,
                           std::vector<int16_t> &audioBuffer, SynthesisResult &result,
                           const std::function<void(const std::vector<int16_t>&)> &chunkCallback,
                           size_t chunkSize) {
   spdlog::debug("textToAudioStreaming: text='{}', chunkSize={}", text, chunkSize);
-  
+
   // Clear result
   result.inferSeconds = 0;
   result.audioSeconds = 0;
   result.realTimeFactor = 0;
-  
+
   // Clear output buffer
   audioBuffer.clear();
-  
+
   if (text.empty()) {
     return;
   }
-  
-  // Calculate dynamic chunk size based on text characteristics
-  size_t dynamicChunkSize = calculateDynamicChunkSize(text, chunkSize > 0 ? chunkSize : 50);
-  
-  // Static regex patterns for better performance (cached compilation)
-  static const std::regex japaneseSentenceBoundary(u8"([。！？、]+)");
-  static const std::regex englishSentenceBoundary("([.!?,;:]+|\\s+(?:and|or|but|because|while|when|if|that|which)\\s+)");
-  
-  // Select appropriate regex based on language
-  const std::regex& sentenceBoundary =
-    (usesOpenJTalk(voice.phonemizeConfig.phonemeType))
-    ? japaneseSentenceBoundary
-    : englishSentenceBoundary;
-  
-  // Split text into chunks at natural boundaries
-  std::vector<std::string> chunks;
-  std::sregex_token_iterator iter(text.begin(), text.end(), sentenceBoundary, {-1, 1});
-  std::sregex_token_iterator end;
-  
-  std::string currentChunk;
-  for (; iter != end; ++iter) {
-    std::string token = *iter;
-    if (token.empty()) continue;
-    
-    // Check if this is a delimiter
-    if (std::regex_match(token, sentenceBoundary)) {
-      // Add delimiter to current chunk
-      currentChunk += token;
-      if (!currentChunk.empty() && 
-          (token.find_first_of(u8"。！？.!?") != std::string::npos ||
-           currentChunk.length() > dynamicChunkSize)) {
-        // End of sentence or chunk is getting long
-        chunks.push_back(currentChunk);
-        currentChunk.clear();
-      }
-    } else {
-      // Regular text
-      currentChunk += token;
+
+  // Split text into sentences using the shared helper (M2-1 / M5-2)
+  auto sentences = splitTextToSentences(text,
+                                        voice.phonemizeConfig.phonemeType,
+                                        chunkSize > 0 ? chunkSize : 0);
+
+  spdlog::debug("Split text into {} sentence(s)", sentences.size());
+
+  // Synthesize each sentence through the unified textToAudio() path.
+  // textToAudio handles all phoneme types (OpenJTalk, MultilingualPhonemes)
+  // correctly, including prosody, language detection, and phoneme silence.
+  for (size_t i = 0; i < sentences.size(); ++i) {
+    const auto &sentence = sentences[i];
+    spdlog::debug("Streaming sentence {}/{}: '{}'", i + 1, sentences.size(), sentence);
+
+    std::vector<int16_t> sentenceAudio;
+    SynthesisResult sentenceResult;
+
+    // Synthesize via textToAudio with no audioCallback so that the full
+    // sentence audio (including sentence silence) is accumulated in
+    // sentenceAudio.
+    textToAudio(config, voice, sentence, sentenceAudio, sentenceResult,
+                nullptr /* audioCallback */);
+
+    // Accumulate into the full output buffer
+    audioBuffer.insert(audioBuffer.end(),
+                       sentenceAudio.begin(), sentenceAudio.end());
+
+    // Update cumulative timing
+    result.inferSeconds += sentenceResult.inferSeconds;
+    result.audioSeconds += sentenceResult.audioSeconds;
+
+    // Deliver sentence audio via callback
+    if (chunkCallback && !sentenceAudio.empty()) {
+      chunkCallback(sentenceAudio);
     }
   }
-  
-  // Add any remaining text
-  if (!currentChunk.empty()) {
-    chunks.push_back(currentChunk);
-  }
-  
-  spdlog::debug("Split text into {} chunks with dynamic chunk size: {}", chunks.size(), dynamicChunkSize);
-  
-  // Track previous chunk for crossfading
-  std::vector<int16_t> previousChunkAudio;
-  
-  // Process each chunk
-  for (size_t i = 0; i < chunks.size(); ++i) {
-    const auto& chunk = chunks[i];
-    spdlog::debug("Processing chunk {}/{}: '{}'", i+1, chunks.size(), chunk);
-    
-    // Phonemize chunk
-    std::vector<std::vector<Phoneme>> chunkSentences;
-    std::vector<std::vector<ProsodyFeature>> chunkProsody;
 
-    // Check if model supports prosody input
-    bool useProsody = voice.session.hasProsodyInput &&
-                      usesOpenJTalk(voice.phonemizeConfig.phonemeType);
-
-    if (usesOpenJTalk(voice.phonemizeConfig.phonemeType)) {
-      // Japanese/Multilingual OpenJTalk phonemizer
-      if (useProsody) {
-        phonemize_openjtalk_with_prosody(chunk, chunkSentences, chunkProsody);
-      } else {
-        phonemize_openjtalk(chunk, chunkSentences);
-      }
-    } else if (voice.phonemizeConfig.phonemeType == MultilingualPhonemes) {
-      // TODO: Implement proper multilingual streaming dispatch
-      // For now, fall back to OpenJTalk for multilingual streaming
-      spdlog::warn("Multilingual streaming not yet implemented; falling back to OpenJTalk for chunk");
-      phonemize_openjtalk(chunk, chunkSentences);
-    }
-
-    // Process each sentence in the chunk
-    for (size_t sentIdx = 0; sentIdx < chunkSentences.size(); sentIdx++) {
-      auto& sentencePhonemes = chunkSentences[sentIdx];
-      if (sentencePhonemes.empty()) {
-        continue;
-      }
-
-      // Convert phonemes to IDs
-      std::vector<PhonemeId> phonemeIds;
-      std::map<Phoneme, std::size_t> missingPhonemes;
-      // Create PhonemeIdConfig from voice config
-      PhonemeIdConfig idConfig;
-      idConfig.phonemeIdMap =
-          std::make_shared<PhonemeIdMap>(voice.phonemizeConfig.phonemeIdMap);
-      idConfig.interspersePad = voice.phonemizeConfig.interspersePad;
-      // OpenJTalk: BOS/EOS are already in the phoneme list from phonemizer
-      if (usesOpenJTalk(voice.phonemizeConfig.phonemeType)) {
-        idConfig.addBos = false;
-        idConfig.addEos = false;
-      } else {
-        idConfig.addBos = true;
-        idConfig.addEos = true;
-      }
-
-      phonemes_to_ids(sentencePhonemes, idConfig, phonemeIds,
-                      missingPhonemes);
-
-      // Report missing phonemes
-      if (!missingPhonemes.empty()) {
-        for (auto& [phoneme, count] : missingPhonemes) {
-          spdlog::warn("Missing phoneme: '{}' (count={})",
-                       phonemeToString(phoneme), count);
-        }
-      }
-
-      // Prepare prosody features if available
-      std::vector<int64_t> *prosodyPtr = nullptr;
-      std::vector<int64_t> prosodyFlat;
-
-      if (useProsody && sentIdx < chunkProsody.size()) {
-        const auto &sentenceProsody = chunkProsody[sentIdx];
-        size_t numPhonemeIds = phonemeIds.size();
-        prosodyFlat.resize(numPhonemeIds * 3, 0);
-
-        if (voice.phonemizeConfig.interspersePad) {
-          size_t prosodyIdx = 0;
-          for (size_t i = 1; i < numPhonemeIds && prosodyIdx < sentenceProsody.size(); i += 2) {
-            prosodyFlat[i * 3 + 0] = sentenceProsody[prosodyIdx].a1;
-            prosodyFlat[i * 3 + 1] = sentenceProsody[prosodyIdx].a2;
-            prosodyFlat[i * 3 + 2] = sentenceProsody[prosodyIdx].a3;
-            prosodyIdx++;
-          }
-        } else {
-          for (size_t i = 0; i < numPhonemeIds && i < sentenceProsody.size(); i++) {
-            prosodyFlat[i * 3 + 0] = sentenceProsody[i].a1;
-            prosodyFlat[i * 3 + 1] = sentenceProsody[i].a2;
-            prosodyFlat[i * 3 + 2] = sentenceProsody[i].a3;
-          }
-        }
-        prosodyPtr = &prosodyFlat;
-      }
-
-      // Synthesize audio for this chunk
-      std::vector<int16_t> chunkAudioBuffer;
-      SynthesisResult chunkResult;
-      synthesize(phonemeIds, voice.synthesisConfig, voice.session,
-                 chunkAudioBuffer, chunkResult, &voice, prosodyPtr);
-      
-      // Update cumulative result
-      result.inferSeconds += chunkResult.inferSeconds;
-      result.audioSeconds += chunkResult.audioSeconds;
-      
-      // Apply crossfade if we have a previous chunk
-      if (!previousChunkAudio.empty() && !chunkAudioBuffer.empty()) {
-        // Crossfade with previous chunk to reduce boundary artifacts
-        crossfadeAudioChunks(previousChunkAudio, chunkAudioBuffer, audioBuffer);
-      } else {
-        // No previous chunk or empty current chunk - just append
-        audioBuffer.insert(audioBuffer.end(), 
-                           chunkAudioBuffer.begin(), 
-                           chunkAudioBuffer.end());
-      }
-      
-      // Store current chunk for next iteration's crossfade
-      previousChunkAudio = chunkAudioBuffer;
-      
-      // Call chunk callback for all chunks (including empty ones for progress tracking)
-      if (chunkCallback) {
-        chunkCallback(chunkAudioBuffer);
-      }
-    }
-  }
-  
   // Calculate final real-time factor
   if (result.audioSeconds > 0) {
     result.realTimeFactor = result.inferSeconds / result.audioSeconds;
   }
-  
-  spdlog::debug("Streaming synthesis complete: {} chunks, {:.2f}s audio, RTF={:.2f}",
-                chunks.size(), result.audioSeconds, result.realTimeFactor);
-  
+
+  spdlog::debug("Streaming synthesis complete: {} sentence(s), {:.2f}s audio, RTF={:.2f}",
+                sentences.size(), result.audioSeconds, result.realTimeFactor);
+
 } /* textToAudioStreaming */
 
 // Streaming phonemes-to-audio synthesis with reduced latency

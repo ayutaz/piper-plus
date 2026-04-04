@@ -1,0 +1,13 @@
+name: piper_plus_example
+description: Dart FFI example for piper-plus C API (TTS synthesis)
+version: 0.1.0
+
+environment:
+  sdk: ">=3.1.0 <4.0.0"
+
+dependencies:
+  ffi: ^2.1.0
+
+dev_dependencies:
+  ffigen: ^9.0.0
+  lints: ^3.0.0
