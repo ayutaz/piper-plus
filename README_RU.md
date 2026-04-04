@@ -33,7 +33,7 @@
 
 ### Синтез речи
 
-- **8 языков** — японский, английский, китайский, корейский, испанский, французский, португальский, шведский (ja=0, en=1, zh=2, ko=3, es=4, fr=5, pt=6, sv=7)
+- **8 языков** — японский, английский, китайский, испанский, французский, португальский, шведский, корейский (ja=0, en=1, zh=2, es=3, fr=4, pt=5, sv=6, ko=7) *Обученная модель покрывает 6 языков (JA/EN/ZH/ES/FR/PT)*
 - **Японский TTS** — интеграция с OpenJTalk, просодическая информация (A1/A2/A3), маркеры вопросительных слов (#204), контекстно-зависимые варианты «ん» (#207)
 - **Английский TTS** — GPL-free G2P ([g2p-en](https://github.com/Kyubyong/g2p), Apache-2.0), espeak-ng не требуется
 - **Мультиспикер** — поддержка до 571 диктора (базовая модель для обучения), SpeakerBalancedBatchSampler, сбалансированная выборка по языковым группам
@@ -53,6 +53,7 @@
 
 - **[WebUI (Gradio)](docs/features/webui.md)** — вывод и обучение, поддержка Docker
 - **C++ CLI** — потоковый вывод, CUDA-инференс, вывод тайминга фонем, пользовательский словарь
+- **[C API Разделяемая библиотека](examples/c-api/README.md)** — `libpiper_plus.so/.dylib/.dll`, поддержка FFI (Flutter/Godot/Swift и др.), потоковый API
 - **[WebAssembly](src/wasm/openjtalk-web/README.npm.md)** — полная работа в браузере, сервер не требуется
 - **[Docker](docker/README.md)** — 5 образов: вывод, обучение, WebUI, C++
 - **PyPI** — простая установка через `pip install piper-plus`
@@ -67,6 +68,7 @@
 | Linux | x86_64 / ARM64 / ARMv7 | Полная поддержка |
 | macOS | ARM64 (Apple Silicon) | M1/M2/M3+ |
 | Windows | x64 | Полная поддержка |
+| C API (FFI) | Linux x64/ARM64, macOS ARM64, Windows x64 | Разделяемая библиотека, Android AAR |
 | Web | WebAssembly | Chrome/Edge/Firefox/Safari |
 | C# (.NET) | x64 / ARM64 | .NET 8/9, Linux/macOS/Windows |
 | Rust | x64 | Linux x64, macOS ARM64, Windows x64 |
@@ -285,7 +287,7 @@ cmake --build . --config Release
 
 Требования: компилятор с поддержкой C++17, CMake 3.15+
 
-- **Linux**: перед сборкой разместите [piper-phonemize](https://github.com/rhasspy/piper-phonemize) в `lib/Linux-$(uname -m)/piper_phonemize`
+- **Linux**: зависимости (ONNX Runtime, OpenJTalk и др.) скачиваются автоматически через CMake
 - **Windows**: см. [руководство по настройке для Windows](docs/getting-started/windows-setup.md)
 - **macOS**: зависимости скачиваются автоматически
 
@@ -698,12 +700,13 @@ piper.exe --model en_US-lessac-medium.onnx -f output.wav
 
 ---
 
-### piper-g2p (Автономный пакет G2P)
+### piper-plus-g2p (Автономный пакет G2P)
 
 Мультиязычный G2P (Grapheme-to-Phoneme) доступен как автономные пакеты:
 
 - **Python**: `pip install piper-plus-g2p` — [Исходный код](src/python/g2p/)
 - **Rust**: `cargo add piper-plus-g2p` — [Исходный код](src/rust/piper-plus-g2p/)
+- **Go**: `go get github.com/ayutaz/piper-plus/src/go/phonemize` — [Исходный код](src/go/phonemize/)
 - **JavaScript/WASM**: `npm install @piper-plus/g2p` — [Исходный код](src/wasm/g2p/)
 
 ---
@@ -718,11 +721,11 @@ piper.exe --model en_US-lessac-medium.onnx -f output.wav
 - Windows / macOS (Apple Silicon) / Linux / Android
 - Японский и английский языки, асинхронный API, потоковый вывод
 
-### Голосовые модели (Voices)
+### Voices
 
-Также доступны голосовые модели оригинального Piper (30+ языков): [piper-voices](https://huggingface.co/rhasspy/piper-voices/tree/v1.0.0)
+Модели piper-plus: [piper-plus-base](https://huggingface.co/ayousanz/piper-plus-base) (6-языковая базовая) · [Tsukuyomi-chan](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan)
 
-Для каждого голоса требуются модель `.onnx` и конфигурационный файл `.onnx.json`. [Примеры голосов](https://rhasspy.github.io/piper-samples) | [Видеоуроки](https://youtu.be/rjq5eZoWWSo)
+> **Примечание:** piper-plus использует собственную систему G2P и фонем, поэтому модели оригинального Piper (rhasspy/piper-voices) НЕ совместимы.
 
 ### Статьи
 

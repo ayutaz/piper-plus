@@ -33,7 +33,7 @@
 
 ### 음성 합성
 
-- **8개 언어 지원** — 일본어, 영어, 중국어, 한국어, 스페인어, 프랑스어, 포르투갈어, 스웨덴어 (ja=0, en=1, zh=2, ko=3, es=4, fr=5, pt=6, sv=7)
+- **8개 언어 지원** — 일본어, 영어, 중국어, 스페인어, 프랑스어, 포르투갈어, 스웨덴어, 한국어 (ja=0, en=1, zh=2, es=3, fr=4, pt=5, sv=6, ko=7) *학습된 모델은 6개 언어 (JA/EN/ZH/ES/FR/PT) 를 지원합니다*
 - **일본어 TTS** — OpenJTalk 통합, 운율 정보 (A1/A2/A3), 의문사 마커 (#204), 문맥 의존 'ん' 변이형 (#207)
 - **영어 TTS** — GPL-free G2P ([g2p-en](https://github.com/Kyubyong/g2p), Apache-2.0), espeak-ng 불필요
 - **다중 화자** — 571 화자 지원 (학습용 기본 모델), SpeakerBalancedBatchSampler, 언어 그룹 균등 샘플링
@@ -53,6 +53,7 @@
 
 - **[WebUI (Gradio)](docs/features/webui.md)** — 추론 및 학습 지원, Docker 지원
 - **C++ CLI** — 스트리밍, CUDA 추론, 음소 타이밍 출력, 커스텀 사전
+- **[C API 공유 라이브러리](examples/c-api/README.md)** — `libpiper_plus.so/.dylib/.dll`, FFI 호환 (Flutter/Godot/Swift 등), 스트리밍 API
 - **[WebAssembly](src/wasm/openjtalk-web/README.npm.md)** — 브라우저 내에서 완전 동작, 서버 불필요
 - **[Docker](docker/README.md)** — 추론, 학습, WebUI, C++ 등 5개 이미지 제공
 - **PyPI** — `pip install piper-plus`로 간편 설치
@@ -67,6 +68,7 @@
 | Linux | x86_64 / ARM64 / ARMv7 | 전체 지원 |
 | macOS | ARM64 (Apple Silicon) 전용 | M1/M2/M3+ |
 | Windows | x64 | 전체 지원 |
+| C API (FFI) | Linux x64/ARM64, macOS ARM64, Windows x64 | 공유 라이브러리, Android AAR |
 | Web | WebAssembly | Chrome/Edge/Firefox/Safari |
 | C# (.NET) | x64 / ARM64 | .NET 8/9, Linux/macOS/Windows |
 | Rust | Linux x64, macOS ARM64, Windows x64 | CUDA/CoreML/DirectML |
@@ -285,7 +287,7 @@ cmake --build . --config Release
 
 필수 요건: C++17 호환 컴파일러, CMake 3.15+
 
-- **Linux**: 빌드 전에 [piper-phonemize](https://github.com/rhasspy/piper-phonemize)를 `lib/Linux-$(uname -m)/piper_phonemize`에 배치
+- **Linux**: 의존성 (ONNX Runtime, OpenJTalk 등)은 CMake에 의해 자동 다운로드됩니다
 - **Windows**: [Windows 설정 가이드](docs/getting-started/windows-setup.md) 참조
 - **macOS**: 의존성은 자동 다운로드
 
@@ -710,9 +712,9 @@ Piper를 Unity에서 사용하기 위한 플러그인: [github.com/ayutaz/uPiper
 
 ### 음성 모델 (Voices)
 
-upstream Piper의 음성 모델 (30개 이상 언어)도 사용 가능: [piper-voices](https://huggingface.co/rhasspy/piper-voices/tree/v1.0.0)
+piper-plus 모델: [piper-plus-base](https://huggingface.co/ayousanz/piper-plus-base) (6개 언어 기본 모델) · [Tsukuyomi-chan](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan)
 
-각 음성에는 `.onnx` 모델과 `.onnx.json` 설정 파일이 필요합니다. [음성 샘플](https://rhasspy.github.io/piper-samples) | [비디오 튜토리얼](https://youtu.be/rjq5eZoWWSo)
+> **Note:** piper-plus는 자체 G2P 및 음소 시스템을 사용하므로 upstream Piper 모델 (rhasspy/piper-voices)은 호환되지 않습니다.
 
 ### 관련 글
 
@@ -720,12 +722,13 @@ upstream Piper의 음성 모델 (30개 이상 언어)도 사용 가능: [piper-v
 - [jvs音声データセットを使ったpiper日本語モデルの作成](https://ayousanz.hatenadiary.jp/entry/2025/06/05/093217)
 - [piperモデルからつくよみちゃんデータセットを使って追加学習を行う](https://ayousanz.hatenadiary.jp/entry/2025/06/07/074232)
 
-### piper-g2p (독립 G2P 패키지)
+### piper-plus-g2p (독립 G2P 패키지)
 
 다국어 G2P (Grapheme-to-Phoneme) 를 독립 패키지로 제공:
 
 - **Python**: `pip install piper-plus-g2p` — [소스 코드](src/python/g2p/)
 - **Rust**: `cargo add piper-plus-g2p` — [소스 코드](src/rust/piper-plus-g2p/)
+- **Go**: `go get github.com/ayutaz/piper-plus/src/go/phonemize` — [소스 코드](src/go/phonemize/)
 - **JavaScript/WASM**: `npm install @piper-plus/g2p` — [소스 코드](src/wasm/g2p/)
 
 ### People using Piper

@@ -57,9 +57,16 @@ WavLM が有効な場合、GPUメモリが約1-2GB増加するため、`--batch-
 
 ### WavLM を無効化する場合
 
-WavLM の損失重みをゼロにする場合は `--c-wavlm 0` を指定します。
+WavLM を完全に無効化するには `--no-wavlm` を指定します。モデルの読み込み自体がスキップされるため、GPU メモリが約1-2GB 節約されます。
 
-> **注意**: `--c-wavlm 0` は損失重みをゼロにするだけで、WavLM モデル自体は GPU メモリに読み込まれます（約1-2GB）。完全に無効化する CLI フラグは現在提供されていません。メモリ節約が目的の場合は、`--batch-size` の調整で対処してください。
+```bash
+uv run python -m piper_train \
+  --dataset-dir /path/to/dataset \
+  --no-wavlm \
+  ...
+```
+
+損失重みのみをゼロにする場合は `--c-wavlm 0` を指定しますが、この場合 WavLM モデル自体は GPU メモリに読み込まれたままです。メモリ節約が目的の場合は `--no-wavlm` を使用してください。
 
 ```bash
 uv run python -m piper_train \
@@ -76,7 +83,7 @@ uv run python -m piper_train \
 |----|------|
 | `0.5` (デフォルト) | 標準的な学習 |
 | `0.2` | 音割れ(クリッピング)が発生する場合の緩和策 |
-| `0` | WavLM を完全に無効化 |
+| `0` | WavLM 損失を無効化（メモリ節約には `--no-wavlm` 推奨） |
 
 c_wavlm を下げて再学習する例:
 
@@ -98,36 +105,25 @@ uv run python -m piper_train \
 
 ## ONNX変換
 
-WavLM で学習したモデルを ONNX に変換する場合、`--stochastic` フラグの使用を**推奨**します。このフラグにより、`noise_scale` によるサンプリングがエクスポートされたグラフ内で有効化され、推論時の音声バリエーション制御が可能になります。
+デフォルトのエクスポートで stochastic モード（`noise_scale` によるサンプリング有効）+ EMA 重み適用が有効です。WavLM で学習したモデルはそのまま変換できます。
 
-EMA 重みはデフォルトで適用されるため、明示的に指定する必要はありません。
+EMA 重みはチェックポイントに存在すれば自動適用されるため、明示的に指定する必要はありません。
 
 ### WavLM モデルの変換
 
 ```bash
+# デフォルト: stochastic + EMA（推奨）
 CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
-  --stochastic \
   /path/to/checkpoint.ckpt \
   /path/to/output.onnx
 ```
 
-### エクスポートオプションの組み合わせ
-
-`--stochastic` と `--no-ema` は独立したオプションで、排他的ではありません。
-
-- `--stochastic`: `noise_scale` によるサンプリングを ONNX グラフ内で有効化
-- `--no-ema`: EMA 重みの適用を無効化（デフォルトでは EMA が適用される）
+deterministic エクスポート（デバッグ用）が必要な場合は `--no-stochastic` を使用します:
 
 ```bash
-# WavLM モデル推奨: stochastic + EMA（デフォルト）
+# deterministic（デバッグ用）
 CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
-  --stochastic \
-  /path/to/checkpoint.ckpt \
-  /path/to/output.onnx
-
-# ベースラインモデル: deterministic + EMAなし
-CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
-  --no-ema \
+  --no-stochastic \
   /path/to/checkpoint.ckpt \
   /path/to/output.onnx
 ```
@@ -136,9 +132,9 @@ CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
 
 | オプション | デフォルト | 説明 |
 |-----------|----------|------|
-| `--stochastic` | off | noise_scale によるサンプリングを有効化（WavLM モデルで推奨） |
-| `--use-ema` | on | チェックポイントの EMA 重みをデコーダに適用 |
-| `--no-ema` | - | EMA 重み適用を無効化 |
+| `--no-stochastic` | - | noise_scale サンプリングを無効化（デバッグ用） |
+| `--no-fp16` | - | FP16 変換を無効化（デフォルト: FP16 有効、モデルサイズ~50%削減） |
+| EMA | (EMA state があれば適用) | チェックポイントに EMA state があれば自動適用 |
 
 変換時は `CUDA_VISIBLE_DEVICES=""` を指定して CPU モードで実行することを推奨します。
 
@@ -253,7 +249,7 @@ uv run python -m piper_train \
   ...
 ```
 
-> **注意**: `--c-wavlm 0` は損失重みをゼロにするだけで、WavLM モデル自体は GPU メモリに残ります（約1-2GB）。完全にモデルの読み込みを無効化する CLI フラグは現在提供されていないため、メモリ削減効果は限定的です。
+> **注意**: `--c-wavlm 0` は損失重みをゼロにするだけで、WavLM モデル自体は GPU メモリに残ります（約1-2GB）。完全にモデルの読み込みを無効化するには `--no-wavlm` を使用してください。
 
 **GPU メモリの目安:**
 

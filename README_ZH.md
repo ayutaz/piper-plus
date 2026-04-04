@@ -33,7 +33,7 @@
 
 ### 语音合成
 
-- **8语言支持** — 日语、英语、普通话、韩语、西班牙语、法语、葡萄牙语、瑞典语 (ja=0, en=1, zh=2, ko=3, es=4, fr=5, pt=6, sv=7)
+- **8语言支持** — 日语、英语、普通话、西班牙语、法语、葡萄牙语、瑞典语、韩语 (ja=0, en=1, zh=2, es=3, fr=4, pt=5, sv=6, ko=7) *训练模型覆盖6种语言 (JA/EN/ZH/ES/FR/PT)*
 - **日语 TTS** — OpenJTalk 集成、韵律特征 (A1/A2/A3)、疑问标记 (#204)、上下文相关「ん」变体 (#207)
 - **英语 TTS** — 无 GPL 依赖的 G2P ([g2p-en](https://github.com/Kyubyong/g2p), Apache-2.0)，无需 espeak-ng
 - **多说话人** — 571说话人的6语言基础模型，SpeakerBalancedBatchSampler，语言均衡采样自动启用
@@ -53,6 +53,7 @@
 
 - **[WebUI (Gradio)](docs/features/webui.md)** — 推理和训练，支持 Docker
 - **C++ CLI** — 流式处理、CUDA 推理、音素时间输出、自定义词典
+- **[C API 共享库](examples/c-api/README.md)** — `libpiper_plus.so/.dylib/.dll`，FFI 兼容 (Flutter/Godot/Swift 等)，流式 API
 - **[WebAssembly](src/wasm/openjtalk-web/README.npm.md)** — 完全在浏览器中运行，无需服务器
 - **[Docker](docker/README.md)** — 提供推理、训练、WebUI、C++ 共 5 个镜像
 - **PyPI** — `pip install piper-plus`
@@ -67,6 +68,7 @@
 | Linux | x86_64 / ARM64 / ARMv7 | 完整支持 |
 | macOS | ARM64 (Apple Silicon) 仅限 | M1/M2/M3+ |
 | Windows | x64 | 完整支持 |
+| C API (FFI) | Linux x64/ARM64, macOS ARM64, Windows x64 | 共享库, Android AAR |
 | Web | WebAssembly | Chrome/Edge/Firefox/Safari |
 | C# (.NET) | x64 / ARM64 | .NET 8/9，Linux/macOS/Windows |
 | Rust | Linux x64, macOS ARM64, Windows x64 | Linux/macOS/Windows，CUDA/CoreML/DirectML |
@@ -294,7 +296,7 @@ cmake --build . --config Release
 
 前提条件：C++17 编译器、CMake 3.15+
 
-- **Linux**：构建前将 [piper-phonemize](https://github.com/rhasspy/piper-phonemize) 放置到 `lib/Linux-$(uname -m)/piper_phonemize`
+- **Linux**：依赖项（ONNX Runtime、OpenJTalk 等）由 CMake 自动下载
 - **Windows**：参阅 [Windows 设置指南](docs/getting-started/windows-setup.md)
 - **macOS**：依赖项自动下载
 
@@ -664,8 +666,6 @@ curl -L -o models/config.json https://huggingface.co/ayousanz/piper-plus-tsukuyo
 
 > **注意：** piper-plus 进行了独自的架构扩展（多语言嵌入、韵律 A1/A2/A3、173个符号），因此与 upstream Piper 的检查点/ONNX 模型不兼容。请使用 piper-plus 专用模型。
 
-上游 Piper 检查点也可使用：[piper-checkpoints](https://huggingface.co/datasets/rhasspy/piper-checkpoints/tree/main)
-
 ---
 
 ## 日语 TTS
@@ -726,9 +726,9 @@ Piper 的 Unity 插件：[github.com/ayutaz/uPiper](https://github.com/ayutaz/uP
 
 ### 语音模型 (Voices)
 
-上游 Piper 语音模型（30+ 种语言）也可使用：[piper-voices](https://huggingface.co/rhasspy/piper-voices/tree/v1.0.0)
+piper-plus 模型：[piper-plus-base](https://huggingface.co/ayousanz/piper-plus-base)（6语言基础模型）· [Tsukuyomi-chan](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan)
 
-每个语音需要一个 `.onnx` 模型和 `.onnx.json` 配置文件。[语音样本](https://rhasspy.github.io/piper-samples) | [视频教程](https://youtu.be/rjq5eZoWWSo)
+> **注意：** piper-plus 使用自有的 G2P 和音素系统，因此上游 Piper 模型 (rhasspy/piper-voices) 不兼容。
 
 ### 相关文章（日语）
 
@@ -736,12 +736,13 @@ Piper 的 Unity 插件：[github.com/ayutaz/uPiper](https://github.com/ayutaz/uP
 - [使用 JVS 语音数据集创建 Piper 日语模型](https://ayousanz.hatenadiary.jp/entry/2025/06/05/093217)
 - [使用 Tsukuyomi-chan 数据集从 Piper 模型进行微调](https://ayousanz.hatenadiary.jp/entry/2025/06/07/074232)
 
-### piper-g2p（独立 G2P 包）
+### piper-plus-g2p（独立 G2P 包）
 
 提供多语言 G2P（字素到音素转换）独立包：
 
 - **Python**：`pip install piper-plus-g2p` — [源代码](src/python/g2p/)
 - **Rust**：`cargo add piper-plus-g2p` — [源代码](src/rust/piper-plus-g2p/)
+- **Go**：`go get github.com/ayutaz/piper-plus/src/go/phonemize` — [源代码](src/go/phonemize/)
 - **JavaScript/WASM**：`npm install @piper-plus/g2p` — [源代码](src/wasm/g2p/)
 
 ### People using Piper

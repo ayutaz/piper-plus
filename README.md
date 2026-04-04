@@ -33,7 +33,7 @@
 
 ### 音声合成
 
-- **8言語対応** — 日本語・英語・中国語・韓国語・スペイン語・フランス語・ポルトガル語・スウェーデン語 (ja=0, en=1, zh=2, ko=3, es=4, fr=5, pt=6, sv=7)
+- **8言語対応** — 日本語・英語・中国語・スペイン語・フランス語・ポルトガル語・スウェーデン語・韓国語 (ja=0, en=1, zh=2, es=3, fr=4, pt=5, sv=6, ko=7) ※学習済みモデルは6言語 (JA/EN/ZH/ES/FR/PT)
 - **日本語 TTS** — OpenJTalk統合、韻律情報 (A1/A2/A3)、疑問詞マーカー (#204)、文脈依存「ん」バリアント (#207)
 - **英語 TTS** — GPL-free G2P ([g2p-en](https://github.com/Kyubyong/g2p), Apache-2.0)、espeak-ng 不要
 - **マルチスピーカー** — 571話者対応 (学習用ベースモデル)、SpeakerBalancedBatchSampler、言語グループ均等サンプリング
@@ -53,6 +53,7 @@
 
 - **[WebUI (Gradio)](docs/features/webui.md)** — 推論・学習対応、Docker対応
 - **C++ CLI** — ストリーミング、CUDA推論、音素タイミング出力、カスタム辞書
+- **[C API 共有ライブラリ](examples/c-api/README.md)** — `libpiper_plus.so/.dylib/.dll`、FFI対応 (Flutter/Godot/Swift等)、ストリーミング API
 - **[WebAssembly](src/wasm/openjtalk-web/README.npm.md)** — ブラウザ内で完全動作、サーバー不要
 - **[Docker](docker/README.md)** — 推論・学習・WebUI・C++の5イメージ提供
 - **PyPI** — `pip install piper-plus` で簡単インストール
@@ -67,6 +68,7 @@
 | Linux | x86_64 / ARM64 / ARMv7 | フルサポート |
 | macOS | ARM64 (Apple Silicon) のみ | M1/M2/M3+ |
 | Windows | x64 | フルサポート |
+| C API (FFI) | Linux x64/ARM64, macOS ARM64, Windows x64 | 共有ライブラリ、Android AAR |
 | Web | WebAssembly | Chrome/Edge/Firefox/Safari |
 | C# (.NET) | x64 / ARM64 | .NET 8/9、Linux/macOS/Windows |
 | Rust | Linux x64, macOS ARM64, Windows x64 | Linux/macOS/Windows、CUDA/CoreML/DirectML |
@@ -285,7 +287,7 @@ cmake --build . --config Release
 
 前提条件: C++17対応コンパイラ、CMake 3.15+
 
-- **Linux**: ビルド前に [piper-phonemize](https://github.com/rhasspy/piper-phonemize) を `lib/Linux-$(uname -m)/piper_phonemize` に配置
+- **Linux**: 依存関係 (ONNX Runtime, OpenJTalk 等) は CMake が自動ダウンロード
 - **Windows**: [Windows セットアップガイド](docs/getting-started/windows-setup.md) を参照
 - **macOS**: 依存関係は自動ダウンロード
 
@@ -575,15 +577,16 @@ CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
 CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
   --no-fp16 /path/to/checkpoint.ckpt /path/to/output.onnx
 
-# WavLMモデル (--stochastic はデフォルト有効)
+# deterministic エクスポート (デバッグ用)
 CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
-  --stochastic /path/to/checkpoint.ckpt /path/to/output.onnx
+  --no-stochastic /path/to/checkpoint.ckpt /path/to/output.onnx
 ```
 
 ### チェックポイント管理
 
 - `--resume_from_checkpoint` — チェックポイントからの学習再開
 - `--resume_from_single_speaker_checkpoint` — シングルスピーカーモデルからマルチスピーカーへの変換
+- `--resume-from-multispeaker-checkpoint` — マルチスピーカーからシングルスピーカーへの転移学習 (自動で `--freeze-dp` 有効化)
 
 ### 音声評価
 
@@ -682,11 +685,10 @@ xattr -cr piper/
 
 ### Windows
 
-espeak-ng-data ディレクトリが必要です。詳細は [Windows セットアップガイド](docs/getting-started/windows-setup.md) を参照。
+詳細は [Windows セットアップガイド](docs/getting-started/windows-setup.md) を参照。
 
 ```cmd
-set ESPEAK_DATA_PATH=C:\path\to\espeak-ng-data
-piper.exe --model en_US-lessac-medium.onnx -f output.wav
+piper.exe --model model.onnx -f output.wav
 ```
 
 ### WebAssembly
@@ -710,9 +712,9 @@ Piper を Unity で使用するプラグイン: [github.com/ayutaz/uPiper](https
 
 ### 音声モデル (Voices)
 
-upstream Piper の音声モデル (30+言語) も利用可能: [piper-voices](https://huggingface.co/rhasspy/piper-voices/tree/v1.0.0)
+piper-plus 専用モデル: [piper-plus-base](https://huggingface.co/ayousanz/piper-plus-base) (6言語ベース) · [つくよみちゃん](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan)
 
-各音声には `.onnx` モデルと `.onnx.json` 設定ファイルが必要です。[音声サンプル](https://rhasspy.github.io/piper-samples) | [ビデオチュートリアル](https://youtu.be/rjq5eZoWWSo)
+> **Note:** piper-plus は独自の G2P・音素体系を使用しているため、upstream Piper (rhasspy/piper-voices) のモデルとは互換性がありません。
 
 ### 関連記事
 
@@ -720,12 +722,13 @@ upstream Piper の音声モデル (30+言語) も利用可能: [piper-voices](ht
 - [jvs音声データセットを使ったpiper日本語モデルの作成](https://ayousanz.hatenadiary.jp/entry/2025/06/05/093217)
 - [piperモデルからつくよみちゃんデータセットを使って追加学習を行う](https://ayousanz.hatenadiary.jp/entry/2025/06/07/074232)
 
-### piper-g2p (独立G2Pパッケージ)
+### piper-plus-g2p (独立G2Pパッケージ)
 
 多言語G2P (Grapheme-to-Phoneme) を独立パッケージとして提供:
 
 - **Python**: `pip install piper-plus-g2p` — [ソースコード](src/python/g2p/)
 - **Rust**: `cargo add piper-plus-g2p` — [ソースコード](src/rust/piper-plus-g2p/)
+- **Go**: `go get github.com/ayutaz/piper-plus/src/go/phonemize` — [ソースコード](src/go/phonemize/)
 - **JavaScript/WASM**: `npm install @piper-plus/g2p` — [ソースコード](src/wasm/g2p/)
 
 ### People using Piper

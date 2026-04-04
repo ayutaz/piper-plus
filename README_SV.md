@@ -33,7 +33,7 @@ Ett snabbt och högkvalitativt neuralt text-till-tal-system (TTS). Bygger på [V
 
 ### Talsyntes
 
-- **Stöd för 8 språk** — Japanska, engelska, kinesiska, koreanska, spanska, franska, portugisiska och svenska (ja=0, en=1, zh=2, ko=3, es=4, fr=5, pt=6, sv=7)
+- **Stöd för 8 språk** — Japanska, engelska, kinesiska, spanska, franska, portugisiska, svenska och koreanska (ja=0, en=1, zh=2, es=3, fr=4, pt=5, sv=6, ko=7) *Den tränade modellen täcker 6 språk (JA/EN/ZH/ES/FR/PT)*
 - **Japansk TTS** — OpenJTalk-integration, prosodiinformation (A1/A2/A3), frågeordsmarkörer (#204), kontextberoende "ん"-varianter (#207)
 - **Engelsk TTS** — GPL-fri G2P ([g2p-en](https://github.com/Kyubyong/g2p), Apache-2.0), ingen espeak-ng krävs
 - **Flera talare** — Stöd för 571 talare (basmodell för träning), SpeakerBalancedBatchSampler, balanserad språkgrupps-sampling
@@ -53,6 +53,7 @@ Ett snabbt och högkvalitativt neuralt text-till-tal-system (TTS). Bygger på [V
 
 - **[WebUI (Gradio)](docs/features/webui.md)** — Stöd för inferens och träning, Docker-kompatibelt
 - **C++ CLI** — Streaming, CUDA-inferens, fonemtidning, anpassad ordlista
+- **[C API Delat bibliotek](examples/c-api/README.md)** — `libpiper_plus.so/.dylib/.dll`, FFI-kompatibelt (Flutter/Godot/Swift etc.), streaming-API
 - **[WebAssembly](src/wasm/openjtalk-web/README.npm.md)** — Körs helt i webbläsaren, ingen server krävs
 - **[Docker](docker/README.md)** — 5 images: inferens, träning, WebUI, C++
 - **PyPI** — Enkel installation med `pip install piper-plus`
@@ -67,6 +68,7 @@ Ett snabbt och högkvalitativt neuralt text-till-tal-system (TTS). Bygger på [V
 | Linux | x86_64 / ARM64 / ARMv7 | Fullt stöd |
 | macOS | ARM64 (Apple Silicon) enbart | M1/M2/M3+ |
 | Windows | x64 | Fullt stöd |
+| C API (FFI) | Linux x64/ARM64, macOS ARM64, Windows x64 | Delat bibliotek, Android AAR |
 | Webb | WebAssembly | Chrome/Edge/Firefox/Safari |
 | C# (.NET) | x64 / ARM64 | .NET 8/9, Linux/macOS/Windows |
 | Rust | Linux x64, macOS ARM64, Windows x64 | CUDA/CoreML/DirectML |
@@ -285,7 +287,7 @@ cmake --build . --config Release
 
 Förutsättningar: C++17-kompatibel kompilator, CMake 3.15+
 
-- **Linux**: Placera [piper-phonemize](https://github.com/rhasspy/piper-phonemize) i `lib/Linux-$(uname -m)/piper_phonemize` innan kompilering
+- **Linux**: Beroenden (ONNX Runtime, OpenJTalk etc.) laddas ner automatiskt av CMake
 - **Windows**: Se [installationsguide för Windows](docs/getting-started/windows-setup.md)
 - **macOS**: Beroenden laddas ner automatiskt
 
@@ -698,12 +700,13 @@ Japansk TTS som körs direkt i webbläsaren. Ingen server krävs, offline-stöd.
 
 ---
 
-### piper-g2p (Fristående G2P-paket)
+### piper-plus-g2p (Fristående G2P-paket)
 
 Flerspråkig G2P (Grapheme-to-Phoneme) tillgänglig som fristående paket:
 
 - **Python**: `pip install piper-plus-g2p` — [Källkod](src/python/g2p/)
 - **Rust**: `cargo add piper-plus-g2p` — [Källkod](src/rust/piper-plus-g2p/)
+- **Go**: `go get github.com/ayutaz/piper-plus/src/go/phonemize` — [Källkod](src/go/phonemize/)
 - **JavaScript/WASM**: `npm install @piper-plus/g2p` — [Källkod](src/wasm/g2p/)
 
 ---
@@ -718,11 +721,11 @@ Plugin för att använda Piper i Unity: [github.com/ayutaz/uPiper](https://githu
 - Windows / macOS (Apple Silicon) / Linux / Android
 - Japanska och engelska, asynkront API, streaming
 
-### Röstmodeller (Voices)
+### Voices
 
-Röstmodeller från upstream Piper (30+ språk) kan också användas: [piper-voices](https://huggingface.co/rhasspy/piper-voices/tree/v1.0.0)
+piper-plus-modeller: [piper-plus-base](https://huggingface.co/ayousanz/piper-plus-base) (6-språks bas) · [Tsukuyomi-chan](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan)
 
-Varje röst kräver en `.onnx`-modell och en `.onnx.json`-konfigurationsfil. [Röstexempel](https://rhasspy.github.io/piper-samples) | [Videohandledning](https://youtu.be/rjq5eZoWWSo)
+> **Obs:** piper-plus använder ett eget G2P- och fonemsystem, vilket innebär att modeller från upstream Piper (rhasspy/piper-voices) INTE är kompatibla.
 
 ### Relaterade artiklar
 

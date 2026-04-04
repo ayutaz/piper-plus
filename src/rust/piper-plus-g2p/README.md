@@ -93,6 +93,7 @@ piper-plus-g2p = { version = "0.1", features = ["ffi", "english"] }
 Also available as:
 - **Python**: `piper-plus-g2p` on PyPI
 - **npm**: `@piper-plus/g2p` for browser/WASM
+- **Go**: `go get github.com/ayutaz/piper-plus/src/go/phonemize`
 
 All implementations share the same PUA mapping and are validated
 against a common test fixture.
