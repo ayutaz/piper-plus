@@ -17,6 +17,7 @@ src/python_run/dist/
 
 /data/
 /build/
+/build-*/
 /local/
 /dist/
 /lib/
