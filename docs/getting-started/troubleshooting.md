@@ -406,15 +406,10 @@ If issues persist:
    CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
      /path/to/checkpoint.ckpt /path/to/output.onnx
    ```
-2. For WavLM-trained models, use `--stochastic` to enable noise-scale sampling:
+2. デフォルトで stochastic + EMA が有効です。deterministic エクスポートが必要な場合は `--no-stochastic` を使用:
    ```bash
    CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
-     --stochastic /path/to/checkpoint.ckpt /path/to/output.onnx
-   ```
-3. Use `--no-ema` for baseline models without EMA weights:
-   ```bash
-   CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
-     --no-ema /path/to/checkpoint.ckpt /path/to/output.onnx
+     --no-stochastic /path/to/checkpoint.ckpt /path/to/output.onnx
    ```
 
 ## C# CLI (PiperPlus) のトラブルシューティング

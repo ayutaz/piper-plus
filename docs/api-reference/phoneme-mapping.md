@@ -10,15 +10,15 @@ Piper Plus の音素体系と ID マッピングのリファレンス。
 テキスト → registry.get_phonemizer(language) → phonemize() → phoneme_ids → モデル
 ```
 
-- `Phonemizer` 抽象基底クラス (`phonemize/base.py`)
-- 言語レジストリ (`phonemize/registry.py`) に `ja` / `en` が自動登録
+- `Phonemizer` 抽象基底クラス (`piper_plus_g2p/base.py`)
+- 言語レジストリ (`piper_plus_g2p/registry.py`) に各言語が自動登録
 - 各言語が `phonemize()`, `phonemize_with_prosody()`, `get_phoneme_id_map()`, `post_process_ids()` を実装
 
 ---
 
 ## 日本語音素体系 (65トークン)
 
-**ソース**: `phonemize/jp_id_map.py`, `phonemize/token_mapper.py`
+**ソース**: `piper_plus_g2p/encode/id_maps.py`, `piper_plus_g2p/encode/pua.py`
 
 ### 特殊トークン (10個)
 
@@ -77,7 +77,7 @@ Piper Plus の音素体系と ID マッピングのリファレンス。
 複数文字音素を Unicode PUA (U+E000〜) の1コードポイントにマッピングし、内部で1文字として処理する。
 固定割り当ては U+E000〜U+E058 の範囲で、U+E059 以降は動的割り当て用に予約されている。
 
-**ソース**: `phonemize/token_mapper.py` の `FIXED_PUA_MAPPING`
+**ソース**: `piper_plus_g2p/encode/pua.py` の `FIXED_PUA_MAPPING`
 
 > **注意**: PUA コードポイントは学習済みモデルに埋め込まれている。既存の割り当てを変更してはならない。
 
@@ -128,7 +128,7 @@ Piper Plus の音素体系と ID マッピングのリファレンス。
 
 ### 中国語 (ZH) — 43エントリ
 
-**ソース**: `phonemize/chinese.py`, `chinese_phonemize.cpp`
+**ソース**: `piper_plus_g2p/chinese.py`, `chinese_phonemize.cpp`
 
 #### 声母 (Initials) — 有気音・破擦音 (8エントリ)
 
@@ -221,7 +221,7 @@ Piper Plus の音素体系と ID マッピングのリファレンス。
 
 ### 韓国語 (KO) — 8エントリ
 
-**ソース**: `phonemize/korean.py`, `korean_phonemize.cpp`
+**ソース**: `piper_plus_g2p/korean.py`, `korean_phonemize.cpp`
 
 > pʰ/tʰ/kʰ/tɕ/tɕʰ は ZH と共有 (同一 PUA コードポイント)。
 
@@ -247,7 +247,7 @@ Piper Plus の音素体系と ID マッピングのリファレンス。
 
 ### スペイン語/ポルトガル語 (ES/PT) — 2エントリ
 
-**ソース**: `phonemize/spanish.py`, `phonemize/portuguese.py`
+**ソース**: `piper_plus_g2p/spanish.py`, `piper_plus_g2p/portuguese.py`
 
 | トークン | PUA | 説明 |
 |---------|-----|------|
@@ -256,7 +256,7 @@ Piper Plus の音素体系と ID マッピングのリファレンス。
 
 ### フランス語 (FR) — 3エントリ
 
-**ソース**: `phonemize/french.py`, `french_phonemize.cpp`
+**ソース**: `piper_plus_g2p/french.py`, `french_phonemize.cpp`
 
 | トークン | PUA | 説明 |
 |---------|-----|------|
@@ -282,7 +282,7 @@ Piper Plus の音素体系と ID マッピングのリファレンス。
 
 ## 英語音素体系
 
-**ソース**: `phonemize/english.py`
+**ソース**: `piper_plus_g2p/english.py`
 **G2P エンジン**: g2p-en (Apache-2.0) — espeak-ng (GPL) 不要
 
 ### ARPAbet → IPA 変換表
@@ -356,10 +356,10 @@ Piper Plus の音素体系と ID マッピングのリファレンス。
 ## 音素 ID マッピングの仕組み
 
 1. テキストを `registry.get_phonemizer(language)` で音素列に変換
-2. 複数文字音素を PUA コードポイントにマッピング (`token_mapper.register()`)
+2. 複数文字音素を PUA コードポイントにマッピング (`piper_plus_g2p/encode/pua.py`)
 3. `phoneme_id_map` (config.json 由来) で各音素を ID に変換
 4. `post_process_ids()` で言語固有の後処理 (英語: BOS/EOS/パディング)
 5. ID 列をモデルに入力
 
-日本語の `phoneme_id_map` は `jp_id_map.get_japanese_id_map()` で自動生成される。
+日本語の `phoneme_id_map` は `piper_plus_g2p/encode/id_maps.py` で自動生成される。
 英語は学習済みモデルの `config.json` に含まれる `phoneme_id_map` を使用する。
