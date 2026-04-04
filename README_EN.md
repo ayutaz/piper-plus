@@ -1,6 +1,6 @@
 ![Piper logo](etc/logo.png)
 
-English | [日本語](README.md) | [中文](README_ZH.md) | [Français](README_FR.md)
+English | [日本語](README.md) | [中文](README_ZH.md) | [Français](README_FR.md) | [한국어](README_KO.md) | [Español](README_ES.md) | [Português](README_PT.md) | [Deutsch](README_DE.md) | [Русский](README_RU.md) | [Svenska](README_SV.md) | [हिन्दी](README_HI.md)
 
 [![CI](https://github.com/ayutaz/piper-plus/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/ayutaz/piper-plus/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/piper-plus)](https://pypi.org/project/piper-plus/)
@@ -53,7 +53,7 @@ A fast, high-quality neural text-to-speech (TTS) system. Built on the [VITS](htt
 
 - **[WebUI (Gradio)](docs/features/webui.md)** — Inference and training, Docker-ready
 - **C++ CLI** — Streaming, CUDA inference, phoneme timing output, custom dictionary
-- **[WebAssembly](src/wasm/openjtalk-web/README.md)** — Fully runs in browser, no server
+- **[WebAssembly](src/wasm/openjtalk-web/README.npm.md)** — Fully runs in browser, no server
 - **[Docker](docker/README.md)** — 5 images for inference, training, WebUI, and C++
 - **PyPI** — `pip install piper-plus`
 - **C# CLI** — .NET 8/9 cross-platform, 8-language multilingual, ONNX inference
@@ -64,13 +64,13 @@ A fast, high-quality neural text-to-speech (TTS) system. Built on the [VITS](htt
 
 | Platform | Architecture | Notes |
 |---|---|---|
-| Linux | x86_64 / ARM64 | Full support |
+| Linux | x86_64 / ARM64 / ARMv7 | Full support |
 | macOS | ARM64 (Apple Silicon) only | M1/M2/M3+ |
 | Windows | x64 | Full support |
 | Web | WebAssembly | Chrome/Edge/Firefox/Safari |
 | C# (.NET) | x64 / ARM64 | .NET 8/9, Linux/macOS/Windows |
-| Rust | x64 / ARM64 | Linux/macOS/Windows, CUDA/CoreML/DirectML |
-| Go | x64 / ARM64 | Linux/macOS/Windows, HTTP API, Docker |
+| Rust | Linux x64, macOS ARM64, Windows x64 | Linux/macOS/Windows, CUDA/CoreML/DirectML |
+| Go | Linux x64, macOS ARM64, Windows x64 | Linux/macOS/Windows, HTTP API, Docker |
 
 ---
 
@@ -98,7 +98,7 @@ uv run python -m piper_train.infer_onnx \
   --language en
 ```
 
-Key options: `--speaker-id` (speaker ID), `--device auto|cpu|gpu`, `--noise-scale` (audio variation), `--length-scale` (speech speed)
+Key options: `--speaker-id` (speaker ID), `--device auto|cpu|gpu`, `--noise-scale` (audio variation), `--noise-scale-w` (phoneme length variation, default: 0.8), `--length-scale` (speech speed)
 
 #### Python CLI Model Management
 
@@ -124,14 +124,52 @@ python -m piper.webui --data-dir /path/to/models
 # → http://localhost:7860
 ```
 
-### C++ Binary
+### Prebuilt Binary (No Build Required)
 
-Download from [GitHub Releases](https://github.com/ayutaz/piper-plus/releases) (amd64 / arm64).
+Download prebuilt binaries from [GitHub Releases](https://github.com/ayutaz/piper-plus/releases) and start synthesizing speech immediately.
+
+**1. Download the binary**
+
+Download and extract for your OS:
+
+**Windows (PowerShell):**
+
+```powershell
+Invoke-WebRequest -Uri "https://github.com/ayutaz/piper-plus/releases/latest/download/piper-windows-x64.zip" -OutFile piper.zip
+Expand-Archive piper.zip -DestinationPath .
+cd piper
+```
+
+**macOS (Apple Silicon):**
+
+```bash
+curl -L -o piper.tar.gz https://github.com/ayutaz/piper-plus/releases/latest/download/piper-macos-arm64.tar.gz
+tar xzf piper.tar.gz
+cd piper
+xattr -cr .
+```
+
+**Linux (x86_64):**
+
+```bash
+curl -L -o piper.tar.gz https://github.com/ayutaz/piper-plus/releases/latest/download/piper-linux-x64.tar.gz
+tar xzf piper.tar.gz
+cd piper
+```
+
+**2. Download a model & generate speech**
 
 ```sh
-./bin/piper --text 'Welcome to the world of speech synthesis!' \
-  --model en_US-lessac-medium.onnx --output_file welcome.wav
+# Download the Tsukuyomi-chan model
+./bin/piper --download-model tsukuyomi
+
+# Generate speech (just the model name is enough — downloaded models are auto-resolved)
+./bin/piper --model tsukuyomi --text "Hello, how are you today?" --output_file output.wav
 ```
+
+> **Windows cmd code page note:** The `--text` option internally uses `GetCommandLineW()` (UTF-16), so it works regardless of code page. Only when using pipe input (`echo ... | piper`) do you need to switch to UTF-8 first with `chcp 65001`.
+>
+> **output.wav location:** Generated in the current directory (where you ran `cd piper`).
 
 ### Docker
 
@@ -161,12 +199,14 @@ docker run --rm --gpus all \
 Pre-built CI/CD images:
 
 ```bash
-docker pull ghcr.io/ayutaz/piper-plus/python-inference:main
-docker pull ghcr.io/ayutaz/piper-plus/python-train:main
-docker pull ghcr.io/ayutaz/piper-plus/webui:main
-docker pull ghcr.io/ayutaz/piper-plus/cpp-inference:main
-docker pull ghcr.io/ayutaz/piper-plus/cpp-dev:main
+docker pull ghcr.io/ayutaz/piper-plus/python-inference:dev
+docker pull ghcr.io/ayutaz/piper-plus/python-train:dev
+docker pull ghcr.io/ayutaz/piper-plus/webui:dev
+docker pull ghcr.io/ayutaz/piper-plus/cpp-inference:dev
+docker pull ghcr.io/ayutaz/piper-plus/cpp-dev:dev
 ```
+
+> **Note:** The webui image is not automatically built by CI. Build manually with: `docker build -t piper-webui -f docker/webui/Dockerfile .`
 
 See [docker/README.md](docker/README.md) for details.
 
@@ -241,7 +281,7 @@ cmake ..
 cmake --build . --config Release
 ```
 
-Prerequisites: C++17 compiler, CMake 3.13+
+Prerequisites: C++17 compiler, CMake 3.15+
 
 - **Linux**: Place [piper-phonemize](https://github.com/rhasspy/piper-phonemize) at `lib/Linux-$(uname -m)/piper_phonemize` before building
 - **Windows**: See [Windows Setup Guide](docs/getting-started/windows-setup.md)
@@ -328,7 +368,7 @@ cargo build --release -p piper-plus-cli
 cargo test -p piper-plus
 ```
 
-Prerequisites: Rust 1.70+, cargo
+Prerequisites: Rust 1.88+, cargo
 
 ---
 
@@ -385,10 +425,15 @@ Key options:
 | Option | Description | Default |
 |---|---|---|
 | `--model PATH\|NAME` | Model file path, or model name (auto-resolves downloaded models) | - |
+| `--config/-c PATH` | Model config file path (auto-detected if not specified) | - |
 | `--text TEXT` | Direct text input (no piping required) | - |
+| `--output_file/-f FILE` | Output WAV file path | - |
+| `--output_dir/-d DIR` | Output directory (one WAV per utterance) | - |
+| `--output-raw` | Output raw PCM audio (no WAV header) | off |
 | `--streaming` | Chunk-based streaming mode | off |
 | `--use-cuda` | Enable CUDA GPU inference | off |
 | `--gpu-device-id NUM` | GPU device ID | 0 |
+| `--language/-l LANG` | Language code(s) (e.g. `ja`, `en`, `ja-en-zh`) | - |
 | `--length-scale VAL` | Speech speed (smaller = faster) | 1.0 |
 | `--noise-scale VAL` | Audio variation control | 0.667 |
 | `--noise-w VAL` | Phoneme duration variation | 0.8 |
@@ -397,11 +442,15 @@ Key options:
 | `--phoneme-silence PHONEME SEC` | Silence duration for specific phonemes | - |
 | `--raw-phonemes` | Interpret input as phonemes | off |
 | `--output-timing FILE` | Phoneme timing output (JSON/TSV) | - |
+| `--timing-format FORMAT` | Timing output format (`json` or `tsv`) | json |
 | `--custom-dict FILE` | Custom dictionary (comma-separated for multiple) | - |
 | `--json-input` | JSON input mode | off |
 | `--list-models [LANG]` | List available models | - |
 | `--download-model NAME` | Download a model | - |
 | `--model-dir DIR` | Model download directory | - |
+| `--test-mode` | Verify phoneme IDs without running ONNX inference | off |
+| `--debug` | Enable debug logging | off |
+| `--quiet/-q` | Suppress non-essential output | off |
 | `--version` | Show version | - |
 
 Run `piper --help` for all options.
@@ -518,7 +567,7 @@ CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
 CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
   --no-fp16 /path/to/checkpoint.ckpt /path/to/output.onnx
 
-# WavLM model (--stochastic required)
+# WavLM model (--stochastic enabled by default)
 CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
   --stochastic /path/to/checkpoint.ckpt /path/to/output.onnx
 ```
@@ -531,7 +580,7 @@ CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
 
 ### Voice Evaluation
 
-MCD, PESQ, and UTMOS evaluation tools are available in `scripts/evaluation/`.
+`scripts/evaluation/` contains evaluation test texts.
 
 ---
 
@@ -551,6 +600,26 @@ Pre-trained models for multilingual TTS and fine-tuning are available on Hugging
 | Model | Languages | Speakers | Description | Download |
 |---|---|---|---|---|
 | 6-Language Base | JA/EN/ZH/ES/FR/PT | 571 | Multilingual pre-trained (508,187 utterances, VITS + Prosody) | [HuggingFace](https://huggingface.co/ayousanz/piper-plus-base) |
+
+### Model Downloads
+
+**Tsukuyomi-chan model:**
+
+**Windows (PowerShell):**
+
+```powershell
+mkdir models
+Invoke-WebRequest -Uri "https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/tsukuyomi-chan-6lang-fp16.onnx" -OutFile models/tsukuyomi.onnx
+Invoke-WebRequest -Uri "https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/config.json" -OutFile models/config.json
+```
+
+**macOS / Linux:**
+
+```bash
+mkdir -p models
+curl -L -o models/tsukuyomi.onnx https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/tsukuyomi-chan-6lang-fp16.onnx
+curl -L -o models/config.json https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/config.json
+```
 
 **6-Language Base Model features:**
 
@@ -609,7 +678,7 @@ piper.exe --model en_US-lessac-medium.onnx -f output.wav
 Japanese TTS running directly in browsers. No server needed, offline capable.
 
 - **[Online Demo](https://ayutaz.github.io/piper-plus/)**
-- **[Technical Details & Integration Guide](src/wasm/openjtalk-web/README.md)**
+- **[Technical Details & Integration Guide](src/wasm/openjtalk-web/README.npm.md)**
 
 ---
 
@@ -622,6 +691,14 @@ Unity plugin for Piper: [github.com/ayutaz/uPiper](https://github.com/ayutaz/uPi
 - Unity 6000.0.35f1+, Unity.InferenceEngine
 - Windows / macOS (Apple Silicon) / Linux / Android
 - Japanese & English, async API, streaming
+
+### piper-g2p (Standalone G2P Package)
+
+Multilingual G2P (Grapheme-to-Phoneme) available as standalone packages:
+
+- **Python**: `pip install piper-plus-g2p` — [Source](src/python/g2p/)
+- **Rust**: `cargo add piper-plus-g2p` — [Source](src/rust/piper-plus-g2p/)
+- **JavaScript/WASM**: `npm install @piper-plus/g2p` — [Source](src/wasm/g2p/)
 
 ### Voices
 
@@ -651,7 +728,7 @@ Each voice requires a `.onnx` model and `.onnx.json` config file. [Voice samples
 | Features | [WebUI](docs/features/webui.md) · CLI Enhancements · Streaming |
 | Setup | Quick Start (Japanese) · [Windows](docs/getting-started/windows-setup.md) · [Troubleshooting](docs/getting-started/troubleshooting.md) |
 | Docker | [Docker Environments](docker/README.md) |
-| WebAssembly | [Technical Details](src/wasm/openjtalk-web/README.md) |
+| WebAssembly | [Technical Details](src/wasm/openjtalk-web/README.npm.md) |
 
 ## Contributing
 

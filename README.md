@@ -1,6 +1,6 @@
 ![Piper logo](etc/logo.png)
 
-[English](README_EN.md) | 日本語 | [中文](README_ZH.md) | [Français](README_FR.md)
+[English](README_EN.md) | 日本語 | [中文](README_ZH.md) | [Français](README_FR.md) | [한국어](README_KO.md) | [Español](README_ES.md) | [Português](README_PT.md) | [Deutsch](README_DE.md) | [Русский](README_RU.md) | [Svenska](README_SV.md) | [हिन्दी](README_HI.md)
 
 [![CI](https://github.com/ayutaz/piper-plus/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/ayutaz/piper-plus/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/piper-plus)](https://pypi.org/project/piper-plus/)
@@ -53,7 +53,7 @@
 
 - **[WebUI (Gradio)](docs/features/webui.md)** — 推論・学習対応、Docker対応
 - **C++ CLI** — ストリーミング、CUDA推論、音素タイミング出力、カスタム辞書
-- **[WebAssembly](src/wasm/openjtalk-web/README.md)** — ブラウザ内で完全動作、サーバー不要
+- **[WebAssembly](src/wasm/openjtalk-web/README.npm.md)** — ブラウザ内で完全動作、サーバー不要
 - **[Docker](docker/README.md)** — 推論・学習・WebUI・C++の5イメージ提供
 - **PyPI** — `pip install piper-plus` で簡単インストール
 - **C# CLI** — .NET 8/9 クロスプラットフォーム、8言語マルチリンガル、ONNX推論
@@ -64,13 +64,13 @@
 
 | プラットフォーム | アーキテクチャ | 備考 |
 |---|---|---|
-| Linux | x86_64 / ARM64 | フルサポート |
+| Linux | x86_64 / ARM64 / ARMv7 | フルサポート |
 | macOS | ARM64 (Apple Silicon) のみ | M1/M2/M3+ |
 | Windows | x64 | フルサポート |
 | Web | WebAssembly | Chrome/Edge/Firefox/Safari |
 | C# (.NET) | x64 / ARM64 | .NET 8/9、Linux/macOS/Windows |
-| Rust | x64 / ARM64 | Linux/macOS/Windows、CUDA/CoreML/DirectML |
-| Go | x64 / ARM64 | Linux/macOS/Windows、HTTP API、Docker |
+| Rust | Linux x64, macOS ARM64, Windows x64 | Linux/macOS/Windows、CUDA/CoreML/DirectML |
+| Go | Linux x64, macOS ARM64, Windows x64 | Linux/macOS/Windows、HTTP API、Docker |
 
 ---
 
@@ -145,7 +145,7 @@ uv run python -m piper_train.infer_onnx \
   --language en
 ```
 
-主なオプション: `--speaker-id`(話者ID)、`--device auto|cpu|gpu`、`--noise-scale`(音声バリエーション)、`--length-scale`(話速)
+主なオプション: `--speaker-id`(話者ID)、`--device auto|cpu|gpu`、`--noise-scale`(音声バリエーション)、`--length-scale`(話速)、`--noise-scale-w`(音素長バリエーション、デフォルト: 0.8)
 
 > **WavLMモデルの推奨設定:** WavLM Discriminatorで学習されたモデル (つくよみちゃん等) は `--noise-scale 0.5` で最適な音質になります (デフォルトは 0.667)。
 
@@ -201,12 +201,14 @@ docker run --rm --gpus all \
 CI/CD ビルド済みイメージ:
 
 ```bash
-docker pull ghcr.io/ayutaz/piper-plus/python-inference:main
-docker pull ghcr.io/ayutaz/piper-plus/python-train:main
-docker pull ghcr.io/ayutaz/piper-plus/webui:main
-docker pull ghcr.io/ayutaz/piper-plus/cpp-inference:main
-docker pull ghcr.io/ayutaz/piper-plus/cpp-dev:main
+docker pull ghcr.io/ayutaz/piper-plus/python-inference:dev
+docker pull ghcr.io/ayutaz/piper-plus/python-train:dev
+docker pull ghcr.io/ayutaz/piper-plus/webui:dev
+docker pull ghcr.io/ayutaz/piper-plus/cpp-inference:dev
+docker pull ghcr.io/ayutaz/piper-plus/cpp-dev:dev
 ```
+
+> **Note:** webui イメージは CI で自動ビルドされません。`docker build -t piper-webui -f docker/webui/Dockerfile .` で手動ビルドしてください。
 
 詳細は [docker/README.md](docker/README.md) を参照。
 
@@ -281,7 +283,7 @@ cmake ..
 cmake --build . --config Release
 ```
 
-前提条件: C++17対応コンパイラ、CMake 3.13+
+前提条件: C++17対応コンパイラ、CMake 3.15+
 
 - **Linux**: ビルド前に [piper-phonemize](https://github.com/rhasspy/piper-phonemize) を `lib/Linux-$(uname -m)/piper_phonemize` に配置
 - **Windows**: [Windows セットアップガイド](docs/getting-started/windows-setup.md) を参照
@@ -368,7 +370,7 @@ cargo build --release -p piper-plus-cli
 cargo test -p piper-plus
 ```
 
-前提条件: Rust 1.70+、cargo
+前提条件: Rust 1.88+、cargo
 
 ---
 
@@ -443,6 +445,15 @@ echo 'Long text...' | ./bin/piper --model en_model.onnx --output-raw | \
 | `--download-model NAME` | モデルをダウンロード | - |
 | `--model-dir DIR` | モデルのダウンロード先ディレクトリ | - |
 | `--version` | バージョン表示 | - |
+| `--config PATH` / `-c` | 設定ファイルパス | - |
+| `--output_file PATH` / `-f` | 出力WAVファイルパス | - |
+| `--output_dir PATH` / `-d` | 出力ディレクトリ | - |
+| `--output-raw` | raw PCM音声を標準出力に出力 | off |
+| `--language LANG` / `-l` | 言語コード | - |
+| `--timing-format FMT` | タイミング出力形式 (json/tsv) | json |
+| `--test-mode` | テストモード (ONNX推論スキップ) | off |
+| `--debug` | デバッグログ有効化 | off |
+| `--quiet` / `-q` | ログ無効化 | off |
 
 `piper --help` で全オプションを確認できます。
 
@@ -564,7 +575,7 @@ CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
 CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
   --no-fp16 /path/to/checkpoint.ckpt /path/to/output.onnx
 
-# WavLMモデル (--stochastic 必須)
+# WavLMモデル (--stochastic はデフォルト有効)
 CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
   --stochastic /path/to/checkpoint.ckpt /path/to/output.onnx
 ```
@@ -576,7 +587,7 @@ CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
 
 ### 音声評価
 
-`scripts/evaluation/` に MCD, PESQ, UTMOS の評価ツールがあります。
+`scripts/evaluation/` に評価用テストテキストがあります。
 
 ---
 
@@ -683,7 +694,7 @@ piper.exe --model en_US-lessac-medium.onnx -f output.wav
 ブラウザで直接動作する日本語 TTS。サーバー不要、オフライン対応。
 
 - **[オンラインデモ](https://ayutaz.github.io/piper-plus/)**
-- **[技術詳細・統合ガイド](src/wasm/openjtalk-web/README.md)**
+- **[技術詳細・統合ガイド](src/wasm/openjtalk-web/README.npm.md)**
 
 ---
 
@@ -709,6 +720,14 @@ upstream Piper の音声モデル (30+言語) も利用可能: [piper-voices](ht
 - [jvs音声データセットを使ったpiper日本語モデルの作成](https://ayousanz.hatenadiary.jp/entry/2025/06/05/093217)
 - [piperモデルからつくよみちゃんデータセットを使って追加学習を行う](https://ayousanz.hatenadiary.jp/entry/2025/06/07/074232)
 
+### piper-g2p (独立G2Pパッケージ)
+
+多言語G2P (Grapheme-to-Phoneme) を独立パッケージとして提供:
+
+- **Python**: `pip install piper-plus-g2p` — [ソースコード](src/python/g2p/)
+- **Rust**: `cargo add piper-plus-g2p` — [ソースコード](src/rust/piper-plus-g2p/)
+- **JavaScript/WASM**: `npm install @piper-plus/g2p` — [ソースコード](src/wasm/g2p/)
+
 ### People using Piper
 
 [Home Assistant](https://github.com/home-assistant/addons/blob/master/piper/README.md) · [Rhasspy 3](https://github.com/rhasspy/rhasspy3/) · [NVDA](https://github.com/nvaccess/nvda/wiki/ExtraVoices) · [Open Voice OS](https://github.com/OpenVoiceOS/ovos-tts-plugin-piper) · [LocalAI](https://github.com/go-skynet/LocalAI) · [JetsonGPT](https://github.com/shahizat/jetsonGPT) · [mintPiper](https://github.com/evuraan/mintPiper) · [Vim-Piper](https://github.com/wolandark/vim-piper)
@@ -725,7 +744,7 @@ upstream Piper の音声モデル (30+言語) も利用可能: [piper-voices](ht
 | 機能 | [WebUI](docs/features/webui.md) · CLI強化 · ストリーミング |
 | セットアップ | クイックスタート (日本語) · [Windows](docs/getting-started/windows-setup.md) · [トラブルシューティング](docs/getting-started/troubleshooting.md) |
 | Docker | [Docker環境](docker/README.md) |
-| WebAssembly | [技術詳細](src/wasm/openjtalk-web/README.md) |
+| WebAssembly | [技術詳細](src/wasm/openjtalk-web/README.npm.md) |
 
 ## Contributing
 

@@ -1,6 +1,6 @@
 ![Piper logo](etc/logo.png)
 
-[English](README_EN.md) | [日本語](README.md) | 中文 | [Français](README_FR.md)
+[English](README_EN.md) | [日本語](README.md) | 中文 | [Français](README_FR.md) | [한국어](README_KO.md) | [Español](README_ES.md) | [Português](README_PT.md) | [Deutsch](README_DE.md) | [Русский](README_RU.md) | [Svenska](README_SV.md) | [हिन्दी](README_HI.md)
 
 [![CI](https://github.com/ayutaz/piper-plus/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/ayutaz/piper-plus/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/piper-plus)](https://pypi.org/project/piper-plus/)
@@ -53,7 +53,7 @@
 
 - **[WebUI (Gradio)](docs/features/webui.md)** — 推理和训练，支持 Docker
 - **C++ CLI** — 流式处理、CUDA 推理、音素时间输出、自定义词典
-- **[WebAssembly](src/wasm/openjtalk-web/README.md)** — 完全在浏览器中运行，无需服务器
+- **[WebAssembly](src/wasm/openjtalk-web/README.npm.md)** — 完全在浏览器中运行，无需服务器
 - **[Docker](docker/README.md)** — 提供推理、训练、WebUI、C++ 共 5 个镜像
 - **PyPI** — `pip install piper-plus`
 - **C# CLI** — .NET 8/9 跨平台，8语言多语言支持，ONNX 推理
@@ -64,13 +64,13 @@
 
 | 平台 | 架构 | 备注 |
 |---|---|---|
-| Linux | x86_64 / ARM64 | 完整支持 |
+| Linux | x86_64 / ARM64 / ARMv7 | 完整支持 |
 | macOS | ARM64 (Apple Silicon) 仅限 | M1/M2/M3+ |
 | Windows | x64 | 完整支持 |
 | Web | WebAssembly | Chrome/Edge/Firefox/Safari |
 | C# (.NET) | x64 / ARM64 | .NET 8/9，Linux/macOS/Windows |
-| Rust | x64 / ARM64 | Linux/macOS/Windows，CUDA/CoreML/DirectML |
-| Go | x64 / ARM64 | Linux/macOS/Windows，HTTP API，Docker |
+| Rust | Linux x64, macOS ARM64, Windows x64 | Linux/macOS/Windows，CUDA/CoreML/DirectML |
+| Go | Linux x64, macOS ARM64, Windows x64 | Linux/macOS/Windows，HTTP API，Docker |
 
 ---
 
@@ -145,7 +145,7 @@ uv run python -m piper_train.infer_onnx \
   --language en
 ```
 
-主要选项：`--speaker-id`（说话人 ID）、`--device auto|cpu|gpu`、`--noise-scale`（音频变化）、`--length-scale`（语速）
+主要选项：`--speaker-id`（说话人 ID）、`--device auto|cpu|gpu`、`--noise-scale`（音频变化）、`--length-scale`（语速）、`--noise-scale-w`（音素长度变化，默认：0.8）
 
 > **WavLM 模型推荐设置：** 使用 WavLM Discriminator 训练的模型（如 Tsukuyomi-chan 等）建议设置 `--noise-scale 0.5` 以获得最佳音质（默认值为 0.667）。
 
@@ -210,12 +210,14 @@ docker run --rm --gpus all \
 CI/CD 预构建镜像：
 
 ```bash
-docker pull ghcr.io/ayutaz/piper-plus/python-inference:main
-docker pull ghcr.io/ayutaz/piper-plus/python-train:main
-docker pull ghcr.io/ayutaz/piper-plus/webui:main
-docker pull ghcr.io/ayutaz/piper-plus/cpp-inference:main
-docker pull ghcr.io/ayutaz/piper-plus/cpp-dev:main
+docker pull ghcr.io/ayutaz/piper-plus/python-inference:dev
+docker pull ghcr.io/ayutaz/piper-plus/python-train:dev
+docker pull ghcr.io/ayutaz/piper-plus/webui:dev
+docker pull ghcr.io/ayutaz/piper-plus/cpp-inference:dev
+docker pull ghcr.io/ayutaz/piper-plus/cpp-dev:dev
 ```
+
+> **注意：** webui 镜像不会由 CI 自动构建。请手动构建：`docker build -t piper-webui -f docker/webui/Dockerfile .`
 
 详情请参阅 [docker/README.md](docker/README.md)。
 
@@ -290,7 +292,7 @@ cmake ..
 cmake --build . --config Release
 ```
 
-前提条件：C++17 编译器、CMake 3.13+
+前提条件：C++17 编译器、CMake 3.15+
 
 - **Linux**：构建前将 [piper-phonemize](https://github.com/rhasspy/piper-phonemize) 放置到 `lib/Linux-$(uname -m)/piper_phonemize`
 - **Windows**：参阅 [Windows 设置指南](docs/getting-started/windows-setup.md)
@@ -377,7 +379,7 @@ cargo build --release -p piper-plus-cli
 cargo test -p piper-plus
 ```
 
-前提条件：Rust 1.70+、cargo
+前提条件：Rust 1.88+、cargo
 
 ---
 
@@ -452,6 +454,15 @@ echo 'Long text...' | ./bin/piper --model en_model.onnx --output-raw | \
 | `--download-model NAME` | 下载模型 | - |
 | `--model-dir DIR` | 模型下载目录 | - |
 | `--version` | 显示版本 | - |
+| `--config PATH` / `-c` | 配置文件路径 | - |
+| `--output_file PATH` / `-f` | 输出 WAV 文件路径 | - |
+| `--output_dir PATH` / `-d` | 输出目录 | - |
+| `--output-raw` | 将 raw PCM 音频输出到标准输出 | off |
+| `--language LANG` / `-l` | 语言代码 | - |
+| `--timing-format FMT` | 时间信息输出格式 (json/tsv) | json |
+| `--test-mode` | 测试模式（跳过 ONNX 推理） | off |
+| `--debug` | 启用调试日志 | off |
+| `--quiet` / `-q` | 禁用日志输出 | off |
 
 运行 `piper --help` 查看所有选项。
 
@@ -506,6 +517,24 @@ echo 'Long text...' | ./bin/piper --model en_model.onnx --output-raw | \
 | `PIPER_MODEL_DIR` | 下载模型的保存目录 | `~/.local/share/piper/models` |
 | `PIPER_GPU_DEVICE_ID` | CUDA GPU 设备 ID | `0` |
 
+### 辅助脚本 (Windows)
+
+为 Windows 用户在 `scripts/` 目录下提供了辅助脚本。
+
+**PowerShell：**
+
+```powershell
+.\scripts\speak.ps1 "こんにちは、今日は良い天気ですね。"
+.\scripts\speak.ps1 -Model "models\tsukuyomi.onnx" -Text "テスト"
+```
+
+**命令提示符：**
+
+```cmd
+scripts\speak.bat "こんにちは、今日は良い天気ですね。"
+scripts\speak.bat --model models\tsukuyomi.onnx "テスト"
+```
+
 ---
 
 ## 训练
@@ -555,7 +584,7 @@ CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
 CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
   --no-fp16 /path/to/checkpoint.ckpt /path/to/output.onnx
 
-# WavLM 模型（必须使用 --stochastic）
+# WavLM 模型（--stochastic 默认启用）
 CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
   --stochastic /path/to/checkpoint.ckpt /path/to/output.onnx
 ```
@@ -568,7 +597,7 @@ CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
 
 ### 语音评估
 
-`scripts/evaluation/` 中提供了 MCD、PESQ 和 UTMOS 评估工具。
+`scripts/evaluation/` 中包含评估用测试文本。
 
 ---
 
@@ -681,7 +710,7 @@ piper.exe --model en_US-lessac-medium.onnx -f output.wav
 日语 TTS 可直接在浏览器中运行。无需服务器，支持离线使用。
 
 - **[在线演示](https://ayutaz.github.io/piper-plus/)**
-- **[技术详情和集成指南](src/wasm/openjtalk-web/README.md)**
+- **[技术详情和集成指南](src/wasm/openjtalk-web/README.npm.md)**
 
 ---
 
@@ -707,6 +736,14 @@ Piper 的 Unity 插件：[github.com/ayutaz/uPiper](https://github.com/ayutaz/uP
 - [使用 JVS 语音数据集创建 Piper 日语模型](https://ayousanz.hatenadiary.jp/entry/2025/06/05/093217)
 - [使用 Tsukuyomi-chan 数据集从 Piper 模型进行微调](https://ayousanz.hatenadiary.jp/entry/2025/06/07/074232)
 
+### piper-g2p（独立 G2P 包）
+
+提供多语言 G2P（字素到音素转换）独立包：
+
+- **Python**：`pip install piper-plus-g2p` — [源代码](src/python/g2p/)
+- **Rust**：`cargo add piper-plus-g2p` — [源代码](src/rust/piper-plus-g2p/)
+- **JavaScript/WASM**：`npm install @piper-plus/g2p` — [源代码](src/wasm/g2p/)
+
 ### People using Piper
 
 [Home Assistant](https://github.com/home-assistant/addons/blob/master/piper/README.md) · [Rhasspy 3](https://github.com/rhasspy/rhasspy3/) · [NVDA](https://github.com/nvaccess/nvda/wiki/ExtraVoices) · [Open Voice OS](https://github.com/OpenVoiceOS/ovos-tts-plugin-piper) · [LocalAI](https://github.com/go-skynet/LocalAI) · [JetsonGPT](https://github.com/shahizat/jetsonGPT) · [mintPiper](https://github.com/evuraan/mintPiper) · [Vim-Piper](https://github.com/wolandark/vim-piper)
@@ -723,7 +760,7 @@ Piper 的 Unity 插件：[github.com/ayutaz/uPiper](https://github.com/ayutaz/uP
 | 功能 | [WebUI](docs/features/webui.md) · CLI 增强 · 流式处理 |
 | 设置 | 快速入门（日语） · [Windows](docs/getting-started/windows-setup.md) · [故障排除](docs/getting-started/troubleshooting.md) |
 | Docker | [Docker 环境](docker/README.md) |
-| WebAssembly | [技术详情](src/wasm/openjtalk-web/README.md) |
+| WebAssembly | [技术详情](src/wasm/openjtalk-web/README.npm.md) |
 
 ## 贡献
 
