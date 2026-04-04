@@ -504,13 +504,27 @@ def main():
         dict_args["upsample_initial_channel"] = 512
         dict_args["upsample_kernel_sizes"] = (16, 16, 4, 4)
 
-    # マルチスピーカーまたは多言語モデルの場合、gin_channelsを512に設定
-    # gin_channels=256ではFT時に滑舌・ノイズ劣化が発生するため512を採用
-    # argparseは常にdefault値(0)をdict_argsに含めるため、値チェック
+    # マルチスピーカーまたは多言語モデルの場合、gin_channelsを設定
+    # --resume-from-multispeaker-checkpoint 指定時はベースモデルの値を継承
+    # それ以外はデフォルト512
     if (num_speakers > 1 or num_languages > 1) and dict_args.get(
         "gin_channels", 0
     ) == 0:
-        dict_args["gin_channels"] = 512
+        base_ckpt_path = dict_args.get("resume_from_multispeaker_checkpoint")
+        if base_ckpt_path:
+            import pathlib as _pathlib
+
+            _base = torch.load(
+                base_ckpt_path, map_location="cpu", weights_only=False
+            )
+            _base_gin = _base.get("hyper_parameters", {}).get("gin_channels", 512)
+            del _base
+            dict_args["gin_channels"] = _base_gin
+            _LOGGER.info(
+                "Inherited gin_channels=%d from base checkpoint", _base_gin
+            )
+        else:
+            dict_args["gin_channels"] = 512
 
     # --resume-from-multispeaker-checkpoint 使用時は freeze_dp を自動有効化
     # モデル作成前に設定しないと save_hyperparameters() に反映されず
