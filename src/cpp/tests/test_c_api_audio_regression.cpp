@@ -41,9 +41,10 @@ protected:
         for (const auto& path : searchPaths) {
             if (fs::exists(path)) {
                 static std::string modelPath = path;
+                g_model_path = modelPath.c_str();
+                // config_path is optional; piper_plus_create defaults to model_path + ".json"
                 static std::string configPath = path + ".json";
                 if (fs::exists(configPath)) {
-                    g_model_path = modelPath.c_str();
                     g_config_path = configPath.c_str();
                 }
                 break;
@@ -213,7 +214,7 @@ TEST_F(AudioRegressionTest, Streaming_vs_OneShot) {
     for (;;) {
         PiperPlusAudioChunk chunk = {};
         PiperPlusStatus chunkRc = piper_plus_synth_next(engine, &chunk);
-        ASSERT_NE(chunkRc, PIPER_PLUS_ERR) << piper_plus_get_last_error();
+        ASSERT_GE(chunkRc, 0) << "synth_next failed: " << piper_plus_get_last_error();
         if (chunk.num_samples > 0) {
             streamTotal += chunk.num_samples;
             streamSamples.insert(streamSamples.end(),

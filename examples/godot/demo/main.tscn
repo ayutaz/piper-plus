@@ -20,7 +20,7 @@ horizontal_alignment = 1
 [node name="Label" type="Label" parent="ModelPath"]
 text = "Model:"
 
-[node name="LineEdit" type="LineEdit" parent="ModelPath"]
+[node name="ModelLineEdit" type="LineEdit" parent="ModelPath"]
 unique_name_in_owner = true
 size_flags_horizontal = 3
 placeholder_text = "Path to .onnx model file"
@@ -30,7 +30,7 @@ placeholder_text = "Path to .onnx model file"
 [node name="Label" type="Label" parent="TextInput"]
 text = "Text:"
 
-[node name="LineEdit" type="LineEdit" parent="TextInput"]
+[node name="TextLineEdit" type="LineEdit" parent="TextInput"]
 unique_name_in_owner = true
 size_flags_horizontal = 3
 text = "Hello, this is a piper-plus GDExtension demo."

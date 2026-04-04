@@ -190,7 +190,7 @@ class PiperPlus {
     }
   }
 
-  /// Synthesize text with streaming, yielding WAV chunks via a [Stream].
+  /// Synthesize text with streaming, yielding raw PCM chunks via a [Stream].
   ///
   /// Each emitted [Uint8List] contains raw 16-bit PCM samples (no WAV header)
   /// for one sentence. Collect all chunks and prepend a WAV header to produce
@@ -198,6 +198,10 @@ class PiperPlus {
   ///
   /// Uses [NativeCallable.listener] (Dart 3.1+) to bridge the C callback
   /// into a Dart [Stream].
+  ///
+  /// **Important:** Do not call [dispose] while this stream is active.
+  /// The stream completes synchronously (within a microtask) so disposal
+  /// after awaiting the stream is safe.
   Stream<Uint8List> synthesizeStream(
     String text, {
     int speakerId = 0,
@@ -238,7 +242,16 @@ class PiperPlus {
     // and invokes the callback on the caller's thread.  In a real Flutter
     // app you would run this in an Isolate.  Here we use scheduleMicrotask
     // for simplicity so the caller can listen to the stream first.
+    // Capture the engine pointer at scheduling time so that a concurrent
+    // dispose() does not leave us with a dangling pointer.
+    final engine = _engine;
     scheduleMicrotask(() {
+      if (engine == null || _engine == null) {
+        controller.addError(StateError('PiperPlus engine has been disposed'));
+        nativeCallback.close();
+        controller.close();
+        return;
+      }
       final textPtr = text.toNativeUtf8();
       final opts = calloc<PiperPlusSynthOptions>();
       opts.ref.speaker_id = speakerId;
@@ -249,7 +262,7 @@ class PiperPlus {
 
       try {
         final rc = _bindings.piper_plus_synthesize_streaming(
-          _engine!,
+          engine,
           textPtr,
           opts,
           nativeCallback.nativeFunction,

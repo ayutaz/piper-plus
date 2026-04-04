@@ -591,6 +591,10 @@ endif()
 if(UNIX)
     find_package(Threads REQUIRED)
     target_link_libraries(test_c_api PRIVATE Threads::Threads)
+    # library_path.c uses dladdr which requires libdl on Linux
+    if(NOT APPLE)
+        target_link_libraries(test_c_api PRIVATE dl)
+    endif()
 endif()
 
 # Build order dependencies
@@ -667,6 +671,10 @@ endif()
 if(UNIX)
     find_package(Threads REQUIRED)
     target_link_libraries(test_c_api_integration PRIVATE Threads::Threads)
+    # library_path.c uses dladdr which requires libdl on Linux
+    if(NOT APPLE)
+        target_link_libraries(test_c_api_integration PRIVATE dl)
+    endif()
 endif()
 
 if(TARGET fmt_external)
@@ -746,6 +754,10 @@ endif()
 if(UNIX)
     find_package(Threads REQUIRED)
     target_link_libraries(test_c_api_audio_regression PRIVATE Threads::Threads)
+    # library_path.c uses dladdr which requires libdl on Linux
+    if(NOT APPLE)
+        target_link_libraries(test_c_api_audio_regression PRIVATE dl)
+    endif()
 endif()
 
 if(TARGET fmt_external)

@@ -460,13 +460,12 @@ TEST(IteratorCrossfadeTest, TotalSamplesPreserved) {
     size_t outC = chunkC.size();
 
     size_t totalOutput = outA + outB + outC;
-    // 2 boundaries * CROSSFADE_SAMPLES overlap each = 2*4 = 8 samples of overlap
-    // But each overlap is shared (not lost), so total output should equal input.
-    // Non-last chunks trim CROSSFADE_SAMPLES, last chunk gets them back via crossfade.
+    // Non-last chunks trim CROSSFADE_SAMPLES from their tail (saved for crossfade).
+    // Last chunk keeps its full length.
     // totalInput = 300
-    // outA = 100 - 4 = 96
-    // outB = 100 - 4 = 96 (crossfade consumes prevTail, saves new tail)
-    // outC = 100 (last chunk, no trim)
+    // outA = 100 - 4 = 96  (first chunk, tail trimmed and saved)
+    // outB = 100 - 4 = 96  (middle chunk, crossfade applied, new tail saved)
+    // outC = 100            (last chunk, no trim)
     // total = 96 + 96 + 100 = 292 = 300 - 2*4
     EXPECT_EQ(totalOutput, totalInput - 2 * TEST_CROSSFADE_SAMPLES);
 }

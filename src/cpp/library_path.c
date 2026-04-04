@@ -1,3 +1,11 @@
+/* _GNU_SOURCE is required on Linux for dladdr() and Dl_info in <dlfcn.h>.
+ * Must be defined before any system header. */
+#if !defined(_WIN32) && !defined(_WIN64) && !defined(__APPLE__)
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+#endif
+
 #include "library_path.h"
 #include <string.h>
 

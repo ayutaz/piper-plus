@@ -269,15 +269,17 @@ Java_com_piperplus_PiperPlusNative_nativeSynthNext(
 
     PiperPlusStatus status = piper_plus_synth_next(engine, &chunk);
 
-    if (status == PIPER_PLUS_DONE) {
-        return nullptr; // No more chunks -- signals end to Kotlin
-    }
-    if (status != PIPER_PLUS_OK) {
+    if (status < 0) {
         throwPiperException(env, status);
         return nullptr;
     }
 
-    return floatsToShortArray(env, chunk.samples, chunk.num_samples);
+    // DONE may still carry the final chunk's samples -- deliver them.
+    // Return null only when there are no samples (pure end-of-stream).
+    if (chunk.num_samples > 0) {
+        return floatsToShortArray(env, chunk.samples, chunk.num_samples);
+    }
+    return nullptr; // End of stream
 }
 
 /**

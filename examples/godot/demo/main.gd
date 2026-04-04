@@ -4,8 +4,8 @@ extends Node
 ## Demonstrates one-shot and streaming synthesis using the piper-plus C API
 ## via the PiperTTS GDExtension node.
 
-@onready var model_input: LineEdit = %LineEdit  # ModelPath/LineEdit
-@onready var text_input: LineEdit = get_node("%TextInput/LineEdit")
+@onready var model_input: LineEdit = %ModelLineEdit
+@onready var text_input: LineEdit = %TextLineEdit
 @onready var load_btn: Button = %LoadButton
 @onready var speak_btn: Button = %SpeakButton
 @onready var stream_btn: Button = %StreamButton

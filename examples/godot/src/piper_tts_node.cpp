@@ -224,21 +224,21 @@ void PiperTTS::speak_streaming(const String &p_text) {
 
     while (true) {
         PiperPlusAudioChunk chunk;
+        memset(&chunk, 0, sizeof(chunk));
         rc = piper_plus_synth_next(m_engine, &chunk);
-        if (rc == PIPER_PLUS_DONE) {
-            break;
-        }
-        if (rc != PIPER_PLUS_OK) {
+        if (rc < 0) {
             UtilityFunctions::printerr("[PiperTTS] Streaming chunk failed: ",
                                        piper_plus_get_last_error());
             return;
         }
 
-        all_samples.insert(all_samples.end(),
-                           chunk.samples, chunk.samples + chunk.num_samples);
-        sample_rate = chunk.sample_rate;
+        if (chunk.num_samples > 0) {
+            all_samples.insert(all_samples.end(),
+                               chunk.samples, chunk.samples + chunk.num_samples);
+            sample_rate = chunk.sample_rate;
+        }
 
-        if (chunk.is_last) break;
+        if (rc == PIPER_PLUS_DONE || chunk.is_last) break;
     }
 
     if (!all_samples.empty()) {
