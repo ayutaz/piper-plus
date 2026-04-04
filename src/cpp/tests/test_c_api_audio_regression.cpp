@@ -187,8 +187,9 @@ TEST_F(AudioRegressionTest, Streaming_vs_OneShot) {
     auto* engine = createEngine();
     ASSERT_NE(engine, nullptr) << piper_plus_get_last_error();
 
-    const char* text = u8"テスト";
-    auto opts = deterministicOptions(/*language_id=*/0);  // JA
+    // Use multi-sentence text for meaningful streaming comparison
+    const char* text = u8"Hello world. This is a test.";
+    auto opts = deterministicOptions(/*language_id=*/-1);  // auto-detect
 
     // --- One-shot synthesis ---
     float* samples = nullptr;
@@ -314,8 +315,8 @@ TEST_F(AudioRegressionTest, CallbackStreaming_vs_OneShot) {
     auto* engine = createEngine();
     ASSERT_NE(engine, nullptr) << piper_plus_get_last_error();
 
-    const char* text = u8"こんにちは";
-    auto opts = deterministicOptions(/*language_id=*/0);
+    const char* text = u8"Hello world. This is a test.";
+    auto opts = deterministicOptions(/*language_id=*/-1);
 
     // One-shot
     float* samples = nullptr;
