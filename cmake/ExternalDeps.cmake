@@ -73,7 +73,7 @@ if(NOT DEFINED SPDLOG_DIR)
     CMAKE_ARGS -DCMAKE_INSTALL_PREFIX:PATH=${SPDLOG_DIR}
                -DSPDLOG_BUILD_SHARED:BOOL=OFF  # Build static libraries
                -DSPDLOG_FMT_EXTERNAL:BOOL=ON  # Use external fmt
-               -DCMAKE_PREFIX_PATH:PATH=${FMT_DIR}
+               -Dfmt_DIR:PATH=${FMT_DIR}/lib/cmake/fmt
                -DFMT_HEADER_ONLY:BOOL=ON  # Use fmt as header-only
                -DCMAKE_POSITION_INDEPENDENT_CODE:BOOL=ON
                ${EXTERNAL_CMAKE_ARGS}

@@ -98,6 +98,13 @@ TEST_F(CApiIntegrationTest, OneShotJapanese) {
     PiperPlusStatus rc = piper_plus_synthesize(engine,
         u8"こんにちは、今日は良い天気ですね。", &opts,
         &samples, &num_samples, &sample_rate);
+
+    if (rc == PIPER_PLUS_OK && num_samples == 0) {
+        piper_plus_free_audio(samples);
+        piper_plus_free(engine);
+        GTEST_SKIP() << "Japanese phonemization unavailable (OpenJTalk not loaded)";
+    }
+
     EXPECT_EQ(rc, PIPER_PLUS_OK);
     EXPECT_GT(num_samples, 0);
 

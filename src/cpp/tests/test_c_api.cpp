@@ -22,7 +22,7 @@
 #include <set>
 #include <string>
 #include <thread>
-#include <unistd.h>
+#include <filesystem>
 #include "piper_plus.h"
 
 // ===== Version tests =====
@@ -702,14 +702,11 @@ TEST(CApiBoundary, LanguageIdNegative) {
 // succeeds and execution reaches the provider selection code in loadModel.
 // Returns the path to the temporary file.  Caller is responsible for cleanup.
 static std::string createMinimalConfigFile() {
-    char tmpl[] = "/tmp/piper_test_XXXXXX";
-    int fd = mkstemp(tmpl);
-    if (fd < 0) return "";
-    // Rename to .json extension (mkstemp creates a plain file)
-    std::string path = std::string(tmpl) + ".json";
-    std::rename(tmpl, path.c_str());
-    close(fd);
+    static int counter = 0;
+    auto tmpDir = std::filesystem::temp_directory_path();
+    std::string path = (tmpDir / ("piper_test_" + std::to_string(counter++) + ".json")).string();
     std::ofstream ofs(path);
+    if (!ofs) return "";
     ofs << R"({"num_speakers": 1})";
     ofs.close();
     return path;
