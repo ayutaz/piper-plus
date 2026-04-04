@@ -406,7 +406,7 @@ If issues persist:
    CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
      /path/to/checkpoint.ckpt /path/to/output.onnx
    ```
-2. デフォルトで stochastic + EMA が有効です。deterministic エクスポートが必要な場合は `--no-stochastic` を使用:
+2. Stochastic + EMA are enabled by default. Use `--no-stochastic` for deterministic export:
    ```bash
    CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
      --no-stochastic /path/to/checkpoint.ckpt /path/to/output.onnx

@@ -134,7 +134,7 @@ CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
 |-----------|----------|------|
 | `--no-stochastic` | - | noise_scale サンプリングを無効化（デバッグ用） |
 | `--no-fp16` | - | FP16 変換を無効化（デフォルト: FP16 有効、モデルサイズ~50%削減） |
-| EMA | 常時有効 | チェックポイントに EMA state があれば自動適用 |
+| EMA | (EMA state があれば適用) | チェックポイントに EMA state があれば自動適用 |
 
 変換時は `CUDA_VISIBLE_DEVICES=""` を指定して CPU モードで実行することを推奨します。
 
