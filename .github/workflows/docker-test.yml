@@ -370,6 +370,28 @@ jobs:
           print('All smoke tests passed')
           "
 
+      - name: NLTK data availability test
+        run: |
+          docker run --rm piper-python-train:test python -c "
+          import nltk
+          nltk.data.find('taggers/averaged_perceptron_tagger_eng')
+          print('averaged_perceptron_tagger_eng: OK')
+          nltk.data.find('corpora/cmudict')
+          print('cmudict: OK')
+          print('NLTK data test passed')
+          "
+
+      - name: English phonemizer test
+        run: |
+          docker run --rm piper-python-train:test python -c "
+          from g2p_en import G2p
+          g2p = G2p()
+          result = g2p('Hello world')
+          assert result, 'g2p-en returned empty result'
+          print(f'g2p-en output: {result}')
+          print('English phonemizer test passed')
+          "
+
   test-cpp-unit-tests:
     runs-on: ubuntu-latest
     steps:

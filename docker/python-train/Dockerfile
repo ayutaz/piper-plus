@@ -105,6 +105,9 @@ RUN mkdir -p /workspace/datasets /workspace/checkpoints /workspace/logs
 # Expose ports for tensorboard and jupyter
 EXPOSE 6006 8888
 
+# Download NLTK data required by g2p-en (English phonemizer)
+RUN python -c "import nltk; nltk.download('averaged_perceptron_tagger'); nltk.download('averaged_perceptron_tagger_eng'); nltk.download('cmudict')"
+
 # Run tests during build to verify the container is working
 RUN echo "=== Running build-time tests ===" && \
     python --version && \

@@ -113,22 +113,78 @@ jobs:
         run: |
           docker build -t piper-webui:test -f docker/webui/Dockerfile .
       
-      - name: Test Docker image
+      - name: Test container startup
         run: |
           # Run container in background
           docker run -d --name piper-webui-test \
             -p 7861:7860 \
             piper-webui:test
-          
+
           # Wait for startup
           sleep 10
-          
+
           # Check if running
           docker ps | grep piper-webui-test
-          
+
           # Check logs
           docker logs piper-webui-test
-          
+
           # Cleanup
           docker stop piper-webui-test
           docker rm piper-webui-test
+
+      - name: Inference test - Japanese
+        run: |
+          mkdir -p /tmp/webui-output
+          docker run --rm \
+            -v ${{ github.workspace }}/test/models:/models:ro \
+            -v /tmp/webui-output:/output \
+            --entrypoint python \
+            piper-webui:test \
+            -c "
+          from app import synthesize, find_models
+          import soundfile as sf
+          models = find_models('/models')
+          assert models, 'No models found in /models'
+          model = models[0]
+          result = synthesize('こんにちは、今日は良い天気ですね。', model, 0, 'ja', 0.667, 1.0, 0.8)
+          assert result is not None, 'synthesize returned None'
+          sr, audio = result
+          sf.write('/output/test_ja.wav', audio, sr)
+          print(f'Japanese inference OK: {len(audio)} samples, {sr}Hz')
+          "
+
+          FILE_SIZE=$(stat --format=%s /tmp/webui-output/test_ja.wav)
+          echo "Output: test_ja.wav ($FILE_SIZE bytes)"
+          if [ "$FILE_SIZE" -lt 1000 ]; then
+            echo "ERROR: Output file too small ($FILE_SIZE bytes)"
+            exit 1
+          fi
+          echo "WebUI Japanese inference test passed"
+
+      - name: Inference test - English
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}/test/models:/models:ro \
+            -v /tmp/webui-output:/output \
+            --entrypoint python \
+            piper-webui:test \
+            -c "
+          from app import synthesize, find_models
+          import soundfile as sf
+          models = find_models('/models')
+          model = models[0]
+          result = synthesize('Hello, how are you today?', model, 0, 'en', 0.667, 1.0, 0.8)
+          assert result is not None, 'synthesize returned None'
+          sr, audio = result
+          sf.write('/output/test_en.wav', audio, sr)
+          print(f'English inference OK: {len(audio)} samples, {sr}Hz')
+          "
+
+          FILE_SIZE=$(stat --format=%s /tmp/webui-output/test_en.wav)
+          echo "Output: test_en.wav ($FILE_SIZE bytes)"
+          if [ "$FILE_SIZE" -lt 1000 ]; then
+            echo "ERROR: Output file too small ($FILE_SIZE bytes)"
+            exit 1
+          fi
+          echo "WebUI English inference test passed"

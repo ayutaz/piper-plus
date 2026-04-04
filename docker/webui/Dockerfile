@@ -19,8 +19,11 @@ COPY src/python /app/src/python
 COPY src/python_run/requirements_webui.txt /app/requirements_webui.txt
 
 # Install piper_train with inference extras + gradio + multilingual
-RUN uv pip install --system "/app/src/python[inference,multilingual]" && \
+RUN uv pip install --system "/app/src/python[inference]" && \
     uv pip install --system -r /app/requirements_webui.txt
+
+# Download NLTK data required by g2p-en (English phonemizer)
+RUN python -c "import nltk; nltk.download('averaged_perceptron_tagger'); nltk.download('averaged_perceptron_tagger_eng'); nltk.download('cmudict')"
 
 # Copy WebUI application and entrypoint
 COPY docker/webui/app.py /app/app.py
