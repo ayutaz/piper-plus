@@ -53,7 +53,7 @@ Sistema neural de texto para fala (TTS) de alta velocidade e alta qualidade. Uti
 
 - **[WebUI (Gradio)](docs/features/webui.md)** — Inferência e treinamento, compatível com Docker
 - **C++ CLI** — Streaming, inferência CUDA, saída de temporização de fonemas, dicionário personalizado
-- **[WebAssembly](src/wasm/openjtalk-web/README.md)** — Funciona completamente no navegador, sem servidor
+- **[WebAssembly](src/wasm/openjtalk-web/README.npm.md)** — Funciona completamente no navegador, sem servidor
 - **[Docker](docker/README.md)** — 5 imagens disponíveis para inferência, treinamento, WebUI e C++
 - **PyPI** — Instalação fácil com `pip install piper-plus`
 - **C# CLI** — .NET 8/9 multiplataforma, 8 idiomas multilíngue, inferência ONNX
@@ -64,13 +64,13 @@ Sistema neural de texto para fala (TTS) de alta velocidade e alta qualidade. Uti
 
 | Plataforma | Arquitetura | Observações |
 |---|---|---|
-| Linux | x86_64 / ARM64 | Suporte completo |
+| Linux | x86_64 / ARM64 / ARMv7 | Suporte completo |
 | macOS | ARM64 (Apple Silicon) apenas | M1/M2/M3+ |
 | Windows | x64 | Suporte completo |
 | Web | WebAssembly | Chrome/Edge/Firefox/Safari |
 | C# (.NET) | x64 / ARM64 | .NET 8/9, Linux/macOS/Windows |
-| Rust | x64 / ARM64 | Linux/macOS/Windows, CUDA/CoreML/DirectML |
-| Go | x64 / ARM64 | Linux/macOS/Windows, HTTP API, Docker |
+| Rust | x64 | Linux x64, macOS ARM64, Windows x64 |
+| Go | x64 | Linux x64, macOS ARM64, Windows x64 |
 
 ---
 
@@ -145,7 +145,7 @@ uv run python -m piper_train.infer_onnx \
   --language en
 ```
 
-Opções principais: `--speaker-id` (ID do falante), `--device auto|cpu|gpu`, `--noise-scale` (variação de voz), `--length-scale` (velocidade da fala)
+Opções principais: `--speaker-id` (ID do falante), `--device auto|cpu|gpu`, `--noise-scale` (variação de voz), `--noise-scale-w` (variação de comprimento de fonema, padrão: 0.8), `--length-scale` (velocidade da fala)
 
 > **Configuração recomendada para modelos WavLM:** Modelos treinados com WavLM Discriminator (como Tsukuyomi-chan etc.) obtêm qualidade de áudio ideal com `--noise-scale 0.5` (padrão: 0.667).
 
@@ -201,11 +201,16 @@ docker run --rm --gpus all \
 Imagens pré-compiladas via CI/CD:
 
 ```bash
-docker pull ghcr.io/ayutaz/piper-plus/python-inference:main
-docker pull ghcr.io/ayutaz/piper-plus/python-train:main
-docker pull ghcr.io/ayutaz/piper-plus/webui:main
-docker pull ghcr.io/ayutaz/piper-plus/cpp-inference:main
-docker pull ghcr.io/ayutaz/piper-plus/cpp-dev:main
+docker pull ghcr.io/ayutaz/piper-plus/python-inference:dev
+docker pull ghcr.io/ayutaz/piper-plus/python-train:dev
+docker pull ghcr.io/ayutaz/piper-plus/webui:dev
+```
+
+> **Nota:** A imagem webui não é construída automaticamente pelo CI. Construa manualmente com: `docker build -t piper-webui -f docker/webui/Dockerfile .`
+
+```bash
+docker pull ghcr.io/ayutaz/piper-plus/cpp-inference:dev
+docker pull ghcr.io/ayutaz/piper-plus/cpp-dev:dev
 ```
 
 Para mais detalhes, consulte [docker/README.md](docker/README.md).
@@ -425,6 +430,10 @@ Opções principais:
 | Opção | Descrição | Padrão |
 |---|---|---|
 | `--model PATH\|NAME` | Caminho do arquivo de modelo ou nome do modelo (resolução automática de modelos baixados) | - |
+| `--config/-c PATH` | Caminho do arquivo de configuração | - |
+| `--output_file/-f PATH` | Caminho do arquivo WAV de saída | - |
+| `--output_dir/-d DIR` | Diretório de saída | - |
+| `--output-raw` | Saída de áudio PCM raw para stdout | off |
 | `--text TEXT` | Entrada de texto direto (sem pipe) | - |
 | `--streaming` | Modo de streaming baseado em chunks | off |
 | `--use-cuda` | Habilitar inferência CUDA GPU | off |
@@ -438,6 +447,11 @@ Opções principais:
 | `--raw-phonemes` | Interpretar entrada como fonemas | off |
 | `--output-timing FILE` | Saída de informações de temporização de fonemas para arquivo (JSON/TSV) | - |
 | `--custom-dict FILE` | Dicionário personalizado (múltiplos separados por vírgula) | - |
+| `--language/-l CODE` | Código do idioma | - |
+| `--timing-format FORMAT` | Formato de saída de temporização (json/tsv) | - |
+| `--test-mode` | Modo de teste, pular inferência ONNX | off |
+| `--debug` | Ativar log de depuração | off |
+| `--quiet/-q` | Desativar log | off |
 | `--json-input` | Modo de entrada JSON | off |
 | `--list-models [LANG]` | Exibir lista de modelos disponíveis | - |
 | `--download-model NAME` | Baixar modelo | - |
@@ -564,7 +578,7 @@ CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
 CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
   --no-fp16 /path/to/checkpoint.ckpt /path/to/output.onnx
 
-# Modelo WavLM (--stochastic obrigatório)
+# Modelo WavLM (--stochastic ativado por padrão)
 CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
   --stochastic /path/to/checkpoint.ckpt /path/to/output.onnx
 ```
@@ -576,7 +590,7 @@ CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
 
 ### Avaliação de áudio
 
-Ferramentas de avaliação MCD, PESQ e UTMOS estão disponíveis em `scripts/evaluation/`.
+`scripts/evaluation/` contém textos de teste para avaliação.
 
 ---
 
@@ -683,11 +697,19 @@ piper.exe --model en_US-lessac-medium.onnx -f output.wav
 TTS em japonês que funciona diretamente no navegador. Sem servidor, compatível com modo offline.
 
 - **[Demo online](https://ayutaz.github.io/piper-plus/)**
-- **[Detalhes técnicos e guia de integração](src/wasm/openjtalk-web/README.md)**
+- **[Detalhes técnicos e guia de integração](src/wasm/openjtalk-web/README.npm.md)**
 
 ---
 
 ## Links Relacionados
+
+### piper-g2p (Pacote G2P independente)
+
+G2P multilíngue (Grapheme-to-Phoneme) disponível como pacotes independentes:
+
+- **Python**: `pip install piper-plus-g2p` — [Código-fonte](src/python/g2p/)
+- **Rust**: `cargo add piper-plus-g2p` — [Código-fonte](src/rust/piper-plus-g2p/)
+- **JavaScript/WASM**: `npm install @piper-plus/g2p` — [Código-fonte](src/wasm/g2p/)
 
 ### Unity — uPiper
 
@@ -725,7 +747,7 @@ Cada voz requer um modelo `.onnx` e um arquivo de configuração `.onnx.json`. [
 | Funcionalidades | [WebUI](docs/features/webui.md) · Melhorias CLI · Streaming |
 | Configuração | Início rápido (japonês) · [Windows](docs/getting-started/windows-setup.md) · [Solução de problemas](docs/getting-started/troubleshooting.md) |
 | Docker | [Ambiente Docker](docker/README.md) |
-| WebAssembly | [Detalhes técnicos](src/wasm/openjtalk-web/README.md) |
+| WebAssembly | [Detalhes técnicos](src/wasm/openjtalk-web/README.npm.md) |
 
 ## Contributing
 

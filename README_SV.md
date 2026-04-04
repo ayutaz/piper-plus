@@ -53,7 +53,7 @@ Ett snabbt och högkvalitativt neuralt text-till-tal-system (TTS). Bygger på [V
 
 - **[WebUI (Gradio)](docs/features/webui.md)** — Stöd för inferens och träning, Docker-kompatibelt
 - **C++ CLI** — Streaming, CUDA-inferens, fonemtidning, anpassad ordlista
-- **[WebAssembly](src/wasm/openjtalk-web/README.md)** — Körs helt i webbläsaren, ingen server krävs
+- **[WebAssembly](src/wasm/openjtalk-web/README.npm.md)** — Körs helt i webbläsaren, ingen server krävs
 - **[Docker](docker/README.md)** — 5 images: inferens, träning, WebUI, C++
 - **PyPI** — Enkel installation med `pip install piper-plus`
 - **C# CLI** — .NET 8/9 plattformsoberoende, 8 språk, ONNX-inferens
@@ -64,13 +64,13 @@ Ett snabbt och högkvalitativt neuralt text-till-tal-system (TTS). Bygger på [V
 
 | Plattform | Arkitektur | Anmärkning |
 |---|---|---|
-| Linux | x86_64 / ARM64 | Fullt stöd |
+| Linux | x86_64 / ARM64 / ARMv7 | Fullt stöd |
 | macOS | ARM64 (Apple Silicon) enbart | M1/M2/M3+ |
 | Windows | x64 | Fullt stöd |
 | Webb | WebAssembly | Chrome/Edge/Firefox/Safari |
 | C# (.NET) | x64 / ARM64 | .NET 8/9, Linux/macOS/Windows |
-| Rust | x64 / ARM64 | Linux/macOS/Windows, CUDA/CoreML/DirectML |
-| Go | x64 / ARM64 | Linux/macOS/Windows, HTTP API, Docker |
+| Rust | Linux x64, macOS ARM64, Windows x64 | CUDA/CoreML/DirectML |
+| Go | Linux x64, macOS ARM64, Windows x64 | HTTP API, Docker |
 
 ---
 
@@ -145,7 +145,7 @@ uv run python -m piper_train.infer_onnx \
   --language en
 ```
 
-Vanliga flaggor: `--speaker-id` (talar-ID), `--device auto|cpu|gpu`, `--noise-scale` (röstvariation), `--length-scale` (talhastighet)
+Vanliga flaggor: `--speaker-id` (talar-ID), `--device auto|cpu|gpu`, `--noise-scale` (röstvariation), `--noise-scale-w` (fonemets längdvariation, standard: 0.8), `--length-scale` (talhastighet)
 
 > **Rekommenderad inställning för WavLM-modeller:** Modeller tränade med WavLM Discriminator (t.ex. Tsukuyomi-chan) ger bäst ljudkvalitet med `--noise-scale 0.5` (standard är 0.667).
 
@@ -201,12 +201,14 @@ docker run --rm --gpus all \
 Förbyggda CI/CD-images:
 
 ```bash
-docker pull ghcr.io/ayutaz/piper-plus/python-inference:main
-docker pull ghcr.io/ayutaz/piper-plus/python-train:main
-docker pull ghcr.io/ayutaz/piper-plus/webui:main
-docker pull ghcr.io/ayutaz/piper-plus/cpp-inference:main
-docker pull ghcr.io/ayutaz/piper-plus/cpp-dev:main
+docker pull ghcr.io/ayutaz/piper-plus/python-inference:dev
+docker pull ghcr.io/ayutaz/piper-plus/python-train:dev
+docker pull ghcr.io/ayutaz/piper-plus/webui:dev
+docker pull ghcr.io/ayutaz/piper-plus/cpp-inference:dev
+docker pull ghcr.io/ayutaz/piper-plus/cpp-dev:dev
 ```
+
+> **Obs:** webui-imagen byggs inte automatiskt av CI. Bygg manuellt med: `docker build -t piper-webui -f docker/webui/Dockerfile .`
 
 Se [docker/README.md](docker/README.md) för mer information.
 
@@ -443,6 +445,15 @@ Vanliga flaggor:
 | `--download-model NAME` | Ladda ner modell | - |
 | `--model-dir DIR` | Katalog för nedladdade modeller | - |
 | `--version` | Visa version | - |
+| `--config`/`-c` | Sökväg till konfigurationsfil | - |
+| `--output_file`/`-f` | Sökväg till WAV-utdatafil | - |
+| `--output_dir`/`-d` | Utdatakatalog | - |
+| `--output-raw` | Raw PCM-ljud till stdout | av |
+| `--language`/`-l` | Språkkod | - |
+| `--timing-format` | Timingutdataformat (json/tsv) | - |
+| `--test-mode` | Testläge, hoppa över ONNX-inferens | av |
+| `--debug` | Aktivera felsökningsloggning | av |
+| `--quiet`/`-q` | Inaktivera loggning | av |
 
 Kör `piper --help` för alla tillgängliga flaggor.
 
@@ -564,7 +575,7 @@ CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
 CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
   --no-fp16 /path/to/checkpoint.ckpt /path/to/output.onnx
 
-# WavLM-modell (--stochastic krävs)
+# WavLM-modell (--stochastic aktiverat som standard)
 CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
   --stochastic /path/to/checkpoint.ckpt /path/to/output.onnx
 ```
@@ -576,7 +587,7 @@ CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
 
 ### Talkvalitetsbedömning
 
-Bedömningsverktyg för MCD, PESQ och UTMOS finns i `scripts/evaluation/`.
+`scripts/evaluation/` innehåller testtexter för utvärdering.
 
 ---
 
@@ -683,7 +694,17 @@ piper.exe --model en_US-lessac-medium.onnx -f output.wav
 Japansk TTS som körs direkt i webbläsaren. Ingen server krävs, offline-stöd.
 
 - **[Online-demo](https://ayutaz.github.io/piper-plus/)**
-- **[Teknisk dokumentation och integrationsguide](src/wasm/openjtalk-web/README.md)**
+- **[Teknisk dokumentation och integrationsguide](src/wasm/openjtalk-web/README.npm.md)**
+
+---
+
+### piper-g2p (Fristående G2P-paket)
+
+Flerspråkig G2P (Grapheme-to-Phoneme) tillgänglig som fristående paket:
+
+- **Python**: `pip install piper-plus-g2p` — [Källkod](src/python/g2p/)
+- **Rust**: `cargo add piper-plus-g2p` — [Källkod](src/rust/piper-plus-g2p/)
+- **JavaScript/WASM**: `npm install @piper-plus/g2p` — [Källkod](src/wasm/g2p/)
 
 ---
 
@@ -725,7 +746,7 @@ Varje röst kräver en `.onnx`-modell och en `.onnx.json`-konfigurationsfil. [R�
 | Funktioner | [WebUI](docs/features/webui.md) · CLI-förbättringar · Streaming |
 | Installation | Snabbstart (japanska) · [Windows](docs/getting-started/windows-setup.md) · [Felsökning](docs/getting-started/troubleshooting.md) |
 | Docker | [Docker-miljö](docker/README.md) |
-| WebAssembly | [Teknisk dokumentation](src/wasm/openjtalk-web/README.md) |
+| WebAssembly | [Teknisk dokumentation](src/wasm/openjtalk-web/README.npm.md) |
 
 ## Contributing
 

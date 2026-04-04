@@ -53,7 +53,7 @@
 
 - **[WebUI (Gradio)](docs/features/webui.md)** — 추론 및 학습 지원, Docker 지원
 - **C++ CLI** — 스트리밍, CUDA 추론, 음소 타이밍 출력, 커스텀 사전
-- **[WebAssembly](src/wasm/openjtalk-web/README.md)** — 브라우저 내에서 완전 동작, 서버 불필요
+- **[WebAssembly](src/wasm/openjtalk-web/README.npm.md)** — 브라우저 내에서 완전 동작, 서버 불필요
 - **[Docker](docker/README.md)** — 추론, 학습, WebUI, C++ 등 5개 이미지 제공
 - **PyPI** — `pip install piper-plus`로 간편 설치
 - **C# CLI** — .NET 8/9 크로스 플랫폼, 8개 언어 다중 언어, ONNX 추론
@@ -64,13 +64,13 @@
 
 | 플랫폼 | 아키텍처 | 비고 |
 |---|---|---|
-| Linux | x86_64 / ARM64 | 전체 지원 |
+| Linux | x86_64 / ARM64 / ARMv7 | 전체 지원 |
 | macOS | ARM64 (Apple Silicon) 전용 | M1/M2/M3+ |
 | Windows | x64 | 전체 지원 |
 | Web | WebAssembly | Chrome/Edge/Firefox/Safari |
 | C# (.NET) | x64 / ARM64 | .NET 8/9, Linux/macOS/Windows |
-| Rust | x64 / ARM64 | Linux/macOS/Windows, CUDA/CoreML/DirectML |
-| Go | x64 / ARM64 | Linux/macOS/Windows, HTTP API, Docker |
+| Rust | Linux x64, macOS ARM64, Windows x64 | CUDA/CoreML/DirectML |
+| Go | Linux x64, macOS ARM64, Windows x64 | HTTP API, Docker |
 
 ---
 
@@ -145,7 +145,7 @@ uv run python -m piper_train.infer_onnx \
   --language en
 ```
 
-주요 옵션: `--speaker-id`(화자 ID), `--device auto|cpu|gpu`, `--noise-scale`(음성 변동), `--length-scale`(말하기 속도)
+주요 옵션: `--speaker-id`(화자 ID), `--device auto|cpu|gpu`, `--noise-scale`(음성 변동), `--noise-scale-w`(음소 길이 변동, 기본값: 0.8), `--length-scale`(말하기 속도)
 
 > **WavLM 모델 권장 설정:** WavLM 판별기로 학습된 모델 (츠쿠요미짱 등)은 `--noise-scale 0.5`에서 최적의 음질을 얻을 수 있습니다 (기본값은 0.667).
 
@@ -201,12 +201,14 @@ docker run --rm --gpus all \
 CI/CD 빌드 이미지:
 
 ```bash
-docker pull ghcr.io/ayutaz/piper-plus/python-inference:main
-docker pull ghcr.io/ayutaz/piper-plus/python-train:main
-docker pull ghcr.io/ayutaz/piper-plus/webui:main
-docker pull ghcr.io/ayutaz/piper-plus/cpp-inference:main
-docker pull ghcr.io/ayutaz/piper-plus/cpp-dev:main
+docker pull ghcr.io/ayutaz/piper-plus/python-inference:dev
+docker pull ghcr.io/ayutaz/piper-plus/python-train:dev
+docker pull ghcr.io/ayutaz/piper-plus/webui:dev
+docker pull ghcr.io/ayutaz/piper-plus/cpp-inference:dev
+docker pull ghcr.io/ayutaz/piper-plus/cpp-dev:dev
 ```
+
+> **참고:** webui 이미지는 CI에서 자동 빌드되지 않습니다. 수동 빌드: `docker build -t piper-webui -f docker/webui/Dockerfile .`
 
 자세한 내용은 [docker/README.md](docker/README.md)를 참조하세요.
 
@@ -443,6 +445,15 @@ echo 'Long text...' | ./bin/piper --model en_model.onnx --output-raw | \
 | `--download-model NAME` | 모델 다운로드 | - |
 | `--model-dir DIR` | 모델 다운로드 디렉터리 | - |
 | `--version` | 버전 표시 | - |
+| `--config PATH` / `-c` | 설정 파일 경로 | - |
+| `--output_file PATH` / `-f` | 출력 WAV 파일 경로 | - |
+| `--output_dir PATH` / `-d` | 출력 디렉토리 | - |
+| `--output-raw` | raw PCM 오디오를 표준 출력으로 출력 | off |
+| `--language LANG` / `-l` | 언어 코드 | - |
+| `--timing-format FMT` | 타이밍 출력 형식 (json/tsv) | json |
+| `--test-mode` | 테스트 모드 (ONNX 추론 스킵) | off |
+| `--debug` | 디버그 로그 활성화 | off |
+| `--quiet` / `-q` | 로그 비활성화 | off |
 
 `piper --help`로 전체 옵션을 확인할 수 있습니다.
 
@@ -564,7 +575,7 @@ CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
 CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
   --no-fp16 /path/to/checkpoint.ckpt /path/to/output.onnx
 
-# WavLM 모델 (--stochastic 필수)
+# WavLM 모델 (--stochastic 기본 활성화)
 CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
   --stochastic /path/to/checkpoint.ckpt /path/to/output.onnx
 ```
@@ -576,7 +587,7 @@ CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
 
 ### 음성 평가
 
-`scripts/evaluation/`에 MCD, PESQ, UTMOS 평가 도구가 있습니다.
+`scripts/evaluation/` 에 평가용 테스트 텍스트가 있습니다.
 
 ---
 
@@ -683,7 +694,7 @@ piper.exe --model en_US-lessac-medium.onnx -f output.wav
 브라우저에서 직접 동작하는 일본어 TTS. 서버 불필요, 오프라인 지원.
 
 - **[온라인 데모](https://ayutaz.github.io/piper-plus/)**
-- **[기술 상세 및 통합 가이드](src/wasm/openjtalk-web/README.md)**
+- **[기술 상세 및 통합 가이드](src/wasm/openjtalk-web/README.npm.md)**
 
 ---
 
@@ -709,6 +720,14 @@ upstream Piper의 음성 모델 (30개 이상 언어)도 사용 가능: [piper-v
 - [jvs音声データセットを使ったpiper日本語モデルの作成](https://ayousanz.hatenadiary.jp/entry/2025/06/05/093217)
 - [piperモデルからつくよみちゃんデータセットを使って追加学習を行う](https://ayousanz.hatenadiary.jp/entry/2025/06/07/074232)
 
+### piper-g2p (독립 G2P 패키지)
+
+다국어 G2P (Grapheme-to-Phoneme) 를 독립 패키지로 제공:
+
+- **Python**: `pip install piper-plus-g2p` — [소스 코드](src/python/g2p/)
+- **Rust**: `cargo add piper-plus-g2p` — [소스 코드](src/rust/piper-plus-g2p/)
+- **JavaScript/WASM**: `npm install @piper-plus/g2p` — [소스 코드](src/wasm/g2p/)
+
 ### People using Piper
 
 [Home Assistant](https://github.com/home-assistant/addons/blob/master/piper/README.md) · [Rhasspy 3](https://github.com/rhasspy/rhasspy3/) · [NVDA](https://github.com/nvaccess/nvda/wiki/ExtraVoices) · [Open Voice OS](https://github.com/OpenVoiceOS/ovos-tts-plugin-piper) · [LocalAI](https://github.com/go-skynet/LocalAI) · [JetsonGPT](https://github.com/shahizat/jetsonGPT) · [mintPiper](https://github.com/evuraan/mintPiper) · [Vim-Piper](https://github.com/wolandark/vim-piper)
@@ -725,7 +744,7 @@ upstream Piper의 음성 모델 (30개 이상 언어)도 사용 가능: [piper-v
 | 기능 | [WebUI](docs/features/webui.md) · CLI 강화 · 스트리밍 |
 | 설정 | 빠른 시작 (일본어) · [Windows](docs/getting-started/windows-setup.md) · [문제 해결](docs/getting-started/troubleshooting.md) |
 | Docker | [Docker 환경](docker/README.md) |
-| WebAssembly | [기술 상세](src/wasm/openjtalk-web/README.md) |
+| WebAssembly | [기술 상세](src/wasm/openjtalk-web/README.npm.md) |
 
 ## Contributing
 

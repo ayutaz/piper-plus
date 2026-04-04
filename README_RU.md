@@ -53,7 +53,7 @@
 
 - **[WebUI (Gradio)](docs/features/webui.md)** — вывод и обучение, поддержка Docker
 - **C++ CLI** — потоковый вывод, CUDA-инференс, вывод тайминга фонем, пользовательский словарь
-- **[WebAssembly](src/wasm/openjtalk-web/README.md)** — полная работа в браузере, сервер не требуется
+- **[WebAssembly](src/wasm/openjtalk-web/README.npm.md)** — полная работа в браузере, сервер не требуется
 - **[Docker](docker/README.md)** — 5 образов: вывод, обучение, WebUI, C++
 - **PyPI** — простая установка через `pip install piper-plus`
 - **C# CLI** — кроссплатформенный .NET 8/9, 8 языков, ONNX-инференс
@@ -64,13 +64,13 @@
 
 | Платформа | Архитектура | Примечание |
 |---|---|---|
-| Linux | x86_64 / ARM64 | Полная поддержка |
+| Linux | x86_64 / ARM64 / ARMv7 | Полная поддержка |
 | macOS | ARM64 (Apple Silicon) | M1/M2/M3+ |
 | Windows | x64 | Полная поддержка |
 | Web | WebAssembly | Chrome/Edge/Firefox/Safari |
 | C# (.NET) | x64 / ARM64 | .NET 8/9, Linux/macOS/Windows |
-| Rust | x64 / ARM64 | Linux/macOS/Windows, CUDA/CoreML/DirectML |
-| Go | x64 / ARM64 | Linux/macOS/Windows, HTTP API, Docker |
+| Rust | x64 | Linux x64, macOS ARM64, Windows x64 |
+| Go | x64 | Linux x64, macOS ARM64, Windows x64 |
 
 ---
 
@@ -145,7 +145,7 @@ uv run python -m piper_train.infer_onnx \
   --language en
 ```
 
-Основные параметры: `--speaker-id` (ID диктора), `--device auto|cpu|gpu`, `--noise-scale` (вариативность голоса), `--length-scale` (скорость речи)
+Основные параметры: `--speaker-id` (ID диктора), `--device auto|cpu|gpu`, `--noise-scale` (вариативность голоса), `--noise-scale-w` (вариация длины фонем, по умолчанию: 0.8), `--length-scale` (скорость речи)
 
 > **Рекомендации для моделей WavLM:** Для моделей, обученных с WavLM Discriminator (например, Цукуёми-тян), оптимальное качество достигается при `--noise-scale 0.5` (по умолчанию 0.667).
 
@@ -201,12 +201,14 @@ docker run --rm --gpus all \
 Готовые образы CI/CD:
 
 ```bash
-docker pull ghcr.io/ayutaz/piper-plus/python-inference:main
-docker pull ghcr.io/ayutaz/piper-plus/python-train:main
-docker pull ghcr.io/ayutaz/piper-plus/webui:main
-docker pull ghcr.io/ayutaz/piper-plus/cpp-inference:main
-docker pull ghcr.io/ayutaz/piper-plus/cpp-dev:main
+docker pull ghcr.io/ayutaz/piper-plus/python-inference:dev
+docker pull ghcr.io/ayutaz/piper-plus/python-train:dev
+docker pull ghcr.io/ayutaz/piper-plus/webui:dev
+docker pull ghcr.io/ayutaz/piper-plus/cpp-inference:dev
+docker pull ghcr.io/ayutaz/piper-plus/cpp-dev:dev
 ```
+
+> **Примечание:** Образ webui не собирается автоматически в CI. Соберите вручную: docker build -t piper-webui -f docker/webui/Dockerfile .
 
 Подробности см. в [docker/README.md](docker/README.md).
 
@@ -442,6 +444,15 @@ echo 'Long text...' | ./bin/piper --model en_model.onnx --output-raw | \
 | `--list-models [LANG]` | Показать список доступных моделей | - |
 | `--download-model NAME` | Скачать модель | - |
 | `--model-dir DIR` | Каталог для скачивания моделей | - |
+| `--config`/`-c` | Путь к файлу конфигурации | - |
+| `--output_file`/`-f` | Путь к выходному WAV-файлу | - |
+| `--output_dir`/`-d` | Выходной каталог | - |
+| `--output-raw` | Вывод raw PCM-аудио в stdout | выкл. |
+| `--language`/`-l` | Код языка | - |
+| `--timing-format` | Формат вывода тайминга json/tsv | - |
+| `--test-mode` | Тестовый режим, пропуск ONNX-инференса | выкл. |
+| `--debug` | Включить отладочное логирование | выкл. |
+| `--quiet`/`-q` | Отключить логирование | выкл. |
 | `--version` | Показать версию | - |
 
 Все параметры можно посмотреть командой `piper --help`.
@@ -564,7 +575,7 @@ CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
 CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
   --no-fp16 /path/to/checkpoint.ckpt /path/to/output.onnx
 
-# Модель WavLM (необходим --stochastic)
+# Модель WavLM (--stochastic включено по умолчанию)
 CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
   --stochastic /path/to/checkpoint.ckpt /path/to/output.onnx
 ```
@@ -576,7 +587,7 @@ CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
 
 ### Оценка качества речи
 
-Инструменты для оценки MCD, PESQ и UTMOS находятся в `scripts/evaluation/`.
+`scripts/evaluation/` содержит тестовые тексты для оценки.
 
 ---
 
@@ -683,7 +694,17 @@ piper.exe --model en_US-lessac-medium.onnx -f output.wav
 Японский TTS, работающий прямо в браузере. Не требует сервера, поддерживает автономный режим.
 
 - **[Онлайн-демо](https://ayutaz.github.io/piper-plus/)**
-- **[Техническая документация и руководство по интеграции](src/wasm/openjtalk-web/README.md)**
+- **[Техническая документация и руководство по интеграции](src/wasm/openjtalk-web/README.npm.md)**
+
+---
+
+### piper-g2p (Автономный пакет G2P)
+
+Мультиязычный G2P (Grapheme-to-Phoneme) доступен как автономные пакеты:
+
+- **Python**: `pip install piper-plus-g2p` — [Исходный код](src/python/g2p/)
+- **Rust**: `cargo add piper-plus-g2p` — [Исходный код](src/rust/piper-plus-g2p/)
+- **JavaScript/WASM**: `npm install @piper-plus/g2p` — [Исходный код](src/wasm/g2p/)
 
 ---
 
@@ -725,7 +746,7 @@ piper.exe --model en_US-lessac-medium.onnx -f output.wav
 | Функции | [WebUI](docs/features/webui.md) · Расширенный CLI · Потоковый вывод |
 | Настройка | Быстрый старт (японский) · [Windows](docs/getting-started/windows-setup.md) · [Устранение неполадок](docs/getting-started/troubleshooting.md) |
 | Docker | [Окружение Docker](docker/README.md) |
-| WebAssembly | [Техническая документация](src/wasm/openjtalk-web/README.md) |
+| WebAssembly | [Техническая документация](src/wasm/openjtalk-web/README.npm.md) |
 
 ## Contributing
 

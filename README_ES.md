@@ -53,7 +53,7 @@ Sistema de texto a voz (TTS) neuronal, rapido y de alta calidad. Basado en la ar
 
 - **[WebUI (Gradio)](docs/features/webui.md)** — Inferencia y entrenamiento, compatible con Docker
 - **CLI C++** — Streaming, inferencia CUDA, salida de timing de fonemas, diccionario personalizado
-- **[WebAssembly](src/wasm/openjtalk-web/README.md)** — Funciona completamente en el navegador, sin servidor
+- **[WebAssembly](src/wasm/openjtalk-web/README.npm.md)** — Funciona completamente en el navegador, sin servidor
 - **[Docker](docker/README.md)** — 5 imagenes disponibles para inferencia, entrenamiento, WebUI y C++
 - **PyPI** — Instalacion sencilla con `pip install piper-plus`
 - **CLI C#** — .NET 8/9 multiplataforma, 8 idiomas multilingue, inferencia ONNX
@@ -64,13 +64,13 @@ Sistema de texto a voz (TTS) neuronal, rapido y de alta calidad. Basado en la ar
 
 | Plataforma | Arquitectura | Notas |
 |---|---|---|
-| Linux | x86_64 / ARM64 | Soporte completo |
+| Linux | x86_64 / ARM64 / ARMv7 | Soporte completo |
 | macOS | ARM64 (Apple Silicon) unicamente | M1/M2/M3+ |
 | Windows | x64 | Soporte completo |
 | Web | WebAssembly | Chrome/Edge/Firefox/Safari |
 | C# (.NET) | x64 / ARM64 | .NET 8/9, Linux/macOS/Windows |
-| Rust | x64 / ARM64 | Linux/macOS/Windows, CUDA/CoreML/DirectML |
-| Go | x64 / ARM64 | Linux/macOS/Windows, HTTP API, Docker |
+| Rust | Linux x64, macOS ARM64, Windows x64 | CUDA/CoreML/DirectML |
+| Go | Linux x64, macOS ARM64, Windows x64 | HTTP API, Docker |
 
 ---
 
@@ -145,7 +145,7 @@ uv run python -m piper_train.infer_onnx \
   --language en
 ```
 
-Opciones principales: `--speaker-id` (ID del hablante), `--device auto|cpu|gpu`, `--noise-scale` (variacion de voz), `--length-scale` (velocidad de habla)
+Opciones principales: `--speaker-id` (ID del hablante), `--device auto|cpu|gpu`, `--noise-scale` (variacion de voz), `--noise-scale-w` (variación de longitud de fonema, predeterminado: 0.8), `--length-scale` (velocidad de habla)
 
 > **Configuracion recomendada para modelos WavLM:** Los modelos entrenados con WavLM Discriminator (como Tsukuyomi-chan) obtienen la mejor calidad de audio con `--noise-scale 0.5` (el valor predeterminado es 0.667).
 
@@ -201,12 +201,14 @@ docker run --rm --gpus all \
 Imagenes precompiladas de CI/CD:
 
 ```bash
-docker pull ghcr.io/ayutaz/piper-plus/python-inference:main
-docker pull ghcr.io/ayutaz/piper-plus/python-train:main
-docker pull ghcr.io/ayutaz/piper-plus/webui:main
-docker pull ghcr.io/ayutaz/piper-plus/cpp-inference:main
-docker pull ghcr.io/ayutaz/piper-plus/cpp-dev:main
+docker pull ghcr.io/ayutaz/piper-plus/python-inference:dev
+docker pull ghcr.io/ayutaz/piper-plus/python-train:dev
+docker pull ghcr.io/ayutaz/piper-plus/webui:dev
+docker pull ghcr.io/ayutaz/piper-plus/cpp-inference:dev
+docker pull ghcr.io/ayutaz/piper-plus/cpp-dev:dev
 ```
+
+> **Nota:** La imagen webui no se construye automáticamente por CI. Construya manualmente con: docker build -t piper-webui -f docker/webui/Dockerfile .
 
 Para mas detalles, consulta [docker/README.md](docker/README.md).
 
@@ -443,6 +445,15 @@ Opciones principales:
 | `--download-model NAME` | Descargar un modelo | - |
 | `--model-dir DIR` | Directorio de destino para modelos descargados | - |
 | `--version` | Mostrar version | - |
+| `--config/-c PATH` | Ruta del archivo de configuración | - |
+| `--output_file/-f PATH` | Ruta del archivo WAV de salida | - |
+| `--output_dir/-d DIR` | Directorio de salida | - |
+| `--output-raw` | Salida de audio PCM raw a stdout | desactivado |
+| `--language/-l CODE` | Código de idioma | - |
+| `--timing-format FMT` | Formato de salida de temporización (json/tsv) | - |
+| `--test-mode` | Modo de prueba, omitir inferencia ONNX | desactivado |
+| `--debug` | Activar registro de depuración | desactivado |
+| `--quiet/-q` | Desactivar registro | desactivado |
 
 Ejecuta `piper --help` para ver todas las opciones.
 
@@ -564,7 +575,7 @@ CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
 CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
   --no-fp16 /path/to/checkpoint.ckpt /path/to/output.onnx
 
-# Modelo WavLM (requiere --stochastic)
+# Modelo WavLM (--stochastic activado por defecto)
 CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
   --stochastic /path/to/checkpoint.ckpt /path/to/output.onnx
 ```
@@ -576,7 +587,7 @@ CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
 
 ### Evaluacion de audio
 
-En `scripts/evaluation/` se encuentran herramientas de evaluacion para MCD, PESQ y UTMOS.
+`scripts/evaluation/` contiene textos de prueba para evaluación.
 
 ---
 
@@ -683,11 +694,19 @@ piper.exe --model en_US-lessac-medium.onnx -f output.wav
 TTS en japones que funciona directamente en el navegador. Sin servidor, compatible con modo offline.
 
 - **[Demo en linea](https://ayutaz.github.io/piper-plus/)**
-- **[Detalles tecnicos y guia de integracion](src/wasm/openjtalk-web/README.md)**
+- **[Detalles tecnicos y guia de integracion](src/wasm/openjtalk-web/README.npm.md)**
 
 ---
 
 ## Enlaces relacionados
+
+### piper-g2p (Paquete G2P independiente)
+
+G2P multilingüe (Grapheme-to-Phoneme) disponible como paquetes independientes:
+
+- **Python**: `pip install piper-plus-g2p` — [Código fuente](src/python/g2p/)
+- **Rust**: `cargo add piper-plus-g2p` — [Código fuente](src/rust/piper-plus-g2p/)
+- **JavaScript/WASM**: `npm install @piper-plus/g2p` — [Código fuente](src/wasm/g2p/)
 
 ### Unity — uPiper
 
@@ -725,7 +744,7 @@ Cada voz requiere un modelo `.onnx` y un archivo de configuracion `.onnx.json`. 
 | Funcionalidades | [WebUI](docs/features/webui.md) · Mejoras de CLI · Streaming |
 | Configuracion | Inicio rapido (japones) · [Windows](docs/getting-started/windows-setup.md) · [Solucion de problemas](docs/getting-started/troubleshooting.md) |
 | Docker | [Entorno Docker](docker/README.md) |
-| WebAssembly | [Detalles tecnicos](src/wasm/openjtalk-web/README.md) |
+| WebAssembly | [Detalles tecnicos](src/wasm/openjtalk-web/README.npm.md) |
 
 ## Contributing
 
