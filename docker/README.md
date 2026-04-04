@@ -179,11 +179,11 @@ CUDA_VISIBLE_DEVICES="" python -m piper_train.export_onnx \
   /workspace/checkpoints/model.onnx
 ```
 
-WavLM Discriminator を使用して学習したモデルの場合は `--stochastic` を追加してください。
+デフォルトのエクスポートでは stochastic モードと EMA が自動的に有効化されるため、通常はオプション指定不要です（上記コマンドを推奨）。deterministic なエクスポートが必要な場合（デバッグ用）は `--no-stochastic` を追加してください。
 
 ```bash
 CUDA_VISIBLE_DEVICES="" python -m piper_train.export_onnx \
-  --stochastic \
+  --no-stochastic \
   /workspace/checkpoints/lightning_logs/version_0/checkpoints/last.ckpt \
   /workspace/checkpoints/model.onnx
 ```

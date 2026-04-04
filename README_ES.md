@@ -33,7 +33,7 @@ Sistema de texto a voz (TTS) neuronal, rapido y de alta calidad. Basado en la ar
 
 ### Sintesis de voz
 
-- **8 idiomas** — Japones, ingles, chino, coreano, espanol, frances, portugues y sueco (ja=0, en=1, zh=2, ko=3, es=4, fr=5, pt=6, sv=7)
+- **8 idiomas** — Japones, ingles, chino, espanol, frances, portugues, sueco y coreano (ja=0, en=1, zh=2, es=3, fr=4, pt=5, sv=6, ko=7) *El modelo entrenado cubre 6 idiomas (JA/EN/ZH/ES/FR/PT)*
 - **TTS en japones** — Integracion con OpenJTalk, informacion prosodica (A1/A2/A3), marcadores de interrogacion (#204), variantes contextuales de "n" (#207)
 - **TTS en ingles** — G2P libre de GPL ([g2p-en](https://github.com/Kyubyong/g2p), Apache-2.0), sin necesidad de espeak-ng
 - **Multihablante** — Soporte para 571 hablantes (modelo base de entrenamiento), SpeakerBalancedBatchSampler, muestreo equilibrado por grupo de idioma
@@ -53,6 +53,7 @@ Sistema de texto a voz (TTS) neuronal, rapido y de alta calidad. Basado en la ar
 
 - **[WebUI (Gradio)](docs/features/webui.md)** — Inferencia y entrenamiento, compatible con Docker
 - **CLI C++** — Streaming, inferencia CUDA, salida de timing de fonemas, diccionario personalizado
+- **[C API Biblioteca compartida](examples/c-api/README.md)** — `libpiper_plus.so/.dylib/.dll`, compatible con FFI (Flutter/Godot/Swift etc.), API de streaming
 - **[WebAssembly](src/wasm/openjtalk-web/README.npm.md)** — Funciona completamente en el navegador, sin servidor
 - **[Docker](docker/README.md)** — 5 imagenes disponibles para inferencia, entrenamiento, WebUI y C++
 - **PyPI** — Instalacion sencilla con `pip install piper-plus`
@@ -67,6 +68,7 @@ Sistema de texto a voz (TTS) neuronal, rapido y de alta calidad. Basado en la ar
 | Linux | x86_64 / ARM64 / ARMv7 | Soporte completo |
 | macOS | ARM64 (Apple Silicon) unicamente | M1/M2/M3+ |
 | Windows | x64 | Soporte completo |
+| C API (FFI) | Linux x64/ARM64, macOS ARM64, Windows x64 | Biblioteca compartida, Android AAR |
 | Web | WebAssembly | Chrome/Edge/Firefox/Safari |
 | C# (.NET) | x64 / ARM64 | .NET 8/9, Linux/macOS/Windows |
 | Rust | Linux x64, macOS ARM64, Windows x64 | CUDA/CoreML/DirectML |
@@ -285,7 +287,7 @@ cmake --build . --config Release
 
 Requisitos previos: Compilador compatible con C++17, CMake 3.15+
 
-- **Linux**: Antes de compilar, coloca [piper-phonemize](https://github.com/rhasspy/piper-phonemize) en `lib/Linux-$(uname -m)/piper_phonemize`
+- **Linux**: Las dependencias (ONNX Runtime, OpenJTalk, etc.) se descargan automaticamente por CMake
 - **Windows**: Consulta la [guia de configuracion de Windows](docs/getting-started/windows-setup.md)
 - **macOS**: Las dependencias se descargan automaticamente
 
@@ -700,12 +702,13 @@ TTS en japones que funciona directamente en el navegador. Sin servidor, compatib
 
 ## Enlaces relacionados
 
-### piper-g2p (Paquete G2P independiente)
+### piper-plus-g2p (Paquete G2P independiente)
 
 G2P multilingüe (Grapheme-to-Phoneme) disponible como paquetes independientes:
 
 - **Python**: `pip install piper-plus-g2p` — [Código fuente](src/python/g2p/)
 - **Rust**: `cargo add piper-plus-g2p` — [Código fuente](src/rust/piper-plus-g2p/)
+- **Go**: `go get github.com/ayutaz/piper-plus/src/go/phonemize` — [Código fuente](src/go/phonemize/)
 - **JavaScript/WASM**: `npm install @piper-plus/g2p` — [Código fuente](src/wasm/g2p/)
 
 ### Unity — uPiper
@@ -718,9 +721,9 @@ Plugin para usar Piper en Unity: [github.com/ayutaz/uPiper](https://github.com/a
 
 ### Modelos de voz (Voices)
 
-Los modelos de voz del Piper original (mas de 30 idiomas) tambien estan disponibles: [piper-voices](https://huggingface.co/rhasspy/piper-voices/tree/v1.0.0)
+Modelos de piper-plus: [piper-plus-base](https://huggingface.co/ayousanz/piper-plus-base) (base 6 idiomas) · [Tsukuyomi-chan](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan)
 
-Cada voz requiere un modelo `.onnx` y un archivo de configuracion `.onnx.json`. [Muestras de voz](https://rhasspy.github.io/piper-samples) | [Video tutorial](https://youtu.be/rjq5eZoWWSo)
+> **Nota:** piper-plus utiliza su propio sistema G2P y de fonemas, por lo que los modelos del Piper original (rhasspy/piper-voices) NO son compatibles.
 
 ### Articulos relacionados
 

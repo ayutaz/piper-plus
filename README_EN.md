@@ -33,7 +33,7 @@ A fast, high-quality neural text-to-speech (TTS) system. Built on the [VITS](htt
 
 ### Speech Synthesis
 
-- **8-Language Support** — Japanese, English, Mandarin Chinese, Korean, Spanish, French, Portuguese, Swedish (language codes: ja=0, en=1, zh=2, ko=3, es=4, fr=5, pt=6, sv=7)
+- **8-Language Support** — Japanese, English, Mandarin Chinese, Spanish, French, Portuguese, Swedish, Korean (language codes: ja=0, en=1, zh=2, es=3, fr=4, pt=5, sv=6, ko=7) *Trained model covers 6 languages (JA/EN/ZH/ES/FR/PT)*
 - **Japanese TTS** — OpenJTalk integration, prosody features (A1/A2/A3), question markers (#204), context-dependent "N" variants (#207)
 - **English TTS** — GPL-free G2P ([g2p-en](https://github.com/Kyubyong/g2p), Apache-2.0), no espeak-ng dependency
 - **Multi-speaker** — 571 speakers in 6-language base model (code supports 8 languages including Swedish and Korean), SpeakerBalancedBatchSampler with language-balanced sampling
@@ -53,6 +53,7 @@ A fast, high-quality neural text-to-speech (TTS) system. Built on the [VITS](htt
 
 - **[WebUI (Gradio)](docs/features/webui.md)** — Inference and training, Docker-ready
 - **C++ CLI** — Streaming, CUDA inference, phoneme timing output, custom dictionary
+- **[C API Shared Library](examples/c-api/README.md)** — `libpiper_plus.so/.dylib/.dll`, FFI-ready (Flutter/Godot/Swift etc.), streaming API
 - **[WebAssembly](src/wasm/openjtalk-web/README.npm.md)** — Fully runs in browser, no server
 - **[Docker](docker/README.md)** — 5 images for inference, training, WebUI, and C++
 - **PyPI** — `pip install piper-plus`
@@ -67,6 +68,7 @@ A fast, high-quality neural text-to-speech (TTS) system. Built on the [VITS](htt
 | Linux | x86_64 / ARM64 / ARMv7 | Full support |
 | macOS | ARM64 (Apple Silicon) only | M1/M2/M3+ |
 | Windows | x64 | Full support |
+| C API (FFI) | Linux x64/ARM64, macOS ARM64, Windows x64 | Shared library, Android AAR |
 | Web | WebAssembly | Chrome/Edge/Firefox/Safari |
 | C# (.NET) | x64 / ARM64 | .NET 8/9, Linux/macOS/Windows |
 | Rust | Linux x64, macOS ARM64, Windows x64 | Linux/macOS/Windows, CUDA/CoreML/DirectML |
@@ -283,7 +285,7 @@ cmake --build . --config Release
 
 Prerequisites: C++17 compiler, CMake 3.15+
 
-- **Linux**: Place [piper-phonemize](https://github.com/rhasspy/piper-phonemize) at `lib/Linux-$(uname -m)/piper_phonemize` before building
+- **Linux**: Dependencies (ONNX Runtime, OpenJTalk, etc.) are downloaded automatically by CMake
 - **Windows**: See [Windows Setup Guide](docs/getting-started/windows-setup.md)
 - **macOS**: Dependencies are downloaded automatically
 
@@ -692,19 +694,20 @@ Unity plugin for Piper: [github.com/ayutaz/uPiper](https://github.com/ayutaz/uPi
 - Windows / macOS (Apple Silicon) / Linux / Android
 - Japanese & English, async API, streaming
 
-### piper-g2p (Standalone G2P Package)
+### piper-plus-g2p (Standalone G2P Package)
 
 Multilingual G2P (Grapheme-to-Phoneme) available as standalone packages:
 
 - **Python**: `pip install piper-plus-g2p` — [Source](src/python/g2p/)
 - **Rust**: `cargo add piper-plus-g2p` — [Source](src/rust/piper-plus-g2p/)
+- **Go**: `go get github.com/ayutaz/piper-plus/src/go/phonemize` — [Source](src/go/phonemize/)
 - **JavaScript/WASM**: `npm install @piper-plus/g2p` — [Source](src/wasm/g2p/)
 
 ### Voices
 
-Upstream Piper voice models (30+ languages) are also available: [piper-voices](https://huggingface.co/rhasspy/piper-voices/tree/v1.0.0)
+piper-plus models: [piper-plus-base](https://huggingface.co/ayousanz/piper-plus-base) (6-language base) · [Tsukuyomi-chan](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan)
 
-Each voice requires a `.onnx` model and `.onnx.json` config file. [Voice samples](https://rhasspy.github.io/piper-samples) | [Video tutorial](https://youtu.be/rjq5eZoWWSo)
+> **Note:** piper-plus uses its own G2P and phoneme system, so upstream Piper models (rhasspy/piper-voices) are NOT compatible.
 
 ### Articles (Japanese)
 
