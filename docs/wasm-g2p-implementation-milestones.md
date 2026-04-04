@@ -6,6 +6,18 @@
 
 ---
 
+## チケット一覧
+
+| チケット | Phase | ステータス | 詳細 |
+|---------|-------|----------|------|
+| [WASM-G2P-ES](./tickets/WASM-G2P-ES.md) | 1 | 未着手 | ES Rust→JS移植 (~600行) |
+| [WASM-G2P-FR](./tickets/WASM-G2P-FR.md) | 2 | 未着手 | FR Rust→JS移植 (~680行) |
+| [WASM-G2P-PT](./tickets/WASM-G2P-PT.md) | 3 | 未着手 | PT Rust→JS移植 (~600行) + BR後処理 |
+| [WASM-G2P-ZH](./tickets/WASM-G2P-ZH.md) | 4 | 未着手 | ZH Rust WASM統合 + 辞書2.6MB |
+| [WASM-G2P-TEST](./tickets/WASM-G2P-TEST.md) | 5 | 未着手 | golden test全言語対応 + CI統合 |
+
+---
+
 ## 全体方針
 
 - **ES/FR/PT:** Rust 実装を JS にルールベース移植（KO/SV と同じアプローチ）
@@ -488,3 +500,52 @@ fix/wasm-zh-fr-pt-phonemizer (ベース)
 | CI グリーン | `g2p-wasm-ci.yml` が 3 OS で通過 |
 | npm サイズ上限 | パッケージサイズ 1MB 以内 (ZH 辞書は外部化) |
 | Rust/Python 互換 | 同一入力に対して同等の phoneme_id 列を生成 (tolerance: token count ±10%) |
+
+---
+
+## 一から作り直すとしたら — Phase 横断の設計再考
+
+各 Phase の個別チケットにも「一から作り直し」セクションがあるが、ここではプロジェクト全体の設計判断を振り返る。
+
+### 判断 1: 言語ごとに独立 JS vs 全言語 Rust WASM 統一
+
+**現在の方針:** ES/FR/PT は JS 移植、ZH は Rust WASM。
+
+**もし一から設計するなら:**
+
+| アプローチ | 利点 | 欠点 |
+|-----------|------|------|
+| (A) 現方針 (ハイブリッド) | ルールベース言語は軽量JS、辞書依存言語のみWASM | 2つの実装パスを維持 |
+| (B) 全言語 Rust WASM | 実装の一元管理、Rust/Python完全互換 | ルールベース言語にWASMオーバーヘッド、バンドルサイズ大 |
+| (C) 全言語 JS 移植 | WASM依存なし、最軽量 | ZH辞書2.6MBのJS管理が複雑 |
+
+**結論:** (A) が最適。KO (520行JS) / SV (876行JS) の実績から、ルールベース言語のJS移植は実用的。ZHのみ辞書サイズの問題でWASMが妥当。
+
+### 判断 2: ラテン系共通基盤の設計タイミング
+
+**現在の方針:** ES を先行実装し、FR/PT 移植時に共通部分を抽出。
+
+**もし一から設計するなら:**
+- `latin-common.js` を先に設計し、NFD/NFC正規化・テキストトークナイズ・母音/子音判定の共通インターフェースを定義
+- ただし音節分割・ストレス規則・異音規則は言語固有のため、共通化は限定的
+- **結論:** premature abstraction 回避のため、ES 先行 → FR/PT で抽出の方針を維持。共通化対象は `collapseCombiningAccents()` と `tokenize()` 程度
+
+### 判断 3: テスト戦略
+
+**現在の方針:** 手動テストケース + Rust テスト移植。
+
+**もし一から設計するなら:**
+1. **golden test 自動生成:** Rust G2P の出力をキャプチャして `expected_tokens` を自動生成
+2. **Property-based testing:** ランダムテキスト → G2P → 構造検証
+3. **クロスプラットフォーム diff CI:** Rust/Python/JS の 3 実装を同一入力で比較
+
+**結論:** Phase 5 完了後に golden test 自動生成を導入検討。初期は手動テストで品質保証
+
+### 判断 4: 辞書形式
+
+**現在の方針:** ZH は JSON (2.6MB)、外部 fetch + キャッシュ。
+
+**もし一から設計するなら:**
+- bincode 形式 (~0.8MB) で JA と統一
+- `from_serialized_dicts(&[u8])` パターン
+- **結論:** 初期は JSON、性能問題が出たら bincode 移行
