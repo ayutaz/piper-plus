@@ -24,7 +24,7 @@ dependencies = [
     "onnxscript>=0.6.2",
     "onnxruntime>=1.17",
     "ghapi>=1.0.13",
-    "onnx>=1.20.1",
+    "onnx>=1.21.0",
 ]
 
 [project.optional-dependencies]
@@ -62,7 +62,7 @@ train = [
     "pytorch-lightning>=2.0",
     "torchmetrics>=1.0",
     "transformers>=4.38",
-    "onnx>=1.15",
+    "onnx>=1.21.0",
     "onnxruntime>=1.17",
     "pyopenjtalk-plus",
     "mecab-python3>=1.0",
