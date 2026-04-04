@@ -241,7 +241,7 @@ cmake ..
 cmake --build . --config Release
 ```
 
-Prerequisites: C++17 compiler, CMake 3.13+
+Prerequisites: C++17 compiler, CMake 3.15+
 
 - **Linux**: Place [piper-phonemize](https://github.com/rhasspy/piper-phonemize) at `lib/Linux-$(uname -m)/piper_phonemize` before building
 - **Windows**: See [Windows Setup Guide](docs/getting-started/windows-setup.md)
@@ -328,7 +328,7 @@ cargo build --release -p piper-plus-cli
 cargo test -p piper-plus
 ```
 
-Prerequisites: Rust 1.70+, cargo
+Prerequisites: Rust 1.88+, cargo
 
 ---
 

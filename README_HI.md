@@ -281,7 +281,7 @@ cmake ..
 cmake --build . --config Release
 ```
 
-पूर्वापेक्षाएँ: C++17 संगत कंपाइलर, CMake 3.13+
+पूर्वापेक्षाएँ: C++17 संगत कंपाइलर, CMake 3.15+
 
 - **Linux**: बिल्ड से पहले [piper-phonemize](https://github.com/rhasspy/piper-phonemize) को `lib/Linux-$(uname -m)/piper_phonemize` में रखें
 - **Windows**: [Windows सेटअप गाइड](docs/getting-started/windows-setup.md) देखें
@@ -368,7 +368,7 @@ cargo build --release -p piper-plus-cli
 cargo test -p piper-plus
 ```
 
-पूर्वापेक्षाएँ: Rust 1.70+, cargo
+पूर्वापेक्षाएँ: Rust 1.88+, cargo
 
 ---
 

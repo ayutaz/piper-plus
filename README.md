@@ -281,7 +281,7 @@ cmake ..
 cmake --build . --config Release
 ```
 
-前提条件: C++17対応コンパイラ、CMake 3.13+
+前提条件: C++17対応コンパイラ、CMake 3.15+
 
 - **Linux**: ビルド前に [piper-phonemize](https://github.com/rhasspy/piper-phonemize) を `lib/Linux-$(uname -m)/piper_phonemize` に配置
 - **Windows**: [Windows セットアップガイド](docs/getting-started/windows-setup.md) を参照
@@ -368,7 +368,7 @@ cargo build --release -p piper-plus-cli
 cargo test -p piper-plus
 ```
 
-前提条件: Rust 1.70+、cargo
+前提条件: Rust 1.88+、cargo
 
 ---
 

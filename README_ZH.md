@@ -290,7 +290,7 @@ cmake ..
 cmake --build . --config Release
 ```
 
-前提条件：C++17 编译器、CMake 3.13+
+前提条件：C++17 编译器、CMake 3.15+
 
 - **Linux**：构建前将 [piper-phonemize](https://github.com/rhasspy/piper-phonemize) 放置到 `lib/Linux-$(uname -m)/piper_phonemize`
 - **Windows**：参阅 [Windows 设置指南](docs/getting-started/windows-setup.md)
@@ -377,7 +377,7 @@ cargo build --release -p piper-plus-cli
 cargo test -p piper-plus
 ```
 
-前提条件：Rust 1.70+、cargo
+前提条件：Rust 1.88+、cargo
 
 ---
 

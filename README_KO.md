@@ -281,7 +281,7 @@ cmake ..
 cmake --build . --config Release
 ```
 
-필수 요건: C++17 호환 컴파일러, CMake 3.13+
+필수 요건: C++17 호환 컴파일러, CMake 3.15+
 
 - **Linux**: 빌드 전에 [piper-phonemize](https://github.com/rhasspy/piper-phonemize)를 `lib/Linux-$(uname -m)/piper_phonemize`에 배치
 - **Windows**: [Windows 설정 가이드](docs/getting-started/windows-setup.md) 참조
@@ -368,7 +368,7 @@ cargo build --release -p piper-plus-cli
 cargo test -p piper-plus
 ```
 
-필수 요건: Rust 1.70+, cargo
+필수 요건: Rust 1.88+, cargo
 
 ---
 

@@ -226,7 +226,7 @@ cmake ..
 cmake --build . --config Release
 ```
 
-Prerequis : compilateur C++17, CMake 3.13+
+Prerequis : compilateur C++17, CMake 3.15+
 
 - **Linux** : placer [piper-phonemize](https://github.com/rhasspy/piper-phonemize) dans `lib/Linux-$(uname -m)/piper_phonemize` avant la construction
 - **Windows** : voir le [Guide d'installation Windows](docs/getting-started/windows-setup.md)
@@ -281,7 +281,7 @@ cargo build --release -p piper-plus-cli
 cargo test -p piper-plus
 ```
 
-Prerequis : Rust 1.70+, cargo
+Prerequis : Rust 1.88+, cargo
 
 #### Exemples d'utilisation du CLI Rust
 

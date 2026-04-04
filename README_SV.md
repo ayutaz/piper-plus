@@ -147,7 +147,7 @@ uv run python -m piper_train.infer_onnx \
 
 Vanliga flaggor: `--speaker-id` (talar-ID), `--device auto|cpu|gpu`, `--noise-scale` (röstvariation), `--length-scale` (talhastighet)
 
-> **Rekommenderad inställning för WavLM-modeller:** Modeller tränade med WavLM Discriminator (t.ex. Tsukuyomi-chan) ger bäst ljudkvalitet med `--noise-scale 0.5` (standard är 0,667).
+> **Rekommenderad inställning för WavLM-modeller:** Modeller tränade med WavLM Discriminator (t.ex. Tsukuyomi-chan) ger bäst ljudkvalitet med `--noise-scale 0.5` (standard är 0.667).
 
 #### Modellhantering i Python CLI
 
@@ -281,7 +281,7 @@ cmake ..
 cmake --build . --config Release
 ```
 
-Förutsättningar: C++17-kompatibel kompilator, CMake 3.13+
+Förutsättningar: C++17-kompatibel kompilator, CMake 3.15+
 
 - **Linux**: Placera [piper-phonemize](https://github.com/rhasspy/piper-phonemize) i `lib/Linux-$(uname -m)/piper_phonemize` innan kompilering
 - **Windows**: Se [installationsguide för Windows](docs/getting-started/windows-setup.md)
@@ -368,7 +368,7 @@ cargo build --release -p piper-plus-cli
 cargo test -p piper-plus
 ```
 
-Förutsättningar: Rust 1.70+, cargo
+Förutsättningar: Rust 1.88+, cargo
 
 ---
 
@@ -446,7 +446,7 @@ Vanliga flaggor:
 
 Kör `piper --help` för alla tillgängliga flaggor.
 
-> **Rekommenderad inställning för WavLM-modeller:** Modeller tränade med WavLM Discriminator bör använda `--noise-scale 0.5` (standard är 0,667).
+> **Rekommenderad inställning för WavLM-modeller:** Modeller tränade med WavLM Discriminator bör använda `--noise-scale 0.5` (standard är 0.667).
 >
 > ```sh
 > echo "こんにちは" | ./bin/piper --model tsukuyomi.onnx --config config.json --noise-scale 0.5 -f output.wav
