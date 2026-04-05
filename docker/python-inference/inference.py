@@ -20,6 +20,7 @@ import numpy as np
 import onnxruntime
 import soundfile as sf
 from piper_plus_g2p.registry import get_phonemizer
+
 from piper_train.ort_utils import create_session_options, get_providers
 
 

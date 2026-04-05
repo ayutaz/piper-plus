@@ -8,6 +8,7 @@ import os
 
 import onnxruntime
 
+
 # VITS is a small model (15-75MB); more than 4 intra-op threads
 # adds synchronization overhead that exceeds the parallelism benefit.
 MAX_INTRA_THREADS = 4

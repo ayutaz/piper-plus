@@ -42,6 +42,7 @@ jobs:
           mkdir -p hf-space-deploy/piper_train/vits
           touch hf-space-deploy/piper_train/__init__.py
           cp src/python/piper_train/infer_onnx.py hf-space-deploy/piper_train/
+          cp src/python/piper_train/ort_utils.py hf-space-deploy/piper_train/
           touch hf-space-deploy/piper_train/vits/__init__.py
           cp src/python/piper_train/vits/utils.py hf-space-deploy/piper_train/vits/
           cp src/python/piper_train/vits/wavfile.py hf-space-deploy/piper_train/vits/
