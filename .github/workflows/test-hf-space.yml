@@ -7,6 +7,7 @@ on:
       - 'huggingface-space/**'
       - 'src/python/g2p/**'
       - 'src/python/piper_train/infer_onnx.py'
+      - 'src/python/piper_train/ort_utils.py'
       - 'src/python/piper_train/vits/utils.py'
       - 'src/python/piper_train/vits/wavfile.py'
       - '.github/workflows/test-hf-space.yml'
@@ -16,6 +17,7 @@ on:
       - 'huggingface-space/**'
       - 'src/python/g2p/**'
       - 'src/python/piper_train/infer_onnx.py'
+      - 'src/python/piper_train/ort_utils.py'
   workflow_dispatch:
 
 jobs:

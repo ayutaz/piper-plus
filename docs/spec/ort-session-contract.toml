@@ -1,0 +1,78 @@
+# ONNX Runtime Session Contract
+# ==============================
+# This file defines the canonical parameter values that ALL implementations
+# (Rust, C#, C++, Python) must agree on. When changing any value here,
+# update all implementations and their tests accordingly.
+#
+# This file serves as a design-time cross-language contract. Implementations
+# and tests are expected to be kept in sync with these values manually unless
+# and until automated contract-verification tests are added.
+#
+# Implementations:
+#   Rust:   src/rust/piper-core/src/engine.rs
+#   C#:     src/csharp/PiperPlus.Core/Inference/SessionFactory.cs
+#   C++:    src/cpp/piper.cpp
+#   Python: src/python/piper_train/ort_utils.py
+
+[session]
+graph_optimization_level = "ORT_ENABLE_ALL"
+execution_mode = "SEQUENTIAL"
+max_intra_threads = 4
+inter_op_threads = 1
+enable_cpu_mem_arena = true
+enable_memory_pattern = true
+dynamic_block_base = 4
+
+[warmup]
+phoneme_length = 100
+bos_token = 1
+eos_token = 2
+dummy_phoneme = 8
+default_runs = 2
+noise_scale = 0.667
+length_scale = 1.0
+noise_w = 0.8
+
+[warmup.optional_inputs]
+# These inputs are added only when the model requires them
+sid_value = 0                       # speaker ID (if model has 'sid' input)
+lid_value = 0                       # language ID (if model has 'lid' input)
+prosody_shape = "1 x phoneme_length x 3"  # prosody_features (if model has input)
+prosody_fill = 0                    # zero-filled
+
+[cache]
+optimized_extension = "opt.onnx"    # e.g., model.cpu.opt.onnx
+sentinel_extension = "opt.onnx.ok"  # e.g., model.cpu.opt.onnx.ok
+sentinel_content = "ok"
+device_label_cpu = "cpu"
+device_label_cuda_format = "cuda{device_id}"  # "cuda0", "cuda1" (no dots)
+
+[cache.behavior]
+# Cache hit:  .opt.onnx + .ok both exist → load with ORT_DISABLE_ALL
+# Incomplete: .opt.onnx only (no .ok) → delete .opt.onnx, re-optimize
+# Miss:       neither exists → optimize, save .opt.onnx, write .ok
+# Load failure: cached model fails to load → delete both, re-optimize
+# Write failure: PermissionError/OSError → warn, continue without cache
+
+[env_vars]
+# Environment variables for runtime control
+# Priority: CLI flag > env var > auto-detect
+disable_warmup = "PIPER_DISABLE_WARMUP"   # "1", "true", "yes" to disable
+disable_cache = "PIPER_DISABLE_CACHE"     # "1", "true", "yes" to disable
+intra_threads = "PIPER_INTRA_THREADS"     # integer, overrides auto-detect
+
+[env_vars.implementation_status]
+# Which implementations support each control mechanism
+# ✓ = supported via env var, CLI = supported via CLI flag, - = not implemented
+#                        Rust    C#     C++    Python
+# warmup disable         CLI     CLI    CLI    ✓ (env)
+# cache disable          -       -      -      ✓ (env)
+# intra threads          -       -      CLI    ✓ (env)
+
+[phonemize_cache]
+# Japanese phonemization LRU cache (Python only, Phase 1)
+strategy = "lru_cache"
+maxsize = 2000
+cache_unit = "sentence"  # cache per-sentence after text splitting
+key_format = "(sentence_text, prosody_flag)"  # piper_train: text only (prosody always true)
+clear_api = "clear_phonemize_cache()"

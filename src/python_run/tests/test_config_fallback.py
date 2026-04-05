@@ -469,3 +469,72 @@ class TestMultilingualPhonemizerImport:
         finally:
             # Restore original modules
             sys.modules.update(removed_modules)
+
+
+# ------------------------------------------------------------------
+# voice.py の _warmup_session() 直接テスト
+# ------------------------------------------------------------------
+class TestVoiceInlineWarmup:
+    """voice.py の _warmup_session() 直接テスト."""
+
+    def _make_mock_session(self, *, has_sid=False, has_lid=False, has_prosody=False):
+        session = MagicMock()
+        inputs = [MagicMock(), MagicMock(), MagicMock()]
+        inputs[0].name = "input"
+        inputs[1].name = "input_lengths"
+        inputs[2].name = "scales"
+        if has_sid:
+            sid = MagicMock()
+            sid.name = "sid"
+            inputs.append(sid)
+        if has_lid:
+            lid = MagicMock()
+            lid.name = "lid"
+            inputs.append(lid)
+        if has_prosody:
+            p = MagicMock()
+            p.name = "prosody_features"
+            inputs.append(p)
+        session.get_inputs.return_value = inputs
+        output = MagicMock()
+        output.name = "output"
+        session.get_outputs.return_value = [output]
+        session.run.return_value = [MagicMock()]
+        return session
+
+    @pytest.mark.unit
+    def test_warmup_calls_session_run(self):
+        from piper.voice import _warmup_session
+
+        session = self._make_mock_session()
+        _warmup_session(session)
+        assert session.run.call_count == 2
+
+    @pytest.mark.unit
+    @patch.dict("os.environ", {"PIPER_DISABLE_WARMUP": "1"})
+    def test_warmup_disabled(self):
+        from piper.voice import _warmup_session
+
+        session = self._make_mock_session()
+        _warmup_session(session)
+        session.run.assert_not_called()
+
+    @pytest.mark.unit
+    def test_warmup_failure_non_fatal(self):
+        from piper.voice import _warmup_session
+
+        session = self._make_mock_session()
+        session.run.side_effect = RuntimeError("ORT error")
+        _warmup_session(session)  # Should not raise
+
+    @pytest.mark.unit
+    def test_warmup_optional_inputs(self):
+        from piper.voice import _warmup_session
+
+        session = self._make_mock_session(has_sid=True, has_lid=True, has_prosody=True)
+        _warmup_session(session, runs=1)
+        call_args = session.run.call_args
+        inputs_dict = call_args[0][1]
+        assert "sid" in inputs_dict
+        assert "lid" in inputs_dict
+        assert "prosody_features" in inputs_dict

@@ -323,12 +323,12 @@ fn main() -> Result<()> {
         let mut voice = PiperVoice::load(&model_path, config_arg.as_deref(), &cli.device)
             .context("Failed to initialize PiperVoice")?;
 
-        // ORT warmup: JIT 最適化キャッシュを温める
+        // ORT warmup: JIT 最適化キャッシュを温める (失敗は非致命的)
         if !cli.no_warmup {
             tracing::info!("Warming up ORT session...");
-            voice
-                .warmup(piper_plus::DEFAULT_WARMUP_RUNS)
-                .context("ORT warmup failed")?;
+            if let Err(e) = voice.warmup(piper_plus::DEFAULT_WARMUP_RUNS) {
+                tracing::warn!("Warmup failed (non-fatal): {}", e);
+            }
         }
 
         // Load custom dictionaries
@@ -422,12 +422,12 @@ fn main() -> Result<()> {
         let mut voice = PiperVoice::load(&model_path, config_arg.as_deref(), &cli.device)
             .context("Failed to initialize PiperVoice")?;
 
-        // ORT warmup: JIT 最適化キャッシュを温める
+        // ORT warmup: JIT 最適化キャッシュを温める (失敗は非致命的)
         if !cli.no_warmup && !cli.test_mode {
             tracing::info!("Warming up ORT session...");
-            voice
-                .warmup(piper_plus::DEFAULT_WARMUP_RUNS)
-                .context("ORT warmup failed")?;
+            if let Err(e) = voice.warmup(piper_plus::DEFAULT_WARMUP_RUNS) {
+                tracing::warn!("Warmup failed (non-fatal): {}", e);
+            }
         }
 
         // Load custom dictionaries
@@ -645,12 +645,12 @@ fn main() -> Result<()> {
         let mut engine = OnnxEngine::load(&model_path, &voice_config, &cli.device)
             .context("Failed to load ONNX model")?;
 
-        // ORT warmup: JIT 最適化キャッシュを温める
+        // ORT warmup: JIT 最適化キャッシュを温める (失敗は非致命的)
         if !cli.no_warmup {
             tracing::info!("Warming up ORT session...");
-            engine
-                .warmup(piper_plus::DEFAULT_WARMUP_RUNS)
-                .context("ORT warmup failed")?;
+            if let Err(e) = engine.warmup(piper_plus::DEFAULT_WARMUP_RUNS) {
+                tracing::warn!("Warmup failed (non-fatal): {}", e);
+            }
         }
 
         let stdin = std::io::stdin();

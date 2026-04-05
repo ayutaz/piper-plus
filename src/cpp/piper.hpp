@@ -100,6 +100,20 @@ struct ModelSession {
   ModelSession() : onnx(nullptr){};
 };
 
+// Collects all inputs needed to build ONNX tensors for VITS inference.
+// Used by synthesize(), synthesizeFloat(), and warmupModel() to avoid
+// duplicating tensor-construction logic.
+struct InferenceInputs {
+  std::vector<int64_t> phonemeIds;
+  float noiseScale  = 0.667f;
+  float lengthScale = 1.0f;
+  float noiseW      = 0.8f;
+  std::optional<int64_t> speakerId;
+  std::optional<int64_t> languageId;
+  // Flat [a1,a2,a3, a1,a2,a3, ...] per phoneme. Empty = no prosody.
+  std::vector<int64_t> prosodyFeatures;
+};
+
 struct PhonemeInfo {
   std::string phoneme;     // Phoneme string
   float start_time;        // Start time in seconds
@@ -150,6 +164,11 @@ void loadVoice(PiperConfig &config, std::string modelPath,
                std::optional<SpeakerId> &speakerId,
                const std::string &provider = "cpu",
                int gpuDeviceId = 0, int numThreads = 0);
+
+/// Warm up the ONNX session with dummy inference runs.
+/// Reduces first-inference latency by 500-800ms.
+/// Any exception is caught and logged as a warning (non-fatal).
+void warmupModel(ModelSession &session, int runs = 2);
 
 // Phonemize text and synthesize audio
 void textToAudio(PiperConfig &config, Voice &voice, std::string text,

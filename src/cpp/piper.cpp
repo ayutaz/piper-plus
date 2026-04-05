@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <array>
 #include <chrono>
 #include <cmath>
@@ -7,6 +8,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <filesystem>
+#include <thread>
 #include <unordered_map>
 #include <regex>
 
@@ -69,6 +71,10 @@ const std::string VERSION = "";
 
 // Maximum value for 16-bit signed WAV sample
 const float MAX_WAV_VALUE = 32767.0f;
+
+// Upper bound for intra-op threads, matching Rust/C#/Python convention.
+// Beyond 4 threads VITS sees diminishing returns and increased contention.
+constexpr int MAX_INTRA_THREADS = 4;
 
 // PUA to multi-char phoneme mapping for display
 static const std::unordered_map<char32_t, std::string> puaToPhoneme = {
@@ -451,12 +457,21 @@ void loadModel(std::string modelPath, ModelSession &session,
     throw std::runtime_error("Unknown provider: " + provider);
   }
 
-  // Set number of intra-op threads if requested (clamp negative to 0)
-  int effectiveThreads = (numThreads < 0) ? 0 : numThreads;
-  if (effectiveThreads > 0) {
-    session.options.SetIntraOpNumThreads(effectiveThreads);
-    spdlog::info("Set IntraOpNumThreads to {}", effectiveThreads);
+  // Compute effective intra-op thread count.
+  // Formula: min(logical_cores / 2, MAX_INTRA_THREADS) — matches Rust/C#/Python.
+  int effectiveThreads = numThreads;
+  if (effectiveThreads <= 0) {
+    unsigned int hwThreads = std::thread::hardware_concurrency();
+    if (hwThreads == 0) hwThreads = 2;  // fallback when detection fails
+    effectiveThreads = std::min(static_cast<int>(hwThreads / 2),
+                                MAX_INTRA_THREADS);
+    if (effectiveThreads < 1) effectiveThreads = 1;
   }
+  effectiveThreads = std::min(effectiveThreads, MAX_INTRA_THREADS);
+  session.options.SetIntraOpNumThreads(effectiveThreads);
+  spdlog::info("Set IntraOpNumThreads to {} (requested={}, hw_concurrency={})",
+               effectiveThreads, numThreads,
+               std::thread::hardware_concurrency());
 
   // Roughly doubles load time for no visible inference benefit
   // session.options.SetGraphOptimizationLevel(
@@ -655,6 +670,98 @@ void loadVoice(PiperConfig &config, std::string modelPath,
 
 } /* loadVoice */
 
+// ---------------------------------------------------------------------------
+// buildInputTensors — shared tensor construction for synthesize / warmupModel
+// ---------------------------------------------------------------------------
+// Buffers (phonemeIdsBuf, etc.) are written by this function and MUST remain
+// alive until after session.onnx.Run() returns, because Ort::Value::CreateTensor
+// holds a raw pointer into them.
+//
+// Returns: { vector<Ort::Value>, vector<const char*> inputNames }
+static std::pair<std::vector<Ort::Value>, std::vector<const char *>>
+buildInputTensors(
+    const InferenceInputs &inputs,
+    const ModelSession &session,
+    Ort::MemoryInfo &memoryInfo,
+    // Caller-owned buffers — kept alive until Run() completes
+    std::vector<int64_t> &phonemeIdsBuf,
+    std::vector<int64_t> &phonemeIdLengthsBuf,
+    std::vector<float>   &scalesBuf,
+    std::vector<int64_t> &sidBuf,
+    std::vector<int64_t> &lidBuf,
+    std::vector<int64_t> &prosodyBuf) {
+
+  // ---- phoneme ids ----
+  phonemeIdsBuf = inputs.phonemeIds;  // copy
+  const int64_t numPhonemes = static_cast<int64_t>(phonemeIdsBuf.size());
+
+  phonemeIdLengthsBuf = {numPhonemes};
+  scalesBuf = {inputs.noiseScale, inputs.lengthScale, inputs.noiseW};
+
+  std::vector<Ort::Value> tensors;
+  std::vector<const char *> names;
+
+  // input (phoneme ids)
+  std::vector<int64_t> phonemeIdsShape{1, numPhonemes};
+  names.push_back("input");
+  tensors.push_back(Ort::Value::CreateTensor<int64_t>(
+      memoryInfo, phonemeIdsBuf.data(), phonemeIdsBuf.size(),
+      phonemeIdsShape.data(), phonemeIdsShape.size()));
+
+  // input_lengths
+  std::vector<int64_t> phonemeIdLengthsShape{
+      static_cast<int64_t>(phonemeIdLengthsBuf.size())};
+  names.push_back("input_lengths");
+  tensors.push_back(Ort::Value::CreateTensor<int64_t>(
+      memoryInfo, phonemeIdLengthsBuf.data(), phonemeIdLengthsBuf.size(),
+      phonemeIdLengthsShape.data(), phonemeIdLengthsShape.size()));
+
+  // scales
+  std::vector<int64_t> scalesShape{static_cast<int64_t>(scalesBuf.size())};
+  names.push_back("scales");
+  tensors.push_back(Ort::Value::CreateTensor<float>(
+      memoryInfo, scalesBuf.data(), scalesBuf.size(),
+      scalesShape.data(), scalesShape.size()));
+
+  // sid (speaker id)
+  if (session.hasMultiSpeaker) {
+    sidBuf = {inputs.speakerId.value_or(0)};
+    std::vector<int64_t> sidShape{static_cast<int64_t>(sidBuf.size())};
+    names.push_back("sid");
+    tensors.push_back(Ort::Value::CreateTensor<int64_t>(
+        memoryInfo, sidBuf.data(), sidBuf.size(),
+        sidShape.data(), sidShape.size()));
+  }
+
+  // lid (language id)
+  if (session.hasLidInput) {
+    lidBuf = {inputs.languageId.value_or(0)};
+    std::vector<int64_t> lidShape{static_cast<int64_t>(lidBuf.size())};
+    names.push_back("lid");
+    tensors.push_back(Ort::Value::CreateTensor<int64_t>(
+        memoryInfo, lidBuf.data(), lidBuf.size(),
+        lidShape.data(), lidShape.size()));
+  }
+
+  // prosody_features
+  if (session.hasProsodyInput) {
+    std::vector<int64_t> prosodyShape{1, numPhonemes, 3};
+    const auto expectedSize = static_cast<size_t>(numPhonemes) * 3;
+    if (!inputs.prosodyFeatures.empty() &&
+        inputs.prosodyFeatures.size() == expectedSize) {
+      prosodyBuf = inputs.prosodyFeatures;  // copy
+    } else {
+      prosodyBuf.assign(expectedSize, 0);
+    }
+    names.push_back("prosody_features");
+    tensors.push_back(Ort::Value::CreateTensor<int64_t>(
+        memoryInfo, prosodyBuf.data(), prosodyBuf.size(),
+        prosodyShape.data(), prosodyShape.size()));
+  }
+
+  return {std::move(tensors), std::move(names)};
+}
+
 // Phoneme ids to WAV audio
 void synthesize(std::vector<PhonemeId> &phonemeIds,
                 SynthesisConfig &synthesisConfig, ModelSession &session,
@@ -666,83 +773,36 @@ void synthesize(std::vector<PhonemeId> &phonemeIds,
   auto memoryInfo = Ort::MemoryInfo::CreateCpu(
       OrtAllocatorType::OrtArenaAllocator, OrtMemType::OrtMemTypeDefault);
 
-  // Allocate
-  std::vector<int64_t> phonemeIdLengths{(int64_t)phonemeIds.size()};
-  std::vector<float> scales{synthesisConfig.noiseScale,
-                            synthesisConfig.lengthScale,
-                            synthesisConfig.noiseW};
-
-  std::vector<Ort::Value> inputTensors;
-  std::vector<int64_t> phonemeIdsShape{1, (int64_t)phonemeIds.size()};
-  inputTensors.push_back(Ort::Value::CreateTensor<int64_t>(
-      memoryInfo, phonemeIds.data(), phonemeIds.size(), phonemeIdsShape.data(),
-      phonemeIdsShape.size()));
-
-  std::vector<int64_t> phomemeIdLengthsShape{(int64_t)phonemeIdLengths.size()};
-  inputTensors.push_back(Ort::Value::CreateTensor<int64_t>(
-      memoryInfo, phonemeIdLengths.data(), phonemeIdLengths.size(),
-      phomemeIdLengthsShape.data(), phomemeIdLengthsShape.size()));
-
-  std::vector<int64_t> scalesShape{(int64_t)scales.size()};
-  inputTensors.push_back(
-      Ort::Value::CreateTensor<float>(memoryInfo, scales.data(), scales.size(),
-                                      scalesShape.data(), scalesShape.size()));
-
-  // Build input names dynamically based on model capabilities
-  std::vector<const char *> inputNamesVec = {"input", "input_lengths", "scales"};
-
-  // Add speaker id only for multi-speaker models
-  // NOTE: These must be kept outside the "if" below to avoid being deallocated.
-  std::vector<int64_t> speakerId{
-      (int64_t)synthesisConfig.speakerId.value_or(0)};
-  std::vector<int64_t> speakerIdShape{(int64_t)speakerId.size()};
-
-  if (session.hasMultiSpeaker) {
-    inputTensors.push_back(Ort::Value::CreateTensor<int64_t>(
-        memoryInfo, speakerId.data(), speakerId.size(), speakerIdShape.data(),
-        speakerIdShape.size()));
-    inputNamesVec.push_back("sid");
-  }
-
-  // Add language id for multilingual models
-  // ONNX input order: ... -> sid -> lid -> prosody_features
-  // NOTE: Must be declared outside "if" to prevent deallocation before Run().
+  // Validate & clamp language ID before building tensors
   auto lid = synthesisConfig.languageId.value_or(0);
   if (voice && (lid < 0 || lid >= voice->modelConfig.numLanguages)) {
     spdlog::warn("Language ID {} out of range [0, {}), using 0",
                  lid, voice->modelConfig.numLanguages);
     lid = 0;
   }
-  std::vector<int64_t> languageId{(int64_t)lid};
-  std::vector<int64_t> languageIdShape{(int64_t)languageId.size()};
 
-  if (session.hasLidInput) {
-    inputTensors.push_back(Ort::Value::CreateTensor<int64_t>(
-        memoryInfo, languageId.data(), languageId.size(),
-        languageIdShape.data(), languageIdShape.size()));
-    inputNamesVec.push_back("lid");
+  // Populate InferenceInputs from the existing parameters
+  InferenceInputs inputs;
+  inputs.phonemeIds.assign(phonemeIds.begin(), phonemeIds.end());
+  inputs.noiseScale  = synthesisConfig.noiseScale;
+  inputs.lengthScale = synthesisConfig.lengthScale;
+  inputs.noiseW      = synthesisConfig.noiseW;
+  inputs.speakerId   = static_cast<int64_t>(synthesisConfig.speakerId.value_or(0));
+  inputs.languageId  = static_cast<int64_t>(lid);
+  if (prosodyFeatures) {
+    inputs.prosodyFeatures = *prosodyFeatures;
   }
 
-  // Add prosody features if model supports them and they are provided
-  // prosodyFeatures is a flat array of [a1, a2, a3, a1, a2, a3, ...] for each phoneme
-  std::vector<int64_t> zeroProsody;
-  if (session.hasProsodyInput) {
-    std::vector<int64_t> prosodyShape{1, (int64_t)phonemeIds.size(), 3};
-    if (prosodyFeatures && prosodyFeatures->size() == phonemeIds.size() * 3) {
-      inputTensors.push_back(Ort::Value::CreateTensor<int64_t>(
-          memoryInfo, prosodyFeatures->data(), prosodyFeatures->size(),
-          prosodyShape.data(), prosodyShape.size()));
-    } else {
-      // Use zeros if no prosody features provided
-      zeroProsody.resize(phonemeIds.size() * 3, 0);
-      inputTensors.push_back(Ort::Value::CreateTensor<int64_t>(
-          memoryInfo, zeroProsody.data(), zeroProsody.size(),
-          prosodyShape.data(), prosodyShape.size()));
-    }
-    inputNamesVec.push_back("prosody_features");
-  }
-  
-  // Check if we should get duration output
+  // Buffers must outlive the Run() call
+  std::vector<int64_t> phonemeIdsBuf, phonemeIdLengthsBuf, sidBuf, lidBuf, prosodyBuf;
+  std::vector<float> scalesBuf;
+
+  auto [inputTensors, inputNamesVec] = buildInputTensors(
+      inputs, session, memoryInfo,
+      phonemeIdsBuf, phonemeIdLengthsBuf, scalesBuf,
+      sidBuf, lidBuf, prosodyBuf);
+
+  // Output names
   std::vector<const char *> outputNamesVec;
   outputNamesVec.push_back("output");
   if (session.hasDurationOutput) {
@@ -867,78 +927,36 @@ void synthesizeFloat(std::vector<PhonemeId> &phonemeIds,
   auto memoryInfo = Ort::MemoryInfo::CreateCpu(
       OrtAllocatorType::OrtArenaAllocator, OrtMemType::OrtMemTypeDefault);
 
-  // Allocate
-  std::vector<int64_t> phonemeIdLengths{(int64_t)phonemeIds.size()};
-  std::vector<float> scales{synthesisConfig.noiseScale,
-                            synthesisConfig.lengthScale,
-                            synthesisConfig.noiseW};
-
-  std::vector<Ort::Value> inputTensors;
-  std::vector<int64_t> phonemeIdsShape{1, (int64_t)phonemeIds.size()};
-  inputTensors.push_back(Ort::Value::CreateTensor<int64_t>(
-      memoryInfo, phonemeIds.data(), phonemeIds.size(), phonemeIdsShape.data(),
-      phonemeIdsShape.size()));
-
-  std::vector<int64_t> phomemeIdLengthsShape{(int64_t)phonemeIdLengths.size()};
-  inputTensors.push_back(Ort::Value::CreateTensor<int64_t>(
-      memoryInfo, phonemeIdLengths.data(), phonemeIdLengths.size(),
-      phomemeIdLengthsShape.data(), phomemeIdLengthsShape.size()));
-
-  std::vector<int64_t> scalesShape{(int64_t)scales.size()};
-  inputTensors.push_back(
-      Ort::Value::CreateTensor<float>(memoryInfo, scales.data(), scales.size(),
-                                      scalesShape.data(), scalesShape.size()));
-
-  // Build input names dynamically based on model capabilities
-  std::vector<const char *> inputNamesVec = {"input", "input_lengths", "scales"};
-
-  // Add speaker id only for multi-speaker models
-  std::vector<int64_t> speakerId{
-      (int64_t)synthesisConfig.speakerId.value_or(0)};
-  std::vector<int64_t> speakerIdShape{(int64_t)speakerId.size()};
-
-  if (session.hasMultiSpeaker) {
-    inputTensors.push_back(Ort::Value::CreateTensor<int64_t>(
-        memoryInfo, speakerId.data(), speakerId.size(), speakerIdShape.data(),
-        speakerIdShape.size()));
-    inputNamesVec.push_back("sid");
-  }
-
-  // Add language id for multilingual models
+  // Validate & clamp language ID before building tensors
   auto lid = synthesisConfig.languageId.value_or(0);
   if (voice && (lid < 0 || lid >= voice->modelConfig.numLanguages)) {
     spdlog::warn("Language ID {} out of range [0, {}), using 0",
                  lid, voice->modelConfig.numLanguages);
     lid = 0;
   }
-  std::vector<int64_t> languageId{(int64_t)lid};
-  std::vector<int64_t> languageIdShape{(int64_t)languageId.size()};
 
-  if (session.hasLidInput) {
-    inputTensors.push_back(Ort::Value::CreateTensor<int64_t>(
-        memoryInfo, languageId.data(), languageId.size(),
-        languageIdShape.data(), languageIdShape.size()));
-    inputNamesVec.push_back("lid");
+  // Populate InferenceInputs from the existing parameters
+  InferenceInputs inputs;
+  inputs.phonemeIds.assign(phonemeIds.begin(), phonemeIds.end());
+  inputs.noiseScale  = synthesisConfig.noiseScale;
+  inputs.lengthScale = synthesisConfig.lengthScale;
+  inputs.noiseW      = synthesisConfig.noiseW;
+  inputs.speakerId   = static_cast<int64_t>(synthesisConfig.speakerId.value_or(0));
+  inputs.languageId  = static_cast<int64_t>(lid);
+  if (prosodyFeatures) {
+    inputs.prosodyFeatures = *prosodyFeatures;
   }
 
-  // Add prosody features if model supports them and they are provided
-  std::vector<int64_t> zeroProsody;
-  if (session.hasProsodyInput) {
-    std::vector<int64_t> prosodyShape{1, (int64_t)phonemeIds.size(), 3};
-    if (prosodyFeatures && prosodyFeatures->size() == phonemeIds.size() * 3) {
-      inputTensors.push_back(Ort::Value::CreateTensor<int64_t>(
-          memoryInfo, prosodyFeatures->data(), prosodyFeatures->size(),
-          prosodyShape.data(), prosodyShape.size()));
-    } else {
-      zeroProsody.resize(phonemeIds.size() * 3, 0);
-      inputTensors.push_back(Ort::Value::CreateTensor<int64_t>(
-          memoryInfo, zeroProsody.data(), zeroProsody.size(),
-          prosodyShape.data(), prosodyShape.size()));
-    }
-    inputNamesVec.push_back("prosody_features");
-  }
+  // Buffers must outlive the Run() call
+  std::vector<int64_t> phonemeIdsBuf, phonemeIdLengthsBuf, sidBuf, lidBuf, prosodyBuf;
+  std::vector<float> scalesBuf;
 
-  // Check if we should get duration output
+  auto [inputTensors, inputNamesVec] = buildInputTensors(
+      inputs, session, memoryInfo,
+      phonemeIdsBuf, phonemeIdLengthsBuf, scalesBuf,
+      sidBuf, lidBuf, prosodyBuf);
+
+  // Output names
   std::vector<const char *> outputNamesVec;
   outputNamesVec.push_back("output");
   if (session.hasDurationOutput) {
@@ -2330,6 +2348,67 @@ void outputTimingsAsTSV(const std::vector<PhonemeInfo> &timings,
                << info.end_time << "\t"
                << info.start_frame << "\t"
                << info.end_frame << std::endl;
+    }
+}
+
+void warmupModel(ModelSession &session, int runs) {
+    if (runs <= 0) {
+        return;
+    }
+
+    try {
+        auto startTime = std::chrono::steady_clock::now();
+        auto memoryInfo = Ort::MemoryInfo::CreateCpu(
+            OrtAllocatorType::OrtArenaAllocator, OrtMemType::OrtMemTypeDefault);
+
+        // Build dummy inputs: BOS(1) + dummy(8)x98 + EOS(2) = 100 tokens
+        constexpr int64_t phonemeLength = 100;
+
+        InferenceInputs dummy;
+        dummy.phonemeIds.assign(phonemeLength, 8);
+        dummy.phonemeIds[0] = 1;                       // BOS
+        dummy.phonemeIds[phonemeLength - 1] = 2;       // EOS
+        // noiseScale / lengthScale / noiseW use defaults (0.667, 1.0, 0.8)
+        if (session.hasMultiSpeaker) dummy.speakerId = 0;
+        if (session.hasLidInput)     dummy.languageId = 0;
+        if (session.hasProsodyInput) {
+            dummy.prosodyFeatures.assign(phonemeLength * 3, 0);
+        }
+
+        // Buffers kept alive across all warmup runs
+        std::vector<int64_t> phonemeIdsBuf, phonemeIdLengthsBuf, sidBuf, lidBuf, prosodyBuf;
+        std::vector<float> scalesBuf;
+
+        auto [inputTensors, inputNames] = buildInputTensors(
+            dummy, session, memoryInfo,
+            phonemeIdsBuf, phonemeIdLengthsBuf, scalesBuf,
+            sidBuf, lidBuf, prosodyBuf);
+
+        // Output names
+        std::vector<const char*> outputNames;
+        outputNames.push_back("output");
+        if (session.hasDurationOutput) {
+            outputNames.push_back("durations");
+        }
+
+        // Run warmup
+        for (int i = 0; i < runs; i++) {
+            auto runStart = std::chrono::steady_clock::now();
+            session.onnx.Run(Ort::RunOptions{nullptr},
+                             inputNames.data(), inputTensors.data(), inputTensors.size(),
+                             outputNames.data(), outputNames.size());
+            auto runEnd = std::chrono::steady_clock::now();
+            spdlog::debug("Warmup run {}/{} completed in {}ms", i + 1, runs,
+                          std::chrono::duration<double, std::milli>(runEnd - runStart).count());
+        }
+
+        auto endTime = std::chrono::steady_clock::now();
+        auto elapsedMs = std::chrono::duration<double, std::milli>(endTime - startTime).count();
+        spdlog::info("Warmup completed ({} runs in {:.0f}ms)", runs, elapsedMs);
+    } catch (const std::exception &e) {
+        spdlog::warn("Warmup failed (non-fatal): {}", e.what());
+    } catch (...) {
+        spdlog::warn("Warmup failed (non-fatal): unknown error");
     }
 }
 

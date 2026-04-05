@@ -8,6 +8,7 @@ on:
       - 'huggingface-space/**'
       - 'src/python/g2p/**'
       - 'src/python/piper_train/infer_onnx.py'
+      - 'src/python/piper_train/ort_utils.py'
       - '.github/workflows/deploy-huggingface.yml'
   workflow_dispatch:
     inputs:

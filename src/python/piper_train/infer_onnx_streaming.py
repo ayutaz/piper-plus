@@ -12,7 +12,7 @@ import time
 import numpy as np
 import onnxruntime
 
-from .ort_utils import create_session_options
+from .ort_utils import create_session_options, warmup_onnx_session
 from .vits.utils import audio_float_to_int16
 
 
@@ -48,6 +48,9 @@ class SpeechStreamer:
         self.decoder = onnxruntime.InferenceSession(
             decoder_path, sess_options=sess_options
         )
+
+        # Warmup encoder only (decoder requires encoder output as input)
+        warmup_onnx_session(self.encoder)
 
         self.sample_rate = sample_rate
         self.chunk_size = chunk_size
