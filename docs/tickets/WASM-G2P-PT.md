@@ -67,6 +67,14 @@ Rust `convert_word()` (L555-811, ~260行) の線形スキャナ。
 | `g` + soft vowel | → ʒ |
 | `j` | → ʒ |
 | `h` | 黙字 |
+| `t` + i/í (BR) | → PUA tʃ (E054) + i |
+| `d` + i/í (BR) | → PUA dʒ (E055) + i |
+
+> **重要:** 口蓋化は 2 箇所で発生する:
+> 1. `convert_word()` 内: grapheme レベルで `t`/`d` + `i`/`í` → PUA affricate (全 ti/di シーケンス)
+> 2. `applyBrPostprocessing()` 内: phoneme レベルで非ストレス語末 `e` の前の `t`/`d` → affricate + `i` (te→tʃi, de→dʒi の変換)
+>
+> 両方を実装しないと、`"tia"` は convert_word で処理されるが `"gente"` は後処理でのみ処理されるため、どちらか片方だけでは不完全。
 
 #### 母音ルール
 
@@ -77,6 +85,18 @@ Rust `convert_word()` (L555-811, ~260行) の線形スキャナ。
 | acute (á, é, í, ó, ú) | → 開母音 (e→ɛ, o→ɔ, 他は base) |
 | circumflex (â, ê, ô) | → 閉母音 (base) |
 | その他 | → base |
+
+**鼻母音 Unicode コードポイント:**
+
+| 鼻母音 | Unicode | ブロック | JS リテラル |
+|--------|---------|---------|------------|
+| ã | U+00E3 | Latin-1 Supplement | `'\u00E3'` |
+| ẽ | U+1EBD | Latin Extended Additional | `'\u1EBD'` |
+| ĩ | U+0129 | Latin Extended-A | `'\u0129'` |
+| õ | U+00F5 | Latin-1 Supplement | `'\u00F5'` |
+| ũ | U+0169 | Latin Extended-A | `'\u0169'` |
+
+注記: ẽ (U+1EBD), ĩ (U+0129), ũ (U+0169) は Latin Extended ブロックに属し、一般的なキーボードからは直接入力できない。JS 実装では Unicode エスケープ (`'\u1EBD'` 等) を使用すること。
 
 ### 2-3. BR 後処理パイプライン (~100行)
 
@@ -89,6 +109,12 @@ convert_word() → removeDuplicateNasalCoda() → applyCodaLVocalization() → a
 #### Stage 1: `removeDuplicateNasalCoda()`
 - 鼻母音 + n/m の重複除去
 - 例: "bom" → b õ (not b õ m)
+
+> **`removeDuplicateNasalCoda()` の実装詳細:**
+> - **スキャン方向:** 末尾から先頭へ逆方向スキャン (`let i = phonemes.length - 1; while (i >= 1)`)
+> - **stress_idx 調整:** 削除位置がストレス位置より前の場合 (`i < stressIdx`) に stressIdx を 1 減算
+>   - 注意: `i < stressIdx` (strictly less than) であり `i <= stressIdx` ではない
+> - **JS immutable 設計の場合:** 新配列を返す方式では、フィルタ後にストレス位置を再計算する方が安全。`{ phonemes, stressIdx }` オブジェクトを返す設計を推奨
 
 #### Stage 2: `applyCodaLVocalization()`
 - 音節末 l → w (語末/子音前/句読点前)
@@ -110,9 +136,13 @@ convert_word() → removeDuplicateNasalCoda() → applyCodaLVocalization() → a
 | `countVowelGroups(word)` | qu/gu + ou 考慮の音節数推定 |
 
 ストレス位置規則:
-- アクセント記号あり → その母音
-- 末尾 a/e/o/am/em/ens → 次末 (paroxytone)
-- 末尾子音 (s除く)/i/u → 最終 (oxytone)
+
+> **ストレス検出の前処理:**
+> 1. 末尾の `s` を繰り返しストリップ (`"casas"` → `"casa"`, `"palabras"` → `"palabra"`)
+> 2. ストリップ後の語尾に以下の規則を適用:
+>    - 末尾 a/e/o/am/em → 次末 (paroxytone)
+>    - 末尾子音/i/u → 最終 (oxytone)
+>    - アクセント記号あり → その母音 (最優先)
 
 ### 2-5. PUA マッピング
 
@@ -208,6 +238,7 @@ Rust 18 テストケースの移植:
    ```
    - Rust は `&mut` で in-place 変更だが、JS では新配列返却の方が immutable で安全
    - 各ステップの入出力をテストで個別検証可能
+   > **注意:** `removeDuplicateNasalCoda` が `stressIdx` を変更する副作用を持つため、immutable 設計では各ステップが `{ phonemes: string[], stressIdx: number }` を返すインターフェースとする。
 
 2. **PT-PT 拡張を見据えた方言パラメータ:**
    ```javascript
