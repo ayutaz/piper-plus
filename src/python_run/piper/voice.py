@@ -18,6 +18,17 @@ from .util import audio_float_to_int16
 
 _LOGGER = logging.getLogger(__name__)
 
+# Optional: use shared ORT utilities when piper_train is available
+try:
+    from piper_train.ort_utils import (
+        create_session_with_cache as _shared_create_session_with_cache,
+        warmup_onnx_session as _shared_warmup,
+    )
+
+    _HAS_SHARED_ORT_UTILS = True
+except ImportError:
+    _HAS_SHARED_ORT_UTILS = False
+
 # Multi-character phoneme to PUA character mapping — derived from token_mapper
 # to guarantee consistency across the codebase.
 MULTI_CHAR_TO_PUA = {k: chr(v) for k, v in FIXED_PUA_MAPPING.items()}
@@ -67,6 +78,121 @@ def _warmup_session(
         _LOGGER.warning("Warmup failed (non-fatal): %s", e)
 
 
+def _load_session_inline(
+    model_path: str | Path,
+    *,
+    use_cuda: bool = False,
+) -> onnxruntime.InferenceSession:
+    """Create an InferenceSession using inline logic (no piper_train dependency).
+
+    This is the fallback used when piper_train.ort_utils is not available.
+    Keep in sync with piper_train.ort_utils.create_session_with_cache().
+    """
+    providers: list[str | tuple[str, dict[str, Any]]]
+    if use_cuda:
+        providers = [
+            (
+                "CUDAExecutionProvider",
+                {"cudnn_conv_algo_search": "HEURISTIC"},
+            )
+        ]
+    else:
+        providers = ["CPUExecutionProvider"]
+
+    # Keep in sync with piper_train.ort_utils.create_session_options()
+    sess_options = onnxruntime.SessionOptions()
+    sess_options.graph_optimization_level = (
+        onnxruntime.GraphOptimizationLevel.ORT_ENABLE_ALL
+    )
+    sess_options.execution_mode = onnxruntime.ExecutionMode.ORT_SEQUENTIAL
+
+    # Thread settings: env var > auto-detect (sched_getaffinity > cpu_count)
+    env_threads = os.environ.get("PIPER_INTRA_THREADS")
+    intra_threads: int | None = None
+    if env_threads is not None:
+        try:
+            intra_threads = max(1, min(int(env_threads), 4))
+        except ValueError:
+            _LOGGER.warning(
+                "Ignoring invalid PIPER_INTRA_THREADS=%r; using auto-detected thread count",
+                env_threads,
+            )
+
+    if intra_threads is None:
+        try:
+            logical_cores = len(os.sched_getaffinity(0))
+        except (AttributeError, OSError):
+            logical_cores = os.cpu_count() or 2
+        intra_threads = min(logical_cores // 2 or 1, 4)
+
+    sess_options.intra_op_num_threads = intra_threads
+    sess_options.inter_op_num_threads = 1
+
+    sess_options.enable_cpu_mem_arena = True
+    sess_options.enable_mem_pattern = True
+    sess_options.enable_mem_reuse = True
+
+    # Dynamic block sizing: reduce latency variance (keep in sync with ort_utils)
+    sess_options.add_session_config_entry("session.dynamic_block_base", "4")
+
+    # === Model cache logic: Keep in sync with piper_train.ort_utils.create_session_with_cache() ===
+    _disable_cache = os.environ.get("PIPER_DISABLE_CACHE", "").lower() in (
+        "1",
+        "true",
+        "yes",
+    )
+
+    model_p = Path(model_path)
+    device_label = "cuda0" if use_cuda else "cpu"
+    cache_path = model_p.with_suffix(f".{device_label}.opt.onnx")
+    sentinel_path = Path(str(cache_path) + ".ok")
+    use_cached = not _disable_cache and cache_path.exists() and sentinel_path.exists()
+
+    if _disable_cache:
+        _LOGGER.info("Model cache disabled via PIPER_DISABLE_CACHE")
+        effective_model_path = str(model_path)
+    elif use_cached:
+        _LOGGER.info("Loading pre-optimized model from %s", cache_path)
+        sess_options.graph_optimization_level = (
+            onnxruntime.GraphOptimizationLevel.ORT_DISABLE_ALL
+        )
+        effective_model_path = str(cache_path)
+    else:
+        if cache_path.exists() and not sentinel_path.exists():
+            _LOGGER.warning(
+                "Removing incomplete cache %s (missing sentinel)", cache_path
+            )
+            try:
+                cache_path.unlink()
+            except OSError:
+                pass
+        try:
+            sess_options.optimized_model_filepath = str(cache_path)
+        except Exception as exc:
+            _LOGGER.warning(
+                "Could not set optimized model path %s: %s (continuing without cache)",
+                cache_path,
+                exc,
+            )
+        effective_model_path = str(model_path)
+
+    session = onnxruntime.InferenceSession(
+        effective_model_path,
+        sess_options=sess_options,
+        providers=providers,
+    )
+
+    # Write sentinel if cache was created
+    if not _disable_cache and not use_cached and cache_path.exists():
+        try:
+            sentinel_path.write_text("ok")
+            _LOGGER.info("Cache sentinel written: %s", sentinel_path)
+        except OSError as exc:
+            _LOGGER.warning("Failed to write sentinel %s: %s", sentinel_path, exc)
+
+    return session
+
+
 @dataclass
 class PiperVoice:
     session: onnxruntime.InferenceSession
@@ -89,111 +215,16 @@ class PiperVoice:
         with open(config_path, encoding="utf-8") as config_file:
             config_dict = json.load(config_file)
 
-        providers: list[str | tuple[str, dict[str, Any]]]
-        if use_cuda:
-            providers = [
-                (
-                    "CUDAExecutionProvider",
-                    {"cudnn_conv_algo_search": "HEURISTIC"},
-                )
-            ]
+        if _HAS_SHARED_ORT_UTILS:
+            # Use shared ORT utilities (avoids code duplication)
+            device = "gpu" if use_cuda else "cpu"
+            session = _shared_create_session_with_cache(model_path, device=device)
+            _shared_warmup(session)
         else:
-            providers = ["CPUExecutionProvider"]
-
-        # Keep in sync with piper_train.ort_utils.create_session_options()
-        sess_options = onnxruntime.SessionOptions()
-        sess_options.graph_optimization_level = (
-            onnxruntime.GraphOptimizationLevel.ORT_ENABLE_ALL
-        )
-        sess_options.execution_mode = onnxruntime.ExecutionMode.ORT_SEQUENTIAL
-
-        # Thread settings: env var > auto-detect (sched_getaffinity > cpu_count)
-        env_threads = os.environ.get("PIPER_INTRA_THREADS")
-        intra_threads: int | None = None
-        if env_threads is not None:
-            try:
-                intra_threads = max(1, min(int(env_threads), 4))
-            except ValueError:
-                _LOGGER.warning(
-                    "Ignoring invalid PIPER_INTRA_THREADS=%r; using auto-detected thread count",
-                    env_threads,
-                )
-
-        if intra_threads is None:
-            try:
-                logical_cores = len(os.sched_getaffinity(0))
-            except (AttributeError, OSError):
-                logical_cores = os.cpu_count() or 2
-            intra_threads = min(logical_cores // 2 or 1, 4)
-
-        sess_options.intra_op_num_threads = intra_threads
-        sess_options.inter_op_num_threads = 1
-
-        sess_options.enable_cpu_mem_arena = True
-        sess_options.enable_mem_pattern = True
-        sess_options.enable_mem_reuse = True
-
-        # Dynamic block sizing: reduce latency variance (keep in sync with ort_utils)
-        sess_options.add_session_config_entry("session.dynamic_block_base", "4")
-
-        # === Model cache logic: Keep in sync with piper_train.ort_utils.create_session_with_cache() ===
-        _disable_cache = os.environ.get("PIPER_DISABLE_CACHE", "").lower() in (
-            "1",
-            "true",
-            "yes",
-        )
-
-        model_p = Path(model_path)
-        device_label = "cuda0" if use_cuda else "cpu"
-        cache_path = model_p.with_suffix(f".{device_label}.opt.onnx")
-        sentinel_path = Path(str(cache_path) + ".ok")
-        use_cached = (
-            not _disable_cache and cache_path.exists() and sentinel_path.exists()
-        )
-
-        if _disable_cache:
-            _LOGGER.info("Model cache disabled via PIPER_DISABLE_CACHE")
-            effective_model_path = str(model_path)
-        elif use_cached:
-            _LOGGER.info("Loading pre-optimized model from %s", cache_path)
-            sess_options.graph_optimization_level = (
-                onnxruntime.GraphOptimizationLevel.ORT_DISABLE_ALL
-            )
-            effective_model_path = str(cache_path)
-        else:
-            if cache_path.exists() and not sentinel_path.exists():
-                _LOGGER.warning(
-                    "Removing incomplete cache %s (missing sentinel)", cache_path
-                )
-                try:
-                    cache_path.unlink()
-                except OSError:
-                    pass
-            try:
-                sess_options.optimized_model_filepath = str(cache_path)
-            except Exception as exc:
-                _LOGGER.warning(
-                    "Could not set optimized model path %s: %s (continuing without cache)",
-                    cache_path,
-                    exc,
-                )
-            effective_model_path = str(model_path)
-
-        session = onnxruntime.InferenceSession(
-            effective_model_path,
-            sess_options=sess_options,
-            providers=providers,
-        )
-
-        # Write sentinel if cache was created
-        if not _disable_cache and not use_cached and cache_path.exists():
-            try:
-                sentinel_path.write_text("ok")
-                _LOGGER.info("Cache sentinel written: %s", sentinel_path)
-            except OSError as exc:
-                _LOGGER.warning("Failed to write sentinel %s: %s", sentinel_path, exc)
-
-        _warmup_session(session)
+            # Fallback: inline implementation (python_run standalone)
+            # Keep in sync with piper_train.ort_utils
+            session = _load_session_inline(model_path, use_cuda=use_cuda)
+            _warmup_session(session)
 
         return PiperVoice(
             config=PiperConfig.from_dict(config_dict),
