@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.11.0] - 2026-04-06
+
+### Added
+- OpenAI 互換 TTS API エンドポイント追加 — `/v1/audio/speech` で既存の OpenAI クライアントから利用可能 (#321)
+- C API 共有ライブラリ — opaque handle + ストリーミング + 配布パッケージ + FFI サンプル (#309)
+- Go 推論バインディング — 6言語 G2P・ONNX 推論・CLI・サーバー (#260, #270)
+- piper-g2p 独立 G2P パッケージ (Python + Rust + JS/WASM) (#300)
+- 韓国語 G2P 対応 — C#・Go・npm/WASM 実装 + ドキュメント更新 (#299)
+- スウェーデン語 G2P 対応 — 全プラットフォーム実装 (#297)
+- WASM G2P — ES/FR/PT/ZH 実装 + テスト 841 件 (#316)
+- WebUI: entrypoint 自動モデル DL — `PIPER_MODEL` 環境変数で起動時取得 (#313)
+- README 多言語化 — 7言語追加 (KO/ES/PT/DE/RU/SV/HI) (#310)
+
+### Changed
+- CPU 推論 Tier 2 Quick Wins — warmup/cache/JA phonemize 全実装統一 (#318)
+- dynamic_block_base + メモリアリーナ/パターン — 全実装統一 (#317)
+- ONNX Runtime SessionOptions 最適化 — 全実装間で設定統一 (#315)
+- コールドスタート最適化 — 初回発話レイテンシ ~2s → ~300ms (Rust/C#/WASM) (#302)
+- WASM/npm パッケージ最適化 — 辞書外部化・feature gate・CI 改善 (#301)
+
+### Fixed
+- WebUI: NLTK tagger データ追加 — 英語推論の LookupError 解消 (#314)
+- セキュリティ脆弱性対応 — Dependabot アラート 17 件解消 (#311)
+- npm: config.json フォールバック追加 — HuggingFace 404 解消 (#304)
+- Dependabot セキュリティアラート対応 — Python/Rust 依存更新 (#298)
+
+### Documentation
+- npm インストール手順追加 + NVDA リンク更新 (#293)
+- npm バージョン参照を 0.1.1 に更新 (#292)
+- 完了済みチケット削除 + ドキュメント誤記修正 (#312)
+- 完了済み WASM G2P チケット・計画文書を削除 (#319)
+
+### Chore
+- 不要ドキュメント・壊れたデモ・WIP ワークフロー削除 (#303)
+
 ## [1.10.0] - 2026-03-28
 
 ### Changed
