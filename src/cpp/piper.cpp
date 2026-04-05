@@ -2333,4 +2333,103 @@ void outputTimingsAsTSV(const std::vector<PhonemeInfo> &timings,
     }
 }
 
+void warmupModel(ModelSession &session, int runs) {
+    if (runs <= 0) {
+        return;
+    }
+
+    try {
+        auto startTime = chrono::steady_clock::now();
+        auto memoryInfo = Ort::MemoryInfo::CreateCpu(
+            OrtAllocatorType::OrtArenaAllocator, OrtMemType::OrtMemTypeDefault);
+
+        // Dummy phoneme_ids: BOS(1) + dummy(8)x98 + EOS(2) = 100 tokens
+        constexpr int64_t phonemeLength = 100;
+        std::vector<int64_t> phonemeIds(phonemeLength, 8);
+        phonemeIds[0] = 1;                    // BOS
+        phonemeIds[phonemeLength - 1] = 2;    // EOS
+        std::vector<int64_t> phonemeIdsShape{1, phonemeLength};
+
+        std::vector<int64_t> phonemeIdLengths{phonemeLength};
+        std::vector<int64_t> phonemeIdLengthsShape{1};
+
+        std::vector<float> scales{0.667f, 1.0f, 0.8f};
+        std::vector<int64_t> scalesShape{3};
+
+        std::vector<Ort::Value> inputTensors;
+        std::vector<const char*> inputNames;
+        std::vector<const char*> outputNames;
+
+        inputNames.push_back("input");
+        inputTensors.push_back(Ort::Value::CreateTensor<int64_t>(
+            memoryInfo, phonemeIds.data(), phonemeIds.size(),
+            phonemeIdsShape.data(), phonemeIdsShape.size()));
+
+        inputNames.push_back("input_lengths");
+        inputTensors.push_back(Ort::Value::CreateTensor<int64_t>(
+            memoryInfo, phonemeIdLengths.data(), phonemeIdLengths.size(),
+            phonemeIdLengthsShape.data(), phonemeIdLengthsShape.size()));
+
+        inputNames.push_back("scales");
+        inputTensors.push_back(Ort::Value::CreateTensor<float>(
+            memoryInfo, scales.data(), scales.size(),
+            scalesShape.data(), scalesShape.size()));
+
+        // Optional: speaker ID
+        std::vector<int64_t> speakerId{0};
+        std::vector<int64_t> speakerIdShape{1};
+        if (session.hasMultiSpeaker) {
+            inputNames.push_back("sid");
+            inputTensors.push_back(Ort::Value::CreateTensor<int64_t>(
+                memoryInfo, speakerId.data(), speakerId.size(),
+                speakerIdShape.data(), speakerIdShape.size()));
+        }
+
+        // Optional: language ID
+        std::vector<int64_t> languageId{0};
+        std::vector<int64_t> languageIdShape{1};
+        if (session.hasLidInput) {
+            inputNames.push_back("lid");
+            inputTensors.push_back(Ort::Value::CreateTensor<int64_t>(
+                memoryInfo, languageId.data(), languageId.size(),
+                languageIdShape.data(), languageIdShape.size()));
+        }
+
+        // Optional: prosody features
+        std::vector<int64_t> prosodyFeatures(phonemeLength * 3, 0);
+        std::vector<int64_t> prosodyShape{1, phonemeLength, 3};
+        if (session.hasProsodyInput) {
+            inputNames.push_back("prosody_features");
+            inputTensors.push_back(Ort::Value::CreateTensor<int64_t>(
+                memoryInfo, prosodyFeatures.data(), prosodyFeatures.size(),
+                prosodyShape.data(), prosodyShape.size()));
+        }
+
+        // Output names
+        outputNames.push_back("output");
+        if (session.hasDurationOutput) {
+            outputNames.push_back("durations");
+        }
+
+        // Run warmup
+        for (int i = 0; i < runs; i++) {
+            auto runStart = chrono::steady_clock::now();
+            session.onnx.Run(Ort::RunOptions{nullptr},
+                             inputNames.data(), inputTensors.data(), inputTensors.size(),
+                             outputNames.data(), outputNames.size());
+            auto runEnd = chrono::steady_clock::now();
+            spdlog::debug("Warmup run {}/{} completed in {}ms", i + 1, runs,
+                          chrono::duration<double, milli>(runEnd - runStart).count());
+        }
+
+        auto endTime = chrono::steady_clock::now();
+        auto elapsedMs = chrono::duration<double, milli>(endTime - startTime).count();
+        spdlog::info("Warmup completed ({} runs in {:.0f}ms)", runs, elapsedMs);
+    } catch (const std::exception &e) {
+        spdlog::warn("Warmup failed (non-fatal): {}", e.what());
+    } catch (...) {
+        spdlog::warn("Warmup failed (non-fatal): unknown error");
+    }
+}
+
 } // namespace piper

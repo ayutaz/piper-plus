@@ -151,6 +151,11 @@ void loadVoice(PiperConfig &config, std::string modelPath,
                const std::string &provider = "cpu",
                int gpuDeviceId = 0, int numThreads = 0);
 
+/// Warm up the ONNX session with dummy inference runs.
+/// Reduces first-inference latency by 500-800ms.
+/// Any exception is caught and logged as a warning (non-fatal).
+void warmupModel(ModelSession &session, int runs = 2);
+
 // Phonemize text and synthesize audio
 void textToAudio(PiperConfig &config, Voice &voice, std::string text,
                  std::vector<int16_t> &audioBuffer, SynthesisResult &result,

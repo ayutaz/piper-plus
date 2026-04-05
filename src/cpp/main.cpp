@@ -53,6 +53,9 @@ struct RunConfig {
   // Test mode - skip ONNX runtime for CI testing
   bool testMode = false;
 
+  // Skip model warmup (faster startup, slower first inference)
+  bool noWarmup = false;
+
   // Type of output to produce.
   // Default is to write a WAV file in the current directory.
   OutputType outputType = OUTPUT_DIRECTORY;
@@ -285,6 +288,11 @@ int main(int argc, char *argv[]) {
   auto endTime = chrono::steady_clock::now();
   spdlog::info("Loaded voice in {} second(s)",
                chrono::duration<double>(endTime - startTime).count());
+
+  // Warmup
+  if (!runConfig.noWarmup && !runConfig.testMode) {
+      piper::warmupModel(voice.session);
+  }
 
   // Resolve --language to a numeric language ID
   if (runConfig.language) {
@@ -754,6 +762,9 @@ void printUsage(char *argv[]) {
   cerr << "   --download-model   NAME       download a voice model" << endl;
   cerr << "   --model-dir        DIR        directory for downloaded models" << endl;
   cerr << endl;
+  cerr << "   --no-warmup                   skip model warmup (faster startup, slower "
+          "first inference)"
+       << endl;
   cerr << "   --debug                       print DEBUG messages to the console"
        << endl;
   cerr << "   -q       --quiet              disable logging" << endl;
@@ -921,6 +932,8 @@ void parseArgs(int argc, char *argv[], RunConfig &runConfig) {
     } else if (arg == "--test-mode") {
       runConfig.testMode = true;
       spdlog::info("Test mode enabled - ONNX runtime will be skipped");
+    } else if (arg == "--no-warmup" || arg == "--no_warmup") {
+      runConfig.noWarmup = true;
     } else if (arg == "--debug") {
       // Set DEBUG logging
       spdlog::set_level(spdlog::level::debug);
@@ -947,7 +960,7 @@ void parseArgs(int argc, char *argv[], RunConfig &runConfig) {
         "--custom-dict", "--custom_dict", "--text",
         "--list-models", "--download-model", "--model-dir", "--model_dir",
         "--version", "--test-mode", "--debug", "--quiet", "--help",
-        "--no-stochastic",
+        "--no-stochastic", "--no-warmup", "--no_warmup",
       };
       // Find best match by edit distance (simple Levenshtein)
       string bestMatch;
