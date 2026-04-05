@@ -9,7 +9,6 @@
 
 ## M1: Python Warmup 実装
 
-> **チケット**: [M1-python-warmup.md](../tickets/tier2/M1-python-warmup.md)
 
 `ort_utils.py` に共有 warmup 関数を追加し、全 Python 推論エントリポイントから呼び出す。
 
@@ -48,7 +47,6 @@
 
 ## M2: C++ Warmup 実装
 
-> **チケット**: [M2-cpp-warmup.md](../tickets/tier2/M2-cpp-warmup.md)
 
 ### M2.1: `warmupModel()` 関数追加
 
@@ -84,7 +82,6 @@
 
 ## M3: Python 最適化モデルキャッシュ
 
-> **チケット**: [M3-python-model-cache.md](../tickets/tier2/M3-python-model-cache.md)
 
 ### M3.1: `create_session_with_cache()` コア実装
 
@@ -127,7 +124,6 @@
 
 ## M4: 日本語音素化キャッシュ
 
-> **チケット**: [M4-japanese-phonemize-cache.md](../tickets/tier2/M4-japanese-phonemize-cache.md)
 
 ### M4.1: piper_train 側 (学習/推論パッケージ)
 
@@ -161,7 +157,6 @@
 
 ## M5: 最終統合・CI・PR
 
-> **チケット**: [M5-integration.md](../tickets/tier2/M5-integration.md)
 
 ### M5.1: lint・フォーマット
 
