@@ -1,6 +1,7 @@
 # CPU 推論速度最適化ガイド
 
 > **調査日**: 2026-04-05
+> **最終更新**: 2026-04-05 (PR #315, #317 反映済み)
 > **対象**: Windows / Linux / macOS の CPU 環境における ONNX 推論速度改善
 
 ---
@@ -117,20 +118,17 @@ float32 audio [1, 1, samples]
 
 **結論**: 現在の FP16 デフォルトエクスポートは CPU 推論でも正しい選択。変更不要。
 
-### 問題 2: Python 推論スクリプトの最適化欠如
+### ~~問題 2: Python 推論スクリプトの最適化欠如~~ (解決済み — PR #315)
 
-`src/python/piper_train/infer_onnx.py:288-299` で `SessionOptions()` がデフォルトのまま:
+`piper_train.ort_utils` モジュールを新設し、全 Python 推論スクリプトの SessionOptions を統一。
 
-```python
-# 現状 (最適化なし)
-sess_options = onnxruntime.SessionOptions()
-```
+**PR #315 ベンチマーク結果 (10文, CPU):**
 
-C# (`SessionFactory.cs`) と Rust (`engine.rs`) は全て最適化済みだが、**Python だけ未対応**:
-- `intra_op_num_threads` 未設定 (全コア使用 → オーバーヘッド)
-- `graph_optimization_level` 未設定
-- `execution_mode` 未設定
-- メモリ最適化 (`enable_cpu_mem_arena`, `enable_mem_pattern`) 未設定
+| 計測 | 最適化前 | 最適化後 | 改善 |
+|------|---------|---------|------|
+| RTF mean | 0.1782 | 0.1556 | **12.7% 改善** |
+| RTF stdev | 0.0198 | 0.0141 | **28.8% 安定化** |
+| モデル読込 | 0.622s | 0.561s | 9.8% 短縮 |
 
 ### 問題 3: INT8 動的量子化は VITS に不適
 
@@ -142,14 +140,14 @@ sherpa-onnx でも INT8 量子化 TTS モデルが FP32 の数百倍遅い報告
 
 ## 最適化提案 (優先度順)
 
-### Tier 1: 即座に実装可能 (再学習不要)
+### Tier 1: 即座に実装可能 (再学習不要) — 全項目完了
 
-| # | 施策 | 期待改善 | 対象 | 実装コスト |
-|---|------|---------|------|----------|
-| 1 | Python `infer_onnx.py` に ORT 最適化設定追加 | RTF 10-30% 改善 | Python | 数行 |
-| 2 | Rust warmup 機能追加 (C# には実装済み) | 初回推論 500-800ms 短縮 | Rust | 低 |
-| 3 | `session.dynamic_block_base=4` 追加 | レイテンシ分散低減 | 全実装 | 1行 |
-| 4 | Rust/C++ にメモリアリーナ・パターン有効化 | RTF 5-15% 改善 | Rust/C++ | 数行 |
+| # | 施策 | 期待改善 | 対象 | 状態 |
+|---|------|---------|------|------|
+| 1 | Python `ort_utils.py` に ORT 最適化設定追加 | RTF 12.7% 改善 | Python | **完了** (PR #315) |
+| 2 | Rust warmup 機能 (C# と同等) | 初回推論 500-800ms 短縮 | Rust | **実装済み** (調査時に既存確認) |
+| 3 | `session.dynamic_block_base=4` 追加 | レイテンシ分散低減 | 全実装 | **完了** (PR #317) |
+| 4 | メモリアリーナ・パターン有効化 | RTF 5-15% 改善 | Rust/C# | **完了** (PR #317) |
 
 ### Tier 2: 中期施策 (再学習不要、検証必要)
 
@@ -181,16 +179,19 @@ sherpa-onnx でも INT8 量子化 TTS モデルが FP32 の数百倍遅い報告
 |---------|------|-----|-----|--------|
 | `ORT_ENABLE_ALL` | OK | OK | OK | OK |
 | `intra_threads=min(cores/2, 4)` | OK | OK | OK | OK |
-| `inter_threads=1` | OK | OK | - | OK |
-| `ORT_SEQUENTIAL` | OK | OK | - | OK |
+| `inter_threads=1` | OK | OK | OK | OK |
+| `ORT_SEQUENTIAL` | OK | OK | OK | OK |
+| `dynamic_block_base=4` | OK | OK | OK | OK |
+| メモリアリーナ (cpu_mem_arena) | OK (`apply_cpu_ep`) | OK | OK (デフォルト) | OK |
+| メモリパターン (mem_pattern) | OK | OK | OK (デフォルト) | OK |
+| メモリ再利用 (mem_reuse) | - | - | - | OK |
 | 最適化モデルキャッシュ (.opt.onnx) | OK | OK | N/A | **未実装** |
 | センチネルファイル (.ok) | OK | OK | N/A | **未実装** |
 | Warmup 推論 (2回) | OK | OK | **未実装** | **未実装** |
-| メモリアリーナ (cpu_mem_arena) | OK (デフォルト) | OK (デフォルト) | OK | OK |
-| メモリパターン (mem_pattern) | OK (デフォルト) | OK (デフォルト) | - | OK |
 | Docker cgroup 対応 | OK | OK (.NET 6+) | - | OK (`sched_getaffinity`) |
 | 環境変数オーバーライド | - | - | `--num-threads` | `PIPER_INTRA_THREADS` |
 | GPU EP (CUDA/CoreML/DirectML) | OK | OK (CUDA) | OK | OK (CUDA) |
+| GPU→CPU フォールバック時のアリーナ | OK (`apply_cpu_ep`) | - | - | - |
 
 ### Rust エンジンの現在の設定
 `src/rust/piper-core/src/engine.rs`:
@@ -202,8 +203,15 @@ let num_intra_threads = std::thread::available_parallelism()
     .map(|n| (n.get() / 2).max(1))  // 論理コア/2 で物理コア近似 (Python/C# と同一)
     .unwrap_or(1)
     .min(MAX_INTRA_THREADS);
-// inter_threads = 1 (固定)
-// GraphOptimizationLevel: 初回 ALL、キャッシュ後 Disable
+
+Session::builder()?
+    .with_intra_threads(num_intra_threads)?
+    .with_inter_threads(1)?
+    .with_memory_pattern(true)?          // PR #317
+    .with_dynamic_block_base(4)?         // PR #317
+    .with_optimization_level(GraphOptimizationLevel::Level3)?;
+// + apply_cpu_ep() で CPU EP アリーナアロケータ有効化 (GPU フォールバック時も適用)
+// + 最適化モデルキャッシュ (.opt.onnx + .ok) + Warmup (2回)
 ```
 
 ### C# エンジンの現在の設定
@@ -211,10 +219,14 @@ let num_intra_threads = std::thread::available_parallelism()
 `src/csharp/PiperPlus.Core/Inference/SessionFactory.cs`:
 
 ```csharp
+// ConfigureSessionOptions() で一元管理
 options.GraphOptimizationLevel = GraphOptimizationLevel.ORT_ENABLE_ALL;
-options.IntraOpNumThreads = Math.Min(Environment.ProcessorCount / 2, 4);
+options.IntraOpNumThreads = Math.Max(Math.Min(Environment.ProcessorCount / 2, 4), 1);
 options.InterOpNumThreads = 1;
 options.ExecutionMode = ExecutionMode.ORT_SEQUENTIAL;
+options.EnableCpuMemArena = true;                                       // PR #317
+options.EnableMemoryPattern = true;                                     // PR #317
+options.AddSessionConfigEntry("session.dynamic_block_base", "4");       // PR #317
 // + 最適化モデルキャッシュ + センチネルファイル + Warmup (2回)
 ```
 
@@ -223,10 +235,13 @@ options.ExecutionMode = ExecutionMode.ORT_SEQUENTIAL;
 `src/cpp/piper.cpp:412-520`:
 
 ```cpp
-session.options.SetIntraOpNumThreads(numThreads);
+session.options.SetIntraOpNumThreads(effectiveThreads);
 session.options.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_ALL);
+session.options.SetExecutionMode(ExecutionMode::ORT_SEQUENTIAL);        // PR #317
+session.options.SetInterOpNumThreads(1);                                // PR #317
+session.options.AddConfigEntry("session.dynamic_block_base", "4");      // PR #317
 session.options.DisableProfiling();
-// + CPU メモリアリーナ (デフォルト有効)
+// + CPU メモリアリーナ・パターン (デフォルト有効)
 // + GPU EP: CUDA, CoreML, DirectML 対応
 ```
 
