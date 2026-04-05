@@ -17,11 +17,10 @@ import time
 from pathlib import Path
 
 import numpy as np
-import onnxruntime
 import soundfile as sf
 from piper_plus_g2p.registry import get_phonemizer
 
-from piper_train.ort_utils import create_session_options, get_providers
+from piper_train.ort_utils import create_session_with_cache, warmup_onnx_session
 
 
 _LOGGER = logging.getLogger(__name__)
@@ -96,12 +95,9 @@ class PiperInferenceEngine:
             config = json.load(f)
         self.phoneme_id_map = config["phoneme_id_map"]
 
-        # Load ONNX model with optimized session options
-        sess_options = create_session_options()
-        providers = get_providers(device)
-        self.model = onnxruntime.InferenceSession(
-            model_path, sess_options=sess_options, providers=providers
-        )
+        # Load ONNX model with optimized session options + cache
+        self.model = create_session_with_cache(model_path, device=device)
+        warmup_onnx_session(self.model)
 
         active_providers = self.model.get_providers()
         _LOGGER.info("ONNX Runtime providers: %s", active_providers)

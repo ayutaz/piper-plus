@@ -9,9 +9,8 @@ import time
 from pathlib import Path
 
 import numpy as np
-import onnxruntime
 
-from .ort_utils import create_session_options, get_providers
+from .ort_utils import create_session_with_cache, warmup_onnx_session
 from .vits.utils import audio_float_to_int16
 from .vits.wavfile import write as write_wav
 
@@ -286,15 +285,12 @@ def main():
     args.output_dir = Path(args.output_dir)
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
-    sess_options = create_session_options()
-    providers = get_providers(args.device)
     _LOGGER.debug("Loading model from %s", args.model)
-    model = onnxruntime.InferenceSession(
-        str(args.model), sess_options=sess_options, providers=providers
-    )
+    model = create_session_with_cache(args.model, device=args.device)
     _LOGGER.info(
         "Loaded model from %s (providers: %s)", args.model, model.get_providers()
     )
+    warmup_onnx_session(model)
 
     # Check if model supports prosody features
     input_names = [inp.name for inp in model.get_inputs()]

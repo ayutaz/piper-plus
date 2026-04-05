@@ -5,15 +5,22 @@ the C#/Rust engine implementations and that get_providers() returns
 the correct execution providers for each device type.
 """
 
-from unittest.mock import patch
+import logging
+from pathlib import Path
+from unittest.mock import MagicMock, patch
 
+import numpy as np
 import onnxruntime
 import pytest
 
 from piper_train.ort_utils import (
+    _build_cache_paths,
+    _get_device_label,
     _get_logical_core_count,
     create_session_options,
+    create_session_with_cache,
     get_providers,
+    warmup_onnx_session,
 )
 
 
@@ -192,3 +199,298 @@ class TestGetProviders:
     def test_default_is_cpu(self):
         providers = get_providers()
         assert providers == ["CPUExecutionProvider"]
+
+
+# ---------------------------------------------------------------------------
+# Warmup tests
+# ---------------------------------------------------------------------------
+
+
+def _make_mock_session(*, has_sid=False, has_lid=False, has_prosody=False):
+    """Create a mock InferenceSession with configurable optional inputs."""
+    session = MagicMock(spec=onnxruntime.InferenceSession)
+
+    # Build input list
+    inputs = []
+    for name in ("input", "input_lengths", "scales"):
+        inp = MagicMock()
+        inp.name = name
+        inputs.append(inp)
+    if has_sid:
+        inp = MagicMock()
+        inp.name = "sid"
+        inputs.append(inp)
+    if has_lid:
+        inp = MagicMock()
+        inp.name = "lid"
+        inputs.append(inp)
+    if has_prosody:
+        inp = MagicMock()
+        inp.name = "prosody_features"
+        inputs.append(inp)
+
+    session.get_inputs.return_value = inputs
+
+    # Single output
+    out = MagicMock()
+    out.name = "output"
+    session.get_outputs.return_value = [out]
+
+    return session
+
+
+@pytest.mark.unit
+class TestWarmup:
+    """warmup_onnx_session() のテスト."""
+
+    def test_warmup_completes_successfully(self):
+        """session.run が DEFAULT_WARMUP_RUNS 回呼ばれる."""
+        session = _make_mock_session()
+        warmup_onnx_session(session)
+        assert session.run.call_count == 2
+
+    def test_warmup_failure_is_non_fatal(self, caplog):
+        """RuntimeError が発生しても warning ログのみで例外を再送しない."""
+        session = _make_mock_session()
+        session.run.side_effect = RuntimeError("test error")
+        with caplog.at_level(logging.WARNING):
+            warmup_onnx_session(session)
+        assert "Warmup failed (non-fatal)" in caplog.text
+
+    @patch.dict("os.environ", {"PIPER_DISABLE_WARMUP": "1"})
+    def test_disable_warmup_env_1(self):
+        """PIPER_DISABLE_WARMUP=1 でスキップ."""
+        session = _make_mock_session()
+        warmup_onnx_session(session)
+        session.run.assert_not_called()
+
+    @patch.dict("os.environ", {"PIPER_DISABLE_WARMUP": "true"})
+    def test_disable_warmup_env_true(self):
+        """PIPER_DISABLE_WARMUP=true でスキップ."""
+        session = _make_mock_session()
+        warmup_onnx_session(session)
+        session.run.assert_not_called()
+
+    @patch.dict("os.environ", {"PIPER_DISABLE_WARMUP": "yes"})
+    def test_disable_warmup_env_yes(self):
+        """PIPER_DISABLE_WARMUP=yes でスキップ."""
+        session = _make_mock_session()
+        warmup_onnx_session(session)
+        session.run.assert_not_called()
+
+    def test_runs_zero_returns_immediately(self):
+        """runs=0 なら即 return."""
+        session = _make_mock_session()
+        warmup_onnx_session(session, runs=0)
+        session.run.assert_not_called()
+
+    def test_optional_inputs_sid_only(self):
+        """sid のみの場合、inputs に sid が含まれる."""
+        session = _make_mock_session(has_sid=True)
+        warmup_onnx_session(session)
+        call_args = session.run.call_args
+        inputs = call_args[0][1]
+        assert "sid" in inputs
+        assert "lid" not in inputs
+        assert "prosody_features" not in inputs
+
+    def test_optional_inputs_all(self):
+        """sid, lid, prosody_features 全てある場合."""
+        session = _make_mock_session(has_sid=True, has_lid=True, has_prosody=True)
+        warmup_onnx_session(session)
+        call_args = session.run.call_args
+        inputs = call_args[0][1]
+        assert "sid" in inputs
+        assert "lid" in inputs
+        assert "prosody_features" in inputs
+
+    def test_optional_inputs_none(self):
+        """オプション入力が一切ない場合."""
+        session = _make_mock_session()
+        warmup_onnx_session(session)
+        call_args = session.run.call_args
+        inputs = call_args[0][1]
+        assert "sid" not in inputs
+        assert "lid" not in inputs
+        assert "prosody_features" not in inputs
+
+    def test_dummy_input_shape_and_values(self):
+        """phoneme_ids の shape=(1,100), BOS=1, EOS=2, 中間=8."""
+        session = _make_mock_session()
+        warmup_onnx_session(session)
+        call_args = session.run.call_args
+        inputs = call_args[0][1]
+        phoneme_ids = inputs["input"]
+        assert phoneme_ids.shape == (1, 100)
+        assert phoneme_ids[0, 0] == 1  # BOS
+        assert phoneme_ids[0, -1] == 2  # EOS
+        assert phoneme_ids[0, 1] == 8  # dummy fill
+
+    def test_prosody_features_shape(self):
+        """prosody_features の shape=(1,100,3), dtype=int64."""
+        session = _make_mock_session(has_prosody=True)
+        warmup_onnx_session(session)
+        call_args = session.run.call_args
+        inputs = call_args[0][1]
+        prosody = inputs["prosody_features"]
+        assert prosody.shape == (1, 100, 3)
+        assert prosody.dtype == np.int64
+
+
+# ---------------------------------------------------------------------------
+# Model cache tests
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+class TestModelCacheHelpers:
+    """_get_device_label() と _build_cache_paths() のテスト."""
+
+    def test_device_label_cpu(self):
+        assert _get_device_label("cpu") == "cpu"
+
+    @patch(
+        "onnxruntime.get_available_providers",
+        return_value=["CUDAExecutionProvider", "CPUExecutionProvider"],
+    )
+    def test_device_label_gpu_with_cuda(self, _mock):
+        assert _get_device_label("gpu") == "cuda0"
+
+    @patch(
+        "onnxruntime.get_available_providers",
+        return_value=["CPUExecutionProvider"],
+    )
+    def test_device_label_gpu_no_cuda(self, _mock):
+        assert _get_device_label("gpu") == "cpu"
+
+    def test_build_cache_paths_cpu(self, tmp_path):
+        model = tmp_path / "model.onnx"
+        cache, sentinel = _build_cache_paths(model, "cpu")
+        assert cache == tmp_path / "model.cpu.opt.onnx"
+        assert sentinel == Path(str(cache) + ".ok")
+
+    def test_build_cache_paths_cuda(self, tmp_path):
+        model = tmp_path / "model.onnx"
+        cache, sentinel = _build_cache_paths(model, "cuda0")
+        assert cache == tmp_path / "model.cuda0.opt.onnx"
+        assert sentinel == Path(str(cache) + ".ok")
+
+
+@pytest.mark.unit
+class TestModelCache:
+    """create_session_with_cache() のテスト."""
+
+    def _mock_inference_session(self, tmp_path):
+        """InferenceSession モックを返す side_effect 関数を生成."""
+        mock_session = MagicMock(spec=onnxruntime.InferenceSession)
+        mock_session.get_providers.return_value = ["CPUExecutionProvider"]
+
+        def side_effect(path, sess_options=None, providers=None):
+            # ORT がキャッシュファイルを生成することをシミュレート
+            if (
+                hasattr(sess_options, "optimized_model_filepath")
+                and sess_options.optimized_model_filepath
+            ):
+                cache_p = Path(sess_options.optimized_model_filepath)
+                cache_p.write_bytes(b"optimized")
+            return mock_session
+
+        return mock_session, side_effect
+
+    def test_cache_miss_creates_cache(self, tmp_path):
+        """初回ロードで .opt.onnx + .ok が生成される."""
+        model = tmp_path / "model.onnx"
+        model.write_bytes(b"dummy")
+        mock_session, side_effect = self._mock_inference_session(tmp_path)
+
+        with patch(
+            "piper_train.ort_utils.onnxruntime.InferenceSession",
+            side_effect=side_effect,
+        ):
+            session = create_session_with_cache(model, device="cpu")
+
+        assert session is mock_session
+        assert (tmp_path / "model.cpu.opt.onnx").exists()
+        assert (tmp_path / "model.cpu.opt.onnx.ok").exists()
+
+    def test_cache_hit_uses_disable_all(self, tmp_path):
+        """キャッシュヒット時に ORT_DISABLE_ALL でロードされる."""
+        model = tmp_path / "model.onnx"
+        model.write_bytes(b"dummy")
+        cache = tmp_path / "model.cpu.opt.onnx"
+        cache.write_bytes(b"optimized")
+        sentinel = tmp_path / "model.cpu.opt.onnx.ok"
+        sentinel.write_text("ok")
+
+        captured: dict = {}
+        mock_session = MagicMock(spec=onnxruntime.InferenceSession)
+
+        def side_effect(path, sess_options=None, providers=None):
+            captured["path"] = path
+            captured["level"] = sess_options.graph_optimization_level
+            return mock_session
+
+        with patch(
+            "piper_train.ort_utils.onnxruntime.InferenceSession",
+            side_effect=side_effect,
+        ):
+            session = create_session_with_cache(model, device="cpu")
+
+        assert session is mock_session
+        assert captured["path"] == str(cache)
+        assert captured["level"] == onnxruntime.GraphOptimizationLevel.ORT_DISABLE_ALL
+
+    def test_incomplete_cache_deleted(self, tmp_path):
+        """不完全キャッシュ (.opt.onnx のみ) が削除される."""
+        model = tmp_path / "model.onnx"
+        model.write_bytes(b"dummy")
+        cache = tmp_path / "model.cpu.opt.onnx"
+        cache.write_bytes(b"incomplete")
+        # sentinel なし
+
+        mock_session, side_effect = self._mock_inference_session(tmp_path)
+        with patch(
+            "piper_train.ort_utils.onnxruntime.InferenceSession",
+            side_effect=side_effect,
+        ):
+            create_session_with_cache(model, device="cpu")
+
+        # 元の不完全キャッシュは削除され、新しいキャッシュ + sentinel が作成される
+        assert (tmp_path / "model.cpu.opt.onnx.ok").exists()
+
+    @patch.dict("os.environ", {"PIPER_DISABLE_CACHE": "1"})
+    def test_disable_cache_env(self, tmp_path):
+        """PIPER_DISABLE_CACHE=1 でキャッシュ生成なし."""
+        model = tmp_path / "model.onnx"
+        model.write_bytes(b"dummy")
+        mock_session = MagicMock(spec=onnxruntime.InferenceSession)
+
+        with patch(
+            "piper_train.ort_utils.onnxruntime.InferenceSession",
+            return_value=mock_session,
+        ):
+            create_session_with_cache(model, device="cpu")
+
+        assert not (tmp_path / "model.cpu.opt.onnx").exists()
+        assert not (tmp_path / "model.cpu.opt.onnx.ok").exists()
+
+
+@pytest.mark.unit
+class TestVoiceCacheParity:
+    """voice.py インライン実装と ort_utils.py の命名規則同期を検証."""
+
+    def test_cache_path_naming_cpu(self, tmp_path):
+        model = tmp_path / "model.onnx"
+        ort_cache, ort_sentinel = _build_cache_paths(model, "cpu")
+        voice_cache = model.with_suffix(".cpu.opt.onnx")
+        voice_sentinel = Path(str(voice_cache) + ".ok")
+        assert ort_cache == voice_cache
+        assert ort_sentinel == voice_sentinel
+
+    def test_cache_path_naming_cuda(self, tmp_path):
+        model = tmp_path / "model.onnx"
+        ort_cache, ort_sentinel = _build_cache_paths(model, "cuda0")
+        voice_cache = model.with_suffix(".cuda0.opt.onnx")
+        voice_sentinel = Path(str(voice_cache) + ".ok")
+        assert ort_cache == voice_cache
+        assert ort_sentinel == voice_sentinel

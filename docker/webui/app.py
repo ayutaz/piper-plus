@@ -11,7 +11,7 @@ import numpy as np
 import onnxruntime
 
 from piper_train.infer_onnx import text_to_phoneme_ids_and_prosody
-from piper_train.ort_utils import create_session_options
+from piper_train.ort_utils import create_session_with_cache, warmup_onnx_session
 
 
 SAMPLE_TEXTS = {
@@ -39,14 +39,11 @@ def _get_session(model_path: str) -> onnxruntime.InferenceSession:
     """Return a cached InferenceSession, creating one if needed."""
     with _cache_lock:
         if model_path not in _session_cache:
-            # Gradio serves concurrent requests; limit per-request threads
-            # to avoid contention.
-            sess_options = create_session_options(intra_op_threads=1)
-            _session_cache[model_path] = onnxruntime.InferenceSession(
-                model_path,
-                sess_options=sess_options,
-                providers=["CPUExecutionProvider"],
+            session = create_session_with_cache(
+                model_path, device="cpu", intra_op_threads=1
             )
+            warmup_onnx_session(session)
+            _session_cache[model_path] = session
         return _session_cache[model_path]
 
 

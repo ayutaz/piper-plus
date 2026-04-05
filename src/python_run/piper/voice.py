@@ -23,6 +23,50 @@ _LOGGER = logging.getLogger(__name__)
 MULTI_CHAR_TO_PUA = {k: chr(v) for k, v in FIXED_PUA_MAPPING.items()}
 
 
+def _warmup_session(
+    session: onnxruntime.InferenceSession,
+    runs: int = 2,
+    phoneme_length: int = 100,
+) -> None:
+    """Inline warmup for python_run (cannot import piper_train.ort_utils).
+
+    Keep in sync with piper_train.ort_utils.warmup_onnx_session().
+    """
+    if os.environ.get("PIPER_DISABLE_WARMUP", "").lower() in ("1", "true", "yes"):
+        return
+    if runs <= 0:
+        return
+    try:
+        phoneme_ids = np.full((1, phoneme_length), 8, dtype=np.int64)
+        phoneme_ids[0, 0] = 1  # BOS
+        phoneme_ids[0, -1] = 2  # EOS
+        input_lengths = np.array([phoneme_length], dtype=np.int64)
+        scales = np.array([0.667, 1.0, 0.8], dtype=np.float32)
+
+        input_names = {inp.name for inp in session.get_inputs()}
+        inputs = {
+            "input": phoneme_ids,
+            "input_lengths": input_lengths,
+            "scales": scales,
+        }
+        if "sid" in input_names:
+            inputs["sid"] = np.array([0], dtype=np.int64)
+        if "lid" in input_names:
+            inputs["lid"] = np.array([0], dtype=np.int64)
+        if "prosody_features" in input_names:
+            inputs["prosody_features"] = np.zeros(
+                (1, phoneme_length, 3), dtype=np.int64
+            )
+
+        output_names = [o.name for o in session.get_outputs()]
+        for _ in range(runs):
+            session.run(output_names, inputs)
+
+        _LOGGER.info("Warmup completed (%d runs)", runs)
+    except Exception as e:
+        _LOGGER.warning("Warmup failed (non-fatal): %s", e)
+
+
 @dataclass
 class PiperVoice:
     session: onnxruntime.InferenceSession
@@ -92,13 +136,68 @@ class PiperVoice:
         # Dynamic block sizing: reduce latency variance (keep in sync with ort_utils)
         sess_options.add_session_config_entry("session.dynamic_block_base", "4")
 
+        # === Model cache logic: Keep in sync with piper_train.ort_utils.create_session_with_cache() ===
+        _disable_cache = os.environ.get("PIPER_DISABLE_CACHE", "").lower() in (
+            "1",
+            "true",
+            "yes",
+        )
+
+        model_p = Path(model_path)
+        device_label = "cuda0" if use_cuda else "cpu"
+        cache_path = model_p.with_suffix(f".{device_label}.opt.onnx")
+        sentinel_path = Path(str(cache_path) + ".ok")
+        use_cached = (
+            not _disable_cache and cache_path.exists() and sentinel_path.exists()
+        )
+
+        if _disable_cache:
+            _LOGGER.info("Model cache disabled via PIPER_DISABLE_CACHE")
+            effective_model_path = str(model_path)
+        elif use_cached:
+            _LOGGER.info("Loading pre-optimized model from %s", cache_path)
+            sess_options.graph_optimization_level = (
+                onnxruntime.GraphOptimizationLevel.ORT_DISABLE_ALL
+            )
+            effective_model_path = str(cache_path)
+        else:
+            if cache_path.exists() and not sentinel_path.exists():
+                _LOGGER.warning(
+                    "Removing incomplete cache %s (missing sentinel)", cache_path
+                )
+                try:
+                    cache_path.unlink()
+                except OSError:
+                    pass
+            try:
+                sess_options.optimized_model_filepath = str(cache_path)
+            except Exception as exc:
+                _LOGGER.warning(
+                    "Could not set optimized model path %s: %s (continuing without cache)",
+                    cache_path,
+                    exc,
+                )
+            effective_model_path = str(model_path)
+
+        session = onnxruntime.InferenceSession(
+            effective_model_path,
+            sess_options=sess_options,
+            providers=providers,
+        )
+
+        # Write sentinel if cache was created
+        if not _disable_cache and not use_cached and cache_path.exists():
+            try:
+                sentinel_path.write_text("ok")
+                _LOGGER.info("Cache sentinel written: %s", sentinel_path)
+            except OSError as exc:
+                _LOGGER.warning("Failed to write sentinel %s: %s", sentinel_path, exc)
+
+        _warmup_session(session)
+
         return PiperVoice(
             config=PiperConfig.from_dict(config_dict),
-            session=onnxruntime.InferenceSession(
-                str(model_path),
-                sess_options=sess_options,
-                providers=providers,
-            ),
+            session=session,
         )
 
     def phonemize(self, text: str) -> list[list[str]]:
