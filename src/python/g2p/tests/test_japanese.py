@@ -153,6 +153,66 @@ class TestCustomDict:
 
 
 @requires_ja
+class TestPhonemizerCache:
+    """日本語音素化キャッシュのテスト."""
+
+    def test_cache_hit_returns_same_result(self):
+        """同一テキストの2回呼び出しで同一結果."""
+        from piper_plus_g2p.japanese import (
+            _phonemize_core_cached,
+            clear_phonemize_cache,
+        )
+
+        clear_phonemize_cache()
+        result1 = _phonemize_core_cached("こんにちは")
+        result2 = _phonemize_core_cached("こんにちは")
+        assert result1 == result2
+
+    def test_cache_returns_tuples(self):
+        """キャッシュ版は tuple を返す."""
+        from piper_plus_g2p.japanese import (
+            _phonemize_core_cached,
+            clear_phonemize_cache,
+        )
+
+        clear_phonemize_cache()
+        tokens, prosody = _phonemize_core_cached("テスト")
+        assert isinstance(tokens, tuple)
+        assert isinstance(prosody, tuple)
+
+    def test_clear_cache(self):
+        """cache_clear() 後に再計算."""
+        from piper_plus_g2p.japanese import (
+            _phonemize_core_cached,
+            clear_phonemize_cache,
+        )
+
+        clear_phonemize_cache()
+        _phonemize_core_cached("テスト")
+        info_before = _phonemize_core_cached.cache_info()
+        assert info_before.hits >= 0
+        clear_phonemize_cache()
+        info_after = _phonemize_core_cached.cache_info()
+        assert info_after.hits == 0
+        assert info_after.misses == 0
+
+    def test_phonemizer_uses_cache(self):
+        """JapanesePhonemizer がキャッシュ版を使用."""
+        from piper_plus_g2p.japanese import (
+            JapanesePhonemizer,
+            _phonemize_core_cached,
+            clear_phonemize_cache,
+        )
+
+        clear_phonemize_cache()
+        p = JapanesePhonemizer()
+        p.phonemize("こんにちは")
+        p.phonemize("こんにちは")
+        info = _phonemize_core_cached.cache_info()
+        assert info.hits >= 1
+
+
+@requires_ja
 class TestProsody:
     def test_prosody_length_matches(self):
         """phonemize_with_prosody returns tokens and prosody of same length."""

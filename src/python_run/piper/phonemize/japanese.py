@@ -8,6 +8,7 @@ import json
 import logging
 import os
 import re
+from functools import lru_cache
 from pathlib import Path
 
 from .token_mapper import map_sequence
@@ -152,48 +153,19 @@ def _split_long_text(text: str, max_chars: int = _MAX_OPENJTALK_CHARS) -> list[s
     return chunks
 
 
-def phonemize_japanese(
-    text: str, custom_dict: CustomDictionary | None = None, prosody: bool = True
-) -> list[str]:
-    """Phonemize Japanese text using the Kurihara method.
+def _phonemize_sentence_core(sentence: str, prosody: bool) -> list[str]:
+    """Phonemize a single sentence (no BOS/EOS, no custom dict, no splitting).
 
-    Prosody symbols inserted:
-        ^   : beginning of sentence
-        $/? : end of sentence
-        _   : short pause (pau)
-        #   : accent phrase boundary
-        [   : rising-pitch mark
-        ]   : falling-pitch mark
+    Extracted from phonemize_japanese() for caching purposes.
     """
-    if not HAS_PYOPENJTALK:
-        raise RuntimeError(
-            "pyopenjtalk or pyopenjtalk-plus is required for Japanese phonemization. "
-            "Install with: pip install pyopenjtalk-plus"
-        )
-
-    if custom_dict:
-        text = custom_dict.apply(text)
-
-    # Split long text to avoid OpenJTalk buffer overflow (~2700 char limit)
-    chunks = _split_long_text(text)
-    if len(chunks) > 1:
-        all_tokens: list[str] = []
-        for chunk in chunks:
-            chunk_tokens = phonemize_japanese(chunk, prosody=prosody)
-            # Strip BOS/EOS from intermediate chunks
-            inner = [t for t in chunk_tokens if t not in ("^", "$", "?")]
-            all_tokens.extend(inner)
-        eos = _get_question_type(text) if prosody else "$"
-        return map_sequence(["^"] + all_tokens + [eos])
-
     if not prosody:
-        phoneme_str = pyopenjtalk.g2p(text)
-        tokens = ["^"] + phoneme_str.split() + ["$"]
+        phoneme_str = pyopenjtalk.g2p(sentence)
+        tokens = phoneme_str.split()
         tokens = _apply_n_phoneme_rules(tokens)
         return map_sequence(tokens)
 
     # Full phonemization with prosody marks using HTS labels
-    labels = pyopenjtalk.extract_fullcontext(text)
+    labels = pyopenjtalk.extract_fullcontext(sentence)
     tokens: list[str] = []
 
     for idx, label in enumerate(labels):
@@ -202,12 +174,8 @@ def phonemize_japanese(
             continue
         phoneme = m_ph.group(1)
 
-        # Beginning / end silence
+        # Skip silence markers (BOS/EOS handled by caller)
         if phoneme == "sil":
-            if idx == 0:
-                tokens.append("^")
-            elif idx == len(labels) - 1:
-                tokens.append(_get_question_type(text))
             continue
 
         # Short pause
@@ -235,22 +203,64 @@ def phonemize_japanese(
         else:
             a2_next = -1
 
-        # Accent nucleus mark "]" at descending point
         if (a1 == 0) and (a2_next == a2 + 1):
             tokens.append("]")
-
-        # Accent phrase boundary "#"
         if (a2 == a3) and (a2_next == 1):
             tokens.append("#")
-
-        # Rising mark "[" at phrase head
         if (a2 == 1) and (a2_next == 2):
             tokens.append("[")
 
-    # Apply context-dependent N phoneme rules
     tokens = _apply_n_phoneme_rules(tokens)
-
     return map_sequence(tokens)
+
+
+@lru_cache(maxsize=2000)
+def _phonemize_sentence_cached(sentence: str, prosody: bool) -> tuple[str, ...]:
+    """Cache wrapper for _phonemize_sentence_core().
+
+    Returns a tuple (immutable) for lru_cache hashability.
+    """
+    return tuple(_phonemize_sentence_core(sentence, prosody))
+
+
+def clear_phonemize_cache() -> None:
+    """Clear the phonemization cache (call after custom dictionary changes)."""
+    _phonemize_sentence_cached.cache_clear()
+
+
+def phonemize_japanese(
+    text: str, custom_dict: CustomDictionary | None = None, prosody: bool = True
+) -> list[str]:
+    """Phonemize Japanese text using the Kurihara method.
+
+    Prosody symbols inserted:
+        ^   : beginning of sentence
+        $/? : end of sentence
+        _   : short pause (pau)
+        #   : accent phrase boundary
+        [   : rising-pitch mark
+        ]   : falling-pitch mark
+    """
+    if not HAS_PYOPENJTALK:
+        raise RuntimeError(
+            "pyopenjtalk or pyopenjtalk-plus is required for Japanese phonemization. "
+            "Install with: pip install pyopenjtalk-plus"
+        )
+
+    if custom_dict:
+        text = custom_dict.apply(text)
+
+    # Split long text to avoid OpenJTalk buffer overflow (~2700 char limit)
+    chunks = _split_long_text(text)
+
+    all_tokens: list[str] = []
+    for chunk in chunks:
+        chunk_tokens = list(_phonemize_sentence_cached(chunk, prosody))
+        all_tokens.extend(chunk_tokens)
+
+    # Wrap with BOS/EOS
+    eos = _get_question_type(text) if prosody else "$"
+    return map_sequence(["^"] + all_tokens + [eos])
 
 
 def phonemize_japanese_simple(text: str) -> list[str]:

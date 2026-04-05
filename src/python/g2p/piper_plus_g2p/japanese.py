@@ -6,6 +6,7 @@ as-is — the caller is responsible for any further encoding.
 """
 
 import re
+from functools import lru_cache
 
 # Try to import pyopenjtalk-plus first (Windows compatible), fall back to pyopenjtalk
 try:
@@ -23,6 +24,7 @@ from .custom_dict import CustomDictionary
 
 __all__ = [
     "JapanesePhonemizer",
+    "clear_phonemize_cache",
 ]
 
 # Phoneme extraction (always matches, including sil/pau labels)
@@ -205,6 +207,24 @@ def _phonemize_core(
     return tokens, prosody_info
 
 
+@lru_cache(maxsize=2000)
+def _phonemize_core_cached(
+    text: str,
+) -> tuple[tuple[str, ...], tuple[ProsodyInfo | None, ...]]:
+    """Cache wrapper for _phonemize_core().
+
+    lru_cache requires hashable return values, so lists are converted to tuples.
+    Callers must convert back to lists if mutation is needed.
+    """
+    tokens, prosody_info = _phonemize_core(text)
+    return tuple(tokens), tuple(prosody_info)
+
+
+def clear_phonemize_cache() -> None:
+    """Clear the phonemization cache (call after custom dictionary changes)."""
+    _phonemize_core_cached.cache_clear()
+
+
 class JapanesePhonemizer(Phonemizer):
     """Japanese phonemizer using OpenJTalk.
 
@@ -233,8 +253,8 @@ class JapanesePhonemizer(Phonemizer):
         text = self._sanitize_input(text)
         if not text:
             return []
-        tokens, _prosody = _phonemize_core(text)
-        return tokens
+        tokens_tuple, _prosody_tuple = _phonemize_core_cached(text)
+        return list(tokens_tuple)
 
     def phonemize_with_prosody(
         self, text: str
@@ -243,4 +263,5 @@ class JapanesePhonemizer(Phonemizer):
         text = self._sanitize_input(text)
         if not text:
             return [], []
-        return _phonemize_core(text)
+        tokens_tuple, prosody_tuple = _phonemize_core_cached(text)
+        return list(tokens_tuple), list(prosody_tuple)
