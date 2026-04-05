@@ -28,11 +28,7 @@ _LOGGER = logging.getLogger(__name__)
 
 # FastAPI (optional)
 try:
-    import uvicorn
-    from fastapi import FastAPI, HTTPException, Query
-    from fastapi.middleware.cors import CORSMiddleware
-    from fastapi.responses import StreamingResponse
-    from pydantic import BaseModel, Field
+    import uvicorn  # noqa: F401
 
     FASTAPI_AVAILABLE = True
 except ImportError:
@@ -395,6 +391,8 @@ def create_app(engine: PiperInferenceEngine, model_path: str):
 
 def _run_server(engine: PiperInferenceEngine, args):
     """Run FastAPI server."""
+    import uvicorn  # noqa: PLC0415
+
     app = create_app(engine, args.model)
     uvicorn.run(app, host="0.0.0.0", port=args.port)
 
