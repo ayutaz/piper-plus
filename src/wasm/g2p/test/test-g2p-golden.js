@@ -58,10 +58,10 @@ function casesFor(lang) {
 }
 
 // Languages where the JS G2P produces IPA tokens (rule-based or dictionary).
-// For character-based languages (ES/FR/PT/ZH), expected_contains from the
+// For character-based languages (FR/PT/ZH), expected_contains from the
 // fixture refers to IPA tokens that the JS implementation does not produce,
 // so those checks are skipped.
-const IPA_OUTPUT_LANGUAGES = new Set(['en', 'ko', 'sv']);
+const IPA_OUTPUT_LANGUAGES = new Set(['en', 'es', 'ko', 'sv']);
 
 // ---------------------------------------------------------------------------
 // Helper: structural assertion (token count only -- JS may differ from Py/Rust)
@@ -117,7 +117,7 @@ describe('G2P golden: English', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Spanish (character-based in JS)
+// Spanish (rule-based IPA)
 // ---------------------------------------------------------------------------
 
 describe('G2P golden: Spanish', () => {
@@ -125,6 +125,11 @@ describe('G2P golden: Spanish', () => {
     for (const c of casesFor('es')) {
         it(c.description ?? c.input, () => {
             const { tokens } = g2p.phonemize(c.input);
+            // Exact token match when fixture specifies expected_tokens
+            if (c.expected_tokens) {
+                assert.deepEqual(tokens, c.expected_tokens,
+                    `ES exact token mismatch for ${JSON.stringify(c.input)}`);
+            }
             assertTokenCountMin(tokens, c);
             assertExpectedContains(tokens, c);
         });
