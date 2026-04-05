@@ -30,7 +30,9 @@ _LOGGER = logging.getLogger(__name__)
 try:
     import uvicorn
     from fastapi import FastAPI, HTTPException, Query
+    from fastapi.middleware.cors import CORSMiddleware
     from fastapi.responses import StreamingResponse
+    from pydantic import BaseModel, Field
 
     FASTAPI_AVAILABLE = True
 except ImportError:
@@ -277,9 +279,38 @@ def main():
         print(f"Audio saved to: {args.output}")
 
 
-def _run_server(engine: PiperInferenceEngine, args):
-    """Run FastAPI server."""
+def create_app(engine: PiperInferenceEngine, model_path: str):
+    """Create the FastAPI application with all endpoints."""
+    from fastapi import FastAPI, HTTPException, Query  # noqa: PLC0415
+    from fastapi.middleware.cors import CORSMiddleware  # noqa: PLC0415
+    from fastapi.responses import StreamingResponse  # noqa: PLC0415
+    from pydantic import BaseModel, Field  # noqa: PLC0415
+
+    class SpeechRequest(BaseModel):
+        """OpenAI-compatible TTS request schema."""
+
+        model: str = "piper-plus"
+        input: str
+        voice: str = "default"
+        response_format: str = "wav"
+        speed: float = Field(default=1.0, gt=0.0, le=4.0)
+        # piper-plus extensions
+        speaker_id: int = 0
+        language: str = "ja"
+        noise_scale: float = 0.667
+        noise_w: float = 0.8
+
     app = FastAPI(title="piper-plus API")
+
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    model_created = int(Path(model_path).stat().st_mtime)
 
     @app.get("/health")
     def health_check():
@@ -310,6 +341,61 @@ def _run_server(engine: PiperInferenceEngine, args):
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e)) from e
 
+    # --- OpenAI-compatible endpoints ---
+
+    @app.post("/v1/audio/speech")
+    def openai_speech(req: SpeechRequest):
+        if not req.input or not req.input.strip():
+            raise HTTPException(status_code=400, detail="input is required")
+        if req.response_format != "wav":
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unsupported response_format: {req.response_format}. Only 'wav' is supported.",
+            )
+
+        length_scale = 1.0 / req.speed
+
+        try:
+            audio = engine.synthesize(
+                req.input,
+                language=req.language,
+                speaker_id=req.speaker_id,
+                noise_scale=req.noise_scale,
+                length_scale=length_scale,
+                noise_scale_w=req.noise_w,
+            )
+            buf = io.BytesIO()
+            sf.write(buf, audio, engine.sample_rate, format="WAV")
+            buf.seek(0)
+            return StreamingResponse(buf, media_type="audio/wav")
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e)) from e
+
+    @app.get("/v1/models")
+    def openai_models():
+        return {
+            "object": "list",
+            "data": [
+                {
+                    "id": "piper-plus",
+                    "object": "model",
+                    "created": model_created,
+                    "owned_by": "piper-plus",
+                }
+            ],
+        }
+
+    @app.get("/v1/audio/speech/languages")
+    def speech_languages():
+        languages = sorted(engine.language_id_map.keys()) if engine.language_id_map else []
+        return {"languages": languages}
+
+    return app
+
+
+def _run_server(engine: PiperInferenceEngine, args):
+    """Run FastAPI server."""
+    app = create_app(engine, args.model)
     uvicorn.run(app, host="0.0.0.0", port=args.port)
 
 
