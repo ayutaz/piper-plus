@@ -163,11 +163,16 @@ describe('EnglishG2P.phonemize - prosody', () => {
 describe('EnglishG2P.phonemizeWithProsody', () => {
     const en = new EnglishG2P();
 
-    it('should return same result as phonemize', () => {
+    it('should return same tokens with prosody objects', () => {
         const result1 = en.phonemize('hello');
         const result2 = en.phonemizeWithProsody('hello');
         assert.deepEqual(result1.tokens, result2.tokens);
-        assert.deepEqual(result1.prosody, result2.prosody);
+        // phonemizeWithProsody returns {a1,a2,a3} objects instead of null
+        for (const p of result2.prosody) {
+            assert.equal(typeof p, 'object');
+            assert.ok(p !== null);
+            assert.equal(typeof p.a1, 'number');
+        }
     });
 
     it('should return { tokens, prosody } structure', () => {

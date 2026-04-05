@@ -5,6 +5,7 @@ on:
     branches: [dev]
     paths:
       - 'src/wasm/g2p/**'
+      - 'src/wasm/g2p/src/latin-common/**'
       - 'tests/fixtures/g2p/phoneme_test_cases.json'
       - '.github/workflows/g2p-wasm-ci.yml'
     tags:
@@ -12,6 +13,7 @@ on:
   pull_request:
     paths:
       - 'src/wasm/g2p/**'
+      - 'src/wasm/g2p/src/latin-common/**'
       - 'tests/fixtures/g2p/phoneme_test_cases.json'
       - '.github/workflows/g2p-wasm-ci.yml'
 
@@ -73,7 +75,7 @@ jobs:
         run: npm install
 
       - name: Run tests
-        run: node --test test/test-encode.js test/test-english.js test/test-g2p.js test/test-languages.js test/test-detect.js test/test-pua-map.js test/test-swedish.js test/test-korean.js test/test-custom-dict.js test/test-strict-mode.js
+        run: node --test test/test-encode.js test/test-english.js test/test-g2p.js test/test-languages.js test/test-detect.js test/test-pua-map.js test/test-swedish.js test/test-korean.js test/test-custom-dict.js test/test-strict-mode.js test/test-spanish.js test/test-french.js test/test-portuguese.js test/test-chinese.js test/test-latin-common.js
 
       - name: Run golden tests
         run: node --test test/test-g2p-golden.js

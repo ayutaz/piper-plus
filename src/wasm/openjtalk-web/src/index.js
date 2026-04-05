@@ -22,7 +22,7 @@ export { AudioResult } from './audio-result.js';
 // Imports used by PiperPlus
 // ---------------------------------------------------------------------------
 
-import { G2P } from '@piper-plus/g2p';
+import { G2P, checkPuaCompat } from '@piper-plus/g2p';
 import { WebGPUSessionManager } from './webgpu-session-manager.js';
 import { StreamingTTSPipeline, TextChunker } from './streaming-pipeline.js';
 import { ModelManager } from './model-manager.js';
@@ -225,6 +225,12 @@ export class PiperPlus {
         throw new Error(`Failed to fetch config: ${configResponse.status} ${configResponse.statusText}`);
       }
       this._config = await configResponse.json();
+
+      // --- PUA compatibility check ------------------------------------------
+      const puaCheck = checkPuaCompat(this._config.pua_compat_version);
+      if (!puaCheck.compatible) {
+        console.warn(`[piper-plus] ${puaCheck.message}`);
+      }
 
       // --- 2. Download & cache ONNX model, create session --------------------
 

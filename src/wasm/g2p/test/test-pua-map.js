@@ -15,7 +15,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { join, dirname } from 'node:path';
-import { PUA_MAP, mapToken, unmapToken } from '../src/pua-map.js';
+import { PUA_MAP, mapToken, unmapToken, checkPuaCompat, PUA_COMPAT_VERSION } from '../src/pua-map.js';
 
 // ---------------------------------------------------------------------------
 // Fixture loading
@@ -263,4 +263,39 @@ describe('PUA full 96-entry individual verification', () => {
             );
         });
     }
+});
+
+// ---------------------------------------------------------------------------
+// checkPuaCompat()
+// ---------------------------------------------------------------------------
+
+describe('checkPuaCompat', () => {
+    it('should return compatible:true for matching version', () => {
+        const result = checkPuaCompat(PUA_COMPAT_VERSION);
+        assert.deepStrictEqual(result, { compatible: true });
+    });
+
+    it('should return compatible:false with message for mismatched version', () => {
+        const result = checkPuaCompat(PUA_COMPAT_VERSION + 1);
+        assert.equal(result.compatible, false);
+        assert.equal(typeof result.message, 'string');
+        assert.ok(result.message.length > 0, 'message should be non-empty');
+    });
+
+    it('should return compatible:true for undefined version', () => {
+        const result = checkPuaCompat(undefined);
+        assert.deepStrictEqual(result, { compatible: true });
+    });
+
+    it('should return compatible:true for null version', () => {
+        const result = checkPuaCompat(null);
+        assert.deepStrictEqual(result, { compatible: true });
+    });
+
+    it('should return compatible:false for zero version', () => {
+        const result = checkPuaCompat(0);
+        assert.equal(result.compatible, false);
+        assert.equal(typeof result.message, 'string');
+        assert.ok(result.message.length > 0, 'message should be non-empty');
+    });
 });

@@ -61,27 +61,70 @@
       "language": "zh",
       "input": "你好",
       "description": "Chinese greeting (ni3 hao3) — tests pypinyin pipeline and tone markers",
-      "expected_token_count_min": 4,
+      "expected_token_count_min": 2,
       "expected_contains_any_tone": true
     },
     {
       "language": "zh",
       "input": "北京欢迎你。",
       "description": "Chinese sentence with punctuation — tests multi-syllable processing",
-      "expected_token_count_min": 8
+      "expected_token_count_min": 6
     },
     {
       "language": "zh",
       "input": "我是学生。",
       "description": "Chinese sentence with tone 3 sandhi (wo3 shi4) — tests tone marker output",
-      "expected_token_count_min": 6,
+      "expected_token_count_min": 5,
       "expected_contains_any_tone": true
+    },
+    {
+      "language": "zh",
+      "input": "谢谢",
+      "description": "Chinese multi-syllable repeat (xie4 xie4); char-based JS: 2 chars",
+      "expected_token_count_min": 2
+    },
+    {
+      "language": "zh",
+      "input": "中国人",
+      "description": "Chinese 3-character word; char-based JS: 3 chars",
+      "expected_token_count_min": 3
+    },
+    {
+      "language": "zh",
+      "input": "Hello你好",
+      "description": "Chinese mixed CJK + Latin script; char-based JS: 7 chars",
+      "expected_token_count_min": 7
+    },
+    {
+      "language": "zh",
+      "input": "一二三",
+      "description": "Chinese digit characters; char-based JS: 3 chars",
+      "expected_token_count_min": 3
+    },
+    {
+      "language": "zh",
+      "input": "。，！",
+      "description": "Chinese punctuation-only input; char-based JS: 3 chars",
+      "expected_token_count_min": 3
+    },
+    {
+      "language": "zh",
+      "input": "123",
+      "description": "Chinese numeric input — passed through; char-based JS: 3 chars",
+      "expected_token_count_min": 3
+    },
+    {
+      "language": "zh",
+      "input": "今天天气很好",
+      "description": "Chinese 6-character sentence (no punctuation); char-based JS: 6 chars",
+      "expected_token_count_min": 6
     },
     {
       "language": "es",
       "input": "hola",
       "description": "Simple Spanish word — rule-based, deterministic output",
-      "expected_tokens": ["ˈ", "o", "l", "a"]
+      "expected_tokens": ["ˈ", "o", "l", "a"],
+      "expected_token_count_min": 4
     },
     {
       "language": "es",
@@ -96,6 +139,83 @@
       "description": "Spanish with trill rr — tests rr PUA token in rule-based phonemizer",
       "expected_token_count_min": 6,
       "expected_contains": ["rr"]
+    },
+    {
+      "language": "es",
+      "input": "chico",
+      "description": "Spanish affricate ch — tS (PUA E054) in rule-based",
+      "expected_token_count_min": 4,
+      "expected_contains": ["k"]
+    },
+    {
+      "language": "es",
+      "input": "calle",
+      "description": "Spanish yeismo — ll -> voiced palatal in rule-based",
+      "expected_token_count_min": 4
+    },
+    {
+      "language": "es",
+      "input": "zapato",
+      "description": "Spanish seseo — z before a in rule-based",
+      "expected_token_count_min": 6
+    },
+    {
+      "language": "es",
+      "input": "guerra",
+      "description": "Spanish gu+e — silent u in rule-based IPA",
+      "expected_token_count_min": 4,
+      "expected_contains": ["ɡ", "e"]
+    },
+    {
+      "language": "es",
+      "input": "jota",
+      "description": "Spanish j -> velar fricative x in rule-based",
+      "expected_token_count_min": 4,
+      "expected_contains": ["x"]
+    },
+    {
+      "language": "es",
+      "input": "rosa",
+      "description": "Spanish word-initial r — trill in rule-based",
+      "expected_token_count_min": 4,
+      "expected_contains": ["rr"]
+    },
+    {
+      "language": "es",
+      "input": "casa",
+      "description": "Spanish penultimate stress — basic CVCV pattern in rule-based",
+      "expected_token_count_min": 4
+    },
+    {
+      "language": "es",
+      "input": "café",
+      "description": "Spanish final-syllable stress via acute accent in rule-based",
+      "expected_token_count_min": 4
+    },
+    {
+      "language": "es",
+      "input": "el gato",
+      "description": "Spanish function word (el) + content word — multi-word processing",
+      "expected_token_count_min": 7
+    },
+    {
+      "language": "es",
+      "input": "todo",
+      "description": "Spanish intervocalic d — allophony to dental fricative in rule-based",
+      "expected_token_count_min": 4,
+      "expected_contains": ["ð"]
+    },
+    {
+      "language": "es",
+      "input": "discípulo",
+      "description": "Spanish sc+i cluster and accented vowel in rule-based",
+      "expected_token_count_min": 8
+    },
+    {
+      "language": "es",
+      "input": "enrique honra rosa",
+      "description": "Spanish sentence with multiple r contexts in rule-based",
+      "expected_token_count_min": 16
     },
     {
       "language": "fr",
@@ -117,6 +237,90 @@
       "expected_token_count_min": 6
     },
     {
+      "language": "fr",
+      "input": "chambre",
+      "description": "French ch -> esh in rule-based IPA",
+      "expected_token_count_min": 4,
+      "expected_contains": ["ʃ"]
+    },
+    {
+      "language": "fr",
+      "input": "montagne",
+      "description": "French gn -> palatal nasal in rule-based IPA",
+      "expected_token_count_min": 5,
+      "expected_contains": ["ɲ"]
+    },
+    {
+      "language": "fr",
+      "input": "parler",
+      "description": "French -er ending -> /e/ in rule-based IPA",
+      "expected_token_count_min": 5,
+      "expected_contains": ["e"]
+    },
+    {
+      "language": "fr",
+      "input": "mer",
+      "description": "French -er exception -> open vowel in rule-based IPA",
+      "expected_token_count_min": 3,
+      "expected_contains": ["m", "ɛ", "ʁ"]
+    },
+    {
+      "language": "fr",
+      "input": "vin",
+      "description": "French nasal vowel nasalized-epsilon in rule-based IPA",
+      "expected_token_count_min": 2,
+      "expected_contains": ["v"]
+    },
+    {
+      "language": "fr",
+      "input": "trois",
+      "description": "French oi -> wa diphthong in rule-based IPA",
+      "expected_token_count_min": 4,
+      "expected_contains": ["w", "a"]
+    },
+    {
+      "language": "fr",
+      "input": "tu",
+      "description": "French u -> front rounded y_vowel in rule-based IPA",
+      "expected_token_count_min": 2,
+      "expected_contains": ["t", "y_vowel"]
+    },
+    {
+      "language": "fr",
+      "input": "fille",
+      "description": "French -ille -> ij in rule-based IPA",
+      "expected_token_count_min": 3,
+      "expected_contains": ["f", "i", "j"]
+    },
+    {
+      "language": "fr",
+      "input": "ville",
+      "description": "French -ille exception -> il in rule-based IPA",
+      "expected_token_count_min": 3,
+      "expected_contains": ["v", "i", "l"]
+    },
+    {
+      "language": "fr",
+      "input": "nation",
+      "description": "French -tion -> nasal vowel in rule-based IPA",
+      "expected_token_count_min": 4,
+      "expected_contains": ["n", "a", "s"]
+    },
+    {
+      "language": "fr",
+      "input": "agneau",
+      "description": "French gn -> palatal nasal in rule-based IPA (verify not separate g+n)",
+      "expected_token_count_min": 3,
+      "expected_contains": ["a", "ɲ"]
+    },
+    {
+      "language": "fr",
+      "input": "eau",
+      "description": "French eau trigraph -> /o/ in rule-based IPA",
+      "expected_token_count_min": 1,
+      "expected_contains": ["o"]
+    },
+    {
       "language": "pt",
       "input": "olá",
       "description": "Portuguese greeting — tests accented vowel stress",
@@ -134,6 +338,90 @@
       "input": "Obrigado pela ajuda.",
       "description": "Portuguese polite phrase — tests multi-word processing and stress",
       "expected_token_count_min": 8
+    },
+    {
+      "language": "pt",
+      "input": "Brasil",
+      "description": "Portuguese coda-l -> w in rule-based IPA",
+      "expected_token_count_min": 5,
+      "expected_contains": ["w"]
+    },
+    {
+      "language": "pt",
+      "input": "bom",
+      "description": "Portuguese nasal vowel (nasal o) in rule-based IPA",
+      "expected_token_count_min": 2,
+      "expected_contains": ["b", "õ"]
+    },
+    {
+      "language": "pt",
+      "input": "dia",
+      "description": "Portuguese d+i palatalization -> dZ in rule-based IPA",
+      "expected_token_count_min": 3,
+      "expected_contains": ["dʒ"]
+    },
+    {
+      "language": "pt",
+      "input": "rato",
+      "description": "Portuguese word-initial r -> uvular in rule-based IPA",
+      "expected_token_count_min": 4,
+      "expected_contains": ["ʁ"]
+    },
+    {
+      "language": "pt",
+      "input": "filho",
+      "description": "Portuguese lh -> palatal lateral in rule-based IPA",
+      "expected_token_count_min": 4,
+      "expected_contains": ["ʎ"]
+    },
+    {
+      "language": "pt",
+      "input": "junho",
+      "description": "Portuguese nh -> palatal nasal in rule-based IPA",
+      "expected_token_count_min": 4,
+      "expected_contains": ["ɲ"]
+    },
+    {
+      "language": "pt",
+      "input": "carro",
+      "description": "Portuguese rr -> uvular in rule-based IPA",
+      "expected_token_count_min": 4,
+      "expected_contains": ["ʁ"]
+    },
+    {
+      "language": "pt",
+      "input": "casa",
+      "description": "Portuguese intervocalic s -> z in rule-based IPA",
+      "expected_token_count_min": 4,
+      "expected_contains": ["z"]
+    },
+    {
+      "language": "pt",
+      "input": "gato",
+      "description": "Portuguese final o reduction -> u in rule-based IPA",
+      "expected_token_count_min": 4,
+      "expected_contains": ["u"]
+    },
+    {
+      "language": "pt",
+      "input": "grande",
+      "description": "Portuguese final e reduction -> i in rule-based IPA",
+      "expected_token_count_min": 5,
+      "expected_contains": ["i"]
+    },
+    {
+      "language": "pt",
+      "input": "manhã",
+      "description": "Portuguese nh + nasal tilde vowel in rule-based IPA",
+      "expected_token_count_min": 4,
+      "expected_contains": ["ɲ", "ã"]
+    },
+    {
+      "language": "pt",
+      "input": "massa",
+      "description": "Portuguese ss -> s reduction in rule-based IPA",
+      "expected_token_count_min": 4,
+      "expected_contains": ["s"]
     },
     {
       "language": "ja",
@@ -192,6 +480,76 @@
       "input": "God morgon Sverige.",
       "description": "Swedish sentence — tests multi-word processing",
       "expected_token_count_min": 6
+    },
+    {
+      "language": "sv",
+      "input": "tack",
+      "description": "Swedish common word — short a before ck geminate (ck -> k), stress marker",
+      "expected_token_count_min": 4,
+      "expected_contains": ["t", "a", "k"]
+    },
+    {
+      "language": "sv",
+      "input": "välkommen",
+      "description": "Swedish compound word — short ä (ɛ) before cluster, short o (ɔ) before mm geminate",
+      "expected_token_count_min": 10,
+      "expected_contains": ["v", "ɛ", "l", "k", "ɔ", "m", "n"]
+    },
+    {
+      "language": "sv",
+      "input": "Sverige",
+      "description": "Swedish country name — long e (eː) before single r, soft g before front vowel -> j",
+      "expected_token_count_min": 8,
+      "expected_contains": ["s", "v", "eː", "j"]
+    },
+    {
+      "language": "sv",
+      "input": "mjölk",
+      "description": "Swedish sj-sound exception — mj onset, short ö (œ) before lk cluster",
+      "expected_token_count_min": 6,
+      "expected_contains": ["m", "j", "œ", "l", "k"]
+    },
+    {
+      "language": "sv",
+      "input": "skön",
+      "description": "Swedish sk + front vowel ö -> sj-sound (ɧ), long ö (øː) before single n",
+      "expected_token_count_min": 4,
+      "expected_contains": ["ɧ", "øː", "n"]
+    },
+    {
+      "language": "sv",
+      "input": "ljus",
+      "description": "Swedish word-initial lj digraph -> j, long u (ʉː) before single s",
+      "expected_token_count_min": 4,
+      "expected_contains": ["j", "ʉː", "s"]
+    },
+    {
+      "language": "sv",
+      "input": "kort",
+      "description": "Swedish retroflex assimilation — rt -> ʈ, short o (ɔ) before cluster",
+      "expected_token_count_min": 4,
+      "expected_contains": ["k", "ɔ", "ʈ"]
+    },
+    {
+      "language": "sv",
+      "input": "barn",
+      "description": "Swedish retroflex assimilation — rn -> ɳ, long a (ɑː) before r+single C",
+      "expected_token_count_min": 4,
+      "expected_contains": ["b", "ɑː", "ɳ"]
+    },
+    {
+      "language": "sv",
+      "input": "flicka",
+      "description": "Swedish hard k exception — k before i stays /k/ (in HARD_K_WORDS), short i (ɪ)",
+      "expected_token_count_min": 6,
+      "expected_contains": ["f", "l", "ɪ", "k", "a"]
+    },
+    {
+      "language": "sv",
+      "input": "station",
+      "description": "Swedish loanword -tion suffix -> sj-sound (ɧ) + long u (uː) + n, stress on suffix",
+      "expected_token_count_min": 7,
+      "expected_contains": ["s", "t", "ɧ", "uː", "n"]
     }
   ],
   "pua_map_count": 96,

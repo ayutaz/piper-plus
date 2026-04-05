@@ -631,6 +631,8 @@ export class EnglishG2P {
      * @returns {{ tokens: string[], prosody: null[] }}
      */
     phonemizeWithProsody(text) {
-        return this.phonemize(text);
+        const { tokens } = this.phonemize(text);
+        const prosody = tokens.map(() => ({ a1: 0, a2: 0, a3: 0 }));
+        return { tokens, prosody };
     }
 }

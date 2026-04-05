@@ -334,3 +334,5 @@ export { DictLoader } from './dict-loader.js';
 export { Encoder } from './encode.js';
 export { UnicodeLanguageDetector } from './detect.js';
 export { CustomDictionary } from './custom-dictionary.js';
+export { PUA_COMPAT_VERSION, checkPuaCompat, PUA_MAP, mapToken, unmapToken } from './pua-map.js';
+export { extractPhonemesFromLabels, applyNPhonemeRules, mapToPUA } from './ja/phoneme-extract.js';

@@ -9,13 +9,14 @@
  *
  * The JS G2P is a lightweight browser-optimised implementation, so some
  * differences from the Python/Rust output are expected:
- * - ES/FR/PT/ZH: character-based tokeniser (no rule-based IPA conversion)
+ * - ZH: character-based tokeniser (no rule-based IPA conversion yet)
  * - EN: dictionary + fallback rules (IPA output, expected_contains checked)
- * - KO/SV: rule-based (expected_contains checked)
+ * - ES/FR/KO/SV: rule-based (expected_contains checked)
  *
  * This test performs `expected_token_count_min` and `expected_contains`
- * checks. Exact token match (`expected_tokens`) is skipped for JS.
- * JA is skipped because it requires the OpenJTalk WASM runtime.
+ * checks. Exact token match (`expected_tokens`) is performed when the
+ * fixture provides it (e.g. ES). JA is skipped because it requires
+ * the OpenJTalk WASM runtime.
  *
  * Additionally, `encode_test_cases` from the fixture are validated against
  * the Encoder class to verify BOS/PAD/EOS insertion and PUA mapping.
@@ -58,10 +59,10 @@ function casesFor(lang) {
 }
 
 // Languages where the JS G2P produces IPA tokens (rule-based or dictionary).
-// For character-based languages (ES/FR/PT/ZH), expected_contains from the
+// For character-based languages (ZH), expected_contains from the
 // fixture refers to IPA tokens that the JS implementation does not produce,
 // so those checks are skipped.
-const IPA_OUTPUT_LANGUAGES = new Set(['en', 'ko', 'sv']);
+const IPA_OUTPUT_LANGUAGES = new Set(['en', 'es', 'fr', 'ko', 'pt', 'sv']);
 
 // ---------------------------------------------------------------------------
 // Helper: structural assertion (token count only -- JS may differ from Py/Rust)
@@ -117,7 +118,7 @@ describe('G2P golden: English', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Spanish (character-based in JS)
+// Spanish (rule-based IPA)
 // ---------------------------------------------------------------------------
 
 describe('G2P golden: Spanish', () => {
@@ -125,6 +126,11 @@ describe('G2P golden: Spanish', () => {
     for (const c of casesFor('es')) {
         it(c.description ?? c.input, () => {
             const { tokens } = g2p.phonemize(c.input);
+            // Exact token match when fixture specifies expected_tokens
+            if (c.expected_tokens) {
+                assert.deepEqual(tokens, c.expected_tokens,
+                    `ES exact token mismatch for ${JSON.stringify(c.input)}`);
+            }
             assertTokenCountMin(tokens, c);
             assertExpectedContains(tokens, c);
         });
@@ -132,7 +138,7 @@ describe('G2P golden: Spanish', () => {
 });
 
 // ---------------------------------------------------------------------------
-// French (character-based in JS)
+// French (rule-based IPA)
 // ---------------------------------------------------------------------------
 
 describe('G2P golden: French', () => {
@@ -147,7 +153,7 @@ describe('G2P golden: French', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Portuguese (character-based in JS)
+// Portuguese (rule-based BR IPA)
 // ---------------------------------------------------------------------------
 
 describe('G2P golden: Portuguese', () => {

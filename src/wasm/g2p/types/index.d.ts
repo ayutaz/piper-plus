@@ -6,7 +6,7 @@
 // ---------------------------------------------------------------------------
 
 /** Supported language codes. */
-export type Language = 'ja' | 'en' | 'zh' | 'es' | 'fr' | 'pt' | 'sv';
+export type Language = 'ja' | 'en' | 'zh' | 'ko' | 'es' | 'fr' | 'pt' | 'sv';
 
 /**
  * Prosody features extracted from OpenJTalk full-context labels.
@@ -559,6 +559,47 @@ export class SwedishG2P {
      * for each phoneme token. a2=2 for primary stress markers.
      *
      * @param text - Swedish text to phonemize.
+     * @returns Phonemize result with IPA tokens and prosody info.
+     */
+    phonemizeWithProsody(text: string): PhonemizeResult;
+}
+
+/**
+ * Korean G2P using Hangul decomposition and IPA mapping.
+ *
+ * Decomposes Hangul syllables into jamo, maps to IPA phonemes, and applies
+ * basic liaison rules (연음법칙). Supports tense consonants, aspirated
+ * consonants, and unreleased finals with PUA codepoints.
+ * No external dependencies required.
+ *
+ * @example
+ * ```js
+ * import { KoreanG2P } from '@piper-plus/g2p/ko';
+ *
+ * const ko = new KoreanG2P();
+ * const result = ko.phonemize('안녕하세요');
+ * ```
+ */
+export class KoreanG2P {
+    constructor(options?: {});
+
+    /** Language code for this G2P instance. */
+    readonly languageCode: string;
+
+    /**
+     * Convert Korean text to phoneme tokens.
+     *
+     * @param text - Korean text to phonemize.
+     * @returns Phonemize result with IPA tokens.
+     */
+    phonemize(text: string): PhonemizeResult;
+
+    /**
+     * Convert Korean text to phoneme tokens with prosody features.
+     *
+     * Korean prosody: A1=0, A2=0, A3=0 (fixed).
+     *
+     * @param text - Korean text to phonemize.
      * @returns Phonemize result with IPA tokens and prosody info.
      */
     phonemizeWithProsody(text: string): PhonemizeResult;
