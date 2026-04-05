@@ -525,3 +525,123 @@ describe('PortugueseG2P -- gu digraph', () => {
             `expected ɡ in 'guerra': [${tokens.join(', ')}]`);
     });
 });
+
+// ===========================================================================
+// phonemizeWithProsody detailed tests
+// ===========================================================================
+
+describe('PortugueseG2P -- phonemizeWithProsody detailed', () => {
+    const pt = new PortugueseG2P();
+
+    it('should have exactly one a2=2 token (stressed vowel) in "café"', () => {
+        const { tokens, prosody } = pt.phonemizeWithProsody('caf\u00E9');
+        const stressedIndices = [];
+        for (let i = 0; i < prosody.length; i++) {
+            if (prosody[i].a2 === 2) {
+                stressedIndices.push(i);
+            }
+        }
+        assert.equal(stressedIndices.length, 1,
+            `expected exactly 1 token with a2=2 in "café", got ${stressedIndices.length}: ` +
+            `tokens=[${tokens.join(', ')}], a2=[${prosody.map(p => p.a2).join(', ')}]`);
+        // All other tokens should have a2=0
+        for (let i = 0; i < prosody.length; i++) {
+            if (i !== stressedIndices[0]) {
+                assert.equal(prosody[i].a2, 0,
+                    `token "${tokens[i]}" at index ${i} should have a2=0`);
+            }
+        }
+    });
+
+    it('should set a3 = word phoneme count for all tokens in "bom"', () => {
+        const { tokens, prosody } = pt.phonemizeWithProsody('bom');
+        // All tokens belong to one word, so a3 should be the same for all
+        const expectedA3 = tokens.length;
+        for (let i = 0; i < tokens.length; i++) {
+            assert.equal(prosody[i].a3, expectedA3,
+                `token "${tokens[i]}" at index ${i} should have a3=${expectedA3}, ` +
+                `got ${prosody[i].a3}`);
+        }
+    });
+
+    it('should reset a3 per word in "bom dia" and set a3=0 for space', () => {
+        const { tokens, prosody } = pt.phonemizeWithProsody('bom dia');
+        const spaceIdx = tokens.indexOf(' ');
+        assert.ok(spaceIdx > 0, 'should have a space separator');
+
+        // Space should have a3=0
+        assert.equal(prosody[spaceIdx].a3, 0,
+            'space token should have a3=0');
+
+        // Word 1: tokens before space
+        const word1Count = spaceIdx;
+        for (let i = 0; i < spaceIdx; i++) {
+            assert.equal(prosody[i].a3, word1Count,
+                `word1 token "${tokens[i]}" at index ${i} should have a3=${word1Count}`);
+        }
+
+        // Word 2: tokens after space
+        const word2Count = tokens.length - spaceIdx - 1;
+        for (let i = spaceIdx + 1; i < tokens.length; i++) {
+            assert.equal(prosody[i].a3, word2Count,
+                `word2 token "${tokens[i]}" at index ${i} should have a3=${word2Count}`);
+        }
+    });
+
+    it('should place stress on final vowel (oxytone) in "café"', () => {
+        const { tokens, prosody } = pt.phonemizeWithProsody('caf\u00E9');
+        // Find the stressed token (a2=2)
+        let stressIdx = -1;
+        for (let i = 0; i < prosody.length; i++) {
+            if (prosody[i].a2 === 2) {
+                stressIdx = i;
+                break;
+            }
+        }
+        assert.ok(stressIdx >= 0, 'should have a stressed token');
+        // The stressed token should be a vowel (ɛ from é)
+        const stressedToken = tokens[stressIdx];
+        assert.equal(stressedToken, IPA_EPSILON,
+            `stressed token should be ɛ (from é), got "${stressedToken}"`);
+        // It should be the last phoneme (final syllable stress)
+        assert.equal(stressIdx, tokens.length - 1,
+            `stress should be on final position (oxytone): stressIdx=${stressIdx}, ` +
+            `len=${tokens.length}`);
+    });
+
+    it('should place stress on penultimate vowel (paroxytone) in "casa"', () => {
+        const { tokens, prosody } = pt.phonemizeWithProsody('casa');
+        // Find the stressed token (a2=2)
+        let stressIdx = -1;
+        for (let i = 0; i < prosody.length; i++) {
+            if (prosody[i].a2 === 2) {
+                stressIdx = i;
+                break;
+            }
+        }
+        assert.ok(stressIdx >= 0, 'should have a stressed token');
+        // Stress should NOT be on the last token (that would be oxytone)
+        assert.ok(stressIdx < tokens.length - 1,
+            `stress should be before the final token (paroxytone): stressIdx=${stressIdx}, ` +
+            `tokens=[${tokens.join(', ')}]`);
+    });
+
+    it('should set a1=0, a2=0, a3=0 for punctuation in "olá!"', () => {
+        const { tokens, prosody } = pt.phonemizeWithProsody('ol\u00E1!');
+        // Find the punctuation token '!'
+        const exclIdx = tokens.indexOf('!');
+        assert.ok(exclIdx >= 0, 'should have "!" token');
+        assert.equal(prosody[exclIdx].a1, 0,
+            'punctuation a1 should be 0');
+        assert.equal(prosody[exclIdx].a2, 0,
+            'punctuation a2 should be 0');
+        assert.equal(prosody[exclIdx].a3, 0,
+            'punctuation a3 should be 0');
+    });
+
+    it('should return empty arrays for empty string', () => {
+        const { tokens, prosody } = pt.phonemizeWithProsody('');
+        assert.deepEqual(tokens, [], 'tokens should be empty');
+        assert.deepEqual(prosody, [], 'prosody should be empty');
+    });
+});

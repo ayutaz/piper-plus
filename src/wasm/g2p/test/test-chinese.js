@@ -237,3 +237,212 @@ describe('ChineseG2P — WASM integration', () => {
         assert.strictEqual(g2p.lastError, null, 'setWasmPhonemizer should clear lastError');
     });
 });
+
+// ---------------------------------------------------------------------------
+// Dictionary loading workflow (setChineseDictionary mock)
+// ---------------------------------------------------------------------------
+
+describe('ChineseG2P — dictionary loading workflow', () => {
+    it('should accept a mock WASM phonemizer with setChineseDictionary method', () => {
+        const mockWasm = {
+            phonemize: (_text, _lang) => ({ tokens: ['ni3', 'hao3'], prosody: [] }),
+            setChineseDictionary: (_single, _phrase) => {},
+        };
+        const g2p = new ChineseG2P();
+        g2p.setWasmPhonemizer(mockWasm);
+        assert.equal(g2p.mode, 'wasm');
+    });
+
+    it('should use WASM path (not fallback) after setting dictionary-capable phonemizer', () => {
+        let wasmCalled = false;
+        const mockWasm = {
+            phonemize: (_text, _lang) => {
+                wasmCalled = true;
+                return { tokens: ['ni3', 'hao3'], prosody: [] };
+            },
+            setChineseDictionary: (_single, _phrase) => {},
+        };
+        const g2p = new ChineseG2P({
+            phonemeIdMap: { '\u4F60': [10], '\u597D': [20] },
+        });
+        // Before setting WASM, phonemize uses fallback
+        const fallbackResult = g2p.phonemize('\u4F60\u597D');
+        assert.deepStrictEqual(fallbackResult.tokens, ['\u4F60', '\u597D']);
+        assert.equal(wasmCalled, false);
+
+        // After setting WASM, phonemize uses WASM path
+        g2p.setWasmPhonemizer(mockWasm);
+        const wasmResult = g2p.phonemize('\u4F60\u597D');
+        assert.deepStrictEqual(wasmResult.tokens, ['ni3', 'hao3']);
+        assert.equal(wasmCalled, true);
+    });
+
+    it('should change mode to "wasm" after setWasmPhonemizer with dictionary-capable mock', () => {
+        const g2p = new ChineseG2P();
+        assert.equal(g2p.mode, 'fallback');
+
+        const mockWasm = {
+            phonemize: () => ({ tokens: [], prosody: [] }),
+            setChineseDictionary: () => {},
+        };
+        g2p.setWasmPhonemizer(mockWasm);
+        assert.equal(g2p.mode, 'wasm');
+    });
+
+    it('should use pinyin tokens from WASM after dictionary is loaded', () => {
+        // Simulate the full workflow: create phonemizer, load dict, then phonemize
+        const mockWasm = {
+            _dictLoaded: false,
+            setChineseDictionary(_single, _phrase) {
+                this._dictLoaded = true;
+            },
+            phonemize(_text, _lang) {
+                if (!this._dictLoaded) {
+                    return { tokens: Array.from(_text), prosody: [] };
+                }
+                // After dict loaded, return pinyin tokens
+                return { tokens: ['ni3', 'hao3'], prosody: [] };
+            },
+        };
+
+        const g2p = new ChineseG2P({ wasmPhonemizer: mockWasm });
+
+        // Before dictionary loading -- returns raw characters
+        const beforeDict = g2p.phonemize('\u4F60\u597D');
+        assert.deepStrictEqual(beforeDict.tokens, ['\u4F60', '\u597D']);
+
+        // Load dictionary
+        mockWasm.setChineseDictionary(new Uint8Array([]), new Uint8Array([]));
+
+        // After dictionary loading -- returns pinyin tokens
+        const afterDict = g2p.phonemize('\u4F60\u597D');
+        assert.deepStrictEqual(afterDict.tokens, ['ni3', 'hao3']);
+    });
+});
+
+// ---------------------------------------------------------------------------
+// setChineseDictionary error cases
+// ---------------------------------------------------------------------------
+
+describe('ChineseG2P — setChineseDictionary error cases', () => {
+    it('should handle setChineseDictionary throwing on invalid JSON', () => {
+        const mockWasm = {
+            phonemize: (_text, _lang) => ({ tokens: Array.from(_text), prosody: [] }),
+            setChineseDictionary: () => {
+                throw new Error('CONFIG_PARSE_ERROR: invalid JSON');
+            },
+        };
+
+        const g2p = new ChineseG2P({ wasmPhonemizer: mockWasm });
+
+        // Dictionary loading fails
+        assert.throws(
+            () => mockWasm.setChineseDictionary(new Uint8Array([]), new Uint8Array([])),
+            { message: 'CONFIG_PARSE_ERROR: invalid JSON' },
+        );
+
+        // Phonemize should still work (WASM phonemizer itself is not broken)
+        const result = g2p.phonemize('\u4F60');
+        assert.deepStrictEqual(result.tokens, ['\u4F60']);
+        assert.strictEqual(g2p.lastError, null);
+    });
+
+    it('should set lastError when WASM phonemizer throws during phonemization', () => {
+        const mockWasm = {
+            phonemize: () => {
+                throw new Error('dict not loaded');
+            },
+            setChineseDictionary: () => {},
+        };
+
+        const g2p = new ChineseG2P({
+            wasmPhonemizer: mockWasm,
+            phonemeIdMap: { '\u4F60': [10] },
+        });
+
+        const result = g2p.phonemize('\u4F60');
+        // Falls back to character passthrough
+        assert.deepStrictEqual(result.tokens, ['\u4F60']);
+        // Error is recorded
+        assert.ok(g2p.lastError);
+        assert.ok(g2p.lastError.includes('WASM phonemize failed'));
+        assert.ok(g2p.lastError.includes('dict not loaded'));
+    });
+
+    it('should recover after replacing a broken phonemizer with a working one', () => {
+        // Step 1: set a broken WASM phonemizer
+        const brokenWasm = {
+            phonemize: () => { throw new Error('broken'); },
+            setChineseDictionary: () => {},
+        };
+        const g2p = new ChineseG2P({
+            wasmPhonemizer: brokenWasm,
+            phonemeIdMap: { '\u4F60': [10], '\u597D': [20] },
+        });
+
+        g2p.phonemize('\u4F60');
+        assert.ok(g2p.lastError, 'lastError should be set after broken WASM call');
+
+        // Step 2: replace with a working phonemizer
+        const workingWasm = {
+            phonemize: (_text, _lang) => ({ tokens: ['ni3', 'hao3'], prosody: [] }),
+            setChineseDictionary: () => {},
+        };
+        g2p.setWasmPhonemizer(workingWasm);
+        assert.strictEqual(g2p.lastError, null, 'lastError should be cleared by setWasmPhonemizer');
+
+        // Step 3: phonemize succeeds with the new phonemizer
+        const result = g2p.phonemize('\u4F60\u597D');
+        assert.deepStrictEqual(result.tokens, ['ni3', 'hao3']);
+        assert.strictEqual(g2p.lastError, null, 'lastError should remain null after success');
+    });
+
+    it('should keep lastError from phonemize failure even if setChineseDictionary works', () => {
+        let callCount = 0;
+        const mockWasm = {
+            phonemize: () => {
+                callCount++;
+                if (callCount === 1) throw new Error('first call fails');
+                return { tokens: ['ok'], prosody: [] };
+            },
+            setChineseDictionary: () => {
+                // Dictionary loading succeeds -- but this does not clear lastError
+            },
+        };
+
+        const g2p = new ChineseG2P({ wasmPhonemizer: mockWasm });
+
+        // First call fails
+        g2p.phonemize('\u4F60');
+        assert.ok(g2p.lastError, 'lastError should be set');
+
+        // Loading dictionary succeeds but does not touch lastError
+        mockWasm.setChineseDictionary(new Uint8Array([]), new Uint8Array([]));
+        assert.ok(g2p.lastError, 'lastError should still be set after dictionary load');
+
+        // Second phonemize call succeeds and clears lastError
+        g2p.phonemize('\u4F60');
+        assert.strictEqual(g2p.lastError, null, 'lastError should be cleared after successful phonemize');
+    });
+
+    it('should handle setChineseDictionary throwing non-Error values', () => {
+        const mockWasm = {
+            phonemize: () => ({ tokens: [], prosody: [] }),
+            setChineseDictionary: () => {
+                throw 'raw string error from WASM';
+            },
+        };
+
+        const g2p = new ChineseG2P({ wasmPhonemizer: mockWasm });
+
+        assert.throws(
+            () => mockWasm.setChineseDictionary(null, null),
+            (err) => err === 'raw string error from WASM',
+        );
+
+        // Phonemizer still works
+        const result = g2p.phonemize('test');
+        assert.deepStrictEqual(result.tokens, []);
+        assert.strictEqual(g2p.lastError, null);
+    });
+});

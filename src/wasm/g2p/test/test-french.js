@@ -667,3 +667,130 @@ describe('FrenchG2P -- Rust test cases', () => {
         assert.ok(result.startsWith('s'), `"ciel" c+i -> s: ${result}`);
     });
 });
+
+// ===========================================================================
+// phonemizeWithProsody detailed
+// ===========================================================================
+
+describe('FrenchG2P -- phonemizeWithProsody detailed', () => {
+    const fr = new FrenchG2P();
+
+    it('a2=2 uniqueness per word: "bon" has exactly one token with a2=2', () => {
+        const { tokens, prosody } = fr.phonemizeWithProsody('bon');
+        const stressed = prosody.filter(p => p.a2 === 2);
+        assert.equal(stressed.length, 1,
+            `"bon" should have exactly 1 stressed token (a2=2), got ${stressed.length}: [${tokens.join(', ')}]`);
+        const unstressed = prosody.filter(p => p.a2 === 0);
+        assert.equal(unstressed.length, tokens.length - 1,
+            'all other tokens should have a2=0');
+    });
+
+    it('a2=2 at last vowel, not consonants: "bonjour" stress on last vowel phoneme', () => {
+        const { tokens, prosody } = fr.phonemizeWithProsody('bonjour');
+        // Find the index where a2=2
+        const stressIdx = prosody.findIndex(p => p.a2 === 2);
+        assert.ok(stressIdx >= 0, '"bonjour" should have a stressed phoneme');
+
+        // The stressed token must be a vowel phoneme
+        const stressedToken = tokens[stressIdx];
+        const vowelPhonemes = new Set([
+            'a', 'e', 'i', 'o', 'u',
+            '\u025B', '\u0254', '\u0259',   // open-e, open-o, schwa
+            '\u00F8', '\u0153',             // slashed-o, oe-ligature
+            '\uE01E',                       // PUA y_vowel
+            '\uE056', '\uE057', '\uE058',   // PUA nasals
+        ]);
+        assert.ok(vowelPhonemes.has(stressedToken),
+            `stressed token "${stressedToken}" at index ${stressIdx} should be a vowel phoneme`);
+
+        // No vowel phoneme AFTER the stressed index (it should be the last vowel)
+        for (let i = stressIdx + 1; i < tokens.length; i++) {
+            assert.ok(!vowelPhonemes.has(tokens[i]),
+                `token "${tokens[i]}" at index ${i} is a vowel after the stress position -- stress should be on last vowel`);
+        }
+
+        // Trailing consonant phonemes should have a2=0
+        for (let i = stressIdx + 1; i < tokens.length; i++) {
+            assert.equal(prosody[i].a2, 0,
+                `trailing token "${tokens[i]}" at index ${i} should have a2=0`);
+        }
+    });
+
+    it('multi-word a3 independence: "bon jour" has independent a3 per word', () => {
+        const { tokens, prosody } = fr.phonemizeWithProsody('bon jour');
+        // Find the space separator
+        const spaceIdx = tokens.indexOf(' ');
+        assert.ok(spaceIdx > 0, '"bon jour" should have a space separator');
+
+        // Space token should have a3=0
+        assert.equal(prosody[spaceIdx].a3, 0,
+            'space token should have a3=0');
+        assert.equal(prosody[spaceIdx].a2, 0,
+            'space token should have a2=0');
+        assert.equal(prosody[spaceIdx].a1, 0,
+            'space token should have a1=0');
+
+        // Word 1 ("bon"): all tokens before the space share the same a3
+        const word1A3 = prosody[0].a3;
+        assert.ok(word1A3 > 0, 'word 1 a3 should be > 0');
+        for (let i = 0; i < spaceIdx; i++) {
+            assert.equal(prosody[i].a3, word1A3,
+                `word1 token "${tokens[i]}" at index ${i} should have a3=${word1A3}`);
+        }
+
+        // Word 2 ("jour"): all tokens after the space share the same a3
+        const word2A3 = prosody[spaceIdx + 1].a3;
+        assert.ok(word2A3 > 0, 'word 2 a3 should be > 0');
+        for (let i = spaceIdx + 1; i < tokens.length; i++) {
+            assert.equal(prosody[i].a3, word2A3,
+                `word2 token "${tokens[i]}" at index ${i} should have a3=${word2A3}`);
+        }
+    });
+
+    it('a3 count accuracy: "bon" a3 matches number of phonemes in the word', () => {
+        const { tokens, prosody } = fr.phonemizeWithProsody('bon');
+        // "bon" is a single word -- all tokens are word phonemes, no spaces
+        const phonemeCount = tokens.length;
+        for (let i = 0; i < tokens.length; i++) {
+            assert.equal(prosody[i].a3, phonemeCount,
+                `"bon" token "${tokens[i]}" at index ${i} should have a3=${phonemeCount}`);
+        }
+    });
+
+    it('nasal vowel stress: "bon" nasal vowel is the stressed position (a2=2)', () => {
+        const { tokens, prosody } = fr.phonemizeWithProsody('bon');
+        // "bon" -> b + PUA_NASAL_ON; the nasal vowel should be stressed
+        const nasalIdx = tokens.indexOf('\uE058'); // PUA_NASAL_ON
+        assert.ok(nasalIdx >= 0, '"bon" should contain nasal-on PUA token');
+        assert.equal(prosody[nasalIdx].a2, 2,
+            'nasal vowel in "bon" should have a2=2 (stressed)');
+
+        // The consonant 'b' should NOT be stressed
+        const bIdx = tokens.indexOf('b');
+        assert.ok(bIdx >= 0, '"bon" should contain "b"');
+        assert.equal(prosody[bIdx].a2, 0,
+            'consonant "b" in "bon" should have a2=0');
+    });
+
+    it('punctuation prosody: "bonjour!" punctuation has a1=0, a2=0, a3=0', () => {
+        const { tokens, prosody } = fr.phonemizeWithProsody('bonjour!');
+        // Find the exclamation mark
+        const exclIdx = tokens.indexOf('!');
+        assert.ok(exclIdx >= 0, '"bonjour!" should contain "!"');
+        assert.equal(prosody[exclIdx].a1, 0, 'punctuation a1 should be 0');
+        assert.equal(prosody[exclIdx].a2, 0, 'punctuation a2 should be 0');
+        assert.equal(prosody[exclIdx].a3, 0, 'punctuation a3 should be 0');
+
+        // Non-punctuation tokens should have a3 > 0
+        for (let i = 0; i < exclIdx; i++) {
+            assert.ok(prosody[i].a3 > 0,
+                `word token "${tokens[i]}" at index ${i} should have a3 > 0`);
+        }
+    });
+
+    it('empty string: phonemizeWithProsody("") returns empty arrays', () => {
+        const { tokens, prosody } = fr.phonemizeWithProsody('');
+        assert.deepEqual(tokens, [], 'tokens should be empty for empty input');
+        assert.deepEqual(prosody, [], 'prosody should be empty for empty input');
+    });
+});

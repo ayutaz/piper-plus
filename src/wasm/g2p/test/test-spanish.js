@@ -568,3 +568,152 @@ describe('SpanishG2P -- sc before e/i', () => {
         assert.ok(hasToken(tokens, 's'), `sc before e -> s: ${JSON.stringify(tokens)}`);
     });
 });
+
+// ===========================================================================
+// Detailed prosody: a2 stress positions, a3 word phoneme count
+// ===========================================================================
+
+describe('SpanishG2P -- phonemizeWithProsody detailed', () => {
+    const es = new SpanishG2P();
+
+    // -----------------------------------------------------------------------
+    // 1. a2=2 at stress positions
+    // -----------------------------------------------------------------------
+
+    it('"hola" -> stress marker and following vowel have a2=2, others a2=0', () => {
+        const { tokens, prosody } = es.phonemizeWithProsody('hola');
+        const stressIdx = tokens.indexOf(IPA_STRESS);
+        assert.ok(stressIdx >= 0, `"hola" should have a stress marker: ${JSON.stringify(tokens)}`);
+
+        // Stress marker itself has a2=2
+        assert.equal(prosody[stressIdx].a2, 2,
+            'stress marker token should have a2=2');
+
+        // The vowel immediately after the stress marker should also have a2=2
+        assert.ok(stressIdx + 1 < tokens.length,
+            'there should be a token after the stress marker');
+        assert.equal(prosody[stressIdx + 1].a2, 2,
+            `vowel after stress marker ("${tokens[stressIdx + 1]}") should have a2=2`);
+
+        // All other tokens should have a2=0
+        for (let i = 0; i < tokens.length; i++) {
+            if (i !== stressIdx && i !== stressIdx + 1) {
+                assert.equal(prosody[i].a2, 0,
+                    `token "${tokens[i]}" at index ${i} should have a2=0`);
+            }
+        }
+    });
+
+    // -----------------------------------------------------------------------
+    // 2. a3 word phoneme count
+    // -----------------------------------------------------------------------
+
+    it('"hola" -> all word tokens have a3 = phoneme count (excluding stress marker)', () => {
+        const { tokens, prosody } = es.phonemizeWithProsody('hola');
+        // "hola" -> [IPA_STRESS, 'o', 'l', 'a'] -- 3 phonemes excl. stress
+        const wordPhonemeCount = tokens.filter(t => t !== IPA_STRESS).length;
+        assert.ok(wordPhonemeCount > 0, 'should have at least one phoneme');
+
+        for (let i = 0; i < tokens.length; i++) {
+            assert.equal(prosody[i].a3, wordPhonemeCount,
+                `token "${tokens[i]}" at index ${i} should have a3=${wordPhonemeCount}, got ${prosody[i].a3}`);
+        }
+    });
+
+    // -----------------------------------------------------------------------
+    // 3. Multi-word a3 reset
+    // -----------------------------------------------------------------------
+
+    it('"hola mundo" -> each word has independent a3, space has a3=0', () => {
+        const { tokens, prosody } = es.phonemizeWithProsody('hola mundo');
+        const spaceIdx = tokens.indexOf(' ');
+        assert.ok(spaceIdx > 0, `should have a space separator: ${JSON.stringify(tokens)}`);
+
+        // Space token has a3=0
+        assert.equal(prosody[spaceIdx].a3, 0,
+            'space token should have a3=0');
+
+        // Word 1 ("hola"): tokens before the space
+        const word1Tokens = tokens.slice(0, spaceIdx);
+        const word1PhCount = word1Tokens.filter(t => t !== IPA_STRESS).length;
+        assert.ok(word1PhCount > 0, 'word 1 should have phonemes');
+        for (let i = 0; i < spaceIdx; i++) {
+            assert.equal(prosody[i].a3, word1PhCount,
+                `word1 token "${tokens[i]}" at index ${i} should have a3=${word1PhCount}`);
+        }
+
+        // Word 2 ("mundo"): tokens after the space
+        const word2Tokens = tokens.slice(spaceIdx + 1);
+        const word2PhCount = word2Tokens.filter(t => t !== IPA_STRESS).length;
+        assert.ok(word2PhCount > 0, 'word 2 should have phonemes');
+        for (let i = spaceIdx + 1; i < tokens.length; i++) {
+            assert.equal(prosody[i].a3, word2PhCount,
+                `word2 token "${tokens[i]}" at index ${i} should have a3=${word2PhCount}`);
+        }
+
+        // The two words have different lengths, so a3 should differ
+        assert.notEqual(word1PhCount, word2PhCount,
+            `"hola" (${word1PhCount} phonemes) and "mundo" (${word2PhCount} phonemes) should have different a3`);
+    });
+
+    // -----------------------------------------------------------------------
+    // 4. Function word prosody
+    // -----------------------------------------------------------------------
+
+    it('"el gato" -> "el" has no stress marker; "gato" has stress', () => {
+        const { tokens, prosody } = es.phonemizeWithProsody('el gato');
+        const spaceIdx = tokens.indexOf(' ');
+        assert.ok(spaceIdx > 0, `should have a space separator: ${JSON.stringify(tokens)}`);
+
+        // "el" is a function word -> no stress marker in word 1
+        const word1Tokens = tokens.slice(0, spaceIdx);
+        assert.ok(!word1Tokens.includes(IPA_STRESS),
+            `function word "el" should have no stress marker: ${JSON.stringify(word1Tokens)}`);
+
+        // "gato" is a content word -> should have a stress marker
+        const word2Tokens = tokens.slice(spaceIdx + 1);
+        assert.ok(word2Tokens.includes(IPA_STRESS),
+            `content word "gato" should have a stress marker: ${JSON.stringify(word2Tokens)}`);
+
+        // Verify a2 values: no a2=2 in "el" tokens
+        for (let i = 0; i < spaceIdx; i++) {
+            assert.equal(prosody[i].a2, 0,
+                `function word token "${tokens[i]}" at index ${i} should have a2=0`);
+        }
+
+        // "gato" should have a2=2 at stress marker and following vowel
+        const gatoStressIdx = tokens.indexOf(IPA_STRESS, spaceIdx + 1);
+        assert.ok(gatoStressIdx >= 0, '"gato" should have a stress marker');
+        assert.equal(prosody[gatoStressIdx].a2, 2,
+            'stress marker in "gato" should have a2=2');
+        assert.equal(prosody[gatoStressIdx + 1].a2, 2,
+            `vowel after stress marker in "gato" ("${tokens[gatoStressIdx + 1]}") should have a2=2`);
+    });
+
+    // -----------------------------------------------------------------------
+    // 5. Punctuation prosody
+    // -----------------------------------------------------------------------
+
+    it('"hola." -> punctuation token has a1=0, a2=0, a3=0', () => {
+        const { tokens, prosody } = es.phonemizeWithProsody('hola.');
+        const dotIdx = tokens.indexOf('.');
+        assert.ok(dotIdx >= 0, `should have a "." token: ${JSON.stringify(tokens)}`);
+
+        assert.equal(prosody[dotIdx].a1, 0,
+            'punctuation "." should have a1=0');
+        assert.equal(prosody[dotIdx].a2, 0,
+            'punctuation "." should have a2=0');
+        assert.equal(prosody[dotIdx].a3, 0,
+            'punctuation "." should have a3=0');
+    });
+
+    // -----------------------------------------------------------------------
+    // 6. Empty string
+    // -----------------------------------------------------------------------
+
+    it('phonemizeWithProsody("") -> empty arrays', () => {
+        const { tokens, prosody } = es.phonemizeWithProsody('');
+        assert.deepEqual(tokens, [], 'tokens should be empty for empty input');
+        assert.deepEqual(prosody, [], 'prosody should be empty for empty input');
+    });
+});
