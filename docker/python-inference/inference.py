@@ -387,7 +387,9 @@ def create_app(engine: PiperInferenceEngine, model_path: str):
 
     @app.get("/v1/audio/speech/languages")
     def speech_languages():
-        languages = sorted(engine.language_id_map.keys()) if engine.language_id_map else []
+        languages = (
+            sorted(engine.language_id_map.keys()) if engine.language_id_map else []
+        )
         return {"languages": languages}
 
     return app
