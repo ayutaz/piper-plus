@@ -8,6 +8,7 @@
 //! No runtime Python dependency — dictionaries are loaded from JSON at startup.
 
 use std::collections::{HashMap, HashSet};
+#[cfg(not(target_arch = "wasm32"))]
 use std::path::Path;
 use std::sync::{LazyLock, OnceLock};
 
@@ -658,22 +659,13 @@ fn phonemize_chinese_internal(
 // Dictionary loading
 // =========================================================================
 
-/// Load pinyin single-char dictionary from JSON.
+/// Parse single-char dictionary from a pre-loaded JSON Value.
 ///
 /// JSON format: `{ "19968": "yi1", "19969": "ding1,zheng4", ... }`
 /// Keys are codepoint values as strings.
-fn load_single_char_dict(path: &Path) -> Result<HashMap<char, String>, G2pError> {
-    let content = std::fs::read_to_string(path).map_err(|_| G2pError::DictionaryLoad {
-        path: path.display().to_string(),
-    })?;
-
-    let json: serde_json::Value =
-        serde_json::from_str(&content).map_err(|e| G2pError::DictionaryLoad {
-            path: format!("{}: {}", path.display(), e),
-        })?;
-
+fn parse_single_char_json(json: &serde_json::Value) -> Result<HashMap<char, String>, G2pError> {
     let obj = json.as_object().ok_or_else(|| G2pError::DictionaryLoad {
-        path: format!("{}: expected JSON object", path.display()),
+        path: "single_char_json: expected JSON object".to_string(),
     })?;
 
     let mut dict = HashMap::with_capacity(obj.len());
@@ -707,24 +699,15 @@ fn load_single_char_dict(path: &Path) -> Result<HashMap<char, String>, G2pError>
     Ok(dict)
 }
 
-/// Load pinyin phrase dictionary from JSON.
+/// Parse phrase dictionary from a pre-loaded JSON Value.
 ///
 /// JSON format supports:
 ///   - string value: `"一个": "yi2 ge4"`
 ///   - array of arrays: `"一个": [["yi2"], ["ge4"]]` (pypinyin format)
 ///   - array of strings: `"一个": ["yi2", "ge4"]`
-fn load_phrase_dict(path: &Path) -> Result<HashMap<String, Vec<String>>, G2pError> {
-    let content = std::fs::read_to_string(path).map_err(|_| G2pError::DictionaryLoad {
-        path: path.display().to_string(),
-    })?;
-
-    let json: serde_json::Value =
-        serde_json::from_str(&content).map_err(|e| G2pError::DictionaryLoad {
-            path: format!("{}: {}", path.display(), e),
-        })?;
-
+fn parse_phrase_json(json: &serde_json::Value) -> Result<HashMap<String, Vec<String>>, G2pError> {
     let obj = json.as_object().ok_or_else(|| G2pError::DictionaryLoad {
-        path: format!("{}: expected JSON object", path.display()),
+        path: "phrase_json: expected JSON object".to_string(),
     })?;
 
     let mut dict = HashMap::with_capacity(obj.len());
@@ -755,6 +738,36 @@ fn load_phrase_dict(path: &Path) -> Result<HashMap<String, Vec<String>>, G2pErro
     }
 
     Ok(dict)
+}
+
+/// Load pinyin single-char dictionary from a JSON file on disk.
+///
+/// Delegates to [`parse_single_char_json`] after reading the file.
+#[cfg(not(target_arch = "wasm32"))]
+fn load_single_char_dict(path: &Path) -> Result<HashMap<char, String>, G2pError> {
+    let content = std::fs::read_to_string(path).map_err(|_| G2pError::DictionaryLoad {
+        path: path.display().to_string(),
+    })?;
+    let json: serde_json::Value =
+        serde_json::from_str(&content).map_err(|e| G2pError::DictionaryLoad {
+            path: format!("{}: {}", path.display(), e),
+        })?;
+    parse_single_char_json(&json)
+}
+
+/// Load pinyin phrase dictionary from a JSON file on disk.
+///
+/// Delegates to [`parse_phrase_json`] after reading the file.
+#[cfg(not(target_arch = "wasm32"))]
+fn load_phrase_dict(path: &Path) -> Result<HashMap<String, Vec<String>>, G2pError> {
+    let content = std::fs::read_to_string(path).map_err(|_| G2pError::DictionaryLoad {
+        path: path.display().to_string(),
+    })?;
+    let json: serde_json::Value =
+        serde_json::from_str(&content).map_err(|e| G2pError::DictionaryLoad {
+            path: format!("{}: {}", path.display(), e),
+        })?;
+    parse_phrase_json(&json)
 }
 
 // =========================================================================
@@ -825,6 +838,7 @@ impl ChinesePhonemizer {
     /// # Arguments
     /// * `single_char_path` - Path to `pinyin_single.json`
     /// * `phrase_path` - Path to `pinyin_phrases.json`
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn new(single_char_path: &Path, phrase_path: &Path) -> Result<Self, G2pError> {
         let (single, phrase) = ZH_DICT_CACHE.get_or_init(|| {
             let s = load_single_char_dict(single_char_path)
@@ -836,6 +850,27 @@ impl ChinesePhonemizer {
         Ok(Self {
             dict: ZhDictRef::Static { single, phrase },
         })
+    }
+
+    /// Create a `ChinesePhonemizer` from JSON dictionary bytes (for WASM).
+    ///
+    /// JSON formats:
+    /// - pinyin_single.json: `{"19968": "yi1", "19969": "ding1,zheng4", ...}`
+    /// - pinyin_phrases.json: `{"一丁不識": [["yī"], ["dīng"], ...], "一个": "yi2 ge4", ...}`
+    pub fn from_json_bytes(single_json: &[u8], phrase_json: &[u8]) -> Result<Self, G2pError> {
+        let single_val: serde_json::Value =
+            serde_json::from_slice(single_json).map_err(|e| G2pError::DictionaryLoad {
+                path: format!("single_json: {}", e),
+            })?;
+        let phrase_val: serde_json::Value =
+            serde_json::from_slice(phrase_json).map_err(|e| G2pError::DictionaryLoad {
+                path: format!("phrase_json: {}", e),
+            })?;
+
+        let single_dict = parse_single_char_json(&single_val)?;
+        let phrase_dict = parse_phrase_json(&phrase_val)?;
+
+        Ok(Self::from_dicts(single_dict, phrase_dict))
     }
 
     /// Create a `ChinesePhonemizer` from pre-loaded dictionaries.
@@ -1248,5 +1283,32 @@ mod tests {
         assert_eq!(first_alternative("hao3,hao4"), "hao3");
         assert_eq!(first_alternative("ma1"), "ma1");
         assert_eq!(first_alternative(""), "");
+    }
+
+    // ===== 15. from_json_bytes =====
+
+    #[test]
+    fn test_from_json_bytes() {
+        // 你=U+4F60=20320, 好=U+597D=22909
+        let single_json = br#"{"20320": "ni3", "22909": "hao3"}"#;
+        let phrase_json = br#"{}"#;
+        let p = ChinesePhonemizer::from_json_bytes(single_json, phrase_json).unwrap();
+        let (tokens, _) = p.phonemize_with_prosody("\u{4f60}\u{597d}").unwrap();
+        assert!(!tokens.is_empty());
+    }
+
+    #[test]
+    fn test_from_json_bytes_invalid_json() {
+        let result = ChinesePhonemizer::from_json_bytes(b"not json", b"{}");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_from_json_bytes_with_phrases() {
+        let single_json = br#"{"19968": "yi1", "20010": "ge4"}"#;
+        let phrase_json = br#"{"\u4e00\u4e2a": "yi2 ge4"}"#;
+        let p = ChinesePhonemizer::from_json_bytes(single_json, phrase_json).unwrap();
+        let (tokens, _) = p.phonemize_with_prosody("\u{4e00}\u{4e2a}").unwrap();
+        assert!(!tokens.is_empty());
     }
 }

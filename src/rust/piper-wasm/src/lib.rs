@@ -10,12 +10,16 @@
 //! - `ja` — Japanese (enables `piper-plus/naist-jdic`, bundles ~30 MB dictionary)
 //! - `ja-external` — Japanese without bundled dictionary (enables `piper-plus/japanese`).
 //!   Use `setJapaneseDictionary()` at runtime to load the dictionary from external bytes.
+//! - `zh` — Chinese (bundles pinyin dictionaries ~2.6 MB into the WASM binary)
+//! - `zh-external` — Chinese with external dictionary loading.
+//!   Use `setChineseDictionary()` at runtime to load pinyin dictionaries from JSON bytes.
 //! - `ko` — Korean
 //! - `es` — Spanish
 //! - `fr` — French
 //! - `pt` — Portuguese
 //! - `sv` — Swedish
-//! - `multilingual-external` — All languages with `ja-external` instead of `ja`
+//! - `multilingual` — All languages with `ja` (bundled) and `zh-external`
+//! - `multilingual-external` — All languages with `ja-external` and `zh-external`
 //!
 //! All features are enabled by default. For a JA-only WASM build:
 //! ```sh
@@ -78,6 +82,8 @@ pub fn get_api_version() -> String {
 }
 
 use piper_plus::config::VoiceConfig;
+#[cfg(any(feature = "zh", feature = "zh-external"))]
+use piper_plus_g2p::chinese::ChinesePhonemizer;
 #[cfg(feature = "fr")]
 use piper_plus_g2p::french::FrenchPhonemizer;
 #[cfg(any(feature = "ja", feature = "ja-external"))]
@@ -226,7 +232,28 @@ fn create_phonemizer(lang: &str) -> Result<Box<dyn Phonemizer>, String> {
                 Ok(Box::new(PassthroughPhonemizer::new("sv")))
             }
         }
-        // EN, ZH, and others: character-level tokenization (no filesystem dictionaries in WASM)
+        "zh" => {
+            #[cfg(all(feature = "zh", not(feature = "zh-external")))]
+            {
+                // Bundled dictionary mode: dictionaries are compiled into the WASM binary.
+                let phonemizer = ChinesePhonemizer::from_json_bytes(
+                    include_bytes!("../../../cpp/pinyin_single.json"),
+                    include_bytes!("../../../cpp/pinyin_phrases.json"),
+                )
+                .map_err(|e| format!("Failed to load ZH dictionaries: {}", e))?;
+                Ok(Box::new(phonemizer))
+            }
+            #[cfg(all(not(feature = "zh"), feature = "zh-external"))]
+            {
+                // External dict mode: passthrough until setChineseDictionary() called
+                Ok(Box::new(PassthroughPhonemizer::new("zh")))
+            }
+            #[cfg(all(not(feature = "zh"), not(feature = "zh-external")))]
+            {
+                Ok(Box::new(PassthroughPhonemizer::new("zh")))
+            }
+        }
+        // EN and others: character-level tokenization (no filesystem dictionaries in WASM)
         other => Ok(Box::new(PassthroughPhonemizer::new(other))),
     }
 }
@@ -416,6 +443,36 @@ impl WasmPhonemizer {
             })?;
         self.phonemizer
             .replace_phonemizer("ja", Box::new(ja_phonemizer));
+        Ok(())
+    }
+
+    /// Load external Chinese pinyin dictionaries from JSON bytes.
+    ///
+    /// This replaces the initial PassthroughPhonemizer for Chinese with a
+    /// full ChinesePhonemizer backed by the provided pinyin dictionaries.
+    ///
+    /// The `single_json` should be the contents of `pinyin_single.json`
+    /// and `phrase_json` should be the contents of `pinyin_phrases.json`.
+    ///
+    /// # Errors
+    ///
+    /// Returns `CONFIG_PARSE_ERROR` if the dictionary JSON is invalid.
+    #[cfg(feature = "zh-external")]
+    #[wasm_bindgen(js_name = setChineseDictionary)]
+    pub fn set_chinese_dictionary(
+        &mut self,
+        single_json: &[u8],
+        phrase_json: &[u8],
+    ) -> Result<(), JsValue> {
+        let zh_phonemizer =
+            ChinesePhonemizer::from_json_bytes(single_json, phrase_json).map_err(|e| {
+                create_wasm_error(
+                    ERROR_CONFIG_PARSE,
+                    &format!("Failed to load Chinese dictionaries: {e}"),
+                )
+            })?;
+        self.phonemizer
+            .replace_phonemizer("zh", Box::new(zh_phonemizer));
         Ok(())
     }
 }

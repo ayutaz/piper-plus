@@ -1,9 +1,14 @@
 /**
- * ChineseG2P -- character-based Chinese G2P for @piper-plus/g2p.
+ * ChineseG2P -- Chinese G2P for @piper-plus/g2p.
  *
- * Each character in the input text is looked up in the phoneme_id_map.
- * Characters not found in the map are passed through as-is.
- * No external dependencies required.
+ * Two operational modes:
+ *   1. **WASM path** (browser): calls `wasmPhonemizer.phonemize(text, 'zh')`
+ *      for full pinyin-to-IPA conversion with tone sandhi.
+ *   2. **Fallback path** (Node.js / no WASM): character-level tokenization
+ *      where each character becomes its own token.
+ *
+ * The WASM phonemizer is injected via the constructor options so that this
+ * module has no hard dependency on wasm-bindgen or onnxruntime-web.
  */
 
 export class ChineseG2P {
@@ -12,9 +17,19 @@ export class ChineseG2P {
      * @param {Record<string, number[]>} [options.phonemeIdMap]
      *   Mapping from character/phoneme string to array of phoneme IDs.
      *   Typically loaded from the model's config.json `phoneme_id_map`.
+     * @param {object} [options.wasmPhonemizer]
+     *   A WASM phonemizer instance with a `phonemize(text, lang)` method.
+     *   When provided, phonemization uses the Rust WASM pipeline.
      */
     constructor(options = {}) {
         this.phonemeIdMap = options.phonemeIdMap || null;
+        /** @private */
+        this._wasmPhonemizer = options.wasmPhonemizer || null;
+    }
+
+    /** @returns {'zh'} */
+    get languageCode() {
+        return 'zh';
     }
 
     /**
@@ -26,40 +41,81 @@ export class ChineseG2P {
     }
 
     /**
+     * Whether the WASM phonemizer is loaded and available.
+     * @returns {boolean}
+     */
+    get isWasmInitialized() {
+        return this._wasmPhonemizer !== null;
+    }
+
+    /**
      * Convert Chinese text to phoneme tokens.
      *
-     * Each character is looked up directly in the phoneme_id_map.
-     * Characters not found in the map are passed through unchanged.
+     * Uses the WASM pipeline when available, otherwise falls back to
+     * character-level tokenization.
      *
      * @param {string} text - Input Chinese text.
-     * @returns {{ tokens: string[], prosody: null[] }}
+     * @returns {{ tokens: string[], prosody: (null|object)[] }}
      */
     phonemize(text) {
-        const tokens = [];
+        if (this._wasmPhonemizer) {
+            return this._wasmPhonemizerPath(text);
+        }
+        return this._fallbackPhonemize(text);
+    }
 
+    /**
+     * Convert Chinese text to phoneme tokens with prosody.
+     * Alias for phonemize() -- prosody info depends on the active backend.
+     *
+     * @param {string} text - Input Chinese text.
+     * @returns {{ tokens: string[], prosody: (null|object)[] }}
+     */
+    phonemizeWithProsody(text) {
+        return this.phonemize(text);
+    }
+
+    // ---- Private helpers ----
+
+    /**
+     * WASM-backed phonemization path.
+     * @private
+     * @param {string} text
+     * @returns {{ tokens: string[], prosody: (null|object)[] }}
+     */
+    _wasmPhonemizerPath(text) {
+        const result = this._wasmPhonemizer.phonemize(text, 'zh');
+        return {
+            tokens: result.tokens || [],
+            prosody: result.prosody || [],
+        };
+    }
+
+    /**
+     * Fallback character-level tokenization for CJK text.
+     *
+     * Each character becomes its own token. Whitespace is preserved as ' '.
+     * This provides basic functionality when WASM is not available.
+     *
+     * @private
+     * @param {string} text
+     * @returns {{ tokens: string[], prosody: null[] }}
+     */
+    _fallbackPhonemize(text) {
+        if (!text) {
+            return { tokens: [], prosody: [] };
+        }
+
+        const tokens = [];
         for (const char of text) {
-            if (this.phonemeIdMap && this.phonemeIdMap[char]) {
-                // Character found in map -- emit it as a token
-                tokens.push(char);
+            if (char.trim() === '') {
+                tokens.push(' ');
             } else {
-                // Unknown character -- pass through
                 tokens.push(char);
             }
         }
 
         const prosody = new Array(tokens.length).fill(null);
         return { tokens, prosody };
-    }
-
-    /**
-     * Convert Chinese text to phoneme tokens with prosody.
-     * Chinese G2P does not provide prosody information, so prosody
-     * is always an array of nulls matching the token count.
-     *
-     * @param {string} text - Input Chinese text.
-     * @returns {{ tokens: string[], prosody: null[] }}
-     */
-    phonemizeWithProsody(text) {
-        return this.phonemize(text);
     }
 }
