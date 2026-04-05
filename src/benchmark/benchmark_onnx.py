@@ -9,6 +9,8 @@ import time
 import numpy as np
 import onnxruntime
 
+from piper_train.ort_utils import create_session_options
+
 
 _NOISE_SCALE = 0.667
 _LENGTH_SCALE = 1.0
@@ -37,21 +39,12 @@ def main() -> None:
 
     start_time = time.monotonic_ns()
 
-    session_options = onnxruntime.SessionOptions()
-    session_options.graph_optimization_level = (
-        onnxruntime.GraphOptimizationLevel.ORT_ENABLE_ALL
-    )
-    # Speed-optimized: enable memory reuse/arena/pattern (trades memory for speed)
-    session_options.enable_mem_reuse = True
-    session_options.enable_cpu_mem_arena = True
-    session_options.enable_mem_pattern = True
+    session_options = create_session_options()
 
     session = onnxruntime.InferenceSession(
         args.model,
         sess_options=session_options,
     )
-    # session.intra_op_num_threads = 1
-    # session.inter_op_num_threads = 1
 
     end_time = time.monotonic_ns()
 

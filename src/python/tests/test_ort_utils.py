@@ -11,7 +11,7 @@ import onnxruntime
 import pytest
 
 from piper_train.ort_utils import (
-    MAX_INTRA_THREADS,
+    _get_logical_core_count,
     create_session_options,
     get_providers,
 )
@@ -36,36 +36,49 @@ class TestCreateSessionOptions:
         opts = create_session_options()
         assert opts.inter_op_num_threads == 1
 
-    def test_intra_op_threads_capped_at_max(self):
-        """intra_op_num_threads は MAX_INTRA_THREADS (4) を超えない."""
+    @patch("piper_train.ort_utils._get_logical_core_count", return_value=128)
+    def test_intra_op_threads_capped_at_max(self, _mock):
+        """128 コア環境: intra_op は上限 4 を超えない."""
         opts = create_session_options()
-        assert opts.intra_op_num_threads <= MAX_INTRA_THREADS
+        assert opts.intra_op_num_threads == 4
 
     def test_intra_op_threads_at_least_one(self):
         opts = create_session_options()
         assert opts.intra_op_num_threads >= 1
 
-    @patch("os.cpu_count", return_value=16)
+    @patch("piper_train.ort_utils._get_logical_core_count", return_value=16)
     def test_intra_op_threads_16_cores(self, _mock):
         """16 コア環境: min(16 // 2, 4) = 4."""
         opts = create_session_options()
         assert opts.intra_op_num_threads == 4
 
-    @patch("os.cpu_count", return_value=4)
+    @patch("piper_train.ort_utils._get_logical_core_count", return_value=8)
+    def test_intra_op_threads_8_cores(self, _mock):
+        """8 コア環境: min(8 // 2, 4) = 4 — 上限に到達."""
+        opts = create_session_options()
+        assert opts.intra_op_num_threads == 4
+
+    @patch("piper_train.ort_utils._get_logical_core_count", return_value=4)
     def test_intra_op_threads_4_cores(self, _mock):
         """4 コア環境: min(4 // 2, 4) = 2."""
         opts = create_session_options()
         assert opts.intra_op_num_threads == 2
 
-    @patch("os.cpu_count", return_value=2)
-    def test_intra_op_threads_2_cores(self, _mock):
-        """2 コア環境: min(2 // 2, 4) = 1."""
+    @patch("piper_train.ort_utils._get_logical_core_count", return_value=3)
+    def test_intra_op_threads_3_cores(self, _mock):
+        """3 コア (奇数): min(3 // 2, 4) = 1."""
         opts = create_session_options()
         assert opts.intra_op_num_threads == 1
 
-    @patch("os.cpu_count", return_value=None)
-    def test_intra_op_threads_unknown_cores(self, _mock):
-        """os.cpu_count() が None: フォールバック 2 → min(1, 4) = 1."""
+    @patch("piper_train.ort_utils._get_logical_core_count", return_value=2)
+    def test_intra_op_threads_2_cores(self, _mock):
+        """2 コア環境: min(2 // 2, 4) = min(1, 4) = 1."""
+        opts = create_session_options()
+        assert opts.intra_op_num_threads == 1
+
+    @patch("piper_train.ort_utils._get_logical_core_count", return_value=1)
+    def test_intra_op_threads_1_core(self, _mock):
+        """Docker --cpus=1: 1 // 2 = 0 → 0 or 1 = 1."""
         opts = create_session_options()
         assert opts.intra_op_num_threads == 1
 
@@ -84,6 +97,73 @@ class TestCreateSessionOptions:
     def test_returns_session_options_instance(self):
         opts = create_session_options()
         assert isinstance(opts, onnxruntime.SessionOptions)
+
+    def test_returns_new_instance_each_call(self):
+        """毎回新しい SessionOptions オブジェクトを返す."""
+        opts_a = create_session_options()
+        opts_b = create_session_options()
+        assert opts_a is not opts_b
+
+
+@pytest.mark.unit
+class TestCreateSessionOptionsParams:
+    """create_session_options() の引数テスト."""
+
+    def test_intra_op_threads_override_1(self):
+        """intra_op_threads=1 が反映される."""
+        opts = create_session_options(intra_op_threads=1)
+        assert opts.intra_op_num_threads == 1
+
+    def test_intra_op_threads_override_2(self):
+        """intra_op_threads=2 が反映される."""
+        opts = create_session_options(intra_op_threads=2)
+        assert opts.intra_op_num_threads == 2
+
+    def test_inter_op_threads_override(self):
+        """inter_op_threads=2 が反映される."""
+        opts = create_session_options(inter_op_threads=2)
+        assert opts.inter_op_num_threads == 2
+
+
+@pytest.mark.unit
+class TestPiperIntraThreadsEnv:
+    """PIPER_INTRA_THREADS 環境変数オーバーライドのテスト."""
+
+    @patch.dict("os.environ", {"PIPER_INTRA_THREADS": "2"})
+    def test_env_overrides_auto_detection(self):
+        """環境変数が自動検出より優先される."""
+        opts = create_session_options()
+        assert opts.intra_op_num_threads == 2
+
+    @patch.dict("os.environ", {"PIPER_INTRA_THREADS": "3"})
+    def test_env_overrides_explicit_arg(self):
+        """環境変数が引数 intra_op_threads より優先される."""
+        opts = create_session_options(intra_op_threads=1)
+        assert opts.intra_op_num_threads == 3
+
+
+@pytest.mark.unit
+class TestGetLogicalCoreCount:
+    """_get_logical_core_count() のテスト."""
+
+    @patch("os.sched_getaffinity", create=True, return_value={0, 1, 2, 3})
+    def test_uses_sched_getaffinity(self, _mock):
+        """sched_getaffinity が利用可能ならその結果を返す."""
+        assert _get_logical_core_count() == 4
+
+    @patch("os.sched_getaffinity", create=True, side_effect=AttributeError)
+    @patch("os.cpu_count", return_value=8)
+    def test_fallback_to_cpu_count(self, _mock_cpu, _mock_affinity):
+        """sched_getaffinity が AttributeError → os.cpu_count() にフォールバック."""
+        assert _get_logical_core_count() == 8
+
+    @patch("os.sched_getaffinity", create=True, side_effect=AttributeError)
+    @patch("os.cpu_count", return_value=None)
+    def test_fallback_to_default_when_cpu_count_none(
+        self, _mock_cpu, _mock_affinity
+    ):
+        """os.cpu_count() が None → デフォルト 2."""
+        assert _get_logical_core_count() == 2
 
 
 @pytest.mark.unit

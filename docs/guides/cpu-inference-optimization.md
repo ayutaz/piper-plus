@@ -179,15 +179,17 @@ sherpa-onnx でも INT8 量子化 TTS モデルが FP32 の数百倍遅い報告
 
 | 設定項目 | Rust | C# | C++ | Python |
 |---------|------|-----|-----|--------|
-| `ORT_ENABLE_ALL` | OK | OK | OK | **未設定** |
-| `intra_threads=min(cores/2, 4)` | OK | OK | OK | **未設定** |
-| `inter_threads=1` | OK | OK | - | **未設定** |
-| `ORT_SEQUENTIAL` | OK | OK | - | **未設定** |
+| `ORT_ENABLE_ALL` | OK | OK | OK | OK |
+| `intra_threads=min(cores/2, 4)` | OK | OK | OK | OK |
+| `inter_threads=1` | OK | OK | - | OK |
+| `ORT_SEQUENTIAL` | OK | OK | - | OK |
 | 最適化モデルキャッシュ (.opt.onnx) | OK | OK | N/A | **未実装** |
 | センチネルファイル (.ok) | OK | OK | N/A | **未実装** |
-| Warmup 推論 (2回) | **未実装** | OK | **未実装** | **未実装** |
-| メモリアリーナ (cpu_mem_arena) | **未設定** | **未設定** | OK | **未設定** |
-| メモリパターン (mem_pattern) | **未設定** | **未設定** | - | **未設定** |
+| Warmup 推論 (2回) | OK | OK | **未実装** | **未実装** |
+| メモリアリーナ (cpu_mem_arena) | OK (デフォルト) | OK (デフォルト) | OK | OK |
+| メモリパターン (mem_pattern) | OK (デフォルト) | OK (デフォルト) | - | OK |
+| Docker cgroup 対応 | OK | OK (.NET 6+) | - | OK (`sched_getaffinity`) |
+| 環境変数オーバーライド | - | - | `--num-threads` | `PIPER_INTRA_THREADS` |
 | GPU EP (CUDA/CoreML/DirectML) | OK | OK (CUDA) | OK | OK (CUDA) |
 
 ### Rust エンジンの現在の設定
@@ -198,8 +200,8 @@ sherpa-onnx でも INT8 量子化 TTS モデルが FP32 の数百倍遅い報告
 const MAX_INTRA_THREADS: usize = 4;  // VITS 小モデル向け上限
 
 let num_intra_threads = std::thread::available_parallelism()
-    .map(|n| n.get())
-    .unwrap_or(2)
+    .map(|n| (n.get() / 2).max(1))  // 論理コア/2 で物理コア近似 (Python/C# と同一)
+    .unwrap_or(1)
     .min(MAX_INTRA_THREADS);
 // inter_threads = 1 (固定)
 // GraphOptimizationLevel: 初回 ALL、キャッシュ後 Disable
@@ -269,39 +271,34 @@ session.options.DisableProfiling();
 
 ### Python (推奨設定)
 
+`piper_train.ort_utils` モジュールが全設定を一元管理:
+
 ```python
-import os
-import onnxruntime
+from piper_train.ort_utils import create_session_options, get_providers
 
-sess_options = onnxruntime.SessionOptions()
-
-# グラフ最適化: 最大レベル (定数畳み込み、演算子融合、レイアウト最適化)
-sess_options.graph_optimization_level = onnxruntime.GraphOptimizationLevel.ORT_ENABLE_ALL
-
-# メモリ最適化: 全有効 (速度優先)
-sess_options.enable_cpu_mem_arena = True   # メモリ事前確保・再利用
-sess_options.enable_mem_pattern = True     # 入力パターンに基づく一括確保
-sess_options.enable_mem_reuse = True       # 中間テンソルのメモリ再利用
-
-# 実行モード: Sequential (VITS は線形グラフ、並列サブグラフが少ない)
-sess_options.execution_mode = onnxruntime.ExecutionMode.ORT_SEQUENTIAL
-
-# スレッド: 物理コアの半分、最大4 (VITS 小モデル向け最適値)
-sess_options.intra_op_num_threads = min(os.cpu_count() // 2 or 1, 4)
-sess_options.inter_op_num_threads = 1
-
-# レイテンシ分散低減
-sess_options.add_session_config_entry("session.dynamic_block_base", "4")
-
-# オフラインキャッシュ (2回目以降の起動高速化)
-# sess_options.optimized_model_filepath = "model.opt.onnx"
+# デフォルト: intra_op=min(logical_cores/2, 4), inter_op=1
+sess_options = create_session_options()
+providers = get_providers("cpu")  # or "gpu", "auto"
 
 session = onnxruntime.InferenceSession(
-    "model.onnx",
-    sess_options=sess_options,
-    providers=["CPUExecutionProvider"],
+    "model.onnx", sess_options=sess_options, providers=providers
 )
 ```
+
+WebUI 等の並行リクエスト環境では:
+
+```python
+# intra_op=1 でスレッド競合を回避
+sess_options = create_session_options(intra_op_threads=1)
+```
+
+環境変数でオーバーライド (Docker 等):
+
+```bash
+PIPER_INTRA_THREADS=2 python -m piper_train.infer_onnx --model model.onnx --text "..."
+```
+
+Docker cgroup 対応: `os.sched_getaffinity(0)` で `--cpus` 制約を自動反映。
 
 ### スレッド設定の根拠
 

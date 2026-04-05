@@ -107,9 +107,10 @@ impl OnnxEngine {
 
         // COLD-M1: VITS は小モデルのためスレッド数上限を設ける。
         // 過剰なスレッド生成はオーバーヘッドになる。
+        // 論理コア数 / 2 で HT 分を除外し物理コア近似 (Python/C# と同一ロジック)。
         let num_intra_threads = std::thread::available_parallelism()
-            .map(|n| n.get())
-            .unwrap_or(2)
+            .map(|n| (n.get() / 2).max(1))
+            .unwrap_or(1)
             .min(MAX_INTRA_THREADS);
 
         // COLD-M5 + F1/D5: 最適化済みモデルキャッシュ

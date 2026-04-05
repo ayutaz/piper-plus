@@ -56,14 +56,25 @@ class PiperVoice:
         else:
             providers = ["CPUExecutionProvider"]
 
+        # Keep in sync with piper_train.ort_utils.create_session_options()
         sess_options = onnxruntime.SessionOptions()
         sess_options.graph_optimization_level = (
             onnxruntime.GraphOptimizationLevel.ORT_ENABLE_ALL
         )
         sess_options.execution_mode = onnxruntime.ExecutionMode.ORT_SEQUENTIAL
-        physical_cores = os.cpu_count() or 2
-        sess_options.intra_op_num_threads = min(physical_cores // 2 or 1, 4)
+
+        # Thread settings: env var > auto-detect (sched_getaffinity > cpu_count)
+        env_threads = os.environ.get("PIPER_INTRA_THREADS")
+        if env_threads is not None:
+            sess_options.intra_op_num_threads = int(env_threads)
+        else:
+            try:
+                logical_cores = len(os.sched_getaffinity(0))
+            except (AttributeError, OSError):
+                logical_cores = os.cpu_count() or 2
+            sess_options.intra_op_num_threads = min(logical_cores // 2 or 1, 4)
         sess_options.inter_op_num_threads = 1
+
         sess_options.enable_cpu_mem_arena = True
         sess_options.enable_mem_pattern = True
         sess_options.enable_mem_reuse = True
