@@ -148,7 +148,13 @@ impl OnnxEngine {
             .with_intra_threads(num_intra_threads)
             .map_err(|e| PiperError::ModelLoad(format!("intra_threads: {e}")))?
             .with_inter_threads(1)
-            .map_err(|e| PiperError::ModelLoad(format!("inter_threads: {e}")))?;
+            .map_err(|e| PiperError::ModelLoad(format!("inter_threads: {e}")))?
+            // メモリパターン有効化: 推論パターンを記憶してアロケーションを最適化
+            .with_memory_pattern(true)
+            .map_err(|e| PiperError::ModelLoad(format!("memory_pattern: {e}")))?
+            // 動的ブロックサイズ: intra-op スレッドの作業分割を細粒度化しレイテンシ分散を低減
+            .with_dynamic_block_base(4)
+            .map_err(|e| PiperError::ModelLoad(format!("dynamic_block_base: {e}")))?;
 
         if use_cached {
             // 最適化済みモデルを直接ロード: 再最適化をスキップ
@@ -714,6 +720,28 @@ mod tests {
         let label = "cuda:0".replace(':', ".");
         assert_eq!(label, "cuda.0");
         assert!(!label.contains(':'));
+    }
+
+    // -----------------------------------------------------------------------
+    // SessionBuilder 設定テスト (memory_pattern, dynamic_block_base)
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_session_builder_with_memory_pattern_and_dynamic_block() {
+        // SessionBuilder に memory_pattern(true) と dynamic_block_base(4) を設定して
+        // エラーが発生しないことを検証する。
+        let builder = Session::builder()
+            .expect("session builder")
+            .with_intra_threads(1)
+            .expect("intra_threads")
+            .with_inter_threads(1)
+            .expect("inter_threads")
+            .with_memory_pattern(true)
+            .expect("memory_pattern")
+            .with_dynamic_block_base(4)
+            .expect("dynamic_block_base");
+        // builder が正常に構築されることを確認 (型の存在で検証)
+        let _ = builder;
     }
 
     #[test]

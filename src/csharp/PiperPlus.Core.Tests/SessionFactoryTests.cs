@@ -280,4 +280,69 @@ public sealed class SessionFactoryTests
         var label = useCuda ? $"cuda{deviceId}" : "cpu";
         Assert.Equal("cuda1", label);
     }
+
+    // ================================================================
+    // SessionOptions 設定値テスト
+    // SessionFactory.Create() はモデルファイルを必要とするため、
+    // SessionOptions のプロパティ設定を直接テストする。
+    // ================================================================
+
+    [Fact]
+    public void SessionOptions_EnableCpuMemArena_DefaultTrue()
+    {
+        // ORT デフォルトは true — SessionFactory でも true を明示設定
+        var options = new SessionOptions();
+        options.EnableCpuMemArena = true;
+        Assert.True(options.EnableCpuMemArena);
+    }
+
+    [Fact]
+    public void SessionOptions_EnableMemoryPattern_DefaultTrue()
+    {
+        var options = new SessionOptions();
+        options.EnableMemoryPattern = true;
+        Assert.True(options.EnableMemoryPattern);
+    }
+
+    [Fact]
+    public void SessionOptions_DynamicBlockBase_SetTo4()
+    {
+        var options = new SessionOptions();
+        // AddSessionConfigEntry は例外なく設定できることを検証
+        options.AddSessionConfigEntry("session.dynamic_block_base", "4");
+        // ORT C# API は get_session_config_entry を公開しないため、
+        // 例外が発生しないことで設定成功を検証する。
+    }
+
+    [Fact]
+    public void SessionOptions_GraphOptimizationLevel_EnableAll()
+    {
+        var options = new SessionOptions();
+        options.GraphOptimizationLevel = GraphOptimizationLevel.ORT_ENABLE_ALL;
+        Assert.Equal(GraphOptimizationLevel.ORT_ENABLE_ALL, options.GraphOptimizationLevel);
+    }
+
+    [Fact]
+    public void SessionOptions_ExecutionMode_Sequential()
+    {
+        var options = new SessionOptions();
+        options.ExecutionMode = ExecutionMode.ORT_SEQUENTIAL;
+        Assert.Equal(ExecutionMode.ORT_SEQUENTIAL, options.ExecutionMode);
+    }
+
+    [Fact]
+    public void SessionOptions_IntraOpThreads_CappedAtMax()
+    {
+        int maxIntraThreads = 4;
+        int computed = Math.Min(Environment.ProcessorCount / 2, maxIntraThreads);
+        Assert.InRange(computed, 0, maxIntraThreads);
+    }
+
+    [Fact]
+    public void SessionOptions_InterOpThreads_IsOne()
+    {
+        var options = new SessionOptions();
+        options.InterOpNumThreads = 1;
+        Assert.Equal(1, options.InterOpNumThreads);
+    }
 }

@@ -234,7 +234,18 @@ pub fn configure_session_builder(
     device: &DeviceType,
 ) -> Result<(ort::session::builder::SessionBuilder, DeviceType), PiperError> {
     match device {
-        DeviceType::Cpu => Ok((builder, DeviceType::Cpu)),
+        DeviceType::Cpu => {
+            // CPU EP でアリーナアロケータを有効化 (Python の enable_cpu_mem_arena=True と同等)
+            let ep = ort::ep::CPU::default().with_arena_allocator(true).build();
+            match builder.with_execution_providers([ep]) {
+                Ok(b) => Ok((b, DeviceType::Cpu)),
+                Err(e) => {
+                    // アリーナ登録失敗は致命的ではない — デフォルトで続行
+                    tracing::warn!("CPU arena allocator registration failed: {e}, continuing with defaults");
+                    Ok((e.recover(), DeviceType::Cpu))
+                }
+            }
+        }
 
         #[cfg(feature = "cuda")]
         DeviceType::Cuda { device_id } => configure_cuda(builder, *device_id),
@@ -701,6 +712,15 @@ mod tests {
         let builder = ort::session::Session::builder().expect("session builder");
         let (_, actual_device) = configure_session_builder(builder, &DeviceType::Cpu).unwrap();
         assert_eq!(actual_device, DeviceType::Cpu);
+    }
+
+    #[test]
+    fn test_configure_cpu_with_arena_allocator() {
+        // CPU EP にアリーナアロケータが設定されてもエラーにならないことを検証
+        let ep = ort::ep::CPU::default().with_arena_allocator(true).build();
+        let builder = ort::session::Session::builder().expect("session builder");
+        let result = builder.with_execution_providers([ep]);
+        assert!(result.is_ok(), "CPU arena allocator registration should succeed");
     }
 
     // -----------------------------------------------------------------------

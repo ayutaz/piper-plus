@@ -98,6 +98,10 @@ class TestCreateSessionOptions:
         opts = create_session_options()
         assert isinstance(opts, onnxruntime.SessionOptions)
 
+    def test_dynamic_block_base(self):
+        opts = create_session_options()
+        assert opts.get_session_config_entry("session.dynamic_block_base") == "4"
+
     def test_returns_new_instance_each_call(self):
         """毎回新しい SessionOptions オブジェクトを返す."""
         opts_a = create_session_options()
@@ -159,9 +163,7 @@ class TestGetLogicalCoreCount:
 
     @patch("os.sched_getaffinity", create=True, side_effect=AttributeError)
     @patch("os.cpu_count", return_value=None)
-    def test_fallback_to_default_when_cpu_count_none(
-        self, _mock_cpu, _mock_affinity
-    ):
+    def test_fallback_to_default_when_cpu_count_none(self, _mock_cpu, _mock_affinity):
         """os.cpu_count() が None → デフォルト 2."""
         assert _get_logical_core_count() == 2
 

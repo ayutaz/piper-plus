@@ -89,6 +89,9 @@ class PiperVoice:
         sess_options.enable_mem_pattern = True
         sess_options.enable_mem_reuse = True
 
+        # Dynamic block sizing: reduce latency variance (keep in sync with ort_utils)
+        sess_options.add_session_config_entry("session.dynamic_block_base", "4")
+
         return PiperVoice(
             config=PiperConfig.from_dict(config_dict),
             session=onnxruntime.InferenceSession(

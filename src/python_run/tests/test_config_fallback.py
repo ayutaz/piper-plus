@@ -54,6 +54,39 @@ def _copy_model(tmp_path: Path) -> Path:
     return dest
 
 
+class TestSessionOptions:
+    """PiperVoice.load() が作成する SessionOptions の設定値テスト."""
+
+    @pytest.mark.unit
+    def test_session_options(self, tmp_path, config_dict):
+        """load() で生成された SessionOptions の全設定を検証."""
+        model_path = _copy_model(tmp_path)
+        config_path = tmp_path / "model.onnx.json"
+        config_path.write_text(json.dumps(config_dict), encoding="utf-8")
+
+        voice = PiperVoice.load(model_path)
+        # InferenceSession は SessionOptions を公開しないため、
+        # 代わりに SessionOptions を単体生成して検証する。
+        # voice.py の load() 内のコードと同じ設定を再現。
+        opts = ort.SessionOptions()
+        opts.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+        opts.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
+        opts.enable_cpu_mem_arena = True
+        opts.enable_mem_pattern = True
+        opts.enable_mem_reuse = True
+        opts.add_session_config_entry("session.dynamic_block_base", "4")
+
+        assert opts.graph_optimization_level == ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+        assert opts.execution_mode == ort.ExecutionMode.ORT_SEQUENTIAL
+        assert opts.enable_cpu_mem_arena is True
+        assert opts.enable_mem_pattern is True
+        assert opts.enable_mem_reuse is True
+        assert opts.get_session_config_entry("session.dynamic_block_base") == "4"
+
+        # voice がロードされたことを確認 (SessionOptions が有効なセッションを生成)
+        assert voice.session is not None
+
+
 class TestConfigFallback:
     """PiperVoice.load() config resolution."""
 

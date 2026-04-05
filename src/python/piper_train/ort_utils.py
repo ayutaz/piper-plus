@@ -91,6 +91,10 @@ def create_session_options(
     opts.enable_mem_pattern = True
     opts.enable_mem_reuse = True
 
+    # Dynamic block sizing: split intra-op thread work into finer blocks
+    # to reduce latency variance across runs.
+    opts.add_session_config_entry("session.dynamic_block_base", "4")
+
     return opts
 
 

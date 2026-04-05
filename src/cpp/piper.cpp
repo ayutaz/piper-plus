@@ -471,8 +471,13 @@ void loadModel(std::string modelPath, ModelSession &session,
   // session.options.DisableCpuMemArena();
   // session.options.DisableMemPattern();
 
-  // Slows down performance very slightly
-  // session.options.SetExecutionMode(ExecutionMode::ORT_PARALLEL);
+  // VITS は単一グラフで並列サブグラフがない — Sequential が最適
+  session.options.SetExecutionMode(ExecutionMode::ORT_SEQUENTIAL);
+  session.options.SetInterOpNumThreads(1);
+
+  // 動的ブロックサイズ: intra-op スレッドの作業分割を細粒度化しレイテンシ分散を低減
+  session.options.AddConfigEntry("session.dynamic_block_base", "4");
+
   session.options.DisableProfiling();
 
   auto startTime = std::chrono::steady_clock::now();

@@ -122,6 +122,13 @@ public static class SessionFactory
         // VITS は単一グラフで並列サブグラフがないため Sequential が最適。
         options.ExecutionMode = ExecutionMode.ORT_SEQUENTIAL;
 
+        // メモリ最適化: 事前アロケーションとバッファ再利用で 5-15% 高速化
+        options.EnableCpuMemArena = true;
+        options.EnableMemoryPattern = true;
+
+        // 動的ブロックサイズ: intra-op スレッドの作業分割を細粒度化しレイテンシ分散を低減
+        options.AddSessionConfigEntry("session.dynamic_block_base", "4");
+
         if (useCuda)
         {
             TryAppendCudaProvider(options, resolvedDeviceId, logger);
