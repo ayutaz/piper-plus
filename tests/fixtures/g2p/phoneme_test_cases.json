@@ -98,6 +98,20 @@
       "expected_contains": ["rr"]
     },
     {
+      "language": "es",
+      "input": "niño",
+      "description": "Spanish palatal nasal — tests ñ -> ɲ mapping",
+      "expected_token_count_min": 3,
+      "expected_contains": ["ɲ"]
+    },
+    {
+      "language": "es",
+      "input": "el lobo",
+      "description": "Spanish allophony — tests intervocalic b -> β spirantization",
+      "expected_token_count_min": 4,
+      "expected_contains": ["β"]
+    },
+    {
       "language": "fr",
       "input": "bonjour",
       "description": "French greeting — tests nasal vowel and silent final consonant",
@@ -117,6 +131,20 @@
       "expected_token_count_min": 6
     },
     {
+      "language": "fr",
+      "input": "lune",
+      "description": "French y_vowel — tests u -> PUA E01E front rounded vowel [y]",
+      "expected_token_count_min": 2,
+      "expected_contains": ["y_vowel"]
+    },
+    {
+      "language": "fr",
+      "input": "maison",
+      "description": "French intervocalic s voicing — tests s -> z between vowels",
+      "expected_token_count_min": 3,
+      "expected_contains": ["z"]
+    },
+    {
       "language": "pt",
       "input": "olá",
       "description": "Portuguese greeting — tests accented vowel stress",
@@ -134,6 +162,20 @@
       "input": "Obrigado pela ajuda.",
       "description": "Portuguese polite phrase — tests multi-word processing and stress",
       "expected_token_count_min": 8
+    },
+    {
+      "language": "pt",
+      "input": "tipo",
+      "description": "Portuguese BR palatalization — tests t+i -> PUA tʃ (E054)",
+      "expected_token_count_min": 3,
+      "expected_contains": ["t\u0283"]
+    },
+    {
+      "language": "pt",
+      "input": "caro",
+      "description": "Portuguese intervocalic r — tests tap r (ɾ) between vowels",
+      "expected_token_count_min": 3,
+      "expected_contains": ["ɾ"]
     },
     {
       "language": "ja",
