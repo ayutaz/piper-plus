@@ -21,11 +21,12 @@ ja = ["piper-plus-g2p/naist-jdic"]
 # ja-external: Enable JA G2P code but load dictionary at runtime via setJapaneseDictionary().
 # Dictionary is NOT bundled -- caller must provide serialized dict bytes. Keeps WASM binary small.
 ja-external = ["piper-plus-g2p/japanese"]
-# zh: Bundle Chinese pinyin dictionaries via include_bytes!() (~2 MB added to WASM binary).
-# Dictionaries are immediately available at construction time.
+# zh: Enable ZH G2P code with Chinese pinyin dictionary support.
+# Starts as PassthroughPhonemizer; caller loads dictionaries via setChineseDictionary().
+# (Unlike JA, Chinese dicts are JSON-based and loaded at runtime in both modes.)
 zh = ["piper-plus-g2p/chinese"]
-# zh-external: Enable ZH G2P code but load dictionaries at runtime via setChineseDictionary().
-# Dictionaries are NOT bundled -- caller must provide JSON dict bytes. Keeps WASM binary small.
+# zh-external: Same as zh -- enable ZH G2P code, load dictionaries at runtime.
+# Kept as a separate feature for symmetry with ja/ja-external naming convention.
 zh-external = ["piper-plus-g2p/chinese"]
 # ko/es/fr/pt/sv: Enable dedicated rule-based G2P for each language.
 # When disabled, that language falls back to PassthroughPhonemizer (character-level tokenization).

@@ -14,8 +14,9 @@
  * - ES/FR/KO/SV: rule-based (expected_contains checked)
  *
  * This test performs `expected_token_count_min` and `expected_contains`
- * checks. Exact token match (`expected_tokens`) is skipped for JS.
- * JA is skipped because it requires the OpenJTalk WASM runtime.
+ * checks. Exact token match (`expected_tokens`) is performed when the
+ * fixture provides it (e.g. ES). JA is skipped because it requires
+ * the OpenJTalk WASM runtime.
  *
  * Additionally, `encode_test_cases` from the fixture are validated against
  * the Encoder class to verify BOS/PAD/EOS insertion and PUA mapping.

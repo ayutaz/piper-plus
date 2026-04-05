@@ -74,6 +74,9 @@ export class ChineseG2P {
      * @returns {{ tokens: string[], prosody: null[] }}
      */
     phonemize(text) {
+        if (!text || typeof text !== 'string') {
+            return { tokens: [], prosody: [] };
+        }
         if (this._wasmPhonemizer) {
             return this._wasmPhonemizerPath(text);
         }

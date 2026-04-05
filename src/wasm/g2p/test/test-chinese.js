@@ -38,6 +38,20 @@ describe('ChineseG2P — fallback phonemization', () => {
         assert.deepStrictEqual(result.prosody, []);
     });
 
+    it('should return empty arrays for null input', () => {
+        const g2p = new ChineseG2P();
+        const result = g2p.phonemize(null);
+        assert.deepStrictEqual(result.tokens, []);
+        assert.deepStrictEqual(result.prosody, []);
+    });
+
+    it('should return empty arrays for undefined input', () => {
+        const g2p = new ChineseG2P();
+        const result = g2p.phonemize(undefined);
+        assert.deepStrictEqual(result.tokens, []);
+        assert.deepStrictEqual(result.prosody, []);
+    });
+
     it('should work without phonemeIdMap', () => {
         const g2p = new ChineseG2P();
         const result = g2p.phonemize('\u4F60\u597D');
