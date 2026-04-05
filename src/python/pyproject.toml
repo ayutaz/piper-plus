@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "piper-train"
-version = "1.10.0"
+version = "1.11.0"
 description = "A fast and local neural text to speech system"
 requires-python = ">=3.11"
 dependencies = [
