@@ -1,6 +1,7 @@
 # CPU 推論 Tier 2 Quick Wins — 技術設計書
 
 > **作成日**: 2026-04-05
+> **最終更新**: 2026-04-05 (PR #318 で全施策実装完了)
 > **ブランチ**: `feat/cpu-inference-tier2-quick-wins`
 > **前提**: PR #315 (ort_utils), PR #317 (dynamic_block_base + メモリアリーナ) 完了済み
 

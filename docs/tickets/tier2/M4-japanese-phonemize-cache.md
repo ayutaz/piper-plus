@@ -2,7 +2,7 @@
 
 > **マイルストーン**: [M4](../../guides/cpu-inference-tier2-milestones.md#m4-日本語音素化キャッシュ)
 > **設計書**: [cpu-inference-tier2-design.md](../../guides/cpu-inference-tier2-design.md#施策-4-日本語音素化キャッシュ)
-> **ステータス**: 未着手
+> **ステータス**: 完了
 > **依存**: なし (独立して実装可能、ただし M1/M3 完了後のコミットが望ましい)
 > **後続**: [M5](M5-integration.md)
 
@@ -323,16 +323,16 @@ Rust と Python では用途が異なるが、「重い初期化/計算を 1 回
 
 ### 5.2 レビューチェックリスト
 
-- [ ] `_phonemize_core_cached()` が **tuple** を返し、呼び出し側で `list()` に変換しているか (mutable aliasing 防止)
-- [ ] `@lru_cache(maxsize=2000)` のデコレータが正しい位置に付与されているか
-- [ ] `clear_phonemize_cache()` が `__all__` に含まれ、外部から呼び出し可能か (G2P 側の現在の `__all__` は `["JapanesePhonemizer"]` のみ — `"clear_phonemize_cache"` を追加すること)
-- [ ] カスタム辞書の `apply()` / `apply_to_text()` がキャッシュ参照の**前**に実行されているか
-- [ ] python_run 側で `prosody` フラグがキャッシュキーに含まれているか
-- [ ] piper_train 側で `ProsodyInfo` が正しく tuple 化/復元されているか (`ProsodyInfo` は `NamedTuple` or `dataclass` のため hashable か確認)
-- [ ] python_run 側で `phonemize_japanese()` の再帰構造が解消され、`_phonemize_sentence_core()` が正しく抽出されているか
-- [ ] 既存の全テスト (`test_japanese.py`, `test_japanese_phonemization.py`, `test_phonemize.py`) が変更なく PASS するか
-- [ ] `uv run ruff check && uv run ruff format --check` PASS
-- [ ] キャッシュヒット時のレイテンシ < 5ms (手動確認)
+- [x] `_phonemize_core_cached()` が **tuple** を返し、呼び出し側で `list()` に変換しているか (mutable aliasing 防止)
+- [x] `@lru_cache(maxsize=2000)` のデコレータが正しい位置に付与されているか
+- [x] `clear_phonemize_cache()` が `__all__` に含まれ、外部から呼び出し可能か (G2P 側の現在の `__all__` は `["JapanesePhonemizer"]` のみ — `"clear_phonemize_cache"` を追加すること)
+- [x] カスタム辞書の `apply()` / `apply_to_text()` がキャッシュ参照の**前**に実行されているか
+- [x] python_run 側で `prosody` フラグがキャッシュキーに含まれているか
+- [x] piper_train 側で `ProsodyInfo` が正しく tuple 化/復元されているか (`ProsodyInfo` は `NamedTuple` or `dataclass` のため hashable か確認)
+- [x] python_run 側で `phonemize_japanese()` の再帰構造が解消され、`_phonemize_sentence_core()` が正しく抽出されているか
+- [x] 既存の全テスト (`test_japanese.py`, `test_japanese_phonemization.py`, `test_phonemize.py`) が変更なく PASS するか
+- [x] `uv run ruff check && uv run ruff format --check` PASS
+- [x] キャッシュヒット時のレイテンシ < 5ms (手動確認)
 
 ---
 

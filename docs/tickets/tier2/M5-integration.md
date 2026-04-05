@@ -2,7 +2,7 @@
 
 > **マイルストーン**: [M5](../../guides/cpu-inference-tier2-milestones.md#m5-最終統合cipr)
 > **設計書**: [cpu-inference-tier2-design.md](../../guides/cpu-inference-tier2-design.md)
-> **ステータス**: 未着手
+> **ステータス**: 完了
 > **依存**: [M1](M1-python-warmup.md), [M2](M2-cpp-warmup.md), [M3](M3-python-model-cache.md), [M4](M4-japanese-phonemize-cache.md) (全完了後)
 > **後続**: なし (最終タスク)
 
@@ -213,42 +213,42 @@ cd src/python && uv run pytest tests/ -v --tb=short -m "unit and not training an
 
 **コード品質:**
 
-- [ ] `uv run ruff check` が警告ゼロ
-- [ ] `uv run ruff format --check` が差分ゼロ
-- [ ] `cargo fmt --all -- --check` が差分ゼロ (無条件実行 — 回帰確認)
-- [ ] `dotnet format --verify-no-changes` が差分ゼロ (無条件実行 — 回帰確認)
-- [ ] C++ コードが既存のコーディングスタイルに準拠
+- [x] `uv run ruff check` が警告ゼロ
+- [x] `uv run ruff format --check` が差分ゼロ
+- [x] `cargo fmt --all -- --check` が差分ゼロ (無条件実行 — 回帰確認)
+- [x] `dotnet format --verify-no-changes` が差分ゼロ (無条件実行 — 回帰確認)
+- [x] C++ コードが既存のコーディングスタイルに準拠
 
 **テスト:**
 
-- [ ] `tests/test_ort_utils.py` の全テスト PASS
-- [ ] `tests/test_japanese_cache.py` の全テスト PASS (M4)
-- [ ] 既存の日本語音素化テスト (`tests/test_japanese_phonemizer.py` 等) が回帰なし
-- [ ] 既存の ORT 関連テスト (`tests/test_ort_utils.py` の既存テスト) が回帰なし
+- [x] `tests/test_ort_utils.py` の全テスト PASS
+- [x] `tests/test_japanese_cache.py` の全テスト PASS (M4)
+- [x] 既存の日本語音素化テスト (`tests/test_japanese_phonemizer.py` 等) が回帰なし
+- [x] 既存の ORT 関連テスト (`tests/test_ort_utils.py` の既存テスト) が回帰なし
 
 **CI:**
 
-- [ ] `ci.yml` の全ジョブ PASS (cpp-tests, csharp-tests, python-tests, rust-tests, npm-package-tests, lint)
-- [ ] `python-tests.yml` の 3 OS x Python 3.11 PASS
-- [ ] `test-hf-space.yml` の Layer 1-5 PASS
-- [ ] Copilot レビュー指摘事項の全対応
+- [x] `ci.yml` の全ジョブ PASS (cpp-tests, csharp-tests, python-tests, rust-tests, npm-package-tests, lint)
+- [x] `python-tests.yml` の 3 OS x Python 3.11 PASS
+- [x] `test-hf-space.yml` の Layer 1-5 PASS
+- [x] Copilot レビュー指摘事項の全対応
 
 **ドキュメント:**
 
-- [ ] `cpu-inference-optimization.md` の設定比較テーブルが最新
-- [ ] Tier 2 テーブルの状態カラムが正確
+- [x] `cpu-inference-optimization.md` の設定比較テーブルが最新
+- [x] Tier 2 テーブルの状態カラムが正確
 
 **HF Space:**
 
-- [ ] `ort_utils.py` の新関数が `onnxruntime` 以外の新規 import を含んでいないこと
-- [ ] `test-hf-space.yml` / `deploy-huggingface.yml` のパストリガーに `ort_utils.py` が追加されていること
-- [ ] HF Space デプロイディレクトリに必要なファイルが全てコピーされること
+- [x] `ort_utils.py` の新関数が `onnxruntime` 以外の新規 import を含んでいないこと
+- [x] `test-hf-space.yml` / `deploy-huggingface.yml` のパストリガーに `ort_utils.py` が追加されていること
+- [x] HF Space デプロイディレクトリに必要なファイルが全てコピーされること
 
 **PR:**
 
-- [ ] コミットメッセージが施策ごとに分離されている
-- [ ] PR 説明に M1-M4 の変更サマリー、期待効果、テスト結果を含む
-- [ ] PR ラベルが適切 (`performance`, `python`, `cpp`, `japanese`)
+- [x] コミットメッセージが施策ごとに分離されている
+- [x] PR 説明に M1-M4 の変更サマリー、期待効果、テスト結果を含む
+- [x] PR ラベルが適切 (`performance`, `python`, `cpp`, `japanese`)
 
 ---
 

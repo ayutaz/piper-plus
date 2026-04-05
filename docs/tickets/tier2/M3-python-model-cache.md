@@ -2,7 +2,7 @@
 
 > **マイルストーン**: [M3](../../guides/cpu-inference-tier2-milestones.md#m3-python-最適化モデルキャッシュ)
 > **設計書**: [cpu-inference-tier2-design.md](../../guides/cpu-inference-tier2-design.md#施策-6-python-最適化モデルキャッシュ)
-> **ステータス**: 未着手
+> **ステータス**: 完了
 > **依存**: [M1](M1-python-warmup.md) (warmup は cache 後に呼ばれる)
 > **後続**: [M4](M4-japanese-phonemize-cache.md), [M5](M5-integration.md)
 
@@ -494,10 +494,10 @@ class TestModelCache:
 
 **完了基準:**
 
-- [ ] `uv run pytest tests/test_ort_utils.py -k TestModelCache` 全 PASS
-- [ ] `uv run pytest tests/test_ort_utils.py -k TestVoiceCacheParity` 全 PASS
-- [ ] `uv run ruff check && uv run ruff format --check` PASS
-- [ ] 既存の `test_ort_utils.py` テストに退行なし
+- [x] `uv run pytest tests/test_ort_utils.py -k TestModelCache` 全 PASS
+- [x] `uv run pytest tests/test_ort_utils.py -k TestVoiceCacheParity` 全 PASS
+- [x] `uv run ruff check && uv run ruff format --check` PASS
+- [x] 既存の `test_ort_utils.py` テストに退行なし
 
 ---
 
@@ -516,18 +516,18 @@ class TestModelCache:
 
 ### 5.2 レビューチェックリスト
 
-- [ ] **パス命名規則**: `.{device}.opt.onnx` + `.{device}.opt.onnx.ok` が Rust (`engine.rs:120-126`) / C# (`SessionFactory.cs:122-124`) と完全一致すること
-- [ ] **センチネルパターン**: (1) `.opt.onnx` + `.ok` 両方存在 → キャッシュヒット、(2) `.opt.onnx` のみ → 削除 + 再最適化、(3) どちらもなし → 初回最適化。3 パターン全てが Rust/C# と同一であること
-- [ ] **例外ハンドリング**: `optimized_model_filepath` 設定失敗、センチネル書き込み失敗、不完全キャッシュ削除失敗 — 全てが warning ログのみで非致命的に続行すること
-- [ ] **`ORT_DISABLE_ALL`**: キャッシュヒット時に `graph_optimization_level = ORT_DISABLE_ALL` が設定されていること (再最適化の二重実行を防止)
-- [ ] **`create_session_options()` 非破壊**: 既存関数のシグネチャ・動作に変更がないこと
-- [ ] **`voice.py` インライン実装**: `ort_utils.py` のコア実装と同一のロジック (パス生成、キャッシュ判定、センチネル、フォールバック) であること
-- [ ] **ログメッセージ**: Rust (`tracing::info!`) / C# (`logger.LogInformation`) と同等のメッセージを `_logger.info()` / `_logger.warning()` で出力すること
-- [ ] **テスト網羅性**: 正常系 (作成 + ヒット) + 異常系 (不完全キャッシュ、権限エラー、ロード失敗) が全てカバーされていること
-- [ ] **`voice.py` 同期コメント**: `voice.py` に `# === Model cache logic: Keep in sync with piper_train.ort_utils.create_session_with_cache() ===` が存在し、`ort_utils.py` に `# NOTE: voice.py (python_run) にインライン複製あり。変更時は両方更新すること` が存在すること
-- [ ] **`TestVoiceCacheParity`**: `tests/test_ort_utils.py` にパリティテストが存在し、CPU/CUDA 両方のパス命名が検証されていること
-- [ ] **`PIPER_DISABLE_CACHE`**: `ort_utils.py` と `voice.py` の両方で `PIPER_DISABLE_CACHE` 環境変数に対応していること
-- [ ] **Warmup 統合コメント**: 各統合箇所 (`infer_onnx.py`, `inference.py`, `app.py`) に `# M1 warmup: ...` コメントが記載されていること
+- [x] **パス命名規則**: `.{device}.opt.onnx` + `.{device}.opt.onnx.ok` が Rust (`engine.rs:120-126`) / C# (`SessionFactory.cs:122-124`) と完全一致すること
+- [x] **センチネルパターン**: (1) `.opt.onnx` + `.ok` 両方存在 → キャッシュヒット、(2) `.opt.onnx` のみ → 削除 + 再最適化、(3) どちらもなし → 初回最適化。3 パターン全てが Rust/C# と同一であること
+- [x] **例外ハンドリング**: `optimized_model_filepath` 設定失敗、センチネル書き込み失敗、不完全キャッシュ削除失敗 — 全てが warning ログのみで非致命的に続行すること
+- [x] **`ORT_DISABLE_ALL`**: キャッシュヒット時に `graph_optimization_level = ORT_DISABLE_ALL` が設定されていること (再最適化の二重実行を防止)
+- [x] **`create_session_options()` 非破壊**: 既存関数のシグネチャ・動作に変更がないこと
+- [x] **`voice.py` インライン実装**: `ort_utils.py` のコア実装と同一のロジック (パス生成、キャッシュ判定、センチネル、フォールバック) であること
+- [x] **ログメッセージ**: Rust (`tracing::info!`) / C# (`logger.LogInformation`) と同等のメッセージを `_logger.info()` / `_logger.warning()` で出力すること
+- [x] **テスト網羅性**: 正常系 (作成 + ヒット) + 異常系 (不完全キャッシュ、権限エラー、ロード失敗) が全てカバーされていること
+- [x] **`voice.py` 同期コメント**: `voice.py` に `# === Model cache logic: Keep in sync with piper_train.ort_utils.create_session_with_cache() ===` が存在し、`ort_utils.py` に `# NOTE: voice.py (python_run) にインライン複製あり。変更時は両方更新すること` が存在すること
+- [x] **`TestVoiceCacheParity`**: `tests/test_ort_utils.py` にパリティテストが存在し、CPU/CUDA 両方のパス命名が検証されていること
+- [x] **`PIPER_DISABLE_CACHE`**: `ort_utils.py` と `voice.py` の両方で `PIPER_DISABLE_CACHE` 環境変数に対応していること
+- [x] **Warmup 統合コメント**: 各統合箇所 (`infer_onnx.py`, `inference.py`, `app.py`) に `# M1 warmup: ...` コメントが記載されていること
 
 ---
 
