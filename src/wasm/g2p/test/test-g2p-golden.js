@@ -9,9 +9,9 @@
  *
  * The JS G2P is a lightweight browser-optimised implementation, so some
  * differences from the Python/Rust output are expected:
- * - ES/FR/PT/ZH: character-based tokeniser (no rule-based IPA conversion)
+ * - PT/ZH: character-based tokeniser (no rule-based IPA conversion yet)
  * - EN: dictionary + fallback rules (IPA output, expected_contains checked)
- * - KO/SV: rule-based (expected_contains checked)
+ * - ES/FR/KO/SV: rule-based (expected_contains checked)
  *
  * This test performs `expected_token_count_min` and `expected_contains`
  * checks. Exact token match (`expected_tokens`) is skipped for JS.
@@ -58,10 +58,10 @@ function casesFor(lang) {
 }
 
 // Languages where the JS G2P produces IPA tokens (rule-based or dictionary).
-// For character-based languages (FR/PT/ZH), expected_contains from the
+// For character-based languages (PT/ZH), expected_contains from the
 // fixture refers to IPA tokens that the JS implementation does not produce,
 // so those checks are skipped.
-const IPA_OUTPUT_LANGUAGES = new Set(['en', 'es', 'ko', 'sv']);
+const IPA_OUTPUT_LANGUAGES = new Set(['en', 'es', 'fr', 'ko', 'sv']);
 
 // ---------------------------------------------------------------------------
 // Helper: structural assertion (token count only -- JS may differ from Py/Rust)
@@ -137,7 +137,7 @@ describe('G2P golden: Spanish', () => {
 });
 
 // ---------------------------------------------------------------------------
-// French (character-based in JS)
+// French (rule-based IPA)
 // ---------------------------------------------------------------------------
 
 describe('G2P golden: French', () => {
