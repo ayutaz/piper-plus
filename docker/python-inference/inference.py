@@ -301,12 +301,15 @@ def create_app(engine: PiperInferenceEngine, model_path: str):
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],
-        allow_credentials=True,
+        allow_credentials=False,
         allow_methods=["*"],
         allow_headers=["*"],
     )
 
-    model_created = int(Path(model_path).stat().st_mtime)
+    try:
+        model_created = int(Path(model_path).stat().st_mtime)
+    except OSError:
+        model_created = int(time.time())
 
     @app.get("/health")
     def health_check():
@@ -364,8 +367,9 @@ def create_app(engine: PiperInferenceEngine, model_path: str):
             sf.write(buf, audio, engine.sample_rate, format="WAV")
             buf.seek(0)
             return StreamingResponse(buf, media_type="audio/wav")
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=str(e)) from e
+        except Exception:
+            _LOGGER.exception("Synthesis failed for /v1/audio/speech")
+            raise HTTPException(status_code=500, detail="Synthesis failed") from None
 
     @app.get("/v1/models")
     def openai_models():

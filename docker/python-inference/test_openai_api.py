@@ -7,15 +7,18 @@ so no ONNX model is required.
 """
 
 import sys
-import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock
 
 import numpy as np
 import pytest
+from fastapi.testclient import TestClient
+
 
 # Ensure inference.py can be imported from this directory
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from inference import create_app  # noqa: E402
 
 
 @pytest.fixture()
@@ -34,10 +37,6 @@ def mock_engine():
 @pytest.fixture()
 def client(mock_engine):
     """Create a FastAPI TestClient backed by the mocked engine."""
-    from fastapi.testclient import TestClient
-
-    from inference import create_app
-
     # Use this test file as a stand-in for stat().st_mtime
     app = create_app(mock_engine, __file__)
     return TestClient(app)
