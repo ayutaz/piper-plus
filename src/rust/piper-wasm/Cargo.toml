@@ -13,14 +13,20 @@ crate-type = ["cdylib", "rlib"]
 
 [features]
 default = []
-multilingual = ["ja", "ko", "es", "fr", "pt", "sv"]
-multilingual-external = ["ja-external", "ko", "es", "fr", "pt", "sv"]
+multilingual = ["ja", "zh", "ko", "es", "fr", "pt", "sv"]
+multilingual-external = ["ja-external", "zh-external", "ko", "es", "fr", "pt", "sv"]
 # ja: Bundle NAIST-JDIC dictionary via include_bytes!() (~30 MB added to WASM binary).
 # Dictionary is immediately available at construction time.
 ja = ["piper-plus-g2p/naist-jdic"]
 # ja-external: Enable JA G2P code but load dictionary at runtime via setJapaneseDictionary().
 # Dictionary is NOT bundled -- caller must provide serialized dict bytes. Keeps WASM binary small.
 ja-external = ["piper-plus-g2p/japanese"]
+# zh: Bundle Chinese pinyin dictionaries via include_bytes!() (~2 MB added to WASM binary).
+# Dictionaries are immediately available at construction time.
+zh = ["piper-plus-g2p/chinese"]
+# zh-external: Enable ZH G2P code but load dictionaries at runtime via setChineseDictionary().
+# Dictionaries are NOT bundled -- caller must provide JSON dict bytes. Keeps WASM binary small.
+zh-external = ["piper-plus-g2p/chinese"]
 # ko/es/fr/pt/sv: Enable dedicated rule-based G2P for each language.
 # When disabled, that language falls back to PassthroughPhonemizer (character-level tokenization).
 # These features have no Cargo dependencies because the G2P logic is pure Rust.

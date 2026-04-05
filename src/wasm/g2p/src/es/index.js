@@ -870,7 +870,7 @@ export class SpanishG2P {
     /**
      * Convert Spanish text to phoneme tokens with prosody information.
      *
-     * Spanish prosody: A1=0, A2=stress-based (0 or 2), A3=0 (fixed).
+     * Spanish prosody: A1=0, A2=stress-based (0 or 2), A3=word phoneme count.
      *
      * @param {string} text - Input Spanish text.
      * @returns {{ tokens: string[], prosody: (null|{ a1: number, a2: number, a3: number })[] }}
@@ -880,8 +880,60 @@ export class SpanishG2P {
             return { tokens: [], prosody: [] };
         }
 
-        const tokens = textToPhonemeChars(text);
-        const prosody = tokens.map(() => ({ a1: 0, a2: 0, a3: 0 }));
-        return { tokens, prosody };
+        const cps = normalize(text);
+        const toks = tokenize(cps);
+        if (toks.length === 0) {
+            return { tokens: [], prosody: [] };
+        }
+
+        const allTokens = [];
+        const allProsody = [];
+        let needSpace = false;
+
+        for (const tok of toks) {
+            if (tok.type === 'punct') {
+                for (const c of tok.chars) {
+                    allTokens.push(c);
+                    allProsody.push({ a1: 0, a2: 0, a3: 0 });
+                }
+            } else if (tok.type === 'word') {
+                if (needSpace) {
+                    allTokens.push(' ');
+                    allProsody.push({ a1: 0, a2: 0, a3: 0 });
+                }
+
+                const res = g2pWord(tok.chars);
+                const wordStr = tok.chars.join('');
+                const isFunctionWord = UNSTRESSED_FUNCTION_WORDS.has(wordStr);
+
+                if (!isFunctionWord) {
+                    insertStressMarker(
+                        res.phonemes,
+                        res.units,
+                        res.boundaries,
+                        res.stressedSyl,
+                    );
+                }
+
+                const wordPhonemeCount = res.phonemes.filter(c => c !== IPA_STRESS).length;
+
+                for (let idx = 0; idx < res.phonemes.length; idx++) {
+                    const ph = res.phonemes[idx];
+                    if (ph === IPA_STRESS) {
+                        allTokens.push(ph);
+                        allProsody.push({ a1: 0, a2: 2, a3: wordPhonemeCount });
+                    } else {
+                        const isStressedVowel =
+                            idx > 0 && res.phonemes[idx - 1] === IPA_STRESS && isVowel(ph);
+                        allTokens.push(ph);
+                        allProsody.push({ a1: 0, a2: isStressedVowel ? 2 : 0, a3: wordPhonemeCount });
+                    }
+                }
+
+                needSpace = true;
+            }
+        }
+
+        return { tokens: allTokens, prosody: allProsody };
     }
 }

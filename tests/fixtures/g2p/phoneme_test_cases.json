@@ -480,6 +480,76 @@
       "input": "God morgon Sverige.",
       "description": "Swedish sentence — tests multi-word processing",
       "expected_token_count_min": 6
+    },
+    {
+      "language": "sv",
+      "input": "tack",
+      "description": "Swedish common word — short a before ck geminate (ck -> k), stress marker",
+      "expected_token_count_min": 4,
+      "expected_contains": ["t", "a", "k"]
+    },
+    {
+      "language": "sv",
+      "input": "välkommen",
+      "description": "Swedish compound word — short ä (ɛ) before cluster, short o (ɔ) before mm geminate",
+      "expected_token_count_min": 10,
+      "expected_contains": ["v", "ɛ", "l", "k", "ɔ", "m", "n"]
+    },
+    {
+      "language": "sv",
+      "input": "Sverige",
+      "description": "Swedish country name — long e (eː) before single r, soft g before front vowel -> j",
+      "expected_token_count_min": 8,
+      "expected_contains": ["s", "v", "eː", "j"]
+    },
+    {
+      "language": "sv",
+      "input": "mjölk",
+      "description": "Swedish sj-sound exception — mj onset, short ö (œ) before lk cluster",
+      "expected_token_count_min": 6,
+      "expected_contains": ["m", "j", "œ", "l", "k"]
+    },
+    {
+      "language": "sv",
+      "input": "skön",
+      "description": "Swedish sk + front vowel ö -> sj-sound (ɧ), long ö (øː) before single n",
+      "expected_token_count_min": 4,
+      "expected_contains": ["ɧ", "øː", "n"]
+    },
+    {
+      "language": "sv",
+      "input": "ljus",
+      "description": "Swedish word-initial lj digraph -> j, long u (ʉː) before single s",
+      "expected_token_count_min": 4,
+      "expected_contains": ["j", "ʉː", "s"]
+    },
+    {
+      "language": "sv",
+      "input": "kort",
+      "description": "Swedish retroflex assimilation — rt -> ʈ, short o (ɔ) before cluster",
+      "expected_token_count_min": 4,
+      "expected_contains": ["k", "ɔ", "ʈ"]
+    },
+    {
+      "language": "sv",
+      "input": "barn",
+      "description": "Swedish retroflex assimilation — rn -> ɳ, long a (ɑː) before r+single C",
+      "expected_token_count_min": 4,
+      "expected_contains": ["b", "ɑː", "ɳ"]
+    },
+    {
+      "language": "sv",
+      "input": "flicka",
+      "description": "Swedish hard k exception — k before i stays /k/ (in HARD_K_WORDS), short i (ɪ)",
+      "expected_token_count_min": 6,
+      "expected_contains": ["f", "l", "ɪ", "k", "a"]
+    },
+    {
+      "language": "sv",
+      "input": "station",
+      "description": "Swedish loanword -tion suffix -> sj-sound (ɧ) + long u (uː) + n, stress on suffix",
+      "expected_token_count_min": 7,
+      "expected_contains": ["s", "t", "ɧ", "uː", "n"]
     }
   ],
   "pua_map_count": 96,

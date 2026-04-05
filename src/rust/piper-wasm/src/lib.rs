@@ -10,18 +10,23 @@
 //! - `ja` — Japanese (enables `piper-plus/naist-jdic`, bundles ~30 MB dictionary)
 //! - `ja-external` — Japanese without bundled dictionary (enables `piper-plus/japanese`).
 //!   Use `setJapaneseDictionary()` at runtime to load the dictionary from external bytes.
+//! - `zh` — Chinese (enables `piper-plus-g2p/chinese`). Pinyin dictionaries must be
+//!   loaded at runtime via `setChineseDictionary()`.
+//! - `zh-external` — Chinese with runtime dictionary loading (same as `zh` but
+//!   semantically indicates external dict loading, like `ja-external`).
+//!   Use `setChineseDictionary()` to load pinyin JSON dictionaries.
 //! - `ko` — Korean (rule-based, no dictionary needed)
 //! - `es` — Spanish (rule-based, no dictionary needed)
 //! - `fr` — French (rule-based, no dictionary needed)
 //! - `pt` — Portuguese (rule-based, no dictionary needed)
 //! - `sv` — Swedish (rule-based, no dictionary needed)
-//! - `multilingual` — All languages with bundled JA dictionary
-//! - `multilingual-external` — All languages with `ja-external` instead of `ja`
+//! - `multilingual` — All languages with bundled JA dictionary + ZH G2P
+//! - `multilingual-external` — All languages with `ja-external` + `zh-external`
 //!
-//! **EN and ZH** always use `PassthroughPhonemizer` (character-level tokenization)
-//! inside Rust WASM because their full G2P requires dictionaries or models that
-//! are impractical to bundle. The JS-side `@piper-plus/g2p` package provides
-//! richer EN/ZH phonemization separately.
+//! **EN** always uses `PassthroughPhonemizer` (character-level tokenization)
+//! inside Rust WASM because its full G2P requires a large pronunciation
+//! dictionary (CMU-dict). The JS-side `@piper-plus/g2p` package provides
+//! richer EN phonemization separately.
 //!
 //! All features are off by default. For a JA-only WASM build:
 //! ```sh
@@ -84,6 +89,8 @@ pub fn get_api_version() -> String {
 }
 
 use piper_plus::config::VoiceConfig;
+#[cfg(any(feature = "zh", feature = "zh-external"))]
+use piper_plus_g2p::chinese::ChinesePhonemizer;
 #[cfg(feature = "fr")]
 use piper_plus_g2p::french::FrenchPhonemizer;
 #[cfg(any(feature = "ja", feature = "ja-external"))]
@@ -162,7 +169,8 @@ impl std::fmt::Debug for WasmPhonemizer {
 /// Helper: create a phonemizer for the given language code.
 ///
 /// When a language feature is enabled, the dedicated phonemizer is used.
-/// When disabled (or for EN/ZH/unknown), falls back to `PassthroughPhonemizer`.
+/// When disabled (or for EN/unknown), falls back to `PassthroughPhonemizer`.
+/// ZH starts as passthrough and is upgraded via `setChineseDictionary()`.
 fn create_phonemizer(lang: &str) -> Result<Box<dyn Phonemizer>, String> {
     match lang {
         "ja" => {
@@ -232,10 +240,26 @@ fn create_phonemizer(lang: &str) -> Result<Box<dyn Phonemizer>, String> {
                 Ok(Box::new(PassthroughPhonemizer::new("sv")))
             }
         }
-        // EN and ZH: always use PassthroughPhonemizer in WASM.
-        // EN requires a large pronunciation dictionary (CMU-dict) and ZH requires
-        // pinyin conversion tables -- both are handled by the JS-side G2P package
-        // (@piper-plus/g2p) which provides EnglishG2P and ChineseG2P classes.
+        "zh" => {
+            #[cfg(feature = "zh")]
+            {
+                // zh feature: dictionaries are bundled but ChinesePhonemizer requires
+                // JSON dict bytes -- not yet available at bundle time.
+                // For now, start with passthrough; caller can use setChineseDictionary().
+                Ok(Box::new(PassthroughPhonemizer::new("zh")))
+            }
+            #[cfg(all(not(feature = "zh"), feature = "zh-external"))]
+            {
+                // External dict mode: start with passthrough, replaced by setChineseDictionary()
+                Ok(Box::new(PassthroughPhonemizer::new("zh")))
+            }
+            #[cfg(all(not(feature = "zh"), not(feature = "zh-external")))]
+            {
+                Ok(Box::new(PassthroughPhonemizer::new("zh")))
+            }
+        }
+        // EN requires a large pronunciation dictionary (CMU-dict) -- handled by the
+        // JS-side G2P package (@piper-plus/g2p) which provides EnglishG2P.
         // Unknown languages also fall back to character-level tokenization.
         other => Ok(Box::new(PassthroughPhonemizer::new(other))),
     }
@@ -426,6 +450,40 @@ impl WasmPhonemizer {
             })?;
         self.phonemizer
             .replace_phonemizer("ja", Box::new(ja_phonemizer));
+        Ok(())
+    }
+
+    /// Load external Chinese pinyin dictionaries from JSON bytes.
+    ///
+    /// This replaces the initial PassthroughPhonemizer for Chinese with a
+    /// full ChinesePhonemizer backed by the provided pinyin dictionaries.
+    ///
+    /// - `single_json` — JSON bytes for single-character pinyin dict
+    ///   (e.g. `{"19968": "yi1", "19969": "ding1,zheng4", ...}`)
+    /// - `phrase_json` — JSON bytes for phrase pinyin dict
+    ///   (e.g. `{"一丁不識": [["yī"], ["dīng"], ...], ...}`)
+    ///
+    /// Typically fetched from a CDN and cached in IndexedDB.
+    ///
+    /// # Errors
+    ///
+    /// Returns `CONFIG_PARSE_ERROR` if the dictionary JSON is invalid.
+    #[cfg(any(feature = "zh", feature = "zh-external"))]
+    #[wasm_bindgen(js_name = setChineseDictionary)]
+    pub fn set_chinese_dictionary(
+        &mut self,
+        single_json: &[u8],
+        phrase_json: &[u8],
+    ) -> Result<(), JsValue> {
+        let zh_phonemizer =
+            ChinesePhonemizer::from_json_bytes(single_json, phrase_json).map_err(|e| {
+                create_wasm_error(
+                    ERROR_CONFIG_PARSE,
+                    &format!("Failed to load Chinese dictionary: {e}"),
+                )
+            })?;
+        self.phonemizer
+            .replace_phonemizer("zh", Box::new(zh_phonemizer));
         Ok(())
     }
 }

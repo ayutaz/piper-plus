@@ -886,14 +886,46 @@ export class PortugueseG2P {
 
     /**
      * Convert Portuguese text to phoneme tokens with prosody.
-     * Portuguese prosody: null (not provided via this simple API).
      *
      * @param {string} text - Input Portuguese text.
-     * @returns {{ tokens: string[], prosody: null[] }}
+     * @returns {{ tokens: string[], prosody: Array<{a1: number, a2: number, a3: number}> }}
      */
     phonemizeWithProsody(text) {
-        const { tokens } = this.phonemize(text);
-        const prosody = tokens.map(() => ({ a1: 0, a2: 0, a3: 0 }));
+        if (!text || typeof text !== 'string') {
+            return { tokens: [], prosody: [] };
+        }
+
+        const cps = normalize(text);
+        const toks = tokenize(cps, isWordChar);
+
+        const tokens = [];
+        const prosody = [];
+        let needSpace = false;
+
+        for (const tok of toks) {
+            if (tok.isPunct) {
+                for (const ch of tok.chars) {
+                    tokens.push(ch);
+                    prosody.push({ a1: 0, a2: 0, a3: 0 });
+                }
+                needSpace = true;
+            } else {
+                if (needSpace) {
+                    tokens.push(' ');
+                    prosody.push({ a1: 0, a2: 0, a3: 0 });
+                }
+                const wr = processWord(tok.chars);
+                const wordPhonemeCount = wr.phonemes.length;
+
+                for (let j = 0; j < wr.phonemes.length; j++) {
+                    const a2 = (j === wr.stressIdx) ? 2 : 0;
+                    tokens.push(wr.phonemes[j]);
+                    prosody.push({ a1: 0, a2, a3: wordPhonemeCount });
+                }
+                needSpace = true;
+            }
+        }
+
         return { tokens, prosody };
     }
 }
