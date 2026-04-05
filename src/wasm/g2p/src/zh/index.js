@@ -1,14 +1,14 @@
 /**
- * ChineseG2P -- Chinese G2P for @piper-plus/g2p.
+ * ChineseG2P -- character-based Chinese G2P for @piper-plus/g2p.
  *
- * Two operational modes:
- *   1. **WASM path** (browser): calls `wasmPhonemizer.phonemize(text, 'zh')`
- *      for full pinyin-to-IPA conversion with tone sandhi.
- *   2. **Fallback path** (Node.js / no WASM): character-level tokenization
- *      where each character becomes its own token.
+ * Each character in the input text is looked up in the phoneme_id_map.
+ * Characters not found in the map are passed through as-is.
+ * No external dependencies required.
  *
- * The WASM phonemizer is injected via the constructor options so that this
- * module has no hard dependency on wasm-bindgen or onnxruntime-web.
+ * Supports optional WASM-backed phonemization: when a `wasmPhonemizer`
+ * is provided, it is used as the primary path. On WASM failure, the
+ * class falls back to character-level passthrough and records the error
+ * in the `lastError` property for caller diagnostics.
  */
 
 export class ChineseG2P {
@@ -18,18 +18,32 @@ export class ChineseG2P {
      *   Mapping from character/phoneme string to array of phoneme IDs.
      *   Typically loaded from the model's config.json `phoneme_id_map`.
      * @param {object} [options.wasmPhonemizer]
-     *   A WASM phonemizer instance with a `phonemize(text, lang)` method.
-     *   When provided, phonemization uses the Rust WASM pipeline.
+     *   Optional WASM phonemizer instance with a `.phonemize(text, lang)` method.
      */
     constructor(options = {}) {
         this.phonemeIdMap = options.phonemeIdMap || null;
-        /** @private */
         this._wasmPhonemizer = options.wasmPhonemizer || null;
+        /** @private */
+        this._lastError = null;
     }
 
-    /** @returns {'zh'} */
-    get languageCode() {
-        return 'zh';
+    /**
+     * The last error encountered during WASM phonemization, or null if
+     * the most recent call succeeded (or WASM was never attempted).
+     * @type {string|null}
+     */
+    get lastError() {
+        return this._lastError;
+    }
+
+    /**
+     * Current operation mode: 'wasm' if a WASM phonemizer is available,
+     * 'fallback' otherwise.
+     * @type {'wasm'|'fallback'}
+     */
+    get mode() {
+        if (this._wasmPhonemizer) return 'wasm';
+        return 'fallback';
     }
 
     /**
@@ -41,21 +55,23 @@ export class ChineseG2P {
     }
 
     /**
-     * Whether the WASM phonemizer is loaded and available.
-     * @returns {boolean}
+     * Set or replace the WASM phonemizer instance.
+     * @param {object|null} wasmPhonemizer
      */
-    get isWasmInitialized() {
-        return this._wasmPhonemizer !== null;
+    setWasmPhonemizer(wasmPhonemizer) {
+        this._wasmPhonemizer = wasmPhonemizer || null;
+        this._lastError = null;
     }
 
     /**
      * Convert Chinese text to phoneme tokens.
      *
-     * Uses the WASM pipeline when available, otherwise falls back to
-     * character-level tokenization.
+     * When a WASM phonemizer is available, it is tried first.
+     * On failure, falls back to character-level passthrough and
+     * stores the error reason in `lastError`.
      *
      * @param {string} text - Input Chinese text.
-     * @returns {{ tokens: string[], prosody: (null|object)[] }}
+     * @returns {{ tokens: string[], prosody: null[] }}
      */
     phonemize(text) {
         if (this._wasmPhonemizer) {
@@ -66,51 +82,50 @@ export class ChineseG2P {
 
     /**
      * Convert Chinese text to phoneme tokens with prosody.
-     * Alias for phonemize() -- prosody info depends on the active backend.
+     * Chinese G2P provides fixed prosody values (a1=0, a2=0, a3=0).
      *
      * @param {string} text - Input Chinese text.
-     * @returns {{ tokens: string[], prosody: (null|object)[] }}
+     * @returns {{ tokens: string[], prosody: ({ a1: number, a2: number, a3: number })[] }}
      */
     phonemizeWithProsody(text) {
-        return this.phonemize(text);
+        const { tokens } = this.phonemize(text);
+        const prosody = tokens.map(() => ({ a1: 0, a2: 0, a3: 0 }));
+        return { tokens, prosody };
     }
 
-    // ---- Private helpers ----
-
     /**
-     * WASM-backed phonemization path.
      * @private
+     * Attempt WASM phonemization; fall back to character passthrough on error.
      * @param {string} text
-     * @returns {{ tokens: string[], prosody: (null|object)[] }}
+     * @returns {{ tokens: string[], prosody: null[] }}
      */
     _wasmPhonemizerPath(text) {
-        const result = this._wasmPhonemizer.phonemize(text, 'zh');
-        return {
-            tokens: result.tokens || [],
-            prosody: result.prosody || [],
-        };
+        try {
+            const result = this._wasmPhonemizer.phonemize(text, 'zh');
+            this._lastError = null;
+            const tokens = result.tokens || [];
+            return { tokens, prosody: new Array(tokens.length).fill(null) };
+        } catch (e) {
+            this._lastError = `WASM phonemize failed: ${e.message || e}`;
+            return this._fallbackPhonemize(text);
+        }
     }
 
     /**
-     * Fallback character-level tokenization for CJK text.
-     *
-     * Each character becomes its own token. Whitespace is preserved as ' '.
-     * This provides basic functionality when WASM is not available.
-     *
      * @private
+     * Character-level passthrough fallback.
      * @param {string} text
      * @returns {{ tokens: string[], prosody: null[] }}
      */
     _fallbackPhonemize(text) {
-        if (!text) {
-            return { tokens: [], prosody: [] };
-        }
-
         const tokens = [];
+
         for (const char of text) {
-            if (char.trim() === '') {
-                tokens.push(' ');
+            if (this.phonemeIdMap && this.phonemeIdMap[char]) {
+                // Character found in map -- emit it as a token
+                tokens.push(char);
             } else {
+                // Unknown character -- pass through
                 tokens.push(char);
             }
         }
