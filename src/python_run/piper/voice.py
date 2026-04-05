@@ -65,14 +65,24 @@ class PiperVoice:
 
         # Thread settings: env var > auto-detect (sched_getaffinity > cpu_count)
         env_threads = os.environ.get("PIPER_INTRA_THREADS")
+        intra_threads: int | None = None
         if env_threads is not None:
-            sess_options.intra_op_num_threads = int(env_threads)
-        else:
+            try:
+                intra_threads = max(1, min(int(env_threads), 4))
+            except ValueError:
+                _LOGGER.warning(
+                    "Ignoring invalid PIPER_INTRA_THREADS=%r; using auto-detected thread count",
+                    env_threads,
+                )
+
+        if intra_threads is None:
             try:
                 logical_cores = len(os.sched_getaffinity(0))
             except (AttributeError, OSError):
                 logical_cores = os.cpu_count() or 2
-            sess_options.intra_op_num_threads = min(logical_cores // 2 or 1, 4)
+            intra_threads = min(logical_cores // 2 or 1, 4)
+
+        sess_options.intra_op_num_threads = intra_threads
         sess_options.inter_op_num_threads = 1
 
         sess_options.enable_cpu_mem_arena = True

@@ -4,9 +4,13 @@ Provides optimized SessionOptions aligned with the C# (SessionFactory.cs)
 and Rust (engine.rs) engine implementations.
 """
 
+import logging
 import os
 
 import onnxruntime
+
+
+_logger = logging.getLogger(__name__)
 
 
 # VITS is a small model (15-75MB); more than 4 intra-op threads
@@ -63,10 +67,18 @@ def create_session_options(
     # Priority: PIPER_INTRA_THREADS env > intra_op_threads arg > auto-detect
     env_threads = os.environ.get("PIPER_INTRA_THREADS")
     if env_threads is not None:
-        opts.intra_op_num_threads = int(env_threads)
-    elif intra_op_threads is not None:
-        opts.intra_op_num_threads = intra_op_threads
-    else:
+        try:
+            opts.intra_op_num_threads = max(1, min(int(env_threads), MAX_INTRA_THREADS))
+        except ValueError:
+            _logger.warning(
+                "Ignoring invalid PIPER_INTRA_THREADS=%r; using auto-detected thread count",
+                env_threads,
+            )
+            env_threads = None  # fall through to auto-detect
+
+    if env_threads is None and intra_op_threads is not None:
+        opts.intra_op_num_threads = max(1, intra_op_threads)
+    elif env_threads is None:
         # os.cpu_count() returns logical cores (incl. HyperThreading).
         # Dividing by 2 approximates physical core count.
         logical_cores = _get_logical_core_count()
