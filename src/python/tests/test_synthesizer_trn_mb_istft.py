@@ -128,3 +128,48 @@ def test_mb_istft_gradient_flow():
     loss.backward()
     # subband_conv_post should receive gradients
     assert model.dec.subband_conv_post.weight.grad is not None
+
+
+@pytest.mark.unit
+def test_voice_conversion_mb_istft():
+    """voice_conversion() returns fullband with MB-iSTFT decoder."""
+    model = _make_synthesizer(mb_istft=True, num_speakers=2)
+    model.eval()
+    spec = torch.randn(1, 513, 32)
+    spec_lengths = torch.LongTensor([32])
+    sid_src = torch.LongTensor([0])
+    sid_tgt = torch.LongTensor([1])
+    lid = torch.LongTensor([0])
+    with torch.no_grad():
+        o_hat, y_mask, (z, z_p, z_hat) = model.voice_conversion(
+            spec, spec_lengths, sid_src, sid_tgt, lid=lid
+        )
+    assert o_hat.shape[1] == 1  # [B, 1, T]
+
+
+@pytest.mark.unit
+def test_synthesizer_output_all_fields():
+    """All SynthesizerOutput fields have correct types."""
+    from piper_train.vits.models import SynthesizerOutput
+
+    model = _make_synthesizer(mb_istft=True, num_speakers=2)
+    x = torch.randint(0, 97, (1, 10))
+    x_lengths = torch.LongTensor([10])
+    spec = torch.randn(1, 513, 32)
+    spec_lengths = torch.LongTensor([32])
+    sid = torch.LongTensor([0])
+    lid = torch.LongTensor([0])
+
+    output = model(x, x_lengths, spec, spec_lengths, sid=sid, lid=lid)
+
+    assert isinstance(output, SynthesizerOutput)
+    assert isinstance(output.waveform, torch.Tensor)
+    assert isinstance(output.duration_loss, torch.Tensor)
+    assert isinstance(output.attention, torch.Tensor)
+    assert isinstance(output.ids_slice, torch.Tensor)
+    assert isinstance(output.x_mask, torch.Tensor)
+    assert isinstance(output.y_mask, torch.Tensor)
+    assert isinstance(output.latents, tuple)
+    assert len(output.latents) == 6
+    # decoder_subbands は MB-iSTFT 時に Tensor
+    assert isinstance(output.decoder_subbands, torch.Tensor)

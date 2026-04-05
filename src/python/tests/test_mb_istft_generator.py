@@ -93,3 +93,39 @@ def test_subband_conv_post_channels():
     expected_in = 256 // (2**2)  # = 64
     assert gen.subband_conv_post.in_channels == expected_in
     assert gen.subband_conv_post.out_channels == 4 * (16 + 2)  # = 72
+
+
+@pytest.mark.unit
+def test_generator_pqmf_injection():
+    """MBiSTFTGenerator accepts external PQMF instance."""
+    from piper_train.vits.mb_istft import PQMF, MBiSTFTGenerator
+
+    pqmf = PQMF(subbands=4)
+    gen = _make_generator(pqmf=pqmf)
+    assert gen.pqmf is pqmf
+    x = torch.randn(1, 192, 32)
+    fullband, subbands = gen(x)
+    assert fullband.shape == (1, 1, 8192)
+
+
+@pytest.mark.unit
+def test_generator_resblock1():
+    """MBiSTFTGenerator works with ResBlock1."""
+    gen = _make_generator(
+        resblock="1",
+        resblock_dilation_sizes=((1, 3, 5), (1, 3, 5), (1, 3, 5)),
+    )
+    x = torch.randn(1, 192, 32)
+    fullband, _ = gen(x)
+    assert fullband.shape == (1, 1, 8192)
+
+
+@pytest.mark.unit
+def test_generator_speaker_cond_batch1():
+    """MB-iSTFT with speaker conditioning and batch_size=1."""
+    gen = _make_generator(gin_channels=512)
+    x = torch.randn(1, 192, 32)
+    g = torch.randn(1, 512, 1)
+    fullband, subbands = gen(x, g=g)
+    assert fullband.shape == (1, 1, 8192)
+    assert subbands.shape == (1, 4, 2048)

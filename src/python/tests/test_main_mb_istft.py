@@ -67,3 +67,15 @@ def test_cli_mb_istft_with_quality_high_errors():
     )
     assert result.returncode != 0
     assert "not supported" in result.stderr.lower() or "error" in result.stderr.lower()
+
+
+@pytest.mark.unit
+def test_cli_c_sub_stft_custom_value():
+    """--c-sub-stft accepts custom float value."""
+    from piper_train.__main__ import create_parser
+
+    parser = create_parser()
+    args = parser.parse_args(
+        ["--dataset-dir", "/tmp/test", "--batch-size", "4", "--c-sub-stft", "2.5"]
+    )
+    assert args.c_sub_stft == 2.5

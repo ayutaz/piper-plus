@@ -820,6 +820,7 @@ class SynthesizerTrn(nn.Module):
 
         self.use_sdp = use_sdp
         self.mb_istft = mb_istft
+        self.onnx_export_mode = False
 
         self.enc_p = TextEncoder(
             n_vocab,

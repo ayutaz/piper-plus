@@ -76,3 +76,51 @@ def test_stft_loss_gradient_flow():
     loss.backward()
     assert x.grad is not None
     assert x.grad.shape == x.shape
+
+
+@pytest.mark.unit
+def test_spectral_convergence_loss_direct():
+    """SpectralConvergenceLoss returns near-zero for identical inputs."""
+    from piper_train.vits.stft_loss import SpectralConvergenceLoss
+
+    loss_fn = SpectralConvergenceLoss()
+    x = torch.randn(4, 100).abs()  # magnitude
+    loss = loss_fn(x, x)
+    assert loss.item() < 1e-6
+
+
+@pytest.mark.unit
+def test_spectral_convergence_loss_zero_target():
+    """SpectralConvergenceLoss handles near-zero target without NaN."""
+    from piper_train.vits.stft_loss import SpectralConvergenceLoss
+
+    loss_fn = SpectralConvergenceLoss()
+    x = torch.randn(4, 100).abs()
+    y = torch.zeros(4, 100)
+    loss = loss_fn(x, y)
+    assert not torch.isnan(loss)
+    assert not torch.isinf(loss)
+
+
+@pytest.mark.unit
+def test_log_stft_magnitude_loss_direct():
+    """LogSTFTMagnitudeLoss returns near-zero for identical inputs."""
+    from piper_train.vits.stft_loss import LogSTFTMagnitudeLoss
+
+    loss_fn = LogSTFTMagnitudeLoss()
+    x = torch.randn(4, 100).abs()
+    loss = loss_fn(x, x)
+    assert loss.item() < 1e-6
+
+
+@pytest.mark.unit
+def test_stft_loss_3d_input():
+    """STFTLoss handles (B, 1, T) 3D input."""
+    from piper_train.vits.stft_loss import STFTLoss
+
+    loss_fn = STFTLoss(384, 30, 150)
+    x = torch.randn(2, 1, 2048)
+    y = torch.randn(2, 1, 2048)
+    loss = loss_fn(x, y)
+    assert loss.dim() == 0
+    assert loss.item() > 0
