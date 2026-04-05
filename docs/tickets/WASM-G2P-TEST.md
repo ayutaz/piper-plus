@@ -31,15 +31,28 @@
 const IPA_OUTPUT_LANGUAGES = new Set(['en', 'ko', 'sv']);
 ```
 
-**変更後:**
+**変更方針:** 一括更新ではなく、各 Phase 完了と同期して言語を段階的に追加する。
+各 Phase のマージ時に対応する言語を追加し、未実装言語の IPA チェックが誤って有効化されることを防止する。
+
 ```javascript
+// Phase 1 (ES) 完了後
+const IPA_OUTPUT_LANGUAGES = new Set(['en', 'ko', 'sv', 'es']);
+// Phase 2 (FR) 完了後
+const IPA_OUTPUT_LANGUAGES = new Set(['en', 'ko', 'sv', 'es', 'fr']);
+// Phase 3 (PT) 完了後
+const IPA_OUTPUT_LANGUAGES = new Set(['en', 'ko', 'sv', 'es', 'fr', 'pt']);
+// Phase 4 (ZH) 完了後 — 最終形
 const IPA_OUTPUT_LANGUAGES = new Set(['en', 'ko', 'sv', 'es', 'fr', 'pt', 'zh']);
 ```
 
 **ZH テストの強化:**
+
+ZH 固有のトーンマーカー検証ロジックを追加するのではなく、フィクスチャの `expected_contains` に
+トーン PUA トークンを含めることで、既存の `assertExpectedContains` で統一的に処理する。
+
 ```javascript
 // 現在: tokens.length > 0 のみ
-// 変更後:
+// 変更後: 他言語と同一のテストパターンを使用 (ZH 固有ロジック不要)
 describe('G2P golden: Chinese', () => {
     const g2p = new ChineseG2P();
     for (const c of casesFor('zh')) {
@@ -47,13 +60,8 @@ describe('G2P golden: Chinese', () => {
             const { tokens } = g2p.phonemize(c.input);
             assertTokenCountMin(tokens, c);
             assertExpectedContains(tokens, c);
-            // ZH 固有: トーンマーカー検証
-            if (c.expected_contains_any_tone) {
-                const toneTokens = ['tone1', 'tone2', 'tone3', 'tone4', 'tone5']
-                    .map(t => mapToken(t));
-                const hasTone = tokens.some(t => toneTokens.includes(t));
-                assert.ok(hasTone, `ZH output should contain tone marker`);
-            }
+            // トーン検証は expected_contains にトークンを含めることで対応
+            // 例: expected_contains: ["tone3"] → assertExpectedContains が検証
         });
     }
 });
@@ -71,7 +79,7 @@ describe('G2P golden: Chinese', () => {
 | fr | `"maison"` | `expected_contains: ["z"]` (母音間 s) |
 | pt | `"tipo"` | `expected_contains: ["tʃ"]` (PUA E054) |
 | pt | `"caro"` | `expected_contains: ["ɾ"]` (tap r) |
-| zh | `"中国"` | `expected_contains_any_tone: true` |
+| zh | `"中国"` | `expected_contains: ["tone3"]` (PUA トーンマーカー、`assertExpectedContains` で統一検証) |
 
 ### 2-3. CI ワークフロー更新 (`g2p-wasm-ci.yml`)
 
@@ -137,8 +145,8 @@ node --test test/test-encode.js test/test-english.js test/test-g2p.js \
 
 ### レビュー項目
 
-- [ ] `IPA_OUTPUT_LANGUAGES` に全 7 言語含む (ja 除く)
-- [ ] ZH の `expected_contains_any_tone` チェックロジック
+- [ ] `IPA_OUTPUT_LANGUAGES` の段階的更新 (各 Phase 完了と同期)
+- [ ] ZH のトーン検証が `expected_contains` + `assertExpectedContains` で統一されていること
 - [ ] CI テストコマンドに 4 新規テストファイル含む
 - [ ] WASM ビルド CI の feature flag 更新
 - [ ] npm サイズチェック通過
