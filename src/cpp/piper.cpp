@@ -2357,7 +2357,7 @@ void warmupModel(ModelSession &session, int runs) {
     }
 
     try {
-        auto startTime = chrono::steady_clock::now();
+        auto startTime = std::chrono::steady_clock::now();
         auto memoryInfo = Ort::MemoryInfo::CreateCpu(
             OrtAllocatorType::OrtArenaAllocator, OrtMemType::OrtMemTypeDefault);
 
@@ -2393,17 +2393,17 @@ void warmupModel(ModelSession &session, int runs) {
 
         // Run warmup
         for (int i = 0; i < runs; i++) {
-            auto runStart = chrono::steady_clock::now();
+            auto runStart = std::chrono::steady_clock::now();
             session.onnx.Run(Ort::RunOptions{nullptr},
                              inputNames.data(), inputTensors.data(), inputTensors.size(),
                              outputNames.data(), outputNames.size());
-            auto runEnd = chrono::steady_clock::now();
+            auto runEnd = std::chrono::steady_clock::now();
             spdlog::debug("Warmup run {}/{} completed in {}ms", i + 1, runs,
-                          chrono::duration<double, milli>(runEnd - runStart).count());
+                          std::chrono::duration<double, std::milli>(runEnd - runStart).count());
         }
 
-        auto endTime = chrono::steady_clock::now();
-        auto elapsedMs = chrono::duration<double, milli>(endTime - startTime).count();
+        auto endTime = std::chrono::steady_clock::now();
+        auto elapsedMs = std::chrono::duration<double, std::milli>(endTime - startTime).count();
         spdlog::info("Warmup completed ({} runs in {:.0f}ms)", runs, elapsedMs);
     } catch (const std::exception &e) {
         spdlog::warn("Warmup failed (non-fatal): {}", e.what());

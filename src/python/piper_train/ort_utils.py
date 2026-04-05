@@ -109,8 +109,11 @@ def get_providers(device: str = "cpu") -> list[str]:
     """
     if device == "cpu":
         return ["CPUExecutionProvider"]
-    # "auto" or "gpu": prefer CUDA, fall back to CPU
-    return ["CUDAExecutionProvider", "CPUExecutionProvider"]
+    # "auto" or "gpu": prefer CUDA when available, otherwise fall back to CPU
+    available = onnxruntime.get_available_providers()
+    if "CUDAExecutionProvider" in available:
+        return ["CUDAExecutionProvider", "CPUExecutionProvider"]
+    return ["CPUExecutionProvider"]
 
 
 # ---------------------------------------------------------------------------
@@ -203,9 +206,11 @@ def create_session_with_cache(
         except OSError:
             pass
 
-    # First run or cache rebuild: optimize and save
+    # First run or cache rebuild
+    _cache_requested = False
     try:
         opts.optimized_model_filepath = str(cache_path)
+        _cache_requested = True
     except Exception as exc:
         _LOGGER.warning(
             "Could not set optimized model path %s: %s (continuing without cache)",
@@ -217,8 +222,8 @@ def create_session_with_cache(
         str(model_path), sess_options=opts, providers=providers
     )
 
-    # Write sentinel if cache was created
-    if cache_path.exists():
+    # Write sentinel only if we actually requested cache generation
+    if _cache_requested and cache_path.exists():
         try:
             sentinel_path.write_text("ok")
             _LOGGER.info("Cache sentinel written: %s", sentinel_path)

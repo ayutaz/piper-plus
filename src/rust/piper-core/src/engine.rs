@@ -127,10 +127,10 @@ impl OnnxEngine {
         };
 
         // キャッシュ有効: .opt.onnx と .ok の両方が存在する場合のみ
-        let mut use_cached = optimized_path.exists() && sentinel_path.exists();
+        let cache_hit = optimized_path.exists() && sentinel_path.exists();
 
         // 不完全なキャッシュがあれば削除
-        if !use_cached && optimized_path.exists() && !sentinel_path.exists() {
+        if !cache_hit && optimized_path.exists() && !sentinel_path.exists() {
             tracing::warn!(
                 "Removing incomplete cache {:?} (missing sentinel)",
                 optimized_path
@@ -139,7 +139,7 @@ impl OnnxEngine {
         }
 
         // キャッシュヒット時のロード試行。失敗したらキャッシュを削除して通常パスにフォールスルー。
-        if use_cached {
+        if cache_hit {
             tracing::info!("Loading pre-optimized model from {:?}", optimized_path);
             match Self::build_session(&optimized_path, num_intra_threads, &device_type, true, None)
             {
@@ -155,13 +155,11 @@ impl OnnxEngine {
                     );
                     let _ = std::fs::remove_file(&optimized_path);
                     let _ = std::fs::remove_file(&sentinel_path);
-                    use_cached = false;
                 }
             }
         }
 
         // 通常パス: 元モデルをロードし、最適化結果をキャッシュに保存
-        let _ = use_cached; // suppress unused warning after fallthrough
         let (session, actual_device) = Self::build_session(
             model_path,
             num_intra_threads,

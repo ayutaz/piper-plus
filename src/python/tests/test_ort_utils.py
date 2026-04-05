@@ -189,18 +189,38 @@ class TestGetProviders:
         providers = get_providers("cpu")
         assert providers == ["CPUExecutionProvider"]
 
-    def test_gpu_provider(self):
+    @patch(
+        "piper_train.ort_utils.onnxruntime.get_available_providers",
+        return_value=["CUDAExecutionProvider", "CPUExecutionProvider"],
+    )
+    def test_gpu_provider_with_cuda(self, _mock):
         providers = get_providers("gpu")
         assert "CUDAExecutionProvider" in providers
         assert "CPUExecutionProvider" in providers
-        assert providers.index("CUDAExecutionProvider") < providers.index(
-            "CPUExecutionProvider"
-        )
 
-    def test_auto_provider(self):
+    @patch(
+        "piper_train.ort_utils.onnxruntime.get_available_providers",
+        return_value=["CPUExecutionProvider"],
+    )
+    def test_gpu_provider_no_cuda_fallback(self, _mock):
+        providers = get_providers("gpu")
+        assert providers == ["CPUExecutionProvider"]
+
+    @patch(
+        "piper_train.ort_utils.onnxruntime.get_available_providers",
+        return_value=["CUDAExecutionProvider", "CPUExecutionProvider"],
+    )
+    def test_auto_provider_with_cuda(self, _mock):
         providers = get_providers("auto")
         assert "CUDAExecutionProvider" in providers
-        assert "CPUExecutionProvider" in providers
+
+    @patch(
+        "piper_train.ort_utils.onnxruntime.get_available_providers",
+        return_value=["CPUExecutionProvider"],
+    )
+    def test_auto_provider_no_cuda(self, _mock):
+        providers = get_providers("auto")
+        assert providers == ["CPUExecutionProvider"]
 
     def test_default_is_cpu(self):
         providers = get_providers()

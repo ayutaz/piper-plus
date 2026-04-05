@@ -215,13 +215,13 @@ class PiperVoice:
         with open(config_path, encoding="utf-8") as config_file:
             config_dict = json.load(config_file)
 
-        if _HAS_SHARED_ORT_UTILS:
-            # Use shared ORT utilities (avoids code duplication)
-            device = "gpu" if use_cuda else "cpu"
-            session = _shared_create_session_with_cache(model_path, device=device)
+        if _HAS_SHARED_ORT_UTILS and not use_cuda:
+            # CPU: use shared ORT utilities (avoids code duplication)
+            session = _shared_create_session_with_cache(model_path, device="cpu")
             _shared_warmup(session)
         else:
-            # Fallback: inline implementation (python_run standalone)
+            # CUDA or standalone: use inline implementation
+            # (preserves cudnn_conv_algo_search=HEURISTIC for CUDA EP)
             # Keep in sync with piper_train.ort_utils
             session = _load_session_inline(model_path, use_cuda=use_cuda)
             _warmup_session(session)

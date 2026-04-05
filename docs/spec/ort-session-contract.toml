@@ -4,8 +4,9 @@
 # (Rust, C#, C++, Python) must agree on. When changing any value here,
 # update all implementations and their tests accordingly.
 #
-# Cross-language consistency is verified by per-language unit tests that
-# assert their constants match these values.
+# This file serves as a design-time cross-language contract. Implementations
+# and tests are expected to be kept in sync with these values manually unless
+# and until automated contract-verification tests are added.
 #
 # Implementations:
 #   Rust:   src/rust/piper-core/src/engine.rs
