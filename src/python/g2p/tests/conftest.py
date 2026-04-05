@@ -1,6 +1,24 @@
 import pytest
 
 
+@pytest.fixture(autouse=True)
+def _clear_phonemize_cache():
+    """各テスト前後に音素化キャッシュをクリア."""
+    try:
+        from piper_plus_g2p.japanese import clear_phonemize_cache
+
+        clear_phonemize_cache()
+    except ImportError:
+        pass
+    yield
+    try:
+        from piper_plus_g2p.japanese import clear_phonemize_cache
+
+        clear_phonemize_cache()
+    except ImportError:
+        pass
+
+
 def _has_pyopenjtalk():
     try:
         import pyopenjtalk_plus  # noqa: F401

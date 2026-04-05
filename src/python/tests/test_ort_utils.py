@@ -152,6 +152,12 @@ class TestPiperIntraThreadsEnv:
         opts = create_session_options(intra_op_threads=1)
         assert opts.intra_op_num_threads == 3
 
+    @patch.dict("os.environ", {"PIPER_INTRA_THREADS": "not_a_number"})
+    def test_env_invalid_value_falls_through(self):
+        """不正な PIPER_INTRA_THREADS は無視され自動検出にフォールバック."""
+        opts = create_session_options()
+        assert opts.intra_op_num_threads >= 1
+
 
 @pytest.mark.unit
 class TestGetLogicalCoreCount:
@@ -458,6 +464,41 @@ class TestModelCache:
         # 元の不完全キャッシュは削除され、新しいキャッシュ + sentinel が作成される
         assert (tmp_path / "model.cpu.opt.onnx.ok").exists()
 
+    def test_cache_hit_load_failure_fallback(self, tmp_path):
+        """キャッシュファイル破損時にキャッシュ削除+再ビルドにフォールバック."""
+        model = tmp_path / "model.onnx"
+        model.write_bytes(b"dummy")
+        cache = tmp_path / "model.cpu.opt.onnx"
+        cache.write_bytes(b"corrupted")
+        sentinel = tmp_path / "model.cpu.opt.onnx.ok"
+        sentinel.write_text("ok")
+
+        call_count = 0
+        mock_session = MagicMock(spec=onnxruntime.InferenceSession)
+
+        def side_effect(path, sess_options=None, providers=None):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                # 1回目: キャッシュからロード → 失敗
+                raise RuntimeError("corrupted cache")
+            # 2回目: 元モデルからロード → 成功
+            if (
+                hasattr(sess_options, "optimized_model_filepath")
+                and sess_options.optimized_model_filepath
+            ):
+                Path(sess_options.optimized_model_filepath).write_bytes(b"rebuilt")
+            return mock_session
+
+        with patch(
+            "piper_train.ort_utils.onnxruntime.InferenceSession",
+            side_effect=side_effect,
+        ):
+            session = create_session_with_cache(model, device="cpu")
+
+        assert session is mock_session
+        assert call_count == 2  # 1回目失敗 + 2回目成功
+
     @patch.dict("os.environ", {"PIPER_DISABLE_CACHE": "1"})
     def test_disable_cache_env(self, tmp_path):
         """PIPER_DISABLE_CACHE=1 でキャッシュ生成なし."""
@@ -473,6 +514,36 @@ class TestModelCache:
 
         assert not (tmp_path / "model.cpu.opt.onnx").exists()
         assert not (tmp_path / "model.cpu.opt.onnx.ok").exists()
+
+    @patch.dict("os.environ", {"PIPER_DISABLE_CACHE": "true"})
+    def test_disable_cache_env_true(self, tmp_path):
+        """PIPER_DISABLE_CACHE=true でキャッシュ生成なし."""
+        model = tmp_path / "model.onnx"
+        model.write_bytes(b"dummy")
+        mock_session = MagicMock(spec=onnxruntime.InferenceSession)
+
+        with patch(
+            "piper_train.ort_utils.onnxruntime.InferenceSession",
+            return_value=mock_session,
+        ):
+            create_session_with_cache(model, device="cpu")
+
+        assert not (tmp_path / "model.cpu.opt.onnx").exists()
+
+    @patch.dict("os.environ", {"PIPER_DISABLE_CACHE": "yes"})
+    def test_disable_cache_env_yes(self, tmp_path):
+        """PIPER_DISABLE_CACHE=yes でキャッシュ生成なし."""
+        model = tmp_path / "model.onnx"
+        model.write_bytes(b"dummy")
+        mock_session = MagicMock(spec=onnxruntime.InferenceSession)
+
+        with patch(
+            "piper_train.ort_utils.onnxruntime.InferenceSession",
+            return_value=mock_session,
+        ):
+            create_session_with_cache(model, device="cpu")
+
+        assert not (tmp_path / "model.cpu.opt.onnx").exists()
 
 
 @pytest.mark.unit
