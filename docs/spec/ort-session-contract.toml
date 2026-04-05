@@ -62,12 +62,12 @@ disable_cache = "PIPER_DISABLE_CACHE"     # "1", "true", "yes" to disable
 intra_threads = "PIPER_INTRA_THREADS"     # integer, overrides auto-detect
 
 [env_vars.implementation_status]
-# Which implementations support each env var
-# ✓ = supported, - = not yet implemented
-#                    Rust  C#   C++  Python
-# PIPER_DISABLE_WARMUP  -    -    -     ✓     (Rust/C#/C++ use CLI --no-warmup)
-# PIPER_DISABLE_CACHE   -    -    -     ✓
-# PIPER_INTRA_THREADS   -    -    -     ✓     (C++ uses CLI --threads)
+# Which implementations support each control mechanism
+# ✓ = supported via env var, CLI = supported via CLI flag, - = not implemented
+#                        Rust    C#     C++    Python
+# warmup disable         CLI     CLI    CLI    ✓ (env)
+# cache disable          -       -      -      ✓ (env)
+# intra threads          -       -      CLI    ✓ (env)
 
 [phonemize_cache]
 # Japanese phonemization LRU cache (Python only, Phase 1)

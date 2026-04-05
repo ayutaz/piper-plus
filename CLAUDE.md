@@ -275,6 +275,33 @@ LibriTTS-R の音声キャッシュを Silero ONNX VAD から numpy エネルギ
 
 **実装:** `norm_audio/__init__.py`, `src/python/piper_train/tools/prepare_bilingual_dataset.py`
 
+### CPU 推論最適化 (Tier 1-2)
+
+4言語実装 (Python/Rust/C#/C++) の ONNX Runtime セッション設定を統一。全実装で同一パラメータを使用。
+
+**パラメータ仕様**: `docs/spec/ort-session-contract.toml`
+
+| 設定 | 値 | 全実装で統一 |
+|------|-----|------------|
+| graph_optimization_level | ORT_ENABLE_ALL | ✅ |
+| execution_mode | SEQUENTIAL | ✅ |
+| max_intra_threads | min(cores/2, 4) | ✅ |
+| inter_op_threads | 1 | ✅ |
+| dynamic_block_base | 4 | ✅ |
+| enable_cpu_mem_arena | true | ✅ |
+| enable_memory_pattern | true | ✅ |
+
+**Warmup**: 全実装でダミー推論 2 回 (100 phonemes, BOS=1/EOS=2/dummy=8, scales=[0.667, 1.0, 0.8])。初回推論の JIT 遅延 (500-800ms) を解消。
+
+**最適化モデルキャッシュ**: `.opt.onnx` + `.ok` センチネルファイル方式。2回目以降の起動で ORT グラフ最適化をスキップ。Rust/C#/Python で実装済み。
+
+**日本語音素化 LRU キャッシュ**: `@lru_cache(maxsize=2000)` で文単位キャッシュ。キャッシュヒット時 <1ms (vs 50-150ms uncached)。Python のみ。
+
+**CLIオプション**: `--no-warmup` (C++/Rust/C#)
+**環境変数**: `PIPER_DISABLE_WARMUP`, `PIPER_DISABLE_CACHE`, `PIPER_INTRA_THREADS` (Python)
+
+**実装**: `src/python/piper_train/ort_utils.py`, `src/cpp/piper.cpp` (`warmupModel()`, `buildInputTensors()`), `src/rust/piper-core/src/engine.rs`, `src/csharp/PiperPlus.Core/Inference/SessionFactory.cs`
+
 ### 疑問詞マーカー拡張 (Issue #204)
 
 日本語疑問文の種類を区別するマーカー: `?!` (強調疑問), `?.` (平叙疑問), `?~` (確認疑問)。
@@ -396,6 +423,8 @@ Rust によるONNX推論エンジン。ストリーミング、CUDA/CoreML/Direc
 | トークンマッパー | `src/python/piper_train/phonemize/token_mapper.py` |
 | ONNXエクスポート | `src/python/piper_train/export_onnx.py` |
 | 推論スクリプト | `src/python/piper_train/infer_onnx.py` |
+| ORT セッション管理 | `src/python/piper_train/ort_utils.py` |
+| 言語横断パラメータ仕様 | `docs/spec/ort-session-contract.toml` |
 | マルチリンガルPhonemizer | `src/python/piper_train/phonemize/multilingual.py` |
 | マルチリンガルIDマップ | `src/python/piper_train/phonemize/multilingual_id_map.py` |
 | バイリンガルPhonemizer | `src/python/piper_train/phonemize/bilingual.py` |

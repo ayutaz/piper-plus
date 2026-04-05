@@ -132,6 +132,30 @@ This document lists all environment variables that can be used to configure Pipe
   export PIPER_GPU_DEVICE_ID=1
   ```
 
+### PIPER_DISABLE_WARMUP
+
+ONNX Runtime の warmup (ダミー推論) を無効化する。`1`, `true`, `yes` のいずれかで無効化。デフォルトは有効 (warmup 実行)。
+
+- **対象**: Python 推論スクリプト (`infer_onnx.py`, `voice.py`, Docker inference, WebUI)
+- **用途**: 組込み環境での起動時間短縮、デバッグ
+- **設定例**: `PIPER_DISABLE_WARMUP=1`
+
+### PIPER_DISABLE_CACHE
+
+ONNX Runtime の最適化モデルキャッシュ (`.opt.onnx`) を無効化する。`1`, `true`, `yes` のいずれかで無効化。デフォルトは有効 (キャッシュ生成)。
+
+- **対象**: Python 推論スクリプト
+- **用途**: 読み取り専用ファイルシステム、CI 環境、デバッグ
+- **設定例**: `PIPER_DISABLE_CACHE=1`
+
+### PIPER_INTRA_THREADS
+
+ONNX Runtime の intra-op スレッド数を明示的に指定する。未設定の場合は `min(論理コア数/2, 4)` で自動計算。
+
+- **対象**: Python 推論スクリプト
+- **用途**: Docker `--cpus` 制約との組み合わせ、パフォーマンスチューニング
+- **設定例**: `PIPER_INTRA_THREADS=2`
+
 ### LD_LIBRARY_PATH (Linux)
 - **Description**: Library search path for shared libraries
 - **Usage**: May need to include piper/lib directory
