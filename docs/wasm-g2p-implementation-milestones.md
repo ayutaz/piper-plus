@@ -43,7 +43,7 @@ export class {Language}G2P {
 | 言語 | PUA エントリ数 | 主要トークン |
 |------|--------------|------------|
 | ES | 3 | rr (E01D), tʃ (E054), dʒ (E055) |
-| FR | 3 | ɛ̃ (E056), ɑ̃ (E057), ɔ̃ (E058) |
+| FR | 3 + 1共有 | ɛ̃ (E056), ɑ̃ (E057), ɔ̃ (E058), y_vowel (E01E, 共有) |
 | PT | 0 | (ES/FR の PUA を共有: tʃ, dʒ, 鼻母音は precomposed Unicode) |
 | ZH | 43 | tone1-5, aspirated, affricates, diphthongs |
 
