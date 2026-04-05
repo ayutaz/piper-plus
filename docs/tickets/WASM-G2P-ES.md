@@ -14,7 +14,7 @@
 - `"hola"` → `["ˈ", "o", "l", "a"]` (golden test exact match)
 - `"perro grande"` → PUA rr (`\uE01D`) トークン含む IPA 列
 - Rust/Python 実装と同等の phoneme_id 列を生成
-- golden test 3件 + 個別テスト 30+ 件が全通過
+- golden test 3件 + 個別テスト 40+ 件が全通過
 
 **非ゴール:**
 - liaison/elision 処理 (Python 固有機能、Rust にもない)
@@ -23,6 +23,8 @@
 ---
 
 ## 2. 実装する内容の詳細
+
+> **Note:** Rust 実装には 25 の関数がある。以下のタスク表に列挙したもの以外にも `accent_base()`, `is_vowel()`, `is_vowel_or_accented()`, `has_stress_accent()`, `chars_to_string()`, `phoneme_count_for_unit()`, `base_cons_of_unit()` 等のヘルパー関数が存在する。Rust ソース (`src/rust/piper-plus-g2p/src/spanish.rs`) を参照して全て移植すること。
 
 ### 2-1. テキスト正規化・トークン化
 
@@ -59,13 +61,17 @@ Unicode NFD 結合文字 (U+0301 acute, U+0303 tilde, U+0308 diaeresis) を NFC 
 | rr trill | `"perro"` | rr | E01D |
 | 語頭 r | `"rosa"` | rr | E01D |
 | ñ palatal | `"niño"` | ɲ | — |
-| b/v 異音 | `"lobo"` (母音間) | β | — |
-| d 異音 | `"todo"` (母音間) | ð | — |
-| g 異音 | `"lago"` (母音間) | ɣ | — |
+| b/v 異音 | `"lobo"` (母音間) → β, `"alba"` (l後) → b (stop), `"hambre"` (鼻音後) → b (stop), 語頭 → b (stop) | β / b | — |
+| d 異音 | `"todo"` (母音間) → ð, `"falda"` (l後) → d (stop), 鼻音後 → d (stop), 語頭 → d (stop) | ð / d | — |
+| g 異音 | `"lago"` (母音間) → ɣ, `"algo"` (l後) → ɡ (stop), 鼻音後 → ɡ (stop), 語頭 → ɡ (stop) | ɣ / ɡ | — |
 | qu → k | `"queso"` | k | — |
 | gu + e/i | `"guerra"` | ɡ (u無音) | — |
 | j, g+e/i | `"jota"`, `"gente"` | x | — |
 | h 黙字 | `"hola"` | (削除) | — |
+| r after l/n/s | `"honra"`, `"alrededor"` | rr (trill) | E01D |
+| gü + e/i (diaeresis) | `"güero"`, `"pingüino"` | ɡw | — |
+| word-final y | `"hoy"`, `"rey"` | i (母音) | — |
+| b/d/g after l → stop | `"alba"` (b), `"falda"` (d), `"algo"` (g) | b, d, ɡ (spirant化しない) | — |
 | ストレス | `"teléfono"` | ˈ 挿入 | — |
 
 **移植元:** `g2p_word()` (Rust L584-871, ~290行) → JS `g2pWord()` (~200行)
@@ -162,6 +168,12 @@ Rust の 27 テストケースを移植:
 | 複文 | `"Buenos dias amigo"` | 複数語処理 |
 | 空文字列 | `""` | 空配列 |
 | sc | `"piscina"` | 単一 `s` |
+| r after l/n/s | `"honra"` | PUA rr (E01D) |
+| gü diaeresis | `"pingüino"` | ɡw |
+| word-final y | `"hoy"` | i (母音) |
+| b after l | `"alba"` | b (stop, not β) |
+| x → ks | `"examen"` | k + s |
+| xc + e/i | `"excelente"` | s |
 
 ### E2E テスト
 
@@ -181,6 +193,7 @@ Rust の 27 テストケースを移植:
 | 二重母音 vs ヒアトゥスの判定 | 音節分割で誤判定 → ストレス位置ずれ | Rust テストの全ケースを移植して検証 |
 | `x` の処理 | 位置依存 (語頭 `ks`, 語中 `ks`) | Rust と同一ルールを移植 |
 | ˈ 挿入位置 | 多音節語で音素数カウントずれ | `phonemeCountForUnit()` を正確に移植 |
+| g2pWord と segmentGraphemes の二重字リスト不一致 | 両関数で ch/ll/rr/qu/gu/sc/xc を独立に認識しており、片方のみ修正すると不整合 | 二重字リストを定数 (`DIGRAPHS`) として共有 |
 
 ### レビュー項目
 
