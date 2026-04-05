@@ -53,6 +53,8 @@ uv run python -m piper_train \
   --default_root_dir /path/to/output
 ```
 
+> **⚠️ 注意:** V100 GPU では `--precision 16-mixed` は backward pass が極端に遅くなる問題があります。V100 では `--precision 32-true` を推奨します。A100 以降の GPU では `16-mixed` が利用可能です。
+
 WavLM が有効な場合、GPUメモリが約1-2GB増加するため、`--batch-size` を従来より下げる必要がある場合があります（例: 20 → 12）。
 
 ### WavLM を無効化する場合

@@ -163,7 +163,7 @@ python -m piper --download-model tsukuyomi
 python -m piper --download-model ja_JP-tsukuyomi-chan-medium
 
 # ダウンロード後に使用
-python -m piper --model ja_JP-tsukuyomi-chan-medium --text "こんにちは" -f output.wav
+python -m piper --model ja_JP-tsukuyomi-chan-medium -f output.wav "こんにちは"
 ```
 
 ### WebUI

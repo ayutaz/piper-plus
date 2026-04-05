@@ -105,8 +105,8 @@ export class PiperPlus {
   private constructor();
 
   /**
-   * Initialize PiperPlus. Downloads (and caches) the ONNX model, config,
-   * OpenJTalk dictionary, and HTS voice, then creates an ONNX inference session.
+   * Initialize PiperPlus. Downloads (and caches) the ONNX model and config,
+   * initializes the WASM phonemizer, then creates an ONNX inference session.
    */
   static initialize(options: PiperPlusOptions): Promise<PiperPlus>;
 
@@ -220,6 +220,24 @@ export class ModelManager {
     key: string,
     options?: { onProgress?: (info: ModelDownloadProgress) => void },
   ): Promise<ArrayBuffer>;
+
+  /**
+   * Resolve a model identifier to concrete URLs for the ONNX model and its
+   * companion config JSON.
+   *
+   * Accepted formats:
+   *   - Registry shortcut: "tsukuyomi"
+   *   - HuggingFace repo:  "ayousanz/piper-plus-tsukuyomi-chan"
+   *   - Direct URL:        "https://example.com/model.onnx"
+   *
+   * @param modelNameOrUrl - Registry shortcut, HuggingFace repo, or direct URL.
+   */
+  resolveUrls(modelNameOrUrl: string): Promise<{
+    modelUrl: string;
+    configUrl: string;
+    configFallbackUrl: string | null;
+    cacheKey: string;
+  }>;
 
   /** Remove all cached models and dictionaries. */
   clearCache(): Promise<void>;

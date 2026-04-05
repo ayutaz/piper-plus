@@ -24,8 +24,8 @@ const jaTokens = g2p.phonemize('こんにちは');
 // => ["k", "o", "N_n", "n", "i", "ch", "i", "h", "a"]
 
 // Encode for Piper TTS inference
-import { PiperEncoder } from '@piper-plus/g2p/encode';
-const encoder = new PiperEncoder(config);
+import { Encoder } from '@piper-plus/g2p/encode';
+const encoder = new Encoder(config);
 const ids = encoder.encode(tokens);
 ```
 
@@ -90,7 +90,7 @@ Converts text to IPA token array. Language is auto-detected if omitted.
 
 Returns `{ tokens, prosody }` with per-token prosody features (Japanese only).
 
-### `PiperEncoder.encode(tokens)`
+### `Encoder.encode(tokens)`
 
 Encodes IPA tokens to Piper-compatible phoneme IDs with BOS/EOS/padding.
 

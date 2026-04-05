@@ -1,7 +1,7 @@
 // Package piperplus provides Go bindings for Piper Plus text-to-speech synthesis.
 //
 // Piper Plus is a neural TTS system using the VITS architecture, supporting
-// 6 languages (Japanese, English, Chinese, Spanish, French, Portuguese).
+// 8 languages (Japanese, English, Chinese, Korean, Spanish, French, Portuguese, Swedish).
 // This package wraps ONNX Runtime for inference via github.com/yalue/onnxruntime_go.
 //
 // # Architecture

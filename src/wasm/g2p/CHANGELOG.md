@@ -16,7 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Chinese G2P with pinyin-based phonemization
 - Spanish, French, Portuguese G2P (rule-based, zero external dependencies)
 - `UnicodeLanguageDetector` for automatic language detection
-- `PiperEncoder` for Piper TTS-compatible phoneme ID encoding
+- `Encoder` for Piper TTS-compatible phoneme ID encoding
 - `CustomDictionary` for user-defined pronunciation overrides (JSON v1.0/v2.0)
 - `DictLoader` for OpenJTalk dictionary management (download + IndexedDB cache)
 - Per-language subpath exports (`@piper-plus/g2p/ja`, `@piper-plus/g2p/en`, etc.)
