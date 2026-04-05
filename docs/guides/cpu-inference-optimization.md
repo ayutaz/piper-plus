@@ -149,15 +149,22 @@ sherpa-onnx でも INT8 量子化 TTS モデルが FP32 の数百倍遅い報告
 | 3 | `session.dynamic_block_base=4` 追加 | レイテンシ分散低減 | 全実装 | **完了** (PR #317) |
 | 4 | メモリアリーナ・パターン有効化 | RTF 5-15% 改善 | Rust/C# | **完了** (PR #317) |
 
-### Tier 2: 中期施策 (再学習不要、検証必要)
+### Tier 2: Quick Wins (コード変更のみ、再学習不要)
+
+| # | 施策 | 期待効果 | 対象 | ステータス |
+|---|------|---------|------|----------|
+| 5 | Python/C++ Warmup 追加 | 初回推論 500-800ms 安定化、RTF stdev ~30% 低減 | Python (5箇所) + C++ | **完了** |
+| 6 | Python 最適化モデルキャッシュ (.opt.onnx) | 2回目以降の起動 500-800ms 短縮 | Python | **完了** |
+| 7 | 日本語音素化キャッシュ | 繰り返し音素化 10-50x 高速化 (50-150ms → 1-5ms) | Python | **完了** |
+
+### Tier 3: 中期施策 (再学習不要、検証必要)
 
 | # | 施策 | 期待改善 | 対象 | 実装コスト |
 |---|------|---------|------|----------|
-| 6 | CoreML EP ベンチマーク検証 | RTF 50-300% 改善の可能性 | macOS | 中 |
-| 7 | OpenVINO EP 対応追加 | RTF 50-200% 改善の可能性 | Intel CPU | 中 |
-| 8 | 静的 INT8 量子化 (選択的、calibration 付き) | RTF 30-80% 改善 | x86 VNNI | 高 |
-| 9 | 音素化キャッシュ (特に日本語) | 音素化 50% 短縮 | 全実装 | 中 |
-| 10 | ストリーミング推論改善 (文分割最適化) | TTFA 50-80% 短縮 | 全実装 | 中 |
+| 8 | CoreML EP ベンチマーク検証 | RTF 50-300% 改善の可能性 | macOS | 中 |
+| 9 | OpenVINO EP 対応追加 | RTF 50-200% 改善の可能性 | Intel CPU | 中 |
+| 10 | 静的 INT8 量子化 (選択的、calibration 付き) | RTF 30-80% 改善 | x86 VNNI | 高 |
+| 11 | ストリーミング推論改善 (文分割最適化) | TTFA 50-80% 短縮 | 全実装 | 中 |
 
 ### Tier 3: 長期施策 (再学習必要、最大効果)
 
@@ -185,9 +192,10 @@ sherpa-onnx でも INT8 量子化 TTS モデルが FP32 の数百倍遅い報告
 | メモリアリーナ (cpu_mem_arena) | OK (`apply_cpu_ep`) | OK | OK (デフォルト) | OK |
 | メモリパターン (mem_pattern) | OK | OK | OK (デフォルト) | OK |
 | メモリ再利用 (mem_reuse) | - | - | - | OK |
-| 最適化モデルキャッシュ (.opt.onnx) | OK | OK | N/A | **未実装** |
-| センチネルファイル (.ok) | OK | OK | N/A | **未実装** |
-| Warmup 推論 (2回) | OK | OK | **未実装** | **未実装** |
+| 最適化モデルキャッシュ (.opt.onnx) | OK | OK | N/A | OK |
+| センチネルファイル (.ok) | OK | OK | N/A | OK |
+| Warmup 推論 (2回) | OK | OK | OK | OK |
+| 日本語音素化 LRU キャッシュ | - | - | - | OK (maxsize=2000) |
 | Docker cgroup 対応 | OK | OK (.NET 6+) | - | OK (`sched_getaffinity`) |
 | 環境変数オーバーライド | - | - | `--num-threads` | `PIPER_INTRA_THREADS` |
 | GPU EP (CUDA/CoreML/DirectML) | OK | OK (CUDA) | OK | OK (CUDA) |
