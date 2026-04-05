@@ -116,7 +116,8 @@ impl OnnxEngine {
         // COLD-M5 + F1/D5: 最適化済みモデルキャッシュ
         // キャッシュパスにデバイス名を含める (D5: CPU/CUDA 混用防止)。
         // センチネルファイル (.ok) で書き込み完了を保証 (F1: 中断耐性)。
-        let device_label = device_type.to_string().replace(':', ".");
+        // コロンを除去: "cuda:0" → "cuda0" (C#/Python と統一)
+        let device_label = device_type.to_string().replace(':', "");
         let cache_ext = format!("{}.opt.onnx", device_label);
         let optimized_path = model_path.with_extension(&cache_ext);
         let sentinel_path = {
@@ -126,73 +127,53 @@ impl OnnxEngine {
         };
 
         // キャッシュ有効: .opt.onnx と .ok の両方が存在する場合のみ
-        let use_cached = optimized_path.exists() && sentinel_path.exists();
+        let mut use_cached = optimized_path.exists() && sentinel_path.exists();
 
-        let (load_path, use_cached) = if use_cached {
-            tracing::info!("Loading pre-optimized model from {:?}", optimized_path);
-            (optimized_path.clone(), true)
-        } else {
-            // 不完全なキャッシュがあれば削除
-            if optimized_path.exists() && !sentinel_path.exists() {
-                tracing::warn!(
-                    "Removing incomplete cache {:?} (missing sentinel)",
-                    optimized_path
-                );
-                let _ = std::fs::remove_file(&optimized_path);
-            }
-            (model_path.to_path_buf(), false)
-        };
+        // 不完全なキャッシュがあれば削除
+        if !use_cached && optimized_path.exists() && !sentinel_path.exists() {
+            tracing::warn!(
+                "Removing incomplete cache {:?} (missing sentinel)",
+                optimized_path
+            );
+            let _ = std::fs::remove_file(&optimized_path);
+        }
 
-        let mut builder = Session::builder()
-            .map_err(|e| PiperError::ModelLoad(e.to_string()))?
-            .with_intra_threads(num_intra_threads)
-            .map_err(|e| PiperError::ModelLoad(format!("intra_threads: {e}")))?
-            .with_inter_threads(1)
-            .map_err(|e| PiperError::ModelLoad(format!("inter_threads: {e}")))?
-            // メモリパターン有効化: 推論パターンを記憶してアロケーションを最適化
-            .with_memory_pattern(true)
-            .map_err(|e| PiperError::ModelLoad(format!("memory_pattern: {e}")))?
-            // 動的ブロックサイズ: intra-op スレッドの作業分割を細粒度化しレイテンシ分散を低減
-            .with_dynamic_block_base(4)
-            .map_err(|e| PiperError::ModelLoad(format!("dynamic_block_base: {e}")))?;
-
+        // キャッシュヒット時のロード試行。失敗したらキャッシュを削除して通常パスにフォールスルー。
         if use_cached {
-            // 最適化済みモデルを直接ロード: 再最適化をスキップ
-            builder = builder
-                .with_optimization_level(GraphOptimizationLevel::Disable)
-                .map_err(|e| PiperError::ModelLoad(format!("optimization_level: {e}")))?;
-        } else {
-            // 初回: 最適化を実行し、結果を .opt.onnx に保存
-            // 書き込み権限がない場合は warning のみでフォールバック
-            match builder.with_optimized_model_path(&optimized_path) {
-                Ok(b) => {
-                    builder = b;
-                    tracing::info!("ORT will save optimized model to {:?}", optimized_path);
+            tracing::info!("Loading pre-optimized model from {:?}", optimized_path);
+            match Self::build_session(&optimized_path, num_intra_threads, &device_type, true, None)
+            {
+                Ok((session, actual_device)) => {
+                    tracing::info!("Using device: {}", actual_device);
+                    return Self::finish_load(session, config);
                 }
                 Err(e) => {
-                    let msg = e.to_string();
-                    builder = e.recover();
                     tracing::warn!(
-                        "Could not set optimized model path {:?}: {} (continuing without cache)",
+                        "Failed to load cached model {:?}, rebuilding: {}",
                         optimized_path,
-                        msg
+                        e
                     );
+                    let _ = std::fs::remove_file(&optimized_path);
+                    let _ = std::fs::remove_file(&sentinel_path);
+                    use_cached = false;
                 }
             }
         }
 
-        let (mut builder, actual_device) =
-            crate::gpu::configure_session_builder(builder, &device_type)
-                .map_err(|e| PiperError::ModelLoad(format!("device config: {e}")))?;
+        // 通常パス: 元モデルをロードし、最適化結果をキャッシュに保存
+        let _ = use_cached; // suppress unused warning after fallthrough
+        let (session, actual_device) = Self::build_session(
+            model_path,
+            num_intra_threads,
+            &device_type,
+            false,
+            Some(&optimized_path),
+        )?;
 
         tracing::info!("Using device: {}", actual_device);
 
-        let session = builder
-            .commit_from_file(&load_path)
-            .map_err(|e| PiperError::ModelLoad(e.to_string()))?;
-
         // F1: セッション作成成功後にセンチネルファイルを書き込む
-        if !use_cached && optimized_path.exists() {
+        if optimized_path.exists() {
             if let Err(e) = std::fs::write(&sentinel_path, b"ok") {
                 tracing::warn!("Failed to write sentinel {:?}: {}", sentinel_path, e);
             } else {
@@ -200,6 +181,74 @@ impl OnnxEngine {
             }
         }
 
+        Self::finish_load(session, config)
+    }
+
+    /// SessionBuilder を構築し、モデルファイルからセッションをコミットする。
+    ///
+    /// `cached` が `true` の場合は最適化をスキップし、`false` の場合は
+    /// `cache_save_path` に最適化結果を保存する。
+    fn build_session(
+        model_path: &Path,
+        num_intra_threads: usize,
+        device_type: &crate::gpu::DeviceType,
+        cached: bool,
+        cache_save_path: Option<&std::path::Path>,
+    ) -> Result<(Session, crate::gpu::DeviceType), PiperError> {
+        let mut builder = Session::builder()
+            .map_err(|e| PiperError::ModelLoad(e.to_string()))?
+            .with_intra_threads(num_intra_threads)
+            .map_err(|e| PiperError::ModelLoad(format!("intra_threads: {e}")))?
+            .with_inter_threads(1)
+            .map_err(|e| PiperError::ModelLoad(format!("inter_threads: {e}")))?
+            // Sequential 実行モード: C#/C++/Python と統一。VITS は分岐が少なく並列化のメリットが薄い。
+            .with_parallel_execution(false)
+            .map_err(|e| PiperError::ModelLoad(format!("execution_mode: {e}")))?
+            // メモリパターン有効化: 推論パターンを記憶してアロケーションを最適化
+            .with_memory_pattern(true)
+            .map_err(|e| PiperError::ModelLoad(format!("memory_pattern: {e}")))?
+            // 動的ブロックサイズ: intra-op スレッドの作業分割を細粒度化しレイテンシ分散を低減
+            .with_dynamic_block_base(4)
+            .map_err(|e| PiperError::ModelLoad(format!("dynamic_block_base: {e}")))?;
+
+        if cached {
+            // 最適化済みモデルを直接ロード: 再最適化をスキップ
+            builder = builder
+                .with_optimization_level(GraphOptimizationLevel::Disable)
+                .map_err(|e| PiperError::ModelLoad(format!("optimization_level: {e}")))?;
+        } else if let Some(save_path) = cache_save_path {
+            // 初回: 最適化を実行し、結果を .opt.onnx に保存
+            // 書き込み権限がない場合は warning のみでフォールバック
+            match builder.with_optimized_model_path(save_path) {
+                Ok(b) => {
+                    builder = b;
+                    tracing::info!("ORT will save optimized model to {:?}", save_path);
+                }
+                Err(e) => {
+                    let msg = e.to_string();
+                    builder = e.recover();
+                    tracing::warn!(
+                        "Could not set optimized model path {:?}: {} (continuing without cache)",
+                        save_path,
+                        msg
+                    );
+                }
+            }
+        }
+
+        let (mut builder, actual_device) =
+            crate::gpu::configure_session_builder(builder, device_type)
+                .map_err(|e| PiperError::ModelLoad(format!("device config: {e}")))?;
+
+        let session = builder
+            .commit_from_file(model_path)
+            .map_err(|e| PiperError::ModelLoad(e.to_string()))?;
+
+        Ok((session, actual_device))
+    }
+
+    /// セッションからモデル能力を検出し、`OnnxEngine` を構築する。
+    fn finish_load(session: Session, config: &VoiceConfig) -> Result<Self, PiperError> {
         // モデルの入出力ノード名から能力を自動検出
         let input_names: Vec<String> = session
             .inputs()
@@ -650,12 +699,12 @@ mod tests {
     #[test]
     fn test_optimized_model_path_construction_cuda() {
         let model_path = PathBuf::from("/data/models/test.onnx");
-        // DeviceType::Cuda { device_id: 0 } displays as "cuda:0", replace ':' -> '.'
-        let device_label = "cuda:0".replace(':', ".");
+        // DeviceType::Cuda { device_id: 0 } displays as "cuda:0", remove ':'
+        let device_label = "cuda:0".replace(':', "");
         let opt_path = build_cache_path(&model_path, &device_label);
         assert_eq!(
             opt_path.to_str().unwrap(),
-            "/data/models/test.cuda.0.opt.onnx"
+            "/data/models/test.cuda0.opt.onnx"
         );
     }
 
@@ -715,11 +764,12 @@ mod tests {
     }
 
     #[test]
-    fn test_device_label_colon_replacement() {
-        // DeviceType display produces "cuda:0", we replace ':' -> '.'
-        let label = "cuda:0".replace(':', ".");
-        assert_eq!(label, "cuda.0");
+    fn test_device_label_colon_removal() {
+        // DeviceType display produces "cuda:0", we remove ':' (C#/Python unified)
+        let label = "cuda:0".replace(':', "");
+        assert_eq!(label, "cuda0");
         assert!(!label.contains(':'));
+        assert!(!label.contains('.'));
     }
 
     // -----------------------------------------------------------------------
@@ -727,15 +777,17 @@ mod tests {
     // -----------------------------------------------------------------------
 
     #[test]
-    fn test_session_builder_with_memory_pattern_and_dynamic_block() {
-        // SessionBuilder に memory_pattern(true) と dynamic_block_base(4) を設定して
-        // エラーが発生しないことを検証する。
+    fn test_session_builder_with_all_options() {
+        // SessionBuilder に parallel_execution(false), memory_pattern(true),
+        // dynamic_block_base(4) を設定してエラーが発生しないことを検証する。
         let builder = Session::builder()
             .expect("session builder")
             .with_intra_threads(1)
             .expect("intra_threads")
             .with_inter_threads(1)
             .expect("inter_threads")
+            .with_parallel_execution(false)
+            .expect("parallel_execution")
             .with_memory_pattern(true)
             .expect("memory_pattern")
             .with_dynamic_block_base(4)
@@ -752,13 +804,13 @@ mod tests {
 
     #[test]
     fn test_device_label_directml() {
-        let label = "directml:1".replace(':', ".");
-        assert_eq!(label, "directml.1");
+        let label = "directml:1".replace(':', "");
+        assert_eq!(label, "directml1");
         let model_path = PathBuf::from("/data/models/test.onnx");
         let opt_path = build_cache_path(&model_path, &label);
         assert_eq!(
             opt_path.to_str().unwrap(),
-            "/data/models/test.directml.1.opt.onnx"
+            "/data/models/test.directml1.opt.onnx"
         );
     }
 
