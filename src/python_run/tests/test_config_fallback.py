@@ -17,7 +17,7 @@ import json
 import shutil
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest
@@ -52,6 +52,38 @@ def _copy_model(tmp_path: Path) -> Path:
     dest = tmp_path / "model.onnx"
     shutil.copy2(_TEST_MODEL, dest)
     return dest
+
+
+class TestSessionOptions:
+    """PiperVoice.load() が作成する SessionOptions の設定値テスト."""
+
+    @pytest.mark.unit
+    def test_session_options(self, tmp_path, config_dict):
+        """load() が InferenceSession に渡す sess_options の全設定を検証."""
+        model_path = _copy_model(tmp_path)
+        config_path = tmp_path / "model.onnx.json"
+        config_path.write_text(json.dumps(config_dict), encoding="utf-8")
+
+        # Mock InferenceSession to capture the sess_options argument
+        with patch("piper.voice.onnxruntime.InferenceSession") as mock_cls:
+            mock_cls.return_value = MagicMock()
+            PiperVoice.load(model_path)
+
+            mock_cls.assert_called_once()
+            call_kwargs = mock_cls.call_args
+            opts = call_kwargs.kwargs.get("sess_options")
+            assert opts is not None, "sess_options was not passed to InferenceSession"
+
+            assert (
+                opts.graph_optimization_level
+                == ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+            )
+            assert opts.execution_mode == ort.ExecutionMode.ORT_SEQUENTIAL
+            assert opts.enable_cpu_mem_arena is True
+            assert opts.enable_mem_pattern is True
+            assert opts.enable_mem_reuse is True
+            assert opts.get_session_config_entry("session.dynamic_block_base") == "4"
+            assert opts.intra_op_num_threads >= 1
 
 
 class TestConfigFallback:
@@ -244,9 +276,7 @@ class TestZeroNoiseScale:
         assert cfg.length_scale == 0.0, (
             f"length_scale should be 0.0, got {cfg.length_scale}"
         )
-        assert cfg.noise_w == 0.0, (
-            f"noise_w should be 0.0, got {cfg.noise_w}"
-        )
+        assert cfg.noise_w == 0.0, f"noise_w should be 0.0, got {cfg.noise_w}"
 
     @pytest.mark.unit
     def test_none_noise_scale_uses_default(self):
@@ -315,9 +345,11 @@ class TestMultilingualPhonemizerImport:
 
         with patch.dict(
             "sys.modules",
-            {"piper_train.phonemize.multilingual": MagicMock(
-                MultilingualPhonemizer=mock_mp_class,
-            )},
+            {
+                "piper_train.phonemize.multilingual": MagicMock(
+                    MultilingualPhonemizer=mock_mp_class,
+                )
+            },
         ):
             result = voice.phonemize("test")
 
@@ -364,9 +396,11 @@ class TestMultilingualPhonemizerImport:
 
         with patch.dict(
             "sys.modules",
-            {"piper_train.phonemize.multilingual": MagicMock(
-                MultilingualPhonemizer=mock_mp_class,
-            )},
+            {
+                "piper_train.phonemize.multilingual": MagicMock(
+                    MultilingualPhonemizer=mock_mp_class,
+                )
+            },
         ):
             result = voice.phonemize("test")
 

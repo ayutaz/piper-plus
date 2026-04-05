@@ -2973,17 +2973,15 @@ dependencies = [
 [package.optional-dependencies]
 inference = [
     { name = "fastapi" },
-    { name = "g2p-en" },
     { name = "onnxruntime" },
-    { name = "pyopenjtalk-plus" },
+    { name = "piper-plus-g2p", extra = ["all"] },
     { name = "soundfile" },
     { name = "uvicorn" },
 ]
 inference-gpu = [
     { name = "fastapi" },
-    { name = "g2p-en" },
     { name = "onnxruntime-gpu" },
-    { name = "pyopenjtalk-plus" },
+    { name = "piper-plus-g2p", extra = ["all"] },
     { name = "soundfile" },
     { name = "uvicorn" },
 ]
@@ -3032,8 +3030,6 @@ requires-dist = [
     { name = "einops", marker = "extra == 'train'", specifier = ">=0.7" },
     { name = "fastapi", marker = "extra == 'inference'", specifier = ">=0.110" },
     { name = "fastapi", marker = "extra == 'inference-gpu'", specifier = ">=0.110" },
-    { name = "g2p-en", marker = "extra == 'inference'", specifier = ">=2.1.0" },
-    { name = "g2p-en", marker = "extra == 'inference-gpu'", specifier = ">=2.1.0" },
     { name = "g2p-en", marker = "extra == 'train'", specifier = ">=2.1.0" },
     { name = "librosa", marker = "extra == 'train'", specifier = ">=0.10" },
     { name = "matplotlib", marker = "extra == 'train'", specifier = ">=3.8" },
@@ -3048,10 +3044,10 @@ requires-dist = [
     { name = "onnxscript", marker = "extra == 'train'", specifier = ">=0.6.2" },
     { name = "onnxsim-prebuilt", marker = "extra == 'train'" },
     { name = "piper-plus-g2p", editable = "src/python/g2p" },
+    { name = "piper-plus-g2p", extras = ["all"], marker = "extra == 'inference'", editable = "src/python/g2p" },
+    { name = "piper-plus-g2p", extras = ["all"], marker = "extra == 'inference-gpu'", editable = "src/python/g2p" },
     { name = "piper-plus-g2p", extras = ["all"], marker = "extra == 'train'", editable = "src/python/g2p" },
     { name = "psutil", marker = "extra == 'test'", specifier = ">=5.9" },
-    { name = "pyopenjtalk-plus", marker = "extra == 'inference'" },
-    { name = "pyopenjtalk-plus", marker = "extra == 'inference-gpu'" },
     { name = "pyopenjtalk-plus", marker = "extra == 'train'" },
     { name = "pytest", marker = "extra == 'test'", specifier = ">=7.4" },
     { name = "pytest-cov", marker = "extra == 'test'", specifier = ">=4.1" },

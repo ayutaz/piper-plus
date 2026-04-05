@@ -280,4 +280,70 @@ public sealed class SessionFactoryTests
         var label = useCuda ? $"cuda{deviceId}" : "cpu";
         Assert.Equal("cuda1", label);
     }
+
+    // ================================================================
+    // ConfigureSessionOptions — tests for the extracted internal method
+    // that configures SessionOptions with VITS-optimized settings.
+    // ================================================================
+
+    [Fact]
+    public void ConfigureSessionOptions_GraphOptimizationLevel_IsEnableAll()
+    {
+        using var options = SessionFactory.ConfigureSessionOptions();
+        Assert.Equal(GraphOptimizationLevel.ORT_ENABLE_ALL, options.GraphOptimizationLevel);
+    }
+
+    [Fact]
+    public void ConfigureSessionOptions_ExecutionMode_IsSequential()
+    {
+        using var options = SessionFactory.ConfigureSessionOptions();
+        Assert.Equal(ExecutionMode.ORT_SEQUENTIAL, options.ExecutionMode);
+    }
+
+    [Fact]
+    public void ConfigureSessionOptions_IntraOpNumThreads_IsHalfProcessorsCappedAt4()
+    {
+        using var options = SessionFactory.ConfigureSessionOptions();
+
+        int expected = Math.Max(Math.Min(Environment.ProcessorCount / 2, 4), 1);
+        Assert.Equal(expected, options.IntraOpNumThreads);
+    }
+
+    [Fact]
+    public void ConfigureSessionOptions_IntraOpNumThreads_AtLeastOne()
+    {
+        using var options = SessionFactory.ConfigureSessionOptions();
+        Assert.True(options.IntraOpNumThreads >= 1,
+            $"IntraOpNumThreads should be >= 1, but was {options.IntraOpNumThreads}");
+    }
+
+    [Fact]
+    public void ConfigureSessionOptions_InterOpNumThreads_IsOne()
+    {
+        using var options = SessionFactory.ConfigureSessionOptions();
+        Assert.Equal(1, options.InterOpNumThreads);
+    }
+
+    [Fact]
+    public void ConfigureSessionOptions_EnableCpuMemArena_IsTrue()
+    {
+        using var options = SessionFactory.ConfigureSessionOptions();
+        Assert.True(options.EnableCpuMemArena);
+    }
+
+    [Fact]
+    public void ConfigureSessionOptions_EnableMemoryPattern_IsTrue()
+    {
+        using var options = SessionFactory.ConfigureSessionOptions();
+        Assert.True(options.EnableMemoryPattern);
+    }
+
+    [Fact]
+    public void ConfigureSessionOptions_DynamicBlockBase_DoesNotThrow()
+    {
+        // ORT C# API does not expose a getter for session config entries,
+        // so we verify that ConfigureSessionOptions completes without throwing.
+        // The dynamic_block_base entry is set inside the method.
+        using var options = SessionFactory.ConfigureSessionOptions();
+    }
 }
