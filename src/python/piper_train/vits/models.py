@@ -8,6 +8,7 @@ from torch.nn.utils import remove_weight_norm, spectral_norm, weight_norm
 
 from . import attentions, commons, modules, monotonic_align
 from .commons import get_padding, init_weights
+from .mb_istft import MBiSTFTGenerator
 
 
 class InferOutput(NamedTuple):
@@ -777,6 +778,7 @@ class SynthesizerTrn(nn.Module):
         use_sdp: bool = True,
         prosody_dim: int = 16,
         prosody_language_ids: "set[int] | None" = None,
+        mb_istft: bool = False,
     ):
         super().__init__()
         self.n_vocab = n_vocab
@@ -806,6 +808,7 @@ class SynthesizerTrn(nn.Module):
         )
 
         self.use_sdp = use_sdp
+        self.mb_istft = mb_istft
 
         self.enc_p = TextEncoder(
             n_vocab,
@@ -818,16 +821,28 @@ class SynthesizerTrn(nn.Module):
             p_dropout,
             gin_channels=gin_channels,
         )
-        self.dec = Generator(
-            inter_channels,
-            resblock,
-            resblock_kernel_sizes,
-            resblock_dilation_sizes,
-            upsample_rates,
-            upsample_initial_channel,
-            upsample_kernel_sizes,
-            gin_channels=gin_channels,
-        )
+        if mb_istft:
+            self.dec = MBiSTFTGenerator(
+                initial_channel=inter_channels,
+                resblock=resblock,
+                resblock_kernel_sizes=resblock_kernel_sizes,
+                resblock_dilation_sizes=resblock_dilation_sizes,
+                upsample_rates=upsample_rates,
+                upsample_initial_channel=upsample_initial_channel,
+                upsample_kernel_sizes=upsample_kernel_sizes,
+                gin_channels=gin_channels,
+            )
+        else:
+            self.dec = Generator(
+                inter_channels,
+                resblock,
+                resblock_kernel_sizes,
+                resblock_dilation_sizes,
+                upsample_rates,
+                upsample_initial_channel,
+                upsample_kernel_sizes,
+                gin_channels=gin_channels,
+            )
         self.enc_q = PosteriorEncoder(
             spec_channels,
             inter_channels,
@@ -1014,7 +1029,11 @@ class SynthesizerTrn(nn.Module):
         z_slice, ids_slice = commons.rand_slice_segments(
             z, y_lengths, self.segment_size
         )
-        o = self.dec(z_slice, g=g)
+        if self.mb_istft:
+            o, o_mb = self.dec(z_slice, g=g)
+        else:
+            o = self.dec(z_slice, g=g)
+            o_mb = None
         return (
             o,
             l_length,
@@ -1023,6 +1042,7 @@ class SynthesizerTrn(nn.Module):
             x_mask,
             y_mask,
             (z, z_p, m_p, logs_p, m_q, logs_q),
+            o_mb,
         )
 
     def _ensure_spk_proj(self, emb_dim: int) -> nn.Linear:
@@ -1142,7 +1162,11 @@ class SynthesizerTrn(nn.Module):
         else:
             z_p = m_p + torch.randn_like(m_p) * torch.exp(logs_p) * noise_scale
         z = self.flow(z_p, y_mask, g=g, reverse=True)
-        o = self.dec((z * y_mask)[:, :, :max_len], g=g)
+        dec_out = self.dec((z * y_mask)[:, :, :max_len], g=g)
+        if self.mb_istft and isinstance(dec_out, tuple):
+            o = dec_out[0]
+        else:
+            o = dec_out
 
         return InferOutput(o, attn, y_mask, (z, z_p, m_p, logs_p), durations)
 
@@ -1153,5 +1177,9 @@ class SynthesizerTrn(nn.Module):
         z, m_q, logs_q, y_mask = self.enc_q(y, y_lengths, g=g_src)
         z_p = self.flow(z, y_mask, g=g_src)
         z_hat = self.flow(z_p, y_mask, g=g_tgt, reverse=True)
-        o_hat = self.dec(z_hat * y_mask, g=g_tgt)
+        dec_out = self.dec(z_hat * y_mask, g=g_tgt)
+        if self.mb_istft and isinstance(dec_out, tuple):
+            o_hat = dec_out[0]
+        else:
+            o_hat = dec_out
         return o_hat, y_mask, (z, z_p, z_hat)

@@ -228,6 +228,20 @@ def create_parser():
         help="Freeze Duration Predictor parameters during training. "
         "Use for fine-tuning to prevent duration prediction degradation.",
     )
+    # MB-iSTFT Generator options
+    parser.add_argument(
+        "--mb-istft",
+        action="store_true",
+        default=False,
+        help="Use MB-iSTFT Generator instead of HiFi-GAN. "
+        "Replaces final upsampling with iSTFT + PQMF for ~1.2x inference speedup.",
+    )
+    parser.add_argument(
+        "--c-sub-stft",
+        type=float,
+        default=1.0,
+        help="Sub-band STFT loss weight for MB-iSTFT training (default: 1.0)",
+    )
     # Trainer arguments
     parser.add_argument("--accelerator", default="gpu", help="Accelerator to use")
     parser.add_argument("--devices", type=int, default=1, help="Number of devices")
@@ -503,6 +517,17 @@ def main():
     trainer = _build_trainer(args, loggers, num_gpus, num_speakers)
 
     dict_args = vars(args)
+
+    # MB-iSTFT: override upsample rates/kernel sizes
+    if args.mb_istft:
+        if args.quality == "high":
+            parser.error("--mb-istft is not supported with --quality high")
+        dict_args["mb_istft"] = True
+        dict_args["upsample_rates"] = (4, 4)
+        dict_args["upsample_kernel_sizes"] = (16, 16)
+        _LOGGER.info(
+            "MB-iSTFT enabled: upsample_rates=(4,4), upsample_kernel_sizes=(16,16)"
+        )
 
     if args.no_wavlm:
         dict_args["use_wavlm_discriminator"] = False

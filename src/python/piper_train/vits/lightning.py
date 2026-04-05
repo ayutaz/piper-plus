@@ -10,12 +10,14 @@ from torch.utils.data import DataLoader, Dataset, random_split
 from .commons import slice_segments
 from .dataset import Batch, PiperDataset, SpeakerBalancedBatchSampler, UtteranceCollate
 from .losses import discriminator_loss, feature_loss, generator_loss, kl_loss
+from .mb_istft import PQMF
 from .mel_processing import mel_spectrogram_torch, spec_to_mel_torch
 from .models import (
     MultiPeriodDiscriminator,
     SynthesizerTrn,
     WavLMDiscriminator,
 )
+from .stft_loss import MultiResolutionSTFTLoss
 
 
 # Optional wandb import with graceful fallback
@@ -122,6 +124,12 @@ class VitsModel(pl.LightningModule):
         wavlm_model_name: str = "microsoft/wavlm-base-plus",
         c_wavlm: float = 0.5,
         wavlm_every_n_steps: int = 1,
+        # MB-iSTFT options
+        mb_istft: bool = False,
+        c_sub_stft: float = 1.0,
+        sub_stft_fft_sizes: tuple[int, ...] = (171, 384, 683),
+        sub_stft_hop_sizes: tuple[int, ...] = (10, 30, 60),
+        sub_stft_win_sizes: tuple[int, ...] = (60, 150, 300),
         **kwargs,
     ):
         super().__init__()
@@ -159,6 +167,7 @@ class VitsModel(pl.LightningModule):
             gin_channels=self.hparams.gin_channels,
             use_sdp=self.hparams.use_sdp,
             prosody_dim=self.hparams.prosody_dim,
+            mb_istft=self.hparams.mb_istft,
         )
         self.model_d = MultiPeriodDiscriminator(
             use_spectral_norm=self.hparams.use_spectral_norm
@@ -173,6 +182,17 @@ class VitsModel(pl.LightningModule):
             self.model_d_wavlm = WavLMDiscriminator(
                 model_name=self.hparams.wavlm_model_name,
                 source_sample_rate=self.hparams.sample_rate,
+            )
+
+        # MB-iSTFT: PQMF for GT analysis + sub-band STFT loss
+        self.pqmf = None
+        self.sub_stft_loss = None
+        if self.hparams.mb_istft:
+            self.pqmf = PQMF(subbands=4)
+            self.sub_stft_loss = MultiResolutionSTFTLoss(
+                fft_sizes=self.hparams.sub_stft_fft_sizes,
+                hop_sizes=self.hparams.sub_stft_hop_sizes,
+                win_sizes=self.hparams.sub_stft_win_sizes,
             )
 
         # Dataset splits
@@ -541,6 +561,7 @@ class VitsModel(pl.LightningModule):
             _x_mask,
             z_mask,
             (_z, z_p, m_p, logs_p, _m_q, logs_q),
+            o_mb,
         ) = self.model_g(
             x,
             x_lengths,
@@ -600,6 +621,15 @@ class VitsModel(pl.LightningModule):
             loss_gen, _losses_gen = generator_loss(y_d_hat_g)
 
             loss_gen_all = loss_gen + loss_fm + loss_mel + loss_dur + loss_kl
+
+            # MB-iSTFT: sub-band STFT loss
+            if self.hparams.mb_istft and o_mb is not None:
+                y_mb = self.pqmf.analysis(y)  # GT subbands [B, 4, T//4]
+                loss_sub_stft = (
+                    self.sub_stft_loss(o_mb, y_mb) * self.hparams.c_sub_stft
+                )
+                loss_gen_all = loss_gen_all + loss_sub_stft
+                self._log_with_batch_info("loss_sub_stft", loss_sub_stft, batch)
 
             # WavLM Discriminator loss (optional, computed every N steps)
             if self.model_d_wavlm is not None and (

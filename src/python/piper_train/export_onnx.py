@@ -429,6 +429,11 @@ def main() -> None:
     with torch.no_grad():
         model_g.dec.remove_weight_norm()
 
+    # MB-iSTFT: set export mode so Generator returns fullband only
+    if hasattr(model_g.dec, "onnx_export_mode"):
+        model_g.dec.onnx_export_mode = True
+        _LOGGER.info("MB-iSTFT Generator: onnx_export_mode enabled")
+
     # Check if model uses prosody features
     has_prosody = getattr(model_g, "prosody_dim", 0) > 0
 
