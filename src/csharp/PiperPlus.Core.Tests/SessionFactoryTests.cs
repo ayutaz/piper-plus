@@ -282,67 +282,68 @@ public sealed class SessionFactoryTests
     }
 
     // ================================================================
-    // SessionOptions 設定値テスト
-    // SessionFactory.Create() はモデルファイルを必要とするため、
-    // SessionOptions のプロパティ設定を直接テストする。
+    // ConfigureSessionOptions — tests for the extracted internal method
+    // that configures SessionOptions with VITS-optimized settings.
     // ================================================================
 
     [Fact]
-    public void SessionOptions_EnableCpuMemArena_DefaultTrue()
+    public void ConfigureSessionOptions_GraphOptimizationLevel_IsEnableAll()
     {
-        // ORT デフォルトは true — SessionFactory でも true を明示設定
-        var options = new SessionOptions();
-        options.EnableCpuMemArena = true;
-        Assert.True(options.EnableCpuMemArena);
-    }
-
-    [Fact]
-    public void SessionOptions_EnableMemoryPattern_DefaultTrue()
-    {
-        var options = new SessionOptions();
-        options.EnableMemoryPattern = true;
-        Assert.True(options.EnableMemoryPattern);
-    }
-
-    [Fact]
-    public void SessionOptions_DynamicBlockBase_SetTo4()
-    {
-        var options = new SessionOptions();
-        // AddSessionConfigEntry は例外なく設定できることを検証
-        options.AddSessionConfigEntry("session.dynamic_block_base", "4");
-        // ORT C# API は get_session_config_entry を公開しないため、
-        // 例外が発生しないことで設定成功を検証する。
-    }
-
-    [Fact]
-    public void SessionOptions_GraphOptimizationLevel_EnableAll()
-    {
-        var options = new SessionOptions();
-        options.GraphOptimizationLevel = GraphOptimizationLevel.ORT_ENABLE_ALL;
+        using var options = SessionFactory.ConfigureSessionOptions();
         Assert.Equal(GraphOptimizationLevel.ORT_ENABLE_ALL, options.GraphOptimizationLevel);
     }
 
     [Fact]
-    public void SessionOptions_ExecutionMode_Sequential()
+    public void ConfigureSessionOptions_ExecutionMode_IsSequential()
     {
-        var options = new SessionOptions();
-        options.ExecutionMode = ExecutionMode.ORT_SEQUENTIAL;
+        using var options = SessionFactory.ConfigureSessionOptions();
         Assert.Equal(ExecutionMode.ORT_SEQUENTIAL, options.ExecutionMode);
     }
 
     [Fact]
-    public void SessionOptions_IntraOpThreads_CappedAtMax()
+    public void ConfigureSessionOptions_IntraOpNumThreads_IsHalfProcessorsCappedAt4()
     {
-        int maxIntraThreads = 4;
-        int computed = Math.Min(Environment.ProcessorCount / 2, maxIntraThreads);
-        Assert.InRange(computed, 0, maxIntraThreads);
+        using var options = SessionFactory.ConfigureSessionOptions();
+
+        int expected = Math.Max(Math.Min(Environment.ProcessorCount / 2, 4), 1);
+        Assert.Equal(expected, options.IntraOpNumThreads);
     }
 
     [Fact]
-    public void SessionOptions_InterOpThreads_IsOne()
+    public void ConfigureSessionOptions_IntraOpNumThreads_AtLeastOne()
     {
-        var options = new SessionOptions();
-        options.InterOpNumThreads = 1;
+        using var options = SessionFactory.ConfigureSessionOptions();
+        Assert.True(options.IntraOpNumThreads >= 1,
+            $"IntraOpNumThreads should be >= 1, but was {options.IntraOpNumThreads}");
+    }
+
+    [Fact]
+    public void ConfigureSessionOptions_InterOpNumThreads_IsOne()
+    {
+        using var options = SessionFactory.ConfigureSessionOptions();
         Assert.Equal(1, options.InterOpNumThreads);
+    }
+
+    [Fact]
+    public void ConfigureSessionOptions_EnableCpuMemArena_IsTrue()
+    {
+        using var options = SessionFactory.ConfigureSessionOptions();
+        Assert.True(options.EnableCpuMemArena);
+    }
+
+    [Fact]
+    public void ConfigureSessionOptions_EnableMemoryPattern_IsTrue()
+    {
+        using var options = SessionFactory.ConfigureSessionOptions();
+        Assert.True(options.EnableMemoryPattern);
+    }
+
+    [Fact]
+    public void ConfigureSessionOptions_DynamicBlockBase_DoesNotThrow()
+    {
+        // ORT C# API does not expose a getter for session config entries,
+        // so we verify that ConfigureSessionOptions completes without throwing.
+        // The dynamic_block_base entry is set inside the method.
+        using var options = SessionFactory.ConfigureSessionOptions();
     }
 }

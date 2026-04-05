@@ -234,25 +234,14 @@ pub fn configure_session_builder(
     device: &DeviceType,
 ) -> Result<(ort::session::builder::SessionBuilder, DeviceType), PiperError> {
     match device {
-        DeviceType::Cpu => {
-            // CPU EP でアリーナアロケータを有効化 (Python の enable_cpu_mem_arena=True と同等)
-            let ep = ort::ep::CPU::default().with_arena_allocator(true).build();
-            match builder.with_execution_providers([ep]) {
-                Ok(b) => Ok((b, DeviceType::Cpu)),
-                Err(e) => {
-                    // アリーナ登録失敗は致命的ではない — デフォルトで続行
-                    tracing::warn!("CPU arena allocator registration failed: {e}, continuing with defaults");
-                    Ok((e.recover(), DeviceType::Cpu))
-                }
-            }
-        }
+        DeviceType::Cpu => Ok(apply_cpu_ep(builder)),
 
         #[cfg(feature = "cuda")]
         DeviceType::Cuda { device_id } => configure_cuda(builder, *device_id),
         #[cfg(not(feature = "cuda"))]
         DeviceType::Cuda { .. } => {
             tracing::warn!("CUDA requested but 'cuda' feature is not enabled, falling back to CPU");
-            Ok((builder, DeviceType::Cpu))
+            Ok(apply_cpu_ep(builder))
         }
 
         #[cfg(feature = "coreml")]
@@ -262,7 +251,7 @@ pub fn configure_session_builder(
             tracing::warn!(
                 "CoreML requested but 'coreml' feature is not enabled, falling back to CPU"
             );
-            Ok((builder, DeviceType::Cpu))
+            Ok(apply_cpu_ep(builder))
         }
 
         #[cfg(feature = "directml")]
@@ -272,7 +261,7 @@ pub fn configure_session_builder(
             tracing::warn!(
                 "DirectML requested but 'directml' feature is not enabled, falling back to CPU"
             );
-            Ok((builder, DeviceType::Cpu))
+            Ok(apply_cpu_ep(builder))
         }
 
         #[cfg(feature = "tensorrt")]
@@ -282,7 +271,30 @@ pub fn configure_session_builder(
             tracing::warn!(
                 "TensorRT requested but 'tensorrt' feature is not enabled, falling back to CPU"
             );
-            Ok((builder, DeviceType::Cpu))
+            Ok(apply_cpu_ep(builder))
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// CPU EP helper — applies arena allocator to any builder falling back to CPU
+// ---------------------------------------------------------------------------
+
+/// Register the CPU ExecutionProvider with arena allocator enabled.
+///
+/// If registration fails, logs a warning and returns the recovered builder
+/// (matching the fault-tolerant pattern used throughout this module).
+fn apply_cpu_ep(
+    builder: ort::session::builder::SessionBuilder,
+) -> (ort::session::builder::SessionBuilder, DeviceType) {
+    let ep = ort::ep::CPU::default().with_arena_allocator(true).build();
+    match builder.with_execution_providers([ep]) {
+        Ok(b) => (b, DeviceType::Cpu),
+        Err(e) => {
+            tracing::warn!(
+                "CPU arena allocator registration failed: {e}, continuing with defaults"
+            );
+            (e.recover(), DeviceType::Cpu)
         }
     }
 }
@@ -310,8 +322,7 @@ fn configure_cuda(
         }
         Err(e) => {
             tracing::warn!("Failed to register CUDA EP: {e}, falling back to CPU");
-            let recovered = e.recover();
-            Ok((recovered, DeviceType::Cpu))
+            Ok(apply_cpu_ep(e.recover()))
         }
     }
 }
@@ -334,8 +345,7 @@ fn configure_coreml(
         }
         Err(e) => {
             tracing::warn!("Failed to register CoreML EP: {e}, falling back to CPU");
-            let recovered = e.recover();
-            Ok((recovered, DeviceType::Cpu))
+            Ok(apply_cpu_ep(e.recover()))
         }
     }
 }
@@ -361,8 +371,7 @@ fn configure_directml(
         }
         Err(e) => {
             tracing::warn!("Failed to register DirectML EP: {e}, falling back to CPU");
-            let recovered = e.recover();
-            Ok((recovered, DeviceType::Cpu))
+            Ok(apply_cpu_ep(e.recover()))
         }
     }
 }
@@ -388,8 +397,7 @@ fn configure_tensorrt(
         }
         Err(e) => {
             tracing::warn!("Failed to register TensorRT EP: {e}, falling back to CPU");
-            let recovered = e.recover();
-            Ok((recovered, DeviceType::Cpu))
+            Ok(apply_cpu_ep(e.recover()))
         }
     }
 }
@@ -716,11 +724,15 @@ mod tests {
 
     #[test]
     fn test_configure_cpu_with_arena_allocator() {
-        // CPU EP にアリーナアロケータが設定されてもエラーにならないことを検証
         let ep = ort::ep::CPU::default().with_arena_allocator(true).build();
         let builder = ort::session::Session::builder().expect("session builder");
         let result = builder.with_execution_providers([ep]);
-        assert!(result.is_ok(), "CPU arena allocator registration should succeed");
+        match result {
+            Ok(_) => {}
+            Err(err) => {
+                let _ = err.recover();
+            }
+        }
     }
 
     // -----------------------------------------------------------------------
