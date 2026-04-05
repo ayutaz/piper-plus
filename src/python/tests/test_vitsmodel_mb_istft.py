@@ -11,8 +11,18 @@ torch = pytest.importorskip("torch", reason="torch required")
 
 
 def _make_vitsmodel(mb_istft=False):
-    """Create a minimal VitsModel with or without MB-iSTFT enabled."""
+    """Create a minimal VitsModel with or without MB-iSTFT enabled.
+
+    When mb_istft=True, upsample_rates and upsample_kernel_sizes are
+    overridden to (4, 4) and (16, 16) respectively, matching the
+    overrides applied in __main__.main().
+    """
     from piper_train.vits.lightning import VitsModel
+
+    kwargs = {}
+    if mb_istft:
+        kwargs["upsample_rates"] = (4, 4)
+        kwargs["upsample_kernel_sizes"] = (16, 16)
 
     return VitsModel(
         num_symbols=97,
@@ -23,6 +33,7 @@ def _make_vitsmodel(mb_istft=False):
         learning_rate=2e-4,
         use_wavlm_discriminator=False,
         mb_istft=mb_istft,
+        **kwargs,
     )
 
 
@@ -44,10 +55,10 @@ def test_vitsmodel_no_pqmf_without_flag():
 
 @pytest.mark.unit
 def test_vitsmodel_hparams_saved():
-    """mb_istft flag is persisted in hparams."""
+    """mb_istft flag and overridden upsample_rates are persisted in hparams."""
     model = _make_vitsmodel(mb_istft=True)
     assert model.hparams.mb_istft is True
-    assert model.hparams.upsample_rates == (4, 4) or model.hparams.mb_istft  # flag is saved
+    assert model.hparams.upsample_rates == (4, 4)
 
 
 @pytest.mark.unit

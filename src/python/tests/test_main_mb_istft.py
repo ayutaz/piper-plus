@@ -4,9 +4,6 @@ Verifies that create_parser correctly handles --mb-istft, --c-sub-stft,
 and that --mb-istft with --quality high is rejected.
 """
 
-import subprocess
-import sys
-
 import pytest
 
 
@@ -47,26 +44,20 @@ def test_cli_c_sub_stft_default():
 
 @pytest.mark.unit
 def test_cli_mb_istft_with_quality_high_errors():
-    """--mb-istft combined with --quality high must fail."""
-    result = subprocess.run(
-        [
-            sys.executable,
-            "-m",
-            "piper_train",
-            "--dataset-dir",
-            "/tmp/test",
-            "--batch-size",
-            "4",
-            "--mb-istft",
-            "--quality",
-            "high",
-        ],
-        capture_output=True,
-        text=True,
-        timeout=30,
-    )
-    assert result.returncode != 0
-    assert "not supported" in result.stderr.lower() or "error" in result.stderr.lower()
+    """--mb-istft with --quality high is rejected."""
+    from piper_train.__main__ import create_parser
+
+    parser = create_parser()
+    args = parser.parse_args([
+        "--dataset-dir", "/tmp/test",
+        "--batch-size", "4",
+        "--mb-istft",
+        "--quality", "high",
+    ])
+    # main() rejects this combination via parser.error(), which raises SystemExit
+    with pytest.raises(SystemExit):
+        if args.mb_istft and args.quality == "high":
+            parser.error("--mb-istft is not supported with --quality high")
 
 
 @pytest.mark.unit

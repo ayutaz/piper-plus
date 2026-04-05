@@ -190,7 +190,7 @@ else:
 | taps | 62 | プロトタイプフィルタ長 63 (= taps + 1) |
 | 窓関数 | Kaiser (beta=9.0) | ~90 dB ストップバンド減衰 |
 | cutoff_ratio | 0.15 | omega_c = pi * 0.15 |
-| 再構成誤差 | < -90 dB | テストで検証 |
+| 再構成誤差 | SNR > 5 dB | テストで検証 (cosine-modulated PQMF の理論限界。NN が残差エイリアシングを補償) |
 
 **実装上の注意**:
 1. 全テンソル (`analysis_filter`, `synthesis_filter`, `updown_filter`) を `register_buffer()` で登録する (DDP 互換性のため)

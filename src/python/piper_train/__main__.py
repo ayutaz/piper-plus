@@ -70,17 +70,30 @@ def configure_ddp_strategy(num_gpus, user_strategy=None, no_wavlm=False):
     return None
 
 
-def _check_decoder_architecture_compatibility(checkpoint_path, model_mb_istft):
+def _check_decoder_architecture_compatibility(
+    checkpoint_path, model_mb_istft, checkpoint=None
+):
     """Warn if checkpoint decoder architecture doesn't match the current model.
 
     Prevents silent quality degradation when loading HiFi-GAN checkpoints
     into MB-iSTFT models or vice versa.
+
+    Args:
+        checkpoint_path: Path to checkpoint file.
+        model_mb_istft: Whether the current model uses MB-iSTFT.
+        checkpoint: Already-loaded checkpoint dict (optional).
+            When provided, avoids a redundant ``torch.load`` of the full
+            checkpoint file.
     """
     try:
-        ckpt = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
-        ckpt_hparams = ckpt.get("hyper_parameters", {})
+        if checkpoint is not None:
+            ckpt_hparams = checkpoint.get("hyper_parameters", {})
+        else:
+            ckpt = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
+            ckpt_hparams = ckpt.get("hyper_parameters", {})
+            del ckpt  # Free memory
+
         ckpt_mb_istft = ckpt_hparams.get("mb_istft", False)
-        del ckpt  # Free memory
 
         if ckpt_mb_istft != model_mb_istft:
             ckpt_type = "MB-iSTFT" if ckpt_mb_istft else "HiFi-GAN"
