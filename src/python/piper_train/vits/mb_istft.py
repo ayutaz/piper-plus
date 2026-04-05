@@ -155,6 +155,7 @@ class MBiSTFTGenerator(nn.Module):
         n_fft: int = 16,
         hop_length: int = 4,
         subbands: int = 4,
+        pqmf: "PQMF | None" = None,
     ):
         super().__init__()
         self.num_kernels = len(resblock_kernel_sizes)
@@ -207,8 +208,8 @@ class MBiSTFTGenerator(nn.Module):
         # --- iSTFT ---
         self.istft = OnnxISTFT(n_fft=n_fft, hop_length=hop_length)
 
-        # --- PQMF ---
-        self.pqmf = PQMF(subbands=subbands)
+        # --- PQMF (shared instance or create new) ---
+        self.pqmf = pqmf if pqmf is not None else PQMF(subbands=subbands)
 
         # --- Weight initialisation (ups only, matching existing Generator) ---
         self.ups.apply(init_weights)

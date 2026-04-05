@@ -189,6 +189,8 @@ class VitsModel(pl.LightningModule):
         self.sub_stft_loss = None
         if self.hparams.mb_istft:
             self.pqmf = PQMF(subbands=4)
+            # Share PQMF instance with Generator to avoid duplicate buffers
+            self.model_g.dec.pqmf = self.pqmf
             self.sub_stft_loss = MultiResolutionSTFTLoss(
                 fft_sizes=self.hparams.sub_stft_fft_sizes,
                 hop_sizes=self.hparams.sub_stft_hop_sizes,
@@ -553,16 +555,7 @@ class VitsModel(pl.LightningModule):
             batch.language_ids if batch.language_ids is not None else None,
             batch.prosody_features if batch.prosody_features is not None else None,
         )
-        (
-            y_hat,
-            l_length,
-            _attn,
-            ids_slice,
-            _x_mask,
-            z_mask,
-            (_z, z_p, m_p, logs_p, _m_q, logs_q),
-            o_mb,
-        ) = self.model_g(
+        g_output = self.model_g(
             x,
             x_lengths,
             spec,
@@ -571,6 +564,15 @@ class VitsModel(pl.LightningModule):
             lid=language_ids,
             prosody_features=prosody_features,
         )
+        y_hat = g_output.waveform
+        l_length = g_output.duration_loss
+        ids_slice = g_output.ids_slice
+        z_mask = g_output.y_mask
+        z_p = g_output.latents[1]
+        m_p = g_output.latents[2]
+        logs_p = g_output.latents[3]
+        logs_q = g_output.latents[5]
+        o_mb = g_output.decoder_subbands
         self._y_hat = y_hat.contiguous()
 
         mel = spec_to_mel_torch(

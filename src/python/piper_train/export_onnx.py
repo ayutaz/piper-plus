@@ -320,6 +320,13 @@ def simplify_onnx_model(onnx_path: Path, check_n: int = 3) -> bool:
         return False
 
 
+def set_export_mode(model: torch.nn.Module, mode: bool = True) -> None:
+    """Set onnx_export_mode on all submodules that support it."""
+    for m in model.modules():
+        if hasattr(m, "onnx_export_mode"):
+            m.onnx_export_mode = mode
+
+
 def main() -> None:
     """Main entry point"""
     torch.manual_seed(1234)
@@ -396,11 +403,9 @@ def main() -> None:
     num_speakers = model_g.n_speakers
     num_languages = getattr(model_g, "n_languages", 1)
 
-    # Enable ONNX export mode for deterministic output
-    model_g.onnx_export_mode = True
-    # Propagate to Duration Predictor (StochasticDurationPredictor)
-    if hasattr(model_g, "dp"):
-        model_g.dp.onnx_export_mode = True
+    # Enable ONNX export mode for all compatible modules
+    set_export_mode(model_g, True)
+    _LOGGER.info("Export mode enabled for all compatible modules")
 
     # Inference only
     model_g.eval()
@@ -428,11 +433,6 @@ def main() -> None:
 
     with torch.no_grad():
         model_g.dec.remove_weight_norm()
-
-    # MB-iSTFT: set export mode so Generator returns fullband only
-    if hasattr(model_g.dec, "onnx_export_mode"):
-        model_g.dec.onnx_export_mode = True
-        _LOGGER.info("MB-iSTFT Generator: onnx_export_mode enabled")
 
     # Check if model uses prosody features
     has_prosody = getattr(model_g, "prosody_dim", 0) > 0

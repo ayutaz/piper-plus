@@ -30,7 +30,7 @@ def test_multi_resolution_stft_loss_zero():
     loss_fn = MultiResolutionSTFTLoss()
     x = torch.randn(2, 4, 2048)
     loss = loss_fn(x, x)
-    assert loss.item() < 0.1  # spectral convergence ~ 0, log mag ~ 0
+    assert loss.item() < 1e-5  # spectral convergence ~ 0, log mag ~ 0
 
 
 @pytest.mark.unit
@@ -53,3 +53,26 @@ def test_stft_loss_window_device():
     loss = STFTLoss(171, 10, 60)
     buffers = dict(loss.named_buffers())
     assert "window" in buffers
+
+
+@pytest.mark.unit
+def test_multi_resolution_stft_loss_num_resolutions():
+    """MultiResolutionSTFTLoss has exactly 3 resolution levels."""
+    from piper_train.vits.stft_loss import MultiResolutionSTFTLoss
+
+    loss_fn = MultiResolutionSTFTLoss()
+    assert len(loss_fn.stft_losses) == 3
+
+
+@pytest.mark.unit
+def test_stft_loss_gradient_flow():
+    """STFT loss supports backward pass."""
+    from piper_train.vits.stft_loss import MultiResolutionSTFTLoss
+
+    loss_fn = MultiResolutionSTFTLoss()
+    x = torch.randn(2, 4, 2048, requires_grad=True)
+    y = torch.randn(2, 4, 2048)
+    loss = loss_fn(x, y)
+    loss.backward()
+    assert x.grad is not None
+    assert x.grad.shape == x.shape

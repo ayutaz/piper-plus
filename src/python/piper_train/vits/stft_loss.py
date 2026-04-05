@@ -25,7 +25,7 @@ class SpectralConvergenceLoss(nn.Module):
         Returns:
             Scalar loss value: ||y_mag - x_mag||_F / ||y_mag||_F
         """
-        return torch.norm(y_mag - x_mag, p="fro") / torch.norm(y_mag, p="fro")
+        return torch.norm(y_mag - x_mag, p="fro") / torch.norm(y_mag, p="fro").clamp(min=1e-7)
 
 
 class LogSTFTMagnitudeLoss(nn.Module):

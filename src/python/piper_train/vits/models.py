@@ -742,6 +742,17 @@ class WavLMDiscriminator(torch.nn.Module):
         return [y_d_r], [y_d_g], [fmap_r], [fmap_g]
 
 
+class SynthesizerOutput(NamedTuple):
+    waveform: torch.Tensor
+    duration_loss: torch.Tensor
+    attention: torch.Tensor
+    ids_slice: torch.Tensor
+    x_mask: torch.Tensor
+    y_mask: torch.Tensor
+    latents: tuple
+    decoder_subbands: "torch.Tensor | None"
+
+
 class SynthesizerTrn(nn.Module):
     """
     Synthesizer for Training
@@ -1034,15 +1045,15 @@ class SynthesizerTrn(nn.Module):
         else:
             o = self.dec(z_slice, g=g)
             o_mb = None
-        return (
-            o,
-            l_length,
-            attn,
-            ids_slice,
-            x_mask,
-            y_mask,
-            (z, z_p, m_p, logs_p, m_q, logs_q),
-            o_mb,
+        return SynthesizerOutput(
+            waveform=o,
+            duration_loss=l_length,
+            attention=attn,
+            ids_slice=ids_slice,
+            x_mask=x_mask,
+            y_mask=y_mask,
+            latents=(z, z_p, m_p, logs_p, m_q, logs_q),
+            decoder_subbands=o_mb,
         )
 
     def _ensure_spk_proj(self, emb_dim: int) -> nn.Linear:
@@ -1162,11 +1173,10 @@ class SynthesizerTrn(nn.Module):
         else:
             z_p = m_p + torch.randn_like(m_p) * torch.exp(logs_p) * noise_scale
         z = self.flow(z_p, y_mask, g=g, reverse=True)
-        dec_out = self.dec((z * y_mask)[:, :, :max_len], g=g)
-        if self.mb_istft and isinstance(dec_out, tuple):
-            o = dec_out[0]
+        if self.mb_istft:
+            o, _ = self.dec((z * y_mask)[:, :, :max_len], g=g)
         else:
-            o = dec_out
+            o = self.dec((z * y_mask)[:, :, :max_len], g=g)
 
         return InferOutput(o, attn, y_mask, (z, z_p, m_p, logs_p), durations)
 
@@ -1177,9 +1187,8 @@ class SynthesizerTrn(nn.Module):
         z, m_q, logs_q, y_mask = self.enc_q(y, y_lengths, g=g_src)
         z_p = self.flow(z, y_mask, g=g_src)
         z_hat = self.flow(z_p, y_mask, g=g_tgt, reverse=True)
-        dec_out = self.dec(z_hat * y_mask, g=g_tgt)
-        if self.mb_istft and isinstance(dec_out, tuple):
-            o_hat = dec_out[0]
+        if self.mb_istft:
+            o_hat, _ = self.dec(z_hat * y_mask, g=g_tgt)
         else:
-            o_hat = dec_out
+            o_hat = self.dec(z_hat * y_mask, g=g_tgt)
         return o_hat, y_mask, (z, z_p, z_hat)

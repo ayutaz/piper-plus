@@ -70,6 +70,32 @@ def configure_ddp_strategy(num_gpus, user_strategy=None, no_wavlm=False):
     return None
 
 
+def _check_decoder_architecture_compatibility(checkpoint_path, model_mb_istft):
+    """Warn if checkpoint decoder architecture doesn't match the current model.
+
+    Prevents silent quality degradation when loading HiFi-GAN checkpoints
+    into MB-iSTFT models or vice versa.
+    """
+    try:
+        ckpt = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
+        ckpt_hparams = ckpt.get("hyper_parameters", {})
+        ckpt_mb_istft = ckpt_hparams.get("mb_istft", False)
+        del ckpt  # Free memory
+
+        if ckpt_mb_istft != model_mb_istft:
+            ckpt_type = "MB-iSTFT" if ckpt_mb_istft else "HiFi-GAN"
+            model_type = "MB-iSTFT" if model_mb_istft else "HiFi-GAN"
+            _LOGGER.warning(
+                "Decoder architecture mismatch: checkpoint uses %s but model uses %s. "
+                "Decoder weights will be randomly initialized (strict=False). "
+                "This is expected for architecture migration but will require full retraining of the decoder.",
+                ckpt_type,
+                model_type,
+            )
+    except Exception as e:
+        _LOGGER.debug("Could not check checkpoint architecture: %s", e)
+
+
 def _build_trainer(args, loggers, num_gpus, num_speakers):
     """Build a Trainer instance with callbacks and strategy from args.
 
@@ -612,6 +638,11 @@ def main():
         )
 
     if args.resume_from_multispeaker_checkpoint:
+        _check_decoder_architecture_compatibility(
+            args.resume_from_multispeaker_checkpoint,
+            args.mb_istft if hasattr(args, "mb_istft") else False,
+        )
+
         assert num_speakers == 1, (
             "--resume-from-multispeaker-checkpoint はシングルスピーカーモデル専用です。"
             "マルチスピーカーへの転移には --resume_from_single_speaker_checkpoint を使用してください。"
@@ -620,6 +651,11 @@ def main():
 
     # チェックポイントからの再開処理を修正
     if args.resume_from_checkpoint:
+        _check_decoder_architecture_compatibility(
+            args.resume_from_checkpoint,
+            args.mb_istft if hasattr(args, "mb_istft") else False,
+        )
+
         _LOGGER.debug(
             "Loading weights from checkpoint: %s", args.resume_from_checkpoint
         )
