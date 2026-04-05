@@ -54,9 +54,7 @@ def create_session_options(
     opts = onnxruntime.SessionOptions()
 
     # Graph optimization: constant folding, operator fusion, layout optimization
-    opts.graph_optimization_level = (
-        onnxruntime.GraphOptimizationLevel.ORT_ENABLE_ALL
-    )
+    opts.graph_optimization_level = onnxruntime.GraphOptimizationLevel.ORT_ENABLE_ALL
 
     # VITS has a linear graph with few parallel sub-graphs
     opts.execution_mode = onnxruntime.ExecutionMode.ORT_SEQUENTIAL
@@ -72,9 +70,7 @@ def create_session_options(
         # os.cpu_count() returns logical cores (incl. HyperThreading).
         # Dividing by 2 approximates physical core count.
         logical_cores = _get_logical_core_count()
-        opts.intra_op_num_threads = min(
-            logical_cores // 2 or 1, MAX_INTRA_THREADS
-        )
+        opts.intra_op_num_threads = min(logical_cores // 2 or 1, MAX_INTRA_THREADS)
 
     opts.inter_op_num_threads = inter_op_threads
 
