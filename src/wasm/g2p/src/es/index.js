@@ -16,6 +16,8 @@
  * Pure JavaScript -- no external dependencies.
  */
 
+import { collapseNfdAccents } from '../latin-common/index.js';
+
 // ---------------------------------------------------------------------------
 // IPA codepoints used in output
 // ---------------------------------------------------------------------------
@@ -124,72 +126,7 @@ function toLowerSp(c) {
     }
 }
 
-// ---------------------------------------------------------------------------
-// NFC normalization for combining accents
-// ---------------------------------------------------------------------------
-
-/**
- * Collapse NFD combining accent sequences into precomposed NFC codepoints.
- *
- * Handles the combining marks relevant to Spanish:
- *   U+0301 COMBINING ACUTE ACCENT  -> a-acute e-acute i-acute o-acute u-acute
- *   U+0303 COMBINING TILDE         -> n-tilde
- *   U+0308 COMBINING DIAERESIS     -> u-diaeresis
- */
-function collapseCombiningAccents(cps) {
-    if (cps.length < 2) return cps.slice();
-
-    const out = [];
-    let i = 0;
-    const n = cps.length;
-
-    while (i < n) {
-        if (i + 1 < n) {
-            const base = cps[i];
-            const comb = cps[i + 1];
-            let composed = null;
-
-            if (comb === '\u0301') {
-                // combining acute
-                switch (base) {
-                    case 'A': composed = '\u00C1'; break;
-                    case 'a': composed = '\u00E1'; break;
-                    case 'E': composed = '\u00C9'; break;
-                    case 'e': composed = '\u00E9'; break;
-                    case 'I': composed = '\u00CD'; break;
-                    case 'i': composed = '\u00ED'; break;
-                    case 'O': composed = '\u00D3'; break;
-                    case 'o': composed = '\u00F3'; break;
-                    case 'U': composed = '\u00DA'; break;
-                    case 'u': composed = '\u00FA'; break;
-                }
-            } else if (comb === '\u0308') {
-                // combining diaeresis
-                switch (base) {
-                    case 'U': composed = '\u00DC'; break;
-                    case 'u': composed = '\u00FC'; break;
-                }
-            } else if (comb === '\u0303') {
-                // combining tilde
-                switch (base) {
-                    case 'N': composed = '\u00D1'; break;
-                    case 'n': composed = '\u00F1'; break;
-                }
-            }
-
-            if (composed !== null) {
-                out.push(composed);
-                i += 2;
-                continue;
-            }
-        }
-
-        out.push(cps[i]);
-        i += 1;
-    }
-
-    return out;
-}
+// collapseCombiningAccents -> collapseNfdAccents imported from latin-common
 
 // ---------------------------------------------------------------------------
 // Normalize: NFC collapse + lowercase + whitespace collapse
@@ -198,7 +135,7 @@ function collapseCombiningAccents(cps) {
 function normalize(text) {
     // Convert string to array of characters (handles surrogates)
     const cps = [...text];
-    const nfc = collapseCombiningAccents(cps);
+    const nfc = collapseNfdAccents(cps);
     return nfc.map(c => toLowerSp(c));
 }
 

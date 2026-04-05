@@ -18,6 +18,14 @@
  * Pure JavaScript -- no external dependencies.
  */
 
+import {
+    collapseNfdAccents,
+    isPunctuation,
+    PUNCTUATION,
+    tokenize,
+    normalizeWhitespace,
+} from '../latin-common/index.js';
+
 // ---------------------------------------------------------------------------
 // PUA codepoints for multi-character phoneme tokens
 // Must match pua-map.js / token_map.rs / token_mapper.py
@@ -81,12 +89,7 @@ const FRONT_VOWELS_CG = new Set([
     '\u00EE', '\u00EF',
 ]);
 
-const PUNCTUATION = new Set([
-    ',', '.', ';', ':', '!', '?',
-    '\u00A1', '\u00BF',
-    '\u2014', '\u2013', '\u2026',
-    '\u00AB', '\u00BB',
-]);
+// PUNCTUATION / isPunctuation imported from latin-common
 
 /**
  * Check if a character is a French letter (lowercase ASCII + accented).
@@ -144,103 +147,24 @@ const ER_AS_EHR = new Set([
     'leader', 'transfer', 'fer',
 ]);
 
-// ---------------------------------------------------------------------------
-// NFD normalization
-// ---------------------------------------------------------------------------
-
-/**
- * Collapse NFD combining sequences into NFC pre-composed forms.
- * @param {number[]} codepoints
- * @returns {number[]}
- */
-function collapseNfd(codepoints) {
-    const out = [];
-    const n = codepoints.length;
-    let i = 0;
-
-    while (i < n) {
-        const ch = codepoints[i];
-
-        if (i + 1 < n) {
-            const comb = codepoints[i + 1];
-            let composed = null;
-
-            // Grave accent (U+0300)
-            if (comb === 0x0300) {
-                if (ch === 0x41 /* A */) composed = 0x00C0;
-                else if (ch === 0x61 /* a */) composed = 0x00E0;
-                else if (ch === 0x45 /* E */) composed = 0x00C8;
-                else if (ch === 0x65 /* e */) composed = 0x00E8;
-                else if (ch === 0x55 /* U */) composed = 0x00D9;
-                else if (ch === 0x75 /* u */) composed = 0x00F9;
-            }
-            // Acute accent (U+0301)
-            else if (comb === 0x0301) {
-                if (ch === 0x45 /* E */) composed = 0x00C9;
-                else if (ch === 0x65 /* e */) composed = 0x00E9;
-            }
-            // Circumflex (U+0302)
-            else if (comb === 0x0302) {
-                if (ch === 0x41 /* A */) composed = 0x00C2;
-                else if (ch === 0x61 /* a */) composed = 0x00E2;
-                else if (ch === 0x45 /* E */) composed = 0x00CA;
-                else if (ch === 0x65 /* e */) composed = 0x00EA;
-                else if (ch === 0x49 /* I */) composed = 0x00CE;
-                else if (ch === 0x69 /* i */) composed = 0x00EE;
-                else if (ch === 0x4F /* O */) composed = 0x00D4;
-                else if (ch === 0x6F /* o */) composed = 0x00F4;
-                else if (ch === 0x55 /* U */) composed = 0x00DB;
-                else if (ch === 0x75 /* u */) composed = 0x00FB;
-            }
-            // Tilde (U+0303)
-            else if (comb === 0x0303) {
-                if (ch === 0x4E /* N */) composed = 0x00D1;
-                else if (ch === 0x6E /* n */) composed = 0x00F1;
-            }
-            // Diaeresis (U+0308)
-            else if (comb === 0x0308) {
-                if (ch === 0x45 /* E */) composed = 0x00CB;
-                else if (ch === 0x65 /* e */) composed = 0x00EB;
-                else if (ch === 0x49 /* I */) composed = 0x00CF;
-                else if (ch === 0x69 /* i */) composed = 0x00EF;
-                else if (ch === 0x55 /* U */) composed = 0x00DC;
-                else if (ch === 0x75 /* u */) composed = 0x00FC;
-            }
-            // Cedilla (U+0327)
-            else if (comb === 0x0327) {
-                if (ch === 0x43 /* C */) composed = 0x00C7;
-                else if (ch === 0x63 /* c */) composed = 0x00E7;
-            }
-
-            if (composed !== null) {
-                out.push(composed);
-                i += 2;
-                continue;
-            }
-        }
-
-        out.push(ch);
-        i += 1;
-    }
-
-    return out;
-}
+// collapseNfdAccents, normalizeWhitespace imported from latin-common
 
 /**
  * French-specific lowercase conversion.
- * @param {number} code - Codepoint.
- * @returns {number}
+ * @param {string} ch - Single character.
+ * @returns {string} Lowercased character.
  */
-function toLowerFr(code) {
+function toLowerFr(ch) {
+    const code = ch.codePointAt(0);
     // ASCII uppercase -> lowercase
-    if (code >= 0x41 && code <= 0x5A) return code + 32;
+    if (code >= 0x41 && code <= 0x5A) return String.fromCodePoint(code + 32);
     // Latin-1 uppercase block (A-grave..O-diaeresis, O-slash..Thorn)
     if ((code >= 0x00C0 && code <= 0x00D6) || (code >= 0x00D8 && code <= 0x00DE)) {
-        return code + 0x20;
+        return String.fromCodePoint(code + 0x20);
     }
     // OE ligature uppercase
-    if (code === 0x0152) return 0x0153;
-    return code;
+    if (code === 0x0152) return '\u0153';
+    return ch;
 }
 
 /**
@@ -249,38 +173,14 @@ function toLowerFr(code) {
  * @returns {string[]} Array of characters.
  */
 function normalize(text) {
-    // Convert to codepoints
-    const cps = [];
-    for (const ch of text) {
-        cps.push(ch.codePointAt(0));
-    }
+    // Split into character array and collapse NFD combining accents
+    let cps = collapseNfdAccents([...text]);
 
-    // NFD collapse
-    const nfc = collapseNfd(cps);
+    // Lowercase
+    cps = cps.map(toLowerFr);
 
-    // Lowercase and collapse whitespace
-    const result = [];
-    let lastWasSpace = true;
-
-    for (const code of nfc) {
-        const ch = String.fromCodePoint(code);
-        if (ch === ' ' || ch === '\t' || ch === '\n' || ch === '\r') {
-            if (!lastWasSpace) {
-                result.push(' ');
-                lastWasSpace = true;
-            }
-            continue;
-        }
-        lastWasSpace = false;
-        result.push(String.fromCodePoint(toLowerFr(code)));
-    }
-
-    // Trim trailing space
-    if (result.length > 0 && result[result.length - 1] === ' ') {
-        result.pop();
-    }
-
-    return result;
+    // Collapse whitespace + trim
+    return normalizeWhitespace(cps);
 }
 
 // ---------------------------------------------------------------------------
@@ -301,44 +201,13 @@ function normalizeApostrophes(chars) {
 
 /**
  * Split normalized text into word and punctuation tokens.
+ * Applies apostrophe normalization, then delegates to shared tokenizer.
  * @param {string[]} chars
- * @returns {Array<{text: string[], isPunct: boolean}>}
+ * @returns {Array<{chars: string[], isPunct: boolean}>}
  */
 function splitWords(chars) {
     const processed = normalizeApostrophes(chars);
-    const tokens = [];
-    const n = processed.length;
-    let i = 0;
-
-    while (i < n) {
-        const ch = processed[i];
-
-        if (ch === ' ') {
-            i += 1;
-            continue;
-        }
-
-        if (PUNCTUATION.has(ch)) {
-            tokens.push({ text: [ch], isPunct: true });
-            i += 1;
-            continue;
-        }
-
-        if (isLetterFr(ch)) {
-            const word = [];
-            while (i < n && isLetterFr(processed[i])) {
-                word.push(processed[i]);
-                i += 1;
-            }
-            tokens.push({ text: word, isPunct: false });
-            continue;
-        }
-
-        // Unknown character -- skip
-        i += 1;
-    }
-
-    return tokens;
+    return tokenize(processed, isLetterFr);
 }
 
 // ---------------------------------------------------------------------------
@@ -1137,12 +1006,12 @@ function phonemizeFrenchInternal(text) {
         }
 
         if (tok.isPunct) {
-            for (const ch of tok.text) {
+            for (const ch of tok.chars) {
                 phonemes.push(ch);
                 prosodyList.push({ a1: 0, a2: 0, a3: 0 });
             }
         } else {
-            const wordPhonemes = convertWord(tok.text);
+            const wordPhonemes = convertWord(tok.chars);
             const wordPhonemeCount = wordPhonemes.length;
 
             // Find last vowel index for stress marking

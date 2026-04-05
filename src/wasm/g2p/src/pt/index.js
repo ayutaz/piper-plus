@@ -17,6 +17,13 @@
  * Pure JavaScript -- no external dependencies.
  */
 
+import {
+    collapseNfdAccents,
+    isPunctuation,
+    tokenize,
+    normalizeWhitespace,
+} from '../latin-common/index.js';
+
 // ---------------------------------------------------------------------------
 // PUA codepoints for multi-codepoint IPA tokens
 // Must match pua-map.js / token_map.rs
@@ -134,18 +141,7 @@ function isIpaConsonant(ch) {
     return IPA_CONSONANTS.has(ch);
 }
 
-const PUNCTUATION = new Set([
-    ',', '.', ';', ':', '!', '?',
-    '\u00A1',  // inverted exclamation
-    '\u00BF',  // inverted question
-    '\u2014',  // em dash
-    '\u2013',  // en dash
-    '\u2026',  // horizontal ellipsis
-]);
-
-function isPunctuation(ch) {
-    return PUNCTUATION.has(ch);
-}
+// isPunctuation imported from latin-common
 
 const SOFT_VOWELS = new Set([
     'e', 'i',
@@ -174,85 +170,7 @@ function isWordChar(ch) {
     return false;
 }
 
-// ---------------------------------------------------------------------------
-// NFC normalization for combining accents
-// ---------------------------------------------------------------------------
-
-/**
- * Collapse NFD combining accent sequences into precomposed NFC codepoints.
- * Handles the common Portuguese combining marks.
- * @param {string[]} cps - Array of single characters.
- * @returns {string[]} NFC-collapsed characters.
- */
-function collapseNfdAccents(cps) {
-    if (cps.length < 2) return cps.slice();
-
-    const out = [];
-    let i = 0;
-    const n = cps.length;
-
-    while (i < n) {
-        if (i + 1 < n) {
-            const base = cps[i];
-            const comb = cps[i + 1];
-            let composed = null;
-
-            switch (comb) {
-            case '\u0300': // COMBINING GRAVE ACCENT
-                if (base === 'a') composed = '\u00E0';
-                else if (base === 'A') composed = '\u00C0';
-                break;
-            case '\u0301': // COMBINING ACUTE ACCENT
-                if (base === 'a') composed = '\u00E1';
-                else if (base === 'e') composed = '\u00E9';
-                else if (base === 'i') composed = '\u00ED';
-                else if (base === 'o') composed = '\u00F3';
-                else if (base === 'u') composed = '\u00FA';
-                else if (base === 'A') composed = '\u00C1';
-                else if (base === 'E') composed = '\u00C9';
-                else if (base === 'I') composed = '\u00CD';
-                else if (base === 'O') composed = '\u00D3';
-                else if (base === 'U') composed = '\u00DA';
-                break;
-            case '\u0302': // COMBINING CIRCUMFLEX ACCENT
-                if (base === 'a') composed = '\u00E2';
-                else if (base === 'e') composed = '\u00EA';
-                else if (base === 'o') composed = '\u00F4';
-                else if (base === 'A') composed = '\u00C2';
-                else if (base === 'E') composed = '\u00CA';
-                else if (base === 'O') composed = '\u00D4';
-                break;
-            case '\u0303': // COMBINING TILDE
-                if (base === 'a') composed = '\u00E3';
-                else if (base === 'o') composed = '\u00F5';
-                else if (base === 'A') composed = '\u00C3';
-                else if (base === 'O') composed = '\u00D5';
-                else if (base === 'n') composed = '\u00F1';
-                else if (base === 'N') composed = '\u00D1';
-                break;
-            case '\u0308': // COMBINING DIAERESIS
-                if (base === 'u') composed = '\u00FC';
-                else if (base === 'U') composed = '\u00DC';
-                break;
-            case '\u0327': // COMBINING CEDILLA
-                if (base === 'c') composed = '\u00E7';
-                else if (base === 'C') composed = '\u00C7';
-                break;
-            }
-
-            if (composed !== null) {
-                out.push(composed);
-                i += 2;
-                continue;
-            }
-        }
-
-        out.push(cps[i]);
-        i += 1;
-    }
-
-    return out;
-}
+// collapseNfdAccents imported from latin-common
 
 /**
  * Simple lowercase for Latin + common accented letters.
@@ -288,61 +206,10 @@ function normalize(text) {
     cps = cps.map(toLower);
 
     // Collapse whitespace + trim
-    const out = [];
-    let prevSpace = true; // trim leading
-    for (const cp of cps) {
-        const ws = cp === ' ' || cp === '\t' || cp === '\n' || cp === '\r';
-        if (ws) {
-            if (!prevSpace) {
-                out.push(' ');
-            }
-            prevSpace = true;
-        } else {
-            out.push(cp);
-            prevSpace = false;
-        }
-    }
-    // trim trailing
-    if (out.length > 0 && out[out.length - 1] === ' ') {
-        out.pop();
-    }
-    return out;
+    return normalizeWhitespace(cps);
 }
 
-// ---------------------------------------------------------------------------
-// Tokenizer
-// ---------------------------------------------------------------------------
-
-/**
- * Split normalized characters into word and punctuation tokens.
- * @param {string[]} cps - Array of normalized characters.
- * @returns {{ chars: string[], isPunct: boolean }[]} Token list.
- */
-function tokenize(cps) {
-    const tokens = [];
-    let i = 0;
-    const n = cps.length;
-
-    while (i < n) {
-        const ch = cps[i];
-        if (isWordChar(ch)) {
-            const chars = [];
-            while (i < n && isWordChar(cps[i])) {
-                chars.push(cps[i]);
-                i += 1;
-            }
-            tokens.push({ chars, isPunct: false });
-        } else if (isPunctuation(ch)) {
-            tokens.push({ chars: [ch], isPunct: true });
-            i += 1;
-        } else {
-            // whitespace or unknown: skip
-            i += 1;
-        }
-    }
-
-    return tokens;
-}
+// tokenize imported from latin-common (uses isWordChar as predicate)
 
 // ---------------------------------------------------------------------------
 // Vowel-group counting (digraph-aware)
@@ -941,7 +808,7 @@ function textToPhonemeChars(text) {
     if (!text) return [];
 
     const cps = normalize(text);
-    const tokens = tokenize(cps);
+    const tokens = tokenize(cps, isWordChar);
 
     const phonemes = [];
     let needSpace = false;
