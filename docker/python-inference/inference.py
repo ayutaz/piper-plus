@@ -21,6 +21,8 @@ import onnxruntime
 import soundfile as sf
 from piper_plus_g2p.registry import get_phonemizer
 
+from piper_train.ort_utils import create_session_options, get_providers
+
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -94,14 +96,9 @@ class PiperInferenceEngine:
             config = json.load(f)
         self.phoneme_id_map = config["phoneme_id_map"]
 
-        # Determine providers based on device
-        if device == "cpu":
-            providers = ["CPUExecutionProvider"]
-        else:  # "auto" or "gpu"
-            providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
-
-        # Load ONNX model
-        sess_options = onnxruntime.SessionOptions()
+        # Load ONNX model with optimized session options
+        sess_options = create_session_options()
+        providers = get_providers(device)
         self.model = onnxruntime.InferenceSession(
             model_path, sess_options=sess_options, providers=providers
         )

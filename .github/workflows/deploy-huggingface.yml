@@ -74,7 +74,8 @@ jobs:
 
           # Inference script (text_to_phoneme_ids_and_prosody uses piper_plus_g2p)
           cp src/python/piper_train/infer_onnx.py hf-space-deploy/piper_train/
-          echo "✓ Copied infer_onnx.py"
+          cp src/python/piper_train/ort_utils.py hf-space-deploy/piper_train/
+          echo "✓ Copied infer_onnx.py, ort_utils.py"
 
           # vits utilities (audio processing, no torch)
           touch hf-space-deploy/piper_train/vits/__init__.py
