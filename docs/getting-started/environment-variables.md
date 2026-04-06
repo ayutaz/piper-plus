@@ -34,6 +34,15 @@ This document lists all environment variables that can be used to configure Pipe
   export OPENJTALK_DATA_DIR=/opt/piper-data
   ```
 
+### OPENJTALK_VOICE
+- **Description**: Path to HTS voice file (.htsvoice) for OpenJTalk speech synthesis
+- **Used by**: C++
+- **Default**: Auto-detected from known locations
+- **Example**:
+  ```bash
+  export OPENJTALK_VOICE=/usr/share/hts-voice/mei/mei_normal.htsvoice
+  ```
+
 ## Dictionary Paths
 
 ### PIPER_DICTIONARIES_PATH

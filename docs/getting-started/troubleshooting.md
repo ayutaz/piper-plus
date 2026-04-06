@@ -200,7 +200,7 @@ powershell -Command "echo 'こんにちは' | .\piper.exe --model model.onnx --o
    type input.txt | piper.exe --model model.onnx --config config.json --output_file out.wav
    ```
 
-3. **v1.5.3以降**: piper.exe 内部で `SetConsoleCP(CP_UTF8)` が呼び出されますが、一部の環境ではパイプ入力に効かない場合があります。その場合は方法2を使用してください。
+3. **v1.5.5以降**: piper.exe 内部で `SetConsoleCP(CP_UTF8)` が呼び出されますが、一部の環境ではパイプ入力に効かない場合があります。その場合は方法2を使用してください。
 
 #### "The filename, directory name, or volume label syntax is incorrect"
 
