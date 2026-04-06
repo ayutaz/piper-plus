@@ -21,6 +21,8 @@ echo "Hello [[ h ə l oʊ ]] world" | piper --model en_US-lessac-medium.onnx -f 
 
 ### Examples
 
+> **Note:** piper-plus は eSpeak-ng に依存しません。以下の eSpeak 音素形式はレガシー互換のための参考情報です。piper-plus の G2P パイプライン (`piper-plus-g2p`) は独自の IPA ベース音素を使用します。
+
 #### English (eSpeak phonemes)
 ```bash
 # Custom pronunciation for a name
@@ -40,6 +42,8 @@ echo "私は [[ m a i k u r u ]] です" | piper --model multilingual-test-mediu
 ```
 
 ### Phoneme Systems
+
+> **Note:** piper-plus は eSpeak-ng に依存しません。以下の eSpeak 音素形式はレガシー互換のための参考情報です。piper-plus の G2P パイプライン (`piper-plus-g2p`) は独自の IPA ベース音素を使用します。
 
 #### eSpeak-ng (Most Languages)
 - Uses IPA (International Phonetic Alphabet) symbols

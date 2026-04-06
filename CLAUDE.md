@@ -204,8 +204,9 @@ nohup /data/piper/.venv/bin/python -m piper_train \
 
 > **Note:** スウェーデン語 (sv) と韓国語 (ko) はG2Pコード実装済みだが、学習済みモデルには未含有 (sv=6, ko=7)。
 
-**実装:** `phonemize/multilingual.py`, `phonemize/multilingual_id_map.py`, `phonemize/{chinese,korean,spanish,portuguese,french,swedish}.py`, `phonemize/{zh,ko,es,pt,fr,sv}_id_map.py`
-**Phonemizer ABC:** `phonemize/base.py` (抽象基底), `phonemize/registry.py` (言語レジストリ)
+**実装 (piper-plus-g2p):** `src/python/g2p/piper_plus_g2p/multilingual.py`, `src/python/g2p/piper_plus_g2p/{chinese,korean,spanish,portuguese,french,swedish}.py`
+**実装 (ランタイム):** `src/python_run/piper/phonemize/multilingual.py`, `src/python_run/piper/phonemize/{japanese,english,chinese,spanish,portuguese,french}.py`
+**Phonemizer ABC:** `src/python/g2p/piper_plus_g2p/base.py` (抽象基底), `src/python/g2p/piper_plus_g2p/registry.py` (言語レジストリ)
 
 ### 言語グループ均等サンプリング (--language-balanced-sampling)
 
@@ -306,13 +307,13 @@ LibriTTS-R の音声キャッシュを Silero ONNX VAD から numpy エネルギ
 
 日本語疑問文の種類を区別するマーカー: `?!` (強調疑問), `?.` (平叙疑問), `?~` (確認疑問)。
 
-**実装:** `phonemize/japanese.py` (`_get_question_type()`)
+**実装:** `src/python/g2p/piper_plus_g2p/japanese.py` (`_get_question_type()`)
 
 ### 文脈依存N phoneme variants (Issue #207)
 
 「ん」の発音を後続音により4バリアントに分類: N_m (両唇音前), N_n (歯茎音前), N_ng (軟口蓋音前), N_uvular (語末/母音前)。
 
-**実装:** `phonemize/japanese.py` (`_apply_n_phoneme_rules()`), `phonemize/jp_id_map.py`, `phonemize/token_mapper.py`
+**実装:** `src/python/g2p/piper_plus_g2p/japanese.py` (`_apply_n_phoneme_rules()`), `src/python/g2p/piper_plus_g2p/encode/id_maps.py`, `src/python_run/piper/phonemize/token_mapper.py`
 
 ### 学習高速化
 
@@ -330,8 +331,8 @@ Validation頻度削減、DataLoader最適化 (num_workers=2, pin_memory)、LRス
 | TFM | PiperPlus.Core: net8.0, PiperPlus.Cli: net9.0 |
 | 対応言語 | JA, EN, ZH, KO, ES, FR, PT, SV (8言語) |
 | G2P依存 | DotNetG2P v1.8.0 (JA), DotNetG2P.MeCab v1.8.0 (JA), DotNetG2P.English v1.8.0 (EN), DotNetG2P.Chinese/Spanish/French/Portuguese v1.7.0 |
-| テスト | 829テスト (xUnit v3) |
-| CI | 3 OS × 2 .NET バージョン (csharp-ci.yml) |
+| テスト | ~1000テスト (xUnit v3) |
+| CI | 3 OS (csharp-ci.yml) |
 | ビルド | `dotnet build src/csharp/PiperPlus.sln` |
 
 **実装:** `src/csharp/PiperPlus.Core/`, `src/csharp/PiperPlus.Cli/`
@@ -379,24 +380,85 @@ Rust によるONNX推論エンジン。ストリーミング、CUDA/CoreML/Direc
 | パッケージ名 | piper-plus |
 | バージョン | 0.2.0 |
 | 対応言語 | JA, EN, ZH, KO, ES, FR, PT, SV (8言語) |
-| 音素化 | jpreprocess WASM (JA、辞書内蔵), SimpleEnglishPhonemizer (EN), キャラクタベース (ZH/KO/ES/FR/PT/SV) |
+| 音素化 | piper-plus-g2p WASM (8言語、@piper-plus/g2p) |
 | 推論 | onnxruntime-web (peerDependency) |
-| テスト | 282テスト (JS Node.js test runner) + 27テスト (Rust native) + 15テスト (wasm-bindgen-test) |
+| テスト | ~1200テスト (JS Node.js test runner) + 34テスト (Rust native) + 22テスト (wasm-bindgen-test) |
 | CI | ci.yml (PR/push), npm-publish.yml (タグトリガー), wasm-build.yml (WASM ビルド + feature flag 組み合わせ) |
 | ビルド | ブラウザ専用 (Node.js 非対応) |
 
 **コアクラス:**
 - `PiperPlus` — 高レベル API (initialize → synthesize → AudioResult)
 - `ModelManager` — HuggingFace モデル DL + IndexedDB キャッシュ
-- `WasmPhonemizer` — Rust WASM 音素化 (`phonemize(text, language?)`, `detect_language()`, `get_supported_languages()`)。構造化エラー (`.code` プロパティ: `CONFIG_PARSE_ERROR`, `PHONEMIZE_ERROR`, `UNSUPPORTED_LANGUAGE`, `EMPTY_INPUT`)
+- `G2P` (@piper-plus/g2p) — Rust WASM 音素化 (8言語対応、`phonemize()`, `encode()`, `dispose()`)
 - `AudioResult` — WAV エンコード + 再生 + ダウンロード
-- `SimpleUnifiedPhonemizer` — 8言語音素化 (eSpeak-ng 不使用)。WASM エラーバウンダリ、入力バリデーション (10万文字上限)、初期化競合防止、30秒タイムアウト
 
 **実装:** `src/wasm/openjtalk-web/src/`, `src/rust/piper-wasm/`, `src/wasm/openjtalk-web/types/index.d.ts`
-**テスト:** `src/wasm/openjtalk-web/test/js/test-*.js` (282テスト), `src/rust/piper-wasm/src/lib.rs` (27 native + 15 wasm-bindgen)
+**テスト:** `src/wasm/openjtalk-web/test/js/test-*.js`, `src/wasm/g2p/test/`, `src/rust/piper-wasm/src/lib.rs`
 **npm README:** `src/wasm/openjtalk-web/README.npm.md`
-**設計ドキュメント:** `docs/design/npm-package-plan.md`, `docs/design/wasm-architecture-review.md`
 **WASM ビルド CI:** `.github/workflows/wasm-build.yml`
+
+### OpenAI 互換 TTS API
+
+FastAPI ベースの OpenAI 互換 TTS エンドポイント。既存の OpenAI クライアントからそのまま利用可能。
+
+| エンドポイント | メソッド | 説明 |
+|-------------|--------|------|
+| `/v1/audio/speech` | POST | 音声合成 (OpenAI互換) |
+| `/v1/models` | GET | モデル一覧 |
+| `/v1/audio/speech/languages` | GET | 対応言語一覧 |
+| `/health` | GET | ヘルスチェック |
+
+**実装:** `docker/python-inference/inference.py`
+**テスト:** `docker/python-inference/test_openai_api.py`
+
+### C API 共有ライブラリ (libpiper_plus)
+
+C ABI 互換の共有ライブラリ。opaque handle パターン、ストリーミングコールバック、カスタム辞書、音素タイミング対応。Dart FFI / Godot GDExtension サンプル付き。
+
+**ビルド:** `cmake -B build -DPIPER_PLUS_BUILD_SHARED=ON && cmake --build build`
+**実装:** `src/cpp/piper_plus.h` (ヘッダー), `src/cpp/piper_plus_c_api.cpp`, `cmake/PiperPlusShared.cmake`
+**テスト:** `src/cpp/tests/test_c_api.cpp`, `test_c_api_integration.cpp`, `test_c_api_audio_regression.cpp`
+**FFIサンプル:** `examples/c-api/` (C), `examples/dart/` (Dart), `examples/godot/` (Godot)
+**リリースCI:** `.github/workflows/release-shared-lib.yml` (Linux/macOS/Windows)
+
+### Go 推論バインディング (piper-plus)
+
+Go による ONNX 推論バインディング。8言語 G2P、HTTP サーバー、ストリーミング対応。
+
+| 項目 | 詳細 |
+|------|------|
+| モジュール | `github.com/ayutaz/piper-plus/src/go` |
+| G2P モジュール | `github.com/ayutaz/piper-plus/src/go/phonemize` (独立) |
+| 対応言語 | JA, EN, ZH, KO, ES, FR, PT, SV (8言語) |
+| テスト | 793テスト (piperplus + phonemize) |
+| CI | 3 OS (go-ci.yml) |
+| ビルド | `cd src/go && go build ./cmd/piper-plus` |
+
+**実装:** `src/go/piperplus/`, `src/go/phonemize/`, `src/go/cmd/piper-plus/`
+**サンプル:** `src/go/examples/` (basic, batch, pool, server, streaming)
+
+### piper-plus-g2p 独立 G2P パッケージ
+
+4言語実装の独立 G2P パッケージ。TTS エンジンなしで音素化のみ利用可能。
+
+| 言語 | パッケージ | レジストリ |
+|------|----------|----------|
+| Python | `piper-plus-g2p` | PyPI |
+| Rust | `piper-plus-g2p` | crates.io |
+| JS/WASM | `@piper-plus/g2p` | npm |
+| Go | `github.com/.../src/go/phonemize` | Go module |
+
+**実装:** `src/python/g2p/`, `src/rust/piper-plus-g2p/`, `src/wasm/g2p/`, `src/go/phonemize/`
+**CI:** `g2p-python-ci.yml`, `g2p-rust-ci.yml`, `g2p-wasm-ci.yml`, `g2p-cross-platform-ci.yml`
+
+### WebUI (Gradio)
+
+Gradio ベースの Web UI。6言語マルチリンガルモデル対応、Docker で起動。
+
+**実装:** `docker/webui/app.py`
+**Docker:** `docker/webui/Dockerfile`, `docker/webui/docker-compose.yml`
+**CI:** `.github/workflows/webui-test.yml`
+**ドキュメント:** `docs/features/webui.md`
 
 ---
 
@@ -408,27 +470,25 @@ Rust によるONNX推論エンジン。ストリーミング、CUDA/CoreML/Direc
 |------|------|
 | 学習スクリプト | `src/python/piper_train/__main__.py` |
 | VITS実装 | `src/python/piper_train/vits/` |
-| Phonemizer ABC | `src/python/piper_train/phonemize/base.py` |
-| 言語レジストリ | `src/python/piper_train/phonemize/registry.py` |
-| 英語音素化 | `src/python/piper_train/phonemize/english.py` |
-| 日本語音素化 | `src/python/piper_train/phonemize/japanese.py` |
-| 中国語音素化 | `src/python/piper_train/phonemize/chinese.py` |
-| 韓国語音素化 | `src/python/piper_train/phonemize/korean.py` |
-| スペイン語音素化 | `src/python/piper_train/phonemize/spanish.py` |
-| ポルトガル語音素化 | `src/python/piper_train/phonemize/portuguese.py` |
-| フランス語音素化 | `src/python/piper_train/phonemize/french.py` |
-| スウェーデン語音素化 | `src/python/piper_train/phonemize/swedish.py` |
-| IDマップ (JA) | `src/python/piper_train/phonemize/jp_id_map.py` |
-| IDマップ (ZH/KO/ES/PT/FR/SV) | `src/python/piper_train/phonemize/{zh,ko,es,pt,fr,sv}_id_map.py` |
-| トークンマッパー | `src/python/piper_train/phonemize/token_mapper.py` |
+| G2P パッケージ (Python) | `src/python/g2p/piper_plus_g2p/` |
+| Phonemizer ABC | `src/python/g2p/piper_plus_g2p/base.py` |
+| 言語レジストリ | `src/python/g2p/piper_plus_g2p/registry.py` |
+| 日本語音素化 | `src/python/g2p/piper_plus_g2p/japanese.py` |
+| 英語音素化 | `src/python/g2p/piper_plus_g2p/english.py` |
+| 中国語音素化 | `src/python/g2p/piper_plus_g2p/chinese.py` |
+| 韓国語音素化 | `src/python/g2p/piper_plus_g2p/korean.py` |
+| スペイン語音素化 | `src/python/g2p/piper_plus_g2p/spanish.py` |
+| ポルトガル語音素化 | `src/python/g2p/piper_plus_g2p/portuguese.py` |
+| フランス語音素化 | `src/python/g2p/piper_plus_g2p/french.py` |
+| スウェーデン語音素化 | `src/python/g2p/piper_plus_g2p/swedish.py` |
+| ランタイム Phonemizer | `src/python_run/piper/phonemize/` |
+| トークンマッパー | `src/python_run/piper/phonemize/token_mapper.py` |
 | ONNXエクスポート | `src/python/piper_train/export_onnx.py` |
 | 推論スクリプト | `src/python/piper_train/infer_onnx.py` |
 | ORT セッション管理 | `src/python/piper_train/ort_utils.py` |
 | 言語横断パラメータ仕様 | `docs/spec/ort-session-contract.toml` |
-| マルチリンガルPhonemizer | `src/python/piper_train/phonemize/multilingual.py` |
-| マルチリンガルIDマップ | `src/python/piper_train/phonemize/multilingual_id_map.py` |
-| バイリンガルPhonemizer | `src/python/piper_train/phonemize/bilingual.py` |
-| バイリンガルIDマップ | `src/python/piper_train/phonemize/bilingual_id_map.py` |
+| OpenAI TTS API | `docker/python-inference/inference.py` |
+| WebUI | `docker/webui/app.py` |
 
 ### C# ソースコード
 
@@ -446,6 +506,7 @@ Rust によるONNX推論エンジン。ストリーミング、CUDA/CoreML/Direc
 | ポルトガル語音素化 | `src/csharp/PiperPlus.Core/Phonemize/PortuguesePhonemizer.cs` |
 | フランス語音素化 | `src/csharp/PiperPlus.Core/Phonemize/FrenchPhonemizer.cs` |
 | 韓国語音素化 | `src/csharp/PiperPlus.Core/Phonemize/KoreanPhonemizer.cs` |
+| スウェーデン語音素化 | `src/csharp/PiperPlus.Core/Phonemize/SwedishPhonemizer.cs` |
 | マルチリンガルPhonemizer | `src/csharp/PiperPlus.Core/Phonemize/MultilingualPhonemizer.cs` |
 | PUAマッピング | `src/csharp/PiperPlus.Core/Mapping/OpenJTalkToPiperMapping.cs` |
 | 設定管理 | `src/csharp/PiperPlus.Core/Config/` |
@@ -470,6 +531,7 @@ Rust によるONNX推論エンジン。ストリーミング、CUDA/CoreML/Direc
 | カスタム辞書テスト | `src/rust/piper-core/tests/test_custom_dict_integration.rs` |
 | デフォルト出力テスト | `src/rust/piper-core/tests/test_default_output.rs` |
 | WASM 音素化 | `src/rust/piper-wasm/` |
+| G2P パッケージ | `src/rust/piper-plus-g2p/` |
 
 ### npm パッケージ ソースコード
 
@@ -483,6 +545,26 @@ Rust によるONNX推論エンジン。ストリーミング、CUDA/CoreML/Direc
 | npm パッケージ設定 | `src/wasm/openjtalk-web/package.json` |
 | npm publish CI | `.github/workflows/npm-publish.yml` |
 | WASM ビルド CI | `.github/workflows/wasm-build.yml` |
+
+### Go ソースコード
+
+| 用途 | パス |
+|------|------|
+| メインモジュール | `src/go/` |
+| コアパッケージ | `src/go/piperplus/` |
+| G2P パッケージ | `src/go/phonemize/` |
+| CLI | `src/go/cmd/piper-plus/` |
+| サンプル | `src/go/examples/` |
+
+### C API ソースコード
+
+| 用途 | パス |
+|------|------|
+| ヘッダー | `src/cpp/piper_plus.h` |
+| 実装 | `src/cpp/piper_plus_c_api.cpp` |
+| CMake | `cmake/PiperPlusShared.cmake` |
+| テスト | `src/cpp/tests/test_c_api*.cpp` |
+| FFI サンプル | `examples/c-api/`, `examples/dart/`, `examples/godot/` |
 
 ### データセット
 

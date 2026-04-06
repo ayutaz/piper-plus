@@ -240,27 +240,28 @@ WebGPU is used automatically when available for faster inference. When WebGPU is
 
 ## Advanced Usage
 
-### Using SimpleUnifiedPhonemizer Directly
+### Using G2P Directly
 
 For phonemization without ONNX inference:
 
 ```javascript
-import { SimpleUnifiedPhonemizer } from "piper-plus";
+import { G2P, Encoder } from "piper-plus/phonemizer";
 
-const phonemizer = new SimpleUnifiedPhonemizer();
-await phonemizer.initialize({
-  configJson: JSON.stringify(modelConfig),  // model's config.json content
-});
+const g2p = await G2P.create({ languages: ['ja', 'en'] });
 
 // Japanese: phonemized via Rust WASM (jpreprocess) with bundled dictionary
-const jaResult = await phonemizer.textToPhonemes("こんにちは", "ja");
-// jaResult.phonemeIds: Int32Array, jaResult.prosodyFeatures: Int32Array
+const jaResult = g2p.phonemize("こんにちは", { language: "ja" });
+// jaResult.tokens: string[], jaResult.language: "ja"
 
-// English: returns IPA string
-const enIPA = await phonemizer.textToPhonemes("Hello world", "en");
-const enPhonemes = phonemizer.extractPhonemes(enIPA, "en");
+// English
+const enResult = g2p.phonemize("Hello world", { language: "en" });
+// enResult.tokens: string[]
 
-phonemizer.dispose();
+// Encode tokens to Piper phoneme IDs for ONNX inference
+const encoder = new Encoder(modelConfig.phoneme_id_map);
+const { phonemeIds } = encoder.encode(jaResult.tokens);
+
+g2p.dispose();
 ```
 
 ### Cache Management
@@ -295,8 +296,8 @@ console.log(modelUrl);  // https://huggingface.co/ayousanz/piper-plus-tsukuyomi-
 The package exposes additional entry points for selective imports:
 
 ```javascript
-// Phonemizer only (no ONNX dependency)
-import { SimpleUnifiedPhonemizer } from "piper-plus/phonemizer";
+// G2P only (no ONNX dependency)
+import { G2P, Encoder } from "piper-plus/phonemizer";
 
 // Streaming pipeline
 import { StreamingTTSPipeline, TextChunker } from "piper-plus/streaming";

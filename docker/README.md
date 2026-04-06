@@ -115,6 +115,31 @@ docker run -d \
 
 ポート 8000 (FastAPI) でリクエストを受け付けます。
 
+#### OpenAI 互換 API
+
+`/v1/audio/speech` エンドポイントで OpenAI 互換の TTS API を提供します。
+
+```bash
+# curl での使用例
+curl -X POST http://localhost:8000/v1/audio/speech \
+  -H "Content-Type: application/json" \
+  -d '{"input": "こんにちは", "language": "ja"}' \
+  -o output.wav
+
+# OpenAI Python クライアント
+from openai import OpenAI
+client = OpenAI(base_url="http://localhost:8000/v1", api_key="dummy")
+response = client.audio.speech.create(model="piper-plus", input="こんにちは", voice="default")
+response.stream_to_file("output.wav")
+```
+
+対応エンドポイント:
+- `POST /v1/audio/speech` — 音声合成
+- `GET /v1/models` — モデル一覧
+- `GET /v1/audio/speech/languages` — 対応言語一覧
+
+> **Note:** `response_format` は `wav` のみ対応。
+
 ## Python 学習
 
 NVIDIA GPU を使用してモデルを学習するためのイメージです。`setup.py` の `[train]` extras でインストールされます。Multi-stage ビルドによりランタイムイメージのサイズを削減しています。

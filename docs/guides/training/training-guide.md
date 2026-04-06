@@ -252,6 +252,8 @@ uv run python -m piper_train \
   --save-top-k -1 \
 ```
 
+> **⚠️ 注意:** V100 GPU では `--precision 16-mixed` は backward pass が極端に遅くなる問題があります。V100 では `--precision 32-true` を推奨します。A100 以降の GPU では `16-mixed` が利用可能です。
+
 Use `--quality high` to train a [larger voice model](https://github.com/rhasspy/piper/blob/master/src/python/piper_train/vits/config.py#L45) (sounds better, but is much slower).
 
 You can adjust the validation split (5% = 0.05) and number of test examples for your specific dataset. For fine-tuning, they are often set to 0 because the target dataset is very small.
@@ -273,6 +275,8 @@ uv run python -m piper_train \
   --precision 16-mixed \                # Mixed precision training (faster, less memory)
   --resume_from_checkpoint /path/to/checkpoint.ckpt  # Resume training
 ```
+
+> **⚠️ 注意:** V100 GPU では `--precision 16-mixed` は backward pass が極端に遅くなる問題があります。V100 では `--precision 32-true` を推奨します。A100 以降の GPU では `16-mixed` が利用可能です。
 
 
 ### Multi-Speaker Fine-Tuning
