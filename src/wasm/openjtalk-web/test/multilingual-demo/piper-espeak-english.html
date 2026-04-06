@@ -216,7 +216,7 @@
                 updateStatus('Initializing PiperPlus...');
 
                 piper = await PiperPlus.initialize({
-                    model: 'tsukuyomi',
+                    model: 'css10',
                     ort: globalThis.ort,
                     onProgress: ({ stage, progress, message }) => {
                         updateStatus(`[${stage}] ${message} (${Math.round(progress * 100)}%)`);

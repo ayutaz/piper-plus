@@ -213,7 +213,7 @@
                 <button class="lang-button" data-lang="pt">Portuguese</button>
             </div>
             <div class="model-info" id="modelInfo">
-                Model: tsukuyomi (JA - Rust WASM jpreprocess)
+                Model: css10 (JA - Rust WASM jpreprocess)
             </div>
         </div>
 
@@ -350,7 +350,7 @@
                 updateStatus('Initializing PiperPlus...', 'loading');
 
                 piper = await PiperPlus.initialize({
-                    model: 'tsukuyomi',
+                    model: 'css10',
                     ort: globalThis.ort,
                     onProgress: ({ stage, progress, message }) => {
                         updateStatus(`[${stage}] ${message} (${Math.round(progress * 100)}%)`, 'loading');
@@ -380,7 +380,7 @@
 
             // Update model info
             const config = languageConfigs[lang] || languageConfigs['ja'];
-            modelInfo.textContent = `Model: tsukuyomi (${lang.toUpperCase()} - ${config.phonemizer})`;
+            modelInfo.textContent = `Model: css10 (${lang.toUpperCase()} - ${config.phonemizer})`;
 
             updateStatus('Ready!', 'success');
 

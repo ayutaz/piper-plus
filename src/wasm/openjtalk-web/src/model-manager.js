@@ -19,6 +19,7 @@ const HUGGINGFACE_RESOLVE_BASE = 'https://huggingface.co';
 const MODEL_REGISTRY = {
   'tsukuyomi': 'ayousanz/piper-plus-tsukuyomi-chan',
   'tsukuyomi-chan': 'ayousanz/piper-plus-tsukuyomi-chan',
+  'css10': 'ayousanz/piper-plus-css10-ja-6lang',
   'css10-ja': 'ayousanz/piper-plus-css10-ja-6lang',
   'base': 'ayousanz/piper-plus-base',
 };
@@ -113,7 +114,7 @@ async function fetchWithProgress(url, onProgress) {
  *   1. Sidecar: `{onnxFilename}.json` (e.g. `model.onnx.json`)
  *   2. Fallback: `config.json`
  *
- * @param {string} repoName - e.g. "ayousanz/piper-plus-tsukuyomi-chan"
+ * @param {string} repoName - e.g. "ayousanz/piper-plus-css10-ja-6lang"
  * @returns {Promise<{onnxFilename: string, configFilename: string}>}
  */
 async function resolveModelFiles(repoName) {
@@ -208,8 +209,8 @@ export class ModelManager {
    * companion config JSON.
    *
    * Accepted formats:
-   *   - Registry shortcut: "tsukuyomi"
-   *   - HuggingFace repo:  "ayousanz/piper-plus-tsukuyomi-chan"
+   *   - Registry shortcut: "css10"
+   *   - HuggingFace repo:  "ayousanz/piper-plus-css10-ja-6lang"
    *   - Direct URL:        "https://example.com/model.onnx"
    *
    * @param {string} modelNameOrUrl

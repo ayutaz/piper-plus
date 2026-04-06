@@ -66,7 +66,7 @@ export class PiperPlus {
    *
    * @param {Object} options
    * @param {string} options.model - HuggingFace model name
-   *   (e.g. "ayousanz/piper-plus-tsukuyomi-chan") or direct URL to an ONNX file.
+   *   (e.g. "ayousanz/piper-plus-css10-ja-6lang") or direct URL to an ONNX file.
    * @param {Object} [options.ort] - onnxruntime-web instance.  When omitted
    *   the global `globalThis.ort` is used.
    * @param {Function} [options.onProgress] - Progress callback receiving

@@ -366,7 +366,7 @@ describe('PiperPlus.initialize バリデーション', { skip }, () => {
 
     // Act & Assert
     await assert.rejects(
-      () => PiperPlus.initialize({ model: 'tsukuyomi' }),
+      () => PiperPlus.initialize({ model: 'test' }),
       (err) => {
         assert.ok(err instanceof Error);
         assert.ok(

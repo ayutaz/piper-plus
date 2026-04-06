@@ -7,7 +7,7 @@ const deploymentConfig = {
     basePath: '',
 
     // Default model for PiperPlus.initialize()
-    defaultModel: 'tsukuyomi',
+    defaultModel: 'css10',
 
     // ONNX Runtime Web CDN URL
     ortCdnUrl: 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.21.0/dist/ort.min.js',

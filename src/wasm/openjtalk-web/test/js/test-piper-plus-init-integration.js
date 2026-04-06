@@ -305,7 +305,7 @@ describe('PiperPlus._init() integration (real _init, mocked deps)', { skip }, ()
     it('config WITHOUT language_id_map: _init completes with all fields set', async () => {
       // BASE_CONFIG has no language_id_map
       const instance = await PiperPlus.initialize({
-        model: 'tsukuyomi',
+        model: 'test',
         ort: globalThis.ort,
       });
 
@@ -333,7 +333,7 @@ describe('PiperPlus._init() integration (real _init, mocked deps)', { skip }, ()
       });
 
       const instance = await PiperPlus.initialize({
-        model: 'tsukuyomi',
+        model: 'test',
         ort: globalThis.ort,
       });
 
@@ -367,13 +367,13 @@ describe('PiperPlus._init() integration (real _init, mocked deps)', { skip }, ()
       });
 
       const instance = await PiperPlus.initialize({
-        model: 'tsukuyomi',
+        model: 'test',
         ort: globalThis.ort,
       });
 
       assert.ok(sessionCreateCalled, 'ort.InferenceSession.create should be called');
       assert.ok(
-        sessionCreateUrl.includes('huggingface.co/mock/tsukuyomi'),
+        sessionCreateUrl.includes('huggingface.co/mock/test'),
         `Session created with model URL, got: ${sessionCreateUrl}`
       );
 
@@ -395,7 +395,7 @@ describe('PiperPlus._init() integration (real _init, mocked deps)', { skip }, ()
 
       try {
         const instance = await PiperPlus.initialize({
-          model: 'tsukuyomi',
+          model: 'test',
           ort: globalThis.ort,
         });
 
@@ -417,7 +417,7 @@ describe('PiperPlus._init() integration (real _init, mocked deps)', { skip }, ()
 
       try {
         const instance = await PiperPlus.initialize({
-          model: 'tsukuyomi',
+          model: 'test',
           ort: globalThis.ort,
         });
 
@@ -441,7 +441,7 @@ describe('PiperPlus._init() integration (real _init, mocked deps)', { skip }, ()
       installGlobalMocks({ configOverride: CONFIG_NO_PHONEME_MAP });
 
       const instance = await PiperPlus.initialize({
-        model: 'tsukuyomi',
+        model: 'test',
         ort: globalThis.ort,
       });
 
@@ -479,7 +479,7 @@ describe('PiperPlus._init() integration (real _init, mocked deps)', { skip }, ()
 
       await assert.rejects(
         () => PiperPlus.initialize({
-          model: 'tsukuyomi',
+          model: 'test',
           ort: globalThis.ort,
         }),
         (err) => {
@@ -501,7 +501,7 @@ describe('PiperPlus._init() integration (real _init, mocked deps)', { skip }, ()
 
       await assert.rejects(
         () => PiperPlus.initialize({
-          model: 'tsukuyomi',
+          model: 'test',
           ort: globalThis.ort,
         }),
         (err) => {
@@ -534,7 +534,7 @@ describe('PiperPlus._init() integration (real _init, mocked deps)', { skip }, ()
 
       await assert.rejects(
         () => PiperPlus.initialize({
-          model: 'tsukuyomi',
+          model: 'test',
           ort: globalThis.ort,
         }),
         (err) => {
@@ -571,7 +571,7 @@ describe('PiperPlus._init() integration (real _init, mocked deps)', { skip }, ()
       });
 
       const instance = await PiperPlus.initialize({
-        model: 'tsukuyomi',
+        model: 'test',
         ort: globalThis.ort,
       });
 
@@ -607,7 +607,7 @@ describe('PiperPlus._init() integration (real _init, mocked deps)', { skip }, ()
       });
 
       const instance = await PiperPlus.initialize({
-        model: 'tsukuyomi',
+        model: 'test',
         ort: globalThis.ort,
       });
 

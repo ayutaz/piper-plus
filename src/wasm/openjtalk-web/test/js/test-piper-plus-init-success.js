@@ -297,7 +297,7 @@ describe('PiperPlus.initialize() 正常系', { skip }, () => {
   // -----------------------------------------------------------------------
   it('model オプション指定で正常に初期化される', async () => {
     // Arrange
-    const modelName = 'tsukuyomi';
+    const modelName = 'test';
 
     // Act
     const instance = await PiperPlus.initialize({
@@ -318,7 +318,7 @@ describe('PiperPlus.initialize() 正常系', { skip }, () => {
   // -----------------------------------------------------------------------
   it('初期化後に config が設定される', async () => {
     // Arrange
-    const modelName = 'tsukuyomi';
+    const modelName = 'test';
 
     // Act
     const instance = await PiperPlus.initialize({
@@ -350,7 +350,7 @@ describe('PiperPlus.initialize() 正常系', { skip }, () => {
   it('初期化後に synthesize が呼べる', async () => {
     // Arrange
     const instance = await PiperPlus.initialize({
-      model: 'tsukuyomi',
+      model: 'test',
       ort: globalThis.ort,
     });
 
@@ -394,7 +394,7 @@ describe('PiperPlus.initialize() 正常系', { skip }, () => {
 
     // Act
     const instance = await PiperPlus.initialize({
-      model: 'tsukuyomi',
+      model: 'test',
       ort: globalThis.ort,
       dictUrl: customDictUrl,
     });
@@ -419,7 +419,7 @@ describe('PiperPlus.initialize() 正常系', { skip }, () => {
 
     // Act
     const instance = await PiperPlus.initialize({
-      model: 'tsukuyomi',
+      model: 'test',
       ort: globalThis.ort,
       onProgress,
     });
