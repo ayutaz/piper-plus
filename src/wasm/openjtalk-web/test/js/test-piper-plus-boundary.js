@@ -176,13 +176,14 @@ function createMockedInstance(overrides = {}) {
     ...overrides.config,
   };
 
-  instance._g2p = overrides.g2p || {
+  instance._phonemizer = overrides.phonemizer || {
     detectLanguage: mock.fn(() => 'ja'),
-    encode: mock.fn((_text, _map, _opts) => ({
+    encode: mock.fn((text, language) => ({
       phonemeIds: [1, 7, 2],
-      prosodyFlat: null,
+      prosodyFeatures: null,
     })),
     dispose: mock.fn(),
+    supportedLanguages: ['en', 'zh', 'es', 'fr', 'pt'],
   };
 
   const capturedFeeds = [];
@@ -262,13 +263,14 @@ describe('G2P encode を経由した phoneme ID 取得', { skip }, () => {
     let capturedFeeds = null;
     const expectedIds = [1, 10, 11, 2];
     const instance = createMockedInstance({
-      g2p: {
+      phonemizer: {
         detectLanguage: mock.fn(() => 'ja'),
-        encode: mock.fn((_text, _map, _opts) => ({
+        encode: mock.fn((text, language) => ({
           phonemeIds: expectedIds,
-          prosodyFlat: null,
+          prosodyFeatures: null,
         })),
         dispose: mock.fn(),
+        supportedLanguages: ['en', 'zh', 'es', 'fr', 'pt'],
       },
       session: {
         run: mock.fn(async (feeds) => {
@@ -288,10 +290,15 @@ describe('G2P encode を経由した phoneme ID 取得', { skip }, () => {
     assert.deepStrictEqual(ids, expectedIds);
   });
 
-  it('phoneme_id_map が config にない場合はエラーになる', async () => {
-    // Arrange
+  it('phonemizer.encode がエラーを投げるとリジェクトされる', async () => {
+    // Arrange — phonemizer that throws on encode (simulates missing config)
     const instance = createMockedInstance({
-      config: { audio: undefined, inference: undefined, phoneme_id_map: undefined },
+      phonemizer: {
+        detectLanguage: mock.fn(() => 'ja'),
+        encode: mock.fn(() => { throw new Error('phoneme_id_map is required'); }),
+        dispose: mock.fn(),
+        supportedLanguages: ['en'],
+      },
     });
 
     // Act & Assert
@@ -348,23 +355,24 @@ describe('noiseScale に負の値を渡した場合の挙動', { skip }, () => {
 describe('language に未知のコードを渡した場合', { skip }, () => {
   it('未知の言語コードでも G2P.encode に委譲される', async () => {
     // Arrange
-    const encodeFn = mock.fn((_text, _map, _opts) => ({
+    const encodeFn = mock.fn((text, language) => ({
       phonemeIds: [1, 7, 2],
-      prosodyFlat: null,
+      prosodyFeatures: null,
     }));
     const instance = createMockedInstance({
-      g2p: {
+      phonemizer: {
         detectLanguage: () => 'ja',
         encode: encodeFn,
         dispose: mock.fn(),
+        supportedLanguages: ['en', 'zh', 'es', 'fr', 'pt'],
       },
     });
 
     // Act — pass explicit language
     await instance.synthesize('test', { language: 'xx' });
 
-    // Assert — encode is called with the language in options
-    assert.strictEqual(encodeFn.mock.calls[0].arguments[2].language, 'xx');
+    // Assert — encode is called with (text, language)
+    assert.strictEqual(encodeFn.mock.calls[0].arguments[1], 'xx');
   });
 });
 

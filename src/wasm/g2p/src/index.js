@@ -100,11 +100,11 @@ export class G2P {
 
     // Initialise Japanese (async -- requires WASM + dict)
     if (languages.includes('ja')) {
-      const jaG2P = await JapaneseG2P.create({
+      const jaG2P = new JapaneseG2P({
         openjtalkModule: options.openjtalkModule,
         jaDict: options.jaDict,
-        customDicts: options.customDicts,
       });
+      await jaG2P.initialize();
       phonemizers.set('ja', jaG2P);
     }
 

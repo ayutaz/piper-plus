@@ -173,6 +173,14 @@
         </div>
     </div>
 
+    <script type="importmap">
+    {
+        "imports": {
+            "@piper-plus/g2p": "../../../g2p/src/index.js"
+        }
+    }
+    </script>
+
     <script type="module">
         import { PiperPlus } from '../../src/index.js';
 
@@ -208,7 +216,7 @@
                 updateStatus('Initializing PiperPlus...');
 
                 piper = await PiperPlus.initialize({
-                    model: 'tsukuyomi',
+                    model: 'css10',
                     ort: globalThis.ort,
                     onProgress: ({ stage, progress, message }) => {
                         updateStatus(`[${stage}] ${message} (${Math.round(progress * 100)}%)`);

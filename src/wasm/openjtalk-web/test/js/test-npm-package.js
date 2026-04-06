@@ -259,10 +259,15 @@ describe('keywords バリデーション', () => {
 // ---------------------------------------------------------------------------
 
 describe('files フィールドバリデーション', () => {
-  it('files エントリが既存のパスに解決される', () => {
+  it('files エントリが既存のパスに解決される (build artifacts excluded)', () => {
+    // dist/ entries are WASM build artifacts that only exist after
+    // wasm-pack build.  Skip them so this test passes in CI without
+    // a prior WASM build step.
+    const BUILD_ARTIFACT_PREFIX = 'dist/';
     const missing = [];
 
     for (const entry of pkg.files) {
+      if (entry.startsWith(BUILD_ARTIFACT_PREFIX)) continue;
       const expanded = expandFilesEntry(entry);
       if (expanded.length === 0) {
         missing.push(entry);

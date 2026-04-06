@@ -68,13 +68,14 @@ function createMockInstance(overrides = {}) {
   const outputAudio = overrides.outputAudio || new Float32Array(22050);
 
   // Default encode returns IDs for [k, o, N, n, i, ch, i, w, a] = [10,11,12,13,14,15,14,16,17]
-  instance._g2p = {
+  instance._phonemizer = {
     detectLanguage: overrides.detectLanguage || ((text) => 'ja'),
-    encode: overrides.encode || ((_text, _map, _opts) => ({
+    encode: overrides.encode || ((text, language) => ({
       phonemeIds: [10, 11, 12, 13, 14, 15, 14, 16, 17],
-      prosodyFlat: null,
+      prosodyFeatures: null,
     })),
-    dispose: overrides.g2pDispose || (() => {}),
+    dispose: overrides.phonemizerDispose || (() => {}),
+    supportedLanguages: ['en', 'zh', 'es', 'fr', 'pt'],
   };
 
   instance._session = {
@@ -116,9 +117,9 @@ describe('PiperPlus synthesize() end-to-end flow', { skip }, () => {
     // Arrange
     const instance = createMockInstance({
       detectLanguage: () => 'en',
-      encode: (_text, _map, _opts) => ({
+      encode: (text, language) => ({
         phonemeIds: [14, 21, 22, 23],
-        prosodyFlat: null,
+        prosodyFeatures: null,
       }),
     });
 
@@ -157,9 +158,9 @@ describe('PiperPlus synthesize() end-to-end flow', { skip }, () => {
     let capturedFeeds = null;
     const instance = createMockInstance({
       // encode returns 3 phoneme IDs to make verification straightforward
-      encode: (_text, _map, _opts) => ({
+      encode: (text, language) => ({
         phonemeIds: [10, 11, 17],
-        prosodyFlat: null,
+        prosodyFeatures: null,
       }),
       sessionRun: async (feeds) => {
         capturedFeeds = feeds;
@@ -211,9 +212,9 @@ describe('PiperPlus synthesize() end-to-end flow', { skip }, () => {
     let detectCalled = false;
     const instance = createMockInstance({
       detectLanguage: () => { detectCalled = true; return 'ja'; },
-      encode: (_text, _map, _opts) => ({
+      encode: (text, language) => ({
         phonemeIds: [14, 21, 22, 23],
-        prosodyFlat: null,
+        prosodyFeatures: null,
       }),
     });
 

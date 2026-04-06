@@ -212,7 +212,7 @@
                 </button>
             </div>
             <div class="model-info" id="modelInfo">
-                Phonemizer: PiperPlus (Rust WASM) | Model: tsukuyomi (HuggingFace auto-download)
+                Phonemizer: PiperPlus (Rust WASM) | Model: css10 (HuggingFace auto-download)
             </div>
         </div>
 
@@ -296,7 +296,7 @@
                 updateStatus('Initializing PiperPlus...', 'loading');
 
                 piper = await PiperPlus.initialize({
-                    model: 'tsukuyomi',
+                    model: 'css10',
                     ort: ort,
                     onProgress: ({ stage, progress, message }) => {
                         updateStatus(`[${stage}] ${message}`, 'loading');

@@ -226,8 +226,8 @@ export class ModelManager {
    * companion config JSON.
    *
    * Accepted formats:
-   *   - Registry shortcut: "tsukuyomi"
-   *   - HuggingFace repo:  "ayousanz/piper-plus-tsukuyomi-chan"
+   *   - Registry shortcut: "css10"
+   *   - HuggingFace repo:  "ayousanz/piper-plus-css10-ja-6lang"
    *   - Direct URL:        "https://example.com/model.onnx"
    *
    * @param modelNameOrUrl - Registry shortcut, HuggingFace repo, or direct URL.

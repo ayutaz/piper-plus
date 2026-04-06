@@ -174,6 +174,74 @@ describe('WebGPUSessionManager', { skip }, () => {
     });
   });
 
+  describe('int64 フォールバック', () => {
+    it('int64入力を持つモデルではWebGPUをスキップしWASMにフォールバックする', async () => {
+      const mgr = new WebGPUSessionManager({
+        ort: {
+          InferenceSession: {
+            create: async (path, opts) => {
+              const provider = (opts.executionProviders || ['wasm'])[0];
+              return {
+                inputNames: ['input', 'input_lengths', 'scales', 'lid'],
+                outputNames: ['output'],
+                inputMetadata: {
+                  input: { dataType: 'int64' },
+                  input_lengths: { dataType: 'int64' },
+                  scales: { dataType: 'float32' },
+                  lid: { dataType: 'int64' },
+                },
+                currentProvider: provider,
+                run: async () => ({ output: { data: new Float32Array(100), dims: [1, 100] } }),
+                release: () => {},
+              };
+            },
+          },
+        },
+        gpu: createMockGPU(true),
+      });
+      const session = await mgr.createSession('model.onnx');
+      assert.equal(mgr.currentProvider, 'wasm',
+        'Should fall back to wasm when model uses int64 inputs');
+    });
+
+    it('float32のみのモデルではWebGPUが選択される', async () => {
+      const mgr = new WebGPUSessionManager({
+        ort: {
+          InferenceSession: {
+            create: async (path, opts) => {
+              const provider = (opts.executionProviders || ['wasm'])[0];
+              return {
+                inputNames: ['x', 'y'],
+                outputNames: ['output'],
+                inputMetadata: {
+                  x: { dataType: 'float32' },
+                  y: { dataType: 'float32' },
+                },
+                currentProvider: provider,
+                run: async () => ({ output: { data: new Float32Array(100), dims: [1, 100] } }),
+                release: () => {},
+              };
+            },
+          },
+        },
+        gpu: createMockGPU(true),
+      });
+      const session = await mgr.createSession('model.onnx');
+      assert.equal(mgr.currentProvider, 'webgpu',
+        'Should use webgpu when model has no int64 inputs');
+    });
+
+    it('inputMetadata未提供時はWebGPUを許可する (後方互換)', async () => {
+      const mgr = new WebGPUSessionManager({
+        ort: createMockOrt({ supportedProviders: ['webgpu', 'wasm'] }),
+        gpu: createMockGPU(true),
+      });
+      const session = await mgr.createSession('model.onnx');
+      assert.equal(mgr.currentProvider, 'webgpu',
+        'Should allow webgpu when metadata is unavailable');
+    });
+  });
+
   describe('セッション設定', () => {
     it('graphOptimizationLevelがextendedに設定される', async () => {
       let capturedOptions;

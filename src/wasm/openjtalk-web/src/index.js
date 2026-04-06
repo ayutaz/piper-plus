@@ -22,11 +22,14 @@ export { AudioResult } from './audio-result.js';
 // Imports used by PiperPlus
 // ---------------------------------------------------------------------------
 
-import { G2P, checkPuaCompat } from '@piper-plus/g2p';
+import { checkPuaCompat } from '@piper-plus/g2p';
 import { WebGPUSessionManager } from './webgpu-session-manager.js';
 import { StreamingTTSPipeline, TextChunker } from './streaming-pipeline.js';
 import { ModelManager } from './model-manager.js';
 import { AudioResult } from './audio-result.js';
+import { RustWasmAdapter } from './phonemizer/rust-wasm-adapter.js';
+import { JsG2pAdapter } from './phonemizer/js-g2p-adapter.js';
+import { CompositePhonemizer } from './phonemizer/composite-phonemizer.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -46,7 +49,7 @@ export class PiperPlus {
   constructor() {
     this._session = null;
     this._config = null;
-    this._g2p = null;
+    this._phonemizer = null;
     this._ort = null;
     this._initialized = false;
     this._warmupPromise = null;
@@ -63,11 +66,15 @@ export class PiperPlus {
    *
    * @param {Object} options
    * @param {string} options.model - HuggingFace model name
-   *   (e.g. "ayousanz/piper-plus-tsukuyomi-chan") or direct URL to an ONNX file.
+   *   (e.g. "ayousanz/piper-plus-css10-ja-6lang") or direct URL to an ONNX file.
    * @param {Object} [options.ort] - onnxruntime-web instance.  When omitted
    *   the global `globalThis.ort` is used.
    * @param {Function} [options.onProgress] - Progress callback receiving
    *   `{ stage: string, progress: number, message: string }`.
+   * @param {string} [options.wasmG2pUrl] - Custom URL for Rust WASM G2P module.
+   *   Defaults to `../dist/rust-wasm/piper_plus_wasm.js`.
+   * @param {Function} [options.wasmLoader] - DI: async function returning WASM
+   *   module for testing. Takes precedence over wasmG2pUrl.
    * @returns {Promise<PiperPlus>}
    */
   static async initialize(options = {}) {
@@ -102,7 +109,7 @@ export class PiperPlus {
       throw new Error('text is required');
     }
 
-    const language = options.language || this._g2p.detectLanguage(text);
+    const language = options.language || this._detectLanguage(text);
     const noiseScale = options.noiseScale ?? this._config.inference?.noise_scale ?? DEFAULT_NOISE_SCALE;
     const lengthScale = options.lengthScale ?? this._config.inference?.length_scale ?? DEFAULT_LENGTH_SCALE;
     const noiseW = options.noiseW ?? this._config.inference?.noise_w ?? DEFAULT_NOISE_W;
@@ -115,6 +122,7 @@ export class PiperPlus {
       noiseScale,
       lengthScale,
       noiseW,
+      language,
     });
 
     // 3. Wrap result
@@ -138,7 +146,7 @@ export class PiperPlus {
       throw new Error('text is required');
     }
 
-    const language = options.language || this._g2p.detectLanguage(text);
+    const language = options.language || this._detectLanguage(text);
     const noiseScale = options.noiseScale ?? this._config.inference?.noise_scale ?? DEFAULT_NOISE_SCALE;
     const lengthScale = options.lengthScale ?? this._config.inference?.length_scale ?? DEFAULT_LENGTH_SCALE;
     const noiseW = options.noiseW ?? this._config.inference?.noise_w ?? DEFAULT_NOISE_W;
@@ -152,7 +160,7 @@ export class PiperPlus {
       synthesize: async (ids) => {
         // Streaming path skips prosody for simplicity — prosody extraction
         // requires the full labels which are language-specific.
-        return this._infer(ids, null, { noiseScale, lengthScale, noiseW });
+        return this._infer(ids, null, { noiseScale, lengthScale, noiseW, language });
       },
       onAudioChunk: onChunk,
     });
@@ -165,16 +173,17 @@ export class PiperPlus {
    */
   dispose() {
     if (this._session) {
-      // onnxruntime-web sessions expose release()
       if (typeof this._session.release === 'function') {
         this._session.release();
       }
       this._session = null;
     }
-    if (this._g2p) {
-      this._g2p.dispose();
-      this._g2p = null;
+    if (this._phonemizer) {
+      this._phonemizer.dispose();
+      this._phonemizer = null;
     }
+    this._sessionManager = null;
+    this._modelUrl = null;
     this._warmupPromise = null;
     this._initialized = false;
   }
@@ -236,22 +245,87 @@ export class PiperPlus {
 
       progress({ stage: 'model', progress: 0.3, message: 'Creating ONNX session...' });
 
-      const sessionManager = new WebGPUSessionManager({
+      // VITS models use int64 tensors (input, input_lengths, lid, prosody_features)
+      // which WebGPU (WGSL) does not support. Always use WASM CPU backend.
+      this._sessionManager = new WebGPUSessionManager({
         ort,
-        gpu: typeof navigator !== 'undefined' ? navigator.gpu : undefined,
+        gpu: undefined,
       });
-      this._session = await sessionManager.createSession(modelUrl);
+      this._modelUrl = modelUrl;
+      this._session = await this._sessionManager.createSession(modelUrl);
 
       progress({ stage: 'model', progress: 0.7, message: 'Model loaded.' });
 
-      // --- 3. Initialise phonemizer (@piper-plus/g2p) --------------------------
+      // --- 3. Initialise phonemizer (Adapter pattern) --------------------------
 
       progress({ stage: 'phonemizer', progress: 0, message: 'Initializing phonemizer...' });
 
-      const languages = this._config.language_id_map
+      let languages = this._config.language_id_map
         ? Object.keys(this._config.language_id_map)
         : undefined;
-      this._g2p = await G2P.create({ languages });
+
+      const phonemizerMap = new Map();
+      let wasmAdapter = null;
+
+      // Languages that REQUIRE Rust WASM (no functional JS G2P fallback):
+      //   ja — needs jpreprocess (no JS equivalent)
+      //   zh — needs pinyin dictionary (JS G2P has no pinyin conversion)
+      const WASM_REQUIRED_LANGUAGES = new Set(['ja', 'zh']);
+
+      // Load Rust WASM phonemizer when any model language benefits from it.
+      // When loaded, route ALL languages through WASM — the Rust
+      // MultilingualPhonemizer now respects language hints for Latin-script
+      // languages (es/fr/pt/sv), so they are phonemized correctly.
+      const needsWasm = languages && languages.some(l => WASM_REQUIRED_LANGUAGES.has(l));
+      if (needsWasm) {
+        try {
+          wasmAdapter = await RustWasmAdapter.create(
+            JSON.stringify(this._config),
+            {
+              wasmUrl: options.wasmG2pUrl || '../../dist/rust-wasm/piper_plus_wasm.js',
+              wasmLoader: options.wasmLoader,
+            },
+          );
+          // Route all languages through WASM
+          const wasmLangs = wasmAdapter.supportedLanguages;
+          for (const lang of languages) {
+            if (wasmLangs.includes(lang)) {
+              phonemizerMap.set(lang, wasmAdapter);
+            }
+          }
+        } catch (err) {
+          const excluded = languages.filter(l => WASM_REQUIRED_LANGUAGES.has(l));
+          console.warn(
+            `[piper-plus] Rust WASM G2P failed to load, excluding ${excluded.join(', ')}:`,
+            err.message,
+          );
+          languages = languages.filter(l => !WASM_REQUIRED_LANGUAGES.has(l));
+        }
+      }
+
+      // Languages not covered by WASM use JS G2P as fallback.
+      // When languages is undefined (no language_id_map), pass undefined to
+      // JsG2pAdapter so G2P.create() initialises all available languages.
+      const jsLanguages = languages?.filter(l => !phonemizerMap.has(l));
+      const needsJsAdapter = !jsLanguages || jsLanguages.length > 0;
+      let jsAdapter = null;
+      if (needsJsAdapter) {
+        jsAdapter = await JsG2pAdapter.create(
+          jsLanguages,  // undefined when no language_id_map
+          this._config.phoneme_id_map,
+        );
+        if (jsLanguages) {
+          for (const lang of jsLanguages) {
+            phonemizerMap.set(lang, jsAdapter);
+          }
+        }
+      }
+
+      this._phonemizer = new CompositePhonemizer({
+        phonemizers: phonemizerMap,
+        fallback: jsAdapter || wasmAdapter,
+        detector: wasmAdapter || jsAdapter,
+      });
 
       progress({ stage: 'phonemizer', progress: 1, message: 'Phonemizer ready.' });
 
@@ -268,27 +342,20 @@ export class PiperPlus {
   }
 
   /**
+   * Detect language of text via the composite phonemizer.
+   * @private
+   */
+  _detectLanguage(text) {
+    return this._phonemizer.detectLanguage(text);
+  }
+
+  /**
    * Convert text to phoneme IDs (and optional prosody features).
+   * Delegates to the appropriate adapter via CompositePhonemizer.
    * @private
    */
   async _textToPhonemeIds(text, language) {
-    const phonemeIdMap = this._config.phoneme_id_map;
-    if (!phonemeIdMap) {
-      throw new Error('Model config is missing phoneme_id_map');
-    }
-    const result = this._g2p.encode(text, phonemeIdMap, { language });
-
-    // Convert flat prosodyFlat [a1,a2,a3,...] to nested [[a1,a2,a3],...] for #infer()
-    let prosodyFeatures = null;
-    if (result.prosodyFlat && result.prosodyFlat.length > 0) {
-      const flat = result.prosodyFlat;
-      prosodyFeatures = [];
-      for (let i = 0; i < flat.length; i += 3) {
-        prosodyFeatures.push([flat[i], flat[i + 1], flat[i + 2]]);
-      }
-    }
-
-    return { phonemeIds: result.phonemeIds, prosodyFeatures };
+    return this._phonemizer.encode(text, language);
   }
 
   /**
@@ -301,7 +368,7 @@ export class PiperPlus {
    * Returns raw Float32Array of audio samples.
    * @private
    */
-  async _infer(phonemeIds, prosodyFeatures, { noiseScale, lengthScale, noiseW }) {
+  async _infer(phonemeIds, prosodyFeatures, { noiseScale, lengthScale, noiseW, language }) {
     const ort = this._ort;
 
     const inputTensor = new ort.Tensor(
@@ -328,6 +395,18 @@ export class PiperPlus {
       scales: scalesTensor,
     };
 
+    // Attach language ID tensor for multilingual models
+    if (this._config.language_id_map && language) {
+      const langId = this._config.language_id_map[language];
+      if (langId !== undefined) {
+        feeds.lid = new ort.Tensor(
+          'int64',
+          new BigInt64Array([BigInt(langId)]),
+          [1]
+        );
+      }
+    }
+
     // Attach prosody features when the model supports them
     if (prosodyFeatures && this._config.prosody_id_map) {
       const flat = [];
@@ -341,7 +420,29 @@ export class PiperPlus {
       );
     }
 
-    const results = await this._session.run(feeds);
+    let results;
+    try {
+      results = await this._session.run(feeds);
+    } catch (e) {
+      // Detect WebGPU int64 kernel failure and fall back to WASM
+      if (this._sessionManager?.currentProvider === 'webgpu'
+          && e?.message?.includes('Unsupported data type')) {
+        console.warn(
+          '[piper-plus] WebGPU inference failed (likely int64 unsupported). '
+          + 'Recreating session with WASM backend.',
+          e.message
+        );
+        if (typeof this._session.release === 'function') {
+          await this._session.release();
+        }
+        // Force WASM by removing GPU reference
+        this._sessionManager._gpu = undefined;
+        this._session = await this._sessionManager.createSession(this._modelUrl);
+        results = await this._session.run(feeds);
+      } else {
+        throw e;
+      }
+    }
     const audioTensor = results.output || results[Object.keys(results)[0]];
     return new Float32Array(audioTensor.data);
   }
