@@ -6,6 +6,13 @@ on:
       - dev
     paths:
       - 'src/wasm/**'
+      - 'src/rust/piper-wasm/**'
+      - '.github/workflows/deploy-webassembly-demo.yml'
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'src/wasm/**'
+      - 'src/rust/piper-wasm/**'
       - '.github/workflows/deploy-webassembly-demo.yml'
   workflow_dispatch:
     inputs:
@@ -21,7 +28,7 @@ permissions:
 
 concurrency:
   group: "pages"
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   build:
