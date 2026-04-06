@@ -268,7 +268,7 @@ export class PiperPlus {
           wasmAdapter = await RustWasmAdapter.create(
             JSON.stringify(this._config),
             {
-              wasmUrl: options.wasmG2pUrl || '../dist/rust-wasm/piper_plus_wasm.js',
+              wasmUrl: options.wasmG2pUrl || '../../dist/rust-wasm/piper_plus_wasm.js',
               wasmLoader: options.wasmLoader,
             },
           );
