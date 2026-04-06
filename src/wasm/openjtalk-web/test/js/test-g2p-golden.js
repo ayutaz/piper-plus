@@ -51,6 +51,31 @@ const FIXTURE_PATH = join(
 
 const FIXTURE = JSON.parse(readFileSync(FIXTURE_PATH, 'utf-8'));
 
+// Build a reverse PUA map: multi-char token name -> PUA single character.
+// The JS G2P emits PUA codepoints (e.g. U+E01E for "y_vowel"), while the
+// fixture's expected_contains uses human-readable token names.  This map
+// lets us translate fixture expectations to the actual PUA characters so
+// that Set.has() comparisons succeed.
+const TOKEN_NAME_TO_PUA = {};
+if (FIXTURE.pua_map) {
+    for (const [name, hex] of Object.entries(FIXTURE.pua_map)) {
+        TOKEN_NAME_TO_PUA[name] = String.fromCodePoint(parseInt(hex, 16));
+    }
+}
+
+/**
+ * Check whether the token set contains the expected token.
+ * Tries both the literal token string AND its PUA-mapped equivalent
+ * (if one exists), because some JS G2P implementations emit PUA
+ * codepoints while others emit the raw multi-character string.
+ */
+function tokenSetHasExpected(tokenSet, expected) {
+    if (tokenSet.has(expected)) return true;
+    const pua = TOKEN_NAME_TO_PUA[expected];
+    if (pua && tokenSet.has(pua)) return true;
+    return false;
+}
+
 function casesFor(lang) {
     return FIXTURE.test_cases.filter(c => c.language === lang);
 }
@@ -100,7 +125,7 @@ describe('G2P golden: French', () => {
                 const tokenSet = new Set(tokens);
                 for (const expected of c.expected_contains) {
                     assert.ok(
-                        tokenSet.has(expected),
+                        tokenSetHasExpected(tokenSet, expected),
                         `FR output missing ${JSON.stringify(expected)} for ${JSON.stringify(c.input)}: [${tokens.join(', ')}]`
                     );
                 }
@@ -123,7 +148,7 @@ describe('G2P golden: Portuguese', () => {
                 const tokenSet = new Set(tokens);
                 for (const expected of c.expected_contains) {
                     assert.ok(
-                        tokenSet.has(expected),
+                        tokenSetHasExpected(tokenSet, expected),
                         `PT output missing ${JSON.stringify(expected)} for ${JSON.stringify(c.input)}: [${tokens.join(', ')}]`
                     );
                 }
@@ -146,7 +171,7 @@ describe('G2P golden: Swedish', () => {
                 const tokenSet = new Set(tokens);
                 for (const expected of c.expected_contains) {
                     assert.ok(
-                        tokenSet.has(expected),
+                        tokenSetHasExpected(tokenSet, expected),
                         `SV output missing ${JSON.stringify(expected)} for ${JSON.stringify(c.input)}: [${tokens.join(', ')}]`
                     );
                 }
@@ -169,7 +194,7 @@ describe('G2P golden: Korean', () => {
                 const tokenSet = new Set(tokens);
                 for (const expected of c.expected_contains) {
                     assert.ok(
-                        tokenSet.has(expected),
+                        tokenSetHasExpected(tokenSet, expected),
                         `KO output missing ${JSON.stringify(expected)} for ${JSON.stringify(c.input)}: [${tokens.join(', ')}]`
                     );
                 }
