@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "piper-plus"
-version = "0.1.0"
+version = "0.2.0"
 description = "High-quality neural text-to-speech with 7-language support"
 requires-python = ">=3.8"
 license = "MIT"
