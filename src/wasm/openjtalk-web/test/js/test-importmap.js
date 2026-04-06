@@ -3,7 +3,8 @@
  *
  * Ensures every HTML demo page that loads ES modules with bare specifiers
  * (e.g. "@piper-plus/g2p") has a matching <script type="importmap"> entry,
- * and that the mapped target file actually exists on disk.
+ * and that each such specifier is mapped in BARE_SPECIFIER_SOURCE_MAP to a
+ * corresponding source-tree file that exists on disk.
  *
  * Run: node --test test/js/test-importmap.js
  */
@@ -11,7 +12,7 @@
 import { strict as assert } from 'node:assert';
 import { describe, it } from 'node:test';
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
-import { join, resolve, dirname } from 'node:path';
+import { join, resolve, dirname, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 // ---------------------------------------------------------------------------
@@ -145,7 +146,7 @@ describe('Import map coverage', () => {
   });
 
   for (const htmlPath of htmlPaths) {
-    const fileName = htmlPath.split('/').pop();
+    const fileName = basename(htmlPath);
 
     // Only test HTML files that actually import from src/ (i.e. use ES modules)
     const htmlContent = existsSync(htmlPath) ? readFileSync(htmlPath, 'utf-8') : '';

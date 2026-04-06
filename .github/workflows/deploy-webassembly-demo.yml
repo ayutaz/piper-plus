@@ -191,7 +191,7 @@ jobs:
             sed -i "s|'../dist/|'./dist/|g" deploy/index.html
             
             # Update import map paths (double-quoted JSON strings)
-            sed -i 's|"../../g2p/|"./g2p/|g' deploy/index.html
+            sed -i 's|"../../../g2p/|"./g2p/|g' deploy/index.html
             sed -i 's|"../../src/|"./src/|g' deploy/index.html
             sed -i 's|"../../dist/|"./dist/|g' deploy/index.html
 
@@ -224,7 +224,7 @@ jobs:
                 sed -i "s|'../../assets/|'../assets/|g" "$file"
                 sed -i "s|'../../dist/|'../dist/|g" "$file"
                 # Import map paths (double-quoted JSON strings)
-                sed -i 's|"../../g2p/|"../g2p/|g' "$file"
+                sed -i 's|"../../../g2p/|"../g2p/|g' "$file"
                 sed -i 's|"../../src/|"../src/|g' "$file"
                 sed -i 's|"../../dist/|"../dist/|g' "$file"
               fi
