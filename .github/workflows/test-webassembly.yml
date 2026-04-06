@@ -86,6 +86,10 @@ jobs:
       working-directory: src/wasm/openjtalk-web
       run: node --test test/js/test-importmap.js
 
+    - name: Run PiperPlus G2P integration tests
+      working-directory: src/wasm/openjtalk-web
+      run: node --test test/js/test-piper-plus-g2p-init.js
+
     - name: Run JavaScript tests
       working-directory: src/wasm/openjtalk-web
       run: |
