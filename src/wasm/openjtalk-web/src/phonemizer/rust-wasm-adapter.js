@@ -25,6 +25,15 @@ export class RustWasmAdapter {
    * @param {function} [options.wasmLoader] - DI loader returning { WasmPhonemizer }
    * @returns {Promise<RustWasmAdapter>}
    */
+  /**
+   * @param {string} configJson - model config JSON
+   * @param {object} [options]
+   * @param {string} [options.wasmUrl] - URL to the WASM module
+   * @param {function} [options.wasmLoader] - DI loader returning { WasmPhonemizer }
+   * @param {string} [options.zhDictBaseUrl] - Base URL for Chinese pinyin dictionaries.
+   *   Defaults to `../../assets/` relative to the WASM module.
+   * @returns {Promise<RustWasmAdapter>}
+   */
   static async create(configJson, options = {}) {
     let wasmModule;
     if (options.wasmLoader) {
@@ -36,6 +45,28 @@ export class RustWasmAdapter {
       await wasmModule.default(); // init() — load WASM binary
     }
     const wasm = new wasmModule.WasmPhonemizer(configJson);
+
+    // Load Chinese pinyin dictionaries if setChineseDictionary is available
+    if (typeof wasm.setChineseDictionary === 'function') {
+      try {
+        const dictBase = options.zhDictBaseUrl
+          || new URL('../../assets/', import.meta.url).href;
+        const [singleResp, phraseResp] = await Promise.all([
+          fetch(new URL('pinyin_single.json', dictBase)),
+          fetch(new URL('pinyin_phrases.json', dictBase)),
+        ]);
+        if (singleResp.ok && phraseResp.ok) {
+          const singleBytes = new Uint8Array(await singleResp.arrayBuffer());
+          const phraseBytes = new Uint8Array(await phraseResp.arrayBuffer());
+          wasm.setChineseDictionary(singleBytes, phraseBytes);
+        } else {
+          console.warn('[piper-plus] Chinese pinyin dictionaries not found, zh will use passthrough');
+        }
+      } catch (e) {
+        console.warn('[piper-plus] Failed to load Chinese dictionaries:', e.message);
+      }
+    }
+
     const languages = typeof wasm.getSupportedLanguages === 'function'
       ? Array.from(wasm.getSupportedLanguages())
       : ['ja', 'en', 'zh', 'ko', 'es', 'fr', 'pt', 'sv'];
