@@ -88,7 +88,9 @@ jobs:
 
     - name: Run PiperPlus G2P integration tests
       working-directory: src/wasm/openjtalk-web
-      run: node --test test/js/test-piper-plus-g2p-init.js
+      run: |
+        node --test test/js/test-piper-plus-g2p-init.js
+        node --test test/js/test-piper-plus-wasm-g2p.js
 
     - name: Install npm dependencies
       working-directory: src/wasm/openjtalk-web

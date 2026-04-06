@@ -239,7 +239,7 @@ describe('PiperPlus G2P.create() integration', { skip: skip ? 'Import failed' : 
     assert.equal(g2pSpy.calls[0].languages, undefined, 'languages should be undefined when no language_id_map');
   });
 
-  it('config with ja in language_id_map excludes ja when no openjtalkModule', async () => {
+  it('config with ja in language_id_map excludes ja from JS G2P (WASM fallback)', async () => {
     setMockConfig({
       ...BASE_CONFIG,
       language_id_map: { ja: 0, en: 1, zh: 2, es: 3, fr: 4, pt: 5 },
@@ -250,7 +250,7 @@ describe('PiperPlus G2P.create() integration', { skip: skip ? 'Import failed' : 
 
     assert.equal(g2pSpy.calls.length, 1);
     const langs = g2pSpy.calls[0].languages;
-    assert.ok(!langs.includes('ja'), 'ja should be excluded when openjtalkModule not provided');
+    assert.ok(!langs.includes('ja'), 'ja should be excluded from JS G2P languages');
     assert.deepEqual(langs.sort(), ['en', 'es', 'fr', 'pt', 'zh']);
   });
 

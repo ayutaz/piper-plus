@@ -8,15 +8,15 @@
 
 | チケット | タイトル | マイルストーン | 状態 | 依存 |
 |---------|---------|--------------|------|------|
-| [M1-1](tickets/M1-1-wasm-loader.md) | `_init()` に Rust WASM ローダー追加 | M1 | TODO | なし |
-| [M1-2](tickets/M1-2-text-to-phoneme-ids.md) | `_textToPhonemeIds()` に日本語分岐追加 | M1 | TODO | M1-1 |
-| [M1-3](tickets/M1-3-language-detection.md) | 言語検出の統合 | M1 | TODO | M1-1 |
-| [M1-4](tickets/M1-4-dispose.md) | `dispose()` でのリソース解放 | M1 | TODO | M1-1 |
-| [M2-1](tickets/M2-1-wasm-loader-tests.md) | WASM ローダーのユニットテスト | M2 | TODO | M1-1 |
-| [M2-2](tickets/M2-2-phonemize-branch-tests.md) | phonemize 分岐・言語検出・dispose テスト | M2 | TODO | M1-2, M1-3, M1-4 |
-| [M2-3](tickets/M2-3-ci-integration.md) | CI にテスト追加 | M2 | TODO | M2-1, M2-2 |
-| [M3-1](tickets/M3-1-demo-ja-verification.md) | デモページ日本語動作確認 | M3 | TODO | M2-3 |
-| [M3-2](tickets/M3-2-regression-other-langs.md) | 他言語回帰テスト | M3 | TODO | M2-3 |
+| [M1-1](tickets/M1-1-wasm-loader.md) | `_init()` に Rust WASM ローダー追加 | M1 | DONE | なし |
+| [M1-2](tickets/M1-2-text-to-phoneme-ids.md) | `_textToPhonemeIds()` に日本語分岐追加 | M1 | DONE | M1-1 |
+| [M1-3](tickets/M1-3-language-detection.md) | 言語検出の統合 | M1 | DONE | M1-1 |
+| [M1-4](tickets/M1-4-dispose.md) | `dispose()` でのリソース解放 | M1 | DONE | M1-1 |
+| [M2-1](tickets/M2-1-wasm-loader-tests.md) | WASM ローダーのユニットテスト | M2 | DONE | M1-1 |
+| [M2-2](tickets/M2-2-phonemize-branch-tests.md) | phonemize 分岐・言語検出・dispose テスト | M2 | DONE | M1-2, M1-3, M1-4 |
+| [M2-3](tickets/M2-3-ci-integration.md) | CI にテスト追加 | M2 | DONE | M2-1, M2-2 |
+| [M3-1](tickets/M3-1-demo-ja-verification.md) | デモページ日本語動作確認 | M3 | DONE | M2-3 |
+| [M3-2](tickets/M3-2-regression-other-langs.md) | 他言語回帰テスト | M3 | DONE | M2-3 |
 
 ---
 
