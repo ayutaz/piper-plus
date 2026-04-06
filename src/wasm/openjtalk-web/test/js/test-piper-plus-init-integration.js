@@ -45,7 +45,7 @@ const BASE_CONFIG = {
 
 const CONFIG_WITH_LANG_MAP = {
   ...BASE_CONFIG,
-  language_id_map: { en: 0, zh: 1 },
+  language_id_map: { en: 0, es: 1 },
 };
 
 const CONFIG_WITH_PUA_COMPAT = {
@@ -340,7 +340,7 @@ describe('PiperPlus._init() integration (real _init, mocked deps)', { skip }, ()
       assert.ok(capturedOptions, 'G2P.create should have been called');
       assert.deepStrictEqual(
         capturedOptions.languages.sort(),
-        ['en', 'zh'],
+        ['en', 'es'],
         'G2P.create should receive languages from language_id_map keys'
       );
 

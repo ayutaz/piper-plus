@@ -208,6 +208,11 @@ const CONFIG_WITHOUT_JA = {
   language_id_map: { en: 0, zh: 1, es: 2 },
 };
 
+const CONFIG_NO_WASM_LANGS = {
+  ...BASE_CONFIG,
+  language_id_map: { en: 0, es: 1, fr: 2 },
+};
+
 let _origResolve;
 function installModelManagerStub() {
   _origResolve = ModelManager.prototype.resolveUrls;
@@ -293,8 +298,34 @@ describe('PiperPlus WASM G2P integration', { skip: skip ? 'Import failed' : fals
       }
     });
 
-    it('skips WASM load when ja not in language_id_map', async () => {
-      setMockConfig(CONFIG_WITHOUT_JA);
+    it('loads WASM when zh (WASM-required) is in config even without ja', async () => {
+      setMockConfig(CONFIG_WITHOUT_JA); // has zh but no ja
+
+      const warnings = [];
+      const origWarn = console.warn;
+      console.warn = (...args) => warnings.push(args.join(' '));
+
+      try {
+        const piper = await PiperPlus.initialize({
+          model: 'test',
+          ort: globalThis.ort,
+        });
+
+        assert.ok(piper._phonemizer, 'Phonemizer should be initialized');
+
+        // WASM should be attempted (and fail in test env), excluding zh
+        const wasmWarnings = warnings.filter(w => w.includes('Rust WASM G2P failed'));
+        assert.ok(wasmWarnings.length > 0, 'WASM should be attempted for zh');
+        assert.ok(wasmWarnings[0].includes('zh'), 'Warning should mention zh');
+
+        piper.dispose();
+      } finally {
+        console.warn = origWarn;
+      }
+    });
+
+    it('skips WASM load when no WASM-required languages in config', async () => {
+      setMockConfig(CONFIG_NO_WASM_LANGS); // en, es, fr only
 
       const warnings = [];
       const origWarn = console.warn;
@@ -309,7 +340,7 @@ describe('PiperPlus WASM G2P integration', { skip: skip ? 'Import failed' : fals
         assert.ok(piper._phonemizer, 'Phonemizer should be initialized');
 
         const wasmWarnings = warnings.filter(w => w.includes('Rust WASM'));
-        assert.equal(wasmWarnings.length, 0, 'No WASM warning when ja not in config');
+        assert.equal(wasmWarnings.length, 0, 'No WASM attempt when no WASM-required langs');
 
         piper.dispose();
       } finally {
@@ -329,7 +360,7 @@ describe('PiperPlus WASM G2P integration', { skip: skip ? 'Import failed' : fals
       piper.dispose();
     });
 
-    it('G2P.create receives languages without ja', async () => {
+    it('G2P.create receives languages without WASM-required langs (ja, zh)', async () => {
       setMockConfig(CONFIG_WITH_JA);
 
       let capturedOptions = null;
@@ -349,10 +380,14 @@ describe('PiperPlus WASM G2P integration', { skip: skip ? 'Import failed' : fals
         !capturedOptions.languages?.includes('ja'),
         'ja should not be in G2P languages'
       );
+      assert.ok(
+        !capturedOptions.languages?.includes('zh'),
+        'zh should not be in G2P languages (WASM-required)'
+      );
       assert.deepEqual(
         capturedOptions.languages?.sort(),
-        ['en', 'es', 'fr', 'pt', 'zh'],
-        'Non-JA languages should be passed to G2P.create'
+        ['en', 'es', 'fr', 'pt'],
+        'Only JS G2P-capable languages should be passed to G2P.create'
       );
 
       piper.dispose();

@@ -215,10 +215,10 @@ describe('PiperPlus G2P.create() integration', { skip: skip ? 'Import failed' : 
     g2pSpy.restore();
   });
 
-  it('config with language_id_map passes languages to G2P.create()', async () => {
+  it('config with language_id_map (no WASM-required) passes languages to G2P.create()', async () => {
     setMockConfig({
       ...BASE_CONFIG,
-      language_id_map: { en: 0, zh: 1, es: 2 },
+      language_id_map: { en: 0, es: 1, fr: 2 },
     });
 
     const piper = await PiperPlus.initialize({ model: 'test', ort: globalThis.ort });
@@ -226,7 +226,7 @@ describe('PiperPlus G2P.create() integration', { skip: skip ? 'Import failed' : 
 
     assert.equal(g2pSpy.calls.length, 1, 'G2P.create() should be called once');
     const langs = g2pSpy.calls[0].languages;
-    assert.deepEqual(langs.sort(), ['en', 'es', 'zh'], 'should pass languages from language_id_map');
+    assert.deepEqual(langs.sort(), ['en', 'es', 'fr'], 'should pass languages from language_id_map');
   });
 
   it('config without language_id_map passes undefined languages', async () => {
@@ -239,7 +239,7 @@ describe('PiperPlus G2P.create() integration', { skip: skip ? 'Import failed' : 
     assert.equal(g2pSpy.calls[0].languages, undefined, 'languages should be undefined when no language_id_map');
   });
 
-  it('config with ja in language_id_map excludes ja from JS G2P (WASM fallback)', async () => {
+  it('config with ja+zh excludes WASM-required langs from JS G2P on WASM fallback', async () => {
     setMockConfig({
       ...BASE_CONFIG,
       language_id_map: { ja: 0, en: 1, zh: 2, es: 3, fr: 4, pt: 5 },
@@ -251,7 +251,8 @@ describe('PiperPlus G2P.create() integration', { skip: skip ? 'Import failed' : 
     assert.equal(g2pSpy.calls.length, 1);
     const langs = g2pSpy.calls[0].languages;
     assert.ok(!langs.includes('ja'), 'ja should be excluded from JS G2P languages');
-    assert.deepEqual(langs.sort(), ['en', 'es', 'fr', 'pt', 'zh']);
+    assert.ok(!langs.includes('zh'), 'zh should be excluded from JS G2P languages');
+    assert.deepEqual(langs.sort(), ['en', 'es', 'fr', 'pt']);
   });
 
   it('G2P.create() failure propagates to PiperPlus.initialize()', async () => {
