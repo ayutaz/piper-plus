@@ -62,6 +62,7 @@ jobs:
         working-directory: src/wasm/g2p
         run: |
           node --test test/test-g2p.js
+          node --test test/test-g2p-contract.js
           node --test test/test-korean.js
           node --test test/test-swedish.js
           node --test test/test-detect.js
