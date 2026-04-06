@@ -980,7 +980,10 @@ mod tests {
 
         // Both should produce output (not empty)
         assert!(!tokens_auto.is_empty(), "auto-detect should produce tokens");
-        assert!(!tokens_hint.is_empty(), "language hint should produce tokens");
+        assert!(
+            !tokens_hint.is_empty(),
+            "language hint should produce tokens"
+        );
     }
 
     #[test]
@@ -989,7 +992,10 @@ mod tests {
 
         // Unknown language hint should fall back to auto-detection
         let (tokens, _) = mp.phonemize_with_language_hint("Hello", "xx").unwrap();
-        assert!(!tokens.is_empty(), "unknown hint should fall back to auto-detect");
+        assert!(
+            !tokens.is_empty(),
+            "unknown hint should fall back to auto-detect"
+        );
     }
 
     #[test]
@@ -1001,6 +1007,9 @@ mod tests {
         let (tokens_auto, _) = mp.phonemize_with_prosody("あ").unwrap();
 
         // Both should produce the same result since auto-detect also detects ja
-        assert_eq!(tokens_hint, tokens_auto, "ja hint should match auto-detected ja");
+        assert_eq!(
+            tokens_hint, tokens_auto,
+            "ja hint should match auto-detected ja"
+        );
     }
 }
