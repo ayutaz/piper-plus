@@ -2,7 +2,9 @@
 
 Gradio-based web interface for piper-plus inference and training.
 
-## Quick Start
+There are two separate WebUI implementations: a **local development** version with inference and training tabs, and a **Docker** version optimized for standalone inference deployment.
+
+## Quick Start (Local)
 
 ### Requirements
 
@@ -46,7 +48,7 @@ python -m piper.webui \
 
 ## Features
 
-### Inference Tab
+### Inference Tab (both implementations)
 
 - **Model Selection**: Auto-detects all .onnx models in the data directory
 - **6言語マルチリンガルモデル対応** (ja, en, zh, es, fr, pt)
@@ -57,7 +59,7 @@ python -m piper.webui \
 - **Noise Parameters**: Expressiveness and phoneme width variation
 - **Audio Output**: Play and download generated speech
 
-### Training Tab
+### Training Tab (local only)
 
 - Dataset path validation with structure check
 - Base model selection or new model training
@@ -67,15 +69,24 @@ python -m piper.webui \
 
 ## Architecture
 
+There are two independent WebUI implementations:
+
+**Local development version** (`src/python_run/piper/webui.py`) -- uses `PiperVoice` runtime for inference and includes a training management tab via `training_manager.py`.
+
+**Docker version** (`docker/webui/app.py`) -- a standalone Gradio app that uses `piper_train.infer_onnx` and `piper_train.ort_utils` directly for ONNX inference. Inference only, no training tab. Includes session caching and warmup via `create_session_with_cache`.
+
 ```
 src/python_run/piper/
-├── webui.py           # Main WebUI application
-├── sample_texts.py    # Sample text collections
+├── webui.py              # Local WebUI (inference + training)
+├── training_manager.py   # Training management backend
+├── sample_texts.py       # Sample text collections
 └── requirements_webui.txt
 
 docker/webui/
+├── app.py                # Docker WebUI (inference only, standalone)
 ├── Dockerfile
 ├── docker-compose.yml
+├── entrypoint.sh
 └── run.sh
 ```
 
@@ -84,8 +95,11 @@ docker/webui/
 - **Gradio Framework**: ML-optimized UI components with built-in audio playback
 - **Language Detection**: Automatic model-to-language mapping with template adaptation
 - **Lazy Model Loading**: Models loaded on synthesis, not on startup
+- **Two implementations**: Local version depends on the `piper` runtime package; Docker version depends on `piper_train` directly, avoiding the runtime dependency
 
 ## Docker Usage
+
+The Docker image uses `docker/webui/app.py` (not the local `webui.py`).
 
 ```bash
 # Build
@@ -98,13 +112,22 @@ docker run -p 7860:7860 -v ./models:/models piper-webui
 cd docker/webui && docker-compose up
 ```
 
-Environment variables: `MODELS_DIR`, `OUTPUT_DIR`, `PORT`
+### Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `MODELS_DIR` | `./models` | Host path to model directory (docker-compose volume) |
+| `OUTPUT_DIR` | `./output` | Host path to output directory (docker-compose volume) |
+| `PIPER_MODEL` | (none) | Specific model to load (passed to entrypoint) |
+| `PIPER_MODEL_DIR` | `/models` | Model directory inside the container |
+| `GRADIO_SERVER_NAME` | `0.0.0.0` | Gradio bind address |
+| `GRADIO_SERVER_PORT` | `7860` | Gradio port |
 
 ## Troubleshooting
 
 | Issue | Solution |
 |-------|----------|
-| No models found | Check `--data-dir` path; ensure .onnx and .onnx.json pairs exist |
+| No models found | Check `--data-dir` path (local) or volume mount (Docker); ensure .onnx and .onnx.json pairs exist |
 | Import errors | `uv pip install -r src/python_run/requirements_webui.txt` |
-| Port in use | Use `--port 8080` |
+| Port in use | Use `--port 8080` (local) or change the port mapping in docker-compose |
 | Docker issues | Check volume mounts and port availability |

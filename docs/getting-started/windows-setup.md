@@ -13,7 +13,7 @@
 - **Visual Studio**: 2022以降（Community版でも可）
   - インストール時に「**C++によるデスクトップ開発**」ワークロードを選択
   - コンポーネント: MSVC v143, Windows 10 SDK
-- **CMake**: 3.13以降
+- **CMake**: 3.15以降
   - [CMake公式サイト](https://cmake.org/download/)からインストーラーをダウンロード
   - インストール時に「Add CMake to the system PATH」を選択
 - **Git for Windows**

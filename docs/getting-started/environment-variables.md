@@ -6,6 +6,7 @@ This document lists all environment variables that can be used to configure Pipe
 
 ### OPENJTALK_DICTIONARY_PATH
 - **Description**: Path to OpenJTalk dictionary directory
+- **Used by**: C++, C#, Go
 - **Default**: Auto-downloaded to user data directory
 - **Platform defaults**:
   - Windows: `%APPDATA%\piper\open_jtalk_dic_utf_8-1.11`
@@ -20,21 +21,9 @@ This document lists all environment variables that can be used to configure Pipe
   export OPENJTALK_DICTIONARY_PATH=/usr/share/open_jtalk/dic
   ```
 
-### OPENJTALK_VOICE
-- **Description**: Path to HTS voice file (.htsvoice)
-- **Default**: Auto-downloaded nitech_jp_atr503_m001.htsvoice
-- **Note**: HTS voice functionality is currently disabled. Piper operates in phonemizer-only mode, so this variable has no effect at present.
-- **Example**:
-  ```bash
-  # Windows
-  set OPENJTALK_VOICE=C:\voices\mei_normal.htsvoice
-
-  # Linux/macOS
-  export OPENJTALK_VOICE=/usr/share/hts-voice/mei_normal.htsvoice
-  ```
-
 ### OPENJTALK_DATA_DIR
 - **Description**: Override the base directory for OpenJTalk data files
+- **Used by**: C++, C#
 - **Default**: Platform-specific user data directory
 - **Example**:
   ```bash
@@ -45,10 +34,60 @@ This document lists all environment variables that can be used to configure Pipe
   export OPENJTALK_DATA_DIR=/opt/piper-data
   ```
 
+## Dictionary Paths
+
+### PIPER_DICTIONARIES_PATH
+- **Description**: Path to a directory containing custom dictionary files (JSON v1.0/v2.0 format). Used as a fallback search location when dictionaries are not found next to the model or executable.
+- **Used by**: C++, Go
+- **Search order**: model directory -> executable-relative directory -> `PIPER_DICTIONARIES_PATH`
+- **Example**:
+  ```bash
+  export PIPER_DICTIONARIES_PATH=/opt/piper/dictionaries
+  ```
+
+### JPREPROCESS_DICT
+- **Description**: Path to a NAIST-JDIC dictionary directory for Japanese phonemization via jpreprocess. Uses lindera format (not OpenJTalk MeCab format).
+- **Used by**: Rust (piper-plus, piper-plus-g2p)
+- **Default**: Bundled `naist-jdic` feature, or auto-detected from known locations
+- **Example**:
+  ```bash
+  export JPREPROCESS_DICT=/opt/naist-jdic
+  ```
+
+### CMUDICT_PATH
+- **Description**: Path to the CMU pronunciation dictionary file (`cmudict_data.json`) for English phonemization
+- **Used by**: Rust (piper-plus, piper-plus-g2p)
+- **Default**: Auto-detected from known locations
+- **Example**:
+  ```bash
+  export CMUDICT_PATH=/opt/piper/cmudict_data.json
+  ```
+
+### PINYIN_SINGLE_PATH / PINYIN_PHRASES_PATH
+- **Description**: Paths to Chinese pinyin dictionary files for Mandarin phonemization
+- **Used by**: Rust (piper-plus)
+- **Default**: Auto-detected next to the model file
+- **Example**:
+  ```bash
+  export PINYIN_SINGLE_PATH=/opt/piper/pinyin_single.json
+  export PINYIN_PHRASES_PATH=/opt/piper/pinyin_phrases.json
+  ```
+
+### DOTNETG2P_NAIST_JDIC_PATH / NAIST_JDIC_PATH
+- **Description**: Alternative paths to NAIST-JDIC dictionary for Japanese phonemization in the C# implementation. `DOTNETG2P_NAIST_JDIC_PATH` is checked first, then `NAIST_JDIC_PATH`.
+- **Used by**: C# (PiperPlus.Core)
+- **Default**: Auto-downloaded to user data directory
+- **Example**:
+  ```bash
+  export DOTNETG2P_NAIST_JDIC_PATH=/opt/naist-jdic
+  # or
+  export NAIST_JDIC_PATH=/opt/naist-jdic
+  ```
+
 ## Download Control
 
 ### PIPER_AUTO_DOWNLOAD_DICT
-- **Description**: Control automatic download of OpenJTalk dictionary and voice files
+- **Description**: Control automatic download of OpenJTalk dictionary files
 - **Values**:
   - `1` (default): Enable automatic download
   - `0`: Disable automatic download
@@ -73,6 +112,7 @@ This document lists all environment variables that can be used to configure Pipe
 
 ### PIPER_DEFAULT_MODEL
 - **Description**: Default ONNX model path, used when `--model` is not specified on the command line
+- **Used by**: Rust, C#
 - **Default**: None (must be specified via CLI or this variable)
 - **Example**:
   ```bash
@@ -85,6 +125,7 @@ This document lists all environment variables that can be used to configure Pipe
 
 ### PIPER_DEFAULT_CONFIG
 - **Description**: Default model configuration file path (JSON), used when `--config` is not specified on the command line
+- **Used by**: Rust, C#
 - **Default**: None (auto-detected from model path if not set)
 - **Example**:
   ```bash
@@ -97,6 +138,7 @@ This document lists all environment variables that can be used to configure Pipe
 
 ### PIPER_MODEL_DIR
 - **Description**: Directory where models are downloaded to, used when `--model-dir` is not specified on the command line
+- **Used by**: Rust, C#
 - **Default**: Platform-specific user data directory
   - Windows: `%APPDATA%\piper\models`
   - Linux: `~/.local/share/piper/models`
@@ -133,28 +175,48 @@ This document lists all environment variables that can be used to configure Pipe
   ```
 
 ### PIPER_DISABLE_WARMUP
-
-ONNX Runtime の warmup (ダミー推論) を無効化する。`1`, `true`, `yes` のいずれかで無効化。デフォルトは有効 (warmup 実行)。
-
-- **対象**: Python 推論スクリプト (`infer_onnx.py`, `voice.py`, Docker inference, WebUI)
-- **用途**: 組込み環境での起動時間短縮、デバッグ
-- **設定例**: `PIPER_DISABLE_WARMUP=1`
+- **Description**: Disable ONNX Runtime warmup (dummy inference runs). Accepts `1`, `true`, or `yes` to disable. Default is enabled (warmup runs on startup).
+- **Used by**: Python inference scripts (`infer_onnx.py`, `voice.py`, Docker inference, WebUI)
+- **Use cases**: Reducing startup time in embedded environments, debugging
+- **Example**:
+  ```bash
+  export PIPER_DISABLE_WARMUP=1
+  ```
 
 ### PIPER_DISABLE_CACHE
-
-ONNX Runtime の最適化モデルキャッシュ (`.opt.onnx`) を無効化する。`1`, `true`, `yes` のいずれかで無効化。デフォルトは有効 (キャッシュ生成)。
-
-- **対象**: Python 推論スクリプト
-- **用途**: 読み取り専用ファイルシステム、CI 環境、デバッグ
-- **設定例**: `PIPER_DISABLE_CACHE=1`
+- **Description**: Disable ONNX Runtime optimized model cache (`.opt.onnx` files). Accepts `1`, `true`, or `yes` to disable. Default is enabled (cache files are generated).
+- **Used by**: Python inference scripts
+- **Use cases**: Read-only file systems, CI environments, debugging
+- **Example**:
+  ```bash
+  export PIPER_DISABLE_CACHE=1
+  ```
 
 ### PIPER_INTRA_THREADS
+- **Description**: Explicitly set the number of ONNX Runtime intra-op threads. When not set, defaults to `min(logical_cores / 2, 4)`.
+- **Used by**: Python inference scripts
+- **Use cases**: Tuning performance with Docker `--cpus` constraints, manual thread control
+- **Example**:
+  ```bash
+  export PIPER_INTRA_THREADS=2
+  ```
 
-ONNX Runtime の intra-op スレッド数を明示的に指定する。未設定の場合は `min(論理コア数/2, 4)` で自動計算。
+### ONNX_RUNTIME_SHARED_LIBRARY_PATH
+- **Description**: Path to the ONNX Runtime shared library (`libonnxruntime.so` / `libonnxruntime.dylib`). Required for Go integration tests and applications.
+- **Used by**: Go (piperplus)
+- **Example**:
+  ```bash
+  export ONNX_RUNTIME_SHARED_LIBRARY_PATH=/usr/lib/libonnxruntime.so
+  ```
 
-- **対象**: Python 推論スクリプト
-- **用途**: Docker `--cpus` 制約との組み合わせ、パフォーマンスチューニング
-- **設定例**: `PIPER_INTRA_THREADS=2`
+### PIPER_PHONEMIZE_DEBUG
+- **Description**: Enable debug output for the bundled piper-phonemize module
+- **Used by**: Python (piper_phonemize)
+- **Values**: Any non-empty value enables debug output
+- **Example**:
+  ```bash
+  export PIPER_PHONEMIZE_DEBUG=1
+  ```
 
 ### LD_LIBRARY_PATH (Linux)
 - **Description**: Library search path for shared libraries
@@ -184,28 +246,25 @@ echo "こんにちは" | piper --model ja_JP-model.onnx --output_file hello.wav
 ```bash
 # Windows
 set OPENJTALK_DICTIONARY_PATH=C:\my-dictionary
-set OPENJTALK_VOICE=C:\my-voice.htsvoice
 echo "テスト" | piper --model ja_JP-model.onnx --output_file test.wav
 
 # Linux/macOS
 export OPENJTALK_DICTIONARY_PATH=/opt/my-dictionary
-export OPENJTALK_VOICE=/opt/my-voice.htsvoice
 echo "テスト" | piper --model ja_JP-model.onnx --output_file test.wav
 ```
 
 ### Offline mode (no downloads)
 ```bash
-# Must have dictionary and voice files already installed
+# Must have dictionary files already installed
 export PIPER_OFFLINE_MODE=1
 export OPENJTALK_DICTIONARY_PATH=/path/to/existing/dictionary
-export OPENJTALK_VOICE=/path/to/existing/voice.htsvoice
 echo "オフライン" | piper --model ja_JP-model.onnx --output_file offline.wav
 ```
 
 ## Precedence Order
 
 Environment variables are checked in the following order:
-1. User-specified paths (OPENJTALK_DICTIONARY_PATH, OPENJTALK_VOICE)
+1. User-specified paths (OPENJTALK_DICTIONARY_PATH, etc.)
 2. System-installed locations (/usr/share/*, /usr/local/share/*)
 3. Auto-download to user data directory (if enabled)
 
