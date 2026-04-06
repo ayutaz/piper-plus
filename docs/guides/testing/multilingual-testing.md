@@ -70,7 +70,7 @@ This gives a 3 OS x 2 .NET versions matrix (6 combinations).
 
 ## Rust Tests (piper-plus)
 
-The Rust `piper-plus` crate has 21 integration test files covering:
+The Rust `piper-plus` crate has 24 integration test files covering:
 
 - Multilingual phonemization (`test_multilingual.rs`, `test_romance_languages.rs`)
 - Per-language phonemizers (`test_japanese_phonemize.rs`, `test_english.rs`, `test_chinese.rs`, `test_korean.rs`)
@@ -104,12 +104,12 @@ The workflow also includes `cargo check`, `cargo fmt`, and `cargo clippy` jobs o
 
 ## Go Tests (piperplus)
 
-The Go `piperplus` package has 690+ unit tests and 11 integration tests covering:
+The Go `piperplus` package has 793 unit tests and 10 integration tests covering:
 
 - All 8 language phonemizers (Japanese, English, Chinese, Korean, Spanish, Portuguese, French, Swedish)
   - Note: Swedish (sv) and Korean (ko) are code-ready but not yet included in the current 6-language trained model.
 - Unicode language detection and text segmentation
-- PUA (Private Use Area) bidirectional mapping (87 entries)
+- PUA (Private Use Area) bidirectional mapping (96 entries)
 - Config parsing, WAV output, error types
 - ONNX inference engine, end-to-end synthesis (integration)
 - HTTP API server handlers (/synthesize, /health, /info)
@@ -141,7 +141,7 @@ CI is defined in `.github/workflows/go-ci.yml` and runs:
 | unit-test | Ubuntu, macOS, Windows | Go 1.26+ | Phonemizer, config, WAV, Unicode detection |
 | integration-test | Ubuntu | Go 1.26+, ONNX Runtime 1.24.4 | ONNX inference, end-to-end synthesis |
 | build | Ubuntu, macOS, Windows | Go 1.26+ | CLI binary generation, artifact upload |
-| lint | Ubuntu | golangci-lint v1.64.8 | Static analysis |
+| lint | Ubuntu | golangci-lint (unpinned, via golangci-lint-action@v7) | Static analysis |
 
 ## 6-Language Multilingual Model Testing
 

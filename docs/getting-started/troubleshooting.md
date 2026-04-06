@@ -97,7 +97,7 @@ Model config doesn't exist
    - Ensure you're using a Japanese model (ja_JP-*.onnx)
    - For Python inference (`infer_onnx`), the Phonemizer registry selects the G2P backend via `--language` (ja→pyopenjtalk, en→g2p-en)
    - For the C++ CLI and preprocessing, `phoneme_type` in `config.json` is still used to choose how text is phonemized
-   - Ensure config.json has the correct `"phoneme_type"`: `"openjtalk"` for Japanese models, `"espeak"` for other languages
+   - Ensure config.json has the correct `"phoneme_type"`: `"openjtalk"` for Japanese models, `"multilingual"` for multilingual models
 
 ### "Failed to download dictionary" Error
 
@@ -200,7 +200,7 @@ powershell -Command "echo 'こんにちは' | .\piper.exe --model model.onnx --o
    type input.txt | piper.exe --model model.onnx --config config.json --output_file out.wav
    ```
 
-3. **v1.6.0以降**: piper.exe 内部で `SetConsoleCP(CP_UTF8)` が呼び出されますが、一部の環境ではパイプ入力に効かない場合があります。その場合は方法2を使用してください。
+3. **v1.5.5以降**: piper.exe 内部で `SetConsoleCP(CP_UTF8)` が呼び出されますが、一部の環境ではパイプ入力に効かない場合があります。その場合は方法2を使用してください。
 
 #### "The filename, directory name, or volume label syntax is incorrect"
 

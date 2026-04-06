@@ -40,7 +40,7 @@ def _load_pua_mapping() -> dict[str, int]:
 
 
 # -------------------------------------------------------------------------
-# Fixed PUA mapping table (87 entries)
+# Fixed PUA mapping table (96 entries)
 # CRITICAL: Every codepoint here is baked into trained models.
 # Do NOT change assigned codepoints.
 # Loaded from data/pua.json — the single source of truth.
