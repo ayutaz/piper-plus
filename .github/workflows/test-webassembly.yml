@@ -90,12 +90,34 @@ jobs:
       working-directory: src/wasm/openjtalk-web
       run: node --test test/js/test-piper-plus-g2p-init.js
 
-    - name: Run JavaScript tests
+    - name: Install npm dependencies
+      working-directory: src/wasm/openjtalk-web
+      run: npm install
+
+    - name: Run openjtalk-web unit tests
       working-directory: src/wasm/openjtalk-web
       run: |
-        # Skip tests for now as they need to be updated
-        echo "Tests need to be updated for lazy loading version"
-        echo "Skipping tests for CI..."
+        node --test \
+          test/js/test-piper-plus.js \
+          test/js/test-piper-plus-init-success.js \
+          test/js/test-piper-plus-boundary.js \
+          test/js/test-piper-plus-synthesize-flow.js \
+          test/js/test-piper-plus-init-integration.js \
+          test/js/test-npm-package.js \
+          test/js/test-audio-result.js \
+          test/js/test-audio-result-wav-edge.js \
+          test/js/test-model-manager.js \
+          test/js/test-model-manager-load.js \
+          test/js/test-model-manager-boundary.js \
+          test/js/test-model-manager-cache.js \
+          test/js/test-dictionary-cache.js \
+          test/js/test-g2p-golden.js
+
+    - name: Note on skipped tests
+      working-directory: src/wasm/openjtalk-web
+      run: |
+        # Some integration tests need real WASM binaries and are covered by ci.yml npm-package-tests job
+        echo "Tests that require real WASM binaries are covered by ci.yml npm-package-tests"
     
     - name: Check file sizes
       working-directory: src/wasm/openjtalk-web
