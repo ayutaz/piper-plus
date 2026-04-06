@@ -22,11 +22,14 @@ export { AudioResult } from './audio-result.js';
 // Imports used by PiperPlus
 // ---------------------------------------------------------------------------
 
-import { G2P, checkPuaCompat } from '@piper-plus/g2p';
+import { checkPuaCompat } from '@piper-plus/g2p';
 import { WebGPUSessionManager } from './webgpu-session-manager.js';
 import { StreamingTTSPipeline, TextChunker } from './streaming-pipeline.js';
 import { ModelManager } from './model-manager.js';
 import { AudioResult } from './audio-result.js';
+import { RustWasmAdapter } from './phonemizer/rust-wasm-adapter.js';
+import { JsG2pAdapter } from './phonemizer/js-g2p-adapter.js';
+import { CompositePhonemizer } from './phonemizer/composite-phonemizer.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -46,8 +49,7 @@ export class PiperPlus {
   constructor() {
     this._session = null;
     this._config = null;
-    this._g2p = null;
-    this._wasmPhonemizer = null;
+    this._phonemizer = null;
     this._ort = null;
     this._initialized = false;
     this._warmupPromise = null;
@@ -71,6 +73,8 @@ export class PiperPlus {
    *   `{ stage: string, progress: number, message: string }`.
    * @param {string} [options.wasmG2pUrl] - Custom URL for Rust WASM G2P module.
    *   Defaults to `../dist/rust-wasm/piper_plus_wasm.js`.
+   * @param {Function} [options.wasmLoader] - DI: async function returning WASM
+   *   module for testing. Takes precedence over wasmG2pUrl.
    * @returns {Promise<PiperPlus>}
    */
   static async initialize(options = {}) {
@@ -168,19 +172,14 @@ export class PiperPlus {
    */
   dispose() {
     if (this._session) {
-      // onnxruntime-web sessions expose release()
       if (typeof this._session.release === 'function') {
         this._session.release();
       }
       this._session = null;
     }
-    if (this._wasmPhonemizer) {
-      this._wasmPhonemizer.free();
-      this._wasmPhonemizer = null;
-    }
-    if (this._g2p) {
-      this._g2p.dispose();
-      this._g2p = null;
+    if (this._phonemizer) {
+      this._phonemizer.dispose();
+      this._phonemizer = null;
     }
     this._warmupPromise = null;
     this._initialized = false;
@@ -251,7 +250,7 @@ export class PiperPlus {
 
       progress({ stage: 'model', progress: 0.7, message: 'Model loaded.' });
 
-      // --- 3. Initialise phonemizer -------------------------------------------
+      // --- 3. Initialise phonemizer (Adapter pattern) --------------------------
 
       progress({ stage: 'phonemizer', progress: 0, message: 'Initializing phonemizer...' });
 
@@ -259,15 +258,21 @@ export class PiperPlus {
         ? Object.keys(this._config.language_id_map)
         : undefined;
 
-      // Load Rust WASM phonemizer for Japanese G2P.
+      const phonemizerMap = new Map();
+      let wasmAdapter = null;
+
+      // Load Rust WASM phonemizer for Japanese (+ all languages).
       // Falls back gracefully when WASM binary is unavailable (e.g. local dev).
-      let wasmPhonemizer = null;
       if (languages && languages.includes('ja')) {
         try {
-          const wasmUrl = options.wasmG2pUrl || '../dist/rust-wasm/piper_plus_wasm.js';
-          const wasmModule = await import(wasmUrl);
-          await wasmModule.default();  // init() — load WASM binary
-          wasmPhonemizer = new wasmModule.WasmPhonemizer(JSON.stringify(this._config));
+          wasmAdapter = await RustWasmAdapter.create(
+            JSON.stringify(this._config),
+            {
+              wasmUrl: options.wasmG2pUrl || '../dist/rust-wasm/piper_plus_wasm.js',
+              wasmLoader: options.wasmLoader,
+            },
+          );
+          phonemizerMap.set('ja', wasmAdapter);
         } catch (err) {
           console.warn('[piper-plus] Rust WASM G2P failed to load, excluding ja:', err.message);
           languages = languages.filter(l => l !== 'ja');
@@ -275,9 +280,22 @@ export class PiperPlus {
       }
 
       // Non-JA languages use JS G2P
-      const g2pLanguages = languages?.filter(l => l !== 'ja');
-      this._g2p = await G2P.create({ languages: g2pLanguages });
-      this._wasmPhonemizer = wasmPhonemizer;
+      const jsLanguages = languages?.filter(l => l !== 'ja');
+      const jsAdapter = await JsG2pAdapter.create(
+        jsLanguages,
+        this._config.phoneme_id_map,
+      );
+      if (jsLanguages) {
+        for (const lang of jsLanguages) {
+          phonemizerMap.set(lang, jsAdapter);
+        }
+      }
+
+      this._phonemizer = new CompositePhonemizer({
+        phonemizers: phonemizerMap,
+        fallback: jsAdapter,
+        detector: wasmAdapter || jsAdapter,
+      });
 
       progress({ stage: 'phonemizer', progress: 1, message: 'Phonemizer ready.' });
 
@@ -294,55 +312,20 @@ export class PiperPlus {
   }
 
   /**
-   * Detect language of text, preferring Rust WASM detector when available.
+   * Detect language of text via the composite phonemizer.
    * @private
    */
   _detectLanguage(text) {
-    if (this._wasmPhonemizer) {
-      return this._wasmPhonemizer.detectLanguage(text);
-    }
-    return this._g2p.detectLanguage(text);
+    return this._phonemizer.detectLanguage(text);
   }
 
   /**
    * Convert text to phoneme IDs (and optional prosody features).
+   * Delegates to the appropriate adapter via CompositePhonemizer.
    * @private
    */
   async _textToPhonemeIds(text, language) {
-    // Japanese: use Rust WASM phonemizer directly
-    if (language === 'ja' && this._wasmPhonemizer) {
-      const result = this._wasmPhonemizer.phonemize(text, 'ja');
-      const phonemeIds = Array.from(result.phonemeIds);
-
-      let prosodyFeatures = null;
-      const flat = result.prosodyFeatures;
-      if (flat && flat.length > 0) {
-        prosodyFeatures = [];
-        for (let i = 0; i < flat.length; i += 3) {
-          prosodyFeatures.push([flat[i], flat[i + 1], flat[i + 2]]);
-        }
-      }
-      result.free();
-      return { phonemeIds, prosodyFeatures };
-    }
-
-    // Other languages: existing JS G2P path
-    const phonemeIdMap = this._config.phoneme_id_map;
-    if (!phonemeIdMap) {
-      throw new Error('Model config is missing phoneme_id_map');
-    }
-    const result = this._g2p.encode(text, phonemeIdMap, { language });
-
-    let prosodyFeatures = null;
-    if (result.prosodyFlat && result.prosodyFlat.length > 0) {
-      const flat = result.prosodyFlat;
-      prosodyFeatures = [];
-      for (let i = 0; i < flat.length; i += 3) {
-        prosodyFeatures.push([flat[i], flat[i + 1], flat[i + 2]]);
-      }
-    }
-
-    return { phonemeIds: result.phonemeIds, prosodyFeatures };
+    return this._phonemizer.encode(text, language);
   }
 
   /**

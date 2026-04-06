@@ -218,21 +218,22 @@ function createInitializedInstance(overrides = {}) {
     release: mock.fn(),
   };
 
-  // G2P mock — simulates G2P after G2P.create()
-  const defaultG2P = {
+  // Phonemizer mock — simulates CompositePhonemizer after _init()
+  const defaultPhonemizer = {
     detectLanguage: mock.fn(() => 'ja'),
-    encode: mock.fn((_text, _phonemeIdMap, _opts) => ({
+    encode: mock.fn((text, language) => ({
       phonemeIds: [1, 7, 2],
-      prosodyFlat: null,
+      prosodyFeatures: null,
     })),
     dispose: mock.fn(),
+    supportedLanguages: ['en', 'zh', 'es', 'fr', 'pt'],
   };
-  const g2p = { ...defaultG2P, ...(overrides.g2p || {}) };
+  const phonemizer = { ...defaultPhonemizer, ...(overrides.phonemizer || {}) };
 
   // Wire up the instance as _init() would
   instance._config = config;
   instance._session = session;
-  instance._g2p = g2p;
+  instance._phonemizer = phonemizer;
   instance._ort = globalThis.ort;
   instance._initialized = true;
 
@@ -388,13 +389,14 @@ describe('SynthesizeOptions デフォルト値', { skip }, () => {
     // Arrange
     const detectLanguageFn = mock.fn(() => 'ja');
     const instance = createInitializedInstance({
-      g2p: {
+      phonemizer: {
         detectLanguage: detectLanguageFn,
-        encode: mock.fn((_text, _phonemeIdMap, _opts) => ({
+        encode: mock.fn((text, language) => ({
           phonemeIds: [1, 7, 2],
-          prosodyFlat: null,
+          prosodyFeatures: null,
         })),
         dispose: mock.fn(),
+        supportedLanguages: ['en', 'zh', 'es', 'fr', 'pt'],
       },
     });
 
@@ -630,9 +632,9 @@ describe('synthesize() 正常系', { skip }, () => {
 
   it('phonemize から infer までのパイプラインが実行される', async () => {
     // Arrange
-    const encodeFn = mock.fn((_text, _phonemeIdMap, _opts) => ({
+    const encodeFn = mock.fn((text, language) => ({
       phonemeIds: [1, 7, 2],
-      prosodyFlat: null,
+      prosodyFeatures: null,
     }));
     const sessionRunFn = mock.fn(async () => ({
       output: { data: new Float32Array(100), dims: [1, 100] },
@@ -640,10 +642,11 @@ describe('synthesize() 正常系', { skip }, () => {
 
     const instance = createInitializedInstance({
       sessionRun: sessionRunFn,
-      g2p: {
+      phonemizer: {
         detectLanguage: mock.fn(() => 'ja'),
         encode: encodeFn,
         dispose: mock.fn(),
+        supportedLanguages: ['en', 'zh', 'es', 'fr', 'pt'],
       },
     });
 
@@ -703,19 +706,19 @@ describe('dispose()', { skip }, () => {
     assert.equal(instance._session, null);
   });
 
-  it('G2P の dispose() を呼び出す', () => {
+  it('phonemizer の dispose() を呼び出す', () => {
     // Arrange
     const instance = createInitializedInstance();
-    const g2p = instance._g2p; // capture ref before dispose nulls it
+    const phonemizer = instance._phonemizer; // capture ref before dispose nulls it
 
     // Act
     instance.dispose();
 
     // Assert
-    assert.equal(g2p.dispose.mock.callCount(), 1);
+    assert.equal(phonemizer.dispose.mock.callCount(), 1);
   });
 
-  it('dispose 後に _g2p が null になる', () => {
+  it('dispose 後に _phonemizer が null になる', () => {
     // Arrange
     const instance = createInitializedInstance();
 
@@ -723,7 +726,7 @@ describe('dispose()', { skip }, () => {
     instance.dispose();
 
     // Assert
-    assert.equal(instance._g2p, null);
+    assert.equal(instance._phonemizer, null);
   });
 
   it('dispose 後に isInitialized が false になる', () => {

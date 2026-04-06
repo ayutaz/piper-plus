@@ -223,16 +223,17 @@ function installInitWrapper() {
 
     progress({ stage: 'model', progress: 0.7, message: 'Model loaded.' });
 
-    // 3. G2P — stub (no real OpenJTalk)
+    // 3. Phonemizer — stub (no real OpenJTalk / WASM)
     progress({ stage: 'phonemizer', progress: 0, message: 'Initializing phonemizer...' });
 
-    this._g2p = {
-      detectLanguage: () => 'ja',
-      encode: (_text, _phonemeIdMap, _opts) => ({
+    this._phonemizer = {
+      detectLanguage: (text) => 'ja',
+      encode: (text, language) => ({
         phonemeIds: [1, 7, 2],
-        prosodyFlat: null,
+        prosodyFeatures: null,
       }),
       dispose: () => {},
+      supportedLanguages: ['en', 'zh', 'es', 'fr', 'pt'],
     };
 
     progress({ stage: 'phonemizer', progress: 1, message: 'Phonemizer ready.' });
@@ -307,7 +308,7 @@ describe('PiperPlus.initialize() 正常系', { skip }, () => {
     // Assert
     assert.equal(instance.isInitialized, true, 'isInitialized should be true');
     assert.ok(instance._session, 'ONNX session should be created');
-    assert.ok(instance._g2p, 'G2P should be created');
+    assert.ok(instance._phonemizer, 'Phonemizer should be created');
 
     instance.dispose();
   });
@@ -401,7 +402,7 @@ describe('PiperPlus.initialize() 正常系', { skip }, () => {
     // Assert
     assert.equal(instance.isInitialized, true, 'should be initialized with custom dictUrl');
     assert.ok(instance.config, 'config should be loaded');
-    assert.ok(instance._g2p, 'G2P should be created');
+    assert.ok(instance._phonemizer, 'Phonemizer should be created');
 
     instance.dispose();
   });

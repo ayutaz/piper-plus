@@ -160,7 +160,7 @@ function removeModelManagerStub() {
 function createMockG2PInstance() {
   return {
     detectLanguage: () => 'en',
-    encode: () => ({ phonemeIds: [1, 7, 2], prosodyFlat: null }),
+    encode: (text, language) => ({ phonemeIds: [1, 7, 2], prosodyFeatures: null }),
     phonemize: () => ({ tokens: ['h', 'e', 'l', 'o'], prosody: [null, null, null, null], language: 'en' }),
     dispose: () => {},
   };

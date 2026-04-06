@@ -169,63 +169,28 @@ jobs:
           # Copy multilingual demo as the main index page
           if [ -f "src/wasm/openjtalk-web/test/multilingual-demo/index.html" ]; then
             cp src/wasm/openjtalk-web/test/multilingual-demo/index.html deploy/index.html
-            
-            # Update paths for root level using more specific patterns
-            sed -i 's|src="../../dist/|src="./dist/|g' deploy/index.html
-            sed -i 's|src="../../assets/|src="./assets/|g' deploy/index.html
-            sed -i 's|src="../../models/|src="./models/|g' deploy/index.html
-            sed -i 's|src="../../src/|src="./src/|g' deploy/index.html
-            sed -i 's|src="../dist/|src="./dist/|g' deploy/index.html
-            
-            # Also update paths in import statements and other references
-            sed -i "s|from '../../|from './|g" deploy/index.html
-            sed -i "s|from '../|from './|g" deploy/index.html
-            
-            # Update model paths in JavaScript strings
-            sed -i "s|'../../models/|'./models/|g" deploy/index.html
-            sed -i "s|'../../assets/|'./assets/|g" deploy/index.html
-            sed -i "s|'../../dist/|'./dist/|g" deploy/index.html
-            sed -i "s|'../models/|'./models/|g" deploy/index.html
-            sed -i "s|'../assets/|'./assets/|g" deploy/index.html
-            sed -i "s|'../dist/|'./dist/|g" deploy/index.html
-            
-            # Update import map paths (double-quoted JSON strings)
-            sed -i 's|"../../../g2p/|"./g2p/|g' deploy/index.html
-            sed -i 's|"../../src/|"./src/|g' deploy/index.html
-            sed -i 's|"../../dist/|"./dist/|g' deploy/index.html
 
-            # Also update template string paths (backtick strings)
-            sed -i "s|\`../../models/|\`./models/|g" deploy/index.html
-            sed -i "s|\`../../assets/|\`./assets/|g" deploy/index.html
-            sed -i "s|\`../models/|\`./models/|g" deploy/index.html
-            sed -i "s|\`../assets/|\`./assets/|g" deploy/index.html
-            
+            # Rewrite relative paths for root level:
+            #   ../../../  (3 levels up, e.g. import map)  → ./
+            #   ../../     (2 levels up, e.g. ES imports)  → ./
+            sed -i 's|\.\./\.\./\.\./|./|g' deploy/index.html
+            sed -i 's|\.\./\.\./|./|g' deploy/index.html
+
             echo "Multilingual demo deployed as main page"
           fi
-          
-          # Copy multilingual demo
+
+          # Copy multilingual demo into subdirectory
           if [ -d "src/wasm/openjtalk-web/test/multilingual-demo" ]; then
             mkdir -p deploy/multilingual-demo
             cp -r src/wasm/openjtalk-web/test/multilingual-demo/* deploy/multilingual-demo/
-            
-            # Update paths for multilingual demo (one level deep in deploy/)
+
+            # Rewrite relative paths for one-level-deep subdirectory:
+            #   ../../../  (3 levels up)  → ../
+            #   ../../     (2 levels up)  → ../
             for file in deploy/multilingual-demo/*.html; do
               if [ -f "$file" ]; then
-                # src attribute paths
-                sed -i 's|src="../../dist/|src="../dist/|g' "$file"
-                sed -i 's|src="../../assets/|src="../assets/|g' "$file"
-                sed -i 's|src="../../models/|src="../models/|g' "$file"
-                sed -i 's|src="../../src/|src="../src/|g' "$file"
-                # ES module import paths
-                sed -i "s|from '../../|from '../|g" "$file"
-                # JS string paths
-                sed -i "s|'../../models/|'../models/|g" "$file"
-                sed -i "s|'../../assets/|'../assets/|g" "$file"
-                sed -i "s|'../../dist/|'../dist/|g" "$file"
-                # Import map paths (double-quoted JSON strings)
-                sed -i 's|"../../../g2p/|"../g2p/|g' "$file"
-                sed -i 's|"../../src/|"../src/|g' "$file"
-                sed -i 's|"../../dist/|"../dist/|g' "$file"
+                sed -i 's|\.\./\.\./\.\./|../|g' "$file"
+                sed -i 's|\.\./\.\./|../|g' "$file"
               fi
             done
           fi
@@ -235,11 +200,13 @@ jobs:
           if [ -d "src/wasm/openjtalk-web/src" ]; then
             mkdir -p deploy/src
             cp src/wasm/openjtalk-web/src/*.js deploy/src/
+            # Copy phonemizer adapters subdirectory
+            if [ -d "src/wasm/openjtalk-web/src/phonemizer" ]; then
+              mkdir -p deploy/src/phonemizer
+              cp src/wasm/openjtalk-web/src/phonemizer/*.js deploy/src/phonemizer/
+            fi
             echo "Copied JS src files:"
-            ls -la deploy/src/
-            # Note: src/*.js use '../dist/' to reference deploy/dist/ from deploy/src/.
-            # This relative path is correct for the deployed directory structure, so no
-            # sed path rewriting is needed here.
+            ls -laR deploy/src/
           fi
 
           # Copy @piper-plus/g2p package (needed by src/index.js and piper-espeak-english.html)

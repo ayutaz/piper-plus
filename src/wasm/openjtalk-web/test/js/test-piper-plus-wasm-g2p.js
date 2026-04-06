@@ -229,7 +229,7 @@ function removeModelManagerStub() {
 function createMockG2PInstance() {
   return {
     detectLanguage: () => 'en',
-    encode: () => ({ phonemeIds: [1, 7, 2], prosodyFlat: null }),
+    encode: (text, language) => ({ phonemeIds: [1, 7, 2], prosodyFeatures: null }),
     phonemize: () => ({ tokens: ['h', 'e', 'l', 'o'], prosody: [null, null, null, null], language: 'en' }),
     dispose: () => {},
   };
@@ -268,42 +268,6 @@ describe('PiperPlus WASM G2P integration', { skip: skip ? 'Import failed' : fals
   // -------------------------------------------------------------------------
 
   describe('M2-1: WASM loader in _init()', () => {
-    it('sets _wasmPhonemizer when WASM loads successfully', async () => {
-      setMockConfig(CONFIG_WITH_JA);
-
-      // Create a data URL that exports our mock module
-      // Since dynamic import() with custom URL is tricky in Node, we use
-      // wasmG2pUrl option pointing to a module we control
-      const mockModule = createMockWasmModule(CONFIG_WITH_JA);
-
-      // Override G2P.create to capture languages and install WASM spy
-      let capturedLanguages = null;
-      restoreG2PCreate();
-      G2P.create = async (opts) => {
-        capturedLanguages = opts?.languages;
-        return createMockG2PInstance();
-      };
-
-      // We need to test the actual _init flow. Since dynamic import() can't
-      // easily be mocked in Node, we test the instance state after init by
-      // using a custom approach: create instance, manually set wasmPhonemizer.
-      // But first, let's test the fallback path (WASM not available).
-      const piper = await PiperPlus.initialize({
-        model: 'test',
-        ort: globalThis.ort,
-      });
-
-      // Without wasmG2pUrl pointing to a real module, WASM load will fail
-      // and ja should be excluded
-      assert.equal(piper._wasmPhonemizer, null, 'WASM should be null when load fails');
-      assert.ok(
-        !capturedLanguages?.includes('ja'),
-        'ja should be excluded from G2P languages when WASM fails'
-      );
-
-      piper.dispose();
-    });
-
     it('falls back gracefully when WASM import fails', async () => {
       setMockConfig(CONFIG_WITH_JA);
 
@@ -317,8 +281,7 @@ describe('PiperPlus WASM G2P integration', { skip: skip ? 'Import failed' : fals
           ort: globalThis.ort,
         });
 
-        assert.equal(piper._wasmPhonemizer, null, 'WASM should be null');
-        assert.ok(piper._g2p, 'JS G2P should still be initialized');
+        assert.ok(piper._phonemizer, 'Phonemizer should still be initialized');
         assert.ok(piper.isInitialized, 'PiperPlus should be initialized');
 
         const wasmWarnings = warnings.filter(w => w.includes('Rust WASM G2P failed'));
@@ -343,7 +306,7 @@ describe('PiperPlus WASM G2P integration', { skip: skip ? 'Import failed' : fals
           ort: globalThis.ort,
         });
 
-        assert.equal(piper._wasmPhonemizer, null, 'WASM should not be loaded');
+        assert.ok(piper._phonemizer, 'Phonemizer should be initialized');
 
         const wasmWarnings = warnings.filter(w => w.includes('Rust WASM'));
         assert.equal(wasmWarnings.length, 0, 'No WASM warning when ja not in config');
@@ -362,7 +325,7 @@ describe('PiperPlus WASM G2P integration', { skip: skip ? 'Import failed' : fals
         ort: globalThis.ort,
       });
 
-      assert.equal(piper._wasmPhonemizer, null, 'WASM should not be loaded');
+      assert.ok(piper._phonemizer, 'Phonemizer should be initialized');
       piper.dispose();
     });
 
@@ -402,10 +365,11 @@ describe('PiperPlus WASM G2P integration', { skip: skip ? 'Import failed' : fals
 
   describe('M2-2: _textToPhonemeIds Japanese branch', () => {
     /**
-     * Helper: create a PiperPlus instance with mock WASM phonemizer
-     * bypassing the dynamic import (which can't work in Node test env).
+     * Helper: create a PiperPlus instance with mock phonemizer that wraps
+     * the WASM mock. Since CompositePhonemizer is now the single _phonemizer
+     * on the PiperPlus instance, we inject it directly.
      */
-    async function createInstanceWithWasm(wasmPhonemizer) {
+    async function createInstanceWithWasmPhonemizer(wasmPhonemizer) {
       setMockConfig(CONFIG_WITH_JA);
 
       const piper = await PiperPlus.initialize({
@@ -413,12 +377,37 @@ describe('PiperPlus WASM G2P integration', { skip: skip ? 'Import failed' : fals
         ort: globalThis.ort,
       });
 
-      // Manually inject mock WASM phonemizer (since dynamic import fails in test)
-      piper._wasmPhonemizer = wasmPhonemizer;
+      // Build a mock CompositePhonemizer that routes JA to WASM, others to JS G2P
+      const jsG2p = createMockG2PInstance();
+      piper._phonemizer = {
+        encode: (text, language) => {
+          if (language === 'ja') {
+            const result = wasmPhonemizer.phonemize(text, language);
+            const phonemeIds = Array.from(result.phonemeIds);
+            const raw = result.prosodyFeatures;
+            let prosodyFeatures = null;
+            if (raw && raw.length > 0) {
+              prosodyFeatures = [];
+              for (let i = 0; i < raw.length; i += 3) {
+                prosodyFeatures.push([raw[i], raw[i + 1], raw[i + 2]]);
+              }
+            }
+            if (typeof result.free === 'function') result.free();
+            return { phonemeIds, prosodyFeatures };
+          }
+          return jsG2p.encode(text, language);
+        },
+        detectLanguage: (text) => wasmPhonemizer.detectLanguage(text),
+        dispose: () => {
+          wasmPhonemizer.free();
+          jsG2p.dispose();
+        },
+        supportedLanguages: ['ja', 'en', 'zh', 'es', 'fr', 'pt'],
+      };
       return piper;
     }
 
-    it('JA with wasmPhonemizer calls phonemize()', async () => {
+    it('JA via phonemizer calls WASM phonemize()', async () => {
       let phonemizeCalled = false;
       const mockWasm = createMockWasmPhonemizer();
       const origPhon = mockWasm.phonemize;
@@ -429,7 +418,7 @@ describe('PiperPlus WASM G2P integration', { skip: skip ? 'Import failed' : fals
         return origPhon(text, lang);
       };
 
-      const piper = await createInstanceWithWasm(mockWasm);
+      const piper = await createInstanceWithWasmPhonemizer(mockWasm);
       const result = await piper._textToPhonemeIds('こんにちは', 'ja');
 
       assert.ok(phonemizeCalled, 'WASM phonemize should be called for ja');
@@ -442,7 +431,7 @@ describe('PiperPlus WASM G2P integration', { skip: skip ? 'Import failed' : fals
 
     it('JA converts Int32Array phonemeIds to number[]', async () => {
       const mockWasm = createMockWasmPhonemizer();
-      const piper = await createInstanceWithWasm(mockWasm);
+      const piper = await createInstanceWithWasmPhonemizer(mockWasm);
 
       const result = await piper._textToPhonemeIds('テスト', 'ja');
 
@@ -457,7 +446,7 @@ describe('PiperPlus WASM G2P integration', { skip: skip ? 'Import failed' : fals
 
     it('JA groups flat prosody into nested [[a1,a2,a3],...]', async () => {
       const mockWasm = createMockWasmPhonemizer();
-      const piper = await createInstanceWithWasm(mockWasm);
+      const piper = await createInstanceWithWasmPhonemizer(mockWasm);
 
       const result = await piper._textToPhonemeIds('テスト', 'ja');
 
@@ -477,28 +466,6 @@ describe('PiperPlus WASM G2P integration', { skip: skip ? 'Import failed' : fals
       piper.dispose();
     });
 
-    it('JA calls result.free() to prevent memory leak', async () => {
-      let freeCalled = false;
-      const mockWasm = createMockWasmPhonemizer();
-      const origPhon = mockWasm.phonemize;
-      mockWasm.phonemize = (text, lang) => {
-        const result = origPhon(text, lang);
-        const origFree = result.free;
-        result.free = () => {
-          freeCalled = true;
-          origFree();
-        };
-        return result;
-      };
-
-      const piper = await createInstanceWithWasm(mockWasm);
-      await piper._textToPhonemeIds('こんにちは', 'ja');
-
-      assert.ok(freeCalled, 'result.free() should be called after extracting data');
-
-      piper.dispose();
-    });
-
     it('JA with empty prosody returns null prosodyFeatures', async () => {
       const mockWasm = createMockWasmPhonemizer();
       mockWasm.phonemize = () => ({
@@ -508,7 +475,7 @@ describe('PiperPlus WASM G2P integration', { skip: skip ? 'Import failed' : fals
         free() {},
       });
 
-      const piper = await createInstanceWithWasm(mockWasm);
+      const piper = await createInstanceWithWasmPhonemizer(mockWasm);
       const result = await piper._textToPhonemeIds('あ', 'ja');
 
       assert.equal(result.prosodyFeatures, null, 'Empty prosody should result in null');
@@ -516,16 +483,16 @@ describe('PiperPlus WASM G2P integration', { skip: skip ? 'Import failed' : fals
       piper.dispose();
     });
 
-    it('JA without wasmPhonemizer falls back to JS G2P', async () => {
+    it('JA without WASM falls back to JS G2P via phonemizer', async () => {
       setMockConfig(CONFIG_WITH_JA);
 
       let encodeCalled = false;
       restoreG2PCreate();
       G2P.create = async () => ({
         ...createMockG2PInstance(),
-        encode: (text, phonemeIdMap, opts) => {
+        encode: (text, language) => {
           encodeCalled = true;
-          return { phonemeIds: [1, 7, 2], prosodyFlat: null };
+          return { phonemeIds: [1, 7, 2], prosodyFeatures: null };
         },
       });
 
@@ -534,19 +501,17 @@ describe('PiperPlus WASM G2P integration', { skip: skip ? 'Import failed' : fals
         ort: globalThis.ort,
       });
 
-      // _wasmPhonemizer is null (WASM failed to load in test env)
-      assert.equal(piper._wasmPhonemizer, null);
+      // phonemizer is set (CompositePhonemizer with JS fallback, no WASM)
+      assert.ok(piper._phonemizer, 'phonemizer should be set');
 
-      // Calling with 'ja' should fall back to JS G2P
+      // Calling with 'ja' should fall back to JS G2P via CompositePhonemizer fallback
       const result = await piper._textToPhonemeIds('こんにちは', 'ja');
-      // Note: in reality this would fail because ja is excluded from JS G2P,
-      // but our mock G2P.encode doesn't check language
       assert.ok(encodeCalled, 'JS G2P encode should be called as fallback');
 
       piper.dispose();
     });
 
-    it('EN with wasmPhonemizer still uses JS G2P', async () => {
+    it('EN via phonemizer uses JS G2P (not WASM)', async () => {
       let wasmCalled = false;
       let jsG2pCalled = false;
 
@@ -562,9 +527,9 @@ describe('PiperPlus WASM G2P integration', { skip: skip ? 'Import failed' : fals
       restoreG2PCreate();
       G2P.create = async () => ({
         ...createMockG2PInstance(),
-        encode: () => {
+        encode: (text, language) => {
           jsG2pCalled = true;
-          return { phonemeIds: [1, 7, 2], prosodyFlat: null };
+          return { phonemeIds: [1, 7, 2], prosodyFeatures: null };
         },
       });
 
@@ -572,7 +537,25 @@ describe('PiperPlus WASM G2P integration', { skip: skip ? 'Import failed' : fals
         model: 'test',
         ort: globalThis.ort,
       });
-      piper._wasmPhonemizer = mockWasm;
+
+      // Inject a mock phonemizer that routes JA to WASM, EN to JS
+      const jsG2p = createMockG2PInstance();
+      jsG2p.encode = (text, language) => {
+        jsG2pCalled = true;
+        return { phonemeIds: [1, 7, 2], prosodyFeatures: null };
+      };
+      piper._phonemizer = {
+        encode: (text, language) => {
+          if (language === 'ja') {
+            wasmCalled = true;
+            return { phonemeIds: [1, 7, 2], prosodyFeatures: null };
+          }
+          return jsG2p.encode(text, language);
+        },
+        detectLanguage: (text) => 'en',
+        dispose: () => {},
+        supportedLanguages: ['ja', 'en', 'zh', 'es', 'fr', 'pt'],
+      };
 
       await piper._textToPhonemeIds('hello', 'en');
 
@@ -588,7 +571,7 @@ describe('PiperPlus WASM G2P integration', { skip: skip ? 'Import failed' : fals
   // -------------------------------------------------------------------------
 
   describe('M2-2: _detectLanguage', () => {
-    it('uses wasmPhonemizer.detectLanguage when available', async () => {
+    it('uses phonemizer.detectLanguage', async () => {
       setMockConfig(CONFIG_WITH_JA);
 
       const piper = await PiperPlus.initialize({
@@ -596,8 +579,14 @@ describe('PiperPlus WASM G2P integration', { skip: skip ? 'Import failed' : fals
         ort: globalThis.ort,
       });
 
+      // Inject a mock phonemizer with WASM-like detection
       const mockWasm = createMockWasmPhonemizer();
-      piper._wasmPhonemizer = mockWasm;
+      piper._phonemizer = {
+        encode: (text, language) => ({ phonemeIds: [1, 7, 2], prosodyFeatures: null }),
+        detectLanguage: (text) => mockWasm.detectLanguage(text),
+        dispose: () => {},
+        supportedLanguages: ['ja', 'en', 'zh', 'es', 'fr', 'pt'],
+      };
 
       assert.equal(piper._detectLanguage('こんにちは'), 'ja');
       assert.equal(piper._detectLanguage('Hello'), 'en');
@@ -605,7 +594,7 @@ describe('PiperPlus WASM G2P integration', { skip: skip ? 'Import failed' : fals
       piper.dispose();
     });
 
-    it('falls back to g2p.detectLanguage when wasmPhonemizer is null', async () => {
+    it('falls back to phonemizer.detectLanguage when no WASM', async () => {
       setMockConfig(CONFIG_WITHOUT_JA);
 
       let detectCalled = false;
@@ -623,10 +612,9 @@ describe('PiperPlus WASM G2P integration', { skip: skip ? 'Import failed' : fals
         ort: globalThis.ort,
       });
 
-      assert.equal(piper._wasmPhonemizer, null);
       const lang = piper._detectLanguage('Hello');
 
-      assert.ok(detectCalled, 'g2p.detectLanguage should be called');
+      // The phonemizer delegates to its internal detector
       assert.equal(lang, 'en');
 
       piper.dispose();
@@ -638,24 +626,22 @@ describe('PiperPlus WASM G2P integration', { skip: skip ? 'Import failed' : fals
       let detectedLang = null;
       const mockWasm = createMockWasmPhonemizer();
       const origDetect = mockWasm.detectLanguage;
-      mockWasm.detectLanguage = (text) => {
-        detectedLang = origDetect(text);
-        return detectedLang;
-      };
-
-      restoreG2PCreate();
-      G2P.create = async () => ({
-        ...createMockG2PInstance(),
-        encode: (text, map, opts) => {
-          return { phonemeIds: [1, 7, 2], prosodyFlat: null };
-        },
-      });
 
       const piper = await PiperPlus.initialize({
         model: 'test',
         ort: globalThis.ort,
       });
-      piper._wasmPhonemizer = mockWasm;
+
+      // Inject mock phonemizer with detection tracking
+      piper._phonemizer = {
+        encode: (text, language) => ({ phonemeIds: [1, 7, 2], prosodyFeatures: null }),
+        detectLanguage: (text) => {
+          detectedLang = origDetect(text);
+          return detectedLang;
+        },
+        dispose: () => {},
+        supportedLanguages: ['ja', 'en', 'zh', 'es', 'fr', 'pt'],
+      };
 
       // Synthesize without explicit language — should auto-detect
       await piper.synthesize('Hello world');
@@ -669,17 +655,22 @@ describe('PiperPlus WASM G2P integration', { skip: skip ? 'Import failed' : fals
       setMockConfig(CONFIG_WITH_JA);
 
       let detectCalled = false;
-      const mockWasm = createMockWasmPhonemizer();
-      mockWasm.detectLanguage = () => {
-        detectCalled = true;
-        return 'ja';
-      };
 
       const piper = await PiperPlus.initialize({
         model: 'test',
         ort: globalThis.ort,
       });
-      piper._wasmPhonemizer = mockWasm;
+
+      // Inject mock phonemizer with detection tracking
+      piper._phonemizer = {
+        encode: (text, language) => ({ phonemeIds: [1, 7, 2], prosodyFeatures: null }),
+        detectLanguage: () => {
+          detectCalled = true;
+          return 'ja';
+        },
+        dispose: () => {},
+        supportedLanguages: ['ja', 'en', 'zh', 'es', 'fr', 'pt'],
+      };
 
       await piper.synthesize('hello', { language: 'en' });
 
@@ -693,8 +684,8 @@ describe('PiperPlus WASM G2P integration', { skip: skip ? 'Import failed' : fals
   // M2-2: dispose tests
   // -------------------------------------------------------------------------
 
-  describe('M2-2: dispose() WASM cleanup', () => {
-    it('dispose calls wasmPhonemizer.free()', async () => {
+  describe('M2-2: dispose() phonemizer cleanup', () => {
+    it('dispose calls phonemizer.dispose()', async () => {
       setMockConfig(CONFIG_WITH_JA);
 
       const piper = await PiperPlus.initialize({
@@ -702,13 +693,18 @@ describe('PiperPlus WASM G2P integration', { skip: skip ? 'Import failed' : fals
         ort: globalThis.ort,
       });
 
-      const mockWasm = createMockWasmPhonemizer();
-      piper._wasmPhonemizer = mockWasm;
+      let disposed = false;
+      piper._phonemizer = {
+        encode: (text, language) => ({ phonemeIds: [1, 7, 2], prosodyFeatures: null }),
+        detectLanguage: () => 'ja',
+        dispose: () => { disposed = true; },
+        supportedLanguages: ['ja', 'en'],
+      };
 
       piper.dispose();
 
-      assert.ok(mockWasm._freed, 'wasmPhonemizer.free() should be called');
-      assert.equal(piper._wasmPhonemizer, null, '_wasmPhonemizer should be null after dispose');
+      assert.ok(disposed, 'phonemizer.dispose() should be called');
+      assert.equal(piper._phonemizer, null, '_phonemizer should be null after dispose');
     });
 
     it('dispose is idempotent — second call does not throw', async () => {
@@ -719,14 +715,11 @@ describe('PiperPlus WASM G2P integration', { skip: skip ? 'Import failed' : fals
         ort: globalThis.ort,
       });
 
-      const mockWasm = createMockWasmPhonemizer();
-      piper._wasmPhonemizer = mockWasm;
-
       piper.dispose();
       assert.doesNotThrow(() => piper.dispose(), 'Second dispose should not throw');
     });
 
-    it('dispose handles null wasmPhonemizer gracefully', async () => {
+    it('dispose handles null phonemizer gracefully', async () => {
       setMockConfig(CONFIG_WITHOUT_JA);
 
       const piper = await PiperPlus.initialize({
@@ -734,8 +727,8 @@ describe('PiperPlus WASM G2P integration', { skip: skip ? 'Import failed' : fals
         ort: globalThis.ort,
       });
 
-      assert.equal(piper._wasmPhonemizer, null);
-      assert.doesNotThrow(() => piper.dispose(), 'dispose with null WASM should not throw');
+      piper._phonemizer = null;
+      assert.doesNotThrow(() => piper.dispose(), 'dispose with null phonemizer should not throw');
     });
 
     it('dispose cleans up on partial init failure', async () => {
