@@ -182,6 +182,8 @@ export class PiperPlus {
       this._phonemizer.dispose();
       this._phonemizer = null;
     }
+    this._sessionManager = null;
+    this._modelUrl = null;
     this._warmupPromise = null;
     this._initialized = false;
   }
@@ -243,11 +245,12 @@ export class PiperPlus {
 
       progress({ stage: 'model', progress: 0.3, message: 'Creating ONNX session...' });
 
-      const sessionManager = new WebGPUSessionManager({
+      this._sessionManager = new WebGPUSessionManager({
         ort,
         gpu: typeof navigator !== 'undefined' ? navigator.gpu : undefined,
       });
-      this._session = await sessionManager.createSession(modelUrl);
+      this._modelUrl = modelUrl;
+      this._session = await this._sessionManager.createSession(modelUrl);
 
       progress({ stage: 'model', progress: 0.7, message: 'Model loaded.' });
 
@@ -391,7 +394,29 @@ export class PiperPlus {
       );
     }
 
-    const results = await this._session.run(feeds);
+    let results;
+    try {
+      results = await this._session.run(feeds);
+    } catch (e) {
+      // Detect WebGPU int64 kernel failure and fall back to WASM
+      if (this._sessionManager?.currentProvider === 'webgpu'
+          && e?.message?.includes('Unsupported data type')) {
+        console.warn(
+          '[piper-plus] WebGPU inference failed (likely int64 unsupported). '
+          + 'Recreating session with WASM backend.',
+          e.message
+        );
+        if (typeof this._session.release === 'function') {
+          await this._session.release();
+        }
+        // Force WASM by removing GPU reference
+        this._sessionManager._gpu = undefined;
+        this._session = await this._sessionManager.createSession(this._modelUrl);
+        results = await this._session.run(feeds);
+      } else {
+        throw e;
+      }
+    }
     const audioTensor = results.output || results[Object.keys(results)[0]];
     return new Float32Array(audioTensor.data);
   }
