@@ -122,6 +122,7 @@ export class PiperPlus {
       noiseScale,
       lengthScale,
       noiseW,
+      language,
     });
 
     // 3. Wrap result
@@ -159,7 +160,7 @@ export class PiperPlus {
       synthesize: async (ids) => {
         // Streaming path skips prosody for simplicity — prosody extraction
         // requires the full labels which are language-specific.
-        return this._infer(ids, null, { noiseScale, lengthScale, noiseW });
+        return this._infer(ids, null, { noiseScale, lengthScale, noiseW, language });
       },
       onAudioChunk: onChunk,
     });
@@ -338,7 +339,7 @@ export class PiperPlus {
    * Returns raw Float32Array of audio samples.
    * @private
    */
-  async _infer(phonemeIds, prosodyFeatures, { noiseScale, lengthScale, noiseW }) {
+  async _infer(phonemeIds, prosodyFeatures, { noiseScale, lengthScale, noiseW, language }) {
     const ort = this._ort;
 
     const inputTensor = new ort.Tensor(
@@ -364,6 +365,18 @@ export class PiperPlus {
       input_lengths: lengthTensor,
       scales: scalesTensor,
     };
+
+    // Attach language ID tensor for multilingual models
+    if (this._config.language_id_map && language) {
+      const langId = this._config.language_id_map[language];
+      if (langId !== undefined) {
+        feeds.lid = new ort.Tensor(
+          'int64',
+          new BigInt64Array([BigInt(langId)]),
+          [1]
+        );
+      }
+    }
 
     // Attach prosody features when the model supports them
     if (prosodyFeatures && this._config.prosody_id_map) {
