@@ -42,6 +42,7 @@
     "test:optimization:phase2": "node --test test/js/test-resampler.js test/js/test-webgpu-session.js test/js/test-audio-backend.js",
     "test:optimization:phase3": "node --test test/js/test-streaming-pipeline.js test/js/test-memory-pool.js",
     "test:optimization:integration": "node --test test/js/test-phase2-integration.js",
+    "test:importmap": "node --test test/js/test-importmap.js",
     "test:npm-package": "node --test test/js/test-npm-package.js",
     "test:npm-package:all": "node --test test/js/test-audio-result.js test/js/test-audio-result-wav-edge.js test/js/test-piper-plus.js test/js/test-piper-plus-boundary.js test/js/test-piper-plus-init-success.js test/js/test-piper-plus-synthesize-flow.js test/js/test-model-manager.js test/js/test-model-manager-load.js test/js/test-model-manager-cache.js test/js/test-model-manager-boundary.js test/js/test-dictionary-cache.js test/js/test-npm-package.js",
     "build:wasm": "cd ../../rust/piper-wasm && wasm-pack build --target web --release --out-dir ../../wasm/openjtalk-web/dist/rust-wasm",

@@ -82,6 +82,10 @@ jobs:
         test -f dist/openjtalk.wasm
         echo "Build outputs verified"
     
+    - name: Run import map validation tests
+      working-directory: src/wasm/openjtalk-web
+      run: node --test test/js/test-importmap.js
+
     - name: Run JavaScript tests
       working-directory: src/wasm/openjtalk-web
       run: |

@@ -257,6 +257,68 @@ jobs:
           echo "Commit: ${{ github.sha }}" >> deploy/deployment-info.txt
           echo "Date: $(date -u +"%Y-%m-%d %H:%M:%S UTC")" >> deploy/deployment-info.txt
       
+      - name: Validate import maps in deployed HTML
+        run: |
+          echo "Validating import maps in deploy/ HTML files..."
+          ERRORS=0
+
+          # Collect bare module specifiers from deployed JS sources
+          BARE_SPECS=$(grep -rhoP "(?:import|export)\s+.*?\s+from\s+['\"]([^'\"./][^'\"]*)['\"]" deploy/src/*.js 2>/dev/null \
+            | grep -oP "['\"][^'\"./][^'\"]*['\"]" | tr -d "'" | tr -d '"' | sort -u || true)
+
+          if [ -z "$BARE_SPECS" ]; then
+            echo "No bare module specifiers found in deploy/src/*.js — skipping"
+          else
+            echo "Bare specifiers found: $BARE_SPECS"
+
+            for html in $(find deploy -name '*.html'); do
+              # Skip HTML files that don't use ES modules
+              if ! grep -q 'type="module"' "$html"; then
+                continue
+              fi
+
+              # Check that an import map exists
+              if ! grep -q 'type="importmap"' "$html"; then
+                echo "ERROR: $html uses ES modules but has no import map"
+                ERRORS=$((ERRORS + 1))
+                continue
+              fi
+
+              # Check each bare specifier is covered
+              for spec in $BARE_SPECS; do
+                if ! grep -q "\"$spec\"" "$html"; then
+                  echo "ERROR: $html is missing import map entry for: $spec"
+                  ERRORS=$((ERRORS + 1))
+                fi
+              done
+
+              # Check import map targets resolve to existing files
+              HTML_DIR=$(dirname "$html")
+              grep -oP '"[^"]+\.js"' "$html" | tr -d '"' | while read -r target; do
+                # Skip bare specifiers (already checked above)
+                if [[ "$target" != ./* && "$target" != ../* ]]; then
+                  continue
+                fi
+                resolved="$HTML_DIR/$target"
+                if [ ! -f "$resolved" ]; then
+                  echo "ERROR: $html import map target missing: $target (resolved: $resolved)"
+                  # Use a temp file since we're in a subshell
+                  touch /tmp/importmap_error
+                fi
+              done
+              if [ -f /tmp/importmap_error ]; then
+                rm /tmp/importmap_error
+                ERRORS=$((ERRORS + 1))
+              fi
+            done
+          fi
+
+          if [ "$ERRORS" -gt 0 ]; then
+            echo "Import map validation failed with $ERRORS error(s)"
+            exit 1
+          fi
+          echo "All import maps validated successfully"
+
       - name: Setup Pages
         uses: actions/configure-pages@v5
       
