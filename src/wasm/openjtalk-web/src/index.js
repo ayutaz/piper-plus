@@ -300,21 +300,27 @@ export class PiperPlus {
         }
       }
 
-      // Languages not covered by WASM use JS G2P as fallback
+      // Languages not covered by WASM use JS G2P as fallback.
+      // When languages is undefined (no language_id_map), pass undefined to
+      // JsG2pAdapter so G2P.create() initialises all available languages.
       const jsLanguages = languages?.filter(l => !phonemizerMap.has(l));
-      const jsAdapter = await JsG2pAdapter.create(
-        jsLanguages,
-        this._config.phoneme_id_map,
-      );
-      if (jsLanguages) {
-        for (const lang of jsLanguages) {
-          phonemizerMap.set(lang, jsAdapter);
+      const needsJsAdapter = !jsLanguages || jsLanguages.length > 0;
+      let jsAdapter = null;
+      if (needsJsAdapter) {
+        jsAdapter = await JsG2pAdapter.create(
+          jsLanguages,  // undefined when no language_id_map
+          this._config.phoneme_id_map,
+        );
+        if (jsLanguages) {
+          for (const lang of jsLanguages) {
+            phonemizerMap.set(lang, jsAdapter);
+          }
         }
       }
 
       this._phonemizer = new CompositePhonemizer({
         phonemizers: phonemizerMap,
-        fallback: jsAdapter,
+        fallback: jsAdapter || wasmAdapter,
         detector: wasmAdapter || jsAdapter,
       });
 
