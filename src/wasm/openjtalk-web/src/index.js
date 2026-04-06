@@ -267,7 +267,7 @@ export class PiperPlus {
       const phonemizerMap = new Map();
       let wasmAdapter = null;
 
-      // Load Rust WASM phonemizer for Japanese (+ all languages).
+      // Load Rust WASM phonemizer (supports all 8 languages).
       // Falls back gracefully when WASM binary is unavailable (e.g. local dev).
       if (languages && languages.includes('ja')) {
         try {
@@ -278,15 +278,23 @@ export class PiperPlus {
               wasmLoader: options.wasmLoader,
             },
           );
-          phonemizerMap.set('ja', wasmAdapter);
+          // Route all WASM-supported languages through the WASM adapter.
+          // This is critical for languages like zh where JS G2P lacks
+          // proper phonemization (e.g. no pinyin conversion).
+          const wasmLangs = wasmAdapter.supportedLanguages;
+          for (const lang of languages) {
+            if (wasmLangs.includes(lang)) {
+              phonemizerMap.set(lang, wasmAdapter);
+            }
+          }
         } catch (err) {
           console.warn('[piper-plus] Rust WASM G2P failed to load, excluding ja:', err.message);
           languages = languages.filter(l => l !== 'ja');
         }
       }
 
-      // Non-JA languages use JS G2P
-      const jsLanguages = languages?.filter(l => l !== 'ja');
+      // Languages not covered by WASM use JS G2P as fallback
+      const jsLanguages = languages?.filter(l => !phonemizerMap.has(l));
       const jsAdapter = await JsG2pAdapter.create(
         jsLanguages,
         this._config.phoneme_id_map,
