@@ -4,61 +4,39 @@
 
 ---
 
+## チケット一覧・進捗
+
+| チケット | タイトル | マイルストーン | 状態 | 依存 |
+|---------|---------|--------------|------|------|
+| [M1-1](tickets/M1-1-wasm-loader.md) | `_init()` に Rust WASM ローダー追加 | M1 | TODO | なし |
+| [M1-2](tickets/M1-2-text-to-phoneme-ids.md) | `_textToPhonemeIds()` に日本語分岐追加 | M1 | TODO | M1-1 |
+| [M1-3](tickets/M1-3-language-detection.md) | 言語検出の統合 | M1 | TODO | M1-1 |
+| [M1-4](tickets/M1-4-dispose.md) | `dispose()` でのリソース解放 | M1 | TODO | M1-1 |
+| [M2-1](tickets/M2-1-wasm-loader-tests.md) | WASM ローダーのユニットテスト | M2 | TODO | M1-1 |
+| [M2-2](tickets/M2-2-phonemize-branch-tests.md) | phonemize 分岐・言語検出・dispose テスト | M2 | TODO | M1-2, M1-3, M1-4 |
+| [M2-3](tickets/M2-3-ci-integration.md) | CI にテスト追加 | M2 | TODO | M2-1, M2-2 |
+| [M3-1](tickets/M3-1-demo-ja-verification.md) | デモページ日本語動作確認 | M3 | TODO | M2-3 |
+| [M3-2](tickets/M3-2-regression-other-langs.md) | 他言語回帰テスト | M3 | TODO | M2-3 |
+
+---
+
 ## M1: PiperPlus に Rust WASM phonemizer を統合
 
 **目標**: `PiperPlus._init()` で Rust WASM (`WasmPhonemizer`) を自動ロードし、日本語 G2P として使用する。他言語は既存の JS G2P (`@piper-plus/g2p`) をそのまま使う。
 
-### タスク
+**チケット**: [M1-1](tickets/M1-1-wasm-loader.md) → [M1-2](tickets/M1-2-text-to-phoneme-ids.md) → [M1-3](tickets/M1-3-language-detection.md) → [M1-4](tickets/M1-4-dispose.md)
 
-#### M1-1: `_init()` に Rust WASM ローダー追加
+### 一から設計するとしたら
 
-- **ファイル**: `src/wasm/openjtalk-web/src/index.js`
-- **内容**:
-  - `language_id_map` に `'ja'` が含まれる場合、`dynamic import()` で `dist/rust-wasm/piper_plus_wasm.js` をロード
-  - `await init()` → `new WasmPhonemizer(JSON.stringify(config))` で初期化
-  - `this._wasmPhonemizer` に保持
-  - ロード失敗時は `console.warn` + `'ja'` を除外してフォールバック
-  - JS G2P (`G2P.create()`) は `'ja'` を除いた言語リストで初期化
-- **受け入れ基準**:
-  - Rust WASM がある環境で `_init()` 完了後 `this._wasmPhonemizer` が non-null
-  - Rust WASM がない環境で `_init()` がエラーなく完了し `this._wasmPhonemizer` が null
+現在の設計は「PiperPlus が内部で Rust WASM をロードし、日本語だけ特別扱いする」方式。一からやり直すなら以下を検討する:
 
-#### M1-2: `_textToPhonemeIds()` に日本語分岐追加
+1. **Rust WASM を全言語の G2P バックエンドにする**: `@piper-plus/g2p` の JS 実装を廃止し、Rust WASM の `WasmPhonemizer` を唯一の G2P とする。メリットは単一パスによる簡潔さ。デメリットは WASM バイナリ (19MB gzip) が全ユーザーに必須になること、ルールベース言語で JS の方が軽量であること。
 
-- **ファイル**: `src/wasm/openjtalk-web/src/index.js`
-- **内容**:
-  - `language === 'ja' && this._wasmPhonemizer` の場合、Rust WASM の `phonemize()` を直接呼ぶ
-  - `result.phonemeIds` (Int32Array) → `Array.from()` で number[] に変換
-  - `result.prosodyFeatures` (Int32Array, flat) → 3要素ずつグループ化して number[][] に変換
-  - `result.free()` でメモリ解放
-  - 他言語は既存の `this._g2p.encode()` パスをそのまま使用
-- **受け入れ基準**:
-  - 日本語テキスト → phonemeIds が BOS で始まり EOS で終わる
-  - prosodyFeatures が phonemeIds と同じ長さの [a1,a2,a3] 配列
-  - 他言語のパスが変更なく動作
+2. **DI (Dependency Injection) パターンの統一**: `PiperPlus.initialize({ phonemizer })` で外部から phonemizer を注入し、PiperPlus は G2P の実装詳細を知らない設計。現在は openjtalkModule / wasmPhonemizer / G2P.create と3つの注入パスが混在しており複雑。理想は 1 つの PhonemizerInterface を定義し、Rust WASM / JS G2P / 将来の実装が同じインターフェースを実装する形。
 
-#### M1-3: 言語検出の統合
+3. **段階的ロード**: WASM バイナリのロードを初期化時ではなく、日本語テキストが初めて入力された時点で行う遅延ロード。初期化時間を短縮できるが、初回日本語合成のレイテンシが増加するトレードオフ。
 
-- **ファイル**: `src/wasm/openjtalk-web/src/index.js`
-- **内容**:
-  - `synthesize()` / `synthesizeStreaming()` 内の言語検出で:
-    - `_wasmPhonemizer` がある場合: `_wasmPhonemizer.detectLanguage(text)` を使用
-    - ない場合: 既存の `_g2p.detectLanguage(text)` を使用
-  - 日本語テキスト (ひらがな/カタカナ含む) で確実に `'ja'` が返ること
-- **受け入れ基準**:
-  - `'こんにちは'` → `'ja'` が検出される
-  - `'Hello'` → `'en'` が検出される
-  - `'你好'` → `'zh'` が検出される
-
-#### M1-4: `dispose()` でのリソース解放
-
-- **ファイル**: `src/wasm/openjtalk-web/src/index.js`
-- **内容**:
-  - `dispose()` に `_wasmPhonemizer.free()` を追加
-  - `_wasmPhonemizer = null` でリセット
-- **受け入れ基準**:
-  - `dispose()` 後に `_wasmPhonemizer` が null
-  - `dispose()` を2回呼んでもエラーにならない
+**今回の方式の妥協点**: 日本語だけ特別パスを通す条件分岐が `_init()`, `_textToPhonemeIds()`, `synthesize()`, `dispose()` の4箇所に散らばる。しかし、既存の JS G2P エコシステム (npm パッケージ、テスト、CI) を壊さずに日本語を動かす最短経路でもある。
 
 ---
 
@@ -66,35 +44,17 @@
 
 **目標**: M1 の全変更をテストでカバーし、CI で事前検知できるようにする。
 
-### タスク
+**チケット**: [M2-1](tickets/M2-1-wasm-loader-tests.md) → [M2-2](tickets/M2-2-phonemize-branch-tests.md) → [M2-3](tickets/M2-3-ci-integration.md)
 
-#### M2-1: Rust WASM ローダーのユニットテスト
+### 一から設計するとしたら
 
-- **ファイル**: `src/wasm/openjtalk-web/test/js/test-piper-plus-wasm-g2p.js` (新規)
-- **テストケース**:
-  1. `_init()` で `_wasmPhonemizer` が設定される (WASM import をモック)
-  2. Rust WASM ロード失敗時に `'ja'` が除外されフォールバック
-  3. `language_id_map` に `'ja'` がない場合は WASM ロードをスキップ
-  4. `dispose()` で `_wasmPhonemizer.free()` が呼ばれる
-- **モック方針**:
-  - `import()` をモックして WasmPhonemizer のスタブを返す
-  - phonemize() は `{ phonemeIds: Int32Array, prosodyFeatures: Int32Array, phonemeCount, free() }` を返す
+現在のテスト戦略は「外部依存 (WASM, fetch, ort, IndexedDB) をモックして Node.js で実行」。一からやり直すなら:
 
-#### M2-2: `_textToPhonemeIds()` の分岐テスト
+1. **ブラウザ E2E テストを第一級市民にする**: Playwright で実際の GitHub Pages デモを叩くテストを CI に組み込む。WASM ロード、ONNX 推論、音声出力まで通しで検証できる。Node.js ユニットテストはモック前提のため統合バグを見逃しやすい（今回の一連のバグがその証拠）。
 
-- **ファイル**: 同上 (M2-1 と同じファイル)
-- **テストケース**:
-  1. JA + wasmPhonemizer あり → Rust WASM phonemize() が呼ばれる
-  2. JA + wasmPhonemizer なし → JS G2P encode() にフォールバック
-  3. EN + wasmPhonemizer あり → JS G2P encode() が使われる (WASM は JA のみ)
-  4. phonemize() の戻り値が `_infer()` の期待する形式に変換される
-  5. `result.free()` が呼ばれる (メモリリーク防止)
+2. **WASM ビルド成果物をテスト artifact として共有**: `wasm-build.yml` が WASM をビルドし、`test-webassembly.yml` がそれをダウンロードして使うパイプライン。現在は WASM テストが全てモックベースで、実際のバイナリとの互換性を検証できない。
 
-#### M2-3: CI にテスト追加
-
-- **ファイル**: `.github/workflows/test-webassembly.yml`
-- **内容**: M2-1, M2-2 のテストファイルを実行ステップに追加
-- **受け入れ基準**: CI で全テストパス
+3. **テストヘルパーの `_init()` バイパスを廃止**: `createInitializedInstance()` が private フィールドを直接代入するパターンを段階的に廃止し、`PiperPlus.initialize()` をモック付き環境で実際に呼ぶパターンに移行する。今回のスタブ監査で発覚した問題の根本原因。
 
 ---
 
@@ -102,53 +62,46 @@
 
 **目標**: GitHub Pages のデモページで日本語テキスト → 音声合成が動作する。
 
-### タスク
+**チケット**: [M3-1](tickets/M3-1-demo-ja-verification.md) → [M3-2](tickets/M3-2-regression-other-langs.md)
 
-#### M3-1: デモページの動作確認
+### 一から設計するとしたら
 
-- **確認手順**:
-  1. https://ayutaz.github.io/piper-plus/ にアクセス
-  2. 初期化完了 (「準備完了！」表示)
-  3. 日本語テキスト「こんにちは、つくよみちゃんです。」を入力
-  4. 「音声合成」ボタン → 音声が再生される
-  5. コンソールにエラーなし
-- **受け入れ基準**:
-  - `openjtalkModule is required` エラーが出ない
-  - `is not a function` エラーが出ない
-  - 日本語・英語・中国語の3言語で音声合成が動作
+手動ブラウザテストは再現性が低く属人的。一からやり直すなら:
 
-#### M3-2: 他言語の回帰テスト
+1. **Playwright による自動 E2E**: デモページへのアクセス → テキスト入力 → 合成ボタン → 音声再生確認をスクリプト化。GitHub Actions で Chromium headless 実行。音声出力は Web Audio API のサンプル数やゼロでないことで検証。
 
-- **確認手順**: デモページで以下のテキストを合成
-  - EN: "Hello, how are you today?"
-  - ZH: "你好，今天天气很好。"
-  - ES: "¿Hola, cómo estás hoy?"
-  - FR: "Bonjour, comment allez-vous?"
-  - PT: "Olá, como você está hoje?"
-- **受け入れ基準**: 全言語で音声が生成され、以前と同等の品質
+2. **Audio regression テスト**: 既知の入力テキストに対する音声出力の統計的特徴 (長さ、RMS、スペクトラム) をスナップショットとして保存し、デプロイ前に比較。完全一致ではなく、しきい値ベースの比較で意図しない音質劣化を検知。
+
+3. **多言語合成のスモークテスト**: 全6言語の短いテキストを合成し、音声長がゼロでないことを自動チェック。言語ごとに期待される最小音声長を設定。
 
 ---
 
-## 依存関係
+## 依存関係図
 
 ```
-M1-1 (WASM ローダー)
-  ↓
-M1-2 (_textToPhonemeIds 分岐)
-  ↓
-M1-3 (言語検出) ← M1-1 に依存
-  ↓
-M1-4 (dispose)
-  ↓
-M2-1, M2-2, M2-3 (テスト) ← M1 全タスクに依存
-  ↓
-M3-1, M3-2 (動作確認) ← M2 に依存
+M1-1 (WASM ローダー) ──────────────┐
+  │                                 │
+  ├─→ M1-2 (_textToPhonemeIds)     │
+  │                                 │
+  ├─→ M1-3 (言語検出)              │
+  │                                 │
+  └─→ M1-4 (dispose)               │
+                                    │
+       M2-1 (ローダーテスト) ←──────┘
+         │
+       M2-2 (分岐テスト) ←── M1-2, M1-3, M1-4
+         │
+       M2-3 (CI 統合) ←── M2-1, M2-2
+         │
+       ┌─┴─┐
+  M3-1    M3-2
+  (JA)    (回帰)
 ```
 
 ## 見積もり
 
-| マイルストーン | タスク数 | 規模 |
-|--------------|---------|------|
+| マイルストーン | チケット数 | 規模 |
+|--------------|-----------|------|
 | M1 (実装) | 4 | `index.js` 1ファイルの変更 (~50行追加) |
 | M2 (テスト) | 3 | テスト1ファイル新規 + CI 更新 |
 | M3 (確認) | 2 | デプロイ + ブラウザ確認 |
