@@ -120,8 +120,9 @@ cd docker/webui && docker-compose up
 | `OUTPUT_DIR` | `./output` | Host path to output directory (docker-compose volume) |
 | `PIPER_MODEL` | (none) | Specific model to load (passed to entrypoint) |
 | `PIPER_MODEL_DIR` | `/models` | Model directory inside the container |
-| `GRADIO_SERVER_NAME` | `0.0.0.0` | Gradio bind address |
-| `GRADIO_SERVER_PORT` | `7860` | Gradio port |
+| `PIPER_OUTPUT_DIR` | `/output` | Output directory inside the container (used by entrypoint.sh) |
+
+> **Note:** `docker-compose.yml` sets `GRADIO_SERVER_NAME` and `GRADIO_SERVER_PORT`, but `app.py` launches Gradio with explicit `--host` / `--port` CLI args (defaults: `0.0.0.0` and `7860`), so those env vars have no effect. To change the bind address or port, override the entrypoint command args instead.
 
 ## Troubleshooting
 

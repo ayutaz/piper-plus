@@ -6,7 +6,7 @@ This document lists all environment variables that can be used to configure Pipe
 
 ### OPENJTALK_DICTIONARY_PATH
 - **Description**: Path to OpenJTalk dictionary directory
-- **Used by**: C++, C#, Go
+- **Used by**: C++, C#, Go, Rust (dictionary download manager)
 - **Default**: Auto-downloaded to user data directory
 - **Platform defaults**:
   - Windows: `%APPDATA%\piper\open_jtalk_dic_utf_8-1.11`
@@ -23,7 +23,7 @@ This document lists all environment variables that can be used to configure Pipe
 
 ### OPENJTALK_DATA_DIR
 - **Description**: Override the base directory for OpenJTalk data files
-- **Used by**: C++, C#
+- **Used by**: C++, C#, Rust (dictionary download manager)
 - **Default**: Platform-specific user data directory
 - **Example**:
   ```bash

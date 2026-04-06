@@ -104,12 +104,12 @@ The workflow also includes `cargo check`, `cargo fmt`, and `cargo clippy` jobs o
 
 ## Go Tests (piperplus)
 
-The Go `piperplus` package has 793 unit tests and 11 integration tests covering:
+The Go `piperplus` package has 793 unit tests and 10 integration tests covering:
 
 - All 8 language phonemizers (Japanese, English, Chinese, Korean, Spanish, Portuguese, French, Swedish)
   - Note: Swedish (sv) and Korean (ko) are code-ready but not yet included in the current 6-language trained model.
 - Unicode language detection and text segmentation
-- PUA (Private Use Area) bidirectional mapping (87 entries)
+- PUA (Private Use Area) bidirectional mapping (96 entries)
 - Config parsing, WAV output, error types
 - ONNX inference engine, end-to-end synthesis (integration)
 - HTTP API server handlers (/synthesize, /health, /info)
