@@ -248,10 +248,22 @@ export class PiperPlus {
 
       progress({ stage: 'phonemizer', progress: 0, message: 'Initializing phonemizer...' });
 
-      const languages = this._config.language_id_map
+      let languages = this._config.language_id_map
         ? Object.keys(this._config.language_id_map)
         : undefined;
-      this._g2p = await G2P.create({ languages });
+
+      // Japanese G2P requires an OpenJTalk WASM module injected via options.
+      // When not provided, exclude 'ja' so the remaining languages still work.
+      const g2pOptions = {};
+      if (options.openjtalkModule) {
+        g2pOptions.openjtalkModule = options.openjtalkModule;
+        if (options.jaDict) g2pOptions.jaDict = options.jaDict;
+      } else if (languages && languages.includes('ja')) {
+        languages = languages.filter((l) => l !== 'ja');
+      }
+      g2pOptions.languages = languages;
+
+      this._g2p = await G2P.create(g2pOptions);
 
       progress({ stage: 'phonemizer', progress: 1, message: 'Phonemizer ready.' });
 

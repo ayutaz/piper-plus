@@ -239,7 +239,7 @@ describe('PiperPlus G2P.create() integration', { skip: skip ? 'Import failed' : 
     assert.equal(g2pSpy.calls[0].languages, undefined, 'languages should be undefined when no language_id_map');
   });
 
-  it('config with ja in language_id_map includes ja in G2P.create() languages', async () => {
+  it('config with ja in language_id_map excludes ja when no openjtalkModule', async () => {
     setMockConfig({
       ...BASE_CONFIG,
       language_id_map: { ja: 0, en: 1, zh: 2, es: 3, fr: 4, pt: 5 },
@@ -250,7 +250,8 @@ describe('PiperPlus G2P.create() integration', { skip: skip ? 'Import failed' : 
 
     assert.equal(g2pSpy.calls.length, 1);
     const langs = g2pSpy.calls[0].languages;
-    assert.ok(langs.includes('ja'), 'ja should be in languages when in language_id_map');
+    assert.ok(!langs.includes('ja'), 'ja should be excluded when openjtalkModule not provided');
+    assert.deepEqual(langs.sort(), ['en', 'es', 'fr', 'pt', 'zh']);
   });
 
   it('G2P.create() failure propagates to PiperPlus.initialize()', async () => {
@@ -277,7 +278,7 @@ describe('PiperPlus G2P.create() integration', { skip: skip ? 'Import failed' : 
     }
   });
 
-  it('real G2P.create() with ja and no openjtalkModule throws descriptive error', async () => {
+  it('real G2P.create() with ja and no openjtalkModule initializes without ja', async () => {
     setMockConfig({
       ...BASE_CONFIG,
       language_id_map: { ja: 0, en: 1 },
@@ -286,23 +287,10 @@ describe('PiperPlus G2P.create() integration', { skip: skip ? 'Import failed' : 
     // Use real G2P.create() (restore spy)
     g2pSpy.restore();
 
-    await assert.rejects(
-      () => PiperPlus.initialize({ model: 'test', ort: globalThis.ort }),
-      (err) => {
-        // Must NOT be "is not a function" (that was the old bug)
-        assert.ok(
-          !err.message.includes('is not a function'),
-          `Should not be a "not a function" error: ${err.message}`
-        );
-        // Must mention openjtalkModule
-        assert.ok(
-          err.message.includes('openjtalkModule'),
-          `Error should mention openjtalkModule: ${err.message}`
-        );
-        return true;
-      },
-      'Real G2P.create() with ja should fail with descriptive error about openjtalkModule'
-    );
+    // Should succeed — ja is excluded, en is initialized
+    const piper = await PiperPlus.initialize({ model: 'test', ort: globalThis.ort });
+    assert.ok(piper, 'Should initialize successfully with ja excluded');
+    piper.dispose();
   });
 
   it('config with only non-ja languages initializes successfully', async () => {
