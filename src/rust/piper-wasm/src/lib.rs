@@ -368,26 +368,27 @@ impl WasmPhonemizer {
             ));
         }
 
-        // If a language hint was provided, compare with auto-detection and warn on mismatch.
-        if let Some(ref hint) = language {
-            let detected = self.phonemizer.detect_primary_language(text);
-            if detected != hint.as_str() {
-                log::warn!(
-                    "language hint '{}' differs from auto-detected '{}'; \
-                     using auto-detected language for phonemization",
-                    hint,
-                    detected,
-                );
-            }
-        }
-
         // Step 1: phonemize → raw tokens + prosody
-        let (tokens, prosody_list) = self.phonemizer.phonemize_with_prosody(text).map_err(|e| {
-            create_wasm_error(
-                ERROR_PHONEMIZE,
-                &format!("Phonemization failed for the provided text: {e}"),
-            )
-        })?;
+        // When a language hint is provided, route the entire text to that
+        // language's phonemizer. This is essential for Latin-script languages
+        // (es/fr/pt/sv) which cannot be distinguished from English by Unicode.
+        let (tokens, prosody_list) = if let Some(ref hint) = language {
+            self.phonemizer
+                .phonemize_with_language_hint(text, hint)
+                .map_err(|e| {
+                    create_wasm_error(
+                        ERROR_PHONEMIZE,
+                        &format!("Phonemization failed for the provided text: {e}"),
+                    )
+                })?
+        } else {
+            self.phonemizer.phonemize_with_prosody(text).map_err(|e| {
+                create_wasm_error(
+                    ERROR_PHONEMIZE,
+                    &format!("Phonemization failed for the provided text: {e}"),
+                )
+            })?
+        };
 
         // Step 2: encode tokens → IDs with BOS/EOS/PAD + prosody alignment
         let eos = self.phonemizer.last_eos();

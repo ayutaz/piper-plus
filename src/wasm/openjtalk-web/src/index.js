@@ -267,15 +267,15 @@ export class PiperPlus {
       const phonemizerMap = new Map();
       let wasmAdapter = null;
 
-      // Languages that REQUIRE Rust WASM:
+      // Languages that REQUIRE Rust WASM (no functional JS G2P fallback):
       //   ja — needs jpreprocess (no JS equivalent)
       //   zh — needs pinyin dictionary (JS G2P has no pinyin conversion)
-      // Latin-script languages (en/es/fr/pt/sv) use JS G2P because the WASM
-      // MultilingualPhonemizer routes all Latin text to its default_latin_language
-      // (en), ignoring the language hint. JS G2P has proper per-language G2P.
       const WASM_REQUIRED_LANGUAGES = new Set(['ja', 'zh']);
 
-      // Load Rust WASM phonemizer when any model language requires it.
+      // Load Rust WASM phonemizer when any model language benefits from it.
+      // When loaded, route ALL languages through WASM — the Rust
+      // MultilingualPhonemizer now respects language hints for Latin-script
+      // languages (es/fr/pt/sv), so they are phonemized correctly.
       const needsWasm = languages && languages.some(l => WASM_REQUIRED_LANGUAGES.has(l));
       if (needsWasm) {
         try {
@@ -286,9 +286,10 @@ export class PiperPlus {
               wasmLoader: options.wasmLoader,
             },
           );
-          // Only route WASM-required languages through WASM.
+          // Route all languages through WASM
+          const wasmLangs = wasmAdapter.supportedLanguages;
           for (const lang of languages) {
-            if (WASM_REQUIRED_LANGUAGES.has(lang)) {
+            if (wasmLangs.includes(lang)) {
               phonemizerMap.set(lang, wasmAdapter);
             }
           }

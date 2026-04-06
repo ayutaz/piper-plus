@@ -414,6 +414,51 @@ impl MultilingualPhonemizer {
         &self.default_latin_language
     }
 
+    /// Phonemize text with an explicit language hint.
+    ///
+    /// When a language hint is provided and the phonemizer for that language
+    /// exists, the entire text is routed to that language's phonemizer
+    /// (bypassing Unicode-based auto-detection). This is critical for
+    /// Latin-script languages (es/fr/pt) which cannot be distinguished from
+    /// English by Unicode ranges alone.
+    ///
+    /// Falls back to auto-detected segmentation if the hint is unknown.
+    pub fn phonemize_with_language_hint(
+        &self,
+        text: &str,
+        language: &str,
+    ) -> Result<(Vec<String>, Vec<Option<ProsodyInfo>>), G2pError> {
+        if let Some(phonemizer) = self.phonemizers.get(language) {
+            let (tokens, prosody) = phonemizer.phonemize_with_prosody(text)?;
+
+            // Strip BOS/EOS tokens from the segment, then re-wrap
+            let bos_eos = Self::bos_eos_tokens();
+            let eos_set = Self::eos_tokens();
+            let mut last_eos = "$".to_string();
+            let mut filtered_tokens = Vec::new();
+            let mut filtered_prosody = Vec::new();
+            for (ph, pr) in tokens.iter().zip(prosody.iter()) {
+                if bos_eos.contains(ph) {
+                    if eos_set.contains(ph) {
+                        last_eos = ph.clone();
+                    }
+                    continue;
+                }
+                filtered_tokens.push(ph.clone());
+                filtered_prosody.push(*pr);
+            }
+
+            if let Ok(mut guard) = self.last_eos.lock() {
+                *guard = last_eos;
+            }
+
+            Ok((filtered_tokens, filtered_prosody))
+        } else {
+            // Unknown language hint — fall back to auto-detection
+            self.phonemize_with_prosody(text)
+        }
+    }
+
     /// Build the set of BOS/EOS-like tokens to strip from individual
     /// segment outputs. Includes PUA-encoded Japanese question markers.
     /// Cached via `OnceLock` to avoid re-constructing the `HashSet` on every call.
@@ -909,5 +954,53 @@ mod tests {
             tokens_before, tokens_after,
             "replacement should produce same results"
         );
+    }
+
+    fn make_hint_test_phonemizer() -> MultilingualPhonemizer {
+        let mut phonemizers: HashMap<String, Box<dyn Phonemizer>> = HashMap::new();
+        phonemizers.insert("ja".to_string(), Box::new(PassthroughPhonemizer::new("ja")));
+        phonemizers.insert("en".to_string(), Box::new(PassthroughPhonemizer::new("en")));
+        phonemizers.insert("es".to_string(), Box::new(PassthroughPhonemizer::new("es")));
+        MultilingualPhonemizer::new(
+            vec!["ja".to_string(), "en".to_string(), "es".to_string()],
+            "en".to_string(),
+            phonemizers,
+        )
+    }
+
+    #[test]
+    fn test_language_hint_routes_to_correct_phonemizer() {
+        let mp = make_hint_test_phonemizer();
+
+        // Without hint: "Hola" is Latin → default_latin (en)
+        let (tokens_auto, _) = mp.phonemize_with_prosody("Hola").unwrap();
+
+        // With hint "es": routes directly to es phonemizer
+        let (tokens_hint, _) = mp.phonemize_with_language_hint("Hola", "es").unwrap();
+
+        // Both should produce output (not empty)
+        assert!(!tokens_auto.is_empty(), "auto-detect should produce tokens");
+        assert!(!tokens_hint.is_empty(), "language hint should produce tokens");
+    }
+
+    #[test]
+    fn test_language_hint_unknown_falls_back_to_auto() {
+        let mp = make_hint_test_phonemizer();
+
+        // Unknown language hint should fall back to auto-detection
+        let (tokens, _) = mp.phonemize_with_language_hint("Hello", "xx").unwrap();
+        assert!(!tokens.is_empty(), "unknown hint should fall back to auto-detect");
+    }
+
+    #[test]
+    fn test_language_hint_ja_matches_auto_detect() {
+        let mp = make_hint_test_phonemizer();
+
+        // "あ" with ja hint → JA phonemizer
+        let (tokens_hint, _) = mp.phonemize_with_language_hint("あ", "ja").unwrap();
+        let (tokens_auto, _) = mp.phonemize_with_prosody("あ").unwrap();
+
+        // Both should produce the same result since auto-detect also detects ja
+        assert_eq!(tokens_hint, tokens_auto, "ja hint should match auto-detected ja");
     }
 }
