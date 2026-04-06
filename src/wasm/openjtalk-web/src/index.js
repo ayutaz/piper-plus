@@ -245,9 +245,11 @@ export class PiperPlus {
 
       progress({ stage: 'model', progress: 0.3, message: 'Creating ONNX session...' });
 
+      // VITS models use int64 tensors (input, input_lengths, lid, prosody_features)
+      // which WebGPU (WGSL) does not support. Always use WASM CPU backend.
       this._sessionManager = new WebGPUSessionManager({
         ort,
-        gpu: typeof navigator !== 'undefined' ? navigator.gpu : undefined,
+        gpu: undefined,
       });
       this._modelUrl = modelUrl;
       this._session = await this._sessionManager.createSession(modelUrl);
