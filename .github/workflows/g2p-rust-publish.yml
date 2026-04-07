@@ -40,8 +40,8 @@ jobs:
         run: |
           TAG_VERSION="${GITHUB_REF#refs/tags/rust-g2p-v}"
           CARGO_VERSION=$(grep '^version' piper-plus-g2p/Cargo.toml | head -1 | sed 's/.*"\(.*\)".*/\1/')
-          if [ -z "$CARGO_VERSION" ]; then
-            # workspace version
+          if [ -z "$CARGO_VERSION" ] || echo "$CARGO_VERSION" | grep -q "workspace"; then
+            # workspace version inheritance — read from workspace root
             CARGO_VERSION=$(grep '^version' Cargo.toml | head -1 | sed 's/.*"\(.*\)".*/\1/')
           fi
           echo "Tag version: $TAG_VERSION"
