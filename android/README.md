@@ -89,7 +89,7 @@ repositories {
 }
 
 dependencies {
-    implementation("com.piperplus:piper-plus:0.1.0")
+    implementation("com.piperplus:piper-plus:0.2.0")
 }
 ```
 
