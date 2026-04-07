@@ -81,7 +81,7 @@ jobs:
           registry-url: https://registry.npmjs.org
 
       - name: Download WASM artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: piper-plus-wasm
           path: src/wasm/openjtalk-web/dist/rust-wasm/

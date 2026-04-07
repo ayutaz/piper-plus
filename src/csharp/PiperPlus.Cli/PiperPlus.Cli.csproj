@@ -17,7 +17,7 @@
 
     <!-- NuGet Package Metadata -->
     <PackageId>PiperPlus.Cli</PackageId>
-    <Version>0.1.0</Version>
+    <Version>0.2.0</Version>
     <Authors>ayousanz</Authors>
     <Description>Piper Plus TTS — C# CLI for neural text-to-speech synthesis</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
@@ -37,10 +37,10 @@
     <PackageReference Include="DotNetG2P" Version="1.8.0" />
     <PackageReference Include="DotNetG2P.MeCab" Version="1.8.0" />
     <PackageReference Include="DotNetG2P.English" Version="1.8.0" />
-    <PackageReference Include="DotNetG2P.Chinese" Version="1.7.0" />
-    <PackageReference Include="DotNetG2P.Spanish" Version="1.7.0" />
-    <PackageReference Include="DotNetG2P.French" Version="1.7.0" />
-    <PackageReference Include="DotNetG2P.Portuguese" Version="1.7.0" />
+    <PackageReference Include="DotNetG2P.Chinese" Version="1.8.0" />
+    <PackageReference Include="DotNetG2P.Spanish" Version="1.8.0" />
+    <PackageReference Include="DotNetG2P.French" Version="1.8.0" />
+    <PackageReference Include="DotNetG2P.Portuguese" Version="1.8.0" />
   </ItemGroup>
 
   <ItemGroup>

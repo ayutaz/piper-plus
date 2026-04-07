@@ -67,11 +67,12 @@ jobs:
 
       - name: Inference test - Japanese
         run: |
-          mkdir -p /tmp/output
+          mkdir -p /tmp/output && chmod 777 /tmp/output
           docker run --rm \
             -v ${{ github.workspace }}/test/models:/models \
             -v /tmp/output:/output \
             -e CUDA_VISIBLE_DEVICES="" \
+            -e PIPER_DISABLE_CACHE=1 \
             piper-python-inference:test \
             python inference.py \
               --model /models/multilingual-test-medium.onnx \
@@ -96,6 +97,7 @@ jobs:
             -v ${{ github.workspace }}/test/models:/models \
             -v /tmp/output:/output \
             -e CUDA_VISIBLE_DEVICES="" \
+            -e PIPER_DISABLE_CACHE=1 \
             piper-python-inference:test \
             python inference.py \
               --model /models/multilingual-test-medium.onnx \
@@ -121,6 +123,7 @@ jobs:
             -v ${{ github.workspace }}/test/models:/models \
             -v /tmp/output:/output \
             -e CUDA_VISIBLE_DEVICES="" \
+            -e PIPER_DISABLE_CACHE=1 \
             piper-python-inference:test \
             python inference.py \
               --model /models/multilingual-test-medium.onnx \
@@ -150,6 +153,7 @@ jobs:
             -v /tmp/fallback-test:/models/fallback \
             -v /tmp/output:/output \
             -e CUDA_VISIBLE_DEVICES="" \
+            -e PIPER_DISABLE_CACHE=1 \
             piper-python-inference:test \
             python inference.py \
               --model /models/fallback/multilingual-test-medium.onnx \
@@ -177,6 +181,7 @@ jobs:
             -v /tmp/noconfig:/models/noconfig \
             -v /tmp/output:/output \
             -e CUDA_VISIBLE_DEVICES="" \
+            -e PIPER_DISABLE_CACHE=1 \
             piper-python-inference:test \
             python inference.py \
               --model /models/noconfig/multilingual-test-medium.onnx \
@@ -229,7 +234,7 @@ jobs:
 
       - name: Inference test - English
         run: |
-          mkdir -p /tmp/output
+          mkdir -p /tmp/output && chmod 777 /tmp/output
           echo "Hello, how are you today?" | docker run --rm -i \
             -v ${{ github.workspace }}/test/models:/models \
             -v /tmp/output:/output \

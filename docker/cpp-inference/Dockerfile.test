@@ -47,6 +47,10 @@ RUN echo "=== BUILT TEST EXECUTABLES ===" && \
 RUN echo "=== BUILD ERRORS ===" && \
     grep -E "FAILED:|error:" /tmp/build.log 2>/dev/null || echo "No build errors found"
 
+# Create non-root user and transfer ownership of workspace
+RUN useradd -m -u 1000 piper && chown -R piper:piper /workspace
+USER piper
+
 # Run tests - allow failure to see results
 RUN cd build && ctest --output-on-failure --timeout 60 2>&1; \
     echo "=== TEST EXIT CODE: $? ==="

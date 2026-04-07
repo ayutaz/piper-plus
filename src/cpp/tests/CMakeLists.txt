@@ -46,6 +46,7 @@ set(TEST_SOURCES
     test_openjtalk_optimized.cpp
     test_gpu_device_id.cpp
     test_phoneme_parser.cpp
+    test_streaming.cpp
     test_streaming_simple.cpp
     test_streaming_raw_phonemes.cpp
     test_n_variants.cpp
@@ -211,6 +212,89 @@ foreach(test_source ${TEST_SOURCES})
             Threads::Threads
         )
         link_openjtalk_to_test(${test_name})
+    endif()
+
+    # Link additional dependencies for streaming test
+    if(${test_name} STREQUAL "test_streaming")
+        target_sources(${test_name} PRIVATE
+            ../piper.cpp
+            ../phoneme_parser.cpp
+            ../custom_dictionary.cpp
+            ../model_manager.cpp
+            ../library_path.c
+            ../language_detector.cpp
+            ../english_phonemize.cpp
+            ../chinese_phonemize.cpp
+            ../korean_phonemize.cpp
+            ../spanish_phonemize.cpp
+            ../french_phonemize.cpp
+            ../portuguese_phonemize.cpp
+            ../swedish_phonemize.cpp
+            ../openjtalk_phonemize.cpp
+            ../openjtalk_phonemize_utils.cpp
+            ../openjtalk_wrapper.c
+            ../openjtalk_dictionary_manager.c
+            ../openjtalk_error.c
+            ../openjtalk_security.c
+            ../openjtalk_optimized.c
+            ../openjtalk_api.c
+        )
+
+        # Include directories
+        target_include_directories(${test_name} PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/..
+            ${CMAKE_BINARY_DIR}/fi/include
+            ${CMAKE_BINARY_DIR}/si/include
+            ${ORT_INCLUDE_DIR}
+            ${CMAKE_BINARY_DIR}/oj/include
+            ${CMAKE_BINARY_DIR}/oj/include/openjtalk
+            ${CMAKE_BINARY_DIR}/hts_stub/include
+        )
+
+        # Add library directories
+        target_link_directories(${test_name} PRIVATE
+            ${CMAKE_BINARY_DIR}/fi/lib
+            ${CMAKE_BINARY_DIR}/si/lib
+            ${ORT_LIB_DIR}
+        )
+
+        # Platform-specific library linking (same as main piper)
+        if(WIN32)
+            # Windows: Link libraries directly
+            target_link_libraries(${test_name}
+                optimized ${CMAKE_BINARY_DIR}/fi/lib/fmt.lib
+                debug ${CMAKE_BINARY_DIR}/fi/lib/fmtd.lib
+                optimized ${CMAKE_BINARY_DIR}/si/lib/spdlog.lib
+                debug ${CMAKE_BINARY_DIR}/si/lib/spdlogd.lib
+                ${ORT_LIB_DIR}/onnxruntime.lib
+            )
+        else()
+            # Unix: Use library names and let CMake find them in link directories
+            target_link_libraries(${test_name}
+                fmt
+                spdlog
+                onnxruntime
+            )
+        endif()
+
+        # Platform-specific linking
+        if(UNIX)
+            find_package(Threads REQUIRED)
+            target_link_libraries(${test_name} Threads::Threads)
+            # library_path.c uses dladdr which requires libdl on Linux
+            if(NOT APPLE)
+                target_link_libraries(${test_name} dl)
+            endif()
+        endif()
+
+        # Link OpenJTalk static library
+        link_openjtalk_to_test(${test_name})
+
+        # Add dependencies to ensure build order
+        add_dependencies(${test_name}
+            fmt_external
+            spdlog_external
+        )
     endif()
 
     # Link additional dependencies for streaming test - using same approach as test_piper

@@ -29,7 +29,7 @@ jobs:
       run:
         working-directory: src/go
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           # NOTE: sparse-checkout only fetches src/go/. Integration tests that
           # reference test models outside this path (e.g. test/models/) will not
@@ -52,13 +52,13 @@ jobs:
       run:
         working-directory: src/go
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: actions/setup-go@v5
         with:
           go-version: '1.26'
           cache-dependency-path: src/go/go.sum
       - name: Cache ONNX Runtime
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: onnxruntime
           key: onnxruntime-linux-x64-${{ env.ORT_VERSION }}
@@ -101,7 +101,7 @@ jobs:
       run:
         working-directory: src/go
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           sparse-checkout: src/go
       - uses: actions/setup-go@v5
@@ -114,7 +114,7 @@ jobs:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
       - name: Upload binary
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.artifact }}
           path: src/go/${{ matrix.artifact }}${{ matrix.goos == 'windows' && '.exe' || '' }}
@@ -126,7 +126,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           # NOTE: sparse-checkout only fetches src/go/. This is sufficient for
           # linting since golangci-lint only needs the Go source files.

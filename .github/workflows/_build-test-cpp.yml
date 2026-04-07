@@ -100,7 +100,7 @@ jobs:
       # ── Build cache ───────────────────────────────────────────
       - name: Setup build cache
         if: runner.os != 'Windows'
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.cache/ccache
@@ -200,7 +200,7 @@ jobs:
       - name: Cache test model
         if: ${{ inputs.run-integration-tests }}
         id: cache-test-model
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: test/models/
           key: test-model-multilingual-medium-v1

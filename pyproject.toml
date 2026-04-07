@@ -6,6 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "piper-plus"
 dynamic = ["version"]
 description = "Training environment for piper-plus"
+license = {text = "MIT"}
 requires-python = ">=3.11"
 dependencies = [
     "huggingface-hub>=0.30.0,<1.0",

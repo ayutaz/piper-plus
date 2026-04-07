@@ -21,7 +21,7 @@ jobs:
       wasm-size-ja: ${{ steps.size-ja.outputs.size }}
       wasm-size-ja-lite: ${{ steps.size-ja-lite.outputs.size }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -85,19 +85,19 @@ jobs:
           echo "size=$SIZE" >> "$GITHUB_OUTPUT"
           echo "WASM ja-lite size: $SIZE bytes ($(( SIZE / 1048576 )) MB)"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: piper-plus-wasm
           path: src/wasm/openjtalk-web/dist/rust-wasm/
           retention-days: 7
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: piper-plus-wasm-ja
           path: src/wasm/openjtalk-web/dist/rust-wasm-ja/
           retention-days: 7
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: piper-plus-wasm-ja-lite
           path: src/wasm/openjtalk-web/dist/rust-wasm-ja-lite/

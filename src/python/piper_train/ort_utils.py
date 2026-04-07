@@ -208,14 +208,20 @@ def create_session_with_cache(
 
     # First run or cache rebuild
     _cache_requested = False
-    try:
-        opts.optimized_model_filepath = str(cache_path)
-        _cache_requested = True
-    except Exception as exc:
-        _LOGGER.warning(
-            "Could not set optimized model path %s: %s (continuing without cache)",
-            cache_path,
-            exc,
+    cache_dir = cache_path.parent
+    if os.access(cache_dir, os.W_OK):
+        try:
+            opts.optimized_model_filepath = str(cache_path)
+            _cache_requested = True
+        except Exception as exc:
+            _LOGGER.warning(
+                "Could not set optimized model path %s: %s (continuing without cache)",
+                cache_path,
+                exc,
+            )
+    else:
+        _LOGGER.info(
+            "Model directory %s is not writable, skipping ORT cache", cache_dir
         )
 
     session = onnxruntime.InferenceSession(

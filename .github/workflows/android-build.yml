@@ -28,7 +28,7 @@ jobs:
       ONNXRUNTIME_VERSION: "1.14.0"
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           submodules: true
 
@@ -50,7 +50,7 @@ jobs:
 
       - name: Cache ONNX Runtime Android
         id: cache-ort-android
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ort-android/
           key: ort-android-${{ env.ONNXRUNTIME_VERSION }}-${{ matrix.abi }}
@@ -118,7 +118,7 @@ jobs:
           cp ort-android/lib/libonnxruntime.so staging/${{ matrix.abi }}/
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: piper-plus-android-${{ matrix.abi }}
           path: staging/${{ matrix.abi }}/
@@ -131,7 +131,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Download all ABI artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: piper-plus-android-*
           path: piper-plus-android/
@@ -163,7 +163,7 @@ jobs:
           find release -type f | sort
 
       - name: Upload combined artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: piper-plus-android
           path: release/piper-plus-android/
