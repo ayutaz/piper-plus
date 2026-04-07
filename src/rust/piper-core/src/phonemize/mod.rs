@@ -1,6 +1,6 @@
 //! Phonemizer trait, language registry, and language-specific implementations.
 //!
-//! Phase 3: 7 languages (ja, en, zh, ko, es, fr, pt) + multilingual support.
+//! 8 languages (ja, en, zh, ko, es, fr, pt, sv) + multilingual support.
 //! JSONL 入力 (Phase 1) に加え、テキスト直接入力をサポート。
 
 use std::collections::HashMap;
@@ -23,6 +23,7 @@ pub mod korean;
 pub use piper_plus_g2p::multilingual;
 pub mod portuguese;
 pub mod spanish;
+pub mod swedish;
 pub use piper_plus_g2p::token_map;
 
 /// プロソディ情報 (言語間で共有)

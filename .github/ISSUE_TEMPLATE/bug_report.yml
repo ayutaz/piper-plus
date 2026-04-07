@@ -1,0 +1,81 @@
+name: Bug Report
+description: Report a bug
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug.
+        Please fill out the sections below to help us investigate the issue.
+
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      description: Which implementation are you using?
+      options:
+        - Python (piper_train / piper-plus-g2p)
+        - Rust (piper-plus CLI / piper-plus-g2p)
+        - "C# (PiperPlus.Cli / PiperPlus.Core)"
+        - Go (piperplus / phonemize)
+        - npm (piper-plus / @piper-plus/g2p)
+        - C++ (libpiper / libpiper_plus)
+        - C API (shared library)
+        - Docker
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Package version or commit hash
+      placeholder: e.g. 0.2.0, v1.8.0, abc1234
+    validations:
+      required: false
+
+  - type: input
+    id: os
+    attributes:
+      label: Operating System
+      placeholder: e.g. Ubuntu 22.04, macOS 14.5, Windows 11
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Minimal steps to reproduce the issue.
+      placeholder: |
+        1. Install ...
+        2. Run ...
+        3. Observe ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What you expected to happen.
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: What actually happened.
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / error output
+      description: Paste any relevant log output or error messages.
+      render: text
+    validations:
+      required: false

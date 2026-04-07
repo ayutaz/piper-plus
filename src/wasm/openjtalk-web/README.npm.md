@@ -5,6 +5,19 @@
 
 Browser-based multilingual neural TTS powered by VITS. No server required.
 
+## Why piper-plus?
+
+piper-plus is built for projects that need high-quality multilingual TTS in the browser -- particularly Japanese. Unlike packages that rely on espeak-ng (GPL-licensed, limited Japanese prosody), piper-plus ships its own rule-based G2P for each language, with a full OpenJTalk-based phonemizer for Japanese that handles pitch accent and prosody correctly. The entire stack is MIT-licensed with no GPL dependencies.
+
+| Feature | piper-plus | kokoro-js | @mintplex-labs/piper-tts-web |
+|---------|-----------|-----------|------------------------------|
+| License | MIT | Apache 2.0 | MIT |
+| Japanese G2P | OpenJTalk (prosody, accent) | espeak-ng (limited) | espeak-ng |
+| Languages | 8 (JA/EN/ZH/KO/ES/FR/PT/SV) | Multiple (English-optimized) | Depends on Piper model |
+| espeak-ng dependency | None (GPL-free) | Required | Required |
+| Custom G2P per language | Yes (rule-based) | No | No |
+| Browser-only (no server) | Yes | Yes | Yes |
+
 ## Features
 
 - **8 languages** -- Japanese, English, Chinese, Korean, Spanish, French, Portuguese, and Swedish
