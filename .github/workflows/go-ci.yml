@@ -29,7 +29,7 @@ jobs:
       run:
         working-directory: src/go
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           # NOTE: sparse-checkout only fetches src/go/. Integration tests that
           # reference test models outside this path (e.g. test/models/) will not
@@ -52,7 +52,7 @@ jobs:
       run:
         working-directory: src/go
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: actions/setup-go@v5
         with:
           go-version: '1.26'
@@ -101,7 +101,7 @@ jobs:
       run:
         working-directory: src/go
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           sparse-checkout: src/go
       - uses: actions/setup-go@v5
@@ -126,7 +126,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           # NOTE: sparse-checkout only fetches src/go/. This is sufficient for
           # linting since golangci-lint only needs the Go source files.

@@ -9,7 +9,7 @@ jobs:
   clang-format:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Check formatting
         run: |
           find src/cpp -name '*.cpp' -o -name '*.h' -o -name '*.c' | \
