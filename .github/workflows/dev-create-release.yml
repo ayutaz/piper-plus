@@ -246,7 +246,7 @@ jobs:
       - name: Publish to PyPI
         env:
           TWINE_USERNAME: __token__
-          TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
+          TWINE_PASSWORD: ${{ secrets.PIPY_TOKEN }}
         run: |
           # Only publish if we have the token and wheels
           if [ -n "$TWINE_PASSWORD" ] && ls dist/*.whl 1> /dev/null 2>&1; then
@@ -287,7 +287,7 @@ jobs:
       - name: Publish stub to PyPI
         env:
           TWINE_USERNAME: __token__
-          TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
+          TWINE_PASSWORD: ${{ secrets.PIPY_TOKEN }}
         run: |
           if [ -n "$TWINE_PASSWORD" ]; then
             twine upload --skip-existing src/python_stub/dist/*
