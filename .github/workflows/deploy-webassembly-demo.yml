@@ -2,6 +2,8 @@ name: Deploy WebAssembly Demo to GitHub Pages
 
 on:
   push:
+    branches:
+      - dev
     paths:
       - 'src/wasm/**'
       - 'src/rust/piper-wasm/**'
