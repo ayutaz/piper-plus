@@ -439,6 +439,31 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Publish piper-plus-g2p (dependency)
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        working-directory: src/rust
+        run: |
+          if [ -n "$CARGO_REGISTRY_TOKEN" ]; then
+            set +e
+            OUTPUT=$(cargo publish -p piper-plus-g2p --allow-dirty 2>&1)
+            STATUS=$?
+            set -e
+            echo "$OUTPUT"
+            if [ "$STATUS" -ne 0 ]; then
+              if echo "$OUTPUT" | grep -q "already uploaded\|already exists"; then
+                echo "⚠️ piper-plus-g2p already published on crates.io (continuing)"
+              else
+                echo "::error::Failed to publish piper-plus-g2p to crates.io"
+                exit "$STATUS"
+              fi
+            fi
+            # Wait for crates.io index to update
+            sleep 30
+          else
+            echo "⚠️ CARGO_REGISTRY_TOKEN not found, skipping crates.io publish"
+          fi
+
       - name: Publish piper-plus (core)
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
