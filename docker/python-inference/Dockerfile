@@ -55,8 +55,11 @@ EXPOSE 8000 7860
 ENV GRADIO_SERVER_NAME=0.0.0.0
 ENV GRADIO_SERVER_PORT=7860
 
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD python -c "import piper_train; import onnxruntime" || exit 1
+# Healthcheck: verify the API server is responding.
+# When used via docker-compose, the compose healthcheck overrides this.
+# start-period allows the model to load before checks begin.
+HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
+  CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')" || exit 1
 
 # Build-time smoke test
 RUN python --version && \

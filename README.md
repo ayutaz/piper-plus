@@ -9,6 +9,9 @@
 [![Hugging Face Demo](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Demo-blue)](https://huggingface.co/spaces/ayousanz/piper-plus-demo)
 [![Hugging Face Model](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Model-orange)](https://huggingface.co/ayousanz/piper-plus-base)
 
+> **MIT ライセンス / espeak-ng 非依存** -- piper-plus は espeak-ng に依存しません。独自実装の G2P で8言語 (JA/EN/ZH/KO/ES/FR/PT/SV) に対応し、プロジェクトのライセンスポリシーにより copyleft 依存を排除しています。商用利用・組込み利用に適しています。
+> オリジナルの [rhasspy/piper](https://github.com/rhasspy/piper) は 2025年10月にアーカイブ済み、[OHF-Voice/piper1-gpl](https://github.com/OHF-Voice/piper1-gpl) は GPL-3.0 に移行しています。
+
 高速・高品質なニューラルテキスト音声合成 (TTS) システム。[VITS](https://github.com/jaywalnut310/vits/) アーキテクチャを採用し、日本語・英語・中国語・韓国語・スペイン語・フランス語・ポルトガル語・スウェーデン語の8言語マルチスピーカー音声合成に対応。[Piper](https://github.com/rhasspy/piper) のフォークで、日本語対応・音質向上・学習機能を大幅に強化しています。
 
 **[Hugging Face デモ](https://huggingface.co/spaces/ayousanz/piper-plus-demo)** | **[WebAssembly デモ](https://ayutaz.github.io/piper-plus/)** (ブラウザで動作、サーバー不要)
@@ -19,10 +22,10 @@
 
 - [主要機能](#主要機能)
 - [クイックスタート](#クイックスタート)
-- [事前学習済みモデル](#事前学習済みモデル)
 - [インストール](#インストール)
 - [使い方](#使い方)
 - [学習](#学習)
+- [事前学習済みモデル](#事前学習済みモデル)
 - [日本語 TTS](#日本語-tts)
 - [プラットフォーム](#プラットフォーム)
 - [関連リンク](#関連リンク)

@@ -1,0 +1,55 @@
+# OpenAI-compatible TTS API (piper-plus)
+#
+# Usage:
+#   1. Place your .onnx model + config.json in ./models/
+#   2. Set PIPER_MODEL to the model filename:
+#        PIPER_MODEL=your-model.onnx docker compose up --build
+#      Or export it:
+#        export PIPER_MODEL=your-model.onnx
+#        docker compose up --build
+#
+# GPU support:
+#   The "deploy" section below enables NVIDIA GPU passthrough.
+#   If you do NOT have an NVIDIA GPU, comment out or remove the entire
+#   "deploy:" block -- the container will fall back to CPU inference.
+
+services:
+  piper-api:
+    build:
+      context: ../..
+      dockerfile: docker/python-inference/Dockerfile
+    container_name: piper-api
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./models:/app/models:ro
+      - ./output:/app/output
+    environment:
+      - CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-}
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    command:
+      - python
+      - inference.py
+      - --server
+      - --model
+      - /app/models/${PIPER_MODEL:-model.onnx}
+      - --port
+      - "8000"
+
+    # GPU support (NVIDIA):
+    # Remove or comment out this section if running on CPU only.
+    # Requires: nvidia-container-toolkit installed on the host.
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]

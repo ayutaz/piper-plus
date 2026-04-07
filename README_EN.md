@@ -9,6 +9,9 @@ English | [日本語](README.md) | [中文](README_ZH.md) | [Français](README_F
 [![Hugging Face Demo](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Demo-blue)](https://huggingface.co/spaces/ayousanz/piper-plus-demo)
 [![Hugging Face Model](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Model-orange)](https://huggingface.co/ayousanz/piper-plus-base)
 
+> **MIT License / No espeak-ng dependency** -- piper-plus does not depend on espeak-ng. Its custom G2P covers 8 languages (JA/EN/ZH/KO/ES/FR/PT/SV), and the project avoids copyleft dependencies under its licensing policy, making it suitable for commercial and embedded use.
+> The original [rhasspy/piper](https://github.com/rhasspy/piper) was archived in October 2025; [OHF-Voice/piper1-gpl](https://github.com/OHF-Voice/piper1-gpl) has moved to GPL-3.0.
+
 A fast, high-quality neural text-to-speech (TTS) system. Built on the [VITS](https://github.com/jaywalnut310/vits/) architecture with multi-speaker support for 8 languages (Japanese, English, Mandarin Chinese, Korean, Spanish, French, Portuguese, Swedish). A fork of [Piper](https://github.com/rhasspy/piper) with significantly enhanced Japanese support, improved voice quality, and advanced training features.
 
 **[Hugging Face Demo](https://huggingface.co/spaces/ayousanz/piper-plus-demo)** | **[WebAssembly Demo](https://ayutaz.github.io/piper-plus/)** (runs in browser, no server needed)

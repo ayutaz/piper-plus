@@ -11,6 +11,11 @@ Comprehensive guides for various aspects of piper-plus.
 ### [Testing](testing/)
 - [Multilingual Testing](testing/multilingual-testing.md) - Testing infrastructure
 
+### Integration
+
+- [Open WebUI Integration](open-webui-integration.md) - Open WebUI との統合ガイド
+
 ## Quick Navigation
 
 - **New to training?** Start with [Training Guide](training/training-guide.md)
+- **Open WebUI?** See [Open WebUI Integration](open-webui-integration.md)
