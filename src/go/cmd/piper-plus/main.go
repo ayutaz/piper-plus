@@ -117,7 +117,7 @@ func stdinHasData() bool {
 func runSynthesize(cmd *cobra.Command, args []string) error {
 	// --version: print version and exit immediately.
 	if version {
-		fmt.Println("piper-plus (Go) v0.1.0")
+		fmt.Println("piper-plus (Go) v0.2.0")
 		return nil
 	}
 

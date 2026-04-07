@@ -89,5 +89,10 @@ RUN test -d /usr/local/share/open_jtalk/dic && \
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD piper --version || exit 1
 
+# Run as non-root user for security
+RUN useradd -m -u 1000 piper && \
+    chown -R piper:piper /app
+USER piper
+
 ENTRYPOINT ["/entrypoint.sh"]
 CMD ["/bin/bash"]

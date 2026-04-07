@@ -62,4 +62,9 @@ RUN python --version && \
     python -c "import piper_train; print('piper_train installed')" && \
     python -c "import gradio; print(f'Gradio: {gradio.__version__}')"
 
+# Run as non-root user for security
+RUN useradd -m -u 1000 piper && \
+    chown -R piper:piper /app/models /app/output
+USER piper
+
 CMD ["echo", "Container started successfully"]

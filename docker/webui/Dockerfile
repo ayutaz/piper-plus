@@ -40,4 +40,9 @@ EXPOSE 7860
 ENV GRADIO_SERVER_NAME=0.0.0.0
 ENV GRADIO_SERVER_PORT=7860
 
+# Run as non-root user for security
+RUN useradd -m -u 1000 piper && \
+    chown -R piper:piper /models /output /app
+USER piper
+
 ENTRYPOINT ["/app/entrypoint.sh"]

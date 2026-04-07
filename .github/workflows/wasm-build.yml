@@ -46,19 +46,19 @@ jobs:
         run: cargo check -p piper-plus-wasm --target wasm32-unknown-unknown
 
       - name: Download WASM artifact (multilingual)
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: piper-plus-wasm
           path: src/wasm/openjtalk-web/dist/rust-wasm/
 
       - name: Download WASM artifact (ja-only)
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: piper-plus-wasm-ja
           path: src/wasm/openjtalk-web/dist/rust-wasm-ja/
 
       - name: Download WASM artifact (ja-lite)
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: piper-plus-wasm-ja-lite
           path: src/wasm/openjtalk-web/dist/rust-wasm-ja-lite/

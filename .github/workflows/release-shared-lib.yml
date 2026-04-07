@@ -80,7 +80,7 @@ jobs:
           Compress-Archive -Path "${{ github.workspace }}/install/*" -DestinationPath "${{ github.workspace }}/${{ matrix.artifact }}.zip"
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.artifact }}
           path: ${{ github.workspace }}/${{ matrix.artifact }}.${{ matrix.archive_ext }}
@@ -92,7 +92,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: artifacts/
 
