@@ -38,8 +38,7 @@ impl Phonemizer for SwedishPhonemizer {
         &self,
         text: &str,
     ) -> Result<(Vec<String>, Vec<Option<ProsodyInfo>>), PiperError> {
-        let (tokens, prosody) =
-            piper_plus_g2p::swedish::phonemize_swedish_with_prosody(text);
+        let (tokens, prosody) = piper_plus_g2p::swedish::phonemize_swedish_with_prosody(text);
 
         // Convert piper_plus_g2p::ProsodyInfo -> piper_core::phonemize::ProsodyInfo
         let prosody = prosody

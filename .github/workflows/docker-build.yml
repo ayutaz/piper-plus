@@ -64,6 +64,7 @@ jobs:
 
       # --- Docker Hub publish (tag push or workflow_dispatch only) ---
       - name: Check Docker Hub credentials
+        if: startsWith(github.ref, 'refs/tags/docker-v') || github.event_name == 'workflow_dispatch'
         id: dockerhub-check
         run: |
           if [ -n "$DOCKERHUB_USERNAME" ] && [ -n "$DOCKERHUB_TOKEN" ]; then
