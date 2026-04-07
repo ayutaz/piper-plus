@@ -23,7 +23,9 @@ RUN uv pip install --system "/app/src/python[inference]" && \
     uv pip install --system -r /app/requirements_webui.txt
 
 # Download NLTK data required by g2p-en (English phonemizer)
-RUN python -c "import nltk; nltk.download('averaged_perceptron_tagger'); nltk.download('averaged_perceptron_tagger_eng'); nltk.download('cmudict')"
+# Use a shared path so data is accessible after USER switch to non-root
+ENV NLTK_DATA=/usr/share/nltk_data
+RUN python -c "import nltk; nltk.download('averaged_perceptron_tagger', download_dir='/usr/share/nltk_data'); nltk.download('averaged_perceptron_tagger_eng', download_dir='/usr/share/nltk_data'); nltk.download('cmudict', download_dir='/usr/share/nltk_data')"
 
 # Copy WebUI application and entrypoint
 COPY docker/webui/app.py /app/app.py
