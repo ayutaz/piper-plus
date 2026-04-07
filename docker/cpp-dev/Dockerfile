@@ -104,6 +104,10 @@ RUN echo "=== Running build-time tests ===" && \
     ldconfig -p | grep -E "HTSEngine" || echo "Some libraries in /usr/local/lib" && \
     echo "=== Build-time tests passed ==="
 
+# Create non-root user and transfer ownership of workspace
+RUN useradd -m -u 1000 piper && chown -R piper:piper /workspace
+USER piper
+
 # Ensure we're in a valid directory
 WORKDIR /workspace
 

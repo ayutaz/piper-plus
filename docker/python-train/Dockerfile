@@ -116,6 +116,11 @@ RUN echo "=== Running build-time tests ===" && \
     cd /opt/piper/src/python && python -c "import piper_train; print('piper_train accessible')" && \
     echo "=== Build-time tests passed ==="
 
+# Create non-root user and transfer ownership of working directories
+RUN useradd -m -u 1000 piper && \
+    chown -R piper:piper /workspace /opt/venv /opt/piper
+USER piper
+
 # Ensure we have a valid working directory
 WORKDIR /workspace
 
