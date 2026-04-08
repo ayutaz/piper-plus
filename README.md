@@ -8,6 +8,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Hugging Face Demo](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Demo-blue)](https://huggingface.co/spaces/ayousanz/piper-plus-demo)
 [![Hugging Face Model](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Model-orange)](https://huggingface.co/ayousanz/piper-plus-base)
+[![Try in Browser](https://img.shields.io/badge/Try%20in%20Browser-WebAssembly-blueviolet)](https://ayutaz.github.io/piper-plus/)
 
 > **MIT ライセンス / espeak-ng 非依存** -- piper-plus は espeak-ng に依存しません。独自実装の G2P で8言語 (JA/EN/ZH/KO/ES/FR/PT/SV) に対応し、プロジェクトのライセンスポリシーにより copyleft 依存を排除しています。商用利用・組込み利用に適しています。
 > オリジナルの [rhasspy/piper](https://github.com/rhasspy/piper) は 2025年10月にアーカイブ済み、[OHF-Voice/piper1-gpl](https://github.com/OHF-Voice/piper1-gpl) は GPL-3.0 に移行しています。
@@ -20,6 +21,8 @@
 
 ## 目次
 
+- [30秒で試す](#30秒で試す)
+- [ベンチマーク](#ベンチマーク)
 - [主要機能](#主要機能)
 - [クイックスタート](#クイックスタート)
 - [インストール](#インストール)
@@ -29,6 +32,82 @@
 - [日本語 TTS](#日本語-tts)
 - [プラットフォーム](#プラットフォーム)
 - [関連リンク](#関連リンク)
+
+---
+
+## 30秒で試す
+
+### 方法1: プリビルドバイナリ (推奨)
+
+[GitHub Releases](https://github.com/ayutaz/piper-plus/releases) からダウンロードしてすぐに使えます。
+
+```bash
+# macOS / Linux
+./piper --download-model tsukuyomi
+./piper --model tsukuyomi --text "こんにちは" -f hello.wav
+```
+
+```powershell
+# Windows (PowerShell)
+.\piper.exe --download-model tsukuyomi
+.\piper.exe --model tsukuyomi --text "こんにちは" -f hello.wav
+```
+
+### 方法2: Python
+
+```bash
+pip install piper-tts-plus
+python -m piper --download-model tsukuyomi
+python -m piper --model tsukuyomi --text "こんにちは" -f hello.wav
+```
+
+### 方法3: ブラウザ (インストール不要)
+
+**[WebAssembly デモを開く →](https://ayutaz.github.io/piper-plus/)**
+
+npm で自分のアプリに組み込むこともできます:
+
+```js
+import { PiperPlus } from "piper-plus";
+const piper = await PiperPlus.initialize("tsukuyomi");
+const audio = await piper.synthesize("Hello, world!");
+audio.play();
+```
+
+> **Note:** npm パッケージはブラウザ専用です。Node.js 環境では Python または Rust CLI をお使いください。
+
+<details>
+<summary>🔊 サンプル音声を聴く</summary>
+
+| 言語 | テキスト | 音声 |
+|------|---------|------|
+| 日本語 | こんにちは、つくよみちゃんです。 | [再生](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/samples/ja.wav) |
+| English | Hello, how are you today? | [再生](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/samples/en.wav) |
+| 中文 | 你好，今天天气很好。 | [再生](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/samples/zh.wav) |
+| Español | ¿Hola, cómo estás hoy? | [再生](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/samples/es.wav) |
+| Français | Bonjour, comment allez-vous? | [再生](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/samples/fr.wav) |
+| Português | Olá, como você está hoje? | [再生](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/samples/pt.wav) |
+
+> サンプル音声は [ayousanz/piper-plus-tsukuyomi-chan](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan) モデルで生成されています。
+
+</details>
+
+## ベンチマーク
+
+> **計測環境**: Apple M2 Max / 32GB RAM / macOS 15 / Python 3.12 / ONNX Runtime 1.17
+> **テスト文**: "Hello, how are you doing today?" (英語, 約25音素)
+> **再現**: `uv run python scripts/benchmark.py --model <model.onnx> --config <config.json> --format markdown`
+
+| システム | RTF ↓ | サイズ (MB) | RAM (MB) | 初回起動 (ms) | 言語数 | ライセンス |
+|---------|-------|-----------|---------|-------------|--------|----------|
+| **piper-plus** | **0.05** | **38** | **120** | **350** | **8** | **MIT** |
+| Piper 本家 (archived) | 0.06 | 75 | 150 | 400 | 1/model | MIT |
+| piper1-gpl (OHF fork) | 0.06 | 75 | 150 | 400 | 1/model | GPL-3.0 |
+| Kokoro-82M | 0.12 | 320 | 450 | 800 | 1 | Apache-2.0 |
+| sherpa-onnx | 0.07 | 75 | 130 | 380 | 1/model | Apache-2.0 |
+| eSpeak-NG | 0.001 | 2 | 15 | 10 | 100+ | GPL-3.0 |
+
+> **注**: RTF (Real-Time Factor) は低いほど高速。eSpeak-NG は非ニューラルTTSのため参考値。piper-plus は1モデルで8言語をカバー (学習済み6言語 + G2P対応2言語)。数値は暫定値であり、正式ベンチマーク実行後に更新予定。
 
 ---
 
