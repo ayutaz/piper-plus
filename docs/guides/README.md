@@ -13,9 +13,12 @@ Comprehensive guides for various aspects of piper-plus.
 
 ### Integration
 
+- [Home Assistant Integration](home-assistant.md) - Wyoming Protocol 経由の Home Assistant 統合ガイド
 - [Open WebUI Integration](open-webui-integration.md) - Open WebUI との統合ガイド
+- [LLM Ecosystem](llm-ecosystem.md) - AnythingLLM, LangChain, Ollama との統合
 
 ## Quick Navigation
 
 - **New to training?** Start with [Training Guide](training/training-guide.md)
+- **Home Assistant?** See [Home Assistant Integration](home-assistant.md)
 - **Open WebUI?** See [Open WebUI Integration](open-webui-integration.md)

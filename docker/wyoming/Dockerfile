@@ -1,56 +1,120 @@
 # Wyoming Protocol TTS adapter for piper-plus
-# CPU-only by default (lightweight for Home Assistant usage)
+# CPU-only, multi-stage build for Home Assistant integration
+#
+# Build (from project root):
+#   docker build -t wyoming-piper-plus -f docker/wyoming/Dockerfile .
+#
+# Run:
+#   docker run -p 10200:10200 wyoming-piper-plus
+
+# ============================================================
+# Stage 1: Builder -- compile C extensions (pyopenjtalk, etc.)
+# ============================================================
+FROM python:3.11-slim-bookworm AS builder
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Build dependencies for pyopenjtalk (cmake, g++) and audio libs
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    cmake \
+    g++ \
+    libsndfile1-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN pip install --no-cache-dir uv
+
+WORKDIR /build
+
+# Copy source tree
+COPY VERSION /build/VERSION
+COPY pyproject.toml /build/pyproject.toml
+COPY src/python/ /build/src/python/
+
+# Install piper_plus_g2p (standalone G2P -- all languages)
+RUN uv pip install --system "/build/src/python/g2p[all]"
+
+# Install piper_train with inference extras (onnxruntime CPU, soundfile, etc.)
+RUN uv pip install --system "/build/src/python[inference]"
+
+# Install wyoming protocol library
+RUN uv pip install --system "wyoming>=1.5"
+
+# Install huggingface-hub for model auto-download
+RUN uv pip install --system "huggingface-hub>=0.22"
+
+# Pre-download NLTK data for g2p-en (English phonemizer)
+ENV NLTK_DATA=/usr/share/nltk_data
+RUN python -c "\
+import nltk; \
+nltk.download('averaged_perceptron_tagger', download_dir='/usr/share/nltk_data'); \
+nltk.download('averaged_perceptron_tagger_eng', download_dir='/usr/share/nltk_data'); \
+nltk.download('cmudict', download_dir='/usr/share/nltk_data')"
+
+
+# ============================================================
+# Stage 2: Runtime -- minimal image
+# ============================================================
 FROM python:3.11-slim-bookworm
 
 ENV PYTHONUNBUFFERED=1
 ENV DEBIAN_FRONTEND=noninteractive
 
-# System dependencies for audio processing
+# Runtime-only system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libsndfile1 \
     && rm -rf /var/lib/apt/lists/*
 
-# Install uv for fast dependency management
-RUN pip install --no-cache-dir uv
-
 WORKDIR /app
 
-# Copy source tree for piper_train install (ort_utils dependency)
-COPY VERSION /app/VERSION
-COPY pyproject.toml /app/pyproject.toml
-COPY src/python/ /app/src/python/
+# Copy installed Python packages from builder
+COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+COPY --from=builder /usr/local/bin /usr/local/bin
 
-# Install piper_plus_g2p (standalone G2P package)
-RUN uv pip install --system "/app/src/python/g2p"
-
-# Install piper_train (for ort_utils)
-RUN uv pip install --system "/app/src/python[inference]"
-
-# Install wyoming protocol
-RUN uv pip install --system "wyoming>=1.5"
-
-# Pre-download NLTK data for g2p-en
+# Copy NLTK data
+COPY --from=builder /usr/share/nltk_data /usr/share/nltk_data
 ENV NLTK_DATA=/usr/share/nltk_data
-RUN python -c "import nltk; nltk.download('averaged_perceptron_tagger', download_dir='/usr/share/nltk_data'); nltk.download('averaged_perceptron_tagger_eng', download_dir='/usr/share/nltk_data'); nltk.download('cmudict', download_dir='/usr/share/nltk_data')"
 
-# Create model directory
-RUN mkdir -p /app/models
+# Copy piper_plus and piper_wyoming source (not included in piper_train package)
+COPY src/python/piper_plus/ /app/piper_plus/
+COPY src/python/piper_wyoming/ /app/piper_wyoming/
+
+# Add /app to PYTHONPATH so piper_plus and piper_wyoming are importable
+ENV PYTHONPATH=/app
+
+# Create directories
+RUN mkdir -p /app/models /home/piper/.cache/piper-plus/models
+
+# Environment variables for configuration
+ENV PIPER_MODEL=tsukuyomi
+ENV PIPER_LANGUAGE=ja
+ENV PIPER_SPEAKER_ID=0
+ENV PIPER_NOISE_SCALE=0.667
+ENV PIPER_LENGTH_SCALE=1.0
+ENV PIPER_NOISE_W=0.8
+ENV PIPER_DEVICE=cpu
+ENV PIPER_PORT=10200
 
 # Build-time smoke test
 RUN python --version && \
     python -c "import onnxruntime as ort; print(f'ONNX Runtime: {ort.__version__}')" && \
     python -c "import wyoming; print('wyoming installed')" && \
-    python -c "import piper_train.ort_utils; print('ort_utils available')"
+    python -c "import piper_plus; print('piper_plus importable')" && \
+    python -c "import piper_wyoming; print('piper_wyoming importable')" && \
+    python -c "import piper_plus_g2p; print('piper_plus_g2p importable')" && \
+    python -c "from huggingface_hub import hf_hub_download; print('huggingface_hub available')"
 
-# Run as non-root
+# Run as non-root user
 RUN useradd -m -u 1000 piper && \
-    chown -R piper:piper /app/models
+    chown -R piper:piper /app/models /home/piper
 USER piper
 
+# Wyoming standard port
 EXPOSE 10200
 
-HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+# Healthcheck: TCP connection to the Wyoming server
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
   CMD python -c "import socket; s=socket.socket(); s.settimeout(5); s.connect(('localhost', 10200)); s.close()" || exit 1
 
 ENTRYPOINT ["python", "-m", "piper_wyoming"]
-CMD ["--model", "/app/models/model.onnx", "--uri", "tcp://0.0.0.0:10200"]
+CMD ["--model", "tsukuyomi", "--uri", "tcp://0.0.0.0:10200"]
