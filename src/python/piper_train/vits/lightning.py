@@ -100,8 +100,8 @@ class VitsModel(pl.LightningModule):
         wavlm_every_n_steps: int = 1,
         # VITS2 Duration Discriminator
         vits2: bool = False,
-        dur_disc_lr: float = 2e-4,
-        lambda_dur: float = 1.0,
+        dur_disc_lr: float = 1e-4,
+        lambda_dur: float = 0.5,
         **kwargs,
     ):
         super().__init__()
@@ -960,7 +960,7 @@ class VitsModel(pl.LightningModule):
                 p for p in self.model_g.dur_disc.parameters() if p.requires_grad
             ]
             if dur_disc_params:
-                dur_disc_lr = getattr(self.hparams, "dur_disc_lr", 2e-4)
+                dur_disc_lr = getattr(self.hparams, "dur_disc_lr", 1e-4)
                 optimizers.append(
                     torch.optim.AdamW(
                         dur_disc_params,

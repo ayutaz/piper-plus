@@ -43,6 +43,7 @@ pub mod wasm;
 // --- Phase 4 modules (推論非依存) ---
 pub mod audio_format;
 pub mod model_download;
+pub mod ssml;
 pub mod streaming;
 pub mod text_splitter;
 pub mod timing;

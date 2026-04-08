@@ -228,20 +228,41 @@ def main():
         "(e.g. 256-dim from ECAPA-TDNN). Overrides --speaker-id.",
     )
     parser.add_argument(
+        "--reference-audio",
         "--encode-speaker",
         default=None,
+        dest="reference_audio",
         metavar="AUDIO_PATH",
         help="Path to a reference audio file. Extracts speaker embedding "
         "on-the-fly using the speaker encoder ONNX model.",
     )
     parser.add_argument(
+        "--speaker-encoder-model",
         "--encode-speaker-model",
         default=None,
+        dest="speaker_encoder_model",
         metavar="ONNX_PATH",
         help="Path to the speaker encoder ONNX model "
-        "(required with --encode-speaker).",
+        "(required with --reference-audio).",
     )
     args = parser.parse_args()
+
+    # Emit deprecation warnings for old option names
+    _raw_argv = sys.argv[1:]
+    if "--encode-speaker" in _raw_argv:
+        import warnings
+        warnings.warn(
+            "--encode-speaker is deprecated, use --reference-audio instead.",
+            DeprecationWarning,
+            stacklevel=1,
+        )
+    if "--encode-speaker-model" in _raw_argv:
+        import warnings
+        warnings.warn(
+            "--encode-speaker-model is deprecated, use --speaker-encoder-model instead.",
+            DeprecationWarning,
+            stacklevel=1,
+        )
 
     # Lazy import: model_manager is optional (not available in HF Space environment)
     try:
@@ -328,7 +349,7 @@ def main():
     if has_spk_emb:
         _LOGGER.info("Model supports speaker_embedding (voice cloning)")
 
-    # Resolve speaker embedding from --speaker-embedding or --encode-speaker
+    # Resolve speaker embedding from --speaker-embedding or --reference-audio
     spk_emb_array = None
     if args.speaker_embedding:
         spk_emb_array = np.load(args.speaker_embedding).astype(np.float32)
@@ -339,21 +360,21 @@ def main():
             args.speaker_embedding,
             spk_emb_array.shape[1],
         )
-    elif args.encode_speaker:
-        if not args.encode_speaker_model:
+    elif args.reference_audio:
+        if not args.speaker_encoder_model:
             print(
-                "Error: --encode-speaker-model is required with --encode-speaker.",
+                "Error: --speaker-encoder-model is required with --reference-audio.",
                 file=sys.stderr,
             )
             sys.exit(1)
         from .speaker_encoder import SpeakerEncoder  # noqa: PLC0415
 
-        se_encoder = SpeakerEncoder.from_onnx(args.encode_speaker_model)
-        spk_emb_vec = se_encoder.encode(args.encode_speaker)
+        se_encoder = SpeakerEncoder.from_onnx(args.speaker_encoder_model)
+        spk_emb_vec = se_encoder.encode(args.reference_audio)
         spk_emb_array = spk_emb_vec.reshape(1, -1).astype(np.float32)
         _LOGGER.info(
             "Encoded speaker embedding from %s (dim=%d)",
-            args.encode_speaker,
+            args.reference_audio,
             spk_emb_array.shape[1],
         )
 

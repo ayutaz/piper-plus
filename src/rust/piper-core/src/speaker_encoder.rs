@@ -274,19 +274,43 @@ fn create_mel_filterbank() -> Vec<f32> {
         .collect();
 
     for m in 0..MEL_N_MELS {
-        for k in 0..fft_bins {
-            let kf = k as f32;
-            if kf >= bin_points[m] && kf < bin_points[m + 1] {
-                let denom = bin_points[m + 1] - bin_points[m];
-                if denom > 0.0 {
-                    filterbank[m * fft_bins + k] = (kf - bin_points[m]) / denom;
-                }
-            } else if kf >= bin_points[m + 1] && kf <= bin_points[m + 2] {
-                let denom = bin_points[m + 2] - bin_points[m + 1];
-                if denom > 0.0 {
-                    filterbank[m * fft_bins + k] = (bin_points[m + 2] - kf) / denom;
-                }
+        // Convert to integer bin indices (matching Python's np.floor().astype(int))
+        let mut left = bin_points[m].floor() as usize;
+        let mut center = bin_points[m + 1].floor() as usize;
+        let mut right = bin_points[m + 2].floor() as usize;
+
+        // Edge case: if the triangle collapses to a single bin, widen it to
+        // guarantee a non-zero response (matches Python reference).
+        if left == center && center == right {
+            center = (center + 1).min(fft_bins - 1);
+            right = (right + 2).min(fft_bins - 1);
+        } else if left == center {
+            center = (center + 1).min(fft_bins - 1);
+        }
+        if center == right {
+            right = (right + 1).min(fft_bins - 1);
+        }
+
+        // Rising slope
+        for k in left..center {
+            if center > left {
+                filterbank[m * fft_bins + k] =
+                    (k - left) as f32 / (center - left) as f32;
             }
+        }
+
+        // Falling slope
+        for k in center..right {
+            if right > center {
+                filterbank[m * fft_bins + k] =
+                    (right - k) as f32 / (right - center) as f32;
+            }
+        }
+
+        // Ensure center bin always has weight >= 1.0
+        if center < fft_bins {
+            filterbank[m * fft_bins + center] =
+                filterbank[m * fft_bins + center].max(1.0);
         }
     }
 

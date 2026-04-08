@@ -1125,7 +1125,7 @@ class SynthesizerTrn(nn.Module):
         nn.Linear
             Projection ``(emb_dim) -> (gin_channels)``.
         """
-        if self.spk_proj is not None:
+        if self.spk_proj is not None and self.spk_proj.in_features == emb_dim:
             return self.spk_proj
 
         device = next(self.parameters()).device

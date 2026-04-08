@@ -227,19 +227,40 @@ function createMelFilterbank() {
   const binPoints = melPoints.map(m => melToHz(m) * MEL_N_FFT / MEL_SAMPLE_RATE);
 
   for (let m = 0; m < MEL_N_MELS; m++) {
-    for (let k = 0; k < fftBins; k++) {
-      const kf = k;
-      if (kf >= binPoints[m] && kf < binPoints[m + 1]) {
-        const denom = binPoints[m + 1] - binPoints[m];
-        if (denom > 0) {
-          filterbank[m * fftBins + k] = (kf - binPoints[m]) / denom;
-        }
-      } else if (kf >= binPoints[m + 1] && kf <= binPoints[m + 2]) {
-        const denom = binPoints[m + 2] - binPoints[m + 1];
-        if (denom > 0) {
-          filterbank[m * fftBins + k] = (binPoints[m + 2] - kf) / denom;
-        }
+    // Convert to integer bin indices (matching Python's np.floor().astype(int))
+    let left = Math.floor(binPoints[m]);
+    let center = Math.floor(binPoints[m + 1]);
+    let right = Math.floor(binPoints[m + 2]);
+
+    // Edge case: if the triangle collapses to a single bin, widen it to
+    // guarantee a non-zero response (matches Python reference).
+    if (left === center && center === right) {
+      center = Math.min(center + 1, fftBins - 1);
+      right = Math.min(right + 2, fftBins - 1);
+    } else if (left === center) {
+      center = Math.min(center + 1, fftBins - 1);
+    }
+    if (center === right) {
+      right = Math.min(right + 1, fftBins - 1);
+    }
+
+    // Rising slope
+    for (let k = left; k < center; k++) {
+      if (center > left) {
+        filterbank[m * fftBins + k] = (k - left) / (center - left);
       }
+    }
+
+    // Falling slope
+    for (let k = center; k < right; k++) {
+      if (right > center) {
+        filterbank[m * fftBins + k] = (right - k) / (right - center);
+      }
+    }
+
+    // Ensure center bin always has weight >= 1.0
+    if (center < fftBins) {
+      filterbank[m * fftBins + center] = Math.max(filterbank[m * fftBins + center], 1.0);
     }
   }
 

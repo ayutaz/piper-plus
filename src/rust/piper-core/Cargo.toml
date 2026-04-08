@@ -35,6 +35,7 @@ tracing = "0.1"
 hound = { version = "3.5", optional = true }
 ndarray = { version = "0.17", optional = true }
 regex = "1"
+quick-xml = "0.37"
 jpreprocess = { version = "0.9", optional = true }
 rodio = { version = "0.19", optional = true }
 reqwest = { version = "0.12", features = ["blocking", "rustls-tls-native-roots"], default-features = false, optional = true }

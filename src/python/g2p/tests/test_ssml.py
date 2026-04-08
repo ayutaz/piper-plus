@@ -47,33 +47,33 @@ class TestIsSSML:
 class TestParseBreakTime:
     """Parsing of break time attributes."""
 
-    def test_milliseconds(self):
-        assert SSMLParser._parse_break_time("500ms") == 500
-
-    def test_seconds(self):
-        assert SSMLParser._parse_break_time("1s") == 1000
-
-    def test_fractional_seconds(self):
-        assert SSMLParser._parse_break_time("0.5s") == 500
-
-    def test_fractional_milliseconds(self):
-        assert SSMLParser._parse_break_time("250.5ms") == 250
-
-    def test_zero_ms(self):
-        assert SSMLParser._parse_break_time("0ms") == 0
-
-    def test_zero_s(self):
-        assert SSMLParser._parse_break_time("0s") == 0
-
-    def test_whitespace_handling(self):
-        assert SSMLParser._parse_break_time("  500ms  ") == 500
-
-    def test_invalid_returns_zero(self):
-        assert SSMLParser._parse_break_time("abc") == 0
-
-    def test_bare_number(self):
-        """Bare number without unit is treated as milliseconds."""
-        assert SSMLParser._parse_break_time("300") == 300
+    @pytest.mark.parametrize(
+        "input_str, expected_ms",
+        [
+            ("500ms", 500),
+            ("1s", 1000),
+            ("0.5s", 500),
+            ("250.5ms", 250),
+            ("0ms", 0),
+            ("0s", 0),
+            ("  500ms  ", 500),
+            ("abc", 0),
+            ("300", 300),
+        ],
+        ids=[
+            "milliseconds",
+            "seconds",
+            "fractional_seconds",
+            "fractional_milliseconds",
+            "zero_ms",
+            "zero_s",
+            "whitespace_handling",
+            "invalid_returns_zero",
+            "bare_number_treated_as_ms",
+        ],
+    )
+    def test_parse_break_time(self, input_str, expected_ms):
+        assert SSMLParser._parse_break_time(input_str) == expected_ms
 
 
 # =====================================================================
@@ -84,49 +84,43 @@ class TestParseBreakTime:
 class TestParseRate:
     """Parsing of prosody rate attributes."""
 
-    def test_named_slow(self):
-        assert SSMLParser._parse_rate("slow") == 1.25
-
-    def test_named_fast(self):
-        assert SSMLParser._parse_rate("fast") == 0.8
-
-    def test_named_medium(self):
-        assert SSMLParser._parse_rate("medium") == 1.0
-
-    def test_named_x_slow(self):
-        assert SSMLParser._parse_rate("x-slow") == 1.5
-
-    def test_named_x_fast(self):
-        assert SSMLParser._parse_rate("x-fast") == 0.6
-
-    def test_percentage_100(self):
-        assert SSMLParser._parse_rate("100%") == pytest.approx(1.0)
-
-    def test_percentage_120(self):
-        """120% speaking rate -> length_scale = 100/120 ~ 0.833."""
-        assert SSMLParser._parse_rate("120%") == pytest.approx(100.0 / 120.0)
-
-    def test_percentage_50(self):
-        """50% speaking rate -> length_scale = 2.0 (slower)."""
-        assert SSMLParser._parse_rate("50%") == pytest.approx(2.0)
-
-    def test_percentage_200(self):
-        """200% speaking rate -> length_scale = 0.5 (faster)."""
-        assert SSMLParser._parse_rate("200%") == pytest.approx(0.5)
-
-    def test_zero_percentage_returns_default(self):
-        """0% is invalid; should return 1.0."""
-        assert SSMLParser._parse_rate("0%") == 1.0
-
-    def test_negative_percentage_returns_default(self):
-        assert SSMLParser._parse_rate("-50%") == 1.0
-
-    def test_invalid_returns_default(self):
-        assert SSMLParser._parse_rate("banana") == 1.0
-
-    def test_case_insensitive(self):
-        assert SSMLParser._parse_rate("SLOW") == 1.25
-        assert SSMLParser._parse_rate("Fast") == 0.8
+    @pytest.mark.parametrize(
+        "input_str, expected",
+        [
+            ("slow", 1.25),
+            ("fast", 0.8),
+            ("medium", 1.0),
+            ("x-slow", 1.5),
+            ("x-fast", 0.6),
+            ("100%", pytest.approx(1.0)),
+            ("120%", pytest.approx(100.0 / 120.0)),
+            ("50%", pytest.approx(2.0)),
+            ("200%", pytest.approx(0.5)),
+            ("0%", 1.0),
+            ("-50%", 1.0),
+            ("banana", 1.0),
+            ("SLOW", 1.25),
+            ("Fast", 0.8),
+        ],
+        ids=[
+            "named_slow",
+            "named_fast",
+            "named_medium",
+            "named_x_slow",
+            "named_x_fast",
+            "percentage_100",
+            "percentage_120",
+            "percentage_50",
+            "percentage_200",
+            "zero_percentage_returns_default",
+            "negative_percentage_returns_default",
+            "invalid_returns_default",
+            "case_insensitive_upper",
+            "case_insensitive_mixed",
+        ],
+    )
+    def test_parse_rate(self, input_str, expected):
+        assert SSMLParser._parse_rate(input_str) == expected
 
 
 # =====================================================================
@@ -141,11 +135,16 @@ class TestBreakStrength:
         for bs in BreakStrength:
             assert bs.value in SSMLParser.BREAK_STRENGTH_MS
 
-    def test_none_is_zero(self):
-        assert SSMLParser.BREAK_STRENGTH_MS["none"] == 0
-
-    def test_x_strong_is_1000(self):
-        assert SSMLParser.BREAK_STRENGTH_MS["x-strong"] == 1000
+    @pytest.mark.parametrize(
+        "strength, expected_ms",
+        [
+            ("none", 0),
+            ("x-strong", 1000),
+        ],
+        ids=["none_is_zero", "x_strong_is_1000"],
+    )
+    def test_strength_value(self, strength, expected_ms):
+        assert SSMLParser.BREAK_STRENGTH_MS[strength] == expected_ms
 
 
 # =====================================================================
@@ -199,33 +198,31 @@ class TestParseBreak:
 class TestParseProsodyRate:
     """Parsing <prosody rate="..."> tags."""
 
-    def test_prosody_rate_slow(self):
-        ssml = '<speak><prosody rate="slow">Hello</prosody></speak>'
+    @pytest.mark.parametrize(
+        "ssml, expected_text, expected_rate",
+        [
+            ('<speak><prosody rate="slow">Hello</prosody></speak>', "Hello", 1.25),
+            ('<speak><prosody rate="fast">Quick</prosody></speak>', "Quick", 0.8),
+            (
+                '<speak><prosody rate="150%">Faster</prosody></speak>',
+                "Faster",
+                pytest.approx(100.0 / 150.0),
+            ),
+            ("<speak>Normal text</speak>", "Normal text", 1.0),
+            ("<speak><prosody>Text</prosody></speak>", "Text", 1.0),
+        ],
+        ids=[
+            "rate_slow",
+            "rate_fast",
+            "rate_percentage_150",
+            "default_when_absent",
+            "prosody_without_rate_attr",
+        ],
+    )
+    def test_prosody_rate(self, ssml, expected_text, expected_rate):
         segments = SSMLParser.parse(ssml)
-        assert len(segments) == 1
-        assert segments[0].text == "Hello"
-        assert segments[0].rate == 1.25
-
-    def test_prosody_rate_fast(self):
-        ssml = '<speak><prosody rate="fast">Quick</prosody></speak>'
-        segments = SSMLParser.parse(ssml)
-        assert segments[0].rate == 0.8
-
-    def test_prosody_rate_percentage(self):
-        ssml = '<speak><prosody rate="150%">Faster</prosody></speak>'
-        segments = SSMLParser.parse(ssml)
-        assert segments[0].rate == pytest.approx(100.0 / 150.0)
-
-    def test_prosody_rate_default_when_absent(self):
-        ssml = "<speak>Normal text</speak>"
-        segments = SSMLParser.parse(ssml)
-        assert segments[0].rate == 1.0
-
-    def test_prosody_without_rate_attr(self):
-        """<prosody> with no rate attribute uses default rate."""
-        ssml = "<speak><prosody>Text</prosody></speak>"
-        segments = SSMLParser.parse(ssml)
-        assert segments[0].rate == 1.0
+        assert segments[0].text == expected_text
+        assert segments[0].rate == expected_rate
 
 
 # =====================================================================

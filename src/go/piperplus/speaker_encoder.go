@@ -339,18 +339,41 @@ func createMelFilterbank() []float32 {
 	}
 
 	for m := 0; m < melNMels; m++ {
-		for k := 0; k < fftBins; k++ {
-			kf := float32(k)
-			if kf >= binPoints[m] && kf < binPoints[m+1] {
-				denom := binPoints[m+1] - binPoints[m]
-				if denom > 0 {
-					filterbank[m*fftBins+k] = (kf - binPoints[m]) / denom
-				}
-			} else if kf >= binPoints[m+1] && kf <= binPoints[m+2] {
-				denom := binPoints[m+2] - binPoints[m+1]
-				if denom > 0 {
-					filterbank[m*fftBins+k] = (binPoints[m+2] - kf) / denom
-				}
+		// Convert to integer bin indices (matching Python's np.floor().astype(int))
+		left := int(math.Floor(float64(binPoints[m])))
+		center := int(math.Floor(float64(binPoints[m+1])))
+		right := int(math.Floor(float64(binPoints[m+2])))
+
+		// Edge case: if the triangle collapses to a single bin, widen it to
+		// guarantee a non-zero response (matches Python reference).
+		if left == center && center == right {
+			center = min(center+1, fftBins-1)
+			right = min(right+2, fftBins-1)
+		} else if left == center {
+			center = min(center+1, fftBins-1)
+		}
+		if center == right {
+			right = min(right+1, fftBins-1)
+		}
+
+		// Rising slope
+		for k := left; k < center; k++ {
+			if center > left {
+				filterbank[m*fftBins+k] = float32(k-left) / float32(center-left)
+			}
+		}
+
+		// Falling slope
+		for k := center; k < right; k++ {
+			if right > center {
+				filterbank[m*fftBins+k] = float32(right-k) / float32(right-center)
+			}
+		}
+
+		// Ensure center bin always has weight >= 1.0
+		if center < fftBins {
+			if filterbank[m*fftBins+center] < 1.0 {
+				filterbank[m*fftBins+center] = 1.0
 			}
 		}
 	}

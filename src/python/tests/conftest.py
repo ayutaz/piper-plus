@@ -445,6 +445,94 @@ def temp_onnx_model_unified_emb_lang(mock_vits_model_multilingual, tmp_path_fact
     return onnx_path
 
 
+# ============================================================================
+# Shared VitsModel / SynthesizerTrn Factory Fixtures
+# ============================================================================
+
+
+@pytest.fixture
+def make_vits_model():
+    """Factory fixture: create a minimal VitsModel with custom settings.
+
+    Usage in tests:
+        model = make_vits_model(vits2=True, freeze_dp=True)
+    """
+    torch = pytest.importorskip("torch", reason="torch required")  # noqa: F841
+
+    def _factory(
+        vits2=False,
+        freeze_dp=False,
+        num_speakers=1,
+        num_languages=2,
+    ):
+        try:
+            from piper_train.vits.lightning import VitsModel
+        except ImportError as e:
+            pytest.skip(f"Training dependencies not available: {e}")
+
+        return VitsModel(
+            num_symbols=97,
+            num_speakers=num_speakers,
+            num_languages=num_languages,
+            dataset=None,
+            batch_size=4,
+            learning_rate=2e-4,
+            use_wavlm_discriminator=False,
+            vits2=vits2,
+            dur_disc_lr=1e-4,
+            lambda_dur=0.5,
+            freeze_dp=freeze_dp,
+            use_sdp=False,
+        )
+
+    return _factory
+
+
+@pytest.fixture
+def make_synthesizer_trn():
+    """Factory fixture: create a minimal SynthesizerTrn with custom settings.
+
+    Usage in tests:
+        model = make_synthesizer_trn(n_speakers=2, gin_channels=256)
+    """
+    torch = pytest.importorskip("torch", reason="torch required")  # noqa: F841
+
+    def _factory(
+        n_speakers=1,
+        n_languages=1,
+        gin_channels=0,
+        prosody_dim=0,
+        use_sdp=True,
+    ):
+        from piper_train.vits.models import SynthesizerTrn
+
+        return SynthesizerTrn(
+            n_vocab=50,
+            spec_channels=513,
+            segment_size=8192,
+            inter_channels=192,
+            hidden_channels=192,
+            filter_channels=768,
+            n_heads=2,
+            n_layers=6,
+            kernel_size=3,
+            p_dropout=0.1,
+            resblock="1",
+            resblock_kernel_sizes=[3, 7, 11],
+            resblock_dilation_sizes=[[1, 3, 5], [1, 3, 5], [1, 3, 5]],
+            upsample_rates=[8, 8, 2, 2],
+            upsample_initial_channel=512,
+            upsample_kernel_sizes=[16, 16, 4, 4],
+            n_speakers=n_speakers,
+            n_languages=n_languages,
+            gin_channels=gin_channels,
+            use_sdp=use_sdp,
+            prosody_dim=prosody_dim,
+        )
+
+    return _factory
+
+
 @pytest.fixture
 def sample_phoneme_ids():
     """標準的なテスト用音素ID列"""

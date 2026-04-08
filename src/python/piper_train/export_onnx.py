@@ -307,9 +307,9 @@ def main() -> None:
                 lang_emb = model_g.emb_lang(lid).unsqueeze(-1)
                 g_se = g_se + lang_emb
             # mask shape (batch, 1) -> (batch, 1, 1) to broadcast over (batch, gin, 1)
-            use_se = (speaker_embedding_mask > 0).unsqueeze(-1).float()
+            use_se = (speaker_embedding_mask >= 1).unsqueeze(-1).float()
             if g_base is not None:
-                g = torch.where(use_se > 0.5, g_se, g_base)
+                g = torch.where(use_se >= 1, g_se, g_base)
             else:
                 # No base conditioning (single-speaker mono-lingual): use se or zeros
                 g = g_se * use_se
@@ -422,7 +422,7 @@ def main() -> None:
     # both sid-based and speaker-embedding-based inference.
     speaker_emb_dim = 256  # ECAPA-TDNN default output dimension
     dummy_speaker_embedding = torch.zeros(1, speaker_emb_dim, dtype=torch.float32)
-    dummy_speaker_embedding_mask = torch.zeros(1, 1, dtype=torch.int64)
+    dummy_speaker_embedding_mask = torch.ones(1, 1, dtype=torch.int64)
 
     dummy_input_list.append(dummy_speaker_embedding)
     input_names.append("speaker_embedding")

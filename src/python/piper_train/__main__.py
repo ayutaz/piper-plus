@@ -240,14 +240,14 @@ def create_parser():
     parser.add_argument(
         "--dur-disc-lr",
         type=float,
-        default=2e-4,
-        help="Learning rate for the VITS2 Duration Discriminator (default: 2e-4).",
+        default=1e-4,
+        help="Learning rate for the VITS2 Duration Discriminator (default: 1e-4).",
     )
     parser.add_argument(
         "--lambda-dur",
         type=float,
-        default=1.0,
-        help="Weight for the VITS2 adversarial duration loss (default: 1.0).",
+        default=0.5,
+        help="Weight for the VITS2 adversarial duration loss (default: 0.5).",
     )
     # Trainer arguments
     parser.add_argument("--accelerator", default="gpu", help="Accelerator to use")

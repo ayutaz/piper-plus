@@ -13,31 +13,6 @@ import pytest
 torch = pytest.importorskip("torch", reason="torch required")
 
 
-def _make_model(vits2=False, freeze_dp=False, num_speakers=1, num_languages=2):
-    """Create a minimal VitsModel with VITS2 settings."""
-    try:
-        from piper_train.vits.lightning import VitsModel
-    except ImportError as e:
-        pytest.skip(f"Training dependencies not available: {e}")
-
-    model = VitsModel(
-        num_symbols=97,
-        num_speakers=num_speakers,
-        num_languages=num_languages,
-        dataset=None,
-        batch_size=4,
-        learning_rate=2e-4,
-        use_wavlm_discriminator=False,
-        vits2=vits2,
-        dur_disc_lr=2e-4,
-        lambda_dur=1.0,
-        freeze_dp=freeze_dp,
-        # Use non-SDP for testable duration info
-        use_sdp=False,
-    )
-    return model
-
-
 class TestDurationDiscriminator:
     """Unit tests for the DurationDiscriminator module."""
 
@@ -123,40 +98,40 @@ class TestVits2Model:
     """Integration tests for VITS2 mode in VitsModel."""
 
     @pytest.mark.unit
-    def test_vits2_flag_default_false(self):
+    def test_when_vits2_disabled_model_has_no_duration_discriminator(self, make_vits_model):
         """vits2 defaults to False."""
-        model = _make_model(vits2=False)
+        model = make_vits_model(vits2=False)
         assert model.hparams.vits2 is False
         assert model.model_g.dur_disc is None
 
     @pytest.mark.unit
-    def test_vits2_flag_enables_dur_disc(self):
+    def test_when_vits2_enabled_model_has_duration_discriminator(self, make_vits_model):
         """vits2=True creates DurationDiscriminator on model_g."""
-        model = _make_model(vits2=True)
+        model = make_vits_model(vits2=True)
         assert model.hparams.vits2 is True
         assert model.model_g.dur_disc is not None
         assert model.model_g.vits2 is True
 
     @pytest.mark.unit
-    def test_vits2_three_optimizers(self):
+    def test_when_vits2_enabled_creates_three_optimizers(self, make_vits_model):
         """VITS2 creates 3 optimizers (gen, disc, dur_disc)."""
-        model = _make_model(vits2=True)
+        model = make_vits_model(vits2=True)
         optimizers, schedulers = model.configure_optimizers()
         assert len(optimizers) == 3, "VITS2 should have 3 optimizers"
         assert len(schedulers) == 3, "VITS2 should have 3 schedulers"
 
     @pytest.mark.unit
-    def test_vits1_two_optimizers(self):
+    def test_when_vits1_creates_two_optimizers(self, make_vits_model):
         """VITS1 (default) creates 2 optimizers."""
-        model = _make_model(vits2=False)
+        model = make_vits_model(vits2=False)
         optimizers, schedulers = model.configure_optimizers()
         assert len(optimizers) == 2, "VITS1 should have 2 optimizers"
         assert len(schedulers) == 2, "VITS1 should have 2 schedulers"
 
     @pytest.mark.unit
-    def test_vits2_dur_disc_excluded_from_gen_optimizer(self):
+    def test_when_vits2_dur_disc_excluded_from_generator_optimizer(self, make_vits_model):
         """dur_disc parameters are NOT in the generator optimizer."""
-        model = _make_model(vits2=True)
+        model = make_vits_model(vits2=True)
         optimizers, _ = model.configure_optimizers()
         opt_g = optimizers[0]
 
@@ -171,9 +146,9 @@ class TestVits2Model:
                 )
 
     @pytest.mark.unit
-    def test_vits2_dur_disc_in_third_optimizer(self):
+    def test_when_vits2_dur_disc_in_third_optimizer(self, make_vits_model):
         """dur_disc parameters are in the 3rd optimizer."""
-        model = _make_model(vits2=True)
+        model = make_vits_model(vits2=True)
         optimizers, _ = model.configure_optimizers()
         opt_dur = optimizers[2]
 
@@ -195,9 +170,9 @@ class TestVits2FreezeDp:
     """Tests for freeze-dp interaction with VITS2."""
 
     @pytest.mark.unit
-    def test_freeze_dp_freezes_dur_disc(self):
+    def test_when_freeze_dp_then_dur_disc_is_frozen(self, make_vits_model):
         """--freeze-dp also freezes DurationDiscriminator in VITS2 mode."""
-        model = _make_model(vits2=True, freeze_dp=True)
+        model = make_vits_model(vits2=True, freeze_dp=True)
         model.configure_optimizers()
 
         for name, param in model.model_g.dur_disc.named_parameters():
@@ -206,17 +181,17 @@ class TestVits2FreezeDp:
             )
 
     @pytest.mark.unit
-    def test_freeze_dp_dur_disc_dummy_optimizer(self):
+    def test_when_freeze_dp_still_has_three_optimizers(self, make_vits_model):
         """When freeze-dp, VITS2 still has 3 optimizers (3rd is dummy)."""
-        model = _make_model(vits2=True, freeze_dp=True)
+        model = make_vits_model(vits2=True, freeze_dp=True)
         optimizers, schedulers = model.configure_optimizers()
         assert len(optimizers) == 3
         assert len(schedulers) == 3
 
     @pytest.mark.unit
-    def test_no_freeze_dp_dur_disc_trainable(self):
+    def test_when_no_freeze_dp_then_dur_disc_is_trainable(self, make_vits_model):
         """Without freeze-dp, dur_disc params are trainable."""
-        model = _make_model(vits2=True, freeze_dp=False)
+        model = make_vits_model(vits2=True, freeze_dp=False)
         model.configure_optimizers()
 
         for name, param in model.model_g.dur_disc.named_parameters():
@@ -229,9 +204,9 @@ class TestVits1Compatibility:
     """Ensure VITS1 path is untouched when vits2=False."""
 
     @pytest.mark.unit
-    def test_vits1_forward_returns_none_dur_info(self):
+    def test_when_vits1_forward_returns_none_dur_info(self, make_vits_model):
         """SynthesizerTrn.forward returns dur_info=None when vits2=False."""
-        model = _make_model(vits2=False)
+        model = make_vits_model(vits2=False)
         model_g = model.model_g
 
         # Create minimal inputs
@@ -252,9 +227,9 @@ class TestVits1Compatibility:
         assert dur_info is None, "dur_info should be None when vits2=False"
 
     @pytest.mark.unit
-    def test_vits2_forward_returns_dur_info(self):
+    def test_when_vits2_forward_returns_dur_info_tuple(self, make_vits_model):
         """SynthesizerTrn.forward returns dur_info tuple when vits2=True (use_sdp=False)."""
-        model = _make_model(vits2=True)
+        model = make_vits_model(vits2=True)
         model_g = model.model_g
 
         batch_size = 1
@@ -274,12 +249,12 @@ class TestVits1Compatibility:
         assert len(dur_info) == 4, "dur_info should be (x_dp_det, x_mask, logw_r, logw_g)"
 
     @pytest.mark.unit
-    def test_vits1_checkpoint_loadable_in_vits2(self):
+    def test_when_loading_vits1_checkpoint_into_vits2(self, make_vits_model):
         """A VITS1 state dict can be loaded into a VITS2 model with strict=False."""
-        model_v1 = _make_model(vits2=False)
+        model_v1 = make_vits_model(vits2=False)
         state_dict_v1 = model_v1.state_dict()
 
-        model_v2 = _make_model(vits2=True)
+        model_v2 = make_vits_model(vits2=True)
         missing, unexpected = model_v2.load_state_dict(state_dict_v1, strict=False)
 
         # dur_disc keys should be in "missing" since VITS1 doesn't have them
@@ -294,11 +269,11 @@ class TestVits1Compatibility:
         )
 
     @pytest.mark.unit
-    def test_vits1_infer_unchanged(self):
+    def test_infer_works_regardless_of_vits2_flag(self, make_vits_model):
         """infer() method works identically regardless of vits2 flag."""
         # Both models should be able to run inference
         for vits2_flag in [False, True]:
-            model = _make_model(vits2=vits2_flag)
+            model = make_vits_model(vits2=vits2_flag)
             model_g = model.model_g
             model_g.eval()
 

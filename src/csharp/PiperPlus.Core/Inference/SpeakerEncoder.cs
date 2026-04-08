@@ -302,22 +302,44 @@ public sealed class SpeakerEncoder : IDisposable
 
         for (int m = 0; m < MelNMels; m++)
         {
-            for (int k = 0; k < fftBins; k++)
+            // Convert to integer bin indices (matching Python's np.floor().astype(int))
+            int left = (int)MathF.Floor(binPoints[m]);
+            int center = (int)MathF.Floor(binPoints[m + 1]);
+            int right = (int)MathF.Floor(binPoints[m + 2]);
+
+            // Edge case: if the triangle collapses to a single bin, widen it to
+            // guarantee a non-zero response (matches Python reference).
+            if (left == center && center == right)
             {
-                float kf = k;
-                if (kf >= binPoints[m] && kf < binPoints[m + 1])
-                {
-                    float denom = binPoints[m + 1] - binPoints[m];
-                    if (denom > 0)
-                        filterbank[m * fftBins + k] = (kf - binPoints[m]) / denom;
-                }
-                else if (kf >= binPoints[m + 1] && kf <= binPoints[m + 2])
-                {
-                    float denom = binPoints[m + 2] - binPoints[m + 1];
-                    if (denom > 0)
-                        filterbank[m * fftBins + k] = (binPoints[m + 2] - kf) / denom;
-                }
+                center = Math.Min(center + 1, fftBins - 1);
+                right = Math.Min(right + 2, fftBins - 1);
             }
+            else if (left == center)
+            {
+                center = Math.Min(center + 1, fftBins - 1);
+            }
+            if (center == right)
+            {
+                right = Math.Min(right + 1, fftBins - 1);
+            }
+
+            // Rising slope
+            for (int k = left; k < center; k++)
+            {
+                if (center > left)
+                    filterbank[m * fftBins + k] = (float)(k - left) / (center - left);
+            }
+
+            // Falling slope
+            for (int k = center; k < right; k++)
+            {
+                if (right > center)
+                    filterbank[m * fftBins + k] = (float)(right - k) / (right - center);
+            }
+
+            // Ensure center bin always has weight >= 1.0
+            if (center < fftBins)
+                filterbank[m * fftBins + center] = MathF.Max(filterbank[m * fftBins + center], 1.0f);
         }
 
         return filterbank;

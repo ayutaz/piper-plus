@@ -15,46 +15,6 @@ torch = pytest.importorskip("torch", reason="torch required")
 
 
 # ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-
-def _make_model(
-    n_speakers=1,
-    n_languages=1,
-    gin_channels=0,
-    prosody_dim=0,
-    use_sdp=True,
-):
-    """Create a minimal SynthesizerTrn for testing."""
-    from piper_train.vits.models import SynthesizerTrn
-
-    return SynthesizerTrn(
-        n_vocab=50,
-        spec_channels=513,
-        segment_size=8192,
-        inter_channels=192,
-        hidden_channels=192,
-        filter_channels=768,
-        n_heads=2,
-        n_layers=6,
-        kernel_size=3,
-        p_dropout=0.1,
-        resblock="1",
-        resblock_kernel_sizes=[3, 7, 11],
-        resblock_dilation_sizes=[[1, 3, 5], [1, 3, 5], [1, 3, 5]],
-        upsample_rates=[8, 8, 2, 2],
-        upsample_initial_channel=512,
-        upsample_kernel_sizes=[16, 16, 4, 4],
-        n_speakers=n_speakers,
-        n_languages=n_languages,
-        gin_channels=gin_channels,
-        use_sdp=use_sdp,
-        prosody_dim=prosody_dim,
-    )
-
-
-# ---------------------------------------------------------------------------
 # Tests: SynthesizerTrn.infer() with speaker_embedding
 # ---------------------------------------------------------------------------
 
@@ -63,10 +23,10 @@ class TestInferSpeakerEmbedding:
     """SynthesizerTrn.infer() speaker_embedding path."""
 
     @pytest.mark.unit
-    def test_infer_with_speaker_embedding_produces_audio(self):
+    def test_infer_with_speaker_embedding_produces_audio(self, make_synthesizer_trn):
         """Passing a speaker_embedding produces valid (non-zero) audio."""
         gin = 256
-        model = _make_model(n_speakers=2, gin_channels=gin)
+        model = make_synthesizer_trn(n_speakers=2, gin_channels=gin)
         model.eval()
 
         x = torch.randint(0, 50, (1, 12))
@@ -83,10 +43,10 @@ class TestInferSpeakerEmbedding:
         assert o.shape[2] > 0, "Audio length should be > 0"
 
     @pytest.mark.unit
-    def test_infer_none_speaker_embedding_uses_sid(self):
+    def test_infer_none_speaker_embedding_uses_sid(self, make_synthesizer_trn):
         """speaker_embedding=None falls back to emb_g(sid)."""
         gin = 256
-        model = _make_model(n_speakers=2, gin_channels=gin)
+        model = make_synthesizer_trn(n_speakers=2, gin_channels=gin)
         model.eval()
 
         x = torch.randint(0, 50, (1, 10))
@@ -100,10 +60,10 @@ class TestInferSpeakerEmbedding:
         assert o.shape[0] == 1
 
     @pytest.mark.unit
-    def test_infer_speaker_embedding_overrides_sid(self):
+    def test_infer_speaker_embedding_overrides_sid(self, make_synthesizer_trn):
         """When both speaker_embedding and sid are provided, speaker_embedding wins."""
         gin = 256
-        model = _make_model(n_speakers=2, gin_channels=gin)
+        model = make_synthesizer_trn(n_speakers=2, gin_channels=gin)
         model.eval()
 
         x = torch.randint(0, 50, (1, 10))
@@ -125,10 +85,10 @@ class TestInferSpeakerEmbedding:
         assert o_sid.shape[0] == 1
 
     @pytest.mark.unit
-    def test_infer_speaker_embedding_3d(self):
+    def test_infer_speaker_embedding_3d(self, make_synthesizer_trn):
         """speaker_embedding with shape (batch, dim, 1) is accepted."""
         gin = 256
-        model = _make_model(n_speakers=2, gin_channels=gin)
+        model = make_synthesizer_trn(n_speakers=2, gin_channels=gin)
         model.eval()
 
         x = torch.randint(0, 50, (1, 10))
@@ -150,11 +110,11 @@ class TestSpeakerEmbeddingProjection:
     """Linear projection for mismatched speaker_embedding dimensions."""
 
     @pytest.mark.unit
-    def test_projection_created_on_mismatch(self):
+    def test_projection_created_on_mismatch(self, make_synthesizer_trn):
         """spk_proj is lazily created when emb_dim != gin_channels."""
         gin = 512
         emb_dim = 256
-        model = _make_model(n_speakers=2, gin_channels=gin)
+        model = make_synthesizer_trn(n_speakers=2, gin_channels=gin)
         model.eval()
 
         assert model.spk_proj is None, "spk_proj should start as None"
@@ -171,10 +131,10 @@ class TestSpeakerEmbeddingProjection:
         assert model.spk_proj.out_features == gin
 
     @pytest.mark.unit
-    def test_no_projection_when_dims_match(self):
+    def test_no_projection_when_dims_match(self, make_synthesizer_trn):
         """No projection needed when emb_dim == gin_channels."""
         gin = 256
-        model = _make_model(n_speakers=2, gin_channels=gin)
+        model = make_synthesizer_trn(n_speakers=2, gin_channels=gin)
         model.eval()
 
         x = torch.randint(0, 50, (1, 10))
@@ -187,11 +147,11 @@ class TestSpeakerEmbeddingProjection:
         assert model.spk_proj is None, "spk_proj should remain None when dims match"
 
     @pytest.mark.unit
-    def test_projection_reused_across_calls(self):
+    def test_projection_reused_across_calls(self, make_synthesizer_trn):
         """spk_proj is created once and reused."""
         gin = 512
         emb_dim = 256
-        model = _make_model(n_speakers=2, gin_channels=gin)
+        model = make_synthesizer_trn(n_speakers=2, gin_channels=gin)
         model.eval()
 
         x = torch.randint(0, 50, (1, 10))
@@ -216,10 +176,10 @@ class TestSpeakerEmbeddingWithLanguage:
     """speaker_embedding + emb_lang (multilingual voice cloning)."""
 
     @pytest.mark.unit
-    def test_infer_with_speaker_embedding_and_lid(self):
+    def test_infer_with_speaker_embedding_and_lid(self, make_synthesizer_trn):
         """speaker_embedding combined with language embedding."""
         gin = 256
-        model = _make_model(n_speakers=2, n_languages=3, gin_channels=gin)
+        model = make_synthesizer_trn(n_speakers=2, n_languages=3, gin_channels=gin)
         model.eval()
 
         x = torch.randint(0, 50, (1, 10))
@@ -245,9 +205,9 @@ class TestForwardSpeakerEmbedding:
     """forward() accepts speaker_embedding kwarg (unused, future-reserved)."""
 
     @pytest.mark.unit
-    def test_forward_accepts_speaker_embedding_kwarg(self):
+    def test_forward_accepts_speaker_embedding_kwarg(self, make_synthesizer_trn):
         """forward() does not raise when speaker_embedding is passed."""
-        model = _make_model(n_speakers=1, gin_channels=0)
+        model = make_synthesizer_trn(n_speakers=1, gin_channels=0)
 
         batch, text_len, spec_len = 1, 10, 50
         x = torch.randint(0, 50, (batch, text_len))
@@ -275,37 +235,17 @@ class TestOnnxExportSpeakerEmbedding:
     """ONNX export includes speaker_embedding and speaker_embedding_mask."""
 
     @pytest.fixture
-    def onnx_model_with_spk_emb(self, tmp_path):
+    def onnx_model_with_spk_emb(self, tmp_path, make_synthesizer_trn):
         """Export a multi-speaker model to ONNX with speaker_embedding support."""
         from piper_train.vits import commons
-        from piper_train.vits.models import SynthesizerTrn
 
         torch.manual_seed(42)
 
         gin_channels = 256
         spk_emb_dim = 256  # same as gin_channels -> no projection needed
 
-        model = SynthesizerTrn(
-            n_vocab=50,
-            spec_channels=513,
-            segment_size=8192,
-            inter_channels=192,
-            hidden_channels=192,
-            filter_channels=768,
-            n_heads=2,
-            n_layers=6,
-            kernel_size=3,
-            p_dropout=0.1,
-            resblock="1",
-            resblock_kernel_sizes=[3, 7, 11],
-            resblock_dilation_sizes=[[1, 3, 5], [1, 3, 5], [1, 3, 5]],
-            upsample_rates=[8, 8, 2, 2],
-            upsample_initial_channel=512,
-            upsample_kernel_sizes=[16, 16, 4, 4],
-            n_speakers=2,
-            gin_channels=gin_channels,
-            use_sdp=True,
-            prosody_dim=0,
+        model = make_synthesizer_trn(
+            n_speakers=2, gin_channels=gin_channels, use_sdp=True, prosody_dim=0,
         )
         model.eval()
         model.onnx_export_mode = True
@@ -334,8 +274,8 @@ class TestOnnxExportSpeakerEmbedding:
             # Speaker-embedding conditioning (trace-friendly: always evaluate
             # both paths and select via torch.where)
             g_se = speaker_embedding.unsqueeze(-1)  # (batch, emb_dim, 1)
-            use_se = (speaker_embedding_mask > 0).unsqueeze(-1).float()
-            g = torch.where(use_se > 0.5, g_se, g_base)
+            use_se = (speaker_embedding_mask >= 1).unsqueeze(-1).float()
+            g = torch.where(use_se >= 1, g_se, g_base)
 
             x, m_p, logs_p, x_mask = model.enc_p(text, text_lengths, g=g)
             x_dp = model._prepare_prosody_input(x, x_mask, None)
