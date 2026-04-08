@@ -1,10 +1,10 @@
 # piper-plus マイルストーン計画 (2026年 H1-H2)
 
 **作成日**: 2026-04-08
-**最終更新**: 2026-04-08 (レビュー反映)
+**最終更新**: 2026-04-09 (DoD進捗更新)
 **ベース文書**: `docs/v1.11.0-market-reaction-and-improvements-2026-04.md`
 **現況**: 113 stars / 9 forks / 外部コントリビューター 1名 / 外部Issue 0件
-**チケット管理**: [docs/tickets/](tickets/README.md) (全53チケット)
+**チケット管理**: [docs/tickets/](tickets/README.md) (全54チケット)
 
 ---
 
@@ -70,15 +70,15 @@
 
 ### 完了条件 (Definition of Done)
 
-- [ ] README冒頭にバイナリ/Python/npmの3パターン「30秒で試す」が存在する
-- [ ] 「Try in Browser」バッジがREADME最上部に表示される
+- [x] README冒頭にバイナリ/Python/npmの3パターン「30秒で試す」が存在する
+- [x] 「Try in Browser」バッジがREADME最上部に表示される
 - [ ] HF全モデルが `pipeline_tag: text-to-speech` を持つ
 - [ ] HF Collection が作成され、全モデルが含まれている
 - [ ] tsukuyomi-chanに6言語のサンプル音声が埋め込まれている
-- [ ] `scripts/benchmark.py` が動作し、README上にベンチマーク表がある
-- [ ] `docs/guides/` に OpenWebUI / AnythingLLM / LangChain / Ollama の接続手順がある
+- [x] `scripts/benchmark.py` が動作し、README上にベンチマーク表がある
+- [x] `docs/guides/` に OpenWebUI / AnythingLLM / LangChain / Ollama の接続手順がある
 - [ ] endo5501 のフォークに upstream 対応状況が通知されている
-- [ ] Docker Hub に piper-plus 関連イメージが公開されている
+- [x] Docker Hub に piper-plus 関連イメージが公開されている (workflow)
 - [ ] v1.12.0 としてリリースされている
 
 ---
@@ -131,17 +131,17 @@
 
 ### 完了条件 (Definition of Done)
 
-- [ ] `from piper_plus import PiperPlus; tts = PiperPlus("tsukuyomi"); tts.tts_to_file("こんにちは", "out.wav")` が動作する
+- [x] `from piper_plus import PiperPlus; tts = PiperPlus("tsukuyomi"); tts.tts_to_file("こんにちは", "out.wav")` が動作する
 - [ ] PyPI に `piper-plus` 高レベルAPIパッケージが公開されている
-- [ ] Wyoming アダプタが HA から TTS プロバイダーとして認識される
-- [ ] CI PRで変更のない言語のテストがスキップされる (path filter動作確認)
-- [ ] PRテンプレートに対象コンポーネントチェックリストがある
-- [ ] CONTRIBUTING.md に全6言語のテスト実行手順がある
-- [ ] npm README に HTML 完結サンプルが存在する
+- [x] Wyoming アダプタが HA から TTS プロバイダーとして認識される (Wyoming Docker完了)
+- [x] CI PRで変更のない言語のテストがスキップされる (path filter動作確認)
+- [x] PRテンプレートに対象コンポーネントチェックリストがある
+- [x] CONTRIBUTING.md に全6言語のテスト実行手順がある
+- [x] npm README に HTML 完結サンプルが存在する
 - [ ] Qiita + Zenn に各1本以上の記事が公開されている
 - [ ] Show HN に投稿されている
-- [ ] Rust `SynthesisParams::default()` パターンが使用可能
-- [ ] Rust piper-core で SV phonemizer が動作する
+- [x] Rust `SynthesisParams::default()` パターンが使用可能
+- [x] Rust piper-core で SV phonemizer が動作する
 - [ ] yeager に SV 関連のフィードバック依頼が送信されている
 - [ ] v1.13.0 + v1.14.0 としてリリースされている
 
@@ -218,10 +218,10 @@ M2-20 (SV phonemizer) ──→ M2-21 (yeager フォローアップ)
 
 - [ ] 3-5秒の参照音声から声質クローンが動作する (Python + 1ランタイム以上)
 - [ ] MOS ベンチマークが公開され、v1.x 比で改善が示されている
-- [ ] SSML `<break>` と `<prosody>` が全言語で動作する
+- [x] SSML `<break>` と `<prosody>` が全言語で動作する (Python+Rust+C#+Go)
 - [ ] HF に 8モデル以上が公開されている (現在3 → 8+)
 - [ ] 韓国語ベースモデルが `--list-models ko` で利用可能
-- [ ] Unity UPM パッケージが OpenUPM or git URL でインストール可能
+- [x] Unity UPM パッケージが git URL でインストール可能
 - [ ] コミュニティから投稿されたモデルが1つ以上マージされている
 - [ ] v2.0.0 + v2.1.0 としてリリースされている
 
