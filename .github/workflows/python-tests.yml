@@ -9,6 +9,10 @@ on:
       - 'src/python_run/**'
       - '.github/workflows/python-tests.yml'
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     name: python-tests (${{ matrix.os }}, ${{ matrix.python-version }})

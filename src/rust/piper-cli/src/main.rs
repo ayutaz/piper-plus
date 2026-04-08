@@ -5,7 +5,9 @@ use anyhow::{Context, Result};
 use clap::Parser;
 
 use piper_plus::phonemize::custom_dict::CustomDictionary;
-use piper_plus::{OnnxEngine, PiperVoice, VoiceConfig, audio, config, input::JsonlReader};
+use piper_plus::{
+    OnnxEngine, PiperVoice, SynthesisParams, VoiceConfig, audio, config, input::JsonlReader,
+};
 
 /// サポートされている言語コード
 const SUPPORTED_LANGUAGES: &[&str] = &["ja", "en", "zh", "ko", "es", "fr", "pt", "sv"];
@@ -147,6 +149,17 @@ fn append_silence(audio: &mut Vec<i16>, sample_rate: u32, silence_seconds: f32) 
     if silence_seconds > 0.0 {
         let num_samples = (sample_rate as f32 * silence_seconds) as usize;
         audio.extend(std::iter::repeat_n(0i16, num_samples));
+    }
+}
+
+/// CLI引数から SynthesisParams を構築する。
+fn build_synthesis_params(cli: &Cli) -> SynthesisParams {
+    SynthesisParams {
+        speaker_id: cli.speaker,
+        language_override: cli.language.clone(),
+        noise_scale: cli.noise_scale,
+        length_scale: cli.length_scale,
+        noise_w: cli.noise_w,
     }
 }
 
@@ -370,6 +383,7 @@ fn main() -> Result<()> {
             batch_path.display()
         );
 
+        let params = build_synthesis_params(&cli);
         for (i, line) in lines.iter().enumerate() {
             let idx = i + 1;
             let text_to_synth = if let Some(ref dict) = custom_dict {
@@ -382,14 +396,7 @@ fn main() -> Result<()> {
                 line.to_string()
             };
             let result = voice
-                .synthesize_text(
-                    &text_to_synth,
-                    cli.speaker,
-                    cli.language.as_deref(),
-                    cli.noise_scale,
-                    cli.length_scale,
-                    cli.noise_w,
-                )
+                .synthesize_with_params(&text_to_synth, &params)
                 .with_context(|| format!("Synthesis failed for line {}", idx))?;
 
             // --sentence-silence: 文末に無音を追加
@@ -492,6 +499,7 @@ fn main() -> Result<()> {
                 .as_ref()
                 .ok_or_else(|| anyhow::anyhow!("--output-dir is required for --stream mode"))?;
 
+            let params = build_synthesis_params(&cli);
             for (i, sentence) in sentences.iter().enumerate() {
                 let idx = i + 1;
                 let text_to_synth = if let Some(ref dict) = custom_dict {
@@ -504,14 +512,7 @@ fn main() -> Result<()> {
                     sentence.to_string()
                 };
                 let result = voice
-                    .synthesize_text(
-                        &text_to_synth,
-                        cli.speaker,
-                        cli.language.as_deref(),
-                        cli.noise_scale,
-                        cli.length_scale,
-                        cli.noise_w,
-                    )
+                    .synthesize_with_params(&text_to_synth, &params)
                     .with_context(|| format!("Synthesis failed for sentence {}", idx))?;
 
                 // --sentence-silence: 文末に無音を追加
@@ -559,15 +560,9 @@ fn main() -> Result<()> {
                 return Ok(());
             }
 
+            let params = build_synthesis_params(&cli);
             let result = voice
-                .synthesize_text(
-                    &text_to_synth,
-                    cli.speaker,
-                    cli.language.as_deref(),
-                    cli.noise_scale,
-                    cli.length_scale,
-                    cli.noise_w,
-                )
+                .synthesize_with_params(&text_to_synth, &params)
                 .context("Failed to synthesize text")?;
 
             tracing::info!(

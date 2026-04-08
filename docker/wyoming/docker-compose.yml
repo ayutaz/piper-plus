@@ -1,0 +1,42 @@
+# Wyoming Protocol TTS adapter for piper-plus
+#
+# Usage:
+#   1. Place your .onnx model + config.json in ./models/
+#   2. Start the service:
+#        docker compose up --build
+#   3. Configure Home Assistant to connect to this server:
+#        Host: <docker-host-ip>  Port: 10200
+#
+# Environment variables:
+#   PIPER_MODEL     - Model filename (default: model.onnx)
+#   PIPER_LANGUAGE  - Default language (default: ja)
+#   PIPER_SPEAKER   - Default speaker ID (default: 0)
+
+services:
+  wyoming-piper-plus:
+    build:
+      context: ../..
+      dockerfile: docker/wyoming/Dockerfile
+    container_name: wyoming-piper-plus
+    ports:
+      - "10200:10200"
+    volumes:
+      - ./models:/app/models:ro
+    environment:
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; s=socket.socket(); s.settimeout(5); s.connect(('localhost', 10200)); s.close()"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    command:
+      - --model
+      - /app/models/${PIPER_MODEL:-model.onnx}
+      - --language
+      - ${PIPER_LANGUAGE:-ja}
+      - --speaker-id
+      - ${PIPER_SPEAKER:-0}
+      - --uri
+      - tcp://0.0.0.0:10200

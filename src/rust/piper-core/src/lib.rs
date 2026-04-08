@@ -56,4 +56,4 @@ pub use engine::{
 pub use error::PiperError;
 pub use phonemize::{ProsodyFeature, ProsodyInfo};
 #[cfg(feature = "onnx")]
-pub use voice::PiperVoice;
+pub use voice::{PiperVoice, SynthesisParams};
