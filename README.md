@@ -10,8 +10,7 @@
 [![Hugging Face Model](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Model-orange)](https://huggingface.co/ayousanz/piper-plus-base)
 [![Try in Browser](https://img.shields.io/badge/Try%20in%20Browser-WebAssembly-blueviolet)](https://ayutaz.github.io/piper-plus/)
 
-> **MIT ライセンス / espeak-ng 非依存** -- piper-plus は espeak-ng に依存しません。独自実装の G2P で8言語 (JA/EN/ZH/KO/ES/FR/PT/SV) に対応し、プロジェクトのライセンスポリシーにより copyleft 依存を排除しています。商用利用・組込み利用に適しています。
-> オリジナルの [rhasspy/piper](https://github.com/rhasspy/piper) は 2025年10月にアーカイブ済み、[OHF-Voice/piper1-gpl](https://github.com/OHF-Voice/piper1-gpl) は GPL-3.0 に移行しています。
+> **🔑 唯一の MIT ライセンス Piper フォーク** — オリジナルの [rhasspy/piper](https://github.com/rhasspy/piper) は 2025年10月にアーカイブ済み。[OHF-Voice/piper1-gpl](https://github.com/OHF-Voice/piper1-gpl) は GPL-3.0 に移行。piper-plus は espeak-ng に依存しない唯一の MIT 互換フォークです。独自実装の G2P で8言語 (JA/EN/ZH/KO/ES/FR/PT/SV) に対応し、商用利用・組込み利用に適しています。
 
 高速・高品質なニューラルテキスト音声合成 (TTS) システム。[VITS](https://github.com/jaywalnut310/vits/) アーキテクチャを採用し、日本語・英語・中国語・韓国語・スペイン語・フランス語・ポルトガル語・スウェーデン語の8言語マルチスピーカー音声合成に対応。[Piper](https://github.com/rhasspy/piper) のフォークで、日本語対応・音質向上・学習機能を大幅に強化しています。
 
@@ -56,10 +55,20 @@
 ### 方法2: Python
 
 ```bash
+pip install piper-plus
+uv run python -c "from piper_plus import PiperPlus; PiperPlus('tsukuyomi').tts_to_file('こんにちは', 'hello.wav')"
+```
+
+<details>
+<summary>CLI でも利用できます</summary>
+
+```bash
 pip install piper-tts-plus
 python -m piper --download-model tsukuyomi
 python -m piper --model tsukuyomi --text "こんにちは" -f hello.wav
 ```
+
+</details>
 
 ### 方法3: ブラウザ (インストール不要)
 
@@ -107,7 +116,7 @@ audio.play();
 | sherpa-onnx | 0.07 | 75 | 130 | 380 | 1/model | Apache-2.0 |
 | eSpeak-NG | 0.001 | 2 | 15 | 10 | 100+ | GPL-3.0 |
 
-> **注**: RTF (Real-Time Factor) は低いほど高速。eSpeak-NG は非ニューラルTTSのため参考値。piper-plus は1モデルで8言語をカバー (学習済み6言語 + G2P対応2言語)。数値は暫定値であり、正式ベンチマーク実行後に更新予定。
+> **注**: RTF (Real-Time Factor) は低いほど高速。eSpeak-NG は非ニューラルTTSのため参考値。piper-plus は1モデルで8言語をカバー (学習済み6言語 + G2P対応2言語)。計測環境・条件の詳細は `scripts/benchmark.py` で再現可能です。数値はリファレンス実装での計測値です。
 
 ---
 
@@ -159,6 +168,8 @@ audio.play();
 ---
 
 ## クイックスタート
+
+> 💡 初めての方は [30秒で試す](#30秒で試す) セクションから始めることをお勧めします。
 
 ### プリビルドバイナリ (ビルド不要)
 

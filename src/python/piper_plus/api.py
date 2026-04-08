@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import logging
 import re
 import time
@@ -17,6 +16,13 @@ from piper_plus._model_resolver import (
     resolve_model,
 )
 from piper_plus.audio import AudioResult
+from piper_plus.engine import (
+    audio_float_to_int16,
+    create_ort_session,
+    load_config,
+    synthesize as engine_synthesize,
+    warmup_session,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -42,8 +48,8 @@ def _split_sentences(text: str) -> list[str]:
 class PiperPlus:
     """High-level text-to-speech engine.
 
-    Wraps the low-level ONNX inference pipeline from ``piper_train``
-    into a simple, user-friendly interface.
+    Uses ``piper_plus.engine`` for ONNX inference (no ``piper_train``
+    dependency) and ``piper_plus_g2p`` for phonemization.
 
     Example::
 
@@ -76,22 +82,6 @@ class PiperPlus:
         length_scale: float = 1.0,
         noise_scale_w: float = 0.8,
     ) -> None:
-        # Import piper_train components (may not be installed)
-        try:
-            from piper_train.ort_utils import (  # noqa: PLC0415
-                create_session_with_cache,
-                warmup_onnx_session,
-            )
-            from piper_train.vits.utils import audio_float_to_int16  # noqa: PLC0415
-        except ImportError:
-            raise ImportError(
-                "piper_train is required for the PiperPlus API. "
-                "Install the piper-plus package with: "
-                "pip install piper-plus  OR  uv pip install -e src/python"
-            ) from None
-
-        self._audio_float_to_int16 = audio_float_to_int16
-
         # Resolve model path
         onnx_path, config_path = resolve_model(
             model, config=config, download=download, cache_dir=cache_dir
@@ -99,9 +89,8 @@ class PiperPlus:
         self._onnx_path = onnx_path
         self._config_path = config_path
 
-        # Load config
-        with open(config_path, encoding="utf-8") as f:
-            self._config: dict = json.load(f)
+        # Load config via engine helper (no piper_train dependency)
+        self._config: dict = load_config(config_path)
 
         self._phoneme_id_map: dict[str, list[int]] = self._config["phoneme_id_map"]
         self._language_id_map: dict[str, int] = self._config.get("language_id_map", {})
@@ -121,9 +110,22 @@ class PiperPlus:
         else:
             self._language = "ja"
 
-        # Create ORT session
+        # Create ORT session via engine (no piper_train dependency)
+        effective_device = device
+        if device == "auto":
+            effective_device = "cpu"
+            try:
+                import onnxruntime as _ort  # noqa: PLC0415
+
+                if "CUDAExecutionProvider" in _ort.get_available_providers():
+                    effective_device = "gpu"
+            except Exception:
+                pass
+
         logger.info("Loading model from %s", onnx_path)
-        self._session = create_session_with_cache(str(onnx_path), device=device)
+        self._session = create_ort_session(
+            str(onnx_path), device=effective_device
+        )
         logger.info(
             "Loaded model (providers: %s)", self._session.get_providers()
         )
@@ -134,8 +136,8 @@ class PiperPlus:
         self._has_sid = "sid" in input_names
         self._has_lid = "lid" in input_names
 
-        # Warmup
-        warmup_onnx_session(self._session)
+        # Warmup via engine
+        warmup_session(self._session, self._config)
 
     # ------------------------------------------------------------------
     # Public properties
@@ -184,7 +186,20 @@ class PiperPlus:
 
         Returns:
             :class:`AudioResult` containing the generated audio.
+
+        Raises:
+            ValueError: If scale parameters are out of valid range.
         """
+        if not text or not text.strip():
+            return AudioResult(audio=np.array([], dtype=np.int16), sample_rate=self.sample_rate)
+
+        if not (0.0 < self.noise_scale <= 2.0):
+            raise ValueError(f"noise_scale must be in (0, 2.0], got {self.noise_scale}")
+        if not (0.1 <= self.length_scale <= 5.0):
+            raise ValueError(f"length_scale must be in [0.1, 5.0], got {self.length_scale}")
+        if not (0.0 <= self.noise_scale_w <= 2.0):
+            raise ValueError(f"noise_w must be in [0, 2.0], got {self.noise_scale_w}")
+
         audio_int16 = self._synthesize_raw(text, speaker_id=speaker_id, language=language)
         return AudioResult(audio=audio_int16, sample_rate=self._sample_rate)
 
@@ -269,78 +284,42 @@ class PiperPlus:
         """Run the full phonemize -> inference pipeline.
 
         Returns int16 PCM audio as a 1-D numpy array.
+
+        Phonemization uses ``piper_plus_g2p`` directly (no ``piper_train``
+        dependency).  Falls back to ``piper_train.infer_onnx`` only if
+        ``piper_plus_g2p`` is not installed.
         """
-        from piper_train.infer_onnx import (  # noqa: PLC0415
-            _detect_dominant_language,
-            text_to_phoneme_ids_and_prosody,
-        )
-
-        # Determine effective language for phonemizer
-        effective_language = language if language else self._language
-
-        # Convert text to phoneme IDs + prosody
-        phoneme_ids, prosody_features_data = text_to_phoneme_ids_and_prosody(
-            text,
-            self._phoneme_id_map,
-            language=effective_language,
-            language_id_map=self._language_id_map if self._has_lid else None,
+        phoneme_ids, prosody_features_data, lid = self._phonemize(
+            text, language=language
         )
 
         if not phoneme_ids:
             return np.array([], dtype=np.int16)
 
-        # Build ONNX inputs
-        text_array = np.expand_dims(np.array(phoneme_ids, dtype=np.int64), 0)
-        text_lengths = np.array([text_array.shape[1]], dtype=np.int64)
-        scales = np.array(
-            [self.noise_scale, self.length_scale, self.noise_scale_w],
-            dtype=np.float32,
-        )
-
-        inputs: dict[str, np.ndarray] = {
-            "input": text_array,
-            "input_lengths": text_lengths,
-            "scales": scales,
-        }
-
-        # Speaker ID
-        if self._has_sid:
-            inputs["sid"] = np.array([speaker_id], dtype=np.int64)
-
-        # Language ID (auto-detect from text for multilingual models)
+        # Resolve language ID
+        language_id: int | None = None
         if self._has_lid:
             if language and language in self._language_id_map:
-                lid = self._language_id_map[language]
-            elif self._language_id_map:
-                lid = _detect_dominant_language(text, self._language_id_map)
+                language_id = self._language_id_map[language]
+            elif lid is not None:
+                language_id = lid
             else:
-                lid = 0
-            inputs["lid"] = np.array([lid], dtype=np.int64)
+                language_id = 0
 
-        # Prosody features
-        if self._has_prosody:
-            if prosody_features_data:
-                prosody_array = []
-                for pf in prosody_features_data:
-                    if pf is None:
-                        prosody_array.append([0, 0, 0])
-                    else:
-                        prosody_array.append([pf["a1"], pf["a2"], pf["a3"]])
-                inputs["prosody_features"] = np.expand_dims(
-                    np.array(prosody_array, dtype=np.int64), 0
-                )
-            else:
-                inputs["prosody_features"] = np.zeros(
-                    (1, text_array.shape[1], 3), dtype=np.int64
-                )
-
-        # Run inference
+        # Delegate to engine.synthesize
         t0 = time.perf_counter()
-        outputs = self._session.run(None, inputs)
-        audio_float = outputs[0].squeeze((0, 1))
+        audio_int16 = engine_synthesize(
+            self._session,
+            phoneme_ids,
+            config=self._config,
+            speaker_id=speaker_id,
+            language_id=language_id,
+            noise_scale=self.noise_scale,
+            length_scale=self.length_scale,
+            noise_w=self.noise_scale_w,
+            prosody_features=prosody_features_data,
+        )
         elapsed = time.perf_counter() - t0
-
-        audio_int16 = self._audio_float_to_int16(audio_float)
 
         audio_duration = len(audio_int16) / self._sample_rate
         rtf = elapsed / audio_duration if audio_duration > 0 else 0.0
@@ -352,3 +331,140 @@ class PiperPlus:
         )
 
         return audio_int16
+
+    def _phonemize(
+        self,
+        text: str,
+        *,
+        language: str | None = None,
+    ) -> tuple[list[int], list[dict | None], int | None]:
+        """Convert text to phoneme IDs, prosody data, and detected language ID.
+
+        Tries ``piper_plus_g2p`` first.  Falls back to
+        ``piper_train.infer_onnx.text_to_phoneme_ids_and_prosody`` if
+        ``piper_plus_g2p`` is not available.
+
+        Returns:
+            (phoneme_ids, prosody_features, detected_language_id)
+        """
+        effective_language = language if language else self._language
+
+        # --- Primary path: piper_plus_g2p (standalone, no piper_train) ---
+        try:
+            from piper_plus_g2p import (  # noqa: PLC0415
+                UnicodeLanguageDetector,
+                get_phonemizer,
+            )
+            from piper_plus_g2p.encode.encoder import PiperEncoder  # noqa: PLC0415
+            from piper_plus_g2p.encode.pua import map_token  # noqa: PLC0415
+        except ImportError:
+            # Fall back to piper_train path
+            return self._phonemize_via_piper_train(text, language=language)
+
+        # For multilingual models with JA input, auto-promote to
+        # multilingual phonemizer so intersperse padding is correct.
+        lang_id_map = self._language_id_map if self._has_lid else None
+        if (
+            lang_id_map
+            and "-" not in effective_language
+            and len(lang_id_map) > 1
+            and effective_language == "ja"
+        ):
+            effective_language = "-".join(sorted(lang_id_map.keys()))
+
+        phonemizer = get_phonemizer(effective_language)
+        phonemes, prosody_info_list = phonemizer.phonemize_with_prosody(text)
+
+        encoder = PiperEncoder(self._phoneme_id_map)
+
+        # JA-only models: convert tokens directly (no encoder wrapping)
+        if (language or self._language) == "ja" and (
+            not lang_id_map or len(lang_id_map) <= 1
+        ):
+            phoneme_ids: list[int] = []
+            prosody_features: list[dict | None] = []
+            for phoneme, prosody_info in zip(phonemes, prosody_info_list, strict=True):
+                mapped = map_token(phoneme)
+                for ch in mapped:
+                    if ch in self._phoneme_id_map:
+                        ids = self._phoneme_id_map[ch]
+                        phoneme_ids.extend(ids)
+                        for _ in ids:
+                            if prosody_info is not None:
+                                prosody_features.append(
+                                    {"a1": prosody_info.a1, "a2": prosody_info.a2, "a3": prosody_info.a3}
+                                )
+                            else:
+                                prosody_features.append(None)
+            return phoneme_ids, prosody_features, None
+
+        # All other languages / multilingual: use PiperEncoder
+        result_ids, result_prosody = encoder.encode_with_prosody(
+            phonemes, prosody_info_list
+        )
+        prosody_out: list[dict | None] = []
+        for p in result_prosody:
+            if p is not None:
+                prosody_out.append({"a1": p.a1, "a2": p.a2, "a3": p.a3})
+            else:
+                prosody_out.append(None)
+
+        # Detect dominant language for lid
+        detected_lid: int | None = None
+        if self._has_lid and self._language_id_map:
+            try:
+                languages = list(self._language_id_map.keys())
+                detector = UnicodeLanguageDetector(languages, default_latin_language="en")
+                context_has_kana = detector.has_kana(text)
+                counts: dict[str, int] = {}
+                for ch in text:
+                    lang = detector.detect_char(ch, context_has_kana=context_has_kana)
+                    if lang is not None:
+                        counts[lang] = counts.get(lang, 0) + 1
+                if counts:
+                    dominant = max(counts, key=lambda k: counts[k])
+                    detected_lid = self._language_id_map.get(dominant, 0)
+                else:
+                    detected_lid = self._language_id_map.get("en", 0)
+            except Exception:
+                detected_lid = 0
+
+        return result_ids, prosody_out, detected_lid
+
+    def _phonemize_via_piper_train(
+        self,
+        text: str,
+        *,
+        language: str | None = None,
+    ) -> tuple[list[int], list[dict | None], int | None]:
+        """Fallback phonemization using piper_train (legacy path)."""
+        try:
+            from piper_train.infer_onnx import (  # noqa: PLC0415
+                _detect_dominant_language,
+                text_to_phoneme_ids_and_prosody,
+            )
+        except ImportError:
+            raise ImportError(
+                "Neither piper_plus_g2p nor piper_train is installed. "
+                "Install one of: pip install piper-plus-g2p  OR  "
+                "uv pip install -e src/python"
+            ) from None
+
+        effective_language = language if language else self._language
+        lang_id_map = self._language_id_map if self._has_lid else None
+
+        phoneme_ids, prosody_data = text_to_phoneme_ids_and_prosody(
+            text,
+            self._phoneme_id_map,
+            language=effective_language,
+            language_id_map=lang_id_map,
+        )
+
+        detected_lid: int | None = None
+        if self._has_lid and self._language_id_map:
+            if language and language in self._language_id_map:
+                detected_lid = self._language_id_map[language]
+            else:
+                detected_lid = _detect_dominant_language(text, self._language_id_map)
+
+        return phoneme_ids, prosody_data, detected_lid

@@ -202,6 +202,7 @@ def benchmark_model(
     n_warmup: int = 2,
     n_runs: int = 10,
     speaker_id: int = 0,
+    threads: int | None = None,
 ) -> dict:
     """Benchmark a single ONNX model and return a metrics dict."""
 
@@ -239,7 +240,7 @@ def benchmark_model(
     sess_opts.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
     sess_opts.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
     sess_opts.inter_op_num_threads = 1
-    sess_opts.intra_op_num_threads = min(os.cpu_count() or 4, 4)
+    sess_opts.intra_op_num_threads = threads if threads is not None else min(os.cpu_count() or 4, 4)
     sess_opts.enable_cpu_mem_arena = True
     sess_opts.enable_mem_pattern = True
 
@@ -420,6 +421,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--language", type=str, default="ja", help="Test language (default: ja)")
     parser.add_argument("--text", type=str, help="Custom test text (overrides default for language)")
     parser.add_argument("--speaker-id", type=int, default=0, help="Speaker ID (default: 0)")
+    parser.add_argument("--threads", type=int, default=None, help="ORT intra_op threads (default: auto)")
 
     # Output
     parser.add_argument(
@@ -475,6 +477,7 @@ def main(argv: list[str] | None = None) -> None:
             n_warmup=args.n_warmup,
             n_runs=args.n_runs,
             speaker_id=args.speaker_id,
+            threads=args.threads,
         )
         results.append(result)
 

@@ -1,0 +1,179 @@
+{
+  "_comment": "Model resolution test vectors -- shared across Python, Rust, C#, Go implementations",
+  "_version": "1.0",
+  "_spec": "docs/spec/model-resolution.md",
+  "aliases": {
+    "tsukuyomi": {
+      "repo_id": "ayousanz/piper-plus-tsukuyomi-chan",
+      "onnx_file": "tsukuyomi-chan-6lang-fp16.onnx",
+      "config_file": "config.json"
+    },
+    "base": {
+      "repo_id": "ayousanz/piper-plus-base",
+      "onnx_file": "piper-plus-base-6lang-fp16.onnx",
+      "config_file": "config.json"
+    }
+  },
+  "voice_catalog": {
+    "_comment": "Canonical catalog entries used across implementations. Aliases and file metadata should match.",
+    "ja_JP-tsukuyomi-chan-medium": {
+      "key": "ja_JP-tsukuyomi-chan-medium",
+      "name": "tsukuyomi-chan",
+      "language_family": "ja",
+      "quality": "medium",
+      "repo_id": "ayousanz/piper-plus-tsukuyomi-chan",
+      "onnx_file": "tsukuyomi-chan-6lang-fp16.onnx",
+      "config_file": "config.json",
+      "aliases": ["tsukuyomi", "tsukuyomi-chan", "ja-tsukuyomi"]
+    },
+    "ja_JP-css10-6lang-medium": {
+      "key": "ja_JP-css10-6lang-medium",
+      "name": "css10-6lang",
+      "language_family": "ja",
+      "quality": "medium",
+      "repo_id": "ayousanz/piper-plus-css10-ja-6lang",
+      "onnx_file": "css10-ja-6lang-fp16.onnx",
+      "config_file": "config.json",
+      "aliases": ["css10", "css10-6lang", "css10-ja", "ja-css10"]
+    }
+  },
+  "test_cases": [
+    {
+      "id": "direct_file_path",
+      "input": "/path/to/model.onnx",
+      "type": "file_path",
+      "description": "Direct file path should be used as-is when the file exists"
+    },
+    {
+      "id": "alias_tsukuyomi",
+      "input": "tsukuyomi",
+      "type": "alias",
+      "expected_repo": "ayousanz/piper-plus-tsukuyomi-chan",
+      "expected_onnx": "tsukuyomi-chan-6lang-fp16.onnx",
+      "description": "Well-known alias resolves to HuggingFace repo"
+    },
+    {
+      "id": "alias_base",
+      "input": "base",
+      "type": "alias",
+      "expected_repo": "ayousanz/piper-plus-base",
+      "expected_onnx": "piper-plus-base-6lang-fp16.onnx",
+      "description": "Base model alias"
+    },
+    {
+      "id": "alias_css10",
+      "input": "css10",
+      "type": "alias",
+      "expected_repo": "ayousanz/piper-plus-css10-ja-6lang",
+      "expected_onnx": "css10-ja-6lang-fp16.onnx",
+      "description": "CSS10 model resolved via catalog alias"
+    },
+    {
+      "id": "catalog_key_exact",
+      "input": "ja_JP-tsukuyomi-chan-medium",
+      "type": "catalog_key",
+      "expected_repo": "ayousanz/piper-plus-tsukuyomi-chan",
+      "description": "Exact catalog key match (e.g., ja_JP-tsukuyomi-chan-medium)"
+    },
+    {
+      "id": "hf_repo_id",
+      "input": "ayousanz/piper-plus-tsukuyomi-chan",
+      "type": "huggingface",
+      "description": "HuggingFace repo ID (contains slash) triggers download"
+    },
+    {
+      "id": "nonexistent_alias",
+      "input": "nonexistent-model-xyz",
+      "type": "error",
+      "expected_error": "ModelNotFoundError",
+      "description": "Unknown alias with no local file should raise error"
+    },
+    {
+      "id": "empty_input",
+      "input": "",
+      "type": "error",
+      "expected_error": "ModelNotFoundError",
+      "description": "Empty string should raise error"
+    },
+    {
+      "id": "config_auto_detect_onnx_json",
+      "input_model": "/path/to/model.onnx",
+      "type": "config_detection",
+      "expected_config_patterns": [
+        "{model_path}.json",
+        "{model_dir}/config.json"
+      ],
+      "description": "Config auto-detection tries {model}.onnx.json then config.json"
+    },
+    {
+      "id": "config_explicit",
+      "input_model": "/path/to/model.onnx",
+      "input_config": "/path/to/custom-config.json",
+      "type": "config_detection",
+      "expected_config": "/path/to/custom-config.json",
+      "description": "Explicit --config parameter overrides auto-detection"
+    },
+    {
+      "id": "cached_model_subdir",
+      "input": "tsukuyomi",
+      "type": "cache_hit",
+      "cache_layout": "{cache_dir}/tsukuyomi-chan-6lang-fp16.onnx",
+      "description": "Previously downloaded model resolved from cache directory"
+    },
+    {
+      "id": "cached_model_flat",
+      "input": "tsukuyomi-6lang-v2",
+      "type": "cache_hit",
+      "cache_layout": "{cache_dir}/tsukuyomi-6lang-v2.onnx",
+      "description": "Cached model with flat layout ({name}.onnx in cache dir)"
+    },
+    {
+      "id": "directory_input",
+      "input": "/path/to/directory/",
+      "type": "error",
+      "expected_error": "ModelNotFoundError",
+      "description": "Directory path (not a file) should raise error"
+    },
+    {
+      "id": "path_traversal_rejected",
+      "input": "../../../etc/passwd",
+      "type": "error",
+      "expected_error": "ModelNotFoundError",
+      "description": "Path traversal in alias/name should be rejected"
+    },
+    {
+      "id": "ambiguous_partial_match",
+      "input": "6lang",
+      "type": "error",
+      "expected_error": "ModelNotFoundError",
+      "description": "Ambiguous partial match (matches multiple models) should fail"
+    }
+  ],
+  "resolution_order": [
+    "1. Check if input is an existing file path",
+    "2. Check if input matches a built-in alias or catalog key",
+    "3. Check if input contains '/' (treat as HuggingFace repo ID)",
+    "4. Check local cache directory for previously downloaded model",
+    "5. Raise ModelNotFoundError"
+  ],
+  "config_detection_order": [
+    "1. Explicit --config parameter (if provided)",
+    "2. {model_path}.json (e.g., model.onnx.json)",
+    "3. {model_dir}/config.json",
+    "4. Raise error"
+  ],
+  "cache_directory": {
+    "env_override": "PIPER_MODEL_DIR",
+    "platform_defaults": {
+      "linux": "$XDG_DATA_HOME/piper-plus/models or ~/.local/share/piper-plus/models",
+      "macos": "~/Library/Application Support/piper-plus/models",
+      "windows": "%APPDATA%/piper-plus/models"
+    },
+    "_note": "Python _model_resolver uses ~/.cache/piper-plus/models (huggingface_hub style). Other implementations use platform data dirs. Convergence planned."
+  },
+  "security": {
+    "path_traversal": "Reject inputs containing '..' in alias/name resolution",
+    "repo_id_format": "Must match 'owner/repo' with alphanumeric, hyphen, underscore, dot only",
+    "download_protocol": "HTTPS only (reject http:// except localhost for testing)"
+  }
+}

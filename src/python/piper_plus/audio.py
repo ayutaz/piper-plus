@@ -54,6 +54,8 @@ class AudioResult:
 
     def play(self) -> None:
         """Play audio using sounddevice (requires ``sounddevice`` package)."""
+        if len(self.audio) == 0:
+            return
         try:
             import sounddevice as sd  # noqa: PLC0415
         except ImportError:

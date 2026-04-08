@@ -25,7 +25,11 @@ jobs:
       wasm: ${{ steps.filter.outputs.wasm }}
       go: ${{ steps.filter.outputs.go }}
       docker: ${{ steps.filter.outputs.docker }}
-      ci-config: ${{ steps.filter.outputs.ci-config }}
+      ci-config-cpp: ${{ steps.filter.outputs.ci-config-cpp }}
+      ci-config-csharp: ${{ steps.filter.outputs.ci-config-csharp }}
+      ci-config-python: ${{ steps.filter.outputs.ci-config-python }}
+      ci-config-rust: ${{ steps.filter.outputs.ci-config-rust }}
+      ci-config-wasm: ${{ steps.filter.outputs.ci-config-wasm }}
       docs: ${{ steps.filter.outputs.docs }}
     steps:
       - uses: dorny/paths-filter@v3
@@ -51,15 +55,33 @@ jobs:
               - 'src/go/**'
             docker:
               - 'docker/**'
-            ci-config:
-              - '.github/workflows/**'
+            ci-config-cpp:
+              - '.github/workflows/ci.yml'
+              - '.github/workflows/_build-test-cpp.yml'
+              - '.github/workflows/cpp-tests.yml'
+              - '.github/workflows/cpp-lint.yml'
+            ci-config-csharp:
+              - '.github/workflows/ci.yml'
+              - '.github/workflows/csharp-ci.yml'
+              - '.github/workflows/csharp-build-all-platforms.yml'
+            ci-config-python:
+              - '.github/workflows/ci.yml'
+              - '.github/workflows/python-tests.yml'
+              - '.github/workflows/python-lint.yml'
+            ci-config-rust:
+              - '.github/workflows/ci.yml'
+              - '.github/workflows/rust-tests.yml'
+            ci-config-wasm:
+              - '.github/workflows/ci.yml'
+              - '.github/workflows/wasm-build.yml'
+              - '.github/workflows/npm-publish.yml'
             docs:
               - 'docs/**'
               - 'README*'
 
   cpp-tests:
     needs: [changes]
-    if: ${{ needs.changes.outputs.cpp == 'true' || needs.changes.outputs.ci-config == 'true' }}
+    if: ${{ needs.changes.outputs.cpp == 'true' || needs.changes.outputs.ci-config-cpp == 'true' }}
     uses: ./.github/workflows/_build-test-cpp.yml
     with:
       run-integration-tests: true
@@ -69,7 +91,7 @@ jobs:
 
   csharp-tests:
     needs: [changes]
-    if: ${{ needs.changes.outputs.csharp == 'true' || needs.changes.outputs.ci-config == 'true' }}
+    if: ${{ needs.changes.outputs.csharp == 'true' || needs.changes.outputs.ci-config-csharp == 'true' }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     strategy:
@@ -121,7 +143,7 @@ jobs:
   csharp-build:
     runs-on: ${{ matrix.os }}
     needs: [changes, csharp-tests]
-    if: ${{ needs.changes.outputs.csharp == 'true' || needs.changes.outputs.ci-config == 'true' }}
+    if: ${{ needs.changes.outputs.csharp == 'true' || needs.changes.outputs.ci-config-csharp == 'true' }}
     timeout-minutes: 20
     strategy:
       fail-fast: false
@@ -188,7 +210,7 @@ jobs:
 
   python-tests:
     needs: [changes]
-    if: ${{ needs.changes.outputs.python == 'true' || needs.changes.outputs.ci-config == 'true' }}
+    if: ${{ needs.changes.outputs.python == 'true' || needs.changes.outputs.ci-config-python == 'true' }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -282,7 +304,7 @@ jobs:
 
   rust-tests:
     needs: [changes]
-    if: ${{ needs.changes.outputs.rust == 'true' || needs.changes.outputs.ci-config == 'true' }}
+    if: ${{ needs.changes.outputs.rust == 'true' || needs.changes.outputs.ci-config-rust == 'true' }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -322,7 +344,7 @@ jobs:
 
   npm-package-tests:
     needs: [changes]
-    if: ${{ needs.changes.outputs.wasm == 'true' || needs.changes.outputs.rust == 'true' || needs.changes.outputs.ci-config == 'true' }}
+    if: ${{ needs.changes.outputs.wasm == 'true' || needs.changes.outputs.rust == 'true' || needs.changes.outputs.ci-config-wasm == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
@@ -374,7 +396,7 @@ jobs:
 
   lint:
     needs: [changes]
-    if: ${{ needs.changes.outputs.python == 'true' || needs.changes.outputs.ci-config == 'true' }}
+    if: ${{ needs.changes.outputs.python == 'true' || needs.changes.outputs.ci-config-python == 'true' }}
     runs-on: ubuntu-latest
 
     steps:
@@ -397,76 +419,30 @@ jobs:
       - name: Run ruff format check
         run: ruff format --check
 
-  # ---------- required status check pass-throughs ----------
-  # These jobs always run so GitHub branch-protection required checks
-  # succeed even when the real job is skipped by paths-filter.
+  # ---------- required status check (single gate) ----------
+  # This job always runs so GitHub branch-protection can use "ci-required"
+  # as the sole required check. It succeeds when every upstream job either
+  # passed or was skipped by paths-filter, and fails if any job failed.
 
-  cpp-tests-required:
+  ci-required:
     if: always()
-    needs: [cpp-tests]
+    needs:
+      - cpp-tests
+      - csharp-tests
+      - csharp-build
+      - python-tests
+      - rust-tests
+      - npm-package-tests
+      - lint
     runs-on: ubuntu-latest
     steps:
-      - run: |
-          if [[ "${{ needs.cpp-tests.result }}" == "failure" ]]; then
-            exit 1
-          fi
-
-  csharp-tests-required:
-    if: always()
-    needs: [csharp-tests]
-    runs-on: ubuntu-latest
-    steps:
-      - run: |
-          if [[ "${{ needs.csharp-tests.result }}" == "failure" ]]; then
-            exit 1
-          fi
-
-  csharp-build-required:
-    if: always()
-    needs: [csharp-build]
-    runs-on: ubuntu-latest
-    steps:
-      - run: |
-          if [[ "${{ needs.csharp-build.result }}" == "failure" ]]; then
-            exit 1
-          fi
-
-  python-tests-required:
-    if: always()
-    needs: [python-tests]
-    runs-on: ubuntu-latest
-    steps:
-      - run: |
-          if [[ "${{ needs.python-tests.result }}" == "failure" ]]; then
-            exit 1
-          fi
-
-  rust-tests-required:
-    if: always()
-    needs: [rust-tests]
-    runs-on: ubuntu-latest
-    steps:
-      - run: |
-          if [[ "${{ needs.rust-tests.result }}" == "failure" ]]; then
-            exit 1
-          fi
-
-  npm-package-tests-required:
-    if: always()
-    needs: [npm-package-tests]
-    runs-on: ubuntu-latest
-    steps:
-      - run: |
-          if [[ "${{ needs.npm-package-tests.result }}" == "failure" ]]; then
-            exit 1
-          fi
-
-  lint-required:
-    if: always()
-    needs: [lint]
-    runs-on: ubuntu-latest
-    steps:
-      - run: |
-          if [[ "${{ needs.lint.result }}" == "failure" ]]; then
-            exit 1
-          fi
+      - name: Check all job results
+        run: |
+          results=("${{ needs.cpp-tests.result }}" "${{ needs.csharp-tests.result }}" "${{ needs.csharp-build.result }}" "${{ needs.python-tests.result }}" "${{ needs.rust-tests.result }}" "${{ needs.npm-package-tests.result }}" "${{ needs.lint.result }}")
+          for result in "${results[@]}"; do
+            if [[ "$result" == "failure" ]]; then
+              echo "One or more jobs failed"
+              exit 1
+            fi
+          done
+          echo "All jobs passed or were skipped"

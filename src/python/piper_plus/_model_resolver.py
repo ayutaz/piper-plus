@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 import logging
+import shutil
+import tempfile
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -95,7 +97,9 @@ def resolve_model(
             return onnx_path, config_path
 
     raise ModelNotFoundError(
-        f"Model '{model}' not found. Available aliases: {list(MODEL_ALIASES.keys())}"
+        f"Model '{model}' not found. "
+        f"Available aliases: {', '.join(MODEL_ALIASES.keys())}. "
+        f"Or provide a file path or HuggingFace repo ID (e.g., 'user/repo')."
     )
 
 
@@ -144,7 +148,6 @@ def _download_from_hf(
         ) from None
 
     model_dir = cache_dir / repo_id.replace("/", "--")
-    model_dir.mkdir(parents=True, exist_ok=True)
 
     # Auto-detect files if not specified
     if onnx_file is None or config_file is None:
@@ -157,14 +160,54 @@ def _download_from_hf(
         if config_file is None:
             config_file = "config.json"
 
-    logger.info("Downloading %s from %s...", onnx_file, repo_id)
-    onnx_path = Path(
-        hf_hub_download(repo_id, onnx_file, local_dir=str(model_dir))
-    )
+    # If model_dir already has the files, return directly
+    if model_dir.is_dir():
+        existing_onnx = model_dir / onnx_file
+        existing_config = model_dir / config_file
+        if existing_onnx.is_file() and existing_config.is_file():
+            return existing_onnx, existing_config
 
-    logger.info("Downloading %s from %s...", config_file, repo_id)
-    config_path = Path(
-        hf_hub_download(repo_id, config_file, local_dir=str(model_dir))
-    )
+    # Download to a temporary directory first, then atomically rename
+    # to mitigate race conditions when multiple processes download
+    # the same model concurrently.
+    # Note: hf_hub_download uses requests internally; to set a download
+    # timeout, use the HF_HUB_DOWNLOAD_TIMEOUT environment variable
+    # (supported by huggingface_hub >= 0.22).
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    tmp_dir = Path(tempfile.mkdtemp(dir=cache_dir))
+    try:
+        logger.info("Downloading %s from %s...", onnx_file, repo_id)
+        onnx_path = Path(
+            hf_hub_download(
+                repo_id, onnx_file, local_dir=str(tmp_dir),
+                force_download=False, resume_download=True,
+            )
+        )
 
-    return onnx_path, config_path
+        logger.info("Downloading %s from %s...", config_file, repo_id)
+        config_path = Path(
+            hf_hub_download(
+                repo_id, config_file, local_dir=str(tmp_dir),
+                force_download=False, resume_download=True,
+            )
+        )
+
+        # Atomic move to final location
+        try:
+            tmp_dir.rename(model_dir)
+        except OSError:
+            # Another process may have already created the directory
+            if model_dir.exists():
+                shutil.rmtree(tmp_dir, ignore_errors=True)
+            else:
+                raise
+
+        # Resolve paths in the final directory
+        onnx_path = model_dir / onnx_file
+        config_path = model_dir / config_file
+        return onnx_path, config_path
+
+    except Exception:
+        # Clean up temp dir on any failure
+        shutil.rmtree(tmp_dir, ignore_errors=True)
+        raise
