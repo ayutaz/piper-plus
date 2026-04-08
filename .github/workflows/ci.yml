@@ -13,7 +13,53 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+    outputs:
+      python: ${{ steps.filter.outputs.python }}
+      rust: ${{ steps.filter.outputs.rust }}
+      csharp: ${{ steps.filter.outputs.csharp }}
+      cpp: ${{ steps.filter.outputs.cpp }}
+      wasm: ${{ steps.filter.outputs.wasm }}
+      go: ${{ steps.filter.outputs.go }}
+      docker: ${{ steps.filter.outputs.docker }}
+      ci-config: ${{ steps.filter.outputs.ci-config }}
+      docs: ${{ steps.filter.outputs.docs }}
+    steps:
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            python:
+              - 'src/python/**'
+              - 'pyproject.toml'
+              - 'uv.lock'
+            rust:
+              - 'src/rust/**'
+            csharp:
+              - 'src/csharp/**'
+            cpp:
+              - 'src/cpp/**'
+              - 'CMakeLists.txt'
+              - 'cmake/**'
+            wasm:
+              - 'src/wasm/**'
+              - 'src/rust/piper-wasm/**'
+            go:
+              - 'src/go/**'
+            docker:
+              - 'docker/**'
+            ci-config:
+              - '.github/workflows/**'
+            docs:
+              - 'docs/**'
+              - 'README*'
+
   cpp-tests:
+    needs: [changes]
+    if: ${{ needs.changes.outputs.cpp == 'true' || needs.changes.outputs.ci-config == 'true' }}
     uses: ./.github/workflows/_build-test-cpp.yml
     with:
       run-integration-tests: true
@@ -22,6 +68,8 @@ jobs:
       timeout-minutes: 25
 
   csharp-tests:
+    needs: [changes]
+    if: ${{ needs.changes.outputs.csharp == 'true' || needs.changes.outputs.ci-config == 'true' }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     strategy:
@@ -72,7 +120,8 @@ jobs:
 
   csharp-build:
     runs-on: ${{ matrix.os }}
-    needs: csharp-tests
+    needs: [changes, csharp-tests]
+    if: ${{ needs.changes.outputs.csharp == 'true' || needs.changes.outputs.ci-config == 'true' }}
     timeout-minutes: 20
     strategy:
       fail-fast: false
@@ -138,6 +187,8 @@ jobs:
           retention-days: 7
 
   python-tests:
+    needs: [changes]
+    if: ${{ needs.changes.outputs.python == 'true' || needs.changes.outputs.ci-config == 'true' }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -230,6 +281,8 @@ jobs:
           name: Python ${{ matrix.python-version }} - ${{ runner.os }}
 
   rust-tests:
+    needs: [changes]
+    if: ${{ needs.changes.outputs.rust == 'true' || needs.changes.outputs.ci-config == 'true' }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -268,6 +321,8 @@ jobs:
         run: cargo check -p piper-plus-python
 
   npm-package-tests:
+    needs: [changes]
+    if: ${{ needs.changes.outputs.wasm == 'true' || needs.changes.outputs.rust == 'true' || needs.changes.outputs.ci-config == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
@@ -318,6 +373,8 @@ jobs:
         run: npm run test:npm-package:all
 
   lint:
+    needs: [changes]
+    if: ${{ needs.changes.outputs.python == 'true' || needs.changes.outputs.ci-config == 'true' }}
     runs-on: ubuntu-latest
 
     steps:
@@ -339,3 +396,77 @@ jobs:
       
       - name: Run ruff format check
         run: ruff format --check
+
+  # ---------- required status check pass-throughs ----------
+  # These jobs always run so GitHub branch-protection required checks
+  # succeed even when the real job is skipped by paths-filter.
+
+  cpp-tests-required:
+    if: always()
+    needs: [cpp-tests]
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          if [[ "${{ needs.cpp-tests.result }}" == "failure" ]]; then
+            exit 1
+          fi
+
+  csharp-tests-required:
+    if: always()
+    needs: [csharp-tests]
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          if [[ "${{ needs.csharp-tests.result }}" == "failure" ]]; then
+            exit 1
+          fi
+
+  csharp-build-required:
+    if: always()
+    needs: [csharp-build]
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          if [[ "${{ needs.csharp-build.result }}" == "failure" ]]; then
+            exit 1
+          fi
+
+  python-tests-required:
+    if: always()
+    needs: [python-tests]
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          if [[ "${{ needs.python-tests.result }}" == "failure" ]]; then
+            exit 1
+          fi
+
+  rust-tests-required:
+    if: always()
+    needs: [rust-tests]
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          if [[ "${{ needs.rust-tests.result }}" == "failure" ]]; then
+            exit 1
+          fi
+
+  npm-package-tests-required:
+    if: always()
+    needs: [npm-package-tests]
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          if [[ "${{ needs.npm-package-tests.result }}" == "failure" ]]; then
+            exit 1
+          fi
+
+  lint-required:
+    if: always()
+    needs: [lint]
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          if [[ "${{ needs.lint.result }}" == "failure" ]]; then
+            exit 1
+          fi

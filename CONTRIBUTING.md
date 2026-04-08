@@ -64,52 +64,117 @@ repos:
 
 ## Code Style
 
-- Python code follows PEP 8 with a line length of 88 characters (Black default)
+### Python
+
+- Formatter: `ruff format`
+- Linter: `ruff check`
+- No Black, no isort (Ruff handles both)
+- Line length: 88 characters
 - Use type hints where possible
 - Write docstrings for all public functions and classes
 - Keep functions focused and modular
 
-## Testing
+### Rust
 
-Run tests before submitting PRs:
+- `cargo fmt` and `cargo clippy`
+
+### C#
+
+- Follow existing code style (no editorconfig enforced yet)
+
+### Go
+
+- `gofmt` and `go vet`
+
+## Running Tests
+
+Run tests before submitting PRs. Each platform has its own test suite:
+
+### Python
 
 ```bash
-# Run tests for piper_train
-cd src/python
-python -m pytest
+# piper_train tests
+uv run pytest src/python/tests/ -v
 
-# Run tests for piper runtime
-cd src/python_run
-python -m pytest
+# G2P tests
+uv run pytest src/python/g2p/tests/ -v
+
+# piper runtime tests
+cd src/python_run && uv run python -m pytest
+```
+
+### Rust
+
+```bash
+cd src/rust && cargo test --workspace
+```
+
+### C#
+
+```bash
+dotnet test src/csharp/PiperPlus.Core.Tests/
+```
+
+### C++ (requires build)
+
+```bash
+mkdir build && cd build && cmake .. && cmake --build .
+ctest --output-on-failure
+```
+
+### Go
+
+```bash
+cd src/go && go test ./...
+```
+
+### WASM/npm
+
+```bash
+cd src/wasm/openjtalk-web && node --test test/js/
 ```
 
 ## License Policy
 
-piper-plus is licensed under the **MIT License**. All contributions and dependencies must be compatible with this license.
+piper-plus is MIT licensed. **All contributions must be compatible with the MIT license.**
 
-### Prohibited Dependencies
-
-- **GPL / LGPL libraries are not allowed.** In particular, **espeak-ng** (GPL-3.0) must not be used as a dependency in any part of the project.
-- Any library licensed under GPL-2.0, GPL-3.0, AGPL, or similar copyleft licenses is prohibited.
-
-### Acceptable Licenses
+### Allowed Licenses
 
 When adding a new dependency, verify that it uses one of the following (or similarly permissive) licenses:
 
-- MIT
-- Apache-2.0
-- BSD-2-Clause / BSD-3-Clause
-- ISC
-- Zlib
+- MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC, Zlib, CC0-1.0
+
+### Prohibited Licenses
+
+The following licenses are **not allowed**:
+
+- GPL, LGPL, AGPL (any version)
+- SSPL, BSL, Commons Clause
+
+### espeak-ng Policy
+
+piper-plus does **NOT** depend on espeak-ng. This is a deliberate design decision to avoid GPL contamination. **Do not introduce espeak-ng as a dependency in any form** (direct, transitive, or optional).
 
 ### Rationale
 
 piper-plus is designed for commercial and embedded use. GPL dependencies would impose copyleft obligations ("GPL contamination") on downstream users, which is incompatible with the project's goals.
 
-### What to Do
+### Checking Dependencies
 
-- Before submitting a PR that adds a new dependency, check its license.
-- If you are unsure whether a license is compatible, ask in the PR or open an issue.
+Before adding a new dependency, verify its license:
+
+```bash
+# Python
+pip-licenses --from=mixed --with-system | grep <package>
+
+# Rust
+cargo license -d | grep <crate>
+
+# npm
+npx license-checker --summary
+```
+
+If you are unsure whether a license is compatible, ask in the PR or open an issue.
 
 ## Adding New Language Support
 
@@ -143,6 +208,20 @@ Each implementation should:
 ### Reference
 
 See existing implementations (e.g., `spanish.py`, `french.py`) for examples of rule-based phonemizers with no external dependencies.
+
+## Your First Pull Request
+
+1. Fork the repository and create a branch from `dev`
+2. Make your changes in the appropriate `src/<language>/` directory
+3. Add or update tests
+4. Run the relevant test suite (see [Running Tests](#running-tests))
+5. Ensure `ruff check` and `ruff format --check` pass for Python changes
+6. Create a PR against the `dev` branch
+7. Ensure all CI checks pass
+
+### Good First Issues
+
+Look for issues labeled [`good first issue`](https://github.com/ayutaz/piper-plus/labels/good%20first%20issue) for beginner-friendly tasks.
 
 ## Pull Requests
 
