@@ -85,9 +85,181 @@ jobs:
           name: ${{ matrix.artifact }}
           path: ${{ github.workspace }}/${{ matrix.artifact }}.${{ matrix.archive_ext }}
 
+  build-ios:
+    name: Build iOS arm64
+    runs-on: macos-14
+    timeout-minutes: 30
+    env:
+      ONNXRUNTIME_VERSION: "1.17.0"
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+
+      - name: Validate version tag
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        run: |
+          TAG="${GITHUB_REF#refs/tags/v}"
+          if ! echo "$TAG" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+'; then
+            echo "::error::Invalid version tag: v$TAG"
+            exit 1
+          fi
+          echo "Version: $TAG"
+
+      - name: Download ONNX Runtime iOS
+        run: |
+          curl -L -o onnxruntime-ios.zip \
+            "https://github.com/microsoft/onnxruntime/releases/download/v${ONNXRUNTIME_VERSION}/onnxruntime-ios-xcframework-${ONNXRUNTIME_VERSION}.zip"
+          unzip -q onnxruntime-ios.zip -d onnxruntime-ios
+          # Locate the ios-arm64 static library inside the xcframework
+          ORT_FW_DIR=$(find onnxruntime-ios -name "onnxruntime.xcframework" -type d | head -1)
+          echo "ORT_FW_DIR=${ORT_FW_DIR}"
+          ls -la "${ORT_FW_DIR}/"
+          # Extract the ios-arm64 slice directory
+          IOS_SLICE=$(find "${ORT_FW_DIR}" -type d -name "ios-arm64" | head -1)
+          if [ -z "${IOS_SLICE}" ]; then
+            # Fallback: look for ios-arm64_arm64e or similar
+            IOS_SLICE=$(find "${ORT_FW_DIR}" -type d -name "ios-arm64*" | head -1)
+          fi
+          echo "IOS_SLICE=${IOS_SLICE}"
+          # Prepare ORT directory structure for CMake
+          mkdir -p ort-ios/lib ort-ios/include
+          # Copy headers from the xcframework
+          HEADER_DIR=$(find onnxruntime-ios -name "onnxruntime_cxx_api.h" -exec dirname {} \; | head -1)
+          if [ -n "${HEADER_DIR}" ]; then
+            cp -R "${HEADER_DIR}/"* ort-ios/include/
+          fi
+          # Copy the static library
+          ORT_LIB=$(find "${IOS_SLICE}" -name "libonnxruntime.a" -o -name "onnxruntime.a" | head -1)
+          if [ -z "${ORT_LIB}" ]; then
+            # xcframework may package as a framework bundle
+            ORT_LIB=$(find "${IOS_SLICE}" -name "onnxruntime" -not -name "*.framework" | head -1)
+          fi
+          echo "ORT_LIB=${ORT_LIB}"
+          cp "${ORT_LIB}" ort-ios/lib/libonnxruntime.a
+          echo "ORT_IOS_DIR=${{ github.workspace }}/ort-ios" >> "$GITHUB_ENV"
+          echo "ORT_IOS_LIB=${{ github.workspace }}/ort-ios/lib/libonnxruntime.a" >> "$GITHUB_ENV"
+
+      - name: Configure CMake (iOS)
+        run: |
+          cmake -B build-ios \
+            -DCMAKE_TOOLCHAIN_FILE=cmake/ios.toolchain.cmake \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_OSX_ARCHITECTURES=arm64 \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=15.0 \
+            -DPIPER_PLUS_BUILD_SHARED=ON \
+            -DBUILD_SHARED_LIBS=OFF \
+            -DONNXRUNTIME_DIR="${ORT_IOS_DIR}" \
+            -DONNXRUNTIME_LIB="${ORT_IOS_LIB}" \
+            -DONNXRUNTIME_INCLUDE_DIR="${ORT_IOS_DIR}/include"
+
+      - name: Build (iOS)
+        run: cmake --build build-ios --config Release -j$(sysctl -n hw.ncpu)
+
+      - name: Package
+        run: |
+          mkdir -p artifacts/lib artifacts/include
+          cp build-ios/libpiper_plus.a artifacts/lib/
+          cp src/cpp/piper_plus.h artifacts/include/
+          cd artifacts
+          tar -czf ${{ github.workspace }}/libpiper_plus-ios-arm64.tar.gz .
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: libpiper_plus-ios-arm64
+          path: libpiper_plus-ios-arm64.tar.gz
+
+  build-android:
+    name: Build Android arm64-v8a
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      ONNXRUNTIME_VERSION: "1.17.0"
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+
+      - name: Validate version tag
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        run: |
+          TAG="${GITHUB_REF#refs/tags/v}"
+          if ! echo "$TAG" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+'; then
+            echo "::error::Invalid version tag: v$TAG"
+            exit 1
+          fi
+          echo "Version: $TAG"
+
+      - name: Setup Android NDK
+        uses: nttld/setup-ndk@v1
+        id: setup-ndk
+        with:
+          ndk-version: r26c
+
+      - name: Download ONNX Runtime Android
+        run: |
+          curl -L -o onnxruntime-android.aar \
+            "https://repo1.maven.org/maven2/com/microsoft/onnxruntime/onnxruntime-android/${ONNXRUNTIME_VERSION}/onnxruntime-android-${ONNXRUNTIME_VERSION}.aar"
+          unzip -q onnxruntime-android.aar -d onnxruntime-android
+          # Prepare ORT directory structure for CMake
+          mkdir -p ort-android/lib ort-android/include
+          # Copy arm64-v8a shared library
+          cp onnxruntime-android/jni/arm64-v8a/libonnxruntime.so ort-android/lib/
+          # Copy headers
+          HEADER_DIR=$(find onnxruntime-android -name "onnxruntime_cxx_api.h" -exec dirname {} \; | head -1)
+          if [ -n "${HEADER_DIR}" ]; then
+            cp -R "${HEADER_DIR}/"* ort-android/include/
+          else
+            # AAR may store headers in headers/ directory
+            HEADER_DIR2=$(find onnxruntime-android -type d -name "headers" | head -1)
+            if [ -n "${HEADER_DIR2}" ]; then
+              cp -R "${HEADER_DIR2}/"* ort-android/include/
+            fi
+          fi
+          echo "ORT_ANDROID_DIR=${{ github.workspace }}/ort-android" >> "$GITHUB_ENV"
+          echo "ORT_ANDROID_LIB=${{ github.workspace }}/ort-android/lib/libonnxruntime.so" >> "$GITHUB_ENV"
+
+      - name: Configure CMake (Android)
+        env:
+          ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
+        run: |
+          cmake -B build-android \
+            -DCMAKE_TOOLCHAIN_FILE="${ANDROID_NDK_HOME}/build/cmake/android.toolchain.cmake" \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DANDROID_ABI=arm64-v8a \
+            -DANDROID_PLATFORM=android-24 \
+            -DPIPER_PLUS_BUILD_SHARED=ON \
+            -DONNXRUNTIME_DIR="${ORT_ANDROID_DIR}" \
+            -DONNXRUNTIME_LIB="${ORT_ANDROID_LIB}" \
+            -DONNXRUNTIME_INCLUDE_DIR="${ORT_ANDROID_DIR}/include"
+
+      - name: Build (Android)
+        run: cmake --build build-android --config Release -j$(nproc)
+
+      - name: Package
+        run: |
+          mkdir -p artifacts/lib artifacts/include
+          cp build-android/libpiper_plus.so artifacts/lib/
+          cp src/cpp/piper_plus.h artifacts/include/
+          # Include ONNX Runtime shared library for Android
+          cp "${ORT_ANDROID_LIB}" artifacts/lib/
+          cd artifacts
+          tar -czf ${{ github.workspace }}/libpiper_plus-android-arm64-v8a.tar.gz .
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: libpiper_plus-android-arm64-v8a
+          path: libpiper_plus-android-arm64-v8a.tar.gz
+
   release:
     name: Create Release
-    needs: build-shared
+    needs: [build-shared, build-ios, build-android]
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     steps:
@@ -95,6 +267,21 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           path: artifacts/
+
+      - name: Rename mobile artifacts with version
+        shell: bash
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          # Rename iOS artifact
+          if [ -f artifacts/libpiper_plus-ios-arm64/libpiper_plus-ios-arm64.tar.gz ]; then
+            mv artifacts/libpiper_plus-ios-arm64/libpiper_plus-ios-arm64.tar.gz \
+               artifacts/libpiper_plus-ios-arm64/libpiper_plus-ios-arm64-${TAG}.tar.gz
+          fi
+          # Rename Android artifact
+          if [ -f artifacts/libpiper_plus-android-arm64-v8a/libpiper_plus-android-arm64-v8a.tar.gz ]; then
+            mv artifacts/libpiper_plus-android-arm64-v8a/libpiper_plus-android-arm64-v8a.tar.gz \
+               artifacts/libpiper_plus-android-arm64-v8a/libpiper_plus-android-arm64-v8a-${TAG}.tar.gz
+          fi
 
       - name: Generate checksums
         shell: bash

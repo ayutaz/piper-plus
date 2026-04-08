@@ -113,6 +113,14 @@ export class PiperPlus {
   /** Synthesize speech from text. */
   synthesize(text: string, options?: SynthesizeOptions): Promise<AudioResult>;
 
+  /**
+   * Synthesize speech with voice cloning from a speaker embedding.
+   * @param text - Text to synthesize.
+   * @param speakerEmbedding - Speaker embedding from SpeakerEncoder.encode().
+   * @param options - Synthesis options (same as synthesize).
+   */
+  synthesizeWithVoiceCloning(text: string, speakerEmbedding: Float32Array, options?: SynthesizeOptions): Promise<AudioResult>;
+
   /** Streaming synthesis -- splits text into sentences and invokes onChunk for each chunk. */
   synthesizeStreaming(text: string, options?: StreamingSynthesizeOptions): Promise<void>;
 
@@ -169,6 +177,44 @@ export interface ModelManagerOptions {
   /** IndexedDB database name for caching. Default: 'piper-plus-models'. */
   cachePrefix?: string;
 }
+
+// ---------------------------------------------------------------------------
+// SpeakerEncoder
+// ---------------------------------------------------------------------------
+
+/** Options for SpeakerEncoder.initialize(). */
+export interface SpeakerEncoderOptions {
+  /** URL to the speaker encoder ONNX model. */
+  modelUrl: string;
+  /** onnxruntime-web instance (defaults to globalThis.ort). */
+  ort?: any;
+}
+
+/**
+ * Speaker encoder for voice cloning.
+ * Loads an ECAPA-TDNN ONNX model and extracts speaker embeddings from audio.
+ */
+export class SpeakerEncoder {
+  private constructor();
+
+  /** Initialize the speaker encoder with an ONNX model. */
+  static initialize(options: SpeakerEncoderOptions): Promise<SpeakerEncoder>;
+
+  /**
+   * Encode audio into a speaker embedding vector.
+   * @param audio - AudioBuffer (first channel, auto-resampled) or Float32Array (mono 16kHz).
+   * @param sampleRate - Sample rate when audio is Float32Array (default: 16000).
+   * @returns Speaker embedding (typically 256-d Float32Array).
+   */
+  encode(audio: AudioBuffer | Float32Array, sampleRate?: number): Promise<Float32Array>;
+
+  /** Release resources held by this encoder. */
+  dispose(): void;
+}
+
+// ---------------------------------------------------------------------------
+// ModelManager
+// ---------------------------------------------------------------------------
 
 /** Result returned by ModelManager.loadModel() and getFromCache(). */
 export interface ModelLoadResult {

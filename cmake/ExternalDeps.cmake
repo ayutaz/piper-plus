@@ -11,8 +11,11 @@ if(NOT DEFINED FMT_DIR)
 
   include(ExternalProject)
   # Pass architecture settings to external projects
-  if(APPLE)
-    # Apple Silicon (arm64) only
+  if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+    # iOS: EXTERNAL_CMAKE_ARGS already set by CompilerSettings.cmake
+    # (no-op here, avoid overriding with macOS settings)
+  elseif(APPLE)
+    # macOS: Apple Silicon (arm64) only
     set(EXTERNAL_CMAKE_ARGS -DCMAKE_OSX_ARCHITECTURES=arm64)
   else()
     set(EXTERNAL_CMAKE_ARGS "")

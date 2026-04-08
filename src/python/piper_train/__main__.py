@@ -228,6 +228,27 @@ def create_parser():
         help="Freeze Duration Predictor parameters during training. "
         "Use for fine-tuning to prevent duration prediction degradation.",
     )
+    # VITS2 Duration Discriminator
+    parser.add_argument(
+        "--vits2",
+        action="store_true",
+        default=False,
+        help="Enable VITS2 adversarial Duration Predictor training. "
+        "Adds a Duration Discriminator for adversarial DP learning. "
+        "ONNX output remains VITS1-compatible (discriminator excluded).",
+    )
+    parser.add_argument(
+        "--dur-disc-lr",
+        type=float,
+        default=2e-4,
+        help="Learning rate for the VITS2 Duration Discriminator (default: 2e-4).",
+    )
+    parser.add_argument(
+        "--lambda-dur",
+        type=float,
+        default=1.0,
+        help="Weight for the VITS2 adversarial duration loss (default: 1.0).",
+    )
     # Trainer arguments
     parser.add_argument("--accelerator", default="gpu", help="Accelerator to use")
     parser.add_argument("--devices", type=int, default=1, help="Number of devices")

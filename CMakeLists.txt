@@ -60,7 +60,7 @@ include(cmake/PiperLink.cmake)
 include(cmake/PiperPlusShared.cmake)
 
 # ==== Add test subdirectory (after all ExternalProject targets are defined) ====
-if(BUILD_TESTS AND NOT ANDROID)
+if(BUILD_TESTS AND NOT ANDROID AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
   if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/cpp/tests")
     add_subdirectory(src/cpp/tests)
   endif()

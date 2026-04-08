@@ -3,3 +3,6 @@ contact_links:
   - name: GitHub Discussions
     url: https://github.com/ayutaz/piper-plus/discussions
     about: Ask questions, share ideas, or start a discussion.
+  - name: Model Contribution Guide
+    url: https://github.com/ayutaz/piper-plus/blob/dev/CONTRIBUTING_MODELS.md
+    about: Read the guide before submitting or requesting a model.

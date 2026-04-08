@@ -47,6 +47,9 @@ public sealed class PiperModel : IDisposable
         // Detect duration output capability (mirrors C++ piper.cpp:loadModel).
         HasDurationOutput = _session.OutputMetadata.ContainsKey("durations");
 
+        // Detect voice cloning capability (speaker_embedding + speaker_embedding_mask).
+        HasSpeakerEmbedding = _session.InputMetadata.ContainsKey("speaker_embedding");
+
         SampleRate = config.Audio.SampleRate;
     }
 
@@ -78,6 +81,12 @@ public sealed class PiperModel : IDisposable
     /// Mirrors <c>hasDurationOutput</c> in the C++ implementation (<c>piper.cpp</c>).
     /// </summary>
     public bool HasDurationOutput { get; }
+
+    /// <summary>
+    /// <c>true</c> when the model accepts <c>speaker_embedding</c> (float32)
+    /// and <c>speaker_embedding_mask</c> (int64) inputs for voice cloning.
+    /// </summary>
+    public bool HasSpeakerEmbedding { get; }
 
     /// <summary>
     /// Audio sample rate in Hz, sourced from the accompanying config.json.

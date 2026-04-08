@@ -11,6 +11,7 @@ from .registry import (
     get_phonemizer,
     register_language,
 )
+from .ssml import SSMLParser, SSMLSegment
 
 __all__ = [
     "__version__",
@@ -20,6 +21,8 @@ __all__ = [
     "ProsodyInfo",
     "MultilingualPhonemizer",
     "UnicodeLanguageDetector",
+    "SSMLParser",
+    "SSMLSegment",
     "get_phonemizer",
     "register_language",
     "available_languages",

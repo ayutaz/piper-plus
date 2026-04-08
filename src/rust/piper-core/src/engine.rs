@@ -37,6 +37,10 @@ pub struct SynthesisRequest {
     pub noise_scale: f32,
     pub length_scale: f32,
     pub noise_w: f32,
+    /// Speaker embedding vector from a speaker encoder model (voice cloning).
+    /// When provided, this overrides `speaker_id` for voice conditioning.
+    /// Typical dimension: 256 floats (ECAPA-TDNN output).
+    pub speaker_embedding: Option<Vec<f32>>,
 }
 
 impl Default for SynthesisRequest {
@@ -49,6 +53,7 @@ impl Default for SynthesisRequest {
             noise_scale: 0.667,
             length_scale: 1.0,
             noise_w: 0.8,
+            speaker_embedding: None,
         }
     }
 }
@@ -84,6 +89,9 @@ pub struct ModelCapabilities {
     pub has_lid: bool,
     pub has_prosody: bool,
     pub has_duration_output: bool,
+    /// Whether the model accepts `speaker_embedding` (float32) and
+    /// `speaker_embedding_mask` (int64) inputs for voice cloning.
+    pub has_speaker_embedding: bool,
 }
 
 /// ONNX 推論エンジン
@@ -267,6 +275,7 @@ impl OnnxEngine {
             has_lid: has_input("lid"),
             has_prosody: has_input("prosody_features"),
             has_duration_output: has_output("durations"),
+            has_speaker_embedding: has_input("speaker_embedding"),
         };
 
         tracing::info!(
@@ -275,11 +284,12 @@ impl OnnxEngine {
             output_names,
         );
         tracing::info!(
-            "Capabilities: sid={}, lid={}, prosody={}, durations={}",
+            "Capabilities: sid={}, lid={}, prosody={}, durations={}, speaker_embedding={}",
             capabilities.has_sid,
             capabilities.has_lid,
             capabilities.has_prosody,
             capabilities.has_duration_output,
+            capabilities.has_speaker_embedding,
         );
 
         Ok(Self {
@@ -308,6 +318,8 @@ impl OnnxEngine {
     /// 4. `sid` (条件付き): int64 \[1\] -- has_sid が true のとき
     /// 5. `lid` (条件付き): int64 \[1\] -- has_lid が true のとき
     /// 6. `prosody_features` (条件付き): int64 \[1, phoneme_length, 3\]
+    /// 7. `speaker_embedding` (条件付き): float32 \[1, embedding_dim\] -- voice cloning
+    /// 8. `speaker_embedding_mask` (条件付き): int64 \[1\] -- 1 if embedding active
     ///
     /// ONNX 出力:
     /// - `output`: float32 \[1, 1, audio_samples\]
@@ -386,9 +398,43 @@ impl OnnxEngine {
             None
         };
 
+        // 7. speaker_embedding: float32 [1, embedding_dim] (条件付き)
+        // 8. speaker_embedding_mask: int64 [1] (条件付き, 1 = embedding active)
+        let speaker_emb_tensor = if self.capabilities.has_speaker_embedding {
+            if let Some(ref emb) = request.speaker_embedding {
+                let emb_dim = emb.len();
+                Some(
+                    Tensor::from_array(([1_usize, emb_dim], emb.to_vec().into_boxed_slice()))
+                        .map_err(|e| {
+                            PiperError::Inference(format!("speaker_embedding tensor: {e}"))
+                        })?,
+                )
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        let speaker_emb_mask_tensor = if self.capabilities.has_speaker_embedding {
+            let mask_val: i64 = if request.speaker_embedding.is_some() {
+                1
+            } else {
+                0
+            };
+            Some(
+                Tensor::from_array(([1_usize], vec![mask_val].into_boxed_slice()))
+                    .map_err(|e| {
+                        PiperError::Inference(format!("speaker_embedding_mask tensor: {e}"))
+                    })?,
+            )
+        } else {
+            None
+        };
+
         // ValueMap を構築
         let mut inputs: Vec<(Cow<str>, ort::session::SessionInputValue<'_>)> =
-            Vec::with_capacity(6);
+            Vec::with_capacity(8);
 
         inputs.push(("input".into(), (&input_tensor).into()));
         inputs.push(("input_lengths".into(), (&lengths_tensor).into()));
@@ -402,6 +448,12 @@ impl OnnxEngine {
         }
         if let Some(ref t) = prosody_tensor {
             inputs.push(("prosody_features".into(), t.into()));
+        }
+        if let Some(ref t) = speaker_emb_tensor {
+            inputs.push(("speaker_embedding".into(), t.into()));
+        }
+        if let Some(ref t) = speaker_emb_mask_tensor {
+            inputs.push(("speaker_embedding_mask".into(), t.into()));
         }
 
         // --- 推論実行 ---
@@ -553,6 +605,7 @@ mod tests {
             has_lid: false,
             has_prosody: true,
             has_duration_output: false,
+            has_speaker_embedding: false,
         };
         let debug = format!("{:?}", caps);
         assert!(debug.contains("has_sid: true"));
@@ -610,6 +663,7 @@ mod tests {
             noise_scale: 0.333,
             length_scale: 1.5,
             noise_w: 0.5,
+            speaker_embedding: None,
         };
         assert_eq!(req.phoneme_ids.len(), 5);
         assert_eq!(req.speaker_id, Some(42));
@@ -629,11 +683,13 @@ mod tests {
             has_lid: true,
             has_prosody: true,
             has_duration_output: true,
+            has_speaker_embedding: true,
         };
         assert!(caps.has_sid);
         assert!(caps.has_lid);
         assert!(caps.has_prosody);
         assert!(caps.has_duration_output);
+        assert!(caps.has_speaker_embedding);
     }
 
     #[test]
@@ -643,11 +699,13 @@ mod tests {
             has_lid: false,
             has_prosody: false,
             has_duration_output: false,
+            has_speaker_embedding: false,
         };
         assert!(!caps.has_sid);
         assert!(!caps.has_lid);
         assert!(!caps.has_prosody);
         assert!(!caps.has_duration_output);
+        assert!(!caps.has_speaker_embedding);
     }
 
     // -----------------------------------------------------------------------

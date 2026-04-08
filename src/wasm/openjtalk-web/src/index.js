@@ -17,6 +17,7 @@ export { AudioBackendFactory } from './audio-backend-factory.js';
 export { CacheManager } from './cache-manager.js';
 export { ModelManager } from './model-manager.js';
 export { AudioResult } from './audio-result.js';
+export { SpeakerEncoder } from './speaker-encoder.js';
 
 // ---------------------------------------------------------------------------
 // Imports used by PiperPlus
@@ -123,6 +124,53 @@ export class PiperPlus {
       lengthScale,
       noiseW,
       language,
+    });
+
+    // 3. Wrap result
+    const sampleRate = this._config.audio?.sample_rate ?? DEFAULT_SAMPLE_RATE;
+    return new AudioResult(audioData, sampleRate);
+  }
+
+  /**
+   * Synthesize speech with voice cloning from a reference audio.
+   *
+   * Requires a SpeakerEncoder to have been initialized separately.
+   * The reference audio is encoded into a speaker embedding, which
+   * is then passed to the ONNX model during inference.
+   *
+   * @param {string} text - Text to synthesize.
+   * @param {Float32Array} speakerEmbedding - Speaker embedding from SpeakerEncoder.encode().
+   * @param {Object} [options] - Same options as synthesize().
+   * @returns {Promise<AudioResult>}
+   */
+  async synthesizeWithVoiceCloning(text, speakerEmbedding, options = {}) {
+    this._assertReady();
+    if (this._warmupPromise) {
+      await this._warmupPromise;
+      this._warmupPromise = null;
+    }
+    if (!text) {
+      throw new Error('text is required');
+    }
+    if (!speakerEmbedding || !(speakerEmbedding instanceof Float32Array)) {
+      throw new Error('speakerEmbedding must be a Float32Array');
+    }
+
+    const language = options.language || this._detectLanguage(text);
+    const noiseScale = options.noiseScale ?? this._config.inference?.noise_scale ?? DEFAULT_NOISE_SCALE;
+    const lengthScale = options.lengthScale ?? this._config.inference?.length_scale ?? DEFAULT_LENGTH_SCALE;
+    const noiseW = options.noiseW ?? this._config.inference?.noise_w ?? DEFAULT_NOISE_W;
+
+    // 1. Phonemize
+    const { phonemeIds, prosodyFeatures } = await this._textToPhonemeIds(text, language);
+
+    // 2. ONNX inference with speaker embedding
+    const audioData = await this._infer(phonemeIds, prosodyFeatures, {
+      noiseScale,
+      lengthScale,
+      noiseW,
+      language,
+      speakerEmbedding,
     });
 
     // 3. Wrap result
@@ -368,7 +416,7 @@ export class PiperPlus {
    * Returns raw Float32Array of audio samples.
    * @private
    */
-  async _infer(phonemeIds, prosodyFeatures, { noiseScale, lengthScale, noiseW, language }) {
+  async _infer(phonemeIds, prosodyFeatures, { noiseScale, lengthScale, noiseW, language, speakerEmbedding }) {
     const ort = this._ort;
 
     const inputTensor = new ort.Tensor(
@@ -405,6 +453,20 @@ export class PiperPlus {
           [1]
         );
       }
+    }
+
+    // Attach speaker embedding for voice cloning
+    if (speakerEmbedding && speakerEmbedding.length > 0) {
+      feeds.speaker_embedding = new ort.Tensor(
+        'float32',
+        speakerEmbedding,
+        [1, speakerEmbedding.length]
+      );
+      feeds.speaker_embedding_mask = new ort.Tensor(
+        'int64',
+        new BigInt64Array([1n]),
+        [1]
+      );
     }
 
     // Attach prosody features when the model supports them

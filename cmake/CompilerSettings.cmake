@@ -50,8 +50,22 @@ if(ANDROID)
   )
 endif()
 
-# ARM64-specific optimizations (skip on Android -- NDK toolchain sets its own flags)
-if(NOT ANDROID AND CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|ARM64")
+# ---- iOS cross-compilation support ----
+if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+  message(STATUS "iOS cross-compilation: arch=${CMAKE_OSX_ARCHITECTURES}, target=${CMAKE_OSX_DEPLOYMENT_TARGET}")
+  # Force HTS Engine stub (autotools not feasible for iOS)
+  set(USE_HTS_ENGINE_STUB ON CACHE BOOL "Force HTS Engine stub on iOS" FORCE)
+  # Propagate iOS settings to ExternalProject_Add calls
+  set(EXTERNAL_CMAKE_ARGS
+    -DCMAKE_SYSTEM_NAME=iOS
+    -DCMAKE_OSX_ARCHITECTURES=${CMAKE_OSX_ARCHITECTURES}
+    -DCMAKE_OSX_DEPLOYMENT_TARGET=${CMAKE_OSX_DEPLOYMENT_TARGET}
+    -DCMAKE_POSITION_INDEPENDENT_CODE=ON
+  )
+endif()
+
+# ARM64-specific optimizations (skip on Android/iOS -- their toolchains set own flags)
+if(NOT ANDROID AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS" AND CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|ARM64")
   message(STATUS "Detected ARM64 architecture, enabling optimizations")
 
   # Enable NEON SIMD instructions

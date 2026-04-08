@@ -16,10 +16,11 @@ const maxPhonemeLen = 10000
 
 // ModelCapabilities detected from ONNX graph.
 type ModelCapabilities struct {
-	HasSpeakerID      bool
-	HasLanguageID     bool
-	HasProsody        bool
-	HasDurationOutput bool
+	HasSpeakerID        bool
+	HasLanguageID       bool
+	HasProsody          bool
+	HasDurationOutput   bool
+	HasSpeakerEmbedding bool // model accepts speaker_embedding + speaker_embedding_mask
 }
 
 // OnnxEngine wraps DynamicAdvancedSession for TTS inference.
@@ -53,10 +54,11 @@ func detectCapabilities(modelPath string) (*ModelCapabilities, error) {
 	}
 
 	caps := &ModelCapabilities{
-		HasSpeakerID:      containsName(inputs, "sid"),
-		HasLanguageID:     containsName(inputs, "lid"),
-		HasProsody:        containsName(inputs, "prosody_features"),
-		HasDurationOutput: containsName(outputs, "durations"),
+		HasSpeakerID:        containsName(inputs, "sid"),
+		HasLanguageID:       containsName(inputs, "lid"),
+		HasProsody:          containsName(inputs, "prosody_features"),
+		HasDurationOutput:   containsName(outputs, "durations"),
+		HasSpeakerEmbedding: containsName(inputs, "speaker_embedding"),
 	}
 	return caps, nil
 }
@@ -79,6 +81,10 @@ func newOnnxEngine(modelPath string, config *VoiceConfig, sessOpts *ort.SessionO
 	if caps.HasProsody {
 		inputNames = append(inputNames, "prosody_features")
 	}
+	if caps.HasSpeakerEmbedding {
+		inputNames = append(inputNames, "speaker_embedding")
+		inputNames = append(inputNames, "speaker_embedding_mask")
+	}
 
 	// Build output names: always include audio output, conditionally add durations.
 	outputNames := []string{"output"}
@@ -100,6 +106,7 @@ func newOnnxEngine(modelPath string, config *VoiceConfig, sessOpts *ort.SessionO
 		"has_language_id", caps.HasLanguageID,
 		"has_prosody", caps.HasProsody,
 		"has_duration_output", caps.HasDurationOutput,
+		"has_speaker_embedding", caps.HasSpeakerEmbedding,
 	)
 
 	return &OnnxEngine{
@@ -210,6 +217,41 @@ func (e *OnnxEngine) Synthesize(ctx context.Context, req *SynthesisRequest) (*Sy
 		}
 		tensors = append(tensors, prosodyTensor)
 		inputs = append(inputs, prosodyTensor)
+	}
+
+	// "speaker_embedding": float32 [1, embDim] + "speaker_embedding_mask": int64 [1]
+	if e.capabilities.HasSpeakerEmbedding {
+		if len(req.SpeakerEmbedding) > 0 {
+			embDim := len(req.SpeakerEmbedding)
+			embTensor, err := ort.NewTensor(ort.NewShape(1, int64(embDim)), req.SpeakerEmbedding)
+			if err != nil {
+				return nil, &InferenceError{Msg: "failed to create speaker_embedding tensor", Err: err}
+			}
+			tensors = append(tensors, embTensor)
+			inputs = append(inputs, embTensor)
+
+			maskTensor, err := ort.NewTensor(ort.NewShape(1), []int64{1})
+			if err != nil {
+				return nil, &InferenceError{Msg: "failed to create speaker_embedding_mask tensor", Err: err}
+			}
+			tensors = append(tensors, maskTensor)
+			inputs = append(inputs, maskTensor)
+		} else {
+			// No embedding provided — send zero-length embedding placeholder and mask=0
+			placeholderTensor, err := ort.NewTensor(ort.NewShape(1, 1), []float32{0})
+			if err != nil {
+				return nil, &InferenceError{Msg: "failed to create speaker_embedding placeholder", Err: err}
+			}
+			tensors = append(tensors, placeholderTensor)
+			inputs = append(inputs, placeholderTensor)
+
+			maskTensor, err := ort.NewTensor(ort.NewShape(1), []int64{0})
+			if err != nil {
+				return nil, &InferenceError{Msg: "failed to create speaker_embedding_mask tensor", Err: err}
+			}
+			tensors = append(tensors, maskTensor)
+			inputs = append(inputs, maskTensor)
+		}
 	}
 
 	// Prepare outputs: nil for auto-allocation.

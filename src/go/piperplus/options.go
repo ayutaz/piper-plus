@@ -13,14 +13,15 @@ import (
 // SynthesisRequest holds parameters for a single synthesis operation.
 // Used with OnnxEngine.Synthesize and Voice.SynthesizeFromIDs.
 type SynthesisRequest struct {
-	PhonemeIDs      []int64            // phoneme ID sequence (required)
-	SpeakerID       int64              // speaker ID (default 0)
-	LanguageID      int64              // language ID (default 0)
-	NoiseScale      float32            // generation noise (default 0.667)
-	LengthScale     float32            // speech rate (default 1.0)
-	NoiseW          float32            // duration predictor noise (default 0.8)
-	ProsodyFeatures [][3]int64         // A1/A2/A3 per phoneme (nil = zero-fill)
-	PhonemeSilence  map[string]float64 // phoneme -> seconds of silence to insert after it (nil = disabled)
+	PhonemeIDs       []int64            // phoneme ID sequence (required)
+	SpeakerID        int64              // speaker ID (default 0)
+	LanguageID       int64              // language ID (default 0)
+	NoiseScale       float32            // generation noise (default 0.667)
+	LengthScale      float32            // speech rate (default 1.0)
+	NoiseW           float32            // duration predictor noise (default 0.8)
+	ProsodyFeatures  [][3]int64         // A1/A2/A3 per phoneme (nil = zero-fill)
+	PhonemeSilence   map[string]float64 // phoneme -> seconds of silence to insert after it (nil = disabled)
+	SpeakerEmbedding []float32          // speaker embedding from encoder (nil = use SpeakerID)
 }
 
 // ---------------------------------------------------------------------------

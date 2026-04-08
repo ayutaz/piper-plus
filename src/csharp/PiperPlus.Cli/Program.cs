@@ -237,6 +237,16 @@ internal static class Program
         var modelDirOption = new Option<DirectoryInfo?>("--model-dir")
         { Description = "Model download directory" };
 
+        // Voice cloning options
+        var referenceAudioOption = new Option<string?>("--reference-audio")
+        { Description = "Reference audio file for voice cloning (WAV format)" };
+
+        var speakerEmbeddingOption = new Option<string?>("--speaker-embedding")
+        { Description = "Pre-computed speaker embedding file (raw binary float32)" };
+
+        var speakerEncoderModelOption = new Option<string?>("--speaker-encoder-model")
+        { Description = "Speaker encoder ONNX model path (required for --reference-audio)" };
+
         var rootCommand = new RootCommand("Piper Plus TTS — C# CLI")
         {
             modelOption,
@@ -271,6 +281,10 @@ internal static class Program
             listModelsOption,
             downloadModelOption,
             modelDirOption,
+            // Voice cloning options
+            referenceAudioOption,
+            speakerEmbeddingOption,
+            speakerEncoderModelOption,
         };
 
         rootCommand.SetAction((parseResult) =>

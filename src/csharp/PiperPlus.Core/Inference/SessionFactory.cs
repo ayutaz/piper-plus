@@ -272,6 +272,16 @@ public static class SessionFactory
                 inputValues.Add(prosodyTensor);
             }
 
+            // speaker_embedding_mask: int64 [1] = 0 (no embedding during warmup)
+            OrtValue? speakerEmbMaskTensor = null;
+            if (metadata.ContainsKey("speaker_embedding_mask"))
+            {
+                long[] mask = [0];
+                speakerEmbMaskTensor = OrtValue.CreateTensorValueFromMemory(mask, [1]);
+                inputNames.Add("speaker_embedding_mask");
+                inputValues.Add(speakerEmbMaskTensor);
+            }
+
             string[] outputNames = session.OutputMetadata.ContainsKey("durations")
                 ? ["output", "durations"]
                 : ["output"];
@@ -290,6 +300,7 @@ public static class SessionFactory
                 sidTensor?.Dispose();
                 lidTensor?.Dispose();
                 prosodyTensor?.Dispose();
+                speakerEmbMaskTensor?.Dispose();
             }
 
             sw.Stop();

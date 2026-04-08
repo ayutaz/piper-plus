@@ -1,0 +1,190 @@
+name: Model Submission
+description: Submit a trained model to the piper-plus model zoo
+title: "[Model Submission] "
+labels: ["model-submission"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for submitting a model to piper-plus!
+        Please fill out all required fields and complete the quality checklist.
+
+        piper-plus へのモデル投稿ありがとうございます。
+        全ての必須項目と品質チェックリストを記入してください。
+
+        See [CONTRIBUTING_MODELS.md](../../CONTRIBUTING_MODELS.md) for the full submission guide.
+
+  - type: input
+    id: model_name
+    attributes:
+      label: Model name / モデル名
+      description: "Key for piper_plus_voices.json. Format: `<lang_REGION>-<name>-<quality>`"
+      placeholder: "e.g., ja_JP-my-model-medium"
+    validations:
+      required: true
+
+  - type: input
+    id: hf_url
+    attributes:
+      label: HuggingFace URL
+      description: URL of the HuggingFace repository containing the ONNX model and config.json.
+      placeholder: "https://huggingface.co/username/piper-plus-my-model"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: language
+    attributes:
+      label: Language / 言語
+      description: Primary language of the model.
+      options:
+        - Japanese (ja)
+        - English (en)
+        - Chinese (zh)
+        - Korean (ko)
+        - Spanish (es)
+        - French (fr)
+        - Portuguese (pt)
+        - Swedish (sv)
+        - Multilingual
+    validations:
+      required: true
+
+  - type: input
+    id: license
+    attributes:
+      label: Model license / モデルライセンス
+      description: "License of the model. See [License Policy](../../CONTRIBUTING_MODELS.md#ライセンスポリシー--license-policy)."
+      placeholder: "e.g., CC-BY-4.0, MIT, Apache-2.0"
+    validations:
+      required: true
+
+  - type: input
+    id: dataset_source
+    attributes:
+      label: Training data source / 学習データソース
+      description: Dataset name and its license.
+      placeholder: "e.g., LJSpeech (CC0), AISHELL-3 (Apache-2.0)"
+    validations:
+      required: true
+
+  - type: input
+    id: num_speakers
+    attributes:
+      label: Number of speakers / 話者数
+      description: Number of speakers in the model.
+      placeholder: "1"
+    validations:
+      required: true
+
+  - type: input
+    id: num_utterances
+    attributes:
+      label: Number of utterances / 発話数
+      description: Number of utterances used for fine-tuning.
+      placeholder: "e.g., 100, 1000, 5000"
+    validations:
+      required: true
+
+  - type: input
+    id: base_checkpoint
+    attributes:
+      label: Base checkpoint / ベースチェックポイント
+      description: Which base model checkpoint was used for fine-tuning.
+      placeholder: "e.g., ayousanz/piper-plus-base epoch=74-step=504712.ckpt"
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: quality_checklist
+    attributes:
+      label: Quality checklist / 品質チェックリスト
+      description: All items must be checked before submission.
+      options:
+        - label: "6-language inference test completed (JA/EN/ZH/ES/FR/PT) / 6言語推論テスト完了"
+          required: true
+        - label: "FP16 ONNX exported via export_onnx.py / FP16 ONNX エクスポート済み"
+          required: true
+        - label: "config.json num_symbols = 173"
+          required: true
+        - label: "Model Card (README.md) created on HuggingFace / Model Card 作成済み"
+          required: true
+        - label: "md5_digest computed for .onnx and config.json / md5_digest 計算済み"
+          required: true
+
+  - type: textarea
+    id: voices_json_entry
+    attributes:
+      label: voices.json entry / voices.json エントリ
+      description: |
+        Paste the proposed entry for `piper_plus_voices.json`. See [Entry template](../../CONTRIBUTING_MODELS.md#voicesjson-エントリ--voicesjson-entry).
+      placeholder: |
+        {
+            "ja_JP-my-model-medium": {
+                "key": "ja_JP-my-model-medium",
+                "name": "my-model",
+                "language": {
+                    "code": "ja_JP",
+                    "family": "ja",
+                    "region": "JP",
+                    "name_native": "日本語",
+                    "name_english": "Japanese",
+                    "country_english": "Japan"
+                },
+                "quality": "medium",
+                "num_speakers": 1,
+                "speaker_id_map": {},
+                "source": "community",
+                "repo": "username/piper-plus-my-model",
+                "files": {
+                    "my-model.onnx": {
+                        "size_bytes": 0,
+                        "md5_digest": "abc123..."
+                    },
+                    "config.json": {
+                        "size_bytes": 0,
+                        "md5_digest": "def456..."
+                    }
+                },
+                "aliases": ["my-model"],
+                "description": "Description of my model"
+            }
+        }
+      render: json
+    validations:
+      required: true
+
+  - type: textarea
+    id: samples
+    attributes:
+      label: Audio samples / サンプル音声
+      description: |
+        Links to audio samples or HuggingFace Space demo.
+        At minimum, include one sample per language tested.
+      placeholder: |
+        - JA: https://...
+        - EN: https://...
+    validations:
+      required: false
+
+  - type: textarea
+    id: training_details
+    attributes:
+      label: Training details / 学習詳細
+      description: |
+        Key training parameters (epochs, batch size, learning rate, etc.)
+      placeholder: |
+        - Epochs: 500
+        - Batch size: 4
+        - Learning rate: 2e-5
+        - Training time: ~2 hours on V100
+    validations:
+      required: false
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes / 備考
+      description: Any additional notes or known issues.
+    validations:
+      required: false

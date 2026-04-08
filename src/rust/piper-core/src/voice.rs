@@ -38,6 +38,8 @@ pub struct SynthesisParams {
     pub length_scale: f32,
     /// ノイズスケール W (持続時間の変動量)
     pub noise_w: f32,
+    /// Speaker embedding vector for voice cloning (overrides speaker_id).
+    pub speaker_embedding: Option<Vec<f32>>,
 }
 
 impl Default for SynthesisParams {
@@ -48,6 +50,7 @@ impl Default for SynthesisParams {
             noise_scale: 0.667,
             length_scale: 1.0,
             noise_w: 0.8,
+            speaker_embedding: None,
         }
     }
 }
@@ -359,6 +362,7 @@ impl PiperVoice {
             noise_scale: params.noise_scale,
             length_scale: params.length_scale,
             noise_w: params.noise_w,
+            speaker_embedding: params.speaker_embedding.clone(),
         };
 
         self.engine.synthesize(&request)
@@ -856,11 +860,13 @@ mod tests {
             noise_scale: 0.667,
             length_scale: 1.0,
             noise_w: 0.8,
+            speaker_embedding: None,
         };
         assert_eq!(request.phoneme_ids, ids);
         assert!(request.prosody_features.is_none());
         assert_eq!(request.speaker_id, Some(0));
         assert!(request.language_id.is_none());
+        assert!(request.speaker_embedding.is_none());
     }
 
     #[test]
@@ -874,6 +880,7 @@ mod tests {
             noise_scale: 0.5,
             length_scale: 1.2,
             noise_w: 0.6,
+            speaker_embedding: None,
         };
         assert_eq!(request.prosody_features.as_ref().unwrap().len(), 3);
         assert_eq!(request.prosody_features.as_ref().unwrap()[0], [-2, 1, 5]);
@@ -891,6 +898,7 @@ mod tests {
             noise_scale: 0.667,
             length_scale: 1.0,
             noise_w: 0.8,
+            speaker_embedding: None,
         };
         assert_eq!(request.language_id, Some(2));
         assert_eq!(request.speaker_id, Some(100));

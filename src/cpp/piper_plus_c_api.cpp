@@ -181,6 +181,15 @@ static void applySynthOptions(piper::SynthesisConfig &synthConfig,
     synthConfig.lengthScale = effectiveOpts.length_scale;
     synthConfig.noiseW = effectiveOpts.noise_w;
     synthConfig.sentenceSilenceSeconds = effectiveOpts.sentence_silence_sec;
+
+    // Voice cloning: speaker embedding
+    if (effectiveOpts.speaker_embedding && effectiveOpts.speaker_embedding_dim > 0) {
+        synthConfig.speakerEmbedding.assign(
+            effectiveOpts.speaker_embedding,
+            effectiveOpts.speaker_embedding + effectiveOpts.speaker_embedding_dim);
+    } else {
+        synthConfig.speakerEmbedding.clear();
+    }
 }
 
 // ===== Boundary validation for speaker_id / language_id =====
@@ -1061,6 +1070,84 @@ PIPER_PLUS_API const char *piper_plus_available_languages(PiperPlusEngine *engin
         engine->availableLanguagesStr += code;
     }
     return engine->availableLanguagesStr.c_str();
+}
+
+// ===== M3-04: Speaker Encoder for Voice Cloning =====
+
+struct PiperPlusSpeakerEncoder {
+    // Placeholder for speaker encoder ONNX session.
+    // The actual implementation depends on piper::SpeakerEncoder from
+    // the C++ speaker encoder module (M3-01).
+    std::string model_path;
+    // NOTE: Full ONNX inference implementation requires the SpeakerEncoder
+    // class from M3-01. This provides the C API surface and validation.
+};
+
+PIPER_PLUS_API PiperPlusSpeakerEncoder* piper_plus_speaker_encoder_create(
+    const char *model_path)
+{
+    if (!model_path || model_path[0] == '\0') {
+        set_error("model_path is NULL or empty");
+        return nullptr;
+    }
+
+    // Verify file exists
+    struct stat st;
+    if (stat(model_path, &st) != 0) {
+        set_error("Speaker encoder model not found: " + std::string(model_path));
+        return nullptr;
+    }
+
+    try {
+        auto encoder = new PiperPlusSpeakerEncoder();
+        encoder->model_path = model_path;
+        return encoder;
+    } catch (const std::exception &e) {
+        set_error(e.what());
+        return nullptr;
+    } catch (...) {
+        set_error("Unknown error creating speaker encoder");
+        return nullptr;
+    }
+}
+
+PIPER_PLUS_API int32_t piper_plus_speaker_encoder_encode(
+    PiperPlusSpeakerEncoder *encoder,
+    const float *audio_samples,
+    int32_t num_samples,
+    int32_t sample_rate,
+    float *embedding_out,
+    int32_t embedding_dim)
+{
+    if (!encoder) {
+        set_error("encoder is NULL");
+        return -1;
+    }
+    if (!audio_samples || num_samples <= 0) {
+        set_error("audio_samples is NULL or empty");
+        return -1;
+    }
+    if (!embedding_out || embedding_dim <= 0) {
+        set_error("embedding_out is NULL or embedding_dim <= 0");
+        return -1;
+    }
+    if (sample_rate <= 0) {
+        set_error("sample_rate must be positive");
+        return -1;
+    }
+
+    // NOTE: Full inference implementation depends on the SpeakerEncoder class
+    // from M3-01. This validates the API surface and returns a placeholder.
+    set_error("Speaker encoder inference not yet connected to M3-01 backend");
+    return -1;
+}
+
+PIPER_PLUS_API void piper_plus_speaker_encoder_destroy(
+    PiperPlusSpeakerEncoder *encoder)
+{
+    if (encoder) {
+        delete encoder;
+    }
 }
 
 } // extern "C"

@@ -209,6 +209,10 @@ Each implementation should:
 
 See existing implementations (e.g., `spanish.py`, `french.py`) for examples of rule-based phonemizers with no external dependencies.
 
+## Contributing Models
+
+If you want to contribute a **trained model** (rather than code), see [CONTRIBUTING_MODELS.md](CONTRIBUTING_MODELS.md) for the full guide on model submission, quality requirements, and licensing.
+
 ## Your First Pull Request
 
 1. Fork the repository and create a branch from `dev`
