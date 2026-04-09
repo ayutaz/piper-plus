@@ -623,7 +623,7 @@ mod tests {
     #[test]
     fn test_streaming_result_debug() {
         let result = StreamingResult {
-            total_audio_seconds: 3.14,
+            total_audio_seconds: 3.15,
             total_infer_seconds: 1.0,
             chunk_count: 2,
         };

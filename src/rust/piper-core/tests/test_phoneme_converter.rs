@@ -25,10 +25,7 @@ fn make_test_id_map() -> HashMap<String, Vec<i64>> {
 #[test]
 fn test_basic_token_conversion() {
     let map = make_test_id_map();
-    let tokens: Vec<String> = vec!["^", "k", "o", "$"]
-        .iter()
-        .map(|s| s.to_string())
-        .collect();
+    let tokens: Vec<String> = ["^", "k", "o", "$"].iter().map(|s| s.to_string()).collect();
     let ids = phoneme_converter::tokens_to_ids(&tokens, &map).unwrap();
     assert_eq!(ids, vec![1, 12, 13, 2]);
 }
@@ -36,7 +33,7 @@ fn test_basic_token_conversion() {
 #[test]
 fn test_pua_token_conversion() {
     let map = make_test_id_map();
-    let tokens: Vec<String> = vec!["\u{E000}"].iter().map(|s| s.to_string()).collect();
+    let tokens: Vec<String> = ["\u{E000}"].iter().map(|s| s.to_string()).collect();
     let ids = phoneme_converter::tokens_to_ids(&tokens, &map).unwrap();
     assert_eq!(ids, vec![20]);
 }
@@ -44,7 +41,7 @@ fn test_pua_token_conversion() {
 #[test]
 fn test_unknown_phoneme_error() {
     let map = make_test_id_map();
-    let tokens: Vec<String> = vec!["z"].iter().map(|s| s.to_string()).collect();
+    let tokens: Vec<String> = ["z"].iter().map(|s| s.to_string()).collect();
     let result = phoneme_converter::tokens_to_ids(&tokens, &map);
     assert!(result.is_err());
     let err = result.unwrap_err();

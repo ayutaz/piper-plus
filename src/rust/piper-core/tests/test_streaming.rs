@@ -276,10 +276,7 @@ fn test_crossfade_clamp_prevents_overflow() {
     let next = vec![-32768i16; 4];
     let result = crossfade(&prev, &next, 4);
     assert_eq!(result.len(), 4);
-    // All results should be valid i16 values
-    for &s in &result {
-        assert!(s >= -32768 && s <= 32767);
-    }
+    // crossfade completed without overflow — verify expected boundary value
     // i=0: alpha=0.0 -> 32767
     assert_eq!(result[0], 32767);
 }
@@ -435,7 +432,7 @@ fn test_streaming_result_clone() {
 #[test]
 fn test_streaming_result_debug_format() {
     let result = StreamingResult {
-        total_audio_seconds: 3.14,
+        total_audio_seconds: 3.15,
         total_infer_seconds: 1.0,
         chunk_count: 2,
     };

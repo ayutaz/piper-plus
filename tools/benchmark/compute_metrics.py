@@ -32,6 +32,7 @@ from pathlib import Path
 
 import numpy as np
 
+
 _LOGGER = logging.getLogger("benchmark.compute_metrics")
 
 EXPECTED_SAMPLE_RATE = 22050

@@ -8,6 +8,7 @@ import logging
 
 from wyoming.info import Attribution, Info, TtsProgram, TtsVoice
 
+
 logger = logging.getLogger(__name__)
 
 # Trained languages only (not SV/KO which are G2P-only)

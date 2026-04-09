@@ -679,7 +679,7 @@ mod portuguese {
         // At least one phoneme should be marked as stressed (a2=2)
         let p = PortuguesePhonemizer::new();
         let (_, prosody) = p.phonemize_with_prosody("casa").unwrap();
-        let has_stress = prosody.iter().any(|p| p.map_or(false, |info| info.a2 == 2));
+        let has_stress = prosody.iter().any(|p| p.is_some_and(|info| info.a2 == 2));
         assert!(has_stress, "should have at least one stressed phoneme");
     }
 }

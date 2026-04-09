@@ -19,6 +19,7 @@ from pathlib import Path
 import numpy as np
 import onnxruntime as ort
 
+
 logger = logging.getLogger(__name__)
 
 # VITS is a small model (15-75 MB); more than 4 intra-op threads adds

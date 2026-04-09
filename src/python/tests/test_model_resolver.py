@@ -8,11 +8,14 @@ and triangulation with multiple resolution paths.
 
 from __future__ import annotations
 
+import importlib
 import json
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
+
+_has_huggingface_hub = importlib.util.find_spec("huggingface_hub") is not None
 
 from piper_plus._model_resolver import (
     DEFAULT_CACHE_DIR,
@@ -240,6 +243,9 @@ class TestResolveModelNotFound:
 class TestDownloadFromHf:
     """_download_from_hf handles download, caching, and race conditions."""
 
+    @pytest.mark.skipif(
+        not _has_huggingface_hub, reason="huggingface-hub not installed"
+    )
     def test_returns_cached_files_without_redownload(self, tmp_path):
         """If files already exist in model_dir, no download is attempted."""
         from piper_plus._model_resolver import _download_from_hf

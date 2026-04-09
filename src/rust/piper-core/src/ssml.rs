@@ -199,10 +199,7 @@ impl SsmlParser {
     }
 
     /// Extract an attribute value from a quick-xml event.
-    fn get_attr(
-        event: &quick_xml::events::BytesStart<'_>,
-        name: &str,
-    ) -> Option<String> {
+    fn get_attr(event: &quick_xml::events::BytesStart<'_>, name: &str) -> Option<String> {
         for attr in event.attributes().flatten() {
             if attr.key.as_ref() == name.as_bytes() {
                 return String::from_utf8(attr.value.to_vec()).ok();
@@ -245,12 +242,10 @@ impl SsmlParser {
                 });
         }
         // Bare number -- assume milliseconds
-        s.parse::<f64>()
-            .map(|v| v as u32)
-            .unwrap_or_else(|_| {
-                tracing::warn!("Invalid break time: {}", time_str);
-                0
-            })
+        s.parse::<f64>().map(|v| v as u32).unwrap_or_else(|_| {
+            tracing::warn!("Invalid break time: {}", time_str);
+            0
+        })
     }
 
     /// Parse a rate specification into a float multiplier.
@@ -568,7 +563,9 @@ mod tests {
         let segments = SsmlParser::parse(bad_ssml);
         // Either parsed leniently or fell back -- text should be present
         assert!(!segments.is_empty());
-        let has_text = segments.iter().any(|s| s.text.contains("Hello") || s.text.contains("world"));
+        let has_text = segments
+            .iter()
+            .any(|s| s.text.contains("Hello") || s.text.contains("world"));
         assert!(has_text);
     }
 
@@ -662,8 +659,7 @@ mod tests {
 
     #[test]
     fn test_multiple_breaks_in_sequence() {
-        let ssml =
-            r#"<speak>Hello<break time="200ms"/><break time="300ms"/>world</speak>"#;
+        let ssml = r#"<speak>Hello<break time="200ms"/><break time="300ms"/>world</speak>"#;
         let segments = SsmlParser::parse(ssml);
         let breaks: Vec<_> = segments.iter().filter(|s| s.break_ms > 0).collect();
         assert_eq!(breaks.len(), 2);
@@ -689,7 +685,8 @@ mod tests {
 
     #[test]
     fn test_nested_prosody_rate_override() {
-        let ssml = r#"<speak><prosody rate="slow"><prosody rate="fast">inner</prosody></prosody></speak>"#;
+        let ssml =
+            r#"<speak><prosody rate="slow"><prosody rate="fast">inner</prosody></prosody></speak>"#;
         let segments = SsmlParser::parse(ssml);
         assert_eq!(segments.len(), 1);
         // Inner prosody overrides outer
@@ -698,8 +695,7 @@ mod tests {
 
     #[test]
     fn test_text_outside_and_inside_prosody() {
-        let ssml =
-            r#"<speak>before <prosody rate="fast">inside</prosody> after</speak>"#;
+        let ssml = r#"<speak>before <prosody rate="fast">inside</prosody> after</speak>"#;
         let segments = SsmlParser::parse(ssml);
         assert!(segments.len() >= 3);
         let before = segments.iter().find(|s| s.text == "before").unwrap();

@@ -58,7 +58,7 @@ fn create_mel_filterbank() -> Vec<f32> {
         .collect();
 
     for m in 0..MEL_N_MELS {
-        let mut left = bin_points[m].floor() as usize;
+        let left = bin_points[m].floor() as usize;
         let mut center = bin_points[m + 1].floor() as usize;
         let mut right = bin_points[m + 2].floor() as usize;
 
@@ -107,7 +107,7 @@ fn compute_mel_spectrogram(samples: &[f32]) -> Vec<f32> {
         let start = frame_idx * MEL_HOP_LENGTH;
 
         let mut power_spec = vec![0.0f32; fft_bins];
-        for k in 0..fft_bins {
+        for (k, ps) in power_spec.iter_mut().enumerate() {
             let mut real = 0.0f32;
             let mut imag = 0.0f32;
             let freq = -2.0 * PI * k as f32 / MEL_N_FFT as f32;
@@ -121,7 +121,7 @@ fn compute_mel_spectrogram(samples: &[f32]) -> Vec<f32> {
                 real += sample * angle.cos();
                 imag += sample * angle.sin();
             }
-            power_spec[k] = real * real + imag * imag;
+            *ps = real * real + imag * imag;
         }
 
         for mel_idx in 0..MEL_N_MELS {
@@ -191,7 +191,8 @@ struct HannWindowGolden {
     first_5: Vec<f64>,
     last_5: Vec<f64>,
     mid_value: f64,
-    checksum: String,
+    #[serde(rename = "checksum")]
+    _checksum: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -199,20 +200,22 @@ struct FilterbankGolden {
     shape: Vec<usize>,
     band_sums: Vec<f64>,
     total_sum: f64,
-    checksum: String,
+    #[serde(rename = "checksum")]
+    _checksum: String,
 }
 
 #[derive(Debug, Deserialize)]
 struct TestCase {
     id: String,
-    #[serde(default)]
-    audio_params: serde_json::Value,
+    #[serde(default, rename = "audio_params")]
+    _audio_params: serde_json::Value,
     #[serde(default)]
     audio_samples_count: usize,
     #[serde(default)]
     expected_mel_shape: Vec<usize>,
     #[serde(default)]
-    expected_mel_checksum: String,
+    #[serde(rename = "expected_mel_checksum")]
+    _expected_mel_checksum: String,
     #[serde(default)]
     mel_corner_values: Option<CornerValues>,
     #[serde(default)]
@@ -241,9 +244,12 @@ struct CornerValues {
 
 fn fixture_path() -> PathBuf {
     let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .parent().unwrap()   // piper-core -> src/rust
-        .parent().unwrap()   // src/rust -> src
-        .parent().unwrap()   // src -> project root
+        .parent()
+        .unwrap() // piper-core -> src/rust
+        .parent()
+        .unwrap() // src/rust -> src
+        .parent()
+        .unwrap() // src -> project root
         .to_path_buf();
     repo_root
         .join("test")
@@ -255,8 +261,7 @@ fn load_golden() -> GoldenData {
     let path = fixture_path();
     let data = std::fs::read_to_string(&path)
         .unwrap_or_else(|e| panic!("Failed to read golden file {}: {e}", path.display()));
-    serde_json::from_str(&data)
-        .unwrap_or_else(|e| panic!("Failed to parse golden file: {e}"))
+    serde_json::from_str(&data).unwrap_or_else(|e| panic!("Failed to parse golden file: {e}"))
 }
 
 fn generate_sine(freq_hz: f32, duration_s: f32, sr: u32) -> Vec<f32> {
@@ -270,8 +275,8 @@ fn generate_multitone(freqs: &[f32], duration_s: f32, sr: u32) -> Vec<f32> {
     let n = (duration_s * sr as f32) as usize;
     let mut samples = vec![0.0f32; n];
     for &f in freqs {
-        for i in 0..n {
-            samples[i] += (2.0 * PI * f * i as f32 / sr as f32).sin();
+        for (i, s) in samples.iter_mut().enumerate() {
+            *s += (2.0 * PI * f * i as f32 / sr as f32).sin();
         }
     }
     let peak = samples.iter().map(|s| s.abs()).fold(0.0f32, f32::max);
@@ -395,7 +400,11 @@ fn golden_mel_filterbank_total_sum() {
 #[test]
 fn golden_sine_440hz_mel_shape() {
     let g = load_golden();
-    let tc = g.test_cases.iter().find(|t| t.id == "sine_440hz_1s").unwrap();
+    let tc = g
+        .test_cases
+        .iter()
+        .find(|t| t.id == "sine_440hz_1s")
+        .unwrap();
 
     let audio = generate_sine(440.0, 1.0, MEL_SAMPLE_RATE);
     assert_eq!(audio.len(), tc.audio_samples_count);
@@ -411,7 +420,11 @@ fn golden_sine_440hz_mel_shape() {
 #[test]
 fn golden_sine_440hz_mel_corners() {
     let g = load_golden();
-    let tc = g.test_cases.iter().find(|t| t.id == "sine_440hz_1s").unwrap();
+    let tc = g
+        .test_cases
+        .iter()
+        .find(|t| t.id == "sine_440hz_1s")
+        .unwrap();
     let corners = tc.mel_corner_values.as_ref().unwrap();
 
     let audio = generate_sine(440.0, 1.0, MEL_SAMPLE_RATE);
@@ -433,14 +446,26 @@ fn golden_sine_440hz_mel_corners() {
 
     check("top_left", mel[0], corners.top_left);
     check("top_right", mel[n_frames - 1], corners.top_right);
-    check("bottom_left", mel[(MEL_N_MELS - 1) * n_frames], corners.bottom_left);
-    check("bottom_right", mel[MEL_N_MELS * n_frames - 1], corners.bottom_right);
+    check(
+        "bottom_left",
+        mel[(MEL_N_MELS - 1) * n_frames],
+        corners.bottom_left,
+    );
+    check(
+        "bottom_right",
+        mel[MEL_N_MELS * n_frames - 1],
+        corners.bottom_right,
+    );
 }
 
 #[test]
 fn golden_sine_440hz_mel_sampled() {
     let g = load_golden();
-    let tc = g.test_cases.iter().find(|t| t.id == "sine_440hz_1s").unwrap();
+    let tc = g
+        .test_cases
+        .iter()
+        .find(|t| t.id == "sine_440hz_1s")
+        .unwrap();
 
     let audio = generate_sine(440.0, 1.0, MEL_SAMPLE_RATE);
     let mel = compute_mel_spectrogram(&audio);
@@ -458,7 +483,11 @@ fn golden_sine_440hz_mel_sampled() {
 #[test]
 fn golden_sine_1000hz_mel_corners() {
     let g = load_golden();
-    let tc = g.test_cases.iter().find(|t| t.id == "sine_1000hz_0.5s").unwrap();
+    let tc = g
+        .test_cases
+        .iter()
+        .find(|t| t.id == "sine_1000hz_0.5s")
+        .unwrap();
     let corners = tc.mel_corner_values.as_ref().unwrap();
 
     let audio = generate_sine(1000.0, 0.5, MEL_SAMPLE_RATE);
@@ -472,19 +501,34 @@ fn golden_sine_1000hz_mel_corners() {
         } else {
             (actual as f64 - expected).abs()
         };
-        assert!(rel < tol, "{name}: expected {expected}, got {actual} (rel err {rel:.6})");
+        assert!(
+            rel < tol,
+            "{name}: expected {expected}, got {actual} (rel err {rel:.6})"
+        );
     };
 
     check("top_left", mel[0], corners.top_left);
     check("top_right", mel[n_frames - 1], corners.top_right);
-    check("bottom_left", mel[(MEL_N_MELS - 1) * n_frames], corners.bottom_left);
-    check("bottom_right", mel[MEL_N_MELS * n_frames - 1], corners.bottom_right);
+    check(
+        "bottom_left",
+        mel[(MEL_N_MELS - 1) * n_frames],
+        corners.bottom_left,
+    );
+    check(
+        "bottom_right",
+        mel[MEL_N_MELS * n_frames - 1],
+        corners.bottom_right,
+    );
 }
 
 #[test]
 fn golden_sine_1000hz_mel_sampled() {
     let g = load_golden();
-    let tc = g.test_cases.iter().find(|t| t.id == "sine_1000hz_0.5s").unwrap();
+    let tc = g
+        .test_cases
+        .iter()
+        .find(|t| t.id == "sine_1000hz_0.5s")
+        .unwrap();
 
     let audio = generate_sine(1000.0, 0.5, MEL_SAMPLE_RATE);
     let mel = compute_mel_spectrogram(&audio);
@@ -520,13 +564,24 @@ fn golden_multitone_mel_corners() {
         } else {
             (actual as f64 - expected).abs()
         };
-        assert!(rel < tol, "{name}: expected {expected}, got {actual} (rel err {rel:.6})");
+        assert!(
+            rel < tol,
+            "{name}: expected {expected}, got {actual} (rel err {rel:.6})"
+        );
     };
 
     check("top_left", mel[0], corners.top_left);
     check("top_right", mel[n_frames - 1], corners.top_right);
-    check("bottom_left", mel[(MEL_N_MELS - 1) * n_frames], corners.bottom_left);
-    check("bottom_right", mel[MEL_N_MELS * n_frames - 1], corners.bottom_right);
+    check(
+        "bottom_left",
+        mel[(MEL_N_MELS - 1) * n_frames],
+        corners.bottom_left,
+    );
+    check(
+        "bottom_right",
+        mel[MEL_N_MELS * n_frames - 1],
+        corners.bottom_right,
+    );
 }
 
 #[test]

@@ -20,6 +20,7 @@ from pathlib import Path
 
 import numpy as np
 
+
 _LOGGER = logging.getLogger(__name__)
 
 # Default audio parameters

@@ -3,9 +3,7 @@
 //! Verifies duration-to-timestamp conversion, serialization formats
 //! (JSON / TSV / SRT), edge cases, and timing invariants.
 
-use piper_plus::timing::{
-    DEFAULT_HOP_LENGTH, PhonemeTimingInfo, TimingResult, durations_to_timing,
-};
+use piper_plus::timing::{DEFAULT_HOP_LENGTH, durations_to_timing};
 
 // =========================================================================
 // Helper

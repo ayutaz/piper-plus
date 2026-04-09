@@ -12,6 +12,7 @@ from pathlib import Path
 # Python 3.11+ is required for this module
 import numpy as np
 
+
 try:
     import gradio as gr
 except ImportError:

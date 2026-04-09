@@ -127,8 +127,7 @@ fn read_wav_file(path: &Path) -> Result<(Vec<f32>, u32), PiperError> {
     use std::fs::File;
     use std::io::BufReader;
 
-    let file = File::open(path)
-        .map_err(|e| PiperError::AudioOutput(e))?;
+    let file = File::open(path).map_err(PiperError::AudioOutput)?;
     let reader = BufReader::new(file);
     let wav_reader = hound::WavReader::new(reader)
         .map_err(|e| PiperError::Inference(format!("WAV read error {}: {e}", path.display())))?;
@@ -214,7 +213,7 @@ fn compute_mel_spectrogram(samples: &[f32]) -> Vec<f32> {
 
         // Apply window and compute power spectrum via DFT
         let mut power_spec = vec![0.0f32; fft_bins];
-        for k in 0..fft_bins {
+        for (k, power_spec_k) in power_spec.iter_mut().enumerate() {
             let mut real = 0.0f32;
             let mut imag = 0.0f32;
             let freq = -2.0 * std::f32::consts::PI * k as f32 / MEL_N_FFT as f32;
@@ -228,7 +227,7 @@ fn compute_mel_spectrogram(samples: &[f32]) -> Vec<f32> {
                 real += sample * angle.cos();
                 imag += sample * angle.sin();
             }
-            power_spec[k] = real * real + imag * imag;
+            *power_spec_k = real * real + imag * imag;
         }
 
         // Apply mel filterbank
@@ -248,9 +247,7 @@ fn compute_mel_spectrogram(samples: &[f32]) -> Vec<f32> {
 /// Create a Hann window of the given length.
 fn hann_window(length: usize) -> Vec<f32> {
     (0..length)
-        .map(|n| {
-            0.5 * (1.0 - (2.0 * std::f32::consts::PI * n as f32 / length as f32).cos())
-        })
+        .map(|n| 0.5 * (1.0 - (2.0 * std::f32::consts::PI * n as f32 / length as f32).cos()))
         .collect()
 }
 
@@ -294,23 +291,20 @@ fn create_mel_filterbank() -> Vec<f32> {
         // Rising slope
         for k in left..center {
             if center > left {
-                filterbank[m * fft_bins + k] =
-                    (k - left) as f32 / (center - left) as f32;
+                filterbank[m * fft_bins + k] = (k - left) as f32 / (center - left) as f32;
             }
         }
 
         // Falling slope
         for k in center..right {
             if right > center {
-                filterbank[m * fft_bins + k] =
-                    (right - k) as f32 / (right - center) as f32;
+                filterbank[m * fft_bins + k] = (right - k) as f32 / (right - center) as f32;
             }
         }
 
         // Ensure center bin always has weight >= 1.0
         if center < fft_bins {
-            filterbank[m * fft_bins + center] =
-                filterbank[m * fft_bins + center].max(1.0);
+            filterbank[m * fft_bins + center] = filterbank[m * fft_bins + center].max(1.0);
         }
     }
 

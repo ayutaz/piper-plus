@@ -11,14 +11,15 @@ import asyncio
 import logging
 from functools import partial
 
+from piper_plus import PiperPlus
 from wyoming.audio import AudioChunk, AudioStart, AudioStop
 from wyoming.event import Event
 from wyoming.info import Describe
 from wyoming.server import AsyncEventHandler, AsyncServer
 from wyoming.tts import Synthesize
 
-from piper_plus import PiperPlus
 from piper_wyoming.handler import SUPPORTED_LANGUAGES, build_info, resolve_language
+
 
 logger = logging.getLogger(__name__)
 

@@ -32,6 +32,7 @@ from .audio_utils import (
     normalize_audio,
 )
 
+
 if TYPE_CHECKING:
     import onnxruntime
     import torch

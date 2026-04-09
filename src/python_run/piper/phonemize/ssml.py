@@ -26,7 +26,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import List
+
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -170,7 +170,7 @@ class SynthesisSegment:
         return int(self.silence_ms * 22.05)
 
 
-def process_ssml(text: str) -> List[SynthesisSegment]:
+def process_ssml(text: str) -> list[SynthesisSegment]:
     """Convert input text (plain or SSML) into synthesis segments.
 
     Parameters
@@ -187,7 +187,7 @@ def process_ssml(text: str) -> List[SynthesisSegment]:
     """
     ssml_segments = SSMLParser.parse(text)
 
-    result: List[SynthesisSegment] = []
+    result: list[SynthesisSegment] = []
     for seg in ssml_segments:
         result.append(
             SynthesisSegment(

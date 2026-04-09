@@ -7,7 +7,6 @@ Usage:
     python example.py "Tell me about Tokyo" --language en
 """
 import argparse
-import sys
 
 import requests
 

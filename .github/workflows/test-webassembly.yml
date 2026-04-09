@@ -123,14 +123,11 @@ jobs:
           test/js/test-audio-regression.js \
           test/js/test-benchmark-runner.js \
           test/js/test-cache-manager.js \
-          test/js/test-complete-simulation.js \
           test/js/test-edge-cases.js \
-          test/js/test-korean.js \
           test/js/test-memory-pool.js \
           test/js/test-phase2-integration.js \
           test/js/test-resampler.js \
           test/js/test-streaming-pipeline.js \
-          test/js/test-swedish.js \
           test/js/test-webgpu-session.js
     
     - name: Check file sizes

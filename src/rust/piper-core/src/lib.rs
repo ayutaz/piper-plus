@@ -32,9 +32,9 @@ pub mod engine;
 #[cfg(feature = "onnx")]
 pub mod gpu;
 #[cfg(feature = "onnx")]
-pub mod speaker_encoder;
-#[cfg(feature = "onnx")]
 pub mod input;
+#[cfg(feature = "onnx")]
+pub mod speaker_encoder;
 #[cfg(feature = "onnx")]
 pub mod voice;
 #[cfg(feature = "onnx")]

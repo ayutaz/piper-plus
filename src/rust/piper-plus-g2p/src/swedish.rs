@@ -1555,10 +1555,8 @@ mod tests {
     #[test]
     fn test_prosody_a1_always_zero() {
         let (_, prosody) = ph_with_prosody("flickan gick");
-        for pi in &prosody {
-            if let Some(info) = pi {
-                assert_eq!(info.a1, 0, "a1 should always be 0");
-            }
+        for info in prosody.iter().flatten() {
+            assert_eq!(info.a1, 0, "a1 should always be 0");
         }
     }
 

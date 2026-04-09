@@ -29,6 +29,7 @@ from pathlib import Path
 
 import torch
 
+
 _LOGGER = logging.getLogger("piper_train.speaker_encoder.export_encoder")
 
 OPSET_VERSION = 17

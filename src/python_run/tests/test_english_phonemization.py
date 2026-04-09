@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 """Test English phonemization functionality"""
 
+import shutil
 import subprocess
 import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
+
+_espeak_ng_available = shutil.which("espeak-ng") is not None
 
 
 # Add parent directory to path
@@ -26,6 +29,7 @@ except ImportError:
 class TestEspeakPhonemizerFallback:
     """Test espeak-ng phonemizer fallback implementation"""
 
+    @pytest.mark.skipif(not _espeak_ng_available, reason="espeak-ng not installed")
     def test_phonemize_espeak_ng_basic(self):
         """Test basic IPA phonemization"""
         # Test with simple text
@@ -70,6 +74,7 @@ class TestEspeakPhonemizerFallback:
             # Should fall back to character list
             assert result == [list("Test")]
 
+    @pytest.mark.skipif(not _espeak_ng_available, reason="espeak-ng not installed")
     def test_phonemize_espeak_phonemes(self):
         """Test phoneme-based (non-IPA) output"""
         result = phonemize_espeak_phonemes("Hello", "en-us")

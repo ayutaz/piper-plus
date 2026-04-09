@@ -152,12 +152,12 @@ public static partial class SsmlParser
             switch (node)
             {
                 case XText textNode:
-                {
-                    var text = textNode.Value.Trim();
-                    if (!string.IsNullOrEmpty(text))
-                        segments.Add(new SsmlSegment(text, Rate: rate));
-                    break;
-                }
+                    {
+                        var text = textNode.Value.Trim();
+                        if (!string.IsNullOrEmpty(text))
+                            segments.Add(new SsmlSegment(text, Rate: rate));
+                        break;
+                    }
                 case XElement childElement:
                     Walk(childElement, rate, segments);
                     break;

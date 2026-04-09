@@ -34,6 +34,7 @@ from pathlib import Path
 
 import numpy as np
 
+
 _LOGGER = logging.getLogger("piper_train.speaker_encoder.evaluate")
 
 

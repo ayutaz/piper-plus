@@ -38,6 +38,7 @@ from pathlib import Path
 import numpy as np
 import onnxruntime as ort
 
+
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
@@ -463,7 +464,7 @@ def main(argv: list[str] | None = None) -> None:
         pairs = [(args.model, args.config)]
         labels = [os.path.basename(args.model)]
     else:
-        pairs = list(zip(args.models, args.configs))
+        pairs = list(zip(args.models, args.configs, strict=False))
         labels = args.labels or [os.path.basename(m) for m in args.models]
 
     results: list[dict] = []

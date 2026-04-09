@@ -1521,7 +1521,7 @@ mod tests {
         let (_, prosody) = phonemize_french_with_prosody("bonjour");
         let stressed: Vec<_> = prosody
             .iter()
-            .filter(|p| p.map_or(false, |pi| pi.a2 == 2))
+            .filter(|p| p.is_some_and(|pi| pi.a2 == 2))
             .collect();
         assert!(!stressed.is_empty(), "should have stressed phoneme");
     }

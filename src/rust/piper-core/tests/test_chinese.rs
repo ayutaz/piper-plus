@@ -106,7 +106,7 @@ fn test_tone_markers_present() {
     let (tokens, _) = p.phonemize_with_prosody("你好").unwrap();
     // Chinese phonemes must contain tone markers (tone1..tone5 mapped to PUA)
     let has_tone = tokens.iter().any(|t| {
-        t.chars().next().map_or(false, |c| {
+        t.chars().next().is_some_and(|c| {
             let code = c as u32;
             (0xE046..=0xE04A).contains(&code)
         })
@@ -122,7 +122,7 @@ fn test_each_syllable_has_tone() {
     let tone_count = tokens
         .iter()
         .filter(|t| {
-            t.chars().next().map_or(false, |c| {
+            t.chars().next().is_some_and(|c| {
                 let code = c as u32;
                 (0xE046..=0xE04A).contains(&code)
             })
@@ -320,7 +320,7 @@ fn test_contains_ipa_vowels_or_consonants() {
     let non_tone_tokens: Vec<&String> = tokens
         .iter()
         .filter(|t| {
-            !t.chars().next().map_or(false, |c| {
+            !t.chars().next().is_some_and(|c| {
                 let code = c as u32;
                 (0xE046..=0xE04A).contains(&code)
             })
@@ -341,7 +341,7 @@ fn test_no_raw_pinyin_in_output() {
     // like "ni3", "hao3", etc.
     for token in &tokens {
         assert!(
-            !token.chars().last().map_or(false, |c| c.is_ascii_digit()),
+            !token.chars().last().is_some_and(|c| c.is_ascii_digit()),
             "Token {:?} looks like raw pinyin with tone number; expected IPA",
             token
         );

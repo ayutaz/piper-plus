@@ -2,8 +2,7 @@
 
 import pytest
 
-from piper_plus_g2p.ssml import BreakStrength, SSMLParser, SSMLSegment, _MAX_SSML_SIZE
-
+from piper_plus_g2p.ssml import _MAX_SSML_SIZE, BreakStrength, SSMLParser, SSMLSegment
 
 # =====================================================================
 # is_ssml()

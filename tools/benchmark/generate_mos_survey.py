@@ -23,6 +23,7 @@ import random
 import sys
 from pathlib import Path
 
+
 _LOGGER = logging.getLogger("benchmark.generate_mos_survey")
 
 

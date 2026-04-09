@@ -9,6 +9,7 @@ from piper_plus.engine import (
     synthesize,
 )
 
+
 __all__ = [
     "AudioResult",
     "PiperPlus",

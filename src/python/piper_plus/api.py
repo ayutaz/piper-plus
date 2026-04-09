@@ -5,19 +5,17 @@ from __future__ import annotations
 import logging
 import re
 import time
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Iterator
 
 import numpy as np
 
 from piper_plus._model_resolver import (
     MODEL_ALIASES,
-    ModelNotFoundError,
     resolve_model,
 )
 from piper_plus.audio import AudioResult
 from piper_plus.engine import (
-    audio_float_to_int16,
     create_ort_session,
     load_config,
     synthesize as engine_synthesize,

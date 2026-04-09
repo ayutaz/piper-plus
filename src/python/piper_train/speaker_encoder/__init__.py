@@ -19,6 +19,7 @@ from .audio_utils import compute_mel_spectrogram, load_audio, normalize_audio
 from .ecapa_tdnn import ECAPATDNN
 from .encoder import SpeakerEncoder
 
+
 __all__ = [
     "ECAPATDNN",
     "SpeakerEncoder",

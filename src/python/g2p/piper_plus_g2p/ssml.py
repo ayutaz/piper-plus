@@ -17,7 +17,6 @@ import re
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from enum import Enum
-from typing import List
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -95,7 +94,7 @@ class SSMLParser:
         return bool(SSMLParser._RE_SSML.search(text))
 
     @staticmethod
-    def parse(ssml_text: str) -> List[SSMLSegment]:
+    def parse(ssml_text: str) -> list[SSMLSegment]:
         """Parse an SSML string into a list of :class:`SSMLSegment`.
 
         If *ssml_text* is not valid XML the entire string is returned as
@@ -133,7 +132,7 @@ class SSMLParser:
             stripped = re.sub(r"<[^>]*>", "", ssml_text).strip()
             return [SSMLSegment(text=stripped if stripped else ssml_text)]
 
-        segments: List[SSMLSegment] = []
+        segments: list[SSMLSegment] = []
         SSMLParser._walk(root, rate=1.0, segments=segments)
 
         # Merge empty-text segments that have no break into neighbours
@@ -148,7 +147,7 @@ class SSMLParser:
     def _walk(
         element: ET.Element,
         rate: float,
-        segments: List[SSMLSegment],
+        segments: list[SSMLSegment],
     ) -> None:
         """Recursively walk the element tree and populate *segments*."""
         tag = SSMLParser._local_tag(element.tag)
@@ -277,6 +276,6 @@ class SSMLParser:
         return tag
 
     @staticmethod
-    def _merge(segments: List[SSMLSegment]) -> List[SSMLSegment]:
+    def _merge(segments: list[SSMLSegment]) -> list[SSMLSegment]:
         """Remove empty-text segments with zero break (no-ops)."""
         return [s for s in segments if s.text.strip() or s.break_ms > 0]

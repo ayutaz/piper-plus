@@ -1114,6 +1114,7 @@ mod tests {
             noise_scale: 0.333,
             length_scale: 1.5,
             noise_w: 0.5,
+            speaker_embedding: None,
         };
         assert_eq!(params.speaker_id, Some(5));
         assert_eq!(params.language_override.as_deref(), Some("en"));

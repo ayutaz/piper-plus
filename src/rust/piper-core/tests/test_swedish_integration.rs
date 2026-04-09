@@ -21,7 +21,7 @@ fn test_language_code() {
 
 #[test]
 fn test_default_impl() {
-    let p = SwedishPhonemizer::default();
+    let p = SwedishPhonemizer;
     assert_eq!(p.language_code(), "sv");
 }
 
@@ -61,9 +61,7 @@ fn test_phonemize_tack() {
 #[test]
 fn test_phonemize_sentence() {
     let p = SwedishPhonemizer::new();
-    let (tokens, prosody) = p
-        .phonemize_with_prosody("Hur m\u{00e5}r du idag?")
-        .unwrap();
+    let (tokens, prosody) = p.phonemize_with_prosody("Hur m\u{00e5}r du idag?").unwrap();
     assert!(
         !tokens.is_empty(),
         "should produce phonemes for a Swedish sentence"
@@ -119,9 +117,7 @@ fn test_punctuation_passthrough() {
 #[test]
 fn test_question_mark() {
     let p = SwedishPhonemizer::new();
-    let (tokens, _) = p
-        .phonemize_with_prosody("Var \u{00e4}r du?")
-        .unwrap();
+    let (tokens, _) = p.phonemize_with_prosody("Var \u{00e4}r du?").unwrap();
     assert!(
         tokens.iter().any(|t| t == "?"),
         "question mark should pass through in {:?}",
@@ -187,10 +183,7 @@ fn test_a_ring_vowel() {
     // \u{00e5} is a distinct vowel in Swedish
     let p = SwedishPhonemizer::new();
     let (tokens, _) = p.phonemize_with_prosody("\u{00e5}r").unwrap();
-    assert!(
-        !tokens.is_empty(),
-        "'\u{00e5}r' should produce phonemes"
-    );
+    assert!(!tokens.is_empty(), "'\u{00e5}r' should produce phonemes");
 }
 
 #[test]
@@ -198,10 +191,7 @@ fn test_a_umlaut_vowel() {
     // \u{00e4} is a distinct vowel in Swedish
     let p = SwedishPhonemizer::new();
     let (tokens, _) = p.phonemize_with_prosody("\u{00e4}pple").unwrap();
-    assert!(
-        !tokens.is_empty(),
-        "'\u{00e4}pple' should produce phonemes"
-    );
+    assert!(!tokens.is_empty(), "'\u{00e4}pple' should produce phonemes");
 }
 
 #[test]
@@ -209,10 +199,7 @@ fn test_o_umlaut_vowel() {
     // \u{00f6} is a distinct vowel in Swedish
     let p = SwedishPhonemizer::new();
     let (tokens, _) = p.phonemize_with_prosody("\u{00f6}ga").unwrap();
-    assert!(
-        !tokens.is_empty(),
-        "'\u{00f6}ga' should produce phonemes"
-    );
+    assert!(!tokens.is_empty(), "'\u{00f6}ga' should produce phonemes");
 }
 
 // =========================================================================
@@ -310,8 +297,8 @@ fn test_detect_primary_language_empty_string() {
 
 #[cfg(feature = "onnx")]
 mod engine_integration {
-    use piper_plus::config::{PhonemeType, VoiceConfig};
     use piper_plus::PiperVoice;
+    use piper_plus::config::{PhonemeType, VoiceConfig};
     use std::collections::HashMap;
 
     #[test]
@@ -325,13 +312,9 @@ mod engine_integration {
             phoneme_type: PhonemeType::Multilingual,
             phoneme_id_map: HashMap::new(),
             num_languages: 3,
-            language_id_map: [
-                ("en".into(), 0i64),
-                ("es".into(), 1),
-                ("sv".into(), 2),
-            ]
-            .into_iter()
-            .collect(),
+            language_id_map: [("en".into(), 0i64), ("es".into(), 1), ("sv".into(), 2)]
+                .into_iter()
+                .collect(),
             speaker_id_map: HashMap::new(),
         };
         let result = PiperVoice::create_phonemizer(&config, None);
@@ -421,9 +404,7 @@ fn test_stockholm_produces_output() {
 #[test]
 fn test_common_phrase_jag_heter() {
     let p = SwedishPhonemizer::new();
-    let (tokens, prosody) = p
-        .phonemize_with_prosody("Jag heter Erik.")
-        .unwrap();
+    let (tokens, prosody) = p.phonemize_with_prosody("Jag heter Erik.").unwrap();
     assert!(
         tokens.len() >= 5,
         "'Jag heter Erik.' should produce multiple phonemes, got {:?}",

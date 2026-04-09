@@ -423,10 +423,9 @@ impl OnnxEngine {
                 0
             };
             Some(
-                Tensor::from_array(([1_usize], vec![mask_val].into_boxed_slice()))
-                    .map_err(|e| {
-                        PiperError::Inference(format!("speaker_embedding_mask tensor: {e}"))
-                    })?,
+                Tensor::from_array(([1_usize], vec![mask_val].into_boxed_slice())).map_err(
+                    |e| PiperError::Inference(format!("speaker_embedding_mask tensor: {e}")),
+                )?,
             )
         } else {
             None

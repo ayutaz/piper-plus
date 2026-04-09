@@ -56,7 +56,7 @@ TEST(CApiDefaultOptions, HasExpectedDefaults) {
 
 TEST(CApiDefaultOptions, ReservedFieldsAreZero) {
     PiperPlusSynthOptions opts = piper_plus_default_options();
-    for (int i = 0; i < 8; i++) {
+    for (int i = 0; i < static_cast<int>(sizeof(opts._reserved) / sizeof(opts._reserved[0])); i++) {
         EXPECT_EQ(opts._reserved[i], 0);
     }
 }
