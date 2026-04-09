@@ -113,11 +113,16 @@ class TestStochasticExport:
 
 @pytest.mark.unit
 class TestEMAWeightApplication:
-    """EMA 重み適用のテスト"""
+    """EMA 重み適用のテスト
 
-    def test_ema_weights_applied(self, tmp_path):
-        """EMA state があればデコーダパラメータに適用される"""
-        from piper_train.export_onnx import apply_ema_weights
+    Tests use ``apply_ema_shadow_params`` (pure logic, no file I/O) where
+    possible.  The convenience wrapper ``apply_ema_weights`` (checkpoint
+    loading) is tested separately for the I/O path.
+    """
+
+    def test_ema_shadow_params_applied(self):
+        """EMA shadow params があればデコーダパラメータに適用される（ファイル不要）"""
+        from piper_train.export_onnx import apply_ema_shadow_params
 
         dec = torch.nn.Sequential(
             torch.nn.Linear(10, 10),
@@ -134,14 +139,7 @@ class TestEMAWeightApplication:
         for name, param in dec.named_parameters():
             shadow_params[name] = param.data.clone() + 0.1
 
-        ema_state = {"shadow_params": shadow_params}
-
-        # モックチェックポイントを保存
-        ckpt_path = tmp_path / "test_ema.ckpt"
-        torch.save({"ema_generator_state": ema_state}, str(ckpt_path))
-
-        # 抽出した関数を直接呼び出す
-        applied, skipped = apply_ema_weights(dec, ckpt_path)
+        applied, skipped = apply_ema_shadow_params(dec, shadow_params)
 
         assert applied > 0, "No EMA parameters were applied"
         assert skipped == 0, f"Unexpected skipped parameters: {skipped}"
@@ -153,8 +151,34 @@ class TestEMAWeightApplication:
                     f"Parameter {name} was not updated by EMA"
                 )
 
-    def test_no_ema_state_is_handled(self, tmp_path):
-        """チェックポイントに EMA state がない場合はスキップされる"""
+    def test_extra_keys_are_skipped(self):
+        """shadow_params にデコーダにないキーがあれば skipped としてカウントされる"""
+        from piper_train.export_onnx import apply_ema_shadow_params
+
+        dec = torch.nn.Sequential(torch.nn.Linear(10, 10))
+
+        shadow_params = {}
+        for name, param in dec.named_parameters():
+            shadow_params[name] = param.data.clone() + 0.1
+        # デコーダに存在しないキーを追加
+        shadow_params["nonexistent.weight"] = torch.randn(5, 5)
+
+        applied, skipped = apply_ema_shadow_params(dec, shadow_params)
+        assert applied > 0
+        assert skipped == 1, f"Expected 1 skipped, got {skipped}"
+
+    def test_empty_shadow_params(self):
+        """shadow_params が空辞書の場合、applied=0 で warning が出る"""
+        from piper_train.export_onnx import apply_ema_shadow_params
+
+        dec = torch.nn.Sequential(torch.nn.Linear(10, 10))
+
+        applied, skipped = apply_ema_shadow_params(dec, {})
+        assert applied == 0
+        assert skipped == 0
+
+    def test_convenience_wrapper_no_ema_state(self, tmp_path):
+        """apply_ema_weights: チェックポイントに EMA state がない場合はスキップ"""
         from piper_train.export_onnx import apply_ema_weights
 
         dec = torch.nn.Sequential(torch.nn.Linear(10, 10))
@@ -166,8 +190,8 @@ class TestEMAWeightApplication:
         assert applied == 0
         assert skipped == 0
 
-    def test_ema_with_extra_keys_are_skipped(self, tmp_path):
-        """shadow_params にデコーダにないキーがあれば skipped としてカウントされる"""
+    def test_convenience_wrapper_loads_and_applies(self, tmp_path):
+        """apply_ema_weights: チェックポイントから EMA を読み込んで適用"""
         from piper_train.export_onnx import apply_ema_weights
 
         dec = torch.nn.Sequential(torch.nn.Linear(10, 10))
@@ -175,10 +199,8 @@ class TestEMAWeightApplication:
         shadow_params = {}
         for name, param in dec.named_parameters():
             shadow_params[name] = param.data.clone() + 0.1
-        # デコーダに存在しないキーを追加
-        shadow_params["nonexistent.weight"] = torch.randn(5, 5)
 
-        ckpt_path = tmp_path / "test_ema_extra.ckpt"
+        ckpt_path = tmp_path / "test_ema.ckpt"
         torch.save(
             {"ema_generator_state": {"shadow_params": shadow_params}},
             str(ckpt_path),
@@ -186,22 +208,6 @@ class TestEMAWeightApplication:
 
         applied, skipped = apply_ema_weights(dec, ckpt_path)
         assert applied > 0
-        assert skipped == 1, f"Expected 1 skipped, got {skipped}"
-
-    def test_ema_empty_shadow_params(self, tmp_path):
-        """shadow_params が空辞書の場合、applied=0 で warning が出る"""
-        from piper_train.export_onnx import apply_ema_weights
-
-        dec = torch.nn.Sequential(torch.nn.Linear(10, 10))
-
-        ckpt_path = tmp_path / "test_ema_empty.ckpt"
-        torch.save(
-            {"ema_generator_state": {"shadow_params": {}}},
-            str(ckpt_path),
-        )
-
-        applied, skipped = apply_ema_weights(dec, ckpt_path)
-        assert applied == 0
         assert skipped == 0
 
 

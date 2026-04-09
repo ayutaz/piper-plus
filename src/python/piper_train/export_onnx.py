@@ -102,18 +102,64 @@ def build_infer_forward(
     return infer_forward
 
 
-def apply_ema_weights(
+def apply_ema_shadow_params(
     decoder: "torch.nn.Module",
-    checkpoint_path: "str | Path",
+    shadow_params: dict,
 ) -> "tuple[int, int]":
-    """Apply EMA shadow weights to the decoder module.
+    """Apply pre-loaded EMA shadow parameters to the decoder module.
 
-    Loads the checkpoint, extracts ``ema_generator_state.shadow_params``,
-    and copies matching parameters into *decoder* **in-place**.
+    This is the pure-logic function that copies shadow parameters into
+    *decoder* **in-place** without any file I/O.  It can be unit-tested
+    with in-memory dicts (no checkpoint files needed).
 
     IMPORTANT: This must be called BEFORE ``remove_weight_norm()``, because
     EMA shadow params use ``weight_g``/``weight_v`` keys. ``remove_weight_norm()``
     fuses them into a single ``weight`` tensor, making EMA keys unmatchable.
+
+    Parameters
+    ----------
+    decoder : torch.nn.Module
+        The decoder sub-module (``model_g.dec``) whose parameters will be
+        overwritten with EMA shadow values.
+    shadow_params : dict
+        Mapping of parameter name → shadow tensor, typically from
+        ``checkpoint["ema_generator_state"]["shadow_params"]``.
+
+    Returns
+    -------
+    (applied, skipped) : tuple[int, int]
+        Number of parameters applied and skipped.
+    """
+    applied = 0
+    skipped = 0
+    dec_params = dict(decoder.named_parameters())
+    for name, shadow_param in shadow_params.items():
+        if name in dec_params:
+            dec_params[name].data.copy_(shadow_param)
+            applied += 1
+        else:
+            skipped += 1
+
+    if applied > 0:
+        _LOGGER.info(
+            "Applied EMA weights to decoder: %d parameters (skipped %d)",
+            applied,
+            skipped,
+        )
+    else:
+        _LOGGER.warning("EMA state found but no matching decoder parameters")
+
+    return applied, skipped
+
+
+def apply_ema_weights(
+    decoder: "torch.nn.Module",
+    checkpoint_path: "str | Path",
+) -> "tuple[int, int]":
+    """High-level convenience: load checkpoint and apply EMA shadow weights.
+
+    Loads the checkpoint, extracts ``ema_generator_state.shadow_params``,
+    and delegates to :func:`apply_ema_shadow_params`.
 
     Parameters
     ----------
@@ -137,27 +183,9 @@ def apply_ema_weights(
         del ckpt
         return 0, 0
 
-    applied = 0
-    skipped = 0
-    dec_params = dict(decoder.named_parameters())
-    for name, shadow_param in ema_state["shadow_params"].items():
-        if name in dec_params:
-            dec_params[name].data.copy_(shadow_param)
-            applied += 1
-        else:
-            skipped += 1
-
-    if applied > 0:
-        _LOGGER.info(
-            "Applied EMA weights to decoder: %d parameters (skipped %d)",
-            applied,
-            skipped,
-        )
-    else:
-        _LOGGER.warning("EMA state found but no matching decoder parameters")
-
+    result = apply_ema_shadow_params(decoder, ema_state["shadow_params"])
     del ckpt
-    return applied, skipped
+    return result
 
 
 def should_unify_emb_lang(

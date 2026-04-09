@@ -305,7 +305,6 @@ def create_parser():
 
 def apply_transfer_defaults(
     args: argparse.Namespace,
-    dict_args: dict,
     num_speakers: int,
     num_languages: int,
 ) -> None:
@@ -315,22 +314,21 @@ def apply_transfer_defaults(
        when not explicitly specified (value == 0).
     2. freeze_dp: auto-enable when --resume-from-multispeaker-checkpoint is used.
 
-    Mutates *args* and *dict_args* in place.  Callers should pass
-    ``dict_args = vars(args)`` so that both references stay in sync.
+    Mutates *args* in place.  Callers should use ``vars(args)`` afterward
+    to obtain a dict view that reflects the updated values.
     """
     # gin_channels 自動設定
     # 768 は ONNX エクスポート時の数値精度低下を引き起こす
     # VitsModel.__init__ のフォールバック (512) と一致させる
-    if (num_speakers > 1 or num_languages > 1) and dict_args.get(
-        "gin_channels", 0
+    if (num_speakers > 1 or num_languages > 1) and getattr(
+        args, "gin_channels", 0
     ) == 0:
-        dict_args["gin_channels"] = 512
+        args.gin_channels = 512
 
     # freeze_dp 自動有効化
     # モデル作成前に設定しないと save_hyperparameters() に反映されない
     if getattr(args, "resume_from_multispeaker_checkpoint", None) and not args.freeze_dp:
         args.freeze_dp = True
-        dict_args["freeze_dp"] = True
         _LOGGER.info(
             "Auto-enabled --freeze-dp for multispeaker→single-speaker transfer"
         )
@@ -455,7 +453,7 @@ def main():
         dict_args["upsample_initial_channel"] = 512
         dict_args["upsample_kernel_sizes"] = (16, 16, 4, 4)
 
-    apply_transfer_defaults(args, dict_args, num_speakers, num_languages)
+    apply_transfer_defaults(args, num_speakers, num_languages)
 
     # num_workers自動調整機能を削除
     # ユーザー指定のnum_workersをそのまま使用する
