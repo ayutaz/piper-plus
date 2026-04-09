@@ -334,7 +334,7 @@ COVERAGE=1 ./build.sh
 
 ## Go
 
-Go 製の HTTP API サーバーおよび CLI ツール (`piper-plus-go`) です。ONNX モデルを使用した音声合成を HTTP API またはコマンドラインから実行できます。
+Go 製の HTTP API サーバーおよび CLI ツールです。Docker イメージ名は `piper-plus-go`、コンテナ内の CLI コマンドは `piper-plus` です。ONNX モデルを使用した音声合成を HTTP API またはコマンドラインから実行できます。Debian ベースのマルチステージビルドで、OpenJTalk (日本語G2P) を静的リンクし、ONNX Runtime v1.24.4 をバンドルしています。
 
 ### ビルド
 
@@ -349,7 +349,7 @@ docker run --rm \
   -v $(pwd)/models:/models:ro \
   -v $(pwd)/output:/output \
   piper-plus-go \
-  piper-plus-go --model /models/model.onnx --text "こんにちは" --output /output/output.wav
+  -m /models/model.onnx -t "こんにちは" -f /output/output.wav
 ```
 
 ### HTTP サーバーモード
@@ -360,7 +360,15 @@ docker run -d \
   -v $(pwd)/models:/models:ro \
   -p 8080:8080 \
   piper-plus-go \
-  piper-plus-go --model /models/model.onnx --server --host 0.0.0.0 --port 8080
+  serve -m /models/model.onnx --addr :8080
+```
+
+テスト:
+
+```bash
+curl "http://localhost:8080/synthesize?text=Hello&lang=en" -o output.wav
+curl http://localhost:8080/health
+curl http://localhost:8080/info
 ```
 
 ## ボリュームマウント
