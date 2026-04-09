@@ -2,7 +2,6 @@
 import argparse
 import json
 import logging
-import math
 import os
 import sys
 import time
@@ -758,7 +757,6 @@ def main():
         audio = outputs[0].squeeze(0)
         # durations output is available for phoneme timing (e.g., lip-sync, karaoke)
         durations = outputs[1] if len(outputs) > 1 else None
-        # audio = denoise(audio, bias_spec, 10)
         audio = audio_float_to_int16(audio.squeeze())
 
         # --- Strategy A: Post-trim silence introduced by padding ---
@@ -791,100 +789,6 @@ def main():
             output_path = args.output_dir / f"{utt_id}.wav"
         write_wav(str(output_path), args.sample_rate, audio)
         _LOGGER.info("Wrote: %s", output_path)
-
-
-def denoise(
-    audio: np.ndarray, bias_spec: np.ndarray, denoiser_strength: float
-) -> np.ndarray:
-    audio_spec, audio_angles = transform(audio)
-
-    a = bias_spec.shape[-1]
-    b = audio_spec.shape[-1]
-    repeats = max(1, math.ceil(b / a))
-    bias_spec_repeat = np.repeat(bias_spec, repeats, axis=-1)[..., :b]
-
-    audio_spec_denoised = audio_spec - (bias_spec_repeat * denoiser_strength)
-    audio_spec_denoised = np.clip(audio_spec_denoised, a_min=0.0, a_max=None)
-    audio_denoised = inverse(audio_spec_denoised, audio_angles)
-
-    return audio_denoised
-
-
-def stft(x, fft_size, hopsamp):
-    """Compute and return the STFT of the supplied time domain signal x.
-    Args:
-        x (1-dim Numpy array): A time domain signal.
-        fft_size (int): FFT size. Should be a power of 2, otherwise DFT will be used.
-        hopsamp (int):
-    Returns:
-        The STFT. The rows are the time slices and columns are the frequency bins.
-    """
-    window = np.hanning(fft_size)
-    fft_size = int(fft_size)
-    hopsamp = int(hopsamp)
-    return np.array(
-        [
-            np.fft.rfft(window * x[i : i + fft_size])
-            for i in range(0, len(x) - fft_size, hopsamp)
-        ]
-    )
-
-
-def istft(X, fft_size, hopsamp):
-    """Invert a STFT into a time domain signal.
-    Args:
-        X (2-dim Numpy array): Input spectrogram. The rows are the time slices and columns are the frequency bins.  # noqa: E501
-        fft_size (int):
-        hopsamp (int): The hop size, in samples.
-    Returns:
-        The inverse STFT.
-    """
-    fft_size = int(fft_size)
-    hopsamp = int(hopsamp)
-    window = np.hanning(fft_size)
-    time_slices = X.shape[0]
-    len_samples = int(time_slices * hopsamp + fft_size)
-    x = np.zeros(len_samples)
-    for n, i in enumerate(range(0, len(x) - fft_size, hopsamp)):
-        x[i : i + fft_size] += window * np.real(np.fft.irfft(X[n]))
-    return x
-
-
-def inverse(magnitude, phase):
-    recombine_magnitude_phase = np.concatenate(
-        [magnitude * np.cos(phase), magnitude * np.sin(phase)], axis=1
-    )
-
-    x_org = recombine_magnitude_phase
-    n_b, n_f, n_t = x_org.shape  # pylint: disable=unpacking-non-sequence
-    x = np.empty([n_b, n_f // 2, n_t], dtype=np.complex64)
-    x.real = x_org[:, : n_f // 2]
-    x.imag = x_org[:, n_f // 2 :]
-    inverse_transform = []
-    for y in x:
-        y_ = istft(y.T, fft_size=1024, hopsamp=256)
-        inverse_transform.append(y_[None, :])
-
-    inverse_transform = np.concatenate(inverse_transform, 0)
-
-    return inverse_transform
-
-
-def transform(input_data):
-    x = input_data
-    real_part = []
-    imag_part = []
-    for y in x:
-        y_ = stft(y, fft_size=1024, hopsamp=256).T
-        real_part.append(y_.real[None, :, :])  # pylint: disable=unsubscriptable-object
-        imag_part.append(y_.imag[None, :, :])  # pylint: disable=unsubscriptable-object
-    real_part = np.concatenate(real_part, 0)
-    imag_part = np.concatenate(imag_part, 0)
-
-    magnitude = np.sqrt(real_part**2 + imag_part**2)
-    phase = np.arctan2(imag_part.data, real_part.data)
-
-    return magnitude, phase
 
 
 if __name__ == "__main__":
