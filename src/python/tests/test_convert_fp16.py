@@ -12,22 +12,31 @@ onnx = pytest.importorskip("onnx")
 
 
 def _onnx_inference(onnx_path, phoneme_ids, prosody_features, noise_scale=0.667):
-    """Run ONNX inference and return audio output."""
+    """Run ONNX inference and return audio output.
+
+    phoneme_ids/prosody_features を指定した場合はそれを使用し、
+    それ以外の入力 (sid, lid 等) は本番 _create_dummy_inputs() に委譲する。
+    """
     import onnxruntime
+
+    from piper_train.tools.convert_fp16 import _create_dummy_inputs
 
     session = onnxruntime.InferenceSession(
         str(onnx_path), providers=["CPUExecutionProvider"]
     )
+
+    # 本番関数でベースとなるダミー入力を生成
+    inputs = _create_dummy_inputs(session)
+    if inputs is None:
+        raise RuntimeError("Failed to create dummy inputs for ONNX model")
+
+    # テスト固有の phoneme_ids で上書き
     text = np.expand_dims(np.array(phoneme_ids, dtype=np.int64), 0)
-    text_lengths = np.array([text.shape[1]], dtype=np.int64)
-    scales = np.array([noise_scale, 1.0, 0.8], dtype=np.float32)
+    inputs["input"] = text
+    inputs["input_lengths"] = np.array([text.shape[1]], dtype=np.int64)
+    inputs["scales"] = np.array([noise_scale, 1.0, 0.8], dtype=np.float32)
 
-    inputs = {
-        "input": text,
-        "input_lengths": text_lengths,
-        "scales": scales,
-    }
-
+    # prosody_features の上書き
     input_names = [inp.name for inp in session.get_inputs()]
     if "prosody_features" in input_names:
         pf = []
@@ -36,7 +45,9 @@ def _onnx_inference(onnx_path, phoneme_ids, prosody_features, noise_scale=0.667)
                 pf.append([0, 0, 0])
             else:
                 pf.append([feat["a1"], feat["a2"], feat["a3"]])
-        inputs["prosody_features"] = np.expand_dims(np.array(pf, dtype=np.int64), 0)
+        inputs["prosody_features"] = np.expand_dims(
+            np.array(pf, dtype=np.int64), 0
+        )
 
     outputs = session.run(None, inputs)
     return outputs[0].squeeze()

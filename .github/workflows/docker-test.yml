@@ -350,10 +350,17 @@ jobs:
           sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost \
             "$AGENT_TOOLSDIRECTORY" /usr/local/lib/android /opt/hostedtoolcache/CodeQL \
             /usr/local/graalvm /usr/local/.ghcup /usr/local/share/powershell \
-            /opt/hostedtoolcache
+            /opt/hostedtoolcache \
+            /usr/share/swift /usr/share/miniconda /usr/share/az_* \
+            /usr/local/julia* /opt/microsoft /opt/pipx
           sudo docker image prune --all --force
           sudo apt-get clean
+          echo "--- Disk space after cleanup ---"
           df -h /
+          avail_gb=$(df / --output=avail -BG | tail -1 | tr -d ' G')
+          if [ "$avail_gb" -lt 40 ]; then
+            echo "::warning::Low disk space (${avail_gb}G). Build may fail on small runners."
+          fi
 
       - uses: actions/checkout@v6
       - uses: docker/setup-buildx-action@v4

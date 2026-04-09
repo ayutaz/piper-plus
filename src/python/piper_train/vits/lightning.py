@@ -32,6 +32,31 @@ _LOGGER = logging.getLogger("vits.lightning")
 MEMORY_CLEANUP_FREQUENCY = 500
 
 
+def normalize_id_tensor(
+    raw_value: int | torch.Tensor | None,
+    device: torch.device | None = None,
+) -> torch.Tensor | None:
+    """Normalize a speaker_id or language_id to a 1-D LongTensor of shape [1].
+
+    Handles four input patterns produced by the dataset layer:
+    - ``int``         -> ``torch.LongTensor([value])``
+    - 0-D ``Tensor``  -> ``value.unsqueeze(0)``  (scalar from ``random_split`` Subset)
+    - 1-D ``Tensor``  -> pass-through            (already shape [1])
+    - ``None``        -> ``None``
+
+    Optionally moves the result to *device*.
+    """
+    if raw_value is None:
+        return None
+    if isinstance(raw_value, torch.Tensor):
+        t = raw_value.unsqueeze(0) if raw_value.dim() == 0 else raw_value
+    else:
+        t = torch.LongTensor([raw_value])
+    if device is not None:
+        t = t.to(device)
+    return t
+
+
 class VitsModel(pl.LightningModule):
     def __init__(
         self,
@@ -705,33 +730,8 @@ class VitsModel(pl.LightningModule):
                                 [len(test_utt.phoneme_ids)]
                             ).to(self.device)
                             scales = [0.667, 1.0, 0.8]
-                            # speaker_id / language_id may be int or Tensor
-                            # (Subset from random_split wraps them as LongTensor)
-                            raw_sid = test_utt.speaker_id
-                            if raw_sid is not None:
-                                if isinstance(raw_sid, torch.Tensor):
-                                    sid = (
-                                        raw_sid.unsqueeze(0)
-                                        if raw_sid.dim() == 0
-                                        else raw_sid
-                                    ).to(self.device)
-                                else:
-                                    sid = torch.LongTensor([raw_sid]).to(self.device)
-                            else:
-                                sid = None
-
-                            raw_lid = test_utt.language_id
-                            if raw_lid is not None:
-                                if isinstance(raw_lid, torch.Tensor):
-                                    lid = (
-                                        raw_lid.unsqueeze(0)
-                                        if raw_lid.dim() == 0
-                                        else raw_lid
-                                    ).to(self.device)
-                                else:
-                                    lid = torch.LongTensor([raw_lid]).to(self.device)
-                            else:
-                                lid = None
+                            sid = normalize_id_tensor(test_utt.speaker_id, self.device)
+                            lid = normalize_id_tensor(test_utt.language_id, self.device)
 
                             test_audio = self(
                                 text, text_lengths, scales, sid=sid, lid=lid

@@ -1,15 +1,21 @@
 #!/usr/bin/env python3
+from __future__ import annotations
+
 import argparse
 import logging
 import pathlib
 import platform
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import torch
 
 from .tools.convert_fp16 import convert_fp16
-from .vits import commons
 from .vits.lightning import VitsModel
+
+
+if TYPE_CHECKING:
+    from .vits.models import SynthesizerTrn
 
 
 # Allow Path objects in checkpoints (PyTorch 2.6+ weights_only=True)
@@ -25,8 +31,183 @@ _LOGGER = logging.getLogger("piper_train.export_onnx")
 OPSET_VERSION = 15
 
 
+def build_infer_forward(
+    model: SynthesizerTrn,
+    *,
+    stochastic: bool = True,
+) -> callable:
+    """Build an inference-only forward function for ONNX export.
+
+    The returned callable replaces ``model.forward`` before
+    ``torch.onnx.export()`` so that the exported graph contains only
+    the inference path (no discriminator, no training loss).
+
+    This is a thin wrapper around :meth:`SynthesizerTrn.infer` that
+    handles scale unpacking, ``onnx_export_mode`` management, and
+    return-value transformation.
+
+    Parameters
+    ----------
+    model : SynthesizerTrn
+        The generator model (``model_g``). Must already have
+        ``remove_weight_norm()`` applied on ``model.dec``.
+    stochastic : bool
+        If True, sample z_p with noise (production default).
+        If False, use the mean (deterministic / debug).
+
+    Returns
+    -------
+    callable
+        A forward function with signature::
+
+            infer_forward(text, text_lengths, scales,
+                          sid=None, lid=None, prosody_features=None,
+                          speaker_embedding=None,
+                          speaker_embedding_mask=None)
+            -> (audio: Tensor, durations: Tensor)
+    """
+
+    def infer_forward(
+        text,
+        text_lengths,
+        scales,
+        sid=None,
+        lid=None,
+        prosody_features=None,
+        speaker_embedding=None,
+        speaker_embedding_mask=None,
+    ):
+        noise_scale = scales[0]
+        length_scale = scales[1]
+        noise_scale_w = scales[2]
+
+        # model.infer() uses onnx_export_mode to decide whether to add noise:
+        #   onnx_export_mode=True  → z_p = m_p          (deterministic)
+        #   onnx_export_mode=False → z_p = m_p + noise   (stochastic)
+        # We set it here to match the stochastic flag, restoring the
+        # original value afterwards so the caller's state is not mutated.
+        prev_model = getattr(model, "onnx_export_mode", False)
+        prev_dp = (
+            getattr(model.dp, "onnx_export_mode", False)
+            if hasattr(model, "dp")
+            else None
+        )
+        model.onnx_export_mode = not stochastic
+        if hasattr(model, "dp"):
+            model.dp.onnx_export_mode = not stochastic
+
+        try:
+            audio, _attn, _y_mask, _latents, durations = model.infer(
+                text,
+                text_lengths,
+                sid=sid,
+                lid=lid,
+                noise_scale=noise_scale,
+                length_scale=length_scale,
+                noise_scale_w=noise_scale_w,
+                prosody_features=prosody_features,
+                speaker_embedding=speaker_embedding,
+                speaker_embedding_mask=speaker_embedding_mask,
+            )
+        finally:
+            model.onnx_export_mode = prev_model
+            if hasattr(model, "dp") and prev_dp is not None:
+                model.dp.onnx_export_mode = prev_dp
+
+        return audio, durations
+
+    return infer_forward
+
+
+def apply_ema_shadow_params(
+    decoder: torch.nn.Module,
+    shadow_params: dict,
+) -> tuple[int, int]:
+    """Apply pre-loaded EMA shadow parameters to the decoder module.
+
+    This is the pure-logic function that copies shadow parameters into
+    *decoder* **in-place** without any file I/O.  It can be unit-tested
+    with in-memory dicts (no checkpoint files needed).
+
+    IMPORTANT: This must be called BEFORE ``remove_weight_norm()``, because
+    EMA shadow params use ``weight_g``/``weight_v`` keys. ``remove_weight_norm()``
+    fuses them into a single ``weight`` tensor, making EMA keys unmatchable.
+
+    Parameters
+    ----------
+    decoder : torch.nn.Module
+        The decoder sub-module (``model_g.dec``) whose parameters will be
+        overwritten with EMA shadow values.
+    shadow_params : dict
+        Mapping of parameter name → shadow tensor, typically from
+        ``checkpoint["ema_generator_state"]["shadow_params"]``.
+
+    Returns
+    -------
+    (applied, skipped) : tuple[int, int]
+        Number of parameters applied and skipped.
+    """
+    applied = 0
+    skipped = 0
+    dec_params = dict(decoder.named_parameters())
+    with torch.no_grad():
+        for name, shadow_param in shadow_params.items():
+            if name in dec_params:
+                dec_params[name].copy_(shadow_param)
+                applied += 1
+            else:
+                skipped += 1
+
+    if applied > 0:
+        _LOGGER.info(
+            "Applied EMA weights to decoder: %d parameters (skipped %d)",
+            applied,
+            skipped,
+        )
+    else:
+        _LOGGER.warning("EMA state found but no matching decoder parameters")
+
+    return applied, skipped
+
+
+def apply_ema_weights(
+    decoder: torch.nn.Module,
+    checkpoint_path: str | Path,
+) -> tuple[int, int]:
+    """High-level convenience: load checkpoint and apply EMA shadow weights.
+
+    Loads the checkpoint, extracts ``ema_generator_state.shadow_params``,
+    and delegates to :func:`apply_ema_shadow_params`.
+
+    Parameters
+    ----------
+    decoder : torch.nn.Module
+        The decoder sub-module (``model_g.dec``) whose parameters will be
+        overwritten with EMA shadow values.
+    checkpoint_path : str | Path
+        Path to the ``.ckpt`` file containing ``ema_generator_state``.
+
+    Returns
+    -------
+    (applied, skipped) : tuple[int, int]
+        Number of parameters applied and skipped.
+        ``(0, 0)`` if no EMA state was found in the checkpoint.
+    """
+    ckpt = torch.load(checkpoint_path, map_location="cpu")
+    ema_state = ckpt.get("ema_generator_state")
+
+    if not ema_state or "shadow_params" not in ema_state:
+        _LOGGER.info("No EMA state found in checkpoint, skipping EMA")
+        del ckpt
+        return 0, 0
+
+    result = apply_ema_shadow_params(decoder, ema_state["shadow_params"])
+    del ckpt
+    return result
+
+
 def should_unify_emb_lang(
-    unify_flag: "bool | None",
+    unify_flag: bool | None,
     num_speakers: int,
     num_languages: int,
 ) -> bool:
@@ -243,29 +424,7 @@ def main() -> None:
     # IMPORTANT: EMA must be applied BEFORE remove_weight_norm(), because EMA shadow
     # params use weight_g/weight_v keys. remove_weight_norm() fuses them into a single
     # "weight" tensor, making EMA keys unmatchable.
-    ckpt = torch.load(args.checkpoint, map_location="cpu")
-    ema_state = ckpt.get("ema_generator_state")
-    if ema_state and "shadow_params" in ema_state:
-        applied = 0
-        skipped = 0
-        dec_params = dict(model_g.dec.named_parameters())
-        for name, shadow_param in ema_state["shadow_params"].items():
-            if name in dec_params:
-                dec_params[name].data.copy_(shadow_param)
-                applied += 1
-            else:
-                skipped += 1
-        if applied > 0:
-            _LOGGER.info(
-                "Applied EMA weights to decoder: %d parameters (skipped %d)",
-                applied,
-                skipped,
-            )
-        else:
-            _LOGGER.warning("EMA state found but no matching decoder parameters")
-    else:
-        _LOGGER.info("No EMA state found in checkpoint, skipping EMA")
-    del ckpt
+    apply_ema_weights(model_g.dec, args.checkpoint)
 
     with torch.no_grad():
         model_g.dec.remove_weight_norm()
@@ -273,92 +432,7 @@ def main() -> None:
     # Check if model uses prosody features
     has_prosody = getattr(model_g, "prosody_dim", 0) > 0
 
-    stochastic = args.stochastic
-
-    def infer_forward(
-        text,
-        text_lengths,
-        scales,
-        sid=None,
-        lid=None,
-        prosody_features=None,
-        speaker_embedding=None,
-        speaker_embedding_mask=None,
-    ):
-        """
-        Efficient forward function that returns both audio and duration information.
-        The duration predictor is called once to compute both durations and audio output.
-        """
-        # noise_scale = scales[0]  # unused in ONNX export (deterministic mode)
-        length_scale = scales[1]
-        noise_scale_w = scales[2]
-
-        # 1. Global conditioning (must be computed before enc_p)
-        # Compute the standard sid/lid conditioning first.
-        g_base = model_g._get_global_conditioning(sid, lid)
-
-        # Speaker-embedding override (trace-friendly: always evaluate both paths
-        # and select via torch.where so that ONNX keeps both inputs in the graph).
-        if speaker_embedding is not None and speaker_embedding_mask is not None:
-            g_se = speaker_embedding.unsqueeze(-1)  # (batch, emb_dim, 1)
-            if g_se.size(1) != model_g.gin_channels:
-                proj = model_g._ensure_spk_proj(g_se.size(1))
-                g_se = proj(g_se.squeeze(-1)).unsqueeze(-1)
-            if num_languages > 1 and lid is not None:
-                lang_emb = model_g.emb_lang(lid).unsqueeze(-1)
-                g_se = g_se + lang_emb
-            # mask shape (batch, 1) -> (batch, 1, 1) to broadcast over (batch, gin, 1)
-            use_se = (speaker_embedding_mask >= 1).unsqueeze(-1).float()
-            if g_base is not None:
-                g = torch.where(use_se >= 1, g_se, g_base)
-            else:
-                # No base conditioning (single-speaker mono-lingual): use se or zeros
-                g = g_se * use_se
-        else:
-            g = g_base
-
-        # 2. Encoder (with global conditioning for cond_layer)
-        x, m_p, logs_p, x_mask = model_g.enc_p(text, text_lengths, g=g)
-
-        # 3. Duration Predictor (called only once)
-        x_dp = model_g._prepare_prosody_input(x, x_mask, prosody_features, lid=lid)
-        if model_g.use_sdp:
-            logw = model_g.dp(
-                x_dp, x_mask, g=g, reverse=True, noise_scale=noise_scale_w
-            )
-        else:
-            logw = model_g.dp(x_dp, x_mask, g=g)
-
-        w = torch.exp(logw) * x_mask * length_scale
-        durations = w.squeeze(1)  # [batch, phoneme_length]
-
-        # 4. Attention/Alignment
-        w_ceil = torch.ceil(w)
-        y_lengths = torch.clamp_min(torch.sum(w_ceil, [1, 2]), 1).long()
-        y_mask = torch.unsqueeze(
-            commons.sequence_mask(y_lengths, y_lengths.max()), 1
-        ).type_as(x_mask)
-        attn_mask = torch.unsqueeze(x_mask, 2) * torch.unsqueeze(y_mask, -1)
-        attn = commons.generate_path(w_ceil, attn_mask)
-
-        # 5. Expand prior
-        m_p = torch.matmul(attn.squeeze(1), m_p.transpose(1, 2)).transpose(1, 2)
-        logs_p = torch.matmul(attn.squeeze(1), logs_p.transpose(1, 2)).transpose(1, 2)
-
-        # 6. Sample z_p
-        if stochastic:
-            noise_scale = scales[0]
-            z_p = m_p + torch.randn_like(m_p) * torch.exp(logs_p) * noise_scale
-        else:
-            z_p = m_p
-
-        # 7. Flow + Decoder
-        z = model_g.flow(z_p, y_mask, g=g, reverse=True)
-        o = model_g.dec((z * y_mask), g=g)
-
-        return o, durations
-
-    model_g.forward = infer_forward
+    model_g.forward = build_infer_forward(model_g, stochastic=args.stochastic)
 
     dummy_input_length = 50
     sequences = torch.randint(

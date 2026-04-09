@@ -34,7 +34,7 @@ class TestInferSpeakerEmbedding:
         spk_emb = torch.randn(1, gin)
 
         with torch.no_grad():
-            o, attn, y_mask, _ = model.infer(
+            o, attn, y_mask, _, _ = model.infer(
                 x, x_len, speaker_embedding=spk_emb
             )
 
@@ -54,7 +54,7 @@ class TestInferSpeakerEmbedding:
         sid = torch.LongTensor([0])
 
         with torch.no_grad():
-            o, attn, y_mask, _ = model.infer(x, x_len, sid=sid)
+            o, attn, y_mask, _, _ = model.infer(x, x_len, sid=sid)
 
         assert o.dim() == 3
         assert o.shape[0] == 1
@@ -72,10 +72,10 @@ class TestInferSpeakerEmbedding:
         spk_emb = torch.randn(1, gin)
 
         with torch.no_grad():
-            o_emb, _, _, _ = model.infer(
+            o_emb, _, _, _, _ = model.infer(
                 x, x_len, sid=sid, speaker_embedding=spk_emb
             )
-            o_sid, _, _, _ = model.infer(x, x_len, sid=sid)
+            o_sid, _, _, _, _ = model.infer(x, x_len, sid=sid)
 
         # Both should produce valid 3D audio tensors.
         # Audio lengths may differ (different conditioning -> different durations).
@@ -96,7 +96,7 @@ class TestInferSpeakerEmbedding:
         spk_emb = torch.randn(1, gin, 1)  # already has trailing dim
 
         with torch.no_grad():
-            o, _, _, _ = model.infer(x, x_len, speaker_embedding=spk_emb)
+            o, _, _, _, _ = model.infer(x, x_len, speaker_embedding=spk_emb)
 
         assert o.dim() == 3
 
@@ -124,7 +124,7 @@ class TestSpeakerEmbeddingProjection:
         spk_emb = torch.randn(1, emb_dim)
 
         with torch.no_grad():
-            o, _, _, _ = model.infer(x, x_len, speaker_embedding=spk_emb)
+            o, _, _, _, _ = model.infer(x, x_len, speaker_embedding=spk_emb)
 
         assert model.spk_proj is not None, "spk_proj should be created"
         assert model.spk_proj.in_features == emb_dim
@@ -188,7 +188,7 @@ class TestSpeakerEmbeddingWithLanguage:
         spk_emb = torch.randn(1, gin)
 
         with torch.no_grad():
-            o, _, _, _ = model.infer(
+            o, _, _, _, _ = model.infer(
                 x, x_len, lid=lid, speaker_embedding=spk_emb
             )
 

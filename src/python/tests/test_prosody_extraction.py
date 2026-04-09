@@ -2,44 +2,24 @@
 Tests for A1/A2/A3 prosody value extraction from OpenJTalk labels.
 """
 
+import functools
+
 import pytest
 
+# Shared helpers from conftest.py.
+# This file uses auto_eos=True (conditional "$") to avoid double-termination
+# for question sentences.
+from conftest import (  # noqa: E402
+    HAS_JAPANESE_G2P as HAS_JAPANESE,
+    phonemize_japanese as _phonemize_japanese_base,
+    phonemize_japanese_with_prosody,
+)
 
-# Japanese imports are optional
-try:
-    import pyopenjtalk  # noqa: F401
+if HAS_JAPANESE:
+    from piper_plus_g2p import ProsodyInfo  # noqa: F811
 
-    from piper_plus_g2p import ProsodyInfo
-    from piper_plus_g2p.japanese import JapanesePhonemizer
-    from piper_plus_g2p.encode.pua import map_token as _map_token
-
-    _EOS_TOKENS = {"$", "?", "?!", "?.", "?~"}
-
-    def phonemize_japanese(text):
-        """Wrapper that matches old piper_train API: returns PUA-mapped tokens with BOS/EOS."""
-        p = JapanesePhonemizer()
-        tokens = p.phonemize(text)
-        # piper_plus_g2p returns raw tokens; add BOS and EOS
-        full_tokens = ["^"] + list(tokens)
-        if not tokens or tokens[-1] not in _EOS_TOKENS:
-            full_tokens.append("$")
-        return [_map_token(t) for t in full_tokens]
-
-    def phonemize_japanese_with_prosody(text):
-        """Wrapper that matches old piper_train API: returns PUA-mapped tokens+prosody with BOS/EOS."""
-        p = JapanesePhonemizer()
-        tokens, prosody = p.phonemize_with_prosody(text)
-        full_tokens = ["^"] + list(tokens)
-        full_prosody = [None] + list(prosody)
-        if not tokens or tokens[-1] not in _EOS_TOKENS:
-            full_tokens.append("$")
-            full_prosody.append(None)
-        mapped_tokens = [_map_token(t) for t in full_tokens]
-        return mapped_tokens, full_prosody
-
-    HAS_JAPANESE = True
-except ImportError:
-    HAS_JAPANESE = False
+# Bind auto_eos=True so callers in this file keep the original behaviour.
+phonemize_japanese = functools.partial(_phonemize_japanese_base, auto_eos=True)
 
 
 class TestProsodyExtraction:
@@ -510,65 +490,3 @@ class TestProsodyDatasetValidation:
             f"phoneme_ids ({len(phoneme_ids)}) != prosody_features ({len(prosody_features)})"
         )
 
-    @pytest.mark.unit
-    def test_validate_dataset_prosody_lengths(self):
-        """Test validation function for dataset prosody/phoneme_ids length matching."""
-        import json
-        import tempfile
-        from pathlib import Path
-
-        # Create a test dataset with valid data
-        valid_data = [
-            {
-                "phoneme_ids": [1, 2, 3, 4, 5],
-                "prosody_features": [
-                    {"a1": 0, "a2": 0, "a3": 0},
-                    {"a1": -1, "a2": 1, "a3": 3},
-                    {"a1": 0, "a2": 2, "a3": 3},
-                    {"a1": 1, "a2": 3, "a3": 3},
-                    {"a1": 0, "a2": 0, "a3": 0},
-                ],
-                "text": "test",
-                "audio_spec_path": "/tmp/test.pt"
-            }
-        ]
-
-        # Create a test dataset with INVALID data (length mismatch)
-        invalid_data = [
-            {
-                "phoneme_ids": [1, 2, 3, 4, 5],  # 5 items
-                "prosody_features": [
-                    {"a1": 0, "a2": 0, "a3": 0},
-                    {"a1": -1, "a2": 1, "a3": 3},
-                    {"a1": 0, "a2": 2, "a3": 3},
-                ],  # Only 3 items - MISMATCH!
-                "text": "test",
-                "audio_spec_path": "/tmp/test.pt"
-            }
-        ]
-
-        def validate_dataset_prosody(dataset_lines):
-            """Validate that all prosody_features match phoneme_ids lengths."""
-            errors = []
-            for i, line in enumerate(dataset_lines):
-                data = json.loads(line) if isinstance(line, str) else line
-                pids = data.get("phoneme_ids", [])
-                pf = data.get("prosody_features", [])
-                if pf and len(pids) != len(pf):
-                    errors.append({
-                        "line": i,
-                        "phoneme_ids_len": len(pids),
-                        "prosody_features_len": len(pf),
-                        "text": data.get("text", "")[:50]
-                    })
-            return errors
-
-        # Valid data should have no errors
-        valid_errors = validate_dataset_prosody([json.dumps(d) for d in valid_data])
-        assert len(valid_errors) == 0, f"Valid data should have no errors: {valid_errors}"
-
-        # Invalid data should be detected
-        invalid_errors = validate_dataset_prosody([json.dumps(d) for d in invalid_data])
-        assert len(invalid_errors) == 1, f"Invalid data should have 1 error: {invalid_errors}"
-        assert invalid_errors[0]["phoneme_ids_len"] == 5
-        assert invalid_errors[0]["prosody_features_len"] == 3

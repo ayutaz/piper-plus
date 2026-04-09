@@ -353,68 +353,33 @@ class TestPhonemeIdRange:
 
 
 @pytest.mark.unit
-class TestSidDefaultForSingleSpeakerMultilingual:
-    """Verify that infer_onnx defaults sid to [0] when has_sid=True but
-    speaker_id is None (single-speaker multilingual model)."""
+class TestResolveSpeakerId:
+    """Verify that resolve_speaker_id() handles speaker_id/has_sid combinations."""
 
-    def test_sid_default_for_single_speaker_multilingual(self):
-        """has_sid=True で speaker_id=None の場合、sid がデフォルト [0] になる.
+    @pytest.mark.parametrize(
+        "speaker_id, has_sid, expected_list, expected_dtype",
+        [
+            pytest.param(None, True, [0], "int64", id="default-sid-when-has-sid"),
+            pytest.param(5, True, [5], "int64", id="explicit-sid-preserved"),
+            pytest.param(None, False, None, None, id="none-when-no-sid-input"),
+        ],
+    )
+    def test_resolve_speaker_id(
+        self, speaker_id, has_sid, expected_list, expected_dtype
+    ):
+        """resolve_speaker_id returns correct ndarray or None."""
+        from piper_train.infer_onnx import resolve_speaker_id
 
-        Regression test: single-speaker multilingual models export with a sid
-        input (because gin_channels > 0 when num_languages > 1), but the user
-        may not provide a speaker_id.  infer_onnx must default sid to [0]
-        rather than passing None, which would cause an ONNX runtime error.
-        """
-        import numpy as np
+        sid = resolve_speaker_id(speaker_id=speaker_id, has_sid=has_sid)
 
-        # Simulate the infer_onnx logic: speaker_id is None, has_sid is True
-        speaker_id = None
-        has_sid = True
-
-        sid = None
-        if speaker_id is not None:
-            sid = np.array([speaker_id], dtype=np.int64)
-
-        # This is the key default logic from infer_onnx.py lines 316-317
-        if sid is None and has_sid:
-            sid = np.array([0], dtype=np.int64)
-
-        assert sid is not None, "sid must not be None when has_sid=True"
-        assert sid.tolist() == [0], f"sid should default to [0], got {sid.tolist()}"
-        assert sid.dtype == np.int64
-
-    def test_sid_preserved_when_explicit(self):
-        """has_sid=True で speaker_id=5 の場合、sid は [5] のまま."""
-        import numpy as np
-
-        speaker_id = 5
-        has_sid = True
-
-        sid = None
-        if speaker_id is not None:
-            sid = np.array([speaker_id], dtype=np.int64)
-
-        if sid is None and has_sid:
-            sid = np.array([0], dtype=np.int64)
-
-        assert sid is not None
-        assert sid.tolist() == [5], f"sid should be [5], got {sid.tolist()}"
-
-    def test_sid_none_when_no_sid_input(self):
-        """has_sid=False で speaker_id=None の場合、sid は None のまま."""
-        import numpy as np
-
-        speaker_id = None
-        has_sid = False
-
-        sid = None
-        if speaker_id is not None:
-            sid = np.array([speaker_id], dtype=np.int64)
-
-        if sid is None and has_sid:
-            sid = np.array([0], dtype=np.int64)
-
-        assert sid is None, "sid must remain None when has_sid=False"
+        if expected_list is None:
+            assert sid is None, "sid must remain None when has_sid=False"
+        else:
+            assert sid is not None, "sid must not be None when has_sid=True"
+            assert sid.tolist() == expected_list, (
+                f"sid should be {expected_list}, got {sid.tolist()}"
+            )
+            assert sid.dtype.name == expected_dtype
 
 
 # ---------------------------------------------------------------------------

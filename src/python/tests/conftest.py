@@ -19,6 +19,108 @@ if python_src and (str(python_src) not in sys.path):
     sys.path.insert(0, str(python_src))
 
 
+try:
+    from piper_train.export_onnx import build_infer_forward  # noqa: E402
+except ImportError:
+    build_infer_forward = None  # torch not installed (e.g., CI python-tests job)
+
+
+# ---------------------------------------------------------------------------
+# Shared Japanese phonemization helpers
+# ---------------------------------------------------------------------------
+# These centralise the BOS/EOS wrapping logic that was previously duplicated
+# across test_phonemize.py, test_prosody_extraction.py, test_performance.py,
+# and test_integration.py.
+#
+# Two EOS behaviours exist:
+#   auto_eos=True  -- skip "$" when the G2P output already ends with a
+#                     sentence-terminal token (?, ?!, ?., ?~).
+#                     Used by test_prosody_extraction.py.
+#   auto_eos=False -- always append "$" unconditionally.
+#                     Used by test_phonemize.py, test_performance.py,
+#                     test_integration.py.
+
+try:
+    import pyopenjtalk  # noqa: F401
+    from piper_plus_g2p import ProsodyInfo  # noqa: F401
+    from piper_plus_g2p.encode.pua import map_token as _map_token
+    from piper_plus_g2p.japanese import JapanesePhonemizer as _JaPhonemizer
+
+    _HAS_JAPANESE_G2P = True
+except ImportError:
+    _HAS_JAPANESE_G2P = False
+
+# EOS tokens that the G2P layer may already append.
+_EOS_TOKENS = {"$", "?", "?!", "?.", "?~"}
+
+
+def phonemize_japanese(text: str, *, auto_eos: bool = False) -> list[str]:
+    """Phonemize Japanese *text* and wrap with BOS/EOS markers.
+
+    Parameters
+    ----------
+    text:
+        Japanese text to phonemize.
+    auto_eos:
+        When ``False`` (default), ``"$"`` is **always** appended after the
+        G2P output -- even if the output already ends with a
+        sentence-terminal token such as ``"?"``.  This is the simpler
+        behaviour used by most test files.
+
+        When ``True``, ``"$"`` is appended **only when** the last G2P token
+        is not already in ``_EOS_TOKENS``.  This avoids double-termination
+        for question sentences and is used by
+        ``test_prosody_extraction.py``.
+
+    Raises
+    ------
+    ImportError
+        If ``piper_plus_g2p`` (or ``pyopenjtalk``) is not installed.
+    """
+    if not _HAS_JAPANESE_G2P:
+        raise ImportError("piper_plus_g2p is not installed")
+    p = _JaPhonemizer()
+    tokens = p.phonemize(text)
+    full_tokens = ["^"] + list(tokens)
+    if auto_eos:
+        if not tokens or tokens[-1] not in _EOS_TOKENS:
+            full_tokens.append("$")
+    else:
+        full_tokens.append("$")
+    return [_map_token(t) for t in full_tokens]
+
+
+def phonemize_japanese_with_prosody(
+    text: str,
+) -> tuple[list[str], list]:
+    """Phonemize Japanese *text* and return aligned prosody info.
+
+    Uses ``auto_eos=True`` semantics (conditional ``"$"``).  A parallel
+    ``[None]`` entry is inserted/appended for each added special token so
+    that the prosody list stays aligned with the token list.
+
+    Raises
+    ------
+    ImportError
+        If ``piper_plus_g2p`` (or ``pyopenjtalk``) is not installed.
+    """
+    if not _HAS_JAPANESE_G2P:
+        raise ImportError("piper_plus_g2p is not installed")
+    p = _JaPhonemizer()
+    tokens, prosody = p.phonemize_with_prosody(text)
+    full_tokens = ["^"] + list(tokens)
+    full_prosody = [None] + list(prosody)
+    if not tokens or tokens[-1] not in _EOS_TOKENS:
+        full_tokens.append("$")
+        full_prosody.append(None)
+    mapped_tokens = [_map_token(t) for t in full_tokens]
+    return mapped_tokens, full_prosody
+
+
+# Expose whether Japanese G2P is available for skip-checks in test files.
+HAS_JAPANESE_G2P = _HAS_JAPANESE_G2P
+
+
 # ============================================================================
 # PyTorch/ONNX Parity Test Fixtures
 # ============================================================================
@@ -94,8 +196,6 @@ def temp_onnx_model(mock_vits_model, tmp_path_factory):
     """モックモデルをONNXにエクスポート（durations出力付き）"""
     import torch
 
-    from piper_train.vits import commons
-
     tmp_dir = tmp_path_factory.mktemp("models")
     onnx_path = tmp_dir / "mock_model.onnx"
     _orig_forward = mock_vits_model.forward
@@ -112,60 +212,22 @@ def temp_onnx_model(mock_vits_model, tmp_path_factory):
     if hasattr(mock_vits_model, "dp"):
         mock_vits_model.dp.onnx_export_mode = True
 
-    # Define infer_forward for export (single-speaker, no sid)
-    # Returns both audio and durations
-    def infer_forward(
-        input_tensor,
-        input_lengths,
-        scales_tensor,
-        prosody_features_tensor,
+    # Build infer_forward using the shared factory (deterministic, single-speaker).
+    # Thin wrapper adapts positional args: ONNX export passes 4 positional args
+    # (text, text_lengths, scales, prosody_features) without sid/lid.
+    _infer = build_infer_forward(mock_vits_model, stochastic=False)
+
+    def infer_forward_single(
+        input_tensor, input_lengths, scales_tensor, prosody_features_tensor
     ):
-        # noise_scale = scales_tensor[0]  # unused in ONNX export (deterministic mode)
-        length_scale = scales_tensor[1]
-        noise_scale_w = scales_tensor[2]
-
-        # 1. Encoder
-        x, m_p, logs_p, x_mask = mock_vits_model.enc_p(input_tensor, input_lengths)
-        g = None  # Single speaker model
-
-        # 2. Duration Predictor (called only once)
-        x_dp = mock_vits_model._prepare_prosody_input(
-            x, x_mask, prosody_features_tensor
+        return _infer(
+            input_tensor,
+            input_lengths,
+            scales_tensor,
+            prosody_features=prosody_features_tensor,
         )
-        if mock_vits_model.use_sdp:
-            logw = mock_vits_model.dp(
-                x_dp, x_mask, g=g, reverse=True, noise_scale=noise_scale_w
-            )
-        else:
-            logw = mock_vits_model.dp(x_dp, x_mask, g=g)
 
-        w = torch.exp(logw) * x_mask * length_scale
-        durations = w.squeeze(1)  # [batch, phoneme_length]
-
-        # 3. Attention/Alignment
-        w_ceil = torch.ceil(w)
-        y_lengths = torch.clamp_min(torch.sum(w_ceil, [1, 2]), 1).long()
-        y_mask = torch.unsqueeze(
-            commons.sequence_mask(y_lengths, y_lengths.max()), 1
-        ).type_as(x_mask)
-        attn_mask = torch.unsqueeze(x_mask, 2) * torch.unsqueeze(y_mask, -1)
-        attn = commons.generate_path(w_ceil, attn_mask)
-
-        # 4. Expand prior
-        m_p = torch.matmul(attn.squeeze(1), m_p.transpose(1, 2)).transpose(1, 2)
-        logs_p = torch.matmul(attn.squeeze(1), logs_p.transpose(1, 2)).transpose(1, 2)
-
-        # 5. Sample z_p: in this test we always use the mean to mimic ONNX export mode
-        z_p = m_p  # deterministic behavior matching when onnx_export_mode is enabled
-
-        # 6. Flow + Decoder
-        z = mock_vits_model.flow(z_p, y_mask, g=g, reverse=True)
-        o = mock_vits_model.dec((z * y_mask), g=g)
-        audio = o.unsqueeze(1)
-
-        return audio, durations
-
-    mock_vits_model.forward = infer_forward
+    mock_vits_model.forward = infer_forward_single
 
     # ONNX export (single-speaker, no sid input) with durations output
     try:
@@ -180,7 +242,7 @@ def temp_onnx_model(mock_vits_model, tmp_path_factory):
                 "input": {0: "batch_size", 1: "phonemes"},
                 "input_lengths": {0: "batch_size"},
                 "prosody_features": {0: "batch_size", 1: "phonemes"},
-                "output": {0: "batch_size", 1: "time"},
+                "output": {0: "batch_size", 2: "time"},
                 "durations": {0: "batch_size", 1: "phonemes"},
             },
             verbose=False,
@@ -199,8 +261,6 @@ def temp_onnx_model_stochastic(mock_vits_model, tmp_path_factory):
     """モックモデルをstochasticモードでONNXにエクスポート"""
     import torch
 
-    from piper_train.vits import commons
-
     tmp_dir = tmp_path_factory.mktemp("models_stochastic")
     onnx_path = tmp_dir / "mock_model_stochastic.onnx"
 
@@ -214,48 +274,18 @@ def temp_onnx_model_stochastic(mock_vits_model, tmp_path_factory):
     if hasattr(mock_vits_model, "dp"):
         mock_vits_model.dp.onnx_export_mode = True
 
+    # Build infer_forward using the shared factory (stochastic, single-speaker).
+    _infer = build_infer_forward(mock_vits_model, stochastic=True)
+
     def infer_forward_stochastic(
         input_tensor, input_lengths, scales_tensor, prosody_features_tensor
     ):
-        length_scale = scales_tensor[1]
-        noise_scale_w = scales_tensor[2]
-
-        x, m_p, logs_p, x_mask = mock_vits_model.enc_p(input_tensor, input_lengths)
-        g = None
-
-        x_dp = mock_vits_model._prepare_prosody_input(
-            x, x_mask, prosody_features_tensor
+        return _infer(
+            input_tensor,
+            input_lengths,
+            scales_tensor,
+            prosody_features=prosody_features_tensor,
         )
-        if mock_vits_model.use_sdp:
-            logw = mock_vits_model.dp(
-                x_dp, x_mask, g=g, reverse=True, noise_scale=noise_scale_w
-            )
-        else:
-            logw = mock_vits_model.dp(x_dp, x_mask, g=g)
-
-        w = torch.exp(logw) * x_mask * length_scale
-        durations = w.squeeze(1)
-
-        w_ceil = torch.ceil(w)
-        y_lengths = torch.clamp_min(torch.sum(w_ceil, [1, 2]), 1).long()
-        y_mask = torch.unsqueeze(
-            commons.sequence_mask(y_lengths, y_lengths.max()), 1
-        ).type_as(x_mask)
-        attn_mask = torch.unsqueeze(x_mask, 2) * torch.unsqueeze(y_mask, -1)
-        attn = commons.generate_path(w_ceil, attn_mask)
-
-        m_p = torch.matmul(attn.squeeze(1), m_p.transpose(1, 2)).transpose(1, 2)
-        logs_p = torch.matmul(attn.squeeze(1), logs_p.transpose(1, 2)).transpose(1, 2)
-
-        # Stochastic: use noise_scale from scales
-        noise_scale = scales_tensor[0]
-        z_p = m_p + torch.randn_like(m_p) * torch.exp(logs_p) * noise_scale
-
-        z = mock_vits_model.flow(z_p, y_mask, g=g, reverse=True)
-        o = mock_vits_model.dec((z * y_mask), g=g)
-        audio = o.unsqueeze(1)
-
-        return audio, durations
 
     _orig_forward = mock_vits_model.forward
     mock_vits_model.forward = infer_forward_stochastic
@@ -272,7 +302,7 @@ def temp_onnx_model_stochastic(mock_vits_model, tmp_path_factory):
                 "input": {0: "batch_size", 1: "phonemes"},
                 "input_lengths": {0: "batch_size"},
                 "prosody_features": {0: "batch_size", 1: "phonemes"},
-                "output": {0: "batch_size", 1: "time"},
+                "output": {0: "batch_size", 2: "time"},
                 "durations": {0: "batch_size", 1: "phonemes"},
             },
             verbose=False,
@@ -337,7 +367,6 @@ def temp_onnx_model_unified_emb_lang(mock_vits_model_multilingual, tmp_path_fact
     import torch
 
     from piper_train.export_onnx import unify_emb_lang_weights
-    from piper_train.vits import commons
 
     model = mock_vits_model_multilingual
 
@@ -362,50 +391,11 @@ def temp_onnx_model_unified_emb_lang(mock_vits_model_multilingual, tmp_path_fact
     if hasattr(model, "dp"):
         model.dp.onnx_export_mode = True
 
-    def infer_forward(
-        input_tensor,
-        input_lengths,
-        scales_tensor,
-        sid_tensor,
-        lid_tensor,
-        prosody_features_tensor,
-    ):
-        length_scale = scales_tensor[1]
-        noise_scale_w = scales_tensor[2]
-
-        g = model._get_global_conditioning(sid_tensor, lid_tensor)
-        x, m_p, logs_p, x_mask = model.enc_p(input_tensor, input_lengths, g=g)
-
-        x_dp = model._prepare_prosody_input(
-            x, x_mask, prosody_features_tensor, lid=lid_tensor
-        )
-        if model.use_sdp:
-            logw = model.dp(x_dp, x_mask, g=g, reverse=True, noise_scale=noise_scale_w)
-        else:
-            logw = model.dp(x_dp, x_mask, g=g)
-
-        w = torch.exp(logw) * x_mask * length_scale
-        durations = w.squeeze(1)
-
-        w_ceil = torch.ceil(w)
-        y_lengths = torch.clamp_min(torch.sum(w_ceil, [1, 2]), 1).long()
-        y_mask = torch.unsqueeze(
-            commons.sequence_mask(y_lengths, y_lengths.max()), 1
-        ).type_as(x_mask)
-        attn_mask = torch.unsqueeze(x_mask, 2) * torch.unsqueeze(y_mask, -1)
-        attn = commons.generate_path(w_ceil, attn_mask)
-
-        m_p = torch.matmul(attn.squeeze(1), m_p.transpose(1, 2)).transpose(1, 2)
-        logs_p = torch.matmul(attn.squeeze(1), logs_p.transpose(1, 2)).transpose(1, 2)
-
-        z_p = m_p  # deterministic
-        z = model.flow(z_p, y_mask, g=g, reverse=True)
-        o = model.dec((z * y_mask), g=g)
-
-        return o, durations
-
+    # Build infer_forward using the shared factory (deterministic, multilingual).
+    # No thin wrapper needed: the signature matches torch.onnx.export's positional
+    # args (text, text_lengths, scales, sid, lid, prosody_features).
     _orig_forward = model.forward
-    model.forward = infer_forward
+    model.forward = build_infer_forward(model, stochastic=False)
 
     try:
         torch.onnx.export(
@@ -527,6 +517,31 @@ def make_synthesizer_trn():
         )
 
     return _factory
+
+
+@pytest.fixture(scope="session")
+def mock_wavlm_discriminator():
+    """WavLMDiscriminator with mocked WavLM model (avoids ~300MB download).
+
+    The resampler is real (sinc interpolation); only the transformer weights
+    are mocked.  Shared across test_vits.py and test_wavlm_discriminator.py.
+    """
+    from unittest.mock import MagicMock, patch
+
+    pytest.importorskip("transformers")
+    pytest.importorskip("torchaudio")
+
+    from piper_train.vits.models import WavLMDiscriminator
+
+    mock_wavlm = MagicMock()
+    mock_wavlm.feature_extractor.parameters.return_value = []
+    with patch("transformers.WavLMModel") as mock_wavlm_cls:
+        mock_wavlm_cls.from_pretrained.return_value = mock_wavlm
+        disc = WavLMDiscriminator(
+            source_sample_rate=22050,
+            target_sample_rate=16000,
+        )
+    return disc
 
 
 @pytest.fixture

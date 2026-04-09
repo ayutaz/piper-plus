@@ -10,29 +10,8 @@ from piper_plus_g2p.encode.pua import (
     map_token,
 )
 
-
-def map_sequence(tokens: list[str]) -> list[str]:
-    """Map a sequence of IPA tokens through PUA mapping."""
-    return [map_token(t) for t in tokens]
-
-
-# Japanese imports are optional
-try:
-    import pyopenjtalk  # noqa: F401
-
-    from piper_plus_g2p.japanese import JapanesePhonemizer
-    from piper_plus_g2p.encode.pua import map_token as _map_token
-
-    def phonemize_japanese(text):
-        """Wrapper that matches old piper_train API: returns PUA-mapped tokens with BOS/EOS."""
-        p = JapanesePhonemizer()
-        tokens = p.phonemize(text)
-        full_tokens = ["^"] + tokens + ["$"]
-        return [_map_token(t) for t in full_tokens]
-
-    HAS_JAPANESE = True
-except ImportError:
-    HAS_JAPANESE = False
+# Shared helper from conftest.py (auto_eos=False → unconditional "$").
+from conftest import HAS_JAPANESE_G2P as HAS_JAPANESE, phonemize_japanese  # noqa: E402
 
 
 class TestPhonemization:
@@ -51,10 +30,10 @@ class TestPhonemization:
             assert CHAR2TOKEN[char] == token
 
     @pytest.mark.unit
-    def test_map_sequence(self):
-        """Test phoneme sequence mapping"""
+    def test_map_token_on_sequence(self):
+        """Test phoneme sequence mapping using map_token"""
         input_seq = ["k", "o", "n", "n", "i", "ch", "i", "w", "a"]
-        mapped = map_sequence(input_seq)
+        mapped = [map_token(t) for t in input_seq]
 
         # "ch" should be mapped to PUA
         assert mapped[5] == "\ue00e"
@@ -84,7 +63,7 @@ class TestPhonemization:
     def test_empty_input(self):
         """Test empty input handling"""
         # Empty list
-        result = map_sequence([])
+        result = [map_token(t) for t in []]
         assert result == []
 
     @pytest.mark.unit

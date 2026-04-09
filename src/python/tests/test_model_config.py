@@ -2,8 +2,9 @@
 
 Prevents regressions:
 1. models.py must import monotonic_align from local Cython module (not super_monotonic_align)
-2. gin_channels must auto-set to 512 for multi-speaker models
-3. Training speedup CLI args (--val-every-n-epochs, --limit-val-batches) have correct defaults
+2. Training speedup CLI args (--val-every-n-epochs, --limit-val-batches) have correct defaults
+
+Note: gin_channels / apply_transfer_defaults tests are in test_multispeaker_transfer.py.
 """
 
 import ast
@@ -63,56 +64,8 @@ def test_models_module_importable():
     assert hasattr(mod, "SynthesizerTrn")
 
 
-@pytest.mark.unit
-def test_gin_channels_auto_512_for_multispeaker():
-    """gin_channels must auto-set to 512 when num_speakers > 1 and not explicitly set.
-
-    Regression test for bug where argparse default value (0) in dict_args
-    caused 'gin_channels not in dict_args' to always be False.
-
-    Note: 768 was previously used but caused ONNX export precision degradation
-    (PyTorch↔ONNX correlation dropped from 0.97 to 0.70). 512 matches the
-    VitsModel.__init__ fallback and produces correct ONNX exports.
-    """
-    # Simulate argparse output: gin_channels=0 (default, not explicitly set)
-    dict_args = {"gin_channels": 0}
-    num_speakers = 80
-
-    # This is the fixed logic from __main__.py
-    if num_speakers > 1 and dict_args.get("gin_channels", 0) == 0:
-        dict_args["gin_channels"] = 512
-
-    assert dict_args["gin_channels"] == 512, (
-        f"gin_channels should be 512 for {num_speakers} speakers, got {dict_args['gin_channels']}"
-    )
-
-
-@pytest.mark.unit
-def test_gin_channels_respects_explicit_value():
-    """gin_channels should not be overridden when explicitly set."""
-    dict_args = {"gin_channels": 256}
-    num_speakers = 80
-
-    if num_speakers > 1 and dict_args.get("gin_channels", 0) == 0:
-        dict_args["gin_channels"] = 512
-
-    assert dict_args["gin_channels"] == 256, (
-        "gin_channels should remain 256 when explicitly set"
-    )
-
-
-@pytest.mark.unit
-def test_gin_channels_not_set_for_single_speaker():
-    """gin_channels should not auto-set for single speaker models."""
-    dict_args = {"gin_channels": 0}
-    num_speakers = 1
-
-    if num_speakers > 1 and dict_args.get("gin_channels", 0) == 0:
-        dict_args["gin_channels"] = 512
-
-    assert dict_args["gin_channels"] == 0, (
-        "gin_channels should remain 0 for single speaker model"
-    )
+# gin_channels / apply_transfer_defaults tests live in test_multispeaker_transfer.py
+# (canonical location for all apply_transfer_defaults coverage).
 
 
 # ============================================================================

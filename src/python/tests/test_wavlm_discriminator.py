@@ -18,6 +18,7 @@ transformers = pytest.importorskip("transformers")
 torchaudio = pytest.importorskip("torchaudio")
 
 
+@pytest.mark.training
 class TestWavLMDiscriminatorFeatureMapFormat:
     """Test that WavLM feature maps are compatible with feature_loss()."""
 
@@ -96,19 +97,19 @@ class TestWavLMDiscriminatorFeatureMapFormat:
         assert y_d_gs[0].shape == (sample_audio.size(0), 1)
 
 
+@pytest.mark.training
 class TestWavLMResampling:
     """Test audio resampling quality."""
 
-    @pytest.fixture
-    def resampler_sinc(self):
-        """Create sinc interpolation resampler."""
-        return torchaudio.transforms.Resample(
-            orig_freq=22050,
-            new_freq=16000,
-            resampling_method="sinc_interp_hann",
-            lowpass_filter_width=64,
-            dtype=torch.float32,
+    @pytest.fixture(scope="class")
+    def resampler_sinc(self, mock_wavlm_discriminator):
+        """Get sinc interpolation resampler from shared mock WavLMDiscriminator."""
+        disc = mock_wavlm_discriminator
+        assert disc.resampler is not None, (
+            "WavLMDiscriminator.resampler should be initialized when "
+            "source_sample_rate != target_sample_rate"
         )
+        return disc.resampler
 
     @pytest.fixture
     def resampler_linear(self):
@@ -184,6 +185,7 @@ class TestWavLMResampling:
         assert sinc_high_energy > 0, "Sinc resampling should preserve high frequencies"
 
 
+@pytest.mark.training
 class TestWavLMGradientFlow:
     """Test gradient flow through WavLM discriminator.
 
@@ -324,6 +326,7 @@ class TestWavLMGradientFlow:
             assert not torch.isnan(param.grad).any(), f"Classifier {name} grad should not be NaN"
 
 
+@pytest.mark.training
 class TestWavLMLossComputation:
     """Test loss computation with WavLM discriminator."""
 
@@ -402,6 +405,7 @@ class TestWavLMLossComputation:
         assert loss_same < loss_diff, "Same audio should have lower feature loss"
 
 
+@pytest.mark.training
 class TestWavLMIntegration:
     """Integration tests for WavLM discriminator with training loop."""
 

@@ -28,9 +28,8 @@ from piper_plus_g2p.swedish import (
 def _split_ipa_to_phonemes(ipa_str: str) -> list[str]:
     """Split an IPA string into individual phoneme tokens.
 
-    Handles long vowels (V + \u02D0), stress markers, and multi-codepoint
-    sequences.  This helper was previously in piper_train.phonemize.swedish
-    and is reproduced here for test compatibility.
+    Test-only utility for verifying IPA output structure.
+    Handles long vowels (V + \\u02D0) as single tokens.
     """
     tokens: list[str] = []
     i = 0
