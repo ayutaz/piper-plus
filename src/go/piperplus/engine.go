@@ -134,7 +134,28 @@ func (e *OnnxEngine) Synthesize(ctx context.Context, req *SynthesisRequest) (*Sy
 		return nil, err
 	}
 
-	phonemeLen := len(req.PhonemeIDs)
+	originalPhonemeLen := len(req.PhonemeIDs)
+
+	// --- Strategy A: Silence Padding for short phoneme sequences ---
+	phonemeIDs := req.PhonemeIDs
+	prosodyFeatures := req.ProsodyFeatures
+	var wasPadded bool
+	phonemeIDs, wasPadded = padPhonemeIDs(phonemeIDs)
+	if wasPadded {
+		prosodyFeatures = padProsodyFeatures(req.ProsodyFeatures, originalPhonemeLen, len(phonemeIDs))
+	}
+
+	// --- Strategy B: Dynamic Scales Adjustment for short phoneme sequences ---
+	noiseScale := req.NoiseScale
+	noiseW := req.NoiseW
+	scalesAdjusted := originalPhonemeLen < minPhonemeIDs
+	noiseScale, noiseW = adjustScalesForShortText(originalPhonemeLen, noiseScale, noiseW)
+
+	if summary := shortTextMitigationSummary(originalPhonemeLen, len(phonemeIDs), wasPadded, scalesAdjusted); summary != "" {
+		e.logger.Debug(summary)
+	}
+
+	phonemeLen := len(phonemeIDs)
 	if phonemeLen > maxPhonemeLen {
 		return nil, &InferenceError{
 			Msg: fmt.Sprintf("phoneme length %d exceeds maximum %d", phonemeLen, maxPhonemeLen),
@@ -155,7 +176,7 @@ func (e *OnnxEngine) Synthesize(ctx context.Context, req *SynthesisRequest) (*Sy
 	inputs := make([]ort.Value, 0, len(e.inputNames))
 
 	// "input": int64 [1, phonemeLen]
-	inputTensor, err := ort.NewTensor(ort.NewShape(1, int64(phonemeLen)), req.PhonemeIDs)
+	inputTensor, err := ort.NewTensor(ort.NewShape(1, int64(phonemeLen)), phonemeIDs)
 	if err != nil {
 		return nil, &InferenceError{Msg: "failed to create input tensor", Err: err}
 	}
@@ -171,7 +192,7 @@ func (e *OnnxEngine) Synthesize(ctx context.Context, req *SynthesisRequest) (*Sy
 	inputs = append(inputs, lengthsTensor)
 
 	// "scales": float32 [3]
-	scalesTensor, err := ort.NewTensor(ort.NewShape(3), []float32{req.NoiseScale, req.LengthScale, req.NoiseW})
+	scalesTensor, err := ort.NewTensor(ort.NewShape(3), []float32{noiseScale, req.LengthScale, noiseW})
 	if err != nil {
 		return nil, &InferenceError{Msg: "failed to create scales tensor", Err: err}
 	}
@@ -201,8 +222,8 @@ func (e *OnnxEngine) Synthesize(ctx context.Context, req *SynthesisRequest) (*Sy
 	// "prosody_features": int64 [1, phonemeLen, 3] (if HasProsody)
 	if e.capabilities.HasProsody {
 		prosodyData := make([]int64, phonemeLen*3)
-		if req.ProsodyFeatures != nil {
-			for i, pf := range req.ProsodyFeatures {
+		if prosodyFeatures != nil {
+			for i, pf := range prosodyFeatures {
 				if i >= phonemeLen {
 					break
 				}
@@ -339,6 +360,11 @@ func (e *OnnxEngine) Synthesize(ctx context.Context, req *SynthesisRequest) (*Sy
 
 	// Peak-normalize and convert to int16.
 	audio := peakNormalize(audioCopy)
+
+	// --- Strategy A post-trim: remove silence introduced by padding ---
+	if wasPadded {
+		audio = trimSilence(audio)
+	}
 
 	// Calculate audio duration using integer arithmetic for precision.
 	var audioDuration time.Duration

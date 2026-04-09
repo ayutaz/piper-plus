@@ -17,6 +17,158 @@ from .vits.wavfile import write as write_wav
 
 _LOGGER = logging.getLogger("piper_train.infer_onnx")
 
+# --- Short-text synthesis quality constants ---
+# Minimum phoneme_ids length below which padding/scale adjustment is applied
+MIN_PHONEME_IDS = 40
+# RMS threshold for silence trimming (float audio range)
+TRIM_THRESHOLD_RMS = 0.01
+# Minimum audio samples to keep after trimming (22050 Hz * 0.1s)
+TRIM_MIN_SAMPLES = 2205
+
+
+def _pad_phoneme_ids(
+    phoneme_ids: list[int],
+    prosody_features: list[dict | None] | None,
+) -> tuple[list[int], list[dict | None] | None, bool]:
+    """Strategy A: Pad short phoneme_ids with silence tokens.
+
+    Inserts pause tokens (ID=0, blank/pad) evenly after BOS and before EOS
+    until the sequence reaches MIN_PHONEME_IDS length.
+
+    Returns:
+        (padded_phoneme_ids, padded_prosody_features, was_padded)
+    """
+    n = len(phoneme_ids)
+    if n >= MIN_PHONEME_IDS:
+        return phoneme_ids, prosody_features, False
+
+    pad_total = MIN_PHONEME_IDS - n
+    pad_front = pad_total // 2
+    pad_back = pad_total - pad_front
+
+    # Insert after BOS (index 1) and before EOS (last element)
+    # BOS is typically phoneme_ids[0], EOS is phoneme_ids[-1]
+    bos = phoneme_ids[:1]
+    eos = phoneme_ids[-1:]
+    middle = phoneme_ids[1:-1] if n > 1 else []
+
+    padded = bos + [0] * pad_front + middle + [0] * pad_back + eos
+
+    # Pad prosody_features correspondingly
+    padded_prosody: list[dict | None] | None = None
+    if prosody_features is not None:
+        p_bos = prosody_features[:1]
+        p_eos = prosody_features[-1:] if len(prosody_features) > 1 else []
+        p_middle = prosody_features[1:-1] if len(prosody_features) > 1 else []
+        padded_prosody = (
+            p_bos + [None] * pad_front + p_middle + [None] * pad_back + p_eos
+        )
+    elif prosody_features is None:
+        padded_prosody = None
+
+    _LOGGER.debug(
+        "Strategy A: padded phoneme_ids from %d to %d tokens "
+        "(+%d front, +%d back)",
+        n,
+        len(padded),
+        pad_front,
+        pad_back,
+    )
+    return padded, padded_prosody, True
+
+
+def _trim_silence(
+    audio: np.ndarray,
+    sample_rate: int = 22050,
+) -> np.ndarray:
+    """Trim leading and trailing silence from int16 audio.
+
+    Uses a sliding RMS window of 256 samples. Keeps at least
+    TRIM_MIN_SAMPLES to avoid producing empty audio.
+    """
+    window_size = 256
+    n = len(audio)
+
+    if n <= window_size:
+        return audio
+
+    # Convert to float for RMS calculation
+    audio_f = audio.astype(np.float32) / 32768.0
+
+    # Compute RMS for each window position
+    # Use a cumulative sum approach for efficiency
+    sq = audio_f**2
+    cumsum = np.concatenate([[0.0], np.cumsum(sq)])
+    num_windows = n - window_size + 1
+    if num_windows <= 0:
+        return audio
+
+    window_sums = cumsum[window_size:] - cumsum[:num_windows]
+    rms_values = np.sqrt(window_sums / window_size)
+
+    # Find first window above threshold (start of non-silence)
+    above = np.where(rms_values >= TRIM_THRESHOLD_RMS)[0]
+    if len(above) == 0:
+        # Entire audio is silence -- keep minimum
+        return audio[:TRIM_MIN_SAMPLES] if n > TRIM_MIN_SAMPLES else audio
+
+    start = above[0]
+    end = above[-1] + window_size  # include the last non-silent window
+
+    # Enforce minimum length
+    trimmed_len = end - start
+    if trimmed_len < TRIM_MIN_SAMPLES:
+        # Centre the minimum window around the detected content
+        centre = (start + end) // 2
+        half = TRIM_MIN_SAMPLES // 2
+        start = max(0, centre - half)
+        end = min(n, start + TRIM_MIN_SAMPLES)
+        start = max(0, end - TRIM_MIN_SAMPLES)
+
+    trimmed = audio[start:end]
+    _LOGGER.debug(
+        "Strategy A post-trim: %d -> %d samples (%.3fs -> %.3fs)",
+        n,
+        len(trimmed),
+        n / sample_rate,
+        len(trimmed) / sample_rate,
+    )
+    return trimmed
+
+
+def _adjust_scales_for_short_input(
+    phoneme_ids: list[int],
+    noise_scale: float,
+    noise_scale_w: float,
+    length_scale: float,
+) -> tuple[float, float, float]:
+    """Strategy B: Reduce noise scales for short inputs.
+
+    For inputs shorter than MIN_PHONEME_IDS, attenuate noise_scale and
+    noise_scale_w proportionally while keeping length_scale unchanged.
+
+    Returns:
+        (adjusted_noise_scale, adjusted_length_scale, adjusted_noise_scale_w)
+        in the same order as the scales array [noise_scale, length_scale, noise_w].
+    """
+    n = len(phoneme_ids)
+    if n >= MIN_PHONEME_IDS:
+        return noise_scale, length_scale, noise_scale_w
+
+    ratio = max(0.0, min(n / MIN_PHONEME_IDS, 1.0))
+    adj_noise = noise_scale * max(0.5, ratio)
+    adj_noise_w = noise_scale_w * max(0.4, ratio)
+
+    _LOGGER.debug(
+        "Strategy B: ratio=%.3f  noise_scale %.3f->%.3f  noise_w %.3f->%.3f",
+        ratio,
+        noise_scale,
+        adj_noise,
+        noise_scale_w,
+        adj_noise_w,
+    )
+    return adj_noise, length_scale, adj_noise_w
+
 
 class _DominantLanguageDetector:
     """Cached wrapper around UnicodeLanguageDetector for dominant-language detection.
@@ -470,10 +622,23 @@ def main():
         speaker_id = utt.get("speaker_id")
         prosody_features_data = utt.get("prosody_features")
 
+        # --- Strategy A: Silence Padding for short inputs ---
+        phoneme_ids, prosody_features_data, was_padded = _pad_phoneme_ids(
+            phoneme_ids, prosody_features_data
+        )
+
+        # --- Strategy B: Dynamic Scales Adjustment for short inputs ---
+        adj_noise, adj_length, adj_noise_w = _adjust_scales_for_short_input(
+            phoneme_ids,
+            args.noise_scale,
+            args.noise_scale_w,
+            args.length_scale,
+        )
+
         text = np.expand_dims(np.array(phoneme_ids, dtype=np.int64), 0)
         text_lengths = np.array([text.shape[1]], dtype=np.int64)
         scales = np.array(
-            [args.noise_scale, args.length_scale, args.noise_scale_w],
+            [adj_noise, adj_length, adj_noise_w],
             dtype=np.float32,
         )
         sid = None
@@ -544,6 +709,11 @@ def main():
         durations = outputs[1] if len(outputs) > 1 else None
         # audio = denoise(audio, bias_spec, 10)
         audio = audio_float_to_int16(audio.squeeze())
+
+        # --- Strategy A: Post-trim silence introduced by padding ---
+        if was_padded:
+            audio = _trim_silence(audio, sample_rate=args.sample_rate)
+
         end_time = time.perf_counter()
 
         audio_duration_sec = audio.shape[-1] / args.sample_rate

@@ -154,12 +154,14 @@ describe('PiperPlus synthesize() end-to-end flow', { skip }, () => {
   // 4. Correct phoneme_ids tensor passed to session.run
   // -----------------------------------------------------------------------
   it('ONNX session.run に正しい phoneme_ids テンソルが渡される', async () => {
-    // Arrange
+    // Arrange — use >= 40 phoneme IDs to bypass short-text padding
+    const expectedIds = new Array(45).fill(8);
+    expectedIds[0] = 10;
+    expectedIds[44] = 17;
     let capturedFeeds = null;
     const instance = createMockInstance({
-      // encode returns 3 phoneme IDs to make verification straightforward
       encode: (text, language) => ({
-        phonemeIds: [10, 11, 17],
+        phonemeIds: expectedIds,
         prosodyFeatures: null,
       }),
       sessionRun: async (feeds) => {
@@ -171,18 +173,25 @@ describe('PiperPlus synthesize() end-to-end flow', { skip }, () => {
     // Act
     await instance.synthesize('こんにちは');
 
-    // Assert — phoneme_ids should be [10, 11, 17] (k=10, o=11, a=17)
+    // Assert — phoneme_ids should pass through unmodified (length >= 40)
     const ids = Array.from(capturedFeeds.input.data).map(Number);
-    assert.deepEqual(ids, [10, 11, 17]);
+    assert.deepEqual(ids, expectedIds);
   });
 
   // -----------------------------------------------------------------------
   // 5. Correct scales tensor passed to session.run
   // -----------------------------------------------------------------------
   it('ONNX session.run に正しい scales テンソルが渡される', async () => {
-    // Arrange
+    // Arrange — use >= 40 phoneme IDs to bypass short-text scale adjustment
+    const longIds = new Array(45).fill(8);
+    longIds[0] = 10;
+    longIds[44] = 17;
     let capturedFeeds = null;
     const instance = createMockInstance({
+      encode: (text, language) => ({
+        phonemeIds: longIds,
+        prosodyFeatures: null,
+      }),
       sessionRun: async (feeds) => {
         capturedFeeds = feeds;
         return { output: { data: new Float32Array(100), dims: [1, 100] } };

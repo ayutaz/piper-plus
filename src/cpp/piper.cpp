@@ -76,6 +76,12 @@ const float MAX_WAV_VALUE = 32767.0f;
 // Beyond 4 threads VITS sees diminishing returns and increased contention.
 constexpr int MAX_INTRA_THREADS = 4;
 
+// Short-text mitigation constants (keep in sync with other runtimes)
+constexpr int MIN_PHONEME_IDS = 40;
+constexpr float TRIM_THRESHOLD_RMS = 0.01f;
+constexpr int TRIM_MIN_SAMPLES = 2205;  // 22050 Hz * 0.1 s
+constexpr int TRIM_WINDOW_SIZE = 256;
+
 // PUA to multi-char phoneme mapping for display
 static const std::unordered_map<char32_t, std::string> puaToPhoneme = {
     {0xE000, "a:"}, {0xE001, "i:"}, {0xE002, "u:"}, {0xE003, "e:"}, {0xE004, "o:"},
@@ -671,6 +677,169 @@ void loadVoice(PiperConfig &config, std::string modelPath,
 } /* loadVoice */
 
 // ---------------------------------------------------------------------------
+// Short-text mitigation: Strategy A helpers
+// ---------------------------------------------------------------------------
+
+// Pad short phoneme ID sequences with silence tokens (pause ID = 0) after BOS
+// and before EOS to reach MIN_PHONEME_IDS length. Returns true if padding was
+// applied.
+static bool padPhonemeIds(std::vector<PhonemeId> &phonemeIds,
+                          PhonemeId padId = 0) {
+  const auto len = static_cast<int>(phonemeIds.size());
+  if (len >= MIN_PHONEME_IDS) {
+    return false;
+  }
+
+  const int needed = MIN_PHONEME_IDS - len;
+  const int front = needed / 2;
+  const int back = needed - front;
+
+  // phonemeIds layout: [BOS, ...body..., EOS]
+  // We need at least 2 elements (BOS + EOS) to split safely.
+  if (phonemeIds.size() < 2) {
+    // Degenerate case: just pad at the end
+    phonemeIds.insert(phonemeIds.end(), static_cast<size_t>(needed), padId);
+    return true;
+  }
+
+  // Split: bos = first element, body = middle, eos = last element
+  PhonemeId bos = phonemeIds.front();
+  PhonemeId eos = phonemeIds.back();
+  std::vector<PhonemeId> body(phonemeIds.begin() + 1, phonemeIds.end() - 1);
+
+  // Reconstruct: BOS + front_pad + body + back_pad + EOS
+  phonemeIds.clear();
+  phonemeIds.reserve(static_cast<size_t>(MIN_PHONEME_IDS));
+  phonemeIds.push_back(bos);
+  phonemeIds.insert(phonemeIds.end(), static_cast<size_t>(front), padId);
+  phonemeIds.insert(phonemeIds.end(), body.begin(), body.end());
+  phonemeIds.insert(phonemeIds.end(), static_cast<size_t>(back), padId);
+  phonemeIds.push_back(eos);
+
+  spdlog::debug("Short-text padding: {} -> {} phoneme IDs ({} pad tokens added)",
+                len, phonemeIds.size(), needed);
+  return true;
+}
+
+// Trim leading/trailing silence from int16 audio using windowed RMS.
+// Preserves at least TRIM_MIN_SAMPLES samples.
+static void trimSilenceInt16(std::vector<int16_t> &audioBuffer) {
+  const auto totalSamples = static_cast<int>(audioBuffer.size());
+  if (totalSamples <= TRIM_MIN_SAMPLES) {
+    return;
+  }
+
+  const int nWindows = totalSamples / TRIM_WINDOW_SIZE;
+  if (nWindows == 0) {
+    return;
+  }
+
+  // Find first and last window above RMS threshold
+  int firstAbove = -1;
+  int lastAbove = -1;
+
+  for (int w = 0; w < nWindows; w++) {
+    float sumSq = 0.0f;
+    const int offset = w * TRIM_WINDOW_SIZE;
+    for (int s = 0; s < TRIM_WINDOW_SIZE; s++) {
+      float sample = static_cast<float>(audioBuffer[offset + s]) / 32767.0f;
+      sumSq += sample * sample;
+    }
+    float rms = std::sqrt(sumSq / static_cast<float>(TRIM_WINDOW_SIZE));
+    if (rms > TRIM_THRESHOLD_RMS) {
+      if (firstAbove < 0) {
+        firstAbove = w;
+      }
+      lastAbove = w;
+    }
+  }
+
+  if (firstAbove < 0) {
+    // All silence -- keep minimum
+    audioBuffer.resize(std::min(totalSamples, TRIM_MIN_SAMPLES));
+    return;
+  }
+
+  int startSample = firstAbove * TRIM_WINDOW_SIZE;
+  int endSample = std::min((lastAbove + 1) * TRIM_WINDOW_SIZE, totalSamples);
+
+  // Ensure minimum length
+  int length = endSample - startSample;
+  if (length < TRIM_MIN_SAMPLES) {
+    int center = (startSample + endSample) / 2;
+    startSample = std::max(0, center - TRIM_MIN_SAMPLES / 2);
+    endSample = std::min(totalSamples, startSample + TRIM_MIN_SAMPLES);
+    startSample = std::max(0, endSample - TRIM_MIN_SAMPLES);
+  }
+
+  if (startSample > 0 || endSample < totalSamples) {
+    spdlog::debug("Trimming silence: [{}, {}) from {} samples",
+                  startSample, endSample, totalSamples);
+    std::vector<int16_t> trimmed(audioBuffer.begin() + startSample,
+                                 audioBuffer.begin() + endSample);
+    audioBuffer = std::move(trimmed);
+  }
+}
+
+// Trim leading/trailing silence from float32 audio using windowed RMS.
+// Audio is assumed normalized to [-1.0, 1.0].
+// Preserves at least TRIM_MIN_SAMPLES samples.
+static void trimSilenceFloat(std::vector<float> &audioBuffer) {
+  const auto totalSamples = static_cast<int>(audioBuffer.size());
+  if (totalSamples <= TRIM_MIN_SAMPLES) {
+    return;
+  }
+
+  const int nWindows = totalSamples / TRIM_WINDOW_SIZE;
+  if (nWindows == 0) {
+    return;
+  }
+
+  int firstAbove = -1;
+  int lastAbove = -1;
+
+  for (int w = 0; w < nWindows; w++) {
+    float sumSq = 0.0f;
+    const int offset = w * TRIM_WINDOW_SIZE;
+    for (int s = 0; s < TRIM_WINDOW_SIZE; s++) {
+      float sample = audioBuffer[offset + s];
+      sumSq += sample * sample;
+    }
+    float rms = std::sqrt(sumSq / static_cast<float>(TRIM_WINDOW_SIZE));
+    if (rms > TRIM_THRESHOLD_RMS) {
+      if (firstAbove < 0) {
+        firstAbove = w;
+      }
+      lastAbove = w;
+    }
+  }
+
+  if (firstAbove < 0) {
+    audioBuffer.resize(std::min(totalSamples, TRIM_MIN_SAMPLES));
+    return;
+  }
+
+  int startSample = firstAbove * TRIM_WINDOW_SIZE;
+  int endSample = std::min((lastAbove + 1) * TRIM_WINDOW_SIZE, totalSamples);
+
+  int length = endSample - startSample;
+  if (length < TRIM_MIN_SAMPLES) {
+    int center = (startSample + endSample) / 2;
+    startSample = std::max(0, center - TRIM_MIN_SAMPLES / 2);
+    endSample = std::min(totalSamples, startSample + TRIM_MIN_SAMPLES);
+    startSample = std::max(0, endSample - TRIM_MIN_SAMPLES);
+  }
+
+  if (startSample > 0 || endSample < totalSamples) {
+    spdlog::debug("Trimming silence (float): [{}, {}) from {} samples",
+                  startSample, endSample, totalSamples);
+    std::vector<float> trimmed(audioBuffer.begin() + startSample,
+                               audioBuffer.begin() + endSample);
+    audioBuffer = std::move(trimmed);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // buildInputTensors — shared tensor construction for synthesize / warmupModel
 // ---------------------------------------------------------------------------
 // Buffers (phonemeIdsBuf, etc.) are written by this function and MUST remain
@@ -781,12 +950,30 @@ void synthesize(std::vector<PhonemeId> &phonemeIds,
     lid = 0;
   }
 
+  // --- Strategy A+B: Short-text mitigation ---
+  const auto originalLen = static_cast<int>(phonemeIds.size());
+  bool wasPadded = padPhonemeIds(phonemeIds);  // Strategy A: padding
+
+  // Strategy B: Dynamic Scales Adjustment
+  float effectiveNoiseScale = synthesisConfig.noiseScale;
+  float effectiveNoiseW = synthesisConfig.noiseW;
+  if (originalLen < MIN_PHONEME_IDS) {
+    float ratio = std::clamp(static_cast<float>(originalLen) /
+                                 static_cast<float>(MIN_PHONEME_IDS),
+                             0.0f, 1.0f);
+    effectiveNoiseScale *= std::max(0.5f, ratio);
+    effectiveNoiseW *= std::max(0.4f, ratio);
+    spdlog::debug("Short-text dynamic scales: ratio={:.3f}, "
+                  "noiseScale={:.4f}, noiseW={:.4f}",
+                  ratio, effectiveNoiseScale, effectiveNoiseW);
+  }
+
   // Populate InferenceInputs from the existing parameters
   InferenceInputs inputs;
   inputs.phonemeIds.assign(phonemeIds.begin(), phonemeIds.end());
-  inputs.noiseScale  = synthesisConfig.noiseScale;
+  inputs.noiseScale  = effectiveNoiseScale;
   inputs.lengthScale = synthesisConfig.lengthScale;
-  inputs.noiseW      = synthesisConfig.noiseW;
+  inputs.noiseW      = effectiveNoiseW;
   inputs.speakerId   = static_cast<int64_t>(synthesisConfig.speakerId.value_or(0));
   inputs.languageId  = static_cast<int64_t>(lid);
   if (prosodyFeatures) {
@@ -837,7 +1024,7 @@ void synthesize(std::vector<PhonemeId> &phonemeIds,
 
   // Get max audio value for scaling
   float maxAudioValue = 0.01f;
-  
+
 #ifdef USE_ARM64_NEON
   maxAudioValue = findMaxAudioValueNEON(audio, audioCount);
 #else
@@ -854,7 +1041,7 @@ void synthesize(std::vector<PhonemeId> &phonemeIds,
 
   // Scale audio to fill range and convert to int16
   float audioScale = (MAX_WAV_VALUE / std::max(0.01f, maxAudioValue));
-  
+
 #ifdef USE_ARM64_NEON
   // Resize buffer to final size for NEON implementation
   audioBuffer.resize(audioCount);
@@ -869,6 +1056,18 @@ void synthesize(std::vector<PhonemeId> &phonemeIds,
     audioBuffer.push_back(intAudioValue);
   }
 #endif
+
+  // --- Strategy A post-trim: remove inserted silence after inference ---
+  if (wasPadded) {
+    trimSilenceInt16(audioBuffer);
+    // Recompute audioSeconds after trimming
+    result.audioSeconds =
+        static_cast<double>(audioBuffer.size()) /
+        static_cast<double>(synthesisConfig.sampleRate);
+    if (result.audioSeconds > 0) {
+      result.realTimeFactor = result.inferSeconds / result.audioSeconds;
+    }
+  }
 
   // Extract phoneme timing information if available
   if (session.hasDurationOutput && outputTensors.size() >= 2 && voice != nullptr) {
@@ -935,12 +1134,30 @@ void synthesizeFloat(std::vector<PhonemeId> &phonemeIds,
     lid = 0;
   }
 
+  // --- Strategy A+B: Short-text mitigation ---
+  const auto originalLen = static_cast<int>(phonemeIds.size());
+  bool wasPadded = padPhonemeIds(phonemeIds);  // Strategy A: padding
+
+  // Strategy B: Dynamic Scales Adjustment
+  float effectiveNoiseScale = synthesisConfig.noiseScale;
+  float effectiveNoiseW = synthesisConfig.noiseW;
+  if (originalLen < MIN_PHONEME_IDS) {
+    float ratio = std::clamp(static_cast<float>(originalLen) /
+                                 static_cast<float>(MIN_PHONEME_IDS),
+                             0.0f, 1.0f);
+    effectiveNoiseScale *= std::max(0.5f, ratio);
+    effectiveNoiseW *= std::max(0.4f, ratio);
+    spdlog::debug("Short-text dynamic scales (float): ratio={:.3f}, "
+                  "noiseScale={:.4f}, noiseW={:.4f}",
+                  ratio, effectiveNoiseScale, effectiveNoiseW);
+  }
+
   // Populate InferenceInputs from the existing parameters
   InferenceInputs inputs;
   inputs.phonemeIds.assign(phonemeIds.begin(), phonemeIds.end());
-  inputs.noiseScale  = synthesisConfig.noiseScale;
+  inputs.noiseScale  = effectiveNoiseScale;
   inputs.lengthScale = synthesisConfig.lengthScale;
-  inputs.noiseW      = synthesisConfig.noiseW;
+  inputs.noiseW      = effectiveNoiseW;
   inputs.speakerId   = static_cast<int64_t>(synthesisConfig.speakerId.value_or(0));
   inputs.languageId  = static_cast<int64_t>(lid);
   if (prosodyFeatures) {
@@ -1011,6 +1228,18 @@ void synthesizeFloat(std::vector<PhonemeId> &phonemeIds,
   for (int64_t i = 0; i < audioCount; i++) {
     audioBuffer.push_back(
         std::clamp(audio[i] * invMax, -1.0f, 1.0f));
+  }
+
+  // --- Strategy A post-trim: remove inserted silence after inference ---
+  if (wasPadded) {
+    trimSilenceFloat(audioBuffer);
+    // Recompute audioSeconds after trimming
+    result.audioSeconds =
+        static_cast<double>(audioBuffer.size()) /
+        static_cast<double>(synthesisConfig.sampleRate);
+    if (result.audioSeconds > 0) {
+      result.realTimeFactor = result.inferSeconds / result.audioSeconds;
+    }
   }
 
   // Extract phoneme timing information if available

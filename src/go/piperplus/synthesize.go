@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"sort"
+	"time"
 
 	"github.com/ayutaz/piper-plus/src/go/phonemize"
 )
@@ -214,6 +215,9 @@ func (v *Voice) Synthesize(ctx context.Context, text string, opts ...SynthesisOp
 			"default_language", defaultLang, "language_id", languageID)
 	}
 
+	// --- Strategy C: detect short text and mark for silence padding ---
+	_, needsBreakPad := wrapShortTextWithBreaks(text)
+
 	// Build request and delegate to engine.
 	req := &SynthesisRequest{
 		PhonemeIDs:      phonemeIDs,
@@ -225,5 +229,20 @@ func (v *Voice) Synthesize(ctx context.Context, text string, opts ...SynthesisOp
 		ProsodyFeatures: prosodyFeatures,
 	}
 
-	return v.engine.Synthesize(ctx, req)
+	synthResult, synthErr := v.engine.Synthesize(ctx, req)
+	if synthErr != nil {
+		return nil, synthErr
+	}
+
+	// --- Strategy C post-process: add silence padding for short text ---
+	if needsBreakPad && synthResult != nil && len(synthResult.Audio) > 0 {
+		synthResult.Audio = prependSilence(synthResult.Audio, synthResult.SampleRate, silencePadMs)
+		synthResult.Audio = appendSilence(synthResult.Audio, synthResult.SampleRate, silencePadMs)
+		// Recalculate duration after padding.
+		if synthResult.SampleRate > 0 {
+			synthResult.Duration = time.Duration(int64(len(synthResult.Audio)) * int64(time.Second) / int64(synthResult.SampleRate))
+		}
+	}
+
+	return synthResult, nil
 }

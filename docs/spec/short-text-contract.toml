@@ -1,0 +1,195 @@
+# Short-Text Synthesis Quality Contract
+# ======================================
+# This file defines the canonical parameter values that ALL implementations
+# must agree on for short-text synthesis quality mitigation.
+#
+# VITS models produce degraded or empty audio when the phoneme ID sequence
+# is shorter than ~40 tokens, because the Duration Predictor becomes
+# unstable. Three complementary strategies mitigate this:
+#
+#   Strategy A — Silence Padding + Post-Trim
+#     Pad the phoneme ID sequence with pause tokens (ID = 0) up to
+#     min_phoneme_ids.  After inference, trim leading/trailing silence.
+#
+#   Strategy B — Dynamic Scales Adjustment
+#     Reduce noise_scale and noise_w proportionally to sequence length
+#     for inputs shorter than min_phoneme_ids.
+#
+#   Strategy C — SSML Silence Injection
+#     For very short plain text (non-SSML, <= short_text_chars non-space
+#     characters), prepend and append silence_pad_ms of silence at the
+#     audio level.
+#
+# This file serves as a design-time cross-language contract. Implementations
+# and tests are expected to be kept in sync with these values manually unless
+# and until automated contract-verification tests are added.
+#
+# Implementations:
+#   Python (piper_train): src/python/piper_train/infer_onnx.py          (A, B)
+#   Python (runtime):     src/python_run/piper/voice.py                 (A, B, C)
+#   Rust:                 src/rust/piper-core/src/engine.rs             (A, B)
+#   Go:                   src/go/piperplus/short_text.go                (A, B, C)
+#   WASM/JS:              src/wasm/openjtalk-web/src/index.js           (A, B)
+#   C#:                   (not yet implemented)
+#   C++:                  (not yet implemented)
+
+# ---------------------------------------------------------------------------
+# Strategy A — Silence Padding + Post-Trim
+# ---------------------------------------------------------------------------
+
+[padding]
+# Minimum phoneme ID count for stable VITS inference.
+# Sequences shorter than this are padded with pause tokens.
+min_phoneme_ids = 40
+
+# Token ID used for padding (pause / blank / PAD symbol "_").
+pause_token_id = 0
+
+# Padding is split evenly: half inserted after BOS (index 0), half
+# inserted before EOS (last index).  When the total is odd, the back
+# half gets the extra token.
+split = "front_back_even"
+
+# Prosody features (when present) are zero-filled at padding positions.
+prosody_fill = 0
+
+[trim]
+# RMS amplitude threshold for silence detection (float audio range 0..1).
+threshold_rms = 0.01
+
+# Minimum number of audio samples to preserve after trimming.
+# Prevents producing empty or near-empty audio.
+# Derivation: sample_rate (22050) * minimum_duration_s (0.1) = 2205.
+min_samples = 2205
+
+# Number of samples per RMS analysis window.
+window_size = 256
+
+# Reference sample rate used to derive min_samples.
+# Implementations should use the model's actual sample rate from
+# config.json when computing time-based values at runtime.
+sample_rate = 22050
+
+# ---------------------------------------------------------------------------
+# Strategy B — Dynamic Scales Adjustment
+# ---------------------------------------------------------------------------
+
+[scales]
+# For inputs with fewer than min_phoneme_ids phonemes, compute:
+#   ratio = clamp(len(phoneme_ids) / min_phoneme_ids, 0.0, 1.0)
+#   noise_scale *= max(noise_scale_min_ratio, ratio)
+#   noise_w     *= max(noise_w_min_ratio,     ratio)
+#   length_scale is NOT adjusted.
+
+# Minimum multiplier for noise_scale (prevents over-attenuation).
+noise_scale_min_ratio = 0.5
+
+# Minimum multiplier for noise_w (prevents over-attenuation).
+noise_w_min_ratio = 0.4
+
+# ---------------------------------------------------------------------------
+# Strategy C — SSML Silence Injection
+# ---------------------------------------------------------------------------
+
+[ssml_injection]
+# Maximum non-space character count to trigger Strategy C.
+# Texts with more characters than this are not considered "short".
+short_text_chars = 10
+
+# Duration of silence (ms) prepended and appended to short text audio.
+silence_pad_ms = 300
+
+# Strategy C is skipped if the input already starts with "<speak>"
+# (i.e. the caller is providing their own SSML).
+skip_if_ssml = true
+
+# ---------------------------------------------------------------------------
+# config.json extension (optional)
+# ---------------------------------------------------------------------------
+#
+# Model authors MAY include a "short_text" section in config.json to
+# override the default values above on a per-model basis.  All fields
+# are optional; omitted fields fall back to the contract defaults.
+#
+# When "enabled" is explicitly set to false, all three strategies are
+# disabled for that model.  When "enabled" is true or omitted, the
+# contract defaults (or any overrides present) are used.
+#
+# The "short_text" section is a sibling of the existing top-level keys
+# ("audio", "inference", "phoneme_id_map", etc.) in config.json.
+#
+# Schema:
+#
+#   {
+#     "audio": { ... },
+#     "inference": { ... },
+#     "phoneme_id_map": { ... },
+#     ...
+#     "short_text": {                      // OPTIONAL — entire section
+#       "enabled": true,                   // OPTIONAL — default: true
+#       "min_phoneme_ids": 40,             // OPTIONAL — default: 40
+#       "short_text_chars": 10,            // OPTIONAL — default: 10
+#       "silence_pad_ms": 300,             // OPTIONAL — default: 300
+#       "noise_scale_min_ratio": 0.5,      // OPTIONAL — default: 0.5
+#       "noise_w_min_ratio": 0.4           // OPTIONAL — default: 0.4
+#     }
+#   }
+#
+# Example — disable short-text mitigation for a model with a fine-tuned
+# Duration Predictor that handles short inputs well:
+#
+#   {
+#     "audio": { "sample_rate": 22050 },
+#     "inference": { "noise_scale": 0.667, "length_scale": 1, "noise_w": 0.8 },
+#     "phoneme_id_map": { ... },
+#     "short_text": { "enabled": false }
+#   }
+#
+# Example — raise the padding threshold for a model trained on longer
+# sequences:
+#
+#   {
+#     "audio": { "sample_rate": 22050 },
+#     "inference": { "noise_scale": 0.667, "length_scale": 1, "noise_w": 0.8 },
+#     "phoneme_id_map": { ... },
+#     "short_text": { "min_phoneme_ids": 60 }
+#   }
+
+[config_json]
+# JSON key name for the optional section in config.json.
+section_key = "short_text"
+
+# Fields and their defaults (all optional):
+#   enabled              bool    true
+#   min_phoneme_ids      int     40
+#   short_text_chars     int     10
+#   silence_pad_ms       int     300
+#   noise_scale_min_ratio float  0.5
+#   noise_w_min_ratio    float   0.4
+#
+# Trim parameters (threshold_rms, min_samples, window_size) are NOT
+# exposed in config.json because they are implementation details of
+# the post-processing step and do not affect model behaviour.
+
+[config_json.defaults]
+enabled = true
+min_phoneme_ids = 40
+short_text_chars = 10
+silence_pad_ms = 300
+noise_scale_min_ratio = 0.5
+noise_w_min_ratio = 0.4
+
+# ---------------------------------------------------------------------------
+# Implementation status
+# ---------------------------------------------------------------------------
+
+[implementation_status]
+# Which implementations support each strategy:
+#   ✓ = implemented, - = not yet implemented
+#
+#                        Python(train)  Python(run)  Rust  Go  WASM/JS  C#  C++
+# Strategy A (padding)   ✓              ✓            ✓     ✓   ✓        -   -
+# Strategy A (trim)      ✓              ✓            ✓     ✓   ✓        -   -
+# Strategy B (scales)    ✓              ✓            ✓     ✓   ✓        -   -
+# Strategy C (SSML)      -              ✓            -     ✓   -        -   -
+# config.json override   -              -            -     -   -        -   -

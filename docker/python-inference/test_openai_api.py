@@ -203,6 +203,91 @@ class TestExistingEndpoints:
         mock_engine.synthesize.assert_called_once()
 
 
+# ---- short-text warning ----
+
+
+class TestShortTextWarning:
+    """Strategy E: X-Piper-Warning header for short text inputs."""
+
+    def test_short_text_has_warning_header(self, client):
+        """Text with <=10 non-space chars should get the warning header."""
+        resp = client.post(
+            "/v1/audio/speech",
+            json={"input": "hello"},  # 5 chars
+        )
+        assert resp.status_code == 200
+        assert resp.headers.get("x-piper-warning") == "short-text-input"
+
+    def test_short_text_ja_has_warning_header(self, client):
+        """Japanese short text should also trigger the warning."""
+        resp = client.post(
+            "/v1/audio/speech",
+            json={"input": "こんにちは", "language": "ja"},  # 5 chars
+        )
+        assert resp.status_code == 200
+        assert resp.headers.get("x-piper-warning") == "short-text-input"
+
+    def test_long_text_no_warning_header(self, client):
+        """Text with >10 non-space chars should NOT get the warning header."""
+        resp = client.post(
+            "/v1/audio/speech",
+            json={"input": "This is a sufficiently long sentence for testing."},
+        )
+        assert resp.status_code == 200
+        assert resp.headers.get("x-piper-warning") is None
+
+    def test_boundary_10_chars_has_warning(self, client):
+        """Exactly 10 non-space chars should still trigger the warning."""
+        resp = client.post(
+            "/v1/audio/speech",
+            json={"input": "1234567890"},  # exactly 10 chars
+        )
+        assert resp.status_code == 200
+        assert resp.headers.get("x-piper-warning") == "short-text-input"
+
+    def test_boundary_11_chars_no_warning(self, client):
+        """11 non-space chars should NOT trigger the warning."""
+        resp = client.post(
+            "/v1/audio/speech",
+            json={"input": "12345678901"},  # 11 chars
+        )
+        assert resp.status_code == 200
+        assert resp.headers.get("x-piper-warning") is None
+
+    def test_spaces_excluded_from_count(self, client):
+        """Spaces should not count toward the character threshold."""
+        resp = client.post(
+            "/v1/audio/speech",
+            json={"input": "a b c d e"},  # 5 non-space chars
+        )
+        assert resp.status_code == 200
+        assert resp.headers.get("x-piper-warning") == "short-text-input"
+
+    def test_fullwidth_spaces_excluded(self, client):
+        """Full-width spaces (U+3000) should not count."""
+        resp = client.post(
+            "/v1/audio/speech",
+            json={"input": "あ\u3000い\u3000う"},  # 3 non-space chars
+        )
+        assert resp.status_code == 200
+        assert resp.headers.get("x-piper-warning") == "short-text-input"
+
+    def test_synthesize_get_short_text_warning(self, client):
+        """GET /synthesize should also include the warning for short text."""
+        resp = client.get("/synthesize", params={"text": "hi"})
+        assert resp.status_code == 200
+        assert resp.headers.get("x-piper-warning") == "short-text-input"
+
+    def test_synthesize_get_long_text_no_warning(self, client):
+        """GET /synthesize should NOT include the warning for long text."""
+        resp = client.get(
+            "/synthesize",
+            params={"text": "This is a long enough sentence."},
+        )
+        assert resp.status_code == 200
+        assert resp.headers.get("x-piper-warning") is None
+
+
 # ---- CORS ----
 
 

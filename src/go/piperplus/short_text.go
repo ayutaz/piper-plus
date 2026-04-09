@@ -1,0 +1,296 @@
+package piperplus
+
+import (
+	"fmt"
+	"math"
+	"strings"
+	"unicode"
+)
+
+// Short-text synthesis quality mitigation constants.
+const (
+	// minPhonemeIDs is the minimum number of phoneme IDs required for stable
+	// VITS inference. Shorter sequences are padded with silence (pause ID = 0).
+	minPhonemeIDs = 40
+
+	// shortTextChars is the character-count threshold (excluding whitespace)
+	// below which Strategy C (silence break auto-injection) is applied.
+	shortTextChars = 10
+
+	// silencePadMs is the duration of silence (in milliseconds) prepended and
+	// appended to short text by Strategy C.
+	silencePadMs = 300
+
+	// trimThresholdRMS is the RMS amplitude threshold used to detect silence
+	// when trimming padded audio (Strategy A post-trim).
+	trimThresholdRMS = 0.01
+
+	// trimMinSamples is the minimum number of audio samples to preserve
+	// after trimming (22050 Hz * 0.1s = 2205).
+	trimMinSamples = 2205
+
+	// trimWindowSize is the number of samples per RMS analysis window
+	// used in silence trimming.
+	trimWindowSize = 256
+)
+
+// padPhonemeIDs inserts pause IDs (0) into phonemeIDs to reach minPhonemeIDs.
+// Pause IDs are inserted evenly after BOS (index 0) and before EOS (last index).
+// Returns the padded slice and true if padding was applied, or the original
+// slice and false if no padding was needed.
+func padPhonemeIDs(ids []int64) ([]int64, bool) {
+	if len(ids) >= minPhonemeIDs {
+		return ids, false
+	}
+
+	needed := minPhonemeIDs - len(ids)
+	// Split padding: half after BOS, half before EOS.
+	frontPad := needed / 2
+	backPad := needed - frontPad
+
+	padded := make([]int64, 0, minPhonemeIDs)
+
+	// BOS (first element).
+	padded = append(padded, ids[0])
+
+	// Front padding (pause ID = 0).
+	for i := 0; i < frontPad; i++ {
+		padded = append(padded, 0)
+	}
+
+	// Middle content (everything between BOS and EOS).
+	if len(ids) > 2 {
+		padded = append(padded, ids[1:len(ids)-1]...)
+	}
+
+	// Back padding (pause ID = 0).
+	for i := 0; i < backPad; i++ {
+		padded = append(padded, 0)
+	}
+
+	// EOS (last element).
+	padded = append(padded, ids[len(ids)-1])
+
+	return padded, true
+}
+
+// padProsodyFeatures extends prosody features to match the new padded phoneme
+// length. Inserted positions are zero-filled.
+func padProsodyFeatures(original [][3]int64, originalLen, paddedLen int) [][3]int64 {
+	if len(original) == 0 {
+		return nil
+	}
+	if paddedLen <= originalLen {
+		return original
+	}
+
+	needed := paddedLen - originalLen
+	frontPad := needed / 2
+	backPad := needed - frontPad
+
+	padded := make([][3]int64, 0, paddedLen)
+
+	// BOS prosody.
+	if len(original) > 0 {
+		padded = append(padded, original[0])
+	}
+
+	// Front padding (zero prosody).
+	for i := 0; i < frontPad; i++ {
+		padded = append(padded, [3]int64{})
+	}
+
+	// Middle content prosody.
+	if len(original) > 2 {
+		end := len(original) - 1
+		if end > originalLen-1 {
+			end = originalLen - 1
+		}
+		padded = append(padded, original[1:end]...)
+	}
+
+	// Back padding (zero prosody).
+	for i := 0; i < backPad; i++ {
+		padded = append(padded, [3]int64{})
+	}
+
+	// EOS prosody.
+	if len(original) > 1 {
+		padded = append(padded, original[len(original)-1])
+	} else if len(original) == 1 {
+		padded = append(padded, [3]int64{})
+	}
+
+	return padded
+}
+
+// trimSilence removes leading and trailing silence from int16 audio samples
+// using a sliding RMS window. At least trimMinSamples are always preserved.
+func trimSilence(audio []int16) []int16 {
+	if len(audio) <= trimMinSamples {
+		return audio
+	}
+
+	// Find the first non-silent window from the front.
+	start := 0
+	for start+trimWindowSize <= len(audio) {
+		if windowRMS(audio[start:start+trimWindowSize]) > trimThresholdRMS {
+			break
+		}
+		start += trimWindowSize
+	}
+
+	// Find the last non-silent window from the end.
+	end := len(audio)
+	for end-trimWindowSize >= 0 {
+		if windowRMS(audio[end-trimWindowSize:end]) > trimThresholdRMS {
+			break
+		}
+		end -= trimWindowSize
+	}
+
+	// Ensure minimum sample count.
+	if end <= start {
+		// All silence -- return center portion.
+		center := len(audio) / 2
+		start = center - trimMinSamples/2
+		end = center + trimMinSamples/2
+		if start < 0 {
+			start = 0
+		}
+		if end > len(audio) {
+			end = len(audio)
+		}
+	}
+
+	if end-start < trimMinSamples {
+		// Expand around the detected region to meet minimum.
+		deficit := trimMinSamples - (end - start)
+		expandFront := deficit / 2
+		expandBack := deficit - expandFront
+		start -= expandFront
+		end += expandBack
+		if start < 0 {
+			end -= start // shift end by the overshoot
+			start = 0
+		}
+		if end > len(audio) {
+			start -= end - len(audio) // shift start by the overshoot
+			end = len(audio)
+		}
+		if start < 0 {
+			start = 0
+		}
+	}
+
+	return audio[start:end]
+}
+
+// windowRMS computes the root-mean-square of a window of int16 samples,
+// normalized to [0, 1] range.
+func windowRMS(samples []int16) float64 {
+	if len(samples) == 0 {
+		return 0
+	}
+	var sum float64
+	for _, s := range samples {
+		v := float64(s) / math.MaxInt16
+		sum += v * v
+	}
+	return math.Sqrt(sum / float64(len(samples)))
+}
+
+// adjustScalesForShortText applies Strategy B: dynamic noise/noiseW reduction
+// for short phoneme sequences. Returns possibly modified noiseScale and noiseW.
+func adjustScalesForShortText(phonemeLen int, noiseScale, noiseW float32) (float32, float32) {
+	if phonemeLen >= minPhonemeIDs {
+		return noiseScale, noiseW
+	}
+
+	ratio := float64(phonemeLen) / float64(minPhonemeIDs)
+	if ratio < 0 {
+		ratio = 0
+	}
+	if ratio > 1 {
+		ratio = 1
+	}
+
+	// noiseScale *= max(0.5, ratio)
+	nsFactor := math.Max(0.5, ratio)
+	noiseScale *= float32(nsFactor)
+
+	// noiseW *= max(0.4, ratio)
+	nwFactor := math.Max(0.4, ratio)
+	noiseW *= float32(nwFactor)
+
+	return noiseScale, noiseW
+}
+
+// countNonSpaceChars counts characters in text excluding whitespace.
+func countNonSpaceChars(text string) int {
+	count := 0
+	for _, r := range text {
+		if !unicode.IsSpace(r) {
+			count++
+		}
+	}
+	return count
+}
+
+// wrapShortTextWithBreaks applies Strategy C: if the text is not already SSML
+// (does not start with "<speak>") and has shortTextChars or fewer non-space
+// characters, wraps it with <break> silence padding for SSML processing.
+// Since the Go runtime does not have an SSML parser, this function instead
+// returns the original text and a flag indicating that silence padding should
+// be applied at the audio level.
+func wrapShortTextWithBreaks(text string) (string, bool) {
+	trimmed := strings.TrimSpace(text)
+	if trimmed == "" {
+		return text, false
+	}
+
+	// If already SSML, do not wrap.
+	if strings.HasPrefix(trimmed, "<speak>") {
+		return text, false
+	}
+
+	// Check non-space character count.
+	if countNonSpaceChars(trimmed) > shortTextChars {
+		return text, false
+	}
+
+	return text, true
+}
+
+// prependSilence adds silence samples at the beginning of audio.
+func prependSilence(audio []int16, sampleRate int, durationMs int) []int16 {
+	silenceSamples := sampleRate * durationMs / 1000
+	result := make([]int16, silenceSamples+len(audio))
+	copy(result[silenceSamples:], audio)
+	return result
+}
+
+// appendSilence adds silence samples at the end of audio.
+func appendSilence(audio []int16, sampleRate int, durationMs int) []int16 {
+	silenceSamples := sampleRate * durationMs / 1000
+	result := make([]int16, len(audio)+silenceSamples)
+	copy(result, audio)
+	return result
+}
+
+// applyShortTextMitigation is a convenience function that logs the mitigation
+// details. It is called from engine.Synthesize when short-text strategies are
+// active.
+func shortTextMitigationSummary(originalLen, paddedLen int, wasPadded bool, scalesAdjusted bool) string {
+	parts := make([]string, 0, 3)
+	if wasPadded {
+		parts = append(parts, fmt.Sprintf("padded %d->%d phonemes", originalLen, paddedLen))
+	}
+	if scalesAdjusted {
+		parts = append(parts, "scales adjusted")
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	return "short-text mitigation: " + strings.Join(parts, ", ")
+}

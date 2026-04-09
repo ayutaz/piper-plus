@@ -41,6 +41,149 @@ const DEFAULT_LENGTH_SCALE = 1.0;
 const DEFAULT_NOISE_W = 0.8;
 const DEFAULT_SAMPLE_RATE = 22050;
 
+// Short-text mitigation constants (keep in sync with other runtimes)
+const MIN_PHONEME_IDS = 40;
+const TRIM_THRESHOLD_RMS = 0.01;
+const TRIM_MIN_SAMPLES = 2205; // 22050 Hz * 0.1 s
+
+// ---------------------------------------------------------------------------
+// Short-text mitigation helpers (Strategy A + B)
+// ---------------------------------------------------------------------------
+
+/**
+ * Strategy A: Pad short phoneme ID sequences with silence tokens.
+ *
+ * Inserts pause tokens (ID = 0) evenly after BOS and before EOS until the
+ * sequence reaches MIN_PHONEME_IDS length.  Also pads prosodyFeatures with
+ * zero triplets at matching positions when present.
+ *
+ * @param {number[]} phonemeIds
+ * @param {number[][]|null} prosodyFeatures
+ * @returns {{ phonemeIds: number[], prosodyFeatures: number[][]|null, wasPadded: boolean }}
+ */
+export function padPhonemeIds(phonemeIds, prosodyFeatures) {
+  const n = phonemeIds.length;
+  if (n >= MIN_PHONEME_IDS) {
+    return { phonemeIds, prosodyFeatures, wasPadded: false };
+  }
+
+  const padTotal = MIN_PHONEME_IDS - n;
+  const padFront = Math.floor(padTotal / 2);
+  const padBack = padTotal - padFront;
+
+  // phonemeIds layout: [BOS, ...body..., EOS]
+  const bos = phonemeIds.slice(0, 1);
+  const body = phonemeIds.slice(1, -1);
+  const eos = phonemeIds.slice(-1);
+
+  const padded = [
+    ...bos,
+    ...new Array(padFront).fill(0),
+    ...body,
+    ...new Array(padBack).fill(0),
+    ...eos,
+  ];
+
+  let paddedProsody = null;
+  if (prosodyFeatures) {
+    const zeroPad = [0, 0, 0];
+    const pBos = prosodyFeatures.slice(0, 1);
+    const pBody = prosodyFeatures.slice(1, -1);
+    const pEos = prosodyFeatures.slice(-1);
+    paddedProsody = [
+      ...pBos,
+      ...new Array(padFront).fill(zeroPad),
+      ...pBody,
+      ...new Array(padBack).fill(zeroPad),
+      ...pEos,
+    ];
+  }
+
+  return { phonemeIds: padded, prosodyFeatures: paddedProsody, wasPadded: true };
+}
+
+/**
+ * Strategy A (post-step): Trim leading and trailing silence from Float32Array
+ * audio using a sliding RMS window.
+ *
+ * Keeps at least TRIM_MIN_SAMPLES to avoid producing empty audio.
+ *
+ * @param {Float32Array} audio - Audio samples in the range -1.0 to 1.0
+ * @param {number} [windowSize=256] - RMS window size in samples
+ * @returns {Float32Array}
+ */
+export function trimSilence(audio, windowSize = 256) {
+  const n = audio.length;
+  if (n <= TRIM_MIN_SAMPLES) {
+    return audio;
+  }
+
+  const nWindows = Math.floor(n / windowSize);
+  if (nWindows === 0) {
+    return audio;
+  }
+
+  // Compute per-window RMS
+  let firstAbove = -1;
+  let lastAbove = -1;
+  for (let w = 0; w < nWindows; w++) {
+    const offset = w * windowSize;
+    let sumSq = 0;
+    for (let j = 0; j < windowSize; j++) {
+      const s = audio[offset + j];
+      sumSq += s * s;
+    }
+    const rms = Math.sqrt(sumSq / windowSize);
+    if (rms > TRIM_THRESHOLD_RMS) {
+      if (firstAbove < 0) firstAbove = w;
+      lastAbove = w;
+    }
+  }
+
+  if (firstAbove < 0) {
+    // All silence — return minimum-length slice from the start
+    return audio.slice(0, TRIM_MIN_SAMPLES);
+  }
+
+  let startSample = firstAbove * windowSize;
+  let endSample = Math.min((lastAbove + 1) * windowSize, n);
+
+  // Ensure minimum length
+  let length = endSample - startSample;
+  if (length < TRIM_MIN_SAMPLES) {
+    const center = Math.floor((startSample + endSample) / 2);
+    const half = Math.floor(TRIM_MIN_SAMPLES / 2);
+    startSample = Math.max(0, center - half);
+    endSample = Math.min(n, startSample + TRIM_MIN_SAMPLES);
+    startSample = Math.max(0, endSample - TRIM_MIN_SAMPLES);
+  }
+
+  return audio.slice(startSample, endSample);
+}
+
+/**
+ * Strategy B: Adjust noise scales for short inputs.
+ *
+ * For inputs shorter than MIN_PHONEME_IDS, attenuate noiseScale and noiseW
+ * proportionally while keeping lengthScale unchanged.
+ *
+ * @param {number} phonemeCount - Number of phoneme IDs
+ * @param {number} noiseScale
+ * @param {number} noiseW
+ * @returns {{ noiseScale: number, noiseW: number }}
+ */
+export function adjustScalesForShortInput(phonemeCount, noiseScale, noiseW) {
+  if (phonemeCount >= MIN_PHONEME_IDS) {
+    return { noiseScale, noiseW };
+  }
+
+  const ratio = Math.min(1.0, phonemeCount / MIN_PHONEME_IDS);
+  return {
+    noiseScale: noiseScale * Math.max(0.5, ratio),
+    noiseW: noiseW * Math.max(0.4, ratio),
+  };
+}
+
 // ---------------------------------------------------------------------------
 // PiperPlus
 // ---------------------------------------------------------------------------
@@ -111,20 +254,37 @@ export class PiperPlus {
     }
 
     const language = options.language || this._detectLanguage(text);
-    const noiseScale = options.noiseScale ?? this._config.inference?.noise_scale ?? DEFAULT_NOISE_SCALE;
+    let noiseScale = options.noiseScale ?? this._config.inference?.noise_scale ?? DEFAULT_NOISE_SCALE;
     const lengthScale = options.lengthScale ?? this._config.inference?.length_scale ?? DEFAULT_LENGTH_SCALE;
-    const noiseW = options.noiseW ?? this._config.inference?.noise_w ?? DEFAULT_NOISE_W;
+    let noiseW = options.noiseW ?? this._config.inference?.noise_w ?? DEFAULT_NOISE_W;
 
     // 1. Phonemize
-    const { phonemeIds, prosodyFeatures } = await this._textToPhonemeIds(text, language);
+    let { phonemeIds, prosodyFeatures } = await this._textToPhonemeIds(text, language);
+
+    // --- Strategy B: Dynamic Scales Adjustment for short inputs ---
+    const originalLength = phonemeIds.length;
+    const adjusted = adjustScalesForShortInput(originalLength, noiseScale, noiseW);
+    noiseScale = adjusted.noiseScale;
+    noiseW = adjusted.noiseW;
+
+    // --- Strategy A: Silence Padding for short inputs ---
+    const padResult = padPhonemeIds(phonemeIds, prosodyFeatures);
+    phonemeIds = padResult.phonemeIds;
+    prosodyFeatures = padResult.prosodyFeatures;
+    const wasPadded = padResult.wasPadded;
 
     // 2. ONNX inference
-    const audioData = await this._infer(phonemeIds, prosodyFeatures, {
+    let audioData = await this._infer(phonemeIds, prosodyFeatures, {
       noiseScale,
       lengthScale,
       noiseW,
       language,
     });
+
+    // --- Strategy A (post-step): Trim silence introduced by padding ---
+    if (wasPadded) {
+      audioData = trimSilence(audioData);
+    }
 
     // 3. Wrap result
     const sampleRate = this._config.audio?.sample_rate ?? DEFAULT_SAMPLE_RATE;

@@ -88,6 +88,14 @@ def load_config(model_path: str) -> dict | None:
     return None
 
 
+_SHORT_TEXT_THRESHOLD = 10
+
+
+def _is_short_text(text: str, threshold: int = _SHORT_TEXT_THRESHOLD) -> bool:
+    """Check if text is short (excluding whitespace)."""
+    return len(text.replace(" ", "").replace("\u3000", "").strip()) <= threshold
+
+
 def synthesize(
     text: str,
     model_path: str,
@@ -100,6 +108,14 @@ def synthesize(
     """Synthesize text to speech."""
     if not text.strip() or not model_path:
         return None
+
+    if _is_short_text(text):
+        gr.Warning(
+            "Short text may produce degraded audio quality. "
+            "Consider using a longer sentence.\n"
+            "短いテキストは音声品質が低下する可能性があります。"
+            "より長い文章をお試しください。"
+        )
 
     config = _get_config(model_path)
     if config is None:
@@ -171,6 +187,11 @@ def create_ui(model_dir: str, output_dir: str):
                 text_input = gr.Textbox(
                     label="Text",
                     placeholder="Enter text to synthesize...",
+                    info=(
+                        "Tip: Very short text (10 chars or less) may produce "
+                        "degraded audio. Use longer sentences for best quality. "
+                        "/ 短いテキスト(10文字以下)は音声品質が低下する場合があります。"
+                    ),
                     lines=3,
                     value=SAMPLE_TEXTS["ja"],
                 )

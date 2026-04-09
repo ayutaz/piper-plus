@@ -219,10 +219,14 @@ function createInitializedInstance(overrides = {}) {
   };
 
   // Phonemizer mock — simulates CompositePhonemizer after _init()
+  // Use >= 40 phoneme IDs to bypass short-text mitigation (Strategy A+B)
+  const longPhonemeIds = new Array(45).fill(7);
+  longPhonemeIds[0] = 1;   // BOS
+  longPhonemeIds[44] = 2;  // EOS
   const defaultPhonemizer = {
     detectLanguage: mock.fn(() => 'ja'),
     encode: mock.fn((text, language) => ({
-      phonemeIds: [1, 7, 2],
+      phonemeIds: longPhonemeIds,
       prosodyFeatures: null,
     })),
     dispose: mock.fn(),
@@ -631,9 +635,12 @@ describe('synthesize() 正常系', { skip }, () => {
   });
 
   it('phonemize から infer までのパイプラインが実行される', async () => {
-    // Arrange
+    // Arrange — use >= 40 phoneme IDs to bypass short-text mitigation
+    const pipelineIds = new Array(45).fill(7);
+    pipelineIds[0] = 1;
+    pipelineIds[44] = 2;
     const encodeFn = mock.fn((text, language) => ({
-      phonemeIds: [1, 7, 2],
+      phonemeIds: pipelineIds,
       prosodyFeatures: null,
     }));
     const sessionRunFn = mock.fn(async () => ({

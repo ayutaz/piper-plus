@@ -528,6 +528,19 @@ Wyoming Protocol TTS の Docker 環境と Home Assistant 統合ガイド。Docke
 **実装:** `docker/wyoming/` (`Dockerfile`, `docker-compose.yml`, `.env.example`, `README.md`)
 **ドキュメント:** `docs/guides/home-assistant.md`
 
+### 短テキスト合成品質改善
+
+短テキスト (1-2文節) 合成時のノイズ・歪み・0秒出力問題に対する緩和策。VITS アーキテクチャの構造的制限に起因する既知の問題 (rhasspy/piper#252) に対し、3つの Strategy を全ランタイムに並列実装。
+
+| Strategy | 手法 | 効果 | 対象ランタイム |
+|----------|------|------|-------------|
+| A | Silence Padding + Post-trim | 高 | 全7ランタイム |
+| B | Dynamic Scales Adjustment | 中 | 全7ランタイム |
+| C | SSML `<break>` Auto-injection | 中 | Python/Rust/C#/Go (SSML対応4ランタイム) |
+
+**設定仕様:** `docs/spec/short-text-contract.toml`
+**ドキュメント:** `docs/features/short-text-synthesis.md`
+
 ---
 
 ## 重要なファイルパス
