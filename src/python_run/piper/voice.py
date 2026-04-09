@@ -468,7 +468,7 @@ class PiperVoice:
             noise_w *= max(0.4, ratio)
 
         # Strategy A: pad short sequences with silence tokens
-        pad_id = self.config.phoneme_id_map.get(PAD, [0])[0]
+        pad_id = 0
         phoneme_ids, was_padded = _pad_phoneme_ids(phoneme_ids, pad_id)
 
         phoneme_ids_array = np.expand_dims(np.array(phoneme_ids, dtype=np.int64), 0)

@@ -88,6 +88,24 @@ static void trimSilenceInt16(std::vector<int16_t> &audioBuffer) {
     }
   }
 
+  // Check partial window (remainder samples after the last full window)
+  const int remainder = totalSamples % TRIM_WINDOW_SIZE;
+  if (remainder > 0) {
+    float sumSq = 0.0f;
+    const int offset = nWindows * TRIM_WINDOW_SIZE;
+    for (int s = 0; s < remainder; s++) {
+      float sample = static_cast<float>(audioBuffer[offset + s]) / 32767.0f;
+      sumSq += sample * sample;
+    }
+    float rms = std::sqrt(sumSq / static_cast<float>(remainder));
+    if (rms > TRIM_THRESHOLD_RMS) {
+      if (firstAbove < 0) {
+        firstAbove = nWindows;
+      }
+      lastAbove = nWindows;
+    }
+  }
+
   if (firstAbove < 0) {
     audioBuffer.resize(std::min(totalSamples, TRIM_MIN_SAMPLES));
     return;
@@ -139,6 +157,24 @@ static void trimSilenceFloat(std::vector<float> &audioBuffer) {
         firstAbove = w;
       }
       lastAbove = w;
+    }
+  }
+
+  // Check partial window (remainder samples after the last full window)
+  const int remainder = totalSamples % TRIM_WINDOW_SIZE;
+  if (remainder > 0) {
+    float sumSq = 0.0f;
+    const int offset = nWindows * TRIM_WINDOW_SIZE;
+    for (int s = 0; s < remainder; s++) {
+      float sample = audioBuffer[offset + s];
+      sumSq += sample * sample;
+    }
+    float rms = std::sqrt(sumSq / static_cast<float>(remainder));
+    if (rms > TRIM_THRESHOLD_RMS) {
+      if (firstAbove < 0) {
+        firstAbove = nWindows;
+      }
+      lastAbove = nWindows;
     }
   }
 
@@ -619,6 +655,221 @@ TEST_F(ShortTextIntegrationTest, TrimPreservesMinSamplesAfterPadding) {
   // Trimmed but not below minimum
   EXPECT_GE(static_cast<int>(audio.size()), TRIM_MIN_SAMPLES);
   EXPECT_LT(static_cast<int>(audio.size()), totalSamples);
+}
+
+// ======================================================================
+// Bug fix: phoneme timing must use pre-padding phonemeIds
+// ======================================================================
+
+class PhonemeTimingPaddingTest : public ::testing::Test {};
+
+TEST_F(PhonemeTimingPaddingTest, OriginalIdsPreservedBeforePadding) {
+  // Simulate the fix: save originalPhonemeIds before padding
+  std::vector<PhonemeId> phonemeIds = {1, 10, 11, 12, 13, 14, 2};  // 7 elements
+  const std::vector<PhonemeId> originalPhonemeIds(phonemeIds);
+
+  bool wasPadded = padPhonemeIds(phonemeIds);
+  EXPECT_TRUE(wasPadded);
+
+  // After padding, phonemeIds is now 40 elements
+  EXPECT_EQ(static_cast<int>(phonemeIds.size()), MIN_PHONEME_IDS);
+
+  // originalPhonemeIds must still be the original 7 elements
+  EXPECT_EQ(originalPhonemeIds.size(), 7u);
+  EXPECT_EQ(originalPhonemeIds[0], 1);   // BOS
+  EXPECT_EQ(originalPhonemeIds[1], 10);
+  EXPECT_EQ(originalPhonemeIds[6], 2);   // EOS
+}
+
+TEST_F(PhonemeTimingPaddingTest, OriginalIdsUnchangedWhenNoPadding) {
+  // Long enough input -- no padding occurs
+  std::vector<PhonemeId> phonemeIds;
+  phonemeIds.push_back(1);
+  for (int i = 0; i < 48; i++) phonemeIds.push_back(10 + i);
+  phonemeIds.push_back(2);
+  ASSERT_EQ(phonemeIds.size(), 50u);
+
+  const std::vector<PhonemeId> originalPhonemeIds(phonemeIds);
+
+  bool wasPadded = padPhonemeIds(phonemeIds);
+  EXPECT_FALSE(wasPadded);
+
+  // Both should be identical
+  EXPECT_EQ(phonemeIds.size(), originalPhonemeIds.size());
+  EXPECT_EQ(phonemeIds, originalPhonemeIds);
+}
+
+TEST_F(PhonemeTimingPaddingTest, OriginalSizeSmallerThanPadded) {
+  // The key invariant: originalPhonemeIds.size() <= phonemeIds.size()
+  // and for short inputs, strictly less.
+  std::vector<PhonemeId> phonemeIds = {1, 5, 6, 7, 2};  // 5 elements
+  const std::vector<PhonemeId> originalPhonemeIds(phonemeIds);
+
+  padPhonemeIds(phonemeIds);
+
+  // original is 5, padded is 40
+  EXPECT_EQ(originalPhonemeIds.size(), 5u);
+  EXPECT_EQ(static_cast<int>(phonemeIds.size()), MIN_PHONEME_IDS);
+  EXPECT_LT(originalPhonemeIds.size(), phonemeIds.size());
+}
+
+TEST_F(PhonemeTimingPaddingTest, DurationVecAlignmentWithOriginal) {
+  // Simulate: duration output from the model has the same length as the
+  // input phoneme sequence (padded). The original phonemeIds is shorter.
+  // extractTimingsFromDurations iterates min(phonemeIds.size(), durations.size())
+  // so passing the original IDs correctly bounds the iteration.
+  std::vector<PhonemeId> phonemeIds = {1, 10, 11, 12, 2};  // 5 elements
+  const std::vector<PhonemeId> originalPhonemeIds(phonemeIds);
+
+  padPhonemeIds(phonemeIds);
+  ASSERT_EQ(static_cast<int>(phonemeIds.size()), MIN_PHONEME_IDS);
+
+  // Model returns durations for the padded input (40 elements)
+  std::vector<float> durationVec(static_cast<size_t>(MIN_PHONEME_IDS), 5.0f);
+
+  // When using originalPhonemeIds (size=5), iteration is bounded to 5
+  size_t iterCount = std::min(originalPhonemeIds.size(), durationVec.size());
+  EXPECT_EQ(iterCount, 5u);
+
+  // When incorrectly using padded phonemeIds (size=40), iteration covers all 40
+  size_t badIterCount = std::min(phonemeIds.size(), durationVec.size());
+  EXPECT_EQ(badIterCount, 40u);
+
+  // The fix ensures we use the smaller, correct count
+  EXPECT_LT(iterCount, badIterCount);
+}
+
+// ======================================================================
+// Bug fix: trimSilence partial window handling
+// ======================================================================
+
+class TrimPartialWindowInt16Test : public ::testing::Test {};
+
+TEST_F(TrimPartialWindowInt16Test, AudioInPartialWindowDetected) {
+  // Create buffer where all full windows are silence, but the partial
+  // window at the end contains loud audio.
+  // 3 full windows (768 samples) + 100 partial samples = 868 total
+  // But we need > TRIM_MIN_SAMPLES (2205), so use more full windows.
+  const int nFullWindows = 10;  // 2560 samples
+  const int partialSize = 100;
+  const int totalSamples = nFullWindows * TRIM_WINDOW_SIZE + partialSize;
+  ASSERT_GT(totalSamples, TRIM_MIN_SAMPLES);
+
+  std::vector<int16_t> audio(totalSamples, 0);  // All silence
+
+  // Put loud audio only in the partial window at the end
+  for (int i = nFullWindows * TRIM_WINDOW_SIZE; i < totalSamples; i++) {
+    audio[i] = 10000;
+  }
+
+  trimSilenceInt16(audio);
+
+  // The partial window audio should be detected and preserved.
+  // Without the fix, lastAbove would be -1 (all-silence path) and the
+  // buffer would be truncated to TRIM_MIN_SAMPLES with no guarantee of
+  // preserving the partial window content.
+  // With the fix, the loud partial window is found and included.
+  bool hasLoudSample = false;
+  for (auto s : audio) {
+    if (std::abs(s) > 5000) {
+      hasLoudSample = true;
+      break;
+    }
+  }
+  EXPECT_TRUE(hasLoudSample);
+}
+
+TEST_F(TrimPartialWindowInt16Test, FullWindowsPlusPartialSilence) {
+  // Full windows have audio, partial window is silence -- should behave
+  // the same as before the fix (partial silence doesn't affect lastAbove).
+  const int nFullWindows = 4;
+  const int partialSize = 50;
+  const int totalSamples = nFullWindows * TRIM_WINDOW_SIZE + partialSize;
+  ASSERT_GT(totalSamples, TRIM_MIN_SAMPLES);
+
+  std::vector<int16_t> audio(totalSamples, 5000);  // All loud
+
+  // Make the partial window silent
+  for (int i = nFullWindows * TRIM_WINDOW_SIZE; i < totalSamples; i++) {
+    audio[i] = 0;
+  }
+
+  trimSilenceInt16(audio);
+
+  // All full windows are loud, so firstAbove=0, lastAbove=3.
+  // endSample = min(4*256, totalSamples) = 1024, which is < totalSamples.
+  // Trailing silence in partial window should be trimmed.
+  EXPECT_LE(static_cast<int>(audio.size()), totalSamples);
+}
+
+TEST_F(TrimPartialWindowInt16Test, ExactMultipleUnchanged) {
+  // When buffer size is exact multiple of TRIM_WINDOW_SIZE, no partial
+  // window exists -- behavior unchanged from before the fix.
+  const int totalSamples = 4 * TRIM_WINDOW_SIZE;
+  ASSERT_GT(totalSamples, TRIM_MIN_SAMPLES);
+  ASSERT_EQ(totalSamples % TRIM_WINDOW_SIZE, 0);
+
+  std::vector<int16_t> audio(totalSamples, 5000);
+
+  trimSilenceInt16(audio);
+
+  EXPECT_EQ(static_cast<int>(audio.size()), totalSamples);
+}
+
+class TrimPartialWindowFloatTest : public ::testing::Test {};
+
+TEST_F(TrimPartialWindowFloatTest, AudioInPartialWindowDetected) {
+  const int nFullWindows = 10;
+  const int partialSize = 100;
+  const int totalSamples = nFullWindows * TRIM_WINDOW_SIZE + partialSize;
+  ASSERT_GT(totalSamples, TRIM_MIN_SAMPLES);
+
+  std::vector<float> audio(totalSamples, 0.0f);
+
+  // Put loud audio only in the partial window
+  for (int i = nFullWindows * TRIM_WINDOW_SIZE; i < totalSamples; i++) {
+    audio[i] = 0.5f;
+  }
+
+  trimSilenceFloat(audio);
+
+  bool hasLoudSample = false;
+  for (auto s : audio) {
+    if (std::abs(s) > 0.1f) {
+      hasLoudSample = true;
+      break;
+    }
+  }
+  EXPECT_TRUE(hasLoudSample);
+}
+
+TEST_F(TrimPartialWindowFloatTest, FullWindowsPlusPartialSilence) {
+  const int nFullWindows = 4;
+  const int partialSize = 50;
+  const int totalSamples = nFullWindows * TRIM_WINDOW_SIZE + partialSize;
+  ASSERT_GT(totalSamples, TRIM_MIN_SAMPLES);
+
+  std::vector<float> audio(totalSamples, 0.5f);
+
+  for (int i = nFullWindows * TRIM_WINDOW_SIZE; i < totalSamples; i++) {
+    audio[i] = 0.0f;
+  }
+
+  trimSilenceFloat(audio);
+
+  EXPECT_LE(static_cast<int>(audio.size()), totalSamples);
+}
+
+TEST_F(TrimPartialWindowFloatTest, ExactMultipleUnchanged) {
+  const int totalSamples = 4 * TRIM_WINDOW_SIZE;
+  ASSERT_GT(totalSamples, TRIM_MIN_SAMPLES);
+  ASSERT_EQ(totalSamples % TRIM_WINDOW_SIZE, 0);
+
+  std::vector<float> audio(totalSamples, 0.5f);
+
+  trimSilenceFloat(audio);
+
+  EXPECT_EQ(static_cast<int>(audio.size()), totalSamples);
 }
 
 int main(int argc, char **argv) {

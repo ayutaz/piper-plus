@@ -656,4 +656,133 @@ public class ShortTextProcessorTests
             "<speak><break time=\"300ms\"/>Test<break time=\"300ms\"/></speak>",
             result);
     }
+
+    // ==================================================================
+    // Strategy C: PadSilenceForShortText (audio-level)
+    // ==================================================================
+
+    [Fact]
+    public void PadSilenceForShortText_AddsLeadingAndTrailingSilence()
+    {
+        short[] audio = [100, 200, 300];
+        int sampleRate = 22050;
+        int expectedSilenceSamples = (int)(sampleRate * ShortTextProcessor.SilencePadMs / 1000.0f);
+
+        short[] padded = ShortTextProcessor.PadSilenceForShortText(audio, sampleRate);
+
+        Assert.Equal(audio.Length + 2 * expectedSilenceSamples, padded.Length);
+    }
+
+    [Fact]
+    public void PadSilenceForShortText_LeadingSilenceIsZero()
+    {
+        short[] audio = [100, 200, 300];
+        int sampleRate = 22050;
+        int silenceSamples = (int)(sampleRate * ShortTextProcessor.SilencePadMs / 1000.0f);
+
+        short[] padded = ShortTextProcessor.PadSilenceForShortText(audio, sampleRate);
+
+        // Leading silence should be all zeros
+        for (int i = 0; i < silenceSamples; i++)
+        {
+            Assert.Equal(0, padded[i]);
+        }
+    }
+
+    [Fact]
+    public void PadSilenceForShortText_TrailingSilenceIsZero()
+    {
+        short[] audio = [100, 200, 300];
+        int sampleRate = 22050;
+        int silenceSamples = (int)(sampleRate * ShortTextProcessor.SilencePadMs / 1000.0f);
+
+        short[] padded = ShortTextProcessor.PadSilenceForShortText(audio, sampleRate);
+
+        // Trailing silence should be all zeros
+        for (int i = padded.Length - silenceSamples; i < padded.Length; i++)
+        {
+            Assert.Equal(0, padded[i]);
+        }
+    }
+
+    [Fact]
+    public void PadSilenceForShortText_OriginalAudioPreservedInMiddle()
+    {
+        short[] audio = [100, 200, 300, 400, 500];
+        int sampleRate = 22050;
+        int silenceSamples = (int)(sampleRate * ShortTextProcessor.SilencePadMs / 1000.0f);
+
+        short[] padded = ShortTextProcessor.PadSilenceForShortText(audio, sampleRate);
+
+        // Original audio should be at offset silenceSamples
+        for (int i = 0; i < audio.Length; i++)
+        {
+            Assert.Equal(audio[i], padded[silenceSamples + i]);
+        }
+    }
+
+    [Fact]
+    public void PadSilenceForShortText_EmptyAudio_ReturnsEmpty()
+    {
+        short[] audio = [];
+
+        short[] padded = ShortTextProcessor.PadSilenceForShortText(audio, 22050);
+
+        Assert.Empty(padded);
+    }
+
+    [Fact]
+    public void PadSilenceForShortText_SilenceDurationMatchesSilencePadMs()
+    {
+        short[] audio = [1];
+        int sampleRate = 22050;
+
+        short[] padded = ShortTextProcessor.PadSilenceForShortText(audio, sampleRate);
+
+        // Each silence block = sampleRate * SilencePadMs / 1000
+        int expectedSilenceSamples = (int)(sampleRate * ShortTextProcessor.SilencePadMs / 1000.0f);
+        int expectedTotal = expectedSilenceSamples + 1 + expectedSilenceSamples;
+        Assert.Equal(expectedTotal, padded.Length);
+    }
+
+    [Fact]
+    public void PadSilenceForShortText_DifferentSampleRate_CorrectDuration()
+    {
+        short[] audio = [1];
+        int sampleRate = 44100; // Different sample rate
+
+        short[] padded = ShortTextProcessor.PadSilenceForShortText(audio, sampleRate);
+
+        int expectedSilenceSamples = (int)(sampleRate * ShortTextProcessor.SilencePadMs / 1000.0f);
+        Assert.Equal(1 + 2 * expectedSilenceSamples, padded.Length);
+    }
+
+    // ==================================================================
+    // Strategy C: Integration — WrapShortTextWithBreaks detection
+    // ==================================================================
+
+    [Fact]
+    public void WrapShortTextWithBreaks_DetectsShortText_ForAudioPadding()
+    {
+        // Verify that WrapShortTextWithBreaks can be used as a short-text
+        // detector: it returns a different string for short text.
+        string shortText = "Hi";
+        string wrapped = ShortTextProcessor.WrapShortTextWithBreaks(shortText);
+
+        bool isShort = !ReferenceEquals(wrapped, shortText)
+                       && !string.Equals(wrapped, shortText, StringComparison.Ordinal);
+        Assert.True(isShort);
+    }
+
+    [Fact]
+    public void WrapShortTextWithBreaks_LongText_NotDetectedAsShort()
+    {
+        string longText = "This is a long sentence that exceeds the threshold.";
+        string wrapped = ShortTextProcessor.WrapShortTextWithBreaks(longText);
+
+        // For long text, WrapShortTextWithBreaks returns the same string
+        bool isShort = !ReferenceEquals(wrapped, longText)
+                       && !string.Equals(wrapped, longText, StringComparison.Ordinal);
+        Assert.False(isShort);
+    }
 }

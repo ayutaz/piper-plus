@@ -313,6 +313,8 @@ def create_app(engine: PiperInferenceEngine, model_path: str):
 
     def _is_short_text(text: str, threshold: int = 10) -> bool:
         """Check if text is short (excluding whitespace)."""
+        if text.lstrip().startswith("<speak>"):
+            return False
         return len(text.replace(" ", "").replace("\u3000", "").strip()) <= threshold
 
     @app.get("/synthesize")

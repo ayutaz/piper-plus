@@ -114,11 +114,11 @@ func padProsodyFeatures(original [][3]int64, originalLen, paddedLen int) [][3]in
 		padded = append(padded, [3]int64{})
 	}
 
-	// EOS prosody.
+	// EOS prosody. When len(original) == 1 the single element already served
+	// as BOS, and the front+back padding fills the remaining paddedLen-1 slots,
+	// so no extra EOS element is appended.
 	if len(original) > 1 {
 		padded = append(padded, original[len(original)-1])
-	} else if len(original) == 1 {
-		padded = append(padded, [3]int64{})
 	}
 
 	return padded

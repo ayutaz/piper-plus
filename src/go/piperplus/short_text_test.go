@@ -548,6 +548,367 @@ func TestShortTextMitigationSummary(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
+// trimSilence boundary conditions
+// ---------------------------------------------------------------------------
+
+func TestTrimSilence_ExactMinSamples(t *testing.T) {
+	// len(audio) == trimMinSamples: should be returned as-is (early return).
+	audio := make([]int16, trimMinSamples)
+	for i := range audio {
+		audio[i] = 5000
+	}
+	trimmed := trimSilence(audio)
+	if len(trimmed) != trimMinSamples {
+		t.Errorf("expected length %d, got %d", trimMinSamples, len(trimmed))
+	}
+}
+
+func TestTrimSilence_OneAboveMinSamples(t *testing.T) {
+	// len(audio) == trimMinSamples+1: just above the early-return threshold.
+	// All loud content, so nothing to trim.
+	audio := make([]int16, trimMinSamples+1)
+	for i := range audio {
+		audio[i] = 5000
+	}
+	trimmed := trimSilence(audio)
+	if len(trimmed) != len(audio) {
+		t.Errorf("expected length %d, got %d", len(audio), len(trimmed))
+	}
+}
+
+func TestTrimSilence_RMSExactlyAtThreshold(t *testing.T) {
+	// Build a window whose RMS is exactly trimThresholdRMS (0.01).
+	// RMS = sqrt(sum(v^2)/n), normalized by MaxInt16.
+	// For uniform value v: RMS = |v|/MaxInt16.
+	// v = trimThresholdRMS * MaxInt16 = 0.01 * 32767 ~ 327.67 -> 327
+	//
+	// With v=327: RMS = 327/32767 ~ 0.00998 < 0.01 (treated as silence).
+	// With v=328: RMS = 328/32767 ~ 0.01003 > 0.01 (not silence).
+	//
+	// Construct: silence + borderline window + silence.
+	totalLen := trimMinSamples + 1000
+	audio := make([]int16, totalLen)
+
+	// Place a window of value 327 (just below threshold) in the middle.
+	// This should be treated as silence; entire audio is "silent".
+	midStart := totalLen/2 - trimWindowSize/2
+	for i := midStart; i < midStart+trimWindowSize; i++ {
+		audio[i] = 327
+	}
+
+	trimmed := trimSilence(audio)
+	// All silence path: should return at least trimMinSamples.
+	if len(trimmed) < trimMinSamples {
+		t.Errorf("expected at least %d samples, got %d", trimMinSamples, len(trimmed))
+	}
+
+	// Now test with value 328 (just above threshold) -- should detect as content.
+	audio2 := make([]int16, totalLen)
+	midStart2 := totalLen/2 - trimWindowSize/2
+	for i := midStart2; i < midStart2+trimWindowSize; i++ {
+		audio2[i] = 328
+	}
+
+	trimmed2 := trimSilence(audio2)
+	// Should detect the content and trim surrounding silence.
+	if len(trimmed2) >= len(audio2) {
+		t.Errorf("expected trimmed audio shorter than %d, got %d", len(audio2), len(trimmed2))
+	}
+	if len(trimmed2) < trimMinSamples {
+		t.Errorf("expected at least %d samples, got %d", trimMinSamples, len(trimmed2))
+	}
+}
+
+func TestTrimSilence_MultiStageAdjustment_StartNegative(t *testing.T) {
+	// Force the scenario where the detected content region is near the
+	// beginning of the audio, so expanding symmetrically would push start < 0.
+	// Layout: tiny non-silent window at the very start, then all silence.
+	audioLen := trimMinSamples * 2
+	audio := make([]int16, audioLen)
+	// Place loud content only in the first window.
+	for i := 0; i < trimWindowSize; i++ {
+		audio[i] = 10000
+	}
+
+	trimmed := trimSilence(audio)
+
+	if len(trimmed) < trimMinSamples {
+		t.Errorf("expected at least %d samples, got %d", trimMinSamples, len(trimmed))
+	}
+	// start must not be negative (would panic on slice).
+	// The test passing without panic verifies the start < 0 guard works.
+}
+
+func TestTrimSilence_MultiStageAdjustment_EndOverflow(t *testing.T) {
+	// Force the scenario where the detected content region is near the
+	// end of the audio, so expanding would push end > len(audio).
+	audioLen := trimMinSamples * 2
+	audio := make([]int16, audioLen)
+	// Place loud content only in the last window.
+	for i := audioLen - trimWindowSize; i < audioLen; i++ {
+		audio[i] = 10000
+	}
+
+	trimmed := trimSilence(audio)
+
+	if len(trimmed) < trimMinSamples {
+		t.Errorf("expected at least %d samples, got %d", trimMinSamples, len(trimmed))
+	}
+	if len(trimmed) > len(audio) {
+		t.Errorf("trimmed length %d exceeds original %d", len(trimmed), len(audio))
+	}
+}
+
+func TestTrimSilence_MultiStageAdjustment_BothOverflow(t *testing.T) {
+	// Audio slightly larger than trimMinSamples with a tiny content
+	// region in the center, so expansion hits both boundaries.
+	audioLen := trimMinSamples + trimWindowSize
+	audio := make([]int16, audioLen)
+	center := audioLen / 2
+	for i := center; i < center+trimWindowSize && i < audioLen; i++ {
+		audio[i] = 10000
+	}
+
+	trimmed := trimSilence(audio)
+
+	if len(trimmed) < trimMinSamples {
+		t.Errorf("expected at least %d samples, got %d", trimMinSamples, len(trimmed))
+	}
+	if len(trimmed) > len(audio) {
+		t.Errorf("trimmed length %d exceeds original %d", len(trimmed), len(audio))
+	}
+}
+
+func TestTrimSilence_AllSilenceSlightlyAboveMin(t *testing.T) {
+	// All-silence audio that is only slightly above trimMinSamples.
+	// Tests the center-portion fallback + minimum guarantee together.
+	audio := make([]int16, trimMinSamples+1)
+	trimmed := trimSilence(audio)
+	if len(trimmed) < trimMinSamples {
+		t.Errorf("expected at least %d samples, got %d", trimMinSamples, len(trimmed))
+	}
+	if len(trimmed) > len(audio) {
+		t.Errorf("trimmed length %d exceeds original %d", len(trimmed), len(audio))
+	}
+}
+
+// ---------------------------------------------------------------------------
+// padProsodyFeatures edge cases
+// ---------------------------------------------------------------------------
+
+func TestPadProsodyFeatures_BOSEOSOnly(t *testing.T) {
+	// Minimal prosody: just BOS and EOS (2 elements), matching phoneme [BOS, EOS].
+	original := [][3]int64{{1, 2, 3}, {4, 5, 6}}
+	originalLen := 2
+	paddedLen := minPhonemeIDs
+
+	result := padProsodyFeatures(original, originalLen, paddedLen)
+
+	if len(result) != paddedLen {
+		t.Errorf("expected length %d, got %d", paddedLen, len(result))
+	}
+
+	// First element must be BOS prosody.
+	if result[0] != original[0] {
+		t.Errorf("expected BOS prosody %v, got %v", original[0], result[0])
+	}
+
+	// Last element must be EOS prosody.
+	if result[len(result)-1] != original[1] {
+		t.Errorf("expected EOS prosody %v, got %v", original[1], result[len(result)-1])
+	}
+}
+
+func TestPadProsodyFeatures_SingleElement(t *testing.T) {
+	// Edge case: only 1 prosody element (just BOS, no EOS in original).
+	original := [][3]int64{{7, 8, 9}}
+	originalLen := 1
+	paddedLen := minPhonemeIDs
+
+	result := padProsodyFeatures(original, originalLen, paddedLen)
+
+	if len(result) != paddedLen {
+		t.Errorf("expected length %d, got %d", paddedLen, len(result))
+	}
+
+	// First element must be the single original prosody.
+	if result[0] != original[0] {
+		t.Errorf("expected first element %v, got %v", original[0], result[0])
+	}
+
+	// Last element should be zero (from back padding; no separate EOS for single-element input).
+	zero := [3]int64{}
+	if result[len(result)-1] != zero {
+		t.Errorf("expected zero prosody at last position, got %v", result[len(result)-1])
+	}
+}
+
+func TestPadProsodyFeatures_OriginalLenMismatch(t *testing.T) {
+	// Case where len(original) > originalLen. The function should use originalLen
+	// for indexing calculations but len(original) for actual data access.
+	// original has 5 elements but originalLen says 3.
+	original := [][3]int64{
+		{1, 1, 1}, {2, 2, 2}, {3, 3, 3}, {4, 4, 4}, {5, 5, 5},
+	}
+	originalLen := 3
+	paddedLen := minPhonemeIDs
+
+	result := padProsodyFeatures(original, originalLen, paddedLen)
+
+	if len(result) != paddedLen {
+		t.Errorf("expected length %d, got %d", paddedLen, len(result))
+	}
+
+	// First element should be original[0].
+	if result[0] != original[0] {
+		t.Errorf("expected first element %v, got %v", original[0], result[0])
+	}
+}
+
+func TestPadProsodyFeatures_PaddedLenSmallerThanOriginal(t *testing.T) {
+	// If paddedLen <= originalLen, no padding should occur.
+	original := [][3]int64{
+		{1, 1, 1}, {2, 2, 2}, {3, 3, 3}, {4, 4, 4}, {5, 5, 5},
+	}
+	result := padProsodyFeatures(original, 5, 3)
+
+	// Should return original unchanged.
+	if len(result) != len(original) {
+		t.Errorf("expected length %d, got %d", len(original), len(result))
+	}
+}
+
+func TestPadProsodyFeatures_EmptySlice(t *testing.T) {
+	// Empty (but non-nil) slice should return nil.
+	result := padProsodyFeatures([][3]int64{}, 0, minPhonemeIDs)
+	if result != nil {
+		t.Errorf("expected nil for empty input, got length %d", len(result))
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Strategy C logging: shortTextMitigationSummary additional cases
+// ---------------------------------------------------------------------------
+
+func TestShortTextMitigationSummary_ContainsPaddedInfo(t *testing.T) {
+	result := shortTextMitigationSummary(5, 40, true, false)
+	if result == "" {
+		t.Fatal("expected non-empty summary")
+	}
+	// Should mention the original and padded lengths.
+	if !containsSubstring(result, "5") || !containsSubstring(result, "40") {
+		t.Errorf("expected summary to contain phoneme counts, got %q", result)
+	}
+}
+
+func TestShortTextMitigationSummary_ContainsScalesInfo(t *testing.T) {
+	result := shortTextMitigationSummary(5, 5, false, true)
+	if result == "" {
+		t.Fatal("expected non-empty summary")
+	}
+	if !containsSubstring(result, "scales") {
+		t.Errorf("expected summary to mention scales, got %q", result)
+	}
+}
+
+func TestShortTextMitigationSummary_BothStrategies(t *testing.T) {
+	result := shortTextMitigationSummary(5, 40, true, true)
+	if result == "" {
+		t.Fatal("expected non-empty summary")
+	}
+	// Should contain both pieces of information.
+	if !containsSubstring(result, "padded") || !containsSubstring(result, "scales") {
+		t.Errorf("expected summary with both padded and scales info, got %q", result)
+	}
+}
+
+// containsSubstring is a test helper that checks if s contains substr.
+func containsSubstring(s, substr string) bool {
+	return len(s) >= len(substr) && searchSubstring(s, substr)
+}
+
+func searchSubstring(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
+}
+
+// ---------------------------------------------------------------------------
+// windowRMS additional boundary tests
+// ---------------------------------------------------------------------------
+
+func TestWindowRMS_SingleSample(t *testing.T) {
+	samples := []int16{math.MaxInt16}
+	rms := windowRMS(samples)
+	if rms < 0.99 {
+		t.Errorf("expected RMS close to 1.0 for single max sample, got %f", rms)
+	}
+}
+
+func TestWindowRMS_MixedSignal(t *testing.T) {
+	// Half max positive, half max negative -- RMS should still be ~1.0.
+	samples := make([]int16, trimWindowSize)
+	for i := range samples {
+		if i%2 == 0 {
+			samples[i] = math.MaxInt16
+		} else {
+			samples[i] = math.MinInt16 + 1 // avoid overflow: MinInt16 = -32768
+		}
+	}
+	rms := windowRMS(samples)
+	if rms < 0.99 {
+		t.Errorf("expected RMS close to 1.0 for alternating max signal, got %f", rms)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// adjustScalesForShortText additional edge cases
+// ---------------------------------------------------------------------------
+
+func TestAdjustScales_ZeroPhonemes(t *testing.T) {
+	// Edge case: 0 phonemes.
+	ns, nw := adjustScalesForShortText(0, 0.667, 0.8)
+	// ratio = 0/40 = 0, clamped floors: noiseScale *= 0.5, noiseW *= 0.4
+	expectedNS := float32(0.667 * 0.5)
+	expectedNW := float32(0.8 * 0.4)
+	if math.Abs(float64(ns-expectedNS)) > 0.001 {
+		t.Errorf("expected noiseScale~%f, got %f", expectedNS, ns)
+	}
+	if math.Abs(float64(nw-expectedNW)) > 0.001 {
+		t.Errorf("expected noiseW~%f, got %f", expectedNW, nw)
+	}
+}
+
+func TestAdjustScales_OnePhoneme(t *testing.T) {
+	// ratio = 1/40 = 0.025, clamped: noiseScale *= 0.5, noiseW *= 0.4
+	ns, nw := adjustScalesForShortText(1, 1.0, 1.0)
+	expectedNS := float32(0.5)
+	expectedNW := float32(0.4)
+	if math.Abs(float64(ns-expectedNS)) > 0.001 {
+		t.Errorf("expected noiseScale~%f, got %f", expectedNS, ns)
+	}
+	if math.Abs(float64(nw-expectedNW)) > 0.001 {
+		t.Errorf("expected noiseW~%f, got %f", expectedNW, nw)
+	}
+}
+
+func TestAdjustScales_JustBelowMinimum(t *testing.T) {
+	// 39 phonemes -> ratio = 39/40 = 0.975
+	ns, nw := adjustScalesForShortText(39, 0.667, 0.8)
+	expectedNS := float32(0.667 * 0.975)
+	expectedNW := float32(0.8 * 0.975)
+	if math.Abs(float64(ns-expectedNS)) > 0.001 {
+		t.Errorf("expected noiseScale~%f, got %f", expectedNS, ns)
+	}
+	if math.Abs(float64(nw-expectedNW)) > 0.001 {
+		t.Errorf("expected noiseW~%f, got %f", expectedNW, nw)
+	}
+}
+
+// ---------------------------------------------------------------------------
 // Constants validation
 // ---------------------------------------------------------------------------
 

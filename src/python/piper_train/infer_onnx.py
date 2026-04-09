@@ -107,7 +107,7 @@ def _trim_silence(
     rms_values = np.sqrt(window_sums / window_size)
 
     # Find first window above threshold (start of non-silence)
-    above = np.where(rms_values >= TRIM_THRESHOLD_RMS)[0]
+    above = np.where(rms_values > TRIM_THRESHOLD_RMS)[0]
     if len(above) == 0:
         # Entire audio is silence -- keep minimum
         return audio[:TRIM_MIN_SAMPLES] if n > TRIM_MIN_SAMPLES else audio
@@ -141,17 +141,30 @@ def _adjust_scales_for_short_input(
     noise_scale: float,
     noise_scale_w: float,
     length_scale: float,
+    *,
+    original_len: int | None = None,
 ) -> tuple[float, float, float]:
     """Strategy B: Reduce noise scales for short inputs.
 
     For inputs shorter than MIN_PHONEME_IDS, attenuate noise_scale and
     noise_scale_w proportionally while keeping length_scale unchanged.
 
+    Args:
+        phoneme_ids: The phoneme ID sequence (used for length if original_len
+            is not provided).
+        noise_scale: Base noise scale.
+        noise_scale_w: Base noise scale w.
+        length_scale: Base length scale (returned unchanged).
+        original_len: If provided, use this as the sequence length instead of
+            ``len(phoneme_ids)``.  This is required when Strategy A (padding)
+            has already been applied, so that the ratio is computed from the
+            *pre-padding* length rather than the padded length.
+
     Returns:
         (adjusted_noise_scale, adjusted_length_scale, adjusted_noise_scale_w)
         in the same order as the scales array [noise_scale, length_scale, noise_w].
     """
-    n = len(phoneme_ids)
+    n = original_len if original_len is not None else len(phoneme_ids)
     if n >= MIN_PHONEME_IDS:
         return noise_scale, length_scale, noise_scale_w
 
@@ -622,17 +635,23 @@ def main():
         speaker_id = utt.get("speaker_id")
         prosody_features_data = utt.get("prosody_features")
 
+        # Save original length before padding for Strategy B
+        original_len = len(phoneme_ids)
+
         # --- Strategy A: Silence Padding for short inputs ---
         phoneme_ids, prosody_features_data, was_padded = _pad_phoneme_ids(
             phoneme_ids, prosody_features_data
         )
 
         # --- Strategy B: Dynamic Scales Adjustment for short inputs ---
+        # Use original_len (pre-padding) so the ratio is based on the actual
+        # input length, not the padded length (which is always MIN_PHONEME_IDS).
         adj_noise, adj_length, adj_noise_w = _adjust_scales_for_short_input(
             phoneme_ids,
             args.noise_scale,
             args.noise_scale_w,
             args.length_scale,
+            original_len=original_len,
         )
 
         text = np.expand_dims(np.array(phoneme_ids, dtype=np.int64), 0)

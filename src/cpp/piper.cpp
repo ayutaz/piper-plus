@@ -754,6 +754,24 @@ static void trimSilenceInt16(std::vector<int16_t> &audioBuffer) {
     }
   }
 
+  // Check partial window (remainder samples after the last full window)
+  const int remainder = totalSamples % TRIM_WINDOW_SIZE;
+  if (remainder > 0) {
+    float sumSq = 0.0f;
+    const int offset = nWindows * TRIM_WINDOW_SIZE;
+    for (int s = 0; s < remainder; s++) {
+      float sample = static_cast<float>(audioBuffer[offset + s]) / 32767.0f;
+      sumSq += sample * sample;
+    }
+    float rms = std::sqrt(sumSq / static_cast<float>(remainder));
+    if (rms > TRIM_THRESHOLD_RMS) {
+      if (firstAbove < 0) {
+        firstAbove = nWindows;  // virtual window index for the partial
+      }
+      lastAbove = nWindows;
+    }
+  }
+
   if (firstAbove < 0) {
     // All silence -- keep minimum
     audioBuffer.resize(std::min(totalSamples, TRIM_MIN_SAMPLES));
@@ -811,6 +829,24 @@ static void trimSilenceFloat(std::vector<float> &audioBuffer) {
         firstAbove = w;
       }
       lastAbove = w;
+    }
+  }
+
+  // Check partial window (remainder samples after the last full window)
+  const int remainder = totalSamples % TRIM_WINDOW_SIZE;
+  if (remainder > 0) {
+    float sumSq = 0.0f;
+    const int offset = nWindows * TRIM_WINDOW_SIZE;
+    for (int s = 0; s < remainder; s++) {
+      float sample = audioBuffer[offset + s];
+      sumSq += sample * sample;
+    }
+    float rms = std::sqrt(sumSq / static_cast<float>(remainder));
+    if (rms > TRIM_THRESHOLD_RMS) {
+      if (firstAbove < 0) {
+        firstAbove = nWindows;
+      }
+      lastAbove = nWindows;
     }
   }
 
@@ -952,6 +988,9 @@ void synthesize(std::vector<PhonemeId> &phonemeIds,
 
   // --- Strategy A+B: Short-text mitigation ---
   const auto originalLen = static_cast<int>(phonemeIds.size());
+  // Save original (pre-padding) phoneme IDs for timing extraction.
+  // Duration output corresponds to the original sequence, not padded.
+  const std::vector<PhonemeId> originalPhonemeIds(phonemeIds);
   bool wasPadded = padPhonemeIds(phonemeIds);  // Strategy A: padding
 
   // Strategy B: Dynamic Scales Adjustment
@@ -1092,14 +1131,14 @@ void synthesize(std::vector<PhonemeId> &phonemeIds,
       }
       
       result.phonemeTimings = extractTimingsFromDurations(
-          durationVec, phonemeIds,
+          durationVec, originalPhonemeIds,
           voice->phonemizeConfig.phonemeIdMap,
           hopSize,
           voice->synthesisConfig.sampleRate,
           voice->phonemizeConfig.phonemeType
       );
       result.hasTimingInfo = true;
-      
+
       spdlog::debug("Extracted timing for {} phonemes", result.phonemeTimings.size());
     }
   }
@@ -1136,6 +1175,9 @@ void synthesizeFloat(std::vector<PhonemeId> &phonemeIds,
 
   // --- Strategy A+B: Short-text mitigation ---
   const auto originalLen = static_cast<int>(phonemeIds.size());
+  // Save original (pre-padding) phoneme IDs for timing extraction.
+  // Duration output corresponds to the original sequence, not padded.
+  const std::vector<PhonemeId> originalPhonemeIds(phonemeIds);
   bool wasPadded = padPhonemeIds(phonemeIds);  // Strategy A: padding
 
   // Strategy B: Dynamic Scales Adjustment
@@ -1262,7 +1304,7 @@ void synthesizeFloat(std::vector<PhonemeId> &phonemeIds,
       }
 
       result.phonemeTimings = extractTimingsFromDurations(
-          durationVec, phonemeIds,
+          durationVec, originalPhonemeIds,
           voice->phonemizeConfig.phonemeIdMap,
           hopSize,
           voice->synthesisConfig.sampleRate,

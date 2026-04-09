@@ -22,7 +22,7 @@ namespace PiperPlus.Core.Inference;
 /// </list>
 /// </para>
 /// </summary>
-internal static class ShortTextProcessor
+public static class ShortTextProcessor
 {
     // ------------------------------------------------------------------
     // Constants (shared across all strategies)
@@ -41,7 +41,7 @@ internal static class ShortTextProcessor
     /// <summary>
     /// Milliseconds of silence injected by Strategy C <c>&lt;break&gt;</c> tags.
     /// </summary>
-    internal const int SilencePadMs = 300;
+    public const int SilencePadMs = 300;
 
     /// <summary>
     /// RMS threshold below which a window is considered silent (Strategy A trim).
@@ -178,7 +178,7 @@ internal static class ShortTextProcessor
         bool foundFront = false;
         for (int w = 0; w < totalWindows; w++)
         {
-            if (WindowRms(audio, w * TrimWindowSize) >= TrimThresholdRms)
+            if (WindowRms(audio, w * TrimWindowSize) > TrimThresholdRms)
             {
                 firstNonSilent = w * TrimWindowSize;
                 foundFront = true;
@@ -199,7 +199,7 @@ internal static class ShortTextProcessor
 
         // Check the tail portion (samples after the last full window)
         int tailStart = totalWindows * TrimWindowSize;
-        if (tailStart < audio.Length && WindowRms(audio, tailStart) >= TrimThresholdRms)
+        if (tailStart < audio.Length && WindowRms(audio, tailStart) > TrimThresholdRms)
         {
             lastNonSilentEnd = audio.Length;
             foundBack = true;
@@ -209,7 +209,7 @@ internal static class ShortTextProcessor
         {
             for (int w = totalWindows - 1; w >= 0; w--)
             {
-                if (WindowRms(audio, w * TrimWindowSize) >= TrimThresholdRms)
+                if (WindowRms(audio, w * TrimWindowSize) > TrimThresholdRms)
                 {
                     lastNonSilentEnd = Math.Min(audio.Length, (w + 1) * TrimWindowSize);
                     foundBack = true;
@@ -304,7 +304,7 @@ internal static class ShortTextProcessor
     /// The original text (unchanged) if it is already SSML or exceeds the
     /// character threshold; otherwise an SSML-wrapped version.
     /// </returns>
-    internal static string WrapShortTextWithBreaks(string text)
+    public static string WrapShortTextWithBreaks(string text)
     {
         if (string.IsNullOrEmpty(text))
             return text;
@@ -347,5 +347,38 @@ internal static class ShortTextProcessor
         }
 
         return charCount <= ShortTextChars;
+    }
+
+    // ------------------------------------------------------------------
+    // Strategy C: Audio-level silence padding for short text
+    // ------------------------------------------------------------------
+
+    /// <summary>
+    /// Prepend and append silence samples to synthesized audio when the
+    /// original input text was short (Strategy C, audio-level path).
+    /// <para>
+    /// This is the audio-level counterpart to <see cref="WrapShortTextWithBreaks"/>:
+    /// both inject <see cref="SilencePadMs"/> of silence before and after the
+    /// content. This method operates on the synthesized PCM audio directly,
+    /// while <see cref="WrapShortTextWithBreaks"/> emits SSML for pipelines
+    /// that include an SSML parser.
+    /// </para>
+    /// </summary>
+    /// <param name="audio">Synthesized int16 PCM audio.</param>
+    /// <param name="sampleRate">Audio sample rate (e.g. 22050).</param>
+    /// <returns>
+    /// Audio with silence prepended and appended. If <paramref name="audio"/>
+    /// is empty, returns it unchanged.
+    /// </returns>
+    public static short[] PadSilenceForShortText(short[] audio, int sampleRate)
+    {
+        if (audio.Length == 0)
+            return audio;
+
+        int silenceSamples = (int)(sampleRate * SilencePadMs / 1000.0f);
+        var padded = new short[silenceSamples + audio.Length + silenceSamples];
+        audio.CopyTo(padded.AsSpan(silenceSamples));
+        // Leading and trailing silence are zero-initialized.
+        return padded;
     }
 }

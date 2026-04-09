@@ -367,3 +367,112 @@ class TestAdjustScalesForShortInput:
         assert ns == pytest.approx(0.667 * 0.5)
         assert ls == pytest.approx(1.0)
         assert nw == pytest.approx(0.8 * 0.4)
+
+    def test_original_len_overrides_phoneme_ids_length(self):
+        """When original_len is given, it should be used instead of len(phoneme_ids)."""
+        # phoneme_ids has 40 elements (>= MIN_PHONEME_IDS), but original_len=5
+        padded_ids = list(range(MIN_PHONEME_IDS))
+        ns, ls, nw = _adjust_scales_for_short_input(
+            padded_ids, 0.667, 0.8, 1.0, original_len=5
+        )
+        # ratio = 5/40 = 0.125, clamped to floor -> noise*0.5, noise_w*0.4
+        assert ns == pytest.approx(0.667 * 0.5)
+        assert nw == pytest.approx(0.8 * 0.4)
+        assert ls == pytest.approx(1.0)
+
+    def test_original_len_no_adjustment_when_large(self):
+        """When original_len >= MIN_PHONEME_IDS, no adjustment should happen."""
+        short_ids = [1, 2, 3]
+        ns, ls, nw = _adjust_scales_for_short_input(
+            short_ids, 0.667, 0.8, 1.0, original_len=MIN_PHONEME_IDS
+        )
+        assert ns == pytest.approx(0.667)
+        assert ls == pytest.approx(1.0)
+        assert nw == pytest.approx(0.8)
+
+
+class TestStrategyBUsesPrePaddingLength:
+    """Integration tests: Strategy B must use the pre-padding length.
+
+    This class tests the bug fix where Strategy B was incorrectly using the
+    post-padding length (always MIN_PHONEME_IDS), making the adjustment a no-op.
+    """
+
+    def test_strategy_b_uses_original_length_after_padding(self):
+        """Strategy B should adjust scales based on original (pre-padding) length.
+
+        Simulates the main() call order: save original_len, then pad (Strategy A),
+        then pass original_len to Strategy B.
+        """
+        short_ids = [1, 10, 20, 2]  # 4 elements, well below MIN_PHONEME_IDS
+        original_len = len(short_ids)
+
+        # Strategy A: pad
+        padded_ids, _, was_padded = _pad_phoneme_ids(short_ids, None)
+        assert was_padded
+        assert len(padded_ids) == MIN_PHONEME_IDS
+
+        # Strategy B with original_len (correct behavior)
+        ns, ls, nw = _adjust_scales_for_short_input(
+            padded_ids, 0.667, 0.8, 1.0, original_len=original_len
+        )
+        # ratio = 4/40 = 0.1, clamped to floors -> 0.5, 0.4
+        assert ns == pytest.approx(0.667 * 0.5)
+        assert nw == pytest.approx(0.8 * 0.4)
+        assert ls == pytest.approx(1.0)
+
+    def test_strategy_b_without_original_len_is_noop_after_padding(self):
+        """Without original_len, Strategy B is a no-op after padding (the old bug).
+
+        This test documents the buggy behavior to prevent regression.
+        """
+        short_ids = [1, 10, 20, 2]
+
+        # Strategy A: pad to MIN_PHONEME_IDS
+        padded_ids, _, was_padded = _pad_phoneme_ids(short_ids, None)
+        assert was_padded
+        assert len(padded_ids) == MIN_PHONEME_IDS
+
+        # Strategy B without original_len: uses len(padded_ids) == MIN_PHONEME_IDS
+        # so it does NOT adjust (this was the bug)
+        ns, ls, nw = _adjust_scales_for_short_input(padded_ids, 0.667, 0.8, 1.0)
+        assert ns == pytest.approx(0.667)  # no reduction -- the old bug
+        assert nw == pytest.approx(0.8)    # no reduction -- the old bug
+
+    def test_combined_strategy_a_b_varying_lengths(self):
+        """Shorter original inputs should get more aggressive scale reduction."""
+        # 10 elements
+        ids_10 = list(range(10))
+        padded_10, _, _ = _pad_phoneme_ids(ids_10, None)
+        ns_10, _, nw_10 = _adjust_scales_for_short_input(
+            padded_10, 0.667, 0.8, 1.0, original_len=10
+        )
+
+        # 30 elements
+        ids_30 = list(range(30))
+        padded_30, _, _ = _pad_phoneme_ids(ids_30, None)
+        ns_30, _, nw_30 = _adjust_scales_for_short_input(
+            padded_30, 0.667, 0.8, 1.0, original_len=30
+        )
+
+        # 30-length should have less reduction than 10-length
+        assert ns_30 > ns_10
+        assert nw_30 > nw_10
+
+        # Both should be less than the unadjusted values
+        assert ns_30 < 0.667
+        assert ns_10 < 0.667
+
+    def test_no_adjustment_when_original_at_threshold(self):
+        """No adjustment when original length is exactly MIN_PHONEME_IDS."""
+        ids = list(range(MIN_PHONEME_IDS))
+        # No padding happens (already at threshold)
+        padded, _, was_padded = _pad_phoneme_ids(ids, None)
+        assert not was_padded
+
+        ns, ls, nw = _adjust_scales_for_short_input(
+            padded, 0.667, 0.8, 1.0, original_len=MIN_PHONEME_IDS
+        )
+        assert ns == pytest.approx(0.667)
+        assert ls == pytest.approx(1.0)
+        assert nw == pytest.approx(0.8)

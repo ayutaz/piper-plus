@@ -198,13 +198,13 @@ Strategy A (Silence Padding + Post-trim), B (Dynamic Scales), C (SSML `<break>` 
 
 | ランタイム | Strategy A | Strategy B | Strategy C | テスト |
 |----------|:---:|:---:|:---:|:---:|
-| Python (runtime) | - | - | - | - |
-| Python (infer_onnx) | - | - | N/A | - |
-| Rust | - | - | - | - |
-| C# | - | - | - | - |
-| Go | - | - | - | - |
-| C++ | - | - | N/A | - |
-| WASM/JS | - | - | N/A | - |
+| Python (runtime) | ✅ | ✅ | ✅ | ✅ |
+| Python (infer_onnx) | ✅ | ✅ | N/A | ✅ |
+| Rust | ✅ | ✅ | ✅ | ✅ |
+| C# | ✅ | ✅ | ✅ | ✅ |
+| Go | ✅ | ✅ | ✅ | ✅ |
+| C++ | ✅ | ✅ | N/A | ✅ |
+| WASM/JS | ✅ | ✅ | N/A | ✅ |
 
 **凡例:** ✅ = 実装済み, - = 未実装, N/A = SSML 非対応のため対象外
 

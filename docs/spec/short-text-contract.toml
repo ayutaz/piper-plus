@@ -28,10 +28,12 @@
 #   Python (piper_train): src/python/piper_train/infer_onnx.py          (A, B)
 #   Python (runtime):     src/python_run/piper/voice.py                 (A, B, C)
 #   Rust:                 src/rust/piper-core/src/engine.rs             (A, B)
+#                         src/rust/piper-core/src/short_text.rs         (C)
 #   Go:                   src/go/piperplus/short_text.go                (A, B, C)
 #   WASM/JS:              src/wasm/openjtalk-web/src/index.js           (A, B)
-#   C#:                   (not yet implemented)
-#   C++:                  (not yet implemented)
+#   C#:                   src/csharp/PiperPlus.Core/Inference/ShortTextProcessor.cs  (A, B, C)
+#                         src/csharp/PiperPlus.Core/Inference/PiperSession.cs        (A, B integration)
+#   C++:                  src/cpp/piper.cpp                             (A, B)
 
 # ---------------------------------------------------------------------------
 # Strategy A — Silence Padding + Post-Trim
@@ -185,11 +187,11 @@ noise_w_min_ratio = 0.4
 
 [implementation_status]
 # Which implementations support each strategy:
-#   ✓ = implemented, - = not yet implemented
+#   ✓ = implemented, - = not yet implemented, N/A = not applicable
 #
-#                        Python(train)  Python(run)  Rust  Go  WASM/JS  C#  C++
-# Strategy A (padding)   ✓              ✓            ✓     ✓   ✓        -   -
-# Strategy A (trim)      ✓              ✓            ✓     ✓   ✓        -   -
-# Strategy B (scales)    ✓              ✓            ✓     ✓   ✓        -   -
-# Strategy C (SSML)      -              ✓            -     ✓   -        -   -
-# config.json override   -              -            -     -   -        -   -
+#                        Python(train)  Python(run)  Rust  Go  WASM/JS  C#   C++
+# Strategy A (padding)   ✓              ✓            ✓     ✓   ✓        ✓    ✓
+# Strategy A (trim)      ✓              ✓            ✓     ✓   ✓        ✓    ✓
+# Strategy B (scales)    ✓              ✓            ✓     ✓   ✓        ✓    ✓
+# Strategy C (SSML)      N/A            ✓            ✓     ✓   N/A      ✓    N/A
+# config.json override   -              -            -     -   -        -    -

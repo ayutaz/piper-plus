@@ -211,6 +211,32 @@ describe('padPhonemeIds (Strategy A - padding)', { skip }, () => {
     assert.equal(result.wasPadded, true);
     assert.equal(result.phonemeIds.length, 40);
   });
+
+  it('padding prosody arrays are independent references (not shared)', () => {
+    const ids = [1, 4, 4, 2]; // 4 elements -> 36 padding (18 front, 18 back)
+    const prosody = [[0, 0, 0], [1, 2, 3], [4, 5, 6], [0, 0, 0]];
+    const result = padPhonemeIds(ids, prosody);
+
+    // Collect all padding prosody entries (front padding: indices 1..18, back: 21..38)
+    const frontPad = result.prosodyFeatures.slice(1, 19);
+    const backPad = result.prosodyFeatures.slice(21, 39);
+    const allPad = [...frontPad, ...backPad];
+
+    // Every padding entry must be a distinct array reference
+    for (let i = 0; i < allPad.length; i++) {
+      for (let j = i + 1; j < allPad.length; j++) {
+        assert.notStrictEqual(allPad[i], allPad[j],
+          `padding prosody[${i}] and [${j}] must not share the same reference`);
+      }
+    }
+
+    // Mutating one padding entry must not affect others
+    allPad[0][0] = 999;
+    for (let i = 1; i < allPad.length; i++) {
+      assert.equal(allPad[i][0], 0,
+        `mutating padding[0] should not affect padding[${i}]`);
+    }
+  });
 });
 
 

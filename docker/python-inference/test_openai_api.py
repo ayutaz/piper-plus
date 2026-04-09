@@ -287,6 +287,24 @@ class TestShortTextWarning:
         assert resp.status_code == 200
         assert resp.headers.get("x-piper-warning") is None
 
+    def test_ssml_short_text_no_warning(self, client):
+        """SSML text starting with <speak> should NOT trigger short-text warning."""
+        resp = client.post(
+            "/v1/audio/speech",
+            json={"input": "<speak>Hi</speak>"},
+        )
+        assert resp.status_code == 200
+        assert resp.headers.get("x-piper-warning") is None
+
+    def test_ssml_synthesize_get_no_warning(self, client):
+        """GET /synthesize with SSML should NOT trigger short-text warning."""
+        resp = client.get(
+            "/synthesize",
+            params={"text": "<speak>Hi</speak>"},
+        )
+        assert resp.status_code == 200
+        assert resp.headers.get("x-piper-warning") is None
+
 
 # ---- CORS ----
 

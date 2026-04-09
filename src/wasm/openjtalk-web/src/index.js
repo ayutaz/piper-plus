@@ -86,15 +86,14 @@ export function padPhonemeIds(phonemeIds, prosodyFeatures) {
 
   let paddedProsody = null;
   if (prosodyFeatures) {
-    const zeroPad = [0, 0, 0];
     const pBos = prosodyFeatures.slice(0, 1);
     const pBody = prosodyFeatures.slice(1, -1);
     const pEos = prosodyFeatures.slice(-1);
     paddedProsody = [
       ...pBos,
-      ...new Array(padFront).fill(zeroPad),
+      ...new Array(padFront).fill(null).map(() => [0, 0, 0]),
       ...pBody,
-      ...new Array(padBack).fill(zeroPad),
+      ...new Array(padBack).fill(null).map(() => [0, 0, 0]),
       ...pEos,
     ];
   }
