@@ -272,12 +272,28 @@ public static class SessionFactory
                 inputValues.Add(prosodyTensor);
             }
 
-            // speaker_embedding_mask: int64 [1] = 0 (no embedding during warmup)
+            // speaker_embedding: float32 [1, embDim] = zeros (no cloning during warmup)
+            // speaker_embedding_mask: int64 [1, 1] = 0
+            // ONNX Runtime requires ALL declared inputs, so both tensors must be
+            // provided when the model supports speaker_embedding.
+            OrtValue? speakerEmbTensor = null;
             OrtValue? speakerEmbMaskTensor = null;
-            if (metadata.ContainsKey("speaker_embedding_mask"))
+            if (metadata.ContainsKey("speaker_embedding"))
             {
+                int embDim = 256; // ECAPA-TDNN default
+                if (metadata.TryGetValue("speaker_embedding", out var embMeta)
+                    && embMeta.Dimensions.Length >= 2 && embMeta.Dimensions[1] > 0)
+                {
+                    embDim = embMeta.Dimensions[1];
+                }
+
+                float[] zeroEmb = new float[embDim];
+                speakerEmbTensor = OrtValue.CreateTensorValueFromMemory(zeroEmb, [1, embDim]);
+                inputNames.Add("speaker_embedding");
+                inputValues.Add(speakerEmbTensor);
+
                 long[] mask = [0];
-                speakerEmbMaskTensor = OrtValue.CreateTensorValueFromMemory(mask, [1]);
+                speakerEmbMaskTensor = OrtValue.CreateTensorValueFromMemory(mask, [1, 1]);
                 inputNames.Add("speaker_embedding_mask");
                 inputValues.Add(speakerEmbMaskTensor);
             }
@@ -300,6 +316,7 @@ public static class SessionFactory
                 sidTensor?.Dispose();
                 lidTensor?.Dispose();
                 prosodyTensor?.Dispose();
+                speakerEmbTensor?.Dispose();
                 speakerEmbMaskTensor?.Dispose();
             }
 

@@ -426,7 +426,8 @@ def main() -> None:
 
     dummy_input_list.append(dummy_speaker_embedding)
     input_names.append("speaker_embedding")
-    dynamic_axes["speaker_embedding"] = {0: "batch_size", 1: "emb_dim"}
+    # axis 1 (emb_dim=256) is fixed at export time by spk_proj weights
+    dynamic_axes["speaker_embedding"] = {0: "batch_size"}
 
     dummy_input_list.append(dummy_speaker_embedding_mask)
     input_names.append("speaker_embedding_mask")

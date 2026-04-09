@@ -1077,6 +1077,12 @@ class SynthesizerTrn(nn.Module):
         if self.use_sdp:
             l_length = self.dp(x_dp, x_mask, w, g=g)
             l_length = l_length / torch.sum(x_mask)
+            # For VITS2: generate predicted durations via SDP reverse pass
+            if self.vits2 and self.dur_disc is not None:
+                logw_ = torch.log(w + 1e-6) * x_mask
+                with torch.no_grad():
+                    logw = self.dp(x_dp, x_mask, g=g, reverse=True)
+                dur_info = (x_dp.detach(), x_mask, logw_, logw)
         else:
             logw_ = torch.log(w + 1e-6) * x_mask
             logw = self.dp(x_dp, x_mask, g=g)

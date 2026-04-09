@@ -219,7 +219,7 @@ func (e *OnnxEngine) Synthesize(ctx context.Context, req *SynthesisRequest) (*Sy
 		inputs = append(inputs, prosodyTensor)
 	}
 
-	// "speaker_embedding": float32 [1, embDim] + "speaker_embedding_mask": int64 [1]
+	// "speaker_embedding": float32 [1, embDim] + "speaker_embedding_mask": int64 [1, 1]
 	if e.capabilities.HasSpeakerEmbedding {
 		if len(req.SpeakerEmbedding) > 0 {
 			embDim := len(req.SpeakerEmbedding)
@@ -230,7 +230,7 @@ func (e *OnnxEngine) Synthesize(ctx context.Context, req *SynthesisRequest) (*Sy
 			tensors = append(tensors, embTensor)
 			inputs = append(inputs, embTensor)
 
-			maskTensor, err := ort.NewTensor(ort.NewShape(1), []int64{1})
+			maskTensor, err := ort.NewTensor(ort.NewShape(1, 1), []int64{1})
 			if err != nil {
 				return nil, &InferenceError{Msg: "failed to create speaker_embedding_mask tensor", Err: err}
 			}
@@ -245,7 +245,7 @@ func (e *OnnxEngine) Synthesize(ctx context.Context, req *SynthesisRequest) (*Sy
 			tensors = append(tensors, placeholderTensor)
 			inputs = append(inputs, placeholderTensor)
 
-			maskTensor, err := ort.NewTensor(ort.NewShape(1), []int64{0})
+			maskTensor, err := ort.NewTensor(ort.NewShape(1, 1), []int64{0})
 			if err != nil {
 				return nil, &InferenceError{Msg: "failed to create speaker_embedding_mask tensor", Err: err}
 			}

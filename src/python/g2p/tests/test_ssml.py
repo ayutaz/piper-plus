@@ -2,7 +2,7 @@
 
 import pytest
 
-from piper_plus_g2p.ssml import BreakStrength, SSMLParser, SSMLSegment
+from piper_plus_g2p.ssml import BreakStrength, SSMLParser, SSMLSegment, _MAX_SSML_SIZE
 
 
 # =====================================================================
@@ -309,6 +309,28 @@ class TestParseCombined:
 # =====================================================================
 # parse() — XML error fallback
 # =====================================================================
+
+
+class TestSSMLSizeLimit:
+    """SSML input size limit to mitigate XML DoS."""
+
+    def test_oversized_ssml_raises(self):
+        ssml = "<speak>" + "A" * (_MAX_SSML_SIZE + 1) + "</speak>"
+        with pytest.raises(ValueError, match="SSML input too large"):
+            SSMLParser.parse(ssml)
+
+    def test_within_limit_parses_ok(self):
+        ssml = "<speak>" + "A" * 100 + "</speak>"
+        segments = SSMLParser.parse(ssml)
+        assert len(segments) >= 1
+        assert "A" in segments[0].text
+
+    def test_plain_text_skips_size_check(self):
+        """Plain text (non-SSML) should not be subject to the size limit."""
+        text = "A" * (_MAX_SSML_SIZE + 1)
+        segments = SSMLParser.parse(text)
+        assert len(segments) == 1
+        assert segments[0].text == text
 
 
 class TestXMLErrorFallback:

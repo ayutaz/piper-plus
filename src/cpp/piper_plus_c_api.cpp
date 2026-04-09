@@ -1072,15 +1072,12 @@ PIPER_PLUS_API const char *piper_plus_available_languages(PiperPlusEngine *engin
     return engine->availableLanguagesStr.c_str();
 }
 
-// ===== M3-04: Speaker Encoder for Voice Cloning =====
+// ===== Speaker Encoder (EXPERIMENTAL -- not yet implemented) =====
 
 struct PiperPlusSpeakerEncoder {
-    // Placeholder for speaker encoder ONNX session.
-    // The actual implementation depends on piper::SpeakerEncoder from
-    // the C++ speaker encoder module (M3-01).
+    // EXPERIMENTAL: Placeholder for speaker encoder ONNX session.
+    // The API surface is reserved for forward compatibility.
     std::string model_path;
-    // NOTE: Full ONNX inference implementation requires the SpeakerEncoder
-    // class from M3-01. This provides the C API surface and validation.
 };
 
 PIPER_PLUS_API PiperPlusSpeakerEncoder* piper_plus_speaker_encoder_create(
@@ -1136,9 +1133,9 @@ PIPER_PLUS_API int32_t piper_plus_speaker_encoder_encode(
         return -1;
     }
 
-    // NOTE: Full inference implementation depends on the SpeakerEncoder class
-    // from M3-01. This validates the API surface and returns a placeholder.
-    set_error("Speaker encoder inference not yet connected to M3-01 backend");
+    // EXPERIMENTAL: Speaker encoder is not yet implemented in C API.
+    // The API surface is reserved for forward compatibility.
+    set_error("Speaker encoder is not yet implemented in C API");
     return -1;
 }
 

@@ -45,7 +45,7 @@ namespace PiperPlus
                 return null;
             }
 
-            const float scale = 1.0f / 32767.0f;
+            const float scale = 1.0f / 32768.0f;
             float[] floatSamples = new float[samples.Length];
             for (int i = 0; i < samples.Length; i++)
             {

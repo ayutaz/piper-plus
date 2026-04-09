@@ -602,8 +602,10 @@ class VitsModel(pl.LightningModule):
             if self.hparams.vits2 and dur_info is not None:
                 x_dp_det, x_mask_dp, _logw_r, logw_g = dur_info
                 dur_disc = self.model_g.dur_disc
+                # Freeze dur_disc params so gradients only flow to the
+                # generator's duration output, not through dur_disc weights.
+                dur_disc.requires_grad_(False)
                 # Generator wants dur_disc to classify fake as real
-                # Run dur_disc in forward-only mode for the fake branch
                 disc_fake = dur_disc._forward_single(
                     x_dp_det, x_mask_dp, logw_g
                 )
@@ -615,6 +617,8 @@ class VitsModel(pl.LightningModule):
                     loss_gen_all + loss_dur_gen * self.hparams.lambda_dur
                 )
                 self._log_with_batch_info("loss_dur_gen", loss_dur_gen, batch)
+                # Re-enable dur_disc gradients for its own training step
+                dur_disc.requires_grad_(True)
 
             # WavLM Discriminator loss (optional, computed every N steps)
             if self.model_d_wavlm is not None and (

@@ -101,7 +101,7 @@ typedef struct PiperPlusSynthOptions {
     float   sentence_silence_sec;       /* Silence between sentences in sec (default: 0.2) */
     const float *speaker_embedding;     /* Voice cloning: float32 embedding (NULL = use speaker_id) */
     int32_t      speaker_embedding_dim; /* Number of elements in speaker_embedding (0 = disabled) */
-    int32_t _reserved[6];               /* Must be zero */
+    int32_t _reserved[5];               /* Must be zero */
 } PiperPlusSynthOptions;
 
 /* ===== Lifecycle ===== */
@@ -313,11 +313,15 @@ PIPER_PLUS_API PiperPlusStatus piper_plus_phonemize(
  *          no language map). Caller MUST copy if persistence is needed. */
 PIPER_PLUS_API const char *piper_plus_available_languages(PiperPlusEngine *engine);
 
-/* ===== Speaker Encoder for Voice Cloning (M3-04) ===== */
+/* ===== Speaker Encoder (EXPERIMENTAL -- not yet implemented) ========= */
 
 /**
  * Opaque speaker encoder handle.
  * Wraps an ECAPA-TDNN ONNX model for extracting speaker embeddings.
+ *
+ * @note EXPERIMENTAL: The speaker encoder API surface is defined for forward
+ *       compatibility but the implementation is not yet connected to a backend.
+ *       All functions currently return an error or NULL.
  */
 typedef struct PiperPlusSpeakerEncoder PiperPlusSpeakerEncoder;
 

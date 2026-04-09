@@ -440,8 +440,8 @@ jobs:
         run: |
           results=("${{ needs.cpp-tests.result }}" "${{ needs.csharp-tests.result }}" "${{ needs.csharp-build.result }}" "${{ needs.python-tests.result }}" "${{ needs.rust-tests.result }}" "${{ needs.npm-package-tests.result }}" "${{ needs.lint.result }}")
           for result in "${results[@]}"; do
-            if [[ "$result" == "failure" ]]; then
-              echo "One or more jobs failed"
+            if [[ "$result" != "success" && "$result" != "skipped" ]]; then
+              echo "One or more jobs failed or were cancelled (got: $result)"
               exit 1
             fi
           done

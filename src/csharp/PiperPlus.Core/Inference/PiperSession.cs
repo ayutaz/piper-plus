@@ -268,7 +268,9 @@ public sealed class PiperSession
         }
 
         // speaker_embedding (optional): [1, embedding_dim]
-        // speaker_embedding_mask (optional): [1] — 1 if embedding active, 0 otherwise
+        // speaker_embedding_mask (optional): [1, 1] — 1 if embedding active, 0 otherwise
+        // ONNX Runtime requires ALL declared inputs, so both tensors must always
+        // be provided when the model supports speaker_embedding.
         OrtValue? speakerEmbTensor = null;
         OrtValue? speakerEmbMaskTensor = null;
         if (_model.HasSpeakerEmbedding)
@@ -282,15 +284,29 @@ public sealed class PiperSession
                 inputValues.Add(speakerEmbTensor);
 
                 long[] mask = [1];
-                speakerEmbMaskTensor = OrtValue.CreateTensorValueFromMemory(mask, [1]);
+                speakerEmbMaskTensor = OrtValue.CreateTensorValueFromMemory(mask, [1, 1]);
                 inputNames.Add("speaker_embedding_mask");
                 inputValues.Add(speakerEmbMaskTensor);
             }
             else
             {
-                // Model supports it but no embedding provided — send mask=0
+                // Model supports it but no embedding provided — send zeros + mask=0.
+                // Read embedding dimension from model input metadata; default 256 (ECAPA-TDNN).
+                int embDim = 256;
+                var meta = _model.Session.InputMetadata;
+                if (meta.TryGetValue("speaker_embedding", out var embMeta)
+                    && embMeta.Dimensions.Length >= 2 && embMeta.Dimensions[1] > 0)
+                {
+                    embDim = embMeta.Dimensions[1];
+                }
+
+                float[] zeroEmb = new float[embDim];
+                speakerEmbTensor = OrtValue.CreateTensorValueFromMemory(zeroEmb, [1, embDim]);
+                inputNames.Add("speaker_embedding");
+                inputValues.Add(speakerEmbTensor);
+
                 long[] mask = [0];
-                speakerEmbMaskTensor = OrtValue.CreateTensorValueFromMemory(mask, [1]);
+                speakerEmbMaskTensor = OrtValue.CreateTensorValueFromMemory(mask, [1, 1]);
                 inputNames.Add("speaker_embedding_mask");
                 inputValues.Add(speakerEmbMaskTensor);
             }

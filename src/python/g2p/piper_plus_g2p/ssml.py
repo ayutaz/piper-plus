@@ -21,6 +21,9 @@ from typing import List
 
 _LOGGER = logging.getLogger(__name__)
 
+# Limit SSML input size to mitigate XML parsing DoS (e.g. billion laughs).
+_MAX_SSML_SIZE = 100_000  # 100 KB
+
 __all__ = ["BreakStrength", "SSMLSegment", "SSMLParser"]
 
 
@@ -111,6 +114,12 @@ class SSMLParser:
         if not SSMLParser.is_ssml(ssml_text):
             # Plain text -- return as a single segment.
             return [SSMLSegment(text=ssml_text)]
+
+        if len(ssml_text) > _MAX_SSML_SIZE:
+            raise ValueError(
+                f"SSML input too large: {len(ssml_text)} bytes "
+                f"(max: {_MAX_SSML_SIZE})"
+            )
 
         try:
             root = ET.fromstring(ssml_text)  # noqa: S314

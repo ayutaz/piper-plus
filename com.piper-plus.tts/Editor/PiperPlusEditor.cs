@@ -169,15 +169,18 @@ namespace PiperPlus.Editor
                     source.Play();
 
                     // Schedule cleanup after clip finishes
-                    float duration = clip.length + 0.5f;
-                    EditorApplication.delayCall += () =>
+                    double cleanupTime = EditorApplication.timeSinceStartup + clip.length + 0.5;
+                    System.Action cleanup = null;
+                    cleanup = () =>
                     {
-                        EditorApplication.delayCall += () =>
+                        if (go == null || EditorApplication.timeSinceStartup >= cleanupTime || !source.isPlaying)
                         {
+                            EditorApplication.update -= cleanup;
                             if (go != null)
                                 Object.DestroyImmediate(go);
-                        };
+                        }
                     };
+                    EditorApplication.update += cleanup;
 
                     _statusMessage = $"Synthesis succeeded: {clip.length:F2}s, {clip.frequency} Hz, {clip.samples} samples";
                     _statusType = MessageType.Info;
