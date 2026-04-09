@@ -334,7 +334,7 @@ COVERAGE=1 ./build.sh
 
 ## Go
 
-Go 製の HTTP API サーバーおよび CLI ツール (`piper-plus-go`) です。ONNX モデルを使用した音声合成を HTTP API またはコマンドラインから実行できます。Debian ベースのマルチステージビルドで、OpenJTalk (日本語G2P) を静的リンクし、ONNX Runtime v1.24.4 をバンドルしています。
+Go 製の HTTP API サーバーおよび CLI ツールです。Docker イメージ名は `piper-plus-go`、コンテナ内の CLI コマンドは `piper-plus` です。ONNX モデルを使用した音声合成を HTTP API またはコマンドラインから実行できます。Debian ベースのマルチステージビルドで、OpenJTalk (日本語G2P) を静的リンクし、ONNX Runtime v1.24.4 をバンドルしています。
 
 ### ビルド
 
