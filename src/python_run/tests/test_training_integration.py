@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Integration tests for training functionality"""
 
+import importlib.util
 import sys
 import time
 from pathlib import Path
@@ -43,6 +44,8 @@ class TestTrainingIntegration:
 
     def test_training_manager_lifecycle(self, create_test_dataset, tmp_path):
         """Test complete training lifecycle"""
+        import threading as _threading
+
         from piper.training_manager import TrainingManager
 
         manager = TrainingManager()
@@ -54,28 +57,41 @@ class TestTrainingIntegration:
             "test", lambda status: status_updates.append(status.to_dict())
         )
 
+        # Use an event to gate when the monitor thread sees end-of-output,
+        # so we can assert is_running() without a race.
+        gate = _threading.Event()
+
+        def _readline_side_effect():
+            """Return training lines, then block until gate is set before EOF."""
+            return _readline_side_effect._next()
+
+        lines = iter([
+            "Initializing training...\n",
+            "Epoch 1/3\n",
+            "train_loss: 1.5, val_loss: 1.6\n",
+            "Epoch 2/3\n",
+            "train_loss: 0.8, val_loss: 0.9\n",
+            "Epoch 3/3\n",
+            "train_loss: 0.3, val_loss: 0.4\n",
+            "Training completed!\n",
+        ])
+
+        def _next():
+            try:
+                return next(lines)
+            except StopIteration:
+                gate.wait()  # block until test releases
+                return ""
+
+        _readline_side_effect._next = _next
+
         # Mock subprocess to simulate training
-        with patch("subprocess.Popen") as mock_popen:
+        with patch("piper.training_manager.subprocess.Popen") as mock_popen:
             # Create mock process
             mock_process = Mock()
-            mock_process.poll.side_effect = [
-                None,
-                None,
-                None,
-                0,
-            ]  # Running 3 times, then done
+            mock_process.poll.return_value = None
             mock_process.returncode = 0
-            mock_process.stdout.readline.side_effect = [
-                "Initializing training...\n",
-                "Epoch 1/3\n",
-                "train_loss: 1.5, val_loss: 1.6\n",
-                "Epoch 2/3\n",
-                "train_loss: 0.8, val_loss: 0.9\n",
-                "Epoch 3/3\n",
-                "train_loss: 0.3, val_loss: 0.4\n",
-                "Training completed!\n",
-                "",  # End of output
-            ]
+            mock_process.stdout.readline = _readline_side_effect
             mock_process.wait.return_value = None
             mock_popen.return_value = mock_process
 
@@ -92,10 +108,14 @@ class TestTrainingIntegration:
             )
 
             assert success
-            assert manager.is_running()
 
-            # Wait for process to complete
-            time.sleep(0.5)
+            # Allow monitor thread to process the data lines
+            time.sleep(0.3)
+            assert manager.status.is_running
+
+            # Release the monitor thread to see EOF and finish
+            gate.set()
+            time.sleep(0.3)
 
             # Check final status
             final_status = manager.get_status()
@@ -117,7 +137,7 @@ class TestTrainingIntegration:
 
         manager = TrainingManager()
 
-        with patch("subprocess.Popen") as mock_popen:
+        with patch("piper.training_manager.subprocess.Popen") as mock_popen:
             # Simulate process that fails immediately
             mock_process = Mock()
             mock_process.poll.return_value = 1  # Non-zero exit code
@@ -147,8 +167,12 @@ class TestTrainingIntegration:
 
             status = manager.get_status()
             assert not status.is_running
-            assert "exit code" in (status.error or "")
+            assert "exited with code" in (status.error or "")
 
+    @pytest.mark.skipif(
+        not importlib.util.find_spec("gradio"),
+        reason="gradio is not installed",
+    )
     def test_webui_training_flow(self, create_test_dataset, tmp_path):
         """Test complete WebUI training flow"""
         from piper.webui import (
@@ -201,6 +225,10 @@ class TestTrainingIntegration:
                 # Verify process was terminated
                 mock_process.terminate.assert_called()
 
+    @pytest.mark.skipif(
+        not importlib.util.find_spec("gradio"),
+        reason="gradio is not installed",
+    )
     def test_concurrent_training_prevention(self, create_test_dataset, tmp_path):
         """Test that concurrent training is prevented"""
         from piper.webui import start_training

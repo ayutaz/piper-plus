@@ -10,8 +10,13 @@ import time
 from pathlib import Path
 
 # Python 3.11+ is required for this module
-import gradio as gr
 import numpy as np
+
+
+try:
+    import gradio as gr
+except ImportError:
+    gr = None  # type: ignore[assignment]  # deferred: only needed for UI entry-points
 
 
 try:

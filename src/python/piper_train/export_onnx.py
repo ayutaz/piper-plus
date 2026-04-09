@@ -276,7 +276,14 @@ def main() -> None:
     stochastic = args.stochastic
 
     def infer_forward(
-        text, text_lengths, scales, sid=None, lid=None, prosody_features=None
+        text,
+        text_lengths,
+        scales,
+        sid=None,
+        lid=None,
+        prosody_features=None,
+        speaker_embedding=None,
+        speaker_embedding_mask=None,
     ):
         """
         Efficient forward function that returns both audio and duration information.
@@ -287,7 +294,28 @@ def main() -> None:
         noise_scale_w = scales[2]
 
         # 1. Global conditioning (must be computed before enc_p)
-        g = model_g._get_global_conditioning(sid, lid)
+        # Compute the standard sid/lid conditioning first.
+        g_base = model_g._get_global_conditioning(sid, lid)
+
+        # Speaker-embedding override (trace-friendly: always evaluate both paths
+        # and select via torch.where so that ONNX keeps both inputs in the graph).
+        if speaker_embedding is not None and speaker_embedding_mask is not None:
+            g_se = speaker_embedding.unsqueeze(-1)  # (batch, emb_dim, 1)
+            if g_se.size(1) != model_g.gin_channels:
+                proj = model_g._ensure_spk_proj(g_se.size(1))
+                g_se = proj(g_se.squeeze(-1)).unsqueeze(-1)
+            if num_languages > 1 and lid is not None:
+                lang_emb = model_g.emb_lang(lid).unsqueeze(-1)
+                g_se = g_se + lang_emb
+            # mask shape (batch, 1) -> (batch, 1, 1) to broadcast over (batch, gin, 1)
+            use_se = (speaker_embedding_mask >= 1).unsqueeze(-1).float()
+            if g_base is not None:
+                g = torch.where(use_se >= 1, g_se, g_base)
+            else:
+                # No base conditioning (single-speaker mono-lingual): use se or zeros
+                g = g_se * use_se
+        else:
+            g = g_base
 
         # 2. Encoder (with global conditioning for cond_layer)
         x, m_p, logs_p, x_mask = model_g.enc_p(text, text_lengths, g=g)
@@ -389,6 +417,27 @@ def main() -> None:
             "Exporting model with prosody features support (prosody_dim=%d)",
             model_g.prosody_dim,
         )
+
+    # Speaker embedding inputs (voice cloning support)
+    # Always include these optional inputs so the ONNX graph supports
+    # both sid-based and speaker-embedding-based inference.
+    speaker_emb_dim = 256  # ECAPA-TDNN default output dimension
+    dummy_speaker_embedding = torch.zeros(1, speaker_emb_dim, dtype=torch.float32)
+    dummy_speaker_embedding_mask = torch.ones(1, 1, dtype=torch.int64)
+
+    dummy_input_list.append(dummy_speaker_embedding)
+    input_names.append("speaker_embedding")
+    # axis 1 (emb_dim=256) is fixed at export time by spk_proj weights
+    dynamic_axes["speaker_embedding"] = {0: "batch_size"}
+
+    dummy_input_list.append(dummy_speaker_embedding_mask)
+    input_names.append("speaker_embedding_mask")
+    dynamic_axes["speaker_embedding_mask"] = {0: "batch_size"}
+
+    _LOGGER.info(
+        "Exporting model with speaker_embedding support (emb_dim=%d)",
+        speaker_emb_dim,
+    )
 
     dummy_input = tuple(dummy_input_list)
 

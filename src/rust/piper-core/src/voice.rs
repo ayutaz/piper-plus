@@ -10,6 +10,51 @@ use crate::error::PiperError;
 use crate::phonemize::Phonemizer;
 use crate::phonemize::adapter::G2pAdapter;
 
+/// テキストレベルの合成パラメータ。
+///
+/// `PiperVoice::synthesize_with_params()` で使用する高レベル構造体。
+/// `..Default::default()` パターンで、変更したいフィールドだけ指定できる。
+///
+/// # Examples
+///
+/// ```ignore
+/// let result = voice.synthesize_with_params("こんにちは", &SynthesisParams {
+///     speaker_id: Some(0),
+///     language_override: Some("ja".into()),
+///     ..Default::default()
+/// })?;
+/// ```
+///
+/// > **Note:** 低レベルの音素ID入力には既存の [`SynthesisRequest`] を使用してください。
+#[derive(Debug, Clone)]
+pub struct SynthesisParams {
+    /// 話者 ID (マルチスピーカーモデル用)
+    pub speaker_id: Option<i64>,
+    /// 言語オーバーライド (マルチリンガルモデル用、phonemizer の自動検出を上書き)
+    pub language_override: Option<String>,
+    /// ノイズスケール (音声の変動量、0.0-1.0)
+    pub noise_scale: f32,
+    /// 長さスケール (話速、1.0 = 標準)
+    pub length_scale: f32,
+    /// ノイズスケール W (持続時間の変動量)
+    pub noise_w: f32,
+    /// Speaker embedding vector for voice cloning (overrides speaker_id).
+    pub speaker_embedding: Option<Vec<f32>>,
+}
+
+impl Default for SynthesisParams {
+    fn default() -> Self {
+        Self {
+            speaker_id: None,
+            language_override: None,
+            noise_scale: 0.667,
+            length_scale: 1.0,
+            noise_w: 0.8,
+            speaker_embedding: None,
+        }
+    }
+}
+
 /// テキストから音声を合成する高レベル API
 pub struct PiperVoice {
     config: VoiceConfig,
@@ -246,18 +291,24 @@ impl PiperVoice {
         })
     }
 
-    /// テキストを音声に変換
+    /// テキストを音声に変換 (`SynthesisParams` 版)
     ///
-    /// `language_override` を指定すると、phonemizer の自動検出を上書きして
-    /// 指定言語の language_id を使用する。多言語モデルで特定言語を強制する場合に使用。
-    pub fn synthesize_text(
+    /// `SynthesisParams` で合成パラメータをまとめて指定する新 API。
+    /// `..Default::default()` パターンで、変更したいフィールドだけ指定できる。
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// let result = voice.synthesize_with_params("こんにちは", &SynthesisParams {
+    ///     speaker_id: Some(0),
+    ///     language_override: Some("ja".into()),
+    ///     ..Default::default()
+    /// })?;
+    /// ```
+    pub fn synthesize_with_params(
         &mut self,
         text: &str,
-        speaker_id: Option<i64>,
-        language_override: Option<&str>,
-        noise_scale: f32,
-        length_scale: f32,
-        noise_w: f32,
+        params: &SynthesisParams,
     ) -> Result<SynthesisResult, PiperError> {
         // 1. Phonemize: テキストをトークン列 + プロソディ情報に変換
         let (tokens, prosody) = self.phonemizer.phonemize_with_prosody(text)?;
@@ -286,8 +337,8 @@ impl PiperVoice {
         //    多言語モデルの場合、テキストの最初の言語セグメントを自動検出して language_id を決定。
         //    単言語モデルの場合は phonemizer の言語コードを使用。
         let language_id = if self.config.needs_lid() {
-            let lang_code = if let Some(ovr) = language_override {
-                ovr
+            let lang_code = if let Some(ref ovr) = params.language_override {
+                ovr.as_str()
             } else {
                 self.detect_language(text)
             };
@@ -306,14 +357,45 @@ impl PiperVoice {
         let request = SynthesisRequest {
             phoneme_ids: ids,
             prosody_features: prosody_tensor,
-            speaker_id,
+            speaker_id: params.speaker_id,
             language_id,
-            noise_scale,
-            length_scale,
-            noise_w,
+            noise_scale: params.noise_scale,
+            length_scale: params.length_scale,
+            noise_w: params.noise_w,
+            speaker_embedding: params.speaker_embedding.clone(),
         };
 
         self.engine.synthesize(&request)
+    }
+
+    /// テキストを音声に変換 (旧 API)
+    ///
+    /// `language_override` を指定すると、phonemizer の自動検出を上書きして
+    /// 指定言語の language_id を使用する。多言語モデルで特定言語を強制する場合に使用。
+    #[deprecated(
+        since = "1.14.0",
+        note = "Use `synthesize_with_params()` with `SynthesisParams` instead"
+    )]
+    pub fn synthesize_text(
+        &mut self,
+        text: &str,
+        speaker_id: Option<i64>,
+        language_override: Option<&str>,
+        noise_scale: f32,
+        length_scale: f32,
+        noise_w: f32,
+    ) -> Result<SynthesisResult, PiperError> {
+        self.synthesize_with_params(
+            text,
+            &SynthesisParams {
+                speaker_id,
+                language_override: language_override.map(String::from),
+                noise_scale,
+                length_scale,
+                noise_w,
+                ..Default::default()
+            },
+        )
     }
 
     /// テキストを音素化して phoneme IDs を返す (ONNX 推論なし)
@@ -345,7 +427,13 @@ impl PiperVoice {
         output: &Path,
         speaker_id: Option<i64>,
     ) -> Result<SynthesisResult, PiperError> {
-        let result = self.synthesize_text(text, speaker_id, None, 0.667, 1.0, 0.8)?;
+        let result = self.synthesize_with_params(
+            text,
+            &SynthesisParams {
+                speaker_id,
+                ..Default::default()
+            },
+        )?;
         crate::audio::write_wav(output, result.sample_rate, &result.audio)?;
         Ok(result)
     }
@@ -773,11 +861,13 @@ mod tests {
             noise_scale: 0.667,
             length_scale: 1.0,
             noise_w: 0.8,
+            speaker_embedding: None,
         };
         assert_eq!(request.phoneme_ids, ids);
         assert!(request.prosody_features.is_none());
         assert_eq!(request.speaker_id, Some(0));
         assert!(request.language_id.is_none());
+        assert!(request.speaker_embedding.is_none());
     }
 
     #[test]
@@ -791,6 +881,7 @@ mod tests {
             noise_scale: 0.5,
             length_scale: 1.2,
             noise_w: 0.6,
+            speaker_embedding: None,
         };
         assert_eq!(request.prosody_features.as_ref().unwrap().len(), 3);
         assert_eq!(request.prosody_features.as_ref().unwrap()[0], [-2, 1, 5]);
@@ -808,6 +899,7 @@ mod tests {
             noise_scale: 0.667,
             length_scale: 1.0,
             noise_w: 0.8,
+            speaker_embedding: None,
         };
         assert_eq!(request.language_id, Some(2));
         assert_eq!(request.speaker_id, Some(100));
@@ -985,4 +1077,70 @@ mod tests {
     //   - post_process_ids: tested in phonemizer trait tests
     // End-to-end testing of phonemize_to_ids is done via integration tests
     // (test_custom_dict_integration.rs) and CLI --test-mode.
+
+    // -----------------------------------------------------------------------
+    // 7. SynthesisParams default values and construction
+    // -----------------------------------------------------------------------
+    #[test]
+    fn test_synthesis_params_default() {
+        let params = SynthesisParams::default();
+        assert!(params.speaker_id.is_none());
+        assert!(params.language_override.is_none());
+        assert!((params.noise_scale - 0.667).abs() < 1e-6);
+        assert!((params.length_scale - 1.0).abs() < 1e-6);
+        assert!((params.noise_w - 0.8).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_synthesis_params_partial_override() {
+        let params = SynthesisParams {
+            speaker_id: Some(42),
+            language_override: Some("ja".into()),
+            ..Default::default()
+        };
+        assert_eq!(params.speaker_id, Some(42));
+        assert_eq!(params.language_override.as_deref(), Some("ja"));
+        // Other fields should be default
+        assert!((params.noise_scale - 0.667).abs() < 1e-6);
+        assert!((params.length_scale - 1.0).abs() < 1e-6);
+        assert!((params.noise_w - 0.8).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_synthesis_params_full_override() {
+        let params = SynthesisParams {
+            speaker_id: Some(5),
+            language_override: Some("en".into()),
+            noise_scale: 0.333,
+            length_scale: 1.5,
+            noise_w: 0.5,
+            speaker_embedding: None,
+        };
+        assert_eq!(params.speaker_id, Some(5));
+        assert_eq!(params.language_override.as_deref(), Some("en"));
+        assert!((params.noise_scale - 0.333).abs() < 1e-6);
+        assert!((params.length_scale - 1.5).abs() < 1e-6);
+        assert!((params.noise_w - 0.5).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_synthesis_params_clone() {
+        let params = SynthesisParams {
+            speaker_id: Some(1),
+            language_override: Some("zh".into()),
+            ..Default::default()
+        };
+        let cloned = params.clone();
+        assert_eq!(cloned.speaker_id, params.speaker_id);
+        assert_eq!(cloned.language_override, params.language_override);
+        assert!((cloned.noise_scale - params.noise_scale).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_synthesis_params_debug() {
+        let params = SynthesisParams::default();
+        let debug = format!("{:?}", params);
+        assert!(debug.contains("SynthesisParams"));
+        assert!(debug.contains("noise_scale"));
+    }
 }

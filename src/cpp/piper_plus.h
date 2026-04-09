@@ -93,13 +93,15 @@ typedef struct PiperPlusConfig {
 /** @note Zero-init safe: noise_scale, length_scale, noise_w が 0.0 の場合は
  *        デフォルト値 (0.667, 1.0, 0.8) に自動置換されます。 */
 typedef struct PiperPlusSynthOptions {
-    int32_t speaker_id;           /* Speaker index (default: 0) */
-    int32_t language_id;          /* Language index (-1 = auto-detect, default: -1) */
-    float   noise_scale;          /* VITS noise_scale (default: 0.667) */
-    float   length_scale;         /* VITS length_scale (default: 1.0) */
-    float   noise_w;              /* VITS noise_w (default: 0.8) */
-    float   sentence_silence_sec; /* Silence between sentences in sec (default: 0.2) */
-    int32_t _reserved[8];         /* Must be zero */
+    int32_t speaker_id;                 /* Speaker index (default: 0) */
+    int32_t language_id;                /* Language index (-1 = auto-detect, default: -1) */
+    float   noise_scale;                /* VITS noise_scale (default: 0.667) */
+    float   length_scale;               /* VITS length_scale (default: 1.0) */
+    float   noise_w;                    /* VITS noise_w (default: 0.8) */
+    float   sentence_silence_sec;       /* Silence between sentences in sec (default: 0.2) */
+    const float *speaker_embedding;     /* Voice cloning: float32 embedding (NULL = use speaker_id) */
+    int32_t      speaker_embedding_dim; /* Number of elements in speaker_embedding (0 = disabled) */
+    int32_t _reserved[5];               /* Must be zero */
 } PiperPlusSynthOptions;
 
 /* ===== Lifecycle ===== */
@@ -310,6 +312,44 @@ PIPER_PLUS_API PiperPlusStatus piper_plus_phonemize(
  *          same engine. Returns "" (empty string) on error (NULL engine or
  *          no language map). Caller MUST copy if persistence is needed. */
 PIPER_PLUS_API const char *piper_plus_available_languages(PiperPlusEngine *engine);
+
+/* ===== Speaker Encoder (EXPERIMENTAL -- not yet implemented) ========= */
+
+/**
+ * Opaque speaker encoder handle.
+ * Wraps an ECAPA-TDNN ONNX model for extracting speaker embeddings.
+ *
+ * @note EXPERIMENTAL: The speaker encoder API surface is defined for forward
+ *       compatibility but the implementation is not yet connected to a backend.
+ *       All functions currently return an error or NULL.
+ */
+typedef struct PiperPlusSpeakerEncoder PiperPlusSpeakerEncoder;
+
+/** Create a speaker encoder from an ONNX model file.
+ *  @param model_path  Path to the speaker encoder .onnx file.
+ *  @return Handle on success, or NULL on error (see piper_plus_get_last_error()). */
+PIPER_PLUS_API PiperPlusSpeakerEncoder* piper_plus_speaker_encoder_create(
+    const char *model_path);
+
+/** Encode audio samples into a speaker embedding.
+ *  @param encoder        Speaker encoder handle (must not be NULL).
+ *  @param audio_samples  Mono float32 PCM audio samples.
+ *  @param num_samples    Number of float samples in audio_samples.
+ *  @param sample_rate    Sample rate of the input audio (e.g. 16000, 22050, 44100).
+ *  @param embedding_out  Output buffer to receive the embedding (caller-allocated).
+ *  @param embedding_dim  Size of embedding_out buffer (e.g. 256).
+ *  @return Number of embedding dimensions written on success, or -1 on error. */
+PIPER_PLUS_API int32_t piper_plus_speaker_encoder_encode(
+    PiperPlusSpeakerEncoder *encoder,
+    const float *audio_samples,
+    int32_t      num_samples,
+    int32_t      sample_rate,
+    float       *embedding_out,
+    int32_t      embedding_dim);
+
+/** Destroy a speaker encoder and release its resources. */
+PIPER_PLUS_API void piper_plus_speaker_encoder_destroy(
+    PiperPlusSpeakerEncoder *encoder);
 
 #ifdef __cplusplus
 }

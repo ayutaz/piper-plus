@@ -1275,7 +1275,7 @@ mod tests {
             "tokens and prosody must match length"
         );
         // At least one phoneme should have a2=2 (stressed)
-        let has_stress = prosody.iter().any(|p| p.map_or(false, |info| info.a2 == 2));
+        let has_stress = prosody.iter().any(|p| p.is_some_and(|info| info.a2 == 2));
         assert!(has_stress, "should have at least one stressed phoneme");
     }
 

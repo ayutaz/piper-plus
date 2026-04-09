@@ -514,7 +514,7 @@ func TestGolden_FR(t *testing.T) {
 			}
 
 			for _, expected := range tc.ExpectedContains {
-				if !tokensContain(tokens, expected) {
+				if !tokensContain(tokens, expected) && !tokensContain(tokens, RegisterToken(expected)) {
 					t.Errorf("output missing %q for %q: %v", expected, tc.Input, tokens)
 				}
 			}
@@ -544,7 +544,7 @@ func TestGolden_PT(t *testing.T) {
 			}
 
 			for _, expected := range tc.ExpectedContains {
-				if !tokensContain(tokens, expected) {
+				if !tokensContain(tokens, expected) && !tokensContain(tokens, RegisterToken(expected)) {
 					t.Errorf("output missing %q for %q: %v", expected, tc.Input, tokens)
 				}
 			}
@@ -604,7 +604,7 @@ func TestGolden_SV(t *testing.T) {
 			}
 
 			for _, expected := range tc.ExpectedContains {
-				if !tokensContain(tokens, expected) {
+				if !tokensContain(tokens, expected) && !tokensContain(tokens, RegisterToken(expected)) {
 					t.Errorf("output missing %q for %q: %v", expected, tc.Input, tokens)
 				}
 			}

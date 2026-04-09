@@ -358,8 +358,8 @@ fn test_fade_in_preserves_samples_after_fade_region() {
     let mut samples = vec![10000i16; 20];
     fade_in(&mut samples, 5);
     // Samples after the fade region should be unchanged
-    for i in 5..20 {
-        assert_eq!(samples[i], 10000, "sample[{i}] should be unchanged");
+    for (i, &s) in samples.iter().enumerate().skip(5) {
+        assert_eq!(s, 10000, "sample[{i}] should be unchanged");
     }
 }
 
@@ -396,8 +396,8 @@ fn test_fade_out_preserves_samples_before_fade_region() {
     let mut samples = vec![10000i16; 20];
     fade_out(&mut samples, 5);
     // Samples before the fade region should be unchanged
-    for i in 0..15 {
-        assert_eq!(samples[i], 10000, "sample[{i}] should be unchanged");
+    for (i, &s) in samples.iter().enumerate().take(15) {
+        assert_eq!(s, 10000, "sample[{i}] should be unchanged");
     }
 }
 

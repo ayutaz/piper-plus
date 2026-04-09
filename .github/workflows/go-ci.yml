@@ -12,6 +12,10 @@ on:
       - 'src/go/**'
   workflow_call:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
 env:
   ORT_VERSION: '1.24.4'
 
@@ -35,7 +39,9 @@ jobs:
           # reference test models outside this path (e.g. test/models/) will not
           # find them here. Those tests run in the integration-test job which
           # does a full checkout.
-          sparse-checkout: src/go
+          sparse-checkout: |
+            src/go
+            test/fixtures
       - uses: actions/setup-go@v5
         with:
           go-version: '1.26'

@@ -1,0 +1,51 @@
+# MOS Benchmark - evaluation target model definitions
+#
+# Environment variable substitution:
+#   ${MODELS_DIR} -> base directory for model files
+#
+# Model types:
+#   piper-plus  : ONNX model using piper-plus inference
+#   external    : external TTS system invoked via subprocess
+
+models:
+  - name: piper-plus-6lang-base
+    path: "${MODELS_DIR}/multilingual-6lang-75epoch.onnx"
+    config: "${MODELS_DIR}/config.json"
+    type: piper-plus
+    description: "6-language base model (75 epoch, 571 speakers)"
+    speaker_ids:
+      ja: 0
+      en: 20
+      zh: 20
+      es: 20
+      fr: 20
+      pt: 20
+
+  - name: piper-plus-tsukuyomi
+    path: "${MODELS_DIR}/tsukuyomi-6lang-v2-fixed.onnx"
+    config: "${MODELS_DIR}/tsukuyomi-config.json"
+    type: piper-plus
+    description: "Tsukuyomi-chan 6-language fine-tuned"
+    speaker_ids:
+      ja: 0
+      en: 0
+      zh: 0
+      es: 0
+      fr: 0
+      pt: 0
+
+  # Comparison targets (external models)
+  - name: edge-tts
+    type: external
+    command: "edge-tts --voice {voice} --text '{text}' --write-media {output}"
+    voices:
+      ja: "ja-JP-NanamiNeural"
+      en: "en-US-JennyNeural"
+      zh: "zh-CN-XiaoxiaoNeural"
+      es: "es-ES-ElviraNeural"
+      fr: "fr-FR-DeniseNeural"
+      pt: "pt-BR-FranciscaNeural"
+
+  - name: gtts
+    type: external
+    command: "gtts-cli '{text}' -l {lang} -o {output}"

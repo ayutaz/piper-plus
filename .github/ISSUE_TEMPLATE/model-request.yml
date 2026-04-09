@@ -1,0 +1,76 @@
+name: Model Request
+description: Request a new model for a specific language or speaker
+title: "[Model Request] "
+labels: ["model-request"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for requesting a new model.
+        Please fill out the sections below so the community can understand what you need.
+
+        モデルリクエストありがとうございます。
+        以下のセクションを記入してください。
+
+  - type: dropdown
+    id: language
+    attributes:
+      label: Language / 言語
+      description: Target language for the model.
+      options:
+        - Japanese (ja)
+        - English (en)
+        - Chinese (zh)
+        - Korean (ko)
+        - Spanish (es)
+        - French (fr)
+        - Portuguese (pt)
+        - Swedish (sv)
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: other_language
+    attributes:
+      label: Other language (if selected above)
+      description: Specify the language if you selected "Other".
+      placeholder: "e.g., German (de)"
+    validations:
+      required: false
+
+  - type: input
+    id: dataset
+    attributes:
+      label: Dataset name (if known) / データセット名
+      description: Name and URL of a public dataset that could be used.
+      placeholder: "e.g., LJSpeech (CC0), Common Voice (CC0)"
+    validations:
+      required: false
+
+  - type: textarea
+    id: use_case
+    attributes:
+      label: Use case / 利用用途
+      description: How would you use this model?
+      placeholder: "e.g., I want a natural-sounding Japanese male voice for my audiobook app."
+    validations:
+      required: true
+
+  - type: textarea
+    id: license_info
+    attributes:
+      label: License information / ライセンス情報
+      description: |
+        License of the dataset (if known). See [CONTRIBUTING_MODELS.md](../../CONTRIBUTING_MODELS.md#ライセンスポリシー--license-policy) for allowed licenses.
+      placeholder: "e.g., LJSpeech is CC0. Common Voice is CC0."
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional_context
+    attributes:
+      label: Additional context / 補足情報
+      description: Any other information that might help (e.g., sample audio links, speaker characteristics).
+    validations:
+      required: false

@@ -28,6 +28,13 @@ public record SynthesisResult(short[] Audio, float[]? Durations);
 /// <param name="NoiseScale">Noise scale for the stochastic duration predictor (higher = more variation).</param>
 /// <param name="LengthScale">Length / speed scale (higher = slower speech).</param>
 /// <param name="NoiseW">Noise scale W for the stochastic duration predictor.</param>
+/// <param name="SpeakerEmbedding">
+/// Speaker embedding vector from a speaker encoder model (voice cloning).
+/// When provided, this is passed as the <c>speaker_embedding</c> ONNX input
+/// together with <c>speaker_embedding_mask=1</c>. Pass <c>null</c> to use
+/// the standard <c>sid</c>-based speaker selection.
+/// Typical dimension: 256 floats (ECAPA-TDNN output).
+/// </param>
 public record SynthesisInput(
     long[] PhonemeIds,
     int SpeakerId = 0,
@@ -35,7 +42,8 @@ public record SynthesisInput(
     long[]? ProsodyFeatures = null,
     float NoiseScale = 0.667f,
     float LengthScale = 1.0f,
-    float NoiseW = 0.8f
+    float NoiseW = 0.8f,
+    float[]? SpeakerEmbedding = null
 );
 
 /// <summary>
@@ -259,6 +267,51 @@ public sealed class PiperSession
             inputValues.Add(prosodyTensor);
         }
 
+        // speaker_embedding (optional): [1, embedding_dim]
+        // speaker_embedding_mask (optional): [1, 1] — 1 if embedding active, 0 otherwise
+        // ONNX Runtime requires ALL declared inputs, so both tensors must always
+        // be provided when the model supports speaker_embedding.
+        OrtValue? speakerEmbTensor = null;
+        OrtValue? speakerEmbMaskTensor = null;
+        if (_model.HasSpeakerEmbedding)
+        {
+            if (input.SpeakerEmbedding is not null && input.SpeakerEmbedding.Length > 0)
+            {
+                int embDim = input.SpeakerEmbedding.Length;
+                speakerEmbTensor = OrtValue.CreateTensorValueFromMemory(
+                    input.SpeakerEmbedding, [1, embDim]);
+                inputNames.Add("speaker_embedding");
+                inputValues.Add(speakerEmbTensor);
+
+                long[] mask = [1];
+                speakerEmbMaskTensor = OrtValue.CreateTensorValueFromMemory(mask, [1, 1]);
+                inputNames.Add("speaker_embedding_mask");
+                inputValues.Add(speakerEmbMaskTensor);
+            }
+            else
+            {
+                // Model supports it but no embedding provided — send zeros + mask=0.
+                // Read embedding dimension from model input metadata; default 256 (ECAPA-TDNN).
+                int embDim = 256;
+                var meta = _model.Session.InputMetadata;
+                if (meta.TryGetValue("speaker_embedding", out var embMeta)
+                    && embMeta.Dimensions.Length >= 2 && embMeta.Dimensions[1] > 0)
+                {
+                    embDim = embMeta.Dimensions[1];
+                }
+
+                float[] zeroEmb = new float[embDim];
+                speakerEmbTensor = OrtValue.CreateTensorValueFromMemory(zeroEmb, [1, embDim]);
+                inputNames.Add("speaker_embedding");
+                inputValues.Add(speakerEmbTensor);
+
+                long[] mask = [0];
+                speakerEmbMaskTensor = OrtValue.CreateTensorValueFromMemory(mask, [1, 1]);
+                inputNames.Add("speaker_embedding_mask");
+                inputValues.Add(speakerEmbMaskTensor);
+            }
+        }
+
         try
         {
             // ----- Build output names -----
@@ -295,6 +348,8 @@ public sealed class PiperSession
             sidTensor?.Dispose();
             lidTensor?.Dispose();
             prosodyTensor?.Dispose();
+            speakerEmbTensor?.Dispose();
+            speakerEmbMaskTensor?.Dispose();
 
             // Return the pooled prosody buffer after the tensor is disposed.
             if (rentedProsody is not null)

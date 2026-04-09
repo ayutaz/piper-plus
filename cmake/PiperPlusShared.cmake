@@ -5,10 +5,18 @@ option(PIPER_PLUS_BUILD_SHARED "Build piper-plus shared library (C API)" OFF)
 
 if(PIPER_PLUS_BUILD_SHARED)
 
-add_library(piper_plus SHARED
-  src/cpp/piper_plus_c_api.cpp
-  $<TARGET_OBJECTS:piper_common>
-)
+# iOS: build as static library (dylib not allowed on App Store)
+if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+  add_library(piper_plus STATIC
+    src/cpp/piper_plus_c_api.cpp
+    $<TARGET_OBJECTS:piper_common>
+  )
+else()
+  add_library(piper_plus SHARED
+    src/cpp/piper_plus_c_api.cpp
+    $<TARGET_OBJECTS:piper_common>
+  )
+endif()
 
 # Dependencies (same as piper/test_piper)
 add_dependencies(piper_plus fmt_external spdlog_external openjtalk_external hts_engine_external)
@@ -61,6 +69,15 @@ if(WIN32)
     ${ONNXRUNTIME_LIB}
     ${OPENJTALK_DIR}/lib/openjtalk.lib
   )
+elseif(CMAKE_SYSTEM_NAME STREQUAL "iOS" AND DEFINED ONNXRUNTIME_LIB)
+  # iOS: link ONNX Runtime by explicit path (from xcframework extraction)
+  target_link_libraries(piper_plus PRIVATE
+    fmt
+    spdlog
+    ${ONNXRUNTIME_LIB}
+  )
+  # Link OpenJTalk static library
+  target_link_libraries(piper_plus PRIVATE ${OPENJTALK_DIR}/lib/libopenjtalk.a)
 elseif(ANDROID AND DEFINED ONNXRUNTIME_LIB)
   # Android: link ONNX Runtime by explicit path (from AAR extraction)
   target_link_libraries(piper_plus PRIVATE
@@ -106,21 +123,27 @@ set_target_properties(piper_plus PROPERTIES
   CXX_VISIBILITY_PRESET hidden
   VISIBILITY_INLINES_HIDDEN ON
   OUTPUT_NAME "piper_plus"
-  VERSION ${piper_version}
-  SOVERSION 1
 )
 
-# RPATH settings
-if(APPLE)
+# iOS static library: no VERSION/SOVERSION/RPATH needed
+if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
   set_target_properties(piper_plus PROPERTIES
-    MACOSX_RPATH TRUE
-    INSTALL_RPATH "@loader_path"
+    VERSION ${piper_version}
+    SOVERSION 1
   )
-elseif(UNIX)
-  set_target_properties(piper_plus PROPERTIES
-    INSTALL_RPATH "$ORIGIN"
-    BUILD_WITH_INSTALL_RPATH TRUE
-  )
+
+  # RPATH settings
+  if(APPLE)
+    set_target_properties(piper_plus PROPERTIES
+      MACOSX_RPATH TRUE
+      INSTALL_RPATH "@loader_path"
+    )
+  elseif(UNIX)
+    set_target_properties(piper_plus PROPERTIES
+      INSTALL_RPATH "$ORIGIN"
+      BUILD_WITH_INSTALL_RPATH TRUE
+    )
+  endif()
 endif()
 
 # Install targets
@@ -136,15 +159,18 @@ install(FILES src/cpp/piper_plus.h
 )
 
 # --- ONNX Runtime shared library install ---
-if(WIN32)
-  # Windows: copy DLLs to bin/
-  file(GLOB _ort_dlls "${ONNXRUNTIME_DIR}/lib/*.dll")
-  install(FILES ${_ort_dlls} DESTINATION ${CMAKE_INSTALL_BINDIR})
-else()
-  # Unix: copy shared libs to lib/ (exclude .dSYM directories on macOS)
-  file(GLOB _ort_libs "${ONNXRUNTIME_DIR}/lib/libonnxruntime*${CMAKE_SHARED_LIBRARY_SUFFIX}*")
-  list(FILTER _ort_libs EXCLUDE REGEX "\\.dSYM$")
-  install(FILES ${_ort_libs} DESTINATION ${CMAKE_INSTALL_LIBDIR})
+# Skip for iOS/Android (ONNX Runtime is linked statically or bundled separately)
+if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS" AND NOT ANDROID)
+  if(WIN32)
+    # Windows: copy DLLs to bin/
+    file(GLOB _ort_dlls "${ONNXRUNTIME_DIR}/lib/*.dll")
+    install(FILES ${_ort_dlls} DESTINATION ${CMAKE_INSTALL_BINDIR})
+  else()
+    # Unix: copy shared libs to lib/ (exclude .dSYM directories on macOS)
+    file(GLOB _ort_libs "${ONNXRUNTIME_DIR}/lib/libonnxruntime*${CMAKE_SHARED_LIBRARY_SUFFIX}*")
+    list(FILTER _ort_libs EXCLUDE REGEX "\\.dSYM$")
+    install(FILES ${_ort_libs} DESTINATION ${CMAKE_INSTALL_LIBDIR})
+  endif()
 endif()
 
 # --- ONNX Runtime license ---

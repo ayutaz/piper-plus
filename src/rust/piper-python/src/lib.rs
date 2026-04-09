@@ -261,6 +261,7 @@ impl PiperVoice {
 
         let result = py.allow_threads(move || {
             let inner = unsafe { inner_ptr.as_mut() };
+            #[allow(deprecated)]
             inner.synthesize_text(
                 &text_owned,
                 speaker_id,
@@ -316,6 +317,7 @@ impl PiperVoice {
             let inner = unsafe { inner_ptr.as_mut() };
             let mut out = Vec::with_capacity(texts.len());
             for text in &texts {
+                #[allow(deprecated)]
                 let r = inner.synthesize_text(
                     text,
                     speaker_id,

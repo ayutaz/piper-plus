@@ -50,7 +50,7 @@ mod korean_encoding {
         // Add PUA entries for tense consonants that might appear in other tests
         if let Some(pua) = token_to_pua("k\u{0348}") {
             // k͈ (tense k)
-            extra.push((&"placeholder_kk", 50));
+            extra.push(("placeholder_kk", 50));
             // We need the actual PUA char as key
             let _ = pua; // used below
         }
@@ -79,7 +79,7 @@ mod korean_encoding {
         let pua_kk_str = pua_kk.to_string();
 
         assert!(
-            tokens.iter().any(|t| *t == pua_kk_str),
+            tokens.contains(&pua_kk_str),
             "tokens should contain PUA for tense k (k͈): got {:?}",
             tokens
         );
@@ -108,7 +108,7 @@ mod korean_encoding {
         let pua_str = pua_k_unrel.to_string();
 
         assert!(
-            tokens.iter().any(|t| *t == pua_str),
+            tokens.contains(&pua_str),
             "tokens for '박' should contain unreleased k̚ PUA: got {:?}",
             tokens
         );

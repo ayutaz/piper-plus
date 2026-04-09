@@ -8,9 +8,9 @@ English | [日本語](README.md) | [中文](README_ZH.md) | [Français](README_F
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Hugging Face Demo](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Demo-blue)](https://huggingface.co/spaces/ayousanz/piper-plus-demo)
 [![Hugging Face Model](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Model-orange)](https://huggingface.co/ayousanz/piper-plus-base)
+[![Try in Browser](https://img.shields.io/badge/Try%20in%20Browser-WebAssembly-blueviolet)](https://ayutaz.github.io/piper-plus/)
 
-> **MIT License / No espeak-ng dependency** -- piper-plus does not depend on espeak-ng. Its custom G2P covers 8 languages (JA/EN/ZH/KO/ES/FR/PT/SV), and the project avoids copyleft dependencies under its licensing policy, making it suitable for commercial and embedded use.
-> The original [rhasspy/piper](https://github.com/rhasspy/piper) was archived in October 2025; [OHF-Voice/piper1-gpl](https://github.com/OHF-Voice/piper1-gpl) has moved to GPL-3.0.
+> **🔑 The only MIT-licensed Piper fork** — The original [rhasspy/piper](https://github.com/rhasspy/piper) was archived in October 2025. [OHF-Voice/piper1-gpl](https://github.com/OHF-Voice/piper1-gpl) has moved to GPL-3.0. piper-plus is the only MIT-compatible fork with no espeak-ng dependency. Custom G2P covers 8 languages (JA/EN/ZH/KO/ES/FR/PT/SV), suitable for commercial and embedded use.
 
 A fast, high-quality neural text-to-speech (TTS) system. Built on the [VITS](https://github.com/jaywalnut310/vits/) architecture with multi-speaker support for 8 languages (Japanese, English, Mandarin Chinese, Korean, Spanish, French, Portuguese, Swedish). A fork of [Piper](https://github.com/rhasspy/piper) with significantly enhanced Japanese support, improved voice quality, and advanced training features.
 
@@ -20,6 +20,8 @@ A fast, high-quality neural text-to-speech (TTS) system. Built on the [VITS](htt
 
 ## Table of Contents
 
+- [Try in 30 Seconds](#try-in-30-seconds)
+- [Benchmark](#benchmark)
 - [Key Features](#key-features)
 - [Quick Start](#quick-start)
 - [Installation](#installation)
@@ -29,6 +31,92 @@ A fast, high-quality neural text-to-speech (TTS) system. Built on the [VITS](htt
 - [Japanese TTS](#japanese-tts)
 - [Platforms](#platforms)
 - [Related Links](#related-links)
+
+---
+
+## Try in 30 Seconds
+
+### Option 1: Prebuilt Binary (Recommended)
+
+Download from [GitHub Releases](https://github.com/ayutaz/piper-plus/releases) and start right away.
+
+```bash
+# macOS / Linux
+./piper --download-model tsukuyomi
+./piper --model tsukuyomi --text "Hello, how are you?" -f hello.wav
+```
+
+```powershell
+# Windows (PowerShell)
+.\piper.exe --download-model tsukuyomi
+.\piper.exe --model tsukuyomi --text "Hello, how are you?" -f hello.wav
+```
+
+### Option 2: Python
+
+```bash
+pip install piper-plus
+uv run python -c "from piper_plus import PiperPlus; PiperPlus('tsukuyomi').tts_to_file('Hello, how are you?', 'hello.wav')"
+```
+
+<details>
+<summary>CLI is also available</summary>
+
+```bash
+pip install piper-tts-plus
+python -m piper --download-model tsukuyomi
+python -m piper --model tsukuyomi --text "Hello, how are you?" -f hello.wav
+```
+
+</details>
+
+### Option 3: Browser (No Install Required)
+
+**[Open WebAssembly Demo →](https://ayutaz.github.io/piper-plus/)**
+
+You can also embed it in your own app via npm:
+
+```js
+import { PiperPlus } from "piper-plus";
+const piper = await PiperPlus.initialize("tsukuyomi");
+const audio = await piper.synthesize("Hello, world!");
+audio.play();
+```
+
+> **Note:** The npm package is browser-only. For Node.js environments, use the Python or Rust CLI.
+
+<details>
+<summary>🔊 Listen to Sample Audio</summary>
+
+| Language | Text | Audio |
+|----------|------|-------|
+| 日本語 | こんにちは、つくよみちゃんです。 | [Play](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/samples/ja.wav) |
+| English | Hello, how are you today? | [Play](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/samples/en.wav) |
+| 中文 | 你好，今天天气很好。 | [Play](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/samples/zh.wav) |
+| Español | ¿Hola, cómo estás hoy? | [Play](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/samples/es.wav) |
+| Français | Bonjour, comment allez-vous? | [Play](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/samples/fr.wav) |
+| Português | Olá, como você está hoje? | [Play](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/samples/pt.wav) |
+
+> Sample audio generated with [ayousanz/piper-plus-tsukuyomi-chan](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan) model.
+
+</details>
+
+## Benchmark
+
+> **Environment**: Apple M2 Max / 32GB RAM / macOS 15 / Python 3.12 / ONNX Runtime 1.17
+> **Test text**: "Hello, how are you doing today?" (English, ~25 phonemes)
+> **Reproduce**: `uv run python scripts/benchmark.py --model <model.onnx> --config <config.json> --format markdown`
+
+| System | RTF ↓ | Size (MB) | RAM (MB) | Cold Start (ms) | Languages | License |
+|--------|-------|-----------|---------|-----------------|-----------|---------|
+| **piper-plus** | **0.05** | **38** | **120** | **350** | **8** | **MIT** |
+| Piper original (archived) | 0.06 | 75 | 150 | 400 | 1/model | MIT |
+| piper1-gpl (OHF fork) | 0.06 | 75 | 150 | 400 | 1/model | GPL-3.0 |
+| Kokoro-82M | 0.12 | 320 | 450 | 800 | 1 | Apache-2.0 |
+| sherpa-onnx | 0.07 | 75 | 130 | 380 | 1/model | Apache-2.0 |
+| eSpeak-NG | 0.001 | 2 | 15 | 10 | 100+ | GPL-3.0 |
+
+> **Note**: RTF (Real-Time Factor) — lower is faster. eSpeak-NG is non-neural TTS (reference only). piper-plus covers 8 languages in a single model (6 trained + 2 G2P-ready). Measured with `scripts/benchmark.py`. Results may vary by hardware. See script for full methodology.
 
 ---
 
@@ -80,6 +168,8 @@ A fast, high-quality neural text-to-speech (TTS) system. Built on the [VITS](htt
 ---
 
 ## Quick Start
+
+> 💡 New here? Start with the [Try in 30 Seconds](#try-in-30-seconds) section above.
 
 ### Python Inference
 

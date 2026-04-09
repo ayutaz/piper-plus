@@ -460,6 +460,74 @@ Gradio ベースの Web UI。6言語マルチリンガルモデル対応、Docke
 **CI:** `.github/workflows/webui-test.yml`
 **ドキュメント:** `docs/features/webui.md`
 
+### Speaker Encoder (ECAPA-TDNN)
+
+Voice Cloning 用の話者エンコーダー。ECAPA-TDNN アーキテクチャで 256 次元 L2 正規化 embedding を出力。参照音声から話者特徴を抽出し、未知の話者の声質でTTS合成を可能にする。
+
+**実装:** `src/python/piper_train/speaker_encoder/` (`ecapa_tdnn.py`, `audio_utils.py`, `encoder.py`, `export_encoder.py`, `evaluate.py`)
+**テスト:** `test/test_speaker_encoder.py`
+
+### Speaker Embedding 入力パス (--speaker-embedding)
+
+ONNX 推論時に `speaker_embedding` テンソルで声質を指定。mask パターンで Optional 入力を実現し、speaker_id と speaker_embedding を排他的に使用可能。Speaker Encoder で抽出した embedding を直接渡して未知話者の合成ができる。
+
+**CLIオプション:** `--speaker-embedding`, `--reference-audio`, `--speaker-encoder-model`
+**実装:** `vits/models.py` (`infer`), `export_onnx.py`, `infer_onnx.py`
+**テスト:** `tests/test_speaker_embedding.py`
+
+### 全ランタイム Voice Cloning 統合
+
+5 ランタイム (Rust/C#/Go/WASM/C++) に Speaker Encoder + speaker_embedding 対応を統合。参照音声から話者 embedding を抽出し、任意の声質で合成可能。
+
+**CLI:** 全ランタイムで `--reference-audio`, `--speaker-embedding`, `--speaker-encoder-model`
+**実装:** 各ランタイムの `speaker_encoder.{rs,cs,go,js}` + engine 修正
+
+### SSML 基本サポート (4ランタイム)
+
+`<speak>`, `<break>`, `<prosody rate="...">` を Python/Rust/C#/Go の 4 ランタイムで実装。W3C SSML サブセット準拠。
+
+**実装:**
+- Python: `src/python/g2p/piper_plus_g2p/ssml.py`
+- Rust: `src/rust/piper-core/src/ssml.rs`
+- C#: `src/csharp/PiperPlus.Core/Ssml/SsmlParser.cs`
+- Go: `src/go/piperplus/ssml/parser.go`
+- ランタイム: `src/python_run/piper/phonemize/ssml.py`
+
+**テスト:** Python 62, Rust 39, C# 59, Go 67 テスト
+
+### Unity UPM パッケージ (com.piper-plus.tts)
+
+Unity 向け P/Invoke + AudioClip 高レベル API。libpiper_plus を介して Unity エディタ・ランタイムから多言語 TTS を利用可能。
+
+**実装:** `com.piper-plus.tts/` (`Runtime/`, `Editor/`, `Samples~/`, `Plugins/`)
+**ドキュメント:** `docs/features/unity-integration.md`
+
+### MOS ベンチマークツール
+
+MOS (Mean Opinion Score) 評価用のサンプル生成、メトリクス計算 (PESQ/STOI 等)、調査フォーム生成ツール。モデル品質の定量的評価を支援。
+
+**実装:** `tools/benchmark/` (`generate_samples.py`, `compute_metrics.py`, `generate_mos_survey.py`, `models.yaml`)
+**ドキュメント:** `docs/benchmark-mos.md`
+
+### iOS/Android ビルド CI
+
+libpiper_plus のモバイルクロスコンパイル。iOS (arm64) と Android (arm64-v8a/armeabi-v7a/x86_64) のネイティブ共有ライブラリをCIで自動ビルド。
+
+**実装:** `.github/workflows/release-shared-lib.yml` (`build-ios`, `build-android`), `cmake/ios.toolchain.cmake`
+
+### モデル投稿ガイド
+
+コミュニティモデル投稿のガイドラインと GitHub Issue テンプレート。モデル公開時の品質基準・ライセンス要件を明文化。
+
+**実装:** `CONTRIBUTING_MODELS.md`, `.github/ISSUE_TEMPLATE/model-request.yml`, `.github/ISSUE_TEMPLATE/model-submission.yml`
+
+### Wyoming Docker + HA 統合
+
+Wyoming Protocol TTS の Docker 環境と Home Assistant 統合ガイド。Docker Compose で Wyoming TTS サーバーを起動し、HA から piper-plus を利用可能。
+
+**実装:** `docker/wyoming/` (`Dockerfile`, `docker-compose.yml`, `.env.example`, `README.md`)
+**ドキュメント:** `docs/guides/home-assistant.md`
+
 ---
 
 ## 重要なファイルパス
@@ -489,6 +557,9 @@ Gradio ベースの Web UI。6言語マルチリンガルモデル対応、Docke
 | 言語横断パラメータ仕様 | `docs/spec/ort-session-contract.toml` |
 | OpenAI TTS API | `docker/python-inference/inference.py` |
 | WebUI | `docker/webui/app.py` |
+| Speaker Encoder | `src/python/piper_train/speaker_encoder/` |
+| SSML (Python) | `src/python/g2p/piper_plus_g2p/ssml.py` |
+| SSML (ランタイム) | `src/python_run/piper/phonemize/ssml.py` |
 
 ### C# ソースコード
 
@@ -515,6 +586,7 @@ Gradio ベースの Web UI。6言語マルチリンガルモデル対応、Docke
 | インライン音素パーサー | `src/csharp/PiperPlus.Core/Phonemize/InlinePhonemeParser.cs` |
 | Raw音素パーサー | `src/csharp/PiperPlus.Core/Phonemize/RawPhonemeParser.cs` |
 | モデルマネージャ | `src/csharp/PiperPlus.Core/Config/ModelManager.cs` |
+| SSML パーサー | `src/csharp/PiperPlus.Core/Ssml/SsmlParser.cs` |
 
 ### Rust ソースコード
 
@@ -530,6 +602,7 @@ Gradio ベースの Web UI。6言語マルチリンガルモデル対応、Docke
 | 辞書マネージャ | `src/rust/piper-core/src/dictionary_manager.rs` |
 | カスタム辞書テスト | `src/rust/piper-core/tests/test_custom_dict_integration.rs` |
 | デフォルト出力テスト | `src/rust/piper-core/tests/test_default_output.rs` |
+| SSML | `src/rust/piper-core/src/ssml.rs` |
 | WASM 音素化 | `src/rust/piper-wasm/` |
 | G2P パッケージ | `src/rust/piper-plus-g2p/` |
 
@@ -554,6 +627,7 @@ Gradio ベースの Web UI。6言語マルチリンガルモデル対応、Docke
 | コアパッケージ | `src/go/piperplus/` |
 | G2P パッケージ | `src/go/phonemize/` |
 | CLI | `src/go/cmd/piper-plus/` |
+| SSML パーサー | `src/go/piperplus/ssml/parser.go` |
 | サンプル | `src/go/examples/` |
 
 ### C API ソースコード
@@ -565,6 +639,34 @@ Gradio ベースの Web UI。6言語マルチリンガルモデル対応、Docke
 | CMake | `cmake/PiperPlusShared.cmake` |
 | テスト | `src/cpp/tests/test_c_api*.cpp` |
 | FFI サンプル | `examples/c-api/`, `examples/dart/`, `examples/godot/` |
+
+### Unity UPM パッケージ
+
+| 用途 | パス |
+|------|------|
+| パッケージルート | `com.piper-plus.tts/` |
+| ランタイム | `com.piper-plus.tts/Runtime/` |
+| エディタ | `com.piper-plus.tts/Editor/` |
+| サンプル | `com.piper-plus.tts/Samples~/` |
+| ネイティブプラグイン | `com.piper-plus.tts/Plugins/` |
+
+### ベンチマーク・ツール
+
+| 用途 | パス |
+|------|------|
+| サンプル生成 | `tools/benchmark/generate_samples.py` |
+| メトリクス計算 | `tools/benchmark/compute_metrics.py` |
+| MOS 調査フォーム生成 | `tools/benchmark/generate_mos_survey.py` |
+| モデル設定 | `tools/benchmark/models.yaml` |
+
+### Wyoming Docker
+
+| 用途 | パス |
+|------|------|
+| Docker 環境 | `docker/wyoming/` |
+| Dockerfile | `docker/wyoming/Dockerfile` |
+| Docker Compose | `docker/wyoming/docker-compose.yml` |
+| HA 統合ガイド | `docs/guides/home-assistant.md` |
 
 ### データセット
 
@@ -591,6 +693,9 @@ Gradio ベースの Web UI。6言語マルチリンガルモデル対応、Docke
 | `add_prosody_features.py` | `src/python/piper_train/tools/add_prosody_features.py` | 既存データセットにprosody_features追加+phoneme_ids再生成 |
 | `prepare_bilingual_dataset.py` | `src/python/piper_train/tools/prepare_bilingual_dataset.py` | JA+ENバイリンガルデータセット作成 |
 | `prepare_libritts_parallel.py` | `/data/piper/prepare_libritts_parallel.py` | LibriTTS-R -> LJSpeech形式変換（並列処理） |
+| `generate_samples.py` | `tools/benchmark/generate_samples.py` | MOS評価用サンプル生成 |
+| `compute_metrics.py` | `tools/benchmark/compute_metrics.py` | PESQ/STOI等メトリクス計算 |
+| `generate_mos_survey.py` | `tools/benchmark/generate_mos_survey.py` | MOS調査フォーム生成 |
 
 ---
 
@@ -620,6 +725,20 @@ CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
 | `--simplify` | - | ONNX モデル simplification を適用 |
 | `--debug` | - | デバッグログ出力 |
 | EMA | 常時有効 | チェックポイントに EMA state があれば自動適用（CLIオプションではない） |
+
+### Voice Cloning 推論 (speaker_embedding)
+
+```bash
+# 参照音声から話者 embedding を抽出して合成
+CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.infer_onnx \
+  --model /path/to/model.onnx \
+  --config /path/to/config.json \
+  --output-dir /path/to/output \
+  --text "こんにちは" \
+  --reference-audio /path/to/reference.wav \
+  --speaker-encoder-model /path/to/speaker_encoder.onnx \
+  --language ja-en-zh-es-fr-pt
+```
 
 ### 推論テスト (6lang マルチリンガルモデル)
 

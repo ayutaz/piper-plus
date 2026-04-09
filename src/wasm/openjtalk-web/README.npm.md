@@ -40,6 +40,25 @@ npm install piper-plus onnxruntime-web
 
 ## Quick Start
 
+### importmap (No Bundler)
+
+```html
+<script type="importmap">
+{
+  "imports": {
+    "piper-plus": "https://cdn.jsdelivr.net/npm/piper-plus@0.3.1/src/index.js",
+    "onnxruntime-web": "https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.mjs"
+  }
+}
+</script>
+<script type="module">
+  import { PiperPlus } from "piper-plus";
+  const piper = await PiperPlus.initialize("tsukuyomi");
+  const audio = await piper.synthesize("Hello, world!");
+  audio.play();
+</script>
+```
+
 ### Basic Usage
 
 ```javascript
@@ -321,6 +340,18 @@ import { StreamingTTSPipeline, TextChunker } from "piper-plus/streaming";
 See [MIGRATION.md](./MIGRATION.md) for a detailed migration guide covering all breaking changes, removed exports, and step-by-step upgrade instructions.
 
 See [CHANGELOG.md](./CHANGELOG.md) for the full list of changes in each release.
+
+## piper-plus vs Kokoro.js
+
+| Feature | piper-plus | Kokoro.js |
+|---------|-----------|-----------|
+| Languages | 8 (JA/EN/ZH/KO/ES/FR/PT/SV) | 1 (EN-optimized) |
+| espeak-ng dependency | None | Required |
+| License | MIT | Apache-2.0 |
+| Model size (WASM) | ~38 MB (FP16) | ~320 MB |
+| Offline capable | Yes | Yes |
+| G2P | Built-in (8 languages) | espeak-ng based |
+| Japanese quality | Native quality (OpenJTalk) | Limited |
 
 ## License
 

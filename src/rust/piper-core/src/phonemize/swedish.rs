@@ -120,7 +120,7 @@ mod tests {
 
     #[test]
     fn test_default_impl() {
-        let p = SwedishPhonemizer::default();
+        let p = SwedishPhonemizer;
         assert_eq!(p.language_code(), "sv");
     }
 

@@ -324,3 +324,10 @@ docker run -d --gpus all \
 
 - openedai-speech で `mp3` 等の形式を指定していた場合、piper-plus は `wav` のみ対応のため、Open WebUI 側の設定で `response_format` が `wav` になっていることを確認してください
 - openedai-speech の voice 名 (`alloy`, `nova` 等) は piper-plus では無視されます。話者を切り替えるには `speaker_id` パラメータを使用してください
+
+---
+
+## 関連ガイド
+
+- [LLM エコシステム統合ガイド](llm-ecosystem.md) — AnythingLLM, LangChain, Ollama との統合
+- [Ollama + piper-plus Stack](../../docker/ollama-stack/) — Docker Compose で一括起動

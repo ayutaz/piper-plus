@@ -1027,10 +1027,8 @@ mod tests {
     fn test_prosody_a1_always_zero() {
         let p = make_phonemizer(&[("hello", "HH AH0 L OW1")]);
         let (_, prosody) = p.phonemize_impl("hello");
-        for pr in &prosody {
-            if let Some(info) = pr {
-                assert_eq!(info.a1, 0, "a1 should always be 0 for English");
-            }
+        for info in prosody.iter().flatten() {
+            assert_eq!(info.a1, 0, "a1 should always be 0 for English");
         }
     }
 
@@ -1055,10 +1053,8 @@ mod tests {
         // "cat" = K AE1 T -> k + æ + t = 3 IPA chars
         let p = make_phonemizer(&[("cat", "K AE1 T")]);
         let (_, prosody) = p.phonemize_impl("cat");
-        for pr in &prosody {
-            if let Some(info) = pr {
-                assert_eq!(info.a3, 3, "a3 should be 3 for 'cat'");
-            }
+        for info in prosody.iter().flatten() {
+            assert_eq!(info.a3, 3, "a3 should be 3 for 'cat'");
         }
     }
 

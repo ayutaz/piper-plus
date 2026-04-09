@@ -5,7 +5,9 @@ use anyhow::{Context, Result};
 use clap::Parser;
 
 use piper_plus::phonemize::custom_dict::CustomDictionary;
-use piper_plus::{OnnxEngine, PiperVoice, VoiceConfig, audio, config, input::JsonlReader};
+use piper_plus::{
+    OnnxEngine, PiperVoice, SynthesisParams, VoiceConfig, audio, config, input::JsonlReader,
+};
 
 /// サポートされている言語コード
 const SUPPORTED_LANGUAGES: &[&str] = &["ja", "en", "zh", "ko", "es", "fr", "pt", "sv"];
@@ -116,6 +118,18 @@ struct Cli {
     /// ORT warmup を無効化 (デフォルト: 起動時にダミー推論2回で JIT キャッシュを温める)
     #[arg(long)]
     no_warmup: bool,
+
+    /// Reference audio file for voice cloning (WAV format)
+    #[arg(long, value_name = "PATH")]
+    reference_audio: Option<PathBuf>,
+
+    /// Pre-computed speaker embedding file (raw binary float32)
+    #[arg(long, value_name = "PATH")]
+    speaker_embedding: Option<PathBuf>,
+
+    /// Speaker encoder ONNX model path (required for --reference-audio)
+    #[arg(long, value_name = "PATH")]
+    speaker_encoder_model: Option<PathBuf>,
 }
 
 /// --phoneme-silence の値をパースして HashMap に変換する。
@@ -148,6 +162,40 @@ fn append_silence(audio: &mut Vec<i16>, sample_rate: u32, silence_seconds: f32) 
         let num_samples = (sample_rate as f32 * silence_seconds) as usize;
         audio.extend(std::iter::repeat_n(0i16, num_samples));
     }
+}
+
+/// CLI引数から SynthesisParams を構築する。
+fn build_synthesis_params(cli: &Cli, speaker_emb: Option<Vec<f32>>) -> SynthesisParams {
+    SynthesisParams {
+        speaker_id: cli.speaker,
+        language_override: cli.language.clone(),
+        noise_scale: cli.noise_scale,
+        length_scale: cli.length_scale,
+        noise_w: cli.noise_w,
+        speaker_embedding: speaker_emb,
+    }
+}
+
+/// Load speaker embedding from a binary file (raw float32 values, little-endian).
+fn load_speaker_embedding(path: &std::path::Path) -> Result<Vec<f32>> {
+    let data = std::fs::read(path)
+        .with_context(|| format!("Failed to read speaker embedding: {}", path.display()))?;
+    if data.len() % 4 != 0 {
+        anyhow::bail!(
+            "Speaker embedding file size ({} bytes) is not a multiple of 4 (float32)",
+            data.len()
+        );
+    }
+    let floats: Vec<f32> = data
+        .chunks_exact(4)
+        .map(|chunk| f32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]))
+        .collect();
+    tracing::info!(
+        "Loaded speaker embedding: {} dimensions from {}",
+        floats.len(),
+        path.display()
+    );
+    Ok(floats)
 }
 
 fn main() -> Result<()> {
@@ -318,6 +366,34 @@ fn main() -> Result<()> {
         tracing::info!("Sentence silence: {:.3}s", cli.sentence_silence);
     }
 
+    // --- Voice cloning: resolve speaker embedding ---
+    if cli.reference_audio.is_some() && cli.speaker_embedding.is_some() {
+        anyhow::bail!("--reference-audio and --speaker-embedding are mutually exclusive");
+    }
+    if cli.reference_audio.is_some() && cli.speaker_encoder_model.is_none() {
+        anyhow::bail!("--speaker-encoder-model is required when using --reference-audio");
+    }
+
+    let speaker_emb: Option<Vec<f32>> = if let Some(ref emb_path) = cli.speaker_embedding {
+        Some(load_speaker_embedding(emb_path)?)
+    } else if let Some(ref ref_audio) = cli.reference_audio {
+        let enc_model = cli.speaker_encoder_model.as_ref().unwrap();
+        tracing::info!("Loading speaker encoder: {}", enc_model.display());
+        let mut encoder = piper_plus::speaker_encoder::SpeakerEncoder::new(enc_model)
+            .context("Failed to load speaker encoder model")?;
+        let emb = encoder
+            .encode_file(ref_audio)
+            .context("Failed to encode reference audio")?;
+        tracing::info!(
+            "Extracted speaker embedding: {} dimensions from {}",
+            emb.len(),
+            ref_audio.display()
+        );
+        Some(emb)
+    } else {
+        None
+    };
+
     if let Some(ref batch_path) = cli.batch {
         // --batch モード: テキストファイルから1行ずつ読み込み合成
         let mut voice = PiperVoice::load(&model_path, config_arg.as_deref(), &cli.device)
@@ -370,6 +446,7 @@ fn main() -> Result<()> {
             batch_path.display()
         );
 
+        let params = build_synthesis_params(&cli, speaker_emb.clone());
         for (i, line) in lines.iter().enumerate() {
             let idx = i + 1;
             let text_to_synth = if let Some(ref dict) = custom_dict {
@@ -382,14 +459,7 @@ fn main() -> Result<()> {
                 line.to_string()
             };
             let result = voice
-                .synthesize_text(
-                    &text_to_synth,
-                    cli.speaker,
-                    cli.language.as_deref(),
-                    cli.noise_scale,
-                    cli.length_scale,
-                    cli.noise_w,
-                )
+                .synthesize_with_params(&text_to_synth, &params)
                 .with_context(|| format!("Synthesis failed for line {}", idx))?;
 
             // --sentence-silence: 文末に無音を追加
@@ -492,6 +562,7 @@ fn main() -> Result<()> {
                 .as_ref()
                 .ok_or_else(|| anyhow::anyhow!("--output-dir is required for --stream mode"))?;
 
+            let params = build_synthesis_params(&cli, speaker_emb.clone());
             for (i, sentence) in sentences.iter().enumerate() {
                 let idx = i + 1;
                 let text_to_synth = if let Some(ref dict) = custom_dict {
@@ -504,14 +575,7 @@ fn main() -> Result<()> {
                     sentence.to_string()
                 };
                 let result = voice
-                    .synthesize_text(
-                        &text_to_synth,
-                        cli.speaker,
-                        cli.language.as_deref(),
-                        cli.noise_scale,
-                        cli.length_scale,
-                        cli.noise_w,
-                    )
+                    .synthesize_with_params(&text_to_synth, &params)
                     .with_context(|| format!("Synthesis failed for sentence {}", idx))?;
 
                 // --sentence-silence: 文末に無音を追加
@@ -559,15 +623,9 @@ fn main() -> Result<()> {
                 return Ok(());
             }
 
+            let params = build_synthesis_params(&cli, speaker_emb.clone());
             let result = voice
-                .synthesize_text(
-                    &text_to_synth,
-                    cli.speaker,
-                    cli.language.as_deref(),
-                    cli.noise_scale,
-                    cli.length_scale,
-                    cli.noise_w,
-                )
+                .synthesize_with_params(&text_to_synth, &params)
                 .context("Failed to synthesize text")?;
 
             tracing::info!(

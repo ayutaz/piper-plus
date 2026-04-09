@@ -201,21 +201,21 @@ class TestJapaneseIntegration:
         from piper_plus_g2p.japanese import JapanesePhonemizer
         from piper_plus_g2p.encode.pua import map_token
 
-        def phonemize_japanese(text, custom_dict=None):
-            p = JapanesePhonemizer()
-            tokens = p.phonemize(text, custom_dict=custom_dict)
-            full_tokens = ["^"] + tokens + ["$"]
-            return [map_token(t) for t in full_tokens]
-        
         # カスタム辞書を作成
         dict_obj = CustomDictionary()
         dict_obj.add_word("Piper", "パイパー", priority=10)
         dict_obj.add_word("Docker", "ドッカー", priority=9)
-        
+
+        def phonemize_japanese(text):
+            p = JapanesePhonemizer(custom_dict=dict_obj)
+            tokens = p.phonemize(text)
+            full_tokens = ["^"] + tokens + ["$"]
+            return [map_token(t) for t in full_tokens]
+
         # 音素化
         text = "PiperとDockerを使います"
-        phonemes = phonemize_japanese(text, custom_dict=dict_obj)
-        
+        phonemes = phonemize_japanese(text)
+
         # 音素列に「パイパー」と「ドッカー」が含まれることを確認
         # （実際の音素は環境により異なる可能性があるため、基本的な動作確認のみ）
         assert isinstance(phonemes, list)

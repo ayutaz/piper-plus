@@ -12,6 +12,10 @@ on:
       - 'src/csharp/**'
       - '.github/workflows/csharp-ci.yml'
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 

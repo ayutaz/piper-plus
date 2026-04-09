@@ -34,6 +34,8 @@ pub mod gpu;
 #[cfg(feature = "onnx")]
 pub mod input;
 #[cfg(feature = "onnx")]
+pub mod speaker_encoder;
+#[cfg(feature = "onnx")]
 pub mod voice;
 #[cfg(feature = "onnx")]
 pub mod wasm;
@@ -41,6 +43,7 @@ pub mod wasm;
 // --- Phase 4 modules (推論非依存) ---
 pub mod audio_format;
 pub mod model_download;
+pub mod ssml;
 pub mod streaming;
 pub mod text_splitter;
 pub mod timing;
@@ -56,4 +59,4 @@ pub use engine::{
 pub use error::PiperError;
 pub use phonemize::{ProsodyFeature, ProsodyInfo};
 #[cfg(feature = "onnx")]
-pub use voice::PiperVoice;
+pub use voice::{PiperVoice, SynthesisParams};

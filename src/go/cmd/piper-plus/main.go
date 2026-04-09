@@ -47,6 +47,11 @@ var (
 	downloadModel  string   // --download-model NAME
 	modelDir       string   // --model-dir DIR
 	phonemeSilence []string // --phoneme-silence (repeatable, "phoneme:seconds" format)
+
+	// Voice cloning flags
+	referenceAudio      string // --reference-audio PATH
+	speakerEmbedding    string // --speaker-embedding PATH
+	speakerEncoderModel string // --speaker-encoder-model PATH
 )
 
 // jsonlInput represents a single line of JSONL input from stdin or batch file.
@@ -98,6 +103,11 @@ func init() {
 	f.BoolVar(&listModels, "list-models", false, "list downloaded models in cache directory")
 	f.StringVar(&downloadModel, "download-model", "", "download model by URL into cache directory")
 	f.StringArrayVar(&phonemeSilence, "phoneme-silence", nil, "per-phoneme silence (format: phoneme:seconds, repeatable)")
+
+	// Voice cloning flags
+	f.StringVar(&referenceAudio, "reference-audio", "", "reference audio file for voice cloning (WAV)")
+	f.StringVar(&speakerEmbedding, "speaker-embedding", "", "pre-computed speaker embedding file (raw binary float32)")
+	f.StringVar(&speakerEncoderModel, "speaker-encoder-model", "", "speaker encoder ONNX model path")
 
 	rootCmd.AddCommand(serveCmd)
 }

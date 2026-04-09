@@ -237,19 +237,28 @@ class PiperVoice:
             PhonemeType.MULTILINGUAL,
             PhonemeType.BILINGUAL,
         ):
-            from .phonemize.multilingual import MultilingualPhonemizer
+            try:
+                from .phonemize.multilingual import MultilingualPhonemizer
+            except ImportError:
+                _LOGGER.warning(
+                    "MultilingualPhonemizer unavailable; falling back to JA phonemizer"
+                )
+            else:
+                languages = (
+                    ["ja", "en"]
+                    if self.config.phoneme_type == PhonemeType.BILINGUAL
+                    else ["ja", "en", "zh", "es", "fr", "pt"]
+                )
+                mp = MultilingualPhonemizer(languages=languages)
+                phonemes = mp.phonemize(text)
+                _LOGGER.debug("MultilingualPhonemizer: '%s' -> %s", text, phonemes)
+                return [phonemes]
 
-            languages = (
-                ["ja", "en"]
-                if self.config.phoneme_type == PhonemeType.BILINGUAL
-                else ["ja", "en", "zh", "es", "fr", "pt"]
-            )
-            mp = MultilingualPhonemizer(languages=languages)
-            phonemes = mp.phonemize(text)
-            _LOGGER.debug("MultilingualPhonemizer: '%s' -> %s", text, phonemes)
-            return [phonemes]
-
-        if self.config.phoneme_type == PhonemeType.OPENJTALK:
+        if self.config.phoneme_type in (
+            PhonemeType.OPENJTALK,
+            PhonemeType.MULTILINGUAL,
+            PhonemeType.BILINGUAL,
+        ):
             from .phonemize.japanese import (
                 get_default_dictionary,
                 phonemize_japanese,

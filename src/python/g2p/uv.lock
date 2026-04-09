@@ -443,8 +443,8 @@ wheels = [
 ]
 
 [[package]]
-name = "piper-g2p"
-version = "0.1.0"
+name = "piper-plus-g2p"
+version = "0.2.0"
 source = { editable = "." }
 
 [package.optional-dependencies]
@@ -484,8 +484,8 @@ requires-dist = [
     { name = "pyopenjtalk-plus", marker = "extra == 'ja'", specifier = ">=0.3,<1" },
     { name = "pypinyin", marker = "extra == 'all'", specifier = ">=0.55.0,<1" },
     { name = "pypinyin", marker = "extra == 'zh'", specifier = ">=0.55.0,<1" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
-    { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=5.0" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.4" },
+    { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=4.1" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.8.0" },
 ]
 provides-extras = ["ja", "en", "zh", "ko", "es", "fr", "pt", "sv", "all", "dev"]

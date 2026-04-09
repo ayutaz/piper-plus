@@ -74,6 +74,10 @@ struct SynthesisConfig {
   // Extra silence
   float sentenceSilenceSeconds = 0.2f;
   std::optional<std::map<piper::Phoneme, float>> phonemeSilenceSeconds;
+
+  // Voice cloning: speaker embedding from speaker encoder (M3-04).
+  // When non-empty, passed as the speaker_embedding ONNX input with mask=1.
+  std::vector<float> speakerEmbedding;
 };
 
 struct ModelConfig {

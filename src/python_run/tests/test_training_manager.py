@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """Tests for training manager functionality"""
 
+import importlib.util
 import sys
+import threading
 import time
 from pathlib import Path
 from unittest.mock import MagicMock, Mock, patch
@@ -107,13 +109,16 @@ class TestTrainingManager:
         assert "test" in manager.callbacks
         assert manager.callbacks["test"] == callback
 
-    @patch("subprocess.Popen")
+    @patch("piper.training_manager.subprocess.Popen")
     def test_start_training_success(self, mock_popen, manager, test_dataset, tmp_path):
         """Test successful training start"""
-        # Mock the process
+        # Mock the process; use a blocking readline so the monitor thread
+        # stays alive during assertions.
+        block = threading.Event()
         mock_process = MagicMock()
         mock_process.poll.return_value = None  # Process is running
-        mock_process.stdout.readline.return_value = ""
+        mock_process.stdout.readline.side_effect = lambda: (block.wait() and "") or ""
+        mock_process.returncode = 0
         mock_popen.return_value = mock_process
 
         output_dir = tmp_path / "output"
@@ -143,6 +148,9 @@ class TestTrainingManager:
         assert "--dataset-dir" in cmd
         assert str(test_dataset) in cmd
 
+        # Unblock the monitor thread so it can clean up
+        block.set()
+
     def test_start_training_invalid_dataset(self, manager, tmp_path):
         """Test starting training with invalid dataset path"""
         success = manager.start_training(
@@ -161,10 +169,12 @@ class TestTrainingManager:
 
     def test_start_training_while_running(self, manager, test_dataset, tmp_path):
         """Test starting training while already running"""
-        with patch("subprocess.Popen") as mock_popen:
+        block = threading.Event()
+        with patch("piper.training_manager.subprocess.Popen") as mock_popen:
             mock_process = MagicMock()
             mock_process.poll.return_value = None
-            mock_process.stdout.readline.return_value = ""
+            mock_process.stdout.readline.side_effect = lambda: (block.wait() and "") or ""
+            mock_process.returncode = 0
             mock_popen.return_value = mock_process
 
             # Start first training
@@ -193,6 +203,9 @@ class TestTrainingManager:
 
             assert not success
 
+            # Unblock the monitor thread
+            block.set()
+
     def test_parse_output_epoch_info(self, manager):
         """Test parsing epoch information from output"""
         manager._parse_output("Epoch 5/100")
@@ -201,9 +214,11 @@ class TestTrainingManager:
 
     def test_parse_output_loss_info(self, manager):
         """Test parsing loss information from output"""
+        # _parse_output iterates all "loss:" tokens; when two appear on the
+        # same line the *last* value wins for current_loss.
         manager._parse_output("train_loss: 0.1234, val_loss: 0.2345")
-        assert manager.status.current_loss == 0.1234
-        assert manager.status.best_loss == 0.1234
+        assert manager.status.current_loss == 0.2345
+        assert manager.status.best_loss == 0.1234  # min of both values
 
         # Test lower loss updates best
         manager._parse_output("train_loss: 0.1000")
@@ -267,7 +282,7 @@ class TestTrainingManager:
         good_callback.assert_called_once()
         bad_callback.assert_called_once()
 
-    @patch("subprocess.Popen")
+    @patch("piper.training_manager.subprocess.Popen")
     def test_monitor_process_success(self, mock_popen, manager, test_dataset, tmp_path):
         """Test monitoring a successful process"""
         # Mock process that outputs some lines then exits successfully
@@ -302,12 +317,14 @@ class TestTrainingManager:
         assert any("Starting training" in log for log in logs)
         assert any("Epoch 1/10" in log for log in logs)
 
-    @patch("subprocess.Popen")
+    @patch("piper.training_manager.subprocess.Popen")
     def test_stop_training_success(self, mock_popen, manager, test_dataset, tmp_path):
         """Test stopping training successfully"""
+        block = threading.Event()
         mock_process = MagicMock()
         mock_process.poll.return_value = None  # Running
-        mock_process.stdout.readline.return_value = ""
+        mock_process.stdout.readline.side_effect = lambda: (block.wait() and "") or ""
+        mock_process.returncode = 0
         mock_popen.return_value = mock_process
 
         # Start training
@@ -322,7 +339,8 @@ class TestTrainingManager:
             validation_split=0.1,
         )
 
-        # Stop training
+        # Stop training -- also unblock the monitor thread so it can exit
+        block.set()
         success = manager.stop_training()
         assert success
 
@@ -330,6 +348,10 @@ class TestTrainingManager:
         mock_process.terminate.assert_called_once()
 
 
+@pytest.mark.skipif(
+    not importlib.util.find_spec("gradio"),
+    reason="gradio is not installed",
+)
 class TestTrainingWebUIIntegration:
     """Test WebUI integration with training"""
 

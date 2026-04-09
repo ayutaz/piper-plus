@@ -220,7 +220,51 @@ def main():
         default="auto",
         help="Device to run inference on (default: auto)",
     )
+    parser.add_argument(
+        "--speaker-embedding",
+        default=None,
+        metavar="PATH",
+        help="Path to a .npy file containing a speaker embedding vector "
+        "(e.g. 256-dim from ECAPA-TDNN). Overrides --speaker-id.",
+    )
+    parser.add_argument(
+        "--reference-audio",
+        "--encode-speaker",
+        default=None,
+        dest="reference_audio",
+        metavar="AUDIO_PATH",
+        help="Path to a reference audio file. Extracts speaker embedding "
+        "on-the-fly using the speaker encoder ONNX model.",
+    )
+    parser.add_argument(
+        "--speaker-encoder-model",
+        "--encode-speaker-model",
+        default=None,
+        dest="speaker_encoder_model",
+        metavar="ONNX_PATH",
+        help="Path to the speaker encoder ONNX model "
+        "(required with --reference-audio).",
+    )
     args = parser.parse_args()
+
+    # Emit deprecation warnings for old option names
+    _raw_argv = sys.argv[1:]
+    if "--encode-speaker" in _raw_argv:
+        import warnings  # noqa: PLC0415
+
+        warnings.warn(
+            "--encode-speaker is deprecated, use --reference-audio instead.",
+            DeprecationWarning,
+            stacklevel=1,
+        )
+    if "--encode-speaker-model" in _raw_argv:
+        import warnings  # noqa: PLC0415
+
+        warnings.warn(
+            "--encode-speaker-model is deprecated, use --speaker-encoder-model instead.",
+            DeprecationWarning,
+            stacklevel=1,
+        )
 
     # Lazy import: model_manager is optional (not available in HF Space environment)
     try:
@@ -297,12 +341,50 @@ def main():
     has_prosody = "prosody_features" in input_names
     has_sid = "sid" in input_names
     has_lid = "lid" in input_names
+    has_spk_emb = "speaker_embedding" in input_names
     if has_prosody:
         _LOGGER.info("Model supports prosody features (A1/A2/A3)")
     if has_sid:
         _LOGGER.info("Model supports multi-speaker (sid input)")
     if has_lid:
         _LOGGER.info("Model supports multi-language (lid input)")
+    if has_spk_emb:
+        _LOGGER.info("Model supports speaker_embedding (voice cloning)")
+
+    # Resolve speaker embedding from --speaker-embedding or --reference-audio
+    spk_emb_array = None
+    if args.speaker_embedding:
+        spk_emb_array = np.load(args.speaker_embedding).astype(np.float32)
+        if spk_emb_array.ndim == 1:
+            spk_emb_array = spk_emb_array.reshape(1, -1)
+        _LOGGER.info(
+            "Loaded speaker embedding from %s (dim=%d)",
+            args.speaker_embedding,
+            spk_emb_array.shape[1],
+        )
+    elif args.reference_audio:
+        if not args.speaker_encoder_model:
+            print(
+                "Error: --speaker-encoder-model is required with --reference-audio.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        from .speaker_encoder import SpeakerEncoder  # noqa: PLC0415
+
+        se_encoder = SpeakerEncoder.from_onnx(args.speaker_encoder_model)
+        spk_emb_vec = se_encoder.encode(args.reference_audio)
+        spk_emb_array = spk_emb_vec.reshape(1, -1).astype(np.float32)
+        _LOGGER.info(
+            "Encoded speaker embedding from %s (dim=%d)",
+            args.reference_audio,
+            spk_emb_array.shape[1],
+        )
+
+    if spk_emb_array is not None and not has_spk_emb:
+        _LOGGER.warning(
+            "speaker_embedding provided but model does not have "
+            "speaker_embedding input; it will be ignored."
+        )
 
     # Handle --text mode: convert text to phoneme_ids and prosody_features
     phoneme_id_map = None
@@ -437,6 +519,23 @@ def main():
                 # No prosody data provided - use zeros (int64)
                 prosody_features = np.zeros((1, text.shape[1], 3), dtype=np.int64)
             inputs["prosody_features"] = prosody_features
+
+        # Handle speaker embedding if model supports it
+        if has_spk_emb:
+            if spk_emb_array is not None:
+                inputs["speaker_embedding"] = spk_emb_array
+                inputs["speaker_embedding_mask"] = np.array([[1]], dtype=np.int64)
+            else:
+                # No speaker embedding: provide zeros with mask=0
+                # Infer emb_dim from the ONNX input shape (dynamic, fallback to 256)
+                for inp in model.get_inputs():
+                    if inp.name == "speaker_embedding":
+                        emb_dim = inp.shape[1] if isinstance(inp.shape[1], int) else 256
+                        break
+                else:
+                    emb_dim = 256
+                inputs["speaker_embedding"] = np.zeros((1, emb_dim), dtype=np.float32)
+                inputs["speaker_embedding_mask"] = np.array([[0]], dtype=np.int64)
 
         start_time = time.perf_counter()
         outputs = model.run(None, inputs)

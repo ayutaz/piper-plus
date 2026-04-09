@@ -13,6 +13,10 @@ on:
       - 'src/python/g2p/**'
       - '.github/workflows/g2p-python-ci.yml'
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 

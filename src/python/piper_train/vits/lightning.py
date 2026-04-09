@@ -11,7 +11,11 @@ from .commons import slice_segments
 from .dataset import Batch, PiperDataset, SpeakerBalancedBatchSampler, UtteranceCollate
 from .losses import discriminator_loss, feature_loss, generator_loss, kl_loss
 from .mel_processing import mel_spectrogram_torch, spec_to_mel_torch
-from .models import MultiPeriodDiscriminator, SynthesizerTrn, WavLMDiscriminator
+from .models import (
+    MultiPeriodDiscriminator,
+    SynthesizerTrn,
+    WavLMDiscriminator,
+)
 
 
 # Optional wandb import with graceful fallback

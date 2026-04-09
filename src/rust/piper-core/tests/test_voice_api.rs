@@ -54,7 +54,7 @@ fn test_tokens_to_ids_with_config_map() {
     map.insert("a".to_string(), vec![10]);
     map.insert("$".to_string(), vec![2]);
 
-    let tokens: Vec<String> = vec!["^", "a", "$"].iter().map(|s| s.to_string()).collect();
+    let tokens: Vec<String> = ["^", "a", "$"].iter().map(|s| s.to_string()).collect();
     let ids = phoneme_converter::tokens_to_ids(&tokens, &map).unwrap();
     assert_eq!(ids, vec![1, 10, 2]);
 }
@@ -62,7 +62,7 @@ fn test_tokens_to_ids_with_config_map() {
 #[test]
 fn test_tokens_to_ids_error_on_unknown() {
     let map: HashMap<String, Vec<i64>> = HashMap::new();
-    let tokens: Vec<String> = vec!["unknown"].iter().map(|s| s.to_string()).collect();
+    let tokens: Vec<String> = ["unknown"].iter().map(|s| s.to_string()).collect();
     let result = phoneme_converter::tokens_to_ids(&tokens, &map);
     assert!(result.is_err());
 }

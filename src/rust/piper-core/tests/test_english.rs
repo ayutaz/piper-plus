@@ -182,14 +182,14 @@ fn test_punctuation_attached_to_word() {
         tokens
     );
     // Find the comma position — it should NOT be preceded by a space
-    if let Some(comma_pos) = tokens.iter().position(|t| t == ",") {
-        if comma_pos > 0 {
-            assert_ne!(
-                tokens[comma_pos - 1],
-                " ",
-                "comma should not be preceded by a space (attached to previous word)"
-            );
-        }
+    if let Some(comma_pos) = tokens.iter().position(|t| t == ",")
+        && comma_pos > 0
+    {
+        assert_ne!(
+            tokens[comma_pos - 1],
+            " ",
+            "comma should not be preceded by a space (attached to previous word)"
+        );
     }
 }
 

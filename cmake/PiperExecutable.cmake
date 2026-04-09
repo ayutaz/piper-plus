@@ -5,8 +5,8 @@
 # AFTER ExternalDeps.cmake and OnnxRuntime.cmake are included. See the
 # piper/test_piper configuration block in the root CMakeLists.txt.
 
-# Skip standalone executables on Android (only shared library is built)
-if(NOT ANDROID)
+# Skip standalone executables on Android/iOS (only library is built)
+if(NOT ANDROID AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
   add_executable(piper src/cpp/main.cpp $<TARGET_OBJECTS:piper_common>)
   add_executable(test_piper src/cpp/test.cpp $<TARGET_OBJECTS:piper_common>)
 endif()

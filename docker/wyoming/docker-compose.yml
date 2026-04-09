@@ -1,0 +1,47 @@
+# Wyoming Protocol TTS adapter for piper-plus
+#
+# Quick start:
+#   docker compose up -d
+#
+# The default model (tsukuyomi) is auto-downloaded from HuggingFace on
+# first startup.  To use a local model, mount it into /app/models:
+#   volumes:
+#     - ./models:/app/models:ro
+#   command: --model /app/models/your-model.onnx
+#
+# Home Assistant setup:
+#   Settings > Devices & Services > Add Integration > Wyoming Protocol
+#   Host: <docker-host-ip>   Port: 10200
+
+services:
+  wyoming-piper-plus:
+    build:
+      context: ../..
+      dockerfile: docker/wyoming/Dockerfile
+    # image: ayousanz/wyoming-piper-plus:latest
+    container_name: wyoming-piper-plus
+    ports:
+      - "${PIPER_PORT:-10200}:10200"
+    volumes:
+      - piper-models:/home/piper/.cache/piper-plus/models
+    environment:
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; s=socket.socket(); s.settimeout(5); s.connect(('localhost', 10200)); s.close()"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    command:
+      - --model
+      - ${PIPER_MODEL:-tsukuyomi}
+      - --language
+      - ${PIPER_LANGUAGE:-ja}
+      - --speaker-id
+      - ${PIPER_SPEAKER_ID:-0}
+      - --uri
+      - tcp://0.0.0.0:10200
+
+volumes:
+  piper-models:

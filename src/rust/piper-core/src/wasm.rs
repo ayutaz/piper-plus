@@ -846,13 +846,12 @@ mod tests {
         let wav = samples_to_wav_bytes(&samples, 22050);
 
         // Verify each extreme value survives the WAV encoding
-        for i in 0..samples.len() {
+        for (i, &expected) in samples.iter().enumerate() {
             let offset = 44 + i * 2;
             let recovered = i16::from_le_bytes([wav[offset], wav[offset + 1]]);
             assert_eq!(
-                recovered, samples[i],
-                "sample {i}: expected {}, got {recovered}",
-                samples[i]
+                recovered, expected,
+                "sample {i}: expected {expected}, got {recovered}",
             );
         }
     }

@@ -846,6 +846,12 @@ class SynthesizerTrn(nn.Module):
         if n_languages > 1:
             self.emb_lang = nn.Embedding(n_languages, gin_channels)
 
+        # Speaker embedding projection (for voice cloning inference)
+        # Maps external speaker_embedding (e.g. 256-d from ECAPA-TDNN) to gin_channels.
+        # When gin_channels == emb_dim, this is an identity-like passthrough.
+        # Lazily initialised on first use if None.
+        self.spk_proj = None
+
     def _get_global_conditioning(self, sid=None, lid=None):
         """Compute global conditioning vector from speaker and language embeddings.
 
@@ -926,8 +932,19 @@ class SynthesizerTrn(nn.Module):
         return x_dp
 
     def forward(
-        self, x, x_lengths, y, y_lengths, sid=None, lid=None, prosody_features=None
+        self,
+        x,
+        x_lengths,
+        y,
+        y_lengths,
+        sid=None,
+        lid=None,
+        prosody_features=None,
+        speaker_embedding=None,
     ):
+        # NOTE: speaker_embedding is accepted but intentionally unused during
+        # training (emb_g(sid) is always used).  The parameter is reserved for
+        # future extensions such as joint speaker-encoder fine-tuning.
         g = self._get_global_conditioning(sid, lid)
         x, m_p, logs_p, x_mask = self.enc_p(x, x_lengths, g=g)
 
@@ -990,6 +1007,33 @@ class SynthesizerTrn(nn.Module):
             (z, z_p, m_p, logs_p, m_q, logs_q),
         )
 
+    def _ensure_spk_proj(self, emb_dim: int) -> nn.Linear:
+        """Lazily create (or return) the speaker-embedding projection layer.
+
+        When the external speaker_embedding dimension differs from
+        ``gin_channels``, a linear projection is required.  The layer is
+        created on first call and reused afterwards.  It lives on the same
+        device as the encoder embedding table so that mixed-device errors
+        are avoided.
+
+        Parameters
+        ----------
+        emb_dim : int
+            Dimension of the incoming speaker embedding.
+
+        Returns
+        -------
+        nn.Linear
+            Projection ``(emb_dim) -> (gin_channels)``.
+        """
+        if self.spk_proj is not None and self.spk_proj.in_features == emb_dim:
+            return self.spk_proj
+
+        device = next(self.parameters()).device
+        self.spk_proj = nn.Linear(emb_dim, self.gin_channels, bias=False).to(device)
+        nn.init.xavier_uniform_(self.spk_proj.weight)
+        return self.spk_proj
+
     def infer(
         self,
         x,
@@ -1001,10 +1045,28 @@ class SynthesizerTrn(nn.Module):
         noise_scale_w=0.8,
         max_len=None,
         prosody_features=None,
+        speaker_embedding=None,
     ):
-        if self.n_speakers > 1:
-            assert sid is not None, "Missing speaker id"
-        g = self._get_global_conditioning(sid, lid)
+        # Determine global conditioning: prefer speaker_embedding over emb_g(sid)
+        if speaker_embedding is not None:
+            # speaker_embedding: (batch, emb_dim) -> (batch, gin_channels, 1)
+            if speaker_embedding.dim() == 2:
+                g = speaker_embedding.unsqueeze(-1)  # (batch, emb_dim, 1)
+            else:
+                g = speaker_embedding
+            # Project to gin_channels if dimensions differ
+            if g.size(1) != self.gin_channels:
+                proj = self._ensure_spk_proj(g.size(1))
+                # (batch, emb_dim, 1) -> (batch, 1, emb_dim) -> Linear -> (batch, 1, gin) -> transpose
+                g = proj(g.squeeze(-1)).unsqueeze(-1)
+            # Add language embedding if available
+            if self.n_languages > 1 and lid is not None:
+                lang_emb = self.emb_lang(lid).unsqueeze(-1)
+                g = g + lang_emb
+        else:
+            if self.n_speakers > 1:
+                assert sid is not None, "Missing speaker id"
+            g = self._get_global_conditioning(sid, lid)
         x, m_p, logs_p, x_mask = self.enc_p(x, x_lengths, g=g)
 
         # Prepare input for duration predictor with prosody features
