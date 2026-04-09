@@ -13,11 +13,6 @@ from piper_plus_g2p.encode.pua import (
 )
 
 
-def map_sequence(tokens: list[str]) -> list[str]:
-    """Map a sequence of IPA tokens through PUA mapping."""
-    return [map_token(t) for t in tokens]
-
-
 class TestTokenMapperImplementation:
     """Test the existing token mapper implementation"""
 
@@ -80,12 +75,12 @@ class TestTokenMapperImplementation:
             )
 
     @pytest.mark.unit
-    def test_map_sequence_basic(self):
-        """Test mapping a sequence of tokens"""
+    def test_map_token_on_sequence_basic(self):
+        """Test mapping a sequence of tokens using map_token"""
         # Test sequence with both mapped and unmapped tokens
         sequence = ["k", "o", "n", "n", "i", "ch", "i", "w", "a"]
 
-        mapped = map_sequence(sequence)
+        mapped = [map_token(t) for t in sequence]
 
         # Verify the mapping
         assert mapped[0] == "k"  # unmapped
@@ -94,11 +89,11 @@ class TestTokenMapperImplementation:
         assert mapped[6] == "i"  # unmapped
 
     @pytest.mark.unit
-    def test_map_sequence_with_multiple_mappings(self):
-        """Test mapping sequence with multiple multi-char phonemes"""
+    def test_map_token_on_sequence_with_multiple_mappings(self):
+        """Test map_token on sequence with multiple multi-char phonemes"""
         sequence = ["ch", "i", "ts", "u", "ky", "o"]
 
-        mapped = map_sequence(sequence)
+        mapped = [map_token(t) for t in sequence]
 
         assert mapped[0] == "\ue00e"  # ch
         assert mapped[1] == "i"
@@ -108,15 +103,15 @@ class TestTokenMapperImplementation:
         assert mapped[5] == "o"
 
     @pytest.mark.unit
-    def test_map_sequence_empty(self):
-        """Test mapping an empty sequence"""
-        assert map_sequence([]) == []
+    def test_map_token_on_empty_sequence(self):
+        """Test map_token on an empty sequence"""
+        assert [map_token(t) for t in []] == []
 
     @pytest.mark.unit
-    def test_map_sequence_no_mappings(self):
-        """Test mapping sequence with no multi-char phonemes"""
+    def test_map_token_on_sequence_no_mappings(self):
+        """Test map_token on sequence with no multi-char phonemes"""
         sequence = ["a", "i", "u", "e", "o"]
-        mapped = map_sequence(sequence)
+        mapped = [map_token(t) for t in sequence]
         assert mapped == sequence  # Should be unchanged
 
     @pytest.mark.unit

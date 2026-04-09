@@ -11,11 +11,6 @@ from piper_plus_g2p.encode.pua import (
 )
 
 
-def map_sequence(tokens: list[str]) -> list[str]:
-    """Map a sequence of IPA tokens through PUA mapping."""
-    return [map_token(t) for t in tokens]
-
-
 # Japanese imports are optional
 try:
     import pyopenjtalk  # noqa: F401
@@ -23,8 +18,35 @@ try:
     from piper_plus_g2p.japanese import JapanesePhonemizer
     from piper_plus_g2p.encode.pua import map_token as _map_token
 
+    # NOTE: A near-duplicate of this wrapper exists in test_prosody_extraction.py.
+    # That version checks _EOS_TOKENS and skips "$" when the G2P output
+    # already ends with a sentence-terminal token (e.g. "?").
+    # This version unconditionally appends "$" — which is acceptable here
+    # because the tests in this file filter out markers before assertions and
+    # do not exercise question-sentence EOS semantics.
+    # Consolidation into conftest.py is deferred until a full EOS-behaviour
+    # analysis is performed (see docs/tickets/M3-3.md).
+
     def phonemize_japanese(text):
-        """Wrapper that matches old piper_train API: returns PUA-mapped tokens with BOS/EOS."""
+        """Test-only helper wrapping ``JapanesePhonemizer.phonemize()``.
+
+        BOS/EOS behaviour
+        -----------------
+        * Prepends BOS ``"^"`` unconditionally.
+        * Appends EOS ``"$"`` **unconditionally** — even when the G2P
+          output already ends with a sentence-terminal token such as
+          ``"?"``.  This differs from the version in
+          ``test_prosody_extraction.py``, which skips ``"$"`` in that
+          case.  The difference is intentionally preserved: tests here
+          strip markers before comparing phoneme content and do not
+          depend on precise EOS semantics.
+
+        Why this exists
+        ---------------
+        ``piper_plus_g2p`` returns raw phoneme tokens without BOS/EOS.
+        There is no shared production utility that adds them, so each
+        test file carries its own wrapper.
+        """
         p = JapanesePhonemizer()
         tokens = p.phonemize(text)
         full_tokens = ["^"] + tokens + ["$"]
@@ -51,10 +73,10 @@ class TestPhonemization:
             assert CHAR2TOKEN[char] == token
 
     @pytest.mark.unit
-    def test_map_sequence(self):
-        """Test phoneme sequence mapping"""
+    def test_map_token_on_sequence(self):
+        """Test phoneme sequence mapping using map_token"""
         input_seq = ["k", "o", "n", "n", "i", "ch", "i", "w", "a"]
-        mapped = map_sequence(input_seq)
+        mapped = [map_token(t) for t in input_seq]
 
         # "ch" should be mapped to PUA
         assert mapped[5] == "\ue00e"
@@ -84,7 +106,7 @@ class TestPhonemization:
     def test_empty_input(self):
         """Test empty input handling"""
         # Empty list
-        result = map_sequence([])
+        result = [map_token(t) for t in []]
         assert result == []
 
     @pytest.mark.unit
