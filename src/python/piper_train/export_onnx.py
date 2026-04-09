@@ -54,12 +54,21 @@ def build_infer_forward(
         A forward function with signature::
 
             infer_forward(text, text_lengths, scales,
-                          sid=None, lid=None, prosody_features=None)
+                          sid=None, lid=None, prosody_features=None,
+                          speaker_embedding=None,
+                          speaker_embedding_mask=None)
             -> (audio: Tensor, durations: Tensor)
     """
 
     def infer_forward(
-        text, text_lengths, scales, sid=None, lid=None, prosody_features=None
+        text,
+        text_lengths,
+        scales,
+        sid=None,
+        lid=None,
+        prosody_features=None,
+        speaker_embedding=None,
+        speaker_embedding_mask=None,
     ):
         noise_scale = scales[0]
         length_scale = scales[1]
@@ -70,21 +79,30 @@ def build_infer_forward(
         #   onnx_export_mode=False → z_p = m_p + noise   (stochastic)
         # We set it here to match the stochastic flag, restoring the
         # original value afterwards so the caller's state is not mutated.
-        prev = getattr(model, "onnx_export_mode", False)
+        prev_model = getattr(model, "onnx_export_mode", False)
+        prev_dp = getattr(model.dp, "onnx_export_mode", False) if hasattr(model, "dp") else None
         model.onnx_export_mode = not stochastic
+        if hasattr(model, "dp"):
+            model.dp.onnx_export_mode = not stochastic
 
-        audio, _attn, _y_mask, _latents, durations = model.infer(
-            text,
-            text_lengths,
-            sid=sid,
-            lid=lid,
-            noise_scale=noise_scale,
-            length_scale=length_scale,
-            noise_scale_w=noise_scale_w,
-            prosody_features=prosody_features,
-        )
+        try:
+            audio, _attn, _y_mask, _latents, durations = model.infer(
+                text,
+                text_lengths,
+                sid=sid,
+                lid=lid,
+                noise_scale=noise_scale,
+                length_scale=length_scale,
+                noise_scale_w=noise_scale_w,
+                prosody_features=prosody_features,
+                speaker_embedding=speaker_embedding,
+                speaker_embedding_mask=speaker_embedding_mask,
+            )
+        finally:
+            model.onnx_export_mode = prev_model
+            if hasattr(model, "dp") and prev_dp is not None:
+                model.dp.onnx_export_mode = prev_dp
 
-        model.onnx_export_mode = prev
         return audio, durations
 
     return infer_forward
@@ -121,12 +139,13 @@ def apply_ema_shadow_params(
     applied = 0
     skipped = 0
     dec_params = dict(decoder.named_parameters())
-    for name, shadow_param in shadow_params.items():
-        if name in dec_params:
-            dec_params[name].data.copy_(shadow_param)
-            applied += 1
-        else:
-            skipped += 1
+    with torch.no_grad():
+        for name, shadow_param in shadow_params.items():
+            if name in dec_params:
+                dec_params[name].copy_(shadow_param)
+                applied += 1
+            else:
+                skipped += 1
 
     if applied > 0:
         _LOGGER.info(
