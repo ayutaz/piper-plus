@@ -137,3 +137,15 @@ jobs:
       - uses: golangci/golangci-lint-action@v7
         with:
           working-directory: src/go
+
+  docker-build:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          sparse-checkout: src/go
+      - name: Build Go Docker image
+        run: docker build -t piper-plus-go -f src/go/docker/Dockerfile .

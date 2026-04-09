@@ -67,9 +67,18 @@ var rootCmd = &cobra.Command{
 }
 
 func init() {
+	// Persistent flags shared across subcommands (synthesize + serve).
+	pf := rootCmd.PersistentFlags()
+	pf.StringVarP(&modelPath, "model", "m", "", "path to ONNX model file (or $PIPER_DEFAULT_MODEL)")
+	pf.StringVarP(&configPath, "config", "c", "", "path to config.json (auto-detected if omitted)")
+	pf.StringVar(&device, "device", "cpu", "inference device (cpu, cuda, coreml, directml)")
+	pf.BoolVar(&debug, "debug", false, "enable debug logging")
+	pf.BoolVarP(&quiet, "quiet", "q", false, "disable all logging")
+	pf.StringArrayVar(&customDictPaths, "custom-dict", nil, "custom dictionary JSON file paths (repeatable)")
+	pf.StringVar(&modelDir, "model-dir", "", "model cache directory override")
+
+	// Local flags for synthesis mode only.
 	f := rootCmd.Flags()
-	f.StringVarP(&modelPath, "model", "m", "", "path to ONNX model file (or $PIPER_DEFAULT_MODEL)")
-	f.StringVarP(&configPath, "config", "c", "", "path to config.json (auto-detected if omitted)")
 	f.StringVarP(&textInput, "text", "t", "", "text to synthesize (single utterance mode)")
 	f.StringVar(&language, "language", "", "language code (e.g. ja, en, zh, ko)")
 	f.Int64VarP(&speakerID, "speaker", "s", 0, "speaker ID for multi-speaker models")
@@ -79,23 +88,18 @@ func init() {
 	f.Float32Var(&lengthScale, "length-scale", 1.0, "speech rate (length scale)")
 	f.Float32Var(&noiseW, "noise-w", 0.8, "duration predictor noise scale")
 	f.Float64Var(&sentenceSilence, "sentence-silence", 0.2, "silence between sentences in seconds")
-	f.StringVar(&device, "device", "cpu", "inference device (cpu, cuda, coreml, directml)")
 	f.BoolVar(&streaming, "streaming", false, "write raw PCM int16 to stdout (no WAV header)")
 	f.StringVar(&batchFile, "batch", "", "batch file with one text line per utterance")
 	f.StringVar(&timingOutput, "output-timing", "", "write phoneme timing to file")
 	f.StringVar(&timingFormat, "timing-format", "json", "timing output format (json or tsv)")
-	f.BoolVar(&debug, "debug", false, "enable debug logging")
-	f.StringArrayVar(&customDictPaths, "custom-dict", nil, "custom dictionary JSON file paths (repeatable)")
-
-	// Additional flags matching C++ implementation.
 	f.BoolVar(&version, "version", false, "print version and exit")
-	f.BoolVarP(&quiet, "quiet", "q", false, "disable all logging")
 	f.BoolVar(&outputRaw, "output-raw", false, "output raw PCM audio to stdout (no WAV header)")
 	f.BoolVar(&jsonInput, "json-input", false, "read stdin as JSON lines")
 	f.BoolVar(&listModels, "list-models", false, "list downloaded models in cache directory")
 	f.StringVar(&downloadModel, "download-model", "", "download model by URL into cache directory")
-	f.StringVar(&modelDir, "model-dir", "", "model cache directory override")
 	f.StringArrayVar(&phonemeSilence, "phoneme-silence", nil, "per-phoneme silence (format: phoneme:seconds, repeatable)")
+
+	rootCmd.AddCommand(serveCmd)
 }
 
 func main() {
