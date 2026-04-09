@@ -13,7 +13,7 @@
 | # | チケット | ファイル | 作業内容 | 並行可 |
 |---|---------|---------|---------|:------:|
 | M0-1 | [M0-1](tickets/M0-1.md) | `test_phonemizer_registry.py` | 存在しない `p.get_phoneme_id_map()` → `get_phoneme_id_map()` スタンドアロン関数に書き換え (L79-88) | - |
-| M0-2 | [M0-2](tickets/M0-2.md) | `test_phonemizer_registry.py` | 存在しない `p.post_process_ids()` → `PiperEncoder.encode()` に書き換え (L94-118) | - |
+| M0-2 | [M0-2](tickets/M0-2.md) | `test_phonemizer_registry.py` | 存在しない `p.post_process_ids()` → `PiperEncoder.encode()` に書き換え (L91-118) | - |
 
 ---
 
