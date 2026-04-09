@@ -15,6 +15,31 @@ except ImportError:
     psutil = None
 
 
+# ---------------------------------------------------------------------------
+# Shared helper — replaces 4 identical local definitions
+# ---------------------------------------------------------------------------
+
+try:
+    from piper_plus_g2p.japanese import JapanesePhonemizer as _JaPhonemizer
+    from piper_plus_g2p.encode.pua import map_token as _map_token
+
+    _HAS_G2P = True
+except ImportError:
+    _HAS_G2P = False
+
+
+def _phonemize_japanese(text: str) -> list[str]:
+    """Phonemize Japanese text with BOS/EOS markers.
+
+    Raises ImportError if piper_plus_g2p is not installed.
+    """
+    if not _HAS_G2P:
+        raise ImportError("piper_plus_g2p is not installed")
+    p = _JaPhonemizer()
+    tokens = p.phonemize(text)
+    return [_map_token(t) for t in ["^"] + tokens + ["$"]]
+
+
 class TestPerformance:
     """Performance test suite"""
 
@@ -25,52 +50,45 @@ class TestPerformance:
     def test_phonemization_single_conversion(self):
         """Benchmark single text to phoneme conversion"""
         try:
-            from piper_plus_g2p.japanese import JapanesePhonemizer as _JaPhonemizer
-            from piper_plus_g2p.encode.pua import map_token as _mt
-
-            def phonemize_japanese(text):
-                p = _JaPhonemizer()
-                tokens = p.phonemize(text)
-                return [_mt(t) for t in ["^"] + tokens + ["$"]]
-
-            # Test texts of various lengths
-            test_texts = [
-                "こんにちは",  # Short
-                "今日はとても良い天気ですね。" * 10,  # Medium
-                "あいうえおかきくけこさしすせそたちつてとなにぬねの" * 100,  # Long
-            ]
-
-            for text in test_texts:
-                times = []
-
-                # Warm up
-                phonemize_japanese(text)
-
-                # Benchmark
-                for _ in range(10):
-                    start = time.perf_counter()
-                    phonemize_japanese(text)
-                    end = time.perf_counter()
-                    times.append(end - start)
-
-                avg_time = statistics.mean(times)
-                std_dev = statistics.stdev(times)
-
-                print(f"\nText length: {len(text)} chars")
-                print(f"Average time: {avg_time * 1000:.2f}ms")
-                print(f"Std dev: {std_dev * 1000:.2f}ms")
-                print(f"Min/Max: {min(times) * 1000:.2f}ms / {max(times) * 1000:.2f}ms")
-
-                # Performance criteria
-                if len(text) < 20:
-                    assert avg_time < 0.1, f"Short text too slow: {avg_time:.3f}s"
-                elif len(text) < 500:
-                    assert avg_time < 0.5, f"Medium text too slow: {avg_time:.3f}s"
-                else:
-                    assert avg_time < 2.0, f"Long text too slow: {avg_time:.3f}s"
-
+            _phonemize_japanese("テスト")
         except ImportError:
             pytest.skip("Japanese phonemizer not available")
+
+        # Test texts of various lengths
+        test_texts = [
+            "こんにちは",  # Short
+            "今日はとても良い天気ですね。" * 10,  # Medium
+            "あいうえおかきくけこさしすせそたちつてとなにぬねの" * 100,  # Long
+        ]
+
+        for text in test_texts:
+            times = []
+
+            # Warm up
+            _phonemize_japanese(text)
+
+            # Benchmark
+            for _ in range(10):
+                start = time.perf_counter()
+                _phonemize_japanese(text)
+                end = time.perf_counter()
+                times.append(end - start)
+
+            avg_time = statistics.mean(times)
+            std_dev = statistics.stdev(times)
+
+            print(f"\nText length: {len(text)} chars")
+            print(f"Average time: {avg_time * 1000:.2f}ms")
+            print(f"Std dev: {std_dev * 1000:.2f}ms")
+            print(f"Min/Max: {min(times) * 1000:.2f}ms / {max(times) * 1000:.2f}ms")
+
+            # Performance criteria
+            if len(text) < 20:
+                assert avg_time < 0.1, f"Short text too slow: {avg_time:.3f}s"
+            elif len(text) < 500:
+                assert avg_time < 0.5, f"Medium text too slow: {avg_time:.3f}s"
+            else:
+                assert avg_time < 2.0, f"Long text too slow: {avg_time:.3f}s"
 
     @pytest.mark.benchmark
     @pytest.mark.japanese
@@ -78,138 +96,121 @@ class TestPerformance:
     def test_batch_conversion_performance(self):
         """Benchmark batch text processing"""
         try:
-            from piper_plus_g2p.japanese import JapanesePhonemizer as _JaPhonemizer
-            from piper_plus_g2p.encode.pua import map_token as _mt
-
-            def phonemize_japanese(text):
-                p = _JaPhonemizer()
-                tokens = p.phonemize(text)
-                return [_mt(t) for t in ["^"] + tokens + ["$"]]
-
-            # Create batch of texts
-            batch_sizes = [10, 50, 100]
-            base_text = "これはバッチ処理のテストです。"
-
-            for batch_size in batch_sizes:
-                texts = [base_text + str(i) for i in range(batch_size)]
-
-                # Measure batch processing
-                start = time.perf_counter()
-                results = [phonemize_japanese(text) for text in texts]
-                end = time.perf_counter()
-
-                total_time = end - start
-                per_text_time = total_time / batch_size
-
-                print(f"\nBatch size: {batch_size}")
-                print(f"Total time: {total_time:.2f}s")
-                print(f"Per text: {per_text_time * 1000:.2f}ms")
-                print(f"Throughput: {batch_size / total_time:.1f} texts/sec")
-
-                # All results should be valid
-                assert len(results) == batch_size
-                assert all(len(r) > 0 for r in results)
-
-                # Throughput should be reasonable
-                assert batch_size / total_time > 5, (
-                    f"Throughput too low: {batch_size / total_time:.1f} texts/sec"
-                )
-
+            _phonemize_japanese("テスト")
         except ImportError:
             pytest.skip("Japanese phonemizer not available")
+
+        # Create batch of texts
+        batch_sizes = [10, 50, 100]
+        base_text = "これはバッチ処理のテストです。"
+
+        for batch_size in batch_sizes:
+            texts = [base_text + str(i) for i in range(batch_size)]
+
+            # Measure batch processing
+            start = time.perf_counter()
+            results = [_phonemize_japanese(text) for text in texts]
+            end = time.perf_counter()
+
+            total_time = end - start
+            per_text_time = total_time / batch_size
+
+            print(f"\nBatch size: {batch_size}")
+            print(f"Total time: {total_time:.2f}s")
+            print(f"Per text: {per_text_time * 1000:.2f}ms")
+            print(f"Throughput: {batch_size / total_time:.1f} texts/sec")
+
+            # All results should be valid
+            assert len(results) == batch_size
+            assert all(len(r) > 0 for r in results)
+
+            # Throughput should be reasonable
+            assert batch_size / total_time > 5, (
+                f"Throughput too low: {batch_size / total_time:.1f} texts/sec"
+            )
 
     @pytest.mark.benchmark
     @pytest.mark.skipif(psutil is None, reason="psutil not installed")
     def test_memory_usage_measurement(self):
         """Measure memory usage during operations"""
         try:
-            import gc
-
-            from piper_plus_g2p.japanese import JapanesePhonemizer as _JaPhonemizer
-            from piper_plus_g2p.encode.pua import map_token as _mt
-
-            def phonemize_japanese(text):
-                p = _JaPhonemizer()
-                tokens = p.phonemize(text)
-                return [_mt(t) for t in ["^"] + tokens + ["$"]]
-
-            process = psutil.Process(os.getpid())
-
-            # Force garbage collection
-            gc.collect()
-
-            # Baseline memory
-            baseline_mem = process.memory_info().rss / 1024 / 1024  # MB
-
-            # Process increasingly large texts
-            text_sizes = [100, 1000, 10000, 50000]
-            memory_usage = []
-
-            for size in text_sizes:
-                text = "あ" * size
-
-                # Measure memory before
-                gc.collect()
-                mem_before = process.memory_info().rss / 1024 / 1024
-
-                # Process text
-                phonemes = phonemize_japanese(text)
-
-                # Measure memory after
-                mem_after = process.memory_info().rss / 1024 / 1024
-                mem_increase = mem_after - mem_before
-
-                memory_usage.append(
-                    {
-                        "text_size": size,
-                        "mem_increase": mem_increase,
-                        "output_size": len(phonemes),
-                    }
-                )
-
-                print(f"\nText size: {size} chars")
-                print(f"Memory increase: {mem_increase:.2f}MB")
-                print(f"Output size: {len(phonemes)} phonemes")
-
-                # Memory usage should be reasonable
-                assert mem_increase < size * 0.001, (
-                    f"Memory usage too high: {mem_increase:.2f}MB for {size} chars"
-                )
-
-                # Clean up
-                del text, phonemes
-                gc.collect()
-
-            # Final memory should not be much higher than baseline
-            final_mem = process.memory_info().rss / 1024 / 1024
-            total_increase = final_mem - baseline_mem
-
-            print(f"\nTotal memory increase: {total_increase:.2f}MB")
-            assert total_increase < 100, (
-                f"Possible memory leak: {total_increase:.2f}MB total increase"
-            )
-
+            _phonemize_japanese("テスト")
         except ImportError:
             pytest.skip("Japanese phonemizer not available")
+
+        import gc
+
+        process = psutil.Process(os.getpid())
+
+        # Force garbage collection
+        gc.collect()
+
+        # Baseline memory
+        baseline_mem = process.memory_info().rss / 1024 / 1024  # MB
+
+        # Process increasingly large texts
+        text_sizes = [100, 1000, 10000, 50000]
+        memory_usage = []
+
+        for size in text_sizes:
+            text = "あ" * size
+
+            # Measure memory before
+            gc.collect()
+            mem_before = process.memory_info().rss / 1024 / 1024
+
+            # Process text
+            phonemes = _phonemize_japanese(text)
+
+            # Measure memory after
+            mem_after = process.memory_info().rss / 1024 / 1024
+            mem_increase = mem_after - mem_before
+
+            memory_usage.append(
+                {
+                    "text_size": size,
+                    "mem_increase": mem_increase,
+                    "output_size": len(phonemes),
+                }
+            )
+
+            print(f"\nText size: {size} chars")
+            print(f"Memory increase: {mem_increase:.2f}MB")
+            print(f"Output size: {len(phonemes)} phonemes")
+
+            # Memory usage should be reasonable
+            assert mem_increase < size * 0.001, (
+                f"Memory usage too high: {mem_increase:.2f}MB for {size} chars"
+            )
+
+            # Clean up
+            del text, phonemes
+            gc.collect()
+
+        # Final memory should not be much higher than baseline
+        final_mem = process.memory_info().rss / 1024 / 1024
+        total_increase = final_mem - baseline_mem
+
+        print(f"\nTotal memory increase: {total_increase:.2f}MB")
+        assert total_increase < 100, (
+            f"Possible memory leak: {total_increase:.2f}MB total increase"
+        )
 
     @pytest.mark.benchmark
     @pytest.mark.slow
     def test_stress_test(self):
         """Stress test with extreme inputs"""
         try:
-            from piper_plus_g2p.japanese import JapanesePhonemizer as _JaPhonemizer
-            from piper_plus_g2p.encode.pua import map_token as _mt
+            _phonemize_japanese("テスト")
+        except ImportError:
+            pytest.skip("Japanese phonemizer not available")
 
-            def phonemize_japanese(text):
-                p = _JaPhonemizer()
-                tokens = p.phonemize(text)
-                return [_mt(t) for t in ["^"] + tokens + ["$"]]
-
+        try:
             # Long text (~5KB, safe for pyopenjtalk)
             very_long_text = "あいうえおかきくけこ" * 500
 
             start = time.perf_counter()
-            phonemes = phonemize_japanese(very_long_text)
+            phonemes = _phonemize_japanese(very_long_text)
             end = time.perf_counter()
 
             process_time = end - start
@@ -228,8 +229,6 @@ class TestPerformance:
             # Output should be proportional to input
             assert len(phonemes) > len(very_long_text), "Output seems too small"
 
-        except ImportError:
-            pytest.skip("Japanese phonemizer not available")
         except RuntimeError:
             pytest.skip("pyopenjtalk crashed on long input (known limitation)")
 
