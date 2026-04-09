@@ -379,7 +379,7 @@ fn main() -> Result<()> {
     } else if let Some(ref ref_audio) = cli.reference_audio {
         let enc_model = cli.speaker_encoder_model.as_ref().unwrap();
         tracing::info!("Loading speaker encoder: {}", enc_model.display());
-        let encoder = piper_plus::speaker_encoder::SpeakerEncoder::new(enc_model)
+        let mut encoder = piper_plus::speaker_encoder::SpeakerEncoder::new(enc_model)
             .context("Failed to load speaker encoder model")?;
         let emb = encoder
             .encode_file(ref_audio)

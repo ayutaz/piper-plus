@@ -61,7 +61,7 @@ impl SpeakerEncoder {
     ///
     /// Returns a Vec<f32> containing the speaker embedding (typically 256-d).
     pub fn encode(
-        &self,
+        &mut self,
         audio_samples: &[f32],
         sample_rate: u32,
     ) -> Result<Vec<f32>, PiperError> {
@@ -94,11 +94,11 @@ impl SpeakerEncoder {
                 .map_err(|e| PiperError::Inference(format!("speaker encoder mel tensor: {e}")))?;
 
         // Run inference
+        let inputs: Vec<(std::borrow::Cow<str>, ort::session::SessionInputValue<'_>)> =
+            vec![("input".into(), (&mel_tensor).into())];
         let outputs = self
             .session
-            .run(ort::inputs!["input" => &mel_tensor].map_err(|e| {
-                PiperError::Inference(format!("speaker encoder input binding: {e}"))
-            })?)
+            .run(inputs)
             .map_err(|e| PiperError::Inference(format!("speaker encoder inference: {e}")))?;
 
         // Extract embedding from output
@@ -116,7 +116,7 @@ impl SpeakerEncoder {
     }
 
     /// Encode audio from a WAV file.
-    pub fn encode_file(&self, path: &Path) -> Result<Vec<f32>, PiperError> {
+    pub fn encode_file(&mut self, path: &Path) -> Result<Vec<f32>, PiperError> {
         let (samples, sample_rate) = read_wav_file(path)?;
         self.encode(&samples, sample_rate)
     }

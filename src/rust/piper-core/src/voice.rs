@@ -393,6 +393,7 @@ impl PiperVoice {
                 noise_scale,
                 length_scale,
                 noise_w,
+                ..Default::default()
             },
         )
     }

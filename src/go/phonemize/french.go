@@ -313,6 +313,8 @@ func frWord(word string) []string {
 				continue
 			}
 			ph = append(ph, "y_vowel")
+			i++
+			continue
 		case 'y':
 			if i+1 < n && frV[rs[i+1]] {
 				ph = append(ph, "j")

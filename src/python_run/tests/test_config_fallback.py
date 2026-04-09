@@ -185,7 +185,6 @@ class TestLanguageIdPropagation:
             num_symbols=100,
             num_speakers=1,
             sample_rate=22050,
-            espeak_voice="",
             length_scale=1.0,
             noise_scale=0.667,
             noise_w=0.8,
@@ -227,7 +226,6 @@ class TestLanguageIdPropagation:
             num_symbols=100,
             num_speakers=1,
             sample_rate=22050,
-            espeak_voice="",
             length_scale=1.0,
             noise_scale=0.667,
             noise_w=0.8,
@@ -325,7 +323,6 @@ class TestMultilingualPhonemizerImport:
             num_symbols=173,
             num_speakers=1,
             sample_rate=22050,
-            espeak_voice="multilingual",
             length_scale=1.0,
             noise_scale=0.667,
             noise_w=0.8,
@@ -343,10 +340,14 @@ class TestMultilingualPhonemizerImport:
         mock_mp_instance.phonemize.return_value = ["a"]
         mock_mp_class = MagicMock(return_value=mock_mp_instance)
 
-        with patch.dict(
+        with patch(
+            "piper.voice.MultilingualPhonemizer",
+            mock_mp_class,
+            create=True,
+        ), patch.dict(
             "sys.modules",
             {
-                "piper_train.phonemize.multilingual": MagicMock(
+                "piper.phonemize.multilingual": MagicMock(
                     MultilingualPhonemizer=mock_mp_class,
                 )
             },
@@ -379,7 +380,6 @@ class TestMultilingualPhonemizerImport:
             num_symbols=97,
             num_speakers=1,
             sample_rate=22050,
-            espeak_voice="",
             length_scale=1.0,
             noise_scale=0.667,
             noise_w=0.8,
@@ -394,10 +394,14 @@ class TestMultilingualPhonemizerImport:
         mock_mp_instance.phonemize.return_value = ["a"]
         mock_mp_class = MagicMock(return_value=mock_mp_instance)
 
-        with patch.dict(
+        with patch(
+            "piper.voice.MultilingualPhonemizer",
+            mock_mp_class,
+            create=True,
+        ), patch.dict(
             "sys.modules",
             {
-                "piper_train.phonemize.multilingual": MagicMock(
+                "piper.phonemize.multilingual": MagicMock(
                     MultilingualPhonemizer=mock_mp_class,
                 )
             },
@@ -429,7 +433,6 @@ class TestMultilingualPhonemizerImport:
             num_symbols=173,
             num_speakers=1,
             sample_rate=22050,
-            espeak_voice="multilingual",
             length_scale=1.0,
             noise_scale=0.667,
             noise_w=0.8,
@@ -451,7 +454,7 @@ class TestMultilingualPhonemizerImport:
             # Block re-import by injecting a sentinel that raises ImportError
             with patch.dict(
                 "sys.modules",
-                {"piper_train.phonemize.multilingual": None},
+                {"piper.phonemize.multilingual": None},
             ):
                 # The phonemize method should not raise ImportError --
                 # it should fall back to JA phonemizer or eSpeak.

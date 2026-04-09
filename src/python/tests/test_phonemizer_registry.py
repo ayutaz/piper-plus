@@ -76,43 +76,54 @@ class TestABCInterface:
         phonemes, prosody = p.phonemize_with_prosody("hello")
         assert len(phonemes) == len(prosody)
 
-    def test_get_phoneme_id_map_monolingual_returns_none(self):
-        for lang in ("ja", "en"):
-            p = get_phonemizer(lang)
-            assert p.get_phoneme_id_map() is None
+    def test_get_phoneme_id_map_ja(self):
+        from piper_plus_g2p.encode.id_maps import get_phoneme_id_map
 
-    def test_get_phoneme_id_map_bilingual_returns_map(self):
-        p = get_phonemizer("ja-en")
-        id_map = p.get_phoneme_id_map()
-        assert id_map is not None
+        id_map = get_phoneme_id_map("ja")
+        assert isinstance(id_map, dict)
         assert len(id_map) > 0
 
+    def test_get_phoneme_id_map_multilingual(self):
+        from piper_plus_g2p.encode.id_maps import get_phoneme_id_map
 
-class TestDefaultPostProcessIds:
-    """Base class post_process_ids is a no-op."""
+        id_map = get_phoneme_id_map("ja-en")
+        assert isinstance(id_map, dict)
+        assert len(id_map) > 0
+        # Multilingual map should be larger than JA-only
+        ja_map = get_phoneme_id_map("ja")
+        assert len(id_map) > len(ja_map)
 
-    def test_ja_noop(self):
-        p = get_phonemizer("ja")
+
+class TestPiperEncoderPostProcess:
+    """PiperEncoder _post_process inserts BOS/EOS/padding."""
+
+    def test_identity_without_special_tokens(self):
+        from piper_plus_g2p.encode.encoder import PiperEncoder
+
+        # With no BOS/EOS in the map, only padding is inserted
+        phoneme_id_map = {"_": [0]}
+        encoder = PiperEncoder(phoneme_id_map)
         ids = [1, 2, 3]
         prosody = [None, None, None]
-        result_ids, result_prosody = p.post_process_ids(ids, prosody, {})
-        assert result_ids == ids
-        assert result_prosody == prosody
-
-
-class TestEnglishPostProcessIds:
-    """English post_process_ids adds BOS/EOS/padding."""
+        result_ids, result_prosody = encoder._post_process(ids, prosody, "$")
+        # Each id gets a pad after it: 1,0, 2,0, 3,0
+        assert result_ids == [1, 0, 2, 0, 3, 0]
+        assert len(result_prosody) == len(result_ids)
 
     def test_bos_eos(self):
-        p = get_phonemizer("en")
+        from piper_plus_g2p.encode.encoder import PiperEncoder
+
         phoneme_id_map = {"_": [0], "^": [1], "$": [2]}
-        ids, prosody = p.post_process_ids([10, 20], [None, None], phoneme_id_map)
+        encoder = PiperEncoder(phoneme_id_map)
+        ids, prosody = encoder._post_process([10, 20], [None, None], "$")
         assert ids[0] == 1  # BOS
         assert ids[-1] == 2  # EOS
 
     def test_padding_inserted(self):
-        p = get_phonemizer("en")
+        from piper_plus_g2p.encode.encoder import PiperEncoder
+
         phoneme_id_map = {"_": [0], "^": [1], "$": [2]}
-        ids, _ = p.post_process_ids([10, 20], [None, None], phoneme_id_map)
+        encoder = PiperEncoder(phoneme_id_map)
+        ids, _ = encoder._post_process([10, 20], [None, None], "$")
         # BOS(1), pad(0), 10, pad(0), 20, pad(0), EOS(2)
         assert ids == [1, 0, 10, 0, 20, 0, 2]

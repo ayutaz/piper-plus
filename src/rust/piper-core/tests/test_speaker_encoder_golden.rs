@@ -240,14 +240,15 @@ struct CornerValues {
 // ---------------------------------------------------------------------------
 
 fn fixture_path() -> PathBuf {
-    let mut p = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    // piper-core -> rust -> src -> project root
-    p.pop(); // rust
-    p.pop(); // src
-    p.push("test");
-    p.push("fixtures");
-    p.push("speaker_encoder_golden.json");
-    p
+    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .parent().unwrap()   // piper-core -> src/rust
+        .parent().unwrap()   // src/rust -> src
+        .parent().unwrap()   // src -> project root
+        .to_path_buf();
+    repo_root
+        .join("test")
+        .join("fixtures")
+        .join("speaker_encoder_golden.json")
 }
 
 fn load_golden() -> GoldenData {
