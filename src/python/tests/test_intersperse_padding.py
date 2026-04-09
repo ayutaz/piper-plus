@@ -21,6 +21,7 @@ pyopenjtalk = pytest.importorskip(
 g2p_en = pytest.importorskip("g2p_en", reason="g2p_en required for EN tests")
 
 from piper_train.infer_onnx import text_to_phoneme_ids_and_prosody
+from piper_train.vits.commons import intersperse
 from piper_plus_g2p.encode.id_maps import get_phoneme_id_map
 
 
@@ -45,36 +46,24 @@ def _get_multilingual_id_map() -> dict[str, list[int]]:
 def has_intersperse_padding(ids: list[int], pad_id: int = 0) -> bool:
     """Check if phoneme IDs have intersperse padding pattern.
 
-    In a properly padded sequence, the pattern should be:
-    [BOS, pad, ph, pad, ph, pad, ..., pad, EOS]
-
-    We check: starting from BOS, every even index (0, 2, 4, ...) should be
-    a real phoneme, and every odd index (1, 3, 5, ...) should be pad (0).
-    Exception: the pad token itself (0) can appear at even positions as a
-    pause/silence phoneme.
+    The pipeline produces ``[BOS, pad, ph1, pad, ph2, ..., pad, EOS]``
+    where data sits at even indices and pad at odd indices.  This is
+    the interior of ``commons.intersperse(data, pad_id)`` (which puts
+    ``pad`` at both ends).  We verify by round-tripping: extract data
+    from even indices, apply ``intersperse``, and strip the outer pads.
     """
     if len(ids) < 3:
         return False
-    # Check that odd positions are all pad tokens
-    for i in range(1, len(ids), 2):
-        if ids[i] != pad_id:
-            return False
-    return True
+    if len(ids) % 2 == 0:
+        return False
+    # Even indices carry the original phonemes (incl. BOS / EOS)
+    originals = ids[::2]
+    return intersperse(originals, pad_id)[1:-1] == ids
 
 
 def _no_intersperse_padding(ids: list[int], pad_id: int = 0) -> bool:
-    """Check that there is NO intersperse padding pattern.
-
-    Returns True if the sequence does NOT follow the intersperse pattern --
-    i.e. at least one odd-indexed position is not a pad token, or the
-    sequence is too short to have the pattern.
-    """
-    if len(ids) < 3:
-        return True
-    for i in range(1, len(ids), 2):
-        if ids[i] != pad_id:
-            return True
-    return False
+    """Check that there is NO intersperse padding pattern."""
+    return not has_intersperse_padding(ids, pad_id)
 
 
 # ---------------------------------------------------------------------------
