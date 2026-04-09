@@ -206,7 +206,7 @@ def test_parity_with_model_infer():
 
     # --- Path 1: model.infer() (deterministic via onnx_export_mode + noise_scale=0) ---
     with torch.no_grad():
-        audio_infer, _attn, _y_mask, (_z, _z_p, _m_p, _logs_p) = model.infer(
+        audio_infer, _attn, _y_mask, (_z, _z_p, _m_p, _logs_p), _durations = model.infer(
             text,
             text_lengths,
             noise_scale=0.0,

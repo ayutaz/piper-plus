@@ -1077,6 +1077,8 @@ class SynthesizerTrn(nn.Module):
         else:
             logw = self.dp(x_dp, x_mask, g=g)
         w = torch.exp(logw) * x_mask * length_scale
+        durations = w.squeeze(1)
+
         w_ceil = torch.ceil(w)
         y_lengths = torch.clamp_min(torch.sum(w_ceil, [1, 2]), 1).long()
         y_mask = torch.unsqueeze(
@@ -1100,7 +1102,7 @@ class SynthesizerTrn(nn.Module):
         z = self.flow(z_p, y_mask, g=g, reverse=True)
         o = self.dec((z * y_mask)[:, :, :max_len], g=g)
 
-        return o, attn, y_mask, (z, z_p, m_p, logs_p)
+        return o, attn, y_mask, (z, z_p, m_p, logs_p), durations
 
     def voice_conversion(self, y, y_lengths, sid_src, sid_tgt, lid=None):
         assert self.n_speakers > 1, "n_speakers have to be larger than 1."

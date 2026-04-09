@@ -8,7 +8,6 @@ from pathlib import Path
 import torch
 
 from .tools.convert_fp16 import convert_fp16
-from .vits import commons
 from .vits.lightning import VitsModel
 
 
@@ -36,6 +35,10 @@ def build_infer_forward(
     ``torch.onnx.export()`` so that the exported graph contains only
     the inference path (no discriminator, no training loss).
 
+    This is a thin wrapper around :meth:`SynthesizerTrn.infer` that
+    handles scale unpacking, ``onnx_export_mode`` management, and
+    return-value transformation.
+
     Parameters
     ----------
     model : SynthesizerTrn
@@ -58,46 +61,31 @@ def build_infer_forward(
     def infer_forward(
         text, text_lengths, scales, sid=None, lid=None, prosody_features=None
     ):
+        noise_scale = scales[0]
         length_scale = scales[1]
         noise_scale_w = scales[2]
 
-        g = model._get_global_conditioning(sid, lid)
-        x, m_p, logs_p, x_mask = model.enc_p(text, text_lengths, g=g)
+        # model.infer() uses onnx_export_mode to decide whether to add noise:
+        #   onnx_export_mode=True  → z_p = m_p          (deterministic)
+        #   onnx_export_mode=False → z_p = m_p + noise   (stochastic)
+        # We set it here to match the stochastic flag, restoring the
+        # original value afterwards so the caller's state is not mutated.
+        prev = getattr(model, "onnx_export_mode", False)
+        model.onnx_export_mode = not stochastic
 
-        x_dp = model._prepare_prosody_input(x, x_mask, prosody_features, lid=lid)
-        if model.use_sdp:
-            logw = model.dp(
-                x_dp, x_mask, g=g, reverse=True, noise_scale=noise_scale_w
-            )
-        else:
-            logw = model.dp(x_dp, x_mask, g=g)
-
-        w = torch.exp(logw) * x_mask * length_scale
-        durations = w.squeeze(1)
-
-        w_ceil = torch.ceil(w)
-        y_lengths = torch.clamp_min(torch.sum(w_ceil, [1, 2]), 1).long()
-        y_mask = torch.unsqueeze(
-            commons.sequence_mask(y_lengths, y_lengths.max()), 1
-        ).type_as(x_mask)
-        attn_mask = torch.unsqueeze(x_mask, 2) * torch.unsqueeze(y_mask, -1)
-        attn = commons.generate_path(w_ceil, attn_mask)
-
-        m_p = torch.matmul(attn.squeeze(1), m_p.transpose(1, 2)).transpose(1, 2)
-        logs_p = torch.matmul(attn.squeeze(1), logs_p.transpose(1, 2)).transpose(
-            1, 2
+        audio, _attn, _y_mask, _latents, durations = model.infer(
+            text,
+            text_lengths,
+            sid=sid,
+            lid=lid,
+            noise_scale=noise_scale,
+            length_scale=length_scale,
+            noise_scale_w=noise_scale_w,
+            prosody_features=prosody_features,
         )
 
-        if stochastic:
-            noise_scale = scales[0]
-            z_p = m_p + torch.randn_like(m_p) * torch.exp(logs_p) * noise_scale
-        else:
-            z_p = m_p
-
-        z = model.flow(z_p, y_mask, g=g, reverse=True)
-        o = model.dec((z * y_mask), g=g)
-
-        return o, durations
+        model.onnx_export_mode = prev
+        return audio, durations
 
     return infer_forward
 
