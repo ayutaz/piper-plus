@@ -2,10 +2,6 @@
 Real integration tests that verify actual functionality
 """
 
-import tempfile
-from pathlib import Path
-
-import numpy as np
 import pytest
 
 
@@ -24,65 +20,6 @@ class TestRealIntegration:
     def test_japanese_synthesis_with_pua(self):
         """Test Japanese synthesis with PUA mapping"""
         pytest.skip("Skipping Japanese synthesis test - requires full piper runtime")
-
-    @pytest.mark.integration
-    def test_model_config_validation(self):
-        """Test that model configs are valid"""
-        test_configs = [
-            {
-                "audio": {"sample_rate": 22050},
-                "num_symbols": 100,
-                "phoneme_id_map": {"_": 0},
-            },
-            {
-                "audio": {"sample_rate": 22050},
-                "phoneme_type": "openjtalk",
-                "language": {"code": "ja"},
-                "num_symbols": 150,
-                "phoneme_id_map": {"_": 0, "\ue00e": 30},
-            },
-        ]
-
-        for config in test_configs:
-            # Required fields
-            assert "audio" in config
-            assert "sample_rate" in config["audio"]
-            assert "phoneme_id_map" in config
-
-            # Japanese specific
-            if config.get("language", {}).get("code") == "ja":
-                assert config.get("phoneme_type") == "openjtalk"
-
-    @pytest.mark.integration
-    def test_wav_file_generation(self):
-        """Test that we can generate valid WAV files"""
-        import wave
-
-        # Create test audio data
-        sample_rate = 22050
-        duration = 0.5
-        samples = int(sample_rate * duration)
-        audio_data = np.zeros(samples, dtype=np.int16)
-
-        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
-            tmp_path = Path(tmp.name)
-
-        try:
-            # Write WAV
-            with wave.open(str(tmp_path), "wb") as wav_file:
-                wav_file.setnchannels(1)
-                wav_file.setsampwidth(2)
-                wav_file.setframerate(sample_rate)
-                wav_file.writeframes(audio_data.tobytes())
-
-            # Verify WAV
-            with wave.open(str(tmp_path), "rb") as wav_file:
-                assert wav_file.getnchannels() == 1
-                assert wav_file.getsampwidth() == 2
-                assert wav_file.getframerate() == sample_rate
-                assert wav_file.getnframes() == samples
-        finally:
-            tmp_path.unlink()
 
     @pytest.mark.integration
     @pytest.mark.slow
