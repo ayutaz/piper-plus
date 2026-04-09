@@ -149,7 +149,7 @@ def create_parser():
     parser.add_argument(
         "--quality",
         default="medium",
-        choices=("x-low", "medium", "high"),
+        choices=("tiny", "x-low", "medium", "high"),
         help="Quality/size of model (default: medium)",
     )
     parser.add_argument(
@@ -510,7 +510,12 @@ def main():
     else:
         dict_args["learning_rate"] = getattr(args, "base_lr", 2e-4)
 
-    if args.quality == "x-low":
+    if args.quality == "tiny":
+        dict_args["hidden_channels"] = 64
+        dict_args["inter_channels"] = 64
+        dict_args["filter_channels"] = 256
+        dict_args["upsample_initial_channel"] = 128
+    elif args.quality == "x-low":
         dict_args["hidden_channels"] = 96
         dict_args["inter_channels"] = 96
         dict_args["filter_channels"] = 384
