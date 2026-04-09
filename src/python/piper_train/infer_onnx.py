@@ -327,6 +327,34 @@ def text_to_phoneme_ids_and_prosody(
     return result_ids, prosody_features_out
 
 
+def resolve_speaker_id(
+    speaker_id: int | None,
+    has_sid: bool,
+) -> "np.ndarray | None":
+    """Resolve speaker_id into an ONNX-compatible numpy array.
+
+    Parameters
+    ----------
+    speaker_id : int or None
+        Explicit speaker ID from the utterance / CLI argument.
+    has_sid : bool
+        Whether the ONNX model has a ``sid`` input tensor.
+
+    Returns
+    -------
+    numpy.ndarray or None
+        - ``np.array([speaker_id], dtype=np.int64)`` if *speaker_id* is not None
+        - ``np.array([0], dtype=np.int64)`` if *speaker_id* is None and *has_sid* is True
+          (single-speaker multilingual models require sid even though there is only 1 speaker)
+        - ``None`` if *has_sid* is False and *speaker_id* is None
+    """
+    if speaker_id is not None:
+        return np.array([speaker_id], dtype=np.int64)
+    if has_sid:
+        return np.array([0], dtype=np.int64)
+    return None
+
+
 def resolve_config_path(model: str, config: str | None) -> Path:
     """Resolve the config.json path for a given model.
 
@@ -671,10 +699,7 @@ def main():
             [adj_noise, adj_length, adj_noise_w],
             dtype=np.float32,
         )
-        sid = None
-
-        if speaker_id is not None:
-            sid = np.array([speaker_id], dtype=np.int64)
+        sid = resolve_speaker_id(speaker_id, has_sid)
 
         # Build input dictionary
         inputs = {
@@ -682,10 +707,6 @@ def main():
             "input_lengths": text_lengths,
             "scales": scales,
         }
-
-        # Default sid to 0 for models that require it (e.g. single-speaker multilingual)
-        if sid is None and has_sid:
-            sid = np.array([0], dtype=np.int64)
 
         if sid is not None:
             inputs["sid"] = sid
