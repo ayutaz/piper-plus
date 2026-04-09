@@ -112,56 +112,26 @@ def test_speaker_id_tensor_handling():
     speaker_id が int (test_utterances.jsonl 経由) の場合と
     Tensor (random_split Subset 経由) の場合の両方を正しく処理できること。
     """
+    from piper_train.vits.lightning import _normalize_id
+
     # Case 1: int -> torch.LongTensor([int])
-    raw_sid_int = 3
-    if isinstance(raw_sid_int, torch.Tensor):
-        sid = raw_sid_int.unsqueeze(0) if raw_sid_int.dim() == 0 else raw_sid_int
-    else:
-        sid = torch.LongTensor([raw_sid_int])
+    sid = _normalize_id(3)
     assert sid.shape == (1,)
     assert sid.dtype == torch.long
     assert sid.item() == 3
 
     # Case 2: 1-D LongTensor([val]) -> already shape [1], keep as-is
-    raw_sid_tensor_1d = torch.LongTensor([5])
-    if isinstance(raw_sid_tensor_1d, torch.Tensor):
-        sid = (
-            raw_sid_tensor_1d.unsqueeze(0)
-            if raw_sid_tensor_1d.dim() == 0
-            else raw_sid_tensor_1d
-        )
-    else:
-        sid = torch.LongTensor([raw_sid_tensor_1d])
+    sid = _normalize_id(torch.LongTensor([5]))
     assert sid.shape == (1,)
     assert sid.dtype == torch.long
     assert sid.item() == 5
 
     # Case 3: 0-D scalar Tensor -> unsqueeze(0) to shape [1]
-    raw_sid_scalar = torch.tensor(7, dtype=torch.long)
-    assert raw_sid_scalar.dim() == 0
-    if isinstance(raw_sid_scalar, torch.Tensor):
-        sid = (
-            raw_sid_scalar.unsqueeze(0)
-            if raw_sid_scalar.dim() == 0
-            else raw_sid_scalar
-        )
-    else:
-        sid = torch.LongTensor([raw_sid_scalar])
+    sid = _normalize_id(torch.tensor(7, dtype=torch.long))
     assert sid.shape == (1,)
     assert sid.dtype == torch.long
     assert sid.item() == 7
 
     # Case 4: None -> stays None
-    raw_sid_none = None
-    if raw_sid_none is not None:
-        if isinstance(raw_sid_none, torch.Tensor):
-            sid = (
-                raw_sid_none.unsqueeze(0)
-                if raw_sid_none.dim() == 0
-                else raw_sid_none
-            )
-        else:
-            sid = torch.LongTensor([raw_sid_none])
-    else:
-        sid = None
+    sid = _normalize_id(None)
     assert sid is None
