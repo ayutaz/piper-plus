@@ -176,10 +176,14 @@ function createMockedInstance(overrides = {}) {
     ...overrides.config,
   };
 
+  // Use >= 40 phoneme IDs to bypass short-text mitigation (Strategy A+B)
+  const longIds = new Array(45).fill(7);
+  longIds[0] = 1;   // BOS
+  longIds[44] = 2;  // EOS
   instance._phonemizer = overrides.phonemizer || {
     detectLanguage: mock.fn(() => 'ja'),
     encode: mock.fn((text, language) => ({
-      phonemeIds: [1, 7, 2],
+      phonemeIds: longIds,
       prosodyFeatures: null,
     })),
     dispose: mock.fn(),
@@ -259,9 +263,11 @@ describe('非常に長いテキストでも synthesize が成功する', { skip 
 
 describe('G2P encode を経由した phoneme ID 取得', { skip }, () => {
   it('G2P.encode の返す phonemeIds が ONNX テンソルに使用される', async () => {
-    // Arrange
+    // Arrange — use >= 40 phoneme IDs to bypass short-text padding
     let capturedFeeds = null;
-    const expectedIds = [1, 10, 11, 2];
+    const expectedIds = new Array(45).fill(10);
+    expectedIds[0] = 1;   // BOS
+    expectedIds[44] = 2;  // EOS
     const instance = createMockedInstance({
       phonemizer: {
         detectLanguage: mock.fn(() => 'ja'),
@@ -284,7 +290,7 @@ describe('G2P encode を経由した phoneme ID 取得', { skip }, () => {
     // Act
     await instance.synthesize('test');
 
-    // Assert — phoneme IDs from encode are passed to ONNX
+    // Assert — phoneme IDs from encode are passed to ONNX unmodified
     assert.ok(capturedFeeds, 'session.run should have been called');
     const ids = Array.from(capturedFeeds.input.data).map(Number);
     assert.deepStrictEqual(ids, expectedIds);

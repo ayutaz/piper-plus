@@ -18,6 +18,13 @@ from .util import audio_float_to_int16
 
 _LOGGER = logging.getLogger(__name__)
 
+# Short-text mitigation constants (keep in sync with other runtimes)
+MIN_PHONEME_IDS = 40
+SHORT_TEXT_CHARS = 10
+SILENCE_PAD_MS = 300
+TRIM_THRESHOLD_RMS = 0.01
+TRIM_MIN_SAMPLES = 2205  # 22050 Hz * 0.1 s
+
 # Optional: use shared ORT utilities when piper_train is available
 try:
     from piper_train.ort_utils import (
@@ -193,6 +200,69 @@ def _load_session_inline(
     return session
 
 
+def _pad_phoneme_ids(
+    phoneme_ids: list[int],
+    pad_id: int,
+    min_length: int = MIN_PHONEME_IDS,
+) -> tuple[list[int], bool]:
+    """Pad short phoneme_ids with silence tokens after BOS and before EOS.
+
+    Returns (padded_ids, was_padded).
+    """
+    if len(phoneme_ids) >= min_length:
+        return phoneme_ids, False
+
+    needed = min_length - len(phoneme_ids)
+    front = needed // 2
+    back = needed - front
+
+    # phoneme_ids: [BOS, ...phonemes..., EOS]
+    bos = phoneme_ids[:1]
+    body = phoneme_ids[1:-1]
+    eos = phoneme_ids[-1:]
+
+    padded = bos + [pad_id] * front + body + [pad_id] * back + eos
+    return padded, True
+
+
+def _trim_silence(
+    audio: np.ndarray,
+    threshold_rms: float = TRIM_THRESHOLD_RMS,
+    window: int = 256,
+    min_samples: int = TRIM_MIN_SAMPLES,
+) -> np.ndarray:
+    """Trim leading/trailing silence from int16 audio using windowed RMS."""
+    if len(audio) <= min_samples:
+        return audio
+
+    float_audio = audio.astype(np.float32) / 32768.0
+    n_windows = len(float_audio) // window
+
+    if n_windows == 0:
+        return audio
+
+    # Compute per-window RMS
+    truncated = float_audio[: n_windows * window].reshape(n_windows, window)
+    rms = np.sqrt(np.mean(truncated**2, axis=1))
+
+    # Find first and last window above threshold
+    above = np.where(rms > threshold_rms)[0]
+    if len(above) == 0:
+        return audio[:min_samples]
+
+    start_sample = above[0] * window
+    end_sample = min((above[-1] + 1) * window, len(audio))
+
+    length = end_sample - start_sample
+    if length < min_samples:
+        center = (start_sample + end_sample) // 2
+        start_sample = max(0, center - min_samples // 2)
+        end_sample = min(len(audio), start_sample + min_samples)
+        start_sample = max(0, end_sample - min_samples)
+
+    return audio[start_sample:end_sample]
+
+
 @dataclass
 class PiperVoice:
     session: onnxruntime.InferenceSession
@@ -338,26 +408,37 @@ class PiperVoice:
         language_id: int | None = None,
     ) -> Iterable[bytes]:
         """Synthesize raw audio per sentence from text."""
+        # Strategy C: auto-inject silence padding for very short plain text
+        is_short_text = (
+            not text.lstrip().startswith(("<speak>", "<speak "))
+            and sum(1 for c in text if not c.isspace()) <= SHORT_TEXT_CHARS
+        )
+
         sentence_phonemes = self.phonemize(text)
 
         # 16-bit mono
         num_silence_samples = int(sentence_silence * self.config.sample_rate)
         silence_bytes = bytes(num_silence_samples * 2)
 
+        # Pre-compute break silence for Strategy C
+        if is_short_text:
+            break_samples = int(self.config.sample_rate * SILENCE_PAD_MS / 1000)
+            break_bytes = bytes(break_samples * 2)
+        else:
+            break_bytes = b""
+
         for phonemes in sentence_phonemes:
             phoneme_ids = self.phonemes_to_ids(phonemes)
-            yield (
-                self.synthesize_ids_to_raw(
-                    phoneme_ids,
-                    speaker_id=speaker_id,
-                    length_scale=length_scale,
-                    noise_scale=noise_scale,
-                    noise_w=noise_w,
-                    volume=volume,
-                    language_id=language_id,
-                )
-                + silence_bytes
+            audio_bytes = self.synthesize_ids_to_raw(
+                phoneme_ids,
+                speaker_id=speaker_id,
+                length_scale=length_scale,
+                noise_scale=noise_scale,
+                noise_w=noise_w,
+                volume=volume,
+                language_id=language_id,
             )
+            yield break_bytes + audio_bytes + break_bytes + silence_bytes
 
     def synthesize_ids_to_raw(
         self,
@@ -378,6 +459,17 @@ class PiperVoice:
 
         if noise_w is None:
             noise_w = self.config.noise_w
+
+        # Strategy B: reduce noise for short sequences (check before padding)
+        original_len = len(phoneme_ids)
+        if original_len < MIN_PHONEME_IDS:
+            ratio = max(0.0, min(original_len / MIN_PHONEME_IDS, 1.0))
+            noise_scale *= max(0.5, ratio)
+            noise_w *= max(0.4, ratio)
+
+        # Strategy A: pad short sequences with silence tokens
+        pad_id = 0
+        phoneme_ids, was_padded = _pad_phoneme_ids(phoneme_ids, pad_id)
 
         phoneme_ids_array = np.expand_dims(np.array(phoneme_ids, dtype=np.int64), 0)
         phoneme_ids_lengths = np.array([phoneme_ids_array.shape[1]], dtype=np.int64)
@@ -425,4 +517,9 @@ class PiperVoice:
             args,
         )[0].squeeze(0)
         audio = audio_float_to_int16(audio.squeeze(), volume=volume)
+
+        # Strategy A: trim silence introduced by padding
+        if was_padded:
+            audio = _trim_silence(audio)
+
         return audio.tobytes()

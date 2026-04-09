@@ -311,6 +311,12 @@ def create_app(engine: PiperInferenceEngine, model_path: str):
     def health_check():
         return {"status": "healthy"}
 
+    def _is_short_text(text: str, threshold: int = 10) -> bool:
+        """Check if text is short (excluding whitespace)."""
+        if text.lstrip().startswith(("<speak>", "<speak ")):
+            return False
+        return sum(1 for c in text if not c.isspace()) <= threshold
+
     @app.get("/synthesize")
     def synthesize(
         text: str = Query(...),
@@ -332,7 +338,15 @@ def create_app(engine: PiperInferenceEngine, model_path: str):
             buf = io.BytesIO()
             sf.write(buf, audio, engine.sample_rate, format="WAV")
             buf.seek(0)
-            return StreamingResponse(buf, media_type="audio/wav")
+            headers = {}
+            if _is_short_text(text):
+                headers["X-Piper-Warning"] = "short-text-input"
+                _LOGGER.warning(
+                    "Short text input detected (%d chars excl. spaces): %r",
+                    len(text.replace(" ", "").replace("\u3000", "").strip()),
+                    text,
+                )
+            return StreamingResponse(buf, media_type="audio/wav", headers=headers)
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e)) from e
 
@@ -362,7 +376,15 @@ def create_app(engine: PiperInferenceEngine, model_path: str):
             buf = io.BytesIO()
             sf.write(buf, audio, engine.sample_rate, format="WAV")
             buf.seek(0)
-            return StreamingResponse(buf, media_type="audio/wav")
+            headers = {}
+            if _is_short_text(req.input):
+                headers["X-Piper-Warning"] = "short-text-input"
+                _LOGGER.warning(
+                    "Short text input detected (%d chars excl. spaces): %r",
+                    len(req.input.replace(" ", "").replace("\u3000", "").strip()),
+                    req.input,
+                )
+            return StreamingResponse(buf, media_type="audio/wav", headers=headers)
         except Exception:
             _LOGGER.exception("Synthesis failed for /v1/audio/speech")
             raise HTTPException(status_code=500, detail="Synthesis failed") from None

@@ -58,6 +58,7 @@ set(TEST_SOURCES
     test_download_utils.cpp
     test_multilingual_g2p.cpp
     test_swedish_phonemize.cpp
+    test_short_text_mitigation.cpp
 )
 
 # Add dictionary manager test for Unix platforms

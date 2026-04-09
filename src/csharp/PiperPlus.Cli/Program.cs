@@ -814,6 +814,21 @@ internal static class Program
                         }
                     }
 
+                    // Strategy C: detect short plain text for post-synthesis
+                    // silence padding. WrapShortTextWithBreaks determines whether
+                    // the text qualifies; if it does, we apply audio-level silence
+                    // padding after synthesis instead of SSML wrapping (the C# runtime
+                    // does not yet have an SSML parser).
+                    string wrapped = ShortTextProcessor.WrapShortTextWithBreaks(textInput);
+                    bool isShortText = !ReferenceEquals(wrapped, textInput)
+                                      && !string.Equals(wrapped, textInput, StringComparison.Ordinal);
+                    if (isShortText)
+                    {
+                        LogDebug(debug, quiet,
+                            $"Strategy C: short text detected ({textInput.Length} chars), " +
+                            $"will pad {ShortTextProcessor.SilencePadMs}ms silence");
+                    }
+
                     LogDebug(debug, quiet, $"Text mode: language={language}, text=\"{textInput}\"");
 
                     // Resolve phonemizer for the requested language
@@ -933,6 +948,15 @@ internal static class Program
                         return;
                     }
 
+                    // Strategy C: pad silence for short text
+                    if (isShortText)
+                    {
+                        audio = ShortTextProcessor.PadSilenceForShortText(audio, sampleRate);
+                        LogDebug(debug, quiet,
+                            $"Strategy C: padded {ShortTextProcessor.SilencePadMs}ms silence " +
+                            $"({audio.Length} total samples)");
+                    }
+
                     // --output-timing: warn that timing data is not available
                     // (VITS model does not expose per-phoneme durations in standard output)
                     if (!string.IsNullOrEmpty(outputTimingPath))
@@ -970,6 +994,11 @@ internal static class Program
                                 if (customDict is not null)
                                     sentenceText = customDict.ApplyToText(sentenceText);
 
+                                // Strategy C: per-sentence short text detection
+                                string sentenceWrapped = ShortTextProcessor.WrapShortTextWithBreaks(sentenceText);
+                                bool isSentenceShort = !ReferenceEquals(sentenceWrapped, sentenceText)
+                                    && !string.Equals(sentenceWrapped, sentenceText, StringComparison.Ordinal);
+
                                 var (sentencePhonemeIds, sentenceProsody) =
                                     PhonemeEncoder.EncodeDirect(
                                         phonemizer, sentenceText, phonemeIdMap);
@@ -989,6 +1018,12 @@ internal static class Program
                                     LogError($"Synthesis failed for sentence: {ex.Message}");
                                     Environment.ExitCode = 1;
                                     return;
+                                }
+
+                                // Strategy C: pad silence for short sentences
+                                if (isSentenceShort)
+                                {
+                                    chunkAudio = ShortTextProcessor.PadSilenceForShortText(chunkAudio, sampleRate);
                                 }
 
                                 StreamingWriter.WriteChunked(stdout, chunkAudio);
@@ -1173,6 +1208,7 @@ internal static class Program
                             // ---------------------------------------------------
                             long[] phonemeIdsLong;
                             long[]? prosodyFlat = null;
+                            bool uttIsShortText = false;
 
                             if (!string.IsNullOrEmpty(utterance?.Text))
                             {
@@ -1200,6 +1236,11 @@ internal static class Program
                                 {
                                     textToPhon = customDict.ApplyToText(textToPhon);
                                 }
+
+                                // Strategy C: detect short text for post-synthesis silence padding
+                                string uttWrapped = ShortTextProcessor.WrapShortTextWithBreaks(textToPhon);
+                                uttIsShortText = !ReferenceEquals(uttWrapped, textToPhon)
+                                    && !string.Equals(uttWrapped, textToPhon, StringComparison.Ordinal);
 
                                 var phonemeIdMap = jsonlPhonemizer.GetPhonemeIdMap()
                                                   ?? config.PhonemeIdMap;
@@ -1261,6 +1302,12 @@ internal static class Program
                                 LogError($"Synthesis failed on line {utteranceIndex + 1}: {ex.Message}");
                                 Environment.ExitCode = 1;
                                 return;
+                            }
+
+                            // Strategy C: pad silence for short JSONL text
+                            if (uttIsShortText)
+                            {
+                                audio = ShortTextProcessor.PadSilenceForShortText(audio, sampleRate);
                             }
 
                             // Determine output target for this utterance

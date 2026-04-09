@@ -96,6 +96,45 @@ export interface StreamingSynthesizeOptions extends SynthesizeOptions {
 }
 
 // ---------------------------------------------------------------------------
+// Short-text mitigation helpers (Strategy A + B)
+// ---------------------------------------------------------------------------
+
+/**
+ * Strategy A: Pad short phoneme ID sequences with silence tokens.
+ *
+ * Inserts pause tokens (ID = 0) evenly after BOS and before EOS until the
+ * sequence reaches MIN_PHONEME_IDS (40) length.
+ */
+export function padPhonemeIds(
+  phonemeIds: number[],
+  prosodyFeatures: number[][] | null,
+): {
+  phonemeIds: number[];
+  prosodyFeatures: number[][] | null;
+  wasPadded: boolean;
+};
+
+/**
+ * Strategy A (post-step): Trim leading and trailing silence from audio
+ * using a sliding RMS window.
+ *
+ * Keeps at least TRIM_MIN_SAMPLES (2205) to avoid producing empty audio.
+ */
+export function trimSilence(audio: Float32Array, windowSize?: number): Float32Array;
+
+/**
+ * Strategy B: Adjust noise scales for short inputs.
+ *
+ * For inputs shorter than MIN_PHONEME_IDS (40), attenuate noiseScale and
+ * noiseW proportionally while keeping lengthScale unchanged.
+ */
+export function adjustScalesForShortInput(
+  phonemeCount: number,
+  noiseScale: number,
+  noiseW: number,
+): { noiseScale: number; noiseW: number };
+
+// ---------------------------------------------------------------------------
 // PiperPlus
 // ---------------------------------------------------------------------------
 

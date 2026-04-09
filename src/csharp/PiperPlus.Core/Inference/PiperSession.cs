@@ -177,6 +177,16 @@ public sealed class PiperSession
     /// <summary>
     /// Build input tensors, run ONNX inference, and return the raw float32 audio
     /// together with optional per-phoneme durations.
+    /// <para>
+    /// When the phoneme sequence is shorter than <see cref="ShortTextProcessor.MinPhonemeIds"/>,
+    /// Strategies A and B are applied automatically:
+    /// <list type="bullet">
+    ///   <item><b>A</b>: Pad with pause IDs (0) after BOS / before EOS, then
+    ///         trim leading/trailing silence from the output.</item>
+    ///   <item><b>B</b>: Reduce <c>noiseScale</c> and <c>noiseW</c>
+    ///         proportionally to stabilise the duration predictor.</item>
+    /// </list>
+    /// </para>
     /// </summary>
     /// <param name="input">Synthesis parameters.</param>
     /// <param name="includeDurations">
@@ -190,6 +200,25 @@ public sealed class PiperSession
         SynthesisInput input, bool includeDurations)
     {
         long[] phonemeIds = input.PhonemeIds;
+        long[]? prosodyFlat = input.ProsodyFeatures;
+        float noiseScale = input.NoiseScale;
+        float noiseW = input.NoiseW;
+
+        // ----- Strategy A: Silence Padding -----
+        bool wasPadded = ShortTextProcessor.NeedsPadding(phonemeIds);
+        if (wasPadded)
+        {
+            (phonemeIds, prosodyFlat) = ShortTextProcessor.PadPhonemeIds(phonemeIds, prosodyFlat);
+        }
+
+        // ----- Strategy B: Dynamic Scales Adjustment -----
+        // Use the *original* length (before padding) for the ratio calculation.
+        if (input.PhonemeIds.Length < ShortTextProcessor.MinPhonemeIds)
+        {
+            (noiseScale, noiseW) = ShortTextProcessor.AdjustScales(
+                input.PhonemeIds.Length, noiseScale, noiseW);
+        }
+
         int phonemeLength = phonemeIds.Length;
 
         // ----- Build input tensors -----
@@ -205,7 +234,7 @@ public sealed class PiperSession
             lengths, new long[] { 1 });
 
         // scales: [3] -- noise_scale, length_scale, noise_w
-        float[] scales = new float[] { input.NoiseScale, input.LengthScale, input.NoiseW };
+        float[] scales = new float[] { noiseScale, input.LengthScale, noiseW };
         using var scalesTensor = OrtValue.CreateTensorValueFromMemory(
             scales, new long[] { 3 });
 
@@ -243,10 +272,10 @@ public sealed class PiperSession
         {
             long[] prosodyArray;
             int prosodySize = phonemeLength * 3;
-            if (input.ProsodyFeatures is not null
-                && input.ProsodyFeatures.Length == prosodySize)
+            if (prosodyFlat is not null
+                && prosodyFlat.Length == prosodySize)
             {
-                prosodyArray = input.ProsodyFeatures;
+                prosodyArray = prosodyFlat;
             }
             else if (prosodySize > 64)
             {
@@ -331,6 +360,12 @@ public sealed class PiperSession
             // Output shape: [1, 1, audio_samples] -- squeeze to 1-D.
             ReadOnlySpan<float> outputSpan = results[0].GetTensorDataAsSpan<float>();
             float[] audio = outputSpan.ToArray();
+
+            // ----- Strategy A: Post-inference silence trimming -----
+            if (wasPadded)
+            {
+                audio = ShortTextProcessor.TrimSilence(audio);
+            }
 
             // Extract durations if available: shape [1, phoneme_length] (float32).
             float[]? durations = null;

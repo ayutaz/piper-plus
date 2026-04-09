@@ -2,6 +2,18 @@
 //!
 //! VITS モデルの ONNX Runtime 推論を行う。
 //! 入力テンソルの構築・条件付きテンソル追加・出力変換を担当。
+//!
+//! ## 短テキスト緩和策 (Strategy A + B)
+//!
+//! VITS は短い phoneme 列 (< 40 tokens) で Duration Predictor が
+//! 不安定になり、音声が崩壊・0秒になる問題がある。
+//! `synthesize()` 内で自動的に以下の緩和策を適用する:
+//!
+//! - **Strategy A (Silence Padding + Post-trim)**: pause トークン (ID=0) を
+//!   BOS 直後と EOS 直前に均等挿入して MIN_PHONEME_IDS まで延長し、
+//!   推論後に先頭・末尾の無音をトリムする。
+//! - **Strategy B (Dynamic Scales Adjustment)**: noise_scale と noise_w を
+//!   phoneme 長に比例して低減し、短い入力での雑音を抑制する。
 
 use std::borrow::Cow;
 use std::path::Path;
@@ -26,6 +38,26 @@ pub const DEFAULT_WARMUP_RUNS: usize = 2;
 /// warmup 用のダミー phoneme 入力長。
 /// 本番入力 (50-200) と同程度の形状で ORT メモリアロケーションを温める。
 const WARMUP_PHONEME_LENGTH: usize = 100;
+
+// ---------------------------------------------------------------------------
+// 短テキスト緩和策の定数 (Strategy A + B)
+// ---------------------------------------------------------------------------
+
+/// 最小 phoneme ID 数。これ未満の場合 padding を挿入する。
+/// VITS の Duration Predictor は ~40 tokens 以上で安定する経験則に基づく。
+pub const MIN_PHONEME_IDS: usize = 40;
+
+/// RMS トリムの閾値。この RMS 以下の窓を無音とみなす。
+const TRIM_THRESHOLD_RMS: f32 = 0.01;
+
+/// トリム後に最低限保持するサンプル数 (22050 Hz x 0.1s)。
+const TRIM_MIN_SAMPLES: usize = 2205;
+
+/// RMS 計算の窓幅 (サンプル数)。
+const TRIM_WINDOW_SIZE: usize = 256;
+
+/// Pause トークン ID (= 0)。BOS/EOS 間に挿入する無音フィラー。
+const PAUSE_TOKEN_ID: i64 = 0;
 
 /// 合成パラメータ
 #[derive(Debug, Clone)]
@@ -92,6 +124,156 @@ pub struct ModelCapabilities {
     /// Whether the model accepts `speaker_embedding` (float32) and
     /// `speaker_embedding_mask` (int64) inputs for voice cloning.
     pub has_speaker_embedding: bool,
+}
+
+// ---------------------------------------------------------------------------
+// 短テキスト緩和策ヘルパー
+// ---------------------------------------------------------------------------
+
+/// Strategy A: phoneme_ids を MIN_PHONEME_IDS まで pause トークンで延長する。
+///
+/// BOS (先頭) と EOS (末尾) を保持したまま、BOS 直後と EOS 直前に
+/// pause トークン (ID=0) を均等挿入する。
+/// prosody_features も同期して延長する (ゼロ埋め)。
+///
+/// 既に MIN_PHONEME_IDS 以上の場合は変更なし。
+pub fn pad_short_phonemes(
+    phoneme_ids: &[i64],
+    prosody_features: Option<&Vec<[i32; 3]>>,
+) -> (Vec<i64>, Option<Vec<[i32; 3]>>, bool) {
+    if phoneme_ids.len() >= MIN_PHONEME_IDS {
+        return (phoneme_ids.to_vec(), prosody_features.cloned(), false);
+    }
+
+    let deficit = MIN_PHONEME_IDS - phoneme_ids.len();
+    let front_pad = deficit / 2;
+    let back_pad = deficit - front_pad;
+
+    // phoneme_ids: [BOS, ...body..., EOS]
+    // → [BOS, pad*front, ...body..., pad*back, EOS]
+    let mut padded = Vec::with_capacity(MIN_PHONEME_IDS);
+    if !phoneme_ids.is_empty() {
+        padded.push(phoneme_ids[0]); // BOS
+    }
+    padded.extend(std::iter::repeat_n(PAUSE_TOKEN_ID, front_pad));
+    if phoneme_ids.len() > 2 {
+        padded.extend_from_slice(&phoneme_ids[1..phoneme_ids.len() - 1]);
+    }
+    padded.extend(std::iter::repeat_n(PAUSE_TOKEN_ID, back_pad));
+    if phoneme_ids.len() > 1 {
+        padded.push(phoneme_ids[phoneme_ids.len() - 1]); // EOS
+    }
+
+    // prosody_features を同期延長
+    let padded_prosody = prosody_features.map(|pf| {
+        let mut padded_pf = Vec::with_capacity(MIN_PHONEME_IDS);
+        if !pf.is_empty() {
+            padded_pf.push(pf[0]);
+        }
+        padded_pf.extend(std::iter::repeat_n([0i32, 0, 0], front_pad));
+        if pf.len() > 2 {
+            padded_pf.extend_from_slice(&pf[1..pf.len() - 1]);
+        }
+        padded_pf.extend(std::iter::repeat_n([0i32, 0, 0], back_pad));
+        if pf.len() > 1 {
+            padded_pf.push(pf[pf.len() - 1]);
+        }
+        padded_pf
+    });
+
+    (padded, padded_prosody, true)
+}
+
+/// Strategy A (post-trim): RMS ベースで先頭・末尾の無音をトリムする。
+///
+/// 窓幅 `TRIM_WINDOW_SIZE` の RMS が `TRIM_THRESHOLD_RMS` を超える
+/// 最初・最後の位置を検出し、その範囲を返す。
+/// 結果は最低 `TRIM_MIN_SAMPLES` サンプルを保持する。
+pub fn trim_silence(audio: &[i16]) -> Vec<i16> {
+    if audio.len() <= TRIM_MIN_SAMPLES {
+        return audio.to_vec();
+    }
+
+    let rms_of_window = |start: usize| -> f32 {
+        let end = (start + TRIM_WINDOW_SIZE).min(audio.len());
+        let n = end - start;
+        if n == 0 {
+            return 0.0;
+        }
+        let sum_sq: f64 = audio[start..end]
+            .iter()
+            .map(|&s| {
+                let f = s as f64 / 32768.0;
+                f * f
+            })
+            .sum();
+        (sum_sq / n as f64).sqrt() as f32
+    };
+
+    // フルウィンドウ数 + partial window の検出 (C++ と同一ロジック)
+    let num_full_windows = audio.len() / TRIM_WINDOW_SIZE;
+    let remainder = audio.len() % TRIM_WINDOW_SIZE;
+
+    // total_windows: フルウィンドウ + partial (存在すれば 1)
+    let total_windows = num_full_windows + if remainder > 0 { 1 } else { 0 };
+
+    // 先頭: RMS > threshold の最初の窓を検出
+    let mut first_above: Option<usize> = None;
+    let mut last_above: Option<usize> = None;
+
+    for w in 0..total_windows {
+        let pos = w * TRIM_WINDOW_SIZE;
+        if rms_of_window(pos) > TRIM_THRESHOLD_RMS {
+            if first_above.is_none() {
+                first_above = Some(w);
+            }
+            last_above = Some(w);
+        }
+    }
+
+    let (trim_start, trim_end) = match (first_above, last_above) {
+        (Some(first), Some(last)) => {
+            let start = first * TRIM_WINDOW_SIZE;
+            let end = ((last + 1) * TRIM_WINDOW_SIZE).min(audio.len());
+            (start, end)
+        }
+        _ => {
+            // 全て無音 -- 最低サンプル数を保持
+            let safe_len = TRIM_MIN_SAMPLES.min(audio.len());
+            return audio[..safe_len].to_vec();
+        }
+    };
+
+    // 最低サンプル数を保証
+    if trim_end <= trim_start || (trim_end - trim_start) < TRIM_MIN_SAMPLES {
+        // トリムすると短すぎる場合は中央を保持
+        let center = audio.len() / 2;
+        let half = TRIM_MIN_SAMPLES / 2;
+        let safe_start = center.saturating_sub(half);
+        let safe_end = (safe_start + TRIM_MIN_SAMPLES).min(audio.len());
+        return audio[safe_start..safe_end].to_vec();
+    }
+
+    audio[trim_start..trim_end].to_vec()
+}
+
+/// Strategy B: 短テキスト向けの scales 調整値を計算する。
+///
+/// phoneme 長が MIN_PHONEME_IDS 未満の場合、ratio に基づいて
+/// noise_scale と noise_w を低減する。
+/// 戻り値: (adjusted_noise_scale, adjusted_noise_w)
+pub fn adjust_scales_for_short_text(
+    phoneme_len: usize,
+    noise_scale: f32,
+    noise_w: f32,
+) -> (f32, f32) {
+    if phoneme_len >= MIN_PHONEME_IDS {
+        return (noise_scale, noise_w);
+    }
+    let ratio = (phoneme_len as f32 / MIN_PHONEME_IDS as f32).clamp(0.0, 1.0);
+    let adjusted_noise_scale = noise_scale * ratio.max(0.5);
+    let adjusted_noise_w = noise_w * ratio.max(0.4);
+    (adjusted_noise_scale, adjusted_noise_w)
 }
 
 /// ONNX 推論エンジン
@@ -328,9 +510,39 @@ impl OnnxEngine {
         &mut self,
         request: &SynthesisRequest,
     ) -> Result<SynthesisResult, PiperError> {
-        let phoneme_len = request.phoneme_ids.len();
-        if phoneme_len == 0 {
+        let original_len = request.phoneme_ids.len();
+        if original_len == 0 {
             return Err(PiperError::Inference("empty phoneme_ids".to_string()));
+        }
+
+        // --- Strategy A: Silence Padding ---
+        // 短い phoneme 列を pause トークンで MIN_PHONEME_IDS まで延長する。
+        let (phoneme_ids, prosody_features, was_padded) =
+            pad_short_phonemes(&request.phoneme_ids, request.prosody_features.as_ref());
+        let phoneme_len = phoneme_ids.len();
+
+        if was_padded {
+            tracing::debug!(
+                "Short text padding: {} -> {} phonemes",
+                original_len,
+                phoneme_len
+            );
+        }
+
+        // --- Strategy B: Dynamic Scales Adjustment ---
+        // 短い入力に対して noise_scale / noise_w を低減する。
+        // original_len を使用して ratio を計算 (padding 前の実際の長さ基準)。
+        let (noise_scale, noise_w) =
+            adjust_scales_for_short_text(original_len, request.noise_scale, request.noise_w);
+
+        if original_len < MIN_PHONEME_IDS {
+            tracing::debug!(
+                "Short text scales: noise_scale {:.3} -> {:.3}, noise_w {:.3} -> {:.3}",
+                request.noise_scale,
+                noise_scale,
+                request.noise_w,
+                noise_w,
+            );
         }
 
         // --- 入力テンソル構築 ---
@@ -338,11 +550,9 @@ impl OnnxEngine {
         // テンソルは run() 完了まで生存する必要があるため、ここで全て確保する。
 
         // 1. input: int64 [1, phoneme_len]
-        let input_tensor = Tensor::from_array((
-            [1_usize, phoneme_len],
-            request.phoneme_ids.to_vec().into_boxed_slice(),
-        ))
-        .map_err(|e| PiperError::Inference(format!("input tensor: {e}")))?;
+        let input_tensor =
+            Tensor::from_array(([1_usize, phoneme_len], phoneme_ids.into_boxed_slice()))
+                .map_err(|e| PiperError::Inference(format!("input tensor: {e}")))?;
 
         // 2. input_lengths: int64 [1]
         let lengths_tensor =
@@ -352,7 +562,7 @@ impl OnnxEngine {
         // 3. scales: float32 [3]
         let scales_tensor = Tensor::from_array((
             [3_usize],
-            vec![request.noise_scale, request.length_scale, request.noise_w].into_boxed_slice(),
+            vec![noise_scale, request.length_scale, noise_w].into_boxed_slice(),
         ))
         .map_err(|e| PiperError::Inference(format!("scales tensor: {e}")))?;
 
@@ -379,8 +589,9 @@ impl OnnxEngine {
         };
 
         // 6. prosody_features: int64 [1, phoneme_len, 3] (条件付き)
+        //    Strategy A で延長済みの prosody_features を使用する。
         let prosody_tensor = if self.capabilities.has_prosody {
-            let flat: Vec<i64> = if let Some(ref features) = request.prosody_features {
+            let flat: Vec<i64> = if let Some(ref features) = prosody_features {
                 features
                     .iter()
                     .flat_map(|f| [f[0] as i64, f[1] as i64, f[2] as i64])
@@ -472,7 +683,20 @@ impl OnnxEngine {
             .map_err(|e| PiperError::Inference(format!("extract output: {e}")))?;
 
         // float32 -> int16 ピーク正規化
-        let audio_i16 = audio_float_to_int16(audio_slice);
+        let audio_i16_raw = audio_float_to_int16(audio_slice);
+
+        // --- Strategy A (post-trim): padding 挿入した場合は無音をトリム ---
+        let audio_i16 = if was_padded {
+            let trimmed = trim_silence(&audio_i16_raw);
+            tracing::debug!(
+                "Short text trim: {} -> {} samples",
+                audio_i16_raw.len(),
+                trimmed.len()
+            );
+            trimmed
+        } else {
+            audio_i16_raw
+        };
         let audio_seconds = audio_i16.len() as f64 / self.sample_rate as f64;
 
         // --- duration テンソル抽出 (オプション) ---
@@ -881,5 +1105,225 @@ mod tests {
         assert_eq!(content, b"ok");
         let _ = std::fs::remove_file(&sentinel);
         let _ = std::fs::remove_dir(&dir);
+    }
+
+    // -----------------------------------------------------------------------
+    // Strategy A: Silence Padding テスト
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_pad_short_phonemes_below_threshold() {
+        // 10 tokens -> should be padded to MIN_PHONEME_IDS
+        let ids: Vec<i64> = vec![1, 5, 6, 7, 8, 9, 10, 11, 12, 2]; // BOS=1, EOS=2
+        let (padded, _, was_padded) = pad_short_phonemes(&ids, None);
+        assert!(was_padded);
+        assert_eq!(padded.len(), MIN_PHONEME_IDS);
+        assert_eq!(padded[0], 1); // BOS preserved
+        assert_eq!(padded[padded.len() - 1], 2); // EOS preserved
+    }
+
+    #[test]
+    fn test_pad_short_phonemes_at_threshold() {
+        // Exactly MIN_PHONEME_IDS -> no padding
+        let ids: Vec<i64> = (0..MIN_PHONEME_IDS as i64).collect();
+        let (padded, _, was_padded) = pad_short_phonemes(&ids, None);
+        assert!(!was_padded);
+        assert_eq!(padded.len(), MIN_PHONEME_IDS);
+        assert_eq!(padded, ids);
+    }
+
+    #[test]
+    fn test_pad_short_phonemes_above_threshold() {
+        // Above MIN_PHONEME_IDS -> no padding
+        let ids: Vec<i64> = (0..(MIN_PHONEME_IDS as i64 + 10)).collect();
+        let (padded, _, was_padded) = pad_short_phonemes(&ids, None);
+        assert!(!was_padded);
+        assert_eq!(padded.len(), MIN_PHONEME_IDS + 10);
+    }
+
+    #[test]
+    fn test_pad_short_phonemes_pause_tokens() {
+        // Verify that inserted tokens are PAUSE_TOKEN_ID (0)
+        let ids: Vec<i64> = vec![1, 100, 200, 2]; // 4 tokens
+        let (padded, _, was_padded) = pad_short_phonemes(&ids, None);
+        assert!(was_padded);
+        // All inserted tokens should be 0
+        let inserted: Vec<i64> = padded
+            .iter()
+            .copied()
+            .filter(|&id| id == PAUSE_TOKEN_ID)
+            .collect();
+        assert_eq!(inserted.len(), MIN_PHONEME_IDS - 4);
+    }
+
+    #[test]
+    fn test_pad_short_phonemes_body_preserved() {
+        // Original body tokens should be preserved in order
+        let ids: Vec<i64> = vec![1, 10, 20, 30, 2]; // BOS=1, body=[10,20,30], EOS=2
+        let (padded, _, _) = pad_short_phonemes(&ids, None);
+
+        // Extract non-pause, non-BOS, non-EOS tokens
+        let body: Vec<i64> = padded
+            .iter()
+            .copied()
+            .filter(|&id| id != PAUSE_TOKEN_ID && id != 1 && id != 2)
+            .collect();
+        assert_eq!(body, vec![10, 20, 30]);
+    }
+
+    #[test]
+    fn test_pad_short_phonemes_with_prosody() {
+        let ids: Vec<i64> = vec![1, 5, 6, 2]; // 4 tokens
+        let prosody = vec![[0, 0, 0], [1, 2, 3], [4, 5, 6], [0, 0, 0]];
+        let (padded_ids, padded_prosody, was_padded) = pad_short_phonemes(&ids, Some(&prosody));
+        assert!(was_padded);
+        assert_eq!(padded_ids.len(), MIN_PHONEME_IDS);
+        let pp = padded_prosody.unwrap();
+        assert_eq!(pp.len(), MIN_PHONEME_IDS);
+        // BOS prosody preserved
+        assert_eq!(pp[0], [0, 0, 0]);
+        // EOS prosody preserved
+        assert_eq!(pp[pp.len() - 1], [0, 0, 0]);
+    }
+
+    #[test]
+    fn test_pad_short_phonemes_prosody_none() {
+        let ids: Vec<i64> = vec![1, 5, 2];
+        let (padded, padded_prosody, was_padded) = pad_short_phonemes(&ids, None);
+        assert!(was_padded);
+        assert_eq!(padded.len(), MIN_PHONEME_IDS);
+        assert!(padded_prosody.is_none());
+    }
+
+    #[test]
+    fn test_pad_short_phonemes_minimal() {
+        // Minimum: [BOS, EOS] = 2 tokens
+        let ids: Vec<i64> = vec![1, 2];
+        let (padded, _, was_padded) = pad_short_phonemes(&ids, None);
+        assert!(was_padded);
+        assert_eq!(padded.len(), MIN_PHONEME_IDS);
+        assert_eq!(padded[0], 1);
+        assert_eq!(padded[padded.len() - 1], 2);
+    }
+
+    #[test]
+    fn test_pad_short_phonemes_single_element() {
+        // Edge case: single element
+        let ids: Vec<i64> = vec![1];
+        let (padded, _, was_padded) = pad_short_phonemes(&ids, None);
+        assert!(was_padded);
+        assert_eq!(padded.len(), MIN_PHONEME_IDS);
+        assert_eq!(padded[0], 1); // BOS preserved
+    }
+
+    // -----------------------------------------------------------------------
+    // Strategy A: Trim Silence テスト
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_trim_silence_removes_leading_silence() {
+        // 1000 samples of silence + 5000 samples of signal
+        let mut audio = vec![0i16; 1000];
+        audio.extend(vec![10000i16; 5000]);
+        let trimmed = trim_silence(&audio);
+        assert!(trimmed.len() < audio.len());
+        // Trimmed result should contain the signal
+        assert!(trimmed.iter().any(|&s| s == 10000));
+    }
+
+    #[test]
+    fn test_trim_silence_removes_trailing_silence() {
+        // 5000 samples of signal + 1000 samples of silence
+        let mut audio = vec![10000i16; 5000];
+        audio.extend(vec![0i16; 1000]);
+        let trimmed = trim_silence(&audio);
+        assert!(trimmed.len() < audio.len());
+    }
+
+    #[test]
+    fn test_trim_silence_preserves_minimum() {
+        // Very short audio should be preserved
+        let audio = vec![0i16; 100];
+        let trimmed = trim_silence(&audio);
+        assert_eq!(trimmed.len(), audio.len()); // Below TRIM_MIN_SAMPLES
+    }
+
+    #[test]
+    fn test_trim_silence_all_silence() {
+        // All silence but longer than TRIM_MIN_SAMPLES -> trims to minimum
+        let audio = vec![0i16; 10000];
+        let trimmed = trim_silence(&audio);
+        assert!(trimmed.len() >= TRIM_MIN_SAMPLES);
+    }
+
+    #[test]
+    fn test_trim_silence_no_silence() {
+        // Constant non-zero signal -> should preserve most of it.
+        // Window-based detection may round to window boundaries,
+        // so allow up to TRIM_WINDOW_SIZE difference.
+        let audio: Vec<i16> = (0..5000).map(|i| ((i % 1000) as i16) + 1000).collect();
+        let trimmed = trim_silence(&audio);
+        assert!(
+            trimmed.len() >= audio.len() - TRIM_WINDOW_SIZE,
+            "trimmed {} from {} (max allowed loss: {})",
+            audio.len() - trimmed.len(),
+            audio.len(),
+            TRIM_WINDOW_SIZE,
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // Strategy B: Dynamic Scales Adjustment テスト
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_adjust_scales_above_threshold() {
+        let (ns, nw) = adjust_scales_for_short_text(MIN_PHONEME_IDS, 0.667, 0.8);
+        assert!((ns - 0.667).abs() < 1e-6);
+        assert!((nw - 0.8).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_adjust_scales_below_threshold() {
+        let len = 20; // 50% of MIN_PHONEME_IDS
+        let (ns, nw) = adjust_scales_for_short_text(len, 0.667, 0.8);
+        // ratio = 20/40 = 0.5, max(0.5, 0.5) = 0.5
+        assert!((ns - 0.667 * 0.5).abs() < 1e-4);
+        // ratio = 0.5, max(0.5, 0.4) = 0.5
+        assert!((nw - 0.8 * 0.5).abs() < 1e-4);
+    }
+
+    #[test]
+    fn test_adjust_scales_very_short() {
+        let len = 5; // 12.5% of MIN_PHONEME_IDS
+        let (ns, nw) = adjust_scales_for_short_text(len, 0.667, 0.8);
+        // ratio = 5/40 = 0.125, but clamped at max(0.125, 0.5) = 0.5
+        assert!((ns - 0.667 * 0.5).abs() < 1e-4);
+        // ratio = 0.125, max(0.125, 0.4) = 0.4
+        assert!((nw - 0.8 * 0.4).abs() < 1e-4);
+    }
+
+    #[test]
+    fn test_adjust_scales_zero_length() {
+        let (ns, nw) = adjust_scales_for_short_text(0, 0.667, 0.8);
+        // ratio = 0.0, clamped at max(0.0, 0.5) = 0.5 for ns
+        assert!((ns - 0.667 * 0.5).abs() < 1e-4);
+        // ratio = 0.0, clamped at max(0.0, 0.4) = 0.4 for nw
+        assert!((nw - 0.8 * 0.4).abs() < 1e-4);
+    }
+
+    #[test]
+    fn test_adjust_scales_boundary_ratio() {
+        // len = 30 -> ratio = 30/40 = 0.75
+        let (ns, nw) = adjust_scales_for_short_text(30, 1.0, 1.0);
+        // ratio = 0.75, max(0.75, 0.5) = 0.75
+        assert!((ns - 0.75).abs() < 1e-4);
+        // ratio = 0.75, max(0.75, 0.4) = 0.75
+        assert!((nw - 0.75).abs() < 1e-4);
+    }
+
+    #[test]
+    fn test_min_phoneme_ids_value() {
+        assert_eq!(MIN_PHONEME_IDS, 40);
     }
 }

@@ -296,6 +296,9 @@ impl PiperVoice {
     /// `SynthesisParams` で合成パラメータをまとめて指定する新 API。
     /// `..Default::default()` パターンで、変更したいフィールドだけ指定できる。
     ///
+    /// 短いテキスト (空白除く10文字以下) には自動的に Strategy C
+    /// (SSML `<break>` ラップ) を適用する。
+    ///
     /// # Examples
     ///
     /// ```ignore
@@ -310,8 +313,12 @@ impl PiperVoice {
         text: &str,
         params: &SynthesisParams,
     ) -> Result<SynthesisResult, PiperError> {
+        // Strategy C: 短テキストを SSML <break> でラップ
+        let effective_text = crate::short_text::wrap_short_text_ssml(text);
+        let text_ref = effective_text.as_str();
+
         // 1. Phonemize: テキストをトークン列 + プロソディ情報に変換
-        let (tokens, prosody) = self.phonemizer.phonemize_with_prosody(text)?;
+        let (tokens, prosody) = self.phonemizer.phonemize_with_prosody(text_ref)?;
 
         // 2. Convert tokens to IDs using phoneme_id_map
         let phoneme_id_map = self

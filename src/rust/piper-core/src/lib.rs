@@ -43,6 +43,7 @@ pub mod wasm;
 // --- Phase 4 modules (推論非依存) ---
 pub mod audio_format;
 pub mod model_download;
+pub mod short_text;
 pub mod ssml;
 pub mod streaming;
 pub mod text_splitter;
@@ -54,9 +55,11 @@ pub mod playback;
 pub use config::{PhonemeIdMap, PhonemeType, VoiceConfig};
 #[cfg(feature = "onnx")]
 pub use engine::{
-    DEFAULT_WARMUP_RUNS, ModelCapabilities, OnnxEngine, SynthesisRequest, SynthesisResult,
+    DEFAULT_WARMUP_RUNS, MIN_PHONEME_IDS, ModelCapabilities, OnnxEngine, SynthesisRequest,
+    SynthesisResult,
 };
 pub use error::PiperError;
 pub use phonemize::{ProsodyFeature, ProsodyInfo};
+pub use short_text::wrap_short_text_ssml;
 #[cfg(feature = "onnx")]
 pub use voice::{PiperVoice, SynthesisParams};
