@@ -22,6 +22,103 @@ if python_src and (str(python_src) not in sys.path):
 from piper_train.export_onnx import build_infer_forward  # noqa: E402
 
 
+# ---------------------------------------------------------------------------
+# Shared Japanese phonemization helpers
+# ---------------------------------------------------------------------------
+# These centralise the BOS/EOS wrapping logic that was previously duplicated
+# across test_phonemize.py, test_prosody_extraction.py, test_performance.py,
+# and test_integration.py.
+#
+# Two EOS behaviours exist:
+#   auto_eos=True  -- skip "$" when the G2P output already ends with a
+#                     sentence-terminal token (?, ?!, ?., ?~).
+#                     Used by test_prosody_extraction.py.
+#   auto_eos=False -- always append "$" unconditionally.
+#                     Used by test_phonemize.py, test_performance.py,
+#                     test_integration.py.
+
+try:
+    import pyopenjtalk  # noqa: F401
+
+    from piper_plus_g2p import ProsodyInfo  # noqa: F401
+    from piper_plus_g2p.japanese import JapanesePhonemizer as _JaPhonemizer
+    from piper_plus_g2p.encode.pua import map_token as _map_token
+
+    _HAS_JAPANESE_G2P = True
+except ImportError:
+    _HAS_JAPANESE_G2P = False
+
+# EOS tokens that the G2P layer may already append.
+_EOS_TOKENS = {"$", "?", "?!", "?.", "?~"}
+
+
+def phonemize_japanese(text: str, *, auto_eos: bool = False) -> list[str]:
+    """Phonemize Japanese *text* and wrap with BOS/EOS markers.
+
+    Parameters
+    ----------
+    text:
+        Japanese text to phonemize.
+    auto_eos:
+        When ``False`` (default), ``"$"`` is **always** appended after the
+        G2P output -- even if the output already ends with a
+        sentence-terminal token such as ``"?"``.  This is the simpler
+        behaviour used by most test files.
+
+        When ``True``, ``"$"`` is appended **only when** the last G2P token
+        is not already in ``_EOS_TOKENS``.  This avoids double-termination
+        for question sentences and is used by
+        ``test_prosody_extraction.py``.
+
+    Raises
+    ------
+    ImportError
+        If ``piper_plus_g2p`` (or ``pyopenjtalk``) is not installed.
+    """
+    if not _HAS_JAPANESE_G2P:
+        raise ImportError("piper_plus_g2p is not installed")
+    p = _JaPhonemizer()
+    tokens = p.phonemize(text)
+    full_tokens = ["^"] + list(tokens)
+    if auto_eos:
+        if not tokens or tokens[-1] not in _EOS_TOKENS:
+            full_tokens.append("$")
+    else:
+        full_tokens.append("$")
+    return [_map_token(t) for t in full_tokens]
+
+
+def phonemize_japanese_with_prosody(
+    text: str,
+) -> tuple[list[str], list]:
+    """Phonemize Japanese *text* and return aligned prosody info.
+
+    Uses ``auto_eos=True`` semantics (conditional ``"$"``).  A parallel
+    ``[None]`` entry is inserted/appended for each added special token so
+    that the prosody list stays aligned with the token list.
+
+    Raises
+    ------
+    ImportError
+        If ``piper_plus_g2p`` (or ``pyopenjtalk``) is not installed.
+    """
+    if not _HAS_JAPANESE_G2P:
+        raise ImportError("piper_plus_g2p is not installed")
+    p = _JaPhonemizer()
+    tokens, prosody = p.phonemize_with_prosody(text)
+    full_tokens = ["^"] + list(tokens)
+    full_prosody = [None] + list(prosody)
+    if not tokens or tokens[-1] not in _EOS_TOKENS:
+        full_tokens.append("$")
+        full_prosody.append(None)
+    mapped_tokens = [_map_token(t) for t in full_tokens]
+    return mapped_tokens, full_prosody
+
+
+# Expose whether Japanese G2P is available for skip-checks in test files.
+HAS_JAPANESE_G2P = _HAS_JAPANESE_G2P
+
+
 # ============================================================================
 # PyTorch/ONNX Parity Test Fixtures
 # ============================================================================

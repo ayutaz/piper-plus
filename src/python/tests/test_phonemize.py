@@ -10,51 +10,8 @@ from piper_plus_g2p.encode.pua import (
     map_token,
 )
 
-
-# Japanese imports are optional
-try:
-    import pyopenjtalk  # noqa: F401
-
-    from piper_plus_g2p.japanese import JapanesePhonemizer
-    from piper_plus_g2p.encode.pua import map_token as _map_token
-
-    # NOTE: A near-duplicate of this wrapper exists in test_prosody_extraction.py.
-    # That version checks _EOS_TOKENS and skips "$" when the G2P output
-    # already ends with a sentence-terminal token (e.g. "?").
-    # This version unconditionally appends "$" — which is acceptable here
-    # because the tests in this file filter out markers before assertions and
-    # do not exercise question-sentence EOS semantics.
-    # Consolidation into conftest.py is deferred until a full EOS-behaviour
-    # analysis is performed (see docs/tickets/M3-3.md).
-
-    def phonemize_japanese(text):
-        """Test-only helper wrapping ``JapanesePhonemizer.phonemize()``.
-
-        BOS/EOS behaviour
-        -----------------
-        * Prepends BOS ``"^"`` unconditionally.
-        * Appends EOS ``"$"`` **unconditionally** — even when the G2P
-          output already ends with a sentence-terminal token such as
-          ``"?"``.  This differs from the version in
-          ``test_prosody_extraction.py``, which skips ``"$"`` in that
-          case.  The difference is intentionally preserved: tests here
-          strip markers before comparing phoneme content and do not
-          depend on precise EOS semantics.
-
-        Why this exists
-        ---------------
-        ``piper_plus_g2p`` returns raw phoneme tokens without BOS/EOS.
-        There is no shared production utility that adds them, so each
-        test file carries its own wrapper.
-        """
-        p = JapanesePhonemizer()
-        tokens = p.phonemize(text)
-        full_tokens = ["^"] + tokens + ["$"]
-        return [_map_token(t) for t in full_tokens]
-
-    HAS_JAPANESE = True
-except ImportError:
-    HAS_JAPANESE = False
+# Shared helper from conftest.py (auto_eos=False → unconditional "$").
+from conftest import HAS_JAPANESE_G2P as HAS_JAPANESE, phonemize_japanese  # noqa: E402
 
 
 class TestPhonemization:

@@ -8,36 +8,14 @@ import time
 
 import pytest
 
+# Shared helper from conftest.py (auto_eos=False → unconditional "$").
+from conftest import phonemize_japanese as _phonemize_japanese  # noqa: E402
+
 
 try:
     import psutil
 except ImportError:
     psutil = None
-
-
-# ---------------------------------------------------------------------------
-# Shared helper — replaces 4 identical local definitions
-# ---------------------------------------------------------------------------
-
-try:
-    from piper_plus_g2p.japanese import JapanesePhonemizer as _JaPhonemizer
-    from piper_plus_g2p.encode.pua import map_token as _map_token
-
-    _HAS_G2P = True
-except ImportError:
-    _HAS_G2P = False
-
-
-def _phonemize_japanese(text: str) -> list[str]:
-    """Phonemize Japanese text with BOS/EOS markers.
-
-    Raises ImportError if piper_plus_g2p is not installed.
-    """
-    if not _HAS_G2P:
-        raise ImportError("piper_plus_g2p is not installed")
-    p = _JaPhonemizer()
-    tokens = p.phonemize(text)
-    return [_map_token(t) for t in ["^"] + tokens + ["$"]]
 
 
 class TestPerformance:
