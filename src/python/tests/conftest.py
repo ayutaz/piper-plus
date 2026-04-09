@@ -221,7 +221,9 @@ def temp_onnx_model(mock_vits_model, tmp_path_factory):
         input_tensor, input_lengths, scales_tensor, prosody_features_tensor
     ):
         return _infer(
-            input_tensor, input_lengths, scales_tensor,
+            input_tensor,
+            input_lengths,
+            scales_tensor,
             prosody_features=prosody_features_tensor,
         )
 
@@ -279,7 +281,9 @@ def temp_onnx_model_stochastic(mock_vits_model, tmp_path_factory):
         input_tensor, input_lengths, scales_tensor, prosody_features_tensor
     ):
         return _infer(
-            input_tensor, input_lengths, scales_tensor,
+            input_tensor,
+            input_lengths,
+            scales_tensor,
             prosody_features=prosody_features_tensor,
         )
 

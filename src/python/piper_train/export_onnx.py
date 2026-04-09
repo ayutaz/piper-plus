@@ -87,7 +87,11 @@ def build_infer_forward(
         # We set it here to match the stochastic flag, restoring the
         # original value afterwards so the caller's state is not mutated.
         prev_model = getattr(model, "onnx_export_mode", False)
-        prev_dp = getattr(model.dp, "onnx_export_mode", False) if hasattr(model, "dp") else None
+        prev_dp = (
+            getattr(model.dp, "onnx_export_mode", False)
+            if hasattr(model, "dp")
+            else None
+        )
         model.onnx_export_mode = not stochastic
         if hasattr(model, "dp"):
             model.dp.onnx_export_mode = not stochastic

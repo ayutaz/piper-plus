@@ -330,9 +330,7 @@ def load_multispeaker_checkpoint(checkpoint_path: str, model: VitsModel) -> None
         map_location="cpu",
         weights_only=False,
     )
-    missing, unexpected = model.load_state_dict(
-        checkpoint["state_dict"], strict=False
-    )
+    missing, unexpected = model.load_state_dict(checkpoint["state_dict"], strict=False)
     _LOGGER.info(
         "Weights loaded (strict=False). Missing keys: %s. Unexpected keys: %s.",
         missing,
@@ -399,7 +397,10 @@ def apply_transfer_defaults(
 
     # freeze_dp 自動有効化
     # モデル作成前に設定しないと save_hyperparameters() に反映されない
-    if getattr(args, "resume_from_multispeaker_checkpoint", None) and not args.freeze_dp:
+    if (
+        getattr(args, "resume_from_multispeaker_checkpoint", None)
+        and not args.freeze_dp
+    ):
         args.freeze_dp = True
         _LOGGER.info(
             "Auto-enabled --freeze-dp for multispeaker→single-speaker transfer"

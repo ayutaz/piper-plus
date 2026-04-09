@@ -19,15 +19,16 @@ pyopenjtalk = pytest.importorskip(
     "pyopenjtalk", reason="pyopenjtalk required for JA tests"
 )
 g2p_en = pytest.importorskip("g2p_en", reason="g2p_en required for EN tests")
+torch = pytest.importorskip("torch", reason="torch required for intersperse tests")
 
 # g2p_en depends on NLTK's averaged_perceptron_tagger_eng data at runtime.
 # The package imports fine, but phonemization fails without the data.
 try:
-    import nltk
+    from nltk.tag.perceptron import PerceptronTagger
 
-    nltk.data.find("taggers/averaged_perceptron_tagger_eng")
+    PerceptronTagger(lang="eng")  # actually load the tagger data, not just find()
     _has_nltk_tagger = True
-except (ImportError, LookupError):
+except (ImportError, LookupError, OSError):
     _has_nltk_tagger = False
 
 _skip_no_nltk = pytest.mark.skipif(

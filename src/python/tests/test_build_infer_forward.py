@@ -10,7 +10,8 @@ Tests verify:
 """
 
 import pytest
-import torch
+
+torch = pytest.importorskip("torch", reason="torch required for build_infer_forward tests")
 
 
 @pytest.mark.unit
