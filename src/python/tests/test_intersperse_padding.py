@@ -20,6 +20,21 @@ pyopenjtalk = pytest.importorskip(
 )
 g2p_en = pytest.importorskip("g2p_en", reason="g2p_en required for EN tests")
 
+# g2p_en depends on NLTK's averaged_perceptron_tagger_eng data at runtime.
+# The package imports fine, but phonemization fails without the data.
+try:
+    import nltk
+
+    nltk.data.find("taggers/averaged_perceptron_tagger_eng")
+    _has_nltk_tagger = True
+except (ImportError, LookupError):
+    _has_nltk_tagger = False
+
+_skip_no_nltk = pytest.mark.skipif(
+    not _has_nltk_tagger,
+    reason="NLTK averaged_perceptron_tagger_eng data not available",
+)
+
 from piper_train.infer_onnx import text_to_phoneme_ids_and_prosody
 from piper_train.vits.commons import intersperse
 from piper_plus_g2p.encode.id_maps import get_phoneme_id_map
@@ -96,6 +111,7 @@ class TestMultilingualInterspersePadding:
         )
         assert len(ids) == len(prosody)
 
+    @_skip_no_nltk
     def test_en_has_intersperse_pattern(self, phoneme_id_map):
         """EN text through multilingual pipeline should have intersperse padding."""
         text = "Hello, how are you today?"
@@ -345,6 +361,7 @@ class TestLatinLanguageNotMisrouted:
         assert len(ids) >= 3
         assert has_intersperse_padding(ids)
 
+    @_skip_no_nltk
     def test_es_phonemes_differ_from_english(self, phoneme_id_map):
         """Same word phonemized as ES vs EN should produce different IDs.
 
