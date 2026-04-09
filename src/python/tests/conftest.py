@@ -416,6 +416,31 @@ def make_synthesizer_trn():
     return _factory
 
 
+@pytest.fixture(scope="session")
+def mock_wavlm_discriminator():
+    """WavLMDiscriminator with mocked WavLM model (avoids ~300MB download).
+
+    The resampler is real (sinc interpolation); only the transformer weights
+    are mocked.  Shared across test_vits.py and test_wavlm_discriminator.py.
+    """
+    from unittest.mock import MagicMock, patch
+
+    transformers = pytest.importorskip("transformers")
+    torchaudio = pytest.importorskip("torchaudio")
+
+    from piper_train.vits.models import WavLMDiscriminator
+
+    mock_wavlm = MagicMock()
+    mock_wavlm.feature_extractor.parameters.return_value = []
+    with patch("transformers.WavLMModel") as mock_wavlm_cls:
+        mock_wavlm_cls.from_pretrained.return_value = mock_wavlm
+        disc = WavLMDiscriminator(
+            source_sample_rate=22050,
+            target_sample_rate=16000,
+        )
+    return disc
+
+
 @pytest.fixture
 def sample_phoneme_ids():
     """標準的なテスト用音素ID列"""

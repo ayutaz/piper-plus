@@ -113,26 +113,12 @@ class TestWavLMDiscriminator:
 
     @pytest.mark.unit
     @pytest.mark.training
-    def test_wavlm_discriminator_resample(self):
+    def test_wavlm_discriminator_resample(self, mock_wavlm_discriminator):
         """Test audio resampling via WavLMDiscriminator._resample()"""
-        from unittest.mock import MagicMock, patch
-
-        from piper_train.vits.models import WavLMDiscriminator
-
         source_sample_rate = 22050
         target_sample_rate = 16000
 
-        # Mock WavLM model loading to avoid downloading the full model.
-        # WavLMModel is imported locally inside __init__, so we patch
-        # the source module (transformers).
-        mock_wavlm = MagicMock()
-        mock_wavlm.feature_extractor.parameters.return_value = []
-        with patch("transformers.WavLMModel") as mock_wavlm_cls:
-            mock_wavlm_cls.from_pretrained.return_value = mock_wavlm
-            disc = WavLMDiscriminator(
-                source_sample_rate=source_sample_rate,
-                target_sample_rate=target_sample_rate,
-            )
+        disc = mock_wavlm_discriminator
 
         # Create test audio (batch=2, 1 channel, 1 second at 22050Hz)
         audio = torch.randn(2, 1, source_sample_rate)
@@ -155,7 +141,7 @@ class TestWavLMDiscriminator:
 
         sr = 16000
 
-        # Mock WavLM model loading to avoid downloading the full model
+        # Same-rate path needs its own instance (source==target, no resampler)
         mock_wavlm = MagicMock()
         mock_wavlm.feature_extractor.parameters.return_value = []
         with patch("transformers.WavLMModel") as mock_wavlm_cls:

@@ -102,20 +102,9 @@ class TestWavLMResampling:
     """Test audio resampling quality."""
 
     @pytest.fixture(scope="class")
-    def resampler_sinc(self):
-        """Get sinc interpolation resampler from WavLMDiscriminator."""
-        from unittest.mock import patch
-
-        from piper_train.vits.models import WavLMDiscriminator
-
-        # Mock WavLMModel.from_pretrained to avoid downloading the full
-        # model (~300 MB).  The resampler is initialised independently of
-        # the WavLM weights.
-        with patch("transformers.WavLMModel.from_pretrained"):
-            disc = WavLMDiscriminator(
-                source_sample_rate=22050,
-                target_sample_rate=16000,
-            )
+    def resampler_sinc(self, mock_wavlm_discriminator):
+        """Get sinc interpolation resampler from shared mock WavLMDiscriminator."""
+        disc = mock_wavlm_discriminator
         assert disc.resampler is not None, (
             "WavLMDiscriminator.resampler should be initialized when "
             "source_sample_rate != target_sample_rate"
