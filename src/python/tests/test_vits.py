@@ -114,24 +114,62 @@ class TestWavLMDiscriminator:
     @pytest.mark.unit
     @pytest.mark.training
     def test_wavlm_discriminator_resample(self):
-        """Test audio resampling logic used by WavLMDiscriminator"""
-        import torchaudio
+        """Test audio resampling via WavLMDiscriminator._resample()"""
+        from unittest.mock import MagicMock, patch
+
+        from piper_train.vits.models import WavLMDiscriminator
 
         source_sample_rate = 22050
         target_sample_rate = 16000
 
+        # Mock WavLM model loading to avoid downloading the full model.
+        # WavLMModel is imported locally inside __init__, so we patch
+        # the source module (transformers).
+        mock_wavlm = MagicMock()
+        mock_wavlm.feature_extractor.parameters.return_value = []
+        with patch("transformers.WavLMModel") as mock_wavlm_cls:
+            mock_wavlm_cls.from_pretrained.return_value = mock_wavlm
+            disc = WavLMDiscriminator(
+                source_sample_rate=source_sample_rate,
+                target_sample_rate=target_sample_rate,
+            )
+
         # Create test audio (batch=2, 1 channel, 1 second at 22050Hz)
         audio = torch.randn(2, 1, source_sample_rate)
 
-        # Squeeze channel dim and resample (same logic as WavLMDiscriminator._resample)
-        audio_squeezed = audio.squeeze(1)
-        resampled = torchaudio.functional.resample(
-            audio_squeezed, source_sample_rate, target_sample_rate
-        )
+        resampled = disc._resample(audio)
 
         # Expected length: 22050 * (16000 / 22050) = 16000
         expected_length = target_sample_rate
-        assert resampled.shape == (2, expected_length), f"Expected shape (2, {expected_length}), got {resampled.shape}"
+        assert resampled.shape == (2, expected_length), (
+            f"Expected shape (2, {expected_length}), got {resampled.shape}"
+        )
+
+    @pytest.mark.unit
+    @pytest.mark.training
+    def test_wavlm_discriminator_resample_same_rate(self):
+        """Test _resample() when source == target sample rate (no-op path)."""
+        from unittest.mock import MagicMock, patch
+
+        from piper_train.vits.models import WavLMDiscriminator
+
+        sr = 16000
+
+        # Mock WavLM model loading to avoid downloading the full model
+        mock_wavlm = MagicMock()
+        mock_wavlm.feature_extractor.parameters.return_value = []
+        with patch("transformers.WavLMModel") as mock_wavlm_cls:
+            mock_wavlm_cls.from_pretrained.return_value = mock_wavlm
+            disc = WavLMDiscriminator(
+                source_sample_rate=sr,
+                target_sample_rate=sr,
+            )
+
+        audio = torch.randn(2, 1, sr)
+        resampled = disc._resample(audio)
+
+        # No resampling; just squeeze channel dim
+        assert resampled.shape == (2, sr)
 
     @pytest.mark.unit
     @pytest.mark.training
