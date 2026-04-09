@@ -1,14 +1,21 @@
 #!/usr/bin/env python3
+from __future__ import annotations
+
 import argparse
 import logging
 import pathlib
 import platform
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import torch
 
 from .tools.convert_fp16 import convert_fp16
 from .vits.lightning import VitsModel
+
+
+if TYPE_CHECKING:
+    from .vits.models import SynthesizerTrn
 
 
 # Allow Path objects in checkpoints (PyTorch 2.6+ weights_only=True)
@@ -25,10 +32,10 @@ OPSET_VERSION = 15
 
 
 def build_infer_forward(
-    model: "SynthesizerTrn",
+    model: SynthesizerTrn,
     *,
     stochastic: bool = True,
-) -> "callable":
+) -> callable:
     """Build an inference-only forward function for ONNX export.
 
     The returned callable replaces ``model.forward`` before
@@ -109,9 +116,9 @@ def build_infer_forward(
 
 
 def apply_ema_shadow_params(
-    decoder: "torch.nn.Module",
+    decoder: torch.nn.Module,
     shadow_params: dict,
-) -> "tuple[int, int]":
+) -> tuple[int, int]:
     """Apply pre-loaded EMA shadow parameters to the decoder module.
 
     This is the pure-logic function that copies shadow parameters into
@@ -160,9 +167,9 @@ def apply_ema_shadow_params(
 
 
 def apply_ema_weights(
-    decoder: "torch.nn.Module",
-    checkpoint_path: "str | Path",
-) -> "tuple[int, int]":
+    decoder: torch.nn.Module,
+    checkpoint_path: str | Path,
+) -> tuple[int, int]:
     """High-level convenience: load checkpoint and apply EMA shadow weights.
 
     Loads the checkpoint, extracts ``ema_generator_state.shadow_params``,
@@ -196,7 +203,7 @@ def apply_ema_weights(
 
 
 def should_unify_emb_lang(
-    unify_flag: "bool | None",
+    unify_flag: bool | None,
     num_speakers: int,
     num_languages: int,
 ) -> bool:

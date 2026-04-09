@@ -1,5 +1,5 @@
 import math
-from typing import NamedTuple, Tuple
+from typing import NamedTuple
 
 import torch
 from torch import nn
@@ -20,7 +20,7 @@ class InferOutput(NamedTuple):
     audio: torch.Tensor
     attn: torch.Tensor
     y_mask: torch.Tensor
-    latents: Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]
+    latents: tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]
     durations: torch.Tensor
 
 

@@ -39,10 +39,9 @@ from piper_train.export_onnx import build_infer_forward  # noqa: E402
 
 try:
     import pyopenjtalk  # noqa: F401
-
     from piper_plus_g2p import ProsodyInfo  # noqa: F401
-    from piper_plus_g2p.japanese import JapanesePhonemizer as _JaPhonemizer
     from piper_plus_g2p.encode.pua import map_token as _map_token
+    from piper_plus_g2p.japanese import JapanesePhonemizer as _JaPhonemizer
 
     _HAS_JAPANESE_G2P = True
 except ImportError:
@@ -522,8 +521,8 @@ def mock_wavlm_discriminator():
     """
     from unittest.mock import MagicMock, patch
 
-    transformers = pytest.importorskip("transformers")
-    torchaudio = pytest.importorskip("torchaudio")
+    pytest.importorskip("transformers")
+    pytest.importorskip("torchaudio")
 
     from piper_train.vits.models import WavLMDiscriminator
 
