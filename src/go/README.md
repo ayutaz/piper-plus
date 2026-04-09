@@ -390,7 +390,7 @@ docker run -p 8080:8080 -v /path/to/models:/models \
   piper-plus-go serve -m /models/model.onnx --addr :8080
 ```
 
-The Dockerfile uses a two-stage build (Go 1.26 Alpine builder + minimal Alpine runtime) and bundles ONNX Runtime `v1.21.0` for `x86_64` by default. Override `ORT_VERSION` and `TARGETARCH` build args for other configurations.
+The Dockerfile uses a multi-stage build: a Debian-based Go builder that compiles OpenJTalk from source for Japanese G2P support, and a `debian:trixie-slim` runtime with ONNX Runtime `v1.24.4`. Override `ORT_VERSION` for other ONNX Runtime versions.
 
 ## Environment Variables / 環境変数
 
