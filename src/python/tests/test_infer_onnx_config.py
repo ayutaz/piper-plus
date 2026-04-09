@@ -12,9 +12,12 @@ fallback order:
 import json
 from pathlib import Path
 
+import pytest
+
 from piper_train.infer_onnx import resolve_config_path
 
 
+@pytest.mark.unit
 class TestConfigPathResolution:
     """Config パス解決ロジックのユニットテスト."""
 

@@ -105,33 +105,33 @@ def test_no_freeze_dp_all_params_trainable():
 
 
 @pytest.mark.unit
-def test_speaker_id_tensor_handling():
-    """speaker_id が int でも Tensor でも正しく shape [1] の LongTensor になる.
+@pytest.mark.parametrize(
+    "raw_value, expected_shape, expected_dtype, expected_item",
+    [
+        pytest.param(3, (1,), torch.long, 3, id="int"),
+        pytest.param(torch.LongTensor([5]), (1,), torch.long, 5, id="1d-tensor"),
+        pytest.param(
+            torch.tensor(7, dtype=torch.long), (1,), torch.long, 7, id="0d-tensor"
+        ),
+        pytest.param(None, None, None, None, id="none"),
+    ],
+)
+def test_speaker_id_tensor_handling(
+    raw_value, expected_shape, expected_dtype, expected_item
+):
+    """normalize_id_tensor converts int/Tensor/None to shape-[1] LongTensor or None.
 
     Regression test: on_validation_epoch_end の audio logging で
     speaker_id が int (test_utterances.jsonl 経由) の場合と
     Tensor (random_split Subset 経由) の場合の両方を正しく処理できること。
     """
-    from piper_train.vits.lightning import _normalize_id
+    from piper_train.vits.lightning import normalize_id_tensor
 
-    # Case 1: int -> torch.LongTensor([int])
-    sid = _normalize_id(3)
-    assert sid.shape == (1,)
-    assert sid.dtype == torch.long
-    assert sid.item() == 3
+    result = normalize_id_tensor(raw_value)
 
-    # Case 2: 1-D LongTensor([val]) -> already shape [1], keep as-is
-    sid = _normalize_id(torch.LongTensor([5]))
-    assert sid.shape == (1,)
-    assert sid.dtype == torch.long
-    assert sid.item() == 5
-
-    # Case 3: 0-D scalar Tensor -> unsqueeze(0) to shape [1]
-    sid = _normalize_id(torch.tensor(7, dtype=torch.long))
-    assert sid.shape == (1,)
-    assert sid.dtype == torch.long
-    assert sid.item() == 7
-
-    # Case 4: None -> stays None
-    sid = _normalize_id(None)
-    assert sid is None
+    if expected_shape is None:
+        assert result is None
+    else:
+        assert result.shape == expected_shape
+        assert result.dtype == expected_dtype
+        assert result.item() == expected_item

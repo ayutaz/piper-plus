@@ -32,7 +32,7 @@ _LOGGER = logging.getLogger("vits.lightning")
 MEMORY_CLEANUP_FREQUENCY = 500
 
 
-def _normalize_id(
+def normalize_id_tensor(
     raw_value: int | torch.Tensor | None,
     device: torch.device | None = None,
 ) -> torch.Tensor | None:
@@ -730,8 +730,8 @@ class VitsModel(pl.LightningModule):
                                 [len(test_utt.phoneme_ids)]
                             ).to(self.device)
                             scales = [0.667, 1.0, 0.8]
-                            sid = _normalize_id(test_utt.speaker_id, self.device)
-                            lid = _normalize_id(test_utt.language_id, self.device)
+                            sid = normalize_id_tensor(test_utt.speaker_id, self.device)
+                            lid = normalize_id_tensor(test_utt.language_id, self.device)
 
                             test_audio = self(
                                 text, text_lengths, scales, sid=sid, lid=lid
