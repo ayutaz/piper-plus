@@ -99,16 +99,26 @@ class TestWavLMDiscriminatorFeatureMapFormat:
 class TestWavLMResampling:
     """Test audio resampling quality."""
 
-    @pytest.fixture
+    @pytest.fixture(scope="class")
     def resampler_sinc(self):
-        """Create sinc interpolation resampler."""
-        return torchaudio.transforms.Resample(
-            orig_freq=22050,
-            new_freq=16000,
-            resampling_method="sinc_interp_hann",
-            lowpass_filter_width=64,
-            dtype=torch.float32,
+        """Get sinc interpolation resampler from WavLMDiscriminator."""
+        from unittest.mock import patch
+
+        from piper_train.vits.models import WavLMDiscriminator
+
+        # Mock WavLMModel.from_pretrained to avoid downloading the full
+        # model (~300 MB).  The resampler is initialised independently of
+        # the WavLM weights.
+        with patch("transformers.WavLMModel.from_pretrained"):
+            disc = WavLMDiscriminator(
+                source_sample_rate=22050,
+                target_sample_rate=16000,
+            )
+        assert disc.resampler is not None, (
+            "WavLMDiscriminator.resampler should be initialized when "
+            "source_sample_rate != target_sample_rate"
         )
+        return disc.resampler
 
     @pytest.fixture
     def resampler_linear(self):
