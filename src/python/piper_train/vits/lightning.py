@@ -12,7 +12,6 @@ from .dataset import Batch, PiperDataset, SpeakerBalancedBatchSampler, Utterance
 from .losses import discriminator_loss, feature_loss, generator_loss, kl_loss
 from .mel_processing import mel_spectrogram_torch, spec_to_mel_torch
 from .models import (
-    DurationDiscriminator,
     MultiPeriodDiscriminator,
     SynthesizerTrn,
     WavLMDiscriminator,
@@ -98,10 +97,6 @@ class VitsModel(pl.LightningModule):
         wavlm_model_name: str = "microsoft/wavlm-base-plus",
         c_wavlm: float = 0.5,
         wavlm_every_n_steps: int = 1,
-        # VITS2 Duration Discriminator
-        vits2: bool = False,
-        dur_disc_lr: float = 1e-4,
-        lambda_dur: float = 0.5,
         **kwargs,
     ):
         super().__init__()
@@ -139,7 +134,6 @@ class VitsModel(pl.LightningModule):
             gin_channels=self.hparams.gin_channels,
             use_sdp=self.hparams.use_sdp,
             prosody_dim=self.hparams.prosody_dim,
-            vits2=self.hparams.vits2,
         )
         self.model_d = MultiPeriodDiscriminator(
             use_spectral_norm=self.hparams.use_spectral_norm
@@ -165,7 +159,6 @@ class VitsModel(pl.LightningModule):
         # State kept between training optimizers
         self._y = None
         self._y_hat = None
-        self._dur_info = None  # VITS2: duration info for dur_disc training
 
     def _load_test_dataset(self, test_utterances_path: Path):
         """Load fixed test dataset for WandB audio logging.
@@ -423,11 +416,7 @@ class VitsModel(pl.LightningModule):
 
     def training_step(self, batch: Batch, batch_idx: int):
         # Manual optimization for multiple optimizers
-        optimizers = self.optimizers()
-        if self.hparams.vits2:
-            opt_g, opt_d, opt_dur = optimizers
-        else:
-            opt_g, opt_d = optimizers
+        opt_g, opt_d = self.optimizers()
 
         # Train generator
         opt_g.zero_grad()
@@ -441,17 +430,9 @@ class VitsModel(pl.LightningModule):
         self.manual_backward(loss_d)
         opt_d.step()
 
-        # Train duration discriminator (VITS2 only)
-        if self.hparams.vits2 and self._dur_info is not None:
-            opt_dur.zero_grad()
-            loss_dur_disc = self.training_step_dur_disc()
-            self.manual_backward(loss_dur_disc)
-            opt_dur.step()
-
         # Clear instance variables to release references
         self._y = None
         self._y_hat = None
-        self._dur_info = None
 
         # Periodic memory cleanup to prevent fragmentation
         if batch_idx % MEMORY_CLEANUP_FREQUENCY == 0:
@@ -535,7 +516,6 @@ class VitsModel(pl.LightningModule):
             _x_mask,
             z_mask,
             (_z, z_p, m_p, logs_p, _m_q, logs_q),
-            dur_info,
         ) = self.model_g(
             x,
             x_lengths,
@@ -546,8 +526,6 @@ class VitsModel(pl.LightningModule):
             prosody_features=prosody_features,
         )
         self._y_hat = y_hat.contiguous()
-        # Save dur_info for training_step_dur_disc (VITS2 only)
-        self._dur_info = dur_info
 
         mel = spec_to_mel_torch(
             spec,
@@ -597,28 +575,6 @@ class VitsModel(pl.LightningModule):
             loss_gen, _losses_gen = generator_loss(y_d_hat_g)
 
             loss_gen_all = loss_gen + loss_fm + loss_mel + loss_dur + loss_kl
-
-            # VITS2 Duration Discriminator: generator fooling loss
-            if self.hparams.vits2 and dur_info is not None:
-                x_dp_det, x_mask_dp, _logw_r, logw_g = dur_info
-                dur_disc = self.model_g.dur_disc
-                # Freeze dur_disc params so gradients only flow to the
-                # generator's duration output, not through dur_disc weights.
-                dur_disc.requires_grad_(False)
-                # Generator wants dur_disc to classify fake as real
-                disc_fake = dur_disc._forward_single(
-                    x_dp_det, x_mask_dp, logw_g
-                )
-                # BCE loss: generator wants disc_fake -> 1 (real)
-                loss_dur_gen = F.binary_cross_entropy_with_logits(
-                    disc_fake, torch.ones_like(disc_fake)
-                )
-                loss_gen_all = (
-                    loss_gen_all + loss_dur_gen * self.hparams.lambda_dur
-                )
-                self._log_with_batch_info("loss_dur_gen", loss_dur_gen, batch)
-                # Re-enable dur_disc gradients for its own training step
-                dur_disc.requires_grad_(True)
 
             # WavLM Discriminator loss (optional, computed every N steps)
             if self.model_d_wavlm is not None and (
@@ -681,38 +637,6 @@ class VitsModel(pl.LightningModule):
             self._log_with_batch_info("loss_disc_all", loss_disc_all, batch)
 
             return loss_disc_all
-
-    def training_step_dur_disc(self):
-        """Train the VITS2 Duration Discriminator.
-
-        Uses cached dur_info from training_step_g to compute BCE loss:
-        real durations (from MAS) -> 1, generated durations (from DP) -> 0.
-        """
-        dur_info = self._dur_info
-        if dur_info is None:
-            return torch.tensor(0.0, device=self.device)
-
-        x_dp_det, x_mask, logw_r, logw_g = dur_info
-        dur_disc = self.model_g.dur_disc
-
-        with autocast(self.device.type, enabled=False):
-            disc_real, disc_fake = dur_disc(
-                x_dp_det, x_mask, logw_r.detach(), logw_g.detach()
-            )
-            # BCE: real -> 1, fake -> 0
-            loss_real = F.binary_cross_entropy_with_logits(
-                disc_real, torch.ones_like(disc_real)
-            )
-            loss_fake = F.binary_cross_entropy_with_logits(
-                disc_fake, torch.zeros_like(disc_fake)
-            )
-            loss_dur_disc = loss_real + loss_fake
-
-            self._log_with_batch_info("loss_dur_disc", loss_dur_disc)
-            self._log_with_batch_info("loss_dur_disc_real", loss_real)
-            self._log_with_batch_info("loss_dur_disc_fake", loss_fake)
-
-            return loss_dur_disc
 
     def validation_step(self, batch: Batch, batch_idx: int):
         # Temporarily suppress self.log to prevent training_step_g/d from
@@ -904,28 +828,12 @@ class VitsModel(pl.LightningModule):
                 "Frozen %d Duration Predictor parameters (--freeze-dp)",
                 dp_frozen_count,
             )
-            # Also freeze Duration Discriminator when DP is frozen (VITS2)
-            if self.model_g.dur_disc is not None:
-                dur_disc_frozen = 0
-                for name, param in self.model_g.dur_disc.named_parameters():
-                    param.requires_grad = False
-                    dur_disc_frozen += 1
-                _LOGGER.info(
-                    "Frozen %d Duration Discriminator parameters (--freeze-dp implies dur_disc freeze)",
-                    dur_disc_frozen,
-                )
 
         # Generator optimizer: only trainable parameters
-        # Exclude dur_disc params from generator optimizer (they have their own)
-        dur_disc_param_ids = set()
-        if self.model_g.dur_disc is not None:
-            dur_disc_param_ids = {
-                id(p) for p in self.model_g.dur_disc.parameters()
-            }
         gen_params = [
             p
             for p in self.model_g.parameters()
-            if p.requires_grad and id(p) not in dur_disc_param_ids
+            if p.requires_grad
         ]
 
         # Collect discriminator parameters (including WavLM if enabled)
@@ -957,47 +865,6 @@ class VitsModel(pl.LightningModule):
                 optimizers[1], gamma=self.hparams.lr_decay
             ),
         ]
-
-        # VITS2: add Duration Discriminator optimizer
-        if self.hparams.vits2 and self.model_g.dur_disc is not None:
-            dur_disc_params = [
-                p for p in self.model_g.dur_disc.parameters() if p.requires_grad
-            ]
-            if dur_disc_params:
-                dur_disc_lr = getattr(self.hparams, "dur_disc_lr", 1e-4)
-                optimizers.append(
-                    torch.optim.AdamW(
-                        dur_disc_params,
-                        lr=dur_disc_lr,
-                        betas=self.hparams.betas,
-                        eps=self.hparams.eps,
-                        fused=torch.cuda.is_available(),
-                    ),
-                )
-                schedulers.append(
-                    torch.optim.lr_scheduler.ExponentialLR(
-                        optimizers[2], gamma=self.hparams.lr_decay
-                    ),
-                )
-                _LOGGER.info(
-                    "VITS2: Duration Discriminator optimizer added (lr=%s)",
-                    dur_disc_lr,
-                )
-            else:
-                # dur_disc frozen (e.g., freeze_dp) - add dummy optimizer
-                # to keep optimizer count consistent
-                dummy_param = torch.nn.Parameter(torch.zeros(1))
-                optimizers.append(
-                    torch.optim.AdamW([dummy_param], lr=0.0),
-                )
-                schedulers.append(
-                    torch.optim.lr_scheduler.ExponentialLR(
-                        optimizers[2], gamma=1.0
-                    ),
-                )
-                _LOGGER.info(
-                    "VITS2: Duration Discriminator frozen, using dummy optimizer"
-                )
 
         return optimizers, schedulers
 

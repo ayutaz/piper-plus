@@ -460,14 +460,6 @@ Gradio ベースの Web UI。6言語マルチリンガルモデル対応、Docke
 **CI:** `.github/workflows/webui-test.yml`
 **ドキュメント:** `docs/features/webui.md`
 
-### VITS2 Adversarial Duration Predictor (--vits2)
-
-Duration Discriminator を用いた敵対的学習で Duration Predictor の品質を向上。VITS2 論文の Adversarial Duration Predictor を実装。学習時のみ使用 (推論グラフには含まれない)。
-
-**CLIオプション:** `--vits2`, `--dur-disc-lr` (デフォルト: 1e-4), `--lambda-dur` (デフォルト: 0.5)
-**実装:** `vits/models.py` (`DurationDiscriminator`), `vits/lightning.py`, `__main__.py`
-**テスト:** `tests/test_vits2.py`
-
 ### Speaker Encoder (ECAPA-TDNN)
 
 Voice Cloning 用の話者エンコーダー。ECAPA-TDNN アーキテクチャで 256 次元 L2 正規化 embedding を出力。参照音声から話者特徴を抽出し、未知の話者の声質でTTS合成を可能にする。
@@ -733,30 +725,6 @@ CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
 | `--simplify` | - | ONNX モデル simplification を適用 |
 | `--debug` | - | デバッグログ出力 |
 | EMA | 常時有効 | チェックポイントに EMA state があれば自動適用（CLIオプションではない） |
-
-### VITS2 学習 (Adversarial Duration Predictor)
-
-```bash
-export WANDB_API_KEY=$(grep WANDB_API_KEY /data/piper/.env | cut -d= -f2) && \
-NCCL_DEBUG=WARN NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 \
-nohup /data/piper/.venv/bin/python -m piper_train \
-  --dataset-dir <DATASET_DIR> \
-  --vits2 \
-  --dur-disc-lr 1e-4 --lambda-dur 0.5 \
-  --prosody-dim 16 \
-  --accelerator gpu --devices 4 --precision 32-true \
-  --max_epochs <EPOCHS> --batch-size 20 --samples-per-speaker 2 \
-  --checkpoint-epochs 5 --quality medium \
-  --base_lr 2e-4 --disable_auto_lr_scaling \
-  --ema-decay 0.9995 \
-  --max-phoneme-ids 400 \
-  --no-wavlm \
-  --audio-log-epochs 5 \
-  --default_root_dir <OUTPUT_DIR> \
-  > training.log 2>&1 &
-```
-
-**注意:** `--vits2` は `--no-wavlm` と併用可能。Duration Discriminator は推論グラフに含まれないため、既存の ONNX エクスポートパイプラインがそのまま使える。
 
 ### Voice Cloning 推論 (speaker_embedding)
 

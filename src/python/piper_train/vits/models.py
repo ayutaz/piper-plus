@@ -723,97 +723,6 @@ class WavLMDiscriminator(torch.nn.Module):
         return [y_d_r], [y_d_g], [fmap_r], [fmap_g]
 
 
-class DurationDiscriminator(nn.Module):
-    """VITS2-style Duration Discriminator for adversarial duration prediction.
-
-    A 3-layer Conv1d discriminator that judges whether duration features are
-    real (from monotonic alignment search) or fake (from the duration predictor).
-    Used only during training; excluded from ONNX export.
-
-    Parameters
-    ----------
-    hidden_channels : int
-        Dimension of the encoder hidden states that feed into the DP.
-    hidden_size : int
-        Internal hidden size for the discriminator convolutions.
-    kernel_size : int
-        Kernel size for Conv1d layers.
-    """
-
-    def __init__(
-        self,
-        hidden_channels: int,
-        hidden_size: int = 256,
-        kernel_size: int = 3,
-    ):
-        super().__init__()
-        padding = kernel_size // 2
-
-        # Duration projection: [batch, 1, T] -> [batch, hidden_channels, T]
-        self.dur_proj = nn.Conv1d(1, hidden_channels, 1)
-
-        # 3-layer Conv1d with LeakyReLU
-        self.convs = nn.Sequential(
-            nn.Conv1d(hidden_channels * 2, hidden_size, kernel_size, padding=padding),
-            nn.LeakyReLU(0.1),
-            nn.Conv1d(hidden_size, hidden_size, kernel_size, padding=padding),
-            nn.LeakyReLU(0.1),
-            nn.Conv1d(hidden_size, hidden_size, kernel_size, padding=padding),
-            nn.LeakyReLU(0.1),
-        )
-        # Final projection to scalar per time step
-        self.output_proj = nn.Conv1d(hidden_size, 1, 1)
-
-    def _forward_single(self, x, x_mask, dur):
-        """Score a single duration sequence.
-
-        Parameters
-        ----------
-        x : torch.Tensor
-            Encoder hidden states [batch, hidden_channels, T].
-        x_mask : torch.Tensor
-            Mask [batch, 1, T].
-        dur : torch.Tensor
-            Log-duration values [batch, 1, T].
-
-        Returns
-        -------
-        torch.Tensor
-            Discrimination scores [batch, 1, T].
-        """
-        dur_proj = self.dur_proj(dur)
-        # Concatenate encoder hidden + projected duration
-        h = torch.cat([x, dur_proj], dim=1)  # [batch, hidden_channels*2, T]
-        h = self.convs(h)
-        h = self.output_proj(h)
-        return h * x_mask
-
-    def forward(self, x, x_mask, dur_r, dur_g):
-        """Discriminate real vs generated durations.
-
-        Parameters
-        ----------
-        x : torch.Tensor
-            Encoder hidden states [batch, hidden_channels, T] (detached).
-        x_mask : torch.Tensor
-            Mask [batch, 1, T].
-        dur_r : torch.Tensor
-            Real (GT) log-durations [batch, 1, T].
-        dur_g : torch.Tensor
-            Generated (predicted) log-durations [batch, 1, T].
-
-        Returns
-        -------
-        disc_real : torch.Tensor
-            Scores for real durations [batch, 1, T].
-        disc_fake : torch.Tensor
-            Scores for generated durations [batch, 1, T].
-        """
-        disc_real = self._forward_single(x, x_mask, dur_r.detach())
-        disc_fake = self._forward_single(x, x_mask, dur_g.detach())
-        return disc_real, disc_fake
-
-
 class SynthesizerTrn(nn.Module):
     """
     Synthesizer for Training
@@ -850,7 +759,6 @@ class SynthesizerTrn(nn.Module):
         use_sdp: bool = True,
         prosody_dim: int = 16,
         prosody_language_ids: "set[int] | None" = None,
-        vits2: bool = False,
     ):
         super().__init__()
         self.n_vocab = n_vocab
@@ -873,7 +781,6 @@ class SynthesizerTrn(nn.Module):
         self.n_languages = n_languages
         self.gin_channels = gin_channels
         self.prosody_dim = prosody_dim
-        self.vits2 = vits2
         # Language IDs with real prosody features (others are zeroed).
         # Default: {0} (JA only). Configurable via prosody_language_ids param.
         self.prosody_language_ids: set[int] = (
@@ -944,13 +851,6 @@ class SynthesizerTrn(nn.Module):
         # When gin_channels == emb_dim, this is an identity-like passthrough.
         # Lazily initialised on first use if None.
         self.spk_proj = None
-
-        # VITS2 Duration Discriminator (training only, excluded from ONNX)
-        self.dur_disc = None
-        if vits2:
-            self.dur_disc = DurationDiscriminator(
-                hidden_channels=dp_in_channels,
-            )
 
     def _get_global_conditioning(self, sid=None, lid=None):
         """Compute global conditioning vector from speaker and language embeddings.
@@ -1072,26 +972,15 @@ class SynthesizerTrn(nn.Module):
         x_dp = self._prepare_prosody_input(x, x_mask, prosody_features, lid=lid)
 
         w = attn.sum(2)
-        # Store duration info for VITS2 adversarial loss
-        dur_info = None
         if self.use_sdp:
             l_length = self.dp(x_dp, x_mask, w, g=g)
             l_length = l_length / torch.sum(x_mask)
-            # For VITS2: generate predicted durations via SDP reverse pass
-            if self.vits2 and self.dur_disc is not None:
-                logw_ = torch.log(w + 1e-6) * x_mask
-                with torch.no_grad():
-                    logw = self.dp(x_dp, x_mask, g=g, reverse=True)
-                dur_info = (x_dp.detach(), x_mask, logw_, logw)
         else:
             logw_ = torch.log(w + 1e-6) * x_mask
             logw = self.dp(x_dp, x_mask, g=g)
             l_length = torch.sum((logw - logw_) ** 2, [1, 2]) / torch.sum(
                 x_mask
             )  # for averaging
-            # For VITS2: provide (x_dp_detached, x_mask, logw_real, logw_gen)
-            if self.vits2 and self.dur_disc is not None:
-                dur_info = (x_dp.detach(), x_mask, logw_, logw)
 
         # expand prior
         m_p = torch.matmul(attn.squeeze(1), m_p.transpose(1, 2)).transpose(1, 2)
@@ -1109,7 +998,6 @@ class SynthesizerTrn(nn.Module):
             x_mask,
             y_mask,
             (z, z_p, m_p, logs_p, m_q, logs_q),
-            dur_info,
         )
 
     def _ensure_spk_proj(self, emb_dim: int) -> nn.Linear:

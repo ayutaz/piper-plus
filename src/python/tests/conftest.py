@@ -455,12 +455,11 @@ def make_vits_model():
     """Factory fixture: create a minimal VitsModel with custom settings.
 
     Usage in tests:
-        model = make_vits_model(vits2=True, freeze_dp=True)
+        model = make_vits_model(freeze_dp=True)
     """
     torch = pytest.importorskip("torch", reason="torch required")  # noqa: F841
 
     def _factory(
-        vits2=False,
         freeze_dp=False,
         num_speakers=1,
         num_languages=2,
@@ -478,9 +477,6 @@ def make_vits_model():
             batch_size=4,
             learning_rate=2e-4,
             use_wavlm_discriminator=False,
-            vits2=vits2,
-            dur_disc_lr=1e-4,
-            lambda_dur=0.5,
             freeze_dp=freeze_dp,
             use_sdp=False,
         )

@@ -215,11 +215,6 @@ def main() -> None:
     num_speakers = model_g.n_speakers
     num_languages = getattr(model_g, "n_languages", 1)
 
-    # Remove VITS2 Duration Discriminator (training-only, not part of inference graph)
-    if getattr(model_g, "dur_disc", None) is not None:
-        _LOGGER.info("Removing DurationDiscriminator from export (training-only module)")
-        model_g.dur_disc = None
-
     # Enable ONNX export mode for deterministic output
     model_g.onnx_export_mode = True
     # Propagate to Duration Predictor (StochasticDurationPredictor)

@@ -222,8 +222,8 @@ class TestForwardSpeakerEmbedding:
                 speaker_embedding=spk_emb,
             )
 
-        # forward returns 8 elements
-        assert len(result) == 8
+        # forward returns 7 elements
+        assert len(result) == 7
 
 
 # ---------------------------------------------------------------------------
