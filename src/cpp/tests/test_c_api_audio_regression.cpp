@@ -195,8 +195,10 @@ TEST_F(AudioRegressionTest, Streaming_vs_OneShot) {
     auto* engine = createEngine();
     ASSERT_NE(engine, nullptr) << piper_plus_get_last_error();
 
-    // Use multi-sentence text for meaningful streaming comparison
-    const char* text = u8"Hello world. This is a test.";
+    // Use multi-sentence text long enough to avoid short-text padding
+    // (MIN_PHONEME_IDS=40 in piper.cpp). Short texts trigger pad+trim in
+    // one-shot but not streaming, causing sample count divergence.
+    const char* text = u8"Hello world, how are you doing today? This is a test of the synthesis engine.";
     auto opts = deterministicOptions(/*language_id=*/-1);  // auto-detect
 
     // --- One-shot synthesis ---
@@ -323,7 +325,8 @@ TEST_F(AudioRegressionTest, CallbackStreaming_vs_OneShot) {
     auto* engine = createEngine();
     ASSERT_NE(engine, nullptr) << piper_plus_get_last_error();
 
-    const char* text = u8"Hello world. This is a test.";
+    // Use text long enough to avoid short-text padding (MIN_PHONEME_IDS=40)
+    const char* text = u8"Hello world, how are you doing today? This is a test of the synthesis engine.";
     auto opts = deterministicOptions(/*language_id=*/-1);
 
     // One-shot
