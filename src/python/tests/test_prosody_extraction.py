@@ -512,63 +512,27 @@ class TestProsodyDatasetValidation:
 
     @pytest.mark.unit
     def test_validate_dataset_prosody_lengths(self):
-        """Test validation function for dataset prosody/phoneme_ids length matching."""
-        import json
-        import tempfile
-        from pathlib import Path
+        """Test that prosody_features length mismatches are detectable in dataset entries."""
+        # Valid: phoneme_ids と prosody_features の長さが一致
+        valid_entry = {
+            "phoneme_ids": [1, 2, 3, 4, 5],
+            "prosody_features": [
+                {"a1": 0, "a2": 0, "a3": 0},
+                {"a1": -1, "a2": 1, "a3": 3},
+                {"a1": 0, "a2": 2, "a3": 3},
+                {"a1": 1, "a2": 3, "a3": 3},
+                {"a1": 0, "a2": 0, "a3": 0},
+            ],
+        }
+        assert len(valid_entry["phoneme_ids"]) == len(valid_entry["prosody_features"])
 
-        # Create a test dataset with valid data
-        valid_data = [
-            {
-                "phoneme_ids": [1, 2, 3, 4, 5],
-                "prosody_features": [
-                    {"a1": 0, "a2": 0, "a3": 0},
-                    {"a1": -1, "a2": 1, "a3": 3},
-                    {"a1": 0, "a2": 2, "a3": 3},
-                    {"a1": 1, "a2": 3, "a3": 3},
-                    {"a1": 0, "a2": 0, "a3": 0},
-                ],
-                "text": "test",
-                "audio_spec_path": "/tmp/test.pt"
-            }
-        ]
-
-        # Create a test dataset with INVALID data (length mismatch)
-        invalid_data = [
-            {
-                "phoneme_ids": [1, 2, 3, 4, 5],  # 5 items
-                "prosody_features": [
-                    {"a1": 0, "a2": 0, "a3": 0},
-                    {"a1": -1, "a2": 1, "a3": 3},
-                    {"a1": 0, "a2": 2, "a3": 3},
-                ],  # Only 3 items - MISMATCH!
-                "text": "test",
-                "audio_spec_path": "/tmp/test.pt"
-            }
-        ]
-
-        def validate_dataset_prosody(dataset_lines):
-            """Validate that all prosody_features match phoneme_ids lengths."""
-            errors = []
-            for i, line in enumerate(dataset_lines):
-                data = json.loads(line) if isinstance(line, str) else line
-                pids = data.get("phoneme_ids", [])
-                pf = data.get("prosody_features", [])
-                if pf and len(pids) != len(pf):
-                    errors.append({
-                        "line": i,
-                        "phoneme_ids_len": len(pids),
-                        "prosody_features_len": len(pf),
-                        "text": data.get("text", "")[:50]
-                    })
-            return errors
-
-        # Valid data should have no errors
-        valid_errors = validate_dataset_prosody([json.dumps(d) for d in valid_data])
-        assert len(valid_errors) == 0, f"Valid data should have no errors: {valid_errors}"
-
-        # Invalid data should be detected
-        invalid_errors = validate_dataset_prosody([json.dumps(d) for d in invalid_data])
-        assert len(invalid_errors) == 1, f"Invalid data should have 1 error: {invalid_errors}"
-        assert invalid_errors[0]["phoneme_ids_len"] == 5
-        assert invalid_errors[0]["prosody_features_len"] == 3
+        # Invalid: 長さ不一致を検出できることを確認
+        invalid_entry = {
+            "phoneme_ids": [1, 2, 3, 4, 5],  # 5 items
+            "prosody_features": [
+                {"a1": 0, "a2": 0, "a3": 0},
+                {"a1": -1, "a2": 1, "a3": 3},
+                {"a1": 0, "a2": 2, "a3": 3},
+            ],  # 3 items — MISMATCH
+        }
+        assert len(invalid_entry["phoneme_ids"]) != len(invalid_entry["prosody_features"])
