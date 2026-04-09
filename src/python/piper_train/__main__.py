@@ -303,6 +303,39 @@ def create_parser():
     return parser
 
 
+def apply_transfer_defaults(
+    args: argparse.Namespace,
+    dict_args: dict,
+    num_speakers: int,
+    num_languages: int,
+) -> None:
+    """Auto-set defaults before model creation for transfer learning.
+
+    1. gin_channels: set to 512 for multi-speaker or multi-language models
+       when not explicitly specified (value == 0).
+    2. freeze_dp: auto-enable when --resume-from-multispeaker-checkpoint is used.
+
+    Mutates *args* and *dict_args* in place.  Callers should pass
+    ``dict_args = vars(args)`` so that both references stay in sync.
+    """
+    # gin_channels 自動設定
+    # 768 は ONNX エクスポート時の数値精度低下を引き起こす
+    # VitsModel.__init__ のフォールバック (512) と一致させる
+    if (num_speakers > 1 or num_languages > 1) and dict_args.get(
+        "gin_channels", 0
+    ) == 0:
+        dict_args["gin_channels"] = 512
+
+    # freeze_dp 自動有効化
+    # モデル作成前に設定しないと save_hyperparameters() に反映されない
+    if getattr(args, "resume_from_multispeaker_checkpoint", None) and not args.freeze_dp:
+        args.freeze_dp = True
+        dict_args["freeze_dp"] = True
+        _LOGGER.info(
+            "Auto-enabled --freeze-dp for multispeaker→single-speaker transfer"
+        )
+
+
 def main():
     logging.basicConfig(level=logging.DEBUG)
 
@@ -422,25 +455,7 @@ def main():
         dict_args["upsample_initial_channel"] = 512
         dict_args["upsample_kernel_sizes"] = (16, 16, 4, 4)
 
-    # マルチスピーカーモデルの場合、gin_channelsを512に設定
-    # 768はONNXエクスポート時の数値精度低下を引き起こす（PyTorch↔ONNX相関が0.97→0.70に低下）
-    # 21話者バイリンガルモデル(gin_channels=512)では正常だが、80話者(768)でガビガビ音が発生
-    # VitsModel.__init__のフォールバック(512)と一致させる
-    # argparseは常にdefault値(0)をdict_argsに含めるため、"not in"ではなく値チェック
-    if (num_speakers > 1 or num_languages > 1) and dict_args.get(
-        "gin_channels", 0
-    ) == 0:
-        dict_args["gin_channels"] = 512
-
-    # --resume-from-multispeaker-checkpoint 使用時は freeze_dp を自動有効化
-    # モデル作成前に設定しないと save_hyperparameters() に反映されず
-    # configure_optimizers() で freeze_dp=False のまま DP が凍結されない
-    if args.resume_from_multispeaker_checkpoint and not args.freeze_dp:
-        args.freeze_dp = True
-        dict_args["freeze_dp"] = True
-        _LOGGER.info(
-            "Auto-enabled --freeze-dp for multispeaker→single-speaker transfer"
-        )
+    apply_transfer_defaults(args, dict_args, num_speakers, num_languages)
 
     # num_workers自動調整機能を削除
     # ユーザー指定のnum_workersをそのまま使用する

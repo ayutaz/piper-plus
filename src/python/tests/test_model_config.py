@@ -6,6 +6,7 @@ Prevents regressions:
 3. Training speedup CLI args (--val-every-n-epochs, --limit-val-batches) have correct defaults
 """
 
+import argparse
 import ast
 import importlib
 from pathlib import Path
@@ -74,28 +75,32 @@ def test_gin_channels_auto_512_for_multispeaker():
     (PyTorch↔ONNX correlation dropped from 0.97 to 0.70). 512 matches the
     VitsModel.__init__ fallback and produces correct ONNX exports.
     """
-    # Simulate argparse output: gin_channels=0 (default, not explicitly set)
-    dict_args = {"gin_channels": 0}
-    num_speakers = 80
+    from piper_train.__main__ import apply_transfer_defaults
 
-    # This is the fixed logic from __main__.py
-    if num_speakers > 1 and dict_args.get("gin_channels", 0) == 0:
-        dict_args["gin_channels"] = 512
-
+    args = argparse.Namespace(
+        resume_from_multispeaker_checkpoint=None,
+        freeze_dp=False,
+        gin_channels=0,
+    )
+    dict_args = vars(args)
+    apply_transfer_defaults(args, dict_args, num_speakers=80, num_languages=1)
     assert dict_args["gin_channels"] == 512, (
-        f"gin_channels should be 512 for {num_speakers} speakers, got {dict_args['gin_channels']}"
+        f"gin_channels should be 512 for 80 speakers, got {dict_args['gin_channels']}"
     )
 
 
 @pytest.mark.unit
 def test_gin_channels_respects_explicit_value():
     """gin_channels should not be overridden when explicitly set."""
-    dict_args = {"gin_channels": 256}
-    num_speakers = 80
+    from piper_train.__main__ import apply_transfer_defaults
 
-    if num_speakers > 1 and dict_args.get("gin_channels", 0) == 0:
-        dict_args["gin_channels"] = 512
-
+    args = argparse.Namespace(
+        resume_from_multispeaker_checkpoint=None,
+        freeze_dp=False,
+        gin_channels=256,
+    )
+    dict_args = vars(args)
+    apply_transfer_defaults(args, dict_args, num_speakers=80, num_languages=1)
     assert dict_args["gin_channels"] == 256, (
         "gin_channels should remain 256 when explicitly set"
     )
@@ -103,13 +108,16 @@ def test_gin_channels_respects_explicit_value():
 
 @pytest.mark.unit
 def test_gin_channels_not_set_for_single_speaker():
-    """gin_channels should not auto-set for single speaker models."""
-    dict_args = {"gin_channels": 0}
-    num_speakers = 1
+    """gin_channels should not auto-set for single speaker, single language models."""
+    from piper_train.__main__ import apply_transfer_defaults
 
-    if num_speakers > 1 and dict_args.get("gin_channels", 0) == 0:
-        dict_args["gin_channels"] = 512
-
+    args = argparse.Namespace(
+        resume_from_multispeaker_checkpoint=None,
+        freeze_dp=False,
+        gin_channels=0,
+    )
+    dict_args = vars(args)
+    apply_transfer_defaults(args, dict_args, num_speakers=1, num_languages=1)
     assert dict_args["gin_channels"] == 0, (
         "gin_channels should remain 0 for single speaker model"
     )
