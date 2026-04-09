@@ -13,20 +13,56 @@ try:
     from piper_plus_g2p.japanese import JapanesePhonemizer
     from piper_plus_g2p.encode.pua import map_token as _map_token
 
+    # EOS tokens that the G2P layer may already append; when present we skip
+    # adding the default "$" terminator.
     _EOS_TOKENS = {"$", "?", "?!", "?.", "?~"}
 
+    # NOTE: A near-duplicate of this wrapper exists in test_phonemize.py.
+    # That version unconditionally appends "$" (no _EOS_TOKENS check).
+    # The two intentionally differ in EOS handling — see each file's docstring
+    # for rationale.  Consolidation into conftest.py is deferred until a full
+    # EOS-behaviour analysis is performed (see docs/tickets/M3-3.md).
+
     def phonemize_japanese(text):
-        """Wrapper that matches old piper_train API: returns PUA-mapped tokens with BOS/EOS."""
+        """Test-only helper wrapping ``JapanesePhonemizer.phonemize()``.
+
+        BOS/EOS behaviour
+        -----------------
+        * Prepends BOS ``"^"`` unconditionally.
+        * Appends EOS ``"$"`` **only when** the G2P output does not already
+          end with a sentence-terminal token (one of ``_EOS_TOKENS``).
+          This avoids double-termination for question sentences (``?``,
+          ``?!``, ``?.``, ``?~``).
+
+        Why this exists
+        ---------------
+        ``piper_plus_g2p`` returns raw phoneme tokens without BOS/EOS.
+        There is no shared production utility that adds them, so each test
+        file carries its own wrapper.  A similar (but not identical) helper
+        lives in ``test_phonemize.py``.
+        """
         p = JapanesePhonemizer()
         tokens = p.phonemize(text)
-        # piper_plus_g2p returns raw tokens; add BOS and EOS
         full_tokens = ["^"] + list(tokens)
         if not tokens or tokens[-1] not in _EOS_TOKENS:
             full_tokens.append("$")
         return [_map_token(t) for t in full_tokens]
 
     def phonemize_japanese_with_prosody(text):
-        """Wrapper that matches old piper_train API: returns PUA-mapped tokens+prosody with BOS/EOS."""
+        """Test-only helper wrapping ``JapanesePhonemizer.phonemize_with_prosody()``.
+
+        BOS/EOS behaviour
+        -----------------
+        Same as ``phonemize_japanese()`` above — prepends ``"^"`` and
+        conditionally appends ``"$"`` (skipped when the last token is
+        already in ``_EOS_TOKENS``).  A parallel ``[None]`` entry is
+        inserted/appended for each added special token so that the
+        prosody list stays aligned with the token list.
+
+        Why this exists
+        ---------------
+        See ``phonemize_japanese()`` docstring.
+        """
         p = JapanesePhonemizer()
         tokens, prosody = p.phonemize_with_prosody(text)
         full_tokens = ["^"] + list(tokens)
