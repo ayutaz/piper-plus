@@ -303,6 +303,78 @@ def create_parser():
     return parser
 
 
+def load_multispeaker_checkpoint(checkpoint_path: str, model: VitsModel) -> None:
+    """Load a multispeaker checkpoint for single-speaker fine-tuning.
+
+    Removes emb_g, adds emb_g mean to emb_lang rows, and loads with strict=False.
+
+    Steps:
+        1. Load checkpoint with ``strict=False`` (emb_g is automatically skipped).
+        2. Add emb_g mean to all emb_lang rows for conditioning distribution correction.
+        3. Preserve all emb_lang rows so the frozen Duration Predictor retains
+           correct conditioning for every language.
+
+    Optimizer state is discarded; training restarts from epoch 0.
+
+    Args:
+        checkpoint_path: Path to the multispeaker ``.ckpt`` file.
+        model: A :class:`VitsModel` instance (single-speaker) to load weights into.
+    """
+    _LOGGER.info("Resuming from multispeaker checkpoint: %s", checkpoint_path)
+
+    # 1. strict=False でロード（emb_g は自動スキップ）
+    # NOTE: weights_only=False is required to handle PosixPath objects in checkpoints
+    # This poses a security risk - only load trusted checkpoints
+    checkpoint = torch.load(
+        checkpoint_path,
+        map_location="cpu",
+        weights_only=False,
+    )
+    missing, unexpected = model.load_state_dict(
+        checkpoint["state_dict"], strict=False
+    )
+    _LOGGER.info(
+        "Weights loaded (strict=False). Missing keys: %s. Unexpected keys: %s.",
+        missing,
+        unexpected,
+    )
+
+    # 2. emb_g 平均を emb_lang に加算（conditioning 分布補正）
+    #    emb_g は平均ノルム ~0.68 でほぼゼロ中心のため影響は軽微だが、
+    #    conceptual correctness のため実施する。
+    saved_sd = checkpoint["state_dict"]
+    emb_g_weight = saved_sd.get("model_g.emb_g.weight")
+    if emb_g_weight is not None and hasattr(model.model_g, "emb_lang"):
+        emb_g_mean = emb_g_weight.mean(dim=0)  # [gin_channels]
+        _LOGGER.info(
+            "emb_g mean norm: %.4f → adding to all emb_lang rows for conditioning correction",
+            emb_g_mean.norm().item(),
+        )
+        with torch.no_grad():
+            model.model_g.emb_lang.weight.add_(emb_g_mean.unsqueeze(0))
+        _LOGGER.info("emb_g_mean added to emb_lang.")
+    else:
+        _LOGGER.info(
+            "emb_g not found in checkpoint or model has no emb_lang; skipping conditioning correction."
+        )
+
+    # 3. All emb_lang rows are preserved with emb_g_mean correction.
+    #    Previously emb_lang[0] (JA) was copied to emb_lang[1] (EN), but this
+    #    caused the frozen Duration Predictor to lose EN conditioning, breaking
+    #    English duration prediction. Keeping original embeddings + correction
+    #    lets the DP predict correct duration patterns for all languages.
+    if hasattr(model.model_g, "emb_lang") and model.model_g.n_languages > 1:
+        _LOGGER.info(
+            "All emb_lang rows preserved with emb_g_mean correction "
+            "for correct duration prediction across languages."
+        )
+
+    _LOGGER.info(
+        "Multispeaker → single-speaker transfer complete. "
+        "Starting training from epoch 0 (optimizer state reset)."
+    )
+
+
 def apply_transfer_defaults(
     args: argparse.Namespace,
     num_speakers: int,
@@ -515,62 +587,7 @@ def main():
             "--resume-from-multispeaker-checkpoint はシングルスピーカーモデル専用です。"
             "マルチスピーカーへの転移には --resume_from_single_speaker_checkpoint を使用してください。"
         )
-        _LOGGER.info(
-            "Resuming from multispeaker checkpoint: %s",
-            args.resume_from_multispeaker_checkpoint,
-        )
-
-        # 1. strict=False でロード（emb_g は自動スキップ）
-        # NOTE: weights_only=False is required to handle PosixPath objects in checkpoints
-        # This poses a security risk - only load trusted checkpoints
-        checkpoint = torch.load(
-            args.resume_from_multispeaker_checkpoint,
-            map_location="cpu",
-            weights_only=False,
-        )
-        missing, unexpected = model.load_state_dict(
-            checkpoint["state_dict"], strict=False
-        )
-        _LOGGER.info(
-            "Weights loaded (strict=False). Missing keys: %s. Unexpected keys: %s.",
-            missing,
-            unexpected,
-        )
-
-        # 2. emb_g 平均を emb_lang に加算（conditioning 分布補正）
-        #    emb_g は平均ノルム ~0.68 でほぼゼロ中心のため影響は軽微だが、
-        #    conceptual correctness のため実施する。
-        saved_sd = checkpoint["state_dict"]
-        emb_g_weight = saved_sd.get("model_g.emb_g.weight")
-        if emb_g_weight is not None and hasattr(model.model_g, "emb_lang"):
-            emb_g_mean = emb_g_weight.mean(dim=0)  # [gin_channels]
-            _LOGGER.info(
-                "emb_g mean norm: %.4f → adding to all emb_lang rows for conditioning correction",
-                emb_g_mean.norm().item(),
-            )
-            with torch.no_grad():
-                model.model_g.emb_lang.weight.add_(emb_g_mean.unsqueeze(0))
-            _LOGGER.info("emb_g_mean added to emb_lang.")
-        else:
-            _LOGGER.info(
-                "emb_g not found in checkpoint or model has no emb_lang; skipping conditioning correction."
-            )
-
-        # 3. All emb_lang rows are preserved with emb_g_mean correction.
-        #    Previously emb_lang[0] (JA) was copied to emb_lang[1] (EN), but this
-        #    caused the frozen Duration Predictor to lose EN conditioning, breaking
-        #    English duration prediction. Keeping original embeddings + correction
-        #    lets the DP predict correct duration patterns for all languages.
-        if hasattr(model.model_g, "emb_lang") and model.model_g.n_languages > 1:
-            _LOGGER.info(
-                "All emb_lang rows preserved with emb_g_mean correction "
-                "for correct duration prediction across languages."
-            )
-
-        _LOGGER.info(
-            "Multispeaker → single-speaker transfer complete. "
-            "Starting training from epoch 0 (optimizer state reset)."
-        )
+        load_multispeaker_checkpoint(args.resume_from_multispeaker_checkpoint, model)
 
     # チェックポイントからの再開処理を修正
     if args.resume_from_checkpoint:
