@@ -19,7 +19,10 @@ if python_src and (str(python_src) not in sys.path):
     sys.path.insert(0, str(python_src))
 
 
-from piper_train.export_onnx import build_infer_forward  # noqa: E402
+try:
+    from piper_train.export_onnx import build_infer_forward  # noqa: E402
+except ImportError:
+    build_infer_forward = None  # torch not installed (e.g., CI python-tests job)
 
 
 # ---------------------------------------------------------------------------
