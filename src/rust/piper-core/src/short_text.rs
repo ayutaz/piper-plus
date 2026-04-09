@@ -36,9 +36,13 @@ pub fn wrap_short_text_ssml(text: &str) -> String {
     let char_count = trimmed.chars().filter(|c| !c.is_whitespace()).count();
 
     if char_count <= SHORT_TEXT_CHARS {
+        let escaped = trimmed
+            .replace('&', "&amp;")
+            .replace('<', "&lt;")
+            .replace('>', "&gt;");
         format!(
             "<speak><break time=\"{}ms\"/>{}<break time=\"{}ms\"/></speak>",
-            SILENCE_PAD_MS, trimmed, SILENCE_PAD_MS
+            SILENCE_PAD_MS, escaped, SILENCE_PAD_MS
         )
     } else {
         text.to_string()
@@ -148,5 +152,24 @@ mod tests {
     #[test]
     fn test_short_text_chars_value() {
         assert_eq!(SHORT_TEXT_CHARS, 10);
+    }
+
+    #[test]
+    fn test_xml_special_chars_escaped() {
+        let result = wrap_short_text_ssml("A & B");
+        assert!(result.contains("A &amp; B"));
+        assert!(!result.contains("A & B"));
+    }
+
+    #[test]
+    fn test_angle_bracket_escaped() {
+        let result = wrap_short_text_ssml("1<2");
+        assert!(result.contains("1&lt;2"));
+    }
+
+    #[test]
+    fn test_gt_escaped() {
+        let result = wrap_short_text_ssml("2>1");
+        assert!(result.contains("2&gt;1"));
     }
 }

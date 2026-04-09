@@ -547,6 +547,35 @@ public class ShortTextProcessorTests
         Assert.Equal(text, result);
     }
 
+    [Fact]
+    public void WrapShortTextWithBreaks_SsmlWithAttributes_NotWrapped()
+    {
+        string text = "<speak xml:lang=\"ja\">Hello</speak>";
+
+        string result = ShortTextProcessor.WrapShortTextWithBreaks(text);
+
+        Assert.Equal(text, result);
+    }
+
+    [Fact]
+    public void WrapShortTextWithBreaks_XmlSpecialChars_Escaped()
+    {
+        string result = ShortTextProcessor.WrapShortTextWithBreaks("A & B");
+
+        Assert.Contains("&amp;", result);
+        Assert.DoesNotContain("& B", result);
+        Assert.StartsWith("<speak>", result);
+    }
+
+    [Fact]
+    public void WrapShortTextWithBreaks_AngleBracket_Escaped()
+    {
+        string result = ShortTextProcessor.WrapShortTextWithBreaks("1<2");
+
+        Assert.Contains("&lt;", result);
+        Assert.StartsWith("<speak>", result);
+    }
+
     // ==================================================================
     // Strategy C: IsShortPlainText
     // ==================================================================
@@ -591,6 +620,12 @@ public class ShortTextProcessorTests
     public void IsShortPlainText_OneAboveThreshold_ReturnsFalse()
     {
         Assert.False(ShortTextProcessor.IsShortPlainText("abcdefghijk")); // 11 chars
+    }
+
+    [Fact]
+    public void IsShortPlainText_SsmlWithAttributes_ReturnsFalse()
+    {
+        Assert.False(ShortTextProcessor.IsShortPlainText("<speak xml:lang=\"ja\">Hi</speak>"));
     }
 
     // ==================================================================

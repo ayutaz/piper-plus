@@ -93,9 +93,9 @@ _SHORT_TEXT_THRESHOLD = 10
 
 def _is_short_text(text: str, threshold: int = _SHORT_TEXT_THRESHOLD) -> bool:
     """Check if text is short (excluding whitespace)."""
-    if text.lstrip().startswith("<speak>"):
+    if text.lstrip().startswith(("<speak>", "<speak ")):
         return False
-    return len(text.replace(" ", "").replace("\u3000", "").strip()) <= threshold
+    return sum(1 for c in text if not c.isspace()) <= threshold
 
 
 def synthesize(

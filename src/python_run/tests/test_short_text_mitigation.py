@@ -246,22 +246,27 @@ class TestShortTextDetection:
 
     @pytest.mark.unit
     def test_short_plain_text_detected(self):
-        assert len("abc".replace(" ", "")) <= SHORT_TEXT_CHARS
+        assert sum(1 for c in "abc" if not c.isspace()) <= SHORT_TEXT_CHARS
 
     @pytest.mark.unit
     def test_long_text_not_detected(self):
         text = "a" * (SHORT_TEXT_CHARS + 1)
-        assert len(text.replace(" ", "")) > SHORT_TEXT_CHARS
+        assert sum(1 for c in text if not c.isspace()) > SHORT_TEXT_CHARS
 
     @pytest.mark.unit
     def test_ssml_text_not_detected(self):
         text = "<speak>short</speak>"
-        assert text.lstrip().startswith("<speak>")
+        assert text.lstrip().startswith(("<speak>", "<speak "))
+
+    @pytest.mark.unit
+    def test_ssml_with_attributes_not_detected(self):
+        text = '<speak xml:lang="ja">short</speak>'
+        assert text.lstrip().startswith(("<speak>", "<speak "))
 
     @pytest.mark.unit
     def test_spaces_excluded_from_count(self):
         text = "a b c d e"  # 5 non-space chars
-        assert len(text.replace(" ", "")) <= SHORT_TEXT_CHARS
+        assert sum(1 for c in text if not c.isspace()) <= SHORT_TEXT_CHARS
 
     @pytest.mark.unit
     def test_break_silence_bytes_length(self):

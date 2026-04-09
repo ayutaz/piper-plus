@@ -250,7 +250,7 @@ func wrapShortTextWithBreaks(text string) (string, bool) {
 	}
 
 	// If already SSML, do not wrap.
-	if strings.HasPrefix(trimmed, "<speak>") {
+	if strings.HasPrefix(trimmed, "<speak>") || strings.HasPrefix(trimmed, "<speak ") {
 		return text, false
 	}
 

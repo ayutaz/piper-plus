@@ -235,7 +235,7 @@ def _trim_silence(
     if len(audio) <= min_samples:
         return audio
 
-    float_audio = audio.astype(np.float32) / 32767.0
+    float_audio = audio.astype(np.float32) / 32768.0
     n_windows = len(float_audio) // window
 
     if n_windows == 0:
@@ -410,8 +410,8 @@ class PiperVoice:
         """Synthesize raw audio per sentence from text."""
         # Strategy C: auto-inject silence padding for very short plain text
         is_short_text = (
-            not text.lstrip().startswith("<speak>")
-            and len(text.replace(" ", "")) <= SHORT_TEXT_CHARS
+            not text.lstrip().startswith(("<speak>", "<speak "))
+            and sum(1 for c in text if not c.isspace()) <= SHORT_TEXT_CHARS
         )
 
         sentence_phonemes = self.phonemize(text)

@@ -310,7 +310,9 @@ public static class ShortTextProcessor
             return text;
 
         // Already SSML?
-        if (text.TrimStart().StartsWith("<speak>", StringComparison.OrdinalIgnoreCase))
+        var trimmedStart = text.TrimStart();
+        if (trimmedStart.StartsWith("<speak>", StringComparison.OrdinalIgnoreCase)
+            || trimmedStart.StartsWith("<speak ", StringComparison.OrdinalIgnoreCase))
             return text;
 
         // Count non-whitespace characters
@@ -324,7 +326,7 @@ public static class ShortTextProcessor
         if (charCount > ShortTextChars)
             return text;
 
-        return $"<speak><break time=\"{SilencePadMs}ms\"/>{text}<break time=\"{SilencePadMs}ms\"/></speak>";
+        return $"<speak><break time=\"{SilencePadMs}ms\"/>{System.Security.SecurityElement.Escape(text)}<break time=\"{SilencePadMs}ms\"/></speak>";
     }
 
     /// <summary>
@@ -336,7 +338,9 @@ public static class ShortTextProcessor
         if (string.IsNullOrEmpty(text))
             return false;
 
-        if (text.TrimStart().StartsWith("<speak>", StringComparison.OrdinalIgnoreCase))
+        var trimmedStart = text.TrimStart();
+        if (trimmedStart.StartsWith("<speak>", StringComparison.OrdinalIgnoreCase)
+            || trimmedStart.StartsWith("<speak ", StringComparison.OrdinalIgnoreCase))
             return false;
 
         int charCount = 0;

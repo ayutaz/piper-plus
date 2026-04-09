@@ -210,26 +210,39 @@ pub fn trim_silence(audio: &[i16]) -> Vec<i16> {
         (sum_sq / n as f64).sqrt() as f32
     };
 
+    // フルウィンドウ数 + partial window の検出 (C++ と同一ロジック)
+    let num_full_windows = audio.len() / TRIM_WINDOW_SIZE;
+    let remainder = audio.len() % TRIM_WINDOW_SIZE;
+
+    // total_windows: フルウィンドウ + partial (存在すれば 1)
+    let total_windows = num_full_windows + if remainder > 0 { 1 } else { 0 };
+
     // 先頭: RMS > threshold の最初の窓を検出
-    let num_windows = audio.len().saturating_sub(TRIM_WINDOW_SIZE) / TRIM_WINDOW_SIZE;
-    let mut trim_start = 0;
-    for i in 0..=num_windows {
-        let pos = i * TRIM_WINDOW_SIZE;
+    let mut first_above: Option<usize> = None;
+    let mut last_above: Option<usize> = None;
+
+    for w in 0..total_windows {
+        let pos = w * TRIM_WINDOW_SIZE;
         if rms_of_window(pos) > TRIM_THRESHOLD_RMS {
-            trim_start = pos;
-            break;
+            if first_above.is_none() {
+                first_above = Some(w);
+            }
+            last_above = Some(w);
         }
     }
 
-    // 末尾: RMS > threshold の最後の窓を検出
-    let mut trim_end = audio.len();
-    for i in (0..=num_windows).rev() {
-        let pos = i * TRIM_WINDOW_SIZE;
-        if rms_of_window(pos) > TRIM_THRESHOLD_RMS {
-            trim_end = (pos + TRIM_WINDOW_SIZE).min(audio.len());
-            break;
+    let (trim_start, trim_end) = match (first_above, last_above) {
+        (Some(first), Some(last)) => {
+            let start = first * TRIM_WINDOW_SIZE;
+            let end = ((last + 1) * TRIM_WINDOW_SIZE).min(audio.len());
+            (start, end)
         }
-    }
+        _ => {
+            // 全て無音 -- 最低サンプル数を保持
+            let safe_len = TRIM_MIN_SAMPLES.min(audio.len());
+            return audio[..safe_len].to_vec();
+        }
+    };
 
     // 最低サンプル数を保証
     if trim_end <= trim_start || (trim_end - trim_start) < TRIM_MIN_SAMPLES {

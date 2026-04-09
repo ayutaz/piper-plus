@@ -85,7 +85,7 @@ export function padPhonemeIds(phonemeIds, prosodyFeatures) {
   ];
 
   let paddedProsody = null;
-  if (prosodyFeatures) {
+  if (prosodyFeatures != null) {
     const pBos = prosodyFeatures.slice(0, 1);
     const pBody = prosodyFeatures.slice(1, -1);
     const pEos = prosodyFeatures.slice(-1);
@@ -136,6 +136,22 @@ export function trimSilence(audio, windowSize = 256) {
     if (rms > TRIM_THRESHOLD_RMS) {
       if (firstAbove < 0) firstAbove = w;
       lastAbove = w;
+    }
+  }
+
+  // Check partial window (remainder samples after the last full window)
+  const remainder = n % windowSize;
+  if (remainder > 0) {
+    const offset = nWindows * windowSize;
+    let sumSq = 0;
+    for (let j = 0; j < remainder; j++) {
+      const s = audio[offset + j];
+      sumSq += s * s;
+    }
+    const rms = Math.sqrt(sumSq / remainder);
+    if (rms > TRIM_THRESHOLD_RMS) {
+      if (firstAbove < 0) firstAbove = nWindows; // virtual window index for the partial
+      lastAbove = nWindows;
     }
   }
 

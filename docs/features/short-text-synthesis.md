@@ -221,11 +221,11 @@ Strategy A (Silence Padding + Post-trim), B (Dynamic Scales), C (SSML `<break>` 
 | パラメータ | デフォルト値 | 説明 |
 |-----------|------------|------|
 | `min_phoneme_ids` | 40 | Silence Padding / Scales 調整の閾値 (音素数) |
-| `padding_phoneme_id` | PAD (0) | パディングに使用する音素 ID |
-| `noise_scale_floor` | 0.5 | noise_scale の最小倍率 (Strategy B) |
-| `noise_w_floor` | 0.4 | noise_w の最小倍率 (Strategy B) |
-| `break_time_ms` | 300 | SSML `<break>` 自動挿入時間 (Strategy C) |
-| `trim_threshold_db` | -40 | Post-trim のエネルギー閾値 (Strategy A) |
+| `padding.pause_token_id` | 0 | パディングに使用する音素 ID |
+| `scales.noise_scale_min_ratio` | 0.5 | noise_scale の最小倍率 (Strategy B) |
+| `scales.noise_w_min_ratio` | 0.4 | noise_w の最小倍率 (Strategy B) |
+| `ssml_injection.silence_pad_ms` | 300 | SSML `<break>` 自動挿入時間 (Strategy C) |
+| `trim.threshold_rms` | 0.01 | Post-trim の RMS 振幅閾値 (Strategy A) |
 
 モデルの `config.json` に `min_phoneme_ids` を追加することで、モデルごとに閾値をカスタマイズ可能。
 

@@ -419,6 +419,17 @@ func TestWrapShortText_Japanese(t *testing.T) {
 	}
 }
 
+func TestWrapShortText_SSMLWithAttributes(t *testing.T) {
+	ssml := `<speak xml:lang="ja">Hello</speak>`
+	text, needsPad := wrapShortTextWithBreaks(ssml)
+	if needsPad {
+		t.Error("expected needsPad=false for SSML with attributes")
+	}
+	if text != ssml {
+		t.Errorf("expected original SSML, got %q", text)
+	}
+}
+
 func TestWrapShortText_CJKShort(t *testing.T) {
 	// 5 CJK characters.
 	cjk := "\u3053\u3093\u306b\u3061\u306f"
