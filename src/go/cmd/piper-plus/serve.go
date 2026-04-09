@@ -4,8 +4,11 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"os"
 	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -31,7 +34,7 @@ func init() {
 }
 
 func runServe(cmd *cobra.Command, args []string) error {
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
 	// Configure logging.
@@ -87,16 +90,24 @@ func runServe(cmd *cobra.Command, args []string) error {
 	defer voice.Close() //nolint:errcheck
 
 	// Start server.
-	server := piperplus.NewServer(voice, logger)
+	ttsServer := piperplus.NewServer(voice, logger)
 	fmt.Fprintf(os.Stderr, "Starting TTS server on %s\n", serveAddr)
 	fmt.Fprintln(os.Stderr, "Endpoints:")
 	fmt.Fprintln(os.Stderr, "  GET/POST /synthesize?text=...&lang=...")
 	fmt.Fprintln(os.Stderr, "  GET      /health")
 	fmt.Fprintln(os.Stderr, "  GET      /info")
 
+	httpServer := &http.Server{
+		Addr:    serveAddr,
+		Handler: ttsServer.Handler(),
+	}
+
 	errCh := make(chan error, 1)
 	go func() {
-		errCh <- server.ListenAndServe(serveAddr)
+		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			errCh <- err
+		}
+		close(errCh)
 	}()
 
 	select {
@@ -104,6 +115,8 @@ func runServe(cmd *cobra.Command, args []string) error {
 		return err
 	case <-ctx.Done():
 		logger.Info("shutting down server")
-		return nil
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		return httpServer.Shutdown(shutdownCtx)
 	}
 }

@@ -12,8 +12,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Download pyopenjtalk-plus (contains OpenJTalk source + MeCab dictionary)
 ARG PYOPENJTALK_URL=https://files.pythonhosted.org/packages/82/4e/1e2c165b04dd250dbcb1c270df8517681eed5c20b755c72bec2b42853851/pyopenjtalk_plus-0.4.1.post7.tar.gz
+ARG PYOPENJTALK_SHA256=555fdf86310d6d72f4a37e92beb251cdc2114aafc133d4c77b136a07a4b17119
 WORKDIR /openjtalk-src
 RUN wget -q "${PYOPENJTALK_URL}" -O pyopenjtalk-plus.tar.gz \
+    && echo "${PYOPENJTALK_SHA256}  pyopenjtalk-plus.tar.gz" | sha256sum -c - \
     && tar xzf pyopenjtalk-plus.tar.gz --strip-components=1 \
     && rm pyopenjtalk-plus.tar.gz
 
@@ -63,8 +65,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Download ONNX Runtime shared library.
 # Uses x64 naming convention (changed from x86_64 in recent releases).
 ARG ORT_VERSION=1.24.4
+ARG ORT_SHA256=3a211fbea252c1e66290658f1b735b772056149f28321e71c308942cdb54b747
 RUN set -eux \
     && wget -q "https://github.com/microsoft/onnxruntime/releases/download/v${ORT_VERSION}/onnxruntime-linux-x64-${ORT_VERSION}.tgz" \
+    && echo "${ORT_SHA256}  onnxruntime-linux-x64-${ORT_VERSION}.tgz" | sha256sum -c - \
     && tar xzf "onnxruntime-linux-x64-${ORT_VERSION}.tgz" \
     && cp "onnxruntime-linux-x64-${ORT_VERSION}/lib/libonnxruntime.so" /usr/lib/ \
     && rm -rf onnxruntime-* \
@@ -72,11 +76,11 @@ RUN set -eux \
 
 # Copy the Go binary and OpenJTalk dictionary from the build stage
 COPY --from=builder /piper-plus /usr/local/bin/piper-plus
-COPY --from=builder /openjtalk-dic /usr/share/open_jtalk/dic
+COPY --from=builder /openjtalk-dic /usr/local/share/open_jtalk/dic
 
 # Environment configuration
 ENV ONNX_RUNTIME_SHARED_LIBRARY_PATH=/usr/lib/libonnxruntime.so
-ENV OPENJTALK_DIC_DIR=/usr/share/open_jtalk/dic
+ENV OPENJTALK_DICTIONARY_PATH=/usr/local/share/open_jtalk/dic
 ENV PIPER_MODEL_DIR=/models
 
 RUN mkdir -p /models

@@ -53,15 +53,10 @@ func TestServeCmd_SynthesisFlagsNotInherited(t *testing.T) {
 	}
 }
 
-func TestServeCmd_RequiresModel(t *testing.T) {
-	// Running serve without --model should fail with a clear error.
-	// Reset the global modelPath to simulate missing model.
-	origModel := modelPath
-	modelPath = ""
-	defer func() { modelPath = origModel }()
-
-	// We can't fully run the command (needs ONNX Runtime), but we can verify
-	// the command exists and has RunE set.
+func TestServeCmd_RunESet(t *testing.T) {
+	// We can't fully execute the serve command here because it depends on
+	// ONNX Runtime, but we can verify the command is configured with a RunE
+	// handler.
 	if serveCmd.RunE == nil {
 		t.Fatal("serveCmd.RunE is nil")
 	}
