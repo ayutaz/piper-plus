@@ -10,22 +10,22 @@ class TestRealIntegration:
 
     @pytest.mark.integration
     @pytest.mark.requires_model
+    @pytest.mark.skip(reason="Requires full piper runtime")
     def test_synthesis_produces_audio(self):
         """Test that synthesis actually produces audio data"""
-        pytest.skip("Skipping synthesis test - requires full piper runtime")
 
     @pytest.mark.integration
     @pytest.mark.japanese
     @pytest.mark.requires_model
+    @pytest.mark.skip(reason="Requires full piper runtime")
     def test_japanese_synthesis_with_pua(self):
         """Test Japanese synthesis with PUA mapping"""
-        pytest.skip("Skipping Japanese synthesis test - requires full piper runtime")
 
     @pytest.mark.integration
     @pytest.mark.slow
+    @pytest.mark.skip(reason="Requires full piper runtime")
     def test_performance_baseline(self):
         """Test that synthesis meets basic performance requirements"""
-        pytest.skip("Skipping performance test - requires full piper runtime")
 
     @pytest.mark.integration
     @pytest.mark.japanese

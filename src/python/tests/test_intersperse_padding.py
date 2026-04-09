@@ -71,6 +71,7 @@ def _no_intersperse_padding(ids: list[int], pad_id: int = 0) -> bool:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.unit
 class TestMultilingualInterspersePadding:
     """Verify intersperse padding for each language in multilingual mode."""
 
@@ -188,6 +189,7 @@ class TestMultilingualInterspersePadding:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.unit
 class TestJaOnlyNoIntersperse:
     """Verify that JA without language_id_map does NOT add intersperse padding."""
 
@@ -216,6 +218,7 @@ class TestJaOnlyNoIntersperse:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.unit
 class TestNoPaddingAfterPause:
     """Verify that pause tokens (ID 0) do NOT get extra padding after them.
 
@@ -286,6 +289,7 @@ class TestNoPaddingAfterPause:
         )
 
 
+@pytest.mark.unit
 class TestLatinLanguageNotMisrouted:
     """Verify that ES/FR/PT text is phonemized by the correct phonemizer,
     not misrouted to English via UnicodeLanguageDetector."""
@@ -367,6 +371,7 @@ class TestLatinLanguageNotMisrouted:
         )
 
 
+@pytest.mark.unit
 class TestPaddingLengthRelation:
     """Verify padded length is roughly 2x unpadded length."""
 

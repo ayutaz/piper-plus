@@ -18,6 +18,7 @@ transformers = pytest.importorskip("transformers")
 torchaudio = pytest.importorskip("torchaudio")
 
 
+@pytest.mark.training
 class TestWavLMDiscriminatorFeatureMapFormat:
     """Test that WavLM feature maps are compatible with feature_loss()."""
 
@@ -96,6 +97,7 @@ class TestWavLMDiscriminatorFeatureMapFormat:
         assert y_d_gs[0].shape == (sample_audio.size(0), 1)
 
 
+@pytest.mark.training
 class TestWavLMResampling:
     """Test audio resampling quality."""
 
@@ -194,6 +196,7 @@ class TestWavLMResampling:
         assert sinc_high_energy > 0, "Sinc resampling should preserve high frequencies"
 
 
+@pytest.mark.training
 class TestWavLMGradientFlow:
     """Test gradient flow through WavLM discriminator.
 
@@ -334,6 +337,7 @@ class TestWavLMGradientFlow:
             assert not torch.isnan(param.grad).any(), f"Classifier {name} grad should not be NaN"
 
 
+@pytest.mark.training
 class TestWavLMLossComputation:
     """Test loss computation with WavLM discriminator."""
 
@@ -412,6 +416,7 @@ class TestWavLMLossComputation:
         assert loss_same < loss_diff, "Same audio should have lower feature loss"
 
 
+@pytest.mark.training
 class TestWavLMIntegration:
     """Integration tests for WavLM discriminator with training loop."""
 
