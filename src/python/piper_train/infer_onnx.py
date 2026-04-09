@@ -327,6 +327,27 @@ def text_to_phoneme_ids_and_prosody(
     return result_ids, prosody_features_out
 
 
+def resolve_config_path(model: str, config: str | None) -> Path:
+    """Resolve the config.json path for a given model.
+
+    Fallback order:
+      1. If *config* is explicitly given, use that path directly.
+      2. Try ``{model}.json`` (e.g. ``model.onnx.json`` -- C++ CLI convention).
+      3. Fall back to ``{model_dir}/config.json``.
+
+    Returns the resolved :class:`Path`.  The caller is responsible for
+    checking whether the returned path actually exists.
+    """
+    if config:
+        return Path(config)
+
+    model_path = Path(model)
+    onnx_json = model_path.with_suffix(model_path.suffix + ".json")
+    if onnx_json.exists():
+        return onnx_json
+    return model_path.parent / "config.json"
+
+
 def main():
     """Main entry point"""
     logging.basicConfig(level=logging.DEBUG)
@@ -554,16 +575,7 @@ def main():
     phoneme_id_map = None
     if args.text:
         # Load config.json for phoneme_id_map
-        if args.config:
-            config_path = Path(args.config)
-        else:
-            # Fallback: {model}.json first (C++ CLI convention), then {model_dir}/config.json
-            model_path = Path(args.model)
-            onnx_json = model_path.with_suffix(model_path.suffix + ".json")
-            if onnx_json.exists():
-                config_path = onnx_json
-            else:
-                config_path = model_path.parent / "config.json"
+        config_path = resolve_config_path(args.model, args.config)
 
         if not config_path.exists():
             _LOGGER.error(

@@ -1,33 +1,18 @@
-"""Tests for infer_onnx config path resolution logic.
+"""Tests for infer_onnx.resolve_config_path().
 
-The config fallback logic in main() (lines 143-152) resolves the config path as:
+These tests verify ``resolve_config_path()`` directly -- the function that
+resolves the config.json path for a given ONNX model with the following
+fallback order:
+
   1. If --config is explicitly given, use that path directly.
   2. Otherwise, try {model}.onnx.json first (C++ CLI convention).
   3. Fall back to {model_dir}/config.json.
-
-These tests exercise the same Path logic without loading an ONNX model.
 """
 
 import json
 from pathlib import Path
 
-
-def resolve_config_path(
-    model: str, config: str | None
-) -> Path:
-    """Reproduce the config resolution logic from infer_onnx.main().
-
-    This is a pure-function extraction of lines 143-152 so it can be
-    unit-tested without argparse or onnxruntime.
-    """
-    if config:
-        return Path(config)
-
-    model_path = Path(model)
-    onnx_json = model_path.with_suffix(model_path.suffix + ".json")
-    if onnx_json.exists():
-        return onnx_json
-    return model_path.parent / "config.json"
+from piper_train.infer_onnx import resolve_config_path
 
 
 class TestConfigPathResolution:
