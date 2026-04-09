@@ -275,7 +275,7 @@ fn create_mel_filterbank() -> Vec<f32> {
 
     for m in 0..MEL_N_MELS {
         // Convert to integer bin indices (matching Python's np.floor().astype(int))
-        let mut left = bin_points[m].floor() as usize;
+        let left = bin_points[m].floor() as usize;
         let mut center = bin_points[m + 1].floor() as usize;
         let mut right = bin_points[m + 2].floor() as usize;
 
