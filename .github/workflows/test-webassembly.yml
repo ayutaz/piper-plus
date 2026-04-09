@@ -115,11 +115,23 @@ jobs:
           test/js/test-dictionary-cache.js \
           test/js/test-g2p-golden.js
 
-    - name: Note on skipped tests
+    - name: Run optimization and advanced tests
       working-directory: src/wasm/openjtalk-web
       run: |
-        # Some integration tests need real WASM binaries and are covered by ci.yml npm-package-tests job
-        echo "Tests that require real WASM binaries are covered by ci.yml npm-package-tests"
+        node --test \
+          test/js/test-audio-backend.js \
+          test/js/test-audio-regression.js \
+          test/js/test-benchmark-runner.js \
+          test/js/test-cache-manager.js \
+          test/js/test-complete-simulation.js \
+          test/js/test-edge-cases.js \
+          test/js/test-korean.js \
+          test/js/test-memory-pool.js \
+          test/js/test-phase2-integration.js \
+          test/js/test-resampler.js \
+          test/js/test-streaming-pipeline.js \
+          test/js/test-swedish.js \
+          test/js/test-webgpu-session.js
     
     - name: Check file sizes
       working-directory: src/wasm/openjtalk-web

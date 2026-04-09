@@ -7,6 +7,8 @@ on:
     paths:
       - 'src/python/**'
       - 'src/python_run/**'
+      - 'test/**'
+      - 'tools/benchmark/**'
       - '.github/workflows/python-tests.yml'
 
 concurrency:
@@ -105,6 +107,33 @@ jobs:
       run: |
         cd src/python_run
         pytest tests/test_japanese_phonemization.py tests/test_multilingual_integration.py -v --tb=short --override-ini="addopts="
+      env:
+        PYTHONUTF8: '1'
+
+    - name: Run runtime full tests (config, training manager, CLI)
+      run: |
+        cd src/python_run
+        pytest tests/test_config_fallback.py tests/test_english_phonemization.py tests/test_runtime.py tests/test_util_impl.py tests/test_cli_models.py tests/test_training_manager.py tests/test_training_integration.py -v --tb=short --override-ini="addopts="
+      env:
+        PYTHONUTF8: '1'
+
+    # ---------------------------------------------------------------
+    # Legacy tests (test/ — speaker_encoder, phoneme_ids, sampler)
+    # ---------------------------------------------------------------
+    - name: Run legacy tests (speaker_encoder, phoneme_ids, sampler)
+      run: |
+        cd src/python
+        pytest ../../test/ -v --tb=short --override-ini="addopts="
+      env:
+        PYTHONUTF8: '1'
+
+    # ---------------------------------------------------------------
+    # Benchmark tool tests (tools/benchmark/)
+    # ---------------------------------------------------------------
+    - name: Run benchmark tool tests
+      run: |
+        cd src/python
+        pytest ../../tools/benchmark/test_benchmark.py -v --tb=short --override-ini="addopts="
       env:
         PYTHONUTF8: '1'
 
