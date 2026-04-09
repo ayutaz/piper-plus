@@ -1,4 +1,5 @@
 import math
+from typing import NamedTuple, Tuple
 
 import torch
 from torch import nn
@@ -7,6 +8,20 @@ from torch.nn.utils import remove_weight_norm, spectral_norm, weight_norm
 
 from . import attentions, commons, modules, monotonic_align
 from .commons import get_padding, init_weights
+
+
+class InferOutput(NamedTuple):
+    """Return type of :meth:`SynthesizerTrn.infer`.
+
+    A NamedTuple so callers can use positional unpacking (``audio, *_ =``)
+    or named access (``result.durations``).
+    """
+
+    audio: torch.Tensor
+    attn: torch.Tensor
+    y_mask: torch.Tensor
+    latents: Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]
+    durations: torch.Tensor
 
 
 class StochasticDurationPredictor(nn.Module):
@@ -1046,23 +1061,47 @@ class SynthesizerTrn(nn.Module):
         max_len=None,
         prosody_features=None,
         speaker_embedding=None,
-    ):
+        speaker_embedding_mask=None,
+    ) -> "InferOutput":
+        """Run inference to synthesize audio from phoneme IDs.
+
+        Returns:
+            InferOutput: a 5-element NamedTuple of
+                (audio, attn, y_mask, latents, durations) where *latents*
+                is itself a tuple ``(z, z_p, m_p, logs_p)``.
+
+        .. versionchanged:: 2026.03
+            Return value changed from a plain 4-tuple to a 5-element
+            ``InferOutput`` NamedTuple (added *durations*).  Existing
+            callers using ``audio, *_ =`` or ``[0]`` indexing are
+            unaffected.
+        """
         # Determine global conditioning: prefer speaker_embedding over emb_g(sid)
         if speaker_embedding is not None:
             # speaker_embedding: (batch, emb_dim) -> (batch, gin_channels, 1)
             if speaker_embedding.dim() == 2:
-                g = speaker_embedding.unsqueeze(-1)  # (batch, emb_dim, 1)
+                g_se = speaker_embedding.unsqueeze(-1)  # (batch, emb_dim, 1)
             else:
-                g = speaker_embedding
+                g_se = speaker_embedding
             # Project to gin_channels if dimensions differ
-            if g.size(1) != self.gin_channels:
-                proj = self._ensure_spk_proj(g.size(1))
+            if g_se.size(1) != self.gin_channels:
+                proj = self._ensure_spk_proj(g_se.size(1))
                 # (batch, emb_dim, 1) -> (batch, 1, emb_dim) -> Linear -> (batch, 1, gin) -> transpose
-                g = proj(g.squeeze(-1)).unsqueeze(-1)
+                g_se = proj(g_se.squeeze(-1)).unsqueeze(-1)
             # Add language embedding if available
             if self.n_languages > 1 and lid is not None:
                 lang_emb = self.emb_lang(lid).unsqueeze(-1)
-                g = g + lang_emb
+                g_se = g_se + lang_emb
+
+            # Apply speaker_embedding_mask: when mask is 0, fall back to
+            # sid-based conditioning.  This keeps the logic trace-friendly
+            # for ONNX export (torch.where instead of Python if).
+            if speaker_embedding_mask is not None:
+                g_base = self._get_global_conditioning(sid, lid)
+                use_se = (speaker_embedding_mask >= 1).unsqueeze(-1).float()
+                g = torch.where(use_se >= 1, g_se, g_base)
+            else:
+                g = g_se
         else:
             if self.n_speakers > 1:
                 assert sid is not None, "Missing speaker id"
@@ -1102,7 +1141,7 @@ class SynthesizerTrn(nn.Module):
         z = self.flow(z_p, y_mask, g=g, reverse=True)
         o = self.dec((z * y_mask)[:, :, :max_len], g=g)
 
-        return o, attn, y_mask, (z, z_p, m_p, logs_p), durations
+        return InferOutput(o, attn, y_mask, (z, z_p, m_p, logs_p), durations)
 
     def voice_conversion(self, y, y_lengths, sid_src, sid_tgt, lid=None):
         assert self.n_speakers > 1, "n_speakers have to be larger than 1."

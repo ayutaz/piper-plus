@@ -490,29 +490,3 @@ class TestProsodyDatasetValidation:
             f"phoneme_ids ({len(phoneme_ids)}) != prosody_features ({len(prosody_features)})"
         )
 
-    @pytest.mark.unit
-    def test_validate_dataset_prosody_lengths(self):
-        """Test that prosody_features length mismatches are detectable in dataset entries."""
-        # Valid: phoneme_ids と prosody_features の長さが一致
-        valid_entry = {
-            "phoneme_ids": [1, 2, 3, 4, 5],
-            "prosody_features": [
-                {"a1": 0, "a2": 0, "a3": 0},
-                {"a1": -1, "a2": 1, "a3": 3},
-                {"a1": 0, "a2": 2, "a3": 3},
-                {"a1": 1, "a2": 3, "a3": 3},
-                {"a1": 0, "a2": 0, "a3": 0},
-            ],
-        }
-        assert len(valid_entry["phoneme_ids"]) == len(valid_entry["prosody_features"])
-
-        # Invalid: 長さ不一致を検出できることを確認
-        invalid_entry = {
-            "phoneme_ids": [1, 2, 3, 4, 5],  # 5 items
-            "prosody_features": [
-                {"a1": 0, "a2": 0, "a3": 0},
-                {"a1": -1, "a2": 1, "a3": 3},
-                {"a1": 0, "a2": 2, "a3": 3},
-            ],  # 3 items — MISMATCH
-        }
-        assert len(invalid_entry["phoneme_ids"]) != len(invalid_entry["prosody_features"])
