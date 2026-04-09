@@ -222,15 +222,13 @@ func (e *OnnxEngine) Synthesize(ctx context.Context, req *SynthesisRequest) (*Sy
 	// "prosody_features": int64 [1, phonemeLen, 3] (if HasProsody)
 	if e.capabilities.HasProsody {
 		prosodyData := make([]int64, phonemeLen*3)
-		if prosodyFeatures != nil {
-			for i, pf := range prosodyFeatures {
-				if i >= phonemeLen {
-					break
-				}
-				prosodyData[i*3+0] = pf[0]
-				prosodyData[i*3+1] = pf[1]
-				prosodyData[i*3+2] = pf[2]
+		for i, pf := range prosodyFeatures {
+			if i >= phonemeLen {
+				break
 			}
+			prosodyData[i*3+0] = pf[0]
+			prosodyData[i*3+1] = pf[1]
+			prosodyData[i*3+2] = pf[2]
 		}
 		prosodyTensor, err := ort.NewTensor(ort.NewShape(1, int64(phonemeLen), 3), prosodyData)
 		if err != nil {
@@ -380,9 +378,13 @@ func (e *OnnxEngine) Synthesize(ctx context.Context, req *SynthesisRequest) (*Sy
 			rawDur := durTensor.GetData()
 			durations = make([]float32, len(rawDur))
 			copy(durations, rawDur)
-			if len(durations) != phonemeLen {
+			// When padding was applied, trim durations back to original length.
+			if wasPadded && len(durations) > originalPhonemeLen {
+				durations = durations[:originalPhonemeLen]
+			}
+			if len(durations) != originalPhonemeLen {
 				e.logger.Warn("duration count does not match phoneme length",
-					"durations", len(durations), "phoneme_len", phonemeLen)
+					"durations", len(durations), "phoneme_len", originalPhonemeLen)
 			}
 		} else {
 			e.logger.Warn("unexpected tensor type for duration output; durations unavailable")

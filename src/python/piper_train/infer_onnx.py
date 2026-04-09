@@ -67,8 +67,7 @@ def _pad_phoneme_ids(
         padded_prosody = None
 
     _LOGGER.debug(
-        "Strategy A: padded phoneme_ids from %d to %d tokens "
-        "(+%d front, +%d back)",
+        "Strategy A: padded phoneme_ids from %d to %d tokens (+%d front, +%d back)",
         n,
         len(padded),
         pad_front,

@@ -492,10 +492,11 @@ TEST_F(CApiIntegrationTest, IteratorVsOneShotParityWithCrossfade) {
 TEST_F(CApiIntegrationTest, SingleSentenceNoCrossfadeEffect) {
     // A single sentence should not be affected by crossfade.
     // Compare Iterator result with one-shot for a single sentence.
+    // Use a long enough text to avoid short-text padding (MIN_PHONEME_IDS=40).
     auto* engine = createEngine();
     ASSERT_NE(engine, nullptr);
 
-    const char* text = "Hello world.";
+    const char* text = "Hello world, how are you doing today?";
     auto opts = piper_plus_default_options();
 
     // One-shot

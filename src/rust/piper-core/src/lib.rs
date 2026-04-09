@@ -58,8 +58,8 @@ pub use engine::{
     DEFAULT_WARMUP_RUNS, MIN_PHONEME_IDS, ModelCapabilities, OnnxEngine, SynthesisRequest,
     SynthesisResult,
 };
-pub use short_text::wrap_short_text_ssml;
 pub use error::PiperError;
 pub use phonemize::{ProsodyFeature, ProsodyInfo};
+pub use short_text::wrap_short_text_ssml;
 #[cfg(feature = "onnx")]
 pub use voice::{PiperVoice, SynthesisParams};

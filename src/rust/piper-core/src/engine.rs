@@ -504,10 +504,8 @@ impl OnnxEngine {
 
         // --- Strategy A: Silence Padding ---
         // 短い phoneme 列を pause トークンで MIN_PHONEME_IDS まで延長する。
-        let (phoneme_ids, prosody_features, was_padded) = pad_short_phonemes(
-            &request.phoneme_ids,
-            request.prosody_features.as_ref(),
-        );
+        let (phoneme_ids, prosody_features, was_padded) =
+            pad_short_phonemes(&request.phoneme_ids, request.prosody_features.as_ref());
         let phoneme_len = phoneme_ids.len();
 
         if was_padded {
@@ -539,11 +537,9 @@ impl OnnxEngine {
         // テンソルは run() 完了まで生存する必要があるため、ここで全て確保する。
 
         // 1. input: int64 [1, phoneme_len]
-        let input_tensor = Tensor::from_array((
-            [1_usize, phoneme_len],
-            phoneme_ids.into_boxed_slice(),
-        ))
-        .map_err(|e| PiperError::Inference(format!("input tensor: {e}")))?;
+        let input_tensor =
+            Tensor::from_array(([1_usize, phoneme_len], phoneme_ids.into_boxed_slice()))
+                .map_err(|e| PiperError::Inference(format!("input tensor: {e}")))?;
 
         // 2. input_lengths: int64 [1]
         let lengths_tensor =
@@ -1166,8 +1162,7 @@ mod tests {
     fn test_pad_short_phonemes_with_prosody() {
         let ids: Vec<i64> = vec![1, 5, 6, 2]; // 4 tokens
         let prosody = vec![[0, 0, 0], [1, 2, 3], [4, 5, 6], [0, 0, 0]];
-        let (padded_ids, padded_prosody, was_padded) =
-            pad_short_phonemes(&ids, Some(&prosody));
+        let (padded_ids, padded_prosody, was_padded) = pad_short_phonemes(&ids, Some(&prosody));
         assert!(was_padded);
         assert_eq!(padded_ids.len(), MIN_PHONEME_IDS);
         let pp = padded_prosody.unwrap();

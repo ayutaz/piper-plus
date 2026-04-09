@@ -346,9 +346,7 @@ def create_app(engine: PiperInferenceEngine, model_path: str):
                     len(text.replace(" ", "").replace("\u3000", "").strip()),
                     text,
                 )
-            return StreamingResponse(
-                buf, media_type="audio/wav", headers=headers
-            )
+            return StreamingResponse(buf, media_type="audio/wav", headers=headers)
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e)) from e
 
@@ -383,16 +381,10 @@ def create_app(engine: PiperInferenceEngine, model_path: str):
                 headers["X-Piper-Warning"] = "short-text-input"
                 _LOGGER.warning(
                     "Short text input detected (%d chars excl. spaces): %r",
-                    len(
-                        req.input.replace(" ", "")
-                        .replace("\u3000", "")
-                        .strip()
-                    ),
+                    len(req.input.replace(" ", "").replace("\u3000", "").strip()),
                     req.input,
                 )
-            return StreamingResponse(
-                buf, media_type="audio/wav", headers=headers
-            )
+            return StreamingResponse(buf, media_type="audio/wav", headers=headers)
         except Exception:
             _LOGGER.exception("Synthesis failed for /v1/audio/speech")
             raise HTTPException(status_code=500, detail="Synthesis failed") from None
