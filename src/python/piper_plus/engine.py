@@ -89,9 +89,7 @@ def _get_providers(device: str = "cpu") -> list[str | tuple[str, dict]]:
         device_id = "0"
         if ":" in device:
             device_id = device.split(":", 1)[1]
-        providers.append(
-            ("CUDAExecutionProvider", {"device_id": device_id})
-        )
+        providers.append(("CUDAExecutionProvider", {"device_id": device_id}))
     elif device in ("gpu", "auto"):
         available = ort.get_available_providers()
         if "CUDAExecutionProvider" in available:

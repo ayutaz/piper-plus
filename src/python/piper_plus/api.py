@@ -93,9 +93,7 @@ class PiperPlus:
         self._phoneme_id_map: dict[str, list[int]] = self._config["phoneme_id_map"]
         self._language_id_map: dict[str, int] = self._config.get("language_id_map", {})
         self._speaker_id_map: dict[str, int] = self._config.get("speaker_id_map", {})
-        self._sample_rate: int = self._config.get(
-            "audio", {}
-        ).get("sample_rate", 22050)
+        self._sample_rate: int = self._config.get("audio", {}).get("sample_rate", 22050)
 
         # Inference scales
         self.noise_scale = noise_scale
@@ -121,12 +119,8 @@ class PiperPlus:
                 pass
 
         logger.info("Loading model from %s", onnx_path)
-        self._session = create_ort_session(
-            str(onnx_path), device=effective_device
-        )
-        logger.info(
-            "Loaded model (providers: %s)", self._session.get_providers()
-        )
+        self._session = create_ort_session(str(onnx_path), device=effective_device)
+        logger.info("Loaded model (providers: %s)", self._session.get_providers())
 
         # Detect model capabilities from input names
         input_names = {inp.name for inp in self._session.get_inputs()}
@@ -189,16 +183,22 @@ class PiperPlus:
             ValueError: If scale parameters are out of valid range.
         """
         if not text or not text.strip():
-            return AudioResult(audio=np.array([], dtype=np.int16), sample_rate=self.sample_rate)
+            return AudioResult(
+                audio=np.array([], dtype=np.int16), sample_rate=self.sample_rate
+            )
 
         if not (0.0 < self.noise_scale <= 2.0):
             raise ValueError(f"noise_scale must be in (0, 2.0], got {self.noise_scale}")
         if not (0.1 <= self.length_scale <= 5.0):
-            raise ValueError(f"length_scale must be in [0.1, 5.0], got {self.length_scale}")
+            raise ValueError(
+                f"length_scale must be in [0.1, 5.0], got {self.length_scale}"
+            )
         if not (0.0 <= self.noise_scale_w <= 2.0):
             raise ValueError(f"noise_w must be in [0, 2.0], got {self.noise_scale_w}")
 
-        audio_int16 = self._synthesize_raw(text, speaker_id=speaker_id, language=language)
+        audio_int16 = self._synthesize_raw(
+            text, speaker_id=speaker_id, language=language
+        )
         return AudioResult(audio=audio_int16, sample_rate=self._sample_rate)
 
     def synthesize_stream(
@@ -390,7 +390,11 @@ class PiperPlus:
                         for _ in ids:
                             if prosody_info is not None:
                                 prosody_features.append(
-                                    {"a1": prosody_info.a1, "a2": prosody_info.a2, "a3": prosody_info.a3}
+                                    {
+                                        "a1": prosody_info.a1,
+                                        "a2": prosody_info.a2,
+                                        "a3": prosody_info.a3,
+                                    }
                                 )
                             else:
                                 prosody_features.append(None)
@@ -412,7 +416,9 @@ class PiperPlus:
         if self._has_lid and self._language_id_map:
             try:
                 languages = list(self._language_id_map.keys())
-                detector = UnicodeLanguageDetector(languages, default_latin_language="en")
+                detector = UnicodeLanguageDetector(
+                    languages, default_latin_language="en"
+                )
                 context_has_kana = detector.has_kana(text)
                 counts: dict[str, int] = {}
                 for ch in text:

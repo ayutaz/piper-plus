@@ -56,7 +56,9 @@ def _infer_hparams(state_dict: dict) -> dict:
     # layer1.0.weight has shape (channels, input_dim, kernel_size)
     layer1_weight = state_dict.get("layer1.0.weight")
     if layer1_weight is None:
-        raise ValueError("Cannot infer hparams: 'layer1.0.weight' not found in state_dict")
+        raise ValueError(
+            "Cannot infer hparams: 'layer1.0.weight' not found in state_dict"
+        )
 
     channels = layer1_weight.shape[0]
     input_dim = layer1_weight.shape[1]
@@ -134,9 +136,7 @@ class SpeakerEncoder:
 
         if isinstance(ckpt, dict) and "model_state_dict" in ckpt:
             state_dict = ckpt["model_state_dict"]
-        elif isinstance(ckpt, dict) and all(
-            isinstance(k, str) for k in ckpt.keys()
-        ):
+        elif isinstance(ckpt, dict) and all(isinstance(k, str) for k in ckpt.keys()):
             state_dict = ckpt
         else:
             raise ValueError(
@@ -227,9 +227,7 @@ class SpeakerEncoder:
 
         # Pad to uniform time length
         max_time = max(m.shape[1] for m in mels)
-        padded = np.zeros(
-            (len(mels), mels[0].shape[0], max_time), dtype=np.float32
-        )
+        padded = np.zeros((len(mels), mels[0].shape[0], max_time), dtype=np.float32)
         for i, m in enumerate(mels):
             padded[i, :, : m.shape[1]] = m
 

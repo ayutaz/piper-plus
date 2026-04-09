@@ -932,7 +932,14 @@ class SynthesizerTrn(nn.Module):
         return x_dp
 
     def forward(
-        self, x, x_lengths, y, y_lengths, sid=None, lid=None, prosody_features=None,
+        self,
+        x,
+        x_lengths,
+        y,
+        y_lengths,
+        sid=None,
+        lid=None,
+        prosody_features=None,
         speaker_embedding=None,
     ):
         # NOTE: speaker_embedding is accepted but intentionally unused during

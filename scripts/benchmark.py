@@ -241,12 +241,18 @@ def benchmark_model(
     sess_opts.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
     sess_opts.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
     sess_opts.inter_op_num_threads = 1
-    sess_opts.intra_op_num_threads = threads if threads is not None else min(os.cpu_count() or 4, 4)
+    sess_opts.intra_op_num_threads = (
+        threads if threads is not None else min(os.cpu_count() or 4, 4)
+    )
     sess_opts.enable_cpu_mem_arena = True
     sess_opts.enable_mem_pattern = True
 
-    session = ort.InferenceSession(model_path, sess_opts, providers=["CPUExecutionProvider"])
-    feeds = _build_inputs(session, phoneme_ids, speaker_id=speaker_id, language_id=language_id)
+    session = ort.InferenceSession(
+        model_path, sess_opts, providers=["CPUExecutionProvider"]
+    )
+    feeds = _build_inputs(
+        session, phoneme_ids, speaker_id=speaker_id, language_id=language_id
+    )
     _run_inference(session, feeds)
     cold_start_ms = (time.perf_counter() - cold_start) * 1000.0
 
@@ -378,7 +384,9 @@ def format_markdown(results: list[dict], labels: list[str] | None = None) -> str
     """Format results as Markdown."""
     if len(results) == 1:
         return format_markdown_single(results[0])
-    effective_labels = labels or [r.get("model", f"Model {i+1}") for i, r in enumerate(results)]
+    effective_labels = labels or [
+        r.get("model", f"Model {i + 1}") for i, r in enumerate(results)
+    ]
     return format_markdown_comparison(results, effective_labels)
 
 
@@ -412,17 +420,38 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--config", type=str, help="Path to config.json for --model")
 
     # Multi-model comparison
-    parser.add_argument("--models", nargs="+", type=str, help="Paths to ONNX models (comparison mode)")
-    parser.add_argument("--configs", nargs="+", type=str, help="Paths to config.json files (comparison mode)")
-    parser.add_argument("--labels", nargs="+", type=str, help="Labels for each model in comparison mode")
+    parser.add_argument(
+        "--models", nargs="+", type=str, help="Paths to ONNX models (comparison mode)"
+    )
+    parser.add_argument(
+        "--configs",
+        nargs="+",
+        type=str,
+        help="Paths to config.json files (comparison mode)",
+    )
+    parser.add_argument(
+        "--labels", nargs="+", type=str, help="Labels for each model in comparison mode"
+    )
 
     # Benchmark parameters
-    parser.add_argument("--n-warmup", type=int, default=2, help="Warmup iterations (default: 2)")
-    parser.add_argument("--n-runs", type=int, default=10, help="Measurement iterations (default: 10)")
-    parser.add_argument("--language", type=str, default="ja", help="Test language (default: ja)")
-    parser.add_argument("--text", type=str, help="Custom test text (overrides default for language)")
-    parser.add_argument("--speaker-id", type=int, default=0, help="Speaker ID (default: 0)")
-    parser.add_argument("--threads", type=int, default=None, help="ORT intra_op threads (default: auto)")
+    parser.add_argument(
+        "--n-warmup", type=int, default=2, help="Warmup iterations (default: 2)"
+    )
+    parser.add_argument(
+        "--n-runs", type=int, default=10, help="Measurement iterations (default: 10)"
+    )
+    parser.add_argument(
+        "--language", type=str, default="ja", help="Test language (default: ja)"
+    )
+    parser.add_argument(
+        "--text", type=str, help="Custom test text (overrides default for language)"
+    )
+    parser.add_argument(
+        "--speaker-id", type=int, default=0, help="Speaker ID (default: 0)"
+    )
+    parser.add_argument(
+        "--threads", type=int, default=None, help="ORT intra_op threads (default: auto)"
+    )
 
     # Output
     parser.add_argument(
@@ -462,10 +491,10 @@ def main(argv: list[str] | None = None) -> None:
     # Collect model/config pairs
     if args.model:
         pairs = [(args.model, args.config)]
-        labels = [os.path.basename(args.model)]
+        _labels = [os.path.basename(args.model)]
     else:
         pairs = list(zip(args.models, args.configs, strict=False))
-        labels = args.labels or [os.path.basename(m) for m in args.models]
+        _labels = args.labels or [os.path.basename(m) for m in args.models]
 
     results: list[dict] = []
     for model_path, config_path in pairs:

@@ -4,6 +4,7 @@ Usage::
 
     uv run python -m piper_wyoming --model tsukuyomi --port 10200
 """
+
 from __future__ import annotations
 
 import argparse
@@ -64,9 +65,7 @@ class PiperPlusEventHandler(AsyncEventHandler):
         if not text.strip():
             # Send empty audio for empty text
             await self.write_event(
-                AudioStart(
-                    rate=self.tts.sample_rate, width=2, channels=1
-                ).event()
+                AudioStart(rate=self.tts.sample_rate, width=2, channels=1).event()
             )
             await self.write_event(AudioStop().event())
             return True
@@ -85,18 +84,14 @@ class PiperPlusEventHandler(AsyncEventHandler):
         except Exception:
             logger.exception("Synthesis failed")
             await self.write_event(
-                AudioStart(
-                    rate=self.tts.sample_rate, width=2, channels=1
-                ).event()
+                AudioStart(rate=self.tts.sample_rate, width=2, channels=1).event()
             )
             await self.write_event(AudioStop().event())
             return True
 
         # Stream audio back
         await self.write_event(
-            AudioStart(
-                rate=result.sample_rate, width=2, channels=1
-            ).event()
+            AudioStart(rate=result.sample_rate, width=2, channels=1).event()
         )
 
         audio_bytes = result.audio.tobytes()
@@ -189,11 +184,7 @@ def main() -> None:
     }
 
     try:
-        asyncio.run(
-            server.run(
-                partial(PiperPlusEventHandler, **handler_kwargs)
-            )
-        )
+        asyncio.run(server.run(partial(PiperPlusEventHandler, **handler_kwargs)))
     except KeyboardInterrupt:
         logger.info("Server stopped")
 

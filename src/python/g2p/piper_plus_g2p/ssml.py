@@ -116,8 +116,7 @@ class SSMLParser:
 
         if len(ssml_text) > _MAX_SSML_SIZE:
             raise ValueError(
-                f"SSML input too large: {len(ssml_text)} bytes "
-                f"(max: {_MAX_SSML_SIZE})"
+                f"SSML input too large: {len(ssml_text)} bytes (max: {_MAX_SSML_SIZE})"
             )
 
         try:
@@ -158,9 +157,7 @@ class SSMLParser:
             # <break/> has no children or tail of its own (self-closing),
             # but handle tail text if present.
             if element.tail and element.tail.strip():
-                segments.append(
-                    SSMLSegment(text=element.tail.strip(), rate=rate)
-                )
+                segments.append(SSMLSegment(text=element.tail.strip(), rate=rate))
             return
 
         # Determine rate for this scope
@@ -171,9 +168,7 @@ class SSMLParser:
 
         # element.text is the text before the first child
         if element.text and element.text.strip():
-            segments.append(
-                SSMLSegment(text=element.text.strip(), rate=rate)
-            )
+            segments.append(SSMLSegment(text=element.text.strip(), rate=rate))
 
         # Recurse into children
         for child in element:
@@ -181,9 +176,7 @@ class SSMLParser:
             # tail text after each child element
             if child.tail and child.tail.strip():
                 # The tail inherits the *parent's* rate, not the child's.
-                segments.append(
-                    SSMLSegment(text=child.tail.strip(), rate=rate)
-                )
+                segments.append(SSMLSegment(text=child.tail.strip(), rate=rate))
 
     @staticmethod
     def _resolve_break(element: ET.Element) -> int:
@@ -194,9 +187,7 @@ class SSMLParser:
 
         strength_attr = element.get("strength")
         if strength_attr is not None:
-            return SSMLParser.BREAK_STRENGTH_MS.get(
-                strength_attr.lower(), 400
-            )
+            return SSMLParser.BREAK_STRENGTH_MS.get(strength_attr.lower(), 400)
 
         # Default break with no attributes -> medium
         return SSMLParser.BREAK_STRENGTH_MS["medium"]

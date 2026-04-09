@@ -76,9 +76,7 @@ def load_test_pairs(pairs_path: Path) -> list[tuple[int, str, str]]:
     return pairs
 
 
-def compute_eer(
-    labels: np.ndarray, scores: np.ndarray
-) -> tuple[float, float]:
+def compute_eer(labels: np.ndarray, scores: np.ndarray) -> tuple[float, float]:
     """Compute Equal Error Rate (EER) and the corresponding threshold.
 
     EER is the operating point where the false acceptance rate (FAR)
@@ -117,12 +115,8 @@ def compute_eer(
     pos_scores = np.sort(scores[labels == 1])
     neg_scores = np.sort(scores[labels == 0])
 
-    fars = np.array(
-        [np.sum(neg_scores >= t) / n_negative for t in thresholds]
-    )
-    frrs = np.array(
-        [np.sum(pos_scores < t) / n_positive for t in thresholds]
-    )
+    fars = np.array([np.sum(neg_scores >= t) / n_negative for t in thresholds])
+    frrs = np.array([np.sum(pos_scores < t) / n_positive for t in thresholds])
 
     # Find the crossing point where FAR and FRR are closest
     diffs = fars - frrs
@@ -167,8 +161,7 @@ def evaluate(
         encoder = SpeakerEncoder.from_pytorch(model_path)
     else:
         raise ValueError(
-            f"Unrecognised model format: {suffix}. "
-            "Expected .onnx, .ckpt, .pt, or .pth"
+            f"Unrecognised model format: {suffix}. Expected .onnx, .ckpt, .pt, or .pth"
         )
 
     # Load test pairs

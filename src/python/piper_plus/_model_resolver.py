@@ -135,9 +135,7 @@ def _download_from_hf(
 ) -> tuple[Path, Path]:
     """Download model from HuggingFace Hub."""
     if not download:
-        raise ModelNotFoundError(
-            f"Model '{repo_id}' not in cache and download=False"
-        )
+        raise ModelNotFoundError(f"Model '{repo_id}' not in cache and download=False")
 
     try:
         from huggingface_hub import hf_hub_download, list_repo_files  # noqa: PLC0415
@@ -179,16 +177,22 @@ def _download_from_hf(
         logger.info("Downloading %s from %s...", onnx_file, repo_id)
         onnx_path = Path(
             hf_hub_download(
-                repo_id, onnx_file, local_dir=str(tmp_dir),
-                force_download=False, resume_download=True,
+                repo_id,
+                onnx_file,
+                local_dir=str(tmp_dir),
+                force_download=False,
+                resume_download=True,
             )
         )
 
         logger.info("Downloading %s from %s...", config_file, repo_id)
         config_path = Path(
             hf_hub_download(
-                repo_id, config_file, local_dir=str(tmp_dir),
-                force_download=False, resume_download=True,
+                repo_id,
+                config_file,
+                local_dir=str(tmp_dir),
+                force_download=False,
+                resume_download=True,
             )
         )
 

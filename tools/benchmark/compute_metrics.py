@@ -59,7 +59,9 @@ def _read_wav_info(wav_path: Path) -> dict:
     if sample_width == 2:
         audio = np.frombuffer(raw_data, dtype=np.int16).astype(np.float32) / 32768.0
     elif sample_width == 4:
-        audio = np.frombuffer(raw_data, dtype=np.int32).astype(np.float32) / 2147483648.0
+        audio = (
+            np.frombuffer(raw_data, dtype=np.int32).astype(np.float32) / 2147483648.0
+        )
     else:
         audio = np.frombuffer(raw_data, dtype=np.uint8).astype(np.float32) / 128.0 - 1.0
 
@@ -174,7 +176,9 @@ def _compute_utmos_scores(
             _LOGGER.warning("UTMOS failed for %s: %s", wav_path, e)
             results[str(wav_path)] = -1.0
 
-    _LOGGER.info("UTMOS computation complete: %d / %d files", len(results), len(wav_paths))
+    _LOGGER.info(
+        "UTMOS computation complete: %d / %d files", len(results), len(wav_paths)
+    )
     return results
 
 
@@ -203,12 +207,14 @@ def _scan_samples_dir(samples_dir: Path) -> list[dict]:
             lang = lang_dir.name
             for wav_file in sorted(lang_dir.glob("*.wav")):
                 text_id = wav_file.stem
-                samples.append({
-                    "model": model_name,
-                    "language": lang,
-                    "text_id": text_id,
-                    "wav_path": wav_file,
-                })
+                samples.append(
+                    {
+                        "model": model_name,
+                        "language": lang,
+                        "text_id": text_id,
+                        "wav_path": wav_file,
+                    }
+                )
 
     return samples
 
@@ -259,7 +265,8 @@ Examples:
         help="Path to generation_results.json for RTF data (default: auto-detect in samples-dir)",
     )
     parser.add_argument(
-        "-v", "--verbose",
+        "-v",
+        "--verbose",
         action="store_true",
         help="Enable debug logging",
     )
@@ -368,7 +375,15 @@ Examples:
             "language": lang,
             "n_samples": len(data["duration_sec"]),
         }
-        for metric_name in ("duration_sec", "file_size_bytes", "rms_db", "peak_db", "silence_ratio", "rtf", "utmos"):
+        for metric_name in (
+            "duration_sec",
+            "file_size_bytes",
+            "rms_db",
+            "peak_db",
+            "silence_ratio",
+            "rtf",
+            "utmos",
+        ):
             values = data.get(metric_name, [])
             if values:
                 agg[f"{metric_name}_mean"] = round(np.mean(values).item(), 4)
@@ -421,7 +436,9 @@ Examples:
 
     # Warnings
     if sample_rate_issues:
-        print(f"\nWARNING: {len(sample_rate_issues)} files have unexpected sample rates:")
+        print(
+            f"\nWARNING: {len(sample_rate_issues)} files have unexpected sample rates:"
+        )
         for issue in sample_rate_issues[:5]:
             print(f"  {issue}")
         if len(sample_rate_issues) > 5:

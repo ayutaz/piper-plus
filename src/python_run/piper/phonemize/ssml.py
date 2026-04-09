@@ -49,12 +49,19 @@ except ImportError:
 
     class SSMLParser:  # type: ignore[no-redef]
         BREAK_STRENGTH_MS = {
-            "none": 0, "x-weak": 100, "weak": 200,
-            "medium": 400, "strong": 700, "x-strong": 1000,
+            "none": 0,
+            "x-weak": 100,
+            "weak": 200,
+            "medium": 400,
+            "strong": 700,
+            "x-strong": 1000,
         }
         RATE_NAMES = {
-            "x-slow": 1.5, "slow": 1.25, "medium": 1.0,
-            "fast": 0.8, "x-fast": 0.6,
+            "x-slow": 1.5,
+            "slow": 1.25,
+            "medium": 1.0,
+            "fast": 0.8,
+            "x-fast": 0.6,
         }
         _RE_SSML = re.compile(r"^\s*<speak[\s>]", re.DOTALL)
 

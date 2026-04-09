@@ -2,6 +2,7 @@
 
 Uses PiperPlus high-level API instead of reimplementing inference logic.
 """
+
 from __future__ import annotations
 
 import logging

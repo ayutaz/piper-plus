@@ -234,11 +234,11 @@ class TestParseNested:
 
     def test_break_inside_prosody(self):
         ssml = (
-            '<speak>'
+            "<speak>"
             '<prosody rate="slow">'
             'Before<break time="300ms"/>After'
-            '</prosody>'
-            '</speak>'
+            "</prosody>"
+            "</speak>"
         )
         segments = SSMLParser.parse(ssml)
         texts = [s.text for s in segments if s.text]
@@ -251,10 +251,10 @@ class TestParseNested:
 
     def test_multiple_prosody_sections(self):
         ssml = (
-            '<speak>'
+            "<speak>"
             '<prosody rate="slow">Slow</prosody>'
             '<prosody rate="fast">Fast</prosody>'
-            '</speak>'
+            "</speak>"
         )
         segments = SSMLParser.parse(ssml)
         slow_segs = [s for s in segments if s.rate == 1.25]
@@ -275,11 +275,11 @@ class TestParseCombined:
 
     def test_break_between_prosody(self):
         ssml = (
-            '<speak>'
+            "<speak>"
             '<prosody rate="slow">Slow</prosody>'
             '<break time="500ms"/>'
             '<prosody rate="fast">Fast</prosody>'
-            '</speak>'
+            "</speak>"
         )
         segments = SSMLParser.parse(ssml)
         texts = [s.text for s in segments if s.text]
@@ -290,13 +290,13 @@ class TestParseCombined:
 
     def test_complex_mixed(self):
         ssml = (
-            '<speak>'
-            'Hello '
+            "<speak>"
+            "Hello "
             '<break time="200ms"/>'
             '<prosody rate="fast">Quick part</prosody>'
             '<break time="1s"/>'
-            'End'
-            '</speak>'
+            "End"
+            "</speak>"
         )
         segments = SSMLParser.parse(ssml)
         texts = [s.text for s in segments if s.text]

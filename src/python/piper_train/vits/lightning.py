@@ -830,11 +830,7 @@ class VitsModel(pl.LightningModule):
             )
 
         # Generator optimizer: only trainable parameters
-        gen_params = [
-            p
-            for p in self.model_g.parameters()
-            if p.requires_grad
-        ]
+        gen_params = [p for p in self.model_g.parameters() if p.requires_grad]
 
         # Collect discriminator parameters (including WavLM if enabled)
         d_params = list(self.model_d.parameters())

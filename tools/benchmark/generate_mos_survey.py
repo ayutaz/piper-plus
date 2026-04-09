@@ -50,12 +50,14 @@ def _scan_samples(samples_dir: Path) -> list[dict]:
             lang = lang_dir.name
             for wav_file in sorted(lang_dir.glob("*.wav")):
                 text_id = wav_file.stem
-                samples.append({
-                    "model": model_name,
-                    "language": lang,
-                    "text_id": text_id,
-                    "wav_path": wav_file,
-                })
+                samples.append(
+                    {
+                        "model": model_name,
+                        "language": lang,
+                        "text_id": text_id,
+                        "wav_path": wav_file,
+                    }
+                )
     return samples
 
 
@@ -110,14 +112,16 @@ def _generate_html(
     # Serialize entries for JavaScript (without audio data in the JSON blob)
     js_entries = []
     for entry in entries:
-        js_entries.append({
-            "id": entry["id"],
-            "display_id": entry["display_id"],
-            "model": entry["model"],
-            "language": entry["language"],
-            "text_id": entry["text_id"],
-            "text": entry["text"],
-        })
+        js_entries.append(
+            {
+                "id": entry["id"],
+                "display_id": entry["display_id"],
+                "model": entry["model"],
+                "language": entry["language"],
+                "text_id": entry["text_id"],
+                "text": entry["text"],
+            }
+        )
 
     # Build sample cards HTML
     sample_cards = []
@@ -150,10 +154,10 @@ def _generate_html(
       </div>
       {text_html}
       <audio controls preload="none">
-        <source src="{entry['audio_data']}" type="audio/wav">
+        <source src="{entry["audio_data"]}" type="audio/wav">
         Your browser does not support the audio element.
       </audio>
-      <div class="rating-group" data-sample-id="{entry['id']}" data-display-id="{display_id}">
+      <div class="rating-group" data-sample-id="{entry["id"]}" data-display-id="{display_id}">
         <span class="rating-label">Rating:</span>
         <label><input type="radio" name="rating-{display_id}" value="1"> 1 (Bad)</label>
         <label><input type="radio" name="rating-{display_id}" value="2"> 2 (Poor)</label>
@@ -556,7 +560,8 @@ Examples:
         help="Filter to specific models (comma-separated)",
     )
     parser.add_argument(
-        "-v", "--verbose",
+        "-v",
+        "--verbose",
         action="store_true",
         help="Enable debug logging",
     )
@@ -579,7 +584,7 @@ Examples:
 
     # Apply filters
     if args.languages:
-        lang_filter = {l.strip() for l in args.languages.split(",")}
+        lang_filter = {lang.strip() for lang in args.languages.split(",")}
         samples = [s for s in samples if s["language"] in lang_filter]
     if args.models:
         model_filter = {m.strip() for m in args.models.split(",")}

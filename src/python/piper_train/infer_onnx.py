@@ -250,14 +250,16 @@ def main():
     # Emit deprecation warnings for old option names
     _raw_argv = sys.argv[1:]
     if "--encode-speaker" in _raw_argv:
-        import warnings
+        import warnings  # noqa: PLC0415
+
         warnings.warn(
             "--encode-speaker is deprecated, use --reference-audio instead.",
             DeprecationWarning,
             stacklevel=1,
         )
     if "--encode-speaker-model" in _raw_argv:
-        import warnings
+        import warnings  # noqa: PLC0415
+
         warnings.warn(
             "--encode-speaker-model is deprecated, use --speaker-encoder-model instead.",
             DeprecationWarning,
@@ -532,9 +534,7 @@ def main():
                         break
                 else:
                     emb_dim = 256
-                inputs["speaker_embedding"] = np.zeros(
-                    (1, emb_dim), dtype=np.float32
-                )
+                inputs["speaker_embedding"] = np.zeros((1, emb_dim), dtype=np.float32)
                 inputs["speaker_embedding_mask"] = np.array([[0]], dtype=np.int64)
 
         start_time = time.perf_counter()

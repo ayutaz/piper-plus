@@ -14,10 +14,10 @@ import (
 // ---------------------------------------------------------------------------
 
 type goldenData struct {
-	MelParams     goldenMelParams   `json:"mel_params"`
-	HannWindow    goldenHannWindow  `json:"hann_window"`
-	MelFilterbank goldenFilterbank  `json:"mel_filterbank"`
-	TestCases     []goldenTestCase  `json:"test_cases"`
+	MelParams     goldenMelParams  `json:"mel_params"`
+	HannWindow    goldenHannWindow `json:"hann_window"`
+	MelFilterbank goldenFilterbank `json:"mel_filterbank"`
+	TestCases     []goldenTestCase `json:"test_cases"`
 }
 
 type goldenMelParams struct {
@@ -140,7 +140,7 @@ func generateMultitoneGo(freqs []float64, durationS float64, sr int) []float32 {
 	return samples
 }
 
-const logFloor = float32(-23.025851) // log(1e-10)
+// logFloor = float32(-23.025851) // log(1e-10) -- removed: unused in tests
 
 // ---------------------------------------------------------------------------
 // Tests: Parameter validation

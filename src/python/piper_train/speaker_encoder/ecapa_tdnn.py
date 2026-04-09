@@ -93,9 +93,7 @@ class Res2NetBlock(nn.Module):
                 for _ in range(scale - 1)
             ]
         )
-        self.bns = nn.ModuleList(
-            [nn.BatchNorm1d(self.width) for _ in range(scale - 1)]
-        )
+        self.bns = nn.ModuleList([nn.BatchNorm1d(self.width) for _ in range(scale - 1)])
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Split, hierarchically convolve, and merge.
@@ -245,13 +243,25 @@ class ECAPATDNN(nn.Module):
 
         # 3 SE-Res2Net blocks with increasing dilation
         self.layer2 = SERes2NetBlock(
-            channels, kernel_size=3, dilation=2, scale=scale, se_bottleneck=se_bottleneck
+            channels,
+            kernel_size=3,
+            dilation=2,
+            scale=scale,
+            se_bottleneck=se_bottleneck,
         )
         self.layer3 = SERes2NetBlock(
-            channels, kernel_size=3, dilation=3, scale=scale, se_bottleneck=se_bottleneck
+            channels,
+            kernel_size=3,
+            dilation=3,
+            scale=scale,
+            se_bottleneck=se_bottleneck,
         )
         self.layer4 = SERes2NetBlock(
-            channels, kernel_size=3, dilation=4, scale=scale, se_bottleneck=se_bottleneck
+            channels,
+            kernel_size=3,
+            dilation=4,
+            scale=scale,
+            se_bottleneck=se_bottleneck,
         )
 
         # Multi-layer Feature Aggregation (MFA):

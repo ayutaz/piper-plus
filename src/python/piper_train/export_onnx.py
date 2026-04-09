@@ -276,8 +276,14 @@ def main() -> None:
     stochastic = args.stochastic
 
     def infer_forward(
-        text, text_lengths, scales, sid=None, lid=None, prosody_features=None,
-        speaker_embedding=None, speaker_embedding_mask=None,
+        text,
+        text_lengths,
+        scales,
+        sid=None,
+        lid=None,
+        prosody_features=None,
+        speaker_embedding=None,
+        speaker_embedding_mask=None,
     ):
         """
         Efficient forward function that returns both audio and duration information.

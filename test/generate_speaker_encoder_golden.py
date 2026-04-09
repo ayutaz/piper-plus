@@ -69,8 +69,10 @@ def create_mel_filterbank() -> np.ndarray:
     mel_fmax = hz_to_mel(F32(FMAX))
 
     mel_points = np.array(
-        [mel_fmin + (mel_fmax - mel_fmin) * F32(i) / F32(N_MELS + 1)
-         for i in range(N_MELS + 2)],
+        [
+            mel_fmin + (mel_fmax - mel_fmin) * F32(i) / F32(N_MELS + 1)
+            for i in range(N_MELS + 2)
+        ],
         dtype=F32,
     )
     hz_points = np.array([mel_to_hz(m) for m in mel_points], dtype=F32)
@@ -145,16 +147,12 @@ def compute_mel_spectrogram(samples: np.ndarray) -> np.ndarray:
             energy = F32(0.0)
             for k_idx in range(fft_bins):
                 energy += mel_filters[mel_idx * fft_bins + k_idx] * power_spec[k_idx]
-            mel_spec[mel_idx * n_frames + frame_idx] = np.log(
-                max(float(energy), 1e-10)
-            )
+            mel_spec[mel_idx * n_frames + frame_idx] = np.log(max(float(energy), 1e-10))
 
     return mel_spec
 
 
-def resample_linear(
-    samples: np.ndarray, from_rate: int, to_rate: int
-) -> np.ndarray:
+def resample_linear(samples: np.ndarray, from_rate: int, to_rate: int) -> np.ndarray:
     """Linear interpolation resampling in float32."""
     samples = np.asarray(samples, dtype=F32)
     if from_rate == to_rate or len(samples) == 0:
@@ -189,9 +187,7 @@ def generate_sine(freq_hz: float, duration_s: float, sr: int) -> np.ndarray:
     return np.sin(F32(2.0) * F32(np.pi) * F32(freq_hz) * i / F32(sr))
 
 
-def generate_multitone(
-    freqs: list[float], duration_s: float, sr: int
-) -> np.ndarray:
+def generate_multitone(freqs: list[float], duration_s: float, sr: int) -> np.ndarray:
     """Generate a sum-of-sines signal in float32."""
     n_samples = int(duration_s * sr)
     samples = np.zeros(n_samples, dtype=F32)

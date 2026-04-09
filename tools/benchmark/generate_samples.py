@@ -73,7 +73,9 @@ def _load_texts(texts_dir: Path, languages: list[str]) -> dict[str, list[str]]:
     for lang in languages:
         txt_path = texts_dir / f"{lang}.txt"
         if not txt_path.exists():
-            _LOGGER.warning("Text file not found: %s (skipping language %s)", txt_path, lang)
+            _LOGGER.warning(
+                "Text file not found: %s (skipping language %s)", txt_path, lang
+            )
             continue
         lines = [
             line.strip()
@@ -93,7 +95,9 @@ def _load_texts(texts_dir: Path, languages: list[str]) -> dict[str, list[str]]:
 # ---------------------------------------------------------------------------
 
 
-def _audio_float_to_int16(audio: np.ndarray, max_wav_value: float = 32767.0) -> np.ndarray:
+def _audio_float_to_int16(
+    audio: np.ndarray, max_wav_value: float = 32767.0
+) -> np.ndarray:
     """Normalize audio and convert to int16 range."""
     audio_norm = audio * (max_wav_value / max(0.01, np.max(np.abs(audio))))
     audio_norm = np.clip(audio_norm, -max_wav_value, max_wav_value)
@@ -147,7 +151,9 @@ def _create_onnx_session(model_path: str, device: str = "cpu"):
     except ImportError:
         import onnxruntime  # noqa: PLC0415
 
-        _LOGGER.warning("piper_train.ort_utils not available; using default session options")
+        _LOGGER.warning(
+            "piper_train.ort_utils not available; using default session options"
+        )
         session = onnxruntime.InferenceSession(
             model_path, providers=["CPUExecutionProvider"]
         )
@@ -231,9 +237,7 @@ def _synthesize_piper_plus(
                 np.array(prosody_array, dtype=np.int64), 0
             )
         else:
-            inputs["prosody_features"] = np.zeros(
-                (1, text.shape[1], 3), dtype=np.int64
-            )
+            inputs["prosody_features"] = np.zeros((1, text.shape[1], 3), dtype=np.int64)
 
     start = time.perf_counter()
     outputs = session.run(None, inputs)
@@ -377,12 +381,17 @@ def _generate_for_piper_model(
                         text,
                         phoneme_id_map,
                         language=ml_language,
-                        language_id_map=language_id_map if len(language_id_map) > 1 else None,
+                        language_id_map=language_id_map
+                        if len(language_id_map) > 1
+                        else None,
                     )
                 except Exception as e:
                     _LOGGER.error(
                         "Phonemization failed for %s/%s/%s: %s",
-                        model_name, lang, text_id, e,
+                        model_name,
+                        lang,
+                        text_id,
+                        e,
                     )
                     continue
 
@@ -418,7 +427,12 @@ def _generate_for_piper_model(
                 results.append(result)
                 _LOGGER.info(
                     "[%s/%s/%s] RTF=%.3f (infer=%.3fs, audio=%.3fs)",
-                    model_name, lang, text_id, rtf, infer_sec, audio_duration,
+                    model_name,
+                    lang,
+                    text_id,
+                    rtf,
+                    infer_sec,
+                    audio_duration,
                 )
 
     return results
@@ -449,9 +463,7 @@ def _generate_for_external_model(
 
         voice = voices.get(lang)
         if not voice and "{voice}" in command_template:
-            _LOGGER.warning(
-                "No voice mapping for %s/%s (skipping)", model_name, lang
-            )
+            _LOGGER.warning("No voice mapping for %s/%s (skipping)", model_name, lang)
             continue
 
         for text_idx, text in enumerate(texts[lang]):
@@ -484,7 +496,12 @@ def _generate_for_external_model(
             results.append(result)
             _LOGGER.info(
                 "[%s/%s/%s] RTF=%.3f (infer=%.3fs, audio=%.3fs)",
-                model_name, lang, text_id, rtf, infer_sec, audio_duration,
+                model_name,
+                lang,
+                text_id,
+                rtf,
+                infer_sec,
+                audio_duration,
             )
 
     return results
@@ -558,7 +575,8 @@ Examples:
         help="Skip external (non-piper-plus) models",
     )
     parser.add_argument(
-        "-v", "--verbose",
+        "-v",
+        "--verbose",
         action="store_true",
         help="Enable debug logging",
     )
@@ -571,7 +589,7 @@ Examples:
     )
 
     # Parse arguments
-    languages = [l.strip() for l in args.languages.split(",") if l.strip()]
+    languages = [lang.strip() for lang in args.languages.split(",") if lang.strip()]
     speaker_id_overrides = None
     if args.speaker_ids:
         speaker_id_overrides = [int(s.strip()) for s in args.speaker_ids.split(",")]
@@ -608,15 +626,24 @@ Examples:
 
         if model_type == "piper-plus":
             results = _generate_for_piper_model(
-                model_def, texts, args.output_dir, languages,
-                speaker_id_overrides, args.device,
+                model_def,
+                texts,
+                args.output_dir,
+                languages,
+                speaker_id_overrides,
+                args.device,
             )
         elif model_type == "external":
             results = _generate_for_external_model(
-                model_def, texts, args.output_dir, languages,
+                model_def,
+                texts,
+                args.output_dir,
+                languages,
             )
         else:
-            _LOGGER.warning("Unknown model type: %s (skipping %s)", model_type, model_name)
+            _LOGGER.warning(
+                "Unknown model type: %s (skipping %s)", model_type, model_name
+            )
             continue
 
         all_results.extend(results)

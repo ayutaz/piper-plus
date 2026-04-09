@@ -170,7 +170,8 @@ func readWavFileForEncoder(path string) ([]float32, int, error) {
 		chunkID := string(chunkHeader[:4])
 		chunkSize := int(binary.LittleEndian.Uint32(chunkHeader[4:8]))
 
-		if chunkID == "fmt " {
+		switch chunkID {
+		case "fmt ":
 			if chunkSize < 16 {
 				return nil, 0, fmt.Errorf("fmt chunk too small")
 			}
@@ -188,11 +189,12 @@ func readWavFileForEncoder(path string) ([]float32, int, error) {
 				skip := make([]byte, remaining)
 				_, _ = io.ReadFull(f, skip)
 			}
-		} else if chunkID == "data" {
+		case "data":
 			numSamples := chunkSize / (bitsPerSample / 8)
 			samples := make([]float32, numSamples)
 
-			if bitsPerSample == 16 {
+			switch {
+			case bitsPerSample == 16:
 				for i := 0; i < numSamples; i++ {
 					var buf [2]byte
 					if _, err := io.ReadFull(f, buf[:]); err != nil {
@@ -201,7 +203,7 @@ func readWavFileForEncoder(path string) ([]float32, int, error) {
 					val := int16(binary.LittleEndian.Uint16(buf[:]))
 					samples[i] = float32(val) / 32768.0
 				}
-			} else if bitsPerSample == 32 && audioFormat == 3 {
+			case bitsPerSample == 32 && audioFormat == 3:
 				for i := 0; i < numSamples; i++ {
 					var buf [4]byte
 					if _, err := io.ReadFull(f, buf[:]); err != nil {
@@ -210,7 +212,7 @@ func readWavFileForEncoder(path string) ([]float32, int, error) {
 					bits := binary.LittleEndian.Uint32(buf[:])
 					samples[i] = math.Float32frombits(bits)
 				}
-			} else {
+			default:
 				return nil, 0, fmt.Errorf("unsupported WAV format: %d-bit, format=%d", bitsPerSample, audioFormat)
 			}
 
@@ -228,7 +230,7 @@ func readWavFileForEncoder(path string) ([]float32, int, error) {
 				return mono, sampleRate, nil
 			}
 			return samples, sampleRate, nil
-		} else {
+		default:
 			// Skip unknown chunk
 			skip := make([]byte, chunkSize)
 			_, _ = io.ReadFull(f, skip)

@@ -118,7 +118,9 @@ def export_speaker_encoder(
     )
 
 
-def _verify_onnx(onnx_path: Path, torch_model: torch.nn.Module, dummy_mel: torch.Tensor) -> None:
+def _verify_onnx(
+    onnx_path: Path, torch_model: torch.nn.Module, dummy_mel: torch.Tensor
+) -> None:
     """Verify ONNX model produces outputs matching PyTorch.
 
     Args:
@@ -186,9 +188,7 @@ def _apply_fp16(onnx_path: Path) -> None:
         raise
 
     fp16_size = onnx_path.stat().st_size
-    reduction_pct = (
-        ((fp32_size - fp16_size) / fp32_size) * 100 if fp32_size > 0 else 0
-    )
+    reduction_pct = ((fp32_size - fp16_size) / fp32_size) * 100 if fp32_size > 0 else 0
     _LOGGER.info(
         "FP16 conversion: %.2f MB -> %.2f MB (%.1f%% reduction)",
         fp32_size / (1024 * 1024),
