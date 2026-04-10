@@ -237,19 +237,21 @@ static char* execute_with_pipes_unix(const char* openjtalk_bin, const char* dic_
         close(stdout_pipe[1]);
         
         // Prepare arguments
+        // Standard open_jtalk does not support "-" for stdin/stdout;
+        // use /dev/stdin and /dev/stdout instead.
         int is_phonemizer = strstr(openjtalk_bin, "phonemizer") != NULL ? 1 : 0;
-        
+
         if (is_phonemizer) {
-            execlp(openjtalk_bin, openjtalk_bin, "-x", dic_path, "-ot", "-", "-", NULL);
+            execlp(openjtalk_bin, openjtalk_bin, "-x", dic_path, "-ot", "/dev/stdout", "/dev/stdin", NULL);
         } else {
             // Need HTS voice for regular open_jtalk
             const char* voice_path = get_openjtalk_voice_path();
             if (voice_path) {
-                execlp(openjtalk_bin, openjtalk_bin, "-x", dic_path, "-m", voice_path, 
-                       "-ow", "/dev/null", "-ot", "-", "-", NULL);
+                execlp(openjtalk_bin, openjtalk_bin, "-x", dic_path, "-m", voice_path,
+                       "-ow", "/dev/null", "-ot", "/dev/stdout", "/dev/stdin", NULL);
             } else {
-                execlp(openjtalk_bin, openjtalk_bin, "-x", dic_path, 
-                       "-ow", "/dev/null", "-ot", "-", "-", NULL);
+                execlp(openjtalk_bin, openjtalk_bin, "-x", dic_path,
+                       "-ow", "/dev/null", "-ot", "/dev/stdout", "/dev/stdin", NULL);
             }
         }
         
