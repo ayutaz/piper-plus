@@ -127,9 +127,9 @@ struct PhonemeInfo {
 };
 
 struct SynthesisResult {
-  double inferSeconds;
-  double audioSeconds;
-  double realTimeFactor;
+  double inferSeconds = 0.0;
+  double audioSeconds = 0.0;
+  double realTimeFactor = 0.0;
   std::vector<PhonemeInfo> phonemeTimings;  // Phoneme timing information
   bool hasTimingInfo = false;                // Whether timing info is available
 };
