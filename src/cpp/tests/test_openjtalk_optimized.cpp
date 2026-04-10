@@ -10,19 +10,25 @@ extern "C" {
 #include "../openjtalk_dictionary_manager.h"
 }
 
+// Check if OpenJTalk can actually produce phonemes.
+// Uses the non-optimized path so cache stats are not polluted.
+static bool openjtalk_functional() {
+    char* phonemes = openjtalk_text_to_phonemes("テスト");
+    if (phonemes) {
+        openjtalk_free_phonemes(phonemes);
+        return true;
+    }
+    return false;
+}
+
+// GTEST_SKIP() expands to `return ...` so it must be invoked directly in the
+// test body — wrapping it in a helper function would only return from that helper.
+#define SKIP_IF_NOT_FUNCTIONAL() \
+    if (!openjtalk_functional()) \
+        GTEST_SKIP() << "OpenJTalk not functional (dictionary or binary missing)"
+
 class OpenJTalkOptimizedTest : public ::testing::Test {
 protected:
-    // Checked once in SetUpTestSuite so that per-test cache stats stay clean.
-    // openjtalk_functional() calls openjtalk_text_to_phonemes_optimized() which
-    // increments cache stats — calling it inside each test pollutes counters.
-    static bool s_functional;
-
-    static void SetUpTestSuite() {
-        // Use openjtalk_is_available() instead of actually invoking the binary.
-        // fork/exec can intermittently hang on CI runners, causing a 120s timeout.
-        s_functional = openjtalk_is_available() != 0;
-    }
-
     void SetUp() override {
         // Initialize with cache enabled (fresh stats via calloc)
         OpenJTalkCacheConfig config;
@@ -35,16 +41,7 @@ protected:
     void TearDown() override {
         openjtalk_optimized_cleanup();
     }
-
 };
-
-bool OpenJTalkOptimizedTest::s_functional = false;
-
-// GTEST_SKIP() expands to `return ...` so it must be invoked directly in the
-// test body — wrapping it in a helper function would only return from that function.
-#define SKIP_IF_NOT_FUNCTIONAL() \
-    if (!s_functional) \
-        GTEST_SKIP() << "OpenJTalk not functional (dictionary or binary missing)"
 
 // Test basic functionality
 TEST_F(OpenJTalkOptimizedTest, BasicConversion) {
@@ -131,10 +128,7 @@ TEST_F(OpenJTalkOptimizedTest, PerformanceComparison) {
     auto end = std::chrono::high_resolution_clock::now();
     auto original_duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 
-    // Clear cache for fair comparison
-    openjtalk_clear_cache();
-
-    // Reinitialize to reset stats completely
+    // Reinitialize to get fresh stats (SetUp's cache may have been used above)
     openjtalk_optimized_cleanup();
     OpenJTalkCacheConfig config;
     config.max_entries = 100;
