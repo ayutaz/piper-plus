@@ -440,8 +440,25 @@ int ensure_openjtalk_dictionary() {
 
 // Get the path to the HTS voice file
 const char* get_openjtalk_voice_path() {
-    // HTS voice not needed for phonemizer-only mode
-    // This function is kept for backward compatibility but returns NULL
+    // Check OPENJTALK_VOICE environment variable first
+    const char* env_voice = getenv("OPENJTALK_VOICE");
+    if (env_voice && access(env_voice, F_OK) == 0) {
+        return env_voice;
+    }
+
+    // Check common system locations
+    const char* voice_paths[] = {
+        "/usr/share/hts-voice/nitech-jp-atr503-m001/nitech_jp_atr503_m001.htsvoice",
+        "/usr/local/share/hts-voice/nitech-jp-atr503-m001/nitech_jp_atr503_m001.htsvoice",
+        NULL
+    };
+    for (int i = 0; voice_paths[i] != NULL; i++) {
+        if (access(voice_paths[i], F_OK) == 0) {
+            return voice_paths[i];
+        }
+    }
+
+    // HTS voice not found — phonemizer-only mode
     return NULL;
 }
 

@@ -596,6 +596,9 @@ foreach(test_source ${TEST_SOURCES})
     endif()
 
     add_test(NAME ${test_name} COMMAND ${test_name})
+    set_tests_properties(${test_name} PROPERTIES
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    )
 endforeach()
 
 # Add test_phoneme_timing - only uses gtest and json.hpp (no spdlog/fmt)
