@@ -45,18 +45,19 @@ protected:
         openjtalk_optimized_cleanup();
     }
 
-    void SkipIfNotFunctional() {
-        if (!s_functional) {
-            GTEST_SKIP() << "OpenJTalk not functional (dictionary or binary missing)";
-        }
-    }
 };
 
 bool OpenJTalkOptimizedTest::s_functional = false;
 
+// GTEST_SKIP() expands to `return ...` so it must be invoked directly in the
+// test body — wrapping it in a helper function would only return from that function.
+#define SKIP_IF_NOT_FUNCTIONAL() \
+    if (!s_functional) \
+        GTEST_SKIP() << "OpenJTalk not functional (dictionary or binary missing)"
+
 // Test basic functionality
 TEST_F(OpenJTalkOptimizedTest, BasicConversion) {
-    SkipIfNotFunctional();
+    SKIP_IF_NOT_FUNCTIONAL();
 
     const char* text = "こんにちは";
     char* phonemes = openjtalk_text_to_phonemes_optimized(text);
@@ -74,7 +75,7 @@ TEST_F(OpenJTalkOptimizedTest, BasicConversion) {
 
 // Test cache functionality
 TEST_F(OpenJTalkOptimizedTest, CacheHitPerformance) {
-    SkipIfNotFunctional();
+    SKIP_IF_NOT_FUNCTIONAL();
 
     const char* text = "キャッシュテスト";
 
@@ -114,7 +115,7 @@ TEST_F(OpenJTalkOptimizedTest, CacheHitPerformance) {
 
 // Test performance comparison with original implementation
 TEST_F(OpenJTalkOptimizedTest, PerformanceComparison) {
-    SkipIfNotFunctional();
+    SKIP_IF_NOT_FUNCTIONAL();
 
     const char* test_texts[] = {
         "これはテストです",
@@ -181,7 +182,7 @@ TEST_F(OpenJTalkOptimizedTest, PerformanceComparison) {
 
 // Test concurrent access
 TEST_F(OpenJTalkOptimizedTest, ConcurrentAccess) {
-    SkipIfNotFunctional();
+    SKIP_IF_NOT_FUNCTIONAL();
 
     const int num_threads = 4;
     const int iterations_per_thread = 10;
@@ -227,7 +228,7 @@ TEST_F(OpenJTalkOptimizedTest, CacheEviction) {
     config.ttl_seconds = 300;
     ASSERT_TRUE(openjtalk_optimized_init(&config));
 
-    SkipIfNotFunctional();
+    SKIP_IF_NOT_FUNCTIONAL();
 
     // Add entries to fill cache
     const char* texts[] = {"テスト1", "テスト2", "テスト3", "テスト4"};
@@ -266,7 +267,7 @@ TEST_F(OpenJTalkOptimizedTest, NoCache) {
     openjtalk_optimized_cleanup();
     ASSERT_TRUE(openjtalk_optimized_init(nullptr));
 
-    SkipIfNotFunctional();
+    SKIP_IF_NOT_FUNCTIONAL();
 
     const char* text = "キャッシュなし";
 
