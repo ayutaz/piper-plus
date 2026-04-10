@@ -232,6 +232,7 @@ jobs:
             export OPENJTALK_VOICE="dummy.htsvoice"
             export OPENJTALK_SKIP_TESTS_IF_UNAVAILABLE=1
             export OPENJTALK_DICTIONARY_DIR="${PWD}/naist-jdic"
+            export OPENJTALK_DICTIONARY_PATH="${PWD}/naist-jdic"
             export ESPEAK_NG_DATA="${PWD}/espeak-ng-data"
           fi
 
