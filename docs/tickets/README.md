@@ -7,7 +7,7 @@
 
 | マイルストーン | チケット | 状態 | 削除行数 | 新規テスト |
 |--------------|---------|------|---------|-----------|
-| [M1: C++ ランタイム](M1-cpp-runtime.md) | M1-001 | :white_large_square: 未着手 | ~230 | 0 (既存安全網) |
+| [M1: C++ ランタイム](M1-cpp-runtime.md) | M1-001 | :white_check_mark: 完了 | ~230 | 0 (既存安全網) |
 | [M2: WASM G2P + openjtalk-web](M2-wasm-g2p.md) | M2-001 | :white_large_square: 未着手 | ~200 | 0 (既存安全網) |
 | [M3: CI / CMake](M3-ci-cmake.md) | M3-001 | :white_large_square: 未着手 | ~120 (+93行ファイル削除) | 0 |
 | [M4: テスト + クリーンアップ](M4-tests-cleanup.md) | M4-001 | :white_large_square: 未着手 | ~50 | 7 |
