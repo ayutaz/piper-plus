@@ -10,22 +10,23 @@ extern "C" {
 #include "../openjtalk_dictionary_manager.h"
 }
 
-// Check if OpenJTalk can actually produce phonemes.
-// Uses the non-optimized path so cache stats are not polluted.
-static bool openjtalk_functional() {
-    char* phonemes = openjtalk_text_to_phonemes("テスト");
-    if (phonemes) {
-        openjtalk_free_phonemes(phonemes);
-        return true;
-    }
+// Check if OpenJTalk binary + dictionary are available WITHOUT invoking
+// fork/exec.  Any fork/exec can intermittently hang on CI runners,
+// causing a 120 s ctest timeout.
+static bool openjtalk_available() {
+#ifdef _WIN32
+    // open_jtalk binary is not shipped on Windows CI.
     return false;
+#else
+    return openjtalk_is_available() != 0;
+#endif
 }
 
 // GTEST_SKIP() expands to `return ...` so it must be invoked directly in the
 // test body — wrapping it in a helper function would only return from that helper.
 #define SKIP_IF_NOT_FUNCTIONAL() \
-    if (!openjtalk_functional()) \
-        GTEST_SKIP() << "OpenJTalk not functional (dictionary or binary missing)"
+    if (!openjtalk_available()) \
+        GTEST_SKIP() << "OpenJTalk not available (dictionary or binary missing)"
 
 class OpenJTalkOptimizedTest : public ::testing::Test {
 protected:
