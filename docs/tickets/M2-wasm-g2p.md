@@ -101,9 +101,9 @@ After:  _openjtalk_initialize(dictPtr) のみ
 **タスク 2.7 -- 型定義更新:**
 
 ```
-L210:     JaDictData から voiceData?: ArrayBuffer を削除
-L225-226: DictLoadOptions から includeVoice?: boolean を削除
-L228:     DictLoadOptions から voiceUrl?: string を削除
+L210-211: JaDictData から voiceData?: ArrayBuffer を削除 (L210: JSDoc コメント, L211: プロパティ宣言)
+L221-226: DictLoadOptions から includeVoice?: boolean を削除 (L221-225: JSDoc ブロック, L226: プロパティ宣言)
+L227-228: DictLoadOptions から voiceUrl?: string を削除 (L227: JSDoc コメント, L228: プロパティ宣言)
 ```
 
 #### 2.1.4 `src/wasm/openjtalk-web/src/simple_wrapper.cpp` -- WASM ラッパー
@@ -126,6 +126,14 @@ After:  int openjtalk_initialize(const char* dic_dir) { return 0; }
 対象行: L10  -- extern "C" の forward 宣言から voice_path を削除
 対象行: L106-107 -- phonemizer_initialize_openjtalk() から voice_path を削除
 ```
+
+#### 2.1.6 WASM リビルド
+
+`simple_wrapper.cpp` と `phonemizer_wrapper.cpp` の C++ シグネチャ変更は、Emscripten による WASM リビルドなしには反映されない。以下の手順が必要:
+
+1. WASM ビルドスクリプト (`build-wasm.sh` 等) を実行して `.wasm` バイナリを再生成
+2. `g2p-wasm-ci.yml` のトリガーパスに `src/wasm/openjtalk-web/src/` が含まれていることを確認（含まれていない場合は追加）
+3. リビルド後の WASM バイナリで `_openjtalk_initialize` のエクスポートシグネチャが 1 引数に変更されていることを検証
 
 ### 2.2 openjtalk-web テスト・ビルドスクリプトの変更
 
@@ -216,6 +224,14 @@ voice パス参照 (`'5. Call openjtalk_initialize("/dict", "/voice/mei_normal.h
 Before: _openjtalk_initialize(allocateUTF8("/dict"), allocateUTF8("/voice/test.htsvoice"))
 After:  _openjtalk_initialize(allocateUTF8("/dict"))
 ```
+
+#### 2.2.5 デモドキュメント (1 ファイル)
+
+**タスク 2.22 -- `test/multilingual-demo/github-pages-setup.md` (L35, L97):**
+
+`voicePath` 参照と `voice/` ディレクトリツリー記載を削除する:
+- L35: `voicePath: deploymentConfig.getPath('../assets/voice/mei_normal.htsvoice')` を削除
+- L97: `│   └── voice/` を削除
 
 ### 2.3 変更の依存順序
 
@@ -336,6 +352,10 @@ piper-plus の npm ダウンロード数と `includeVoice: true` の使用事例
 - [ ] `pre-check.sh` のセクション番号がリナンバリングされているか
 - [ ] `test-headless.js` の生成 HTML テンプレート内の voice 参照が全て除去されているか
 - [ ] `simple-test.html` の `_openjtalk_initialize` 呼び出しが 1 引数になっているか
+
+### 5.5 WASM ビルド CI トリガー (重大度: 低)
+
+`wasm-build.yml` のトリガーパスに `src/wasm/openjtalk-web/src/` が含まれていない場合、M2 の C++ 変更が自動ビルドをトリガーしない。手動トリガーまたはパス追加が必要。
 
 ---
 
@@ -569,3 +589,15 @@ M4 のテストピラミッドの観点から言えば、テスト 1-2 (C++ Goog
 | **M1-001** (C++ ランタイム) | M2 は M1 と独立して並行作業可能。WASM C++ ラッパー (`simple_wrapper.cpp`) は C++ ランタイム (`openjtalk_wrapper.c`, `openjtalk_optimized.c`) とは別のコードパスであり、相互に影響しない |
 | **M3-001** (CI/CMake) | M2 の変更は CI ワークフロー (`wasm-build.yml`) に間接的に影響する可能性がある。WASM ビルド CI が voice ファイルを前提としている場合、M3 で対応が必要。ただし `wasm-build.yml` の voice 依存は M2 のスコープ内で除去されるため、M3 では追加対応不要の見込み |
 | **npm publish** | M2 完了後に `@piper-plus/g2p` を publish する場合、M4 のバージョンバンプ完了後とすること。M2 の変更だけでは `package.json` の version が `0.2.0` のままであり、breaking change が既存バージョンで配布されるリスクがある |
+
+### M4-001 への引き継ぎ
+
+1. **WASM ABI 変更**: `_openjtalk_initialize` のパラメータ数が 2→1 に変更済み。M4 のテスト 4.3-4.5 はこの変更を前提とする
+2. **DictLoader API 変更**: `includeVoice`, `voiceUrl` オプションが除去済み。M4 のテスト 4.5 (DictLoader 契約テスト) の前提
+3. **TypeScript 型定義変更**: `JaDictData.voiceData`, `DictLoadOptions.includeVoice`, `DictLoadOptions.voiceUrl` が削除済み
+4. **`@piper-plus/g2p` バージョンバンプ未実施**: M2 ではバージョンバンプを行わない。M4 で `0.2.0` → `0.3.0` にバンプすること
+5. **WASM リビルド済み**: `simple_wrapper.cpp`, `phonemizer_wrapper.cpp` の ABI 変更は WASM リビルドにより反映済み
+
+### dev マージ時の注意
+
+- M2 は M1 と並行開発可能だが、dev へのマージは M1 完了後を推奨 (M3 の前提条件と整合させるため)

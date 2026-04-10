@@ -38,8 +38,8 @@ piper-plus は VITS ニューラル TTS エンジンであり、OpenJTalk の「
 | 1.2 | voice パス検索関数削除 | `src/cpp/openjtalk_dictionary_manager.c` | L422-427 | 6行 |
 | 1.3 | 無効化済み DL コード削除 | `src/cpp/openjtalk_dictionary_manager.c` | L429-567 | 139行 |
 | 1.4 | ヘッダー宣言削除 | `src/cpp/openjtalk_dictionary_manager.h` | L11-12 | 2行 |
-| 1.5 | wrapper 関数 1 簡素化 | `src/cpp/openjtalk_wrapper.c` | L405-432 | ~20行 |
-| 1.6 | wrapper 関数 2 簡素化 | `src/cpp/openjtalk_wrapper.c` | L715-737 | ~17行 |
+| 1.5 | wrapper 関数 1 簡素化 | `src/cpp/openjtalk_wrapper.c` | L405-433 | ~20行 |
+| 1.6 | wrapper 関数 2 簡素化 | `src/cpp/openjtalk_wrapper.c` | L715-738 | ~17行 |
 | 1.7 | optimized Unix パス簡素化 | `src/cpp/openjtalk_optimized.c` | L244-254 | ~7行 |
 | 1.8 | optimized Windows パス簡素化 | `src/cpp/openjtalk_optimized.c` | L390-401 | ~8行 |
 | 1.9 | HTSVoicePath テスト削除 | `src/cpp/tests/test_dictionary_manager.cpp` | L252-270 | 19行 |
@@ -358,7 +358,7 @@ After:
 |---------|---------|
 | `src/cpp/openjtalk_dictionary_manager.c` | HTS voice 定数 (L30-35)、`get_openjtalk_voice_path()` 関数 (L422-427)、`#if 0` ブロック (L429-567) を削除 |
 | `src/cpp/openjtalk_dictionary_manager.h` | `get_openjtalk_voice_path()` 宣言 (L11-12) を削除 |
-| `src/cpp/openjtalk_wrapper.c` | 2 箇所の voice 分岐 (L405-432, L715-737) を単一パスに簡素化 |
+| `src/cpp/openjtalk_wrapper.c` | 2 箇所の voice 分岐 (L405-433, L715-738) を単一パスに簡素化 |
 | `src/cpp/openjtalk_optimized.c` | 2 箇所の voice 分岐 (L244-254, L390-401) を単一パスに簡素化 |
 | `src/cpp/tests/test_dictionary_manager.cpp` | `HTSVoicePath` テスト (L252-270) を削除 |
 
@@ -385,6 +385,10 @@ After:
 | `test_openjtalk_optimized.cpp` | `CacheHitPerformance` | キャッシュ正確性 (voice 無関係) |
 
 これらのテストは phonemizer バイナリ経由のパスを検証しており、voice 分岐の除去による影響を受けない。phonemizer バイナリが利用できない CI 環境では `GTEST_SKIP` で安全にスキップされる。
+
+**M4 で追加すべき検証テスト:**
+
+- `test_command_without_voice_flag`: 構築されるコマンド文字列に `-m` フラグが含まれないことを確認するテスト。M4-001 のテスト仕様に含める
 
 **削除すべきテスト:**
 
@@ -430,7 +434,13 @@ After:
 
 **確認結果:** 既存コードの L408-410 に `if (!voice_path) { fprintf(stderr, "Warning: HTS voice not found, attempting phoneme extraction only\n"); }` という warning があり、voice なしでの動作は既に想定されている。また、`get_openjtalk_voice_path()` が常に `NULL` を返す現状で、voice なし動作が本番で常時使われている。
 
-### 5.5 レビュー時チェックリスト
+### 5.5 追加リスク一覧
+
+| リスク | 重大度 | 詳細 |
+|--------|--------|------|
+| `open_jtalk` バイナリの `-m` なし動作 | 低 | システムの `open_jtalk` (apt 版等) は `-m` なしでエラーコード 1 を返す可能性がある。piper-plus ビルドの phonemizer バイナリが優先パスなので影響は限定的。フォールバック時のエラーメッセージに「phonemizer バイナリの使用を推奨」と表示することを検討 |
+
+### 5.6 レビュー時チェックリスト
 
 - [ ] 変更が 5 ファイルのみであること (スコープ超過がないこと)
 - [ ] `get_openjtalk_voice_path` シンボルが `src/cpp/` 配下で完全に消滅していること
@@ -573,6 +583,15 @@ HTS Engine はスタブで十分なら、最初からスタブのみをサポー
 1. オプショナル機能は最初から `cmake option()` + `#ifdef` で制御する。ビルドマトリクスに ON/OFF 両方を含める
 2. 段階的移行には明示的な「卒業条件」を設定する。条件を満たしたら旧パスを即座に削除する
 3. dead code 検出を CI に組み込む。`-Wunreachable-code` や static analysis (例: `cppcheck --enable=unusedFunction`) を活用する
+
+### 6.8 可逆性の判断
+
+HTS voice 対応を将来的に復活させるコストについて、意識的に判断を記録する:
+
+- **物理的な可逆性**: git history から削除コードを復元可能。`git revert` で全マイルストーンを巻き戻せる
+- **stub の維持 (M3)**: `hts_engine_stub.h/c` を維持する判断自体が、OpenJTalk のヘッダー互換性という形で部分的な可逆性を担保している
+- **復活が不要な根拠**: piper-plus は VITS アーキテクチャによるニューラル合成を採用しており、HTS パラメトリック合成は品質・アーキテクチャの両面で不要。この前提が変わらない限り、HTS voice 対応の復活は不要
+- **判断**: 完全除去を選択する。復活が必要になった場合は git history からの復元で対応可能
 
 ## 7. 後続タスクへの連絡事項
 
