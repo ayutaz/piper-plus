@@ -18,18 +18,9 @@ protected:
     static bool s_functional;
 
     static void SetUpTestSuite() {
-        OpenJTalkCacheConfig config;
-        config.max_entries = 100;
-        config.max_memory_bytes = 1024 * 1024;
-        config.ttl_seconds = 300;
-        openjtalk_optimized_init(&config);
-
-        char* phonemes = openjtalk_text_to_phonemes_optimized("テスト");
-        if (phonemes) {
-            openjtalk_free_phonemes(phonemes);
-            s_functional = true;
-        }
-        openjtalk_optimized_cleanup();
+        // Use openjtalk_is_available() instead of actually invoking the binary.
+        // fork/exec can intermittently hang on CI runners, causing a 120s timeout.
+        s_functional = openjtalk_is_available() != 0;
     }
 
     void SetUp() override {
