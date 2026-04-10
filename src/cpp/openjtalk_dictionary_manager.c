@@ -450,6 +450,7 @@ const char* get_openjtalk_voice_path() {
     const char* voice_paths[] = {
         "/usr/share/hts-voice/nitech-jp-atr503-m001/nitech_jp_atr503_m001.htsvoice",
         "/usr/local/share/hts-voice/nitech-jp-atr503-m001/nitech_jp_atr503_m001.htsvoice",
+        "/opt/homebrew/share/hts-voice/nitech-jp-atr503-m001/nitech_jp_atr503_m001.htsvoice",
         NULL
     };
     for (int i = 0; voice_paths[i] != NULL; i++) {

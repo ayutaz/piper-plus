@@ -46,7 +46,8 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            build-essential cmake ccache wget open-jtalk
+            build-essential cmake ccache wget open-jtalk \
+            hts-voice-nitech-jp-atr503-m001
 
           # Install ONNX Runtime
           wget -q https://github.com/microsoft/onnxruntime/releases/download/v1.14.1/onnxruntime-linux-x64-1.14.1.tgz
@@ -230,21 +231,50 @@ jobs:
             export ESPEAK_NG_DATA="${PWD}/espeak-ng-data"
             export PATH="${ONNXRUNTIME_ROOT_PATH}/lib:${PATH}"
           else
-            # Use system HTS voice if available (installed by open-jtalk package)
-            if [ -f "/usr/share/hts-voice/nitech-jp-atr503-m001/nitech_jp_atr503_m001.htsvoice" ]; then
-              export OPENJTALK_VOICE="/usr/share/hts-voice/nitech-jp-atr503-m001/nitech_jp_atr503_m001.htsvoice"
-            else
-              export OPENJTALK_VOICE="dummy.htsvoice"
+            # Find HTS voice file (needed by open_jtalk binary)
+            VOICE_FOUND=""
+            for vp in \
+              "/usr/share/hts-voice/nitech-jp-atr503-m001/nitech_jp_atr503_m001.htsvoice" \
+              "/usr/local/share/hts-voice/nitech-jp-atr503-m001/nitech_jp_atr503_m001.htsvoice" \
+              "/opt/homebrew/share/hts-voice/nitech-jp-atr503-m001/nitech_jp_atr503_m001.htsvoice"; do
+              if [ -f "$vp" ]; then
+                VOICE_FOUND="$vp"
+                break
+              fi
+            done
+            # Download HTS voice if not found on system
+            if [ -z "$VOICE_FOUND" ]; then
+              echo "HTS voice not found on system, downloading from SourceForge..."
+              mkdir -p /tmp/hts-voice
+              if curl -sfL "https://sourceforge.net/projects/open-jtalk/files/HTS%20voice/hts_voice_nitech_jp_atr503_m001-1.05/hts_voice_nitech_jp_atr503_m001-1.05.tar.gz/download" \
+                  -o /tmp/hts-voice.tar.gz; then
+                tar -xzf /tmp/hts-voice.tar.gz -C /tmp/hts-voice/ --strip-components=1
+                if [ -f "/tmp/hts-voice/nitech_jp_atr503_m001.htsvoice" ]; then
+                  VOICE_FOUND="/tmp/hts-voice/nitech_jp_atr503_m001.htsvoice"
+                fi
+              fi
             fi
+            if [ -n "$VOICE_FOUND" ]; then
+              export OPENJTALK_VOICE="$VOICE_FOUND"
+              echo "Using HTS voice: $VOICE_FOUND"
+            else
+              echo "Warning: HTS voice not available, OpenJTalk optimized tests may skip"
+            fi
+
             export OPENJTALK_SKIP_TESTS_IF_UNAVAILABLE=1
             export OPENJTALK_DICTIONARY_DIR="${PWD}/naist-jdic"
             # Use system dictionary if available, fallback to downloaded one
             if [ -d "/var/lib/mecab/dic/open-jtalk/naist-jdic" ]; then
               export OPENJTALK_DICTIONARY_PATH="/var/lib/mecab/dic/open-jtalk/naist-jdic"
+            elif [ -d "/opt/homebrew/share/open_jtalk/dic" ]; then
+              export OPENJTALK_DICTIONARY_PATH="/opt/homebrew/share/open_jtalk/dic"
             else
               export OPENJTALK_DICTIONARY_PATH="${PWD}/naist-jdic"
             fi
             export ESPEAK_NG_DATA="${PWD}/espeak-ng-data"
+
+            echo "OpenJTalk env: DICTIONARY_PATH=$OPENJTALK_DICTIONARY_PATH VOICE=${OPENJTALK_VOICE:-<unset>}"
+            echo "open_jtalk binary: $(which open_jtalk 2>/dev/null || echo 'not in PATH')"
           fi
 
           echo "Running C++ tests for ${{ runner.os }} ${{ matrix.build-type }}"

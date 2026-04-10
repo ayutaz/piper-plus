@@ -760,10 +760,12 @@ static char* find_openjtalk_binary(void) {
         "./bin/open_jtalk_phonemizer",
         "/usr/bin/open_jtalk_phonemizer",
         "/usr/local/bin/open_jtalk_phonemizer",
+        "/opt/homebrew/bin/open_jtalk_phonemizer",
         "./open_jtalk",
         "./bin/open_jtalk",
         "/usr/bin/open_jtalk",
         "/usr/local/bin/open_jtalk",
+        "/opt/homebrew/bin/open_jtalk",
 #endif
         NULL
     };
