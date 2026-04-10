@@ -403,32 +403,15 @@ char* openjtalk_text_to_phonemes(const char* text) {
                  openjtalk_bin, dic_path, output_file, input_file);
 #endif
     } else {
-        // Fall back to regular open_jtalk with HTS voice
-        const char* voice_path = get_openjtalk_voice_path();
-        if (!voice_path) {
-            fprintf(stderr, "Warning: HTS voice not found, attempting phoneme extraction only\n");
-        }
-
+        // open_jtalk fallback: phoneme extraction only (no HTS voice needed)
 #ifdef _WIN32
-        if (voice_path) {
-            snprintf(command, sizeof(command),
-                     "\"%s\" -x \"%s\" -m \"%s\" -ow NUL -ot \"%s\" \"%s\"",
-                     openjtalk_bin, dic_path, voice_path, output_file, input_file);
-        } else {
-            snprintf(command, sizeof(command),
-                     "\"%s\" -x \"%s\" -ow NUL -ot \"%s\" \"%s\"",
-                     openjtalk_bin, dic_path, output_file, input_file);
-        }
+        snprintf(command, sizeof(command),
+                 "\"%s\" -x \"%s\" -ow NUL -ot \"%s\" \"%s\"",
+                 openjtalk_bin, dic_path, output_file, input_file);
 #else
-        if (voice_path) {
-            snprintf(command, sizeof(command),
-                     "\"%s\" -x \"%s\" -m \"%s\" -ow /dev/null -ot \"%s\" \"%s\"",
-                     openjtalk_bin, dic_path, voice_path, output_file, input_file);
-        } else {
-            snprintf(command, sizeof(command),
-                     "\"%s\" -x \"%s\" -ow /dev/null -ot \"%s\" \"%s\"",
-                     openjtalk_bin, dic_path, output_file, input_file);
-        }
+        snprintf(command, sizeof(command),
+                 "\"%s\" -x \"%s\" -ow /dev/null -ot \"%s\" \"%s\"",
+                 openjtalk_bin, dic_path, output_file, input_file);
 #endif
     }
 
@@ -713,27 +696,15 @@ static OpenJTalkProsodyResult* openjtalk_text_to_phonemes_with_prosody_binary(co
                  openjtalk_bin, dic_path, output_file, input_file);
 #endif
     } else {
-        const char* voice_path = get_openjtalk_voice_path();
+        // open_jtalk fallback: phoneme extraction only (no HTS voice needed)
 #ifdef _WIN32
-        if (voice_path) {
-            snprintf(command, sizeof(command),
-                     "\"%s\" -x \"%s\" -m \"%s\" -ow NUL -ot \"%s\" \"%s\"",
-                     openjtalk_bin, dic_path, voice_path, output_file, input_file);
-        } else {
-            snprintf(command, sizeof(command),
-                     "\"%s\" -x \"%s\" -ow NUL -ot \"%s\" \"%s\"",
-                     openjtalk_bin, dic_path, output_file, input_file);
-        }
+        snprintf(command, sizeof(command),
+                 "\"%s\" -x \"%s\" -ow NUL -ot \"%s\" \"%s\"",
+                 openjtalk_bin, dic_path, output_file, input_file);
 #else
-        if (voice_path) {
-            snprintf(command, sizeof(command),
-                     "\"%s\" -x \"%s\" -m \"%s\" -ow /dev/null -ot \"%s\" \"%s\"",
-                     openjtalk_bin, dic_path, voice_path, output_file, input_file);
-        } else {
-            snprintf(command, sizeof(command),
-                     "\"%s\" -x \"%s\" -ow /dev/null -ot \"%s\" \"%s\"",
-                     openjtalk_bin, dic_path, output_file, input_file);
-        }
+        snprintf(command, sizeof(command),
+                 "\"%s\" -x \"%s\" -ow /dev/null -ot \"%s\" \"%s\"",
+                 openjtalk_bin, dic_path, output_file, input_file);
 #endif
     }
 

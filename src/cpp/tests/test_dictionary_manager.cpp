@@ -259,26 +259,6 @@ TEST_F(DictionaryManagerTest, AutoDownloadDisabled) {
 //     // This would affect subsequent dictionary downloads
 // }
 
-// Test HTS voice path resolution
-TEST_F(DictionaryManagerTest, HTSVoicePath) {
-    const char* custom_voice = "/tmp/custom_voice_test.htsvoice";
-    
-    // Create dummy voice file
-    FILE* fp = fopen(custom_voice, "w");
-    if (fp) {
-        fprintf(fp, "dummy hts voice");
-        fclose(fp);
-    }
-    
-    setenv("OPENJTALK_VOICE", custom_voice, 1);
-    
-    const char* voice_path = nullptr;
-    // This test might fail due to network in CI, so we just test the path resolution
-    // In a real test environment, we'd mock the download functionality
-    
-    unlink(custom_voice);
-}
-
 int main(int argc, char** argv) {
     ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();
