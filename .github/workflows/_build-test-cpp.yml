@@ -46,7 +46,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            build-essential cmake ccache wget
+            build-essential cmake ccache wget open-jtalk
 
           # Install ONNX Runtime
           wget -q https://github.com/microsoft/onnxruntime/releases/download/v1.14.1/onnxruntime-linux-x64-1.14.1.tgz
@@ -68,6 +68,7 @@ jobs:
           brew install cmake || true
           brew install ccache || brew upgrade ccache || true
           brew install wget || brew upgrade wget || true
+          brew install open-jtalk || brew upgrade open-jtalk || true
 
           # Install ONNX Runtime (architecture-aware)
           sudo mkdir -p /usr/local/lib /usr/local/include

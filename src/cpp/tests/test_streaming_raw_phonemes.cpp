@@ -3,51 +3,59 @@
 #include <vector>
 #include <string>
 #include <chrono>
+#include <filesystem>
+#include <optional>
 
 #include "piper.hpp"
 #include "phoneme_parser.hpp"
 
+namespace fs = std::filesystem;
+
 namespace piper {
+
+// Shared model path resolved once per test suite
+static const char* g_model_path = nullptr;
+static const char* g_config_path = nullptr;
 
 class StreamingRawPhonemesTest : public ::testing::Test {
 protected:
   PiperConfig config;
   Voice voice;
-  std::string modelPath;
-  
+
+  static void SetUpTestSuite() {
+    std::vector<std::string> searchPaths = {
+      "test/models/multilingual-test-medium.onnx",
+      "../test/models/multilingual-test-medium.onnx",
+      "../../test/models/multilingual-test-medium.onnx",
+    };
+    for (const auto& path : searchPaths) {
+      if (fs::exists(path)) {
+        static std::string modelPath = path;
+        static std::string configPath = path + ".json";
+        if (fs::exists(configPath)) {
+          g_model_path = modelPath.c_str();
+          g_config_path = configPath.c_str();
+        }
+        break;
+      }
+    }
+  }
+
   void SetUp() override {
-    // Use the test model if available
-    modelPath = "test/models/text_voice.onnx";
-
-    // Initialize minimal voice configuration
-    voice.phonemizeConfig.phonemeType = MultilingualPhonemes;
-    voice.phonemizeConfig.interspersePad = true;
-
-    // Set pad/bos/eos IDs (these are already default values, but explicit for clarity)
-    voice.phonemizeConfig.idPad = 0;
-    voice.phonemizeConfig.idBos = 1;
-    voice.phonemizeConfig.idEos = 2;
-
-    // Add some basic phonemes for testing
-    // phonemeIdMap maps Phoneme (char32_t) to vector<PhonemeId>
-    PhonemeId id = 3;
-    for (char c = 'a'; c <= 'z'; c++) {
-      voice.phonemizeConfig.phonemeIdMap[static_cast<Phoneme>(c)] = {id++};
+    if (!g_model_path) {
+      GTEST_SKIP() << "Test model not found; skipping streaming test";
+      return;
     }
 
-    // Set synthesis config
-    voice.synthesisConfig.sampleRate = 22050;
-    voice.synthesisConfig.sampleWidth = 2;
-    voice.synthesisConfig.channels = 1;
+    // Load the model and config via loadVoice
+    std::optional<SpeakerId> speakerId;
+    loadVoice(config, std::string(g_model_path), std::string(g_config_path),
+              voice, speakerId, "cpu", 0, 1);
   }
 };
 
 TEST_F(StreamingRawPhonemesTest, BasicStreamingTest) {
-  // Skip if no model is loaded
-  if (!std::filesystem::exists(modelPath)) {
-    GTEST_SKIP() << "Skipping streaming test - no model at " << modelPath;
-  }
-  
+
   // Test phoneme string
   std::string phonemeString = "h ə l oʊ w ɜː l d";
   auto phonemes = parsePhonemeString(phonemeString, PHONEME_TYPE_ESPEAK);
@@ -80,11 +88,7 @@ TEST_F(StreamingRawPhonemesTest, BasicStreamingTest) {
 }
 
 TEST_F(StreamingRawPhonemesTest, CompareStreamingVsRegular) {
-  // Skip if no model is loaded
-  if (!std::filesystem::exists(modelPath)) {
-    GTEST_SKIP() << "Skipping streaming test - no model at " << modelPath;
-  }
-  
+
   std::string phonemeString = "t ɛ s t ɪ ŋ s t r iː m ɪ ŋ";
   auto phonemes = parsePhonemeString(phonemeString, PHONEME_TYPE_ESPEAK);
   
@@ -131,11 +135,7 @@ TEST_F(StreamingRawPhonemesTest, EmptyPhonemesTest) {
 }
 
 TEST_F(StreamingRawPhonemesTest, PerformanceTest) {
-  // Skip if no model is loaded
-  if (!std::filesystem::exists(modelPath)) {
-    GTEST_SKIP() << "Skipping performance test - no model at " << modelPath;
-  }
-  
+
   // Create a longer phoneme sequence
   std::string longPhonemeString = "p ɜː f ɔː m ə n s t ɛ s t ";
   for (int i = 0; i < 5; i++) {
