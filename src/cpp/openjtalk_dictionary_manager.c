@@ -311,6 +311,25 @@ const char* get_openjtalk_dictionary_path() {
     return dict_path;
 }
 
+// Reset the cached dictionary path (for testing only).
+// If override_path is non-NULL, force the cache to that path
+// (useful for pointing at a non-existent path in tests).
+void reset_openjtalk_dictionary_cache(void) {
+    char* path = (char*)get_openjtalk_dictionary_path();
+    if (path) {
+        path[0] = '\0';
+    }
+}
+
+// Force the cached dictionary path to a specific value (for testing).
+void force_openjtalk_dictionary_path(const char* path) {
+    char* cached = (char*)get_openjtalk_dictionary_path();
+    if (cached && path) {
+        strncpy(cached, path, 1023);
+        cached[1023] = '\0';
+    }
+}
+
 // Download and extract the dictionary
 static int download_and_extract_dictionary() {
     const char* data_dir = get_data_dir();

@@ -248,15 +248,15 @@ TEST_F(ChineseG2PTest, SentenceWithPunctuation) {
     ASSERT_FALSE(phonemes.empty());
     EXPECT_FALSE(phonemes[0].empty());
 
-    // Should contain the period (U+3002) passed through as punctuation
+    // Chinese G2P maps fullwidth period U+3002 to ASCII '.' (0x2E)
     bool hasPunct = false;
     for (auto ph : phonemes[0]) {
-        if (ph == 0x3002) {  // 。
+        if (ph == '.') {  // U+3002 mapped to ASCII period
             hasPunct = true;
             break;
         }
     }
-    EXPECT_TRUE(hasPunct) << "Expected punctuation U+3002 in output";
+    EXPECT_TRUE(hasPunct) << "Expected ASCII period '.' (mapped from U+3002) in output";
 }
 
 // =========================================================================

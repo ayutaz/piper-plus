@@ -128,6 +128,9 @@ protected:
 #endif
         }
         
+        // Reset dictionary cache so other test suites are not affected
+        reset_openjtalk_dictionary_cache();
+
         // Clean up test directory
         if (test_dir) {
             std::filesystem::remove_all(test_dir);
@@ -213,25 +216,32 @@ TEST_F(DictionaryManagerTest, CustomDictPath) {
 
 // Test offline mode
 TEST_F(DictionaryManagerTest, OfflineMode) {
+    // Force the cache to a non-existent path so ensure_openjtalk_dictionary()
+    // cannot find a dictionary and must attempt download (which offline blocks)
+    force_openjtalk_dictionary_path("/nonexistent_dict_path_for_test");
+
 #ifdef _WIN32
     SetEnvironmentVariableA("PIPER_OFFLINE_MODE", "1");
 #else
     setenv("PIPER_OFFLINE_MODE", "1", 1);
 #endif
-    
-    // Should fail in offline mode without existing dictionary
+
+    // Should fail: dictionary doesn't exist and offline mode blocks download
     EXPECT_NE(ensure_openjtalk_dictionary(), 0);
 }
 
 // Test auto-download disabled
 TEST_F(DictionaryManagerTest, AutoDownloadDisabled) {
+    // Force the cache to a non-existent path
+    force_openjtalk_dictionary_path("/nonexistent_dict_path_for_test");
+
 #ifdef _WIN32
     SetEnvironmentVariableA("PIPER_AUTO_DOWNLOAD_DICT", "0");
 #else
     setenv("PIPER_AUTO_DOWNLOAD_DICT", "0", 1);
 #endif
-    
-    // Should fail when auto-download is disabled
+
+    // Should fail: dictionary doesn't exist and auto-download is disabled
     EXPECT_NE(ensure_openjtalk_dictionary(), 0);
 }
 
