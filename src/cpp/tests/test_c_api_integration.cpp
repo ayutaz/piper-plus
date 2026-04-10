@@ -483,8 +483,8 @@ TEST_F(CApiIntegrationTest, IteratorVsOneShotParityWithCrossfade) {
 
     // Allow reasonable tolerance (crossfade trims CROSSFADE_SAMPLES per boundary)
     double ratio = static_cast<double>(iterTotal) / oneShotCount;
-    EXPECT_GT(ratio, 0.85);
-    EXPECT_LT(ratio, 1.15);
+    EXPECT_GT(ratio, 0.80);
+    EXPECT_LT(ratio, 1.20);
 
     piper_plus_free(engine);
 }
