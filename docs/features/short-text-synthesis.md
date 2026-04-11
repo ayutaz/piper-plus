@@ -174,7 +174,7 @@ y_lengths = torch.clamp_min(torch.sum(w_ceil, [1, 2]), 1).long()
 |----------|-------|------|
 | Python | P0 | WebUI / OpenAI API で直接利用される |
 | Rust | P1 | CLI / PyO3 バインディング経由で利用 |
-| C# | P1 | Unity 統合経由で利用 |
+| C# | P1 | CLI / PiperPlus.Core 経由で利用 (Unity統合は [uPiper](https://github.com/ayutaz/uPiper) を参照) |
 | Go | P2 | HTTP サーバー経由で利用 |
 | C++ | P2 | C API / libpiper_plus 経由で利用 |
 | WASM | P3 | ブラウザ利用 |
