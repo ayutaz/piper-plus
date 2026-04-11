@@ -25,12 +25,12 @@
 #
 # Closing punctuation divergence (as of 2026-04-12):
 #   C++:    14/14 chars (fully conformant after Issue #346)
-#   Rust:   11/14 chars (missing U+201D, U+2019, U+00BB)
-#   C#:     11/14 chars (missing U+201D, U+2019, U+00BB)
+#   Rust:   14/14 chars (fully conformant after Issue #346)
+#   C#:     14/14 chars (fully conformant after Issue #346)
 #   Go:      8/14 chars (missing U+0022, U+0027, U+FF3D, U+FF63, U+2019, U+00BB)
 #
 # Sentence terminator divergence (as of 2026-04-12):
-#   C++:    6/7 terminators (missing U+FF0E)
+#   C++:    7/7 terminators (fully conformant after Issue #346)
 #   Rust:   6/7 terminators (missing U+FF0E)
 #   C#:     6/7 terminators (missing U+FF0E)
 #   Go:     7/7 terminators (fully conformant)
@@ -186,7 +186,7 @@ name = "Fullwidth Question Mark (？)"
 char = "\uFF0E"
 codepoint = "U+FF0E"
 name = "Fullwidth Full Stop (．)"
-note = "Currently only in Go. Not in C++/Rust/C#. Covers CJK fullwidth period usage."
+note = "In C++ and Go. Not in Rust/C#. Covers CJK fullwidth period usage."
 
 # ---------------------------------------------------------------------------
 # Behavioral Contract

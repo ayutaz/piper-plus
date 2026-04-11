@@ -2149,7 +2149,7 @@ std::vector<std::string> splitTextToSentences(
     if (phonemeType == MultilingualPhonemes) {
       // Multilingual: CJK fullwidth + ASCII sentence-end + ellipsis
       return c == U'\u3002' || c == U'\uFF01' || c == U'\uFF1F' ||
-             c == U'.' || c == U'!' || c == U'?' ||
+             c == U'\uFF0E' || c == U'.' || c == U'!' || c == U'?' ||
              c == U'\u2026'; // …
     } else if (usesOpenJTalk(phonemeType)) {
       // Japanese: fullwidth sentence-end + ideographic comma
@@ -2166,7 +2166,7 @@ std::vector<std::string> splitTextToSentences(
   auto isSentenceTerminator = [&](char32_t c) -> bool {
     if (phonemeType == MultilingualPhonemes) {
       return c == U'\u3002' || c == U'\uFF01' || c == U'\uFF1F' ||
-             c == U'.' || c == U'!' || c == U'?';
+             c == U'\uFF0E' || c == U'.' || c == U'!' || c == U'?';
     } else if (usesOpenJTalk(phonemeType)) {
       // For Japanese, 、 (comma) is boundary but NOT a terminator
       return c == U'\u3002' || c == U'\uFF01' || c == U'\uFF1F';

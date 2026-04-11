@@ -108,6 +108,9 @@ public static class TextSplitter
             '\uFF3D' => true,   // ］
             '\u3011' => true,   // 】
             '\uFF63' => true,   // ｣ (half-width)
+            '\u201D' => true,   // " (right double quotation mark)
+            '\u2019' => true,   // ' (right single quotation mark)
+            '\u00BB' => true,   // » (right-pointing double angle quotation mark)
             _ => false,
         };
     }

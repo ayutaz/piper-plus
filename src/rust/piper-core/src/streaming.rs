@@ -336,6 +336,9 @@ fn is_closing_punctuation(ch: char) -> bool {
             | '\u{FF3D}' // ］
             | '\u{3011}' // 】
             | '\u{FF63}' // ｣ (half-width)
+            | '\u{201D}' // " right double quotation mark
+            | '\u{2019}' // ' right single quotation mark
+            | '\u{00BB}' // » right-pointing double angle quotation mark
     )
 }
 
