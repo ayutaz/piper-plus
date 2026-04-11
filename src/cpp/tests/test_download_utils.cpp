@@ -200,7 +200,7 @@ TEST(DownloadUtilsTest, ModelDownloadPath) {
 
     // Flat directory layout: files go directly into modelDir (matches Python behavior)
     fs::path expectedPath = modelDir / filename;
-    EXPECT_EQ(expectedPath.string(), "/tmp/piper/models/tsukuyomi-chan-6lang-fp16.onnx");
+    EXPECT_EQ(expectedPath, fs::path("/tmp/piper/models/tsukuyomi-chan-6lang-fp16.onnx"));
 }
 
 TEST(DownloadUtilsTest, ConfigDownloadPath) {
@@ -211,7 +211,7 @@ TEST(DownloadUtilsTest, ConfigDownloadPath) {
 
     // Flat directory layout: files go directly into modelDir (matches Python behavior)
     fs::path expectedPath = modelDir / filename;
-    EXPECT_EQ(expectedPath.string(), "/tmp/piper/models/config.json");
+    EXPECT_EQ(expectedPath, fs::path("/tmp/piper/models/config.json"));
 }
 
 // ============================================

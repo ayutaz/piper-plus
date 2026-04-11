@@ -46,7 +46,8 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            build-essential cmake ccache wget
+            build-essential cmake ccache wget open-jtalk \
+            hts-voice-nitech-jp-atr503-m001
 
           # Install ONNX Runtime
           wget -q https://github.com/microsoft/onnxruntime/releases/download/v1.14.1/onnxruntime-linux-x64-1.14.1.tgz
@@ -68,6 +69,7 @@ jobs:
           brew install cmake || true
           brew install ccache || brew upgrade ccache || true
           brew install wget || brew upgrade wget || true
+          brew install open-jtalk || brew upgrade open-jtalk || true
 
           # Install ONNX Runtime (architecture-aware)
           sudo mkdir -p /usr/local/lib /usr/local/include
@@ -156,9 +158,8 @@ jobs:
           fi
           echo "Build succeeded"
 
-      # ── Runtime data (non-Windows) ────────────────────────────
+      # ── Runtime data ──────────────────────────────────────────
       - name: Download OpenJTalk dictionary
-        if: runner.os != 'Windows'
         shell: bash
         run: |
           mkdir -p build/naist-jdic
@@ -192,9 +193,18 @@ jobs:
 
       - name: Download espeak-ng-data (Windows)
         if: runner.os == 'Windows'
+        shell: bash
         run: |
-          echo "Skipping espeak-ng-data download on Windows (not required for build verification)"
-          New-Item -ItemType Directory -Force -Path build\espeak-ng-data
+          mkdir -p build
+          cd build
+          if wget -q https://github.com/rhasspy/espeak-ng/releases/download/2023.9.7-4/espeak-ng-data.tar.gz; then
+            tar -xzf espeak-ng-data.tar.gz
+            rm espeak-ng-data.tar.gz
+            echo "espeak-ng-data downloaded successfully"
+          else
+            echo "Warning: Failed to download espeak-ng-data, some tests may be skipped"
+            mkdir -p espeak-ng-data
+          fi
 
       # ── Test model (integration tests only) ───────────────────
       - name: Cache test model
@@ -228,11 +238,54 @@ jobs:
           if [ "${{ runner.os }}" == "Windows" ]; then
             export ESPEAK_NG_DATA="${PWD}/espeak-ng-data"
             export PATH="${ONNXRUNTIME_ROOT_PATH}/lib:${PATH}"
+            export OPENJTALK_DICTIONARY_DIR="${PWD}/naist-jdic"
+            export OPENJTALK_DICTIONARY_PATH="${PWD}/naist-jdic"
+            export OPENJTALK_SKIP_TESTS_IF_UNAVAILABLE=1
           else
-            export OPENJTALK_VOICE="dummy.htsvoice"
+            # Find HTS voice file (needed by open_jtalk binary)
+            VOICE_FOUND=""
+            for vp in \
+              "/usr/share/hts-voice/nitech-jp-atr503-m001/nitech_jp_atr503_m001.htsvoice" \
+              "/usr/local/share/hts-voice/nitech-jp-atr503-m001/nitech_jp_atr503_m001.htsvoice" \
+              "/opt/homebrew/share/hts-voice/nitech-jp-atr503-m001/nitech_jp_atr503_m001.htsvoice"; do
+              if [ -f "$vp" ]; then
+                VOICE_FOUND="$vp"
+                break
+              fi
+            done
+            # Download HTS voice if not found on system
+            if [ -z "$VOICE_FOUND" ]; then
+              echo "HTS voice not found on system, downloading from SourceForge..."
+              mkdir -p /tmp/hts-voice
+              if curl -sfL "https://sourceforge.net/projects/open-jtalk/files/HTS%20voice/hts_voice_nitech_jp_atr503_m001-1.05/hts_voice_nitech_jp_atr503_m001-1.05.tar.gz/download" \
+                  -o /tmp/hts-voice.tar.gz; then
+                tar -xzf /tmp/hts-voice.tar.gz -C /tmp/hts-voice/ --strip-components=1
+                if [ -f "/tmp/hts-voice/nitech_jp_atr503_m001.htsvoice" ]; then
+                  VOICE_FOUND="/tmp/hts-voice/nitech_jp_atr503_m001.htsvoice"
+                fi
+              fi
+            fi
+            if [ -n "$VOICE_FOUND" ]; then
+              export OPENJTALK_VOICE="$VOICE_FOUND"
+              echo "Using HTS voice: $VOICE_FOUND"
+            else
+              echo "Warning: HTS voice not available, OpenJTalk optimized tests may skip"
+            fi
+
             export OPENJTALK_SKIP_TESTS_IF_UNAVAILABLE=1
             export OPENJTALK_DICTIONARY_DIR="${PWD}/naist-jdic"
+            # Use system dictionary if available, fallback to downloaded one
+            if [ -d "/var/lib/mecab/dic/open-jtalk/naist-jdic" ]; then
+              export OPENJTALK_DICTIONARY_PATH="/var/lib/mecab/dic/open-jtalk/naist-jdic"
+            elif [ -d "/opt/homebrew/share/open_jtalk/dic" ]; then
+              export OPENJTALK_DICTIONARY_PATH="/opt/homebrew/share/open_jtalk/dic"
+            else
+              export OPENJTALK_DICTIONARY_PATH="${PWD}/naist-jdic"
+            fi
             export ESPEAK_NG_DATA="${PWD}/espeak-ng-data"
+
+            echo "OpenJTalk env: DICTIONARY_PATH=$OPENJTALK_DICTIONARY_PATH VOICE=${OPENJTALK_VOICE:-<unset>}"
+            echo "open_jtalk binary: $(which open_jtalk 2>/dev/null || echo 'not in PATH')"
           fi
 
           echo "Running C++ tests for ${{ runner.os }} ${{ matrix.build-type }}"
@@ -240,52 +293,21 @@ jobs:
           ctest -C ${{ matrix.build-type }} -N | grep -E "Test #" || echo "No tests found"
 
           CRITICAL_TESTS_PASSED=true
+          INTEGRATION_TESTS="test_c_api_integration|test_c_api_audio_regression"
 
-          if [ "${{ runner.os }}" == "Windows" ]; then
-            echo "Running minimal tests on Windows..."
-            if ctest -C ${{ matrix.build-type }} -N | grep -q "Test #"; then
-              if ctest -C ${{ matrix.build-type }} -R "test_gpu_device_id" --output-on-failure --timeout 30; then
-                echo "At least one test passed on Windows"
-              else
-                echo "Tests failed on Windows, but build completed"
-              fi
+          if [ "${{ inputs.run-integration-tests }}" == "true" ]; then
+            echo "Running all tests..."
+            if ctest -C ${{ matrix.build-type }} --output-on-failure -V --timeout 120; then
+              echo "All tests passed"
             else
-              echo "No tests found on Windows, but build completed"
+              CRITICAL_TESTS_PASSED=false
             fi
-            CRITICAL_TESTS_PASSED=true
           else
-            # Unix platforms — run critical tests
-            TESTS_FOUND=false
-
-            # Build test list: always include unit tests
-            UNIT_TESTS="test_gpu_device_id test_phoneme_parser test_model_speaker_detection test_prosody_inference test_swedish_phonemize test_library_path test_c_api"
-            INTEGRATION_TESTS="test_c_api_integration test_c_api_audio_regression"
-
-            if [ "${{ inputs.run-integration-tests }}" == "true" ]; then
-              TEST_LIST="${UNIT_TESTS} ${INTEGRATION_TESTS}"
+            echo "Running unit tests (excluding integration tests)..."
+            if ctest -C ${{ matrix.build-type }} -E "${INTEGRATION_TESTS}" --output-on-failure -V --timeout 120; then
+              echo "All unit tests passed"
             else
-              TEST_LIST="${UNIT_TESTS}"
-            fi
-
-            for test in ${TEST_LIST}; do
-              echo "Checking for ${test}..."
-              if ctest -C ${{ matrix.build-type }} -N | grep -q "${test}"; then
-                TESTS_FOUND=true
-                echo "Running ${test}..."
-                if ctest -C ${{ matrix.build-type }} -R "^${test}$" --output-on-failure -V --timeout 60; then
-                  echo "${test} passed"
-                else
-                  echo "${test} failed"
-                  CRITICAL_TESTS_PASSED=false
-                fi
-              else
-                echo "${test} not found in test list"
-              fi
-            done
-
-            if [ "$TESTS_FOUND" = "false" ]; then
-              echo "No critical tests found, but build succeeded."
-              CRITICAL_TESTS_PASSED=true
+              CRITICAL_TESTS_PASSED=false
             fi
           fi
 

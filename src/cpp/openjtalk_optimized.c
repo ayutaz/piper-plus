@@ -26,6 +26,8 @@
 #include <pthread.h>
 #include <sys/wait.h>
 #include <errno.h>
+#include <poll.h>
+#include <signal.h>
 #endif
 
 // Cache entry structure
@@ -237,25 +239,28 @@ static char* execute_with_pipes_unix(const char* openjtalk_bin, const char* dic_
         close(stdout_pipe[1]);
         
         // Prepare arguments
+        // Standard open_jtalk does not support "-" for stdin/stdout;
+        // use /dev/stdin and /dev/stdout instead.
         int is_phonemizer = strstr(openjtalk_bin, "phonemizer") != NULL ? 1 : 0;
-        
+
         if (is_phonemizer) {
-            execlp(openjtalk_bin, openjtalk_bin, "-x", dic_path, "-ot", "-", "-", NULL);
+            execlp(openjtalk_bin, openjtalk_bin, "-x", dic_path, "-ot", "/dev/stdout", "/dev/stdin", NULL);
         } else {
             // Need HTS voice for regular open_jtalk
             const char* voice_path = get_openjtalk_voice_path();
             if (voice_path) {
-                execlp(openjtalk_bin, openjtalk_bin, "-x", dic_path, "-m", voice_path, 
-                       "-ow", "/dev/null", "-ot", "-", "-", NULL);
+                execlp(openjtalk_bin, openjtalk_bin, "-x", dic_path, "-m", voice_path,
+                       "-ow", "/dev/null", "-ot", "/dev/stdout", "/dev/stdin", NULL);
             } else {
-                execlp(openjtalk_bin, openjtalk_bin, "-x", dic_path, 
-                       "-ow", "/dev/null", "-ot", "-", "-", NULL);
+                execlp(openjtalk_bin, openjtalk_bin, "-x", dic_path,
+                       "-ow", "/dev/null", "-ot", "/dev/stdout", "/dev/stdin", NULL);
             }
         }
         
-        // If exec fails
+        // If exec fails, use _exit() to avoid running atexit handlers
+        // or C++ destructors that may deadlock on inherited locks.
         perror("execlp");
-        exit(1);
+        _exit(1);
     }
     
     // Parent process
@@ -273,20 +278,24 @@ static char* execute_with_pipes_unix(const char* openjtalk_bin, const char* dic_
         return NULL;
     }
     
-    // Read output from child's stdout
+    // Read output from child's stdout with timeout to prevent hangs
     char buffer[4096];
     size_t total_size = 0;
     size_t buffer_size = 4096;
     char* result = malloc(buffer_size);
     if (!result) {
         close(stdout_pipe[0]);
+        kill(pid, SIGKILL);
         waitpid(pid, NULL, 0);
         return NULL;
     }
     result[0] = '\0';
-    
+
     ssize_t bytes_read;
-    while ((bytes_read = read(stdout_pipe[0], buffer, sizeof(buffer) - 1)) > 0) {
+    struct pollfd pfd = { .fd = stdout_pipe[0], .events = POLLIN };
+    const int timeout_ms = 15000; // 15 second timeout per read
+    while (poll(&pfd, 1, timeout_ms) > 0 &&
+           (bytes_read = read(stdout_pipe[0], buffer, sizeof(buffer) - 1)) > 0) {
         buffer[bytes_read] = '\0';
         
         // Parse phonemes from output
@@ -326,13 +335,22 @@ static char* execute_with_pipes_unix(const char* openjtalk_bin, const char* dic_
             line = strtok(NULL, "\n");
         }
     }
-    
+
     close(stdout_pipe[0]);
-    
-    // Wait for child to finish
+
+    // Wait for child with timeout — if still running, kill it
     int status;
-    waitpid(pid, &status, 0);
-    
+    pid_t wait_result = waitpid(pid, &status, WNOHANG);
+    if (wait_result == 0) {
+        // Child still running — give it 2 more seconds, then kill
+        usleep(2000000);
+        wait_result = waitpid(pid, &status, WNOHANG);
+        if (wait_result == 0) {
+            kill(pid, SIGKILL);
+            waitpid(pid, &status, 0);
+        }
+    }
+
     if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
         free(result);
         return NULL;
@@ -760,10 +778,12 @@ static char* find_openjtalk_binary(void) {
         "./bin/open_jtalk_phonemizer",
         "/usr/bin/open_jtalk_phonemizer",
         "/usr/local/bin/open_jtalk_phonemizer",
+        "/opt/homebrew/bin/open_jtalk_phonemizer",
         "./open_jtalk",
         "./bin/open_jtalk",
         "/usr/bin/open_jtalk",
         "/usr/local/bin/open_jtalk",
+        "/opt/homebrew/bin/open_jtalk",
 #endif
         NULL
     };

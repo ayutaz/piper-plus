@@ -202,29 +202,6 @@ TEST(ProsodyInferenceTest, ZeroProsodyFallback) {
 }
 
 // ----------------------------------------------------------------------------
-// Test: End-to-End Inference with Prosody (requires ONNX model)
-// ----------------------------------------------------------------------------
-
-TEST(ProsodyInferenceTest, EndToEndInferenceWithProsody) {
-    // This test requires an actual ONNX model with prosody support
-    // Set PIPER_TEST_MODEL_PATH environment variable to run this test
-    const char* model_path = std::getenv("PIPER_TEST_MODEL_PATH");
-    if (!model_path) {
-        GTEST_SKIP() << "PIPER_TEST_MODEL_PATH not set, skipping integration test";
-    }
-
-    // TODO: Implement end-to-end inference test with actual ONNX model
-    // 1. Load model using Ort::Session
-    // 2. Verify model has prosody_features input
-    // 3. Create test input with prosody features
-    // 4. Run inference
-    // 5. Verify audio output is generated
-
-    // For now, just verify the model file exists
-    GTEST_SKIP() << "End-to-end test not yet fully implemented";
-}
-
-// ----------------------------------------------------------------------------
 // Main
 // ----------------------------------------------------------------------------
 

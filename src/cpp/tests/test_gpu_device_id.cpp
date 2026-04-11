@@ -91,9 +91,16 @@ TEST_F(GPUDeviceIdTest, NegativeDeviceIds) {
 TEST_F(GPUDeviceIdTest, EmptyStringHandling) {
     setenv("PIPER_GPU_DEVICE_ID", "", 1);
     const char* env_value = std::getenv("PIPER_GPU_DEVICE_ID");
+#ifdef _WIN32
+    // Windows _putenv_s("name", "") removes the variable entirely
+    if (env_value == nullptr) {
+        SUCCEED();
+        return;
+    }
+#endif
     ASSERT_NE(env_value, nullptr);
     EXPECT_STREQ(env_value, "");
-    
+
     // Empty string should cause parsing error
     try {
         std::stoi(env_value);

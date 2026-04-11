@@ -311,6 +311,25 @@ const char* get_openjtalk_dictionary_path() {
     return dict_path;
 }
 
+// Reset the cached dictionary path (for testing only).
+// If override_path is non-NULL, force the cache to that path
+// (useful for pointing at a non-existent path in tests).
+void reset_openjtalk_dictionary_cache(void) {
+    char* path = (char*)get_openjtalk_dictionary_path();
+    if (path) {
+        path[0] = '\0';
+    }
+}
+
+// Force the cached dictionary path to a specific value (for testing).
+void force_openjtalk_dictionary_path(const char* path) {
+    char* cached = (char*)get_openjtalk_dictionary_path();
+    if (cached && path) {
+        strncpy(cached, path, 1023);
+        cached[1023] = '\0';
+    }
+}
+
 // Download and extract the dictionary
 static int download_and_extract_dictionary() {
     const char* data_dir = get_data_dir();
@@ -421,8 +440,26 @@ int ensure_openjtalk_dictionary() {
 
 // Get the path to the HTS voice file
 const char* get_openjtalk_voice_path() {
-    // HTS voice not needed for phonemizer-only mode
-    // This function is kept for backward compatibility but returns NULL
+    // Check OPENJTALK_VOICE environment variable first
+    const char* env_voice = getenv("OPENJTALK_VOICE");
+    if (env_voice && access(env_voice, F_OK) == 0) {
+        return env_voice;
+    }
+
+    // Check common system locations
+    const char* voice_paths[] = {
+        "/usr/share/hts-voice/nitech-jp-atr503-m001/nitech_jp_atr503_m001.htsvoice",
+        "/usr/local/share/hts-voice/nitech-jp-atr503-m001/nitech_jp_atr503_m001.htsvoice",
+        "/opt/homebrew/share/hts-voice/nitech-jp-atr503-m001/nitech_jp_atr503_m001.htsvoice",
+        NULL
+    };
+    for (int i = 0; voice_paths[i] != NULL; i++) {
+        if (access(voice_paths[i], F_OK) == 0) {
+            return voice_paths[i];
+        }
+    }
+
+    // HTS voice not found — phonemizer-only mode
     return NULL;
 }
 

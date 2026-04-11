@@ -377,12 +377,13 @@ TEST_F(TrimSilenceInt16Test, NoOpWhenExactlyMinSamples) {
 }
 
 TEST_F(TrimSilenceInt16Test, TrimsLeadingSilence) {
-  // 2 windows of silence + 2 windows of audio + 2 windows of silence
-  const int totalSamples = 6 * TRIM_WINDOW_SIZE;
+  // 3 windows of silence + 4 windows of audio + 3 windows of silence = 10
+  // totalSamples = 10 * 256 = 2560 > TRIM_MIN_SAMPLES (2205)
+  const int totalSamples = 10 * TRIM_WINDOW_SIZE;
   std::vector<int16_t> audio(totalSamples, 0);
 
-  // Fill windows 2-3 with loud audio
-  for (int i = 2 * TRIM_WINDOW_SIZE; i < 4 * TRIM_WINDOW_SIZE; i++) {
+  // Fill windows 3-6 with loud audio
+  for (int i = 3 * TRIM_WINDOW_SIZE; i < 7 * TRIM_WINDOW_SIZE; i++) {
     audio[i] = 10000;
   }
 
@@ -390,8 +391,8 @@ TEST_F(TrimSilenceInt16Test, TrimsLeadingSilence) {
 
   // Result should be shorter than original
   EXPECT_LT(static_cast<int>(audio.size()), totalSamples);
-  // Result should start around window 2 and end around window 4
-  EXPECT_GE(static_cast<int>(audio.size()), 2 * TRIM_WINDOW_SIZE);
+  // Result should start around window 3 and end around window 7
+  EXPECT_GE(static_cast<int>(audio.size()), 4 * TRIM_WINDOW_SIZE);
 }
 
 TEST_F(TrimSilenceInt16Test, AllSilenceKeepsMinSamples) {
@@ -403,7 +404,8 @@ TEST_F(TrimSilenceInt16Test, AllSilenceKeepsMinSamples) {
 
 TEST_F(TrimSilenceInt16Test, NoSilenceKeepsAll) {
   // All windows above threshold
-  const int totalSamples = 4 * TRIM_WINDOW_SIZE;
+  // totalSamples = 10 * 256 = 2560 > TRIM_MIN_SAMPLES (2205)
+  const int totalSamples = 10 * TRIM_WINDOW_SIZE;
   std::vector<int16_t> audio(totalSamples, 5000);
 
   trimSilenceInt16(audio);
@@ -443,18 +445,20 @@ TEST_F(TrimSilenceFloatTest, NoOpWhenShorterThanMinSamples) {
 }
 
 TEST_F(TrimSilenceFloatTest, TrimsLeadingSilence) {
-  const int totalSamples = 6 * TRIM_WINDOW_SIZE;
+  // 3 windows of silence + 4 windows of audio + 3 windows of silence = 10
+  // totalSamples = 10 * 256 = 2560 > TRIM_MIN_SAMPLES (2205)
+  const int totalSamples = 10 * TRIM_WINDOW_SIZE;
   std::vector<float> audio(totalSamples, 0.0f);
 
-  // Fill windows 2-3 with loud audio
-  for (int i = 2 * TRIM_WINDOW_SIZE; i < 4 * TRIM_WINDOW_SIZE; i++) {
+  // Fill windows 3-6 with loud audio
+  for (int i = 3 * TRIM_WINDOW_SIZE; i < 7 * TRIM_WINDOW_SIZE; i++) {
     audio[i] = 0.5f;
   }
 
   trimSilenceFloat(audio);
 
   EXPECT_LT(static_cast<int>(audio.size()), totalSamples);
-  EXPECT_GE(static_cast<int>(audio.size()), 2 * TRIM_WINDOW_SIZE);
+  EXPECT_GE(static_cast<int>(audio.size()), 4 * TRIM_WINDOW_SIZE);
 }
 
 TEST_F(TrimSilenceFloatTest, AllSilenceKeepsMinSamples) {
@@ -465,7 +469,8 @@ TEST_F(TrimSilenceFloatTest, AllSilenceKeepsMinSamples) {
 }
 
 TEST_F(TrimSilenceFloatTest, NoSilenceKeepsAll) {
-  const int totalSamples = 4 * TRIM_WINDOW_SIZE;
+  // totalSamples = 10 * 256 = 2560 > TRIM_MIN_SAMPLES (2205)
+  const int totalSamples = 10 * TRIM_WINDOW_SIZE;
   std::vector<float> audio(totalSamples, 0.5f);
 
   trimSilenceFloat(audio);
@@ -782,7 +787,7 @@ TEST_F(TrimPartialWindowInt16Test, AudioInPartialWindowDetected) {
 TEST_F(TrimPartialWindowInt16Test, FullWindowsPlusPartialSilence) {
   // Full windows have audio, partial window is silence -- should behave
   // the same as before the fix (partial silence doesn't affect lastAbove).
-  const int nFullWindows = 4;
+  const int nFullWindows = 9;  // 9 * 256 = 2304 > TRIM_MIN_SAMPLES (2205)
   const int partialSize = 50;
   const int totalSamples = nFullWindows * TRIM_WINDOW_SIZE + partialSize;
   ASSERT_GT(totalSamples, TRIM_MIN_SAMPLES);
@@ -796,8 +801,8 @@ TEST_F(TrimPartialWindowInt16Test, FullWindowsPlusPartialSilence) {
 
   trimSilenceInt16(audio);
 
-  // All full windows are loud, so firstAbove=0, lastAbove=3.
-  // endSample = min(4*256, totalSamples) = 1024, which is < totalSamples.
+  // All full windows are loud, so firstAbove=0, lastAbove=8.
+  // endSample = min(9*256, totalSamples) = 2304, which is < totalSamples.
   // Trailing silence in partial window should be trimmed.
   EXPECT_LE(static_cast<int>(audio.size()), totalSamples);
 }
@@ -805,7 +810,7 @@ TEST_F(TrimPartialWindowInt16Test, FullWindowsPlusPartialSilence) {
 TEST_F(TrimPartialWindowInt16Test, ExactMultipleUnchanged) {
   // When buffer size is exact multiple of TRIM_WINDOW_SIZE, no partial
   // window exists -- behavior unchanged from before the fix.
-  const int totalSamples = 4 * TRIM_WINDOW_SIZE;
+  const int totalSamples = 9 * TRIM_WINDOW_SIZE;  // 2304 > TRIM_MIN_SAMPLES
   ASSERT_GT(totalSamples, TRIM_MIN_SAMPLES);
   ASSERT_EQ(totalSamples % TRIM_WINDOW_SIZE, 0);
 
@@ -844,7 +849,7 @@ TEST_F(TrimPartialWindowFloatTest, AudioInPartialWindowDetected) {
 }
 
 TEST_F(TrimPartialWindowFloatTest, FullWindowsPlusPartialSilence) {
-  const int nFullWindows = 4;
+  const int nFullWindows = 9;  // 9 * 256 = 2304 > TRIM_MIN_SAMPLES (2205)
   const int partialSize = 50;
   const int totalSamples = nFullWindows * TRIM_WINDOW_SIZE + partialSize;
   ASSERT_GT(totalSamples, TRIM_MIN_SAMPLES);
@@ -861,7 +866,7 @@ TEST_F(TrimPartialWindowFloatTest, FullWindowsPlusPartialSilence) {
 }
 
 TEST_F(TrimPartialWindowFloatTest, ExactMultipleUnchanged) {
-  const int totalSamples = 4 * TRIM_WINDOW_SIZE;
+  const int totalSamples = 9 * TRIM_WINDOW_SIZE;  // 2304 > TRIM_MIN_SAMPLES
   ASSERT_GT(totalSamples, TRIM_MIN_SAMPLES);
   ASSERT_EQ(totalSamples % TRIM_WINDOW_SIZE, 0);
 
