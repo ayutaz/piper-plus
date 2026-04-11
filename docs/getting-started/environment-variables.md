@@ -165,8 +165,8 @@ This document lists all environment variables that can be used to configure Pipe
 
 ### ESPEAK_DATA_PATH
 - **Description**: Path to espeak-ng data directory
-- **Status**: **Not applicable** — piper-plus no longer uses eSpeak-ng. Phonemization is handled by the in-house G2P stack (Python/Rust/C#/Go). This variable has no effect on any current runtime.
-- **Legacy note**: Was required by upstream `piper` before the G2P stack replaced eSpeak-ng.
+- **Status**: **Legacy / preprocessing only** — the default piper-plus runtime no longer uses eSpeak-ng for phonemization, which is handled by the in-house G2P stack (Python/Rust/C#/Go). However, this variable may still be referenced by legacy, bundled, or preprocessing workflows that rely on `espeak-ng`.
+- **Legacy note**: Historically required by upstream `piper`, and still relevant for any remaining espeak-based tooling or preprocessing paths in this repository.
 
 ### PIPER_GPU_DEVICE_ID
 - **Description**: GPU device ID to use for CUDA inference

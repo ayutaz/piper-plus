@@ -110,7 +110,6 @@ dir Release\*.exe
 # 必須ファイルの確認
 $requiredFiles = @(
     "Release\piper.exe",
-    "Release\test_piper.exe",
     "Release\*.dll"
 )
 
@@ -260,26 +259,37 @@ uv run python -m piper_train.infer_onnx --help
 
 ### OpenJTalkが見つからない
 
-エラー: `OpenJTalk binary not found`
+エラー: `OpenJTalk dictionary not found` または初回実行時に辞書の自動ダウンロードが失敗する場合
+
+> **注意**: OpenJTalk は `piper.exe` に静的リンク済みです。別途バイナリは不要です。このエラーは辞書ファイルが見つからない場合に発生します。
 
 解決方法：
 
 ```powershell
-# 1. piper.exeの存在確認
-$piperPath = Get-ChildItem -Path . -Filter "piper.exe" -Recurse
-if ($piperPath) {
-    Write-Host "Piper found at: $($piperPath.FullName)" -ForegroundColor Green
+# 1. piper.exeの存在確認（念のため）
+if (Test-Path ".\Release\piper.exe") {
+    Write-Host "piper.exe OK" -ForegroundColor Green
 } else {
-    Write-Host "piper.exe not found. Rebuilding..." -ForegroundColor Red
-    cmake --build . --config Release --target piper
+    Write-Host "piper.exe not found. Rebuild with: cmake --build . --config Release" -ForegroundColor Red
 }
 
-# 2. PATHに追加
-$buildPath = (Get-Location).Path + "\Release"
-$env:PATH = "$buildPath;$env:PATH"
+# 2. OpenJTalk辞書ディレクトリの確認
+$dictPath = "$env:APPDATA\piper\open_jtalk_dic_utf_8-1.11"
+if (Test-Path $dictPath) {
+    Write-Host "辞書ディレクトリが見つかりました: $dictPath" -ForegroundColor Green
+} else {
+    Write-Host "辞書ディレクトリが見つかりません。以下の手順でダウンロードしてください。" -ForegroundColor Red
+}
 
-# 3. または辞書パス環境変数で指定
-[Environment]::SetEnvironmentVariable("OPENJTALK_DICTIONARY_PATH", "$env:APPDATA\piper\openjtalk_dic", [EnvironmentVariableTarget]::User)
+# 3. 辞書を手動でダウンロード・展開する（自動DLが失敗した場合）
+New-Item -ItemType Directory -Path "$env:APPDATA\piper" -Force | Out-Null
+Invoke-WebRequest -Uri "https://jaist.dl.sourceforge.net/project/open-jtalk/Dictionary/open_jtalk_dic-1.11/open_jtalk_dic_utf_8-1.11.tar.gz" `
+    -OutFile "$env:TEMP\open_jtalk_dic_utf_8-1.11.tar.gz"
+tar -xzf "$env:TEMP\open_jtalk_dic_utf_8-1.11.tar.gz" -C "$env:APPDATA\piper"
+
+# 4. 辞書パスを環境変数で明示指定
+[Environment]::SetEnvironmentVariable("OPENJTALK_DICTIONARY_PATH", "$env:APPDATA\piper\open_jtalk_dic_utf_8-1.11", [EnvironmentVariableTarget]::User)
+Write-Host "OPENJTALK_DICTIONARY_PATH を設定しました。PowerShellを再起動してください。" -ForegroundColor Green
 ```
 
 ### 辞書のダウンロードエラー
