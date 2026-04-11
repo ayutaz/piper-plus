@@ -25,7 +25,7 @@
 
 1. `isClosingPunctuation(char32_t)` を `splitTextToSentences()` の直前に static 関数として追加
 
-### 閉じ括弧文字セット（12文字）
+### 閉じ括弧文字セット（14文字）
 
 | 文字 | Unicode | 名称 |
 |------|---------|------|
@@ -41,10 +41,12 @@
 | `】` | U+3011 | Right Black Lenticular Bracket |
 | `｣` | U+FF63 | Halfwidth Right Corner Bracket |
 | `"` | U+201D | Right Double Quotation Mark |
+| `'` | U+2019 | Right Single Quotation Mark |
+| `»` | U+00BB | Right-Pointing Double Angle Quotation Mark |
 
 ### 設計根拠
 
-- Rust streaming.rs (11文字) + Go の U+201D = 12文字の全ランタイムスーパーセット
+- 全ランタイムスーパーセット (Rust 11文字 + Go U+201D + 8言語対応追加 U+2019/U+00BB) = 14文字。正規定義は `docs/spec/text-splitter-contract.toml`
 - `static` 関数（`piper.cpp` ファイルスコープ）。ヘッダー公開不要
 - 既存の `isSingleCodepoint()`, `getCodepoint()` と同じパターン
 

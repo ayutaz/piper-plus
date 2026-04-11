@@ -306,7 +306,7 @@ behavior = "post-consume"   # or "depth-tracking"
 
 1. **`isClosingPunctuation()` 関数の追加** (M1 のミラー)
    - 匿名名前空間内、`splitTextToSentences()` の前に `static` (不要、名前空間内なので) もしくはフリー関数として追加
-   - 文字セットは M1 で定義された12文字と完全一致させること
+   - 文字セットは M1 で定義された14文字と完全一致させること
 
 2. **閉じ括弧消費ループの追加** (M2 のミラー)
    - ミラーの L110 (`while` ループ閉じ `}`) と L111 (`i = punctEnd - 1`) の間に同じ5行を挿入

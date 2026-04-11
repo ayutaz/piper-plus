@@ -80,7 +80,7 @@ fix(cpp): consume closing brackets after sentence terminators (#346)
 
 ## Changes
 
-- `isClosingPunctuation()` ヘルパー関数追加 (12文字の閉じ括弧文字セット)
+- `isClosingPunctuation()` ヘルパー関数追加 (14文字の閉じ括弧文字セット)
 - boundary punctuation 消費ループの直後に閉じ括弧消費ループを追加
 - テストミラー更新 + 10個の新規テストケース追加
 
@@ -112,7 +112,7 @@ After:  ["「こんにちは。」", "次の文。"]  -- 正しい
 
 | # | 確認項目 | ファイル:行 (M1-M3 適用後の推定) |
 |---|---------|------------|
-| 1 | `isClosingPunctuation()` の12文字が Rust/C#/Go のスーパーセットであること | `piper.cpp`: `splitTextToSentences()` 直前 |
+| 1 | `isClosingPunctuation()` の14文字が Rust/C#/Go のスーパーセットであること | `piper.cpp`: `splitTextToSentences()` 直前 |
 | 2 | 消費ループが `hasTerminator` ガード付きであること | `piper.cpp`: `i = punctEnd - 1` 直前 |
 | 3 | テストミラーが `piper.cpp` と完全一致していること | `test_split_sentences.cpp` 匿名名前空間内 |
 | 4 | テスト #10 (`NoTerminatorNoop`) が `hasTerminator` ガードの正しさを証明すること | `test_split_sentences.cpp` 末尾 |
@@ -458,7 +458,7 @@ Python (`src/python_run/piper/phonemize/japanese.py`) は `re.compile(r"(?<=[。
 全ランタイム (C++/Rust/C#/Go) の文分割動作を `docs/spec/sentence-split-contract.toml` として文書化し、CI で横断検証する。
 
 **統一すべき項目:**
-- 閉じ括弧文字セット (現在12文字だが Go は8文字)
+- 閉じ括弧文字セット (現在14文字だが Go は8文字)
 - 文末記号文字セット (Go のみ `．` U+FF0E を含む)
 - Depth tracking の有無 (Go のみ実装)
 - 略語認識の有無 (Rust `text_splitter.rs` のみ実装)

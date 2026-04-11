@@ -44,6 +44,8 @@ bool isClosingPunctuation(char32_t cp) {
     case U'\u3011': // 】 Right Black Lenticular Bracket
     case U'\uFF63': // ｣  Halfwidth Right Corner Bracket
     case U'\u201D': // "  Right Double Quotation Mark
+    case U'\u2019': // '  Right Single Quotation Mark
+    case U'\u00BB': // »  Right-Pointing Double Angle Quotation Mark
       return true;
     default:
       return false;
@@ -303,7 +305,7 @@ TEST(SplitSentencesTest, CJKClosingBracket_NoTerminatorNoop) {
 
 **レビューチェックリスト:**
 
-- [ ] ミラーの `isClosingPunctuation()` が `piper.cpp` (M1) の 12 文字セットと完全一致すること
+- [ ] ミラーの `isClosingPunctuation()` が `piper.cpp` (M1) の 14 文字セットと完全一致すること
 - [ ] ミラーの消費ループが `piper.cpp` (M2) と同一ロジックであること (`hasTerminator` ガード、`punctEnd` インクリメント)
 - [ ] 10 個のテストの期待出力が Rust/C# の対応テストと一致すること (空白処理の差異を除く)
 - [ ] 既存の 26 テストが変更なく PASS すること

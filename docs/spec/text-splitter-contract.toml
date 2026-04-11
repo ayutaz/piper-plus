@@ -1,0 +1,199 @@
+# Text Splitter — Closing Punctuation Contract
+# ==============================================
+# This file defines the canonical character set for closing punctuation marks
+# that should be consumed after a sentence terminator during text splitting.
+#
+# All runtime implementations of isClosingPunctuation() (or equivalent) MUST
+# include exactly these characters. The set is the union of all characters
+# used across runtimes, covering all 8 supported languages (JA, EN, ZH, KO,
+# ES, FR, PT, SV).
+#
+# This file serves as a design-time cross-language contract. Implementations
+# and tests are expected to be kept in sync with these values manually unless
+# and until automated contract-verification tests are added.
+#
+# Implementations:
+#   C++:    src/cpp/piper.cpp                    isClosingPunctuation()
+#   Rust:   src/rust/piper-core/src/streaming.rs is_closing_punctuation()
+#   C#:     src/csharp/PiperPlus.Core/Phonemize/TextSplitter.cs  IsClosingPunctuation()
+#   Go:     src/go/piperplus/text_splitter.go    isCloseBracket()
+#   WASM:   (uses Rust via piper-wasm)
+#
+# Related:
+#   Issue: https://github.com/ayutaz/piper-plus/issues/346
+#   Spec:  docs/spec/text-splitter-contract.toml (this file)
+#
+# Divergence status (as of 2026-04-12):
+#   C++:    14/14 chars (fully conformant after Issue #346)
+#   Rust:   11/14 chars (missing U+201D, U+2019, U+00BB)
+#   C#:     11/14 chars (missing U+201D, U+2019, U+00BB)
+#   Go:      8/14 chars (missing U+0022, U+0027, U+FF3D, U+FF63, U+2019, U+00BB)
+#
+# Future work: align all runtimes to this 14-char canonical set.
+
+# ---------------------------------------------------------------------------
+# Closing Punctuation Character Set (14 characters)
+# ---------------------------------------------------------------------------
+# Characters are consumed greedily after a sentence terminator when
+# hasTerminator is true. This prevents closing brackets from leaking
+# into the next sentence chunk.
+
+[[closing_punctuation]]
+char = ")"
+codepoint = "U+0029"
+name = "Right Parenthesis"
+category = "Pe"
+languages = ["EN", "ES", "FR", "PT", "SV", "JA", "ZH", "KO"]
+
+[[closing_punctuation]]
+char = "]"
+codepoint = "U+005D"
+name = "Right Square Bracket"
+category = "Pe"
+languages = ["EN", "ES", "FR", "PT", "SV"]
+
+[[closing_punctuation]]
+char = "}"
+codepoint = "U+007D"
+name = "Right Curly Bracket"
+category = "Pe"
+languages = ["EN"]
+
+[[closing_punctuation]]
+char = "\""
+codepoint = "U+0022"
+name = "Quotation Mark"
+category = "Po"
+note = "Ambiguous open/close. Safe: only called after sentence terminator."
+languages = ["EN", "ES", "FR", "PT", "SV"]
+
+[[closing_punctuation]]
+char = "'"
+codepoint = "U+0027"
+name = "Apostrophe"
+category = "Po"
+note = "Ambiguous open/close. Safe: only called after sentence terminator."
+languages = ["EN"]
+
+[[closing_punctuation]]
+char = "\u300D"
+codepoint = "U+300D"
+name = "Right Corner Bracket (」)"
+category = "Pe"
+languages = ["JA", "ZH", "KO"]
+
+[[closing_punctuation]]
+char = "\u300F"
+codepoint = "U+300F"
+name = "Right White Corner Bracket (』)"
+category = "Pe"
+languages = ["JA", "ZH", "KO"]
+
+[[closing_punctuation]]
+char = "\uFF09"
+codepoint = "U+FF09"
+name = "Fullwidth Right Parenthesis (）)"
+category = "Pe"
+languages = ["JA", "ZH", "KO"]
+
+[[closing_punctuation]]
+char = "\uFF3D"
+codepoint = "U+FF3D"
+name = "Fullwidth Right Square Bracket (］)"
+category = "Pe"
+languages = ["JA", "ZH"]
+
+[[closing_punctuation]]
+char = "\u3011"
+codepoint = "U+3011"
+name = "Right Black Lenticular Bracket (】)"
+category = "Pe"
+languages = ["JA", "ZH"]
+
+[[closing_punctuation]]
+char = "\uFF63"
+codepoint = "U+FF63"
+name = "Halfwidth Right Corner Bracket (｣)"
+category = "Pe"
+languages = ["JA"]
+
+[[closing_punctuation]]
+char = "\u201D"
+codepoint = "U+201D"
+name = "Right Double Quotation Mark (\u201C\u201D)"
+category = "Pf"
+languages = ["EN", "ZH", "JA"]
+
+[[closing_punctuation]]
+char = "\u2019"
+codepoint = "U+2019"
+name = "Right Single Quotation Mark (\u2018\u2019)"
+category = "Pf"
+note = "Used in EN/FR for closing single quotes. Not in original Rust/C#/Go sets."
+languages = ["EN", "FR"]
+
+[[closing_punctuation]]
+char = "\u00BB"
+codepoint = "U+00BB"
+name = "Right-Pointing Double Angle Quotation Mark (guillemet, \u00AB\u00BB)"
+category = "Pf"
+note = "Used in FR/PT/ES/SV as closing quotation mark. Not in original Rust/C#/Go sets."
+languages = ["FR", "PT", "ES", "SV"]
+
+# ---------------------------------------------------------------------------
+# Sentence Terminators (6 characters)
+# ---------------------------------------------------------------------------
+# These are the characters that trigger sentence splitting. Closing
+# punctuation is only consumed when hasTerminator is true.
+
+[[sentence_terminators]]
+char = "."
+codepoint = "U+002E"
+name = "Full Stop"
+
+[[sentence_terminators]]
+char = "!"
+codepoint = "U+0021"
+name = "Exclamation Mark"
+
+[[sentence_terminators]]
+char = "?"
+codepoint = "U+003F"
+name = "Question Mark"
+
+[[sentence_terminators]]
+char = "\u3002"
+codepoint = "U+3002"
+name = "Ideographic Full Stop (。)"
+
+[[sentence_terminators]]
+char = "\uFF01"
+codepoint = "U+FF01"
+name = "Fullwidth Exclamation Mark (！)"
+
+[[sentence_terminators]]
+char = "\uFF1F"
+codepoint = "U+FF1F"
+name = "Fullwidth Question Mark (？)"
+
+# ---------------------------------------------------------------------------
+# Behavioral Contract
+# ---------------------------------------------------------------------------
+
+[behavior]
+# How closing punctuation is handled after sentence terminators.
+# "post-consume": After detecting a sentence terminator, greedily consume
+#                 any following closing punctuation into the same chunk.
+#                 Used by C++, Rust (streaming.rs), C#.
+# "depth-tracking": Track bracket nesting depth; suppress sentence splitting
+#                   while depth > 0. Used by Go.
+#
+# The two approaches produce different results for nested quotes:
+#   Input: 彼は「元気です。」と言った。終わり。
+#   post-consume:  ["彼は「元気です。」", "と言った。", "終わり。"]  (3 chunks)
+#   depth-tracking: ["彼は「元気です。」と言った。", "終わり。"]     (2 chunks)
+#
+# This divergence is documented and accepted. Unifying to one approach
+# is a separate initiative.
+strategy = "post-consume"
+note = "Go uses depth-tracking. This is a known divergence."

@@ -2087,6 +2087,34 @@ static size_t calculateDynamicChunkSize(const std::vector<char32_t>& cps,
   return baseSize * 2;  // Medium density
 }
 
+// Helper: is a codepoint a closing punctuation mark that should be
+// consumed after a sentence terminator? (Issue #346)
+// Character set (14 chars): all-runtime superset covering 8 supported languages.
+// See docs/spec/text-splitter-contract.toml for the canonical definition.
+// Includes U+0022 and U+0027 which are ambiguous (open/close), but safe because
+// this function is only called after a sentence terminator (hasTerminator guard).
+static bool isClosingPunctuation(char32_t c) {
+  switch (c) {
+    case U')':      // U+0029  Right Parenthesis
+    case U']':      // U+005D  Right Square Bracket
+    case U'}':      // U+007D  Right Curly Bracket
+    case U'"':      // U+0022  Quotation Mark
+    case U'\'':     // U+0027  Apostrophe
+    case U'\u300D': // 」 Right Corner Bracket
+    case U'\u300F': // 』 Right White Corner Bracket
+    case U'\uFF09': // ） Fullwidth Right Parenthesis
+    case U'\uFF3D': // ］ Fullwidth Right Square Bracket
+    case U'\u3011': // 】 Right Black Lenticular Bracket
+    case U'\uFF63': // ｣  Halfwidth Right Corner Bracket
+    case U'\u201D': // "  Right Double Quotation Mark
+    case U'\u2019': // '  Right Single Quotation Mark
+    case U'\u00BB': // »  Right-Pointing Double Angle Quotation Mark
+      return true;
+    default:
+      return false;
+  }
+}
+
 // Split text into sentences at natural boundaries (public API).
 // Uses codepoint-level iteration via utf8_utils to correctly handle
 // multibyte UTF-8 characters (CJK punctuation, etc.).
