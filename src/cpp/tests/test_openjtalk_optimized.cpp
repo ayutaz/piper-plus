@@ -14,9 +14,18 @@ extern "C" {
 // GTEST_SKIP() expands to `return ...` so it must be invoked directly in the
 // test body — wrapping it in a helper function would only return from that helper.
 // This test binary is only built on Unix (see CMakeLists.txt).
+// Two-stage check: (1) binary/dictionary existence, (2) actual phoneme conversion.
+// Stage 2 catches cases where the system binary exists (e.g. macOS homebrew) but
+// doesn't support voice-free operation (requires -m flag for HTS voice).
 #define SKIP_IF_NOT_FUNCTIONAL() \
     if (!openjtalk_is_available()) \
-        GTEST_SKIP() << "OpenJTalk not available (dictionary or binary missing)"
+        GTEST_SKIP() << "OpenJTalk not available (dictionary or binary missing)"; \
+    do { \
+        char* _skip_probe = openjtalk_text_to_phonemes_optimized("テスト"); \
+        if (!_skip_probe) \
+            GTEST_SKIP() << "OpenJTalk binary cannot produce phonemes (voice-free not supported)"; \
+        openjtalk_free_phonemes(_skip_probe); \
+    } while(0)
 
 // Windows does not provide unsetenv; emulate via _putenv_s
 #ifdef _WIN32
