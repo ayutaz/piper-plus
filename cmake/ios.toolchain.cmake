@@ -21,8 +21,5 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fembed-bitcode=off" CACHE STRING "" FOR
 # Disable code signing for CI builds
 set(CMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED "NO" CACHE STRING "")
 
-# Force HTS Engine stub (autotools not feasible for iOS cross-compilation)
-set(USE_HTS_ENGINE_STUB ON CACHE BOOL "Force HTS Engine stub on iOS" FORCE)
-
 # Skip standalone executables on iOS (only static library is built)
 set(IOS TRUE CACHE BOOL "Building for iOS" FORCE)

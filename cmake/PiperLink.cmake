@@ -61,6 +61,8 @@ if(TARGET piper)
   add_dependencies(test_piper hts_engine_external)
 endif()
 
+# hts_engine_stub: OpenJTalk ヘッダーが HTS_engine.h を transitively include するため、
+# 型定義互換シムとしてリンクが必要。HTS 合成機能は一切使用しない。
 if(USE_HTS_ENGINE_STUB)
   if(TARGET piper)
     target_link_libraries(piper PRIVATE hts_engine_stub)

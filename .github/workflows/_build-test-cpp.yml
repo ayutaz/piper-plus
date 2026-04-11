@@ -225,6 +225,19 @@ jobs:
           curl -sfL "https://huggingface.co/ayousanz/piper-plus-base/resolve/main/multilingual-test-medium.onnx.json" \
             -o test/models/multilingual-test-medium.onnx.json || true
 
+      # ── Dead code lint guard ──────────────────────────────────
+      - name: Check for dead code markers
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          echo "Checking for #if 0 dead code blocks in C++ sources..."
+          if grep -rn '#if 0' src/cpp/ --include="*.c" --include="*.cpp" --include="*.h"; then
+            echo "FAIL: #if 0 blocks found. Remove dead code or use feature flags."
+            exit 1
+          else
+            echo "OK: No #if 0 blocks found."
+          fi
+
       # ── Run tests ─────────────────────────────────────────────
       - name: Run tests
         shell: bash

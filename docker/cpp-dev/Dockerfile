@@ -51,7 +51,9 @@ RUN apt-get update && apt-get install -y \
     mecab-ipadic-utf8 \
     && rm -rf /var/lib/apt/lists/*
 
-# Install HTS Engine
+# NOTE: HTS Engine is only needed for building the system open_jtalk binary
+# (used as fallback in tests). piper-plus CMake build uses hts_engine_stub instead.
+# This can be removed once the system open_jtalk fallback is no longer needed.
 RUN wget https://downloads.sourceforge.net/hts-engine/hts_engine_API-1.10.tar.gz && \
     tar -xzf hts_engine_API-1.10.tar.gz && \
     cd hts_engine_API-1.10 && \

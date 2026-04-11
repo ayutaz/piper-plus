@@ -37,8 +37,6 @@ endif()
 # ---- Android cross-compilation support ----
 if(ANDROID)
   message(STATUS "Android cross-compilation: ABI=${ANDROID_ABI}, Platform=${ANDROID_PLATFORM}")
-  # Force HTS Engine stub (autotools build is not feasible under NDK)
-  set(USE_HTS_ENGINE_STUB ON CACHE BOOL "Force HTS Engine stub on Android" FORCE)
   # Propagate NDK toolchain to ExternalProject_Add calls
   set(ANDROID_CMAKE_ARGS
     -DCMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}
@@ -53,8 +51,6 @@ endif()
 # ---- iOS cross-compilation support ----
 if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
   message(STATUS "iOS cross-compilation: arch=${CMAKE_OSX_ARCHITECTURES}, target=${CMAKE_OSX_DEPLOYMENT_TARGET}")
-  # Force HTS Engine stub (autotools not feasible for iOS)
-  set(USE_HTS_ENGINE_STUB ON CACHE BOOL "Force HTS Engine stub on iOS" FORCE)
   # Propagate iOS settings to ExternalProject_Add calls
   set(EXTERNAL_CMAKE_ARGS
     -DCMAKE_SYSTEM_NAME=iOS

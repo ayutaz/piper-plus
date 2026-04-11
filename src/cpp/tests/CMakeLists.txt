@@ -22,6 +22,7 @@ macro(link_openjtalk_to_test target_name)
     target_include_directories(${target_name} PRIVATE
         ${CMAKE_BINARY_DIR}/oj/include
         ${CMAKE_BINARY_DIR}/oj/include/openjtalk
+        # hts_stub/include: OpenJTalk ヘッダーの HTS_engine.h 依存を満たす互換シム
         ${CMAKE_BINARY_DIR}/hts_stub/include
     )
     if(WIN32)
@@ -29,6 +30,7 @@ macro(link_openjtalk_to_test target_name)
     else()
         target_link_libraries(${target_name} ${CMAKE_BINARY_DIR}/oj/lib/libopenjtalk.a)
     endif()
+    # hts_engine_stub: HTS 合成は不使用。OpenJTalk のリンク時シンボル解決にのみ必要。
     if(TARGET hts_engine_stub)
         target_link_libraries(${target_name} hts_engine_stub)
     endif()

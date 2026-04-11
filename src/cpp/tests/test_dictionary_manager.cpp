@@ -44,7 +44,6 @@ protected:
         // Save original environment variables
         original_home = getenv("HOME");
         original_dict_dir = getenv("OPENJTALK_DICTIONARY_DIR");
-        original_voice = getenv("OPENJTALK_VOICE");
         original_auto_download = getenv("PIPER_AUTO_DOWNLOAD_DICT");
         original_offline = getenv("PIPER_OFFLINE_MODE");
         
@@ -83,20 +82,6 @@ protected:
             SetEnvironmentVariableA("OPENJTALK_DICTIONARY_DIR", NULL);
 #else
             unsetenv("OPENJTALK_DICTIONARY_DIR");
-#endif
-        }
-        
-        if (original_voice) {
-#ifdef _WIN32
-            SetEnvironmentVariableA("OPENJTALK_VOICE", original_voice);
-#else
-            setenv("OPENJTALK_VOICE", original_voice, 1);
-#endif
-        } else {
-#ifdef _WIN32
-            SetEnvironmentVariableA("OPENJTALK_VOICE", NULL);
-#else
-            unsetenv("OPENJTALK_VOICE");
 #endif
         }
         
@@ -143,7 +128,6 @@ protected:
     char* test_dir = nullptr;
     const char* original_home = nullptr;
     const char* original_dict_dir = nullptr;
-    const char* original_voice = nullptr;
     const char* original_auto_download = nullptr;
     const char* original_offline = nullptr;
 };
