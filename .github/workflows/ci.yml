@@ -8,6 +8,9 @@ on:
     branches:
       - dev
 
+env:
+  NODE_VERSION: '24.x'
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
   cancel-in-progress: true
@@ -359,7 +362,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: '24'
+          node-version: ${{ env.NODE_VERSION }}
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
