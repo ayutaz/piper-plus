@@ -387,7 +387,7 @@ char* openjtalk_text_to_phonemes(const char* text) {
     int is_phonemizer = strstr(openjtalk_bin, "phonemizer") != NULL ? 1 : 0;
 
     if (is_phonemizer) {
-        // Use phonemizer binary - no HTS voice needed
+        // Use phonemizer binary
 #ifdef _WIN32
         char short_bin[OPENJTALK_MAX_PATH];
         char short_dic[OPENJTALK_MAX_PATH];
@@ -403,7 +403,7 @@ char* openjtalk_text_to_phonemes(const char* text) {
                  openjtalk_bin, dic_path, output_file, input_file);
 #endif
     } else {
-        // open_jtalk fallback: phoneme extraction only (no HTS voice needed)
+        // open_jtalk fallback: phoneme extraction only
 #ifdef _WIN32
         snprintf(command, sizeof(command),
                  "\"%s\" -x \"%s\" -ow NUL -ot \"%s\" \"%s\"",
@@ -414,9 +414,6 @@ char* openjtalk_text_to_phonemes(const char* text) {
                  openjtalk_bin, dic_path, output_file, input_file);
 #endif
     }
-
-    // Log the command for debugging
-    fprintf(stderr, "DEBUG: Executing command: %s\n", command);
 
     // Execute command
     err = execute_openjtalk_command(command, &result);
@@ -696,7 +693,7 @@ static OpenJTalkProsodyResult* openjtalk_text_to_phonemes_with_prosody_binary(co
                  openjtalk_bin, dic_path, output_file, input_file);
 #endif
     } else {
-        // open_jtalk fallback: phoneme extraction only (no HTS voice needed)
+        // open_jtalk fallback: phoneme extraction only
 #ifdef _WIN32
         snprintf(command, sizeof(command),
                  "\"%s\" -x \"%s\" -ow NUL -ot \"%s\" \"%s\"",

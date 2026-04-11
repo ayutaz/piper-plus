@@ -400,7 +400,7 @@ static char* execute_with_pipes_windows(const char* openjtalk_bin, const char* d
                  "\"%s\" -x \"%s\" -ot - -",
                  openjtalk_bin, dic_path);
     } else {
-        // open_jtalk fallback: phoneme extraction only (no HTS voice needed)
+        // open_jtalk fallback: phoneme extraction only
         snprintf(command, sizeof(command),
                  "\"%s\" -x \"%s\" -ow NUL -ot - -",
                  openjtalk_bin, dic_path);

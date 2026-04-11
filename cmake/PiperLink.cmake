@@ -123,20 +123,16 @@ if(TARGET piper)
   target_compile_definitions(piper PUBLIC FMT_HEADER_ONLY=1)
 
   # Add OpenJTalk dictionary path definition
-  if(TRUE)  # HTSEngine and OpenJTalk are built
-    # Dictionary will be downloaded by CI/CD or provided by user
-    # Use relative path from binary location for better portability
-    if(WIN32)
-      target_compile_definitions(piper PUBLIC OPENJTALK_DIC_PATH="..\\\\share\\\\open_jtalk\\\\dic")
-      target_compile_definitions(test_piper PUBLIC OPENJTALK_DIC_PATH="${CMAKE_CURRENT_BINARY_DIR}\\\\naist-jdic")
-      target_compile_definitions(test_piper PUBLIC SPDLOG_FMT_EXTERNAL=1)
-      target_compile_definitions(test_piper PUBLIC FMT_HEADER_ONLY=1)
-    else()
-      target_compile_definitions(piper PUBLIC OPENJTALK_DIC_PATH="../share/open_jtalk/dic")
-      target_compile_definitions(test_piper PUBLIC OPENJTALK_DIC_PATH="${CMAKE_CURRENT_BINARY_DIR}/naist-jdic")
-      target_compile_definitions(test_piper PUBLIC SPDLOG_FMT_EXTERNAL=1)
-      target_compile_definitions(test_piper PUBLIC FMT_HEADER_ONLY=1)
-    endif()
+  if(WIN32)
+    target_compile_definitions(piper PUBLIC OPENJTALK_DIC_PATH="..\\\\share\\\\open_jtalk\\\\dic")
+    target_compile_definitions(test_piper PUBLIC OPENJTALK_DIC_PATH="${CMAKE_CURRENT_BINARY_DIR}\\\\naist-jdic")
+    target_compile_definitions(test_piper PUBLIC SPDLOG_FMT_EXTERNAL=1)
+    target_compile_definitions(test_piper PUBLIC FMT_HEADER_ONLY=1)
+  else()
+    target_compile_definitions(piper PUBLIC OPENJTALK_DIC_PATH="../share/open_jtalk/dic")
+    target_compile_definitions(test_piper PUBLIC OPENJTALK_DIC_PATH="${CMAKE_CURRENT_BINARY_DIR}/naist-jdic")
+    target_compile_definitions(test_piper PUBLIC SPDLOG_FMT_EXTERNAL=1)
+    target_compile_definitions(test_piper PUBLIC FMT_HEADER_ONLY=1)
   endif()
 endif() # TARGET piper
 
