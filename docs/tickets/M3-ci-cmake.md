@@ -580,9 +580,9 @@ HTS voice 依存除去による定量的な改善を計測すべき:
 
 ### M4 (テスト追加 + クリーンアップ) への連絡
 
-1. **`USE_HTS_ENGINE_STUB` オプションの完全除去を検討:** M3 完了後、`USE_HTS_ENGINE_STUB` は常に ON でなければならない。M4 で `option()` 宣言を削除し、stub ビルドを無条件化することを検討する。その場合、`if(USE_HTS_ENGINE_STUB)` ガードも除去する。
+1. **~~`USE_HTS_ENGINE_STUB` オプションの完全除去を検討~~:** :white_check_mark: 第3回レビューで M3 内で実施済み (commit de23606b)。`option()` 宣言を削除し、stub ビルドを無条件化。レガシーキャッシュ検出ガードのみ残す。
 
-2. **`hts_engine_external` ターゲットの除去を検討:** M3 では `ExternalDeps.cmake` L139 の `add_custom_target(hts_engine_external DEPENDS hts_engine_stub)` を維持している。M4 でこのターゲットを削除し、全ての `add_dependencies(... hts_engine_external)` を直接 `hts_engine_stub` に置き換えることを検討する。
+2. **~~`hts_engine_external` ターゲットの除去を検討~~:** :white_check_mark: 第3回レビューで M3 内で実施済み (commit de23606b)。孤立ターゲットを削除。
 
 3. **`PiperLink.cmake` L4 のコメント更新:** `HTS_ENGINE_DIR` への言及がコメントに残っている。M4 でコメントを更新する。
 
@@ -599,3 +599,32 @@ HTS voice 依存除去による定量的な改善を計測すべき:
    ```
 
 5. **`examples/test_japanese_tts.sh` の削除:** このスクリプトは HTS voice を前提としており、M3 のスコープ外とした。M4 で削除または phonemizer ベースに書き換える。
+
+### 6.9 第3回設計レビュー結果 (2026-04-11)
+
+M1-M3 全体を対象に 5 チーム (アーキテクチャ / セキュリティ / コード品質 / ビルドシステム / API 互換性) による設計レビューを実施。
+
+**CRITICAL: 0件**
+
+**修正済み (commit de23606b):**
+
+| # | 重大度 | 内容 | 修正 |
+|---|--------|------|------|
+| 1 | HIGH | npm バージョン未バンプ (WASM ABI 破壊変更) | piper-plus 0.3.1→0.4.0, @piper-plus/g2p 0.2.0→0.3.0 |
+| 2 | HIGH | テスト環境変数名不一致 (OPENJTALK_DICTIONARY_DIR vs OPENJTALK_DICTIONARY_PATH) | test_dictionary_manager.cpp 修正 |
+| 3 | MEDIUM | `hts_engine_external` 孤立ターゲット | ExternalDeps.cmake から削除 |
+| 4 | MEDIUM | `USE_HTS_ENGINE_STUB` option() 不要 | option() 廃止、stub 無条件ビルド化 |
+| 5 | MEDIUM | `PiperLink.cmake` の `if(TRUE)` 旧 HTS ガード残存 | 除去 |
+| 6 | MEDIUM | EOF 改行なし (`openjtalk_dictionary_manager.c`) | 改行追加 |
+| 7 | LOW | "no HTS voice needed" コメント 5 箇所 | "phoneme extraction only" に統一 |
+| 8 | LOW | DEBUG fprintf が本番コード残存 | 削除 |
+
+**将来課題 (本 PR スコープ外):**
+
+| # | 重大度 | 内容 | 理由 |
+|---|--------|------|------|
+| 9 | HIGH | `find_openjtalk_binary()` 重複実装 (wrapper/optimized) | M1-M3 以前の既存技術的負債。別 PR で対応推奨 |
+| 10 | MEDIUM | `system()`/`popen()` コマンドインジェクション面 | 大規模リファクタ。libcurl 直接呼び出しへの移行を別途検討 |
+| 11 | MEDIUM | テストの大半がコメントアウト TODO | M4 スコープ |
+| 12 | LOW | CI に SourceForge URL 残存 (CMake 外) | 辞書 DL の別系統。別 Issue で対応推奨 |
+| 13 | LOW | `phonemizer_wrapper.cpp` の eSpeak-ng 依存残存 | GPL 回避方針との整合を別途確認 |
