@@ -73,18 +73,7 @@ Model config doesn't exist
 
 **Common Causes & Solutions**:
 
-1. **OpenJTalk binary not found**
-   ```bash
-   # Check if open_jtalk is in PATH
-   which open_jtalk  # Linux/macOS
-   where open_jtalk  # Windows
-   
-   # Add to PATH if needed
-   export PATH=/path/to/piper/bin:$PATH  # Linux/macOS
-   set PATH=%PATH%;C:\path\to\piper\bin  # Windows
-   ```
-
-2. **Dictionary not found**
+1. **Dictionary not found**
    ```bash
    # Enable auto-download
    export PIPER_AUTO_DOWNLOAD_DICT=1
@@ -219,23 +208,6 @@ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 
 ### macOS
 
-#### "Library not loaded" Error
-
-**Symptoms**:
-```
-dyld: Library not loaded: @rpath/libpiper_phonemize.1.dylib
-```
-
-**Solutions**:
-```bash
-# Set library path
-export DYLD_LIBRARY_PATH=/path/to/piper/lib:$DYLD_LIBRARY_PATH
-export DYLD_FALLBACK_LIBRARY_PATH=/path/to/piper/lib:$DYLD_FALLBACK_LIBRARY_PATH
-
-# Or install to system location
-sudo cp piper/lib/*.dylib /usr/local/lib/
-```
-
 #### Gatekeeper Warnings
 
 **Solution**:
@@ -246,25 +218,12 @@ xattr -cr /path/to/piper/
 
 ### Linux
 
-#### "libpiper_phonemize.so.1: cannot open shared object file"
-
-**Solutions**:
-```bash
-# Add library path
-export LD_LIBRARY_PATH=/path/to/piper/lib:$LD_LIBRARY_PATH
-
-# Or add to system
-echo "/path/to/piper/lib" | sudo tee /etc/ld.so.conf.d/piper.conf
-sudo ldconfig
-```
-
 #### Permission Denied
 
 **Solutions**:
 ```bash
 # Make executable
 chmod +x piper/bin/piper
-chmod +x piper/bin/open_jtalk
 
 # Check SELinux (if applicable)
 sudo setenforce 0  # Temporary disable to test
@@ -329,10 +288,6 @@ cmake .. -DONNXRUNTIME_DIR=/path/to/onnxruntime
 
 Enable debug output for more information:
 ```bash
-# Set debug logging
-export PIPER_LOG_LEVEL=DEBUG
-
-# Or use debug flag
 piper --debug --model model.onnx < input.txt
 ```
 
@@ -350,13 +305,11 @@ If issues persist:
 
 | Error | Cause | Solution |
 |-------|-------|----------|
-| "OpenJTalk is not available" | Binary not found | Check PATH, install OpenJTalk |
+| "OpenJTalk is not available" | Dictionary missing | Download/specify dictionary |
 | "Failed to initialize OpenJTalk" | Dictionary missing | Download/specify dictionary |
 | "Unknown multi-character phoneme" | Wrong phoneme format | Update to latest version |
 | "Checksum verification failed" | Corrupt download | Re-download files |
 | "HTS voice must be specified" | Voice file missing | Download/specify .htsvoice file |
-| "Cannot open shared object" | Missing library | Set LD_LIBRARY_PATH |
-| "Library not loaded" (macOS) | Missing dylib | Set DYLD_LIBRARY_PATH |
 | "UnicodeEncodeError" (Windows) | Console encoding | Use chcp 65001 |
 
 ## Training Troubleshooting

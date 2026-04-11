@@ -110,7 +110,7 @@ dir Release\*.exe
 # 必須ファイルの確認
 $requiredFiles = @(
     "Release\piper.exe",
-    "Release\open_jtalk.exe",
+    "Release\test_piper.exe",
     "Release\*.dll"
 )
 
@@ -265,21 +265,21 @@ uv run python -m piper_train.infer_onnx --help
 解決方法：
 
 ```powershell
-# 1. open_jtalk.exeの存在確認
-$openJtalkPath = Get-ChildItem -Path . -Filter "open_jtalk.exe" -Recurse
-if ($openJtalkPath) {
-    Write-Host "OpenJTalk found at: $($openJtalkPath.FullName)" -ForegroundColor Green
+# 1. piper.exeの存在確認
+$piperPath = Get-ChildItem -Path . -Filter "piper.exe" -Recurse
+if ($piperPath) {
+    Write-Host "Piper found at: $($piperPath.FullName)" -ForegroundColor Green
 } else {
-    Write-Host "OpenJTalk not found. Rebuilding..." -ForegroundColor Red
-    cmake --build . --config Release --target open_jtalk
+    Write-Host "piper.exe not found. Rebuilding..." -ForegroundColor Red
+    cmake --build . --config Release --target piper
 }
 
 # 2. PATHに追加
 $buildPath = (Get-Location).Path + "\Release"
 $env:PATH = "$buildPath;$env:PATH"
 
-# 3. または環境変数で指定
-[Environment]::SetEnvironmentVariable("OPENJTALK_PATH", "$buildPath\open_jtalk.exe", [EnvironmentVariableTarget]::User)
+# 3. または辞書パス環境変数で指定
+[Environment]::SetEnvironmentVariable("OPENJTALK_DICTIONARY_PATH", "$env:APPDATA\piper\openjtalk_dic", [EnvironmentVariableTarget]::User)
 ```
 
 ### 辞書のダウンロードエラー
@@ -465,25 +465,16 @@ foreach ($chunk in $chunks) {
 ## 既知の問題と回避策
 
 ### 1. テキストサイズ制限
-- **問題**: 4KB以上のテキストは処理できません（#69で対応予定）
-- **回避策**: 上記のテキスト分割スクリプトを使用
+- **問題**: ~~4KB以上のテキストは処理できません~~ — **解決済み (#69)**。`main.cpp` のstdinループは `getline()` で行単位読み取りを行うため、4KBの上限はありません。
 
 ### 2. パスの文字エンコーディング
-- **問題**: 非ASCII文字を含むパスで問題が発生（#71で対応予定）
-- **回避策**:
-  ```powershell
-  # ASCII文字のみのパスを使用
-  Set-Location "C:\workspace\piper"
-
-  # または一時ファイルを使用
-  $tempDir = [System.IO.Path]::GetTempPath()
-  ```
+- **問題**: ~~非ASCII文字を含むパスで問題が発生~~ — **解決済み (#71)**。コードは `std::filesystem::path` を使用し、Windows上でのUTF-8引数を正しく処理します。
 
 ### 3. 同時実行の制限
-- **問題**: スレッドセーフではありません
+- **現状**: 単一のエンジンインスタンスはスレッドセーフではありません。ただし、スレッドごとに独立したインスタンスを使用することで、複数スレッドからの並列実行が可能です。
 - **回避策**:
   ```powershell
-  # ミューテックスを使用した排他制御
+  # 単一インスタンスを共有する場合はミューテックスで排他制御
   $mutex = New-Object System.Threading.Mutex($false, "PiperTTSMutex")
   try {
       $mutex.WaitOne() | Out-Null
@@ -495,7 +486,7 @@ foreach ($chunk in $chunks) {
   ```
 
 ### 4. ウイルス対策ソフトの誤検知
-- **問題**: open_jtalk.exeがウイルスとして誤検知される場合がある
+- **問題**: ビルドした実行ファイルがウイルスとして誤検知される場合がある
 - **解決方法**: Windows Defenderの除外リストに追加
 
 ## パフォーマンス最適化

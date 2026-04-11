@@ -165,14 +165,8 @@ This document lists all environment variables that can be used to configure Pipe
 
 ### ESPEAK_DATA_PATH
 - **Description**: Path to espeak-ng data directory
-- **Default**: Varies by installation method
-- **Typical locations**:
-  - Bundled: `piper/share/espeak-ng-data`
-  - System: `/usr/share/espeak-ng-data`
-- **Example**:
-  ```bash
-  export ESPEAK_DATA_PATH=/usr/local/share/espeak-ng-data
-  ```
+- **Status**: **Not applicable** — piper-plus no longer uses eSpeak-ng. Phonemization is handled by the in-house G2P stack (Python/Rust/C#/Go). This variable has no effect on any current runtime.
+- **Legacy note**: Was required by upstream `piper` before the G2P stack replaced eSpeak-ng.
 
 ### PIPER_GPU_DEVICE_ID
 - **Description**: GPU device ID to use for CUDA inference
@@ -219,8 +213,9 @@ This document lists all environment variables that can be used to configure Pipe
   ```
 
 ### PIPER_PHONEMIZE_DEBUG
-- **Description**: Enable debug output for the bundled piper-phonemize module
-- **Used by**: Python (piper_phonemize)
+- **Description**: Enable debug output for the legacy bundled piper-phonemize module
+- **Status**: **Legacy / preprocessing only** — only recognized by `src/piper_phonemize_bundled/` (used by `preprocess.py` for eSpeak-based phoneme types). Not available in the main Python inference path (`src/python_run/`) or any other runtime.
+- **Used by**: Legacy preprocessing pipeline (`preprocess.py`) only
 - **Values**: Any non-empty value enables debug output
 - **Example**:
   ```bash

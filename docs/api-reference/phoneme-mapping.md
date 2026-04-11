@@ -12,7 +12,9 @@ Piper Plus の音素体系と ID マッピングのリファレンス。
 
 - `Phonemizer` 抽象基底クラス (`piper_plus_g2p/base.py`)
 - 言語レジストリ (`piper_plus_g2p/registry.py`) に各言語が自動登録
-- 各言語が `phonemize()`, `phonemize_with_prosody()`, `get_phoneme_id_map()`, `post_process_ids()` を実装
+- `Phonemizer` ABC は `phonemize()` と `phonemize_with_prosody()` を定義し、各言語サブクラスがこれを実装
+- `get_phoneme_id_map()` は `piper_plus_g2p/encode/id_maps.py` のスタンドアロン関数
+- `post_process_ids()` は `piper_plus_g2p/encode/encoder.py` の `PiperEncoder` クラスのメソッド (音素列への BOS/EOS/パディング付与を担当)
 
 ---
 
