@@ -46,8 +46,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            build-essential cmake ccache wget open-jtalk \
-            hts-voice-nitech-jp-atr503-m001
+            build-essential cmake ccache wget
 
           # Install ONNX Runtime
           wget -q https://github.com/microsoft/onnxruntime/releases/download/v1.14.1/onnxruntime-linux-x64-1.14.1.tgz
@@ -69,7 +68,6 @@ jobs:
           brew install cmake || true
           brew install ccache || brew upgrade ccache || true
           brew install wget || brew upgrade wget || true
-          brew install open-jtalk || brew upgrade open-jtalk || true
 
           # Install ONNX Runtime (architecture-aware)
           sudo mkdir -p /usr/local/lib /usr/local/include
@@ -162,19 +160,12 @@ jobs:
       - name: Download OpenJTalk dictionary
         shell: bash
         run: |
+          # Always download dictionary — no dependency on system open-jtalk packages
           mkdir -p build/naist-jdic
-          if [ -d "/usr/share/open_jtalk/dic" ]; then
-            cp -r /usr/share/open_jtalk/dic/* build/naist-jdic/
-          elif [ -d "/opt/homebrew/share/open_jtalk/dic" ]; then
-            cp -r /opt/homebrew/share/open_jtalk/dic/* build/naist-jdic/
-          elif [ -d "/usr/local/share/open_jtalk/dic" ]; then
-            cp -r /usr/local/share/open_jtalk/dic/* build/naist-jdic/
-          else
-            echo "Downloading OpenJTalk dictionary..."
-            curl -sL https://sourceforge.net/projects/open-jtalk/files/Dictionary/open_jtalk_dic-1.11/open_jtalk_dic_utf_8-1.11.tar.gz/download \
-              | tar xzf - -C build/
-            mv build/open_jtalk_dic_utf_8-1.11/* build/naist-jdic/
-          fi
+          echo "Downloading OpenJTalk dictionary..."
+          curl -sL https://sourceforge.net/projects/open-jtalk/files/Dictionary/open_jtalk_dic-1.11/open_jtalk_dic_utf_8-1.11.tar.gz/download \
+            | tar xzf - -C build/
+          mv build/open_jtalk_dic_utf_8-1.11/* build/naist-jdic/
 
       - name: Download espeak-ng-data
         if: runner.os != 'Windows'
@@ -255,18 +246,11 @@ jobs:
             export OPENJTALK_SKIP_TESTS_IF_UNAVAILABLE=1
           else
             export OPENJTALK_SKIP_TESTS_IF_UNAVAILABLE=1
-            # Use system dictionary if available, fallback to downloaded one
-            if [ -d "/var/lib/mecab/dic/open-jtalk/naist-jdic" ]; then
-              export OPENJTALK_DICTIONARY_PATH="/var/lib/mecab/dic/open-jtalk/naist-jdic"
-            elif [ -d "/opt/homebrew/share/open_jtalk/dic" ]; then
-              export OPENJTALK_DICTIONARY_PATH="/opt/homebrew/share/open_jtalk/dic"
-            else
-              export OPENJTALK_DICTIONARY_PATH="${PWD}/naist-jdic"
-            fi
+            # Always use downloaded dictionary (no system open-jtalk dependency)
+            export OPENJTALK_DICTIONARY_PATH="${PWD}/naist-jdic"
             export ESPEAK_NG_DATA="${PWD}/espeak-ng-data"
 
             echo "OpenJTalk env: DICTIONARY_PATH=$OPENJTALK_DICTIONARY_PATH"
-            echo "open_jtalk binary: $(which open_jtalk 2>/dev/null || echo 'not in PATH')"
           fi
 
           echo "Running C++ tests for ${{ runner.os }} ${{ matrix.build-type }}"
