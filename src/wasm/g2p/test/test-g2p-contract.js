@@ -178,3 +178,65 @@ describe('G2P.create() factory with Japanese (mocked)', () => {
     }
   });
 });
+
+// ---------------------------------------------------------------------------
+// Tests: voice-free initialization (M4 — HTS voice dependency removed)
+// ---------------------------------------------------------------------------
+
+describe('G2P contract: voice-free initialization (M4)', () => {
+  it('should accept jaDict with dictData only (no voiceData required)', () => {
+    const DICT_FILES = [
+        'char.bin', 'matrix.bin', 'sys.dic', 'unk.dic',
+        'left-id.def', 'pos-id.def', 'rewrite.def', 'right-id.def',
+    ];
+    const mockDict = {
+        dictData: Object.fromEntries(
+            DICT_FILES.map(f => [f, new ArrayBuffer(10)])
+        ),
+    };
+    const ja = new JapaneseG2P({ jaDict: mockDict });
+    assert.ok(ja, 'JapaneseG2P should initialize with dictData only');
+  });
+
+  it('should throw when dictData is missing from jaDict', () => {
+    const ja = new JapaneseG2P({ jaDict: {} });
+    ja._openjtalkModule = {
+        FS: { mkdir: () => {}, writeFile: () => {} },
+        allocateUTF8: () => 1,
+        _free: () => {},
+        _openjtalk_initialize: () => 0,
+    };
+    assert.throws(
+        () => ja._loadDict({}),
+        (err) => err.message.includes('dictData'),
+        '_loadDict({}) must throw an error mentioning dictData'
+    );
+  });
+
+  it('DictLoader.loadJaDict should not include voiceData in its contract', async () => {
+    const { DictLoader } = await import('../src/dict-loader.js');
+    const loader = new DictLoader();
+
+    assert.equal(typeof loader.loadJaDict, 'function',
+        'DictLoader must have loadJaDict method');
+
+    assert.strictEqual(
+        loader.loadJaDict.length <= 1, true,
+        'loadJaDict should accept at most 1 parameter (options without includeVoice)'
+    );
+
+    // Source-level structural check for defense in depth
+    const { default: fs } = await import('node:fs');
+    const src = fs.readFileSync(
+        new URL('../src/dict-loader.js', import.meta.url), 'utf-8'
+    );
+    assert.ok(
+        !src.includes('VOICE_CACHE_KEY'),
+        'dict-loader.js must not contain VOICE_CACHE_KEY after M2 cleanup'
+    );
+    assert.ok(
+        !src.includes('includeVoice'),
+        'dict-loader.js must not contain includeVoice option after M2 cleanup'
+    );
+  });
+});

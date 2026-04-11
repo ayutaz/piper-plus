@@ -452,7 +452,6 @@ foreach ($chunk in $chunks) {
 | 変数名 | 説明 | デフォルト |
 |--------|------|-----------|
 | `OPENJTALK_DICTIONARY_PATH` | 辞書ディレクトリのパス | 自動検出 |
-| `OPENJTALK_VOICE` | HTSボイスファイルのパス | 自動ダウンロード |
 | `OPENJTALK_DATA_DIR` | データファイルの保存先 | `%APPDATA%\piper` |
 | `PIPER_OFFLINE_MODE` | オフラインモード（1で有効） | 0 |
 | `PIPER_AUTO_DOWNLOAD_DICT` | 自動ダウンロード（0で無効） | 1 |

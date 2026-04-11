@@ -45,6 +45,35 @@ if command -v wasm-objdump &> /dev/null; then
     echo "  Found $EXPORTS OpenJTalk-related exports"
 fi
 
+# === Voice files should NOT be present (HTS voice dependency removed) ===
+echo ""
+echo "Checking that voice files are absent..."
+if [ -d "assets/voice" ] && [ "$(find assets/voice -type f 2>/dev/null | wc -l)" -gt 0 ]; then
+    echo -e "  ${RED}FAIL${NC}: Voice files found in assets/voice (should be removed)"
+    FAILED=1
+else
+    echo -e "  ${GREEN}OK${NC}: No voice files in assets/"
+fi
+
+if grep -q '"voices"' assets/assets.json 2>/dev/null; then
+    echo -e "  ${RED}FAIL${NC}: assets.json still contains \"voices\" section"
+    FAILED=1
+else
+    echo -e "  ${GREEN}OK${NC}: assets.json does not contain \"voices\" section"
+fi
+
+# === WASM binary size regression check ===
+echo ""
+echo "Checking WASM binary size..."
+WASM_SIZE=$(find dist/rust-wasm -name "*.wasm" -exec wc -c {} + 2>/dev/null | tail -1 | awk '{print $1}')
+MAX_SIZE=5242880  # 5MB threshold
+if [ -n "$WASM_SIZE" ] && [ "$WASM_SIZE" -gt "$MAX_SIZE" ]; then
+    echo -e "  ${RED}FAIL${NC}: WASM binary too large (${WASM_SIZE} bytes > ${MAX_SIZE})"
+    FAILED=1
+else
+    echo -e "  ${GREEN}OK${NC}: WASM binary size within limits (${WASM_SIZE:-0} bytes)"
+fi
+
 # Summary
 echo ""
 if [ $FAILED -eq 0 ]; then

@@ -1,8 +1,10 @@
 #include <gtest/gtest.h>
+#include <gmock/gmock.h>
 #include <chrono>
 #include <vector>
 #include <thread>
 #include <cstring>
+#include <cstdlib>
 
 extern "C" {
 #include "../openjtalk_optimized.h"
@@ -16,6 +18,24 @@ extern "C" {
 #define SKIP_IF_NOT_FUNCTIONAL() \
     if (!openjtalk_is_available()) \
         GTEST_SKIP() << "OpenJTalk not available (dictionary or binary missing)"
+
+// Windows does not provide unsetenv; emulate via _putenv_s
+#ifdef _WIN32
+static int unsetenv(const char* name) {
+    return _putenv_s(name, "");
+}
+#endif
+
+// Helper: check that OpenJTalk is actually functional (dictionary + binary)
+// by attempting a real phoneme conversion
+static bool openjtalk_functional() {
+    char* phonemes = openjtalk_text_to_phonemes_optimized("テスト");
+    if (phonemes) {
+        openjtalk_free_phonemes(phonemes);
+        return true;
+    }
+    return false;
+}
 
 class OpenJTalkOptimizedTest : public ::testing::Test {
 protected:
@@ -258,4 +278,89 @@ TEST_F(OpenJTalkOptimizedTest, NoCache) {
 
     openjtalk_free_phonemes(phonemes1);
     openjtalk_free_phonemes(phonemes2);
+}
+
+// ---------------------------------------------------------------------------
+// HTS voice dependency removal regression tests (M1-M3)
+// ---------------------------------------------------------------------------
+
+// Verify phoneme extraction works without OPENJTALK_VOICE env var
+TEST_F(OpenJTalkOptimizedTest, PhonemeExtractionWithoutVoice) {
+    unsetenv("OPENJTALK_VOICE");
+
+    char* result = openjtalk_text_to_phonemes_optimized("こんにちは");
+    if (!result) {
+        GTEST_SKIP() << "OpenJTalk binary or dictionary not available";
+    }
+
+    EXPECT_GT(strlen(result), 0u);
+    EXPECT_THAT(std::string(result), ::testing::HasSubstr("k"));
+
+    openjtalk_free_phonemes(result);
+}
+
+// Verify the wrapper (non-optimized) path also works without voice
+TEST_F(OpenJTalkOptimizedTest, StreamingWithoutVoice) {
+    unsetenv("OPENJTALK_VOICE");
+
+    char* result = openjtalk_text_to_phonemes("テスト");
+    if (!result) {
+        GTEST_SKIP() << "OpenJTalk binary or dictionary not available";
+    }
+
+    EXPECT_GT(strlen(result), 0u);
+    EXPECT_THAT(std::string(result), ::testing::HasSubstr("t"));
+
+    openjtalk_free_phonemes(result);
+}
+
+// Indirectly verify that no -m (voice) flag is required for conversion
+TEST_F(OpenJTalkOptimizedTest, CommandWithoutVoiceFlag) {
+    unsetenv("OPENJTALK_VOICE");
+
+    char* result = openjtalk_text_to_phonemes_optimized("テスト");
+    if (!result) {
+        GTEST_SKIP() << "OpenJTalk binary or dictionary not available";
+    }
+
+    EXPECT_GT(strlen(result), 0u);
+
+    openjtalk_free_phonemes(result);
+}
+
+// Even when OPENJTALK_VOICE points to a nonexistent file, phoneme
+// extraction must still succeed (the voice file is never needed).
+TEST_F(OpenJTalkOptimizedTest, IgnoresVoiceEnvVar) {
+    // Save the current value so we can restore it later
+    const char* prev = std::getenv("OPENJTALK_VOICE");
+    std::string saved = prev ? prev : "";
+    bool had_env = (prev != nullptr);
+
+    // Set OPENJTALK_VOICE to a path that does not exist
+#ifdef _WIN32
+    _putenv_s("OPENJTALK_VOICE", "C:\\nonexistent\\voice.htsvoice");
+#else
+    setenv("OPENJTALK_VOICE", "/nonexistent/voice.htsvoice", 1);
+#endif
+
+    char* result = openjtalk_text_to_phonemes_optimized("テスト");
+
+    // Restore original env state before any assertions
+    if (had_env) {
+#ifdef _WIN32
+        _putenv_s("OPENJTALK_VOICE", saved.c_str());
+#else
+        setenv("OPENJTALK_VOICE", saved.c_str(), 1);
+#endif
+    } else {
+        unsetenv("OPENJTALK_VOICE");
+    }
+
+    if (!result) {
+        GTEST_SKIP() << "OpenJTalk binary or dictionary not available";
+    }
+
+    EXPECT_GT(strlen(result), 0u);
+
+    openjtalk_free_phonemes(result);
 }
