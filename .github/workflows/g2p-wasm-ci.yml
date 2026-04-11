@@ -24,6 +24,9 @@ concurrency:
 permissions:
   contents: read
 
+env:
+  NODE_VERSION: '24.x'
+
 jobs:
   lint:
     name: lint
@@ -38,7 +41,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: '22'
+          node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
           cache-dependency-path: src/wasm/g2p/package.json
 
@@ -61,7 +64,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        node-version: ['20']
+        node-version: ['24.x']
     defaults:
       run:
         working-directory: src/wasm/g2p
@@ -98,7 +101,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: '22'
+          node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
           cache-dependency-path: src/wasm/g2p/package.json
 
@@ -136,7 +139,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: '22'
+          node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
           cache-dependency-path: src/wasm/g2p/package.json
           registry-url: https://registry.npmjs.org

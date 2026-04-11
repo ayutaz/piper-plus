@@ -12,6 +12,9 @@ on:
       - 'src/wasm/**'
       - '.github/workflows/test-webassembly.yml'
 
+env:
+  NODE_VERSION: '24.x'
+
 jobs:
   test-openjtalk-web:
     runs-on: ubuntu-latest
@@ -25,7 +28,7 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@v6
       with:
-        node-version: '20'
+        node-version: ${{ env.NODE_VERSION }}
     
     - name: Setup Emscripten
       uses: mymindstorm/setup-emsdk@v14
