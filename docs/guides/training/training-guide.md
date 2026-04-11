@@ -468,11 +468,7 @@ uv run python -m piper_train.infer_onnx \
     --language en
 ```
 
-The input format to `piper_train.infer_onnx` is the same as `dataset.jsonl`: one line of JSON per utterance with `phoneme_ids` and `speaker_id` (multi-speaker only). Generate your own test file with [piper-phonemize](https://github.com/rhasspy/piper-phonemize/):
-
-```sh
-lib/piper_phonemize -l en-us --espeak-data lib/espeak-ng-data/ < my_test_sentences.txt > my_test_phonemes.jsonl
-```
+The input format to `piper_train.infer_onnx` is the same as `dataset.jsonl`: one line of JSON per utterance with `phoneme_ids` and `speaker_id` (multi-speaker only). For direct text-to-speech inference without pre-generating a JSONL file, use the `--text` option shown above. Alternatively, use the built-in `piper-plus-g2p` package to phonemize text programmatically (see `src/python/g2p/piper_plus_g2p/`).
 
 
 ### Multilingual Inference (8言語推論)

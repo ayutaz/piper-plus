@@ -110,7 +110,6 @@ dir Release\*.exe
 # 必須ファイルの確認
 $requiredFiles = @(
     "Release\piper.exe",
-    "Release\open_jtalk.exe",
     "Release\*.dll"
 )
 
@@ -260,26 +259,37 @@ uv run python -m piper_train.infer_onnx --help
 
 ### OpenJTalkが見つからない
 
-エラー: `OpenJTalk binary not found`
+エラー: `OpenJTalk dictionary not found` または初回実行時に辞書の自動ダウンロードが失敗する場合
+
+> **注意**: OpenJTalk は `piper.exe` に静的リンク済みです。別途バイナリは不要です。このエラーは辞書ファイルが見つからない場合に発生します。
 
 解決方法：
 
 ```powershell
-# 1. open_jtalk.exeの存在確認
-$openJtalkPath = Get-ChildItem -Path . -Filter "open_jtalk.exe" -Recurse
-if ($openJtalkPath) {
-    Write-Host "OpenJTalk found at: $($openJtalkPath.FullName)" -ForegroundColor Green
+# 1. piper.exeの存在確認（念のため）
+if (Test-Path ".\Release\piper.exe") {
+    Write-Host "piper.exe OK" -ForegroundColor Green
 } else {
-    Write-Host "OpenJTalk not found. Rebuilding..." -ForegroundColor Red
-    cmake --build . --config Release --target open_jtalk
+    Write-Host "piper.exe not found. Rebuild with: cmake --build . --config Release" -ForegroundColor Red
 }
 
-# 2. PATHに追加
-$buildPath = (Get-Location).Path + "\Release"
-$env:PATH = "$buildPath;$env:PATH"
+# 2. OpenJTalk辞書ディレクトリの確認
+$dictPath = "$env:APPDATA\piper\open_jtalk_dic_utf_8-1.11"
+if (Test-Path $dictPath) {
+    Write-Host "辞書ディレクトリが見つかりました: $dictPath" -ForegroundColor Green
+} else {
+    Write-Host "辞書ディレクトリが見つかりません。以下の手順でダウンロードしてください。" -ForegroundColor Red
+}
 
-# 3. または環境変数で指定
-[Environment]::SetEnvironmentVariable("OPENJTALK_PATH", "$buildPath\open_jtalk.exe", [EnvironmentVariableTarget]::User)
+# 3. 辞書を手動でダウンロード・展開する（自動DLが失敗した場合）
+New-Item -ItemType Directory -Path "$env:APPDATA\piper" -Force | Out-Null
+Invoke-WebRequest -Uri "https://jaist.dl.sourceforge.net/project/open-jtalk/Dictionary/open_jtalk_dic-1.11/open_jtalk_dic_utf_8-1.11.tar.gz" `
+    -OutFile "$env:TEMP\open_jtalk_dic_utf_8-1.11.tar.gz"
+tar -xzf "$env:TEMP\open_jtalk_dic_utf_8-1.11.tar.gz" -C "$env:APPDATA\piper"
+
+# 4. 辞書パスを環境変数で明示指定
+[Environment]::SetEnvironmentVariable("OPENJTALK_DICTIONARY_PATH", "$env:APPDATA\piper\open_jtalk_dic_utf_8-1.11", [EnvironmentVariableTarget]::User)
+Write-Host "OPENJTALK_DICTIONARY_PATH を設定しました。PowerShellを再起動してください。" -ForegroundColor Green
 ```
 
 ### 辞書のダウンロードエラー
@@ -465,25 +475,16 @@ foreach ($chunk in $chunks) {
 ## 既知の問題と回避策
 
 ### 1. テキストサイズ制限
-- **問題**: 4KB以上のテキストは処理できません（#69で対応予定）
-- **回避策**: 上記のテキスト分割スクリプトを使用
+- **問題**: ~~4KB以上のテキストは処理できません~~ — **解決済み (#69)**。`main.cpp` のstdinループは `getline()` で行単位読み取りを行うため、4KBの上限はありません。
 
 ### 2. パスの文字エンコーディング
-- **問題**: 非ASCII文字を含むパスで問題が発生（#71で対応予定）
-- **回避策**:
-  ```powershell
-  # ASCII文字のみのパスを使用
-  Set-Location "C:\workspace\piper"
-
-  # または一時ファイルを使用
-  $tempDir = [System.IO.Path]::GetTempPath()
-  ```
+- **問題**: ~~非ASCII文字を含むパスで問題が発生~~ — **解決済み (#71)**。コードは `std::filesystem::path` を使用し、Windows上でのUTF-8引数を正しく処理します。
 
 ### 3. 同時実行の制限
-- **問題**: スレッドセーフではありません
+- **現状**: 単一のエンジンインスタンスはスレッドセーフではありません。ただし、スレッドごとに独立したインスタンスを使用することで、複数スレッドからの並列実行が可能です。
 - **回避策**:
   ```powershell
-  # ミューテックスを使用した排他制御
+  # 単一インスタンスを共有する場合はミューテックスで排他制御
   $mutex = New-Object System.Threading.Mutex($false, "PiperTTSMutex")
   try {
       $mutex.WaitOne() | Out-Null
@@ -495,7 +496,7 @@ foreach ($chunk in $chunks) {
   ```
 
 ### 4. ウイルス対策ソフトの誤検知
-- **問題**: open_jtalk.exeがウイルスとして誤検知される場合がある
+- **問題**: ビルドした実行ファイルがウイルスとして誤検知される場合がある
 - **解決方法**: Windows Defenderの除外リストに追加
 
 ## パフォーマンス最適化
