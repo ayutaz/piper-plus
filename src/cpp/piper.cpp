@@ -2100,6 +2100,13 @@ std::vector<std::string> splitTextToSentences(
     return {};
   }
 
+  // Guard against invalid UTF-8: toCodepoints() uses utf8::unchecked
+  // internally and requires well-formed input.
+  if (!utf8::is_valid(text.begin(), text.end())) {
+    spdlog::warn("splitTextToSentences: invalid UTF-8 input, returning as single chunk");
+    return {text};
+  }
+
   using utf8_util::toCodepoints;
   using utf8_util::cpsToUtf8;
 

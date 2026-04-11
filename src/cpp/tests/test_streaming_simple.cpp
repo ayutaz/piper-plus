@@ -5,6 +5,8 @@
 #include <algorithm>
 #include <cstdint>
 
+#include "utf8_utils.hpp"
+
 // Simple test for streaming text chunking logic
 TEST(StreamingSimpleTest, TextChunkingEnglish) {
     std::string text = "Hello world. This is a test. Multiple sentences here!";
@@ -138,6 +140,7 @@ TEST(StreamingSimpleTest, SingleSentenceProducesOneChunk) {
 TEST(StreamingSimpleTest, DynamicChunkSizeCalculation) {
     // Codepoint-level helper that mirrors the fixed calculateDynamicChunkSize
     // in piper.cpp (Issue #343: byte-level was broken for CJK text).
+    using piper::utf8_util::toCodepoints;
     auto isPunctCodepoint = [](char32_t c) -> bool {
         switch (c) {
             case U'\u3002': case U'\u3001': case U'\uFF01': case U'\uFF1F':
@@ -145,19 +148,6 @@ TEST(StreamingSimpleTest, DynamicChunkSizeCalculation) {
                 return true;
             default: return false;
         }
-    };
-    auto toCodepoints = [](const std::string &s) -> std::vector<char32_t> {
-        std::vector<char32_t> cps;
-        for (size_t i = 0; i < s.size(); ) {
-            char32_t cp = 0;
-            unsigned char c = static_cast<unsigned char>(s[i]);
-            if (c < 0x80) { cp = c; i += 1; }
-            else if (c < 0xE0) { cp = (c & 0x1F) << 6 | (s[i+1] & 0x3F); i += 2; }
-            else if (c < 0xF0) { cp = (c & 0x0F) << 12 | (s[i+1] & 0x3F) << 6 | (s[i+2] & 0x3F); i += 3; }
-            else { cp = (c & 0x07) << 18 | (s[i+1] & 0x3F) << 12 | (s[i+2] & 0x3F) << 6 | (s[i+3] & 0x3F); i += 4; }
-            cps.push_back(cp);
-        }
-        return cps;
     };
     auto calculateDynamicChunkSize = [&](const std::string& text, size_t baseSize = 50) -> size_t {
         auto cps = toCodepoints(text);
