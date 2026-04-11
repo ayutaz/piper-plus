@@ -532,7 +532,6 @@ Wyoming Protocol TTS の Docker 環境と Home Assistant 統合ガイド。Docke
 | C | SSML `<break>` Auto-injection | 中 | Python/Rust/C#/Go (SSML対応4ランタイム) |
 
 **設定仕様:** `docs/spec/short-text-contract.toml`
-**ドキュメント:** `docs/features/short-text-synthesis.md`
 
 ---
 
