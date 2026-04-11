@@ -135,6 +135,7 @@ jobs:
       - name: Build piper (Unix)
         if: runner.os != 'Windows'
         run: |
+          mkdir -p build
           cd build
           
           # Set CMAKE flags
@@ -186,6 +187,7 @@ jobs:
       - name: Build piper (Windows)
         if: runner.os == 'Windows'
         run: |
+          New-Item -ItemType Directory -Force -Path build | Out-Null
           cd build
           
           # Set CMAKE flags

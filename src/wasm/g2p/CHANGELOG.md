@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Breaking Changes
 
-- **JapaneseG2P**: `voiceData` is no longer required or accepted in `jaDict`. Pass `{ dictData }` only.
+- **JapaneseG2P**: `voiceData` is no longer required or accepted in `jaDict`. Pass `{ dictFiles }` only (matching `DictLoader.loadJaDict()` return value). Legacy `{ dictData }` is still accepted for backward compatibility.
 - **DictLoader**: `includeVoice` and `voiceUrl` options removed from `loadJaDict()`. Return value no longer includes `voiceData`.
 - **TypeScript types**: `voiceData` removed from `JaDictData`, `includeVoice`/`voiceUrl` removed from `DictLoadOptions`.
 - **WASM ABI**: `_openjtalk_initialize()` now takes 1 parameter (dict path only), not 2.

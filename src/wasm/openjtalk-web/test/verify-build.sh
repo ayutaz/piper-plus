@@ -65,7 +65,12 @@ fi
 # === WASM binary size regression check ===
 echo ""
 echo "Checking WASM binary size..."
-WASM_SIZE=$(find dist/rust-wasm -name "*.wasm" -exec wc -c {} + 2>/dev/null | tail -1 | awk '{print $1}')
+WASM_FILE="dist/openjtalk.wasm"
+if [ -f "$WASM_FILE" ]; then
+    WASM_SIZE=$(wc -c < "$WASM_FILE")
+else
+    WASM_SIZE=0
+fi
 MAX_SIZE=5242880  # 5MB threshold — based on pre-removal baseline (~3MB dict + ~1.5MB WASM).
                   # Voice re-introduction would add ~2MB, exceeding this limit.
                   # Increase if new features legitimately grow the binary.

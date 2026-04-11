@@ -184,7 +184,21 @@ describe('G2P.create() factory with Japanese (mocked)', () => {
 // ---------------------------------------------------------------------------
 
 describe('G2P contract: voice-free initialization (M4)', () => {
-  it('should accept jaDict with dictData only (no voiceData required)', () => {
+  it('should accept jaDict with dictFiles (canonical field name)', () => {
+    const DICT_FILES = [
+        'char.bin', 'matrix.bin', 'sys.dic', 'unk.dic',
+        'left-id.def', 'pos-id.def', 'rewrite.def', 'right-id.def',
+    ];
+    const mockDict = {
+        dictFiles: Object.fromEntries(
+            DICT_FILES.map(f => [f, new ArrayBuffer(10)])
+        ),
+    };
+    const ja = new JapaneseG2P({ jaDict: mockDict });
+    assert.ok(ja, 'JapaneseG2P should initialize with dictFiles');
+  });
+
+  it('should accept jaDict with legacy dictData field (backward compat)', () => {
     const DICT_FILES = [
         'char.bin', 'matrix.bin', 'sys.dic', 'unk.dic',
         'left-id.def', 'pos-id.def', 'rewrite.def', 'right-id.def',
@@ -195,10 +209,10 @@ describe('G2P contract: voice-free initialization (M4)', () => {
         ),
     };
     const ja = new JapaneseG2P({ jaDict: mockDict });
-    assert.ok(ja, 'JapaneseG2P should initialize with dictData only');
+    assert.ok(ja, 'JapaneseG2P should still accept legacy dictData');
   });
 
-  it('should throw when dictData is missing from jaDict', () => {
+  it('should throw when dictFiles is missing from jaDict', () => {
     const ja = new JapaneseG2P({ jaDict: {} });
     ja._openjtalkModule = {
         FS: { mkdir: () => {}, writeFile: () => {} },
@@ -208,8 +222,8 @@ describe('G2P contract: voice-free initialization (M4)', () => {
     };
     assert.throws(
         () => ja._loadDict({}),
-        (err) => err.message.includes('dictData'),
-        '_loadDict({}) must throw an error mentioning dictData'
+        (err) => err.message.includes('dictFiles'),
+        '_loadDict({}) must throw an error mentioning dictFiles'
     );
   });
 

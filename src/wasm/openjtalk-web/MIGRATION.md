@@ -326,15 +326,16 @@ If you use `JapaneseG2P` or `DictLoader` directly from `@piper-plus/g2p`:
 **Before (v0.2.0):**
 ```js
 const ja = new JapaneseG2P({
-  jaDict: { dictData: {...}, voiceData: {...} }
+  jaDict: { dictFiles: {...}, voiceData: {...} }
 });
 ```
 
 **After (v0.3.0+):**
 ```js
-const ja = new JapaneseG2P({
-  jaDict: { dictData: {...} }
-});
+const loader = new DictLoader();
+const jaDict = await loader.loadJaDict();
+// jaDict = { dictFiles: { 'sys.dic': ArrayBuffer, ... } }
+const ja = new JapaneseG2P({ jaDict });
 ```
 
 `voiceData` is no longer accepted. `DictLoader.loadJaDict()` no longer accepts `includeVoice` or `voiceUrl` options.

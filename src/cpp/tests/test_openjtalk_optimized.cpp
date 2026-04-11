@@ -1,5 +1,4 @@
 #include <gtest/gtest.h>
-#include <gmock/gmock.h>
 #include <chrono>
 #include <vector>
 #include <thread>
@@ -25,17 +24,6 @@ static int unsetenv(const char* name) {
     return _putenv_s(name, "");
 }
 #endif
-
-// Helper: check that OpenJTalk is actually functional (dictionary + binary)
-// by attempting a real phoneme conversion
-static bool openjtalk_functional() {
-    char* phonemes = openjtalk_text_to_phonemes_optimized("テスト");
-    if (phonemes) {
-        openjtalk_free_phonemes(phonemes);
-        return true;
-    }
-    return false;
-}
 
 class OpenJTalkOptimizedTest : public ::testing::Test {
 protected:
@@ -310,7 +298,7 @@ TEST_F(OpenJTalkOptimizedTest, PhonemeExtractionWithoutVoice) {
     }
 
     EXPECT_GT(strlen(result), 0u);
-    EXPECT_THAT(std::string(result), ::testing::HasSubstr("k"));
+    EXPECT_NE(strstr(result, "k"), nullptr);
 
     openjtalk_free_phonemes(result);
 }
@@ -341,7 +329,7 @@ TEST_F(OpenJTalkOptimizedTest, StreamingWithoutVoice) {
     }
 
     EXPECT_GT(strlen(result), 0u);
-    EXPECT_THAT(std::string(result), ::testing::HasSubstr("t"));
+    EXPECT_NE(strstr(result, "t"), nullptr);
 
     openjtalk_free_phonemes(result);
 }

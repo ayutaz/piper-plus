@@ -86,6 +86,11 @@ jobs:
       working-directory: src/wasm/openjtalk-web
       run: node --test test/js/test-importmap.js
 
+    - name: Link local @piper-plus/g2p package
+      run: |
+        cd src/wasm/g2p && npm link
+        cd ../openjtalk-web && npm link @piper-plus/g2p
+
     - name: Install npm dependencies
       working-directory: src/wasm/openjtalk-web
       run: npm install

@@ -251,12 +251,10 @@ jobs:
           if [ "${{ runner.os }}" == "Windows" ]; then
             export ESPEAK_NG_DATA="${PWD}/espeak-ng-data"
             export PATH="${ONNXRUNTIME_ROOT_PATH}/lib:${PATH}"
-            export OPENJTALK_DICTIONARY_DIR="${PWD}/naist-jdic"
             export OPENJTALK_DICTIONARY_PATH="${PWD}/naist-jdic"
             export OPENJTALK_SKIP_TESTS_IF_UNAVAILABLE=1
           else
             export OPENJTALK_SKIP_TESTS_IF_UNAVAILABLE=1
-            export OPENJTALK_DICTIONARY_DIR="${PWD}/naist-jdic"
             # Use system dictionary if available, fallback to downloaded one
             if [ -d "/var/lib/mecab/dic/open-jtalk/naist-jdic" ]; then
               export OPENJTALK_DICTIONARY_PATH="/var/lib/mecab/dic/open-jtalk/naist-jdic"
