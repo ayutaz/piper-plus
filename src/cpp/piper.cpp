@@ -10,7 +10,6 @@
 #include <filesystem>
 #include <thread>
 #include <unordered_map>
-#include <regex>
 
 #include <onnxruntime_cxx_api.h>
 #ifdef __APPLE__
