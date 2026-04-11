@@ -390,14 +390,8 @@ jobs:
         working-directory: src/rust
         run: cargo test -p piper-plus-wasm --features ja-external --no-fail-fast
 
-      - name: Link local @piper-plus/g2p package
-        working-directory: .
-        run: |
-          cd src/wasm/g2p && npm link
-          cd ../openjtalk-web && npm link @piper-plus/g2p
-
-      - name: Install dependencies
-        run: npm install
+      - name: Install dependencies (with local @piper-plus/g2p)
+        run: npm install "@piper-plus/g2p@file:../g2p"
 
       - name: Run npm package tests
         run: npm run test:npm-package:all
