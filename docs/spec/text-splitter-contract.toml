@@ -23,13 +23,19 @@
 #   Issue: https://github.com/ayutaz/piper-plus/issues/346
 #   Spec:  docs/spec/text-splitter-contract.toml (this file)
 #
-# Divergence status (as of 2026-04-12):
+# Closing punctuation divergence (as of 2026-04-12):
 #   C++:    14/14 chars (fully conformant after Issue #346)
 #   Rust:   11/14 chars (missing U+201D, U+2019, U+00BB)
 #   C#:     11/14 chars (missing U+201D, U+2019, U+00BB)
 #   Go:      8/14 chars (missing U+0022, U+0027, U+FF3D, U+FF63, U+2019, U+00BB)
 #
-# Future work: align all runtimes to this 14-char canonical set.
+# Sentence terminator divergence (as of 2026-04-12):
+#   C++:    6/7 terminators (missing U+FF0E)
+#   Rust:   6/7 terminators (missing U+FF0E)
+#   C#:     6/7 terminators (missing U+FF0E)
+#   Go:     7/7 terminators (fully conformant)
+#
+# Future work: align all runtimes to the canonical character sets.
 
 # ---------------------------------------------------------------------------
 # Closing Punctuation Character Set (14 characters)
@@ -141,7 +147,7 @@ note = "Used in FR/PT/ES/SV as closing quotation mark. Not in original Rust/C#/G
 languages = ["FR", "PT", "ES", "SV"]
 
 # ---------------------------------------------------------------------------
-# Sentence Terminators (6 characters)
+# Sentence Terminators (7 characters)
 # ---------------------------------------------------------------------------
 # These are the characters that trigger sentence splitting. Closing
 # punctuation is only consumed when hasTerminator is true.
@@ -175,6 +181,12 @@ name = "Fullwidth Exclamation Mark (！)"
 char = "\uFF1F"
 codepoint = "U+FF1F"
 name = "Fullwidth Question Mark (？)"
+
+[[sentence_terminators]]
+char = "\uFF0E"
+codepoint = "U+FF0E"
+name = "Fullwidth Full Stop (．)"
+note = "Currently only in Go. Not in C++/Rust/C#. Covers CJK fullwidth period usage."
 
 # ---------------------------------------------------------------------------
 # Behavioral Contract

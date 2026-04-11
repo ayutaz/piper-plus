@@ -2191,6 +2191,13 @@ std::vector<std::string> splitTextToSentences(
         }
         punctEnd++;
       }
+      // Issue #346: Consume closing brackets/quotes after sentence terminator
+      // so that 「こんにちは。」 stays in one chunk (matches Rust/C# behavior).
+      if (hasTerminator) {
+        while (punctEnd < cpLen && isClosingPunctuation(cps[punctEnd])) {
+          punctEnd++;
+        }
+      }
       i = punctEnd - 1; // advance past punctuation run (for-loop will ++)
 
       // Split if this contains a sentence terminator, or chunk is too long
