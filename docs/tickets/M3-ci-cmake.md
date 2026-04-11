@@ -504,7 +504,50 @@ endforeach()
 
 **改善案:** CMake の `FetchContent` (3.11+) を使えば、ExternalProject よりもターゲット統合が自然になる。ただし FetchContent は configure フェーズでダウンロードを行うため、ビルド時ダウンロードが必要な場合は ExternalProject の方が適切。piper-plus の場合、依存ライブラリ (fmt, spdlog, OpenJTalk) はすべて CMake 対応であり、FetchContent への移行が可能。ただし OpenJTalk は pyopenjtalk-plus の tar.gz から SOURCE_SUBDIR で取り出す特殊なパターンを使っており、FetchContent では対応が難しい。
 
-### 6.7 やってはいけないこと / 次回はこうする
+### 6.7 第2回設計レビュー結果からの追加タスク (2026-04-11)
+
+5 チームによる M1/M2 設計レビューから M3 に追加すべきタスクが特定された。
+
+#### 追加タスク 3.8: `#if 0` CI lint ガード
+
+**ファイル:** `.github/workflows/_build-test-cpp.yml`
+**目的:** C++ ソースコードでの `#if 0` ブロック蓄積を CI で自動検出し、dead code の長期残存を構造的に防止する。M1 で除去された 139 行の `#if 0` ブロックの再発を防止する。
+
+```yaml
+- name: Check for dead code markers
+  run: |
+    if grep -rn '#if 0' src/cpp/ --include="*.c" --include="*.cpp" --include="*.h"; then
+      echo "FAIL: #if 0 blocks found in C++ source. Remove dead code or use feature flags."
+      exit 1
+    fi
+```
+
+**優先度:** 高 — 根本原因 (静的解析 CI の不在) に対する即効的対策
+
+#### 追加タスク 3.9: Docker `cpp-dev` HTS Engine ビルド除去
+
+**ファイル:** `docker/cpp-dev/Dockerfile`
+**目的:** Docker 開発環境が実 HTS Engine 1.10 をビルドしている無駄を除去。CMake が stub を自動処理するため不要。
+
+**変更内容:** HTS Engine のダウンロード・ビルドステップを削除し、`USE_HTS_ENGINE_STUB=ON` のみをサポートする。
+
+#### 追加タスク 3.10: `hts_engine_stub` 残存理由のインラインコメント
+
+**ファイル:** `src/cpp/tests/CMakeLists.txt`, `cmake/PiperLink.cmake`
+**目的:** stub リンク箇所に「なぜ stub が必要か」のコメントを追加し、将来のメンテナーの混乱を防止する。
+
+```cmake
+# hts_engine_stub: OpenJTalk ヘッダーが HTS_engine.h を transitively include するため、
+# 型定義互換シムとしてリンクが必要。HTS 合成機能は一切使用しない。
+target_link_libraries(${TEST_NAME} PRIVATE hts_engine_stub)
+```
+
+#### 追加タスク 3.11: CompilerSettings.cmake の `USE_HTS_ENGINE_STUB` 強制設定の除去
+
+**ファイル:** `cmake/CompilerSettings.cmake` (L41, L57), `cmake/ios.toolchain.cmake` (L25)
+**目的:** Android/iOS の `set(USE_HTS_ENGINE_STUB ON CACHE BOOL "" FORCE)` は、`OFF` パスを `FATAL_ERROR` にした後は冗長。除去して CMake の統一性を向上させる。
+
+### 6.8 やってはいけないこと / 次回はこうする
 
 **やってはいけないこと:**
 

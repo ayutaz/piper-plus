@@ -579,6 +579,45 @@ M2 の WASM ABI 変更と M4 のテスト追加を横断して見ると、WASM C
 
 M4 のテストピラミッドの観点から言えば、テスト 1-2 (C++ GoogleTest) は unit テスト、テスト 3-5 (JS contract) は integration テスト、テスト 6 (shell verify-build) は E2E テストに相当する。契約テストはこの unit/integration の境界に位置し、WASM ABI という境界面を明示的にカバーするレイヤーである。
 
+### 6.7 第2回設計レビュー結果 (2026-04-11)
+
+5 チームによるエージェントレビューの結果を以下にまとめる。
+
+#### アーキテクチャ評価
+
+- **即時除去は正当** — pre-1.0 パッケージで `includeVoice` のデフォルトが `false` であり、deprecation cycle は不要
+- **ABI 変更のリスクは LOW** — npm バンドル方式 (`@piper-plus/g2p` が自身の WASM を同梱) によりバージョン skew が発生しない。old JS + new WASM の組み合わせは Emscripten calling convention で extra arg が無視されるため安全
+- **struct-based init パターン** — 将来の ABI 拡張に備え、`OpenJTalkInitParams` 構造体ベースの init を検討する価値あり (低優先度)
+
+#### セキュリティ・信頼性
+
+| リスク | 深刻度 | 可能性 | 評価 |
+|--------|--------|--------|------|
+| WASM ABI break (2→1 引数) | 中 | 低 | **LOW** — npm バンドルで版 skew 回避 |
+| WASM バイナリ証明なし | 中 | 低 | **LOW** — CI が都度ビルド |
+| IndexedDB voice キャッシュ残留 (~50MB) | 低 | 低 | **M4 で clearCache() 手順を文書化** |
+| 辞書 DL の SHA-256 検証 | — | — | **変更なし** (DICT_SHA256 健在) |
+
+**CRITICAL/HIGH リスクなし。**
+
+#### コード品質
+
+- **コミット粒度** — 18 ファイル 1 コミットは borderline。理想は「C++ ABI (2 ファイル) → JS/TS API (16 ファイル)」の 2 コミット分割だが、ABI 一致制約から同一コミットは許容範囲
+- **TypeScript breaking change の文書化タイミング** — `voiceData` 除去とバージョンバンプは同一コミットが理想。M4 での遅延バンプは許容だが、CHANGELOG エントリの欠落期間が生じる
+- **残存 API は最小・クリーン** — `DictLoader.loadJaDict()` は `dictUrl` + `onProgress` のみ、`JaDictData` は `dictFiles` のみ。不要な optional パラメータなし
+
+#### API 互換性
+
+- **`piper-plus` (v0.3.1) メインパッケージに影響なし** — `PiperPlus.initialize()` は `voiceData` を渡していない
+- **Rust WASM (`src/rust/piper-wasm/`) に HTS 依存なし** — M2 スコープ外で正しい
+- **npm semver `0.2.0→0.3.0` は正しい** — pre-1.0 の MINOR = breaking change
+- **deprecation cycle 不要** — 影響範囲が `@piper-plus/g2p` の直接利用者のみで極めて狭い
+
+#### ビルドパイプライン
+
+- **JS/WASM 同期ゲートは健全** — `ci.yml` の `npm-package-tests` ジョブが WASM リビルド → JS テストを一貫実行。ABI 不一致は CI で検出可能
+- **`dist/rust-wasm/` コミット済みバイナリ** — ABI 変更後にローカル開発でサイレント破壊の可能性。`.gitignore` 追加またはビルド時バージョンチェックを推奨 (低優先度)
+
 ---
 
 ## 7. 後続タスクへの連絡事項

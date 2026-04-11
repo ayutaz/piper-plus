@@ -724,6 +724,74 @@ rationale = "VITS architecture makes HTS parametric synthesis unnecessary"
 3. **卒業**: 卒業条件を全て満たす。ON オプションを `FATAL_ERROR` に変更
 4. **削除**: 卒業から 1 リリース後。`cmake option()` 自体を削除。stub 要否を再評価
 
+### 6.17 第2回設計レビュー結果 (2026-04-11)
+
+5 チームによるエージェントレビューの結果を以下にまとめる。
+
+#### アーキテクチャ評価
+
+- **PhonemeBackend 抽象層は不要** — `openjtalk_api.h` が既に正しい境界を提供しており、voice 除去のために追加の抽象化を導入する必要はない。voice 汚染は binary-fallback コードパスに限定されていた
+- **Big-bang 削除は正当** — 機能置換ではなくデッドコード除去であるため、Strangler Fig パターンは不適切。atomic commit による一括削除が正しい判断
+- **wrapper/optimized の命名** — `openjtalk_phonemize.c` / `openjtalk_phonemize_external.c` の方が役割を正確に表す
+
+#### `openjtalk_initialize` 名前衝突
+
+3つの異なるシグネチャが同名を共有する潜在的ハザード:
+
+| 場所 | シグネチャ |
+|------|-----------|
+| `openjtalk_api.h` | `OpenJTalk* openjtalk_initialize()` — 引数なし |
+| `simple_wrapper.cpp` (WASM) | `int openjtalk_initialize(const char*)` — 1引数 |
+| M2前の `phonemizer_wrapper.cpp` | `int openjtalk_initialize(const char*, const char*)` — 2引数 |
+
+**推奨:** バージョン付き共有 ABI ヘッダーの導入:
+```c
+#define OPENJTALK_ABI_VERSION 2
+int openjtalk_phonemize_init(const char* dict_dir);
+```
+
+#### セキュリティ・信頼性
+
+| リスク | 深刻度 | 可能性 | 評価 |
+|--------|--------|--------|------|
+| 全 caller 確認済み (`get_openjtalk_voice_path` 参照 0 件) | — | — | **安全** |
+| `snprintf` バッファサイズ (`sizeof(command)` 使用) | 低 | 極低 | **安全** |
+| コマンドインジェクション (`openjtalk_is_safe_path()` で防御) | 低 | 極低 | **安全** |
+| 環境変数 `OPENJTALK_VOICE` テストフィクスチャ残存 | 低 | 極低 | **M4 でクリーンアップ** |
+
+**CRITICAL/HIGH リスクなし。**
+
+#### コード品質
+
+- **`test_dictionary_manager.cpp` のテストが薄い** — 活きているテストは 3 件のみ (他は TODO)。M4 でテスト補強が重要
+- **テスト順序の懸念** — M1/M2 で削除 → M4 でテスト追加という順序は、リグレッション未検出の窓を作る。理想は「テスト追加 → 削除 → CI 検証」だが、`get_openjtalk_voice_path()` が常に NULL を返す現状では実質的なリスクは低い
+- **`#ifdef _WIN32` の 12 箇所重複** — `setenv_portable()` / `unsetenv_portable()` 共通化を推奨 (M4 スコープ外)
+- **`// open_jtalk fallback: phoneme extraction only` コメント** — 設計判断の WHY を説明しており、**残すべき**
+
+#### ビルドシステム
+
+- **CI ゲートは健全** — `ci-required` ジョブが C++ テスト (3 OS × 2 ビルドタイプ) を集約。M1 の変更は `cpp-tests` パスフィルタで正しくキャッチされる
+- **Windows CI テストが薄い** — `test_gpu_device_id` のみ実行。M1 の Windows パス変更のテストカバレッジが不十分だが、コンパイル成功で最低限の検証は担保される
+
+#### API 互換性
+
+- **C API (`piper_plus.h`) への影響なし** — Unity/Dart/Godot 向け FFI 消費者は完全に安全
+- **Rust/C#/Go/Python に HTS voice コード残存なし** — M1 のスコープは正確
+- **`PIPER_PLUS_API_VERSION` のバンプ不要** — 公開 API 表面に変更なし
+
+#### `#if 0` 再発防止
+
+CI に grep ベース lint を追加し、デッドコード蓄積を構造的に防止すべき:
+```bash
+grep -rn '#if 0' src/cpp/ && exit 1
+```
+
+**推奨優先度:** `cppcheck --enable=unusedFunction` > `#if 0` lint > `clang-tidy` > カバレッジ CI
+
+#### `find_openjtalk_binary()` 重複
+
+`openjtalk_wrapper.c` と `openjtalk_optimized.c` に類似の binary 検索ロジックが存在。共有ユーティリティへの抽出を M4 スコープ外の後続リファクタリングとして推奨。
+
 ## 7. 後続タスクへの連絡事項
 
 ### M3 (CI / CMake) への引き継ぎ
