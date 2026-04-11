@@ -94,16 +94,6 @@ endif()
 # HTS Engine stub for OpenJTalk header compatibility.
 # piper-plus uses ONNX neural synthesis, not HTS Engine.
 
-# Legacy cache detection: reject stale -DUSE_HTS_ENGINE_STUB=OFF
-if(DEFINED USE_HTS_ENGINE_STUB AND NOT USE_HTS_ENGINE_STUB)
-  message(FATAL_ERROR
-    "USE_HTS_ENGINE_STUB=OFF is no longer supported. "
-    "piper-plus uses neural network synthesis (ONNX), not HTS Engine. "
-    "The HTS Engine stub is required for OpenJTalk header compatibility. "
-    "If you have a stale CMakeCache.txt with USE_HTS_ENGINE_STUB=OFF, "
-    "delete your build directory and re-run: rm -rf build (Unix) or rmdir /s /q build (Windows)")
-endif()
-
 # Use stub instead of real HTS Engine
 set(HTS_STUB_DIR "${CMAKE_CURRENT_BINARY_DIR}/hts_stub")
 file(MAKE_DIRECTORY ${HTS_STUB_DIR}/include)

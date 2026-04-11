@@ -34,10 +34,6 @@ This document lists all environment variables that can be used to configure Pipe
   export OPENJTALK_DATA_DIR=/opt/piper-data
   ```
 
-### OPENJTALK_VOICE (deprecated)
-- **Status**: Deprecated in v0.3.0
-- **Note**: piper-plus uses phonemizer-only mode for phoneme extraction. HTS voice files (`.htsvoice`) are no longer required or used. This environment variable is ignored if set.
-
 ## Dictionary Paths
 
 ### PIPER_DICTIONARIES_PATH

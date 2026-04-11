@@ -267,7 +267,7 @@ jobs:
             fi
             export ESPEAK_NG_DATA="${PWD}/espeak-ng-data"
 
-            echo "OpenJTalk env: DICTIONARY_PATH=$OPENJTALK_DICTIONARY_PATH VOICE=${OPENJTALK_VOICE:-<unset>}"
+            echo "OpenJTalk env: DICTIONARY_PATH=$OPENJTALK_DICTIONARY_PATH"
             echo "open_jtalk binary: $(which open_jtalk 2>/dev/null || echo 'not in PATH')"
           fi
 

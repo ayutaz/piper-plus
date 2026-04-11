@@ -309,7 +309,6 @@ If issues persist:
 | "Failed to initialize OpenJTalk" | Dictionary missing | Download/specify dictionary |
 | "Unknown multi-character phoneme" | Wrong phoneme format | Update to latest version |
 | "Checksum verification failed" | Corrupt download | Re-download files |
-| "HTS voice must be specified" | Outdated version | Update to latest piper-plus (v0.3.0+). HTS voice files are no longer required. |
 | "UnicodeEncodeError" (Windows) | Console encoding | Use chcp 65001 |
 
 ## Training Troubleshooting
