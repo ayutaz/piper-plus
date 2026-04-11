@@ -60,6 +60,7 @@ set(TEST_SOURCES
     test_multilingual_g2p.cpp
     test_swedish_phonemize.cpp
     test_short_text_mitigation.cpp
+    test_split_sentences.cpp
 )
 
 # Add Unix-only tests (require open_jtalk binary or Unix APIs)
@@ -121,6 +122,13 @@ foreach(test_source ${TEST_SOURCES})
         )
     endif()
     
+    # Link utf8_utils.hpp include path for split sentences test
+    if(${test_name} STREQUAL "test_split_sentences")
+        target_include_directories(${test_name} PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/..
+        )
+    endif()
+
     # Link additional dependencies for custom dictionary test
     if(${test_name} STREQUAL "test_custom_dictionary")
         target_sources(${test_name} PRIVATE

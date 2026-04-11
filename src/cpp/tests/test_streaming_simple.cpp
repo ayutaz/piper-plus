@@ -5,6 +5,8 @@
 #include <algorithm>
 #include <cstdint>
 
+#include "utf8_utils.hpp"
+
 // Simple test for streaming text chunking logic
 TEST(StreamingSimpleTest, TextChunkingEnglish) {
     std::string text = "Hello world. This is a test. Multiple sentences here!";
@@ -134,49 +136,52 @@ TEST(StreamingSimpleTest, SingleSentenceProducesOneChunk) {
     EXPECT_EQ(chunks[0], "This is a single sentence.");
 }
 
-// Test dynamic chunk size calculation
+// Test dynamic chunk size calculation (codepoint-based, mirrors piper.cpp)
 TEST(StreamingSimpleTest, DynamicChunkSizeCalculation) {
-    // Helper function to calculate dynamic chunk size (simplified version)
-    auto calculateDynamicChunkSize = [](const std::string& text, size_t baseSize = 50) -> size_t {
-        if (text.length() < baseSize * 2) {
-            return text.length();
+    // Codepoint-level helper that mirrors the fixed calculateDynamicChunkSize
+    // in piper.cpp (Issue #343: byte-level was broken for CJK text).
+    using piper::utf8_util::toCodepoints;
+    auto isPunctCodepoint = [](char32_t c) -> bool {
+        switch (c) {
+            case U'\u3002': case U'\u3001': case U'\uFF01': case U'\uFF1F':
+            case U'.': case U'!': case U'?': case U',': case U';': case U':':
+                return true;
+            default: return false;
         }
-        
+    };
+    auto calculateDynamicChunkSize = [&](const std::string& text, size_t baseSize = 50) -> size_t {
+        auto cps = toCodepoints(text);
+        size_t cpLen = cps.size();
+        if (cpLen < baseSize * 2) return cpLen;
         size_t punctCount = 0;
-        const std::string punctMarks = u8"。、！？.!?,;:";
-        for (size_t i = 0; i < text.length(); ++i) {
-            if (punctMarks.find(text[i]) != std::string::npos) {
-                punctCount++;
-            }
-        }
-        
-        float punctDensity = static_cast<float>(punctCount) / text.length();
-        if (punctDensity > 0.05f) {
-            return baseSize;
-        } else if (punctDensity < 0.02f) {
-            return baseSize * 3;
-        }
+        for (char32_t c : cps) { if (isPunctCodepoint(c)) punctCount++; }
+        float punctDensity = static_cast<float>(punctCount) / static_cast<float>(cpLen);
+        if (punctDensity > 0.05f) return baseSize;
+        if (punctDensity < 0.02f) return baseSize * 3;
         return baseSize * 2;
     };
-    
-    // Test short text
+
+    // Test short ASCII text (12 codepoints < 100)
     std::string shortText = "Hello world!";
-    EXPECT_EQ(calculateDynamicChunkSize(shortText), shortText.length());
-    
-    // Test high punctuation density (text length is 46, so it returns length)
+    EXPECT_EQ(calculateDynamicChunkSize(shortText), 12u);
+
+    // Test short ASCII text with punctuation (46 codepoints < 100)
     std::string highPunctText = "Hello! How are you? I'm fine, thanks. And you?";
     size_t highPunctSize = calculateDynamicChunkSize(highPunctText);
-    EXPECT_EQ(highPunctSize, highPunctText.length()) << "Short text should return its length";
-    
+    EXPECT_EQ(highPunctSize, 46u) << "Short text should return codepoint count";
+
     // Test low punctuation density with longer text
     std::string lowPunctText = "This is a very long text with minimal punctuation that goes on and on without many stops or breaks in the flow";
     size_t lowPunctSize = calculateDynamicChunkSize(lowPunctText);
-    EXPECT_EQ(lowPunctSize, 150) << "Low punctuation density should use 3x base size";
-    
-    // Test medium punctuation density (text length is 65, so it returns length)
-    std::string mediumPunctText = "This is a normal text. It has some punctuation, but not too much.";
-    size_t mediumPunctSize = calculateDynamicChunkSize(mediumPunctText);
-    EXPECT_EQ(mediumPunctSize, mediumPunctText.length()) << "Short text should return its length";
+    EXPECT_EQ(lowPunctSize, 150u) << "Low punctuation density should use 3x base size";
+
+    // Test Japanese text: codepoint count should be used, not byte count
+    // "こんにちは。今日はいい天気ですね。" = 17 codepoints (< 100), should return 17
+    std::string jaText = u8"こんにちは。今日はいい天気ですね。";
+    auto jaCps = toCodepoints(jaText);
+    EXPECT_EQ(jaCps.size(), 17u) << "Japanese text should have 17 codepoints";
+    size_t jaSize = calculateDynamicChunkSize(jaText);
+    EXPECT_EQ(jaSize, 17u) << "Short CJK text should return codepoint count, not byte count";
 }
 
 // Test crossfade functionality

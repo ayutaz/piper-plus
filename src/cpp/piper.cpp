@@ -10,7 +10,6 @@
 #include <filesystem>
 #include <thread>
 #include <unordered_map>
-#include <regex>
 
 #include <onnxruntime_cxx_api.h>
 #ifdef __APPLE__
@@ -30,6 +29,7 @@
 #include "json.hpp"
 #include "piper.hpp"
 #include "utf8.h"
+#include "utf8_utils.hpp"
 #include "wavfile.hpp"
 #include "openjtalk_phonemize.hpp"
 #include "phoneme_parser.hpp"
@@ -2044,24 +2044,41 @@ void phonemesToWavFile(PiperConfig &config, Voice &voice,
                   
 } /* phonemesToWavFile */
 
-// Helper function for calculating dynamic chunk size based on text characteristics
-static size_t calculateDynamicChunkSize(const std::string& text, size_t baseSize = 50) {
-  // Short texts should not be chunked
-  if (text.length() < baseSize * 2) {
-    return text.length();
+// Helper: is a codepoint a punctuation mark used for density calculation?
+static bool isPunctCodepoint(char32_t c) {
+  switch (c) {
+    case U'\u3002': // 。
+    case U'\u3001': // 、
+    case U'\uFF01': // ！
+    case U'\uFF1F': // ？
+    case U'.': case U'!': case U'?': case U',': case U';': case U':':
+      return true;
+    default:
+      return false;
   }
-  
-  // Calculate punctuation density
+}
+
+// Helper function for calculating dynamic chunk size based on text characteristics.
+// Operates on codepoints (not bytes) to correctly handle CJK text.
+static size_t calculateDynamicChunkSize(const std::vector<char32_t>& cps,
+                                        size_t baseSize = 50) {
+  size_t cpLen = cps.size();
+
+  // Short texts should not be chunked
+  if (cpLen < baseSize * 2) {
+    return cpLen;
+  }
+
+  // Calculate punctuation density (codepoint-level)
   size_t punctCount = 0;
-  const std::string punctMarks = u8"。、！？.!?,;:";
-  for (size_t i = 0; i < text.length(); ++i) {
-    if (punctMarks.find(text[i]) != std::string::npos) {
+  for (char32_t c : cps) {
+    if (isPunctCodepoint(c)) {
       punctCount++;
     }
   }
-  
+
   // Adjust chunk size based on punctuation density
-  float punctDensity = static_cast<float>(punctCount) / text.length();
+  float punctDensity = static_cast<float>(punctCount) / static_cast<float>(cpLen);
   if (punctDensity > 0.05f) {  // More than 5% punctuation - use smaller chunks
     return baseSize;
   } else if (punctDensity < 0.02f) {  // Less than 2% punctuation - use larger chunks
@@ -2070,7 +2087,10 @@ static size_t calculateDynamicChunkSize(const std::string& text, size_t baseSize
   return baseSize * 2;  // Medium density
 }
 
-// Split text into sentences at natural boundaries (public API)
+// Split text into sentences at natural boundaries (public API).
+// Uses codepoint-level iteration via utf8_utils to correctly handle
+// multibyte UTF-8 characters (CJK punctuation, etc.).
+// Fixes: https://github.com/ayutaz/piper-plus/issues/343
 std::vector<std::string> splitTextToSentences(
     const std::string &text,
     PhonemeType phonemeType,
@@ -2080,50 +2100,89 @@ std::vector<std::string> splitTextToSentences(
     return {};
   }
 
+  // Guard against invalid UTF-8: toCodepoints() uses utf8::unchecked
+  // internally and requires well-formed input.
+  if (!utf8::is_valid(text.begin(), text.end())) {
+    spdlog::warn("splitTextToSentences: invalid UTF-8 input, returning as single chunk");
+    return {text};
+  }
+
+  using utf8_util::toCodepoints;
+  using utf8_util::cpsToUtf8;
+
+  auto cps = toCodepoints(text);
+  size_t cpLen = cps.size();
+
   size_t baseSize = maxChunkSize > 0 ? maxChunkSize : 50;
-  size_t dynamicChunkSize = calculateDynamicChunkSize(text, baseSize);
+  size_t dynamicChunkSize = calculateDynamicChunkSize(cps, baseSize);
 
-  static const std::regex japaneseSentenceBoundary(u8"([。！？、]+)");
-  static const std::regex englishSentenceBoundary("([.!?,;:]+|\\s+(?:and|or|but|because|while|when|if|that|which)\\s+)");
+  // Classify whether a codepoint is a boundary punctuation mark
+  auto isBoundaryPunct = [&](char32_t c) -> bool {
+    if (phonemeType == MultilingualPhonemes) {
+      // Multilingual: CJK fullwidth + ASCII sentence-end + ellipsis
+      return c == U'\u3002' || c == U'\uFF01' || c == U'\uFF1F' ||
+             c == U'.' || c == U'!' || c == U'?' ||
+             c == U'\u2026'; // …
+    } else if (usesOpenJTalk(phonemeType)) {
+      // Japanese: fullwidth sentence-end + ideographic comma
+      return c == U'\u3002' || c == U'\uFF01' || c == U'\uFF1F' ||
+             c == U'\u3001'; // 、
+    } else {
+      // English/other: ASCII punctuation
+      return c == U'.' || c == U'!' || c == U'?' || c == U',' ||
+             c == U';' || c == U':';
+    }
+  };
 
-  // Multilingual pattern: JA/ZH fullwidth + EN/ES/FR/PT ASCII sentence-end punctuation.
-  // Note: usesOpenJTalk() returns true for MultilingualPhonemes too, so we must
-  // check phonemeType directly to avoid falling into the JA-only branch.
-  static const std::regex multilingualSentenceEnd(
-      u8"([。！？.!?]+|[…]+|[\\.]{3,})"
-  );
-
-  const std::regex& sentenceBoundary =
-    (phonemeType == MultilingualPhonemes)
-    ? multilingualSentenceEnd
-    : (usesOpenJTalk(phonemeType))
-      ? japaneseSentenceBoundary
-      : englishSentenceBoundary;
+  // Check if a codepoint is a sentence terminator (triggers immediate split)
+  auto isSentenceTerminator = [&](char32_t c) -> bool {
+    if (phonemeType == MultilingualPhonemes) {
+      return c == U'\u3002' || c == U'\uFF01' || c == U'\uFF1F' ||
+             c == U'.' || c == U'!' || c == U'?';
+    } else if (usesOpenJTalk(phonemeType)) {
+      // For Japanese, 、 (comma) is boundary but NOT a terminator
+      return c == U'\u3002' || c == U'\uFF01' || c == U'\uFF1F';
+    } else {
+      return c == U'.' || c == U'!' || c == U'?';
+    }
+  };
 
   std::vector<std::string> chunks;
-  std::sregex_token_iterator iter(text.begin(), text.end(), sentenceBoundary, {-1, 1});
-  std::sregex_token_iterator end;
+  size_t sentenceStart = 0;
 
-  std::string currentChunk;
-  for (; iter != end; ++iter) {
-    std::string token = *iter;
-    if (token.empty()) continue;
+  for (size_t i = 0; i < cpLen; ++i) {
+    char32_t c = cps[i];
 
-    if (std::regex_match(token, sentenceBoundary)) {
-      currentChunk += token;
-      if (!currentChunk.empty() &&
-          (token.find_first_of(u8"。！？.!?") != std::string::npos ||
-           currentChunk.length() > dynamicChunkSize)) {
-        chunks.push_back(currentChunk);
-        currentChunk.clear();
+    if (isBoundaryPunct(c)) {
+      // Consume the entire run of boundary punctuation
+      bool hasTerminator = isSentenceTerminator(c);
+      size_t punctEnd = i + 1;
+      while (punctEnd < cpLen && isBoundaryPunct(cps[punctEnd])) {
+        if (isSentenceTerminator(cps[punctEnd])) {
+          hasTerminator = true;
+        }
+        punctEnd++;
       }
-    } else {
-      currentChunk += token;
+      i = punctEnd - 1; // advance past punctuation run (for-loop will ++)
+
+      // Split if this contains a sentence terminator, or chunk is too long
+      size_t chunkLen = punctEnd - sentenceStart;
+      if (hasTerminator || chunkLen > dynamicChunkSize) {
+        std::string chunk = cpsToUtf8(cps, sentenceStart, chunkLen);
+        if (!chunk.empty()) {
+          chunks.push_back(chunk);
+        }
+        sentenceStart = punctEnd;
+      }
     }
   }
 
-  if (!currentChunk.empty()) {
-    chunks.push_back(currentChunk);
+  // Emit any remaining text
+  if (sentenceStart < cpLen) {
+    std::string remaining = cpsToUtf8(cps, sentenceStart, cpLen - sentenceStart);
+    if (!remaining.empty()) {
+      chunks.push_back(remaining);
+    }
   }
 
   return chunks;
