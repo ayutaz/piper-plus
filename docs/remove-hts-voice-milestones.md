@@ -1,3 +1,7 @@
+> **Status: 完了 (2026-04-11)** — 全4マイルストーン (M1-M4) が完了しました。この文書は計画段階で作成されたものであり、実際の実装と差異がある箇所があります。最新の状態は [チケット一覧](tickets/README.md) を参照してください。
+
+---
+
 # HTS Voice 依存除去 — マイルストーン
 
 > 参照: [docs/remove-hts-voice-dependency.md](remove-hts-voice-dependency.md)

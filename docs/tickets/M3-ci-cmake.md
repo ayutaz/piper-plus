@@ -584,7 +584,7 @@ HTS voice 依存除去による定量的な改善を計測すべき:
 
 2. **~~`hts_engine_external` ターゲットの除去を検討~~:** :white_check_mark: 第3回レビューで M3 内で実施済み (commit de23606b)。孤立ターゲットを削除。
 
-3. **`PiperLink.cmake` L4 のコメント更新:** `HTS_ENGINE_DIR` への言及がコメントに残っている。M4 でコメントを更新する。
+3. **~~`PiperLink.cmake` L4 のコメント更新~~:** :white_check_mark: 第4回レビューで `HTS_ENGINE_DIR` → `HTS_STUB_DIR` にリネーム済み (commit d055cc60)。
 
 4. **CI 検証ステップの追加:** M4 で `_build-test-cpp.yml` に `USE_HTS_ENGINE_STUB=OFF` の拒否テストを追加することを推奨:
    ```yaml
@@ -597,6 +597,7 @@ HTS voice 依存除去による定量的な改善を計測すべき:
          exit 1
        fi
    ```
+   > **Note (2026-04-11):** この CI ステップは M4 スコープ外として見送り。`USE_HTS_ENGINE_STUB=OFF` は `FATAL_ERROR` で拒否されるため、通常の CI ビルドで間接的に検証される。
 
 5. **`examples/test_japanese_tts.sh` の削除:** このスクリプトは HTS voice を前提としており、M3 のスコープ外とした。M4 で削除または phonemizer ベースに書き換える。
 

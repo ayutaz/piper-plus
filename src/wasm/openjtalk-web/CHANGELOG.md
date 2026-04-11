@@ -5,6 +5,34 @@ All notable changes to the `piper-plus` npm package will be documented in this f
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-04-11
+
+### Breaking Changes
+
+- **@piper-plus/g2p dependency**: Updated from `^0.2.0` to `^0.3.0`. The `@piper-plus/g2p` package removed `voiceData` from its API (see `@piper-plus/g2p` CHANGELOG for details).
+
+### Changed
+
+- Bumped `@piper-plus/g2p` peer dependency to `^0.3.0`
+
+## [0.3.0] - 2026-04-11
+
+### Breaking Changes
+
+- **WASM ABI**: `_openjtalk_initialize()` now takes 1 parameter (dictionary path only). The voice path parameter has been removed.
+- **HTS voice dependency removed**: `.htsvoice` files are no longer downloaded, cached, or referenced. The phonemization pipeline operates in dictionary-only mode.
+
+### Removed
+
+- HTS voice file support: all voice-related download, caching, and initialization logic
+- `voice` parameter from `_openjtalk_initialize()` WASM export
+- Voice file checks in `verify-build.sh`
+
+### Added
+
+- Build verification checks: voice file absence check, WASM binary size regression check
+- Contract tests verifying voice-free initialization
+
 ## [0.2.0] - 2026-04-02
 
 ### Changed
@@ -70,3 +98,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - WebGPU session manager with WASM fallback
 - Streaming synthesis pipeline
 - TypeScript type definitions
+
+[0.3.0]: https://github.com/ayutaz/piper-plus/releases/tag/npm-v0.3.0
+[0.4.0]: https://github.com/ayutaz/piper-plus/releases/tag/npm-v0.4.0
