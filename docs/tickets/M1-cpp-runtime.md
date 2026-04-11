@@ -402,11 +402,11 @@ After:
 
 - [ ] **ビルド成功**: `cmake --build build` がエラーなく完了する
 - [ ] **テスト通過**: `ctest` の全テストが PASS または SKIP (FAIL なし)
-- [ ] **シンボル残存確認 1**: `grep -r "get_openjtalk_voice_path" src/cpp/` が 0 件
-- [ ] **シンボル残存確認 2**: `grep -r "HTS_VOICE_URL" src/cpp/` が 0 件
-- [ ] **シンボル残存確認 3**: `grep -r "HTS_VOICE_FILENAME\|HTS_VOICE_DIR\|HTS_VOICE_FILE\|HTS_VOICE_SHA256" src/cpp/` が 0 件
-- [ ] **ヘッダー確認**: `src/cpp/openjtalk_dictionary_manager.h` に `voice` を含む行がないこと
-- [ ] **dead code 確認**: `grep -r "#if 0" src/cpp/openjtalk_dictionary_manager.c` が 0 件
+- [x] **シンボル残存確認 1**: `grep -r "get_openjtalk_voice_path" src/cpp/` が 0 件
+- [x] **シンボル残存確認 2**: `grep -r "HTS_VOICE_URL" src/cpp/` が 0 件
+- [x] **シンボル残存確認 3**: `grep -r "HTS_VOICE_FILENAME\|HTS_VOICE_DIR\|HTS_VOICE_FILE\|HTS_VOICE_SHA256" src/cpp/` が 0 件
+- [x] **ヘッダー確認**: `src/cpp/openjtalk_dictionary_manager.h` に `voice` を含む行がないこと
+- [x] **dead code 確認**: `grep -r "#if 0" src/cpp/openjtalk_dictionary_manager.c` が 0 件
 
 ## 5. 懸念事項とレビュー項目
 
@@ -442,14 +442,14 @@ After:
 
 ### 5.6 レビュー時チェックリスト
 
-- [ ] 変更が 5 ファイルのみであること (スコープ超過がないこと)
-- [ ] `get_openjtalk_voice_path` シンボルが `src/cpp/` 配下で完全に消滅していること
-- [ ] HTS voice 関連の 6 定数 (`HTS_VOICE_URL` 等) が消滅していること
-- [ ] `#if 0` ブロックが `openjtalk_dictionary_manager.c` から消滅していること
-- [ ] wrapper/optimized の `#ifdef _WIN32` 分岐が After コードと一致していること
-- [ ] `openjtalk_dictionary_manager.h` のエクスポート関数が `get_openjtalk_dictionary_path()` と `ensure_openjtalk_dictionary()` の 2 つのみであること
-- [ ] `HTSVoicePath` テストが削除されていること
-- [ ] コミットが 1 つであること (分割されていないこと)
+- [x] 変更が 5 ファイルのみであること (スコープ超過がないこと)
+- [x] `get_openjtalk_voice_path` シンボルが `src/cpp/` 配下で完全に消滅していること
+- [x] HTS voice 関連の 6 定数 (`HTS_VOICE_URL` 等) が消滅していること
+- [x] `#if 0` ブロックが `openjtalk_dictionary_manager.c` から消滅していること
+- [x] wrapper/optimized の `#ifdef _WIN32` 分岐が After コードと一致していること
+- [x] `openjtalk_dictionary_manager.h` のエクスポート関数が `get_openjtalk_dictionary_path()` と `ensure_openjtalk_dictionary()` の 2 つのみであること
+- [x] `HTSVoicePath` テストが削除されていること
+- [x] コミットが 1 つであること (分割されていないこと)
 
 ## 6. ゼロから作り直すとしたら
 

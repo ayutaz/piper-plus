@@ -302,8 +302,8 @@ M2 完了後の受入基準として以下を実行する:
 
 - [ ] `@piper-plus/g2p` のテスト (`npm test`) が全て PASS
 - [ ] openjtalk-web のテスト (`test-cli.js` 等) が voice なしで PASS (WASM ビルドが利用可能な環境)
-- [ ] `grep -r "voiceData\|includeVoice\|VOICE_CACHE_KEY\|htsvoice" src/wasm/g2p/src/` が 0 件
-- [ ] `grep -r "loadVoiceFile\|mei_normal" src/wasm/openjtalk-web/test/` が 0 件
+- [x] `grep -r "voiceData\|includeVoice\|VOICE_CACHE_KEY\|htsvoice" src/wasm/g2p/src/` が 0 件
+- [x] `grep -r "loadVoiceFile\|mei_normal" src/wasm/openjtalk-web/test/` が 0 件
 - [ ] `verify-build.sh` が voice チェックなしで PASS
 
 ---
@@ -345,13 +345,13 @@ piper-plus の npm ダウンロード数と `includeVoice: true` の使用事例
 
 ### 5.4 レビュー項目チェックリスト
 
-- [ ] WASM C++ シグネチャと JS 呼び出しの引数数が一致しているか
-- [ ] `_loadDict()` のエラーメッセージが `voiceData` を要求しなくなっているか
-- [ ] TypeScript 型定義が実装と一致しているか
-- [ ] `prepare-dictionary.sh` の assets.json テンプレートから voices が削除されているか
-- [ ] `pre-check.sh` のセクション番号がリナンバリングされているか
-- [ ] `test-headless.js` の生成 HTML テンプレート内の voice 参照が全て除去されているか
-- [ ] `simple-test.html` の `_openjtalk_initialize` 呼び出しが 1 引数になっているか
+- [x] WASM C++ シグネチャと JS 呼び出しの引数数が一致しているか
+- [x] `_loadDict()` のエラーメッセージが `voiceData` を要求しなくなっているか
+- [x] TypeScript 型定義が実装と一致しているか
+- [x] `prepare-dictionary.sh` の assets.json テンプレートから voices が削除されているか
+- [x] `pre-check.sh` のセクション番号がリナンバリングされているか
+- [x] `test-headless.js` の生成 HTML テンプレート内の voice 参照が全て除去されているか
+- [x] `simple-test.html` の `_openjtalk_initialize` 呼び出しが 1 引数になっているか
 
 ### 5.5 WASM ビルド CI トリガー (重大度: 低)
 
