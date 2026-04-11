@@ -101,30 +101,30 @@ if(DEFINED USE_HTS_ENGINE_STUB AND NOT USE_HTS_ENGINE_STUB)
     "piper-plus uses neural network synthesis (ONNX), not HTS Engine. "
     "The HTS Engine stub is required for OpenJTalk header compatibility. "
     "If you have a stale CMakeCache.txt with USE_HTS_ENGINE_STUB=OFF, "
-    "delete your build directory and re-run: rm -rf build && cmake -B build")
+    "delete your build directory and re-run: rm -rf build (Unix) or rmdir /s /q build (Windows)")
 endif()
 
 # Use stub instead of real HTS Engine
-set(HTS_ENGINE_DIR "${CMAKE_CURRENT_BINARY_DIR}/hts_stub")
-file(MAKE_DIRECTORY ${HTS_ENGINE_DIR}/include)
-file(MAKE_DIRECTORY ${HTS_ENGINE_DIR}/lib)
+set(HTS_STUB_DIR "${CMAKE_CURRENT_BINARY_DIR}/hts_stub")
+file(MAKE_DIRECTORY ${HTS_STUB_DIR}/include)
+file(MAKE_DIRECTORY ${HTS_STUB_DIR}/lib)
 
 # Copy stub files
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/cmake/hts_engine_stub.h
-               ${HTS_ENGINE_DIR}/include/HTS_engine.h COPYONLY)
+               ${HTS_STUB_DIR}/include/HTS_engine.h COPYONLY)
 
 # Build stub library
 add_library(hts_engine_stub STATIC ${CMAKE_CURRENT_SOURCE_DIR}/cmake/hts_engine_stub.c)
-target_include_directories(hts_engine_stub PUBLIC ${HTS_ENGINE_DIR}/include)
+target_include_directories(hts_engine_stub PUBLIC ${HTS_STUB_DIR}/include)
 set_target_properties(hts_engine_stub PROPERTIES POSITION_INDEPENDENT_CODE ON)
 if(WIN32)
   set_target_properties(hts_engine_stub PROPERTIES
-    ARCHIVE_OUTPUT_DIRECTORY ${HTS_ENGINE_DIR}/lib
+    ARCHIVE_OUTPUT_DIRECTORY ${HTS_STUB_DIR}/lib
     OUTPUT_NAME HTSEngine
     PREFIX "")
 else()
   set_target_properties(hts_engine_stub PROPERTIES
-    ARCHIVE_OUTPUT_DIRECTORY ${HTS_ENGINE_DIR}/lib
+    ARCHIVE_OUTPUT_DIRECTORY ${HTS_STUB_DIR}/lib
     OUTPUT_NAME HTSEngine
     PREFIX "lib")
 endif()
@@ -132,14 +132,14 @@ endif()
 # Ensure the stub library is built and create a symlink/copy for compatibility
 if(WIN32)
   add_custom_command(TARGET hts_engine_stub POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E make_directory ${HTS_ENGINE_DIR}/lib
-    COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:hts_engine_stub> ${HTS_ENGINE_DIR}/lib/HTSEngine.lib
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${HTS_STUB_DIR}/lib
+    COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:hts_engine_stub> ${HTS_STUB_DIR}/lib/HTSEngine.lib
     COMMENT "Ensuring HTS Engine stub library is in expected location (Windows)"
   )
 else()
   add_custom_command(TARGET hts_engine_stub POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E make_directory ${HTS_ENGINE_DIR}/lib
-    COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:hts_engine_stub> ${HTS_ENGINE_DIR}/lib/libHTSEngine.a
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${HTS_STUB_DIR}/lib
+    COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:hts_engine_stub> ${HTS_STUB_DIR}/lib/libHTSEngine.a
     COMMENT "Ensuring HTS Engine stub library is in expected location (Unix)"
   )
 endif()

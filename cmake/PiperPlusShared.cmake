@@ -19,7 +19,7 @@ else()
 endif()
 
 # Dependencies (same as piper/test_piper)
-add_dependencies(piper_plus fmt_external spdlog_external openjtalk_external)
+add_dependencies(piper_plus fmt_external spdlog_external openjtalk_external hts_engine_stub)
 if(TARGET onnxruntime_external)
   add_dependencies(piper_plus onnxruntime_external)
 endif()
@@ -32,7 +32,7 @@ target_include_directories(piper_plus
     ${SPDLOG_DIR}/include
     ${OPENJTALK_DIR}/include
     ${OPENJTALK_DIR}/include/openjtalk
-    ${HTS_ENGINE_DIR}/include
+    ${HTS_STUB_DIR}/include
   PUBLIC
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )

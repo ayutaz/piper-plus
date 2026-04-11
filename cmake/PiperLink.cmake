@@ -1,7 +1,7 @@
 # cmake/PiperLink.cmake
 # Linking, include directories, and compile definitions for piper / test_piper
 # executables. Must be included AFTER ExternalDeps.cmake and OnnxRuntime.cmake
-# so that FMT_DIR, SPDLOG_DIR, OPENJTALK_DIR, HTS_ENGINE_DIR, ONNXRUNTIME_DIR
+# so that FMT_DIR, SPDLOG_DIR, OPENJTALK_DIR, HTS_STUB_DIR, ONNXRUNTIME_DIR
 # etc. are already set.
 
 # ---- Platform-specific extra libraries and static linking ----
@@ -103,10 +103,10 @@ if(TARGET piper)
 
   # Include HTSEngine headers (required for OpenJTalk)
   target_include_directories(piper PUBLIC
-    ${HTS_ENGINE_DIR}/include
+    ${HTS_STUB_DIR}/include
   )
   target_include_directories(test_piper PUBLIC
-    ${HTS_ENGINE_DIR}/include
+    ${HTS_STUB_DIR}/include
   )
 
   # Link OpenJTalk static library (r9y9 fork: single "openjtalk" lib with MeCab included)

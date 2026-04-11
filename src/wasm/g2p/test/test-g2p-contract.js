@@ -217,15 +217,19 @@ describe('G2P contract: voice-free initialization (M4)', () => {
     const { DictLoader } = await import('../src/dict-loader.js');
     const loader = new DictLoader();
 
+    // Primary: API contract verification
     assert.equal(typeof loader.loadJaDict, 'function',
         'DictLoader must have loadJaDict method');
-
     assert.strictEqual(
         loader.loadJaDict.length <= 1, true,
         'loadJaDict should accept at most 1 parameter (options without includeVoice)'
     );
+  });
 
-    // Source-level structural check for defense in depth
+  it('dict-loader.js source should not reference voice concepts (defense-in-depth)', async () => {
+    // NOTE: This is a defense-in-depth static check, not a behavioral test.
+    // If this breaks due to refactoring (e.g., variable rename), it is safe to
+    // update the assertions — the behavioral tests above are authoritative.
     const { default: fs } = await import('node:fs');
     const src = fs.readFileSync(
         new URL('../src/dict-loader.js', import.meta.url), 'utf-8'

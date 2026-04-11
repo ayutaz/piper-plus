@@ -66,7 +66,9 @@ fi
 echo ""
 echo "Checking WASM binary size..."
 WASM_SIZE=$(find dist/rust-wasm -name "*.wasm" -exec wc -c {} + 2>/dev/null | tail -1 | awk '{print $1}')
-MAX_SIZE=5242880  # 5MB threshold
+MAX_SIZE=5242880  # 5MB threshold — based on pre-removal baseline (~3MB dict + ~1.5MB WASM).
+                  # Voice re-introduction would add ~2MB, exceeding this limit.
+                  # Increase if new features legitimately grow the binary.
 if [ -n "$WASM_SIZE" ] && [ "$WASM_SIZE" -gt "$MAX_SIZE" ]; then
     echo -e "  ${RED}FAIL${NC}: WASM binary too large (${WASM_SIZE} bytes > ${MAX_SIZE})"
     FAILED=1

@@ -103,7 +103,7 @@ static const char* find_openjtalk_binary() {
     const char* env_path = getenv("OPENJTALK_PHONEMIZER_PATH");
     if (env_path) {
         fprintf(stderr, "DEBUG: OPENJTALK_PHONEMIZER_PATH = %s\n", env_path);
-        if (access(env_path, F_OK) == 0) {
+        if (access(env_path, F_OK) == 0 && openjtalk_is_safe_path(env_path)) {
             strncpy(g_openjtalk_bin_path, env_path, sizeof(g_openjtalk_bin_path) - 1);
             g_openjtalk_bin_path[sizeof(g_openjtalk_bin_path) - 1] = '\0';
 #ifdef _WIN32
@@ -112,6 +112,8 @@ static const char* find_openjtalk_binary() {
             pthread_mutex_unlock(&g_path_mutex);
 #endif
             return g_openjtalk_bin_path;
+        } else if (access(env_path, F_OK) == 0) {
+            fprintf(stderr, "WARNING: OPENJTALK_PHONEMIZER_PATH rejected by path validation\n");
         } else {
             fprintf(stderr, "DEBUG: File not found at OPENJTALK_PHONEMIZER_PATH\n");
         }
