@@ -210,12 +210,18 @@ static char* execute_with_pipes_unix(const char* openjtalk_bin, const char* dic_
     int stdin_pipe[2], stdout_pipe[2];
     pid_t pid;
     
+    // Validate paths before execution
+    if (!openjtalk_is_safe_path(openjtalk_bin) ||
+        !openjtalk_is_safe_path(dic_path)) {
+        return NULL;
+    }
+
     // Create pipes
     if (pipe(stdin_pipe) == -1 || pipe(stdout_pipe) == -1) {
         perror("pipe");
         return NULL;
     }
-    
+
     // Fork process
     pid = fork();
     if (pid == -1) {
@@ -246,15 +252,9 @@ static char* execute_with_pipes_unix(const char* openjtalk_bin, const char* dic_
         if (is_phonemizer) {
             execlp(openjtalk_bin, openjtalk_bin, "-x", dic_path, "-ot", "/dev/stdout", "/dev/stdin", NULL);
         } else {
-            // Need HTS voice for regular open_jtalk
-            const char* voice_path = get_openjtalk_voice_path();
-            if (voice_path) {
-                execlp(openjtalk_bin, openjtalk_bin, "-x", dic_path, "-m", voice_path,
-                       "-ow", "/dev/null", "-ot", "/dev/stdout", "/dev/stdin", NULL);
-            } else {
-                execlp(openjtalk_bin, openjtalk_bin, "-x", dic_path,
-                       "-ow", "/dev/null", "-ot", "/dev/stdout", "/dev/stdin", NULL);
-            }
+            // open_jtalk fallback: phoneme extraction only
+            execlp(openjtalk_bin, openjtalk_bin, "-x", dic_path,
+                   "-ow", "/dev/null", "-ot", "/dev/stdout", "/dev/stdin", NULL);
         }
         
         // If exec fails, use _exit() to avoid running atexit handlers
@@ -397,25 +397,38 @@ static char* execute_with_pipes_windows(const char* openjtalk_bin, const char* d
     si.hStdError = GetStdHandle(STD_ERROR_HANDLE);
     si.dwFlags |= STARTF_USESTDHANDLES;
     
+    // Validate paths before command construction
+    if (!openjtalk_is_safe_path(openjtalk_bin) ||
+        !openjtalk_is_safe_path(dic_path)) {
+        CloseHandle(stdin_read);
+        CloseHandle(stdin_write);
+        CloseHandle(stdout_read);
+        CloseHandle(stdout_write);
+        return NULL;
+    }
+
     // Prepare command line
     char command[4096];
     int is_phonemizer = strstr(openjtalk_bin, "phonemizer") != NULL ? 1 : 0;
-    
+
+    // Pre-flight buffer length check to prevent silent truncation
+    if (strlen(openjtalk_bin) + strlen(dic_path) + 64 > sizeof(command)) {
+        CloseHandle(stdin_read);
+        CloseHandle(stdin_write);
+        CloseHandle(stdout_read);
+        CloseHandle(stdout_write);
+        return NULL;
+    }
+
     if (is_phonemizer) {
         snprintf(command, sizeof(command),
                  "\"%s\" -x \"%s\" -ot - -",
                  openjtalk_bin, dic_path);
     } else {
-        const char* voice_path = get_openjtalk_voice_path();
-        if (voice_path) {
-            snprintf(command, sizeof(command),
-                     "\"%s\" -x \"%s\" -m \"%s\" -ow NUL -ot - -",
-                     openjtalk_bin, dic_path, voice_path);
-        } else {
-            snprintf(command, sizeof(command),
-                     "\"%s\" -x \"%s\" -ow NUL -ot - -",
-                     openjtalk_bin, dic_path);
-        }
+        // open_jtalk fallback: phoneme extraction only
+        snprintf(command, sizeof(command),
+                 "\"%s\" -x \"%s\" -ow NUL -ot - -",
+                 openjtalk_bin, dic_path);
     }
     
     // Create process

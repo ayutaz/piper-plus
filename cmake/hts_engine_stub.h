@@ -9,7 +9,7 @@ extern "C" {
 #endif
 
 /* Version */
-#define HTS_ENGINE_VERSION "1.10"
+#define HTS_ENGINE_VERSION "1.10-stub"
 
 /* Stub structures - complete definitions for compilation */
 typedef struct _HTS_Engine {

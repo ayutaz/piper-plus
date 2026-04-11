@@ -42,8 +42,9 @@ target_include_directories(piper_common PUBLIC
   ${SPDLOG_DIR}/include
   ${OPENJTALK_DIR}/include
   ${OPENJTALK_DIR}/include/openjtalk
-  ${HTS_ENGINE_DIR}/include
+  ${HTS_STUB_DIR}/include
 )
+add_dependencies(piper_common hts_engine_stub)
 target_compile_definitions(piper_common PUBLIC
   _PIPER_VERSION=${piper_version}
   SPDLOG_FMT_EXTERNAL=1

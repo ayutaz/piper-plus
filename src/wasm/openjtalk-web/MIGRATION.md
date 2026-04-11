@@ -306,3 +306,73 @@ const tts = await PiperPlus.initialize({
 ### My app stored dictionary data in IndexedDB. Will that be cleaned up automatically?
 
 No. v0.2.0 simply stops using IndexedDB for dictionary storage. The old data (~103MB) will remain until explicitly deleted. See Step 7 in the Migration Steps above for a cleanup snippet.
+
+---
+
+# Migration Guide: piper-plus v0.2.0 to v0.4.0
+
+## Overview
+
+piper-plus v0.3.0/v0.4.0 removes the HTS voice file dependency entirely. The `_openjtalk_initialize()` WASM function now takes only a dictionary path (1 parameter instead of 2). The `@piper-plus/g2p` package (v0.3.0) removes `voiceData` from its API.
+
+If you are using the high-level `PiperPlus` API, **no code changes are required** — the API is unchanged. These are internal breaking changes that only affect direct WASM or `@piper-plus/g2p` usage.
+
+## Breaking Changes
+
+### 1. `@piper-plus/g2p` v0.3.0: `voiceData` removed
+
+If you use `JapaneseG2P` or `DictLoader` directly from `@piper-plus/g2p`:
+
+**Before (v0.2.0):**
+```js
+const ja = new JapaneseG2P({
+  jaDict: { dictFiles: {...}, voiceData: {...} }
+});
+```
+
+**After (v0.3.0+):**
+```js
+const loader = new DictLoader();
+const jaDict = await loader.loadJaDict();
+// jaDict = { dictFiles: { 'sys.dic': ArrayBuffer, ... } }
+const ja = new JapaneseG2P({ jaDict });
+```
+
+`voiceData` is no longer accepted. `DictLoader.loadJaDict()` no longer accepts `includeVoice` or `voiceUrl` options.
+
+### 2. WASM ABI change: `_openjtalk_initialize(dictPtr)`
+
+If you call the WASM C function directly:
+
+**Before:** `_openjtalk_initialize(dictPtr, voicePtr)`
+**After:** `_openjtalk_initialize(dictPtr)`
+
+### 3. IndexedDB cache cleanup
+
+If upgrading from v0.2.0 or earlier, stale voice data may remain in IndexedDB. Clean it up:
+
+```js
+// Optional: clean up stale voice cache from older versions
+const dbs = await indexedDB.databases();
+for (const db of dbs) {
+  if (db.name && db.name.includes('piper-g2p-cache')) {
+    indexedDB.deleteDatabase(db.name);
+  }
+}
+```
+
+## Migration Steps
+
+1. Update packages:
+   ```bash
+   npm install piper-plus@0.4.0
+   ```
+
+2. If using `@piper-plus/g2p` directly:
+   ```bash
+   npm install @piper-plus/g2p@0.3.0
+   ```
+
+3. Remove any `voiceData`, `includeVoice`, or `voiceUrl` references in your code.
+
+4. No changes needed for `PiperPlus` high-level API users.

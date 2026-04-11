@@ -31,8 +31,7 @@ await unifiedPhonemizer.initialize({
     openjtalk: {
         jsPath: deploymentConfig.getPath('../dist/openjtalk.js'),
         wasmPath: deploymentConfig.getPath('../dist/openjtalk.wasm'),
-        dictPath: deploymentConfig.getPath('../assets/dict'),
-        voicePath: deploymentConfig.getPath('../assets/voice/mei_normal.htsvoice')
+        dictPath: deploymentConfig.getPath('../assets/dict')
     }
 });
 ```
@@ -93,8 +92,7 @@ GitHub Pages で正しく動作するには、以下の構造が必要：
 ├── config.js
 ├── assets/
 │   ├── custom_dictionary.json
-│   ├── dict/
-│   └── voice/
+│   └── dict/
 ├── dist/
 │   ├── openjtalk.js
 │   ├── openjtalk.wasm

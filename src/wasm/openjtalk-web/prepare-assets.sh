@@ -25,15 +25,6 @@ else
     echo "Warning: Dictionary files not found in reference repository"
 fi
 
-# Copy voice files
-echo "Copying voice files..."
-if [ -f "$REFERENCE_DIR/etc/mei/mei_normal.htsvoice" ]; then
-    cp "$REFERENCE_DIR/etc/mei/mei_normal.htsvoice" "$ASSETS_DIR/"
-    echo "Voice file copied to $ASSETS_DIR/"
-else
-    echo "Warning: Voice file not found in reference repository"
-fi
-
 # Create compressed dictionary for web delivery
 if command -v tar &> /dev/null && [ -d "$ASSETS_DIR/dict" ]; then
     echo "Creating compressed dictionary..."

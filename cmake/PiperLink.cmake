@@ -1,7 +1,7 @@
 # cmake/PiperLink.cmake
 # Linking, include directories, and compile definitions for piper / test_piper
 # executables. Must be included AFTER ExternalDeps.cmake and OnnxRuntime.cmake
-# so that FMT_DIR, SPDLOG_DIR, OPENJTALK_DIR, HTS_ENGINE_DIR, ONNXRUNTIME_DIR
+# so that FMT_DIR, SPDLOG_DIR, OPENJTALK_DIR, HTS_STUB_DIR, ONNXRUNTIME_DIR
 # etc. are already set.
 
 # ---- Platform-specific extra libraries and static linking ----
@@ -54,38 +54,11 @@ if(TARGET piper)
   add_dependencies(test_piper openjtalk_external)
 endif()
 
-# Link HTS_Engine (required for OpenJTalk build)
-add_dependencies(piper_common hts_engine_external)
+# hts_engine_stub: OpenJTalk ヘッダーが HTS_engine.h を transitively include するため、
+# 型定義互換シムとしてリンクが必要。HTS 合成機能は一切使用しない。
 if(TARGET piper)
-  add_dependencies(piper hts_engine_external)
-  add_dependencies(test_piper hts_engine_external)
-endif()
-
-if(USE_HTS_ENGINE_STUB)
-  if(TARGET piper)
-    target_link_libraries(piper PRIVATE hts_engine_stub)
-    target_link_libraries(test_piper PRIVATE hts_engine_stub)
-  endif()
-else()
-  if(WIN32)
-    if(TARGET piper)
-      target_link_libraries(piper PRIVATE
-        ${CMAKE_CURRENT_BINARY_DIR}/he/lib/HTSEngine.lib
-      )
-      target_link_libraries(test_piper PRIVATE
-        ${CMAKE_CURRENT_BINARY_DIR}/he/lib/HTSEngine.lib
-      )
-    endif()
-  else()
-    if(TARGET piper)
-      target_link_libraries(piper PRIVATE
-        ${CMAKE_CURRENT_BINARY_DIR}/he/lib/libHTSEngine.a
-      )
-      target_link_libraries(test_piper PRIVATE
-        ${CMAKE_CURRENT_BINARY_DIR}/he/lib/libHTSEngine.a
-      )
-    endif()
-  endif()
+  target_link_libraries(piper PRIVATE hts_engine_stub)
+  target_link_libraries(test_piper PRIVATE hts_engine_stub)
 endif()
 
 # ---- piper / test_piper link directories and include directories ----
@@ -130,10 +103,10 @@ if(TARGET piper)
 
   # Include HTSEngine headers (required for OpenJTalk)
   target_include_directories(piper PUBLIC
-    ${HTS_ENGINE_DIR}/include
+    ${HTS_STUB_DIR}/include
   )
   target_include_directories(test_piper PUBLIC
-    ${HTS_ENGINE_DIR}/include
+    ${HTS_STUB_DIR}/include
   )
 
   # Link OpenJTalk static library (r9y9 fork: single "openjtalk" lib with MeCab included)
@@ -150,20 +123,16 @@ if(TARGET piper)
   target_compile_definitions(piper PUBLIC FMT_HEADER_ONLY=1)
 
   # Add OpenJTalk dictionary path definition
-  if(TRUE)  # HTSEngine and OpenJTalk are built
-    # Dictionary will be downloaded by CI/CD or provided by user
-    # Use relative path from binary location for better portability
-    if(WIN32)
-      target_compile_definitions(piper PUBLIC OPENJTALK_DIC_PATH="..\\\\share\\\\open_jtalk\\\\dic")
-      target_compile_definitions(test_piper PUBLIC OPENJTALK_DIC_PATH="${CMAKE_CURRENT_BINARY_DIR}\\\\naist-jdic")
-      target_compile_definitions(test_piper PUBLIC SPDLOG_FMT_EXTERNAL=1)
-      target_compile_definitions(test_piper PUBLIC FMT_HEADER_ONLY=1)
-    else()
-      target_compile_definitions(piper PUBLIC OPENJTALK_DIC_PATH="../share/open_jtalk/dic")
-      target_compile_definitions(test_piper PUBLIC OPENJTALK_DIC_PATH="${CMAKE_CURRENT_BINARY_DIR}/naist-jdic")
-      target_compile_definitions(test_piper PUBLIC SPDLOG_FMT_EXTERNAL=1)
-      target_compile_definitions(test_piper PUBLIC FMT_HEADER_ONLY=1)
-    endif()
+  if(WIN32)
+    target_compile_definitions(piper PUBLIC OPENJTALK_DIC_PATH="..\\\\share\\\\open_jtalk\\\\dic")
+    target_compile_definitions(test_piper PUBLIC OPENJTALK_DIC_PATH="${CMAKE_CURRENT_BINARY_DIR}\\\\naist-jdic")
+    target_compile_definitions(test_piper PUBLIC SPDLOG_FMT_EXTERNAL=1)
+    target_compile_definitions(test_piper PUBLIC FMT_HEADER_ONLY=1)
+  else()
+    target_compile_definitions(piper PUBLIC OPENJTALK_DIC_PATH="../share/open_jtalk/dic")
+    target_compile_definitions(test_piper PUBLIC OPENJTALK_DIC_PATH="${CMAKE_CURRENT_BINARY_DIR}/naist-jdic")
+    target_compile_definitions(test_piper PUBLIC SPDLOG_FMT_EXTERNAL=1)
+    target_compile_definitions(test_piper PUBLIC FMT_HEADER_ONLY=1)
   endif()
 endif() # TARGET piper
 

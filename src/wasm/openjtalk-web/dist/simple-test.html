@@ -118,11 +118,10 @@
                 
                 // Test OpenJTalk functions
                 output.textContent += '\nTesting OpenJTalk functions...\n';
-                
+
                 // Initialize (will fail without dictionary)
                 const initResult = window.moduleInstance._openjtalk_initialize(
-                    window.moduleInstance.allocateUTF8("/dict"),
-                    window.moduleInstance.allocateUTF8("/voice/test.htsvoice")
+                    window.moduleInstance.allocateUTF8("/dict")
                 );
                 output.textContent += `OpenJTalk initialize result: ${initResult}\n`;
                 if (initResult !== 0) {

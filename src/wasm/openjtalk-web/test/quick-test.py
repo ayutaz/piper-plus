@@ -54,7 +54,6 @@ def test_server_files():
         "/dist/openjtalk.js",
         "/dist/openjtalk.wasm",
         "/assets/dict/char.bin",
-        "/assets/voice/mei_normal.htsvoice",
     ]
 
     print("Checking required files...")

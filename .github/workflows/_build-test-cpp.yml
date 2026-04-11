@@ -46,8 +46,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            build-essential cmake ccache wget open-jtalk \
-            hts-voice-nitech-jp-atr503-m001
+            build-essential cmake ccache wget
 
           # Install ONNX Runtime
           wget -q https://github.com/microsoft/onnxruntime/releases/download/v1.14.1/onnxruntime-linux-x64-1.14.1.tgz
@@ -69,7 +68,6 @@ jobs:
           brew install cmake || true
           brew install ccache || brew upgrade ccache || true
           brew install wget || brew upgrade wget || true
-          brew install open-jtalk || brew upgrade open-jtalk || true
 
           # Install ONNX Runtime (architecture-aware)
           sudo mkdir -p /usr/local/lib /usr/local/include
@@ -162,19 +160,12 @@ jobs:
       - name: Download OpenJTalk dictionary
         shell: bash
         run: |
+          # Always download dictionary — no dependency on system open-jtalk packages
           mkdir -p build/naist-jdic
-          if [ -d "/usr/share/open_jtalk/dic" ]; then
-            cp -r /usr/share/open_jtalk/dic/* build/naist-jdic/
-          elif [ -d "/opt/homebrew/share/open_jtalk/dic" ]; then
-            cp -r /opt/homebrew/share/open_jtalk/dic/* build/naist-jdic/
-          elif [ -d "/usr/local/share/open_jtalk/dic" ]; then
-            cp -r /usr/local/share/open_jtalk/dic/* build/naist-jdic/
-          else
-            echo "Downloading OpenJTalk dictionary..."
-            curl -sL https://sourceforge.net/projects/open-jtalk/files/Dictionary/open_jtalk_dic-1.11/open_jtalk_dic_utf_8-1.11.tar.gz/download \
-              | tar xzf - -C build/
-            mv build/open_jtalk_dic_utf_8-1.11/* build/naist-jdic/
-          fi
+          echo "Downloading OpenJTalk dictionary..."
+          curl -sL https://sourceforge.net/projects/open-jtalk/files/Dictionary/open_jtalk_dic-1.11/open_jtalk_dic_utf_8-1.11.tar.gz/download \
+            | tar xzf - -C build/
+          mv build/open_jtalk_dic_utf_8-1.11/* build/naist-jdic/
 
       - name: Download espeak-ng-data
         if: runner.os != 'Windows'
@@ -225,6 +216,19 @@ jobs:
           curl -sfL "https://huggingface.co/ayousanz/piper-plus-base/resolve/main/multilingual-test-medium.onnx.json" \
             -o test/models/multilingual-test-medium.onnx.json || true
 
+      # ── Dead code lint guard ──────────────────────────────────
+      - name: Check for dead code markers
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          echo "Checking for #if 0 dead code blocks in C++ sources..."
+          if grep -rn '#if 0' src/cpp/ --include="*.c" --include="*.cpp" --include="*.h"; then
+            echo "FAIL: #if 0 blocks found. Remove dead code or use feature flags."
+            exit 1
+          else
+            echo "OK: No #if 0 blocks found."
+          fi
+
       # ── Run tests ─────────────────────────────────────────────
       - name: Run tests
         shell: bash
@@ -238,54 +242,15 @@ jobs:
           if [ "${{ runner.os }}" == "Windows" ]; then
             export ESPEAK_NG_DATA="${PWD}/espeak-ng-data"
             export PATH="${ONNXRUNTIME_ROOT_PATH}/lib:${PATH}"
-            export OPENJTALK_DICTIONARY_DIR="${PWD}/naist-jdic"
             export OPENJTALK_DICTIONARY_PATH="${PWD}/naist-jdic"
             export OPENJTALK_SKIP_TESTS_IF_UNAVAILABLE=1
           else
-            # Find HTS voice file (needed by open_jtalk binary)
-            VOICE_FOUND=""
-            for vp in \
-              "/usr/share/hts-voice/nitech-jp-atr503-m001/nitech_jp_atr503_m001.htsvoice" \
-              "/usr/local/share/hts-voice/nitech-jp-atr503-m001/nitech_jp_atr503_m001.htsvoice" \
-              "/opt/homebrew/share/hts-voice/nitech-jp-atr503-m001/nitech_jp_atr503_m001.htsvoice"; do
-              if [ -f "$vp" ]; then
-                VOICE_FOUND="$vp"
-                break
-              fi
-            done
-            # Download HTS voice if not found on system
-            if [ -z "$VOICE_FOUND" ]; then
-              echo "HTS voice not found on system, downloading from SourceForge..."
-              mkdir -p /tmp/hts-voice
-              if curl -sfL "https://sourceforge.net/projects/open-jtalk/files/HTS%20voice/hts_voice_nitech_jp_atr503_m001-1.05/hts_voice_nitech_jp_atr503_m001-1.05.tar.gz/download" \
-                  -o /tmp/hts-voice.tar.gz; then
-                tar -xzf /tmp/hts-voice.tar.gz -C /tmp/hts-voice/ --strip-components=1
-                if [ -f "/tmp/hts-voice/nitech_jp_atr503_m001.htsvoice" ]; then
-                  VOICE_FOUND="/tmp/hts-voice/nitech_jp_atr503_m001.htsvoice"
-                fi
-              fi
-            fi
-            if [ -n "$VOICE_FOUND" ]; then
-              export OPENJTALK_VOICE="$VOICE_FOUND"
-              echo "Using HTS voice: $VOICE_FOUND"
-            else
-              echo "Warning: HTS voice not available, OpenJTalk optimized tests may skip"
-            fi
-
             export OPENJTALK_SKIP_TESTS_IF_UNAVAILABLE=1
-            export OPENJTALK_DICTIONARY_DIR="${PWD}/naist-jdic"
-            # Use system dictionary if available, fallback to downloaded one
-            if [ -d "/var/lib/mecab/dic/open-jtalk/naist-jdic" ]; then
-              export OPENJTALK_DICTIONARY_PATH="/var/lib/mecab/dic/open-jtalk/naist-jdic"
-            elif [ -d "/opt/homebrew/share/open_jtalk/dic" ]; then
-              export OPENJTALK_DICTIONARY_PATH="/opt/homebrew/share/open_jtalk/dic"
-            else
-              export OPENJTALK_DICTIONARY_PATH="${PWD}/naist-jdic"
-            fi
+            # Always use downloaded dictionary (no system open-jtalk dependency)
+            export OPENJTALK_DICTIONARY_PATH="${PWD}/naist-jdic"
             export ESPEAK_NG_DATA="${PWD}/espeak-ng-data"
 
-            echo "OpenJTalk env: DICTIONARY_PATH=$OPENJTALK_DICTIONARY_PATH VOICE=${OPENJTALK_VOICE:-<unset>}"
-            echo "open_jtalk binary: $(which open_jtalk 2>/dev/null || echo 'not in PATH')"
+            echo "OpenJTalk env: DICTIONARY_PATH=$OPENJTALK_DICTIONARY_PATH"
           fi
 
           echo "Running C++ tests for ${{ runner.os }} ${{ matrix.build-type }}"

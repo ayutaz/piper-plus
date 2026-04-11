@@ -163,20 +163,11 @@ function createTestHTML() {
                     log(\`Loaded \${file}\`, 'info');
                 }
                 
-                // Load voice
-                log('Loading voice file...', 'info');
-                FS.mkdir('/voice');
-                const voiceResponse = await fetch('../assets/voice/mei_normal.htsvoice');
-                const voiceData = await voiceResponse.arrayBuffer();
-                FS.writeFile('/voice/mei_normal.htsvoice', new Uint8Array(voiceData));
-                
                 // Initialize
                 log('Initializing OpenJTalk...', 'info');
                 const dictPtr = moduleInstance.allocateUTF8('/dict');
-                const voicePtr = moduleInstance.allocateUTF8('/voice/mei_normal.htsvoice');
-                const result = moduleInstance._openjtalk_initialize(dictPtr, voicePtr);
+                const result = moduleInstance._openjtalk_initialize(dictPtr);
                 moduleInstance._free(dictPtr);
-                moduleInstance._free(voicePtr);
                 
                 if (result === 0) {
                     window.testResults.initialized = true;

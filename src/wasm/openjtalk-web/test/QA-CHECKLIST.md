@@ -8,7 +8,7 @@
 ## 1. package.json
 
 - [ ] `name` が `"piper-plus"` である
-- [ ] `version` が `"0.2.0-alpha.0"` である
+- [ ] `version` が `"0.4.0"` である
 - [ ] `license` が `"MIT"` である
 - [ ] `type` が `"module"` である
 - [ ] `exports["."].import` が `"./src/index.js"` を指す

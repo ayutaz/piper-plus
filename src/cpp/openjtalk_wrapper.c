@@ -103,7 +103,7 @@ static const char* find_openjtalk_binary() {
     const char* env_path = getenv("OPENJTALK_PHONEMIZER_PATH");
     if (env_path) {
         fprintf(stderr, "DEBUG: OPENJTALK_PHONEMIZER_PATH = %s\n", env_path);
-        if (access(env_path, F_OK) == 0) {
+        if (access(env_path, F_OK) == 0 && openjtalk_is_safe_path(env_path)) {
             strncpy(g_openjtalk_bin_path, env_path, sizeof(g_openjtalk_bin_path) - 1);
             g_openjtalk_bin_path[sizeof(g_openjtalk_bin_path) - 1] = '\0';
 #ifdef _WIN32
@@ -112,6 +112,8 @@ static const char* find_openjtalk_binary() {
             pthread_mutex_unlock(&g_path_mutex);
 #endif
             return g_openjtalk_bin_path;
+        } else if (access(env_path, F_OK) == 0) {
+            fprintf(stderr, "WARNING: OPENJTALK_PHONEMIZER_PATH rejected by path validation\n");
         } else {
             fprintf(stderr, "DEBUG: File not found at OPENJTALK_PHONEMIZER_PATH\n");
         }
@@ -387,7 +389,7 @@ char* openjtalk_text_to_phonemes(const char* text) {
     int is_phonemizer = strstr(openjtalk_bin, "phonemizer") != NULL ? 1 : 0;
 
     if (is_phonemizer) {
-        // Use phonemizer binary - no HTS voice needed
+        // Use phonemizer binary
 #ifdef _WIN32
         char short_bin[OPENJTALK_MAX_PATH];
         char short_dic[OPENJTALK_MAX_PATH];
@@ -403,37 +405,17 @@ char* openjtalk_text_to_phonemes(const char* text) {
                  openjtalk_bin, dic_path, output_file, input_file);
 #endif
     } else {
-        // Fall back to regular open_jtalk with HTS voice
-        const char* voice_path = get_openjtalk_voice_path();
-        if (!voice_path) {
-            fprintf(stderr, "Warning: HTS voice not found, attempting phoneme extraction only\n");
-        }
-
+        // open_jtalk fallback: phoneme extraction only
 #ifdef _WIN32
-        if (voice_path) {
-            snprintf(command, sizeof(command),
-                     "\"%s\" -x \"%s\" -m \"%s\" -ow NUL -ot \"%s\" \"%s\"",
-                     openjtalk_bin, dic_path, voice_path, output_file, input_file);
-        } else {
-            snprintf(command, sizeof(command),
-                     "\"%s\" -x \"%s\" -ow NUL -ot \"%s\" \"%s\"",
-                     openjtalk_bin, dic_path, output_file, input_file);
-        }
+        snprintf(command, sizeof(command),
+                 "\"%s\" -x \"%s\" -ow NUL -ot \"%s\" \"%s\"",
+                 openjtalk_bin, dic_path, output_file, input_file);
 #else
-        if (voice_path) {
-            snprintf(command, sizeof(command),
-                     "\"%s\" -x \"%s\" -m \"%s\" -ow /dev/null -ot \"%s\" \"%s\"",
-                     openjtalk_bin, dic_path, voice_path, output_file, input_file);
-        } else {
-            snprintf(command, sizeof(command),
-                     "\"%s\" -x \"%s\" -ow /dev/null -ot \"%s\" \"%s\"",
-                     openjtalk_bin, dic_path, output_file, input_file);
-        }
+        snprintf(command, sizeof(command),
+                 "\"%s\" -x \"%s\" -ow /dev/null -ot \"%s\" \"%s\"",
+                 openjtalk_bin, dic_path, output_file, input_file);
 #endif
     }
-
-    // Log the command for debugging
-    fprintf(stderr, "DEBUG: Executing command: %s\n", command);
 
     // Execute command
     err = execute_openjtalk_command(command, &result);
@@ -713,27 +695,15 @@ static OpenJTalkProsodyResult* openjtalk_text_to_phonemes_with_prosody_binary(co
                  openjtalk_bin, dic_path, output_file, input_file);
 #endif
     } else {
-        const char* voice_path = get_openjtalk_voice_path();
+        // open_jtalk fallback: phoneme extraction only
 #ifdef _WIN32
-        if (voice_path) {
-            snprintf(command, sizeof(command),
-                     "\"%s\" -x \"%s\" -m \"%s\" -ow NUL -ot \"%s\" \"%s\"",
-                     openjtalk_bin, dic_path, voice_path, output_file, input_file);
-        } else {
-            snprintf(command, sizeof(command),
-                     "\"%s\" -x \"%s\" -ow NUL -ot \"%s\" \"%s\"",
-                     openjtalk_bin, dic_path, output_file, input_file);
-        }
+        snprintf(command, sizeof(command),
+                 "\"%s\" -x \"%s\" -ow NUL -ot \"%s\" \"%s\"",
+                 openjtalk_bin, dic_path, output_file, input_file);
 #else
-        if (voice_path) {
-            snprintf(command, sizeof(command),
-                     "\"%s\" -x \"%s\" -m \"%s\" -ow /dev/null -ot \"%s\" \"%s\"",
-                     openjtalk_bin, dic_path, voice_path, output_file, input_file);
-        } else {
-            snprintf(command, sizeof(command),
-                     "\"%s\" -x \"%s\" -ow /dev/null -ot \"%s\" \"%s\"",
-                     openjtalk_bin, dic_path, output_file, input_file);
-        }
+        snprintf(command, sizeof(command),
+                 "\"%s\" -x \"%s\" -ow /dev/null -ot \"%s\" \"%s\"",
+                 openjtalk_bin, dic_path, output_file, input_file);
 #endif
     }
 

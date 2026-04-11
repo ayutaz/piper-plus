@@ -91,103 +91,47 @@ endif()
 
 # ---- HTSEngine ---
 
-# HTSEngine stub for phonemizer-only mode
-option(USE_HTS_ENGINE_STUB "Use HTS Engine stub (phonemizer-only mode)" ON)
+# HTS Engine stub for OpenJTalk header compatibility.
+# piper-plus uses ONNX neural synthesis, not HTS Engine.
 
-if(USE_HTS_ENGINE_STUB)
-  # Use stub instead of real HTS Engine
-  set(HTS_ENGINE_DIR "${CMAKE_CURRENT_BINARY_DIR}/hts_stub")
-  file(MAKE_DIRECTORY ${HTS_ENGINE_DIR}/include)
-  file(MAKE_DIRECTORY ${HTS_ENGINE_DIR}/lib)
+# Use stub instead of real HTS Engine
+set(HTS_STUB_DIR "${CMAKE_CURRENT_BINARY_DIR}/hts_stub")
+file(MAKE_DIRECTORY ${HTS_STUB_DIR}/include)
+file(MAKE_DIRECTORY ${HTS_STUB_DIR}/lib)
 
-  # Copy stub files
-  configure_file(${CMAKE_CURRENT_SOURCE_DIR}/cmake/hts_engine_stub.h
-                 ${HTS_ENGINE_DIR}/include/HTS_engine.h COPYONLY)
+# Copy stub files
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/cmake/hts_engine_stub.h
+               ${HTS_STUB_DIR}/include/HTS_engine.h COPYONLY)
 
-  # Build stub library
-  add_library(hts_engine_stub STATIC ${CMAKE_CURRENT_SOURCE_DIR}/cmake/hts_engine_stub.c)
-  target_include_directories(hts_engine_stub PUBLIC ${HTS_ENGINE_DIR}/include)
-  set_target_properties(hts_engine_stub PROPERTIES POSITION_INDEPENDENT_CODE ON)
-  if(WIN32)
-    set_target_properties(hts_engine_stub PROPERTIES
-      ARCHIVE_OUTPUT_DIRECTORY ${HTS_ENGINE_DIR}/lib
-      OUTPUT_NAME HTSEngine
-      PREFIX "")
-  else()
-    set_target_properties(hts_engine_stub PROPERTIES
-      ARCHIVE_OUTPUT_DIRECTORY ${HTS_ENGINE_DIR}/lib
-      OUTPUT_NAME HTSEngine
-      PREFIX "lib")
-  endif()
+# Build stub library
+add_library(hts_engine_stub STATIC ${CMAKE_CURRENT_SOURCE_DIR}/cmake/hts_engine_stub.c)
+target_include_directories(hts_engine_stub PUBLIC ${HTS_STUB_DIR}/include)
+set_target_properties(hts_engine_stub PROPERTIES POSITION_INDEPENDENT_CODE ON)
+if(WIN32)
+  set_target_properties(hts_engine_stub PROPERTIES
+    ARCHIVE_OUTPUT_DIRECTORY ${HTS_STUB_DIR}/lib
+    OUTPUT_NAME HTSEngine
+    PREFIX "")
+else()
+  set_target_properties(hts_engine_stub PROPERTIES
+    ARCHIVE_OUTPUT_DIRECTORY ${HTS_STUB_DIR}/lib
+    OUTPUT_NAME HTSEngine
+    PREFIX "lib")
+endif()
 
-  # Ensure the stub library is built and create a symlink/copy for compatibility
-  if(WIN32)
-    add_custom_command(TARGET hts_engine_stub POST_BUILD
-      COMMAND ${CMAKE_COMMAND} -E make_directory ${HTS_ENGINE_DIR}/lib
-      COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:hts_engine_stub> ${HTS_ENGINE_DIR}/lib/HTSEngine.lib
-      COMMENT "Ensuring HTS Engine stub library is in expected location (Windows)"
-    )
-  else()
-    add_custom_command(TARGET hts_engine_stub POST_BUILD
-      COMMAND ${CMAKE_COMMAND} -E make_directory ${HTS_ENGINE_DIR}/lib
-      COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:hts_engine_stub> ${HTS_ENGINE_DIR}/lib/libHTSEngine.a
-      COMMENT "Ensuring HTS Engine stub library is in expected location (Unix)"
-    )
-  endif()
-
-  # Create dummy target for dependencies
-  add_custom_target(hts_engine_external DEPENDS hts_engine_stub)
-
-elseif(NOT DEFINED HTS_ENGINE_DIR)
-    set(HTS_ENGINE_DIR "${CMAKE_CURRENT_BINARY_DIR}/he")
-    set(HTS_ENGINE_VERSION "1.10")
-
-    if(WIN32)
-      # Use CMake build for Windows
-      ExternalProject_Add(
-        hts_engine_external
-        PREFIX "${CMAKE_CURRENT_BINARY_DIR}/h"
-        URL "https://downloads.sourceforge.net/project/hts-engine/hts_engine%20API/hts_engine_API-${HTS_ENGINE_VERSION}/hts_engine_API-${HTS_ENGINE_VERSION}.tar.gz"
-        CMAKE_ARGS
-          -DCMAKE_INSTALL_PREFIX:PATH=${HTS_ENGINE_DIR}
-          -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}
-          -DBUILD_SHARED_LIBS:BOOL=OFF
-          -DHTS_EMBEDDED:BOOL=ON
-          -DCMAKE_POSITION_INDEPENDENT_CODE:BOOL=ON
-          -DCMAKE_MSVC_RUNTIME_LIBRARY:STRING=${CMAKE_MSVC_RUNTIME_LIBRARY}
-          ${EXTERNAL_CMAKE_ARGS}
-        PATCH_COMMAND ${CMAKE_COMMAND} -E copy
-          ${CMAKE_CURRENT_SOURCE_DIR}/cmake/HTSEngine_CMakeLists.txt
-          <SOURCE_DIR>/CMakeLists.txt
-        BUILD_BYPRODUCTS ${HTS_ENGINE_DIR}/lib/HTSEngine.lib
-      )
-    else()
-      # Use autotools for Unix platforms
-      # Set architecture flags for configure scripts
-      if(APPLE)
-        # Apple Silicon (arm64) only
-        set(CONFIGURE_HOST "--host=aarch64-apple-darwin")
-        set(CONFIGURE_ENV "CFLAGS=-arch arm64 -fPIC" "CXXFLAGS=-arch arm64 -fPIC" "LDFLAGS=-arch arm64")
-      elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64" AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
-        # Linux ARM64 cross-compilation
-        set(CONFIGURE_HOST "--host=aarch64-linux-gnu")
-        set(CONFIGURE_ENV "CC=aarch64-linux-gnu-gcc" "CXX=aarch64-linux-gnu-g++" "AR=aarch64-linux-gnu-ar" "RANLIB=aarch64-linux-gnu-ranlib" "CFLAGS=-fPIC" "CXXFLAGS=-fPIC")
-      else()
-        set(CONFIGURE_HOST "")
-        set(CONFIGURE_ENV "CFLAGS=-fPIC" "CXXFLAGS=-fPIC")
-      endif()
-
-      ExternalProject_Add(
-        hts_engine_external
-        PREFIX "${CMAKE_CURRENT_BINARY_DIR}/h"
-        URL "https://downloads.sourceforge.net/project/hts-engine/hts_engine%20API/hts_engine_API-${HTS_ENGINE_VERSION}/hts_engine_API-${HTS_ENGINE_VERSION}.tar.gz"
-        CONFIGURE_COMMAND ${CMAKE_COMMAND} -E env ${CONFIGURE_ENV} ${CMAKE_COMMAND} -E chdir <SOURCE_DIR> ./configure --prefix=${HTS_ENGINE_DIR} ${CONFIGURE_HOST}
-        BUILD_COMMAND ${CMAKE_COMMAND} -E chdir <SOURCE_DIR> make
-        INSTALL_COMMAND ${CMAKE_COMMAND} -E chdir <SOURCE_DIR> make install
-        BUILD_IN_SOURCE 1
-        BUILD_BYPRODUCTS ${HTS_ENGINE_DIR}/lib/libHTSEngine.a
-      )
-    endif()
+# Ensure the stub library is built and create a symlink/copy for compatibility
+if(WIN32)
+  add_custom_command(TARGET hts_engine_stub POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${HTS_STUB_DIR}/lib
+    COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:hts_engine_stub> ${HTS_STUB_DIR}/lib/HTSEngine.lib
+    COMMENT "Ensuring HTS Engine stub library is in expected location (Windows)"
+  )
+else()
+  add_custom_command(TARGET hts_engine_stub POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${HTS_STUB_DIR}/lib
+    COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:hts_engine_stub> ${HTS_STUB_DIR}/lib/libHTSEngine.a
+    COMMENT "Ensuring HTS Engine stub library is in expected location (Unix)"
+  )
 endif()
 
 # ---- OpenJTalk ---
@@ -247,7 +191,6 @@ if(NOT DEFINED OPENJTALK_DIR)
     )
 
     # Note: pyopenjtalk-plus fork doesn't require HTS_Engine for NJD pipeline
-    # (no add_dependencies on hts_engine_external needed)
 
     # Dictionary from pyopenjtalk-plus (same source, same archive)
     # Custom dictionary with improved accent predictions from jpreprocess project.

@@ -48,18 +48,6 @@ console.log('- First 4 bytes (uint32): 0x' + sysDicData.readUInt32LE(0).toString
 console.log('- Bytes 4-8 (uint32): 0x' + sysDicData.readUInt32LE(4).toString(16));
 console.log('- Bytes 8-12 (uint32): 0x' + sysDicData.readUInt32LE(8).toString(16));
 
-// Check voice file
-console.log('\nVoice file check:');
-const voicePath = path.join(__dirname, '..', 'tools', 'wasm_open_jtalk', 'etc', 'mei', 'mei_normal.htsvoice');
-try {
-    const voiceStats = fs.statSync(voicePath);
-    const voiceData = fs.readFileSync(voicePath);
-    console.log(`- mei_normal.htsvoice: ${voiceStats.size} bytes`);
-    console.log(`  First 16 bytes (hex): ${voiceData.slice(0, 16).toString('hex')}`);
-} catch (e) {
-    console.log(`- mei_normal.htsvoice: ERROR - ${e.message}`);
-}
-
 console.log('\nKey observations:');
 console.log('1. The dictionary files are quite large (sys.dic is ~103MB)');
 console.log('2. The format does not start with standard MeCab magic number (0xDAC0)');

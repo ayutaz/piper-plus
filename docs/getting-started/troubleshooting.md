@@ -309,7 +309,6 @@ If issues persist:
 | "Failed to initialize OpenJTalk" | Dictionary missing | Download/specify dictionary |
 | "Unknown multi-character phoneme" | Wrong phoneme format | Update to latest version |
 | "Checksum verification failed" | Corrupt download | Re-download files |
-| "HTS voice must be specified" | Voice file missing | Download/specify .htsvoice file |
 | "UnicodeEncodeError" (Windows) | Console encoding | Use chcp 65001 |
 
 ## Training Troubleshooting

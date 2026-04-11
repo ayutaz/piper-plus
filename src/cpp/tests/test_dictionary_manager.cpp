@@ -43,8 +43,7 @@ protected:
         
         // Save original environment variables
         original_home = getenv("HOME");
-        original_dict_dir = getenv("OPENJTALK_DICTIONARY_DIR");
-        original_voice = getenv("OPENJTALK_VOICE");
+        original_dict_dir = getenv("OPENJTALK_DICTIONARY_PATH");
         original_auto_download = getenv("PIPER_AUTO_DOWNLOAD_DICT");
         original_offline = getenv("PIPER_OFFLINE_MODE");
         
@@ -74,29 +73,15 @@ protected:
         
         if (original_dict_dir) {
 #ifdef _WIN32
-            SetEnvironmentVariableA("OPENJTALK_DICTIONARY_DIR", original_dict_dir);
+            SetEnvironmentVariableA("OPENJTALK_DICTIONARY_PATH", original_dict_dir);
 #else
-            setenv("OPENJTALK_DICTIONARY_DIR", original_dict_dir, 1);
+            setenv("OPENJTALK_DICTIONARY_PATH", original_dict_dir, 1);
 #endif
         } else {
 #ifdef _WIN32
-            SetEnvironmentVariableA("OPENJTALK_DICTIONARY_DIR", NULL);
+            SetEnvironmentVariableA("OPENJTALK_DICTIONARY_PATH", NULL);
 #else
-            unsetenv("OPENJTALK_DICTIONARY_DIR");
-#endif
-        }
-        
-        if (original_voice) {
-#ifdef _WIN32
-            SetEnvironmentVariableA("OPENJTALK_VOICE", original_voice);
-#else
-            setenv("OPENJTALK_VOICE", original_voice, 1);
-#endif
-        } else {
-#ifdef _WIN32
-            SetEnvironmentVariableA("OPENJTALK_VOICE", NULL);
-#else
-            unsetenv("OPENJTALK_VOICE");
+            unsetenv("OPENJTALK_DICTIONARY_PATH");
 #endif
         }
         
@@ -143,7 +128,6 @@ protected:
     char* test_dir = nullptr;
     const char* original_home = nullptr;
     const char* original_dict_dir = nullptr;
-    const char* original_voice = nullptr;
     const char* original_auto_download = nullptr;
     const char* original_offline = nullptr;
 };
@@ -162,12 +146,12 @@ protected:
 // Test custom dictionary path via environment variable
 TEST_F(DictionaryManagerTest, CustomDictPath) {
     const char* custom_path = "/custom/dict/path";
-    setenv("OPENJTALK_DICTIONARY_DIR", custom_path, 1);
+    setenv("OPENJTALK_DICTIONARY_PATH", custom_path, 1);
     
     // Create dummy dictionary files
     mkdir("/tmp", 0755);
     mkdir("/tmp/custom_dict_test", 0755);
-    setenv("OPENJTALK_DICTIONARY_DIR", "/tmp/custom_dict_test", 1);
+    setenv("OPENJTALK_DICTIONARY_PATH", "/tmp/custom_dict_test", 1);
     
     // Create dummy dictionary files
     FILE* fp = fopen("/tmp/custom_dict_test/sys.dic", "w");
@@ -258,26 +242,6 @@ TEST_F(DictionaryManagerTest, AutoDownloadDisabled) {
 //     openjtalk_set_dict_version("1.10");
 //     // This would affect subsequent dictionary downloads
 // }
-
-// Test HTS voice path resolution
-TEST_F(DictionaryManagerTest, HTSVoicePath) {
-    const char* custom_voice = "/tmp/custom_voice_test.htsvoice";
-    
-    // Create dummy voice file
-    FILE* fp = fopen(custom_voice, "w");
-    if (fp) {
-        fprintf(fp, "dummy hts voice");
-        fclose(fp);
-    }
-    
-    setenv("OPENJTALK_VOICE", custom_voice, 1);
-    
-    const char* voice_path = nullptr;
-    // This test might fail due to network in CI, so we just test the path resolution
-    // In a real test environment, we'd mock the download functionality
-    
-    unlink(custom_voice);
-}
 
 int main(int argc, char** argv) {
     ::testing::InitGoogleTest(&argc, argv);

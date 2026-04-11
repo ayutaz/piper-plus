@@ -2,7 +2,7 @@
  * DictLoader -- OpenJTalk dictionary download + IndexedDB cache for G2P.
  *
  * Derived from @piper-plus/piper-plus DictManager, stripped down to
- * dictionary-only loading (no onnxruntime-web, no voice file by default).
+ * dictionary-only loading (no onnxruntime-web dependency).
  *
  * Downloads the dictionary archive from GitHub Releases, verifies the
  * SHA-256 hash, extracts individual files in the browser, and caches
@@ -46,12 +46,6 @@ const DICT_FILES = [
   'rewrite.def',
   'right-id.def',
 ];
-
-/** Default HTS voice file URL (only used when includeVoice is true). */
-const DEFAULT_VOICE_URL =
-  'https://huggingface.co/ayousanz/piper-plus-base/resolve/main/voice/mei_normal.htsvoice';
-
-const VOICE_CACHE_KEY = 'voice/mei_normal.htsvoice';
 
 const DEFAULT_DB_NAME = 'piper-g2p-dict';
 const STORE_NAME = 'files';
@@ -307,8 +301,7 @@ async function downloadAndExtractDict(tarGzUrl, onProgress) {
  * Dictionary loader for @piper-plus/g2p.
  *
  * Downloads OpenJTalk MeCab dictionary files from GitHub Releases, verifies
- * the SHA-256 hash, and caches them in IndexedDB. Optionally downloads the
- * HTS voice file when `includeVoice: true` is specified.
+ * the SHA-256 hash, and caches them in IndexedDB.
  *
  * No dependency on onnxruntime-web.
  *
@@ -316,13 +309,6 @@ async function downloadAndExtractDict(tarGzUrl, onProgress) {
  * const loader = new DictLoader();
  * const { dictFiles } = await loader.loadJaDict();
  * // dictFiles['sys.dic'] -> ArrayBuffer
- *
- * @example
- * // With voice data for full synthesis
- * const { dictFiles, voiceData } = await loader.loadJaDict({
- *   includeVoice: true,
- *   onProgress: ({ loaded, total }) => console.log(`${loaded}/${total}`),
- * });
  */
 export class DictLoader {
   /**
@@ -346,21 +332,15 @@ export class DictLoader {
    *
    * @param {Object} [options]
    * @param {string} [options.dictUrl]       - Custom tar.gz URL (default: GitHub Releases).
-   * @param {boolean} [options.includeVoice] - Whether to also download the HTS voice file
-   *                                           (default: false -- G2P does not need it).
-   * @param {string} [options.voiceUrl]      - Custom URL for the HTS voice file.
    * @param {(progress: { loaded: number, total: number }) => void} [options.onProgress]
    *   Progress callback. Called with `{ loaded, total }` (bytes) during download.
    * @returns {Promise<JaDictData>}
    *
    * @typedef {Object} JaDictData
    * @property {Record<string, ArrayBuffer>} dictFiles - The 8 MeCab dictionary files.
-   * @property {ArrayBuffer} [voiceData]               - HTS voice data (only when includeVoice is true).
    */
   async loadJaDict(options = {}) {
     const dictUrl = options.dictUrl || DICT_TAR_GZ_URL;
-    const includeVoice = options.includeVoice || false;
-    const voiceUrl = options.voiceUrl || DEFAULT_VOICE_URL;
     const onProgress = options.onProgress || null;
 
     const db = await this._openDB();
@@ -387,26 +367,7 @@ export class DictLoader {
       }
     }
 
-    // ---- Voice file (optional) ----------------------------------------------
-
-    if (!includeVoice) {
-      return { dictFiles };
-    }
-
-    let voiceData;
-    const cachedVoice = await this._getFromCache(db, VOICE_CACHE_KEY);
-
-    if (cachedVoice) {
-      voiceData = cachedVoice;
-      if (onProgress) {
-        onProgress({ loaded: cachedVoice.byteLength, total: cachedVoice.byteLength });
-      }
-    } else {
-      voiceData = await fetchWithProgress(voiceUrl, onProgress);
-      await this._putToCache(db, VOICE_CACHE_KEY, voiceData);
-    }
-
-    return { dictFiles, voiceData };
+    return { dictFiles };
   }
 
   /**
