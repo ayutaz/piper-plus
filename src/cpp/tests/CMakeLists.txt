@@ -43,7 +43,6 @@ set(TEST_SOURCES
     test_piper_core.cpp
     test_openjtalk_security.cpp
     test_openjtalk_error_handling.cpp
-    test_openjtalk_optimized.cpp
     test_gpu_device_id.cpp
     test_phoneme_parser.cpp
     test_streaming.cpp
@@ -61,9 +60,12 @@ set(TEST_SOURCES
     test_short_text_mitigation.cpp
 )
 
-# Add dictionary manager test for Unix platforms
+# Add Unix-only tests (require open_jtalk binary or Unix APIs)
 if(NOT WIN32 AND NOT MSVC)
-    list(APPEND TEST_SOURCES test_dictionary_manager.cpp)
+    list(APPEND TEST_SOURCES
+        test_dictionary_manager.cpp
+        test_openjtalk_optimized.cpp
+    )
 endif()
 
 # Add prosody inference test only when ONNX Runtime headers are available

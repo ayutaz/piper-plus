@@ -10,22 +10,11 @@ extern "C" {
 #include "../openjtalk_dictionary_manager.h"
 }
 
-// Check if OpenJTalk binary + dictionary are available WITHOUT invoking
-// fork/exec.  Any fork/exec can intermittently hang on CI runners,
-// causing a 120 s ctest timeout.
-static bool openjtalk_available() {
-#ifdef _WIN32
-    // open_jtalk binary is not shipped on Windows CI.
-    return false;
-#else
-    return openjtalk_is_available() != 0;
-#endif
-}
-
 // GTEST_SKIP() expands to `return ...` so it must be invoked directly in the
 // test body — wrapping it in a helper function would only return from that helper.
+// This test binary is only built on Unix (see CMakeLists.txt).
 #define SKIP_IF_NOT_FUNCTIONAL() \
-    if (!openjtalk_available()) \
+    if (!openjtalk_is_available()) \
         GTEST_SKIP() << "OpenJTalk not available (dictionary or binary missing)"
 
 class OpenJTalkOptimizedTest : public ::testing::Test {
