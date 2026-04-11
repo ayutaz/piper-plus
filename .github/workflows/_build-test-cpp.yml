@@ -255,36 +255,6 @@ jobs:
             export OPENJTALK_DICTIONARY_PATH="${PWD}/naist-jdic"
             export OPENJTALK_SKIP_TESTS_IF_UNAVAILABLE=1
           else
-            # Find HTS voice file (needed by open_jtalk binary)
-            VOICE_FOUND=""
-            for vp in \
-              "/usr/share/hts-voice/nitech-jp-atr503-m001/nitech_jp_atr503_m001.htsvoice" \
-              "/usr/local/share/hts-voice/nitech-jp-atr503-m001/nitech_jp_atr503_m001.htsvoice" \
-              "/opt/homebrew/share/hts-voice/nitech-jp-atr503-m001/nitech_jp_atr503_m001.htsvoice"; do
-              if [ -f "$vp" ]; then
-                VOICE_FOUND="$vp"
-                break
-              fi
-            done
-            # Download HTS voice if not found on system
-            if [ -z "$VOICE_FOUND" ]; then
-              echo "HTS voice not found on system, downloading from SourceForge..."
-              mkdir -p /tmp/hts-voice
-              if curl -sfL "https://sourceforge.net/projects/open-jtalk/files/HTS%20voice/hts_voice_nitech_jp_atr503_m001-1.05/hts_voice_nitech_jp_atr503_m001-1.05.tar.gz/download" \
-                  -o /tmp/hts-voice.tar.gz; then
-                tar -xzf /tmp/hts-voice.tar.gz -C /tmp/hts-voice/ --strip-components=1
-                if [ -f "/tmp/hts-voice/nitech_jp_atr503_m001.htsvoice" ]; then
-                  VOICE_FOUND="/tmp/hts-voice/nitech_jp_atr503_m001.htsvoice"
-                fi
-              fi
-            fi
-            if [ -n "$VOICE_FOUND" ]; then
-              export OPENJTALK_VOICE="$VOICE_FOUND"
-              echo "Using HTS voice: $VOICE_FOUND"
-            else
-              echo "Warning: HTS voice not available, OpenJTalk optimized tests may skip"
-            fi
-
             export OPENJTALK_SKIP_TESTS_IF_UNAVAILABLE=1
             export OPENJTALK_DICTIONARY_DIR="${PWD}/naist-jdic"
             # Use system dictionary if available, fallback to downloaded one

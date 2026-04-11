@@ -4,7 +4,7 @@
 - マイルストーン: M3
 - 依存チケット: M1-001 (C++ ランタイムから `get_openjtalk_voice_path()` 削除済みであること)
 - ブロックするチケット: M4-001 (テスト追加 + クリーンアップ)
-- 状態: 未着手
+- 状態: :white_check_mark: 完了
 - 推定削除行数: ~120行 (コード削除) + 93行 (HTSEngine_CMakeLists.txt ファイル削除) — 内訳: 実 HTS Engine ビルドパス 51行 + CI stub 手動作成 23行 + PiperLink 分岐 26行 + PiperPlusShared 分岐 9行 + CI 環境変数 1行 + tests/CMakeLists.txt 7行
 
 ## 1. 目的とゴール

@@ -138,56 +138,13 @@ if(USE_HTS_ENGINE_STUB)
   # Create dummy target for dependencies
   add_custom_target(hts_engine_external DEPENDS hts_engine_stub)
 
-elseif(NOT DEFINED HTS_ENGINE_DIR)
-    set(HTS_ENGINE_DIR "${CMAKE_CURRENT_BINARY_DIR}/he")
-    set(HTS_ENGINE_VERSION "1.10")
-
-    if(WIN32)
-      # Use CMake build for Windows
-      ExternalProject_Add(
-        hts_engine_external
-        PREFIX "${CMAKE_CURRENT_BINARY_DIR}/h"
-        URL "https://downloads.sourceforge.net/project/hts-engine/hts_engine%20API/hts_engine_API-${HTS_ENGINE_VERSION}/hts_engine_API-${HTS_ENGINE_VERSION}.tar.gz"
-        CMAKE_ARGS
-          -DCMAKE_INSTALL_PREFIX:PATH=${HTS_ENGINE_DIR}
-          -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}
-          -DBUILD_SHARED_LIBS:BOOL=OFF
-          -DHTS_EMBEDDED:BOOL=ON
-          -DCMAKE_POSITION_INDEPENDENT_CODE:BOOL=ON
-          -DCMAKE_MSVC_RUNTIME_LIBRARY:STRING=${CMAKE_MSVC_RUNTIME_LIBRARY}
-          ${EXTERNAL_CMAKE_ARGS}
-        PATCH_COMMAND ${CMAKE_COMMAND} -E copy
-          ${CMAKE_CURRENT_SOURCE_DIR}/cmake/HTSEngine_CMakeLists.txt
-          <SOURCE_DIR>/CMakeLists.txt
-        BUILD_BYPRODUCTS ${HTS_ENGINE_DIR}/lib/HTSEngine.lib
-      )
-    else()
-      # Use autotools for Unix platforms
-      # Set architecture flags for configure scripts
-      if(APPLE)
-        # Apple Silicon (arm64) only
-        set(CONFIGURE_HOST "--host=aarch64-apple-darwin")
-        set(CONFIGURE_ENV "CFLAGS=-arch arm64 -fPIC" "CXXFLAGS=-arch arm64 -fPIC" "LDFLAGS=-arch arm64")
-      elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64" AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
-        # Linux ARM64 cross-compilation
-        set(CONFIGURE_HOST "--host=aarch64-linux-gnu")
-        set(CONFIGURE_ENV "CC=aarch64-linux-gnu-gcc" "CXX=aarch64-linux-gnu-g++" "AR=aarch64-linux-gnu-ar" "RANLIB=aarch64-linux-gnu-ranlib" "CFLAGS=-fPIC" "CXXFLAGS=-fPIC")
-      else()
-        set(CONFIGURE_HOST "")
-        set(CONFIGURE_ENV "CFLAGS=-fPIC" "CXXFLAGS=-fPIC")
-      endif()
-
-      ExternalProject_Add(
-        hts_engine_external
-        PREFIX "${CMAKE_CURRENT_BINARY_DIR}/h"
-        URL "https://downloads.sourceforge.net/project/hts-engine/hts_engine%20API/hts_engine_API-${HTS_ENGINE_VERSION}/hts_engine_API-${HTS_ENGINE_VERSION}.tar.gz"
-        CONFIGURE_COMMAND ${CMAKE_COMMAND} -E env ${CONFIGURE_ENV} ${CMAKE_COMMAND} -E chdir <SOURCE_DIR> ./configure --prefix=${HTS_ENGINE_DIR} ${CONFIGURE_HOST}
-        BUILD_COMMAND ${CMAKE_COMMAND} -E chdir <SOURCE_DIR> make
-        INSTALL_COMMAND ${CMAKE_COMMAND} -E chdir <SOURCE_DIR> make install
-        BUILD_IN_SOURCE 1
-        BUILD_BYPRODUCTS ${HTS_ENGINE_DIR}/lib/libHTSEngine.a
-      )
-    endif()
+else()
+  message(FATAL_ERROR
+    "USE_HTS_ENGINE_STUB=OFF is no longer supported. "
+    "piper-plus uses neural network synthesis (ONNX), not HTS Engine. "
+    "The HTS Engine stub is required for OpenJTalk header compatibility. "
+    "If you have a stale CMakeCache.txt with USE_HTS_ENGINE_STUB=OFF, "
+    "delete your build directory and re-run: rm -rf build && cmake -B build")
 endif()
 
 # ---- OpenJTalk ---

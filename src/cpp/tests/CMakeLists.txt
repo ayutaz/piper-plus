@@ -253,7 +253,6 @@ foreach(test_source ${TEST_SOURCES})
             ${ORT_INCLUDE_DIR}
             ${CMAKE_BINARY_DIR}/oj/include
             ${CMAKE_BINARY_DIR}/oj/include/openjtalk
-            ${CMAKE_BINARY_DIR}/hts_stub/include
         )
 
         # Add library directories
@@ -336,16 +335,15 @@ foreach(test_source ${TEST_SOURCES})
             ${ORT_INCLUDE_DIR}
             ${CMAKE_BINARY_DIR}/oj/include
             ${CMAKE_BINARY_DIR}/oj/include/openjtalk
-            ${CMAKE_BINARY_DIR}/hts_stub/include
         )
-        
+
         # Add library directories
         target_link_directories(${test_name} PRIVATE
             ${CMAKE_BINARY_DIR}/fi/lib
             ${CMAKE_BINARY_DIR}/si/lib
             ${ORT_LIB_DIR}
         )
-        
+
         # Platform-specific library linking (same as main piper)
         if(WIN32)
             # Windows: Link libraries directly
@@ -364,7 +362,7 @@ foreach(test_source ${TEST_SOURCES})
                 onnxruntime
             )
         endif()
-        
+
         # Platform-specific linking
         if(UNIX)
             find_package(Threads REQUIRED)
@@ -457,16 +455,15 @@ foreach(test_source ${TEST_SOURCES})
             ${ORT_INCLUDE_DIR}
             ${CMAKE_BINARY_DIR}/oj/include
             ${CMAKE_BINARY_DIR}/oj/include/openjtalk
-            ${CMAKE_BINARY_DIR}/hts_stub/include
         )
-        
+
         # Add library directories
         target_link_directories(${test_name} PRIVATE
             ${CMAKE_BINARY_DIR}/fi/lib
             ${CMAKE_BINARY_DIR}/si/lib
             ${ORT_LIB_DIR}
         )
-        
+
         # Platform-specific library linking (same as main piper)
         if(WIN32)
             # Windows: Link libraries directly
@@ -485,7 +482,7 @@ foreach(test_source ${TEST_SOURCES})
                 onnxruntime
             )
         endif()
-        
+
         # Platform-specific linking
         if(UNIX)
             find_package(Threads REQUIRED)
@@ -667,7 +664,6 @@ target_include_directories(test_c_api PRIVATE
     ${ORT_INCLUDE_DIR}
     ${CMAKE_BINARY_DIR}/oj/include
     ${CMAKE_BINARY_DIR}/oj/include/openjtalk
-    ${CMAKE_BINARY_DIR}/hts_stub/include
 )
 
 # Library directories
@@ -751,7 +747,6 @@ target_include_directories(test_c_api_integration PRIVATE
     ${ORT_INCLUDE_DIR}
     ${CMAKE_BINARY_DIR}/oj/include
     ${CMAKE_BINARY_DIR}/oj/include/openjtalk
-    ${CMAKE_BINARY_DIR}/hts_stub/include
 )
 
 target_link_directories(test_c_api_integration PRIVATE
@@ -834,7 +829,6 @@ target_include_directories(test_c_api_audio_regression PRIVATE
     ${ORT_INCLUDE_DIR}
     ${CMAKE_BINARY_DIR}/oj/include
     ${CMAKE_BINARY_DIR}/oj/include/openjtalk
-    ${CMAKE_BINARY_DIR}/hts_stub/include
 )
 
 target_link_directories(test_c_api_audio_regression PRIVATE

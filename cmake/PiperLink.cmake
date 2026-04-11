@@ -54,40 +54,11 @@ if(TARGET piper)
   add_dependencies(test_piper openjtalk_external)
 endif()
 
-# Link HTS_Engine (required for OpenJTalk build)
-add_dependencies(piper_common hts_engine_external)
-if(TARGET piper)
-  add_dependencies(piper hts_engine_external)
-  add_dependencies(test_piper hts_engine_external)
-endif()
-
 # hts_engine_stub: OpenJTalk ヘッダーが HTS_engine.h を transitively include するため、
 # 型定義互換シムとしてリンクが必要。HTS 合成機能は一切使用しない。
-if(USE_HTS_ENGINE_STUB)
-  if(TARGET piper)
-    target_link_libraries(piper PRIVATE hts_engine_stub)
-    target_link_libraries(test_piper PRIVATE hts_engine_stub)
-  endif()
-else()
-  if(WIN32)
-    if(TARGET piper)
-      target_link_libraries(piper PRIVATE
-        ${CMAKE_CURRENT_BINARY_DIR}/he/lib/HTSEngine.lib
-      )
-      target_link_libraries(test_piper PRIVATE
-        ${CMAKE_CURRENT_BINARY_DIR}/he/lib/HTSEngine.lib
-      )
-    endif()
-  else()
-    if(TARGET piper)
-      target_link_libraries(piper PRIVATE
-        ${CMAKE_CURRENT_BINARY_DIR}/he/lib/libHTSEngine.a
-      )
-      target_link_libraries(test_piper PRIVATE
-        ${CMAKE_CURRENT_BINARY_DIR}/he/lib/libHTSEngine.a
-      )
-    endif()
-  endif()
+if(TARGET piper)
+  target_link_libraries(piper PRIVATE hts_engine_stub)
+  target_link_libraries(test_piper PRIVATE hts_engine_stub)
 endif()
 
 # ---- piper / test_piper link directories and include directories ----

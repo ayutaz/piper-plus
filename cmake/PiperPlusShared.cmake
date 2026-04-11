@@ -19,7 +19,7 @@ else()
 endif()
 
 # Dependencies (same as piper/test_piper)
-add_dependencies(piper_plus fmt_external spdlog_external openjtalk_external hts_engine_external)
+add_dependencies(piper_plus fmt_external spdlog_external openjtalk_external)
 if(TARGET onnxruntime_external)
   add_dependencies(piper_plus onnxruntime_external)
 endif()
@@ -98,16 +98,8 @@ else()
   target_link_libraries(piper_plus PRIVATE ${OPENJTALK_DIR}/lib/libopenjtalk.a)
 endif()
 
-# Link HTS Engine
-if(USE_HTS_ENGINE_STUB)
-  target_link_libraries(piper_plus PRIVATE hts_engine_stub)
-else()
-  if(WIN32)
-    target_link_libraries(piper_plus PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/he/lib/HTSEngine.lib)
-  else()
-    target_link_libraries(piper_plus PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/he/lib/libHTSEngine.a)
-  endif()
-endif()
+# Link HTS Engine stub (required for OpenJTalk header compatibility)
+target_link_libraries(piper_plus PRIVATE hts_engine_stub)
 
 # Link pthread and libdl on Linux/Android
 if(ANDROID)
