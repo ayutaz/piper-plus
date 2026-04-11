@@ -84,12 +84,8 @@ for file in "${DICT_FILES[@]}"; do
 done
 echo -e "  Total dictionary size: $((DICT_TOTAL_SIZE / 1024 / 1024)) MB"
 
-# 5. Check voice files
-echo -e "\n${BLUE}5. Checking voice files...${NC}"
-check_file "assets/voice/mei_normal.htsvoice"
-
-# 6. Check permissions
-echo -e "\n${BLUE}6. Checking file permissions...${NC}"
+# 5. Check permissions
+echo -e "\n${BLUE}5. Checking file permissions...${NC}"
 if [ -r "dist/openjtalk.wasm" ] && [ -r "dist/openjtalk.js" ]; then
     echo -e "  ${GREEN}✓${NC} Files are readable"
 else
@@ -97,8 +93,8 @@ else
     FAILED=1
 fi
 
-# 7. Test HTTP serving
-echo -e "\n${BLUE}7. Testing HTTP serving capability...${NC}"
+# 6. Test HTTP serving
+echo -e "\n${BLUE}6. Testing HTTP serving capability...${NC}"
 # Check if Python is available
 if command -v python3 &> /dev/null; then
     echo -e "  ${GREEN}✓${NC} Python3 available for HTTP server"
@@ -106,8 +102,8 @@ else
     echo -e "  ${YELLOW}!${NC} Python3 not found"
 fi
 
-# 8. Check for common issues
-echo -e "\n${BLUE}8. Checking for common issues...${NC}"
+# 7. Check for common issues
+echo -e "\n${BLUE}7. Checking for common issues...${NC}"
 
 # Check if WASM file has the right magic number
 if xxd -l 4 -p dist/openjtalk.wasm 2>/dev/null | grep -q "0061736d"; then
@@ -124,14 +120,14 @@ else
     echo -e "  ${YELLOW}!${NC} Environment flags not found"
 fi
 
-# 9. Memory estimation
-echo -e "\n${BLUE}9. Memory requirements...${NC}"
+# 8. Memory estimation
+echo -e "\n${BLUE}8. Memory requirements...${NC}"
 WASM_SIZE=$(stat -f%z "dist/openjtalk.wasm" 2>/dev/null || stat -c%s "dist/openjtalk.wasm" 2>/dev/null)
 ESTIMATED_MEMORY=$((WASM_SIZE * 3 + DICT_TOTAL_SIZE + 33554432)) # WASM + dict + initial heap
 echo -e "  Estimated memory needed: $((ESTIMATED_MEMORY / 1024 / 1024)) MB"
 
-# 10. Quick syntax check
-echo -e "\n${BLUE}10. Checking for syntax errors...${NC}"
+# 9. Quick syntax check
+echo -e "\n${BLUE}9. Checking for syntax errors...${NC}"
 if node -c dist/openjtalk.js 2>/dev/null; then
     echo -e "  ${GREEN}✓${NC} No syntax errors in JS file"
 else

@@ -40,7 +40,7 @@ void free_string(char* str) {
 
 // Placeholder functions for OpenJTalk API
 EMSCRIPTEN_KEEPALIVE
-int openjtalk_initialize(const char* dic_dir, const char* voice_path) {
+int openjtalk_initialize(const char* dic_dir) {
     // For now, just return success
     return 0;
 }

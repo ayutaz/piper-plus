@@ -35,7 +35,7 @@ export class JapaneseG2P {
      * @param {Object} [options.openjtalkModule] - Pre-loaded OpenJTalk WASM module instance.
      *   If provided, initialize() will skip module loading.
      * @param {Object} [options.jaDict] - Dictionary data object.
-     *   Must contain { dictData: { [filename]: ArrayBuffer }, voiceData: ArrayBuffer }
+     *   Must contain { dictData: { [filename]: ArrayBuffer } }
      */
     constructor(options = {}) {
         /** @private */
@@ -62,7 +62,7 @@ export class JapaneseG2P {
      *
      * @param {Object} [options]
      * @param {Object} [options.openjtalkModule] - OpenJTalk WASM module instance
-     * @param {Object} [options.jaDict] - { dictData: { [filename]: ArrayBuffer }, voiceData: ArrayBuffer }
+     * @param {Object} [options.jaDict] - { dictData: { [filename]: ArrayBuffer } }
      * @throws {Error} If openjtalkModule is not provided
      * @throws {Error} If required dictionary files are missing
      * @throws {Error} If OpenJTalk initialization fails
@@ -87,10 +87,8 @@ export class JapaneseG2P {
 
         // Initialize OpenJTalk C API
         const dictPtr = mod.allocateUTF8('/dict');
-        const voicePtr = mod.allocateUTF8('/voice/voice.htsvoice');
-        const result = mod._openjtalk_initialize(dictPtr, voicePtr);
+        const result = mod._openjtalk_initialize(dictPtr);
         mod._free(dictPtr);
-        mod._free(voicePtr);
 
         if (result !== 0) {
             throw new Error(`OpenJTalk initialization failed with code: ${result}`);
@@ -170,15 +168,15 @@ export class JapaneseG2P {
     /**
      * Write dictionary files into the WASM filesystem.
      * @private
-     * @param {Object} dict - { dictData: { [filename]: ArrayBuffer }, voiceData: ArrayBuffer }
+     * @param {Object} dict - { dictData: { [filename]: ArrayBuffer } }
      */
     _loadDict(dict) {
         const mod = this._openjtalkModule;
-        const { dictData, voiceData } = dict;
+        const { dictData } = dict;
 
-        if (!dictData || !voiceData) {
+        if (!dictData) {
             throw new Error(
-                'jaDict must have { dictData: { [filename]: ArrayBuffer }, voiceData: ArrayBuffer }.'
+                'jaDict must have { dictData: { [filename]: ArrayBuffer } }.'
             );
         }
 
@@ -191,17 +189,11 @@ export class JapaneseG2P {
             );
         }
 
-        if (!(voiceData instanceof ArrayBuffer)) {
-            throw new Error('voiceData must be an ArrayBuffer.');
-        }
-
         // Create directories (ignore if already exist)
         try { mod.FS.mkdir('/dict'); } catch (_) { /* exists */ }
-        try { mod.FS.mkdir('/voice'); } catch (_) { /* exists */ }
 
         for (const file of DICT_FILE_NAMES) {
             mod.FS.writeFile(`/dict/${file}`, new Uint8Array(dictData[file]));
         }
-        mod.FS.writeFile('/voice/voice.htsvoice', new Uint8Array(voiceData));
     }
 }

@@ -197,8 +197,7 @@ export class G2P {
 /**
  * Japanese dictionary data loaded by DictLoader.
  *
- * Contains the 8 MeCab dictionary files required by OpenJTalk and
- * optionally the HTS voice file for full synthesis.
+ * Contains the 8 MeCab dictionary files required by OpenJTalk.
  */
 export interface JaDictData {
     /**
@@ -207,8 +206,6 @@ export interface JaDictData {
      * left-id.def, pos-id.def, rewrite.def, right-id.def.
      */
     dictFiles: Record<string, ArrayBuffer>;
-    /** HTS voice data. Only present when loaded with `includeVoice: true`. */
-    voiceData?: ArrayBuffer;
 }
 
 /** Options for DictLoader.loadJaDict(). */
@@ -218,14 +215,6 @@ export interface DictLoadOptions {
      * Defaults to the official GitHub Releases URL.
      */
     dictUrl?: string;
-    /**
-     * Whether to also download the HTS voice file.
-     * G2P-only usage does not require the voice file.
-     * @default false
-     */
-    includeVoice?: boolean;
-    /** Custom URL for the HTS voice file. */
-    voiceUrl?: string;
     /**
      * Progress callback invoked during download.
      * Called with `{ loaded, total }` in bytes.
@@ -262,7 +251,7 @@ export class DictLoader {
      * return instantly from the cache.
      *
      * @param options - Download options.
-     * @returns Dictionary data with MeCab files and optional voice data.
+     * @returns Dictionary data with MeCab files.
      */
     loadJaDict(options?: DictLoadOptions): Promise<JaDictData>;
 
@@ -274,7 +263,7 @@ export class DictLoader {
     isCached(): Promise<boolean>;
 
     /**
-     * Remove all cached dictionary and voice data from IndexedDB.
+     * Remove all cached dictionary data from IndexedDB.
      */
     clearCache(): Promise<void>;
 

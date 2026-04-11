@@ -34,20 +34,6 @@ tar -xzf dict.tar.gz -C "$DICT_DIR" --strip-components=1
 echo "Dictionary files:"
 ls -la "$DICT_DIR/"
 
-# Create a minimal HTS voice file for testing
-VOICE_DIR="$ASSETS_DIR/voice"
-mkdir -p "$VOICE_DIR"
-
-# Check if we have MEI voice files from wasm_open_jtalk
-WASM_OPEN_JTALK_DIR="$PROJECT_DIR/tools/wasm_open_jtalk"
-if [ -d "$WASM_OPEN_JTALK_DIR/etc/mei" ]; then
-    echo "Copying MEI voice files..."
-    cp "$WASM_OPEN_JTALK_DIR/etc/mei/"*.htsvoice "$VOICE_DIR/" || true
-    ls -la "$VOICE_DIR/"
-else
-    echo "MEI voice files not found. You'll need to add HTS voice files manually."
-fi
-
 # Create metadata file
 cat > "$ASSETS_DIR/assets.json" << EOF
 {
@@ -64,13 +50,6 @@ cat > "$ASSETS_DIR/assets.json" << EOF
       "rewrite.def",
       "right-id.def"
     ]
-  },
-  "voices": {
-    "mei_normal": {
-      "name": "MEI Normal",
-      "file": "mei_normal.htsvoice",
-      "language": "ja"
-    }
   }
 }
 EOF

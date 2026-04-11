@@ -37,10 +37,6 @@ check_file "assets/dict/matrix.bin" || FAILED=1
 check_file "assets/dict/sys.dic" || FAILED=1
 check_file "assets/dict/unk.dic" || FAILED=1
 
-echo ""
-echo "Checking voice files..."
-check_file "assets/voice/mei_normal.htsvoice" || FAILED=1
-
 # Check WASM module exports using wasm-objdump if available
 if command -v wasm-objdump &> /dev/null; then
     echo ""

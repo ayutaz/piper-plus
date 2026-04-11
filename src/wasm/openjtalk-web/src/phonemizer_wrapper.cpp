@@ -7,7 +7,7 @@
 
 // Forward declarations for OpenJTalk functions
 extern "C" {
-    int openjtalk_initialize(const char* dict_dir, const char* voice_path);
+    int openjtalk_initialize(const char* dict_dir);
     char* openjtalk_synthesis_labels(const char* text);
     void openjtalk_clear();
     void openjtalk_free_string(char* str);
@@ -103,8 +103,8 @@ Language detectLanguage(const std::string& text) {
 extern "C" {
 
 EMSCRIPTEN_KEEPALIVE
-int phonemizer_initialize_openjtalk(const char* dict_dir, const char* voice_path) {
-    return openjtalk_initialize(dict_dir, voice_path);
+int phonemizer_initialize_openjtalk(const char* dict_dir) {
+    return openjtalk_initialize(dict_dir);
 }
 
 EMSCRIPTEN_KEEPALIVE

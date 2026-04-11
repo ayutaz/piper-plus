@@ -27,9 +27,8 @@ console.log('Browser test flow:');
 console.log('1. Load WASM module');
 console.log('2. Initialize file system');
 console.log('3. Load dictionary files');
-console.log('4. Load voice file');
-console.log('5. Call openjtalk_initialize("/dict", "/voice/mei_normal.htsvoice")');
-console.log('6. Call openjtalk_synthesis_labels("こんにちは、世界！...")');
+console.log('4. Call openjtalk_initialize("/dict")');
+console.log('5. Call openjtalk_synthesis_labels("こんにちは、世界！...")');
 console.log('\n');
 
 console.log('Current issue:');

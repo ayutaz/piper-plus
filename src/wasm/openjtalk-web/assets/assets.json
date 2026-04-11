@@ -12,12 +12,5 @@
       "rewrite.def",
       "right-id.def"
     ]
-  },
-  "voices": {
-    "mei_normal": {
-      "name": "MEI Normal",
-      "file": "mei_normal.htsvoice",
-      "language": "ja"
-    }
   }
 }

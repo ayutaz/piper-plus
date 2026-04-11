@@ -106,37 +106,14 @@ function loadDictionaryFiles(Module) {
     log(`Dictionary loaded successfully (Total: ${totalSize.toLocaleString()} bytes)`, 'success');
 }
 
-function loadVoiceFile(Module) {
-    log('Loading voice file...', 'info');
-    
-    const voicePath = path.join(ASSETS_DIR, 'voice', 'mei_normal.htsvoice');
-    if (!fs.existsSync(voicePath)) {
-        throw new Error(`Voice file not found: ${voicePath}`);
-    }
-    
-    // Create directory in virtual FS
-    try {
-        Module.FS.mkdir('/voice');
-    } catch (e) {
-        // Directory may already exist
-    }
-    
-    const data = fs.readFileSync(voicePath);
-    Module.FS.writeFile('/voice/mei_normal.htsvoice', data);
-    
-    log(`Voice file loaded successfully (${data.length.toLocaleString()} bytes)`, 'success');
-}
-
 function initializeOpenJTalk(Module) {
     log('Initializing OpenJTalk...', 'info');
     
     const dictPtr = Module.allocateUTF8('/dict');
-    const voicePtr = Module.allocateUTF8('/voice/mei_normal.htsvoice');
-    
-    const result = Module._openjtalk_initialize(dictPtr, voicePtr);
-    
+
+    const result = Module._openjtalk_initialize(dictPtr);
+
     Module._free(dictPtr);
-    Module._free(voicePtr);
     
     if (result === 0) {
         log('OpenJTalk initialized successfully!', 'success');
@@ -233,8 +210,7 @@ async function main() {
         
         // Load resources
         loadDictionaryFiles(Module);
-        loadVoiceFile(Module);
-        
+
         // Initialize
         initializeOpenJTalk(Module);
         
