@@ -106,7 +106,7 @@ def test_infer_returns_fullband_only():
     lid = torch.LongTensor([0])
 
     with torch.no_grad():
-        o, attn, y_mask, latents = model.infer(
+        o, attn, y_mask, latents, _durations = model.infer(
             x, x_lengths, sid=sid, lid=lid
         )
     assert o.shape[1] == 1  # fullband

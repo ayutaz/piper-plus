@@ -4,8 +4,8 @@ Training-only loss module. Not included in the ONNX inference graph.
 """
 
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
+from torch import nn
 
 
 class SpectralConvergenceLoss(nn.Module):
@@ -25,7 +25,9 @@ class SpectralConvergenceLoss(nn.Module):
         Returns:
             Scalar loss value: ||y_mag - x_mag||_F / ||y_mag||_F
         """
-        return torch.norm(y_mag - x_mag, p="fro") / torch.norm(y_mag, p="fro").clamp(min=1e-7)
+        return torch.norm(y_mag - x_mag, p="fro") / torch.norm(y_mag, p="fro").clamp(
+            min=1e-7
+        )
 
 
 class LogSTFTMagnitudeLoss(nn.Module):
@@ -117,7 +119,7 @@ class MultiResolutionSTFTLoss(nn.Module):
     ) -> None:
         super().__init__()
         self.stft_losses = nn.ModuleList()
-        for fs, hs, ws in zip(fft_sizes, hop_sizes, win_sizes):
+        for fs, hs, ws in zip(fft_sizes, hop_sizes, win_sizes, strict=False):
             self.stft_losses.append(STFTLoss(fs, hs, ws))
 
     def forward(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:

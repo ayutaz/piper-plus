@@ -18,6 +18,7 @@ from .commons import init_weights
 from .modules import ResBlock1, ResBlock2
 from .stft_onnx import OnnxISTFT
 
+
 LRELU_SLOPE = 0.1
 
 
@@ -62,9 +63,7 @@ class PQMF(nn.Module):
                 analysis_filter[k, 0, n] = (
                     2.0
                     * prototype[n]
-                    * np.cos(
-                        (2 * k + 1) * np.pi / (2 * subbands) * (n - subbands / 2)
-                    )
+                    * np.cos((2 * k + 1) * np.pi / (2 * subbands) * (n - subbands / 2))
                 )
 
         # Synthesis filter: time-reversed analysis filter
@@ -261,14 +260,16 @@ class MBiSTFTGenerator(nn.Module):
         x = x.reshape(B, self.subbands, self.n_fft + 2, T_frames)
 
         # Magnitude (positive via exp) and phase (bounded to [-pi, pi] via sin)
-        mag = torch.exp(x[:, :, :n_half, :])    # [B, subbands, 9, T_frames]
+        mag = torch.exp(x[:, :, :n_half, :])  # [B, subbands, 9, T_frames]
         phase = torch.sin(x[:, :, n_half:, :]) * math.pi  # [B, subbands, 9, T_frames]
 
         # Flatten subbands into batch for iSTFT (expects [B, n_fft//2+1, T])
         mag = mag.reshape(B * self.subbands, n_half, T_frames)
         phase = phase.reshape(B * self.subbands, n_half, T_frames)
         sub_wav = self.istft(mag, phase)  # [B*subbands, 1, T_sub_raw]
-        subbands_signal = sub_wav.reshape(B, self.subbands, -1)  # [B, subbands, T_sub_raw]
+        subbands_signal = sub_wav.reshape(
+            B, self.subbands, -1
+        )  # [B, subbands, T_sub_raw]
 
         # Trim iSTFT output to expected length.
         # conv_transpose1d produces (T-1)*stride + kernel extra samples;

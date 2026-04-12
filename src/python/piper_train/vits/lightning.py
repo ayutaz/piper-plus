@@ -627,9 +627,7 @@ class VitsModel(pl.LightningModule):
             # MB-iSTFT: sub-band STFT loss
             if self.hparams.mb_istft and o_mb is not None:
                 y_mb = self.pqmf.analysis(y)  # GT subbands [B, 4, T//4]
-                loss_sub_stft = (
-                    self.sub_stft_loss(o_mb, y_mb) * self.hparams.c_sub_stft
-                )
+                loss_sub_stft = self.sub_stft_loss(o_mb, y_mb) * self.hparams.c_sub_stft
                 loss_gen_all = loss_gen_all + loss_sub_stft
                 self._log_with_batch_info("loss_sub_stft", loss_sub_stft, batch)
 
