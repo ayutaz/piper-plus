@@ -71,6 +71,36 @@ public class TextSplitterTests
         Assert.Equal("Then left.", result[1]);
     }
 
+    [Fact]
+    public void ClosingPunctuation_RightDoubleQuotationMark()
+    {
+        // U+201D right double quotation mark
+        var result = TextSplitter.SplitSentences("She said \u201CHello.\u201D Then left.");
+        Assert.Equal(2, result.Count);
+        Assert.Equal("She said \u201CHello.\u201D", result[0]);
+        Assert.Equal("Then left.", result[1]);
+    }
+
+    [Fact]
+    public void ClosingPunctuation_RightSingleQuotationMark()
+    {
+        // U+2019 right single quotation mark
+        var result = TextSplitter.SplitSentences("She said \u2018Hello.\u2019 Then left.");
+        Assert.Equal(2, result.Count);
+        Assert.Equal("She said \u2018Hello.\u2019", result[0]);
+        Assert.Equal("Then left.", result[1]);
+    }
+
+    [Fact]
+    public void ClosingPunctuation_RightPointingDoubleAngleQuotationMark()
+    {
+        // U+00BB right-pointing double angle quotation mark
+        var result = TextSplitter.SplitSentences("\u00ABBonjour.\u00BB Au revoir.");
+        Assert.Equal(2, result.Count);
+        Assert.Equal("\u00ABBonjour.\u00BB", result[0]);
+        Assert.Equal("Au revoir.", result[1]);
+    }
+
     // ================================================================
     // Edge cases: empty and whitespace
     // ================================================================

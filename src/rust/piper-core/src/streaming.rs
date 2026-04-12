@@ -336,6 +336,9 @@ fn is_closing_punctuation(ch: char) -> bool {
             | '\u{FF3D}' // ］
             | '\u{3011}' // 】
             | '\u{FF63}' // ｣ (half-width)
+            | '\u{201D}' // " right double quotation mark
+            | '\u{2019}' // ' right single quotation mark
+            | '\u{00BB}' // » right-pointing double angle quotation mark
     )
 }
 
@@ -582,6 +585,36 @@ mod tests {
         assert_eq!(result.len(), 2);
         assert_eq!(result[0], "「こんにちは。」");
         assert_eq!(result[1], "次の文。");
+    }
+
+    #[test]
+    fn test_split_sentences_with_right_double_quote() {
+        // U+201C / U+201D: "Hello." should stay in the first chunk
+        let text = "She said \u{201C}Hello.\u{201D} Then left.";
+        let result = split_sentences(text);
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0], "She said \u{201C}Hello.\u{201D}");
+        assert_eq!(result[1], "Then left.");
+    }
+
+    #[test]
+    fn test_split_sentences_with_right_single_quote() {
+        // U+2018 / U+2019: 'Hi.' should stay in the first chunk
+        let text = "She said \u{2018}Hi.\u{2019} Then left.";
+        let result = split_sentences(text);
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0], "She said \u{2018}Hi.\u{2019}");
+        assert_eq!(result[1], "Then left.");
+    }
+
+    #[test]
+    fn test_split_sentences_with_guillemet() {
+        // U+00AB / U+00BB: «Bonjour.» should stay in the first chunk
+        let text = "Il a dit \u{00AB}Bonjour.\u{00BB} Ensuite.";
+        let result = split_sentences(text);
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0], "Il a dit \u{00AB}Bonjour.\u{00BB}");
+        assert_eq!(result[1], "Ensuite.");
     }
 
     #[test]

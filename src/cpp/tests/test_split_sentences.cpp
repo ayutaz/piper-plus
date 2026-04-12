@@ -54,6 +54,25 @@ size_t calculateDynamicChunkSize(const std::vector<char32_t>& cps,
   return baseSize * 2;
 }
 
+// ---- Mirror of piper.cpp isClosingPunctuation (Issue #346, M1) ----
+bool isClosingPunctuation(char32_t c) {
+  switch (c) {
+    case U')': case U']': case U'}': case U'"': case U'\'':
+    case U'\u300D': // 」 Right Corner Bracket
+    case U'\u300F': // 』 Right White Corner Bracket
+    case U'\uFF09': // ） Fullwidth Right Parenthesis
+    case U'\uFF3D': // ］ Fullwidth Right Square Bracket
+    case U'\u3011': // 】 Right Black Lenticular Bracket
+    case U'\uFF63': // ｣  Halfwidth Right Corner Bracket
+    case U'\u201D': // "  Right Double Quotation Mark
+    case U'\u2019': // '  Right Single Quotation Mark
+    case U'\u00BB': // »  Right-Pointing Double Angle Quotation Mark
+      return true;
+    default:
+      return false;
+  }
+}
+
 // ---- Mirror of piper.cpp splitTextToSentences ----
 std::vector<std::string> splitTextToSentences(
     const std::string &text,
@@ -74,7 +93,7 @@ std::vector<std::string> splitTextToSentences(
   auto isBoundaryPunct = [&](char32_t c) -> bool {
     if (phonemeType == MultilingualPhonemes) {
       return c == U'\u3002' || c == U'\uFF01' || c == U'\uFF1F' ||
-             c == U'.' || c == U'!' || c == U'?' ||
+             c == U'\uFF0E' || c == U'.' || c == U'!' || c == U'?' ||
              c == U'\u2026';
     } else if (usesOpenJTalk(phonemeType)) {
       return c == U'\u3002' || c == U'\uFF01' || c == U'\uFF1F' ||
@@ -88,7 +107,7 @@ std::vector<std::string> splitTextToSentences(
   auto isSentenceTerminator = [&](char32_t c) -> bool {
     if (phonemeType == MultilingualPhonemes) {
       return c == U'\u3002' || c == U'\uFF01' || c == U'\uFF1F' ||
-             c == U'.' || c == U'!' || c == U'?';
+             c == U'\uFF0E' || c == U'.' || c == U'!' || c == U'?';
     } else if (usesOpenJTalk(phonemeType)) {
       return c == U'\u3002' || c == U'\uFF01' || c == U'\uFF1F';
     } else {
@@ -107,6 +126,12 @@ std::vector<std::string> splitTextToSentences(
       while (punctEnd < cpLen && isBoundaryPunct(cps[punctEnd])) {
         if (isSentenceTerminator(cps[punctEnd])) hasTerminator = true;
         punctEnd++;
+      }
+      // Issue #346: Consume closing brackets/quotes after sentence terminator
+      if (hasTerminator) {
+        while (punctEnd < cpLen && isClosingPunctuation(cps[punctEnd])) {
+          punctEnd++;
+        }
       }
       i = punctEnd - 1;
       size_t chunkLen = punctEnd - sentenceStart;
@@ -405,4 +430,137 @@ TEST(DynamicChunkSizeTest, HighPunctDensityCJK) {
   // 52 periods out of 104 = 50% density > 5% -> should return baseSize (50)
   size_t result = calculateDynamicChunkSize(cps);
   EXPECT_EQ(result, 50u);
+}
+
+// ========================================================================
+// Issue #346: CJK closing bracket consumption
+// ========================================================================
+
+TEST(SplitSentencesTest, CJKClosingBracket_BasicKakko) {
+  auto result = splitTextToSentences(
+      u8"「こんにちは。」次の文。",
+      MultilingualPhonemes);
+  ASSERT_EQ(result.size(), 2u);
+  EXPECT_EQ(result[0], u8"「こんにちは。」");
+  EXPECT_EQ(result[1], u8"次の文。");
+}
+
+TEST(SplitSentencesTest, CJKClosingBracket_DoubleCornerBracket) {
+  auto result = splitTextToSentences(
+      u8"『素晴らしい！』感動した。",
+      MultilingualPhonemes);
+  ASSERT_EQ(result.size(), 2u);
+  EXPECT_EQ(result[0], u8"『素晴らしい！』");
+  EXPECT_EQ(result[1], u8"感動した。");
+}
+
+TEST(SplitSentencesTest, CJKClosingBracket_FullwidthParen) {
+  auto result = splitTextToSentences(
+      u8"結果は（成功です。）次へ。",
+      MultilingualPhonemes);
+  ASSERT_EQ(result.size(), 2u);
+  EXPECT_EQ(result[0], u8"結果は（成功です。）");
+  EXPECT_EQ(result[1], u8"次へ。");
+}
+
+TEST(SplitSentencesTest, CJKClosingBracket_Sumitsuki) {
+  auto result = splitTextToSentences(
+      u8"【テスト。】次。",
+      MultilingualPhonemes);
+  ASSERT_EQ(result.size(), 2u);
+  EXPECT_EQ(result[0], u8"【テスト。】");
+  EXPECT_EQ(result[1], u8"次。");
+}
+
+TEST(SplitSentencesTest, CJKClosingBracket_HalfwidthKakko) {
+  auto result = splitTextToSentences(
+      u8"｢テスト。｣次。",
+      MultilingualPhonemes);
+  ASSERT_EQ(result.size(), 2u);
+  EXPECT_EQ(result[0], u8"｢テスト。｣");
+  EXPECT_EQ(result[1], u8"次。");
+}
+
+TEST(SplitSentencesTest, CJKClosingBracket_MultipleBrackets) {
+  auto result = splitTextToSentences(
+      u8"「『OK。』」次。",
+      MultilingualPhonemes);
+  ASSERT_EQ(result.size(), 2u);
+  EXPECT_EQ(result[0], u8"「『OK。』」");
+  EXPECT_EQ(result[1], u8"次。");
+}
+
+TEST(SplitSentencesTest, WesternClosingQuote) {
+  auto result = splitTextToSentences(
+      "She said \"Hello.\" Then left.",
+      MultilingualPhonemes);
+  ASSERT_EQ(result.size(), 2u);
+  EXPECT_EQ(result[0], "She said \"Hello.\"");
+  EXPECT_EQ(result[1], " Then left.");
+}
+
+TEST(SplitSentencesTest, WesternClosingParen) {
+  auto result = splitTextToSentences(
+      "Result (ok.) Next.",
+      MultilingualPhonemes);
+  ASSERT_EQ(result.size(), 2u);
+  EXPECT_EQ(result[0], "Result (ok.)");
+  EXPECT_EQ(result[1], " Next.");
+}
+
+TEST(SplitSentencesTest, CJKClosingBracket_NoClosingNoop) {
+  auto result = splitTextToSentences(
+      u8"テスト。次のテスト。",
+      MultilingualPhonemes);
+  ASSERT_EQ(result.size(), 2u);
+  EXPECT_EQ(result[0], u8"テスト。");
+  EXPECT_EQ(result[1], u8"次のテスト。");
+}
+
+TEST(SplitSentencesTest, CJKClosingBracket_NoTerminatorNoop) {
+  // 「テスト」 -- 」 の前に文末記号がないため分割しない
+  auto result = splitTextToSentences(
+      u8"「テスト」続き。",
+      MultilingualPhonemes);
+  ASSERT_EQ(result.size(), 1u);
+  EXPECT_EQ(result[0], u8"「テスト」続き。");
+}
+
+TEST(SplitSentencesTest, CJKClosingBracket_ConsecutiveThree) {
+  // 3 consecutive closing brackets: all consumed greedily
+  auto result = splitTextToSentences(
+      u8"テスト。」』）次。",
+      MultilingualPhonemes);
+  ASSERT_EQ(result.size(), 2u);
+  EXPECT_EQ(result[0], u8"テスト。」』）");
+  EXPECT_EQ(result[1], u8"次。");
+}
+
+TEST(SplitSentencesTest, CJKClosingBracket_EndOfString) {
+  // Text ends with closing bracket, no trailing text
+  auto result = splitTextToSentences(
+      u8"「テスト。」",
+      MultilingualPhonemes);
+  ASSERT_EQ(result.size(), 1u);
+  EXPECT_EQ(result[0], u8"「テスト。」");
+}
+
+TEST(SplitSentencesTest, CJKClosingBracket_FullwidthPeriod) {
+  // U+FF0E (fullwidth full stop) as sentence terminator + closing bracket
+  auto result = splitTextToSentences(
+      u8"「テスト．」次。",
+      MultilingualPhonemes);
+  ASSERT_EQ(result.size(), 2u);
+  EXPECT_EQ(result[0], u8"「テスト．」");
+  EXPECT_EQ(result[1], u8"次。");
+}
+
+TEST(SplitSentencesTest, CJKClosingBracket_OpenJTalkMode) {
+  // OpenJTalk mode: 。 is both boundary and terminator, bracket consumed
+  auto result = splitTextToSentences(
+      u8"「こんにちは。」次の文。",
+      OpenJTalkPhonemes);
+  ASSERT_EQ(result.size(), 2u);
+  EXPECT_EQ(result[0], u8"「こんにちは。」");
+  EXPECT_EQ(result[1], u8"次の文。");
 }
