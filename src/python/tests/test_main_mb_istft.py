@@ -6,6 +6,8 @@ and that --mb-istft with --quality high is rejected.
 
 import pytest
 
+pytest.importorskip("torch", reason="torch required for piper_train.__main__")
+
 
 # Minimal required args for create_parser().parse_args() to succeed
 # (--dataset-dir and --batch-size are both required)
