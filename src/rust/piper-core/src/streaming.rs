@@ -588,6 +588,36 @@ mod tests {
     }
 
     #[test]
+    fn test_split_sentences_with_right_double_quote() {
+        // U+201C / U+201D: "Hello." should stay in the first chunk
+        let text = "She said \u{201C}Hello.\u{201D} Then left.";
+        let result = split_sentences(text);
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0], "She said \u{201C}Hello.\u{201D}");
+        assert_eq!(result[1], "Then left.");
+    }
+
+    #[test]
+    fn test_split_sentences_with_right_single_quote() {
+        // U+2018 / U+2019: 'Hi.' should stay in the first chunk
+        let text = "She said \u{2018}Hi.\u{2019} Then left.";
+        let result = split_sentences(text);
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0], "She said \u{2018}Hi.\u{2019}");
+        assert_eq!(result[1], "Then left.");
+    }
+
+    #[test]
+    fn test_split_sentences_with_guillemet() {
+        // U+00AB / U+00BB: «Bonjour.» should stay in the first chunk
+        let text = "Il a dit \u{00AB}Bonjour.\u{00BB} Ensuite.";
+        let result = split_sentences(text);
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0], "Il a dit \u{00AB}Bonjour.\u{00BB}");
+        assert_eq!(result[1], "Ensuite.");
+    }
+
+    #[test]
     fn test_split_sentences_single_sentence() {
         let text = "一つだけ。";
         let result = split_sentences(text);
