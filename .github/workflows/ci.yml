@@ -43,6 +43,7 @@ jobs:
           filters: |
             python:
               - 'src/python/**'
+              - 'src/python_run/**'
               - 'pyproject.toml'
               - 'uv.lock'
             rust:

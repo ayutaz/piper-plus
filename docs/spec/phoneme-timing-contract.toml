@@ -1,0 +1,236 @@
+# Phoneme Timing Output Contract
+# ===============================
+# This file defines canonical parameter values, calculation logic, and output
+# formats that ALL runtimes (Python, Rust, Go, C++, C#, WASM/JS) must implement
+# identically for phoneme timing extraction.
+#
+# Cross-runtime byte-for-byte compatibility is maintained by all implementations
+# adhering to this spec.
+
+[meta]
+spec_version = "1.0"
+last_updated = "2026-04-14"
+applies_to = ["python", "rust", "go", "cpp", "csharp", "wasm-js"]
+
+# ============================================================================
+# Calculation
+# ============================================================================
+
+[calculation]
+# VITS models output a 'durations' tensor [1, phoneme_length] containing the
+# number of frames (hop_length-sized) each phoneme occupies. This section
+# specifies how to convert frame counts to millisecond timestamps.
+
+formula = "frame_time_ms = (hop_length / sample_rate) * 1000"
+default_hop_length = 256
+# default_sample_rate is read from config.json's audio.sample_rate
+example_sample_rate = 22050
+# At 22050Hz / 256 hop, frame_time_ms ≈ 11.609977
+
+[calculation.cursor_walk]
+description = """
+Iterate phoneme-by-phoneme, accumulating start_ms with each duration.
+Each phoneme's end_ms equals the next phoneme's start_ms (continuous boundaries).
+"""
+algorithm = """
+cursor_ms = 0.0
+for each (duration_frames, phoneme_token) in zip(durations, tokens):
+    duration_ms = max(duration_frames, 0.0) * frame_time_ms
+    start_ms = cursor_ms
+    end_ms = cursor_ms + duration_ms
+    yield {phoneme, start_ms, end_ms, duration_ms}
+    cursor_ms = end_ms
+total_duration_ms = cursor_ms
+"""
+
+[calculation.negative_handling]
+# Negative durations should be clamped to 0.0 with a warning logged
+clamp_to = 0.0
+log_level = "warning"
+# Negative values must NOT raise an exception (gracefully degrade)
+
+# ============================================================================
+# Validation
+# ============================================================================
+
+[validation]
+# Inputs that all implementations must reject
+
+[validation.sample_rate]
+must_be = "positive finite number"
+forbidden = ["NaN", "Infinity", "-Infinity", "0", "negative"]
+exception_type = "TypeError (JS) / ValueError (Python) / Error (Rust/Go)"
+
+[validation.hop_length]
+must_be = "positive finite integer"
+forbidden = ["NaN", "Infinity", "-Infinity", "0", "negative"]
+exception_type = "TypeError (JS) / ValueError (Python) / Error (Rust/Go)"
+
+[validation.length_consistency]
+# durations and phoneme_tokens (when provided) must have the same length
+exception_type = "RangeError (JS) / ValueError (Python) / Error (Rust/Go)"
+
+# ============================================================================
+# Data Structures
+# ============================================================================
+
+[types.phoneme_timing_info]
+# Single phoneme entry
+fields = [
+  { name = "phoneme", type = "string", description = "Phoneme token (e.g. 'a', 'k', or 'U+E019' for unmapped PUA)" },
+  { name = "start_ms", type = "float", description = "Start time in milliseconds from utterance start" },
+  { name = "end_ms", type = "float", description = "End time in milliseconds from utterance start" },
+  { name = "duration_ms", type = "float", description = "Duration in milliseconds (= end_ms - start_ms)" },
+]
+
+[types.timing_result]
+# Complete timing result for an utterance
+fields = [
+  { name = "phonemes", type = "array<PhonemeTimingInfo>", description = "Per-phoneme timing entries" },
+  { name = "total_duration_ms", type = "float", description = "Total utterance duration in milliseconds" },
+  { name = "sample_rate", type = "int", description = "Audio sample rate (Hz)" },
+]
+
+# ============================================================================
+# Output Formats
+# ============================================================================
+
+[output_formats.json_pretty]
+# Pretty-printed JSON with 2-space indentation
+indent = 2
+ensure_ascii = false
+schema = "{ phonemes: [{phoneme, start_ms, end_ms, duration_ms}], total_duration_ms, sample_rate }"
+field_naming = "snake_case"
+example = '''
+{
+  "phonemes": [
+    {"phoneme": "^", "start_ms": 0.0, "end_ms": 58.0, "duration_ms": 58.0}
+  ],
+  "total_duration_ms": 58.0,
+  "sample_rate": 22050
+}
+'''
+
+[output_formats.json_compact]
+# Single-line JSON for streaming/network use
+indent = 0
+ensure_ascii = false
+
+[output_formats.tsv]
+header = "start_ms\tend_ms\tduration_ms\tphoneme"
+column_separator = "\t"
+row_separator = "\n"
+trailing_newline = true
+float_precision = 3  # toFixed(3) / "{:.3f}"
+escape_tab_in_phoneme = "\\t"
+escape_newline_in_phoneme = "\\n"
+example = '''
+start_ms	end_ms	duration_ms	phoneme
+0.000	58.000	58.000	^
+58.000	150.800	92.800	k
+'''
+
+[output_formats.srt]
+# SubRip subtitle format
+timestamp_format = "HH:MM:SS,mmm"
+cue_format = "{index}\n{start} --> {end}\n{phoneme}\n\n"
+indexing_starts_at = 1
+example = '''
+1
+00:00:00,000 --> 00:00:00,058
+^
+
+2
+00:00:00,058 --> 00:00:00,151
+k
+'''
+
+# ============================================================================
+# Phoneme ID Reverse Mapping
+# ============================================================================
+
+[reverse_map]
+# When converting phoneme IDs back to display strings, a reverse map is built
+# from the model config's phoneme_id_map.
+
+[reverse_map.collision_resolution]
+# When multiple phoneme strings map to the same ID, the first occurrence
+# (by iteration order over phoneme_id_map keys) is preserved. Later
+# duplicates are ignored. Both Python and JavaScript implementations use
+# this first-wins semantics for deterministic cross-runtime behavior.
+# Python: `if phoneme_id not in reverse_map: reverse_map[phoneme_id] = display`
+# JS:     `if (!(id in reverse)) { reverse[id] = display; }`
+strategy = "first-wins"
+
+[reverse_map.pua_handling]
+# PUA characters (U+E000–U+F8FF) without an explicit name mapping should be
+# rendered as "U+XXXX" using uppercase hex.
+range = ["U+E000", "U+F8FF"]
+fallback_format = "U+{HEX:04X}"
+example = "char '\\uE019' → 'U+E019'"
+
+[reverse_map.explicit_pua_mapping]
+# Implementations may accept an optional pua_to_multi_char dict to translate
+# PUA chars into human-readable multi-char names (e.g. "N_m", "ch", "tʃ").
+optional = true
+example = "{ '\\uE019': 'N_m', '\\uE00E': 'ch' }"
+
+# ============================================================================
+# Implementation Status
+# ============================================================================
+
+[implementations]
+# Tracks which runtime implements each format and feature
+
+[implementations.python]
+file = "src/python_run/piper/timing.py"
+voice_integration = "src/python_run/piper/voice.py:synthesize_with_timing"
+http_endpoint = "POST /api/phoneme-timing (src/python_run/piper/http_server.py)"
+formats = ["json_pretty", "json_compact", "tsv", "srt"]
+test_files = [
+  "src/python_run/tests/test_phoneme_timing.py",
+  "src/python_run/tests/test_voice_timing.py",
+  "src/python_run/tests/test_http_timing.py",
+]
+
+[implementations.rust]
+file = "src/rust/piper-core/src/timing.rs"
+cli_integration = "src/rust/piper-cli/src/main.rs (--output-timing, --timing-format)"
+formats = ["json_pretty", "json_compact", "tsv", "srt"]
+
+[implementations.go]
+file = "src/go/piperplus/timing.go"
+cli_integration = "src/go/cmd/piper-plus/main.go (--output-timing, --timing-format)"
+http_integration = true
+formats = ["json_pretty", "json_compact", "tsv", "srt"]
+
+[implementations.cpp]
+file = "src/cpp/piper.cpp (extractTimingsFromDurations)"
+cli_integration = "src/cpp/main.cpp (--output-timing, --timing-format)"
+formats = ["json_pretty", "json_compact", "tsv", "srt"]
+
+[implementations.csharp]
+file = "src/csharp/PiperPlus.Core/Inference/PhonemeTimingExtractor.cs"
+formats = ["json_pretty", "json_compact", "tsv", "srt"]
+
+[implementations.wasm_js]
+file = "src/wasm/openjtalk-web/src/timing.js"
+audio_result_integration = "src/wasm/openjtalk-web/src/audio-result.js (timing, hasTimingInfo)"
+piper_plus_integration = "src/wasm/openjtalk-web/src/index.js (synthesize, synthesizeWithVoiceCloning)"
+streaming = "Float32Array only — timing intentionally discarded in synthesizeStreaming"
+formats = ["json_pretty", "json_compact", "tsv", "srt"]
+exports = ["main", "./timing subpath"]
+
+# ============================================================================
+# Backward Compatibility
+# ============================================================================
+
+[backward_compat]
+# All runtimes must maintain backward compatibility with pre-timing APIs
+
+python_synthesize = "Returns bytes (unchanged from pre-timing version)"
+python_synthesize_stream_raw = "Returns Iterable[bytes] (unchanged)"
+python_synthesize_ids_to_raw = "Returns bytes (now wraps _synthesize_ids_core internally)"
+
+wasm_audio_result_2arg = "new AudioResult(samples, sampleRate) still works (timing defaults to null)"
+wasm_synthesize_streaming = "onChunk callback still receives Float32Array (no timing)"

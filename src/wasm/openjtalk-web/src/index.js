@@ -19,6 +19,19 @@ export { ModelManager } from './model-manager.js';
 export { AudioResult } from './audio-result.js';
 export { SpeakerEncoder } from './speaker-encoder.js';
 
+// Re-export timing utilities from the main package entry so that users can
+// bring them in alongside the high-level PiperPlus and AudioResult APIs
+// without needing a separate subpath import.
+export {
+  DEFAULT_HOP_LENGTH,
+  buildPhonemeIdToTokenMap,
+  durationsToTiming,
+  timingToJson,
+  timingToJsonCompact,
+  timingToSrt,
+  timingToTsv,
+} from './timing.js';
+
 // ---------------------------------------------------------------------------
 // Imports used by PiperPlus
 // ---------------------------------------------------------------------------
@@ -28,6 +41,15 @@ import { WebGPUSessionManager } from './webgpu-session-manager.js';
 import { StreamingTTSPipeline, TextChunker } from './streaming-pipeline.js';
 import { ModelManager } from './model-manager.js';
 import { AudioResult } from './audio-result.js';
+import {
+  DEFAULT_HOP_LENGTH,
+  buildPhonemeIdToTokenMap,
+  durationsToTiming,
+  timingToJson,
+  timingToJsonCompact,
+  timingToSrt,
+  timingToTsv,
+} from './timing.js';
 import { RustWasmAdapter } from './phonemizer/rust-wasm-adapter.js';
 import { JsG2pAdapter } from './phonemizer/js-g2p-adapter.js';
 import { CompositePhonemizer } from './phonemizer/composite-phonemizer.js';
@@ -283,27 +305,32 @@ export class PiperPlus {
     noiseW = adjusted.noiseW;
 
     // --- Strategy A: Silence Padding for short inputs ---
+    // Save original (pre-padding) phoneme IDs for timing calculation.
+    const originalPhonemeIds = phonemeIds;
     const padResult = padPhonemeIds(phonemeIds, prosodyFeatures);
     phonemeIds = padResult.phonemeIds;
     prosodyFeatures = padResult.prosodyFeatures;
     const wasPadded = padResult.wasPadded;
 
     // 2. ONNX inference
-    let audioData = await this._infer(phonemeIds, prosodyFeatures, {
+    const inferResult = await this._infer(phonemeIds, prosodyFeatures, {
       noiseScale,
       lengthScale,
       noiseW,
       language,
     });
+    let audioData = inferResult.audio;
+    const durations = inferResult.durations;
 
     // --- Strategy A (post-step): Trim silence introduced by padding ---
     if (wasPadded) {
       audioData = trimSilence(audioData);
     }
 
-    // 3. Wrap result
+    // 3. Wrap result — include phoneme timing when the model supports it
     const sampleRate = this._config.audio?.sample_rate ?? DEFAULT_SAMPLE_RATE;
-    return new AudioResult(audioData, sampleRate);
+    const timing = this._createTiming(durations, originalPhonemeIds);
+    return new AudioResult(audioData, sampleRate, timing);
   }
 
   /**
@@ -340,17 +367,20 @@ export class PiperPlus {
     const { phonemeIds, prosodyFeatures } = await this._textToPhonemeIds(text, language);
 
     // 2. ONNX inference with speaker embedding
-    const audioData = await this._infer(phonemeIds, prosodyFeatures, {
+    const inferResult = await this._infer(phonemeIds, prosodyFeatures, {
       noiseScale,
       lengthScale,
       noiseW,
       language,
       speakerEmbedding,
     });
+    const audioData = inferResult.audio;
+    const durations = inferResult.durations;
 
-    // 3. Wrap result
+    // 3. Wrap result — include phoneme timing when the model supports it
     const sampleRate = this._config.audio?.sample_rate ?? DEFAULT_SAMPLE_RATE;
-    return new AudioResult(audioData, sampleRate);
+    const timing = this._createTiming(durations, phonemeIds);
+    return new AudioResult(audioData, sampleRate, timing);
   }
 
   /**
@@ -383,7 +413,10 @@ export class PiperPlus {
       synthesize: async (ids) => {
         // Streaming path skips prosody for simplicity — prosody extraction
         // requires the full labels which are language-specific.
-        return this._infer(ids, null, { noiseScale, lengthScale, noiseW, language });
+        // The streaming pipeline expects a Float32Array, so unwrap .audio
+        // from the { audio, durations } object returned by _infer().
+        const inferResult = await this._infer(ids, null, { noiseScale, lengthScale, noiseW, language });
+        return inferResult.audio;
       },
       onAudioChunk: onChunk,
     });
@@ -582,6 +615,61 @@ export class PiperPlus {
   }
 
   /**
+   * Build a cached phoneme-ID → token reverse map from the current config.
+   * The map is lazily built once per model load.
+   * @private
+   */
+  _getPhonemeIdToTokenMap() {
+    if (this._phonemeIdToTokenMap === undefined) {
+      this._phonemeIdToTokenMap = buildPhonemeIdToTokenMap(
+        this._config?.phoneme_id_map ?? null
+      );
+    }
+    return this._phonemeIdToTokenMap;
+  }
+
+  /**
+   * Convert ONNX `durations` output to a TimingResult using the model's
+   * phoneme ID map for human-readable phoneme tokens.
+   *
+   * @param {Float32Array} durations - Raw duration frames from ONNX
+   * @param {number[]} phonemeIds - Phoneme IDs corresponding to each duration
+   *   (may be longer than durations if padding was applied; truncated to min)
+   * @returns {object} TimingResult
+   * @private
+   */
+  _createTiming(durations, phonemeIds) {
+    if (!durations) return null;
+
+    const sampleRate = this._config?.audio?.sample_rate ?? DEFAULT_SAMPLE_RATE;
+    const idToToken = this._getPhonemeIdToTokenMap();
+
+    // Build phoneme tokens from the original (pre-padding) IDs.
+    // Durations length may differ from phonemeIds length if the model
+    // applies internal padding; align to the minimum of the two.
+    const minLen = Math.min(durations.length, phonemeIds.length);
+    const tokens = new Array(minLen);
+    for (let i = 0; i < minLen; i++) {
+      tokens[i] = idToToken[phonemeIds[i]] ?? `ph_${i}`;
+    }
+
+    // Create a truncated durations view if needed.
+    const alignedDurations =
+      minLen === durations.length
+        ? durations
+        : durations.subarray
+        ? durations.subarray(0, minLen)
+        : Array.from(durations).slice(0, minLen);
+
+    return durationsToTiming(
+      alignedDurations,
+      sampleRate,
+      DEFAULT_HOP_LENGTH,
+      tokens,
+    );
+  }
+
+  /**
    * Run ONNX inference.  Builds tensors matching the VITS model inputs:
    *   - input        (int64)   [1, seq_len]
    *   - input_lengths (int64)  [1]
@@ -681,7 +769,15 @@ export class PiperPlus {
       }
     }
     const audioTensor = results.output || results[Object.keys(results)[0]];
-    return new Float32Array(audioTensor.data);
+    const audio = new Float32Array(audioTensor.data);
+
+    // Extract durations tensor if the model supports it (optional output)
+    let durations = null;
+    if (results.durations && results.durations.data) {
+      durations = new Float32Array(results.durations.data);
+    }
+
+    return { audio, durations };
   }
 
   /**

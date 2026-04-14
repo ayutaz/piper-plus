@@ -6,7 +6,7 @@ import wave
 from pathlib import Path
 from typing import Any
 
-from flask import Flask, request
+from flask import Flask, jsonify, request
 
 from . import PiperVoice
 from .download import ensure_voice_exists, find_voice, get_voices
@@ -130,6 +130,89 @@ def main() -> None:
                 )
 
             return wav_io.getvalue()
+
+    @app.route("/api/phoneme-timing", methods=["GET", "POST"])
+    def app_phoneme_timing():
+        """Phoneme timing endpoint.
+
+        Synthesize text and return per-phoneme timing information.
+
+        Query Parameters
+        ----------------
+        text : str
+            Text to synthesize. Can also be sent as POST body.
+        format : str, optional
+            Output format: ``'json'`` (default) or ``'tsv'``.
+        language : str, optional
+            Language code (``'ja'``, ``'en'``, ``'zh'``, etc.). Resolved via
+            the model's ``language_id_map``.
+        language_id : int, optional
+            Numeric language ID. Takes precedence over ``language``.
+
+        Responses
+        ---------
+        200 OK
+            Body is JSON or TSV timing data based on the ``format`` parameter.
+            Content-Type: ``application/json`` or ``text/tab-separated-values``.
+        400 Bad Request
+            Empty text, unsupported format, or model has no duration output.
+
+        Examples
+        --------
+        ::
+
+            curl 'http://localhost:5000/api/phoneme-timing?text=Hello&format=json'
+            curl 'http://localhost:5000/api/phoneme-timing?text=Hello&format=tsv'
+            curl -X POST 'http://localhost:5000/api/phoneme-timing?language=ja' \\
+                 -d 'こんにちは'
+        """
+        if request.method == "POST":
+            text = request.data.decode("utf-8")
+        else:
+            text = request.args.get("text", "")
+
+        text = text.strip()
+        if not text:
+            return jsonify({"error": "No text provided"}), 400
+
+        fmt = request.args.get("format", "json").lower()
+        if fmt not in ("json", "tsv"):
+            return jsonify(
+                {"error": f"Unsupported format: {fmt}. Use 'json' or 'tsv'."}
+            ), 400
+
+        # Resolve language_id
+        language_id: int | None = None
+        language_id_raw = request.args.get("language_id", None)
+        language = request.args.get("language", None)
+
+        if language_id_raw is not None:
+            try:
+                language_id = int(language_id_raw)
+            except (ValueError, TypeError):
+                language_id = None
+        elif language is not None:
+            language_id_map = voice.config.language_id_map
+            if language_id_map:
+                language_id = language_id_map.get(language)
+
+        from .timing import timing_to_json, timing_to_tsv
+
+        _, timing_result = voice.synthesize_with_timing(
+            text, **synthesize_args, language_id=language_id
+        )
+
+        if timing_result is None:
+            return jsonify({"error": "Model does not support duration output"}), 400
+
+        if fmt == "tsv":
+            return (
+                timing_to_tsv(timing_result),
+                200,
+                {"Content-Type": "text/tab-separated-values"},
+            )
+
+        return timing_to_json(timing_result), 200, {"Content-Type": "application/json"}
 
     app.run(host=args.host, port=args.port)
 

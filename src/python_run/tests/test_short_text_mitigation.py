@@ -184,7 +184,7 @@ class TestDynamicScales:
 
         from piper.voice import PiperVoice
 
-        raw = PiperVoice.synthesize_ids_to_raw(voice, short_ids)
+        PiperVoice._synthesize_ids_core(voice, short_ids)
 
         # Check that session.run was called
         voice.session.run.assert_called_once()
@@ -229,7 +229,7 @@ class TestDynamicScales:
 
         from piper.voice import PiperVoice
 
-        PiperVoice.synthesize_ids_to_raw(voice, long_ids)
+        PiperVoice._synthesize_ids_core(voice, long_ids)
 
         call_args = voice.session.run.call_args[0][1]
         scales = call_args["scales"]

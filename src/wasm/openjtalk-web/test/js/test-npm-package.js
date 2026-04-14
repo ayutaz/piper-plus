@@ -11,7 +11,7 @@ import { strict as assert } from 'node:assert';
 import { describe, it } from 'node:test';
 import { readFileSync, existsSync, statSync, readdirSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -99,13 +99,14 @@ describe('exports バリデーション', () => {
     const entryPath = resolve(PROJECT_ROOT, 'src', 'index.js');
     assert.ok(existsSync(entryPath), `Entry point does not exist: ${entryPath}`);
 
-    const mod = await import(entryPath);
+    // Convert to file:// URL for Windows compatibility with dynamic import().
+    const mod = await import(pathToFileURL(entryPath).href);
     assert.ok(mod, 'Module should be importable');
   });
 
   it('すべての期待されるシンボルがエクスポートされている', async () => {
     const entryPath = resolve(PROJECT_ROOT, 'src', 'index.js');
-    const mod = await import(entryPath);
+    const mod = await import(pathToFileURL(entryPath).href);
     const exportedNames = Object.keys(mod);
 
     for (const name of EXPECTED_EXPORTS) {
@@ -125,7 +126,7 @@ describe('exports バリデーション', () => {
 
     const dtsContent = readFileSync(dtsPath, 'utf-8');
     const entryPath = resolve(PROJECT_ROOT, 'src', 'index.js');
-    const mod = await import(entryPath);
+    const mod = await import(pathToFileURL(entryPath).href);
     const exportedNames = Object.keys(mod);
 
     for (const name of exportedNames) {

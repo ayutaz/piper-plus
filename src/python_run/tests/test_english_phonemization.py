@@ -1,22 +1,22 @@
 #!/usr/bin/env python3
-"""Test English phonemization functionality"""
+"""Test English phonemization functionality.
 
-import shutil
+Note: piper-plus does NOT depend on espeak-ng at runtime.  English G2P uses
+``g2p-en`` (Apache-2.0); see ``piper/phonemize/english.py``.  The legacy
+``espeak_phonemizer.py`` module was removed as dead code.
+"""
+
 import subprocess
 import sys
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
-
-_espeak_ng_available = shutil.which("espeak-ng") is not None
-
 
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from piper.config import PhonemeType, PiperConfig
-from piper.espeak_phonemizer import phonemize_espeak_ng, phonemize_espeak_phonemes
 
 
 # Import PiperVoice separately to avoid import issues during testing
@@ -24,69 +24,6 @@ try:
     from piper.voice import PiperVoice
 except ImportError:
     PiperVoice = None
-
-
-class TestEspeakPhonemizerFallback:
-    """Test espeak-ng phonemizer fallback implementation"""
-
-    @pytest.mark.skipif(not _espeak_ng_available, reason="espeak-ng not installed")
-    def test_phonemize_espeak_ng_basic(self):
-        """Test basic IPA phonemization"""
-        # Test with simple text
-        result = phonemize_espeak_ng("Hello world", "en-us")
-
-        # Should return a list of lists
-        assert isinstance(result, list)
-        assert len(result) == 1
-        assert isinstance(result[0], list)
-
-        # Check that we get IPA symbols (not just characters)
-        phonemes = result[0]
-        phoneme_str = "".join(phonemes)
-
-        # Should contain IPA symbols like ə, ˈ, ʊ, ɜ, etc.
-        assert any(
-            char in phoneme_str for char in ["ə", "ˈ", "ʊ", "ɜ", "ː", "ɹ", "ɔ", "æ"]
-        )
-
-        # Should NOT be just the original text split into characters
-        assert phonemes != list("Hello world")
-
-    def test_phonemize_espeak_ng_fallback(self):
-        """Test fallback when espeak-ng is not available"""
-        with patch("subprocess.run", side_effect=FileNotFoundError()):
-            result = phonemize_espeak_ng("Hello", "en-us")
-
-            # Should fall back to character list
-            assert result == [list("Hello")]
-
-    def test_phonemize_espeak_ng_error_handling(self):
-        """Test error handling when espeak-ng fails"""
-        mock_result = MagicMock()
-        mock_result.stdout = ""
-
-        with patch(
-            "subprocess.run",
-            side_effect=subprocess.CalledProcessError(1, ["espeak-ng"]),
-        ):
-            result = phonemize_espeak_ng("Test", "en-us")
-
-            # Should fall back to character list
-            assert result == [list("Test")]
-
-    @pytest.mark.skipif(not _espeak_ng_available, reason="espeak-ng not installed")
-    def test_phonemize_espeak_phonemes(self):
-        """Test phoneme-based (non-IPA) output"""
-        result = phonemize_espeak_phonemes("Hello", "en-us")
-
-        # Should return a list of lists
-        assert isinstance(result, list)
-        assert len(result) == 1
-        assert isinstance(result[0], list)
-
-        # Check that we get phonemes
-        phonemes = result[0]
-        assert len(phonemes) > 0
 
 
 class TestVoicePhonemizerIntegration:

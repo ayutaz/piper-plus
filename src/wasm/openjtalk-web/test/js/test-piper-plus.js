@@ -57,10 +57,19 @@ function installGlobalMocks() {
     InferenceSession: {
       create: async () => ({
         inputNames: ['input', 'input_lengths', 'scales'],
-        outputNames: ['output'],
-        run: async () => ({
-          output: { data: new Float32Array(22050), dims: [1, 22050] },
-        }),
+        outputNames: ['output', 'durations'],
+        run: async (feeds) => {
+          const inputLen =
+            (feeds?.input?.data && feeds.input.data.length) ||
+            (feeds?.input?.dims && feeds.input.dims[1]) ||
+            5;
+          const durData = new Float32Array(inputLen);
+          for (let i = 0; i < inputLen; i++) durData[i] = 5 + ((i * 3) % 10);
+          return {
+            output: { data: new Float32Array(22050), dims: [1, 22050] },
+            durations: { data: durData, dims: [1, inputLen] },
+          };
+        },
         release: () => {},
       }),
     },
@@ -208,9 +217,18 @@ function createInitializedInstance(overrides = {}) {
   };
 
   // Session — simulates the ONNX session created by _init()
-  const sessionRunFn = overrides.sessionRun ?? (async () => ({
-    output: { data: new Float32Array(100), dims: [1, 100] },
-  }));
+  const sessionRunFn = overrides.sessionRun ?? (async (feeds) => {
+    const inputLen =
+      (feeds?.input?.data && feeds.input.data.length) ||
+      (feeds?.input?.dims && feeds.input.dims[1]) ||
+      5;
+    const durData = new Float32Array(inputLen);
+    for (let i = 0; i < inputLen; i++) durData[i] = 5 + ((i * 3) % 10);
+    return {
+      output: { data: new Float32Array(100), dims: [1, 100] },
+      durations: { data: durData, dims: [1, inputLen] },
+    };
+  });
   const session = {
     run: typeof sessionRunFn === 'function' && sessionRunFn.mock
       ? sessionRunFn
@@ -417,7 +435,16 @@ describe('SynthesizeOptions デフォルト値', { skip }, () => {
     const instance = createInitializedInstance({
       sessionRun: async (feeds) => {
         capturedScales = Array.from(feeds.scales.data);
-        return { output: { data: new Float32Array(100), dims: [1, 100] } };
+        const inputLen =
+          (feeds?.input?.data && feeds.input.data.length) ||
+          (feeds?.input?.dims && feeds.input.dims[1]) ||
+          5;
+        const durData = new Float32Array(inputLen);
+        for (let i = 0; i < inputLen; i++) durData[i] = 5 + ((i * 3) % 10);
+        return {
+          output: { data: new Float32Array(100), dims: [1, 100] },
+          durations: { data: durData, dims: [1, inputLen] },
+        };
       },
     });
 
@@ -435,7 +462,16 @@ describe('SynthesizeOptions デフォルト値', { skip }, () => {
     const instance = createInitializedInstance({
       sessionRun: async (feeds) => {
         capturedScales = Array.from(feeds.scales.data);
-        return { output: { data: new Float32Array(100), dims: [1, 100] } };
+        const inputLen =
+          (feeds?.input?.data && feeds.input.data.length) ||
+          (feeds?.input?.dims && feeds.input.dims[1]) ||
+          5;
+        const durData = new Float32Array(inputLen);
+        for (let i = 0; i < inputLen; i++) durData[i] = 5 + ((i * 3) % 10);
+        return {
+          output: { data: new Float32Array(100), dims: [1, 100] },
+          durations: { data: durData, dims: [1, inputLen] },
+        };
       },
     });
 
@@ -453,7 +489,16 @@ describe('SynthesizeOptions デフォルト値', { skip }, () => {
     const instance = createInitializedInstance({
       sessionRun: async (feeds) => {
         capturedScales = Array.from(feeds.scales.data);
-        return { output: { data: new Float32Array(100), dims: [1, 100] } };
+        const inputLen =
+          (feeds?.input?.data && feeds.input.data.length) ||
+          (feeds?.input?.dims && feeds.input.dims[1]) ||
+          5;
+        const durData = new Float32Array(inputLen);
+        for (let i = 0; i < inputLen; i++) durData[i] = 5 + ((i * 3) % 10);
+        return {
+          output: { data: new Float32Array(100), dims: [1, 100] },
+          durations: { data: durData, dims: [1, inputLen] },
+        };
       },
     });
 
@@ -481,7 +526,16 @@ describe('config.inference によるデフォルト上書き', { skip }, () => {
       },
       sessionRun: async (feeds) => {
         capturedScales = Array.from(feeds.scales.data);
-        return { output: { data: new Float32Array(100), dims: [1, 100] } };
+        const inputLen =
+          (feeds?.input?.data && feeds.input.data.length) ||
+          (feeds?.input?.dims && feeds.input.dims[1]) ||
+          5;
+        const durData = new Float32Array(inputLen);
+        for (let i = 0; i < inputLen; i++) durData[i] = 5 + ((i * 3) % 10);
+        return {
+          output: { data: new Float32Array(100), dims: [1, 100] },
+          durations: { data: durData, dims: [1, inputLen] },
+        };
       },
     });
     return { instance, getCapturedScales: () => capturedScales };
@@ -536,7 +590,16 @@ describe('明示的オプションによる上書き', { skip }, () => {
       },
       sessionRun: async (feeds) => {
         capturedScales = Array.from(feeds.scales.data);
-        return { output: { data: new Float32Array(100), dims: [1, 100] } };
+        const inputLen =
+          (feeds?.input?.data && feeds.input.data.length) ||
+          (feeds?.input?.dims && feeds.input.dims[1]) ||
+          5;
+        const durData = new Float32Array(inputLen);
+        for (let i = 0; i < inputLen; i++) durData[i] = 5 + ((i * 3) % 10);
+        return {
+          output: { data: new Float32Array(100), dims: [1, 100] },
+          durations: { data: durData, dims: [1, inputLen] },
+        };
       },
     });
     return { instance, getCapturedScales: () => capturedScales };
@@ -589,9 +652,18 @@ describe('synthesize() 正常系', { skip }, () => {
         audio: { sample_rate: 22050 },
         phoneme_id_map: { _: [0], '^': [1], $: [2], a: [7] },
       },
-      sessionRun: async () => ({
-        output: { data: expectedSamples, dims: [1, expectedSamples.length] },
-      }),
+      sessionRun: async (feeds) => {
+        const inputLen =
+          (feeds?.input?.data && feeds.input.data.length) ||
+          (feeds?.input?.dims && feeds.input.dims[1]) ||
+          5;
+        const durData = new Float32Array(inputLen);
+        for (let i = 0; i < inputLen; i++) durData[i] = 5 + ((i * 3) % 10);
+        return {
+          output: { data: expectedSamples, dims: [1, expectedSamples.length] },
+          durations: { data: durData, dims: [1, inputLen] },
+        };
+      },
     });
 
     // Act
@@ -621,9 +693,18 @@ describe('synthesize() 正常系', { skip }, () => {
     // Arrange
     const expectedSamples = new Float32Array([0.5, -0.5, 0.25]);
     const instance = createInitializedInstance({
-      sessionRun: async () => ({
-        output: { data: expectedSamples, dims: [1, expectedSamples.length] },
-      }),
+      sessionRun: async (feeds) => {
+        const inputLen =
+          (feeds?.input?.data && feeds.input.data.length) ||
+          (feeds?.input?.dims && feeds.input.dims[1]) ||
+          5;
+        const durData = new Float32Array(inputLen);
+        for (let i = 0; i < inputLen; i++) durData[i] = 5 + ((i * 3) % 10);
+        return {
+          output: { data: expectedSamples, dims: [1, expectedSamples.length] },
+          durations: { data: durData, dims: [1, inputLen] },
+        };
+      },
     });
 
     // Act
@@ -643,9 +724,18 @@ describe('synthesize() 正常系', { skip }, () => {
       phonemeIds: pipelineIds,
       prosodyFeatures: null,
     }));
-    const sessionRunFn = mock.fn(async () => ({
-      output: { data: new Float32Array(100), dims: [1, 100] },
-    }));
+    const sessionRunFn = mock.fn(async (feeds) => {
+      const inputLen =
+        (feeds?.input?.data && feeds.input.data.length) ||
+        (feeds?.input?.dims && feeds.input.dims[1]) ||
+        5;
+      const durData = new Float32Array(inputLen);
+      for (let i = 0; i < inputLen; i++) durData[i] = 5 + ((i * 3) % 10);
+      return {
+        output: { data: new Float32Array(100), dims: [1, 100] },
+        durations: { data: durData, dims: [1, inputLen] },
+      };
+    });
 
     const instance = createInitializedInstance({
       sessionRun: sessionRunFn,

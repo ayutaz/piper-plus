@@ -407,6 +407,7 @@ FastAPI ベースの OpenAI 互換 TTS エンドポイント。既存の OpenAI 
 | `/v1/models` | GET | モデル一覧 |
 | `/v1/audio/speech/languages` | GET | 対応言語一覧 |
 | `/health` | GET | ヘルスチェック |
+| `/api/phoneme-timing` | POST/GET | Phoneme Timing 出力 (JSON/TSV) |
 
 **実装:** `docker/python-inference/inference.py`
 **テスト:** `docker/python-inference/test_openai_api.py`
@@ -533,6 +534,45 @@ Wyoming Protocol TTS の Docker 環境と Home Assistant 統合ガイド。Docke
 
 **設定仕様:** `docs/spec/short-text-contract.toml`
 
+### Phoneme Timing 出力
+
+VITS Duration Predictor の出力から音素ごとの開始時刻・終了時刻・継続時間を抽出し JSON/TSV/SRT 形式で出力する機能。リップシンク、字幕生成、カラオケアプリケーション向け。Rust/Go/C++/C# の既存実装と byte-for-byte 互換 (`(hop_length / sample_rate) * 1000` 計算式)。
+
+**対応ランタイム:** Python, JavaScript/WASM (新規追加)、Rust, Go, C++, C# (既存)
+
+**対応形式:** JSON (pretty/compact), TSV (header付き), SRT (字幕用)
+
+**Python API:**
+- `PiperVoice.synthesize_with_timing(text, ...) -> tuple[bytes, TimingResult | None]`
+- `PiperVoice.has_duration_output -> bool` (モデル対応判定)
+- `piper.timing.durations_to_timing()`, `timing_to_json/tsv/srt()`, `build_phoneme_id_reverse_map()`
+- HTTP エンドポイント: `POST /api/phoneme-timing` (`format=json|tsv` クエリ対応)
+
+**WASM API:**
+- `AudioResult.timing -> TimingResult | null` (deep frozen, immutable)
+- `AudioResult.hasTimingInfo -> boolean`
+- メインエクスポート + `./timing` サブパスで `durationsToTiming`, `timingToJson/Tsv/Srt`, `buildPhonemeIdToTokenMap` 利用可能
+- TypeScript 型定義完備 (`PhonemeTimingInfo`, `TimingResult`)
+
+**設計:**
+- `PiperConfig.hop_size` (デフォルト 256) を config.json から読込
+- 短文 padding 適用時も `originalPhonemeIds` を保持し timing 計算
+- 負の duration は警告ログ付きで 0 にクランプ
+- NaN/Infinity validation で TypeError、長さ不一致で RangeError
+
+**実装:**
+- Python: `src/python_run/piper/timing.py`, `src/python_run/piper/voice.py`, `src/python_run/piper/http_server.py`
+- WASM: `src/wasm/openjtalk-web/src/timing.js`, `src/wasm/openjtalk-web/src/audio-result.js`, `src/wasm/openjtalk-web/src/index.js`
+
+**テスト:**
+- Python: `test_phoneme_timing.py` (44件), `test_voice_timing.py` (22件), `test_http_timing.py` (14件), `test_config_fallback.py` (hop_size 5件)
+- WASM: `test-phoneme-timing.js` (66件), `test-audio-result-timing.js` (18件), `test-piper-plus-timing.js` (22件)
+- クロスランタイム互換性: Rust/Go/C++/C# の既存テストと同じ計算結果
+
+**関連 PR/コミット:**
+- Python: feat(python) phoneme timing 機能追加
+- WASM: feat(wasm) phoneme timing 機能追加 + refactor(wasm) 品質向上
+
 ---
 
 ## 重要なファイルパス
@@ -565,6 +605,7 @@ Wyoming Protocol TTS の Docker 環境と Home Assistant 統合ガイド。Docke
 | Speaker Encoder | `src/python/piper_train/speaker_encoder/` |
 | SSML (Python) | `src/python/g2p/piper_plus_g2p/ssml.py` |
 | SSML (ランタイム) | `src/python_run/piper/phonemize/ssml.py` |
+| Phoneme Timing (Python) | `src/python_run/piper/timing.py` |
 
 ### C# ソースコード
 
@@ -618,6 +659,7 @@ Wyoming Protocol TTS の Docker 環境と Home Assistant 統合ガイド。Docke
 | エントリーポイント | `src/wasm/openjtalk-web/src/index.js` |
 | モデルマネージャ | `src/wasm/openjtalk-web/src/model-manager.js` |
 | 音声結果 | `src/wasm/openjtalk-web/src/audio-result.js` |
+| Phoneme Timing (WASM) | `src/wasm/openjtalk-web/src/timing.js` |
 | Rust WASM ビルド成果物 | `src/wasm/openjtalk-web/dist/rust-wasm/` |
 | TypeScript型定義 | `src/wasm/openjtalk-web/types/index.d.ts` |
 | npm パッケージ設定 | `src/wasm/openjtalk-web/package.json` |

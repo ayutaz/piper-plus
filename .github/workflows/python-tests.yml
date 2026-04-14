@@ -110,10 +110,10 @@ jobs:
       env:
         PYTHONUTF8: '1'
 
-    - name: Run runtime full tests (config, training manager, CLI)
+    - name: Run runtime full tests (config, training manager, CLI, timing)
       run: |
         cd src/python_run
-        pytest tests/test_config_fallback.py tests/test_english_phonemization.py tests/test_runtime.py tests/test_util_impl.py tests/test_cli_models.py tests/test_training_manager.py tests/test_training_integration.py -v --tb=short --override-ini="addopts="
+        pytest tests/test_config_fallback.py tests/test_english_phonemization.py tests/test_runtime.py tests/test_util_impl.py tests/test_cli_models.py tests/test_training_manager.py tests/test_training_integration.py tests/test_phoneme_timing.py tests/test_voice_timing.py tests/test_http_timing.py -v --tb=short --override-ini="addopts="
       env:
         PYTHONUTF8: '1'
 

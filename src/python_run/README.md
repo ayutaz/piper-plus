@@ -57,6 +57,92 @@ with wave.open("output.wav", "wb") as wav_file:
     voice.synthesize("こんにちは、今日は良い天気ですね。", wav_file)
 ```
 
+## Phoneme Timing (リップシンク・字幕同期)
+
+piper-plus は VITS Duration Predictor から音素レベルのタイミング情報を抽出できます。リップシンク、字幕同期、カラオケアプリケーションで使用できます。Rust/Go/C++/C# 実装と byte-for-byte 互換です。
+
+### Python API
+
+```python
+from piper import PiperVoice
+from piper.timing import (
+    PhonemeTimingInfo,
+    TimingResult,
+    durations_to_timing,
+    timing_to_json,
+    timing_to_tsv,
+    timing_to_srt,
+)
+
+voice = PiperVoice.load("model.onnx", config_path="config.json")
+
+# モデルが durations 出力をサポートしているか確認
+if voice.has_duration_output:
+    wav_bytes, timing = voice.synthesize_with_timing("こんにちは")
+
+    if timing:
+        # JSON 出力 (pretty-printed)
+        print(timing_to_json(timing))
+
+        # TSV 出力 (タブ区切り、ヘッダ付き)
+        with open("timing.tsv", "w") as f:
+            f.write(timing_to_tsv(timing))
+
+        # SRT 字幕形式
+        with open("subtitles.srt", "w") as f:
+            f.write(timing_to_srt(timing))
+
+        # 各音素を直接アクセス
+        for p in timing.phonemes:
+            print(f"{p.phoneme}: {p.start_ms:.1f} - {p.end_ms:.1f} ms ({p.duration_ms:.1f} ms)")
+```
+
+### 出力例
+
+```json
+{
+  "phonemes": [
+    {"phoneme": "^", "start_ms": 0.0, "end_ms": 58.0, "duration_ms": 58.0},
+    {"phoneme": "k", "start_ms": 58.0, "end_ms": 150.8, "duration_ms": 92.8},
+    {"phoneme": "o", "start_ms": 150.8, "end_ms": 290.0, "duration_ms": 139.2}
+  ],
+  "total_duration_ms": 290.0,
+  "sample_rate": 22050
+}
+```
+
+### HTTP エンドポイント
+
+`piper.http_server` を起動すると `/api/phoneme-timing` エンドポイントが利用可能になります:
+
+```bash
+# JSON で取得
+curl "http://localhost:5000/api/phoneme-timing?text=Hello&format=json"
+
+# TSV で取得
+curl "http://localhost:5000/api/phoneme-timing?text=Hello&format=tsv"
+
+# 言語指定
+curl "http://localhost:5000/api/phoneme-timing?text=Hello&language=en&format=json"
+```
+
+### API リファレンス
+
+| 関数 / メソッド | 説明 |
+|----------------|------|
+| `PiperVoice.synthesize_with_timing(text, ...)` | 音声 + TimingResult を返す |
+| `PiperVoice.has_duration_output` | モデルが timing をサポートするか判定 |
+| `durations_to_timing(durations, tokens, sample_rate, hop_length)` | duration フレーム → TimingResult |
+| `timing_to_json(result)` | pretty-printed JSON |
+| `timing_to_json_compact(result)` | 単一行 JSON |
+| `timing_to_tsv(result)` | TSV (start_ms, end_ms, duration_ms, phoneme) |
+| `timing_to_srt(result)` | SRT 字幕形式 |
+| `build_phoneme_id_reverse_map(phoneme_id_map, pua_to_multi_char?)` | ID → 音素文字列の逆引きマップ |
+
+### 設定
+
+`config.json` の `audio.hop_size` で STFT hop length を指定できます (デフォルト: 256)。値は `PiperConfig.hop_size` 経由で利用され、timing 計算に使用されます。
+
 ## 事前学習済みモデル
 
 | モデル | 言語 | 話者数 | ダウンロード |

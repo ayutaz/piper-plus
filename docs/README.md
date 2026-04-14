@@ -24,6 +24,7 @@ Piper Plus documentation. Guides and references for using and developing with Pi
 
 ## Features
 - [Phoneme Input](features/phoneme-input.md) - Direct phoneme specification guide
+- [Phoneme Timing](features/phoneme-timing.md) - 音素ごとのタイミング情報出力 (リップシンク・字幕)
 - [WebUI](features/webui.md) - Browser-based interface
 
 ## Guides

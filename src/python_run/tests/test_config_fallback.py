@@ -541,3 +541,69 @@ class TestVoiceInlineWarmup:
         assert "sid" in inputs_dict
         assert "lid" in inputs_dict
         assert "prosody_features" in inputs_dict
+
+
+class TestPiperConfigHopSize:
+    """Tests for the hop_size field added for phoneme timing support."""
+
+    def _base_config_dict(self):
+        """Minimal valid config dict for PiperConfig.from_dict()."""
+        return {
+            "num_symbols": 100,
+            "num_speakers": 1,
+            "audio": {"sample_rate": 22050},
+            "inference": {
+                "noise_scale": 0.667,
+                "length_scale": 1.0,
+                "noise_w": 0.8,
+            },
+            "phoneme_id_map": {"_": [0], "^": [1], "$": [2], "a": [10]},
+            "phoneme_type": "multilingual",
+        }
+
+    def test_hop_size_default_when_missing(self):
+        """hop_size defaults to 256 when not present in config.json."""
+        from piper.config import PiperConfig
+
+        config_dict = self._base_config_dict()
+        # No audio.hop_size key
+        config = PiperConfig.from_dict(config_dict)
+        assert config.hop_size == 256
+
+    def test_hop_size_explicit_value_from_config(self):
+        """hop_size is read from config['audio']['hop_size'] when provided."""
+        from piper.config import PiperConfig
+
+        config_dict = self._base_config_dict()
+        config_dict["audio"]["hop_size"] = 512
+        config = PiperConfig.from_dict(config_dict)
+        assert config.hop_size == 512
+
+    def test_hop_size_zero_in_config(self):
+        """hop_size of 0 in config is preserved (PiperConfig does not validate)."""
+        from piper.config import PiperConfig
+
+        config_dict = self._base_config_dict()
+        config_dict["audio"]["hop_size"] = 0
+        config = PiperConfig.from_dict(config_dict)
+        assert config.hop_size == 0
+
+    def test_hop_size_small_value(self):
+        """hop_size can be set to small values like 128."""
+        from piper.config import PiperConfig
+
+        config_dict = self._base_config_dict()
+        config_dict["audio"]["hop_size"] = 128
+        config = PiperConfig.from_dict(config_dict)
+        assert config.hop_size == 128
+
+    def test_hop_size_attribute_accessible_from_instance(self):
+        """PiperConfig instances expose hop_size as a regular attribute."""
+        from piper.config import PiperConfig
+
+        config_dict = self._base_config_dict()
+        config_dict["audio"]["hop_size"] = 256
+        config = PiperConfig.from_dict(config_dict)
+        # Can be read like any dataclass field
+        assert hasattr(config, "hop_size")
+        assert config.hop_size == 256
