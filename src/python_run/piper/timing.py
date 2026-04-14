@@ -15,6 +15,7 @@ import logging
 from collections.abc import Sequence
 from dataclasses import asdict, dataclass
 
+
 logger = logging.getLogger(__name__)
 
 DEFAULT_HOP_LENGTH: int = 256
@@ -110,7 +111,7 @@ def durations_to_timing(
     phonemes: list[PhonemeTimingInfo] = []
     cursor_ms: float = 0.0
 
-    for i, (dur, token) in enumerate(zip(durations, phoneme_tokens)):
+    for i, (dur, token) in enumerate(zip(durations, phoneme_tokens, strict=False)):
         if dur < 0:
             logger.warning(
                 "negative phoneme duration clamped to 0: "

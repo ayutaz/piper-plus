@@ -1,6 +1,5 @@
 from importlib.metadata import PackageNotFoundError, version
 
-from .voice import PiperVoice
 from .timing import (
     PhonemeTimingInfo,
     TimingResult,
@@ -11,6 +10,7 @@ from .timing import (
     timing_to_srt,
     timing_to_tsv,
 )
+from .voice import PiperVoice
 
 
 try:
