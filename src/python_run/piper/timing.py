@@ -234,6 +234,9 @@ def build_phoneme_id_reverse_map(
             display = char
 
         for phoneme_id in ids:
-            reverse_map[phoneme_id] = display
+            # First-wins semantics: preserve the first mapping seen for an ID.
+            # Matches the JS implementation in src/wasm/openjtalk-web/src/timing.js.
+            if phoneme_id not in reverse_map:
+                reverse_map[phoneme_id] = display
 
     return reverse_map

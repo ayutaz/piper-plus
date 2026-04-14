@@ -154,11 +154,13 @@ k
 # from the model config's phoneme_id_map.
 
 [reverse_map.collision_resolution]
-# When multiple phoneme strings map to the same ID, the iteration order
-# determines the winner (first or last seen depending on implementation).
-# Both Python and JS implementations use first-occurrence-wins semantics
-# during construction (iteration over dict keys in insertion order).
-strategy = "implementation-defined (typically first-wins by iteration order)"
+# When multiple phoneme strings map to the same ID, the first occurrence
+# (by iteration order over phoneme_id_map keys) is preserved. Later
+# duplicates are ignored. Both Python and JavaScript implementations use
+# this first-wins semantics for deterministic cross-runtime behavior.
+# Python: `if phoneme_id not in reverse_map: reverse_map[phoneme_id] = display`
+# JS:     `if (!(id in reverse)) { reverse[id] = display; }`
+strategy = "first-wins"
 
 [reverse_map.pua_handling]
 # PUA characters (U+E000–U+F8FF) without an explicit name mapping should be

@@ -559,7 +559,14 @@ class PiperVoice:
         # Synthesize through Onnx
         output_names = [o.name for o in self.session.get_outputs()]
         _outputs = self.session.run(output_names, args)
-        audio = _outputs[0].squeeze(0)
+
+        # Extract audio by name (not index) for robustness across models
+        # that may list outputs in a different order.
+        if "output" in output_names:
+            audio_idx = output_names.index("output")
+        else:
+            audio_idx = 0
+        audio = _outputs[audio_idx].squeeze(0)
 
         # Extract durations by name (not index) for robustness
         durations = None

@@ -424,21 +424,18 @@ def test_build_reverse_map_multi_ids_first_wins():
     assert rmap[20] == "k"
 
 
-def test_build_reverse_map_conflicting_ids_last_wins_by_iteration():
-    """When a single ID appears in multiple phonemes, the iteration order wins.
+def test_build_reverse_map_conflicting_ids_first_wins():
+    """When a single ID appears in multiple phonemes, the first occurrence wins.
 
-    Python's dict preserves insertion order; `build_phoneme_id_reverse_map`
-    iterates in order and overwrites. The behavior is deterministic and
-    depends on the order of keys in phoneme_id_map.
+    Python dict preserves insertion order; `build_phoneme_id_reverse_map`
+    iterates in order and only assigns if the ID is not yet in the map.
+    This matches the JS implementation in timing.js.
     """
     # "a" comes first, "b" comes second with the same ID 10.
-    # The last-seen ID wins (since the loop overwrites reverse[pid] = display).
+    # The first occurrence ("a") wins.
     phoneme_id_map = {"a": [10], "b": [10]}
     rmap = build_phoneme_id_reverse_map(phoneme_id_map)
-    # The function always assigns; whichever comes last wins.
-    # This test documents the current behavior so future refactoring
-    # noticing first-wins vs last-wins differences.
-    assert rmap[10] in ("a", "b")
+    assert rmap[10] == "a"
 
 
 def test_build_reverse_map_empty_phoneme_id_map():
