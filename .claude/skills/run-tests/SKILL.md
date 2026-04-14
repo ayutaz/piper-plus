@@ -2,6 +2,7 @@
 name: run-tests
 description: piper-plus の各言語ランタイムのテストを実行します。引数 python/rust/cs/go/js/cpp/all で対象を選択。未指定なら git diff から自動判定。
 argument-hint: "[python|rust|cs|go|js|cpp|all]"
+disable-model-invocation: true
 allowed-tools: Bash(uv run *) Bash(cargo test *) Bash(dotnet test *) Bash(go test *) Bash(go vet *) Bash(node --test *) Bash(npm *) Bash(cmake *) Bash(ctest *) Bash(git diff *)
 ---
 

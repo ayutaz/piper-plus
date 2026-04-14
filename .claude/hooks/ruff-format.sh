@@ -47,9 +47,11 @@ case "$FILE" in
   *) exit 0 ;;
 esac
 
-# Only process files inside known piper-plus Python source trees
+# Only process files inside known piper-plus Python source trees.
+# Match both repository-relative paths (e.g. src/python_run/foo.py)
+# and absolute or parent-prefixed paths (e.g. /repo/src/python_run/foo.py).
 case "$FILE" in
-  */src/python/*|*/src/python_run/*|*/tools/benchmark/*|*/docker/*) ;;
+  src/python/*|*/src/python/*|src/python_run/*|*/src/python_run/*|tools/benchmark/*|*/tools/benchmark/*|docker/*|*/docker/*) ;;
   *) exit 0 ;;
 esac
 

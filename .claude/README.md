@@ -104,7 +104,7 @@ choco install jq
 winget install jqlang.jq
 ```
 
-## 線種について
+## 改行種について
 
 `.claude/hooks/*.sh` は **LF (Unix)** 改行で保存される必要があります。これは `.gitattributes` の `*.sh text eol=lf` ルールで自動的に保証されます。
 
