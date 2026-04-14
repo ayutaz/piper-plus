@@ -730,7 +730,8 @@ class PiperVoice:
                         _LOGGER.debug(
                             "Duration-token length mismatch: durations=%d, tokens=%d; "
                             "truncating to %d",
-                            len(dur_list), len(tokens),
+                            len(dur_list),
+                            len(tokens),
                             min(len(dur_list), len(tokens)),
                         )
                     min_len = min(len(dur_list), len(tokens))
@@ -738,7 +739,9 @@ class PiperVoice:
                     tokens = tokens[:min_len]
 
                     timing = durations_to_timing(
-                        dur_list, tokens, self.config.sample_rate,
+                        dur_list,
+                        tokens,
+                        self.config.sample_rate,
                         hop_length=self.config.hop_size,
                     )
 

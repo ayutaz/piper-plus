@@ -177,7 +177,9 @@ def main() -> None:
 
         fmt = request.args.get("format", "json").lower()
         if fmt not in ("json", "tsv"):
-            return jsonify({"error": f"Unsupported format: {fmt}. Use 'json' or 'tsv'."}), 400
+            return jsonify(
+                {"error": f"Unsupported format: {fmt}. Use 'json' or 'tsv'."}
+            ), 400
 
         # Resolve language_id
         language_id: int | None = None
@@ -204,7 +206,11 @@ def main() -> None:
             return jsonify({"error": "Model does not support duration output"}), 400
 
         if fmt == "tsv":
-            return timing_to_tsv(timing_result), 200, {"Content-Type": "text/tab-separated-values"}
+            return (
+                timing_to_tsv(timing_result),
+                200,
+                {"Content-Type": "text/tab-separated-values"},
+            )
 
         return timing_to_json(timing_result), 200, {"Content-Type": "application/json"}
 
