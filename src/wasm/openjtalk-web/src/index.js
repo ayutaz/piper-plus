@@ -28,6 +28,7 @@ import { WebGPUSessionManager } from './webgpu-session-manager.js';
 import { StreamingTTSPipeline, TextChunker } from './streaming-pipeline.js';
 import { ModelManager } from './model-manager.js';
 import { AudioResult } from './audio-result.js';
+import { durationsToTiming } from './timing.js';
 import { RustWasmAdapter } from './phonemizer/rust-wasm-adapter.js';
 import { JsG2pAdapter } from './phonemizer/js-g2p-adapter.js';
 import { CompositePhonemizer } from './phonemizer/composite-phonemizer.js';
@@ -289,21 +290,27 @@ export class PiperPlus {
     const wasPadded = padResult.wasPadded;
 
     // 2. ONNX inference
-    let audioData = await this._infer(phonemeIds, prosodyFeatures, {
+    const inferResult = await this._infer(phonemeIds, prosodyFeatures, {
       noiseScale,
       lengthScale,
       noiseW,
       language,
     });
+    let audioData = inferResult.audio;
+    const durations = inferResult.durations;
 
     // --- Strategy A (post-step): Trim silence introduced by padding ---
     if (wasPadded) {
       audioData = trimSilence(audioData);
     }
 
-    // 3. Wrap result
+    // 3. Wrap result — include phoneme timing when the model supports it
     const sampleRate = this._config.audio?.sample_rate ?? DEFAULT_SAMPLE_RATE;
-    return new AudioResult(audioData, sampleRate);
+    let timing = null;
+    if (durations) {
+      timing = durationsToTiming(durations, sampleRate);
+    }
+    return new AudioResult(audioData, sampleRate, timing);
   }
 
   /**
@@ -340,17 +347,23 @@ export class PiperPlus {
     const { phonemeIds, prosodyFeatures } = await this._textToPhonemeIds(text, language);
 
     // 2. ONNX inference with speaker embedding
-    const audioData = await this._infer(phonemeIds, prosodyFeatures, {
+    const inferResult = await this._infer(phonemeIds, prosodyFeatures, {
       noiseScale,
       lengthScale,
       noiseW,
       language,
       speakerEmbedding,
     });
+    const audioData = inferResult.audio;
+    const durations = inferResult.durations;
 
-    // 3. Wrap result
+    // 3. Wrap result — include phoneme timing when the model supports it
     const sampleRate = this._config.audio?.sample_rate ?? DEFAULT_SAMPLE_RATE;
-    return new AudioResult(audioData, sampleRate);
+    let timing = null;
+    if (durations) {
+      timing = durationsToTiming(durations, sampleRate);
+    }
+    return new AudioResult(audioData, sampleRate, timing);
   }
 
   /**
@@ -383,7 +396,10 @@ export class PiperPlus {
       synthesize: async (ids) => {
         // Streaming path skips prosody for simplicity — prosody extraction
         // requires the full labels which are language-specific.
-        return this._infer(ids, null, { noiseScale, lengthScale, noiseW, language });
+        // The streaming pipeline expects a Float32Array, so unwrap .audio
+        // from the { audio, durations } object returned by _infer().
+        const inferResult = await this._infer(ids, null, { noiseScale, lengthScale, noiseW, language });
+        return inferResult.audio;
       },
       onAudioChunk: onChunk,
     });
@@ -681,7 +697,15 @@ export class PiperPlus {
       }
     }
     const audioTensor = results.output || results[Object.keys(results)[0]];
-    return new Float32Array(audioTensor.data);
+    const audio = new Float32Array(audioTensor.data);
+
+    // Extract durations tensor if the model supports it (optional output)
+    let durations = null;
+    if (results.durations && results.durations.data) {
+      durations = new Float32Array(results.durations.data);
+    }
+
+    return { audio, durations };
   }
 
   /**

@@ -100,12 +100,15 @@ export class AudioResult {
   #samples;
   /** @type {number} */
   #sampleRate;
+  /** @type {object | null} Phoneme timing result (TimingResult from timing.js) */
+  #timing;
 
   /**
    * @param {Float32Array} samples    - Audio sample data (range: -1.0 to 1.0)
    * @param {number}       [sampleRate=22050] - Sample rate in Hz
+   * @param {object|null}  [timing=null] - Phoneme timing result (TimingResult) or null if unavailable
    */
-  constructor(samples, sampleRate = 22050) {
+  constructor(samples, sampleRate = 22050, timing = null) {
     if (!(samples instanceof Float32Array)) {
       throw new TypeError('samples must be a Float32Array');
     }
@@ -114,6 +117,7 @@ export class AudioResult {
     }
     this.#samples = samples;
     this.#sampleRate = sampleRate;
+    this.#timing = timing;
   }
 
   /** Audio sample data. */
@@ -129,6 +133,22 @@ export class AudioResult {
   /** Duration of the audio in seconds. */
   get duration() {
     return this.#samples.length / this.#sampleRate;
+  }
+
+  /**
+   * Phoneme timing information, or null when the model does not output durations.
+   * @returns {object|null}
+   */
+  get timing() {
+    return this.#timing;
+  }
+
+  /**
+   * Whether phoneme timing information is available for this result.
+   * @returns {boolean}
+   */
+  get hasTimingInfo() {
+    return this.#timing != null;
   }
 
   /**

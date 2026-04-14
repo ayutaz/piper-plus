@@ -11,6 +11,10 @@
       "types": "./types/index.d.ts",
       "import": "./src/index.js"
     },
+    "./timing": {
+      "types": "./types/index.d.ts",
+      "import": "./src/timing.js"
+    },
     "./phonemizer": {
       "import": "./src/phonemizer-compat.js"
     },

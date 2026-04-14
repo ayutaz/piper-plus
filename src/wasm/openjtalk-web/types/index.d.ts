@@ -174,6 +174,56 @@ export class PiperPlus {
 }
 
 // ---------------------------------------------------------------------------
+// Phoneme timing
+// ---------------------------------------------------------------------------
+
+/** Timing information for a single phoneme. */
+export interface PhonemeTimingInfo {
+  /** Phoneme token (default: `ph_0`, `ph_1`, ... indices). */
+  phoneme: string;
+  /** Start time in milliseconds from the beginning of the utterance. */
+  start_ms: number;
+  /** End time in milliseconds from the beginning of the utterance. */
+  end_ms: number;
+  /** Duration in milliseconds. */
+  duration_ms: number;
+}
+
+/** Complete timing result for a synthesized utterance. */
+export interface TimingResult {
+  phonemes: PhonemeTimingInfo[];
+  total_duration_ms: number;
+  sample_rate: number;
+}
+
+/**
+ * Convert ONNX duration tensor output to phoneme timing information.
+ *
+ * @param durations   - Frame-count durations from the ONNX `durations` output tensor.
+ * @param sampleRate  - Audio sample rate (e.g. 22050).
+ * @param hopLength   - STFT hop length (default: 256 for VITS medium).
+ * @param phonemeTokens - Optional explicit phoneme names; defaults to `ph_0`, `ph_1`, ...
+ */
+export function durationsToTiming(
+  durations: Float32Array | number[],
+  sampleRate: number,
+  hopLength?: number,
+  phonemeTokens?: string[] | null,
+): TimingResult;
+
+/** Serialize a TimingResult to pretty-printed JSON (matches Rust/Go output). */
+export function timingToJson(result: TimingResult): string;
+
+/** Serialize a TimingResult to compact single-line JSON. */
+export function timingToJsonCompact(result: TimingResult): string;
+
+/** Serialize a TimingResult to TSV (matches Rust/Go output). */
+export function timingToTsv(result: TimingResult): string;
+
+/** Serialize a TimingResult to SRT subtitle format (matches Rust output). */
+export function timingToSrt(result: TimingResult): string;
+
+// ---------------------------------------------------------------------------
 // AudioResult
 // ---------------------------------------------------------------------------
 
@@ -182,8 +232,9 @@ export class AudioResult {
   /**
    * @param samples - Audio sample data (range: -1.0 to 1.0)
    * @param sampleRate - Sample rate in Hz (default: 22050)
+   * @param timing - Phoneme timing info, or null if unavailable
    */
-  constructor(samples: Float32Array, sampleRate?: number);
+  constructor(samples: Float32Array, sampleRate?: number, timing?: TimingResult | null);
 
   /** Audio sample data. */
   readonly samples: Float32Array;
@@ -193,6 +244,12 @@ export class AudioResult {
 
   /** Duration of the audio in seconds. */
   readonly duration: number;
+
+  /** Phoneme timing information (null when the model does not output durations). */
+  readonly timing: TimingResult | null;
+
+  /** Whether phoneme timing information is available for this result. */
+  readonly hasTimingInfo: boolean;
 
   /** Play the audio through the browser's audio output. Resolves when playback finishes. */
   play(): Promise<void>;

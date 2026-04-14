@@ -57,9 +57,10 @@ function installGlobalMocks() {
     InferenceSession: {
       create: async () => ({
         inputNames: ['input', 'input_lengths', 'scales'],
-        outputNames: ['output'],
+        outputNames: ['output', 'durations'],
         run: async () => ({
           output: { data: new Float32Array(22050), dims: [1, 22050] },
+          durations: { data: new Float32Array([5, 8, 12, 10, 7]), dims: [1, 5] },
         }),
         release: () => {},
       }),
@@ -210,6 +211,7 @@ function createInitializedInstance(overrides = {}) {
   // Session — simulates the ONNX session created by _init()
   const sessionRunFn = overrides.sessionRun ?? (async () => ({
     output: { data: new Float32Array(100), dims: [1, 100] },
+    durations: { data: new Float32Array([5, 8, 12, 10, 7]), dims: [1, 5] },
   }));
   const session = {
     run: typeof sessionRunFn === 'function' && sessionRunFn.mock
@@ -417,7 +419,10 @@ describe('SynthesizeOptions デフォルト値', { skip }, () => {
     const instance = createInitializedInstance({
       sessionRun: async (feeds) => {
         capturedScales = Array.from(feeds.scales.data);
-        return { output: { data: new Float32Array(100), dims: [1, 100] } };
+        return {
+          output: { data: new Float32Array(100), dims: [1, 100] },
+          durations: { data: new Float32Array([5, 8, 12, 10, 7]), dims: [1, 5] },
+        };
       },
     });
 
@@ -435,7 +440,10 @@ describe('SynthesizeOptions デフォルト値', { skip }, () => {
     const instance = createInitializedInstance({
       sessionRun: async (feeds) => {
         capturedScales = Array.from(feeds.scales.data);
-        return { output: { data: new Float32Array(100), dims: [1, 100] } };
+        return {
+          output: { data: new Float32Array(100), dims: [1, 100] },
+          durations: { data: new Float32Array([5, 8, 12, 10, 7]), dims: [1, 5] },
+        };
       },
     });
 
@@ -453,7 +461,10 @@ describe('SynthesizeOptions デフォルト値', { skip }, () => {
     const instance = createInitializedInstance({
       sessionRun: async (feeds) => {
         capturedScales = Array.from(feeds.scales.data);
-        return { output: { data: new Float32Array(100), dims: [1, 100] } };
+        return {
+          output: { data: new Float32Array(100), dims: [1, 100] },
+          durations: { data: new Float32Array([5, 8, 12, 10, 7]), dims: [1, 5] },
+        };
       },
     });
 
@@ -481,7 +492,10 @@ describe('config.inference によるデフォルト上書き', { skip }, () => {
       },
       sessionRun: async (feeds) => {
         capturedScales = Array.from(feeds.scales.data);
-        return { output: { data: new Float32Array(100), dims: [1, 100] } };
+        return {
+          output: { data: new Float32Array(100), dims: [1, 100] },
+          durations: { data: new Float32Array([5, 8, 12, 10, 7]), dims: [1, 5] },
+        };
       },
     });
     return { instance, getCapturedScales: () => capturedScales };
@@ -536,7 +550,10 @@ describe('明示的オプションによる上書き', { skip }, () => {
       },
       sessionRun: async (feeds) => {
         capturedScales = Array.from(feeds.scales.data);
-        return { output: { data: new Float32Array(100), dims: [1, 100] } };
+        return {
+          output: { data: new Float32Array(100), dims: [1, 100] },
+          durations: { data: new Float32Array([5, 8, 12, 10, 7]), dims: [1, 5] },
+        };
       },
     });
     return { instance, getCapturedScales: () => capturedScales };
@@ -591,6 +608,7 @@ describe('synthesize() 正常系', { skip }, () => {
       },
       sessionRun: async () => ({
         output: { data: expectedSamples, dims: [1, expectedSamples.length] },
+        durations: { data: new Float32Array([5, 8, 12, 10, 7]), dims: [1, 5] },
       }),
     });
 
@@ -623,6 +641,7 @@ describe('synthesize() 正常系', { skip }, () => {
     const instance = createInitializedInstance({
       sessionRun: async () => ({
         output: { data: expectedSamples, dims: [1, expectedSamples.length] },
+        durations: { data: new Float32Array([5, 8, 12, 10, 7]), dims: [1, 5] },
       }),
     });
 
@@ -645,6 +664,7 @@ describe('synthesize() 正常系', { skip }, () => {
     }));
     const sessionRunFn = mock.fn(async () => ({
       output: { data: new Float32Array(100), dims: [1, 100] },
+      durations: { data: new Float32Array([5, 8, 12, 10, 7]), dims: [1, 5] },
     }));
 
     const instance = createInitializedInstance({
