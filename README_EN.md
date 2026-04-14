@@ -143,14 +143,26 @@ audio.play();
 ### Interfaces
 
 - **[WebUI (Gradio)](docs/features/webui.md)** — Inference and training, Docker-ready
-- **C++ CLI** — Streaming, CUDA inference, phoneme timing output, custom dictionary
+- **C++ CLI** — Streaming, CUDA inference, **phoneme timing output (JSON/TSV/SRT)**, custom dictionary
 - **[C API Shared Library](examples/c-api/README.md)** — `libpiper_plus.so/.dylib/.dll`, FFI-ready (Flutter/Godot/Swift etc.), streaming API
-- **[WebAssembly](src/wasm/openjtalk-web/README.npm.md)** — Fully runs in browser, no server
+- **[WebAssembly](src/wasm/openjtalk-web/README.npm.md)** — Fully runs in browser, **phoneme timing output (JSON/TSV/SRT)**, no server
 - **[Docker](docker/README.md)** — 5 images for inference, training, WebUI, and C++
-- **PyPI** — `pip install piper-plus`
-- **C# CLI** — .NET 8/9 cross-platform, 8-language multilingual, ONNX inference
-- **Rust CLI** — piper-plus/piper-plus-cli, streaming, CUDA/CoreML/DirectML support, auto dictionary download
-- **[Go CLI](src/go/README.md)** — HTTP API server, session pooling, Docker, single binary
+- **PyPI (`pip install piper-plus`)** — Easy install, multilingual, **phoneme timing output (JSON/TSV/SRT)**, HTTP API
+- **C# CLI** — .NET 8/9 cross-platform, 8-language multilingual, ONNX inference, **phoneme timing output (JSON/TSV/SRT)**
+- **Rust CLI** — piper-plus/piper-plus-cli, streaming, CUDA/CoreML/DirectML support, **phoneme timing output (JSON/TSV/SRT)**, auto dictionary download
+- **[Go CLI](src/go/README.md)** — HTTP API server, session pooling, Docker, single binary, **phoneme timing output (JSON/TSV/SRT)**
+
+### Feature Support by Runtime
+
+| Feature | Python | Rust | C++ | C# | Go | WASM/JS |
+|---|---|---|---|---|---|---|
+| Multilingual TTS (8 langs) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Phoneme Timing (JSON/TSV/SRT)** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Streaming Synthesis | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Voice Cloning | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| SSML Support | ✅ | ✅ | ❌ | ✅ | ✅ | ❌ |
+| HTTP API Server | ✅ | ❌ | ❌ | ❌ | ✅ | N/A |
+| Custom Dictionary | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 
 ### Platforms
 

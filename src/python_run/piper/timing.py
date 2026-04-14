@@ -22,7 +22,23 @@ DEFAULT_HOP_LENGTH: int = 256
 
 @dataclass
 class PhonemeTimingInfo:
-    """Timing information for a single phoneme."""
+    """Timing information for a single phoneme.
+
+    Attributes
+    ----------
+    phoneme : str
+        Phoneme token string. May be a regular character (e.g. ``'a'``, ``'k'``),
+        a multi-char name (e.g. ``'ch'``, ``'N_m'``), or a PUA fallback
+        (e.g. ``'U+E019'``) when no explicit mapping is provided.
+    start_ms : float
+        Start time in milliseconds from the beginning of the utterance.
+    end_ms : float
+        End time in milliseconds from the beginning of the utterance.
+        Always equals the next phoneme's ``start_ms`` (continuous boundaries).
+    duration_ms : float
+        Duration of this phoneme in milliseconds (= ``end_ms - start_ms``).
+        Non-negative; negative input frames are clamped to zero.
+    """
 
     phoneme: str
     start_ms: float
@@ -32,7 +48,18 @@ class PhonemeTimingInfo:
 
 @dataclass
 class TimingResult:
-    """Complete timing result for a synthesized utterance."""
+    """Complete timing result for a synthesized utterance.
+
+    Attributes
+    ----------
+    phonemes : list[PhonemeTimingInfo]
+        Phoneme-by-phoneme timing entries in synthesis order.
+    total_duration_ms : float
+        Total utterance duration in milliseconds. Equals the last phoneme's
+        ``end_ms`` (or 0.0 for empty input).
+    sample_rate : int
+        Audio sample rate in Hz (e.g. 22050). Inherited from the model config.
+    """
 
     phonemes: list[PhonemeTimingInfo]
     total_duration_ms: float

@@ -143,14 +143,26 @@ audio.play();
 ### インターフェース
 
 - **[WebUI (Gradio)](docs/features/webui.md)** — 推論・学習対応、Docker対応
-- **C++ CLI** — ストリーミング、CUDA推論、音素タイミング出力、カスタム辞書
+- **C++ CLI** — ストリーミング、CUDA推論、**音素タイミング出力 (JSON/TSV/SRT)**、カスタム辞書
 - **[C API 共有ライブラリ](examples/c-api/README.md)** — `libpiper_plus.so/.dylib/.dll`、FFI対応 (Flutter/Godot/Swift等)、ストリーミング API
-- **[WebAssembly](src/wasm/openjtalk-web/README.npm.md)** — ブラウザ内で完全動作、サーバー不要
+- **[WebAssembly](src/wasm/openjtalk-web/README.npm.md)** — ブラウザ内で完全動作、**音素タイミング出力 (JSON/TSV/SRT)**、サーバー不要
 - **[Docker](docker/README.md)** — 推論・学習・WebUI・C++の5イメージ提供
-- **PyPI** — `pip install piper-plus` で簡単インストール
-- **C# CLI** — .NET 8/9 クロスプラットフォーム、8言語マルチリンガル、ONNX推論
-- **Rust CLI** — piper-plus/piper-plus-cli、ストリーミング、CUDA/CoreML/DirectML対応、辞書自動ダウンロード
-- **[Go CLI](src/go/README.md)** — HTTP APIサーバー、セッションプーリング、Docker対応、シングルバイナリ
+- **PyPI** — `pip install piper-plus` で簡単インストール、8言語マルチリンガル、**音素タイミング出力 (JSON/TSV/SRT)**、HTTP API
+- **C# CLI** — .NET 8/9 クロスプラットフォーム、8言語マルチリンガル、ONNX推論、**音素タイミング出力 (JSON/TSV/SRT)**
+- **Rust CLI** — piper-plus/piper-plus-cli、ストリーミング、CUDA/CoreML/DirectML対応、**音素タイミング出力 (JSON/TSV/SRT)**、辞書自動ダウンロード
+- **[Go CLI](src/go/README.md)** — HTTP APIサーバー、セッションプーリング、Docker対応、シングルバイナリ、**音素タイミング出力 (JSON/TSV/SRT)**
+
+### ランタイム別機能サポート
+
+| 機能 | Python | Rust | C++ | C# | Go | WASM/JS |
+|---|---|---|---|---|---|---|
+| 多言語 TTS (8言語) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **音素タイミング (JSON/TSV/SRT)** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| ストリーミング合成 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Voice Cloning | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| SSML サポート | ✅ | ✅ | ❌ | ✅ | ✅ | ❌ |
+| HTTP API サーバー | ✅ | ❌ | ❌ | ❌ | ✅ | N/A |
+| カスタム辞書 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 
 ### プラットフォーム
 

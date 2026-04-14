@@ -133,6 +133,39 @@ def main() -> None:
 
     @app.route("/api/phoneme-timing", methods=["GET", "POST"])
     def app_phoneme_timing():
+        """Phoneme timing endpoint.
+
+        Synthesize text and return per-phoneme timing information.
+
+        Query Parameters
+        ----------------
+        text : str
+            Text to synthesize. Can also be sent as POST body.
+        format : str, optional
+            Output format: ``'json'`` (default) or ``'tsv'``.
+        language : str, optional
+            Language code (``'ja'``, ``'en'``, ``'zh'``, etc.). Resolved via
+            the model's ``language_id_map``.
+        language_id : int, optional
+            Numeric language ID. Takes precedence over ``language``.
+
+        Responses
+        ---------
+        200 OK
+            Body is JSON or TSV timing data based on the ``format`` parameter.
+            Content-Type: ``application/json`` or ``text/tab-separated-values``.
+        400 Bad Request
+            Empty text, unsupported format, or model has no duration output.
+
+        Examples
+        --------
+        ::
+
+            curl 'http://localhost:5000/api/phoneme-timing?text=Hello&format=json'
+            curl 'http://localhost:5000/api/phoneme-timing?text=Hello&format=tsv'
+            curl -X POST 'http://localhost:5000/api/phoneme-timing?language=ja' \\
+                 -d 'こんにちは'
+        """
         if request.method == "POST":
             text = request.data.decode("utf-8")
         else:

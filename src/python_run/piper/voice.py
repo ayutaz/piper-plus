@@ -457,7 +457,43 @@ class PiperVoice:
         volume: float = 1.0,
         language_id: int | None = None,
     ) -> tuple[bytes, "np.ndarray | None", list[int]]:
-        """Core synthesis returning (audio_bytes, durations, original_phoneme_ids)."""
+        """Core synthesis returning ``(audio_bytes, durations, original_phoneme_ids)``.
+
+        Internal method that runs the full synthesis pipeline:
+
+        1. Applies short-text mitigation (Strategy A padding + Strategy B
+           noise scale adjustment) for inputs shorter than ``MIN_PHONEME_IDS``.
+        2. Runs ONNX inference with the configured parameters.
+        3. Trims silence introduced by padding (when applicable).
+
+        Parameters
+        ----------
+        phoneme_ids : list[int]
+            Phoneme IDs including BOS (first) and EOS (last) tokens.
+            Saved as ``original_phoneme_ids`` before any padding is applied.
+        speaker_id, length_scale, noise_scale, noise_w, volume, language_id
+            See :meth:`synthesize_with_timing` for parameter descriptions.
+
+        Returns
+        -------
+        tuple[bytes, np.ndarray | None, list[int]]
+            A 3-tuple of:
+
+            - ``audio_bytes`` : PCM 16-bit mono audio (silence trimmed if padded).
+            - ``durations`` : 1-D float32 array of frame counts per phoneme,
+              or ``None`` if the model has no ``durations`` output.
+              Length matches the *padded* phoneme sequence; callers should
+              align with ``original_phoneme_ids`` length when computing timing.
+            - ``original_phoneme_ids`` : The input ``phoneme_ids`` list,
+              preserved before any padding mutation.
+
+        Notes
+        -----
+        This is a private helper. Public APIs:
+
+        - :meth:`synthesize_ids_to_raw` for raw bytes (backward-compat wrapper).
+        - :meth:`synthesize_with_timing` for full text-to-speech with timing.
+        """
         original_phoneme_ids = list(phoneme_ids)
 
         if length_scale is None:
@@ -563,7 +599,20 @@ class PiperVoice:
 
     @property
     def has_duration_output(self) -> bool:
-        """Check if the ONNX model supports phoneme duration output."""
+        """Whether the ONNX model exposes a ``durations`` output tensor.
+
+        Returns
+        -------
+        bool
+            ``True`` if the loaded ONNX session has an output named
+            ``'durations'`` (Duration Predictor output), ``False`` otherwise.
+
+        Notes
+        -----
+        When ``False``, calling :meth:`synthesize_with_timing` will return
+        ``None`` for the timing result. Older VITS models exported without
+        ``durations`` are still supported for plain audio synthesis.
+        """
         return "durations" in {o.name for o in self.session.get_outputs()}
 
     def synthesize_with_timing(
@@ -581,9 +630,59 @@ class PiperVoice:
     ) -> tuple[bytes, TimingResult | None]:
         """Synthesize audio with phoneme timing information.
 
-        Returns:
-            Tuple of (wav_bytes, timing_result).
-            timing_result is None if model doesn't support duration output.
+        Synthesizes ``text`` to speech and returns both the raw WAV bytes
+        and per-phoneme timing data (when supported by the model).
+
+        Parameters
+        ----------
+        text : str
+            Input text to synthesize.
+        wav_file : wave.Wave_write or None, optional
+            If provided, audio frames are also written to this file object
+            in addition to being returned in the tuple. The caller must have
+            already opened the file in 'wb' mode.
+        speaker_id : int or None, optional
+            Speaker ID for multi-speaker models. Defaults to None (uses
+            speaker 0 if the model is multi-speaker).
+        length_scale : float or None, optional
+            Speech speed multiplier. None uses the config default.
+        noise_scale : float or None, optional
+            Speaker variation noise scale. None uses the config default.
+        noise_w : float or None, optional
+            Phoneme width noise scale. None uses the config default.
+        sentence_silence : float, default 0.0
+            Seconds of silence to insert between sentences.
+        volume : float, default 1.0
+            Volume multiplier applied to the output samples.
+        language_id : int or None, optional
+            Language ID for multilingual models. Required for models that
+            expose an ``lid`` input tensor.
+
+        Returns
+        -------
+        tuple[bytes, TimingResult | None]
+            ``(wav_bytes, timing_result)`` where:
+
+            - ``wav_bytes`` : Complete WAV file content (RIFF header + PCM).
+            - ``timing_result`` : :class:`piper.timing.TimingResult` with
+              per-phoneme entries, or ``None`` if the model does not output
+              a ``durations`` tensor (check ``self.has_duration_output``).
+
+        Notes
+        -----
+        Cross-runtime compatibility: timing values are byte-for-byte identical
+        to the Rust, Go, C++, C#, and WASM implementations.
+
+        Multi-sentence input is handled by accumulating cumulative ``start_ms``
+        offsets across sentences, including any ``sentence_silence`` gap.
+
+        Examples
+        --------
+        >>> voice = PiperVoice.load('model.onnx', config_path='config.json')
+        >>> wav_bytes, timing = voice.synthesize_with_timing('Hello world')
+        >>> if timing is not None:
+        ...     for p in timing.phonemes:
+        ...         print(f'{p.phoneme}: {p.start_ms:.1f}-{p.end_ms:.1f} ms')
         """
         wav_buf = io.BytesIO()
         with wave.open(wav_buf, "wb") as wf:

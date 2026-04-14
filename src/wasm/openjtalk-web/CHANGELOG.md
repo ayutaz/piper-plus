@@ -5,6 +5,57 @@ All notable changes to the `piper-plus` npm package will be documented in this f
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+#### Phoneme Timing 機能 (新規モジュール)
+
+ブラウザ上で完全動作する phoneme timing 出力機能を追加。VITS Duration Predictor から音素ごとの timing を抽出し、リップシンク・字幕生成・カラオケアプリケーションで使用可能。
+
+**新規モジュール:**
+- `src/timing.js` — `durationsToTiming`, `timingToJson`, `timingToJsonCompact`, `timingToTsv`, `timingToSrt`, `buildPhonemeIdToTokenMap`, `DEFAULT_HOP_LENGTH`
+- メインエクスポート + `./timing` サブパスエクスポート両対応
+
+**AudioResult 拡張:**
+- `timing` プロパティ (TimingResult | null、deep frozen で immutable)
+- `hasTimingInfo` プロパティ (boolean)
+- 後方互換: 2 引数コンストラクタ `new AudioResult(samples, sampleRate)` も動作
+
+**PiperPlus 拡張:**
+- `_infer()` の戻り値型を `Float32Array` → `{ audio: Float32Array, durations: Float32Array | null }` に変更
+- `synthesize()` / `synthesizeWithVoiceCloning()` で AudioResult に timing を伝搬
+- `synthesizeStreaming()` は引き続き Float32Array チャンクを返す (timing は streaming パスでは捨てられる - intentional)
+- `_createTiming()`, `_getPhonemeIdToTokenMap()` 内部 helper 追加 (phoneme_id_map 逆引き、PUA 対応、length alignment)
+
+**バリデーション:**
+- `sampleRate` / `hopLength` の `NaN` / `Infinity` チェック → `TypeError`
+- `phonemeTokens` 長さ不一致 → `RangeError`
+- 負の duration は警告ログ付きで 0 にクランプ
+
+**TypeScript 型定義:**
+- `PhonemeTimingInfo`, `TimingResult` インターフェース
+- `AudioResult` の `timing` / `hasTimingInfo` プロパティ
+- 全 timing 関数の JSDoc + `@example` + `@throws` 完備
+
+**互換性:**
+- Rust/Go/C++/C#/Python と byte-for-byte 互換 (`(hop_length / sample_rate) * 1000` 計算式統一)
+- 既存 `AudioResult` / `synthesize()` API は完全な後方互換
+
+**テスト追加 (+90 件以上):**
+- `test/js/test-phoneme-timing.js` (66 テスト): 計算精度、エッジケース、SRT、buildPhonemeIdToTokenMap、validation、performance
+- `test/js/test-audio-result-timing.js` (18 テスト): timing プロパティ、deep freeze immutability
+- `test/js/test-piper-plus-timing.js` (22 テスト): E2E 統合、length alignment、cache、streaming/voice cloning パス
+
+**README.npm.md:**
+- "Phoneme Timing for Lip-Sync & Subtitles" セクション追加
+- Viseme マッピング例
+- Output format リファレンス
+
+### Tests
+
+- 全テスト: 376 passed, 1 skipped, 0 failed (リグレッション 0 件)
+
 ## [0.4.0] - 2026-04-11
 
 ### Breaking Changes

@@ -7,6 +7,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+#### Python ランタイム Phoneme Timing 機能 (新規)
+
+Python ランタイムに完全な phoneme timing 出力機能を追加。VITS Duration Predictor から音素ごとの開始時刻・終了時刻・継続時間を抽出し、JSON/TSV/SRT 形式で出力可能。
+
+**新規モジュール:**
+- `piper.timing` モジュール (`src/python_run/piper/timing.py`)
+  - `PhonemeTimingInfo`, `TimingResult` データクラス
+  - `durations_to_timing()`, `timing_to_json/tsv/srt()`, `timing_to_json_compact()`
+  - `build_phoneme_id_reverse_map()` (PUA char 対応)
+
+**PiperVoice 拡張:**
+- `synthesize_with_timing(text, wav_file=None, ...) -> tuple[bytes, TimingResult | None]`
+- `has_duration_output` プロパティ (モデル対応判定)
+- `_synthesize_ids_core()` 内部メソッド (durations 取得 + original_phoneme_ids 保持)
+
+**HTTP エンドポイント:**
+- `POST/GET /api/phoneme-timing` (Flask、`format=json|tsv` 対応)
+- `language` / `language_id` クエリパラメータで多言語対応
+
+**設定:**
+- `PiperConfig.hop_size` フィールド追加 (デフォルト 256、`config.json` の `audio.hop_size` から読込)
+
+**互換性:**
+- Rust/Go/C++/C# の既存実装と byte-for-byte 互換
+- 既存の `synthesize()`, `synthesize_stream_raw()`, `synthesize_ids_to_raw()` API は完全な後方互換性を維持
+
+**テスト:**
+- `tests/test_phoneme_timing.py` (44 テスト)
+- `tests/test_voice_timing.py` (22 テスト)
+- `tests/test_http_timing.py` (14 テスト)
+- `tests/test_config_fallback.py` に hop_size テスト 5 件追加
+
+### Removed
+
+- 死んだコード `src/python_run/piper/espeak_phonemizer.py` を削除 (piper-plus は推論時に espeak-ng に依存しない)
+
+### Tests
+- 196 → 212 passed (リグレッション 0 件)
+
 ## [1.11.0] - 2026-04-06
 
 ### Added
