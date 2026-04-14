@@ -85,6 +85,7 @@ src/wasm/openjtalk-web/tools/
 scripts/debug/
 debug_*.py
 test_phoneme*.py
+!src/python_run/tests/test_phoneme*.py
 verify_*.py
 analyze_*.py
 check_*.py

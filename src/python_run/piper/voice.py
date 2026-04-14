@@ -1,3 +1,4 @@
+import io
 import json
 import logging
 import os
@@ -13,6 +14,12 @@ import onnxruntime
 from .config import PhonemeType, PiperConfig
 from .const import BOS, EOS, PAD
 from .phonemize.token_mapper import FIXED_PUA_MAPPING
+from .timing import (
+    PhonemeTimingInfo,
+    TimingResult,
+    build_phoneme_id_reverse_map,
+    durations_to_timing,
+)
 from .util import audio_float_to_int16
 
 
@@ -440,7 +447,7 @@ class PiperVoice:
             )
             yield break_bytes + audio_bytes + break_bytes + silence_bytes
 
-    def synthesize_ids_to_raw(
+    def _synthesize_ids_core(
         self,
         phoneme_ids: list[int],
         speaker_id: int | None = None,
@@ -449,8 +456,10 @@ class PiperVoice:
         noise_w: float | None = None,
         volume: float = 1.0,
         language_id: int | None = None,
-    ) -> bytes:
-        """Synthesize raw audio from phoneme ids."""
+    ) -> tuple[bytes, "np.ndarray | None", list[int]]:
+        """Core synthesis returning (audio_bytes, durations, original_phoneme_ids)."""
+        original_phoneme_ids = list(phoneme_ids)
+
         if length_scale is None:
             length_scale = self.config.length_scale
 
@@ -512,14 +521,161 @@ class PiperVoice:
             args["prosody_features"] = prosody
 
         # Synthesize through Onnx
-        audio = self.session.run(
-            None,
-            args,
-        )[0].squeeze(0)
+        output_names = [o.name for o in self.session.get_outputs()]
+        _outputs = self.session.run(output_names, args)
+        audio = _outputs[0].squeeze(0)
+
+        # Extract durations by name (not index) for robustness
+        durations = None
+        if "durations" in output_names:
+            dur_idx = output_names.index("durations")
+            if dur_idx < len(_outputs):
+                durations = _outputs[dur_idx].squeeze()
         audio = audio_float_to_int16(audio.squeeze(), volume=volume)
 
         # Strategy A: trim silence introduced by padding
         if was_padded:
             audio = _trim_silence(audio)
 
-        return audio.tobytes()
+        return audio.tobytes(), durations, original_phoneme_ids
+
+    def synthesize_ids_to_raw(
+        self,
+        phoneme_ids: list[int],
+        speaker_id: int | None = None,
+        length_scale: float | None = None,
+        noise_scale: float | None = None,
+        noise_w: float | None = None,
+        volume: float = 1.0,
+        language_id: int | None = None,
+    ) -> bytes:
+        """Synthesize raw audio from phoneme ids."""
+        audio_bytes, _, _ = self._synthesize_ids_core(
+            phoneme_ids,
+            speaker_id=speaker_id,
+            length_scale=length_scale,
+            noise_scale=noise_scale,
+            noise_w=noise_w,
+            volume=volume,
+            language_id=language_id,
+        )
+        return audio_bytes
+
+    @property
+    def has_duration_output(self) -> bool:
+        """Check if the ONNX model supports phoneme duration output."""
+        return "durations" in {o.name for o in self.session.get_outputs()}
+
+    def synthesize_with_timing(
+        self,
+        text: str,
+        wav_file: wave.Wave_write | None = None,
+        *,
+        speaker_id: int | None = None,
+        length_scale: float | None = None,
+        noise_scale: float | None = None,
+        noise_w: float | None = None,
+        sentence_silence: float = 0.0,
+        volume: float = 1.0,
+        language_id: int | None = None,
+    ) -> tuple[bytes, TimingResult | None]:
+        """Synthesize audio with phoneme timing information.
+
+        Returns:
+            Tuple of (wav_bytes, timing_result).
+            timing_result is None if model doesn't support duration output.
+        """
+        wav_buf = io.BytesIO()
+        with wave.open(wav_buf, "wb") as wf:
+            wf.setframerate(self.config.sample_rate)
+            wf.setsampwidth(2)
+            wf.setnchannels(1)
+
+            all_timing_entries: list[PhonemeTimingInfo] = []
+            cumulative_ms = 0.0
+
+            # Build reverse map for phoneme display names
+            pua_reverse = {chr(v): k for k, v in FIXED_PUA_MAPPING.items()}
+            reverse_map = build_phoneme_id_reverse_map(
+                self.config.phoneme_id_map, pua_reverse
+            )
+
+            sentence_phonemes = self.phonemize(text)
+            num_silence_samples = int(sentence_silence * self.config.sample_rate)
+            all_raw_frames: list[bytes] = []
+
+            for phonemes in sentence_phonemes:
+                phoneme_ids = self.phonemes_to_ids(phonemes)
+                audio_bytes, durations, original_ids = self._synthesize_ids_core(
+                    phoneme_ids,
+                    speaker_id=speaker_id,
+                    length_scale=length_scale,
+                    noise_scale=noise_scale,
+                    noise_w=noise_w,
+                    volume=volume,
+                    language_id=language_id,
+                )
+
+                wf.writeframes(audio_bytes)
+                all_raw_frames.append(audio_bytes)
+
+                if durations is not None:
+                    tokens = [
+                        reverse_map.get(pid, f"ph_{i}")
+                        for i, pid in enumerate(original_ids)
+                    ]
+                    dur_list = durations.tolist()
+
+                    # Align lengths (durations may include padding)
+                    if len(dur_list) != len(tokens):
+                        _LOGGER.debug(
+                            "Duration-token length mismatch: durations=%d, tokens=%d; "
+                            "truncating to %d",
+                            len(dur_list), len(tokens),
+                            min(len(dur_list), len(tokens)),
+                        )
+                    min_len = min(len(dur_list), len(tokens))
+                    dur_list = dur_list[:min_len]
+                    tokens = tokens[:min_len]
+
+                    timing = durations_to_timing(
+                        dur_list, tokens, self.config.sample_rate,
+                        hop_length=self.config.hop_size,
+                    )
+
+                    for p in timing.phonemes:
+                        all_timing_entries.append(
+                            PhonemeTimingInfo(
+                                phoneme=p.phoneme,
+                                start_ms=p.start_ms + cumulative_ms,
+                                end_ms=p.end_ms + cumulative_ms,
+                                duration_ms=p.duration_ms,
+                            )
+                        )
+                    cumulative_ms += timing.total_duration_ms
+
+                if sentence_silence > 0:
+                    silence_ms = sentence_silence * 1000.0
+                    cumulative_ms += silence_ms
+                    silence_frame = bytes(num_silence_samples * 2)
+                    wf.writeframes(silence_frame)
+                    all_raw_frames.append(silence_frame)
+
+        # Also write to caller's wav_file if provided
+        if wav_file is not None:
+            wav_file.setframerate(self.config.sample_rate)
+            wav_file.setsampwidth(2)
+            wav_file.setnchannels(1)
+            for frame_data in all_raw_frames:
+                wav_file.writeframes(frame_data)
+
+        timing_result = None
+        if all_timing_entries:
+            timing_result = TimingResult(
+                phonemes=all_timing_entries,
+                total_duration_ms=cumulative_ms,
+                sample_rate=self.config.sample_rate,
+            )
+
+        wav_buf.seek(0)
+        return wav_buf.getvalue(), timing_result

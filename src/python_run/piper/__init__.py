@@ -1,6 +1,16 @@
 from importlib.metadata import PackageNotFoundError, version
 
 from .voice import PiperVoice
+from .timing import (
+    PhonemeTimingInfo,
+    TimingResult,
+    build_phoneme_id_reverse_map,
+    durations_to_timing,
+    timing_to_json,
+    timing_to_json_compact,
+    timing_to_srt,
+    timing_to_tsv,
+)
 
 
 try:
@@ -15,6 +25,14 @@ except PackageNotFoundError:
     )
 
 __all__ = [
+    "PhonemeTimingInfo",
     "PiperVoice",
+    "TimingResult",
     "__version__",
+    "build_phoneme_id_reverse_map",
+    "durations_to_timing",
+    "timing_to_json",
+    "timing_to_json_compact",
+    "timing_to_srt",
+    "timing_to_tsv",
 ]
