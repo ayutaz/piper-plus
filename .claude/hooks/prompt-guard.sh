@@ -103,6 +103,19 @@ case "$PROMPT" in
     ;;
 esac
 
+case "$PROMPT" in
+  *"レビュー"*|*"review comment"*|*"レビューコメント"*|*"resolve"*|*"レビューに返信"*|*"PR のコメント"*)
+    NOTES+=$'### レビュー対応リマインダー\n'
+    NOTES+=$'- `/reply-review <pr-number>` skill で返信 + resolve を自動化できます\n'
+    NOTES+=$'- 修正をコミットしてから skill を実行するフロー:\n'
+    NOTES+=$'  1. レビュー指摘を修正\n'
+    NOTES+=$'  2. `/commit` でコミット (適切な prefix 付き)\n'
+    NOTES+=$'  3. `git push` で PR に反映\n'
+    NOTES+=$'  4. `/reply-review <pr-number>` で返信 + resolve\n'
+    NOTES+=$'- GraphQL API を使うため `gh` CLI が認証済みである必要があります\n'
+    ;;
+esac
+
 if [ -n "$NOTES" ]; then
   if command -v jq >/dev/null 2>&1; then
     jq -n --arg ctx "$NOTES" '{

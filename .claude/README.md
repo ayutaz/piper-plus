@@ -20,7 +20,8 @@
 │   ├── check-pr-ready/SKILL.md     # /check-pr-ready — PR 作成前の最終チェック
 │   ├── commit/SKILL.md             # /commit — CLAUDE.md 準拠コミット
 │   ├── run-tests/SKILL.md          # /run-tests — 各言語ランタイムテスト
-│   └── sync-docs/SKILL.md          # /sync-docs — エージェントチームによる全ドキュメント監査・更新
+│   ├── sync-docs/SKILL.md          # /sync-docs — エージェントチームによる全ドキュメント監査・更新
+│   └── reply-review/SKILL.md       # /reply-review — レビューコメントに返信 + thread resolve
 └── commands/                       # 既存の slash commands (skills と併存可)
     ├── add-language.md             # 新言語追加ガイド
     └── review-language.md          # 10 エージェント並列レビュー
@@ -82,6 +83,23 @@ CLAUDE.md のコミットルール (`--no-verify` 禁止、HEREDOC、適切な p
 - Agent 6: docstring / JSDoc 整合性
 
 PR #349 で発生した「ドキュメント更新を一括で後付けする」パターンをコミット単位で防止します。
+
+### `/reply-review <pr-number> [commit-hash]`
+**レビューコメントへの返信 + thread resolve を自動化**。修正コミット後に呼び出すと、未解決の review thread を取得し、各コメントに対応内容 (コミットハッシュ付き) を返信して thread を resolve します。
+
+**推奨フロー**:
+1. レビュー指摘を修正
+2. `/commit` でコミット
+3. `git push` で PR に反映
+4. `/reply-review <pr-number>` で返信 + resolve
+
+**内部で使う API**:
+- GraphQL `resolveReviewThread` mutation (thread resolve)
+- REST API `POST /repos/{owner}/{repo}/pulls/{pr}/comments` with `in_reply_to` (返信投稿)
+
+GitHub CLI (`gh`) の認証が必要です。`$1` を省略した場合は引数不足エラー、`$2` を省略した場合は `git rev-parse HEAD` の短縮ハッシュを使用します。
+
+PR #349 / #350 のレビュー対応で手動実行していたワークフローを skill 化したものです。
 
 ## 依存
 
