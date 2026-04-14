@@ -33,8 +33,16 @@ src/python_run/dist/
 lightning_logs/
 
 # Claude settings
+# Default: ignore everything under .claude/ ...
 .claude/*
+# ... but keep shared automation (hooks, skills, settings, commands).
+# Personal/runtime files (settings.local.json, worktrees/, scheduled_tasks.lock,
+# .coverage, etc.) remain ignored via the leading `.claude/*` rule.
 !.claude/commands/
+!.claude/hooks/
+!.claude/skills/
+!.claude/settings.json
+!.claude/README.md
 settings.local.json
 
 # Generated audio files
