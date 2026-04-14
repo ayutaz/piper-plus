@@ -59,6 +59,8 @@ case "$PROMPT" in
     NOTES+="- \`.env\` / credentials は誤コミット禁止\n"
     NOTES+="- メッセージは 1-2 文、why を強調、HEREDOC 形式\n"
     NOTES+="- 既存コミットの \`--amend\` は明示要求がない限り禁止\n"
+    NOTES+="- **大規模変更 (>100 行 or 新規 API)** なら \`/sync-docs\` でドキュメント監査を先に実行\n"
+    NOTES+="- 推奨フロー: \`/sync-docs\` → \`/commit\` → \`gh pr create\`\n"
     ;;
 esac
 
@@ -89,6 +91,15 @@ case "$PROMPT" in
     NOTES+="- パッケージは \`uv pip install\` ではなく \`uv add\` (memory: feedback_uv_add)\n"
     NOTES+="- テストは \`uv run pytest\` 経由で実行 (memory: feedback_uv_testing)\n"
     NOTES+="- pytest.ini が \`--cov\` を要求するので \`-o addopts=\"\"\` で上書き可能\n"
+    ;;
+esac
+
+case "$PROMPT" in
+  *"ドキュメント"*|*"docs "*|*"README"*|*"CLAUDE.md"*|*"CHANGELOG"*)
+    NOTES+="### ドキュメント更新リマインダー\n"
+    NOTES+="- \`/sync-docs\` でエージェントチームによる一括監査・更新が可能\n"
+    NOTES+="- 監査対象: CLAUDE.md / README / CHANGELOG / docs/features / docstring\n"
+    NOTES+="- 大規模コード変更後は \`/sync-docs\` → \`/commit\` のフローを推奨\n"
     ;;
 esac
 

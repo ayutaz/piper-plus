@@ -19,7 +19,8 @@
 │   ├── precheck/SKILL.md           # /precheck — lint + format + test 一括
 │   ├── check-pr-ready/SKILL.md     # /check-pr-ready — PR 作成前の最終チェック
 │   ├── commit/SKILL.md             # /commit — CLAUDE.md 準拠コミット
-│   └── run-tests/SKILL.md          # /run-tests — 各言語ランタイムテスト
+│   ├── run-tests/SKILL.md          # /run-tests — 各言語ランタイムテスト
+│   └── sync-docs/SKILL.md          # /sync-docs — エージェントチームによる全ドキュメント監査・更新
 └── commands/                       # 既存の slash commands (skills と併存可)
     ├── add-language.md             # 新言語追加ガイド
     └── review-language.md          # 10 エージェント並列レビュー
@@ -62,6 +63,25 @@ CLAUDE.md のコミットルール (`--no-verify` 禁止、HEREDOC、適切な p
 
 ### `/run-tests [scope]`
 各言語ランタイムのテストを CI と同条件でローカル実行。
+
+### `/sync-docs [commit-range]`
+**エージェントチームで全ドキュメントを監査・更新**。コード変更に対して CLAUDE.md / README / CHANGELOG / docs/features / docstring の整合性を 6 エージェント並列で監査し、必要な更新を提案・適用します。
+
+**推奨フロー**:
+1. 実装・テスト追加
+2. `/sync-docs` でドキュメント監査 → 承認後に自動更新
+3. `/commit` でコミット
+4. `/check-pr-ready` → PR 作成
+
+**監査エージェント**:
+- Agent 1: CLAUDE.md (実装済み機能・ファイルパス・API 表)
+- Agent 2: ルート README (Features / Feature Support Matrix)
+- Agent 3: ランタイム別 README (python_run, openjtalk-web, etc.)
+- Agent 4: CHANGELOG (Unreleased セクション)
+- Agent 5: docs/features / docs/spec
+- Agent 6: docstring / JSDoc 整合性
+
+PR #349 で発生した「ドキュメント更新を一括で後付けする」パターンをコミット単位で防止します。
 
 ## 依存
 
@@ -130,6 +150,7 @@ bash .claude/hooks/session-env.sh < /dev/null
 4. **未コミット変更の放置** → セッション終了時に気付かない
 
 Hooks は **自動実行で予防**、Skills は **明示的に呼び出して使う一括ツール** という棲み分けです。
+**問題 2** (ドキュメント更新漏れ) は `/sync-docs` skill でエージェントチームによる並列監査として解決しています。コミット前に呼び出すことで、PR #349 のような「後付けの一括ドキュメント更新」を避けられます。
 
 ## 既存 commands との関係
 
