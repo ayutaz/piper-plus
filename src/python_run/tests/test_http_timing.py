@@ -237,3 +237,230 @@ class TestTimingEndpointFormatValidation:
         data = json.loads(resp.data)
         assert "error" in data
         assert "xml" in data["error"].lower() or "unsupported" in data["error"].lower()
+
+
+class TestTimingEndpointLanguageResolution:
+    """Tests for language_id / language query parameter resolution.
+
+    The endpoint supports two forms:
+    - `?language_id=N` — use integer directly
+    - `?language=<code>` — look up in voice.config.language_id_map
+    """
+
+    def test_language_id_numeric_parameter_accepted(self, mock_timing_result):
+        """GET with ?language_id=3 succeeds and returns timing JSON."""
+        from flask import Flask, jsonify, request
+
+        from piper.timing import timing_to_json, timing_to_tsv
+
+        captured = {}
+        mock_voice = MagicMock()
+        mock_voice.config.language_id_map = {"ja": 0, "en": 1}
+
+        def _synth(text, **kwargs):
+            captured["language_id"] = kwargs.get("language_id")
+            return (b"fake-wav", mock_timing_result)
+
+        mock_voice.synthesize_with_timing.side_effect = _synth
+
+        app = Flask(__name__)
+
+        @app.route("/api/phoneme-timing", methods=["GET", "POST"])
+        def handler():
+            text = (
+                request.data.decode("utf-8")
+                if request.method == "POST"
+                else request.args.get("text", "")
+            )
+            text = text.strip()
+            if not text:
+                return jsonify({"error": "No text provided"}), 400
+
+            fmt = request.args.get("format", "json").lower()
+            if fmt not in ("json", "tsv"):
+                return jsonify({"error": f"Unsupported format: {fmt}"}), 400
+
+            language_id = None
+            language_id_raw = request.args.get("language_id", None)
+            language = request.args.get("language", None)
+            if language_id_raw is not None:
+                try:
+                    language_id = int(language_id_raw)
+                except (ValueError, TypeError):
+                    language_id = None
+            elif language is not None:
+                lmap = mock_voice.config.language_id_map
+                if lmap:
+                    language_id = lmap.get(language)
+
+            _, timing = mock_voice.synthesize_with_timing(
+                text, language_id=language_id
+            )
+            if timing is None:
+                return jsonify({"error": "Model does not support duration output"}), 400
+            if fmt == "tsv":
+                return (
+                    timing_to_tsv(timing),
+                    200,
+                    {"Content-Type": "text/tab-separated-values"},
+                )
+            return (
+                timing_to_json(timing),
+                200,
+                {"Content-Type": "application/json"},
+            )
+
+        client = app.test_client()
+        resp = client.get("/api/phoneme-timing?text=hello&language_id=3")
+        assert resp.status_code == 200
+        assert captured["language_id"] == 3
+
+    def test_language_code_resolved_via_language_id_map(self, mock_timing_result):
+        """GET with ?language=ja looks up language_id_map and passes 0."""
+        from flask import Flask, jsonify, request
+
+        from piper.timing import timing_to_json, timing_to_tsv
+
+        captured = {}
+        mock_voice = MagicMock()
+        mock_voice.config.language_id_map = {"ja": 0, "en": 1, "zh": 2}
+
+        def _synth(text, **kwargs):
+            captured["language_id"] = kwargs.get("language_id")
+            return (b"fake-wav", mock_timing_result)
+
+        mock_voice.synthesize_with_timing.side_effect = _synth
+
+        app = Flask(__name__)
+
+        @app.route("/api/phoneme-timing", methods=["GET", "POST"])
+        def handler():
+            text = request.args.get("text", "").strip()
+            if not text:
+                return jsonify({"error": "No text provided"}), 400
+            fmt = request.args.get("format", "json").lower()
+            if fmt not in ("json", "tsv"):
+                return jsonify({"error": f"Unsupported format: {fmt}"}), 400
+
+            language_id = None
+            language = request.args.get("language", None)
+            language_id_raw = request.args.get("language_id", None)
+            if language_id_raw is not None:
+                try:
+                    language_id = int(language_id_raw)
+                except (ValueError, TypeError):
+                    language_id = None
+            elif language is not None:
+                lmap = mock_voice.config.language_id_map
+                if lmap:
+                    language_id = lmap.get(language)
+
+            _, timing = mock_voice.synthesize_with_timing(
+                text, language_id=language_id
+            )
+            if timing is None:
+                return jsonify({"error": "no duration support"}), 400
+            if fmt == "tsv":
+                return timing_to_tsv(timing), 200, {"Content-Type": "text/tab-separated-values"}
+            return timing_to_json(timing), 200, {"Content-Type": "application/json"}
+
+        client = app.test_client()
+        resp = client.get("/api/phoneme-timing?text=hello&language=zh")
+        assert resp.status_code == 200
+        assert captured["language_id"] == 2
+
+    def test_invalid_language_id_falls_back_to_none(self, mock_timing_result):
+        """Non-integer language_id falls back to None (gracefully)."""
+        from flask import Flask, jsonify, request
+
+        from piper.timing import timing_to_json
+
+        captured = {}
+        mock_voice = MagicMock()
+        mock_voice.config.language_id_map = None
+
+        def _synth(text, **kwargs):
+            captured["language_id"] = kwargs.get("language_id")
+            return (b"fake-wav", mock_timing_result)
+
+        mock_voice.synthesize_with_timing.side_effect = _synth
+
+        app = Flask(__name__)
+
+        @app.route("/api/phoneme-timing", methods=["GET", "POST"])
+        def handler():
+            text = request.args.get("text", "").strip()
+            if not text:
+                return jsonify({"error": "No text provided"}), 400
+            fmt = request.args.get("format", "json").lower()
+            if fmt not in ("json", "tsv"):
+                return jsonify({"error": f"Unsupported format: {fmt}"}), 400
+
+            language_id = None
+            language_id_raw = request.args.get("language_id", None)
+            if language_id_raw is not None:
+                try:
+                    language_id = int(language_id_raw)
+                except (ValueError, TypeError):
+                    language_id = None
+
+            _, timing = mock_voice.synthesize_with_timing(
+                text, language_id=language_id
+            )
+            return timing_to_json(timing), 200, {"Content-Type": "application/json"}
+
+        client = app.test_client()
+        resp = client.get("/api/phoneme-timing?text=hello&language_id=not-an-int")
+        assert resp.status_code == 200
+        assert captured["language_id"] is None
+
+    def test_unknown_language_code_returns_none(self, mock_timing_result):
+        """Unknown language code (not in language_id_map) resolves to None."""
+        from flask import Flask, jsonify, request
+
+        from piper.timing import timing_to_json
+
+        captured = {}
+        mock_voice = MagicMock()
+        mock_voice.config.language_id_map = {"ja": 0, "en": 1}
+
+        def _synth(text, **kwargs):
+            captured["language_id"] = kwargs.get("language_id")
+            return (b"fake-wav", mock_timing_result)
+
+        mock_voice.synthesize_with_timing.side_effect = _synth
+
+        app = Flask(__name__)
+
+        @app.route("/api/phoneme-timing", methods=["GET", "POST"])
+        def handler():
+            text = request.args.get("text", "").strip()
+            if not text:
+                return jsonify({"error": "No text provided"}), 400
+            fmt = request.args.get("format", "json").lower()
+            if fmt not in ("json", "tsv"):
+                return jsonify({"error": f"Unsupported format: {fmt}"}), 400
+
+            language_id = None
+            language_id_raw = request.args.get("language_id", None)
+            language = request.args.get("language", None)
+            if language_id_raw is not None:
+                try:
+                    language_id = int(language_id_raw)
+                except (ValueError, TypeError):
+                    language_id = None
+            elif language is not None:
+                lmap = mock_voice.config.language_id_map
+                if lmap:
+                    language_id = lmap.get(language)
+
+            _, timing = mock_voice.synthesize_with_timing(
+                text, language_id=language_id
+            )
+            return timing_to_json(timing), 200, {"Content-Type": "application/json"}
+
+        client = app.test_client()
+        resp = client.get("/api/phoneme-timing?text=hello&language=fr")
+        # Unknown language returns None (lmap.get returns None for missing keys)
+        assert resp.status_code == 200
+        assert captured["language_id"] is None

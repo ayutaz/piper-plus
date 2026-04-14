@@ -328,3 +328,117 @@ class TestSynthesizeWithTimingAdvanced:
         _, timing = voice.synthesize_with_timing("a")
         assert timing is not None
         assert timing.sample_rate == voice.config.sample_rate
+
+
+class TestSynthesizeWithTimingParameters:
+    """Parameter pass-through tests for `synthesize_with_timing()`."""
+
+    def test_wav_file_parameter_writes_frames(self):
+        """When a wav_file is provided, synthesize_with_timing writes frames to it."""
+        import io as _io
+        import wave as _wave
+
+        voice = _make_mock_voice(has_durations=True, phoneme_ids_len=5)
+        voice.phonemize = MagicMock(return_value=[["a"]])
+
+        buf = _io.BytesIO()
+        with _wave.open(buf, "wb") as wav_file:
+            wav_bytes, timing = voice.synthesize_with_timing("a", wav_file=wav_file)
+
+        # wav_file should have received frames (buffer not empty)
+        assert buf.tell() > 0
+
+        # Verify the buffer is a valid WAV file with the expected sample rate
+        buf.seek(0)
+        with _wave.open(buf, "rb") as wav_read:
+            assert wav_read.getframerate() == voice.config.sample_rate
+            assert wav_read.getnchannels() == 1
+            assert wav_read.getsampwidth() == 2
+            assert wav_read.getnframes() > 0
+
+    def test_language_id_parameter_forwarded_to_session(self):
+        """language_id reaches the ONNX session.run call when the model has lid."""
+        voice = _make_mock_voice(has_durations=True, phoneme_ids_len=5)
+        voice.phonemize = MagicMock(return_value=[["a"]])
+
+        # Add 'lid' to the mock model's input names so the language_id path is taken.
+        lid_mock = MagicMock()
+        lid_mock.name = "lid"
+        existing_inputs = voice.session.get_inputs.return_value
+        voice.session.get_inputs.return_value = [*existing_inputs, lid_mock]
+
+        _, _ = voice.synthesize_with_timing("a", language_id=3)
+
+        # Inspect the feeds dict from the captured session.run call
+        call_args = voice.session.run.call_args
+        assert call_args is not None
+        feeds = call_args[0][1]
+        assert "lid" in feeds
+        # Numpy array element access
+        assert int(feeds["lid"][0]) == 3
+
+    def test_speaker_id_parameter_forwarded_to_session(self):
+        """speaker_id reaches the ONNX session.run call for multi-speaker models."""
+        voice = _make_mock_voice(
+            num_speakers=3, has_durations=True, phoneme_ids_len=5
+        )
+        voice.phonemize = MagicMock(return_value=[["a"]])
+
+        _, _ = voice.synthesize_with_timing("a", speaker_id=2)
+
+        call_args = voice.session.run.call_args
+        assert call_args is not None
+        feeds = call_args[0][1]
+        assert "sid" in feeds
+        # shape is [1, 1]
+        assert int(feeds["sid"][0][0]) == 2
+
+
+class TestSynthesizeCoreShortText:
+    """Verifies short-text mitigation (Strategy A padding + Strategy B noise) in core."""
+
+    def test_short_ids_reduce_noise_scale(self):
+        """Phoneme sequences shorter than MIN_PHONEME_IDS reduce noise_scale."""
+        from piper.voice import MIN_PHONEME_IDS, PiperVoice
+
+        voice = _make_mock_voice(has_durations=True, phoneme_ids_len=50)
+
+        # Very short input (4 IDs, well below MIN_PHONEME_IDS=40)
+        short_ids = [1, 10, 10, 2]
+        PiperVoice._synthesize_ids_core(voice, short_ids)
+
+        # Verify scales[0] (noise_scale) was reduced below the default 0.667
+        call_args = voice.session.run.call_args
+        assert call_args is not None
+        feeds = call_args[0][1]
+        scales = feeds["scales"]
+        assert scales[0] < 0.667  # noise_scale reduced
+        assert scales[2] < 0.8    # noise_w reduced
+        assert abs(scales[1] - 1.0) < 1e-6  # length_scale unchanged
+
+    def test_long_ids_keep_default_scales(self):
+        """Phoneme sequences >= MIN_PHONEME_IDS use the default scales."""
+        from piper.voice import MIN_PHONEME_IDS, PiperVoice
+
+        voice = _make_mock_voice(has_durations=True, phoneme_ids_len=50)
+
+        long_ids = [1] + [10] * (MIN_PHONEME_IDS - 1) + [2]
+        PiperVoice._synthesize_ids_core(voice, long_ids)
+
+        call_args = voice.session.run.call_args
+        assert call_args is not None
+        feeds = call_args[0][1]
+        scales = feeds["scales"]
+        # Default values preserved
+        assert abs(scales[0] - 0.667) < 1e-6
+        assert abs(scales[1] - 1.0) < 1e-6
+        assert abs(scales[2] - 0.8) < 1e-6
+
+    def test_original_phoneme_ids_preserved_after_padding(self):
+        """_synthesize_ids_core returns the original (pre-padding) phoneme IDs."""
+        voice = _make_mock_voice(has_durations=True, phoneme_ids_len=50)
+
+        short_ids = [1, 10, 10, 10, 2]
+        _, _, original_ids = voice._synthesize_ids_core(short_ids)
+
+        assert original_ids == [1, 10, 10, 10, 2]

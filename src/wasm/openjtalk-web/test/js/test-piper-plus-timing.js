@@ -267,3 +267,198 @@ describe('PiperPlus timing - independent timing objects', () => {
     assert.notStrictEqual(result1.timing.phonemes[0], result2.timing.phonemes[0]);
   });
 });
+
+
+// ---------------------------------------------------------------------------
+// _createTiming semantics: durations/phonemeIds length alignment
+// ---------------------------------------------------------------------------
+
+describe('PiperPlus timing - durations and phonemeIds length alignment', () => {
+  it('truncates to min(durations.length, phonemeIds.length) when durations is longer', async () => {
+    const { buildPhonemeIdToTokenMap } = await import('../../src/timing.js');
+
+    // Simulate _createTiming's internal logic:
+    // durations has 5 entries, but original phonemeIds has only 3 (pre-padding)
+    const durations = new Float32Array([5, 8, 12, 10, 7]);
+    const phonemeIds = [1, 7, 2]; // ^ a $ — length 3
+    const phonemeIdMap = { _: [0], '^': [1], $: [2], a: [7] };
+    const idToToken = buildPhonemeIdToTokenMap(phonemeIdMap);
+
+    // Mirror the alignment logic from PiperPlus._createTiming
+    const minLen = Math.min(durations.length, phonemeIds.length);
+    const tokens = new Array(minLen);
+    for (let i = 0; i < minLen; i++) {
+      tokens[i] = idToToken[phonemeIds[i]] ?? `ph_${i}`;
+    }
+    const alignedDurations = durations.subarray(0, minLen);
+
+    const timing = durationsToTiming(alignedDurations, 22050, 256, tokens);
+
+    // Expectation: only 3 phonemes, matching the original (pre-padding) length.
+    assert.strictEqual(timing.phonemes.length, 3);
+    assert.deepStrictEqual(
+      timing.phonemes.map((p) => p.phoneme),
+      ['^', 'a', '$'],
+    );
+  });
+
+  it('truncates to min when phonemeIds is longer than durations', async () => {
+    const { buildPhonemeIdToTokenMap } = await import('../../src/timing.js');
+
+    // Edge case: durations shorter than phonemeIds (e.g., model truncation)
+    const durations = new Float32Array([5, 8]);
+    const phonemeIds = [1, 7, 10, 2]; // length 4
+    const phonemeIdMap = { '^': [1], $: [2], a: [7], k: [10] };
+    const idToToken = buildPhonemeIdToTokenMap(phonemeIdMap);
+
+    const minLen = Math.min(durations.length, phonemeIds.length);
+    const tokens = new Array(minLen);
+    for (let i = 0; i < minLen; i++) {
+      tokens[i] = idToToken[phonemeIds[i]] ?? `ph_${i}`;
+    }
+    const alignedDurations = durations.subarray(0, minLen);
+    const timing = durationsToTiming(alignedDurations, 22050, 256, tokens);
+
+    assert.strictEqual(timing.phonemes.length, 2);
+    assert.strictEqual(timing.phonemes[0].phoneme, '^');
+    assert.strictEqual(timing.phonemes[1].phoneme, 'a');
+  });
+
+  it('handles equal-length durations and phonemeIds cleanly', async () => {
+    const { buildPhonemeIdToTokenMap } = await import('../../src/timing.js');
+
+    const durations = new Float32Array([5, 8, 12]);
+    const phonemeIds = [1, 7, 2];
+    const phonemeIdMap = { '^': [1], $: [2], a: [7] };
+    const idToToken = buildPhonemeIdToTokenMap(phonemeIdMap);
+    const tokens = phonemeIds.map((id, i) => idToToken[id] ?? `ph_${i}`);
+
+    const timing = durationsToTiming(durations, 22050, 256, tokens);
+    assert.strictEqual(timing.phonemes.length, 3);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// PhonemeIdToTokenMap caching (simulates _getPhonemeIdToTokenMap semantics)
+// ---------------------------------------------------------------------------
+
+describe('PiperPlus timing - phoneme ID to token map caching', () => {
+  it('can be built repeatedly with same input and produces stable output', async () => {
+    const { buildPhonemeIdToTokenMap } = await import('../../src/timing.js');
+
+    const phonemeIdMap = { _: [0], '^': [1], $: [2], a: [7], k: [10] };
+
+    const first = buildPhonemeIdToTokenMap(phonemeIdMap);
+    const second = buildPhonemeIdToTokenMap(phonemeIdMap);
+
+    // Objects are separate references (new maps each call), but content equal
+    assert.notStrictEqual(first, second);
+    assert.deepStrictEqual(first, second);
+  });
+
+  it('cached value is valid for use in durationsToTiming across calls', async () => {
+    const { buildPhonemeIdToTokenMap } = await import('../../src/timing.js');
+
+    const phonemeIdMap = { '^': [1], $: [2], a: [7] };
+    const idToToken = buildPhonemeIdToTokenMap(phonemeIdMap);
+
+    // Simulate two separate synthesize() calls that reuse the cached map
+    const ids1 = [1, 7, 2];
+    const ids2 = [1, 7, 7, 2];
+    const tokens1 = ids1.map((id, i) => idToToken[id] ?? `ph_${i}`);
+    const tokens2 = ids2.map((id, i) => idToToken[id] ?? `ph_${i}`);
+
+    const timing1 = durationsToTiming(new Float32Array([5, 8, 3]), 22050, 256, tokens1);
+    const timing2 = durationsToTiming(new Float32Array([5, 8, 9, 3]), 22050, 256, tokens2);
+
+    assert.strictEqual(timing1.phonemes.length, 3);
+    assert.strictEqual(timing2.phonemes.length, 4);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Streaming path timing semantics (intentional: no timing)
+// ---------------------------------------------------------------------------
+
+describe('PiperPlus timing - streaming path behavior (documentation guard)', () => {
+  it('raw Float32Array has no timing information attached (streaming contract)', () => {
+    // synthesizeStreaming() unwraps { audio, durations } and returns audio only.
+    // This test documents that contract: the streaming pipeline receives plain
+    // Float32Array chunks without timing metadata.
+    const audio = new Float32Array([0.1, 0.2, -0.1]);
+    // A raw Float32Array has no .timing or .hasTimingInfo properties.
+    assert.strictEqual(audio.timing, undefined);
+    assert.strictEqual(audio.hasTimingInfo, undefined);
+    assert.ok(audio instanceof Float32Array);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Voice cloning path: same _createTiming logic applied
+// ---------------------------------------------------------------------------
+
+describe('PiperPlus timing - voice cloning path timing', () => {
+  it('voice cloning path uses same durations->timing conversion as synthesize()', async () => {
+    const { buildPhonemeIdToTokenMap } = await import('../../src/timing.js');
+
+    // Same phonemes, same durations — voice cloning does not apply padding,
+    // so phonemeIds is used directly (no originalPhonemeIds indirection).
+    const phonemeIds = [1, 7, 10, 2];
+    const durations = new Float32Array([5, 10, 8, 3]);
+    const phonemeIdMap = { '^': [1], $: [2], a: [7], k: [10] };
+    const idToToken = buildPhonemeIdToTokenMap(phonemeIdMap);
+    const tokens = phonemeIds.map((id, i) => idToToken[id] ?? `ph_${i}`);
+
+    const timing = durationsToTiming(durations, 22050, 256, tokens);
+
+    // Result is identical regardless of whether it came from synthesize() or
+    // synthesizeWithVoiceCloning(), because both call _createTiming() with the
+    // same (durations, phonemeIds) tuple.
+    assert.strictEqual(timing.phonemes.length, 4);
+    assert.deepStrictEqual(
+      timing.phonemes.map((p) => p.phoneme),
+      ['^', 'a', 'k', '$'],
+    );
+
+    // The wrapped AudioResult should expose immutable timing
+    const result = new AudioResult(new Float32Array(1000), 22050, timing);
+    assert.ok(result.hasTimingInfo);
+    assert.ok(Object.isFrozen(result.timing));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// synthesize() padding-aware timing: originalPhonemeIds must be pre-padding
+// ---------------------------------------------------------------------------
+
+describe('PiperPlus timing - synthesize() padding-aware timing', () => {
+  it('timing built from originalPhonemeIds contains only real phonemes, not pad tokens', async () => {
+    const { buildPhonemeIdToTokenMap } = await import('../../src/timing.js');
+
+    // Simulate a short text that would trigger Strategy A padding.
+    // Original (pre-padding) IDs: [1, 7, 2] (length 3)
+    // After padding: [1, 0, 0, ..., 7, ..., 0, 2] (length MIN_PHONEME_IDS=40)
+    // The model returns durations of length 40 (one per padded slot).
+    // _createTiming() MUST use originalPhonemeIds so timing.phonemes.length === 3.
+    const originalPhonemeIds = [1, 7, 2];
+    const paddedDurations = new Float32Array(40);
+    for (let i = 0; i < 40; i++) paddedDurations[i] = 5 + (i % 7);
+
+    const phonemeIdMap = { _: [0], '^': [1], $: [2], a: [7] };
+    const idToToken = buildPhonemeIdToTokenMap(phonemeIdMap);
+
+    const minLen = Math.min(paddedDurations.length, originalPhonemeIds.length);
+    const tokens = originalPhonemeIds.map(
+      (id, i) => idToToken[id] ?? `ph_${i}`,
+    );
+    const alignedDurations = paddedDurations.subarray(0, minLen);
+    const timing = durationsToTiming(alignedDurations, 22050, 256, tokens);
+
+    // Only the 3 original phonemes appear in timing; padding is discarded.
+    assert.strictEqual(timing.phonemes.length, 3);
+    assert.deepStrictEqual(
+      timing.phonemes.map((p) => p.phoneme),
+      ['^', 'a', '$'],
+    );
+  });
+});

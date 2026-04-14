@@ -612,3 +612,127 @@ describe('buildPhonemeIdToTokenMap', () => {
     assert.strictEqual(map[7], 'a');
   });
 });
+
+
+// ---------------------------------------------------------------------------
+// TSV tab / newline escaping in phoneme names (P1 from audit)
+// ---------------------------------------------------------------------------
+
+describe('timingToTsv - special character escaping', () => {
+  it('escapes literal tab characters in phoneme names', () => {
+    const result = durationsToTiming(
+      new Float32Array([5]),
+      22050,
+      256,
+      ['a\tb'],
+    );
+    const tsv = timingToTsv(result);
+    // The literal \t must be escaped so the TSV still has 4 columns per row
+    assert.ok(tsv.includes('a\\tb'));
+
+    const lines = tsv.split('\n').filter((l) => l.length > 0);
+    // Header + 1 data line
+    assert.strictEqual(lines.length, 2);
+    // Data row has exactly 4 tab-separated columns
+    assert.strictEqual(lines[1].split('\t').length, 4);
+  });
+
+  it('escapes literal newline characters in phoneme names', () => {
+    const result = durationsToTiming(
+      new Float32Array([5]),
+      22050,
+      256,
+      ['a\nb'],
+    );
+    const tsv = timingToTsv(result);
+    assert.ok(tsv.includes('a\\nb'));
+
+    // The total number of non-empty lines should still be header + 1
+    const lines = tsv.split('\n').filter((l) => l.length > 0);
+    assert.strictEqual(lines.length, 2);
+  });
+
+  it('handles both tab and newline in the same phoneme name', () => {
+    const result = durationsToTiming(
+      new Float32Array([5]),
+      22050,
+      256,
+      ['a\tb\nc'],
+    );
+    const tsv = timingToTsv(result);
+    assert.ok(tsv.includes('a\\tb\\nc'));
+  });
+
+  it('preserves normal phoneme names without modification', () => {
+    const result = durationsToTiming(
+      new Float32Array([5, 8]),
+      22050,
+      256,
+      ['ch', 'sh'],
+    );
+    const tsv = timingToTsv(result);
+    assert.ok(tsv.includes('ch'));
+    assert.ok(tsv.includes('sh'));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// JSON roundtrip precision for tiny and large values
+// ---------------------------------------------------------------------------
+
+describe('timingToJson / timingToJsonCompact - roundtrip precision', () => {
+  it('tiny duration values survive JSON roundtrip', () => {
+    const result = durationsToTiming(new Float32Array([0.001]), 22050);
+    const json = timingToJson(result);
+    const parsed = JSON.parse(json);
+
+    const original = result.phonemes[0].duration_ms;
+    const roundtripped = parsed.phonemes[0].duration_ms;
+    assert.ok(Math.abs(roundtripped - original) < 1e-9);
+  });
+
+  it('very large duration values survive JSON roundtrip', () => {
+    const result = durationsToTiming(new Float32Array([1_000_000]), 22050);
+    const json = timingToJson(result);
+    const parsed = JSON.parse(json);
+
+    const original = result.phonemes[0].duration_ms;
+    const roundtripped = parsed.phonemes[0].duration_ms;
+    // For very large numbers, absolute tolerance loosens — use relative
+    const relErr = Math.abs((roundtripped - original) / original);
+    assert.ok(relErr < 1e-12);
+  });
+
+  it('compact JSON produces same parsed value as pretty JSON', () => {
+    const result = durationsToTiming(
+      new Float32Array([10, 20, 15]),
+      22050,
+      256,
+      ['a', 'b', 'c'],
+    );
+    const pretty = JSON.parse(timingToJson(result));
+    const compact = JSON.parse(timingToJsonCompact(result));
+    assert.deepStrictEqual(compact, pretty);
+  });
+
+  it('sample_rate field is preserved as integer through JSON roundtrip', () => {
+    const result = durationsToTiming(new Float32Array([5]), 22050);
+    const parsed = JSON.parse(timingToJson(result));
+    assert.strictEqual(parsed.sample_rate, 22050);
+    assert.strictEqual(typeof parsed.sample_rate, 'number');
+  });
+
+  it('total_duration_ms equals sum of per-phoneme durations after roundtrip', () => {
+    const result = durationsToTiming(
+      new Float32Array([5, 8, 12, 10, 7]),
+      22050,
+    );
+    const parsed = JSON.parse(timingToJson(result));
+    const sum = parsed.phonemes.reduce((acc, p) => acc + p.duration_ms, 0);
+    assert.ok(Math.abs(parsed.total_duration_ms - sum) < 1e-9);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Import via timingToJsonCompact (add to imports if missing)
+// ---------------------------------------------------------------------------

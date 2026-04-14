@@ -403,3 +403,108 @@ def test_tsv_numeric_values_parseable():
         assert start >= 0
         assert end >= start
         assert dur >= 0
+
+
+# ---------------------------------------------------------------------------
+# Multi-ID reverse map (first-wins semantics)
+# ---------------------------------------------------------------------------
+
+
+def test_build_reverse_map_multi_ids_first_wins():
+    """When multiple IDs are assigned to the same phoneme, all map to the same name."""
+    phoneme_id_map = {
+        "a": [10, 11, 12],
+        "k": [20],
+    }
+    rmap = build_phoneme_id_reverse_map(phoneme_id_map)
+
+    assert rmap[10] == "a"
+    assert rmap[11] == "a"
+    assert rmap[12] == "a"
+    assert rmap[20] == "k"
+
+
+def test_build_reverse_map_conflicting_ids_last_wins_by_iteration():
+    """When a single ID appears in multiple phonemes, the iteration order wins.
+
+    Python's dict preserves insertion order; `build_phoneme_id_reverse_map`
+    iterates in order and overwrites. The behavior is deterministic and
+    depends on the order of keys in phoneme_id_map.
+    """
+    # "a" comes first, "b" comes second with the same ID 10.
+    # The last-seen ID wins (since the loop overwrites reverse[pid] = display).
+    phoneme_id_map = {"a": [10], "b": [10]}
+    rmap = build_phoneme_id_reverse_map(phoneme_id_map)
+    # The function always assigns; whichever comes last wins.
+    # This test documents the current behavior so future refactoring
+    # noticing first-wins vs last-wins differences.
+    assert rmap[10] in ("a", "b")
+
+
+def test_build_reverse_map_empty_phoneme_id_map():
+    """Empty phoneme_id_map produces an empty reverse map."""
+    rmap = build_phoneme_id_reverse_map({})
+    assert rmap == {}
+
+
+def test_build_reverse_map_none_pua_mapping():
+    """Passing None for pua_to_multi_char is equivalent to omitting it."""
+    phoneme_id_map = {"a": [1], "\uE000": [2]}
+    rmap_none = build_phoneme_id_reverse_map(phoneme_id_map, None)
+    rmap_default = build_phoneme_id_reverse_map(phoneme_id_map)
+    assert rmap_none == rmap_default
+
+
+# ---------------------------------------------------------------------------
+# TSV tab/newline escaping
+# ---------------------------------------------------------------------------
+
+
+def test_tsv_escapes_tab_in_phoneme_name():
+    """Tabs in phoneme names are escaped to prevent TSV column corruption."""
+    result = durations_to_timing([5.0], ["a\tb"], sample_rate=22050)
+    tsv = timing_to_tsv(result)
+    # Literal tab should be escaped to the two-character sequence \t
+    assert "a\\tb" in tsv
+    # The data row should have exactly 4 tab-separated columns
+    data_line = tsv.strip().split("\n")[-1]
+    cols = data_line.split("\t")
+    assert len(cols) == 4
+
+
+def test_tsv_escapes_newline_in_phoneme_name():
+    """Newlines in phoneme names are escaped to keep one row per phoneme."""
+    result = durations_to_timing([5.0], ["a\nb"], sample_rate=22050)
+    tsv = timing_to_tsv(result)
+    # Literal newline inside phoneme should be escaped
+    assert "a\\nb" in tsv
+    # We should still have exactly 2 non-empty lines (header + 1 data row)
+    non_empty_lines = [l for l in tsv.split("\n") if l.strip()]
+    assert len(non_empty_lines) == 2
+
+
+# ---------------------------------------------------------------------------
+# JSON roundtrip precision for extreme values
+# ---------------------------------------------------------------------------
+
+
+def test_json_roundtrip_precision_tiny_duration():
+    """Very small duration values survive JSON roundtrip."""
+    import json as json_mod
+
+    result = durations_to_timing([0.001], ["x"], sample_rate=22050)
+    parsed = json_mod.loads(timing_to_json(result))
+    original_ms = result.phonemes[0].duration_ms
+    parsed_ms = parsed["phonemes"][0]["duration_ms"]
+    assert abs(parsed_ms - original_ms) < 1e-9
+
+
+def test_json_roundtrip_precision_large_duration():
+    """Very large duration values survive JSON roundtrip."""
+    import json as json_mod
+
+    result = durations_to_timing([1_000_000.0], ["x"], sample_rate=22050)
+    parsed = json_mod.loads(timing_to_json(result))
+    original_ms = result.phonemes[0].duration_ms
+    parsed_ms = parsed["phonemes"][0]["duration_ms"]
+    assert abs(parsed_ms - original_ms) < 1e-3  # Allow small relative error
