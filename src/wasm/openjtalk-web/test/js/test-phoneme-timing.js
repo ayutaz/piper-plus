@@ -12,11 +12,12 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   DEFAULT_HOP_LENGTH,
+  buildPhonemeIdToTokenMap,
   durationsToTiming,
   timingToJson,
   timingToJsonCompact,
-  timingToTsv,
   timingToSrt,
+  timingToTsv,
 } from '../../src/timing.js';
 
 // Frame time at 22050 Hz with 256 hop length: (256 / 22050) * 1000 ≈ 11.60998 ms
@@ -116,27 +117,27 @@ describe('durationsToTiming - validation errors', () => {
   });
 
   it('throws when sampleRate is zero', () => {
-    assert.throws(() => durationsToTiming([10], 0), /sampleRate must be positive/);
+    assert.throws(() => durationsToTiming([10], 0), /sampleRate.*positive/);
   });
 
   it('throws when sampleRate is negative', () => {
     assert.throws(
       () => durationsToTiming([10], -22050),
-      /sampleRate must be positive/,
+      /sampleRate.*positive/,
     );
   });
 
   it('throws when hopLength is zero', () => {
     assert.throws(
       () => durationsToTiming([10], 22050, 0),
-      /hopLength must be positive/,
+      /hopLength.*positive/,
     );
   });
 
   it('throws when hopLength is negative', () => {
     assert.throws(
       () => durationsToTiming([10], 22050, -256),
-      /hopLength must be positive/,
+      /hopLength.*positive/,
     );
   });
 });
@@ -431,5 +432,183 @@ describe('timingToTsv - numeric parseability', () => {
       assert.ok(end >= start, 'end_ms must be >= start_ms');
       assert.ok(dur >= 0, 'duration_ms must be non-negative');
     }
+  });
+});
+
+
+// ---------------------------------------------------------------------------
+// NaN/Infinity validation (P0 from review)
+// ---------------------------------------------------------------------------
+
+describe('durationsToTiming - NaN/Infinity validation', () => {
+  it('rejects NaN sampleRate with TypeError', () => {
+    assert.throws(
+      () => durationsToTiming([10], NaN),
+      { name: 'TypeError' },
+    );
+  });
+
+  it('rejects Infinity sampleRate with TypeError', () => {
+    assert.throws(
+      () => durationsToTiming([10], Infinity),
+      { name: 'TypeError' },
+    );
+  });
+
+  it('rejects -Infinity sampleRate with TypeError', () => {
+    assert.throws(
+      () => durationsToTiming([10], -Infinity),
+      { name: 'TypeError' },
+    );
+  });
+
+  it('rejects NaN hopLength with TypeError', () => {
+    assert.throws(
+      () => durationsToTiming([10], 22050, NaN),
+      { name: 'TypeError' },
+    );
+  });
+
+  it('rejects Infinity hopLength with TypeError', () => {
+    assert.throws(
+      () => durationsToTiming([10], 22050, Infinity),
+      { name: 'TypeError' },
+    );
+  });
+
+  it('rejects non-array durations with TypeError', () => {
+    assert.throws(
+      () => durationsToTiming({}, 22050),
+      { name: 'TypeError' },
+    );
+  });
+
+  it('rejects null durations with TypeError', () => {
+    assert.throws(
+      () => durationsToTiming(null, 22050),
+      { name: 'TypeError' },
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Specific error type distinction (TypeError vs RangeError)
+// ---------------------------------------------------------------------------
+
+describe('durationsToTiming - specific error types', () => {
+  it('throws RangeError for phonemeTokens length mismatch', () => {
+    assert.throws(
+      () => durationsToTiming([10, 20], 22050, 256, ['a']),
+      { name: 'RangeError' },
+    );
+  });
+
+  it('throws TypeError when phonemeTokens is not an array', () => {
+    assert.throws(
+      () => durationsToTiming([10], 22050, 256, 'not-an-array'),
+      { name: 'TypeError' },
+    );
+  });
+
+  it('throws TypeError for sampleRate=0', () => {
+    assert.throws(
+      () => durationsToTiming([10], 0),
+      { name: 'TypeError' },
+    );
+  });
+
+  it('throws TypeError for hopLength=0', () => {
+    assert.throws(
+      () => durationsToTiming([10], 22050, 0),
+      { name: 'TypeError' },
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Performance tests
+// ---------------------------------------------------------------------------
+
+describe('durationsToTiming - performance', () => {
+  it('handles 1000 phonemes in under 50ms', () => {
+    const durations = new Float32Array(1000);
+    for (let i = 0; i < 1000; i++) durations[i] = 10;
+
+    const start = performance.now();
+    const result = durationsToTiming(durations, 22050);
+    const elapsed = performance.now() - start;
+
+    assert.ok(elapsed < 50, `took ${elapsed.toFixed(2)}ms, expected < 50ms`);
+    assert.strictEqual(result.phonemes.length, 1000);
+  });
+
+  it('TSV generation of 1000 phonemes completes in under 50ms', () => {
+    const result = durationsToTiming(
+      new Float32Array(1000).fill(10),
+      22050,
+    );
+
+    const start = performance.now();
+    const tsv = timingToTsv(result);
+    const elapsed = performance.now() - start;
+
+    assert.ok(elapsed < 50, `took ${elapsed.toFixed(2)}ms, expected < 50ms`);
+    // Validate that all rows were produced (1 header + 1000 data rows)
+    const lineCount = tsv.split('\n').filter((l) => l.length > 0).length;
+    assert.strictEqual(lineCount, 1001);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// buildPhonemeIdToTokenMap helper
+// ---------------------------------------------------------------------------
+
+describe('buildPhonemeIdToTokenMap', () => {
+  it('builds reverse map from simple phoneme_id_map', () => {
+    const phonemeIdMap = {
+      _: [0],
+      '^': [1],
+      $: [2],
+      a: [7],
+      k: [10],
+    };
+    const map = buildPhonemeIdToTokenMap(phonemeIdMap);
+    assert.strictEqual(map[0], '_');
+    assert.strictEqual(map[1], '^');
+    assert.strictEqual(map[2], '$');
+    assert.strictEqual(map[7], 'a');
+    assert.strictEqual(map[10], 'k');
+  });
+
+  it('renders PUA chars as U+XXXX when no explicit mapping', () => {
+    const phonemeIdMap = {
+      '\uE00E': [15], // PUA for "ch"
+      '\uE019': [40], // PUA for "N_m"
+    };
+    const map = buildPhonemeIdToTokenMap(phonemeIdMap);
+    assert.strictEqual(map[15], 'U+E00E');
+    assert.strictEqual(map[40], 'U+E019');
+  });
+
+  it('uses explicit PUA mapping when provided', () => {
+    const phonemeIdMap = { '\uE00E': [15] };
+    const puaToMultiChar = { '\uE00E': 'ch' };
+    const map = buildPhonemeIdToTokenMap(phonemeIdMap, puaToMultiChar);
+    assert.strictEqual(map[15], 'ch');
+  });
+
+  it('handles null/undefined phoneme_id_map gracefully', () => {
+    assert.deepStrictEqual(buildPhonemeIdToTokenMap(null), {});
+    assert.deepStrictEqual(buildPhonemeIdToTokenMap(undefined), {});
+  });
+
+  it('first-wins when multiple phonemes share the same ID', () => {
+    const phonemeIdMap = {
+      a: [7],
+      ah: [7], // same ID
+    };
+    const map = buildPhonemeIdToTokenMap(phonemeIdMap);
+    // First occurrence ("a") wins
+    assert.strictEqual(map[7], 'a');
   });
 });

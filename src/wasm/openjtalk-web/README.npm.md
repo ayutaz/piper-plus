@@ -137,6 +137,151 @@ const tts = await PiperPlus.initialize({
 });
 ```
 
+## Phoneme Timing (Lip-sync, subtitles, karaoke)
+
+`piper-plus` can extract precise phoneme-level timing from the VITS duration
+predictor. This enables lip-sync animation, subtitle generation, karaoke-style
+text highlighting, and phoneme-level analytics — all entirely in the browser.
+
+### Basic usage
+
+```javascript
+import { PiperPlus } from 'piper-plus';
+
+const piper = await PiperPlus.initialize({ model: 'tsukuyomi' });
+const result = await piper.synthesize('こんにちは');
+
+if (result.hasTimingInfo) {
+  for (const p of result.timing.phonemes) {
+    console.log(
+      `${p.phoneme}: ${p.start_ms.toFixed(1)} → ${p.end_ms.toFixed(1)} ms`,
+    );
+  }
+  console.log(`Total: ${result.timing.total_duration_ms.toFixed(1)} ms`);
+}
+```
+
+Example output:
+
+```
+^: 0.0 → 58.0 ms
+k: 58.0 → 150.8 ms
+o: 150.8 → 290.0 ms
+N: 290.0 → 406.0 ms
+n: 406.0 → 487.2 ms
+i: 487.2 → 591.6 ms
+ch: 591.6 → 661.2 ms
+i: 661.2 → 788.8 ms
+w: 788.8 → 881.6 ms
+a: 881.6 → 1044.0 ms
+$: 1044.0 → 1102.0 ms
+Total: 1102.0 ms
+```
+
+### Output formats
+
+piper-plus provides four serialization helpers compatible with
+Rust/Go/Python/C#/C++ runtimes (byte-for-byte output):
+
+```javascript
+import {
+  timingToJson,         // Pretty-printed JSON
+  timingToJsonCompact,  // Single-line JSON
+  timingToTsv,          // Tab-separated values with header
+  timingToSrt,          // SubRip subtitle format
+} from 'piper-plus';
+
+const jsonStr = timingToJson(result.timing);
+const tsvStr = timingToTsv(result.timing);
+const srtStr = timingToSrt(result.timing);
+```
+
+**SRT output** can be saved alongside the audio for playback in media players:
+
+```
+1
+00:00:00,000 --> 00:00:00,058
+^
+
+2
+00:00:00,058 --> 00:00:00,151
+k
+
+3
+00:00:00,151 --> 00:00:00,290
+o
+...
+```
+
+### Lip-sync example (Viseme mapping)
+
+```javascript
+// Japanese phoneme → simplified viseme (mouth shape)
+const PHONEME_TO_VISEME = {
+  a: 'A', i: 'I', u: 'U', e: 'E', o: 'O',
+  k: 'K', g: 'K',
+  s: 'S', sh: 'S', z: 'S',
+  t: 'T', d: 'T', ts: 'T', ch: 'T',
+  n: 'N', N: 'N',
+  m: 'M', b: 'M', p: 'M',
+  w: 'W', y: 'Y',
+  h: 'H', f: 'H',
+  r: 'R',
+  '^': 'SILENT', $: 'SILENT', _: 'SILENT',
+};
+
+function playLipSync(result) {
+  if (!result.hasTimingInfo) return;
+
+  const startAt = performance.now();
+  for (const p of result.timing.phonemes) {
+    const delay = p.start_ms - (performance.now() - startAt);
+    setTimeout(() => {
+      const viseme = PHONEME_TO_VISEME[p.phoneme] ?? 'SILENT';
+      updateMouthShape(viseme); // your animation function
+    }, Math.max(0, delay));
+  }
+}
+
+const result = await piper.synthesize('こんにちは');
+await result.play();
+playLipSync(result);
+```
+
+### Manual timing extraction
+
+If you already have a `durations` tensor from another source, use
+`durationsToTiming` directly:
+
+```javascript
+import { durationsToTiming } from 'piper-plus';
+
+const durations = new Float32Array([10, 15, 12, 8]); // frame counts
+const sampleRate = 22050;
+const hopLength = 256; // VITS default
+const tokens = ['a', 'e', 'i', 'o']; // optional; defaults to ph_0, ph_1, ...
+
+const timing = durationsToTiming(durations, sampleRate, hopLength, tokens);
+```
+
+### API reference
+
+| Export | Description |
+|---|---|
+| `AudioResult.timing` | `TimingResult \| null` |
+| `AudioResult.hasTimingInfo` | `boolean` |
+| `durationsToTiming(durations, sampleRate, hopLength?, phonemeTokens?)` | Convert frame counts to `TimingResult` |
+| `timingToJson(result)` | Pretty-printed JSON string |
+| `timingToJsonCompact(result)` | Single-line JSON string |
+| `timingToTsv(result)` | TSV with header line |
+| `timingToSrt(result)` | SubRip subtitle format |
+| `buildPhonemeIdToTokenMap(phonemeIdMap, puaToMultiChar?)` | Reverse map from phoneme ID to token string |
+| `DEFAULT_HOP_LENGTH` | `256` (VITS default) |
+
+> **Note**: Field names use `snake_case` (`start_ms`, `end_ms`, `duration_ms`,
+> `total_duration_ms`, `sample_rate`) to maintain byte-for-byte JSON
+> compatibility with the Rust / Go / Python / C# / C++ runtimes.
+
 ## API Reference
 
 ### `PiperPlus.initialize(options)`

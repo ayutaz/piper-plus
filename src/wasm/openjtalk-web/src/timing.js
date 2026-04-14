@@ -65,24 +65,26 @@ export function durationsToTiming(
   hopLength = DEFAULT_HOP_LENGTH,
   phonemeTokens = null,
 ) {
-  if (sampleRate <= 0) {
-    throw new Error(`sampleRate must be positive, got ${sampleRate}`);
+  if (!Number.isFinite(sampleRate) || sampleRate <= 0) {
+    throw new TypeError(`sampleRate must be a positive finite number (Hz), got ${sampleRate}`);
   }
-  if (hopLength <= 0) {
-    throw new Error(`hopLength must be positive, got ${hopLength}`);
+  if (!Number.isFinite(hopLength) || hopLength <= 0) {
+    throw new TypeError(`hopLength must be a positive finite number (samples), got ${hopLength}`);
   }
   if (durations == null || typeof durations.length !== 'number') {
-    throw new Error('durations must be a Float32Array, Array, or indexable with length');
+    throw new TypeError(
+      'durations must be a Float32Array, Array, or indexable with a numeric length property',
+    );
   }
 
   const length = durations.length;
 
-  if (phonemeTokens !== null && phonemeTokens !== undefined) {
+  if (phonemeTokens != null) {
     if (!Array.isArray(phonemeTokens)) {
-      throw new Error('phonemeTokens must be an array of strings');
+      throw new TypeError('phonemeTokens must be an array of strings');
     }
     if (phonemeTokens.length !== length) {
-      throw new Error(
+      throw new RangeError(
         `length mismatch: durations has ${length} elements but phonemeTokens has ${phonemeTokens.length}`,
       );
     }
@@ -95,6 +97,7 @@ export function durationsToTiming(
   let cursorMs = 0;
   let totalDurationMs = 0;
 
+  const hasTokens = phonemeTokens != null;
   for (let i = 0; i < length; i++) {
     const raw = durations[i];
     if (raw < 0) {
@@ -107,10 +110,7 @@ export function durationsToTiming(
     const startMs = cursorMs;
     const endMs = cursorMs + durationMs;
 
-    const token =
-      phonemeTokens !== null && phonemeTokens !== undefined
-        ? phonemeTokens[i]
-        : `ph_${i}`;
+    const token = hasTokens ? phonemeTokens[i] : `ph_${i}`;
 
     phonemes[i] = {
       phoneme: token,
@@ -160,12 +160,14 @@ export function timingToJsonCompact(result) {
  * @returns {string}
  */
 export function timingToTsv(result) {
-  let buf = 'start_ms\tend_ms\tduration_ms\tphoneme\n';
-  for (const p of result.phonemes) {
+  const rows = new Array(result.phonemes.length + 1);
+  rows[0] = 'start_ms\tend_ms\tduration_ms\tphoneme';
+  for (let i = 0; i < result.phonemes.length; i++) {
+    const p = result.phonemes[i];
     const escaped = String(p.phoneme).replace(/\t/g, '\\t').replace(/\n/g, '\\n');
-    buf += `${p.start_ms.toFixed(3)}\t${p.end_ms.toFixed(3)}\t${p.duration_ms.toFixed(3)}\t${escaped}\n`;
+    rows[i + 1] = `${p.start_ms.toFixed(3)}\t${p.end_ms.toFixed(3)}\t${p.duration_ms.toFixed(3)}\t${escaped}`;
   }
-  return buf;
+  return rows.join('\n') + '\n';
 }
 
 /**
@@ -210,4 +212,50 @@ function formatSrtTimestamp(ms) {
   const ss = String(secs).padStart(2, '0');
   const mmm = String(millis).padStart(3, '0');
   return `${hh}:${mm}:${ss},${mmm}`;
+}
+
+
+/**
+ * Build a reverse lookup map from phoneme ID to phoneme token string.
+ *
+ * Given a model config's `phoneme_id_map` (phoneme string → list of IDs),
+ * returns a flat map of ID → phoneme string for efficient reverse lookup.
+ * When multiple IDs point to the same phoneme, the first occurrence wins.
+ *
+ * PUA (Private Use Area, U+E000–U+F8FF) characters without an explicit
+ * `puaToMultiChar` mapping are rendered as `U+XXXX` for readability.
+ *
+ * This matches the Python `build_phoneme_id_reverse_map()` behavior.
+ *
+ * @param {Record<string, number[]>} phonemeIdMap - Config's phoneme_id_map
+ * @param {Record<string, string> | null} [puaToMultiChar=null] - Optional
+ *   PUA char → multi-char name mapping (e.g. `{"\uE019": "N_m"}`)
+ * @returns {Record<number, string>} ID → display name
+ */
+export function buildPhonemeIdToTokenMap(phonemeIdMap, puaToMultiChar = null) {
+  const reverse = {};
+  if (!phonemeIdMap) return reverse;
+
+  for (const [char, ids] of Object.entries(phonemeIdMap)) {
+    if (!Array.isArray(ids)) continue;
+
+    // Determine display name for this character.
+    let display = char;
+    if (puaToMultiChar && puaToMultiChar[char] !== undefined) {
+      display = puaToMultiChar[char];
+    } else if (char.length === 1) {
+      const code = char.charCodeAt(0);
+      if (code >= 0xE000 && code <= 0xF8FF) {
+        display = `U+${code.toString(16).toUpperCase().padStart(4, '0')}`;
+      }
+    }
+
+    for (const id of ids) {
+      if (typeof id === 'number' && !(id in reverse)) {
+        reverse[id] = display;
+      }
+    }
+  }
+
+  return reverse;
 }

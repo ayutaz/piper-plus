@@ -199,10 +199,22 @@ export interface TimingResult {
 /**
  * Convert ONNX duration tensor output to phoneme timing information.
  *
- * @param durations   - Frame-count durations from the ONNX `durations` output tensor.
- * @param sampleRate  - Audio sample rate (e.g. 22050).
- * @param hopLength   - STFT hop length (default: 256 for VITS medium).
- * @param phonemeTokens - Optional explicit phoneme names; defaults to `ph_0`, `ph_1`, ...
+ * @param durations - Frame counts from the ONNX `durations` output tensor
+ * @param sampleRate - Audio sample rate (e.g. 22050)
+ * @param hopLength - STFT hop length (default: 256 for VITS medium)
+ * @param phonemeTokens - Optional phoneme names; defaults to `ph_0`, `ph_1`, …
+ * @throws {TypeError} If sampleRate or hopLength are not finite positive numbers
+ * @throws {RangeError} If phonemeTokens length differs from durations length
+ *
+ * @example
+ * const durations = new Float32Array([10, 15, 12]);
+ * const timing = durationsToTiming(durations, 22050);
+ * // timing.phonemes[0] = { phoneme: "ph_0", start_ms: 0, end_ms: 116.1, duration_ms: 116.1 }
+ *
+ * @example
+ * // With explicit phoneme tokens
+ * const timing = durationsToTiming(durations, 22050, 256, ["a", "e", "i"]);
+ * // timing.phonemes[0].phoneme === "a"
  */
 export function durationsToTiming(
   durations: Float32Array | number[],
@@ -222,6 +234,34 @@ export function timingToTsv(result: TimingResult): string;
 
 /** Serialize a TimingResult to SRT subtitle format (matches Rust output). */
 export function timingToSrt(result: TimingResult): string;
+
+/**
+ * STFT hop length used by VITS medium-quality models.
+ */
+export const DEFAULT_HOP_LENGTH: number;
+
+/**
+ * Build a reverse lookup map from phoneme ID to phoneme token string.
+ *
+ * Given a model config's `phoneme_id_map` (phoneme string → list of IDs),
+ * returns a flat `{ id: string }` map for efficient reverse lookup. When
+ * multiple IDs point to the same phoneme, the first occurrence wins.
+ *
+ * PUA characters (U+E000–U+F8FF) without an explicit `puaToMultiChar`
+ * mapping are rendered as `U+XXXX`.
+ *
+ * @param phonemeIdMap - Model config's phoneme_id_map
+ * @param puaToMultiChar - Optional PUA char → multi-char name mapping
+ * @returns Flat ID → display name map
+ *
+ * @example
+ * const map = buildPhonemeIdToTokenMap({ "a": [7], "k": [10] });
+ * // { 7: "a", 10: "k" }
+ */
+export function buildPhonemeIdToTokenMap(
+  phonemeIdMap: Record<string, number[]> | null | undefined,
+  puaToMultiChar?: Record<string, string> | null,
+): Record<number, string>;
 
 // ---------------------------------------------------------------------------
 // AudioResult
@@ -245,7 +285,21 @@ export class AudioResult {
   /** Duration of the audio in seconds. */
   readonly duration: number;
 
-  /** Phoneme timing information (null when the model does not output durations). */
+  /**
+   * Phoneme timing information for lip-sync / subtitle / karaoke use cases.
+   * Returns `null` if the ONNX model does not output a `durations` tensor.
+   *
+   * The object is deeply frozen — attempts to mutate any field throw
+   * `TypeError` in strict mode.
+   *
+   * @example
+   * const result = await piper.synthesize("Hello");
+   * if (result.hasTimingInfo) {
+   *   for (const p of result.timing.phonemes) {
+   *     console.log(`${p.phoneme}: ${p.start_ms}ms–${p.end_ms}ms`);
+   *   }
+   * }
+   */
   readonly timing: TimingResult | null;
 
   /** Whether phoneme timing information is available for this result. */

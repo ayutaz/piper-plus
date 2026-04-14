@@ -161,3 +161,109 @@ describe('PiperPlus timing integration', () => {
     assertCloseTo(timing.total_duration_ms, sum, 'total_duration_ms vs sum of phonemes');
   });
 });
+
+
+// ---------------------------------------------------------------------------
+// E2E: phoneme ID → token reverse lookup integration
+// ---------------------------------------------------------------------------
+
+describe('PiperPlus timing - phoneme token integration', () => {
+  it('durationsToTiming uses real phoneme tokens when provided', () => {
+    const durations = new Float32Array([5, 8, 12]);
+    const tokens = ['^', 'k', 'o'];
+    const timing = durationsToTiming(durations, 22050, 256, tokens);
+
+    assert.strictEqual(timing.phonemes.length, 3);
+    assert.strictEqual(timing.phonemes[0].phoneme, '^');
+    assert.strictEqual(timing.phonemes[1].phoneme, 'k');
+    assert.strictEqual(timing.phonemes[2].phoneme, 'o');
+  });
+
+  it('durationsToTiming falls back to ph_N when tokens are omitted', () => {
+    const durations = new Float32Array([5, 8, 12]);
+    const timing = durationsToTiming(durations, 22050);
+
+    assert.strictEqual(timing.phonemes[0].phoneme, 'ph_0');
+    assert.strictEqual(timing.phonemes[1].phoneme, 'ph_1');
+    assert.strictEqual(timing.phonemes[2].phoneme, 'ph_2');
+  });
+
+  it('buildPhonemeIdToTokenMap + durationsToTiming produces real phoneme names', async () => {
+    const { buildPhonemeIdToTokenMap } = await import('../../src/timing.js');
+
+    // Simulate a model's phoneme_id_map
+    const phonemeIdMap = {
+      _: [0],
+      '^': [1],
+      $: [2],
+      a: [7],
+      k: [10],
+      o: [15],
+    };
+    const idToToken = buildPhonemeIdToTokenMap(phonemeIdMap);
+
+    // Original phoneme IDs for "こんにちは" simulation
+    const phonemeIds = [1, 10, 15, 7, 2]; // ^ k o a $
+    const durations = new Float32Array([5, 8, 12, 10, 5]);
+
+    // Build tokens from IDs using the reverse map
+    const tokens = phonemeIds.map((id, i) => idToToken[id] ?? `ph_${i}`);
+    assert.deepStrictEqual(tokens, ['^', 'k', 'o', 'a', '$']);
+
+    const timing = durationsToTiming(durations, 22050, 256, tokens);
+    assert.deepStrictEqual(
+      timing.phonemes.map((p) => p.phoneme),
+      ['^', 'k', 'o', 'a', '$'],
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// E2E: models without durations output
+// ---------------------------------------------------------------------------
+
+describe('PiperPlus timing - missing durations fallback', () => {
+  it('AudioResult with null timing has hasTimingInfo=false', () => {
+    const samples = new Float32Array(22050);
+    const result = new AudioResult(samples, 22050, null);
+    assert.strictEqual(result.hasTimingInfo, false);
+    assert.strictEqual(result.timing, null);
+  });
+
+  it('AudioResult.duration still works when timing is null', () => {
+    const samples = new Float32Array(22050);
+    const result = new AudioResult(samples, 22050);
+    assert.strictEqual(result.duration, 1.0);
+    assert.strictEqual(result.hasTimingInfo, false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// E2E: multiple synthesize() calls produce independent timing objects
+// ---------------------------------------------------------------------------
+
+describe('PiperPlus timing - independent timing objects', () => {
+  it('two durations with different lengths produce independent timings', () => {
+    const durations1 = new Float32Array([5]);
+    const durations2 = new Float32Array([10, 15, 20]);
+
+    const timing1 = durationsToTiming(durations1, 22050);
+    const timing2 = durationsToTiming(durations2, 22050);
+
+    assert.notStrictEqual(timing1, timing2);
+    assert.strictEqual(timing1.phonemes.length, 1);
+    assert.strictEqual(timing2.phonemes.length, 3);
+    assert.notStrictEqual(timing1.phonemes, timing2.phonemes);
+  });
+
+  it('AudioResult instances with independent timings', () => {
+    const timing1 = durationsToTiming(new Float32Array([5]), 22050);
+    const timing2 = durationsToTiming(new Float32Array([10]), 22050);
+
+    const result1 = new AudioResult(new Float32Array(100), 22050, timing1);
+    const result2 = new AudioResult(new Float32Array(200), 22050, timing2);
+
+    assert.notStrictEqual(result1.timing, result2.timing);
+    assert.notStrictEqual(result1.timing.phonemes[0], result2.timing.phonemes[0]);
+  });
+});

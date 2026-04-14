@@ -95,6 +95,24 @@ function writeString(view, offset, str) {
   }
 }
 
+/**
+ * Deep freeze a TimingResult object so callers cannot accidentally mutate it
+ * via `result.timing.phonemes[0].start_ms = ...`. The freeze is shallow at the
+ * outer object level plus one level into the `phonemes` array (since each
+ * phoneme is a plain object with only primitive fields).
+ * @param {object} timing
+ * @returns {object}
+ */
+function deepFreezeTiming(timing) {
+  if (timing && Array.isArray(timing.phonemes)) {
+    for (const p of timing.phonemes) {
+      Object.freeze(p);
+    }
+    Object.freeze(timing.phonemes);
+  }
+  return Object.freeze(timing);
+}
+
 export class AudioResult {
   /** @type {Float32Array} */
   #samples;
@@ -117,7 +135,9 @@ export class AudioResult {
     }
     this.#samples = samples;
     this.#sampleRate = sampleRate;
-    this.#timing = timing;
+    // Deep freeze the timing result to prevent accidental mutations.
+    // Callers reading `result.timing` get a stable, immutable snapshot.
+    this.#timing = timing != null ? deepFreezeTiming(timing) : null;
   }
 
   /** Audio sample data. */

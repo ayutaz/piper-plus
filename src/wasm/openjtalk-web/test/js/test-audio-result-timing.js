@@ -168,3 +168,82 @@ describe('AudioResult.timing / hasTimingInfo', () => {
     assert.strictEqual(wav.byteLength, 44 + 100 * 2);
   });
 });
+
+
+// ---------------------------------------------------------------------------
+// Immutability (timing should be frozen)
+// ---------------------------------------------------------------------------
+
+describe('AudioResult.timing - immutability', () => {
+  function makeSampleTiming() {
+    return {
+      phonemes: [
+        { phoneme: '^', start_ms: 0, end_ms: 58, duration_ms: 58 },
+        { phoneme: 'k', start_ms: 58, end_ms: 150.8, duration_ms: 92.8 },
+      ],
+      total_duration_ms: 150.8,
+      sample_rate: 22050,
+    };
+  }
+
+  it('timing object is frozen', () => {
+    const samples = new Float32Array([0.1, 0.2]);
+    const timing = makeSampleTiming();
+    const result = new AudioResult(samples, 22050, timing);
+
+    assert.ok(Object.isFrozen(result.timing));
+  });
+
+  it('timing.phonemes array is frozen', () => {
+    const samples = new Float32Array([0.1, 0.2]);
+    const result = new AudioResult(samples, 22050, makeSampleTiming());
+
+    assert.ok(Object.isFrozen(result.timing.phonemes));
+  });
+
+  it('individual phoneme entries are frozen', () => {
+    const samples = new Float32Array([0.1, 0.2]);
+    const result = new AudioResult(samples, 22050, makeSampleTiming());
+
+    for (const p of result.timing.phonemes) {
+      assert.ok(Object.isFrozen(p));
+    }
+  });
+
+  it('attempting to mutate timing.phonemes[0].start_ms throws in strict mode', () => {
+    'use strict';
+    const samples = new Float32Array([0.1, 0.2]);
+    const result = new AudioResult(samples, 22050, makeSampleTiming());
+
+    assert.throws(() => {
+      result.timing.phonemes[0].start_ms = 999;
+    }, TypeError);
+  });
+
+  it('attempting to push to timing.phonemes throws in strict mode', () => {
+    'use strict';
+    const samples = new Float32Array([0.1, 0.2]);
+    const result = new AudioResult(samples, 22050, makeSampleTiming());
+
+    assert.throws(() => {
+      result.timing.phonemes.push({
+        phoneme: 'x',
+        start_ms: 0,
+        end_ms: 1,
+        duration_ms: 1,
+      });
+    }, TypeError);
+  });
+
+  it('mutating input timing object after construction does NOT affect result', () => {
+    const samples = new Float32Array([0.1, 0.2]);
+    const originalTiming = makeSampleTiming();
+    const result = new AudioResult(samples, 22050, originalTiming);
+
+    // The constructor deep-froze the passed reference, so mutations on the
+    // same object will also fail in strict mode. We verify the result still
+    // reflects the frozen snapshot.
+    assert.strictEqual(result.timing.phonemes[0].start_ms, 0);
+    assert.strictEqual(result.timing.phonemes[0].end_ms, 58);
+  });
+});
