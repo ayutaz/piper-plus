@@ -30,6 +30,7 @@ def build_info(languages: list[str] | None = None) -> Info:
             attribution=attribution,
             installed=True,
             languages=[lang],
+            version="1.0.0",
         )
         for lang in langs
     ]
@@ -41,6 +42,7 @@ def build_info(languages: list[str] | None = None) -> Info:
                 attribution=attribution,
                 installed=True,
                 voices=voices,
+                version="1.0.0",
             )
         ]
     )
