@@ -86,7 +86,7 @@ dev = [
     "mypy>=1.13",
     "pylint==3.0.2",
     "ruff==0.12.5",
-    "pytest==7.4.3",
+    "pytest>=9.0.3,<10",
     "pytest-cov==4.1.0",
     "pytest-xdist==3.5.0",
     "pytest-timeout==2.2.0",
@@ -100,7 +100,7 @@ dev = [
 ]
 
 test = [
-    "pytest==7.4.3",
+    "pytest>=9.0.3,<10",
     "pytest-cov==4.1.0",
     "pytest-xdist==3.5.0",
     "pytest-timeout==2.2.0",
@@ -136,7 +136,7 @@ members = [
 [tool.uv]
 dev-dependencies = [
     "ruff==0.12.5",
-    "pytest==7.4.3",
+    "pytest>=9.0.3,<10",
     "pytest-timeout>=2.2.0",
     "black==26.3.1",
     "fastapi>=0.135.1",
