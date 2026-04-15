@@ -32,10 +32,14 @@ COPY pyproject.toml /build/pyproject.toml
 COPY src/python/ /build/src/python/
 
 # Install piper_plus_g2p (standalone G2P -- all languages)
-RUN uv pip install --system "/build/src/python/g2p[all]"
+WORKDIR /build/src/python/g2p
+RUN uv pip install --system .[all]
 
 # Install piper_train with inference extras (onnxruntime CPU, soundfile, etc.)
-RUN uv pip install --system "/build/src/python[inference]"
+WORKDIR /build/src/python
+RUN uv pip install --system .[inference]
+
+WORKDIR /build
 
 # Install wyoming protocol library
 RUN uv pip install --system "wyoming>=1.5"
@@ -71,6 +75,9 @@ WORKDIR /app
 COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 
+# Copy source tree for runtime (required for g2p and other modules)
+COPY --from=builder /build/src/python/ /app/
+
 # Copy NLTK data
 COPY --from=builder /usr/share/nltk_data /usr/share/nltk_data
 ENV NLTK_DATA=/usr/share/nltk_data
@@ -79,8 +86,8 @@ ENV NLTK_DATA=/usr/share/nltk_data
 COPY src/python/piper_plus/ /app/piper_plus/
 COPY src/python/piper_wyoming/ /app/piper_wyoming/
 
-# Add /app to PYTHONPATH so piper_plus and piper_wyoming are importable
-ENV PYTHONPATH=/app
+# Add /app and g2p to PYTHONPATH so piper_plus, piper_wyoming, and g2p are importable
+ENV PYTHONPATH=/app:/app/g2p
 
 # Create directories
 RUN mkdir -p /app/models /home/piper/.cache/piper-plus/models
