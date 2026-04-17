@@ -1174,10 +1174,7 @@ class SynthesizerTrn(nn.Module):
         else:
             z_p = m_p + torch.randn_like(m_p) * torch.exp(logs_p) * noise_scale
         z = self.flow(z_p, y_mask, g=g, reverse=True)
-        if self.mb_istft:
-            o, _ = self.dec((z * y_mask)[:, :, :max_len], g=g)
-        else:
-            o = self.dec((z * y_mask)[:, :, :max_len], g=g)
+        o = self.dec((z * y_mask)[:, :, :max_len], g=g)
 
         return InferOutput(o, attn, y_mask, (z, z_p, m_p, logs_p), durations)
 

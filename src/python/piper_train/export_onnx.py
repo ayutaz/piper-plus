@@ -85,34 +85,22 @@ def build_infer_forward(
         #   onnx_export_mode=True  → z_p = m_p          (deterministic)
         #   onnx_export_mode=False → z_p = m_p + noise   (stochastic)
         # We set it here to match the stochastic flag, restoring the
-        # original value afterwards so the caller's state is not mutated.
-        prev_model = getattr(model, "onnx_export_mode", False)
-        prev_dp = (
-            getattr(model.dp, "onnx_export_mode", False)
-            if hasattr(model, "dp")
-            else None
+        # onnx_export_mode is set globally via set_export_mode() before
+        # torch.onnx.export(). Do NOT toggle it here — changing module
+        # attributes inside the traced forward causes
+        # "state_dict changed after running the tracer" errors.
+        audio, _attn, _y_mask, _latents, durations = model.infer(
+            text,
+            text_lengths,
+            sid=sid,
+            lid=lid,
+            noise_scale=noise_scale,
+            length_scale=length_scale,
+            noise_scale_w=noise_scale_w,
+            prosody_features=prosody_features,
+            speaker_embedding=speaker_embedding,
+            speaker_embedding_mask=speaker_embedding_mask,
         )
-        model.onnx_export_mode = not stochastic
-        if hasattr(model, "dp"):
-            model.dp.onnx_export_mode = not stochastic
-
-        try:
-            audio, _attn, _y_mask, _latents, durations = model.infer(
-                text,
-                text_lengths,
-                sid=sid,
-                lid=lid,
-                noise_scale=noise_scale,
-                length_scale=length_scale,
-                noise_scale_w=noise_scale_w,
-                prosody_features=prosody_features,
-                speaker_embedding=speaker_embedding,
-                speaker_embedding_mask=speaker_embedding_mask,
-            )
-        finally:
-            model.onnx_export_mode = prev_model
-            if hasattr(model, "dp") and prev_dp is not None:
-                model.dp.onnx_export_mode = prev_dp
 
         return audio, durations
 
@@ -519,6 +507,12 @@ def main() -> None:
     )
 
     dummy_input = tuple(dummy_input_list)
+
+    # Pre-run to trigger lazy module initialization (e.g. _ensure_spk_proj
+    # creates nn.Linear on first forward). Without this, torch.jit.trace
+    # detects state_dict changes and raises RuntimeError.
+    with torch.no_grad():
+        model_g(*dummy_input)
 
     # Export - always include durations output
     output_names = ["output", "durations"]
