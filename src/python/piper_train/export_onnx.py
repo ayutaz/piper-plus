@@ -66,6 +66,14 @@ def build_infer_forward(
                           speaker_embedding_mask=None)
             -> (audio: Tensor, durations: Tensor)
     """
+    # Configure stochastic/deterministic mode ONCE at build time
+    # (not inside forward, to avoid "state_dict changed during tracing" errors).
+    # model.onnx_export_mode: controls noise injection (True = deterministic).
+    # model.dp.onnx_export_mode: same for duration predictor.
+    # model.dec.onnx_export_mode: controls MB-iSTFT output format (always True for export).
+    model.onnx_export_mode = not stochastic
+    if hasattr(model, "dp"):
+        model.dp.onnx_export_mode = not stochastic
 
     def infer_forward(
         text,
@@ -393,14 +401,9 @@ def main() -> None:
 
     # Enable ONNX export mode for all compatible modules.
     # This controls MB-iSTFT decoder output (fullband only) and other
-    # ONNX-specific behavior. For stochastic export, we keep the decoder
-    # in export mode but disable the deterministic override on the model
-    # and duration predictor so noise injection still works.
+    # ONNX-specific behavior. The stochastic/deterministic override on
+    # model and duration predictor is applied later by build_infer_forward.
     set_export_mode(model_g, True)
-    if args.stochastic:
-        model_g.onnx_export_mode = False
-        if hasattr(model_g, "dp"):
-            model_g.dp.onnx_export_mode = False
     _LOGGER.info("Export mode enabled (stochastic=%s)", args.stochastic)
 
     # Inference only
