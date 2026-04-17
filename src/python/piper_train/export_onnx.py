@@ -391,9 +391,17 @@ def main() -> None:
     num_speakers = model_g.n_speakers
     num_languages = getattr(model_g, "n_languages", 1)
 
-    # Enable ONNX export mode for all compatible modules
+    # Enable ONNX export mode for all compatible modules.
+    # This controls MB-iSTFT decoder output (fullband only) and other
+    # ONNX-specific behavior. For stochastic export, we keep the decoder
+    # in export mode but disable the deterministic override on the model
+    # and duration predictor so noise injection still works.
     set_export_mode(model_g, True)
-    _LOGGER.info("Export mode enabled for all compatible modules")
+    if args.stochastic:
+        model_g.onnx_export_mode = False
+        if hasattr(model_g, "dp"):
+            model_g.dp.onnx_export_mode = False
+    _LOGGER.info("Export mode enabled (stochastic=%s)", args.stochastic)
 
     # Inference only
     model_g.eval()

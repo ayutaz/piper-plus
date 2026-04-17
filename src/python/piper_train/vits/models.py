@@ -1174,7 +1174,10 @@ class SynthesizerTrn(nn.Module):
         else:
             z_p = m_p + torch.randn_like(m_p) * torch.exp(logs_p) * noise_scale
         z = self.flow(z_p, y_mask, g=g, reverse=True)
-        o = self.dec((z * y_mask)[:, :, :max_len], g=g)
+        dec_out = self.dec((z * y_mask)[:, :, :max_len], g=g)
+        # MB-iSTFT decoder returns (fullband, subbands) in training mode,
+        # but only fullband in onnx_export_mode. Extract fullband in both cases.
+        o = dec_out[0] if isinstance(dec_out, tuple) else dec_out
 
         return InferOutput(o, attn, y_mask, (z, z_p, m_p, logs_p), durations)
 
