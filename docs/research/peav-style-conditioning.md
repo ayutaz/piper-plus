@@ -30,6 +30,8 @@ fork に、VITS にスタイルベクトル条件付け (style vector conditioni
 
 **ベース学習 vs Fine-tune の効果差 (推定)**: 感情表現で -0.3〜0.5 MOS、多言語均等性で大幅低下 (英語以外で -30〜40pt)、ただし学習コストは 1/15。**先に fine-tune で実測し、不足ならベース再学習に進む** のが合理的。詳細は §16。
 
+**📋 詳細な実装計画**: [`implementation-plan/`](implementation-plan/README.md) ディレクトリに Phase 別の実装計画ドキュメントを作成済み (PoC スクリプト、patch 計画、テストケース、CLI 設計、分割 PR 案、CREMA-D 前処理コード、fine-tune コマンド、評価プロトコル等)。
+
 ---
 
 ## 2. 対象コミット
