@@ -1,9 +1,12 @@
 # Phase 3-4 実装計画: Style Bank 生成ツール + PE-A Emotion Loss 統合
 
-**Phase 3 工数**: 3 日
-**Phase 4 工数**: 1.5 週間
+**実装主体**: Claude Code (AIエージェント)
+**Phase 3 Claude Code 工数**: 4〜8h (コード完全設計済み + CREMA-D DL 待ち)
+**Phase 4 Claude Code 工数**: 1〜2 日 (fork 移植 + 小規模学習テスト)
 **依存**: Phase 0 完了 (PE-A モデルロード方法確定)、Phase 1 完了 (style vector conditioning)
 **後続**: Phase 5 (fine-tune 実験で style bank と PE-A loss を使用)
+
+> **参考**: 人間エンジニア想定は Phase 3 = 3 日、Phase 4 = 1.5 週間。Claude Code では設計済みコードをほぼそのまま実装可能、テスト自動生成で短縮。
 
 ---
 
@@ -603,15 +606,17 @@ def test_save_style_bank_schema(tmp_path):
 
 ### 3.6 工数内訳 (Phase 3)
 
-| タスク | 工数 |
-|-------|-----|
-| PE-A モデルローダー (Phase 0 と共通) | 1〜2h |
-| CREMA-D データセットクラス | 4h |
-| 埋め込み抽出 + 統計計算 | 4h |
-| CLI + レポート生成 | 3h |
-| `inject_style_labels.py` | 3h |
-| テストケース + ドキュメント | 4h |
-| **合計** | **約 3 日** |
+| タスク | Claude Code | 人間エンジニア (参考) |
+|-------|-----------|-----------------|
+| PE-A モデルローダー (Phase 0 と共通) | 15分 | 1〜2h |
+| CREMA-D データセットクラス | 30分 | 4h |
+| 埋め込み抽出 + 統計計算 | 30分 | 4h |
+| CLI + レポート生成 | 30分 | 3h |
+| `inject_style_labels.py` | 30分 | 3h |
+| テストケース + ドキュメント | 45分 | 4h |
+| CREMA-D ダウンロード待機 | 2〜3h (並行可) | 3h (並行可) |
+| **合計 (実作業時間)** | **3h** | 21h |
+| **合計 (DL 待機含む)** | **4〜8h** | 約 3 日 |
 
 ---
 
@@ -865,35 +870,38 @@ def test_pea_emotion_loss_shape():
 
 ### 4.8 工数内訳 (Phase 4)
 
-| タスク | 工数 |
-|-------|-----|
-| PE-A loss 計算ロジック実装 | 5h |
-| lightning.py への統合 | 3h |
-| CLI オプション追加 | 2h |
-| DAC 勾配制御テスト | 3h |
-| ユニットテスト (6 テスト) | 4h |
-| ドキュメント + エラーメッセージ | 2h |
-| CI 確認 + 学習レグレッション | 3h |
-| **合計** | **約 1.5 週間 (22h)** |
+| タスク | Claude Code | 人間エンジニア (参考) |
+|-------|-----------|-----------------|
+| PE-A loss 計算ロジック実装 | 45分 | 5h |
+| lightning.py への統合 | 30分 | 3h |
+| CLI オプション追加 | 15分 | 2h |
+| DAC 勾配制御テスト | 30分 | 3h |
+| ユニットテスト (6 テスト) | 45分 | 4h |
+| ドキュメント + エラーメッセージ | 15分 | 2h |
+| CI 確認 + 学習レグレッション (小規模テスト学習) | 2〜4h (待ち含む) | 3h |
+| **合計** | **1〜2 日** | 約 1.5 週間 (22h) |
 
 ---
 
-## 合計工数と依存関係
+## 合計工数と依存関係 (Claude Code 実装)
 
 ```
-Phase 0 (PoC): 1〜2h
+Phase 0 (PoC): 30分〜1h
      ↓
-Phase 1 (学習側, style_vector): 1 週間
+Phase 1 (学習側, style_vector): 4〜8h
      ↓
 ┌────┴────┐
 │         │
 Phase 3    Phase 4
-(ツール, 3日) (PE-A loss, 1.5週間)
+(ツール,  (PE-A loss,
+ 4〜8h)    1〜2日)
 │         │
 └────┬────┘
      ↓
-Phase 5 (fine-tune, 3〜5日)
+Phase 5 (fine-tune, 1〜2日 + GPU 2日)
 ```
+
+**Claude Code 実装合計**: 約 5〜8 日稼働 + GPU 学習 2 日 = **実質 10 日間** (MOS 評価除く)
 
 ---
 

@@ -1,9 +1,13 @@
 # Phase 0-1 実装計画: PE-A PoC + Style Vector Conditioning 学習側統合
 
-**Phase 0 工数**: 1〜2h (PoC)
-**Phase 1 工数**: 1 週間
+**実装主体**: Claude Code (AIエージェント)
+**Phase 0 Claude Code 工数**: 30分〜1h (PoC、HF ダウンロード待ち含む)
+**Phase 1 Claude Code 工数**: 4〜8h (fork cherry-pick + テスト + CI)
 **依存**: なし (Phase 0)、Phase 0 完了 (Phase 1)
 **後続**: Phase 2 (ONNX+ランタイム)、Phase 3 (Style bank)、Phase 4 (PE-A loss)
+
+> **参考**: 人間エンジニア想定の工数目安は Phase 0 = 1〜2h、Phase 1 = 1 週間 (21.5h)。
+> Claude Code では並列 tool 実行・Agent 起動・テスト自動生成により短縮される。
 
 ---
 
@@ -467,19 +471,19 @@ def test_strict_true_raises_on_missing(tmp_path):
 
 ### 1.7 工数内訳
 
-| タスク | 工数 |
-|-------|-----|
-| Fork から差分取得・マッピング確認 | 1h |
-| `models.py` patch | 4h |
-| `lightning.py` patch (Phase 1 スコープのみ) | 2h |
-| `dataset.py` patch | 3h |
-| `commons.py` patch | 0.5h |
-| `__main__.py` patch | 3h |
-| `infer.py` patch | 1h |
-| テスト作成 (11 テスト) | 4h |
-| CLAUDE.md 更新 | 1h |
-| CI 確認 + リグレッション確認 | 2h |
-| **合計** | **約 1 週間 (21.5h)** |
+| タスク | Claude Code | 人間エンジニア (参考) |
+|-------|-----------|----------------|
+| Fork から差分取得・マッピング確認 | 5分 | 1h |
+| `models.py` patch | 30分 | 4h |
+| `lightning.py` patch (Phase 1 スコープのみ) | 15分 | 2h |
+| `dataset.py` patch | 30分 | 3h |
+| `commons.py` patch | 5分 | 0.5h |
+| `__main__.py` patch | 30分 | 3h |
+| `infer.py` patch | 15分 | 1h |
+| テスト作成 (11 テスト) | 1h | 4h |
+| CLAUDE.md 更新 | 10分 | 1h |
+| CI 確認 + リグレッション確認 | 1〜3h (CI 待ち含む) | 2h |
+| **合計** | **4〜8h** (半日〜1日) | 約 1 週間 (21.5h) |
 
 ### 1.8 リスクと対策
 

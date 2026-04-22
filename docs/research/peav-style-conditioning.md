@@ -26,7 +26,11 @@ fork に、VITS にスタイルベクトル条件付け (style vector conditioni
 - **ONNX エクスポート側が未対応** — fork 側でも `export_onnx.py` は変更なし。学習で style_vector を使っても ONNX 化すると機能しない
 - **C++/Rust/C#/Go/JS/WASM ランタイム全てで style_vector 入力追加が必要** — 既存の `speaker_embedding` マスクパターンを踏襲
 
-**推奨アクション**: 取り込み方針で進行 (詳細は §11, §14)。段階統合: Phase 0 PoC → Phase 1 学習側 → Phase 2 ONNX+ランタイム → Phase 3 style bank ツール → Phase 4 PE-A loss 有効化 → Phase 5 **既存 6lang ベースに fine-tune 実験** (ベース再学習なし)。yusuke-ai への連絡は **省略可** (自前実装で完結)。総工数 **約 1.5 ヶ月**。
+**推奨アクション**: 取り込み方針で進行 (詳細は §11, §14)。段階統合: Phase 0 PoC → Phase 1 学習側 → Phase 2 ONNX+ランタイム → Phase 3 style bank ツール → Phase 4 PE-A loss 有効化 → Phase 5 **既存 6lang ベースに fine-tune 実験** (ベース再学習なし)。yusuke-ai への連絡は **省略可** (自前実装で完結)。
+
+**工数**:
+- Claude Code 実装: 約 **5〜8 日稼働** (MOS 評価除く、実質 10 日間で完了目安)
+- 人間エンジニア想定 (参考): 約 1.5 ヶ月
 
 **ベース学習 vs Fine-tune の効果差 (推定)**: 感情表現で -0.3〜0.5 MOS、多言語均等性で大幅低下 (英語以外で -30〜40pt)、ただし学習コストは 1/15。**先に fine-tune で実測し、不足ならベース再学習に進む** のが合理的。詳細は §16。
 
@@ -524,17 +528,23 @@ self.register_buffer("pea_emotion_centroids", F.normalize(emotion_centroids, dim
 
 ---
 
-## 14. 実装ロードマップ (2026-04-22 更新: fine-tune 対応)
+## 14. 実装ロードマップ (2026-04-22 更新: Claude Code 実装前提)
 
-| Phase | 内容 | 工数 | 既存ポジション影響 | 優先度 |
-|-------|-----|-----|-----------------|------|
-| 0 | `facebook/pe-av-small` 動作確認 PoC | 1〜2h | なし | ★★★ |
-| 1 | Style vector conditioning 学習側統合 (PE-A loss なし) | 1 週間 | モデル +0.5MB、opt-in | ★★★ |
-| 2 | ONNX + 5 ランタイム対応 | 2 週間 | **推論影響なし** | ★★ |
-| 3 | Style bank 生成ツール + CREMA-D 対応 | 3〜4 日 | なし (tool) | ★★ |
-| 4 | PE-A emotion loss 有効化 + 小規模実験 | 1 週間 | 学習時のみ | ★★ |
-| 5 | **既存 6lang ベースへ fine-tune 実験** (ベース再学習なし) | **3〜5 日** | なし | ★ |
-| **合計** | | **約 1.5 ヶ月** | | |
+**実装主体**: Claude Code (AIエージェント) が全 Phase を実装。人間はレビュー・承認・評価のみ。
+
+| Phase | 内容 | Claude Code 工数 | 既存ポジション影響 | 優先度 |
+|-------|-----|---------------|-----------------|------|
+| 0 | `facebook/pe-av-small` 動作確認 PoC | 30分〜1h | なし | ★★★ |
+| 1 | Style vector conditioning 学習側統合 (PE-A loss なし) | 4〜8h | モデル +0.5MB、opt-in | ★★★ |
+| 2 | ONNX + 5 ランタイム対応 | 2〜3 日 (並列 Agent) | **推論影響なし** | ★★ |
+| 3 | Style bank 生成ツール + CREMA-D 対応 | 4〜8h | なし (tool) | ★★ |
+| 4 | PE-A emotion loss 有効化 + 小規模実験 | 1〜2 日 | 学習時のみ | ★★ |
+| 5 | **既存 6lang ベースへ fine-tune 実験** (ベース再学習なし) | **1〜2 日 + GPU 2 日** | なし | ★ |
+| **Claude Code 実装合計** | | **約 5〜8 日稼働** | | |
+| **GPU 学習 (バックグラウンド)** | | 約 2 日 | | |
+| **実質完了目安** | | **約 10 日間** (MOS 評価除く) | | |
+
+**参考 (人間エンジニア想定)**: 約 1.5 ヶ月。Claude Code では並列 tool 実行、Agent 並列起動、テスト自動生成、コード完全設計済みなどで大幅短縮。
 
 **Phase 5 短縮の根拠**: style_proj はゼロ初期化された加算的モジュールで、既存モデル挙動を完全に保持したまま追加学習可能。6lang ベース (75 epoch, 92h) 再学習は不要。詳細は §15。
 
@@ -682,6 +692,7 @@ nohup /data/piper/.venv/bin/python -m piper_train \
 | 学習時間 | V100 1GPU で 200 epoch / 約 6〜24 時間 |
 | ディスク | style_vectors/*.npy × 発話数 × 256次元 × 4byte = 約 10〜100MB |
 | GPU 時間比較 | ベース再学習 92h → fine-tune 6〜24h (**約 10〜15 分の 1**) |
+| Claude Code 実装時間 | 1〜2 日 (設定・実行・監視・評価) |
 
 ### 15.6 Fine-tune のメリット
 

@@ -1,8 +1,11 @@
 # Phase 2 実装計画: ONNX エクスポート + 5 ランタイム対応
 
-**Phase 2 工数**: 2 週間 (並列化で 4〜5 日に短縮可能)
+**実装主体**: Claude Code (AIエージェント)
+**Phase 2 Claude Code 工数**: 2〜3 日 (Agent 並列起動でランタイム毎同時対応)
 **依存**: Phase 1 完了 (Style vector conditioning 学習側統合)
 **後続**: Phase 5 (fine-tune 実験で ONNX 動作確認が必要)
+
+> **参考**: 人間エンジニア想定は 2 週間 (並列化で 4〜5 日)。Claude Code では 6 ランタイム (Python/C++/Rust/C#/Go/WASM) を Agent で並列処理。
 
 ---
 
@@ -554,20 +557,22 @@ TEST(PiperPlusStyleVector, WithStyleVector) {
 
 ## 2.6 工数内訳
 
-| タスク | 工数 |
-|-------|-----|
-| ONNX エクスポート (export_onnx.py + テスト) | 1.5 日 |
-| Python (infer_onnx.py + テスト) | 1 日 |
-| C++ (piper_plus.h, piper_plus_c_api.cpp + テスト) | 2 日 |
-| Rust (piper-core + CLI + テスト) | 1.5 日 |
-| C# (PiperPlus.Core + CLI + テスト) | 1.5 日 |
-| Go (piperplus + CLI + テスト) | 1.5 日 |
-| WASM/JS (piper-wasm + npm + テスト) | 1.5 日 |
-| 統合テスト + 互換性確認 | 1 日 |
-| ドキュメント (CLAUDE.md 更新等) | 1 日 |
-| **合計** | **~14 日 (2 週間)** |
+| タスク | Claude Code | 人間エンジニア (参考) |
+|-------|-----------|---------------|
+| ONNX エクスポート (export_onnx.py + テスト) | 4〜6h | 1.5 日 |
+| Python (infer_onnx.py + テスト) | 2〜4h | 1 日 |
+| C++ (piper_plus.h, piper_plus_c_api.cpp + テスト) | 6〜8h | 2 日 |
+| Rust (piper-core + CLI + テスト) | 4〜6h | 1.5 日 |
+| C# (PiperPlus.Core + CLI + テスト) | 4〜6h | 1.5 日 |
+| Go (piperplus + CLI + テスト) | 4〜6h | 1.5 日 |
+| WASM/JS (piper-wasm + npm + テスト) | 4〜6h | 1.5 日 |
+| 統合テスト + 互換性確認 (CI 待ち含む) | 3〜6h | 1 日 |
+| ドキュメント (CLAUDE.md 更新等) | 1〜2h | 1 日 |
+| **合計 (逐次実施)** | **約 3〜5 日** | ~14 日 (2 週間) |
+| **合計 (並列 Agent)** | **約 2〜3 日** | 4〜5 日 (3〜4 人チーム) |
 
-**並列化**: Python/C++/Rust/C#/Go/WASM は独立作業のため、3〜4 人チームなら 4〜5 日に短縮可能。
+**並列化**: Claude Code は Agent を並列起動してランタイム毎同時対応可能。
+例: PR-C (ONNX) マージ後、PR-D-Py/Cpp/Rust/C#/Go/Wasm を Agent 6つで並列実施。
 
 ---
 

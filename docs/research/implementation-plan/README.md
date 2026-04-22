@@ -4,20 +4,28 @@
 **対象機能**: fork `yusuke-ai/piper-plus` の `feature/2026-04-14-2312-peav-style-conditioning` ブランチ実装を本家 `ayutaz/piper-plus` に取り込む
 **前提調査**: `../peav-style-conditioning.md` (全体像・ライセンス・アーキテクチャ分析)
 **実施方針**: ベース再学習なし、fine-tune のみで対応 (詳細は前提調査 §15)
-**総工数目安**: 約 1.5 ヶ月 (分割 PR、段階 Phase)
+**実装主体**: **Claude Code (AIエージェント)** が実装を担当
+**総工数目安**: 実装約 **1 週間** + GPU 学習 約 2 日 (バックグラウンド) + ユーザー MOS 評価 (オプション)
 
 ---
 
 ## 目次
 
-| Phase | ファイル | 内容 | 工数 |
-|-------|--------|------|------|
-| 0 | [phase-0-1.md](phase-0-1.md) (§Phase 0) | `facebook/pe-av-small` PoC | 1〜2h |
-| 1 | [phase-0-1.md](phase-0-1.md) (§Phase 1) | Style vector conditioning 学習側統合 | 1 週間 |
-| 2 | [phase-2.md](phase-2.md) | ONNX エクスポート + 5 ランタイム対応 | 2 週間 |
-| 3 | [phase-3-4.md](phase-3-4.md) (§Phase 3) | Style bank 生成ツール (`build_pea_style_bank.py`) | 3 日 |
-| 4 | [phase-3-4.md](phase-3-4.md) (§Phase 4) | PE-A emotion loss 学習側統合 | 1.5 週間 |
-| 5 | [phase-5.md](phase-5.md) | 既存 6lang ベースへの Fine-tune 実験 | 3〜5 日 |
+| Phase | ファイル | 内容 | Claude Code 実装 | 備考 |
+|-------|--------|------|----------------|------|
+| 0 | [phase-0-1.md](phase-0-1.md) (§Phase 0) | `facebook/pe-av-small` PoC | 30分〜1h | HF ダウンロード待ち含む |
+| 1 | [phase-0-1.md](phase-0-1.md) (§Phase 1) | Style vector conditioning 学習側統合 | 4〜8h | fork cherry-pick + テスト + CI |
+| 2 | [phase-2.md](phase-2.md) | ONNX エクスポート + 5 ランタイム対応 | 2〜3 日 | 並列 Agent 活用、ランタイム毎 CI |
+| 3 | [phase-3-4.md](phase-3-4.md) (§Phase 3) | Style bank 生成ツール | 4〜8h | コード設計済み + CREMA-D DL |
+| 4 | [phase-3-4.md](phase-3-4.md) (§Phase 4) | PE-A emotion loss 学習側統合 | 1〜2 日 | fork 移植 + 小規模学習テスト |
+| 5 | [phase-5.md](phase-5.md) | 既存 6lang ベースへの Fine-tune 実験 | 1〜2 日 + GPU 2 日 | 実装と評価は CC、学習は BG |
+
+**合計**:
+- Claude Code 実装稼働: 約 5〜8 日
+- GPU 学習 (バックグラウンド): 約 2 日
+- 現実的な完了目安: **約 10 日間** (MOS 評価を除く)
+
+**人間エンジニア想定の工数目安** (参考): 約 1.5 ヶ月 (他の開発者が実装する場合の参考値、元の見積もり)
 
 ---
 
@@ -43,22 +51,22 @@ Phase 0 (PoC) ──┬──→ Phase 1 (学習側統合) ──┬──→ Ph
 
 ## 分割 PR 案
 
-| PR | タイトル | Phase | 工数 | 依存 |
-|----|---------|-------|-----|------|
-| PR-A | `feat(pea): facebook/pe-av-small loader + minimal PoC` | 0 | 1〜2h | なし |
-| PR-B | `feat(train): style vector conditioning (models.py + lightning.py + dataset.py + infer.py + CLI)` | 1 | 1 週間 | PR-A |
-| PR-C | `feat(onnx): style_vector を ONNX 入力に追加 (mask パターン)` | 2 | 1.5 日 | PR-B |
-| PR-D-Py | `feat(infer): support style_vector in Python ONNX inference` | 2 | 1 日 | PR-C |
-| PR-D-Cpp | `feat(runtime): add style_vector support to C++ API` | 2 | 2 日 | PR-C |
-| PR-D-Rust | `feat(rust): add style_vector to piper-core and CLI` | 2 | 1.5 日 | PR-C |
-| PR-D-CSharp | `feat(csharp): add style_vector to PiperPlus.Core and CLI` | 2 | 1.5 日 | PR-C |
-| PR-D-Go | `feat(go): add style_vector support to Go engine` | 2 | 1.5 日 | PR-C |
-| PR-D-Wasm | `feat(wasm): export style_vector in JS/WASM API` | 2 | 1.5 日 | PR-C |
-| PR-E | `feat(tools): build_pea_style_bank.py + inject_style_labels.py + CREMA-D loader` | 3 | 3 日 | PR-A |
-| PR-F | `feat(train): PE-A emotion loss 統合 + CLI + docs` | 4 | 1.5 週間 | PR-B, PR-E |
-| PR-G | `exp(finetune): CREMA-D fine-tune of 6lang base + evaluation report` | 5 | 3〜5 日 | PR-B, PR-E, PR-F |
+| PR | タイトル | Phase | Claude Code 工数 | 依存 |
+|----|---------|-------|---------------|------|
+| PR-A | `feat(pea): facebook/pe-av-small loader + minimal PoC` | 0 | 30分〜1h | なし |
+| PR-B | `feat(train): style vector conditioning (models.py + lightning.py + dataset.py + infer.py + CLI)` | 1 | 4〜8h | PR-A |
+| PR-C | `feat(onnx): style_vector を ONNX 入力に追加 (mask パターン)` | 2 | 4〜6h | PR-B |
+| PR-D-Py | `feat(infer): support style_vector in Python ONNX inference` | 2 | 2〜4h | PR-C |
+| PR-D-Cpp | `feat(runtime): add style_vector support to C++ API` | 2 | 6〜8h | PR-C |
+| PR-D-Rust | `feat(rust): add style_vector to piper-core and CLI` | 2 | 4〜6h | PR-C |
+| PR-D-CSharp | `feat(csharp): add style_vector to PiperPlus.Core and CLI` | 2 | 4〜6h | PR-C |
+| PR-D-Go | `feat(go): add style_vector support to Go engine` | 2 | 4〜6h | PR-C |
+| PR-D-Wasm | `feat(wasm): export style_vector in JS/WASM API` | 2 | 4〜6h | PR-C |
+| PR-E | `feat(tools): build_pea_style_bank.py + inject_style_labels.py + CREMA-D loader` | 3 | 4〜8h | PR-A |
+| PR-F | `feat(train): PE-A emotion loss 統合 + CLI + docs` | 4 | 1〜2 日 | PR-B, PR-E |
+| PR-G | `exp(finetune): CREMA-D fine-tune of 6lang base + evaluation report` | 5 | 1〜2 日 + GPU 2 日 | PR-B, PR-E, PR-F |
 
-PR-D-* は PR-C マージ後、**並列実施可能** (各ランタイム独立)。
+PR-D-* は PR-C マージ後、**並列実施可能** (Claude Code の Agent 並列起動で同時対応)。
 
 ---
 
