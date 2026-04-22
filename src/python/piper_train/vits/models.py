@@ -590,8 +590,8 @@ class WavLMDiscriminator(torch.nn.Module):
         self.source_sample_rate = source_sample_rate
         self.hidden_size = 768  # WavLM base hidden size
 
-        # Load WavLM model (use safetensors for compatibility with torch < 2.6)
-        self.wavlm = WavLMModel.from_pretrained(model_name, use_safetensors=True)
+        # microsoft/wavlm-base-plus publishes pytorch_model.bin, not safetensors.
+        self.wavlm = WavLMModel.from_pretrained(model_name, use_safetensors=False)
 
         # Enable gradient checkpointing for memory efficiency
         self.wavlm.gradient_checkpointing_enable()
