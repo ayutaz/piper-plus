@@ -29,6 +29,33 @@
 
 ---
 
+## 個別チケット ([tickets/](tickets/))
+
+各 Phase を更に細分化した 32 件の個別チケットを [tickets/](tickets/) に配置しています。各チケットは以下の 9 セクションで構成されます:
+
+1. タスク目的とゴール (Definition of Done 付き)
+2. 実装内容の詳細 (対象ファイル、手順、コード例)
+3. エージェントチーム構成 (役割と人数)
+4. 提供範囲 (Deliverables)
+5. テスト項目 (Unit + E2E)
+6. 懸念事項とレビュー項目
+7. **一から作り直すとしたら** (代替案と採用理由)
+8. 後続タスクへの連絡事項
+9. 参考リンク
+
+| Phase | チケット数 | INDEX |
+|-------|----------|-------|
+| 0 | 3 | [tickets/phase-0/README.md](tickets/phase-0/README.md) |
+| 1 | 7 | [tickets/phase-1/README.md](tickets/phase-1/README.md) |
+| 2 | 8 | [tickets/phase-2/README.md](tickets/phase-2/README.md) |
+| 3 | 4 | [tickets/phase-3/README.md](tickets/phase-3/README.md) |
+| 4 | 5 | [tickets/phase-4/README.md](tickets/phase-4/README.md) |
+| 5 | 5 | [tickets/phase-5/README.md](tickets/phase-5/README.md) |
+
+全チケット一覧と全体依存関係図は [tickets/README.md](tickets/README.md) を参照してください。
+
+---
+
 ## 依存関係グラフ
 
 ```
