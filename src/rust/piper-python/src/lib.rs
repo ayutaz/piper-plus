@@ -236,7 +236,7 @@ impl PiperVoice {
     ///     ValueError: If the text produces unknown phonemes.
     ///     RuntimeError: If ONNX inference fails.
     #[allow(clippy::too_many_arguments)]
-    #[pyo3(signature = (text, speaker_id=None, language=None, noise_scale=0.667, length_scale=1.0, noise_w=0.8))]
+    #[pyo3(signature = (text, speaker_id=None, language=None, noise_scale=0.667, length_scale=1.0, noise_w=0.8, style_vector=None))]
     fn synthesize(
         &mut self,
         py: Python<'_>,
@@ -246,6 +246,7 @@ impl PiperVoice {
         noise_scale: f32,
         length_scale: f32,
         noise_w: f32,
+        style_vector: Option<Vec<f32>>,
     ) -> PyResult<SynthesisResult> {
         // Copy parameters into owned values for the closure (text is &str,
         // language is Option<&str> -- we need owned copies to move into
@@ -261,15 +262,18 @@ impl PiperVoice {
 
         let result = py.allow_threads(move || {
             let inner = unsafe { inner_ptr.as_mut() };
-            #[allow(deprecated)]
-            inner.synthesize_text(
-                &text_owned,
+            // Phase 2 (P2-T04): route through SynthesisParams so style_vector
+            // is carried through to the underlying engine.
+            let params = piper_core::SynthesisParams {
                 speaker_id,
-                language_owned.as_deref(),
+                language_override: language_owned,
                 noise_scale,
                 length_scale,
                 noise_w,
-            )
+                speaker_embedding: None,
+                style_vector,
+            };
+            inner.synthesize_with_params(&text_owned, &params)
         });
 
         Ok(result.map_err(piper_err_to_pyerr)?.into())

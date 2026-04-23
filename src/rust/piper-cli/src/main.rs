@@ -130,6 +130,16 @@ struct Cli {
     /// Speaker encoder ONNX model path (required for --reference-audio)
     #[arg(long, value_name = "PATH")]
     speaker_encoder_model: Option<PathBuf>,
+
+    /// Phase 2 (P2-T04): Style vector .npy file (float32, 1-D or (1,dim)).
+    /// Only used when the model has a `style_vector` input.
+    #[arg(long, value_name = "PATH")]
+    style_vector: Option<PathBuf>,
+
+    /// Inline style vector: comma-separated float32 values. Takes precedence
+    /// over --style-vector.
+    #[arg(long, value_name = "VALUES")]
+    style_vector_inline: Option<String>,
 }
 
 /// --phoneme-silence の値をパースして HashMap に変換する。
@@ -165,7 +175,11 @@ fn append_silence(audio: &mut Vec<i16>, sample_rate: u32, silence_seconds: f32) 
 }
 
 /// CLI引数から SynthesisParams を構築する。
-fn build_synthesis_params(cli: &Cli, speaker_emb: Option<Vec<f32>>) -> SynthesisParams {
+fn build_synthesis_params(
+    cli: &Cli,
+    speaker_emb: Option<Vec<f32>>,
+    style_vector: Option<Vec<f32>>,
+) -> SynthesisParams {
     SynthesisParams {
         speaker_id: cli.speaker,
         language_override: cli.language.clone(),
@@ -173,7 +187,67 @@ fn build_synthesis_params(cli: &Cli, speaker_emb: Option<Vec<f32>>) -> Synthesis
         length_scale: cli.length_scale,
         noise_w: cli.noise_w,
         speaker_embedding: speaker_emb,
+        style_vector,
     }
+}
+
+/// Phase 2 (P2-T04): minimal .npy reader for 1-D float32 arrays.
+///
+/// Supports numpy `.npy` format v1.0/v2.0 with dtype `'<f4'` (little-endian
+/// float32). Accepts 1-D `(dim,)` or 2-D `(1, dim)` shapes.
+fn load_style_vector_npy(path: &std::path::Path) -> Result<Vec<f32>> {
+    let bytes = std::fs::read(path)
+        .with_context(|| format!("Failed to read style_vector: {}", path.display()))?;
+    if bytes.len() < 10 || &bytes[0..6] != b"\x93NUMPY" {
+        anyhow::bail!(".npy magic header invalid: {}", path.display());
+    }
+    let major = bytes[6];
+    let (header_len, data_offset) = match major {
+        1 => {
+            let h = u16::from_le_bytes([bytes[8], bytes[9]]) as usize;
+            (h, 10 + h)
+        }
+        2 => {
+            let h = u32::from_le_bytes([bytes[8], bytes[9], bytes[10], bytes[11]]) as usize;
+            (h, 12 + h)
+        }
+        v => anyhow::bail!(".npy unsupported version: {}", v),
+    };
+    if bytes.len() < data_offset {
+        anyhow::bail!(".npy truncated header: {}", path.display());
+    }
+    let header_start = if major == 1 { 10 } else { 12 };
+    let header = std::str::from_utf8(&bytes[header_start..header_start + header_len])
+        .unwrap_or("");
+    if !header.contains("'descr': '<f4'") && !header.contains("\"descr\": \"<f4\"") {
+        anyhow::bail!(
+            ".npy dtype must be '<f4' (little-endian float32); header: {}",
+            header
+        );
+    }
+    let data = &bytes[data_offset..];
+    if data.len() % 4 != 0 {
+        anyhow::bail!(
+            ".npy data size ({} bytes) not a multiple of 4",
+            data.len()
+        );
+    }
+    Ok(data
+        .chunks_exact(4)
+        .map(|c| f32::from_le_bytes([c[0], c[1], c[2], c[3]]))
+        .collect())
+}
+
+/// Parse a comma-separated inline style vector into a Vec<f32>.
+fn parse_style_vector_inline(s: &str) -> Result<Vec<f32>> {
+    s.split(',')
+        .map(|t| t.trim())
+        .filter(|t| !t.is_empty())
+        .map(|t| {
+            t.parse::<f32>()
+                .with_context(|| format!("invalid style_vector-inline value: {}", t))
+        })
+        .collect()
 }
 
 /// Load speaker embedding from a binary file (raw float32 values, little-endian).
@@ -394,6 +468,24 @@ fn main() -> Result<()> {
         None
     };
 
+    // Phase 2 (P2-T04): Resolve style_vector from --style-vector-inline or
+    // --style-vector (inline takes precedence).
+    let style_vector: Option<Vec<f32>> = if let Some(ref inline) = cli.style_vector_inline {
+        let v = parse_style_vector_inline(inline)?;
+        tracing::info!("Loaded inline style_vector: {} dims", v.len());
+        Some(v)
+    } else if let Some(ref path) = cli.style_vector {
+        let v = load_style_vector_npy(path)?;
+        tracing::info!(
+            "Loaded style_vector: {} dims from {}",
+            v.len(),
+            path.display()
+        );
+        Some(v)
+    } else {
+        None
+    };
+
     if let Some(ref batch_path) = cli.batch {
         // --batch モード: テキストファイルから1行ずつ読み込み合成
         let mut voice = PiperVoice::load(&model_path, config_arg.as_deref(), &cli.device)
@@ -446,7 +538,7 @@ fn main() -> Result<()> {
             batch_path.display()
         );
 
-        let params = build_synthesis_params(&cli, speaker_emb.clone());
+        let params = build_synthesis_params(&cli, speaker_emb.clone(), style_vector.clone());
         for (i, line) in lines.iter().enumerate() {
             let idx = i + 1;
             let text_to_synth = if let Some(ref dict) = custom_dict {
@@ -562,7 +654,7 @@ fn main() -> Result<()> {
                 .as_ref()
                 .ok_or_else(|| anyhow::anyhow!("--output-dir is required for --stream mode"))?;
 
-            let params = build_synthesis_params(&cli, speaker_emb.clone());
+            let params = build_synthesis_params(&cli, speaker_emb.clone(), style_vector.clone());
             for (i, sentence) in sentences.iter().enumerate() {
                 let idx = i + 1;
                 let text_to_synth = if let Some(ref dict) = custom_dict {
@@ -623,7 +715,7 @@ fn main() -> Result<()> {
                 return Ok(());
             }
 
-            let params = build_synthesis_params(&cli, speaker_emb.clone());
+            let params = build_synthesis_params(&cli, speaker_emb.clone(), style_vector.clone());
             let result = voice
                 .synthesize_with_params(&text_to_synth, &params)
                 .context("Failed to synthesize text")?;

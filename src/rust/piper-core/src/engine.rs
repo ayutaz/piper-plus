@@ -88,6 +88,13 @@ pub struct SynthesisRequest {
     /// When provided, this overrides `speaker_id` for voice conditioning.
     /// Typical dimension: 256 floats (ECAPA-TDNN output).
     pub speaker_embedding: Option<Vec<f32>>,
+    /// Style vector for PE-AV / PE-A style conditioning (Phase 2 P2-T04).
+    ///
+    /// When the loaded ONNX model has a `style_vector` input and this is
+    /// `Some(vec)`, the vector is sent with `style_vector_mask=1`. When
+    /// `None` (and the model has the input), zeros + `mask=0` are sent
+    /// so the style branch is effectively disabled for the call.
+    pub style_vector: Option<Vec<f32>>,
 }
 
 impl Default for SynthesisRequest {
@@ -101,6 +108,7 @@ impl Default for SynthesisRequest {
             length_scale: 1.0,
             noise_w: 0.8,
             speaker_embedding: None,
+            style_vector: None,
         }
     }
 }
@@ -139,6 +147,13 @@ pub struct ModelCapabilities {
     /// Whether the model accepts `speaker_embedding` (float32) and
     /// `speaker_embedding_mask` (int64) inputs for voice cloning.
     pub has_speaker_embedding: bool,
+    /// Phase 2 (P2-T04): Whether the model accepts `style_vector` (float32)
+    /// and `style_vector_mask` (int64) inputs for PE-AV / PE-A style
+    /// conditioning.
+    pub has_style_vector: bool,
+    /// Expected `style_vector` dimension (axis 1 of the input, resolved
+    /// from the ONNX shape or ``custom_metadata_map["style_vector_dim"]``).
+    pub style_vector_dim: u32,
 }
 
 // ---------------------------------------------------------------------------
@@ -559,12 +574,42 @@ impl OnnxEngine {
         let has_input = |name: &str| input_names.iter().any(|n| n == name);
         let has_output = |name: &str| output_names.iter().any(|n| n == name);
 
+        // Phase 2 (P2-T04): detect style_vector and resolve its dim.
+        let has_style_vector = has_input("style_vector");
+        let style_vector_dim: u32 = if has_style_vector {
+            // 1. Try the concrete ONNX input shape (axis 1)
+            let mut dim_from_shape: Option<u32> = None;
+            for input in session.inputs().iter() {
+                if input.name() == "style_vector" {
+                    if let ort::value::ValueType::Tensor { shape, .. } = input.dtype() {
+                        // shape deref's to &[i64]. Dynamic dims are -1.
+                        if shape.len() >= 2 && shape[1] > 0 {
+                            dim_from_shape = Some(shape[1] as u32);
+                        }
+                    }
+                }
+            }
+
+            // 2. Fall back to custom metadata map
+            let dim_from_meta: Option<u32> = session
+                .metadata()
+                .ok()
+                .and_then(|m| m.custom("style_vector_dim"))
+                .and_then(|s: String| s.parse::<u32>().ok());
+
+            dim_from_shape.or(dim_from_meta).unwrap_or(0)
+        } else {
+            0
+        };
+
         let capabilities = ModelCapabilities {
             has_sid: has_input("sid"),
             has_lid: has_input("lid"),
             has_prosody: has_input("prosody_features"),
             has_duration_output: has_output("durations"),
             has_speaker_embedding: has_input("speaker_embedding"),
+            has_style_vector,
+            style_vector_dim,
         };
 
         tracing::info!(
@@ -573,12 +618,15 @@ impl OnnxEngine {
             output_names,
         );
         tracing::info!(
-            "Capabilities: sid={}, lid={}, prosody={}, durations={}, speaker_embedding={}",
+            "Capabilities: sid={}, lid={}, prosody={}, durations={}, \
+             speaker_embedding={}, style_vector={} (dim={})",
             capabilities.has_sid,
             capabilities.has_lid,
             capabilities.has_prosody,
             capabilities.has_duration_output,
             capabilities.has_speaker_embedding,
+            capabilities.has_style_vector,
+            capabilities.style_vector_dim,
         );
 
         // hop_size: 0 (config 欠如時の serde default 直前の異常値) は
@@ -758,6 +806,45 @@ impl OnnxEngine {
             None
         };
 
+        // Phase 2 (P2-T04): style_vector + style_vector_mask.
+        // When the model has the input, we MUST always send both tensors --
+        // zero-fill + mask=0 when the caller did not provide a vector.
+        let (style_vector_tensor, style_vector_mask_tensor) = if self
+            .capabilities
+            .has_style_vector
+        {
+            let dim = self.capabilities.style_vector_dim.max(1) as usize;
+            let (data, mask_val): (Vec<f32>, i64) = match &request.style_vector {
+                Some(vec)
+                    if vec.len() == self.capabilities.style_vector_dim as usize
+                        && self.capabilities.style_vector_dim > 0 =>
+                {
+                    (vec.clone(), 1)
+                }
+                Some(vec) => {
+                    tracing::warn!(
+                        "style_vector length {} != expected {}; ignoring (mask=0)",
+                        vec.len(),
+                        self.capabilities.style_vector_dim,
+                    );
+                    (vec![0.0_f32; dim], 0)
+                }
+                None => (vec![0.0_f32; dim], 0),
+            };
+            let sv = Tensor::from_array(([1_usize, dim], data.into_boxed_slice()))
+                .map_err(|e| PiperError::Inference(format!("style_vector tensor: {e}")))?;
+            let mask = Tensor::from_array((
+                [1_usize, 1_usize],
+                vec![mask_val].into_boxed_slice(),
+            ))
+            .map_err(|e| {
+                PiperError::Inference(format!("style_vector_mask tensor: {e}"))
+            })?;
+            (Some(sv), Some(mask))
+        } else {
+            (None, None)
+        };
+
         // ValueMap を構築
         let mut inputs: Vec<(Cow<str>, ort::session::SessionInputValue<'_>)> =
             Vec::with_capacity(8);
@@ -780,6 +867,12 @@ impl OnnxEngine {
         }
         if let Some(ref t) = speaker_emb_mask_tensor {
             inputs.push(("speaker_embedding_mask".into(), t.into()));
+        }
+        if let Some(ref t) = style_vector_tensor {
+            inputs.push(("style_vector".into(), t.into()));
+        }
+        if let Some(ref t) = style_vector_mask_tensor {
+            inputs.push(("style_vector_mask".into(), t.into()));
         }
 
         // --- 推論実行 ---
@@ -969,6 +1062,8 @@ mod tests {
             has_prosody: true,
             has_duration_output: false,
             has_speaker_embedding: false,
+            has_style_vector: false,
+            style_vector_dim: 0,
         };
         let debug = format!("{:?}", caps);
         assert!(debug.contains("has_sid: true"));
@@ -1027,6 +1122,7 @@ mod tests {
             length_scale: 1.5,
             noise_w: 0.5,
             speaker_embedding: None,
+            style_vector: None,
         };
         assert_eq!(req.phoneme_ids.len(), 5);
         assert_eq!(req.speaker_id, Some(42));
@@ -1047,12 +1143,16 @@ mod tests {
             has_prosody: true,
             has_duration_output: true,
             has_speaker_embedding: true,
+            has_style_vector: true,
+            style_vector_dim: 256,
         };
         assert!(caps.has_sid);
         assert!(caps.has_lid);
         assert!(caps.has_prosody);
         assert!(caps.has_duration_output);
         assert!(caps.has_speaker_embedding);
+        assert!(caps.has_style_vector);
+        assert_eq!(caps.style_vector_dim, 256);
     }
 
     #[test]
@@ -1063,12 +1163,31 @@ mod tests {
             has_prosody: false,
             has_duration_output: false,
             has_speaker_embedding: false,
+            has_style_vector: false,
+            style_vector_dim: 0,
         };
         assert!(!caps.has_sid);
         assert!(!caps.has_lid);
         assert!(!caps.has_prosody);
         assert!(!caps.has_duration_output);
         assert!(!caps.has_speaker_embedding);
+        assert!(!caps.has_style_vector);
+        assert_eq!(caps.style_vector_dim, 0);
+    }
+
+    #[test]
+    fn test_synthesis_request_default_has_style_vector_none() {
+        let req = SynthesisRequest::default();
+        assert!(req.style_vector.is_none());
+    }
+
+    #[test]
+    fn test_synthesis_request_with_style_vector() {
+        let req = SynthesisRequest {
+            style_vector: Some(vec![0.1; 256]),
+            ..SynthesisRequest::default()
+        };
+        assert_eq!(req.style_vector.as_ref().map(|v| v.len()), Some(256));
     }
 
     // -----------------------------------------------------------------------

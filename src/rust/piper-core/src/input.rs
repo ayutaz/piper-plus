@@ -58,6 +58,7 @@ impl JsonlUtterance {
             length_scale,
             noise_w,
             speaker_embedding: None,
+            style_vector: None,
         }
     }
 }
