@@ -43,6 +43,17 @@ class PiperConfig:
     language_id_map: Mapping[str, int] | None = None
     """Language code -> language id (e.g. {"ja": 0, "en": 1})"""
 
+    style_vector_dim: int = 0
+    """Dimension of the style_vector ONNX input (0 = disabled).
+
+    Used as a fallback when the ONNX ``custom_metadata_map`` does not
+    provide ``style_vector_dim``. See Phase 2 style conditioning
+    documentation for the full resolution order.
+    """
+
+    style_condition_mode: str = "global"
+    """How the style_vector conditions the model ("global" or "text")."""
+
     @staticmethod
     def from_dict(config: dict[str, Any]) -> "PiperConfig":
         inference = config.get("inference", {})
@@ -59,4 +70,8 @@ class PiperConfig:
             phoneme_type=PhonemeType(config.get("phoneme_type", "multilingual")),
             num_languages=config.get("num_languages", 1),
             language_id_map=config.get("language_id_map"),
+            style_vector_dim=int(config.get("style_vector_dim", 0) or 0),
+            style_condition_mode=str(
+                config.get("style_condition_mode", "global") or "global"
+            ),
         )

@@ -17,6 +17,7 @@ browsers, ``ffmpeg`` and most media players.
 from __future__ import annotations
 
 import argparse
+import base64
 import io
 import logging
 import struct
@@ -24,6 +25,7 @@ import wave
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 import uvicorn
 from fastapi import FastAPI, Query, Request, Response
 from fastapi.concurrency import run_in_threadpool
@@ -294,6 +296,43 @@ def _warn_if_public_bind(host: str) -> None:
             "Pass --host 127.0.0.1 to restrict to localhost.",
             host or "0.0.0.0",
         )
+
+
+def _parse_style_vector_from_request(req) -> "np.ndarray | None":
+    """Extract a style_vector from an incoming Flask request.
+
+    Supports three encodings (checked in order):
+
+    1. ``X-Style-Vector-B64`` request header: base64-encoded raw float32 LE.
+    2. Query parameter ``style_vector_b64``: base64-encoded float32 LE.
+    3. JSON body with ``{"style_vector": [f, f, ...]}`` (only if the
+       request's ``Content-Type`` is ``application/json``).
+
+    Returns
+    -------
+    np.ndarray or None
+        A 1-D float32 array, or ``None`` when no style vector was supplied.
+    """
+    # 1. Base64 in header
+    header_b64 = req.headers.get("X-Style-Vector-B64")
+    if header_b64:
+        raw = base64.b64decode(header_b64)
+        return np.frombuffer(raw, dtype=np.float32).copy()
+
+    # 2. Base64 in query string
+    q_b64 = req.args.get("style_vector_b64")
+    if q_b64:
+        raw = base64.b64decode(q_b64)
+        return np.frombuffer(raw, dtype=np.float32).copy()
+
+    # 3. JSON body
+    if req.is_json:
+        payload = req.get_json(silent=True) or {}
+        sv = payload.get("style_vector")
+        if sv is not None:
+            return np.asarray(sv, dtype=np.float32)
+
+    return None
 
 
 def main() -> None:
