@@ -1301,6 +1301,81 @@ class VitsModel(pl.LightningModule):
                 "'text' adds projected style to the scaled text encoder input."
             ),
         )
+        # PE-A emotion perceptual loss (Phase 4 / PR-F) — all disabled by
+        # default. Loss is implicitly enabled when ANY of the three weights
+        # is > 0. ``--pea-emotion-style-bank`` becomes required in that
+        # case (enforced by VitsModel._init_pea_emotion_loss()).
+        parser.add_argument(
+            "--pea-emotion-loss-weight",
+            type=float,
+            default=0.0,
+            help=(
+                "Weight for PE-A generated-audio direction loss toward the "
+                "target emotion. Default: 0.0 (disabled)."
+            ),
+        )
+        parser.add_argument(
+            "--pea-emotion-centroid-weight",
+            type=float,
+            default=0.0,
+            help=(
+                "Weight for PE-A generated-audio attraction to the target "
+                "emotion centroid (1 - cosine). Default: 0.0 (disabled)."
+            ),
+        )
+        parser.add_argument(
+            "--pea-emotion-margin-weight",
+            type=float,
+            default=0.0,
+            help=(
+                "Weight for PE-A target-vs-other emotion centroid hinge "
+                "margin loss. Default: 0.0 (disabled)."
+            ),
+        )
+        parser.add_argument(
+            "--pea-emotion-style-bank",
+            default=None,
+            help=(
+                "Path to a PE-A style bank .npz (schema: emotion_names, "
+                "emotion_centroids, global_centroid). Required when any "
+                "pea-emotion weight > 0."
+            ),
+        )
+        parser.add_argument(
+            "--pea-emotion-model-name",
+            default="facebook/pe-av-small",
+            help="HuggingFace model name for PE-A (default: facebook/pe-av-small).",
+        )
+        parser.add_argument(
+            "--pea-emotion-sample-rate",
+            type=int,
+            default=16000,
+            help="Sample rate used by the PE-A emotion model (default: 16000).",
+        )
+        parser.add_argument(
+            "--pea-emotion-loss-every-n-steps",
+            type=int,
+            default=1,
+            help=(
+                "Compute PE-A emotion loss every N generator steps "
+                "(default: 1; recommended 4 for speed)."
+            ),
+        )
+        parser.add_argument(
+            "--pea-emotion-warmup-steps",
+            type=int,
+            default=0,
+            help=(
+                "Delay PE-A emotion loss until this many global steps have "
+                "elapsed (default: 0; recommended 2000)."
+            ),
+        )
+        parser.add_argument(
+            "--pea-emotion-margin",
+            type=float,
+            default=0.1,
+            help="Cosine margin for PE-A target-vs-other margin loss (default: 0.1).",
+        )
         parser.add_argument(
             "--num-workers",
             type=int,

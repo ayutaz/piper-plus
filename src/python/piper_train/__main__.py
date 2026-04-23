@@ -474,12 +474,40 @@ def apply_transfer_defaults(
         )
 
 
+def _validate_pea_emotion_args(
+    parser: argparse.ArgumentParser, args: argparse.Namespace
+) -> None:
+    """Fail fast when PE-A emotion loss is half-configured.
+
+    If any of the three PE-A weight flags is positive, a style bank path
+    must also be supplied. The underlying ``_init_pea_emotion_loss`` raises
+    ``ValueError`` in that case, but we surface the problem as a friendlier
+    argparse error so the user sees the CLI usage banner rather than a
+    Python stack trace.
+    """
+    any_pea_weight_positive = (
+        getattr(args, "pea_emotion_loss_weight", 0.0) > 0
+        or getattr(args, "pea_emotion_centroid_weight", 0.0) > 0
+        or getattr(args, "pea_emotion_margin_weight", 0.0) > 0
+    )
+    if any_pea_weight_positive and not getattr(
+        args, "pea_emotion_style_bank", None
+    ):
+        parser.error(
+            "--pea-emotion-style-bank is required when any of "
+            "--pea-emotion-loss-weight / --pea-emotion-centroid-weight / "
+            "--pea-emotion-margin-weight is greater than 0."
+        )
+
+
 def main():
     logging.basicConfig(level=logging.DEBUG)
 
     parser = create_parser()
     args = parser.parse_args()
     _LOGGER.debug(args)
+
+    _validate_pea_emotion_args(parser, args)
 
     args.dataset_dir = Path(args.dataset_dir)
 
