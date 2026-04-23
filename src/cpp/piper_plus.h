@@ -101,7 +101,17 @@ typedef struct PiperPlusSynthOptions {
     float   sentence_silence_sec;       /* Silence between sentences in sec (default: 0.2) */
     const float *speaker_embedding;     /* Voice cloning: float32 embedding (NULL = use speaker_id) */
     int32_t      speaker_embedding_dim; /* Number of elements in speaker_embedding (0 = disabled) */
-    int32_t _reserved[5];               /* Must be zero */
+
+    /* Phase 2 (P2-T03): Style vector conditioning (PE-AV / PE-A). */
+    const float *style_vector;          /* Optional float32 style vector (NULL = use zeros + mask=0) */
+    int32_t      style_vector_dim;      /* Number of elements in style_vector (0 = disabled for this call) */
+
+    int32_t _reserved[3];               /* Must be zero.
+                                         * ABI NOTE: _reserved shrunk from [5] to [3]
+                                         * to absorb two new pointer/int fields while
+                                         * keeping sizeof(PiperPlusSynthOptions) stable
+                                         * on 64-bit platforms (sizeof(const float*)=8,
+                                         * sizeof(int32_t)=4, padding absorbs the rest). */
 } PiperPlusSynthOptions;
 
 /* ===== Lifecycle ===== */

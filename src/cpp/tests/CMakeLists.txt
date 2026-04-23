@@ -622,6 +622,73 @@ target_link_libraries(test_phoneme_timing
 
 add_test(NAME test_phoneme_timing COMMAND test_phoneme_timing)
 
+# Phase 2 (P2-T03): style_vector ABI + defaults tests.
+# Header-only struct checks; no ONNX runtime linkage needed.
+add_executable(test_style_vector
+    test_style_vector.cpp
+    ../piper_plus_c_api.cpp
+    $<TARGET_OBJECTS:piper_common>
+)
+target_link_libraries(test_style_vector PRIVATE
+    gtest
+    gtest_main
+)
+target_compile_definitions(test_style_vector PRIVATE
+    PIPER_PLUS_BUILDING_DLL
+    _PIPER_VERSION=${piper_version}
+)
+target_include_directories(test_style_vector PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+    ${CMAKE_BINARY_DIR}/fi/include
+    ${CMAKE_BINARY_DIR}/si/include
+    ${ORT_INCLUDE_DIR}
+    ${CMAKE_BINARY_DIR}/oj/include
+    ${CMAKE_BINARY_DIR}/oj/include/openjtalk
+)
+target_link_directories(test_style_vector PRIVATE
+    ${CMAKE_BINARY_DIR}/fi/lib
+    ${CMAKE_BINARY_DIR}/si/lib
+    ${ORT_LIB_DIR}
+)
+if(WIN32)
+    target_link_libraries(test_style_vector PRIVATE
+        optimized ${CMAKE_BINARY_DIR}/fi/lib/fmt.lib
+        debug ${CMAKE_BINARY_DIR}/fi/lib/fmtd.lib
+        optimized ${CMAKE_BINARY_DIR}/si/lib/spdlog.lib
+        debug ${CMAKE_BINARY_DIR}/si/lib/spdlogd.lib
+        ${ORT_LIB_DIR}/onnxruntime.lib
+    )
+    target_link_libraries(test_style_vector PRIVATE ${CMAKE_BINARY_DIR}/oj/lib/openjtalk.lib)
+else()
+    target_link_libraries(test_style_vector PRIVATE
+        fmt
+        spdlog
+        onnxruntime
+    )
+    target_link_libraries(test_style_vector PRIVATE ${CMAKE_BINARY_DIR}/oj/lib/libopenjtalk.a)
+endif()
+if(TARGET hts_engine_stub)
+    target_link_libraries(test_style_vector PRIVATE hts_engine_stub)
+endif()
+if(UNIX)
+    find_package(Threads REQUIRED)
+    target_link_libraries(test_style_vector PRIVATE Threads::Threads)
+    if(NOT APPLE)
+        target_link_libraries(test_style_vector PRIVATE dl)
+    endif()
+endif()
+if(TARGET fmt_external)
+    add_dependencies(test_style_vector fmt_external)
+endif()
+if(TARGET spdlog_external)
+    add_dependencies(test_style_vector spdlog_external)
+endif()
+if(TARGET openjtalk_external)
+    add_dependencies(test_style_vector openjtalk_external)
+endif()
+add_test(NAME test_style_vector COMMAND test_style_vector)
+set_tests_properties(test_style_vector PROPERTIES TIMEOUT 30)
+
 # ---- test_library_path: library_path.c unit tests ----
 add_executable(test_library_path
     test_library_path.cpp
