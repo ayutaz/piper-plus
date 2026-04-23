@@ -4,7 +4,7 @@
 |------|-----|
 | Phase | 4 |
 | マイルストーン | [#14](https://github.com/ayutaz/piper-plus/milestone/14) |
-| ステータス | 未着手 |
+| ステータス | 完了 |
 | 優先度 | 高 |
 | Claude Code 工数 | 1〜2h |
 | 依存チケット | P4-T01 (loader), P4-T02 (loss), P4-T03 (統合), P4-T04 (CLI) |
