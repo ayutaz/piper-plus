@@ -4,7 +4,7 @@
 |------|-----|
 | Phase | 4 |
 | マイルストーン | [#14](https://github.com/ayutaz/piper-plus/milestone/14) |
-| ステータス | 未着手 |
+| ステータス | 完了 |
 | 優先度 | 高 |
 | Claude Code 工数 | 2〜3h |
 | 依存チケット | P0 (PE-A loader), P3-T02 (style bank 生成) |

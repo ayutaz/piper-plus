@@ -1,8 +1,11 @@
 import logging
+import types
 from pathlib import Path
 
+import numpy as np
 import pytorch_lightning as pl
 import torch
+import torchaudio.functional as AF
 from torch import autocast
 from torch.nn import functional as F
 from torch.utils.data import DataLoader, Dataset, random_split
@@ -125,6 +128,18 @@ class VitsModel(pl.LightningModule):
         wavlm_model_name: str = "microsoft/wavlm-base-plus",
         c_wavlm: float = 0.5,
         wavlm_every_n_steps: int = 1,
+        # PE-A emotion perceptual loss (Phase 4 / PR-F)
+        # All weights default to 0.0 so the loss is disabled unless the user
+        # opts in via ``--pea-emotion-*`` flags in ``__main__.py``.
+        pea_emotion_loss_weight: float = 0.0,
+        pea_emotion_centroid_weight: float = 0.0,
+        pea_emotion_margin_weight: float = 0.0,
+        pea_emotion_style_bank: str | Path | None = None,
+        pea_emotion_model_name: str = "facebook/pe-av-small",
+        pea_emotion_sample_rate: int = 16000,
+        pea_emotion_loss_every_n_steps: int = 1,
+        pea_emotion_warmup_steps: int = 0,
+        pea_emotion_margin: float = 0.1,
         **kwargs,
     ):
         super().__init__()
@@ -187,6 +202,15 @@ class VitsModel(pl.LightningModule):
                 model_name=self.hparams.wavlm_model_name,
                 source_sample_rate=self.hparams.sample_rate,
             )
+
+        # PE-A emotion perceptual loss state (Phase 4 / PR-F).
+        # ``_pea_emotion_model`` is lazily loaded the first time
+        # ``_compute_pea_emotion_loss`` is invoked (see P4-T02).
+        # Must be assigned AFTER save_hyperparameters() so the hparams
+        # snapshot of the 9 pea_emotion_* kwargs is already captured.
+        self._pea_emotion_model = None
+        self._pea_emotion_to_idx: dict[str, int] = {}
+        self._init_pea_emotion_loss()
 
         # Dataset splits
         self._train_dataset: Dataset | None = None
@@ -326,6 +350,117 @@ class VitsModel(pl.LightningModule):
                 [train_set_size, num_test_examples, valid_set_size],
                 generator=split_generator,
             )
+
+    # ------------------------------------------------------------------
+    # PE-A emotion perceptual loss (Phase 4 / PR-F)
+    # ------------------------------------------------------------------
+
+    def _pea_emotion_loss_enabled(self) -> bool:
+        """Return True when any PE-A emotion loss weight is positive.
+
+        Fork-compatible auto-enable: the three loss weights act as implicit
+        enable flags so we do not need a separate ``--pea-emotion-enabled``
+        CLI option. All weights defaulting to 0.0 keeps the feature off for
+        existing training runs.
+        """
+        return (
+            self.hparams.pea_emotion_loss_weight > 0
+            or self.hparams.pea_emotion_centroid_weight > 0
+            or self.hparams.pea_emotion_margin_weight > 0
+        )
+
+    def _init_pea_emotion_loss(self) -> None:
+        """Load the style bank and register emotion centroids as buffers.
+
+        Called once from ``__init__`` after ``save_hyperparameters()``. When
+        the loss is disabled (all weights == 0) this is a no-op so existing
+        training runs see zero overhead.
+
+        Raises
+        ------
+        ValueError
+            If the loss is enabled but ``--pea-emotion-style-bank`` was not
+            supplied.
+        """
+        if not self._pea_emotion_loss_enabled():
+            return
+
+        style_bank = self.hparams.pea_emotion_style_bank
+        if not style_bank:
+            raise ValueError(
+                "--pea-emotion-style-bank is required when PE-A emotion loss is enabled"
+            )
+
+        # Use the shared loader so the .npz schema stays in lock-step with
+        # piper_train.tools.build_pea_style_bank / validate_style_bank.
+        from piper_train.perception.pea_loader import load_style_bank
+
+        emotion_names, emotion_centroids, global_centroid = load_style_bank(
+            Path(style_bank)
+        )
+
+        self._pea_emotion_to_idx = {
+            name: idx for idx, name in enumerate(emotion_names)
+        }
+        # L2-normalise both centroid arrays before registering so downstream
+        # cosine similarity / direction maths consume unit-norm vectors.
+        self.register_buffer(
+            "pea_emotion_global_centroid",
+            F.normalize(global_centroid, dim=-1),
+            persistent=False,
+        )
+        self.register_buffer(
+            "pea_emotion_centroids",
+            F.normalize(emotion_centroids, dim=-1),
+            persistent=False,
+        )
+        _LOGGER.info(
+            "PE-A emotion loss enabled: style_bank=%s, emotions=%s",
+            style_bank,
+            ",".join(emotion_names),
+        )
+
+    def _ensure_pea_emotion_model(self):
+        """Lazily load the PE-A audio model.
+
+        The model is loaded on the first call and cached on the instance.
+        Call sites should invoke this from
+        ``_compute_pea_emotion_loss`` so that when the loss is disabled no
+        PE-A weights are ever downloaded or held in GPU memory.
+
+        The loaded model is moved to ``self.device`` and its audio embedder
+        is monkey-patched to use :func:`grad_enabled_embedder_forward` so
+        gradients flow back to ``y_hat`` while PE-A weights stay frozen.
+        """
+        if self._pea_emotion_model is not None:
+            return self._pea_emotion_model
+
+        from piper_train.perception.pea_loader import (
+            grad_enabled_embedder_forward,
+            load_pea_emotion_model,
+        )
+
+        model = load_pea_emotion_model(
+            self.hparams.pea_emotion_model_name,
+            device=self.device,
+        )
+
+        # Rebind the DAC embedder to the grad-enabled forward (fork 314b3355
+        # approach). The attribute path mirrors Transformers PE-A.
+        try:
+            embedder = model.audio_model.audio_encoder.embedder
+        except AttributeError as err:
+            raise AttributeError(
+                "Unexpected PE-A model layout: expected "
+                "model.audio_model.audio_encoder.embedder. "
+                f"Underlying error: {err}"
+            ) from err
+        embedder.forward = types.MethodType(
+            grad_enabled_embedder_forward, embedder
+        )
+
+        self._pea_emotion_model = model
+        return self._pea_emotion_model
 
     def forward(
         self,
