@@ -462,6 +462,158 @@ class VitsModel(pl.LightningModule):
         self._pea_emotion_model = model
         return self._pea_emotion_model
 
+    def _compute_pea_emotion_loss(
+        self,
+        y_hat: torch.Tensor,
+        batch: Batch,
+    ) -> torch.Tensor | None:
+        """Compute the 3-term PE-A emotion perceptual loss.
+
+        Composition (fork 314b3355 ``lightning.py:298-382`` faithful port)::
+
+            loss = w_dir      * (1 - cos(e_dir,     t_dir))
+                 + w_centroid * (1 - cos(embeddings, target_centroids))
+                 + w_margin   * ReLU(margin + max_other_sim - target_sim)
+
+        where ``e_dir = normalize(embeddings - global_centroid)`` and
+        ``t_dir = normalize(target_centroids - global_centroid)``.
+
+        Ticket design: this method contains the numerical calculation only.
+        Warmup / ``every_n_steps`` gating lives in ``training_step_g`` (see
+        P4-T03) so the loss computation stays pure and unit-testable.
+
+        Returns
+        -------
+        torch.Tensor | None
+            Scalar tensor when loss is produced. ``None`` when the loss is
+            disabled (all weights ≤ 0), the batch carries no ``emotions``
+            field, no sample's emotion is in the style bank, or the loss
+            value contains ``NaN``/``Inf`` (guard with warning log).
+        """
+
+        # --- Guard 1: fully disabled → zero overhead bail-out ---
+        if not self._pea_emotion_loss_enabled():
+            return None
+
+        emotions = getattr(batch, "emotions", None)
+        # --- Guard 2: no emotion labels in this batch ---
+        if not emotions:
+            return None
+
+        # Filter batch samples that have a label present in the style bank.
+        valid_indices = [
+            idx
+            for idx, emotion in enumerate(emotions)
+            if emotion in self._pea_emotion_to_idx
+        ]
+        if not valid_indices:
+            return None
+
+        sample_indices = torch.as_tensor(valid_indices, device=y_hat.device)
+        emotion_indices = torch.as_tensor(
+            [self._pea_emotion_to_idx[emotions[idx]] for idx in valid_indices],
+            device=y_hat.device,
+            dtype=torch.long,
+        )
+
+        # --- Resample audio to PE-A's expected rate (16 kHz default) ---
+        # y_hat is typically [B, 1, T] from the generator; index_select on
+        # dim 0 keeps the channel axis intact which torchaudio handles fine.
+        audio = y_hat.index_select(0, sample_indices).float()
+        if self.hparams.sample_rate != self.hparams.pea_emotion_sample_rate:
+            audio = AF.resample(
+                audio,
+                orig_freq=int(self.hparams.sample_rate),
+                new_freq=int(self.hparams.pea_emotion_sample_rate),
+            )
+
+        # --- Extract L2-normalised embeddings (DAC gradient-control inside
+        # the embedder's monkey-patched forward) ---
+        pea_model = self._ensure_pea_emotion_model()
+        embeddings = pea_model.get_audio_embeds(audio)
+        # ModelOutput fallback: some wrapper variants return an object with
+        # an ``audio_embeds`` attribute instead of a raw tensor.
+        if hasattr(embeddings, "audio_embeds"):
+            embeddings = embeddings.audio_embeds
+        embeddings = F.normalize(embeddings.float(), dim=-1)
+
+        # --- Gather target centroids ---
+        centroids = self.pea_emotion_centroids.to(
+            device=embeddings.device, dtype=embeddings.dtype
+        )
+        global_centroid = self.pea_emotion_global_centroid.to(
+            device=embeddings.device, dtype=embeddings.dtype
+        )
+        target_centroids = centroids.index_select(0, emotion_indices)
+
+        # --- 3-term composition ---
+        loss = embeddings.new_zeros(())
+
+        # Direction loss (always computed to give us a scalar for logging,
+        # but only added to the total when w_direction > 0).
+        target_dirs = F.normalize(
+            target_centroids - global_centroid.unsqueeze(0), dim=-1
+        )
+        embedding_dirs = F.normalize(
+            embeddings - global_centroid.unsqueeze(0), dim=-1
+        )
+        loss_dir = (
+            1.0 - F.cosine_similarity(embedding_dirs, target_dirs, dim=-1).mean()
+        )
+        if self.hparams.pea_emotion_loss_weight > 0:
+            loss = loss + loss_dir * self.hparams.pea_emotion_loss_weight
+            self._log_with_batch_info("loss_pea_emotion_dir", loss_dir, batch)
+
+        # Centroid loss: 1 - cos(embedding, target) — fork implementation
+        # uses angular distance, NOT L2 (norm-invariant, more stable under
+        # SimCLR/CLIP-style conventions). See P4-T02 §6.1 for rationale.
+        if self.hparams.pea_emotion_centroid_weight > 0:
+            loss_centroid = 1.0 - F.cosine_similarity(
+                embeddings, target_centroids, dim=-1
+            ).mean()
+            loss = loss + loss_centroid * self.hparams.pea_emotion_centroid_weight
+            self._log_with_batch_info(
+                "loss_pea_emotion_centroid", loss_centroid, batch
+            )
+
+        # Margin hinge: push ``target_similarity`` at least ``margin``
+        # ahead of the best non-target centroid. ``masked_fill`` avoids
+        # touching the ``similarities`` tensor in-place so autograd stays
+        # happy (fork 314b3355 uses the same pattern).
+        if self.hparams.pea_emotion_margin_weight > 0:
+            similarities = embeddings @ centroids.transpose(0, 1)
+            target_similarity = similarities.gather(
+                1, emotion_indices[:, None]
+            )
+            other_similarities = similarities.masked_fill(
+                F.one_hot(
+                    emotion_indices, num_classes=centroids.size(0)
+                ).bool(),
+                -1.0,
+            )
+            max_other_similarity = other_similarities.max(
+                dim=1, keepdim=True
+            ).values
+            loss_margin = F.relu(
+                self.hparams.pea_emotion_margin
+                + max_other_similarity
+                - target_similarity
+            ).mean()
+            loss = loss + loss_margin * self.hparams.pea_emotion_margin_weight
+            self._log_with_batch_info("loss_pea_emotion_margin", loss_margin, batch)
+
+        # --- NaN/Inf guard: skip this step if the loss degenerated ---
+        if not torch.isfinite(loss).all():
+            _LOGGER.warning(
+                "PE-A emotion loss produced non-finite value at step=%d; "
+                "skipping loss contribution for this step.",
+                int(self.global_step),
+            )
+            return None
+
+        self._log_with_batch_info("loss_pea_emotion", loss, batch)
+        return loss
+
     def forward(
         self,
         text,
