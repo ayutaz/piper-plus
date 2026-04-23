@@ -50,6 +50,32 @@ public sealed class PiperModel : IDisposable
         // Detect voice cloning capability (speaker_embedding + speaker_embedding_mask).
         HasSpeakerEmbedding = _session.InputMetadata.ContainsKey("speaker_embedding");
 
+        // Phase 2 (P2-T05): Detect style_vector conditioning capability.
+        HasStyleVector = _session.InputMetadata.ContainsKey("style_vector");
+        if (HasStyleVector)
+        {
+            // Resolution order: ONNX custom metadata → ONNX input shape → 0.
+            StyleVectorDim = 0;
+
+            var customMeta = _session.ModelMetadata.CustomMetadataMap;
+            if (customMeta != null
+                && customMeta.TryGetValue("style_vector_dim", out var dimStr)
+                && int.TryParse(dimStr, out var dimFromMeta))
+            {
+                StyleVectorDim = dimFromMeta;
+            }
+
+            if (StyleVectorDim <= 0
+                && _session.InputMetadata.TryGetValue("style_vector", out var styleMeta))
+            {
+                // Dimensions[1] is the dim (axis 0 is dynamic batch).
+                if (styleMeta.Dimensions.Length >= 2 && styleMeta.Dimensions[1] > 0)
+                {
+                    StyleVectorDim = styleMeta.Dimensions[1];
+                }
+            }
+        }
+
         SampleRate = config.Audio.SampleRate;
 
         // Hop size needed for durations-based Strategy A trim (issue #356).
@@ -93,6 +119,20 @@ public sealed class PiperModel : IDisposable
     /// and <c>speaker_embedding_mask</c> (int64) inputs for voice cloning.
     /// </summary>
     public bool HasSpeakerEmbedding { get; }
+
+    /// <summary>
+    /// Phase 2 (P2-T05): <c>true</c> when the model accepts
+    /// <c>style_vector</c> (float32) and <c>style_vector_mask</c>
+    /// (int64) inputs for PE-AV / PE-A style conditioning.
+    /// </summary>
+    public bool HasStyleVector { get; }
+
+    /// <summary>
+    /// Expected <c>style_vector</c> dimension. Resolved from ONNX custom
+    /// metadata (<c>style_vector_dim</c>) first, falling back to the ONNX
+    /// input shape. 0 when the feature is not present.
+    /// </summary>
+    public int StyleVectorDim { get; }
 
     /// <summary>
     /// Audio sample rate in Hz, sourced from the accompanying config.json.
