@@ -4,7 +4,7 @@
 |------|-----|
 | Phase | 5 |
 | マイルストーン | [#15](https://github.com/ayutaz/piper-plus/milestone/15) |
-| ステータス | 未着手 |
+| ステータス | スクリプト準備完了 (実 GPU 学習は 2 日、別セッションで実行) |
 | 優先度 | 最高 (T03/T04/T05 の前提) |
 | Claude Code 工数 | 1h (実装・起動・監視) + GPU 2 日 (バックグラウンド学習) |
 | 依存チケット | P5-T01 (dataset 準備), Phase 1 全タスク (CLI/models/dataset), Phase 4 全タスク (PE-A loss、Stage 5b 時のみ必須、Stage 5a は style conditioning のみ) |
