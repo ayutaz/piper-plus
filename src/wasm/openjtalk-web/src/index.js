@@ -380,6 +380,9 @@ export class PiperPlus {
    * @param {number} [options.noiseScale]
    * @param {number} [options.lengthScale]
    * @param {number} [options.noiseW]
+   * @param {Float32Array} [options.styleVector] - Phase 2 P2-T07: optional style
+   *   vector for PE-AV / PE-A style conditioning. Length must match the model's
+   *   `style_vector_dim`. When omitted, zeros + mask=0 are sent (style disabled).
    * @returns {Promise<AudioResult>}
    */
   async synthesize(text, options = {}) {
@@ -390,6 +393,9 @@ export class PiperPlus {
     }
     if (!text) {
       throw new Error('text is required');
+    }
+    if (options.styleVector !== undefined && !(options.styleVector instanceof Float32Array)) {
+      throw new Error('styleVector must be a Float32Array');
     }
 
     const language = options.language || this._detectLanguage(text);
@@ -422,6 +428,7 @@ export class PiperPlus {
       lengthScale,
       noiseW,
       language,
+      styleVector: options.styleVector,
     });
     let audioData = inferResult.audio;
     const durations = inferResult.durations;
@@ -459,7 +466,7 @@ export class PiperPlus {
    *
    * @param {string} text - Text to synthesize.
    * @param {Float32Array} speakerEmbedding - Speaker embedding from SpeakerEncoder.encode().
-   * @param {Object} [options] - Same options as synthesize().
+   * @param {Object} [options] - Same options as synthesize(), incl. styleVector.
    * @returns {Promise<AudioResult>}
    */
   async synthesizeWithVoiceCloning(text, speakerEmbedding, options = {}) {
@@ -473,6 +480,9 @@ export class PiperPlus {
     }
     if (!speakerEmbedding || !(speakerEmbedding instanceof Float32Array)) {
       throw new Error('speakerEmbedding must be a Float32Array');
+    }
+    if (options.styleVector !== undefined && !(options.styleVector instanceof Float32Array)) {
+      throw new Error('styleVector must be a Float32Array');
     }
 
     const language = options.language || this._detectLanguage(text);
@@ -490,6 +500,7 @@ export class PiperPlus {
       noiseW,
       language,
       speakerEmbedding,
+      styleVector: options.styleVector,
     });
     const audioData = inferResult.audio;
     const durations = inferResult.durations;
@@ -796,7 +807,7 @@ export class PiperPlus {
    * Returns raw Float32Array of audio samples.
    * @private
    */
-  async _infer(phonemeIds, prosodyFeatures, { noiseScale, lengthScale, noiseW, language, speakerEmbedding }) {
+  async _infer(phonemeIds, prosodyFeatures, { noiseScale, lengthScale, noiseW, language, speakerEmbedding, styleVector }) {
     const ort = this._ort;
 
     const inputTensor = new ort.Tensor(
@@ -847,6 +858,39 @@ export class PiperPlus {
         new BigInt64Array([1n]),
         [1]
       );
+    }
+
+    // Phase 2 (P2-T07): attach style_vector + style_vector_mask when the
+    // model supports style conditioning. Detect via inputNames exposed by
+    // onnxruntime-web; fall back to simply attaching when styleVector
+    // was passed.
+    const modelInputNames = this._session?.inputNames || [];
+    const hasStyleVectorInput = modelInputNames.includes('style_vector');
+    if (hasStyleVectorInput) {
+      // Determine model-expected dimension. Prefer config-level metadata
+      // (written by export_onnx.py), fall back to styleVector.length, and
+      // fall back further to zeros of length 1 when nothing is known.
+      const configuredDim = this._config?.style_vector_dim
+        ?? this._config?.inference?.style_vector_dim
+        ?? 0;
+
+      let vector;
+      let maskVal;
+      if (styleVector && styleVector.length > 0) {
+        if (configuredDim > 0 && styleVector.length !== configuredDim) {
+          throw new Error(
+            `styleVector length ${styleVector.length} != model style_vector_dim ${configuredDim}`
+          );
+        }
+        vector = styleVector;
+        maskVal = 1n;
+      } else {
+        const dim = configuredDim > 0 ? configuredDim : 1;
+        vector = new Float32Array(dim);
+        maskVal = 0n;
+      }
+      feeds.style_vector = new ort.Tensor('float32', vector, [1, vector.length]);
+      feeds.style_vector_mask = new ort.Tensor('int64', new BigInt64Array([maskVal]), [1]);
     }
 
     // Attach prosody features when the model supports them
