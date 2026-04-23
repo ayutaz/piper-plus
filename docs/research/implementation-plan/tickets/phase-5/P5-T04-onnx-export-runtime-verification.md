@@ -4,7 +4,7 @@
 |------|-----|
 | Phase | 5 |
 | マイルストーン | [#15](https://github.com/ayutaz/piper-plus/milestone/15) |
-| ステータス | 未着手 |
+| ステータス | スクリプト準備完了 (実 runtime 起動は学習済モデル到着後の別セッション) |
 | 優先度 | 高 |
 | Claude Code 工数 | 2〜3h |
 | 依存チケット | P5-T02 (Stage 5a 学習完了), Phase 2 全タスク (ONNX エクスポート + 6 ランタイム style_vector 統合) |
