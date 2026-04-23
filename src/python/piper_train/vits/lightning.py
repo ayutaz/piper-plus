@@ -930,6 +930,28 @@ class VitsModel(pl.LightningModule):
             help="Dimension for prosody feature projection (A1/A2/A3). Default: 16 (enabled)",
         )
         parser.add_argument(
+            "--style-vector-dim",
+            type=int,
+            default=0,
+            help="Dimension of optional utterance-level style vectors. Default: 0 (disabled, backwards-compatible).",
+        )
+        parser.add_argument(
+            "--style-condition-dropout",
+            type=float,
+            default=0.0,
+            help="Dropout probability for style-vector conditioning during training. Default: 0.0.",
+        )
+        parser.add_argument(
+            "--style-condition-mode",
+            choices=("text", "global"),
+            default="global",
+            help=(
+                "Where to inject utterance-level style vectors. "
+                "'global' adds projected style to VITS global conditioning g; "
+                "'text' adds projected style to the scaled text encoder input."
+            ),
+        )
+        parser.add_argument(
             "--num-workers",
             type=int,
             default=2,

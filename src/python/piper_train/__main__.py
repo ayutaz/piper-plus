@@ -296,6 +296,16 @@ def create_parser():
         default=None,
         help="Path to checkpoint to resume from",
     )
+    parser.add_argument(
+        "--load_weights_from_checkpoint",
+        default=None,
+        help=(
+            "Path to checkpoint to load matching model weights from without "
+            "optimizer/trainer state. Shape-aware: tensors with mismatched shape "
+            "are skipped with a warning (useful when extending the architecture, "
+            "e.g. adding style vector conditioning to an existing model)."
+        ),
+    )
     VitsModel.add_model_specific_args(parser)
     parser.add_argument(
         "--compile",
@@ -374,6 +384,60 @@ def load_multispeaker_checkpoint(checkpoint_path: str, model: VitsModel) -> None
         "Multispeaker → single-speaker transfer complete. "
         "Starting training from epoch 0 (optimizer state reset)."
     )
+
+
+def load_checkpoint_weights(checkpoint_path: str, model: VitsModel) -> None:
+    """Load only compatible tensors from a checkpoint and keep new tensors initialized.
+
+    Shape-aware partial load for fine-tuning with architecture change
+    (e.g. extending an existing model with style-vector conditioning).
+
+    - Tensors matching ``model.state_dict()`` key + shape are loaded.
+    - Tensors missing in the checkpoint keep their freshly initialised value.
+    - Tensors present in the checkpoint with mismatched shape are skipped and
+      logged at WARNING level (first 20 shown, remainder counted).
+
+    Args:
+        checkpoint_path: Path to a Lightning ``.ckpt`` or raw ``state_dict``
+            ``.pt``.  ``weights_only=False`` is required to handle PosixPath
+            values (trusted-checkpoints-only policy).
+        model: A :class:`VitsModel` instance to load weights into.
+    """
+    _LOGGER.info("Loading compatible weights from checkpoint: %s", checkpoint_path)
+    checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
+    saved_state_dict = checkpoint.get("state_dict", checkpoint)
+    current_state_dict = model.state_dict()
+    new_state_dict: dict[str, torch.Tensor] = {}
+    loaded = 0
+    kept = 0
+    skipped: list[str] = []
+
+    for key, current_value in current_state_dict.items():
+        saved_value = saved_state_dict.get(key)
+        if saved_value is not None and tuple(saved_value.shape) == tuple(
+            current_value.shape
+        ):
+            new_state_dict[key] = saved_value
+            loaded += 1
+        else:
+            new_state_dict[key] = current_value
+            kept += 1
+            if saved_value is not None:
+                skipped.append(
+                    f"{key}: checkpoint {tuple(saved_value.shape)} != model {tuple(current_value.shape)}"
+                )
+
+    model.load_state_dict(new_state_dict, strict=True)
+    _LOGGER.info(
+        "Loaded %d tensors from checkpoint; kept %d initialized tensors; skipped %d mismatched tensors",
+        loaded,
+        kept,
+        len(skipped),
+    )
+    for item in skipped[:20]:
+        _LOGGER.warning("Skipped mismatched tensor: %s", item)
+    if len(skipped) > 20:
+        _LOGGER.warning("... and %d more mismatched tensors", len(skipped) - 20)
 
 
 def apply_transfer_defaults(
@@ -592,6 +656,9 @@ def main():
             "マルチスピーカーへの転移には --resume_from_single_speaker_checkpoint を使用してください。"
         )
         load_multispeaker_checkpoint(args.resume_from_multispeaker_checkpoint, model)
+
+    if args.load_weights_from_checkpoint:
+        load_checkpoint_weights(args.load_weights_from_checkpoint, model)
 
     # チェックポイントからの再開処理を修正
     if args.resume_from_checkpoint:
