@@ -63,7 +63,9 @@ def build_infer_forward(
             infer_forward(text, text_lengths, scales,
                           sid=None, lid=None, prosody_features=None,
                           speaker_embedding=None,
-                          speaker_embedding_mask=None)
+                          speaker_embedding_mask=None,
+                          style_vector=None,
+                          style_vector_mask=None)
             -> (audio: Tensor, durations: Tensor)
     """
 
@@ -76,6 +78,8 @@ def build_infer_forward(
         prosody_features=None,
         speaker_embedding=None,
         speaker_embedding_mask=None,
+        style_vector=None,
+        style_vector_mask=None,
     ):
         noise_scale = scales[0]
         length_scale = scales[1]
@@ -96,6 +100,26 @@ def build_infer_forward(
         if hasattr(model, "dp"):
             model.dp.onnx_export_mode = not stochastic
 
+        # Apply style_vector_mask before passing to infer():
+        #   mask=0 -> style_vector treated as zeros (no style conditioning)
+        #   mask=1 -> style_vector passed through as-is
+        # This mirrors the speaker_embedding_mask pattern so the ONNX graph
+        # can conditionally enable style conditioning at inference time.
+        effective_style_vector = style_vector
+        if (
+            style_vector is not None
+            and style_vector_mask is not None
+        ):
+            # Broadcast mask [batch, 1] to [batch, dim] and multiply.
+            # When mask=0, style_vector becomes zeros => _add_style_condition
+            # behaves like style_vector=None (no style shift).
+            # Cast mask to float32 explicitly (input is int64 for the ONNX
+            # graph, matching the speaker_embedding_mask contract).
+            mask_f = style_vector_mask.float()
+            if mask_f.dim() == 1:
+                mask_f = mask_f.unsqueeze(-1)
+            effective_style_vector = style_vector * mask_f
+
         try:
             audio, _attn, _y_mask, _latents, durations = model.infer(
                 text,
@@ -108,6 +132,7 @@ def build_infer_forward(
                 prosody_features=prosody_features,
                 speaker_embedding=speaker_embedding,
                 speaker_embedding_mask=speaker_embedding_mask,
+                style_vector=effective_style_vector,
             )
         finally:
             model.onnx_export_mode = prev_model
@@ -263,6 +288,38 @@ def unify_emb_lang_weights(model_g, source: int = 0) -> None:
         source,
         num_languages,
     )
+
+
+def write_style_vector_metadata(
+    onnx_path: Path, style_vector_dim: int, style_condition_mode: str
+) -> None:
+    """Append style_vector_dim / style_condition_mode entries to an ONNX model.
+
+    Uses ``StringStringEntryProto`` which is the correct API for
+    ``metadata_props`` (do NOT use ``onnx.helper.make_attribute_proto`` —
+    that returns an ``AttributeProto`` and is incompatible with the
+    ``StringStringEntryProto`` collection type).
+
+    Existing entries with the same key are preserved (append semantics).
+    Callers that need to avoid duplicates should load → filter → save
+    explicitly.
+    """
+    import onnx  # noqa: PLC0415
+    from onnx import StringStringEntryProto  # noqa: PLC0415
+
+    model_onnx = onnx.load(str(onnx_path))
+
+    dim_entry = StringStringEntryProto()
+    dim_entry.key = "style_vector_dim"
+    dim_entry.value = str(style_vector_dim)
+    model_onnx.metadata_props.append(dim_entry)
+
+    mode_entry = StringStringEntryProto()
+    mode_entry.key = "style_condition_mode"
+    mode_entry.value = str(style_condition_mode)
+    model_onnx.metadata_props.append(mode_entry)
+
+    onnx.save(model_onnx, str(onnx_path))
 
 
 def simplify_onnx_model(onnx_path: Path, check_n: int = 3) -> bool:
@@ -513,6 +570,32 @@ def main() -> None:
         speaker_emb_dim,
     )
 
+    # Style vector inputs (PE-AV / PE-A style conditioning)
+    # Only add to ONNX graph when the generator was trained with
+    # style_vector_dim > 0. dim=0 models keep backward compatibility
+    # (no style_vector input in the graph).
+    style_vector_dim = getattr(model_g, "style_vector_dim", 0)
+    style_condition_mode = getattr(model_g, "style_condition_mode", "global")
+    if style_vector_dim > 0:
+        dummy_style_vector = torch.zeros(
+            1, style_vector_dim, dtype=torch.float32
+        )
+        dummy_style_vector_mask = torch.ones(1, 1, dtype=torch.int64)
+
+        dummy_input_list.append(dummy_style_vector)
+        input_names.append("style_vector")
+        dynamic_axes["style_vector"] = {0: "batch_size"}
+
+        dummy_input_list.append(dummy_style_vector_mask)
+        input_names.append("style_vector_mask")
+        dynamic_axes["style_vector_mask"] = {0: "batch_size"}
+
+        _LOGGER.info(
+            "Exporting model with style_vector support (dim=%d, mode=%s)",
+            style_vector_dim,
+            style_condition_mode,
+        )
+
     dummy_input = tuple(dummy_input_list)
 
     # Export - always include durations output
@@ -532,6 +615,17 @@ def main() -> None:
 
     mode = "stochastic" if args.stochastic else "deterministic"
     _LOGGER.info("Exported model to %s (mode: %s)", args.output, mode)
+
+    # Write style_vector metadata into the ONNX model's metadata_props.
+    if style_vector_dim > 0:
+        write_style_vector_metadata(
+            args.output, style_vector_dim, style_condition_mode
+        )
+        _LOGGER.info(
+            "Wrote style_vector metadata: dim=%d, mode=%s",
+            style_vector_dim,
+            style_condition_mode,
+        )
 
     # Apply ONNX simplification if requested
     # Skip simplification for prosody models to avoid numerical precision issues
@@ -565,6 +659,22 @@ def main() -> None:
             fp16_size / (1024 * 1024),
             reduction_pct,
         )
+
+    # Re-inject style_vector metadata if simplify or FP16 conversion stripped it.
+    # onnx-simplifier and some FP16 conversion paths drop metadata_props
+    # during serialization round-trip; we restore it here as the final step.
+    if style_vector_dim > 0 and (args.simplify or not args.no_fp16):
+        import onnx as _onnx  # noqa: PLC0415
+
+        model_onnx = _onnx.load(str(args.output))
+        existing_keys = {entry.key for entry in model_onnx.metadata_props}
+        if "style_vector_dim" not in existing_keys:
+            write_style_vector_metadata(
+                args.output, style_vector_dim, style_condition_mode
+            )
+            _LOGGER.info(
+                "Re-injected style_vector metadata after post-processing"
+            )
 
 
 # -----------------------------------------------------------------------------
