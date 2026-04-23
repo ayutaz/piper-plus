@@ -4,7 +4,7 @@
 |------|-----|
 | Phase | 5 |
 | マイルストーン | [#15](https://github.com/ayutaz/piper-plus/milestone/15) |
-| ステータス | 未着手 |
+| ステータス | テンプレート作成完了 (学習完了後に §3〜§6 の TODO を埋める) |
 | 優先度 | 高 |
 | Claude Code 工数 | 2〜3h |
 | 依存チケット | P5-T01, P5-T02, P5-T03, P5-T04 (全 Phase 5 タスク完了) |
