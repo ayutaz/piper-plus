@@ -80,6 +80,24 @@ train = [
     "onnxsim-prebuilt",
 ]
 
+# Phase 4 PE-A Emotion Loss backend.
+#
+# Meta's facebook/pe-av-small is not wired into transformers' AutoConfig,
+# so the loader falls back to the reference code in
+# `facebookresearch/perception_models`. The PE-AV weights are Apache-2.0
+# (LICENSE.PE), so this extra is safe to combine with piper-plus (MIT).
+#
+# Install:
+#     uv sync --extra pea
+#
+# The git dependency also pulls several heavy transitive requirements
+# (torchcodec, decord, opencv-python, tiktoken, ...) that are NOT needed
+# for Phase 4 PE-A loss. If you hit resolver conflicts, pin `perception-models`
+# to a specific commit or clone + `uv pip install --no-deps` manually.
+pea = [
+    "perception-models @ git+https://github.com/facebookresearch/perception_models.git",
+]
+
 dev = [
     "black==26.3.1",
     "flake8==6.1.0",

@@ -317,6 +317,7 @@ def load_pea_model(
     hint = (
         "PE-A model could not be loaded. Tried (A) transformers AutoModel and "
         "(B) perception_models. Install options:\n"
+        "  1) uv sync --extra pea   (recommended; pulls the git dep from pyproject.toml)\n"
         "  A) pip install transformers>=4.40  (requires upstream model_type=pe_audio_video support)\n"
         "  B) pip install git+https://github.com/facebookresearch/perception_models.git\n"
         "Errors:\n  - " + "\n  - ".join(errors)
