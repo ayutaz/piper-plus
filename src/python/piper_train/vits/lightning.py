@@ -99,6 +99,9 @@ class VitsModel(pl.LightningModule):
         use_sdp: bool = True,
         segment_size: int = 8192,
         prosody_dim: int = 16,
+        style_vector_dim: int = 0,
+        style_condition_dropout: float = 0.0,
+        style_condition_mode: str = "global",
         # training
         dataset: list[str | Path] | None = None,
         learning_rate: float = 2e-4,
@@ -128,10 +131,17 @@ class VitsModel(pl.LightningModule):
         self.automatic_optimization = (
             False  # Multiple optimizers require manual optimization
         )
+        if style_condition_mode not in {"global", "text"}:
+            raise ValueError(
+                "style_condition_mode must be either 'global' or 'text', "
+                f"got {style_condition_mode!r}"
+            )
 
         # Fix gin_channels BEFORE save_hyperparameters() so the correct value is saved
         # This fixes the bug where gin_channels=0 was saved for multi-speaker models
         if (num_speakers > 1 or num_languages > 1) and (gin_channels <= 0):
+            gin_channels = 512
+        if (style_vector_dim > 0) and (gin_channels <= 0):
             gin_channels = 512
 
         self.save_hyperparameters()
@@ -159,6 +169,9 @@ class VitsModel(pl.LightningModule):
             gin_channels=self.hparams.gin_channels,
             use_sdp=self.hparams.use_sdp,
             prosody_dim=self.hparams.prosody_dim,
+            style_vector_dim=self.hparams.style_vector_dim,
+            style_condition_dropout=self.hparams.style_condition_dropout,
+            style_condition_mode=self.hparams.style_condition_mode,
         )
         self.model_d = MultiPeriodDiscriminator(
             use_spectral_norm=self.hparams.use_spectral_norm
@@ -315,7 +328,14 @@ class VitsModel(pl.LightningModule):
             )
 
     def forward(
-        self, text, text_lengths, scales, sid=None, lid=None, prosody_features=None
+        self,
+        text,
+        text_lengths,
+        scales,
+        sid=None,
+        lid=None,
+        prosody_features=None,
+        style_vector=None,
     ):
         noise_scale = scales[0]
         length_scale = scales[1]
@@ -329,6 +349,7 @@ class VitsModel(pl.LightningModule):
             sid=sid,
             lid=lid,
             prosody_features=prosody_features,
+            style_vector=style_vector,
         )
 
         return audio
@@ -522,6 +543,7 @@ class VitsModel(pl.LightningModule):
             speaker_ids,
             language_ids,
             prosody_features,
+            style_vectors,
         ) = (
             batch.phoneme_ids,
             batch.phoneme_lengths,
@@ -532,6 +554,7 @@ class VitsModel(pl.LightningModule):
             batch.speaker_ids if batch.speaker_ids is not None else None,
             batch.language_ids if batch.language_ids is not None else None,
             batch.prosody_features if batch.prosody_features is not None else None,
+            batch.style_vectors if batch.style_vectors is not None else None,
         )
         (
             y_hat,
@@ -549,6 +572,7 @@ class VitsModel(pl.LightningModule):
             speaker_ids,
             lid=language_ids,
             prosody_features=prosody_features,
+            style_vector=style_vectors,
         )
         self._y_hat = y_hat.contiguous()
 
