@@ -4,7 +4,7 @@
 |------|-----|
 | Phase | 5 |
 | マイルストーン | [#15](https://github.com/ayutaz/piper-plus/milestone/15) |
-| ステータス | 未着手 |
+| ステータス | スクリプト + 10 テスト PASS (実学習済モデル到着後に inference 部分を接続) |
 | 優先度 | 高 |
 | Claude Code 工数 | 4〜6h (学習完了後) |
 | 依存チケット | P5-T02 (Stage 5a 学習完了) |
