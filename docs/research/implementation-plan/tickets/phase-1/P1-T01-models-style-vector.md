@@ -4,7 +4,7 @@
 |------|-----|
 | Phase | 1 |
 | マイルストーン | [#11](https://github.com/ayutaz/piper-plus/milestone/11) |
-| ステータス | 未着手 |
+| ステータス | 完了 |
 | 優先度 | 高 |
 | Claude Code 工数 | 30分〜1h |
 | 依存チケット | P0-T03 (embedding 次元確定) |
