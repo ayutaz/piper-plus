@@ -11,6 +11,7 @@ See:
 """
 
 import logging
+import time
 
 import torch
 import torch.nn.functional as F
@@ -159,12 +160,72 @@ def test_inference(model: torch.nn.Module) -> torch.Tensor:
     )
 
 
+def benchmark(model: torch.nn.Module, n_runs: int = 5) -> float:
+    """Benchmark inference latency and peak GPU memory.
+
+    Performs 1 warmup run (not counted) followed by ``n_runs`` timed runs
+    on 16 kHz, 3-second mono audio. On CUDA devices, ``torch.cuda.synchronize``
+    is called before/after each run to get reliable wall clock times, and
+    ``torch.cuda.max_memory_allocated`` reports peak GPU memory usage.
+
+    Args:
+        model: Loaded and `.eval()`-ed PE-A model.
+        n_runs: Number of timed runs (excluding warmup).
+
+    Returns:
+        Average latency in milliseconds across ``n_runs``.
+    """
+    device = next(model.parameters()).device
+    _LOGGER.info("Benchmarking on device: %s", device)
+
+    if device.type == "cuda":
+        torch.cuda.reset_peak_memory_stats(device)
+
+    def _run() -> None:
+        audio = torch.randn(1, 16000 * 3, device=device)
+        with torch.no_grad():
+            _invoke_model(model, audio)
+
+    _LOGGER.info("Warmup run...")
+    if device.type == "cuda":
+        torch.cuda.synchronize(device)
+    _run()
+    if device.type == "cuda":
+        torch.cuda.synchronize(device)
+
+    times_ms: list[float] = []
+    for i in range(n_runs):
+        if device.type == "cuda":
+            torch.cuda.synchronize(device)
+        start = time.perf_counter()
+        _run()
+        if device.type == "cuda":
+            torch.cuda.synchronize(device)
+        elapsed_ms = (time.perf_counter() - start) * 1000.0
+        times_ms.append(elapsed_ms)
+        _LOGGER.info("Run %d: %.2f ms", i + 1, elapsed_ms)
+
+    avg_ms = sum(times_ms) / len(times_ms)
+    _LOGGER.info("Average latency over %d runs: %.2f ms", n_runs, avg_ms)
+
+    if device.type == "cuda":
+        peak_mb = torch.cuda.max_memory_allocated(device) / (1024**2)
+        _LOGGER.info("Peak GPU memory: %.1f MB", peak_mb)
+
+    return avg_ms
+
+
 if __name__ == "__main__":
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
-    _LOGGER.info("=== Phase 0 PoC: facebook/pe-av-small (loading + inference) ===")
+    _LOGGER.info("=== Phase 0 PoC: facebook/pe-av-small (loading + inference + benchmark) ===")
     model = test_loading()
-    test_inference(model)
-    _LOGGER.info("=== Inference test complete ===")
+    embeddings = test_inference(model)
+    avg_ms = benchmark(model)
+    _LOGGER.info(
+        "=== PoC complete: embedding_dim=%d, avg_latency=%.2fms ===",
+        embeddings.size(-1),
+        avg_ms,
+    )
