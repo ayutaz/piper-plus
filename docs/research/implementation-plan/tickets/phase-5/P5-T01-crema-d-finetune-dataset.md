@@ -4,7 +4,7 @@
 |------|-----|
 | Phase | 5 |
 | マイルストーン | [#15](https://github.com/ayutaz/piper-plus/milestone/15) |
-| ステータス | 未着手 |
+| ステータス | 完了 (スクリプト + 10 テスト PASS、実機 CREMA-D DL は P3-T01 後の別セッション) |
 | 優先度 | 最高 (T02 学習の前提) |
 | Claude Code 工数 | 2〜3h |
 | 依存チケット | P3-T01 (CREMA-D DL), P3-T02 (style bank 生成), P3-T03 (inject style labels), Phase 1 全タスク (dataset.jsonl 拡張フィールド受入れ) |
