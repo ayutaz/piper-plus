@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -52,6 +53,10 @@ var (
 	referenceAudio      string // --reference-audio PATH
 	speakerEmbedding    string // --speaker-embedding PATH
 	speakerEncoderModel string // --speaker-encoder-model PATH
+
+	// Phase 2 (P2-T06): Style vector conditioning flags
+	styleVectorPath   string // --style-vector PATH (.npy)
+	styleVectorInline string // --style-vector-inline "0.1,0.2,..."
 )
 
 // jsonlInput represents a single line of JSONL input from stdin or batch file.
@@ -108,6 +113,10 @@ func init() {
 	f.StringVar(&referenceAudio, "reference-audio", "", "reference audio file for voice cloning (WAV)")
 	f.StringVar(&speakerEmbedding, "speaker-embedding", "", "pre-computed speaker embedding file (raw binary float32)")
 	f.StringVar(&speakerEncoderModel, "speaker-encoder-model", "", "speaker encoder ONNX model path")
+
+	// Phase 2 (P2-T06): Style vector conditioning flags
+	f.StringVar(&styleVectorPath, "style-vector", "", "path to style vector .npy file (float32)")
+	f.StringVar(&styleVectorInline, "style-vector-inline", "", "inline style vector (comma-separated float32 values)")
 
 	rootCmd.AddCommand(serveCmd)
 }
@@ -447,6 +456,15 @@ func buildRequest(input *jsonlInput) *piperplus.SynthesisRequest {
 		NoiseW:      noiseW,
 	}
 
+	// Phase 2 (P2-T06): Style vector from CLI flags.
+	if sv, err := resolveStyleVector(); err != nil {
+		// buildRequest can't return errors — callers of runSynthesize handle
+		// flag parsing errors earlier, so we log and continue with nil style.
+		logger.Warn("failed to resolve style vector, ignoring", "err", err)
+	} else if sv != nil {
+		req.StyleVector = sv
+	}
+
 	if input != nil {
 		// Use phoneme IDs from JSONL if provided.
 		if len(input.PhonemeIDs) > 0 {
@@ -467,6 +485,32 @@ func buildRequest(input *jsonlInput) *piperplus.SynthesisRequest {
 	}
 
 	return req
+}
+
+// resolveStyleVector returns the user-provided style vector (from inline flag
+// or .npy file), or nil when neither flag was given. --style-vector-inline
+// takes precedence over --style-vector.
+func resolveStyleVector() ([]float32, error) {
+	if styleVectorInline != "" {
+		parts := strings.Split(styleVectorInline, ",")
+		out := make([]float32, 0, len(parts))
+		for _, p := range parts {
+			p = strings.TrimSpace(p)
+			if p == "" {
+				continue
+			}
+			v, err := strconv.ParseFloat(p, 32)
+			if err != nil {
+				return nil, fmt.Errorf("invalid --style-vector-inline value %q: %w", p, err)
+			}
+			out = append(out, float32(v))
+		}
+		return out, nil
+	}
+	if styleVectorPath != "" {
+		return piperplus.LoadFloat32Npy(styleVectorPath)
+	}
+	return nil, nil
 }
 
 // outputFilePath returns the resolved output path for a given file, used for

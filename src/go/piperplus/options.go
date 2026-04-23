@@ -22,6 +22,11 @@ type SynthesisRequest struct {
 	ProsodyFeatures  [][3]int64         // A1/A2/A3 per phoneme (nil = zero-fill)
 	PhonemeSilence   map[string]float64 // phoneme -> seconds of silence to insert after it (nil = disabled)
 	SpeakerEmbedding []float32          // speaker embedding from encoder (nil = use SpeakerID)
+	// StyleVector is the Phase 2 (P2-T06) optional style vector for PE-AV /
+	// PE-A conditioning. When the loaded model has a style_vector input and
+	// this field is non-nil, the vector is sent with style_vector_mask=1.
+	// nil => zeros + mask=0 (style conditioning effectively disabled).
+	StyleVector []float32
 }
 
 // ---------------------------------------------------------------------------
