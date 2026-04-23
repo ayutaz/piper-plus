@@ -933,6 +933,37 @@ class VitsModel(pl.LightningModule):
                 self._log_with_batch_info("loss_gen_wavlm", loss_gen_wavlm, batch)
                 self._log_with_batch_info("loss_fm_wavlm", loss_fm_wavlm, batch)
 
+            # PE-A emotion perceptual loss (Phase 4 / PR-F).
+            # Warmup + every_n_steps gating live HERE (not inside
+            # _compute_pea_emotion_loss) per P4-T03 design: the loss method
+            # stays a pure numerical function, training_step_g owns the
+            # scheduling. When the loss is fully disabled the
+            # _pea_emotion_loss_enabled() check short-circuits so there is
+            # zero overhead for existing training runs.
+            loss_pea_emotion = None
+            if self._pea_emotion_loss_enabled():
+                warmup_steps = int(self.hparams.pea_emotion_warmup_steps)
+                every_n_steps = max(
+                    1, int(self.hparams.pea_emotion_loss_every_n_steps)
+                )
+                if (
+                    self.global_step >= warmup_steps
+                    and self.global_step % every_n_steps == 0
+                ):
+                    loss_pea_emotion = self._compute_pea_emotion_loss(
+                        y_hat, batch
+                    )
+
+            if loss_pea_emotion is not None:
+                # Scale up by every_n_steps so the effective gradient
+                # magnitude stays consistent regardless of skip-step cadence
+                # (fork 314b3355 uses the same multiplier pattern for WavLM
+                # above and for PE-A in its own implementation).
+                loss_pea_emotion_scaled = loss_pea_emotion * max(
+                    1, int(self.hparams.pea_emotion_loss_every_n_steps)
+                )
+                loss_gen_all = loss_gen_all + loss_pea_emotion_scaled
+
             self._log_with_batch_info("loss_gen_all", loss_gen_all, batch)
 
             return loss_gen_all
@@ -973,6 +1004,38 @@ class VitsModel(pl.LightningModule):
             self._log_with_batch_info("loss_disc_all", loss_disc_all, batch)
 
             return loss_disc_all
+
+    def on_after_backward(self) -> None:
+        """Zero gradients when non-finite values are detected.
+
+        PE-A emotion perceptual loss goes through a frozen external model
+        (PE-A / DAC) which, in rare cases, produces NaN/Inf gradients during
+        early training. Without this hook a single poisoned step could
+        propagate NaNs throughout the optimizer state and permanently break
+        training.
+
+        The hook only runs when PE-A loss is enabled (so existing training
+        flows see no behaviour change) and iterates model parameters until
+        it finds a non-finite gradient. When found it zeros ALL gradients
+        for this step via ``zero_grad(set_to_none=True)`` — equivalent to a
+        skip-step — and emits a WARNING log.
+        """
+        if not self._pea_emotion_loss_enabled():
+            return
+
+        for name, param in self.named_parameters():
+            grad = param.grad
+            if grad is None:
+                continue
+            if not torch.isfinite(grad).all():
+                _LOGGER.warning(
+                    "PE-A emotion loss produced non-finite gradient at "
+                    "step=%d (param=%s); zeroing all gradients for this step.",
+                    int(self.global_step),
+                    name,
+                )
+                self.zero_grad(set_to_none=True)
+                return
 
     def validation_step(self, batch: Batch, batch_idx: int):
         # Temporarily suppress self.log to prevent training_step_g/d from
