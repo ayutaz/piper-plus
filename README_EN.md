@@ -20,7 +20,6 @@ A fast, high-quality neural text-to-speech (TTS) system. Built on the [VITS](htt
 
 ## Table of Contents
 
-- [Try in 30 Seconds](#try-in-30-seconds)
 - [Benchmark](#benchmark)
 - [Key Features](#key-features)
 - [Quick Start](#quick-start)
@@ -33,100 +32,6 @@ A fast, high-quality neural text-to-speech (TTS) system. Built on the [VITS](htt
 - [Related Links](#related-links)
 
 ---
-
-## Try in 30 Seconds
-
-### Option 1: Prebuilt Binary (Recommended)
-
-Pick the command for your OS and paste it. You should hear synthesized speech in about 30 seconds.
-
-#### macOS (Apple Silicon, M1/M2/M3+)
-
-```bash
-curl -L https://github.com/ayutaz/piper-plus/releases/latest/download/piper-macos-arm64.tar.gz | tar xz
-cd piper
-./bin/piper --download-model tsukuyomi
-./bin/piper --model tsukuyomi --text "Hello, world." -f hello.wav
-```
-
-#### Linux (x86_64)
-
-```bash
-curl -L https://github.com/ayutaz/piper-plus/releases/latest/download/piper-linux-x64.tar.gz | tar xz
-cd piper
-./bin/piper --download-model tsukuyomi
-./bin/piper --model tsukuyomi --text "Hello, world." -f hello.wav
-```
-
-#### Linux (ARM64, Raspberry Pi 4/5)
-
-```bash
-curl -L https://github.com/ayutaz/piper-plus/releases/latest/download/piper-linux-arm64.tar.gz | tar xz
-cd piper
-./bin/piper --download-model tsukuyomi
-./bin/piper --model tsukuyomi --text "Hello, world." -f hello.wav
-```
-
-#### Windows (PowerShell)
-
-```powershell
-Invoke-WebRequest "https://github.com/ayutaz/piper-plus/releases/latest/download/piper-windows-x64.zip" -OutFile piper.zip
-Expand-Archive piper.zip -DestinationPath .
-cd piper
-.\bin\piper.exe --download-model tsukuyomi
-.\bin\piper.exe --model tsukuyomi --text "Hello, world." -f hello.wav
-```
-
-> **Which binary should I pick?** Releases also include `piper-plus-cli-*` (C# .NET) and `piper-plus-rs-cli-*` (Rust) CLIs. The Quick Start above uses **C++ CLI (`piper-*`)**, which has the widest platform support and is recommended for most users. See [Choosing a CLI binary](docs/getting-started/binary-selection.md) for details.
-
-### Option 2: Python
-
-```bash
-pip install piper-plus
-uv run python -c "from piper_plus import PiperPlus; PiperPlus('tsukuyomi').tts_to_file('Hello, how are you?', 'hello.wav')"
-```
-
-<details>
-<summary>CLI is also available</summary>
-
-```bash
-pip install piper-tts-plus
-python -m piper --download-model tsukuyomi
-python -m piper --model tsukuyomi --text "Hello, how are you?" -f hello.wav
-```
-
-</details>
-
-### Option 3: Browser (No Install Required)
-
-**[Open WebAssembly Demo →](https://ayutaz.github.io/piper-plus/)**
-
-You can also embed it in your own app via npm:
-
-```js
-import { PiperPlus } from "piper-plus";
-const piper = await PiperPlus.initialize("tsukuyomi");
-const audio = await piper.synthesize("Hello, world!");
-audio.play();
-```
-
-> **Note:** The npm package is browser-only. For Node.js environments, use the Python or Rust CLI.
-
-<details>
-<summary>🔊 Listen to Sample Audio</summary>
-
-| Language | Text | Audio |
-|----------|------|-------|
-| 日本語 | こんにちは、つくよみちゃんです。 | [Play](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/samples/ja.wav) |
-| English | Hello, how are you today? | [Play](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/samples/en.wav) |
-| 中文 | 你好，今天天气很好。 | [Play](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/samples/zh.wav) |
-| Español | ¿Hola, cómo estás hoy? | [Play](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/samples/es.wav) |
-| Français | Bonjour, comment allez-vous? | [Play](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/samples/fr.wav) |
-| Português | Olá, como você está hoje? | [Play](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/samples/pt.wav) |
-
-> Sample audio generated with [ayousanz/piper-plus-tsukuyomi-chan](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan) model.
-
-</details>
 
 ## Benchmark
 
@@ -207,8 +112,6 @@ audio.play();
 ---
 
 ## Quick Start
-
-> 💡 New here? Start with the [Try in 30 Seconds](#try-in-30-seconds) section above.
 
 ### Python Inference
 
@@ -291,6 +194,14 @@ tar xzf piper.tar.gz
 cd piper
 ```
 
+**Linux (ARM64, Raspberry Pi 4/5):**
+
+```bash
+curl -L -o piper.tar.gz https://github.com/ayutaz/piper-plus/releases/latest/download/piper-linux-arm64.tar.gz
+tar xzf piper.tar.gz
+cd piper
+```
+
 **2. Download a model & generate speech**
 
 ```sh
@@ -304,6 +215,8 @@ cd piper
 > **Windows cmd code page note:** The `--text` option internally uses `GetCommandLineW()` (UTF-16), so it works regardless of code page. Only when using pipe input (`echo ... | piper`) do you need to switch to UTF-8 first with `chcp 65001`.
 >
 > **output.wav location:** Generated in the current directory (where you ran `cd piper`).
+
+> **Which binary should I pick?** Releases also include `piper-plus-cli-*` (C# .NET) and `piper-plus-rs-cli-*` (Rust) CLIs. The Quick Start above uses **C++ CLI (`piper-*`)**, which has the widest platform support and is recommended for most users. See [Choosing a CLI binary](docs/getting-started/binary-selection.md) for details.
 
 ### Docker
 

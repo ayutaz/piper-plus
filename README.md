@@ -20,7 +20,6 @@
 
 ## 目次
 
-- [30秒で試す](#30秒で試す)
 - [ベンチマーク](#ベンチマーク)
 - [主要機能](#主要機能)
 - [クイックスタート](#クイックスタート)
@@ -33,100 +32,6 @@
 - [関連リンク](#関連リンク)
 
 ---
-
-## 30秒で試す
-
-### 方法1: プリビルドバイナリ (推奨)
-
-OS に合わせて以下をコピペで実行してください。約30秒で音声合成が動きます。
-
-#### macOS (Apple Silicon, M1/M2/M3 以降)
-
-```bash
-curl -L https://github.com/ayutaz/piper-plus/releases/latest/download/piper-macos-arm64.tar.gz | tar xz
-cd piper
-./bin/piper --download-model tsukuyomi
-./bin/piper --model tsukuyomi --text "こんにちは" -f hello.wav
-```
-
-#### Linux (x86_64)
-
-```bash
-curl -L https://github.com/ayutaz/piper-plus/releases/latest/download/piper-linux-x64.tar.gz | tar xz
-cd piper
-./bin/piper --download-model tsukuyomi
-./bin/piper --model tsukuyomi --text "こんにちは" -f hello.wav
-```
-
-#### Linux (ARM64, Raspberry Pi 4/5 等)
-
-```bash
-curl -L https://github.com/ayutaz/piper-plus/releases/latest/download/piper-linux-arm64.tar.gz | tar xz
-cd piper
-./bin/piper --download-model tsukuyomi
-./bin/piper --model tsukuyomi --text "こんにちは" -f hello.wav
-```
-
-#### Windows (PowerShell)
-
-```powershell
-Invoke-WebRequest "https://github.com/ayutaz/piper-plus/releases/latest/download/piper-windows-x64.zip" -OutFile piper.zip
-Expand-Archive piper.zip -DestinationPath .
-cd piper
-.\bin\piper.exe --download-model tsukuyomi
-.\bin\piper.exe --model tsukuyomi --text "こんにちは" -f hello.wav
-```
-
-> **どのバイナリを選べばよい？** Releases には `piper-*` (C++) のほか、`piper-plus-cli-*` (C# .NET) と `piper-plus-rs-cli-*` (Rust) のCLIもあります。Quick Start で使っている **C++ CLI (`piper-*`)** が最も多くのプラットフォームに対応していて推奨です。詳しくは [CLIバイナリの選び方](docs/getting-started/binary-selection.md) を参照。
-
-### 方法2: Python
-
-```bash
-pip install piper-plus
-uv run python -c "from piper_plus import PiperPlus; PiperPlus('tsukuyomi').tts_to_file('こんにちは', 'hello.wav')"
-```
-
-<details>
-<summary>CLI でも利用できます</summary>
-
-```bash
-pip install piper-tts-plus
-python -m piper --download-model tsukuyomi
-python -m piper --model tsukuyomi --text "こんにちは" -f hello.wav
-```
-
-</details>
-
-### 方法3: ブラウザ (インストール不要)
-
-**[WebAssembly デモを開く →](https://ayutaz.github.io/piper-plus/)**
-
-npm で自分のアプリに組み込むこともできます:
-
-```js
-import { PiperPlus } from "piper-plus";
-const piper = await PiperPlus.initialize("tsukuyomi");
-const audio = await piper.synthesize("Hello, world!");
-audio.play();
-```
-
-> **Note:** npm パッケージはブラウザ専用です。Node.js 環境では Python または Rust CLI をお使いください。
-
-<details>
-<summary>🔊 サンプル音声を聴く</summary>
-
-| 言語 | テキスト | 音声 |
-|------|---------|------|
-| 日本語 | こんにちは、つくよみちゃんです。 | [再生](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/samples/ja.wav) |
-| English | Hello, how are you today? | [再生](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/samples/en.wav) |
-| 中文 | 你好，今天天气很好。 | [再生](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/samples/zh.wav) |
-| Español | ¿Hola, cómo estás hoy? | [再生](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/samples/es.wav) |
-| Français | Bonjour, comment allez-vous? | [再生](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/samples/fr.wav) |
-| Português | Olá, como você está hoje? | [再生](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/samples/pt.wav) |
-
-> サンプル音声は [ayousanz/piper-plus-tsukuyomi-chan](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan) モデルで生成されています。
-
-</details>
 
 ## ベンチマーク
 
@@ -208,8 +113,6 @@ audio.play();
 
 ## クイックスタート
 
-> 💡 初めての方は [30秒で試す](#30秒で試す) セクションから始めることをお勧めします。
-
 ### プリビルドバイナリ (ビルド不要)
 
 [GitHub Releases](https://github.com/ayutaz/piper-plus/releases) からプリビルドバイナリをダウンロードして、すぐに音声合成を開始できます。
@@ -243,6 +146,14 @@ tar xzf piper.tar.gz
 cd piper
 ```
 
+**Linux (ARM64, Raspberry Pi 4/5):**
+
+```bash
+curl -L -o piper.tar.gz https://github.com/ayutaz/piper-plus/releases/latest/download/piper-linux-arm64.tar.gz
+tar xzf piper.tar.gz
+cd piper
+```
+
 **2. モデルをダウンロード & 音声を生成**
 
 ```sh
@@ -256,6 +167,8 @@ cd piper
 > **Windows cmd のコードページについて:** `--text` オプションは内部で `GetCommandLineW()` (UTF-16) を使用するため、コードページに依存せずそのまま動作します。パイプ入力（`echo ... | piper`）を使う場合のみ、事前に `chcp 65001` で UTF-8 に切り替えてください。
 >
 > **output.wav の出力先:** カレントディレクトリ（`cd piper` した場所）に生成されます。
+
+> **どのバイナリを選べばよい？** Releases には `piper-*` (C++) のほか、`piper-plus-cli-*` (C# .NET) と `piper-plus-rs-cli-*` (Rust) のCLIもあります。上記のクイックスタートで使っている **C++ CLI (`piper-*`)** が最も多くのプラットフォームに対応していて推奨です。詳しくは [CLIバイナリの選び方](docs/getting-started/binary-selection.md) を参照。
 
 ### Python推論
 
