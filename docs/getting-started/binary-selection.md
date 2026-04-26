@@ -59,7 +59,7 @@ Apple Silicon Mac で `piper-macos-arm64.tar.gz` (C++) と `piper-plus-cli-osx-a
 curl -LO https://github.com/ayutaz/piper-plus/releases/latest/download/piper-macos-arm64.tar.gz
 tar -xzf piper-macos-arm64.tar.gz
 cd piper
-./piper --help
+./bin/piper --help
 ```
 
 ### C# .NET CLI (Linux x64)
@@ -89,18 +89,18 @@ Expand-Archive piper-plus-rs-cli.zip -DestinationPath piper-plus-rs-cli
 Gatekeeper によりブロックされる場合があります。展開後、隔離属性を外してください。
 
 ```bash
-xattr -dr com.apple.quarantine ./piper
+xattr -dr com.apple.quarantine ./bin/piper
 ```
 
 または「システム設定 > プライバシーとセキュリティ」から個別に許可することもできます。
 
 ### Linux: `error while loading shared libraries: libonnxruntime.so`
 
-C++ CLI のアーカイブには ONNX Runtime の共有ライブラリが同梱されています。`piper` バイナリと同じディレクトリから実行するか、`LD_LIBRARY_PATH` を設定してください。
+C++ CLI のアーカイブには ONNX Runtime の共有ライブラリが `lib/` ディレクトリに同梱されています。展開した `piper` ディレクトリ直下で `LD_LIBRARY_PATH` に `lib` を追加してから実行してください。
 
 ```bash
-export LD_LIBRARY_PATH=$(pwd):$LD_LIBRARY_PATH
-./piper --help
+export LD_LIBRARY_PATH=$(pwd)/lib:$LD_LIBRARY_PATH
+./bin/piper --help
 ```
 
 ### Windows: Defender / SmartScreen によるブロック

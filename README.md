@@ -45,8 +45,8 @@ OS に合わせて以下をコピペで実行してください。約30秒で音
 ```bash
 curl -L https://github.com/ayutaz/piper-plus/releases/latest/download/piper-macos-arm64.tar.gz | tar xz
 cd piper
-./piper --download-model tsukuyomi
-./piper --model tsukuyomi --text "こんにちは" -f hello.wav
+./bin/piper --download-model tsukuyomi
+./bin/piper --model tsukuyomi --text "こんにちは" -f hello.wav
 ```
 
 #### Linux (x86_64)
@@ -54,8 +54,8 @@ cd piper
 ```bash
 curl -L https://github.com/ayutaz/piper-plus/releases/latest/download/piper-linux-x64.tar.gz | tar xz
 cd piper
-./piper --download-model tsukuyomi
-./piper --model tsukuyomi --text "こんにちは" -f hello.wav
+./bin/piper --download-model tsukuyomi
+./bin/piper --model tsukuyomi --text "こんにちは" -f hello.wav
 ```
 
 #### Linux (ARM64, Raspberry Pi 4/5 等)
@@ -63,8 +63,8 @@ cd piper
 ```bash
 curl -L https://github.com/ayutaz/piper-plus/releases/latest/download/piper-linux-arm64.tar.gz | tar xz
 cd piper
-./piper --download-model tsukuyomi
-./piper --model tsukuyomi --text "こんにちは" -f hello.wav
+./bin/piper --download-model tsukuyomi
+./bin/piper --model tsukuyomi --text "こんにちは" -f hello.wav
 ```
 
 #### Windows (PowerShell)
@@ -73,8 +73,8 @@ cd piper
 Invoke-WebRequest "https://github.com/ayutaz/piper-plus/releases/latest/download/piper-windows-x64.zip" -OutFile piper.zip
 Expand-Archive piper.zip -DestinationPath .
 cd piper
-.\piper.exe --download-model tsukuyomi
-.\piper.exe --model tsukuyomi --text "こんにちは" -f hello.wav
+.\bin\piper.exe --download-model tsukuyomi
+.\bin\piper.exe --model tsukuyomi --text "こんにちは" -f hello.wav
 ```
 
 > **どのバイナリを選べばよい？** Releases には `piper-*` (C++) のほか、`piper-plus-cli-*` (C# .NET) と `piper-plus-rs-cli-*` (Rust) のCLIもあります。Quick Start で使っている **C++ CLI (`piper-*`)** が最も多くのプラットフォームに対応していて推奨です。詳しくは [CLIバイナリの選び方](docs/getting-started/binary-selection.md) を参照。

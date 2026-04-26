@@ -45,8 +45,8 @@ Pick the command for your OS and paste it. You should hear synthesized speech in
 ```bash
 curl -L https://github.com/ayutaz/piper-plus/releases/latest/download/piper-macos-arm64.tar.gz | tar xz
 cd piper
-./piper --download-model tsukuyomi
-./piper --model tsukuyomi --text "Hello, world." -f hello.wav
+./bin/piper --download-model tsukuyomi
+./bin/piper --model tsukuyomi --text "Hello, world." -f hello.wav
 ```
 
 #### Linux (x86_64)
@@ -54,8 +54,8 @@ cd piper
 ```bash
 curl -L https://github.com/ayutaz/piper-plus/releases/latest/download/piper-linux-x64.tar.gz | tar xz
 cd piper
-./piper --download-model tsukuyomi
-./piper --model tsukuyomi --text "Hello, world." -f hello.wav
+./bin/piper --download-model tsukuyomi
+./bin/piper --model tsukuyomi --text "Hello, world." -f hello.wav
 ```
 
 #### Linux (ARM64, Raspberry Pi 4/5)
@@ -63,8 +63,8 @@ cd piper
 ```bash
 curl -L https://github.com/ayutaz/piper-plus/releases/latest/download/piper-linux-arm64.tar.gz | tar xz
 cd piper
-./piper --download-model tsukuyomi
-./piper --model tsukuyomi --text "Hello, world." -f hello.wav
+./bin/piper --download-model tsukuyomi
+./bin/piper --model tsukuyomi --text "Hello, world." -f hello.wav
 ```
 
 #### Windows (PowerShell)
@@ -73,8 +73,8 @@ cd piper
 Invoke-WebRequest "https://github.com/ayutaz/piper-plus/releases/latest/download/piper-windows-x64.zip" -OutFile piper.zip
 Expand-Archive piper.zip -DestinationPath .
 cd piper
-.\piper.exe --download-model tsukuyomi
-.\piper.exe --model tsukuyomi --text "Hello, world." -f hello.wav
+.\bin\piper.exe --download-model tsukuyomi
+.\bin\piper.exe --model tsukuyomi --text "Hello, world." -f hello.wav
 ```
 
 > **Which binary should I pick?** Releases also include `piper-plus-cli-*` (C# .NET) and `piper-plus-rs-cli-*` (Rust) CLIs. The Quick Start above uses **C++ CLI (`piper-*`)**, which has the widest platform support and is recommended for most users. See [Choosing a CLI binary](docs/getting-started/binary-selection.md) for details.
