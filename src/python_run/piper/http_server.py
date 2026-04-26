@@ -24,7 +24,9 @@ import wave
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, HTTPException, Query, Request, Response
+import uvicorn
+from fastapi import FastAPI, Query, Request, Response
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse, PlainTextResponse, StreamingResponse
 
 from . import PiperVoice
@@ -33,9 +35,20 @@ from .timing import timing_to_json, timing_to_tsv
 
 _LOGGER = logging.getLogger(__name__)
 
+# Default channel/bit-depth assumptions match `PiperVoice.synthesize` output.
+_WAV_CHANNELS = 1
+_WAV_BIT_DEPTH = 16
+
+# Generous text body cap. Practical Piper utterances are well under 10 KiB;
+# 1 MiB stays out of the way of legitimate batched requests while preventing
+# memory blow-up from a single client.
+MAX_TEXT_BYTES = 1 * 1024 * 1024
+
 
 def _build_streaming_wav_header(
-    sample_rate: int, channels: int = 1, bit_depth: int = 16
+    sample_rate: int,
+    channels: int = _WAV_CHANNELS,
+    bit_depth: int = _WAV_BIT_DEPTH,
 ) -> bytes:
     """Build a WAV header with placeholder sizes for chunked streaming.
 
@@ -62,35 +75,73 @@ def _build_streaming_wav_header(
 
 
 def _resolve_language_id(
-    voice: PiperVoice,
+    voice: Any,
     language_id_raw: str | None,
     language: str | None,
 ) -> int | None:
+    """Resolve query parameters to an integer language id.
+
+    Falls back to ``None`` for unparseable / unknown / out-of-range values to
+    preserve the silent-fallback behavior of the original Flask server. Out-
+    of-range values are logged so operators can spot misconfigured clients.
+    """
+    lmap = getattr(voice.config, "language_id_map", None) or None
+
     if language_id_raw is not None:
         try:
-            return int(language_id_raw)
+            language_id = int(language_id_raw)
         except (ValueError, TypeError):
             return None
-    if language is not None:
-        lmap = voice.config.language_id_map
-        if lmap:
-            return lmap.get(language)
+        if lmap is not None:
+            valid_ids = set(lmap.values())
+            if language_id not in valid_ids:
+                _LOGGER.warning(
+                    "language_id=%s out of range (valid: %s); falling back to None",
+                    language_id,
+                    sorted(valid_ids),
+                )
+                return None
+        return language_id
+
+    if language is not None and lmap is not None:
+        return lmap.get(language)
+
     return None
 
 
 async def _read_text(request: Request, query_text: str | None) -> str:
+    """Read text from POST body or GET ``?text=`` query, with a size cap."""
     if request.method == "POST":
+        # Reject obviously oversized bodies up front when Content-Length is set
+        cl = request.headers.get("content-length")
+        if cl is not None:
+            try:
+                if int(cl) > MAX_TEXT_BYTES:
+                    raise _RequestTooLarge()
+            except ValueError:
+                pass
         body = await request.body()
-        text = body.decode("utf-8")
+        if len(body) > MAX_TEXT_BYTES:
+            raise _RequestTooLarge()
+        text = body.decode("utf-8", errors="replace")
     else:
         text = query_text or ""
     return text.strip()
+
+
+class _RequestTooLarge(Exception):
+    """Internal sentinel for body-size enforcement."""
 
 
 def _parse_bool_flag(value: str | None) -> bool:
     if value is None:
         return False
     return value.strip().lower() in ("1", "true", "yes", "on")
+
+
+def _error_response(status_code: int, message: str) -> JSONResponse:
+    """Flask-compatible ``{"error": ...}`` JSON error body."""
+    return JSONResponse(status_code=status_code, content={"error": message})
 
 
 def create_app(voice: Any, synthesize_args: dict[str, Any]) -> FastAPI:
@@ -108,9 +159,15 @@ def create_app(voice: Any, synthesize_args: dict[str, Any]) -> FastAPI:
         language_id: str | None = Query(None),
         streaming: str | None = Query(None),
     ) -> Response:
-        body_text = await _read_text(request, text)
+        try:
+            body_text = await _read_text(request, text)
+        except _RequestTooLarge:
+            return _error_response(
+                413, f"Request body exceeds {MAX_TEXT_BYTES} bytes"
+            )
+
         if not body_text:
-            raise HTTPException(status_code=400, detail="No text provided")
+            return _error_response(400, "No text provided")
 
         resolved_language_id = _resolve_language_id(voice, language_id, language)
         is_streaming = _parse_bool_flag(streaming)
@@ -125,61 +182,75 @@ def create_app(voice: Any, synthesize_args: dict[str, Any]) -> FastAPI:
             sample_rate = voice.config.sample_rate
 
             def _iter_wav():
-                yield _build_streaming_wav_header(sample_rate)
-                for audio_bytes in voice.synthesize_stream_raw(
-                    body_text,
-                    **synthesize_args,
-                    language_id=resolved_language_id,
-                ):
-                    yield audio_bytes
+                try:
+                    yield _build_streaming_wav_header(sample_rate)
+                    for audio_bytes in voice.synthesize_stream_raw(
+                        body_text,
+                        **synthesize_args,
+                        language_id=resolved_language_id,
+                    ):
+                        yield audio_bytes
+                except Exception:
+                    # Headers have already been sent — we cannot return 500.
+                    # Log so operators can diagnose silent client truncation.
+                    _LOGGER.exception("Streaming synthesis failed")
+                    raise
 
             return StreamingResponse(_iter_wav(), media_type="audio/wav")
 
-        with io.BytesIO() as wav_io:
-            with wave.open(wav_io, "wb") as wav_file:
-                voice.synthesize(
-                    body_text,
-                    wav_file,
-                    **synthesize_args,
-                    language_id=resolved_language_id,
-                )
-            return Response(content=wav_io.getvalue(), media_type="audio/wav")
+        def _do_synth() -> bytes:
+            with io.BytesIO() as wav_io:
+                with wave.open(wav_io, "wb") as wav_file:
+                    voice.synthesize(
+                        body_text,
+                        wav_file,
+                        **synthesize_args,
+                        language_id=resolved_language_id,
+                    )
+                return wav_io.getvalue()
+
+        wav_bytes = await run_in_threadpool(_do_synth)
+        return Response(content=wav_bytes, media_type="audio/wav")
 
     @app.api_route("/api/phoneme-timing", methods=["GET", "POST"])
     async def app_phoneme_timing(
         request: Request,
         text: str | None = Query(None),
-        format: str = Query("json"),
+        fmt: str = Query("json", alias="format"),
         language: str | None = Query(None),
         language_id: str | None = Query(None),
     ) -> Response:
-        body_text = await _read_text(request, text)
-        if not body_text:
-            return JSONResponse(
-                status_code=400, content={"error": "No text provided"}
+        try:
+            body_text = await _read_text(request, text)
+        except _RequestTooLarge:
+            return _error_response(
+                413, f"Request body exceeds {MAX_TEXT_BYTES} bytes"
             )
 
-        fmt = format.lower()
-        if fmt not in ("json", "tsv"):
-            return JSONResponse(
-                status_code=400,
-                content={
-                    "error": f"Unsupported format: {fmt}. Use 'json' or 'tsv'."
-                },
+        if not body_text:
+            return _error_response(400, "No text provided")
+
+        fmt_lower = fmt.lower()
+        if fmt_lower not in ("json", "tsv"):
+            return _error_response(
+                400, f"Unsupported format: {fmt_lower}. Use 'json' or 'tsv'."
             )
 
         resolved_language_id = _resolve_language_id(voice, language_id, language)
-        _, timing_result = voice.synthesize_with_timing(
-            body_text, **synthesize_args, language_id=resolved_language_id
-        )
 
-        if timing_result is None:
-            return JSONResponse(
-                status_code=400,
-                content={"error": "Model does not support duration output"},
+        def _do_timing():
+            return voice.synthesize_with_timing(
+                body_text,
+                **synthesize_args,
+                language_id=resolved_language_id,
             )
 
-        if fmt == "tsv":
+        _, timing_result = await run_in_threadpool(_do_timing)
+
+        if timing_result is None:
+            return _error_response(400, "Model does not support duration output")
+
+        if fmt_lower == "tsv":
             return PlainTextResponse(
                 content=timing_to_tsv(timing_result),
                 media_type="text/tab-separated-values",
@@ -193,9 +264,18 @@ def create_app(voice: Any, synthesize_args: dict[str, Any]) -> FastAPI:
     return app
 
 
-def main() -> None:
-    import uvicorn
+def _warn_if_public_bind(host: str) -> None:
+    """Log a startup warning when binding to a non-loopback address."""
+    if host in ("0.0.0.0", "::", ""):
+        _LOGGER.warning(
+            "Binding to %s with no authentication. "
+            "Anyone able to reach this port can synthesize audio. "
+            "Pass --host 127.0.0.1 to restrict to localhost.",
+            host or "0.0.0.0",
+        )
 
+
+def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--host", default="0.0.0.0", help="HTTP server host")
     parser.add_argument("--port", type=int, default=5000, help="HTTP server port")
@@ -244,6 +324,8 @@ def main() -> None:
     args = parser.parse_args()
     logging.basicConfig(level=logging.DEBUG if args.debug else logging.INFO)
     _LOGGER.debug(args)
+
+    _warn_if_public_bind(args.host)
 
     if not args.download_dir:
         args.download_dir = args.data_dir[0]

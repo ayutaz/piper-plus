@@ -207,10 +207,37 @@ class TestTimingEndpointLanguageResolution:
         return TestClient(create_app(voice, synthesize_args={})), captured
 
     def test_numeric_language_id(self, mock_timing_result):
-        client, captured = self._build(mock_timing_result, {"ja": 0, "en": 1})
+        # Use a map that includes id 3 so range validation accepts it
+        client, captured = self._build(
+            mock_timing_result, {"ja": 0, "en": 1, "zh": 2, "fr": 3}
+        )
         resp = client.get("/api/phoneme-timing?text=hello&language_id=3")
         assert resp.status_code == 200
         assert captured["language_id"] == 3
+
+    def test_numeric_language_id_with_no_map_passes_through(
+        self, mock_timing_result
+    ):
+        """Without a language_id_map, numeric ids are passed through unchanged."""
+        client, captured = self._build(mock_timing_result, None)
+        resp = client.get("/api/phoneme-timing?text=hello&language_id=5")
+        assert resp.status_code == 200
+        assert captured["language_id"] == 5
+
+    def test_out_of_range_language_id_falls_back_to_none(
+        self, mock_timing_result
+    ):
+        """language_id outside the configured map falls back to None."""
+        client, captured = self._build(mock_timing_result, {"ja": 0, "en": 1})
+        resp = client.get("/api/phoneme-timing?text=hello&language_id=999")
+        assert resp.status_code == 200
+        assert captured["language_id"] is None
+
+    def test_negative_language_id_falls_back_to_none(self, mock_timing_result):
+        client, captured = self._build(mock_timing_result, {"ja": 0, "en": 1})
+        resp = client.get("/api/phoneme-timing?text=hello&language_id=-1")
+        assert resp.status_code == 200
+        assert captured["language_id"] is None
 
     def test_language_code_resolved(self, mock_timing_result):
         client, captured = self._build(
@@ -362,3 +389,136 @@ def test_timing_json_body_is_parseable(client):
     parsed = json.loads(resp.text)
     assert isinstance(parsed, dict)
     assert "phonemes" in parsed
+
+
+# ---------------------------------------------------------------------------
+# Body size limit (DoS guard)
+# ---------------------------------------------------------------------------
+
+
+class TestRequestBodySizeLimit:
+    """POST bodies above the configured cap are rejected with 413."""
+
+    def test_oversized_body_rejected(self, mock_timing_result):
+        from piper.http_server import MAX_TEXT_BYTES
+
+        voice = _make_voice(mock_timing_result)
+        client = TestClient(create_app(voice, synthesize_args={}))
+        oversized = b"a" * (MAX_TEXT_BYTES + 1)
+        resp = client.post("/", content=oversized)
+        assert resp.status_code == 413
+        body = resp.json()
+        assert "error" in body
+
+    def test_oversized_body_rejected_for_timing(self, mock_timing_result):
+        from piper.http_server import MAX_TEXT_BYTES
+
+        voice = _make_voice(mock_timing_result)
+        client = TestClient(create_app(voice, synthesize_args={}))
+        oversized = b"a" * (MAX_TEXT_BYTES + 1)
+        resp = client.post("/api/phoneme-timing", content=oversized)
+        assert resp.status_code == 413
+
+
+# ---------------------------------------------------------------------------
+# Error response shape consistency
+# ---------------------------------------------------------------------------
+
+
+class TestErrorResponseShape:
+    """All 4xx responses share the ``{"error": ...}`` body shape."""
+
+    def test_synthesize_empty_text_uses_error_key(self, client):
+        resp = client.post("/", content="")
+        assert resp.status_code == 400
+        body = resp.json()
+        assert "error" in body
+        assert "detail" not in body  # Not FastAPI default shape
+
+    def test_timing_empty_text_uses_error_key(self, client):
+        resp = client.post("/api/phoneme-timing", content="")
+        assert resp.status_code == 400
+        body = resp.json()
+        assert "error" in body
+        assert "detail" not in body
+
+
+# ---------------------------------------------------------------------------
+# Streaming exception handling
+# ---------------------------------------------------------------------------
+
+
+class TestStreamingExceptionHandling:
+    """Generators that raise mid-stream are logged (no silent failures)."""
+
+    def test_streaming_exception_is_logged(self, mock_timing_result, caplog):
+        import logging
+
+        voice = _make_voice(mock_timing_result)
+
+        def _broken_stream(_text, **_kwargs):
+            yield b"\x00\x00" * 50
+            raise RuntimeError("boom")
+
+        voice.synthesize_stream_raw.side_effect = _broken_stream
+        client = TestClient(create_app(voice, synthesize_args={}))
+
+        with caplog.at_level(logging.ERROR, logger="piper.http_server"):
+            with pytest.raises(RuntimeError):
+                with client.stream(
+                    "POST", "/?streaming=true", content="hello"
+                ) as resp:
+                    list(resp.iter_bytes())
+        assert any(
+            "Streaming synthesis failed" in r.message for r in caplog.records
+        )
+
+
+# ---------------------------------------------------------------------------
+# Streaming additional contract: passes language_id through to voice
+# ---------------------------------------------------------------------------
+
+
+class TestStreamingLanguageIdPassthrough:
+    def test_streaming_passes_language_id(self, mock_timing_result):
+        voice = _make_voice(
+            mock_timing_result, language_id_map={"ja": 0, "en": 1}
+        )
+        captured: dict = {}
+
+        def _stream(_text, **kwargs):
+            captured["language_id"] = kwargs.get("language_id")
+            yield b"\x00\x00" * 100
+
+        voice.synthesize_stream_raw.side_effect = _stream
+        client = TestClient(create_app(voice, synthesize_args={}))
+        with client.stream(
+            "POST", "/?streaming=true&language=en", content="hello"
+        ) as resp:
+            list(resp.iter_bytes())
+        assert captured["language_id"] == 1
+
+
+# ---------------------------------------------------------------------------
+# _warn_if_public_bind helper
+# ---------------------------------------------------------------------------
+
+
+class TestPublicBindWarning:
+    def test_warns_for_wildcard_address(self, caplog):
+        import logging
+
+        from piper.http_server import _warn_if_public_bind
+
+        with caplog.at_level(logging.WARNING, logger="piper.http_server"):
+            _warn_if_public_bind("0.0.0.0")
+        assert any("authentication" in r.message for r in caplog.records)
+
+    def test_no_warning_for_loopback(self, caplog):
+        import logging
+
+        from piper.http_server import _warn_if_public_bind
+
+        with caplog.at_level(logging.WARNING, logger="piper.http_server"):
+            _warn_if_public_bind("127.0.0.1")
+        assert not any("authentication" in r.message for r in caplog.records)
