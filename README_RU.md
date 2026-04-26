@@ -111,6 +111,14 @@ tar xzf piper.tar.gz
 cd piper
 ```
 
+**Linux (ARM64, Raspberry Pi 4/5):**
+
+```bash
+curl -L -o piper.tar.gz https://github.com/ayutaz/piper-plus/releases/latest/download/piper-linux-arm64.tar.gz
+tar xzf piper.tar.gz
+cd piper
+```
+
 **2. Скачайте модель и сгенерируйте речь**
 
 ```sh
@@ -124,6 +132,8 @@ cd piper
 > **О кодовой странице Windows cmd:** Опция `--text` внутри использует `GetCommandLineW()` (UTF-16), поэтому работает независимо от кодовой страницы. При использовании ввода через конвейер (`echo ... | piper`) предварительно переключите кодовую страницу на UTF-8 командой `chcp 65001`.
 >
 > **Каталог вывода output.wav:** Файл создаётся в текущем каталоге (куда вы перешли командой `cd piper`).
+
+> **Какой бинарник выбрать?** Релизы также включают CLI `piper-plus-cli-*` (C# .NET) и `piper-plus-rs-cli-*` (Rust). В быстром старте выше используется **C++ CLI (`piper-*`)**, который имеет самую широкую поддержку платформ и рекомендуется для большинства пользователей. Подробнее см. [Выбор CLI-бинарника](docs/getting-started/binary-selection.md).
 
 ### Вывод через Python
 

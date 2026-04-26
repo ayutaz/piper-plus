@@ -111,6 +111,14 @@ tar xzf piper.tar.gz
 cd piper
 ```
 
+**Linux (ARM64, Raspberry Pi 4/5):**
+
+```bash
+curl -L -o piper.tar.gz https://github.com/ayutaz/piper-plus/releases/latest/download/piper-linux-arm64.tar.gz
+tar xzf piper.tar.gz
+cd piper
+```
+
 **2. Descargar un modelo y generar audio**
 
 ```sh
@@ -124,6 +132,8 @@ cd piper
 > **Sobre el code page en Windows cmd:** La opcion `--text` utiliza internamente `GetCommandLineW()` (UTF-16), por lo que funciona independientemente del code page. Solo si usa entrada por pipe (`echo ... | piper`) necesita cambiar a UTF-8 previamente con `chcp 65001`.
 >
 > **Ubicacion de output.wav:** Se genera en el directorio actual (donde ejecuto `cd piper`).
+
+> **¿Que binario debo elegir?** Las releases tambien incluyen los CLIs `piper-plus-cli-*` (C# .NET) y `piper-plus-rs-cli-*` (Rust). El Inicio rapido anterior utiliza el **CLI de C++ (`piper-*`)**, que tiene el soporte de plataformas mas amplio y es el recomendado para la mayoria de los usuarios. Consulta [Como elegir un binario CLI](docs/getting-started/binary-selection.md) para mas detalles.
 
 ### Inferencia con Python
 

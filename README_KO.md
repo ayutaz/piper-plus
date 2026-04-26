@@ -111,6 +111,14 @@ tar xzf piper.tar.gz
 cd piper
 ```
 
+**Linux (ARM64, 라즈베리 파이 4/5):**
+
+```bash
+curl -L -o piper.tar.gz https://github.com/ayutaz/piper-plus/releases/latest/download/piper-linux-arm64.tar.gz
+tar xzf piper.tar.gz
+cd piper
+```
+
 **2. 모델 다운로드 및 음성 생성**
 
 ```sh
@@ -124,6 +132,8 @@ cd piper
 > **Windows cmd의 코드 페이지에 대해:** `--text` 옵션은 내부적으로 `GetCommandLineW()` (UTF-16)를 사용하므로 코드 페이지에 관계없이 그대로 동작합니다. 파이프 입력(`echo ... | piper`)을 사용하는 경우에만 `chcp 65001`로 UTF-8로 전환해 주세요.
 >
 > **output.wav 출력 위치:** 현재 디렉터리(`cd piper`한 위치)에 생성됩니다.
+
+> **어떤 바이너리를 선택해야 하나요?** 릴리스에는 `piper-plus-cli-*` (C# .NET) 및 `piper-plus-rs-cli-*` (Rust) CLI도 포함되어 있습니다. 위의 빠른 시작은 **C++ CLI (`piper-*`)**를 사용하며, 가장 폭넓은 플랫폼을 지원하므로 대부분의 사용자에게 권장됩니다. 자세한 내용은 [CLI 바이너리 선택하기](docs/getting-started/binary-selection.md)를 참조하세요.
 
 ### Python 추론
 
