@@ -114,6 +114,14 @@ tar xzf piper.tar.gz
 cd piper
 ```
 
+**Linux (ARM64，树莓派 4/5):**
+
+```bash
+curl -L -o piper.tar.gz https://github.com/ayutaz/piper-plus/releases/latest/download/piper-linux-arm64.tar.gz
+tar xzf piper.tar.gz
+cd piper
+```
+
 **2. 下载模型并生成语音**
 
 ```sh
@@ -127,6 +135,8 @@ cd piper
 > **关于 Windows cmd 代码页：** `--text` 选项内部使用 `GetCommandLineW()` (UTF-16)，不依赖代码页，可直接使用。仅在使用管道输入（`echo ... | piper`）时，需要先运行 `chcp 65001` 切换到 UTF-8。
 >
 > **output.wav 输出位置：** 生成在当前目录（即 `cd piper` 后的位置）。
+
+> **应该选择哪个二进制文件？** Releases 中还提供 `piper-plus-cli-*`（C# .NET）和 `piper-plus-rs-cli-*`（Rust）CLI。上述快速入门使用的是 **C++ CLI（`piper-*`）**，它支持的平台最广，推荐大多数用户使用。详情请参阅[选择 CLI 二进制文件](docs/getting-started/binary-selection.md)。
 
 ### Python 推理
 

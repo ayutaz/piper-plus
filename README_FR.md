@@ -161,6 +161,14 @@ tar xzf piper.tar.gz
 cd piper
 ```
 
+**Linux (ARM64, Raspberry Pi 4/5) :**
+
+```bash
+curl -L -o piper.tar.gz https://github.com/ayutaz/piper-plus/releases/latest/download/piper-linux-arm64.tar.gz
+tar xzf piper.tar.gz
+cd piper
+```
+
 **2. Telecharger un modele et generer de l'audio**
 
 ```sh
@@ -174,6 +182,8 @@ cd piper
 > **Page de code Windows cmd :** L'option `--text` utilise `GetCommandLineW()` (UTF-16) en interne et fonctionne independamment de la page de code. Pour l'entree par pipe (`echo ... | piper`), basculez d'abord en UTF-8 avec `chcp 65001`.
 >
 > **Emplacement de output.wav :** Le fichier est genere dans le repertoire courant (l'endroit ou vous avez execute `cd piper`).
+
+> **Quel binaire choisir ?** Les releases incluent egalement les CLI `piper-plus-cli-*` (C# .NET) et `piper-plus-rs-cli-*` (Rust). Le Demarrage rapide ci-dessus utilise le **CLI C++ (`piper-*`)**, qui dispose de la prise en charge de plateformes la plus large et est recommande pour la plupart des utilisateurs. Voir [Choisir un binaire CLI](docs/getting-started/binary-selection.md) pour plus de details.
 
 ### Docker
 
