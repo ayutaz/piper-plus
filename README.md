@@ -27,7 +27,6 @@
 - [使い方](#使い方)
 - [学習](#学習)
 - [事前学習済みモデル](#事前学習済みモデル)
-- [日本語 TTS](#日本語-tts)
 - [プラットフォーム](#プラットフォーム)
 - [関連リンク](#関連リンク)
 
@@ -86,28 +85,7 @@
 
 ### ランタイム別機能サポート
 
-| 機能 | Python | Rust | C++ | C# | Go | WASM/JS |
-|---|---|---|---|---|---|---|
-| 多言語 TTS (8言語) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **音素タイミング (JSON/TSV/SRT)** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| ストリーミング合成 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Voice Cloning | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| SSML サポート | ✅ | ✅ | ❌ | ✅ | ✅ | ❌ |
-| HTTP API サーバー | ✅ | ❌ | ❌ | ❌ | ✅ | N/A |
-| カスタム辞書 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-
-### プラットフォーム
-
-| プラットフォーム | アーキテクチャ | 備考 |
-|---|---|---|
-| Linux | x86_64 / ARM64 / ARMv7 | フルサポート |
-| macOS | ARM64 (Apple Silicon) のみ | M1/M2/M3+ |
-| Windows | x64 | フルサポート |
-| C API (FFI) | Linux x64/ARM64, macOS ARM64, Windows x64 | 共有ライブラリ、Android AAR |
-| Web | WebAssembly | Chrome/Edge/Firefox/Safari |
-| C# (.NET) | x64 / ARM64 | .NET 8/9、Linux/macOS/Windows |
-| Rust | Linux x64, macOS ARM64, Windows x64 | Linux/macOS/Windows、CUDA/CoreML/DirectML |
-| Go | Linux x64, macOS ARM64, Windows x64 | Linux/macOS/Windows、HTTP API、Docker |
+6 ランタイム (Python/Rust/C#/Go/JS-WASM/C++) で同等の8言語マルチリンガル合成を実現。音素タイミング・ストリーミング・Voice Cloning・カスタム辞書は全ランタイム対応。SSML は Python/Rust/C#/Go の4ランタイム対応、HTTP API は Python/Go の2ランタイム対応。
 
 ---
 
@@ -320,428 +298,45 @@ dotnet add package PiperPlus.Core
 piper-plus = "0.2.0"
 ```
 
-### ソースからビルド (C++)
+### ソースからビルド
 
-```bash
-git clone https://github.com/ayutaz/piper-plus.git
-cd piper-plus
-mkdir build && cd build
-cmake ..
-cmake --build . --config Release
-```
-
-前提条件: C++17対応コンパイラ、CMake 3.15+
-
-- **Linux**: 依存関係 (ONNX Runtime, OpenJTalk 等) は CMake が自動ダウンロード
-- **Windows**: [Windows セットアップガイド](docs/getting-started/windows-setup.md) を参照
-- **macOS**: 依存関係は自動ダウンロード
-
-### ソースからビルド (C#)
-
-```bash
-# C# CLI ビルド
-dotnet build src/csharp/PiperPlus.sln -c Release
-# テスト
-dotnet test src/csharp/PiperPlus.Core.Tests/
-```
-
-前提条件: .NET 8 SDK 以上
-
-#### C# CLI 使用例
-
-```bash
-# モデル名で推論 (自動ダウンロード対応、--output-file 省略で output.wav に出力)
-piper-plus --model tsukuyomi --text "こんにちは" --language ja
-
-# 英語
-piper-plus --model model.onnx --text "Hello world" --language en
-
-# マルチリンガル (自動言語検出)
-piper-plus --model model.onnx --text "こんにちはHello你好" --language ja-en-zh
-
-# インライン音素記法 (テキスト中に直接音素を指定)
-piper-plus --model model.onnx --text "Hello [[ h ə l oʊ ]] world" --language en
-
-# ストリーミング (文ごとに逐次PCM出力)
-piper-plus --model model.onnx --text "最初の文。次の文。" --language ja --streaming | aplay -r 22050 -f S16_LE
-
-# カスタム辞書 (JSON v1/v2 または TSV)
-piper-plus --model model.onnx --text "AI技術" --language ja --custom-dict my_dict.json
-
-# モデルダウンロード
-piper-plus --download-model tsukuyomi
-piper-plus --list-models ja
-
-# テストモード (ONNX推論なしで phoneme IDs を確認)
-piper-plus --model model.onnx --test-mode --text "こんにちは" --language ja
-```
-
-#### Rust CLI 使用例
-
-```bash
-# モデル名で推論 (自動ダウンロード対応)
-piper-plus-cli --model tsukuyomi --text "こんにちは" --language ja
-
-# 英語
-piper-plus-cli --model model.onnx --text "Hello world" --language en
-
-# モデルダウンロード・管理
-piper-plus-cli --download-model tsukuyomi
-piper-plus-cli --list-models ja
-
-# ストリーミング (文ごとに逐次合成)
-piper-plus-cli --model model.onnx --text "First sentence. Second sentence." --stream --output-dir chunks/
-
-# カスタム辞書
-piper-plus-cli --model model.onnx --text "AI技術" --custom-dict my_dict.json
-
-# GPU推論
-piper-plus-cli --model model.onnx --text "Hello" --device cuda
-
-# テストモード・静音モード
-piper-plus-cli --model model.onnx --test-mode --text "hello" --language en
-piper-plus-cli --model model.onnx --text "hello" --language en --quiet
-
-# raw PCM出力 (WAVヘッダなし)
-piper-plus-cli --model model.onnx --text "hello" --language en --output-raw | aplay -r 22050 -f S16_LE
-```
-
-> **Note:** C# CLI は `dotnet tool install -g PiperPlus.Cli` で、Rust CLI は `cargo install piper-plus-cli` でインストールできます。両方とも8言語対応・カスタム辞書・ストリーミングをサポートしています。
-
-### ソースからビルド (Rust)
-
-```bash
-# Rust CLI ビルド
-cargo build --release -p piper-plus-cli
-# テスト
-cargo test -p piper-plus
-```
-
-前提条件: Rust 1.88+、cargo
+プリビルドバイナリが提供されていないプラットフォームで使う場合や piper-plus を改変したい場合は、ソースからビルドできます。C++ / C# / Rust の各ランタイムのビルド手順は **[ソースからのビルドガイド](docs/guides/building-from-source.md)** を参照してください。
 
 ---
 
 ## 使い方
 
-### C++ CLI
+C++ CLI の詳細なコマンドラインオプション、JSON 入力フォーマット、モデル管理、環境変数、Windows ヘルパースクリプトの使い方は **[CLI 使用ガイド](docs/guides/cli-usage.md)** を参照してください。
 
-#### テキスト直接入力 (推奨)
-
-`--text` オプションでパイプなしにテキストを直接入力できます:
-
-```sh
-# テキストから音声生成
-./bin/piper --model model.onnx --text "Hello, how are you?" -f output.wav
-
-# 日本語テキスト (Windowsでのエンコーディング問題を回避)
-bin\piper.exe --model models\tsukuyomi.onnx --text "こんにちは、今日は良い天気ですね。" -f output.wav
-
-# 話者指定
-./bin/piper --model model.onnx --text "Hello" --speaker 3 -f output.wav
-```
-
-#### パイプ入力
-
-```sh
-# 基本
-echo "こんにちは" | ./bin/piper --model ja_model.onnx --output_file output.wav
-
-# ストリーミング (低レイテンシ)
-echo "長いテキスト..." | ./bin/piper --model ja_model.onnx --output_file output.wav --streaming
-
-# GPU推論
-echo "Hello" | ./bin/piper --model en_model.onnx --use-cuda --output_file output.wav
-
-# 音素タイミング出力 (リップシンク・字幕同期用)
-echo "Hello world" | ./bin/piper --model en_model.onnx -f speech.wav --output-timing timing.json
-
-# カスタム辞書
-echo "DockerとGitHubを使います" | ./bin/piper --model ja_model.onnx --custom-dict my_dict.json -f output.wav
-
-# インライン音素入力
-echo 'Hello [[ h ə l oʊ ]] world' | ./bin/piper --model en_model.onnx -f output.wav
-
-# 生の音素入力
-echo 'h ə l oʊ _ w ɜː l d' | ./bin/piper --model en_model.onnx --raw-phonemes -f output.wav
-
-# ストリーミング (raw audio 出力)
-echo 'Long text...' | ./bin/piper --model en_model.onnx --output-raw | \
-  aplay -r 22050 -f S16_LE -t raw -
-```
-
-主なオプション:
-
-| オプション | 説明 | デフォルト |
-|---|---|---|
-| `--model PATH\|NAME` | モデルファイルのパス、またはモデル名 (ダウンロード済みモデルを自動解決) | - |
-| `--text TEXT` | テキスト直接入力 (パイプ不要) | - |
-| `--streaming` | チャンクベースのストリーミングモード | off |
-| `--use-cuda` | CUDA GPU推論を有効化 | off |
-| `--gpu-device-id NUM` | GPU デバイスID | 0 |
-| `--length-scale VAL` | 話速調整 (小さい=速い) | 1.0 |
-| `--noise-scale VAL` | 音声バリエーション制御 | 0.667 |
-| `--noise-w VAL` | 音素長バリエーション制御 | 0.8 |
-| `--sentence-silence SEC` | 文間の無音 (秒) | 0.2 |
-| `--speaker NUM` | マルチスピーカーモデルの話者番号 | 0 |
-| `--phoneme-silence PHONEME SEC` | 特定音素の無音時間設定 | - |
-| `--raw-phonemes` | 入力を音素として解釈 | off |
-| `--output-timing FILE` | 音素タイミング情報をファイル出力 (JSON/TSV) | - |
-| `--custom-dict FILE` | カスタム辞書 (カンマ区切りで複数指定可) | - |
-| `--json-input` | JSON入力モード | off |
-| `--list-models [LANG]` | 利用可能なモデル一覧を表示 | - |
-| `--download-model NAME` | モデルをダウンロード | - |
-| `--model-dir DIR` | モデルのダウンロード先ディレクトリ | - |
-| `--version` | バージョン表示 | - |
-| `--config PATH` / `-c` | 設定ファイルパス | - |
-| `--output_file PATH` / `-f` | 出力WAVファイルパス | - |
-| `--output_dir PATH` / `-d` | 出力ディレクトリ | - |
-| `--output-raw` | raw PCM音声を標準出力に出力 | off |
-| `--language LANG` / `-l` | 言語コード | - |
-| `--timing-format FMT` | タイミング出力形式 (json/tsv) | json |
-| `--test-mode` | テストモード (ONNX推論スキップ) | off |
-| `--debug` | デバッグログ有効化 | off |
-| `--quiet` / `-q` | ログ無効化 | off |
-
-`piper --help` で全オプションを確認できます。
-
-> **WavLMモデルの推奨設定:** WavLM Discriminatorで学習されたモデルは `--noise-scale 0.5` を推奨します (デフォルトは 0.667)。
->
-> ```sh
-> echo "こんにちは" | ./bin/piper --model tsukuyomi.onnx --config config.json --noise-scale 0.5 -f output.wav
-> ```
-
-### JSON入力
-
-`--json-input` フラグでJSON入力を受け付けます:
-
-```json
-{ "text": "First speaker.", "speaker_id": 0, "output_file": "/tmp/speaker_0.wav" }
-{ "text": "Second speaker.", "speaker_id": 1, "output_file": "/tmp/speaker_1.wav" }
-```
-
-### モデル管理
-
-#### モデル一覧の表示
+簡単な使用例:
 
 ```bash
-# 利用可能なモデル一覧を表示
-./bin/piper --list-models
-
-# 言語でフィルタリング
-./bin/piper --list-models ja
-./bin/piper --list-models en
-```
-
-#### モデルのダウンロード
-
-```bash
-# モデル名を指定してダウンロード (エイリアスも使用可能)
-./bin/piper --download-model tsukuyomi
-./bin/piper --download-model en_US-lessac-medium
-
-# ダウンロード先ディレクトリを指定
-./bin/piper --download-model tsukuyomi --model-dir /path/to/models
-
-# ダウンロード後、モデル名で推論 (フルパス不要)
-./bin/piper --model tsukuyomi --text "こんにちは"
-```
-
-### 環境変数 (C++ CLI)
-
-| 変数名 | 説明 | 例 |
-|---|---|---|
-| `PIPER_DEFAULT_MODEL` | `--model` 未指定時のデフォルトモデルパス | `/path/to/model.onnx` |
-| `PIPER_DEFAULT_CONFIG` | `--config` 未指定時のデフォルト設定ファイルパス | `/path/to/config.json` |
-| `PIPER_MODEL_DIR` | ダウンロードモデルの保存先ディレクトリ | `~/.local/share/piper/models` |
-| `PIPER_GPU_DEVICE_ID` | CUDA GPUデバイスID | `0` |
-
-### ヘルパースクリプト (Windows)
-
-Windows ユーザー向けに `scripts/` ディレクトリにヘルパースクリプトを提供しています。
-
-**PowerShell:**
-
-```powershell
-.\scripts\speak.ps1 "こんにちは、今日は良い天気ですね。"
-.\scripts\speak.ps1 -Model "models\tsukuyomi.onnx" -Text "テスト"
-```
-
-**コマンドプロンプト:**
-
-```cmd
-scripts\speak.bat "こんにちは、今日は良い天気ですね。"
-scripts\speak.bat --model models\tsukuyomi.onnx "テスト"
+./bin/piper --model tsukuyomi --text "こんにちは" --output_file hello.wav
 ```
 
 ---
 
 ## 学習
 
-詳細は [学習ガイド](docs/guides/training/training-guide.md) を参照。
+ピパープラスモデルの学習・ファインチューニング方法 (基本設定、マルチスピーカー / マルチ GPU、ONNX 変換、チェックポイント管理、音声評価) は **[学習ガイド](docs/guides/training.md)** を参照してください。
 
-### 基本
-
-```bash
-uv pip install ".[train]"
-
-uv run python -m piper_train \
-  --dataset-dir /path/to/dataset \
-  --accelerator gpu --devices 1 --precision 16-mixed \
-  --max_epochs 200 --batch-size 16 \
-  --quality medium \
-  --prosody-dim 16 \
-  --ema-decay 0.9995
-```
-
-### マルチスピーカー・マルチGPU
-
-```bash
-NCCL_DEBUG=WARN NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 \
-uv run python -m piper_train \
-  --dataset-dir /path/to/dataset \
-  --prosody-dim 16 \
-  --accelerator gpu --devices 4 --precision 16-mixed \
-  --max_epochs 200 --batch-size 12 --samples-per-speaker 2 \
-  --checkpoint-epochs 1 --quality medium \
-  --base_lr 2e-4 --disable_auto_lr_scaling \
-  --ema-decay 0.9995
-```
-
-マルチGPUでは DDP (Distributed Data Parallel) が自動設定されます。NCCL環境変数の設定が必要です。詳細はマルチGPU学習ガイドを参照。
-
-### ONNX変換
-
-デフォルトでFP16変換が適用され、モデルサイズが約50%削減されます。`--no-fp16` で無効化可能。数値安定性のため LayerNormalization, Sigmoid, Softmax は FP32 のまま保持されます。
-
-```bash
-# 標準モデル (FP16出力)
-CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
-  /path/to/checkpoint.ckpt /path/to/output.onnx
-
-# FP32出力
-CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
-  --no-fp16 /path/to/checkpoint.ckpt /path/to/output.onnx
-
-# deterministic エクスポート (デバッグ用)
-CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
-  --no-stochastic /path/to/checkpoint.ckpt /path/to/output.onnx
-```
-
-### チェックポイント管理
-
-- `--resume_from_checkpoint` — チェックポイントからの学習再開
-- `--resume_from_single_speaker_checkpoint` — シングルスピーカーモデルからマルチスピーカーへの変換
-- `--resume-from-multispeaker-checkpoint` — マルチスピーカーからシングルスピーカーへの転移学習 (自動で `--freeze-dp` 有効化)
-
-### 音声評価
-
-`scripts/evaluation/` に評価用テストテキストがあります。
+実運用向けの 6 言語事前学習・つくよみちゃんファインチューニングのコマンドテンプレートは [CLAUDE.md](CLAUDE.md) にあります。
 
 ---
 
 ## 事前学習済みモデル
 
-推論用の音声合成モデルを Hugging Face で公開しています。
+公開されている piper-plus モデルの一覧、ダウンロード方法、6 言語ベースモデルの特徴、日本語 TTS の詳細は **[モデルガイド](docs/guides/pretrained-models.md)** を参照してください。
 
-**推論用モデル (すぐに使えます):**
-
-| モデル | 言語 | 話者数 | 説明 | ダウンロード |
-|---|---|---|---|---|
-| つくよみちゃん 6lang | JA/EN/ZH/ES/FR/PT | 1 | つくよみちゃん音声、6言語対応、FP16 | [HuggingFace](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan) |
-| CSS10 日本語 6lang | JA/EN/ZH/ES/FR/PT | 1 | CSS10日本語音声、6言語対応、FP16 | [HuggingFace](https://huggingface.co/ayousanz/piper-plus-css10-ja-6lang) |
-
-**学習用ベースモデル (ファインチューニング用):**
-
-| モデル | 言語 | 話者数 | 説明 | ダウンロード |
-|---|---|---|---|---|
-| 6言語ベースモデル | JA/EN/ZH/ES/FR/PT | 571 | マルチリンガル事前学習済み (508,187発話, VITS + Prosody) | [HuggingFace](https://huggingface.co/ayousanz/piper-plus-base) |
-
-### モデルのダウンロード
-
-**つくよみちゃんモデル:**
-
-**Windows (PowerShell):**
-
-```powershell
-mkdir models
-Invoke-WebRequest -Uri "https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/tsukuyomi-chan-6lang-fp16.onnx" -OutFile models/tsukuyomi.onnx
-Invoke-WebRequest -Uri "https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/config.json" -OutFile models/config.json
-```
-
-**macOS / Linux:**
-
-```bash
-mkdir -p models
-curl -L -o models/tsukuyomi.onnx https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/tsukuyomi-chan-6lang-fp16.onnx
-curl -L -o models/config.json https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/config.json
-```
-
-### 6言語ベースモデルの特徴 (学習用)
-
-- アーキテクチャ: VITS + Prosody Features
-- 学習データ: 508,187発話 (571話者, 6言語)
-- サンプリングレート: 22,050 Hz
-- シンボル数: 173
-- Prosody Features: A1/A2/A3 韻律情報 (日本語)
-- 言語グループ均等サンプリング: 自動有効化
-
-**対応言語:**
-
-| 言語 | コード | language_id | 話者数 | 発話数 | ソース |
-|---|---|---|---|---|---|
-| 日本語 | ja | 0 | 20 | 60,148 | MOE-Speech |
-| 英語 | en | 1 | 310 | 74,912 | LibriTTS-R |
-| 中国語 | zh | 2 | 142 | 63,223 | AISHELL-3 |
-| スペイン語 | es | 3 | 63 | 168,374 | CML-TTS |
-| フランス語 | fr | 4 | 28 | 107,464 | CML-TTS |
-| ポルトガル語 | pt | 5 | 8 | 34,066 | CML-TTS |
-
-> **Note:** piper-plus は独自のアーキテクチャ拡張 (多言語埋め込み、Prosody A1/A2/A3、173シンボル) を行っているため、upstream Piper のチェックポイント/ONNXモデルとの互換性はありません。piper-plus 専用のモデルをご利用ください。
-
----
-
-## 日本語 TTS
-
-OpenJTalk 統合による高品質な日本語音声合成。辞書・ボイスファイルは初回実行時に自動ダウンロードされます。
-
-**環境変数 (オプション):**
-
-| 変数名 | 説明 |
-|---|---|
-| `OPENJTALK_DICTIONARY_PATH` | OpenJTalk辞書パス (未設定時は自動ダウンロード) |
-| `PIPER_AUTO_DOWNLOAD_DICT` | `0` で自動ダウンロード無効化 |
-| `PIPER_OFFLINE_MODE` | `1` でオフラインモード |
-
-詳細は日本語音声合成ガイドおよび [音素マッピングリファレンス](docs/api-reference/phoneme-mapping.md) を参照。
+主要モデル: `tsukuyomi` (日本語), `multilingual-6lang` (8 言語ベース), `bilingual-ja-en-v4` (日英 2 言語) — 詳細は HuggingFace の [ayousanz/piper-plus-base](https://huggingface.co/ayousanz/piper-plus-base) や [ayousanz/piper-plus-tsukuyomi-chan](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan) を参照。
 
 ---
 
 ## プラットフォーム
 
-### macOS
-
-**Apple Silicon (M1/M2/M3+) のみサポート。** Intel Mac は Docker またはソースビルドをご利用ください。
-
-初回実行時のセキュリティ警告:
-
-```bash
-xattr -cr piper/
-```
-
-### Windows
-
-詳細は [Windows セットアップガイド](docs/getting-started/windows-setup.md) を参照。
-
-```cmd
-piper.exe --model model.onnx -f output.wav
-```
-
-### WebAssembly
-
-ブラウザで直接動作する日本語 TTS。サーバー不要、オフライン対応。
-
-- **[オンラインデモ](https://ayutaz.github.io/piper-plus/)**
-- **[技術詳細・統合ガイド](src/wasm/openjtalk-web/README.npm.md)**
+- **macOS**: Apple Silicon (arm64) ネイティブ対応。詳細は [macOS セットアップ](docs/getting-started/binary-selection.md#macos-開発元を確認できないため開けません) 参照
+- **Windows**: x64 / arm64 対応。OpenJTalk セットアップは [Windows セットアップガイド](docs/getting-started/windows-setup.md)
+- **WebAssembly**: ブラウザで完全オフライン実行。[デモ](https://ayutaz.github.io/piper-plus/) | [npm パッケージ](https://www.npmjs.com/package/piper-plus)
 
 ---
 
