@@ -163,9 +163,7 @@ def create_app(voice: Any, synthesize_args: dict[str, Any]) -> FastAPI:
         try:
             body_text = await _read_text(request, text)
         except _RequestTooLarge:
-            return _error_response(
-                413, f"Request body exceeds {MAX_TEXT_BYTES} bytes"
-            )
+            return _error_response(413, f"Request body exceeds {MAX_TEXT_BYTES} bytes")
 
         if not body_text:
             return _error_response(400, "No text provided")
@@ -223,9 +221,7 @@ def create_app(voice: Any, synthesize_args: dict[str, Any]) -> FastAPI:
         try:
             body_text = await _read_text(request, text)
         except _RequestTooLarge:
-            return _error_response(
-                413, f"Request body exceeds {MAX_TEXT_BYTES} bytes"
-            )
+            return _error_response(413, f"Request body exceeds {MAX_TEXT_BYTES} bytes")
 
         if not body_text:
             return _error_response(400, "No text provided")
@@ -279,9 +275,7 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--host", default="0.0.0.0", help="HTTP server host")
     parser.add_argument("--port", type=int, default=5000, help="HTTP server port")
-    parser.add_argument(
-        "-m", "--model", required=True, help="Path to Onnx model file"
-    )
+    parser.add_argument("-m", "--model", required=True, help="Path to Onnx model file")
     parser.add_argument("-c", "--config", help="Path to model config file")
     parser.add_argument("-s", "--speaker", type=int, help="Id of speaker (default: 0)")
     parser.add_argument(
