@@ -104,6 +104,7 @@ create_comprehensive_*.py
 add_missing_*.py
 retrain_*.py
 comprehensive_*.py
+tmp_*.py
 
 # Training datasets and downloaded models
 datasets/
