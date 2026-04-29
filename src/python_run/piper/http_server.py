@@ -33,6 +33,7 @@ from . import PiperVoice
 from .download import ensure_voice_exists, find_voice, get_voices
 from .timing import timing_to_json, timing_to_tsv
 
+
 _LOGGER = logging.getLogger(__name__)
 
 # Default channel/bit-depth assumptions match `PiperVoice.synthesize` output.
@@ -184,12 +185,11 @@ def create_app(voice: Any, synthesize_args: dict[str, Any]) -> FastAPI:
             def _iter_wav():
                 try:
                     yield _build_streaming_wav_header(sample_rate)
-                    for audio_bytes in voice.synthesize_stream_raw(
+                    yield from voice.synthesize_stream_raw(
                         body_text,
                         **synthesize_args,
                         language_id=resolved_language_id,
-                    ):
-                        yield audio_bytes
+                    )
                 except Exception:
                     # Headers have already been sent — we cannot return 500.
                     # Log so operators can diagnose silent client truncation.
