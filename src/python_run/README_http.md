@@ -5,14 +5,16 @@ FastAPI ベースの HTTP サーバー。`/synthesize` の代わりにルート 
 
 ## インストール
 
-```sh
-uv pip install -r requirements_http.txt
-```
-
-または extras 経由:
+`[http]` extras で `fastapi` + `uvicorn[standard]` を入れます。
 
 ```sh
 uv pip install "piper-plus[http]"
+```
+
+`uv add` を使う場合:
+
+```sh
+uv add "piper-plus[http]"
 ```
 
 ## 起動

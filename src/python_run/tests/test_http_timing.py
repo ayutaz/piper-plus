@@ -10,8 +10,9 @@ from unittest.mock import MagicMock
 
 import pytest
 
-fastapi = pytest.importorskip("fastapi")
-httpx = pytest.importorskip("httpx")
+
+pytest.importorskip("fastapi")
+pytest.importorskip("httpx")
 
 from fastapi.testclient import TestClient  # noqa: E402
 
@@ -29,9 +30,7 @@ def mock_timing_result() -> TimingResult:
     """Sample TimingResult covering 3 phonemes."""
     return TimingResult(
         phonemes=[
-            PhonemeTimingInfo(
-                phoneme="^", start_ms=0.0, end_ms=58.0, duration_ms=58.0
-            ),
+            PhonemeTimingInfo(phoneme="^", start_ms=0.0, end_ms=58.0, duration_ms=58.0),
             PhonemeTimingInfo(
                 phoneme="k", start_ms=58.0, end_ms=150.8, duration_ms=92.8
             ),
@@ -215,18 +214,14 @@ class TestTimingEndpointLanguageResolution:
         assert resp.status_code == 200
         assert captured["language_id"] == 3
 
-    def test_numeric_language_id_with_no_map_passes_through(
-        self, mock_timing_result
-    ):
+    def test_numeric_language_id_with_no_map_passes_through(self, mock_timing_result):
         """Without a language_id_map, numeric ids are passed through unchanged."""
         client, captured = self._build(mock_timing_result, None)
         resp = client.get("/api/phoneme-timing?text=hello&language_id=5")
         assert resp.status_code == 200
         assert captured["language_id"] == 5
 
-    def test_out_of_range_language_id_falls_back_to_none(
-        self, mock_timing_result
-    ):
+    def test_out_of_range_language_id_falls_back_to_none(self, mock_timing_result):
         """language_id outside the configured map falls back to None."""
         client, captured = self._build(mock_timing_result, {"ja": 0, "en": 1})
         resp = client.get("/api/phoneme-timing?text=hello&language_id=999")
@@ -240,18 +235,14 @@ class TestTimingEndpointLanguageResolution:
         assert captured["language_id"] is None
 
     def test_language_code_resolved(self, mock_timing_result):
-        client, captured = self._build(
-            mock_timing_result, {"ja": 0, "en": 1, "zh": 2}
-        )
+        client, captured = self._build(mock_timing_result, {"ja": 0, "en": 1, "zh": 2})
         resp = client.get("/api/phoneme-timing?text=hello&language=zh")
         assert resp.status_code == 200
         assert captured["language_id"] == 2
 
     def test_invalid_language_id_falls_back_to_none(self, mock_timing_result):
         client, captured = self._build(mock_timing_result, None)
-        resp = client.get(
-            "/api/phoneme-timing?text=hello&language_id=not-an-int"
-        )
+        resp = client.get("/api/phoneme-timing?text=hello&language_id=not-an-int")
         assert resp.status_code == 200
         assert captured["language_id"] is None
 
@@ -296,9 +287,7 @@ class TestSynthesizeEndpoint:
 class TestStreamingEndpoint:
     """Tests for ``?streaming=true`` chunked WAV streaming on ``/``."""
 
-    def test_streaming_returns_wav_with_placeholder_sizes(
-        self, mock_timing_result
-    ):
+    def test_streaming_returns_wav_with_placeholder_sizes(self, mock_timing_result):
         voice = _make_voice(mock_timing_result, sample_rate=22050)
         client = TestClient(create_app(voice, synthesize_args={}))
 
@@ -351,9 +340,7 @@ class TestStreamingEndpoint:
         assert voice.synthesize.called
         assert not voice.synthesize_stream_raw.called
 
-    def test_streaming_wav_header_uses_voice_sample_rate(
-        self, mock_timing_result
-    ):
+    def test_streaming_wav_header_uses_voice_sample_rate(self, mock_timing_result):
         voice = _make_voice(mock_timing_result, sample_rate=16000)
         client = TestClient(create_app(voice, synthesize_args={}))
         with client.stream("POST", "/?streaming=true", content="hello") as resp:
@@ -419,6 +406,35 @@ class TestRequestBodySizeLimit:
         resp = client.post("/api/phoneme-timing", content=oversized)
         assert resp.status_code == 413
 
+    def test_oversized_get_query_raises(self):
+        """``_read_text`` rejects oversized GET ``?text=`` directly.
+
+        We can't exercise this via ``TestClient`` because httpx refuses to
+        build URLs over its own internal cap (``InvalidURL: query too long``)
+        before the request reaches the server.
+        """
+        import asyncio
+
+        from piper.http_server import MAX_TEXT_BYTES, _read_text, _RequestTooLarge
+
+        request = MagicMock()
+        request.method = "GET"
+        oversized = "a" * (MAX_TEXT_BYTES + 1)
+
+        with pytest.raises(_RequestTooLarge):
+            asyncio.run(_read_text(request, oversized))
+
+    def test_within_get_query_accepted(self):
+        """Sanity check: GET ``?text=`` under the cap passes through."""
+        import asyncio
+
+        from piper.http_server import _read_text
+
+        request = MagicMock()
+        request.method = "GET"
+        result = asyncio.run(_read_text(request, "hello"))
+        assert result == "hello"
+
 
 # ---------------------------------------------------------------------------
 # Error response shape consistency
@@ -465,13 +481,9 @@ class TestStreamingExceptionHandling:
 
         with caplog.at_level(logging.ERROR, logger="piper.http_server"):
             with pytest.raises(RuntimeError):
-                with client.stream(
-                    "POST", "/?streaming=true", content="hello"
-                ) as resp:
+                with client.stream("POST", "/?streaming=true", content="hello") as resp:
                     list(resp.iter_bytes())
-        assert any(
-            "Streaming synthesis failed" in r.message for r in caplog.records
-        )
+        assert any("Streaming synthesis failed" in r.message for r in caplog.records)
 
 
 # ---------------------------------------------------------------------------
@@ -481,9 +493,7 @@ class TestStreamingExceptionHandling:
 
 class TestStreamingLanguageIdPassthrough:
     def test_streaming_passes_language_id(self, mock_timing_result):
-        voice = _make_voice(
-            mock_timing_result, language_id_map={"ja": 0, "en": 1}
-        )
+        voice = _make_voice(mock_timing_result, language_id_map={"ja": 0, "en": 1})
         captured: dict = {}
 
         def _stream(_text, **kwargs):

@@ -111,9 +111,13 @@ def _resolve_language_id(
 
 
 async def _read_text(request: Request, query_text: str | None) -> str:
-    """Read text from POST body or GET ``?text=`` query, with a size cap."""
+    """Read text from POST body or GET ``?text=`` query, with a size cap.
+
+    POST bodies are read as a stream and aborted once ``MAX_TEXT_BYTES`` is
+    exceeded, so chunked / Content-Length-less uploads cannot blow up memory.
+    The same cap is applied to GET ``?text=`` (UTF-8 byte length).
+    """
     if request.method == "POST":
-        # Reject obviously oversized bodies up front when Content-Length is set
         cl = request.headers.get("content-length")
         if cl is not None:
             try:
@@ -121,12 +125,18 @@ async def _read_text(request: Request, query_text: str | None) -> str:
                     raise _RequestTooLarge()
             except ValueError:
                 pass
-        body = await request.body()
-        if len(body) > MAX_TEXT_BYTES:
-            raise _RequestTooLarge()
-        text = body.decode("utf-8", errors="replace")
+        chunks: list[bytes] = []
+        total = 0
+        async for chunk in request.stream():
+            total += len(chunk)
+            if total > MAX_TEXT_BYTES:
+                raise _RequestTooLarge()
+            chunks.append(chunk)
+        text = b"".join(chunks).decode("utf-8", errors="replace")
     else:
         text = query_text or ""
+        if len(text.encode("utf-8", errors="replace")) > MAX_TEXT_BYTES:
+            raise _RequestTooLarge()
     return text.strip()
 
 
