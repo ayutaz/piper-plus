@@ -211,13 +211,15 @@ def _pad_phoneme_ids(
     phoneme_ids: list[int],
     pad_id: int,
     min_length: int = MIN_PHONEME_IDS,
-) -> tuple[list[int], bool]:
+) -> tuple[list[int], bool, int, int]:
     """Pad short phoneme_ids with silence tokens after BOS and before EOS.
 
-    Returns (padded_ids, was_padded).
+    Returns ``(padded_ids, was_padded, front_pad, back_pad)`` where
+    ``front_pad`` / ``back_pad`` are the numbers of pad tokens inserted
+    after BOS and before EOS respectively (both 0 when no padding occurred).
     """
     if len(phoneme_ids) >= min_length:
-        return phoneme_ids, False
+        return phoneme_ids, False, 0, 0
 
     needed = min_length - len(phoneme_ids)
     front = needed // 2
@@ -229,7 +231,48 @@ def _pad_phoneme_ids(
     eos = phoneme_ids[-1:]
 
     padded = bos + [pad_id] * front + body + [pad_id] * back + eos
-    return padded, True
+    return padded, True, front, back
+
+
+def _trim_padding_by_durations(
+    audio: np.ndarray,
+    durations: np.ndarray,
+    front_pad: int,
+    back_pad: int,
+    hop_size: int,
+) -> np.ndarray:
+    """Trim Strategy A padding using model durations (precise method).
+
+    The padded sequence layout is::
+
+        [BOS, pad×front_pad, ...body..., pad×back_pad, EOS]
+
+    Each ``durations[i]`` is the frame count VITS assigned to phoneme ``i``.
+    Multiplying the pad-token frame counts by ``hop_size`` gives the exact
+    number of audio samples generated for the padding, which can be sliced
+    off without relying on RMS thresholds.
+
+    BOS / EOS frames are kept (they bracket the body and aren't padding).
+    Returns ``audio`` unchanged when inputs are inconsistent.
+    """
+    if front_pad <= 0 and back_pad <= 0:
+        return audio
+    if durations is None or hop_size <= 0:
+        return audio
+
+    durations_1d = np.asarray(durations).reshape(-1)
+    expected_len = 1 + front_pad + back_pad + 1  # BOS + pads + EOS (body counted separately)
+    if durations_1d.size < expected_len:
+        return audio
+
+    front_samples = int(durations_1d[1 : 1 + front_pad].sum() * hop_size) if front_pad > 0 else 0
+    back_samples = int(durations_1d[-(1 + back_pad) : -1].sum() * hop_size) if back_pad > 0 else 0
+
+    start = max(0, front_samples)
+    end = max(start, len(audio) - back_samples)
+    if start >= len(audio) or end <= 0 or start >= end:
+        return audio
+    return audio[start:end]
 
 
 def _trim_silence(
@@ -238,7 +281,13 @@ def _trim_silence(
     window: int = 256,
     min_samples: int = TRIM_MIN_SAMPLES,
 ) -> np.ndarray:
-    """Trim leading/trailing silence from int16 audio using windowed RMS."""
+    """Trim leading/trailing silence from int16 audio using windowed RMS.
+
+    Fallback used when model durations are unavailable. Note that VITS pad
+    tokens often produce voiced-looking audio (RMS > threshold), so this
+    method is unreliable for Strategy A trimming; prefer
+    :func:`_trim_padding_by_durations` whenever durations are present.
+    """
     if len(audio) <= min_samples:
         return audio
 
@@ -514,7 +563,9 @@ class PiperVoice:
 
         # Strategy A: pad short sequences with silence tokens
         pad_id = 0
-        phoneme_ids, was_padded = _pad_phoneme_ids(phoneme_ids, pad_id)
+        phoneme_ids, was_padded, front_pad, back_pad = _pad_phoneme_ids(
+            phoneme_ids, pad_id
+        )
 
         phoneme_ids_array = np.expand_dims(np.array(phoneme_ids, dtype=np.int64), 0)
         phoneme_ids_lengths = np.array([phoneme_ids_array.shape[1]], dtype=np.int64)
@@ -576,9 +627,20 @@ class PiperVoice:
                 durations = _outputs[dur_idx].squeeze()
         audio = audio_float_to_int16(audio.squeeze(), volume=volume)
 
-        # Strategy A: trim silence introduced by padding
+        # Strategy A: trim silence introduced by padding.
+        # Prefer durations-based precise trim; fall back to RMS when the model
+        # has no durations output (older VITS exports).
         if was_padded:
-            audio = _trim_silence(audio)
+            if durations is not None:
+                audio = _trim_padding_by_durations(
+                    audio,
+                    durations,
+                    front_pad,
+                    back_pad,
+                    self.config.hop_size,
+                )
+            else:
+                audio = _trim_silence(audio)
 
         return audio.tobytes(), durations, original_phoneme_ids
 

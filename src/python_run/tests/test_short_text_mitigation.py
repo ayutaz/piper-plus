@@ -16,6 +16,7 @@ from piper.voice import (
     TRIM_MIN_SAMPLES,
     TRIM_THRESHOLD_RMS,
     _pad_phoneme_ids,
+    _trim_padding_by_durations,
     _trim_silence,
 )
 
@@ -28,35 +29,40 @@ class TestPadPhonemeIds:
     @pytest.mark.unit
     def test_no_pad_when_long_enough(self):
         ids = list(range(MIN_PHONEME_IDS))
-        padded, was_padded = _pad_phoneme_ids(ids, pad_id=0)
+        padded, was_padded, front_pad, back_pad = _pad_phoneme_ids(ids, pad_id=0)
         assert not was_padded
         assert padded is ids
+        assert front_pad == 0
+        assert back_pad == 0
 
     @pytest.mark.unit
     def test_no_pad_when_exceeds_min(self):
         ids = list(range(MIN_PHONEME_IDS + 10))
-        padded, was_padded = _pad_phoneme_ids(ids, pad_id=0)
+        padded, was_padded, front_pad, back_pad = _pad_phoneme_ids(ids, pad_id=0)
         assert not was_padded
         assert padded is ids
+        assert front_pad == 0
+        assert back_pad == 0
 
     @pytest.mark.unit
     def test_pads_short_sequence(self):
         bos, eos = 1, 2
         body = [10, 11, 12]
         ids = [bos] + body + [eos]  # length 5
-        padded, was_padded = _pad_phoneme_ids(ids, pad_id=0)
+        padded, was_padded, front_pad, back_pad = _pad_phoneme_ids(ids, pad_id=0)
 
         assert was_padded
         assert len(padded) == MIN_PHONEME_IDS
         assert padded[0] == bos
         assert padded[-1] == eos
+        assert front_pad + back_pad == MIN_PHONEME_IDS - len(ids)
 
     @pytest.mark.unit
     def test_preserves_body_content(self):
         bos, eos, pad_id = 1, 2, 0
         body = [10, 20, 30]
         ids = [bos] + body + [eos]
-        padded, _ = _pad_phoneme_ids(ids, pad_id=pad_id)
+        padded, _, _, _ = _pad_phoneme_ids(ids, pad_id=pad_id)
 
         # body should appear contiguously in the padded result
         body_start = padded.index(10)
@@ -67,30 +73,105 @@ class TestPadPhonemeIds:
         """Front and back padding should be roughly equal."""
         bos, eos, pad_id = 1, 2, 0
         ids = [bos, 10, eos]  # length 3
-        padded, _ = _pad_phoneme_ids(ids, pad_id=pad_id)
+        padded, _, front_pad, back_pad = _pad_phoneme_ids(ids, pad_id=pad_id)
 
         needed = MIN_PHONEME_IDS - 3
-        front = needed // 2
-        back = needed - front
+        expected_front = needed // 2
+        expected_back = needed - expected_front
+        assert front_pad == expected_front
+        assert back_pad == expected_back
 
         # After BOS, expect front pad tokens
-        assert padded[1 : 1 + front] == [pad_id] * front
+        assert padded[1 : 1 + front_pad] == [pad_id] * front_pad
         # Before EOS, expect back pad tokens
-        assert padded[-1 - back : -1] == [pad_id] * back
+        assert padded[-1 - back_pad : -1] == [pad_id] * back_pad
 
     @pytest.mark.unit
     def test_minimum_input_two_elements(self):
         """Edge case: only BOS + EOS."""
         ids = [1, 2]
-        padded, was_padded = _pad_phoneme_ids(ids, pad_id=0)
+        padded, was_padded, front_pad, back_pad = _pad_phoneme_ids(ids, pad_id=0)
         assert was_padded
         assert len(padded) == MIN_PHONEME_IDS
         assert padded[0] == 1
         assert padded[-1] == 2
+        assert front_pad + back_pad == MIN_PHONEME_IDS - 2
 
 
 # ---------------------------------------------------------------
-# Strategy A: _trim_silence
+# Strategy A: _trim_padding_by_durations (precise method, Issue #356)
+# ---------------------------------------------------------------
+class TestTrimPaddingByDurations:
+    """Durations-based padding trim (preferred over RMS for Strategy A).
+
+    Regression coverage for issue #356 where pad tokens (ID=0) produced
+    voiced-looking audio that RMS-based trim could not strip, yielding
+    'あこんにちはた' (extra 'a' / 'ta' at boundaries).
+    """
+
+    @pytest.mark.unit
+    def test_no_op_when_no_padding(self):
+        audio = np.arange(1000, dtype=np.int16)
+        durations = np.array([1.0] * 5, dtype=np.float32)
+        result = _trim_padding_by_durations(audio, durations, 0, 0, hop_size=256)
+        assert np.array_equal(result, audio)
+
+    @pytest.mark.unit
+    def test_trims_front_padding_only(self):
+        # Layout: BOS=2, pad×3 (totals 9 frames), body=4, EOS=1 → 19 frames
+        durations = np.array([2.0, 3.0, 3.0, 3.0, 4.0, 1.0], dtype=np.float32)
+        hop = 100
+        total_samples = int(durations.sum() * hop)  # 1900
+        audio = np.arange(total_samples, dtype=np.int16)
+        result = _trim_padding_by_durations(audio, durations, front_pad=3, back_pad=0, hop_size=hop)
+        # front padding samples = (3+3+3) * 100 = 900
+        assert len(result) == total_samples - 900
+        assert result[0] == audio[900]
+
+    @pytest.mark.unit
+    def test_trims_back_padding_only(self):
+        durations = np.array([2.0, 4.0, 3.0, 3.0, 3.0, 1.0], dtype=np.float32)
+        hop = 100
+        total_samples = int(durations.sum() * hop)  # 1600
+        audio = np.arange(total_samples, dtype=np.int16)
+        result = _trim_padding_by_durations(audio, durations, front_pad=0, back_pad=3, hop_size=hop)
+        # back padding samples = (3+3+3) * 100 = 900
+        assert len(result) == total_samples - 900
+        assert result[-1] == audio[total_samples - 900 - 1]
+
+    @pytest.mark.unit
+    def test_trims_both_sides(self):
+        # BOS, pad×2, body×2, pad×2, EOS
+        durations = np.array(
+            [2.0, 5.0, 5.0, 4.0, 4.0, 5.0, 5.0, 1.0], dtype=np.float32
+        )
+        hop = 100
+        total = int(durations.sum() * hop)  # 3100
+        audio = np.arange(total, dtype=np.int16)
+        result = _trim_padding_by_durations(audio, durations, front_pad=2, back_pad=2, hop_size=hop)
+        front_samples = int((5.0 + 5.0) * hop)  # 1000
+        back_samples = int((5.0 + 5.0) * hop)  # 1000
+        assert len(result) == total - front_samples - back_samples
+        assert result[0] == audio[front_samples]
+        assert result[-1] == audio[total - back_samples - 1]
+
+    @pytest.mark.unit
+    def test_returns_input_when_durations_none(self):
+        audio = np.arange(1000, dtype=np.int16)
+        result = _trim_padding_by_durations(audio, None, 3, 3, hop_size=256)
+        assert np.array_equal(result, audio)
+
+    @pytest.mark.unit
+    def test_returns_input_when_durations_too_short(self):
+        # durations has fewer entries than 1+front+back+1
+        audio = np.arange(1000, dtype=np.int16)
+        durations = np.array([1.0, 1.0, 1.0], dtype=np.float32)
+        result = _trim_padding_by_durations(audio, durations, front_pad=5, back_pad=5, hop_size=256)
+        assert np.array_equal(result, audio)
+
+
+# ---------------------------------------------------------------
+# Strategy A: _trim_silence (RMS fallback)
 # ---------------------------------------------------------------
 class TestTrimSilence:
 
