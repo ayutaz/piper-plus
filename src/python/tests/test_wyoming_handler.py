@@ -416,6 +416,23 @@ class TestBuildInfo:
         assert attr.name == "piper-plus"
         assert "github.com" in attr.url
 
+    @pytest.mark.unit
+    def test_build_info_version_matches_package(self):
+        """TtsProgram と TtsVoice の version は piper_wyoming.__version__ と一致するべき.
+
+        Wyoming 1.6.0+ で Artifact.version が required になっているため、
+        version 引数を渡さないと TypeError で HA 統合が停止する。
+        ハードコード値ではなくパッケージバージョンを参照することで、
+        メタデータの一貫性を保つ.
+        """
+        from piper_wyoming import __version__
+
+        info = build_info()
+        program = info.tts[0]
+        assert program.version == __version__
+        for voice in program.voices:
+            assert voice.version == __version__
+
 
 # ---------------------------------------------------------------------------
 # TestResolveLanguageEdgeCases
