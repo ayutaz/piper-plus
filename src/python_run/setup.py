@@ -64,7 +64,10 @@ setup(
     python_requires=">=3.11",
     extras_require={
         "gpu": ["onnxruntime-gpu>=1.11.0,<2"],
-        "http": ["flask>=3,<4"],
+        "http": [
+            "fastapi>=0.110,<1",
+            "uvicorn[standard]>=0.27,<1",
+        ],
     },
     classifiers=[
         "Development Status :: 3 - Alpha",

@@ -99,6 +99,8 @@ jobs:
     - name: Install runtime package dependencies
       run: |
         pip install pyopenjtalk-plus g2p-en pypinyin
+        # HTTP サーバー (FastAPI) のテストに必要な依存。バージョン制約は src/python_run/setup.py の [http] extras で一元管理。
+        pip install fastapi 'uvicorn[standard]' httpx
         python -c "import nltk; nltk.download('averaged_perceptron_tagger_eng', quiet=True); nltk.download('cmudict', quiet=True)"
       env:
         PYTHONUTF8: '1'
