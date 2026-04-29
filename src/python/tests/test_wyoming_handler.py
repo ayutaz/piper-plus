@@ -420,10 +420,11 @@ class TestBuildInfo:
     def test_build_info_version_matches_package(self):
         """TtsProgram と TtsVoice の version は piper_wyoming.__version__ と一致するべき.
 
-        Wyoming 1.6.0+ で Artifact.version が required になっているため、
-        version 引数を渡さないと TypeError で HA 統合が停止する。
+        Wyoming 1.5.1 で Artifact.version (Optional[str]) が追加されたが、
+        default 値を持たないため引数指定が実質必須。version 引数を渡さないと
+        TypeError で Home Assistant 統合が停止する。
         ハードコード値ではなくパッケージバージョンを参照することで、
-        メタデータの一貫性を保つ.
+        メタデータの一貫性を保ち、将来の __version__ 更新時の取り残しを防ぐ.
         """
         from piper_wyoming import __version__
 

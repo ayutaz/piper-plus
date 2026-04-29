@@ -22,7 +22,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libsndfile1-dev \
     && rm -rf /var/lib/apt/lists/*
 
-RUN pip install --no-cache-dir uv
+# Pin uv to a known-good major version (workspace editable handling is uv version-sensitive)
+RUN pip install --no-cache-dir "uv>=0.9,<1"
 
 WORKDIR /build
 
@@ -31,14 +32,28 @@ COPY VERSION /build/VERSION
 COPY pyproject.toml /build/pyproject.toml
 COPY src/python/ /build/src/python/
 
+# Build wheels first to guarantee non-editable installs.
+# `uv pip install /path[extras]` can resolve to .pth-style editable links when uv
+# detects the workspace pyproject.toml (root pyproject.toml has
+# `[tool.uv.sources] piper-plus-g2p = { workspace = true, editable = true }`).
+# Editable installs would leave `/build/...` references in site-packages, which
+# break in stage-2 because `/build/` is not copied to the runtime image.
+# Building wheels first sidesteps this entirely (archive_info instead of dir_info
+# in dist-info/direct_url.json).
+RUN uv build /build/src/python/g2p --wheel --out-dir /tmp/wheels/ \
+ && uv build /build/src/python      --wheel --out-dir /tmp/wheels/
+
 # Install piper_plus_g2p (standalone G2P -- all languages)
-RUN uv pip install --system "/build/src/python/g2p[all]"
+RUN uv pip install --system "$(ls /tmp/wheels/piper_plus_g2p-*.whl)[all]"
 
 # Install piper_train with inference extras (onnxruntime CPU, soundfile, etc.)
-RUN uv pip install --system "/build/src/python[inference]"
+RUN uv pip install --system "$(ls /tmp/wheels/piper_train-*.whl)[inference]"
 
-# Install wyoming protocol library
-RUN uv pip install --system "wyoming>=1.5"
+# Install wyoming protocol library.
+# >=1.5.1 added Artifact.version field; 1.5.0 raises TypeError on
+# `TtsVoice(version=...)`.  We follow the rhasspy/wyoming-piper upstream pin
+# (`wyoming>=1.7,<2`) for HA 2026.x compatibility.
+RUN uv pip install --system "wyoming>=1.7,<2"
 
 # Install huggingface-hub for model auto-download
 RUN uv pip install --system "huggingface-hub>=0.22"
