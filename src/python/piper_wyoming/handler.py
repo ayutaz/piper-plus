@@ -32,7 +32,8 @@ def build_info(languages: list[str] | None = None) -> Info:
             attribution=attribution,
             installed=True,
             languages=[lang],
-            version=__version__,
+            # Voice モデル自身のバージョンが無いため None (rhasspy/wyoming-piper 準拠)
+            version=None,
         )
         for lang in langs
     ]
@@ -44,6 +45,7 @@ def build_info(languages: list[str] | None = None) -> Info:
                 attribution=attribution,
                 installed=True,
                 voices=voices,
+                # サービスソフトウェアのバージョン
                 version=__version__,
             )
         ]
