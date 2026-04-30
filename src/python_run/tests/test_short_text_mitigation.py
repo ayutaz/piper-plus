@@ -118,30 +118,48 @@ class TestTrimPaddingByDurations:
 
     @pytest.mark.unit
     def test_trims_front_padding_only(self):
-        # Layout: BOS=2, pad×3 (totals 9 frames), body=4, EOS=1 → 19 frames
+        # Layout: BOS=2, pad×3 (3+3+3 frames), body=4, EOS=1 → 19 frames total
+        # Strategy A trims BOS + front padding from the start.
+        # EOS=1 frame is below eos_max_frames (default 6), so it's preserved.
         durations = np.array([2.0, 3.0, 3.0, 3.0, 4.0, 1.0], dtype=np.float32)
         hop = 100
         total_samples = int(durations.sum() * hop)  # 1900
         audio = np.arange(total_samples, dtype=np.int16)
         result = _trim_padding_by_durations(audio, durations, front_pad=3, back_pad=0, hop_size=hop)
-        # front padding samples = (3+3+3) * 100 = 900
-        assert len(result) == total_samples - 900
-        assert result[0] == audio[900]
+        # BOS + front padding samples = (2+3+3+3) * 100 = 1100
+        assert len(result) == total_samples - 1100
+        assert result[0] == audio[1100]
 
     @pytest.mark.unit
-    def test_trims_back_padding_only(self):
+    def test_trims_back_padding_preserves_normal_eos(self):
+        # Back padding stripped, EOS=1 frame preserved (under eos_max_frames=6).
+        # Layout: [body=2, body=4, pad=3, pad=3, pad=3, EOS=1] with front_pad=0
         durations = np.array([2.0, 4.0, 3.0, 3.0, 3.0, 1.0], dtype=np.float32)
         hop = 100
         total_samples = int(durations.sum() * hop)  # 1600
         audio = np.arange(total_samples, dtype=np.int16)
         result = _trim_padding_by_durations(audio, durations, front_pad=0, back_pad=3, hop_size=hop)
-        # back padding samples = (3+3+3) * 100 = 900
+        # Trim back padding only (3+3+3)*100 = 900; EOS=1 frame stays in audio.
         assert len(result) == total_samples - 900
+        # The last 100 samples (= 1 frame * hop) of the result are the EOS region.
         assert result[-1] == audio[total_samples - 900 - 1]
 
     @pytest.mark.unit
+    def test_clamps_inflated_eos_duration(self):
+        # EOS=10 frames is above eos_max_frames=6, excess 4 frames trimmed.
+        durations = np.array([2.0, 3.0, 3.0, 4.0, 3.0, 3.0, 10.0], dtype=np.float32)
+        hop = 100
+        total = int(durations.sum() * hop)  # 2800
+        audio = np.arange(total, dtype=np.int16)
+        result = _trim_padding_by_durations(audio, durations, front_pad=2, back_pad=2, hop_size=hop)
+        # BOS + front padding = (2+3+3) * 100 = 800
+        # back padding + EOS excess = (3+3 + (10-6)) * 100 = 1000
+        assert len(result) == total - 800 - 1000
+
+    @pytest.mark.unit
     def test_trims_both_sides(self):
-        # BOS, pad×2, body×2, pad×2, EOS
+        # BOS=2, pad×2, body×2, pad×2, EOS=1
+        # EOS below eos_max_frames so preserved entirely.
         durations = np.array(
             [2.0, 5.0, 5.0, 4.0, 4.0, 5.0, 5.0, 1.0], dtype=np.float32
         )
@@ -149,11 +167,27 @@ class TestTrimPaddingByDurations:
         total = int(durations.sum() * hop)  # 3100
         audio = np.arange(total, dtype=np.int16)
         result = _trim_padding_by_durations(audio, durations, front_pad=2, back_pad=2, hop_size=hop)
-        front_samples = int((5.0 + 5.0) * hop)  # 1000
-        back_samples = int((5.0 + 5.0) * hop)  # 1000
+        # BOS + front padding = (2+5+5)*100 = 1200
+        # back padding only (EOS preserved) = (5+5)*100 = 1000
+        front_samples = int((2.0 + 5.0 + 5.0) * hop)
+        back_samples = int((5.0 + 5.0) * hop)
         assert len(result) == total - front_samples - back_samples
         assert result[0] == audio[front_samples]
         assert result[-1] == audio[total - back_samples - 1]
+
+    @pytest.mark.unit
+    def test_eos_max_frames_override(self):
+        # Custom eos_max_frames=2 clamps EOS=5 → excess 3 frames trimmed.
+        durations = np.array([1.0, 3.0, 3.0, 4.0, 3.0, 3.0, 5.0], dtype=np.float32)
+        hop = 100
+        total = int(durations.sum() * hop)  # 2200
+        audio = np.arange(total, dtype=np.int16)
+        result = _trim_padding_by_durations(
+            audio, durations, front_pad=2, back_pad=2, hop_size=hop, eos_max_frames=2
+        )
+        # BOS + front = (1+3+3)*100 = 700
+        # back + EOS excess = (3+3 + (5-2))*100 = 900
+        assert len(result) == total - 700 - 900
 
     @pytest.mark.unit
     def test_returns_input_when_durations_none(self):

@@ -234,12 +234,23 @@ def _pad_phoneme_ids(
     return padded, True, front, back
 
 
+# Maximum EOS duration (in frames) preserved during Strategy A trim.
+# VITS tends to predict an inflated EOS duration under the padded context
+# (observed ~8 frames / 94 ms vs. ~6 frames / 76 ms without padding for the
+# tsukuyomi 6lang model). Without clamping, the excess emits a faint
+# "extra syllable" at the very end (issue #356 follow-up). 6 frames is
+# slightly above the typical unpadded value, leaving the natural utterance
+# tail intact while clipping the padding-induced artefact.
+TRIM_EOS_MAX_FRAMES = 6
+
+
 def _trim_padding_by_durations(
     audio: np.ndarray,
     durations: np.ndarray,
     front_pad: int,
     back_pad: int,
     hop_size: int,
+    eos_max_frames: int = TRIM_EOS_MAX_FRAMES,
 ) -> np.ndarray:
     """Trim Strategy A padding using model durations (precise method).
 
@@ -252,7 +263,15 @@ def _trim_padding_by_durations(
     number of audio samples generated for the padding, which can be sliced
     off without relying on RMS thresholds.
 
-    BOS / EOS frames are kept (they bracket the body and aren't padding).
+    Trimming policy (issue #356):
+
+    * **BOS + front padding**: stripped completely. VITS produces an
+      audible "あ" at the start under the padded context.
+    * **Back padding**: stripped completely.
+    * **EOS**: clamped to ``eos_max_frames`` (default 6). The natural
+      utterance tail is preserved while the padding-induced tail
+      ("た"-like artefact) is removed.
+
     Returns ``audio`` unchanged when inputs are inconsistent.
     """
     if front_pad <= 0 and back_pad <= 0:
@@ -261,12 +280,22 @@ def _trim_padding_by_durations(
         return audio
 
     durations_1d = np.asarray(durations).reshape(-1)
-    expected_len = 1 + front_pad + back_pad + 1  # BOS + pads + EOS (body counted separately)
+    expected_len = 1 + front_pad + back_pad + 1  # BOS + pads + EOS
     if durations_1d.size < expected_len:
         return audio
 
-    front_samples = int(durations_1d[1 : 1 + front_pad].sum() * hop_size) if front_pad > 0 else 0
-    back_samples = int(durations_1d[-(1 + back_pad) : -1].sum() * hop_size) if back_pad > 0 else 0
+    # BOS + front padding samples (stripped).
+    front_samples = (
+        int(durations_1d[0 : 1 + front_pad].sum() * hop_size) if front_pad > 0 else 0
+    )
+
+    # Back padding samples + EOS excess (over eos_max_frames) samples.
+    back_pad_samples = (
+        int(durations_1d[-(1 + back_pad) : -1].sum() * hop_size) if back_pad > 0 else 0
+    )
+    eos_frames = float(durations_1d[-1])
+    eos_excess_frames = max(0.0, eos_frames - float(eos_max_frames))
+    back_samples = back_pad_samples + int(eos_excess_frames * hop_size)
 
     start = max(0, front_samples)
     end = max(start, len(audio) - back_samples)
