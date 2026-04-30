@@ -236,12 +236,13 @@ def _pad_phoneme_ids(
 
 # Maximum EOS duration (in frames) preserved during Strategy A trim.
 # VITS tends to predict an inflated EOS duration under the padded context
-# (observed ~8 frames / 94 ms vs. ~6 frames / 76 ms without padding for the
-# tsukuyomi 6lang model). Without clamping, the excess emits a faint
-# "extra syllable" at the very end (issue #356 follow-up). 6 frames is
-# slightly above the typical unpadded value, leaving the natural utterance
-# tail intact while clipping the padding-induced artefact.
-TRIM_EOS_MAX_FRAMES = 6
+# and emits an audible artefact ("こんにちはだぁ" instead of "こんにちは" —
+# kun432 氏 issue #356 試聴フィードバック). Empirically, even modest
+# clamping (6 frames) leaves a recognisable tail. Default to 0 so the
+# entire EOS region is dropped along with the back padding; the unpadded
+# PyPI 1.11.0 path keeps a similar tail but with no audible artefact, so
+# losing it here is acceptable.
+TRIM_EOS_MAX_FRAMES = 0
 
 
 def _trim_padding_by_durations(
