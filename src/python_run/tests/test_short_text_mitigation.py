@@ -508,7 +508,10 @@ class TestConstants:
 
     @pytest.mark.unit
     def test_min_phoneme_ids(self):
-        assert MIN_PHONEME_IDS == 40
+        # Empirically tuned for tsukuyomi 6lang (issue #356).
+        # Was 40 — caused Strategy A to fire on stable inputs and leak
+        # padding artefacts. See voice.py for the threshold rationale.
+        assert MIN_PHONEME_IDS == 15
 
     @pytest.mark.unit
     def test_short_text_chars(self):

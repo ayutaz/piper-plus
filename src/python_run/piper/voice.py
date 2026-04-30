@@ -25,8 +25,18 @@ from .util import audio_float_to_int16
 
 _LOGGER = logging.getLogger(__name__)
 
-# Short-text mitigation constants (keep in sync with other runtimes)
-MIN_PHONEME_IDS = 40
+# Short-text mitigation constants (keep in sync with other runtimes — see
+# docs/spec/short-text-contract.toml).
+#
+# Threshold note (issue #356): docs originally claimed VITS becomes unstable
+# below ~40 phoneme IDs. Empirical measurements on the tsukuyomi 6lang
+# model show a much lower true threshold — synthesis is stable at 8 IDs and
+# weakens only below ~7. Setting MIN_PHONEME_IDS too high triggers Strategy
+# A on already-stable inputs (e.g. 「こんにちは。」= 22 IDs), and the pad
+# tokens leak as audible artefacts that post-trim cannot fully remove. We
+# pick 15 as a conservative middle ground: roughly 2× the measured stable
+# minimum, still well below typical short utterances like 「こんにちは。」.
+MIN_PHONEME_IDS = 15
 SHORT_TEXT_CHARS = 10
 SILENCE_PAD_MS = 300
 TRIM_THRESHOLD_RMS = 0.01
