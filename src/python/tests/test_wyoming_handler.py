@@ -416,6 +416,31 @@ class TestBuildInfo:
         assert attr.name == "piper-plus"
         assert "github.com" in attr.url
 
+    @pytest.mark.unit
+    def test_build_info_version_semantics(self):
+        """TtsProgram.version はパッケージ __version__、TtsVoice.version は None であるべき.
+
+        Wyoming 1.5.1 で Artifact.version (Optional[str]) が追加されたが、
+        default 値を持たないため引数指定が実質必須。version 引数を渡さないと
+        TypeError で Home Assistant 統合が停止する。
+
+        version の意味論:
+        - TtsProgram.version: サービスソフトウェアのバージョン → piper_wyoming.__version__
+        - TtsVoice.version: voice モデル自身のバージョン → モデル管理していないため None
+
+        rhasspy/wyoming-piper の慣習に準拠。HA UI で voice 一覧に同一値が
+        並ぶ冗長表示を避ける目的もある。
+        """
+        from piper_wyoming import __version__
+
+        info = build_info()
+        program = info.tts[0]
+        # TtsProgram はサービス software のバージョン
+        assert program.version == __version__
+        # TtsVoice は voice モデル自身のバージョン (管理外のため None)
+        for voice in program.voices:
+            assert voice.version is None
+
 
 # ---------------------------------------------------------------------------
 # TestResolveLanguageEdgeCases

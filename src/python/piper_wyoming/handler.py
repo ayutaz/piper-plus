@@ -9,6 +9,8 @@ import logging
 
 from wyoming.info import Attribution, Info, TtsProgram, TtsVoice
 
+from piper_wyoming import __version__
+
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +32,8 @@ def build_info(languages: list[str] | None = None) -> Info:
             attribution=attribution,
             installed=True,
             languages=[lang],
+            # Voice モデル自身のバージョンが無いため None (rhasspy/wyoming-piper 準拠)
+            version=None,
         )
         for lang in langs
     ]
@@ -41,6 +45,8 @@ def build_info(languages: list[str] | None = None) -> Info:
                 attribution=attribution,
                 installed=True,
                 voices=voices,
+                # サービスソフトウェアのバージョン
+                version=__version__,
             )
         ]
     )
