@@ -51,6 +51,12 @@ public sealed class PiperModel : IDisposable
         HasSpeakerEmbedding = _session.InputMetadata.ContainsKey("speaker_embedding");
 
         SampleRate = config.Audio.SampleRate;
+
+        // Hop size needed for durations-based Strategy A trim (issue #356).
+        // Falls back to ShortTextProcessor.DefaultHopSize when the config
+        // omits audio.hop_size (older configs).
+        int hop = config.Audio.HopSize ?? 0;
+        HopSize = hop > 0 ? hop : ShortTextProcessor.DefaultHopSize;
     }
 
     // ----------------------------------------------------------------
@@ -92,6 +98,14 @@ public sealed class PiperModel : IDisposable
     /// Audio sample rate in Hz, sourced from the accompanying config.json.
     /// </summary>
     public int SampleRate { get; }
+
+    /// <summary>
+    /// VITS hop length (samples per acoustic frame) used by the
+    /// durations-based Strategy A post-trim (issue #356). Defaults to
+    /// <see cref="ShortTextProcessor.DefaultHopSize"/> (256) when the
+    /// config does not declare <c>audio.hop_size</c>.
+    /// </summary>
+    public int HopSize { get; }
 
     /// <summary>
     /// Ordered list of input tensor names exposed by the ONNX model.

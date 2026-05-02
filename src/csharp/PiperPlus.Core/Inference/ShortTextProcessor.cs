@@ -80,6 +80,18 @@ public static class ShortTextProcessor
     /// </summary>
     internal const long PauseId = 0;
 
+    /// <summary>
+    /// Maximum number of EOS frames retained by the durations-based Strategy A
+    /// trim. VITS predicts an inflated EOS under the padded context that emits
+    /// an audible artefact otherwise (issue #356); 0 = drop the entire EOS.
+    /// </summary>
+    internal const int TrimEosMaxFrames = 0;
+
+    /// <summary>
+    /// Default hop length when config.json does not declare audio.hop_size.
+    /// </summary>
+    internal const int DefaultHopSize = 256;
+
     // ------------------------------------------------------------------
     // Strategy A: Silence Padding
     // ------------------------------------------------------------------
@@ -117,15 +129,15 @@ public static class ShortTextProcessor
     /// <returns>
     /// Padded phoneme IDs and (optionally) padded prosody array.
     /// </returns>
-    internal static (long[] PaddedIds, long[]? PaddedProsody) PadPhonemeIds(
+    internal static (long[] PaddedIds, long[]? PaddedProsody, int FrontPad, int BackPad) PadPhonemeIds(
         long[] phonemeIds, long[]? prosodyFlat)
     {
         // Skip Strategy A for very short bodies — see NeedsPadding / issue #356.
         int bodyLengthGuard = phonemeIds.Length - 2;
         if (bodyLengthGuard < MinBodyForStrategyA)
-            return (phonemeIds, prosodyFlat);
+            return (phonemeIds, prosodyFlat, 0, 0);
         if (phonemeIds.Length >= MinPhonemeIds)
-            return (phonemeIds, prosodyFlat);
+            return (phonemeIds, prosodyFlat, 0, 0);
 
         int deficit = MinPhonemeIds - phonemeIds.Length;
         int afterBos = deficit / 2;       // pause IDs inserted after index 0 (BOS)
@@ -182,7 +194,85 @@ public static class ShortTextProcessor
             paddedProsody[eosDstOffset + 2] = prosodyFlat[eosSrcOffset + 2];
         }
 
-        return (padded, paddedProsody);
+        return (padded, paddedProsody, afterBos, beforeEos);
+    }
+
+    /// <summary>
+    /// Strategy A precise post-trim using the model's duration output.
+    /// Mirrors the Python reference (<c>src/python_run/piper/voice.py</c>
+    /// <c>_trim_padding_by_durations</c>) so all runtimes produce
+    /// byte-equal output for the same inputs (issue #356).
+    /// <para>
+    /// Padded layout: [BOS, pad×frontPad, ...body..., pad×backPad, EOS].
+    /// Trimming policy:
+    /// <list type="bullet">
+    /// <item>BOS + front padding: stripped completely.</item>
+    /// <item>Back padding: stripped completely.</item>
+    /// <item>EOS: keep only <paramref name="eosMaxFrames"/> frames
+    /// (default <see cref="TrimEosMaxFrames"/> = 0, drop entire EOS).</item>
+    /// </list>
+    /// All frame→sample conversions use truncation (<c>(int)</c>) — required
+    /// for byte-equality with the Python reference.
+    /// </para>
+    /// </summary>
+    /// <returns>
+    /// The trimmed audio, or the input unchanged when arguments are
+    /// inconsistent (null durations, non-positive hop, durations shorter
+    /// than 1 + frontPad + backPad + 1, etc.).
+    /// </returns>
+    internal static float[] TrimPaddingByDurations(
+        float[] audio,
+        float[]? durations,
+        int frontPad,
+        int backPad,
+        int hopSize,
+        int eosMaxFrames = TrimEosMaxFrames)
+    {
+        if (frontPad <= 0 && backPad <= 0)
+            return audio;
+        if (durations is null || hopSize <= 0)
+            return audio;
+
+        int expectedLen = 1 + frontPad + backPad + 1;
+        if (durations.Length < expectedLen)
+            return audio;
+
+        // Front: BOS + front padding samples (truncated).
+        float frontSum = 0f;
+        for (int i = 0; i < 1 + frontPad; i++)
+        {
+            frontSum += durations[i];
+        }
+        int frontSamples = (int)(frontSum * hopSize);
+
+        // Back: back padding samples + EOS excess (over eosMaxFrames).
+        float backPadSum = 0f;
+        if (backPad > 0)
+        {
+            // durations[-(1+backPad) : -1] in Python = [len-1-backPad, len-1)
+            int start = durations.Length - 1 - backPad;
+            for (int i = start; i < durations.Length - 1; i++)
+            {
+                backPadSum += durations[i];
+            }
+        }
+        int backPadSamples = (int)(backPadSum * hopSize);
+
+        float eosFrames = durations[^1];
+        float eosExcess = eosFrames - eosMaxFrames;
+        if (eosExcess < 0f) eosExcess = 0f;
+        int backSamples = backPadSamples + (int)(eosExcess * hopSize);
+
+        if (frontSamples < 0) frontSamples = 0;
+        int end = audio.Length - backSamples;
+        if (end < frontSamples) end = frontSamples;
+        if (frontSamples >= audio.Length || end <= 0 || frontSamples >= end)
+            return audio;
+
+        int newLength = end - frontSamples;
+        var trimmed = new float[newLength];
+        Array.Copy(audio, frontSamples, trimmed, 0, newLength);
+        return trimmed;
     }
 
     // ------------------------------------------------------------------
