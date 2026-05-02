@@ -57,6 +57,11 @@ pub const MIN_PHONEME_IDS: usize = 15;
 /// 支配的になる (例: 「あ。」, body=2)。raw VITS 出力の方が結果として自然。
 pub const MIN_BODY_FOR_STRATEGY_A: usize = 3;
 
+/// `trim_padding_by_durations` がデフォルトで残す EOS フレーム数。
+/// padding context で VITS が膨張させた EOS が末尾の余分音として聞こえるため
+/// (issue #356)、デフォルトでは 0 にして EOS を完全削除する。
+pub const TRIM_EOS_MAX_FRAMES: usize = 0;
+
 /// RMS トリムの閾値。この RMS 以下の窓を無音とみなす。
 const TRIM_THRESHOLD_RMS: f32 = 0.01;
 
@@ -150,16 +155,23 @@ pub struct ModelCapabilities {
 /// body 長 (= phoneme_ids - 2) が MIN_BODY_FOR_STRATEGY_A 未満の場合は
 /// padding/body 比が大きくなりすぎるため Strategy A をスキップする
 /// (issue #356)。
+///
+/// 戻り値の 4 番目・5 番目は挿入された front / back pad トークン数。
+/// padding が行われなかった場合は両方 0。durations ベース post-trim で
+/// pad token のフレーム範囲を正確に切るために必要。
+///
+/// **Breaking change (#356):** 旧シグネチャは 3 タプルだった。
+/// `pad_short_phonemes()` 直接利用者は呼び出しを更新すること。
 pub fn pad_short_phonemes(
     phoneme_ids: &[i64],
     prosody_features: Option<&Vec<[i32; 3]>>,
-) -> (Vec<i64>, Option<Vec<[i32; 3]>>, bool) {
+) -> (Vec<i64>, Option<Vec<[i32; 3]>>, bool, usize, usize) {
     let body_len = phoneme_ids.len().saturating_sub(2);
     if body_len < MIN_BODY_FOR_STRATEGY_A {
-        return (phoneme_ids.to_vec(), prosody_features.cloned(), false);
+        return (phoneme_ids.to_vec(), prosody_features.cloned(), false, 0, 0);
     }
     if phoneme_ids.len() >= MIN_PHONEME_IDS {
-        return (phoneme_ids.to_vec(), prosody_features.cloned(), false);
+        return (phoneme_ids.to_vec(), prosody_features.cloned(), false, 0, 0);
     }
 
     let deficit = MIN_PHONEME_IDS - phoneme_ids.len();
@@ -198,7 +210,81 @@ pub fn pad_short_phonemes(
         padded_pf
     });
 
-    (padded, padded_prosody, true)
+    (padded, padded_prosody, true, front_pad, back_pad)
+}
+
+/// Strategy A 精密 post-trim: モデルの `durations` 出力から padding に
+/// 起因するサンプル数を計算して切り落とす。
+///
+/// Python (`src/python_run/piper/voice.py::_trim_padding_by_durations`)
+/// と同じロジック・truncation で実装し、全ランタイムが同じ入力に対して
+/// バイト一致の音声を返せるようにする (issue #356, クロスランタイム契約)。
+///
+/// 期待する padded layout:
+///
+/// ```text
+/// [BOS, pad×front_pad, ...body..., pad×back_pad, EOS]
+/// ```
+///
+/// `durations[i]` は VITS が phoneme i に割り当てたフレーム数。
+/// `hop_size` を掛けてサンプル数に変換し、front 側 (BOS+front_pad) と
+/// back 側 (back_pad+EOS over `eos_max_frames`) を削る。
+///
+/// すべての frame→sample 変換は `as i64` 経由の truncation
+/// (Python の `int()` と一致) で行う。`round` を使うとランタイム間で
+/// 1 サンプルのズレが生じるため避ける。
+///
+/// 引数が不整合 (`durations.is_empty()`, `hop_size == 0`,
+/// `durations.len() < 1 + front_pad + back_pad + 1` など) のときは入力を
+/// そのまま返す。
+pub fn trim_padding_by_durations(
+    audio: &[i16],
+    durations: &[f32],
+    front_pad: usize,
+    back_pad: usize,
+    hop_size: u32,
+    eos_max_frames: usize,
+) -> Vec<i16> {
+    if front_pad == 0 && back_pad == 0 {
+        return audio.to_vec();
+    }
+    if durations.is_empty() || hop_size == 0 {
+        return audio.to_vec();
+    }
+    let expected_len = 1 + front_pad + back_pad + 1; // BOS + pads + EOS
+    if durations.len() < expected_len {
+        return audio.to_vec();
+    }
+
+    let hop = hop_size as f32;
+
+    // Front: BOS + front padding samples (truncated).
+    let front_sum: f32 = durations[0..1 + front_pad].iter().sum();
+    let front_samples = (front_sum * hop) as i64;
+
+    // Back: back padding samples + EOS excess (over eos_max_frames).
+    let back_pad_sum: f32 = if back_pad > 0 {
+        let start = durations.len() - 1 - back_pad;
+        durations[start..durations.len() - 1].iter().sum()
+    } else {
+        0.0
+    };
+    let back_pad_samples = (back_pad_sum * hop) as i64;
+
+    let eos_frames = durations[durations.len() - 1];
+    let eos_excess = (eos_frames - eos_max_frames as f32).max(0.0);
+    let back_samples = back_pad_samples + (eos_excess * hop) as i64;
+
+    let total = audio.len() as i64;
+    let start = front_samples.max(0) as i64;
+    let mut end = total - back_samples;
+    if end < start {
+        end = start;
+    }
+    if start >= total || end <= 0 || start >= end {
+        return audio.to_vec();
+    }
+    audio[start as usize..end as usize].to_vec()
 }
 
 /// Strategy A (post-trim): RMS ベースで先頭・末尾の無音をトリムする。
@@ -298,6 +384,9 @@ pub struct OnnxEngine {
     session: Session,
     capabilities: ModelCapabilities,
     sample_rate: u32,
+    /// VITS hop length (samples per acoustic frame), used by the
+    /// durations-based Strategy A post-trim (#356).
+    hop_size: u32,
 }
 
 impl OnnxEngine {
@@ -491,10 +580,19 @@ impl OnnxEngine {
             capabilities.has_speaker_embedding,
         );
 
+        // hop_size: 0 (config 欠如時の serde default 直前の異常値) は
+        // contract 既定の 256 にフォールバック。
+        let hop_size = if config.audio.hop_size > 0 {
+            config.audio.hop_size
+        } else {
+            256
+        };
+
         Ok(Self {
             session,
             capabilities,
             sample_rate: config.audio.sample_rate,
+            hop_size,
         })
     }
 
@@ -534,7 +632,7 @@ impl OnnxEngine {
 
         // --- Strategy A: Silence Padding ---
         // 短い phoneme 列を pause トークンで MIN_PHONEME_IDS まで延長する。
-        let (phoneme_ids, prosody_features, was_padded) =
+        let (phoneme_ids, prosody_features, was_padded, front_pad, back_pad) =
             pad_short_phonemes(&request.phoneme_ids, request.prosody_features.as_ref());
         let phoneme_len = phoneme_ids.len();
 
@@ -702,22 +800,11 @@ impl OnnxEngine {
         // float32 -> int16 ピーク正規化
         let audio_i16_raw = audio_float_to_int16(audio_slice);
 
-        // --- Strategy A (post-trim): padding 挿入した場合は無音をトリム ---
-        let audio_i16 = if was_padded {
-            let trimmed = trim_silence(&audio_i16_raw);
-            tracing::debug!(
-                "Short text trim: {} -> {} samples",
-                audio_i16_raw.len(),
-                trimmed.len()
-            );
-            trimmed
-        } else {
-            audio_i16_raw
-        };
-        let audio_seconds = audio_i16.len() as f64 / self.sample_rate as f64;
-
-        // --- duration テンソル抽出 (オプション) ---
-        let durations = if self.capabilities.has_duration_output {
+        // --- duration テンソル抽出 (post-trim より前) ---
+        // padded sequence の durations を保持して `trim_padding_by_durations`
+        // から正確に padding 範囲を切り出すために必要。
+        // 呼び出し側へ返す `durations` は後で original 長に切り詰める。
+        let padded_durations: Option<Vec<f32>> = if self.capabilities.has_duration_output {
             match outputs.get("durations") {
                 Some(d) => match d.try_extract_tensor::<f32>() {
                     Ok((_shape, data)) => {
@@ -744,6 +831,41 @@ impl OnnxEngine {
         } else {
             None
         };
+
+        // --- Strategy A (post-trim): padding 由来の音声を除去 ---
+        // durations が利用可能なら精密 trim、なければ RMS フォールバック。
+        let audio_i16 = if was_padded {
+            let trimmed = if let Some(durs) = padded_durations.as_deref() {
+                trim_padding_by_durations(
+                    &audio_i16_raw,
+                    durs,
+                    front_pad,
+                    back_pad,
+                    self.hop_size,
+                    TRIM_EOS_MAX_FRAMES,
+                )
+            } else {
+                trim_silence(&audio_i16_raw)
+            };
+            tracing::debug!(
+                "Short text trim: {} -> {} samples",
+                audio_i16_raw.len(),
+                trimmed.len()
+            );
+            trimmed
+        } else {
+            audio_i16_raw
+        };
+        let audio_seconds = audio_i16.len() as f64 / self.sample_rate as f64;
+
+        // 呼び出し側に返す durations は original 長に切り詰める
+        // (timing 用途では padded extras は not user-visible)。
+        let durations = padded_durations.map(|mut d| {
+            if was_padded && d.len() > original_len {
+                d.truncate(original_len);
+            }
+            d
+        });
 
         Ok(SynthesisResult {
             audio: audio_i16,
@@ -1132,7 +1254,7 @@ mod tests {
     fn test_pad_short_phonemes_below_threshold() {
         // 10 tokens -> should be padded to MIN_PHONEME_IDS
         let ids: Vec<i64> = vec![1, 5, 6, 7, 8, 9, 10, 11, 12, 2]; // BOS=1, EOS=2
-        let (padded, _, was_padded) = pad_short_phonemes(&ids, None);
+        let (padded, _, was_padded, _, _) = pad_short_phonemes(&ids, None);
         assert!(was_padded);
         assert_eq!(padded.len(), MIN_PHONEME_IDS);
         assert_eq!(padded[0], 1); // BOS preserved
@@ -1143,7 +1265,7 @@ mod tests {
     fn test_pad_short_phonemes_at_threshold() {
         // Exactly MIN_PHONEME_IDS -> no padding
         let ids: Vec<i64> = (0..MIN_PHONEME_IDS as i64).collect();
-        let (padded, _, was_padded) = pad_short_phonemes(&ids, None);
+        let (padded, _, was_padded, _, _) = pad_short_phonemes(&ids, None);
         assert!(!was_padded);
         assert_eq!(padded.len(), MIN_PHONEME_IDS);
         assert_eq!(padded, ids);
@@ -1153,7 +1275,7 @@ mod tests {
     fn test_pad_short_phonemes_above_threshold() {
         // Above MIN_PHONEME_IDS -> no padding
         let ids: Vec<i64> = (0..(MIN_PHONEME_IDS as i64 + 10)).collect();
-        let (padded, _, was_padded) = pad_short_phonemes(&ids, None);
+        let (padded, _, was_padded, _, _) = pad_short_phonemes(&ids, None);
         assert!(!was_padded);
         assert_eq!(padded.len(), MIN_PHONEME_IDS + 10);
     }
@@ -1166,7 +1288,7 @@ mod tests {
         ids.extend((0..MIN_BODY_FOR_STRATEGY_A as i64).map(|i| 100 + i));
         ids.push(2); // EOS
         let total = ids.len();
-        let (padded, _, was_padded) = pad_short_phonemes(&ids, None);
+        let (padded, _, was_padded, _, _) = pad_short_phonemes(&ids, None);
         assert!(was_padded);
         // All inserted tokens should be 0
         let inserted: Vec<i64> = padded
@@ -1181,7 +1303,7 @@ mod tests {
     fn test_pad_short_phonemes_body_preserved() {
         // Original body tokens should be preserved in order
         let ids: Vec<i64> = vec![1, 10, 20, 30, 2]; // BOS=1, body=[10,20,30], EOS=2
-        let (padded, _, _) = pad_short_phonemes(&ids, None);
+        let (padded, _, _, _, _) = pad_short_phonemes(&ids, None);
 
         // Extract non-pause, non-BOS, non-EOS tokens
         let body: Vec<i64> = padded
@@ -1202,7 +1324,7 @@ mod tests {
         prosody.extend((0..MIN_BODY_FOR_STRATEGY_A as i32).map(|i| [i + 1, i + 2, i + 3]));
         prosody.push([0, 0, 0]);
 
-        let (padded_ids, padded_prosody, was_padded) = pad_short_phonemes(&ids, Some(&prosody));
+        let (padded_ids, padded_prosody, was_padded, _, _) = pad_short_phonemes(&ids, Some(&prosody));
         assert!(was_padded);
         assert_eq!(padded_ids.len(), MIN_PHONEME_IDS);
         let pp = padded_prosody.unwrap();
@@ -1219,7 +1341,7 @@ mod tests {
         let mut ids: Vec<i64> = vec![1];
         ids.extend((0..MIN_BODY_FOR_STRATEGY_A as i64).map(|i| 5 + i));
         ids.push(2);
-        let (padded, padded_prosody, was_padded) = pad_short_phonemes(&ids, None);
+        let (padded, padded_prosody, was_padded, _, _) = pad_short_phonemes(&ids, None);
         assert!(was_padded);
         assert_eq!(padded.len(), MIN_PHONEME_IDS);
         assert!(padded_prosody.is_none());
@@ -1229,20 +1351,20 @@ mod tests {
     fn test_pad_short_phonemes_skips_when_body_too_short() {
         // body=0 (just BOS+EOS): Strategy A skipped (issue #356).
         let ids: Vec<i64> = vec![1, 2];
-        let (padded, _, was_padded) = pad_short_phonemes(&ids, None);
+        let (padded, _, was_padded, _, _) = pad_short_phonemes(&ids, None);
         assert!(!was_padded);
         assert_eq!(padded, ids);
 
         // body=1 (e.g. just one phoneme between BOS/EOS).
         let ids: Vec<i64> = vec![1, 10, 2];
-        let (padded, _, was_padded) = pad_short_phonemes(&ids, None);
+        let (padded, _, was_padded, _, _) = pad_short_phonemes(&ids, None);
         assert!(!was_padded);
         assert_eq!(padded, ids);
 
         // body=2 ("あ。" case).
         if MIN_BODY_FOR_STRATEGY_A > 2 {
             let ids: Vec<i64> = vec![1, 10, 11, 2];
-            let (padded, _, was_padded) = pad_short_phonemes(&ids, None);
+            let (padded, _, was_padded, _, _) = pad_short_phonemes(&ids, None);
             assert!(!was_padded);
             assert_eq!(padded, ids);
         }
@@ -1253,7 +1375,7 @@ mod tests {
         // Edge case: single element — body would be < 0 (saturating to 0)
         // so Strategy A is skipped.
         let ids: Vec<i64> = vec![1];
-        let (padded, _, was_padded) = pad_short_phonemes(&ids, None);
+        let (padded, _, was_padded, _, _) = pad_short_phonemes(&ids, None);
         assert!(!was_padded);
         assert_eq!(padded, ids);
     }
@@ -1375,5 +1497,108 @@ mod tests {
     #[test]
     fn test_min_body_for_strategy_a_value() {
         assert_eq!(MIN_BODY_FOR_STRATEGY_A, 3);
+    }
+
+    #[test]
+    fn test_trim_eos_max_frames_value() {
+        assert_eq!(TRIM_EOS_MAX_FRAMES, 0);
+    }
+
+    // -----------------------------------------------------------------------
+    // Strategy A: trim_padding_by_durations (precise post-trim, issue #356)
+    // -----------------------------------------------------------------------
+    // Mirrors src/python_run/tests/test_short_text_mitigation.py and ensures
+    // every runtime trims by the same number of samples for the same inputs.
+
+    #[test]
+    fn test_trim_padding_by_durations_no_op_when_no_padding() {
+        let audio: Vec<i16> = (0..1000).map(|i| i as i16).collect();
+        let durations = vec![1.0_f32; 5];
+        let result = trim_padding_by_durations(&audio, &durations, 0, 0, 256, TRIM_EOS_MAX_FRAMES);
+        assert_eq!(result.len(), audio.len());
+    }
+
+    #[test]
+    fn test_trim_padding_by_durations_trims_front_padding_only() {
+        // Layout: BOS=2, pad×3 (3+3+3), body=4, EOS=1 → 19 frames total.
+        let durations: Vec<f32> = vec![2.0, 3.0, 3.0, 3.0, 4.0, 1.0];
+        let hop = 100u32;
+        let total = 1900usize;
+        let audio = vec![0i16; total];
+        let result = trim_padding_by_durations(&audio, &durations, 3, 0, hop, 6);
+        // BOS + front padding samples = (2+3+3+3) * 100 = 1100
+        assert_eq!(result.len(), total - 1100);
+    }
+
+    #[test]
+    fn test_trim_padding_by_durations_default_strips_eos_completely() {
+        let durations: Vec<f32> = vec![2.0, 5.0, 5.0, 4.0, 4.0, 5.0, 5.0, 8.0];
+        let hop = 100u32;
+        let total = 3800usize;
+        let audio = vec![0i16; total];
+        let result =
+            trim_padding_by_durations(&audio, &durations, 2, 2, hop, TRIM_EOS_MAX_FRAMES);
+        // BOS + front padding = (2+5+5)*100 = 1200
+        // back padding + entire EOS = (5+5+8)*100 = 1800
+        assert_eq!(result.len(), total - 1200 - 1800);
+    }
+
+    #[test]
+    fn test_trim_padding_by_durations_clamps_inflated_eos() {
+        let durations: Vec<f32> = vec![2.0, 3.0, 3.0, 4.0, 3.0, 3.0, 10.0];
+        let hop = 100u32;
+        let total = 2800usize;
+        let audio = vec![0i16; total];
+        let result = trim_padding_by_durations(&audio, &durations, 2, 2, hop, 6);
+        // BOS + front padding = (2+3+3) * 100 = 800
+        // back padding + EOS excess = (3+3 + (10-6)) * 100 = 1000
+        assert_eq!(result.len(), total - 800 - 1000);
+    }
+
+    #[test]
+    fn test_trim_padding_by_durations_returns_input_when_durations_empty() {
+        let audio = vec![0i16; 1000];
+        let durations: Vec<f32> = vec![];
+        let result = trim_padding_by_durations(&audio, &durations, 3, 3, 256, TRIM_EOS_MAX_FRAMES);
+        assert_eq!(result.len(), audio.len());
+    }
+
+    #[test]
+    fn test_trim_padding_by_durations_returns_input_when_durations_too_short() {
+        let audio = vec![0i16; 1000];
+        let durations: Vec<f32> = vec![1.0, 1.0, 1.0];
+        let result = trim_padding_by_durations(&audio, &durations, 5, 5, 256, TRIM_EOS_MAX_FRAMES);
+        assert_eq!(result.len(), audio.len());
+    }
+
+    #[test]
+    fn test_trim_padding_by_durations_returns_input_when_hop_size_zero() {
+        let audio = vec![0i16; 1000];
+        let durations: Vec<f32> = vec![1.0; 8];
+        let result = trim_padding_by_durations(&audio, &durations, 2, 2, 0, TRIM_EOS_MAX_FRAMES);
+        assert_eq!(result.len(), audio.len());
+    }
+
+    #[test]
+    fn test_trim_padding_by_durations_truncation_matches_int_cast() {
+        // Layout (front_pad=1, back_pad=1, body=3):
+        //   [BOS=0.701, pad=0.701, body=2, body=2, body=2, pad=0.703, EOS=0.701]
+        // Front trim = ((0.701+0.701)*100) as i64 = 140
+        // Back trim  = (0.703*100) as i64 + (0.701*100) as i64 = 70 + 70 = 140
+        // round() would diverge → cross-runtime drift.
+        let durations: Vec<f32> = vec![0.701, 0.701, 2.0, 2.0, 2.0, 0.703, 0.701];
+        let hop = 100u32;
+        let sum: f32 = durations.iter().sum();
+        let total = (sum * hop as f32) as usize;
+        let audio = vec![0i16; total];
+        let result = trim_padding_by_durations(
+            &audio,
+            &durations,
+            1,
+            1,
+            hop,
+            TRIM_EOS_MAX_FRAMES,
+        );
+        assert_eq!(result.len(), total - 140 - 140);
     }
 }

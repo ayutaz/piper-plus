@@ -56,7 +56,8 @@ pub use config::{PhonemeIdMap, PhonemeType, VoiceConfig};
 #[cfg(feature = "onnx")]
 pub use engine::{
     DEFAULT_WARMUP_RUNS, MIN_BODY_FOR_STRATEGY_A, MIN_PHONEME_IDS, ModelCapabilities, OnnxEngine,
-    SynthesisRequest, SynthesisResult,
+    SynthesisRequest, SynthesisResult, TRIM_EOS_MAX_FRAMES, pad_short_phonemes,
+    trim_padding_by_durations,
 };
 pub use error::PiperError;
 pub use phonemize::{ProsodyFeature, ProsodyInfo};
