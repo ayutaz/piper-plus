@@ -60,9 +60,9 @@ Ein schnelles und hochwertiges neuronales Text-to-Speech-System (TTS). Basierend
 - **C# CLI** — .NET 8/9, plattformuebergreifend, 8 Sprachen, ONNX-Inferenz, **Phoneme-Timing-Ausgabe (JSON/TSV/SRT)**
 - **Rust CLI** — piper-plus/piper-plus-cli, Streaming, CUDA/CoreML/DirectML-Unterstuetzung, **Phoneme-Timing-Ausgabe (JSON/TSV/SRT)**, automatischer Woerterbuch-Download
 - **[Go CLI](src/go/README.md)** — HTTP-API-Server, Session-Pooling, Docker-kompatibel, einzelne Binaerdatei, **Phoneme-Timing-Ausgabe (JSON/TSV/SRT)**
-- **Voice Cloning (Speaker Encoder + speaker_embedding)** — in allen 7 Runtimes (Python/Rust/C#/Go/WASM/C++) verfuegbar
+- **Voice Cloning (Speaker Encoder + speaker_embedding)** — in allen 6 Runtimes (Python/Rust/C#/Go/WASM/C++) verfuegbar
 - **SSML-Unterstuetzung** — `<speak>`, `<break>`, `<prosody rate="...">` in 4 Runtimes (Python/Rust/C#/Go) verfuegbar
-- **Qualitaetsverbesserung fuer Kurztexte (Strategy A/B/C)** — Silence Padding, dynamische Scales und automatisches SSML `<break>` in allen 7 Runtimes
+- **Qualitaetsverbesserung fuer Kurztexte (Strategy A/B/C)** — Silence Padding, dynamische Scales und automatisches SSML `<break>` in allen 6 Runtimes
 
 ### Funktionsunterstuetzung pro Runtime
 

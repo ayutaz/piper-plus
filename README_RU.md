@@ -60,9 +60,9 @@
 - **C# CLI** — кроссплатформенный .NET 8/9, 8 языков, ONNX-инференс, **вывод Phoneme Timing (JSON/TSV/SRT)**
 - **Rust CLI** — piper-plus/piper-plus-cli, потоковый вывод, CUDA/CoreML/DirectML, **вывод Phoneme Timing (JSON/TSV/SRT)**, автозагрузка словарей
 - **[Go CLI](src/go/README.md)** — HTTP API-сервер, пулинг сессий, Docker, единый бинарник, **вывод Phoneme Timing (JSON/TSV/SRT)**
-- **Voice Cloning (Speaker Encoder + speaker_embedding)** — поддерживается во всех 7 рантаймах (Python/Rust/C#/Go/WASM/C++)
+- **Voice Cloning (Speaker Encoder + speaker_embedding)** — поддерживается во всех 6 рантаймах (Python/Rust/C#/Go/WASM/C++)
 - **Поддержка SSML** — `<speak>`, `<break>`, `<prosody rate="...">` доступны в 4 рантаймах (Python/Rust/C#/Go)
-- **Улучшение качества коротких текстов (Strategy A/B/C)** — Silence Padding, Dynamic Scales и автоматический SSML `<break>` во всех 7 рантаймах
+- **Улучшение качества коротких текстов (Strategy A/B/C)** — Silence Padding, Dynamic Scales и автоматический SSML `<break>` во всех 6 рантаймах
 
 ### Поддержка функций по рантаймам
 

@@ -30,8 +30,13 @@ PiperConfig config = PiperConfig.LoadFromFile("models/tsukuyomi.onnx.json");
 InferenceSession session = SessionFactory.Create("models/tsukuyomi.onnx");
 using var model = new PiperModel(session, config);
 
-// 2. Phonemize text (Japanese in this example — wire up DotNetG2P engines first)
-IPhonemizer phonemizer = new JapanesePhonemizer(new DotNetG2PEngine());
+// 2. Phonemize text. JapanesePhonemizer requires an IJapaneseG2PEngine
+//    implementation that wraps the DotNetG2P NuGet packages
+//    (DotNetG2P + DotNetG2P.MeCab + DotNetG2P.Engine — bring your own
+//    adapter, or copy the one in PiperPlus.Cli/DotNetG2PEngine.cs which is
+//    internal). The same pattern applies to EnglishPhonemizer / ChinesePhonemizer.
+IJapaneseG2PEngine g2pEngine = /* your IJapaneseG2PEngine implementation */;
+IPhonemizer phonemizer = new JapanesePhonemizer(g2pEngine);
 var phonemeIdMap = phonemizer.GetPhonemeIdMap() ?? config.PhonemeIdMap;
 var (phonemeIds, prosody) = PhonemeEncoder.EncodeDirect(
     phonemizer, "こんにちは、世界。", phonemeIdMap);

@@ -63,9 +63,9 @@
 - **C# CLI** — .NET 8/9 跨平台，8语言多语言支持，ONNX 推理，**Phoneme Timing 输出 (JSON/TSV/SRT)**
 - **Rust CLI** — piper-plus/piper-plus-cli，流式处理，CUDA/CoreML/DirectML 支持，**Phoneme Timing 输出 (JSON/TSV/SRT)**，词典自动下载
 - **[Go CLI](src/go/README.md)** — HTTP API服务器、会话池、Docker、单一二进制文件、**Phoneme Timing 输出 (JSON/TSV/SRT)**
-- **Voice Cloning (Speaker Encoder + speaker_embedding)** — 7 个运行时 (Python/Rust/C#/Go/WASM/C++) 全部支持
+- **Voice Cloning (Speaker Encoder + speaker_embedding)** — 6 个运行时 (Python/Rust/C#/Go/WASM/C++) 全部支持
 - **SSML 支持** — `<speak>`、`<break>`、`<prosody rate="...">` 在 4 个运行时 (Python/Rust/C#/Go) 中支持
-- **短文本质量改进 (Strategy A/B/C)** — Silence Padding、Dynamic Scales、SSML `<break>` 自动注入在全部 7 个运行时中支持
+- **短文本质量改进 (Strategy A/B/C)** — Silence Padding、Dynamic Scales、SSML `<break>` 自动注入在全部 6 个运行时中支持
 
 ### 各运行时功能支持
 

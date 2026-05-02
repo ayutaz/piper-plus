@@ -295,7 +295,7 @@ voice, err := piperplus.LoadVoice(ctx, "model.onnx",
 )
 ```
 
-## HTTP API / HTTPエンドポイント
+## HTTP API
 
 Start the server:
 
@@ -375,13 +375,23 @@ Returns model information:
 ### Build (multi-arch / マルチアーキテクチャ)
 
 ```bash
-# Native build (host arch)
+# Native build (host arch) — produces a locally runnable image tag
 docker build -t piper-plus-go -f src/go/docker/Dockerfile .
 
-# Cross-platform build (amd64 + arm64) via buildx
+# Cross-platform single-arch build via buildx, loaded into the local image store
+# (use --load for "docker run" usability; --load is incompatible with multi-platform)
+docker buildx build \
+  --platform linux/arm64 \
+  -t piper-plus-go \
+  --load \
+  -f src/go/docker/Dockerfile .
+
+# Cross-platform multi-arch build that pushes directly to a registry
+# (--push is required when --platform lists more than one platform)
 docker buildx build \
   --platform linux/amd64,linux/arm64 \
-  -t piper-plus-go \
+  -t <registry>/piper-plus-go:latest \
+  --push \
   -f src/go/docker/Dockerfile .
 ```
 
@@ -403,7 +413,7 @@ The Dockerfile uses a multi-stage build: a Debian-based Go builder that compiles
 
 ## `serve` subcommand / `serve` サブコマンド
 
-The CLI binary doubles as an HTTP server when invoked with `serve` as the first argument. Endpoints (`/synthesize`, `/health`, `/info`) are described in [HTTP API](#http-api--http-api) below.
+The CLI binary doubles as an HTTP server when invoked with `serve` as the first argument. Endpoints (`/synthesize`, `/health`, `/info`) are described in [HTTP API](#http-api) below.
 
 ```bash
 # Local serve (host)

@@ -60,9 +60,9 @@
 - **C# CLI** — .NET 8/9 크로스 플랫폼, 8개 언어 다중 언어, ONNX 추론, **Phoneme Timing 출력 (JSON/TSV/SRT)**
 - **Rust CLI** — piper-plus/piper-plus-cli, 스트리밍, CUDA/CoreML/DirectML 지원, **Phoneme Timing 출력 (JSON/TSV/SRT)**, 사전 자동 다운로드
 - **[Go CLI](src/go/README.md)** — HTTP API 서버, 세션 풀링, Docker 지원, 단일 바이너리, **Phoneme Timing 출력 (JSON/TSV/SRT)**
-- **Voice Cloning (Speaker Encoder + speaker_embedding)** — 7개 런타임 (Python/Rust/C#/Go/WASM/C++) 모두 지원
+- **Voice Cloning (Speaker Encoder + speaker_embedding)** — 6개 런타임 (Python/Rust/C#/Go/WASM/C++) 모두 지원
 - **SSML 지원** — `<speak>`, `<break>`, `<prosody rate="...">` 4개 런타임 (Python/Rust/C#/Go) 지원
-- **단문 품질 개선 (Strategy A/B/C)** — Silence Padding, Dynamic Scales, SSML `<break>` 자동 삽입을 7개 런타임 모두에서 지원
+- **단문 품질 개선 (Strategy A/B/C)** — Silence Padding, Dynamic Scales, SSML `<break>` 자동 삽입을 6개 런타임 모두에서 지원
 
 ### 런타임별 기능 지원
 

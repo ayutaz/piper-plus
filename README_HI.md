@@ -60,9 +60,9 @@
 - **C# CLI** — .NET 8/9 क्रॉस-प्लेटफ़ॉर्म, 8 भाषा मल्टीलिंगुअल, ONNX अनुमान, **Phoneme Timing आउटपुट (JSON/TSV/SRT)**
 - **Rust CLI** — piper-plus/piper-plus-cli, स्ट्रीमिंग, CUDA/CoreML/DirectML समर्थन, **Phoneme Timing आउटपुट (JSON/TSV/SRT)**, शब्दकोश स्वचालित डाउनलोड
 - **[Go CLI](src/go/README.md)** — HTTP API सर्वर, सेशन पूलिंग, Docker समर्थन, सिंगल बाइनरी, **Phoneme Timing आउटपुट (JSON/TSV/SRT)**
-- **Voice Cloning (Speaker Encoder + speaker_embedding)** — सभी 7 रनटाइम (Python/Rust/C#/Go/WASM/C++) में समर्थित
+- **Voice Cloning (Speaker Encoder + speaker_embedding)** — सभी 6 रनटाइम (Python/Rust/C#/Go/WASM/C++) में समर्थित
 - **SSML समर्थन** — `<speak>`, `<break>`, `<prosody rate="...">` 4 रनटाइम (Python/Rust/C#/Go) में समर्थित
-- **छोटे टेक्स्ट गुणवत्ता सुधार (Strategy A/B/C)** — Silence Padding, Dynamic Scales, और स्वचालित SSML `<break>` सभी 7 रनटाइम में समर्थित
+- **छोटे टेक्स्ट गुणवत्ता सुधार (Strategy A/B/C)** — Silence Padding, Dynamic Scales, और स्वचालित SSML `<break>` सभी 6 रनटाइम में समर्थित
 
 ### रनटाइम-वार सुविधा समर्थन
 
