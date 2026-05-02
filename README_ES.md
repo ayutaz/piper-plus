@@ -52,14 +52,21 @@ Sistema de texto a voz (TTS) neuronal, rapido y de alta calidad. Basado en la ar
 ### Interfaces
 
 - **[WebUI (Gradio)](docs/features/webui.md)** — Inferencia y entrenamiento, compatible con Docker
-- **CLI C++** — Streaming, inferencia CUDA, salida de timing de fonemas, diccionario personalizado
+- **CLI C++** — Streaming, inferencia CUDA, **salida de Phoneme Timing (JSON/TSV/SRT)**, diccionario personalizado
 - **[C API Biblioteca compartida](examples/c-api/README.md)** — `libpiper_plus.so/.dylib/.dll`, compatible con FFI (Flutter/Godot/Swift etc.), API de streaming
-- **[WebAssembly](src/wasm/openjtalk-web/README.npm.md)** — Funciona completamente en el navegador, sin servidor
+- **[WebAssembly](src/wasm/openjtalk-web/README.npm.md)** — Funciona completamente en el navegador, **salida de Phoneme Timing (JSON/TSV/SRT)**, sin servidor
 - **[Docker](docker/README.md)** — 5 imagenes disponibles para inferencia, entrenamiento, WebUI y C++
-- **PyPI** — Instalacion sencilla con `pip install piper-plus`
-- **CLI C#** — .NET 8/9 multiplataforma, 8 idiomas multilingue, inferencia ONNX
-- **CLI Rust** — piper-plus/piper-plus-cli, streaming, CUDA/CoreML/DirectML, descarga automatica de diccionarios
-- **[CLI Go](src/go/README.md)** — Servidor HTTP API, pooling de sesiones, compatible con Docker, binario unico
+- **PyPI** — `pip install piper-plus`, 8 idiomas multilingue, **salida de Phoneme Timing (JSON/TSV/SRT)**, streaming, **HTTP API basada en FastAPI**
+- **CLI C#** — .NET 8/9 multiplataforma, 8 idiomas multilingue, inferencia ONNX, **salida de Phoneme Timing (JSON/TSV/SRT)**
+- **CLI Rust** — piper-plus/piper-plus-cli, streaming, CUDA/CoreML/DirectML, **salida de Phoneme Timing (JSON/TSV/SRT)**, descarga automatica de diccionarios
+- **[CLI Go](src/go/README.md)** — Servidor HTTP API, pooling de sesiones, compatible con Docker, binario unico, **salida de Phoneme Timing (JSON/TSV/SRT)**
+- **Voice Cloning (Speaker Encoder + speaker_embedding)** — disponible en los 7 runtimes (Python/Rust/C#/Go/WASM/C++)
+- **Soporte SSML** — `<speak>`, `<break>`, `<prosody rate="...">` disponibles en 4 runtimes (Python/Rust/C#/Go)
+- **Mejora de calidad para textos cortos (Estrategia A/B/C)** — Silence Padding, Dynamic Scales y SSML `<break>` automatico en los 7 runtimes
+
+### Soporte de funcionalidades por runtime
+
+Sintesis multilingue equivalente en 8 idiomas a traves de 6 runtimes (Python/Rust/C#/Go/JS-WASM/C++). Phoneme Timing, streaming (incluyendo division por oraciones), Voice Cloning y diccionarios personalizados estan disponibles en todos los runtimes. SSML es compatible con 4 runtimes (Python/Rust/C#/Go) y la API HTTP con 2 runtimes (Python/Go).
 
 ### Plataformas
 
@@ -754,7 +761,7 @@ Modelos de piper-plus: [piper-plus-base](https://huggingface.co/ayousanz/piper-p
 | TTS en japones | Guia de sintesis de voz en japones |
 | Entrenamiento | [Guia de entrenamiento](docs/guides/training/training-guide.md) · Multi-GPU |
 | API | [Mapeo de fonemas](docs/api-reference/phoneme-mapping.md) · [Variables de entorno](docs/getting-started/environment-variables.md) |
-| Funcionalidades | [WebUI](docs/features/webui.md) · Mejoras de CLI · Streaming |
+| Funcionalidades | [WebUI](docs/features/webui.md) · Mejoras de CLI · Streaming · Phoneme Timing · SSML |
 | Configuracion | Inicio rapido (japones) · [Windows](docs/getting-started/windows-setup.md) · [Solucion de problemas](docs/getting-started/troubleshooting.md) |
 | Docker | [Entorno Docker](docker/README.md) |
 | WebAssembly | [Detalles tecnicos](src/wasm/openjtalk-web/README.npm.md) |

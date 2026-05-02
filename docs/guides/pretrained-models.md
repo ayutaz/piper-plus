@@ -10,14 +10,14 @@ Pre-trained models for multilingual TTS and fine-tuning are available on Hugging
 
 | Model | Languages | Speakers | Description | Download |
 |---|---|---|---|---|
-| Tsukuyomi-chan 6lang | JA/EN/ZH/ES/FR/PT | 1 | Tsukuyomi-chan voice, 6-language, FP16 | [HuggingFace](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan) |
-| CSS10 Japanese 6lang | JA/EN/ZH/ES/FR/PT | 1 | CSS10 Japanese voice, 6-language, FP16 | [HuggingFace](https://huggingface.co/ayousanz/piper-plus-css10-ja-6lang) |
+| Tsukuyomi-chan 6lang-v2 | JA/EN/ZH/ES/FR/PT | 1 | Tsukuyomi-chan voice, 6-language, FP16. **500 epochs (2026-03-16)**, fine-tuned from 6-language base with `freeze-dp` + `emb_lang` unify for voice consistency across all 6 languages. ONNX size 75 MB. | [HuggingFace](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan) |
+| CSS10 Japanese 6lang | JA/EN/ZH/ES/FR/PT | 1 | CSS10 Japanese voice, 6-language, FP16. 50 epochs from 6-language base, 6,841 utterances. | [HuggingFace](https://huggingface.co/ayousanz/piper-plus-css10-ja-6lang) |
 
 **Base Models (for fine-tuning):**
 
 | Model | Languages | Speakers | Description | Download |
 |---|---|---|---|---|
-| 6-Language Base | JA/EN/ZH/ES/FR/PT | 571 | Multilingual pre-trained (508,187 utterances, VITS + Prosody) | [HuggingFace](https://huggingface.co/ayousanz/piper-plus-base) |
+| 6-Language Base | JA/EN/ZH/ES/FR/PT | 571 | Multilingual pre-trained (508,187 utterances, VITS + Prosody). **75 epochs / ~282K gradient steps (2026-03-16)**, language-balanced sampling, WavLM-disabled (V100 friendly). Checkpoint `epoch=74-step=504712.ckpt`. | [HuggingFace](https://huggingface.co/ayousanz/piper-plus-base) |
 
 **Tsukuyomi-chan model:**
 
@@ -52,7 +52,7 @@ curl -L -o models/config.json https://huggingface.co/ayousanz/piper-plus-tsukuyo
 
 ## Japanese TTS Specifics
 
-High-quality Japanese speech synthesis with OpenJTalk integration. Dictionary and voice files are automatically downloaded on first run.
+High-quality Japanese speech synthesis with OpenJTalk integration. The dictionary (NAIST-JDIC) is automatically downloaded on first run. HTS voice files are not required (removed in PR #342).
 
 **Environment Variables (optional):**
 

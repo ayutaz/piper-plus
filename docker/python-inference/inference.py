@@ -3,8 +3,15 @@
 Inference script for piper-plus.
 CLI and FastAPI server modes supported.
 
-Uses piper_train.phonemize for text-to-phoneme conversion
-and ONNX Runtime for inference (CPU, no PyTorch required).
+Server mode exposes both:
+- Native endpoints (`POST /synthesize`, etc.) for direct piper-plus usage
+- OpenAI-compatible endpoints (`POST /v1/audio/speech`, `GET /v1/models`,
+  `GET /v1/audio/speech/languages`, `POST/GET /api/phoneme-timing`,
+  `GET /health`) so existing OpenAI clients can drop in unchanged (PR #321)
+
+Uses piper_plus_g2p.registry for text-to-phoneme conversion (8 languages:
+JA/EN/ZH/KO/ES/FR/PT/SV) and ONNX Runtime for inference (CPU, no PyTorch
+required).
 """
 
 import argparse

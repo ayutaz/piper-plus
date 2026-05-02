@@ -126,7 +126,7 @@ foreach ($file in $requiredFiles) {
 
 #### 自動セットアップ（推奨）
 
-OpenJTalkは自動的にビルドされ、必要な辞書とHTS音声ファイルは初回実行時に自動ダウンロードされます。
+OpenJTalkは自動的にビルドされ、必要な辞書 (NAIST-JDIC) は初回実行時に自動ダウンロードされます。HTS 音声ファイル (`*.htsvoice`) は piper-plus では不要です (PR #342 で依存削除済み)。
 
 ```powershell
 # 自動ダウンロードのテスト

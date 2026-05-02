@@ -252,7 +252,8 @@ def create_parser():
         "--language-balanced-sampling",
         action="store_true",
         default=False,
-        help="Force language-balanced sampling (JA 50%% / EN 50%%). "
+        help="Force language-balanced sampling across multiple language groups "
+        "(distributes batch slots equally per language, e.g. 6-language model gets ~16.7%% each). "
         "If not specified, auto-enabled when speaker count ratio between languages >= 3:1. "
         "Requires --samples-per-speaker > 0 and num_languages > 1.",
     )

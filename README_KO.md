@@ -52,14 +52,21 @@
 ### 인터페이스
 
 - **[WebUI (Gradio)](docs/features/webui.md)** — 추론 및 학습 지원, Docker 지원
-- **C++ CLI** — 스트리밍, CUDA 추론, 음소 타이밍 출력, 커스텀 사전
+- **C++ CLI** — 스트리밍, CUDA 추론, **Phoneme Timing 출력 (JSON/TSV/SRT)**, 커스텀 사전
 - **[C API 공유 라이브러리](examples/c-api/README.md)** — `libpiper_plus.so/.dylib/.dll`, FFI 호환 (Flutter/Godot/Swift 등), 스트리밍 API
-- **[WebAssembly](src/wasm/openjtalk-web/README.npm.md)** — 브라우저 내에서 완전 동작, 서버 불필요
+- **[WebAssembly](src/wasm/openjtalk-web/README.npm.md)** — 브라우저 내에서 완전 동작, **Phoneme Timing 출력 (JSON/TSV/SRT)**, 서버 불필요
 - **[Docker](docker/README.md)** — 추론, 학습, WebUI, C++ 등 5개 이미지 제공
-- **PyPI** — `pip install piper-plus`로 간편 설치
-- **C# CLI** — .NET 8/9 크로스 플랫폼, 8개 언어 다중 언어, ONNX 추론
-- **Rust CLI** — piper-plus/piper-plus-cli, 스트리밍, CUDA/CoreML/DirectML 지원, 사전 자동 다운로드
-- **[Go CLI](src/go/README.md)** — HTTP API 서버, 세션 풀링, Docker 지원, 단일 바이너리
+- **PyPI** — `pip install piper-plus`, 8개 언어 다중 언어, **Phoneme Timing 출력 (JSON/TSV/SRT)**, 스트리밍, **FastAPI 기반 HTTP API**
+- **C# CLI** — .NET 8/9 크로스 플랫폼, 8개 언어 다중 언어, ONNX 추론, **Phoneme Timing 출력 (JSON/TSV/SRT)**
+- **Rust CLI** — piper-plus/piper-plus-cli, 스트리밍, CUDA/CoreML/DirectML 지원, **Phoneme Timing 출력 (JSON/TSV/SRT)**, 사전 자동 다운로드
+- **[Go CLI](src/go/README.md)** — HTTP API 서버, 세션 풀링, Docker 지원, 단일 바이너리, **Phoneme Timing 출력 (JSON/TSV/SRT)**
+- **Voice Cloning (Speaker Encoder + speaker_embedding)** — 7개 런타임 (Python/Rust/C#/Go/WASM/C++) 모두 지원
+- **SSML 지원** — `<speak>`, `<break>`, `<prosody rate="...">` 4개 런타임 (Python/Rust/C#/Go) 지원
+- **단문 품질 개선 (Strategy A/B/C)** — Silence Padding, Dynamic Scales, SSML `<break>` 자동 삽입을 7개 런타임 모두에서 지원
+
+### 런타임별 기능 지원
+
+6개 런타임 (Python/Rust/C#/Go/JS-WASM/C++) 에서 동등한 8개 언어 다중 언어 합성 제공. Phoneme Timing, 스트리밍 (문장 단위 분할 포함), Voice Cloning, 커스텀 사전은 모든 런타임에서 지원합니다. SSML은 4개 런타임 (Python/Rust/C#/Go), HTTP API는 2개 런타임 (Python/Go) 에서 지원합니다.
 
 ### 플랫폼
 
@@ -754,7 +761,7 @@ piper-plus 모델: [piper-plus-base](https://huggingface.co/ayousanz/piper-plus-
 | 일본어 TTS | 일본어 음성 합성 가이드 |
 | 학습 | [학습 가이드](docs/guides/training/training-guide.md) · 다중 GPU |
 | API | [음소 매핑](docs/api-reference/phoneme-mapping.md) · [환경 변수](docs/getting-started/environment-variables.md) |
-| 기능 | [WebUI](docs/features/webui.md) · CLI 강화 · 스트리밍 |
+| 기능 | [WebUI](docs/features/webui.md) · CLI 강화 · 스트리밍 · Phoneme Timing · SSML |
 | 설정 | 빠른 시작 (일본어) · [Windows](docs/getting-started/windows-setup.md) · [문제 해결](docs/getting-started/troubleshooting.md) |
 | Docker | [Docker 환경](docker/README.md) |
 | WebAssembly | [기술 상세](src/wasm/openjtalk-web/README.npm.md) |

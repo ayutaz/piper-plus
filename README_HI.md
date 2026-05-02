@@ -52,14 +52,21 @@
 ### इंटरफ़ेस
 
 - **[WebUI (Gradio)](docs/features/webui.md)** — अनुमान और प्रशिक्षण समर्थन, Docker समर्थन
-- **C++ CLI** — स्ट्रीमिंग, CUDA अनुमान, फ़ोनीम टाइमिंग आउटपुट, कस्टम शब्दकोश
+- **C++ CLI** — स्ट्रीमिंग, CUDA अनुमान, **Phoneme Timing आउटपुट (JSON/TSV/SRT)**, कस्टम शब्दकोश
 - **[C API शेयर्ड लाइब्रेरी](examples/c-api/README.md)** — `libpiper_plus.so/.dylib/.dll`, FFI संगत (Flutter/Godot/Swift आदि), स्ट्रीमिंग API
-- **[WebAssembly](src/wasm/openjtalk-web/README.npm.md)** — ब्राउज़र में पूर्ण संचालन, सर्वर अनावश्यक
+- **[WebAssembly](src/wasm/openjtalk-web/README.npm.md)** — ब्राउज़र में पूर्ण संचालन, **Phoneme Timing आउटपुट (JSON/TSV/SRT)**, सर्वर अनावश्यक
 - **[Docker](docker/README.md)** — अनुमान, प्रशिक्षण, WebUI, C++ के 5 इमेज उपलब्ध
-- **PyPI** — `pip install piper-plus` से आसान इंस्टॉलेशन
-- **C# CLI** — .NET 8/9 क्रॉस-प्लेटफ़ॉर्म, 8 भाषा मल्टीलिंगुअल, ONNX अनुमान
-- **Rust CLI** — piper-plus/piper-plus-cli, स्ट्रीमिंग, CUDA/CoreML/DirectML समर्थन, शब्दकोश स्वचालित डाउनलोड
-- **[Go CLI](src/go/README.md)** — HTTP API सर्वर, सेशन पूलिंग, Docker समर्थन, सिंगल बाइनरी
+- **PyPI** — `pip install piper-plus`, 8 भाषा मल्टीलिंगुअल, **Phoneme Timing आउटपुट (JSON/TSV/SRT)**, स्ट्रीमिंग, **FastAPI आधारित HTTP API**
+- **C# CLI** — .NET 8/9 क्रॉस-प्लेटफ़ॉर्म, 8 भाषा मल्टीलिंगुअल, ONNX अनुमान, **Phoneme Timing आउटपुट (JSON/TSV/SRT)**
+- **Rust CLI** — piper-plus/piper-plus-cli, स्ट्रीमिंग, CUDA/CoreML/DirectML समर्थन, **Phoneme Timing आउटपुट (JSON/TSV/SRT)**, शब्दकोश स्वचालित डाउनलोड
+- **[Go CLI](src/go/README.md)** — HTTP API सर्वर, सेशन पूलिंग, Docker समर्थन, सिंगल बाइनरी, **Phoneme Timing आउटपुट (JSON/TSV/SRT)**
+- **Voice Cloning (Speaker Encoder + speaker_embedding)** — सभी 7 रनटाइम (Python/Rust/C#/Go/WASM/C++) में समर्थित
+- **SSML समर्थन** — `<speak>`, `<break>`, `<prosody rate="...">` 4 रनटाइम (Python/Rust/C#/Go) में समर्थित
+- **छोटे टेक्स्ट गुणवत्ता सुधार (Strategy A/B/C)** — Silence Padding, Dynamic Scales, और स्वचालित SSML `<break>` सभी 7 रनटाइम में समर्थित
+
+### रनटाइम-वार सुविधा समर्थन
+
+6 रनटाइम (Python/Rust/C#/Go/JS-WASM/C++) में समतुल्य 8-भाषा मल्टीलिंगुअल संश्लेषण। Phoneme Timing, स्ट्रीमिंग (वाक्य-स्तर विभाजन सहित), Voice Cloning, और कस्टम शब्दकोश सभी रनटाइम में उपलब्ध हैं। SSML 4 रनटाइम (Python/Rust/C#/Go) में और HTTP API 2 रनटाइम (Python/Go) में समर्थित है।
 
 ### प्लेटफ़ॉर्म
 
@@ -745,7 +752,7 @@ piper-plus मॉडल: [piper-plus-base](https://huggingface.co/ayousanz/piper
 | जापानी TTS | जापानी वाक् संश्लेषण गाइड |
 | प्रशिक्षण | [प्रशिक्षण गाइड](docs/guides/training/training-guide.md) · मल्टी-GPU |
 | API | [फ़ोनीम मैपिंग](docs/api-reference/phoneme-mapping.md) · [पर्यावरण चर](docs/getting-started/environment-variables.md) |
-| विशेषताएँ | [WebUI](docs/features/webui.md) · CLI संवर्धन · स्ट्रीमिंग |
+| विशेषताएँ | [WebUI](docs/features/webui.md) · CLI संवर्धन · स्ट्रीमिंग · Phoneme Timing · SSML |
 | सेटअप | त्वरित प्रारंभ (जापानी) · [Windows](docs/getting-started/windows-setup.md) · [समस्या निवारण](docs/getting-started/troubleshooting.md) |
 | Docker | [Docker वातावरण](docker/README.md) |
 | WebAssembly | [तकनीकी विवरण](src/wasm/openjtalk-web/README.npm.md) |

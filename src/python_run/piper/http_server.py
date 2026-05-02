@@ -170,6 +170,14 @@ def create_app(voice: Any, synthesize_args: dict[str, Any]) -> FastAPI:
         language_id: str | None = Query(None),
         streaming: str | None = Query(None),
     ) -> Response:
+        """Synthesize speech and return ``audio/wav``.
+
+        Text comes from the POST body or ``?text=`` query (cap: ``MAX_TEXT_BYTES``).
+        Pass ``?streaming=true`` to receive a chunked WAV (placeholder header +
+        per-sentence PCM frames via ``synthesize_stream_raw``); otherwise the
+        full WAV is buffered and returned in one response. ``?language=`` /
+        ``?language_id=`` route through the loaded voice's language map.
+        """
         try:
             body_text = await _read_text(request, text)
         except _RequestTooLarge:
@@ -228,6 +236,13 @@ def create_app(voice: Any, synthesize_args: dict[str, Any]) -> FastAPI:
         language: str | None = Query(None),
         language_id: str | None = Query(None),
     ) -> Response:
+        """Return phoneme timing as JSON or TSV.
+
+        Calls ``PiperVoice.synthesize_with_timing`` (audio is discarded; only
+        timing metadata is returned). ``?format=json`` (default) or ``tsv``.
+        Returns 400 if the model lacks ``durations`` output. Compatible with
+        Rust/Go/C++/C# implementations (byte-for-byte timing values).
+        """
         try:
             body_text = await _read_text(request, text)
         except _RequestTooLarge:

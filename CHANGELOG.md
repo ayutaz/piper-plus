@@ -73,6 +73,28 @@ Python ランタイムに完全な phoneme timing 出力機能を追加。VITS D
 
 - 死んだコード `src/python_run/piper/espeak_phonemizer.py` を削除 (piper-plus は推論時に espeak-ng に依存しない)
 
+### Changed
+
+- HTTP server を Flask から **FastAPI に移行**、`?streaming=true` で `StreamingResponse` による真のチャンク配信に対応 (#361)
+- README の「30秒で試す」を OS 別ワンライナー化 + CLI バイナリ選択ガイド追加 (#360)
+
+### Fixed
+
+- 短文「こんにちは。」が「あこんにちはた」と崩壊する問題を修正 (C++ ランタイム、UTF-8 コードポイントベースの文分割への置換 + 終止符直後の閉じ括弧を消費するロジック) (#363, #347, #348)
+- Wyoming HA 統合エラー + Docker g2p import + リリース配布を解決 (#362)
+- Go Dockerfile を `TARGETARCH` で arm64 対応 (multi-arch ビルド) (#366)
+- WavLM Discriminator: safetensors 未公開モデルに合わせて `use_safetensors=False` に変更 (#353)
+- Dependabot セキュリティアラート対応 (低リスク 7 件 + 高リスク 4 件) (#352, #364)
+
+### Documentation
+
+- README の「30秒で試す」セクションを OS 別ワンライナーに刷新 + CLI バイナリ選択ガイド追加 (#360)
+
+### Chore
+
+- black を 26.3.1 へ更新 (Dependabot #145, #146) (#365)
+- Claude Code hooks + skills で開発ワークフロー自動化 (#350)
+
 ### Tests
 - 196 → 212 passed (リグレッション 0 件)
 
