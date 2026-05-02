@@ -30,8 +30,25 @@ public static class ShortTextProcessor
 
     /// <summary>
     /// Minimum number of phoneme IDs below which padding is applied.
+    /// <para>
+    /// Issue #356: Was 40 (per the original spec) but empirical measurements
+    /// on the tsukuyomi 6lang model show synthesis is stable down to ~8 IDs.
+    /// 40 caused Strategy A to fire on already-stable inputs (e.g. 22-ID
+    /// sentences) and the pad tokens leaked as audible artefacts. 15 keeps
+    /// Strategy A active for genuinely tiny inputs only.
+    /// </para>
     /// </summary>
-    internal const int MinPhonemeIds = 40;
+    internal const int MinPhonemeIds = 15;
+
+    /// <summary>
+    /// Minimum body length (= phoneme IDs minus BOS / EOS) for Strategy A
+    /// to apply. Below this threshold, padding-to-body ratio explodes and
+    /// pad-token audio dominates the actual content (e.g. 「あ。」 has
+    /// body=2 and would get 11 pad tokens around 2 body tokens at MinPhonemeIds=15).
+    /// Raw VITS output is preferable in that regime — degraded for tiny
+    /// utterances but free from padding artefacts.
+    /// </summary>
+    internal const int MinBodyForStrategyA = 3;
 
     /// <summary>
     /// Character count threshold (excluding whitespace) for Strategy C.
@@ -69,9 +86,19 @@ public static class ShortTextProcessor
 
     /// <summary>
     /// Determine whether the phoneme ID sequence is short enough to need padding.
+    /// <para>
+    /// Strategy A is skipped both when the sequence already has enough IDs
+    /// and when the body (= phoneme IDs minus BOS / EOS) is shorter than
+    /// <see cref="MinBodyForStrategyA"/> — see issue #356.
+    /// </para>
     /// </summary>
     internal static bool NeedsPadding(long[] phonemeIds)
-        => phonemeIds.Length < MinPhonemeIds;
+    {
+        int bodyLength = phonemeIds.Length - 2; // exclude BOS / EOS
+        if (bodyLength < MinBodyForStrategyA)
+            return false;
+        return phonemeIds.Length < MinPhonemeIds;
+    }
 
     /// <summary>
     /// Pad a short phoneme-ID sequence with pause IDs (<c>0</c>) inserted
@@ -93,6 +120,10 @@ public static class ShortTextProcessor
     internal static (long[] PaddedIds, long[]? PaddedProsody) PadPhonemeIds(
         long[] phonemeIds, long[]? prosodyFlat)
     {
+        // Skip Strategy A for very short bodies — see NeedsPadding / issue #356.
+        int bodyLengthGuard = phonemeIds.Length - 2;
+        if (bodyLengthGuard < MinBodyForStrategyA)
+            return (phonemeIds, prosodyFlat);
         if (phonemeIds.Length >= MinPhonemeIds)
             return (phonemeIds, prosodyFlat);
 

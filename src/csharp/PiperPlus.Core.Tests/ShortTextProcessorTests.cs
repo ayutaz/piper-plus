@@ -15,7 +15,8 @@ public class ShortTextProcessorTests
     [Fact]
     public void Constants_HaveExpectedValues()
     {
-        Assert.Equal(40, ShortTextProcessor.MinPhonemeIds);
+        Assert.Equal(15, ShortTextProcessor.MinPhonemeIds);
+        Assert.Equal(3, ShortTextProcessor.MinBodyForStrategyA);
         Assert.Equal(10, ShortTextProcessor.ShortTextChars);
         Assert.Equal(300, ShortTextProcessor.SilencePadMs);
         Assert.Equal(0.01f, ShortTextProcessor.TrimThresholdRms);
@@ -31,7 +32,32 @@ public class ShortTextProcessorTests
     [Fact]
     public void NeedsPadding_ShortSequence_ReturnsTrue()
     {
-        var ids = new long[10]; // well below MinPhonemeIds=40
+        // Length < MinPhonemeIds and body >= MinBodyForStrategyA → padding applies.
+        var ids = new long[10];
+        Assert.True(ShortTextProcessor.NeedsPadding(ids));
+    }
+
+    [Fact]
+    public void NeedsPadding_BodyTooShort_ReturnsFalse()
+    {
+        // The current contract is MinBodyForStrategyA == 3.
+        Assert.Equal(3, ShortTextProcessor.MinBodyForStrategyA);
+
+        // body=0 (BOS+EOS only): Strategy A skipped (issue #356).
+        Assert.False(ShortTextProcessor.NeedsPadding(new long[2]));
+
+        // body=1
+        Assert.False(ShortTextProcessor.NeedsPadding(new long[3]));
+
+        // body=2 (e.g. 「あ。」)
+        Assert.False(ShortTextProcessor.NeedsPadding(new long[4]));
+    }
+
+    [Fact]
+    public void NeedsPadding_BodyAtMinimum_ReturnsTrue()
+    {
+        // body == MinBodyForStrategyA: Strategy A applies if length < MinPhonemeIds.
+        var ids = new long[2 + ShortTextProcessor.MinBodyForStrategyA];
         Assert.True(ShortTextProcessor.NeedsPadding(ids));
     }
 
@@ -81,7 +107,8 @@ public class ShortTextProcessorTests
     [Fact]
     public void PadPhonemeIds_PreservesBosAndEos()
     {
-        long[] ids = [1, 10, 11, 2];
+        // body must be >= MinBodyForStrategyA for Strategy A to apply.
+        long[] ids = [1, 10, 11, 12, 2];
 
         var (padded, _) = ShortTextProcessor.PadPhonemeIds(ids, null);
 
@@ -92,8 +119,8 @@ public class ShortTextProcessorTests
     [Fact]
     public void PadPhonemeIds_InsertsOnlyPauseIds()
     {
-        // BOS=1, a=10, EOS=2 => 3 elements, needs 37 pause IDs
-        long[] ids = [1, 10, 2];
+        // body must be >= MinBodyForStrategyA for Strategy A to apply.
+        long[] ids = [1, 10, 11, 12, 2]; // body = 3
         var originalSet = new HashSet<long>(ids);
 
         var (padded, _) = ShortTextProcessor.PadPhonemeIds(ids, null);
@@ -104,6 +131,21 @@ public class ShortTextProcessorTests
             if (!originalSet.Contains(id))
                 Assert.Equal(ShortTextProcessor.PauseId, id);
         }
+    }
+
+    [Fact]
+    public void PadPhonemeIds_SkipsWhenBodyTooShort()
+    {
+        // body=2 ("あ。" case) → Strategy A skipped, returns input unchanged.
+        long[] ids = [1, 10, 11, 2]; // body = 2
+        var (padded, prosody) = ShortTextProcessor.PadPhonemeIds(ids, null);
+
+        // The current contract is MinBodyForStrategyA == 3, so this body=2
+        // input must be returned untouched. If MinBodyForStrategyA is ever
+        // lowered below 3 we will need to revisit this assertion.
+        Assert.Equal(3, ShortTextProcessor.MinBodyForStrategyA);
+        Assert.Same(ids, padded);
+        Assert.Null(prosody);
     }
 
     [Fact]
@@ -143,8 +185,9 @@ public class ShortTextProcessorTests
     [Fact]
     public void PadPhonemeIds_WithProsody_ProsodyExtended()
     {
-        long[] ids = [1, 10, 11, 2]; // 4 elements
-        long[] prosody = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]; // 4 * 3 = 12
+        // body must be >= MinBodyForStrategyA so Strategy A applies.
+        long[] ids = [1, 10, 11, 12, 2]; // 5 elements (body=3)
+        long[] prosody = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]; // 5 * 3
 
         var (padded, paddedProsody) = ShortTextProcessor.PadPhonemeIds(ids, prosody);
 
@@ -157,16 +200,17 @@ public class ShortTextProcessorTests
         Assert.Equal(3L, paddedProsody[2]);
 
         // EOS prosody preserved
-        Assert.Equal(10L, paddedProsody[^3]);
-        Assert.Equal(11L, paddedProsody[^2]);
-        Assert.Equal(12L, paddedProsody[^1]);
+        Assert.Equal(13L, paddedProsody[^3]);
+        Assert.Equal(14L, paddedProsody[^2]);
+        Assert.Equal(15L, paddedProsody[^1]);
     }
 
     [Fact]
     public void PadPhonemeIds_WithProsody_PaddingPositionsAreZero()
     {
-        long[] ids = [1, 10, 2]; // 3 elements => needs 37 padding
-        long[] prosody = [1, 1, 1, 2, 2, 2, 3, 3, 3]; // 3 * 3 = 9
+        // body must be >= MinBodyForStrategyA so Strategy A applies.
+        long[] ids = [1, 10, 11, 12, 2]; // 5 elements (body=3)
+        long[] prosody = [1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4, 5, 5, 5];
 
         var (padded, paddedProsody) = ShortTextProcessor.PadPhonemeIds(ids, prosody);
 
@@ -182,7 +226,8 @@ public class ShortTextProcessorTests
     [Fact]
     public void PadPhonemeIds_NullProsody_ReturnsNull()
     {
-        long[] ids = [1, 10, 2];
+        // body must be >= MinBodyForStrategyA so PadPhonemeIds actually pads.
+        long[] ids = [1, 10, 11, 12, 2];
 
         var (_, paddedProsody) = ShortTextProcessor.PadPhonemeIds(ids, null);
 
@@ -192,8 +237,8 @@ public class ShortTextProcessorTests
     [Fact]
     public void PadPhonemeIds_MismatchedProsodyLength_ReturnsNull()
     {
-        long[] ids = [1, 10, 2];
-        long[] prosody = [1, 2]; // wrong length (should be 9)
+        long[] ids = [1, 10, 11, 12, 2];
+        long[] prosody = [1, 2]; // wrong length (should be 15)
 
         var (_, paddedProsody) = ShortTextProcessor.PadPhonemeIds(ids, prosody);
 
@@ -229,7 +274,8 @@ public class ShortTextProcessorTests
         }
 
         int totalPadding = afterBosPadding + beforeEosPadding;
-        Assert.Equal(35, totalPadding);
+        // 5 input IDs → deficit = MinPhonemeIds - 5 pause tokens.
+        Assert.Equal(ShortTextProcessor.MinPhonemeIds - 5, totalPadding);
         // Distribution should be roughly even (difference <= 1)
         Assert.True(Math.Abs(afterBosPadding - beforeEosPadding) <= 1,
             $"Padding should be roughly even: afterBos={afterBosPadding}, beforeEos={beforeEosPadding}");
@@ -369,13 +415,16 @@ public class ShortTextProcessorTests
     {
         float noiseScale = 1.0f;
         float noiseW = 1.0f;
-        int halfMin = ShortTextProcessor.MinPhonemeIds / 2; // 20
+        int halfMin = ShortTextProcessor.MinPhonemeIds / 2;
 
         var (adjNoise, adjW) = ShortTextProcessor.AdjustScales(halfMin, noiseScale, noiseW);
 
-        // ratio = 20/40 = 0.5. max(0.5, 0.5) = 0.5 for noise, max(0.4, 0.5) = 0.5 for noiseW
-        Assert.Equal(0.5f, adjNoise);
-        Assert.Equal(0.5f, adjW);
+        // ratio = halfMin / MinPhonemeIds, floors clamp where needed.
+        float ratio = (float)halfMin / ShortTextProcessor.MinPhonemeIds;
+        float nsRatio = MathF.Max(0.5f, ratio);
+        float nwRatio = MathF.Max(0.4f, ratio);
+        Assert.Equal(nsRatio, adjNoise);
+        Assert.Equal(nwRatio, adjW);
     }
 
     [Fact]
