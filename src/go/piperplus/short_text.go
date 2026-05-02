@@ -43,20 +43,27 @@ const (
 	// trimWindowSize is the number of samples per RMS analysis window
 	// used in silence trimming.
 	trimWindowSize = 256
+
+	// trimEosMaxFrames bounds how many EOS frames the durations-based trim
+	// keeps after Strategy A padding. VITS predicts an inflated EOS under
+	// the padded context that produces an audible artefact otherwise
+	// (issue #356). Default 0 = drop the entire EOS region.
+	trimEosMaxFrames = 0
 )
 
 // padPhonemeIDs inserts pause IDs (0) into phonemeIDs to reach minPhonemeIDs.
 // Pause IDs are inserted evenly after BOS (index 0) and before EOS (last index).
-// Returns the padded slice and true if padding was applied, or the original
-// slice and false if no padding was needed (or skipped because the body is
-// shorter than minBodyForStrategyA — issue #356).
-func padPhonemeIDs(ids []int64) ([]int64, bool) {
+// Returns the padded slice, true if padding was applied, and the front/back
+// padding counts. Strategy A is skipped (returns the original slice and zero
+// counts) when the body (= phoneme IDs minus BOS / EOS) is shorter than
+// minBodyForStrategyA — see issue #356.
+func padPhonemeIDs(ids []int64) ([]int64, bool, int, int) {
 	bodyLen := len(ids) - 2 // exclude BOS / EOS
 	if bodyLen < minBodyForStrategyA {
-		return ids, false
+		return ids, false, 0, 0
 	}
 	if len(ids) >= minPhonemeIDs {
-		return ids, false
+		return ids, false, 0, 0
 	}
 
 	needed := minPhonemeIDs - len(ids)
@@ -87,7 +94,79 @@ func padPhonemeIDs(ids []int64) ([]int64, bool) {
 	// EOS (last element).
 	padded = append(padded, ids[len(ids)-1])
 
-	return padded, true
+	return padded, true, frontPad, backPad
+}
+
+// trimPaddingByDurations performs the Strategy A precise post-trim using the
+// model's duration output. Mirrors src/python_run/piper/voice.py
+// _trim_padding_by_durations so all runtimes produce byte-equal output for
+// the same inputs (issue #356, cross-runtime contract).
+//
+// The padded sequence layout is:
+//
+//	[BOS, pad×frontPad, ...body..., pad×backPad, EOS]
+//
+// durations[i] is the frame count VITS assigned to phoneme i. Multiplying the
+// pad-token totals by hopSize gives the exact sample count to drop.
+//
+// Trimming policy:
+//   - BOS + front padding: stripped completely
+//   - Back padding: stripped completely
+//   - EOS: keep only eosMaxFrames frames (default trimEosMaxFrames = 0)
+//
+// All frame→sample conversions use truncation (int) — required for
+// byte-equality with the Python reference implementation.
+//
+// Returns audio unchanged when inputs are inconsistent (nil durations, zero
+// hop, durations shorter than 1+frontPad+backPad+1, etc.).
+func trimPaddingByDurations(audio []int16, durations []float32, frontPad, backPad, hopSize, eosMaxFrames int) []int16 {
+	if frontPad <= 0 && backPad <= 0 {
+		return audio
+	}
+	if durations == nil || hopSize <= 0 {
+		return audio
+	}
+	expectedLen := 1 + frontPad + backPad + 1 // BOS + pads + EOS
+	if len(durations) < expectedLen {
+		return audio
+	}
+
+	// Front: BOS + front padding samples. Truncation matches int() in Python.
+	var frontSum float32
+	for i := 0; i < 1+frontPad; i++ {
+		frontSum += durations[i]
+	}
+	frontSamples := int(frontSum * float32(hopSize))
+
+	// Back: back padding samples + EOS excess (over eosMaxFrames).
+	var backPadSum float32
+	if backPad > 0 {
+		// durations[-(1+backPad) : -1] in Python = durations[len-1-backPad : len-1]
+		start := len(durations) - 1 - backPad
+		for i := start; i < len(durations)-1; i++ {
+			backPadSum += durations[i]
+		}
+	}
+	backPadSamples := int(backPadSum * float32(hopSize))
+
+	eosFrames := durations[len(durations)-1]
+	eosExcess := eosFrames - float32(eosMaxFrames)
+	if eosExcess < 0 {
+		eosExcess = 0
+	}
+	backSamples := backPadSamples + int(eosExcess*float32(hopSize))
+
+	if frontSamples < 0 {
+		frontSamples = 0
+	}
+	end := len(audio) - backSamples
+	if end < frontSamples {
+		end = frontSamples
+	}
+	if frontSamples >= len(audio) || end <= 0 || frontSamples >= end {
+		return audio
+	}
+	return audio[frontSamples:end]
 }
 
 // padProsodyFeatures extends prosody features to match the new padded phoneme

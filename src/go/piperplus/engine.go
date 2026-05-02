@@ -28,6 +28,7 @@ type OnnxEngine struct {
 	session      *ort.DynamicAdvancedSession
 	capabilities ModelCapabilities
 	sampleRate   int
+	hopSize      int
 	inputNames   []string
 	outputNames  []string
 	logger       *slog.Logger
@@ -109,10 +110,16 @@ func newOnnxEngine(modelPath string, config *VoiceConfig, sessOpts *ort.SessionO
 		"has_speaker_embedding", caps.HasSpeakerEmbedding,
 	)
 
+	hopSize := config.Audio.HopSize
+	if hopSize <= 0 {
+		hopSize = 256 // matches docs/spec/short-text-contract.toml default
+	}
+
 	return &OnnxEngine{
 		session:      session,
 		capabilities: *caps,
 		sampleRate:   config.Audio.SampleRate,
+		hopSize:      hopSize,
 		inputNames:   inputNames,
 		outputNames:  outputNames,
 		logger:       logger,
@@ -140,7 +147,8 @@ func (e *OnnxEngine) Synthesize(ctx context.Context, req *SynthesisRequest) (*Sy
 	phonemeIDs := req.PhonemeIDs
 	prosodyFeatures := req.ProsodyFeatures
 	var wasPadded bool
-	phonemeIDs, wasPadded = padPhonemeIDs(phonemeIDs)
+	var frontPad, backPad int
+	phonemeIDs, wasPadded, frontPad, backPad = padPhonemeIDs(phonemeIDs)
 	if wasPadded {
 		prosodyFeatures = padProsodyFeatures(req.ProsodyFeatures, originalPhonemeLen, len(phonemeIDs))
 	}
@@ -359,23 +367,18 @@ func (e *OnnxEngine) Synthesize(ctx context.Context, req *SynthesisRequest) (*Sy
 	// Peak-normalize and convert to int16.
 	audio := peakNormalize(audioCopy)
 
-	// --- Strategy A post-trim: remove silence introduced by padding ---
-	if wasPadded {
-		audio = trimSilence(audio)
-	}
-
-	// Calculate audio duration using integer arithmetic for precision.
-	var audioDuration time.Duration
-	if len(audio) > 0 && e.sampleRate > 0 {
-		audioDuration = time.Duration(int64(len(audio)) * int64(time.Second) / int64(e.sampleRate))
-	}
-
-	// Extract durations if available.
+	// Extract durations BEFORE post-trim so the precise trimmer can use them.
+	// `paddedDurations` keeps the full padded-sequence durations needed by
+	// trimPaddingByDurations, while `durations` (returned to callers) is
+	// truncated back to the original phoneme length for timing alignment.
+	var paddedDurations []float32
 	var durations []float32
 	if e.capabilities.HasDurationOutput && len(outputs) > 1 && outputs[1] != nil {
 		durTensor, ok := outputs[1].(*ort.Tensor[float32])
 		if ok {
 			rawDur := durTensor.GetData()
+			paddedDurations = make([]float32, len(rawDur))
+			copy(paddedDurations, rawDur)
 			durations = make([]float32, len(rawDur))
 			copy(durations, rawDur)
 			// When padding was applied, trim durations back to original length.
@@ -389,6 +392,31 @@ func (e *OnnxEngine) Synthesize(ctx context.Context, req *SynthesisRequest) (*Sy
 		} else {
 			e.logger.Warn("unexpected tensor type for duration output; durations unavailable")
 		}
+	}
+
+	// --- Strategy A post-trim: remove padding-induced audio ---
+	// Prefer the durations-based precise trim when the model exposes
+	// durations (issue #356). Falls back to the legacy RMS trim for older
+	// exports without a duration output.
+	if wasPadded {
+		if paddedDurations != nil {
+			audio = trimPaddingByDurations(
+				audio,
+				paddedDurations,
+				frontPad,
+				backPad,
+				e.hopSize,
+				trimEosMaxFrames,
+			)
+		} else {
+			audio = trimSilence(audio)
+		}
+	}
+
+	// Calculate audio duration using integer arithmetic for precision.
+	var audioDuration time.Duration
+	if len(audio) > 0 && e.sampleRate > 0 {
+		audioDuration = time.Duration(int64(len(audio)) * int64(time.Second) / int64(e.sampleRate))
 	}
 
 	e.logger.Debug("inference complete",

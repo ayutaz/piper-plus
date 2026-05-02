@@ -15,7 +15,7 @@ func TestPadPhonemeIDs_NoPaddingNeeded(t *testing.T) {
 		ids[i] = int64(i)
 	}
 
-	padded, wasPadded := padPhonemeIDs(ids)
+	padded, wasPadded, _, _ := padPhonemeIDs(ids)
 	if wasPadded {
 		t.Error("expected wasPadded=false for len >= minPhonemeIDs")
 	}
@@ -28,7 +28,7 @@ func TestPadPhonemeIDs_ShortSequence(t *testing.T) {
 	// BOS=1, some content, EOS=2
 	ids := []int64{1, 10, 20, 30, 2}
 
-	padded, wasPadded := padPhonemeIDs(ids)
+	padded, wasPadded, _, _ := padPhonemeIDs(ids)
 	if !wasPadded {
 		t.Error("expected wasPadded=true for short sequence")
 	}
@@ -75,7 +75,7 @@ func TestPadPhonemeIDs_MinimalSequence_Skipped(t *testing.T) {
 	// is skipped entirely (issue #356).
 	ids := []int64{1, 2}
 
-	padded, wasPadded := padPhonemeIDs(ids)
+	padded, wasPadded, _, _ := padPhonemeIDs(ids)
 	if wasPadded {
 		t.Error("expected wasPadded=false for body < minBodyForStrategyA")
 	}
@@ -92,7 +92,7 @@ func TestPadPhonemeIDs_BodyTooShort(t *testing.T) {
 	}
 	ids := []int64{1, 10, 11, 2}
 
-	padded, wasPadded := padPhonemeIDs(ids)
+	padded, wasPadded, _, _ := padPhonemeIDs(ids)
 	if wasPadded {
 		t.Error("expected wasPadded=false for body=2 < minBodyForStrategyA")
 	}
@@ -110,7 +110,7 @@ func TestPadPhonemeIDs_BodyAtMinimum(t *testing.T) {
 	}
 	ids = append(ids, 2) // EOS
 
-	padded, wasPadded := padPhonemeIDs(ids)
+	padded, wasPadded, _, _ := padPhonemeIDs(ids)
 	if !wasPadded {
 		t.Error("expected wasPadded=true for body == minBodyForStrategyA")
 	}
@@ -124,7 +124,7 @@ func TestPadPhonemeIDs_ExactMinimum(t *testing.T) {
 	ids[0] = 1
 	ids[len(ids)-1] = 2
 
-	padded, wasPadded := padPhonemeIDs(ids)
+	padded, wasPadded, _, _ := padPhonemeIDs(ids)
 	if wasPadded {
 		t.Error("expected wasPadded=false when exactly at minimum")
 	}
@@ -138,7 +138,7 @@ func TestPadPhonemeIDs_AboveMinimum(t *testing.T) {
 	ids[0] = 1
 	ids[len(ids)-1] = 2
 
-	padded, wasPadded := padPhonemeIDs(ids)
+	padded, wasPadded, _, _ := padPhonemeIDs(ids)
 	if wasPadded {
 		t.Error("expected wasPadded=false when above minimum")
 	}
@@ -187,6 +187,112 @@ func TestPadProsodyFeatures_PaddingApplied(t *testing.T) {
 	// Last element should match original EOS prosody.
 	if result[len(result)-1] != original[len(original)-1] {
 		t.Errorf("expected last element %v, got %v", original[len(original)-1], result[len(result)-1])
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Strategy A: trimPaddingByDurations (precise post-trim, issue #356)
+// ---------------------------------------------------------------------------
+
+// Mirrors the Python reference (src/python_run/piper/voice.py and
+// src/python/piper_train/infer_onnx.py) so the cross-runtime contract holds.
+
+func TestTrimPaddingByDurations_NoOpWhenNoPadding(t *testing.T) {
+	audio := make([]int16, 1000)
+	for i := range audio {
+		audio[i] = int16(i)
+	}
+	durations := []float32{1.0, 1.0, 1.0, 1.0, 1.0}
+	result := trimPaddingByDurations(audio, durations, 0, 0, 256, trimEosMaxFrames)
+	if len(result) != len(audio) {
+		t.Errorf("expected length %d, got %d", len(audio), len(result))
+	}
+}
+
+func TestTrimPaddingByDurations_TrimsFrontPaddingOnly(t *testing.T) {
+	// Layout: BOS=2, pad×3 (3+3+3 frames), body=4, EOS=1 → 19 frames total.
+	durations := []float32{2.0, 3.0, 3.0, 3.0, 4.0, 1.0}
+	const hop = 100
+	total := 1900 // sum * hop
+	audio := make([]int16, total)
+	result := trimPaddingByDurations(audio, durations, 3, 0, hop, 6)
+	// BOS + front padding samples = (2+3+3+3) * 100 = 1100
+	if len(result) != total-1100 {
+		t.Errorf("expected length %d, got %d", total-1100, len(result))
+	}
+}
+
+func TestTrimPaddingByDurations_DefaultStripsEosCompletely(t *testing.T) {
+	// Default trimEosMaxFrames=0 drops the entire EOS region.
+	durations := []float32{2.0, 5.0, 5.0, 4.0, 4.0, 5.0, 5.0, 8.0}
+	const hop = 100
+	total := 3800
+	audio := make([]int16, total)
+	result := trimPaddingByDurations(audio, durations, 2, 2, hop, trimEosMaxFrames)
+	// BOS + front padding = (2+5+5)*100 = 1200
+	// back padding + entire EOS = (5+5+8)*100 = 1800
+	if len(result) != total-1200-1800 {
+		t.Errorf("expected length %d, got %d", total-1200-1800, len(result))
+	}
+}
+
+func TestTrimPaddingByDurations_ClampsInflatedEos(t *testing.T) {
+	// EOS=10 frames, eosMaxFrames=6 → excess 4 frames trimmed.
+	durations := []float32{2.0, 3.0, 3.0, 4.0, 3.0, 3.0, 10.0}
+	const hop = 100
+	total := 2800
+	audio := make([]int16, total)
+	result := trimPaddingByDurations(audio, durations, 2, 2, hop, 6)
+	// BOS + front padding = (2+3+3) * 100 = 800
+	// back padding + EOS excess = (3+3 + (10-6)) * 100 = 1000
+	if len(result) != total-800-1000 {
+		t.Errorf("expected length %d, got %d", total-800-1000, len(result))
+	}
+}
+
+func TestTrimPaddingByDurations_ReturnsInputWhenDurationsNil(t *testing.T) {
+	audio := make([]int16, 1000)
+	result := trimPaddingByDurations(audio, nil, 3, 3, 256, trimEosMaxFrames)
+	if len(result) != len(audio) {
+		t.Errorf("expected unchanged length %d, got %d", len(audio), len(result))
+	}
+}
+
+func TestTrimPaddingByDurations_ReturnsInputWhenDurationsTooShort(t *testing.T) {
+	audio := make([]int16, 1000)
+	durations := []float32{1.0, 1.0, 1.0}
+	result := trimPaddingByDurations(audio, durations, 5, 5, 256, trimEosMaxFrames)
+	if len(result) != len(audio) {
+		t.Errorf("expected unchanged length %d, got %d", len(audio), len(result))
+	}
+}
+
+func TestTrimPaddingByDurations_ReturnsInputWhenHopSizeZero(t *testing.T) {
+	audio := make([]int16, 1000)
+	durations := []float32{1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0}
+	result := trimPaddingByDurations(audio, durations, 2, 2, 0, trimEosMaxFrames)
+	if len(result) != len(audio) {
+		t.Errorf("expected unchanged length %d, got %d", len(audio), len(result))
+	}
+}
+
+func TestTrimPaddingByDurations_TruncationMatchesIntCast(t *testing.T) {
+	// Layout (frontPad=1, backPad=1, body=3):
+	//   [BOS=0.701, pad=0.701, body=2, body=2, body=2, pad=0.703, EOS=0.701]
+	// Front trim = int((0.701+0.701)*100) = 140
+	// Back trim  = int(0.703*100) + int(0.701*100) = 70 + 70 = 140 (truncated each)
+	// A round() implementation would diverge by 1 sample → cross-runtime drift.
+	durations := []float32{0.701, 0.701, 2.0, 2.0, 2.0, 0.703, 0.701}
+	const hop = 100
+	var sum float32
+	for _, d := range durations {
+		sum += d
+	}
+	total := int(sum * hop)
+	audio := make([]int16, total)
+	result := trimPaddingByDurations(audio, durations, 1, 1, hop, trimEosMaxFrames)
+	if len(result) != total-140-140 {
+		t.Errorf("expected length %d, got %d", total-140-140, len(result))
 	}
 }
 
