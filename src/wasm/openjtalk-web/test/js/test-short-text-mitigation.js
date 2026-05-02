@@ -21,6 +21,7 @@ import assert from 'node:assert/strict';
 // ---------------------------------------------------------------------------
 
 let PiperPlus, AudioResult, padPhonemeIds, trimSilence, adjustScalesForShortInput;
+let MIN_PHONEME_IDS, MIN_BODY_FOR_STRATEGY_A;
 let importError = null;
 
 try {
@@ -30,6 +31,8 @@ try {
   padPhonemeIds = mod.padPhonemeIds;
   trimSilence = mod.trimSilence;
   adjustScalesForShortInput = mod.adjustScalesForShortInput;
+  MIN_PHONEME_IDS = mod.MIN_PHONEME_IDS;
+  MIN_BODY_FOR_STRATEGY_A = mod.MIN_BODY_FOR_STRATEGY_A;
 } catch (e) {
   importError = e;
 }
@@ -93,11 +96,20 @@ function createMockInstance(overrides = {}) {
 // padPhonemeIds
 // ===========================================================================
 
+// Helper: build [BOS, body..., EOS] of a target total length, with body
+// large enough for Strategy A to apply (body >= MIN_BODY_FOR_STRATEGY_A).
+function makeIds(total) {
+  const out = [1];
+  for (let i = 0; i < total - 2; i++) {
+    out.push(4);
+  }
+  out.push(2);
+  return out;
+}
+
 describe('padPhonemeIds (Strategy A - padding)', { skip }, () => {
   it('does not pad when phonemeIds length >= MIN_PHONEME_IDS', () => {
-    const ids = new Array(40).fill(4);
-    ids[0] = 1; // BOS
-    ids[39] = 2; // EOS
+    const ids = makeIds(MIN_PHONEME_IDS);
     const result = padPhonemeIds(ids, null);
 
     assert.equal(result.wasPadded, false);
@@ -106,33 +118,31 @@ describe('padPhonemeIds (Strategy A - padding)', { skip }, () => {
   });
 
   it('does not pad when phonemeIds length > MIN_PHONEME_IDS', () => {
-    const ids = new Array(50).fill(4);
-    ids[0] = 1;
-    ids[49] = 2;
+    const ids = makeIds(MIN_PHONEME_IDS + 10);
     const result = padPhonemeIds(ids, null);
 
     assert.equal(result.wasPadded, false);
-    assert.equal(result.phonemeIds.length, 50);
+    assert.equal(result.phonemeIds.length, MIN_PHONEME_IDS + 10);
   });
 
-  it('pads short sequences to MIN_PHONEME_IDS (40)', () => {
-    // [BOS, a, a, a, EOS] = 5 elements, needs 35 padding
-    const ids = [1, 4, 4, 4, 2];
+  it('pads short sequences to MIN_PHONEME_IDS', () => {
+    // body must be >= MIN_BODY_FOR_STRATEGY_A.
+    const ids = makeIds(2 + MIN_BODY_FOR_STRATEGY_A);
     const result = padPhonemeIds(ids, null);
 
     assert.equal(result.wasPadded, true);
-    assert.equal(result.phonemeIds.length, 40);
+    assert.equal(result.phonemeIds.length, MIN_PHONEME_IDS);
   });
 
   it('preserves BOS as first element after padding', () => {
-    const ids = [1, 4, 4, 2];
+    const ids = makeIds(2 + MIN_BODY_FOR_STRATEGY_A);
     const result = padPhonemeIds(ids, null);
 
     assert.equal(result.phonemeIds[0], 1, 'first element should be BOS');
   });
 
   it('preserves EOS as last element after padding', () => {
-    const ids = [1, 4, 4, 2];
+    const ids = makeIds(2 + MIN_BODY_FOR_STRATEGY_A);
     const result = padPhonemeIds(ids, null);
 
     assert.equal(result.phonemeIds[result.phonemeIds.length - 1], 2,
@@ -140,86 +150,112 @@ describe('padPhonemeIds (Strategy A - padding)', { skip }, () => {
   });
 
   it('inserts pause tokens (ID=0) for padding', () => {
-    const ids = [1, 4, 2]; // 3 elements, needs 37 padding
+    // body=3, so deficit = MIN_PHONEME_IDS - 5.
+    const ids = makeIds(2 + MIN_BODY_FOR_STRATEGY_A);
+    const expectedPads = MIN_PHONEME_IDS - ids.length;
     const result = padPhonemeIds(ids, null);
 
-    // Count zeros (excluding any that were already there)
     const zeros = result.phonemeIds.filter(id => id === 0).length;
-    assert.equal(zeros, 37, 'should have 37 pause tokens inserted');
+    assert.equal(zeros, expectedPads, `should have ${expectedPads} pause tokens inserted`);
   });
 
   it('distributes padding evenly: front gets floor, back gets remainder', () => {
-    // 5 elements -> need 35 padding -> front=17, back=18
-    const ids = [1, 10, 11, 12, 2];
+    const ids = [1, 10, 11, 12, 2]; // body=3
+    const total = MIN_PHONEME_IDS - ids.length;
+    const front = Math.floor(total / 2);
+    const back = total - front;
     const result = padPhonemeIds(ids, null);
 
-    // After BOS (index 0), next 17 should be padding zeros
-    for (let i = 1; i <= 17; i++) {
+    // After BOS, `front` zeros, then body, then `back` zeros, then EOS.
+    for (let i = 1; i <= front; i++) {
       assert.equal(result.phonemeIds[i], 0, `index ${i} should be pad`);
     }
-    // Then body: 10, 11, 12
-    assert.equal(result.phonemeIds[18], 10);
-    assert.equal(result.phonemeIds[19], 11);
-    assert.equal(result.phonemeIds[20], 12);
-    // Then 18 padding zeros
-    for (let i = 21; i <= 38; i++) {
+    assert.equal(result.phonemeIds[1 + front], 10);
+    assert.equal(result.phonemeIds[1 + front + 1], 11);
+    assert.equal(result.phonemeIds[1 + front + 2], 12);
+    for (let i = 1 + front + 3; i < MIN_PHONEME_IDS - 1; i++) {
       assert.equal(result.phonemeIds[i], 0, `index ${i} should be pad`);
     }
-    // Then EOS
-    assert.equal(result.phonemeIds[39], 2);
+    assert.equal(result.phonemeIds[MIN_PHONEME_IDS - 1], 2);
+    assert.equal(result.phonemeIds.length, MIN_PHONEME_IDS);
+    // Distribution split is balanced.
+    assert.ok(Math.abs(front - back) <= 1);
   });
 
   it('pads prosodyFeatures in parallel when present', () => {
-    const ids = [1, 4, 4, 2]; // 4 elements -> 36 padding (18 front, 18 back)
-    const prosody = [[0, 0, 0], [1, 2, 3], [4, 5, 6], [0, 0, 0]];
+    // body must be >= MIN_BODY_FOR_STRATEGY_A.
+    const bodySize = MIN_BODY_FOR_STRATEGY_A;
+    const ids = [1, ...new Array(bodySize).fill(4), 2];
+    const prosody = [[0, 0, 0], ...new Array(bodySize).fill(null).map((_, i) => [i, i + 1, i + 2]), [0, 0, 0]];
     const result = padPhonemeIds(ids, prosody);
 
     assert.equal(result.wasPadded, true);
-    assert.equal(result.prosodyFeatures.length, 40);
+    assert.equal(result.prosodyFeatures.length, MIN_PHONEME_IDS);
     // BOS prosody preserved
     assert.deepEqual(result.prosodyFeatures[0], [0, 0, 0]);
     // Padding prosody should be zero triplets
     assert.deepEqual(result.prosodyFeatures[1], [0, 0, 0]);
     // EOS prosody preserved
-    assert.deepEqual(result.prosodyFeatures[39], [0, 0, 0]);
+    assert.deepEqual(result.prosodyFeatures[MIN_PHONEME_IDS - 1], [0, 0, 0]);
   });
 
   it('returns null prosodyFeatures when input prosody is null', () => {
-    const ids = [1, 4, 2];
+    // body must be >= MIN_BODY_FOR_STRATEGY_A.
+    const ids = [1, ...new Array(MIN_BODY_FOR_STRATEGY_A).fill(4), 2];
     const result = padPhonemeIds(ids, null);
 
     assert.equal(result.wasPadded, true);
     assert.equal(result.prosodyFeatures, null);
   });
 
-  it('handles minimum input (2 elements: BOS + EOS)', () => {
-    const ids = [1, 2];
-    const result = padPhonemeIds(ids, null);
-
-    assert.equal(result.wasPadded, true);
-    assert.equal(result.phonemeIds.length, 40);
-    assert.equal(result.phonemeIds[0], 1);
-    assert.equal(result.phonemeIds[39], 2);
+  it('skips Strategy A when body is too short', () => {
+    // body=0 (BOS+EOS only)
+    {
+      const ids = [1, 2];
+      const result = padPhonemeIds(ids, null);
+      assert.equal(result.wasPadded, false);
+      assert.deepEqual(result.phonemeIds, ids);
+    }
+    // body=1
+    {
+      const ids = [1, 4, 2];
+      const result = padPhonemeIds(ids, null);
+      assert.equal(result.wasPadded, false);
+      assert.deepEqual(result.phonemeIds, ids);
+    }
+    // body=2 (e.g. "あ。" case)
+    if (MIN_BODY_FOR_STRATEGY_A > 2) {
+      const ids = [1, 4, 5, 2];
+      const result = padPhonemeIds(ids, null);
+      assert.equal(result.wasPadded, false);
+      assert.deepEqual(result.phonemeIds, ids);
+    }
   });
 
   it('handles input of length exactly MIN_PHONEME_IDS - 1', () => {
-    const ids = new Array(39).fill(4);
-    ids[0] = 1;
-    ids[38] = 2;
+    const ids = makeIds(MIN_PHONEME_IDS - 1);
     const result = padPhonemeIds(ids, null);
 
     assert.equal(result.wasPadded, true);
-    assert.equal(result.phonemeIds.length, 40);
+    assert.equal(result.phonemeIds.length, MIN_PHONEME_IDS);
   });
 
   it('padding prosody arrays are independent references (not shared)', () => {
-    const ids = [1, 4, 4, 2]; // 4 elements -> 36 padding (18 front, 18 back)
-    const prosody = [[0, 0, 0], [1, 2, 3], [4, 5, 6], [0, 0, 0]];
+    const bodySize = MIN_BODY_FOR_STRATEGY_A;
+    const ids = [1, ...new Array(bodySize).fill(4), 2];
+    const prosody = [[0, 0, 0], ...new Array(bodySize).fill(null).map((_, i) => [i, i + 1, i + 2]), [0, 0, 0]];
     const result = padPhonemeIds(ids, prosody);
+    assert.equal(result.wasPadded, true);
 
-    // Collect all padding prosody entries (front padding: indices 1..18, back: 21..38)
-    const frontPad = result.prosodyFeatures.slice(1, 19);
-    const backPad = result.prosodyFeatures.slice(21, 39);
+    // Total deficit = MIN_PHONEME_IDS - ids.length, split front/back.
+    const total = MIN_PHONEME_IDS - ids.length;
+    const front = Math.floor(total / 2);
+    const back = total - front;
+
+    // Front padding: indices [1, 1+front), back padding: indices
+    // [1+front+bodySize, 1+front+bodySize+back).
+    const frontPad = result.prosodyFeatures.slice(1, 1 + front);
+    const backPad = result.prosodyFeatures.slice(1 + front + bodySize, 1 + front + bodySize + back);
     const allPad = [...frontPad, ...backPad];
 
     // Every padding entry must be a distinct array reference
@@ -352,42 +388,45 @@ describe('trimSilence (Strategy A - post-trim)', { skip }, () => {
 
 describe('adjustScalesForShortInput (Strategy B)', { skip }, () => {
   it('does not adjust when phonemeCount >= MIN_PHONEME_IDS', () => {
-    const result = adjustScalesForShortInput(40, 0.667, 0.8);
+    const result = adjustScalesForShortInput(MIN_PHONEME_IDS, 0.667, 0.8);
 
     assert.equal(result.noiseScale, 0.667);
     assert.equal(result.noiseW, 0.8);
   });
 
   it('does not adjust when phonemeCount > MIN_PHONEME_IDS', () => {
-    const result = adjustScalesForShortInput(100, 0.667, 0.8);
+    const result = adjustScalesForShortInput(MIN_PHONEME_IDS + 50, 0.667, 0.8);
 
     assert.equal(result.noiseScale, 0.667);
     assert.equal(result.noiseW, 0.8);
   });
 
   it('reduces noiseScale for short input', () => {
-    // 20 phonemes -> ratio = 20/40 = 0.5, max(0.5, 0.5) = 0.5
-    const result = adjustScalesForShortInput(20, 0.667, 0.8);
+    // Half of MIN_PHONEME_IDS — both ratios clamp to their floors at this point.
+    const len = Math.floor(MIN_PHONEME_IDS / 2);
+    const result = adjustScalesForShortInput(len, 0.667, 0.8);
+    const ratio = len / MIN_PHONEME_IDS;
+    const expected = 0.667 * Math.max(0.5, ratio);
 
     assert.ok(result.noiseScale < 0.667, 'noiseScale should be reduced');
-    const expected = 0.667 * 0.5;
     assert.ok(Math.abs(result.noiseScale - expected) < 1e-6,
       `noiseScale should be ${expected}, got ${result.noiseScale}`);
   });
 
   it('reduces noiseW for short input', () => {
-    // 20 phonemes -> ratio = 0.5, max(0.4, 0.5) = 0.5
-    const result = adjustScalesForShortInput(20, 0.667, 0.8);
+    const len = Math.floor(MIN_PHONEME_IDS / 2);
+    const result = adjustScalesForShortInput(len, 0.667, 0.8);
+    const ratio = len / MIN_PHONEME_IDS;
+    const expected = 0.8 * Math.max(0.4, ratio);
 
     assert.ok(result.noiseW < 0.8, 'noiseW should be reduced');
-    const expected = 0.8 * 0.5;
     assert.ok(Math.abs(result.noiseW - expected) < 1e-6,
       `noiseW should be ${expected}, got ${result.noiseW}`);
   });
 
   it('clamps noiseScale multiplier at 0.5 for very short input', () => {
-    // 5 phonemes -> ratio = 5/40 = 0.125, max(0.5, 0.125) = 0.5
-    const result = adjustScalesForShortInput(5, 0.667, 0.8);
+    // 1 phoneme — far below the noiseScale floor (0.5).
+    const result = adjustScalesForShortInput(1, 0.667, 0.8);
 
     const expected = 0.667 * 0.5;
     assert.ok(Math.abs(result.noiseScale - expected) < 1e-6,
@@ -395,8 +434,8 @@ describe('adjustScalesForShortInput (Strategy B)', { skip }, () => {
   });
 
   it('clamps noiseW multiplier at 0.4 for very short input', () => {
-    // 5 phonemes -> ratio = 0.125, max(0.4, 0.125) = 0.4
-    const result = adjustScalesForShortInput(5, 0.667, 0.8);
+    // 1 phoneme — far below the noiseW floor (0.4).
+    const result = adjustScalesForShortInput(1, 0.667, 0.8);
 
     const expected = 0.8 * 0.4;
     assert.ok(Math.abs(result.noiseW - expected) < 1e-6,
@@ -412,20 +451,25 @@ describe('adjustScalesForShortInput (Strategy B)', { skip }, () => {
   });
 
   it('applies linear scaling in the mid-range', () => {
-    // 30 phonemes -> ratio = 30/40 = 0.75
-    const result = adjustScalesForShortInput(30, 1.0, 1.0);
+    // Pick a length between both floors and the threshold so the ratio is used directly.
+    const len = MIN_PHONEME_IDS - 1;
+    const result = adjustScalesForShortInput(len, 1.0, 1.0);
+    const ratio = len / MIN_PHONEME_IDS;
+    const expectedNs = Math.max(0.5, ratio);
+    const expectedNw = Math.max(0.4, ratio);
 
-    assert.ok(Math.abs(result.noiseScale - 0.75) < 1e-6,
-      `expected 0.75, got ${result.noiseScale}`);
-    assert.ok(Math.abs(result.noiseW - 0.75) < 1e-6,
-      `expected 0.75, got ${result.noiseW}`);
+    assert.ok(Math.abs(result.noiseScale - expectedNs) < 1e-6,
+      `expected ${expectedNs}, got ${result.noiseScale}`);
+    assert.ok(Math.abs(result.noiseW - expectedNw) < 1e-6,
+      `expected ${expectedNw}, got ${result.noiseW}`);
   });
 
   it('handles ratio exactly at the clamp boundary for noiseW', () => {
-    // ratio = 0.4 -> phonemes = 0.4 * 40 = 16
-    const result = adjustScalesForShortInput(16, 1.0, 1.0);
+    // Choose len so ratio == 0.4 (or as close as integer math allows).
+    const len = Math.max(1, Math.round(0.4 * MIN_PHONEME_IDS));
+    const result = adjustScalesForShortInput(len, 1.0, 1.0);
 
-    const ratio = 16 / 40;
+    const ratio = len / MIN_PHONEME_IDS;
     assert.ok(Math.abs(result.noiseScale - Math.max(0.5, ratio)) < 1e-6);
     assert.ok(Math.abs(result.noiseW - Math.max(0.4, ratio)) < 1e-6);
   });
@@ -439,9 +483,10 @@ describe('adjustScalesForShortInput (Strategy B)', { skip }, () => {
 describe('synthesize() short-text mitigation integration', { skip }, () => {
   it('applies padding and scale adjustment for short phonemeIds', async () => {
     let capturedFeeds = null;
-    // Return 5 phoneme IDs (well below MIN_PHONEME_IDS=40)
+    // body must be >= MIN_BODY_FOR_STRATEGY_A but length < MIN_PHONEME_IDS.
+    const phonemeIds = [1, ...new Array(MIN_BODY_FOR_STRATEGY_A).fill(4), 2];
     const instance = createMockInstance({
-      phonemeIds: [1, 4, 4, 4, 2],
+      phonemeIds,
       sessionRun: async (feeds) => {
         capturedFeeds = feeds;
         return { output: { data: new Float32Array(5000), dims: [1, 5000] } };
@@ -450,28 +495,26 @@ describe('synthesize() short-text mitigation integration', { skip }, () => {
 
     await instance.synthesize('hi');
 
-    // Strategy A: phonemeIds should be padded to 40
+    // Strategy A: padded to MIN_PHONEME_IDS
     const inputIds = Array.from(capturedFeeds.input.data).map(Number);
-    assert.equal(inputIds.length, 40, 'padded phonemeIds should be 40');
+    assert.equal(inputIds.length, MIN_PHONEME_IDS, `padded phonemeIds should be ${MIN_PHONEME_IDS}`);
     assert.equal(inputIds[0], 1, 'BOS preserved');
-    assert.equal(inputIds[39], 2, 'EOS preserved');
+    assert.equal(inputIds[MIN_PHONEME_IDS - 1], 2, 'EOS preserved');
 
-    // Strategy B: noiseScale and noiseW should be adjusted
+    // Strategy B: noiseScale and noiseW should be adjusted (ratio < 1).
     const scales = Array.from(capturedFeeds.scales.data);
-    // Original noiseScale = 0.667, ratio = 5/40 = 0.125, clamp 0.5
-    // adjusted = 0.667 * 0.5 = 0.3335
     assert.ok(scales[0] < 0.667, `noiseScale should be reduced: ${scales[0]}`);
     // lengthScale should be unchanged
     assert.ok(Math.abs(scales[1] - 1.0) < 1e-6, 'lengthScale unchanged');
-    // noiseW should be adjusted: 0.8 * 0.4 = 0.32
     assert.ok(scales[2] < 0.8, `noiseW should be reduced: ${scales[2]}`);
   });
 
   it('does NOT pad or adjust scales for long phonemeIds', async () => {
     let capturedFeeds = null;
-    const longIds = new Array(50).fill(4);
+    const longLen = MIN_PHONEME_IDS + 10;
+    const longIds = new Array(longLen).fill(4);
     longIds[0] = 1;
-    longIds[49] = 2;
+    longIds[longLen - 1] = 2;
 
     const instance = createMockInstance({
       encode: () => ({ phonemeIds: longIds, prosodyFeatures: null }),
@@ -484,7 +527,7 @@ describe('synthesize() short-text mitigation integration', { skip }, () => {
     await instance.synthesize('a long enough sentence with many phonemes');
 
     const inputIds = Array.from(capturedFeeds.input.data).map(Number);
-    assert.equal(inputIds.length, 50, 'should NOT be padded');
+    assert.equal(inputIds.length, longLen, 'should NOT be padded');
 
     const scales = Array.from(capturedFeeds.scales.data);
     assert.ok(Math.abs(scales[0] - 0.667) < 1e-6, 'noiseScale unchanged');
@@ -500,7 +543,8 @@ describe('synthesize() short-text mitigation integration', { skip }, () => {
     }
 
     const instance = createMockInstance({
-      phonemeIds: [1, 4, 2], // very short, triggers padding
+      // body must be >= MIN_BODY_FOR_STRATEGY_A so Strategy A applies.
+      phonemeIds: [1, ...new Array(MIN_BODY_FOR_STRATEGY_A).fill(4), 2],
       sessionRun: async () => ({
         output: { data: audio, dims: [1, audio.length] },
       }),
@@ -522,9 +566,10 @@ describe('synthesize() short-text mitigation integration', { skip }, () => {
       audio[i] = 0.5;
     }
 
-    const longIds = new Array(45).fill(4);
+    const longLen = MIN_PHONEME_IDS + 5;
+    const longIds = new Array(longLen).fill(4);
     longIds[0] = 1;
-    longIds[44] = 2;
+    longIds[longLen - 1] = 2;
 
     const instance = createMockInstance({
       encode: () => ({ phonemeIds: longIds, prosodyFeatures: null }),
@@ -547,7 +592,8 @@ describe('synthesize() short-text mitigation integration', { skip }, () => {
         inference: { noise_scale: 0.667, length_scale: 1.0, noise_w: 0.8 },
         phoneme_id_map: { _: [0] },
       },
-      phonemeIds: [1, 4, 2],
+      // body must be >= MIN_BODY_FOR_STRATEGY_A so the path exercises padding too.
+      phonemeIds: [1, ...new Array(MIN_BODY_FOR_STRATEGY_A).fill(4), 2],
     });
 
     const result = await instance.synthesize('hi');
@@ -558,10 +604,10 @@ describe('synthesize() short-text mitigation integration', { skip }, () => {
 
   it('passes prosody features through padding correctly', async () => {
     let capturedFeeds = null;
+    const bodySize = MIN_BODY_FOR_STRATEGY_A;
     const prosody = [
       [0, 0, 0], // BOS
-      [1, 2, 3],
-      [4, 5, 6],
+      ...new Array(bodySize).fill(null).map((_, i) => [i + 1, i + 2, i + 3]),
       [0, 0, 0], // EOS
     ];
 
@@ -573,7 +619,7 @@ describe('synthesize() short-text mitigation integration', { skip }, () => {
         prosody_id_map: { a1: 0, a2: 1, a3: 2 },
       },
       encode: () => ({
-        phonemeIds: [1, 4, 4, 2],
+        phonemeIds: [1, ...new Array(bodySize).fill(4), 2],
         prosodyFeatures: prosody,
       }),
       sessionRun: async (feeds) => {
@@ -586,14 +632,16 @@ describe('synthesize() short-text mitigation integration', { skip }, () => {
 
     // prosody_features tensor should exist and match padded length
     assert.ok(capturedFeeds.prosody_features, 'prosody_features tensor should exist');
-    // Padded to 40 phonemes, each with 3 features
-    assert.deepEqual(capturedFeeds.prosody_features.dims, [1, 40, 3]);
+    // Padded to MIN_PHONEME_IDS phonemes, each with 3 features
+    assert.deepEqual(capturedFeeds.prosody_features.dims, [1, MIN_PHONEME_IDS, 3]);
   });
 
   it('Strategy B uses original phoneme count (before padding) for ratio', async () => {
     let capturedFeeds = null;
-    // 10 phoneme IDs -> ratio = 10/40 = 0.25, clamped to 0.5 for noise, 0.4 for noiseW
-    const ids = [1, 4, 4, 4, 4, 4, 4, 4, 4, 2];
+    // Pick a length so ratio is below the noise_scale floor (0.5).
+    const len = Math.max(2 + MIN_BODY_FOR_STRATEGY_A,
+                         Math.floor(MIN_PHONEME_IDS / 2) + 1);
+    const ids = [1, ...new Array(len - 2).fill(4), 2];
 
     const instance = createMockInstance({
       phonemeIds: ids,
@@ -606,12 +654,11 @@ describe('synthesize() short-text mitigation integration', { skip }, () => {
     await instance.synthesize('test');
 
     const scales = Array.from(capturedFeeds.scales.data);
-    // noiseScale: 0.667 * max(0.5, 10/40) = 0.667 * 0.5 = 0.3335
-    const expectedNoise = 0.667 * 0.5;
+    const ratio = ids.length / MIN_PHONEME_IDS;
+    const expectedNoise = 0.667 * Math.max(0.5, ratio);
+    const expectedNoiseW = 0.8 * Math.max(0.4, ratio);
     assert.ok(Math.abs(scales[0] - expectedNoise) < 1e-4,
       `noiseScale: expected ~${expectedNoise}, got ${scales[0]}`);
-    // noiseW: 0.8 * max(0.4, 10/40) = 0.8 * 0.4 = 0.32
-    const expectedNoiseW = 0.8 * 0.4;
     assert.ok(Math.abs(scales[2] - expectedNoiseW) < 1e-4,
       `noiseW: expected ~${expectedNoiseW}, got ${scales[2]}`);
   });

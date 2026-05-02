@@ -63,8 +63,17 @@ const DEFAULT_LENGTH_SCALE = 1.0;
 const DEFAULT_NOISE_W = 0.8;
 const DEFAULT_SAMPLE_RATE = 22050;
 
-// Short-text mitigation constants (keep in sync with other runtimes)
-const MIN_PHONEME_IDS = 40;
+// Short-text mitigation constants (keep in sync with other runtimes —
+// docs/spec/short-text-contract.toml).
+//
+// Issue #356: MIN_PHONEME_IDS was 40, but tsukuyomi 6lang testing showed
+// synthesis is stable down to ~8 IDs. 40 caused Strategy A to fire on
+// already-stable inputs and leak padding artefacts. 15 keeps Strategy A
+// active for genuinely tiny inputs only. MIN_BODY_FOR_STRATEGY_A = 3
+// additionally bypasses Strategy A when the body (= phoneme IDs minus
+// BOS/EOS) is too small for padding to outweigh content (e.g. 「あ。」).
+export const MIN_PHONEME_IDS = 15;
+export const MIN_BODY_FOR_STRATEGY_A = 3;
 const TRIM_THRESHOLD_RMS = 0.01;
 const TRIM_MIN_SAMPLES = 2205; // 22050 Hz * 0.1 s
 
@@ -79,12 +88,19 @@ const TRIM_MIN_SAMPLES = 2205; // 22050 Hz * 0.1 s
  * sequence reaches MIN_PHONEME_IDS length.  Also pads prosodyFeatures with
  * zero triplets at matching positions when present.
  *
+ * Strategy A is skipped when the body (= phoneme IDs minus BOS / EOS) is
+ * shorter than MIN_BODY_FOR_STRATEGY_A — see issue #356.
+ *
  * @param {number[]} phonemeIds
  * @param {number[][]|null} prosodyFeatures
  * @returns {{ phonemeIds: number[], prosodyFeatures: number[][]|null, wasPadded: boolean }}
  */
 export function padPhonemeIds(phonemeIds, prosodyFeatures) {
   const n = phonemeIds.length;
+  const bodyLen = n - 2; // exclude BOS / EOS
+  if (bodyLen < MIN_BODY_FOR_STRATEGY_A) {
+    return { phonemeIds, prosodyFeatures, wasPadded: false };
+  }
   if (n >= MIN_PHONEME_IDS) {
     return { phonemeIds, prosodyFeatures, wasPadded: false };
   }
