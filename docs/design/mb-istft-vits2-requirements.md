@@ -3,7 +3,8 @@
 > **Issue**: [#268](https://github.com/ayutaz/piper-plus/issues/268)
 > **ブランチ**: `feat/mb-istft-vits2`
 > **作成日**: 2026-04-05
-> **ステータス**: Draft
+> **最終更新**: 2026-05-02
+> **ステータス**: Step 1-4 完了 / Step 5 進行中
 
 ---
 
@@ -520,17 +521,17 @@ if args.simplify:
 | `src/python/tests/test_mb_istft_generator.py` | Generator 出力形状・speaker conditioning テスト (新規) |
 | `src/python/tests/test_stft_loss.py` | Sub-band STFT 損失テスト (新規) |
 
-**受け入れ基準**:
-- [ ] PQMF analysis → synthesis 往復で再構成 SNR > 5 dB (cosine-modulated PQMF with Kaiser 窓の理論限界。NN が残差エイリアシングを補償する設計)
-- [ ] PQMF の全テンソルが `register_buffer` で登録されている (`.cuda()` ハードコードなし)
-- [ ] MBiSTFTGenerator の学習時出力が `(fullband, subbands)` タプル
-- [ ] MBiSTFTGenerator の `onnx_export_mode=True` 時出力が `fullband` のみ
-- [ ] MBiSTFTGenerator の出力形状が `[B, 1, T]` (T = segment_size = 8192)
-- [ ] MBiSTFTGenerator が `g` (speaker embedding) を `self.cond` 経由で正しく受け取る
-- [ ] subband_conv_post の入力チャネルが `upsample_initial_channel // (2 ** len(upsample_rates))` と一致
-- [ ] OnnxISTFT が `torch.istft` と同等の出力を生成する (定常領域の絶対誤差 < 1e-4)
-- [ ] OnnxISTFT の inverse_basis 形状が `(n_fft+2, 1, n_fft)` = `(18, 1, 16)`
-- [ ] MultiResolutionSTFTLoss が 3 解像度で損失を計算する
+**受け入れ基準** (実装完了):
+- [x] PQMF analysis → synthesis 往復で再構成 SNR > 5 dB (cosine-modulated PQMF with Kaiser 窓の理論限界。NN が残差エイリアシングを補償する設計)
+- [x] PQMF の全テンソルが `register_buffer` で登録されている (`.cuda()` ハードコードなし)
+- [x] MBiSTFTGenerator の学習時出力が `(fullband, subbands)` タプル
+- [x] MBiSTFTGenerator の `onnx_export_mode=True` 時出力が `fullband` のみ
+- [x] MBiSTFTGenerator の出力形状が `[B, 1, T]` (T = segment_size = 8192)
+- [x] MBiSTFTGenerator が `g` (speaker embedding) を `self.cond` 経由で正しく受け取る
+- [x] subband_conv_post の入力チャネルが `upsample_initial_channel // (2 ** len(upsample_rates))` と一致
+- [x] OnnxISTFT が `torch.istft` と同等の出力を生成する (定常領域の絶対誤差 < 1e-4)
+- [x] OnnxISTFT の inverse_basis 形状が `(n_fft+2, 1, n_fft)` = `(18, 1, 16)`
+- [x] MultiResolutionSTFTLoss が 3 解像度で損失を計算する
 
 ### Step 2: 学習パイプライン統合
 
@@ -542,15 +543,15 @@ if args.simplify:
 | `src/python/piper_train/vits/lightning.py` | training_step_g に PQMF analysis + sub-band STFT 損失追加 |
 | `src/python/piper_train/vits/models.py` | SynthesizerTrn に MB-iSTFT Generator の選択ロジック追加 |
 
-**受け入れ基準**:
-- [ ] `--mb-istft` で MBiSTFTGenerator が選択される
-- [ ] `--mb-istft` で `upsample_rates=(4,4)`, `upsample_kernel_sizes=(16,16)` が自動設定される
-- [ ] `--mb-istft` と `--quality high` の組み合わせでエラーが出る
-- [ ] `save_hyperparameters()` に `mb_istft=True` が記録される
-- [ ] training_step_g で sub-band STFT 損失が計算・ログされる
-- [ ] PQMF analysis が GT 音声に適用されてサブバンド分解される
-- [ ] フルバンド判別器 (MPD/MSD) は PQMF 合成後の信号に適用される
-- [ ] WavLM 判別器との共存が正常に動作する
+**受け入れ基準** (実装完了):
+- [x] `--mb-istft` で MBiSTFTGenerator が選択される
+- [x] `--mb-istft` で `upsample_rates=(4,4)`, `upsample_kernel_sizes=(16,16)` が自動設定される
+- [x] `--mb-istft` と `--quality high` の組み合わせでエラーが出る
+- [x] `save_hyperparameters()` に `mb_istft=True` が記録される
+- [x] training_step_g で sub-band STFT 損失が計算・ログされる
+- [x] PQMF analysis が GT 音声に適用されてサブバンド分解される
+- [x] フルバンド判別器 (MPD/MSD) は PQMF 合成後の信号に適用される
+- [x] WavLM 判別器との共存が正常に動作する
 
 ### Step 3: ONNX エクスポート対応
 
@@ -561,16 +562,28 @@ if args.simplify:
 | `src/python/piper_train/export_onnx.py` | iSTFT → OnnxISTFT 差替え、PQMF bake |
 | `src/python/tests/test_export_onnx.py` | MB-iSTFT ONNX エクスポートテスト追加 |
 
-**受け入れ基準**:
-- [ ] ONNX エクスポートが成功する (opset 15)
-- [ ] FP16 変換が正常に動作する
-- [ ] ONNX 出力形状が `[B, 1, T]`
-- [ ] PyTorch と ONNX の推論結果が一致する (既存 `test_pytorch_onnx_parity.py` のパターンで検証)
-- [ ] EMA が MB-iSTFT Generator に正しく適用される
-- [ ] `remove_weight_norm()` が正常に動作する
-- [ ] マルチスピーカー + 多言語モデルのエクスポートが成功する
+**受け入れ基準** (実装完了 — PyTorch 2.10 対応含む):
+- [x] ONNX エクスポートが成功する (opset 15)
+- [x] FP16 変換が正常に動作する
+- [x] ONNX 出力形状が `[B, 1, T]`
+- [x] PyTorch と ONNX の推論結果が一致する (既存 `test_pytorch_onnx_parity.py` のパターンで検証)
+- [x] EMA が MB-iSTFT Generator に正しく適用される
+- [x] `remove_weight_norm()` が正常に動作する
+- [x] マルチスピーカー + 多言語モデルのエクスポートが成功する
 
 ### Step 4: 6 言語事前学習
+
+**ステータス**: 学習完了 (2026-04-16)
+
+| 項目 | 値 |
+|------|-----|
+| 期間 | 2026-04-12 〜 2026-04-16 |
+| エポック | 75 (スクラッチ学習) |
+| データセット | `/data/piper/dataset-multilingual-6lang-filtered/` (508,187 発話、571 話者) |
+| チェックポイント | `/data/piper/output-multilingual-6lang-mb-istft/checkpoints/epoch=74-step=500034.ckpt` (+ `last.ckpt`) |
+| ONNX (FP16) | `/data/piper/output-multilingual-6lang-mb-istft/multilingual-6lang-mb-istft-scratch-75epoch.onnx` (40MB) |
+| ONNX (最適化版) | `/data/piper/output-multilingual-6lang-mb-istft/multilingual-6lang-mb-istft-scratch-75epoch.cpu.opt.onnx` (79MB) |
+| 品質確認 | ユーザーによる聴感確認済み (詳細メトリクスは未記録) |
 
 **学習コマンド**:
 
@@ -606,7 +619,16 @@ nohup /data/piper/.venv/bin/python -m piper_train \
 
 ### Step 5: つくよみちゃんファインチューニング
 
+**ステータス**: 2026-05-02 開始 (進行中)
+
 Template B (シングルスピーカー FT) + `--mb-istft` で実行。Step 4 完了後に着手。
+
+| 項目 | 値 |
+|------|-----|
+| データセット | `/data/piper/dataset-tsukuyomi-finetune-6lang/` (再生成中) |
+| ベースチェックポイント | `/data/piper/output-multilingual-6lang-mb-istft/checkpoints/epoch=74-step=500034.ckpt` |
+| 出力先 | `/data/piper/output-tsukuyomi-mb-istft-finetune/` |
+| 主要設定 | `--mb-istft`, `--max_epochs 500`, `--batch-size 4`, `--base_lr 2e-5`, `--resume-from-multispeaker-checkpoint` (freeze_dp 自動有効化) |
 
 ### Step 6: 品質比較 (必須ゲート)
 
