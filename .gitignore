@@ -114,6 +114,14 @@ models/
 # Local working files
 checkpoints/
 output/
+output-*/
+dataset-*/
+libritts-r/
+moe-speech-*/
+downloads/
+hf_readme.md
+rebuild_cache.py
+upload_webdataset.py
 pip-test/
 upiper_comparison_samples/
 compare_phonemes.txt
