@@ -90,6 +90,10 @@ constexpr int MIN_BODY_FOR_STRATEGY_A = 3;
 constexpr float TRIM_THRESHOLD_RMS = 0.01f;
 constexpr int TRIM_MIN_SAMPLES = 2205;  // 22050 Hz * 0.1 s
 constexpr int TRIM_WINDOW_SIZE = 256;
+// Maximum EOS frames retained by the durations-based Strategy A trim.
+// VITS predicts an inflated EOS under the padded context that emits an
+// audible artefact otherwise. 0 = drop the entire EOS region.
+constexpr int TRIM_EOS_MAX_FRAMES = 0;
 
 // PUA to multi-char phoneme mapping for display
 static const std::unordered_map<char32_t, std::string> puaToPhoneme = {
@@ -693,8 +697,16 @@ void loadVoice(PiperConfig &config, std::string modelPath,
 // and before EOS to reach MIN_PHONEME_IDS length. Returns true if padding was
 // applied. Strategy A is also skipped when the body (= phoneme IDs minus
 // BOS/EOS) is shorter than MIN_BODY_FOR_STRATEGY_A — see issue #356.
+//
+// When padding is applied, *frontPadOut and *backPadOut (when non-null)
+// receive the number of pad tokens inserted after BOS and before EOS
+// respectively, so the durations-based trim can locate them precisely.
 static bool padPhonemeIds(std::vector<PhonemeId> &phonemeIds,
-                          PhonemeId padId = 0) {
+                          PhonemeId padId = 0,
+                          int *frontPadOut = nullptr,
+                          int *backPadOut = nullptr) {
+  if (frontPadOut) *frontPadOut = 0;
+  if (backPadOut) *backPadOut = 0;
   const auto len = static_cast<int>(phonemeIds.size());
   const int bodyLen = len - 2; // exclude BOS / EOS
   if (bodyLen < MIN_BODY_FOR_STRATEGY_A) {
@@ -713,6 +725,8 @@ static bool padPhonemeIds(std::vector<PhonemeId> &phonemeIds,
   if (phonemeIds.size() < 2) {
     // Degenerate case: just pad at the end
     phonemeIds.insert(phonemeIds.end(), static_cast<size_t>(needed), padId);
+    if (frontPadOut) *frontPadOut = front;
+    if (backPadOut) *backPadOut = back;
     return true;
   }
 
@@ -732,7 +746,122 @@ static bool padPhonemeIds(std::vector<PhonemeId> &phonemeIds,
 
   spdlog::debug("Short-text padding: {} -> {} phoneme IDs ({} pad tokens added)",
                 len, phonemeIds.size(), needed);
+  if (frontPadOut) *frontPadOut = front;
+  if (backPadOut) *backPadOut = back;
   return true;
+}
+
+// Strategy A precise post-trim using the model's duration output.
+// Mirrors the Python reference (src/python_run/piper/voice.py
+// _trim_padding_by_durations) so all runtimes produce byte-equal output for
+// the same inputs (issue #356, cross-runtime contract).
+//
+// Layout: [BOS, pad×frontPad, ...body..., pad×backPad, EOS]
+//
+// Trimming policy:
+//   - BOS + front padding: stripped completely
+//   - Back padding: stripped completely
+//   - EOS: keep only `eosMaxFrames` frames (default TRIM_EOS_MAX_FRAMES = 0)
+//
+// All frame→sample conversions use static_cast<int>(...) on a float product
+// (truncation toward zero), matching int() in the Python implementation.
+//
+// Falls through unchanged when arguments are inconsistent.
+static void trimPaddingByDurations(std::vector<int16_t> &audioBuffer,
+                                   const std::vector<float> &durations,
+                                   int frontPad,
+                                   int backPad,
+                                   int hopSize,
+                                   int eosMaxFrames = TRIM_EOS_MAX_FRAMES) {
+  if (frontPad <= 0 && backPad <= 0) return;
+  if (durations.empty() || hopSize <= 0) return;
+  const int expectedLen = 1 + frontPad + backPad + 1; // BOS + pads + EOS
+  if (static_cast<int>(durations.size()) < expectedLen) return;
+
+  // Front: BOS + front padding samples (truncated).
+  float frontSum = 0.0f;
+  for (int i = 0; i < 1 + frontPad; i++) {
+    frontSum += durations[i];
+  }
+  const int frontSamples = static_cast<int>(frontSum * static_cast<float>(hopSize));
+
+  // Back: back padding samples + EOS excess (over eosMaxFrames).
+  float backPadSum = 0.0f;
+  if (backPad > 0) {
+    // durations[-(1+backPad) : -1] in Python = [size-1-backPad, size-1)
+    const int start = static_cast<int>(durations.size()) - 1 - backPad;
+    for (int i = start; i < static_cast<int>(durations.size()) - 1; i++) {
+      backPadSum += durations[i];
+    }
+  }
+  const int backPadSamples =
+      static_cast<int>(backPadSum * static_cast<float>(hopSize));
+  const float eosFrames = durations.back();
+  float eosExcess = eosFrames - static_cast<float>(eosMaxFrames);
+  if (eosExcess < 0.0f) eosExcess = 0.0f;
+  const int backSamples =
+      backPadSamples +
+      static_cast<int>(eosExcess * static_cast<float>(hopSize));
+
+  const int totalSamples = static_cast<int>(audioBuffer.size());
+  int start = frontSamples < 0 ? 0 : frontSamples;
+  int end = totalSamples - backSamples;
+  if (end < start) end = start;
+  if (start >= totalSamples || end <= 0 || start >= end) return;
+
+  if (start > 0 || end < totalSamples) {
+    std::vector<int16_t> trimmed(audioBuffer.begin() + start,
+                                 audioBuffer.begin() + end);
+    audioBuffer = std::move(trimmed);
+  }
+}
+
+// Float32 variant of trimPaddingByDurations. Identical sample-count logic;
+// only the buffer element type differs.
+static void trimPaddingByDurationsFloat(std::vector<float> &audioBuffer,
+                                        const std::vector<float> &durations,
+                                        int frontPad,
+                                        int backPad,
+                                        int hopSize,
+                                        int eosMaxFrames = TRIM_EOS_MAX_FRAMES) {
+  if (frontPad <= 0 && backPad <= 0) return;
+  if (durations.empty() || hopSize <= 0) return;
+  const int expectedLen = 1 + frontPad + backPad + 1;
+  if (static_cast<int>(durations.size()) < expectedLen) return;
+
+  float frontSum = 0.0f;
+  for (int i = 0; i < 1 + frontPad; i++) {
+    frontSum += durations[i];
+  }
+  const int frontSamples = static_cast<int>(frontSum * static_cast<float>(hopSize));
+
+  float backPadSum = 0.0f;
+  if (backPad > 0) {
+    const int start = static_cast<int>(durations.size()) - 1 - backPad;
+    for (int i = start; i < static_cast<int>(durations.size()) - 1; i++) {
+      backPadSum += durations[i];
+    }
+  }
+  const int backPadSamples =
+      static_cast<int>(backPadSum * static_cast<float>(hopSize));
+  const float eosFrames = durations.back();
+  float eosExcess = eosFrames - static_cast<float>(eosMaxFrames);
+  if (eosExcess < 0.0f) eosExcess = 0.0f;
+  const int backSamples =
+      backPadSamples +
+      static_cast<int>(eosExcess * static_cast<float>(hopSize));
+
+  const int totalSamples = static_cast<int>(audioBuffer.size());
+  int start = frontSamples < 0 ? 0 : frontSamples;
+  int end = totalSamples - backSamples;
+  if (end < start) end = start;
+  if (start >= totalSamples || end <= 0 || start >= end) return;
+
+  if (start > 0 || end < totalSamples) {
+    std::vector<float> trimmed(audioBuffer.begin() + start,
+                               audioBuffer.begin() + end);
+    audioBuffer = std::move(trimmed);
+  }
 }
 
 // Trim leading/trailing silence from int16 audio using windowed RMS.
@@ -1005,7 +1134,9 @@ void synthesize(std::vector<PhonemeId> &phonemeIds,
   // Save original (pre-padding) phoneme IDs for timing extraction.
   // Duration output corresponds to the original sequence, not padded.
   const std::vector<PhonemeId> originalPhonemeIds(phonemeIds);
-  bool wasPadded = padPhonemeIds(phonemeIds);  // Strategy A: padding
+  int frontPad = 0;
+  int backPad = 0;
+  bool wasPadded = padPhonemeIds(phonemeIds, /*padId=*/0, &frontPad, &backPad);
 
   // Strategy B: Dynamic Scales Adjustment
   float effectiveNoiseScale = synthesisConfig.noiseScale;
@@ -1047,6 +1178,14 @@ void synthesize(std::vector<PhonemeId> &phonemeIds,
   outputNamesVec.push_back("output");
   if (session.hasDurationOutput) {
     outputNamesVec.push_back("durations");
+  }
+
+  // Resolve hop_size for durations-based Strategy A trim. Falls back to
+  // DEFAULT_HOP_SIZE when the config is missing or the field is absent.
+  int hopSize = DEFAULT_HOP_SIZE;
+  if (voice && voice->configRoot.contains("audio") &&
+      voice->configRoot["audio"].contains("hop_size")) {
+    hopSize = voice->configRoot["audio"]["hop_size"];
   }
 
   // Infer
@@ -1110,10 +1249,34 @@ void synthesize(std::vector<PhonemeId> &phonemeIds,
   }
 #endif
 
-  // --- Strategy A post-trim: remove inserted silence after inference ---
+  // Extract durations BEFORE post-trim so the precise trimmer can use them.
+  std::vector<float> paddedDurations;
+  bool haveDurations = false;
+  if (session.hasDurationOutput && outputTensors.size() >= 2) {
+    auto& durationTensor = outputTensors[1];
+    if (durationTensor.IsTensor()) {
+      const float *dPtr = durationTensor.GetTensorData<float>();
+      auto durationShape = durationTensor.GetTensorTypeAndShapeInfo().GetShape();
+      size_t durationCount = 1;
+      for (auto dim : durationShape) {
+        durationCount *= dim;
+      }
+      paddedDurations.assign(dPtr, dPtr + durationCount);
+      haveDurations = true;
+    }
+  }
+
+  // --- Strategy A post-trim: remove padding-induced audio ---
+  // Prefer the durations-based precise trim when the model exposes
+  // durations (issue #356). Falls back to the legacy RMS trim only when
+  // durations are unavailable.
   if (wasPadded) {
-    trimSilenceInt16(audioBuffer);
-    // Recompute audioSeconds after trimming
+    if (haveDurations) {
+      trimPaddingByDurations(audioBuffer, paddedDurations, frontPad, backPad,
+                             hopSize, TRIM_EOS_MAX_FRAMES);
+    } else {
+      trimSilenceInt16(audioBuffer);
+    }
     result.audioSeconds =
         static_cast<double>(audioBuffer.size()) /
         static_cast<double>(synthesisConfig.sampleRate);
@@ -1122,39 +1285,18 @@ void synthesize(std::vector<PhonemeId> &phonemeIds,
     }
   }
 
-  // Extract phoneme timing information if available
-  if (session.hasDurationOutput && outputTensors.size() >= 2 && voice != nullptr) {
-    auto& durationTensor = outputTensors[1];
-    if (durationTensor.IsTensor()) {
-      const float *durations = durationTensor.GetTensorData<float>();
-      auto durationShape = durationTensor.GetTensorTypeAndShapeInfo().GetShape();
-      size_t durationCount = 1;
-      for (auto dim : durationShape) {
-        durationCount *= dim;
-      }
-      
-      // Convert durations to vector
-      std::vector<float> durationVec(durations, durations + durationCount);
-      
-      // Extract timing information
-      // Get hop_size from config
-      int hopSize = DEFAULT_HOP_SIZE;
-      if (voice->configRoot.contains("audio") && 
-          voice->configRoot["audio"].contains("hop_size")) {
-        hopSize = voice->configRoot["audio"]["hop_size"];
-      }
-      
-      result.phonemeTimings = extractTimingsFromDurations(
-          durationVec, originalPhonemeIds,
-          voice->phonemizeConfig.phonemeIdMap,
-          hopSize,
-          voice->synthesisConfig.sampleRate,
-          voice->phonemizeConfig.phonemeType
-      );
-      result.hasTimingInfo = true;
-
-      spdlog::debug("Extracted timing for {} phonemes", result.phonemeTimings.size());
-    }
+  // Extract phoneme timing information using the original (pre-padding)
+  // sequence so callers see indices aligned with their input.
+  if (haveDurations && voice != nullptr) {
+    result.phonemeTimings = extractTimingsFromDurations(
+        paddedDurations, originalPhonemeIds,
+        voice->phonemizeConfig.phonemeIdMap,
+        hopSize,
+        voice->synthesisConfig.sampleRate,
+        voice->phonemizeConfig.phonemeType);
+    result.hasTimingInfo = true;
+    spdlog::debug("Extracted timing for {} phonemes",
+                  result.phonemeTimings.size());
   }
 
   // Clean up
@@ -1192,7 +1334,9 @@ void synthesizeFloat(std::vector<PhonemeId> &phonemeIds,
   // Save original (pre-padding) phoneme IDs for timing extraction.
   // Duration output corresponds to the original sequence, not padded.
   const std::vector<PhonemeId> originalPhonemeIds(phonemeIds);
-  bool wasPadded = padPhonemeIds(phonemeIds);  // Strategy A: padding
+  int frontPad = 0;
+  int backPad = 0;
+  bool wasPadded = padPhonemeIds(phonemeIds, /*padId=*/0, &frontPad, &backPad);
 
   // Strategy B: Dynamic Scales Adjustment
   float effectiveNoiseScale = synthesisConfig.noiseScale;
@@ -1206,6 +1350,13 @@ void synthesizeFloat(std::vector<PhonemeId> &phonemeIds,
     spdlog::debug("Short-text dynamic scales (float): ratio={:.3f}, "
                   "noiseScale={:.4f}, noiseW={:.4f}",
                   ratio, effectiveNoiseScale, effectiveNoiseW);
+  }
+
+  // Resolve hop_size for durations-based Strategy A trim.
+  int hopSize = DEFAULT_HOP_SIZE;
+  if (voice && voice->configRoot.contains("audio") &&
+      voice->configRoot["audio"].contains("hop_size")) {
+    hopSize = voice->configRoot["audio"]["hop_size"];
   }
 
   // Populate InferenceInputs from the existing parameters
@@ -1286,10 +1437,31 @@ void synthesizeFloat(std::vector<PhonemeId> &phonemeIds,
         std::clamp(audio[i] * invMax, -1.0f, 1.0f));
   }
 
-  // --- Strategy A post-trim: remove inserted silence after inference ---
+  // Extract durations BEFORE post-trim so the precise trimmer can use them.
+  std::vector<float> paddedDurations;
+  bool haveDurations = false;
+  if (session.hasDurationOutput && outputTensors.size() >= 2) {
+    auto& durationTensor = outputTensors[1];
+    if (durationTensor.IsTensor()) {
+      const float *dPtr = durationTensor.GetTensorData<float>();
+      auto durationShape = durationTensor.GetTensorTypeAndShapeInfo().GetShape();
+      size_t durationCount = 1;
+      for (auto dim : durationShape) {
+        durationCount *= dim;
+      }
+      paddedDurations.assign(dPtr, dPtr + durationCount);
+      haveDurations = true;
+    }
+  }
+
+  // --- Strategy A post-trim: remove padding-induced audio ---
   if (wasPadded) {
-    trimSilenceFloat(audioBuffer);
-    // Recompute audioSeconds after trimming
+    if (haveDurations) {
+      trimPaddingByDurationsFloat(audioBuffer, paddedDurations, frontPad,
+                                  backPad, hopSize, TRIM_EOS_MAX_FRAMES);
+    } else {
+      trimSilenceFloat(audioBuffer);
+    }
     result.audioSeconds =
         static_cast<double>(audioBuffer.size()) /
         static_cast<double>(synthesisConfig.sampleRate);
@@ -1298,7 +1470,9 @@ void synthesizeFloat(std::vector<PhonemeId> &phonemeIds,
     }
   }
 
-  // Extract phoneme timing information if available
+  // Extract phoneme timing information if available (legacy block kept
+  // intact below — it consumes the durationTensor a second time only when
+  // we entered this branch).
   if (session.hasDurationOutput && outputTensors.size() >= 2 && voice != nullptr) {
     auto& durationTensor = outputTensors[1];
     if (durationTensor.IsTensor()) {

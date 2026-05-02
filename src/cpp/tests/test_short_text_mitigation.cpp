@@ -25,10 +25,15 @@ constexpr int MIN_BODY_FOR_STRATEGY_A = 3;
 constexpr float TRIM_THRESHOLD_RMS = 0.01f;
 constexpr int TRIM_MIN_SAMPLES = 2205;  // 22050 Hz * 0.1 s
 constexpr int TRIM_WINDOW_SIZE = 256;
+constexpr int TRIM_EOS_MAX_FRAMES = 0;
 
 // Replica of padPhonemeIds from piper.cpp
 static bool padPhonemeIds(std::vector<PhonemeId> &phonemeIds,
-                          PhonemeId padId = 0) {
+                          PhonemeId padId = 0,
+                          int *frontPadOut = nullptr,
+                          int *backPadOut = nullptr) {
+  if (frontPadOut) *frontPadOut = 0;
+  if (backPadOut) *backPadOut = 0;
   const auto len = static_cast<int>(phonemeIds.size());
   const int bodyLen = len - 2;
   if (bodyLen < MIN_BODY_FOR_STRATEGY_A) {
@@ -44,6 +49,8 @@ static bool padPhonemeIds(std::vector<PhonemeId> &phonemeIds,
 
   if (phonemeIds.size() < 2) {
     phonemeIds.insert(phonemeIds.end(), static_cast<size_t>(needed), padId);
+    if (frontPadOut) *frontPadOut = front;
+    if (backPadOut) *backPadOut = back;
     return true;
   }
 
@@ -59,7 +66,56 @@ static bool padPhonemeIds(std::vector<PhonemeId> &phonemeIds,
   phonemeIds.insert(phonemeIds.end(), static_cast<size_t>(back), padId);
   phonemeIds.push_back(eos);
 
+  if (frontPadOut) *frontPadOut = front;
+  if (backPadOut) *backPadOut = back;
   return true;
+}
+
+// Replica of trimPaddingByDurations from piper.cpp (int16 variant).
+static void trimPaddingByDurations(std::vector<int16_t> &audioBuffer,
+                                   const std::vector<float> &durations,
+                                   int frontPad,
+                                   int backPad,
+                                   int hopSize,
+                                   int eosMaxFrames = TRIM_EOS_MAX_FRAMES) {
+  if (frontPad <= 0 && backPad <= 0) return;
+  if (durations.empty() || hopSize <= 0) return;
+  const int expectedLen = 1 + frontPad + backPad + 1;
+  if (static_cast<int>(durations.size()) < expectedLen) return;
+
+  float frontSum = 0.0f;
+  for (int i = 0; i < 1 + frontPad; i++) {
+    frontSum += durations[i];
+  }
+  const int frontSamples = static_cast<int>(frontSum * static_cast<float>(hopSize));
+
+  float backPadSum = 0.0f;
+  if (backPad > 0) {
+    const int start = static_cast<int>(durations.size()) - 1 - backPad;
+    for (int i = start; i < static_cast<int>(durations.size()) - 1; i++) {
+      backPadSum += durations[i];
+    }
+  }
+  const int backPadSamples =
+      static_cast<int>(backPadSum * static_cast<float>(hopSize));
+  const float eosFrames = durations.back();
+  float eosExcess = eosFrames - static_cast<float>(eosMaxFrames);
+  if (eosExcess < 0.0f) eosExcess = 0.0f;
+  const int backSamples =
+      backPadSamples +
+      static_cast<int>(eosExcess * static_cast<float>(hopSize));
+
+  const int totalSamples = static_cast<int>(audioBuffer.size());
+  int start = frontSamples < 0 ? 0 : frontSamples;
+  int end = totalSamples - backSamples;
+  if (end < start) end = start;
+  if (start >= totalSamples || end <= 0 || start >= end) return;
+
+  if (start > 0 || end < totalSamples) {
+    std::vector<int16_t> trimmed(audioBuffer.begin() + start,
+                                 audioBuffer.begin() + end);
+    audioBuffer = std::move(trimmed);
+  }
 }
 
 // Replica of trimSilenceInt16 from piper.cpp
@@ -897,6 +953,107 @@ TEST_F(TrimPartialWindowFloatTest, ExactMultipleUnchanged) {
   trimSilenceFloat(audio);
 
   EXPECT_EQ(static_cast<int>(audio.size()), totalSamples);
+}
+
+// ======================================================================
+// Strategy A: trimPaddingByDurations (precise post-trim, issue #356)
+// ======================================================================
+// Mirrors src/python_run/tests/test_short_text_mitigation.py and ensures
+// every runtime trims by the same number of samples for the same inputs.
+
+class TrimPaddingByDurationsTest : public ::testing::Test {};
+
+TEST_F(TrimPaddingByDurationsTest, NoOpWhenNoPadding) {
+  std::vector<int16_t> audio(1000);
+  for (int i = 0; i < 1000; i++) audio[i] = static_cast<int16_t>(i);
+  std::vector<float> durations = {1.0f, 1.0f, 1.0f, 1.0f, 1.0f};
+
+  trimPaddingByDurations(audio, durations, /*frontPad=*/0, /*backPad=*/0,
+                         /*hopSize=*/256, TRIM_EOS_MAX_FRAMES);
+
+  EXPECT_EQ(static_cast<int>(audio.size()), 1000);
+}
+
+TEST_F(TrimPaddingByDurationsTest, TrimsFrontPaddingOnly) {
+  // Layout: BOS=2, pad×3 (3+3+3), body=4, EOS=1 → 19 frames total.
+  std::vector<float> durations = {2.0f, 3.0f, 3.0f, 3.0f, 4.0f, 1.0f};
+  const int hop = 100;
+  const int total = 1900;
+  std::vector<int16_t> audio(total);
+
+  trimPaddingByDurations(audio, durations, /*frontPad=*/3, /*backPad=*/0,
+                         hop, /*eosMaxFrames=*/6);
+
+  // BOS + front padding samples = (2+3+3+3) * 100 = 1100
+  EXPECT_EQ(static_cast<int>(audio.size()), total - 1100);
+}
+
+TEST_F(TrimPaddingByDurationsTest, DefaultStripsEosCompletely) {
+  std::vector<float> durations = {2.0f, 5.0f, 5.0f, 4.0f, 4.0f, 5.0f, 5.0f, 8.0f};
+  const int hop = 100;
+  const int total = 3800;
+  std::vector<int16_t> audio(total);
+
+  trimPaddingByDurations(audio, durations, /*frontPad=*/2, /*backPad=*/2,
+                         hop, TRIM_EOS_MAX_FRAMES);
+
+  // BOS + front padding = (2+5+5)*100 = 1200
+  // back padding + entire EOS = (5+5+8)*100 = 1800
+  EXPECT_EQ(static_cast<int>(audio.size()), total - 1200 - 1800);
+}
+
+TEST_F(TrimPaddingByDurationsTest, ClampsInflatedEos) {
+  std::vector<float> durations = {2.0f, 3.0f, 3.0f, 4.0f, 3.0f, 3.0f, 10.0f};
+  const int hop = 100;
+  const int total = 2800;
+  std::vector<int16_t> audio(total);
+
+  trimPaddingByDurations(audio, durations, /*frontPad=*/2, /*backPad=*/2,
+                         hop, /*eosMaxFrames=*/6);
+
+  // BOS + front padding = (2+3+3) * 100 = 800
+  // back padding + EOS excess = (3+3 + (10-6)) * 100 = 1000
+  EXPECT_EQ(static_cast<int>(audio.size()), total - 800 - 1000);
+}
+
+TEST_F(TrimPaddingByDurationsTest, ReturnsInputWhenDurationsTooShort) {
+  std::vector<int16_t> audio(1000);
+  std::vector<float> durations = {1.0f, 1.0f, 1.0f};
+
+  trimPaddingByDurations(audio, durations, /*frontPad=*/5, /*backPad=*/5,
+                         /*hopSize=*/256, TRIM_EOS_MAX_FRAMES);
+
+  EXPECT_EQ(static_cast<int>(audio.size()), 1000);
+}
+
+TEST_F(TrimPaddingByDurationsTest, ReturnsInputWhenHopSizeZero) {
+  std::vector<int16_t> audio(1000);
+  std::vector<float> durations(8, 1.0f);
+
+  trimPaddingByDurations(audio, durations, /*frontPad=*/2, /*backPad=*/2,
+                         /*hopSize=*/0, TRIM_EOS_MAX_FRAMES);
+
+  EXPECT_EQ(static_cast<int>(audio.size()), 1000);
+}
+
+TEST_F(TrimPaddingByDurationsTest, TruncationMatchesIntCast) {
+  // Layout (frontPad=1, backPad=1, body=3):
+  //   [BOS=0.701, pad=0.701, body=2, body=2, body=2, pad=0.703, EOS=0.701]
+  // Front trim = static_cast<int>((0.701+0.701)*100) = 140
+  // Back trim  = static_cast<int>(0.703*100) + static_cast<int>(0.701*100)
+  //            = 70 + 70 = 140
+  // A round() implementation would diverge → cross-runtime drift.
+  std::vector<float> durations = {0.701f, 0.701f, 2.0f, 2.0f, 2.0f, 0.703f, 0.701f};
+  const int hop = 100;
+  float sum = 0.0f;
+  for (auto d : durations) sum += d;
+  const int total = static_cast<int>(sum * static_cast<float>(hop));
+  std::vector<int16_t> audio(total);
+
+  trimPaddingByDurations(audio, durations, /*frontPad=*/1, /*backPad=*/1,
+                         hop, TRIM_EOS_MAX_FRAMES);
+
+  EXPECT_EQ(static_cast<int>(audio.size()), total - 140 - 140);
 }
 
 int main(int argc, char **argv) {
