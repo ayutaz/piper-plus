@@ -10,12 +10,14 @@ import numpy as np
 import pytest
 
 from piper.voice import (
+    MIN_BODY_FOR_STRATEGY_A,
     MIN_PHONEME_IDS,
     SHORT_TEXT_CHARS,
     SILENCE_PAD_MS,
     TRIM_MIN_SAMPLES,
     TRIM_THRESHOLD_RMS,
     _pad_phoneme_ids,
+    _trim_padding_by_durations,
     _trim_silence,
 )
 
@@ -28,35 +30,40 @@ class TestPadPhonemeIds:
     @pytest.mark.unit
     def test_no_pad_when_long_enough(self):
         ids = list(range(MIN_PHONEME_IDS))
-        padded, was_padded = _pad_phoneme_ids(ids, pad_id=0)
+        padded, was_padded, front_pad, back_pad = _pad_phoneme_ids(ids, pad_id=0)
         assert not was_padded
         assert padded is ids
+        assert front_pad == 0
+        assert back_pad == 0
 
     @pytest.mark.unit
     def test_no_pad_when_exceeds_min(self):
         ids = list(range(MIN_PHONEME_IDS + 10))
-        padded, was_padded = _pad_phoneme_ids(ids, pad_id=0)
+        padded, was_padded, front_pad, back_pad = _pad_phoneme_ids(ids, pad_id=0)
         assert not was_padded
         assert padded is ids
+        assert front_pad == 0
+        assert back_pad == 0
 
     @pytest.mark.unit
     def test_pads_short_sequence(self):
         bos, eos = 1, 2
         body = [10, 11, 12]
         ids = [bos] + body + [eos]  # length 5
-        padded, was_padded = _pad_phoneme_ids(ids, pad_id=0)
+        padded, was_padded, front_pad, back_pad = _pad_phoneme_ids(ids, pad_id=0)
 
         assert was_padded
         assert len(padded) == MIN_PHONEME_IDS
         assert padded[0] == bos
         assert padded[-1] == eos
+        assert front_pad + back_pad == MIN_PHONEME_IDS - len(ids)
 
     @pytest.mark.unit
     def test_preserves_body_content(self):
         bos, eos, pad_id = 1, 2, 0
         body = [10, 20, 30]
         ids = [bos] + body + [eos]
-        padded, _ = _pad_phoneme_ids(ids, pad_id=pad_id)
+        padded, _, _, _ = _pad_phoneme_ids(ids, pad_id=pad_id)
 
         # body should appear contiguously in the padded result
         body_start = padded.index(10)
@@ -64,33 +71,192 @@ class TestPadPhonemeIds:
 
     @pytest.mark.unit
     def test_pad_distribution(self):
-        """Front and back padding should be roughly equal."""
-        bos, eos, pad_id = 1, 2, 0
-        ids = [bos, 10, eos]  # length 3
-        padded, _ = _pad_phoneme_ids(ids, pad_id=pad_id)
+        """Front and back padding should be roughly equal.
 
-        needed = MIN_PHONEME_IDS - 3
-        front = needed // 2
-        back = needed - front
+        Uses a body of MIN_BODY_FOR_STRATEGY_A so Strategy A actually
+        kicks in (smaller bodies are bypassed — see issue #356).
+        """
+        bos, eos, pad_id = 1, 2, 0
+        body = list(range(10, 10 + MIN_BODY_FOR_STRATEGY_A))
+        ids = [bos] + body + [eos]
+        padded, _, front_pad, back_pad = _pad_phoneme_ids(ids, pad_id=pad_id)
+
+        needed = MIN_PHONEME_IDS - len(ids)
+        expected_front = needed // 2
+        expected_back = needed - expected_front
+        assert front_pad == expected_front
+        assert back_pad == expected_back
 
         # After BOS, expect front pad tokens
-        assert padded[1 : 1 + front] == [pad_id] * front
+        assert padded[1 : 1 + front_pad] == [pad_id] * front_pad
         # Before EOS, expect back pad tokens
-        assert padded[-1 - back : -1] == [pad_id] * back
+        assert padded[-1 - back_pad : -1] == [pad_id] * back_pad
 
     @pytest.mark.unit
-    def test_minimum_input_two_elements(self):
-        """Edge case: only BOS + EOS."""
+    def test_skips_strategy_a_when_body_too_short(self):
+        """body shorter than MIN_BODY_FOR_STRATEGY_A skips Strategy A.
+
+        Padding ratio explodes for tiny bodies — raw VITS output is
+        preferable in that regime (issue #356 follow-up).
+        """
+        # body = 0 (only BOS + EOS)
         ids = [1, 2]
-        padded, was_padded = _pad_phoneme_ids(ids, pad_id=0)
+        padded, was_padded, front_pad, back_pad = _pad_phoneme_ids(ids, pad_id=0)
+        assert not was_padded
+        assert padded is ids
+        assert front_pad == 0 and back_pad == 0
+
+        # body = 2, e.g. 「あ。」 → [BOS, a, ., EOS]
+        if MIN_BODY_FOR_STRATEGY_A > 2:
+            ids = [1, 10, 11, 2]
+            padded, was_padded, front_pad, back_pad = _pad_phoneme_ids(ids, pad_id=0)
+            assert not was_padded
+            assert padded is ids
+            assert front_pad == 0 and back_pad == 0
+
+    @pytest.mark.unit
+    def test_pads_when_body_meets_min_body(self):
+        """Body at MIN_BODY_FOR_STRATEGY_A should still be padded."""
+        body = list(range(10, 10 + MIN_BODY_FOR_STRATEGY_A))
+        ids = [1] + body + [2]  # BOS + body + EOS
+        padded, was_padded, front_pad, back_pad = _pad_phoneme_ids(ids, pad_id=0)
         assert was_padded
         assert len(padded) == MIN_PHONEME_IDS
-        assert padded[0] == 1
-        assert padded[-1] == 2
+        assert front_pad + back_pad == MIN_PHONEME_IDS - len(ids)
 
 
 # ---------------------------------------------------------------
-# Strategy A: _trim_silence
+# Strategy A: _trim_padding_by_durations (precise method, Issue #356)
+# ---------------------------------------------------------------
+class TestTrimPaddingByDurations:
+    """Durations-based padding trim (preferred over RMS for Strategy A).
+
+    Regression coverage for issue #356 where pad tokens (ID=0) produced
+    voiced-looking audio that RMS-based trim could not strip, yielding
+    'あこんにちはた' (extra 'a' / 'ta' at boundaries).
+    """
+
+    @pytest.mark.unit
+    def test_no_op_when_no_padding(self):
+        audio = np.arange(1000, dtype=np.int16)
+        durations = np.array([1.0] * 5, dtype=np.float32)
+        result = _trim_padding_by_durations(audio, durations, 0, 0, hop_size=256)
+        assert np.array_equal(result, audio)
+
+    @pytest.mark.unit
+    def test_trims_front_padding_only(self):
+        # Layout: BOS=2, pad×3 (3+3+3 frames), body=4, EOS=1 → 19 frames total
+        # Strategy A trims BOS + front padding from the start.
+        # EOS=1 frame ≤ eos_max_frames=6, so it's preserved.
+        durations = np.array([2.0, 3.0, 3.0, 3.0, 4.0, 1.0], dtype=np.float32)
+        hop = 100
+        total_samples = int(durations.sum() * hop)  # 1900
+        audio = np.arange(total_samples, dtype=np.int16)
+        result = _trim_padding_by_durations(
+            audio, durations, front_pad=3, back_pad=0, hop_size=hop, eos_max_frames=6
+        )
+        # BOS + front padding samples = (2+3+3+3) * 100 = 1100
+        assert len(result) == total_samples - 1100
+        assert result[0] == audio[1100]
+
+    @pytest.mark.unit
+    def test_trims_back_padding_preserves_normal_eos(self):
+        # Back padding stripped, EOS=1 frame preserved (eos_max_frames=6).
+        # Layout: [body=2, body=4, pad=3, pad=3, pad=3, EOS=1] with front_pad=0
+        durations = np.array([2.0, 4.0, 3.0, 3.0, 3.0, 1.0], dtype=np.float32)
+        hop = 100
+        total_samples = int(durations.sum() * hop)  # 1600
+        audio = np.arange(total_samples, dtype=np.int16)
+        result = _trim_padding_by_durations(
+            audio, durations, front_pad=0, back_pad=3, hop_size=hop, eos_max_frames=6
+        )
+        # Trim back padding only (3+3+3)*100 = 900; EOS=1 frame stays in audio.
+        assert len(result) == total_samples - 900
+        # The last 100 samples (= 1 frame * hop) of the result are the EOS region.
+        assert result[-1] == audio[total_samples - 900 - 1]
+
+    @pytest.mark.unit
+    def test_clamps_inflated_eos_duration(self):
+        # EOS=10 frames is above eos_max_frames=6, excess 4 frames trimmed.
+        durations = np.array([2.0, 3.0, 3.0, 4.0, 3.0, 3.0, 10.0], dtype=np.float32)
+        hop = 100
+        total = int(durations.sum() * hop)  # 2800
+        audio = np.arange(total, dtype=np.int16)
+        result = _trim_padding_by_durations(
+            audio, durations, front_pad=2, back_pad=2, hop_size=hop, eos_max_frames=6
+        )
+        # BOS + front padding = (2+3+3) * 100 = 800
+        # back padding + EOS excess = (3+3 + (10-6)) * 100 = 1000
+        assert len(result) == total - 800 - 1000
+
+    @pytest.mark.unit
+    def test_trims_both_sides(self):
+        # BOS=2, pad×2, body×2, pad×2, EOS=1
+        # EOS=1 below eos_max_frames=6 so preserved entirely.
+        durations = np.array(
+            [2.0, 5.0, 5.0, 4.0, 4.0, 5.0, 5.0, 1.0], dtype=np.float32
+        )
+        hop = 100
+        total = int(durations.sum() * hop)  # 3100
+        audio = np.arange(total, dtype=np.int16)
+        result = _trim_padding_by_durations(
+            audio, durations, front_pad=2, back_pad=2, hop_size=hop, eos_max_frames=6
+        )
+        # BOS + front padding = (2+5+5)*100 = 1200
+        # back padding only (EOS preserved) = (5+5)*100 = 1000
+        front_samples = int((2.0 + 5.0 + 5.0) * hop)
+        back_samples = int((5.0 + 5.0) * hop)
+        assert len(result) == total - front_samples - back_samples
+        assert result[0] == audio[front_samples]
+        assert result[-1] == audio[total - back_samples - 1]
+
+    @pytest.mark.unit
+    def test_eos_max_frames_override(self):
+        # Custom eos_max_frames=2 clamps EOS=5 → excess 3 frames trimmed.
+        durations = np.array([1.0, 3.0, 3.0, 4.0, 3.0, 3.0, 5.0], dtype=np.float32)
+        hop = 100
+        total = int(durations.sum() * hop)  # 2200
+        audio = np.arange(total, dtype=np.int16)
+        result = _trim_padding_by_durations(
+            audio, durations, front_pad=2, back_pad=2, hop_size=hop, eos_max_frames=2
+        )
+        # BOS + front = (1+3+3)*100 = 700
+        # back + EOS excess = (3+3 + (5-2))*100 = 900
+        assert len(result) == total - 700 - 900
+
+    @pytest.mark.unit
+    def test_default_strips_eos_completely(self):
+        # Default eos_max_frames=0: VITS predicts an inflated EOS under padded
+        # context that emits "だぁ"-like artifacts (issue #356 follow-up), so
+        # the entire EOS region is dropped along with back padding.
+        durations = np.array([2.0, 5.0, 5.0, 4.0, 4.0, 5.0, 5.0, 8.0], dtype=np.float32)
+        hop = 100
+        total = int(durations.sum() * hop)  # 3800
+        audio = np.arange(total, dtype=np.int16)
+        result = _trim_padding_by_durations(
+            audio, durations, front_pad=2, back_pad=2, hop_size=hop
+        )
+        # BOS + front padding = (2+5+5)*100 = 1200
+        # back padding + entire EOS = (5+5+8)*100 = 1800
+        assert len(result) == total - 1200 - 1800
+
+    @pytest.mark.unit
+    def test_returns_input_when_durations_none(self):
+        audio = np.arange(1000, dtype=np.int16)
+        result = _trim_padding_by_durations(audio, None, 3, 3, hop_size=256)
+        assert np.array_equal(result, audio)
+
+    @pytest.mark.unit
+    def test_returns_input_when_durations_too_short(self):
+        # durations has fewer entries than 1+front+back+1
+        audio = np.arange(1000, dtype=np.int16)
+        durations = np.array([1.0, 1.0, 1.0], dtype=np.float32)
+        result = _trim_padding_by_durations(audio, durations, front_pad=5, back_pad=5, hop_size=256)
+        assert np.array_equal(result, audio)
+
+
+# ---------------------------------------------------------------
+# Strategy A: _trim_silence (RMS fallback)
 # ---------------------------------------------------------------
 class TestTrimSilence:
 
@@ -369,7 +535,16 @@ class TestConstants:
 
     @pytest.mark.unit
     def test_min_phoneme_ids(self):
-        assert MIN_PHONEME_IDS == 40
+        # Empirically tuned for tsukuyomi 6lang (issue #356).
+        # Was 40 — caused Strategy A to fire on stable inputs and leak
+        # padding artifacts. See voice.py for the threshold rationale.
+        assert MIN_PHONEME_IDS == 15
+
+    @pytest.mark.unit
+    def test_min_body_for_strategy_a(self):
+        # Bodies smaller than this skip Strategy A (issue #356 follow-up
+        # for inputs like 「あ。」). See voice.py for rationale.
+        assert MIN_BODY_FOR_STRATEGY_A == 3
 
     @pytest.mark.unit
     def test_short_text_chars(self):

@@ -163,7 +163,7 @@ impl CustomDictionary {
 
         // Case-sensitive エントリ (長い順)
         let mut cs_entries: Vec<_> = self.case_sensitive_entries.iter().collect();
-        cs_entries.sort_by(|a, b| b.0.len().cmp(&a.0.len()));
+        cs_entries.sort_by_key(|entry| std::cmp::Reverse(entry.0.len()));
 
         for (word, entry) in &cs_entries {
             let pattern = self.get_word_pattern(word, true);
@@ -174,7 +174,7 @@ impl CustomDictionary {
 
         // Case-insensitive エントリ (長い順)
         let mut ci_entries: Vec<_> = self.entries.iter().collect();
-        ci_entries.sort_by(|a, b| b.0.len().cmp(&a.0.len()));
+        ci_entries.sort_by_key(|entry| std::cmp::Reverse(entry.0.len()));
 
         for (word, entry) in &ci_entries {
             let pattern = self.get_word_pattern(word, false);

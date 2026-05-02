@@ -206,9 +206,12 @@ public sealed class PiperSession
 
         // ----- Strategy A: Silence Padding -----
         bool wasPadded = ShortTextProcessor.NeedsPadding(phonemeIds);
+        int frontPad = 0;
+        int backPad = 0;
         if (wasPadded)
         {
-            (phonemeIds, prosodyFlat) = ShortTextProcessor.PadPhonemeIds(phonemeIds, prosodyFlat);
+            (phonemeIds, prosodyFlat, frontPad, backPad) =
+                ShortTextProcessor.PadPhonemeIds(phonemeIds, prosodyFlat);
         }
 
         // ----- Strategy B: Dynamic Scales Adjustment -----
@@ -361,18 +364,41 @@ public sealed class PiperSession
             ReadOnlySpan<float> outputSpan = results[0].GetTensorDataAsSpan<float>();
             float[] audio = outputSpan.ToArray();
 
-            // ----- Strategy A: Post-inference silence trimming -----
-            if (wasPadded)
-            {
-                audio = ShortTextProcessor.TrimSilence(audio);
-            }
-
-            // Extract durations if available: shape [1, phoneme_length] (float32).
-            float[]? durations = null;
+            // Extract durations BEFORE post-trim so the precise trimmer can
+            // use them. Always copy out the full padded-sequence durations
+            // first; the value returned to callers is truncated below to the
+            // original phoneme length so timing alignment is preserved.
+            float[]? paddedDurations = null;
             if (requestDurations && results.Count >= 2)
             {
                 ReadOnlySpan<float> durSpan = results[1].GetTensorDataAsSpan<float>();
-                durations = durSpan.ToArray();
+                paddedDurations = durSpan.ToArray();
+            }
+
+            // ----- Strategy A: Post-inference padding-induced trim -----
+            // Prefer durations-based precise trim (issue #356); fall back to
+            // legacy RMS trim only when durations are unavailable.
+            if (wasPadded)
+            {
+                if (paddedDurations is not null)
+                {
+                    audio = ShortTextProcessor.TrimPaddingByDurations(
+                        audio, paddedDurations, frontPad, backPad, _model.HopSize);
+                }
+                else
+                {
+                    audio = ShortTextProcessor.TrimSilence(audio);
+                }
+            }
+
+            // Truncate durations back to the original phoneme length for
+            // timing consumers (they treat the padded extras as out-of-band).
+            float[]? durations = paddedDurations;
+            if (durations is not null && wasPadded && durations.Length > input.PhonemeIds.Length)
+            {
+                var trimmed = new float[input.PhonemeIds.Length];
+                Array.Copy(durations, trimmed, input.PhonemeIds.Length);
+                durations = trimmed;
             }
 
             return (audio, durations);

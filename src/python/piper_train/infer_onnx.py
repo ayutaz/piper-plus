@@ -17,29 +17,53 @@ from .vits.wavfile import write as write_wav
 _LOGGER = logging.getLogger("piper_train.infer_onnx")
 
 # --- Short-text synthesis quality constants ---
-# Minimum phoneme_ids length below which padding/scale adjustment is applied
-MIN_PHONEME_IDS = 40
+# Minimum phoneme_ids length below which padding/scale adjustment is applied.
+# See docs/spec/short-text-contract.toml and issue #356 for rationale (was 40,
+# empirically tuned to 15 to avoid Strategy A firing on already-stable inputs).
+MIN_PHONEME_IDS = 15
+# Minimum body length (excluding BOS/EOS) for Strategy A to apply.
+# Bodies smaller than this would have padding ratio so high that pad-token
+# audio dominates over actual content; raw VITS output is preferable.
+MIN_BODY_FOR_STRATEGY_A = 3
 # RMS threshold for silence trimming (float audio range)
 TRIM_THRESHOLD_RMS = 0.01
 # Minimum audio samples to keep after trimming (22050 Hz * 0.1s)
 TRIM_MIN_SAMPLES = 2205
+# Number of EOS frames retained after Strategy A padding when the durations-
+# based trim is in use. Defaults to 0 — VITS predicts an inflated EOS under
+# the padded context that emits an audible artifact otherwise (issue #356).
+TRIM_EOS_MAX_FRAMES = 0
+# Default hop length when config.json does not declare audio.hop_size.
+DEFAULT_HOP_SIZE = 256
 
 
 def _pad_phoneme_ids(
     phoneme_ids: list[int],
     prosody_features: list[dict | None] | None,
-) -> tuple[list[int], list[dict | None] | None, bool]:
+) -> tuple[list[int], list[dict | None] | None, bool, int, int]:
     """Strategy A: Pad short phoneme_ids with silence tokens.
 
     Inserts pause tokens (ID=0, blank/pad) evenly after BOS and before EOS
     until the sequence reaches MIN_PHONEME_IDS length.
 
+    Skips padding when the body (= phoneme_ids excluding BOS/EOS) has fewer
+    than MIN_BODY_FOR_STRATEGY_A IDs — pad tokens would otherwise overwhelm
+    the actual content (issue #356).
+
     Returns:
-        (padded_phoneme_ids, padded_prosody_features, was_padded)
+        (padded_phoneme_ids, padded_prosody_features, was_padded,
+         front_pad, back_pad)
+
+        ``front_pad`` / ``back_pad`` are the numbers of pad tokens inserted
+        after BOS and before EOS respectively (both 0 when no padding
+        occurred). They are needed for the durations-based post-trim.
     """
     n = len(phoneme_ids)
+    body_len = n - 2  # exclude BOS / EOS
+    if body_len < MIN_BODY_FOR_STRATEGY_A:
+        return phoneme_ids, prosody_features, False, 0, 0
     if n >= MIN_PHONEME_IDS:
-        return phoneme_ids, prosody_features, False
+        return phoneme_ids, prosody_features, False, 0, 0
 
     pad_total = MIN_PHONEME_IDS - n
     pad_front = pad_total // 2
@@ -72,7 +96,69 @@ def _pad_phoneme_ids(
         pad_front,
         pad_back,
     )
-    return padded, padded_prosody, True
+    return padded, padded_prosody, True, pad_front, pad_back
+
+
+def _trim_padding_by_durations(
+    audio: np.ndarray,
+    durations: np.ndarray,
+    front_pad: int,
+    back_pad: int,
+    hop_size: int,
+    eos_max_frames: int = TRIM_EOS_MAX_FRAMES,
+) -> np.ndarray:
+    """Strategy A post-trim using model durations (precise method).
+
+    Mirrors :func:`piper.voice._trim_padding_by_durations` so the runtime and
+    training paths share the same trimming behaviour. The padded sequence
+    layout is::
+
+        [BOS, pad×front_pad, ...body..., pad×back_pad, EOS]
+
+    ``durations[i]`` is the frame count VITS assigned to phoneme ``i``;
+    multiplying the pad-token frame counts by ``hop_size`` gives the exact
+    number of audio samples generated for the padding. The conversion uses
+    ``int(...)`` (truncation) to match the cross-runtime contract — every
+    runtime must clip frame totals the same way for byte-equal output.
+
+    Trimming policy (issue #356):
+
+    * **BOS + front padding**: stripped completely.
+    * **Back padding**: stripped completely.
+    * **EOS**: keep only the first ``eos_max_frames`` frames (default
+      ``TRIM_EOS_MAX_FRAMES`` = 0, i.e. drop the entire EOS region).
+
+    Returns ``audio`` unchanged when inputs are inconsistent.
+    """
+    if front_pad <= 0 and back_pad <= 0:
+        return audio
+    if durations is None or hop_size <= 0:
+        return audio
+
+    durations_1d = np.asarray(durations).reshape(-1)
+    expected_len = 1 + front_pad + back_pad + 1  # BOS + pads + EOS
+    if durations_1d.size < expected_len:
+        return audio
+
+    # BOS + front padding samples (stripped). Truncation matches the
+    # cross-runtime contract.
+    front_samples = (
+        int(durations_1d[0 : 1 + front_pad].sum() * hop_size) if front_pad > 0 else 0
+    )
+
+    # Back padding samples + EOS excess (over eos_max_frames) samples.
+    back_pad_samples = (
+        int(durations_1d[-(1 + back_pad) : -1].sum() * hop_size) if back_pad > 0 else 0
+    )
+    eos_frames = float(durations_1d[-1])
+    eos_excess_frames = max(0.0, eos_frames - float(eos_max_frames))
+    back_samples = back_pad_samples + int(eos_excess_frames * hop_size)
+
+    start = max(0, front_samples)
+    end = max(start, len(audio) - back_samples)
+    if start >= len(audio) or end <= 0 or start >= end:
+        return audio
+    return audio[start:end]
 
 
 def _trim_silence(
@@ -401,6 +487,16 @@ def main():
         help="Model download/search directory",
     )
     parser.add_argument("--sample-rate", type=int, default=22050)
+    parser.add_argument(
+        "--hop-size",
+        type=int,
+        default=DEFAULT_HOP_SIZE,
+        help=(
+            "Audio frames per VITS hop. Used to convert duration outputs "
+            "into sample positions during Strategy A post-trim. "
+            "Defaults to 256."
+        ),
+    )
     parser.add_argument("--noise-scale", type=float, default=0.667)
     parser.add_argument("--noise-scale-w", type=float, default=0.8)
     parser.add_argument("--length-scale", type=float, default=1.0)
@@ -619,6 +715,13 @@ def main():
             _LOGGER.error("phoneme_id_map not found in config.json")
             sys.exit(1)
 
+        # If --hop-size was left at the default and config supplies it,
+        # honour the config value so durations-based trim has the right
+        # sample/frame conversion (issue #356, cross-runtime contract).
+        config_hop_size = config.get("audio", {}).get("hop_size")
+        if config_hop_size and args.hop_size == DEFAULT_HOP_SIZE:
+            args.hop_size = int(config_hop_size)
+
         _LOGGER.info("Loaded phoneme_id_map from %s", config_path)
 
         # Load language_id_map (needed for multilingual auto-promotion)
@@ -677,9 +780,13 @@ def main():
         original_len = len(phoneme_ids)
 
         # --- Strategy A: Silence Padding for short inputs ---
-        phoneme_ids, prosody_features_data, was_padded = _pad_phoneme_ids(
-            phoneme_ids, prosody_features_data
-        )
+        (
+            phoneme_ids,
+            prosody_features_data,
+            was_padded,
+            front_pad,
+            back_pad,
+        ) = _pad_phoneme_ids(phoneme_ids, prosody_features_data)
 
         # --- Strategy B: Dynamic Scales Adjustment for short inputs ---
         # Use original_len (pre-padding) so the ratio is based on the actual
@@ -760,8 +867,21 @@ def main():
         audio = audio_float_to_int16(audio.squeeze())
 
         # --- Strategy A: Post-trim silence introduced by padding ---
+        # Prefer the durations-based precise trim when the model exposes
+        # ``durations`` (cross-runtime contract — issue #356). Falls back to
+        # the legacy RMS-based trim for older exports without durations.
         if was_padded:
-            audio = _trim_silence(audio, sample_rate=args.sample_rate)
+            if durations is not None:
+                durations_1d = np.asarray(durations).reshape(-1)
+                audio = _trim_padding_by_durations(
+                    audio,
+                    durations_1d,
+                    front_pad,
+                    back_pad,
+                    args.hop_size,
+                )
+            else:
+                audio = _trim_silence(audio, sample_rate=args.sample_rate)
 
         end_time = time.perf_counter()
 

@@ -25,8 +25,28 @@ from .util import audio_float_to_int16
 
 _LOGGER = logging.getLogger(__name__)
 
-# Short-text mitigation constants (keep in sync with other runtimes)
-MIN_PHONEME_IDS = 40
+# Short-text mitigation constants (keep in sync with other runtimes — see
+# docs/spec/short-text-contract.toml).
+#
+# Threshold note (issue #356): docs originally claimed VITS becomes unstable
+# below ~40 phoneme IDs. Empirical measurements on the tsukuyomi 6lang
+# model show a much lower true threshold — synthesis is stable at 8 IDs and
+# weakens only below ~7. Setting MIN_PHONEME_IDS too high triggers Strategy
+# A on already-stable inputs (e.g. 「こんにちは。」= 22 IDs), and the pad
+# tokens leak as audible artifacts that post-trim cannot fully remove. We
+# pick 15 as a conservative middle ground: roughly 2× the measured stable
+# minimum, still well below typical short utterances like 「こんにちは。」.
+MIN_PHONEME_IDS = 15
+
+# Minimum body length (excluding BOS/EOS) for Strategy A to kick in.
+# When the body is shorter than this (e.g. 「あ。」 with body of 2 IDs),
+# padding-to-body ratio explodes and the pad tokens dominate over the
+# actual content even with durations-based trim — bypassing Strategy A
+# entirely produces a more natural single-phoneme utterance than padding
+# does. The raw VITS output for tiny inputs is degraded but bounded;
+# users invoking such inputs presumably accept that limitation.
+MIN_BODY_FOR_STRATEGY_A = 3
+
 SHORT_TEXT_CHARS = 10
 SILENCE_PAD_MS = 300
 TRIM_THRESHOLD_RMS = 0.01
@@ -211,13 +231,24 @@ def _pad_phoneme_ids(
     phoneme_ids: list[int],
     pad_id: int,
     min_length: int = MIN_PHONEME_IDS,
-) -> tuple[list[int], bool]:
+    min_body: int = MIN_BODY_FOR_STRATEGY_A,
+) -> tuple[list[int], bool, int, int]:
     """Pad short phoneme_ids with silence tokens after BOS and before EOS.
 
-    Returns (padded_ids, was_padded).
+    Returns ``(padded_ids, was_padded, front_pad, back_pad)`` where
+    ``front_pad`` / ``back_pad`` are the numbers of pad tokens inserted
+    after BOS and before EOS respectively (both 0 when no padding occurred).
+
+    Skips padding entirely when the body (i.e. ``phoneme_ids`` excluding
+    BOS/EOS) has fewer than ``min_body`` IDs. With such tiny bodies the
+    padding-to-body ratio becomes so high that pad-token audio dominates
+    the actual content; raw VITS output is preferable in that regime.
     """
+    body_len = len(phoneme_ids) - 2  # exclude BOS / EOS
+    if body_len < min_body:
+        return phoneme_ids, False, 0, 0
     if len(phoneme_ids) >= min_length:
-        return phoneme_ids, False
+        return phoneme_ids, False, 0, 0
 
     needed = min_length - len(phoneme_ids)
     front = needed // 2
@@ -229,7 +260,80 @@ def _pad_phoneme_ids(
     eos = phoneme_ids[-1:]
 
     padded = bos + [pad_id] * front + body + [pad_id] * back + eos
-    return padded, True
+    return padded, True, front, back
+
+
+# Maximum EOS duration (in frames) preserved during Strategy A trim.
+# VITS tends to predict an inflated EOS duration under the padded context
+# and emits an audible artifact ("こんにちはだぁ" instead of "こんにちは" —
+# kun432 氏 issue #356 試聴フィードバック). Empirically, even modest
+# clamping (6 frames) leaves a recognisable tail. Default to 0 so the
+# entire EOS region is dropped along with the back padding; the unpadded
+# PyPI 1.11.0 path keeps a similar tail but with no audible artifact, so
+# losing it here is acceptable.
+TRIM_EOS_MAX_FRAMES = 0
+
+
+def _trim_padding_by_durations(
+    audio: np.ndarray,
+    durations: np.ndarray,
+    front_pad: int,
+    back_pad: int,
+    hop_size: int,
+    eos_max_frames: int = TRIM_EOS_MAX_FRAMES,
+) -> np.ndarray:
+    """Trim Strategy A padding using model durations (precise method).
+
+    The padded sequence layout is::
+
+        [BOS, pad×front_pad, ...body..., pad×back_pad, EOS]
+
+    Each ``durations[i]`` is the frame count VITS assigned to phoneme ``i``.
+    Multiplying the pad-token frame counts by ``hop_size`` gives the exact
+    number of audio samples generated for the padding, which can be sliced
+    off without relying on RMS thresholds.
+
+    Trimming policy (issue #356):
+
+    * **BOS + front padding**: stripped completely. VITS produces an
+      audible "あ" at the start under the padded context.
+    * **Back padding**: stripped completely.
+    * **EOS**: keep only the first ``eos_max_frames`` frames (default
+      ``TRIM_EOS_MAX_FRAMES`` = 0, i.e. drop the entire EOS region).
+      0 was chosen empirically because even modest clamping (6 frames)
+      left an audible "だぁ"-like tail under the padded context. Callers
+      can pass a larger value to preserve a natural utterance tail.
+
+    Returns ``audio`` unchanged when inputs are inconsistent.
+    """
+    if front_pad <= 0 and back_pad <= 0:
+        return audio
+    if durations is None or hop_size <= 0:
+        return audio
+
+    durations_1d = np.asarray(durations).reshape(-1)
+    expected_len = 1 + front_pad + back_pad + 1  # BOS + pads + EOS
+    if durations_1d.size < expected_len:
+        return audio
+
+    # BOS + front padding samples (stripped).
+    front_samples = (
+        int(durations_1d[0 : 1 + front_pad].sum() * hop_size) if front_pad > 0 else 0
+    )
+
+    # Back padding samples + EOS excess (over eos_max_frames) samples.
+    back_pad_samples = (
+        int(durations_1d[-(1 + back_pad) : -1].sum() * hop_size) if back_pad > 0 else 0
+    )
+    eos_frames = float(durations_1d[-1])
+    eos_excess_frames = max(0.0, eos_frames - float(eos_max_frames))
+    back_samples = back_pad_samples + int(eos_excess_frames * hop_size)
+
+    start = max(0, front_samples)
+    end = max(start, len(audio) - back_samples)
+    if start >= len(audio) or end <= 0 or start >= end:
+        return audio
+    return audio[start:end]
 
 
 def _trim_silence(
@@ -238,7 +342,13 @@ def _trim_silence(
     window: int = 256,
     min_samples: int = TRIM_MIN_SAMPLES,
 ) -> np.ndarray:
-    """Trim leading/trailing silence from int16 audio using windowed RMS."""
+    """Trim leading/trailing silence from int16 audio using windowed RMS.
+
+    Fallback used when model durations are unavailable. Note that VITS pad
+    tokens often produce voiced-looking audio (RMS > threshold), so this
+    method is unreliable for Strategy A trimming; prefer
+    :func:`_trim_padding_by_durations` whenever durations are present.
+    """
     if len(audio) <= min_samples:
         return audio
 
@@ -514,7 +624,9 @@ class PiperVoice:
 
         # Strategy A: pad short sequences with silence tokens
         pad_id = 0
-        phoneme_ids, was_padded = _pad_phoneme_ids(phoneme_ids, pad_id)
+        phoneme_ids, was_padded, front_pad, back_pad = _pad_phoneme_ids(
+            phoneme_ids, pad_id
+        )
 
         phoneme_ids_array = np.expand_dims(np.array(phoneme_ids, dtype=np.int64), 0)
         phoneme_ids_lengths = np.array([phoneme_ids_array.shape[1]], dtype=np.int64)
@@ -576,9 +688,20 @@ class PiperVoice:
                 durations = _outputs[dur_idx].squeeze()
         audio = audio_float_to_int16(audio.squeeze(), volume=volume)
 
-        # Strategy A: trim silence introduced by padding
+        # Strategy A: trim silence introduced by padding.
+        # Prefer durations-based precise trim; fall back to RMS when the model
+        # has no durations output (older VITS exports).
         if was_padded:
-            audio = _trim_silence(audio)
+            if durations is not None:
+                audio = _trim_padding_by_durations(
+                    audio,
+                    durations,
+                    front_pad,
+                    back_pad,
+                    self.config.hop_size,
+                )
+            else:
+                audio = _trim_silence(audio)
 
         return audio.tobytes(), durations, original_phoneme_ids
 

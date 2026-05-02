@@ -100,10 +100,37 @@ export interface StreamingSynthesizeOptions extends SynthesizeOptions {
 // ---------------------------------------------------------------------------
 
 /**
+ * Minimum phoneme ID count below which Strategy A padding is applied.
+ * See docs/spec/short-text-contract.toml.
+ */
+export const MIN_PHONEME_IDS: number;
+
+/**
+ * Minimum body length (= phoneme IDs minus BOS/EOS) for Strategy A to
+ * apply. Below this threshold pad-token audio dominates the actual
+ * content (issue #356); the runtime emits raw VITS output instead.
+ */
+export const MIN_BODY_FOR_STRATEGY_A: number;
+
+/**
+ * Number of EOS frames retained by `trimPaddingByDurations`. Defaults
+ * to 0 (drop the entire EOS) — see issue #356.
+ */
+export const TRIM_EOS_MAX_FRAMES: number;
+
+/**
+ * Default hop length when `config.json` does not declare
+ * `audio.hop_size`. Used by `trimPaddingByDurations`.
+ */
+export const DEFAULT_HOP_SIZE: number;
+
+/**
  * Strategy A: Pad short phoneme ID sequences with silence tokens.
  *
- * Inserts pause tokens (ID = 0) evenly after BOS and before EOS until the
- * sequence reaches MIN_PHONEME_IDS (40) length.
+ * Inserts pause tokens (ID = 0) evenly after BOS and before EOS until
+ * the sequence reaches MIN_PHONEME_IDS length. The result also carries
+ * `frontPad` and `backPad` so the durations-based post-trim can locate
+ * the padding precisely (added in 0.5.0; existing fields are unchanged).
  */
 export function padPhonemeIds(
   phonemeIds: number[],
@@ -112,11 +139,35 @@ export function padPhonemeIds(
   phonemeIds: number[];
   prosodyFeatures: number[][] | null;
   wasPadded: boolean;
+  /** Pad tokens inserted after BOS (0 when wasPadded is false). */
+  frontPad: number;
+  /** Pad tokens inserted before EOS (0 when wasPadded is false). */
+  backPad: number;
 };
 
 /**
+ * Strategy A precise post-trim: drop padding-induced samples using the
+ * model's `durations` output. Mirrors the cross-runtime contract — every
+ * runtime trims by the same number of samples for the same inputs
+ * (issue #356).
+ *
+ * Returns the input unchanged when arguments are inconsistent (null
+ * `durations`, non-positive `hopSize`, or fewer durations than
+ * `1 + frontPad + backPad + 1`).
+ */
+export function trimPaddingByDurations(
+  audio: Float32Array,
+  durations: ArrayLike<number> | null,
+  frontPad: number,
+  backPad: number,
+  hopSize: number,
+  eosMaxFrames?: number,
+): Float32Array;
+
+/**
  * Strategy A (post-step): Trim leading and trailing silence from audio
- * using a sliding RMS window.
+ * using a sliding RMS window. Used as a fallback when the model does
+ * not expose a `durations` output.
  *
  * Keeps at least TRIM_MIN_SAMPLES (2205) to avoid producing empty audio.
  */
@@ -125,7 +176,7 @@ export function trimSilence(audio: Float32Array, windowSize?: number): Float32Ar
 /**
  * Strategy B: Adjust noise scales for short inputs.
  *
- * For inputs shorter than MIN_PHONEME_IDS (40), attenuate noiseScale and
+ * For inputs shorter than MIN_PHONEME_IDS, attenuate noiseScale and
  * noiseW proportionally while keeping lengthScale unchanged.
  */
 export function adjustScalesForShortInput(

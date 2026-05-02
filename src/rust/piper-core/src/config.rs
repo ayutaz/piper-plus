@@ -37,11 +37,22 @@ pub struct VoiceConfig {
 pub struct AudioConfig {
     #[serde(default = "default_sample_rate")]
     pub sample_rate: u32,
+
+    /// VITS hop length (samples per acoustic frame).
+    ///
+    /// Required for converting frame-level ``durations`` (model output) into
+    /// audio-sample positions during Strategy A post-trim. Defaults to 256
+    /// to keep older config.json files (no `audio.hop_size` field) working.
+    #[serde(default = "default_hop_size")]
+    pub hop_size: u32,
 }
 
 impl Default for AudioConfig {
     fn default() -> Self {
-        Self { sample_rate: 22050 }
+        Self {
+            sample_rate: 22050,
+            hop_size: 256,
+        }
     }
 }
 
@@ -66,6 +77,9 @@ fn default_num_languages() -> usize {
 }
 fn default_sample_rate() -> u32 {
     22050
+}
+fn default_hop_size() -> u32 {
+    256
 }
 
 impl VoiceConfig {
@@ -215,10 +229,38 @@ mod tests {
         let json = r#"{"phoneme_id_map": {"a": [1]}, "audio": {"sample_rate": 22050}}"#;
         let config: VoiceConfig = serde_json::from_str(json).unwrap();
         assert_eq!(config.audio.sample_rate, 22050);
+        // hop_size defaults to 256 when missing — keeps older configs working.
+        assert_eq!(config.audio.hop_size, 256);
         assert_eq!(config.num_speakers, 1);
         assert_eq!(config.num_languages, 1);
         assert!(!config.is_multilingual());
         assert!(!config.needs_lid());
+    }
+
+    #[test]
+    fn test_deserialize_audio_hop_size() {
+        // Explicit hop_size is honoured.
+        let json =
+            r#"{"phoneme_id_map": {"a": [1]}, "audio": {"sample_rate": 22050, "hop_size": 512}}"#;
+        let config: VoiceConfig = serde_json::from_str(json).unwrap();
+        assert_eq!(config.audio.hop_size, 512);
+    }
+
+    #[test]
+    fn test_deserialize_audio_default_hop_size_when_audio_missing() {
+        // No audio section at all → both defaults apply.
+        let json = r#"{"phoneme_id_map": {"a": [1]}}"#;
+        let config: VoiceConfig = serde_json::from_str(json).unwrap();
+        assert_eq!(config.audio.sample_rate, 22050);
+        assert_eq!(config.audio.hop_size, 256);
+    }
+
+    #[test]
+    fn test_audio_config_default() {
+        // Ensure Default impl matches serde defaults.
+        let audio = AudioConfig::default();
+        assert_eq!(audio.sample_rate, 22050);
+        assert_eq!(audio.hop_size, 256);
     }
 
     #[test]
