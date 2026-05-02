@@ -298,9 +298,11 @@ def _trim_padding_by_durations(
     * **BOS + front padding**: stripped completely. VITS produces an
       audible "あ" at the start under the padded context.
     * **Back padding**: stripped completely.
-    * **EOS**: clamped to ``eos_max_frames`` (default 6). The natural
-      utterance tail is preserved while the padding-induced tail
-      ("た"-like artefact) is removed.
+    * **EOS**: keep only the first ``eos_max_frames`` frames (default
+      ``TRIM_EOS_MAX_FRAMES`` = 0, i.e. drop the entire EOS region).
+      0 was chosen empirically because even modest clamping (6 frames)
+      left an audible "だぁ"-like tail under the padded context. Callers
+      can pass a larger value to preserve a natural utterance tail.
 
     Returns ``audio`` unchanged when inputs are inconsistent.
     """

@@ -54,9 +54,11 @@ min_phoneme_ids = 15
 # Minimum body length (= phoneme_ids excluding BOS / EOS) for Strategy A
 # to apply. When the body is smaller than this, padding-to-body ratio
 # explodes and the pad-token audio dominates over the actual content
-# (e.g. 「あ。」 has body=2 → 11 pad tokens around 2 body tokens with the
-# previous 40 threshold). Below this threshold we use raw VITS output
-# instead — degraded for tiny utterances but free from padding artefacts.
+# (e.g. 「あ。」 has body=2 → 36 pad tokens around 2 body tokens at the
+# previous threshold of 40, or 11 pad tokens at the current threshold of
+# 15 — either way the body is overwhelmed). Below this threshold we use
+# raw VITS output instead — degraded for tiny utterances but free from
+# padding artefacts.
 min_body_for_strategy_a = 3
 
 # Token ID used for padding (pause / blank / PAD symbol "_").
