@@ -63,14 +63,22 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Download ONNX Runtime shared library.
-# Uses x64 naming convention (changed from x86_64 in recent releases).
+# Selects the correct tarball based on docker buildx's TARGETARCH automatic
+# argument so multi-arch builds (linux/amd64, linux/arm64) work transparently.
+ARG TARGETARCH
 ARG ORT_VERSION=1.24.4
-ARG ORT_SHA256=3a211fbea252c1e66290658f1b735b772056149f28321e71c308942cdb54b747
+ARG ORT_SHA256_AMD64=3a211fbea252c1e66290658f1b735b772056149f28321e71c308942cdb54b747
+ARG ORT_SHA256_ARM64=866109a9248d057671a039b9d725be4bd86888e3754140e6701ec621be9d4d7e
 RUN set -eux \
-    && wget -q "https://github.com/microsoft/onnxruntime/releases/download/v${ORT_VERSION}/onnxruntime-linux-x64-${ORT_VERSION}.tgz" \
-    && echo "${ORT_SHA256}  onnxruntime-linux-x64-${ORT_VERSION}.tgz" | sha256sum -c - \
-    && tar xzf "onnxruntime-linux-x64-${ORT_VERSION}.tgz" \
-    && cp "onnxruntime-linux-x64-${ORT_VERSION}/lib/libonnxruntime.so" /usr/lib/ \
+    && case "${TARGETARCH:-amd64}" in \
+         amd64) ORT_ARCH=x64;     ORT_SHA256=${ORT_SHA256_AMD64} ;; \
+         arm64) ORT_ARCH=aarch64; ORT_SHA256=${ORT_SHA256_ARM64} ;; \
+         *) echo "Unsupported TARGETARCH: ${TARGETARCH}"; exit 1 ;; \
+       esac \
+    && wget -q "https://github.com/microsoft/onnxruntime/releases/download/v${ORT_VERSION}/onnxruntime-linux-${ORT_ARCH}-${ORT_VERSION}.tgz" \
+    && echo "${ORT_SHA256}  onnxruntime-linux-${ORT_ARCH}-${ORT_VERSION}.tgz" | sha256sum -c - \
+    && tar xzf "onnxruntime-linux-${ORT_ARCH}-${ORT_VERSION}.tgz" \
+    && cp "onnxruntime-linux-${ORT_ARCH}-${ORT_VERSION}/lib/libonnxruntime.so" /usr/lib/ \
     && rm -rf onnxruntime-* \
     && ldconfig
 

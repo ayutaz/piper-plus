@@ -146,12 +146,38 @@ jobs:
 
   docker-build:
     runs-on: ubuntu-22.04
-    timeout-minutes: 20
+    timeout-minutes: 45
     permissions:
       contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/amd64
+            tag_suffix: amd64
+          - platform: linux/arm64
+            tag_suffix: arm64
     steps:
       - uses: actions/checkout@v6
         with:
           sparse-checkout: src/go
-      - name: Build Go Docker image
-        run: docker build -t piper-plus-go -f src/go/docker/Dockerfile .
+      - name: Set up QEMU
+        if: matrix.platform != 'linux/amd64'
+        uses: docker/setup-qemu-action@v4
+        with:
+          platforms: arm64
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+      - name: Build Go Docker image (${{ matrix.platform }})
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: src/go/docker/Dockerfile
+          platforms: ${{ matrix.platform }}
+          push: false
+          load: true
+          tags: piper-plus-go:test-${{ matrix.tag_suffix }}
+          cache-from: type=gha,scope=go-docker-${{ matrix.tag_suffix }}
+          cache-to: type=gha,mode=max,scope=go-docker-${{ matrix.tag_suffix }}
+      - name: Smoke test (${{ matrix.platform }})
+        run: docker run --rm --platform ${{ matrix.platform }} piper-plus-go:test-${{ matrix.tag_suffix }} --version
