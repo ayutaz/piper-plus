@@ -82,6 +82,9 @@
 - **C# CLI** — .NET 8/9 クロスプラットフォーム、8言語マルチリンガル、ONNX推論、**音素タイミング出力 (JSON/TSV/SRT)**
 - **Rust CLI** — piper-plus/piper-plus-cli、ストリーミング、CUDA/CoreML/DirectML対応、**音素タイミング出力 (JSON/TSV/SRT)**、辞書自動ダウンロード
 - **[Go CLI](src/go/README.md)** — HTTP APIサーバー、セッションプーリング、Docker対応、シングルバイナリ、**音素タイミング出力 (JSON/TSV/SRT)**
+- **Voice Cloning (Speaker Encoder + speaker_embedding)** — 全 7 ランタイム (Python/Rust/C#/Go/WASM/C++[`libpiper_plus`]) 対応。ECAPA-TDNN による参照音声からの話者 embedding 抽出 (`--reference-audio`)
+- **SSML サポート** — `<speak>`, `<break>`, `<prosody rate="...">` を Python/Rust/C#/Go の 4 ランタイムで実装
+- **短文品質改善 (Strategy A/B/C)** — Silence Padding、Dynamic Scales、SSML `<break>` 自動注入を全 7 ランタイムで対応 (`docs/spec/short-text-contract.toml`)
 
 ### ランタイム別機能サポート
 

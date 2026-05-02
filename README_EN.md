@@ -82,6 +82,9 @@ A fast, high-quality neural text-to-speech (TTS) system. Built on the [VITS](htt
 - **C# CLI** — .NET 8/9 cross-platform, 8-language multilingual, ONNX inference, **phoneme timing output (JSON/TSV/SRT)**
 - **Rust CLI** — piper-plus/piper-plus-cli, streaming, CUDA/CoreML/DirectML support, **phoneme timing output (JSON/TSV/SRT)**, auto dictionary download
 - **[Go CLI](src/go/README.md)** — HTTP API server, session pooling, Docker, single binary, **phoneme timing output (JSON/TSV/SRT)**
+- **Voice Cloning (Speaker Encoder + speaker_embedding)** — supported by all 7 runtimes (Python/Rust/C#/Go/WASM/C++[`libpiper_plus`]). Extract speaker embedding from a reference audio via ECAPA-TDNN (`--reference-audio`).
+- **SSML support** — `<speak>`, `<break>`, `<prosody rate="...">` implemented across 4 runtimes (Python/Rust/C#/Go).
+- **Short-text quality improvements (Strategy A/B/C)** — silence padding, dynamic scales, SSML `<break>` auto-injection deployed across all 7 runtimes (`docs/spec/short-text-contract.toml`).
 - Equivalent 8-language multilingual synthesis across 6 runtimes (Python/Rust/C#/Go/JS-WASM/C++).
 
 ---

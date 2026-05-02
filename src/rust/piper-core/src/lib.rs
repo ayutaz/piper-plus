@@ -1,7 +1,7 @@
 //! Piper-Plus 推論コアライブラリ
 //!
 //! VITS ベースのニューラル TTS 推論エンジン。
-//! ONNX Runtime を使用し、7 言語 (JA/EN/ZH/KO/ES/FR/PT) に対応。
+//! ONNX Runtime を使用し、8 言語 G2P (JA/EN/ZH/KO/ES/FR/PT/SV) に対応 (学習済みモデルは 6 言語: ja/en/zh/es/fr/pt)。
 //!
 //! Phase 4 追加機能:
 //! - ストリーミング合成 (`streaming`)
