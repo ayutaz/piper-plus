@@ -21,7 +21,8 @@ import assert from 'node:assert/strict';
 // ---------------------------------------------------------------------------
 
 let PiperPlus, AudioResult, padPhonemeIds, trimSilence, adjustScalesForShortInput;
-let MIN_PHONEME_IDS, MIN_BODY_FOR_STRATEGY_A;
+let trimPaddingByDurations;
+let MIN_PHONEME_IDS, MIN_BODY_FOR_STRATEGY_A, TRIM_EOS_MAX_FRAMES, DEFAULT_HOP_SIZE;
 let importError = null;
 
 try {
@@ -30,9 +31,12 @@ try {
   AudioResult = mod.AudioResult;
   padPhonemeIds = mod.padPhonemeIds;
   trimSilence = mod.trimSilence;
+  trimPaddingByDurations = mod.trimPaddingByDurations;
   adjustScalesForShortInput = mod.adjustScalesForShortInput;
   MIN_PHONEME_IDS = mod.MIN_PHONEME_IDS;
   MIN_BODY_FOR_STRATEGY_A = mod.MIN_BODY_FOR_STRATEGY_A;
+  TRIM_EOS_MAX_FRAMES = mod.TRIM_EOS_MAX_FRAMES;
+  DEFAULT_HOP_SIZE = mod.DEFAULT_HOP_SIZE;
 } catch (e) {
   importError = e;
 }
@@ -272,6 +276,121 @@ describe('padPhonemeIds (Strategy A - padding)', { skip }, () => {
       assert.equal(allPad[i][0], 0,
         `mutating padding[0] should not affect padding[${i}]`);
     }
+  });
+
+  it('exposes frontPad and backPad on the result (issue #356)', () => {
+    // body must be >= MIN_BODY_FOR_STRATEGY_A so Strategy A applies.
+    const ids = [1, ...new Array(MIN_BODY_FOR_STRATEGY_A).fill(4), 2];
+    const result = padPhonemeIds(ids, null);
+    assert.equal(result.wasPadded, true);
+    assert.equal(typeof result.frontPad, 'number');
+    assert.equal(typeof result.backPad, 'number');
+    const total = MIN_PHONEME_IDS - ids.length;
+    assert.equal(result.frontPad + result.backPad, total);
+  });
+
+  it('reports frontPad=0 / backPad=0 when no padding was applied', () => {
+    // body < MIN_BODY_FOR_STRATEGY_A → skipped.
+    const skipResult = padPhonemeIds([1, 2], null);
+    assert.equal(skipResult.wasPadded, false);
+    assert.equal(skipResult.frontPad, 0);
+    assert.equal(skipResult.backPad, 0);
+
+    // length >= MIN_PHONEME_IDS → no padding needed.
+    const longIds = makeIds(MIN_PHONEME_IDS);
+    const longResult = padPhonemeIds(longIds, null);
+    assert.equal(longResult.wasPadded, false);
+    assert.equal(longResult.frontPad, 0);
+    assert.equal(longResult.backPad, 0);
+  });
+});
+
+
+// ===========================================================================
+// trimPaddingByDurations (precise post-trim, issue #356)
+// ===========================================================================
+// Mirrors src/python_run/tests/test_short_text_mitigation.py.
+
+describe('trimPaddingByDurations (Strategy A - precise post-trim)', { skip }, () => {
+  it('is a no-op when no padding was applied', () => {
+    const audio = Float32Array.from({ length: 1000 }, (_, i) => i / 1000);
+    const durations = new Float32Array([1, 1, 1, 1, 1]);
+    const result = trimPaddingByDurations(audio, durations, 0, 0, 256);
+    assert.equal(result.length, audio.length);
+  });
+
+  it('trims front padding only', () => {
+    // Layout: BOS=2, pad×3 (3+3+3), body=4, EOS=1 → 19 frames total
+    const durations = new Float32Array([2, 3, 3, 3, 4, 1]);
+    const hop = 100;
+    const total = 1900;
+    const audio = new Float32Array(total);
+    const result = trimPaddingByDurations(audio, durations, 3, 0, hop, 6);
+    // BOS + front padding = (2+3+3+3)*100 = 1100
+    assert.equal(result.length, total - 1100);
+  });
+
+  it('strips the entire EOS region by default', () => {
+    const durations = new Float32Array([2, 5, 5, 4, 4, 5, 5, 8]);
+    const hop = 100;
+    const total = 3800;
+    const audio = new Float32Array(total);
+    const result = trimPaddingByDurations(audio, durations, 2, 2, hop);
+    // BOS + front padding = (2+5+5)*100 = 1200
+    // back padding + entire EOS = (5+5+8)*100 = 1800
+    assert.equal(result.length, total - 1200 - 1800);
+  });
+
+  it('clamps an inflated EOS to eosMaxFrames', () => {
+    const durations = new Float32Array([2, 3, 3, 4, 3, 3, 10]);
+    const hop = 100;
+    const total = 2800;
+    const audio = new Float32Array(total);
+    const result = trimPaddingByDurations(audio, durations, 2, 2, hop, 6);
+    // BOS + front padding = (2+3+3)*100 = 800
+    // back padding + EOS excess = (3+3 + (10-6))*100 = 1000
+    assert.equal(result.length, total - 800 - 1000);
+  });
+
+  it('returns the input unchanged when durations is null', () => {
+    const audio = new Float32Array(1000);
+    const result = trimPaddingByDurations(audio, null, 3, 3, 256);
+    assert.equal(result.length, audio.length);
+  });
+
+  it('returns the input unchanged when durations is too short', () => {
+    const audio = new Float32Array(1000);
+    const durations = new Float32Array([1, 1, 1]);
+    const result = trimPaddingByDurations(audio, durations, 5, 5, 256);
+    assert.equal(result.length, audio.length);
+  });
+
+  it('returns the input unchanged when hopSize is zero', () => {
+    const audio = new Float32Array(1000);
+    const durations = new Float32Array(8).fill(1);
+    const result = trimPaddingByDurations(audio, durations, 2, 2, 0);
+    assert.equal(result.length, audio.length);
+  });
+
+  it('uses Math.trunc (matches int() / `as i64` in other runtimes)', () => {
+    // Layout (frontPad=1, backPad=1, body=3):
+    //   [BOS=0.701, pad=0.701, body=2, body=2, body=2, pad=0.703, EOS=0.701]
+    // Front trim = trunc((0.701+0.701)*100) = 140
+    // Back trim  = trunc(0.703*100) + trunc(0.701*100) = 70+70 = 140
+    // Math.round() would diverge → cross-runtime drift.
+    const durations = new Float32Array([0.701, 0.701, 2, 2, 2, 0.703, 0.701]);
+    const hop = 100;
+    let sum = 0;
+    for (const d of durations) sum += d;
+    const total = Math.trunc(sum * hop);
+    const audio = new Float32Array(total);
+    const result = trimPaddingByDurations(audio, durations, 1, 1, hop);
+    assert.equal(result.length, total - 140 - 140);
+  });
+
+  it('exposes TRIM_EOS_MAX_FRAMES = 0 and DEFAULT_HOP_SIZE = 256', () => {
+    assert.equal(TRIM_EOS_MAX_FRAMES, 0);
+    assert.equal(DEFAULT_HOP_SIZE, 256);
   });
 });
 

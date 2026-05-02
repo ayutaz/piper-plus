@@ -74,6 +74,11 @@ const DEFAULT_SAMPLE_RATE = 22050;
 // BOS/EOS) is too small for padding to outweigh content (e.g. 「あ。」).
 export const MIN_PHONEME_IDS = 15;
 export const MIN_BODY_FOR_STRATEGY_A = 3;
+// Number of EOS frames retained by the durations-based Strategy A trim.
+// 0 = drop the entire EOS region (issue #356).
+export const TRIM_EOS_MAX_FRAMES = 0;
+// Default hop length when config.json does not declare audio.hop_size.
+export const DEFAULT_HOP_SIZE = 256;
 const TRIM_THRESHOLD_RMS = 0.01;
 const TRIM_MIN_SAMPLES = 2205; // 22050 Hz * 0.1 s
 
@@ -91,18 +96,24 @@ const TRIM_MIN_SAMPLES = 2205; // 22050 Hz * 0.1 s
  * Strategy A is skipped when the body (= phoneme IDs minus BOS / EOS) is
  * shorter than MIN_BODY_FOR_STRATEGY_A — see issue #356.
  *
+ * The returned object now also carries `frontPad` / `backPad` (the number
+ * of pad tokens inserted on each side) so the durations-based post-trim
+ * can locate the padding precisely. Existing callers that only consumed
+ * `phonemeIds` / `prosodyFeatures` / `wasPadded` continue to work
+ * unchanged (object extension, not breaking).
+ *
  * @param {number[]} phonemeIds
  * @param {number[][]|null} prosodyFeatures
- * @returns {{ phonemeIds: number[], prosodyFeatures: number[][]|null, wasPadded: boolean }}
+ * @returns {{ phonemeIds: number[], prosodyFeatures: number[][]|null, wasPadded: boolean, frontPad: number, backPad: number }}
  */
 export function padPhonemeIds(phonemeIds, prosodyFeatures) {
   const n = phonemeIds.length;
   const bodyLen = n - 2; // exclude BOS / EOS
   if (bodyLen < MIN_BODY_FOR_STRATEGY_A) {
-    return { phonemeIds, prosodyFeatures, wasPadded: false };
+    return { phonemeIds, prosodyFeatures, wasPadded: false, frontPad: 0, backPad: 0 };
   }
   if (n >= MIN_PHONEME_IDS) {
-    return { phonemeIds, prosodyFeatures, wasPadded: false };
+    return { phonemeIds, prosodyFeatures, wasPadded: false, frontPad: 0, backPad: 0 };
   }
 
   const padTotal = MIN_PHONEME_IDS - n;
@@ -136,7 +147,82 @@ export function padPhonemeIds(phonemeIds, prosodyFeatures) {
     ];
   }
 
-  return { phonemeIds: padded, prosodyFeatures: paddedProsody, wasPadded: true };
+  return {
+    phonemeIds: padded,
+    prosodyFeatures: paddedProsody,
+    wasPadded: true,
+    frontPad: padFront,
+    backPad: padBack,
+  };
+}
+
+/**
+ * Strategy A precise post-trim using the model's duration output.
+ * Mirrors the Python reference (src/python_run/piper/voice.py
+ * `_trim_padding_by_durations`) so all runtimes produce byte-equal output
+ * for the same inputs (issue #356).
+ *
+ * Padded layout: `[BOS, pad×frontPad, ...body..., pad×backPad, EOS]`.
+ *
+ * Trimming policy:
+ *   - BOS + front padding: stripped completely
+ *   - Back padding: stripped completely
+ *   - EOS: keep only `eosMaxFrames` frames (default 0 — drop the entire EOS)
+ *
+ * All frame→sample conversions use `Math.trunc()` (truncation toward zero),
+ * matching `int()` in Python and `as i64` in Rust. `Math.round()` is *not*
+ * used because it would diverge from the other runtimes.
+ *
+ * @param {Float32Array} audio  Audio samples in the range -1.0 to 1.0
+ * @param {number[]|Float32Array|null} durations  Per-phoneme frame counts
+ * @param {number} frontPad
+ * @param {number} backPad
+ * @param {number} hopSize  VITS hop length (samples per frame)
+ * @param {number} [eosMaxFrames=TRIM_EOS_MAX_FRAMES]
+ * @returns {Float32Array} Trimmed audio (or the original if inputs are inconsistent)
+ */
+export function trimPaddingByDurations(
+  audio,
+  durations,
+  frontPad,
+  backPad,
+  hopSize,
+  eosMaxFrames = TRIM_EOS_MAX_FRAMES,
+) {
+  if (frontPad <= 0 && backPad <= 0) return audio;
+  if (durations == null || hopSize <= 0) return audio;
+  const expectedLen = 1 + frontPad + backPad + 1; // BOS + pads + EOS
+  if (durations.length < expectedLen) return audio;
+
+  // Front: BOS + front padding samples (truncated).
+  let frontSum = 0;
+  for (let i = 0; i < 1 + frontPad; i++) {
+    frontSum += durations[i];
+  }
+  const frontSamples = Math.trunc(frontSum * hopSize);
+
+  // Back: back padding samples + EOS excess (over eosMaxFrames).
+  let backPadSum = 0;
+  if (backPad > 0) {
+    // Equivalent to durations[-(1+backPad) : -1] in Python.
+    const start = durations.length - 1 - backPad;
+    for (let i = start; i < durations.length - 1; i++) {
+      backPadSum += durations[i];
+    }
+  }
+  const backPadSamples = Math.trunc(backPadSum * hopSize);
+  const eosFrames = durations[durations.length - 1];
+  const eosExcess = Math.max(0, eosFrames - eosMaxFrames);
+  const backSamples = backPadSamples + Math.trunc(eosExcess * hopSize);
+
+  const total = audio.length;
+  const start = Math.max(0, frontSamples);
+  let end = total - backSamples;
+  if (end < start) end = start;
+  if (start >= total || end <= 0 || start >= end) return audio;
+
+  // subarray() avoids a copy; subscribers that mutate must already clone.
+  return audio.subarray(start, end);
 }
 
 /**
@@ -327,6 +413,8 @@ export class PiperPlus {
     phonemeIds = padResult.phonemeIds;
     prosodyFeatures = padResult.prosodyFeatures;
     const wasPadded = padResult.wasPadded;
+    const frontPad = padResult.frontPad;
+    const backPad = padResult.backPad;
 
     // 2. ONNX inference
     const inferResult = await this._infer(phonemeIds, prosodyFeatures, {
@@ -338,9 +426,22 @@ export class PiperPlus {
     let audioData = inferResult.audio;
     const durations = inferResult.durations;
 
-    // --- Strategy A (post-step): Trim silence introduced by padding ---
+    // --- Strategy A (post-step): Trim padding-induced audio ---
+    // Prefer the durations-based precise trim (issue #356); fall back to
+    // the legacy RMS trim only when durations are unavailable.
     if (wasPadded) {
-      audioData = trimSilence(audioData);
+      if (durations != null) {
+        const hopSize = this._config.audio?.hop_size ?? DEFAULT_HOP_SIZE;
+        audioData = trimPaddingByDurations(
+          audioData,
+          durations,
+          frontPad,
+          backPad,
+          hopSize > 0 ? hopSize : DEFAULT_HOP_SIZE,
+        );
+      } else {
+        audioData = trimSilence(audioData);
+      }
     }
 
     // 3. Wrap result — include phoneme timing when the model supports it
