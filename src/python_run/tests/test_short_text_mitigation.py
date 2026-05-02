@@ -227,7 +227,7 @@ class TestTrimPaddingByDurations:
     @pytest.mark.unit
     def test_default_strips_eos_completely(self):
         # Default eos_max_frames=0: VITS predicts an inflated EOS under padded
-        # context that emits "だぁ"-like artefacts (issue #356 follow-up), so
+        # context that emits "だぁ"-like artifacts (issue #356 follow-up), so
         # the entire EOS region is dropped along with back padding.
         durations = np.array([2.0, 5.0, 5.0, 4.0, 4.0, 5.0, 5.0, 8.0], dtype=np.float32)
         hop = 100
@@ -537,7 +537,7 @@ class TestConstants:
     def test_min_phoneme_ids(self):
         # Empirically tuned for tsukuyomi 6lang (issue #356).
         # Was 40 — caused Strategy A to fire on stable inputs and leak
-        # padding artefacts. See voice.py for the threshold rationale.
+        # padding artifacts. See voice.py for the threshold rationale.
         assert MIN_PHONEME_IDS == 15
 
     @pytest.mark.unit

@@ -34,7 +34,7 @@ public static class ShortTextProcessor
     /// Issue #356: Was 40 (per the original spec) but empirical measurements
     /// on the tsukuyomi 6lang model show synthesis is stable down to ~8 IDs.
     /// 40 caused Strategy A to fire on already-stable inputs (e.g. 22-ID
-    /// sentences) and the pad tokens leaked as audible artefacts. 15 keeps
+    /// sentences) and the pad tokens leaked as audible artifacts. 15 keeps
     /// Strategy A active for genuinely tiny inputs only.
     /// </para>
     /// </summary>
@@ -46,7 +46,7 @@ public static class ShortTextProcessor
     /// pad-token audio dominates the actual content (e.g. 「あ。」 has
     /// body=2 and would get 11 pad tokens around 2 body tokens at MinPhonemeIds=15).
     /// Raw VITS output is preferable in that regime — degraded for tiny
-    /// utterances but free from padding artefacts.
+    /// utterances but free from padding artifacts.
     /// </summary>
     internal const int MinBodyForStrategyA = 3;
 
@@ -83,7 +83,7 @@ public static class ShortTextProcessor
     /// <summary>
     /// Maximum number of EOS frames retained by the durations-based Strategy A
     /// trim. VITS predicts an inflated EOS under the padded context that emits
-    /// an audible artefact otherwise (issue #356); 0 = drop the entire EOS.
+    /// an audible artifact otherwise (issue #356); 0 = drop the entire EOS.
     /// </summary>
     internal const int TrimEosMaxFrames = 0;
 

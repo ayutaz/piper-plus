@@ -31,7 +31,7 @@ TRIM_THRESHOLD_RMS = 0.01
 TRIM_MIN_SAMPLES = 2205
 # Number of EOS frames retained after Strategy A padding when the durations-
 # based trim is in use. Defaults to 0 — VITS predicts an inflated EOS under
-# the padded context that emits an audible artefact otherwise (issue #356).
+# the padded context that emits an audible artifact otherwise (issue #356).
 TRIM_EOS_MAX_FRAMES = 0
 # Default hop length when config.json does not declare audio.hop_size.
 DEFAULT_HOP_SIZE = 256

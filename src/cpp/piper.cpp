@@ -81,7 +81,7 @@ constexpr int MAX_INTRA_THREADS = 4;
 //
 // Issue #356: MIN_PHONEME_IDS was 40 but tsukuyomi 6lang testing shows
 // synthesis is stable down to ~8 IDs. 40 caused Strategy A to fire on
-// already-stable inputs and leak padding artefacts. 15 keeps Strategy A
+// already-stable inputs and leak padding artifacts. 15 keeps Strategy A
 // active for genuinely tiny inputs only. MIN_BODY_FOR_STRATEGY_A = 3
 // additionally bypasses Strategy A when the body (= phoneme IDs minus
 // BOS/EOS) is too small for padding to outweigh content (e.g. 「あ。」).
@@ -92,7 +92,7 @@ constexpr int TRIM_MIN_SAMPLES = 2205;  // 22050 Hz * 0.1 s
 constexpr int TRIM_WINDOW_SIZE = 256;
 // Maximum EOS frames retained by the durations-based Strategy A trim.
 // VITS predicts an inflated EOS under the padded context that emits an
-// audible artefact otherwise. 0 = drop the entire EOS region.
+// audible artifact otherwise. 0 = drop the entire EOS region.
 constexpr int TRIM_EOS_MAX_FRAMES = 0;
 
 // PUA to multi-char phoneme mapping for display

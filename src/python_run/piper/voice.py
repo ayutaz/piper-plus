@@ -33,7 +33,7 @@ _LOGGER = logging.getLogger(__name__)
 # model show a much lower true threshold — synthesis is stable at 8 IDs and
 # weakens only below ~7. Setting MIN_PHONEME_IDS too high triggers Strategy
 # A on already-stable inputs (e.g. 「こんにちは。」= 22 IDs), and the pad
-# tokens leak as audible artefacts that post-trim cannot fully remove. We
+# tokens leak as audible artifacts that post-trim cannot fully remove. We
 # pick 15 as a conservative middle ground: roughly 2× the measured stable
 # minimum, still well below typical short utterances like 「こんにちは。」.
 MIN_PHONEME_IDS = 15
@@ -265,11 +265,11 @@ def _pad_phoneme_ids(
 
 # Maximum EOS duration (in frames) preserved during Strategy A trim.
 # VITS tends to predict an inflated EOS duration under the padded context
-# and emits an audible artefact ("こんにちはだぁ" instead of "こんにちは" —
+# and emits an audible artifact ("こんにちはだぁ" instead of "こんにちは" —
 # kun432 氏 issue #356 試聴フィードバック). Empirically, even modest
 # clamping (6 frames) leaves a recognisable tail. Default to 0 so the
 # entire EOS region is dropped along with the back padding; the unpadded
-# PyPI 1.11.0 path keeps a similar tail but with no audible artefact, so
+# PyPI 1.11.0 path keeps a similar tail but with no audible artifact, so
 # losing it here is acceptable.
 TRIM_EOS_MAX_FRAMES = 0
 

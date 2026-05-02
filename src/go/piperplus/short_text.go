@@ -15,7 +15,7 @@ const (
 	//
 	// Issue #356: Was 40, but empirical measurements on the tsukuyomi 6lang
 	// model show synthesis is stable down to ~8 IDs. 40 caused Strategy A to
-	// fire on already-stable inputs and leak padding artefacts. 15 keeps
+	// fire on already-stable inputs and leak padding artifacts. 15 keeps
 	// Strategy A active for genuinely tiny inputs only.
 	minPhonemeIDs = 15
 
@@ -46,7 +46,7 @@ const (
 
 	// trimEosMaxFrames bounds how many EOS frames the durations-based trim
 	// keeps after Strategy A padding. VITS predicts an inflated EOS under
-	// the padded context that produces an audible artefact otherwise
+	// the padded context that produces an audible artifact otherwise
 	// (issue #356). Default 0 = drop the entire EOS region.
 	trimEosMaxFrames = 0
 )

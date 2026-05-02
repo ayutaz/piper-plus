@@ -68,7 +68,7 @@ const DEFAULT_SAMPLE_RATE = 22050;
 //
 // Issue #356: MIN_PHONEME_IDS was 40, but tsukuyomi 6lang testing showed
 // synthesis is stable down to ~8 IDs. 40 caused Strategy A to fire on
-// already-stable inputs and leak padding artefacts. 15 keeps Strategy A
+// already-stable inputs and leak padding artifacts. 15 keeps Strategy A
 // active for genuinely tiny inputs only. MIN_BODY_FOR_STRATEGY_A = 3
 // additionally bypasses Strategy A when the body (= phoneme IDs minus
 // BOS/EOS) is too small for padding to outweigh content (e.g. 「あ。」).
