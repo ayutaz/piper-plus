@@ -4,12 +4,15 @@ import numpy as np
 import pytest
 
 from piper_train.infer_onnx import (
+    DEFAULT_HOP_SIZE,
     MIN_BODY_FOR_STRATEGY_A,
     MIN_PHONEME_IDS,
+    TRIM_EOS_MAX_FRAMES,
     TRIM_MIN_SAMPLES,
     TRIM_THRESHOLD_RMS,
     _adjust_scales_for_short_input,
     _pad_phoneme_ids,
+    _trim_padding_by_durations,
     _trim_silence,
     text_to_phoneme_ids_and_prosody,
 )
@@ -172,7 +175,7 @@ class TestPadPhonemeIds:
         """Sequences >= MIN_PHONEME_IDS should not be padded."""
         ids = list(range(MIN_PHONEME_IDS))
         prosody = [None] * MIN_PHONEME_IDS
-        result_ids, result_prosody, was_padded = _pad_phoneme_ids(ids, prosody)
+        result_ids, result_prosody, was_padded, _, _ = _pad_phoneme_ids(ids, prosody)
         assert not was_padded
         assert result_ids == ids
         assert result_prosody == prosody
@@ -182,7 +185,7 @@ class TestPadPhonemeIds:
         # BOS=1, some content, EOS=2
         ids = [1, 10, 20, 30, 2]
         prosody = [None, {"a1": 1, "a2": 2, "a3": 3}, None, None, None]
-        result_ids, result_prosody, was_padded = _pad_phoneme_ids(ids, prosody)
+        result_ids, result_prosody, was_padded, _, _ = _pad_phoneme_ids(ids, prosody)
         assert was_padded
         assert len(result_ids) == MIN_PHONEME_IDS
         assert len(result_prosody) == MIN_PHONEME_IDS
@@ -191,7 +194,7 @@ class TestPadPhonemeIds:
         """BOS (first) and EOS (last) tokens should be preserved."""
         # body length must be >= MIN_BODY_FOR_STRATEGY_A for padding to apply.
         ids = [1] + list(range(10, 10 + MIN_BODY_FOR_STRATEGY_A)) + [2]
-        result_ids, _, was_padded = _pad_phoneme_ids(ids, None)
+        result_ids, _, was_padded, _, _ = _pad_phoneme_ids(ids, None)
         assert was_padded
         assert result_ids[0] == 1  # BOS
         assert result_ids[-1] == 2  # EOS
@@ -200,7 +203,7 @@ class TestPadPhonemeIds:
         """Inserted padding tokens should be 0 (blank/pad)."""
         # body=3 (>= MIN_BODY_FOR_STRATEGY_A) so padding applies.
         ids = [1, 10, 20, 30, 2]
-        result_ids, _, was_padded = _pad_phoneme_ids(ids, None)
+        result_ids, _, was_padded, _, _ = _pad_phoneme_ids(ids, None)
         assert was_padded
         # Middle content (10, 20, 30) should still be present
         assert 10 in result_ids
@@ -214,7 +217,7 @@ class TestPadPhonemeIds:
         """When prosody_features is None, output prosody should also be None."""
         # body=3 (>= MIN_BODY_FOR_STRATEGY_A).
         ids = [1, 10, 20, 30, 2]
-        result_ids, result_prosody, was_padded = _pad_phoneme_ids(ids, None)
+        result_ids, result_prosody, was_padded, _, _ = _pad_phoneme_ids(ids, None)
         assert was_padded
         assert result_prosody is None
 
@@ -229,7 +232,7 @@ class TestPadPhonemeIds:
             {"a1": 7, "a2": 8, "a3": 9},
             None,
         ]
-        result_ids, result_prosody, was_padded = _pad_phoneme_ids(ids, prosody)
+        result_ids, result_prosody, was_padded, _, _ = _pad_phoneme_ids(ids, prosody)
         assert was_padded
         # Count non-None entries -- should still be 3 (the original content)
         non_none = [p for p in result_prosody if p is not None]
@@ -239,7 +242,7 @@ class TestPadPhonemeIds:
         """Padding should be approximately even between front and back."""
         # body=3 so padding applies.
         ids = [1, 10, 20, 30, 2]
-        result_ids, _, _ = _pad_phoneme_ids(ids, None)
+        result_ids, _, _, _, _ = _pad_phoneme_ids(ids, None)
         # Find position of first content token 10
         pos = result_ids.index(10)
         front_pads = pos - 1  # subtract BOS
@@ -256,22 +259,120 @@ class TestPadPhonemeIds:
         """
         # body = 0 (only BOS + EOS)
         ids = [1, 2]
-        result_ids, result_prosody, was_padded = _pad_phoneme_ids(ids, None)
+        result_ids, result_prosody, was_padded, _, _ = _pad_phoneme_ids(ids, None)
         assert not was_padded
         assert result_ids == ids
 
         # body = 1
         ids = [1, 10, 2]
-        result_ids, _, was_padded = _pad_phoneme_ids(ids, None)
+        result_ids, _, was_padded, _, _ = _pad_phoneme_ids(ids, None)
         assert not was_padded
         assert result_ids == ids
 
         # body = 2 (e.g. 「あ。」 with [BOS, a, ., EOS])
         if MIN_BODY_FOR_STRATEGY_A > 2:
             ids = [1, 10, 11, 2]
-            result_ids, _, was_padded = _pad_phoneme_ids(ids, None)
+            result_ids, _, was_padded, _, _ = _pad_phoneme_ids(ids, None)
             assert not was_padded
             assert result_ids == ids
+
+
+class TestTrimPaddingByDurations:
+    """Tests for Strategy A precise post-trim: _trim_padding_by_durations.
+
+    Mirrors src/python_run/tests/test_short_text_mitigation.py to keep the
+    runtime and training implementations behaviourally identical
+    (cross-runtime contract — issue #356).
+    """
+
+    def test_no_op_when_no_padding(self):
+        audio = np.arange(1000, dtype=np.int16)
+        durations = np.array([1.0] * 5, dtype=np.float32)
+        result = _trim_padding_by_durations(audio, durations, 0, 0, hop_size=256)
+        assert np.array_equal(result, audio)
+
+    def test_trims_front_padding_only(self):
+        # Layout: BOS=2, pad×3 (3+3+3), body=4, EOS=1 → 19 frames total
+        durations = np.array([2.0, 3.0, 3.0, 3.0, 4.0, 1.0], dtype=np.float32)
+        hop = 100
+        total = int(durations.sum() * hop)  # 1900
+        audio = np.arange(total, dtype=np.int16)
+        result = _trim_padding_by_durations(
+            audio, durations, front_pad=3, back_pad=0, hop_size=hop, eos_max_frames=6
+        )
+        # BOS + front padding samples = (2+3+3+3) * 100 = 1100
+        assert len(result) == total - 1100
+
+    def test_default_strips_eos_completely(self):
+        """Default eos_max_frames=0 drops the entire EOS region (#356)."""
+        # body × 2, pads × 2, EOS=8
+        durations = np.array(
+            [2.0, 5.0, 5.0, 4.0, 4.0, 5.0, 5.0, 8.0], dtype=np.float32
+        )
+        hop = 100
+        total = int(durations.sum() * hop)  # 3800
+        audio = np.arange(total, dtype=np.int16)
+        result = _trim_padding_by_durations(
+            audio, durations, front_pad=2, back_pad=2, hop_size=hop
+        )
+        # BOS + front padding = (2+5+5)*100 = 1200
+        # back padding + entire EOS = (5+5+8)*100 = 1800
+        assert len(result) == total - 1200 - 1800
+
+    def test_clamps_inflated_eos_duration(self):
+        # EOS=10 frames, eos_max_frames=6 → excess 4 frames trimmed.
+        durations = np.array([2.0, 3.0, 3.0, 4.0, 3.0, 3.0, 10.0], dtype=np.float32)
+        hop = 100
+        total = int(durations.sum() * hop)  # 2800
+        audio = np.arange(total, dtype=np.int16)
+        result = _trim_padding_by_durations(
+            audio, durations, front_pad=2, back_pad=2, hop_size=hop, eos_max_frames=6
+        )
+        assert len(result) == total - 800 - 1000
+
+    def test_returns_input_when_durations_none(self):
+        audio = np.arange(1000, dtype=np.int16)
+        result = _trim_padding_by_durations(audio, None, 3, 3, hop_size=256)
+        assert np.array_equal(result, audio)
+
+    def test_returns_input_when_durations_too_short(self):
+        # durations has fewer entries than 1 + front + back + 1
+        audio = np.arange(1000, dtype=np.int16)
+        durations = np.array([1.0, 1.0, 1.0], dtype=np.float32)
+        result = _trim_padding_by_durations(
+            audio, durations, front_pad=5, back_pad=5, hop_size=256
+        )
+        assert np.array_equal(result, audio)
+
+    def test_returns_input_when_hop_size_zero(self):
+        audio = np.arange(1000, dtype=np.int16)
+        durations = np.array([1.0] * 8, dtype=np.float32)
+        result = _trim_padding_by_durations(
+            audio, durations, front_pad=2, back_pad=2, hop_size=0
+        )
+        assert np.array_equal(result, audio)
+
+    def test_truncation_matches_int_cast(self):
+        """Sample count must use truncation (int()) — cross-runtime contract."""
+        # Layout (front_pad=1, back_pad=1, body=3):
+        #   [BOS=0.701, pad=0.701, body=2, body=2, body=2, pad=0.703, EOS=0.701]
+        # 0.701 / 0.703 chosen to expose float-rounding drift between runtimes.
+        durations = np.array(
+            [0.701, 0.701, 2.0, 2.0, 2.0, 0.703, 0.701], dtype=np.float32
+        )
+        hop = 100
+        total_samples = len(np.arange(int(durations.sum() * hop), dtype=np.int16))
+        audio = np.arange(total_samples, dtype=np.int16)
+        result = _trim_padding_by_durations(
+            audio, durations, front_pad=1, back_pad=1, hop_size=hop
+        )
+        # Front trim = int((BOS + pad) * 100)
+        #            = int((0.701 + 0.701) * 100) = int(140.2) → 140 (truncated)
+        # Back trim  = int(pad * 100) + int(EOS * 100)  (eos_max_frames=0)
+        #            = int(0.703 * 100) + int(0.701 * 100)
+        #            = 70 + 70 = 140 (each truncated independently)
+        # If a runtime mistakenly used round() it would yield 141 + 70 = 141.
+        assert len(result) == total_samples - 140 - 140
 
 
 class TestTrimSilence:
@@ -445,7 +546,7 @@ class TestStrategyBUsesPrePaddingLength:
         original_len = len(short_ids)
 
         # Strategy A: pad
-        padded_ids, _, was_padded = _pad_phoneme_ids(short_ids, None)
+        padded_ids, _, was_padded, _, _ = _pad_phoneme_ids(short_ids, None)
         assert was_padded
         assert len(padded_ids) == MIN_PHONEME_IDS
 
@@ -466,7 +567,7 @@ class TestStrategyBUsesPrePaddingLength:
         short_ids = [1] + list(range(10, 10 + MIN_BODY_FOR_STRATEGY_A)) + [2]
 
         # Strategy A: pad to MIN_PHONEME_IDS
-        padded_ids, _, was_padded = _pad_phoneme_ids(short_ids, None)
+        padded_ids, _, was_padded, _, _ = _pad_phoneme_ids(short_ids, None)
         assert was_padded
         assert len(padded_ids) == MIN_PHONEME_IDS
 
@@ -485,13 +586,13 @@ class TestStrategyBUsesPrePaddingLength:
 
         # body length needs >= MIN_BODY_FOR_STRATEGY_A so Strategy A applies.
         ids_low = [1] + list(range(10, 10 + low - 2)) + [2]
-        padded_low, _, _ = _pad_phoneme_ids(ids_low, None)
+        padded_low, _, _, _, _ = _pad_phoneme_ids(ids_low, None)
         ns_low, _, nw_low = _adjust_scales_for_short_input(
             padded_low, 0.667, 0.8, 1.0, original_len=len(ids_low)
         )
 
         ids_high = [1] + list(range(10, 10 + high - 2)) + [2]
-        padded_high, _, _ = _pad_phoneme_ids(ids_high, None)
+        padded_high, _, _, _, _ = _pad_phoneme_ids(ids_high, None)
         ns_high, _, nw_high = _adjust_scales_for_short_input(
             padded_high, 0.667, 0.8, 1.0, original_len=len(ids_high)
         )
@@ -508,7 +609,7 @@ class TestStrategyBUsesPrePaddingLength:
         """No adjustment when original length is exactly MIN_PHONEME_IDS."""
         ids = list(range(MIN_PHONEME_IDS))
         # No padding happens (already at threshold)
-        padded, _, was_padded = _pad_phoneme_ids(ids, None)
+        padded, _, was_padded, _, _ = _pad_phoneme_ids(ids, None)
         assert not was_padded
 
         ns, ls, nw = _adjust_scales_for_short_input(
