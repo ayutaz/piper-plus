@@ -519,7 +519,14 @@ class PiperVoice:
         volume: float = 1.0,
         language_id: int | None = None,
     ):
-        """Synthesize WAV audio from text."""
+        """Synthesize WAV audio from text.
+
+        Multi-sentence input is split at sentence boundaries by
+        :meth:`phonemize` and rendered chunk-by-chunk via
+        :meth:`synthesize_stream_raw`. The chunks are concatenated into a
+        single WAV file. SSML markup (``<speak>...``) is treated as a
+        single unit.
+        """
         wav_file.setframerate(self.config.sample_rate)
         wav_file.setsampwidth(2)  # 16-bit
         wav_file.setnchannels(1)  # mono
@@ -547,7 +554,21 @@ class PiperVoice:
         volume: float = 1.0,
         language_id: int | None = None,
     ) -> Iterable[bytes]:
-        """Synthesize raw audio per sentence from text."""
+        """Synthesize raw audio per sentence from text.
+
+        Yields one PCM 16-bit mono audio chunk per sentence. Sentence
+        boundaries are detected by :func:`piper.text_splitter.split_sentences`
+        (mirrors the Rust / C# / Go / C++ implementations) so a single call
+        with multi-sentence input produces multiple chunks suitable for
+        streaming clients (e.g. HTTP ``?streaming=true``).
+
+        SSML input (``<speak>...``) is yielded as a single chunk to preserve
+        the markup structure.
+
+        Each chunk is wrapped with ``sentence_silence`` worth of trailing
+        silence; very short plain-text inputs additionally receive
+        Strategy C silence padding around every chunk.
+        """
         # Strategy C: auto-inject silence padding for very short plain text
         is_short_text = (
             not text.lstrip().startswith(("<speak>", "<speak "))
