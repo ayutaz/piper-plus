@@ -76,8 +76,17 @@ const float MAX_WAV_VALUE = 32767.0f;
 // Beyond 4 threads VITS sees diminishing returns and increased contention.
 constexpr int MAX_INTRA_THREADS = 4;
 
-// Short-text mitigation constants (keep in sync with other runtimes)
-constexpr int MIN_PHONEME_IDS = 40;
+// Short-text mitigation constants (keep in sync with other runtimes —
+// docs/spec/short-text-contract.toml).
+//
+// Issue #356: MIN_PHONEME_IDS was 40 but tsukuyomi 6lang testing shows
+// synthesis is stable down to ~8 IDs. 40 caused Strategy A to fire on
+// already-stable inputs and leak padding artefacts. 15 keeps Strategy A
+// active for genuinely tiny inputs only. MIN_BODY_FOR_STRATEGY_A = 3
+// additionally bypasses Strategy A when the body (= phoneme IDs minus
+// BOS/EOS) is too small for padding to outweigh content (e.g. 「あ。」).
+constexpr int MIN_PHONEME_IDS = 15;
+constexpr int MIN_BODY_FOR_STRATEGY_A = 3;
 constexpr float TRIM_THRESHOLD_RMS = 0.01f;
 constexpr int TRIM_MIN_SAMPLES = 2205;  // 22050 Hz * 0.1 s
 constexpr int TRIM_WINDOW_SIZE = 256;
@@ -682,10 +691,15 @@ void loadVoice(PiperConfig &config, std::string modelPath,
 
 // Pad short phoneme ID sequences with silence tokens (pause ID = 0) after BOS
 // and before EOS to reach MIN_PHONEME_IDS length. Returns true if padding was
-// applied.
+// applied. Strategy A is also skipped when the body (= phoneme IDs minus
+// BOS/EOS) is shorter than MIN_BODY_FOR_STRATEGY_A — see issue #356.
 static bool padPhonemeIds(std::vector<PhonemeId> &phonemeIds,
                           PhonemeId padId = 0) {
   const auto len = static_cast<int>(phonemeIds.size());
+  const int bodyLen = len - 2; // exclude BOS / EOS
+  if (bodyLen < MIN_BODY_FOR_STRATEGY_A) {
+    return false;
+  }
   if (len >= MIN_PHONEME_IDS) {
     return false;
   }
