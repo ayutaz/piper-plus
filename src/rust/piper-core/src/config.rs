@@ -240,7 +240,8 @@ mod tests {
     #[test]
     fn test_deserialize_audio_hop_size() {
         // Explicit hop_size is honoured.
-        let json = r#"{"phoneme_id_map": {"a": [1]}, "audio": {"sample_rate": 22050, "hop_size": 512}}"#;
+        let json =
+            r#"{"phoneme_id_map": {"a": [1]}, "audio": {"sample_rate": 22050, "hop_size": 512}}"#;
         let config: VoiceConfig = serde_json::from_str(json).unwrap();
         assert_eq!(config.audio.hop_size, 512);
     }

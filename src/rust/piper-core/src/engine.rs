@@ -162,6 +162,7 @@ pub struct ModelCapabilities {
 ///
 /// **Breaking change (#356):** 旧シグネチャは 3 タプルだった。
 /// `pad_short_phonemes()` 直接利用者は呼び出しを更新すること。
+#[allow(clippy::type_complexity)]
 pub fn pad_short_phonemes(
     phoneme_ids: &[i64],
     prosody_features: Option<&Vec<[i32; 3]>>,
@@ -276,7 +277,7 @@ pub fn trim_padding_by_durations(
     let back_samples = back_pad_samples + (eos_excess * hop) as i64;
 
     let total = audio.len() as i64;
-    let start = front_samples.max(0) as i64;
+    let start = front_samples.max(0);
     let mut end = total - back_samples;
     if end < start {
         end = start;
@@ -1324,7 +1325,8 @@ mod tests {
         prosody.extend((0..MIN_BODY_FOR_STRATEGY_A as i32).map(|i| [i + 1, i + 2, i + 3]));
         prosody.push([0, 0, 0]);
 
-        let (padded_ids, padded_prosody, was_padded, _, _) = pad_short_phonemes(&ids, Some(&prosody));
+        let (padded_ids, padded_prosody, was_padded, _, _) =
+            pad_short_phonemes(&ids, Some(&prosody));
         assert!(was_padded);
         assert_eq!(padded_ids.len(), MIN_PHONEME_IDS);
         let pp = padded_prosody.unwrap();
@@ -1392,7 +1394,7 @@ mod tests {
         let trimmed = trim_silence(&audio);
         assert!(trimmed.len() < audio.len());
         // Trimmed result should contain the signal
-        assert!(trimmed.iter().any(|&s| s == 10000));
+        assert!(trimmed.contains(&10000));
     }
 
     #[test]
@@ -1536,8 +1538,7 @@ mod tests {
         let hop = 100u32;
         let total = 3800usize;
         let audio = vec![0i16; total];
-        let result =
-            trim_padding_by_durations(&audio, &durations, 2, 2, hop, TRIM_EOS_MAX_FRAMES);
+        let result = trim_padding_by_durations(&audio, &durations, 2, 2, hop, TRIM_EOS_MAX_FRAMES);
         // BOS + front padding = (2+5+5)*100 = 1200
         // back padding + entire EOS = (5+5+8)*100 = 1800
         assert_eq!(result.len(), total - 1200 - 1800);
@@ -1591,14 +1592,7 @@ mod tests {
         let sum: f32 = durations.iter().sum();
         let total = (sum * hop as f32) as usize;
         let audio = vec![0i16; total];
-        let result = trim_padding_by_durations(
-            &audio,
-            &durations,
-            1,
-            1,
-            hop,
-            TRIM_EOS_MAX_FRAMES,
-        );
+        let result = trim_padding_by_durations(&audio, &durations, 1, 1, hop, TRIM_EOS_MAX_FRAMES);
         assert_eq!(result.len(), total - 140 - 140);
     }
 }
