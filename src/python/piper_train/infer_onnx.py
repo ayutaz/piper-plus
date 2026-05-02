@@ -17,8 +17,14 @@ from .vits.wavfile import write as write_wav
 _LOGGER = logging.getLogger("piper_train.infer_onnx")
 
 # --- Short-text synthesis quality constants ---
-# Minimum phoneme_ids length below which padding/scale adjustment is applied
-MIN_PHONEME_IDS = 40
+# Minimum phoneme_ids length below which padding/scale adjustment is applied.
+# See docs/spec/short-text-contract.toml and issue #356 for rationale (was 40,
+# empirically tuned to 15 to avoid Strategy A firing on already-stable inputs).
+MIN_PHONEME_IDS = 15
+# Minimum body length (excluding BOS/EOS) for Strategy A to apply.
+# Bodies smaller than this would have padding ratio so high that pad-token
+# audio dominates over actual content; raw VITS output is preferable.
+MIN_BODY_FOR_STRATEGY_A = 3
 # RMS threshold for silence trimming (float audio range)
 TRIM_THRESHOLD_RMS = 0.01
 # Minimum audio samples to keep after trimming (22050 Hz * 0.1s)
@@ -34,10 +40,17 @@ def _pad_phoneme_ids(
     Inserts pause tokens (ID=0, blank/pad) evenly after BOS and before EOS
     until the sequence reaches MIN_PHONEME_IDS length.
 
+    Skips padding when the body (= phoneme_ids excluding BOS/EOS) has fewer
+    than MIN_BODY_FOR_STRATEGY_A IDs — pad tokens would otherwise overwhelm
+    the actual content (issue #356).
+
     Returns:
         (padded_phoneme_ids, padded_prosody_features, was_padded)
     """
     n = len(phoneme_ids)
+    body_len = n - 2  # exclude BOS / EOS
+    if body_len < MIN_BODY_FOR_STRATEGY_A:
+        return phoneme_ids, prosody_features, False
     if n >= MIN_PHONEME_IDS:
         return phoneme_ids, prosody_features, False
 

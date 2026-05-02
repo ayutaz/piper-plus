@@ -42,7 +42,22 @@
 [padding]
 # Minimum phoneme ID count for stable VITS inference.
 # Sequences shorter than this are padded with pause tokens.
-min_phoneme_ids = 40
+#
+# Issue #356: Was 40, but empirical measurements on the tsukuyomi 6lang
+# model show synthesis is stable down to ~8 IDs and weakens only below ~7.
+# 40 was so conservative that Strategy A fired on already-stable inputs
+# (e.g. 「こんにちは。」= 22 IDs), and the pad tokens leaked as audible
+# artefacts that post-trim could not fully remove. 15 keeps Strategy A
+# active for genuinely tiny inputs while leaving stable sequences alone.
+min_phoneme_ids = 15
+
+# Minimum body length (= phoneme_ids excluding BOS / EOS) for Strategy A
+# to apply. When the body is smaller than this, padding-to-body ratio
+# explodes and the pad-token audio dominates over the actual content
+# (e.g. 「あ。」 has body=2 → 11 pad tokens around 2 body tokens with the
+# previous 40 threshold). Below this threshold we use raw VITS output
+# instead — degraded for tiny utterances but free from padding artefacts.
+min_body_for_strategy_a = 3
 
 # Token ID used for padding (pause / blank / PAD symbol "_").
 pause_token_id = 0

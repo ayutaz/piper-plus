@@ -4,6 +4,7 @@ import numpy as np
 import pytest
 
 from piper_train.infer_onnx import (
+    MIN_BODY_FOR_STRATEGY_A,
     MIN_PHONEME_IDS,
     TRIM_MIN_SAMPLES,
     TRIM_THRESHOLD_RMS,
@@ -188,7 +189,8 @@ class TestPadPhonemeIds:
 
     def test_bos_eos_preserved(self):
         """BOS (first) and EOS (last) tokens should be preserved."""
-        ids = [1, 10, 20, 2]
+        # body length must be >= MIN_BODY_FOR_STRATEGY_A for padding to apply.
+        ids = [1] + list(range(10, 10 + MIN_BODY_FOR_STRATEGY_A)) + [2]
         result_ids, _, was_padded = _pad_phoneme_ids(ids, None)
         assert was_padded
         assert result_ids[0] == 1  # BOS
@@ -196,51 +198,80 @@ class TestPadPhonemeIds:
 
     def test_padding_is_zero(self):
         """Inserted padding tokens should be 0 (blank/pad)."""
-        ids = [1, 10, 2]
+        # body=3 (>= MIN_BODY_FOR_STRATEGY_A) so padding applies.
+        ids = [1, 10, 20, 30, 2]
         result_ids, _, was_padded = _pad_phoneme_ids(ids, None)
         assert was_padded
-        # Middle content (10) should still be present
+        # Middle content (10, 20, 30) should still be present
         assert 10 in result_ids
+        assert 20 in result_ids
+        assert 30 in result_ids
         # All padding tokens are 0
         pad_count = result_ids.count(0)
         assert pad_count == MIN_PHONEME_IDS - len(ids)
 
     def test_prosody_none_passthrough(self):
         """When prosody_features is None, output prosody should also be None."""
-        ids = [1, 10, 2]
+        # body=3 (>= MIN_BODY_FOR_STRATEGY_A).
+        ids = [1, 10, 20, 30, 2]
         result_ids, result_prosody, was_padded = _pad_phoneme_ids(ids, None)
         assert was_padded
         assert result_prosody is None
 
     def test_prosody_padded_with_none(self):
         """Prosody padding entries should be None."""
-        ids = [1, 10, 2]
-        prosody = [None, {"a1": 1, "a2": 2, "a3": 3}, None]
+        # body=3 with prosody.
+        ids = [1, 10, 20, 30, 2]
+        prosody = [
+            None,
+            {"a1": 1, "a2": 2, "a3": 3},
+            {"a1": 4, "a2": 5, "a3": 6},
+            {"a1": 7, "a2": 8, "a3": 9},
+            None,
+        ]
         result_ids, result_prosody, was_padded = _pad_phoneme_ids(ids, prosody)
         assert was_padded
-        # Count non-None entries -- should still be 1 (the original content)
+        # Count non-None entries -- should still be 3 (the original content)
         non_none = [p for p in result_prosody if p is not None]
-        assert len(non_none) == 1
-        assert non_none[0] == {"a1": 1, "a2": 2, "a3": 3}
+        assert len(non_none) == 3
 
     def test_even_split(self):
         """Padding should be approximately even between front and back."""
-        ids = [1, 10, 2]  # 3 elements, need 37 padding
+        # body=3 so padding applies.
+        ids = [1, 10, 20, 30, 2]
         result_ids, _, _ = _pad_phoneme_ids(ids, None)
-        # Find position of content token 10
+        # Find position of first content token 10
         pos = result_ids.index(10)
         front_pads = pos - 1  # subtract BOS
-        back_pads = len(result_ids) - pos - 2  # subtract content + EOS
+        # Find last content token 30
+        last_pos = len(result_ids) - 1 - result_ids[::-1].index(30)
+        back_pads = len(result_ids) - last_pos - 2  # subtract content + EOS
         assert abs(front_pads - back_pads) <= 1
 
-    def test_two_element_input(self):
-        """Minimal input with just BOS+EOS should be padded correctly."""
+    def test_skips_when_body_too_short(self):
+        """body shorter than MIN_BODY_FOR_STRATEGY_A skips Strategy A.
+
+        Tiny bodies (e.g. 「あ。」) would have padding-to-body ratio so high
+        that pad-token audio dominates over content (issue #356).
+        """
+        # body = 0 (only BOS + EOS)
         ids = [1, 2]
+        result_ids, result_prosody, was_padded = _pad_phoneme_ids(ids, None)
+        assert not was_padded
+        assert result_ids == ids
+
+        # body = 1
+        ids = [1, 10, 2]
         result_ids, _, was_padded = _pad_phoneme_ids(ids, None)
-        assert was_padded
-        assert len(result_ids) == MIN_PHONEME_IDS
-        assert result_ids[0] == 1
-        assert result_ids[-1] == 2
+        assert not was_padded
+        assert result_ids == ids
+
+        # body = 2 (e.g. 「あ。」 with [BOS, a, ., EOS])
+        if MIN_BODY_FOR_STRATEGY_A > 2:
+            ids = [1, 10, 11, 2]
+            result_ids, _, was_padded = _pad_phoneme_ids(ids, None)
+            assert not was_padded
+            assert result_ids == ids
 
 
 class TestTrimSilence:
@@ -315,7 +346,9 @@ class TestAdjustScalesForShortInput:
 
     def test_adjustment_applied_when_short(self):
         """Scales should be reduced for short sequences."""
-        ids = list(range(20))  # 20 < 40
+        # Pick a length below MIN_PHONEME_IDS but above the noise_scale floor
+        # (ratio = len/MIN >= 0.5 keeps us off the noise_scale clamp).
+        ids = list(range(MIN_PHONEME_IDS - 1))
         ns, ls, nw = _adjust_scales_for_short_input(ids, 0.667, 0.8, 1.0)
         # noise_scale should be reduced
         assert ns < 0.667
@@ -328,14 +361,14 @@ class TestAdjustScalesForShortInput:
         """noise_scale multiplier should not go below 0.5."""
         ids = [1]  # very short
         ns, _, _ = _adjust_scales_for_short_input(ids, 0.667, 0.8, 1.0)
-        # ratio = 1/40 = 0.025, max(0.5, 0.025) = 0.5
+        # ratio = 1/MIN_PHONEME_IDS, well below 0.5 floor
         assert ns == pytest.approx(0.667 * 0.5)
 
     def test_noise_w_floor_at_04(self):
         """noise_w multiplier should not go below 0.4."""
         ids = [1]  # very short
         _, _, nw = _adjust_scales_for_short_input(ids, 0.667, 0.8, 1.0)
-        # ratio = 1/40 = 0.025, max(0.4, 0.025) = 0.4
+        # ratio = 1/MIN_PHONEME_IDS, well below 0.4 floor
         assert nw == pytest.approx(0.8 * 0.4)
 
     def test_length_scale_unchanged(self):
@@ -346,20 +379,23 @@ class TestAdjustScalesForShortInput:
 
     def test_ratio_proportional(self):
         """Scale reduction should be proportional to input length."""
-        # Use 30 (ratio=0.75) vs 20 (ratio=0.5) -- both above the floor
-        ids_30 = list(range(30))  # ratio=0.75, above floor
-        ids_20 = list(range(20))  # ratio=0.5, at floor for noise_scale
+        # Pick two lengths in (floor * MIN, MIN) so both stay off the floor.
+        # MIN=15: high=12 (ratio 0.8), low=8 (ratio ~0.53)
+        high = max(MIN_PHONEME_IDS - 3, 1)
+        low = max(MIN_PHONEME_IDS // 2 + 1, 1)
+        ids_high = list(range(high))
+        ids_low = list(range(low))
 
-        ns_30, _, nw_30 = _adjust_scales_for_short_input(
-            ids_30, 0.667, 0.8, 1.0
+        ns_high, _, nw_high = _adjust_scales_for_short_input(
+            ids_high, 0.667, 0.8, 1.0
         )
-        ns_20, _, nw_20 = _adjust_scales_for_short_input(
-            ids_20, 0.667, 0.8, 1.0
+        ns_low, _, nw_low = _adjust_scales_for_short_input(
+            ids_low, 0.667, 0.8, 1.0
         )
 
-        # 30-length input should have less reduction than 20-length
-        assert ns_30 > ns_20
-        assert nw_30 > nw_20
+        # Longer input should have less reduction than shorter input.
+        assert ns_high > ns_low
+        assert nw_high > nw_low
 
     def test_empty_input(self):
         """Empty phoneme_ids should use floor values."""
@@ -404,7 +440,8 @@ class TestStrategyBUsesPrePaddingLength:
         Simulates the main() call order: save original_len, then pad (Strategy A),
         then pass original_len to Strategy B.
         """
-        short_ids = [1, 10, 20, 2]  # 4 elements, well below MIN_PHONEME_IDS
+        # body length must be >= MIN_BODY_FOR_STRATEGY_A for Strategy A to apply.
+        short_ids = [1] + list(range(10, 10 + MIN_BODY_FOR_STRATEGY_A)) + [2]
         original_len = len(short_ids)
 
         # Strategy A: pad
@@ -416,7 +453,7 @@ class TestStrategyBUsesPrePaddingLength:
         ns, ls, nw = _adjust_scales_for_short_input(
             padded_ids, 0.667, 0.8, 1.0, original_len=original_len
         )
-        # ratio = 4/40 = 0.1, clamped to floors -> 0.5, 0.4
+        # Short original_len → ratio well below the noise floors.
         assert ns == pytest.approx(0.667 * 0.5)
         assert nw == pytest.approx(0.8 * 0.4)
         assert ls == pytest.approx(1.0)
@@ -426,7 +463,7 @@ class TestStrategyBUsesPrePaddingLength:
 
         This test documents the buggy behavior to prevent regression.
         """
-        short_ids = [1, 10, 20, 2]
+        short_ids = [1] + list(range(10, 10 + MIN_BODY_FOR_STRATEGY_A)) + [2]
 
         # Strategy A: pad to MIN_PHONEME_IDS
         padded_ids, _, was_padded = _pad_phoneme_ids(short_ids, None)
@@ -441,27 +478,31 @@ class TestStrategyBUsesPrePaddingLength:
 
     def test_combined_strategy_a_b_varying_lengths(self):
         """Shorter original inputs should get more aggressive scale reduction."""
-        # 10 elements
-        ids_10 = list(range(10))
-        padded_10, _, _ = _pad_phoneme_ids(ids_10, None)
-        ns_10, _, nw_10 = _adjust_scales_for_short_input(
-            padded_10, 0.667, 0.8, 1.0, original_len=10
+        # Pick lengths inside the noise_scale floor band so Strategy B actually
+        # differentiates them: low close to MIN/2 + 1, high close to MIN - 1.
+        low = max(MIN_PHONEME_IDS // 2 + 1, MIN_BODY_FOR_STRATEGY_A + 2)
+        high = max(MIN_PHONEME_IDS - 1, low + 1)
+
+        # body length needs >= MIN_BODY_FOR_STRATEGY_A so Strategy A applies.
+        ids_low = [1] + list(range(10, 10 + low - 2)) + [2]
+        padded_low, _, _ = _pad_phoneme_ids(ids_low, None)
+        ns_low, _, nw_low = _adjust_scales_for_short_input(
+            padded_low, 0.667, 0.8, 1.0, original_len=len(ids_low)
         )
 
-        # 30 elements
-        ids_30 = list(range(30))
-        padded_30, _, _ = _pad_phoneme_ids(ids_30, None)
-        ns_30, _, nw_30 = _adjust_scales_for_short_input(
-            padded_30, 0.667, 0.8, 1.0, original_len=30
+        ids_high = [1] + list(range(10, 10 + high - 2)) + [2]
+        padded_high, _, _ = _pad_phoneme_ids(ids_high, None)
+        ns_high, _, nw_high = _adjust_scales_for_short_input(
+            padded_high, 0.667, 0.8, 1.0, original_len=len(ids_high)
         )
 
-        # 30-length should have less reduction than 10-length
-        assert ns_30 > ns_10
-        assert nw_30 > nw_10
+        # Longer original input should have less reduction than shorter.
+        assert ns_high > ns_low
+        assert nw_high > nw_low
 
-        # Both should be less than the unadjusted values
-        assert ns_30 < 0.667
-        assert ns_10 < 0.667
+        # Both should be less than the unadjusted values.
+        assert ns_high < 0.667
+        assert ns_low < 0.667
 
     def test_no_adjustment_when_original_at_threshold(self):
         """No adjustment when original length is exactly MIN_PHONEME_IDS."""
