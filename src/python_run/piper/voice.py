@@ -419,7 +419,31 @@ class PiperVoice:
         )
 
     def phonemize(self, text: str) -> list[list[str]]:
-        """Text to phonemes grouped by sentence."""
+        """Text to phonemes grouped by sentence.
+
+        Plain text is split at sentence boundaries (`.`, `!`, `?`, `。`,
+        `！`, `？`, `．`, including trailing closing punctuation) so callers
+        such as :meth:`synthesize_stream_raw` can yield audio incrementally.
+        SSML markup (``<speak>...``) is treated as a single unit to preserve
+        its structure.
+
+        Empty or whitespace-only input returns ``[]`` (no sentences) so
+        callers do not waste cycles synthesizing a BOS/EOS-only chunk.
+        """
+        from .text_splitter import split_sentences
+
+        stripped = text.lstrip()
+        is_ssml = stripped.startswith("<speak") and (
+            len(stripped) == len("<speak")
+            or stripped[len("<speak")] in (">", " ", "\t", "\n", "\r")
+        )
+        if is_ssml:
+            sentences = [text]
+        elif not text.strip():
+            sentences = []
+        else:
+            sentences = split_sentences(text) or [text]
+
         if self.config.phoneme_type in (
             PhonemeType.MULTILINGUAL,
             PhonemeType.BILINGUAL,
@@ -437,9 +461,14 @@ class PiperVoice:
                     else ["ja", "en", "zh", "es", "fr", "pt"]
                 )
                 mp = MultilingualPhonemizer(languages=languages)
-                phonemes = mp.phonemize(text)
-                _LOGGER.debug("MultilingualPhonemizer: '%s' -> %s", text, phonemes)
-                return [phonemes]
+                results: list[list[str]] = []
+                for sentence in sentences:
+                    phonemes = mp.phonemize(sentence)
+                    _LOGGER.debug(
+                        "MultilingualPhonemizer: '%s' -> %s", sentence, phonemes
+                    )
+                    results.append(phonemes)
+                return results
 
         if self.config.phoneme_type in (
             PhonemeType.OPENJTALK,
@@ -452,12 +481,15 @@ class PiperVoice:
             )
 
             custom_dict = get_default_dictionary()
-            result = (
-                phonemize_japanese(text, custom_dict=custom_dict)
-                if custom_dict
-                else phonemize_japanese(text)
-            )
-            return [result]
+            results = []
+            for sentence in sentences:
+                result = (
+                    phonemize_japanese(sentence, custom_dict=custom_dict)
+                    if custom_dict
+                    else phonemize_japanese(sentence)
+                )
+                results.append(result)
+            return results
 
         raise ValueError(f"Unsupported phoneme type: {self.config.phoneme_type}")
 
@@ -496,7 +528,14 @@ class PiperVoice:
         volume: float = 1.0,
         language_id: int | None = None,
     ):
-        """Synthesize WAV audio from text."""
+        """Synthesize WAV audio from text.
+
+        Multi-sentence input is split at sentence boundaries by
+        :meth:`phonemize` and rendered chunk-by-chunk via
+        :meth:`synthesize_stream_raw`. The chunks are concatenated into a
+        single WAV file. SSML markup (``<speak>...``) is treated as a
+        single unit.
+        """
         wav_file.setframerate(self.config.sample_rate)
         wav_file.setsampwidth(2)  # 16-bit
         wav_file.setnchannels(1)  # mono
@@ -524,7 +563,21 @@ class PiperVoice:
         volume: float = 1.0,
         language_id: int | None = None,
     ) -> Iterable[bytes]:
-        """Synthesize raw audio per sentence from text."""
+        """Synthesize raw audio per sentence from text.
+
+        Yields one PCM 16-bit mono audio chunk per sentence. Sentence
+        boundaries are detected by :func:`piper.text_splitter.split_sentences`
+        (mirrors the Rust / C# / Go / C++ implementations) so a single call
+        with multi-sentence input produces multiple chunks suitable for
+        streaming clients (e.g. HTTP ``?streaming=true``).
+
+        SSML input (``<speak>...``) is yielded as a single chunk to preserve
+        the markup structure.
+
+        Each chunk is wrapped with ``sentence_silence`` worth of trailing
+        silence; very short plain-text inputs additionally receive
+        Strategy C silence padding around every chunk.
+        """
         # Strategy C: auto-inject silence padding for very short plain text
         is_short_text = (
             not text.lstrip().startswith(("<speak>", "<speak "))

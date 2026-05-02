@@ -9,6 +9,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### Python ランタイム ストリーミング文単位分割 (新規)
+
+[Zenn スクラップ (kun432 氏)](https://zenn.dev/kun432/scraps/cddbfcd75b8b34) で指摘された「Python ランタイムだけ `synthesize_stream_raw()` に文単位分割が無く、HTTP `?streaming=true` でも単一チャンクで返ってしまう」問題を解消。
+
+**新規モジュール:**
+- `piper.text_splitter` (`src/python_run/piper/text_splitter.py`)
+  - `split_sentences(text) -> list[str]` — 終止符 `.`/`!`/`?`/`。`/`！`/`？` および直後の閉じ括弧 (`」 』 ） ］ 】 ｣ ” ’ »` 等) を扱う
+  - Rust `piper-core/src/streaming.rs::split_sentences` と同等の挙動 (post-consume 戦略)
+
+**PiperVoice 修正:**
+- `phonemize()` が複数文の入力を文ごとに音素化し `list[list[str]]` を返すよう変更
+- SSML (`<speak>...`) は単一ユニットとして扱い構造保持
+- 既存呼び出し側 (`synthesize_stream_raw` / `synthesize_with_timing`) は無修正で複数チャンク化が動作
+
+**互換性:**
+- `phonemize()` の戻り値型 `list[list[str]]` は変更なし (中身が複数文に分かれるのみ)
+- HTTP `?streaming=true` (PR #361 の FastAPI `StreamingResponse`) も真のチャンク配信になる
+
+**設定仕様:**
+- `docs/spec/text-splitter-contract.toml` の Implementations 一覧に Python 実装を追加
+- 終止符 6/7、閉じ括弧 14/14 (Rust と同状態、U+FF0E は spec 通り未対応)
+
+**テスト:**
+- `tests/test_text_splitter.py` (18 件) — Rust テストスイートを移植
+- `tests/test_voice_streaming.py` (8 件) — `synthesize_stream_raw()` の文単位 yield と SSML ハンドリング
+
+**関連:** PR #367 (続編元: PR #361 FastAPI 移行)
+
 #### Python ランタイム Phoneme Timing 機能 (新規)
 
 Python ランタイムに完全な phoneme timing 出力機能を追加。VITS Duration Predictor から音素ごとの開始時刻・終了時刻・継続時間を抽出し、JSON/TSV/SRT 形式で出力可能。

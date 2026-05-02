@@ -78,14 +78,14 @@
 - **[C API 共有ライブラリ](examples/c-api/README.md)** — `libpiper_plus.so/.dylib/.dll`、FFI対応 (Flutter/Godot/Swift等)、ストリーミング API
 - **[WebAssembly](src/wasm/openjtalk-web/README.npm.md)** — ブラウザ内で完全動作、**音素タイミング出力 (JSON/TSV/SRT)**、サーバー不要
 - **[Docker](docker/README.md)** — 推論・学習・WebUI・C++の5イメージ提供
-- **PyPI** — `pip install piper-plus` で簡単インストール、8言語マルチリンガル、**音素タイミング出力 (JSON/TSV/SRT)**、HTTP API
+- **PyPI** — `pip install piper-plus` で簡単インストール、8言語マルチリンガル、**音素タイミング出力 (JSON/TSV/SRT)**、ストリーミング、HTTP API
 - **C# CLI** — .NET 8/9 クロスプラットフォーム、8言語マルチリンガル、ONNX推論、**音素タイミング出力 (JSON/TSV/SRT)**
 - **Rust CLI** — piper-plus/piper-plus-cli、ストリーミング、CUDA/CoreML/DirectML対応、**音素タイミング出力 (JSON/TSV/SRT)**、辞書自動ダウンロード
 - **[Go CLI](src/go/README.md)** — HTTP APIサーバー、セッションプーリング、Docker対応、シングルバイナリ、**音素タイミング出力 (JSON/TSV/SRT)**
 
 ### ランタイム別機能サポート
 
-6 ランタイム (Python/Rust/C#/Go/JS-WASM/C++) で同等の8言語マルチリンガル合成を実現。音素タイミング・ストリーミング・Voice Cloning・カスタム辞書は全ランタイム対応。SSML は Python/Rust/C#/Go の4ランタイム対応、HTTP API は Python/Go の2ランタイム対応。
+6 ランタイム (Python/Rust/C#/Go/JS-WASM/C++) で同等の8言語マルチリンガル合成を実現。音素タイミング・ストリーミング (文単位分割含む)・Voice Cloning・カスタム辞書は全ランタイム対応。SSML は Python/Rust/C#/Go の4ランタイム対応、HTTP API は Python/Go の2ランタイム対応。
 
 ---
 
