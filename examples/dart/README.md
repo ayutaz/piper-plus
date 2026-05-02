@@ -3,6 +3,8 @@
 Dart/Flutter FFI example for the piper-plus C shared library.
 Demonstrates one-shot and streaming text-to-speech synthesis using `dart:ffi`.
 
+> **CI verification status**: this example is **not** currently exercised by CI (no Dart toolchain in the GitHub Actions matrix). The bindings target a stable C ABI from `src/cpp/piper_plus.h`, which itself is regression-tested. Please report issues if Dart/Flutter integration breaks.
+
 ## Prerequisites
 
 - **Dart SDK** >= 3.1.0 (required for `NativeCallable.listener`)

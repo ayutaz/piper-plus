@@ -2,6 +2,8 @@
 
 A reference implementation of a GDExtension wrapper that uses the **piper-plus C API shared library** for text-to-speech in Godot 4.3+.
 
+> **CI verification status**: this example is **not** currently exercised by CI (no Godot/SCons toolchain in the GitHub Actions matrix). The wrapper targets a stable C ABI from `src/cpp/piper_plus.h`, which itself is regression-tested. The companion project [godot-piper-plus](https://github.com/ayutaz/godot-piper-plus) provides a more polished, separately-maintained Godot integration.
+
 This example demonstrates how to wrap the piper-plus C API into a `PiperTTS` node (derived from `AudioStreamPlayer`) that can be used directly from GDScript.
 
 ## Directory Structure

@@ -2,6 +2,8 @@
 
 Minimal examples demonstrating the piper-plus C shared library.
 
+> **CI verification status**: builds are exercised by `.github/workflows/_build-test-cpp.yml` as part of the C++ CMake build. End-to-end runtime synthesis verification with downloaded models is **not** part of the regular CI matrix — please report issues if any sample fails to build or run after extracting a release archive.
+
 ## Prerequisites
 
 Download a release archive from [GitHub Releases](https://github.com/ayutaz/piper-plus/releases) and extract it:

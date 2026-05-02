@@ -39,6 +39,12 @@ public sealed class PiperConfig
     [JsonPropertyName("phoneme_type")]
     public string? PhonemeType { get; set; }
 
+    /// <summary>
+    /// Legacy espeak-ng phonemizer config. piper-plus does NOT depend on
+    /// espeak-ng (GPL-free design — see CONTRIBUTING.md "espeak-ng Policy");
+    /// this property exists only for backward-compatible deserialization of
+    /// older config.json files. New models should leave this <c>null</c>.
+    /// </summary>
     [JsonPropertyName("espeak")]
     public EspeakConfig? Espeak { get; set; }
 

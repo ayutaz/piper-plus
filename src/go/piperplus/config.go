@@ -11,8 +11,17 @@ import (
 type PhonemeType string
 
 const (
-	PhonemeTypeEspeak       PhonemeType = "espeak"
-	PhonemeTypeOpenJTalk    PhonemeType = "openjtalk"
+	// PhonemeTypeEspeak is retained for legacy config.json compatibility only.
+	//
+	// Deprecated: piper-plus does NOT depend on espeak-ng (GPL-free design — see
+	// CONTRIBUTING.md "espeak-ng Policy"). New models should not set
+	// phoneme_type="espeak"; use PhonemeTypeOpenJTalk or PhonemeTypeMultilingual.
+	PhonemeTypeEspeak    PhonemeType = "espeak"
+	PhonemeTypeOpenJTalk PhonemeType = "openjtalk"
+	// PhonemeTypeBilingual is retained for legacy v3/v4 JA+EN datasets.
+	//
+	// Deprecated: bilingual mode was replaced by 6-language multilingual training
+	// in v1.7 (PR #218). New models should use PhonemeTypeMultilingual.
 	PhonemeTypeBilingual    PhonemeType = "bilingual"
 	PhonemeTypeMultilingual PhonemeType = "multilingual"
 	PhonemeTypeText         PhonemeType = "text"
