@@ -41,11 +41,21 @@ const WARMUP_PHONEME_LENGTH: usize = 100;
 
 // ---------------------------------------------------------------------------
 // 短テキスト緩和策の定数 (Strategy A + B)
+// docs/spec/short-text-contract.toml と同期させること。
 // ---------------------------------------------------------------------------
 
 /// 最小 phoneme ID 数。これ未満の場合 padding を挿入する。
-/// VITS の Duration Predictor は ~40 tokens 以上で安定する経験則に基づく。
-pub const MIN_PHONEME_IDS: usize = 40;
+///
+/// Issue #356: 当初 40 と仕様で固定していたが、実機計測 (tsukuyomi 6lang) で
+/// 8 phoneme 以上で安定合成可能と判明。40 では Strategy A が安定入力にも
+/// 発動して padding アーティファクトを残してしまう。15 に下げて
+/// 「こんにちは。」級は素通りさせ、極短文だけ Strategy A を発動させる。
+pub const MIN_PHONEME_IDS: usize = 15;
+
+/// Strategy A を発動する body 長 (= phoneme_ids から BOS/EOS を除いた数) の
+/// 下限。これ未満では padding が body を圧倒し、pad token 由来の音が
+/// 支配的になる (例: 「あ。」, body=2)。raw VITS 出力の方が結果として自然。
+pub const MIN_BODY_FOR_STRATEGY_A: usize = 3;
 
 /// RMS トリムの閾値。この RMS 以下の窓を無音とみなす。
 const TRIM_THRESHOLD_RMS: f32 = 0.01;
@@ -137,10 +147,17 @@ pub struct ModelCapabilities {
 /// prosody_features も同期して延長する (ゼロ埋め)。
 ///
 /// 既に MIN_PHONEME_IDS 以上の場合は変更なし。
+/// body 長 (= phoneme_ids - 2) が MIN_BODY_FOR_STRATEGY_A 未満の場合は
+/// padding/body 比が大きくなりすぎるため Strategy A をスキップする
+/// (issue #356)。
 pub fn pad_short_phonemes(
     phoneme_ids: &[i64],
     prosody_features: Option<&Vec<[i32; 3]>>,
 ) -> (Vec<i64>, Option<Vec<[i32; 3]>>, bool) {
+    let body_len = phoneme_ids.len().saturating_sub(2);
+    if body_len < MIN_BODY_FOR_STRATEGY_A {
+        return (phoneme_ids.to_vec(), prosody_features.cloned(), false);
+    }
     if phoneme_ids.len() >= MIN_PHONEME_IDS {
         return (phoneme_ids.to_vec(), prosody_features.cloned(), false);
     }
@@ -1143,8 +1160,12 @@ mod tests {
 
     #[test]
     fn test_pad_short_phonemes_pause_tokens() {
-        // Verify that inserted tokens are PAUSE_TOKEN_ID (0)
-        let ids: Vec<i64> = vec![1, 100, 200, 2]; // 4 tokens
+        // Verify that inserted tokens are PAUSE_TOKEN_ID (0).
+        // body must be >= MIN_BODY_FOR_STRATEGY_A for Strategy A to apply.
+        let mut ids: Vec<i64> = vec![1]; // BOS
+        ids.extend((0..MIN_BODY_FOR_STRATEGY_A as i64).map(|i| 100 + i));
+        ids.push(2); // EOS
+        let total = ids.len();
         let (padded, _, was_padded) = pad_short_phonemes(&ids, None);
         assert!(was_padded);
         // All inserted tokens should be 0
@@ -1153,7 +1174,7 @@ mod tests {
             .copied()
             .filter(|&id| id == PAUSE_TOKEN_ID)
             .collect();
-        assert_eq!(inserted.len(), MIN_PHONEME_IDS - 4);
+        assert_eq!(inserted.len(), MIN_PHONEME_IDS - total);
     }
 
     #[test]
@@ -1173,8 +1194,14 @@ mod tests {
 
     #[test]
     fn test_pad_short_phonemes_with_prosody() {
-        let ids: Vec<i64> = vec![1, 5, 6, 2]; // 4 tokens
-        let prosody = vec![[0, 0, 0], [1, 2, 3], [4, 5, 6], [0, 0, 0]];
+        // body == MIN_BODY_FOR_STRATEGY_A so Strategy A applies.
+        let mut ids: Vec<i64> = vec![1];
+        ids.extend((0..MIN_BODY_FOR_STRATEGY_A as i64).map(|i| 5 + i));
+        ids.push(2);
+        let mut prosody = vec![[0, 0, 0]];
+        prosody.extend((0..MIN_BODY_FOR_STRATEGY_A as i32).map(|i| [i + 1, i + 2, i + 3]));
+        prosody.push([0, 0, 0]);
+
         let (padded_ids, padded_prosody, was_padded) = pad_short_phonemes(&ids, Some(&prosody));
         assert!(was_padded);
         assert_eq!(padded_ids.len(), MIN_PHONEME_IDS);
@@ -1188,7 +1215,10 @@ mod tests {
 
     #[test]
     fn test_pad_short_phonemes_prosody_none() {
-        let ids: Vec<i64> = vec![1, 5, 2];
+        // body == MIN_BODY_FOR_STRATEGY_A.
+        let mut ids: Vec<i64> = vec![1];
+        ids.extend((0..MIN_BODY_FOR_STRATEGY_A as i64).map(|i| 5 + i));
+        ids.push(2);
         let (padded, padded_prosody, was_padded) = pad_short_phonemes(&ids, None);
         assert!(was_padded);
         assert_eq!(padded.len(), MIN_PHONEME_IDS);
@@ -1196,24 +1226,36 @@ mod tests {
     }
 
     #[test]
-    fn test_pad_short_phonemes_minimal() {
-        // Minimum: [BOS, EOS] = 2 tokens
+    fn test_pad_short_phonemes_skips_when_body_too_short() {
+        // body=0 (just BOS+EOS): Strategy A skipped (issue #356).
         let ids: Vec<i64> = vec![1, 2];
         let (padded, _, was_padded) = pad_short_phonemes(&ids, None);
-        assert!(was_padded);
-        assert_eq!(padded.len(), MIN_PHONEME_IDS);
-        assert_eq!(padded[0], 1);
-        assert_eq!(padded[padded.len() - 1], 2);
+        assert!(!was_padded);
+        assert_eq!(padded, ids);
+
+        // body=1 (e.g. just one phoneme between BOS/EOS).
+        let ids: Vec<i64> = vec![1, 10, 2];
+        let (padded, _, was_padded) = pad_short_phonemes(&ids, None);
+        assert!(!was_padded);
+        assert_eq!(padded, ids);
+
+        // body=2 ("あ。" case).
+        if MIN_BODY_FOR_STRATEGY_A > 2 {
+            let ids: Vec<i64> = vec![1, 10, 11, 2];
+            let (padded, _, was_padded) = pad_short_phonemes(&ids, None);
+            assert!(!was_padded);
+            assert_eq!(padded, ids);
+        }
     }
 
     #[test]
     fn test_pad_short_phonemes_single_element() {
-        // Edge case: single element
+        // Edge case: single element — body would be < 0 (saturating to 0)
+        // so Strategy A is skipped.
         let ids: Vec<i64> = vec![1];
         let (padded, _, was_padded) = pad_short_phonemes(&ids, None);
-        assert!(was_padded);
-        assert_eq!(padded.len(), MIN_PHONEME_IDS);
-        assert_eq!(padded[0], 1); // BOS preserved
+        assert!(!was_padded);
+        assert_eq!(padded, ids);
     }
 
     // -----------------------------------------------------------------------
@@ -1285,21 +1327,23 @@ mod tests {
 
     #[test]
     fn test_adjust_scales_below_threshold() {
-        let len = 20; // 50% of MIN_PHONEME_IDS
+        // 50% of MIN_PHONEME_IDS — exactly at the noise_scale floor (0.5).
+        let len = MIN_PHONEME_IDS / 2;
         let (ns, nw) = adjust_scales_for_short_text(len, 0.667, 0.8);
-        // ratio = 20/40 = 0.5, max(0.5, 0.5) = 0.5
-        assert!((ns - 0.667 * 0.5).abs() < 1e-4);
-        // ratio = 0.5, max(0.5, 0.4) = 0.5
-        assert!((nw - 0.8 * 0.5).abs() < 1e-4);
+        let ratio = len as f32 / MIN_PHONEME_IDS as f32;
+        let ns_ratio = ratio.max(0.5);
+        let nw_ratio = ratio.max(0.4);
+        assert!((ns - 0.667 * ns_ratio).abs() < 1e-4);
+        assert!((nw - 0.8 * nw_ratio).abs() < 1e-4);
     }
 
     #[test]
     fn test_adjust_scales_very_short() {
-        let len = 5; // 12.5% of MIN_PHONEME_IDS
+        // 1 phoneme — far below both floors so they fully clamp.
+        let len = 1;
         let (ns, nw) = adjust_scales_for_short_text(len, 0.667, 0.8);
-        // ratio = 5/40 = 0.125, but clamped at max(0.125, 0.5) = 0.5
+        // ratio is below both floors (0.5 / 0.4)
         assert!((ns - 0.667 * 0.5).abs() < 1e-4);
-        // ratio = 0.125, max(0.125, 0.4) = 0.4
         assert!((nw - 0.8 * 0.4).abs() < 1e-4);
     }
 
@@ -1314,16 +1358,22 @@ mod tests {
 
     #[test]
     fn test_adjust_scales_boundary_ratio() {
-        // len = 30 -> ratio = 30/40 = 0.75
-        let (ns, nw) = adjust_scales_for_short_text(30, 1.0, 1.0);
-        // ratio = 0.75, max(0.75, 0.5) = 0.75
-        assert!((ns - 0.75).abs() < 1e-4);
-        // ratio = 0.75, max(0.75, 0.4) = 0.75
-        assert!((nw - 0.75).abs() < 1e-4);
+        // Just below the threshold so neither floor engages.
+        let len = MIN_PHONEME_IDS - 1;
+        let ratio = len as f32 / MIN_PHONEME_IDS as f32;
+        let (ns, nw) = adjust_scales_for_short_text(len, 1.0, 1.0);
+        // ratio is above both floors so both expectations equal `ratio`.
+        assert!((ns - ratio).abs() < 1e-4);
+        assert!((nw - ratio).abs() < 1e-4);
     }
 
     #[test]
     fn test_min_phoneme_ids_value() {
-        assert_eq!(MIN_PHONEME_IDS, 40);
+        assert_eq!(MIN_PHONEME_IDS, 15);
+    }
+
+    #[test]
+    fn test_min_body_for_strategy_a_value() {
+        assert_eq!(MIN_BODY_FOR_STRATEGY_A, 3);
     }
 }

@@ -55,8 +55,8 @@ pub mod playback;
 pub use config::{PhonemeIdMap, PhonemeType, VoiceConfig};
 #[cfg(feature = "onnx")]
 pub use engine::{
-    DEFAULT_WARMUP_RUNS, MIN_PHONEME_IDS, ModelCapabilities, OnnxEngine, SynthesisRequest,
-    SynthesisResult,
+    DEFAULT_WARMUP_RUNS, MIN_BODY_FOR_STRATEGY_A, MIN_PHONEME_IDS, ModelCapabilities, OnnxEngine,
+    SynthesisRequest, SynthesisResult,
 };
 pub use error::PiperError;
 pub use phonemize::{ProsodyFeature, ProsodyInfo};
