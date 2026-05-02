@@ -422,16 +422,25 @@ class PiperVoice:
         """Text to phonemes grouped by sentence.
 
         Plain text is split at sentence boundaries (`.`, `!`, `?`, `。`,
-        `！`, `？`, including trailing closing punctuation) so callers
+        `！`, `？`, `．`, including trailing closing punctuation) so callers
         such as :meth:`synthesize_stream_raw` can yield audio incrementally.
         SSML markup (``<speak>...``) is treated as a single unit to preserve
         its structure.
+
+        Empty or whitespace-only input returns ``[]`` (no sentences) so
+        callers do not waste cycles synthesizing a BOS/EOS-only chunk.
         """
         from .text_splitter import split_sentences
 
-        is_ssml = text.lstrip().startswith(("<speak>", "<speak "))
+        stripped = text.lstrip()
+        is_ssml = stripped.startswith("<speak") and (
+            len(stripped) == len("<speak")
+            or stripped[len("<speak")] in (">", " ", "\t", "\n", "\r")
+        )
         if is_ssml:
             sentences = [text]
+        elif not text.strip():
+            sentences = []
         else:
             sentences = split_sentences(text) or [text]
 

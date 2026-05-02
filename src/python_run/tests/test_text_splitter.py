@@ -128,3 +128,18 @@ class TestSplitSentencesShortText:
     def test_two_short_sentences(self):
         result = split_sentences("はい。いいえ。")
         assert result == ["はい。", "いいえ。"]
+
+
+class TestSplitSentencesContractCompliance:
+    """Verify alignment with docs/spec/text-splitter-contract.toml."""
+
+    @pytest.mark.unit
+    def test_fullwidth_full_stop_terminator(self):
+        # U+FF0E (．) is listed in the canonical contract terminators set.
+        result = split_sentences("テスト．次の文．")
+        assert result == ["テスト．", "次の文．"]
+
+    @pytest.mark.unit
+    def test_fullwidth_full_stop_with_closing_bracket(self):
+        result = split_sentences("「やった．」次の文．")
+        assert result == ["「やった．」", "次の文．"]

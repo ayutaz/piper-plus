@@ -94,6 +94,14 @@ class TestSynthesizeStreamRawSentenceSplit:
         chunks = list(voice.synthesize_stream_raw("no terminator"))
         assert len(chunks) == 1
 
+    def test_whitespace_only_yields_no_chunks(self):
+        # When phonemize returns no sentences, the stream should be empty.
+        voice = _make_mock_voice()
+        voice.phonemize = MagicMock(return_value=[])
+
+        chunks = list(voice.synthesize_stream_raw("   "))
+        assert chunks == []
+
 
 class TestPhonemizeReturnsPerSentence:
     """``phonemize`` is the layer that performs the sentence split."""
@@ -165,3 +173,43 @@ class TestPhonemizeReturnsPerSentence:
 
         assert len(sentences) == 1
         assert captured == ["no terminator"]
+
+    def test_ssml_with_newline_after_speak(self):
+        # `<speak\n  lang="ja">...` should NOT be split as plain text — the
+        # SSML detector must recognize whitespace after `<speak`.
+        voice = _make_mock_voice()
+        original, captured = self._patch_multilingual(self)
+        try:
+            ssml = "<speak\n  lang=\"ja\">Hello. World.</speak>"
+            sentences = voice.phonemize(ssml)
+        finally:
+            self._restore_multilingual(original)
+
+        assert len(sentences) == 1
+        assert captured == [ssml]
+
+    def test_ssml_with_tab_after_speak(self):
+        voice = _make_mock_voice()
+        original, captured = self._patch_multilingual(self)
+        try:
+            ssml = "<speak\tversion=\"1.0\">Hi.</speak>"
+            sentences = voice.phonemize(ssml)
+        finally:
+            self._restore_multilingual(original)
+
+        assert len(sentences) == 1
+        assert captured == [ssml]
+
+    def test_whitespace_only_returns_no_sentences(self):
+        # Empty / whitespace-only input must not synthesize a BOS/EOS-only
+        # chunk. phonemize() should return an empty list.
+        voice = _make_mock_voice()
+        original, captured = self._patch_multilingual(self)
+        try:
+            assert voice.phonemize("") == []
+            assert voice.phonemize("   ") == []
+            assert voice.phonemize("\n\t  \n") == []
+        finally:
+            self._restore_multilingual(original)
+
+        assert captured == []

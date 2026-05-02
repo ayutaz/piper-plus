@@ -3,8 +3,8 @@
 Mirrors the Rust implementation in
 ``piper-core/src/streaming.rs::split_sentences`` and the C# implementation in
 ``PiperPlus.Core/Phonemize/TextSplitter.SplitSentences``. Keep these
-implementations in sync — see ``docs/spec/short-text-contract.toml`` for the
-shared specification.
+implementations in sync — see ``docs/spec/text-splitter-contract.toml`` for
+the shared specification (canonical character sets).
 """
 
 from __future__ import annotations
@@ -15,9 +15,10 @@ _SENTENCE_TERMINATORS: frozenset[str] = frozenset(
         ".",
         "!",
         "?",
-        "。",  # 。
-        "！",  # ！
-        "？",  # ？
+        "。",  # U+3002 Ideographic Full Stop
+        "！",  # U+FF01 Fullwidth Exclamation Mark
+        "？",  # U+FF1F Fullwidth Question Mark
+        "．",  # U+FF0E Fullwidth Full Stop (per text-splitter-contract.toml)
     }
 )
 

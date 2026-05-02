@@ -35,7 +35,7 @@
 #   C++:    7/7 terminators (fully conformant after Issue #346)
 #   Rust:   6/7 terminators (missing U+FF0E)
 #   C#:     6/7 terminators (missing U+FF0E)
-#   Python: 6/7 terminators (missing U+FF0E, mirrors Rust)
+#   Python: 7/7 terminators (fully conformant per spec)
 #   Go:     7/7 terminators (fully conformant)
 #
 # Future work: align all runtimes to the canonical character sets.
