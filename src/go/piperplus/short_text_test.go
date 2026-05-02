@@ -70,22 +70,52 @@ func TestPadPhonemeIDs_ShortSequence(t *testing.T) {
 	}
 }
 
-func TestPadPhonemeIDs_MinimalSequence(t *testing.T) {
-	// Just BOS and EOS.
+func TestPadPhonemeIDs_MinimalSequence_Skipped(t *testing.T) {
+	// Just BOS and EOS — body=0 is below minBodyForStrategyA so Strategy A
+	// is skipped entirely (issue #356).
 	ids := []int64{1, 2}
 
 	padded, wasPadded := padPhonemeIDs(ids)
+	if wasPadded {
+		t.Error("expected wasPadded=false for body < minBodyForStrategyA")
+	}
+	if len(padded) != len(ids) {
+		t.Errorf("expected length %d, got %d", len(ids), len(padded))
+	}
+}
+
+func TestPadPhonemeIDs_BodyTooShort(t *testing.T) {
+	// body=2 (e.g. 「あ。」 phonemized as [BOS, a, ., EOS]) should also
+	// skip Strategy A under minBodyForStrategyA=3.
+	if minBodyForStrategyA <= 2 {
+		t.Skip("minBodyForStrategyA changed; this test no longer applies")
+	}
+	ids := []int64{1, 10, 11, 2}
+
+	padded, wasPadded := padPhonemeIDs(ids)
+	if wasPadded {
+		t.Error("expected wasPadded=false for body=2 < minBodyForStrategyA")
+	}
+	if len(padded) != len(ids) {
+		t.Errorf("expected length %d, got %d", len(ids), len(padded))
+	}
+}
+
+func TestPadPhonemeIDs_BodyAtMinimum(t *testing.T) {
+	// body == minBodyForStrategyA: Strategy A applies.
+	ids := make([]int64, 0, 2+minBodyForStrategyA)
+	ids = append(ids, 1) // BOS
+	for i := 0; i < minBodyForStrategyA; i++ {
+		ids = append(ids, int64(10+i))
+	}
+	ids = append(ids, 2) // EOS
+
+	padded, wasPadded := padPhonemeIDs(ids)
 	if !wasPadded {
-		t.Error("expected wasPadded=true")
+		t.Error("expected wasPadded=true for body == minBodyForStrategyA")
 	}
 	if len(padded) != minPhonemeIDs {
 		t.Errorf("expected length %d, got %d", minPhonemeIDs, len(padded))
-	}
-	if padded[0] != 1 {
-		t.Errorf("expected BOS=1 at index 0, got %d", padded[0])
-	}
-	if padded[len(padded)-1] != 2 {
-		t.Errorf("expected EOS=2 at last index, got %d", padded[len(padded)-1])
 	}
 }
 
@@ -270,10 +300,12 @@ func TestAdjustScales_AboveMinimum(t *testing.T) {
 }
 
 func TestAdjustScales_VeryShort(t *testing.T) {
-	// 5 phonemes -> ratio = 5/40 = 0.125
-	// noiseScale *= max(0.5, 0.125) = 0.5
-	// noiseW *= max(0.4, 0.125) = 0.4
-	ns, nw := adjustScalesForShortText(5, 0.667, 0.8)
+	// Below the noiseW floor (0.4) — both clamps engage.
+	n := minPhonemeIDs / 4
+	if n < 1 {
+		n = 1
+	}
+	ns, nw := adjustScalesForShortText(n, 0.667, 0.8)
 
 	expectedNS := float32(0.667 * 0.5)
 	expectedNW := float32(0.8 * 0.4)
@@ -287,13 +319,15 @@ func TestAdjustScales_VeryShort(t *testing.T) {
 }
 
 func TestAdjustScales_HalfMinimum(t *testing.T) {
-	// 20 phonemes -> ratio = 20/40 = 0.5
-	// noiseScale *= max(0.5, 0.5) = 0.5
-	// noiseW *= max(0.4, 0.5) = 0.5
-	ns, nw := adjustScalesForShortText(20, 0.667, 0.8)
+	// At the noiseScale floor (ratio = 0.5).
+	n := minPhonemeIDs / 2
+	ns, nw := adjustScalesForShortText(n, 0.667, 0.8)
 
-	expectedNS := float32(0.667 * 0.5)
-	expectedNW := float32(0.8 * 0.5)
+	ratio := float32(n) / float32(minPhonemeIDs)
+	nsRatio := float32(math.Max(0.5, float64(ratio)))
+	nwRatio := float32(math.Max(0.4, float64(ratio)))
+	expectedNS := float32(0.667) * nsRatio
+	expectedNW := float32(0.8) * nwRatio
 
 	if math.Abs(float64(ns-expectedNS)) > 0.001 {
 		t.Errorf("expected noiseScale~%f, got %f", expectedNS, ns)
@@ -304,13 +338,18 @@ func TestAdjustScales_HalfMinimum(t *testing.T) {
 }
 
 func TestAdjustScales_MostlyFull(t *testing.T) {
-	// 35 phonemes -> ratio = 35/40 = 0.875
-	// noiseScale *= max(0.5, 0.875) = 0.875
-	// noiseW *= max(0.4, 0.875) = 0.875
-	ns, nw := adjustScalesForShortText(35, 0.667, 0.8)
+	// Just below the threshold so neither floor engages.
+	n := minPhonemeIDs - 2
+	if n < 1 {
+		n = 1
+	}
+	ns, nw := adjustScalesForShortText(n, 0.667, 0.8)
 
-	expectedNS := float32(0.667 * 0.875)
-	expectedNW := float32(0.8 * 0.875)
+	ratio := float32(n) / float32(minPhonemeIDs)
+	nsRatio := float32(math.Max(0.5, float64(ratio)))
+	nwRatio := float32(math.Max(0.4, float64(ratio)))
+	expectedNS := float32(0.667) * nsRatio
+	expectedNW := float32(0.8) * nwRatio
 
 	if math.Abs(float64(ns-expectedNS)) > 0.001 {
 		t.Errorf("expected noiseScale~%f, got %f", expectedNS, ns)
@@ -882,7 +921,7 @@ func TestWindowRMS_MixedSignal(t *testing.T) {
 func TestAdjustScales_ZeroPhonemes(t *testing.T) {
 	// Edge case: 0 phonemes.
 	ns, nw := adjustScalesForShortText(0, 0.667, 0.8)
-	// ratio = 0/40 = 0, clamped floors: noiseScale *= 0.5, noiseW *= 0.4
+	// ratio = 0, clamped floors: noiseScale *= 0.5, noiseW *= 0.4
 	expectedNS := float32(0.667 * 0.5)
 	expectedNW := float32(0.8 * 0.4)
 	if math.Abs(float64(ns-expectedNS)) > 0.001 {
@@ -894,7 +933,7 @@ func TestAdjustScales_ZeroPhonemes(t *testing.T) {
 }
 
 func TestAdjustScales_OnePhoneme(t *testing.T) {
-	// ratio = 1/40 = 0.025, clamped: noiseScale *= 0.5, noiseW *= 0.4
+	// ratio = 1/minPhonemeIDs, well below both floors → clamped to 0.5 / 0.4
 	ns, nw := adjustScalesForShortText(1, 1.0, 1.0)
 	expectedNS := float32(0.5)
 	expectedNW := float32(0.4)
@@ -907,10 +946,12 @@ func TestAdjustScales_OnePhoneme(t *testing.T) {
 }
 
 func TestAdjustScales_JustBelowMinimum(t *testing.T) {
-	// 39 phonemes -> ratio = 39/40 = 0.975
-	ns, nw := adjustScalesForShortText(39, 0.667, 0.8)
-	expectedNS := float32(0.667 * 0.975)
-	expectedNW := float32(0.8 * 0.975)
+	// minPhonemeIDs - 1 phonemes -> ratio = (min-1)/min, no floor clamp.
+	n := minPhonemeIDs - 1
+	ns, nw := adjustScalesForShortText(n, 0.667, 0.8)
+	ratio := float32(n) / float32(minPhonemeIDs)
+	expectedNS := float32(0.667) * ratio
+	expectedNW := float32(0.8) * ratio
 	if math.Abs(float64(ns-expectedNS)) > 0.001 {
 		t.Errorf("expected noiseScale~%f, got %f", expectedNS, ns)
 	}
@@ -924,8 +965,11 @@ func TestAdjustScales_JustBelowMinimum(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestConstants(t *testing.T) {
-	if minPhonemeIDs != 40 {
-		t.Errorf("expected minPhonemeIDs=40, got %d", minPhonemeIDs)
+	if minPhonemeIDs != 15 {
+		t.Errorf("expected minPhonemeIDs=15, got %d", minPhonemeIDs)
+	}
+	if minBodyForStrategyA != 3 {
+		t.Errorf("expected minBodyForStrategyA=3, got %d", minBodyForStrategyA)
 	}
 	if shortTextChars != 10 {
 		t.Errorf("expected shortTextChars=10, got %d", shortTextChars)

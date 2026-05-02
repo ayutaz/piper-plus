@@ -8,10 +8,21 @@ import (
 )
 
 // Short-text synthesis quality mitigation constants.
+// Keep in sync with docs/spec/short-text-contract.toml.
 const (
 	// minPhonemeIDs is the minimum number of phoneme IDs required for stable
 	// VITS inference. Shorter sequences are padded with silence (pause ID = 0).
-	minPhonemeIDs = 40
+	//
+	// Issue #356: Was 40, but empirical measurements on the tsukuyomi 6lang
+	// model show synthesis is stable down to ~8 IDs. 40 caused Strategy A to
+	// fire on already-stable inputs and leak padding artefacts. 15 keeps
+	// Strategy A active for genuinely tiny inputs only.
+	minPhonemeIDs = 15
+
+	// minBodyForStrategyA is the minimum body length (= phoneme IDs minus
+	// BOS / EOS) for Strategy A to apply. Below this threshold, padding
+	// would dominate over actual content; raw VITS output is preferable.
+	minBodyForStrategyA = 3
 
 	// shortTextChars is the character-count threshold (excluding whitespace)
 	// below which Strategy C (silence break auto-injection) is applied.
@@ -37,8 +48,13 @@ const (
 // padPhonemeIDs inserts pause IDs (0) into phonemeIDs to reach minPhonemeIDs.
 // Pause IDs are inserted evenly after BOS (index 0) and before EOS (last index).
 // Returns the padded slice and true if padding was applied, or the original
-// slice and false if no padding was needed.
+// slice and false if no padding was needed (or skipped because the body is
+// shorter than minBodyForStrategyA — issue #356).
 func padPhonemeIDs(ids []int64) ([]int64, bool) {
+	bodyLen := len(ids) - 2 // exclude BOS / EOS
+	if bodyLen < minBodyForStrategyA {
+		return ids, false
+	}
 	if len(ids) >= minPhonemeIDs {
 		return ids, false
 	}
