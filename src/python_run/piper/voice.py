@@ -419,7 +419,22 @@ class PiperVoice:
         )
 
     def phonemize(self, text: str) -> list[list[str]]:
-        """Text to phonemes grouped by sentence."""
+        """Text to phonemes grouped by sentence.
+
+        Plain text is split at sentence boundaries (`.`, `!`, `?`, `。`,
+        `！`, `？`, including trailing closing punctuation) so callers
+        such as :meth:`synthesize_stream_raw` can yield audio incrementally.
+        SSML markup (``<speak>...``) is treated as a single unit to preserve
+        its structure.
+        """
+        from .text_splitter import split_sentences
+
+        is_ssml = text.lstrip().startswith(("<speak>", "<speak "))
+        if is_ssml:
+            sentences = [text]
+        else:
+            sentences = split_sentences(text) or [text]
+
         if self.config.phoneme_type in (
             PhonemeType.MULTILINGUAL,
             PhonemeType.BILINGUAL,
@@ -437,9 +452,14 @@ class PiperVoice:
                     else ["ja", "en", "zh", "es", "fr", "pt"]
                 )
                 mp = MultilingualPhonemizer(languages=languages)
-                phonemes = mp.phonemize(text)
-                _LOGGER.debug("MultilingualPhonemizer: '%s' -> %s", text, phonemes)
-                return [phonemes]
+                results: list[list[str]] = []
+                for sentence in sentences:
+                    phonemes = mp.phonemize(sentence)
+                    _LOGGER.debug(
+                        "MultilingualPhonemizer: '%s' -> %s", sentence, phonemes
+                    )
+                    results.append(phonemes)
+                return results
 
         if self.config.phoneme_type in (
             PhonemeType.OPENJTALK,
@@ -452,12 +472,15 @@ class PiperVoice:
             )
 
             custom_dict = get_default_dictionary()
-            result = (
-                phonemize_japanese(text, custom_dict=custom_dict)
-                if custom_dict
-                else phonemize_japanese(text)
-            )
-            return [result]
+            results = []
+            for sentence in sentences:
+                result = (
+                    phonemize_japanese(sentence, custom_dict=custom_dict)
+                    if custom_dict
+                    else phonemize_japanese(sentence)
+                )
+                results.append(result)
+            return results
 
         raise ValueError(f"Unsupported phoneme type: {self.config.phoneme_type}")
 
