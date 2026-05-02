@@ -122,6 +122,7 @@ downloads/
 hf_readme.md
 rebuild_cache.py
 upload_webdataset.py
+bench_mb_istft.py
 pip-test/
 upiper_comparison_samples/
 compare_phonemes.txt
