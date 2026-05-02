@@ -10,6 +10,7 @@ import numpy as np
 import pytest
 
 from piper.voice import (
+    MIN_BODY_FOR_STRATEGY_A,
     MIN_PHONEME_IDS,
     SHORT_TEXT_CHARS,
     SILENCE_PAD_MS,
@@ -70,12 +71,17 @@ class TestPadPhonemeIds:
 
     @pytest.mark.unit
     def test_pad_distribution(self):
-        """Front and back padding should be roughly equal."""
+        """Front and back padding should be roughly equal.
+
+        Uses a body of MIN_BODY_FOR_STRATEGY_A so Strategy A actually
+        kicks in (smaller bodies are bypassed — see issue #356).
+        """
         bos, eos, pad_id = 1, 2, 0
-        ids = [bos, 10, eos]  # length 3
+        body = list(range(10, 10 + MIN_BODY_FOR_STRATEGY_A))
+        ids = [bos] + body + [eos]
         padded, _, front_pad, back_pad = _pad_phoneme_ids(ids, pad_id=pad_id)
 
-        needed = MIN_PHONEME_IDS - 3
+        needed = MIN_PHONEME_IDS - len(ids)
         expected_front = needed // 2
         expected_back = needed - expected_front
         assert front_pad == expected_front
@@ -87,15 +93,36 @@ class TestPadPhonemeIds:
         assert padded[-1 - back_pad : -1] == [pad_id] * back_pad
 
     @pytest.mark.unit
-    def test_minimum_input_two_elements(self):
-        """Edge case: only BOS + EOS."""
+    def test_skips_strategy_a_when_body_too_short(self):
+        """body shorter than MIN_BODY_FOR_STRATEGY_A skips Strategy A.
+
+        Padding ratio explodes for tiny bodies — raw VITS output is
+        preferable in that regime (issue #356 follow-up).
+        """
+        # body = 0 (only BOS + EOS)
         ids = [1, 2]
+        padded, was_padded, front_pad, back_pad = _pad_phoneme_ids(ids, pad_id=0)
+        assert not was_padded
+        assert padded is ids
+        assert front_pad == 0 and back_pad == 0
+
+        # body = 2, e.g. 「あ。」 → [BOS, a, ., EOS]
+        if MIN_BODY_FOR_STRATEGY_A > 2:
+            ids = [1, 10, 11, 2]
+            padded, was_padded, front_pad, back_pad = _pad_phoneme_ids(ids, pad_id=0)
+            assert not was_padded
+            assert padded is ids
+            assert front_pad == 0 and back_pad == 0
+
+    @pytest.mark.unit
+    def test_pads_when_body_meets_min_body(self):
+        """Body at MIN_BODY_FOR_STRATEGY_A should still be padded."""
+        body = list(range(10, 10 + MIN_BODY_FOR_STRATEGY_A))
+        ids = [1] + body + [2]  # BOS + body + EOS
         padded, was_padded, front_pad, back_pad = _pad_phoneme_ids(ids, pad_id=0)
         assert was_padded
         assert len(padded) == MIN_PHONEME_IDS
-        assert padded[0] == 1
-        assert padded[-1] == 2
-        assert front_pad + back_pad == MIN_PHONEME_IDS - 2
+        assert front_pad + back_pad == MIN_PHONEME_IDS - len(ids)
 
 
 # ---------------------------------------------------------------
@@ -512,6 +539,12 @@ class TestConstants:
         # Was 40 — caused Strategy A to fire on stable inputs and leak
         # padding artefacts. See voice.py for the threshold rationale.
         assert MIN_PHONEME_IDS == 15
+
+    @pytest.mark.unit
+    def test_min_body_for_strategy_a(self):
+        # Bodies smaller than this skip Strategy A (issue #356 follow-up
+        # for inputs like 「あ。」). See voice.py for rationale.
+        assert MIN_BODY_FOR_STRATEGY_A == 3
 
     @pytest.mark.unit
     def test_short_text_chars(self):

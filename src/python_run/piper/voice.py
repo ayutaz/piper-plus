@@ -37,6 +37,16 @@ _LOGGER = logging.getLogger(__name__)
 # pick 15 as a conservative middle ground: roughly 2× the measured stable
 # minimum, still well below typical short utterances like 「こんにちは。」.
 MIN_PHONEME_IDS = 15
+
+# Minimum body length (excluding BOS/EOS) for Strategy A to kick in.
+# When the body is shorter than this (e.g. 「あ。」 with body of 2 IDs),
+# padding-to-body ratio explodes and the pad tokens dominate over the
+# actual content even with durations-based trim — bypassing Strategy A
+# entirely produces a more natural single-phoneme utterance than padding
+# does. The raw VITS output for tiny inputs is degraded but bounded;
+# users invoking such inputs presumably accept that limitation.
+MIN_BODY_FOR_STRATEGY_A = 3
+
 SHORT_TEXT_CHARS = 10
 SILENCE_PAD_MS = 300
 TRIM_THRESHOLD_RMS = 0.01
@@ -221,13 +231,22 @@ def _pad_phoneme_ids(
     phoneme_ids: list[int],
     pad_id: int,
     min_length: int = MIN_PHONEME_IDS,
+    min_body: int = MIN_BODY_FOR_STRATEGY_A,
 ) -> tuple[list[int], bool, int, int]:
     """Pad short phoneme_ids with silence tokens after BOS and before EOS.
 
     Returns ``(padded_ids, was_padded, front_pad, back_pad)`` where
     ``front_pad`` / ``back_pad`` are the numbers of pad tokens inserted
     after BOS and before EOS respectively (both 0 when no padding occurred).
+
+    Skips padding entirely when the body (i.e. ``phoneme_ids`` excluding
+    BOS/EOS) has fewer than ``min_body`` IDs. With such tiny bodies the
+    padding-to-body ratio becomes so high that pad-token audio dominates
+    the actual content; raw VITS output is preferable in that regime.
     """
+    body_len = len(phoneme_ids) - 2  # exclude BOS / EOS
+    if body_len < min_body:
+        return phoneme_ids, False, 0, 0
     if len(phoneme_ids) >= min_length:
         return phoneme_ids, False, 0, 0
 
