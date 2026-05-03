@@ -1,5 +1,6 @@
 #include <chrono>
 #include <condition_variable>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <functional>
@@ -127,11 +128,78 @@ struct RunConfig {
   optional<string> listModelsLanguage;
   optional<string> downloadModelName;
   optional<filesystem::path> modelDir;
+
+  // Style vector conditioning (PE-AV / PE-A)
+  // Path to a .npy file containing a float32 style vector.
+  optional<filesystem::path> styleVectorPath;
+  // Inline style vector (comma-separated float32 values). Takes precedence.
+  optional<string> styleVectorInline;
 };
 
 // Define static constants
 const string RunConfig::FORMAT_JSON = "json";
 const string RunConfig::FORMAT_TSV = "tsv";
+
+// ---------------------------------------------------------------------------
+// minimal .npy reader for float32 1-D arrays.
+//
+// Supports numpy .npy format v1.0/v2.0 with dtype '<f4' (little-endian float32).
+// Accepts 1-D ``(dim,)`` or 2-D ``(1, dim)`` shapes. Returns the data as a
+// single contiguous ``vector<float>``. Any other dtype / multi-row shape is
+// rejected with a thrown ``std::runtime_error``.
+// ---------------------------------------------------------------------------
+static vector<float> readNpyFloat32(const filesystem::path &path) {
+  std::ifstream f(path, std::ios::binary);
+  if (!f) {
+    throw std::runtime_error("Failed to open .npy file: " + path.string());
+  }
+  std::vector<char> buf((std::istreambuf_iterator<char>(f)),
+                         std::istreambuf_iterator<char>());
+  if (buf.size() < 10 || std::memcmp(buf.data(), "\x93NUMPY", 6) != 0) {
+    throw std::runtime_error(".npy magic header invalid: " + path.string());
+  }
+  uint8_t major = static_cast<uint8_t>(buf[6]);
+  uint8_t minor = static_cast<uint8_t>(buf[7]);
+  (void)minor;
+
+  size_t headerLen = 0;
+  size_t dataOffset = 0;
+  if (major == 1) {
+    // v1.0: little-endian uint16 header length at offset 8
+    headerLen = static_cast<uint8_t>(buf[8]) |
+                (static_cast<uint8_t>(buf[9]) << 8);
+    dataOffset = 10 + headerLen;
+  } else if (major == 2) {
+    // v2.0: little-endian uint32 header length at offset 8
+    headerLen = static_cast<uint8_t>(buf[8]) |
+                (static_cast<uint8_t>(buf[9]) << 8) |
+                (static_cast<uint8_t>(buf[10]) << 16) |
+                (static_cast<uint8_t>(buf[11]) << 24);
+    dataOffset = 12 + headerLen;
+  } else {
+    throw std::runtime_error(
+        ".npy unsupported version: " + std::to_string(major));
+  }
+  if (buf.size() < dataOffset) {
+    throw std::runtime_error(".npy truncated header: " + path.string());
+  }
+  string header(buf.data() + (major == 1 ? 10 : 12), headerLen);
+  if (header.find("'descr': '<f4'") == string::npos &&
+      header.find("\"descr\": \"<f4\"") == string::npos) {
+    throw std::runtime_error(
+        ".npy dtype must be '<f4' (little-endian float32); got header: " +
+        header);
+  }
+
+  size_t totalBytes = buf.size() - dataOffset;
+  if (totalBytes % sizeof(float) != 0) {
+    throw std::runtime_error(".npy data size not a multiple of 4 bytes");
+  }
+  size_t numFloats = totalBytes / sizeof(float);
+  vector<float> out(numFloats);
+  std::memcpy(out.data(), buf.data() + dataOffset, totalBytes);
+  return out;
+}
 
 void parseArgs(int argc, char *argv[], RunConfig &runConfig);
 void rawOutputProc(vector<int16_t> &sharedAudioBuffer, mutex &mutAudio,
@@ -373,6 +441,39 @@ int main(int argc, char *argv[]) {
     }
 
   } // if phonemeSilenceSeconds
+
+  // style vector conditioning.
+  // --style-vector-inline takes precedence over --style-vector.
+  if (runConfig.styleVectorInline) {
+    std::vector<float> vec;
+    std::stringstream ssv(*runConfig.styleVectorInline);
+    std::string tok;
+    while (std::getline(ssv, tok, ',')) {
+      if (!tok.empty()) {
+        try {
+          vec.push_back(std::stof(tok));
+        } catch (const std::exception &e) {
+          spdlog::error("Invalid --style-vector-inline value '{}': {}",
+                        tok, e.what());
+          exit(1);
+        }
+      }
+    }
+    voice.synthesisConfig.styleVector = std::move(vec);
+    spdlog::info("Loaded inline style_vector (dim={})",
+                 voice.synthesisConfig.styleVector.size());
+  } else if (runConfig.styleVectorPath) {
+    try {
+      voice.synthesisConfig.styleVector =
+          readNpyFloat32(*runConfig.styleVectorPath);
+    } catch (const std::exception &e) {
+      spdlog::error("Failed to read --style-vector: {}", e.what());
+      exit(1);
+    }
+    spdlog::info("Loaded style_vector from {} (dim={})",
+                 runConfig.styleVectorPath->string(),
+                 voice.synthesisConfig.styleVector.size());
+  }
 
   // カスタム辞書の初期化
   std::unique_ptr<piper::CustomDictionary> customDict;
@@ -911,6 +1012,14 @@ void parseArgs(int argc, char *argv[], RunConfig &runConfig) {
       while (getline(ss, path, ',')) {
         runConfig.customDictPaths.push_back(filesystem::path(path));
       }
+    } else if (arg == "--style-vector" || arg == "--style_vector") {
+      // path to a float32 .npy style vector.
+      ensureArg(argc, argv, i);
+      runConfig.styleVectorPath = filesystem::path(argv[++i]);
+    } else if (arg == "--style-vector-inline" || arg == "--style_vector_inline") {
+      // inline comma-separated float32 style vector.
+      ensureArg(argc, argv, i);
+      runConfig.styleVectorInline = argv[++i];
     } else if (arg == "-t" || arg == "--text") {
       ensureArg(argc, argv, i);
       runConfig.textInput = argv[++i];
@@ -961,6 +1070,8 @@ void parseArgs(int argc, char *argv[], RunConfig &runConfig) {
         "--list-models", "--download-model", "--model-dir", "--model_dir",
         "--version", "--test-mode", "--debug", "--quiet", "--help",
         "--no-stochastic", "--no-warmup", "--no_warmup",
+        "--style-vector", "--style_vector",
+        "--style-vector-inline", "--style_vector_inline",
       };
       // Find best match by edit distance (simple Levenshtein)
       string bestMatch;

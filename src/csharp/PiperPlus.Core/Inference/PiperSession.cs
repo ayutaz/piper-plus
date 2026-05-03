@@ -35,6 +35,13 @@ public record SynthesisResult(short[] Audio, float[]? Durations);
 /// the standard <c>sid</c>-based speaker selection.
 /// Typical dimension: 256 floats (ECAPA-TDNN output).
 /// </param>
+/// <param name="StyleVector">
+/// Optional style vector for PE-AV / PE-A conditioning.
+/// When the loaded model exposes a <c>style_vector</c> input and this
+/// parameter is non-null, the vector is sent with
+/// <c>style_vector_mask=1</c>. Pass <c>null</c> (default) to disable style
+/// conditioning for this call (zeros + <c>mask=0</c>).
+/// </param>
 public record SynthesisInput(
     long[] PhonemeIds,
     int SpeakerId = 0,
@@ -43,7 +50,8 @@ public record SynthesisInput(
     float NoiseScale = 0.667f,
     float LengthScale = 1.0f,
     float NoiseW = 0.8f,
-    float[]? SpeakerEmbedding = null
+    float[]? SpeakerEmbedding = null,
+    float[]? StyleVector = null
 );
 
 /// <summary>
@@ -344,6 +352,48 @@ public sealed class PiperSession
             }
         }
 
+        // style_vector + style_vector_mask.
+        // Always send both tensors when the model has the input, just like
+        // speaker_embedding. Zero-fill + mask=0 when the caller did not
+        // supply a vector (or the shape does not match).
+        OrtValue? styleVectorTensor = null;
+        OrtValue? styleVectorMaskTensor = null;
+        if (_model.HasStyleVector)
+        {
+            int dim = _model.StyleVectorDim > 0 ? _model.StyleVectorDim : 1;
+            float[] vec;
+            long maskVal;
+            if (input.StyleVector is not null
+                && _model.StyleVectorDim > 0
+                && input.StyleVector.Length == _model.StyleVectorDim)
+            {
+                vec = input.StyleVector;
+                maskVal = 1;
+            }
+            else
+            {
+                if (input.StyleVector is not null && _model.StyleVectorDim > 0
+                    && input.StyleVector.Length != _model.StyleVectorDim)
+                {
+                    throw new ArgumentException(
+                        $"StyleVector length {input.StyleVector.Length} != expected {_model.StyleVectorDim}",
+                        nameof(input));
+                }
+                vec = new float[dim];
+                maskVal = 0;
+            }
+
+            styleVectorTensor = OrtValue.CreateTensorValueFromMemory(
+                vec, [1, dim]);
+            inputNames.Add("style_vector");
+            inputValues.Add(styleVectorTensor);
+
+            long[] svMask = [maskVal];
+            styleVectorMaskTensor = OrtValue.CreateTensorValueFromMemory(svMask, [1, 1]);
+            inputNames.Add("style_vector_mask");
+            inputValues.Add(styleVectorMaskTensor);
+        }
+
         try
         {
             // ----- Build output names -----
@@ -411,6 +461,8 @@ public sealed class PiperSession
             prosodyTensor?.Dispose();
             speakerEmbTensor?.Dispose();
             speakerEmbMaskTensor?.Dispose();
+            styleVectorTensor?.Dispose();
+            styleVectorMaskTensor?.Dispose();
 
             // Return the pooled prosody buffer after the tensor is disposed.
             if (rentedProsody is not null)

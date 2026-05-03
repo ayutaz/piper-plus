@@ -247,6 +247,13 @@ internal static class Program
         var speakerEncoderModelOption = new Option<string?>("--speaker-encoder-model")
         { Description = "Speaker encoder ONNX model path (required for --reference-audio)" };
 
+        // Style vector conditioning (PE-AV / PE-A)
+        var styleVectorOption = new Option<string?>("--style-vector")
+        { Description = "Path to a .npy style vector file (float32, 1-D or (1,dim))" };
+
+        var styleVectorInlineOption = new Option<string?>("--style-vector-inline")
+        { Description = "Inline style vector: comma-separated float32 values. Takes precedence over --style-vector." };
+
         var rootCommand = new RootCommand("Piper Plus TTS — C# CLI")
         {
             modelOption,
@@ -285,6 +292,9 @@ internal static class Program
             referenceAudioOption,
             speakerEmbeddingOption,
             speakerEncoderModelOption,
+            // Style vector conditioning
+            styleVectorOption,
+            styleVectorInlineOption,
         };
 
         rootCommand.SetAction((parseResult) =>
@@ -539,6 +549,46 @@ internal static class Program
 
                 string? outputFile = parseResult.GetValue(outputFileOption);
                 var outputDir = parseResult.GetValue(outputDirOption)!;
+
+                // Style vector resolution.
+                string? styleVectorPath = parseResult.GetValue(styleVectorOption);
+                string? styleVectorInline = parseResult.GetValue(styleVectorInlineOption);
+                float[]? styleVector = null;
+                if (!string.IsNullOrEmpty(styleVectorInline))
+                {
+                    try
+                    {
+                        styleVector = styleVectorInline
+                            .Split(',')
+                            .Select(s => s.Trim())
+                            .Where(s => s.Length > 0)
+                            .Select(s => float.Parse(s, System.Globalization.CultureInfo.InvariantCulture))
+                            .ToArray();
+                        LogDebug(debug, quiet,
+                            $"Loaded inline style_vector (dim={styleVector.Length})");
+                    }
+                    catch (Exception ex)
+                    {
+                        LogError($"Invalid --style-vector-inline value: {ex.Message}");
+                        Environment.ExitCode = 1;
+                        return;
+                    }
+                }
+                else if (!string.IsNullOrEmpty(styleVectorPath))
+                {
+                    try
+                    {
+                        styleVector = PiperPlus.Core.IO.NumpyLoader.LoadFloat32Array(styleVectorPath);
+                        LogDebug(debug, quiet,
+                            $"Loaded style_vector from {styleVectorPath} (dim={styleVector.Length})");
+                    }
+                    catch (Exception ex)
+                    {
+                        LogError($"Failed to read --style-vector: {ex.Message}");
+                        Environment.ExitCode = 1;
+                        return;
+                    }
+                }
 
                 // Validate --text and --json-input are mutually exclusive
                 if (!string.IsNullOrEmpty(textInput) && jsonInput)
@@ -939,7 +989,8 @@ internal static class Program
                         audio = SynthesizeWithPhonemeSilence(
                             piperSession, phonemeIdsLong, prosodyFlat,
                             speaker, languageId, noiseScale, lengthScale, noiseW,
-                            phonemeSilenceMap, config.PhonemeIdMap, sampleRate);
+                            phonemeSilenceMap, config.PhonemeIdMap, sampleRate,
+                            styleVector: styleVector);
                     }
                     catch (Exception ex)
                     {
@@ -1011,7 +1062,8 @@ internal static class Program
                                     chunkAudio = SynthesizeWithPhonemeSilence(
                                         piperSession, sentencePhonemeIds, sentenceProsody,
                                         speaker, languageId, noiseScale, lengthScale, noiseW,
-                                        phonemeSilenceMap, config.PhonemeIdMap, sampleRate);
+                                        phonemeSilenceMap, config.PhonemeIdMap, sampleRate,
+                            styleVector: styleVector);
                                 }
                                 catch (Exception ex)
                                 {
@@ -1092,7 +1144,8 @@ internal static class Program
                                 audio = SynthesizeWithPhonemeSilence(
                                     piperSession, phonemeIdsLong, null,
                                     speaker, languageId, noiseScale, lengthScale, noiseW,
-                                    phonemeSilenceMap, config.PhonemeIdMap, sampleRate);
+                                    phonemeSilenceMap, config.PhonemeIdMap, sampleRate,
+                            styleVector: styleVector);
                             }
                             catch (Exception ex)
                             {
@@ -1295,7 +1348,8 @@ internal static class Program
                                 audio = SynthesizeWithPhonemeSilence(
                                     piperSession, phonemeIdsLong, prosodyFlat,
                                     uttSpeaker, uttLanguageId, noiseScale, lengthScale, noiseW,
-                                    phonemeSilenceMap, config.PhonemeIdMap, sampleRate);
+                                    phonemeSilenceMap, config.PhonemeIdMap, sampleRate,
+                            styleVector: styleVector);
                             }
                             catch (Exception ex)
                             {
@@ -1370,7 +1424,9 @@ internal static class Program
         float noiseW,
         Dictionary<string, float>? phonemeSilenceMap,
         Dictionary<string, int[]> phonemeIdMap,
-        int sampleRate)
+        int sampleRate,
+        float[]? speakerEmbedding = null,
+        float[]? styleVector = null)
     {
         // Normal (non-split) path
         if (phonemeSilenceMap is null || phonemeSilenceMap.Count == 0)
@@ -1382,7 +1438,9 @@ internal static class Program
                 ProsodyFeatures: prosodyFlat,
                 NoiseScale: noiseScale,
                 LengthScale: lengthScale,
-                NoiseW: noiseW);
+                NoiseW: noiseW,
+                SpeakerEmbedding: speakerEmbedding,
+                StyleVector: styleVector);
             return piperSession.Synthesize(input);
         }
 
@@ -1409,7 +1467,9 @@ internal static class Program
                 ProsodyFeatures: phraseProsody,
                 NoiseScale: noiseScale,
                 LengthScale: lengthScale,
-                NoiseW: noiseW);
+                NoiseW: noiseW,
+                SpeakerEmbedding: speakerEmbedding,
+                StyleVector: styleVector);
 
             short[] phraseAudio = piperSession.Synthesize(input);
             segments.Add((phraseAudio, phrase.SilenceSamples));

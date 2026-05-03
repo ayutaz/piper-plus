@@ -1,0 +1,100 @@
+# Style Vector Conditioning Runtime Contract
+# ==========================================
+# This file defines canonical ONNX graph conventions and runtime behaviour
+# that ALL implementations (Python, Rust, Go, C++, C#, WASM/JS) must follow
+# for PE-AV / PE-A style vector conditioning.
+#
+# Cross-runtime byte-for-byte compatibility requires every runtime to build
+# the same tensors with the same dtype/shape/mask semantics.
+
+[meta]
+spec_version = "1.0"
+last_updated = "2026-04-23"
+applies_to = ["python", "rust", "go", "cpp", "csharp", "wasm-js"]
+
+# ============================================================================
+# ONNX graph inputs
+# ============================================================================
+
+[onnx.inputs.style_vector]
+dtype = "float32"
+shape = [1, "style_vector_dim"]
+# style_vector_dim is resolved at runtime from (in priority order):
+#   1. ONNX model input[1].shape[1] when the export pinned a concrete dim
+#   2. ONNX metadata_props["style_vector_dim"] as a decimal integer string
+#   3. Voice config.json key `style_vector_dim` (or `inference.style_vector_dim`)
+description = """
+User-provided style vector. When the user did not provide one, the runtime
+MUST fill this tensor with zeros of the configured dim and set the mask to 0.
+"""
+
+[onnx.inputs.style_vector_mask]
+dtype = "int64"
+shape = [1, 1]
+# Dimensions:
+# - Python export currently uses [1, 1]; runtimes MAY also accept [1].
+# - The mask value is broadcast against style_vector inside the graph.
+values = "0 when disabled, 1 when an explicit style_vector is passed"
+description = """
+Mask flag. Value 1 => SynthesizerTrn uses the style_vector as-is. Value 0 =>
+SynthesizerTrn replaces style_vector with zeros internally (backward compat).
+"""
+
+# ============================================================================
+# Runtime behaviour
+# ============================================================================
+
+[runtime.default_behaviour]
+when_input_omitted = "zeros tensor + mask=0"
+when_length_mismatch = "raise a descriptive error, do NOT silently pad/truncate"
+when_input_absent_in_graph = "do NOT attach style_vector / style_vector_mask feeds (legacy model)"
+
+[runtime.detection]
+# Each runtime checks whether the loaded ONNX graph exposes a `style_vector`
+# input name. Presence of the input turns on style conditioning support.
+input_name_check = "style_vector"
+# Legacy models (dim=0 or pre-Phase-2 export) do not have this input, and
+# runtimes MUST skip the style feeds entirely.
+
+# ============================================================================
+# CLI surface
+# ============================================================================
+
+[cli.flags]
+# All runtimes expose the following two flags for users.
+style_vector_path = "--style-vector PATH"          # .npy (float32 little-endian)
+style_vector_inline = "--style-vector-inline LIST" # "0.1,0.2,..." comma-separated floats
+# Precedence: inline > path. When both are empty, behaviour falls back to
+# `when_input_omitted` above.
+
+# ============================================================================
+# Reference implementations
+# ============================================================================
+
+[implementations]
+python.export = "src/python/piper_train/export_onnx.py"
+python.runtime = "src/python_run/piper/voice.py"
+python.cli = "src/python/piper_train/infer_onnx.py"
+cpp.header = "src/cpp/piper.hpp"
+cpp.runtime = "src/cpp/piper.cpp"
+cpp.c_api = "src/cpp/piper_plus_c_api.cpp"
+cpp.cli = "src/cpp/main.cpp"
+rust.core = "src/rust/piper-core/src/engine.rs"
+rust.cli = "src/rust/piper-cli/src/main.rs"
+csharp.core = "src/csharp/PiperPlus.Core/Inference/"
+csharp.cli = "src/csharp/PiperPlus.Cli/Program.cs"
+go.core = "src/go/piperplus/engine.go"
+go.cli = "src/go/cmd/piper-plus/main.go"
+wasm.js = "src/wasm/openjtalk-web/src/index.js"
+wasm.types = "src/wasm/openjtalk-web/types/index.d.ts"
+
+# ============================================================================
+# Cross-runtime tests
+# ============================================================================
+
+[tests]
+python_spec_integration = "src/python/tests/test_cross_runtime_style_vector.py"
+wasm_js_unit = "src/wasm/openjtalk-web/test/js/test-piper-plus-style-vector.js"
+# Per-runtime unit tests exercise the same feed-construction behaviour. The
+# Python spec-integration test additionally asserts that the ONNX export
+# produces a graph that every runtime can consume.

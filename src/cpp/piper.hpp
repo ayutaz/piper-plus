@@ -78,6 +78,11 @@ struct SynthesisConfig {
   // Voice cloning: speaker embedding from speaker encoder (M3-04).
   // When non-empty, passed as the speaker_embedding ONNX input with mask=1.
   std::vector<float> speakerEmbedding;
+
+  // Style vector conditioning (PE-AV / PE-A).
+  // When non-empty, passed as the style_vector ONNX input with mask=1.
+  // When empty and the model has a style_vector input, zeros + mask=0 are sent.
+  std::vector<float> styleVector;
 };
 
 struct ModelConfig {
@@ -101,6 +106,10 @@ struct ModelSession {
   bool hasMultiSpeaker = false;    // Whether model has sid (speaker ID) input
   bool hasLidInput = false;        // Whether model has lid (language ID) input
 
+  // Style vector conditioning.
+  bool hasStyleVector = false;     // Whether model accepts style_vector input
+  int  styleVectorDim = 0;         // Expected style_vector dim (from ONNX metadata or input shape)
+
   ModelSession() : onnx(nullptr){};
 };
 
@@ -116,6 +125,11 @@ struct InferenceInputs {
   std::optional<int64_t> languageId;
   // Flat [a1,a2,a3, a1,a2,a3, ...] per phoneme. Empty = no prosody.
   std::vector<int64_t> prosodyFeatures;
+
+  // Style vector conditioning (PE-AV / PE-A).
+  // When non-empty, sent as style_vector input with mask=1.
+  // When empty and the model has style_vector, zeros + mask=0 are sent.
+  std::vector<float> styleVector;
 };
 
 struct PhonemeInfo {

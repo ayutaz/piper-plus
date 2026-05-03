@@ -190,6 +190,15 @@ static void applySynthOptions(piper::SynthesisConfig &synthConfig,
     } else {
         synthConfig.speakerEmbedding.clear();
     }
+
+    // Style vector conditioning
+    if (effectiveOpts.style_vector && effectiveOpts.style_vector_dim > 0) {
+        synthConfig.styleVector.assign(
+            effectiveOpts.style_vector,
+            effectiveOpts.style_vector + effectiveOpts.style_vector_dim);
+    } else {
+        synthConfig.styleVector.clear();
+    }
 }
 
 // ===== Boundary validation for speaker_id / language_id =====

@@ -554,6 +554,37 @@ void loadModel(std::string modelPath, ModelSession &session,
     } else if (name == "lid") {
       session.hasLidInput = true;
       spdlog::debug("Model supports language ID (lid input)");
+    } else if (name == "style_vector") {
+      session.hasStyleVector = true;
+      spdlog::debug("Model supports style vector conditioning");
+
+      // Try to read the concrete dim from the input shape (axis 1).
+      try {
+        auto typeInfo = session.onnx.GetInputTypeInfo(i);
+        auto tensorInfo = typeInfo.GetTensorTypeAndShapeInfo();
+        auto shape = tensorInfo.GetShape();
+        if (shape.size() >= 2 && shape[1] > 0) {
+          session.styleVectorDim = static_cast<int>(shape[1]);
+        }
+      } catch (...) {
+        // Shape not available; fall through to metadata/config resolution.
+      }
+    }
+  }
+
+  // Resolve style_vector_dim from ONNX custom metadata if the shape was
+  // dynamic/unknown. Keys are written by piper_train.export_onnx.
+  if (session.hasStyleVector && session.styleVectorDim <= 0) {
+    try {
+      Ort::ModelMetadata meta = session.onnx.GetModelMetadata();
+      Ort::AllocatorWithDefaultOptions alloc;
+      auto dimPtr = meta.LookupCustomMetadataMapAllocated(
+          "style_vector_dim", alloc);
+      if (dimPtr) {
+        session.styleVectorDim = std::atoi(dimPtr.get());
+      }
+    } catch (...) {
+      // Metadata lookup failed; leave dim = 0.
     }
   }
 }
@@ -1037,7 +1068,10 @@ buildInputTensors(
     std::vector<float>   &scalesBuf,
     std::vector<int64_t> &sidBuf,
     std::vector<int64_t> &lidBuf,
-    std::vector<int64_t> &prosodyBuf) {
+    std::vector<int64_t> &prosodyBuf,
+    // style vector buffers
+    std::vector<float>   &styleVectorBuf,
+    std::vector<int64_t> &styleVectorMaskBuf) {
 
   // ---- phoneme ids ----
   phonemeIdsBuf = inputs.phonemeIds;  // copy
@@ -1107,6 +1141,40 @@ buildInputTensors(
         prosodyShape.data(), prosodyShape.size()));
   }
 
+  // style_vector + style_vector_mask
+  if (session.hasStyleVector) {
+    const int64_t dim =
+        session.styleVectorDim > 0 ? session.styleVectorDim : 1;
+
+    if (!inputs.styleVector.empty() &&
+        static_cast<int>(inputs.styleVector.size()) == session.styleVectorDim) {
+      styleVectorBuf = inputs.styleVector;  // copy
+      styleVectorMaskBuf = {1};
+    } else {
+      // Either empty or mismatched; send zeros with mask=0 so the model
+      // treats this call as "no style conditioning".
+      if (!inputs.styleVector.empty()) {
+        spdlog::warn(
+            "styleVector size {} != expected {}; ignoring (mask=0)",
+            inputs.styleVector.size(), session.styleVectorDim);
+      }
+      styleVectorBuf.assign(static_cast<size_t>(dim), 0.0f);
+      styleVectorMaskBuf = {0};
+    }
+
+    std::vector<int64_t> styleShape{1, dim};
+    names.push_back("style_vector");
+    tensors.push_back(Ort::Value::CreateTensor<float>(
+        memoryInfo, styleVectorBuf.data(), styleVectorBuf.size(),
+        styleShape.data(), styleShape.size()));
+
+    std::vector<int64_t> maskShape{1, 1};
+    names.push_back("style_vector_mask");
+    tensors.push_back(Ort::Value::CreateTensor<int64_t>(
+        memoryInfo, styleVectorMaskBuf.data(), styleVectorMaskBuf.size(),
+        maskShape.data(), maskShape.size()));
+  }
+
   return {std::move(tensors), std::move(names)};
 }
 
@@ -1163,15 +1231,19 @@ void synthesize(std::vector<PhonemeId> &phonemeIds,
   if (prosodyFeatures) {
     inputs.prosodyFeatures = *prosodyFeatures;
   }
+  inputs.styleVector = synthesisConfig.styleVector;  //
 
   // Buffers must outlive the Run() call
   std::vector<int64_t> phonemeIdsBuf, phonemeIdLengthsBuf, sidBuf, lidBuf, prosodyBuf;
   std::vector<float> scalesBuf;
+  std::vector<float> styleVectorBuf;
+  std::vector<int64_t> styleVectorMaskBuf;
 
   auto [inputTensors, inputNamesVec] = buildInputTensors(
       inputs, session, memoryInfo,
       phonemeIdsBuf, phonemeIdLengthsBuf, scalesBuf,
-      sidBuf, lidBuf, prosodyBuf);
+      sidBuf, lidBuf, prosodyBuf,
+      styleVectorBuf, styleVectorMaskBuf);
 
   // Output names
   std::vector<const char *> outputNamesVec;
@@ -1370,15 +1442,19 @@ void synthesizeFloat(std::vector<PhonemeId> &phonemeIds,
   if (prosodyFeatures) {
     inputs.prosodyFeatures = *prosodyFeatures;
   }
+  inputs.styleVector = synthesisConfig.styleVector;  //
 
   // Buffers must outlive the Run() call
   std::vector<int64_t> phonemeIdsBuf, phonemeIdLengthsBuf, sidBuf, lidBuf, prosodyBuf;
   std::vector<float> scalesBuf;
+  std::vector<float> styleVectorBuf;
+  std::vector<int64_t> styleVectorMaskBuf;
 
   auto [inputTensors, inputNamesVec] = buildInputTensors(
       inputs, session, memoryInfo,
       phonemeIdsBuf, phonemeIdLengthsBuf, scalesBuf,
-      sidBuf, lidBuf, prosodyBuf);
+      sidBuf, lidBuf, prosodyBuf,
+      styleVectorBuf, styleVectorMaskBuf);
 
   // Output names
   std::vector<const char *> outputNamesVec;
@@ -2931,11 +3007,14 @@ void warmupModel(ModelSession &session, int runs) {
         // Buffers kept alive across all warmup runs
         std::vector<int64_t> phonemeIdsBuf, phonemeIdLengthsBuf, sidBuf, lidBuf, prosodyBuf;
         std::vector<float> scalesBuf;
+        std::vector<float> styleVectorBuf;
+        std::vector<int64_t> styleVectorMaskBuf;
 
         auto [inputTensors, inputNames] = buildInputTensors(
             dummy, session, memoryInfo,
             phonemeIdsBuf, phonemeIdLengthsBuf, scalesBuf,
-            sidBuf, lidBuf, prosodyBuf);
+            sidBuf, lidBuf, prosodyBuf,
+            styleVectorBuf, styleVectorMaskBuf);
 
         // Output names
         std::vector<const char*> outputNames;

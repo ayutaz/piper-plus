@@ -553,6 +553,20 @@ def main():
         help="Path to the speaker encoder ONNX model "
         "(required with --reference-audio).",
     )
+    parser.add_argument(
+        "--style-vector",
+        default=None,
+        metavar="PATH",
+        help="Path to a .npy file containing a style vector (float32, 1D or "
+        "shape (1, dim)). Only used when the model has a style_vector input.",
+    )
+    parser.add_argument(
+        "--style-vector-inline",
+        default=None,
+        metavar="VALUES",
+        help="Inline style vector: comma-separated float32 values. "
+        "Takes precedence over --style-vector.",
+    )
     args = parser.parse_args()
 
     # Emit deprecation warnings for old option names
@@ -650,6 +664,7 @@ def main():
     has_sid = "sid" in input_names
     has_lid = "lid" in input_names
     has_spk_emb = "speaker_embedding" in input_names
+    has_style_vector = "style_vector" in input_names
     if has_prosody:
         _LOGGER.info("Model supports prosody features (A1/A2/A3)")
     if has_sid:
@@ -658,6 +673,8 @@ def main():
         _LOGGER.info("Model supports multi-language (lid input)")
     if has_spk_emb:
         _LOGGER.info("Model supports speaker_embedding (voice cloning)")
+    if has_style_vector:
+        _LOGGER.info("Model supports style_vector conditioning")
 
     # Resolve speaker embedding from --speaker-embedding or --reference-audio
     spk_emb_array = None
@@ -692,6 +709,39 @@ def main():
         _LOGGER.warning(
             "speaker_embedding provided but model does not have "
             "speaker_embedding input; it will be ignored."
+        )
+
+    # Resolve style_vector from --style-vector-inline or --style-vector
+    style_vector_array = None
+    if args.style_vector_inline:
+        try:
+            values = [
+                float(x.strip())
+                for x in args.style_vector_inline.split(",")
+                if x.strip()
+            ]
+        except ValueError as e:
+            print(
+                f"Error: invalid --style-vector-inline value: {e}",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        style_vector_array = np.asarray(values, dtype=np.float32).reshape(1, -1)
+        _LOGGER.info("Loaded inline style_vector (dim=%d)", style_vector_array.shape[1])
+    elif args.style_vector:
+        style_vector_array = np.load(args.style_vector).astype(np.float32)
+        if style_vector_array.ndim == 1:
+            style_vector_array = style_vector_array.reshape(1, -1)
+        _LOGGER.info(
+            "Loaded style_vector from %s (dim=%d)",
+            args.style_vector,
+            style_vector_array.shape[1],
+        )
+
+    if style_vector_array is not None and not has_style_vector:
+        _LOGGER.warning(
+            "style_vector provided but model does not have style_vector input; "
+            "it will be ignored."
         )
 
     # Handle --text mode: convert text to phoneme_ids and prosody_features
@@ -858,6 +908,41 @@ def main():
                     emb_dim = 256
                 inputs["speaker_embedding"] = np.zeros((1, emb_dim), dtype=np.float32)
                 inputs["speaker_embedding_mask"] = np.array([[0]], dtype=np.int64)
+
+        # Handle style_vector (PE-AV / PE-A style conditioning)
+        if has_style_vector:
+            # Resolve expected dim: ONNX metadata → model input shape → 0
+            style_vector_dim = 0
+            try:
+                meta_map = dict(model.get_modelmeta().custom_metadata_map)
+            except Exception:
+                meta_map = {}
+            if "style_vector_dim" in meta_map:
+                try:
+                    style_vector_dim = int(meta_map["style_vector_dim"])
+                except (TypeError, ValueError):
+                    pass
+            if style_vector_dim <= 0:
+                for inp in model.get_inputs():
+                    if inp.name == "style_vector" and isinstance(inp.shape[1], int):
+                        style_vector_dim = int(inp.shape[1])
+                        break
+
+            if style_vector_array is not None and style_vector_dim > 0:
+                if style_vector_array.shape != (1, style_vector_dim):
+                    print(
+                        f"Error: style_vector shape {style_vector_array.shape} "
+                        f"!= expected (1, {style_vector_dim})",
+                        file=sys.stderr,
+                    )
+                    sys.exit(1)
+                inputs["style_vector"] = style_vector_array
+                inputs["style_vector_mask"] = np.array([[1]], dtype=np.int64)
+            else:
+                inputs["style_vector"] = np.zeros(
+                    (1, max(style_vector_dim, 1)), dtype=np.float32
+                )
+                inputs["style_vector_mask"] = np.array([[0]], dtype=np.int64)
 
         start_time = time.perf_counter()
         outputs = model.run(None, inputs)

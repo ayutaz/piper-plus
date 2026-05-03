@@ -1,4 +1,5 @@
 import logging
+import types
 from pathlib import Path
 
 import pytorch_lightning as pl
@@ -99,6 +100,9 @@ class VitsModel(pl.LightningModule):
         use_sdp: bool = True,
         segment_size: int = 8192,
         prosody_dim: int = 16,
+        style_vector_dim: int = 0,
+        style_condition_dropout: float = 0.0,
+        style_condition_mode: str = "global",
         # training
         dataset: list[str | Path] | None = None,
         learning_rate: float = 2e-4,
@@ -122,16 +126,35 @@ class VitsModel(pl.LightningModule):
         wavlm_model_name: str = "microsoft/wavlm-base-plus",
         c_wavlm: float = 0.5,
         wavlm_every_n_steps: int = 1,
+        # PE-A emotion perceptual loss
+        # All weights default to 0.0 so the loss is disabled unless the user
+        # opts in via ``--pea-emotion-*`` flags in ``__main__.py``.
+        pea_emotion_loss_weight: float = 0.0,
+        pea_emotion_centroid_weight: float = 0.0,
+        pea_emotion_margin_weight: float = 0.0,
+        pea_emotion_style_bank: str | Path | None = None,
+        pea_emotion_model_name: str = "facebook/pe-av-small",
+        pea_emotion_sample_rate: int = 16000,
+        pea_emotion_loss_every_n_steps: int = 1,
+        pea_emotion_warmup_steps: int = 0,
+        pea_emotion_margin: float = 0.1,
         **kwargs,
     ):
         super().__init__()
         self.automatic_optimization = (
             False  # Multiple optimizers require manual optimization
         )
+        if style_condition_mode not in {"global", "text"}:
+            raise ValueError(
+                "style_condition_mode must be either 'global' or 'text', "
+                f"got {style_condition_mode!r}"
+            )
 
         # Fix gin_channels BEFORE save_hyperparameters() so the correct value is saved
         # This fixes the bug where gin_channels=0 was saved for multi-speaker models
         if (num_speakers > 1 or num_languages > 1) and (gin_channels <= 0):
+            gin_channels = 512
+        if (style_vector_dim > 0) and (gin_channels <= 0):
             gin_channels = 512
 
         self.save_hyperparameters()
@@ -159,6 +182,9 @@ class VitsModel(pl.LightningModule):
             gin_channels=self.hparams.gin_channels,
             use_sdp=self.hparams.use_sdp,
             prosody_dim=self.hparams.prosody_dim,
+            style_vector_dim=self.hparams.style_vector_dim,
+            style_condition_dropout=self.hparams.style_condition_dropout,
+            style_condition_mode=self.hparams.style_condition_mode,
         )
         self.model_d = MultiPeriodDiscriminator(
             use_spectral_norm=self.hparams.use_spectral_norm
@@ -174,6 +200,15 @@ class VitsModel(pl.LightningModule):
                 model_name=self.hparams.wavlm_model_name,
                 source_sample_rate=self.hparams.sample_rate,
             )
+
+        # PE-A emotion perceptual loss state.
+        # ``_pea_emotion_model`` is lazily loaded the first time
+        # ``_compute_pea_emotion_loss`` is invoked.
+        # Must be assigned AFTER save_hyperparameters() so the hparams
+        # snapshot of the 9 pea_emotion_* kwargs is already captured.
+        self._pea_emotion_model = None
+        self._pea_emotion_to_idx: dict[str, int] = {}
+        self._init_pea_emotion_loss()
 
         # Dataset splits
         self._train_dataset: Dataset | None = None
@@ -314,8 +349,264 @@ class VitsModel(pl.LightningModule):
                 generator=split_generator,
             )
 
+    # ------------------------------------------------------------------
+    # PE-A emotion perceptual loss
+    # ------------------------------------------------------------------
+
+    def _pea_emotion_loss_enabled(self) -> bool:
+        """Return True when any PE-A emotion loss weight is positive.
+
+        Fork-compatible auto-enable: the three loss weights act as implicit
+        enable flags so we do not need a separate ``--pea-emotion-enabled``
+        CLI option. All weights defaulting to 0.0 keeps the feature off for
+        existing training runs.
+        """
+        return (
+            self.hparams.pea_emotion_loss_weight > 0
+            or self.hparams.pea_emotion_centroid_weight > 0
+            or self.hparams.pea_emotion_margin_weight > 0
+        )
+
+    def _init_pea_emotion_loss(self) -> None:
+        """Load the style bank and register emotion centroids as buffers.
+
+        Called once from ``__init__`` after ``save_hyperparameters()``. When
+        the loss is disabled (all weights == 0) this is a no-op so existing
+        training runs see zero overhead.
+
+        Raises
+        ------
+        ValueError
+            If the loss is enabled but ``--pea-emotion-style-bank`` was not
+            supplied.
+        """
+        if not self._pea_emotion_loss_enabled():
+            return
+
+        style_bank = self.hparams.pea_emotion_style_bank
+        if not style_bank:
+            raise ValueError(
+                "--pea-emotion-style-bank is required when PE-A emotion loss is enabled"
+            )
+
+        # Use the shared loader so the .npz schema stays in lock-step with
+        # piper_train.tools.build_pea_style_bank / validate_style_bank.
+        from piper_train.perception.pea_loader import load_style_bank
+
+        emotion_names, emotion_centroids, global_centroid = load_style_bank(
+            Path(style_bank)
+        )
+
+        self._pea_emotion_to_idx = {name: idx for idx, name in enumerate(emotion_names)}
+        # L2-normalise both centroid arrays before registering so downstream
+        # cosine similarity / direction maths consume unit-norm vectors.
+        self.register_buffer(
+            "pea_emotion_global_centroid",
+            F.normalize(global_centroid, dim=-1),
+            persistent=False,
+        )
+        self.register_buffer(
+            "pea_emotion_centroids",
+            F.normalize(emotion_centroids, dim=-1),
+            persistent=False,
+        )
+        _LOGGER.info(
+            "PE-A emotion loss enabled: style_bank=%s, emotions=%s",
+            style_bank,
+            ",".join(emotion_names),
+        )
+
+    def _ensure_pea_emotion_model(self):
+        """Lazily load the PE-A audio model.
+
+        The model is loaded on the first call and cached on the instance.
+        Call sites should invoke this from
+        ``_compute_pea_emotion_loss`` so that when the loss is disabled no
+        PE-A weights are ever downloaded or held in GPU memory.
+
+        The loaded model is moved to ``self.device`` and its audio embedder
+        is monkey-patched to use :func:`grad_enabled_embedder_forward` so
+        gradients flow back to ``y_hat`` while PE-A weights stay frozen.
+        """
+        if self._pea_emotion_model is not None:
+            return self._pea_emotion_model
+
+        from piper_train.perception.pea_loader import (
+            grad_enabled_embedder_forward,
+            load_pea_emotion_model,
+        )
+
+        model = load_pea_emotion_model(
+            self.hparams.pea_emotion_model_name,
+            device=self.device,
+        )
+
+        # Rebind the DAC embedder to the grad-enabled forward (fork 314b3355
+        # approach). The attribute path mirrors Transformers PE-A.
+        try:
+            embedder = model.audio_model.audio_encoder.embedder
+        except AttributeError as err:
+            raise AttributeError(
+                "Unexpected PE-A model layout: expected "
+                "model.audio_model.audio_encoder.embedder. "
+                f"Underlying error: {err}"
+            ) from err
+        embedder.forward = types.MethodType(grad_enabled_embedder_forward, embedder)
+
+        self._pea_emotion_model = model
+        return self._pea_emotion_model
+
+    def _compute_pea_emotion_loss(
+        self,
+        y_hat: torch.Tensor,
+        batch: Batch,
+    ) -> torch.Tensor | None:
+        """Compute the 3-term PE-A emotion perceptual loss.
+
+        Composition (fork 314b3355 ``lightning.py:298-382`` faithful port)::
+
+            loss = w_dir      * (1 - cos(e_dir,     t_dir))
+                 + w_centroid * (1 - cos(embeddings, target_centroids))
+                 + w_margin   * ReLU(margin + max_other_sim - target_sim)
+
+        where ``e_dir = normalize(embeddings - global_centroid)`` and
+        ``t_dir = normalize(target_centroids - global_centroid)``.
+
+        Design: this method contains the numerical calculation only.
+        Warmup / ``every_n_steps`` gating lives in ``training_step_g`` so
+        the loss computation stays pure and unit-testable.
+
+        Returns
+        -------
+        torch.Tensor | None
+            Scalar tensor when loss is produced. ``None`` when the loss is
+            disabled (all weights ≤ 0), the batch carries no ``emotions``
+            field, no sample's emotion is in the style bank, or the loss
+            value contains ``NaN``/``Inf`` (guard with warning log).
+        """
+
+        # --- Guard 1: fully disabled → zero overhead bail-out ---
+        if not self._pea_emotion_loss_enabled():
+            return None
+
+        emotions = getattr(batch, "emotions", None)
+        # --- Guard 2: no emotion labels in this batch ---
+        if not emotions:
+            return None
+
+        # Filter batch samples that have a label present in the style bank.
+        valid_indices = [
+            idx
+            for idx, emotion in enumerate(emotions)
+            if emotion in self._pea_emotion_to_idx
+        ]
+        if not valid_indices:
+            return None
+
+        sample_indices = torch.as_tensor(valid_indices, device=y_hat.device)
+        emotion_indices = torch.as_tensor(
+            [self._pea_emotion_to_idx[emotions[idx]] for idx in valid_indices],
+            device=y_hat.device,
+            dtype=torch.long,
+        )
+
+        # --- Resample audio to PE-A's expected rate (16 kHz default) ---
+        # y_hat is typically [B, 1, T] from the generator; index_select on
+        # dim 0 keeps the channel axis intact which torchaudio handles fine.
+        audio = y_hat.index_select(0, sample_indices).float()
+        if self.hparams.sample_rate != self.hparams.pea_emotion_sample_rate:
+            import torchaudio.functional as AF
+
+            audio = AF.resample(
+                audio,
+                orig_freq=int(self.hparams.sample_rate),
+                new_freq=int(self.hparams.pea_emotion_sample_rate),
+            )
+
+        # --- Extract L2-normalised embeddings (DAC gradient-control inside
+        # the embedder's monkey-patched forward) ---
+        pea_model = self._ensure_pea_emotion_model()
+        embeddings = pea_model.get_audio_embeds(audio)
+        # ModelOutput fallback: some wrapper variants return an object with
+        # an ``audio_embeds`` attribute instead of a raw tensor.
+        if hasattr(embeddings, "audio_embeds"):
+            embeddings = embeddings.audio_embeds
+        embeddings = F.normalize(embeddings.float(), dim=-1)
+
+        # --- Gather target centroids ---
+        centroids = self.pea_emotion_centroids.to(
+            device=embeddings.device, dtype=embeddings.dtype
+        )
+        global_centroid = self.pea_emotion_global_centroid.to(
+            device=embeddings.device, dtype=embeddings.dtype
+        )
+        target_centroids = centroids.index_select(0, emotion_indices)
+
+        # --- 3-term composition ---
+        loss = embeddings.new_zeros(())
+
+        # Direction loss (always computed to give us a scalar for logging,
+        # but only added to the total when w_direction > 0).
+        target_dirs = F.normalize(
+            target_centroids - global_centroid.unsqueeze(0), dim=-1
+        )
+        embedding_dirs = F.normalize(embeddings - global_centroid.unsqueeze(0), dim=-1)
+        loss_dir = 1.0 - F.cosine_similarity(embedding_dirs, target_dirs, dim=-1).mean()
+        if self.hparams.pea_emotion_loss_weight > 0:
+            loss = loss + loss_dir * self.hparams.pea_emotion_loss_weight
+            self._log_with_batch_info("loss_pea_emotion_dir", loss_dir, batch)
+
+        # Centroid loss: 1 - cos(embedding, target) — fork implementation
+        # uses angular distance, NOT L2 (norm-invariant, more stable under
+        # SimCLR/CLIP-style conventions).
+        if self.hparams.pea_emotion_centroid_weight > 0:
+            loss_centroid = (
+                1.0 - F.cosine_similarity(embeddings, target_centroids, dim=-1).mean()
+            )
+            loss = loss + loss_centroid * self.hparams.pea_emotion_centroid_weight
+            self._log_with_batch_info("loss_pea_emotion_centroid", loss_centroid, batch)
+
+        # Margin hinge: push ``target_similarity`` at least ``margin``
+        # ahead of the best non-target centroid. ``masked_fill`` avoids
+        # touching the ``similarities`` tensor in-place so autograd stays
+        # happy (fork 314b3355 uses the same pattern).
+        if self.hparams.pea_emotion_margin_weight > 0:
+            similarities = embeddings @ centroids.transpose(0, 1)
+            target_similarity = similarities.gather(1, emotion_indices[:, None])
+            other_similarities = similarities.masked_fill(
+                F.one_hot(emotion_indices, num_classes=centroids.size(0)).bool(),
+                -1.0,
+            )
+            max_other_similarity = other_similarities.max(dim=1, keepdim=True).values
+            loss_margin = F.relu(
+                self.hparams.pea_emotion_margin
+                + max_other_similarity
+                - target_similarity
+            ).mean()
+            loss = loss + loss_margin * self.hparams.pea_emotion_margin_weight
+            self._log_with_batch_info("loss_pea_emotion_margin", loss_margin, batch)
+
+        # --- NaN/Inf guard: skip this step if the loss degenerated ---
+        if not torch.isfinite(loss).all():
+            _LOGGER.warning(
+                "PE-A emotion loss produced non-finite value at step=%d; "
+                "skipping loss contribution for this step.",
+                int(self.global_step),
+            )
+            return None
+
+        self._log_with_batch_info("loss_pea_emotion", loss, batch)
+        return loss
+
     def forward(
-        self, text, text_lengths, scales, sid=None, lid=None, prosody_features=None
+        self,
+        text,
+        text_lengths,
+        scales,
+        sid=None,
+        lid=None,
+        prosody_features=None,
+        style_vector=None,
     ):
         noise_scale = scales[0]
         length_scale = scales[1]
@@ -329,6 +620,7 @@ class VitsModel(pl.LightningModule):
             sid=sid,
             lid=lid,
             prosody_features=prosody_features,
+            style_vector=style_vector,
         )
 
         return audio
@@ -522,6 +814,7 @@ class VitsModel(pl.LightningModule):
             speaker_ids,
             language_ids,
             prosody_features,
+            style_vectors,
         ) = (
             batch.phoneme_ids,
             batch.phoneme_lengths,
@@ -532,6 +825,7 @@ class VitsModel(pl.LightningModule):
             batch.speaker_ids if batch.speaker_ids is not None else None,
             batch.language_ids if batch.language_ids is not None else None,
             batch.prosody_features if batch.prosody_features is not None else None,
+            batch.style_vectors if batch.style_vectors is not None else None,
         )
         (
             y_hat,
@@ -549,6 +843,7 @@ class VitsModel(pl.LightningModule):
             speaker_ids,
             lid=language_ids,
             prosody_features=prosody_features,
+            style_vector=style_vectors,
         )
         self._y_hat = y_hat.contiguous()
 
@@ -622,6 +917,33 @@ class VitsModel(pl.LightningModule):
                 self._log_with_batch_info("loss_gen_wavlm", loss_gen_wavlm, batch)
                 self._log_with_batch_info("loss_fm_wavlm", loss_fm_wavlm, batch)
 
+            # PE-A emotion perceptual loss.
+            # Warmup + every_n_steps gating live HERE (not inside
+            # _compute_pea_emotion_loss) by design: the loss method stays
+            # a pure numerical function, training_step_g owns the scheduling.
+            # When the loss is fully disabled the _pea_emotion_loss_enabled()
+            # check short-circuits so there is zero overhead for existing
+            # training runs.
+            loss_pea_emotion = None
+            if self._pea_emotion_loss_enabled():
+                warmup_steps = int(self.hparams.pea_emotion_warmup_steps)
+                every_n_steps = max(1, int(self.hparams.pea_emotion_loss_every_n_steps))
+                if (
+                    self.global_step >= warmup_steps
+                    and self.global_step % every_n_steps == 0
+                ):
+                    loss_pea_emotion = self._compute_pea_emotion_loss(y_hat, batch)
+
+            if loss_pea_emotion is not None:
+                # Scale up by every_n_steps so the effective gradient
+                # magnitude stays consistent regardless of skip-step cadence
+                # (fork 314b3355 uses the same multiplier pattern for WavLM
+                # above and for PE-A in its own implementation).
+                loss_pea_emotion_scaled = loss_pea_emotion * max(
+                    1, int(self.hparams.pea_emotion_loss_every_n_steps)
+                )
+                loss_gen_all = loss_gen_all + loss_pea_emotion_scaled
+
             self._log_with_batch_info("loss_gen_all", loss_gen_all, batch)
 
             return loss_gen_all
@@ -662,6 +984,38 @@ class VitsModel(pl.LightningModule):
             self._log_with_batch_info("loss_disc_all", loss_disc_all, batch)
 
             return loss_disc_all
+
+    def on_after_backward(self) -> None:
+        """Zero gradients when non-finite values are detected.
+
+        PE-A emotion perceptual loss goes through a frozen external model
+        (PE-A / DAC) which, in rare cases, produces NaN/Inf gradients during
+        early training. Without this hook a single poisoned step could
+        propagate NaNs throughout the optimizer state and permanently break
+        training.
+
+        The hook only runs when PE-A loss is enabled (so existing training
+        flows see no behaviour change) and iterates model parameters until
+        it finds a non-finite gradient. When found it zeros ALL gradients
+        for this step via ``zero_grad(set_to_none=True)`` — equivalent to a
+        skip-step — and emits a WARNING log.
+        """
+        if not self._pea_emotion_loss_enabled():
+            return
+
+        for name, param in self.named_parameters():
+            grad = param.grad
+            if grad is None:
+                continue
+            if not torch.isfinite(grad).all():
+                _LOGGER.warning(
+                    "PE-A emotion loss produced non-finite gradient at "
+                    "step=%d (param=%s); zeroing all gradients for this step.",
+                    int(self.global_step),
+                    name,
+                )
+                self.zero_grad(set_to_none=True)
+                return
 
     def validation_step(self, batch: Batch, batch_idx: int):
         # Temporarily suppress self.log to prevent training_step_g/d from
@@ -904,6 +1258,103 @@ class VitsModel(pl.LightningModule):
             type=int,
             default=16,
             help="Dimension for prosody feature projection (A1/A2/A3). Default: 16 (enabled)",
+        )
+        parser.add_argument(
+            "--style-vector-dim",
+            type=int,
+            default=0,
+            help="Dimension of optional utterance-level style vectors. Default: 0 (disabled, backwards-compatible).",
+        )
+        parser.add_argument(
+            "--style-condition-dropout",
+            type=float,
+            default=0.0,
+            help="Dropout probability for style-vector conditioning during training. Default: 0.0.",
+        )
+        parser.add_argument(
+            "--style-condition-mode",
+            choices=("text", "global"),
+            default="global",
+            help=(
+                "Where to inject utterance-level style vectors. "
+                "'global' adds projected style to VITS global conditioning g; "
+                "'text' adds projected style to the scaled text encoder input."
+            ),
+        )
+        # PE-A emotion perceptual loss — all disabled by default. Loss is
+        # implicitly enabled when ANY of the three weights is > 0.
+        # ``--pea-emotion-style-bank`` becomes required in that case
+        # (enforced by VitsModel._init_pea_emotion_loss()).
+        parser.add_argument(
+            "--pea-emotion-loss-weight",
+            type=float,
+            default=0.0,
+            help=(
+                "Weight for PE-A generated-audio direction loss toward the "
+                "target emotion. Default: 0.0 (disabled)."
+            ),
+        )
+        parser.add_argument(
+            "--pea-emotion-centroid-weight",
+            type=float,
+            default=0.0,
+            help=(
+                "Weight for PE-A generated-audio attraction to the target "
+                "emotion centroid (1 - cosine). Default: 0.0 (disabled)."
+            ),
+        )
+        parser.add_argument(
+            "--pea-emotion-margin-weight",
+            type=float,
+            default=0.0,
+            help=(
+                "Weight for PE-A target-vs-other emotion centroid hinge "
+                "margin loss. Default: 0.0 (disabled)."
+            ),
+        )
+        parser.add_argument(
+            "--pea-emotion-style-bank",
+            default=None,
+            help=(
+                "Path to a PE-A style bank .npz (schema: emotion_names, "
+                "emotion_centroids, global_centroid). Required when any "
+                "pea-emotion weight > 0."
+            ),
+        )
+        parser.add_argument(
+            "--pea-emotion-model-name",
+            default="facebook/pe-av-small",
+            help="HuggingFace model name for PE-A (default: facebook/pe-av-small).",
+        )
+        parser.add_argument(
+            "--pea-emotion-sample-rate",
+            type=int,
+            default=16000,
+            help="Sample rate used by the PE-A emotion model (default: 16000).",
+        )
+        parser.add_argument(
+            "--pea-emotion-loss-every-n-steps",
+            type=int,
+            default=1,
+            help=(
+                "Compute PE-A emotion loss every N generator steps "
+                "(default: 1; recommended 4 for speed)."
+            ),
+        )
+        parser.add_argument(
+            "--pea-emotion-warmup-steps",
+            type=int,
+            default=0,
+            help=(
+                "Delay PE-A emotion loss until this many global steps have "
+                "elapsed (default: 0; recommended 2000)."
+            ),
+        )
+        parser.add_argument(
+            "--pea-emotion-margin",
+            type=float,
+            default=0.1,
+            help="Cosine margin for PE-A target-vs-other margin loss (default: 0.1).",
         )
         parser.add_argument(
             "--num-workers",

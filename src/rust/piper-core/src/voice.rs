@@ -40,6 +40,8 @@ pub struct SynthesisParams {
     pub noise_w: f32,
     /// Speaker embedding vector for voice cloning (overrides speaker_id).
     pub speaker_embedding: Option<Vec<f32>>,
+    /// Style vector for PE-AV / PE-A conditioning.
+    pub style_vector: Option<Vec<f32>>,
 }
 
 impl Default for SynthesisParams {
@@ -51,6 +53,7 @@ impl Default for SynthesisParams {
             length_scale: 1.0,
             noise_w: 0.8,
             speaker_embedding: None,
+            style_vector: None,
         }
     }
 }
@@ -370,6 +373,7 @@ impl PiperVoice {
             length_scale: params.length_scale,
             noise_w: params.noise_w,
             speaker_embedding: params.speaker_embedding.clone(),
+            style_vector: params.style_vector.clone(),
         };
 
         self.engine.synthesize(&request)
@@ -869,6 +873,7 @@ mod tests {
             length_scale: 1.0,
             noise_w: 0.8,
             speaker_embedding: None,
+            style_vector: None,
         };
         assert_eq!(request.phoneme_ids, ids);
         assert!(request.prosody_features.is_none());
@@ -889,6 +894,7 @@ mod tests {
             length_scale: 1.2,
             noise_w: 0.6,
             speaker_embedding: None,
+            style_vector: None,
         };
         assert_eq!(request.prosody_features.as_ref().unwrap().len(), 3);
         assert_eq!(request.prosody_features.as_ref().unwrap()[0], [-2, 1, 5]);
@@ -907,6 +913,7 @@ mod tests {
             length_scale: 1.0,
             noise_w: 0.8,
             speaker_embedding: None,
+            style_vector: None,
         };
         assert_eq!(request.language_id, Some(2));
         assert_eq!(request.speaker_id, Some(100));
@@ -1122,12 +1129,19 @@ mod tests {
             length_scale: 1.5,
             noise_w: 0.5,
             speaker_embedding: None,
+            style_vector: None,
         };
         assert_eq!(params.speaker_id, Some(5));
         assert_eq!(params.language_override.as_deref(), Some("en"));
         assert!((params.noise_scale - 0.333).abs() < 1e-6);
         assert!((params.length_scale - 1.5).abs() < 1e-6);
         assert!((params.noise_w - 0.5).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_synthesis_params_default_style_vector_none() {
+        let params = SynthesisParams::default();
+        assert!(params.style_vector.is_none());
     }
 
     #[test]

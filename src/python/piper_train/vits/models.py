@@ -194,6 +194,8 @@ class TextEncoder(nn.Module):
         kernel_size: int,
         p_dropout: float,
         gin_channels: int = 0,
+        style_vector_dim: int = 0,
+        style_condition_dropout: float = 0.0,
     ):
         super().__init__()
         self.n_vocab = n_vocab
@@ -205,9 +207,19 @@ class TextEncoder(nn.Module):
         self.kernel_size = kernel_size
         self.p_dropout = p_dropout
         self.gin_channels = gin_channels
+        self.style_vector_dim = style_vector_dim
+        self.style_condition_dropout = style_condition_dropout
 
         self.emb = nn.Embedding(n_vocab, hidden_channels)
         nn.init.normal_(self.emb.weight, 0.0, hidden_channels**-0.5)
+        self.style_proj = (
+            nn.Linear(style_vector_dim, hidden_channels)
+            if style_vector_dim > 0
+            else None
+        )
+        if self.style_proj is not None:
+            nn.init.zeros_(self.style_proj.weight)
+            nn.init.zeros_(self.style_proj.bias)
 
         self.encoder = attentions.Encoder(
             hidden_channels, filter_channels, n_heads, n_layers, kernel_size, p_dropout
@@ -217,8 +229,48 @@ class TextEncoder(nn.Module):
         if gin_channels != 0:
             self.cond_layer = nn.Conv1d(gin_channels, hidden_channels, 1)
 
-    def forward(self, x, x_lengths, g=None):
+    def _style_embedding(self, style_vector, batch_size: int, device, dtype):
+        """Project an optional utterance-level style vector to hidden_channels.
+
+        Returns ``None`` when the encoder was built with ``style_vector_dim=0``
+        (backwards-compatible default).  Otherwise returns a tensor of shape
+        ``[batch, 1, hidden_channels]`` so it can be broadcast-added to the
+        post-scaling token embedding ``[batch, time, hidden_channels]``.
+        """
+        if self.style_proj is None:
+            return None
+
+        if style_vector is None:
+            style_vector = torch.zeros(
+                batch_size,
+                self.style_vector_dim,
+                device=device,
+                dtype=dtype,
+            )
+
+        proj_weight = next(self.style_proj.parameters())
+        style_emb = self.style_proj(
+            style_vector.to(device=proj_weight.device, dtype=proj_weight.dtype)
+        )
+        if self.training and self.style_condition_dropout > 0.0:
+            keep = (
+                torch.rand(style_emb.size(0), device=style_emb.device)
+                >= self.style_condition_dropout
+            ).to(style_emb.dtype)
+            style_emb = style_emb * keep[:, None]
+
+        return style_emb.to(device=device, dtype=dtype).unsqueeze(1)
+
+    def forward(self, x, x_lengths, g=None, style_vector=None):
         x = self.emb(x) * math.sqrt(self.hidden_channels)  # [b, t, h]
+        style_emb = self._style_embedding(
+            style_vector, batch_size=x.size(0), device=x.device, dtype=x.dtype
+        )
+        if style_emb is not None:
+            # Add text-level style after token embedding scaling. PE-A emotion
+            # vectors can be intentionally amplified at inference, and scaling
+            # the projected style by sqrt(hidden_channels) destabilizes duration.
+            x = x + style_emb
         x = torch.transpose(x, 1, -1)  # [b, h, t]
         x_mask = torch.unsqueeze(
             commons.sequence_mask(x_lengths, x.size(2)), 1
@@ -777,8 +829,16 @@ class SynthesizerTrn(nn.Module):
         use_sdp: bool = True,
         prosody_dim: int = 16,
         prosody_language_ids: "set[int] | None" = None,
+        style_vector_dim: int = 0,
+        style_condition_dropout: float = 0.0,
+        style_condition_mode: str = "global",
     ):
         super().__init__()
+        if style_condition_mode not in {"global", "text"}:
+            raise ValueError(
+                "style_condition_mode must be either 'global' or 'text', "
+                f"got {style_condition_mode!r}"
+            )
         self.n_vocab = n_vocab
         self.spec_channels = spec_channels
         self.inter_channels = inter_channels
@@ -799,6 +859,9 @@ class SynthesizerTrn(nn.Module):
         self.n_languages = n_languages
         self.gin_channels = gin_channels
         self.prosody_dim = prosody_dim
+        self.style_vector_dim = style_vector_dim
+        self.style_condition_dropout = style_condition_dropout
+        self.style_condition_mode = style_condition_mode
         # Language IDs with real prosody features (others are zeroed).
         # Default: {0} (JA only). Configurable via prosody_language_ids param.
         self.prosody_language_ids: set[int] = (
@@ -817,6 +880,10 @@ class SynthesizerTrn(nn.Module):
             kernel_size,
             p_dropout,
             gin_channels=gin_channels,
+            style_vector_dim=(
+                style_vector_dim if style_condition_mode == "text" else 0
+            ),
+            style_condition_dropout=style_condition_dropout,
         )
         self.dec = Generator(
             inter_channels,
@@ -870,6 +937,25 @@ class SynthesizerTrn(nn.Module):
         # Lazily initialised on first use if None.
         self.spk_proj = None
 
+        self.style_proj = None
+        if style_vector_dim > 0 and style_condition_mode == "global":
+            if gin_channels <= 0:
+                raise ValueError(
+                    "style_vector_dim > 0 requires gin_channels > 0 so style vectors "
+                    "can condition the decoder, flow, and duration predictor."
+                )
+            self.style_proj = nn.Sequential(
+                nn.Linear(style_vector_dim, gin_channels),
+                nn.SiLU(),
+                nn.Linear(gin_channels, gin_channels),
+            )
+            # Zero-initialise the final Linear so that style conditioning is a
+            # no-op at training start; weights/biases of the first Linear are
+            # left at default (Xavier) to keep gradients flowing once the final
+            # Linear picks up non-zero weights.
+            nn.init.zeros_(self.style_proj[-1].weight)
+            nn.init.zeros_(self.style_proj[-1].bias)
+
     def _get_global_conditioning(self, sid=None, lid=None):
         """Compute global conditioning vector from speaker and language embeddings.
 
@@ -892,6 +978,35 @@ class SynthesizerTrn(nn.Module):
             lang_emb = self.emb_lang(lid).unsqueeze(-1)  # [b, h, 1]
             g = (g + lang_emb) if g is not None else lang_emb
         return g
+
+    def _add_style_condition(self, g, style_vector, batch_size: int, device, dtype):
+        """Add file-backed style-vector conditioning to the global condition."""
+        if self.style_proj is None:
+            return g
+
+        if style_vector is None:
+            style_vector = torch.zeros(
+                batch_size,
+                self.style_vector_dim,
+                device=device,
+                dtype=dtype,
+            )
+
+        proj_weight = next(self.style_proj.parameters())
+        style_g = self.style_proj(
+            style_vector.to(device=proj_weight.device, dtype=proj_weight.dtype)
+        )
+        if self.training and self.style_condition_dropout > 0.0:
+            keep = (
+                torch.rand(style_g.size(0), device=style_g.device)
+                >= self.style_condition_dropout
+            ).to(style_g.dtype)
+            style_g = style_g * keep[:, None]
+
+        style_g = style_g.unsqueeze(-1)
+        if g is None:
+            return style_g.to(device=device, dtype=dtype)
+        return g + style_g.to(device=g.device, dtype=g.dtype)
 
     def _prepare_prosody_input(self, x, x_mask, prosody_features, lid=None):
         """Prepare encoder output with prosody features for duration predictor.
@@ -959,12 +1074,22 @@ class SynthesizerTrn(nn.Module):
         lid=None,
         prosody_features=None,
         speaker_embedding=None,
+        style_vector=None,
     ):
         # NOTE: speaker_embedding is accepted but intentionally unused during
         # training (emb_g(sid) is always used).  The parameter is reserved for
         # future extensions such as joint speaker-encoder fine-tuning.
         g = self._get_global_conditioning(sid, lid)
-        x, m_p, logs_p, x_mask = self.enc_p(x, x_lengths, g=g)
+        if self.style_condition_mode == "global":
+            g = self._add_style_condition(
+                g, style_vector, batch_size=x.size(0), device=x.device, dtype=x.dtype
+            )
+            text_style_vector = None
+        else:
+            text_style_vector = style_vector
+        x, m_p, logs_p, x_mask = self.enc_p(
+            x, x_lengths, g=g, style_vector=text_style_vector
+        )
 
         z, m_q, logs_q, y_mask = self.enc_q(y, y_lengths, g=g)
         z_p = self.flow(z, y_mask, g=g)
@@ -1065,6 +1190,7 @@ class SynthesizerTrn(nn.Module):
         prosody_features=None,
         speaker_embedding=None,
         speaker_embedding_mask=None,
+        style_vector=None,
     ) -> "InferOutput":
         """Run inference to synthesize audio from phoneme IDs.
 
@@ -1109,7 +1235,16 @@ class SynthesizerTrn(nn.Module):
             if self.n_speakers > 1:
                 assert sid is not None, "Missing speaker id"
             g = self._get_global_conditioning(sid, lid)
-        x, m_p, logs_p, x_mask = self.enc_p(x, x_lengths, g=g)
+        if self.style_condition_mode == "global":
+            g = self._add_style_condition(
+                g, style_vector, batch_size=x.size(0), device=x.device, dtype=x.dtype
+            )
+            text_style_vector = None
+        else:
+            text_style_vector = style_vector
+        x, m_p, logs_p, x_mask = self.enc_p(
+            x, x_lengths, g=g, style_vector=text_style_vector
+        )
 
         # Prepare input for duration predictor with prosody features
         x_dp = self._prepare_prosody_input(x, x_mask, prosody_features, lid=lid)

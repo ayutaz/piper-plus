@@ -38,6 +38,8 @@ class Utterance:
     prosody_features: np.ndarray | None = (
         None  # dtype=int16, shape=(num_phonemes, 3) for A1/A2/A3
     )
+    style_vector_path: Path | None = None
+    emotion: str | None = None
 
 
 @dataclass
@@ -49,6 +51,8 @@ class UtteranceTensors:
     language_id: LongTensor | None = None
     text: str | None = None
     prosody_features: LongTensor | None = None  # Shape: (num_phonemes, 3) for A1/A2/A3
+    style_vector: FloatTensor | None = None
+    emotion: str | None = None
 
     @property
     def spec_length(self) -> int:
@@ -66,6 +70,8 @@ class Batch:
     speaker_ids: LongTensor | None = None
     language_ids: LongTensor | None = None
     prosody_features: LongTensor | None = None  # Shape: (batch, max_phonemes, 3)
+    style_vectors: FloatTensor | None = None  # Shape: (batch, style_vector_dim)
+    emotions: list[str | None] | None = None
 
 
 class PiperDataset(Dataset):
@@ -129,6 +135,10 @@ class PiperDataset(Dataset):
         if utt.prosody_features is not None:
             prosody_tensor = self._prosody_features_to_tensor(utt.prosody_features)
 
+        style_vector = None
+        if utt.style_vector_path is not None:
+            style_vector = _load_tensor(utt.style_vector_path).float().view(-1)
+
         return UtteranceTensors(
             phoneme_ids=torch.from_numpy(utt.phoneme_ids).long(),
             audio_norm=audio_norm,
@@ -141,6 +151,8 @@ class PiperDataset(Dataset):
             ),
             text=utt.text,
             prosody_features=prosody_tensor,
+            style_vector=style_vector,
+            emotion=utt.emotion,
         )
 
     @staticmethod
@@ -225,6 +237,11 @@ class PiperDataset(Dataset):
 
         audio_norm_path = Path(utt_dict["audio_norm_path"])
         audio_spec_path = Path(utt_dict["audio_spec_path"])
+        style_vector_path = (
+            Path(utt_dict["style_vector_path"])
+            if utt_dict.get("style_vector_path") is not None
+            else None
+        )
 
         # Resolve relative paths against dataset directory
         if dataset_dir is not None:
@@ -232,6 +249,8 @@ class PiperDataset(Dataset):
                 audio_norm_path = dataset_dir / audio_norm_path
             if not audio_spec_path.is_absolute():
                 audio_spec_path = dataset_dir / audio_spec_path
+            if style_vector_path is not None and not style_vector_path.is_absolute():
+                style_vector_path = dataset_dir / style_vector_path
 
         return Utterance(
             phoneme_ids=phoneme_ids,
@@ -241,6 +260,8 @@ class PiperDataset(Dataset):
             language_id=utt_dict.get("language_id"),
             text=utt_dict.get("text"),
             prosody_features=prosody_features,
+            style_vector_path=style_vector_path,
+            emotion=utt_dict.get("emotion"),
         )
 
 
@@ -262,6 +283,8 @@ class UtteranceCollate:
 
         num_mels = 0
         has_prosody = False
+        style_vector_dim = 0
+        has_emotion = False
 
         # Determine lengths
         for _utt_idx, utt in enumerate(utterances):
@@ -282,6 +305,10 @@ class UtteranceCollate:
 
             if utt.prosody_features is not None:
                 has_prosody = True
+            if utt.style_vector is not None:
+                style_vector_dim = max(style_vector_dim, int(utt.style_vector.numel()))
+            if utt.emotion is not None:
+                has_emotion = True
 
         # Audio cannot be smaller than segment size (8192)
         max_audio_length = max(max_audio_length, self.segment_size)
@@ -312,6 +339,13 @@ class UtteranceCollate:
         if has_prosody:
             prosody_padded = LongTensor(num_utterances, max_phonemes_length, 3)
             prosody_padded.zero_()
+
+        style_vectors: FloatTensor | None = None
+        if style_vector_dim > 0:
+            style_vectors = FloatTensor(num_utterances, style_vector_dim)
+            style_vectors.zero_()
+
+        emotions: list[str | None] | None = [] if has_emotion else None
 
         # Sort by decreasing spectrogram length
         sorted_utterances = sorted(
@@ -346,6 +380,13 @@ class UtteranceCollate:
                         :prosody_length
                     ]
 
+            if style_vectors is not None and utt.style_vector is not None:
+                n = min(style_vector_dim, int(utt.style_vector.numel()))
+                style_vectors[utt_idx, :n] = utt.style_vector[:n]
+
+            if emotions is not None:
+                emotions.append(utt.emotion)
+
         return Batch(
             phoneme_ids=phonemes_padded,
             phoneme_lengths=phoneme_lengths,
@@ -356,6 +397,8 @@ class UtteranceCollate:
             speaker_ids=speaker_ids,
             language_ids=language_ids,
             prosody_features=prosody_padded,
+            style_vectors=style_vectors,
+            emotions=emotions,
         )
 
 

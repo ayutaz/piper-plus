@@ -83,6 +83,27 @@ await audio.play();
 tts.dispose();
 ```
 
+### Style-Conditioned Synthesis (optional)
+
+PE-AV / PE-A style vectors let you steer the synthesized voice toward an
+emotion or style target. Pass a `Float32Array` whose length matches the
+model's `style_vector_dim` (from `config.json`).
+
+```javascript
+// styleVector.length must match the model's config.style_vector_dim.
+const styleVector = new Float32Array(256);
+// Populate styleVector with an emotion centroid from your style bank
+// (e.g. emotion_centroids["happy"] from build_pea_style_bank.py).
+
+const audio = await tts.synthesize("嬉しいです", {
+  language: "ja",
+  styleVector,
+});
+```
+
+Omitting `styleVector` is safe: the runtime sends zeros and a mask=0 flag,
+which makes style conditioning effectively disabled.
+
 ### Streaming Synthesis
 
 For long texts, streaming mode splits the input into sentences and delivers audio chunks as they are generated:

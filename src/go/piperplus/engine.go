@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"math"
+	"strconv"
 	"time"
 
 	ort "github.com/yalue/onnxruntime_go"
@@ -21,6 +22,9 @@ type ModelCapabilities struct {
 	HasProsody          bool
 	HasDurationOutput   bool
 	HasSpeakerEmbedding bool // model accepts speaker_embedding + speaker_embedding_mask
+	// style_vector conditioning.
+	HasStyleVector bool
+	StyleVectorDim int32
 }
 
 // OnnxEngine wraps DynamicAdvancedSession for TTS inference.
@@ -60,7 +64,23 @@ func detectCapabilities(modelPath string) (*ModelCapabilities, error) {
 		HasProsody:          containsName(inputs, "prosody_features"),
 		HasDurationOutput:   containsName(outputs, "durations"),
 		HasSpeakerEmbedding: containsName(inputs, "speaker_embedding"),
+		HasStyleVector:      containsName(inputs, "style_vector"),
 	}
+
+	// resolve style_vector_dim from the input shape.
+	// Axis 0 is dynamic (batch), axis 1 is the dim.
+	if caps.HasStyleVector {
+		for _, info := range inputs {
+			if info.Name == "style_vector" && len(info.Dimensions) >= 2 {
+				dim := info.Dimensions[1]
+				if dim > 0 {
+					caps.StyleVectorDim = int32(dim)
+				}
+				break
+			}
+		}
+	}
+
 	return caps, nil
 }
 
@@ -86,6 +106,10 @@ func newOnnxEngine(modelPath string, config *VoiceConfig, sessOpts *ort.SessionO
 		inputNames = append(inputNames, "speaker_embedding")
 		inputNames = append(inputNames, "speaker_embedding_mask")
 	}
+	if caps.HasStyleVector {
+		inputNames = append(inputNames, "style_vector")
+		inputNames = append(inputNames, "style_vector_mask")
+	}
 
 	// Build output names: always include audio output, conditionally add durations.
 	outputNames := []string{"output"}
@@ -101,6 +125,19 @@ func newOnnxEngine(modelPath string, config *VoiceConfig, sessOpts *ort.SessionO
 		}
 	}
 
+	// fallback — resolve style_vector_dim from ONNX custom
+	// metadata when the input shape did not expose a concrete dim.
+	if caps.HasStyleVector && caps.StyleVectorDim <= 0 {
+		if meta, mErr := session.GetModelMetadata(); mErr == nil && meta != nil {
+			if val, present, lErr := meta.LookupCustomMetadataMap("style_vector_dim"); lErr == nil && present {
+				if parsed, pErr := strconv.Atoi(val); pErr == nil && parsed > 0 {
+					caps.StyleVectorDim = int32(parsed)
+				}
+			}
+			_ = meta.Destroy()
+		}
+	}
+
 	logger.Info("loaded ONNX model",
 		"path", modelPath,
 		"has_speaker_id", caps.HasSpeakerID,
@@ -108,6 +145,8 @@ func newOnnxEngine(modelPath string, config *VoiceConfig, sessOpts *ort.SessionO
 		"has_prosody", caps.HasProsody,
 		"has_duration_output", caps.HasDurationOutput,
 		"has_speaker_embedding", caps.HasSpeakerEmbedding,
+		"has_style_vector", caps.HasStyleVector,
+		"style_vector_dim", caps.StyleVectorDim,
 	)
 
 	hopSize := config.Audio.HopSize
@@ -279,6 +318,44 @@ func (e *OnnxEngine) Synthesize(ctx context.Context, req *SynthesisRequest) (*Sy
 			tensors = append(tensors, maskTensor)
 			inputs = append(inputs, maskTensor)
 		}
+	}
+
+	// "style_vector" + "style_vector_mask" inputs.
+	// Always send both when the model has the input; zero-fill + mask=0
+	// when the caller did not provide a valid style vector.
+	if e.capabilities.HasStyleVector {
+		dim := int64(1)
+		if e.capabilities.StyleVectorDim > 0 {
+			dim = int64(e.capabilities.StyleVectorDim)
+		}
+		var styleData []float32
+		var maskVal int64
+		expected := int(e.capabilities.StyleVectorDim)
+		if len(req.StyleVector) > 0 && expected > 0 && len(req.StyleVector) == expected {
+			styleData = req.StyleVector
+			maskVal = 1
+		} else {
+			if len(req.StyleVector) > 0 && expected > 0 && len(req.StyleVector) != expected {
+				return nil, &InferenceError{Msg: fmt.Sprintf(
+					"StyleVector length %d != expected %d", len(req.StyleVector), expected)}
+			}
+			styleData = make([]float32, dim)
+			maskVal = 0
+		}
+
+		styleTensor, err := ort.NewTensor(ort.NewShape(1, dim), styleData)
+		if err != nil {
+			return nil, &InferenceError{Msg: "failed to create style_vector tensor", Err: err}
+		}
+		tensors = append(tensors, styleTensor)
+		inputs = append(inputs, styleTensor)
+
+		styleMaskTensor, err := ort.NewTensor(ort.NewShape(1, 1), []int64{maskVal})
+		if err != nil {
+			return nil, &InferenceError{Msg: "failed to create style_vector_mask tensor", Err: err}
+		}
+		tensors = append(tensors, styleMaskTensor)
+		inputs = append(inputs, styleMaskTensor)
 	}
 
 	// Prepare outputs: nil for auto-allocation.

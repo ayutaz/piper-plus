@@ -536,6 +536,7 @@ class PiperVoice:
         sentence_silence: float = 0.0,
         volume: float = 1.0,
         language_id: int | None = None,
+        style_vector: "np.ndarray | None" = None,
     ):
         """Synthesize WAV audio from text.
 
@@ -544,6 +545,15 @@ class PiperVoice:
         :meth:`synthesize_stream_raw`. The chunks are concatenated into a
         single WAV file. SSML markup (``<speak>...``) is treated as a
         single unit.
+
+        Parameters
+        ----------
+        style_vector : np.ndarray or None
+            Optional style vector (float32, shape ``(dim,)`` or ``(1, dim)``)
+            that conditions the model. When the loaded ONNX model has a
+            ``style_vector`` input and this argument is ``None``, the input is
+            populated with zeros and ``style_vector_mask`` is set to 0 so the
+            model's style branch is effectively disabled.
         """
         wav_file.setframerate(self.config.sample_rate)
         wav_file.setsampwidth(2)  # 16-bit
@@ -558,6 +568,7 @@ class PiperVoice:
             sentence_silence=sentence_silence,
             volume=volume,
             language_id=language_id,
+            style_vector=style_vector,
         ):
             wav_file.writeframes(audio_bytes)
 
@@ -571,6 +582,7 @@ class PiperVoice:
         sentence_silence: float = 0.0,
         volume: float = 1.0,
         language_id: int | None = None,
+        style_vector: "np.ndarray | None" = None,
     ) -> Iterable[bytes]:
         """Synthesize raw audio per sentence from text.
 
@@ -616,8 +628,35 @@ class PiperVoice:
                 noise_w=noise_w,
                 volume=volume,
                 language_id=language_id,
+                style_vector=style_vector,
             )
             yield break_bytes + audio_bytes + break_bytes + silence_bytes
+
+    def _resolve_style_vector_dim(self) -> int:
+        """Resolve the style_vector dimension from ONNX metadata → config → 0.
+
+        Looks up ``style_vector_dim`` in the following order:
+
+        1. ``session.get_modelmeta().custom_metadata_map`` (set at ONNX export
+           time by :func:`piper_train.export_onnx.write_style_vector_metadata`).
+        2. ``PiperConfig.style_vector_dim`` (optional ``config.json`` field).
+        3. ``0`` (feature disabled).
+
+        Returns
+        -------
+        int
+            The effective ``style_vector_dim`` for this voice.
+        """
+        try:
+            meta_map = dict(self.session.get_modelmeta().custom_metadata_map)
+        except Exception:
+            meta_map = {}
+        if "style_vector_dim" in meta_map:
+            try:
+                return int(meta_map["style_vector_dim"])
+            except (TypeError, ValueError):
+                pass
+        return getattr(self.config, "style_vector_dim", 0) or 0
 
     def _synthesize_ids_core(
         self,
@@ -628,6 +667,7 @@ class PiperVoice:
         noise_w: float | None = None,
         volume: float = 1.0,
         language_id: int | None = None,
+        style_vector: "np.ndarray | None" = None,
     ) -> tuple[bytes, "np.ndarray | None", list[int]]:
         """Core synthesis returning ``(audio_bytes, durations, original_phoneme_ids)``.
 
@@ -730,6 +770,41 @@ class PiperVoice:
             prosody = np.zeros((1, num_phonemes, 3), dtype=np.int64)
             args["prosody_features"] = prosody
 
+        # Include style_vector + style_vector_mask if model supports them.
+        # mask=1 when a caller-provided vector is used, mask=0 + zeros when
+        # style conditioning should be effectively disabled for this call.
+        if "style_vector" in input_names:
+            style_vector_dim = self._resolve_style_vector_dim()
+            if style_vector_dim <= 0:
+                # Fall back to the first input's declared shape axis 1 if the
+                # metadata/config did not provide a dim.
+                sv_input = next(
+                    inp
+                    for inp in self.session.get_inputs()
+                    if inp.name == "style_vector"
+                )
+                # shape may contain a str/None for dynamic axes; the second
+                # axis (dim) is expected to be a concrete integer.
+                if len(sv_input.shape) >= 2 and isinstance(sv_input.shape[1], int):
+                    style_vector_dim = int(sv_input.shape[1])
+
+            if style_vector is not None and style_vector_dim > 0:
+                style_vec = np.asarray(style_vector, dtype=np.float32)
+                if style_vec.ndim == 1:
+                    style_vec = style_vec.reshape(1, -1)
+                if style_vec.shape != (1, style_vector_dim):
+                    raise ValueError(
+                        "style_vector shape mismatch: expected "
+                        f"(1, {style_vector_dim}), got {style_vec.shape}"
+                    )
+                args["style_vector"] = style_vec
+                args["style_vector_mask"] = np.array([[1]], dtype=np.int64)
+            else:
+                args["style_vector"] = np.zeros(
+                    (1, max(style_vector_dim, 1)), dtype=np.float32
+                )
+                args["style_vector_mask"] = np.array([[0]], dtype=np.int64)
+
         # Synthesize through Onnx
         output_names = [o.name for o in self.session.get_outputs()]
         _outputs = self.session.run(output_names, args)
@@ -776,6 +851,7 @@ class PiperVoice:
         noise_w: float | None = None,
         volume: float = 1.0,
         language_id: int | None = None,
+        style_vector: "np.ndarray | None" = None,
     ) -> bytes:
         """Synthesize raw audio from phoneme ids."""
         audio_bytes, _, _ = self._synthesize_ids_core(
@@ -786,6 +862,7 @@ class PiperVoice:
             noise_w=noise_w,
             volume=volume,
             language_id=language_id,
+            style_vector=style_vector,
         )
         return audio_bytes
 
@@ -819,6 +896,7 @@ class PiperVoice:
         sentence_silence: float = 0.0,
         volume: float = 1.0,
         language_id: int | None = None,
+        style_vector: "np.ndarray | None" = None,
     ) -> tuple[bytes, TimingResult | None]:
         """Synthesize audio with phoneme timing information.
 
@@ -905,6 +983,7 @@ class PiperVoice:
                     noise_w=noise_w,
                     volume=volume,
                     language_id=language_id,
+                    style_vector=style_vector,
                 )
 
                 wf.writeframes(audio_bytes)
