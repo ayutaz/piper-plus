@@ -51,7 +51,7 @@
   "homepage": "https://github.com/ayutaz/piper-plus/tree/dev/src/wasm/g2p#readme",
   "bugs": "https://github.com/ayutaz/piper-plus/issues",
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=24.0.0"
   },
   "pua_compat_version": 1
 }
