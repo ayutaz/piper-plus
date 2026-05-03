@@ -171,6 +171,7 @@ def create_app(voice: Any, synthesize_args: dict[str, Any]) -> FastAPI:
         language: str | None = Query(None),
         language_id: str | None = Query(None),
         streaming: str | None = Query(None),
+        style_vector_b64: str | None = Query(None),
     ) -> Response:
         """Synthesize speech and return ``audio/wav``.
 
@@ -179,6 +180,12 @@ def create_app(voice: Any, synthesize_args: dict[str, Any]) -> FastAPI:
         per-sentence PCM frames via ``synthesize_stream_raw``); otherwise the
         full WAV is buffered and returned in one response. ``?language=`` /
         ``?language_id=`` route through the loaded voice's language map.
+
+        Optional style vector input (only used when the loaded ONNX model
+        exposes a ``style_vector`` input):
+
+        - ``X-Style-Vector-B64`` header: base64-encoded raw float32 LE.
+        - ``?style_vector_b64=`` query: same encoding.
         """
         try:
             body_text = await _read_text(request, text)
@@ -190,6 +197,7 @@ def create_app(voice: Any, synthesize_args: dict[str, Any]) -> FastAPI:
 
         resolved_language_id = _resolve_language_id(voice, language_id, language)
         is_streaming = _parse_bool_flag(streaming)
+        style_vector = _parse_style_vector_from_request(request, style_vector_b64)
         _LOGGER.debug(
             "Synthesizing text: %s (language_id=%s, streaming=%s)",
             body_text,
@@ -207,6 +215,7 @@ def create_app(voice: Any, synthesize_args: dict[str, Any]) -> FastAPI:
                         body_text,
                         **synthesize_args,
                         language_id=resolved_language_id,
+                        style_vector=style_vector,
                     )
                 except Exception:
                     # Headers have already been sent — we cannot return 500.
@@ -224,6 +233,7 @@ def create_app(voice: Any, synthesize_args: dict[str, Any]) -> FastAPI:
                         wav_file,
                         **synthesize_args,
                         language_id=resolved_language_id,
+                        style_vector=style_vector,
                     )
                 return wav_io.getvalue()
 
@@ -298,39 +308,34 @@ def _warn_if_public_bind(host: str) -> None:
         )
 
 
-def _parse_style_vector_from_request(req) -> "np.ndarray | None":
-    """Extract a style_vector from an incoming Flask request.
+def _parse_style_vector_from_request(
+    request: "Request",
+    style_vector_b64_query: str | None,
+) -> "np.ndarray | None":
+    """Extract a style_vector from an incoming FastAPI request.
 
-    Supports three encodings (checked in order):
+    Supports two encodings (checked in order):
 
     1. ``X-Style-Vector-B64`` request header: base64-encoded raw float32 LE.
     2. Query parameter ``style_vector_b64``: base64-encoded float32 LE.
-    3. JSON body with ``{"style_vector": [f, f, ...]}`` (only if the
-       request's ``Content-Type`` is ``application/json``).
+
+    JSON-body encoding is intentionally unsupported here because the POST
+    body is consumed once as raw text by :func:`_read_text` and FastAPI's
+    request stream cannot be replayed.
 
     Returns
     -------
     np.ndarray or None
         A 1-D float32 array, or ``None`` when no style vector was supplied.
     """
-    # 1. Base64 in header
-    header_b64 = req.headers.get("X-Style-Vector-B64")
+    header_b64 = request.headers.get("x-style-vector-b64")
     if header_b64:
         raw = base64.b64decode(header_b64)
         return np.frombuffer(raw, dtype=np.float32).copy()
 
-    # 2. Base64 in query string
-    q_b64 = req.args.get("style_vector_b64")
-    if q_b64:
-        raw = base64.b64decode(q_b64)
+    if style_vector_b64_query:
+        raw = base64.b64decode(style_vector_b64_query)
         return np.frombuffer(raw, dtype=np.float32).copy()
-
-    # 3. JSON body
-    if req.is_json:
-        payload = req.get_json(silent=True) or {}
-        sv = payload.get("style_vector")
-        if sv is not None:
-            return np.asarray(sv, dtype=np.float32)
 
     return None
 
