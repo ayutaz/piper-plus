@@ -34,20 +34,24 @@ A fast, high-quality neural text-to-speech (TTS) system. Built on the [VITS](htt
 
 ## Benchmark
 
-> **Environment**: Apple M2 Max / 32GB RAM / macOS 15 / Python 3.12 / ONNX Runtime 1.17
-> **Test text**: "Hello, how are you doing today?" (English, ~25 phonemes)
-> **Reproduce**: `uv run python scripts/benchmark.py --model <model.onnx> --config <config.json> --format markdown`
+> **Environment (piper-plus row)**: Intel Xeon E5-2650 v4 @ 2.20GHz / 48 cores / Linux x86_64 / Python 3.12 / ONNX Runtime 1.24
+> **Model**: 6lang MB-iSTFT 75epoch ONNX (unified decoder introduced in PR #320)
+> **Test text**: "Hello, how are you doing today?" (English, 25 phonemes)
+> **Run config**: 5 warmup iterations + 30 measured iterations
+> **Reproduce**: `uv run python scripts/benchmark.py --model <model.onnx> --config <config.json> --language en --text "Hello, how are you doing today?" --n-warmup 5 --n-runs 30 --format markdown`
 
-| System | RTF ↓ | Size (MB) | RAM (MB) | Cold Start (ms) | Languages | License |
-|--------|-------|-----------|---------|-----------------|-----------|---------|
-| **piper-plus** | **0.05** | **38** | **120** | **350** | **8** | **MIT** |
-| Piper original (archived) | 0.06 | 75 | 150 | 400 | 1/model | MIT |
-| piper1-gpl (OHF fork) | 0.06 | 75 | 150 | 400 | 1/model | GPL-3.0 |
-| Kokoro-82M | 0.12 | 320 | 450 | 800 | 1 | Apache-2.0 |
-| sherpa-onnx | 0.07 | 75 | 130 | 380 | 1/model | Apache-2.0 |
-| eSpeak-NG | 0.001 | 2 | 15 | 10 | 100+ | GPL-3.0 |
+| System | RTF ↓ | Latency P50 (ms) | Size (MB) | RAM (MB) | Cold Start (ms) | Languages | License |
+|--------|-------|------------------|-----------|---------|-----------------|-----------|---------|
+| **piper-plus (MB-iSTFT)** | **0.078** | **27** | **38** | **208** | **1633** | **8** | **MIT** |
+| Piper original (archived) † | 0.06 | — | 75 | 150 | 400 | 1/model | MIT |
+| piper1-gpl (OHF fork) † | 0.06 | — | 75 | 150 | 400 | 1/model | GPL-3.0 |
+| Kokoro-82M † | 0.12 | — | 320 | 450 | 800 | 1 | Apache-2.0 |
+| sherpa-onnx † | 0.07 | — | 75 | 130 | 380 | 1/model | Apache-2.0 |
+| eSpeak-NG † | 0.001 | — | 2 | 15 | 10 | 100+ | GPL-3.0 |
 
-> **Note**: RTF (Real-Time Factor) — lower is faster. eSpeak-NG is non-neural TTS (reference only). piper-plus covers 8 languages in a single model (6 trained + 2 G2P-ready). Measured with `scripts/benchmark.py`. Results may vary by hardware. See script for full methodology.
+> **Note**: RTF (Real-Time Factor) — lower is faster. `Latency P50` is the median single-inference time and is the most direct measure of responsiveness. piper-plus's MB-iSTFT unified decoder reduces P50 by -38% over the legacy HiFi-GAN baseline (43.3ms → 26.9ms). A single model covers 8 languages (6 trained + 2 G2P-ready).
+>
+> **†** rows are previous benchmarks taken on Apple M2 Max and were not re-measured in this PR. Treat the cross-row comparison as approximate due to hardware differences. eSpeak-NG is non-neural TTS (reference only).
 
 ---
 
