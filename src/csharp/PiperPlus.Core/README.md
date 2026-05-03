@@ -5,7 +5,7 @@
 
 > 日本語の概要は [リポジトリ ルート README (日本語)](https://github.com/ayutaz/piper-plus/blob/dev/README.md) と [`CLAUDE.md`](https://github.com/ayutaz/piper-plus/blob/dev/CLAUDE.md) を参照してください。
 
-`PiperPlus.Core` is the .NET library that powers [Piper Plus](https://github.com/ayutaz/piper-plus) — a fast, high-quality neural text-to-speech engine based on the VITS architecture. It bundles ONNX inference, 8-language phonemization, dictionary management, SSML parsing, and streaming text splitting in a single library targeting `net8.0`.
+`PiperPlus.Core` is the .NET library that powers [Piper Plus](https://github.com/ayutaz/piper-plus) — a fast, high-quality neural text-to-speech engine based on the VITS architecture. It bundles ONNX inference, 8-language phonemization, dictionary management, SSML parsing, and streaming text splitting in a single library targeting `net10.0`.
 
 Use this package when you want to embed Piper Plus directly in a .NET application; for a ready-to-run command-line tool, see [`PiperPlus.Cli`](https://www.nuget.org/packages/PiperPlus.Cli/).
 
@@ -85,7 +85,7 @@ Capabilities like multi-speaker (`HasSpeakerId`), multilingual (`HasLanguageId`)
 
 ## Target framework
 
-- `net8.0` (the `PiperPlus.Cli` tool that consumes this library targets `net9.0`).
+- `net10.0` (the `PiperPlus.Cli` tool that consumes this library also targets `net10.0`).
 - Depends on `Microsoft.ML.OnnxRuntime.Managed` 1.24.x and `Microsoft.Extensions.Logging.Abstractions` 8.x.
 
 ## Related packages

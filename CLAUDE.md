@@ -338,7 +338,7 @@ Validation頻度削減、DataLoader最適化 (num_workers=2, pin_memory)、LRス
 
 | 項目 | 詳細 |
 |------|------|
-| TFM | PiperPlus.Core: net8.0, PiperPlus.Cli: net9.0 |
+| TFM | PiperPlus.Core: net10.0, PiperPlus.Cli: net10.0 |
 | 対応言語 | JA, EN, ZH, KO, ES, FR, PT, SV (8言語) |
 | G2P依存 | DotNetG2P v1.8.0 (JA), DotNetG2P.MeCab v1.8.0 (JA), DotNetG2P.English v1.8.0 (EN), DotNetG2P.Chinese/Spanish/French/Portuguese v1.8.0 |
 | テスト | ~1000テスト (xUnit v3) |

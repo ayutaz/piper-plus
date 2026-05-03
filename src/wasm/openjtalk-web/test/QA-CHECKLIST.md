@@ -31,7 +31,7 @@
 - [ ] `files` に `assets/` が含まれて**いない**
 - [ ] `files` に `models/` が含まれて**いない**
 - [ ] `peerDependencies` に `onnxruntime-web` が `">=1.21.0"` で指定されている
-- [ ] `engines.node` が `">=18.0.0"` である
+- [ ] `engines.node` が `">=24.0.0"` である
 - [ ] `repository.url` が `"https://github.com/ayutaz/piper-plus"` である
 
 ---
