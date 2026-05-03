@@ -65,10 +65,6 @@ uv run python -m piper_train \
 | `--sub-stft-win-sizes` | `60,150,300` | Window sizes |
 | `--c-sub-stft` | `1.0` | Weight for sub-band STFT loss |
 
-### Details
-
-For the design specification, PQMF formulas, and ONNX-compatible iSTFT implementation details, see [docs/design/mb-istft-vits2-requirements.md](../design/mb-istft-vits2-requirements.md).
-
 ## ONNX Export
 
 FP16 conversion is applied by default, reducing model size by ~50%. Use `--no-fp16` to disable.

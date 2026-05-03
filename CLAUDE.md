@@ -243,7 +243,6 @@ HiFi-GAN Decoder の最終アップサンプリング段を MB-iSTFT (Multi-Band
 
 **CLIオプション:** `--mb-istft`, `--sub-stft-fft-sizes` (デフォルト: 171,384,683), `--sub-stft-hop-sizes` (デフォルト: 10,30,60), `--sub-stft-win-sizes` (デフォルト: 60,150,300), `--c-sub-stft` (デフォルト: 1.0)
 **実装:** `vits/mb_istft.py` (`MBiSTFTGenerator`, `PQMF`), `vits/stft_onnx.py` (`OnnxISTFT`), `vits/stft_loss.py` (`MultiResolutionSTFTLoss`), `vits/models.py`, `vits/lightning.py`, `__main__.py`, `export_onnx.py`
-**設計仕様:** `docs/design/mb-istft-vits2-requirements.md`
 **テスト:** `tests/test_pqmf.py`, `tests/test_mb_istft_generator.py`, `tests/test_stft_loss.py`, `tests/test_stft_onnx.py`, `tests/test_export_onnx_mb_istft.py`, `tests/test_main_mb_istft.py`
 **性能:** 通常 VITS 168.2ms vs MB-iSTFT 76.2ms (CPU 100 phoneme p50, **2.21x 高速化**)、つくよみちゃん FT 61.9ms (RTF 0.046)。Decoder 単体は ~3.6x 高速 (論文値と同等)。
 **制約:** `--mb-istft` は `--quality medium` 専用 (high 非対応)。

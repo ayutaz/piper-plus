@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 #### MB-iSTFT-VITS2 Generator (`--mb-istft`) (新規)
 
-- **MB-iSTFT-VITS2 Generator (`--mb-istft`)**: HiFi-GAN Decoder の最終アップサンプリング段を MB-iSTFT (Multi-Band inverse STFT) + PQMF に置換した軽量 Generator。`upsample_rates=(4,4)` + iSTFT(4x) + PQMF(4x) = 256x 倍率を維持しつつ Decoder 計算量を削減し、CPU 推論を **2.21x 高速化** (Mean infer 168.2ms → 76.2ms, RTF 0.066 → 0.037, 100 phoneme p50)。ONNX 互換 iSTFT は DFT 行列方式 (`OnnxISTFT`) で `F.conv_transpose1d` に展開し opset 15 で動作。出力形状 `[B, 1, T]` 維持のため C#/Rust/Go/WASM/C++ ランタイム変更不要。新規 CLI: `--mb-istft`, `--sub-stft-fft-sizes`, `--sub-stft-hop-sizes`, `--sub-stft-win-sizes`, `--c-sub-stft`。学習済みモデル: 6lang MB-iSTFT 75 epoch ベース + つくよみちゃん MB-iSTFT 500 epoch FT。実装: `vits/mb_istft.py`, `vits/stft_onnx.py`, `vits/stft_loss.py`。設計仕様: [docs/design/mb-istft-vits2-requirements.md](docs/design/mb-istft-vits2-requirements.md)。Issue #268, PR #320。
+- **MB-iSTFT-VITS2 Generator (`--mb-istft`)**: HiFi-GAN Decoder の最終アップサンプリング段を MB-iSTFT (Multi-Band inverse STFT) + PQMF に置換した軽量 Generator。`upsample_rates=(4,4)` + iSTFT(4x) + PQMF(4x) = 256x 倍率を維持しつつ Decoder 計算量を削減し、CPU 推論を **2.21x 高速化** (Mean infer 168.2ms → 76.2ms, RTF 0.066 → 0.037, 100 phoneme p50)。ONNX 互換 iSTFT は DFT 行列方式 (`OnnxISTFT`) で `F.conv_transpose1d` に展開し opset 15 で動作。出力形状 `[B, 1, T]` 維持のため C#/Rust/Go/WASM/C++ ランタイム変更不要。新規 CLI: `--mb-istft`, `--sub-stft-fft-sizes`, `--sub-stft-hop-sizes`, `--sub-stft-win-sizes`, `--c-sub-stft`。学習済みモデル: 6lang MB-iSTFT 75 epoch ベース + つくよみちゃん MB-iSTFT 500 epoch FT。実装: `vits/mb_istft.py`, `vits/stft_onnx.py`, `vits/stft_loss.py`。Issue #268, PR #320。
 
 #### Python ランタイム ストリーミング文単位分割 (新規)
 
