@@ -39,6 +39,11 @@ Piper Plus documentation. Guides and references for using and developing with Pi
 ## API Reference
 - [Phoneme Mapping](api-reference/phoneme-mapping.md) - Phoneme reference for all languages
 
+## Spec
+- [Runtime Versions & Update Plan](spec/runtime-versions.md) - 各言語ランタイムのバージョンポリシー・EOL ステータス・.NET/Unity マルチターゲット化計画
+- [ONNX Runtime Versions](spec/ort-versions.md) - 各実装の ONNX Runtime バージョン整合
+- [Model Resolution](spec/model-resolution.md) - モデル名解決仕様
+
 ## Development
 - [Contributing](/CONTRIBUTING.md) - Contribution guidelines
 - [Changelog](/CHANGELOG.md) - Version history
