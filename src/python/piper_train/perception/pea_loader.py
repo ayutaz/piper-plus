@@ -30,10 +30,10 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Optional, Tuple
 
 import numpy as np
 import torch
+
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -60,7 +60,7 @@ _PEA_INSTALL_HINT = (
 
 def load_pea_emotion_model(
     model_name: str = "facebook/pe-av-small",
-    device: Optional[torch.device] = None,
+    device: torch.device | None = None,
 ) -> torch.nn.Module:
     """Load the PE-A audio encoder in ``eval()`` mode with all params frozen.
 
@@ -91,8 +91,8 @@ def load_pea_emotion_model(
         :func:`grad_enabled_embedder_forward` at call time.
     """
 
-    transformers_err: Optional[Exception] = None
-    perception_models_err: Optional[Exception] = None
+    transformers_err: Exception | None = None
+    perception_models_err: Exception | None = None
 
     # --- Attempt 1: transformers.AutoModel (preferred, thin) ---
     try:
@@ -102,9 +102,7 @@ def load_pea_emotion_model(
         model = AutoModel.from_pretrained(model_name, trust_remote_code=True)
     except Exception as err:  # noqa: BLE001 — we re-raise below if both fail
         transformers_err = err
-        _LOGGER.info(
-            "transformers.AutoModel failed for %s: %s", model_name, err
-        )
+        _LOGGER.info("transformers.AutoModel failed for %s: %s", model_name, err)
         model = None  # type: ignore[assignment]
 
     # --- Attempt 2: perception_models (Meta's internal class) ---
@@ -119,20 +117,15 @@ def load_pea_emotion_model(
                     PeAudioVideoModel,
                 )
 
-            _LOGGER.info(
-                "Loading PE-A model via PeAudioVideoModel: %s", model_name
-            )
+            _LOGGER.info("Loading PE-A model via PeAudioVideoModel: %s", model_name)
             model = PeAudioVideoModel.from_pretrained(model_name)
         except Exception as err:  # noqa: BLE001
             perception_models_err = err
-            _LOGGER.info(
-                "PeAudioVideoModel loader failed for %s: %s", model_name, err
-            )
+            _LOGGER.info("PeAudioVideoModel loader failed for %s: %s", model_name, err)
 
     if model is None:
         raise ImportError(
-            _PEA_INSTALL_HINT
-            % (model_name, transformers_err, perception_models_err)
+            _PEA_INSTALL_HINT % (model_name, transformers_err, perception_models_err)
         )
 
     # Freeze the model — the perceptual loss keeps PE-A weights static while
@@ -154,7 +147,7 @@ def load_pea_emotion_model(
 
 def load_style_bank(
     path: Path | str,
-) -> Tuple[list[str], torch.Tensor, torch.Tensor]:
+) -> tuple[list[str], torch.Tensor, torch.Tensor]:
     """Load a PE-A style bank ``.npz`` file.
 
     Parameters
@@ -187,12 +180,8 @@ def load_style_bank(
         )
 
     emotion_names = [str(name) for name in bank["emotion_names"].tolist()]
-    emotion_centroids = torch.as_tensor(
-        bank["emotion_centroids"], dtype=torch.float32
-    )
-    global_centroid = torch.as_tensor(
-        bank["global_centroid"], dtype=torch.float32
-    )
+    emotion_centroids = torch.as_tensor(bank["emotion_centroids"], dtype=torch.float32)
+    global_centroid = torch.as_tensor(bank["global_centroid"], dtype=torch.float32)
 
     _LOGGER.info(
         "Loaded style bank: path=%s, N=%d, D=%d",
@@ -211,7 +200,7 @@ def load_style_bank(
 def grad_enabled_embedder_forward(
     embedder_self,
     input_values: torch.Tensor,
-    padding_mask: Optional[torch.Tensor] = None,
+    padding_mask: torch.Tensor | None = None,
 ):
     """Fork-compatible DAC embedder forward that keeps gradients flowing.
 
@@ -255,9 +244,7 @@ def grad_enabled_embedder_forward(
     codec_features = hidden_states.transpose(1, 2)
     inputs_embeds = embedder_self.data_proj(codec_features)
     if padding_mask is not None:
-        padding_mask = padding_mask[
-            :, :: embedder_self.config.dac_config.hop_length
-        ]
+        padding_mask = padding_mask[:, :: embedder_self.config.dac_config.hop_length]
     return inputs_embeds, padding_mask
 
 

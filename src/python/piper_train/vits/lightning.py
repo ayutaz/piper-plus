@@ -2,7 +2,6 @@ import logging
 import types
 from pathlib import Path
 
-import numpy as np
 import pytorch_lightning as pl
 import torch
 import torchaudio.functional as AF
@@ -399,9 +398,7 @@ class VitsModel(pl.LightningModule):
             Path(style_bank)
         )
 
-        self._pea_emotion_to_idx = {
-            name: idx for idx, name in enumerate(emotion_names)
-        }
+        self._pea_emotion_to_idx = {name: idx for idx, name in enumerate(emotion_names)}
         # L2-normalise both centroid arrays before registering so downstream
         # cosine similarity / direction maths consume unit-norm vectors.
         self.register_buffer(
@@ -455,9 +452,7 @@ class VitsModel(pl.LightningModule):
                 "model.audio_model.audio_encoder.embedder. "
                 f"Underlying error: {err}"
             ) from err
-        embedder.forward = types.MethodType(
-            grad_enabled_embedder_forward, embedder
-        )
+        embedder.forward = types.MethodType(grad_enabled_embedder_forward, embedder)
 
         self._pea_emotion_model = model
         return self._pea_emotion_model
@@ -554,12 +549,8 @@ class VitsModel(pl.LightningModule):
         target_dirs = F.normalize(
             target_centroids - global_centroid.unsqueeze(0), dim=-1
         )
-        embedding_dirs = F.normalize(
-            embeddings - global_centroid.unsqueeze(0), dim=-1
-        )
-        loss_dir = (
-            1.0 - F.cosine_similarity(embedding_dirs, target_dirs, dim=-1).mean()
-        )
+        embedding_dirs = F.normalize(embeddings - global_centroid.unsqueeze(0), dim=-1)
+        loss_dir = 1.0 - F.cosine_similarity(embedding_dirs, target_dirs, dim=-1).mean()
         if self.hparams.pea_emotion_loss_weight > 0:
             loss = loss + loss_dir * self.hparams.pea_emotion_loss_weight
             self._log_with_batch_info("loss_pea_emotion_dir", loss_dir, batch)
@@ -568,13 +559,11 @@ class VitsModel(pl.LightningModule):
         # uses angular distance, NOT L2 (norm-invariant, more stable under
         # SimCLR/CLIP-style conventions). See P4-T02 §6.1 for rationale.
         if self.hparams.pea_emotion_centroid_weight > 0:
-            loss_centroid = 1.0 - F.cosine_similarity(
-                embeddings, target_centroids, dim=-1
-            ).mean()
-            loss = loss + loss_centroid * self.hparams.pea_emotion_centroid_weight
-            self._log_with_batch_info(
-                "loss_pea_emotion_centroid", loss_centroid, batch
+            loss_centroid = (
+                1.0 - F.cosine_similarity(embeddings, target_centroids, dim=-1).mean()
             )
+            loss = loss + loss_centroid * self.hparams.pea_emotion_centroid_weight
+            self._log_with_batch_info("loss_pea_emotion_centroid", loss_centroid, batch)
 
         # Margin hinge: push ``target_similarity`` at least ``margin``
         # ahead of the best non-target centroid. ``masked_fill`` avoids
@@ -582,18 +571,12 @@ class VitsModel(pl.LightningModule):
         # happy (fork 314b3355 uses the same pattern).
         if self.hparams.pea_emotion_margin_weight > 0:
             similarities = embeddings @ centroids.transpose(0, 1)
-            target_similarity = similarities.gather(
-                1, emotion_indices[:, None]
-            )
+            target_similarity = similarities.gather(1, emotion_indices[:, None])
             other_similarities = similarities.masked_fill(
-                F.one_hot(
-                    emotion_indices, num_classes=centroids.size(0)
-                ).bool(),
+                F.one_hot(emotion_indices, num_classes=centroids.size(0)).bool(),
                 -1.0,
             )
-            max_other_similarity = other_similarities.max(
-                dim=1, keepdim=True
-            ).values
+            max_other_similarity = other_similarities.max(dim=1, keepdim=True).values
             loss_margin = F.relu(
                 self.hparams.pea_emotion_margin
                 + max_other_similarity
@@ -943,16 +926,12 @@ class VitsModel(pl.LightningModule):
             loss_pea_emotion = None
             if self._pea_emotion_loss_enabled():
                 warmup_steps = int(self.hparams.pea_emotion_warmup_steps)
-                every_n_steps = max(
-                    1, int(self.hparams.pea_emotion_loss_every_n_steps)
-                )
+                every_n_steps = max(1, int(self.hparams.pea_emotion_loss_every_n_steps))
                 if (
                     self.global_step >= warmup_steps
                     and self.global_step % every_n_steps == 0
                 ):
-                    loss_pea_emotion = self._compute_pea_emotion_loss(
-                        y_hat, batch
-                    )
+                    loss_pea_emotion = self._compute_pea_emotion_loss(y_hat, batch)
 
             if loss_pea_emotion is not None:
                 # Scale up by every_n_steps so the effective gradient

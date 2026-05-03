@@ -309,9 +309,9 @@ def _warn_if_public_bind(host: str) -> None:
 
 
 def _parse_style_vector_from_request(
-    request: "Request",
+    request: Request,
     style_vector_b64_query: str | None,
-) -> "np.ndarray | None":
+) -> np.ndarray | None:
     """Extract a style_vector from an incoming FastAPI request.
 
     Supports two encodings (checked in order):

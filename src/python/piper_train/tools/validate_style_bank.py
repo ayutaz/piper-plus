@@ -36,9 +36,10 @@ import argparse
 import logging
 import sys
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import numpy as np
+
 
 _LOGGER = logging.getLogger("validate_style_bank")
 
@@ -71,41 +72,29 @@ def check_schema(bank: dict[str, Any]) -> list[str]:
     global_c = bank["global_centroid"]
 
     if names.dtype != object:
-        errors.append(
-            f"emotion_names dtype must be object (str), got {names.dtype}"
-        )
+        errors.append(f"emotion_names dtype must be object (str), got {names.dtype}")
     if names.ndim != 1:
         errors.append(f"emotion_names must be 1-D, got {names.ndim}-D")
 
     if centroids.dtype != np.float32:
-        errors.append(
-            f"emotion_centroids dtype must be float32, got {centroids.dtype}"
-        )
+        errors.append(f"emotion_centroids dtype must be float32, got {centroids.dtype}")
     if centroids.ndim != 2:
-        errors.append(
-            f"emotion_centroids must be 2-D [N, D], got {centroids.ndim}-D"
-        )
+        errors.append(f"emotion_centroids must be 2-D [N, D], got {centroids.ndim}-D")
 
     if global_c.dtype != np.float32:
-        errors.append(
-            f"global_centroid dtype must be float32, got {global_c.dtype}"
-        )
+        errors.append(f"global_centroid dtype must be float32, got {global_c.dtype}")
     if global_c.ndim != 1:
         errors.append(f"global_centroid must be 1-D, got {global_c.ndim}-D")
 
     if centroids.ndim == 2 and names.ndim == 1:
         if centroids.shape[0] != names.shape[0]:
             errors.append(
-                "Mismatch: emotion_centroids.shape[0]={} vs len(emotion_names)={}".format(
-                    centroids.shape[0], names.shape[0]
-                )
+                f"Mismatch: emotion_centroids.shape[0]={centroids.shape[0]} vs len(emotion_names)={names.shape[0]}"
             )
     if centroids.ndim == 2 and global_c.ndim == 1:
         if centroids.shape[1] != global_c.shape[0]:
             errors.append(
-                "Embedding dim mismatch: emotion_centroids={} vs global_centroid={}".format(
-                    centroids.shape[1], global_c.shape[0]
-                )
+                f"Embedding dim mismatch: emotion_centroids={centroids.shape[1]} vs global_centroid={global_c.shape[0]}"
             )
     return errors
 
@@ -194,8 +183,8 @@ def validate(
     style_bank_path: Path,
     *,
     strict: bool = False,
-    expected_emotions: Optional[list[str]] = None,
-    expected_dim: Optional[int] = None,
+    expected_emotions: list[str] | None = None,
+    expected_dim: int | None = None,
 ) -> int:
     _LOGGER.info("Validating: %s", style_bank_path)
     bank = load_style_bank(style_bank_path)
@@ -263,7 +252,7 @@ def validate(
 # ---------------------------------------------------------------------------
 
 
-def _parse_argv(argv: Optional[list[str]]) -> argparse.Namespace:
+def _parse_argv(argv: list[str] | None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Validate a PE-A style bank .npz for schema and numerical correctness",
     )
@@ -293,7 +282,7 @@ def _parse_argv(argv: Optional[list[str]]) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def main(argv: Optional[list[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     args = _parse_argv(argv)
     logging.basicConfig(
         level=args.log_level,

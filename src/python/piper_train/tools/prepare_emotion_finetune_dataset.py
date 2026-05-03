@@ -27,6 +27,7 @@ import json
 import logging
 from pathlib import Path
 
+
 _LOGGER = logging.getLogger("prepare_emotion_finetune_dataset")
 
 # CREMA-D emotion tag (filename token) -> canonical lowercase label
@@ -138,7 +139,9 @@ def build_crema_d_manifest(
 
     speakers = sorted({_parse_filename(p)[0] for p in wav_files if _parse_filename(p)})
     speaker_id_map = {spk: idx for idx, spk in enumerate(speakers)}
-    _LOGGER.info("Found %d WAV files, %d unique speakers", len(wav_files), len(speakers))
+    _LOGGER.info(
+        "Found %d WAV files, %d unique speakers", len(wav_files), len(speakers)
+    )
 
     output_dir.mkdir(parents=True, exist_ok=True)
     jsonl_path = output_dir / "dataset.jsonl"
@@ -160,7 +163,9 @@ def build_crema_d_manifest(
 
             text = _get_crema_d_text(sent)
             if not text:
-                _LOGGER.warning("Unknown sentence code %s, skipping: %s", sent, wav_path.name)
+                _LOGGER.warning(
+                    "Unknown sentence code %s, skipping: %s", sent, wav_path.name
+                )
                 n_skipped += 1
                 continue
 
@@ -182,7 +187,9 @@ def build_crema_d_manifest(
             f_out.write(json.dumps(record, ensure_ascii=False) + "\n")
             n_written += 1
 
-    _LOGGER.info("Wrote %d samples to %s (%d skipped)", n_written, jsonl_path, n_skipped)
+    _LOGGER.info(
+        "Wrote %d samples to %s (%d skipped)", n_written, jsonl_path, n_skipped
+    )
 
     # config.json — inherit everything from the 6lang base, then override
     config = dict(base_config)
@@ -199,7 +206,9 @@ def build_crema_d_manifest(
         json.dump(config, f_out, indent=2, ensure_ascii=False)
     _LOGGER.info(
         "Wrote config: %s (num_speakers=%d, style_vector_dim=%d)",
-        config_path, len(speakers), style_vector_dim,
+        config_path,
+        len(speakers),
+        style_vector_dim,
     )
 
     return n_written, n_skipped
@@ -211,9 +220,15 @@ def main() -> None:
     parser.add_argument("--style-vectors-dir", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--base-config", type=Path, required=True)
-    parser.add_argument("--style-vector-dim", type=int, default=DEFAULT_STYLE_VECTOR_DIM)
-    parser.add_argument("--style-condition-mode", type=str, default=DEFAULT_STYLE_CONDITION_MODE)
-    parser.add_argument("--style-condition-dropout", type=float, default=DEFAULT_STYLE_CONDITION_DROPOUT)
+    parser.add_argument(
+        "--style-vector-dim", type=int, default=DEFAULT_STYLE_VECTOR_DIM
+    )
+    parser.add_argument(
+        "--style-condition-mode", type=str, default=DEFAULT_STYLE_CONDITION_MODE
+    )
+    parser.add_argument(
+        "--style-condition-dropout", type=float, default=DEFAULT_STYLE_CONDITION_DROPOUT
+    )
     parser.add_argument(
         "--audio-subdir",
         type=str,

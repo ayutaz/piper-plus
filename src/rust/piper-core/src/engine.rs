@@ -809,9 +809,7 @@ impl OnnxEngine {
         // Phase 2 (P2-T04): style_vector + style_vector_mask.
         // When the model has the input, we MUST always send both tensors --
         // zero-fill + mask=0 when the caller did not provide a vector.
-        let (style_vector_tensor, style_vector_mask_tensor) = if self
-            .capabilities
-            .has_style_vector
+        let (style_vector_tensor, style_vector_mask_tensor) = if self.capabilities.has_style_vector
         {
             let dim = self.capabilities.style_vector_dim.max(1) as usize;
             let (data, mask_val): (Vec<f32>, i64) = match &request.style_vector {
@@ -833,13 +831,8 @@ impl OnnxEngine {
             };
             let sv = Tensor::from_array(([1_usize, dim], data.into_boxed_slice()))
                 .map_err(|e| PiperError::Inference(format!("style_vector tensor: {e}")))?;
-            let mask = Tensor::from_array((
-                [1_usize, 1_usize],
-                vec![mask_val].into_boxed_slice(),
-            ))
-            .map_err(|e| {
-                PiperError::Inference(format!("style_vector_mask tensor: {e}"))
-            })?;
+            let mask = Tensor::from_array(([1_usize, 1_usize], vec![mask_val].into_boxed_slice()))
+                .map_err(|e| PiperError::Inference(format!("style_vector_mask tensor: {e}")))?;
             (Some(sv), Some(mask))
         } else {
             (None, None)

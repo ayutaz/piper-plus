@@ -727,9 +727,7 @@ def main():
             )
             sys.exit(1)
         style_vector_array = np.asarray(values, dtype=np.float32).reshape(1, -1)
-        _LOGGER.info(
-            "Loaded inline style_vector (dim=%d)", style_vector_array.shape[1]
-        )
+        _LOGGER.info("Loaded inline style_vector (dim=%d)", style_vector_array.shape[1])
     elif args.style_vector:
         style_vector_array = np.load(args.style_vector).astype(np.float32)
         if style_vector_array.ndim == 1:
@@ -926,9 +924,7 @@ def main():
                     pass
             if style_vector_dim <= 0:
                 for inp in model.get_inputs():
-                    if inp.name == "style_vector" and isinstance(
-                        inp.shape[1], int
-                    ):
+                    if inp.name == "style_vector" and isinstance(inp.shape[1], int):
                         style_vector_dim = int(inp.shape[1])
                         break
 

@@ -217,8 +217,7 @@ fn load_style_vector_npy(path: &std::path::Path) -> Result<Vec<f32>> {
         anyhow::bail!(".npy truncated header: {}", path.display());
     }
     let header_start = if major == 1 { 10 } else { 12 };
-    let header = std::str::from_utf8(&bytes[header_start..header_start + header_len])
-        .unwrap_or("");
+    let header = std::str::from_utf8(&bytes[header_start..header_start + header_len]).unwrap_or("");
     if !header.contains("'descr': '<f4'") && !header.contains("\"descr\": \"<f4\"") {
         anyhow::bail!(
             ".npy dtype must be '<f4' (little-endian float32); header: {}",
@@ -227,10 +226,7 @@ fn load_style_vector_npy(path: &std::path::Path) -> Result<Vec<f32>> {
     }
     let data = &bytes[data_offset..];
     if data.len() % 4 != 0 {
-        anyhow::bail!(
-            ".npy data size ({} bytes) not a multiple of 4",
-            data.len()
-        );
+        anyhow::bail!(".npy data size ({} bytes) not a multiple of 4", data.len());
     }
     Ok(data
         .chunks_exact(4)

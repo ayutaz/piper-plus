@@ -48,15 +48,18 @@ import json
 import logging
 import sys
 from pathlib import Path
-from typing import Any, Iterable, Optional
+from typing import Any
 
 import numpy as np
+
 
 try:
     from tqdm import tqdm
 except ImportError:  # pragma: no cover - fallback when tqdm missing
+
     def tqdm(iterable, **_kwargs):  # type: ignore[misc]
         return iterable
+
 
 _LOGGER = logging.getLogger("build_pea_style_bank")
 
@@ -97,8 +100,8 @@ class EmotionAudioDataset:
 
     def __init__(
         self,
-        dataset_dir: Optional[Path] = None,
-        manifest_path: Optional[Path] = None,
+        dataset_dir: Path | None = None,
+        manifest_path: Path | None = None,
         sample_rate: int = PE_A_SAMPLE_RATE,
     ) -> None:
         self.dataset_dir = Path(dataset_dir) if dataset_dir else None
@@ -146,7 +149,7 @@ class EmotionAudioDataset:
             self._load_csv(manifest_path)
 
     def _load_jsonl(self, path: Path) -> None:
-        with open(path, "r", encoding="utf-8") as fh:
+        with open(path, encoding="utf-8") as fh:
             for line_no, line in enumerate(fh, start=1):
                 line = line.strip()
                 if not line or line.startswith("#"):
@@ -170,10 +173,8 @@ class EmotionAudioDataset:
                 )
 
     def _load_csv(self, path: Path) -> None:
-        with open(path, "r", encoding="utf-8", newline="") as fh:
-            reader = csv.DictReader(
-                (ln for ln in fh if ln and not ln.startswith("#"))
-            )
+        with open(path, encoding="utf-8", newline="") as fh:
+            reader = csv.DictReader(ln for ln in fh if ln and not ln.startswith("#"))
             for row_no, row in enumerate(reader, start=1):
                 audio_path = row.get("audio_path") or row.get("audio_norm_path")
                 emotion = row.get("emotion")
@@ -283,7 +284,9 @@ def load_pea_model(
         import importlib
 
         pm = importlib.import_module("perception_models")
-        _LOGGER.info("Loaded perception_models version=%s", getattr(pm, "__version__", "?"))
+        _LOGGER.info(
+            "Loaded perception_models version=%s", getattr(pm, "__version__", "?")
+        )
         # Primary symbol proposed upstream; tolerate minor re-organisations.
         PEAudio = None
         for mod_path in ("perception_models.pe_av", "perception_models.pe_audio"):
@@ -301,9 +304,11 @@ def load_pea_model(
             raise ImportError(
                 "perception_models installed but no PEAudio/PEAModel class found"
             )
-        model = PEAudio.from_pretrained(model_name) if hasattr(
-            PEAudio, "from_pretrained"
-        ) else PEAudio()
+        model = (
+            PEAudio.from_pretrained(model_name)
+            if hasattr(PEAudio, "from_pretrained")
+            else PEAudio()
+        )
         if hasattr(model, "eval"):
             model.eval()
         if hasattr(model, "to"):
@@ -360,12 +365,19 @@ def extract_audio_embedding(
     if not isinstance(embed, torch.Tensor):
         # Some implementations return dataclass/dict
         if isinstance(embed, dict):
-            for key in ("audio_embeds", "embedding", "last_hidden_state", "pooler_output"):
+            for key in (
+                "audio_embeds",
+                "embedding",
+                "last_hidden_state",
+                "pooler_output",
+            ):
                 if key in embed:
                     embed = embed[key]
                     break
         else:
-            embed = getattr(embed, "audio_embeds", None) or getattr(embed, "embedding", embed)
+            embed = getattr(embed, "audio_embeds", None) or getattr(
+                embed, "embedding", embed
+            )
         if not isinstance(embed, torch.Tensor):  # pragma: no cover - defensive
             raise TypeError(f"Unexpected PE-A output type: {type(embed)}")
 
@@ -482,7 +494,9 @@ def generate_report(
     report = {
         "emotion_names": list(emotion_names),
         "counts": per_emotion_counts,
-        "embedding_dim": int(emotion_centroids.shape[1]) if emotion_centroids.size else 0,
+        "embedding_dim": int(emotion_centroids.shape[1])
+        if emotion_centroids.size
+        else 0,
         "cosine_similarity_matrix": cos_matrix,
         "global_centroid_norm": float(np.linalg.norm(global_centroid)),
     }
@@ -500,7 +514,7 @@ def build_style_bank(
     dataset: EmotionAudioDataset,
     model_handle: dict[str, Any],
     device: str = "cpu",
-    per_utterance_dir: Optional[Path] = None,
+    per_utterance_dir: Path | None = None,
 ) -> tuple[list[str], np.ndarray, np.ndarray, dict[str, int]]:
     """Iterate over the dataset, extract embeddings, and aggregate centroids."""
     if per_utterance_dir is not None:
@@ -537,7 +551,7 @@ def build_style_bank(
 # ---------------------------------------------------------------------------
 
 
-def _parse_argv(argv: Optional[list[str]]) -> argparse.Namespace:
+def _parse_argv(argv: list[str] | None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Build PE-A emotion style bank (.npz) from labelled audio"
     )
@@ -605,7 +619,7 @@ def _parse_argv(argv: Optional[list[str]]) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def main(argv: Optional[list[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     args = _parse_argv(argv)
     logging.basicConfig(
         level=args.log_level,

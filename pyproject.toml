@@ -251,6 +251,14 @@ inline-quotes = "double"
 "src/python/piper_train/export_onnx.py" = ["E402"]
 # lightning.py: メソッド内の遅延import（循環import回避、オプショナル依存）
 "src/python/piper_train/vits/lightning.py" = ["PLC0415"]
+# perception/pea_loader.py: optional extra [pea] のため遅延import (perception_models / torch)
+"src/python/piper_train/perception/pea_loader.py" = ["PLC0415"]
+# tools/build_pea_style_bank.py: optional dep (perception_models / torch) を遅延import
+"src/python/piper_train/tools/build_pea_style_bank.py" = ["PLC0415"]
+# tools/validate_style_bank.py: 整合性検証で多数の早期 returnを許容
+"src/python/piper_train/tools/validate_style_bank.py" = ["PLR0911"]
+# tools/benchmark/*: optional eval deps (transformers / pesq / pystoi) を遅延import
+"tools/benchmark/*.py" = ["PLC0415"]
 
 [tool.setuptools.packages.find]
 where = ["src/python"]

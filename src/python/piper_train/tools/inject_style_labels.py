@@ -39,15 +39,18 @@ import json
 import logging
 from collections import Counter
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import numpy as np
+
 
 try:
     from tqdm import tqdm
 except ImportError:  # pragma: no cover
+
     def tqdm(iterable, **_kwargs):  # type: ignore[misc]
         return iterable
+
 
 _LOGGER = logging.getLogger("inject_style_labels")
 
@@ -63,7 +66,7 @@ def load_emotion_mapping_from_csv(csv_path: Path) -> dict[str, str]:
     Lines starting with ``#`` are treated as comments.
     """
     mapping: dict[str, str] = {}
-    with open(csv_path, "r", encoding="utf-8") as fh:
+    with open(csv_path, encoding="utf-8") as fh:
         for line in fh:
             line = line.strip()
             if not line or line.startswith("#"):
@@ -139,12 +142,12 @@ def _resolve_emotion(
 
 def _resolve_style_vector_path(
     utt_id: str,
-    style_vectors_dir: Optional[Path],
-    dataset_dir: Optional[Path],
-    output_dir: Optional[Path],
+    style_vectors_dir: Path | None,
+    dataset_dir: Path | None,
+    output_dir: Path | None,
     emotion: str,
-    emotion_centroids: Optional[dict[str, np.ndarray]],
-) -> Optional[str]:
+    emotion_centroids: dict[str, np.ndarray] | None,
+) -> str | None:
     """Resolve (or materialise) a ``.npy`` style vector for the utterance."""
     # 1. Prefer a pre-computed per-utterance vector.
     if style_vectors_dir is not None:
@@ -167,7 +170,7 @@ def _resolve_style_vector_path(
     return None
 
 
-def _relative_if_possible(path: Path, root: Optional[Path]) -> str:
+def _relative_if_possible(path: Path, root: Path | None) -> str:
     if root is None:
         return str(path)
     try:
@@ -185,14 +188,14 @@ def _load_bank_centroids(style_bank_path: Path) -> dict[str, np.ndarray]:
 
 def inject_style_labels(
     input_dataset: Path,
-    output_manifest: Optional[Path],
-    dataset_dir: Optional[Path] = None,
-    style_vectors_dir: Optional[Path] = None,
-    emotion_csv_mapping: Optional[dict[str, str]] = None,
-    emotion_translation: Optional[dict[str, str]] = None,
+    output_manifest: Path | None,
+    dataset_dir: Path | None = None,
+    style_vectors_dir: Path | None = None,
+    emotion_csv_mapping: dict[str, str] | None = None,
+    emotion_translation: dict[str, str] | None = None,
     default_emotion: str = "neutral",
-    style_bank_path: Optional[Path] = None,
-    output_vectors_dir: Optional[Path] = None,
+    style_bank_path: Path | None = None,
+    output_vectors_dir: Path | None = None,
 ) -> dict[str, Any]:
     """Walk the input JSONL and emit a manifest with emotion + style_vector_path.
 
@@ -204,7 +207,7 @@ def inject_style_labels(
     emotion_csv_mapping = dict(emotion_csv_mapping or {})
     emotion_translation = dict(emotion_translation or {})
 
-    emotion_centroids: Optional[dict[str, np.ndarray]] = None
+    emotion_centroids: dict[str, np.ndarray] | None = None
     if style_bank_path is not None and output_vectors_dir is not None:
         emotion_centroids = _load_bank_centroids(style_bank_path)
 
@@ -216,9 +219,10 @@ def inject_style_labels(
     # Stream read -> stream write to avoid loading 500k rows into memory.
     tmp_out = Path(str(output_manifest) + ".tmp")
     tmp_out.parent.mkdir(parents=True, exist_ok=True)
-    with open(input_dataset, "r", encoding="utf-8") as src, open(
-        tmp_out, "w", encoding="utf-8"
-    ) as dst:
+    with (
+        open(input_dataset, encoding="utf-8") as src,
+        open(tmp_out, "w", encoding="utf-8") as dst,
+    ):
         for line in tqdm(src, desc="Injecting labels"):
             line = line.strip()
             if not line:
@@ -233,9 +237,7 @@ def inject_style_labels(
             utt_id = Path(audio_path).stem if audio_path else ""
 
             if "emotion" in item and item["emotion"] is not None:
-                _LOGGER.debug(
-                    "Overwriting existing emotion for utt_id=%s", utt_id
-                )
+                _LOGGER.debug("Overwriting existing emotion for utt_id=%s", utt_id)
             emotion = _resolve_emotion(
                 utt_id=utt_id,
                 audio_path=audio_path,
@@ -286,7 +288,7 @@ def inject_style_labels(
 # ---------------------------------------------------------------------------
 
 
-def _parse_argv(argv: Optional[list[str]]) -> argparse.Namespace:
+def _parse_argv(argv: list[str] | None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Inject emotion + style_vector_path fields into a dataset manifest",
     )
@@ -349,7 +351,7 @@ def _parse_argv(argv: Optional[list[str]]) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def main(argv: Optional[list[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     args = _parse_argv(argv)
     logging.basicConfig(
         level=args.log_level,
@@ -369,12 +371,12 @@ def main(argv: Optional[list[str]] = None) -> int:
     if args.style_bank is not None and emotion_csv_mapping:
         missing = validate_emotions_against_bank(emotion_csv_mapping, args.style_bank)
         if missing:
-            _LOGGER.warning("Emotions in CSV not present in style bank: %s", sorted(missing))
+            _LOGGER.warning(
+                "Emotions in CSV not present in style bank: %s", sorted(missing)
+            )
 
     if args.output_dir is not None and args.style_bank is None:
-        _LOGGER.warning(
-            "--output-dir is ignored because --style-bank was not provided"
-        )
+        _LOGGER.warning("--output-dir is ignored because --style-bank was not provided")
 
     inject_style_labels(
         input_dataset=args.input_dataset,

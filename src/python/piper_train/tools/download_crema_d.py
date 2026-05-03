@@ -47,6 +47,7 @@ import subprocess
 import time
 from pathlib import Path
 
+
 try:
     import soundfile as sf
 except ImportError:  # pragma: no cover - handled at runtime
@@ -55,8 +56,10 @@ except ImportError:  # pragma: no cover - handled at runtime
 try:
     from tqdm import tqdm
 except ImportError:  # pragma: no cover - fallback when tqdm missing in tests
+
     def tqdm(iterable, **_kwargs):  # type: ignore[misc]
         return iterable
+
 
 _LOGGER = logging.getLogger("download_crema_d")
 
@@ -205,9 +208,10 @@ def generate_metadata(data_dir: Path) -> dict:
     skipped: list[str] = []
     total = 0
 
-    with open(metadata_path, "w", encoding="utf-8") as meta_f, open(
-        emotions_path, "w", encoding="utf-8"
-    ) as emo_f:
+    with (
+        open(metadata_path, "w", encoding="utf-8") as meta_f,
+        open(emotions_path, "w", encoding="utf-8") as emo_f,
+    ):
         meta_f.write(
             "# CREMA-D metadata (utt_id|text|emotion) -- "
             "License: ODbL 1.0 + Community License\n"
@@ -314,9 +318,7 @@ def main(argv: list[str] | None = None) -> int:
     copy_license(args.data_dir)
 
     elapsed = time.time() - start
-    _LOGGER.info(
-        "CREMA-D preparation complete in %.1fs: %s", elapsed, args.data_dir
-    )
+    _LOGGER.info("CREMA-D preparation complete in %.1fs: %s", elapsed, args.data_dir)
     return 0
 
 

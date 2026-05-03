@@ -106,10 +106,7 @@ def build_infer_forward(
         # This mirrors the speaker_embedding_mask pattern so the ONNX graph
         # can conditionally enable style conditioning at inference time.
         effective_style_vector = style_vector
-        if (
-            style_vector is not None
-            and style_vector_mask is not None
-        ):
+        if style_vector is not None and style_vector_mask is not None:
             # Broadcast mask [batch, 1] to [batch, dim] and multiply.
             # When mask=0, style_vector becomes zeros => _add_style_condition
             # behaves like style_vector=None (no style shift).
@@ -577,9 +574,7 @@ def main() -> None:
     style_vector_dim = getattr(model_g, "style_vector_dim", 0)
     style_condition_mode = getattr(model_g, "style_condition_mode", "global")
     if style_vector_dim > 0:
-        dummy_style_vector = torch.zeros(
-            1, style_vector_dim, dtype=torch.float32
-        )
+        dummy_style_vector = torch.zeros(1, style_vector_dim, dtype=torch.float32)
         dummy_style_vector_mask = torch.ones(1, 1, dtype=torch.int64)
 
         dummy_input_list.append(dummy_style_vector)
@@ -618,9 +613,7 @@ def main() -> None:
 
     # Write style_vector metadata into the ONNX model's metadata_props.
     if style_vector_dim > 0:
-        write_style_vector_metadata(
-            args.output, style_vector_dim, style_condition_mode
-        )
+        write_style_vector_metadata(args.output, style_vector_dim, style_condition_mode)
         _LOGGER.info(
             "Wrote style_vector metadata: dim=%d, mode=%s",
             style_vector_dim,
@@ -672,9 +665,7 @@ def main() -> None:
             write_style_vector_metadata(
                 args.output, style_vector_dim, style_condition_mode
             )
-            _LOGGER.info(
-                "Re-injected style_vector metadata after post-processing"
-            )
+            _LOGGER.info("Re-injected style_vector metadata after post-processing")
 
 
 # -----------------------------------------------------------------------------

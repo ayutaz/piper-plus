@@ -490,9 +490,7 @@ def _validate_pea_emotion_args(
         or getattr(args, "pea_emotion_centroid_weight", 0.0) > 0
         or getattr(args, "pea_emotion_margin_weight", 0.0) > 0
     )
-    if any_pea_weight_positive and not getattr(
-        args, "pea_emotion_style_bank", None
-    ):
+    if any_pea_weight_positive and not getattr(args, "pea_emotion_style_bank", None):
         parser.error(
             "--pea-emotion-style-bank is required when any of "
             "--pea-emotion-loss-weight / --pea-emotion-centroid-weight / "

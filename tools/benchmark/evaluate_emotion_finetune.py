@@ -43,14 +43,20 @@ from __future__ import annotations
 import argparse
 import json
 import logging
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
+
 
 _LOGGER = logging.getLogger("evaluate_emotion_finetune")
 
 TARGET_EMOTIONS: tuple[str, ...] = (
-    "angry", "disgusted", "fearful", "happy", "neutral", "sad",
+    "angry",
+    "disgusted",
+    "fearful",
+    "happy",
+    "neutral",
+    "sad",
 )
 
 SUCCESS_GATES: dict[str, float] = {
@@ -64,6 +70,7 @@ SUCCESS_GATES: dict[str, float] = {
 @dataclass
 class SerResult:
     """Top-1 accuracy from the Speech Emotion Recognition classifier."""
+
     top1_accuracy: float = 0.0
     per_emotion_accuracy: dict[str, float] = field(default_factory=dict)
     confusion: dict[str, dict[str, int]] = field(default_factory=dict)
@@ -74,6 +81,7 @@ class SerResult:
 @dataclass
 class MosResult:
     """PESQ / STOI aggregates for emotion fine-tune vs. CREMA-D reference."""
+
     pesq_mean: float = 0.0
     pesq_median: float = 0.0
     stoi_mean: float = 0.0
@@ -85,6 +93,7 @@ class MosResult:
 @dataclass
 class MultilingualRegressionResult:
     """Regression on the other 5 languages relative to the 6lang base."""
+
     per_language: dict[str, dict[str, float]] = field(default_factory=dict)
     worst_pesq_drop: float = 0.0
     worst_language: str | None = None
@@ -141,7 +150,9 @@ def evaluate_mos(
     if not emotion_model.is_file():
         return MosResult(skipped_reason=f"emotion model missing: {emotion_model}")
     if not reference_dataset.is_dir():
-        return MosResult(skipped_reason=f"reference dataset missing: {reference_dataset}")
+        return MosResult(
+            skipped_reason=f"reference dataset missing: {reference_dataset}"
+        )
 
     try:  # pesq + pystoi are optional deps
         import pesq  # type: ignore[import-not-found]  # noqa: F401
@@ -216,14 +227,19 @@ def check_success_gates(
         failures.append(f"MOS skipped: {mos.skipped_reason}")
 
     if multilingual.skipped_reason is None:
-        if multilingual.worst_pesq_drop > SUCCESS_GATES["multilingual_pesq_regression_max"]:
+        if (
+            multilingual.worst_pesq_drop
+            > SUCCESS_GATES["multilingual_pesq_regression_max"]
+        ):
             failures.append(
                 f"Multilingual regression {multilingual.worst_pesq_drop:.2f} on "
                 f"{multilingual.worst_language} > gate "
                 f"{SUCCESS_GATES['multilingual_pesq_regression_max']}"
             )
     else:
-        failures.append(f"Multilingual regression skipped: {multilingual.skipped_reason}")
+        failures.append(
+            f"Multilingual regression skipped: {multilingual.skipped_reason}"
+        )
 
     return len(failures) == 0, failures
 
@@ -268,11 +284,22 @@ def write_outputs(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--model", type=Path, required=True, help="Fine-tuned emotion ONNX")
-    parser.add_argument("--config", type=Path, required=True, help="Emotion dataset config.json")
+    parser.add_argument(
+        "--model", type=Path, required=True, help="Fine-tuned emotion ONNX"
+    )
+    parser.add_argument(
+        "--config", type=Path, required=True, help="Emotion dataset config.json"
+    )
     parser.add_argument("--reference-dataset", type=Path, required=True)
-    parser.add_argument("--base-model", type=Path, required=True, help="6lang base ONNX (for regression)")
-    parser.add_argument("--style-bank", type=Path, help="style_bank_crema_d.npz (optional)")
+    parser.add_argument(
+        "--base-model",
+        type=Path,
+        required=True,
+        help="6lang base ONNX (for regression)",
+    )
+    parser.add_argument(
+        "--style-bank", type=Path, help="style_bank_crema_d.npz (optional)"
+    )
     parser.add_argument(
         "--ser-model",
         type=str,
@@ -292,7 +319,9 @@ def main() -> None:
     ser = evaluate_ser(args.model, args.ser_model, args.num_samples)
     mos = evaluate_mos(args.model, args.reference_dataset, args.num_samples)
     multilingual = evaluate_multilingual_regression(
-        args.model, args.base_model, args.num_samples,
+        args.model,
+        args.base_model,
+        args.num_samples,
     )
 
     gate_passed, failures = check_success_gates(ser, mos, multilingual)
