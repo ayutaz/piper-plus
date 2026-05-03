@@ -36,6 +36,19 @@ uv run python -m piper_train \
 
 Multi-GPU automatically configures DDP (Distributed Data Parallel). NCCL environment variables are required. See the Multi-GPU Training Guide for details.
 
+## MB-iSTFT-VITS2 Decoder
+
+The VITS decoder is **MB-iSTFT (Multi-Band inverse STFT) + PQMF**, the only generator path. Total upsample factor is `upsample_rates(16x) * iSTFT_hop(4x) * PQMF_subbands(4x) = 256x`, delivering approximately **2.21x faster CPU ONNX inference** (100 phoneme p50) versus the legacy HiFi-GAN baseline. The output shape `[B, 1, T]` is preserved, so existing C++/Rust/C#/Go/WASM runtimes work unchanged. Both `--quality medium` and `--quality high` are supported (the latter applies bigger ResBlocks and 512 initial channels).
+
+### Sub-band STFT loss tuning
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--c-sub-stft` | `1.0` | Weight for sub-band STFT loss |
+| `--sub-stft-fft-sizes` | `171,384,683` | FFT sizes for sub-band Multi-resolution STFT loss (3 resolutions) |
+| `--sub-stft-hop-sizes` | `10,30,60` | Hop sizes |
+| `--sub-stft-win-sizes` | `60,150,300` | Window sizes |
+
 ## ONNX Export
 
 FP16 conversion is applied by default, reducing model size by ~50%. Use `--no-fp16` to disable.
@@ -59,6 +72,8 @@ CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
 - `--resume_from_checkpoint` — Resume training from checkpoint
 - `--resume_from_single_speaker_checkpoint` — Convert single-speaker to multi-speaker model
 - `--resume-from-multispeaker-checkpoint` — Convert multi-speaker to single-speaker for fine-tuning (auto-enables `--freeze-dp`)
+
+> Existing HiFi-GAN-based `.ckpt` files (pre-MB-iSTFT) are no longer compatible with `--resume_from_checkpoint`. Use the new MB-iSTFT base models published with this release.
 
 ## Voice Evaluation
 

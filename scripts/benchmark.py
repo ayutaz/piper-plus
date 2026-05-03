@@ -172,8 +172,21 @@ def _build_inputs(
         feeds["lid"] = np.array([language_id], dtype=np.int64)
 
     if "prosody_features" in input_names:
+        # ONNX export stores prosody_features as int64 (A1/A2/A3 raw values).
         seq_len = len(phoneme_ids)
-        feeds["prosody_features"] = np.zeros((1, seq_len, 3), dtype=np.float32)
+        feeds["prosody_features"] = np.zeros((1, seq_len, 3), dtype=np.int64)
+
+    # Optional Voice Cloning inputs introduced for MB-iSTFT-VITS2 ONNX models.
+    # Pass zero vectors with mask=0 so they remain disabled during the benchmark.
+    if "speaker_embedding" in input_names:
+        emb_dim = 256
+        for inp in session.get_inputs():
+            if inp.name == "speaker_embedding" and isinstance(inp.shape[1], int):
+                emb_dim = inp.shape[1]
+                break
+        feeds["speaker_embedding"] = np.zeros((1, emb_dim), dtype=np.float32)
+    if "speaker_embedding_mask" in input_names:
+        feeds["speaker_embedding_mask"] = np.zeros((1, 1), dtype=np.int64)
 
     return feeds
 

@@ -228,6 +228,13 @@ def create_parser():
         help="Freeze Duration Predictor parameters during training. "
         "Use for fine-tuning to prevent duration prediction degradation.",
     )
+    # MB-iSTFT Generator options
+    parser.add_argument(
+        "--c-sub-stft",
+        type=float,
+        default=1.0,
+        help="Sub-band STFT loss weight for MB-iSTFT training (default: 1.0)",
+    )
     # Trainer arguments
     parser.add_argument("--accelerator", default="gpu", help="Accelerator to use")
     parser.add_argument("--devices", type=int, default=1, help="Number of devices")
@@ -513,6 +520,13 @@ def main():
     else:
         dict_args["learning_rate"] = getattr(args, "base_lr", 2e-4)
 
+    # MB-iSTFT decoder is the only generator path. Total upsample factor is
+    # 256x = upsample_rates(16x) * iSTFT_hop(4x) * PQMF_subbands(4x); the
+    # quality preset adjusts resblock complexity and channel count, but not
+    # the upsample structure.
+    dict_args["upsample_rates"] = (4, 4)
+    dict_args["upsample_kernel_sizes"] = (16, 16)
+
     if args.quality == "x-low":
         dict_args["hidden_channels"] = 96
         dict_args["inter_channels"] = 96
@@ -525,9 +539,7 @@ def main():
             (1, 3, 5),
             (1, 3, 5),
         )
-        dict_args["upsample_rates"] = (8, 8, 2, 2)
         dict_args["upsample_initial_channel"] = 512
-        dict_args["upsample_kernel_sizes"] = (16, 16, 4, 4)
 
     apply_transfer_defaults(args, num_speakers, num_languages)
 

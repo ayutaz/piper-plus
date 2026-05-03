@@ -34,20 +34,28 @@
 
 ## ベンチマーク
 
-> **計測環境**: Apple M2 Max / 32GB RAM / macOS 15 / Python 3.12 / ONNX Runtime 1.17
-> **テスト文**: "Hello, how are you doing today?" (英語, 約25音素)
-> **再現**: `uv run python scripts/benchmark.py --model <model.onnx> --config <config.json> --format markdown`
+> **計測環境**: Intel Xeon E5-2650 v4 @ 2.20GHz / 48 cores / Linux x86_64 / Python 3.12 / ONNX Runtime 1.24
+> **テスト文**: "Hello, how are you doing today?" (英語, 25 音素)
+> **計測パラメータ**: warmup 5 回 / 計測 30 回 (intra-op threads = auto)
+> **使用モデル**:
+> - piper-plus: 6lang MB-iSTFT 75epoch ONNX (PR #320 で導入された統一 Decoder)
+> - Piper 本家: `en_US-lessac-medium` (rhasspy/piper-voices v1.0.0)
+> - sherpa-onnx: `vits-piper-en_US-amy-low` (k2-fsa リリース)
+>
+> **再現**: `uv run python scripts/benchmark.py --model <model.onnx> --config <config.json> --language en --text "Hello, how are you doing today?" --n-warmup 5 --n-runs 30 --format markdown`
 
-| システム | RTF ↓ | サイズ (MB) | RAM (MB) | 初回起動 (ms) | 言語数 | ライセンス |
-|---------|-------|-----------|---------|-------------|--------|----------|
-| **piper-plus** | **0.05** | **38** | **120** | **350** | **8** | **MIT** |
-| Piper 本家 (archived) | 0.06 | 75 | 150 | 400 | 1/model | MIT |
-| piper1-gpl (OHF fork) | 0.06 | 75 | 150 | 400 | 1/model | GPL-3.0 |
-| Kokoro-82M | 0.12 | 320 | 450 | 800 | 1 | Apache-2.0 |
-| sherpa-onnx | 0.07 | 75 | 130 | 380 | 1/model | Apache-2.0 |
-| eSpeak-NG | 0.001 | 2 | 15 | 10 | 100+ | GPL-3.0 |
+| システム | RTF ↓ | Latency P50 (ms) | サイズ (MB) | RAM (MB) | 初回起動 (ms) | パラメータ | 言語数 | ライセンス |
+|---------|-------|------------------|-----------|---------|-------------|----------|--------|----------|
+| **piper-plus (MB-iSTFT)** | **0.078** | **27** | **38** | **208** | **1633** | **19.6 M** | **8** | **MIT** |
+| Piper 本家 (archived) | 0.066 | 35 | 60 | 185 | 2510 | 15.7 M | 1/model | MIT |
+| sherpa-onnx (VITS Piper-fmt) | 0.075 | 53 | 60 | 202 | 2554 | 15.6 M | 1/model | Apache-2.0 |
+| piper1-gpl (OHF fork) † | 0.06 | — | 75 | 150 | 400 | — | 1/model | GPL-3.0 |
+| Kokoro-82M † | 0.12 | — | 320 | 450 | 800 | — | 1 | Apache-2.0 |
+| eSpeak-NG † | 0.001 | — | 2 | 15 | 10 | — | 100+ | GPL-3.0 |
 
-> **注**: RTF (Real-Time Factor) は低いほど高速。eSpeak-NG は非ニューラルTTSのため参考値。piper-plus は1モデルで8言語をカバー (学習済み6言語 + G2P対応2言語)。計測環境・条件の詳細は `scripts/benchmark.py` で再現可能です。数値はリファレンス実装での計測値です。
+> **注**: RTF (Real-Time Factor) は低いほど高速。`Latency P50` は単発推論の中央値で「実際の応答性」を直接表す指標。piper-plus は MB-iSTFT 統一 Decoder により Latency P50 27ms と最速 (Piper 本家 35ms 比 -23%、sherpa-onnx 53ms 比 -49%) 、かつモデルサイズも 38MB と最小クラス。旧 piper-plus HiFi-GAN ベース (P50 43.3ms) と比べても -38% の改善。
+>
+> **†** がついた行は本 PR では再計測していません (`piper1-gpl` は piper 本家と同一アーキテクチャ・ONNX 形式のため Piper 本家行とほぼ同等になる見込み。`Kokoro-82M` は別アーキテクチャ、`eSpeak-NG` は非ニューラル CLI のため `scripts/benchmark.py` のテンソル契約に乗らず、別ハーネスが必要)。これらの値は前回計測時 (Apple M2 Max) のもの。
 
 ---
 
@@ -65,6 +73,7 @@
 ### 学習
 
 - **WavLM Discriminator** — MOS +0.15-0.25 向上 (デフォルト有効、学習時のみ使用)
+- **MB-iSTFT-VITS2 Decoder** — Decoder を MB-iSTFT + PQMF に統一、CPU 推論 2.21x 高速化。ONNX 形式不変で既存ランタイム互換
 - **FP16 Mixed Precision** — 学習速度2-3倍、メモリ約50%削減 (デフォルト有効)
 - **EMA** — Exponential Moving Average による学習安定性向上 (デフォルト有効)
 - **マルチGPU** — DDP対応、自動学習率スケーリング

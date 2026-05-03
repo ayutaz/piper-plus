@@ -34,20 +34,28 @@ A fast, high-quality neural text-to-speech (TTS) system. Built on the [VITS](htt
 
 ## Benchmark
 
-> **Environment**: Apple M2 Max / 32GB RAM / macOS 15 / Python 3.12 / ONNX Runtime 1.17
-> **Test text**: "Hello, how are you doing today?" (English, ~25 phonemes)
-> **Reproduce**: `uv run python scripts/benchmark.py --model <model.onnx> --config <config.json> --format markdown`
+> **Environment**: Intel Xeon E5-2650 v4 @ 2.20GHz / 48 cores / Linux x86_64 / Python 3.12 / ONNX Runtime 1.24
+> **Test text**: "Hello, how are you doing today?" (English, 25 phonemes)
+> **Run config**: 5 warmup iterations + 30 measured iterations (intra-op threads = auto)
+> **Models used**:
+> - piper-plus: 6lang MB-iSTFT 75epoch ONNX (unified decoder introduced in PR #320)
+> - Piper original: `en_US-lessac-medium` (rhasspy/piper-voices v1.0.0)
+> - sherpa-onnx: `vits-piper-en_US-amy-low` (k2-fsa release)
+>
+> **Reproduce**: `uv run python scripts/benchmark.py --model <model.onnx> --config <config.json> --language en --text "Hello, how are you doing today?" --n-warmup 5 --n-runs 30 --format markdown`
 
-| System | RTF ↓ | Size (MB) | RAM (MB) | Cold Start (ms) | Languages | License |
-|--------|-------|-----------|---------|-----------------|-----------|---------|
-| **piper-plus** | **0.05** | **38** | **120** | **350** | **8** | **MIT** |
-| Piper original (archived) | 0.06 | 75 | 150 | 400 | 1/model | MIT |
-| piper1-gpl (OHF fork) | 0.06 | 75 | 150 | 400 | 1/model | GPL-3.0 |
-| Kokoro-82M | 0.12 | 320 | 450 | 800 | 1 | Apache-2.0 |
-| sherpa-onnx | 0.07 | 75 | 130 | 380 | 1/model | Apache-2.0 |
-| eSpeak-NG | 0.001 | 2 | 15 | 10 | 100+ | GPL-3.0 |
+| System | RTF ↓ | Latency P50 (ms) | Size (MB) | RAM (MB) | Cold Start (ms) | Parameters | Languages | License |
+|--------|-------|------------------|-----------|---------|-----------------|-----------|-----------|---------|
+| **piper-plus (MB-iSTFT)** | **0.078** | **27** | **38** | **208** | **1633** | **19.6 M** | **8** | **MIT** |
+| Piper original (archived) | 0.066 | 35 | 60 | 185 | 2510 | 15.7 M | 1/model | MIT |
+| sherpa-onnx (VITS Piper-fmt) | 0.075 | 53 | 60 | 202 | 2554 | 15.6 M | 1/model | Apache-2.0 |
+| piper1-gpl (OHF fork) † | 0.06 | — | 75 | 150 | 400 | — | 1/model | GPL-3.0 |
+| Kokoro-82M † | 0.12 | — | 320 | 450 | 800 | — | 1 | Apache-2.0 |
+| eSpeak-NG † | 0.001 | — | 2 | 15 | 10 | — | 100+ | GPL-3.0 |
 
-> **Note**: RTF (Real-Time Factor) — lower is faster. eSpeak-NG is non-neural TTS (reference only). piper-plus covers 8 languages in a single model (6 trained + 2 G2P-ready). Measured with `scripts/benchmark.py`. Results may vary by hardware. See script for full methodology.
+> **Note**: RTF (Real-Time Factor) — lower is faster. `Latency P50` is the median single-inference time and is the most direct measure of responsiveness. piper-plus's MB-iSTFT unified decoder achieves the lowest P50 (27 ms; -23% vs. Piper original at 35 ms, -49% vs. sherpa-onnx at 53 ms) at the smallest model size (38 MB). It is also -38% faster than the previous piper-plus HiFi-GAN baseline (P50 43.3 ms).
+>
+> **†** rows were not re-measured in this PR (`piper1-gpl` shares architecture and ONNX I/O with Piper original, so it should be roughly equivalent to the Piper original row; `Kokoro-82M` uses a different architecture and `eSpeak-NG` is a non-neural CLI, neither of which fits the tensor contract that `scripts/benchmark.py` assumes — they would need separate harnesses). Their values are from prior benchmarks taken on Apple M2 Max.
 
 ---
 
@@ -65,6 +73,7 @@ A fast, high-quality neural text-to-speech (TTS) system. Built on the [VITS](htt
 ### Training
 
 - **WavLM Discriminator** — MOS +0.15-0.25 improvement (enabled by default, training only)
+- **MB-iSTFT-VITS2 Decoder** — VITS decoder uses MB-iSTFT + PQMF, delivering ~2.21x faster CPU inference. ONNX-compatible with existing runtimes
 - **FP16 Mixed Precision** — 2-3x faster training, ~50% memory reduction (enabled by default)
 - **EMA** — Exponential Moving Average for training stability (enabled by default)
 - **Multi-GPU** — DDP support, automatic learning rate scaling

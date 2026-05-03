@@ -43,6 +43,7 @@ Ein schnelles und hochwertiges neuronales Text-to-Speech-System (TTS). Basierend
 ### Training
 
 - **WavLM Discriminator** — MOS-Verbesserung von +0,15-0,25 (standardmaessig aktiviert, nur beim Training verwendet)
+- **MB-iSTFT-VITS2 (`--mb-istft`)** — Ersetzt HiFi-GAN Decoder durch MB-iSTFT + PQMF für ~2,21x schnellere CPU-Inferenz (nur Medium-Qualität, ONNX-kompatibel)
 - **FP16 Mixed Precision** — 2-3x schnelleres Training, ca. 50% weniger Speicherbedarf (standardmaessig aktiviert)
 - **EMA** — Exponential Moving Average fuer stabiles Training (standardmaessig aktiviert)
 - **Multi-GPU** — DDP-Unterstuetzung, automatische Lernraten-Skalierung

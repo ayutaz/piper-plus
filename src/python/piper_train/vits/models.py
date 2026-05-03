@@ -3,11 +3,12 @@ from typing import NamedTuple
 
 import torch
 from torch import nn
-from torch.nn import Conv1d, Conv2d, ConvTranspose1d, functional as F
-from torch.nn.utils import remove_weight_norm, spectral_norm, weight_norm
+from torch.nn import Conv1d, Conv2d, functional as F
+from torch.nn.utils import spectral_norm, weight_norm
 
 from . import attentions, commons, modules, monotonic_align
-from .commons import get_padding, init_weights
+from .commons import get_padding
+from .mb_istft import MBiSTFTGenerator
 
 
 class InferOutput(NamedTuple):
@@ -318,87 +319,6 @@ class PosteriorEncoder(nn.Module):
         m, logs = torch.split(stats, self.out_channels, dim=1)
         z = (m + torch.randn_like(m) * torch.exp(logs)) * x_mask
         return z, m, logs, x_mask
-
-
-class Generator(torch.nn.Module):
-    def __init__(
-        self,
-        initial_channel: int,
-        resblock: str | None,
-        resblock_kernel_sizes: tuple[int, ...],
-        resblock_dilation_sizes: tuple[tuple[int, ...], ...],
-        upsample_rates: tuple[int, ...],
-        upsample_initial_channel: int,
-        upsample_kernel_sizes: tuple[int, ...],
-        gin_channels: int = 0,
-    ):
-        super().__init__()
-        self.LRELU_SLOPE = 0.1
-        self.num_kernels = len(resblock_kernel_sizes)
-        self.num_upsamples = len(upsample_rates)
-        self.conv_pre = Conv1d(
-            initial_channel, upsample_initial_channel, 7, 1, padding=3
-        )
-        resblock_module = modules.ResBlock1 if resblock == "1" else modules.ResBlock2
-
-        self.ups = nn.ModuleList()
-        for i, (u, k) in enumerate(
-            zip(upsample_rates, upsample_kernel_sizes, strict=False)
-        ):
-            self.ups.append(
-                weight_norm(
-                    ConvTranspose1d(
-                        upsample_initial_channel // (2**i),
-                        upsample_initial_channel // (2 ** (i + 1)),
-                        k,
-                        u,
-                        padding=(k - u) // 2,
-                    )
-                )
-            )
-
-        self.resblocks = nn.ModuleList()
-        for i in range(len(self.ups)):
-            ch = upsample_initial_channel // (2 ** (i + 1))
-            for _j, (k, d) in enumerate(
-                zip(resblock_kernel_sizes, resblock_dilation_sizes, strict=False)
-            ):
-                self.resblocks.append(resblock_module(ch, k, d))
-
-        self.conv_post = Conv1d(ch, 1, 7, 1, padding=3, bias=False)
-        self.ups.apply(init_weights)
-
-        if gin_channels != 0:
-            self.cond = nn.Conv1d(gin_channels, upsample_initial_channel, 1)
-
-    def forward(self, x, g=None):
-        x = self.conv_pre(x)
-        if g is not None:
-            x = x + self.cond(g)
-
-        for i, up in enumerate(self.ups):
-            x = F.leaky_relu(x, self.LRELU_SLOPE)
-            x = up(x)
-            xs = None  # Initialize as None instead of CPU scalar
-            for j, resblock in enumerate(self.resblocks):
-                index = j - (i * self.num_kernels)
-                if index == 0:
-                    xs = resblock(x)
-                elif (index > 0) and (index < self.num_kernels):
-                    xs = xs + resblock(x)  # Non-in-place addition
-            x = xs / self.num_kernels
-        x = F.leaky_relu(x)
-        x = self.conv_post(x)
-        x = torch.tanh(x)
-
-        return x
-
-    def remove_weight_norm(self):
-        print("Removing weight norm...")
-        for l in self.ups:  # noqa: E741
-            remove_weight_norm(l)
-        for l in self.resblocks:  # noqa: E741
-            l.remove_weight_norm()
 
 
 class DiscriminatorP(torch.nn.Module):
@@ -741,6 +661,17 @@ class WavLMDiscriminator(torch.nn.Module):
         return [y_d_r], [y_d_g], [fmap_r], [fmap_g]
 
 
+class SynthesizerOutput(NamedTuple):
+    waveform: torch.Tensor
+    duration_loss: torch.Tensor
+    attention: torch.Tensor
+    ids_slice: torch.Tensor
+    x_mask: torch.Tensor
+    y_mask: torch.Tensor
+    latents: tuple
+    decoder_subbands: "torch.Tensor | None"
+
+
 class SynthesizerTrn(nn.Module):
     """
     Synthesizer for Training
@@ -806,6 +737,7 @@ class SynthesizerTrn(nn.Module):
         )
 
         self.use_sdp = use_sdp
+        self.onnx_export_mode = False
 
         self.enc_p = TextEncoder(
             n_vocab,
@@ -818,14 +750,14 @@ class SynthesizerTrn(nn.Module):
             p_dropout,
             gin_channels=gin_channels,
         )
-        self.dec = Generator(
-            inter_channels,
-            resblock,
-            resblock_kernel_sizes,
-            resblock_dilation_sizes,
-            upsample_rates,
-            upsample_initial_channel,
-            upsample_kernel_sizes,
+        self.dec = MBiSTFTGenerator(
+            initial_channel=inter_channels,
+            resblock=resblock,
+            resblock_kernel_sizes=resblock_kernel_sizes,
+            resblock_dilation_sizes=resblock_dilation_sizes,
+            upsample_rates=upsample_rates,
+            upsample_initial_channel=upsample_initial_channel,
+            upsample_kernel_sizes=upsample_kernel_sizes,
             gin_channels=gin_channels,
         )
         self.enc_q = PosteriorEncoder(
@@ -1014,15 +946,16 @@ class SynthesizerTrn(nn.Module):
         z_slice, ids_slice = commons.rand_slice_segments(
             z, y_lengths, self.segment_size
         )
-        o = self.dec(z_slice, g=g)
-        return (
-            o,
-            l_length,
-            attn,
-            ids_slice,
-            x_mask,
-            y_mask,
-            (z, z_p, m_p, logs_p, m_q, logs_q),
+        o, o_mb = self.dec(z_slice, g=g)
+        return SynthesizerOutput(
+            waveform=o,
+            duration_loss=l_length,
+            attention=attn,
+            ids_slice=ids_slice,
+            x_mask=x_mask,
+            y_mask=y_mask,
+            latents=(z, z_p, m_p, logs_p, m_q, logs_q),
+            decoder_subbands=o_mb,
         )
 
     def _ensure_spk_proj(self, emb_dim: int) -> nn.Linear:
@@ -1142,7 +1075,10 @@ class SynthesizerTrn(nn.Module):
         else:
             z_p = m_p + torch.randn_like(m_p) * torch.exp(logs_p) * noise_scale
         z = self.flow(z_p, y_mask, g=g, reverse=True)
-        o = self.dec((z * y_mask)[:, :, :max_len], g=g)
+        dec_out = self.dec((z * y_mask)[:, :, :max_len], g=g)
+        # Decoder returns (fullband, subbands) in training mode but only
+        # fullband in onnx_export_mode. Extract fullband in both cases.
+        o = dec_out[0] if isinstance(dec_out, tuple) else dec_out
 
         return InferOutput(o, attn, y_mask, (z, z_p, m_p, logs_p), durations)
 
@@ -1153,5 +1089,5 @@ class SynthesizerTrn(nn.Module):
         z, m_q, logs_q, y_mask = self.enc_q(y, y_lengths, g=g_src)
         z_p = self.flow(z, y_mask, g=g_src)
         z_hat = self.flow(z_p, y_mask, g=g_tgt, reverse=True)
-        o_hat = self.dec(z_hat * y_mask, g=g_tgt)
+        o_hat, _ = self.dec(z_hat * y_mask, g=g_tgt)
         return o_hat, y_mask, (z, z_p, z_hat)

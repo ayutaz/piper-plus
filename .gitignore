@@ -5,6 +5,11 @@ tmp/
 *.backup
 requirements.txt.backup
 
+# Local secrets / API tokens
+.env
+.env.*
+!.env.example
+
 *.py[cod]
 __pycache__/
 *.egg
@@ -114,6 +119,15 @@ models/
 # Local working files
 checkpoints/
 output/
+output-*/
+dataset-*/
+libritts-r/
+moe-speech-*/
+downloads/
+hf_readme.md
+rebuild_cache.py
+upload_webdataset.py
+bench_mb_istft.py
 pip-test/
 upiper_comparison_samples/
 compare_phonemes.txt

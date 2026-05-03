@@ -43,6 +43,7 @@
 ### 학습
 
 - **WavLM 판별기** — MOS +0.15-0.25 향상 (기본 활성화, 학습 시에만 사용)
+- **MB-iSTFT-VITS2 (`--mb-istft`)** — HiFi-GAN 디코더를 MB-iSTFT + PQMF로 교체, CPU 추론 약 2.21배 가속 (medium 품질 전용, ONNX 호환)
 - **FP16 혼합 정밀도** — 학습 속도 2-3배, 메모리 약 50% 절감 (기본 활성화)
 - **EMA** — Exponential Moving Average를 통한 학습 안정성 향상 (기본 활성화)
 - **다중 GPU** — DDP 지원, 자동 학습률 스케일링

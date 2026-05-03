@@ -34,6 +34,8 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from hashlib import sha256 as _sha256
 from pathlib import Path
 
+from piper_plus_g2p.encode.pua import map_token as _map_token
+
 
 _LOGGER = logging.getLogger("prepare_multilingual")
 
@@ -289,6 +291,43 @@ def _init_phonemize_worker(
             pass
 
 
+def _post_process_ids(
+    phoneme_ids: list[int],
+    prosody_features: list,
+    id_map: dict[str, list[int]],
+) -> tuple[list[int], list]:
+    """Insert BOS/EOS and inter-phoneme padding.
+
+    Mirrors ``PiperEncoder._post_process()`` from piper_plus_g2p.
+    """
+    pad_ids = id_map.get("_", [0])
+    bos_ids = id_map.get("^")
+    eos_ids = id_map.get("$")
+
+    # Insert pad between every phoneme ID, skip after existing pad tokens
+    padded_ids: list[int] = []
+    padded_prosody: list = []
+    for phoneme_id, prosody_feature in zip(phoneme_ids, prosody_features, strict=True):
+        padded_ids.append(phoneme_id)
+        padded_prosody.append(prosody_feature)
+        if phoneme_id not in pad_ids:
+            padded_ids.extend(pad_ids)
+            padded_prosody.extend([None] * len(pad_ids))
+
+    phoneme_ids = padded_ids
+    prosody_features = padded_prosody
+
+    # Wrap with BOS / EOS
+    if bos_ids:
+        phoneme_ids = bos_ids + [pad_ids[0]] + phoneme_ids
+        prosody_features = [None] * (len(bos_ids) + 1) + prosody_features
+    if eos_ids:
+        phoneme_ids = phoneme_ids + eos_ids
+        prosody_features = prosody_features + [None] * len(eos_ids)
+
+    return phoneme_ids, prosody_features
+
+
 def _phonemize_single(
     text: str,
     wav_path: str,
@@ -297,7 +336,6 @@ def _phonemize_single(
     language_id: int,
 ) -> dict:
     """Phonemize a single utterance using cached worker state."""
-    ml_phonemizer = _phonemize_worker_state["ml_phonemizer"]
     id_map = _phonemize_worker_state["id_map"]
     lang_phonemizer = _phonemize_worker_state.get(f"phonemizer_{language}")
 
@@ -311,8 +349,9 @@ def _phonemize_single(
         prosody_features = []
         missing = []
         for ph, pr in zip(phonemes, prosody_list, strict=True):
-            if ph in id_map:
-                ids = id_map[ph]
+            mapped_ph = _map_token(ph)
+            if mapped_ph in id_map:
+                ids = id_map[mapped_ph]
                 phoneme_ids.extend(ids)
                 for _ in ids:
                     if pr is not None:
@@ -322,7 +361,7 @@ def _phonemize_single(
             else:
                 missing.append(ph)
 
-        phoneme_ids, prosody_features = ml_phonemizer.post_process_ids(
+        phoneme_ids, prosody_features = _post_process_ids(
             phoneme_ids, prosody_features, id_map
         )
 
@@ -387,7 +426,6 @@ def _phonemize_zh_pinyin_single(
         phonemize_from_pinyin_syllables,
     )
 
-    ml_phonemizer = _phonemize_worker_state["ml_phonemizer"]
     id_map = _phonemize_worker_state["id_map"]
 
     try:
@@ -399,8 +437,9 @@ def _phonemize_zh_pinyin_single(
         prosody_features = []
         missing = []
         for ph, pr in zip(phonemes, prosody_list, strict=True):
-            if ph in id_map:
-                ids = id_map[ph]
+            mapped_ph = _map_token(ph)
+            if mapped_ph in id_map:
+                ids = id_map[mapped_ph]
                 phoneme_ids.extend(ids)
                 for _ in ids:
                     if pr is not None:
@@ -410,7 +449,7 @@ def _phonemize_zh_pinyin_single(
             else:
                 missing.append(ph)
 
-        phoneme_ids, prosody_features = ml_phonemizer.post_process_ids(
+        phoneme_ids, prosody_features = _post_process_ids(
             phoneme_ids, prosody_features, id_map
         )
 

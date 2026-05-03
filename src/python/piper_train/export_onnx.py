@@ -66,6 +66,14 @@ def build_infer_forward(
                           speaker_embedding_mask=None)
             -> (audio: Tensor, durations: Tensor)
     """
+    # Configure stochastic/deterministic mode ONCE at build time
+    # (not inside forward, to avoid "state_dict changed during tracing" errors).
+    # model.onnx_export_mode: controls noise injection (True = deterministic).
+    # model.dp.onnx_export_mode: same for duration predictor.
+    # model.dec.onnx_export_mode: makes the decoder return fullband only (always True for export).
+    model.onnx_export_mode = not stochastic
+    if hasattr(model, "dp"):
+        model.dp.onnx_export_mode = not stochastic
 
     def infer_forward(
         text,
@@ -85,34 +93,22 @@ def build_infer_forward(
         #   onnx_export_mode=True  → z_p = m_p          (deterministic)
         #   onnx_export_mode=False → z_p = m_p + noise   (stochastic)
         # We set it here to match the stochastic flag, restoring the
-        # original value afterwards so the caller's state is not mutated.
-        prev_model = getattr(model, "onnx_export_mode", False)
-        prev_dp = (
-            getattr(model.dp, "onnx_export_mode", False)
-            if hasattr(model, "dp")
-            else None
+        # onnx_export_mode is set globally via set_export_mode() before
+        # torch.onnx.export(). Do NOT toggle it here — changing module
+        # attributes inside the traced forward causes
+        # "state_dict changed after running the tracer" errors.
+        audio, _attn, _y_mask, _latents, durations = model.infer(
+            text,
+            text_lengths,
+            sid=sid,
+            lid=lid,
+            noise_scale=noise_scale,
+            length_scale=length_scale,
+            noise_scale_w=noise_scale_w,
+            prosody_features=prosody_features,
+            speaker_embedding=speaker_embedding,
+            speaker_embedding_mask=speaker_embedding_mask,
         )
-        model.onnx_export_mode = not stochastic
-        if hasattr(model, "dp"):
-            model.dp.onnx_export_mode = not stochastic
-
-        try:
-            audio, _attn, _y_mask, _latents, durations = model.infer(
-                text,
-                text_lengths,
-                sid=sid,
-                lid=lid,
-                noise_scale=noise_scale,
-                length_scale=length_scale,
-                noise_scale_w=noise_scale_w,
-                prosody_features=prosody_features,
-                speaker_embedding=speaker_embedding,
-                speaker_embedding_mask=speaker_embedding_mask,
-            )
-        finally:
-            model.onnx_export_mode = prev_model
-            if hasattr(model, "dp") and prev_dp is not None:
-                model.dp.onnx_export_mode = prev_dp
 
         return audio, durations
 
@@ -320,6 +316,13 @@ def simplify_onnx_model(onnx_path: Path, check_n: int = 3) -> bool:
         return False
 
 
+def set_export_mode(model: torch.nn.Module, mode: bool = True) -> None:
+    """Set onnx_export_mode on all submodules that support it."""
+    for m in model.modules():
+        if hasattr(m, "onnx_export_mode"):
+            m.onnx_export_mode = mode
+
+
 def main() -> None:
     """Main entry point"""
     torch.manual_seed(1234)
@@ -396,11 +399,12 @@ def main() -> None:
     num_speakers = model_g.n_speakers
     num_languages = getattr(model_g, "n_languages", 1)
 
-    # Enable ONNX export mode for deterministic output
-    model_g.onnx_export_mode = True
-    # Propagate to Duration Predictor (StochasticDurationPredictor)
-    if hasattr(model_g, "dp"):
-        model_g.dp.onnx_export_mode = True
+    # Enable ONNX export mode for all compatible modules.
+    # This makes the decoder emit fullband-only output and applies other
+    # ONNX-specific behaviors. The stochastic/deterministic override on
+    # model and duration predictor is applied later by build_infer_forward.
+    set_export_mode(model_g, True)
+    _LOGGER.info("Export mode enabled (stochastic=%s)", args.stochastic)
 
     # Inference only
     model_g.eval()
@@ -514,6 +518,12 @@ def main() -> None:
     )
 
     dummy_input = tuple(dummy_input_list)
+
+    # Pre-run to trigger lazy module initialization (e.g. _ensure_spk_proj
+    # creates nn.Linear on first forward). Without this, torch.jit.trace
+    # detects state_dict changes and raises RuntimeError.
+    with torch.no_grad():
+        model_g(*dummy_input)
 
     # Export - always include durations output
     output_names = ["output", "durations"]
