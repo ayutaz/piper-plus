@@ -5,6 +5,11 @@ tmp/
 *.backup
 requirements.txt.backup
 
+# Local secrets / API tokens
+.env
+.env.*
+!.env.example
+
 *.py[cod]
 __pycache__/
 *.egg
