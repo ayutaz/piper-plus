@@ -124,6 +124,7 @@ dataset-*/
 libritts-r/
 moe-speech-*/
 downloads/
+hf_upload/
 hf_readme.md
 rebuild_cache.py
 upload_webdataset.py
