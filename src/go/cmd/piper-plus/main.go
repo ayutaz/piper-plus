@@ -460,7 +460,7 @@ func buildRequest(input *jsonlInput) *piperplus.SynthesisRequest {
 	if sv, err := resolveStyleVector(); err != nil {
 		// buildRequest can't return errors — callers of runSynthesize handle
 		// flag parsing errors earlier, so we log and continue with nil style.
-		logger.Warn("failed to resolve style vector, ignoring", "err", err)
+		slog.Default().Warn("failed to resolve style vector, ignoring", "err", err)
 	} else if sv != nil {
 		req.StyleVector = sv
 	}
