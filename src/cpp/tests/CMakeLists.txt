@@ -622,7 +622,7 @@ target_link_libraries(test_phoneme_timing
 
 add_test(NAME test_phoneme_timing COMMAND test_phoneme_timing)
 
-# Phase 2 (P2-T03): style_vector ABI + defaults tests.
+# style_vector ABI + defaults tests.
 # Header-only struct checks; no ONNX runtime linkage needed.
 add_executable(test_style_vector
     test_style_vector.cpp
