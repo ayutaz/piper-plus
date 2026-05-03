@@ -580,12 +580,12 @@ impl OnnxEngine {
             // 1. Try the concrete ONNX input shape (axis 1)
             let mut dim_from_shape: Option<u32> = None;
             for input in session.inputs().iter() {
-                if input.name() == "style_vector" {
-                    if let ort::value::ValueType::Tensor { shape, .. } = input.dtype() {
-                        // shape deref's to &[i64]. Dynamic dims are -1.
-                        if shape.len() >= 2 && shape[1] > 0 {
-                            dim_from_shape = Some(shape[1] as u32);
-                        }
+                if input.name() == "style_vector"
+                    && let ort::value::ValueType::Tensor { shape, .. } = input.dtype()
+                {
+                    // shape deref's to &[i64]. Dynamic dims are -1.
+                    if shape.len() >= 2 && shape[1] > 0 {
+                        dim_from_shape = Some(shape[1] as u32);
                     }
                 }
             }
