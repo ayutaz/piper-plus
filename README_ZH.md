@@ -55,14 +55,21 @@
 ### 接口
 
 - **[WebUI (Gradio)](docs/features/webui.md)** — 推理和训练，支持 Docker
-- **C++ CLI** — 流式处理、CUDA 推理、音素时间输出、自定义词典
+- **C++ CLI** — 流式处理、CUDA 推理、**Phoneme Timing 输出 (JSON/TSV/SRT)**、自定义词典
 - **[C API 共享库](examples/c-api/README.md)** — `libpiper_plus.so/.dylib/.dll`，FFI 兼容 (Flutter/Godot/Swift 等)，流式 API
-- **[WebAssembly](src/wasm/openjtalk-web/README.npm.md)** — 完全在浏览器中运行，无需服务器
+- **[WebAssembly](src/wasm/openjtalk-web/README.npm.md)** — 完全在浏览器中运行，**Phoneme Timing 输出 (JSON/TSV/SRT)**，无需服务器
 - **[Docker](docker/README.md)** — 提供推理、训练、WebUI、C++ 共 5 个镜像
-- **PyPI** — `pip install piper-plus`
-- **C# CLI** — .NET 8/9 跨平台，8语言多语言支持，ONNX 推理
-- **Rust CLI** — piper-plus/piper-plus-cli，流式处理，CUDA/CoreML/DirectML 支持，词典自动下载
-- **[Go CLI](src/go/README.md)** — HTTP API服务器、会话池、Docker、单一二进制文件
+- **PyPI** — `pip install piper-plus`，8语言多语言支持，**Phoneme Timing 输出 (JSON/TSV/SRT)**，流式处理，**基于 FastAPI 的 HTTP API**
+- **C# CLI** — .NET 8/9 跨平台，8语言多语言支持，ONNX 推理，**Phoneme Timing 输出 (JSON/TSV/SRT)**
+- **Rust CLI** — piper-plus/piper-plus-cli，流式处理，CUDA/CoreML/DirectML 支持，**Phoneme Timing 输出 (JSON/TSV/SRT)**，词典自动下载
+- **[Go CLI](src/go/README.md)** — HTTP API服务器、会话池、Docker、单一二进制文件、**Phoneme Timing 输出 (JSON/TSV/SRT)**
+- **Voice Cloning (Speaker Encoder + speaker_embedding)** — 6 个运行时 (Python/Rust/C#/Go/WASM/C++) 全部支持
+- **SSML 支持** — `<speak>`、`<break>`、`<prosody rate="...">` 在 4 个运行时 (Python/Rust/C#/Go) 中支持
+- **短文本质量改进 (Strategy A/B/C)** — Silence Padding、Dynamic Scales、SSML `<break>` 自动注入在全部 6 个运行时中支持
+
+### 各运行时功能支持
+
+6 个运行时 (Python/Rust/C#/Go/JS-WASM/C++) 提供等效的 8 语言多语言合成。Phoneme Timing、流式处理（含按句分割）、Voice Cloning、自定义词典在所有运行时均可用。SSML 在 4 个运行时 (Python/Rust/C#/Go) 中支持，HTTP API 在 2 个运行时 (Python/Go) 中支持。
 
 ### 平台
 
@@ -771,7 +778,7 @@ piper-plus 模型：[piper-plus-base](https://huggingface.co/ayousanz/piper-plus
 | 日语 TTS | 日语使用指南 |
 | 训练 | [训练指南](docs/guides/training/training-guide.md) · 多 GPU |
 | API | [音素映射](docs/api-reference/phoneme-mapping.md) · [环境变量](docs/getting-started/environment-variables.md) |
-| 功能 | [WebUI](docs/features/webui.md) · CLI 增强 · 流式处理 |
+| 功能 | [WebUI](docs/features/webui.md) · CLI 增强 · 流式处理 · Phoneme Timing · SSML |
 | 设置 | 快速入门（日语） · [Windows](docs/getting-started/windows-setup.md) · [故障排除](docs/getting-started/troubleshooting.md) |
 | Docker | [Docker 环境](docker/README.md) |
 | WebAssembly | [技术详情](src/wasm/openjtalk-web/README.npm.md) |

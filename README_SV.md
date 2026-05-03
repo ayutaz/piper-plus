@@ -52,14 +52,21 @@ Ett snabbt och högkvalitativt neuralt text-till-tal-system (TTS). Bygger på [V
 ### Gränssnitt
 
 - **[WebUI (Gradio)](docs/features/webui.md)** — Stöd för inferens och träning, Docker-kompatibelt
-- **C++ CLI** — Streaming, CUDA-inferens, fonemtidning, anpassad ordlista
+- **C++ CLI** — Streaming, CUDA-inferens, **Phoneme Timing-utmatning (JSON/TSV/SRT)**, anpassad ordlista
 - **[C API Delat bibliotek](examples/c-api/README.md)** — `libpiper_plus.so/.dylib/.dll`, FFI-kompatibelt (Flutter/Godot/Swift etc.), streaming-API
-- **[WebAssembly](src/wasm/openjtalk-web/README.npm.md)** — Körs helt i webbläsaren, ingen server krävs
+- **[WebAssembly](src/wasm/openjtalk-web/README.npm.md)** — Körs helt i webbläsaren, **Phoneme Timing-utmatning (JSON/TSV/SRT)**, ingen server krävs
 - **[Docker](docker/README.md)** — 5 images: inferens, träning, WebUI, C++
-- **PyPI** — Enkel installation med `pip install piper-plus`
-- **C# CLI** — .NET 8/9 plattformsoberoende, 8 språk, ONNX-inferens
-- **Rust CLI** — piper-plus/piper-plus-cli, streaming, CUDA/CoreML/DirectML-stöd, automatisk ordlistenedladdning
-- **[Go CLI](src/go/README.md)** — HTTP API-server, sessionspoolning, Docker-kompatibelt, enskild binärfil
+- **PyPI** — `pip install piper-plus`, 8 språk flerspråkigt, **Phoneme Timing-utmatning (JSON/TSV/SRT)**, streaming, **FastAPI-baserat HTTP API**
+- **C# CLI** — .NET 8/9 plattformsoberoende, 8 språk, ONNX-inferens, **Phoneme Timing-utmatning (JSON/TSV/SRT)**
+- **Rust CLI** — piper-plus/piper-plus-cli, streaming, CUDA/CoreML/DirectML-stöd, **Phoneme Timing-utmatning (JSON/TSV/SRT)**, automatisk ordlistenedladdning
+- **[Go CLI](src/go/README.md)** — HTTP API-server, sessionspoolning, Docker-kompatibelt, enskild binärfil, **Phoneme Timing-utmatning (JSON/TSV/SRT)**
+- **Voice Cloning (Speaker Encoder + speaker_embedding)** — stöds av samtliga 6 runtimes (Python/Rust/C#/Go/WASM/C++)
+- **SSML-stöd** — `<speak>`, `<break>`, `<prosody rate="...">` stöds av 4 runtimes (Python/Rust/C#/Go)
+- **Kvalitetsförbättring för korta texter (Strategy A/B/C)** — Silence Padding, Dynamic Scales och automatisk SSML `<break>` i samtliga 6 runtimes
+
+### Funktionsstöd per runtime
+
+Likvärdig flerspråkig 8-språks-syntes över 6 runtimes (Python/Rust/C#/Go/JS-WASM/C++). Phoneme Timing, streaming (inklusive uppdelning per mening), Voice Cloning och anpassade ordlistor stöds av alla runtimes. SSML stöds av 4 runtimes (Python/Rust/C#/Go) och HTTP API av 2 runtimes (Python/Go).
 
 ### Plattformar
 
@@ -756,7 +763,7 @@ piper-plus-modeller: [piper-plus-base](https://huggingface.co/ayousanz/piper-plu
 | Japansk TTS | Guide för japansk talsyntes |
 | Träning | [Träningsguide](docs/guides/training/training-guide.md) · Multi-GPU |
 | API | [Fonemmappning](docs/api-reference/phoneme-mapping.md) · [Miljövariabler](docs/getting-started/environment-variables.md) |
-| Funktioner | [WebUI](docs/features/webui.md) · CLI-förbättringar · Streaming |
+| Funktioner | [WebUI](docs/features/webui.md) · CLI-förbättringar · Streaming · Phoneme Timing · SSML |
 | Installation | Snabbstart (japanska) · [Windows](docs/getting-started/windows-setup.md) · [Felsökning](docs/getting-started/troubleshooting.md) |
 | Docker | [Docker-miljö](docker/README.md) |
 | WebAssembly | [Teknisk dokumentation](src/wasm/openjtalk-web/README.npm.md) |

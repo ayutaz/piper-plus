@@ -295,7 +295,7 @@ voice, err := piperplus.LoadVoice(ctx, "model.onnx",
 )
 ```
 
-## HTTP API / HTTPエンドポイント
+## HTTP API
 
 Start the server:
 
@@ -372,11 +372,30 @@ Returns model information:
 
 ## Docker / Dockerでの使用
 
-### Build
+### Build (multi-arch / マルチアーキテクチャ)
 
 ```bash
+# Native build (host arch) — produces a locally runnable image tag
 docker build -t piper-plus-go -f src/go/docker/Dockerfile .
+
+# Cross-platform single-arch build via buildx, loaded into the local image store
+# (use --load for "docker run" usability; --load is incompatible with multi-platform)
+docker buildx build \
+  --platform linux/arm64 \
+  -t piper-plus-go \
+  --load \
+  -f src/go/docker/Dockerfile .
+
+# Cross-platform multi-arch build that pushes directly to a registry
+# (--push is required when --platform lists more than one platform)
+docker buildx build \
+  --platform linux/amd64,linux/arm64 \
+  -t <registry>/piper-plus-go:latest \
+  --push \
+  -f src/go/docker/Dockerfile .
 ```
+
+The Dockerfile uses `TARGETARCH` (multi-arch ready, PR #366) so the same Dockerfile builds amd64 and arm64 images. The runtime stage downloads the architecture-matching ONNX Runtime tarball automatically.
 
 ### Run
 
@@ -385,12 +404,36 @@ docker build -t piper-plus-go -f src/go/docker/Dockerfile .
 docker run -v /path/to/models:/models \
   piper-plus-go -m /models/model.onnx -t "Hello" -f /models/output.wav
 
-# HTTP server mode (with piped server command)
+# HTTP server mode — see "serve subcommand" below
 docker run -p 8080:8080 -v /path/to/models:/models \
   piper-plus-go serve -m /models/model.onnx --addr :8080
 ```
 
-The Dockerfile uses a multi-stage build: a Debian-based Go builder that compiles OpenJTalk from source for Japanese G2P support, and a `debian:trixie-slim` runtime with ONNX Runtime `v1.24.4`. Override `ORT_VERSION` for other ONNX Runtime versions.
+The Dockerfile uses a multi-stage build: a Debian-based Go builder that compiles OpenJTalk from source for Japanese G2P support, and a `debian:trixie-slim` runtime with ONNX Runtime `v1.24.4`. Override `ORT_VERSION` for other ONNX Runtime versions, and `TARGETARCH` is honored automatically by `docker buildx`.
+
+## `serve` subcommand / `serve` サブコマンド
+
+The CLI binary doubles as an HTTP server when invoked with `serve` as the first argument. Endpoints (`/synthesize`, `/health`, `/info`) are described in [HTTP API](#http-api) below.
+
+```bash
+# Local serve (host)
+piper-plus serve -m model.onnx --addr :8080
+
+# Streaming + custom dictionary
+piper-plus serve -m model.onnx --addr :8080 --custom-dict dict.json
+
+# In Docker (port-forwarded)
+docker run -p 8080:8080 -v /path/to/models:/models \
+  piper-plus-go serve -m /models/model.onnx --addr :8080
+```
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--addr` | `:8080` | HTTP listen address |
+| `-m, --model` | (required) | ONNX model path |
+| `-c, --config` | auto-detected | `config.json` path |
+| `--custom-dict` | | Custom dictionary path (JSON v1/v2 or TSV) |
+| `--device` | `cpu` | Inference device (`cpu`, `cuda`, `coreml`, `directml`) |
 
 ## Environment Variables / 環境変数
 

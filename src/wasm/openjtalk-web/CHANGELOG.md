@@ -56,7 +56,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - 全テスト: 376 passed, 1 skipped, 0 failed (リグレッション 0 件)
 
-## [0.4.0] - 2026-04-11
+## [0.4.0] - 2026-04-12
 
 ### Breaking Changes
 
@@ -66,7 +66,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Bumped `@piper-plus/g2p` dependency to `^0.3.0`
 
-## [0.3.0] - 2026-04-11
+## [0.3.1] - 2026-04-08
+
+### Changed
+
+- Documentation: README.md でのバージョン表記を npm 公開状況に合わせて更新 (#330)
+- 内部依存関係の minor 整理 (テストランナーは 376 passed を維持)
+
+### Fixed
+
+- パッケージ構成の軽微な修正 (npm publish 後の patch バージョン)
+
+## [0.3.0] - 2026-04-07
 
 ### Breaking Changes
 
@@ -150,5 +161,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Streaming synthesis pipeline
 - TypeScript type definitions
 
+[0.1.0]: https://github.com/ayutaz/piper-plus/releases/tag/npm-v0.1.0
+[0.1.1]: https://github.com/ayutaz/piper-plus/releases/tag/npm-v0.1.1
 [0.3.0]: https://github.com/ayutaz/piper-plus/releases/tag/npm-v0.3.0
+[0.3.1]: https://github.com/ayutaz/piper-plus/releases/tag/npm-v0.3.1
 [0.4.0]: https://github.com/ayutaz/piper-plus/releases/tag/npm-v0.4.0

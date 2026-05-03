@@ -52,14 +52,21 @@
 ### Интерфейсы
 
 - **[WebUI (Gradio)](docs/features/webui.md)** — вывод и обучение, поддержка Docker
-- **C++ CLI** — потоковый вывод, CUDA-инференс, вывод тайминга фонем, пользовательский словарь
+- **C++ CLI** — потоковый вывод, CUDA-инференс, **вывод Phoneme Timing (JSON/TSV/SRT)**, пользовательский словарь
 - **[C API Разделяемая библиотека](examples/c-api/README.md)** — `libpiper_plus.so/.dylib/.dll`, поддержка FFI (Flutter/Godot/Swift и др.), потоковый API
-- **[WebAssembly](src/wasm/openjtalk-web/README.npm.md)** — полная работа в браузере, сервер не требуется
+- **[WebAssembly](src/wasm/openjtalk-web/README.npm.md)** — полная работа в браузере, **вывод Phoneme Timing (JSON/TSV/SRT)**, сервер не требуется
 - **[Docker](docker/README.md)** — 5 образов: вывод, обучение, WebUI, C++
-- **PyPI** — простая установка через `pip install piper-plus`
-- **C# CLI** — кроссплатформенный .NET 8/9, 8 языков, ONNX-инференс
-- **Rust CLI** — piper-plus/piper-plus-cli, потоковый вывод, CUDA/CoreML/DirectML, автозагрузка словарей
-- **[Go CLI](src/go/README.md)** — HTTP API-сервер, пулинг сессий, Docker, единый бинарник
+- **PyPI** — `pip install piper-plus`, 8 языков мультиязычно, **вывод Phoneme Timing (JSON/TSV/SRT)**, потоковый вывод, **HTTP API на основе FastAPI**
+- **C# CLI** — кроссплатформенный .NET 8/9, 8 языков, ONNX-инференс, **вывод Phoneme Timing (JSON/TSV/SRT)**
+- **Rust CLI** — piper-plus/piper-plus-cli, потоковый вывод, CUDA/CoreML/DirectML, **вывод Phoneme Timing (JSON/TSV/SRT)**, автозагрузка словарей
+- **[Go CLI](src/go/README.md)** — HTTP API-сервер, пулинг сессий, Docker, единый бинарник, **вывод Phoneme Timing (JSON/TSV/SRT)**
+- **Voice Cloning (Speaker Encoder + speaker_embedding)** — поддерживается во всех 6 рантаймах (Python/Rust/C#/Go/WASM/C++)
+- **Поддержка SSML** — `<speak>`, `<break>`, `<prosody rate="...">` доступны в 4 рантаймах (Python/Rust/C#/Go)
+- **Улучшение качества коротких текстов (Strategy A/B/C)** — Silence Padding, Dynamic Scales и автоматический SSML `<break>` во всех 6 рантаймах
+
+### Поддержка функций по рантаймам
+
+Эквивалентный мультиязычный синтез на 8 языках в 6 рантаймах (Python/Rust/C#/Go/JS-WASM/C++). Phoneme Timing, потоковый вывод (включая разбиение по предложениям), Voice Cloning и пользовательские словари доступны во всех рантаймах. SSML поддерживается в 4 рантаймах (Python/Rust/C#/Go), HTTP API — в 2 рантаймах (Python/Go).
 
 ### Платформы
 
@@ -756,7 +763,7 @@ piper.exe --model en_US-lessac-medium.onnx -f output.wav
 | Японский TTS | Руководство по синтезу японской речи |
 | Обучение | [Руководство по обучению](docs/guides/training/training-guide.md) · Мульти-GPU |
 | API | [Фонемный маппинг](docs/api-reference/phoneme-mapping.md) · [Переменные окружения](docs/getting-started/environment-variables.md) |
-| Функции | [WebUI](docs/features/webui.md) · Расширенный CLI · Потоковый вывод |
+| Функции | [WebUI](docs/features/webui.md) · Расширенный CLI · Потоковый вывод · Phoneme Timing · SSML |
 | Настройка | Быстрый старт (японский) · [Windows](docs/getting-started/windows-setup.md) · [Устранение неполадок](docs/getting-started/troubleshooting.md) |
 | Docker | [Окружение Docker](docker/README.md) |
 | WebAssembly | [Техническая документация](src/wasm/openjtalk-web/README.npm.md) |

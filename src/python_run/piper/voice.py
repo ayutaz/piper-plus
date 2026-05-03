@@ -444,9 +444,14 @@ class PiperVoice:
         else:
             sentences = split_sentences(text) or [text]
 
+        # NOTE: PhonemeType.BILINGUAL is a legacy compatibility branch for
+        # v3/v4 JA+EN datasets that predate the 6-language multilingual model
+        # (PR #218, v1.7). Modern models use MULTILINGUAL exclusively.
+        # Deprecated: scheduled for removal in a future major release; new
+        # models must not set phoneme_type="bilingual".
         if self.config.phoneme_type in (
             PhonemeType.MULTILINGUAL,
-            PhonemeType.BILINGUAL,
+            PhonemeType.BILINGUAL,  # Deprecated: legacy v3/v4 bilingual datasets
         ):
             try:
                 from .phonemize.multilingual import MultilingualPhonemizer
@@ -455,6 +460,10 @@ class PiperVoice:
                     "MultilingualPhonemizer unavailable; falling back to JA phonemizer"
                 )
             else:
+                # Legacy bilingual = JA+EN only; multilingual = 6 trained languages.
+                # SV/KO have G2P implementations but are not in any trained model
+                # yet (see CLAUDE.md: "学習済みモデルは 6 言語"), so they are not
+                # listed here.
                 languages = (
                     ["ja", "en"]
                     if self.config.phoneme_type == PhonemeType.BILINGUAL

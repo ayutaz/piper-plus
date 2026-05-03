@@ -234,3 +234,31 @@ Look for issues labeled [`good first issue`](https://github.com/ayutaz/piper-plu
 3. Run linting and tests
 4. Submit a PR to the `dev` branch
 5. Ensure all CI checks pass
+
+## Package Versioning Policy
+
+piper-plus ships **as several independent packages**, each released and versioned on its own schedule. There is **no single project-wide version number** — the value displayed in the README header (e.g. "v1.11.0") tracks the **PyPI** package only.
+
+| Package | Registry | Source | Tag prefix | Versioning |
+|---|---|---|---|---|
+| `piper-plus` (Python TTS) | PyPI | `src/python/`, `src/python_run/` | `v<X.Y.Z>` (e.g. `v1.11.0`) | SemVer |
+| `piper-plus-g2p` (Python G2P) | PyPI | `src/python/g2p/` | `g2p-py-v<X.Y.Z>` | SemVer |
+| `piper-plus-cli` / `piper-plus` (Rust crate) | crates.io | `src/rust/` | `rust-v<X.Y.Z>` | SemVer |
+| `PiperPlus.Core` / `PiperPlus.Cli` (NuGet) | NuGet | `src/csharp/` | `csharp-v<X.Y.Z>` | SemVer |
+| `piper-plus` (npm) | npm | `src/wasm/openjtalk-web/` | `npm-v<X.Y.Z>` (e.g. `npm-v0.3.1`) | SemVer |
+| `@piper-plus/g2p` (npm) | npm | `src/wasm/g2p/` | `g2p-v<X.Y.Z>` (e.g. `g2p-v0.3.0`) | SemVer |
+| `github.com/ayutaz/piper-plus/src/go` | Go module | `src/go/` | (none — uses commit SHA via `go get`) | Go module versioning |
+| C API shared library (`libpiper_plus`) | GitHub Releases | `src/cpp/` | `shared-lib-v<X.Y.Z>` | SemVer |
+
+### Why independent versioning
+
+- A bug fix in the Rust runtime should not force a Python/PyPI release.
+- A breaking change in the npm package (e.g. removing HTS voice support, npm 0.3.0) should not bump the entire project to a new major.
+- Per-language ecosystems have different stability expectations (e.g. crates.io is stricter about breaking changes than internal Python releases).
+
+### Ground rules
+
+1. Each package keeps its own `CHANGELOG.md` (root `CHANGELOG.md` mirrors the **Python** package + project-wide highlights).
+2. Each release has a tag matching the prefix scheme above; do not reuse a generic `v<X.Y.Z>` tag for non-Python releases.
+3. Cross-package compatibility is documented in the relevant package README (e.g. npm `piper-plus` declares its required `@piper-plus/g2p` range in `package.json`).
+4. When making a change that affects multiple packages (e.g. adding a new language), bump each affected package's version individually and document the relationship in the root CHANGELOG.

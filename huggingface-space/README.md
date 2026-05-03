@@ -28,15 +28,16 @@ A web-based demo for [piper-plus](https://github.com/ayutaz/piper-plus), featuri
 
 ## Supported Languages
 
-| Code | Language | Script | Phonemizer |
-|------|----------|--------|------------|
-| `ja` | Japanese | Hiragana/Katakana/Kanji | pyopenjtalk |
-| `en` | English | Latin | g2p-en |
-| `zh` | Chinese (Mandarin) | Simplified Chinese | pypinyin |
-| `ko` | Korean | Hangul | g2pk2 |
-| `es` | Spanish | Latin | Rule-based |
-| `fr` | French | Latin | Rule-based |
-| `pt` | Portuguese | Latin | Rule-based |
+| Code | Language | Script | Phonemizer | In demo model |
+|------|----------|--------|------------|---------------|
+| `ja` | Japanese | Hiragana/Katakana/Kanji | pyopenjtalk | ✅ |
+| `en` | English | Latin | g2p-en | ✅ |
+| `zh` | Chinese (Mandarin) | Simplified Chinese | pypinyin | ✅ |
+| `ko` | Korean | Hangul | g2pk2 | ❌ (G2P only — model not trained yet) |
+| `es` | Spanish | Latin | Rule-based | ✅ |
+| `fr` | French | Latin | Rule-based | ✅ |
+| `pt` | Portuguese | Latin | Rule-based | ✅ |
+| `sv` | Swedish | Latin | Rule-based | ❌ (G2P only — model not trained yet) |
 
 ## Models
 
