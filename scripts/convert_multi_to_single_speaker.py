@@ -12,23 +12,38 @@
      / loops / callbacks を削除 (これだけで ~600 MB 削減)
   2. state_dict から model_g.emb_g.weight (話者埋め込み) を削除
   3. hyper_parameters.num_speakers を 0 / speaker_id を None に変更
-  4. ema_generator_state からも emb_g 系キーを削除
 
 Note:
   cond_layer 系 (model_g.dec.cond.*, dp.cond.*, enc_q/flow.*.cond_layer.*,
   enc_p.cond_layer.*) は **保持** する。学習側 `--resume-from-multispeaker-checkpoint`
   が起動時に動的に emb_g.mean() を bias に吸収する設計のため。
   (PR #170 時点では cond_layer も削除していたが現行アーキでは不要)
+
+  ema_generator_state は decoder の shadow_params のみを保持しており
+  emb_g 系キーは元々含まれないため処理不要。
+
+Security:
+  torch.load(weights_only=False) は任意のオブジェクトをアンピクルするため
+  **信頼できる ckpt** にのみ使用すること。Lightning ckpt の hyper_parameters に
+  pathlib.Path 等が含まれるため weights_only=True では読み込めない。
 """
 
 from __future__ import annotations
 
 import argparse
 import os
+import pathlib
 import sys
 from pathlib import Path
 
 import torch
+
+
+# Windows で Linux 由来の ckpt をロードするための互換パッチ。
+# (Lightning は hyper_parameters に PosixPath を直接ピクルする)
+if sys.platform == "win32":
+    pathlib.PosixPath = pathlib.WindowsPath  # type: ignore[misc,assignment]
+torch.serialization.add_safe_globals([pathlib.PosixPath, pathlib.WindowsPath])
 
 
 TOP_LEVEL_KEYS_TO_DROP = (
@@ -53,6 +68,8 @@ def convert_checkpoint(input_path: str, output_path: str) -> bool:
 
     print(f"Loading checkpoint: {input_path}")
     print(f"  size: {_file_size_mb(input_path):.1f} MB")
+    # weights_only=False is required because Lightning ckpts pickle pathlib
+    # objects in hyper_parameters. Only run on TRUSTED checkpoint files.
     ckpt = torch.load(input_path, map_location="cpu", weights_only=False)
     print(f"  top-level keys: {list(ckpt.keys())}")
 
@@ -78,14 +95,8 @@ def convert_checkpoint(input_path: str, output_path: str) -> bool:
             dropped_sd.append(key)
     print(f"  dropped state_dict: {dropped_sd}")
 
-    ema_gen = ckpt.get("ema_generator_state")
-    if isinstance(ema_gen, dict) and "module" in ema_gen:
-        ema_module = ema_gen["module"]
-        ema_dropped = [k for k in list(ema_module.keys()) if "emb_g" in k]
-        for k in ema_dropped:
-            del ema_module[k]
-        if ema_dropped:
-            print(f"  dropped ema_generator: {ema_dropped}")
+    # NOTE: 現行 ema (vits/ema.py) は decoder のみ shadow_params で保持しており
+    # emb_g は元々 EMA の対象外。よって ema_generator_state 側の clean-up は不要。
 
     if "hyper_parameters" in ckpt:
         ckpt["hyper_parameters"]["num_speakers"] = 0

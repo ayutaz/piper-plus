@@ -10,13 +10,20 @@
 | `optimizer_states` 削除 | ~600 MB |
 | `lr_schedulers` / `ema_discriminator_state` / `loops` / `callbacks` 削除 | 数 MB |
 | `state_dict` から `model_g.emb_g.weight` 削除 | ~1 MB (= num_speakers x 512 x 4) |
-| `ema_generator_state` 内の `emb_g` 系キー削除 | 数 KB |
 | `hyper_parameters.num_speakers = 0` に書き換え | — |
 
 `cond_layer` 系 (`model_g.dec.cond.*`, `dp.cond.*`, `enc_q.enc.cond_layer.*`,
 `flow.flows.*.enc.cond_layer.*`, `enc_p.cond_layer.*`) は **保持** する。
 学習側の `--resume-from-multispeaker-checkpoint` が起動時に動的に
 `emb_g.mean()` を bias に吸収する設計のため。
+
+`ema_generator_state` は decoder の `shadow_params` だけを保持しており
+`emb_g` 系は元から EMA の対象外。そのまま残しても問題ないので clean-up しない。
+
+> **Security**: `torch.load(weights_only=False)` を使用。Lightning ckpt は
+> `hyper_parameters` に `pathlib.Path` をピクルするので weights_only=True では
+> 読めない。**信頼できる ckpt にのみ使用すること**。Windows では Linux 由来の
+> ckpt をロードするため `pathlib.PosixPath` の互換パッチを自動適用。
 
 ## 使い方
 
@@ -69,10 +76,14 @@ python -m piper_train \
 ## 履歴
 
 PR #170 (2025-08-28) で初導入、PR #229 (M1+M1.5 リファクタ) で削除。
-PR #320 (MB-iSTFT 統一 Decoder) で復活させ、現行アーキ向けに簡素化:
+PR #320 (MB-iSTFT 統一 Decoder) のマージ後に取り残された再追加分として、
+follow-up PR #369 で復活 + 現行アーキ向けに簡素化:
 
 - 旧版: `cond_layer` 系も全部削除していた
 - 現行版: `cond_layer` 系は保持 (`--resume-from-multispeaker-checkpoint` の
   動的吸収ロジックに任せる)
 - 旧版: `optimizer_states` / `lr_schedulers` のみ top-level 削除
 - 現行版: 加えて `ema_discriminator_state` / `loops` / `callbacks` も削除
+- 旧版: 推測で `ema_generator_state["module"]` 内の `emb_g` キーを削除しようと
+  していたが、現行 EMA 実装は `shadow_params` 形式 + decoder のみで `emb_g`
+  対象外なのでそのブロックを削除
