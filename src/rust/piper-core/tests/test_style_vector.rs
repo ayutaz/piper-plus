@@ -4,6 +4,12 @@
 //! These tests do not load a real ONNX model — they verify the
 //! wiring and type-level contracts so downstream runtimes know the
 //! new field behaves as expected.
+//!
+//! `SynthesisRequest`, `SynthesisParams`, and `ModelCapabilities` are
+//! all re-exported under `feature = "onnx"`, so the whole file is gated
+//! the same way (matches test_voice_api.rs / test_batch.rs).
+
+#![cfg(feature = "onnx")]
 
 use piper_plus::{ModelCapabilities, SynthesisParams, SynthesisRequest};
 
