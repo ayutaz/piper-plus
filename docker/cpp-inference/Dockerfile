@@ -90,7 +90,9 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD piper --version || exit 1
 
 # Run as non-root user for security
-RUN useradd -m -u 1000 piper && \
+# ubuntu:24.04 has a default 'ubuntu' user with UID 1000; remove it first to avoid collision
+RUN userdel -r ubuntu 2>/dev/null || true && \
+    useradd -m -u 1000 piper && \
     chown -R piper:piper /app
 USER piper
 

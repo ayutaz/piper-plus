@@ -107,7 +107,9 @@ RUN echo "=== Running build-time tests ===" && \
     echo "=== Build-time tests passed ==="
 
 # Create non-root user and transfer ownership of workspace
-RUN useradd -m -u 1000 piper && chown -R piper:piper /workspace
+# ubuntu:24.04 has a default 'ubuntu' user with UID 1000; remove it first to avoid collision
+RUN userdel -r ubuntu 2>/dev/null || true && \
+    useradd -m -u 1000 piper && chown -R piper:piper /workspace
 USER piper
 
 # Ensure we're in a valid directory
