@@ -1,7 +1,7 @@
 # Multi-stage build for C++ Inference Environment
 
 # Stage 1: Builder
-FROM ubuntu:22.04 AS builder
+FROM ubuntu:24.04 AS builder
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -53,7 +53,7 @@ RUN if [ ! -d /install/share/open_jtalk/dic ]; then \
     fi
 
 # Stage 2: Runtime (CPU only)
-FROM ubuntu:22.04
+FROM ubuntu:24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
