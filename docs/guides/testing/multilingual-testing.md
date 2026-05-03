@@ -63,10 +63,10 @@ CI is defined in `.github/workflows/csharp-ci.yml` and runs on:
 
 | Dimension | Values |
 |-----------|--------|
-| OS | ubuntu-22.04, windows-latest, macos-14 |
-| .NET | 8.0.x, 9.0.x |
+| OS | ubuntu-24.04, windows-latest, macos-14 |
+| .NET | 10.0.x |
 
-This gives a 3 OS x 2 .NET versions matrix (6 combinations).
+This gives a 3 OS x 1 .NET version matrix (3 combinations).
 
 ## Rust Tests (piper-plus)
 

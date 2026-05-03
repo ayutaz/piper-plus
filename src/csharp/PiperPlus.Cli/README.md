@@ -122,7 +122,7 @@ Combined codes (e.g. `ja-en-zh-es-fr-pt`) instantiate a `MultilingualPhonemizer`
 
 ## Platforms
 
-- **TFM:** `net9.0` (built with `Microsoft.NET.Sdk` + `PublishReadyToRun=true`)
+- **TFM:** `net10.0` (built with `Microsoft.NET.Sdk` + `PublishReadyToRun=true`)
 - **OS:** Windows / Linux / macOS — CI runs on all three (`csharp-ci.yml`)
 - **Hardware:** CPU by default; CUDA via `--use-cuda` (requires the matching `Microsoft.ML.OnnxRuntime` GPU runtime)
 
