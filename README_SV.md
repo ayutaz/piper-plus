@@ -43,6 +43,7 @@ Ett snabbt och högkvalitativt neuralt text-till-tal-system (TTS). Bygger på [V
 ### Träning
 
 - **WavLM Discriminator** — MOS-förbättring +0,15–0,25 (aktiverad som standard, används enbart vid träning)
+- **MB-iSTFT-VITS2 (`--mb-istft`)** — Ersätter HiFi-GAN-avkodaren med MB-iSTFT + PQMF för ~2,21x snabbare CPU-inferens (endast medium-kvalitet, ONNX-kompatibel)
 - **FP16 Mixed Precision** — 2–3x snabbare träning, ca 50 % minnesreduktion (aktiverad som standard)
 - **EMA** — Exponential Moving Average för stabilare träning (aktiverad som standard)
 - **Multi-GPU** — DDP-stöd, automatisk skalning av inlärningsfrekvens

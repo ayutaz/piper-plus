@@ -43,6 +43,7 @@ Systeme de synthese vocale neuronale (TTS) rapide et de haute qualite. Base sur 
 ### Entrainement
 
 - **WavLM Discriminator** — Amelioration MOS +0.15-0.25 (active par defaut, uniquement a l'entrainement)
+- **MB-iSTFT-VITS2 (`--mb-istft`)** — Remplace le décodeur HiFi-GAN par MB-iSTFT + PQMF pour une inférence CPU ~2,21x plus rapide (qualité medium uniquement, compatible ONNX)
 - **FP16 Mixed Precision** — Entrainement 2-3x plus rapide, ~50% de memoire en moins (active par defaut)
 - **EMA** — Moyenne mobile exponentielle pour la stabilite (active par defaut)
 - **Multi-GPU** — Support DDP, mise a l'echelle automatique du taux d'apprentissage

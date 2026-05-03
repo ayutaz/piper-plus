@@ -36,6 +36,39 @@ uv run python -m piper_train \
 
 Multi-GPU automatically configures DDP (Distributed Data Parallel). NCCL environment variables are required. See the Multi-GPU Training Guide for details.
 
+## MB-iSTFT-VITS2 Generator (`--mb-istft`)
+
+Replaces the final upsampling stage of the HiFi-GAN decoder with MB-iSTFT (Multi-Band inverse STFT) + PQMF, achieving approximately **2.21x faster ONNX inference** (CPU, 100 phoneme p50). Output shape `[B, 1, T]` is preserved, so the existing C++/Rust/C#/Go/WASM runtimes can be used without any changes.
+
+**Prerequisite**: `--quality medium` only (mutually exclusive with `--quality high`).
+
+### Training command example
+
+```bash
+uv run python -m piper_train \
+  --dataset-dir /path/to/dataset \
+  --mb-istft \
+  --quality medium \
+  --max_epochs 75 --batch-size 20 \
+  --base_lr 2e-4 --disable_auto_lr_scaling \
+  --ema-decay 0.9995 \
+  --default_root_dir /path/to/output
+```
+
+### Related CLI options
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--mb-istft` | off | Enable MB-iSTFT Generator |
+| `--sub-stft-fft-sizes` | `171,384,683` | FFT sizes for sub-band Multi-resolution STFT loss (3 resolutions) |
+| `--sub-stft-hop-sizes` | `10,30,60` | Hop sizes |
+| `--sub-stft-win-sizes` | `60,150,300` | Window sizes |
+| `--c-sub-stft` | `1.0` | Weight for sub-band STFT loss |
+
+### Details
+
+For the design specification, PQMF formulas, and ONNX-compatible iSTFT implementation details, see [docs/design/mb-istft-vits2-requirements.md](../design/mb-istft-vits2-requirements.md).
+
 ## ONNX Export
 
 FP16 conversion is applied by default, reducing model size by ~50%. Use `--no-fp16` to disable.

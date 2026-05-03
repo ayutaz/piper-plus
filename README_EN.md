@@ -65,6 +65,7 @@ A fast, high-quality neural text-to-speech (TTS) system. Built on the [VITS](htt
 ### Training
 
 - **WavLM Discriminator** — MOS +0.15-0.25 improvement (enabled by default, training only)
+- **MB-iSTFT-VITS2 (`--mb-istft`)** — Replaces HiFi-GAN decoder with MB-iSTFT + PQMF for ~2.21x faster CPU inference (medium quality only, ONNX-compatible — no runtime changes)
 - **FP16 Mixed Precision** — 2-3x faster training, ~50% memory reduction (enabled by default)
 - **EMA** — Exponential Moving Average for training stability (enabled by default)
 - **Multi-GPU** — DDP support, automatic learning rate scaling

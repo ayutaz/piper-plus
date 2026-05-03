@@ -46,6 +46,7 @@
 ### 训练
 
 - **WavLM Discriminator** — MOS 提升 +0.15-0.25（默认启用，仅训练时使用）
+- **MB-iSTFT-VITS2 (`--mb-istft`)** — 将 HiFi-GAN 解码器替换为 MB-iSTFT + PQMF，CPU 推理速度提升约 2.21 倍 (仅限 medium 质量，ONNX 兼容)
 - **FP16 混合精度** — 训练速度提升 2-3 倍，内存减少约 50%（默认启用）
 - **EMA** — 指数移动平均，提高训练稳定性（默认启用）
 - **多 GPU** — DDP 支持，自动学习率缩放

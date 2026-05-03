@@ -43,6 +43,7 @@
 ### प्रशिक्षण
 
 - **WavLM Discriminator** — MOS +0.15-0.25 सुधार (डिफ़ॉल्ट रूप से सक्षम, केवल प्रशिक्षण में उपयोग)
+- **MB-iSTFT-VITS2 (`--mb-istft`)** — HiFi-GAN डिकोडर को MB-iSTFT + PQMF से बदलकर ~2.21x तेज CPU inference (केवल medium quality, ONNX-संगत)
 - **FP16 Mixed Precision** — प्रशिक्षण गति 2-3 गुना, मेमोरी ~50% कम (डिफ़ॉल्ट रूप से सक्षम)
 - **EMA** — Exponential Moving Average द्वारा प्रशिक्षण स्थिरता में सुधार (डिफ़ॉल्ट रूप से सक्षम)
 - **मल्टी-GPU** — DDP समर्थन, स्वचालित लर्निंग रेट स्केलिंग

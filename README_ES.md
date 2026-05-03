@@ -43,6 +43,7 @@ Sistema de texto a voz (TTS) neuronal, rapido y de alta calidad. Basado en la ar
 ### Entrenamiento
 
 - **Discriminador WavLM** — Mejora de MOS +0.15-0.25 (activo por defecto, solo durante el entrenamiento)
+- **MB-iSTFT-VITS2 (`--mb-istft`)** — Reemplaza el decodificador HiFi-GAN con MB-iSTFT + PQMF para inferencia ~2,21x más rápida en CPU (solo calidad medium, compatible con ONNX)
 - **Precision mixta FP16** — Velocidad de entrenamiento 2-3x mayor, ~50% menos memoria (activo por defecto)
 - **EMA** — Estabilidad de entrenamiento mejorada con Exponential Moving Average (activo por defecto)
 - **Multi-GPU** — Soporte DDP, escalado automatico de tasa de aprendizaje

@@ -739,6 +739,11 @@ Summary of key CLI options for `piper_train`:
 | `--samples-per-speaker N` | - | Activate `SpeakerBalancedBatchSampler` with N samples per speaker per batch. |
 | `--c-wavlm` | 0.5 | WavLM discriminator loss weight. Reduce if audio clipping occurs. |
 | `--num-test-examples N` | 2 | Number of test audio examples to generate during validation. |
+| `--mb-istft` | off | Replace HiFi-GAN decoder with MB-iSTFT + PQMF. ~2.21x faster CPU inference, requires `--quality medium`. |
+| `--sub-stft-fft-sizes` | `171,384,683` | FFT sizes for sub-band Multi-resolution STFT loss (MB-iSTFT only). |
+| `--sub-stft-hop-sizes` | `10,30,60` | Hop sizes for sub-band STFT loss. |
+| `--sub-stft-win-sizes` | `60,150,300` | Window sizes for sub-band STFT loss. |
+| `--c-sub-stft` | `1.0` | Weight for sub-band STFT loss. |
 
 ### DataLoader ワーカー数 (`--num-workers`)
 

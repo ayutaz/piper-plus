@@ -36,6 +36,9 @@ Piper Plus documentation. Guides and references for using and developing with Pi
 ### Testing
 - [Multilingual Testing](guides/testing/multilingual-testing.md) - Testing infrastructure
 
+## Design
+- [MB-iSTFT-VITS2 設計仕様](design/mb-istft-vits2-requirements.md) — Decoder 置換による推論 2.21x 高速化 (Issue #268)
+
 ## API Reference
 - [Phoneme Mapping](api-reference/phoneme-mapping.md) - Phoneme reference for all languages
 

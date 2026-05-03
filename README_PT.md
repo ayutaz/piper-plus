@@ -43,6 +43,7 @@ Sistema neural de texto para fala (TTS) de alta velocidade e alta qualidade. Uti
 ### Treinamento
 
 - **WavLM Discriminator** — Melhoria de MOS +0.15-0.25 (habilitado por padrão, usado apenas durante treinamento)
+- **MB-iSTFT-VITS2 (`--mb-istft`)** — Substitui o decodificador HiFi-GAN por MB-iSTFT + PQMF para inferência CPU ~2,21x mais rápida (apenas qualidade medium, compatível com ONNX)
 - **FP16 Mixed Precision** — Velocidade de treinamento 2-3x, redução de memória ~50% (habilitado por padrão)
 - **EMA** — Estabilidade de treinamento com Exponential Moving Average (habilitado por padrão)
 - **Multi-GPU** — Suporte DDP, escalonamento automático da taxa de aprendizado
