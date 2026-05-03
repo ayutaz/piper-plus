@@ -70,45 +70,6 @@ def configure_ddp_strategy(num_gpus, user_strategy=None, no_wavlm=False):
     return None
 
 
-def _check_decoder_architecture_compatibility(
-    checkpoint_path, model_mb_istft, checkpoint=None
-):
-    """Warn if checkpoint decoder architecture doesn't match the current model.
-
-    Prevents silent quality degradation when loading HiFi-GAN checkpoints
-    into MB-iSTFT models or vice versa.
-
-    Args:
-        checkpoint_path: Path to checkpoint file.
-        model_mb_istft: Whether the current model uses MB-iSTFT.
-        checkpoint: Already-loaded checkpoint dict (optional).
-            When provided, avoids a redundant ``torch.load`` of the full
-            checkpoint file.
-    """
-    try:
-        if checkpoint is not None:
-            ckpt_hparams = checkpoint.get("hyper_parameters", {})
-        else:
-            ckpt = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
-            ckpt_hparams = ckpt.get("hyper_parameters", {})
-            del ckpt  # Free memory
-
-        ckpt_mb_istft = ckpt_hparams.get("mb_istft", False)
-
-        if ckpt_mb_istft != model_mb_istft:
-            ckpt_type = "MB-iSTFT" if ckpt_mb_istft else "HiFi-GAN"
-            model_type = "MB-iSTFT" if model_mb_istft else "HiFi-GAN"
-            _LOGGER.warning(
-                "Decoder architecture mismatch: checkpoint uses %s but model uses %s. "
-                "Decoder weights will be randomly initialized (strict=False). "
-                "This is expected for architecture migration but will require full retraining of the decoder.",
-                ckpt_type,
-                model_type,
-            )
-    except Exception as e:
-        _LOGGER.debug("Could not check checkpoint architecture: %s", e)
-
-
 def _build_trainer(args, loggers, num_gpus, num_speakers):
     """Build a Trainer instance with callbacks and strategy from args.
 
@@ -268,13 +229,6 @@ def create_parser():
         "Use for fine-tuning to prevent duration prediction degradation.",
     )
     # MB-iSTFT Generator options
-    parser.add_argument(
-        "--mb-istft",
-        action="store_true",
-        default=False,
-        help="Use MB-iSTFT Generator instead of HiFi-GAN. "
-        "Replaces final upsampling with iSTFT + PQMF for ~1.2x inference speedup.",
-    )
     parser.add_argument(
         "--c-sub-stft",
         type=float,
@@ -557,17 +511,6 @@ def main():
 
     dict_args = vars(args)
 
-    # MB-iSTFT: override upsample rates/kernel sizes
-    if args.mb_istft:
-        if args.quality == "high":
-            parser.error("--mb-istft is not supported with --quality high")
-        dict_args["mb_istft"] = True
-        dict_args["upsample_rates"] = (4, 4)
-        dict_args["upsample_kernel_sizes"] = (16, 16)
-        _LOGGER.info(
-            "MB-iSTFT enabled: upsample_rates=(4,4), upsample_kernel_sizes=(16,16)"
-        )
-
     if args.no_wavlm:
         dict_args["use_wavlm_discriminator"] = False
 
@@ -576,6 +519,13 @@ def main():
         dict_args["learning_rate"] = scaled_lr
     else:
         dict_args["learning_rate"] = getattr(args, "base_lr", 2e-4)
+
+    # MB-iSTFT decoder is the only generator path. Total upsample factor is
+    # 256x = upsample_rates(16x) * iSTFT_hop(4x) * PQMF_subbands(4x); the
+    # quality preset adjusts resblock complexity and channel count, but not
+    # the upsample structure.
+    dict_args["upsample_rates"] = (4, 4)
+    dict_args["upsample_kernel_sizes"] = (16, 16)
 
     if args.quality == "x-low":
         dict_args["hidden_channels"] = 96
@@ -589,9 +539,7 @@ def main():
             (1, 3, 5),
             (1, 3, 5),
         )
-        dict_args["upsample_rates"] = (8, 8, 2, 2)
         dict_args["upsample_initial_channel"] = 512
-        dict_args["upsample_kernel_sizes"] = (16, 16, 4, 4)
 
     apply_transfer_defaults(args, num_speakers, num_languages)
 
@@ -651,11 +599,6 @@ def main():
         )
 
     if args.resume_from_multispeaker_checkpoint:
-        _check_decoder_architecture_compatibility(
-            args.resume_from_multispeaker_checkpoint,
-            args.mb_istft if hasattr(args, "mb_istft") else False,
-        )
-
         assert num_speakers == 1, (
             "--resume-from-multispeaker-checkpoint はシングルスピーカーモデル専用です。"
             "マルチスピーカーへの転移には --resume_from_single_speaker_checkpoint を使用してください。"
@@ -664,11 +607,6 @@ def main():
 
     # チェックポイントからの再開処理を修正
     if args.resume_from_checkpoint:
-        _check_decoder_architecture_compatibility(
-            args.resume_from_checkpoint,
-            args.mb_istft if hasattr(args, "mb_istft") else False,
-        )
-
         _LOGGER.debug(
             "Loading weights from checkpoint: %s", args.resume_from_checkpoint
         )

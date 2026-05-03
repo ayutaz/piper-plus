@@ -70,7 +70,7 @@ def build_infer_forward(
     # (not inside forward, to avoid "state_dict changed during tracing" errors).
     # model.onnx_export_mode: controls noise injection (True = deterministic).
     # model.dp.onnx_export_mode: same for duration predictor.
-    # model.dec.onnx_export_mode: controls MB-iSTFT output format (always True for export).
+    # model.dec.onnx_export_mode: makes the decoder return fullband only (always True for export).
     model.onnx_export_mode = not stochastic
     if hasattr(model, "dp"):
         model.dp.onnx_export_mode = not stochastic
@@ -400,8 +400,8 @@ def main() -> None:
     num_languages = getattr(model_g, "n_languages", 1)
 
     # Enable ONNX export mode for all compatible modules.
-    # This controls MB-iSTFT decoder output (fullband only) and other
-    # ONNX-specific behavior. The stochastic/deterministic override on
+    # This makes the decoder emit fullband-only output and applies other
+    # ONNX-specific behaviors. The stochastic/deterministic override on
     # model and duration predictor is applied later by build_infer_forward.
     set_export_mode(model_g, True)
     _LOGGER.info("Export mode enabled (stochastic=%s)", args.stochastic)

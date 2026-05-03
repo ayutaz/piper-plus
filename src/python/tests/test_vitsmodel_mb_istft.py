@@ -1,28 +1,21 @@
-"""Tests for VitsModel with mb_istft=True path.
+"""Tests for VitsModel MB-iSTFT decoder integration.
 
-Verifies that the MB-iSTFT code path in VitsModel correctly initialises
-PQMF / sub-band STFT loss, saves hparams, shares the PQMF instance with
-the generator, and includes MB-iSTFT parameters in the optimiser.
+Verifies that VitsModel correctly initialises PQMF / sub-band STFT loss,
+shares the PQMF instance with the generator, and includes MB-iSTFT
+parameters in the optimiser. MB-iSTFT is the only decoder path.
 """
 
 import pytest
 
+
 torch = pytest.importorskip("torch", reason="torch required")
 
 
-def _make_vitsmodel(mb_istft=False):
-    """Create a minimal VitsModel with or without MB-iSTFT enabled.
-
-    When mb_istft=True, upsample_rates and upsample_kernel_sizes are
-    overridden to (4, 4) and (16, 16) respectively, matching the
-    overrides applied in __main__.main().
+def _make_vitsmodel():
+    """Create a minimal VitsModel with the standard MB-iSTFT upsample
+    structure (4, 4) that __main__.main() applies for all qualities.
     """
     from piper_train.vits.lightning import VitsModel
-
-    kwargs = {}
-    if mb_istft:
-        kwargs["upsample_rates"] = (4, 4)
-        kwargs["upsample_kernel_sizes"] = (16, 16)
 
     return VitsModel(
         num_symbols=97,
@@ -32,51 +25,39 @@ def _make_vitsmodel(mb_istft=False):
         batch_size=4,
         learning_rate=2e-4,
         use_wavlm_discriminator=False,
-        mb_istft=mb_istft,
-        **kwargs,
+        upsample_rates=(4, 4),
+        upsample_kernel_sizes=(16, 16),
     )
 
 
 @pytest.mark.unit
-def test_vitsmodel_mb_istft_init_pqmf():
-    """MB-iSTFT path creates PQMF and sub-band STFT loss."""
-    model = _make_vitsmodel(mb_istft=True)
+def test_vitsmodel_init_pqmf():
+    """VitsModel always creates PQMF and sub-band STFT loss."""
+    model = _make_vitsmodel()
     assert model.pqmf is not None
     assert model.sub_stft_loss is not None
 
 
 @pytest.mark.unit
-def test_vitsmodel_no_pqmf_without_flag():
-    """Without mb_istft, PQMF and sub-band STFT loss are None."""
-    model = _make_vitsmodel(mb_istft=False)
-    assert model.pqmf is None
-    assert model.sub_stft_loss is None
-
-
-@pytest.mark.unit
 def test_vitsmodel_hparams_saved():
-    """mb_istft flag and overridden upsample_rates are persisted in hparams."""
-    model = _make_vitsmodel(mb_istft=True)
-    assert model.hparams.mb_istft is True
+    """upsample_rates are persisted in hparams."""
+    model = _make_vitsmodel()
     assert model.hparams.upsample_rates == (4, 4)
 
 
 @pytest.mark.unit
 def test_vitsmodel_pqmf_shared_with_generator():
-    """VitsModel.pqmf and Generator.pqmf are the same instance."""
-    model = _make_vitsmodel(mb_istft=True)
-    # VitsModel.pqmf and Generator.pqmf should be the same object
+    """VitsModel.pqmf and decoder.pqmf are the same instance."""
+    model = _make_vitsmodel()
     assert model.pqmf is model.model_g.dec.pqmf
 
 
 @pytest.mark.unit
 def test_vitsmodel_configure_optimizers():
     """MB-iSTFT parameters are included in the generator optimiser."""
-    model = _make_vitsmodel(mb_istft=True)
-    # configure_optimizers may require Trainer context in some PL versions
+    model = _make_vitsmodel()
     try:
         opt_g, opt_d = model.configure_optimizers()
-        # MB-iSTFT parameters should be present in the generator optimiser
         g_param_count = sum(
             p.numel() for group in opt_g[0].param_groups for p in group["params"]
         )

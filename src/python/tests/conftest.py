@@ -150,9 +150,10 @@ def mock_vits_model():
     resblock = "1"
     resblock_kernel_sizes = [3, 7, 11]
     resblock_dilation_sizes = [[1, 3, 5], [1, 3, 5], [1, 3, 5]]
-    upsample_rates = [8, 8, 2, 2]
+    # MB-iSTFT decoder: upsample_rates(16x) * iSTFT_hop(4x) * PQMF_subbands(4x) = 256x
+    upsample_rates = [4, 4]
     upsample_initial_channel = 512
-    upsample_kernel_sizes = [16, 16, 4, 4]
+    upsample_kernel_sizes = [16, 16]
     n_speakers = 1
     gin_channels = 0
     use_sdp = True
@@ -339,9 +340,9 @@ def mock_vits_model_multilingual():
         resblock="1",
         resblock_kernel_sizes=[3, 7, 11],
         resblock_dilation_sizes=[[1, 3, 5], [1, 3, 5], [1, 3, 5]],
-        upsample_rates=[8, 8, 2, 2],
+        upsample_rates=[4, 4],
         upsample_initial_channel=512,
-        upsample_kernel_sizes=[16, 16, 4, 4],
+        upsample_kernel_sizes=[16, 16],
         n_speakers=1,
         n_languages=2,
         gin_channels=512,

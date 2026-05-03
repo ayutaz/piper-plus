@@ -133,12 +133,10 @@ class PQMF(nn.Module):
 class MBiSTFTGenerator(nn.Module):
     """Multi-Band inverse STFT Generator.
 
-    Replaces the final upsampling stages of HiFi-GAN with iSTFT + PQMF
-    synthesis, reducing computation while maintaining quality.
-
-    The interface (``__init__``, ``forward``, ``remove_weight_norm``) matches
-    the existing ``Generator`` in ``models.py`` so that ``SynthesizerTrn`` can
-    use either decoder interchangeably.
+    The sole VITS decoder. Generates fullband audio from latents via two
+    transposed-convolution upsample stages followed by sub-band iSTFT and
+    PQMF synthesis. Total upsample factor is
+    ``upsample_rates(16x) * iSTFT_hop(4x) * PQMF_subbands(4x) = 256x``.
     """
 
     def __init__(
@@ -210,7 +208,7 @@ class MBiSTFTGenerator(nn.Module):
         # --- PQMF (shared instance or create new) ---
         self.pqmf = pqmf if pqmf is not None else PQMF(subbands=subbands)
 
-        # --- Weight initialisation (ups only, matching existing Generator) ---
+        # --- Weight initialisation (ups only) ---
         self.ups.apply(init_weights)
 
         # --- Speaker conditioning ---

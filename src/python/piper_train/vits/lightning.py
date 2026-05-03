@@ -125,7 +125,6 @@ class VitsModel(pl.LightningModule):
         c_wavlm: float = 0.5,
         wavlm_every_n_steps: int = 1,
         # MB-iSTFT options
-        mb_istft: bool = False,
         c_sub_stft: float = 1.0,
         sub_stft_fft_sizes: tuple[int, ...] = (171, 384, 683),
         sub_stft_hop_sizes: tuple[int, ...] = (10, 30, 60),
@@ -167,7 +166,6 @@ class VitsModel(pl.LightningModule):
             gin_channels=self.hparams.gin_channels,
             use_sdp=self.hparams.use_sdp,
             prosody_dim=self.hparams.prosody_dim,
-            mb_istft=self.hparams.mb_istft,
         )
         self.model_d = MultiPeriodDiscriminator(
             use_spectral_norm=self.hparams.use_spectral_norm
@@ -185,17 +183,14 @@ class VitsModel(pl.LightningModule):
             )
 
         # MB-iSTFT: PQMF for GT analysis + sub-band STFT loss
-        self.pqmf = None
-        self.sub_stft_loss = None
-        if self.hparams.mb_istft:
-            self.pqmf = PQMF(subbands=4)
-            # Share PQMF instance with Generator to avoid duplicate buffers
-            self.model_g.dec.pqmf = self.pqmf
-            self.sub_stft_loss = MultiResolutionSTFTLoss(
-                fft_sizes=self.hparams.sub_stft_fft_sizes,
-                hop_sizes=self.hparams.sub_stft_hop_sizes,
-                win_sizes=self.hparams.sub_stft_win_sizes,
-            )
+        self.pqmf = PQMF(subbands=4)
+        # Share PQMF instance with the decoder to avoid duplicate buffers
+        self.model_g.dec.pqmf = self.pqmf
+        self.sub_stft_loss = MultiResolutionSTFTLoss(
+            fft_sizes=self.hparams.sub_stft_fft_sizes,
+            hop_sizes=self.hparams.sub_stft_hop_sizes,
+            win_sizes=self.hparams.sub_stft_win_sizes,
+        )
 
         # Dataset splits
         self._train_dataset: Dataset | None = None
@@ -625,7 +620,7 @@ class VitsModel(pl.LightningModule):
             loss_gen_all = loss_gen + loss_fm + loss_mel + loss_dur + loss_kl
 
             # MB-iSTFT: sub-band STFT loss
-            if self.hparams.mb_istft and o_mb is not None:
+            if o_mb is not None:
                 y_mb = self.pqmf.analysis(y)  # GT subbands [B, 4, T//4]
                 loss_sub_stft = self.sub_stft_loss(o_mb, y_mb) * self.hparams.c_sub_stft
                 loss_gen_all = loss_gen_all + loss_sub_stft

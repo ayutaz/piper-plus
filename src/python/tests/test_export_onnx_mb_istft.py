@@ -1,7 +1,7 @@
 """Tests for MB-iSTFT model ONNX export path.
 
 Covers the full export pipeline for MBiSTFTGenerator-based models:
-  1. torch.onnx.export succeeds for a SynthesizerTrn(mb_istft=True) model
+  1. torch.onnx.export succeeds for a SynthesizerTrn (MB-iSTFT decoder) model
   2. remove_weight_norm + onnx_export_mode forward produces correct output
   3. Exported ONNX model produces [B, 1, T] output (onnxruntime validation)
 """
@@ -44,14 +44,13 @@ _MB_ISTFT_KWARGS = dict(
     gin_channels=512,
     use_sdp=True,
     prosody_dim=0,
-    mb_istft=True,
 )
 
 _DUMMY_INPUT_LENGTH = 10
 
 
 def _build_mb_istft_model():
-    """Create, eval, and prepare a SynthesizerTrn(mb_istft=True) for export."""
+    """Create, eval, and prepare a SynthesizerTrn (MB-iSTFT decoder) for export."""
     torch.manual_seed(42)
     model = SynthesizerTrn(**_MB_ISTFT_KWARGS)
     model.eval()
@@ -73,9 +72,7 @@ def _make_infer_forward(model):
 
         x_dp = model._prepare_prosody_input(x, x_mask, None, lid=lid)
         if model.use_sdp:
-            logw = model.dp(
-                x_dp, x_mask, g=g, reverse=True, noise_scale=noise_scale_w
-            )
+            logw = model.dp(x_dp, x_mask, g=g, reverse=True, noise_scale=noise_scale_w)
         else:
             logw = model.dp(x_dp, x_mask, g=g)
 
@@ -91,9 +88,7 @@ def _make_infer_forward(model):
         attn = commons.generate_path(w_ceil, attn_mask)
 
         m_p = torch.matmul(attn.squeeze(1), m_p.transpose(1, 2)).transpose(1, 2)
-        logs_p = torch.matmul(attn.squeeze(1), logs_p.transpose(1, 2)).transpose(
-            1, 2
-        )
+        logs_p = torch.matmul(attn.squeeze(1), logs_p.transpose(1, 2)).transpose(1, 2)
 
         z_p = m_p  # deterministic
         z = model.flow(z_p, y_mask, g=g, reverse=True)

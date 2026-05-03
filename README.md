@@ -65,7 +65,7 @@
 ### 学習
 
 - **WavLM Discriminator** — MOS +0.15-0.25 向上 (デフォルト有効、学習時のみ使用)
-- **MB-iSTFT-VITS2 (`--mb-istft`)** — HiFi-GAN Decoder の最終段を MB-iSTFT + PQMF に置換、CPU 推論 2.21x 高速化 (medium のみ、ONNX 形式不変でランタイム互換)
+- **MB-iSTFT-VITS2 Decoder** — Decoder を MB-iSTFT + PQMF に統一、CPU 推論 2.21x 高速化。ONNX 形式不変で既存ランタイム互換
 - **FP16 Mixed Precision** — 学習速度2-3倍、メモリ約50%削減 (デフォルト有効)
 - **EMA** — Exponential Moving Average による学習安定性向上 (デフォルト有効)
 - **マルチGPU** — DDP対応、自動学習率スケーリング
