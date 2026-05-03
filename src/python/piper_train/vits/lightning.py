@@ -4,7 +4,6 @@ from pathlib import Path
 
 import pytorch_lightning as pl
 import torch
-import torchaudio.functional as AF
 from torch import autocast
 from torch.nn import functional as F
 from torch.utils.data import DataLoader, Dataset, random_split
@@ -516,6 +515,8 @@ class VitsModel(pl.LightningModule):
         # dim 0 keeps the channel axis intact which torchaudio handles fine.
         audio = y_hat.index_select(0, sample_indices).float()
         if self.hparams.sample_rate != self.hparams.pea_emotion_sample_rate:
+            import torchaudio.functional as AF
+
             audio = AF.resample(
                 audio,
                 orig_freq=int(self.hparams.sample_rate),
