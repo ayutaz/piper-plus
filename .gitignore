@@ -123,7 +123,9 @@ output-*/
 dataset-*/
 libritts-r/
 moe-speech-*/
+css10-*/
 downloads/
+hf_upload/
 hf_readme.md
 rebuild_cache.py
 upload_webdataset.py
