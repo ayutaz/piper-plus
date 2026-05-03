@@ -30,6 +30,7 @@ from pathlib import Path
 
 import torch
 
+
 TOP_LEVEL_KEYS_TO_DROP = (
     "optimizer_states",
     "lr_schedulers",
