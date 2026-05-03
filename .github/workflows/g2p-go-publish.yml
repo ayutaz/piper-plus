@@ -15,7 +15,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-22.04, macos-latest, windows-latest]
+        os: [ubuntu-24.04, macos-latest, windows-latest]
     defaults:
       run:
         working-directory: src/go
@@ -34,7 +34,7 @@ jobs:
 
   lint:
     name: golangci-lint (phonemize)
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-go@v5
@@ -47,7 +47,7 @@ jobs:
   publish:
     name: Tag and publish to pkg.go.dev
     needs: [test, lint]
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
         with:

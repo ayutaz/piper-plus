@@ -91,7 +91,7 @@ jobs:
     uses: ./.github/workflows/_build-test-cpp.yml
     with:
       run-integration-tests: true
-      os-matrix: '["ubuntu-22.04", "macos-latest", "windows-latest"]'
+      os-matrix: '["ubuntu-24.04", "macos-latest", "windows-latest"]'
       build-type-matrix: '["Release", "Debug"]'
       timeout-minutes: 25
 
@@ -103,7 +103,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-22.04, macos-latest, windows-latest]
+        os: [ubuntu-24.04, macos-latest, windows-latest]
     steps:
       - uses: actions/checkout@v6
 
@@ -153,10 +153,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-22.04
+          - os: ubuntu-24.04
             rid: linux-x64
             cross: false
-          - os: ubuntu-22.04
+          - os: ubuntu-24.04
             rid: linux-arm64
             cross: true
           - os: macos-14
@@ -217,7 +217,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-22.04]
+        os: [ubuntu-24.04]
         python-version: ['3.11']
         
     steps:

@@ -19,7 +19,7 @@ jobs:
       matrix:
         abi: [arm64-v8a, armeabi-v7a, x86_64]
     name: Android ${{ matrix.abi }}
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
 
     env:
@@ -128,7 +128,7 @@ jobs:
   package-android:
     name: Package Android (all ABIs)
     needs: build-android
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - name: Download all ABI artifacts
         uses: actions/download-artifact@v8
