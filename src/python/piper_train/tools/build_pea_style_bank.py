@@ -5,8 +5,8 @@ This tool extracts audio embeddings via the Meta "Perception Encoder" family
 (``facebook/pe-av-small``) and aggregates them into per-emotion centroids
 plus a global centroid. The resulting ``.npz`` file is byte-for-byte
 compatible with the fork ``yusuke-ai/piper-plus``'s ``_init_pea_emotion_loss``
-buffer loader, so the same artefact can be consumed by Phase 4 without
-schema translation.
+buffer loader, so the same artefact can be consumed by the emotion loss
+without schema translation.
 
 Schema::
 
@@ -14,7 +14,7 @@ Schema::
     emotion_centroids : float32        [N, D]   (L2-normalised rows)
     global_centroid   : float32        [D]      (raw mean, not re-normalised)
 
-Two model loaders are tried in order (following the Phase 0 P0-T03 outcome):
+Two model loaders are tried in order:
 
 1. ``transformers.AutoModel.from_pretrained("facebook/pe-av-small", ...)``
    with ``trust_remote_code=True``. Known to fail today because the

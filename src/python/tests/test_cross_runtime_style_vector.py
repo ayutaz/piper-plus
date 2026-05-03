@@ -1,4 +1,4 @@
-"""Phase 2 P2-T08: cross-runtime style_vector contract verification.
+""": cross-runtime style_vector contract verification.
 
 Six runtimes (Python, C++, Rust, C#, Go, WASM/JS) each implement
 ``style_vector`` input handling according to the contract written in
@@ -193,8 +193,8 @@ def test_wasm_typescript_exposes_style_vector_option() -> None:
 def test_existing_style_vector_unit_tests_present() -> None:
     base = REPO_ROOT / "src" / "python" / "tests"
     assert (base / "test_style_vector_conditioning.py").is_file(), (
-        "Phase 1 P1-T06 unit tests missing"
+        " unit tests missing"
     )
     assert (base / "test_load_weights_from_checkpoint.py").is_file(), (
-        "Phase 1 P1-T06 load_weights tests missing"
+        " load_weights tests missing"
     )

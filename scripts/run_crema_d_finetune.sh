@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Phase 5 P5-T02: CREMA-D emotion fine-tune driver.
+# CREMA-D emotion fine-tune driver.
 #
 # Two stages are supported:
-#   stage5a — style conditioning only (Phase 1 + Phase 2 ONNX compatible).
-#   stage5b — style conditioning + PE-A emotion loss (Phase 4 gated).
+#   stage5a — style conditioning only (style_vector input, no emotion loss).
+#   stage5b — style conditioning + PE-A emotion loss.
 #
-# stage5a is the Phase 5 default. Run stage5b only after stage5a has converged
-# AND P3-T02 has produced ``style_bank_crema_d.npz``.
+# stage5a is the default. Run stage5b only after stage5a has converged AND
+# build_pea_style_bank.py has produced ``style_bank_crema_d.npz``.
 #
 # Usage:
 #   scripts/run_crema_d_finetune.sh stage5a
@@ -16,9 +16,6 @@
 # Environment:
 #   WANDB_API_KEY must be readable; the script sources /data/piper/.env when
 #   present, or falls back to the existing environment variable.
-#
-# Relevant tickets:
-#   docs/research/implementation-plan/tickets/phase-5/P5-T02-finetune-stage-5a.md
 #
 set -euo pipefail
 
@@ -63,7 +60,7 @@ common_args=(
 
 case "${STAGE}" in
     stage5a)
-        export WANDB_NOTES="Phase 5a: Style conditioning only, CREMA-D, 200 epochs"
+        export WANDB_NOTES="Stage 5a: Style conditioning only, CREMA-D, 200 epochs"
         LOG_FILE="/data/piper/training_emotion_v1.log"
         nohup /data/piper/.venv/bin/python -m piper_train \
             "${common_args[@]}" \
@@ -80,10 +77,10 @@ case "${STAGE}" in
         fi
         if [[ ! -f "${STYLE_BANK}" ]]; then
             echo "stage5b requires style bank at ${STYLE_BANK}" >&2
-            echo "Run Phase 3 P3-T02 build_pea_style_bank.py first." >&2
+            echo "Run build_pea_style_bank.py first." >&2
             exit 65
         fi
-        export WANDB_NOTES="Phase 5b: Style + PE-A loss, warmup 2k steps"
+        export WANDB_NOTES="Stage 5b: Style + PE-A loss, warmup 2k steps"
         LOG_FILE="/data/piper/training_emotion_v2.log"
         nohup /data/piper/.venv/bin/python -m piper_train \
             "${common_args[@]}" \

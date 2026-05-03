@@ -1,4 +1,4 @@
-"""Phase 5 P5-T01: unit tests for prepare_emotion_finetune_dataset.
+""": unit tests for prepare_emotion_finetune_dataset.
 
 The real CREMA-D corpus is 27 GB and the fine-tune dataset output lives under
 /data/piper/. This test uses a tmp_path-based mini corpus with three synthetic

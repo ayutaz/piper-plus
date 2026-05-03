@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Phase 5 P5-T04: emotion fine-tune ONNX export + cross-runtime smoke check.
+# Emotion fine-tune ONNX export + cross-runtime smoke check.
 #
-# Exports the Phase 5 fine-tuned VITS checkpoint to ONNX with Phase 2's
-# mask-pattern style_vector inputs, then drives each of the six runtimes
-# (Python, C++, Rust, C#, Go, WASM) with the same ``--style-vector`` file
-# and verifies that the produced audio matches byte-for-byte.
+# Exports the fine-tuned VITS checkpoint to ONNX with the mask-pattern
+# style_vector inputs, then drives each of the six runtimes (Python, C++,
+# Rust, C#, Go, WASM) with the same ``--style-vector`` file and verifies
+# that the produced audio matches byte-for-byte.
 #
 # The runtimes that require their own build toolchain (C++/C#/Go) only emit
 # "build and run manually" instructions here — this script handles Python +
@@ -20,9 +20,6 @@
 #   <artifact-dir>/python_audio.wav  (+ .md5)
 #   <artifact-dir>/rust_audio.wav    (+ .md5)
 #   <artifact-dir>/runtime_summary.md
-#
-# Relevant tickets:
-#   docs/research/implementation-plan/tickets/phase-5/P5-T04-onnx-export-runtime-verification.md
 #
 set -euo pipefail
 
@@ -107,7 +104,7 @@ echo ""
 echo "=== 5. Summary ==="
 SUMMARY_MD="${ARTIFACT_DIR}/runtime_summary.md"
 {
-    echo "# Phase 5 P5-T04 Runtime Verification"
+    echo "# Emotion ONNX Runtime Verification"
     echo ""
     echo "- Checkpoint: ${CKPT_PATH}"
     echo "- Style vector: ${STYLE_VECTOR}"

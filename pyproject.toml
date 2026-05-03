@@ -80,7 +80,7 @@ train = [
     "onnxsim-prebuilt",
 ]
 
-# Phase 4 PE-A Emotion Loss backend.
+# PE-A Emotion Loss backend (optional).
 #
 # Meta's facebook/pe-av-small is not wired into transformers' AutoConfig,
 # so the loader falls back to the reference code in
@@ -92,7 +92,7 @@ train = [
 #
 # The git dependency also pulls several heavy transitive requirements
 # (torchcodec, decord, opencv-python, tiktoken, ...) that are NOT needed
-# for Phase 4 PE-A loss. If you hit resolver conflicts, pin `perception-models`
+# for the PE-A loss path. If you hit resolver conflicts, pin `perception-models`
 # to a specific commit or clone + `uv pip install --no-deps` manually.
 pea = [
     "perception-models @ git+https://github.com/facebookresearch/perception_models.git",

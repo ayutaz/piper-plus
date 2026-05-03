@@ -1,5 +1,5 @@
 /**
- * Test: Style vector conditioning (Phase 2 P2-T03)
+ * Test: Style vector conditioning
  *
  * Covers the C API additions in piper_plus.h:
  *   - PiperPlusSynthOptions.style_vector / style_vector_dim defaults
@@ -47,7 +47,7 @@ TEST(StyleVectorAbi, ReservedArrayShrunkButSizeStable) {
     std::memset(&opts, 0, sizeof(opts));
     static_assert(sizeof(opts._reserved) / sizeof(opts._reserved[0]) == 3,
                   "Expected _reserved array to have 3 int32_t slots after "
-                  "style_vector additions (P2-T03). If this fails, the "
+                  "style_vector additions (). If this fails, the "
                   "struct layout drifted and existing FFI bindings must be "
                   "reviewed.");
 

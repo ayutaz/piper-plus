@@ -88,7 +88,7 @@ export interface SynthesizeOptions {
   /** Controls phoneme duration variation. Default: 0.8. */
   noiseW?: number;
   /**
-   * Phase 2 (P2-T07): optional style vector for PE-AV / PE-A style
+   * optional style vector for PE-AV / PE-A style
    * conditioning. Length must match the loaded model's `style_vector_dim`
    * (exposed as `config.style_vector_dim`). When omitted, zeros + mask=0
    * are sent to the ONNX graph (style conditioning effectively disabled).

@@ -1,4 +1,4 @@
-"""Tests for PiperVoice style_vector support (Phase 2 P2-T02).
+"""Tests for PiperVoice style_vector support.
 
 These tests use a mocked ONNX session to verify the mask-based style_vector
 handling. The feature-on / feature-off path, metadata resolution, and CLI

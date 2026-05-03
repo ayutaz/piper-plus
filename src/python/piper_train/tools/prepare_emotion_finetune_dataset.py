@@ -1,8 +1,8 @@
-"""Phase 5 P5-T01: CREMA-D (or similar emotion corpus) → piper-train fine-tune dataset.
+"""CREMA-D (or similar emotion corpus) → piper-train fine-tune dataset.
 
 Converts a directory of CREMA-D ``AudioWAV/`` files into a piper-train-compatible
 dataset (``dataset.jsonl`` + ``config.json``) suitable for feeding the
-``--style-vector-dim 256`` fine-tune path introduced in Phase 1/4.
+``--style-vector-dim 256`` fine-tune path.
 
 Usage:
     uv run python -m piper_train.tools.prepare_emotion_finetune_dataset \\
@@ -14,10 +14,7 @@ Usage:
 
 The style_vectors directory is expected to already contain one ``.npy`` file
 per utterance (same stem as the WAV file) — produced earlier by
-``build_pea_style_bank.py --per-utterance-dir`` (Phase 3 P3-T02/T03).
-
-See:
-    docs/research/implementation-plan/tickets/phase-5/P5-T01-crema-d-finetune-dataset.md
+``build_pea_style_bank.py --per-utterance-dir``.
 """
 
 from __future__ import annotations

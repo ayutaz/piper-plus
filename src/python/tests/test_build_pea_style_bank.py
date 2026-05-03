@@ -1,4 +1,4 @@
-"""Unit tests for ``piper_train.tools.build_pea_style_bank`` (Phase 3 P3-T02).
+"""Unit tests for ``piper_train.tools.build_pea_style_bank``.
 
 All tests run offline: the PE-A audio model is either mocked outright or the
 ``extract_audio_embedding`` helper is monkeypatched, so no HuggingFace

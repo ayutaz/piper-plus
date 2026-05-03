@@ -1,4 +1,4 @@
-"""Phase 5 P5-T03: emotion fine-tune evaluation harness.
+"""Emotion fine-tune evaluation harness.
 
 Runs three evaluation axes against a freshly fine-tuned emotion model:
 
@@ -33,9 +33,6 @@ Outputs:
     ``<output-dir>/mos_results.json`` (PESQ / STOI aggregates)
     ``<output-dir>/multilingual_regression.json``
     ``<output-dir>/summary.md`` (human-readable recap, success gate markers)
-
-See:
-    docs/research/implementation-plan/tickets/phase-5/P5-T03-evaluation-ser-mos.md
 """
 
 from __future__ import annotations

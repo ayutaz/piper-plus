@@ -2,7 +2,7 @@
 # ==========================================
 # This file defines canonical ONNX graph conventions and runtime behaviour
 # that ALL implementations (Python, Rust, Go, C++, C#, WASM/JS) must follow
-# for PE-AV / PE-A style vector conditioning (Phase 2 P2-T01..T08).
+# for PE-AV / PE-A style vector conditioning.
 #
 # Cross-runtime byte-for-byte compatibility requires every runtime to build
 # the same tensors with the same dtype/shape/mask semantics.
@@ -11,8 +11,6 @@
 spec_version = "1.0"
 last_updated = "2026-04-23"
 applies_to = ["python", "rust", "go", "cpp", "csharp", "wasm-js"]
-phase = "2"
-tickets = ["P2-T01", "P2-T02", "P2-T03", "P2-T04", "P2-T05", "P2-T06", "P2-T07", "P2-T08"]
 
 # ============================================================================
 # ONNX graph inputs

@@ -191,7 +191,7 @@ static void applySynthOptions(piper::SynthesisConfig &synthConfig,
         synthConfig.speakerEmbedding.clear();
     }
 
-    // Phase 2 (P2-T03): Style vector conditioning
+    // Style vector conditioning
     if (effectiveOpts.style_vector && effectiveOpts.style_vector_dim > 0) {
         synthConfig.styleVector.assign(
             effectiveOpts.style_vector,

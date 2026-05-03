@@ -355,7 +355,7 @@ class TestUnifyEmbLangOnnxExport:
 
 
 # =============================================================================
-# Style Vector Conditioning (Phase 2 P2-T01) -- ONNX export
+# Style Vector Conditioning -- ONNX export
 # =============================================================================
 
 
@@ -447,7 +447,7 @@ def _export_with_style_vector(
     # NOTE: We intentionally skip speaker_embedding inputs in these style_vector
     # focused tests. The speaker_embedding path in SynthesizerTrn.infer() has a
     # pre-existing tracing issue with certain model configs that is out of
-    # scope for P2-T01; the production export path exercises it separately.
+    # scope for ; the production export path exercises it separately.
 
     if style_vector_dim > 0:
         dummy_input_list.append(
@@ -516,7 +516,7 @@ def _export_with_style_vector(
 
 @pytest.mark.inference
 class TestExportStyleVector:
-    """style_vector 入力の ONNX エクスポートテスト (Phase 2 P2-T01)."""
+    """style_vector 入力の ONNX エクスポートテスト."""
 
     def test_export_with_style_vector_dim_0(self, tmp_path):
         """dim=0 の場合、ONNX 入力に style_vector が含まれないこと (後方互換)."""

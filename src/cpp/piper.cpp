@@ -1069,7 +1069,7 @@ buildInputTensors(
     std::vector<int64_t> &sidBuf,
     std::vector<int64_t> &lidBuf,
     std::vector<int64_t> &prosodyBuf,
-    // Phase 2 (P2-T03) style vector buffers
+    // style vector buffers
     std::vector<float>   &styleVectorBuf,
     std::vector<int64_t> &styleVectorMaskBuf) {
 
@@ -1141,7 +1141,7 @@ buildInputTensors(
         prosodyShape.data(), prosodyShape.size()));
   }
 
-  // style_vector + style_vector_mask (Phase 2 P2-T03)
+  // style_vector + style_vector_mask
   if (session.hasStyleVector) {
     const int64_t dim =
         session.styleVectorDim > 0 ? session.styleVectorDim : 1;
@@ -1231,7 +1231,7 @@ void synthesize(std::vector<PhonemeId> &phonemeIds,
   if (prosodyFeatures) {
     inputs.prosodyFeatures = *prosodyFeatures;
   }
-  inputs.styleVector = synthesisConfig.styleVector;  // Phase 2 P2-T03
+  inputs.styleVector = synthesisConfig.styleVector;  //
 
   // Buffers must outlive the Run() call
   std::vector<int64_t> phonemeIdsBuf, phonemeIdLengthsBuf, sidBuf, lidBuf, prosodyBuf;
@@ -1442,7 +1442,7 @@ void synthesizeFloat(std::vector<PhonemeId> &phonemeIds,
   if (prosodyFeatures) {
     inputs.prosodyFeatures = *prosodyFeatures;
   }
-  inputs.styleVector = synthesisConfig.styleVector;  // Phase 2 P2-T03
+  inputs.styleVector = synthesisConfig.styleVector;  //
 
   // Buffers must outlive the Run() call
   std::vector<int64_t> phonemeIdsBuf, phonemeIdLengthsBuf, sidBuf, lidBuf, prosodyBuf;

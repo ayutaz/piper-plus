@@ -1,13 +1,8 @@
-"""Phase 0 PoC: facebook/pe-av-small 動作確認スクリプト.
+"""facebook/pe-av-small 動作確認 PoC スクリプト.
 
 Style Vector Conditioning + PE-A Emotion Loss 機能の前提調査。
 `facebook/pe-av-small` (arxiv:2512.19687) が HuggingFace Hub から
 `transformers.AutoModel.from_pretrained` 経由でロード可能かを検証する。
-
-See:
-    - docs/research/implementation-plan/tickets/phase-0/P0-T01.md
-    - docs/research/implementation-plan/tickets/phase-0/P0-T02.md
-    - docs/research/implementation-plan/phase-0-1.md §Phase 0
 """
 
 import logging

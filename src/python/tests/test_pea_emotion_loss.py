@@ -1,14 +1,14 @@
 """Unit tests for PE-A emotion perceptual loss (Phase 4 / PR-F).
 
-Covers the implementations delivered in P4-T01..P4-T04:
+Covers the implementations delivered in ..:
 
-- P4-T01: loader utilities (``piper_train.perception.pea_loader``) and the
+- : loader utilities (``piper_train.perception.pea_loader``) and the
   ``VitsModel`` init path that registers centroid buffers.
-- P4-T02: the 3-term ``_compute_pea_emotion_loss`` (direction / centroid /
+- : the 3-term ``_compute_pea_emotion_loss`` (direction / centroid /
   margin) plus NaN / Inf guards.
-- P4-T03: ``training_step_g`` gating (warmup + every_n_steps) and the
+- : ``training_step_g`` gating (warmup + every_n_steps) and the
   ``on_after_backward`` NaN gradient hook.
-- P4-T04: argparse CLI defaults and early validation.
+- : argparse CLI defaults and early validation.
 
 These tests are CPU-only and deliberately avoid downloading PE-A weights;
 model-dependent plumbing is either mocked or indirectly verified through
@@ -183,7 +183,7 @@ def test_margin_loss_hinge_zero():
 
 @pytest.mark.unit
 def test_warmup_step_function():
-    """Gating replicates P4-T03 ``training_step_g`` scheduling.
+    """Gating replicates  ``training_step_g`` scheduling.
 
     Step function (not linear ramp): compute iff
     ``step >= warmup_steps and step % every_n_steps == 0``.

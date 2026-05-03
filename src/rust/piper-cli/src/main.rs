@@ -131,7 +131,7 @@ struct Cli {
     #[arg(long, value_name = "PATH")]
     speaker_encoder_model: Option<PathBuf>,
 
-    /// Phase 2 (P2-T04): Style vector .npy file (float32, 1-D or (1,dim)).
+    /// Style vector .npy file (float32, 1-D or (1,dim)).
     /// Only used when the model has a `style_vector` input.
     #[arg(long, value_name = "PATH")]
     style_vector: Option<PathBuf>,
@@ -191,7 +191,7 @@ fn build_synthesis_params(
     }
 }
 
-/// Phase 2 (P2-T04): minimal .npy reader for 1-D float32 arrays.
+/// minimal .npy reader for 1-D float32 arrays.
 ///
 /// Supports numpy `.npy` format v1.0/v2.0 with dtype `'<f4'` (little-endian
 /// float32). Accepts 1-D `(dim,)` or 2-D `(1, dim)` shapes.
@@ -464,7 +464,7 @@ fn main() -> Result<()> {
         None
     };
 
-    // Phase 2 (P2-T04): Resolve style_vector from --style-vector-inline or
+    // Resolve style_vector from --style-vector-inline or
     // --style-vector (inline takes precedence).
     let style_vector: Option<Vec<f32>> = if let Some(ref inline) = cli.style_vector_inline {
         let v = parse_style_vector_inline(inline)?;

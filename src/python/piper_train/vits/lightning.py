@@ -126,7 +126,7 @@ class VitsModel(pl.LightningModule):
         wavlm_model_name: str = "microsoft/wavlm-base-plus",
         c_wavlm: float = 0.5,
         wavlm_every_n_steps: int = 1,
-        # PE-A emotion perceptual loss (Phase 4 / PR-F)
+        # PE-A emotion perceptual loss
         # All weights default to 0.0 so the loss is disabled unless the user
         # opts in via ``--pea-emotion-*`` flags in ``__main__.py``.
         pea_emotion_loss_weight: float = 0.0,
@@ -201,9 +201,9 @@ class VitsModel(pl.LightningModule):
                 source_sample_rate=self.hparams.sample_rate,
             )
 
-        # PE-A emotion perceptual loss state (Phase 4 / PR-F).
+        # PE-A emotion perceptual loss state.
         # ``_pea_emotion_model`` is lazily loaded the first time
-        # ``_compute_pea_emotion_loss`` is invoked (see P4-T02).
+        # ``_compute_pea_emotion_loss`` is invoked.
         # Must be assigned AFTER save_hyperparameters() so the hparams
         # snapshot of the 9 pea_emotion_* kwargs is already captured.
         self._pea_emotion_model = None
@@ -350,7 +350,7 @@ class VitsModel(pl.LightningModule):
             )
 
     # ------------------------------------------------------------------
-    # PE-A emotion perceptual loss (Phase 4 / PR-F)
+    # PE-A emotion perceptual loss
     # ------------------------------------------------------------------
 
     def _pea_emotion_loss_enabled(self) -> bool:
@@ -472,9 +472,9 @@ class VitsModel(pl.LightningModule):
         where ``e_dir = normalize(embeddings - global_centroid)`` and
         ``t_dir = normalize(target_centroids - global_centroid)``.
 
-        Ticket design: this method contains the numerical calculation only.
-        Warmup / ``every_n_steps`` gating lives in ``training_step_g`` (see
-        P4-T03) so the loss computation stays pure and unit-testable.
+        Design: this method contains the numerical calculation only.
+        Warmup / ``every_n_steps`` gating lives in ``training_step_g`` so
+        the loss computation stays pure and unit-testable.
 
         Returns
         -------
@@ -558,7 +558,7 @@ class VitsModel(pl.LightningModule):
 
         # Centroid loss: 1 - cos(embedding, target) — fork implementation
         # uses angular distance, NOT L2 (norm-invariant, more stable under
-        # SimCLR/CLIP-style conventions). See P4-T02 §6.1 for rationale.
+        # SimCLR/CLIP-style conventions).
         if self.hparams.pea_emotion_centroid_weight > 0:
             loss_centroid = (
                 1.0 - F.cosine_similarity(embeddings, target_centroids, dim=-1).mean()
@@ -917,13 +917,13 @@ class VitsModel(pl.LightningModule):
                 self._log_with_batch_info("loss_gen_wavlm", loss_gen_wavlm, batch)
                 self._log_with_batch_info("loss_fm_wavlm", loss_fm_wavlm, batch)
 
-            # PE-A emotion perceptual loss (Phase 4 / PR-F).
+            # PE-A emotion perceptual loss.
             # Warmup + every_n_steps gating live HERE (not inside
-            # _compute_pea_emotion_loss) per P4-T03 design: the loss method
-            # stays a pure numerical function, training_step_g owns the
-            # scheduling. When the loss is fully disabled the
-            # _pea_emotion_loss_enabled() check short-circuits so there is
-            # zero overhead for existing training runs.
+            # _compute_pea_emotion_loss) by design: the loss method stays
+            # a pure numerical function, training_step_g owns the scheduling.
+            # When the loss is fully disabled the _pea_emotion_loss_enabled()
+            # check short-circuits so there is zero overhead for existing
+            # training runs.
             loss_pea_emotion = None
             if self._pea_emotion_loss_enabled():
                 warmup_steps = int(self.hparams.pea_emotion_warmup_steps)
@@ -1281,10 +1281,10 @@ class VitsModel(pl.LightningModule):
                 "'text' adds projected style to the scaled text encoder input."
             ),
         )
-        # PE-A emotion perceptual loss (Phase 4 / PR-F) — all disabled by
-        # default. Loss is implicitly enabled when ANY of the three weights
-        # is > 0. ``--pea-emotion-style-bank`` becomes required in that
-        # case (enforced by VitsModel._init_pea_emotion_loss()).
+        # PE-A emotion perceptual loss — all disabled by default. Loss is
+        # implicitly enabled when ANY of the three weights is > 0.
+        # ``--pea-emotion-style-bank`` becomes required in that case
+        # (enforced by VitsModel._init_pea_emotion_loss()).
         parser.add_argument(
             "--pea-emotion-loss-weight",
             type=float,

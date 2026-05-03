@@ -262,7 +262,7 @@ impl PiperVoice {
 
         let result = py.allow_threads(move || {
             let inner = unsafe { inner_ptr.as_mut() };
-            // Phase 2 (P2-T04): route through SynthesisParams so style_vector
+            // route through SynthesisParams so style_vector
             // is carried through to the underlying engine.
             let params = piper_core::SynthesisParams {
                 speaker_id,

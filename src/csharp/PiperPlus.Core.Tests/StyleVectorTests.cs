@@ -4,7 +4,7 @@ using PiperPlus.Core.IO;
 namespace PiperPlus.Core.Tests;
 
 /// <summary>
-/// Phase 2 (P2-T05) tests for style_vector handling.
+/// tests for style_vector handling.
 /// </summary>
 public class StyleVectorTests
 {

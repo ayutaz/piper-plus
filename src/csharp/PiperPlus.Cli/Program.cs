@@ -247,7 +247,7 @@ internal static class Program
         var speakerEncoderModelOption = new Option<string?>("--speaker-encoder-model")
         { Description = "Speaker encoder ONNX model path (required for --reference-audio)" };
 
-        // Phase 2 (P2-T05): Style vector conditioning (PE-AV / PE-A)
+        // Style vector conditioning (PE-AV / PE-A)
         var styleVectorOption = new Option<string?>("--style-vector")
         { Description = "Path to a .npy style vector file (float32, 1-D or (1,dim))" };
 
@@ -292,7 +292,7 @@ internal static class Program
             referenceAudioOption,
             speakerEmbeddingOption,
             speakerEncoderModelOption,
-            // Phase 2 (P2-T05): Style vector conditioning
+            // Style vector conditioning
             styleVectorOption,
             styleVectorInlineOption,
         };
@@ -550,7 +550,7 @@ internal static class Program
                 string? outputFile = parseResult.GetValue(outputFileOption);
                 var outputDir = parseResult.GetValue(outputDirOption)!;
 
-                // Phase 2 (P2-T05): Style vector resolution.
+                // Style vector resolution.
                 string? styleVectorPath = parseResult.GetValue(styleVectorOption);
                 string? styleVectorInline = parseResult.GetValue(styleVectorInlineOption);
                 float[]? styleVector = null;

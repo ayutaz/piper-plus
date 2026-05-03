@@ -1,4 +1,4 @@
-"""Phase 5 P5-T03: tests for the evaluation harness (no model needed)."""
+""": tests for the evaluation harness (no model needed)."""
 
 from __future__ import annotations
 

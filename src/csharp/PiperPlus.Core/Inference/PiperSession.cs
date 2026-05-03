@@ -36,7 +36,7 @@ public record SynthesisResult(short[] Audio, float[]? Durations);
 /// Typical dimension: 256 floats (ECAPA-TDNN output).
 /// </param>
 /// <param name="StyleVector">
-/// Phase 2 (P2-T05): Optional style vector for PE-AV / PE-A conditioning.
+/// Optional style vector for PE-AV / PE-A conditioning.
 /// When the loaded model exposes a <c>style_vector</c> input and this
 /// parameter is non-null, the vector is sent with
 /// <c>style_vector_mask=1</c>. Pass <c>null</c> (default) to disable style
@@ -352,7 +352,7 @@ public sealed class PiperSession
             }
         }
 
-        // Phase 2 (P2-T05): style_vector + style_vector_mask.
+        // style_vector + style_vector_mask.
         // Always send both tensors when the model has the input, just like
         // speaker_embedding. Zero-fill + mask=0 when the caller did not
         // supply a vector (or the shape does not match).

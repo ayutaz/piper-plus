@@ -54,7 +54,7 @@ var (
 	speakerEmbedding    string // --speaker-embedding PATH
 	speakerEncoderModel string // --speaker-encoder-model PATH
 
-	// Phase 2 (P2-T06): Style vector conditioning flags
+	// Style vector conditioning flags
 	styleVectorPath   string // --style-vector PATH (.npy)
 	styleVectorInline string // --style-vector-inline "0.1,0.2,..."
 )
@@ -114,7 +114,7 @@ func init() {
 	f.StringVar(&speakerEmbedding, "speaker-embedding", "", "pre-computed speaker embedding file (raw binary float32)")
 	f.StringVar(&speakerEncoderModel, "speaker-encoder-model", "", "speaker encoder ONNX model path")
 
-	// Phase 2 (P2-T06): Style vector conditioning flags
+	// Style vector conditioning flags
 	f.StringVar(&styleVectorPath, "style-vector", "", "path to style vector .npy file (float32)")
 	f.StringVar(&styleVectorInline, "style-vector-inline", "", "inline style vector (comma-separated float32 values)")
 
@@ -456,7 +456,7 @@ func buildRequest(input *jsonlInput) *piperplus.SynthesisRequest {
 		NoiseW:      noiseW,
 	}
 
-	// Phase 2 (P2-T06): Style vector from CLI flags.
+	// Style vector from CLI flags.
 	if sv, err := resolveStyleVector(); err != nil {
 		// buildRequest can't return errors — callers of runSynthesize handle
 		// flag parsing errors earlier, so we log and continue with nil style.

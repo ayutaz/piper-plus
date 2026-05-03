@@ -1,5 +1,5 @@
 /**
- * Unit tests for PiperPlus.synthesize({ styleVector }) — Phase 2 P2-T07.
+ * Unit tests for PiperPlus.synthesize({ styleVector }) —.
  *
  * Run with: node --test test/js/test-piper-plus-style-vector.js
  *

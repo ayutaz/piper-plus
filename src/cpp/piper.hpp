@@ -79,7 +79,7 @@ struct SynthesisConfig {
   // When non-empty, passed as the speaker_embedding ONNX input with mask=1.
   std::vector<float> speakerEmbedding;
 
-  // Phase 2 (P2-T03): Style vector conditioning (PE-AV / PE-A).
+  // Style vector conditioning (PE-AV / PE-A).
   // When non-empty, passed as the style_vector ONNX input with mask=1.
   // When empty and the model has a style_vector input, zeros + mask=0 are sent.
   std::vector<float> styleVector;
@@ -106,7 +106,7 @@ struct ModelSession {
   bool hasMultiSpeaker = false;    // Whether model has sid (speaker ID) input
   bool hasLidInput = false;        // Whether model has lid (language ID) input
 
-  // Phase 2 (P2-T03): Style vector conditioning.
+  // Style vector conditioning.
   bool hasStyleVector = false;     // Whether model accepts style_vector input
   int  styleVectorDim = 0;         // Expected style_vector dim (from ONNX metadata or input shape)
 
@@ -126,7 +126,7 @@ struct InferenceInputs {
   // Flat [a1,a2,a3, a1,a2,a3, ...] per phoneme. Empty = no prosody.
   std::vector<int64_t> prosodyFeatures;
 
-  // Phase 2 (P2-T03): Style vector conditioning (PE-AV / PE-A).
+  // Style vector conditioning (PE-AV / PE-A).
   // When non-empty, sent as style_vector input with mask=1.
   // When empty and the model has style_vector, zeros + mask=0 are sent.
   std::vector<float> styleVector;

@@ -3,7 +3,7 @@ using System.Text;
 namespace PiperPlus.Core.IO;
 
 /// <summary>
-/// Minimal reader for numpy <c>.npy</c> files (Phase 2 P2-T05).
+/// Minimal reader for numpy <c>.npy</c> files.
 /// </summary>
 /// <remarks>
 /// Supports the v1.0 / v2.0 file format with dtype <c>&lt;f4</c> (little-endian

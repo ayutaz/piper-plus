@@ -129,7 +129,7 @@ struct RunConfig {
   optional<string> downloadModelName;
   optional<filesystem::path> modelDir;
 
-  // Phase 2 (P2-T03): Style vector conditioning (PE-AV / PE-A)
+  // Style vector conditioning (PE-AV / PE-A)
   // Path to a .npy file containing a float32 style vector.
   optional<filesystem::path> styleVectorPath;
   // Inline style vector (comma-separated float32 values). Takes precedence.
@@ -141,7 +141,7 @@ const string RunConfig::FORMAT_JSON = "json";
 const string RunConfig::FORMAT_TSV = "tsv";
 
 // ---------------------------------------------------------------------------
-// Phase 2 (P2-T03): minimal .npy reader for float32 1-D arrays.
+// minimal .npy reader for float32 1-D arrays.
 //
 // Supports numpy .npy format v1.0/v2.0 with dtype '<f4' (little-endian float32).
 // Accepts 1-D ``(dim,)`` or 2-D ``(1, dim)`` shapes. Returns the data as a
@@ -442,7 +442,7 @@ int main(int argc, char *argv[]) {
 
   } // if phonemeSilenceSeconds
 
-  // Phase 2 (P2-T03): style vector conditioning.
+  // style vector conditioning.
   // --style-vector-inline takes precedence over --style-vector.
   if (runConfig.styleVectorInline) {
     std::vector<float> vec;
@@ -1013,11 +1013,11 @@ void parseArgs(int argc, char *argv[], RunConfig &runConfig) {
         runConfig.customDictPaths.push_back(filesystem::path(path));
       }
     } else if (arg == "--style-vector" || arg == "--style_vector") {
-      // Phase 2 (P2-T03): path to a float32 .npy style vector.
+      // path to a float32 .npy style vector.
       ensureArg(argc, argv, i);
       runConfig.styleVectorPath = filesystem::path(argv[++i]);
     } else if (arg == "--style-vector-inline" || arg == "--style_vector_inline") {
-      // Phase 2 (P2-T03): inline comma-separated float32 style vector.
+      // inline comma-separated float32 style vector.
       ensureArg(argc, argv, i);
       runConfig.styleVectorInline = argv[++i];
     } else if (arg == "-t" || arg == "--text") {

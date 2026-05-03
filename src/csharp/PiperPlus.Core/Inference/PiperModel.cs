@@ -50,7 +50,7 @@ public sealed class PiperModel : IDisposable
         // Detect voice cloning capability (speaker_embedding + speaker_embedding_mask).
         HasSpeakerEmbedding = _session.InputMetadata.ContainsKey("speaker_embedding");
 
-        // Phase 2 (P2-T05): Detect style_vector conditioning capability.
+        // Detect style_vector conditioning capability.
         HasStyleVector = _session.InputMetadata.ContainsKey("style_vector");
         if (HasStyleVector)
         {
@@ -121,7 +121,7 @@ public sealed class PiperModel : IDisposable
     public bool HasSpeakerEmbedding { get; }
 
     /// <summary>
-    /// Phase 2 (P2-T05): <c>true</c> when the model accepts
+    /// <c>true</c> when the model accepts
     /// <c>style_vector</c> (float32) and <c>style_vector_mask</c>
     /// (int64) inputs for PE-AV / PE-A style conditioning.
     /// </summary>

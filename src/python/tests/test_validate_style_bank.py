@@ -1,4 +1,4 @@
-"""Unit tests for ``piper_train.tools.validate_style_bank`` (Phase 3 P3-T04)."""
+"""Unit tests for ``piper_train.tools.validate_style_bank``."""
 
 from __future__ import annotations
 

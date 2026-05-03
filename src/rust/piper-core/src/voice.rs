@@ -40,7 +40,7 @@ pub struct SynthesisParams {
     pub noise_w: f32,
     /// Speaker embedding vector for voice cloning (overrides speaker_id).
     pub speaker_embedding: Option<Vec<f32>>,
-    /// Phase 2 (P2-T04): Style vector for PE-AV / PE-A conditioning.
+    /// Style vector for PE-AV / PE-A conditioning.
     pub style_vector: Option<Vec<f32>>,
 }
 

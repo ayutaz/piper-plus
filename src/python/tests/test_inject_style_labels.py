@@ -1,4 +1,4 @@
-"""Unit tests for ``piper_train.tools.inject_style_labels`` (Phase 3 P3-T03)."""
+"""Unit tests for ``piper_train.tools.inject_style_labels``."""
 
 from __future__ import annotations
 

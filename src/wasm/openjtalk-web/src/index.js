@@ -380,7 +380,7 @@ export class PiperPlus {
    * @param {number} [options.noiseScale]
    * @param {number} [options.lengthScale]
    * @param {number} [options.noiseW]
-   * @param {Float32Array} [options.styleVector] - Phase 2 P2-T07: optional style
+   * @param {Float32Array} [options.styleVector] -: optional style
    *   vector for PE-AV / PE-A style conditioning. Length must match the model's
    *   `style_vector_dim`. When omitted, zeros + mask=0 are sent (style disabled).
    * @returns {Promise<AudioResult>}
@@ -860,7 +860,7 @@ export class PiperPlus {
       );
     }
 
-    // Phase 2 (P2-T07): attach style_vector + style_vector_mask when the
+    // attach style_vector + style_vector_mask when the
     // model supports style conditioning. Detect via inputNames exposed by
     // onnxruntime-web; fall back to simply attaching when styleVector
     // was passed.

@@ -102,7 +102,7 @@ typedef struct PiperPlusSynthOptions {
     const float *speaker_embedding;     /* Voice cloning: float32 embedding (NULL = use speaker_id) */
     int32_t      speaker_embedding_dim; /* Number of elements in speaker_embedding (0 = disabled) */
 
-    /* Phase 2 (P2-T03): Style vector conditioning (PE-AV / PE-A). */
+    /* Style vector conditioning (PE-AV / PE-A). */
     const float *style_vector;          /* Optional float32 style vector (NULL = use zeros + mask=0) */
     int32_t      style_vector_dim;      /* Number of elements in style_vector (0 = disabled for this call) */
 

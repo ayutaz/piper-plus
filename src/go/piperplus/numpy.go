@@ -1,6 +1,6 @@
 package piperplus
 
-// Phase 2 (P2-T06): minimal numpy .npy reader.
+// minimal numpy .npy reader.
 //
 // Supports version 1.0 / 2.0 with dtype '<f4' (little-endian float32) and
 // 1-D (dim,) or 2-D (1, dim) shapes. Used by the CLI to load style vectors.

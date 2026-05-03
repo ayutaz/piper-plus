@@ -22,7 +22,7 @@ type ModelCapabilities struct {
 	HasProsody          bool
 	HasDurationOutput   bool
 	HasSpeakerEmbedding bool // model accepts speaker_embedding + speaker_embedding_mask
-	// Phase 2 (P2-T06): style_vector conditioning.
+	// style_vector conditioning.
 	HasStyleVector bool
 	StyleVectorDim int32
 }
@@ -67,7 +67,7 @@ func detectCapabilities(modelPath string) (*ModelCapabilities, error) {
 		HasStyleVector:      containsName(inputs, "style_vector"),
 	}
 
-	// Phase 2 (P2-T06): resolve style_vector_dim from the input shape.
+	// resolve style_vector_dim from the input shape.
 	// Axis 0 is dynamic (batch), axis 1 is the dim.
 	if caps.HasStyleVector {
 		for _, info := range inputs {
@@ -125,7 +125,7 @@ func newOnnxEngine(modelPath string, config *VoiceConfig, sessOpts *ort.SessionO
 		}
 	}
 
-	// Phase 2 (P2-T06): fallback — resolve style_vector_dim from ONNX custom
+	// fallback — resolve style_vector_dim from ONNX custom
 	// metadata when the input shape did not expose a concrete dim.
 	if caps.HasStyleVector && caps.StyleVectorDim <= 0 {
 		if meta, mErr := session.GetModelMetadata(); mErr == nil && meta != nil {
@@ -320,7 +320,7 @@ func (e *OnnxEngine) Synthesize(ctx context.Context, req *SynthesisRequest) (*Sy
 		}
 	}
 
-	// Phase 2 (P2-T06): "style_vector" + "style_vector_mask" inputs.
+	// "style_vector" + "style_vector_mask" inputs.
 	// Always send both when the model has the input; zero-fill + mask=0
 	// when the caller did not provide a valid style vector.
 	if e.capabilities.HasStyleVector {

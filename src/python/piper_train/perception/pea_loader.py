@@ -5,7 +5,7 @@ perceptual loss in ``piper_train.vits.lightning``:
 
 * :func:`load_pea_emotion_model` — load ``facebook/pe-av-small`` via
   ``transformers`` (preferred) or the ``perception_models`` package (fallback).
-* :func:`load_style_bank` — read the ``.npz`` produced by Phase 3's
+* :func:`load_style_bank` — read the ``.npz`` produced by
   ``build_pea_style_bank.py`` / validated by ``validate_style_bank.py``.
 * :func:`grad_enabled_embedder_forward` — forward-wrapper that keeps the DAC
   encoder + bottleneck path differentiable so gradients flow back to ``y_hat``
@@ -64,7 +64,7 @@ def load_pea_emotion_model(
 ) -> torch.nn.Module:
     """Load the PE-A audio encoder in ``eval()`` mode with all params frozen.
 
-    Two candidate loaders are tried in order (Phase 0 P0-T03 outcome):
+    Two candidate loaders are tried in order:
 
     1. ``transformers.AutoModel.from_pretrained(model_name,
        trust_remote_code=True)``. Known to fail today because the

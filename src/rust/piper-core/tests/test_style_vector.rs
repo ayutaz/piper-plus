@@ -1,4 +1,4 @@
-//! Integration tests for the Phase 2 P2-T04 style_vector changes to
+//! Integration tests for the style_vector changes to
 //! `SynthesisRequest`, `SynthesisParams`, and `ModelCapabilities`.
 //!
 //! These tests do not load a real ONNX model — they verify the

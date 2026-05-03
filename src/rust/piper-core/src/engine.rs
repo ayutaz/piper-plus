@@ -88,7 +88,7 @@ pub struct SynthesisRequest {
     /// When provided, this overrides `speaker_id` for voice conditioning.
     /// Typical dimension: 256 floats (ECAPA-TDNN output).
     pub speaker_embedding: Option<Vec<f32>>,
-    /// Style vector for PE-AV / PE-A style conditioning (Phase 2 P2-T04).
+    /// Style vector for PE-AV / PE-A style conditioning.
     ///
     /// When the loaded ONNX model has a `style_vector` input and this is
     /// `Some(vec)`, the vector is sent with `style_vector_mask=1`. When
@@ -147,7 +147,7 @@ pub struct ModelCapabilities {
     /// Whether the model accepts `speaker_embedding` (float32) and
     /// `speaker_embedding_mask` (int64) inputs for voice cloning.
     pub has_speaker_embedding: bool,
-    /// Phase 2 (P2-T04): Whether the model accepts `style_vector` (float32)
+    /// Whether the model accepts `style_vector` (float32)
     /// and `style_vector_mask` (int64) inputs for PE-AV / PE-A style
     /// conditioning.
     pub has_style_vector: bool,
@@ -574,7 +574,7 @@ impl OnnxEngine {
         let has_input = |name: &str| input_names.iter().any(|n| n == name);
         let has_output = |name: &str| output_names.iter().any(|n| n == name);
 
-        // Phase 2 (P2-T04): detect style_vector and resolve its dim.
+        // detect style_vector and resolve its dim.
         let has_style_vector = has_input("style_vector");
         let style_vector_dim: u32 = if has_style_vector {
             // 1. Try the concrete ONNX input shape (axis 1)
@@ -806,7 +806,7 @@ impl OnnxEngine {
             None
         };
 
-        // Phase 2 (P2-T04): style_vector + style_vector_mask.
+        // style_vector + style_vector_mask.
         // When the model has the input, we MUST always send both tensors --
         // zero-fill + mask=0 when the caller did not provide a vector.
         let (style_vector_tensor, style_vector_mask_tensor) = if self.capabilities.has_style_vector
