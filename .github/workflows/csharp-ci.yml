@@ -34,9 +34,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v5
         with:
-          dotnet-version: |
-            8.0.x
-            9.0.x
+          dotnet-version: 8.0.x
 
       - name: Cache NuGet packages
         uses: actions/cache@v5
