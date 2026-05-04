@@ -1,8 +1,8 @@
-# [M4] Swift Package Manager パッケージ併設 (別 repo 管理)
+# [M4] Swift Package Manager パッケージ併設 (本体 repo 直下、案 X 採用)
 
 > **iOS Shared Library Distribution 仕様 ([#377](https://github.com/ayutaz/piper-plus/issues/377)) のマイルストーン M4 実装チケット**
 > 関連仕様: [`docs/spec/ios-shared-lib.md §8 M4`](../spec/ios-shared-lib.md#m4-将来-swift-package-manager-パッケージ併設)
-> **本チケットは「将来別 repo + 別 issue で実装される予定」の設計記録であり、本ブランチでは実装されない。**
+> **道 A 確定により本ブランチで着手する。§11.7 推奨どおり案 X (本体 repo `ayutaz/piper-plus` 直下に `Package.swift`) を主仕様とする。M2 で module map を組込済みのため後付け再 zip 不要。**
 
 ---
 
@@ -11,19 +11,20 @@
 | 項目 | 値 |
 |------|-----|
 | マイルストーン | **M4** |
-| 親 Issue | [#377](https://github.com/ayutaz/piper-plus/issues/377) (M4 自体は別 issue 化予定) |
-| 担当ブランチ | **別 repo `ayousanz/piper-plus-swift-package-manager` で管理 (本ブランチ `dev` では実装しない)** |
-| 状態 | **pending (別 issue 化予定)** |
-| 想定 PR | 別 repo に 1〜3 PR (Package.swift 初版 / リリース連携 workflow / README & デモ target) |
-| 想定所要 | 1〜2 日 (別 repo セットアップ + リリース連携 + Swift Package Index 登録) |
-| 依存 | **M2 完了** (xcframework.zip の安定リリース) **必須**。M3 完了後を推奨 (利用者ガイド整備済) |
-| ターゲット OS | iOS 14.0+ / iOS Simulator (arm64) — visionOS / macCatalyst は M5 以降 |
-| ターゲット Swift | Swift 5.9+ (`swift-tools-version:5.9`) |
-| 配布物 | `Package.swift` (`binaryTarget(url:, checksum:)`) + module map + デモ target |
+| 親 Issue | [#377](https://github.com/ayutaz/piper-plus/issues/377) |
+| 担当ブランチ | `fix/ios-shared-lib-build-377` (本体 repo 内、道 A 確定) |
+| 状態 | [README 表 を SoT として参照](README.md) |
+| 想定 PR | 1 PR (小、~50-80 行: `Package.swift` + workflow checksum 自動更新 + 最小 README) |
+| 想定所要 (Claude Code 実行ベース) | 実装 1-2 時間 + `swift package resolve` 検証 (CI 内で完結) ~15 分 |
+| 環境制約 | Apple Silicon Mac は本セッションで使用不可。`xcodebuild -resolvePackageDependencies` / 実機 `import` テストは **Swift Package Index の自動互換性チェック + GitHub Actions macos-14 runner 上の `swift build` で代替** |
+| 依存 | **M2 完了必須** (xcframework + module map が成立)、M3 推奨 (利用者ガイド整備済) |
+| ターゲット OS | iOS 15.0+ / iOS Simulator (arm64+x86_64) — M2 と一致。visionOS / macCatalyst は M5 以降 |
+| ターゲット Swift | Swift 5.9+ (`swift-tools-version: 5.9`) |
+| 配布物 | 本体 repo 直下の `Package.swift` (`binaryTarget(url:, checksum:)`) + M2 同梱 module map + (オプション) `Sources/PiperPlusDemo/` |
 
-> **位置づけ:** 本チケットは設計記録であり、本チケットのマージは実装完了を意味しない。M4 着手時に本ドキュメントを参照しつつ別 issue を切ること。
+> **位置づけ:** 本チケットは道 A 確定により本ブランチで実装される。
 >
-> **本書の主仕様 (§1〜§10) は案 Y (別 repo `piper-plus-swift-package-manager` 新設) を仮採用** して書かれている。**§11 では案 X (本体 repo 直下に `Package.swift` 配置) を強く推奨** する別案を批判的に提示する。実装時は §11.7 の判定基準で iOS 利用者観測を行い、案 Y / 案 X / 永久延期のいずれを採るかを別 issue で最終確定すること。
+> **採用案:** §11.7 推奨どおり **案 X (本体 repo 直下に `Package.swift`)** を主仕様。sherpa-onnx / whisper.cpp と同方式。別 repo (案 Y) はリリース連携 PAT 管理コストが大きく、本体 repo 単一管理が経済合理。§3 以降は案 X ベースで全面再構成済み。
 
 ---
 
@@ -158,16 +159,17 @@ https://swiftpackageindex.com/add-a-package で repo URL を入力。`Package.sw
 
 ---
 
-## 4. エージェントチームの役割と人数
+## 4. 担当者と Agent 並列レビュー観点
 
-| 役割 | 人数 | 主担当 |
-|------|------|--------|
-| **SPM Engineer** | 1名 | `Package.swift` 設計、binaryTarget の url/checksum、module map 仕様調整 (M2 連携)、デモ target |
-| **CI Engineer** | 1名 | piper-plus → 別 repo の repository-dispatch 連携、PAT 管理、checksum 自動計算 (`shasum -a 256`) |
-| **Reviewer** | 1名 | SPM 仕様準拠、Swift API 慣習、Swift Package Index 互換 |
-| **QA Engineer** | 1名 | SwiftUI App / iOS App から `import PiperPlus` 動作検証、Simulator + 実機ロード |
+> **実行体制:** 本タスクは Claude Code が単独で実装・検証・コミットを行う。レビューは Agent ツール (subagent) で複数観点を並列起動して補強する。「人数」表記は廃止。
 
-合計 **4 名**。M2/M3 担当者と一部重複可。
+| 観点 (subagent role) | 数 | 主担当 | 責務 |
+|---------------------|----|------|------|
+| **実装** | - | Claude Code (主) | `Package.swift` 配置 (案 X)、binaryTarget url/checksum 連携、`release-shared-lib.yml` 内での checksum 自動更新ステップ追加、最小 README、PR 起票、commit |
+| **SPM 仕様レビュー** | 1 観点 | Agent (general-purpose) | `swift-tools-version` / `binaryTarget` / `dependencies` ピン方法 / `platforms:` 値が SPM 仕様準拠か |
+| **整合性レビュー** | 1 観点 | Agent (general-purpose) | M2 で生成する xcframework.zip の URL / checksum 連動、ORT バージョン pin が M2 と一致 |
+
+実装後 `Agent` ツールで 1-2 観点を並列起動。`xcodebuild -resolvePackageDependencies` の実機検証は環境制約上不可、Swift Package Index の自動互換性チェック (登録後) で代替。重大な指摘がなければ `gh pr merge --auto` で CI 完了マージ。
 
 ---
 

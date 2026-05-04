@@ -1,6 +1,6 @@
 # [M2] xcframework 化 (配布形式の実用化)
 
-> **iOS Shared Library Distribution 仕様 ([#377](https://github.com/ayutaz/issues/377)) のマイルストーン M2 実装チケット**
+> **iOS Shared Library Distribution 仕様 ([#377](https://github.com/ayutaz/piper-plus/issues/377)) のマイルストーン M2 実装チケット**
 > 関連仕様: [`docs/spec/ios-shared-lib.md §8 M2`](../spec/ios-shared-lib.md#m2-xcframework-化-配布形式の実用化)
 
 ---
@@ -12,9 +12,10 @@
 | マイルストーン | **M2** ([xcframework 化 / 配布形式の実用化](../spec/ios-shared-lib.md#m2-xcframework-化-配布形式の実用化)) |
 | 親 Issue | [#377](https://github.com/ayutaz/piper-plus/issues/377) |
 | ブランチ | `fix/ios-shared-lib-build-377` |
-| 状態 | `pending` |
-| 想定 PR | 1 PR (中、~150〜200 行 diff、M1 で発覚した CDN zip 構造変更を踏まえやや膨らむ) |
-| 想定所要 | 1〜2 日 + simulator slice 検証 0.5 日 |
+| 状態 | [README 表 を SoT として参照](README.md) |
+| 想定 PR | 1 PR (中、~180-230 行 diff、modulemap + PrivacyInfo 繰り上げ採用で +30 行) |
+| 想定所要 (Claude Code 実行ベース) | 実装 2-4 時間 + `workflow_dispatch` CI ~30 分 (matrix 並列で 1-2 サイクル) + 仮想 tag push 検証 ~30 分 |
+| 環境制約 | Apple Silicon Mac は本セッションで使用不可。drag-drop / `xcrun simctl` boot / 実機ロード検証は **CI 内 `xcodebuild -create-xcframework` 成功 + `plutil -p Info.plist` 検証で代替**。手動実機検証は v1.13.0-rc1 リリース後の利用者観測で行う |
 | 関連仕様 | [docs/spec/ios-shared-lib.md §2.1 ORT 取得経路](../spec/ios-shared-lib.md#21-ort-取得経路), [§2.2 piper-plus 配布形式](../spec/ios-shared-lib.md#22-piper-plus-配布形式), [§2.3 互換性維持](../spec/ios-shared-lib.md#23-互換性維持), [§8 M2](../spec/ios-shared-lib.md#m2-xcframework-化-配布形式の実用化) |
 | 対象ワークフロー | `.github/workflows/release-shared-lib.yml` (`build-ios` 既存ジョブの matrix 化 + `assemble-xcframework` 新規ジョブ追加) |
 | 対象 CMake | `cmake/ios.toolchain.cmake` (simulator slice パラメータ化), `cmake/PiperPlusShared.cmake` (両 slice の dylib リンク互換性確認) |
@@ -260,18 +261,18 @@ iOS 分岐 (L72-80) は既に `${ONNXRUNTIME_LIB}` パス指定での explicit l
 
 ---
 
-## 4. エージェントチームの役割と人数
+## 4. 担当者と Agent 並列レビュー観点
 
-| 役割 | 人数 | 責務 |
-|------|------|------|
-| **CI Engineer** (主担当) | 1 名 | `release-shared-lib.yml` の `build-ios` matrix 化、`assemble-xcframework` ジョブ新規追加、artifact 命名規約整備、`workflow_dispatch` での dry-run、PR 起票 |
-| **CMake Engineer** | 1 名 | `cmake/ios.toolchain.cmake` の sysroot/archs パラメータ化、`cmake/PiperPlusShared.cmake` の simulator slice 互換性確認、`--trace-expand` での確認ログ |
-| **iOS Build Engineer** | 1 名 | `xcodebuild -create-xcframework` コマンドの実装と検証、Apple Silicon Mac での simulator 実機ロード確認 (`xcrun simctl`)、Xcode 15.x / 16.x 互換性チェック |
-| **Workflow Reviewer** | 1 名 | YAML 構文 (matrix 設計、`needs` 結線)、artifact 命名衝突回避、既存ジョブ非破壊性レビュー |
-| **iOS Distribution Reviewer** | 1 名 | xcframework Info.plist の妥当性、ORT 含めない決定 (案 A) の利用者影響評価、M1 tar.gz との並行配布が利用者を混乱させないかレビュー |
-| **QA Engineer** | 1 名 | matrix 単独実行 (device 単独 / simulator 単独 / 全体)、仮想 tag (`v1.13.0-rc1`) push の release ジョブ完走確認、Xcode への drag-drop 動作確認 (手動) |
+> **実行体制:** 本タスクは Claude Code が単独で実装・検証・コミットを行う。レビューは Agent ツール (subagent) で複数観点を並列起動して補強する。「人数」表記は廃止。
 
-> **合計 6 名**。M1 の 5 名構成から iOS Build Engineer を追加。matrix 化と xcodebuild 統合の検証は iOS 固有知識を要するため独立担当を割く。重大指摘なしで `gh pr merge --auto`。
+| 観点 (subagent role) | 数 | 主担当 | 責務 |
+|---------------------|----|------|------|
+| **実装** | - | Claude Code (主) | matrix 化、`assemble-xcframework` 新規ジョブ、modulemap/PrivacyInfo 生成ロジック、`xcodebuild -create-xcframework`、`workflow_dispatch` 起動、PR 起票、commit |
+| **CMake / iOS 技術レビュー** | 1 観点 | Agent (general-purpose) | toolchain の sysroot/archs パラメータ化、PiperPlusShared.cmake の simulator slice 対応、Info.plist 妥当性、xcodebuild の `-library` 引数妥当性 |
+| **整合性レビュー** | 1 観点 | Agent (general-purpose) | 仕様書 §8 M2 ↔ 本チケット ↔ workflow YAML の整合 (slice 命名 / artifact 命名 / sha256 / Embed & Sign 表記) |
+| **構造 / DoD レビュー** | 1 観点 | Agent (general-purpose) | M1 tar.gz との並行配布の利用者影響、modulemap/PrivacyInfo 繰り上げ判断の反映、rollback 手順 |
+
+実装後 `Agent` ツールで 2-3 観点を並列起動。matrix 化と xcframework は iOS 固有知識領域のため CMake / iOS 技術レビューは必須観点。重大指摘なしで `gh pr merge --auto`。
 
 ---
 

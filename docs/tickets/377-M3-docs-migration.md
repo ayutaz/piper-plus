@@ -12,9 +12,10 @@
 | マイルストーン | **M3** ([ドキュメント・移行ガイド整備](../spec/ios-shared-lib.md#m3-ドキュメント移行ガイド整備)) |
 | 親 Issue | [#377](https://github.com/ayutaz/piper-plus/issues/377) |
 | ブランチ | `fix/ios-shared-lib-build-377` |
-| 状態 | `pending` |
-| 想定 PR | 1 PR (小〜中、~80-150 行 diff、ドキュメント変更主体) |
-| 想定所要 | 半日〜1 日 |
+| 状態 | [README 表 を SoT として参照](README.md) |
+| 想定 PR | 1 PR (中、~440 行 diff、新規 ~330 行 + 編集 ~110 行、ドキュメント変更主体) |
+| 想定所要 (Claude Code 実行ベース) | 実装 1-2 時間 (ドキュメント執筆) + ローカル markdownlint / lychee 検証 ~10 分 |
+| 環境制約 | Apple Silicon Mac は本セッションで使用不可。Xcode UI スクリーンショットは文字列指示主とし、画像は **別 issue で利用者から PR 受付** で補追する方針 |
 | 関連仕様 | [docs/spec/ios-shared-lib.md §2.1 zip 構造](../spec/ios-shared-lib.md#21-ort-取得経路), [§2.3 互換性維持](../spec/ios-shared-lib.md#23-互換性維持), [§8 M3](../spec/ios-shared-lib.md#m3-ドキュメント移行ガイド整備) |
 | 対象ファイル | `examples/dart/README.md`, `examples/godot/README.md`, `docs/spec/ort-versions.md`, `CHANGELOG.md`, `docs/spec/ios-shared-lib.md`, `docs/tickets/README.md`, (新規) `docs/guides/ios-integration.md`, (新規) `examples/swift/README.md` |
 
@@ -294,16 +295,17 @@ let voice = try PiperVoice.load(modelPath: "...")
 
 ---
 
-## 4. エージェントチームの役割と人数
+## 4. 担当者と Agent 並列レビュー観点
 
-| 役割 | 人数 | 責務 |
-|------|------|------|
-| **Technical Writer** (主担当) | 1 名 | 利用者向け文書のトーン整備、配布物選択ガイドの執筆、`examples/dart/README.md` / `examples/godot/README.md` の章立て刷新、`docs/guides/ios-integration.md` および `examples/swift/README.md` の新規作成、CHANGELOG エントリの文言調整 |
-| **iOS Integration Specialist** | 1 名 | Embed & Sign Frameworks 手順の正確性、Privacy Manifest / .dSYM / module map の現状記述の検証、ORT xcframework 取得 3 案 (CocoaPods/SPM/CDN) の網羅性、Xcode UI スクリーンショット撮影 |
-| **Reviewer** (Documentation Lead) | 1 名 | ドキュメント全体の整合性、`docs/spec/ios-shared-lib.md` 冒頭 Status 更新の正しさ、`docs/tickets/README.md` 表との同期、リンク切れチェック (markdownlint / lychee) |
-| **QA Engineer** | 1 名 | 実機 (Apple Silicon Mac) で README 手順を再現確認、Dart / Flutter / Godot プロジェクトでの組込み実機検証、配布物切り替え動作確認 (tar.gz と xcframework.zip 両方) |
+> **実行体制:** 本タスクは Claude Code が単独で実装・検証・コミットを行う。レビューは Agent ツール (subagent) で複数観点を並列起動して補強する。「人数」表記は廃止。
 
-> **合計 4 名**。Technical Writer が PR 起票、iOS Specialist が UI スクリーンショット込みで具体的手順を補強、Reviewer が文書整合性を担保、QA が実機再現で「絵に描いた餅でない」ことを確認。重大な指摘がなければ `gh pr merge --auto` で CI 完了マージ。
+| 観点 (subagent role) | 数 | 主担当 | 責務 |
+|---------------------|----|------|------|
+| **実装** | - | Claude Code (主) | dart/godot README 改訂、`docs/guides/ios-integration.md` / `examples/swift/README.md` 新規、CHANGELOG / spec status 更新、markdownlint/lychee 実行、PR 起票、commit |
+| **整合性レビュー** | 1 観点 | Agent (general-purpose) | 配布物選択ガイド / Embed & Sign 表記 / tar.gz 廃止予告 / spec 冒頭 Status / README 表の同期、リンク切れ |
+| **UX / 利用者導線レビュー** | 1 観点 | Agent (general-purpose) | TTHW (Time-To-Hello-World) 30 分目標達成可否、配布物選択 (Hick's Law) 混乱回避、つまづきポイント TOP 5 への対処 |
+
+実装後 `Agent` ツールで 1-2 観点を並列起動。Apple Silicon Mac での実機再現検証は環境制約上不可、利用者観測 (M3 §12.2 別 issue) で代替。重大な指摘がなければ `gh pr merge --auto` で CI 完了マージ。
 
 ---
 

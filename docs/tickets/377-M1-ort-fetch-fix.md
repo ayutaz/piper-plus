@@ -12,9 +12,10 @@
 | マイルストーン | **M1** ([取得経路の修復 / release ジョブの解凍](../spec/ios-shared-lib.md#m1-取得経路の修復-release-ジョブの解凍)) |
 | 親 Issue | [#377](https://github.com/ayutaz/piper-plus/issues/377) |
 | ブランチ | `fix/ios-shared-lib-build-377` |
-| 状態 | `pending` |
+| 状態 | [README 表 を SoT として参照](README.md) |
 | 想定 PR | 1 PR (中、~60-80 行 diff) |
-| 想定所要 | 1〜1.5 日 + 事前検証 0.5 日 |
+| 想定所要 (Claude Code 実行ベース) | 実装 1-2 時間 + `workflow_dispatch` CI ~20 分 (1 サイクル) + 仮想 tag push 検証 ~30 分 |
+| 環境制約 | Apple Silicon Mac は本セッションで使用不可。ローカル CMake 連携検証 (§3.4) は **CI 内 `workflow_dispatch` で代替**、シンボル解決検証 (`nm -u` / `nm -gU`) は同 CI 内で実施 |
 | 関連仕様 | [docs/spec/ios-shared-lib.md §2.1 ORT 取得経路](../spec/ios-shared-lib.md#21-ort-取得経路), [§8 M1](../spec/ios-shared-lib.md#m1-取得経路の修復-release-ジョブの解凍) |
 | 対象ワークフロー | `.github/workflows/release-shared-lib.yml` (`build-ios` ジョブ L123-206) |
 
@@ -196,17 +197,18 @@ file build-ios-test/libpiper_plus.a   # 期待: ar archive (Mach-O arm64)
 
 ---
 
-## 4. エージェントチームの役割と人数
+## 4. 担当者と Agent 並列レビュー観点
 
-| 役割 | 人数 | 責務 |
-|------|------|------|
-| **CI Engineer** (主担当) | 1 名 | curl URL 差し替え、sha256 検証ステップの実装、`.framework` ベース extraction の書換、Package ステップ拡張、`workflow_dispatch` での dry-run、PR 起票 |
-| **CMake / Build Engineer** | 1 名 | §3.4 のローカル CMake 検証、`PiperPlusShared.cmake` の dylib リンク互換性確認、必要に応じた最小修正 |
-| **Workflow Reviewer** | 1 名 | YAML 構文、`set -euo pipefail` などのシェル堅牢性、既存ジョブへの非破壊性 (matrix/needs/permissions) のレビュー |
-| **Supply Chain Reviewer** | 1 名 | sha256 ピンの妥当性、`--fail` フラグの有無、`Embed & Sign` 必須化が利用者に与える影響の整理 |
-| **QA Engineer** | 1 名 | `workflow_dispatch` での iOS ジョブ単独実行、仮想 tag (`v1.13.0-rc1` 等) push による release ジョブ完走確認、artifact のダウンロード/解凍・`file`/`lipo` 検証 |
+> **実行体制:** 本タスクは Claude Code が単独で実装・検証・コミットを行う。レビューは Agent ツール (subagent) で複数観点を並列起動して補強する。「人数」表記は廃止。
 
-> **合計 5 名**。CI Engineer が PR 起票、CMake Engineer が事前検証、Reviewer 2 名 + QA 1 名でレビュー。重大な指摘がなければ `gh pr merge --auto` を使用 (CI 完了でマージ)。
+| 観点 (subagent role) | 数 | 主担当 | 責務 |
+|---------------------|----|------|------|
+| **実装** | - | Claude Code (主) | curl URL 差替、sha256 検証ロジック、`.framework` extraction 書換、Package ステップ拡張、`workflow_dispatch` 起動、PR 起票、commit |
+| **整合性レビュー** | 1 観点 | Agent (general-purpose) | spec ↔ チケット ↔ workflow YAML 間の数値・URL・用語整合性 |
+| **技術検証レビュー** | 1 観点 | Agent (general-purpose) | YAML / shell / sha256 / シンボル解決 (`nm -u`/`nm -gU`) の正当性、CDN URL の HTTP 200 実証 |
+| **構造レビュー** | 1 観点 | Agent (general-purpose) | PR スコープ / DoD / rollback 妥当性 |
+
+実装後 `Agent` ツールで 1-3 観点を並列起動し、指摘は本チケット内に反映してから commit。`gh pr merge --auto` で CI 完了マージ。
 
 ---
 
