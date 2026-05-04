@@ -262,3 +262,27 @@ piper-plus ships **as several independent packages**, each released and versione
 2. Each release has a tag matching the prefix scheme above; do not reuse a generic `v<X.Y.Z>` tag for non-Python releases.
 3. Cross-package compatibility is documented in the relevant package README (e.g. npm `piper-plus` declares its required `@piper-plus/g2p` range in `package.json`).
 4. When making a change that affects multiple packages (e.g. adding a new language), bump each affected package's version individually and document the relationship in the root CHANGELOG.
+
+### Release order (dependency-aware)
+
+Some packages depend on others published to the **same registry**. Publishing them in the wrong order breaks fresh installs.
+
+| Registry | Required publish order | Reason |
+|---|---|---|
+| npm | `@piper-plus/g2p` → `piper-plus` | `piper-plus/package.json` lists `@piper-plus/g2p` as a runtime dependency, so the g2p version must already exist on npm. |
+| crates.io | `piper-plus-g2p` → `piper-plus` (core) → `piper-plus-cli` | `piper-plus` depends on `piper-plus-g2p`; `piper-plus-cli` depends on `piper-plus`. The `dev-create-release.yml` automation already handles this with `sleep 30` between steps. |
+| PyPI | `piper-plus-g2p` → `piper-plus` → `piper-tts-plus` (stub) | Same dependency chain. Manual Release workflow chains `publish_pypi` → `publish_pypi_stub`. |
+| NuGet | `PiperPlus.Core` → `PiperPlus.Cli` | CLI references Core. |
+
+**Manual operation needed for npm:** the GitHub Actions Manual Release workflow handles PyPI / NuGet / crates.io automatically, but **npm publishes are gated by separate tag triggers** (`npm-publish.yml` listens on `npm-v*` and `g2p-v*` tags). To publish a coordinated npm release:
+
+```bash
+# 1. Publish g2p first
+git tag g2p-v0.4.0 && git push --tags
+
+# 2. Wait for the g2p tag's CI to finish publishing to npm
+# 3. Then publish piper-plus
+git tag npm-v0.6.0 && git push --tags
+```
+
+Skipping step 1 will cause `npm install piper-plus@0.6.0` to fail with `notarget No matching version found for @piper-plus/g2p@^0.4.0`.

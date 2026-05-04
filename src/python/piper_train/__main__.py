@@ -34,6 +34,32 @@ except ImportError:
 _LOGGER = logging.getLogger(__package__)
 
 
+def _is_legacy_hifigan_checkpoint(state_dict: dict) -> bool:
+    """v1.11.0 以前の HiFi-GAN ベース ckpt を検出する。
+
+    v1.12.0 で Decoder は MB-iSTFT-VITS2 に統一された。MB-iSTFT decoder は
+    ``model_g.dec.subband_conv_post.*`` または ``model_g.dec.pqmf.*`` を持つが、
+    HiFi-GAN decoder にはこれらが存在しない。decoder 系キーがあるのに
+    MB-iSTFT のマーカーが無い場合、HiFi-GAN ckpt とみなす。
+    """
+    has_decoder_keys = any(k.startswith("model_g.dec.") for k in state_dict)
+    has_mbistft_marker = any(
+        k.startswith("model_g.dec.subband_conv_post")
+        or k.startswith("model_g.dec.pqmf")
+        for k in state_dict
+    )
+    return has_decoder_keys and not has_mbistft_marker
+
+
+_LEGACY_HIFIGAN_MESSAGE = (
+    "Checkpoint {path!r} appears to be from v1.11.0 or earlier (HiFi-GAN Generator). "
+    "v1.12.0 unified the decoder to MB-iSTFT-VITS2, so HiFi-GAN ckpt files cannot be "
+    "resumed for training. Fine-tune from the new MB-iSTFT base model instead:\n"
+    "    https://huggingface.co/ayousanz/piper-plus-base/resolve/main/model.ckpt\n"
+    "See docs/migration/v1.11-to-v1.12.md for the full migration guide."
+)
+
+
 def calculate_effective_batch_size(batch_size, num_gpus=1):
     """Calculate effective batch size for multi-GPU training."""
     return batch_size * num_gpus
@@ -340,6 +366,8 @@ def load_multispeaker_checkpoint(checkpoint_path: str, model: VitsModel) -> None
         map_location="cpu",
         weights_only=False,
     )
+    if _is_legacy_hifigan_checkpoint(checkpoint["state_dict"]):
+        raise RuntimeError(_LEGACY_HIFIGAN_MESSAGE.format(path=str(checkpoint_path)))
     missing, unexpected = model.load_state_dict(checkpoint["state_dict"], strict=False)
     _LOGGER.info(
         "Weights loaded (strict=False). Missing keys: %s. Unexpected keys: %s.",
@@ -624,6 +652,12 @@ def main():
             checkpoint = torch.load(
                 args.resume_from_checkpoint, map_location="cpu", weights_only=False
             )
+            if _is_legacy_hifigan_checkpoint(checkpoint["state_dict"]):
+                raise RuntimeError(
+                    _LEGACY_HIFIGAN_MESSAGE.format(
+                        path=str(args.resume_from_checkpoint)
+                    )
+                )
             model.load_state_dict(checkpoint["state_dict"], strict=False)
 
             _LOGGER.info(
