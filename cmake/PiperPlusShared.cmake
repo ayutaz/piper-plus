@@ -151,6 +151,15 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
   endif()
 endif()
 
+# iOS: skip all install/EXPORT/pkg-config/CMakeConfig logic below.
+# Reasoning: the xcframework build flow (.github/workflows/release-shared-lib.yml,
+# Stage slice for xcframework assembly step) cp's libpiper_plus.a directly from
+# CMAKE_BINARY_DIR. SPM consumers (M4 Package.swift binaryTarget) resolve headers
+# via the xcframework's Headers/ + module.modulemap, not via CMake find_package.
+# Including the install(EXPORT) below on iOS would also fail because piper_plus
+# transitively depends on hts_engine_stub which is not in the export set.
+if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
+
 # Install targets
 include(GNUInstallDirs)
 install(TARGETS piper_plus
@@ -257,5 +266,7 @@ install(FILES
   ${CMAKE_CURRENT_BINARY_DIR}/PiperPlusConfigVersion.cmake
   DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/PiperPlus
 )
+
+endif() # NOT CMAKE_SYSTEM_NAME STREQUAL "iOS"
 
 endif() # PIPER_PLUS_BUILD_SHARED
