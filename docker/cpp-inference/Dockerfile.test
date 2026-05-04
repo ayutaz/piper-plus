@@ -1,7 +1,7 @@
 # Test Dockerfile for C++ unit tests
 # Builds with -DBUILD_TESTS=ON and runs ctest
 
-FROM ubuntu:22.04 AS builder
+FROM ubuntu:24.04 AS builder
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -48,7 +48,9 @@ RUN echo "=== BUILD ERRORS ===" && \
     grep -E "FAILED:|error:" /tmp/build.log 2>/dev/null || echo "No build errors found"
 
 # Create non-root user and transfer ownership of workspace
-RUN useradd -m -u 1000 piper && chown -R piper:piper /workspace
+# ubuntu:24.04 has a default 'ubuntu' user with UID 1000; remove it first to avoid collision
+RUN userdel -r ubuntu 2>/dev/null || true && \
+    useradd -m -u 1000 piper && chown -R piper:piper /workspace
 USER piper
 
 # Run tests - allow failure to see results

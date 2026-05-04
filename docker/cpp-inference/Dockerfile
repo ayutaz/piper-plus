@@ -1,7 +1,7 @@
 # Multi-stage build for C++ Inference Environment
 
 # Stage 1: Builder
-FROM ubuntu:22.04 AS builder
+FROM ubuntu:24.04 AS builder
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -53,7 +53,7 @@ RUN if [ ! -d /install/share/open_jtalk/dic ]; then \
     fi
 
 # Stage 2: Runtime (CPU only)
-FROM ubuntu:22.04
+FROM ubuntu:24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
@@ -90,7 +90,9 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD piper --version || exit 1
 
 # Run as non-root user for security
-RUN useradd -m -u 1000 piper && \
+# ubuntu:24.04 has a default 'ubuntu' user with UID 1000; remove it first to avoid collision
+RUN userdel -r ubuntu 2>/dev/null || true && \
+    useradd -m -u 1000 piper && \
     chown -R piper:piper /app
 USER piper
 

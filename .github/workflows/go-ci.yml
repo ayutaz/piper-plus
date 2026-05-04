@@ -26,7 +26,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-22.04, macos-latest, windows-latest]
+        os: [ubuntu-24.04, macos-latest, windows-latest]
     permissions:
       contents: read
     defaults:
@@ -50,7 +50,7 @@ jobs:
       - run: go test -v -race -count=1 ./... ./phonemize/...
 
   integration-test:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
       contents: read
@@ -89,7 +89,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-22.04
+          - os: ubuntu-24.04
             goos: linux
             goarch: amd64
             artifact: piper-plus-linux-amd64
@@ -127,7 +127,7 @@ jobs:
           retention-days: 14
 
   lint:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
       contents: read
@@ -145,7 +145,7 @@ jobs:
           working-directory: src/go
 
   docker-build:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     permissions:
       contents: read

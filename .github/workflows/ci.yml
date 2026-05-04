@@ -17,7 +17,7 @@ concurrency:
 
 jobs:
   changes:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       pull-requests: read
@@ -91,7 +91,7 @@ jobs:
     uses: ./.github/workflows/_build-test-cpp.yml
     with:
       run-integration-tests: true
-      os-matrix: '["ubuntu-22.04", "macos-latest", "windows-latest"]'
+      os-matrix: '["ubuntu-24.04", "macos-latest", "windows-latest"]'
       build-type-matrix: '["Release", "Debug"]'
       timeout-minutes: 25
 
@@ -103,7 +103,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-22.04, macos-latest, windows-latest]
+        os: [ubuntu-24.04, macos-latest, windows-latest]
     steps:
       - uses: actions/checkout@v6
 
@@ -153,10 +153,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-22.04
+          - os: ubuntu-24.04
             rid: linux-x64
             cross: false
-          - os: ubuntu-22.04
+          - os: ubuntu-24.04
             rid: linux-arm64
             cross: true
           - os: macos-14
@@ -217,7 +217,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-22.04]
+        os: [ubuntu-24.04]
         python-version: ['3.11']
         
     steps:
@@ -348,7 +348,7 @@ jobs:
   npm-package-tests:
     needs: [changes]
     if: ${{ needs.changes.outputs.wasm == 'true' || needs.changes.outputs.rust == 'true' || needs.changes.outputs.ci-config-wasm == 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     defaults:
       run:
@@ -400,7 +400,7 @@ jobs:
   lint:
     needs: [changes]
     if: ${{ needs.changes.outputs.python == 'true' || needs.changes.outputs.ci-config-python == 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
       - uses: actions/checkout@v6
@@ -437,7 +437,7 @@ jobs:
       - rust-tests
       - npm-package-tests
       - lint
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Check all job results
         run: |

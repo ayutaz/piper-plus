@@ -20,7 +20,7 @@ jobs:
   # Create Release
   create_release:
     name: Create Development Release
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       upload_url: ${{ steps.create_release.outputs.upload_url }}
       release_name: ${{ steps.get_release_name.outputs.name }}
@@ -215,7 +215,7 @@ jobs:
     if: |
       always() && 
       needs.build_all.result == 'success'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
 
@@ -262,7 +262,7 @@ jobs:
     if: |
       always() &&
       needs.publish_pypi.result == 'success'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
 
@@ -314,11 +314,11 @@ jobs:
             archive_ext: zip
             cross: true
           - rid: linux-x64
-            os: ubuntu-22.04
+            os: ubuntu-24.04
             archive_ext: tar.gz
             cross: false
           - rid: linux-arm64
-            os: ubuntu-22.04
+            os: ubuntu-24.04
             archive_ext: tar.gz
             cross: true
           - rid: osx-x64
@@ -379,7 +379,7 @@ jobs:
   publish_nuget:
     name: Publish to NuGet
     needs: create_release
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
 
@@ -417,7 +417,7 @@ jobs:
   publish_crates:
     name: Publish to crates.io
     needs: create_release
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
 
@@ -591,7 +591,7 @@ jobs:
   # Final summary
   release_summary:
     name: Release Summary
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: [create_release, build_all, publish_pypi, publish_pypi_stub, publish_nuget, publish_crates, csharp-cli, rust-cli]
     if: always()
     steps:
