@@ -50,18 +50,34 @@ endif()
 
 # ---- iOS cross-compilation support ----
 if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
-  message(STATUS "iOS cross-compilation: arch=${CMAKE_OSX_ARCHITECTURES}, target=${CMAKE_OSX_DEPLOYMENT_TARGET}")
-  # Propagate iOS settings to ExternalProject_Add calls
+  message(STATUS "iOS cross-compilation: sysroot=${CMAKE_OSX_SYSROOT}, arch=${CMAKE_OSX_ARCHITECTURES}, target=${CMAKE_OSX_DEPLOYMENT_TARGET}")
+  # Propagate iOS settings to ExternalProject_Add calls.
+  #
+  # CMAKE_OSX_SYSROOT is critical (issue #377): without it, ExternalProjects
+  # default to the iphoneos (device) SDK regardless of the parent's slice
+  # selection. When the simulator slice's main project (built with
+  # iphonesimulator) merges in the ExternalProject's static archive (built
+  # with iphoneos), `xcodebuild -create-xcframework` rejects the result with
+  # "binaries with multiple platforms are not supported".
+  #
+  # CMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY prevents try_compile from
+  # attempting to link an executable (which fails on iOS cross-compile because
+  # device-arch crt1.o cannot link against host crt1.o), and avoids silent
+  # feature-detection regressions inside the ExternalProject's CMake config.
   set(EXTERNAL_CMAKE_ARGS
     -DCMAKE_SYSTEM_NAME=iOS
+    -DCMAKE_OSX_SYSROOT=${CMAKE_OSX_SYSROOT}
     -DCMAKE_OSX_ARCHITECTURES=${CMAKE_OSX_ARCHITECTURES}
     -DCMAKE_OSX_DEPLOYMENT_TARGET=${CMAKE_OSX_DEPLOYMENT_TARGET}
     -DCMAKE_POSITION_INDEPENDENT_CODE=ON
+    -DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY
   )
 endif()
 
-# ARM64-specific optimizations (skip on Android/iOS -- their toolchains set own flags)
-if(NOT ANDROID AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS" AND CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|ARM64")
+# ARM64-specific optimizations (skip on Android/Apple-embedded -- their
+# toolchains set their own flags). PIPER_APPLE_EMBEDDED is defined in the
+# root CMakeLists.txt before this file is included.
+if(NOT ANDROID AND NOT PIPER_APPLE_EMBEDDED AND CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|ARM64")
   message(STATUS "Detected ARM64 architecture, enabling optimizations")
 
   # Enable NEON SIMD instructions

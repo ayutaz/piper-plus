@@ -157,6 +157,7 @@ nohup /data/piper/.venv/bin/python -m piper_train \
 | Go (Go module) | `github.com/ayutaz/piper-plus/src/go` | tag-based | 793 | `src/go/piperplus/`, `src/go/cmd/piper-plus/` |
 | JS/WASM (npm) | `piper-plus` | 0.6.0 | ~1200 + 56 (Rust) | `src/wasm/openjtalk-web/`, `src/rust/piper-wasm/` |
 | C API | `libpiper_plus` | shared lib | C/Dart/Godot サンプル | `src/cpp/piper_plus.{h,c_api.cpp}`, `cmake/PiperPlusShared.cmake` |
+| iOS xcframework + SPM | `piper-plus` (Swift Package) | 1.13.0+ (M4) | release-shared-lib CI | `Package.swift`, `Sources/PiperPlus/`, `cmake/PrivacyInfo.xcprivacy` |
 | 独立 G2P | `piper-plus-g2p` (Py/Rust)、`@piper-plus/g2p` (npm)、`src/go/phonemize` (Go) | 同上 | — | `src/{python/g2p,rust/piper-plus-g2p,wasm/g2p,go/phonemize}/` |
 
 **主な追加機能 (全ランタイム共通):** モデル名自動解決 (`--model tsukuyomi` でエイリアス + 自動 DL)、カスタム辞書 (JSON v1/v2 / TSV)、`[[ phoneme ]]` インライン音素記法 (C#/Python)、`--sentence-silence` / `--phoneme-silence` 制御、`--list-models` 言語フィルタ。
@@ -167,7 +168,7 @@ nohup /data/piper/.venv/bin/python -m piper_train \
 - **WebUI (Gradio)** (`docker/webui/app.py`) — 6lang モデル対応。CI: `webui-test.yml`。ドキュメント: `docs/features/webui.md`。
 - **Wyoming Docker + HA 統合** (`docker/wyoming/`) — Home Assistant 連携。ガイド: `docs/guides/home-assistant.md`。
 - **MOS ベンチマーク** (`tools/benchmark/`) — サンプル生成、PESQ/STOI 計算、調査フォーム生成。ドキュメント: `docs/benchmark-mos.md`。
-- **iOS/Android ビルド CI** (`release-shared-lib.yml`, `cmake/ios.toolchain.cmake`) — libpiper_plus を iOS arm64 / Android (arm64-v8a/armeabi-v7a/x86_64) でクロスコンパイル。
+- **iOS/Android ビルド CI** (`release-shared-lib.yml`, `cmake/ios.toolchain.cmake`) — libpiper_plus を iOS arm64 / Android (arm64-v8a/armeabi-v7a/x86_64) でクロスコンパイル。iOS は xcframework (device + simulator universal) として配信、`Package.swift` 経由で SPM 利用可能。Apple-embedded プラットフォーム検出は `PIPER_APPLE_EMBEDDED` 変数で集約 (CMakeLists.txt)、OpenJTalk 関数は `src/cpp/openjtalk_ios_stub.c` で stub 化。詳細: `docs/guides/ios-integration.md`、`docs/spec/ios-shared-lib.md`。
 - **モデル投稿ガイド** — `CONTRIBUTING_MODELS.md` + GitHub Issue テンプレート (`.github/ISSUE_TEMPLATE/model-{request,submission}.yml`)。
 
 ---

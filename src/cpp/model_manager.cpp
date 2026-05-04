@@ -254,6 +254,11 @@ static bool downloadFile(const std::string& url,
         }
     }
 
+    // Note: on Apple embedded platforms (iOS / tvOS / watchOS / visionOS),
+    // this entire translation unit is excluded from piper_common via
+    // cmake/PiperCommon.cmake (issue #377) — std::system() / popen() / fork()
+    // are unavailable in the App Sandbox. Apple-embedded consumers must
+    // pre-download models via URLSession and pass the local file path.
     std::string cmd;
 
 #ifdef _WIN32

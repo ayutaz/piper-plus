@@ -645,16 +645,17 @@ endif()
 add_test(NAME test_library_path COMMAND test_library_path)
 
 # ---- test_c_api: C API shared library unit tests ----
-# Compiles piper_plus_c_api.cpp directly with piper_common object library.
+# Compiles piper_plus_c_api.cpp directly with piper_common static library.
 # piper_plus_c_api.cpp wraps the full piper:: namespace, so it needs
 # the same dependencies as the streaming tests (onnxruntime, openjtalk, etc.).
+# (issue #377: piper_common is STATIC since iOS toolchain regression.)
 add_executable(test_c_api
     test_c_api.cpp
     ../piper_plus_c_api.cpp
-    $<TARGET_OBJECTS:piper_common>
 )
 
 target_link_libraries(test_c_api PRIVATE
+    piper_common
     gtest
     gtest_main
 )
@@ -730,15 +731,15 @@ add_test(NAME test_c_api COMMAND test_c_api)
 set_tests_properties(test_c_api PROPERTIES TIMEOUT 60)
 
 # ---- test_c_api_integration: C API integration tests (model required) ----
-# Links against the piper_plus shared library (or object lib for static build).
-# Uses piper_common objects for the full piper engine.
+# Links against the piper_plus shared library (or static lib for embedded build).
+# Uses piper_common static library for the full piper engine. (issue #377)
 add_executable(test_c_api_integration
     test_c_api_integration.cpp
     ../piper_plus_c_api.cpp
-    $<TARGET_OBJECTS:piper_common>
 )
 
 target_link_libraries(test_c_api_integration PRIVATE
+    piper_common
     gtest
     gtest_main
 )
@@ -817,10 +818,10 @@ set_tests_properties(test_c_api_integration PROPERTIES
 add_executable(test_c_api_audio_regression
     test_c_api_audio_regression.cpp
     ../piper_plus_c_api.cpp
-    $<TARGET_OBJECTS:piper_common>
 )
 
 target_link_libraries(test_c_api_audio_regression PRIVATE
+    piper_common
     gtest
     gtest_main
 )

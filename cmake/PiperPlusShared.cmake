@@ -5,18 +5,28 @@ option(PIPER_PLUS_BUILD_SHARED "Build piper-plus shared library (C API)" OFF)
 
 if(PIPER_PLUS_BUILD_SHARED)
 
-# iOS: build as static library (dylib not allowed on App Store)
-if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+# Apple embedded platforms (iOS / tvOS / watchOS / visionOS): build as static
+# archive — dylib not allowed by App Store distribution rules.
+if(PIPER_APPLE_EMBEDDED)
   add_library(piper_plus STATIC
     src/cpp/piper_plus_c_api.cpp
-    $<TARGET_OBJECTS:piper_common>
   )
 else()
   add_library(piper_plus SHARED
     src/cpp/piper_plus_c_api.cpp
-    $<TARGET_OBJECTS:piper_common>
   )
 endif()
+
+# Link the piper_common OBJECT library via target_link_libraries — the
+# CMake 3.12+ canonical API for OBJECT libraries. Passing
+# $<TARGET_OBJECTS:piper_common> in the `sources` argument of add_library
+# (the previous approach) appears to silently drop the .o files from the
+# resulting STATIC archive on iOS (Apple's `xcrun libtool -static` does not
+# consume generator-expression .o paths the same way `ld` does for SHARED
+# builds — issue #377). target_link_libraries propagates both the build
+# dependency AND the .o file membership into the consumer archive on every
+# platform, so use it uniformly for SHARED and STATIC.
+target_link_libraries(piper_plus PRIVATE piper_common)
 
 # Dependencies (same as piper/test_piper)
 add_dependencies(piper_plus fmt_external spdlog_external openjtalk_external hts_engine_stub)
@@ -69,8 +79,8 @@ if(WIN32)
     ${ONNXRUNTIME_LIB}
     ${OPENJTALK_DIR}/lib/openjtalk.lib
   )
-elseif(CMAKE_SYSTEM_NAME STREQUAL "iOS" AND DEFINED ONNXRUNTIME_LIB)
-  # iOS: link ONNX Runtime by explicit path (from xcframework extraction)
+elseif(PIPER_APPLE_EMBEDDED AND DEFINED ONNXRUNTIME_LIB)
+  # Apple embedded: link ONNX Runtime by explicit path (from xcframework extraction)
   target_link_libraries(piper_plus PRIVATE
     fmt
     spdlog
@@ -78,6 +88,19 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "iOS" AND DEFINED ONNXRUNTIME_LIB)
   )
   # Link OpenJTalk static library
   target_link_libraries(piper_plus PRIVATE ${OPENJTALK_DIR}/lib/libopenjtalk.a)
+
+  # Generate module.modulemap for xcframework Swift import support
+  # (M2 §11.7 繰り上げ採用 — issue #377)
+  # The map file is placed in CMAKE_BINARY_DIR and the assemble-xcframework CI
+  # job copies it into each slice's Headers/ directory inside the xcframework,
+  # enabling `import PiperPlus` from Swift via SPM binaryTarget consumption.
+  file(WRITE "${CMAKE_BINARY_DIR}/module.modulemap"
+"module PiperPlus {
+  umbrella header \"piper_plus.h\"
+  export *
+  module * { export * }
+}
+")
 elseif(ANDROID AND DEFINED ONNXRUNTIME_LIB)
   # Android: link ONNX Runtime by explicit path (from AAR extraction)
   target_link_libraries(piper_plus PRIVATE
@@ -109,16 +132,59 @@ elseif(UNIX AND NOT APPLE)
   target_link_libraries(piper_plus PRIVATE Threads::Threads dl)
 endif()
 
-# Visibility and output settings
-set_target_properties(piper_plus PROPERTIES
-  C_VISIBILITY_PRESET hidden
-  CXX_VISIBILITY_PRESET hidden
-  VISIBILITY_INLINES_HIDDEN ON
-  OUTPUT_NAME "piper_plus"
-)
+# ---- Apple embedded: merge dependency archives into libpiper_plus.a ----
+# Background (issue #377): on iOS, target_link_libraries records the
+# dependency graph but Apple's xcrun libtool only places piper_plus_c_api.o
+# into the resulting archive — consumer Xcode projects would need to link
+# libpiper_common.a + libopenjtalk.a + libhts_engine_stub.a separately, AND
+# CMake doesn't propagate transitive STATIC dependencies through the
+# xcframework boundary. To produce a single .a that consumer apps can link
+# straight from Frameworks/piper_plus.xcframework/.../libpiper_plus.a, we
+# post-process with `xcrun libtool -static` to merge all transitive STATIC
+# dependencies. Same pattern as sherpa-onnx / whisper.cpp.
+if(PIPER_APPLE_EMBEDDED)
+  add_custom_command(TARGET piper_plus POST_BUILD
+    # Step 1: rename libpiper_plus.a (currently containing only piper_plus_c_api.o)
+    #   to libpiper_plus_partial.a so we can rebuild the canonical name.
+    COMMAND ${CMAKE_COMMAND} -E rename
+      $<TARGET_FILE:piper_plus>
+      $<TARGET_FILE_DIR:piper_plus>/libpiper_plus_partial.a
+    # Step 2: combine partial + dependency archives into the final libpiper_plus.a.
+    #   -no_warning_for_no_symbols silences libtool's complaint about object
+    #   files with only file-static symbols (e.g., openjtalk_security.c).
+    COMMAND xcrun libtool -static -no_warning_for_no_symbols
+      -o $<TARGET_FILE:piper_plus>
+      $<TARGET_FILE_DIR:piper_plus>/libpiper_plus_partial.a
+      $<TARGET_FILE:piper_common>
+      $<TARGET_FILE:hts_engine_stub>
+      ${OPENJTALK_DIR}/lib/libopenjtalk.a
+    # Step 3: clean up the partial archive.
+    COMMAND ${CMAKE_COMMAND} -E remove
+      $<TARGET_FILE_DIR:piper_plus>/libpiper_plus_partial.a
+    VERBATIM
+    COMMENT "Merging libpiper_common.a + libopenjtalk.a + libhts_engine_stub.a into libpiper_plus.a (iOS unified archive)"
+  )
+endif()
 
-# iOS static library: no VERSION/SOVERSION/RPATH needed
-if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
+# Output name is universal.
+set_target_properties(piper_plus PROPERTIES OUTPUT_NAME "piper_plus")
+
+# Visibility (hidden) only applies meaningfully to SHARED / dynamic libraries
+# where it controls the dynamic export table. On STATIC archives (Apple iOS),
+# archive symbol tables don't honor visibility — and applying hidden visibility
+# while libtool consolidates the archive can silently drop cross-TU references
+# (e.g., piper_common's piper:: namespace symbols referenced from
+# piper_plus_c_api.cpp). Apply only on SHARED-targeting platforms.
+if(NOT PIPER_APPLE_EMBEDDED)
+  set_target_properties(piper_plus PROPERTIES
+    C_VISIBILITY_PRESET hidden
+    CXX_VISIBILITY_PRESET hidden
+    VISIBILITY_INLINES_HIDDEN ON
+  )
+endif()
+
+# Apple embedded static archive: no VERSION/SOVERSION/RPATH needed
+if(NOT PIPER_APPLE_EMBEDDED)
   set_target_properties(piper_plus PROPERTIES
     VERSION ${piper_version}
     SOVERSION 1
@@ -138,6 +204,16 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
   endif()
 endif()
 
+# Apple embedded (iOS/tvOS/watchOS/visionOS): skip all install/EXPORT/pkg-config/
+# CMakeConfig logic below. Reasoning: the xcframework build flow
+# (.github/workflows/release-shared-lib.yml, Stage slice for xcframework assembly
+# step) cp's libpiper_plus.a directly from CMAKE_BINARY_DIR. SPM consumers
+# (M4 Package.swift binaryTarget) resolve headers via the xcframework's
+# Headers/ + module.modulemap, not via CMake find_package. Including the
+# install(EXPORT) below on Apple embedded would also fail because piper_plus
+# transitively depends on hts_engine_stub which is not in the export set.
+if(NOT PIPER_APPLE_EMBEDDED)
+
 # Install targets
 include(GNUInstallDirs)
 install(TARGETS piper_plus
@@ -151,8 +227,8 @@ install(FILES src/cpp/piper_plus.h
 )
 
 # --- ONNX Runtime shared library install ---
-# Skip for iOS/Android (ONNX Runtime is linked statically or bundled separately)
-if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS" AND NOT ANDROID)
+# Skip for Apple embedded / Android (ORT is linked from xcframework / .aar bundle)
+if(NOT PIPER_APPLE_EMBEDDED AND NOT ANDROID)
   if(WIN32)
     # Windows: copy DLLs to bin/
     file(GLOB _ort_dlls "${ONNXRUNTIME_DIR}/lib/*.dll")
@@ -244,5 +320,7 @@ install(FILES
   ${CMAKE_CURRENT_BINARY_DIR}/PiperPlusConfigVersion.cmake
   DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/PiperPlus
 )
+
+endif() # NOT PIPER_APPLE_EMBEDDED
 
 endif() # PIPER_PLUS_BUILD_SHARED

@@ -16,7 +16,7 @@ so that version drift can be detected early.
 | C#       | 1.24.3      | `Microsoft.ML.OnnxRuntime` (NuGet) |
 | Go       | 1.27.0      | `github.com/yalue/onnxruntime_go` |
 | C++      | 1.17.0      | source build via CMake |
-| iOS      | 1.17.0      | xcframework (GitHub Releases) |
+| iOS      | 1.17.0      | xcframework (Microsoft CDN: `download.onnxruntime.ai/pod-archive-onnxruntime-c-1.17.0.zip`, sha256 `1623e1150507d9e5...db871`, 検証日 2026-05-04) |
 | Android (release) | 1.17.0 | AAR (Maven Central) |
 | Android (PR CI)   | 1.17.0 | AAR (Maven Central) |
 | JS/WASM  | >=1.21.0    | `onnxruntime-web` (npm, peerDependency) |

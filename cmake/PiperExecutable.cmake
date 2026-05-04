@@ -5,10 +5,13 @@
 # AFTER ExternalDeps.cmake and OnnxRuntime.cmake are included. See the
 # piper/test_piper configuration block in the root CMakeLists.txt.
 
-# Skip standalone executables on Android/iOS (only library is built)
-if(NOT ANDROID AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
-  add_executable(piper src/cpp/main.cpp $<TARGET_OBJECTS:piper_common>)
-  add_executable(test_piper src/cpp/test.cpp $<TARGET_OBJECTS:piper_common>)
+# Skip standalone executables on Android / Apple-embedded (only library is built)
+if(NOT ANDROID AND NOT PIPER_APPLE_EMBEDDED)
+  add_executable(piper src/cpp/main.cpp)
+  add_executable(test_piper src/cpp/test.cpp)
+  # Link the piper_common STATIC library (was OBJECT before issue #377 fix).
+  target_link_libraries(piper PRIVATE piper_common)
+  target_link_libraries(test_piper PRIVATE piper_common)
 endif()
 
 # Link pthread and libdl on Linux (libdl needed for dladdr in library_path.c)

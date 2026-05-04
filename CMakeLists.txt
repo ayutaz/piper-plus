@@ -16,6 +16,20 @@ string(STRIP "${piper_version}" piper_version)
 
 option(USE_CUDA "Enable CUDA support for GPU acceleration" OFF)
 
+# Detect Apple "embedded" / sandboxed platforms (iOS / iPadOS / tvOS / watchOS
+# / visionOS) where std::system / popen / fork are unavailable in the App
+# Sandbox. Used throughout the cmake/ tree to exclude the desktop-only
+# OpenJTalk / model-manager pipeline and toggle install / EXPORT generation.
+# Mac Catalyst (CMAKE_SYSTEM_NAME == "Darwin" with iOS deployment target) is
+# NOT covered here — Catalyst projects can spawn helper tools, so they take
+# the desktop path. Future Catalyst-specific issues should be handled
+# separately.
+if(CMAKE_SYSTEM_NAME MATCHES "^(iOS|tvOS|watchOS|visionOS)$")
+  set(PIPER_APPLE_EMBEDDED ON)
+else()
+  set(PIPER_APPLE_EMBEDDED OFF)
+endif()
+
 # ==== Compiler flags, C/C++ standards, Android/ARM64 settings ====
 include(cmake/CompilerSettings.cmake)
 
@@ -61,7 +75,7 @@ include(cmake/PiperLink.cmake)
 include(cmake/PiperPlusShared.cmake)
 
 # ==== Add test subdirectory (after all ExternalProject targets are defined) ====
-if(BUILD_TESTS AND NOT ANDROID AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
+if(BUILD_TESTS AND NOT ANDROID AND NOT PIPER_APPLE_EMBEDDED)
   if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/cpp/tests")
     add_subdirectory(src/cpp/tests)
   endif()
