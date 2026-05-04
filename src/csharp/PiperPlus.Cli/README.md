@@ -13,7 +13,7 @@
 dotnet tool install -g PiperPlus.Cli
 ```
 
-Requires the [.NET 9 runtime](https://dotnet.microsoft.com/download). The installed binary is named `piper-plus`.
+Requires the [.NET 10 runtime](https://dotnet.microsoft.com/download). The installed binary is named `piper-plus`.
 
 ## Quick start
 

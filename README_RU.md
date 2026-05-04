@@ -43,7 +43,7 @@
 ### Обучение
 
 - **WavLM Discriminator** — улучшение MOS на +0.15–0.25 (включён по умолчанию, используется только при обучении)
-- **MB-iSTFT-VITS2 (`--mb-istft`)** — Замена декодера HiFi-GAN на MB-iSTFT + PQMF для CPU-инференса ~2.21x быстрее (только medium качество, ONNX-совместимо)
+- **MB-iSTFT-VITS2 Decoder** — Декодер унифицирован на MB-iSTFT + PQMF, CPU-инференс ~2.21x быстрее. Совместимо с ONNX и существующими runtime
 - **FP16 Mixed Precision** — ускорение обучения в 2–3 раза, сокращение памяти ~50% (включено по умолчанию)
 - **EMA** — Exponential Moving Average для стабилизации обучения (включено по умолчанию)
 - **Мульти-GPU** — поддержка DDP, автоматическое масштабирование скорости обучения
@@ -58,7 +58,7 @@
 - **[WebAssembly](src/wasm/openjtalk-web/README.npm.md)** — полная работа в браузере, **вывод Phoneme Timing (JSON/TSV/SRT)**, сервер не требуется
 - **[Docker](docker/README.md)** — 5 образов: вывод, обучение, WebUI, C++
 - **PyPI** — `pip install piper-plus`, 8 языков мультиязычно, **вывод Phoneme Timing (JSON/TSV/SRT)**, потоковый вывод, **HTTP API на основе FastAPI**
-- **C# CLI** — кроссплатформенный .NET 8/9, 8 языков, ONNX-инференс, **вывод Phoneme Timing (JSON/TSV/SRT)**
+- **C# CLI** — кроссплатформенный .NET 10, 8 языков, ONNX-инференс, **вывод Phoneme Timing (JSON/TSV/SRT)**
 - **Rust CLI** — piper-plus/piper-plus-cli, потоковый вывод, CUDA/CoreML/DirectML, **вывод Phoneme Timing (JSON/TSV/SRT)**, автозагрузка словарей
 - **[Go CLI](src/go/README.md)** — HTTP API-сервер, пулинг сессий, Docker, единый бинарник, **вывод Phoneme Timing (JSON/TSV/SRT)**
 - **Voice Cloning (Speaker Encoder + speaker_embedding)** — поддерживается во всех 6 рантаймах (Python/Rust/C#/Go/WASM/C++)
@@ -78,7 +78,7 @@
 | Windows | x64 | Полная поддержка |
 | C API (FFI) | Linux x64/ARM64, macOS ARM64, Windows x64 | Разделяемая библиотека, Android AAR |
 | Web | WebAssembly | Chrome/Edge/Firefox/Safari |
-| C# (.NET) | x64 / ARM64 | .NET 8/9, Linux/macOS/Windows |
+| C# (.NET) | x64 / ARM64 | .NET 10, Linux/macOS/Windows |
 | Rust | x64 | Linux x64, macOS ARM64, Windows x64 |
 | Go | x64 | Linux x64, macOS ARM64, Windows x64 |
 
@@ -290,7 +290,7 @@ dotnet add package PiperPlus.Core
 **Rust библиотека (crates.io):**
 ```toml
 [dependencies]
-piper-plus = "0.2.0"
+piper-plus = "0.3"
 ```
 
 ### Сборка из исходников (C++)
@@ -318,7 +318,7 @@ dotnet build src/csharp/PiperPlus.sln -c Release
 dotnet test src/csharp/PiperPlus.Core.Tests/
 ```
 
-Требования: .NET 8 SDK или новее
+Требования: .NET 10 SDK или новее
 
 #### Примеры использования C# CLI
 
@@ -702,10 +702,9 @@ xattr -cr piper/
 
 ### Windows
 
-Требуется каталог espeak-ng-data. Подробности см. в [руководстве по настройке для Windows](docs/getting-started/windows-setup.md).
+Поддерживаются x64 / arm64. Словарь OpenJTalk загружается автоматически при первом запуске. Подробности см. в [руководстве по настройке для Windows](docs/getting-started/windows-setup.md).
 
 ```cmd
-set ESPEAK_DATA_PATH=C:\path\to\espeak-ng-data
 piper.exe --model en_US-lessac-medium.onnx -f output.wav
 ```
 

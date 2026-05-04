@@ -167,7 +167,7 @@ curl "http://localhost:5000/api/phoneme-timing?text=Hello&language=en&format=jso
 
 - **[C++ CLI](https://github.com/ayutaz/piper-plus/releases)** — ストリーミング、CUDA推論、カスタム辞書
 - **[Rust CLI](https://github.com/ayutaz/piper-plus/tree/dev/src/rust)** — ストリーミング、CUDA/CoreML/DirectML対応
-- **[C# CLI (.NET)](https://github.com/ayutaz/piper-plus/tree/dev/src/csharp)** — クロスプラットフォーム .NET 8/9
+- **[C# CLI (.NET)](https://github.com/ayutaz/piper-plus/tree/dev/src/csharp)** — クロスプラットフォーム .NET 10
 - **[WebAssembly](https://ayutaz.github.io/piper-plus/)** — ブラウザ内で完全動作
 - **[Docker](https://github.com/ayutaz/piper-plus/tree/dev/docker)** — 推論・学習・WebUI イメージ
 

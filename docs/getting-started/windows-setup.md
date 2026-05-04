@@ -157,7 +157,7 @@ New-Item -ItemType Directory -Path $dictPath -Force
 
 C++ ビルドの代わりに C# CLI を使用する場合:
 
-1. **.NET 9 SDK** のインストール: https://dotnet.microsoft.com/download/dotnet/9.0
+1. **.NET 10 SDK** のインストール: https://dotnet.microsoft.com/download/dotnet/10.0
 2. ビルド:
 ```powershell
 dotnet build src\csharp\PiperPlus.sln -c Release

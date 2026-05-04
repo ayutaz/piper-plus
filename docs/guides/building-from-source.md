@@ -27,7 +27,7 @@ dotnet build src/csharp/PiperPlus.sln -c Release
 dotnet test src/csharp/PiperPlus.Core.Tests/
 ```
 
-Prerequisites: .NET 8 SDK or later
+Prerequisites: .NET 10 SDK or later
 
 #### C# CLI Usage Examples
 

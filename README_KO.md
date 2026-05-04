@@ -43,7 +43,7 @@
 ### 학습
 
 - **WavLM 판별기** — MOS +0.15-0.25 향상 (기본 활성화, 학습 시에만 사용)
-- **MB-iSTFT-VITS2 (`--mb-istft`)** — HiFi-GAN 디코더를 MB-iSTFT + PQMF로 교체, CPU 추론 약 2.21배 가속 (medium 품질 전용, ONNX 호환)
+- **MB-iSTFT-VITS2 디코더** — 디코더를 MB-iSTFT + PQMF로 통합, CPU 추론 약 2.21배 가속. 기존 런타임과 ONNX 호환
 - **FP16 혼합 정밀도** — 학습 속도 2-3배, 메모리 약 50% 절감 (기본 활성화)
 - **EMA** — Exponential Moving Average를 통한 학습 안정성 향상 (기본 활성화)
 - **다중 GPU** — DDP 지원, 자동 학습률 스케일링
@@ -58,7 +58,7 @@
 - **[WebAssembly](src/wasm/openjtalk-web/README.npm.md)** — 브라우저 내에서 완전 동작, **Phoneme Timing 출력 (JSON/TSV/SRT)**, 서버 불필요
 - **[Docker](docker/README.md)** — 추론, 학습, WebUI, C++ 등 5개 이미지 제공
 - **PyPI** — `pip install piper-plus`, 8개 언어 다중 언어, **Phoneme Timing 출력 (JSON/TSV/SRT)**, 스트리밍, **FastAPI 기반 HTTP API**
-- **C# CLI** — .NET 8/9 크로스 플랫폼, 8개 언어 다중 언어, ONNX 추론, **Phoneme Timing 출력 (JSON/TSV/SRT)**
+- **C# CLI** — .NET 10 크로스 플랫폼, 8개 언어 다중 언어, ONNX 추론, **Phoneme Timing 출력 (JSON/TSV/SRT)**
 - **Rust CLI** — piper-plus/piper-plus-cli, 스트리밍, CUDA/CoreML/DirectML 지원, **Phoneme Timing 출력 (JSON/TSV/SRT)**, 사전 자동 다운로드
 - **[Go CLI](src/go/README.md)** — HTTP API 서버, 세션 풀링, Docker 지원, 단일 바이너리, **Phoneme Timing 출력 (JSON/TSV/SRT)**
 - **Voice Cloning (Speaker Encoder + speaker_embedding)** — 6개 런타임 (Python/Rust/C#/Go/WASM/C++) 모두 지원
@@ -78,7 +78,7 @@
 | Windows | x64 | 전체 지원 |
 | C API (FFI) | Linux x64/ARM64, macOS ARM64, Windows x64 | 공유 라이브러리, Android AAR |
 | Web | WebAssembly | Chrome/Edge/Firefox/Safari |
-| C# (.NET) | x64 / ARM64 | .NET 8/9, Linux/macOS/Windows |
+| C# (.NET) | x64 / ARM64 | .NET 10, Linux/macOS/Windows |
 | Rust | Linux x64, macOS ARM64, Windows x64 | CUDA/CoreML/DirectML |
 | Go | Linux x64, macOS ARM64, Windows x64 | HTTP API, Docker |
 
@@ -290,7 +290,7 @@ dotnet add package PiperPlus.Core
 **Rust 라이브러리 (crates.io):**
 ```toml
 [dependencies]
-piper-plus = "0.2.0"
+piper-plus = "0.3"
 ```
 
 ### 소스에서 빌드 (C++)
@@ -318,7 +318,7 @@ dotnet build src/csharp/PiperPlus.sln -c Release
 dotnet test src/csharp/PiperPlus.Core.Tests/
 ```
 
-필수 요건: .NET 8 SDK 이상
+필수 요건: .NET 10 SDK 이상
 
 #### C# CLI 사용 예시
 
@@ -702,10 +702,9 @@ xattr -cr piper/
 
 ### Windows
 
-espeak-ng-data 디렉터리가 필요합니다. 자세한 내용은 [Windows 설정 가이드](docs/getting-started/windows-setup.md)를 참조하세요.
+x64 / arm64이 지원됩니다. OpenJTalk 사전은 첫 실행 시 자동으로 다운로드됩니다. 자세한 내용은 [Windows 설정 가이드](docs/getting-started/windows-setup.md)를 참조하세요.
 
 ```cmd
-set ESPEAK_DATA_PATH=C:\path\to\espeak-ng-data
 piper.exe --model en_US-lessac-medium.onnx -f output.wav
 ```
 

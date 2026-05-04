@@ -237,15 +237,15 @@ Look for issues labeled [`good first issue`](https://github.com/ayutaz/piper-plu
 
 ## Package Versioning Policy
 
-piper-plus ships **as several independent packages**, each released and versioned on its own schedule. There is **no single project-wide version number** — the value displayed in the README header (e.g. "v1.11.0") tracks the **PyPI** package only.
+piper-plus ships **as several independent packages**, each released and versioned on its own schedule. There is **no single project-wide version number** — the value displayed in the README header (e.g. "v1.12.0") tracks the **PyPI** package only.
 
 | Package | Registry | Source | Tag prefix | Versioning |
 |---|---|---|---|---|
-| `piper-plus` (Python TTS) | PyPI | `src/python/`, `src/python_run/` | `v<X.Y.Z>` (e.g. `v1.11.0`) | SemVer |
+| `piper-plus` (Python TTS) | PyPI | `src/python/`, `src/python_run/` | `v<X.Y.Z>` (e.g. `v1.12.0`) | SemVer |
 | `piper-plus-g2p` (Python G2P) | PyPI | `src/python/g2p/` | `g2p-py-v<X.Y.Z>` | SemVer |
 | `piper-plus-cli` / `piper-plus` (Rust crate) | crates.io | `src/rust/` | `rust-v<X.Y.Z>` | SemVer |
 | `PiperPlus.Core` / `PiperPlus.Cli` (NuGet) | NuGet | `src/csharp/` | `csharp-v<X.Y.Z>` | SemVer |
-| `piper-plus` (npm) | npm | `src/wasm/openjtalk-web/` | `npm-v<X.Y.Z>` (e.g. `npm-v0.3.1`) | SemVer |
+| `piper-plus` (npm) | npm | `src/wasm/openjtalk-web/` | `npm-v<X.Y.Z>` (e.g. `npm-v0.5.0`) | SemVer |
 | `@piper-plus/g2p` (npm) | npm | `src/wasm/g2p/` | `g2p-v<X.Y.Z>` (e.g. `g2p-v0.3.0`) | SemVer |
 | `github.com/ayutaz/piper-plus/src/go` | Go module | `src/go/` | (none — uses commit SHA via `go get`) | Go module versioning |
 | C API shared library (`libpiper_plus`) | GitHub Releases | `src/cpp/` | `shared-lib-v<X.Y.Z>` | SemVer |

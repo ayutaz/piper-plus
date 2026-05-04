@@ -93,9 +93,9 @@ curl -X POST 'http://localhost:5000/api/phoneme-timing?language=ja&format=json' 
 `200 OK` で JSON または TSV を返します。モデルが duration 出力を持たない場合は
 `400 Bad Request` (`{"error": "Model does not support duration output"}`) を返します。
 
-## Flask 版からの移行
+## v1.11 以前 (Flask) からの互換性
 
-旧 Flask 版と URL / クエリパラメータは互換です:
+v1.12.0 で HTTP サーバーは Flask から FastAPI に移行しましたが、URL / クエリパラメータは互換です:
 
 - `GET/POST /` で WAV を返す挙動は変更なし
 - `/api/phoneme-timing` のレスポンス形状も同一

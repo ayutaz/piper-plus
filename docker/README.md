@@ -248,7 +248,7 @@ docker run -p 7860:7860 \
 
 ## C++ 推論
 
-C++ バイナリ (`piper`) による CPU 推論環境です。CMake ExternalProject で全依存関係（piper-phonemize, espeak-ng, OpenJTalk, ONNX Runtime 等）を自動ビルドし、ランタイムステージにコピーする multi-stage ビルドです。GPU は不要で、CPU のみで高速に推論を実行できます。
+C++ バイナリ (`piper`) による CPU 推論環境です。CMake ExternalProject で必要な依存関係（ONNX Runtime と OpenJTalk のみ、espeak-ng 不使用）を自動ビルドし、ランタイムステージにコピーする multi-stage ビルドです。GPU は不要で、CPU のみで高速に推論を実行できます。
 
 ### ビルド
 
