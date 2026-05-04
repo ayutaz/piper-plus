@@ -874,7 +874,7 @@ M2 で xcframework.zip 配布が確立した前提で、M4 では:
 - **artifact 数の増加**: M1 で 5 個 → M2 で 7 個 (slice artifact x2、xcframework.zip x1 追加)。Actions Artifacts の保持期間 90 日には影響なし
 - **GitHub Releases サイズ**: M2 後の v1.13.0 リリースで iOS 関連は tar.gz (~35MB) + xcframework.zip (~6〜10MB) = ~45MB。リリースあたり許容範囲内
 - **csukuangfj/onnxruntime-libs ミラー**: M1 §9 C1 で温存した CDN 失効時のフォールバックは M2 でも実装せず。M2 完了後の運用課題として、CDN HEAD 200 監視を週次 cron で導入するかを別 issue で検討
-- **iOS 利用者観測 (M1 §11.5 永遠負債の継承)**: M2 完了後、`download metrics` 取得・Issue 受信頻度・Discord 言及の集計を M3 以降で開始。6 ヶ月以内に M1 §11.9 で示された案 X (ORT ソースビルド) / 案 Z (iOS 廃止) の判断を下す
+- **iOS 利用者観測 (M1 §11.5 永遠負債の継承)**: M2 完了後、`download metrics` 取得・Issue 受信頻度・Discord 言及の集計を M3 で開始。**M3 完了 PR マージ日を起点として 6 ヶ月以内** に M1 §11.9 で示された案 X (ORT ソースビルド) / 案 Z (iOS 廃止) の判断を下す (起点規約は `docs/tickets/README.md §利用者観測タイムライン` で統一管理)
 
 ### 12.4 マージ後アクション
 
