@@ -1,9 +1,9 @@
 # iOS Shared Library Distribution Specification
 
-> **Version:** 1.1 (Proposed, 道 A 確定)
-> **Status:** Proposed — branch `fix/ios-shared-lib-build-377` で M1→M2→M3→M4 を順次実装 (道 A、Claude Code 実行ベース)
+> **Version:** 1.1
+> **Status:** Implemented (v1.13.0) — `fix/ios-shared-lib-build-377` で M1→M2→M3 完了、M4 (Package.swift 案 X) 同ブランチに含む
 > **対象 Issue:** [#377](https://github.com/ayutaz/piper-plus/issues/377)
-> **対象ファイル:** `.github/workflows/release-shared-lib.yml`, `cmake/ios.toolchain.cmake`, `cmake/PiperPlusShared.cmake`, `Package.swift` (M4 で新規)
+> **対象ファイル:** `.github/workflows/release-shared-lib.yml`, `cmake/ios.toolchain.cmake`, `cmake/PiperPlusShared.cmake`, `cmake/PrivacyInfo.xcprivacy`, `Package.swift` (M4)
 > **進捗 Single Source of Truth:** [`docs/tickets/README.md`](../tickets/README.md) の表
 
 ---

@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+#### iOS shared-lib を xcframework として配布開始 (Issue #377)
+
+iOS 利用シナリオ (Dart FFI / Godot / Swift / SPM) に対応する xcframework 配布を成立させた。device (arm64) + simulator (arm64+x86_64 universal) の両 slice を含み、Swift `import PiperPlus` を可能にする `module.modulemap` および iOS 17+ App Store 提出に必要な空 `PrivacyInfo.xcprivacy` を同梱。
+
+- 新 artifact: `libpiper_plus-ios-${VERSION}.xcframework.zip` (device + simulator slices)
+- ONNX Runtime は別途取得 (CocoaPods `pod 'onnxruntime-c'` / SPM `microsoft/onnxruntime-swift-package-manager` / CDN `download.onnxruntime.ai`)
+- 利用者ガイド: [`docs/guides/ios-integration.md`](docs/guides/ios-integration.md) (Dart / Godot / Swift 横断)
+- Swift プロジェクト向け暫定手順: [`examples/swift/README.md`](examples/swift/README.md)
+
+#### iOS shared-lib 取得経路を Microsoft 公式 CDN に切替 (Issue #377)
+
+ONNX Runtime の旧 GitHub Releases zip は Microsoft が配布チャネルを CocoaPods/SPM/CDN に一本化したため削除されており、v1.11.0 以降 `Build iOS arm64` ジョブが連続失敗していた。**release ジョブの巻き添えで Linux/Windows/macOS/Android shared-lib も Releases に上がっていなかった問題を解消**。
+
+- curl URL を `https://download.onnxruntime.ai/pod-archive-onnxruntime-c-${VERSION}.zip` に変更
+- sha256 検証ステップ追加 (1.17.0 = `1623e1150507d9e5...db871`)
+- CDN zip は Mach-O dylib のみで static `.a` 不在のため、利用者は `Embed & Sign Frameworks` で組込
+
+### Deprecated
+
+#### `libpiper_plus-ios-arm64-${VERSION}.tar.gz` (device-only、`.framework` 同梱 tar.gz)
+
+- v1.13.0 では新 xcframework.zip と並行配布 (移行期間)
+- **v1.14.0 で削除予定** — `libpiper_plus-ios-${VERSION}.xcframework.zip` への移行を推奨
+
+### Fixed
+
+- iOS / Linux / Windows / macOS / Android shared-lib リリースパイプラインを復旧 (Issue #377、v1.11.0 以降の停止)
+  - `release` ジョブの `needs:` が `build-ios` 失敗で全 OS artifact のアップロードを止めていた
+
 ## [1.12.0] - 2026-05-04
 
 ### Changed (Breaking)

@@ -196,7 +196,7 @@ examples/godot/
 | Custom dictionary | Requires source changes | `piper_plus_load_custom_dict()` via C API |
 | Streaming synthesis | Custom implementation | `piper_plus_synth_start/next()` via C API |
 | Thread safety | Varies | Documented: one engine per thread |
-| Platforms | Linux, Windows, macOS | Linux, Windows, macOS |
+| Platforms | Linux, Windows, macOS | Linux, Windows, macOS, **iOS (xcframework, v1.13.0+)** |
 
 ## Platform Notes
 
@@ -217,6 +217,48 @@ export DYLD_LIBRARY_PATH=/usr/local/lib:$DYLD_LIBRARY_PATH
 ### Windows
 
 Place `piper_plus.dll` and `onnxruntime.dll` in the same directory as the Godot executable or the exported game executable.
+
+### iOS (v1.13.0+)
+
+- **Architecture**: arm64 (device) + arm64/x86_64 (simulator universal)
+- **Status**: Stable
+- **Distribution**: `libpiper_plus-ios-${VERSION}.xcframework.zip` (Mach-O static archive, modulemap + empty PrivacyInfo bundled)
+- **ORT bundling**: separate — consumer must obtain `onnxruntime.xcframework` via CocoaPods, SPM, or [Microsoft CDN](https://download.onnxruntime.ai/)
+
+#### GDExtension descriptor (`piper_tts.gdextension`)
+
+```ini
+[libraries]
+ios.debug   = "res://addons/piper-plus/ios/piper_plus.xcframework"
+ios.release = "res://addons/piper-plus/ios/piper_plus.xcframework"
+
+[dependencies]
+ios.debug   = {"res://addons/piper-plus/ios/onnxruntime.xcframework" : ""}
+ios.release = {"res://addons/piper-plus/ios/onnxruntime.xcframework" : ""}
+```
+
+The `ios.dependencies` entry instructs Godot's iOS exporter to embed `onnxruntime.xcframework` automatically — no manual `Embed & Sign Frameworks` step required from the consumer.
+
+#### Setup
+
+```bash
+# Place inside your Godot project
+mkdir -p addons/piper-plus/ios
+gh release download v1.13.0 -p 'libpiper_plus-ios-*.xcframework.zip' \
+  -O addons/piper-plus/ios/libpiper_plus-ios.xcframework.zip
+unzip addons/piper-plus/ios/libpiper_plus-ios.xcframework.zip \
+  -d addons/piper-plus/ios/
+
+# ORT (CDN option, see ios-integration.md for CocoaPods/SPM alternatives)
+curl -LO https://download.onnxruntime.ai/pod-archive-onnxruntime-c-1.17.0.zip
+unzip pod-archive-onnxruntime-c-1.17.0.zip -d addons/piper-plus/ios/
+```
+
+For the cross-runtime guide (Dart / Godot / Swift) see [`docs/guides/ios-integration.md`](../../docs/guides/ios-integration.md).
+
+#### Note: App Extension / App Clip not supported
+
+piper-plus + ORT is ~35MB (compressed slice). iOS App Extension uncompressed slice limit is 32 MB and App Clip is 10 MB — piper-plus cannot fit inside either. Targeting full iOS apps only.
 
 ## Thread Safety
 

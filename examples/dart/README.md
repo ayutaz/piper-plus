@@ -110,10 +110,120 @@ tts.dispose();
   In a Flutter app, run synthesis in a separate `Isolate` to avoid blocking the
   UI thread. The streaming example uses `scheduleMicrotask` for simplicity.
 - **Library path**: On Android, the `.so` is typically bundled via the AAR in
-  `jniLibs/`. On iOS, use a framework or embed the `.dylib`. See [M5-20](../../docs/tickets/M5-20-android-aar.md) for Android packaging.
+  `jniLibs/`. On iOS, use the **xcframework** approach described in [iOS Integration](#ios-integration) below. See [M5-20](../../docs/tickets/M5-20-android-aar.md) for Android packaging.
 - **Native assets**: Dart's native assets RFC is experimental as of 2026. This
   example uses `DynamicLibrary.open()` with explicit paths. Once native assets
   stabilize, consider migrating to declarative native dependencies.
+
+## iOS Integration
+
+> **For the full cross-runtime guide (Dart / Godot / Swift), see [`docs/guides/ios-integration.md`](../../docs/guides/ios-integration.md).** This section is the Dart-specific quick reference.
+
+### Prerequisites
+
+- **Xcode** 15+ (Xcode 16 recommended)
+- **iOS Deployment Target** 15.0+
+- **Apple Silicon Mac** for development (Intel Macs work via the simulator universal slice)
+
+### Distribution selection (v1.13.0)
+
+| Your situation | Recommended artifact | Why |
+|----------------|---------------------|-----|
+| Flutter / Dart FFI for iOS | **`libpiper_plus-ios-${VERSION}.xcframework.zip`** | Xcode treats xcframework as first-class, supports both device and simulator |
+| Existing CMake project (v1.12.0 or earlier) | `libpiper_plus-ios-arm64-${VERSION}.tar.gz` (device-only, deprecated) | v1.13.0 transitional; **will be removed in v1.14.0** |
+
+> **Don't know which?** Choose the **xcframework.zip** — it's the supported path going forward.
+
+### Step 1: Download piper-plus xcframework
+
+```bash
+gh release download v1.13.0 -p 'libpiper_plus-ios-*.xcframework.zip'
+unzip libpiper_plus-ios-*.xcframework.zip
+# Result: piper_plus.xcframework/
+#   ├── Info.plist
+#   ├── PrivacyInfo.xcprivacy        (empty Privacy Manifest)
+#   ├── ios-arm64/
+#   │   ├── libpiper_plus.a
+#   │   └── Headers/
+#   │       ├── piper_plus.h
+#   │       └── module.modulemap     (for Swift `import PiperPlus`)
+#   └── ios-arm64_x86_64-simulator/
+#       └── (same structure)
+```
+
+### Step 2: Download ONNX Runtime xcframework (3 options)
+
+ORT is **not** bundled with `piper_plus.xcframework` — the consumer chooses how to obtain it.
+
+#### Option A: CocoaPods (recommended for existing Podfiles)
+
+```ruby
+# ios/Podfile
+pod 'onnxruntime-c', '1.17.0'
+```
+
+```bash
+cd ios && pod install
+```
+
+#### Option B: Swift Package Manager (recommended for pure SPM projects)
+
+```swift
+// Package.swift
+.package(url: "https://github.com/microsoft/onnxruntime-swift-package-manager", exact: "1.17.0")
+```
+
+#### Option C: Microsoft CDN (manual)
+
+```bash
+curl -LO https://download.onnxruntime.ai/pod-archive-onnxruntime-c-1.17.0.zip
+unzip pod-archive-onnxruntime-c-1.17.0.zip
+# Result: onnxruntime.xcframework/
+```
+
+> **sha256 (1.17.0)**: `1623e1150507d9e50554e3d3e5cf9abf75e1bfd8324b74a602acfe45343db871`
+
+### Step 3: Embed both xcframeworks in Xcode
+
+In Xcode for your Flutter project's iOS target (`Runner.xcodeproj`):
+
+1. **Project Navigator** → drag `piper_plus.xcframework` and `onnxruntime.xcframework` into the project
+2. **Targets** → **General** → **Frameworks, Libraries, and Embedded Content**
+3. For **both** entries, choose **"Embed & Sign"**
+
+> **Common failure**: leaving `"Do Not Embed"` causes runtime `Image Not Found` errors. **Always select Embed & Sign for both frameworks.**
+
+### Step 4: Use from Dart FFI
+
+```dart
+import 'dart:ffi';
+import 'dart:io' show Platform;
+
+final lib = Platform.isIOS
+    ? DynamicLibrary.process()  // statically linked from xcframework, symbols are in process
+    : DynamicLibrary.open(...);
+```
+
+On iOS, the static archive in the xcframework gets linked into the consumer app, so `DynamicLibrary.process()` resolves the symbols. ORT framework symbols resolve via the embedded dynamic framework.
+
+### Troubleshooting
+
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| `dyld: Library not loaded: @rpath/onnxruntime.framework/onnxruntime` | ORT xcframework not embedded | Step 3 — Embed & Sign onnxruntime.xcframework |
+| `_OrtCreateEnv` undefined at link | piper_plus xcframework not embedded | Step 3 — Embed & Sign piper_plus.xcframework |
+| Simulator crash on Apple Silicon Mac | Old xcframework without simulator slice | Use v1.13.0+ xcframework.zip (M2 includes simulator slice) |
+| App Store Connect rejects build | Missing Privacy Manifest for ORT | Add your own `PrivacyInfo.xcprivacy` covering Microsoft's ORT (piper-plus side already includes empty Manifest) |
+
+### Note: Privacy Manifest (iOS 17+)
+
+- piper-plus xcframework ships with an **empty** `PrivacyInfo.xcprivacy` (no tracking, no Required Reason API access)
+- **ONNX Runtime does not yet ship a Privacy Manifest** (Microsoft, as of 2026-05). If your app uses Required Reason APIs (file timestamp, system boot time, disk space, user defaults), add your own consolidated `PrivacyInfo.xcprivacy` to your app target
+
+### Note: App Extension / App Clip size limits
+
+- piper-plus + ORT is ~35MB (compressed slice); the iOS App Extension uncompressed slice limit is **32 MB** — **piper-plus + ORT cannot fit inside an App Extension**
+- App Clip's 10 MB uncompressed limit makes piper-plus integration impossible there too
 
 ## Platform-specific library names
 
@@ -122,3 +232,4 @@ tts.dispose();
 | Linux | `libpiper_plus.so` |
 | macOS | `libpiper_plus.dylib` |
 | Windows | `piper_plus.dll` |
+| iOS | `piper_plus.xcframework` (static archive inside, see [iOS Integration](#ios-integration)) |
