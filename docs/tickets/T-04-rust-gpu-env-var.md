@@ -20,7 +20,7 @@
 
 - `gpu.rs` に `pub fn resolve_device_string(device: &str) -> Result<DeviceType, PiperError>` が追加されている
 - `engine.rs` の `parse_device_string` 呼び出しが `resolve_device_string` に切り替えられている
-- 追加した 6 件のユニットテストがすべて `cargo test -p piper-core` で PASS する
+- 追加した 6 件のユニットテストがすべて `cargo test -p piper-core -- --test-threads=1` で PASS する（env var の並列汚染を防ぐため `--test-threads=1` 必須）
 - `PIPER_EXECUTION_PROVIDER` が未設定または空文字列の場合は従来動作と完全に一致する
 - `PIPER_EXECUTION_PROVIDER=cpu` を設定した状態で `parse_device_string("cuda")` 相当の呼び出しが `DeviceType::Cpu` を返す
 
