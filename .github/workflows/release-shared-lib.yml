@@ -250,18 +250,30 @@ jobs:
       - name: Show libpiper_plus.a archive contents
         # Diagnostic — confirms the POST_BUILD libtool merge produced an archive
         # containing piper_common / openjtalk / hts_engine_stub objects.
+        # Note: simulator slice produces an arm64+x86_64 fat archive that `ar`
+        # can't read directly (must be unpacked with `lipo -thin` first), so we
+        # use `nm` for symbol probing — `nm` handles both thin and fat archives.
         run: |
           set -euo pipefail
           echo "=== file size ==="
           ls -la build-ios/libpiper_plus.a
-          echo "=== member count ==="
-          ar -t build-ios/libpiper_plus.a | wc -l
-          echo "=== member list (first 30) ==="
-          ar -t build-ios/libpiper_plus.a | head -30
-          echo "=== sample piper:: defined symbols (first 5) ==="
+          echo "=== file type ==="
+          file build-ios/libpiper_plus.a
+          echo "=== arch(s) ==="
+          lipo -archs build-ios/libpiper_plus.a 2>/dev/null || echo "(thin archive — single arch)"
+          echo "=== sample piper:: defined symbols (first 5, any arch) ==="
+          # nm -gU returns external defined symbols across all archs in fat archives.
           nm -gU build-ios/libpiper_plus.a 2>/dev/null \
             | awk '$2 ~ /^[TDSR]$/ {print $NF}' \
-            | grep -E '^__ZN[0-9]+piper' | head -5 || echo "(none — archive merge failed)"
+            | grep -E '^__ZN[0-9]+piper' \
+            | sort -u | head -5 \
+            || echo "(none — archive merge failed)"
+          echo "=== sample _piper_plus_* / _openjtalk_* defined symbols (first 5) ==="
+          nm -gU build-ios/libpiper_plus.a 2>/dev/null \
+            | awk '$2 ~ /^[TDSR]$/ {print $NF}' \
+            | grep -E '^_(piper_plus_|openjtalk_)' \
+            | sort -u | head -5 \
+            || echo "(none — stub TU not merged)"
 
       - name: Verify symbol resolution (ORT + project-internal)
         # Three-stage symbol-resolution gate for the iOS slice:
