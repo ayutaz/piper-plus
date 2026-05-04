@@ -28,8 +28,8 @@ RUN apt-get update && apt-get install -y \
     libgtest-dev \
     libgmock-dev \
     libbenchmark-dev \
-    python3.11 \
-    python3.11-dev \
+    python3.12 \
+    python3.12-dev \
     python3-pip \
     && rm -rf /var/lib/apt/lists/*
 
@@ -74,8 +74,18 @@ RUN wget https://downloads.sourceforge.net/open-jtalk/open_jtalk-1.11.tar.gz && 
 # Create working directory
 WORKDIR /workspace
 
-# Install development tools
-RUN pip3 install \
+# Install uv via official installer
+ENV UV_INSTALL_DIR=/usr/local/bin
+ADD https://astral.sh/uv/install.sh /uv-installer.sh
+RUN sh /uv-installer.sh && rm /uv-installer.sh
+
+# Create a dedicated venv for development tools (avoids PEP 668 on Ubuntu 24.04 / python3.12)
+ENV VIRTUAL_ENV=/opt/devtools
+RUN uv venv "$VIRTUAL_ENV"
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+
+# Install development tools into the venv
+RUN uv pip install \
     conan \
     cpplint \
     cppcheck \
