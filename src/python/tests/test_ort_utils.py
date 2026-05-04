@@ -382,12 +382,10 @@ class TestModelCacheHelpers:
     def test_device_label_gpu_with_cuda(self, _mock):
         assert _get_device_label("gpu") == "cuda0"
 
-    @patch(
-        "onnxruntime.get_available_providers",
-        return_value=["CPUExecutionProvider"],
-    )
-    def test_device_label_gpu_no_cuda(self, _mock):
-        assert _get_device_label("gpu") == "cpu"
+    def test_device_label_gpu_no_cuda(self):
+        # 'gpu' は 'cuda' の後方互換別名のため、CUDA 非利用時でもラベルは 'cuda0'。
+        # キャッシュパスはデバイス意図に基づき決まる（利用可能性は get_providers() が担当）。
+        assert _get_device_label("gpu") == "cuda0"
 
     def test_build_cache_paths_cpu(self, tmp_path):
         model = tmp_path / "model.onnx"
@@ -585,3 +583,163 @@ class TestVoiceCacheParity:
         voice_sentinel = Path(str(voice_cache) + ".ok")
         assert ort_cache == voice_cache
         assert ort_sentinel == voice_sentinel
+
+
+from unittest.mock import patch  # noqa: E402  (already imported above, re-import for clarity)
+
+
+@pytest.mark.unit
+class TestGetProviders:
+    """get_providers() の実行プロバイダー選択テスト."""
+
+    def test_cpu_returns_cpu_ep(self):
+        result = get_providers("cpu")
+        assert result == ["CPUExecutionProvider"]
+
+    def test_auto_with_no_gpu_returns_cpu(self):
+        with patch("onnxruntime.get_available_providers", return_value=["CPUExecutionProvider"]):
+            result = get_providers("auto")
+        assert result == ["CPUExecutionProvider"]
+
+    def test_auto_detects_cuda(self):
+        available = ["CUDAExecutionProvider", "CPUExecutionProvider"]
+        with patch("onnxruntime.get_available_providers", return_value=available):
+            result = get_providers("auto")
+        assert result[0] == "CUDAExecutionProvider"
+        assert "CPUExecutionProvider" in result
+
+    def test_auto_detects_coreml_when_no_cuda(self):
+        available = ["CoreMLExecutionProvider", "CPUExecutionProvider"]
+        with patch("onnxruntime.get_available_providers", return_value=available):
+            result = get_providers("auto")
+        assert result[0] == "CoreMLExecutionProvider"
+
+    def test_auto_detects_directml_when_no_cuda_coreml(self):
+        available = ["DmlExecutionProvider", "CPUExecutionProvider"]
+        with patch("onnxruntime.get_available_providers", return_value=available):
+            result = get_providers("auto")
+        assert result[0] == "DmlExecutionProvider"
+
+    def test_explicit_cuda_returns_cuda_ep(self):
+        available = ["CUDAExecutionProvider", "CPUExecutionProvider"]
+        with patch("onnxruntime.get_available_providers", return_value=available):
+            result = get_providers("cuda")
+        assert any(
+            ep == "CUDAExecutionProvider" or
+            (isinstance(ep, tuple) and ep[0] == "CUDAExecutionProvider")
+            for ep in result
+        )
+
+    def test_explicit_coreml_returns_coreml_ep(self):
+        available = ["CoreMLExecutionProvider", "CPUExecutionProvider"]
+        with patch("onnxruntime.get_available_providers", return_value=available):
+            result = get_providers("coreml")
+        assert "CoreMLExecutionProvider" in result
+
+    def test_explicit_directml_returns_dml_ep(self):
+        available = ["DmlExecutionProvider", "CPUExecutionProvider"]
+        with patch("onnxruntime.get_available_providers", return_value=available):
+            result = get_providers("directml")
+        assert any(
+            ep == "DmlExecutionProvider" or
+            (isinstance(ep, tuple) and ep[0] == "DmlExecutionProvider")
+            for ep in result
+        )
+
+    def test_unavailable_ep_falls_back_to_cpu(self):
+        with patch("onnxruntime.get_available_providers", return_value=["CPUExecutionProvider"]):
+            result = get_providers("cuda")
+        assert result == ["CPUExecutionProvider"]
+
+    def test_env_var_overrides_device_param(self, monkeypatch):
+        monkeypatch.setenv("PIPER_EXECUTION_PROVIDER", "cpu")
+        available = ["CUDAExecutionProvider", "CPUExecutionProvider"]
+        with patch("onnxruntime.get_available_providers", return_value=available):
+            result = get_providers("auto")
+        assert result == ["CPUExecutionProvider"]
+
+    def test_env_var_selects_coreml(self, monkeypatch):
+        monkeypatch.setenv("PIPER_EXECUTION_PROVIDER", "coreml")
+        available = ["CoreMLExecutionProvider", "CPUExecutionProvider"]
+        with patch("onnxruntime.get_available_providers", return_value=available):
+            result = get_providers("auto")
+        assert "CoreMLExecutionProvider" in result
+
+    def test_tensorrt_excluded_from_auto(self):
+        available = ["TensorrtExecutionProvider", "CPUExecutionProvider"]
+        with patch("onnxruntime.get_available_providers", return_value=available):
+            result = get_providers("auto")
+        assert result == ["CPUExecutionProvider"]
+
+    def test_unknown_device_falls_back_to_cpu(self):
+        result = get_providers("vulkan")
+        assert result == ["CPUExecutionProvider"]
+
+    def test_gpu_alias_works_as_cuda(self):
+        """'gpu' は 'cuda' の後方互換別名として機能すること."""
+        available = ["CUDAExecutionProvider", "CPUExecutionProvider"]
+        with patch("onnxruntime.get_available_providers", return_value=available):
+            result = get_providers("gpu")
+        assert any(
+            ep == "CUDAExecutionProvider" or
+            (isinstance(ep, tuple) and ep[0] == "CUDAExecutionProvider")
+            for ep in result
+        )
+
+
+@pytest.mark.unit
+class TestGetDeviceLabel:
+    """_get_device_label() のキャッシュラベルテスト."""
+
+    def test_cpu_returns_cpu(self):
+        result = _get_device_label("cpu")
+        assert result == "cpu"
+
+    def test_auto_no_gpu_returns_cpu(self):
+        with patch("onnxruntime.get_available_providers", return_value=["CPUExecutionProvider"]):
+            result = _get_device_label("auto")
+        assert result == "cpu"
+
+    def test_auto_with_cuda_returns_cuda0(self):
+        available = ["CUDAExecutionProvider", "CPUExecutionProvider"]
+        with patch("onnxruntime.get_available_providers", return_value=available):
+            result = _get_device_label("auto")
+        assert result == "cuda0"
+
+    def test_explicit_cuda_returns_cuda0(self):
+        result = _get_device_label("cuda")
+        assert result == "cuda0"
+
+    def test_explicit_cuda1_returns_cuda1(self):
+        result = _get_device_label("cuda:1")
+        assert result == "cuda1"
+
+    def test_explicit_coreml_returns_coreml(self):
+        result = _get_device_label("coreml")
+        assert result == "coreml"
+
+    def test_explicit_directml_returns_directml0(self):
+        result = _get_device_label("directml")
+        assert result == "directml0"
+
+    def test_explicit_directml1_returns_directml1(self):
+        result = _get_device_label("directml:1")
+        assert result == "directml1"
+
+    def test_explicit_openvino_returns_openvino(self):
+        result = _get_device_label("openvino")
+        assert result == "openvino"
+
+    def test_explicit_tensorrt_returns_tensorrt0(self):
+        result = _get_device_label("tensorrt")
+        assert result == "tensorrt0"
+
+    def test_env_var_overrides_device_label(self, monkeypatch):
+        monkeypatch.setenv("PIPER_EXECUTION_PROVIDER", "coreml")
+        result = _get_device_label("auto")
+        assert result == "coreml"
+
+    def test_gpu_alias_returns_cuda0(self):
+        """'gpu' は 'cuda' の後方互換別名。ラベルは 'cuda0' を返すこと."""
+        result = _get_device_label("gpu")
+        assert result == "cuda0"

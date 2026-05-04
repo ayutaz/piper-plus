@@ -101,33 +101,115 @@ def create_session_options(
     return opts
 
 
-def get_providers(device: str = "cpu") -> list[str]:
+# TensorRT は auto-detect 対象外（明示指定のみ）
+_EP_AUTO_PRIORITY = [
+    "CUDAExecutionProvider",
+    "CoreMLExecutionProvider",
+    "DmlExecutionProvider",
+    "OpenVINOExecutionProvider",
+]
+
+_EP_KEY_TO_ORT_NAME: dict[str, str] = {
+    "cuda": "CUDAExecutionProvider",
+    "gpu": "CUDAExecutionProvider",   # backward compat alias
+    "coreml": "CoreMLExecutionProvider",
+    "directml": "DmlExecutionProvider",
+    "openvino": "OpenVINOExecutionProvider",
+    "tensorrt": "TensorrtExecutionProvider",
+}
+
+
+def get_providers(device: str = "auto") -> list[str | tuple[str, dict]]:
     """Return ONNX Runtime execution providers for the given device.
 
     Args:
-        device: ``"cpu"``, ``"gpu"``, or ``"auto"``.
+        device: "auto" | "cpu" | "cuda" | "cuda:N" | "coreml" |
+                "directml" | "directml:N" | "openvino" | "tensorrt" | "tensorrt:N"
+
+    PIPER_EXECUTION_PROVIDER env var overrides ``device`` when set.
     """
-    if device == "cpu":
+    env = os.environ.get("PIPER_EXECUTION_PROVIDER", "").lower().strip()
+    target = env if env else device.lower().strip()
+
+    if target in ("cpu", ""):
         return ["CPUExecutionProvider"]
-    # "auto" or "gpu": prefer CUDA when available, otherwise fall back to CPU
+
     available = onnxruntime.get_available_providers()
-    if "CUDAExecutionProvider" in available:
-        return ["CUDAExecutionProvider", "CPUExecutionProvider"]
-    return ["CPUExecutionProvider"]
+
+    if target == "auto":
+        for ep in _EP_AUTO_PRIORITY:
+            if ep in available:
+                _LOGGER.info("Auto-selected execution provider: %s", ep)
+                return [ep, "CPUExecutionProvider"]
+        return ["CPUExecutionProvider"]
+
+    parts = target.split(":", 1)
+    provider_key = parts[0]
+    device_id = int(parts[1]) if len(parts) > 1 and parts[1].isdigit() else 0
+
+    ep_name = _EP_KEY_TO_ORT_NAME.get(provider_key)
+    if ep_name is None:
+        _LOGGER.warning("Unknown provider %r, falling back to CPU", provider_key)
+        return ["CPUExecutionProvider"]
+
+    if ep_name not in available:
+        _LOGGER.warning("EP %s not available, falling back to CPU", ep_name)
+        return ["CPUExecutionProvider"]
+
+    if provider_key in ("cuda", "gpu"):
+        return [
+            (ep_name, {"device_id": str(device_id), "cudnn_conv_algo_search": "HEURISTIC"}),
+            "CPUExecutionProvider",
+        ]
+    if provider_key in ("directml", "tensorrt"):
+        return [(ep_name, {"device_id": str(device_id)}), "CPUExecutionProvider"]
+    return [ep_name, "CPUExecutionProvider"]
 
 
 # ---------------------------------------------------------------------------
 # Optimized model cache
 # ---------------------------------------------------------------------------
 
+_EP_KEY_TO_LABEL_FORMAT: dict[str, str] = {
+    "cuda": "cuda{id}",
+    "gpu": "cuda{id}",   # backward compat alias
+    "coreml": "coreml",
+    "directml": "directml{id}",
+    "openvino": "openvino",
+    "tensorrt": "tensorrt{id}",
+}
+
+_EP_ORT_TO_LABEL: dict[str, str] = {
+    "CUDAExecutionProvider": "cuda0",
+    "CoreMLExecutionProvider": "coreml",
+    "DmlExecutionProvider": "directml0",
+    "OpenVINOExecutionProvider": "openvino",
+}
+
 
 def _get_device_label(device: str) -> str:
-    """Return effective device label for cache path (e.g., 'cpu', 'cuda0')."""
-    if device in ("gpu", "auto"):
+    """Return effective device label for cache path (e.g., 'cpu', 'cuda0', 'coreml')."""
+    env = os.environ.get("PIPER_EXECUTION_PROVIDER", "").lower().strip()
+    target = env if env else device.lower().strip()
+
+    if target in ("cpu", ""):
+        return "cpu"
+
+    if target == "auto":
         available = onnxruntime.get_available_providers()
-        if "CUDAExecutionProvider" in available:
-            return "cuda0"
-    return "cpu"
+        for ep, label in _EP_ORT_TO_LABEL.items():
+            if ep in available:
+                return label
+        return "cpu"
+
+    parts = target.split(":", 1)
+    provider_key = parts[0]
+    device_id = int(parts[1]) if len(parts) > 1 and parts[1].isdigit() else 0
+
+    fmt = _EP_KEY_TO_LABEL_FORMAT.get(provider_key)
+    if fmt is None:
+        return "cpu"
+    return fmt.format(id=device_id)
 
 
 def _build_cache_paths(model_path: str | Path, device_label: str) -> tuple[Path, Path]:
