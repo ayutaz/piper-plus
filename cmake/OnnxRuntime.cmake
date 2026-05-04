@@ -6,7 +6,7 @@ if(WIN32)
   include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/find_onnxruntime_windows.cmake)
 elseif(NOT DEFINED ONNXRUNTIME_DIR)
   # Linux/macOS: Download pre-built ONNX Runtime if not already available
-  set(ONNXRUNTIME_VERSION "1.14.1")
+  set(ONNXRUNTIME_VERSION "1.17.0")
   if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|ARM64")
     if(APPLE)
       set(ONNXRUNTIME_ARCH "arm64")
