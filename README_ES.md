@@ -290,7 +290,7 @@ dotnet add package PiperPlus.Core
 **Biblioteca Rust (crates.io):**
 ```toml
 [dependencies]
-piper-plus = "0.3"
+piper-plus = "0.4"
 ```
 
 ### Compilar desde fuente (C++)

@@ -302,7 +302,7 @@ dotnet add package PiperPlus.Core
 **Rust 库 (crates.io):**
 ```toml
 [dependencies]
-piper-plus = "0.3"
+piper-plus = "0.4"
 ```
 
 ### 从源码构建 (C++)

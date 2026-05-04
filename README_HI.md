@@ -290,7 +290,7 @@ dotnet add package PiperPlus.Core
 **Rust लाइब्रेरी (crates.io):**
 ```toml
 [dependencies]
-piper-plus = "0.3"
+piper-plus = "0.4"
 ```
 
 ### सोर्स से बिल्ड (C++)
