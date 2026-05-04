@@ -338,15 +338,19 @@ Plan A の xcframework ビルドロジック (`xcodebuild -create-xcframework`) 
 - **状態:** [README 表 を SoT として参照](../tickets/README.md)
 - **スコープ:**
   - [ ] 本体 repo (`ayutaz/piper-plus`) 直下に `Package.swift` を配置 (案 X)
-    - `binaryTarget(url:, checksum:)` で piper-plus Releases の `libpiper_plus-ios-${VERSION}.xcframework.zip` を参照
-    - `dependencies` で `microsoft/onnxruntime-swift-package-manager` を `exact:` ピン
-  - [ ] tag push 時に `release-shared-lib.yml` で `Package.swift` の url/checksum を自動更新 (case X では本体 repo の同 PR で完結、別 repo 連携 PAT 不要)
+    - `binaryTarget(url:, checksum:)` で piper-plus Releases の `libpiper_plus-ios-v${VERSION}.xcframework.zip` を参照 (URL の `v` 接頭辞は workflow の Rename ステップと整合)
+    - `platforms: [.iOS(.v15)]` のみ (macOS slice は v1.13.0 では未提供、M5 候補)
+    - `dependencies` 宣言は **しない** (`binaryTarget` が dependencies を transitively 解決できないため。consumer 側で ORT を別途追加する運用に統一、`examples/swift/README.md` で案内)
+  - [ ] tag commit に正しい version + checksum を含める運用フロー (sherpa-onnx 方式):
+    - メンテナが tag push **前** に `dev` 上で `Package.swift` を手動更新 (workflow_dispatch で xcframework.zip を生成 → `swift package compute-checksum` → 値を反映 → commit → tag push)
+    - 旧設計の release ジョブ内自動 PR 作成は **採用せず** (tag commit に古い manifest が残るため `swift package resolve` が失敗するため)
   - [ ] (オプション) `Sources/PiperPlusDemo/` でコンパイル検証用の最小 target 追加
   - [ ] Swift Package Index 登録 (利用者観測 ≥ 5 件確認後)
 - **完了条件 (DoD):**
-  - `swift package resolve` がローカル/CI 両方で成功
-  - 任意の SwiftPM プロジェクトの `dependencies` に `https://github.com/ayutaz/piper-plus` を追加すると `import PiperPlus` がコンパイル成立
-  - tag push 時の checksum 自動更新が dry-run で確認済み
+  - `Package.swift` が本体 repo 直下に存在し、`platforms: [.iOS(.v15)]` のみで宣言されている
+  - URL が `libpiper_plus-ios-v\(version).xcframework.zip` パターンに一致
+  - 初回 `v1.13.0` リリース時にメンテナが手動更新の手順を踏み、tag commit に正しい checksum が含まれていることを確認
+  - `examples/swift/README.md` に consumer 側の `Package.swift` テンプレート (piper-plus + ORT 同時宣言) が記載済み
 - **依存:** M2 完了 (xcframework + module map が成立)、M3 推奨 (利用者ガイド整備)
 - **リスク:**
   - 本体 repo に Apple ecosystem 設定が混入 (案 X のトレードオフ、sherpa-onnx / whisper.cpp は同方式採用)

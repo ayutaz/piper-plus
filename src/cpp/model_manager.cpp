@@ -259,15 +259,21 @@ static bool downloadFile(const std::string& url,
     }
 
 #if defined(__APPLE__) && TARGET_OS_IPHONE
-    // iOS / iPadOS / tvOS / watchOS: std::system() is unavailable.
-    // App sandbox forbids spawning curl/wget anyway. Auto-download is therefore
-    // unsupported on these platforms — consumer apps must pre-download the
-    // model via URLSession (or equivalent platform networking API) and pass
-    // the local file path to piper-plus.
+    // Apple non-macOS platforms: std::system() is unavailable.
+    // TARGET_OS_IPHONE evaluates true on iOS, iPadOS, tvOS, watchOS, Mac
+    // Catalyst, and visionOS — all of these forbid spawning curl/wget under
+    // the App Sandbox. Auto-download is therefore unsupported; consumer apps
+    // must pre-download the model via URLSession (or equivalent platform
+    // networking API) and pass the local file path to piper-plus.
+    //
+    // Note: on iOS, this entire translation unit is excluded from
+    // piper_common via cmake/PiperCommon.cmake (issue #377), so this branch
+    // primarily defends against future builds that re-include the file
+    // (e.g., a Mac Catalyst flavor without the exclusion).
     (void)url;
     (void)outStr;
     spdlog::error(
-        "Model auto-download is not supported on iOS / iPadOS / tvOS / watchOS. "
+        "Model auto-download is not supported on this Apple platform. "
         "Pre-download the model via URLSession and pass the local file path.");
     return false;
 #else

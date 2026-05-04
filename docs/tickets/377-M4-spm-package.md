@@ -14,7 +14,7 @@
 | 親 Issue | [#377](https://github.com/ayutaz/piper-plus/issues/377) |
 | 担当ブランチ | `fix/ios-shared-lib-build-377` (本体 repo 内、道 A 確定) |
 | 状態 | [README 表 を SoT として参照](README.md) |
-| 想定 PR | 1 PR (小、~50-80 行: `Package.swift` + workflow checksum 自動更新 + 最小 README) |
+| 想定 PR | 1 PR (小、~50-80 行: `Package.swift` + 最小 README、checksum はメンテナがリリース時に手動更新) |
 | 想定所要 (Claude Code 実行ベース) | 実装 1-2 時間 + `swift package resolve` 検証 (CI 内で完結) ~15 分 |
 | 環境制約 | Apple Silicon Mac は本セッションで使用不可。`xcodebuild -resolvePackageDependencies` / 実機 `import` テストは **Swift Package Index の自動互換性チェック + GitHub Actions macos-15 runner 上の `swift build` で代替** |
 | 依存 | **M2 完了必須** (xcframework + module map が成立)、M3 推奨 (利用者ガイド整備済) |
@@ -38,15 +38,16 @@
 
 ### Definition of Done (案 Y 主仕様)
 
-- [ ] 別 repo `ayousanz/piper-plus-swift-package-manager` が公開状態で存在する
-- [ ] `Package.swift` で `binaryTarget(url:, checksum:)` が piper-plus Releases の `libpiper_plus-ios-${VERSION}.xcframework.zip` を指している
-- [ ] 任意の SwiftPM プロジェクトで `dependencies: [.package(url: "https://github.com/ayousanz/piper-plus-swift-package-manager", from: "1.13.0")]` を追加すると依存解決が成功する
-- [ ] piper-plus に新規 tag (`vX.Y.Z`) が push されると、別 repo の `Package.swift` の url/checksum が自動更新される
-- [ ] Swift Package Index への登録が完了し、ビルドステータスが GREEN
-- [ ] xcframework 内に **module map** が含まれ、Swift から `import PiperPlus` が成立する (M2 §11.7 の繰り上げで対応されている前提)
-- [ ] デモ target (`PiperPlusDemo`) で最低 1 件の合成テスト (text → wav) が PASS
-
-> 案 X 採用時 (§11 推奨) は別 repo を新設せず、本体 repo `ayutaz/piper-plus` 直下に `Package.swift` を配置。リリース連携の DoD は不要 (タグ push と SPM 公開が同期)、それ以外の項目は案 X でも適用される。
+- [ ] 本体 repo (`ayutaz/piper-plus`) 直下に `Package.swift` が配置されている
+- [ ] `Package.swift` で `binaryTarget(url:, checksum:)` が piper-plus Releases の `libpiper_plus-ios-v${VERSION}.xcframework.zip` を指している (URL の `v` 接頭辞が workflow Rename ステップと一致)
+- [ ] `platforms: [.iOS(.v15)]` のみ宣言、macOS / visionOS 等は xcframework に slice が無い限り宣言しない
+- [ ] consumer 側 `Package.swift` テンプレートが `examples/swift/README.md` に存在 (piper-plus + ORT 同時宣言、`binaryTarget` の transitive deps 不可ゆえ ORT は consumer 責任である旨明記)
+- [ ] **メンテナ手動更新フロー** (sherpa-onnx 方式) が `Package.swift` 冒頭コメントと `examples/swift/README.md` に記載されている:
+  - tag push 前に `dev` で `swift package compute-checksum` 結果を反映 → commit → tag → push
+  - 旧設計 (release ジョブ内 auto-PR) は不採用 (tag commit に古い manifest が残ると SPM resolve が失敗するため)
+- [ ] 任意の SwiftPM プロジェクトで `dependencies: [.package(url: "https://github.com/ayutaz/piper-plus", from: "1.13.0")]` + ORT 公式 SPM パッケージを追加で `import PiperPlus` が成立 (初回 v1.13.0 リリース後、メンテナが手動更新済み tag commit を切った時点で有効)
+- [ ] xcframework 内に **module map** が含まれ、Swift から `import PiperPlus` が成立する (M2 §3.1 modulemap 自動生成で対応済)
+- [ ] (将来) Swift Package Index への登録、ビルドステータスが GREEN (利用者観測 ≥ 5 件確認後の運用判断)
 
 ---
 
@@ -103,31 +104,49 @@ let package = Package(
 )
 ```
 
-### 3.3 リリース連携 (案 X 採用により単純化)
+### 3.3 リリース連携 (sherpa-onnx 方式: メンテナ手動更新)
 
-**案 X (採用): 本体 repo 単一管理**
+**根本制約:** SwiftPM の `binaryTarget(url:, checksum:)` は **resolved 時点での tag commit 内の `Package.swift` の値**で URL/checksum を解決する。tag push **後** に `Package.swift` を更新しても (旧設計案: release ジョブ内 auto-PR を `dev` に投げる)、その tag に対する `swift package resolve` は古い checksum を見るため失敗する。`Package.swift` の正しい値は **tag commit そのものに含まれていなければならない**。
 
-`Package.swift` を `ayutaz/piper-plus` 直下に置くため、tag push と SPM 公開が同期する。リリース連携で別 repo を経由する必要がない。`release-shared-lib.yml` の `release` ジョブ末尾に **同 repo 内の `Package.swift` の version/checksum を更新する step** を追加する:
+**採用フロー:** メンテナが tag push の **前** に `Package.swift` を手動更新する。sherpa-onnx と同じ運用:
 
-```yaml
-- name: Update Package.swift checksum
-  run: |
-    # release ジョブ内で生成した libpiper_plus-ios-${VERSION}.xcframework.zip の sha256
-    NEW_CHECKSUM=$(swift package compute-checksum libpiper_plus-ios-${VERSION}.xcframework.zip)
-    NEW_VERSION="${{ github.ref_name }}"
-    sed -i.bak "s/let version = .*/let version = \"${NEW_VERSION#v}\"/" Package.swift
-    sed -i.bak "s/let checksum = .*/let checksum = \"${NEW_CHECKSUM}\"/" Package.swift
-    rm -f Package.swift.bak
-- name: Commit Package.swift bump
-  uses: stefanzweifel/git-auto-commit-action@v5
-  with:
-    commit_message: "chore(spm): bump Package.swift to ${{ github.ref_name }}"
-    file_pattern: Package.swift
+```bash
+# 1. xcframework.zip を生成 (tag を切らずに workflow_dispatch で起動)
+gh workflow run release-shared-lib.yml --ref dev
+
+# 2. CI 完了を待ち、Actions Artifacts から libpiper_plus-ios-xcframework を DL
+gh run download <run-id> -n libpiper_plus-ios-xcframework
+
+# 3. checksum 計算
+swift package compute-checksum libpiper_plus-ios.xcframework.zip
+# → 出力された 64 桁の hex を控える
+
+# 4. Package.swift を編集
+#    let version = "1.13.0"
+#    let checksum = "<上で計算した値>"
+sed -i.bak \
+  -e 's/^let version = .*/let version = "1.13.0"/' \
+  -e 's/^let checksum = .*/let checksum = "<COMPUTED>"/' \
+  Package.swift
+
+# 5. dev に commit + tag push
+git add Package.swift
+git commit -m "chore(spm): bump Package.swift to v1.13.0"
+git push origin dev
+git tag v1.13.0
+git push origin v1.13.0
+
+# 6. tag push が release ジョブを起動、xcframework.zip が GitHub Release にアップロード
+#    (xcframework のビルドは決定論的で、step 1 で計算した checksum と一致する)
 ```
 
-> **不採用: 案 Y (別 repo + repository-dispatch)** — 別 repo メンテ負荷、PAT (`SPM_REPO_PAT`) ローテーション、dispatch 失敗時の手動 fallback などの永続コストが大きい。本体 repo 単一管理で全て解消。
->
-> **不採用: 案 Z (cron polling)** — タイムラグ最大 6h、観測欠如、運用上 brittle。
+**不採用 (旧設計): release ジョブ内 auto-PR**
+
+旧設計では `release` ジョブの末尾で `Package.swift` を `sed` 更新 → `peter-evans/create-pull-request` で `dev` に PR 作成、という自動化を組んでいたが、**tag commit には古い `Package.swift` が残るため SPM resolve 失敗** という致命的欠陥があった (Copilot レビュー #381 で指摘)。release ジョブからは Package.swift 関連ステップを撤去済。
+
+**不採用 (案 Y): 別 repo + repository-dispatch** — 別 repo メンテ負荷、PAT 管理、dispatch 失敗 fallback の運用コスト過大。本体 repo 単一管理で解消。
+
+**不採用 (案 Z): cron polling** — タイムラグ最大 6h、観測欠如、運用上 brittle。
 
 ### 3.4 module map の組込み (M2 で対応済)
 

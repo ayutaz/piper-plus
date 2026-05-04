@@ -13,10 +13,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 iOS 利用シナリオ (Dart FFI / Godot / Swift / SPM) に対応する xcframework 配布を成立させた。device (arm64) + simulator (arm64+x86_64 universal) の両 slice を含み、Swift `import PiperPlus` を可能にする `module.modulemap` および iOS 17+ App Store 提出に必要な空 `PrivacyInfo.xcprivacy` を同梱。
 
-- 新 artifact: `libpiper_plus-ios-${VERSION}.xcframework.zip` (device + simulator slices)
-- ONNX Runtime は別途取得 (CocoaPods `pod 'onnxruntime-c'` / SPM `microsoft/onnxruntime-swift-package-manager` / CDN `download.onnxruntime.ai`)
+- 新 artifact: `libpiper_plus-ios-v${VERSION}.xcframework.zip` (device + simulator slices)
+- **`piper_plus.xcframework` は static archive** — Xcode では **"Do Not Embed"** で取り込む (リンクのみ)。`onnxruntime.xcframework` は dynamic framework のため **"Embed & Sign"** が必須
+- ONNX Runtime は別途取得 (CocoaPods `pod 'onnxruntime-c'` / SPM `microsoft/onnxruntime-swift-package-manager` / CDN `download.onnxruntime.ai`)。SPM 利用時は `binaryTarget` の制約で transitive dependency が引けないため、consumer 側 `Package.swift` で piper-plus と ORT を **両方** 宣言する必要あり
 - 利用者ガイド: [`docs/guides/ios-integration.md`](docs/guides/ios-integration.md) (Dart / Godot / Swift 横断)
-- Swift プロジェクト向け暫定手順: [`examples/swift/README.md`](examples/swift/README.md)
+- Swift プロジェクト向け手順 (SPM Quick Start + 手動 drag-and-drop): [`examples/swift/README.md`](examples/swift/README.md)
+
+#### Swift Package Manager マニフェスト (`Package.swift`) を repo 直下に配置 (Issue #377)
+
+- `binaryTarget(url:, checksum:)` で GitHub Releases の xcframework.zip を参照
+- `platforms: [.iOS(.v15)]` のみ宣言 (macOS / visionOS / Mac Catalyst slice は v1.13.0 では無し、M5 候補)
+- メンテナがリリースタグ push **前** に `Package.swift` の version + checksum を `dev` 上で手動更新する運用 (sherpa-onnx 方式、`Package.swift` 冒頭コメントに手順記載)
 
 #### iOS shared-lib 取得経路を Microsoft 公式 CDN に切替 (Issue #377)
 

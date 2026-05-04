@@ -92,15 +92,19 @@ unzip pod-archive-onnxruntime-c-1.17.0.zip
 
 > **sha256 (1.17.0)**: `1623e1150507d9e50554e3d3e5cf9abf75e1bfd8324b74a602acfe45343db871`
 
-## Step 3: Embed & Sign Both xcframeworks
+## Step 3: Link PiperPlus + Embed & Sign ORT
+
+`piper_plus.xcframework` ships a **static archive** (`libpiper_plus.a`) — its symbols are linked into your app at link time, so it does NOT need to be embedded. `onnxruntime.xcframework` ships a **dynamic framework** (Mach-O dylib) — it must be embedded and signed so iOS can load it at runtime.
 
 In Xcode for your iOS app target:
 
-1. **Project Navigator** → drag both `piper_plus.xcframework` and `onnxruntime.xcframework`
+1. **Project Navigator** → drag both `piper_plus.xcframework` and `onnxruntime.xcframework` into the project
 2. **Targets** → **General** → **Frameworks, Libraries, and Embedded Content**
-3. For **both** entries, choose **"Embed & Sign"**
+3. Set the **"Embed"** column as follows:
+   - `piper_plus.xcframework` → **"Do Not Embed"** (static archive; linked-only)
+   - `onnxruntime.xcframework` → **"Embed & Sign"** (dynamic framework; required for `dyld` to find it)
 
-> **The single most common iOS integration failure is leaving "Do Not Embed".** Both frameworks must be Embed & Sign.
+> **The most common iOS integration failure is leaving the ORT framework as "Do Not Embed"** — that triggers `dyld: Library not loaded: @rpath/onnxruntime.framework/onnxruntime` at app launch. Always Embed & Sign the ORT framework.
 
 > **Godot users**: Step 3 is automated by `ios.dependencies` in your `.gdextension` — no manual Embed & Sign required. See [`examples/godot/README.md` § iOS](../../examples/godot/README.md#ios-v1130).
 
@@ -149,8 +153,9 @@ tts.speak("こんにちは。")
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|
-| `dyld: Library not loaded: @rpath/onnxruntime.framework/onnxruntime` | ORT xcframework Embed missing | Step 3 — Embed & Sign onnxruntime.xcframework |
-| `_OrtCreateEnv` undefined at link | piper_plus xcframework Embed missing | Step 3 — Embed & Sign piper_plus.xcframework |
+| `dyld: Library not loaded: @rpath/onnxruntime.framework/onnxruntime` (runtime) | ORT framework not embedded | Step 3 — set onnxruntime.xcframework to **Embed & Sign** |
+| `_OrtCreateEnv` undefined symbol (link time) | ORT framework not added to the target / wrong slice picked | Confirm onnxruntime.xcframework is in **Frameworks, Libraries, and Embedded Content**, and that the build's `EFFECTIVE_PLATFORM_NAME` matches the slice (device build → `ios-arm64`, simulator build → `ios-arm64_x86_64-simulator`) |
+| `_piper_plus_*` undefined symbol (link time) | piper_plus.xcframework not added to the target | Step 3 — drag piper_plus.xcframework into Frameworks (Embed = "Do Not Embed" is correct, but it must still be **linked**) |
 | Build OK on simulator, crash on device (or vice versa) | Used a single-slice (device-only) artifact | Use the v1.13.0+ xcframework.zip (contains both slices) |
 | `import PiperPlus` fails to compile in Swift | Old xcframework without modulemap | Use v1.13.0+ xcframework.zip (M2 includes modulemap) |
 | App Store Connect rejects build for missing Privacy Manifest | Your app uses Required Reason APIs that ORT doesn't declare | Add a consolidated `PrivacyInfo.xcprivacy` to your app target covering ORT's API usage |

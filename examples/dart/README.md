@@ -183,15 +183,19 @@ unzip pod-archive-onnxruntime-c-1.17.0.zip
 
 > **sha256 (1.17.0)**: `1623e1150507d9e50554e3d3e5cf9abf75e1bfd8324b74a602acfe45343db871`
 
-### Step 3: Embed both xcframeworks in Xcode
+### Step 3: Add to Xcode (Link PiperPlus + Embed & Sign ORT)
+
+`piper_plus.xcframework` ships a **static archive** (`libpiper_plus.a`) → linked-only, no embedding required. `onnxruntime.xcframework` ships a **dynamic framework** → must be Embed & Sign so iOS can load it at runtime.
 
 In Xcode for your Flutter project's iOS target (`Runner.xcodeproj`):
 
 1. **Project Navigator** → drag `piper_plus.xcframework` and `onnxruntime.xcframework` into the project
 2. **Targets** → **General** → **Frameworks, Libraries, and Embedded Content**
-3. For **both** entries, choose **"Embed & Sign"**
+3. Set the **"Embed"** column:
+   - `piper_plus.xcframework` → **"Do Not Embed"** (static archive — linked-only)
+   - `onnxruntime.xcframework` → **"Embed & Sign"** (dynamic framework — required for `dyld`)
 
-> **Common failure**: leaving `"Do Not Embed"` causes runtime `Image Not Found` errors. **Always select Embed & Sign for both frameworks.**
+> **Common failure**: leaving `onnxruntime.xcframework` as `"Do Not Embed"` causes `dyld: Library not loaded: @rpath/onnxruntime.framework/onnxruntime` at app launch. The ORT framework MUST be Embed & Sign.
 
 ### Step 4: Use from Dart FFI
 
@@ -210,8 +214,9 @@ On iOS, the static archive in the xcframework gets linked into the consumer app,
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|
-| `dyld: Library not loaded: @rpath/onnxruntime.framework/onnxruntime` | ORT xcframework not embedded | Step 3 — Embed & Sign onnxruntime.xcframework |
-| `_OrtCreateEnv` undefined at link | piper_plus xcframework not embedded | Step 3 — Embed & Sign piper_plus.xcframework |
+| `dyld: Library not loaded: @rpath/onnxruntime.framework/onnxruntime` (runtime) | ORT framework not embedded | Step 3 — set onnxruntime.xcframework to **Embed & Sign** |
+| `_OrtCreateEnv` undefined symbol (link time) | ORT framework not added to the target / wrong slice picked | Confirm onnxruntime.xcframework is in **Frameworks, Libraries, and Embedded Content**, and that the slice (`ios-arm64` for device, `ios-arm64_x86_64-simulator` for simulator) matches your build target |
+| `_piper_plus_*` undefined symbol (link time) | piper_plus.xcframework not added to the target | Step 3 — drag piper_plus.xcframework into Frameworks (Embed = "Do Not Embed" is correct, but it must still be **linked**) |
 | Simulator crash on Apple Silicon Mac | Old xcframework without simulator slice | Use v1.13.0+ xcframework.zip (M2 includes simulator slice) |
 | App Store Connect rejects build | Missing Privacy Manifest for ORT | Add your own `PrivacyInfo.xcprivacy` covering Microsoft's ORT (piper-plus side already includes empty Manifest) |
 
