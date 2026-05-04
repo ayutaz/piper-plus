@@ -167,12 +167,59 @@ $ unzip -l ort-cdn.zip | grep "ios-arm64/onnxruntime.framework"
           tar -czf ${{ github.workspace }}/libpiper_plus-ios-arm64.tar.gz .
 ```
 
-### 3.4 CMake 連携の事前検証 (PR 起票前に必須)
+### 3.4 CMake 連携検証 (CI 内で完結)
 
-`cmake/PiperPlusShared.cmake` で `ONNXRUNTIME_LIB` に dylib を渡したときに piper-plus 側のリンクが通るかを事前確認する:
+> **環境制約:** ローカル Apple Silicon Mac は本セッションで使用不可。PR 起票前のローカル CMake 検証は実施せず、`workflow_dispatch` 起動による CI 内検証で代替する。CI で失敗した場合は CMake 側の修正をその場で行うか、不整合の規模が大きい場合のみ M2 統合に切替判断する。
+
+#### CI 内 検証ステップ案 (M1 PR の `release-shared-lib.yml` に追加)
+
+`Build (iOS)` ステップ後、`Verify symbol resolution` ステップを新設:
+
+```yaml
+- name: Verify symbol resolution against ORT framework
+  run: |
+    set -euo pipefail
+
+    # piper-plus static archive の未解決シンボル一覧
+    nm -u build-ios/libpiper_plus.a 2>/dev/null \
+      | grep -v '^$' \
+      | awk '{print $NF}' \
+      | sort -u > undefined-syms.txt
+    echo "undefined symbols in libpiper_plus.a:"
+    wc -l undefined-syms.txt
+
+    # ORT framework が export するシンボル一覧
+    nm -gU "${ORT_FW_DIR}/onnxruntime" 2>/dev/null \
+      | awk '$2 == "T" || $2 == "D" || $2 == "S" {print $NF}' \
+      | sort -u > ort-exports.txt
+    echo "exported symbols in onnxruntime framework:"
+    wc -l ort-exports.txt
+
+    # ORT で解決される expected: Ort* / OrtApi* で始まる ORT C API シンボル
+    # Apple/libc 関数 (___stack_chk_*, _memcpy 等) は最終リンク時に解決されるため除外
+    comm -23 undefined-syms.txt ort-exports.txt \
+      | grep -E '^_(Ort|OrtApi|GetVersionString|OrtRelease|OrtCreate|OrtSession)' \
+      > ort-related-unresolved.txt || true
+
+    if [ -s ort-related-unresolved.txt ]; then
+      echo "::error::ORT-related symbols unresolved against onnxruntime framework"
+      cat ort-related-unresolved.txt
+      exit 1
+    fi
+    echo "✓ all ORT-related symbols resolve against onnxruntime framework"
+```
+
+> **注:** `nm -u` の出力フォーマットは Mach-O ar archive に対しては `_<symbol>` 形式 (アンダースコア prefix)。`nm -gU` は dylib に対して `<address> <type> <symbol>` 形式を返す。grep 範囲は ORT 関連シンボルに絞り、Apple/libc 由来は除外する (これらは利用者アプリの最終リンク段階で解決されるため piper-plus xcframework 段階での未解決は正常)。
+
+#### 検証失敗時の判断
+
+- **ORT 関連シンボルのみ未解決** → ORT C API のリンク経路に問題、`cmake/PiperPlusShared.cmake` の iOS 分岐に framework 探索パス (`-F`) または `target_link_libraries` の syntax 修正
+- **CMake が dylib path 指定を受理しない** → M1 PR を取下げ、M2 統合に切替
+
+#### ローカル参考 (Apple Silicon Mac 環境を持つ contributor 向け)
 
 ```bash
-# ローカル macOS で検証
+# Apple Silicon Mac でローカル再現する場合の参考
 unzip pod-archive-onnxruntime-c-1.17.0.zip
 cmake -B build-ios-test \
   -DCMAKE_TOOLCHAIN_FILE=cmake/ios.toolchain.cmake \
@@ -186,8 +233,6 @@ cmake -B build-ios-test \
 cmake --build build-ios-test --config Release
 file build-ios-test/libpiper_plus.a   # 期待: ar archive (Mach-O arm64)
 ```
-
-検証で `cmake/PiperPlusShared.cmake` が dylib リンクを期待していないなどの不整合が見つかった場合、本 M1 は M2 (xcframework 化) と統合し、CMake 側の修正もまとめて行う方向に切替える。
 
 ### 3.5 触らないファイル (M1 スコープ外)
 
@@ -340,6 +385,7 @@ lipo -info lib/onnxruntime.framework/onnxruntime # 期待: arm64
 | C5 | CDN zip に macOS slice (~69MB) も含まれており artifact が肥大化する可能性 | 低 | iOS slice のみを `find` で選択しているため、artifact には iOS slice の ~31MB のみ含まれる。zip ダウンロード時の通信は ~40MB だがビルド時のみ |
 | C6 | `cmake/PiperPlusShared.cmake` が dylib リンクを想定していない場合 | 中 | §3.4 の事前検証で確認、必要なら `cmake/PiperPlusShared.cmake` の iOS 分岐に最小修正を追加。修正範囲が大きい場合は M2 統合判断 |
 | C7 | sha256 不一致時の運用 | 低 | fail-stop。CI ログから手動で再計算し PR で値更新。誤更新による silent corruption を避ける |
+| C8 | ORT 1.17.0 (2024-01) 固定の正当性 | 中 | iOS 単独で bump 不可: `release-shared-lib.yml` の `env.ONNXRUNTIME_VERSION` は **iOS / Android で共有**、`docs/spec/ort-versions.md` で C++/iOS/Android が 1.17.0 で揃っている。1.20.0 (44MB, 2024-10) / 1.22.0 (47MB, 2025-05) とも CDN HTTP 200 確認済 (2026-05-04)。M1 では bump せず、**全 OS 横断 bump (例: 1.17.0 → 1.22.0) を別 issue として起票**することを M3 §12.2 の運用課題に追加 |
 
 ---
 
