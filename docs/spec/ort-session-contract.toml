@@ -76,3 +76,32 @@ maxsize = 2000
 cache_unit = "sentence"  # cache per-sentence after text splitting
 key_format = "(sentence_text, prosody_flag)"  # piper_train: text only (prosody always true)
 clear_api = "clear_phonemize_cache()"
+
+# --- Execution Provider ---
+
+[execution_provider]
+# 自動検出の優先度順（TensorRT は auto-detect 対象外 — 明示指定のみ）
+# OpenVINO は Python ランタイムのみ対応。
+auto_priority = ["CUDA", "CoreML", "DirectML", "OpenVINO", "CPU"]
+
+[execution_provider.env]
+override_var = "PIPER_EXECUTION_PROVIDER"
+# 値: "cpu" | "cuda" | "cuda:N" | "coreml" | "directml" | "directml:N"
+#     | "openvino" | "tensorrt" | "tensorrt:N"
+# TensorRT は auto-detect 対象外だが明示指定は可能。
+# env var は device パラメータより優先される。
+
+# --- [cache] セクションへの追記 ---
+# 既存キー device_label_cpu / device_label_cuda_format に加えて追加:
+
+[cache.extra_device_labels]
+device_label_coreml          = "coreml"
+device_label_directml_format = "directml{device_id}"
+device_label_openvino        = "openvino"
+device_label_tensorrt_format = "tensorrt{device_id}"
+
+# --- [env_vars.implementation_status] への追記 ---
+# PIPER_EXECUTION_PROVIDER の実装状況
+#                        Rust    C#     C++    Python   Go
+# ep env var             ✓       ✓      ✓      ✓        ✓
+# openvino ep            -       -      -      ✓        -
