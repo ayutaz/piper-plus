@@ -67,6 +67,102 @@ except ImportError:
 # to guarantee consistency across the codebase.
 MULTI_CHAR_TO_PUA = {k: chr(v) for k, v in FIXED_PUA_MAPPING.items()}
 
+# TensorRT は auto-detect 対象外（明示指定のみ）。
+# ort_utils.py の _EP_AUTO_PRIORITY / _EP_KEY_TO_ORT_NAME と同期を保つこと。
+_INLINE_EP_AUTO_PRIORITY = [
+    "CUDAExecutionProvider",
+    "CoreMLExecutionProvider",
+    "DmlExecutionProvider",
+    "OpenVINOExecutionProvider",
+]
+
+_INLINE_EP_KEY_MAP: dict[str, str] = {
+    "cuda": "CUDAExecutionProvider",
+    "gpu": "CUDAExecutionProvider",   # backward compat alias
+    "coreml": "CoreMLExecutionProvider",
+    "directml": "DmlExecutionProvider",
+    "openvino": "OpenVINOExecutionProvider",
+    "tensorrt": "TensorrtExecutionProvider",
+}
+
+
+def _inline_get_providers(device: str) -> list:
+    """Inline variant of ort_utils.get_providers() for standalone voice.py.
+
+    Keep in sync with piper_train.ort_utils.get_providers().
+    """
+    import onnxruntime as _ort
+
+    env = os.environ.get("PIPER_EXECUTION_PROVIDER", "").lower().strip()
+    target = env if env else device.lower().strip()
+
+    if target in ("cpu", ""):
+        return ["CPUExecutionProvider"]
+
+    available = _ort.get_available_providers()
+
+    if target == "auto":
+        for ep in _INLINE_EP_AUTO_PRIORITY:
+            if ep in available:
+                return [ep, "CPUExecutionProvider"]
+        return ["CPUExecutionProvider"]
+
+    parts = target.split(":", 1)
+    key = parts[0]
+    dev_id = int(parts[1]) if len(parts) > 1 and parts[1].isdigit() else 0
+
+    ep_name = _INLINE_EP_KEY_MAP.get(key)
+    if ep_name is None or ep_name not in available:
+        return ["CPUExecutionProvider"]
+
+    if key in ("cuda", "gpu"):
+        return [(ep_name, {"device_id": str(dev_id), "cudnn_conv_algo_search": "HEURISTIC"}),
+                "CPUExecutionProvider"]
+    if key in ("directml", "tensorrt"):
+        return [(ep_name, {"device_id": str(dev_id)}), "CPUExecutionProvider"]
+    return [ep_name, "CPUExecutionProvider"]
+
+
+def _inline_get_device_label(device: str) -> str:
+    """Inline variant of ort_utils._get_device_label() for standalone voice.py.
+
+    Keep in sync with piper_train.ort_utils._get_device_label().
+    """
+    import onnxruntime as _ort
+
+    env = os.environ.get("PIPER_EXECUTION_PROVIDER", "").lower().strip()
+    target = env if env else device.lower().strip()
+
+    if target in ("cpu", ""):
+        return "cpu"
+
+    if target == "auto":
+        available = _ort.get_available_providers()
+        label_map = {
+            "CUDAExecutionProvider": "cuda0",
+            "CoreMLExecutionProvider": "coreml",
+            "DmlExecutionProvider": "directml0",
+            "OpenVINOExecutionProvider": "openvino",
+        }
+        for ep, label in label_map.items():
+            if ep in available:
+                return label
+        return "cpu"
+
+    parts = target.split(":", 1)
+    key = parts[0]
+    dev_id = int(parts[1]) if len(parts) > 1 and parts[1].isdigit() else 0
+
+    fmt_map = {
+        "cuda": f"cuda{dev_id}",
+        "gpu": f"cuda{dev_id}",   # backward compat alias
+        "coreml": "coreml",
+        "directml": f"directml{dev_id}",
+        "openvino": "openvino",
+        "tensorrt": f"tensorrt{dev_id}",
+    }
+    return fmt_map.get(key, "cpu")
+
 
 def _warmup_session(
     session: onnxruntime.InferenceSession,
@@ -115,23 +211,18 @@ def _warmup_session(
 def _load_session_inline(
     model_path: str | Path,
     *,
-    use_cuda: bool = False,
+    use_cuda: bool = False,  # deprecated: use device="cuda" instead
+    device: str = "auto",
 ) -> onnxruntime.InferenceSession:
-    """Create an InferenceSession using inline logic (no piper_train dependency).
+    """Create InferenceSession (no piper_train dependency).
 
-    This is the fallback used when piper_train.ort_utils is not available.
     Keep in sync with piper_train.ort_utils.create_session_with_cache().
     """
-    providers: list[str | tuple[str, dict[str, Any]]]
-    if use_cuda:
-        providers = [
-            (
-                "CUDAExecutionProvider",
-                {"cudnn_conv_algo_search": "HEURISTIC"},
-            )
-        ]
-    else:
-        providers = ["CPUExecutionProvider"]
+    # Backward compat: use_cuda=True + device="auto" → device="cuda"
+    if use_cuda and device == "auto":
+        device = "cuda"
+
+    providers = _inline_get_providers(device)
 
     # Keep in sync with piper_train.ort_utils.create_session_options()
     sess_options = onnxruntime.SessionOptions()
@@ -177,7 +268,7 @@ def _load_session_inline(
     )
 
     model_p = Path(model_path)
-    device_label = "cuda0" if use_cuda else "cpu"
+    device_label = _inline_get_device_label(device)
     cache_path = model_p.with_suffix(f".{device_label}.opt.onnx")
     sentinel_path = Path(str(cache_path) + ".ok")
     use_cached = not _disable_cache and cache_path.exists() and sentinel_path.exists()
@@ -389,9 +480,14 @@ class PiperVoice:
     def load(
         model_path: str | Path,
         config_path: str | Path | None = None,
-        use_cuda: bool = False,
+        use_cuda: bool = False,   # deprecated: use device="cuda" instead
+        device: str = "auto",
     ) -> "PiperVoice":
         """Load an ONNX model and config."""
+        # Backward compat: use_cuda=True + device="auto" → device="cuda"
+        if use_cuda and device == "auto":
+            device = "cuda"
+
         if config_path is None:
             candidate = Path(f"{model_path}.json")
             if candidate.exists():
@@ -402,15 +498,11 @@ class PiperVoice:
         with open(config_path, encoding="utf-8") as config_file:
             config_dict = json.load(config_file)
 
-        if _HAS_SHARED_ORT_UTILS and not use_cuda:
-            # CPU: use shared ORT utilities (avoids code duplication)
-            session = _shared_create_session_with_cache(model_path, device="cpu")
+        if _HAS_SHARED_ORT_UTILS:
+            session = _shared_create_session_with_cache(model_path, device=device)
             _shared_warmup(session)
         else:
-            # CUDA or standalone: use inline implementation
-            # (preserves cudnn_conv_algo_search=HEURISTIC for CUDA EP)
-            # Keep in sync with piper_train.ort_utils
-            session = _load_session_inline(model_path, use_cuda=use_cuda)
+            session = _load_session_inline(model_path, device=device)
             _warmup_session(session)
 
         return PiperVoice(
