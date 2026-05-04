@@ -117,6 +117,27 @@ pub fn parse_device_string(device: &str) -> Result<DeviceType, PiperError> {
     })
 }
 
+/// Resolve a device string, applying `PIPER_EXECUTION_PROVIDER` env var override.
+///
+/// Priority: env var > `device` argument.
+/// If env var is empty or unset, `device` is used.
+/// If effective value is "auto" or empty, `auto_detect_device()` is called.
+///
+/// Use this instead of `parse_device_string` in inference engines.
+pub fn resolve_device_string(device: &str) -> Result<DeviceType, PiperError> {
+    let env_ep = std::env::var("PIPER_EXECUTION_PROVIDER")
+        .ok()
+        .filter(|s| !s.is_empty());
+
+    let effective = env_ep.as_deref().unwrap_or(device);
+
+    if effective.eq_ignore_ascii_case("auto") || effective.is_empty() {
+        return Ok(auto_detect_device());
+    }
+
+    parse_device_string(effective)
+}
+
 /// Cached result of `auto_detect_device()`.
 ///
 /// `OnceLock` ensures the detection logic runs at most once per process,
@@ -797,6 +818,60 @@ mod tests {
         let d1 = auto_detect_device();
         let d2 = auto_detect_device();
         assert_eq!(d1, d2);
+    }
+
+    #[test]
+    fn test_resolve_device_string_env_var_cpu() {
+        unsafe { std::env::set_var("PIPER_EXECUTION_PROVIDER", "cpu") };
+        let result = resolve_device_string("auto").unwrap();
+        unsafe { std::env::remove_var("PIPER_EXECUTION_PROVIDER") };
+        assert_eq!(result, DeviceType::Cpu);
+    }
+
+    #[test]
+    fn test_resolve_device_string_env_var_cuda() {
+        unsafe { std::env::set_var("PIPER_EXECUTION_PROVIDER", "cuda") };
+        let result = resolve_device_string("cpu").unwrap();
+        unsafe { std::env::remove_var("PIPER_EXECUTION_PROVIDER") };
+        assert_eq!(result, DeviceType::Cuda { device_id: 0 });
+    }
+
+    #[test]
+    fn test_resolve_device_string_env_var_coreml() {
+        unsafe { std::env::set_var("PIPER_EXECUTION_PROVIDER", "coreml") };
+        let result = resolve_device_string("cpu").unwrap();
+        unsafe { std::env::remove_var("PIPER_EXECUTION_PROVIDER") };
+        assert_eq!(result, DeviceType::CoreML);
+    }
+
+    #[test]
+    fn test_resolve_device_string_no_env_var_uses_param() {
+        unsafe { std::env::remove_var("PIPER_EXECUTION_PROVIDER") };
+        let result = resolve_device_string("cpu").unwrap();
+        assert_eq!(result, DeviceType::Cpu);
+    }
+
+    #[test]
+    fn test_resolve_device_string_empty_env_var_uses_param() {
+        unsafe { std::env::set_var("PIPER_EXECUTION_PROVIDER", "") };
+        let result = resolve_device_string("cpu").unwrap();
+        unsafe { std::env::remove_var("PIPER_EXECUTION_PROVIDER") };
+        assert_eq!(result, DeviceType::Cpu);
+    }
+
+    #[test]
+    fn test_resolve_device_string_auto_without_env() {
+        unsafe { std::env::remove_var("PIPER_EXECUTION_PROVIDER") };
+        // auto → 常に有効な DeviceType を返す（最低でも CPU）
+        let result = resolve_device_string("auto").unwrap();
+        // 全バリアントを網羅した match で unreachable がないことを確認
+        match result {
+            DeviceType::Cpu
+            | DeviceType::Cuda { .. }
+            | DeviceType::CoreML
+            | DeviceType::DirectML { .. }
+            | DeviceType::TensorRT { .. } => {}
+        }
     }
 
     #[test]

@@ -399,7 +399,7 @@ impl OnnxEngine {
         // デバイス文字列をパースして GPU プロバイダを設定
         // "auto" は parse_device_string 内でフォールバックするが、
         // 明示的なデバイス指定 (e.g. "cuda:0") が不正な場合はエラーを返す。
-        let device_type = crate::gpu::parse_device_string(device)
+        let device_type = crate::gpu::resolve_device_string(device)
             .map_err(|e| PiperError::ModelLoad(format!("invalid device '{}': {}", device, e)))?;
 
         // COLD-M1: VITS は小モデルのためスレッド数上限を設ける。
