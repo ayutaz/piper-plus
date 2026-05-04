@@ -137,30 +137,56 @@ private static void TryAppendCoreML(SessionOptions options, ILogger logger)
 
 `OrtEnv.Instance.GetAvailableProviders()` で EP を列挙し、優先度順に試みる。
 
+**設計仕様書 §2.1「EP が利用可能でも初期化に失敗した場合は次の EP に降格し警告ログを出す」** を実現するため、`TryAppend*` メソッドはすべて `bool`（成功時 `true`）を返す設計にする。`void` 戻り値の既存メソッドは `bool` 返値に変更すること（戻り値を無視していた呼び出し元も合わせて更新）。
+
 ```csharp
 private static string AutoDetectAndConfigureEP(SessionOptions options, ILogger logger)
 {
     var available = OrtEnv.Instance.GetAvailableProviders();
 
-    if (Array.IndexOf(available, "CUDAExecutionProvider") >= 0)
-    {
-        TryAppendCudaProvider(options, 0, logger);
+    if (Array.IndexOf(available, "CUDAExecutionProvider") >= 0
+        && TryAppendCudaProvider(options, 0, logger))
         return "cuda0";
-    }
-    if (Array.IndexOf(available, "CoreMLExecutionProvider") >= 0)
-    {
-        TryAppendCoreML(options, logger);
+
+    if (Array.IndexOf(available, "CoreMLExecutionProvider") >= 0
+        && TryAppendCoreML(options, logger))
         return "coreml";
-    }
-    if (Array.IndexOf(available, "DmlExecutionProvider") >= 0)
-    {
-        TryAppendDirectMLProvider(options, 0, logger);
+
+    if (Array.IndexOf(available, "DmlExecutionProvider") >= 0
+        && TryAppendDirectMLProvider(options, 0, logger))
         return "directml0";
-    }
+
     logger.LogInformation("No hardware EP available, using CPU");
     return "cpu";
 }
 ```
+
+**`TryAppend*` メソッドの戻り値変更（`void` → `bool`）:**
+
+```csharp
+// 変更前（例: TryAppendCoreML）
+private static void TryAppendCoreML(SessionOptions options, ILogger logger) { ... }
+
+// 変更後
+private static bool TryAppendCoreML(SessionOptions options, ILogger logger)
+{
+    try
+    {
+        options.AppendExecutionProviderCoreML(0);
+        logger.LogInformation("CoreML execution provider enabled");
+        return true;
+    }
+    catch (Exception ex)
+    {
+        logger.LogWarning(
+            "CoreML execution provider unavailable, falling back to CPU: {Message}",
+            ex.Message);
+        return false;
+    }
+}
+```
+
+同様に `TryAppendCudaProvider` と `TryAppendDirectMLProvider` も `bool` 返値に変更する。
 
 ### 2.4 `Create()` メソッドの変更
 
