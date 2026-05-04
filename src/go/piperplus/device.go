@@ -3,6 +3,7 @@ package piperplus
 import (
 	"fmt"
 	"log/slog"
+	"os"
 	"strconv"
 	"strings"
 
@@ -23,6 +24,17 @@ func (d DeviceType) String() string {
 	default:
 		return fmt.Sprintf("%s:%d", d.Provider, d.DeviceID)
 	}
+}
+
+// selectDeviceWithEnv returns the effective device string after applying
+// the PIPER_EXECUTION_PROVIDER environment variable override.
+// env var takes precedence over the device parameter.
+// If env var is empty or unset, device is returned as-is.
+func selectDeviceWithEnv(device string) string {
+	if ep := os.Getenv("PIPER_EXECUTION_PROVIDER"); ep != "" {
+		return strings.ToLower(strings.TrimSpace(ep))
+	}
+	return device
 }
 
 // ParseDevice parses a device string into a DeviceType.
@@ -78,6 +90,7 @@ func ParseDevice(device string) (DeviceType, error) {
 // specified device. On EP configuration failure the function logs a warning and
 // falls back to CPU. The caller must call sessOpts.Destroy() when done.
 func configureSessionOptions(device string, logger *slog.Logger) (*ort.SessionOptions, error) {
+	device = selectDeviceWithEnv(device) // env var override
 	if logger == nil {
 		logger = slog.Default()
 	}
