@@ -246,7 +246,7 @@ piper-plus ships **as several independent packages**, each released and versione
 | `piper-plus-cli` / `piper-plus` (Rust crate) | crates.io | `src/rust/` | `rust-v<X.Y.Z>` | SemVer |
 | `PiperPlus.Core` / `PiperPlus.Cli` (NuGet) | NuGet | `src/csharp/` | `csharp-v<X.Y.Z>` | SemVer |
 | `piper-plus` (npm) | npm | `src/wasm/openjtalk-web/` | `npm-v<X.Y.Z>` (e.g. `npm-v0.5.0`) | SemVer |
-| `@piper-plus/g2p` (npm) | npm | `src/wasm/g2p/` | `g2p-v<X.Y.Z>` (e.g. `g2p-v0.3.0`) | SemVer |
+| `@piper-plus/g2p` (npm) | npm | `src/wasm/g2p/` | `wasm-g2p-v<X.Y.Z>` (e.g. `wasm-g2p-v0.4.0`) | SemVer |
 | `github.com/ayutaz/piper-plus/src/go` | Go module | `src/go/` | (none — uses commit SHA via `go get`) | Go module versioning |
 | C API shared library (`libpiper_plus`) | GitHub Releases | `src/cpp/` | `shared-lib-v<X.Y.Z>` | SemVer |
 
@@ -274,15 +274,17 @@ Some packages depend on others published to the **same registry**. Publishing th
 | PyPI | `piper-plus-g2p` → `piper-plus` → `piper-tts-plus` (stub) | Same dependency chain. Manual Release workflow chains `publish_pypi` → `publish_pypi_stub`. |
 | NuGet | `PiperPlus.Core` → `PiperPlus.Cli` | CLI references Core. |
 
-**Manual operation needed for npm:** the GitHub Actions Manual Release workflow handles PyPI / NuGet / crates.io automatically, but **npm publishes are gated by separate tag triggers** (`npm-publish.yml` listens on `npm-v*` and `g2p-v*` tags). To publish a coordinated npm release:
+**Manual operation needed for npm:** the GitHub Actions Manual Release workflow handles PyPI / NuGet / crates.io automatically, but **npm publishes are gated by separate tag triggers**: `g2p-wasm-ci.yml` listens on `wasm-g2p-v*` tags (publishes `@piper-plus/g2p`), and `npm-publish.yml` listens on `npm-v*` tags (publishes `piper-plus`). To publish a coordinated npm release:
 
 ```bash
-# 1. Publish g2p first
-git tag g2p-v0.4.0 && git push --tags
+# 1. Publish @piper-plus/g2p first (triggered by g2p-wasm-ci.yml)
+git tag wasm-g2p-v0.4.0 <COMMIT>
+git push origin wasm-g2p-v0.4.0
 
-# 2. Wait for the g2p tag's CI to finish publishing to npm
-# 3. Then publish piper-plus
-git tag npm-v0.6.0 && git push --tags
+# 2. Wait for g2p-wasm-ci to finish publishing to npm
+# 3. Then publish piper-plus (triggered by npm-publish.yml)
+git tag npm-v0.6.0 <COMMIT>
+git push origin npm-v0.6.0
 ```
 
 Skipping step 1 will cause `npm install piper-plus@0.6.0` to fail with `notarget No matching version found for @piper-plus/g2p@^0.4.0`.
