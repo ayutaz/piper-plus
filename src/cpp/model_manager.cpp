@@ -18,6 +18,10 @@
 #include <windows.h>
 #endif
 
+#if defined(__APPLE__)
+#include <TargetConditionals.h>
+#endif
+
 #include <spdlog/spdlog.h>
 #include "json.hpp"
 #include "model_manager.hpp"
@@ -254,12 +258,25 @@ static bool downloadFile(const std::string& url,
         }
     }
 
+#if defined(__APPLE__) && TARGET_OS_IPHONE
+    // iOS / iPadOS / tvOS / watchOS: std::system() is unavailable.
+    // App sandbox forbids spawning curl/wget anyway. Auto-download is therefore
+    // unsupported on these platforms — consumer apps must pre-download the
+    // model via URLSession (or equivalent platform networking API) and pass
+    // the local file path to piper-plus.
+    (void)url;
+    (void)outStr;
+    spdlog::error(
+        "Model auto-download is not supported on iOS / iPadOS / tvOS / watchOS. "
+        "Pre-download the model via URLSession and pass the local file path.");
+    return false;
+#else
     std::string cmd;
 
-#ifdef _WIN32
+#  ifdef _WIN32
     cmd = "powershell -NoProfile -Command \"Invoke-WebRequest -Uri '"
         + url + "' -OutFile '" + outStr + "'\"";
-#else
+#  else
     // Prefer curl, fall back to wget
     if (std::system("which curl > /dev/null 2>&1") == 0) {
         cmd = "curl -L -# -o \"" + outStr + "\" \"" + url + "\"";
@@ -269,11 +286,12 @@ static bool downloadFile(const std::string& url,
         spdlog::error("Neither curl nor wget is available for downloading");
         return false;
     }
-#endif
+#  endif
 
     spdlog::info("Downloading {} ...", url);
     int rc = std::system(cmd.c_str());
     return rc == 0;
+#endif
 }
 
 // ---------------------------------------------------------------------------
