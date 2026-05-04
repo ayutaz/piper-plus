@@ -132,6 +132,40 @@ elseif(UNIX AND NOT APPLE)
   target_link_libraries(piper_plus PRIVATE Threads::Threads dl)
 endif()
 
+# ---- Apple embedded: merge dependency archives into libpiper_plus.a ----
+# Background (issue #377): on iOS, target_link_libraries records the
+# dependency graph but Apple's xcrun libtool only places piper_plus_c_api.o
+# into the resulting archive — consumer Xcode projects would need to link
+# libpiper_common.a + libopenjtalk.a + libhts_engine_stub.a separately, AND
+# CMake doesn't propagate transitive STATIC dependencies through the
+# xcframework boundary. To produce a single .a that consumer apps can link
+# straight from Frameworks/piper_plus.xcframework/.../libpiper_plus.a, we
+# post-process with `xcrun libtool -static` to merge all transitive STATIC
+# dependencies. Same pattern as sherpa-onnx / whisper.cpp.
+if(PIPER_APPLE_EMBEDDED)
+  add_custom_command(TARGET piper_plus POST_BUILD
+    # Step 1: rename libpiper_plus.a (currently containing only piper_plus_c_api.o)
+    #   to libpiper_plus_partial.a so we can rebuild the canonical name.
+    COMMAND ${CMAKE_COMMAND} -E rename
+      $<TARGET_FILE:piper_plus>
+      $<TARGET_FILE_DIR:piper_plus>/libpiper_plus_partial.a
+    # Step 2: combine partial + dependency archives into the final libpiper_plus.a.
+    #   -no_warning_for_no_symbols silences libtool's complaint about object
+    #   files with only file-static symbols (e.g., openjtalk_security.c).
+    COMMAND xcrun libtool -static -no_warning_for_no_symbols
+      -o $<TARGET_FILE:piper_plus>
+      $<TARGET_FILE_DIR:piper_plus>/libpiper_plus_partial.a
+      $<TARGET_FILE:piper_common>
+      $<TARGET_FILE:hts_engine_stub>
+      ${OPENJTALK_DIR}/lib/libopenjtalk.a
+    # Step 3: clean up the partial archive.
+    COMMAND ${CMAKE_COMMAND} -E remove
+      $<TARGET_FILE_DIR:piper_plus>/libpiper_plus_partial.a
+    VERBATIM
+    COMMENT "Merging libpiper_common.a + libopenjtalk.a + libhts_engine_stub.a into libpiper_plus.a (iOS unified archive)"
+  )
+endif()
+
 # Output name is universal.
 set_target_properties(piper_plus PROPERTIES OUTPUT_NAME "piper_plus")
 
