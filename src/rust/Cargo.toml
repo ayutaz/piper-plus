@@ -3,7 +3,7 @@ members = ["piper-plus-g2p", "piper-core", "piper-cli", "piper-python", "piper-w
 resolver = "2"
 
 [workspace.package]
-version = "0.3.0"
+version = "0.4.0"
 edition = "2024"
 rust-version = "1.88"
 license = "MIT"
