@@ -74,8 +74,18 @@ RUN wget https://downloads.sourceforge.net/open-jtalk/open_jtalk-1.11.tar.gz && 
 # Create working directory
 WORKDIR /workspace
 
-# Install development tools (--break-system-packages: PEP 668 / Ubuntu 24.04)
-RUN pip3 install --break-system-packages \
+# Install uv via official installer
+ENV UV_INSTALL_DIR=/usr/local/bin
+ADD https://astral.sh/uv/install.sh /uv-installer.sh
+RUN sh /uv-installer.sh && rm /uv-installer.sh
+
+# Create a dedicated venv for development tools (avoids PEP 668 on Ubuntu 24.04 / python3.12)
+ENV VIRTUAL_ENV=/opt/devtools
+RUN uv venv "$VIRTUAL_ENV"
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+
+# Install development tools into the venv
+RUN uv pip install \
     conan \
     cpplint \
     cppcheck \
