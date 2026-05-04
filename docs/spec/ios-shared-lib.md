@@ -215,6 +215,7 @@ Plan A の xcframework ビルドロジック (`xcodebuild -create-xcframework`) 
 
 > **目的:** 表層問題を最短で解消し、shared-lib リリースパイプライン全体を復旧する。
 
+- **チケット:** [`docs/tickets/377-M1-ort-fetch-fix.md`](../tickets/377-M1-ort-fetch-fix.md)
 - **状態:** [ ] 未着手
 - **スコープ:**
   - [ ] `release-shared-lib.yml:144-148` の curl URL を `https://download.onnxruntime.ai/pod-archive-onnxruntime-c-${ONNXRUNTIME_VERSION}.zip` に変更
@@ -236,6 +237,7 @@ Plan A の xcframework ビルドロジック (`xcodebuild -create-xcframework`) 
 
 > **目的:** 根本問題 (`.a` 単独配布が Dart FFI / Godot / Swift と不整合) を解消し、iOS 利用シナリオを実用化する。
 
+- **チケット:** [`docs/tickets/377-M2-xcframework.md`](../tickets/377-M2-xcframework.md)
 - **状態:** [ ] 未着手
 - **スコープ:**
   - [ ] `release-shared-lib.yml` の `build-ios` を `matrix.slice` で 2 分割
@@ -266,6 +268,7 @@ Plan A の xcframework ビルドロジック (`xcodebuild -create-xcframework`) 
 
 > **目的:** 利用者が xcframework を組み込めるよう統合手順を整備し、既存 `.a` 配布の段階的廃止を案内する。
 
+- **チケット:** [`docs/tickets/377-M3-docs-migration.md`](../tickets/377-M3-docs-migration.md)
 - **状態:** [ ] 未着手
 - **スコープ:**
   - [ ] `examples/dart/README.md` の iOS 統合手順を xcframework ベースに刷新
@@ -291,6 +294,7 @@ Plan A の xcframework ビルドロジック (`xcodebuild -create-xcframework`) 
 
 > **目的:** SPM ユーザーへ公式パッケージを提供し、`import PiperPlus` で消費可能にする。
 
+- **チケット:** [`docs/tickets/377-M4-spm-package.md`](../tickets/377-M4-spm-package.md)
 - **状態:** [ ] 別 issue で管理予定 (本仕様スコープ外)
 - **スコープ:**
   - [ ] 別 repo `ayousanz/piper-plus-swift-package-manager` を新設
