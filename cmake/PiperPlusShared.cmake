@@ -78,6 +78,19 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "iOS" AND DEFINED ONNXRUNTIME_LIB)
   )
   # Link OpenJTalk static library
   target_link_libraries(piper_plus PRIVATE ${OPENJTALK_DIR}/lib/libopenjtalk.a)
+
+  # Generate module.modulemap for xcframework Swift import support
+  # (M2 §11.7 繰り上げ採用 — issue #377)
+  # The map file is placed in CMAKE_BINARY_DIR and the assemble-xcframework CI
+  # job copies it into each slice's Headers/ directory inside the xcframework,
+  # enabling `import PiperPlus` from Swift via SPM binaryTarget consumption.
+  file(WRITE "${CMAKE_BINARY_DIR}/module.modulemap"
+"module PiperPlus {
+  umbrella header \"piper_plus.h\"
+  export *
+  module * { export * }
+}
+")
 elseif(ANDROID AND DEFINED ONNXRUNTIME_LIB)
   # Android: link ONNX Runtime by explicit path (from AAR extraction)
   target_link_libraries(piper_plus PRIVATE
