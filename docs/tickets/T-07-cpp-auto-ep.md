@@ -233,6 +233,7 @@ cerr << endl;
 
 | ファイル | 変更内容 |
 |---|---|
+| `src/cpp/piper.hpp` | `RunConfig` 構造体に `std::string provider = "auto";` フィールド追加 |
 | `src/cpp/piper.cpp` | `loadModel()` に `provider == "auto"` / `provider.empty()` の auto-detect ブロック追加 |
 | `src/cpp/main.cpp` | `parseArgs()` に `PIPER_EXECUTION_PROVIDER` env var 読み取り追加。`printUsage()` に env var 説明追記 |
 
