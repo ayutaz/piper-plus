@@ -156,7 +156,7 @@ CUDA     = ["python", "rust", "csharp", "cpp", "go"]
 CoreML   = ["python", "rust", "csharp", "cpp", "go"]
 DirectML = ["python", "rust", "csharp", "cpp", "go"]
 OpenVINO = ["python"]
-TensorRT = ["python", "rust", "csharp", "cpp", "go"]  # explicit-only
+TensorRT = ["python", "rust", "csharp", "go"]  # explicit-only; cpp: future issue（T-07 スコープ外）
 ```
 
 各ランタイムのテストが `ort-session-contract.toml` を直接読み込んで `auto_priority` の順序やラベル形式を検証するコントラクトテストを持つことで、仕様と実装のズレを自動検出できる。
