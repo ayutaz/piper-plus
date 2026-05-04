@@ -128,11 +128,14 @@ jobs:
           echo "# Python" >> $GITHUB_OUTPUT
           echo "pip install piper-plus==${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
           echo "" >> $GITHUB_OUTPUT
-          echo "# C# (.NET Global Tool) — v0.1.0" >> $GITHUB_OUTPUT
-          echo "dotnet tool install -g PiperPlus.Cli --version 0.1.0" >> $GITHUB_OUTPUT
+          # C#/Rust/npm パッケージは独立バージョン管理 — 各 manifest から動的取得
+          CS_VERSION=$(grep -oPm1 '(?<=<Version>)[^<]+' src/csharp/PiperPlus.Cli/PiperPlus.Cli.csproj)
+          echo "# C# (.NET Global Tool) — v${CS_VERSION}" >> $GITHUB_OUTPUT
+          echo "dotnet tool install -g PiperPlus.Cli --version ${CS_VERSION}" >> $GITHUB_OUTPUT
           echo "" >> $GITHUB_OUTPUT
-          echo "# Rust — v0.1.0" >> $GITHUB_OUTPUT
-          echo "cargo install piper-plus-cli --version 0.1.0" >> $GITHUB_OUTPUT
+          RS_VERSION=$(grep -m1 '^version' src/rust/Cargo.toml | sed 's/.*"\(.*\)".*/\1/')
+          echo "# Rust — v${RS_VERSION}" >> $GITHUB_OUTPUT
+          echo "cargo install piper-plus-cli --version ${RS_VERSION}" >> $GITHUB_OUTPUT
           echo "" >> $GITHUB_OUTPUT
           NPM_VERSION=$(node -p "require('./src/wasm/openjtalk-web/package.json').version")
           echo "# npm (Browser WASM) — v${NPM_VERSION}" >> $GITHUB_OUTPUT

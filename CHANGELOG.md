@@ -91,7 +91,7 @@ Python ランタイムに完全な phoneme timing 出力機能を追加。VITS D
 - `_synthesize_ids_core()` 内部メソッド (durations 取得 + original_phoneme_ids 保持)
 
 **HTTP エンドポイント:**
-- `POST/GET /api/phoneme-timing` (Flask、`format=json|tsv` 対応)
+- `POST/GET /api/phoneme-timing` (FastAPI、`format=json|tsv` 対応)
 - `language` / `language_id` クエリパラメータで多言語対応
 
 **設定:**
