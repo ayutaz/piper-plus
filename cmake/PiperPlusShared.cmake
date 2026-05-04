@@ -10,14 +10,23 @@ if(PIPER_PLUS_BUILD_SHARED)
 if(PIPER_APPLE_EMBEDDED)
   add_library(piper_plus STATIC
     src/cpp/piper_plus_c_api.cpp
-    $<TARGET_OBJECTS:piper_common>
   )
 else()
   add_library(piper_plus SHARED
     src/cpp/piper_plus_c_api.cpp
-    $<TARGET_OBJECTS:piper_common>
   )
 endif()
+
+# Link the piper_common OBJECT library via target_link_libraries — the
+# CMake 3.12+ canonical API for OBJECT libraries. Passing
+# $<TARGET_OBJECTS:piper_common> in the `sources` argument of add_library
+# (the previous approach) appears to silently drop the .o files from the
+# resulting STATIC archive on iOS (Apple's `xcrun libtool -static` does not
+# consume generator-expression .o paths the same way `ld` does for SHARED
+# builds — issue #377). target_link_libraries propagates both the build
+# dependency AND the .o file membership into the consumer archive on every
+# platform, so use it uniformly for SHARED and STATIC.
+target_link_libraries(piper_plus PRIVATE piper_common)
 
 # Dependencies (same as piper/test_piper)
 add_dependencies(piper_plus fmt_external spdlog_external openjtalk_external hts_engine_stub)
@@ -123,13 +132,22 @@ elseif(UNIX AND NOT APPLE)
   target_link_libraries(piper_plus PRIVATE Threads::Threads dl)
 endif()
 
-# Visibility and output settings
-set_target_properties(piper_plus PROPERTIES
-  C_VISIBILITY_PRESET hidden
-  CXX_VISIBILITY_PRESET hidden
-  VISIBILITY_INLINES_HIDDEN ON
-  OUTPUT_NAME "piper_plus"
-)
+# Output name is universal.
+set_target_properties(piper_plus PROPERTIES OUTPUT_NAME "piper_plus")
+
+# Visibility (hidden) only applies meaningfully to SHARED / dynamic libraries
+# where it controls the dynamic export table. On STATIC archives (Apple iOS),
+# archive symbol tables don't honor visibility — and applying hidden visibility
+# while libtool consolidates the archive can silently drop cross-TU references
+# (e.g., piper_common's piper:: namespace symbols referenced from
+# piper_plus_c_api.cpp). Apply only on SHARED-targeting platforms.
+if(NOT PIPER_APPLE_EMBEDDED)
+  set_target_properties(piper_plus PROPERTIES
+    C_VISIBILITY_PRESET hidden
+    CXX_VISIBILITY_PRESET hidden
+    VISIBILITY_INLINES_HIDDEN ON
+  )
+endif()
 
 # Apple embedded static archive: no VERSION/SOVERSION/RPATH needed
 if(NOT PIPER_APPLE_EMBEDDED)
