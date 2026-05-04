@@ -449,7 +449,64 @@ void loadModel(std::string modelPath, ModelSession &session,
   }
 
   // Execution provider selection
-  if (provider == "cuda") {
+  if (provider == "auto" || provider.empty()) {
+    // Auto-detect: CUDA → CoreML → DirectML → CPU
+    const OrtApi* ort_api = OrtGetApiBase()->GetApi(ORT_API_VERSION);
+    char** available_eps = nullptr;
+    int num_eps = 0;
+    OrtStatus* status = ort_api->GetAvailableProviders(&available_eps, &num_eps);
+    if (status == nullptr && available_eps != nullptr) {
+      auto has_ep = [&](const std::string& name) -> bool {
+        for (int i = 0; i < num_eps; ++i) {
+          if (std::string(available_eps[i]) == name) return true;
+        }
+        return false;
+      };
+      bool configured = false;
+      if (!configured && has_ep("CUDAExecutionProvider")) {
+        try {
+          OrtCUDAProviderOptions cuda_opts{};
+          cuda_opts.device_id = gpuDeviceId;
+          session.options.AppendExecutionProvider_CUDA(cuda_opts);
+          spdlog::info("Auto-detected: using CUDA execution provider (device={})", gpuDeviceId);
+          configured = true;
+        } catch (const std::exception& e) {
+          spdlog::warn("CUDA EP failed: {}, trying next", e.what());
+        }
+      }
+#ifdef __APPLE__
+      if (!configured && has_ep("CoreMLExecutionProvider")) {
+        try {
+          Ort::ThrowOnError(OrtSessionOptionsAppendExecutionProvider_CoreML(session.options, 0));
+          spdlog::info("Auto-detected: using CoreML execution provider");
+          configured = true;
+        } catch (const std::exception& e) {
+          spdlog::warn("CoreML EP failed: {}, trying next", e.what());
+        }
+      }
+#endif
+#ifdef PIPER_HAS_DIRECTML
+      if (!configured && has_ep("DmlExecutionProvider")) {
+        try {
+          Ort::ThrowOnError(OrtSessionOptionsAppendExecutionProvider_DML(session.options, gpuDeviceId));
+          spdlog::info("Auto-detected: using DirectML execution provider (device={})", gpuDeviceId);
+          configured = true;
+        } catch (const std::exception& e) {
+          spdlog::warn("DirectML EP failed: {}, trying next", e.what());
+        }
+      }
+#endif
+      ort_api->ReleaseAvailableProviders(available_eps, num_eps);
+      if (!configured) {
+        spdlog::info("Auto-detect: no hardware EP available, using CPU");
+      }
+    } else {
+      spdlog::warn("Failed to query available execution providers, falling back to CPU");
+      if (status != nullptr) {
+        ort_api->ReleaseStatus(status);
+      }
+    }
+  } else if (provider == "cuda") {
     // Use CUDA provider
     OrtCUDAProviderOptions cuda_options{};
     cuda_options.device_id = gpuDeviceId;
@@ -472,7 +529,7 @@ void loadModel(std::string modelPath, ModelSession &session,
 #else
     throw std::runtime_error("DirectML is only available on Windows");
 #endif
-  } else if (!provider.empty() && provider != "cpu") {
+  } else if (provider != "cpu") {
     throw std::runtime_error("Unknown provider: " + provider);
   }
 

@@ -97,6 +97,9 @@ struct RunConfig {
   // true to use CUDA execution provider
   bool useCuda = false;
 
+  // Execution provider: "auto" | "cpu" | "cuda" | "coreml" | "directml" | "tensorrt"
+  std::string provider = "auto";
+
   // GPU device ID for CUDA execution provider (default: 0)
   int gpuDeviceId = 0;
 
@@ -281,10 +284,9 @@ int main(int argc, char *argv[]) {
                 runConfig.modelConfigPath.string());
 
   auto startTime = chrono::steady_clock::now();
-  std::string provider = runConfig.useCuda ? "cuda" : "cpu";
   loadVoice(piperConfig, runConfig.modelPath.string(),
             runConfig.modelConfigPath.string(), voice, runConfig.speakerId,
-            provider, runConfig.gpuDeviceId);
+            runConfig.provider, runConfig.gpuDeviceId);
   auto endTime = chrono::steady_clock::now();
   spdlog::info("Loaded voice in {} second(s)",
                chrono::duration<double>(endTime - startTime).count());
@@ -773,6 +775,7 @@ void printUsage(char *argv[]) {
   cerr << "   PIPER_DEFAULT_MODEL           default model path (if --model not specified)" << endl;
   cerr << "   PIPER_DEFAULT_CONFIG          default config file path" << endl;
   cerr << "   PIPER_MODEL_DIR               default model directory (if --model-dir not specified)" << endl;
+  cerr << "   PIPER_EXECUTION_PROVIDER         Execution provider: auto|cpu|cuda|coreml|directml|tensorrt" << endl;
   cerr << "   PIPER_GPU_DEVICE_ID           GPU device ID for CUDA" << endl;
   cerr << endl;
 }
@@ -787,6 +790,13 @@ void ensureArg(int argc, char *argv[], int argi) {
 // Parse command-line arguments
 void parseArgs(int argc, char *argv[], RunConfig &runConfig) {
   optional<filesystem::path> modelConfigPath;
+
+  // PIPER_EXECUTION_PROVIDER は --use-cuda / --provider CLI フラグより優先
+  const char* epEnv = std::getenv("PIPER_EXECUTION_PROVIDER");
+  if (epEnv != nullptr && strlen(epEnv) > 0) {
+    runConfig.provider = std::string(epEnv);
+    spdlog::info("Execution provider set from PIPER_EXECUTION_PROVIDER: {}", runConfig.provider);
+  }
 
   // Check for GPU device ID environment variable
   const char* gpuDeviceEnv = std::getenv("PIPER_GPU_DEVICE_ID");
@@ -884,7 +894,8 @@ void parseArgs(int argc, char *argv[], RunConfig &runConfig) {
     } else if (arg == "--json_input" || arg == "--json-input") {
       runConfig.jsonInput = true;
     } else if (arg == "--use_cuda" || arg == "--use-cuda") {
-      runConfig.useCuda = true;
+      runConfig.useCuda = true;   // backward compat
+      runConfig.provider = "cuda";
     } else if (arg == "--gpu-device-id" || arg == "--gpu_device_id") {
       ensureArg(argc, argv, i);
       runConfig.gpuDeviceId = stoi(argv[++i]);

@@ -166,7 +166,7 @@ void terminate(PiperConfig &config);
 void loadVoice(PiperConfig &config, std::string modelPath,
                std::string modelConfigPath, Voice &voice,
                std::optional<SpeakerId> &speakerId,
-               const std::string &provider = "cpu",
+               const std::string &provider = "auto",
                int gpuDeviceId = 0, int numThreads = 0);
 
 /// Warm up the ONNX session with dummy inference runs.
