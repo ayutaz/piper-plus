@@ -141,39 +141,65 @@ jobs:
           fi
           echo "Version: $TAG"
 
-      - name: Download ONNX Runtime iOS
+      - name: Download ONNX Runtime iOS (Microsoft CDN)
+        env:
+          # ORT 1.17.0 sha256 (verified 2026-05-04, Content-Length: 40,771,813)
+          # Source: https://download.onnxruntime.ai/pod-archive-onnxruntime-c-1.17.0.zip
+          # Last-Modified: Wed, 31 Jan 2024 19:39:25 GMT
+          # Note: This zip is shared with CocoaPods/SPM — Microsoft breaking it
+          # would also break those channels, providing a strong invariant.
+          # See docs/spec/ios-shared-lib.md §2.1 for details.
+          ORT_IOS_SHA256: "1623e1150507d9e50554e3d3e5cf9abf75e1bfd8324b74a602acfe45343db871"
         run: |
-          curl -L -o onnxruntime-ios.zip \
-            "https://github.com/microsoft/onnxruntime/releases/download/v${ONNXRUNTIME_VERSION}/onnxruntime-ios-xcframework-${ONNXRUNTIME_VERSION}.zip"
-          unzip -q onnxruntime-ios.zip -d onnxruntime-ios
-          # Locate the ios-arm64 static library inside the xcframework
-          ORT_FW_DIR=$(find onnxruntime-ios -name "onnxruntime.xcframework" -type d | head -1)
-          echo "ORT_FW_DIR=${ORT_FW_DIR}"
-          ls -la "${ORT_FW_DIR}/"
-          # Extract the ios-arm64 slice directory
-          IOS_SLICE=$(find "${ORT_FW_DIR}" -type d -name "ios-arm64" | head -1)
-          if [ -z "${IOS_SLICE}" ]; then
-            # Fallback: look for ios-arm64_arm64e or similar
-            IOS_SLICE=$(find "${ORT_FW_DIR}" -type d -name "ios-arm64*" | head -1)
+          set -euo pipefail
+          PRIMARY_URL="https://download.onnxruntime.ai/pod-archive-onnxruntime-c-${ONNXRUNTIME_VERSION}.zip"
+
+          curl -L --fail --retry 3 -o onnxruntime-ios.zip "${PRIMARY_URL}"
+
+          # sha256 verification (reproducibility + supply chain minimum)
+          ACTUAL_SHA256=$(shasum -a 256 onnxruntime-ios.zip | awk '{print $1}')
+          echo "Expected sha256: ${ORT_IOS_SHA256}"
+          echo "Actual   sha256: ${ACTUAL_SHA256}"
+          if [ "${ACTUAL_SHA256}" != "${ORT_IOS_SHA256}" ]; then
+            echo "::error::ONNX Runtime iOS zip sha256 mismatch — CDN content changed unexpectedly"
+            exit 1
           fi
-          echo "IOS_SLICE=${IOS_SLICE}"
+
+          unzip -q onnxruntime-ios.zip -d onnxruntime-ios
+
+          # The CDN zip provides ios-arm64/onnxruntime.framework/onnxruntime
+          # as a Mach-O dynamic library. Static .a is NOT included
+          # (incompatible with the legacy GitHub Releases zip, see
+          # docs/spec/ios-shared-lib.md §2.1 ⚠️).
+          ORT_FW_ROOT=$(find onnxruntime-ios -name "onnxruntime.xcframework" -type d | head -1)
+          if [ -z "${ORT_FW_ROOT}" ]; then
+            echo "::error::onnxruntime.xcframework not found in CDN zip"
+            exit 1
+          fi
+          IOS_SLICE="${ORT_FW_ROOT}/ios-arm64"
+          ORT_FW_DIR="${IOS_SLICE}/onnxruntime.framework"
+
+          if [ ! -d "${ORT_FW_DIR}" ]; then
+            echo "::error::onnxruntime.framework not found at ${ORT_FW_DIR}"
+            echo "xcframework structure:"
+            ls -la "${ORT_FW_ROOT}/"
+            exit 1
+          fi
+
+          ORT_DYLIB="${ORT_FW_DIR}/onnxruntime"  # Mach-O dylib (no extension)
+          file "${ORT_DYLIB}"  # Expected: Mach-O 64-bit dynamic library arm64
+
           # Prepare ORT directory structure for CMake
           mkdir -p ort-ios/lib ort-ios/include
-          # Copy headers from the xcframework
-          HEADER_DIR=$(find onnxruntime-ios -name "onnxruntime_cxx_api.h" -exec dirname {} \; | head -1)
-          if [ -n "${HEADER_DIR}" ]; then
-            cp -R "${HEADER_DIR}/"* ort-ios/include/
-          fi
-          # Copy the static library
-          ORT_LIB=$(find "${IOS_SLICE}" -name "libonnxruntime.a" -o -name "onnxruntime.a" | head -1)
-          if [ -z "${ORT_LIB}" ]; then
-            # xcframework may package as a framework bundle
-            ORT_LIB=$(find "${IOS_SLICE}" -name "onnxruntime" -not -name "*.framework" | head -1)
-          fi
-          echo "ORT_LIB=${ORT_LIB}"
-          cp "${ORT_LIB}" ort-ios/lib/libonnxruntime.a
+          cp -R "${ORT_FW_DIR}/Headers/." ort-ios/include/
+          # Preserve the entire framework bundle (Info.plist required for Embed & Sign)
+          cp -R "${ORT_FW_DIR}" ort-ios/lib/onnxruntime.framework
+          # Symlink for CMake target_link_libraries (single-file path expectation)
+          ln -sf onnxruntime.framework/onnxruntime ort-ios/lib/libonnxruntime.dylib
+
           echo "ORT_IOS_DIR=${{ github.workspace }}/ort-ios" >> "$GITHUB_ENV"
-          echo "ORT_IOS_LIB=${{ github.workspace }}/ort-ios/lib/libonnxruntime.a" >> "$GITHUB_ENV"
+          echo "ORT_IOS_LIB=${{ github.workspace }}/ort-ios/lib/libonnxruntime.dylib" >> "$GITHUB_ENV"
+          echo "ORT_IOS_FRAMEWORK=${{ github.workspace }}/ort-ios/lib/onnxruntime.framework" >> "$GITHUB_ENV"
 
       - name: Configure CMake (iOS)
         run: |
@@ -191,13 +217,49 @@ jobs:
       - name: Build (iOS)
         run: cmake --build build-ios --config Release -j$(sysctl -n hw.ncpu)
 
+      - name: Verify symbol resolution against ORT framework
+        # Verifies that all ORT-related undefined symbols in libpiper_plus.a
+        # resolve against the ORT framework's exported symbols. Apple/libc
+        # symbols (___stack_chk_*, _memcpy etc.) are excluded — those are
+        # resolved at the consumer app's final link stage.
+        run: |
+          set -euo pipefail
+
+          # Undefined symbols in libpiper_plus.a (one per line, U-marked entries)
+          nm -u build-ios/libpiper_plus.a 2>/dev/null \
+            | awk 'NF > 0 {print $NF}' \
+            | sort -u > undefined-syms.txt
+          echo "undefined symbols in libpiper_plus.a: $(wc -l < undefined-syms.txt)"
+
+          # External symbols defined by the ORT dylib (T/D/S types)
+          nm -gU "${ORT_IOS_FRAMEWORK}/onnxruntime" 2>/dev/null \
+            | awk '$2 ~ /^[TDS]$/ {print $NF}' \
+            | sort -u > ort-exports.txt
+          echo "exported symbols in onnxruntime framework: $(wc -l < ort-exports.txt)"
+
+          # ORT-related unresolved (those starting with _Ort, _OrtApi, etc.)
+          comm -23 undefined-syms.txt ort-exports.txt \
+            | grep -E '^_(Ort|OrtApi|OrtCreate|OrtRelease|OrtSession|OrtGetVersionString)' \
+            > ort-related-unresolved.txt || true
+
+          if [ -s ort-related-unresolved.txt ]; then
+            echo "::error::ORT-related symbols unresolved against onnxruntime framework"
+            cat ort-related-unresolved.txt
+            exit 1
+          fi
+          echo "✓ all ORT-related undefined symbols resolve against onnxruntime framework"
+
       - name: Package
         run: |
+          set -euo pipefail
           mkdir -p artifacts/lib artifacts/include
           cp build-ios/libpiper_plus.a artifacts/lib/
           cp src/cpp/piper_plus.h artifacts/include/
+          # Bundle the ORT framework so consumers can Embed & Sign it
+          # (CDN zip provides Mach-O dylib only; static .a no longer exists)
+          cp -R "${ORT_IOS_FRAMEWORK}" artifacts/lib/
           cd artifacts
-          tar -czf ${{ github.workspace }}/libpiper_plus-ios-arm64.tar.gz .
+          tar -czf "${{ github.workspace }}/libpiper_plus-ios-arm64.tar.gz" .
 
       - name: Upload artifact
         uses: actions/upload-artifact@v7
