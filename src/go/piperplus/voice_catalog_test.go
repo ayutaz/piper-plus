@@ -51,7 +51,7 @@ func TestListVoices_Filter(t *testing.T) {
 func TestVoiceCatalogEntry_OnnxFileName(t *testing.T) {
 	e, _ := FindVoice("tsukuyomi-chan")
 	name := e.OnnxFileName()
-	if name != "tsukuyomi-chan.onnx" {
+	if name != "tsukuyomi-chan-6lang-fp16.onnx" {
 		t.Errorf("unexpected onnx name: %s", name)
 	}
 }

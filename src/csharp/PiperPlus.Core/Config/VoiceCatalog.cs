@@ -27,11 +27,11 @@ public static class VoiceCatalog
             RepoId: "ayousanz/piper-plus-tsukuyomi-chan",
             Files:
             [
-                new VoiceFileInfo("tsukuyomi-chan-6lang-fp16.onnx", 77594624, ""),
-                new VoiceFileInfo("config.json", 3072, ""),
+                new VoiceFileInfo("tsukuyomi-chan-6lang-fp16.onnx", 39652717, ""),
+                new VoiceFileInfo("config.json", 6279, ""),
             ],
             Aliases: ["tsukuyomi", "tsukuyomi-chan", "ja-tsukuyomi"],
-            Description: "Tsukuyomi-chan Japanese TTS model trained with WavLM discriminator (300 epochs)"),
+            Description: "Tsukuyomi-chan 6-language TTS model fine-tuned from multilingual base (FP16, MB-iSTFT)"),
 
         new VoiceInfo(
             Key: "ja_JP-css10-6lang-medium",
@@ -46,11 +46,11 @@ public static class VoiceCatalog
             RepoId: "ayousanz/piper-plus-css10-ja-6lang",
             Files:
             [
-                new VoiceFileInfo("css10-ja-6lang-fp16.onnx", 39414515, ""),
-                new VoiceFileInfo("config.json", 8966, ""),
+                new VoiceFileInfo("css10-ja-6lang-fp16.onnx", 39652717, ""),
+                new VoiceFileInfo("config.json", 5912, ""),
             ],
             Aliases: ["css10", "css10-6lang", "css10-ja", "ja-css10"],
-            Description: "CSS10 Japanese 6-language TTS model fine-tuned from multilingual base (FP16, 6841 utterances)"),
+            Description: "CSS10 Japanese 6-language TTS model fine-tuned from multilingual base (FP16, MB-iSTFT, 6841 utterances)"),
     ];
 
     /// <summary>
