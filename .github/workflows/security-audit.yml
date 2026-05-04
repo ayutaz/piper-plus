@@ -68,7 +68,11 @@ jobs:
         run: cargo install --locked cargo-audit
       - name: Run cargo-audit
         working-directory: src/rust
-        run: cargo audit --deny warnings
+        # vulnerabilities (実 CVE) のみ exit 1。unmaintained / informational
+        # 警告は表示するが pass 扱い。RUSTSEC-2025-0141 (bincode unmaintained)、
+        # RUSTSEC-2021-0153 (encoding unmaintained) のような既知警告で
+        # リリースをブロックしないため。
+        run: cargo audit
 
   # npm: npm audit
   npm-audit:
@@ -83,6 +87,15 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: "24"
+      - name: Generate lockfile if missing (${{ matrix.package }})
+        working-directory: ${{ matrix.package }}
+        # src/wasm/g2p には package-lock.json をコミットしていないため、
+        # audit に必要な lockfile をその場で生成する。
+        run: |
+          if [ ! -f "package-lock.json" ]; then
+            echo "Generating package-lock.json (not committed in this package)"
+            npm install --package-lock-only --no-audit --no-fund
+          fi
       - name: Run npm audit (${{ matrix.package }})
         working-directory: ${{ matrix.package }}
         # production 依存の HIGH 以上のみ失敗扱い (devDependencies は警告)
