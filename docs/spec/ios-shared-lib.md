@@ -1,9 +1,10 @@
 # iOS Shared Library Distribution Specification
 
-> **Version:** 1.0 (Proposed)
-> **Status:** Proposed — to be implemented in branch `fix/ios-shared-lib-build-377`
+> **Version:** 1.1 (Proposed, 道 A 確定)
+> **Status:** Proposed — branch `fix/ios-shared-lib-build-377` で M1→M2→M3→M4 を順次実装 (道 A、Claude Code 実行ベース)
 > **対象 Issue:** [#377](https://github.com/ayutaz/piper-plus/issues/377)
-> **対象ファイル:** `.github/workflows/release-shared-lib.yml`, `cmake/ios.toolchain.cmake`, `cmake/PiperPlusShared.cmake`
+> **対象ファイル:** `.github/workflows/release-shared-lib.yml`, `cmake/ios.toolchain.cmake`, `cmake/PiperPlusShared.cmake`, `Package.swift` (M4 で新規)
+> **進捗 Single Source of Truth:** [`docs/tickets/README.md`](../tickets/README.md) の表
 
 ---
 
