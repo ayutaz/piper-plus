@@ -105,7 +105,7 @@ def get_providers(device: str = "auto") -> list[str | tuple[str, dict]]:
 ```
 
 **注意事項:**
-- 既存の `TestGetProviders.test_gpu_provider_with_cuda` は `get_providers("gpu")` を呼んでいる。新実装では `"gpu"` は `_EP_KEY_TO_ORT_NAME` に未登録のため `"Unknown provider"` 警告＋CPU フォールバックになる。既存テストが壊れないようテストの `"gpu"` を `"cuda"` に書き換えるか、後方互換のため `"gpu"` を `"cuda"` の別名として `_EP_KEY_TO_ORT_NAME` に登録する方針を選択すること（実装者判断）。
+- 既存の `TestGetProviders.test_gpu_provider_with_cuda` は `get_providers("gpu")` を呼んでいる。新実装では `"gpu"` は `_EP_KEY_TO_ORT_NAME` に未登録のため `"Unknown provider"` 警告＋CPU フォールバックになる。**推奨方針: `_EP_KEY_TO_ORT_NAME["gpu"] = "CUDAExecutionProvider"` として別名登録し後方互換を維持する。** テストの書き換えでなく別名登録を選ぶ理由は、`piper-plus` の外部 CLI/スクリプトが `--device gpu` を渡している可能性があり、ログに警告が出るだけの静かな後退は NG だから。T-03 でも同じ方針（`_INLINE_EP_KEY_MAP["gpu"] = "CUDAExecutionProvider"`）を踏襲すること。
 - デフォルト値を `"cpu"` から `"auto"` に変更する。これにより `create_session_with_cache()` の呼び出し側に影響が出る可能性があるため、`create_session_with_cache()` 内部の `device="cpu"` デフォルトは変更しない。
 
 ### 2.2 `_get_device_label()` の置き換え
