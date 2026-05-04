@@ -657,7 +657,7 @@ def main():
                     _LEGACY_HIFIGAN_MESSAGE.format(
                         path=str(args.resume_from_checkpoint)
                     )
-                )
+                ) from None
             model.load_state_dict(checkpoint["state_dict"], strict=False)
 
             _LOGGER.info(
