@@ -50,37 +50,69 @@ jobs:
           fi
           echo "Version: $TAG"
 
-      - name: Configure CMake
+      # NOTE: Windows uses PowerShell for CMake invocations because bash on
+      # windows-2022 mangles ${{ github.workspace }} (D:\a\piper-plus\piper-plus)
+      # — backslashes are interpreted as escape sequences resulting in
+      # `D:apiper-pluspiper-plus/install/...`. Using ${env:GITHUB_WORKSPACE}
+      # in pwsh keeps the path intact.
+      - name: Configure CMake (Unix)
+        if: runner.os != 'Windows'
         shell: bash
         run: |
           cmake -B build \
             -DCMAKE_BUILD_TYPE=Release \
             -DPIPER_PLUS_BUILD_SHARED=ON \
-            -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/install
+            -DCMAKE_INSTALL_PREFIX="${{ github.workspace }}/install"
 
-      - name: Build
+      - name: Configure CMake (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $installDir = "${env:GITHUB_WORKSPACE}/install" -replace '\\','/'
+          cmake -B build `
+            -DCMAKE_BUILD_TYPE=Release `
+            -DPIPER_PLUS_BUILD_SHARED=ON `
+            "-DCMAKE_INSTALL_PREFIX=$installDir"
+
+      - name: Build (Unix)
+        if: runner.os != 'Windows'
         shell: bash
         run: cmake --build build --config Release -j$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)
+
+      - name: Build (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: cmake --build build --config Release -j $env:NUMBER_OF_PROCESSORS
 
       - name: Install
         shell: bash
         run: cmake --install build --config Release
 
-      - name: Verify install layout
+      - name: Verify install layout (Unix)
+        if: runner.os != 'Windows'
         shell: bash
-        run: cmake -DPREFIX=${{ github.workspace }}/install -P cmake/verify_install_layout.cmake
+        run: cmake -DPREFIX="${{ github.workspace }}/install" -P cmake/verify_install_layout.cmake
+
+      - name: Verify install layout (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $installDir = "${env:GITHUB_WORKSPACE}/install" -replace '\\','/'
+          cmake "-DPREFIX=$installDir" -P cmake/verify_install_layout.cmake
 
       - name: Create archive (Unix)
         if: runner.os != 'Windows'
         run: |
-          cd ${{ github.workspace }}/install
-          tar -czf ${{ github.workspace }}/${{ matrix.artifact }}.tar.gz .
+          cd "${{ github.workspace }}/install"
+          tar -czf "${{ github.workspace }}/${{ matrix.artifact }}.tar.gz" .
 
       - name: Create archive (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          Compress-Archive -Path "${{ github.workspace }}/install/*" -DestinationPath "${{ github.workspace }}/${{ matrix.artifact }}.zip"
+          $installDir = "${env:GITHUB_WORKSPACE}/install"
+          $archivePath = "${env:GITHUB_WORKSPACE}/${{ matrix.artifact }}.zip"
+          Compress-Archive -Path "$installDir/*" -DestinationPath "$archivePath"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v7
