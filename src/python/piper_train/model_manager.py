@@ -22,11 +22,11 @@ _BUILTIN_CATALOG = {
         "source": "piper-plus",
         "repo_id": "ayousanz/piper-plus-tsukuyomi-chan",
         "files": {
-            "tsukuyomi-chan-6lang-fp16.onnx": {"size_bytes": 39216913},
-            "config.json": {"size_bytes": 8568},
+            "tsukuyomi-chan-6lang-fp16.onnx": {"size_bytes": 39652717},
+            "config.json": {"size_bytes": 6279},
         },
         "aliases": ["tsukuyomi", "tsukuyomi-chan", "ja-tsukuyomi"],
-        "description": "Tsukuyomi-chan 6-language TTS model fine-tuned from multilingual base (FP16)",
+        "description": "Tsukuyomi-chan 6-language TTS model fine-tuned from multilingual base (FP16, MB-iSTFT)",
     },
     "ja_JP-css10-6lang-medium": {
         "key": "ja_JP-css10-6lang-medium",
@@ -40,11 +40,11 @@ _BUILTIN_CATALOG = {
         "source": "piper-plus",
         "repo_id": "ayousanz/piper-plus-css10-ja-6lang",
         "files": {
-            "css10-ja-6lang-fp16.onnx": {"size_bytes": 39414515},
-            "config.json": {"size_bytes": 8966},
+            "css10-ja-6lang-fp16.onnx": {"size_bytes": 39652717},
+            "config.json": {"size_bytes": 5912},
         },
         "aliases": ["css10", "css10-6lang", "css10-ja", "ja-css10"],
-        "description": "CSS10 Japanese 6-language TTS model fine-tuned from multilingual base (FP16, 6841 utterances)",
+        "description": "CSS10 Japanese 6-language TTS model fine-tuned from multilingual base (FP16, MB-iSTFT, 6841 utterances)",
     },
 }
 

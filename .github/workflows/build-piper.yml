@@ -70,7 +70,7 @@ jobs:
           path: |
             /usr/local/lib/libonnxruntime*
             /usr/local/include/onnxruntime*
-          key: ${{ inputs.cache-key-prefix }}-linux-onnxruntime-1.14.1-v2
+          key: ${{ inputs.cache-key-prefix }}-linux-onnxruntime-1.17.0-v3
       
       # Cache for macOS dependencies
       - name: Cache macOS dependencies
@@ -80,7 +80,7 @@ jobs:
           path: |
             /usr/local/lib/libonnxruntime*
             /usr/local/include/onnxruntime*
-          key: ${{ inputs.cache-key-prefix }}-macos-${{ runner.arch }}-onnxruntime-1.14.1-v2
+          key: ${{ inputs.cache-key-prefix }}-macos-${{ runner.arch }}-onnxruntime-1.17.0-v3
       
       # Install dependencies
       - name: Install dependencies (Ubuntu)
@@ -93,12 +93,12 @@ jobs:
           # Check if ONNX Runtime is already cached
           if [ ! -f "/usr/local/lib/libonnxruntime.so" ]; then
             echo "Installing ONNX Runtime..."
-            wget https://github.com/microsoft/onnxruntime/releases/download/v1.14.1/onnxruntime-linux-x64-1.14.1.tgz
-            tar -xzf onnxruntime-linux-x64-1.14.1.tgz
-            sudo cp -r onnxruntime-linux-x64-1.14.1/lib/* /usr/local/lib/
-            sudo cp -r onnxruntime-linux-x64-1.14.1/include/* /usr/local/include/
+            wget https://github.com/microsoft/onnxruntime/releases/download/v1.17.0/onnxruntime-linux-x64-1.17.0.tgz
+            tar -xzf onnxruntime-linux-x64-1.17.0.tgz
+            sudo cp -r onnxruntime-linux-x64-1.17.0/lib/* /usr/local/lib/
+            sudo cp -r onnxruntime-linux-x64-1.17.0/include/* /usr/local/include/
             sudo ldconfig
-            rm -rf onnxruntime-linux-x64-1.14.1*
+            rm -rf onnxruntime-linux-x64-1.17.0*
           else
             echo "Using cached ONNX Runtime"
             sudo ldconfig
@@ -118,11 +118,11 @@ jobs:
             sudo mkdir -p /usr/local/lib /usr/local/include
             
             # Only support arm64 (Apple Silicon)
-            wget https://github.com/microsoft/onnxruntime/releases/download/v1.14.1/onnxruntime-osx-arm64-1.14.1.tgz
-            tar -xzf onnxruntime-osx-arm64-1.14.1.tgz
-            sudo cp -r onnxruntime-osx-arm64-1.14.1/lib/* /usr/local/lib/
-            sudo cp -r onnxruntime-osx-arm64-1.14.1/include/* /usr/local/include/
-            rm -rf onnxruntime-osx-arm64-1.14.1*
+            wget https://github.com/microsoft/onnxruntime/releases/download/v1.17.0/onnxruntime-osx-arm64-1.17.0.tgz
+            tar -xzf onnxruntime-osx-arm64-1.17.0.tgz
+            sudo cp -r onnxruntime-osx-arm64-1.17.0/lib/* /usr/local/lib/
+            sudo cp -r onnxruntime-osx-arm64-1.17.0/include/* /usr/local/include/
+            rm -rf onnxruntime-osx-arm64-1.17.0*
           else
             echo "Using cached ONNX Runtime"
           fi
@@ -218,12 +218,24 @@ jobs:
             }
           }
           
-          $buildResult = cmake --build . --config ${{ inputs.build-type }} --parallel 2
+          # 出力をキャプチャせず stdout/stderr を直接表示する
+          # ($var = cmake --build ...) は build ログが見えなくなり、piper.exe が
+          # 生成されない原因の特定が困難になる。
+          cmake --build . --config ${{ inputs.build-type }} --parallel 2 --target piper --verbose
           if ($LASTEXITCODE -ne 0) {
-            Write-Host "❌ Build failed"
+            Write-Host "❌ Build failed (cmake --build returned $LASTEXITCODE)"
             exit 1
           }
           Write-Host "Build succeeded"
+
+          # piper.exe が生成されていない場合は build を失敗扱いにする
+          # (CMake が exit 0 を返しても target が出力されない構成不良を検出)
+          if (-not (Test-Path "Release/piper.exe") -and -not (Test-Path "piper.exe")) {
+            Write-Host "❌ piper.exe not found after build; listing build outputs:"
+            Get-ChildItem -Recurse -Filter "*.exe" | Select-Object -First 30 | Format-Table FullName
+            Get-ChildItem -Recurse -Filter "*.dll" | Select-Object -First 30 | Format-Table FullName
+            exit 1
+          }
           
           # Run tests if enabled
           if ("${{ inputs.include-tests }}" -eq "true") {

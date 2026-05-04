@@ -43,7 +43,7 @@
 ### प्रशिक्षण
 
 - **WavLM Discriminator** — MOS +0.15-0.25 सुधार (डिफ़ॉल्ट रूप से सक्षम, केवल प्रशिक्षण में उपयोग)
-- **MB-iSTFT-VITS2 (`--mb-istft`)** — HiFi-GAN डिकोडर को MB-iSTFT + PQMF से बदलकर ~2.21x तेज CPU inference (केवल medium quality, ONNX-संगत)
+- **MB-iSTFT-VITS2 Decoder** — Decoder को MB-iSTFT + PQMF में एकीकृत, ~2.21x तेज CPU inference। मौजूदा runtime के साथ ONNX-संगत
 - **FP16 Mixed Precision** — प्रशिक्षण गति 2-3 गुना, मेमोरी ~50% कम (डिफ़ॉल्ट रूप से सक्षम)
 - **EMA** — Exponential Moving Average द्वारा प्रशिक्षण स्थिरता में सुधार (डिफ़ॉल्ट रूप से सक्षम)
 - **मल्टी-GPU** — DDP समर्थन, स्वचालित लर्निंग रेट स्केलिंग
@@ -58,7 +58,7 @@
 - **[WebAssembly](src/wasm/openjtalk-web/README.npm.md)** — ब्राउज़र में पूर्ण संचालन, **Phoneme Timing आउटपुट (JSON/TSV/SRT)**, सर्वर अनावश्यक
 - **[Docker](docker/README.md)** — अनुमान, प्रशिक्षण, WebUI, C++ के 5 इमेज उपलब्ध
 - **PyPI** — `pip install piper-plus`, 8 भाषा मल्टीलिंगुअल, **Phoneme Timing आउटपुट (JSON/TSV/SRT)**, स्ट्रीमिंग, **FastAPI आधारित HTTP API**
-- **C# CLI** — .NET 8/9 क्रॉस-प्लेटफ़ॉर्म, 8 भाषा मल्टीलिंगुअल, ONNX अनुमान, **Phoneme Timing आउटपुट (JSON/TSV/SRT)**
+- **C# CLI** — .NET 10 क्रॉस-प्लेटफ़ॉर्म, 8 भाषा मल्टीलिंगुअल, ONNX अनुमान, **Phoneme Timing आउटपुट (JSON/TSV/SRT)**
 - **Rust CLI** — piper-plus/piper-plus-cli, स्ट्रीमिंग, CUDA/CoreML/DirectML समर्थन, **Phoneme Timing आउटपुट (JSON/TSV/SRT)**, शब्दकोश स्वचालित डाउनलोड
 - **[Go CLI](src/go/README.md)** — HTTP API सर्वर, सेशन पूलिंग, Docker समर्थन, सिंगल बाइनरी, **Phoneme Timing आउटपुट (JSON/TSV/SRT)**
 - **Voice Cloning (Speaker Encoder + speaker_embedding)** — सभी 6 रनटाइम (Python/Rust/C#/Go/WASM/C++) में समर्थित
@@ -78,7 +78,7 @@
 | Windows | x64 | पूर्ण समर्थन |
 | C API (FFI) | Linux x64/ARM64, macOS ARM64, Windows x64 | शेयर्ड लाइब्रेरी, Android AAR |
 | Web | WebAssembly | Chrome/Edge/Firefox/Safari |
-| C# (.NET) | x64 / ARM64 | .NET 8/9, Linux/macOS/Windows |
+| C# (.NET) | x64 / ARM64 | .NET 10, Linux/macOS/Windows |
 | Rust | Linux x64, macOS ARM64, Windows x64 | CUDA/CoreML/DirectML |
 | Go | Linux x64, macOS ARM64, Windows x64 | HTTP API, Docker |
 
@@ -290,7 +290,7 @@ dotnet add package PiperPlus.Core
 **Rust लाइब्रेरी (crates.io):**
 ```toml
 [dependencies]
-piper-plus = "0.2.0"
+piper-plus = "0.4"
 ```
 
 ### सोर्स से बिल्ड (C++)
@@ -318,7 +318,7 @@ dotnet build src/csharp/PiperPlus.sln -c Release
 dotnet test src/csharp/PiperPlus.Core.Tests/
 ```
 
-पूर्वापेक्षाएँ: .NET 8 SDK या उच्चतर
+पूर्वापेक्षाएँ: .NET 10 SDK या उच्चतर
 
 #### C# CLI उपयोग उदाहरण
 
@@ -702,10 +702,9 @@ xattr -cr piper/
 
 ### Windows
 
-espeak-ng-data डायरेक्टरी आवश्यक है। विवरण के लिए [Windows सेटअप गाइड](docs/getting-started/windows-setup.md) देखें।
+x64 / arm64 समर्थित हैं। OpenJTalk डिक्शनरी पहले रन पर स्वचालित रूप से डाउनलोड हो जाती है। विवरण के लिए [Windows सेटअप गाइड](docs/getting-started/windows-setup.md) देखें।
 
 ```cmd
-set ESPEAK_DATA_PATH=C:\path\to\espeak-ng-data
 piper.exe --model en_US-lessac-medium.onnx -f output.wav
 ```
 

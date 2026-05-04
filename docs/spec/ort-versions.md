@@ -18,7 +18,7 @@ so that version drift can be detected early.
 | C++      | 1.17.0      | source build via CMake |
 | iOS      | 1.17.0      | xcframework (GitHub Releases) |
 | Android (release) | 1.17.0 | AAR (Maven Central) |
-| Android (PR CI)   | 1.14.0 | AAR (Maven Central) |
+| Android (PR CI)   | 1.17.0 | AAR (Maven Central) |
 | JS/WASM  | >=1.21.0    | `onnxruntime-web` (npm, peerDependency) |
 
 ## CI Workflow References

@@ -61,10 +61,6 @@ CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
 # Full precision (FP32)
 CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
   --no-fp16 /path/to/checkpoint.ckpt /path/to/output.onnx
-
-# WavLM model (--stochastic enabled by default)
-CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
-  --stochastic /path/to/checkpoint.ckpt /path/to/output.onnx
 ```
 
 ## Checkpoint Management

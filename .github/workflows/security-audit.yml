@@ -1,0 +1,116 @@
+name: Security Audit
+
+on:
+  pull_request:
+    paths:
+      - "pyproject.toml"
+      - "uv.lock"
+      - "src/python/pyproject.toml"
+      - "src/python_run/setup.py"
+      - "src/rust/**/Cargo.toml"
+      - "src/rust/Cargo.lock"
+      - "src/wasm/**/package.json"
+      - "src/wasm/**/package-lock.json"
+      - ".github/workflows/security-audit.yml"
+  push:
+    branches: [dev, main]
+  schedule:
+    # 毎週月曜 03:00 UTC (= 12:00 JST)
+    - cron: "0 3 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  # GitHub Dependency Review (PR 時に新規追加される依存をチェック)
+  dependency-review:
+    name: Dependency Review (PR)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
+          comment-summary-in-pr: on-failure
+
+  # Python: pip-audit
+  pip-audit:
+    name: pip-audit (Python)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - name: Install pip-audit
+        run: pip install pip-audit
+      - name: Audit root requirements
+        continue-on-error: true
+        run: |
+          pip-audit --requirement <(uv pip compile pyproject.toml 2>/dev/null) --strict --vulnerability-service osv || \
+          pip-audit --strict --vulnerability-service osv
+      - name: Audit src/python_run
+        continue-on-error: true
+        working-directory: src/python_run
+        run: pip-audit --strict --vulnerability-service osv
+
+  # Rust: cargo-audit
+  cargo-audit:
+    name: cargo-audit (Rust)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install cargo-audit
+        run: cargo install --locked cargo-audit
+      - name: Run cargo-audit
+        working-directory: src/rust
+        # vulnerabilities (実 CVE) のみ exit 1。unmaintained / informational
+        # 警告は表示するが pass 扱い。RUSTSEC-2025-0141 (bincode unmaintained)、
+        # RUSTSEC-2021-0153 (encoding unmaintained) のような既知警告で
+        # リリースをブロックしないため。
+        run: cargo audit
+
+  # npm: npm audit
+  npm-audit:
+    name: npm audit
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        package: [src/wasm/openjtalk-web, src/wasm/g2p]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+      - name: Generate lockfile if missing (${{ matrix.package }})
+        working-directory: ${{ matrix.package }}
+        # src/wasm/g2p には package-lock.json をコミットしていないため、
+        # audit に必要な lockfile をその場で生成する。
+        run: |
+          if [ ! -f "package-lock.json" ]; then
+            echo "Generating package-lock.json (not committed in this package)"
+            npm install --package-lock-only --no-audit --no-fund
+          fi
+      - name: Run npm audit (${{ matrix.package }})
+        working-directory: ${{ matrix.package }}
+        # production 依存の HIGH 以上のみ失敗扱い (devDependencies は警告)
+        run: npm audit --omit=dev --audit-level=high
+
+  # 結果サマリ
+  audit-summary:
+    name: Audit Summary
+    if: always()
+    needs: [pip-audit, cargo-audit, npm-audit]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Summary
+        run: |
+          echo "## Security Audit Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- pip-audit: ${{ needs.pip-audit.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- cargo-audit: ${{ needs.cargo-audit.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- npm-audit: ${{ needs.npm-audit.result }}" >> $GITHUB_STEP_SUMMARY

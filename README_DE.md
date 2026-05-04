@@ -43,7 +43,7 @@ Ein schnelles und hochwertiges neuronales Text-to-Speech-System (TTS). Basierend
 ### Training
 
 - **WavLM Discriminator** — MOS-Verbesserung von +0,15-0,25 (standardmaessig aktiviert, nur beim Training verwendet)
-- **MB-iSTFT-VITS2 (`--mb-istft`)** — Ersetzt HiFi-GAN Decoder durch MB-iSTFT + PQMF für ~2,21x schnellere CPU-Inferenz (nur Medium-Qualität, ONNX-kompatibel)
+- **MB-iSTFT-VITS2 Decoder** — Decoder vereinheitlicht zu MB-iSTFT + PQMF, ~2,21x schnellere CPU-Inferenz. ONNX-kompatibel mit bestehenden Runtimes
 - **FP16 Mixed Precision** — 2-3x schnelleres Training, ca. 50% weniger Speicherbedarf (standardmaessig aktiviert)
 - **EMA** — Exponential Moving Average fuer stabiles Training (standardmaessig aktiviert)
 - **Multi-GPU** — DDP-Unterstuetzung, automatische Lernraten-Skalierung
@@ -58,7 +58,7 @@ Ein schnelles und hochwertiges neuronales Text-to-Speech-System (TTS). Basierend
 - **[WebAssembly](src/wasm/openjtalk-web/README.npm.md)** — Laeuft vollstaendig im Browser, **Phoneme-Timing-Ausgabe (JSON/TSV/SRT)**, kein Server erforderlich
 - **[Docker](docker/README.md)** — 5 Images fuer Inferenz, Training, WebUI und C++
 - **PyPI** — `pip install piper-plus`, 8 Sprachen multilingual, **Phoneme-Timing-Ausgabe (JSON/TSV/SRT)**, Streaming, **HTTP API auf FastAPI-Basis**
-- **C# CLI** — .NET 8/9, plattformuebergreifend, 8 Sprachen, ONNX-Inferenz, **Phoneme-Timing-Ausgabe (JSON/TSV/SRT)**
+- **C# CLI** — .NET 10, plattformuebergreifend, 8 Sprachen, ONNX-Inferenz, **Phoneme-Timing-Ausgabe (JSON/TSV/SRT)**
 - **Rust CLI** — piper-plus/piper-plus-cli, Streaming, CUDA/CoreML/DirectML-Unterstuetzung, **Phoneme-Timing-Ausgabe (JSON/TSV/SRT)**, automatischer Woerterbuch-Download
 - **[Go CLI](src/go/README.md)** — HTTP-API-Server, Session-Pooling, Docker-kompatibel, einzelne Binaerdatei, **Phoneme-Timing-Ausgabe (JSON/TSV/SRT)**
 - **Voice Cloning (Speaker Encoder + speaker_embedding)** — in allen 6 Runtimes (Python/Rust/C#/Go/WASM/C++) verfuegbar
@@ -78,7 +78,7 @@ Aequivalente 8-sprachige multilinguale Synthese ueber 6 Runtimes (Python/Rust/C#
 | Windows | x64 | Volle Unterstuetzung |
 | C API (FFI) | Linux x64/ARM64, macOS ARM64, Windows x64 | Shared Library, Android AAR |
 | Web | WebAssembly | Chrome/Edge/Firefox/Safari |
-| C# (.NET) | x64 / ARM64 | .NET 8/9, Linux/macOS/Windows |
+| C# (.NET) | x64 / ARM64 | .NET 10, Linux/macOS/Windows |
 | Rust | Linux x64, macOS ARM64, Windows x64 | CUDA/CoreML/DirectML |
 | Go | Linux x64, macOS ARM64, Windows x64 | HTTP API, Docker |
 
@@ -290,7 +290,7 @@ dotnet add package PiperPlus.Core
 **Rust Bibliothek (crates.io):**
 ```toml
 [dependencies]
-piper-plus = "0.2.0"
+piper-plus = "0.4"
 ```
 
 ### Aus Quellcode bauen (C++)
@@ -318,7 +318,7 @@ dotnet build src/csharp/PiperPlus.sln -c Release
 dotnet test src/csharp/PiperPlus.Core.Tests/
 ```
 
-Voraussetzungen: .NET 8 SDK oder hoeher
+Voraussetzungen: .NET 10 SDK oder hoeher
 
 #### C# CLI Verwendungsbeispiele
 
@@ -702,10 +702,9 @@ xattr -cr piper/
 
 ### Windows
 
-Das espeak-ng-data-Verzeichnis wird benoetigt. Weitere Details in der [Windows-Setup-Anleitung](docs/getting-started/windows-setup.md).
+x64 / arm64 werden unterstützt. Das OpenJTalk-Wörterbuch wird beim ersten Start automatisch heruntergeladen. Weitere Details in der [Windows-Setup-Anleitung](docs/getting-started/windows-setup.md).
 
 ```cmd
-set ESPEAK_DATA_PATH=C:\path\to\espeak-ng-data
 piper.exe --model en_US-lessac-medium.onnx -f output.wav
 ```
 

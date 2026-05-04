@@ -54,24 +54,24 @@ func (e *VoiceCatalogEntry) OnnxFileName() string {
 // embeddedCatalog contains built-in piper-plus voice entries.
 var embeddedCatalog = []VoiceCatalogEntry{
 	{
-		Key: "ja_JP-tsukuyomi-chan-medium", Name: "Tsukuyomi-chan",
+		Key: "ja_JP-tsukuyomi-chan-medium", Name: "tsukuyomi-chan",
 		LanguageCode: "ja_JP", LanguageFamily: "ja", LanguageNative: "日本語", LanguageEnglish: "Japanese",
 		Quality: "medium", NumSpeakers: 1, Source: "piper-plus", RepoID: "ayousanz/piper-plus-tsukuyomi-chan",
 		Files: []VoiceFileInfo{
-			{RelativePath: "tsukuyomi-chan.onnx", SizeBytes: 63_000_000},
-			{RelativePath: "tsukuyomi-chan.onnx.json", SizeBytes: 15_000},
+			{RelativePath: "tsukuyomi-chan-6lang-fp16.onnx", SizeBytes: 39_652_717},
+			{RelativePath: "config.json", SizeBytes: 6_279},
 		},
-		Aliases: []string{"tsukuyomi-chan", "tsukuyomi"},
+		Aliases: []string{"tsukuyomi", "tsukuyomi-chan", "ja-tsukuyomi"},
 	},
 	{
-		Key: "ja_JP-css10-6lang-medium", Name: "CSS10 6-Language",
+		Key: "ja_JP-css10-6lang-medium", Name: "css10-6lang",
 		LanguageCode: "ja_JP", LanguageFamily: "ja", LanguageNative: "日本語", LanguageEnglish: "Japanese",
-		Quality: "medium", NumSpeakers: 1, Source: "piper-plus", RepoID: "ayousanz/piper-plus-base",
+		Quality: "medium", NumSpeakers: 1, Source: "piper-plus", RepoID: "ayousanz/piper-plus-css10-ja-6lang",
 		Files: []VoiceFileInfo{
-			{RelativePath: "multilingual-test-medium.onnx", SizeBytes: 38_000_000},
-			{RelativePath: "multilingual-test-medium.onnx.json", SizeBytes: 15_000},
+			{RelativePath: "css10-ja-6lang-fp16.onnx", SizeBytes: 39_652_717},
+			{RelativePath: "config.json", SizeBytes: 5_912},
 		},
-		Aliases: []string{"css10", "css10-6lang"},
+		Aliases: []string{"css10", "css10-6lang", "css10-ja", "ja-css10"},
 	},
 }
 

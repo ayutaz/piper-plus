@@ -17,7 +17,7 @@
 
     <!-- NuGet Package Metadata -->
     <PackageId>PiperPlus.Cli</PackageId>
-    <Version>0.2.0</Version>
+    <Version>0.3.0</Version>
     <Authors>ayousanz</Authors>
     <Description>Piper Plus TTS — C# CLI for neural text-to-speech synthesis</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>

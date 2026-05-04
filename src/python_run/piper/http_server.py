@@ -83,8 +83,9 @@ def _resolve_language_id(
     """Resolve query parameters to an integer language id.
 
     Falls back to ``None`` for unparseable / unknown / out-of-range values to
-    preserve the silent-fallback behavior of the original Flask server. Out-
-    of-range values are logged so operators can spot misconfigured clients.
+    preserve the silent-fallback behavior of the FastAPI server (compatible
+    with the previous Flask implementation). Out-of-range values are logged so
+    operators can spot misconfigured clients.
     """
     lmap = getattr(voice.config, "language_id_map", None) or None
 
@@ -151,7 +152,7 @@ def _parse_bool_flag(value: str | None) -> bool:
 
 
 def _error_response(status_code: int, message: str) -> JSONResponse:
-    """Flask-compatible ``{"error": ...}`` JSON error body."""
+    """FastAPI compatible ``{"error": ...}`` JSON error body (matches the legacy Flask shape)."""
     return JSONResponse(status_code=status_code, content={"error": message})
 
 

@@ -46,7 +46,7 @@
 ### 训练
 
 - **WavLM Discriminator** — MOS 提升 +0.15-0.25（默认启用，仅训练时使用）
-- **MB-iSTFT-VITS2 (`--mb-istft`)** — 将 HiFi-GAN 解码器替换为 MB-iSTFT + PQMF，CPU 推理速度提升约 2.21 倍 (仅限 medium 质量，ONNX 兼容)
+- **MB-iSTFT-VITS2 解码器** — 解码器统一为 MB-iSTFT + PQMF，CPU 推理速度提升约 2.21 倍。ONNX 兼容现有运行时
 - **FP16 混合精度** — 训练速度提升 2-3 倍，内存减少约 50%（默认启用）
 - **EMA** — 指数移动平均，提高训练稳定性（默认启用）
 - **多 GPU** — DDP 支持，自动学习率缩放
@@ -61,7 +61,7 @@
 - **[WebAssembly](src/wasm/openjtalk-web/README.npm.md)** — 完全在浏览器中运行，**Phoneme Timing 输出 (JSON/TSV/SRT)**，无需服务器
 - **[Docker](docker/README.md)** — 提供推理、训练、WebUI、C++ 共 5 个镜像
 - **PyPI** — `pip install piper-plus`，8语言多语言支持，**Phoneme Timing 输出 (JSON/TSV/SRT)**，流式处理，**基于 FastAPI 的 HTTP API**
-- **C# CLI** — .NET 8/9 跨平台，8语言多语言支持，ONNX 推理，**Phoneme Timing 输出 (JSON/TSV/SRT)**
+- **C# CLI** — .NET 10 跨平台，8语言多语言支持，ONNX 推理，**Phoneme Timing 输出 (JSON/TSV/SRT)**
 - **Rust CLI** — piper-plus/piper-plus-cli，流式处理，CUDA/CoreML/DirectML 支持，**Phoneme Timing 输出 (JSON/TSV/SRT)**，词典自动下载
 - **[Go CLI](src/go/README.md)** — HTTP API服务器、会话池、Docker、单一二进制文件、**Phoneme Timing 输出 (JSON/TSV/SRT)**
 - **Voice Cloning (Speaker Encoder + speaker_embedding)** — 6 个运行时 (Python/Rust/C#/Go/WASM/C++) 全部支持
@@ -81,7 +81,7 @@
 | Windows | x64 | 完整支持 |
 | C API (FFI) | Linux x64/ARM64, macOS ARM64, Windows x64 | 共享库, Android AAR |
 | Web | WebAssembly | Chrome/Edge/Firefox/Safari |
-| C# (.NET) | x64 / ARM64 | .NET 8/9，Linux/macOS/Windows |
+| C# (.NET) | x64 / ARM64 | .NET 10，Linux/macOS/Windows |
 | Rust | Linux x64, macOS ARM64, Windows x64 | Linux/macOS/Windows，CUDA/CoreML/DirectML |
 | Go | Linux x64, macOS ARM64, Windows x64 | Linux/macOS/Windows，HTTP API，Docker |
 
@@ -302,7 +302,7 @@ dotnet add package PiperPlus.Core
 **Rust 库 (crates.io):**
 ```toml
 [dependencies]
-piper-plus = "0.2.0"
+piper-plus = "0.4"
 ```
 
 ### 从源码构建 (C++)
@@ -330,7 +330,7 @@ dotnet build src/csharp/PiperPlus.sln -c Release
 dotnet test src/csharp/PiperPlus.Core.Tests/
 ```
 
-前提条件：.NET 8 SDK 以上
+前提条件：.NET 10 SDK 以上
 
 #### C# CLI 使用示例
 
@@ -719,10 +719,9 @@ xattr -cr piper/
 
 ### Windows
 
-需要 espeak-ng-data 目录。详情请参阅 [Windows 设置指南](docs/getting-started/windows-setup.md)。
+支持 x64 / arm64。OpenJTalk 词典在首次启动时自动下载。详情请参阅 [Windows 设置指南](docs/getting-started/windows-setup.md)。
 
 ```cmd
-set ESPEAK_DATA_PATH=C:\path\to\espeak-ng-data
 piper.exe --model en_US-lessac-medium.onnx -f output.wav
 ```
 

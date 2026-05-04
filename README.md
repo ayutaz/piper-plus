@@ -88,7 +88,7 @@
 - **[WebAssembly](src/wasm/openjtalk-web/README.npm.md)** — ブラウザ内で完全動作、**音素タイミング出力 (JSON/TSV/SRT)**、サーバー不要
 - **[Docker](docker/README.md)** — 推論・学習・WebUI・C++の5イメージ提供
 - **PyPI** — `pip install piper-plus` で簡単インストール、8言語マルチリンガル、**音素タイミング出力 (JSON/TSV/SRT)**、ストリーミング、HTTP API
-- **C# CLI** — .NET 8/9 クロスプラットフォーム、8言語マルチリンガル、ONNX推論、**音素タイミング出力 (JSON/TSV/SRT)**
+- **C# CLI** — .NET 10 クロスプラットフォーム、8言語マルチリンガル、ONNX推論、**音素タイミング出力 (JSON/TSV/SRT)**
 - **Rust CLI** — piper-plus/piper-plus-cli、ストリーミング、CUDA/CoreML/DirectML対応、**音素タイミング出力 (JSON/TSV/SRT)**、辞書自動ダウンロード
 - **[Go CLI](src/go/README.md)** — HTTP APIサーバー、セッションプーリング、Docker対応、シングルバイナリ、**音素タイミング出力 (JSON/TSV/SRT)**
 - **Voice Cloning (Speaker Encoder + speaker_embedding)** — 全 6 ランタイム (Python/Rust/C#/Go/WASM/C++) 対応。C++ は CLI バイナリと `libpiper_plus` C API ライブラリの両形式で利用可。ECAPA-TDNN による参照音声からの話者 embedding 抽出 (`--reference-audio`)
@@ -307,7 +307,7 @@ dotnet add package PiperPlus.Core
 **Rust ライブラリ (crates.io):**
 ```toml
 [dependencies]
-piper-plus = "0.2.0"
+piper-plus = "0.4"
 ```
 
 ### ソースからビルド

@@ -370,7 +370,7 @@ If issues persist:
 
 **問題**: `dotnet` コマンドが認識されない
 
-**解決策**: .NET 8 SDK 以上をインストールしてください:
+**解決策**: .NET 10 SDK 以上をインストールしてください:
 - https://dotnet.microsoft.com/download
 
 ### DotNetG2P パッケージエラー
