@@ -395,11 +395,24 @@ public record DeviceConfig(ExecutionProvider Provider, int DeviceId = 0)
     // "cuda:1" → DeviceConfig(Cuda, 1)
     public static DeviceConfig Parse(string value) { ... }
 
-    // 環境変数優先
+    // 環境変数優先（解決順: PIPER_EXECUTION_PROVIDER > requested > PIPER_GPU_DEVICE_ID）
+    // PIPER_EXECUTION_PROVIDER が設定されていれば最優先。
+    // 未設定かつ requested が "auto" のとき、PIPER_GPU_DEVICE_ID が設定されていれば
+    // 後方互換として "cuda:<id>" に変換する（useCuda=true 相当）。
     public static DeviceConfig Resolve(string requested)
     {
-        var env = Environment.GetEnvironmentVariable("PIPER_EXECUTION_PROVIDER");
-        return Parse(!string.IsNullOrWhiteSpace(env) ? env : requested);
+        var ep = Environment.GetEnvironmentVariable("PIPER_EXECUTION_PROVIDER");
+        if (!string.IsNullOrWhiteSpace(ep))
+            return Parse(ep);
+
+        // 後方互換: PIPER_GPU_DEVICE_ID が設定されていれば "auto" を "cuda:<id>" に読み替え
+        var gpuId = Environment.GetEnvironmentVariable("PIPER_GPU_DEVICE_ID");
+        if (!string.IsNullOrWhiteSpace(gpuId)
+            && int.TryParse(gpuId, out var deviceId)
+            && requested == "auto")
+            return new DeviceConfig(ExecutionProvider.Cuda, deviceId);
+
+        return Parse(requested);
     }
 
     public string CacheLabel => Provider switch
