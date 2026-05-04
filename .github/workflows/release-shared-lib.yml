@@ -247,39 +247,66 @@ jobs:
           echo "onnxruntime framework arch:"
           lipo -info "${ORT_IOS_FRAMEWORK}/onnxruntime"
 
+      - name: Show libpiper_plus.a archive contents
+        # Diagnostic — confirms the POST_BUILD libtool merge produced an archive
+        # containing piper_common / openjtalk / hts_engine_stub objects.
+        run: |
+          set -euo pipefail
+          echo "=== file size ==="
+          ls -la build-ios/libpiper_plus.a
+          echo "=== member count ==="
+          ar -t build-ios/libpiper_plus.a | wc -l
+          echo "=== member list (first 30) ==="
+          ar -t build-ios/libpiper_plus.a | head -30
+          echo "=== sample piper:: defined symbols (first 5) ==="
+          nm -gU build-ios/libpiper_plus.a 2>/dev/null \
+            | awk '$2 ~ /^[TDSR]$/ {print $NF}' \
+            | grep -E '^__ZN[0-9]+piper' | head -5 || echo "(none — archive merge failed)"
+
       - name: Verify symbol resolution (ORT + project-internal)
-        # Two-stage symbol-resolution gate for the iOS slice:
-        #   1. ORT-prefixed symbols (_Ort*, _OrtApi*, ...) MUST resolve against
-        #      onnxruntime framework. Catches ORT version drift / missing dylib.
-        #   2. Project-internal symbols (_piper_plus_*, _openjtalk_*,
-        #      __ZN<N>piper) MUST NOT remain undefined after subtracting ORT
-        #      exports. Catches the iOS-exclusion bug where a desktop-only TU
-        #      is excluded from the build but its callers remain (issue #377):
-        #      consumer Xcode projects would otherwise fail at app link time
-        #      with "Undefined symbol: _openjtalk_is_available" etc.
-        # Apple/libc/libc++ runtime symbols are resolved by the consumer's
-        # final link stage and are not validated here.
+        # Three-stage symbol-resolution gate for the iOS slice:
+        #   1. Undefined references in libpiper_plus.a (per-object level).
+        #   2. SUBTRACT symbols that ARE defined elsewhere inside the same
+        #      archive — these are intra-archive cross-TU references that
+        #      resolve at consumer link time. `nm -u` reports them as undefined
+        #      per-object, but they're not actually missing.
+        #   3. Of what's left:
+        #      a. ORT-prefixed (_Ort*, _OrtApi*, ...) MUST resolve against
+        #         onnxruntime framework. Catches ORT version drift.
+        #      b. Project-internal (_piper_plus_*, _openjtalk_*, __ZN<N>piper)
+        #         MUST be empty. Catches missing TUs / failed archive merge.
+        # Apple/libc/libc++ runtime symbols pass through unchecked; the
+        # consumer's final link resolves them.
         run: |
           set -euo pipefail
 
-          # 1. Undefined symbols in libpiper_plus.a (one per line, U-marked entries)
+          # 1. ALL undefined references (per-object, includes intra-archive refs).
           nm -u build-ios/libpiper_plus.a 2>/dev/null \
             | awk 'NF > 0 {print $NF}' \
-            | sort -u > undefined-syms.txt
-          echo "undefined symbols in libpiper_plus.a: $(wc -l < undefined-syms.txt)"
+            | sort -u > all-undefined.txt
+          echo "raw undefined references (per-object): $(wc -l < all-undefined.txt)"
 
-          # 2. External symbols defined by the ORT dylib (T/D/S types).
-          #    For simulator slice (universal arm64+x86_64) nm returns symbols
-          #    for both archs — duplicates are fine since we sort -u.
+          # 2. Symbols defined inside the archive (T/D/S/R types). Subtracting
+          #    these from the undefined set gives "truly external" references.
+          nm -gU build-ios/libpiper_plus.a 2>/dev/null \
+            | awk '$2 ~ /^[TDSR]$/ {print $NF}' \
+            | sort -u > defined-in-archive.txt
+          echo "symbols defined inside the archive:    $(wc -l < defined-in-archive.txt)"
+
+          # 3. Truly external = undefined - defined-in-archive.
+          comm -23 all-undefined.txt defined-in-archive.txt > truly-external.txt
+          echo "symbols that must resolve externally:  $(wc -l < truly-external.txt)"
+
+          # 4. ORT framework exports.
           nm -gU "${ORT_IOS_FRAMEWORK}/onnxruntime" 2>/dev/null \
             | awk '$2 ~ /^[TDS]$/ {print $NF}' \
             | sort -u > ort-exports.txt
-          echo "exported symbols in onnxruntime framework: $(wc -l < ort-exports.txt)"
+          echo "ORT framework exports:                 $(wc -l < ort-exports.txt)"
 
-          # 3. Subtract ORT-resolved → unresolved-after-ort.txt
-          comm -23 undefined-syms.txt ort-exports.txt > unresolved-after-ort.txt
+          # 5. Subtract ORT-resolved.
+          comm -23 truly-external.txt ort-exports.txt > unresolved-after-ort.txt
 
-          # 3a. ORT-prefixed unresolved (catches ORT version drift)
+          # 5a. ORT-prefixed unresolved (catches ORT version drift / missing dylib).
           grep -E '^_(Ort|OrtApi|OrtCreate|OrtRelease|OrtSession|OrtGetVersionString)' \
             unresolved-after-ort.txt > ort-related-unresolved.txt || true
 
@@ -290,15 +317,7 @@ jobs:
           fi
           echo "✓ all _Ort*/_OrtApi*/_OrtSession* undefined symbols resolve against onnxruntime framework"
 
-          # 3b. Project-internal unresolved (catches iOS-exclusion bugs).
-          #    Patterns:
-          #      _piper_plus_*       — public C API (must self-resolve)
-          #      _openjtalk_*        — desktop-only OpenJTalk wrapper functions
-          #      _get_openjtalk_*    — dictionary path getter
-          #      _ensure_openjtalk_* — dictionary ensure helper
-          #      _reset_openjtalk_*  — test-only cache reset
-          #      _force_openjtalk_*  — test-only path override
-          #      __ZN<N>piper        — Itanium-mangled C++ piper:: namespace
+          # 5b. Project-internal unresolved (catches iOS-exclusion bugs / failed merge).
           grep -E '^_(piper_plus_|openjtalk_|get_openjtalk_|ensure_openjtalk_|reset_openjtalk_|force_openjtalk_)|^__ZN[0-9]+piper' \
             unresolved-after-ort.txt > project-unresolved.txt || true
 
@@ -310,7 +329,7 @@ jobs:
             echo "To fix:"
             echo "  - For OpenJTalk wrapper functions: add a stub to src/cpp/openjtalk_ios_stub.c"
             echo "  - For piper_plus_* C API: ensure the implementing TU is included in PiperCommon.cmake's iOS branch"
-            echo "  - For piper:: C++ symbols: ensure the implementing TU is included in piper_common"
+            echo "  - For piper:: C++ symbols: confirm cmake/PiperPlusShared.cmake's POST_BUILD libtool merge step ran (check the prior 'Show libpiper_plus.a archive contents' step output)"
             exit 1
           fi
           echo "✓ no project-internal unresolved symbols (libpiper_plus.a iOS slice will link cleanly in consumer apps)"
