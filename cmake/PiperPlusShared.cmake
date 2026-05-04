@@ -5,8 +5,9 @@ option(PIPER_PLUS_BUILD_SHARED "Build piper-plus shared library (C API)" OFF)
 
 if(PIPER_PLUS_BUILD_SHARED)
 
-# iOS: build as static library (dylib not allowed on App Store)
-if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+# Apple embedded platforms (iOS / tvOS / watchOS / visionOS): build as static
+# archive — dylib not allowed by App Store distribution rules.
+if(PIPER_APPLE_EMBEDDED)
   add_library(piper_plus STATIC
     src/cpp/piper_plus_c_api.cpp
     $<TARGET_OBJECTS:piper_common>
@@ -69,8 +70,8 @@ if(WIN32)
     ${ONNXRUNTIME_LIB}
     ${OPENJTALK_DIR}/lib/openjtalk.lib
   )
-elseif(CMAKE_SYSTEM_NAME STREQUAL "iOS" AND DEFINED ONNXRUNTIME_LIB)
-  # iOS: link ONNX Runtime by explicit path (from xcframework extraction)
+elseif(PIPER_APPLE_EMBEDDED AND DEFINED ONNXRUNTIME_LIB)
+  # Apple embedded: link ONNX Runtime by explicit path (from xcframework extraction)
   target_link_libraries(piper_plus PRIVATE
     fmt
     spdlog
@@ -130,8 +131,8 @@ set_target_properties(piper_plus PROPERTIES
   OUTPUT_NAME "piper_plus"
 )
 
-# iOS static library: no VERSION/SOVERSION/RPATH needed
-if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
+# Apple embedded static archive: no VERSION/SOVERSION/RPATH needed
+if(NOT PIPER_APPLE_EMBEDDED)
   set_target_properties(piper_plus PROPERTIES
     VERSION ${piper_version}
     SOVERSION 1
@@ -151,14 +152,15 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
   endif()
 endif()
 
-# iOS: skip all install/EXPORT/pkg-config/CMakeConfig logic below.
-# Reasoning: the xcframework build flow (.github/workflows/release-shared-lib.yml,
-# Stage slice for xcframework assembly step) cp's libpiper_plus.a directly from
-# CMAKE_BINARY_DIR. SPM consumers (M4 Package.swift binaryTarget) resolve headers
-# via the xcframework's Headers/ + module.modulemap, not via CMake find_package.
-# Including the install(EXPORT) below on iOS would also fail because piper_plus
+# Apple embedded (iOS/tvOS/watchOS/visionOS): skip all install/EXPORT/pkg-config/
+# CMakeConfig logic below. Reasoning: the xcframework build flow
+# (.github/workflows/release-shared-lib.yml, Stage slice for xcframework assembly
+# step) cp's libpiper_plus.a directly from CMAKE_BINARY_DIR. SPM consumers
+# (M4 Package.swift binaryTarget) resolve headers via the xcframework's
+# Headers/ + module.modulemap, not via CMake find_package. Including the
+# install(EXPORT) below on Apple embedded would also fail because piper_plus
 # transitively depends on hts_engine_stub which is not in the export set.
-if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
+if(NOT PIPER_APPLE_EMBEDDED)
 
 # Install targets
 include(GNUInstallDirs)
@@ -173,8 +175,8 @@ install(FILES src/cpp/piper_plus.h
 )
 
 # --- ONNX Runtime shared library install ---
-# Skip for iOS/Android (ONNX Runtime is linked statically or bundled separately)
-if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS" AND NOT ANDROID)
+# Skip for Apple embedded / Android (ORT is linked from xcframework / .aar bundle)
+if(NOT PIPER_APPLE_EMBEDDED AND NOT ANDROID)
   if(WIN32)
     # Windows: copy DLLs to bin/
     file(GLOB _ort_dlls "${ONNXRUNTIME_DIR}/lib/*.dll")
@@ -267,6 +269,6 @@ install(FILES
   DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/PiperPlus
 )
 
-endif() # NOT CMAKE_SYSTEM_NAME STREQUAL "iOS"
+endif() # NOT PIPER_APPLE_EMBEDDED
 
 endif() # PIPER_PLUS_BUILD_SHARED

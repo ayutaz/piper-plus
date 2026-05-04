@@ -42,8 +42,16 @@ set(PIPER_COMMON_SOURCES
   src/cpp/library_path.c
 )
 
-# Desktop-only sources (std::system / popen / fork unavailable on iOS).
-if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
+# Desktop-only sources (std::system / popen / fork unavailable on Apple
+# embedded platforms — iOS / tvOS / watchOS / visionOS). On those targets,
+# openjtalk_ios_stub.c provides minimal stand-ins for the symbols referenced
+# by openjtalk_phonemize.cpp / openjtalk_api.c (which remain in the build),
+# so libpiper_plus.a links cleanly in consumer Xcode projects.
+if(PIPER_APPLE_EMBEDDED)
+  list(APPEND PIPER_COMMON_SOURCES
+    src/cpp/openjtalk_ios_stub.c
+  )
+else()
   list(APPEND PIPER_COMMON_SOURCES
     src/cpp/model_manager.cpp
     src/cpp/openjtalk_wrapper.c

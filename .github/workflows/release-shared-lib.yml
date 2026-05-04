@@ -6,8 +6,10 @@ on:
       - 'v[0-9]*'
   workflow_dispatch:
 
+# Workflow-level permissions are read-only; the `release` job opts into
+# `contents: write` for GitHub Release creation only.
 permissions:
-  contents: write
+  contents: read
 
 env:
   ONNXRUNTIME_VERSION: "1.17.0"
@@ -44,7 +46,9 @@ jobs:
         shell: bash
         run: |
           TAG="${GITHUB_REF#refs/tags/v}"
-          if ! echo "$TAG" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+'; then
+          # Anchored fully ($) so that tags like "1.0.0-malicious$(rm)" are rejected.
+          # Allow optional pre-release / build-metadata: 1.0.0, 1.0.0-rc1, 1.0.0+build.5
+          if ! echo "$TAG" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+([-+][A-Za-z0-9.-]+)?$'; then
             echo "::error::Invalid version tag: v$TAG"
             exit 1
           fi
@@ -110,9 +114,13 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
+          # bsdtar (Windows 10+ ships it as `tar`) produces forward-slash POSIX
+          # paths inside the zip — Compress-Archive uses backslash paths which
+          # break cross-platform extraction (tar -t / unzip on Linux/macOS get
+          # garbled member names).
           $installDir = "${env:GITHUB_WORKSPACE}/install"
           $archivePath = "${env:GITHUB_WORKSPACE}/${{ matrix.artifact }}.zip"
-          Compress-Archive -Path "$installDir/*" -DestinationPath "$archivePath"
+          tar -a -cf "$archivePath" -C "$installDir" .
 
       - name: Upload artifact
         uses: actions/upload-artifact@v7
@@ -145,7 +153,9 @@ jobs:
         shell: bash
         run: |
           TAG="${GITHUB_REF#refs/tags/v}"
-          if ! echo "$TAG" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+'; then
+          # Anchored fully ($) so that tags like "1.0.0-malicious$(rm)" are rejected.
+          # Allow optional pre-release / build-metadata: 1.0.0, 1.0.0-rc1, 1.0.0+build.5
+          if ! echo "$TAG" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+([-+][A-Za-z0-9.-]+)?$'; then
             echo "::error::Invalid version tag: v$TAG"
             exit 1
           fi
@@ -237,39 +247,73 @@ jobs:
           echo "onnxruntime framework arch:"
           lipo -info "${ORT_IOS_FRAMEWORK}/onnxruntime"
 
-      - name: Verify symbol resolution against ORT framework
-        # Verifies that all ORT-related undefined symbols in libpiper_plus.a
-        # resolve against the ORT framework's exported symbols. Apple/libc
-        # symbols (___stack_chk_*, _memcpy etc.) are excluded — those are
-        # resolved at the consumer app's final link stage.
+      - name: Verify symbol resolution (ORT + project-internal)
+        # Two-stage symbol-resolution gate for the iOS slice:
+        #   1. ORT-prefixed symbols (_Ort*, _OrtApi*, ...) MUST resolve against
+        #      onnxruntime framework. Catches ORT version drift / missing dylib.
+        #   2. Project-internal symbols (_piper_plus_*, _openjtalk_*,
+        #      __ZN<N>piper) MUST NOT remain undefined after subtracting ORT
+        #      exports. Catches the iOS-exclusion bug where a desktop-only TU
+        #      is excluded from the build but its callers remain (issue #377):
+        #      consumer Xcode projects would otherwise fail at app link time
+        #      with "Undefined symbol: _openjtalk_is_available" etc.
+        # Apple/libc/libc++ runtime symbols are resolved by the consumer's
+        # final link stage and are not validated here.
         run: |
           set -euo pipefail
 
-          # Undefined symbols in libpiper_plus.a (one per line, U-marked entries)
+          # 1. Undefined symbols in libpiper_plus.a (one per line, U-marked entries)
           nm -u build-ios/libpiper_plus.a 2>/dev/null \
             | awk 'NF > 0 {print $NF}' \
             | sort -u > undefined-syms.txt
           echo "undefined symbols in libpiper_plus.a: $(wc -l < undefined-syms.txt)"
 
-          # External symbols defined by the ORT dylib (T/D/S types).
-          # For simulator slice (universal arm64+x86_64) nm returns symbols
-          # for both archs — duplicates are fine since we sort -u.
+          # 2. External symbols defined by the ORT dylib (T/D/S types).
+          #    For simulator slice (universal arm64+x86_64) nm returns symbols
+          #    for both archs — duplicates are fine since we sort -u.
           nm -gU "${ORT_IOS_FRAMEWORK}/onnxruntime" 2>/dev/null \
             | awk '$2 ~ /^[TDS]$/ {print $NF}' \
             | sort -u > ort-exports.txt
           echo "exported symbols in onnxruntime framework: $(wc -l < ort-exports.txt)"
 
-          # ORT-related unresolved (those starting with _Ort, _OrtApi, etc.)
-          comm -23 undefined-syms.txt ort-exports.txt \
-            | grep -E '^_(Ort|OrtApi|OrtCreate|OrtRelease|OrtSession|OrtGetVersionString)' \
-            > ort-related-unresolved.txt || true
+          # 3. Subtract ORT-resolved → unresolved-after-ort.txt
+          comm -23 undefined-syms.txt ort-exports.txt > unresolved-after-ort.txt
+
+          # 3a. ORT-prefixed unresolved (catches ORT version drift)
+          grep -E '^_(Ort|OrtApi|OrtCreate|OrtRelease|OrtSession|OrtGetVersionString)' \
+            unresolved-after-ort.txt > ort-related-unresolved.txt || true
 
           if [ -s ort-related-unresolved.txt ]; then
-            echo "::error::ORT-related symbols unresolved against onnxruntime framework"
+            echo "::error::ORT-prefixed symbols are unresolved against onnxruntime framework."
             cat ort-related-unresolved.txt
             exit 1
           fi
-          echo "✓ all ORT-related undefined symbols resolve against onnxruntime framework"
+          echo "✓ all _Ort*/_OrtApi*/_OrtSession* undefined symbols resolve against onnxruntime framework"
+
+          # 3b. Project-internal unresolved (catches iOS-exclusion bugs).
+          #    Patterns:
+          #      _piper_plus_*       — public C API (must self-resolve)
+          #      _openjtalk_*        — desktop-only OpenJTalk wrapper functions
+          #      _get_openjtalk_*    — dictionary path getter
+          #      _ensure_openjtalk_* — dictionary ensure helper
+          #      _reset_openjtalk_*  — test-only cache reset
+          #      _force_openjtalk_*  — test-only path override
+          #      __ZN<N>piper        — Itanium-mangled C++ piper:: namespace
+          grep -E '^_(piper_plus_|openjtalk_|get_openjtalk_|ensure_openjtalk_|reset_openjtalk_|force_openjtalk_)|^__ZN[0-9]+piper' \
+            unresolved-after-ort.txt > project-unresolved.txt || true
+
+          if [ -s project-unresolved.txt ]; then
+            echo "::error::Project-internal symbols are unresolved in libpiper_plus.a."
+            echo "These will fail to link in consumer Xcode projects:"
+            cat project-unresolved.txt
+            echo ""
+            echo "To fix:"
+            echo "  - For OpenJTalk wrapper functions: add a stub to src/cpp/openjtalk_ios_stub.c"
+            echo "  - For piper_plus_* C API: ensure the implementing TU is included in PiperCommon.cmake's iOS branch"
+            echo "  - For piper:: C++ symbols: ensure the implementing TU is included in piper_common"
+            exit 1
+          fi
+          echo "✓ no project-internal unresolved symbols (libpiper_plus.a iOS slice will link cleanly in consumer apps)"
 
       - name: Stage slice for xcframework assembly
         # Each slice prepares a self-contained directory (lib + include +
@@ -305,7 +349,14 @@ jobs:
           mkdir -p artifacts/lib artifacts/include
           cp build-ios/libpiper_plus.a artifacts/lib/
           cp src/cpp/piper_plus.h artifacts/include/
-          cp -R "${ORT_IOS_FRAMEWORK}" artifacts/lib/
+          # Use `ditto` (Apple-aware) instead of `cp -R` to preserve framework
+          # symlinks (Versions/A) and resource forks. Critical for codesign
+          # validation on consumer side.
+          ditto "${ORT_IOS_FRAMEWORK}" artifacts/lib/onnxruntime.framework
+          # Emit a deprecation warning so consumers know the M1-compat path is
+          # going away — the SPM xcframework path is the supported flow from
+          # v1.13.0 onwards. tar.gz disappears in v1.14.0 (see CHANGELOG).
+          echo "::warning::libpiper_plus-ios-arm64.tar.gz is DEPRECATED in v1.13.0 and will be removed in v1.14.0. Migrate to libpiper_plus-ios-v\${VERSION}.xcframework.zip + Package.swift."
           cd artifacts
           tar -czf "${{ github.workspace }}/libpiper_plus-ios-arm64.tar.gz" .
 
@@ -349,7 +400,20 @@ jobs:
             echo "=== ${slice} ==="
             ls -la "slices/${slice}/lib"
             ls -la "slices/${slice}/include"
-            lipo -info "slices/${slice}/lib/libpiper_plus.a"
+            # Use `lipo -archs` and grep for expected arch tokens — `lipo -info`
+            # returns 0 even for empty archives, so it's not a real check.
+            archs=$(lipo -archs "slices/${slice}/lib/libpiper_plus.a")
+            echo "archs: ${archs}"
+            case "${slice}" in
+              ios-arm64)
+                echo "${archs}" | grep -qx 'arm64' \
+                  || { echo "::error::expected arm64 only, got: ${archs}"; exit 1; }
+                ;;
+              ios-arm64_x86_64-simulator)
+                echo "${archs}" | tr ' ' '\n' | sort | tr '\n' ' ' | grep -q 'arm64 x86_64' \
+                  || { echo "::error::expected arm64+x86_64 simulator slice, got: ${archs}"; exit 1; }
+                ;;
+            esac
             test -f "slices/${slice}/include/piper_plus.h"
             test -f "slices/${slice}/include/module.modulemap"
           done
@@ -378,7 +442,7 @@ jobs:
           echo "=== xcframework structure ==="
           ls -la piper_plus.xcframework/
           plutil -p piper_plus.xcframework/Info.plist
-          find piper_plus.xcframework -name "libpiper_plus.a" -exec lipo -info {} \;
+          find piper_plus.xcframework -name "libpiper_plus.a" -exec lipo -archs {} \;
           find piper_plus.xcframework -name "module.modulemap" -print -exec cat {} \;
           plutil -p piper_plus.xcframework/PrivacyInfo.xcprivacy
 
@@ -413,7 +477,9 @@ jobs:
         shell: bash
         run: |
           TAG="${GITHUB_REF#refs/tags/v}"
-          if ! echo "$TAG" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+'; then
+          # Anchored fully ($) so that tags like "1.0.0-malicious$(rm)" are rejected.
+          # Allow optional pre-release / build-metadata: 1.0.0, 1.0.0-rc1, 1.0.0+build.5
+          if ! echo "$TAG" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+([-+][A-Za-z0-9.-]+)?$'; then
             echo "::error::Invalid version tag: v$TAG"
             exit 1
           fi
@@ -486,7 +552,54 @@ jobs:
     needs: [build-shared, build-ios, build-android, assemble-xcframework]
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-24.04
+    # GitHub Release creation requires `contents: write`. Scoped to this job
+    # only so build / assemble jobs run with workflow-default `contents: read`.
+    permissions:
+      contents: write
     steps:
+      - name: Checkout tag commit (for Package.swift checksum verification)
+        uses: actions/checkout@v6
+        with:
+          # Sparse checkout — we only need Package.swift to verify the SPM
+          # checksum was updated before tagging.
+          sparse-checkout: |
+            Package.swift
+          sparse-checkout-cone-mode: false
+
+      - name: Verify Package.swift checksum is non-placeholder
+        # Catches the C3 footgun: tag was pushed before the maintainer ran
+        # `swift package compute-checksum` and updated Package.swift. SwiftPM
+        # consumers would hit `error: artifact has changed checksum` because
+        # the all-zero placeholder doesn't match the released asset.
+        # See Package.swift header comment for the manual update procedure.
+        run: |
+          set -euo pipefail
+          if ! [ -f Package.swift ]; then
+            echo "::error::Package.swift not found at tag commit"
+            exit 1
+          fi
+          CHECKSUM=$(grep -E '^let checksum' Package.swift | sed -E 's/.*"([^"]+)".*/\1/')
+          if [ -z "${CHECKSUM}" ]; then
+            echo "::error::Could not extract checksum from Package.swift"
+            exit 1
+          fi
+          # all-zero (64 hex chars of '0') is the placeholder.
+          if echo "${CHECKSUM}" | grep -qE '^0+$'; then
+            echo "::error::Package.swift checksum is the placeholder '${CHECKSUM}'."
+            echo "::error::Maintainer must update Package.swift BEFORE tagging:"
+            echo "::error::  1. Run 'workflow_dispatch' to produce libpiper_plus-ios.xcframework.zip"
+            echo "::error::  2. Run 'swift package compute-checksum libpiper_plus-ios.xcframework.zip'"
+            echo "::error::  3. Update 'let checksum = \"...\"' in Package.swift"
+            echo "::error::  4. Commit on dev, then tag the same commit"
+            exit 1
+          fi
+          # Sanity-check: SHA-256 hex is exactly 64 chars [0-9a-f].
+          if ! echo "${CHECKSUM}" | grep -qE '^[0-9a-f]{64}$'; then
+            echo "::error::Package.swift checksum '${CHECKSUM}' is not a valid SHA-256 hex string"
+            exit 1
+          fi
+          echo "✓ Package.swift checksum is set: ${CHECKSUM}"
+
       - name: Download artifacts
         uses: actions/download-artifact@v8
         with:
@@ -518,6 +631,32 @@ jobs:
           cd artifacts
           find . -type f \( -name "*.tar.gz" -o -name "*.zip" \) -exec sha256sum {} \; > checksums-sha256.txt
           cat checksums-sha256.txt
+
+      - name: Verify Package.swift checksum matches xcframework asset
+        # Cross-check: the SHA-256 declared in Package.swift MUST match the
+        # actually-released xcframework zip. If they differ, SwiftPM consumers
+        # hit `error: artifact has changed checksum`. This catches the case
+        # where the maintainer updated Package.swift but used a checksum from
+        # a different (e.g. preview) build.
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF#refs/tags/}"
+          XCF_ZIP="artifacts/libpiper_plus-ios-xcframework/libpiper_plus-ios-${TAG}.xcframework.zip"
+          if ! [ -f "${XCF_ZIP}" ]; then
+            echo "::error::Released xcframework zip not found at ${XCF_ZIP}"
+            exit 1
+          fi
+          ACTUAL=$(sha256sum "${XCF_ZIP}" | awk '{print $1}')
+          DECLARED=$(grep -E '^let checksum' Package.swift | sed -E 's/.*"([^"]+)".*/\1/')
+          echo "Released xcframework SHA-256:    ${ACTUAL}"
+          echo "Package.swift declared checksum: ${DECLARED}"
+          if [ "${ACTUAL}" != "${DECLARED}" ]; then
+            echo "::error::Checksum mismatch: SwiftPM consumers will fail to resolve."
+            echo "::error::Run 'swift package compute-checksum ${XCF_ZIP}' locally and update Package.swift, then re-tag."
+            exit 1
+          fi
+          echo "✓ Package.swift checksum matches released xcframework"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2

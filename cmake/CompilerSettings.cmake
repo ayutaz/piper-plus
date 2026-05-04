@@ -60,8 +60,10 @@ if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
   )
 endif()
 
-# ARM64-specific optimizations (skip on Android/iOS -- their toolchains set own flags)
-if(NOT ANDROID AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS" AND CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|ARM64")
+# ARM64-specific optimizations (skip on Android/Apple-embedded -- their
+# toolchains set their own flags). PIPER_APPLE_EMBEDDED is defined in the
+# root CMakeLists.txt before this file is included.
+if(NOT ANDROID AND NOT PIPER_APPLE_EMBEDDED AND CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|ARM64")
   message(STATUS "Detected ARM64 architecture, enabling optimizations")
 
   # Enable NEON SIMD instructions

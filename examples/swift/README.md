@@ -12,9 +12,9 @@ Swift integration for piper-plus on **iOS** (device + simulator).
 
 ## SPM Quick Start
 
-### Step 1: Add piper-plus and ORT as dependencies
+### Step 1: Add piper-plus as a dependency
 
-`piper-plus`'s `Package.swift` uses `binaryTarget(url:, checksum:)` for the xcframework, and `binaryTarget` cannot declare its own dependencies. Therefore consumers must explicitly add **both** packages:
+Starting from v1.13.0, `piper-plus`'s `Package.swift` wraps the binary xcframework in a Swift `target` that depends on the official `onnxruntime-swift-package-manager` package. **ORT is therefore pulled transitively** — consumers only declare `piper-plus`:
 
 ```swift
 // swift-tools-version: 5.9
@@ -26,18 +26,14 @@ let package = Package(
     platforms: [.iOS(.v15)],
     dependencies: [
         .package(url: "https://github.com/ayutaz/piper-plus", from: "1.13.0"),
-        // ORT is REQUIRED — piper-plus binaryTarget cannot pull it transitively.
-        .package(
-            url: "https://github.com/microsoft/onnxruntime-swift-package-manager",
-            exact: "1.17.0"
-        ),
+        // No need to declare onnxruntime — piper-plus pulls it transitively
+        // through its wrapper target. See Package.swift in the piper-plus repo.
     ],
     targets: [
         .target(
             name: "MyApp",
             dependencies: [
                 .product(name: "PiperPlus", package: "piper-plus"),
-                .product(name: "onnxruntime", package: "onnxruntime-swift-package-manager"),
             ]
         ),
     ]
@@ -49,8 +45,7 @@ Or in Xcode:
 1. **File → Add Package Dependencies…**
 2. Paste `https://github.com/ayutaz/piper-plus`
 3. Select `from: 1.13.0`
-4. Add `PiperPlus` to your target
-5. Repeat for `https://github.com/microsoft/onnxruntime-swift-package-manager` (exact `1.17.0`)
+4. Add `PiperPlus` to your target — `onnxruntime` is added automatically.
 
 ### Step 2: Resolve and use
 
@@ -65,7 +60,7 @@ import PiperPlus
 let synthesizer = piper_plus_create_synthesizer(/* … */)
 ```
 
-> **Note**: the `Package.swift` at the piper-plus repo root uses `binaryTarget(url:, checksum:)` to point at the `libpiper_plus-ios-v${VERSION}.xcframework.zip` published in GitHub Releases. SPM downloads the zip on first resolve and caches it in `~/Library/Developer/Xcode/DerivedData/SourcePackages/`.
+> **Note**: the `Package.swift` at the piper-plus repo root combines a Swift wrapper `target` (named `PiperPlus`) with a `binaryTarget` (named `PiperPlusBinary`) that points at `libpiper_plus-ios-v${VERSION}.xcframework.zip` published in GitHub Releases. SPM downloads the zip on first resolve and caches it in `~/Library/Developer/Xcode/DerivedData/SourcePackages/`. The wrapper target depends on `onnxruntime`, so consumers don't need to declare it.
 
 > **Release-cycle caveat**: SPM resolves `binaryTarget` against the manifest at the resolved tag commit. The piper-plus maintainer updates `Package.swift`'s version + checksum on `dev` BEFORE tagging; if you depend on a tag whose `Package.swift` was not updated to match its release asset, `swift package resolve` will fail with a checksum mismatch. Pin to a known-good tag (e.g. `from: "1.13.0"`).
 

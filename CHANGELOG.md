@@ -11,21 +11,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 #### iOS shared-lib を xcframework として配布開始 (Issue #377)
 
-iOS 利用シナリオ (Dart FFI / Godot / Swift / SPM) に対応する xcframework 配布を成立させた。device (arm64) + simulator (arm64+x86_64 universal) の両 slice を含み、Swift `import PiperPlus` を可能にする `module.modulemap` および iOS 17+ App Store 提出に必要な空 `PrivacyInfo.xcprivacy` を同梱。
+iOS 利用シナリオ (Dart FFI / Godot / Swift / SPM) に対応する xcframework 配布を成立させた。device (arm64) + simulator (arm64+x86_64 universal) の両 slice を含む。
 
-- 新 artifact: `libpiper_plus-ios-v${VERSION}.xcframework.zip` (device + simulator slices)
+- 新 artifact: `libpiper_plus-ios-v${VERSION}.xcframework.zip` (device slice + simulator universal slice)
 - **`piper_plus.xcframework` は static archive** — Xcode では **"Do Not Embed"** で取り込む (リンクのみ)。`onnxruntime.xcframework` は dynamic framework のため **"Embed & Sign"** が必須
-- ONNX Runtime は別途取得 (CocoaPods `pod 'onnxruntime-c'` / SPM `microsoft/onnxruntime-swift-package-manager` / CDN `download.onnxruntime.ai`)。SPM 利用時は `binaryTarget` の制約で transitive dependency が引けないため、consumer 側 `Package.swift` で piper-plus と ORT を **両方** 宣言する必要あり
-- 利用者ガイド: [`docs/guides/ios-integration.md`](docs/guides/ios-integration.md) (Dart / Godot / Swift 横断)
-- Swift プロジェクト向け手順 (SPM Quick Start + 手動 drag-and-drop): [`examples/swift/README.md`](examples/swift/README.md)
+- 利用者ガイド: [`docs/guides/ios-integration.md`](docs/guides/ios-integration.md) (Dart / Godot / Swift 横断、トラブルシューティング、App Store 提出チェックリスト含む)
+- Swift プロジェクト向け手順: [`examples/swift/README.md`](examples/swift/README.md)
 
-#### Swift Package Manager マニフェスト (`Package.swift`) を repo 直下に配置 (Issue #377)
+#### Swift `import PiperPlus` を有効化する `module.modulemap` 同梱
 
-- `binaryTarget(url:, checksum:)` で GitHub Releases の xcframework.zip を参照
+- xcframework の各 slice の `Headers/` に `module.modulemap` を CMake で自動生成して同梱
+- Swift consumer は `import PiperPlus` で `piper_plus.h` の C API surface 全体にアクセス可能
+- 仕様: 非 framework 形式の `module PiperPlus { umbrella header "piper_plus.h" export * module * { export * } }`
+
+#### Swift Package Manager マニフェスト (`Package.swift`) を repo 直下に配置
+
+- consumer は `Package.swift` 一行 (`from: "1.13.0"`) のみで `import PiperPlus` 利用可能 — ORT は wrapper target 経由で **transitive 解決**される
+- 内部構造: Swift `target` (`PiperPlus`、`@_exported import PiperPlusBinary` で C API を再エクスポート) + `binaryTarget` (`PiperPlusBinary`、xcframework.zip 参照) + `dependencies: [onnxruntime-swift-package-manager]`
 - `platforms: [.iOS(.v15)]` のみ宣言 (macOS / visionOS / Mac Catalyst slice は v1.13.0 では無し、M5 候補)
 - メンテナがリリースタグ push **前** に `Package.swift` の version + checksum を `dev` 上で手動更新する運用 (sherpa-onnx 方式、`Package.swift` 冒頭コメントに手順記載)
+- リリース時に `release` ジョブが Package.swift の checksum が placeholder ("0000...") でないこと、および xcframework zip の SHA-256 と一致することを CI ガード
 
-#### iOS shared-lib 取得経路を Microsoft 公式 CDN に切替 (Issue #377)
+#### iOS shared-lib 取得経路を Microsoft 公式 CDN に切替
 
 ONNX Runtime の旧 GitHub Releases zip は Microsoft が配布チャネルを CocoaPods/SPM/CDN に一本化したため削除されており、v1.11.0 以降 `Build iOS arm64` ジョブが連続失敗していた。**release ジョブの巻き添えで Linux/Windows/macOS/Android shared-lib も Releases に上がっていなかった問題を解消**。
 
@@ -33,17 +40,49 @@ ONNX Runtime の旧 GitHub Releases zip は Microsoft が配布チャネルを C
 - sha256 検証ステップ追加 (1.17.0 = `1623e1150507d9e5...db871`)
 - CDN zip は Mach-O dylib のみで static `.a` 不在のため、利用者は `Embed & Sign Frameworks` で組込
 
+#### `PrivacyInfo.xcprivacy` informational reference を xcframework に同梱
+
+- xcframework root に空の Privacy Manifest (`NSPrivacyTracking=false`、3 配列空) を配置
+- **注意:** Apple App Store の Privacy Manifest スキャナは `*.framework` bundle root の `PrivacyInfo.xcprivacy` を読む。static archive xcframework のルート配置は **informational reference のみ** — consumer app target で `PrivacyInfo.xcprivacy` を別途用意する必要あり
+- 推奨 declaration テンプレートと Required Reason API カテゴリ (SystemBootTime / FileTimestamp / DiskSpace) を [`docs/guides/ios-integration.md`](docs/guides/ios-integration.md#app-store-submission-checklist) に記載
+
+#### iOS リンクエラー検出 CI ガード
+
+- `release-shared-lib.yml` の `Verify symbol resolution` を 2 段階チェックに強化
+  - ORT-prefix 系 (`_Ort*` 等) の未解決 → fail (ORT version drift 検出)
+  - project-internal 系 (`_piper_plus_*`, `_openjtalk_*`, `__ZN<N>piper`) の未解決 → fail (iOS 除外バグ検出)
+- desktop-only TU を iOS で除外して呼び出し側だけ残るバグ (例: `openjtalk_phonemize.cpp` から `openjtalk_is_available` を呼ぶ場合) を CI で検出
+
+### Limitations (v1.13.0 iOS xcframework)
+
+| Item | Status | Notes |
+|------|--------|-------|
+| ONNX Runtime bundling | ✗ | xcframework に同梱されない。SPM 経由なら transitive 解決、それ以外は consumer が CocoaPods / 手動 DL で取得 + Embed & Sign |
+| OpenJTalk 辞書 (日本語 TTS 必須) | ✗ | App Sandbox で auto-DL 不可。consumer app が `open_jtalk_dic_utf_8-1.11/` を bundle に同梱して `dict_dir` で渡す ([guide](docs/guides/ios-integration.md#step-4-japanese-tts-only-bundle-the-openjtalk-dictionary)) |
+| macOS / Mac Catalyst slice | ✗ | M5 候補 — 現状 xcframework は iOS のみ。`Package.swift` も `platforms: [.iOS(.v15)]` のみ |
+| visionOS / tvOS / watchOS slice | ✗ | M5 候補 — ORT visionOS 対応待ち |
+| `.dSYM` for crash symbolication | ✗ | xcframework binary は stripped、別 issue 追跡 |
+| App Extension / App Clip | ✗ | piper-plus + ORT (~35 MB) が 32 MB / 10 MB 制限を超過 |
+| Privacy Manifest 自動スキャン | ✗ | static archive xcframework は Apple スキャナの読取り対象外、consumer app target に追加要 |
+| C++ symbol leak (ODR) | ⚠ | `fmt::` / `spdlog::` / `piper::` symbols は static archive に export される。他 C++ 静的ライブラリと衝突する場合は Other Linker Flags に `-Wl,-load_hidden,...libpiper_plus.a` を追加 |
+
 ### Deprecated
 
 #### `libpiper_plus-ios-arm64-${VERSION}.tar.gz` (device-only、`.framework` 同梱 tar.gz)
 
 - v1.13.0 では新 xcframework.zip と並行配布 (移行期間)
-- **v1.14.0 で削除予定** — `libpiper_plus-ios-${VERSION}.xcframework.zip` への移行を推奨
+- **v1.14.0 で削除予定** — `libpiper_plus-ios-v${VERSION}.xcframework.zip` への移行を推奨
+- v1.13.0 の `release-shared-lib.yml` は tar.gz 生成時に `::warning::` を出力するため利用者が deprecation を即時認識可能
 
 ### Fixed
 
 - iOS / Linux / Windows / macOS / Android shared-lib リリースパイプラインを復旧 (Issue #377、v1.11.0 以降の停止)
   - `release` ジョブの `needs:` が `build-ios` 失敗で全 OS artifact のアップロードを止めていた
+
+### Security
+
+- `release-shared-lib.yml` の workflow-level permissions を `contents: read` に縮小、`release` ジョブのみ `contents: write` を opt-in
+- tag validator の regex を `^[0-9]+\.[0-9]+\.[0-9]+([-+][A-Za-z0-9.-]+)?$` に anchored 化 (例: `1.0.0-malicious$(rm)` 形のタグ injection を拒否)
 
 ## [1.12.0] - 2026-05-04
 

@@ -99,7 +99,7 @@ https://download.onnxruntime.ai/pod-archive-onnxruntime-c-${ONNXRUNTIME_VERSION}
 | `ios-arm64` | arm64 (device) | 実機 (iPhone/iPad) |
 | `ios-arm64_x86_64-simulator` | arm64 + x86_64 (universal) | シミュレータ (Apple Silicon Mac / Intel Mac) |
 
-**最終 artifact:** `libpiper_plus-ios-${VERSION}.xcframework.zip`
+**最終 artifact:** `libpiper_plus-ios-v${VERSION}.xcframework.zip`
 
 ### 2.3 互換性維持
 
@@ -280,7 +280,7 @@ Plan A の xcframework ビルドロジック (`xcodebuild -create-xcframework`) 
   - [ ] 新規 `assemble-xcframework` ジョブを追加 (`needs: build-ios`)
     - 各 slice の `libpiper_plus.a` + headers + `module.modulemap` + `PrivacyInfo.xcprivacy` をダウンロード
     - `xcodebuild -create-xcframework` で統合
-    - `libpiper_plus-ios-${VERSION}.xcframework.zip` を生成
+    - `libpiper_plus-ios-v${VERSION}.xcframework.zip` を生成
   - [ ] `cmake/ios.toolchain.cmake` の simulator slice 対応
     - `CMAKE_OSX_SYSROOT` (iphoneos / iphonesimulator) と `CMAKE_OSX_ARCHITECTURES` のパラメータ化
     - bitcode 無効維持
@@ -293,7 +293,7 @@ Plan A の xcframework ビルドロジック (`xcodebuild -create-xcframework`) 
   - `lipo -info` または `xcodebuild -checkFirstLaunchStatus` で 3 アーキテクチャ確認
   - 各 slice に `Headers/module.modulemap` + `PrivacyInfo.xcprivacy` が含まれる
   - macOS シミュレータ (Apple Silicon) でのロード検証は環境制約上 CI 内で完結 (`xcodebuild -create-xcframework` 成功 + Info.plist 生成検証)
-  - tag push で `libpiper_plus-ios-${VERSION}.xcframework.zip` が Releases にアップロード
+  - tag push で `libpiper_plus-ios-v${VERSION}.xcframework.zip` が Releases にアップロード
 - **依存:** M1 完了
 - **リスク:**
   - `xcodebuild -create-xcframework` の互換性 (Xcode 15.x 〜 16.x で安定)

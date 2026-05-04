@@ -41,7 +41,7 @@
 - [ ] 本体 repo (`ayutaz/piper-plus`) 直下に `Package.swift` が配置されている
 - [ ] `Package.swift` で `binaryTarget(url:, checksum:)` が piper-plus Releases の `libpiper_plus-ios-v${VERSION}.xcframework.zip` を指している (URL の `v` 接頭辞が workflow Rename ステップと一致)
 - [ ] `platforms: [.iOS(.v15)]` のみ宣言、macOS / visionOS 等は xcframework に slice が無い限り宣言しない
-- [ ] consumer 側 `Package.swift` テンプレートが `examples/swift/README.md` に存在 (piper-plus + ORT 同時宣言、`binaryTarget` の transitive deps 不可ゆえ ORT は consumer 責任である旨明記)
+- [ ] consumer 側 `Package.swift` テンプレートが `examples/swift/README.md` に存在 (piper-plus 一行のみ — wrapper target が ORT を transitive 解決する旨明記)
 - [ ] **メンテナ手動更新フロー** (sherpa-onnx 方式) が `Package.swift` 冒頭コメントと `examples/swift/README.md` に記載されている:
   - tag push 前に `dev` で `swift package compute-checksum` 結果を反映 → commit → tag → push
   - 旧設計 (release ジョブ内 auto-PR) は不採用 (tag commit に古い manifest が残ると SPM resolve が失敗するため)
@@ -53,26 +53,11 @@
 
 ## 3. 実装する内容の詳細
 
-> **実装場所:** 以下は別 repo `ayousanz/piper-plus-swift-package-manager` (案 Y) で行う。案 X 採用時は本体 repo `ayutaz/piper-plus` の別 PR で実施。**いずれにせよ本ブランチ `fix/ios-shared-lib-build-377` ではドキュメント (本チケット) のみ追加する**。
+> **実装場所:** 案 X 採用済 — 本体 repo `ayutaz/piper-plus` 直下に `Package.swift` を配置する。本ブランチ `fix/ios-shared-lib-build-377` で実施。
 
-### 3.1 別 repo 新設 (案 Y)
+### 3.1 Package.swift の構造 (本体 repo 直下、案 X)
 
-```bash
-gh repo create ayousanz/piper-plus-swift-package-manager \
-  --public \
-  --description "Swift Package Manager distribution of piper-plus iOS xcframework" \
-  --license Apache-2.0
-```
-
-初期コミットには以下を含める:
-
-- `Package.swift`
-- `README.md` (使い方、ORT の併用方法)
-- `.github/workflows/update-on-release.yml` (リリース連携)
-- `Sources/PiperPlusDemo/` (デモ target、optional)
-- `Tests/PiperPlusTests/` (簡易呼出テスト)
-
-### 3.2 Package.swift の構造 (案 X、本体 repo `ayutaz/piper-plus` 直下に配置)
+wrapper Swift target で `binaryTarget` を包むことで、`onnxruntime` を `dependencies:` に置き、consumer に transitive 解決させる:
 
 ```swift
 // swift-tools-version: 5.9
@@ -83,28 +68,47 @@ let checksum = "<sha256-from-release>"
 
 let package = Package(
     name: "PiperPlus",
-    platforms: [.iOS(.v15), .macOS(.v12)],
+    // iOS-only — macOS / visionOS / Mac Catalyst slices は M5 候補
+    platforms: [.iOS(.v15)],
     products: [
         .library(name: "PiperPlus", targets: ["PiperPlus"]),
     ],
     dependencies: [
-        // ORT 公式 SPM パッケージを exact ピン (M2 でリンクした 1.17.0 と一致)
+        // ORT 公式 SPM パッケージを semver range で宣言 (1.17 系の patch update を許容)
         .package(
             url: "https://github.com/microsoft/onnxruntime-swift-package-manager",
-            exact: "1.17.0"
+            from: "1.17.0"
         ),
     ],
     targets: [
-        .binaryTarget(
+        // Wrapper target — `binaryTarget` は `dependencies:` を持てないため、
+        // ここで onnxruntime を transitive に引き、consumer の `Package.swift` を簡略化する
+        .target(
             name: "PiperPlus",
-            url: "https://github.com/ayutaz/piper-plus/releases/download/v\(version)/libpiper_plus-ios-\(version).xcframework.zip",
+            dependencies: [
+                .target(name: "PiperPlusBinary"),
+                .product(
+                    name: "onnxruntime",
+                    package: "onnxruntime-swift-package-manager"
+                ),
+            ],
+            path: "Sources/PiperPlus"
+        ),
+        .binaryTarget(
+            name: "PiperPlusBinary",
+            // URL の `v` 接頭辞は `release-shared-lib.yml` の Rename ステップ
+            // (`mv ... libpiper_plus-ios-${TAG}.xcframework.zip` で `${TAG}` =
+            // `v1.13.0`) と整合する
+            url: "https://github.com/ayutaz/piper-plus/releases/download/v\(version)/libpiper_plus-ios-v\(version).xcframework.zip",
             checksum: checksum
         ),
     ]
 )
 ```
 
-### 3.3 リリース連携 (sherpa-onnx 方式: メンテナ手動更新)
+`Sources/PiperPlus/PiperPlus.swift` は `@_exported import PiperPlusBinary` 1 行のみ — wrapper target を空にしないためのプレースホルダかつ C API surface 再エクスポートを兼ねる。
+
+### 3.2 リリース連携 (sherpa-onnx 方式: メンテナ手動更新)
 
 **根本制約:** SwiftPM の `binaryTarget(url:, checksum:)` は **resolved 時点での tag commit 内の `Package.swift` の値**で URL/checksum を解決する。tag push **後** に `Package.swift` を更新しても (旧設計案: release ジョブ内 auto-PR を `dev` に投げる)、その tag に対する `swift package resolve` は古い checksum を見るため失敗する。`Package.swift` の正しい値は **tag commit そのものに含まれていなければならない**。
 
@@ -148,22 +152,24 @@ git push origin v1.13.0
 
 **不採用 (案 Z): cron polling** — タイムラグ最大 6h、観測欠如、運用上 brittle。
 
-### 3.4 module map の組込み (M2 で対応済)
+### 3.3 module map の組込み (M2 で対応済)
 
 道 A 確定により M2 §3.1 で **`cmake/PiperPlusShared.cmake` の iOS 分岐に module map 自動生成ステップが追加済**。M4 ではこれを利用するだけで `import PiperPlus` が成立するため、追加実装不要。
 
-参考 (M2 で生成される modulemap 内容):
+参考 (M2 で生成される modulemap 内容、非 framework 形式 — static archive xcframework のため):
 ```
-framework module PiperPlus {
+module PiperPlus {
     umbrella header "piper_plus.h"
     export *
     module * { export * }
 }
 ```
 
+> SPM `binaryTarget` は static archive xcframework に対し非 framework 形式の module map を期待する (`framework module` 構文は `.framework` bundle 内でのみ有効)。
+
 M4 の `Package.swift` の `binaryTarget(url:, checksum:)` は xcframework 内 `Headers/module.modulemap` を自動的に解決するため、追加 modulemap 設定は不要。
 
-### 3.5 Swift Package Index 登録
+### 3.4 Swift Package Index 登録
 
 https://swiftpackageindex.com/add-a-package で repo URL を入力。`Package.swift` の `swift-tools-version` と product 定義が正しければ自動でビルド検証され、互換性バッジ (iOS / macOS / Swift version) が生成される。
 
@@ -216,7 +222,7 @@ https://swiftpackageindex.com/add-a-package で repo URL を入力。`Package.sw
 | 4 | 合成動作 | デモ target で text-to-speech 合成 → 16-bit PCM wav 生成 |
 | 5 | Simulator 互換 | Apple Silicon Mac の iOS Simulator (arm64) でロード成功 |
 | 6 | 実機互換 | iOS 実機 (arm64) でロード成功 (要 codesign 確認) |
-| 7 | リリース連携 | piper-plus に仮想 tag (`v0.0.0-test`) を push → 別 repo に PR が自動作成 |
+| 7 | リリース時 checksum guard | tag commit の `Package.swift` の checksum が all-zero placeholder のまま push → release ジョブが fail (案 X のため別 repo PR は無し) |
 | 8 | checksum 検証 | sha256 が不一致な状態で resolve → SPM がエラーを返す (改ざん検知) |
 
 ---
@@ -261,11 +267,11 @@ https://swiftpackageindex.com/add-a-package で repo URL を入力。`Package.sw
 ## 10. レビュー項目
 
 - [ ] `Package.swift` の `swift-tools-version` が 5.9 以上
-- [ ] `binaryTarget` の `url` が piper-plus Releases の正規パターン (`libpiper_plus-ios-${VERSION}.xcframework.zip`) と一致
-- [ ] `checksum` が piper-plus 側 `shasum -a 256` と byte-for-byte 一致
-- [ ] `platforms:` が `.iOS(.v14)` 以上
+- [ ] `binaryTarget` の `url` が piper-plus Releases の正規パターン (`libpiper_plus-ios-v${VERSION}.xcframework.zip`、v 接頭辞有り) と一致
+- [ ] `checksum` が piper-plus 側 `shasum -a 256` と byte-for-byte 一致 (release ジョブの `Verify Package.swift checksum matches xcframework asset` が CI ガード)
+- [ ] `platforms:` が `.iOS(.v15)` 以上 (v15 が最低互換)
 - [ ] `products: [.library]` の name が `PiperPlus` (PascalCase)
-- [ ] xcframework 内 module map が `framework module PiperPlus` を宣言
+- [ ] xcframework 内 module map が `module PiperPlus` (非 framework 形式) を宣言 — static archive のため
 - [ ] リリース連携 workflow の PAT スコープが最小権限 (`contents: write`, `pull-requests: write`)
 - [ ] README に ORT 併用方法 (`microsoft/onnxruntime-swift-package-manager` 追加) を明記
 - [ ] Swift Package Index バッジ (iOS / Swift version 互換性) を README 先頭に貼付

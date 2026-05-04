@@ -3,7 +3,15 @@
 // piper-plus Swift Package Manager manifest
 //
 // Distributes the iOS xcframework via `binaryTarget(url:, checksum:)` pointing
-// at the corresponding GitHub Release asset.
+// at the corresponding GitHub Release asset, wrapped in a `target` that pulls
+// onnxruntime as a transitive dependency.
+//
+// Consumer usage (just one package):
+//
+//   .package(url: "https://github.com/ayutaz/piper-plus", from: "1.13.0")
+//
+// `import PiperPlus` then re-exports the C API from the bundled xcframework,
+// and onnxruntime is linked automatically through the wrapper target.
 //
 // IMPORTANT — release flow (sherpa-onnx-style manual update, see Issue #377):
 //
@@ -27,18 +35,15 @@
 //      the checksum continues to match. SwiftPM resolution against the new
 //      tag now succeeds.
 //
+// Tag-time CI guards:
+//   - The `release` job verifies that this `Package.swift` has a non-placeholder
+//     checksum (rejects all-zero), AND that it matches the released
+//     xcframework zip's SHA-256. A mismatch fails the release before publishing.
+//
 // For consumer-facing usage, see:
 //   - examples/swift/README.md  (SPM quick start + manual drag-and-drop)
 //   - docs/guides/ios-integration.md  (cross-runtime guide)
 //   - docs/spec/ios-shared-lib.md  (specification)
-//
-// ONNX Runtime is NOT declared as an SPM dependency here:
-//   - SwiftPM `binaryTarget` cannot declare `dependencies`, so even if we
-//     listed `onnxruntime-swift-package-manager`, it would not be linked
-//     transitively to consumer targets.
-//   - Consumer apps must add the ORT package themselves (see
-//     `examples/swift/README.md` for the consumer-side `Package.swift`
-//     template). This matches the sherpa-onnx-spm convention.
 
 import PackageDescription
 
@@ -63,13 +68,37 @@ let package = Package(
             targets: ["PiperPlus"]
         ),
     ],
+    dependencies: [
+        // ONNX Runtime is required at runtime (the xcframework's static
+        // archive references _OrtCreateEnv etc.). We pull it via Microsoft's
+        // official SwiftPM package and re-export through the wrapper target
+        // so consumers don't have to declare it themselves.
+        .package(
+            url: "https://github.com/microsoft/onnxruntime-swift-package-manager",
+            from: "1.17.0"
+        ),
+    ],
     targets: [
-        .binaryTarget(
+        // Wrapper Swift target — exists so we can attach `dependencies:`
+        // (binaryTarget cannot). It re-exports `PiperPlusBinary` so
+        // `import PiperPlus` from consumer code surfaces the full C API.
+        .target(
             name: "PiperPlus",
-            // The release-shared-lib workflow renames the asset to
-            // `libpiper_plus-ios-v${VERSION}.xcframework.zip` (with the
-            // leading `v`), so the URL below interpolates `v\(version)` to
-            // match.
+            dependencies: [
+                .target(name: "PiperPlusBinary"),
+                .product(
+                    name: "onnxruntime",
+                    package: "onnxruntime-swift-package-manager"
+                ),
+            ],
+            path: "Sources/PiperPlus"
+        ),
+        // Binary xcframework — produced by .github/workflows/release-shared-lib.yml.
+        // The release-shared-lib workflow renames the asset to
+        // `libpiper_plus-ios-v${VERSION}.xcframework.zip` (with the leading
+        // `v`), so the URL below interpolates `v\(version)` to match.
+        .binaryTarget(
+            name: "PiperPlusBinary",
             url: "https://github.com/ayutaz/piper-plus/releases/download/v\(version)/libpiper_plus-ios-v\(version).xcframework.zip",
             checksum: checksum
         ),

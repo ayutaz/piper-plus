@@ -114,6 +114,19 @@ tts.dispose();
 - **Native assets**: Dart's native assets RFC is experimental as of 2026. This
   example uses `DynamicLibrary.open()` with explicit paths. Once native assets
   stabilize, consider migrating to declarative native dependencies.
+- **iOS Mach-O dead-code stripping** (most common Flutter-on-iOS bug):
+  `DynamicLibrary.process()` only resolves symbols that ld kept in the final
+  app binary. Static archives like `libpiper_plus.a` are subject to dead-code
+  stripping — if no Swift / Obj-C code references `piper_plus_*`, all symbols
+  get stripped and `DynamicLibrary.process()` returns `Symbol not found` at
+  the first FFI call. **Fix**: in `ios/Runner.xcodeproj` → Build Settings →
+  **Other Linker Flags**, add:
+  ```
+  -force_load $(BUILT_PRODUCTS_DIR)/PiperPlus/piper_plus.xcframework/ios-arm64/libpiper_plus.a
+  ```
+  (or the matching simulator path for sim builds). Alternatively, use
+  `DynamicLibrary.open(...)` with an explicit path to the framework binary
+  inside the app bundle if you switched to a dynamic framework variant.
 
 ## iOS Integration
 
@@ -129,7 +142,7 @@ tts.dispose();
 
 | Your situation | Recommended artifact | Why |
 |----------------|---------------------|-----|
-| Flutter / Dart FFI for iOS | **`libpiper_plus-ios-${VERSION}.xcframework.zip`** | Xcode treats xcframework as first-class, supports both device and simulator |
+| Flutter / Dart FFI for iOS | **`libpiper_plus-ios-v${VERSION}.xcframework.zip`** | Xcode treats xcframework as first-class, supports both device and simulator |
 | Existing CMake project (v1.12.0 or earlier) | `libpiper_plus-ios-arm64-${VERSION}.tar.gz` (device-only, deprecated) | v1.13.0 transitional; **will be removed in v1.14.0** |
 
 > **Don't know which?** Choose the **xcframework.zip** — it's the supported path going forward.
@@ -169,8 +182,8 @@ cd ios && pod install
 #### Option B: Swift Package Manager (recommended for pure SPM projects)
 
 ```swift
-// Package.swift
-.package(url: "https://github.com/microsoft/onnxruntime-swift-package-manager", exact: "1.17.0")
+// Package.swift — semver range, see docs/spec/ort-versions.md for the matrix
+.package(url: "https://github.com/microsoft/onnxruntime-swift-package-manager", from: "1.17.0")
 ```
 
 #### Option C: Microsoft CDN (manual)

@@ -222,8 +222,10 @@ Place `piper_plus.dll` and `onnxruntime.dll` in the same directory as the Godot 
 
 - **Architecture**: arm64 (device) + arm64/x86_64 (simulator universal)
 - **Status**: Stable
-- **Distribution**: `libpiper_plus-ios-${VERSION}.xcframework.zip` (Mach-O static archive, modulemap + empty PrivacyInfo bundled)
+- **Distribution**: `libpiper_plus-ios-v${VERSION}.xcframework.zip` (Mach-O static archive, modulemap + empty PrivacyInfo bundled)
 - **ORT bundling**: separate — consumer must obtain `onnxruntime.xcframework` via CocoaPods, SPM, or [Microsoft CDN](https://download.onnxruntime.ai/)
+
+> **Note: this demo's `bin/piper_tts.gdextension` does NOT include iOS entries** because the demo's `piper_tts_init` GDExtension wrapper is built only for desktop platforms (Linux / macOS / Windows) at this time. Building the demo wrapper into a `piper_tts.xcframework` for iOS is a follow-up task. The snippet below is a **template for your own consumer GDExtension** that wraps piper-plus directly.
 
 #### GDExtension descriptor (`piper_tts.gdextension`)
 
