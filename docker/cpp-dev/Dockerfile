@@ -28,8 +28,8 @@ RUN apt-get update && apt-get install -y \
     libgtest-dev \
     libgmock-dev \
     libbenchmark-dev \
-    python3.11 \
-    python3.11-dev \
+    python3.12 \
+    python3.12-dev \
     python3-pip \
     && rm -rf /var/lib/apt/lists/*
 
