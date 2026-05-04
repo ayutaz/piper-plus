@@ -49,20 +49,45 @@ https://download.onnxruntime.ai/pod-archive-onnxruntime-c-${ONNXRUNTIME_VERSION}
   `binaryTarget(url:)` でこの URL を指している。Microsoft が壊すと
   CocoaPods/SPM が連動して壊れるため、強い不変条件として機能する。
 - **検証 (2026-05-04):** 1.17.0 / 1.20.0 / 1.22.0 とも HTTP 200 OK (40〜49 MB)。
+- **sha256 (1.17.0):** `1623e1150507d9e50554e3d3e5cf9abf75e1bfd8324b74a602acfe45343db871` (40,771,813 bytes)
 - **Zip 構造:**
   ```
   onnxruntime.xcframework/
-  ├── Headers/
-  │   ├── onnxruntime_c_api.h
-  │   ├── onnxruntime_cxx_api.h         ← C++ API 同梱
-  │   ├── onnxruntime_cxx_inline.h
-  │   └── cpu_provider_factory.h
   ├── Info.plist
   ├── ios-arm64/
-  │   └── onnxruntime.a                  ← device static archive
-  └── ios-arm64_x86_64-simulator/
-      └── onnxruntime.a                  ← simulator static archive (universal)
+  │   └── onnxruntime.framework/
+  │       ├── onnxruntime              ← Mach-O dynamic library (device, 拡張子なし, ~31MB)
+  │       ├── Headers/
+  │       │   ├── onnxruntime_c_api.h
+  │       │   ├── onnxruntime_cxx_api.h     ← C++ API 同梱
+  │       │   ├── onnxruntime_cxx_inline.h
+  │       │   ├── coreml_provider_factory.h
+  │       │   ├── cpu_provider_factory.h
+  │       │   ├── onnxruntime_float16.h
+  │       │   ├── onnxruntime_run_options_config_keys.h
+  │       │   └── onnxruntime_session_options_config_keys.h
+  │       └── Info.plist
+  ├── ios-arm64_x86_64-simulator/
+  │   └── onnxruntime.framework/
+  │       ├── onnxruntime              ← Mach-O dynamic library (simulator universal, ~67MB)
+  │       ├── Headers/                  ← (同上)
+  │       └── Info.plist
+  └── macos-arm64_x86_64/
+      └── onnxruntime.framework/
+          ├── onnxruntime              ← Mach-O dynamic library (macOS universal, ~69MB)
+          ├── Headers/                  ← (同上)
+          └── Info.plist
   ```
+
+> **⚠️ 重要 (2026-05-04 発覚):** 旧 GitHub Releases zip は `ios-arm64/onnxruntime.a`
+> (static archive) を出力していたが、**現行 CDN zip は `.framework` バンドル形式の
+> Mach-O dynamic library のみを提供**する。`.a` static archive は同梱されない。
+> したがって:
+> - 旧来の `.a` を CMake で static link する CI ロジックは流用不可、`.framework`
+>   ベースに書き直す必要がある (M1 で対応)
+> - iOS では dylib 単体配布は App Store が拒否するため、消費者側で
+>   `Embed & Sign Frameworks` への追加が必須 (M3 で利用者ガイドに明記)
+> - 純粋 static archive が必要な場合は ORT ソースビルドに切替 (将来 M5 検討)
 
 ### 2.2 piper-plus 配布形式
 
@@ -77,8 +102,13 @@ https://download.onnxruntime.ai/pod-archive-onnxruntime-c-${ONNXRUNTIME_VERSION}
 
 ### 2.3 互換性維持
 
-既存の `libpiper_plus-ios-arm64-${VERSION}.tar.gz` (device only `.a`) は
-v1.13.0 移行期間として継続提供する。v1.14.0 で xcframework のみに集約予定。
+v1.11.0 / v1.12.0 で iOS shared-lib artifact は実際には Releases に上がっていなかった
+(`build-ios` ジョブの継続失敗により release ジョブが巻き添え停止)。よって厳密な意味の
+「旧形式 `.a` の既存利用者」は観測されておらず、後方互換の対象は存在しない。
+
+ただし `libpiper_plus-ios-arm64-${VERSION}.tar.gz` の **命名そのもの** は v1.13.0 で
+継続使用する (中身は `.framework` 同梱の tar.gz になる、§2.1 ⚠️ 注記参照)。v1.14.0 で
+`xcframework.zip` 命名に集約し、tar.gz 命名は廃止予定。
 
 ---
 
