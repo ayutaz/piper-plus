@@ -511,9 +511,8 @@ def _load_session_inline(
 `PiperVoice.load()` のシグネチャ（392行目付近）を以下に変更する：
 
 ```python
-    @classmethod
+    @staticmethod
     def load(
-        cls,
         model_path: str | Path,
         config_path: str | Path | None = None,
         use_cuda: bool = False,   # deprecated: use device="cuda" instead
