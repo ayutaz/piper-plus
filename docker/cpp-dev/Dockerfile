@@ -74,8 +74,8 @@ RUN wget https://downloads.sourceforge.net/open-jtalk/open_jtalk-1.11.tar.gz && 
 # Create working directory
 WORKDIR /workspace
 
-# Install development tools
-RUN pip3 install \
+# Install development tools (--break-system-packages: PEP 668 / Ubuntu 24.04)
+RUN pip3 install --break-system-packages \
     conan \
     cpplint \
     cppcheck \
