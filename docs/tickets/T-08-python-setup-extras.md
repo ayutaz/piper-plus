@@ -195,7 +195,7 @@ http = ["fastapi>=0.110,<1", "uvicorn[standard]>=0.27,<1"]
 
 1. `setup.py` を廃止して `pyproject.toml` に一本化
 2. Hatch または Poetry でビルドバックエンドを管理
-3. ORT パッケージの相互排他を `pip` の `Conflicts` メタデータで宣言（PEP 685 準拠）
+3. ORT パッケージの相互排他をドキュメントで明示（Python 標準パッケージングには `Conflicts` メタデータは存在しない。PEP 685 は extra 名の正規化を定めるもので Conflicts とは無関係。相互排他の実行時検証は `pip check` に委ねる）
 4. CI で `pip install piper-plus[directml]` → `pip check` による競合検証を追加
 
 ### 現行実装との主な差異
