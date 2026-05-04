@@ -26,7 +26,7 @@ jobs:
             name: linux-x64
             artifact: piper-plus-shared-linux-x64
             archive_ext: tar.gz
-          - os: macos-14
+          - os: macos-15
             name: macos-arm64
             artifact: piper-plus-shared-macos-arm64
             archive_ext: tar.gz
@@ -123,7 +123,7 @@ jobs:
 
   build-ios:
     name: Build iOS ${{ matrix.slice }}
-    runs-on: macos-14
+    runs-on: macos-15
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -320,7 +320,7 @@ jobs:
   assemble-xcframework:
     name: Assemble piper_plus.xcframework
     needs: build-ios
-    runs-on: macos-14
+    runs-on: macos-15
     timeout-minutes: 15
 
     steps:

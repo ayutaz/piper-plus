@@ -122,7 +122,7 @@ v1.11.0 / v1.12.0 で iOS shared-lib artifact は実際には Releases に上が
 ```yaml
 build-ios:
   name: Build iOS xcframework
-  runs-on: macos-14
+  runs-on: macos-15
   strategy:
     fail-fast: false
     matrix:
@@ -148,7 +148,7 @@ build-ios:
 
 assemble-xcframework:
   needs: build-ios
-  runs-on: macos-14
+  runs-on: macos-15
   steps:
     - name: Download all slice artifacts
     - name: xcodebuild -create-xcframework
@@ -209,7 +209,7 @@ iOS 行を更新:
 | Microsoft CDN URL の変更/失効 | 低 (CocoaPods/SPM 共有のため不変条件強) | csukuangfj/onnxruntime-libs ミラーへの fallback を追加 (`||` で連鎖) |
 | 特定パッチバージョンが CDN に未公開 (例: 1.20.1) | 中 | メジャー・マイナーで version pin、欠番回避は `ort-versions.md` で管理 |
 | xcframework slice path の変更 | 低 | `find -name "onnxruntime.xcframework" -type d` で動的解決 (既存ロジック流用) |
-| Xcode メジャーバージョン更新による破壊変更 | 中 | runner image を `macos-14` でピン留め、必要時のみ更新 |
+| Xcode メジャーバージョン更新による破壊変更 | 中 | runner image を `macos-15` (Xcode 16.4 デフォルト、Xcode 26 も installed) でピン留め、必要時のみ更新。次の昇格候補は `macos-26` (Xcode 26.x、iOS 26 SDK) |
 | ORT 1.17.0 が将来 CDN から外れる | 低〜中 | アーカイブミラー (csukuangfj) または社内 GitHub Release ミラーへ事前バックアップ |
 
 ---

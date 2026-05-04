@@ -410,7 +410,7 @@ lipo -info lib/onnxruntime.framework/onnxruntime # 期待: arm64
 
 - [ ] sha256 値が `env:` ブロックでステップローカルに定義されている (workflow グローバル env を汚染しない)
 - [ ] sha256 値 (`1623e115...db871`) が PR 本文で `shasum -a 256` 実行ログとともに記録されている
-- [ ] 検証コマンドが `shasum -a 256` (macOS 標準コマンド) を使っている。`sha256sum` は GNU coreutils 由来で macos-14 runner では PATH 上にない場合がある
+- [ ] 検証コマンドが `shasum -a 256` (macOS 標準コマンド) を使っている。`sha256sum` は GNU coreutils 由来で macos-15 runner では PATH 上にない場合がある
 
 ### 10.4 `.framework` extraction ロジック
 
@@ -531,7 +531,7 @@ LTO (Link Time Optimization) は piper-plus 側コードに局所適用可能だ
 
 | 観点 | 白紙設計の選択 | 理由 |
 |------|--------------|------|
-| **CI ホスト** | GitHub Actions (`macos-14`) で開始、月次予算超過時に self-hosted Mac mini に移行 | 案 X (ORT ソースビルド) を採るなら macOS minutes が ~10x になるため自前ホストが射程に入る |
+| **CI ホスト** | GitHub Actions (`macos-15`、Apple Silicon、Xcode 16.4 デフォルト) で開始、月次予算超過時に self-hosted Mac mini に移行 | 案 X (ORT ソースビルド) を採るなら macOS minutes が ~10x になるため自前ホストが射程に入る |
 | **キャッシュ戦略** | `actions/cache@v4` + sha256 ピン留め、月次手動 invalidate | ORT バイナリ ~50MB × 3 slice = キャッシュ容量上問題なし |
 | **配布チャネル** | tag-based release (現状維持)、nightly は不要 | piper-plus はライブラリであり nightly 利用者が想定されない |
 | **Artifact ホスト** | GitHub Releases (現状維持) | OCI image (ghcr.io) は iOS では消費側がない、CDN 自前 (R2/S3) は運用負荷に対して便益が薄い |

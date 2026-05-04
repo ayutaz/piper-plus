@@ -16,7 +16,7 @@
 | 状態 | [README 表 を SoT として参照](README.md) |
 | 想定 PR | 1 PR (小、~50-80 行: `Package.swift` + workflow checksum 自動更新 + 最小 README) |
 | 想定所要 (Claude Code 実行ベース) | 実装 1-2 時間 + `swift package resolve` 検証 (CI 内で完結) ~15 分 |
-| 環境制約 | Apple Silicon Mac は本セッションで使用不可。`xcodebuild -resolvePackageDependencies` / 実機 `import` テストは **Swift Package Index の自動互換性チェック + GitHub Actions macos-14 runner 上の `swift build` で代替** |
+| 環境制約 | Apple Silicon Mac は本セッションで使用不可。`xcodebuild -resolvePackageDependencies` / 実機 `import` テストは **Swift Package Index の自動互換性チェック + GitHub Actions macos-15 runner 上の `swift build` で代替** |
 | 依存 | **M2 完了必須** (xcframework + module map が成立)、M3 推奨 (利用者ガイド整備済) |
 | ターゲット OS | iOS 15.0+ / iOS Simulator (arm64+x86_64) — M2 と一致。visionOS / macCatalyst は M5 以降 |
 | ターゲット Swift | Swift 5.9+ (`swift-tools-version: 5.9`) |
