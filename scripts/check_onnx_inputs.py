@@ -36,6 +36,7 @@ import argparse
 import sys
 from pathlib import Path
 
+
 # The set of inputs that mainline CLI runtimes *can* feed today. Anything
 # outside this set means the model needs a special caller (and is therefore
 # not safe to drop into a generic distribution slot).
@@ -65,9 +66,7 @@ def get_input_names(onnx_path: Path) -> list[str]:
             "onnxruntime is required. Install with `uv pip install onnxruntime`."
         ) from e
 
-    session = ort.InferenceSession(
-        str(onnx_path), providers=["CPUExecutionProvider"]
-    )
+    session = ort.InferenceSession(str(onnx_path), providers=["CPUExecutionProvider"])
     return [inp.name for inp in session.get_inputs()]
 
 
@@ -136,7 +135,7 @@ def main() -> int:
     )
     parser.add_argument(
         "--expected",
-        type=lambda s: set(x.strip() for x in s.split(",") if x.strip()),
+        type=lambda s: {x.strip() for x in s.split(",") if x.strip()},
         default=None,
         help="Comma-separated expected input names (used with --strict). "
         "Example: input,input_lengths,scales,lid,prosody_features",
