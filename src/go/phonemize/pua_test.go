@@ -338,7 +338,7 @@ func TestPUAToToken_ReverseMapping(t *testing.T) {
 	}
 }
 
-// TestPUAToToken_AllFixedEntries verifies reverse mapping for all 96 entries.
+// TestPUAToToken_AllFixedEntries verifies reverse mapping for all 99 entries (PUA v2).
 func TestPUAToToken_AllFixedEntries(t *testing.T) {
 	for _, tc := range allFixedPUA {
 		got, ok := PUAToToken(tc.want)
