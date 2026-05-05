@@ -1,7 +1,7 @@
 # iOS Shared Library Distribution Specification
 
 > **Version:** 1.1
-> **Status:** Implemented (v1.13.0, PR #381)
+> **Status:** Implemented (v1.13.0, [PR #381](https://github.com/ayutaz/piper-plus/pull/381))
 > **対象 Issue:** [#377](https://github.com/ayutaz/piper-plus/issues/377)
 > **対象ファイル:** `.github/workflows/release-shared-lib.yml`, `cmake/ios.toolchain.cmake`, `cmake/PiperPlusShared.cmake`, `cmake/PrivacyInfo.xcprivacy`, `Package.swift`
 
