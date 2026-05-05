@@ -505,7 +505,7 @@ public static class SessionFactory
             // CoreML EP is available on macOS/iOS.
             // uint flags: 0 = default (CoreMLFlags.COREML_FLAG_ONLY_ENABLE_DEVICE_WITH_ANE
             // may be OR-ed in for ANE-only mode, but 0 works for all CoreML-capable devices).
-            options.AppendExecutionProviderCoreML(0);
+            options.AppendExecutionProvider_CoreML((CoreMLFlags)0);
             logger.LogInformation("CoreML execution provider enabled");
             return true;
         }
@@ -552,7 +552,7 @@ public static class SessionFactory
     /// </returns>
     private static string AutoDetectAndConfigureEP(SessionOptions options, ILogger logger)
     {
-        var available = OrtEnv.Instance.GetAvailableProviders();
+        var available = OrtEnv.Instance().GetAvailableProviders();
 
         if (Array.IndexOf(available, "CUDAExecutionProvider") >= 0
             && TryAppendCudaProvider(options, 0, logger))
