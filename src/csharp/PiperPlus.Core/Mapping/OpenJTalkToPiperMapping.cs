@@ -13,14 +13,14 @@ namespace PiperPlus.Core.Mapping;
 public static class OpenJTalkToPiperMapping
 {
     // ----------------------------------------------------------------
-    // Fixed PUA mapping table (U+E000 .. U+E061) -- 96 entries
+    // Fixed PUA mapping table (U+E000 .. U+E064) -- 99 entries
     // ----------------------------------------------------------------
 
     /// <summary>
     /// Multi-character token to single PUA character.
     /// </summary>
     public static IReadOnlyDictionary<string, char> TokenToChar { get; } =
-        new Dictionary<string, char>(96)
+        new Dictionary<string, char>(99)
         {
             // =============================================================
             // Japanese (JA) — U+E000–U+E01C (29 entries)
@@ -183,6 +183,13 @@ public static class OpenJTalkToPiperMapping
             ["o\u02D0"] = '\uE05F',          // oː  close-mid back rounded long
             ["u\u02D0"] = '\uE060',          // uː  close back rounded long
             ["\u0289\u02D0"] = '\uE061',     // ʉː  close central rounded long
+
+            // =============================================================
+            // Additional multi-codepoint diphthongs / nasal vowels (PUA v2) — 3 entries
+            // =============================================================
+            ["ɔɪ"] = '',     // ɔɪ  English diphthong (OY)
+            ["œ̃"] = '',     // œ̃   French nasal open-mid front rounded vowel
+            ["ɐ̃"] = '',     // ɐ̃   Portuguese nasal near-open central vowel
         }.AsReadOnly();
 
     /// <summary>

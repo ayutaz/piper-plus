@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "description": "PUA mapping table \u2014 shared across Python/Rust/JS",
   "entries": [
     {"token": "a:", "codepoint": "0xE000", "language": "ja", "description": "Long vowel a"},
@@ -97,6 +97,9 @@
     {"token": "\u0251\u02d0", "codepoint": "0xE05E", "language": "sv", "description": "open back unrounded long"},
     {"token": "o\u02d0", "codepoint": "0xE05F", "language": "sv", "description": "close-mid back rounded long"},
     {"token": "u\u02d0", "codepoint": "0xE060", "language": "sv", "description": "close back rounded long"},
-    {"token": "\u0289\u02d0", "codepoint": "0xE061", "language": "sv", "description": "close central rounded long"}
+    {"token": "\u0289\u02d0", "codepoint": "0xE061", "language": "sv", "description": "close central rounded long"},
+    {"token": "\u0254\u026a", "codepoint": "0xE062", "language": "en", "description": "Diphthong \u0254\u026a (English OY)"},
+    {"token": "\u0153\u0303", "codepoint": "0xE063", "language": "fr", "description": "Nasal open-mid front rounded vowel \u0153\u0303"},
+    {"token": "\u0250\u0303", "codepoint": "0xE064", "language": "pt", "description": "Nasal near-open central vowel \u0250\u0303"}
   ]
 }

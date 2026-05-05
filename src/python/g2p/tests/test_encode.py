@@ -35,8 +35,8 @@ def _load_pua_spot_checks() -> list[dict]:
 
 class TestPUAMapping:
     def test_pua_mapping_count(self):
-        """FIXED_PUA_MAPPING has exactly 96 entries."""
-        assert len(FIXED_PUA_MAPPING) == 96
+        """FIXED_PUA_MAPPING has exactly 99 entries."""
+        assert len(FIXED_PUA_MAPPING) == 99
 
     def test_pua_single_char_passthrough(self):
         """Single-character tokens pass through map_token unchanged."""
@@ -100,22 +100,29 @@ class TestPUASpotChecks:
 
 
 class TestPUAUnmappedTokens:
-    """Test map_token behaviour for tokens NOT in the fixed mapping."""
+    """Test map_token behaviour for tokens NOT in the fixed mapping.
+
+    Note: as of PUA v2 (docs/spec/pua-contract.toml), the default behaviour
+    is strict=True which raises UnmappedMultiCodepointTokenError. The legacy
+    warning-only behaviour is still available via strict=False for one-off
+    decoding utilities. See test_pua_invariants.py::TestMapTokenFailFast for
+    strict-mode tests.
+    """
 
     def test_unknown_multi_char_returns_unchanged_with_warning(self):
-        """Unknown multi-char token is returned unchanged and emits a warning."""
+        """Legacy strict=False mode: unknown multi-char token returns unchanged with warning."""
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
-            result = map_token("xyz_unknown")
+            result = map_token("xyz_unknown", strict=False)
             assert result == "xyz_unknown"
             assert len(w) == 1
             assert "no pua mapping" in str(w[0].message).lower()
 
     def test_unknown_two_char_returns_unchanged(self):
-        """Two-character token not in the mapping is returned unchanged."""
+        """Legacy strict=False mode: two-character token not in mapping returns unchanged."""
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
-            result = map_token("zq")
+            result = map_token("zq", strict=False)
             assert result == "zq"
             assert len(w) == 1
 

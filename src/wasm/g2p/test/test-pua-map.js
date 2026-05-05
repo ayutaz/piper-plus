@@ -4,7 +4,7 @@
  * Validates the forward/reverse PUA mapping table and the mapToken/unmapToken
  * helper functions used by the Encoder.
  *
- * Also validates all 96 PUA entries and spot-check codepoints against the
+ * Also validates all 99 PUA entries and spot-check codepoints against the
  * cross-platform fixture (tests/fixtures/g2p/phoneme_test_cases.json).
  *
  * Run: node --test src/wasm/g2p/test/test-pua-map.js
@@ -36,8 +36,8 @@ const FIXTURE = JSON.parse(readFileSync(FIXTURE_PATH, 'utf-8'));
 // ---------------------------------------------------------------------------
 
 describe('PUA_MAP table', () => {
-    it('should have exactly 96 entries', () => {
-        assert.equal(Object.keys(PUA_MAP).length, 96);
+    it('should have exactly 99 entries', () => {
+        assert.equal(Object.keys(PUA_MAP).length, 99);
     });
 
     it('should have unique PUA codepoints (no duplicates)', () => {
@@ -47,13 +47,13 @@ describe('PUA_MAP table', () => {
             'Duplicate PUA codepoints detected');
     });
 
-    it('should map all values to PUA range U+E000..U+E061', () => {
+    it('should map all values to PUA range U+E000..U+E064', () => {
         for (const [token, puaChar] of Object.entries(PUA_MAP)) {
             const code = puaChar.codePointAt(0);
             assert.ok(
-                code >= 0xE000 && code <= 0xE061,
+                code >= 0xE000 && code <= 0xE064,
                 `Token "${token}" maps to U+${code.toString(16).toUpperCase()}, ` +
-                `outside expected range U+E000..U+E061`
+                `outside expected range U+E000..U+E064`
             );
         }
     });
@@ -169,7 +169,7 @@ describe('unmapToken', () => {
 // ---------------------------------------------------------------------------
 
 describe('PUA round-trip', () => {
-    it('should round-trip all 96 entries correctly', () => {
+    it('should round-trip all 99 entries correctly', () => {
         for (const [token, puaChar] of Object.entries(PUA_MAP)) {
             const mapped = mapToken(token);
             assert.equal(mapped, puaChar,
@@ -231,7 +231,7 @@ describe('PUA fixture: pua_spot_checks', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Full 96-entry individual verification
+// Full 99-entry individual verification
 //
 // Checks every single entry in PUA_MAP:
 // 1. mapToken(token) returns the correct PUA char
@@ -239,9 +239,9 @@ describe('PUA fixture: pua_spot_checks', () => {
 // 3. The codepoint is within the valid PUA range
 // ---------------------------------------------------------------------------
 
-describe('PUA full 96-entry individual verification', () => {
+describe('PUA full 99-entry individual verification', () => {
     const entries = Object.entries(PUA_MAP);
-    assert.equal(entries.length, 96, 'PUA_MAP should have exactly 96 entries');
+    assert.equal(entries.length, 99, 'PUA_MAP should have exactly 99 entries');
 
     for (const [token, puaChar] of entries) {
         it(`mapToken("${token}") -> U+${puaChar.codePointAt(0).toString(16).toUpperCase()}`, () => {
@@ -258,8 +258,8 @@ describe('PUA full 96-entry individual verification', () => {
             // Codepoint range check
             const code = puaChar.codePointAt(0);
             assert.ok(
-                code >= 0xE000 && code <= 0xE061,
-                `Codepoint U+${code.toString(16).toUpperCase()} outside range U+E000..U+E061`
+                code >= 0xE000 && code <= 0xE064,
+                `Codepoint U+${code.toString(16).toUpperCase()} outside range U+E000..U+E064`
             );
         });
     }

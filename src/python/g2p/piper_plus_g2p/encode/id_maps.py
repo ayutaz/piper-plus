@@ -15,6 +15,25 @@ from .pua import map_token
 
 __all__ = ["get_phoneme_id_map"]
 
+
+def _assert_single_codepoint_keys(
+    phoneme_id_map: dict[str, list[int]], *, language: str
+) -> None:
+    """Invariant: every key in a generated phoneme_id_map must be exactly 1 codepoint.
+
+    A multi-codepoint key would cause the C++ runtime to reject the config
+    (see docs/spec/pua-contract.toml). This is the last line of defence
+    after ``map_token(strict=True)`` already raises on unmapped tokens.
+    """
+    bad_keys = [k for k in phoneme_id_map if len(k) != 1]
+    if bad_keys:
+        raise AssertionError(
+            f"Generated phoneme_id_map for language={language!r} contains "
+            f"{len(bad_keys)} multi-codepoint key(s): {bad_keys!r}. "
+            "All keys must be single Unicode codepoints (PUA-encoded). "
+            "Update pua.json and runtime tables (see docs/spec/pua-contract.toml)."
+        )
+
 # -------------------------------------------------------------------------
 # Japanese phoneme inventory (identical ordering to piper_train)
 # -------------------------------------------------------------------------
@@ -105,8 +124,12 @@ def _build_japanese_id_map() -> dict[str, list[int]]:
     used as the dictionary key.  This ensures compatibility with models
     trained by piper_train.
     """
-    symbols = [map_token(s) for s in (_SPECIAL_TOKENS + _JAPANESE_PHONEMES)]
-    return {symbol: [idx] for idx, symbol in enumerate(symbols)}
+    # strict=True at build time: any multi-codepoint inventory token without a
+    # PUA mapping is a CI-fatal bug (see docs/spec/pua-contract.toml).
+    symbols = [map_token(s, strict=True) for s in (_SPECIAL_TOKENS + _JAPANESE_PHONEMES)]
+    result = {symbol: [idx] for idx, symbol in enumerate(symbols)}
+    _assert_single_codepoint_keys(result, language="ja")
+    return result
 
 
 # -------------------------------------------------------------------------
@@ -331,20 +354,24 @@ def _build_multilingual_id_map() -> dict[str, list[int]]:
     symbols: list[str] = []
     seen: set[str] = set()
 
+    # strict=True at build time: any unmapped multi-codepoint token is a fatal
+    # bug here (would produce an unloadable config for C++ runtime).
     for s in _SPECIAL_TOKENS:
-        mapped = map_token(s)
+        mapped = map_token(s, strict=True)
         if mapped not in seen:
             symbols.append(mapped)
             seen.add(mapped)
 
     for inventory in all_inventories:
         for s in inventory:
-            mapped = map_token(s)
+            mapped = map_token(s, strict=True)
             if mapped not in seen:
                 symbols.append(mapped)
                 seen.add(mapped)
 
-    return {symbol: [idx] for idx, symbol in enumerate(symbols)}
+    result = {symbol: [idx] for idx, symbol in enumerate(symbols)}
+    _assert_single_codepoint_keys(result, language="multilingual")
+    return result
 
 
 @lru_cache(maxsize=8)

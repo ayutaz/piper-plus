@@ -8,7 +8,7 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// 1. Fixed PUA mapping — exhaustive verification of all 96 entries
+// 1. Fixed PUA mapping — exhaustive verification of all 99 entries
 // ---------------------------------------------------------------------------
 
 // allFixedPUA defines the complete expected mapping between Python and Go.
@@ -139,18 +139,23 @@ var allFixedPUA = []struct {
 	{"o\u02d0", 0xE05F, "SV"},      // oː
 	{"u\u02d0", 0xE060, "SV"},      // uː
 	{"\u0289\u02d0", 0xE061, "SV"}, // ʉː
+
+	// Additional multi-codepoint diphthongs / nasal vowels (PUA v2) — 3 entries
+	{"ɔɪ", 0xE062, "MULTI_V2"}, // ɔɪ  English diphthong (OY)
+	{"œ̃", 0xE063, "MULTI_V2"}, // œ̃   French nasal open-mid front rounded vowel
+	{"ɐ̃", 0xE064, "MULTI_V2"}, // ɐ̃   Portuguese nasal near-open central vowel
 }
 
-// TestFixedPUA_TotalCount ensures the Go fixedPUA map has exactly 96 entries,
-// matching the Python FIXED_PUA_MAPPING plus Swedish long vowels.
+// TestFixedPUA_TotalCount ensures the Go fixedPUA map has exactly 99 entries,
+// matching the Python FIXED_PUA_MAPPING plus Swedish long vowels and PUA v2 additions.
 func TestFixedPUA_TotalCount(t *testing.T) {
-	const want = 96
+	const want = 99
 	if got := len(fixedPUA); got != want {
 		t.Errorf("fixedPUA has %d entries, want %d (must match Python FIXED_PUA_MAPPING)", got, want)
 	}
 }
 
-// TestFixedPUA_AllEntries verifies every single one of the 96 fixed PUA
+// TestFixedPUA_AllEntries verifies every single one of the 99 fixed PUA
 // entries against the Python reference. This is an exhaustive golden test.
 func TestFixedPUA_AllEntries(t *testing.T) {
 	for _, tc := range allFixedPUA {
@@ -203,8 +208,9 @@ func TestFixedPUA_CodepointRanges(t *testing.T) {
 		"ZH":     {0xE020, 0xE04A},
 		"KO":     {0xE04B, 0xE052},
 		"ES/PT":  {0xE054, 0xE055},
-		"FR":     {0xE056, 0xE058},
-		"SV":     {0xE059, 0xE061},
+		"FR":       {0xE056, 0xE058},
+		"SV":       {0xE059, 0xE061},
+		"MULTI_V2": {0xE062, 0xE064},
 	}
 	for _, tc := range allFixedPUA {
 		r := ranges[tc.group]
@@ -223,8 +229,9 @@ func TestFixedPUA_GroupCounts(t *testing.T) {
 		"ZH":     43,
 		"KO":     8,
 		"ES/PT":  2,
-		"FR":     3,
-		"SV":     9,
+		"FR":       3,
+		"SV":       9,
+		"MULTI_V2": 3,
 	}
 	counts := make(map[string]int)
 	for _, tc := range allFixedPUA {
@@ -450,8 +457,8 @@ func TestRegisterToken_DynamicPUA(t *testing.T) {
 	}
 
 	r, _ := utf8.DecodeRuneInString(mapped)
-	if r != 0xE064 {
-		t.Errorf("RegisterToken(%q) allocated U+%04X, want U+E064", token, r)
+	if r != 0xE065 {
+		t.Errorf("RegisterToken(%q) allocated U+%04X, want U+E065", token, r)
 	}
 
 	// Calling again with the same token should return the same mapping.
@@ -475,7 +482,7 @@ func TestRegisterToken_DynamicPUA(t *testing.T) {
 }
 
 // TestRegisterToken_DynamicPUA_Sequential verifies sequential dynamic allocations
-// get consecutive PUA codepoints starting at 0xE064.
+// get consecutive PUA codepoints starting at 0xE065.
 func TestRegisterToken_DynamicPUA_Sequential(t *testing.T) {
 	ResetDynamicPUA()
 	defer ResetDynamicPUA()
@@ -484,7 +491,7 @@ func TestRegisterToken_DynamicPUA_Sequential(t *testing.T) {
 	for i, tok := range tokens {
 		mapped := RegisterToken(tok)
 		r, _ := utf8.DecodeRuneInString(mapped)
-		expectedR := rune(0xE064 + i)
+		expectedR := rune(0xE065 + i)
 		if r != expectedR {
 			t.Errorf("RegisterToken(%q) = U+%04X, want U+%04X (sequential allocation #%d)",
 				tok, r, expectedR, i)
@@ -654,8 +661,8 @@ func TestResetDynamicPUA(t *testing.T) {
 	// After reset, the same starting PUA codepoint should be reused.
 	mapped := RegisterToken("reset_test_token_2")
 	r, _ := utf8.DecodeRuneInString(mapped)
-	if r != 0xE064 {
-		t.Errorf("after reset, first dynamic allocation = U+%04X, want U+E064", r)
+	if r != 0xE065 {
+		t.Errorf("after reset, first dynamic allocation = U+%04X, want U+E065", r)
 	}
 
 	ResetDynamicPUA()
@@ -1117,7 +1124,7 @@ func TestFixedPUA_MultiCodepointTokenRuneCount(t *testing.T) {
 // 11. Dynamic PUA space boundary
 // ---------------------------------------------------------------------------
 
-// TestDynamicPUA_StartsAfterFixed ensures dynamic allocation starts at 0xE064,
+// TestDynamicPUA_StartsAfterFixed ensures dynamic allocation starts at 0xE065,
 // which is past the last fixed codepoint (0xE061 = SV ʉː) + 2 reserved.
 func TestDynamicPUA_StartsAfterFixed(t *testing.T) {
 	ResetDynamicPUA()
@@ -1125,8 +1132,8 @@ func TestDynamicPUA_StartsAfterFixed(t *testing.T) {
 
 	mapped := RegisterToken("boundary_test_first_dynamic")
 	r, _ := utf8.DecodeRuneInString(mapped)
-	if r != 0xE064 {
-		t.Errorf("first dynamic PUA = U+%04X, want U+E064", r)
+	if r != 0xE065 {
+		t.Errorf("first dynamic PUA = U+%04X, want U+E065", r)
 	}
 }
 
