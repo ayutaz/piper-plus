@@ -138,6 +138,6 @@ See [`docs/guides/ios-integration.md` § Troubleshooting](../../docs/guides/ios-
 ## Further Reading
 
 - [Cross-runtime iOS Integration Guide](../../docs/guides/ios-integration.md) — Dart / Flutter / Godot / Swift
-- [iOS Specification](../../docs/spec/ios-shared-lib.md) — design rationale and milestone history (M1-M4)
+- [iOS Specification](../../docs/spec/ios-shared-lib.md) — design rationale
 - [piper-plus Package.swift](../../Package.swift) — the SwiftPM manifest at the repo root
 - [ORT SwiftPM Package](https://github.com/microsoft/onnxruntime-swift-package-manager) — Microsoft official ORT for Swift

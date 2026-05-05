@@ -110,7 +110,7 @@ tts.dispose();
   In a Flutter app, run synthesis in a separate `Isolate` to avoid blocking the
   UI thread. The streaming example uses `scheduleMicrotask` for simplicity.
 - **Library path**: On Android, the `.so` is typically bundled via the AAR in
-  `jniLibs/`. On iOS, use the **xcframework** approach described in [iOS Integration](#ios-integration) below. See [M5-20](../../docs/tickets/M5-20-android-aar.md) for Android packaging.
+  `jniLibs/`. On iOS, use the **xcframework** approach described in [iOS Integration](#ios-integration) below. Pre-built Android AAR packaging is not yet tracked — please open an issue at [ayutaz/piper-plus/issues](https://github.com/ayutaz/piper-plus/issues) if you need it.
 - **Native assets**: Dart's native assets RFC is experimental as of 2026. This
   example uses `DynamicLibrary.open()` with explicit paths. Once native assets
   stabilize, consider migrating to declarative native dependencies.
