@@ -85,6 +85,8 @@
 - **[WebUI (Gradio)](docs/features/webui.md)** — 推論・学習対応、Docker対応
 - **C++ CLI** — ストリーミング、CUDA推論、**音素タイミング出力 (JSON/TSV/SRT)**、カスタム辞書
 - **[C API 共有ライブラリ](examples/c-api/README.md)** — `libpiper_plus.so/.dylib/.dll`、FFI対応 (Flutter/Godot/Swift等)、ストリーミング API
+- **[iOS xcframework + SPM](docs/guides/ios-integration.md)** — `PiperPlus` (Swift Package)、合成エンジン本体を iOS arm64 device + simulator universal で配信
+- **[iOS Swift G2P (SPM)](docs/guides/swift-g2p-integration.md)** — `PiperPlusG2P` 単独ライブラリ、8言語の G2P を ONNX Runtime 非依存で iOS 上で利用可能 (Issue #387)
 - **[WebAssembly](src/wasm/openjtalk-web/README.npm.md)** — ブラウザ内で完全動作、**音素タイミング出力 (JSON/TSV/SRT)**、サーバー不要
 - **[Docker](docker/README.md)** — 推論・学習・WebUI・C++の5イメージ提供
 - **PyPI** — `pip install piper-plus` で簡単インストール、8言語マルチリンガル、**音素タイミング出力 (JSON/TSV/SRT)**、ストリーミング、HTTP API

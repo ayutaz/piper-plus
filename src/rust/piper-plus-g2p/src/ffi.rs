@@ -21,10 +21,10 @@ pub unsafe extern "C" fn piper_plus_g2p_create(languages: *const c_char) -> *mut
     let result = std::panic::catch_unwind(|| {
         let mut registry = PhonemizerRegistry::new();
         let langs: Vec<&str> = if languages.is_null() {
-            vec!["en", "es", "fr", "pt", "sv"]
+            default_languages()
         } else {
             match unsafe { CStr::from_ptr(languages) }.to_str() {
-                Ok("") => vec!["en", "es", "fr", "pt", "sv"],
+                Ok("") => default_languages(),
                 Ok(s) => s.split(',').map(str::trim).collect(),
                 Err(_) => return ptr::null_mut(),
             }
@@ -600,6 +600,41 @@ mod tests {
             piper_plus_g2p_free(handle);
         }
     }
+}
+
+/// Default languages for `piper_plus_g2p_create(NULL)`.
+///
+/// Always includes rule-based languages (`es`, `fr`, `pt`, `sv`).
+/// `en` is included whenever the `english` feature is on (file lookup
+/// without `bundled-dicts`, embedded JSON with it).
+/// `ko` (rule-based) is included when `korean` is on.
+/// `zh` is included only when both `chinese` and `bundled-dicts` are on,
+/// because path-based init would otherwise fail at runtime on iOS.
+/// `ja` requires either `naist-jdic` (bundled NAIST-JDIC) or
+/// `japanese` + `bundled-dicts`.
+#[allow(unused_mut)]
+fn default_languages() -> Vec<&'static str> {
+    let mut langs: Vec<&'static str> = Vec::new();
+    #[cfg(feature = "english")]
+    langs.push("en");
+    #[cfg(feature = "spanish")]
+    langs.push("es");
+    #[cfg(feature = "french")]
+    langs.push("fr");
+    #[cfg(feature = "portuguese")]
+    langs.push("pt");
+    #[cfg(feature = "swedish")]
+    langs.push("sv");
+    #[cfg(feature = "korean")]
+    langs.push("ko");
+    #[cfg(all(feature = "chinese", feature = "bundled-dicts"))]
+    langs.push("zh");
+    #[cfg(any(
+        feature = "naist-jdic",
+        all(feature = "japanese", feature = "bundled-dicts")
+    ))]
+    langs.push("ja");
+    langs
 }
 
 fn register_one(registry: &mut PhonemizerRegistry, lang: &str) -> Result<(), crate::G2pError> {

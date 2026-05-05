@@ -1,0 +1,173 @@
+# Swift G2P Contract
+# ==================
+# This file defines the canonical FFI ABI, JSON envelope, xcframework
+# layout, and Swift API for the standalone Swift G2P distribution
+# (Issue #387). The Swift wrapper, Rust FFI, and CI release pipeline all
+# adhere to these definitions; any change here requires updating all
+# three in lockstep.
+
+[meta]
+spec_version = "1.0"
+last_updated = "2026-05-06"
+issue = 387
+applies_to = ["rust-ffi", "swift-package", "release-shared-lib-yml"]
+
+# ============================================================================
+# C ABI (cbindgen-generated header: piper_plus_g2p.h)
+# ============================================================================
+
+[abi]
+symbol_prefix = "piper_plus_g2p_"
+opaque_handle = "PiperG2pHandle"
+encoding = "UTF-8 null-terminated C strings"
+panic_strategy = "catch_unwind at every entry point — return NULL on panic"
+
+[abi.functions.create]
+signature = "PiperG2pHandle *piper_plus_g2p_create(const char *languages)"
+languages_arg = "comma-separated language codes (e.g. \"en,ja,zh\"), or NULL/empty for default set"
+returns = "owned handle, or NULL on init failure / panic"
+ownership = "caller must call piper_plus_g2p_free"
+
+[abi.functions.phonemize]
+signature = "char *piper_plus_g2p_phonemize(const PiperG2pHandle *h, const char *text, const char *language)"
+returns = "owned UTF-8 JSON string (see [json_envelope]), or NULL on lookup failure"
+ownership = "caller must call piper_plus_g2p_free_string"
+
+[abi.functions.free_string]
+signature = "void piper_plus_g2p_free_string(char *ptr)"
+behavior = "no-op on NULL; otherwise frees a string returned by phonemize / available_languages"
+
+[abi.functions.free]
+signature = "void piper_plus_g2p_free(PiperG2pHandle *h)"
+behavior = "no-op on NULL; otherwise drops the registry"
+
+[abi.functions.available_languages]
+signature = "char *piper_plus_g2p_available_languages(const PiperG2pHandle *h)"
+returns = "owned comma-separated UTF-8 string of registered language codes"
+ownership = "caller must call piper_plus_g2p_free_string"
+
+# ============================================================================
+# JSON envelope (return value of phonemize)
+# ============================================================================
+
+[json_envelope]
+schema = '{"tokens": [string, ...], "language": string}'
+example = '{"tokens": ["k", "o", "ɴ", "n", "i", "tɕ", "i", "w", "a"], "language": "ja"}'
+encoding = "UTF-8, no BOM, compact (no whitespace)"
+notes = """
+'tokens' contains IPA + occasional PUA codepoints (E000-F8FF) for
+language-specific phonemes. 'language' echoes the request to allow
+the caller to verify which phonemizer handled the text.
+"""
+
+# ============================================================================
+# Default languages (when languages arg is NULL or empty)
+# ============================================================================
+
+[default_languages]
+description = """
+The default set is computed at compile time from enabled Cargo
+features in src/rust/piper-plus-g2p/src/ffi.rs::default_languages().
+Rule-based languages are always included; bundled-dict languages
+(en/ja/zh) are included only when the underlying dictionary is
+embeddable on the target platform (typically iOS).
+"""
+
+# Always-on (rule-based, no external dictionary)
+rule_based = ["es", "fr", "pt", "sv", "ko"]
+
+# Conditional inclusion
+[default_languages.conditional]
+en = "feature:english (always; uses bundled JSON when bundled-dicts on)"
+zh = "feature:chinese AND feature:bundled-dicts"
+ja = "feature:naist-jdic OR (feature:japanese AND feature:bundled-dicts)"
+
+# ============================================================================
+# bundled-dicts feature
+# ============================================================================
+
+[bundled_dicts]
+purpose = """
+Embed dictionary JSON files into the binary via include_str! /
+include_bytes!. Required for iOS App Sandbox where loading external
+files outside the bundle is impractical.
+"""
+adds_to_binary_bytes = 6_300_000  # ~6.3 MB total
+
+[bundled_dicts.files]
+"data/cmudict_data.json" = { license = "BSD-style (CMU)", size_bytes = 3_700_000 }
+"data/pinyin_single.json" = { license = "MIT (pypinyin)", size_bytes = 705_000 }
+"data/pinyin_phrases.json" = { license = "MIT (pypinyin)", size_bytes = 1_900_000 }
+"NAIST-JDIC (via jpreprocess)" = { license = "BSD-3-Clause", size_bytes = 20_000_000, gated_by = "naist-jdic" }
+
+# ============================================================================
+# xcframework (released artifact)
+# ============================================================================
+
+[xcframework]
+name = "piper_plus_g2p.xcframework"
+zip_artifact = "libpiper_plus_g2p-ios-v${VERSION}.xcframework.zip"
+download_url_template = "https://github.com/ayutaz/piper-plus/releases/download/v${VERSION}/libpiper_plus_g2p-ios-v${VERSION}.xcframework.zip"
+
+[xcframework.slices]
+"ios-arm64" = { archs = ["arm64"], platform = "iphoneos" }
+"ios-arm64_x86_64-simulator" = { archs = ["arm64", "x86_64"], platform = "iphonesimulator" }
+
+[xcframework.contents]
+header = "Headers/piper_plus_g2p.h"
+modulemap = "Headers/module.modulemap (enables `import PiperPlusG2PBinary`)"
+static_library = "libpiper_plus_g2p.a"
+privacy_manifest = "PrivacyInfo.xcprivacy (no tracking, no Required Reason API)"
+
+# ============================================================================
+# Swift API (Sources/PiperPlusG2P/)
+# ============================================================================
+
+[swift_api]
+module = "PiperPlusG2P"
+binary_dependency = "PiperPlusG2PBinary (binaryTarget in Package.swift)"
+spm_product = "PiperPlusG2P"
+
+[swift_api.types]
+"Phonemizer" = "final class, @unchecked Sendable, owns OpaquePointer to PiperG2pHandle"
+"Language" = "enum, CaseIterable, Sendable, rawValue is the ISO 639-1 code"
+"G2PError" = "enum: initializationFailed, phonemizeReturnedNull, invalidUTF8, decodeFailed(String)"
+"PhonemizeResult" = "Codable struct with tokens: [String], language: String"
+
+[swift_api.thread_safety]
+phonemizer_init = "thread-safe (each Phonemizer owns its handle)"
+phonemizer_phonemize = """
+Read-only across the FFI: PhonemizerRegistry::get returns &dyn
+Phonemize and individual phonemizers do not mutate state during
+phonemize_with_prosody. Multiple concurrent calls on the same
+Phonemizer instance are supported (see ConcurrencyTests.swift).
+"""
+
+# ============================================================================
+# Cargo features required for iOS xcframework build
+# ============================================================================
+
+[cargo_features.ios]
+required = ["all-languages", "naist-jdic", "bundled-dicts", "ffi"]
+rationale = """
+- all-languages: enable all 8 G2P backends (ja, en, zh, ko, es, fr, pt, sv)
+- naist-jdic:    bundle NAIST-JDIC dictionary for Japanese
+- bundled-dicts: embed cmudict + pinyin JSON for English / Chinese
+- ffi:           compile the C-compatible entry points
+"""
+
+# ============================================================================
+# Cross-runtime parity
+# ============================================================================
+
+[parity]
+golden_fixture = "tests/fixtures/g2p/phoneme_test_cases.json"
+swift_test_target = "PiperPlusG2PTests/GoldenPhonemeTests.swift"
+expected_runtimes = ["python", "rust", "go", "csharp", "wasm-js", "swift"]
+notes = """
+Swift goldens reference the same fixture JSON as the other 5 runtimes
+via #filePath, ensuring single source of truth. Structural assertions
+(expected_token_count_min / expected_contains / expected_tokens /
+expected_contains_any_tone / expected_has_question_marker) are
+identical across runtimes.
+"""
