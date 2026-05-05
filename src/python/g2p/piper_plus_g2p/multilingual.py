@@ -286,6 +286,13 @@ class MultilingualPhonemizer(Phonemizer):
         Each language segment is phonemized independently, then
         concatenated. BOS/EOS markers are NOT added here -- they are
         the responsibility of ``piper_plus_g2p.encode.PiperEncoder``.
+
+        Special case: an English segment adjacent to a Chinese segment
+        (``[zh, en]``, ``[en, zh]``, or ``[zh, en, zh]``) is dispatched
+        to ``ChinesePhonemizer.phonemize_embedded_english`` so the
+        English token is rendered in Mandarin pinyin instead of US
+        English. This matches the typical Chinese-speaker pronunciation
+        of acronyms and loanwords inserted into a Chinese sentence.
         """
         from .registry import get_phonemizer  # noqa: PLC0415
 
@@ -298,13 +305,28 @@ class MultilingualPhonemizer(Phonemizer):
         if not segments:
             return [], []
 
+        has_zh = "zh" in self._languages
+
         all_phonemes: list[str] = []
         all_prosody: list[ProsodyInfo | None] = []
 
-        for lang, segment_text in segments:  # noqa: PLW2901
+        for i, (lang, segment_text) in enumerate(segments):
+            if has_zh and lang == "en":
+                prev_is_zh = i > 0 and segments[i - 1][0] == "zh"
+                next_is_zh = i + 1 < len(segments) and segments[i + 1][0] == "zh"
+                if prev_is_zh or next_is_zh:
+                    zh_phonemizer = get_phonemizer("zh")
+                    embedded = getattr(
+                        zh_phonemizer, "phonemize_embedded_english", None
+                    )
+                    if embedded is not None:
+                        phonemes, prosody_list = embedded(segment_text)
+                        all_phonemes.extend(phonemes)
+                        all_prosody.extend(prosody_list)
+                        continue
+
             phonemizer = get_phonemizer(lang)
             phonemes, prosody_list = phonemizer.phonemize_with_prosody(segment_text)
-
             all_phonemes.extend(phonemes)
             all_prosody.extend(prosody_list)
 

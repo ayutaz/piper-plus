@@ -5,13 +5,32 @@ Converts Chinese text to IPA phonemes via pinyin intermediate representation.
 G2P logic is identical to the training side (piper_train.phonemize.chinese).
 """
 
+import functools
+import json
 import logging
 import re
+from pathlib import Path
 
 from .token_mapper import map_sequence
 
 
 _LOGGER = logging.getLogger(__name__)
+
+# zh-en code-switching loanword data lives in the training-side g2p package
+# so both sides share the same JSON. Resolve the path relative to the source
+# tree; if the file is not reachable (e.g. installed wheel layout), fall back
+# to empty tables and emit a debug-level log.
+# __file__ -> .../src/python_run/piper/phonemize/chinese.py
+# parents[3] -> .../src/  (then -> src/python/g2p/piper_plus_g2p/data/...)
+_DEFAULT_LOANWORD_DATA_PATH = (
+    Path(__file__).resolve().parents[3]
+    / "python"
+    / "g2p"
+    / "piper_plus_g2p"
+    / "data"
+    / "zh_en_loanword.json"
+)
+_RE_TOKEN_SPLIT = re.compile(r"[A-Za-z0-9]+")
 
 # Punctuation mapping (Chinese → Western equivalents)
 _ZH_PUNCT_MAP: dict[str, str] = {
@@ -446,5 +465,116 @@ def _phonemize_chinese_raw(text: str) -> list[str]:
 def phonemize_chinese(text: str) -> list[str]:
     """Phonemize Chinese text. Returns tokens after map_sequence."""
     phonemes = _phonemize_chinese_raw(text)
+    tokens = ["^"] + phonemes + ["$"]
+    return map_sequence(tokens)
+
+
+# ---------------------------------------------------------------------------
+# ZH-EN code-switching: embedded English -> pinyin -> IPA
+# ---------------------------------------------------------------------------
+
+
+def _load_loanword_data(path: Path | str) -> dict:
+    """Load a zh-en loanword JSON file from disk."""
+    p = Path(path)
+    with open(p, encoding="utf-8") as f:
+        data = json.load(f)
+    return {
+        "acronyms": dict(data.get("acronyms", {})),
+        "loanwords": dict(data.get("loanwords", {})),
+        "letter_fallback": dict(data.get("letter_fallback", {})),
+    }
+
+
+@functools.cache
+def _get_default_loanword_data() -> dict:
+    """Return the bundled default zh-en loanword data (cached)."""
+    try:
+        return _load_loanword_data(_DEFAULT_LOANWORD_DATA_PATH)
+    except FileNotFoundError:
+        _LOGGER.debug(
+            "zh-en loanword data not found at %s; using empty tables",
+            _DEFAULT_LOANWORD_DATA_PATH,
+        )
+        return {"acronyms": {}, "loanwords": {}, "letter_fallback": {}}
+
+
+def _phonemize_embedded_english_raw(
+    text: str, loanword_data: dict | None = None
+) -> list[str]:
+    """Convert embedded English text to raw IPA tokens (no BOS/EOS, pre-PUA).
+
+    Looks up the entire token in case-sensitive ``loanwords`` first, then in
+    uppercase ``acronyms``, and finally falls back to per-letter conversion
+    via ``letter_fallback``.
+    """
+    if loanword_data is None:
+        loanword_data = _get_default_loanword_data()
+
+    acronyms: dict[str, list[str]] = loanword_data.get("acronyms", {})
+    loanwords: dict[str, list[str]] = loanword_data.get("loanwords", {})
+    letter_fallback: dict[str, list[str]] = loanword_data.get("letter_fallback", {})
+
+    pinyin_syllables: list[str] = []
+
+    for token in _RE_TOKEN_SPLIT.findall(text):
+        if not token:
+            continue
+        if token in loanwords:
+            pinyin_syllables.extend(loanwords[token])
+            continue
+        upper = token.upper()
+        if upper in acronyms:
+            pinyin_syllables.extend(acronyms[upper])
+            continue
+        for ch in upper:
+            if ch in letter_fallback:
+                pinyin_syllables.extend(letter_fallback[ch])
+
+    if not pinyin_syllables:
+        return []
+
+    phonemes: list[str] = []
+    for syllable in pinyin_syllables:
+        if not syllable:
+            continue
+        tone = 5
+        if syllable[-1].isdigit():
+            tone = int(syllable[-1])
+            syllable_base = syllable[:-1]
+        else:
+            syllable_base = syllable
+
+        normalized = _normalize_pinyin(syllable_base)
+
+        erhua_token: str | None = None
+        if normalized.endswith("r") and len(normalized) > 1 and normalized != "er":
+            erhua_token = "ɚ"
+            normalized = normalized[:-1]
+
+        ipa_tokens = _pinyin_to_ipa(normalized, tone)
+        if erhua_token is not None:
+            tone_marker = (
+                ipa_tokens[-1]
+                if ipa_tokens and ipa_tokens[-1].startswith("tone")
+                else None
+            )
+            if tone_marker is not None:
+                ipa_tokens = ipa_tokens[:-1] + [erhua_token] + [tone_marker]
+            else:
+                ipa_tokens.append(erhua_token)
+
+        phonemes.extend(ipa_tokens)
+
+    return map_sequence(phonemes)
+
+
+def phonemize_embedded_english(text: str) -> list[str]:
+    """Phonemize English embedded in a Chinese context as Mandarin pinyin.
+
+    Returns tokens after map_sequence (PUA-mapped). BOS/EOS are added so
+    the output shape matches :func:`phonemize_chinese`.
+    """
+    phonemes = _phonemize_embedded_english_raw(text)
     tokens = ["^"] + phonemes + ["$"]
     return map_sequence(tokens)

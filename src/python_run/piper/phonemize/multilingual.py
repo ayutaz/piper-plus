@@ -237,6 +237,16 @@ def _get_phonemize_func(lang: str):
     return func
 
 
+def _get_zh_embedded_english_func():
+    """Lazy-import the embedded-English-in-Chinese phonemize function."""
+    if "_zh_embedded_en" in _PHONEMIZE_FUNCS:
+        return _PHONEMIZE_FUNCS["_zh_embedded_en"]
+    from .chinese import phonemize_embedded_english  # noqa: PLC0415
+
+    _PHONEMIZE_FUNCS["_zh_embedded_en"] = phonemize_embedded_english
+    return phonemize_embedded_english
+
+
 class MultilingualPhonemizer:
     """Phonemizer that handles code-switching between N languages.
 
@@ -281,7 +291,13 @@ class MultilingualPhonemizer:
         return self._languages
 
     def phonemize(self, text: str) -> list[str]:
-        """Phonemize mixed-language text. Returns tokens after map_sequence."""
+        """Phonemize mixed-language text. Returns tokens after map_sequence.
+
+        Special case: an English segment adjacent to a Chinese segment
+        (``[zh, en]``, ``[en, zh]``, or ``[zh, en, zh]``) is dispatched
+        to the embedded-English-as-pinyin path so the English token is
+        rendered in Mandarin pinyin instead of US English.
+        """
         segments = _segment_text_multilingual(text, self._detector)
         if not segments:
             return []
@@ -293,10 +309,19 @@ class MultilingualPhonemizer:
             if marker in TOKEN2CHAR:
                 _bos_eos_tokens.add(TOKEN2CHAR[marker])
 
+        has_zh = "zh" in self._languages
+
         all_tokens: list[str] = []
 
-        for lang, segment_text in segments:
+        for i, (lang, segment_text) in enumerate(segments):
             func = _get_phonemize_func(lang)
+
+            if has_zh and lang == "en":
+                prev_is_zh = i > 0 and segments[i - 1][0] == "zh"
+                next_is_zh = i + 1 < len(segments) and segments[i + 1][0] == "zh"
+                if prev_is_zh or next_is_zh:
+                    func = _get_zh_embedded_english_func()
+
             tokens = func(segment_text)
 
             # Strip BOS/EOS from individual segments
