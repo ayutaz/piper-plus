@@ -6,7 +6,7 @@ Cross-runtime guide for integrating piper-plus into iOS projects (Dart / Flutter
 > - [Dart / Flutter quick reference](../../examples/dart/README.md#ios-integration)
 > - [Godot iOS notes](../../examples/godot/README.md#ios-v1130)
 > - [Swift example (manual drag-and-drop, SPM via Package.swift)](../../examples/swift/README.md)
-> - [Specification](../spec/ios-shared-lib.md) (design rationale, milestone history)
+> - [Specification](../spec/ios-shared-lib.md) (design rationale)
 
 ## Prerequisites
 
@@ -328,6 +328,6 @@ If you were using `libpiper_plus-ios-arm64-${VERSION}.tar.gz` (v1.12.0 or earlie
 
 ## Further Reading
 
-- [iOS Specification](../spec/ios-shared-lib.md) — design rationale, plan A milestones, "what would I do from scratch" reflections
+- [iOS Specification](../spec/ios-shared-lib.md) — design rationale and Plan A details
 - [ORT Version Matrix](../spec/ort-versions.md) — concrete ORT versions per runtime
 - [CHANGELOG](../../CHANGELOG.md) — release history

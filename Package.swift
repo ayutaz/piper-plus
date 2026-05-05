@@ -58,7 +58,7 @@ let package = Package(
     name: "PiperPlus",
     // iOS-only: the released xcframework currently contains
     // ios-arm64 + ios-arm64_x86_64-simulator slices. macOS / visionOS /
-    // Mac Catalyst slices are M5 candidates (see docs/spec/ios-shared-lib.md).
+    // Mac Catalyst slices are not yet supported (see docs/spec/ios-shared-lib.md §6).
     platforms: [
         .iOS(.v15),
     ],
