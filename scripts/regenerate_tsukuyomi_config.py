@@ -43,12 +43,23 @@ def download_config(repo: str) -> dict:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--repo", default=DEFAULT_REPO,
-                        help=f"HuggingFace model repo id (default: {DEFAULT_REPO})")
-    parser.add_argument("--out", type=Path, default=REPO_ROOT / "tmp",
-                        help="Output directory for regenerated config (default: tmp/)")
-    parser.add_argument("--source", type=Path, default=None,
-                        help="Use a local config.json instead of downloading from HF")
+    parser.add_argument(
+        "--repo",
+        default=DEFAULT_REPO,
+        help=f"HuggingFace model repo id (default: {DEFAULT_REPO})",
+    )
+    parser.add_argument(
+        "--out",
+        type=Path,
+        default=REPO_ROOT / "tmp",
+        help="Output directory for regenerated config (default: tmp/)",
+    )
+    parser.add_argument(
+        "--source",
+        type=Path,
+        default=None,
+        help="Use a local config.json instead of downloading from HF",
+    )
     args = parser.parse_args()
 
     args.out.mkdir(parents=True, exist_ok=True)

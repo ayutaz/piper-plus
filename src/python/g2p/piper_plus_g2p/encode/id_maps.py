@@ -34,6 +34,7 @@ def _assert_single_codepoint_keys(
             "Update pua.json and runtime tables (see docs/spec/pua-contract.toml)."
         )
 
+
 # -------------------------------------------------------------------------
 # Japanese phoneme inventory (identical ordering to piper_train)
 # -------------------------------------------------------------------------

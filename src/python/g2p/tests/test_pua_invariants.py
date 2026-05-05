@@ -127,9 +127,7 @@ class TestInventoryCoverage:
         self, inventory_name: str, inventory: list[str]
     ):
         unmapped = [
-            tok
-            for tok in inventory
-            if len(tok) > 1 and tok not in FIXED_PUA_MAPPING
+            tok for tok in inventory if len(tok) > 1 and tok not in FIXED_PUA_MAPPING
         ]
         assert not unmapped, (
             f"Inventory {inventory_name} has {len(unmapped)} multi-codepoint "
@@ -173,9 +171,9 @@ class TestMapTokenFailFast:
 
     def test_v2_additions_are_mapped(self):
         # The 3 tokens that caused the v1.12.0 regression
-        assert map_token("ɔɪ") == ""   # English diphthong
-        assert map_token("œ̃") == ""   # French nasal
-        assert map_token("ɐ̃") == ""   # Portuguese nasal
+        assert map_token("ɔɪ") == ""  # English diphthong
+        assert map_token("œ̃") == ""  # French nasal
+        assert map_token("ɐ̃") == ""  # Portuguese nasal
 
 
 # ---------------------------------------------------------------------------

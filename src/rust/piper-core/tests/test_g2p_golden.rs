@@ -438,7 +438,7 @@ fn test_encode_golden() {
 }
 
 // ---------------------------------------------------------------------------
-// PUA map individual match test (all 96 entries)
+// PUA map individual match test (all 99 entries — PUA v2)
 // ---------------------------------------------------------------------------
 
 #[test]
@@ -454,8 +454,8 @@ fn test_pua_map_individual() {
         fixture.pua_map_count,
     );
     assert_eq!(
-        fixture.pua_map_count, 96,
-        "pua_map_count should be 96, got {}",
+        fixture.pua_map_count, 99,
+        "pua_map_count should be 99 (PUA v2), got {}",
         fixture.pua_map_count,
     );
 
