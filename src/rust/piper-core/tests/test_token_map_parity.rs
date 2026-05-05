@@ -237,8 +237,7 @@ fn test_total_entry_count_matches_python() {
         .parent()
         .unwrap()
         .to_path_buf();
-    let pua_json = repo_root
-        .join("src/python/g2p/piper_plus_g2p/data/pua.json");
+    let pua_json = repo_root.join("src/python/g2p/piper_plus_g2p/data/pua.json");
     let content = std::fs::read_to_string(&pua_json)
         .unwrap_or_else(|e| panic!("Failed to read pua.json {pua_json:?}: {e}"));
     let parsed: serde_json::Value =
