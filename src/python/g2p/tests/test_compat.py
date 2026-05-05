@@ -31,10 +31,22 @@ class TestJACorrectness:
         assert len(pua_tokens) > 2  # more than just BOS+EOS
 
     def test_pua_mapping_count(self):
-        """FIXED_PUA_MAPPING should have the expected number of entries."""
+        """FIXED_PUA_MAPPING entry count matches the cross-platform fixture."""
+        import json
+        from pathlib import Path
+
         from piper_plus_g2p.encode.pua import FIXED_PUA_MAPPING
 
-        assert len(FIXED_PUA_MAPPING) == 99
+        fixture = (
+            Path(__file__).resolve().parents[4]
+            / "tests"
+            / "fixtures"
+            / "g2p"
+            / "phoneme_test_cases.json"
+        )
+        with open(fixture, encoding="utf-8") as f:
+            expected = json.load(f)["pua_map_count"]
+        assert len(FIXED_PUA_MAPPING) == expected
 
     def test_ja_id_map_format(self):
         """get_phoneme_id_map('ja') should return a valid id map."""

@@ -1,3 +1,5 @@
+using System.IO;
+using System.Text.Json;
 using PiperPlus.Core.Mapping;
 using PiperPlus.Core.Phonemize;
 
@@ -605,14 +607,39 @@ public sealed class SwedishPhonemizerTests
     }
 
     // ================================================================
-    // 27. PuaMapping_TotalCount_Is99
+    // 27. PuaMapping_CountMatchesCanonical
     // ================================================================
 
     [Fact]
-    public void PuaMapping_TotalCount_Is99()
+    public void PuaMapping_CountMatchesCanonical()
     {
-        // PUA v2: 29 JA + 2 shared + 43 ZH + 8 KO + 2 ES/PT + 3 FR + 9 SV + 3 multi-CP v2 = 99
-        Assert.Equal(99, OpenJTalkToPiperMapping.TokenToChar.Count);
+        // Compare the C# table size against the canonical pua.json. This
+        // catches partial truncation (Copilot review on PR #392) — the
+        // previous `>= 50` sanity guard was too weak.
+        string puaJsonPath = FindRepoFile(Path.Combine(
+            "src", "python", "g2p", "piper_plus_g2p", "data", "pua.json"));
+        using var doc = JsonDocument.Parse(File.ReadAllText(puaJsonPath));
+        int expected = doc.RootElement.GetProperty("entries").GetArrayLength();
+
+        Assert.Equal(expected, OpenJTalkToPiperMapping.TokenToChar.Count);
+    }
+
+    /// <summary>
+    /// Walk up from the test binary location until <paramref name="relative"/>
+    /// resolves to an existing file. Mirrors the discovery pattern in
+    /// SpeakerEncoderTests.FindGoldenPath.
+    /// </summary>
+    private static string FindRepoFile(string relative)
+    {
+        string dir = AppDomain.CurrentDomain.BaseDirectory;
+        for (int i = 0; i < 10; i++)
+        {
+            string candidate = Path.Combine(dir, relative);
+            if (File.Exists(candidate)) return candidate;
+            dir = Path.GetDirectoryName(dir) ?? dir;
+        }
+        throw new FileNotFoundException(
+            $"Cannot find {relative} walking up from test binary directory.");
     }
 
     // ================================================================

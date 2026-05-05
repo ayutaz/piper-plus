@@ -63,6 +63,19 @@ jobs:
       - name: Verify cross-runtime PUA mapping consistency
         run: python scripts/check_pua_consistency.py --verbose --check-version
 
+  fixture-drift:
+    name: Test fixture in sync with pua.json
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Detect drift between pua.json and phoneme_test_cases.json
+        run: python scripts/regenerate_test_fixture.py --check
+
   inventory-and-fail-fast-tests:
     name: Inventory coverage + fail-fast guards
     runs-on: ubuntu-latest

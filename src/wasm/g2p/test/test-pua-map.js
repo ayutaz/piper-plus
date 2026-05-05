@@ -4,7 +4,7 @@
  * Validates the forward/reverse PUA mapping table and the mapToken/unmapToken
  * helper functions used by the Encoder.
  *
- * Also validates all 99 PUA entries and spot-check codepoints against the
+ * Also validates all PUA entries and spot-check codepoints against the
  * cross-platform fixture (tests/fixtures/g2p/phoneme_test_cases.json).
  *
  * Run: node --test src/wasm/g2p/test/test-pua-map.js
@@ -36,8 +36,8 @@ const FIXTURE = JSON.parse(readFileSync(FIXTURE_PATH, 'utf-8'));
 // ---------------------------------------------------------------------------
 
 describe('PUA_MAP table', () => {
-    it('should have exactly 99 entries', () => {
-        assert.equal(Object.keys(PUA_MAP).length, 99);
+    it('entry count matches the cross-platform fixture', () => {
+        assert.equal(Object.keys(PUA_MAP).length, FIXTURE.pua_map_count);
     });
 
     it('should have unique PUA codepoints (no duplicates)', () => {
@@ -231,7 +231,7 @@ describe('PUA fixture: pua_spot_checks', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Full 99-entry individual verification
+// Full individual verification
 //
 // Checks every single entry in PUA_MAP:
 // 1. mapToken(token) returns the correct PUA char
@@ -239,9 +239,13 @@ describe('PUA fixture: pua_spot_checks', () => {
 // 3. The codepoint is within the valid PUA range
 // ---------------------------------------------------------------------------
 
-describe('PUA full 99-entry individual verification', () => {
+describe('PUA full individual verification', () => {
     const entries = Object.entries(PUA_MAP);
-    assert.equal(entries.length, 99, 'PUA_MAP should have exactly 99 entries');
+
+    it('PUA_MAP entry count must match fixture pua_map_count', () => {
+        assert.equal(entries.length, FIXTURE.pua_map_count,
+            'PUA_MAP entry count must match fixture pua_map_count');
+    });
 
     for (const [token, puaChar] of entries) {
         it(`mapToken("${token}") -> U+${puaChar.codePointAt(0).toString(16).toUpperCase()}`, () => {
