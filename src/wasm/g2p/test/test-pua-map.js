@@ -241,8 +241,11 @@ describe('PUA fixture: pua_spot_checks', () => {
 
 describe('PUA full individual verification', () => {
     const entries = Object.entries(PUA_MAP);
-    assert.equal(entries.length, FIXTURE.pua_map_count,
-        'PUA_MAP entry count must match fixture pua_map_count');
+
+    it('PUA_MAP entry count must match fixture pua_map_count', () => {
+        assert.equal(entries.length, FIXTURE.pua_map_count,
+            'PUA_MAP entry count must match fixture pua_map_count');
+    });
 
     for (const [token, puaChar] of entries) {
         it(`mapToken("${token}") -> U+${puaChar.codePointAt(0).toString(16).toUpperCase()}`, () => {

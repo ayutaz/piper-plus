@@ -54,33 +54,61 @@ def _build_pua_map_block(entries: list[dict], indent: str = "  ") -> str:
     return ",\n".join(lines)
 
 
+class FixtureFormatError(RuntimeError):
+    """Raised when the fixture JSON does not match the expected layout.
+
+    The script intentionally relies on a small structural assumption (top-level
+    `pua_map_count`/`pua_map` blocks at indent 2). Failing fast here prevents
+    silent no-op rewrites if the fixture format is ever restructured.
+    """
+
+
 def regenerate(text: str, pua_data: dict) -> str:
     """Return the fixture JSON text with `pua_map_count` and `pua_map` updated.
 
     Idempotent: running the function twice on its output yields the same string.
+
+    Raises:
+        FixtureFormatError: if either of the two fields cannot be located.
+            ``re.sub`` would otherwise return the input unchanged on a missed
+            match, hiding the failure.
     """
     entries = pua_data["entries"]
     pua_map_count = len(entries)
 
     # 1) Replace pua_map_count
-    text = re.sub(
+    text, n = re.subn(
         r'"pua_map_count":\s*\d+',
         f'"pua_map_count": {pua_map_count}',
         text,
         count=1,
     )
+    if n != 1:
+        raise FixtureFormatError(
+            "could not locate `\"pua_map_count\": <int>` in the fixture; "
+            "regenerate_test_fixture.py needs an update if the schema changed."
+        )
 
-    # 2) Replace pua_map dict body. The fixture has no nested {} inside this
-    #    block, so a non-greedy match between `{` and the matching closing `}`
-    #    on its own line is unambiguous.
+    # 2) Replace pua_map dict body. The fixture's top-level `pua_map` is
+    #    written at 2-space indent (matching the rest of the JSON), and
+    #    contains no nested objects, so the closing brace is always
+    #    `\n  }` on its own line. We anchor on that and on `[^{}]*` (any
+    #    character except braces) so a future stray brace inside the block
+    #    would surface as a match failure rather than a silent no-op.
     new_body = _build_pua_map_block(entries)
-    text = re.sub(
-        r'("pua_map":\s*\{)[^}]*(\n  \})',
+    text, n = re.subn(
+        r'("pua_map":\s*\{)[^{}]*(\n  \})',
         lambda m: f"{m.group(1)}\n{new_body}{m.group(2)}",
         text,
         count=1,
         flags=re.DOTALL,
     )
+    if n != 1:
+        raise FixtureFormatError(
+            "could not locate the top-level `\"pua_map\": { ... \\n  }` block "
+            "in the fixture; regenerate_test_fixture.py needs an update if "
+            "the schema changed."
+        )
 
     return text
 

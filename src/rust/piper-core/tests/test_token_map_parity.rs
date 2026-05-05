@@ -223,21 +223,24 @@ fn test_nonexistent_tokens_return_none() {
 // Structural invariants
 // =========================================================================
 
+/// Walk up from this crate's `Cargo.toml` to the repo root.
+/// `src/rust/piper-core` -> `src/rust` -> `src` -> repo root.
+fn repo_root() -> std::path::PathBuf {
+    std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(|p| p.parent())
+        .and_then(|p| p.parent())
+        .expect("CARGO_MANIFEST_DIR should resolve to repo root after 3 parent() hops")
+        .to_path_buf()
+}
+
 #[test]
 fn test_total_entry_count_matches_python() {
     // The Rust map must always agree with the canonical pua.json. Reading the
     // count from pua.json (rather than baking the literal in) removes the
     // class of bug where someone bumps the table but forgets to update this
     // test — a regression that bit PR #389.
-    let repo_root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .unwrap()
-        .parent()
-        .unwrap()
-        .parent()
-        .unwrap()
-        .to_path_buf();
-    let pua_json = repo_root.join("src/python/g2p/piper_plus_g2p/data/pua.json");
+    let pua_json = repo_root().join("src/python/g2p/piper_plus_g2p/data/pua.json");
     let content = std::fs::read_to_string(&pua_json)
         .unwrap_or_else(|e| panic!("Failed to read pua.json {pua_json:?}: {e}"));
     let parsed: serde_json::Value =

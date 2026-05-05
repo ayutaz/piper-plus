@@ -190,14 +190,25 @@ mod tests {
 
     #[test]
     fn test_fixed_pua_count() {
-        // Sanity: the table is non-trivially populated. The strong invariant
-        // ("byte-for-byte identical to pua.json") is enforced by the
-        // `cross-runtime-table-consistency` CI gate, so a literal count here
-        // would only duplicate that check while drifting on every PUA bump.
-        assert!(
-            FIXED_PUA_MAP.len() >= 50,
-            "FIXED_PUA_MAP unexpectedly small: {}",
-            FIXED_PUA_MAP.len()
+        // Compare against the canonical pua.json embedded at compile time.
+        // This catches partial truncation (Copilot review on PR #392) — a
+        // weakness of the previous `>= 50` sanity check — without baking in
+        // a literal count that drifts on every PUA bump.
+        const PUA_JSON: &str = include_str!(
+            "../../../python/g2p/piper_plus_g2p/data/pua.json"
+        );
+        let parsed: serde_json::Value = serde_json::from_str(PUA_JSON)
+            .expect("embedded pua.json should be valid JSON");
+        let expected = parsed["entries"]
+            .as_array()
+            .expect("pua.json must contain an entries array")
+            .len();
+        assert_eq!(
+            FIXED_PUA_MAP.len(),
+            expected,
+            "FIXED_PUA_MAP ({}) does not match pua.json entries ({})",
+            FIXED_PUA_MAP.len(),
+            expected,
         );
     }
 
