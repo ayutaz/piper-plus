@@ -887,6 +887,13 @@ impl ChinesePhonemizer {
             },
         }
     }
+
+    #[cfg(feature = "bundled-dicts")]
+    pub fn new_bundled() -> Result<Self, G2pError> {
+        const SINGLE: &[u8] = include_bytes!("../data/pinyin_single.json");
+        const PHRASE: &[u8] = include_bytes!("../data/pinyin_phrases.json");
+        Self::from_json_bytes(SINGLE, PHRASE)
+    }
 }
 
 impl Phonemizer for ChinesePhonemizer {

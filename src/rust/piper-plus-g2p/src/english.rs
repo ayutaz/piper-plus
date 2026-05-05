@@ -646,6 +646,14 @@ impl EnglishPhonemizer {
         }
     }
 
+    #[cfg(feature = "bundled-dicts")]
+    pub fn new_bundled() -> Result<Self, G2pError> {
+        const CMU_DICT_JSON: &str = include_str!("../data/cmudict_data.json");
+        let dict: HashMap<String, String> = serde_json::from_str(CMU_DICT_JSON)
+            .map_err(|e| G2pError::DictionaryLoad { path: format!("(bundled cmudict): {e}") })?;
+        Ok(Self::new_with_hashmap(dict))
+    }
+
     /// Search well-known locations for the CMU dictionary JSON file.
     fn find_dictionary() -> Result<std::path::PathBuf, G2pError> {
         // 1. Environment variable override
