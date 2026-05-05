@@ -30,6 +30,7 @@ import re
 import sys
 from pathlib import Path
 
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 PUA_JSON = REPO_ROOT / "src" / "python" / "g2p" / "piper_plus_g2p" / "data" / "pua.json"
 FIXTURE = REPO_ROOT / "tests" / "fixtures" / "g2p" / "phoneme_test_cases.json"
