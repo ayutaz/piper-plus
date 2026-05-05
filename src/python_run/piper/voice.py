@@ -102,6 +102,15 @@ def _warmup_session(
             inputs["prosody_features"] = np.zeros(
                 (1, phoneme_length, 3), dtype=np.int64
             )
+        if "speaker_embedding" in input_names:
+            emb_dim = 256
+            for inp in session.get_inputs():
+                if inp.name == "speaker_embedding":
+                    if len(inp.shape) >= 2 and isinstance(inp.shape[1], int):
+                        emb_dim = inp.shape[1]
+                    break
+            inputs["speaker_embedding"] = np.zeros((1, emb_dim), dtype=np.float32)
+            inputs["speaker_embedding_mask"] = np.array([[0]], dtype=np.int64)
 
         output_names = [o.name for o in session.get_outputs()]
         for _ in range(runs):
@@ -729,6 +738,22 @@ class PiperVoice:
             num_phonemes = phoneme_ids_array.shape[1]
             prosody = np.zeros((1, num_phonemes, 3), dtype=np.int64)
             args["prosody_features"] = prosody
+
+        # speaker_embedding / speaker_embedding_mask are always declared by
+        # export_onnx.py as a forward-compat hook, but the bundled checkpoints
+        # are not trained for zero-shot speaker transfer (spk_proj is lazy-
+        # initialised and never sees gradients). Feed zeros with mask=0 so the
+        # torch.where branch in models.py:VitsModel.infer falls back to the
+        # trained speaker_id / lid conditioning.
+        if "speaker_embedding" in input_names:
+            emb_dim = 256
+            for inp in self.session.get_inputs():
+                if inp.name == "speaker_embedding":
+                    if len(inp.shape) >= 2 and isinstance(inp.shape[1], int):
+                        emb_dim = inp.shape[1]
+                    break
+            args["speaker_embedding"] = np.zeros((1, emb_dim), dtype=np.float32)
+            args["speaker_embedding_mask"] = np.array([[0]], dtype=np.int64)
 
         # Synthesize through Onnx
         output_names = [o.name for o in self.session.get_outputs()]

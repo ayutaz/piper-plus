@@ -232,7 +232,14 @@ class TestGetProviders:
 # ---------------------------------------------------------------------------
 
 
-def _make_mock_session(*, has_sid=False, has_lid=False, has_prosody=False):
+def _make_mock_session(
+    *,
+    has_sid=False,
+    has_lid=False,
+    has_prosody=False,
+    has_speaker_embedding=False,
+    speaker_embedding_dim=256,
+):
     """Create a mock InferenceSession with configurable optional inputs."""
     session = MagicMock(spec=onnxruntime.InferenceSession)
 
@@ -253,6 +260,15 @@ def _make_mock_session(*, has_sid=False, has_lid=False, has_prosody=False):
     if has_prosody:
         inp = MagicMock()
         inp.name = "prosody_features"
+        inputs.append(inp)
+    if has_speaker_embedding:
+        inp = MagicMock()
+        inp.name = "speaker_embedding"
+        inp.shape = ["batch_size", speaker_embedding_dim]
+        inputs.append(inp)
+        inp = MagicMock()
+        inp.name = "speaker_embedding_mask"
+        inp.shape = ["batch_size", 1]
         inputs.append(inp)
 
     session.get_inputs.return_value = inputs
@@ -361,6 +377,32 @@ class TestWarmup:
         prosody = inputs["prosody_features"]
         assert prosody.shape == (1, 100, 3)
         assert prosody.dtype == np.int64
+
+    def test_optional_inputs_speaker_embedding(self):
+        """speaker_embedding 入力がある場合、zeros + mask=0 が渡される (issue #385)."""
+        session = _make_mock_session(
+            has_speaker_embedding=True, speaker_embedding_dim=192
+        )
+        warmup_onnx_session(session)
+        inputs = session.run.call_args[0][1]
+        assert "speaker_embedding" in inputs
+        assert "speaker_embedding_mask" in inputs
+        assert inputs["speaker_embedding"].shape == (1, 192)
+        assert inputs["speaker_embedding"].dtype == np.float32
+        assert np.all(inputs["speaker_embedding"] == 0.0)
+        assert inputs["speaker_embedding_mask"].tolist() == [[0]]
+        assert inputs["speaker_embedding_mask"].dtype == np.int64
+
+    def test_speaker_embedding_symbolic_shape_uses_default_dim(self):
+        """ONNX 入力 shape が symbolic の場合、デフォルト 256 次元を使う."""
+        session = _make_mock_session(has_speaker_embedding=True)
+        for inp in session.get_inputs.return_value:
+            if inp.name == "speaker_embedding":
+                inp.shape = ["batch_size", "emb_dim"]
+                break
+        warmup_onnx_session(session)
+        inputs = session.run.call_args[0][1]
+        assert inputs["speaker_embedding"].shape == (1, 256)
 
 
 # ---------------------------------------------------------------------------

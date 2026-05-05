@@ -289,6 +289,15 @@ def warmup_onnx_session(
             inputs["prosody_features"] = np.zeros(
                 (1, phoneme_length, 3), dtype=np.int64
             )
+        if "speaker_embedding" in input_names:
+            emb_dim = 256
+            for inp in session.get_inputs():
+                if inp.name == "speaker_embedding":
+                    if len(inp.shape) >= 2 and isinstance(inp.shape[1], int):
+                        emb_dim = inp.shape[1]
+                    break
+            inputs["speaker_embedding"] = np.zeros((1, emb_dim), dtype=np.float32)
+            inputs["speaker_embedding_mask"] = np.array([[0]], dtype=np.int64)
 
         output_names = [o.name for o in session.get_outputs()]
         t0 = time.perf_counter()
