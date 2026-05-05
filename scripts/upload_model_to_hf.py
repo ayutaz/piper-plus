@@ -36,6 +36,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 
@@ -63,6 +64,7 @@ def run_validation(config_path: Path) -> None:
         cwd=src_python,
         capture_output=True,
         text=True,
+        check=False,
     )
     sys.stdout.write(result.stdout)
     sys.stderr.write(result.stderr)
