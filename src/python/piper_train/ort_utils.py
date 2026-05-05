@@ -111,7 +111,7 @@ _EP_AUTO_PRIORITY = [
 
 _EP_KEY_TO_ORT_NAME: dict[str, str] = {
     "cuda": "CUDAExecutionProvider",
-    "gpu": "CUDAExecutionProvider",   # backward compat alias
+    "gpu": "CUDAExecutionProvider",  # backward compat alias
     "coreml": "CoreMLExecutionProvider",
     "directml": "DmlExecutionProvider",
     "openvino": "OpenVINOExecutionProvider",
@@ -165,7 +165,10 @@ def get_providers(device: str = "auto") -> list[str | tuple[str, dict]]:
 
     if provider_key in ("cuda", "gpu"):
         return [
-            (ep_name, {"device_id": str(device_id), "cudnn_conv_algo_search": "HEURISTIC"}),
+            (
+                ep_name,
+                {"device_id": str(device_id), "cudnn_conv_algo_search": "HEURISTIC"},
+            ),
             "CPUExecutionProvider",
         ]
     if provider_key == "coreml":
@@ -183,7 +186,7 @@ def get_providers(device: str = "auto") -> list[str | tuple[str, dict]]:
 
 _EP_KEY_TO_LABEL_FORMAT: dict[str, str] = {
     "cuda": "cuda{id}",
-    "gpu": "cuda{id}",   # backward compat alias
+    "gpu": "cuda{id}",  # backward compat alias
     "coreml": "coreml",
     "directml": "directml{id}",
     "openvino": "openvino",
@@ -264,9 +267,7 @@ def _probe_session(session: onnxruntime.InferenceSession) -> bool:
             if "lid" in input_names:
                 inputs["lid"] = np.array([0], dtype=np.int64)
             if "prosody_features" in input_names:
-                inputs["prosody_features"] = np.zeros(
-                    (1, ph_len, 3), dtype=np.int64
-                )
+                inputs["prosody_features"] = np.zeros((1, ph_len, 3), dtype=np.int64)
             session.run(None, inputs)
         return True
     except Exception as exc:

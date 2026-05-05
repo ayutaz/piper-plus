@@ -3,6 +3,7 @@
 CoreML EP はこの VITS モデルの Duration Predictor (NonZero + ゼロ要素動的形状)
 で非対応のため CPU EP のみで計測する。
 """
+
 import os
 import platform
 import statistics
@@ -94,10 +95,10 @@ def main():
     print()
 
     configs = [
-        ("CPU-1thread",  1),
-        ("CPU-2thread",  2),
-        ("CPU-4thread",  4),
-        ("CPU-8thread",  min(8, cpu_count)),
+        ("CPU-1thread", 1),
+        ("CPU-2thread", 2),
+        ("CPU-4thread", 4),
+        ("CPU-8thread", min(8, cpu_count)),
     ]
     # 重複排除
     seen = set()
@@ -118,7 +119,9 @@ def main():
     print()
 
     print("=== 推論ベンチマーク ===")
-    print(f"  {'設定':12s} | {'ph':>4s} | {'median':>10s}  {'p95':>10s}  {'audio_len':>9s}  {'RTF':>6s}")
+    print(
+        f"  {'設定':12s} | {'ph':>4s} | {'median':>10s}  {'p95':>10s}  {'audio_len':>9s}  {'RTF':>6s}"
+    )
     print("  " + "-" * 62)
     for label, threads in unique_configs:
         sess = make_session(threads)

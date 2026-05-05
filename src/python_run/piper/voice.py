@@ -77,7 +77,7 @@ _INLINE_EP_AUTO_PRIORITY = [
 
 _INLINE_EP_KEY_MAP: dict[str, str] = {
     "cuda": "CUDAExecutionProvider",
-    "gpu": "CUDAExecutionProvider",   # backward compat alias
+    "gpu": "CUDAExecutionProvider",  # backward compat alias
     "coreml": "CoreMLExecutionProvider",
     "directml": "DmlExecutionProvider",
     "openvino": "OpenVINOExecutionProvider",
@@ -115,8 +115,13 @@ def _inline_get_providers(device: str) -> list:
         return ["CPUExecutionProvider"]
 
     if key in ("cuda", "gpu"):
-        return [(ep_name, {"device_id": str(dev_id), "cudnn_conv_algo_search": "HEURISTIC"}),
-                "CPUExecutionProvider"]
+        return [
+            (
+                ep_name,
+                {"device_id": str(dev_id), "cudnn_conv_algo_search": "HEURISTIC"},
+            ),
+            "CPUExecutionProvider",
+        ]
     if key in ("directml", "tensorrt"):
         return [(ep_name, {"device_id": str(dev_id)}), "CPUExecutionProvider"]
     return [ep_name, "CPUExecutionProvider"]
@@ -154,7 +159,7 @@ def _inline_get_device_label(device: str) -> str:
 
     fmt_map = {
         "cuda": f"cuda{dev_id}",
-        "gpu": f"cuda{dev_id}",   # backward compat alias
+        "gpu": f"cuda{dev_id}",  # backward compat alias
         "coreml": "coreml",
         "directml": f"directml{dev_id}",
         "openvino": "openvino",
@@ -479,7 +484,7 @@ class PiperVoice:
     def load(
         model_path: str | Path,
         config_path: str | Path | None = None,
-        use_cuda: bool = False,   # deprecated: use device="cuda" instead
+        use_cuda: bool = False,  # deprecated: use device="cuda" instead
         device: str = "auto",
     ) -> "PiperVoice":
         """Load an ONNX model and config."""
