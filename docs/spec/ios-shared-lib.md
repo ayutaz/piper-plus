@@ -4,7 +4,6 @@
 > **Status:** Implemented (v1.13.0) — `fix/ios-shared-lib-build-377` で M1→M2→M3 完了、M4 (Package.swift 案 X) 同ブランチに含む
 > **対象 Issue:** [#377](https://github.com/ayutaz/piper-plus/issues/377)
 > **対象ファイル:** `.github/workflows/release-shared-lib.yml`, `cmake/ios.toolchain.cmake`, `cmake/PiperPlusShared.cmake`, `cmake/PrivacyInfo.xcprivacy`, `Package.swift` (M4)
-> **進捗 Single Source of Truth:** [`docs/tickets/README.md`](../tickets/README.md) の表
 
 ---
 
@@ -246,8 +245,7 @@ Plan A の xcframework ビルドロジック (`xcodebuild -create-xcframework`) 
 
 > **目的:** 表層問題を最短で解消し、shared-lib リリースパイプライン全体を復旧する。
 
-- **チケット:** [`docs/tickets/377-M1-ort-fetch-fix.md`](../tickets/377-M1-ort-fetch-fix.md)
-- **状態:** [README 表 を SoT として参照](../tickets/README.md)
+- **状態:** done (PR #381, 2026-05-05)
 - **スコープ:**
   - [ ] `release-shared-lib.yml:144-176` の `Download ONNX Runtime iOS` run ブロックを書き換え
     - curl URL を `https://download.onnxruntime.ai/pod-archive-onnxruntime-c-${ONNXRUNTIME_VERSION}.zip` に変更
@@ -271,8 +269,7 @@ Plan A の xcframework ビルドロジック (`xcodebuild -create-xcframework`) 
 > **目的:** 根本問題 (`.a` 単独配布が Dart FFI / Godot / Swift と不整合) を解消し、iOS 利用シナリオを実用化する。
 > **判断 2 採用:** module map / Privacy Manifest を M2 スコープに繰り上げ (旧 M2 §11.7 提案、4 観点レビュー一致推奨、後付け運用負債を回避)。
 
-- **チケット:** [`docs/tickets/377-M2-xcframework.md`](../tickets/377-M2-xcframework.md)
-- **状態:** [README 表 を SoT として参照](../tickets/README.md)
+- **状態:** done (PR #381, 2026-05-05)
 - **スコープ:**
   - [ ] `release-shared-lib.yml` の `build-ios` を `matrix.slice` で 2 分割
     - `slice: ios-arm64` (sdk: iphoneos, archs: arm64)
@@ -306,8 +303,7 @@ Plan A の xcframework ビルドロジック (`xcodebuild -create-xcframework`) 
 
 > **目的:** 利用者が xcframework を組み込めるよう統合手順を整備し、既存 `.a` 配布の段階的廃止を案内する。
 
-- **チケット:** [`docs/tickets/377-M3-docs-migration.md`](../tickets/377-M3-docs-migration.md)
-- **状態:** [README 表 を SoT として参照](../tickets/README.md)
+- **状態:** done (PR #381, 2026-05-05)
 - **スコープ:**
   - [ ] `examples/dart/README.md` の iOS 統合手順を xcframework ベースに刷新
     - 現状の「`.framework` か `.dylib` が必要」記述 (L113) を実装と整合させる
@@ -334,8 +330,7 @@ Plan A の xcframework ビルドロジック (`xcodebuild -create-xcframework`) 
 > **目的:** SPM ユーザーへ公式パッケージを提供し、`import PiperPlus` で消費可能にする。
 > **採用案:** 道 A 確定により本ブランチでも着手可。チケット §11 推奨どおり **案 X (本体 repo 直下に `Package.swift`)** を主仕様とする (案 Y の別 repo 新設はリリース連携負債が大きいため不採用)。M2 で module map を組込み済みのため後付け再 zip 不要。
 
-- **チケット:** [`docs/tickets/377-M4-spm-package.md`](../tickets/377-M4-spm-package.md)
-- **状態:** [README 表 を SoT として参照](../tickets/README.md)
+- **状態:** done (PR #381, 2026-05-05)
 - **スコープ:**
   - [ ] 本体 repo (`ayutaz/piper-plus`) 直下に `Package.swift` を配置 (案 X)
     - `binaryTarget(url:, checksum:)` で piper-plus Releases の `libpiper_plus-ios-v${VERSION}.xcframework.zip` を参照 (URL の `v` 接頭辞は workflow の Rename ステップと整合)
@@ -376,11 +371,9 @@ Plan A の xcframework ビルドロジック (`xcodebuild -create-xcframework`) 
 
 ### 進捗トラッキング
 
-- **Single Source of Truth:** [`docs/tickets/README.md`](../tickets/README.md) の表
-- 本書 §8 各 M のチェックボックスはスコープ確認用、状態列は README 表を参照
-- マイルストーン完了時は本書冒頭の `Status:` フィールドも併せて更新 (例: `Proposed` → `M1 完了 / M2 進行中`)
+- 各マイルストーンの完了状態は §8 各 M セクション冒頭の `**状態:**` 行に記載
+- マイルストーン完了 PR では本書冒頭の `Status:` フィールドと該当 M の `**状態:**` 行を更新
 - M1 完了で `Status: Partially Implemented`、M3 完了で `Status: Implemented (v1.13.0)`、M4 完了で `Status: Implemented + SPM (v1.13.0 or v1.14.0)` を目安とする
-- 各 PR マージ時に README 表の該当行のみ更新、他文書 (チケット先頭 / 本書 §8) はリンク参照のため更新不要
 
 ---
 
