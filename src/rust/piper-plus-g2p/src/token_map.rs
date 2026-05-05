@@ -194,11 +194,9 @@ mod tests {
         // This catches partial truncation (Copilot review on PR #392) — a
         // weakness of the previous `>= 50` sanity check — without baking in
         // a literal count that drifts on every PUA bump.
-        const PUA_JSON: &str = include_str!(
-            "../../../python/g2p/piper_plus_g2p/data/pua.json"
-        );
-        let parsed: serde_json::Value = serde_json::from_str(PUA_JSON)
-            .expect("embedded pua.json should be valid JSON");
+        const PUA_JSON: &str = include_str!("../../../python/g2p/piper_plus_g2p/data/pua.json");
+        let parsed: serde_json::Value =
+            serde_json::from_str(PUA_JSON).expect("embedded pua.json should be valid JSON");
         let expected = parsed["entries"]
             .as_array()
             .expect("pua.json must contain an entries array")

@@ -85,7 +85,7 @@ def regenerate(text: str, pua_data: dict) -> str:
     )
     if n != 1:
         raise FixtureFormatError(
-            "could not locate `\"pua_map_count\": <int>` in the fixture; "
+            'could not locate `"pua_map_count": <int>` in the fixture; '
             "regenerate_test_fixture.py needs an update if the schema changed."
         )
 
@@ -105,7 +105,7 @@ def regenerate(text: str, pua_data: dict) -> str:
     )
     if n != 1:
         raise FixtureFormatError(
-            "could not locate the top-level `\"pua_map\": { ... \\n  }` block "
+            'could not locate the top-level `"pua_map": { ... \\n  }` block '
             "in the fixture; regenerate_test_fixture.py needs an update if "
             "the schema changed."
         )
