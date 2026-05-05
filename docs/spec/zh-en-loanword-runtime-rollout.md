@@ -883,11 +883,244 @@ PIPER_PLUS_API const char* piper_plus_get_last_error(void);
 
 ---
 
+### 8.10 Go の `//go:embed` + JSON tag 戦略
+
+**既存パターン**: 現状 `src/go/` 配下で `//go:embed` 使用例なし (全て外部ファイル参照)。`custom_dict.go` で `encoding/json` + `json:""` tag による snake_case → CamelCase mapping は確立。
+
+**推奨**:
+
+```
+src/go/phonemize/
+├── data/
+│   └── zh_en_loanword.json    ← Python から copy
+├── loanword.go                 ← embed + struct + sync.Once
+└── loanword_test.go
+```
+
+**実装スケッチ**:
+
+```go
+package phonemize
+
+import (
+    "embed"
+    "encoding/json"
+    "fmt"
+    "sync"
+)
+
+//go:embed data/zh_en_loanword.json
+var loanwordFS embed.FS
+
+type LoanwordData struct {
+    Version        int                 `json:"version"`
+    Acronyms       map[string][]string `json:"acronyms"`
+    Loanwords      map[string][]string `json:"loanwords"`
+    LetterFallback map[string][]string `json:"letter_fallback"`
+}
+
+var (
+    loanwordOnce sync.Once
+    loanwordData *LoanwordData
+    loanwordErr  error
+)
+
+func LoadLoanwordData() (*LoanwordData, error) {
+    loanwordOnce.Do(func() {
+        data, err := loanwordFS.ReadFile("data/zh_en_loanword.json")
+        if err != nil {
+            loanwordErr = fmt.Errorf("read embedded loanword data: %w", err)
+            return
+        }
+        ld := &LoanwordData{}
+        if err := json.Unmarshal(data, ld); err != nil {
+            loanwordErr = fmt.Errorf("parse loanword JSON: %w", err)
+            return
+        }
+        if err := ld.Validate(); err != nil {
+            loanwordErr = fmt.Errorf("validate loanword data: %w", err)
+            return
+        }
+        loanwordData = ld
+    })
+    return loanwordData, loanwordErr
+}
+
+func (ld *LoanwordData) Validate() error {
+    if ld.Version < 1 {
+        return fmt.Errorf("invalid loanword version: %d", ld.Version)
+    }
+    for section, m := range map[string]map[string][]string{
+        "acronyms":        ld.Acronyms,
+        "loanwords":       ld.Loanwords,
+        "letter_fallback": ld.LetterFallback,
+    } {
+        for k, v := range m {
+            if len(v) == 0 {
+                return fmt.Errorf("'%s.%s' must be non-empty list[str]", section, k)
+            }
+        }
+    }
+    return nil
+}
+```
+
+**設計判断**:
+
+| 項目 | 採用 | 理由 |
+|------|-----|------|
+| `embed.FS` (vs `[]byte`) | ✓ | バイナリサイズ同等、型安全、拡張性 |
+| `sync.Once` lazy load | ✓ | init() オーバーヘッド回避、エラー処理明示 |
+| `json:""` snake_case tag | ✓ | 既存 `custom_dict.go` 慣例 |
+| `Validate()` メソッド | ✓ | schema 整合性、早期エラー検出 |
+| `fmt.Errorf("%w", err)` wrap | ✓ | 既存コード慣習、エラーチェーン |
+
+### 8.11 リリース戦略
+
+**現状バージョン**:
+
+| Registry | パッケージ | 現行版 | 推奨 bump | bump 後 |
+|----------|----------|-------|---------|--------|
+| PyPI | `piper-plus-g2p` | 0.2.0 | minor | **0.3.0** |
+| crates.io | `piper-plus`, `piper-plus-g2p`, `piper-plus-cli` | 0.4.0 | minor | **0.5.0** |
+| NuGet | `PiperPlus.Core`, `PiperPlus.Cli` | 0.3.0 | minor | **0.4.0** |
+| npm | `@piper-plus/g2p` | 0.4.0 | minor | **0.5.0** |
+| Go module | tag-based | latest | リポジトリ tag | **v1.13.0** |
+| C API | `libpiper_plus` | v1.13.0+ | リリースタグ連動 | **v1.13.0** |
+
+**全ランタイム共通: minor bump** (新規 API 追加、breaking change なし)
+
+**配信順序の依存関係**:
+
+```
+1. CHANGELOG 更新 (リポジトリルート + src/python/g2p/)
+2. Rust crates.io   (cargo publish: g2p → core → cli の順)
+3. git tag push     (Go module 自動解決 + release-shared-lib.yml 自動実行)
+4. npm registry     (Rust 0.5.0 完了待ち)
+5. PyPI             (piper-plus-g2p 0.3.0)
+6. NuGet            (PiperPlus.Core/Cli 0.4.0、手動 dotnet nuget push)
+7. GitHub Release 確認 (Package.swift checksum 検証済み)
+```
+
+**チェックリスト** (PR マージ後):
+
+- [ ] CHANGELOG.md (root) [Unreleased] → [0.5.0] / [Date] に bump
+- [ ] src/python/g2p/CHANGELOG.md [Unreleased] → [0.3.0]
+- [ ] src/rust/Cargo.toml workspace version → 0.5.0
+- [ ] src/csharp/*.csproj Version → 0.4.0
+- [ ] src/wasm/g2p/package.json version → 0.5.0
+- [ ] `cargo publish` (3 crates、依存順)
+- [ ] `git tag v1.13.0 && git push --tags` (Go module + GitHub Release 自動)
+- [ ] `npm publish` (Rust crates 完了後)
+- [ ] `pip install piper-plus-g2p==0.3.0` で動作確認
+- [ ] `dotnet nuget push PiperPlus.Core.0.4.0.nupkg`
+- [ ] Package.swift checksum 自動検証 (CI 出力確認)
+
+**Migration guide**: **不要** (新機能のみ、既存 API 非変更)。各 README の "What's New" セクションに記載で十分。
+
+**リリース時間目安**: マニュアル工程 5-10 分 (cargo publish ~3 分 + npm publish ~1 分 + pip publish ~2 分 + dotnet nuget push ~2 分、並列可)
+
+### 8.12 後方互換性戦略
+
+**Breaking change 評価**: **なし** (詳細分析済)
+
+| 既存ユースケース | 影響 | 対策 |
+|----------------|------|------|
+| ZH のみ使用 | ✓ なし | 設定不要、既存挙動維持 |
+| EN のみ使用 | ✓ なし | 設定不要、既存挙動維持 |
+| ZH-EN mixed (新機能歓迎) | ✓ 改善 | デフォルト有効 |
+| ZH-EN mixed (英語発音維持希望) | ⚠ 影響あり | **opt-out flag が必要** |
+
+**Python (PR #397) で確認済み**:
+- `test_multilingual_pure_zh_unaffected`: 純 ZH は同一出力 ✓
+- `test_multilingual_pure_english_uses_english_path`: 純 EN は EnglishPhonemizer 経路 ✓
+- 既存 g2p テスト 791 件全 PASS、リグレッションなし
+
+**opt-out flag 設計**:
+
+各ランタイムに `enable_zh_en_dispatch` (default `True`) を追加し、既存ユーザーが旧挙動 (英語発音) を維持できる経路を提供する:
+
+```python
+# Python
+MultilingualPhonemizer(
+    languages=["zh", "en"],
+    default_latin_language="en",
+    enable_zh_en_dispatch=True,        # NEW: opt-out 用 flag (default ON)
+    zh_en_loanword_dict_paths=None,    # NEW: カスタム辞書
+)
+```
+
+```rust
+// Rust
+MultilingualPhonemizer::builder()
+    .languages(vec!["zh", "en"])
+    .enable_zh_en_dispatch(true)       // NEW: builder pattern 推奨
+    .build()
+```
+
+```go
+// Go
+func NewMultilingualPhonemizer(opts ...Option) *MultilingualPhonemizer
+WithZhEnDispatch(enabled bool) Option   // NEW: functional options
+```
+
+```csharp
+// C#
+new MultilingualPhonemizer(
+    languages: new[] { "zh", "en" },
+    enableZhEnDispatch: true            // NEW
+);
+```
+
+```typescript
+// TypeScript
+new G2P({ languages: ["zh", "en"], enableZhEnDispatch: true })
+```
+
+**Phase 戦略**:
+
+| Phase | 内容 | 期間 |
+|-------|------|------|
+| **Phase 1 (本 PR)** | 全ランタイムに default-on で機能展開、opt-out flag は Python のみ追加 (リファレンス) | 本 PR |
+| **Phase 2** | 各ランタイムに opt-out flag 追加 (互換性 100% 保証) | フォローアップ |
+| **Phase 3** | Beta 期間 (1 minor version) でフィードバック収集 | 1-2 ヶ月 |
+
+**API ドキュメント更新ガイドライン**:
+
+```markdown
+#### ZH-EN Code-Switching (v0.5.0+)
+
+MultilingualPhonemizer で中国語に隣接する英単語を自動検出し、
+英語発音ではなく Mandarin pinyin で発音します。
+
+例:
+  p.phonemize("请打开 GPS")
+    → GPS = "ji4 pi4 ai1 si4" (pinyin via tone markers)
+
+カスタマイズ:
+  - 無効化: enable_zh_en_dispatch=False
+  - カスタム辞書: zh_en_loanword_dict_paths=[Path("my_dict.json")]
+```
+
+**将来機能との API 整合性**:
+
+| Phase | 機能 | API 追加 | 既存影響 |
+|-------|------|---------|--------|
+| A1 (本 PR) | ZH-EN code-switching | `enable_zh_en_dispatch` | なし |
+| A2 | プロソディ平滑化 | `prosody_smooth=True` | 独立 |
+| A3 | 言語切替トークン | `insert_language_tags=True` | 独立 |
+| B | Fine-tuning コーパス | (新規パイプライン) | 独立 |
+
+設計原則: **新規機能は opt-in flag で統一、既存 API 非修飾**。
+
+---
+
 ## 9. 改訂履歴
 
 | 日付 | バージョン | 変更内容 | 著者 |
 |------|---------|---------|------|
 | 2026-05-06 | Draft v1 | 初版作成 (調査結果 + 対応計画) | Claude |
-| 2026-05-06 | Draft v2 | 深堀り調査 3 項目追加 (C++ iOS/Android リソース、C# 独立実装、JSON 同期 CI) | Claude |
-| 2026-05-06 | Draft v3 | 深堀り調査 3 項目追加 (JS/WASM 二層 FFI、Rust crate 重複問題、C++ テストフレーム拡充) — 重要発見: Rust は 2 箇所実装必要、工数 ~400→~600 行 | Claude |
-| 2026-05-06 | Draft v4 | 深堀り調査 3 項目追加 (テストデータ統一フォーマット、Multilingual dispatcher エッジケース、エラーハンドリング統一仕様) | Claude |
+| 2026-05-06 | Draft v2 | 深堀り 3 項目追加 (C++ iOS/Android リソース、C# 独立実装、JSON 同期 CI) | Claude |
+| 2026-05-06 | Draft v3 | 深堀り 3 項目追加 (JS/WASM 二層 FFI、Rust crate 重複、C++ テストフレーム) — Rust 2 箇所実装必要 | Claude |
+| 2026-05-06 | Draft v4 | 深堀り 3 項目追加 (テストデータ統一、dispatcher エッジケース、エラーハンドリング統一) | Claude |
+| 2026-05-06 | Draft v5 | 深堀り 3 項目追加 (Go embed/JSON tag、リリース戦略、後方互換性 + opt-out flag) — 計 12 項目で実装フェーズ移行可能 | Claude |
