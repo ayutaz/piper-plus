@@ -36,6 +36,8 @@ def _make_mock_voice(
     sample_rate: int = 22050,
     has_durations: bool = True,
     phoneme_ids_len: int = 50,
+    has_speaker_embedding: bool = False,
+    speaker_embedding_dim: int = 256,
 ) -> PiperVoice:
     """Create a PiperVoice with a mocked ONNX session.
 
@@ -49,6 +51,11 @@ def _make_mock_voice(
         Whether the mock model advertises a ``durations`` output.
     phoneme_ids_len:
         Length of the durations tensor returned by session.run().
+    has_speaker_embedding:
+        Whether the mock model advertises ``speaker_embedding`` /
+        ``speaker_embedding_mask`` inputs (regression coverage for issue #385).
+    speaker_embedding_dim:
+        Embedding dimension reported by the mocked input shape.
     """
     config = PiperConfig(
         num_symbols=100,
@@ -77,7 +84,16 @@ def _make_mock_voice(
     input_lengths_mock.name = "input_lengths"
     scales_mock = MagicMock()
     scales_mock.name = "scales"
-    session.get_inputs.return_value = [input_mock, input_lengths_mock, scales_mock]
+    inputs_list = [input_mock, input_lengths_mock, scales_mock]
+    if has_speaker_embedding:
+        spk_emb_mock = MagicMock()
+        spk_emb_mock.name = "speaker_embedding"
+        spk_emb_mock.shape = ["batch_size", speaker_embedding_dim]
+        spk_emb_mask_mock = MagicMock()
+        spk_emb_mask_mock.name = "speaker_embedding_mask"
+        spk_emb_mask_mock.shape = ["batch_size", 1]
+        inputs_list.extend([spk_emb_mock, spk_emb_mask_mock])
+    session.get_inputs.return_value = inputs_list
 
     # -- Mock get_outputs (include "durations" when requested) --
     output_mock = MagicMock()
@@ -442,3 +458,71 @@ class TestSynthesizeCoreShortText:
         _, _, original_ids = voice._synthesize_ids_core(short_ids)
 
         assert original_ids == [1, 10, 10, 10, 2]
+
+
+# ---------------------------------------------------------------------------
+# Regression: speaker_embedding inputs (issue #385)
+# ---------------------------------------------------------------------------
+
+
+class TestSpeakerEmbeddingDefaults:
+    """Regression coverage for issue #385.
+
+    Models exported with voice-cloning support (e.g. tsukuyomi-chan-6lang)
+    declare ``speaker_embedding`` / ``speaker_embedding_mask`` ONNX inputs.
+    The runtime must feed default zero values with mask=0 when the caller
+    does not supply a reference embedding, otherwise ORT raises
+    ``ValueError: Required inputs (...) are missing from input feed``.
+    """
+
+    def test_synthesize_passes_zero_embedding_with_mask_off(self):
+        """_synthesize_ids_core supplies zeros + mask=0 by default."""
+        voice = _make_mock_voice(
+            has_durations=True,
+            has_speaker_embedding=True,
+            speaker_embedding_dim=192,
+        )
+        phoneme_ids = [1, 0, 10, 0, 12, 0, 15, 0, 2]
+
+        voice._synthesize_ids_core(phoneme_ids)
+
+        assert voice.session.run.called
+        feeds = voice.session.run.call_args[0][1]
+        assert "speaker_embedding" in feeds
+        assert "speaker_embedding_mask" in feeds
+        assert feeds["speaker_embedding"].shape == (1, 192)
+        assert feeds["speaker_embedding"].dtype == np.float32
+        assert np.all(feeds["speaker_embedding"] == 0.0)
+        assert feeds["speaker_embedding_mask"].tolist() == [[0]]
+        assert feeds["speaker_embedding_mask"].dtype == np.int64
+
+    def test_synthesize_falls_back_to_default_dim_when_shape_unknown(self):
+        """When the ONNX input shape is symbolic, default to 256 dims."""
+        voice = _make_mock_voice(has_speaker_embedding=True)
+        # Overwrite the speaker_embedding input to advertise a symbolic dim
+        for inp in voice.session.get_inputs.return_value:
+            if inp.name == "speaker_embedding":
+                inp.shape = ["batch_size", "emb_dim"]
+                break
+
+        voice._synthesize_ids_core([1, 0, 10, 0, 2])
+
+        feeds = voice.session.run.call_args[0][1]
+        assert feeds["speaker_embedding"].shape == (1, 256)
+
+    def test_warmup_supplies_speaker_embedding_inputs(self):
+        """_warmup_session feeds zero speaker_embedding + mask=0 when required."""
+        from piper.voice import _warmup_session
+
+        voice = _make_mock_voice(
+            has_speaker_embedding=True,
+            speaker_embedding_dim=192,
+        )
+
+        _warmup_session(voice.session, runs=1, phoneme_length=20)
+
+        assert voice.session.run.called
+        feeds = voice.session.run.call_args[0][1]
+        assert feeds["speaker_embedding"].shape == (1, 192)
+        assert feeds["speaker_embedding"].dtype == np.float32
+        assert feeds["speaker_embedding_mask"].tolist() == [[0]]
