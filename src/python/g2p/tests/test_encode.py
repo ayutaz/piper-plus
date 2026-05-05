@@ -110,7 +110,7 @@ class TestPUAUnmappedTokens:
     """
 
     def test_unknown_multi_char_returns_unchanged_with_warning(self):
-        """Legacy strict=False mode: unknown multi-char token returns unchanged with warning."""
+        """Legacy strict=False: unknown multi-char returns unchanged with warning."""
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
             result = map_token("xyz_unknown", strict=False)
@@ -119,7 +119,7 @@ class TestPUAUnmappedTokens:
             assert "no pua mapping" in str(w[0].message).lower()
 
     def test_unknown_two_char_returns_unchanged(self):
-        """Legacy strict=False mode: two-character token not in mapping returns unchanged."""
+        """Legacy strict=False: two-character token not in mapping returns unchanged."""
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
             result = map_token("zq", strict=False)

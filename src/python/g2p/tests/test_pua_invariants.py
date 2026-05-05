@@ -40,7 +40,6 @@ from piper_plus_g2p.encode.pua import (
     map_token,
 )
 
-
 CANONICAL_PUA_JSON = (
     Path(__file__).parent.parent / "piper_plus_g2p" / "data" / "pua.json"
 )

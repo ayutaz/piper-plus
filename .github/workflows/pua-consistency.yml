@@ -83,7 +83,7 @@ jobs:
 
       - name: Install piper_train deps
         working-directory: src/python
-        run: uv sync --extra dev || uv sync
+        run: uv sync --extra test
 
       - name: Run update_model_config validate tests
         working-directory: src/python

@@ -27,6 +27,7 @@ import sys
 import urllib.request
 from pathlib import Path
 
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 DEFAULT_REPO = "ayousanz/piper-plus-tsukuyomi-chan"
@@ -108,9 +109,9 @@ def main() -> int:
     print()
     print("Next steps (manual):")
     print(f"  1. Review {out_path}")
-    print(f"  2. huggingface-cli login")
+    print("  2. huggingface-cli login")
     print(f"  3. huggingface-cli upload {args.repo} {out_path} config.json")
-    print(f"  4. Bump version tag on the HF repo if desired.")
+    print("  4. Bump version tag on the HF repo if desired.")
 
     return 0
 

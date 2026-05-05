@@ -126,7 +126,8 @@ def _build_japanese_id_map() -> dict[str, list[int]]:
     """
     # strict=True at build time: any multi-codepoint inventory token without a
     # PUA mapping is a CI-fatal bug (see docs/spec/pua-contract.toml).
-    symbols = [map_token(s, strict=True) for s in (_SPECIAL_TOKENS + _JAPANESE_PHONEMES)]
+    inventory = _SPECIAL_TOKENS + _JAPANESE_PHONEMES
+    symbols = [map_token(s, strict=True) for s in inventory]
     result = {symbol: [idx] for idx, symbol in enumerate(symbols)}
     _assert_single_codepoint_keys(result, language="ja")
     return result

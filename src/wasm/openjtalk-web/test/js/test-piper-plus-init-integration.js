@@ -50,7 +50,7 @@ const CONFIG_WITH_LANG_MAP = {
 
 const CONFIG_WITH_PUA_COMPAT = {
   ...BASE_CONFIG,
-  pua_compat_version: 1,
+  pua_compat_version: 2,
 };
 
 const CONFIG_WITH_BAD_PUA = {
