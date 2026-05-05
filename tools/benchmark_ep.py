@@ -4,11 +4,14 @@ CoreML EP はこの VITS モデルの Duration Predictor (NonZero + ゼロ要素
 で非対応のため CPU EP のみで計測する。
 """
 import os
+import platform
+import statistics
 import sys
 import time
-import statistics
-import platform
+
 import numpy as np
+import onnxruntime as ort
+
 
 MODEL_PATH = "test/models/multilingual-test-medium.onnx"
 WARMUP_RUNS = 3
@@ -60,7 +63,6 @@ def bench_session(sess, label: str) -> dict[int, dict]:
 
 
 def make_session(threads: int):
-    import onnxruntime as ort
     so = ort.SessionOptions()
     so.intra_op_num_threads = threads
     so.inter_op_num_threads = 1
@@ -74,8 +76,6 @@ def make_session(threads: int):
 
 
 def main():
-    import onnxruntime as ort
-
     cpu_count = os.cpu_count() or 4
     print("=" * 65)
     print("  piper-plus EP ベンチマーク")

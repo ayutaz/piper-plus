@@ -378,12 +378,12 @@ public static class SessionFactory
 
         return key switch
         {
-            "cuda"     => $"cuda{id}",
-            "coreml"   => "coreml",
+            "cuda" => $"cuda{id}",
+            "coreml" => "coreml",
             "directml" => $"directml{id}",
             "openvino" => "openvino",
             "tensorrt" => $"tensorrt{id}",
-            _          => "cpu",
+            _ => "cpu",
         };
     }
 
