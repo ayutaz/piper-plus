@@ -231,6 +231,17 @@ CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
 
 ### エクスポート後の確認
 
+**重要**: 配布前に `scripts/check_onnx_inputs.py` で ONNX の入力グラフを検証してください。voice-cloning 用フラグ (`speaker_embedding`/`speaker_embedding_mask`) が必須入力として残っていると CLI ランタイム経由で動かなくなります (Issue #385)。
+
+```bash
+# 入力グラフ検証
+python scripts/check_onnx_inputs.py /path/to/model-name.onnx
+# 期待される出力: OK: ['input', 'input_lengths', 'lid', 'prosody_features', 'scales']
+
+# voice-cloning モデルとして意図的に配布する場合
+python scripts/check_onnx_inputs.py --allow-voice-cloning /path/to/model-name.onnx
+```
+
 ```bash
 # 推論テスト
 CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.infer_onnx \
