@@ -76,7 +76,12 @@ def check(
     allow_voice_cloning: bool,
     strict_expected: set[str] | None,
 ) -> tuple[bool, str]:
-    """Return (ok, message)."""
+    """Return (ok, message).
+
+    Output messages preserve graph order for the actual input list (so the
+    user can correlate output with what export_onnx.py produced). Set-diff
+    fields (extra/missing) are sorted because set ordering is undefined.
+    """
     inputs = get_input_names(onnx_path)
     inputs_set = set(inputs)
 
@@ -85,11 +90,11 @@ def check(
             extra = inputs_set - strict_expected
             missing = strict_expected - inputs_set
             return False, (
-                f"Strict mismatch. Got: {sorted(inputs)}. "
+                f"Strict mismatch. Got: {inputs}. "
                 f"Expected: {sorted(strict_expected)}. "
                 f"Extra: {sorted(extra)}. Missing: {sorted(missing)}."
             )
-        return True, f"OK (strict): {sorted(inputs)}"
+        return True, f"OK (strict): {inputs}"
 
     leaked_vc = inputs_set & VOICE_CLONING_INPUTS
     if leaked_vc and not allow_voice_cloning:
@@ -111,7 +116,7 @@ def check(
             f"if the export now legitimately produces this input."
         )
 
-    return True, f"OK: {sorted(inputs)}"
+    return True, f"OK: {inputs}"
 
 
 def main() -> int:
@@ -156,8 +161,12 @@ def main() -> int:
                 allow_voice_cloning=args.allow_voice_cloning,
                 strict_expected=args.expected if args.strict else None,
             )
-        except RuntimeError as e:
-            print(f"ERROR: {path}: {e}", file=sys.stderr)
+        except Exception as e:
+            # InferenceSession can raise onnxruntime.capi exceptions for
+            # corrupt/incompatible ONNX, plus IOError, ValueError, etc.
+            # Treat any unexpected exception as a hard failure (Copilot review
+            # on PR #395) — don't let it leak as a Python traceback to CI.
+            print(f"ERROR: {path}: {type(e).__name__}: {e}", file=sys.stderr)
             return 2
         prefix = "OK  " if ok else "FAIL"
         print(f"{prefix}  {path}: {msg}")
