@@ -5,12 +5,13 @@ name: Release Model Config to HF Hub
 # step that would have prevented the v1.12.0 ɔɪ/œ̃/ɐ̃ leak.
 #
 # Usage (GitHub UI):
-#   1. Go to Actions → "Release Model Config to HF Hub" → Run workflow.
-#   2. Fill in:
-#      - hf_repo: e.g. ayousanz/piper-plus-tsukuyomi-chan
-#      - config_artifact_url: a published artifact URL from a prior CI run
-#        (or upload via repo file input — see workflow_dispatch inputs)
-#      - dry_run: true to validate only without pushing to HF
+#   1. Push the prepared config.json (and optionally .onnx) to a branch.
+#   2. Go to Actions → "Release Model Config to HF Hub" → Run workflow.
+#   3. Select that branch and fill in:
+#      - hf_repo:     e.g. ayousanz/piper-plus-tsukuyomi-chan
+#      - config_path: repo-relative path to config.json on the selected branch
+#      - onnx_path:   (optional) repo-relative path to model.onnx
+#      - dry_run:     true to validate only without pushing to HF
 #
 # The HF_TOKEN secret must be configured at repo or org level.
 
@@ -25,7 +26,7 @@ on:
         description: >
           Path inside the repo to the config.json to upload
           (e.g. tmp/tsukuyomi-chan-6lang-fp16.onnx.json).
-          Must already be checked into a branch or uploaded as workflow artifact.
+          The file must already be checked into the branch selected for this run.
         required: true
         type: string
       onnx_path:

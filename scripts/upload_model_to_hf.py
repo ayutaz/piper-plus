@@ -49,19 +49,33 @@ def run_validation(config_path: Path) -> None:
 
     Raises UploadAbortedError if the config still contains multi-codepoint
     phoneme_id_map keys (i.e. PUA normalization didn't fully run).
+
+    Uses PYTHONPATH instead of changing the working directory so a relative
+    --config argument resolves against the user's CWD (Copilot review on
+    PR #393).
     """
-    print(f"==> Pre-flight validation: {config_path}")
-    src_python = REPO_ROOT / "src" / "python"
+    # Resolve to absolute so the subprocess sees the same file regardless of
+    # the cwd it inherits (which we leave at the caller's cwd).
+    abs_config = config_path.resolve()
+    print(f"==> Pre-flight validation: {abs_config}")
+
+    src_python = str(REPO_ROOT / "src" / "python")
+    env = os.environ.copy()
+    existing = env.get("PYTHONPATH", "")
+    env["PYTHONPATH"] = (
+        f"{src_python}{os.pathsep}{existing}" if existing else src_python
+    )
+
     cmd = [
         sys.executable,
         "-m",
         "piper_train.update_model_config",
         "--validate-only",
-        str(config_path),
+        str(abs_config),
     ]
     result = subprocess.run(
         cmd,
-        cwd=src_python,
+        env=env,
         capture_output=True,
         text=True,
         check=False,
@@ -99,7 +113,7 @@ def upload(
         )
 
     try:
-        from huggingface_hub import HfApi
+        from huggingface_hub import CommitOperationAdd, HfApi
     except ImportError as e:
         raise UploadAbortedError(
             "huggingface_hub is not installed. "
@@ -107,15 +121,20 @@ def upload(
         ) from e
 
     api = HfApi(token=token)
-    print(f"==> Uploading {len(files)} file(s) to {repo}")
+    print(f"==> Uploading {len(files)} file(s) to {repo} (single atomic commit)")
     for local, remote in files:
         print(f"    {local.name} -> {remote}")
-        api.upload_file(
-            path_or_fileobj=str(local),
-            path_in_repo=remote,
-            repo_id=repo,
-            commit_message=commit_message,
-        )
+    # Use create_commit so all files land in one commit; if any file errors,
+    # nothing is published. This avoids a half-uploaded release where the
+    # config landed but the .onnx didn't (Copilot review on PR #393).
+    api.create_commit(
+        repo_id=repo,
+        operations=[
+            CommitOperationAdd(path_in_repo=remote, path_or_fileobj=str(local))
+            for local, remote in files
+        ],
+        commit_message=commit_message,
+    )
     print("==> Upload complete.")
 
 
