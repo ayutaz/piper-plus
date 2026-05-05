@@ -1,0 +1,34 @@
+# Pre-commit hooks for piper-plus.
+#
+# Install once with `pre-commit install`. Then every `git commit` will run
+# the hooks below on changed files; if any hook fails, the commit is blocked.
+#
+# These hooks are mirrored by CI (.github/workflows/pua-consistency.yml +
+# ruff job), so the local check just gives faster feedback.
+
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.8.5
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
+
+  # PUA-related checks. These only run when files in the regression-prone
+  # set actually change, so the typical `git commit` is unaffected.
+  - repo: local
+    hooks:
+      - id: pua-cross-runtime-consistency
+        name: PUA cross-runtime consistency (6 runtime tables vs pua.json)
+        entry: python scripts/check_pua_consistency.py --check-version
+        language: system
+        # Mirror of paths in .github/workflows/pua-consistency.yml
+        files: ^(src/python/g2p/piper_plus_g2p/data/pua\.json|src/python/g2p/piper_plus_g2p/encode/.+|src/python_run/piper/phonemize/token_mapper\.py|src/rust/piper-plus-g2p/src/token_map\.rs|src/go/phonemize/pua\.go|src/go/phonemize/pua_test\.go|src/wasm/g2p/src/pua-map\.js|src/csharp/PiperPlus\.Core/Mapping/OpenJTalkToPiperMapping\.cs|src/cpp/phoneme_parser\.cpp)$
+        pass_filenames: false
+
+      - id: pua-fixture-drift
+        name: Test fixture in sync with pua.json
+        entry: python scripts/regenerate_test_fixture.py --check
+        language: system
+        files: ^(src/python/g2p/piper_plus_g2p/data/pua\.json|tests/fixtures/g2p/phoneme_test_cases\.json)$
+        pass_filenames: false
