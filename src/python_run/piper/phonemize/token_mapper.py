@@ -135,6 +135,25 @@ FIXED_PUA_MAPPING = {
     "\u025b\u0303": 0xE056,  # ɛ̃  nasal open-mid front unrounded (vin, pain)
     "\u0251\u0303": 0xE057,  # ɑ̃  nasal open back unrounded (France, temps)
     "\u0254\u0303": 0xE058,  # ɔ̃  nasal open-mid back rounded (bon, nom)
+    # =======================================================================
+    # Swedish (SV) -- swedish_phonemize.cpp
+    # =======================================================================
+    # --- Long vowels (Complementary Quantity) ---
+    "iː": 0xE059,  # i:  close front unrounded long
+    "yː": 0xE05A,  # y:  close front rounded long
+    "eː": 0xE05B,  # e:  close-mid front unrounded long
+    "ɛː": 0xE05C,  # E:  open-mid front unrounded long
+    "øː": 0xE05D,  # 0:  close-mid front rounded long
+    "ɑː": 0xE05E,  # A:  open back unrounded long
+    "oː": 0xE05F,  # o:  close-mid back rounded long
+    "uː": 0xE060,  # u:  close back rounded long
+    "ʉː": 0xE061,  # U:  close central rounded long
+    # =======================================================================
+    # Additional multi-codepoint diphthongs / nasal vowels (PUA v2)
+    # =======================================================================
+    "ɔɪ": 0xE062,  # OY  English diphthong
+    "œ̃": 0xE063,  # oe-tilde  French nasal open-mid front rounded
+    "ɐ̃": 0xE064,  # a-tilde  Portuguese nasal near-open central
 }
 
 # Build bidirectional mappings
@@ -148,8 +167,8 @@ for token, codepoint in FIXED_PUA_MAPPING.items():
     CHAR2TOKEN[ch] = token
 
 # Private Use Area for dynamic allocation (starting after the last FIXED codepoint)
-# 0xE058 is the last used fixed codepoint (FR ɔ̃), so dynamic starts at 0xE059.
-_PUA_START = 0xE059
+# 0xE064 is the last used fixed codepoint (PT ɐ̃), so dynamic starts at 0xE065.
+_PUA_START = 0xE065
 _next = _PUA_START
 
 

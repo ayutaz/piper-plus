@@ -552,7 +552,7 @@
       "expected_contains": ["s", "t", "ɧ", "uː", "n"]
     }
   ],
-  "pua_map_count": 96,
+  "pua_map_count": 99,
   "pua_spot_checks": [
     { "token": "a:", "codepoint": "0xE000", "description": "JA long vowel a" },
     { "token": "cl", "codepoint": "0xE005", "description": "JA geminate consonant (sokuon)" },
@@ -704,7 +704,10 @@
     "\u0251\u02d0": "0xE05E",
     "o\u02d0": "0xE05F",
     "u\u02d0": "0xE060",
-    "\u0289\u02d0": "0xE061"
+    "\u0289\u02d0": "0xE061",
+    "\u0254\u026a": "0xE062",
+    "\u0153\u0303": "0xE063",
+    "\u0250\u0303": "0xE064"
   },
   "detect_test_cases": [
     {

@@ -1,10 +1,10 @@
 /**
  * PUA (Private Use Area) mapping table.
  *
- * Canonical source: src/python/g2p/piper_plus_g2p/data/pua.json (96 entries)
+ * Canonical source: src/python/g2p/piper_plus_g2p/data/pua.json (99 entries)
  *
  * Multi-character phoneme tokens are mapped to single Unicode PUA codepoints
- * (U+E000..U+E061) so that the model's phoneme_id_map can look them up as
+ * (U+E000..U+E064) so that the model's phoneme_id_map can look them up as
  * single characters.
  *
  * @module pua-map
@@ -14,7 +14,7 @@
  * PUA compatibility version. Increment when new PUA mappings are added.
  * @type {number}
  */
-export const PUA_COMPAT_VERSION = 1;
+export const PUA_COMPAT_VERSION = 2;
 
 /**
  * Check if a model's PUA version is compatible.
@@ -37,7 +37,7 @@ export function checkPuaCompat(modelVersion) {
 }
 
 /**
- * Forward mapping: multi-char token -> PUA character (96 entries).
+ * Forward mapping: multi-char token -> PUA character (99 entries).
  * @type {Record<string, string>}
  */
 export const PUA_MAP = {
@@ -150,6 +150,11 @@ export const PUA_MAP = {
     'o\u02D0':          '\uE05F',  // oː  Long close-mid back rounded vowel
     'u\u02D0':          '\uE060',  // uː  Long close back rounded vowel
     '\u0289\u02D0':     '\uE061',  // ʉː  Long close central rounded vowel
+
+    // --- Additional multi-codepoint diphthongs / nasal vowels (PUA v2) --- 3 entries
+    '\u0254\u026A':     '\uE062',  // ɔɪ  English diphthong (OY)
+    '\u0153\u0303':     '\uE063',  // œ̃ French nasal open-mid front rounded vowel
+    '\u0250\u0303':     '\uE064',  // ɐ̃ Portuguese nasal near-open central vowel
 };
 
 /**

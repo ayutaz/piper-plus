@@ -1,0 +1,127 @@
+# PUA (Private Use Area) Mapping Contract
+# ========================================
+# Defines canonical PUA codepoint assignments for multi-character phoneme tokens
+# that ALL runtimes (Python, Rust, Go, C++, C#, WASM/JS) MUST implement identically.
+#
+# Multi-codepoint IPA tokens (e.g. "a:", "ɔɪ", "œ̃") are mapped to single Unicode
+# Private Use Area codepoints (U+E000..U+F8FF in BMP) so that:
+#   - the model's `phoneme_id_map` can use single-codepoint keys
+#   - C++ runtimes (which require std::map<char32_t, ...>) can load configs
+#   - all runtimes produce the same phoneme IDs for the same input text
+#
+# CRITICAL: Codepoints baked into trained models. Never change existing assignments.
+
+[meta]
+spec_version = "2.0"
+last_updated = "2026-05-05"
+applies_to = ["python", "rust", "go", "cpp", "csharp", "wasm-js"]
+canonical_source = "src/python/g2p/piper_plus_g2p/data/pua.json"
+pua_compat_version = 2
+
+# ============================================================================
+# Invariant 1 — Single canonical source
+# ============================================================================
+# pua.json is the ONLY authoritative table. Every other PUA table in the codebase
+# (Python token_mapper, Rust token_map, Go pua, JS pua-map, C# OpenJTalkToPiperMapping,
+# C++ phoneme_parser) MUST be byte-equivalent (after tokenization) to pua.json.
+#
+# Any change to pua.json requires synchronized PR updates to all 6 runtime tables.
+# CI gate: scripts/check_pua_consistency.py validates this on every push.
+
+[invariants.canonical_source]
+file = "src/python/g2p/piper_plus_g2p/data/pua.json"
+schema = "{ version: int, description: str, entries: [{token: str, codepoint: hex_str, language: str, description: str}] }"
+forbidden_changes = [
+    "Modifying any existing token's codepoint",
+    "Removing entries (would break old models)",
+    "Lowering the version number",
+]
+
+# ============================================================================
+# Invariant 2 — All multi-codepoint inventory tokens MUST be in pua.json
+# ============================================================================
+# Every multi-codepoint phoneme token that appears in a language inventory list
+# (id_maps.py:_*_PHONEMES) MUST exist as a token in pua.json. Otherwise the
+# generated phoneme_id_map will contain multi-codepoint keys, causing C++
+# runtime to reject the config (see Issue: ɔɪ/œ̃/ɐ̃ regression).
+#
+# This invariant is checked at build time:
+#   - encode/pua.py:map_token() raises UnmappedMultiCodepointTokenError on
+#     unknown multi-codepoint tokens (in strict mode)
+#   - encode/id_maps.py:_build_*_id_map() asserts all generated keys are single
+#     codepoints
+#   - src/python/g2p/tests/test_pua_invariants.py walks every inventory and
+#     verifies pua.json coverage
+
+[invariants.inventory_coverage]
+inventory_files = [
+    "src/python/g2p/piper_plus_g2p/encode/id_maps.py",
+]
+inventory_lists = [
+    "_SPECIAL_TOKENS",
+    "_JAPANESE_PHONEMES",
+    "_ENGLISH_PHONEMES",
+    "_CHINESE_PHONEMES",
+    "_SPANISH_PHONEMES",
+    "_FRENCH_PHONEMES",
+    "_PORTUGUESE_PHONEMES",
+    "_KOREAN_PHONEMES",
+    "_SWEDISH_PHONEMES",
+]
+rule = "Any multi-codepoint token in any inventory list must appear as a token in pua.json"
+
+# ============================================================================
+# Invariant 3 — Generated phoneme_id_map keys are all single-codepoint
+# ============================================================================
+# After running encode/id_maps.py:get_phoneme_id_map(language), every key in
+# the returned dict MUST be exactly 1 Unicode codepoint. Any multi-codepoint
+# key indicates a missing pua.json entry and would cause C++ runtime failure.
+
+[invariants.config_keys]
+rule = "All keys in phoneme_id_map must satisfy len(key) == 1 (Python str sense, i.e. single Unicode codepoint)"
+enforced_by = [
+    "encode/pua.py:map_token() — raises if input is multi-codepoint and not in mapping",
+    "encode/id_maps.py:_build_*_id_map() — asserts post-build invariant",
+    "piper_train/update_model_config.py:update_phoneme_id_map() — fails on multi-codepoint key not in FIXED_PUA_MAPPING",
+    "scripts/check_config_phoneme_keys.py — pre-release validator",
+]
+
+# ============================================================================
+# Invariant 4 — PUA_COMPAT_VERSION must match across runtimes and pua.json
+# ============================================================================
+[invariants.compat_version]
+canonical = "src/python/g2p/piper_plus_g2p/data/pua.json:version"
+runtime_constants = [
+    "src/python/g2p/piper_plus_g2p/encode/pua.py:PUA_COMPAT_VERSION",
+    "src/wasm/g2p/src/pua-map.js:PUA_COMPAT_VERSION",
+    "src/rust/piper-plus-g2p/src/token_map.rs:PUA_COMPAT_VERSION",
+]
+rule = "All listed values must equal pua.json's version field"
+
+# ============================================================================
+# Codepoint range allocation (informational)
+# ============================================================================
+[ranges]
+"U+E000-E01C" = "Japanese (29 entries)"
+"U+E01D-E01E" = "Multilingual shared (rr, y_vowel)"
+"U+E01F"      = "(reserved gap)"
+"U+E020-E04A" = "Chinese (43 entries)"
+"U+E04B-E052" = "Korean (8 entries)"
+"U+E053"      = "(reserved gap)"
+"U+E054-E055" = "Spanish/Portuguese (tʃ, dʒ)"
+"U+E056-E058" = "French nasal vowels (ɛ̃, ɑ̃, ɔ̃)"
+"U+E059-E061" = "Swedish long vowels (9 entries)"
+"U+E062-E064" = "Multi-codepoint additions v2 (ɔɪ, œ̃, ɐ̃)"
+"U+E065-"     = "(future allocations)"
+
+# ============================================================================
+# CI enforcement
+# ============================================================================
+[ci]
+required_jobs = [
+    "PUA consistency: scripts/check_pua_consistency.py",
+    "Inventory + invariants: pytest src/python/g2p/tests/test_pua_invariants.py",
+    "Pre-flight config validator: pytest src/python/tests/test_update_model_config.py",
+    "Compat version sync: scripts/check_pua_consistency.py --check-version",
+]
+workflow = ".github/workflows/pua-consistency.yml"

@@ -23,6 +23,7 @@ __all__ = [
     "map_token",
     "PUA_COMPAT_VERSION",
     "check_pua_compat",
+    "UnmappedMultiCodepointTokenError",
 ]
 
 _log = logging.getLogger(__name__)
@@ -40,7 +41,7 @@ def _load_pua_mapping() -> dict[str, int]:
 
 
 # -------------------------------------------------------------------------
-# Fixed PUA mapping table (96 entries)
+# Fixed PUA mapping table (99 entries — PUA v2)
 # CRITICAL: Every codepoint here is baked into trained models.
 # Do NOT change assigned codepoints.
 # Loaded from data/pua.json — the single source of truth.
@@ -60,7 +61,7 @@ for _token, _codepoint in FIXED_PUA_MAPPING.items():
 
 
 # PUA compatibility version. Increment when new PUA mappings are added.
-PUA_COMPAT_VERSION: int = 1
+PUA_COMPAT_VERSION: int = 2
 
 
 def check_pua_compat(config: dict) -> None:
@@ -85,18 +86,51 @@ def check_pua_compat(config: dict) -> None:
         )
 
 
-def map_token(token: str) -> str:
+class UnmappedMultiCodepointTokenError(ValueError):
+    """Raised when a multi-codepoint token has no PUA mapping.
+
+    A multi-codepoint phoneme token without a PUA entry would produce a
+    multi-codepoint key in the generated ``phoneme_id_map``, which the
+    C++ runtime rejects (see docs/spec/pua-contract.toml). Failing fast
+    here prevents silent regression bugs like the ɔɪ/œ̃/ɐ̃ leak that hit
+    Windows users in v1.12.0.
+    """
+
+
+def map_token(token: str, *, strict: bool = False) -> str:
     """Map a multi-character IPA token to a single PUA character.
 
     Single-character tokens are passed through unchanged.
-    Multi-character tokens not in the fixed mapping emit a warning
-    and are returned unchanged (no dynamic allocation).
+
+    Multi-character tokens not in the fixed mapping:
+      - in ``strict=True``, raise ``UnmappedMultiCodepointTokenError``
+      - in ``strict=False`` (default), emit a warning and return the token
+        unchanged
+
+    The strict mode is required when generating ``phoneme_id_map`` keys
+    because the C++ runtime requires all keys to be single Unicode
+    codepoints. The default is non-strict to preserve backward compatibility
+    for one-off decoding utilities and the runtime encoder fallback path
+    (PiperEncoder gracefully handles unknown tokens via skip_unknown).
+
+    Build-time call sites that produce ``phoneme_id_map`` (see
+    ``id_maps.py:_build_*_id_map``) MUST pass ``strict=True``. The CI gate
+    ``scripts/check_pua_consistency.py`` plus the inventory-coverage tests
+    in ``tests/test_pua_invariants.py`` ensure no inventory token reaches
+    a build-time ``map_token`` call without a PUA entry.
     """
     if token in TOKEN2CHAR:
         return TOKEN2CHAR[token]
 
     if len(token) == 1:
         return token
+
+    if strict:
+        raise UnmappedMultiCodepointTokenError(
+            f"Multi-codepoint token {token!r} has no PUA mapping in pua.json. "
+            "Add it to src/python/g2p/piper_plus_g2p/data/pua.json and "
+            "synchronize all 6 runtime tables (see docs/spec/pua-contract.toml)."
+        )
 
     warnings.warn(
         f"Unknown multi-character token {token!r} has no PUA mapping; "

@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use std::sync::LazyLock;
 
 /// PUA compatibility version. Increment when new PUA mappings are added.
-pub const PUA_COMPAT_VERSION: u32 = 1;
+pub const PUA_COMPAT_VERSION: u32 = 2;
 
 /// Check if a model's PUA version is compatible.
 pub fn check_pua_compat(model_version: Option<u32>) -> Result<(), String> {
@@ -21,7 +21,7 @@ pub fn check_pua_compat(model_version: Option<u32>) -> Result<(), String> {
     }
 }
 
-/// 固定 PUA マッピング (96 エントリ)
+/// 固定 PUA マッピング (99 エントリ)
 /// 多文字音素トークン → Unicode Private Use Area コードポイント
 pub static FIXED_PUA_MAP: LazyLock<Vec<(&'static str, u32)>> = LazyLock::new(|| {
     vec![
@@ -151,6 +151,10 @@ pub static FIXED_PUA_MAP: LazyLock<Vec<(&'static str, u32)>> = LazyLock::new(|| 
         ("o\u{02D0}", 0xE05F),        // oː  close-mid back rounded long
         ("u\u{02D0}", 0xE060),        // uː  close back rounded long
         ("\u{0289}\u{02D0}", 0xE061), // ʉː  close central rounded long
+        // === Additional multi-codepoint diphthongs / nasal vowels (PUA v2) ===
+        ("\u{0254}\u{026A}", 0xE062), // ɔɪ  English diphthong (OY)
+        ("\u{0153}\u{0303}", 0xE063), // œ̃   French nasal open-mid front rounded vowel
+        ("\u{0250}\u{0303}", 0xE064), // ɐ̃   Portuguese nasal near-open central vowel
     ]
 });
 
@@ -187,7 +191,7 @@ mod tests {
     #[test]
     fn test_fixed_pua_count() {
         // Must match Python token_mapper.py FIXED_PUA_MAPPING count exactly
-        assert_eq!(FIXED_PUA_MAP.len(), 96);
+        assert_eq!(FIXED_PUA_MAP.len(), 99);
     }
 
     #[test]

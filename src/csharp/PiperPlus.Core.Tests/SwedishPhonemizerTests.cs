@@ -605,14 +605,14 @@ public sealed class SwedishPhonemizerTests
     }
 
     // ================================================================
-    // 27. PuaMapping_TotalCount_Is96
+    // 27. PuaMapping_TotalCount_Is99
     // ================================================================
 
     [Fact]
-    public void PuaMapping_TotalCount_Is96()
+    public void PuaMapping_TotalCount_Is99()
     {
-        // 29 JA + 2 shared + 43 ZH + 8 KO + 2 ES/PT + 3 FR + 9 SV = 96
-        Assert.Equal(96, OpenJTalkToPiperMapping.TokenToChar.Count);
+        // PUA v2: 29 JA + 2 shared + 43 ZH + 8 KO + 2 ES/PT + 3 FR + 9 SV + 3 multi-CP v2 = 99
+        Assert.Equal(99, OpenJTalkToPiperMapping.TokenToChar.Count);
     }
 
     // ================================================================

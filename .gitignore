@@ -105,6 +105,7 @@ test_phoneme*.py
 verify_*.py
 analyze_*.py
 check_*.py
+!scripts/check_pua_consistency.py
 create_comprehensive_*.py
 add_missing_*.py
 retrain_*.py

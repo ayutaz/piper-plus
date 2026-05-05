@@ -1,0 +1,174 @@
+name: "PUA Consistency Gate"
+
+# Prevents the multi-codepoint regression class (e.g. ɔɪ/œ̃/ɐ̃ leak in v1.12.0).
+# See docs/spec/pua-contract.toml for the full contract.
+#
+# This workflow runs on every push/PR that touches:
+#   - the canonical pua.json
+#   - any of the 6 runtime PUA tables (Python/Rust/Go/JS/C#/C++)
+#   - the inventory lists in id_maps.py
+#   - the contract spec or this workflow itself
+
+on:
+  push:
+    branches: [dev, main]
+    paths:
+      - 'src/python/g2p/piper_plus_g2p/data/pua.json'
+      - 'src/python/g2p/piper_plus_g2p/encode/**'
+      - 'src/python_run/piper/phonemize/token_mapper.py'
+      - 'src/rust/piper-plus-g2p/src/token_map.rs'
+      - 'src/go/phonemize/pua.go'
+      - 'src/go/phonemize/pua_test.go'
+      - 'src/wasm/g2p/src/pua-map.js'
+      - 'src/csharp/PiperPlus.Core/Mapping/OpenJTalkToPiperMapping.cs'
+      - 'src/cpp/phoneme_parser.cpp'
+      - 'src/python/piper_train/update_model_config.py'
+      - 'docs/spec/pua-contract.toml'
+      - 'scripts/check_pua_consistency.py'
+      - '.github/workflows/pua-consistency.yml'
+  pull_request:
+    paths:
+      - 'src/python/g2p/piper_plus_g2p/data/pua.json'
+      - 'src/python/g2p/piper_plus_g2p/encode/**'
+      - 'src/python_run/piper/phonemize/token_mapper.py'
+      - 'src/rust/piper-plus-g2p/src/token_map.rs'
+      - 'src/go/phonemize/pua.go'
+      - 'src/go/phonemize/pua_test.go'
+      - 'src/wasm/g2p/src/pua-map.js'
+      - 'src/csharp/PiperPlus.Core/Mapping/OpenJTalkToPiperMapping.cs'
+      - 'src/cpp/phoneme_parser.cpp'
+      - 'src/python/piper_train/update_model_config.py'
+      - 'docs/spec/pua-contract.toml'
+      - 'scripts/check_pua_consistency.py'
+      - '.github/workflows/pua-consistency.yml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  cross-runtime-table-consistency:
+    name: All 6 runtime PUA tables match pua.json
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Verify cross-runtime PUA mapping consistency
+        run: python scripts/check_pua_consistency.py --verbose --check-version
+
+  inventory-and-fail-fast-tests:
+    name: Inventory coverage + fail-fast guards
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: '3.13'
+
+      - name: Install Python G2P deps
+        working-directory: src/python/g2p
+        run: uv sync --extra all --extra dev
+
+      - name: Run PUA invariant tests (G2P)
+        working-directory: src/python/g2p
+        run: uv run pytest tests/test_pua_invariants.py -v
+
+      - name: Install piper_train deps
+        working-directory: src/python
+        run: uv sync --extra test
+
+      - name: Run update_model_config validate tests
+        working-directory: src/python
+        run: uv run pytest tests/test_update_model_config.py -v
+
+  rust-pua-tests:
+    name: Rust PUA table tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src/rust
+
+      - name: Run Rust PUA tests
+        working-directory: src/rust
+        run: |
+          cargo test -p piper-plus-g2p --lib -- token_map
+          cargo test -p piper-plus-g2p --lib -- test_fixed_pua_count
+
+  go-pua-tests:
+    name: Go PUA table tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v5
+        with:
+          go-version: 'stable'
+
+      - name: Run Go PUA tests
+        working-directory: src/go
+        run: go test ./phonemize/... -run "TestFixedPUA|TestRegisterToken_DynamicPUA" -v
+
+  js-pua-tests:
+    name: JS/WASM PUA table tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24.x'
+
+      - name: Run JS PUA tests
+        working-directory: src/wasm/g2p
+        run: |
+          node --test test/test-pua-map.js
+          node --test test/test-encode.js
+
+  config-key-validator:
+    name: Pre-flight config validator (release gate)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Validate any config.json checked into the repo
+        run: |
+          set -e
+          configs=$(find . -name 'config.json' -path '*/test/*' -o -name 'config.json' -path '*/tests/*' -o -name 'config.json' -path '*/fixtures/*' 2>/dev/null || true)
+          if [ -z "$configs" ]; then
+            echo "No test/fixture config.json files to validate."
+            exit 0
+          fi
+          echo "Found configs to validate:"
+          echo "$configs"
+          for cfg in $configs; do
+            echo ""
+            echo "Checking $cfg..."
+            python - <<EOF
+          import json, sys
+          with open("$cfg", encoding="utf-8") as f:
+              data = json.load(f)
+          pid_map = data.get("phoneme_id_map", {})
+          bad = [k for k in pid_map if len(k) > 1]
+          if bad:
+              print(f"FAIL: $cfg has {len(bad)} multi-codepoint key(s): {bad}")
+              sys.exit(1)
+          else:
+              print(f"OK: $cfg ({len(pid_map)} phoneme_id_map entries, all single-codepoint)")
+          EOF
+          done

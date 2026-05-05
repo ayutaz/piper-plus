@@ -76,57 +76,7 @@ jobs:
           node --test test/test-detect.js
           node --test test/test-exports.js
 
-      - name: PUA map count validation
-        run: |
-          python3 -c "
-          import json
-          with open('src/python/g2p/piper_plus_g2p/data/pua.json') as f:
-              data = json.load(f)
-          with open('tests/fixtures/g2p/phoneme_test_cases.json') as f:
-              fixture = json.load(f)
-          pua_count = len(data['entries'])
-          expected = fixture['pua_map_count']
-          print(f'PUA entries: {pua_count}, fixture expects: {expected}')
-          assert pua_count >= expected, f'PUA count {pua_count} < fixture expected {expected}'
-          print('PUA map count validation passed')
-          "
-
-      - name: PUA count cross-platform validation
-        run: |
-          EXPECTED=96
-
-          # JS: count PUA value entries ('\uE0xx') in pua-map.js
-          js_count=$(grep -c "'\\\uE0" src/wasm/g2p/src/pua-map.js || true)
-          echo "JS  PUA entries: $js_count (expected: $EXPECTED)"
-
-          # Rust: count PUA tuple entries (', 0xE0xx') in token_map.rs
-          rust_count=$(grep -c ', 0xE0' src/rust/piper-plus-g2p/src/token_map.rs || true)
-          echo "Rust PUA entries: $rust_count (expected: $EXPECTED)"
-
-          # Python: count from canonical pua.json
-          py_count=$(python3 -c "
-          import json
-          with open('src/python/g2p/piper_plus_g2p/data/pua.json') as f:
-              print(len(json.load(f)['entries']))
-          ")
-          echo "Python PUA entries: $py_count (expected: $EXPECTED)"
-
-          failed=0
-          if [ "$js_count" -ne "$EXPECTED" ]; then
-            echo "::error::JS PUA count mismatch: got $js_count, expected $EXPECTED"
-            failed=1
-          fi
-          if [ "$rust_count" -ne "$EXPECTED" ]; then
-            echo "::error::Rust PUA count mismatch: got $rust_count, expected $EXPECTED"
-            failed=1
-          fi
-          if [ "$py_count" -ne "$EXPECTED" ]; then
-            echo "::error::Python PUA count mismatch: got $py_count, expected $EXPECTED"
-            failed=1
-          fi
-
-          if [ "$failed" -eq 1 ]; then
-            echo "::error::PUA counts are inconsistent across platforms"
-            exit 1
-          fi
-          echo "PUA cross-platform count validation passed (all $EXPECTED)"
+      - name: Cross-runtime PUA table consistency (entry-by-entry)
+        # Replaces previous count-only validation with full entry comparison
+        # across all 6 runtime tables. See docs/spec/pua-contract.toml.
+        run: python3 scripts/check_pua_consistency.py --verbose --check-version

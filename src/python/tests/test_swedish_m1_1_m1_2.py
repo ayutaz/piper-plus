@@ -64,9 +64,10 @@ class TestM12PhonemeInventory:
 
     @pytest.mark.unit
     def test_pua_max_codepoint(self):
-        # SV long vowels end at 0xE061; reserved range ends at 0xE063
+        # PUA v2 (2026-05): added en/fr/pt multi-CP entries at 0xE062-0xE064.
+        # Allocation map lives in docs/spec/pua-contract.toml.
         max_cp = max(FIXED_PUA_MAPPING.values())
-        assert max_cp <= 0xE063, f"Max PUA codepoint 0x{max_cp:04X} exceeds SV reserved range"
+        assert max_cp <= 0xE064, f"Max PUA codepoint 0x{max_cp:04X} exceeds PUA v2 range"
 
     @pytest.mark.unit
     def test_sv_pua_range(self):

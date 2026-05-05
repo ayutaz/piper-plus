@@ -34,7 +34,7 @@ class TestJACorrectness:
         """FIXED_PUA_MAPPING should have the expected number of entries."""
         from piper_plus_g2p.encode.pua import FIXED_PUA_MAPPING
 
-        assert len(FIXED_PUA_MAPPING) == 96
+        assert len(FIXED_PUA_MAPPING) == 99
 
     def test_ja_id_map_format(self):
         """get_phoneme_id_map('ja') should return a valid id map."""
