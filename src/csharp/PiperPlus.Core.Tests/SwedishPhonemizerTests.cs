@@ -605,14 +605,17 @@ public sealed class SwedishPhonemizerTests
     }
 
     // ================================================================
-    // 27. PuaMapping_TotalCount_Is99
+    // 27. PuaMapping_IsPopulated (sanity; strong check is in CI gate)
     // ================================================================
 
     [Fact]
-    public void PuaMapping_TotalCount_Is99()
+    public void PuaMapping_IsPopulated()
     {
-        // PUA v2: 29 JA + 2 shared + 43 ZH + 8 KO + 2 ES/PT + 3 FR + 9 SV + 3 multi-CP v2 = 99
-        Assert.Equal(99, OpenJTalkToPiperMapping.TokenToChar.Count);
+        // Sanity: the table is non-trivially populated. The strong invariant
+        // ("byte-for-byte identical to pua.json") is enforced by the
+        // cross-runtime-table-consistency CI gate.
+        Assert.True(OpenJTalkToPiperMapping.TokenToChar.Count >= 50,
+            $"OpenJTalkToPiperMapping.TokenToChar unexpectedly small: {OpenJTalkToPiperMapping.TokenToChar.Count}");
     }
 
     // ================================================================

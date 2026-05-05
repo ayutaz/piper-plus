@@ -63,8 +63,12 @@ public sealed class PhonemeConverterTests
 
         var actual = OpenJTalkToPiperMapping.TokenToChar;
 
-        // PUA v2: 99 total = 29 JA + 2 shared + 43 ZH + 8 KO + 2 ES/PT + 3 FR + 9 SV + 3 multi-CP v2
-        Assert.Equal(99, actual.Count);
+        // Sanity: the table is populated. The strong invariant ("byte-for-byte
+        // identical to pua.json") is enforced by the cross-runtime-table-consistency
+        // CI gate; baking in an absolute count would only duplicate that check
+        // and drift on every PUA bump (the bug class behind PR #389).
+        Assert.True(actual.Count >= 50,
+            $"OpenJTalkToPiperMapping.TokenToChar unexpectedly small: {actual.Count}");
 
         foreach (var (token, expectedChar) in expected)
         {

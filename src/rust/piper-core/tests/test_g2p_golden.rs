@@ -438,14 +438,18 @@ fn test_encode_golden() {
 }
 
 // ---------------------------------------------------------------------------
-// PUA map individual match test (all 99 entries — PUA v2)
+// PUA map individual match test — all entries from the fixture round-trip
+// through FIXED_PUA_MAP. The fixture is regenerated from pua.json, so any
+// drift between the canonical source and the runtime is caught here without
+// any absolute count baked into the test.
 // ---------------------------------------------------------------------------
 
 #[test]
 fn test_pua_map_individual() {
     let fixture = load_fixture();
 
-    // Verify fixture has the expected number of entries
+    // Fixture self-consistency: pua_map dict size matches its declared count.
+    // Drift would mean someone updated one but not the other.
     assert_eq!(
         fixture.pua_map.len(),
         fixture.pua_map_count,
@@ -453,13 +457,9 @@ fn test_pua_map_individual() {
         fixture.pua_map.len(),
         fixture.pua_map_count,
     );
-    assert_eq!(
-        fixture.pua_map_count, 99,
-        "pua_map_count should be 99 (PUA v2), got {}",
-        fixture.pua_map_count,
-    );
 
-    // Verify FIXED_PUA_MAP count matches fixture
+    // Runtime parity: FIXED_PUA_MAP must have the same number of entries
+    // as the fixture (and therefore as pua.json after regenerate_test_fixture).
     assert_eq!(
         piper_plus_g2p::token_map::FIXED_PUA_MAP.len(),
         fixture.pua_map_count,

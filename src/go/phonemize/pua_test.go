@@ -146,17 +146,20 @@ var allFixedPUA = []struct {
 	{"ɐ̃", 0xE064, "MULTI_V2"}, // ɐ̃   Portuguese nasal near-open central vowel
 }
 
-// TestFixedPUA_TotalCount ensures the Go fixedPUA map has exactly 99 entries,
-// matching the Python FIXED_PUA_MAPPING plus Swedish long vowels and PUA v2 additions.
+// TestFixedPUA_TotalCount ensures the Go fixedPUA map has the same number
+// of entries as the test-side reference list (allFixedPUA). Both lists are
+// kept in sync with Python FIXED_PUA_MAPPING via the cross-platform CI gate.
+// Using len(allFixedPUA) rather than a literal avoids the dual-update bug
+// that bit PR #389 (where 96 was bumped to 99 in some places but not others).
 func TestFixedPUA_TotalCount(t *testing.T) {
-	const want = 99
+	want := len(allFixedPUA)
 	if got := len(fixedPUA); got != want {
-		t.Errorf("fixedPUA has %d entries, want %d (must match Python FIXED_PUA_MAPPING)", got, want)
+		t.Errorf("fixedPUA has %d entries, want %d (must match allFixedPUA reference)", got, want)
 	}
 }
 
-// TestFixedPUA_AllEntries verifies every single one of the 99 fixed PUA
-// entries against the Python reference. This is an exhaustive golden test.
+// TestFixedPUA_AllEntries verifies every fixed PUA entry against the Python
+// reference list. This is an exhaustive golden test.
 func TestFixedPUA_AllEntries(t *testing.T) {
 	for _, tc := range allFixedPUA {
 		t.Run(fmt.Sprintf("%s_U+%04X", tc.group, tc.want), func(t *testing.T) {

@@ -225,8 +225,29 @@ fn test_nonexistent_tokens_return_none() {
 
 #[test]
 fn test_total_entry_count_matches_python() {
-    // Python FIXED_PUA_MAPPING has exactly 99 entries (PUA v2)
-    assert_eq!(FIXED_PUA_MAP.len(), 99);
+    // The Rust map must always agree with the canonical pua.json. Reading the
+    // count from pua.json (rather than baking the literal in) removes the
+    // class of bug where someone bumps the table but forgets to update this
+    // test — a regression that bit PR #389.
+    let repo_root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .unwrap()
+        .parent()
+        .unwrap()
+        .parent()
+        .unwrap()
+        .to_path_buf();
+    let pua_json = repo_root
+        .join("src/python/g2p/piper_plus_g2p/data/pua.json");
+    let content = std::fs::read_to_string(&pua_json)
+        .unwrap_or_else(|e| panic!("Failed to read pua.json {pua_json:?}: {e}"));
+    let parsed: serde_json::Value =
+        serde_json::from_str(&content).expect("Failed to parse pua.json");
+    let expected = parsed["entries"]
+        .as_array()
+        .expect("pua.json must contain an entries array")
+        .len();
+    assert_eq!(FIXED_PUA_MAP.len(), expected);
 }
 
 #[test]

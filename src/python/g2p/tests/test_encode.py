@@ -35,8 +35,10 @@ def _load_pua_spot_checks() -> list[dict]:
 
 class TestPUAMapping:
     def test_pua_mapping_count(self):
-        """FIXED_PUA_MAPPING has exactly 99 entries."""
-        assert len(FIXED_PUA_MAPPING) == 99
+        """FIXED_PUA_MAPPING entry count matches the cross-platform fixture."""
+        with open(_FIXTURE_PATH, encoding="utf-8") as f:
+            expected = json.load(f)["pua_map_count"]
+        assert len(FIXED_PUA_MAPPING) == expected
 
     def test_pua_single_char_passthrough(self):
         """Single-character tokens pass through map_token unchanged."""
