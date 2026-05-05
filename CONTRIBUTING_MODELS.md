@@ -315,6 +315,24 @@ Issue 投稿時に以下のテンプレートを記入してください。
    - `config.json` -- モデル設定ファイル
    - `README.md` -- Model Card (後述)
 
+**重要**: 直接アップロードする代わりに `scripts/upload_model_to_hf.py` を使ってください。このスクリプトは `update_model_config.py --validate-only` を必ず先に走らせるので、`phoneme_id_map` に multi-codepoint key (例: `ɔɪ`/`œ̃`/`ɐ̃`) が残ったままアップロードされる事故 (v1.12.0 で発生) を防げます。
+
+```bash
+# 検証 + アップロード (config + onnx)
+HF_TOKEN=hf_xxx python scripts/upload_model_to_hf.py \
+    --repo username/piper-plus-my-model \
+    --config path/to/config.json \
+    --onnx   path/to/model.onnx
+
+# 検証のみ (dry run)
+python scripts/upload_model_to_hf.py \
+    --repo username/piper-plus-my-model \
+    --config path/to/config.json \
+    --dry-run
+```
+
+CI 経由で投稿する場合は GitHub Actions の `Release Model Config to HF Hub` workflow (`workflow_dispatch`) も利用できます。
+
 ### Step 2: Model Card (README.md) を作成
 
 HuggingFace リポジトリの README.md に以下の情報を含めてください。

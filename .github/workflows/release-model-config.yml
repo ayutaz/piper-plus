@@ -1,0 +1,126 @@
+name: Release Model Config to HF Hub
+
+# Manual workflow that uploads a Piper-Plus model config (and optionally
+# the .onnx) to Hugging Face Hub, with a mandatory pre-flight validation
+# step that would have prevented the v1.12.0 ɔɪ/œ̃/ɐ̃ leak.
+#
+# Usage (GitHub UI):
+#   1. Push the prepared config.json (and optionally .onnx) to a branch.
+#   2. Go to Actions → "Release Model Config to HF Hub" → Run workflow.
+#   3. Select that branch and fill in:
+#      - hf_repo:     e.g. ayousanz/piper-plus-tsukuyomi-chan
+#      - config_path: repo-relative path to config.json on the selected branch
+#      - onnx_path:   (optional) repo-relative path to model.onnx
+#      - dry_run:     true to validate only without pushing to HF
+#
+# The HF_TOKEN secret must be configured at repo or org level.
+
+on:
+  workflow_dispatch:
+    inputs:
+      hf_repo:
+        description: 'HuggingFace repo id (e.g. ayousanz/piper-plus-tsukuyomi-chan)'
+        required: true
+        type: string
+      config_path:
+        description: >
+          Path inside the repo to the config.json to upload
+          (e.g. tmp/tsukuyomi-chan-6lang-fp16.onnx.json).
+          The file must already be checked into the branch selected for this run.
+        required: true
+        type: string
+      onnx_path:
+        description: 'Optional: path to .onnx in repo to upload alongside the config'
+        required: false
+        type: string
+        default: ''
+      config_remote_name:
+        description: 'Optional: filename to use on the HF Hub side for config'
+        required: false
+        type: string
+        default: ''
+      onnx_remote_name:
+        description: 'Optional: filename to use on the HF Hub side for onnx'
+        required: false
+        type: string
+        default: ''
+      commit_message:
+        description: 'Commit message for the HF upload'
+        required: false
+        type: string
+        default: 'Update model config (validated by release-model-config workflow)'
+      dry_run:
+        description: 'Validate only — do not call HF API'
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  validate-and-upload:
+    name: Pre-flight validate + HF upload
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: '3.13'
+
+      - name: Install piper_train + huggingface_hub
+        working-directory: src/python
+        run: |
+          uv sync --extra test
+          uv pip install huggingface_hub
+
+      - name: Verify config exists
+        run: |
+          if [ ! -f "${{ inputs.config_path }}" ]; then
+            echo "::error::config_path '${{ inputs.config_path }}' does not exist in the repo at ref ${{ github.sha }}"
+            exit 1
+          fi
+          if [ -n "${{ inputs.onnx_path }}" ] && [ ! -f "${{ inputs.onnx_path }}" ]; then
+            echo "::error::onnx_path '${{ inputs.onnx_path }}' does not exist"
+            exit 1
+          fi
+
+      - name: Validate + upload via upload_model_to_hf.py
+        working-directory: src/python
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          set -e
+          ARGS=(--repo "${{ inputs.hf_repo }}" --config "${GITHUB_WORKSPACE}/${{ inputs.config_path }}")
+          if [ -n "${{ inputs.onnx_path }}" ]; then
+            ARGS+=(--onnx "${GITHUB_WORKSPACE}/${{ inputs.onnx_path }}")
+          fi
+          if [ -n "${{ inputs.config_remote_name }}" ]; then
+            ARGS+=(--config-remote-name "${{ inputs.config_remote_name }}")
+          fi
+          if [ -n "${{ inputs.onnx_remote_name }}" ]; then
+            ARGS+=(--onnx-remote-name "${{ inputs.onnx_remote_name }}")
+          fi
+          ARGS+=(--commit-message "${{ inputs.commit_message }}")
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            ARGS+=(--dry-run)
+          fi
+          uv run python "${GITHUB_WORKSPACE}/scripts/upload_model_to_hf.py" "${ARGS[@]}"
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## HF Hub Upload"
+            echo ""
+            echo "- Repo: \`${{ inputs.hf_repo }}\`"
+            echo "- Config: \`${{ inputs.config_path }}\`"
+            if [ -n "${{ inputs.onnx_path }}" ]; then
+              echo "- Onnx:   \`${{ inputs.onnx_path }}\`"
+            fi
+            echo "- Dry run: \`${{ inputs.dry_run }}\`"
+            echo ""
+            echo "Validation: \`update_model_config.py --validate-only\` was enforced before any upload."
+          } >> "$GITHUB_STEP_SUMMARY"
