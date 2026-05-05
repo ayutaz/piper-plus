@@ -166,11 +166,13 @@ Step 4. ユニットテスト + CI 同期ガード
 
 | # | ランタイム | タスク | 行数目安 | 難易度 |
 |---|----------|-------|---------|-------|
-| R1 | Rust | `chinese.rs` に `phonemize_embedded_english` 関数追加 | ~150 | 中 |
+| R1 | Rust | `chinese.rs` に `phonemize_embedded_english` 関数追加 (2 箇所 †1) | ~300 | 中 |
 | R2 | Rust | `LoanwordData` struct + `load_loanword_data()` (schema validation) | ~80 | 低 |
 | R3 | Rust | `multilingual.rs` で `[zh,en,*]` パターン dispatch | ~50 | 低 |
 | R4 | Rust | `data/zh_en_loanword.json` 同梱 (`include_str!`) | ~5 | 低 |
-| R5 | Rust | テスト追加 (unit + integration) | ~120 | 中 |
+| R5 | Rust | テスト追加 (unit + integration、2 箇所同期確認含む) | ~150 | 中 |
+
+> **†1 Rust の重要な制約**: 中国語実装が `piper-plus-g2p/src/chinese.rs` (WASM 用) と `piper-core/src/phonemize/chinese.rs` (デスクトップ + ProsodyInfo 統合) の **2 箇所に存在** (詳細: §8.5)。両方に実装が必要なため、当初見積 ~400 行 → **~600 行**。同期テストを追加して整合性を担保する。
 | G1 | Go | `chinese_loanword.go` 新規 (Loanword struct + load) | ~120 | 低 |
 | G2 | Go | `chinese.go` の `PhonemizeEmbeddedEnglish` 関数追加 | ~100 | 中 |
 | G3 | Go | `multilingual.go` dispatch 追加 | ~50 | 低 |
@@ -512,9 +514,206 @@ jobs:
 
 ---
 
+### 8.4 JS/WASM 二層 FFI 設計
+
+**問題**: ZH-EN loanword data を Rust WASM 側と JS 側のどちらに置くか。WASM バンドルサイズ影響を最小化したい。
+
+**既存 FFI パターン**:
+
+```rust
+// src/rust/piper-wasm/src/lib.rs:473
+#[wasm_bindgen(js_name = setChineseDictionary)]
+pub fn set_chinese_dictionary(
+    &mut self,
+    single_json: &[u8],     // JSON bytes (JS から渡す)
+    phrase_json: &[u8],
+) -> Result<(), JsValue>
+```
+
+JS 側 → Rust 側に **JSON bytes** を渡す形 (`&[u8]`) で、Rust 内部で `serde` パース。一度 set すれば永続。**これと同じパターンを踏襲**。
+
+**3 案比較**:
+
+| 案 | データ位置 | WASM サイズ | JS bundle サイズ | メンテ性 |
+|---|-----------|------------|----------------|---------|
+| **A** | Rust 内 `include_bytes!` | +5KB (圧縮 +2KB) | 不変 | △ (WASM 再ビルド必要) |
+| **B** | JS 側に bundle、`setChineseLoanwordData()` で inject | 不変 | +5KB | ★★★ (JSON 差し替え容易) |
+| **C** | npm 公開時 `fetch()` で外部取得 | 不変 | 不変 | ✗ (オフライン NG) |
+
+**推奨**: **案 B (JS 側 bundle + Rust 注入)** — 既存 `setChineseDictionary` と完全に同じパターンで一貫性確保、WASM 再ビルド不要、bundler は JSON import を最適化済み
+
+**実装スケッチ**:
+
+```rust
+// piper-wasm/src/lib.rs に追加
+#[wasm_bindgen(js_name = setChineseLoanwordData)]
+pub fn set_chinese_loanword_data(
+    &mut self,
+    loanword_json: &[u8],
+) -> Result<(), JsValue> {
+    let data = serde_json::from_slice::<LoanwordData>(loanword_json)
+        .map_err(|e| JsValue::from_str(&format!("CONFIG_PARSE_ERROR: {e}")))?;
+    self.chinese_phonemizer.set_loanword_data(data);
+    Ok(())
+}
+```
+
+```typescript
+// src/wasm/g2p/types/index.d.ts に追加
+export interface LoanwordData {
+    version: number;
+    acronyms: Record<string, string[]>;
+    loanwords: Record<string, string[]>;
+    letter_fallback: Record<string, string[]>;
+}
+
+export class ChineseG2P {
+    setLoanwordData(data: LoanwordData): void;
+}
+```
+
+```javascript
+// src/wasm/g2p/src/zh/index.js
+import loanwordData from '../../data/zh_en_loanword.json' assert { type: 'json' };
+
+class ChineseG2P {
+    setLoanwordData(data) {
+        this._loanwordData = data;
+        if (this._wasmPhonemizer) {
+            const bytes = new TextEncoder().encode(JSON.stringify(data));
+            this._wasmPhonemizer.setChineseLoanwordData(bytes);
+        }
+    }
+}
+```
+
+**テストフレーム**: 既存の `node:test` (`src/wasm/g2p/test/test-chinese.js` 463 行で使用) を継続。新規ケース ~120 行追加。
+
+### 8.5 Rust crate 重複問題と実装場所決定
+
+**重要発見**: 中国語 phonemizer 実装が **2 箇所に存在**:
+
+```
+src/rust/
+├── piper-plus-g2p/src/chinese.rs    (1,314 行) — WASM 対応版、crates.io 公開
+└── piper-core/src/phonemize/chinese.rs (1,462 行) — non-WASM、ProsodyInfo 統合
+```
+
+**依存関係グラフ**:
+
+```
+piper-cli       → piper-core
+piper-python    → piper-core
+piper-wasm      → piper-core + piper-plus-g2p (feature-gated)
+piper-core      → piper-plus-g2p (依存先、ただし phonemize は独自実装あり)
+piper-plus-g2p  → 独立 (crates.io 公開)
+```
+
+**両者の差分**:
+
+| 項目 | `piper-plus-g2p` | `piper-core` |
+|------|----------------|--------------|
+| WASM 対応 | ✓ (`from_json_bytes()`) | ✗ (`cfg!(not(target_arch = "wasm32"))`) |
+| `ProsodyInfo` (a1/a2/a3) | △ (基本のみ) | ✓ 統合 |
+| crates.io 公開 | ✓ | ✓ |
+| 利用元 | piper-wasm のみ | piper-cli / piper-python / piper-wasm 全て |
+| コールドスタート最適化 (#302) | 未適用 | 適用済 |
+
+**結論**: **両方に実装する必要がある**
+
+- **`piper-core/src/phonemize/chinese.rs`**: デスクトップ用 CLI / Python binding が使う、`ProsodyInfo` 統合済 → **ここで主実装**
+- **`piper-plus-g2p/src/chinese.rs`**: WASM ビルド時の経路 → **同等実装をミラー** (将来 v0.5.0 で統合予定だが本 PR では並列維持)
+
+**両者を一致させるため**:
+- 実装の core ロジック (lookup priority、token tokenize 等) を 1 つの module 化検討 (例: `piper-plus-g2p::chinese::loanword` を `piper-core` から re-export)
+- ただし `ProsodyInfo` の差で完全 re-export 困難なら、コミット内で同期確認テストを追加
+
+**推奨アプローチ**:
+
+```
+1. piper-core/src/phonemize/chinese.rs に embedded_english_phonemize() を主実装
+2. piper-plus-g2p/src/chinese.rs にも同等関数を実装 (WASM 経路用)
+3. 両方の実装が同じ JSON データから同じ結果を生むテストを追加
+4. v0.5.0 でいずれか統合 (本 PR の Out of Scope)
+```
+
+**Rust 工数の修正**: 当初見積 ~400 行 → **~600 行** (2 箇所実装のため +50%)
+
+### 8.6 C++ テストフレーム拡充戦略
+
+**問題**: 中国語テストが現状 `test_multilingual_g2p.cpp` で 2 ケースしかない (`NiHao` / `SentenceWithPunctuation`)。設計書の統一テストマトリックス 20 ケースを追加する必要がある。
+
+**既存テスト構造**:
+
+- フレームワーク: **Google Test (gtest)**
+- ファイル: `src/cpp/tests/test_multilingual_g2p.cpp` (31 テスト、`TEST_F` 形式)
+- パラメータ化テスト (`TEST_P`/`INSTANTIATE_TEST_SUITE_P`) は **未使用**
+- fixture: inline `makeTestXxxDict()` で十分、外部 JSON 不要
+- CMake: `src/cpp/tests/CMakeLists.txt:607` で `add_test()` 登録、`gtest_discover_tests` 使用
+
+**推奨拡充戦略**:
+
+| 項目 | 推奨 | 理由 |
+|------|-----|------|
+| ファイル戦略 | **既存 `test_multilingual_g2p.cpp` に追記** (新規ファイル不要) | CMake 修正最小、既存 fixture 流用可 |
+| クラス | 新規 `class ZhEnLoanwordTest : public ::testing::Test` | 中国語専用 fixture を持たせる |
+| パターン | `TEST_F` で 20 ケース直書き、`TEST_P` 不使用 | ロジック差異が大きく、パラメータ化のメリット薄い |
+| C API テスト | 別ファイル `test_c_api_zh_en.cpp` 推奨 | C ABI 経由のテストは責務分離 |
+| fixture | inline `makeTestLoanwordData()` で配列リテラル | 外部 JSON 依存しない、自己完結 |
+
+**テストコード例**:
+
+```cpp
+class ZhEnLoanwordTest : public ::testing::Test {
+protected:
+    LoanwordData loanwordData = makeTestLoanwordData();
+    std::unordered_map<int, std::string> singleCharDict = makeTestSingleCharDict();
+    std::unordered_map<std::string, std::string> phraseDict = makeTestPhraseDict();
+};
+
+TEST_F(ZhEnLoanwordTest, AcronymGPS_HitsAcronymTable) {
+    std::vector<std::vector<Phoneme>> phonemes;
+    phonemize_embedded_english("GPS", phonemes, loanwordData);
+    ASSERT_FALSE(phonemes.empty());
+    // tone marker (PUA 0xE046-0xE04A) が含まれることを検証
+    bool hasTone = false;
+    for (auto ph : phonemes[0]) {
+        if (ph >= 0xE046 && ph <= 0xE04A) { hasTone = true; break; }
+    }
+    EXPECT_TRUE(hasTone);
+}
+
+TEST_F(ZhEnLoanwordTest, IssueExample_PleaseOpenGPS) {
+    std::vector<std::vector<Phoneme>> phonemes;
+    phonemize_chinese_mixed(
+        "请打开 GPS",
+        phonemes,
+        singleCharDict, phraseDict, loanwordData
+    );
+    // GPS が 4 syllable 分の tone marker を持つことを検証
+    int toneCount = countTones(phonemes);
+    EXPECT_GE(toneCount, 4);
+}
+```
+
+**工数見積**:
+
+| 項目 | 工数 |
+|------|------|
+| 20 テストケース実装 | 2-3 時間 |
+| CMake 修正 (不要、既存枠) | 10 分 |
+| fixture data の C++ リテラル化 | 30 分 |
+| C API テスト別ファイル | 1 時間 |
+| **合計** | **4-5 時間** |
+
+**CI 影響**: ビルド時間 +3-5 秒、CI 全体で +2-3 秒程度 (影響軽微)
+
+---
+
 ## 9. 改訂履歴
 
 | 日付 | バージョン | 変更内容 | 著者 |
 |------|---------|---------|------|
 | 2026-05-06 | Draft v1 | 初版作成 (調査結果 + 対応計画) | Claude |
 | 2026-05-06 | Draft v2 | 深堀り調査 3 項目追加 (C++ iOS/Android リソース、C# 独立実装、JSON 同期 CI) | Claude |
+| 2026-05-06 | Draft v3 | 深堀り調査 3 項目追加 (JS/WASM 二層 FFI、Rust crate 重複問題、C++ テストフレーム拡充) — 重要発見: Rust は 2 箇所実装必要、工数 ~400→~600 行に修正 | Claude |
