@@ -1125,7 +1125,7 @@ func TestFixedPUA_MultiCodepointTokenRuneCount(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 // TestDynamicPUA_StartsAfterFixed ensures dynamic allocation starts at 0xE065,
-// which is past the last fixed codepoint (0xE061 = SV ʉː) + 2 reserved.
+// which is past the last fixed codepoint (0xE064 = PT ɐ̃, PUA v2).
 func TestDynamicPUA_StartsAfterFixed(t *testing.T) {
 	ResetDynamicPUA()
 	defer ResetDynamicPUA()

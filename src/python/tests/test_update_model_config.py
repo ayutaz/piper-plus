@@ -42,14 +42,21 @@ class TestUpdatePhonemeIdMap:
         assert "ch" not in cfg["phoneme_id_map"]
 
     def test_unmapped_multi_codepoint_raises_in_strict_mode(self):
-        # The exact bug from v1.12.0
-        cfg = _make_config({"a": [0], "ɔɪ": [1], "œ̃": [2], "ɐ̃": [3]})
-        # Note: as of PUA v2 these ARE registered, so we use a fake unknown token
+        # PUA v2 registered ɔɪ/œ̃/ɐ̃ already, so use a synthetic unmapped token
+        # to verify strict-mode fail-fast behaviour.
         cfg = _make_config({"a": [0], "zz_fake_multi": [1]})
         with pytest.raises(UnmappedMultiCodepointKeyError) as ei:
             update_phoneme_id_map(cfg, strict=True)
         assert "multi-codepoint" in str(ei.value)
         assert "pua.json" in str(ei.value)
+
+    def test_v1_regression_tokens_are_now_mapped_in_strict_mode(self):
+        # The exact bug from v1.12.0: ɔɪ/œ̃/ɐ̃ as multi-codepoint keys.
+        # With PUA v2 these resolve to single-codepoint PUA characters.
+        cfg = _make_config({"a": [0], "ɔɪ": [1], "œ̃": [2], "ɐ̃": [3]})
+        update_phoneme_id_map(cfg, strict=True)
+        # All keys post-update must be single-codepoint.
+        assert all(len(k) == 1 for k in cfg["phoneme_id_map"])
 
     def test_unmapped_multi_codepoint_warns_in_non_strict(self, capsys):
         cfg = _make_config({"a": [0], "zz_fake_multi": [1]})

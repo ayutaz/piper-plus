@@ -160,7 +160,8 @@ def main():
         "--validate-only",
         action="store_true",
         help="Only check that all phoneme_id_map keys are single-codepoint; "
-        "exit non-zero if any multi-codepoint key without PUA mapping exists.",
+        "exit non-zero if any multi-codepoint key exists. C++ runtime "
+        "rejects multi-codepoint keys regardless of PUA mapping presence.",
     )
     parser.add_argument(
         "--no-strict",

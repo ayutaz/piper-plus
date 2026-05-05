@@ -46,11 +46,12 @@ forbidden_changes = [
 # runtime to reject the config (see Issue: ɔɪ/œ̃/ɐ̃ regression).
 #
 # This invariant is checked at build time:
-#   - encode/pua.py:map_token() raises ValueError on unknown multi-codepoint
+#   - encode/pua.py:map_token() raises UnmappedMultiCodepointTokenError on
+#     unknown multi-codepoint tokens (in strict mode)
 #   - encode/id_maps.py:_build_*_id_map() asserts all generated keys are single
 #     codepoints
-#   - tests/test_pua_inventory_integrity.py walks every inventory and verifies
-#     pua.json coverage
+#   - src/python/g2p/tests/test_pua_invariants.py walks every inventory and
+#     verifies pua.json coverage
 
 [invariants.inventory_coverage]
 inventory_files = [
@@ -119,8 +120,8 @@ rule = "All listed values must equal pua.json's version field"
 [ci]
 required_jobs = [
     "PUA consistency: scripts/check_pua_consistency.py",
-    "Inventory coverage: pytest tests/test_pua_inventory_integrity.py",
-    "Generated map keys: pytest src/python/g2p/tests/test_id_maps_invariants.py",
+    "Inventory + invariants: pytest src/python/g2p/tests/test_pua_invariants.py",
+    "Pre-flight config validator: pytest src/python/tests/test_update_model_config.py",
     "Compat version sync: scripts/check_pua_consistency.py --check-version",
 ]
 workflow = ".github/workflows/pua-consistency.yml"
