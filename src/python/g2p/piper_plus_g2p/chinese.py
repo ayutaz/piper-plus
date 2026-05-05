@@ -26,9 +26,7 @@ __all__ = [
     "ChinesePhonemizer",
 ]
 
-_DEFAULT_LOANWORD_DATA_PATH = (
-    Path(__file__).parent / "data" / "zh_en_loanword.json"
-)
+_DEFAULT_LOANWORD_DATA_PATH = Path(__file__).parent / "data" / "zh_en_loanword.json"
 _RE_TOKEN_SPLIT = re.compile(r"[A-Za-z0-9]+")
 
 # Punctuation mapping (Chinese -> Western equivalents)
@@ -606,15 +604,42 @@ def phonemize_chinese(text: str) -> list[str]:
 
 
 def _load_loanword_data(path: Path | str) -> dict:
-    """Load a zh-en loanword JSON file from disk."""
+    """Load and validate a zh-en loanword JSON file from disk.
+
+    Raises
+    ------
+    ValueError
+        If any section ("acronyms", "loanwords", "letter_fallback") is not
+        a mapping, or if any entry value is not a ``list[str]``. Without
+        this check a malformed string value would be iterated by
+        ``list.extend`` character-by-character and produce hard-to-debug
+        downstream output.
+    """
     p = Path(path)
     with open(p, encoding="utf-8") as f:
         data = json.load(f)
-    return {
-        "acronyms": dict(data.get("acronyms", {})),
-        "loanwords": dict(data.get("loanwords", {})),
-        "letter_fallback": dict(data.get("letter_fallback", {})),
+
+    result: dict[str, dict[str, list[str]]] = {
+        "acronyms": {},
+        "loanwords": {},
+        "letter_fallback": {},
     }
+    for section in ("acronyms", "loanwords", "letter_fallback"):
+        section_data = data.get(section, {})
+        if not isinstance(section_data, dict):
+            raise ValueError(
+                f"{p}: section '{section}' must be a mapping, got "
+                f"{type(section_data).__name__}"
+            )
+        for key, value in section_data.items():
+            if not isinstance(value, list) or not all(
+                isinstance(v, str) for v in value
+            ):
+                raise ValueError(
+                    f"{p}: '{section}.{key}' must be list[str], got {value!r}"
+                )
+            result[section][key] = list(value)
+    return result
 
 
 @functools.cache

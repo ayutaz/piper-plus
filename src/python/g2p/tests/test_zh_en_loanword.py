@@ -56,9 +56,7 @@ class TestEmbeddedEnglishUnit:
         tokens, _ = p.phonemize_embedded_english("ChatGPT")
         tone_tokens = [t for t in tokens if t.startswith("tone")]
         # ChatGPT entry has 5 pinyin syllables -> 5 tone markers
-        assert len(tone_tokens) == 5, (
-            f"Expected 5 tones for ChatGPT, got {tone_tokens}"
-        )
+        assert len(tone_tokens) == 5, f"Expected 5 tones for ChatGPT, got {tone_tokens}"
 
     def test_letter_fallback_for_unknown(self):
         """Unknown tokens fall back to per-letter conversion."""
@@ -251,12 +249,8 @@ class TestMultilingualDispatch:
         p = get_phonemizer("zh-en")
         zh_only = ChinesePhonemizer()
 
-        ml_tokens, _ = p.phonemize_with_prosody(
-            "今天天气很好"
-        )
-        zh_tokens, _ = zh_only.phonemize_with_prosody(
-            "今天天气很好"
-        )
+        ml_tokens, _ = p.phonemize_with_prosody("今天天气很好")
+        zh_tokens, _ = zh_only.phonemize_with_prosody("今天天气很好")
         assert ml_tokens == zh_tokens
 
     @requires_en
@@ -287,9 +281,7 @@ class TestIssueExampleCases:
         # GPS adds 4 syllables -> 4 extra tone markers vs the zh-only path
         from piper_plus_g2p.chinese import ChinesePhonemizer
 
-        zh_only_tokens, _ = ChinesePhonemizer().phonemize_with_prosody(
-            "请打开"
-        )
+        zh_only_tokens, _ = ChinesePhonemizer().phonemize_with_prosody("请打开")
         zh_only_tones = sum(1 for t in zh_only_tokens if t.startswith("tone"))
         ml_tones = sum(1 for t in tokens if t.startswith("tone"))
         assert ml_tones - zh_only_tones == 4
@@ -324,9 +316,7 @@ class TestIssueExampleCases:
         assert len(tokens) == len(prosody)
         from piper_plus_g2p.chinese import ChinesePhonemizer
 
-        zh_only_tokens, _ = ChinesePhonemizer().phonemize_with_prosody(
-            "让我用 写代码"
-        )
+        zh_only_tokens, _ = ChinesePhonemizer().phonemize_with_prosody("让我用 写代码")
         zh_only_tones = sum(1 for t in zh_only_tokens if t.startswith("tone"))
         ml_tones = sum(1 for t in tokens if t.startswith("tone"))
         # ChatGPT -> 5 syllables
@@ -439,9 +429,7 @@ class TestMultipleEmbeddedSegments:
         from piper_plus_g2p.registry import get_phonemizer
 
         p = get_phonemizer("zh-en")
-        full_tokens, _ = p.phonemize_with_prosody(
-            "让我用 ChatGPT 和 Python 写代码"
-        )
+        full_tokens, _ = p.phonemize_with_prosody("让我用 ChatGPT 和 Python 写代码")
         # Compare against pure ZH baseline (without the EN tokens)
         baseline_tokens, _ = ChinesePhonemizer().phonemize_with_prosody(
             "让我用 和 写代码"
@@ -451,8 +439,7 @@ class TestMultipleEmbeddedSegments:
         base_tones = sum(1 for t in baseline_tokens if t.startswith("tone"))
         # ChatGPT = 5 syllables, Python = 2 syllables -> +7 tones
         assert full_tones - base_tones == 7, (
-            f"Expected +7 tones (ChatGPT=5 + Python=2), got "
-            f"{full_tones - base_tones}"
+            f"Expected +7 tones (ChatGPT=5 + Python=2), got {full_tones - base_tones}"
         )
 
 
@@ -570,6 +557,90 @@ class TestDataIntegrity:
                     assert 1 <= int(syl[-1]) <= 5, (
                         f"Syllable {syl!r} in {section}/{token} has invalid tone"
                     )
+
+
+@requires_zh
+class TestSchemaValidation:
+    """``_load_loanword_data`` validates the JSON schema and rejects malformed input."""
+
+    def test_string_value_rejected(self, tmp_path: Path):
+        """A string instead of list[str] for a loanword raises ValueError."""
+        from piper_plus_g2p.chinese import _load_loanword_data
+
+        bad = {"version": 1, "loanwords": {"GPS": "ji4-pi4"}}
+        path = tmp_path / "bad.json"
+        path.write_text(json.dumps(bad), encoding="utf-8")
+        with pytest.raises(ValueError, match=r"loanwords\.GPS"):
+            _load_loanword_data(path)
+
+    def test_non_string_inside_list_rejected(self, tmp_path: Path):
+        """A non-string element inside the list raises ValueError."""
+        from piper_plus_g2p.chinese import _load_loanword_data
+
+        bad = {"version": 1, "acronyms": {"GPS": ["ji4", 123]}}
+        path = tmp_path / "bad.json"
+        path.write_text(json.dumps(bad), encoding="utf-8")
+        with pytest.raises(ValueError, match=r"acronyms\.GPS"):
+            _load_loanword_data(path)
+
+    def test_section_not_mapping_rejected(self, tmp_path: Path):
+        """A section that is not a dict raises ValueError."""
+        from piper_plus_g2p.chinese import _load_loanword_data
+
+        bad = {"version": 1, "letter_fallback": ["A", "B"]}
+        path = tmp_path / "bad.json"
+        path.write_text(json.dumps(bad), encoding="utf-8")
+        with pytest.raises(ValueError, match=r"letter_fallback.*mapping"):
+            _load_loanword_data(path)
+
+    def test_valid_json_accepted(self, tmp_path: Path):
+        """A well-formed JSON loads without error."""
+        from piper_plus_g2p.chinese import _load_loanword_data
+
+        good = {
+            "version": 1,
+            "acronyms": {"AB": ["ma1"]},
+            "loanwords": {"Foo": ["fu1"]},
+            "letter_fallback": {"Q": ["kiu1"]},
+        }
+        path = tmp_path / "good.json"
+        path.write_text(json.dumps(good), encoding="utf-8")
+        data = _load_loanword_data(path)
+        assert data["acronyms"]["AB"] == ["ma1"]
+        assert data["loanwords"]["Foo"] == ["fu1"]
+
+
+@requires_zh
+class TestRuntimeBundleSync:
+    """The runtime-side JSON copy must stay in sync with the training-side source."""
+
+    def test_runtime_copy_matches_source(self):
+        """src/python_run/piper/phonemize/data/zh_en_loanword.json
+        must match src/python/g2p/piper_plus_g2p/data/zh_en_loanword.json
+        byte-for-byte. The runtime wheel ships its own copy because the
+        training-side g2p package is not a runtime dependency.
+        """
+        from piper_plus_g2p.chinese import _DEFAULT_LOANWORD_DATA_PATH
+
+        repo_root = Path(__file__).resolve().parents[4]
+        runtime_copy = (
+            repo_root
+            / "src"
+            / "python_run"
+            / "piper"
+            / "phonemize"
+            / "data"
+            / "zh_en_loanword.json"
+        )
+        if not runtime_copy.exists():
+            pytest.skip(f"Runtime copy not present at {runtime_copy}")
+        src_bytes = Path(_DEFAULT_LOANWORD_DATA_PATH).read_bytes()
+        rt_bytes = runtime_copy.read_bytes()
+        assert src_bytes == rt_bytes, (
+            "Runtime zh_en_loanword.json is out of sync with the training-side "
+            "source. Re-run `cp src/python/g2p/piper_plus_g2p/data/zh_en_loanword.json "
+            "src/python_run/piper/phonemize/data/zh_en_loanword.json`."
+        )
 
 
 if __name__ == "__main__":

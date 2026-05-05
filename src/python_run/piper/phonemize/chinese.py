@@ -16,19 +16,12 @@ from .token_mapper import map_sequence
 
 _LOGGER = logging.getLogger(__name__)
 
-# zh-en code-switching loanword data lives in the training-side g2p package
-# so both sides share the same JSON. Resolve the path relative to the source
-# tree; if the file is not reachable (e.g. installed wheel layout), fall back
-# to empty tables and emit a debug-level log.
-# __file__ -> .../src/python_run/piper/phonemize/chinese.py
-# parents[3] -> .../src/  (then -> src/python/g2p/piper_plus_g2p/data/...)
+# Bundled with the runtime wheel (see setup.py / MANIFEST.in). The file is a
+# byte-for-byte copy of src/python/g2p/piper_plus_g2p/data/zh_en_loanword.json
+# so that ZH-EN loanword pinyinisation works in the installed package without
+# requiring the training-side g2p package on PYTHONPATH.
 _DEFAULT_LOANWORD_DATA_PATH = (
-    Path(__file__).resolve().parents[3]
-    / "python"
-    / "g2p"
-    / "piper_plus_g2p"
-    / "data"
-    / "zh_en_loanword.json"
+    Path(__file__).resolve().parent / "data" / "zh_en_loanword.json"
 )
 _RE_TOKEN_SPLIT = re.compile(r"[A-Za-z0-9]+")
 
@@ -475,15 +468,42 @@ def phonemize_chinese(text: str) -> list[str]:
 
 
 def _load_loanword_data(path: Path | str) -> dict:
-    """Load a zh-en loanword JSON file from disk."""
+    """Load and validate a zh-en loanword JSON file from disk.
+
+    Raises
+    ------
+    ValueError
+        If any section ("acronyms", "loanwords", "letter_fallback") is not
+        a mapping, or if any entry value is not a ``list[str]``. Without
+        this check a malformed string value would be iterated by
+        ``list.extend`` character-by-character and produce hard-to-debug
+        downstream output.
+    """
     p = Path(path)
     with open(p, encoding="utf-8") as f:
         data = json.load(f)
-    return {
-        "acronyms": dict(data.get("acronyms", {})),
-        "loanwords": dict(data.get("loanwords", {})),
-        "letter_fallback": dict(data.get("letter_fallback", {})),
+
+    result: dict[str, dict[str, list[str]]] = {
+        "acronyms": {},
+        "loanwords": {},
+        "letter_fallback": {},
     }
+    for section in ("acronyms", "loanwords", "letter_fallback"):
+        section_data = data.get(section, {})
+        if not isinstance(section_data, dict):
+            raise ValueError(
+                f"{p}: section '{section}' must be a mapping, got "
+                f"{type(section_data).__name__}"
+            )
+        for key, value in section_data.items():
+            if not isinstance(value, list) or not all(
+                isinstance(v, str) for v in value
+            ):
+                raise ValueError(
+                    f"{p}: '{section}.{key}' must be list[str], got {value!r}"
+                )
+            result[section][key] = list(value)
+    return result
 
 
 @functools.cache
@@ -502,11 +522,14 @@ def _get_default_loanword_data() -> dict:
 def _phonemize_embedded_english_raw(
     text: str, loanword_data: dict | None = None
 ) -> list[str]:
-    """Convert embedded English text to raw IPA tokens (no BOS/EOS, pre-PUA).
+    """Convert embedded English text to PUA-mapped IPA tokens (no BOS/EOS).
 
     Looks up the entire token in case-sensitive ``loanwords`` first, then in
     uppercase ``acronyms``, and finally falls back to per-letter conversion
-    via ``letter_fallback``.
+    via ``letter_fallback``. Multi-character IPA tokens are mapped to PUA
+    single-codepoint chars via :func:`map_sequence` (consistent with the
+    other ``_*_raw`` helpers in this module). BOS/EOS are added by the
+    public :func:`phonemize_embedded_english` wrapper.
     """
     if loanword_data is None:
         loanword_data = _get_default_loanword_data()

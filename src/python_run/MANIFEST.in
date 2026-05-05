@@ -1,2 +1,3 @@
 include requirements.txt
 include piper/voices.json
+include piper/phonemize/data/zh_en_loanword.json

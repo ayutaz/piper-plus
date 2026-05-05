@@ -206,9 +206,6 @@ def test_runtime_training_consistency_for_embedded_english():
     # Runtime side maps tone tokens to PUA, so count PUA codepoints in the
     # tone range (E046-E04A per pua.json).
     runtime_tones = sum(
-        1
-        for tok in runtime_tokens
-        for ch in tok
-        if 0xE046 <= ord(ch) <= 0xE04A
+        1 for tok in runtime_tokens for ch in tok if 0xE046 <= ord(ch) <= 0xE04A
     )
     assert train_tones == runtime_tones
