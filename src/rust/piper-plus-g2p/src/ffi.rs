@@ -124,6 +124,88 @@ mod tests {
     use std::ffi::{CStr, CString};
 
     // -----------------------------------------------------------------------
+    // Chinese FFI tests (bundled-dicts feature)
+    // -----------------------------------------------------------------------
+
+    #[test]
+    #[cfg(all(feature = "chinese", feature = "bundled-dicts"))]
+    fn test_ffi_create_with_chinese_bundled() {
+        let lang = CString::new("zh").unwrap();
+        unsafe {
+            let handle = piper_plus_g2p_create(lang.as_ptr());
+            assert!(
+                !handle.is_null(),
+                "handle should not be NULL for 'zh' with bundled-dicts"
+            );
+            piper_plus_g2p_free(handle);
+        }
+    }
+
+    #[test]
+    #[cfg(all(feature = "chinese", feature = "bundled-dicts"))]
+    fn test_ffi_phonemize_chinese_bundled() {
+        let lang = CString::new("zh").unwrap();
+        let text = CString::new("你好").unwrap();
+        unsafe {
+            let handle = piper_plus_g2p_create(lang.as_ptr());
+            assert!(!handle.is_null());
+
+            let result = piper_plus_g2p_phonemize(handle, text.as_ptr(), lang.as_ptr());
+            assert!(!result.is_null(), "phonemize result should not be NULL");
+
+            let s = CStr::from_ptr(result).to_str().unwrap();
+            assert!(s.contains("\"tokens\""));
+            assert!(s.contains("\"language\":\"zh\""));
+
+            piper_plus_g2p_free_string(result);
+            piper_plus_g2p_free(handle);
+        }
+    }
+
+    #[test]
+    #[cfg(all(feature = "english", feature = "bundled-dicts"))]
+    fn test_ffi_phonemize_english_bundled() {
+        let lang = CString::new("en").unwrap();
+        let text = CString::new("Hello").unwrap();
+        unsafe {
+            let handle = piper_plus_g2p_create(lang.as_ptr());
+            assert!(!handle.is_null());
+
+            let result = piper_plus_g2p_phonemize(handle, text.as_ptr(), lang.as_ptr());
+            assert!(
+                !result.is_null(),
+                "english phonemize with bundled-dicts must succeed"
+            );
+
+            let s = CStr::from_ptr(result).to_str().unwrap();
+            assert!(s.contains("\"language\":\"en\""));
+
+            piper_plus_g2p_free_string(result);
+            piper_plus_g2p_free(handle);
+        }
+    }
+
+    #[test]
+    #[cfg(all(feature = "naist-jdic", feature = "bundled-dicts"))]
+    fn test_ffi_phonemize_japanese_bundled() {
+        let lang = CString::new("ja").unwrap();
+        let text = CString::new("こんにちは").unwrap();
+        unsafe {
+            let handle = piper_plus_g2p_create(lang.as_ptr());
+            assert!(!handle.is_null());
+
+            let result = piper_plus_g2p_phonemize(handle, text.as_ptr(), lang.as_ptr());
+            assert!(!result.is_null());
+
+            let s = CStr::from_ptr(result).to_str().unwrap();
+            assert!(s.contains("\"language\":\"ja\""));
+
+            piper_plus_g2p_free_string(result);
+            piper_plus_g2p_free(handle);
+        }
+    }
+
+    // -----------------------------------------------------------------------
     // Korean FFI tests
     // -----------------------------------------------------------------------
 
@@ -522,16 +604,28 @@ mod tests {
 
 fn register_one(registry: &mut PhonemizerRegistry, lang: &str) -> Result<(), crate::G2pError> {
     match lang {
-        #[cfg(feature = "english")]
+        #[cfg(all(feature = "english", feature = "bundled-dicts"))]
+        "en" => {
+            registry.register(
+                "en",
+                Box::new(crate::english::EnglishPhonemizer::new_bundled()?),
+            );
+        }
+        #[cfg(all(feature = "english", not(feature = "bundled-dicts")))]
         "en" => {
             registry.register("en", Box::new(crate::english::EnglishPhonemizer::new()?));
         }
-        #[cfg(feature = "chinese")]
+        #[cfg(all(feature = "chinese", feature = "bundled-dicts"))]
         "zh" => {
-            // ChinesePhonemizer requires dictionary file paths;
-            // skip registration when paths are not available via FFI.
+            registry.register(
+                "zh",
+                Box::new(crate::chinese::ChinesePhonemizer::new_bundled()?),
+            );
+        }
+        #[cfg(all(feature = "chinese", not(feature = "bundled-dicts")))]
+        "zh" => {
             return Err(crate::G2pError::Phonemize(
-                "Chinese requires dictionary paths; use from_dicts() instead".into(),
+                "Chinese requires bundled-dicts feature or use from_dicts() directly".into(),
             ));
         }
         #[cfg(feature = "korean")]
@@ -557,7 +651,14 @@ fn register_one(registry: &mut PhonemizerRegistry, lang: &str) -> Result<(), cra
         "sv" => {
             registry.register("sv", Box::new(crate::swedish::SwedishPhonemizer::new()));
         }
-        #[cfg(feature = "japanese")]
+        #[cfg(feature = "naist-jdic")]
+        "ja" => {
+            registry.register(
+                "ja",
+                Box::new(crate::japanese::JapanesePhonemizer::new_bundled()?),
+            );
+        }
+        #[cfg(all(feature = "japanese", not(feature = "naist-jdic")))]
         "ja" => {
             registry.register("ja", Box::new(crate::japanese::JapanesePhonemizer::new()?));
         }

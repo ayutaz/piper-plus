@@ -54,6 +54,14 @@ import PackageDescription
 let version = "1.13.0"
 let checksum = "0000000000000000000000000000000000000000000000000000000000000000"
 
+// G2P-only artifact — produced by the same release workflow but as a
+// separate xcframework that does NOT depend on ONNX Runtime. Consumers
+// who need only G2P (text → IPA tokens) can pull just `PiperPlusG2P`.
+// Same release-cadence as the synthesis engine above; checksum is updated
+// manually before each tag push (Issue #387).
+let g2pVersion = "1.13.0"
+let g2pChecksum = "0000000000000000000000000000000000000000000000000000000000000000"
+
 let package = Package(
     name: "PiperPlus",
     // iOS-only: the released xcframework currently contains
@@ -66,6 +74,12 @@ let package = Package(
         .library(
             name: "PiperPlus",
             targets: ["PiperPlus"]
+        ),
+        // G2P-only product — no ONNX Runtime dependency. See
+        // docs/guides/swift-g2p-integration.md for usage.
+        .library(
+            name: "PiperPlusG2P",
+            targets: ["PiperPlusG2P"]
         ),
     ],
     dependencies: [
@@ -101,6 +115,28 @@ let package = Package(
             name: "PiperPlusBinary",
             url: "https://github.com/ayutaz/piper-plus/releases/download/v\(version)/libpiper_plus-ios-v\(version).xcframework.zip",
             checksum: checksum
+        ),
+        // PiperPlusG2P (Issue #387) — Swift wrapper around the Rust
+        // piper-plus-g2p crate's C FFI. Independent from the synthesis
+        // engine: no ORT dependency, ~3-5 MB xcframework after compression.
+        .target(
+            name: "PiperPlusG2P",
+            dependencies: [
+                .target(name: "PiperPlusG2PBinary"),
+            ],
+            path: "Sources/PiperPlusG2P"
+        ),
+        .binaryTarget(
+            name: "PiperPlusG2PBinary",
+            url: "https://github.com/ayutaz/piper-plus/releases/download/v\(g2pVersion)/libpiper_plus_g2p-ios-v\(g2pVersion).xcframework.zip",
+            checksum: g2pChecksum
+        ),
+        // Test target — runs against the resolved binaryTarget. Excluded
+        // from `swift build` until a published xcframework is available.
+        .testTarget(
+            name: "PiperPlusG2PTests",
+            dependencies: ["PiperPlusG2P"],
+            path: "tests/PiperPlusG2PTests"
         ),
     ]
 )

@@ -12,6 +12,11 @@ include = [
   "piper_plus_g2p_free_string",
   "piper_plus_g2p_free",
 ]
+exclude = [
+  "PUA_COMPAT_VERSION",
+]
+
+[export.rename]
 
 [parse]
 parse_deps = false

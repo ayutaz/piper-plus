@@ -67,6 +67,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Rust piper-core / piper-plus-g2p の chinese.rs 重複**: `piper-core/src/phonemize/chinese.rs` は piper-plus-g2p の ~470 行のコピー (CI parity test で drift 防止)。`pub use piper_plus_g2p::chinese::*` への置換で長期メンテナンスコストを下げる予定。
 - **Rust `last_eos` Mutex のセマンティクス改善**: 現状 `Mutex<String>` は単一スレッド前提で安全だが論理的にはスナップショット。中期的には `phonemize_with_prosody` の戻り値型に EOS を含める設計に変更予定。
 
+#### Swift G2P 単独利用サポート (Issue #387)
+
+iOS / Swift から piper-plus の G2P (Grapheme-to-Phoneme) を **ONNX Runtime 非依存で**単独利用可能に。8 言語 (ja/en/zh/ko/es/fr/pt/sv) 対応、辞書はバイナリ埋込で iOS App Sandbox でも動作。
+
+- 新 SPM product: `PiperPlusG2P` (`Package.swift` の `.library(name: "PiperPlusG2P", ...)`)
+- 新 artifact: `libpiper_plus_g2p-ios-v${VERSION}.xcframework.zip` (合成エンジン xcframework と独立、ORT 非依存、~3-5MB zip)
+- Swift API: `Phonemizer(languages:)` / `phonemize(_:language:)` / `availableLanguages` (`Sources/PiperPlusG2P/`)
+- Rust 側変更:
+  - `piper-plus-g2p` crate に `[lib] crate-type = ["staticlib", "cdylib", "rlib"]` 追加
+  - `bundled-dicts` feature 新設 (cmudict + pinyin JSON を `include_str!` / `include_bytes!` で埋込)
+  - `EnglishPhonemizer::new_bundled()` / `ChinesePhonemizer::new_bundled()` 追加
+  - `ffi.rs::register_one()` を `bundled-dicts` 有効時に新コンストラクタ経由に変更
+- `cbindgen.toml` 新設 — `piper_plus_g2p.h` を CI で自動生成
+- CI: `release-shared-lib.yml` に `build-g2p-ios` matrix + `assemble-g2p-xcframework` ジョブ追加。`release` ジョブは G2P xcframework の sha256 と `Package.swift` の `g2pChecksum` 一致を verify
+- ドキュメント: [`docs/spec/swift-g2p.md`](docs/spec/swift-g2p.md) (仕様)、[`docs/guides/swift-g2p-integration.md`](docs/guides/swift-g2p-integration.md) (利用ガイド)、[`docs/spec/swift-g2p-decisions.md`](docs/spec/swift-g2p-decisions.md) (実装着手前判断記録)
+
 #### iOS shared-lib を xcframework として配布開始 (Issue #377)
 
 iOS 利用シナリオ (Dart FFI / Godot / Swift / SPM) に対応する xcframework 配布を成立させた。device (arm64) + simulator (arm64+x86_64 universal) の両 slice を含む。
