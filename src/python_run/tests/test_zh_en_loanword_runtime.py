@@ -122,3 +122,93 @@ def test_multilingual_pure_zh_unaffected():
     zh_inner = [t for t in via_zh if t not in {"^", "$"}]
     ml_inner = [t for t in via_ml if t not in {"^", "$"}]
     assert zh_inner == ml_inner
+
+
+def test_phonemize_embedded_english_punctuation_invariant():
+    """Trailing punctuation does not change the embedded-english output."""
+    _require_pypinyin()
+    from piper.phonemize.chinese import _phonemize_embedded_english_raw
+
+    a = _phonemize_embedded_english_raw("GPS")
+    b = _phonemize_embedded_english_raw("GPS,")
+    c = _phonemize_embedded_english_raw("GPS.")
+    assert a == b == c
+
+
+def test_phonemize_embedded_english_digits_dropped():
+    """Digits in letter_fallback path are silently dropped."""
+    _require_pypinyin()
+    from piper.phonemize.chinese import _phonemize_embedded_english_raw
+
+    a = _phonemize_embedded_english_raw("ZZ")
+    b = _phonemize_embedded_english_raw("Z2Z9")
+    assert a == b
+
+
+def test_phonemize_embedded_english_priority_loanword():
+    """Loanword (case-sensitive) is preferred over uppercase acronym lookup.
+
+    'Python' (loanword) vs 'PYTHON' (no loanword match, no acronym match
+    -> letter_fallback) must produce different sequence lengths.
+    """
+    _require_pypinyin()
+    from piper.phonemize.chinese import _phonemize_embedded_english_raw
+
+    py = _phonemize_embedded_english_raw("Python")
+    upper = _phonemize_embedded_english_raw("PYTHON")
+    assert py != upper
+    assert len(upper) > len(py)
+
+
+def test_multilingual_punctuation_after_embedded_en():
+    """Trailing punctuation in dispatched segment keeps the embedded path."""
+    _require_pypinyin()
+    from piper.phonemize.multilingual import MultilingualPhonemizer
+
+    p = MultilingualPhonemizer(["zh", "en"], default_latin_language="en")
+    a = p.phonemize("请打开 GPS")
+    b = p.phonemize("请打开 GPS。")
+    # Same non-BOS/EOS content modulo a possible trailing period
+    a_inner = [t for t in a if t not in {"^", "$"}]
+    b_inner = [t for t in b if t not in {"^", "$"}]
+    assert abs(len(a_inner) - len(b_inner)) <= 1
+
+
+def test_multilingual_two_embedded_en_segments():
+    """[zh, en, zh, en, zh] -- both EN segments dispatched to embedded path."""
+    _require_pypinyin()
+    from piper.phonemize.multilingual import MultilingualPhonemizer
+
+    p = MultilingualPhonemizer(["zh", "en"], default_latin_language="en")
+    full = p.phonemize("让我用 ChatGPT 和 Python 写代码")
+    assert len(full) > 0
+
+
+def test_runtime_training_consistency_for_embedded_english():
+    """Runtime PUA tokens map back to the same training-side IPA sequence.
+
+    Sanity check: the runtime adds PUA encoding on top of the same IPA
+    tokens produced training-side, so decoding the PUA chars back to
+    their token names should yield a sequence that contains the same
+    tone markers as the training-side path.
+    """
+    _require_pypinyin()
+    pytest.importorskip(
+        "piper_plus_g2p", reason="training-side g2p package not installed"
+    )
+    from piper_plus_g2p.chinese import phonemize_embedded_english as train_fn
+
+    from piper.phonemize.chinese import _phonemize_embedded_english_raw
+
+    train_tokens, _ = train_fn("GPS")
+    runtime_tokens = _phonemize_embedded_english_raw("GPS")
+    train_tones = sum(1 for t in train_tokens if t.startswith("tone"))
+    # Runtime side maps tone tokens to PUA, so count PUA codepoints in the
+    # tone range (E046-E04A per pua.json).
+    runtime_tones = sum(
+        1
+        for tok in runtime_tokens
+        for ch in tok
+        if 0xE046 <= ord(ch) <= 0xE04A
+    )
+    assert train_tones == runtime_tones

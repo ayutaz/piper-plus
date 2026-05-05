@@ -334,6 +334,204 @@ class TestIssueExampleCases:
 
 
 @requires_zh
+class TestLookupPriority:
+    """The 3-tier priority: case-sensitive loanwords > acronyms > letter_fallback."""
+
+    def test_loanword_beats_acronym(self, tmp_path: Path):
+        """A case-sensitive loanword entry takes priority over an uppercase acronym."""
+        from piper_plus_g2p.chinese import ChinesePhonemizer
+
+        # Default: GPS is a 4-syllable acronym. Override registers GPS as a
+        # 2-syllable case-sensitive loanword. Loanword must win.
+        override = {
+            "version": 1,
+            "loanwords": {"GPS": ["ka1", "la2"]},
+        }
+        path = tmp_path / "loanword_wins.json"
+        path.write_text(json.dumps(override), encoding="utf-8")
+
+        p = ChinesePhonemizer(zh_en_loanword_dict_paths=str(path))
+        tokens, _ = p.phonemize_embedded_english("GPS")
+        tones = [t for t in tokens if t.startswith("tone")]
+        assert len(tones) == 2, (
+            f"Loanword override should win (2 syllables), got {tones}"
+        )
+
+    def test_acronym_beats_letter_fallback(self, tmp_path: Path):
+        """An acronym entry takes priority over per-letter fallback."""
+        from piper_plus_g2p.chinese import ChinesePhonemizer
+
+        # 'AB' is not in the default dictionary. Letter fallback would yield
+        # A + B = 2 syllables. Override registers AB as a 1-syllable acronym;
+        # the acronym must win.
+        override = {
+            "version": 1,
+            "acronyms": {"AB": ["ma1"]},
+        }
+        path = tmp_path / "acronym_wins.json"
+        path.write_text(json.dumps(override), encoding="utf-8")
+
+        p = ChinesePhonemizer(zh_en_loanword_dict_paths=str(path))
+        tokens, _ = p.phonemize_embedded_english("AB")
+        tones = [t for t in tokens if t.startswith("tone")]
+        assert len(tones) == 1, (
+            f"Acronym should win over letter fallback (1 syllable), got {tones}"
+        )
+
+    def test_loanword_case_sensitivity(self):
+        """'Python' (loanword) and 'PYTHON' (uppercase) take different paths."""
+        from piper_plus_g2p.chinese import ChinesePhonemizer
+
+        p = ChinesePhonemizer()
+        # 'Python' -> case-sensitive loanword (2 syllables: pai4, sen1)
+        py_tokens, _ = p.phonemize_embedded_english("Python")
+        py_tones = [t for t in py_tokens if t.startswith("tone")]
+        assert len(py_tones) == 2
+
+        # 'PYTHON' -> not a loanword (case-sensitive miss), not in acronyms,
+        # falls through to letter_fallback. P,Y,T,H,O,N letters all map to
+        # at least 1 syllable each (H = 2 syllables).
+        upper_tokens, _ = p.phonemize_embedded_english("PYTHON")
+        upper_tones = [t for t in upper_tokens if t.startswith("tone")]
+        assert len(upper_tones) > len(py_tones), (
+            f"PYTHON via letter_fallback should produce more tones than "
+            f"Python via loanword. py={py_tones}, upper={upper_tones}"
+        )
+
+
+@requires_zh
+class TestPunctuationHandling:
+    """Punctuation around English tokens must not corrupt the lookup."""
+
+    def test_trailing_punctuation_ignored(self):
+        """'GPS', 'GPS,', 'GPS.', 'GPS!' all yield the same phonemes."""
+        from piper_plus_g2p.chinese import ChinesePhonemizer
+
+        p = ChinesePhonemizer()
+        bare, _ = p.phonemize_embedded_english("GPS")
+        comma, _ = p.phonemize_embedded_english("GPS,")
+        period, _ = p.phonemize_embedded_english("GPS.")
+        bang, _ = p.phonemize_embedded_english("GPS!")
+        assert bare == comma == period == bang
+
+    def test_punctuation_in_multilingual_dispatch(self):
+        """Trailing punctuation in dispatched segment doesn't change the path."""
+        from piper_plus_g2p.registry import get_phonemizer
+
+        p = get_phonemizer("zh-en")
+        a_tokens, _ = p.phonemize_with_prosody("请打开 GPS")
+        b_tokens, _ = p.phonemize_with_prosody("请打开 GPS。")
+
+        a_tones = sum(1 for t in a_tokens if t.startswith("tone"))
+        b_tones = sum(1 for t in b_tokens if t.startswith("tone"))
+        assert a_tones == b_tones, (
+            f"Punctuation should not affect tone count: {a_tones} vs {b_tones}"
+        )
+
+
+@requires_zh
+class TestMultipleEmbeddedSegments:
+    """Multiple English tokens interleaved with Chinese -- all must be embedded."""
+
+    def test_two_embedded_en_segments(self):
+        """让我用 ChatGPT 和 Python 写代码 -- both EN tokens dispatched."""
+        from piper_plus_g2p.chinese import ChinesePhonemizer
+        from piper_plus_g2p.registry import get_phonemizer
+
+        p = get_phonemizer("zh-en")
+        full_tokens, _ = p.phonemize_with_prosody(
+            "让我用 ChatGPT 和 Python 写代码"
+        )
+        # Compare against pure ZH baseline (without the EN tokens)
+        baseline_tokens, _ = ChinesePhonemizer().phonemize_with_prosody(
+            "让我用 和 写代码"
+        )
+
+        full_tones = sum(1 for t in full_tokens if t.startswith("tone"))
+        base_tones = sum(1 for t in baseline_tokens if t.startswith("tone"))
+        # ChatGPT = 5 syllables, Python = 2 syllables -> +7 tones
+        assert full_tones - base_tones == 7, (
+            f"Expected +7 tones (ChatGPT=5 + Python=2), got "
+            f"{full_tones - base_tones}"
+        )
+
+
+@requires_zh
+class TestUnknownTokenWithDigits:
+    """Digits in unknown tokens are silently dropped (no fallback entry)."""
+
+    def test_digits_dropped_in_letter_fallback(self):
+        """'Z2Z9' yields the same phonemes as 'ZZ' (digits dropped)."""
+        from piper_plus_g2p.chinese import ChinesePhonemizer
+
+        p = ChinesePhonemizer()
+        no_digit, _ = p.phonemize_embedded_english("ZZ")
+        with_digits, _ = p.phonemize_embedded_english("Z2Z9")
+        assert no_digit == with_digits, (
+            f"Digits should be dropped: ZZ={no_digit}, Z2Z9={with_digits}"
+        )
+
+    def test_registered_acronym_with_digits(self):
+        """An acronym pre-registered with digits (MP3) hits the table directly."""
+        from piper_plus_g2p.chinese import ChinesePhonemizer
+
+        p = ChinesePhonemizer()
+        # MP3 is in the default acronym table -> 4 pinyin syllables
+        tokens, _ = p.phonemize_embedded_english("MP3")
+        tones = [t for t in tokens if t.startswith("tone")]
+        assert len(tones) == 4, f"MP3 acronym should be 4 syllables, got {tones}"
+
+
+@requires_zh
+class TestProsodyAlignment:
+    """Prosody arrays must always match the phoneme array length."""
+
+    def test_embedded_english_prosody_alignment(self):
+        """Every supported input produces matching prosody and phoneme arrays."""
+        from piper_plus_g2p.chinese import ChinesePhonemizer
+
+        p = ChinesePhonemizer()
+        cases = [
+            "GPS",
+            "Python",
+            "ChatGPT",
+            "ZZ",
+            "GPS,",
+            "GPS.",
+            "MP3",
+            "Z2Z9",
+            "AB CD",
+        ]
+        for text in cases:
+            tokens, prosody = p.phonemize_embedded_english(text)
+            assert len(tokens) == len(prosody), (
+                f"Length mismatch for {text!r}: "
+                f"{len(tokens)} tokens vs {len(prosody)} prosody"
+            )
+
+    def test_dispatch_prosody_alignment(self):
+        """Multilingual dispatch path keeps prosody alignment for embedded EN."""
+        from piper_plus_g2p.registry import get_phonemizer
+
+        p = get_phonemizer("zh-en")
+        cases = [
+            "请打开 GPS",
+            "我喜欢用 Python 写代码",
+            "让我用 ChatGPT 写代码",
+            "让我用 ChatGPT 和 Python 写代码",
+            "请打开 GPS, 然后呢",
+            "GPS 在哪里",
+            "今天天气很好",  # pure zh regression
+        ]
+        for text in cases:
+            tokens, prosody = p.phonemize_with_prosody(text)
+            assert len(tokens) == len(prosody), (
+                f"Length mismatch for {text!r}: "
+                f"{len(tokens)} tokens vs {len(prosody)} prosody"
+            )
+
+
+@requires_zh
 class TestDataIntegrity:
     """Validate the bundled zh_en_loanword.json against the spec."""
 
