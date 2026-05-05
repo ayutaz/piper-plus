@@ -739,10 +739,12 @@ class PiperVoice:
             prosody = np.zeros((1, num_phonemes, 3), dtype=np.int64)
             args["prosody_features"] = prosody
 
-        # Include speaker_embedding when the model expects it. Voice cloning
-        # is not yet exposed via this entry point, so default to zeros with
-        # mask=0 — this matches the masking branch in models.py:VitsModel.infer
-        # and tells the model to fall back to the speaker_id / lid embeddings.
+        # speaker_embedding / speaker_embedding_mask are always declared by
+        # export_onnx.py as a forward-compat hook, but the bundled checkpoints
+        # are not trained for zero-shot speaker transfer (spk_proj is lazy-
+        # initialised and never sees gradients). Feed zeros with mask=0 so the
+        # torch.where branch in models.py:VitsModel.infer falls back to the
+        # trained speaker_id / lid conditioning.
         if "speaker_embedding" in input_names:
             emb_dim = 256
             for inp in self.session.get_inputs():

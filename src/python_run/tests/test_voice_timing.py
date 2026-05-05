@@ -468,11 +468,13 @@ class TestSynthesizeCoreShortText:
 class TestSpeakerEmbeddingDefaults:
     """Regression coverage for issue #385.
 
-    Models exported with voice-cloning support (e.g. tsukuyomi-chan-6lang)
-    declare ``speaker_embedding`` / ``speaker_embedding_mask`` ONNX inputs.
-    The runtime must feed default zero values with mask=0 when the caller
-    does not supply a reference embedding, otherwise ORT raises
-    ``ValueError: Required inputs (...) are missing from input feed``.
+    ``export_onnx.py`` always declares ``speaker_embedding`` and
+    ``speaker_embedding_mask`` inputs (forward-compat hook for future
+    voice-cloning training; the bundled checkpoints are not trained for
+    zero-shot transfer). The runtime must still feed those inputs to
+    satisfy ORT — zeros with ``mask=0`` — so the inference falls back
+    to the trained ``sid`` / ``lid`` conditioning. Without this, ORT
+    raises ``ValueError: Required inputs (...) are missing from input feed``.
     """
 
     def test_synthesize_passes_zero_embedding_with_mask_off(self):
