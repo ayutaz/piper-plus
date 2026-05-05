@@ -41,25 +41,31 @@ ruff format --check
 ruff format
 ```
 
-#### Pre-commit Hook (Optional)
+#### Pre-commit Hook (Optional, recommended)
 
-To automatically run Ruff before each commit:
+A `.pre-commit-config.yaml` is checked in at the repo root. Install the
+runner once and the hooks will run on every `git commit`:
 
 ```bash
 uv pip install pre-commit
 pre-commit install
 ```
 
-Create `.pre-commit-config.yaml`:
+The hooks include:
 
-```yaml
-repos:
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.8.5
-    hooks:
-      - id: ruff
-        args: [ --fix ]
-      - id: ruff-format
+- **Ruff** (`ruff` + `ruff format`) on every Python file change.
+- **PUA cross-runtime consistency** when any of the 6 runtime PUA tables
+  or `pua.json` change. Mirrors the CI gate that prevents the
+  multi-codepoint regression class (see `docs/spec/pua-contract.toml`).
+- **Test fixture drift** when `pua.json` or
+  `tests/fixtures/g2p/phoneme_test_cases.json` change. Catches the bug
+  class behind PR #389 (the bumped `pua_map_count` not matching the
+  `pua_map` dict).
+
+To run the hooks manually on the current tree:
+
+```bash
+pre-commit run --all-files
 ```
 
 ## Code Style
