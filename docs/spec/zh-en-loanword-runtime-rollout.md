@@ -319,8 +319,202 @@ PR マージの最低条件:
 
 ---
 
-## 8. 改訂履歴
+## 8. 深堀り調査結果
+
+主要な実装ブロッカーになり得る 3 項目について個別調査を実施。各項目で推奨案を確定した。
+
+### 8.1 C++ iOS/Android リソース同梱戦略
+
+**問題**: デスクトップ (Linux/macOS/Windows) は `std::ifstream` で実行時読込で OK だが、iOS xcframework / Android aar は別パターン。既存パターンの調査結果:
+
+- 現状の G2P 辞書 (`cmudict_data.json` 3.7MB, `pinyin_single.json` 704KB 等) は **Linux/macOS/Windows のみ** `share/piper/dicts/` にインストール (`PiperPlusShared.cmake:263-273`)
+- iOS/Android では `NOT PIPER_APPLE_EMBEDDED` 条件で **インストール対象外**
+- C API (`piper_plus.h:PiperPlusConfig.dict_dir`) は **呼び出し側責任**でパス指定する設計
+
+**3 案比較**:
+
+| 案 | 手法 | バイナリサイズ | 起動時間 | メンテ性 |
+|---|---|---|---|---|
+| **A** | `xxd -i` で C 配列に変換、`.h` 化して static 埋め込み | +2KB (gzip 後) | 不要 | ★★★ |
+| **B** | iOS bundle / Android assets 経由でファイル配信 | ほぼ 0 | +5-10ms | ★★ |
+| **C** | shared lib にシンボル埋め込み (`incbin` 系) | +5KB | 不要 | ★ (iOS 非対応) |
+
+**推奨**: **案 A (xxd 埋め込み)** — JSON サイズが小さい (5KB) ため埋め込みコスト低、既存パターンとの一貫性、ファイル I/O 不要、ABI 破壊なし
+
+**実装スケッチ**:
+
+```cmake
+# src/cpp/CMakeLists.txt
+if(PIPER_APPLE_EMBEDDED OR ANDROID)
+    add_custom_command(
+        OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/zh_en_loanword_data.h
+        COMMAND xxd -i -n zh_en_loanword_json
+                "${CMAKE_CURRENT_SOURCE_DIR}/data/zh_en_loanword.json"
+                > "${CMAKE_CURRENT_BINARY_DIR}/zh_en_loanword_data.h"
+        DEPENDS data/zh_en_loanword.json
+    )
+    target_sources(piper_plus PRIVATE
+        ${CMAKE_CURRENT_BINARY_DIR}/zh_en_loanword_data.h)
+    target_compile_definitions(piper_plus PRIVATE PIPER_PLUS_EMBEDDED_LOANWORD)
+endif()
+```
+
+```cpp
+// chinese_loanword.cpp
+#ifdef PIPER_PLUS_EMBEDDED_LOANWORD
+#include "zh_en_loanword_data.h"
+LoanwordData loadDefaultLoanwordData() {
+    return parseLoanwordJson(std::string(
+        reinterpret_cast<const char*>(zh_en_loanword_json),
+        zh_en_loanword_json_len
+    ));
+}
+#else
+LoanwordData loadDefaultLoanwordData(const std::string& jsonPath) {
+    std::ifstream f(jsonPath);
+    json j;
+    f >> j;
+    return parseLoanwordJson(j);
+}
+#endif
+```
+
+C API への影響: `PiperPlusConfig` 拡張不要 (デスクトップは従来通り `dict_dir` で指定、モバイルは埋め込みデータを使用)
+
+### 8.2 C# 独立実装方針
+
+**問題**: `DotNetG2P.Chinese 1.8.0` (NuGet) は外部ライブラリで改修不可。Python 側の `_pinyin_to_ipa()` 相当を C# 側に独立実装する必要がある。
+
+**Python 移植量見積**:
+
+| Python 関数/データ | LOC | C# 移植要否 |
+|------------------|-----|------------|
+| `_pinyin_to_ipa()` | ~40 | ✓ 必須 |
+| `_split_pinyin()` | ~20 | ✓ 必須 |
+| `_normalize_pinyin()` | ~20 | ✓ 必須 |
+| `_INITIAL_TO_IPA` (dict) | ~25 | ✓ 必須 (静的辞書として) |
+| `_FINAL_TO_IPA` (dict) | ~55 | ✓ 必須 (静的辞書として) |
+| `_apply_tone_sandhi()` | ~75 | ✗ **不要** (loanword は単独 syllable で sandhi 不要) |
+| `phonemize_embedded_english()` | ~60 | ✓ 必須 |
+| **合計** | **~295 行** | **~120 行** (sandhi 除外) |
+
+**3 案比較**:
+
+| 案 | 実装場所 | メリット | デメリット |
+|---|---------|--------|-----------|
+| **A** | `IChineseG2PEngine` 拡張 + `DotNetChineseG2PEngine` で実装 | Engine 一貫性 | NuGet 経由しない経路を Engine 内に持つ違和感 |
+| **B** | `Core/Phonemize/ChineseEmbeddedEnglishConverter` 独立 class | シンプル、Engine 不要 | Engine 経路と独立しすぎる |
+| **C** | `MultilingualPhonemizer` 内に直接実装 | 局所的 | 汎用性低、テスト困難 |
+
+**推奨**: **案 A (`IChineseG2PEngine` 拡張)** — Engine interface に `ConvertEmbeddedEnglish(text, loanwordData)` を追加、`DotNetChineseG2PEngine` 内に Python 移植版実装。ロジックは NuGet 経由しないが、interface としては統一。
+
+**csproj 設定 (EmbeddedResource)**:
+
+```xml
+<!-- PiperPlus.Core.csproj -->
+<ItemGroup>
+  <EmbeddedResource Include="Phonemize/Data/zh_en_loanword.json" />
+</ItemGroup>
+```
+
+```csharp
+// PiperPlus.Core/Phonemize/Data/LoanwordDataLoader.cs
+internal static class LoanwordDataLoader {
+    public static LoanwordData LoadDefault() {
+        var asm = typeof(LoanwordDataLoader).Assembly;
+        using var stream = asm.GetManifestResourceStream(
+            "PiperPlus.Core.Phonemize.Data.zh_en_loanword.json");
+        // schema validation 込みでパース
+        return ParseAndValidate(stream);
+    }
+}
+```
+
+**実装規模**: 合計 **~340 LOC** (実装 ~140 + テスト ~200)、想定 1.5 週間。
+
+### 8.3 JSON 同期 CI 戦略
+
+**問題**: 6 箇所 (Python 学習側 / Python ランタイム側 / Rust / Go / C# / WASM / C++) に同じ JSON が分散する。
+
+**既存パターン**: `pua.json` の同期は `check_pua_consistency.py` + `/check-pua` skill + pre-commit hook で実現済み (commit `3a38a61f`, `96138922`, `90ff6390`)。これを踏襲する。
+
+**4 案比較**:
+
+| 案 | 工数 | CI 速度 | 開発体験 | Windows 対応 |
+|---|-----|---------|---------|------------|
+| **A** | 各ランタイム側 unit test で byte 比較 | ★★ | 手動同期必要 | ◯ |
+| **B** | 専用 CI job で sha256 比較 | ★ | CI 報告のみ | ◯ |
+| **C** | 自動 sync スクリプト + pre-commit hook | ★★★ | ベスト | △ (CRLF 注意) |
+| **D** | symlink で single source 化 | ★ | ベスト | ✗ (Windows 非対応) |
+
+**推奨**: **案 A + B のハイブリッド** — 既存 PUA 同期戦略を踏襲しつつ、CI で hash 比較を最終ガード
+
+**段階構成**:
+
+```
+段階 1: Python 既存テスト保持 (TestRuntimeBundleSync) - 0.5h
+段階 2: 各ランタイムに schema 検証 + byte 比較テスト追加 - 3h
+段階 3: 専用 CI job で sha256 hash 比較 - 1h
+段階 4: ドキュメント / QA - 1h
+
+合計: ~5.5h
+```
+
+**新規 CI job (案)**:
+
+```yaml
+# .github/workflows/loanword-consistency.yml
+name: Loanword Dictionary Sync
+on:
+  pull_request:
+    paths:
+      - '**/zh_en_loanword.json'
+      - '.github/workflows/loanword-consistency.yml'
+jobs:
+  hash-consistency:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Verify byte-for-byte sync
+        run: |
+          SOURCE=src/python/g2p/piper_plus_g2p/data/zh_en_loanword.json
+          HASH=$(sha256sum "$SOURCE" | cut -d' ' -f1)
+          COPIES=(
+            src/python_run/piper/phonemize/data/zh_en_loanword.json
+            src/rust/piper-plus-g2p/data/zh_en_loanword.json
+            src/go/phonemize/data/zh_en_loanword.json
+            src/csharp/PiperPlus.Core/Phonemize/Data/zh_en_loanword.json
+            src/wasm/g2p/data/zh_en_loanword.json
+            src/cpp/data/zh_en_loanword.json
+          )
+          for copy in "${COPIES[@]}"; do
+            [ -f "$copy" ] || { echo "MISSING: $copy"; exit 1; }
+            COPY_HASH=$(sha256sum "$copy" | cut -d' ' -f1)
+            [ "$HASH" = "$COPY_HASH" ] || {
+              echo "MISMATCH: $copy"
+              echo "Expected: $HASH"
+              echo "Got:      $COPY_HASH"
+              exit 1
+            }
+          done
+          echo "All 6 copies match $SOURCE"
+```
+
+**新規 helper script (PUA パターン踏襲)**:
+
+```python
+# scripts/check_loanword_consistency.py (PUA 同等)
+# 使い方: python scripts/check_loanword_consistency.py [--fix]
+# --fix オプションで Python source から自動コピー
+```
+
+これで `/check-loanword` skill 化して開発者体験を向上できる (将来課題)。
+
+---
+
+## 9. 改訂履歴
 
 | 日付 | バージョン | 変更内容 | 著者 |
 |------|---------|---------|------|
-| 2026-05-06 | Draft | 初版作成 (調査結果 + 対応計画) | Claude |
+| 2026-05-06 | Draft v1 | 初版作成 (調査結果 + 対応計画) | Claude |
+| 2026-05-06 | Draft v2 | 深堀り調査 3 項目追加 (C++ iOS/Android リソース、C# 独立実装、JSON 同期 CI) | Claude |
