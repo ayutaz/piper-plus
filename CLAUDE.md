@@ -138,6 +138,10 @@ nohup /data/piper/.venv/bin/python -m piper_train \
 - **疑問詞マーカー拡張** (`japanese.py:_get_question_type`) — `?!` 強調 / `?.` 平叙 / `?~` 確認 (Issue #204)。
 - **文脈依存 N バリアント** (`japanese.py:_apply_n_phoneme_rules`) — 「ん」を後続音で 4 種に分類: N_m / N_n / N_ng / N_uvular (Issue #207)。
 
+### G2P 詳細機能 (中国語)
+
+- **ZH-EN 混在ピンイン化** (`chinese.py:phonemize_embedded_english`) — 中国語に隣接する英単語 (acronym/loanword) を米国英語ではなく Mandarin pinyin で発音。`MultilingualPhonemizer` が `[zh,en,zh]`/`[zh,en]`/`[en,zh]` パターンを自動検出してディスパッチ。辞書: `data/zh_en_loanword.json` (acronyms 65 / loanwords 40 / A-Z fallback)。カスタム上書きは `ChinesePhonemizer(zh_en_loanword_dict_paths=...)`。Python ランタイム側にも同等実装。Issue #384。
+
 ### ランタイム共通機能
 
 - **CPU 推論最適化 (Tier 1-2)** — 4 言語実装で ORT セッション設定統一、Warmup 2 回 (100 phonemes、scales=[0.667,1.0,0.8])、`.opt.onnx`+`.ok` キャッシュ、JA 音素化 LRU キャッシュ (Python のみ)。仕様: `docs/spec/ort-session-contract.toml`。CLI: `--no-warmup`。env: `PIPER_DISABLE_WARMUP`, `PIPER_DISABLE_CACHE`, `PIPER_INTRA_THREADS`。

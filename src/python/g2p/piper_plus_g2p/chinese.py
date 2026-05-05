@@ -8,8 +8,11 @@ This module produces clean IPA token lists without BOS/EOS or PUA encoding.
 Multi-character tokens (e.g. "tɕ", "tone1") are returned as-is.
 """
 
+import functools
+import json
 import logging
 import re
+from pathlib import Path
 
 from .base import Phonemizer, ProsodyInfo
 
@@ -18,9 +21,13 @@ _LOGGER = logging.getLogger(__name__)
 __all__ = [
     "phonemize_chinese",
     "phonemize_chinese_with_prosody",
+    "phonemize_embedded_english",
     "phonemize_from_pinyin_syllables",
     "ChinesePhonemizer",
 ]
+
+_DEFAULT_LOANWORD_DATA_PATH = Path(__file__).parent / "data" / "zh_en_loanword.json"
+_RE_TOKEN_SPLIT = re.compile(r"[A-Za-z0-9]+")
 
 # Punctuation mapping (Chinese -> Western equivalents)
 _ZH_PUNCT_MAP: dict[str, str] = {
@@ -596,8 +603,166 @@ def phonemize_chinese(text: str) -> list[str]:
     return phonemes
 
 
+def _load_loanword_data(path: Path | str) -> dict:
+    """Load and validate a zh-en loanword JSON file from disk.
+
+    Raises
+    ------
+    ValueError
+        If any section ("acronyms", "loanwords", "letter_fallback") is not
+        a mapping, or if any entry value is not a ``list[str]``. Without
+        this check a malformed string value would be iterated by
+        ``list.extend`` character-by-character and produce hard-to-debug
+        downstream output.
+    """
+    p = Path(path)
+    with open(p, encoding="utf-8") as f:
+        data = json.load(f)
+
+    result: dict[str, dict[str, list[str]]] = {
+        "acronyms": {},
+        "loanwords": {},
+        "letter_fallback": {},
+    }
+    for section in ("acronyms", "loanwords", "letter_fallback"):
+        section_data = data.get(section, {})
+        if not isinstance(section_data, dict):
+            raise ValueError(
+                f"{p}: section '{section}' must be a mapping, got "
+                f"{type(section_data).__name__}"
+            )
+        for key, value in section_data.items():
+            if not isinstance(value, list) or not all(
+                isinstance(v, str) for v in value
+            ):
+                raise ValueError(
+                    f"{p}: '{section}.{key}' must be list[str], got {value!r}"
+                )
+            result[section][key] = list(value)
+    return result
+
+
+@functools.cache
+def _get_default_loanword_data() -> dict:
+    """Return the bundled default zh-en loanword data (cached)."""
+    try:
+        return _load_loanword_data(_DEFAULT_LOANWORD_DATA_PATH)
+    except FileNotFoundError:
+        _LOGGER.warning(
+            "Default zh-en loanword data not found at %s; using empty tables.",
+            _DEFAULT_LOANWORD_DATA_PATH,
+        )
+        return {"acronyms": {}, "loanwords": {}, "letter_fallback": {}}
+
+
+def _merge_loanword_data(base: dict, override: dict) -> dict:
+    """Merge override on top of base. Per-section entry-level override (last wins)."""
+    merged = {
+        "acronyms": dict(base.get("acronyms", {})),
+        "loanwords": dict(base.get("loanwords", {})),
+        "letter_fallback": dict(base.get("letter_fallback", {})),
+    }
+    for section in ("acronyms", "loanwords", "letter_fallback"):
+        merged[section].update(override.get(section, {}))
+    return merged
+
+
+def phonemize_embedded_english(
+    text: str,
+    loanword_data: dict | None = None,
+) -> tuple[list[str], list[ProsodyInfo | None]]:
+    """Phonemize English text embedded in Chinese context as Mandarin pinyin.
+
+    Looks up the entire token in case-sensitive ``loanwords`` first, then in
+    uppercase ``acronyms``, and finally falls back to per-letter conversion
+    via ``letter_fallback``. Resulting pinyin syllables are converted to IPA
+    via :func:`phonemize_from_pinyin_syllables`.
+
+    Parameters
+    ----------
+    text:
+        English text segment to be pronounced as Mandarin.
+    loanword_data:
+        Optional loanword data dict (with ``acronyms``, ``loanwords``,
+        ``letter_fallback`` keys). Defaults to the bundled data.
+
+    Returns
+    -------
+    tuple[list[str], list[ProsodyInfo | None]]
+        IPA tokens and matching prosody entries.
+    """
+    if loanword_data is None:
+        loanword_data = _get_default_loanword_data()
+
+    acronyms: dict[str, list[str]] = loanword_data.get("acronyms", {})
+    loanwords: dict[str, list[str]] = loanword_data.get("loanwords", {})
+    letter_fallback: dict[str, list[str]] = loanword_data.get("letter_fallback", {})
+
+    pinyin_syllables: list[str] = []
+
+    # Tokenize: extract alphanumeric runs (drop punctuation/whitespace).
+    # Digits within a token are also skipped from letter_fallback (they are
+    # not in A-Z), but acronyms like "MP3" handle their own digits explicitly.
+    for token in _RE_TOKEN_SPLIT.findall(text):
+        if not token:
+            continue
+
+        # 1. Case-sensitive loanword (e.g. "iPhone", "ChatGPT")
+        if token in loanwords:
+            pinyin_syllables.extend(loanwords[token])
+            continue
+
+        # 2. Uppercase acronym (e.g. "GPS", "USB")
+        upper = token.upper()
+        if upper in acronyms:
+            pinyin_syllables.extend(acronyms[upper])
+            continue
+
+        # 3. Letter-by-letter fallback (digits are silently dropped unless
+        # the user explicitly added them to letter_fallback).
+        for ch in upper:
+            if ch in letter_fallback:
+                pinyin_syllables.extend(letter_fallback[ch])
+
+    if not pinyin_syllables:
+        return [], []
+
+    return phonemize_from_pinyin_syllables(pinyin_syllables, chinese_text="")
+
+
 class ChinesePhonemizer(Phonemizer):
-    """Chinese (Mandarin) phonemizer using pypinyin."""
+    """Chinese (Mandarin) phonemizer using pypinyin.
+
+    Parameters
+    ----------
+    zh_en_loanword_dict_paths:
+        Optional list of JSON paths used to override the bundled
+        zh-en loanword data. Files are merged in order, with later
+        files overriding earlier entries. Each file may contain a
+        subset of the ``acronyms``, ``loanwords``, ``letter_fallback``
+        sections.
+    """
+
+    def __init__(
+        self,
+        zh_en_loanword_dict_paths: str | list[str] | None = None,
+    ) -> None:
+        self._loanword_data = _get_default_loanword_data()
+        if zh_en_loanword_dict_paths is not None:
+            paths = (
+                [zh_en_loanword_dict_paths]
+                if isinstance(zh_en_loanword_dict_paths, str)
+                else list(zh_en_loanword_dict_paths)
+            )
+            for p in paths:
+                try:
+                    override = _load_loanword_data(p)
+                except FileNotFoundError:
+                    _LOGGER.warning("zh-en loanword override not found: %s", p)
+                    continue
+                self._loanword_data = _merge_loanword_data(
+                    self._loanword_data, override
+                )
 
     @property
     def language_code(self) -> str:
@@ -610,3 +775,9 @@ class ChinesePhonemizer(Phonemizer):
         self, text: str
     ) -> tuple[list[str], list[ProsodyInfo | None]]:
         return phonemize_chinese_with_prosody(text)
+
+    def phonemize_embedded_english(
+        self, text: str
+    ) -> tuple[list[str], list[ProsodyInfo | None]]:
+        """Phonemize English text embedded in Chinese context as Mandarin pinyin."""
+        return phonemize_embedded_english(text, loanword_data=self._loanword_data)

@@ -36,7 +36,10 @@ readme_path = this_dir / "README.md"
 if readme_path.is_file():
     long_description = readme_path.read_text(encoding="utf-8")
 
-data_files = [module_dir / "voices.json"]
+data_files = [
+    module_dir / "voices.json",
+    module_dir / "phonemize" / "data" / "zh_en_loanword.json",
+]
 
 # -----------------------------------------------------------------------------
 

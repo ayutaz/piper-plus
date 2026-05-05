@@ -49,7 +49,7 @@ en.phonemize("Hello world")
 |---|---|---|---|---|
 | Japanese | `ja` | `piper-plus-g2p[ja]` | pyopenjtalk-plus | Context-dependent N variants, prosody info |
 | English | `en` | `piper-plus-g2p[en]` | g2p-en | CMU-dict + neural fallback |
-| Chinese | `zh` | `piper-plus-g2p[zh]` | pypinyin | Pinyin-to-IPA conversion |
+| Chinese | `zh` | `piper-plus-g2p[zh]` | pypinyin | Pinyin-to-IPA, ZH-EN code-switching (loanword pinyinisation) |
 | Korean | `ko` | `piper-plus-g2p[ko]` | g2pk2 | Optional dependency |
 | Spanish | `es` | -- | Rule-based | No external dependency |
 | French | `fr` | -- | Rule-based | No external dependency |
@@ -69,6 +69,33 @@ from piper_plus_g2p import get_phonemizer
 
 multi = get_phonemizer("ja-en-zh")
 tokens = multi.phonemize("こんにちは Hello 你好")
+```
+
+### ZH-EN Code-Switching (English Inside Chinese Context)
+
+When an English token (acronym, brand, technical term) appears next
+to a Chinese segment, ``MultilingualPhonemizer`` routes it through
+``ChinesePhonemizer.phonemize_embedded_english`` so it is rendered as
+Mandarin pinyin instead of US English -- matching how Chinese
+speakers naturally pronounce inserted English words.
+
+```python
+from piper_plus_g2p import get_phonemizer
+
+multi = get_phonemizer("zh-en")
+multi.phonemize("请打开 GPS")          # GPS -> ji4-pi4-ai1-si4 (pinyin)
+multi.phonemize("我喜欢用 Python 写代码")  # Python -> pai4-sen1
+multi.phonemize("Hello world")        # No zh context -> g2p-en (unchanged)
+```
+
+Custom overrides (acronym/loanword/letter_fallback) are loaded from a
+JSON file shaped like the bundled ``data/zh_en_loanword.json``:
+
+```python
+from piper_plus_g2p.chinese import ChinesePhonemizer
+
+zh = ChinesePhonemizer(zh_en_loanword_dict_paths="my_overrides.json")
+zh.phonemize_embedded_english("MYORG")
 ```
 
 ### PiperEncoder
