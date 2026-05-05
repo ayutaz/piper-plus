@@ -20,11 +20,13 @@ install(
 )
 
 # Install phonemizer dictionaries (English CMU, Chinese Pinyin)
+# Source of truth: src/rust/piper-plus-g2p/data/ (Issue #387 — single
+# location for both Rust crate's include_bytes! and C++ install-time copy).
 install(
   FILES
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/cpp/cmudict_data.json
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/cpp/pinyin_single.json
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/cpp/pinyin_phrases.json
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/rust/piper-plus-g2p/data/cmudict_data.json
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/rust/piper-plus-g2p/data/pinyin_single.json
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/rust/piper-plus-g2p/data/pinyin_phrases.json
   DESTINATION share/piper/dicts
 )
 

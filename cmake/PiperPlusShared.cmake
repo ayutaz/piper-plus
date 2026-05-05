@@ -261,10 +261,14 @@ if(EXISTS "${CMAKE_BINARY_DIR}/oj/dic")
 endif()
 
 # --- G2P dictionaries (English CMU, Chinese Pinyin) ---
+# Source of truth lives in src/rust/piper-plus-g2p/data/ (Issue #387)
+# so the Rust crate can include them via include_str!/include_bytes! for
+# the bundled-dicts feature. The C++ runtime locates them at runtime via
+# findDictionaryFile() — install-time paths only.
 set(_g2p_dict_files
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/cpp/cmudict_data.json
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/cpp/pinyin_single.json
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/cpp/pinyin_phrases.json
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/rust/piper-plus-g2p/data/cmudict_data.json
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/rust/piper-plus-g2p/data/pinyin_single.json
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/rust/piper-plus-g2p/data/pinyin_phrases.json
 )
 foreach(_dict ${_g2p_dict_files})
   if(EXISTS "${_dict}")
