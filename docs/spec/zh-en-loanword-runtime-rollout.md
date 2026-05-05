@@ -710,10 +710,184 @@ TEST_F(ZhEnLoanwordTest, IssueExample_PleaseOpenGPS) {
 
 ---
 
+### 8.7 テストデータ統一フォーマット
+
+**問題**: 5 ランタイム × 20 ケース = **100 テスト**を独立に書くと、メンテ時に整合性ずれが起きる。一元管理したい。
+
+**既存パターン**:
+- `tests/fixtures/g2p/phoneme_test_cases.json` — Python/Rust/JS 共有 fixture (15+ ケース実例あり)
+- `docs/spec/pua-contract.toml` — 6 ランタイム PUA mapping spec
+- `scripts/check_pua_consistency.py` — entry-by-entry 比較
+- `.github/workflows/g2p-cross-platform-ci.yml` — 全ランタイム同時実行
+
+**推奨**: **共有 JSON fixture + 各ランタイム loader (案 B+D ハイブリッド)** — PUA で実証済みのパターンを踏襲
+
+```json
+// tests/fixtures/g2p/zh_en_test_matrix.json (新規)
+{
+  "version": 1,
+  "description": "ZH-EN code-switching test matrix: 20 cases × 5 runtimes",
+  "test_matrix": [
+    {
+      "id": "zh_en_001_basic",
+      "category": "basic",
+      "input": "请打开 GPS",
+      "language": "zh-en",
+      "expected_segments": [
+        {"type": "zh", "text": "请打开"},
+        {"type": "en", "text": "GPS", "loanword_match": "acronym", "expected_syllable_count": 4}
+      ],
+      "expected_properties": {"all_single_codepoint": true}
+    },
+    ...
+  ]
+}
+```
+
+**各ランタイム loader (例)**:
+
+```python
+# Python: tests/test_zh_en_unified.py
+@pytest.mark.parametrize("case", load_matrix())
+def test_case(case):
+    p = get_phonemizer(case["language"])
+    tokens, _ = p.phonemize_with_prosody(case["input"])
+    # expected_syllable_count、expected_properties をアサート
+```
+
+```rust
+// Rust: piper-plus-g2p/tests/test_zh_en_unified.rs
+#[test]
+fn test_zh_en_matrix() {
+    let matrix: Vec<TestCase> = load_fixture(".../zh_en_test_matrix.json");
+    for case in matrix { run_case(&case); }
+}
+```
+
+**新規 CI ジョブ**:
+
+```yaml
+# .github/workflows/zh-en-cross-platform-ci.yml
+zh-en-cross-platform:
+  steps:
+    - name: Python ZH-EN tests
+    - name: Rust ZH-EN tests (cargo test)
+    - name: JS/WASM ZH-EN tests (node:test)
+    - name: Cross-runtime IPA comparison
+      run: python scripts/compare_zh_en_outputs.py
+```
+
+**工数見積**: Fixture JSON 4h + 各ランタイム loader (5 × 2h) + CI 統合 3h = **~17h** (一度切り)、将来 case 追加は **+1h/case**
+
+### 8.8 Multilingual Dispatcher のエッジケース動作確定
+
+**確定したエッジケース動作テーブル** (Python 現状実装ベース):
+
+| ケース | 入力例 | セグメント | 動作 | テスト要否 |
+|--------|-------|----------|-----|----------|
+| A | `你好 Hello 世界` | `[zh,en,zh]` | embedded | ✓ 既存 |
+| B | `请打开 GPS` | `[zh,en]` | embedded | ✓ 既存 |
+| C | `GPS 在哪里` | `[en,zh]` | embedded | ✓ 既存 |
+| D | `Hello world` | `[en]` | English path | ✓ 既存 |
+| E | `こんにちは Hello 北京` | `[ja,en,zh]`* | **English path** (kana で zh が ja 化) | ⚠ 新規必須 |
+| F | `你好 Hello World 世界` | `[zh,en,zh]`** | embedded (連続 en は 1 segment 化) | ⚠ 新規 |
+| G | `你好 English 日本` | `[zh,en,ja]` | **English path** (next が ja) | ⚠ 新規必須 |
+| H | `日本 English 日本` | `[ja,en,ja]` (kana ctx) | English path | ⚠ 新規 |
+| I | `UsB` | `[en]` (1 token) | letter_fallback | - |
+| J | `请 GPS USB 打开` | `[zh,en,zh]`** (連続 en 統合) | embedded (両 token) | ⚠ 新規 |
+| K | `123` のみ | `[en]` (default fallback) | English fallback | ✓ 既存 |
+| L | `http://test.com` | `[en]` (1 segment) | English path | ⚠ 新規 |
+| M | `Ｐｙｔｈｏｎ` (全角英数) | `[en]` | English/embedded | ⚠ 新規 |
+| N | `A/B` (スラッシュ) | `[en]` (neutral 吸収) | letter_fallback | ⚠ 新規 |
+
+*\* CJK + kana 干渉**: `UnicodeLanguageDetector.detect_char` の規則で `kana ありの場合 CJK は ja 化`。**結果として ja-en-zh modeでは zh segment が出ず、embedded path 不発動**。これは設計上の制約として明記。
+
+**\*\* 連続 en の neutral 吸収**: `_segment_text_multilingual` は空白を直前言語に absorption するため `Hello World` は 1 segment。
+
+**dispatch decision tree (各ランタイム共通)**:
+
+```
+IF current_lang == "en" AND zh ∈ supported_languages:
+    prev_is_zh = i > 0 AND segments[i-1].lang == "zh"
+    next_is_zh = i+1 < len AND segments[i+1].lang == "zh"
+    IF prev_is_zh OR next_is_zh:
+        → embedded_english_path
+    ELSE:
+        → english_phonemizer_path
+ELSE:
+    → get_phonemizer(current_lang)
+```
+
+**設計上の制約 (明示すべき)**:
+
+> ja-en-zh のように **kana を含む 3 言語 mode** では、kana の存在で CJK 全体が ja 化するため、zh セグメントが生成されず embedded English の dispatch が発動しない。これは現状の `UnicodeLanguageDetector` の仕様に従う動作で、本 PR では **変更しない**。将来的に解決するなら段落単位の kana スキャン or 言語切替トークン (issue A3) が必要。
+
+**新規必須テスト** (各ランタイムで実装):
+- E: ja-en-zh で kana 化を確認
+- G: zh-en-ja で next が ja の時に English path
+- L: URL は drop されず English path
+- M: 全角英数の挙動
+
+### 8.9 エラーハンドリング統一仕様
+
+**メッセージテンプレート統一**:
+
+```
+{path}: '{section}.{key}' must be list[str], got {actual_type}
+```
+
+**各ランタイムのエラー型対応**:
+
+| ランタイム | エラー型 | 例 |
+|-----------|---------|-----|
+| Python | `ValueError` | 既存実装どおり |
+| Rust | `G2pError::LoanwordSchema { .. }` (`thiserror` 拡張) | `Err(G2pError::LoanwordSchema { path, section, key })` |
+| Go | wrapped `error` (`fmt.Errorf("%w", ...)`) | `return fmt.Errorf("zh-en loanword: '%s.%s' must be list[str]: %w", ...)` |
+| C# | `FormatException` | `throw new FormatException($"zh-en loanword: '{section}.{key}' must be list[str], got {valueType}")` |
+| JS/WASM | `Error` with `code='SCHEMA_ERROR'` | Rust 側 `JsValue::from_str("SCHEMA_ERROR: ...")` |
+| C++ | `PiperPlusStatus` enum + thread-local message | 新規 `PIPER_PLUS_ERR_LOANWORD_SCHEMA = -7` |
+
+**ケース別の挙動統一**:
+
+| ケース | 全ランタイム共通の挙動 |
+|-------|---------------------|
+| **default file 欠損** | warning ログ + 空辞書 fallback (silent degrade) |
+| **override file 欠損** | error / 例外 (呼び出し側に明示) |
+| **malformed JSON** | error / 例外 (parse error wrap) |
+| **schema violation** | error / 例外 (パス + 違反箇所を含むメッセージ) |
+| **空 sections** | OK (空辞書として扱う) |
+
+**C API 拡張**:
+
+```c
+// piper_plus.h に追加
+typedef enum PiperPlusStatus {
+    PIPER_PLUS_OK = 0,
+    /* 既存 */
+    PIPER_PLUS_ERR_LOANWORD_SCHEMA = -7,  // schema violation
+    PIPER_PLUS_ERR_LOANWORD_IO = -8,       // file missing/unreadable
+} PiperPlusStatus;
+
+PIPER_PLUS_API const char* piper_plus_get_last_error(void);
+```
+
+**ログレベルガイドライン**:
+
+| 状況 | ログレベル |
+|------|----------|
+| default file 欠損 | warning |
+| override file 欠損 | warning |
+| 空セクション | debug |
+| 正常ロード成功 | debug |
+| schema violation | (例外メッセージで十分、log 不要) |
+
+---
+
 ## 9. 改訂履歴
 
 | 日付 | バージョン | 変更内容 | 著者 |
 |------|---------|---------|------|
 | 2026-05-06 | Draft v1 | 初版作成 (調査結果 + 対応計画) | Claude |
 | 2026-05-06 | Draft v2 | 深堀り調査 3 項目追加 (C++ iOS/Android リソース、C# 独立実装、JSON 同期 CI) | Claude |
-| 2026-05-06 | Draft v3 | 深堀り調査 3 項目追加 (JS/WASM 二層 FFI、Rust crate 重複問題、C++ テストフレーム拡充) — 重要発見: Rust は 2 箇所実装必要、工数 ~400→~600 行に修正 | Claude |
+| 2026-05-06 | Draft v3 | 深堀り調査 3 項目追加 (JS/WASM 二層 FFI、Rust crate 重複問題、C++ テストフレーム拡充) — 重要発見: Rust は 2 箇所実装必要、工数 ~400→~600 行 | Claude |
+| 2026-05-06 | Draft v4 | 深堀り調査 3 項目追加 (テストデータ統一フォーマット、Multilingual dispatcher エッジケース、エラーハンドリング統一仕様) | Claude |
