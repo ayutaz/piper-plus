@@ -140,6 +140,13 @@ def get_providers(device: str = "auto") -> list[str | tuple[str, dict]]:
         for ep in _EP_AUTO_PRIORITY:
             if ep in available:
                 _LOGGER.info("Auto-selected execution provider: %s", ep)
+                if ep == "CoreMLExecutionProvider":
+                    # MLProgram format を使うことで推論失敗時に SIGSEGV ではなく
+                    # Python 例外が発生し、_probe_session() による CPU フォールバックが機能する。
+                    return [
+                        (ep, {"ModelFormat": "MLProgram"}),
+                        "CPUExecutionProvider",
+                    ]
                 return [ep, "CPUExecutionProvider"]
         return ["CPUExecutionProvider"]
 
@@ -161,6 +168,10 @@ def get_providers(device: str = "auto") -> list[str | tuple[str, dict]]:
             (ep_name, {"device_id": str(device_id), "cudnn_conv_algo_search": "HEURISTIC"}),
             "CPUExecutionProvider",
         ]
+    if provider_key == "coreml":
+        # MLProgram format: 推論失敗時に SIGSEGV ではなく Python 例外になるため
+        # _probe_session() による CPU フォールバックが機能する。
+        return [(ep_name, {"ModelFormat": "MLProgram"}), "CPUExecutionProvider"]
     if provider_key in ("directml", "tensorrt"):
         return [(ep_name, {"device_id": str(device_id)}), "CPUExecutionProvider"]
     return [ep_name, "CPUExecutionProvider"]
@@ -218,6 +229,49 @@ def _build_cache_paths(model_path: str | Path, device_label: str) -> tuple[Path,
     cache_path = model_p.with_suffix(f".{device_label}.opt.onnx")
     sentinel_path = Path(str(cache_path) + ".ok")
     return cache_path, sentinel_path
+
+
+_PROBE_PHONEME_LENGTHS = (6, 100)
+"""短い入力と標準入力の両方でプローブする。
+
+VITS SDP の NonZero op はテキストが短い場合（6 phonemes 程度）にゼロ要素の
+動的形状を生成しやすい。CoreML EP はこれを非対応のため推論時に失敗する。
+100 phonemes だけでは失敗しないケースがあるため、両長でプローブする。
+"""
+
+
+def _probe_session(session: onnxruntime.InferenceSession) -> bool:
+    """ダミー推論で EP が正常動作するか確認する。True = 成功。
+
+    CoreML EP はセッション作成には成功するが、VITS Duration Predictor の
+    NonZero op + ゼロ要素動的形状で推論時にエラーになる既知の制限がある。
+    このプローブでその失敗を早期検出し、CPU へのフォールバックを可能にする。
+    複数の phoneme 長でプローブし、いずれかが失敗したら False を返す。
+    """
+    try:
+        input_names = {inp.name for inp in session.get_inputs()}
+        for ph_len in _PROBE_PHONEME_LENGTHS:
+            phoneme_ids = np.full((1, ph_len), 8, dtype=np.int64)
+            phoneme_ids[0, 0] = 1  # BOS
+            phoneme_ids[0, -1] = 2  # EOS
+            inputs: dict[str, np.ndarray] = {
+                "input": phoneme_ids,
+                "input_lengths": np.array([ph_len], dtype=np.int64),
+                "scales": np.array([0.667, 1.0, 0.8], dtype=np.float32),
+            }
+            if "sid" in input_names:
+                inputs["sid"] = np.array([0], dtype=np.int64)
+            if "lid" in input_names:
+                inputs["lid"] = np.array([0], dtype=np.int64)
+            if "prosody_features" in input_names:
+                inputs["prosody_features"] = np.zeros(
+                    (1, ph_len, 3), dtype=np.int64
+                )
+            session.run(None, inputs)
+        return True
+    except Exception as exc:
+        _LOGGER.debug("EP probe failed: %s", exc)
+        return False
 
 
 # NOTE: voice.py (python_run) にインライン複製あり。変更時は両方更新すること
@@ -289,9 +343,12 @@ def create_session_with_cache(
             pass
 
     # First run or cache rebuild
+    # NOTE: CoreML など非 CPU EP はコンパイル済みノードを含むモデルを
+    # シリアライズできないため、optimized_model_filepath を設定するのは
+    # CPU EP のみに限定する。
     _cache_requested = False
     cache_dir = cache_path.parent
-    if os.access(cache_dir, os.W_OK):
+    if providers[0] == "CPUExecutionProvider" and os.access(cache_dir, os.W_OK):
         try:
             opts.optimized_model_filepath = str(cache_path)
             _cache_requested = True
@@ -301,6 +358,11 @@ def create_session_with_cache(
                 cache_path,
                 exc,
             )
+    elif providers[0] != "CPUExecutionProvider":
+        _LOGGER.debug(
+            "Skipping ORT cache for non-CPU EP (%s): compiled nodes cannot be serialized",
+            providers[0],
+        )
     else:
         _LOGGER.info(
             "Model directory %s is not writable, skipping ORT cache", cache_dir
@@ -317,6 +379,24 @@ def create_session_with_cache(
             _LOGGER.info("Cache sentinel written: %s", sentinel_path)
         except OSError as exc:
             _LOGGER.warning("Failed to write sentinel %s: %s", sentinel_path, exc)
+
+    # EP フォールバック: CoreML など非 CPU EP はセッション作成後も推論時に
+    # 失敗することがある（例: VITS Duration Predictor の NonZero + ゼロ要素動的形状
+    # は CoreML EP 非対応）。プローブで早期検出し CPU EP で再作成する。
+    if providers[0] != "CPUExecutionProvider" and not _probe_session(session):
+        _LOGGER.warning(
+            "EP probe failed (providers=%s) — falling back to CPUExecutionProvider",
+            providers,
+        )
+        cpu_opts = create_session_options(
+            intra_op_threads=intra_op_threads,
+            inter_op_threads=inter_op_threads,
+        )
+        session = onnxruntime.InferenceSession(
+            str(model_path),
+            sess_options=cpu_opts,
+            providers=["CPUExecutionProvider"],
+        )
 
     return session
 

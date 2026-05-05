@@ -105,3 +105,28 @@ device_label_tensorrt_format = "tensorrt{device_id}"
 #                        Rust    C#     C++    Python   Go
 # ep env var             ✓       ✓      ✓      ✓        ✓
 # openvino ep            -       -      -      ✓        -
+
+# --- EP 既知制限 ---
+
+[execution_provider.known_limitations]
+
+# CoreML EP (macOS / iOS)
+# VITS モデルの Duration Predictor は Stochastic Duration Predictor (SDP) の
+# flows に NonZero op を含む。推論時に SDP の一部が shape {-1,-1} → {3,0}
+# (ゼロ要素) になるケースがあり、CoreML EP はゼロ要素テンソルを非対応のため
+# onnxruntime.capi.onnxruntime_pybind11_state.Fail で失敗する。
+#
+# 対処: Python runtime は create_session_with_cache() 内で _probe_session() を
+#       実行し、失敗時に自動的に CPUExecutionProvider へフォールバックする。
+#       他ランタイム (Rust / Go / C# / C++) は現時点で同等のフォールバックなし。
+#
+# 根本解決: モデルエクスポート時に SDP の NonZero をゼロ要素非生成パスに変更する
+#           か、ORT の CoreML EP が shape {0} をサポートするまで待つ。
+#
+# ORT issue ref: CoreML EP — "CoreML does not support shapes with dimension
+#                values of 0" / "runtime shape has zero elements"
+coreml_vits_sdp_nonzero = """
+CoreML EP fails on VITS SDP NonZero op when output shape contains zero elements.
+Python: auto-fallback to CPU via _probe_session().
+Other runtimes: known limitation, falls back naturally if CoreML unavailable.
+"""
