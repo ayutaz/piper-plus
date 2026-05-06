@@ -1314,6 +1314,177 @@ zh-en-loanword-sync  → JSON 同期忘れ (gate)
 
 ---
 
+### 8.16 メモリ管理戦略
+
+**各ランタイムの推奨パターン**:
+
+| ランタイム | 推奨 lifecycle | 共有方式 | IDisposable |
+|-----------|--------------|--------|-----------|
+| Rust | `OnceLock<Arc<LoanwordData>>` | `Arc::clone()` で zero-copy 共有 | — |
+| Go | package-level `sync.Once` + global var | immutable design、各 instance が参照 | — |
+| C# | `static Lazy<LoanwordData>` | thread-safe 自動共有 | **不要** (managed dict のみ) |
+| C++ | `std::shared_ptr<const LoanwordData>` | factory 関数で reference 増加 | — |
+| WASM/JS | Rust 側で byte copy → 内部保持 | JS 側からは fire-and-forget | — |
+
+**実装スケッチ**:
+
+```rust
+// Rust: 推奨パターン
+static BUILTIN_LOANWORD: OnceLock<Arc<LoanwordData>> = OnceLock::new();
+
+pub fn default_loanword_data() -> Arc<LoanwordData> {
+    Arc::clone(BUILTIN_LOANWORD.get_or_init(|| {
+        Arc::new(load_and_validate_default())
+    }))
+}
+
+// 複数 ChinesePhonemizer インスタンスで共有
+let phonemizer1 = ChinesePhonemizer::new(default_loanword_data());
+let phonemizer2 = ChinesePhonemizer::new(default_loanword_data());
+// → 内部 Arc<LoanwordData> は同一 (zero-copy 共有)
+```
+
+```csharp
+// C#: 推奨パターン
+public class ChinesePhonemizer {
+    private static readonly Lazy<LoanwordData> s_default =
+        new(() => LoanwordDataLoader.LoadDefault(), LazyThreadSafetyMode.ExecutionAndPublication);
+    
+    public ChinesePhonemizer(string? customPath = null) {
+        _data = customPath == null ? s_default.Value : LoadAndMerge(customPath);
+    }
+}
+// → IDisposable 不要 (LoanwordData は managed のみ、GC で解放)
+```
+
+**カスタム辞書のメモリ overhead**:
+
+- default + override マージ後は **インスタンス毎に独立コピー** (~10-50 KB/インスタンス)
+- 実用上は server プロセスで 1-2 個程度なので問題なし
+- 大量インスタンス生成シナリオ (test 等) では LRU cache の実装余地あり (Phase 2)
+
+**メモリ overhead 見積**:
+
+```
+LoanwordData (default):
+  acronyms (65)        ~3 KB
+  loanwords (40)       ~2 KB
+  letter_fallback (26) ~1 KB
+  ───────────────────────
+  Total                ~6 KB (struct 化後 ~20 KB)
+```
+
+100 インスタンス共有でも default は 1 つだけ → **総メモリ ~20 KB** (Arc 共有の効果)
+
+### 8.17 i18n / 多言語ペア拡張性
+
+**現状**: ZH-EN のみ対応。将来 JA-EN / KO-EN / ES-EN 等に拡張する可能性。
+
+**3 段階拡張ロードマップ**:
+
+| Phase | 対象 | ファイル構成 | スキーマ |
+|-------|-----|-----------|---------|
+| **本 PR (現在)** | ZH-EN | `data/zh_en_loanword.json` | v1 (現行) |
+| **6 ヶ月後 (フォローアップ)** | JA-EN 等追加 | `data/loanword/{src}_{tgt}.json` | v1 (構造同一) |
+| **2 年後+ (必要なら)** | 多ペア統合 | `data/loanword.json` (`pairs: { ... }`) | v2 (構造変更) |
+
+**推奨**: **Phase 1 (本 PR) は現状の `zh_en_loanword.json` 維持**、Phase 2 で必要に応じて `data/loanword/` ディレクトリ化
+
+**スキーマに `language_pair` field 追加 (任意、Phase 2 で必須化)**:
+
+```json
+{
+  "version": 1,
+  "language_pair": "zh-en",        // ← 推奨: 早期に追加 (option)
+  "description": "...",
+  "acronyms": { ... },
+  "loanwords": { ... },
+  "letter_fallback": { ... }
+}
+```
+
+**既存 `swedish.py` の `loanword_suffix` との概念衝突**: なし (スウェーデン語の loanword は外来語の発音規則、本機能は外来語 → 中国語発音、スコープが異なる)
+
+**他言語処理の現状**:
+
+| 言語 | 現状 | 同種機能の必要性 |
+|------|------|-----------------|
+| 日本語 (ja) | OpenJTalk が外来語 (カタカナ) を自動処理 | 個別の英単語埋め込み辞書あれば改善余地 (将来課題) |
+| 韓国語 (ko) | g2pk2 + Hangul 分解 | 英単語特別処理なし、JA-EN 同様 (将来課題) |
+| ES/PT/FR/SV | 規則ベース | 各言語で同様の loanword 辞書を作る余地あり |
+
+### 8.18 セキュリティ考慮事項
+
+**脅威モデル**:
+
+| 脅威 | 影響 | 緩和策 |
+|------|------|--------|
+| 巨大 JSON (DoS) | メモリ枯渇 | サイズ上限 **1 MB** |
+| ネスト過深 (parser DoS) | stack overflow | depth 制限 **100** |
+| symbolic link (path traversal) | ファイル領域外アクセス | `resolve()` + warning log |
+| 大量エントリ (10K+) | hash table 巨大化 | エントリ数上限 **10,000** |
+| 不正な pinyin syllable | IPA 変換失敗 | schema validation (8.9 で対応済) |
+| PUA codepoint 注入 | token encoding 破損 | input sanitization |
+
+**既存パターンの踏襲**: `custom_dict.py:13` の `MAX_DICT_FILE_SIZE = 10 * 1024 * 1024` (10 MB) と同等のガードを zh_en_loanword にも適用。
+
+**推奨ガード値**:
+
+```python
+# 全ランタイム共通仕様
+MAX_LOANWORD_FILE_SIZE = 1 * 1024 * 1024   # 1 MB (default JSON は ~6 KB)
+MAX_LOANWORD_ENTRIES = 10_000               # default 合計 ~131 entries
+MAX_LOANWORD_DEPTH = 100                    # default 最深 3 層
+```
+
+**各ランタイム JSON parser 安全性**:
+
+| ランタイム | デフォルト nest 制限 | 追加対策 |
+|-----------|------------------|---------|
+| Python `json` | 1,000 | サイズ check |
+| Rust `serde_json` | 安全 | サイズ check |
+| Go `encoding/json` | 10,000 | `io.LimitReader` でサイズ check |
+| C# `System.Text.Json` | 64 | `JsonSerializerOptions.MaxDepth` 設定 |
+| C++ `nlohmann/json` | **無制限** ⚠️ | recursion 制限を明示的に設定 |
+| JS `JSON.parse` | stack-based | サイズ check + try/catch |
+
+**実装スケッチ (Python 共通モジュール案)**:
+
+```python
+def _safe_load_json(
+    path: str,
+    *,
+    max_size_bytes: int = MAX_LOANWORD_FILE_SIZE,
+    max_entries: int = MAX_LOANWORD_ENTRIES,
+) -> dict:
+    p = Path(path).resolve()
+    if str(p) != str(Path(path).absolute()):
+        _LOGGER.warning("Path resolved via symlink: %s -> %s", path, p)
+    size = p.stat().st_size
+    if size > max_size_bytes:
+        raise ValueError(f"{path}: file too large: {size} > {max_size_bytes}")
+    with open(p, encoding="utf-8") as f:
+        data = json.load(f)
+    total = sum(len(data.get(s, {})) for s in ("acronyms","loanwords","letter_fallback"))
+    if total > max_entries:
+        raise ValueError(f"{path}: too many entries: {total} > {max_entries}")
+    return data
+```
+
+**`custom_dict.py` の既存パターンとの共通化**:
+
+将来 `_safe_load_json` を共通モジュール化検討 (Phase 2)。本 PR では各ランタイムで個別実装。
+
+**実装優先度**:
+
+| Tier | 項目 | 必須度 |
+|------|------|--------|
+| Tier 1 (本 PR) | サイズ上限、symbolic link 警告、schema validation | **必須** |
+| Tier 2 (本 PR) | エントリ数上限、JSON depth 制限 | **必須** |
+| Tier 3 (フォローアップ) | 共通 `_safe_load_json` モジュール化 | 任意 |
+
+---
+
 ## 9. 改訂履歴
 
 | 日付 | バージョン | 変更内容 | 著者 |
@@ -1324,3 +1495,4 @@ zh-en-loanword-sync  → JSON 同期忘れ (gate)
 | 2026-05-06 | Draft v4 | 深堀り 3 項目追加 (テストデータ統一、dispatcher エッジケース、エラーハンドリング統一) | Claude |
 | 2026-05-06 | Draft v5 | 深堀り 3 項目追加 (Go embed/JSON tag、リリース戦略、後方互換性 + opt-out flag) — 計 12 項目で実装フェーズ移行可能 | Claude |
 | 2026-05-07 | Draft v6 | 深堀り 3 項目追加 (パフォーマンス目標 <100μs、C++ thread safety with shared_ptr<const>、CI ジョブ整合性 +2分) | Claude |
+| 2026-05-07 | Draft v7 | 深堀り 3 項目追加 (メモリ管理: Arc/Lazy/shared_ptr、i18n 拡張: data/loanword/ ディレクトリ化、セキュリティ: 1MB/10K entry/depth 100 のガード) | Claude |
