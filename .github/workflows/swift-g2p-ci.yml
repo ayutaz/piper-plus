@@ -1,0 +1,221 @@
+name: "Swift G2P CI"
+
+# PR-stage smoke check for the PiperPlusG2P SPM product (Issue #387).
+#
+# The release Package.swift uses URL-based `binaryTarget`s that don't exist
+# before tag publication, which makes `swift test` impossible for the Swift
+# wrapper before a release lands. This workflow:
+#
+#   1. Builds piper-plus-g2p as a macOS staticlib (universal arm64 + x86_64).
+#   2. Generates the C header via cbindgen.
+#   3. Assembles a local macOS xcframework.
+#   4. Replaces the release Package.swift with a G2P-only CI manifest that
+#      points PiperPlusG2PBinary at the locally built xcframework.
+#   5. Runs `swift test --filter PiperPlusG2PTests` against the real Rust
+#      FFI, exercising PhonemizerTests, GoldenPhonemeTests, and
+#      ConcurrencyTests.
+#
+# The release manifest is overwritten in-place; this is safe because the CI
+# workspace is ephemeral and the change is never committed back. See
+# docs/spec/swift-g2p-decisions.md (Resolution Summary, follow-up D-10).
+
+on:
+  push:
+    branches: [dev, main]
+    paths:
+      - 'src/rust/piper-plus-g2p/**'
+      - 'Sources/PiperPlusG2P/**'
+      - 'tests/PiperPlusG2PTests/**'
+      - 'tests/fixtures/g2p/**'
+      - 'Package.swift'
+      - '.github/workflows/swift-g2p-ci.yml'
+  pull_request:
+    paths:
+      - 'src/rust/piper-plus-g2p/**'
+      - 'Sources/PiperPlusG2P/**'
+      - 'tests/PiperPlusG2PTests/**'
+      - 'tests/fixtures/g2p/**'
+      - 'Package.swift'
+      - '.github/workflows/swift-g2p-ci.yml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  swift-test:
+    name: swift test (PiperPlusG2PTests, macOS)
+    runs-on: macos-15
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Toolchain versions
+        run: |
+          swift --version
+          xcodebuild -version
+          rustc --version
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - name: Cache cargo registry + target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            src/rust/target
+          key: swift-g2p-mac-${{ hashFiles('src/rust/Cargo.lock', 'src/rust/piper-plus-g2p/Cargo.toml') }}
+          restore-keys: |
+            swift-g2p-mac-
+
+      - name: Cache cbindgen
+        uses: actions/cache@v4
+        id: cbindgen-cache
+        with:
+          path: ~/.cargo/bin/cbindgen
+          key: cbindgen-v0.29.2-${{ runner.os }}
+
+      - name: Install cbindgen
+        if: steps.cbindgen-cache.outputs.cache-hit != 'true'
+        run: cargo install cbindgen --version 0.29.2 --locked
+
+      - name: Build piper-plus-g2p staticlib (universal macOS)
+        working-directory: src/rust
+        env:
+          CARGO_INCREMENTAL: "0"
+        run: |
+          set -euo pipefail
+          for target in aarch64-apple-darwin x86_64-apple-darwin; do
+            echo "=== Building $target ==="
+            cargo build \
+              -p piper-plus-g2p \
+              --target "$target" \
+              --release \
+              --features all-languages,naist-jdic,bundled-dicts,ffi
+          done
+          mkdir -p ../../build-mac/macos
+          lipo -create \
+            target/aarch64-apple-darwin/release/libpiper_plus_g2p.a \
+            target/x86_64-apple-darwin/release/libpiper_plus_g2p.a \
+            -output ../../build-mac/macos/libpiper_plus_g2p.a
+          echo "=== archs ==="
+          lipo -archs ../../build-mac/macos/libpiper_plus_g2p.a
+          echo "=== size ==="
+          ls -la ../../build-mac/macos/libpiper_plus_g2p.a
+
+      - name: Generate C header (cbindgen)
+        run: |
+          set -euo pipefail
+          cd src/rust/piper-plus-g2p
+          cbindgen \
+            --config cbindgen.toml \
+            --crate piper-plus-g2p \
+            --output ../../../build-mac/macos/piper_plus_g2p.h
+          echo "=== header preview ==="
+          head -40 ../../../build-mac/macos/piper_plus_g2p.h
+          # Verify all 5 FFI symbols appear in the generated header.
+          for sym in \
+            piper_plus_g2p_create \
+            piper_plus_g2p_phonemize \
+            piper_plus_g2p_free_string \
+            piper_plus_g2p_free \
+            piper_plus_g2p_available_languages
+          do
+            grep -q "$sym" ../../../build-mac/macos/piper_plus_g2p.h \
+              || { echo "::error::cbindgen output missing symbol: $sym"; exit 1; }
+          done
+          # Verify the same symbols are exported by the staticlib.
+          echo "=== nm symbols ==="
+          nm -gU ../../../build-mac/macos/libpiper_plus_g2p.a 2>/dev/null \
+            | grep -E '_piper_plus_g2p_(create|phonemize|free|free_string|available_languages)' \
+            | sort -u
+
+      - name: Stage Headers + module.modulemap
+        run: |
+          set -euo pipefail
+          mkdir -p build-mac/Headers
+          cp build-mac/macos/piper_plus_g2p.h build-mac/Headers/
+          cat > build-mac/Headers/module.modulemap <<'MODULEMAP'
+          module PiperPlusG2PBinary {
+              header "piper_plus_g2p.h"
+              export *
+              link "piper_plus_g2p"
+          }
+          MODULEMAP
+
+      - name: Assemble local macOS xcframework
+        run: |
+          set -euo pipefail
+          rm -rf build-mac/piper_plus_g2p.xcframework
+          xcodebuild -create-xcframework \
+            -library build-mac/macos/libpiper_plus_g2p.a \
+            -headers build-mac/Headers \
+            -output build-mac/piper_plus_g2p.xcframework
+          echo "=== xcframework contents ==="
+          find build-mac/piper_plus_g2p.xcframework
+
+      - name: Replace Package.swift with G2P-only CI manifest
+        run: |
+          set -euo pipefail
+          # The release Package.swift declares PiperPlus + PiperPlusG2P with
+          # iOS-only platform support and URL-based binaryTargets pointing
+          # at unreleased GitHub assets. We replace it with a minimal
+          # macOS-only manifest that consumes the locally built xcframework
+          # so PiperPlusG2PTests can actually run pre-release.
+          cat > Package.swift <<'PACKAGE'
+          // swift-tools-version: 5.9
+          //
+          // CI-only Package.swift — replaces the release manifest in
+          // .github/workflows/swift-g2p-ci.yml. Do NOT commit this file
+          // in this form; the workflow regenerates it per run.
+          //
+          // The release Package.swift uses URL-based binaryTargets that
+          // don't exist before tag publication, making pre-release
+          // `swift test` impossible. This minimal manifest:
+          //   - drops PiperPlus (synthesis engine, ORT, iOS-only)
+          //   - keeps PiperPlusG2P + tests
+          //   - points PiperPlusG2PBinary at build-mac/piper_plus_g2p.xcframework
+          //     produced earlier in this workflow
+          import PackageDescription
+
+          let package = Package(
+              name: "PiperPlusG2PTest",
+              platforms: [.macOS(.v13)],
+              products: [
+                  .library(name: "PiperPlusG2P", targets: ["PiperPlusG2P"]),
+              ],
+              targets: [
+                  .target(
+                      name: "PiperPlusG2P",
+                      dependencies: [.target(name: "PiperPlusG2PBinary")],
+                      path: "Sources/PiperPlusG2P"
+                  ),
+                  .binaryTarget(
+                      name: "PiperPlusG2PBinary",
+                      path: "build-mac/piper_plus_g2p.xcframework"
+                  ),
+                  .testTarget(
+                      name: "PiperPlusG2PTests",
+                      dependencies: ["PiperPlusG2P"],
+                      path: "tests/PiperPlusG2PTests"
+                  ),
+              ]
+          )
+          PACKAGE
+          echo "=== Package.swift (CI override) ==="
+          cat Package.swift
+
+      - name: Run Swift tests
+        run: |
+          set -euo pipefail
+          swift test --filter PiperPlusG2PTests 2>&1 | tee swift-test.log
+          # Surface a one-line summary at the end so the workflow log is
+          # easier to scan when scrolling through.
+          echo "=== summary ==="
+          grep -E "Test Suite '.*' passed|Test Suite '.*' failed|Executed [0-9]+ tests?" swift-test.log | tail -10 || true

@@ -600,6 +600,152 @@ mod tests {
             piper_plus_g2p_free(handle);
         }
     }
+
+    // -----------------------------------------------------------------------
+    // default_languages() — feature-gated default set (commit 44008b8)
+    // -----------------------------------------------------------------------
+
+    #[test]
+    #[cfg(all(
+        feature = "all-languages",
+        feature = "naist-jdic",
+        feature = "bundled-dicts"
+    ))]
+    fn test_default_languages_full_feature_set() {
+        // With all-languages + naist-jdic + bundled-dicts (the iOS xcframework
+        // build configuration), default_languages() must return all 8.
+        let langs = default_languages();
+        assert_eq!(
+            langs.len(),
+            8,
+            "expected 8 default languages with full feature set, got {langs:?}"
+        );
+        for expected in &["en", "es", "fr", "pt", "sv", "ko", "zh", "ja"] {
+            assert!(
+                langs.contains(expected),
+                "default_languages() missing {expected}: {langs:?}"
+            );
+        }
+    }
+
+    #[test]
+    #[cfg(any(feature = "english", feature = "spanish"))]
+    fn test_default_languages_includes_rule_based_when_features_on() {
+        // Whatever subset of features is enabled, the rule-based languages
+        // present in the build must appear in defaults (no path lookup needed).
+        let langs = default_languages();
+        #[cfg(feature = "english")]
+        assert!(langs.contains(&"en"), "en missing: {langs:?}");
+        #[cfg(feature = "spanish")]
+        assert!(langs.contains(&"es"), "es missing: {langs:?}");
+        #[cfg(feature = "french")]
+        assert!(langs.contains(&"fr"), "fr missing: {langs:?}");
+        #[cfg(feature = "portuguese")]
+        assert!(langs.contains(&"pt"), "pt missing: {langs:?}");
+        #[cfg(feature = "swedish")]
+        assert!(langs.contains(&"sv"), "sv missing: {langs:?}");
+        #[cfg(feature = "korean")]
+        assert!(langs.contains(&"ko"), "ko missing: {langs:?}");
+    }
+
+    #[test]
+    #[cfg(all(feature = "chinese", not(feature = "bundled-dicts")))]
+    fn test_default_languages_excludes_zh_without_bundled_dicts() {
+        // Without bundled-dicts, ChinesePhonemizer cannot self-init from a
+        // path on iOS. default_languages() must NOT include "zh" so that
+        // piper_plus_g2p_create(NULL) does not return NULL on every iOS app.
+        let langs = default_languages();
+        assert!(
+            !langs.contains(&"zh"),
+            "zh must not be in default without bundled-dicts: {langs:?}"
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // register_one() — error paths (commit 44008b8 added cfg gating)
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_register_one_unsupported_language() {
+        let mut registry = PhonemizerRegistry::new();
+        let err = register_one(&mut registry, "xx").expect_err("xx must fail");
+        match err {
+            crate::G2pError::UnsupportedLanguage { code } => {
+                assert_eq!(code, "xx");
+            }
+            other => panic!("expected UnsupportedLanguage, got {other:?}"),
+        }
+    }
+
+    #[test]
+    #[cfg(all(feature = "chinese", not(feature = "bundled-dicts")))]
+    fn test_register_one_zh_without_bundled_dicts_returns_phonemize_error() {
+        // The path-based zh path is intentionally an error in register_one
+        // because we cannot reasonably ship JSON files alongside an iOS app.
+        let mut registry = PhonemizerRegistry::new();
+        let err =
+            register_one(&mut registry, "zh").expect_err("zh without bundled-dicts must fail");
+        assert!(matches!(err, crate::G2pError::Phonemize(_)));
+    }
+
+    #[test]
+    #[cfg(feature = "english")]
+    fn test_register_one_en_succeeds() {
+        let mut registry = PhonemizerRegistry::new();
+        register_one(&mut registry, "en").expect("en must register");
+        assert!(registry.get("en").is_some(), "en should be queryable");
+    }
+
+    #[test]
+    #[cfg(feature = "korean")]
+    fn test_register_one_ko_rule_based_succeeds() {
+        // ko is rule-based, no dict needed — must always work when the
+        // korean feature is enabled.
+        let mut registry = PhonemizerRegistry::new();
+        register_one(&mut registry, "ko").expect("ko must register");
+        assert!(registry.get("ko").is_some());
+    }
+
+    #[test]
+    #[cfg(all(feature = "naist-jdic", feature = "bundled-dicts"))]
+    fn test_register_one_ja_with_naist_jdic_succeeds() {
+        let mut registry = PhonemizerRegistry::new();
+        register_one(&mut registry, "ja").expect("ja must register with naist-jdic");
+        assert!(registry.get("ja").is_some());
+    }
+
+    // -----------------------------------------------------------------------
+    // create(NULL) returns the same set as default_languages()
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_create_null_yields_default_set() {
+        unsafe {
+            let handle = piper_plus_g2p_create(std::ptr::null());
+            assert!(
+                !handle.is_null(),
+                "NULL languages should yield default handle"
+            );
+            let avail_ptr = piper_plus_g2p_available_languages(handle);
+            assert!(!avail_ptr.is_null());
+            let avail = CStr::from_ptr(avail_ptr).to_str().unwrap();
+            let avail_set: Vec<&str> = avail.split(',').filter(|s| !s.is_empty()).collect();
+            let expected = default_languages();
+            assert_eq!(
+                avail_set.len(),
+                expected.len(),
+                "available langs ({avail_set:?}) must match default_languages() ({expected:?})"
+            );
+            for lang in &expected {
+                assert!(
+                    avail_set.contains(lang),
+                    "available langs missing {lang}: {avail:?}"
+                );
+            }
+            piper_plus_g2p_free_string(avail_ptr);
+            piper_plus_g2p_free(handle);
+        }
+    }
 }
 
 /// Default languages for `piper_plus_g2p_create(NULL)`.
@@ -612,7 +758,7 @@ mod tests {
 /// because path-based init would otherwise fail at runtime on iOS.
 /// `ja` requires either `naist-jdic` (bundled NAIST-JDIC) or
 /// `japanese` + `bundled-dicts`.
-#[allow(unused_mut)]
+#[allow(unused_mut, clippy::vec_init_then_push)]
 fn default_languages() -> Vec<&'static str> {
     let mut langs: Vec<&'static str> = Vec::new();
     #[cfg(feature = "english")]

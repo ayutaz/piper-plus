@@ -4,6 +4,19 @@ on:
   push:
     tags:
       - 'v[0-9]*'
+  # PR triggers cover only the G2P iOS jobs (build-g2p-ios +
+  # assemble-g2p-xcframework). All other jobs and the release job remain
+  # gated to push (tags) / workflow_dispatch via per-job `if` conditions.
+  # See Issue #387 — PR-stage smoke check for the iOS G2P xcframework
+  # pipeline.
+  pull_request:
+    paths:
+      - 'src/rust/piper-plus-g2p/**'
+      - 'Sources/PiperPlusG2P/**'
+      - 'tests/PiperPlusG2PTests/**'
+      - 'Package.swift'
+      - 'cmake/PrivacyInfo.xcprivacy'
+      - '.github/workflows/release-shared-lib.yml'
   workflow_dispatch:
 
 # Workflow-level permissions are read-only; the `release` job opts into
@@ -17,6 +30,7 @@ env:
 jobs:
   build-shared:
     name: Build ${{ matrix.name }}
+    if: github.event_name != 'pull_request'
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     strategy:
@@ -130,6 +144,7 @@ jobs:
 
   build-ios:
     name: Build iOS ${{ matrix.slice }}
+    if: github.event_name != 'pull_request'
     runs-on: macos-15
     timeout-minutes: 30
     strategy:
@@ -400,6 +415,7 @@ jobs:
 
   assemble-xcframework:
     name: Assemble piper_plus.xcframework
+    if: github.event_name != 'pull_request'
     needs: build-ios
     runs-on: macos-15
     timeout-minutes: 15
@@ -734,6 +750,7 @@ jobs:
 
   build-android:
     name: Build Android arm64-v8a
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
 
