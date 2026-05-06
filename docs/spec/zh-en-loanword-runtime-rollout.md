@@ -1115,6 +1115,205 @@ MultilingualPhonemizer で中国語に隣接する英単語を自動検出し、
 
 ---
 
+### 8.13 パフォーマンス・ベンチマーク戦略
+
+**目標値**:
+
+| 項目 | 目標 |
+|------|------|
+| 1 token あたりの latency | **< 100 μs** |
+| `phonemize_chinese` 全体への増分 | **< 5%** |
+| WASM バンドルサイズ増加 | **+2-5 KB** (gzip 後) |
+| メモリ固定オーバーヘッド | **< 100 KB** (3 辞書合計) |
+
+**ホットパス分析** (Python ベース、1 token "GPS"):
+
+```
+tokenize (re.findall)        ~1 μs
+loanword lookup (dict miss)  ~0.5 μs
+acronym lookup (dict hit)    ~0.5 μs
+pinyin → IPA (4 syllables)   ~30 μs
+prosody build                ~5 μs
+─────────────────────────────────────
+Total                        ~37 μs/token  ← 目標 100μs 内
+```
+
+**各ランタイムのベンチマーク実装**:
+
+| ランタイム | フレーム | ファイル |
+|-----------|--------|--------|
+| Python | `time.perf_counter()` | `src/python/g2p/benchmarks/bench_zh_en.py` |
+| Rust | `criterion` | `src/rust/piper-plus-g2p/benches/bench_chinese_embedded.rs` |
+| Go | `testing.B` | `src/go/phonemize/bench_test.go` |
+| C# | `BenchmarkDotNet` | `src/csharp/PiperPlus.Benchmarks/ChineseEmbeddedEnglishBench.cs` |
+| C++ | Google Benchmark | `src/cpp/benchmarks/bench_chinese_embedded.cpp` |
+| JS/WASM | `mitata` | `src/wasm/g2p/bench/bench-zh-en.js` |
+
+**キャッシュ戦略 (全ランタイム共通)**: app lifetime 中 1 回のみロード
+- Python: `@functools.cache` (実装済)
+- Rust: `OnceLock` / `LazyLock`
+- Go: `sync.Once` (8.10 で確定)
+- C#: static field + lazy init
+- C++: C++11 magic statics + `std::call_once`
+- WASM: JS の `setChineseLoanwordData()` で 1 回注入
+
+**新規 CI ジョブ**:
+
+```yaml
+# .github/workflows/g2p-phonemize-perf.yml
+name: G2P Phonemize Performance
+on: [pull_request]
+jobs:
+  benchmark:
+    strategy:
+      matrix:
+        runtime: [python, rust, go, csharp, wasm]
+    steps:
+      - run: # ランタイム毎の bench コマンド
+      - name: Latency regression check
+        run: # < 100 μs 検証
+```
+
+**工数**: ベンチ実装 ~3-4 日、CI 統合 ~1 日 = **~5 日**
+
+### 8.14 C++ Thread Safety
+
+**既存実装の評価**:
+
+| 既存箇所 | 状態 | 根拠 |
+|---------|------|------|
+| `english_phonemize.cpp:74-117` の static テーブル | ✅ Thread-safe | C++11 magic statics |
+| `piper_plus_c_api.cpp:45` の `thread_local g_last_error` | ✅ Thread-safe | thread-local 保証 |
+| `Voice` 構造体の dict (`pinyinSingleDict` 等) | ⚠️ 部分的 | 同一 engine を複数スレッドが共有する場合は要対策 |
+
+**推奨パターン**: **immutable shared_ptr 共有** (mutex 不要)
+
+```cpp
+// chinese_loanword.hpp
+struct LoanwordData {
+    std::unordered_map<std::string, std::vector<std::string>> acronyms;
+    std::unordered_map<std::string, std::vector<std::string>> loanwords;
+    std::unordered_map<std::string, std::vector<std::string>> letter_fallback;
+};
+
+// 初期化は std::call_once で 1 度だけ
+std::shared_ptr<const LoanwordData> getDefaultLoanwordData() {
+    static std::shared_ptr<const LoanwordData> cached;
+    static std::once_flag init_flag;
+    std::call_once(init_flag, []() {
+        cached = std::make_shared<const LoanwordData>(loadAndValidate());
+    });
+    return cached;
+}
+
+// phonemize 時は const 参照のみ → ロック不要
+void phonemize_embedded_english(
+    const std::string& text,
+    std::vector<std::vector<Phoneme>>& out,
+    const LoanwordData& data  // const 参照渡し
+);
+```
+
+**設計判断**:
+
+- **`std::shared_ptr<const T>`**: 読み取り専用なら mutex 不要、複数スレッドから安全に読める
+- **`std::call_once`**: C++11 magic statics でも代替可能だが、loanword data の初期化は明示的に `call_once` で行う方が意図が明確
+- **C API**: engine ポインタ単位で独立すれば自然に thread-safe (現状パターン継続)
+
+**マルチスレッドテスト追加**:
+
+```cpp
+TEST(ZhEnLoanwordTest, ConcurrentAccess) {
+    auto data = getDefaultLoanwordData();
+    std::vector<std::thread> threads;
+    for (int i = 0; i < 16; ++i) {
+        threads.emplace_back([data]() {
+            for (int j = 0; j < 1000; ++j) {
+                std::vector<std::vector<Phoneme>> out;
+                phonemize_embedded_english("GPS", out, *data);
+            }
+        });
+    }
+    for (auto& t : threads) t.join();
+}
+```
+
+### 8.15 CI ジョブ整合性
+
+**既存 CI 構成**: 41 workflow、`ci-required` が branch protection 必須
+
+**本 PR の CI 影響見積**:
+
+| Workflow | 現行 | 追加 | 新計 | 備考 |
+|---------|------|------|------|------|
+| python-lint | 2 分 | +10 秒 | 2:10 | ruff format (新ファイル) |
+| python-tests | 7 分 | +45 秒 | 7:45 | 3 OS × 3 Python、pytest +35 ケース |
+| g2p-cross-platform | 20 分 | +2 分 | 22 分 | JSON 同期 step + ZH-EN 検証 |
+| Rust tests | (matrix) | +1-2 分 | — | cargo test +20 ケース |
+| Go tests | — | +30 秒 | — | go test +20 ケース |
+| C# tests | (matrix) | +30 秒 | — | xUnit +20 ケース |
+| WASM tests | — | +30 秒 | — | node:test +20 ケース |
+| C++ tests | (matrix) | +1 分 | — | gtest +20 ケース |
+| **PR 全体 (critical path)** | **~28 分** | **+2 分** | **~30 分** | 並列実行で許容範囲 |
+
+**新規 CI ジョブ**: `zh-en-loanword-sync.yml`
+
+```yaml
+name: ZH-EN Loanword Sync
+on:
+  pull_request:
+    paths:
+      - '**/zh_en_loanword.json'
+jobs:
+  json-sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+      - name: Verify all 6 copies match (sha256)
+        run: |
+          SOURCE=src/python/g2p/piper_plus_g2p/data/zh_en_loanword.json
+          HASH=$(sha256sum "$SOURCE" | cut -d' ' -f1)
+          for copy in \
+            src/python_run/piper/phonemize/data/zh_en_loanword.json \
+            src/rust/piper-plus-g2p/data/zh_en_loanword.json \
+            src/go/phonemize/data/zh_en_loanword.json \
+            src/csharp/PiperPlus.Core/Phonemize/Data/zh_en_loanword.json \
+            src/wasm/g2p/data/zh_en_loanword.json \
+            src/cpp/data/zh_en_loanword.json; do
+            [ -f "$copy" ] || { echo "MISSING: $copy"; exit 1; }
+            COPY_HASH=$(sha256sum "$copy" | cut -d' ' -f1)
+            [ "$HASH" = "$COPY_HASH" ] || { echo "MISMATCH: $copy"; exit 1; }
+          done
+      - name: Schema validation (Python)
+        run: |
+          python3 -c "
+          import json
+          with open('src/python/g2p/piper_plus_g2p/data/zh_en_loanword.json') as f:
+              d = json.load(f)
+          for s in ('acronyms','loanwords','letter_fallback'):
+              assert isinstance(d[s], dict), f'{s} must be dict'
+              for k, v in d[s].items():
+                  assert isinstance(v, list) and all(isinstance(e,str) for e in v), \
+                      f'{s}.{k} must be list[str]'
+          print(f'✓ {len(d[\"acronyms\"])} acronyms, {len(d[\"loanwords\"])} loanwords, {len(d[\"letter_fallback\"])} letters')
+          "
+```
+
+**`ci-required` への追加**: `needs: [zh-en-loanword-sync, ...]`
+
+**CI 失敗時の切り分け**:
+
+```
+JSON hash mismatch    → 6 copy のいずれかを編集し忘れ
+Schema fail          → loanword.json が malformed
+{lang}-tests fail    → 各ランタイム実装ロジック問題
+g2p-cross-platform   → ランタイム間で出力が分岐
+zh-en-loanword-sync  → JSON 同期忘れ (gate)
+```
+
+---
+
 ## 9. 改訂履歴
 
 | 日付 | バージョン | 変更内容 | 著者 |
@@ -1124,3 +1323,4 @@ MultilingualPhonemizer で中国語に隣接する英単語を自動検出し、
 | 2026-05-06 | Draft v3 | 深堀り 3 項目追加 (JS/WASM 二層 FFI、Rust crate 重複、C++ テストフレーム) — Rust 2 箇所実装必要 | Claude |
 | 2026-05-06 | Draft v4 | 深堀り 3 項目追加 (テストデータ統一、dispatcher エッジケース、エラーハンドリング統一) | Claude |
 | 2026-05-06 | Draft v5 | 深堀り 3 項目追加 (Go embed/JSON tag、リリース戦略、後方互換性 + opt-out flag) — 計 12 項目で実装フェーズ移行可能 | Claude |
+| 2026-05-07 | Draft v6 | 深堀り 3 項目追加 (パフォーマンス目標 <100μs、C++ thread safety with shared_ptr<const>、CI ジョブ整合性 +2分) | Claude |
