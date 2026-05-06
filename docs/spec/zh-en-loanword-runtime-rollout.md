@@ -1485,6 +1485,252 @@ def _safe_load_json(
 
 ---
 
+### 8.19 API ドキュメンテーション統一
+
+**各ランタイムの既存ドキュメント品質**:
+
+| ランタイム | 形式 | 既存品質 |
+|-----------|------|---------|
+| Rust | rustdoc (`///`) | ⭐⭐⭐⭐⭐ (japanese.rs に詳細例あり) |
+| C# | XML doc (`<summary>`) | ⭐⭐⭐⭐⭐ (`IChineseG2PEngine` で `<list type="table">` 等使用) |
+| TypeScript | JSDoc + `.d.ts` | ⭐⭐⭐⭐⭐ (`types/index.d.ts` 400+ 行) |
+| Python | Google docstring | ⭐⭐⭐⭐⭐ |
+| Go | godoc | ⭐⭐⭐⭐ (簡潔) |
+| C++ | doxygen | ⭐⭐ (現状最小限、要拡充) |
+
+**共通の必須要件** (各ランタイムの慣例を尊重しつつ統一):
+
+1. **概要** (1-2 文): 機能説明 + 用途
+2. **パラメータ**: 型 + 意味
+3. **戻り値**: 型 + フィールド説明
+4. **エッジケース注記**: kana 干渉、opt-out flag
+5. **使用例**: コード snippet
+6. **クロスリファレンス**: 関連関数 / 型
+
+**共通用語集** (全ランタイムで統一):
+
+| 用語 | 統一定義 |
+|------|---------|
+| **embedded English** | 中国語コンテキスト中の英単語、ピンイン経由で発音 |
+| **loanword** | `loanwords` 辞書のエントリ (case-sensitive、例: Python) |
+| **acronym** | `acronyms` 辞書のエントリ (uppercase、例: GPS) |
+| **letter_fallback** | A-Z 文字単位フォールバック |
+| **zh_en_dispatch** | `MultilingualPhonemizer` が `[zh,en,*]` 検出時に embedded path を使う挙動 |
+| **kana 干渉** | ja-en-zh モードで kana 存在時に zh が ja 化される制約 |
+| **opt-out flag** | `enable_zh_en_dispatch=False` で従来挙動に戻すパラメータ |
+
+**テンプレート例 (Rust)**:
+
+```rust
+/// Phonemizes English text embedded in Chinese context as Mandarin pinyin.
+///
+/// Applies the ZH-EN code-switching rule: when the multilingual dispatcher
+/// detects `[zh,en,*]` or `[en,zh]` patterns, embedded English words are
+/// pronounced via Mandarin pinyin (e.g., "Python" → ["pai4", "sen1"]).
+///
+/// # Arguments
+/// * `text` - English text segment (already split from Chinese context).
+/// * `loanword_data` - Loanword dictionary with acronyms/loanwords/letter_fallback.
+///
+/// # Returns
+/// Token array (IPA strings, no PUA encoding). Multi-char tokens like "tɕʰ"
+/// are returned as-is for subsequent PUA mapping by the encoder.
+///
+/// # Example
+/// ```
+/// let ld = LoanwordData::default();
+/// let result = phonemize_embedded_english("GPS Python", &ld);
+/// ```
+///
+/// # Notes
+/// Set `enable_zh_en_dispatch = false` in `MultilingualPhonemizer` to
+/// skip this path and use standard English phonemization.
+pub fn phonemize_embedded_english(
+    text: &str,
+    loanword_data: &LoanwordData,
+) -> Vec<String> { ... }
+```
+
+**ドキュメント生成 CI**:
+
+| ランタイム | 生成コマンド | 既存 CI |
+|-----------|-----------|--------|
+| Rust | `cargo doc --no-deps` | (検討中、`rust-tests.yml` 拡張) |
+| C# | docfx | (未設定、Phase 2) |
+| TypeScript | `typedoc` | (未設定、Phase 2) |
+| Python | `sphinx-build` | (一部) |
+| C++ | `doxygen` | **未設定 → 新規追加検討** |
+| Go | godoc (組込) | (組込) |
+
+### 8.20 デバッグ・トレース戦略
+
+**統一 log level ガイドライン**:
+
+| Level | 用途 |
+|-------|------|
+| **DEBUG** | dispatch 発動、loanword/acronym/letter_fallback hit、lookup count |
+| **INFO** | phonemizer 初期化完了 |
+| **WARN** | スキーマ違反、スキップされたセグメント、symbolic link 検出 |
+| **ERROR** | ファイル not found、致命的エラー |
+
+**統一フォーマット**: `[runtime:component] op=value key=value ...`
+
+**各ランタイムの実装パターン**:
+
+```python
+# Python (logging)
+_LOGGER.debug("zh_en dispatch: type=%s text=%r count=%d", "acronym", "GPS", 4)
+```
+
+```rust
+// Rust (log crate)
+log::debug!("zh_en dispatch: type={} text={:?} count={}", "acronym", "GPS", 4);
+```
+
+```go
+// Go (slog)
+slog.Debug("zh_en dispatch", "type", "acronym", "text", "GPS", "count", 4)
+```
+
+```csharp
+// C# (Microsoft.Extensions.Logging)
+logger.LogDebug("zh_en dispatch: type={Type} text={Text} count={Count}", "acronym", "GPS", 4);
+```
+
+```cpp
+// C++ (spdlog)
+spdlog::debug("zh_en dispatch: type={} text={} count={}", "acronym", "GPS", 4);
+```
+
+```javascript
+// JS/WASM (console)
+console.debug("[zh_en] dispatch", { type: "acronym", text: "GPS", count: 4 });
+```
+
+**デバッグフラグ**: `PIPER_DEBUG_ZH_EN=1` (全ランタイム共通の環境変数)
+
+```python
+# Python
+import os
+if os.environ.get("PIPER_DEBUG_ZH_EN"):
+    logging.getLogger("piper_plus_g2p.chinese").setLevel(logging.DEBUG)
+```
+
+```rust
+// Rust: 既存 RUST_LOG=debug でも有効
+// 追加: PIPER_DEBUG_ZH_EN=1 で当該モジュールのみ DEBUG
+```
+
+**性能影響対策**:
+- production build では debug log を出さない (各ランタイムの conditional logging)
+- Python: `_LOGGER.isEnabledFor(logging.DEBUG)` でガード
+- C++: `NDEBUG` macro で compile-time に削除可能
+- WASM: `process.env.NODE_ENV !== 'production'` でガード
+
+### 8.21 データセット拡張運用フロー
+
+**目的**: 将来 `acronyms` / `loanwords` の追加要望が来た時の管理プロセスを定める。
+
+**PR テンプレート追記** (`.github/PULL_REQUEST_TEMPLATE.md`):
+
+```markdown
+## Dictionary Update (if zh_en_loanword.json modified)
+
+- [ ] 新規エントリは **標準 Mandarin pinyin** + tone marker (1-5) で記述
+- [ ] 参考辞書を PR description に明記 (MDBG / Pleco / 新华字典 等)
+- [ ] **6 箇所すべて**で同期 (CI `zh-en-loanword-sync` で自動検証)
+- [ ] テスト追加 (`test_zh_en_loanword.py` の TestSchemaValidation pattern)
+- [ ] 既存エントリとの重複検証 (CI で自動)
+- [ ] エントリ数 sanity check 通過 (acronyms ≥ 50, loanwords ≥ 30)
+```
+
+**新規 GitHub Issue テンプレート** (`.github/ISSUE_TEMPLATE/dict-request.yml`):
+
+```yaml
+name: Dictionary Entry Request (ZH-EN)
+description: 新規 acronym/loanword エントリのリクエスト
+labels: ["dict", "enhancement", "zh-en"]
+body:
+  - type: input
+    id: token
+    attributes:
+      label: English Token
+      placeholder: "e.g., ChatGPT, GitHub"
+    validations: { required: true }
+  - type: textarea
+    id: pinyin
+    attributes:
+      label: Proposed Pinyin (tone付き)
+      placeholder: "e.g., chai4 ti2 ji4 pi4 ti4"
+    validations: { required: true }
+  - type: dropdown
+    id: category
+    attributes:
+      label: Category
+      options:
+        - acronym (e.g., GPS, USB)
+        - loanword (e.g., Python, iPhone)
+        - new letter mapping
+    validations: { required: true }
+  - type: input
+    id: reference
+    attributes:
+      label: Reference Source
+      placeholder: "MDBG, Pleco, 新华字典 等"
+    validations: { required: true }
+```
+
+**レビュー基準**:
+
+| 評価軸 | OK | NG |
+|-------|----|----|
+| pinyin の正確性 | 標準 Mandarin pinyin + tone | 非標準音 / tone なし |
+| 重複検証 | 既存エントリと衝突なし | 重複あり |
+| 文化的適切性 | 中立、商標侵害なし | ヘイト用語、政治的バイアス |
+| 出典 | 信頼できる辞書 | 出典なし |
+
+**Schema バージョン bump ルール**:
+
+| 変更 | version bump | 理由 |
+|------|------------|------|
+| エントリ追加のみ | **不要** (v1 維持) | backward compatible |
+| 既存エントリの修正 | **不要** (v1 維持) | 出力が変わるが構造同じ |
+| 新フィールド追加 | **必要** (v2) | スキーマ拡張 |
+| フィールド削除 | **必要** (v2) | breaking |
+
+**自動 CI 検証** (`zh-en-loanword-sync.yml` 拡張):
+
+```yaml
+- name: Pinyin syntax + duplicate detection
+  run: python scripts/validate_loanword_dict.py src/python/g2p/piper_plus_g2p/data/zh_en_loanword.json
+```
+
+```python
+# scripts/validate_loanword_dict.py
+def validate(path):
+    data = json.load(open(path))
+    seen = {}
+    for section in ("acronyms", "loanwords", "letter_fallback"):
+        for key, syllables in data[section].items():
+            # 1. 重複検出
+            if key in seen:
+                raise ValueError(f"Duplicate: {key} in {seen[key]} and {section}")
+            seen[key] = section
+            # 2. tone marker 検証
+            for syl in syllables:
+                if not syl[-1].isdigit() or not 1 <= int(syl[-1]) <= 5:
+                    raise ValueError(f"{section}.{key}: invalid tone in {syl!r}")
+            # 3. IPA 変換可能性 (phonemize_from_pinyin_syllables で)
+            try:
+                phonemize_from_pinyin_syllables(syllables)
+            except Exception as e:
+                raise ValueError(f"{section}.{key}: IPA conversion failed: {e}")
+```
+
+**実装工数**: PR テンプレート 5 分、Issue テンプレート 10 分、CI スクリプト 20 分 = **~35 分**
+
+---
+
 ## 9. 改訂履歴
 
 | 日付 | バージョン | 変更内容 | 著者 |
@@ -1496,3 +1742,4 @@ def _safe_load_json(
 | 2026-05-06 | Draft v5 | 深堀り 3 項目追加 (Go embed/JSON tag、リリース戦略、後方互換性 + opt-out flag) — 計 12 項目で実装フェーズ移行可能 | Claude |
 | 2026-05-07 | Draft v6 | 深堀り 3 項目追加 (パフォーマンス目標 <100μs、C++ thread safety with shared_ptr<const>、CI ジョブ整合性 +2分) | Claude |
 | 2026-05-07 | Draft v7 | 深堀り 3 項目追加 (メモリ管理: Arc/Lazy/shared_ptr、i18n 拡張: data/loanword/ ディレクトリ化、セキュリティ: 1MB/10K entry/depth 100 のガード) | Claude |
+| 2026-05-07 | Draft v8 | 深堀り 3 項目追加 (API ドキュメント統一: 共通用語集 + 言語別テンプレート、デバッグ・トレース: PIPER_DEBUG_ZH_EN 環境変数、データセット運用: PR/Issue テンプレート + validate スクリプト) | Claude |
