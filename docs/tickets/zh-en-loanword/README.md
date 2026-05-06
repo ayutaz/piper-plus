@@ -40,31 +40,33 @@ Day 14    ┃ Phase 7: Docs/Release (CHANGELOG/README/API)   [TICKET-07]
 
 | # | チケット | ランタイム | LOC | 依存 | ステータス | 担当エージェントチーム |
 |---|---------|----------|-----|------|----------|----------------------|
-| 01 | [TICKET-01-rust.md](TICKET-01-rust.md) | Rust | ~600 | なし | 📝 Draft | Lead × 1, Rust Core × 2, QA × 1 |
-| 02 | [TICKET-02-go.md](TICKET-02-go.md) | Go | ~355 | なし | 📝 Draft | Lead × 1, Go Dev × 1, QA × 1 |
-| 03 | [TICKET-03-csharp.md](TICKET-03-csharp.md) | C# | ~460 | なし | 📝 Draft | Lead × 1, C# Dev × 2, QA × 1 |
-| 04 | [TICKET-04-wasm.md](TICKET-04-wasm.md) | JS/WASM | ~250 | TICKET-01 | 📝 Draft | Lead × 1, WASM Dev × 1, JS Dev × 1, QA × 1 |
-| 05 | [TICKET-05-cpp.md](TICKET-05-cpp.md) | C++ | ~810 | なし | 📝 Draft | Lead × 1, C++ Dev × 2, Mobile × 1, QA × 1 |
-| 06 | [TICKET-06-ci-sync.md](TICKET-06-ci-sync.md) | CI | ~150 | TICKET-01〜05 | 📝 Draft | Lead × 1, DevOps × 1 |
-| 07 | [TICKET-07-docs.md](TICKET-07-docs.md) | Docs | ~300 | TICKET-01〜06 | 📝 Draft | Lead × 1, Tech Writer × 1 |
+| 01 | [TICKET-01-rust.md](TICKET-01-rust.md) | Rust | ~600 | なし | 📋 Ready | Lead × 1, Rust Core × 2, QA × 1 |
+| 02 | [TICKET-02-go.md](TICKET-02-go.md) | Go | ~355 | なし | 📋 Ready | Lead × 1, Go Dev × 1, QA × 1 |
+| 03 | [TICKET-03-csharp.md](TICKET-03-csharp.md) | C# | ~460 | なし | 📋 Ready | Lead × 1, C# Dev × 2, QA × 1 |
+| 04 | [TICKET-04-wasm.md](TICKET-04-wasm.md) | JS/WASM | ~250 | TICKET-01 | 📋 Ready | Lead × 1, WASM Dev × 1, JS Dev × 1, QA × 1 |
+| 05 | [TICKET-05-cpp.md](TICKET-05-cpp.md) | C++ | ~810 | なし | 📋 Ready | Lead × 1, C++ Dev × 2, Mobile × 1, QA × 1 |
+| 06 | [TICKET-06-ci-sync.md](TICKET-06-ci-sync.md) | CI | ~200 | TICKET-01〜05 | 📋 Ready | Lead × 1, DevOps × 1, Python Dev × 1, QA × 1 |
+| 07 | [TICKET-07-docs.md](TICKET-07-docs.md) | Docs | ~300 | TICKET-01〜06 | 📋 Ready | Lead × 1, Tech Writer × 1, Python Dev × 1, DevOps × 1 |
 
-**ステータス凡例**: 📝 Draft / 🚧 In Progress / 👀 Review / ✅ Done / ⏸ Blocked
+**ステータス凡例**: 📝 Draft / 📋 Ready (チケット作成 + エージェントレビュー反映済) / 🚧 In Progress / 👀 Review / ✅ Done / ⏸ Blocked
 
 ---
 
 ## 4. 進捗ダッシュボード
 
 ```
-[Phase 1] Rust      ░░░░░░░░░░░░░░░░░░░░  0%   📝 Draft
-[Phase 2] Go        ░░░░░░░░░░░░░░░░░░░░  0%   📝 Draft
-[Phase 3] C#        ░░░░░░░░░░░░░░░░░░░░  0%   📝 Draft
-[Phase 4] JS/WASM   ░░░░░░░░░░░░░░░░░░░░  0%   📝 Draft
-[Phase 5] C++       ░░░░░░░░░░░░░░░░░░░░  0%   📝 Draft
-[Phase 6] CI Sync   ░░░░░░░░░░░░░░░░░░░░  0%   📝 Draft
-[Phase 7] Docs      ░░░░░░░░░░░░░░░░░░░░  0%   📝 Draft
+[Phase 0] チケット作成 ████████████████████  100%  ✅ Done (7 チケット作成 + レビュー反映済)
+[Phase 1] Rust         ░░░░░░░░░░░░░░░░░░░░    0%  📋 Ready
+[Phase 2] Go           ░░░░░░░░░░░░░░░░░░░░    0%  📋 Ready
+[Phase 3] C#           ░░░░░░░░░░░░░░░░░░░░    0%  📋 Ready
+[Phase 4] JS/WASM      ░░░░░░░░░░░░░░░░░░░░    0%  📋 Ready
+[Phase 5] C++          ░░░░░░░░░░░░░░░░░░░░    0%  📋 Ready
+[Phase 6] CI Sync      ░░░░░░░░░░░░░░░░░░░░    0%  📋 Ready
+[Phase 7] Docs         ░░░░░░░░░░░░░░░░░░░░    0%  📋 Ready
 ```
 
-**全体進捗**: 0 / 7 チケット完了。
+**チケット作成進捗**: 7 / 7 完了 (各チケット Plan エージェントレビュー反映済)。
+**実装進捗**: 0 / 7 着手前 (チームレビュー後に開始予定)。
 
 ---
 
@@ -164,3 +166,4 @@ Day 14    ┃ Phase 7: Docs/Release (CHANGELOG/README/API)   [TICKET-07]
 | 日付 | 版 | 変更内容 |
 |------|----|---------|
 | 2026-05-07 | v1 | INDEX 初版作成 (7 チケットの骨子確定) |
+| 2026-05-07 | v2 | 7 チケット全件作成 + Plan エージェントレビュー反映済。各チケットに Section 9「一から作り直すとしたら」を 9.0-9.X で詳細化 (思想 / データ層 / API 層 / Dispatcher / Failure mode / i18n / テスト / Observability)。LOC 見積を実反映 (TICKET-06: 150→200、TICKET-07: 既存通り 300)。 |
