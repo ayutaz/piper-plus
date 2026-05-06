@@ -1731,6 +1731,216 @@ def validate(path):
 
 ---
 
+### 8.22 WASM サイズ最適化詳細
+
+**現状サイズ**:
+
+| 成果物 | サイズ |
+|--------|------|
+| `piper_plus_wasm.wasm` (release、全言語+JA 辞書込み) | 59 MB |
+| `@piper-plus/g2p` npm package (実装コードのみ) | 684 KB |
+| 既存 `g2p-wasm-ci.yml` の **size-check 制限** | **1 MB** (npm package) |
+
+**JSON を JS 側に bundle 済 (8.4 で確定)** のため WASM サイズへのデータ影響は **+0**。
+
+**コード追加によるサイズ影響**:
+
+| 項目 | 影響 |
+|------|------|
+| `phonemize_embedded_english` (~150 行) | +5-8 KB |
+| `LoanwordData` struct + serde derive | (serde_json 既存依存、追加なし) |
+| Multilingual dispatcher 拡張 | +2-3 KB |
+| **合計** | **+8-12 KB** (圧縮後) |
+
+**最適化戦略**:
+
+```toml
+# src/rust/piper-wasm/Cargo.toml
+[features]
+default = ["zh", "ja", "en"]
+zh = ["piper-plus-g2p/chinese"]
+zh-en = ["zh", "piper-plus-g2p/zh-en-loanword"]   # ← 新規 opt-in
+en = ["piper-plus-g2p/english"]
+```
+
+**feature gate の意義**:
+- ZH-EN 機能を必要としないアプリ (例: 日本語専用 TTS) は `default-features = false` で除外可能
+- ABI 安定性: feature gate により API は cargo level で制御
+
+**既存 wasm-opt 設定** (`piper-wasm/Cargo.toml`):
+```toml
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = ['-Os']  # サイズ重視最適化
+```
+
+**目標**:
+
+| 項目 | 目標 | 実績見込み |
+|------|------|----------|
+| WASM サイズ増分 | < +25 KB | +8-12 KB ✓ |
+| npm package size | < 1 MB (CI 既存ガード) | 684 KB → ~700 KB ✓ |
+| feature gate | `zh-en` 新規追加 | 必須 |
+
+**CI size regression 検出**: 既存 `g2p-wasm-ci.yml` の **1 MB ガード**で監視継続 (新規ジョブ不要)
+
+### 8.23 Cross-Compile 詳細
+
+**既存 build matrix** (`release-shared-lib.yml`):
+
+| Platform | Architecture | Toolchain |
+|----------|------------|-----------|
+| Linux | x86_64 | GCC (`ubuntu-latest`) |
+| macOS | aarch64 | Apple Clang (`macos-latest`) |
+| Windows | x64 | MSVC (`windows-latest`) |
+| Android | arm64-v8a, armeabi-v7a, x86_64 | NDK 26.1 |
+| iOS | arm64 + simulator (x86_64/arm64) | `cmake/ios.toolchain.cmake` |
+
+**xxd 互換性問題**:
+
+- xxd は **GNU/Linux/macOS でデフォルト**、**Windows MSVC では非デフォルト**
+- Windows CI runner では Git Bash / WSL 経由で利用可能だが、確実性に欠ける
+
+**推奨代替案**: **CMake `file(READ HEX)` で MSVC 互換実装**
+
+```cmake
+# src/cpp/CMakeLists.txt
+function(embed_json_as_header INPUT_JSON OUTPUT_HEADER VAR_NAME)
+    file(READ "${INPUT_JSON}" hex_content HEX)
+    # hex_content を 0x__ 形式の C 配列に変換
+    string(REGEX REPLACE "([0-9a-f][0-9a-f])" "0x\\1," c_array "${hex_content}")
+    file(WRITE "${OUTPUT_HEADER}"
+        "// Auto-generated, do not edit\n"
+        "#pragma once\n"
+        "static const unsigned char ${VAR_NAME}[] = { ${c_array} };\n"
+        "static const unsigned int ${VAR_NAME}_len = sizeof(${VAR_NAME});\n"
+    )
+endfunction()
+
+if(PIPER_APPLE_EMBEDDED OR ANDROID)
+    set(LOANWORD_HEADER ${CMAKE_CURRENT_BINARY_DIR}/zh_en_loanword_data.h)
+    embed_json_as_header(
+        ${CMAKE_CURRENT_SOURCE_DIR}/data/zh_en_loanword.json
+        ${LOANWORD_HEADER}
+        zh_en_loanword_json
+    )
+    target_sources(piper_plus PRIVATE ${LOANWORD_HEADER})
+    target_compile_definitions(piper_plus PRIVATE PIPER_PLUS_EMBEDDED_LOANWORD)
+endif()
+```
+
+**メリット**: xxd 依存なし、全 platform の CMake で動作 (3.10+)
+
+**Platform 別配信戦略**:
+
+| Platform | 戦略 | 実装 |
+|----------|------|------|
+| iOS xcframework | static embed | CMake `file(READ HEX)` → `.h` |
+| Android .aar | static embed | 同上 |
+| Linux/macOS/Windows | runtime load | `std::ifstream` (`share/piper/dicts/` 既存パターン) |
+
+**ARM 系の注意点**:
+
+| 項目 | 影響 |
+|------|------|
+| エンディアン | JSON はテキスト → **影響なし** |
+| 32/64-bit サイズ差 | pointer 型のみ、struct layout 同一 |
+| emulator vs native | ABI 一致なら動作同一、Android emulator は実機テスト必要 |
+
+**CI matrix の追加**: **既存 matrix で全 platform カバー可能**、新規 job 不要
+
+**Windows xxd 不要化の追加メリット**:
+- Git Bash / WSL のセットアップステップ削減
+- CI ステップ簡素化
+
+### 8.24 テストカバレッジ目標
+
+**カバレッジ目標値**:
+
+| 項目 | 目標 | 根拠 |
+|------|------|------|
+| 全体 line coverage | **80%+** | 業界標準 |
+| ZH-EN 機能 line coverage | **90%+** | 新機能、厳格 |
+| ZH-EN 機能 branch coverage | **90%+** | 3 経路 (loanword/acronym/fallback) 全網羅 |
+| エラーパス coverage | **100%** | schema violation / file not found |
+
+**必須 branch 経路**:
+
+```
+phonemize_embedded_english():
+├─ loanword_hit (case-sensitive)        ← test_loanword_python_case_sensitive
+├─ acronym_hit (case-insensitive)       ← test_acronym_gps
+├─ letter_fallback (未知語)             ← test_letter_fallback_for_unknown
+└─ digits_dropped (数字混じり)          ← test_digits_dropped_in_letter_fallback
+
+_load_loanword_data():
+├─ valid JSON                           ← test_valid_json_accepted
+├─ string instead of list (schema)      ← test_string_value_rejected
+├─ non-string in list (schema)          ← test_non_string_inside_list_rejected
+└─ section is not dict (schema)         ← test_section_not_mapping_rejected
+```
+
+**各ランタイムの計測ツール**:
+
+| Runtime | ツール | 既存 CI 統合 |
+|---------|------|------------|
+| Python | `pytest-cov` + coverage.py | ✓ 既存 (codecov アップロード済) |
+| Rust | `cargo-tarpaulin` (or `cargo-llvm-cov`) | **新規追加が必要** |
+| Go | `go test -coverprofile` | **新規追加が必要** |
+| C# | `coverlet` (`XPlat Code Coverage`) | ✓ 既存 (cobertura.xml artifact) |
+| JS/TS | `vitest --coverage` (c8) | **新規追加が必要** |
+| C++ | `gcov` + `lcov` | **新規追加が必要** |
+
+**新規 CI ワークフロー** (`.github/workflows/coverage-unified.yml`):
+
+```yaml
+name: Unified Coverage
+on: [pull_request]
+jobs:
+  python-coverage:
+    steps:
+      - run: |
+          cd src/python/g2p
+          uv run pytest --cov=piper_plus_g2p --cov-report=xml --cov-fail-under=80
+  rust-coverage:
+    steps:
+      - run: |
+          cargo install cargo-tarpaulin
+          cargo tarpaulin -p piper-plus-g2p --out Xml --fail-under 80
+  go-coverage:
+    steps:
+      - run: |
+          cd src/go
+          go test -coverprofile=coverage.out ./phonemize/...
+          go tool cover -func=coverage.out | grep total | awk '{print $3}'
+          # < 80% で fail
+  csharp-coverage:
+    steps:
+      - run: |
+          dotnet test --collect:"XPlat Code Coverage" --results-directory coverage
+  upload:
+    needs: [python-coverage, rust-coverage, go-coverage, csharp-coverage]
+    steps:
+      - uses: codecov/codecov-action@v5
+        with:
+          flags: python,rust,go,csharp
+          fail-ci-if-error: false
+```
+
+**Phase 戦略**:
+
+| Phase | 範囲 | 内容 |
+|-------|------|------|
+| Phase 1 (本 PR) | Python + 既存 C# | 既存ツールで ZH-EN を 90%+ に引上 |
+| Phase 2 (フォローアップ) | Rust / Go / JS-WASM | カバレッジ計測ツール導入 + CI 追加 |
+| Phase 3 (将来) | C++ | gcov/lcov + 統合ダッシュボード |
+
+**実装工数**:
+- Phase 1: 既存基盤利用 → ~2 時間
+- Phase 2: 各ランタイムで CI 設定 → ~5 時間
+- Phase 3: gcov 統合 → ~3 時間
+
+---
+
 ## 9. 改訂履歴
 
 | 日付 | バージョン | 変更内容 | 著者 |
@@ -1743,3 +1953,4 @@ def validate(path):
 | 2026-05-07 | Draft v6 | 深堀り 3 項目追加 (パフォーマンス目標 <100μs、C++ thread safety with shared_ptr<const>、CI ジョブ整合性 +2分) | Claude |
 | 2026-05-07 | Draft v7 | 深堀り 3 項目追加 (メモリ管理: Arc/Lazy/shared_ptr、i18n 拡張: data/loanword/ ディレクトリ化、セキュリティ: 1MB/10K entry/depth 100 のガード) | Claude |
 | 2026-05-07 | Draft v8 | 深堀り 3 項目追加 (API ドキュメント統一: 共通用語集 + 言語別テンプレート、デバッグ・トレース: PIPER_DEBUG_ZH_EN 環境変数、データセット運用: PR/Issue テンプレート + validate スクリプト) | Claude |
+| 2026-05-07 | Draft v9 | 深堀り 3 項目追加 (WASM サイズ最適化: feature gate `zh-en` で +8-12 KB、Cross-compile: CMake `file(READ HEX)` で xxd 不要、テストカバレッジ: 新機能 90%+ + 統合 CI workflow) | Claude |
