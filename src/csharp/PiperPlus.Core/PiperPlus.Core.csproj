@@ -29,4 +29,12 @@
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.3" />
   </ItemGroup>
 
+  <!-- ZH-EN code-switching loanword dictionary (TICKET-03 C2). Byte-for-byte
+       identical to src/python/g2p/piper_plus_g2p/data/zh_en_loanword.json
+       (CI gate: scripts/check_loanword_consistency.py). -->
+  <ItemGroup>
+    <EmbeddedResource Include="Phonemize/Data/zh_en_loanword.json"
+                      LogicalName="PiperPlus.Core.Phonemize.Data.zh_en_loanword.json" />
+  </ItemGroup>
+
 </Project>

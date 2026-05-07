@@ -30,6 +30,13 @@ public sealed class MultilingualPhonemizer : IPhonemizer
     private readonly UnicodeLanguageDetector _detector;
 
     /// <summary>
+    /// ZH-EN code-switching dispatch toggle (TICKET-03 §9.0 #2, Issue #384).
+    /// Default-on when both "zh" and "en" phonemizers are registered;
+    /// settable via the <c>EnableZhEnDispatch</c> ctor parameter.
+    /// </summary>
+    private bool _enableZhEnDispatch;
+
+    /// <summary>
     /// Per-thread EOS token captured during <see cref="PhonemizeWithProsody"/>
     /// and read by <see cref="PostProcessIds"/> to determine the correct EOS ID.
     /// Thread-local storage ensures concurrent callers do not interfere.
@@ -102,6 +109,30 @@ public sealed class MultilingualPhonemizer : IPhonemizer
 
         _detector = new UnicodeLanguageDetector(
             _phonemizers.Keys.ToList(), defaultLatinLanguage);
+
+        // Default-on: enable ZH-EN code-switching when both zh and en are
+        // registered. The two-layer model (compile-time + runtime) is
+        // unified for C# in the runtime layer because the language is always
+        // present at compile time. (TICKET-03 §9.0 #2.)
+        _enableZhEnDispatch =
+            _phonemizers.ContainsKey("zh") &&
+            _phonemizers.ContainsKey("en") &&
+            _phonemizers["zh"] is ChinesePhonemizer;
+    }
+
+    /// <summary>
+    /// Toggle ZH-EN code-switching dispatch.
+    /// </summary>
+    /// <remarks>
+    /// When <c>false</c>, embedded English in Chinese context falls through to
+    /// the standard English phonemizer instead of being mapped to Mandarin pinyin.
+    /// Default-on when both <c>"zh"</c> (a <see cref="ChinesePhonemizer"/>) and
+    /// <c>"en"</c> phonemizers are registered.
+    /// </remarks>
+    public bool EnableZhEnDispatch
+    {
+        get => _enableZhEnDispatch;
+        set => _enableZhEnDispatch = value;
     }
 
     /// <inheritdoc />
@@ -217,8 +248,45 @@ public sealed class MultilingualPhonemizer : IPhonemizer
         var allProsody = new List<ProsodyInfo?>(segments.Count * 50);
         string lastEos = "$";
 
-        foreach (var (lang, segmentText) in segments)
+        // Pre-compute whether text contains zh segment for ZH-EN dispatch.
+        bool hasZhSegment = false;
+        if (_enableZhEnDispatch)
         {
+            foreach (var (lang, _) in segments)
+            {
+                if (lang == "zh") { hasZhSegment = true; break; }
+            }
+        }
+
+        for (int segIdx = 0; segIdx < segments.Count; segIdx++)
+        {
+            var (lang, segmentText) = segments[segIdx];
+
+            // ZH-EN code-switching dispatch: route embedded en (with adjacent
+            // zh) through the chinese loanword path. Issue #384, design §2.3.
+            if (_enableZhEnDispatch && hasZhSegment && lang == "en" &&
+                _phonemizers["zh"] is ChinesePhonemizer cp)
+            {
+                bool prevIsZh = segIdx > 0 && segments[segIdx - 1].Item1 == "zh";
+                bool nextIsZh = segIdx + 1 < segments.Count && segments[segIdx + 1].Item1 == "zh";
+                if (prevIsZh || nextIsZh)
+                {
+                    var dispatched = cp.PhonemizeEmbeddedEnglish(segmentText);
+                    foreach (var ph in dispatched)
+                    {
+                        if (s_bosEosTokens.Contains(ph))
+                        {
+                            if (s_eosTokens.Contains(ph))
+                                lastEos = ph;
+                            continue;
+                        }
+                        allPhonemes.Add(ph);
+                        allProsody.Add(null); // embedded EN: no prosody
+                    }
+                    continue;
+                }
+            }
+
             if (!_phonemizers.TryGetValue(lang, out IPhonemizer? phonemizer))
                 continue;
 

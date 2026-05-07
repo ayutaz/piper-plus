@@ -33,6 +33,18 @@ public sealed class ChinesePhonemizer : IPhonemizer
         _engine = engine ?? throw new ArgumentNullException(nameof(engine));
     }
 
+    /// <summary>Underlying G2P engine (used by multilingual dispatch for ZH-EN).</summary>
+    internal IChineseG2PEngine Engine => _engine;
+
+    /// <summary>
+    /// Phonemize English text embedded in Chinese context as Mandarin pinyin
+    /// (ZH-EN code-switching, Issue #384). Returns raw IPA tokens (no
+    /// BOS/EOS/padding); use through <see cref="MultilingualPhonemizer"/> for
+    /// the full pipeline.
+    /// </summary>
+    public IReadOnlyList<string> PhonemizeEmbeddedEnglish(string text) =>
+        _engine.ConvertEmbeddedEnglish(text).Phonemes;
+
     /// <inheritdoc />
     public List<string> Phonemize(string text)
     {
