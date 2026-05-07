@@ -103,7 +103,7 @@ dependencies {
 // rather than symlink so Windows hosts work too.
 val syncG2pFixture = tasks.register<Copy>("syncG2pFixture") {
     from(rootProject.layout.projectDirectory.dir("../tests/fixtures/g2p"))
-    include("phoneme_test_cases.json")
+    include("phoneme_test_cases.json", "phoneme_test_cases_golden.json")
     into(layout.projectDirectory.dir("src/androidTest/assets/g2p_fixtures"))
 }
 tasks.matching {

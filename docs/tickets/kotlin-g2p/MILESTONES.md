@@ -292,10 +292,10 @@ M1   C API Extension         █████████████████
 M2   JNI Bridge              ████████████████████  100%  ✅ Done       (commit c2696072)
 M3   Kotlin Public API       ████████████████████  100%  ✅ Done       (commit c2696072)
 M4   Gradle Module + Build   ████████████████████  100%  ✅ Done       (commit c2696072)
-M5   Automated Tests         ████████████████░░░░   80%  👀 Review     (L1/L3/L5 + L4 stub; L4 parity 拡充は別 PR)
+M5   Automated Tests         ████████████████████  100%  ✅ Done       (L1/L3/L4-structural/L4-strict-golden/L5)
 M6   Dictionary Distribution ████████████████████  100%  ✅ Done       (DictionaryDownloader + ガイド)
 M7   Maven Central Publish   ████████████████████  100%  ✅ Done       (release-kotlin-g2p.yml)
-M8   Docs & Sample App       ████████████████░░░░   80%  👀 Review     (README/CLAUDE/CHANGELOG 同期; サンプルアプリは別 PR)
+M8   Docs & Sample App       ████████████████████  100%  ✅ Done       (Compose サンプルアプリ + ドキュメント)
 M9   GA Release v1.0.0       ░░░░░░░░░░░░░░░░░░░░    0%  🎯 Target      (タグ push 待ち、Q-1/Q-2/Q-7 解決後)
 ```
 

@@ -21,6 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Maven Central 自動公開**: `.github/workflows/release-kotlin-g2p.yml` がタグ `kotlin-g2p-v*` push を検知して GPG in-memory key + Sonatype Central Portal credentials で `publishAndReleaseToMavenCentral` を実行。PR では `publishToMavenLocal` の dry-run のみ
 - **辞書配布 3 パターン**: AAR には OpenJTalk 辞書 (~102MB) を同梱せず、(1) App assets バンドル (`OpenJTalkDictionary.fromAssets`)、(2) Play Asset Delivery (`fromPath`)、(3) Runtime DL from Hugging Face Hub (`DictionaryDownloader.downloadFromHuggingFace` + SHA-256 検証) の 3 通りを提供。詳細: `docs/guides/android-g2p-dictionary.md`
 - **GTest 26 ケース** (`src/cpp/tests/test_c_api_g2p.cpp`): lifecycle / NULL safety / `available_languages` order / 規則ベース 3 言語 (es/fr/pt) / ZH-EN dispatch toggle / borrowed pointer 寿命 / custom dict
+- **L4 byte-for-byte parity**: `tools/generate_g2p_golden.py` で Python `MultilingualPhonemizer` から 70 ケースの IPA 列を pre-compute し `tests/fixtures/g2p/phoneme_test_cases_golden.json` に固定。Kotlin instrumented `PhonemeFixtureParityTest.byte_for_byte_parity_with_python_golden` が strict diff で drift を検知 (FR-CAPI-3 / FR-TEST-1)
+- **サンプル Compose アプリ**: `examples/android-g2p-sample/` (8 言語タブ + TextField → phonemize → カード表示)。Gradle composite build で in-repo AAR を直接消費。`.github/workflows/kotlin-g2p-ci.yml` の `sample-app` ジョブで `assembleDebug` を CI gate (AC-10)
 - **設計・要件・マイルストーン**: `docs/spec/kotlin-g2p-{design,requirements}.md`、`docs/tickets/kotlin-g2p/{README,MILESTONES}.md`
 
 #### ZH-EN code-switching を全 7 ランタイムに展開 (Issue #384)

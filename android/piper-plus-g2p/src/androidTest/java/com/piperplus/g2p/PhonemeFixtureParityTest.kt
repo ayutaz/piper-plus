@@ -101,4 +101,70 @@ class PhonemeFixtureParityTest {
             root.has("version"),
         )
     }
+
+    /**
+     * Strict byte-for-byte parity against the Python pre-computed golden
+     * fixture (`phoneme_test_cases_golden.json`). When the JNI's space-
+     * separated phoneme string differs from the Python reference even by
+     * one character, the test fails — so any drift in the C++ phonemize
+     * pipeline relative to Python is caught immediately.
+     *
+     * Skipped languages:
+     *   - ja: dictionary not bundled in the test APK.
+     *   - ko: g2pk2 inside libpiper_plus.so should match Python g2pk2,
+     *         but on hosts where Python g2pk2 cannot run (Windows / no
+     *         eunjeon) the golden file may omit those cases — we only
+     *         compare what's in the golden.
+     */
+    @Test
+    fun byte_for_byte_parity_with_python_golden() {
+        val rawJson = try {
+            ctx.assets.open("g2p_fixtures/phoneme_test_cases_golden.json")
+                .bufferedReader().use { it.readText() }
+        } catch (e: Exception) {
+            // Golden file not synced yet — skip rather than fail. The
+            // structural check above still catches major regressions.
+            assumeTrue(
+                "phoneme_test_cases_golden.json not present; run " +
+                    "tools/generate_g2p_golden.py to generate",
+                false,
+            )
+            return
+        }
+        val root = JSONObject(rawJson)
+        val cases = root.getJSONArray("test_cases")
+
+        var verified = 0
+        val mismatches = mutableListOf<String>()
+        PiperPlusG2p.create(InstrumentationRegistry.getInstrumentation().targetContext).use { g2p ->
+            for (i in 0 until cases.length()) {
+                val case = cases.getJSONObject(i)
+                val lang = case.getString("language")
+                if (lang == "ja") continue
+
+                val input = case.getString("input")
+                val expected = case.getString("expected_phonemes")
+                val description = case.optString("description", "")
+                val actual = try {
+                    g2p.phonemize(input, lang).phonemes
+                } catch (e: PiperPlusG2pException) {
+                    mismatches += "[$lang] '$input': phonemize threw ${e.message}"
+                    continue
+                }
+                if (actual != expected) {
+                    mismatches += "[$lang] '$input' ($description)\n" +
+                        "  expected: $expected\n" +
+                        "  actual:   $actual"
+                }
+                verified++
+            }
+        }
+        assertNotEquals("no parity cases verified — golden fixture empty?", 0, verified)
+        if (mismatches.isNotEmpty()) {
+            throw AssertionError(
+                "Byte-for-byte parity failures (${mismatches.size}/${verified}):\n" +
+                    mismatches.joinToString("\n\n"),
+            )
+        }
+    }
 }
