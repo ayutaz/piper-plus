@@ -487,6 +487,26 @@ impl WasmPhonemizer {
             .replace_phonemizer("zh", Box::new(zh_phonemizer));
         Ok(())
     }
+
+    /// Toggle ZH-EN code-switching dispatch (TICKET-04 W2, Issue #384).
+    ///
+    /// When enabled (default-on with `chinese` feature), English segments
+    /// adjacent to Chinese (`[zh, en, *]` / `[en, zh]` / `[zh, en, zh]`)
+    /// are phonemized as Mandarin pinyin via the bundled loanword
+    /// dictionary instead of the standard English path.
+    ///
+    /// Pass `false` to opt out and route embedded English through the
+    /// regular English phonemizer.
+    #[wasm_bindgen(js_name = setZhEnDispatch)]
+    pub fn set_zh_en_dispatch(&mut self, enabled: bool) {
+        self.phonemizer.enable_zh_en_dispatch(enabled);
+    }
+
+    /// Return whether ZH-EN code-switching dispatch is enabled.
+    #[wasm_bindgen(js_name = isZhEnDispatchEnabled)]
+    pub fn is_zh_en_dispatch_enabled(&self) -> bool {
+        self.phonemizer.is_zh_en_dispatch_enabled()
+    }
 }
 
 // ===========================================================================
