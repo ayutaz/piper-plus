@@ -29,7 +29,12 @@ concurrency:
 env:
   ANDROID_NDK_VERSION: "26.1.10909125"
   ANDROID_API_LEVEL: "24"
-  ONNXRUNTIME_VERSION: "1.17.0"
+  # ORT 1.20.0 is the first Android Maven Central release shipping 16-KB-page-
+  # aligned libonnxruntime.so (verified: PT_LOAD p_align = 0x4000). Required for
+  # the L5 NFR-COMPAT-4 / FR-TEST-5 alignment gate and Android 15+ devices that
+  # default to 16 KB pages. ORT C API has been stable since 1.x so the existing
+  # piper-plus C++ code links unchanged.
+  ONNXRUNTIME_VERSION: "1.20.0"
 
 jobs:
   # ---------------------------------------------------------------------------
