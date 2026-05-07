@@ -1,9 +1,9 @@
 name: "ZH-EN Loanword Sync Gate"
 
-# Prevents drift between Python source and 6 runtime mirrors of zh_en_loanword.json.
-# Phase 6a (Day 1): skeleton with --allow-missing so TICKET-01〜05 can land copies
-# incrementally without blocking PRs that don't yet have all 7 paths.
-# Phase 6b (Day 14): drop --allow-missing and tighten branch protection.
+# Phase 6b (Day 14, TICKET-06b): full byte-for-byte gate across all 7 copies +
+# 6 fixture mirrors. The Phase 6a `--allow-missing` flag was dropped after
+# TICKET-01〜05 landed all runtime copies. Any PR that drifts a copy from
+# the Python source-of-truth is now blocked at this gate.
 #
 # Source of truth: src/python/g2p/piper_plus_g2p/data/zh_en_loanword.json
 # See docs/tickets/zh-en-loanword/TICKET-06-ci-sync.md for the full contract.
@@ -45,8 +45,8 @@ jobs:
       - name: Schema validation (Python source)
         run: python scripts/check_loanword_consistency.py --schema-only
 
-      - name: Byte-for-byte hash check (Phase 6a — allow missing while TICKET-01〜05 land)
-        run: python scripts/check_loanword_consistency.py --allow-missing
+      - name: Byte-for-byte hash check (Phase 6b — full gate, 7 copies + 6 fixture mirrors)
+        run: python scripts/check_loanword_consistency.py
 
   fixture-self-check:
     name: Helper script self-check (pytest)

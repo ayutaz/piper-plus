@@ -1,0 +1,118 @@
+{
+  "schema_version": 1,
+  "description": "Cross-runtime test matrix for ZH-EN code-switching (Issue #384). All runtimes must produce identical token-count behavior. The exact IPA token sequences are produced by the Python reference and verified per-runtime in each ticket's mirror tests.",
+  "metadata": {
+    "source": "Python piper_plus_g2p (PR #397)",
+    "py_runtime": "src/python_run/piper/phonemize/chinese.py:phonemize_embedded_english",
+    "version": 1
+  },
+  "cases": [
+    {
+      "name": "acronym_gps",
+      "input": "GPS",
+      "expected_token_count": 11,
+      "notes": "GPS = ji4(3) + pi4(3) + ai1(2 zero-initial) + si4(3) = 11 phonemes"
+    },
+    {
+      "name": "acronym_usb",
+      "input": "USB",
+      "expected_token_count": 11,
+      "notes": "USB = you1 + ai1(zero) + si4 + bi4"
+    },
+    {
+      "name": "loanword_python_case_sensitive",
+      "input": "Python",
+      "expected_token_count": 6,
+      "notes": "pai4(3) + sen1(3) = 6"
+    },
+    {
+      "name": "loanword_chatgpt_5syllables",
+      "input": "ChatGPT",
+      "expected_token_count": 15,
+      "notes": "5 syllables x 3 phonemes = 15"
+    },
+    {
+      "name": "letter_fallback_zz_doubles_z",
+      "input": "ZZ",
+      "expected_token_count_relation": "2x_of_input_Z",
+      "notes": "ZZ must produce exactly twice as many tokens as Z (per-letter fallback)"
+    },
+    {
+      "name": "empty_input",
+      "input": "",
+      "expected_token_count": 0
+    },
+    {
+      "name": "whitespace_only",
+      "input": "   ",
+      "expected_token_count": 0
+    },
+    {
+      "name": "punctuation_only",
+      "input": ",.!?",
+      "expected_token_count": 0
+    },
+    {
+      "name": "trailing_comma_equiv_gps",
+      "input": "GPS,",
+      "expected_token_count_equiv": "GPS",
+      "notes": "trailing punctuation must yield the same tokens as bare GPS"
+    },
+    {
+      "name": "trailing_period_equiv_gps",
+      "input": "GPS.",
+      "expected_token_count_equiv": "GPS"
+    },
+    {
+      "name": "trailing_exclam_equiv_gps",
+      "input": "GPS!",
+      "expected_token_count_equiv": "GPS"
+    },
+    {
+      "name": "digits_z2z9_equiv_zz",
+      "input": "Z2Z9",
+      "expected_token_count_equiv": "ZZ",
+      "notes": "digits (2, 9) must be silently dropped from letter_fallback"
+    },
+    {
+      "name": "two_embedded_en_chatgpt_he_python",
+      "input": "ChatGPT 和 Python",
+      "expected_token_count_equiv_sum": ["ChatGPT", "Python"],
+      "notes": "non-ASCII separator (和 he) drops; total = ChatGPT + Python"
+    },
+    {
+      "name": "case_sensitivity_python_vs_PYTHON",
+      "input": "PYTHON",
+      "expected_token_count_differs_from": "Python",
+      "notes": "PYTHON falls through to letter_fallback (case-sensitive loanword 'Python' miss)"
+    },
+    {
+      "name": "issue_384_please_open_gps",
+      "input": "请打开 GPS",
+      "notes": "Issue #384 example 1 — GPS must phonemize via loanword path; full sentence verification is per-runtime"
+    },
+    {
+      "name": "issue_384_i_use_python",
+      "input": "我喜欢用 Python 写代码",
+      "notes": "Issue #384 example 2 — Python via case-sensitive loanword"
+    },
+    {
+      "name": "issue_384_let_me_use_chatgpt",
+      "input": "让我用 ChatGPT 写代码",
+      "notes": "Issue #384 example 3 — ChatGPT via case-sensitive loanword"
+    },
+    {
+      "name": "schema_v2_forward_compat_loader",
+      "input_json": {
+        "version": 2,
+        "schema_version": 2,
+        "metadata": {"experimental": true},
+        "acronyms": {"GPS": ["ji4"]},
+        "loanwords": {"Python": ["pai4"]},
+        "letter_fallback": {"A": ["ei1"]},
+        "tone_overrides": {"GPS": "high"}
+      },
+      "notes": "YELLOW-5: future schema_version: 2 with unknown fields must parse without errors. Each runtime's loader is pinned by `*Loader*Schema*V2*` test."
+    }
+  ]
+}
