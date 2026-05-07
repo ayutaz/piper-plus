@@ -22,6 +22,9 @@
 CMakeLists.txt text eol=lf
 *.cmake text eol=lf
 
+# JSON files (required for byte-for-byte sync across runtimes — Windows CRLF would break sha256 gate)
+*.json text eol=lf
+
 # Docker files
 Dockerfile* text eol=lf
 .dockerignore text eol=lf

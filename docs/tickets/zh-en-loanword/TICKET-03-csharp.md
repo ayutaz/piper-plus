@@ -3,7 +3,7 @@
 | 項目 | 値 |
 |------|---|
 | **チケット ID** | TICKET-03 |
-| **マイルストーン** | Phase 3 (Day 6-8) |
+| **マイルストーン** | Phase 3 (Day 7-9) ※ Rust / Go と並列着手可 (Day 1〜) |
 | **親 INDEX** | [README.md](README.md) |
 | **設計書参照** | §2.3 / §4.1 C1-C4 / §8.2 (独立実装方針) |
 | **ステータス** | 📝 Draft |
@@ -106,9 +106,9 @@ public interface IChineseG2PEngine
 `DotNetChineseG2PEngine` 側で実装 (NuGet 経由しない、`PinyinToIpa` 移植版を呼ぶ):
 
 ```csharp
-public IReadOnlyList<string> ConvertEmbeddedEnglish(string text, LoanwordData data)
+public ChineseG2PResult ConvertEmbeddedEnglish(string text, LoanwordData data)
 {
-    var result = new List<string>();
+    var tokens = new List<string>();
     foreach (var raw in TokenizeEnglishWords(text))
     {
         var stripped = StripTrailingPunctuation(raw);
@@ -118,15 +118,20 @@ public IReadOnlyList<string> ConvertEmbeddedEnglish(string text, LoanwordData da
             {
                 var split = PinyinToIpa.SplitPinyin(syl);
                 var ipa = PinyinToIpa.Convert(split);
-                result.AddRange(ipa);
+                tokens.AddRange(ipa);
             }
         }
     }
-    return result;
+    // embedded EN は prosody 0 fill (Python `chinese.py` の挙動と整合、設計書 §8.5)
+    var prosody = new ChineseProsody(
+        A1: new int[tokens.Count],
+        A2: new int[tokens.Count],
+        A3: new int[tokens.Count]);
+    return new ChineseG2PResult(Tokens: tokens, Prosody: prosody);
 }
 ```
 
-`MultilingualPhonemizer.Phonemize` 内 dispatch:
+`MultilingualPhonemizer.Phonemize` 内 dispatch (戻り値が `ChineseG2PResult` に統一されたため `result.Tokens` を AddRange):
 
 ```csharp
 for (int i = 0; i < segments.Count; i++)
@@ -138,14 +143,20 @@ for (int i = 0; i < segments.Count; i++)
         var nextIsZh = i + 1 < segments.Count && segments[i + 1].Lang == "zh";
         if (prevIsZh || nextIsZh)
         {
-            var tokens = _zhEngine.ConvertEmbeddedEnglish(seg.Text, _loanwordData);
-            result.AddRange(tokens);
+            var dispatched = _zhEngine.ConvertEmbeddedEnglish(seg.Text, _loanwordData);
+            result.AddRange(dispatched.Tokens);
+            // prosody が呼出元で必要な場合は dispatched.Prosody を統合 (PhonemizeWithProsody 経路)
             continue;
         }
     }
     result.AddRange(_enEngine.Convert(seg.Text));
 }
 ```
+
+> **戻り値型統一**: `ConvertEmbeddedEnglish` は既存 `Convert` と同じ `ChineseG2PResult` を返す。これにより:
+> 1. `IChineseG2PEngine` の signature が一意 (interface 宣言と実装が一致)
+> 2. `PhonemizeWithProsody` 経路で prosody 情報を欠損なく流せる
+> 3. Rust/Go/C++ の flat な戻り値 (Vec<String>/[]string/vector<Phoneme>) と意味論的に対応 (Tokens プロパティ抽出で互換)
 
 ### C4. テスト追加 (xUnit v3)
 
@@ -190,8 +201,9 @@ src/csharp/PiperPlus.Core.Tests/Phonemize/
 | `PinyinToIpa_Initial_BBeats_p` | Python `_INITIAL_TO_IPA['b']` と一致 |
 | `PinyinToIpa_Final_AngBeatsAng` | Python `_FINAL_TO_IPA['ang']` と一致 |
 | `PinyinToIpa_FullSyllable_Python_pai4` | full syllable round-trip |
+| `Loader_AcceptsUnknownFieldsInSchemaV2` | **forward-compat (YELLOW-5)**: `schema_version: 2` 未来の追加フィールド (例: `tone_overrides`) を含む JSON を `JsonSerializerOptions` の `UnmappedMemberHandling = Skip` (.NET 10 default) で受理することを確認。`Disallow` 指定時は throw する逆ケースも併せて検証。設計書 §9.5 schema migration プロトコル整合 |
 
-合計 **27 テスト**。
+合計 **28 テスト**。
 
 ---
 
@@ -347,7 +359,7 @@ diff phonemes_python.json phonemes_csharp.json  # 期待: 差分ゼロ
 | # | 原則 | 説明 |
 |---|------|------|
 | 1 | **PUA 出力 byte 一致** | 既存学習済みモデル PUA 0xE020-0xE04A を絶対変えない。 |
-| 2 | **Default-on, opt-out 可** | `MultilingualPhonemizerOptions { ZhEnDispatch = true }` で制御。 |
+| 2 | **Default-on, opt-out 可** | `MultilingualPhonemizerOptions { EnableZhEnDispatch = true }` で制御。命名は 5 ランタイム共通 (Rust `.enable_zh_en_dispatch()` / Go `.WithZhEnDispatch()` / JS `.setZhEnDispatch()` / C++ `.enable_zh_en_dispatch()` と整合、レビュー指摘 YELLOW-2 反映)。 |
 | 3 | **Graceful failure** | default 欠損 → exception (assembly resource は build 時保証)、override 欠損 → `FileNotFoundException`。 |
 | 4 | **Single source of truth** | Python JSON が canonical、C# は consumer。 |
 | 5 | **NuGet 外部依存に依存しない経路** | `DotNetG2P.Chinese` を経由しない代替経路を Core に常備。9.6a で離脱ロードマップを管理。 |
@@ -424,9 +436,9 @@ private static Stream GetEmbeddedResource(Assembly asm, string fileName)
 ### 9.2 API 層
 
 ```csharp
-// builder pattern + opt-out
+// builder pattern + opt-out (命名は 5 ランタイム共通の enable_zh_en_dispatch / EnableZhEnDispatch)
 var phonemizer = new MultilingualPhonemizerBuilder()
-    .WithZhEnDispatch(enabled: true)
+    .EnableZhEnDispatch(true)  // default true (opt-out 可、設定は明示でも可)
     .WithLoanwordData(LoanwordSource.Default)
     // or .WithLoanwordData(LoanwordSource.FromFile("custom.json"))
     .Build();
@@ -477,7 +489,7 @@ src/csharp/
 | `LoadFromPath(path)` で file 欠損 | `FileNotFoundException` | — |
 | schema 違反 | `LoanwordValidationException` | Python と同文言 |
 | JSON parse error | `JsonException` (System.Text.Json) | inner |
-| `ZhEnDispatch=false` | Engine 非経由、loanword は touch しない | — |
+| `EnableZhEnDispatch=false` | Engine 非経由、loanword は touch しない | — |
 
 ### 9.6 i18n 拡張パス
 

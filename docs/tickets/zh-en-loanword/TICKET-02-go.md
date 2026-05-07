@@ -3,7 +3,7 @@
 | 項目 | 値 |
 |------|---|
 | **チケット ID** | TICKET-02 |
-| **マイルストーン** | Phase 2 (Day 4-5) |
+| **マイルストーン** | Phase 2 (Day 5-6) ※ Rust と並列着手可 (Day 1〜) |
 | **親 INDEX** | [README.md](README.md) |
 | **設計書参照** | §2.2 / §4.1 G1-G5 / §8.10 (`//go:embed` + sync.Once) |
 | **ステータス** | 📝 Draft |
@@ -144,6 +144,7 @@ for i, segment := range segments {
 | `TestLoadLoanwordData_OnceOnly` | `sync.Once` で 2 回呼んでも同じ pointer |
 | `TestValidate_InvalidSchema` | `[]int` を渡すと `Validate()` がエラー |
 | `TestEmbedConsistency` | `loanwordFS.ReadFile` の bytes が Python source と一致 |
+| `TestLoaderAcceptsUnknownFieldsInSchemaV2` | **forward-compat (YELLOW-5)**: `schema_version: 2` 未来の追加フィールド (例: `tone_overrides`) を含む JSON を `json.Unmarshal` が DisallowUnknownFields **指定なし**で受理することを確認。Go default は unknown field を ignore するため、明示的な test で挙動を固定する。設計書 §9.5 schema migration プロトコル整合 |
 
 #### Integration テスト (`multilingual_test.go` 拡張)
 

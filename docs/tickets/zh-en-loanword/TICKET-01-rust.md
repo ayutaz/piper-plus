@@ -3,7 +3,7 @@
 | 項目 | 値 |
 |------|---|
 | **チケット ID** | TICKET-01 |
-| **マイルストーン** | Phase 1 (Day 1-3) |
+| **マイルストーン** | Phase 1 (Day 1-4) ※ レビュー指摘 RED-C1 で 3→4 日に拡張 (2 crate 同期 + 44 テストの実工数考慮) |
 | **親 INDEX** | [README.md](README.md) |
 | **設計書参照** | §2.1 / §4.1 R1-R5 / §8.5 (crate 重複問題) / §8.14 (thread safety) |
 | **ステータス** | 📝 Draft |
@@ -137,6 +137,7 @@ for (i, segment) in segments.iter().enumerate() {
 | `test_digits_dropped` | `Z2Z9` == `ZZ` |
 | `test_acronym_with_digits` | `MP3` が acronym 直接ヒット |
 | `test_schema_validation_invalid_type` | 不正な schema で `validate_schema` がエラーを返す |
+| `test_loader_accepts_unknown_fields_in_schema_v2` | **forward-compat (YELLOW-5)**: `schema_version: 2` 未来の追加フィールド (例: `tone_overrides`) を含む JSON を loader が `unknown field` エラーで拒否しない (`#[serde(default)]` + struct `#[serde(deny_unknown_fields = false)]` の挙動確認)。設計書 §9.5 schema migration プロトコル整合 |
 
 #### Integration テスト (`piper-core/tests/test_chinese.rs` 拡張)
 
@@ -188,7 +189,7 @@ for (i, segment) in segments.iter().enumerate() {
 
 ### テスト項目
 
-設計書 §4.3 の統一テストマトリックス全件 + 重複 crate 同期テスト。最低 **22 テスト/crate × 2 = 44 テスト**。
+設計書 §4.3 の統一テストマトリックス全件 + 重複 crate 同期テスト + forward-compat loader test (YELLOW-5)。最低 **23 テスト/crate × 2 = 46 テスト**。
 
 ---
 
@@ -256,8 +257,19 @@ diff <python_phonemes.json> <rust_phonemes.json>
 
 ### 懸念 5: WASM ビルドサイズ増加 (§8.22)
 - **影響**: JSON 同梱で wasm bundle が ~30KB 増。
-- **緩和**: `feature = "zh-en"` で gate 可能にする (デフォルト on、必要なら off にできる)。本 PR ではデフォルト on のみ。
+- **緩和 (二層管理、レビュー指摘 YELLOW-1 反映)**: opt-in/opt-out を **コンパイル時 (Cargo feature)** と **ランタイム (dispatch)** の 2 層で分離する:
+
+  | 層 | 既定値 | 制御方法 | 目的 |
+  |----|--------|---------|------|
+  | **Cargo feature `zh-en`** | **opt-in (`default = []`)** | `[features] default = ["zh", "ja", "en"]` (`zh-en` を**除外**)、利用者が `features = ["zh-en"]` で明示有効化 | WASM bundle size 制御 (~30KB)。WASM 利用者の中にも ZH-EN 不要な人がいるため opt-in 維持 |
+  | **ランタイム dispatch** | **opt-out (default-on)** | `feature = "zh-en"` 有効時、`MultilingualPhonemizer::new()` で **default 有効**、`.enable_zh_en_dispatch(false)` で無効化可能 | 設計書 §8.12 「全ランタイムに default-on で機能展開」と整合 |
+
+  本 PR では:
+  - `Cargo.toml` の `[features]` で `zh-en` を `default` から外す (WASM size 守る)
+  - native (piper-core) crate では `default = ["zh", "ja", "en", "zh-en"]` を設定可能 (利用者が `features` で制御)
+  - ランタイムの `MultilingualPhonemizer::new()` は feature 有効なら default-on dispatch、`.enable_zh_en_dispatch(false)` で opt-out
 - **責任**: Rust Core Dev #1。
+- **整合確認**: 設計書 §8.22 (`default = ["zh", "ja", "en"]`、zh-en を opt-in) / TICKET-04 §2 W2 (`default = []`) / 本懸念は **二層管理として整合**。設計書 §8.12 (全ランタイム default-on) との「矛盾」は、ランタイム層が default-on (feature 有効時) であることを明示することで解消。
 
 ---
 

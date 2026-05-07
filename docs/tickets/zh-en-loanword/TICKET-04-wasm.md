@@ -3,7 +3,7 @@
 | 項目 | 値 |
 |------|---|
 | **チケット ID** | TICKET-04 |
-| **マイルストーン** | Phase 4 (Day 9) |
+| **マイルストーン** | Phase 4 (Day 10-11) ※ レビュー指摘 RED-C1 で 1→2 日に拡張 (TICKET-01 setter shape 確定 Day 4 後着手) |
 | **親 INDEX** | [README.md](README.md) |
 | **設計書参照** | §2.4 / §4.1 W2-W5 / §8.4 (二層 FFI) / §8.22 (WASM size 最適化) |
 | **ステータス** | 📝 Draft |
@@ -152,8 +152,9 @@ export class ChineseG2P {
 | `issue example: 我喜欢用 Python 写代码` | Issue 例 2 |
 | `issue example: 让我用 ChatGPT 写代码` | Issue 例 3 |
 | `bundled JSON SHA256 matches Python source` | byte 一致確認 |
+| `loader accepts unknown fields in schema_v2` | **forward-compat (YELLOW-5)**: `schema_version: 2` 未来の追加フィールド (例: `tone_overrides`) を含む JSON を Rust serde の `#[serde(default)]` 経路 + JS 側 `JSON.parse` (unknown fields 保持) で受理することを確認。設計書 §9.5 schema migration プロトコル整合 |
 
-合計 **21 テスト**。
+合計 **22 テスト**。
 
 #### E2E テスト (browser smoke)
 

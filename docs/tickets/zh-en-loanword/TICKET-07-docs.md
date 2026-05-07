@@ -3,7 +3,7 @@
 | 項目 | 値 |
 |------|---|
 | **チケット ID** | TICKET-07 |
-| **マイルストーン** | Phase 7 (Day 14) |
+| **マイルストーン** | Phase 7 (Day 15) ※ Day 16 は統合バッファ (cross-runtime PR review / 最終回帰) |
 | **親 INDEX** | [README.md](README.md) |
 | **設計書参照** | §8.11 (リリース戦略) / §8.19 (API doc 統一) / §8.21 (データセット拡張運用) |
 | **ステータス** | 📝 Draft |
@@ -535,21 +535,55 @@ docs/migration/
 
 **`_template.md`** は新規 migration を書くたびにコピペ元として使用、構造の統一を担保。
 
-**冒頭に compatibility matrix を必須化** (利用者が「私のコードは何を変える必要があるか」を 1 表で理解):
+**冒頭に compatibility matrix を必須化** (利用者が「私のコードは何を変える必要があるか」を 1 表で理解)。**4 軸 (API / SemVer / ABI / schema) で集約** (レビュー指摘 D1 反映、TICKET-01 §9.4 / TICKET-04 §9.9 / TICKET-05 §9.9 / TICKET-06 §9.5 のコンテンツを単一表に統合):
 
 ```markdown
-## Compatibility matrix (v{prev} → v{this})
+## Compatibility matrix (v{prev} → v{this}) — API / SemVer / ABI / Schema 4 軸
 
-| Runtime | Default 動作変更 | 新 API | Opt-out 必要なケース | あなたが行うこと |
-|--------|---------------|------|-----------------|------------|
-| Python (`piper-plus-g2p` X → Y) | ZH-EN 経路 default-on | `enable_zh_en_dispatch=False` | 旧 EN 発音維持希望 | **何もしない** または opt-out flag 追加 |
-| Rust (X → Y) | 同上 | `.enable_zh_en_dispatch(false)` builder | 同上 | 同上 |
-| Go (X → Y) | 同上 | `WithZhEnDispatch(false)` option | 同上 | 同上 |
-| C# (X → Y) | 同上 | `MultilingualPhonemizerOptions { ZhEnDispatch = false }` | 同上 | 同上 |
-| JS (X → Y) | 同上 | `setZhEnDispatch(false)` instance method | 同上 | 同上 |
-| C++ (vX → vY) | 同上 | `phonemizeChineseMixed(..., enable_zh_en_dispatch=false)` | 同上 | 同上 |
+### A. API シグネチャ + Default 動作
 
-> **TL;DR**: 純 ZH / 純 EN 利用者は何もする必要なし。
+| Runtime | Default 動作変更 | 新 API (opt-out) | 既存利用者が行うこと |
+|--------|---------------|---------------|------------|
+| Python (`piper-plus-g2p` X → Y) | ZH-EN 経路 default-on | `phonemize(..., enable_zh_en_dispatch=False)` | **何もしない** または opt-out flag 追加 |
+| Rust `piper-plus-g2p` (X → Y) | 同上 (Cargo `feature = "zh-en"` 有効時) | `MultilingualPhonemizer::builder().enable_zh_en_dispatch(false)` | feature 無効なら影響なし |
+| Rust `piper-core` (X → Y) | 同上 | `.enable_zh_en_dispatch(false)` | 同上 |
+| Go (X → Y) | 同上 | `multilingual.New(..., WithZhEnDispatch(false))` functional option | 同上 |
+| C# (X → Y) | 同上 | `new MultilingualPhonemizerBuilder().EnableZhEnDispatch(false)` builder, または `MultilingualPhonemizerOptions { EnableZhEnDispatch = false }` | 同上 |
+| JS / WASM (X → Y) | 同上 (Cargo `feature = "zh-en"` 有効時、bundle に含まれる時のみ) | `phonemizer.setZhEnDispatch(false)` instance method | feature 未有効版を使えば影響なし |
+| C++ (vX → vY) | 同上 (デスクトップ default-on / Mobile build-time 設定) | `MultilingualPhonemizerOptions{ enable_zh_en_dispatch = false }` | 同上 |
+
+### B. SemVer 影響 (TICKET-01 §9.4 / TICKET-04 §9.9 集約)
+
+| Runtime | 本 PR の bump | 理由 | major bump 候補となる将来変更 |
+|--------|-----------|------|---------------------|
+| Python | minor (`X.Y.0`) | API 追加のみ、既存呼び出しは互換 | - |
+| Rust | minor (`0.X+1.0` or `X.Y+1.0`) | trait method 追加、既存実装に default あり (semver compat) | trait に required method 追加、`piper-plus-g2p` と `piper-core` 統合 (v0.5.0 候補) |
+| Go | minor | functional option 追加 | exported function signature 変更 |
+| C# | minor (`0.X+1.0`) | new member on sealed class、AOT context 拡張 | sealed class → record class 変更、AOT context source-gen breaking |
+| WASM/npm | minor (`0.X+1.0`) | new method on instance、Cargo `feature = "zh-en"` opt-in | feature default 有効化 (bundle size +30KB) |
+| C++ | minor (lib soname 据え置き) | header-only struct 追加 (POD)、wrapper function 追加 | `phonemizeEmbeddedEnglish` を `chinese_phonemize.cpp` 内部関数の signature 変更 |
+
+### C. ABI (C++ shared lib のみ、TICKET-05 §9.9 集約)
+
+| 観点 | 状態 |
+|------|------|
+| `libpiper_plus.so` / `libpiper_plus.dylib` / `piper_plus.dll` SONAME | **据え置き** (本 PR で SO 番号変更なし) |
+| ABI snapshot | `tests/abi/symbols.txt` に固定 (新規追加 export 関数のみ追加) |
+| iOS xcframework symbol | `release-shared-lib.yml` で symbol check 強化 |
+| inline namespace 使用 | `piper::v1::` を導入 (将来の major bump で `v2::` へ移行可能、co-installable) |
+| `_Static_assert` で struct alignment 固定 | `LoanwordData` 等の POD 構造体に追加 |
+
+### D. Schema migration (TICKET-06 §9.5 集約)
+
+| 観点 | 状態 |
+|------|------|
+| Current schema | `schema_version: 1` (`acronyms` / `loanwords` / `letter_fallback` の 3 dict) |
+| Forward-compat loader | 全 5 ランタイム + Python が `unknown field` を ignore (各テスト `test_loader_accepts_unknown_fields_in_schema_v2` で固定、YELLOW-5) |
+| v2 schema 追加候補 | `tone_overrides`, `ja_en_loanwords`, `dialectal_variants` 等 |
+| Breaking schema migration プロトコル | (1) Python source で v2 提案 → (2) forward-compat loader で全 5 ランタイム受理確認 → (3) major bump (Python `2.0.0` + Rust `1.0.0` + ...) で v1 サポート削除 |
+| 5 ランタイム同時 PR は不要 | forward-compat loader 経由で段階的移行可能 |
+
+> **TL;DR**: 純 ZH / 純 EN 利用者は何もする必要なし。本 PR は API / SemVer / ABI / Schema いずれの軸でも minor / 据え置きのみで、major breaking change なし。
 ```
 
 ### 9.3 Release automation

@@ -3,29 +3,40 @@
 | 項目 | 値 |
 |------|---|
 | **チケット ID** | TICKET-06 |
-| **マイルストーン** | Phase 6 (Day 13) |
+| **マイルストーン** | **Phase 6a (Day 1) — workflow + hash gate skeleton 先行 merge** / **Phase 6b (Day 14) — fixture matrix + skill 完成** |
 | **親 INDEX** | [README.md](README.md) |
 | **設計書参照** | §4.2 X5 / §8.3 (JSON 同期 CI) / §8.7 (テストデータ統一) / §8.15 (CI 整合性) |
 | **ステータス** | 📝 Draft |
-| **依存元** | TICKET-01〜05 (各ランタイム実装完了が前提、ただし JSON 同期 job のみは並列着手可) |
+| **依存元** | **Phase 6a**: なし (TICKET-01 開始前に着手可) / **Phase 6b**: TICKET-01〜05 (fixture mirror 配置のため各ランタイム実装完了が前提) |
 | **依存先** | TICKET-07 (Docs) |
-| **追加 LOC** | ~150 (workflow YAML + Python helper script + fixture) |
+| **追加 LOC** | ~200 (workflow YAML + Python helper script + fixture matrix) |
 | **作業ブランチ** | `feat/zh-en-loanword-runtimes` |
+
+> **二段階運用 (レビュー指摘 RED-B2 反映)**: 当初は Day 13 に集中着手予定だったが、12 日間 CI gate 不在で JSON drift が検知されないリスクを回避するため、以下の 2 phase に分割:
+> - **Phase 6a (Day 1)**: S1 workflow YAML + S2 helper script (`--allow-missing` mode) を先行 merge。各 TICKET-01〜05 の merge 時点で path が埋まっていく
+> - **Phase 6b (Day 14)**: S3 fixture matrix + S4 各ランタイム loader 統合 + S5 branch protection 登録 + S6 `/check-loanword` skill 雛形完成
 
 ---
 
 ## 1. タスク目的とゴール
 
-**目的**: 6 箇所に分散する `zh_en_loanword.json` の **byte-for-byte 一致**を CI で強制する。Cross-runtime 統一テスト fixture (`tests/fixtures/g2p/zh_en_loanword_matrix.json`) を導入し、5 ランタイム全てで同じケースをループ実行できるようにする。
+**目的**: 7 箇所に分散する `zh_en_loanword.json` の **byte-for-byte 一致**を CI で強制する。Cross-runtime 統一テスト fixture (`tests/fixtures/g2p/zh_en_loanword_matrix.json`) を導入し、5 ランタイム全てで同じケースをループ実行できるようにする。
 
-**ゴール**:
-- `.github/workflows/zh-en-loanword-sync.yml` が PR で hash mismatch を 100% 検出。
-- `scripts/check_loanword_consistency.py` で開発者がローカルで同期確認・自動コピー (`--fix`) できる。
+> **7 箇所の内訳**: Python 学習側 (`src/python/g2p/piper_plus_g2p/data/`) を source of truth とし、Python ランタイム側 + Rust 2 crate (`piper-plus-g2p` + `piper-core`、§8.5 の crate 重複問題から導出) + Go + C# + WASM-data + C++ の **計 7 ファイル**。設計書 §6.3 / §8.3 / §8.15 / §8.21 で「6 箇所」と書かれている箇所はすべて Rust 1 crate 想定の旧表記であり、本チケットを実装の正本とする。
+
+**Phase 6a ゴール (Day 1 先行 merge)**:
+- `.github/workflows/zh-en-loanword-sync.yml` が PR で hash mismatch を 100% 検出 (path 未存在は `--allow-missing` で warn、後段 phase で順次埋まる)。
+- `scripts/check_loanword_consistency.py` の hash check + schema validation 部分が動作 (fixture 関連は後段)。
+- 各 TICKET-01〜05 の実装中に新規 JSON copy が source と乖離した瞬間に CI で検知。
+
+**Phase 6b ゴール (Day 14 完成)**:
 - `tests/fixtures/g2p/zh_en_loanword_matrix.json` に統一マトリックス (~25 ケース、`schema_version: 1` 必須) を配置。
 - 各ランタイム test loader が fixture を読み込み、ループ実行で全件 PASS。
 - `ci-required` (branch protection) に新 sync job を追加。
+- `scripts/check_loanword_consistency.py --fix` で Python source からの一方向コピーが完成 (fixture mirror 含む)。
 - CI 全体時間 +2 分以内に収める。
 - pre-commit hook (`scripts/check_loanword_consistency.py --check`) が opt-in で動作。
+- `/check-loanword` skill 雛形を `.claude/skills/` に配置 (将来の dev experience 向上ポイント)。
 
 ---
 
@@ -113,16 +124,25 @@ jobs:
 
 PUA 同期 (`scripts/check_pua_consistency.py`) を踏襲。
 
+> **重要 (レビュー指摘 YELLOW-4 反映)**: **Source of truth は Python `src/python/g2p/piper_plus_g2p/data/zh_en_loanword.json` のみ**。`--fix` は Python source からの **一方向コピー** であり、他の 6 mirror を直接編集しても伝播しない (CI fail 後に `--fix` で「自分の編集が消える」結果になり混乱要因)。Rust/Go/C#/WASM/C++ 開発者が JSON 変更を提案する場合は、必ず Python source を編集すること。`--diff` flag (今後追加) で `--fix` 実行前に dry-run 差分表示を行う運用を推奨。
+>
+> **`.gitattributes` 前提条件**: Windows 開発者 (`git config core.autocrlf=true`) で `*.json` が CRLF 変換されると sha256 が壊れる。本 PR で `.gitattributes` に `*.json text eol=lf` を追加済 (リポジトリルート、レビュー指摘 YELLOW-4)。既存リポジトリで作業中の人は `git rm --cached <file>` → `git add <file>` で再正規化が必要。
+
 ```python
 #!/usr/bin/env python3
 """ZH-EN loanword JSON 同期チェッカー.
 
-7 箇所の zh_en_loanword.json を Python source と byte 一致させる。
+7 箇所の zh_en_loanword.json を Python source と byte 一致させる (一方向コピー).
+
+Source of truth: src/python/g2p/piper_plus_g2p/data/zh_en_loanword.json
+他の 6 mirror を直接編集しても --fix では Python source 内容に上書きされる。
+JSON 変更を提案する場合は必ず Python source を編集すること.
 
 Usage:
     python scripts/check_loanword_consistency.py            # チェックのみ (CI 用)
-    python scripts/check_loanword_consistency.py --fix       # 自動コピー (開発者用)
+    python scripts/check_loanword_consistency.py --fix       # Python source → 6 mirror 一方向コピー (開発者用)
     python scripts/check_loanword_consistency.py --schema-only  # schema のみ
+    python scripts/check_loanword_consistency.py --diff      # --fix 前の dry-run 差分表示 (将来追加)
 """
 import argparse
 import hashlib
@@ -147,6 +167,7 @@ FIXTURE_MIRRORS = [
     Path("src/csharp/PiperPlus.Core.Tests/Phonemize/TestData/zh_en_loanword_matrix.json"),
     Path("src/cpp/tests/fixtures/zh_en_loanword_matrix.json"),
     Path("src/wasm/g2p/test/fixtures/zh_en_loanword_matrix.json"),
+    Path("src/rust/piper-plus-g2p/tests/fixtures/zh_en_loanword_matrix.json"),  # YELLOW-3: 2 crate 対称テスト
     Path("src/rust/piper-core/tests/fixtures/zh_en_loanword_matrix.json"),
 ]
 

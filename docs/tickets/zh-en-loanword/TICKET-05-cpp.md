@@ -3,7 +3,7 @@
 | 項目 | 値 |
 |------|---|
 | **チケット ID** | TICKET-05 |
-| **マイルストーン** | Phase 5 (Day 10-12) |
+| **マイルストーン** | Phase 5 (Day 11-14) ※ レビュー指摘 RED-C1 で 3→4 日に拡張 (5 platform CI + xcframework symbol 検証 + Mobile 検証日独立) |
 | **親 INDEX** | [README.md](README.md) |
 | **設計書参照** | §2.5 / §4.1 P1-P6 / §8.1 (iOS/Android リソース) / §8.6 (テスト拡充) / §8.14 (thread safety) / §8.23 (cross-compile) |
 | **ステータス** | 📝 Draft |
@@ -68,14 +68,14 @@ std::shared_ptr<const LoanwordData> getDefaultLoanwordData();
 std::shared_ptr<const LoanwordData> loadLoanwordDataFromPath(const std::string& path);
 void validateLoanwordData(const LoanwordData& data);  // throws std::invalid_argument
 
-// メイン関数
+// メイン関数 (戻り値は flat: 1 要素 = 1 phoneme。Rust `Vec<String>` / Go `[]string` / C# `IReadOnlyList<string>` と整合、設計書 §8.5 / §4.3 fixture 比較整合)
 void phonemizeEmbeddedEnglish(
     const std::string& text,
-    std::vector<std::vector<Phoneme>>& out,
+    std::vector<Phoneme>& out,
     const LoanwordData& data
 );
 
-}  // namespace piper_plus
+}  // namespace piper
 ```
 
 **implementation (`chinese_loanword.cpp`)** の主要箇所:
@@ -113,12 +113,12 @@ std::shared_ptr<const LoanwordData> getDefaultLoanwordData() {
 
 ### P2. `phonemizeEmbeddedEnglish()` C++ 実装 (~150 LOC)
 
-Lookup priority (Python と一致):
+Lookup priority (Python と一致)。**out は flat な `std::vector<Phoneme>`** (Rust/Go/C# と byte-for-byte 比較するため、設計書 §4.3 fixture matrix の `expected_tokens` は flat list 前提):
 
 ```cpp
 void phonemizeEmbeddedEnglish(
     const std::string& text,
-    std::vector<std::vector<Phoneme>>& out,
+    std::vector<Phoneme>& out,
     const LoanwordData& data)
 {
     auto words = tokenizeEnglishWords(text);
@@ -137,28 +137,31 @@ void phonemizeEmbeddedEnglish(
             if (it2 != data.acronyms.end()) syllables = &it2->second;
         }
 
-        // 3. letter_fallback (char-by-char, digits drop)
+        // 3. letter_fallback (char-by-char, digits drop) — flat append
         if (!syllables) {
             for (char ch : stripped) {
                 if (std::isdigit(static_cast<unsigned char>(ch))) continue;
                 std::string key(1, std::toupper(static_cast<unsigned char>(ch)));
                 auto it3 = data.letter_fallback.find(key);
                 if (it3 != data.letter_fallback.end()) {
-                    appendPinyinToIpa(it3->second, out);
+                    // appendPinyinToIpaFlat: 各 syllable の phoneme 列を out に flat 結合
+                    appendPinyinToIpaFlat(it3->second, out);
                 }
             }
             continue;
         }
 
-        // syllables を pinyin → IPA 変換
+        // syllables を pinyin → IPA 変換し out へ flat 結合
         for (const auto& syl : *syllables) {
             auto split = splitPinyin(syl);
-            auto ipa = pinyinToIpa(split);  // 既存関数 (chinese_phonemize.cpp:670 周辺)
-            out.emplace_back(std::move(ipa));
+            auto ipa = pinyinToIpa(split);  // std::vector<Phoneme> (= 1 syllable の phoneme 列)
+            out.insert(out.end(), ipa.begin(), ipa.end());
         }
     }
 }
 ```
+
+> **戻り値構造**: 各 phoneme を flat に並べた `vector<Phoneme>`。Python `chinese.py:phonemize_embedded_english(text) -> list[str]` の挙動と整合。fixture (`tests/fixtures/g2p/zh_en_loanword_matrix.json`) の `expected_tokens` は flat list なので、CI でランタイム間 byte 一致比較が成立する。
 
 ### P3. `piper.cpp` dispatch 拡張 (~50 LOC)
 
@@ -171,9 +174,14 @@ for (size_t i = 0; i < segments.size(); ++i) {
         bool prevIsZh = i > 0 && segments[i-1].lang == "zh";
         bool nextIsZh = i+1 < segments.size() && segments[i+1].lang == "zh";
         if (prevIsZh || nextIsZh) {
-            std::vector<std::vector<Phoneme>> embedded_phonemes;
-            phonemizeEmbeddedEnglish(seg.text, embedded_phonemes, *loanwordData);
-            out.insert(out.end(), embedded_phonemes.begin(), embedded_phonemes.end());
+            // phonemizeEmbeddedEnglish は flat vector<Phoneme> を返す
+            std::vector<Phoneme> embedded_flat;
+            phonemizeEmbeddedEnglish(seg.text, embedded_flat, *loanwordData);
+            // piper.cpp の既存 out は vector<vector<Phoneme>> (1 word = 1 entry) なので
+            // dispatch 時点で 1 entry として wrap (既存 ABI を保つ adapter 層)
+            if (!embedded_flat.empty()) {
+                out.emplace_back(std::move(embedded_flat));
+            }
             continue;
         }
     }
@@ -181,6 +189,11 @@ for (size_t i = 0; i < segments.size(); ++i) {
     phonemizeEnglish(seg.text, out, ...);
 }
 ```
+
+> **API 層と内部 ABI の分離**: `phonemizeEmbeddedEnglish` は **flat (Rust/Go/C# 整合)**、`piper.cpp` 既存の `vector<vector<Phoneme>>` へは dispatch 側で wrap。これにより:
+> - Cross-runtime fixture 比較は flat 同士で成立 (`expected_tokens` 直接比較)
+> - 既存 `piper.cpp` の音声合成パイプラインの ABI 変更不要
+> - 将来 `piper.cpp` 自体を flat 化する際も `phonemizeEmbeddedEnglish` は変更不要
 
 ### P4. C API export 追加
 
@@ -272,6 +285,7 @@ endif()
 | `Multilingual_ZhEnZh_Pattern` | `请打开 GPS 系统` |
 | `Multilingual_PureZh_Unaffected` | regression |
 | `Multilingual_PureEn_Unaffected` | regression |
+| `Loader_AcceptsUnknownFieldsInSchemaV2` | **forward-compat (YELLOW-5)**: `schema_version: 2` 未来の追加フィールド (例: `tone_overrides`) を含む JSON を loader が拒否しないことを確認。`parseLoanwordJson` が unknown field を ignore する挙動を test で固定。設計書 §9.5 schema migration プロトコル整合 |
 
 #### Multi-thread テスト (設計書 §8.14)
 
@@ -282,7 +296,7 @@ TEST(ZhEnLoanwordTest, ConcurrentAccess) {
     for (int i = 0; i < 16; ++i) {
         threads.emplace_back([data]() {
             for (int j = 0; j < 1000; ++j) {
-                std::vector<std::vector<Phoneme>> out;
+                std::vector<Phoneme> out;  // flat (RED-A2 統一)
                 phonemizeEmbeddedEnglish("GPS", out, *data);
             }
         });
@@ -301,7 +315,7 @@ TEST(ZhEnLoanwordTest, ConcurrentAccess) {
 | `CApi_PhonemizeEmbeddedEnglish_GPS` | 出力 buffer サイズ確認 |
 | `CApi_BufferTooSmall_ReturnsRequiredSize` | partial fill + true size |
 
-合計 **27 テスト**。設計書 §8.6 で設定した「現状 2 ケース → 27 ケース」目標に到達。
+合計 **28 テスト**。設計書 §8.6 で設定した「現状 2 ケース → 27 ケース」目標を超過 (forward-compat loader test 追加分)。
 
 ---
 

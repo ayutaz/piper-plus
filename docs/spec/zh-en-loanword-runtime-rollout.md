@@ -200,7 +200,7 @@ Step 4. ユニットテスト + CI 同期ガード
 
 | # | 課題 | 詳細 | 対応方針 |
 |---|------|------|---------|
-| X1 | **Source of truth の JSON 同期** | 6 箇所に同じ JSON が分散する (Python 学習 / Python ランタイム / Rust / Go / C# / WASM-data / C++) | CI 同期ガードを各ランタイムで追加、git pre-commit hook 検討 |
+| X1 | **Source of truth の JSON 同期** | **7 箇所**に同じ JSON が分散する (Python 学習 / Python ランタイム / Rust 2 crate (`piper-plus-g2p` + `piper-core`) / Go / C# / WASM-data / C++) | CI 同期ガードを各ランタイムで追加、git pre-commit hook 検討 |
 | X2 | **PUA mapping の一貫性** | 中国語 PUA codepoint (0xE020-0xE04A) が全ランタイムで同じ tone marker を出すか確認 | 既存の `docs/spec/pua-contract.toml` で担保済み、新規追加なし |
 | X3 | **Schema validation の方針統一** | Python 側の `_load_loanword_data` は厳格 validation (list[str] 型チェック)。各ランタイムで同等のエラーメッセージ形式を出す | `f"{path}: '{section}.{key}' must be list[str]"` 形式を標準化 |
 | X4 | **テストケースの統一** | Issue 例 3 つ + 各 priority/punctuation/digits ケースを全ランタイムでカバー | 統一テストマトリックス (後述) |
@@ -303,7 +303,7 @@ PR マージの最低条件:
 
 - [ ] 5 ランタイムすべてで Issue #384 例 3 つが期待 IPA 列を出す
 - [ ] 各ランタイムで上記テストマトリックス全件 PASS
-- [ ] `zh_en_loanword.json` が 6 箇所すべてで byte-for-byte 一致 (CI ガード)
+- [ ] `zh_en_loanword.json` が **7 箇所** (Rust 2 crate 含む) すべてで byte-for-byte 一致 (CI ガード)
 - [ ] 既存の純中国語 / 純英語 / `[ja,en]` パターンにリグレッションなし
 - [ ] CI 全 job green (lint, ruff format, build matrix, runtime tests)
 - [ ] 各ランタイムの README/CHANGELOG 更新
@@ -436,7 +436,7 @@ internal static class LoanwordDataLoader {
 
 ### 8.3 JSON 同期 CI 戦略
 
-**問題**: 6 箇所 (Python 学習側 / Python ランタイム側 / Rust / Go / C# / WASM / C++) に同じ JSON が分散する。
+**問題**: **7 箇所** (Python 学習側 / Python ランタイム側 / Rust 2 crate (`piper-plus-g2p` + `piper-core`) / Go / C# / WASM / C++) に同じ JSON が分散する。
 
 **既存パターン**: `pua.json` の同期は `check_pua_consistency.py` + `/check-pua` skill + pre-commit hook で実現済み (commit `3a38a61f`, `96138922`, `90ff6390`)。これを踏襲する。
 
@@ -484,6 +484,7 @@ jobs:
           COPIES=(
             src/python_run/piper/phonemize/data/zh_en_loanword.json
             src/rust/piper-plus-g2p/data/zh_en_loanword.json
+            src/rust/piper-core/data/zh_en_loanword.json
             src/go/phonemize/data/zh_en_loanword.json
             src/csharp/PiperPlus.Core/Phonemize/Data/zh_en_loanword.json
             src/wasm/g2p/data/zh_en_loanword.json
@@ -499,7 +500,7 @@ jobs:
               exit 1
             }
           done
-          echo "All 6 copies match $SOURCE"
+          echo "All 7 copies match $SOURCE"
 ```
 
 **新規 helper script (PUA パターン踏襲)**:
@@ -1270,13 +1271,14 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v6
-      - name: Verify all 6 copies match (sha256)
+      - name: Verify all 7 copies match (sha256)
         run: |
           SOURCE=src/python/g2p/piper_plus_g2p/data/zh_en_loanword.json
           HASH=$(sha256sum "$SOURCE" | cut -d' ' -f1)
           for copy in \
             src/python_run/piper/phonemize/data/zh_en_loanword.json \
             src/rust/piper-plus-g2p/data/zh_en_loanword.json \
+            src/rust/piper-core/data/zh_en_loanword.json \
             src/go/phonemize/data/zh_en_loanword.json \
             src/csharp/PiperPlus.Core/Phonemize/Data/zh_en_loanword.json \
             src/wasm/g2p/data/zh_en_loanword.json \
@@ -1638,7 +1640,7 @@ if os.environ.get("PIPER_DEBUG_ZH_EN"):
 
 - [ ] 新規エントリは **標準 Mandarin pinyin** + tone marker (1-5) で記述
 - [ ] 参考辞書を PR description に明記 (MDBG / Pleco / 新华字典 等)
-- [ ] **6 箇所すべて**で同期 (CI `zh-en-loanword-sync` で自動検証)
+- [ ] **7 箇所すべて** (Rust 2 crate 含む) で同期 (CI `zh-en-loanword-sync` で自動検証)
 - [ ] テスト追加 (`test_zh_en_loanword.py` の TestSchemaValidation pattern)
 - [ ] 既存エントリとの重複検証 (CI で自動)
 - [ ] エントリ数 sanity check 通過 (acronyms ≥ 50, loanwords ≥ 30)
