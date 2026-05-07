@@ -1108,14 +1108,23 @@ mod tests {
     fn test_zh_en_dispatch_pattern_zh_en_zh() {
         // [zh, en, zh] — embedded English routes to loanword path
         let mp = make_zh_en_dispatch_phonemizer();
-        let (tokens_dispatch, _) = mp.phonemize_with_prosody("\u{4f60}\u{597d} GPS \u{4e16}\u{754c}").unwrap();
+        let (tokens_dispatch, _) = mp
+            .phonemize_with_prosody("\u{4f60}\u{597d} GPS \u{4e16}\u{754c}")
+            .unwrap();
         // tokens contain GPS-mapped pinyin IPA tokens (PUA codepoints in 0xE020-0xE04A range)
         assert!(!tokens_dispatch.is_empty());
         let pua_count = tokens_dispatch
             .iter()
-            .filter(|t| t.chars().next().is_some_and(|c| (0xE020..=0xE04A).contains(&(c as u32))))
+            .filter(|t| {
+                t.chars()
+                    .next()
+                    .is_some_and(|c| (0xE020..=0xE04A).contains(&(c as u32)))
+            })
             .count();
-        assert!(pua_count > 0, "expected PUA tone markers from loanword path");
+        assert!(
+            pua_count > 0,
+            "expected PUA tone markers from loanword path"
+        );
     }
 
     #[cfg(feature = "chinese")]
@@ -1123,7 +1132,9 @@ mod tests {
     fn test_zh_en_dispatch_pattern_zh_en() {
         // [zh, en] — `en` segment after zh routes to loanword path
         let mp = make_zh_en_dispatch_phonemizer();
-        let (tokens, _) = mp.phonemize_with_prosody("\u{8bf7}\u{6253}\u{5f00} GPS").unwrap();
+        let (tokens, _) = mp
+            .phonemize_with_prosody("\u{8bf7}\u{6253}\u{5f00} GPS")
+            .unwrap();
         // The `en` segment "GPS" (with leading space absorbed into prior zh segment
         // or its own) should route through the loanword path.
         assert!(!tokens.is_empty());
@@ -1141,9 +1152,16 @@ mod tests {
         // them are PUA tone markers from the loanword path.
         let pua_count = tokens
             .iter()
-            .filter(|t| t.chars().next().is_some_and(|c| (0xE020..=0xE04A).contains(&(c as u32))))
+            .filter(|t| {
+                t.chars()
+                    .next()
+                    .is_some_and(|c| (0xE020..=0xE04A).contains(&(c as u32)))
+            })
             .count();
-        assert_eq!(pua_count, 0, "dispatch disabled: no loanword PUA markers expected");
+        assert_eq!(
+            pua_count, 0,
+            "dispatch disabled: no loanword PUA markers expected"
+        );
     }
 
     #[cfg(feature = "chinese")]
@@ -1151,7 +1169,9 @@ mod tests {
     fn test_zh_en_dispatch_pure_zh_unaffected() {
         let mp = make_zh_en_dispatch_phonemizer();
         // Pure zh — no en segment, dispatch doesn't fire.
-        let (tokens, _) = mp.phonemize_with_prosody("\u{4f60}\u{597d}\u{4e16}\u{754c}").unwrap();
+        let (tokens, _) = mp
+            .phonemize_with_prosody("\u{4f60}\u{597d}\u{4e16}\u{754c}")
+            .unwrap();
         assert!(!tokens.is_empty());
     }
 
@@ -1163,7 +1183,11 @@ mod tests {
         let (tokens, _) = mp.phonemize_with_prosody("Hello GPS world").unwrap();
         let pua_count = tokens
             .iter()
-            .filter(|t| t.chars().next().is_some_and(|c| (0xE020..=0xE04A).contains(&(c as u32))))
+            .filter(|t| {
+                t.chars()
+                    .next()
+                    .is_some_and(|c| (0xE020..=0xE04A).contains(&(c as u32)))
+            })
             .count();
         assert_eq!(pua_count, 0, "no zh segment: dispatch must not fire");
     }
@@ -1175,11 +1199,16 @@ mod tests {
         // middle, *both* en segments are adjacent to a zh segment and so
         // both should route through the loanword path.
         let mp = make_zh_en_dispatch_phonemizer();
-        let (tokens, _) =
-            mp.phonemize_with_prosody("Hello \u{4f60}\u{597d} GPS").unwrap();
+        let (tokens, _) = mp
+            .phonemize_with_prosody("Hello \u{4f60}\u{597d} GPS")
+            .unwrap();
         let pua_count = tokens
             .iter()
-            .filter(|t| t.chars().next().is_some_and(|c| (0xE020..=0xE04A).contains(&(c as u32))))
+            .filter(|t| {
+                t.chars()
+                    .next()
+                    .is_some_and(|c| (0xE020..=0xE04A).contains(&(c as u32)))
+            })
             .count();
         assert!(
             pua_count > 0,
@@ -1193,8 +1222,9 @@ mod tests {
         // Review note R-C1: dispatched IPA tokens must carry per-token
         // prosody (a1=tone, a2=a3=1), not None.
         let mp = make_zh_en_dispatch_phonemizer();
-        let (tokens, prosody) =
-            mp.phonemize_with_prosody("\u{4f60}\u{597d} GPS \u{4e16}\u{754c}").unwrap();
+        let (tokens, prosody) = mp
+            .phonemize_with_prosody("\u{4f60}\u{597d} GPS \u{4e16}\u{754c}")
+            .unwrap();
         assert_eq!(tokens.len(), prosody.len(), "shape parity");
         // Find at least one PUA tone marker token from the dispatch path
         // and verify its prosody is `Some` with a valid Mandarin tone.

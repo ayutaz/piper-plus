@@ -38,7 +38,10 @@ fn test_two_crate_consistency_default_data() {
     assert_eq!(core_data.version, g2p_data.version);
     assert_eq!(core_data.acronyms.len(), g2p_data.acronyms.len());
     assert_eq!(core_data.loanwords.len(), g2p_data.loanwords.len());
-    assert_eq!(core_data.letter_fallback.len(), g2p_data.letter_fallback.len());
+    assert_eq!(
+        core_data.letter_fallback.len(),
+        g2p_data.letter_fallback.len()
+    );
 
     for input in PARITY_INPUTS {
         let core_tokens = core_chinese::phonemize_embedded_english(input, core_data);
@@ -119,9 +122,7 @@ fn test_two_crate_prosody_consistency() {
                     );
                 }
                 (None, None) => {}
-                _ => panic!(
-                    "{input:?}[{i}]: prosody Some/None mismatch (core={cp:?}, g2p={gp:?})"
-                ),
+                _ => panic!("{input:?}[{i}]: prosody Some/None mismatch (core={cp:?}, g2p={gp:?})"),
             }
         }
     }
@@ -135,10 +136,10 @@ fn test_two_crate_g2p_adapter_dispatch_round_trip() {
     // phonemizer. Without this CI test, a future refactor that drops the
     // forwarding (e.g. adding a new method that shadows the default) would
     // silently make the runtime opt-out unreachable from `piper-core` users.
-    use piper_plus::phonemize::{adapter::G2pAdapter, Phonemizer as CorePhonemizer};
+    use piper_plus::phonemize::{Phonemizer as CorePhonemizer, adapter::G2pAdapter};
     use piper_plus_g2p::{
-        multilingual::{MultilingualPhonemizer, PassthroughPhonemizer},
         Phonemizer as G2pPhonemizer,
+        multilingual::{MultilingualPhonemizer, PassthroughPhonemizer},
     };
     use std::collections::HashMap;
 
@@ -211,7 +212,9 @@ fn test_fixture_matrix_loadable_and_well_formed() {
 
     let raw = std::fs::read_to_string(&fixture).unwrap();
     let json: serde_json::Value = serde_json::from_str(&raw).unwrap();
-    let cases = json.get("cases").and_then(|c| c.as_array())
+    let cases = json
+        .get("cases")
+        .and_then(|c| c.as_array())
         .expect("matrix must have a `cases` array");
     assert!(!cases.is_empty(), "matrix must contain at least one case");
 
@@ -253,7 +256,10 @@ fn test_fixture_matrix_loadable_and_well_formed() {
         mismatches.join("\n")
     );
 
-    assert!(total > 0, "no cases had `expected_token_count`; matrix is stale");
+    assert!(
+        total > 0,
+        "no cases had `expected_token_count`; matrix is stale"
+    );
     assert!(
         matches > 0,
         "no fixture cases agreed with the implementation — fixture is wholly broken"

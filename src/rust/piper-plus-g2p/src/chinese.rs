@@ -1007,9 +1007,9 @@ pub fn parse_loanword_json(label: &str, json: &str) -> Result<LoanwordData, Stri
             _ => unreachable!(),
         };
         for (k, v) in map {
-            let arr = v.as_array().ok_or_else(|| {
-                format!("{label}: '{section}.{k}' must be list[str], got {v}")
-            })?;
+            let arr = v
+                .as_array()
+                .ok_or_else(|| format!("{label}: '{section}.{k}' must be list[str], got {v}"))?;
             let mut strs: Vec<String> = Vec::with_capacity(arr.len());
             for elem in arr {
                 let s = elem.as_str().ok_or_else(|| {
@@ -1609,8 +1609,16 @@ mod tests {
         let data = load_default_loanword_data();
         assert_eq!(data.version, 1);
         // 65 acronyms + 40 loanwords + 26 letters per design (canonical JSON entries)
-        assert!(data.acronyms.len() >= 60, "acronyms count: {}", data.acronyms.len());
-        assert!(data.loanwords.len() >= 35, "loanwords count: {}", data.loanwords.len());
+        assert!(
+            data.acronyms.len() >= 60,
+            "acronyms count: {}",
+            data.acronyms.len()
+        );
+        assert!(
+            data.loanwords.len() >= 35,
+            "loanwords count: {}",
+            data.loanwords.len()
+        );
         assert_eq!(data.letter_fallback.len(), 26, "letter_fallback A-Z");
     }
 
@@ -1659,8 +1667,14 @@ mod tests {
     fn test_zh_en_empty_input() {
         let data = load_default_loanword_data();
         assert_eq!(phonemize_embedded_english("", data), Vec::<String>::new());
-        assert_eq!(phonemize_embedded_english("   ", data), Vec::<String>::new());
-        assert_eq!(phonemize_embedded_english(",.!?", data), Vec::<String>::new());
+        assert_eq!(
+            phonemize_embedded_english("   ", data),
+            Vec::<String>::new()
+        );
+        assert_eq!(
+            phonemize_embedded_english(",.!?", data),
+            Vec::<String>::new()
+        );
     }
 
     #[test]
@@ -1669,8 +1683,10 @@ mod tests {
         // pinyin) and acronym. Loanword should win (case-sensitive lookup is
         // tried first).
         let mut data = LoanwordData::default();
-        data.loanwords.insert("AI".to_string(), vec!["ma1".to_string()]); // dummy
-        data.acronyms.insert("AI".to_string(), vec!["ji4".to_string()]); // dummy
+        data.loanwords
+            .insert("AI".to_string(), vec!["ma1".to_string()]); // dummy
+        data.acronyms
+            .insert("AI".to_string(), vec!["ji4".to_string()]); // dummy
         let tokens = phonemize_embedded_english("AI", &data);
         // ma1 = m + a + tone1 = 3 IPA tokens; ji4 = t\u0255 + i + tone4 = 3.
         // Both produce 3 tokens but with different content. We confirm the
@@ -1690,14 +1706,18 @@ mod tests {
         // Add it to acronyms with custom pinyin and verify acronym is preferred over
         // letter-by-letter fallback.
         let mut data = LoanwordData::default();
-        data.acronyms.insert("ZX".to_string(), vec!["ma1".to_string()]); // single syllable
+        data.acronyms
+            .insert("ZX".to_string(), vec!["ma1".to_string()]); // single syllable
         data.letter_fallback
             .insert("Z".to_string(), vec!["zi4".to_string()]);
         data.letter_fallback
             .insert("X".to_string(), vec!["ai4".to_string()]);
         let tokens_acronym = phonemize_embedded_english("ZX", &data);
         // Acronym: 1 syllable -> ~3 IPA. Letter fallback: 2 syllables -> ~6 IPA.
-        assert!(tokens_acronym.len() < 6, "acronym path should beat letter fallback");
+        assert!(
+            tokens_acronym.len() < 6,
+            "acronym path should beat letter fallback"
+        );
     }
 
     #[test]
@@ -1710,7 +1730,10 @@ mod tests {
         // Both should be non-empty but different lengths.
         assert!(!lower.is_empty());
         assert!(!upper.is_empty());
-        assert_ne!(lower, upper, "Python vs PYTHON must differ (case-sensitive loanword vs fallback)");
+        assert_ne!(
+            lower, upper,
+            "Python vs PYTHON must differ (case-sensitive loanword vs fallback)"
+        );
     }
 
     #[test]
@@ -1776,15 +1799,24 @@ mod tests {
         // value is not list[str] \u2192 must error with Python-equivalent format.
         let bad = r#"{"version": 1, "acronyms": {"GPS": "not_a_list"}}"#;
         let err = parse_loanword_json("test.json", bad).unwrap_err();
-        assert!(err.contains("'acronyms.GPS'"), "error should name section.key: {err}");
-        assert!(err.contains("must be list[str]"), "error should mention list[str]: {err}");
+        assert!(
+            err.contains("'acronyms.GPS'"),
+            "error should name section.key: {err}"
+        );
+        assert!(
+            err.contains("must be list[str]"),
+            "error should mention list[str]: {err}"
+        );
     }
 
     #[test]
     fn test_zh_en_schema_validation_section_not_dict() {
         let bad = r#"{"version": 1, "acronyms": "not_a_dict"}"#;
         let err = parse_loanword_json("test.json", bad).unwrap_err();
-        assert!(err.contains("'acronyms'"), "error should mention section: {err}");
+        assert!(
+            err.contains("'acronyms'"),
+            "error should mention section: {err}"
+        );
         assert!(err.contains("must be a mapping"), "{err}");
     }
 
@@ -1813,8 +1845,7 @@ mod tests {
         // (uses bundled default loanword data).
         let p = make_phonemizer(&[], &[]);
         let via_method = p.phonemize_embedded_english("GPS");
-        let via_free_fn =
-            phonemize_embedded_english("GPS", load_default_loanword_data());
+        let via_free_fn = phonemize_embedded_english("GPS", load_default_loanword_data());
         assert_eq!(via_method, via_free_fn);
     }
 
@@ -1825,14 +1856,13 @@ mod tests {
         // produces ProsodyInfo(a1=tone, a2=1, a3=1) for every IPA token.
         // This regression test pins that behavior in Rust.
         let data = load_default_loanword_data();
-        let (tokens, prosody) =
-            phonemize_embedded_english_with_prosody("GPS", data);
+        let (tokens, prosody) = phonemize_embedded_english_with_prosody("GPS", data);
         assert_eq!(tokens.len(), prosody.len(), "shape parity");
         assert!(!tokens.is_empty(), "GPS must produce tokens");
         for (tok, pros) in tokens.iter().zip(prosody.iter()) {
-            let p = pros.as_ref().unwrap_or_else(|| panic!(
-                "embedded-english tokens must carry prosody (got None for {tok:?})"
-            ));
+            let p = pros.as_ref().unwrap_or_else(|| {
+                panic!("embedded-english tokens must carry prosody (got None for {tok:?})")
+            });
             assert!(
                 (1..=5).contains(&p.a1),
                 "a1 must be a Mandarin tone 1..=5, got {} for {tok:?}",

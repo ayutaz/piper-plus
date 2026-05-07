@@ -1078,9 +1078,9 @@ pub fn parse_loanword_json(label: &str, json: &str) -> Result<LoanwordData, Stri
             _ => unreachable!(),
         };
         for (k, v) in map {
-            let arr = v.as_array().ok_or_else(|| {
-                format!("{label}: '{section}.{k}' must be list[str], got {v}")
-            })?;
+            let arr = v
+                .as_array()
+                .ok_or_else(|| format!("{label}: '{section}.{k}' must be list[str], got {v}"))?;
             let mut strs: Vec<String> = Vec::with_capacity(arr.len());
             for elem in arr {
                 let s = elem.as_str().ok_or_else(|| {
@@ -1788,15 +1788,23 @@ mod tests {
     fn test_zh_en_empty_input() {
         let data = load_default_loanword_data();
         assert_eq!(phonemize_embedded_english("", data), Vec::<String>::new());
-        assert_eq!(phonemize_embedded_english("   ", data), Vec::<String>::new());
-        assert_eq!(phonemize_embedded_english(",.!?", data), Vec::<String>::new());
+        assert_eq!(
+            phonemize_embedded_english("   ", data),
+            Vec::<String>::new()
+        );
+        assert_eq!(
+            phonemize_embedded_english(",.!?", data),
+            Vec::<String>::new()
+        );
     }
 
     #[test]
     fn test_zh_en_loanword_beats_acronym() {
         let mut data = LoanwordData::default();
-        data.loanwords.insert("AI".to_string(), vec!["ma1".to_string()]);
-        data.acronyms.insert("AI".to_string(), vec!["ji4".to_string()]);
+        data.loanwords
+            .insert("AI".to_string(), vec!["ma1".to_string()]);
+        data.acronyms
+            .insert("AI".to_string(), vec!["ji4".to_string()]);
         let tokens = phonemize_embedded_english("AI", &data);
         let mut data_loan_only = LoanwordData::default();
         data_loan_only
@@ -1809,9 +1817,12 @@ mod tests {
     #[test]
     fn test_zh_en_acronym_beats_fallback() {
         let mut data = LoanwordData::default();
-        data.acronyms.insert("ZX".to_string(), vec!["ma1".to_string()]);
-        data.letter_fallback.insert("Z".to_string(), vec!["zi4".to_string()]);
-        data.letter_fallback.insert("X".to_string(), vec!["ai4".to_string()]);
+        data.acronyms
+            .insert("ZX".to_string(), vec!["ma1".to_string()]);
+        data.letter_fallback
+            .insert("Z".to_string(), vec!["zi4".to_string()]);
+        data.letter_fallback
+            .insert("X".to_string(), vec!["ai4".to_string()]);
         let tokens_acronym = phonemize_embedded_english("ZX", &data);
         assert!(tokens_acronym.len() < 6);
     }
@@ -1841,8 +1852,7 @@ mod tests {
     #[test]
     fn test_zh_en_two_embedded_en() {
         let data = load_default_loanword_data();
-        let combined =
-            phonemize_embedded_english("ChatGPT \u{548c} Python", data);
+        let combined = phonemize_embedded_english("ChatGPT \u{548c} Python", data);
         let chatgpt = phonemize_embedded_english("ChatGPT", data);
         let python = phonemize_embedded_english("Python", data);
         assert_eq!(combined.len(), chatgpt.len() + python.len());
@@ -1859,7 +1869,8 @@ mod tests {
     #[test]
     fn test_zh_en_acronym_with_digits() {
         let mut data = LoanwordData::default();
-        data.acronyms.insert("MP3".to_string(), vec!["ai1".to_string()]);
+        data.acronyms
+            .insert("MP3".to_string(), vec!["ai1".to_string()]);
         data.letter_fallback
             .insert("M".to_string(), vec!["ai1".to_string(), "mu5".to_string()]);
         data.letter_fallback
@@ -1916,7 +1927,11 @@ mod tests {
         // Previously this crate filled (0,0,0), silently dropping tone.
         let data = load_default_loanword_data();
         let (tokens, prosody) = phonemize_embedded_english_with_prosody("GPS", data);
-        assert_eq!(tokens.len(), prosody.len(), "tokens/prosody length mismatch");
+        assert_eq!(
+            tokens.len(),
+            prosody.len(),
+            "tokens/prosody length mismatch"
+        );
         assert!(!tokens.is_empty());
         for (tok, pros) in tokens.iter().zip(prosody.iter()) {
             let p = pros.unwrap_or_else(|| panic!("expected Some prosody for {tok:?}"));

@@ -802,8 +802,9 @@ class TestFixtureMatrixConsumer:
 
         p = ChinesePhonemizer()
         data = self._load_matrix()
+        target_name = "letter_fallback_zz_doubles_z"
         z_case = next(
-            (c for c in data["cases"] if c.get("name") == "letter_fallback_zz_doubles_z"),
+            (c for c in data["cases"] if c.get("name") == target_name),
             None,
         )
         if z_case is None:
@@ -820,8 +821,9 @@ class TestFixtureMatrixConsumer:
         from piper_plus_g2p.chinese import _load_loanword_data
 
         data = self._load_matrix()
+        target_name = "schema_v2_forward_compat_loader"
         case = next(
-            (c for c in data["cases"] if c.get("name") == "schema_v2_forward_compat_loader"),
+            (c for c in data["cases"] if c.get("name") == target_name),
             None,
         )
         if case is None:

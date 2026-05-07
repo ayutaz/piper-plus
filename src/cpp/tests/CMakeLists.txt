@@ -253,6 +253,7 @@ foreach(test_source ${TEST_SOURCES})
             ../piper.cpp
             ../phoneme_parser.cpp
             ../custom_dictionary.cpp
+            ../chinese_loanword.cpp
             ../model_manager.cpp
             ../library_path.c
             ../language_detector.cpp
@@ -335,6 +336,7 @@ foreach(test_source ${TEST_SOURCES})
             ../piper.cpp
             ../phoneme_parser.cpp
             ../custom_dictionary.cpp
+            ../chinese_loanword.cpp
             ../model_manager.cpp
             ../library_path.c
             ../language_detector.cpp
@@ -455,6 +457,7 @@ foreach(test_source ${TEST_SOURCES})
             ../piper.cpp
             ../phoneme_parser.cpp
             ../custom_dictionary.cpp
+            ../chinese_loanword.cpp
             ../model_manager.cpp
             ../library_path.c
             ../language_detector.cpp
