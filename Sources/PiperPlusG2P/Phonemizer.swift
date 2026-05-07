@@ -22,10 +22,13 @@ public final class Phonemizer: @unchecked Sendable {
     ///   `piper_plus_g2p_create` returns NULL.
     public init(languages: [Language] = Language.allCases) throws {
         let csv = languages.map(\.rawValue).joined(separator: ",")
+        // `piper_plus_g2p_create` returns `struct PiperG2pHandle *`. cbindgen
+        // emits it as an opaque forward-declared struct, which the Swift
+        // clang importer bridges directly to `OpaquePointer?` — no extra
+        // wrapping is needed (and wrapping it would not type-check, since
+        // OpaquePointer's initializers expect raw pointers).
         let raw: OpaquePointer? = csv.withCString { ptr in
-            // C signature returns `PiperG2pHandle *` — cbindgen exports it
-            // as an opaque struct pointer, which Swift bridges to OpaquePointer?.
-            OpaquePointer(piper_plus_g2p_create(ptr))
+            piper_plus_g2p_create(ptr)
         }
         guard let raw else { throw G2PError.initializationFailed }
         self.handle = raw
@@ -33,7 +36,7 @@ public final class Phonemizer: @unchecked Sendable {
     }
 
     deinit {
-        piper_plus_g2p_free(.init(handle))
+        piper_plus_g2p_free(handle)
     }
 
     /// Phonemize `text` using the phonemizer registered for `language`.
@@ -45,7 +48,7 @@ public final class Phonemizer: @unchecked Sendable {
     public func phonemize(_ text: String, language: Language) throws -> PhonemizeResult {
         let raw: UnsafeMutablePointer<CChar>? = text.withCString { textPtr in
             language.rawValue.withCString { langPtr in
-                piper_plus_g2p_phonemize(.init(handle), textPtr, langPtr)
+                piper_plus_g2p_phonemize(handle, textPtr, langPtr)
             }
         }
         guard let raw else { throw G2PError.phonemizeReturnedNull }
@@ -64,7 +67,7 @@ public final class Phonemizer: @unchecked Sendable {
     /// Languages successfully registered by `init`. May be a strict subset
     /// of the requested set if a language failed to register internally.
     public var availableLanguages: [Language] {
-        guard let raw = piper_plus_g2p_available_languages(.init(handle)) else {
+        guard let raw = piper_plus_g2p_available_languages(handle) else {
             return []
         }
         defer { piper_plus_g2p_free_string(raw) }
