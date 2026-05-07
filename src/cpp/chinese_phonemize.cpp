@@ -8,6 +8,7 @@
 // No runtime Python dependency — dictionaries are loaded from JSON at startup.
 
 #include "chinese_phonemize.hpp"
+#include "chinese_loanword.hpp"
 #include "json.hpp"
 #include "utf8.h"
 #include "utf8_utils.hpp"
@@ -813,6 +814,95 @@ void phonemize_chinese(const std::string& text,
 
     if (!sentence.empty()) {
         phonemes.push_back(std::move(sentence));
+    }
+}
+
+// =========================================================================
+// ZH-EN code-switching: phonemize_embedded_english (TICKET-05 P2, Issue #384)
+// =========================================================================
+
+namespace {
+
+/// Tokenize text into [A-Za-z0-9]+ runs. Mirrors Python's
+/// `_RE_TOKEN_SPLIT = re.compile(r"[A-Za-z0-9]+")`.
+std::vector<std::string> tokenize_alnum(const std::string& text) {
+    std::vector<std::string> out;
+    std::string cur;
+    for (char ch : text) {
+        bool is_alnum = (ch >= 'A' && ch <= 'Z') ||
+                        (ch >= 'a' && ch <= 'z') ||
+                        (ch >= '0' && ch <= '9');
+        if (is_alnum) {
+            cur.push_back(ch);
+        } else if (!cur.empty()) {
+            out.push_back(std::move(cur));
+            cur.clear();
+        }
+    }
+    if (!cur.empty()) out.push_back(std::move(cur));
+    return out;
+}
+
+/// Convert pinyin syllables to flat IPA Phoneme tokens (with tone PUA).
+/// Mirrors Python `phonemize_from_pinyin_syllables(..., chinese_text="")`.
+void append_pinyin_to_ipa_flat(const std::vector<std::string>& syllables,
+                               std::vector<Phoneme>& out) {
+    if (syllables.empty()) return;
+
+    // Step 1: extract tone, normalize
+    std::vector<SyllableTone> st;
+    st.reserve(syllables.size());
+    for (const auto& s : syllables) {
+        std::string base;
+        int tone = extractTone(s, base);
+        st.push_back(SyllableTone{normalizePinyin(base), tone});
+    }
+
+    // Step 2: tone sandhi
+    applyToneSandhi(st);
+
+    // Step 3: pinyin -> IPA (already PUA-mapped by pinyinToIPA)
+    for (const auto& syl : st) {
+        auto ipa = pinyinToIPA(syl.syllable, syl.tone);
+        out.insert(out.end(), ipa.begin(), ipa.end());
+    }
+}
+
+}  // namespace
+
+void phonemizeEmbeddedEnglish(const std::string& text,
+                              std::vector<Phoneme>& out,
+                              const LoanwordData& data) {
+    for (const auto& token : tokenize_alnum(text)) {
+        if (token.empty()) continue;
+
+        // 1. Case-sensitive loanword
+        auto lit = data.loanwords.find(token);
+        if (lit != data.loanwords.end()) {
+            append_pinyin_to_ipa_flat(lit->second, out);
+            continue;
+        }
+
+        // 2. Uppercase acronym (ASCII upper)
+        std::string upper = token;
+        for (auto& ch : upper) {
+            if (ch >= 'a' && ch <= 'z') ch = static_cast<char>(ch - 'a' + 'A');
+        }
+        auto ait = data.acronyms.find(upper);
+        if (ait != data.acronyms.end()) {
+            append_pinyin_to_ipa_flat(ait->second, out);
+            continue;
+        }
+
+        // 3. Letter-by-letter fallback (digits silently dropped)
+        for (char ch : upper) {
+            if (ch >= '0' && ch <= '9') continue;
+            std::string key(1, ch);
+            auto fit = data.letter_fallback.find(key);
+            if (fit != data.letter_fallback.end()) {
+                append_pinyin_to_ipa_flat(fit->second, out);
+            }
+        }
     }
 }
 

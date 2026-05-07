@@ -37,6 +37,7 @@ set(PIPER_COMMON_SOURCES
   src/cpp/language_detector.cpp
   src/cpp/english_phonemize.cpp
   src/cpp/chinese_phonemize.cpp
+  src/cpp/chinese_loanword.cpp
   src/cpp/korean_phonemize.cpp
   src/cpp/spanish_phonemize.cpp
   src/cpp/french_phonemize.cpp

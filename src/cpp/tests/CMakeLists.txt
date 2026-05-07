@@ -61,6 +61,7 @@ set(TEST_SOURCES
     test_swedish_phonemize.cpp
     test_short_text_mitigation.cpp
     test_split_sentences.cpp
+    test_zh_en_loanword.cpp
 )
 
 # Add Unix-only tests (require open_jtalk binary or Unix APIs)
@@ -137,6 +138,25 @@ foreach(test_source ${TEST_SOURCES})
         target_include_directories(${test_name} PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/..
         )
+    endif()
+
+    # ZH-EN loanword test depends on chinese_loanword + chinese_phonemize
+    # (TICKET-05 P6). chinese_phonemize.cpp uses utf8.h / json.hpp (header-only).
+    if(${test_name} STREQUAL "test_zh_en_loanword")
+        target_sources(${test_name} PRIVATE
+            ../chinese_loanword.cpp
+            ../chinese_phonemize.cpp
+            ../phoneme_parser.cpp
+            ../library_path.c
+        )
+        target_include_directories(${test_name} PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/..
+            ${CMAKE_BINARY_DIR}/si/include
+            ${CMAKE_BINARY_DIR}/fi/include
+        )
+        if(UNIX AND NOT APPLE)
+            target_link_libraries(${test_name} dl)
+        endif()
     endif()
 
     # Link additional dependencies for model manager test
