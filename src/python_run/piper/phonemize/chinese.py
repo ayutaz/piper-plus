@@ -488,8 +488,7 @@ def _load_loanword_data(path: Path | str) -> dict:
 
     if not isinstance(data, dict):
         raise ValueError(
-            f"{p}: top-level JSON must be an object/mapping, got "
-            f"{type(data).__name__}"
+            f"{p}: top-level JSON must be an object/mapping, got {type(data).__name__}"
         )
 
     result: dict[str, dict[str, list[str]]] = {

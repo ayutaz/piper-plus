@@ -157,6 +157,18 @@ foreach(test_source ${TEST_SOURCES})
         if(UNIX AND NOT APPLE)
             target_link_libraries(${test_name} dl)
         endif()
+        # ``getDefaultLoanwordData()`` resolves data via the exe-relative
+        # ``<exe-dir>/data/zh_en_loanword.json`` layout (matching desktop install).
+        # Copy the JSON next to the test binary so the bundled-data path is
+        # populated for ``ZhEnLoanwordTest.FixtureMatrixLoadable``.
+        add_custom_command(TARGET ${test_name} POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E make_directory
+                $<TARGET_FILE_DIR:${test_name}>/data
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                ${CMAKE_SOURCE_DIR}/src/cpp/data/zh_en_loanword.json
+                $<TARGET_FILE_DIR:${test_name}>/data/zh_en_loanword.json
+            COMMENT "Staging zh_en_loanword.json next to ${test_name}"
+        )
     endif()
 
     # Link additional dependencies for model manager test
