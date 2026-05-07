@@ -10,6 +10,7 @@
 
 #include "piper_plus.h"
 #include "piper.hpp"
+#include "chinese_loanword.hpp"
 #include "custom_dictionary.hpp"
 #include "library_path.h"
 
@@ -1144,6 +1145,128 @@ PIPER_PLUS_API void piper_plus_speaker_encoder_destroy(
 {
     if (encoder) {
         delete encoder;
+    }
+}
+
+/* ===== ZH-EN code-switching loanword (Issue #384, TICKET-05 P4) ===== */
+
+/// Internal handle structure: holds the parsed loanword data and a
+/// per-handle output buffer for the most recent phonemize call (so callers
+/// can read the BORROWED phoneme string until the next call on the handle).
+struct PiperPlusLoanwordHandle {
+    std::shared_ptr<const piper::LoanwordData> data;
+    std::string last_phonemes;
+    std::string last_language;
+};
+
+PIPER_PLUS_API PiperPlusLoanwordHandle *piper_plus_loanword_load_default(void)
+{
+    try {
+        auto data = piper::getDefaultLoanwordData();
+        if (!data) {
+            const auto &err = piper::getDefaultLoanwordError();
+            set_error(("loanword default-load failed: " + err).c_str());
+            return nullptr;
+        }
+        auto *h = new PiperPlusLoanwordHandle{};
+        h->data = std::move(data);
+        h->last_language = "zh";
+        return h;
+    } catch (const std::exception &e) {
+        set_error(e.what());
+        return nullptr;
+    } catch (...) {
+        set_error("Unknown error in piper_plus_loanword_load_default");
+        return nullptr;
+    }
+}
+
+PIPER_PLUS_API PiperPlusLoanwordHandle *piper_plus_loanword_load_from_path(
+    const char *path)
+{
+    if (!path) {
+        set_error("path is NULL");
+        return nullptr;
+    }
+    try {
+        auto data = piper::loadLoanwordDataFromPath(path);
+        auto *h = new PiperPlusLoanwordHandle{};
+        h->data = std::move(data);
+        h->last_language = "zh";
+        return h;
+    } catch (const std::exception &e) {
+        set_error(e.what());
+        return nullptr;
+    } catch (...) {
+        set_error("Unknown error in piper_plus_loanword_load_from_path");
+        return nullptr;
+    }
+}
+
+PIPER_PLUS_API void piper_plus_loanword_free(PiperPlusLoanwordHandle *handle)
+{
+    if (handle) {
+        delete handle;
+    }
+}
+
+PIPER_PLUS_API PiperPlusStatus piper_plus_phonemize_embedded_english(
+    PiperPlusLoanwordHandle *handle,
+    const char              *text,
+    PiperPlusPhonemeResult  *out_result)
+{
+    if (!handle) {
+        set_error("handle is NULL");
+        return PIPER_PLUS_ERR;
+    }
+    if (!text) {
+        set_error("text is NULL");
+        return PIPER_PLUS_ERR;
+    }
+    if (!out_result) {
+        set_error("out_result is NULL");
+        return PIPER_PLUS_ERR;
+    }
+
+    try {
+        std::vector<piper::Phoneme> tokens;
+        piper::phonemizeEmbeddedEnglish(text, tokens, *handle->data);
+
+        // Convert UTF-32 phoneme codepoints to a UTF-8 space-separated string.
+        // (PUA codepoints in U+E020..E04A are encoded as 3-byte UTF-8.)
+        handle->last_phonemes.clear();
+        handle->last_phonemes.reserve(tokens.size() * 4);
+        for (size_t i = 0; i < tokens.size(); ++i) {
+            if (i > 0) handle->last_phonemes.push_back(' ');
+            uint32_t cp = static_cast<uint32_t>(tokens[i]);
+            if (cp < 0x80) {
+                handle->last_phonemes.push_back(static_cast<char>(cp));
+            } else if (cp < 0x800) {
+                handle->last_phonemes.push_back(static_cast<char>(0xC0 | (cp >> 6)));
+                handle->last_phonemes.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
+            } else if (cp < 0x10000) {
+                handle->last_phonemes.push_back(static_cast<char>(0xE0 | (cp >> 12)));
+                handle->last_phonemes.push_back(static_cast<char>(0x80 | ((cp >> 6) & 0x3F)));
+                handle->last_phonemes.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
+            } else if (cp < 0x110000) {
+                handle->last_phonemes.push_back(static_cast<char>(0xF0 | (cp >> 18)));
+                handle->last_phonemes.push_back(static_cast<char>(0x80 | ((cp >> 12) & 0x3F)));
+                handle->last_phonemes.push_back(static_cast<char>(0x80 | ((cp >> 6) & 0x3F)));
+                handle->last_phonemes.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
+            }
+        }
+
+        std::memset(out_result, 0, sizeof(*out_result));
+        out_result->phonemes = handle->last_phonemes.c_str();
+        out_result->language = handle->last_language.c_str();
+        out_result->num_phonemes = static_cast<int32_t>(tokens.size());
+        return PIPER_PLUS_OK;
+    } catch (const std::exception &e) {
+        set_error(e.what());
+        return PIPER_PLUS_ERR;
+    } catch (...) {
+        set_error("Unknown error in piper_plus_phonemize_embedded_english");
+        return PIPER_PLUS_ERR;
     }
 }
 
