@@ -686,6 +686,7 @@ add_test(NAME test_library_path COMMAND test_library_path)
 # (issue #377: piper_common is STATIC since iOS toolchain regression.)
 add_executable(test_c_api
     test_c_api.cpp
+    test_c_api_g2p.cpp
     ../piper_plus_c_api.cpp
 )
 

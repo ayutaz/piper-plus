@@ -399,6 +399,102 @@ PIPER_PLUS_API PiperPlusStatus piper_plus_phonemize_embedded_english(
     const char              *text,
     PiperPlusPhonemeResult  *out_result);
 
+/* ===== Engine-less G2P (Issue #388, Kotlin AAR / Dart FFI / Godot etc.) =====
+ *
+ * Phonemization without an ONNX model.
+ *
+ * Use case: callers (e.g. the Kotlin Android G2P AAR) want piper-plus's
+ * 8-language G2P (text -> phoneme string) without bundling a synthesis model.
+ * This handle uses a built-in language ID map (ja=0, en=1, zh=2, es=3, fr=4,
+ * pt=5, ko=6, sv=7) and reuses the same MultilingualPhonemizer pipeline as
+ * `piper_plus_phonemize()`, so output is byte-for-byte identical for the
+ * shared 8 languages.
+ *
+ * Lifecycle:
+ *   PiperPlusG2pHandle *h = piper_plus_g2p_create(dict_dir_or_null);
+ *   if (!h) { fprintf(stderr, "%s", piper_plus_get_last_error()); return 1; }
+ *   PiperPlusPhonemeResult result;
+ *   piper_plus_g2p_phonemize(h, "Hello world", "en", &result);
+ *   // result.phonemes / result.language are BORROWED, valid until the next
+ *   // piper_plus_g2p_phonemize() call on the same handle.
+ *   piper_plus_g2p_free(h);
+ *
+ * Threading: per-handle single-threaded. Multiple handles are independent.
+ * Note: the underlying OpenJTalk dictionary is selected via global state, so
+ * passing different `dict_dir` values to concurrent `_create()` calls is not
+ * supported.
+ */
+typedef struct PiperPlusG2pHandle PiperPlusG2pHandle;
+
+/** Create a G2P handle without an ONNX model.
+ *
+ *  Uses a built-in language ID map for: en, fr, ja, ko, es, pt, sv, zh.
+ *  English/Chinese/Korean/Spanish/French/Portuguese/Swedish all work without
+ *  any external dictionary (rules and embedded data are statically linked).
+ *  Japanese requires an OpenJTalk dictionary; pass its directory in `dict_dir`
+ *  or set the dictionary via the usual auto-detect / `PIPER_OPENJTALK_DICT_DIR`
+ *  environment variable mechanism.
+ *
+ *  CMU / pinyin auxiliary dictionaries (cmudict_data.json, pinyin_single.json,
+ *  pinyin_phrases.json) are searched in `dict_dir` first (if non-NULL), then
+ *  the standard piper search path (`<exe>/../share/piper/dicts/`,
+ *  `PIPER_DICTIONARIES_PATH`). When not found, English/Chinese fall back to
+ *  the embedded loanword dataset and rule-based output (still functional).
+ *
+ *  @param dict_dir  Optional directory containing OpenJTalk and/or CMU/pinyin
+ *                   dictionaries. NULL = auto-detect only.
+ *  @return Handle on success, NULL on failure (call piper_plus_get_last_error()).
+ *  @threading Per-handle single-threaded; multiple handles are independent. */
+PIPER_PLUS_API PiperPlusG2pHandle *piper_plus_g2p_create(const char *dict_dir);
+
+/** Free a G2P handle. Safe to pass NULL. */
+PIPER_PLUS_API void piper_plus_g2p_free(PiperPlusG2pHandle *handle);
+
+/** Phonemize text without synthesis.
+ *
+ *  @param handle      Handle from piper_plus_g2p_create().
+ *  @param text        UTF-8 input text. NULL or empty yields zero phonemes
+ *                     with PIPER_PLUS_OK.
+ *  @param language    Language code (e.g. "en", "ja"). NULL or empty enables
+ *                     auto-detection via Unicode script analysis.
+ *  @param out_result  Receives BORROWED pointers to a space-separated IPA
+ *                     phoneme string and the resolved language code. Valid
+ *                     until the next piper_plus_g2p_phonemize() call on the
+ *                     same handle.
+ *  @return PIPER_PLUS_OK on success, error code otherwise. */
+PIPER_PLUS_API PiperPlusStatus piper_plus_g2p_phonemize(
+    PiperPlusG2pHandle      *handle,
+    const char              *text,
+    const char              *language,
+    PiperPlusPhonemeResult  *out_result);
+
+/** Available language codes as a comma-separated string (e.g.
+ *  "en,es,fr,ja,ko,pt,sv,zh"). The returned pointer is BORROWED and valid
+ *  until the next call to this function on the same handle. Returns "" on
+ *  error (NULL handle). */
+PIPER_PLUS_API const char *piper_plus_g2p_available_languages(
+    PiperPlusG2pHandle *handle);
+
+/** Load a custom dictionary (JSON v1.0 / v2.0 schema). Replaces any previously
+ *  loaded custom dictionary on this handle.
+ *
+ *  @param handle     Handle from piper_plus_g2p_create().
+ *  @param dict_path  UTF-8 path to a custom dictionary JSON file.
+ *  @return PIPER_PLUS_OK on success, PIPER_PLUS_ERR on parse/IO failure. */
+PIPER_PLUS_API PiperPlusStatus piper_plus_g2p_load_custom_dict(
+    PiperPlusG2pHandle *handle,
+    const char         *dict_path);
+
+/** Toggle the ZH-EN code-switching dispatch path on this G2P handle.
+ *  See piper_plus_set_zh_en_dispatch() for semantics. Default = enabled (1). */
+PIPER_PLUS_API PiperPlusStatus piper_plus_g2p_set_zh_en_dispatch(
+    PiperPlusG2pHandle *handle,
+    int32_t             enabled);
+
+/** Returns 1 if ZH-EN dispatch is enabled, 0 if disabled, -1 on error. */
+PIPER_PLUS_API int32_t piper_plus_g2p_is_zh_en_dispatch_enabled(
+    const PiperPlusG2pHandle *handle);
+
 /* ===== Speaker Encoder (EXPERIMENTAL -- not yet implemented) ========= */
 
 /**
