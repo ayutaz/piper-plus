@@ -131,10 +131,23 @@ jobs:
               || { echo "::error::cbindgen output missing symbol: $sym"; exit 1; }
           done
           # Verify the same symbols are exported by the staticlib.
+          # Note: macOS nm can return non-zero on archive members with no
+          # external symbols even though the FFI symbols themselves are
+          # present. We check each symbol explicitly via grep -q to avoid
+          # the pipefail interaction with nm's exit code on universal libs.
           echo "=== nm symbols ==="
-          nm -gU ../../../build-mac/macos/libpiper_plus_g2p.a 2>/dev/null \
-            | grep -E '_piper_plus_g2p_(create|phonemize|free|free_string|available_languages)' \
-            | sort -u
+          nm_out=$(nm -gU ../../../build-mac/macos/libpiper_plus_g2p.a 2>/dev/null || true)
+          for sym in \
+            piper_plus_g2p_create \
+            piper_plus_g2p_phonemize \
+            piper_plus_g2p_free_string \
+            piper_plus_g2p_free \
+            piper_plus_g2p_available_languages
+          do
+            echo "$nm_out" | grep -q "_${sym}\$" \
+              || { echo "::error::staticlib missing FFI symbol: $sym"; exit 1; }
+            echo "  ok: $sym"
+          done
 
       - name: Stage Headers + module.modulemap
         run: |

@@ -616,14 +616,24 @@ jobs:
           set -euo pipefail
           A="build-g2p-ios/${{ matrix.slice }}/libpiper_plus_g2p.a"
           echo "=== piper_plus_g2p_* symbols (defined) ==="
-          # nm -gU works across both thin and fat archives
-          found=$(nm -gU "$A" 2>/dev/null | awk '$2 ~ /^[TDSR]$/ {print $NF}' | grep -c '^_piper_plus_g2p_' || true)
-          if [ "$found" -lt 5 ]; then
-            echo "::error::expected 5 piper_plus_g2p_* symbols, found $found"
-            nm -gU "$A" 2>/dev/null | grep piper_plus_g2p_ || true
-            exit 1
-          fi
-          nm -gU "$A" 2>/dev/null | awk '$2 ~ /^[TDSR]$/ {print $NF}' | grep '^_piper_plus_g2p_' | sort -u
+          # macOS nm can return non-zero when iterating archive members with
+          # no external symbols (the symbols are still exported correctly).
+          # Capture output once via `|| true` so pipefail doesn't kill the
+          # step, then verify each FFI symbol explicitly.
+          nm_out=$(nm -gU "$A" 2>/dev/null || true)
+          for sym in \
+            piper_plus_g2p_create \
+            piper_plus_g2p_phonemize \
+            piper_plus_g2p_free \
+            piper_plus_g2p_free_string \
+            piper_plus_g2p_available_languages
+          do
+            echo "$nm_out" | awk '$2 ~ /^[TDSR]$/ {print $NF}' | grep -q "^_${sym}\$" \
+              || { echo "::error::staticlib missing FFI symbol: $sym"; \
+                   echo "$nm_out" | grep piper_plus_g2p_ || true; \
+                   exit 1; }
+            echo "  ok: $sym"
+          done
 
       - name: Generate piper_plus_g2p.h via cbindgen
         working-directory: src/rust/piper-plus-g2p
