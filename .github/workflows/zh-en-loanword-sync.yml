@@ -1,0 +1,70 @@
+name: "ZH-EN Loanword Sync Gate"
+
+# Prevents drift between Python source and 6 runtime mirrors of zh_en_loanword.json.
+# Phase 6a (Day 1): skeleton with --allow-missing so TICKET-01〜05 can land copies
+# incrementally without blocking PRs that don't yet have all 7 paths.
+# Phase 6b (Day 14): drop --allow-missing and tighten branch protection.
+#
+# Source of truth: src/python/g2p/piper_plus_g2p/data/zh_en_loanword.json
+# See docs/tickets/zh-en-loanword/TICKET-06-ci-sync.md for the full contract.
+
+on:
+  push:
+    branches: [dev, main]
+    paths:
+      - '**/zh_en_loanword.json'
+      - 'tests/fixtures/g2p/zh_en_loanword_matrix.json'
+      - 'scripts/check_loanword_consistency.py'
+      - '.github/workflows/zh-en-loanword-sync.yml'
+  pull_request:
+    paths:
+      - '**/zh_en_loanword.json'
+      - 'tests/fixtures/g2p/zh_en_loanword_matrix.json'
+      - 'scripts/check_loanword_consistency.py'
+      - '.github/workflows/zh-en-loanword-sync.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  json-sync:
+    name: 7 zh_en_loanword.json copies match Python source
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Schema validation (Python source)
+        run: python scripts/check_loanword_consistency.py --schema-only
+
+      - name: Byte-for-byte hash check (Phase 6a — allow missing while TICKET-01〜05 land)
+        run: python scripts/check_loanword_consistency.py --allow-missing
+
+  fixture-self-check:
+    name: Helper script self-check (pytest)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install pytest
+        run: pip install pytest
+
+      - name: Run helper script tests
+        run: |
+          if [ -f tests/test_check_loanword_consistency.py ]; then
+            pytest tests/test_check_loanword_consistency.py -v
+          else
+            echo "No tests yet — placeholder for TICKET-06b."
+          fi
