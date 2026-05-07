@@ -4,6 +4,7 @@
 > **作業ブランチ**: `feat/issue-388-kotlin-g2p`
 > **設計書**: [kotlin-g2p-design.md](kotlin-g2p-design.md) (Phase 0 で先行作成)
 > **チケット INDEX**: [docs/tickets/kotlin-g2p/README.md](../tickets/kotlin-g2p/README.md)
+> **マイルストーン管理**: [docs/tickets/kotlin-g2p/MILESTONES.md](../tickets/kotlin-g2p/MILESTONES.md)
 > **判定基準**: 自動化可能性 (CLI/CI で完結) を最優先。実装工数は評価軸から除外。
 
 ---
