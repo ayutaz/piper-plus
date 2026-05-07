@@ -145,3 +145,10 @@ nul
 test/models/tsukuyomi-chan/
 docs/development/usability-issues-2026-03.md
 src/rust/target/*
+
+# Kotlin G2P AAR (Issue #388): Gradle copies fixtures + native .so at build time
+android/piper-plus-g2p/src/androidTest/assets/g2p_fixtures/
+android/piper-plus-g2p/src/main/jniLibs/
+android/piper-plus-g2p/.cxx/
+android/piper-plus-g2p/build/
+android/.gradle/

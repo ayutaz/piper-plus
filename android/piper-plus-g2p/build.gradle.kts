@@ -95,7 +95,21 @@ dependencies {
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation("androidx.test:runner:1.6.2")
+    androidTestImplementation("org.json:json:20240303")
 }
+
+// Copy the cross-runtime G2P fixture into androidTest assets so the L4 parity
+// instrumented test can read it via `assets.open(...)`. We copy the file
+// rather than symlink so Windows hosts work too.
+val syncG2pFixture = tasks.register<Copy>("syncG2pFixture") {
+    from(rootProject.layout.projectDirectory.dir("../tests/fixtures/g2p"))
+    include("phoneme_test_cases.json")
+    into(layout.projectDirectory.dir("src/androidTest/assets/g2p_fixtures"))
+}
+tasks.matching {
+    it.name.startsWith("merge") && it.name.endsWith("AndroidTestAssets")
+}.configureEach { dependsOn(syncG2pFixture) }
+tasks.matching { it.name == "preBuild" }.configureEach { dependsOn(syncG2pFixture) }
 
 mavenPublishing {
     publishToMavenCentral(SonatypeHost.CENTRAL_PORTAL)
