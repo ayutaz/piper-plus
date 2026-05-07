@@ -121,7 +121,20 @@ tasks.matching { it.name == "preBuild" }.configureEach { dependsOn(syncG2pFixtur
 
 mavenPublishing {
     publishToMavenCentral(SonatypeHost.CENTRAL_PORTAL)
-    signAllPublications()
+
+    // Only sign when GPG credentials are available. PR / dry-run builds
+    // run `publishToMavenLocal` without secrets and would otherwise fail
+    // the `signMavenPublication` task with `Cannot perform signing task
+    // ... because it has no configured signatory`. The release workflow
+    // (release-kotlin-g2p.yml) provides ORG_GRADLE_PROJECT_signingInMemoryKey
+    // (or signingKey) so signing only kicks in for actual Maven Central
+    // publishes.
+    val hasSigningKey = listOf(
+        "signingInMemoryKey", "signing.key", "signingKey",
+    ).any { project.findProperty(it) != null }
+    if (hasSigningKey) {
+        signAllPublications()
+    }
 
     val publishVersion = project.findProperty("VERSION_NAME") as? String ?: "1.0.0"
     coordinates(

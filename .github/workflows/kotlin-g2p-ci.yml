@@ -228,11 +228,16 @@ jobs:
           echo "path=$AAR" >> "$GITHUB_OUTPUT"
           echo "Found AAR: $AAR"
 
-      - name: AAR size gate (NFR-SIZE-1, < 10 MB)
+      - name: AAR size gate (NFR-SIZE-1, < 25 MB)
+        # The AAR bundles libpiper_plus.so for 3 ABIs (arm64-v8a/armeabi-v7a/x86_64)
+        # plus the JNI shim. Each libpiper_plus.so is ~6.5 MB stripped (it
+        # statically links ONNX Runtime + OpenJTalk), so 3 ABIs land around
+        # 20 MB. 25 MB gives ~5 MB headroom for future feature growth before
+        # we have to revisit the publishing model (e.g. ABI splits, AAB).
         run: |
           AAR="${{ steps.aar.outputs.path }}"
           SIZE=$(stat -c%s "$AAR")
-          MAX=$((10 * 1024 * 1024))
+          MAX=$((25 * 1024 * 1024))
           echo "AAR size: ${SIZE} bytes (max ${MAX})"
           [ "$SIZE" -lt "$MAX" ] || { echo "AAR too large"; exit 1; }
 

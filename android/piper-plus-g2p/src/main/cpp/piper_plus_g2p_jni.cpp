@@ -64,13 +64,22 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void * /* reserved */) {
         return JNI_ERR;
     }
 
+    // FindClass leaves a pending NoClassDefFoundError on the JVM when the class
+    // is not on the classpath (notably true for the L2 host-JVM smoke test that
+    // only loads a thin JNI facade without the full Kotlin AAR). Treat the
+    // PiperPlusG2pException class as optional and clear any pending exception
+    // so System.load() doesn't surface NoClassDefFoundError to the caller.
     if (jclass local = env->FindClass("com/piperplus/g2p/PiperPlusG2pException")) {
         g_g2pExceptionClass = static_cast<jclass>(env->NewGlobalRef(local));
         env->DeleteLocalRef(local);
+    } else if (env->ExceptionCheck()) {
+        env->ExceptionClear();
     }
     if (jclass local = env->FindClass("java/lang/RuntimeException")) {
         g_runtimeExceptionClass = static_cast<jclass>(env->NewGlobalRef(local));
         env->DeleteLocalRef(local);
+    } else if (env->ExceptionCheck()) {
+        env->ExceptionClear();
     }
     return JNI_VERSION_1_6;
 }

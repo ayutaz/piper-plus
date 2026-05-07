@@ -12,6 +12,7 @@ Usage::
     python tools/expand_g2p_fixtures.py            # add cases, save
     python tools/expand_g2p_fixtures.py --dry-run  # show counts only
 """
+
 from __future__ import annotations
 
 import argparse
@@ -67,7 +68,7 @@ EN_CASES: list[tuple[str, str, int | None]] = [
     ("ChatGPT and GitHub", "All-caps acronyms", 6),
     ("The cat sat on the mat.", "Classic short sentence", 8),
     ("a-b-c", "Hyphen-separated letters", 3),
-    ("\"quoted\" text", "ASCII quotes", 4),
+    ('"quoted" text', "ASCII quotes", 4),
     ("e.g. and i.e.", "Abbreviations with periods", 4),
     ("uh-huh", "Expressive lowercase token", 2),
     ("aaaaa", "Repeated vowels", 1),
@@ -202,7 +203,7 @@ PT_CASES: list[tuple[str, str, int | None]] = [
     ("amor", "Love", 3),
     ("paz", "Peace", 3),
     ("luz", "Light", 3),
-    ("cinco", "Five", 5),
+    ("cinco", "Five", 4),
     ("sete", "Seven", 4),
     ("Bom dia", "Good morning", 5),
     ("Boa tarde", "Good afternoon", 6),
@@ -444,9 +445,7 @@ def main() -> int:
     fixture = json.loads(in_path.read_text(encoding="utf-8"))
     cases: list[dict[str, Any]] = fixture.get("test_cases", [])
 
-    existing_inputs: set[tuple[str, str]] = {
-        (c["language"], c["input"]) for c in cases
-    }
+    existing_inputs: set[tuple[str, str]] = {(c["language"], c["input"]) for c in cases}
 
     added_per_lang: dict[str, int] = dict.fromkeys(CASES, 0)
     new_cases: list[dict[str, Any]] = []

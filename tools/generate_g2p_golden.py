@@ -15,6 +15,7 @@ Run with::
     uv run --with-editable src/python/g2p \\
         python tools/generate_g2p_golden.py
 """
+
 from __future__ import annotations
 
 import argparse

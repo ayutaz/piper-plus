@@ -10,6 +10,7 @@ Exit codes:
   0 — agreement on every overlapping (language, input) pair
   1 — drift detected in at least one overlapping case
 """
+
 from __future__ import annotations
 
 import argparse

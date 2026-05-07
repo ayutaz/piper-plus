@@ -185,6 +185,8 @@ class TestJAPhonemeFixtures:
 
         p = get_phonemizer("ja")
         for case in _cases_for_language(fixtures, "ja"):
+            if "expected_token_count_min" not in case:
+                continue
             tokens = p.phonemize(case["input"])
             expected_min = case["expected_token_count_min"]
             assert len(tokens) >= expected_min, (
@@ -231,6 +233,8 @@ class TestENPhonemeFixtures:
 
         p = get_phonemizer("en")
         for case in _cases_for_language(fixtures, "en"):
+            if "expected_token_count_min" not in case:
+                continue
             tokens = p.phonemize(case["input"])
             expected_min = case["expected_token_count_min"]
             assert len(tokens) >= expected_min, (
@@ -263,6 +267,8 @@ class TestZHPhonemeFixtures:
 
         p = get_phonemizer("zh")
         for case in _cases_for_language(fixtures, "zh"):
+            if "expected_token_count_min" not in case:
+                continue
             tokens = p.phonemize(case["input"])
             expected_min = case["expected_token_count_min"]
             assert len(tokens) >= expected_min, (
@@ -342,6 +348,8 @@ class TestFRPhonemeFixtures:
 
         p = get_phonemizer("fr")
         for case in _cases_for_language(fixtures, "fr"):
+            if "expected_token_count_min" not in case:
+                continue
             tokens = p.phonemize(case["input"])
             expected_min = case["expected_token_count_min"]
             assert len(tokens) >= expected_min, (
@@ -373,6 +381,8 @@ class TestPTPhonemeFixtures:
 
         p = get_phonemizer("pt")
         for case in _cases_for_language(fixtures, "pt"):
+            if "expected_token_count_min" not in case:
+                continue
             tokens = p.phonemize(case["input"])
             expected_min = case["expected_token_count_min"]
             assert len(tokens) >= expected_min, (
@@ -405,6 +415,8 @@ class TestKOPhonemeFixtures:
 
         p = get_phonemizer("ko")
         for case in _cases_for_language(fixtures, "ko"):
+            if "expected_token_count_min" not in case:
+                continue
             tokens = p.phonemize(case["input"])
             expected_min = case["expected_token_count_min"]
             assert len(tokens) >= expected_min, (
@@ -440,6 +452,8 @@ class TestSVPhonemeFixtures:
 
         p = get_phonemizer("sv")
         for case in _cases_for_language(fixtures, "sv"):
+            if "expected_token_count_min" not in case:
+                continue
             tokens = p.phonemize(case["input"])
             expected_min = case["expected_token_count_min"]
             assert len(tokens) >= expected_min, (
@@ -471,8 +485,8 @@ class TestFixtureSanity:
     """Guard-rail checks on the fixture file itself."""
 
     def test_fixture_version(self, fixtures):
-        """Fixture version is 1 (current schema)."""
-        assert fixtures["version"] == 1
+        """Fixture version is 2 (current schema with 8×50 expanded cases)."""
+        assert fixtures["version"] == 2
 
     def test_all_languages_covered(self, fixtures):
         """Fixture covers all 8 expected languages
