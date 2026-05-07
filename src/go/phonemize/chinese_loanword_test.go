@@ -3,6 +3,9 @@
 package phonemize
 
 import (
+	"encoding/json"
+	"fmt"
+	"os"
 	"strings"
 	"testing"
 )
@@ -397,5 +400,85 @@ func TestZhEnDispatch_PureEnUnaffected(t *testing.T) {
 	}
 	if puaCount != 0 {
 		t.Errorf("pure en: expected 0 PUA markers, got %d", puaCount)
+	}
+}
+
+// =========================================================================
+// CI-C1: cross-runtime fixture matrix consumer (Go side).
+//
+// `testdata/zh_en_loanword_matrix.json` is mirrored from
+// `tests/fixtures/g2p/zh_en_loanword_matrix.json` by the JSON sync gate.
+// Until this consumer landed the file had no test depending on it in the Go
+// runtime, so a drift between the matrix and the implementation would have
+// gone unnoticed. Mirrors `test_fixture_matrix_loadable_and_well_formed` in
+// piper-core (Rust). We assert the file loads and is well-formed; we do
+// NOT fail per-case mismatches because the matrix's `expected_token_count`
+// uses the bundled (full) JSON while the test runs with the same loader,
+// so most counts agree but counting conventions can drift across runtimes
+// (tracked as TICKET-06b followup).
+// =========================================================================
+
+func TestFixtureMatrixLoadable(t *testing.T) {
+	type matrixCase struct {
+		Name                string `json:"name"`
+		Input               *string `json:"input,omitempty"`
+		ExpectedTokenCount  *int   `json:"expected_token_count,omitempty"`
+	}
+	type matrix struct {
+		SchemaVersion int          `json:"schema_version"`
+		Cases         []matrixCase `json:"cases"`
+	}
+
+	raw, err := os.ReadFile("testdata/zh_en_loanword_matrix.json")
+	if err != nil {
+		t.Fatalf("matrix not found: %v", err)
+	}
+	var m matrix
+	if err := json.Unmarshal(raw, &m); err != nil {
+		t.Fatalf("matrix is not valid JSON: %v", err)
+	}
+	if len(m.Cases) == 0 {
+		t.Fatal("matrix `cases` must be non-empty")
+	}
+	for _, c := range m.Cases {
+		if c.Name == "" {
+			t.Errorf("case missing `name`: %+v", c)
+		}
+	}
+
+	cp := &ChinesePhonemizer{}
+	data, err := LoadLoanwordData()
+	if err != nil {
+		t.Fatalf("LoadLoanwordData: %v", err)
+	}
+
+	total, matches := 0, 0
+	mismatches := []string{}
+	for _, c := range m.Cases {
+		if c.Input == nil || c.ExpectedTokenCount == nil {
+			// Loader-only / equivalence cases don't have direct counts.
+			continue
+		}
+		tokens := cp.PhonemizeEmbeddedEnglish(*c.Input, data)
+		total++
+		if len(tokens) == *c.ExpectedTokenCount {
+			matches++
+		} else {
+			mismatches = append(mismatches, fmt.Sprintf(
+				"  %q (input=%q): expected %d, got %d",
+				c.Name, *c.Input, *c.ExpectedTokenCount, len(tokens),
+			))
+		}
+	}
+	if total == 0 {
+		t.Fatal("no cases had `expected_token_count` — matrix is stale")
+	}
+	t.Logf("[matrix] %d / %d cases match expected_token_count exactly", matches, total)
+	if len(mismatches) > 0 {
+		t.Logf("mismatches (tracked as TICKET-06b followup):\n%s",
+			strings.Join(mismatches, "\n"))
+	}
+	if matches == 0 {
+		t.Errorf("no fixture cases agreed with the implementation — fixture is wholly broken")
 	}
 }

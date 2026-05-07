@@ -164,3 +164,93 @@ describe('zh_en_loanword.json bundled data', () => {
         assert.deepEqual(data.acronyms.GPS, ['ji4']);
     });
 });
+
+// ---------------------------------------------------------------------------
+// CI-C1: cross-runtime fixture matrix consumer (WASM/JS side).
+//
+// `test/fixtures/zh_en_loanword_matrix.json` is mirrored from
+// `tests/fixtures/g2p/zh_en_loanword_matrix.json` by the JSON sync gate.
+// Until this consumer landed the JS side had no test depending on it. We
+// assert the fixture loads and is well-formed + every case has the required
+// `name` field. We do NOT exercise the embedded-english path here because
+// the JS layer is a thin wrapper around Rust WASM (covered by Rust tests);
+// the goal of this consumer is to catch fixture rot at JS-test time and to
+// pin the schema for downstream npm consumers.
+// ---------------------------------------------------------------------------
+
+const MATRIX_PATH = join(__dirname, 'fixtures', 'zh_en_loanword_matrix.json');
+
+describe('zh_en_loanword_matrix.json fixture (cross-runtime)', () => {
+    it('loads as valid JSON with a non-empty `cases` array', async () => {
+        const raw = await readFile(MATRIX_PATH, 'utf8');
+        const data = JSON.parse(raw);
+        assert.equal(typeof data, 'object');
+        assert.ok(Array.isArray(data.cases), 'matrix must have `cases` array');
+        assert.ok(data.cases.length > 0, 'matrix `cases` must be non-empty');
+    });
+
+    it('every case has a `name` field', async () => {
+        const raw = await readFile(MATRIX_PATH, 'utf8');
+        const data = JSON.parse(raw);
+        for (const c of data.cases) {
+            assert.equal(typeof c.name, 'string', `case missing name: ${JSON.stringify(c)}`);
+            assert.ok(c.name.length > 0, `case name empty: ${JSON.stringify(c)}`);
+        }
+    });
+
+    it('cases with `expected_token_count` have number values', async () => {
+        const raw = await readFile(MATRIX_PATH, 'utf8');
+        const data = JSON.parse(raw);
+        let countCases = 0;
+        for (const c of data.cases) {
+            if ('expected_token_count' in c) {
+                assert.equal(typeof c.expected_token_count, 'number',
+                    `${c.name}: expected_token_count must be a number`);
+                countCases++;
+            }
+        }
+        assert.ok(countCases > 0, 'no cases have expected_token_count — fixture is stale');
+    });
+
+    it('schema_v2 forward-compat case round-trips through JSON.parse', async () => {
+        const raw = await readFile(MATRIX_PATH, 'utf8');
+        const data = JSON.parse(raw);
+        const schemaV2Case = data.cases.find(
+            (c) => c.name === 'schema_v2_forward_compat_loader',
+        );
+        if (!schemaV2Case) {
+            return; // Skipped: fixture without this case is allowed for older snapshots
+        }
+        assert.ok(schemaV2Case.input_json, 'schema_v2 case must have input_json');
+        // Round-trip via JSON to verify the inline payload is itself valid.
+        const reparsed = JSON.parse(JSON.stringify(schemaV2Case.input_json));
+        assert.deepEqual(reparsed.acronyms, schemaV2Case.input_json.acronyms);
+    });
+
+    it('matches the matrix mirrored under tests/fixtures/g2p (byte-identical)', async () => {
+        // The CI sync gate (scripts/check_loanword_consistency.py) keeps the 6
+        // fixture mirrors byte-identical to tests/fixtures/g2p/. This test
+        // adds a JS-side check: even if the gate is bypassed, drift between
+        // the WASM mirror and the source fixture surfaces here at npm-test time.
+        const repoRoot = join(__dirname, '..', '..', '..', '..');
+        const sourceFixture = join(
+            repoRoot, 'tests', 'fixtures', 'g2p', 'zh_en_loanword_matrix.json',
+        );
+        let sourceRaw;
+        try {
+            sourceRaw = await readFile(sourceFixture, 'utf8');
+        } catch {
+            // Source fixture not present in this checkout — npm-published
+            // packages don't ship tests/fixtures/. Skip silently.
+            return;
+        }
+        const mirrorRaw = await readFile(MATRIX_PATH, 'utf8');
+        // Normalize line endings so a stray CRLF on Windows checkouts doesn't
+        // false-flag the gate. The byte-for-byte gate is enforced separately
+        // by scripts/check_loanword_consistency.py at CI time.
+        const norm = (s) => s.replace(/\r\n/g, '\n');
+        assert.equal(norm(mirrorRaw), norm(sourceRaw),
+            'WASM matrix mirror has drifted from tests/fixtures/g2p — run ' +
+            '`python scripts/check_loanword_consistency.py --fix`');
+    });
+});

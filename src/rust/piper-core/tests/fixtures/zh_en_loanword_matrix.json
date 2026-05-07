@@ -16,8 +16,8 @@
     {
       "name": "acronym_usb",
       "input": "USB",
-      "expected_token_count": 11,
-      "notes": "USB = you1 + ai1(zero) + si4 + bi4"
+      "expected_token_count": 10,
+      "notes": "USB = you1(2 zero-initial) + ai1(2 zero-initial) + si4(3) + bi4(3) = 10 phonemes"
     },
     {
       "name": "loanword_python_case_sensitive",

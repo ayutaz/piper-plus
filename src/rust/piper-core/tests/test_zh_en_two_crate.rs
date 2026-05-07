@@ -128,6 +128,65 @@ fn test_two_crate_prosody_consistency() {
 }
 
 #[test]
+fn test_two_crate_g2p_adapter_dispatch_round_trip() {
+    // Review note R-C3: piper-core's `Phonemizer` trait declares
+    // `set_zh_en_dispatch` / `is_zh_en_dispatch_enabled` as default-no-op,
+    // and `G2pAdapter` forwards both to the wrapped `piper_plus_g2p`
+    // phonemizer. Without this CI test, a future refactor that drops the
+    // forwarding (e.g. adding a new method that shadows the default) would
+    // silently make the runtime opt-out unreachable from `piper-core` users.
+    use piper_plus::phonemize::{adapter::G2pAdapter, Phonemizer as CorePhonemizer};
+    use piper_plus_g2p::{
+        multilingual::{MultilingualPhonemizer, PassthroughPhonemizer},
+        Phonemizer as G2pPhonemizer,
+    };
+    use std::collections::HashMap;
+
+    // Single-language passthrough phonemizers report `is_zh_en_dispatch_enabled() == false`
+    // and silently swallow `set_zh_en_dispatch(true)` (default trait no-op).
+    let plain: Box<dyn G2pPhonemizer> = Box::new(PassthroughPhonemizer::new("en"));
+    let mut adapter_plain = G2pAdapter::new(plain);
+    assert!(
+        !adapter_plain.is_zh_en_dispatch_enabled(),
+        "non-multilingual adapter default = disabled"
+    );
+    adapter_plain.set_zh_en_dispatch(true);
+    assert!(
+        !adapter_plain.is_zh_en_dispatch_enabled(),
+        "non-multilingual adapter ignores set (default no-op)"
+    );
+
+    // MultilingualPhonemizer with both zh and en — dispatch toggle must round-trip
+    // through the G2pAdapter.
+    let mut langs: HashMap<String, Box<dyn G2pPhonemizer>> = HashMap::new();
+    langs.insert("zh".to_string(), Box::new(PassthroughPhonemizer::new("zh")));
+    langs.insert("en".to_string(), Box::new(PassthroughPhonemizer::new("en")));
+    let mp = MultilingualPhonemizer::new(
+        vec!["zh".to_string(), "en".to_string()],
+        "en".to_string(),
+        langs,
+    );
+    let inherent_default = mp.is_zh_en_dispatch_enabled();
+
+    let mut adapter = G2pAdapter::new(Box::new(mp));
+    assert_eq!(
+        adapter.is_zh_en_dispatch_enabled(),
+        inherent_default,
+        "G2pAdapter must reflect the wrapped multilingual phonemizer's default"
+    );
+    adapter.set_zh_en_dispatch(false);
+    assert!(
+        !adapter.is_zh_en_dispatch_enabled(),
+        "G2pAdapter set_zh_en_dispatch(false) must propagate"
+    );
+    adapter.set_zh_en_dispatch(true);
+    assert!(
+        adapter.is_zh_en_dispatch_enabled(),
+        "G2pAdapter set_zh_en_dispatch(true) must propagate"
+    );
+}
+
+#[test]
 fn test_fixture_matrix_loadable_and_well_formed() {
     // Review note CI-C1: the cross-runtime fixture matrix
     // (`tests/fixtures/g2p/zh_en_loanword_matrix.json`, mirrored into each

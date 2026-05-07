@@ -1216,4 +1216,45 @@ mod tests {
             "expected at least one dispatched PUA token with (a1=tone, a2=1, a3=1)"
         );
     }
+
+    #[cfg(feature = "chinese")]
+    #[test]
+    fn test_zh_en_dispatch_via_phonemizer_trait() {
+        // R-C3 followup: set_zh_en_dispatch / is_zh_en_dispatch_enabled must
+        // round-trip through the Phonemizer trait (dyn dispatch), not just the
+        // inherent methods. WASM/Go bindings call through the trait.
+        let mut mp: Box<dyn Phonemizer> = Box::new(make_zh_en_dispatch_phonemizer());
+        assert!(
+            mp.is_zh_en_dispatch_enabled(),
+            "default ON under `chinese` feature"
+        );
+        mp.set_zh_en_dispatch(false);
+        assert!(
+            !mp.is_zh_en_dispatch_enabled(),
+            "set_zh_en_dispatch(false) must propagate through trait"
+        );
+        mp.set_zh_en_dispatch(true);
+        assert!(
+            mp.is_zh_en_dispatch_enabled(),
+            "set_zh_en_dispatch(true) must propagate through trait"
+        );
+    }
+
+    #[test]
+    fn test_zh_en_dispatch_trait_default_noop_for_other_phonemizers() {
+        // R-C3 followup: Phonemizer trait has a default no-op for
+        // set/is_zh_en_dispatch_enabled so non-multilingual phonemizers
+        // (e.g. PassthroughPhonemizer) silently report "disabled" and ignore
+        // toggle calls. This guarantees capability discovery is meaningful.
+        let mut p = PassthroughPhonemizer::new("en");
+        assert!(
+            !p.is_zh_en_dispatch_enabled(),
+            "non-multilingual phonemizer default = disabled"
+        );
+        p.set_zh_en_dispatch(true);
+        assert!(
+            !p.is_zh_en_dispatch_enabled(),
+            "default no-op: set_zh_en_dispatch(true) does not change state"
+        );
+    }
 }

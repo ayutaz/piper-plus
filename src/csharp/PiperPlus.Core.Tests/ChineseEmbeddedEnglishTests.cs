@@ -380,4 +380,119 @@ public sealed class ChineseEmbeddedEnglishTests
         Assert.True(found,
             "expected at least one dispatched PUA token with (a1=tone, a2=1, a3=1)");
     }
+
+    // ================================================================
+    // CS-H2: LoanwordDataLoader exception wrapping (CA1032 + JSON wrap)
+    // ================================================================
+
+    [Fact]
+    public void Loader_MalformedJson_WrapsAsSchemaException()
+    {
+        // Truncated/malformed JSON triggers System.Text.Json.JsonException.
+        // The loader must wrap that as LoanwordSchemaException so callers
+        // need to catch only one exception type.
+        var bad = System.Text.Encoding.UTF8.GetBytes(@"{""version"": 1, ""acron");
+        var ex = Assert.Throws<LoanwordSchemaException>(() =>
+            LoanwordDataLoader.LoadFromBytes("malformed.json", bad));
+        Assert.Contains("invalid JSON", ex.Message, StringComparison.OrdinalIgnoreCase);
+        // The original JsonException is preserved as InnerException.
+        Assert.NotNull(ex.InnerException);
+        Assert.IsAssignableFrom<System.Text.Json.JsonException>(ex.InnerException);
+    }
+
+    [Fact]
+    public void Loader_NotAJsonObject_WrapsAsSchemaException()
+    {
+        // Top-level JSON array (not object) — handled by the value-kind check,
+        // not the JsonException path, so InnerException is null.
+        var arr = System.Text.Encoding.UTF8.GetBytes(@"[1, 2, 3]");
+        var ex = Assert.Throws<LoanwordSchemaException>(() =>
+            LoanwordDataLoader.LoadFromBytes("array.json", arr));
+        Assert.Contains("top-level must be a JSON object", ex.Message);
+    }
+
+    [Fact]
+    public void LoanwordSchemaException_AllCa1032CtorsCallable()
+    {
+        // CA1032 requires three constructors: parameterless, (string),
+        // (string, Exception innerException).
+        var e1 = new LoanwordSchemaException();
+        Assert.NotNull(e1);
+        var e2 = new LoanwordSchemaException("test message");
+        Assert.Equal("test message", e2.Message);
+        var inner = new InvalidOperationException("inner");
+        var e3 = new LoanwordSchemaException("wrapper", inner);
+        Assert.Same(inner, e3.InnerException);
+    }
+
+    // ================================================================
+    // CS-H3: EnableZhEnDispatch is `volatile bool` — verify cross-thread
+    // visibility. We can't deterministically reproduce a memory-ordering
+    // bug with a unit test, but we can lock in (a) the flag flips through
+    // a public setter, (b) reader threads observe the new value within a
+    // bounded number of polls, and (c) the field is actually marked volatile
+    // (reflection check — fails if a future refactor drops the modifier).
+    // ================================================================
+
+    [Fact]
+    public void EnableZhEnDispatch_IsMarkedVolatile()
+    {
+        // Pin the volatile modifier via reflection so a future refactor that
+        // accidentally drops it (and thus reintroduces the memory-visibility
+        // hazard) is caught at CI time.
+        var field = typeof(MultilingualPhonemizer).GetField(
+            "_enableZhEnDispatch",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+        Assert.NotNull(field);
+        // C# `volatile` is encoded as `IsVolatile()` modifier on the type.
+        var mods = field!.GetRequiredCustomModifiers();
+        bool isVolatile = false;
+        foreach (var m in mods)
+        {
+            if (m.FullName == "System.Runtime.CompilerServices.IsVolatile")
+            {
+                isVolatile = true;
+                break;
+            }
+        }
+        Assert.True(isVolatile,
+            "MultilingualPhonemizer._enableZhEnDispatch must remain `volatile bool` " +
+            "(CS-H3) — without it, writers on one thread are not guaranteed to be " +
+            "visible to readers on another thread.");
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task EnableZhEnDispatch_VisibleAcrossThreads()
+    {
+        var mp = MakeZhEnDispatchPhonemizer();
+        Assert.True(mp.EnableZhEnDispatch, "default = on under chinese feature");
+
+        // Spawn a reader that polls the flag while a writer flips it. The
+        // reader must observe at least one `false` reading (via volatile reads
+        // — without volatile, optimizers could hoist the read out of the loop).
+        using var stop = new System.Threading.CancellationTokenSource(
+            TimeSpan.FromSeconds(2));
+        var observedFalse = false;
+        var reader = System.Threading.Tasks.Task.Run(() =>
+        {
+            while (!stop.IsCancellationRequested)
+            {
+                if (!mp.EnableZhEnDispatch)
+                {
+                    observedFalse = true;
+                    return;
+                }
+                System.Threading.Thread.SpinWait(500);
+            }
+        });
+
+        // Give the reader a moment to start spinning, then flip the flag.
+        await System.Threading.Tasks.Task.Delay(50);
+        mp.EnableZhEnDispatch = false;
+
+        await reader;
+        Assert.True(observedFalse,
+            "reader thread must observe EnableZhEnDispatch=false after the writer " +
+            "flipped it. If this fails, the volatile modifier may have been removed.");
+    }
 }
