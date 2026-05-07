@@ -1,0 +1,180 @@
+name: Release Kotlin G2P (Maven Central)
+
+# Trigger:
+#   - tag push `kotlin-g2p-v*` → real publish to Maven Central
+#   - workflow_dispatch with version input → manual rerun
+#   - PR touching publishing files → publishToMavenLocal dry-run only
+on:
+  push:
+    tags: ['kotlin-g2p-v*']
+  pull_request:
+    branches: [dev]
+    paths:
+      - 'android/piper-plus-g2p/build.gradle.kts'
+      - 'android/build.gradle.kts'
+      - 'android/settings.gradle.kts'
+      - '.github/workflows/release-kotlin-g2p.yml'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish (e.g. 1.0.0)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  ANDROID_NDK_VERSION: "26.1.10909125"
+  ANDROID_API_LEVEL: "24"
+  ONNXRUNTIME_VERSION: "1.17.0"
+
+jobs:
+  build-native:
+    strategy:
+      fail-fast: false
+      matrix:
+        abi: [arm64-v8a, armeabi-v7a, x86_64]
+    name: Native ${{ matrix.abi }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+        with: { submodules: true }
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 17 }
+      - name: Setup Android NDK
+        uses: android-actions/setup-android@v3
+        with: { cmdline-tools-version: 11076708 }
+      - name: Install NDK
+        run: |
+          sdkmanager "ndk;${{ env.ANDROID_NDK_VERSION }}"
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/${{ env.ANDROID_NDK_VERSION }}" >> $GITHUB_ENV
+      - name: Cache ONNX Runtime Android
+        id: cache-ort
+        uses: actions/cache@v5
+        with:
+          path: ort-android/
+          key: ort-android-${{ env.ONNXRUNTIME_VERSION }}-${{ matrix.abi }}
+      - name: Download ONNX Runtime Android
+        if: steps.cache-ort.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ort-android
+          curl -sfL "https://repo1.maven.org/maven2/com/microsoft/onnxruntime/onnxruntime-android/${{ env.ONNXRUNTIME_VERSION }}/onnxruntime-android-${{ env.ONNXRUNTIME_VERSION }}.aar" -o /tmp/ort.aar
+          (cd ort-android && unzip -o /tmp/ort.aar "jni/${{ matrix.abi }}/*" -d .)
+          mkdir -p ort-android/lib ort-android/include
+          cp ort-android/jni/${{ matrix.abi }}/libonnxruntime.so ort-android/lib/
+          curl -sfL "https://github.com/microsoft/onnxruntime/releases/download/v${{ env.ONNXRUNTIME_VERSION }}/onnxruntime-linux-x64-${{ env.ONNXRUNTIME_VERSION }}.tgz" -o /tmp/ort-headers.tgz
+          tar -xzf /tmp/ort-headers.tgz --strip-components=1 -C ort-android "onnxruntime-linux-x64-${{ env.ONNXRUNTIME_VERSION }}/include"
+      - name: Configure CMake
+        run: |
+          CMAKE_EXTRA_FLAGS=""
+          [ "${{ matrix.abi }}" = "armeabi-v7a" ] && CMAKE_EXTRA_FLAGS="-DANDROID_ARM_NEON=ON"
+          cmake -B build \
+            -DCMAKE_TOOLCHAIN_FILE=${{ env.ANDROID_NDK_HOME }}/build/cmake/android.toolchain.cmake \
+            -DANDROID_ABI=${{ matrix.abi }} \
+            -DANDROID_PLATFORM=android-${{ env.ANDROID_API_LEVEL }} \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DPIPER_PLUS_BUILD_SHARED=ON \
+            -DBUILD_TESTS=OFF \
+            -DCMAKE_SHARED_LINKER_FLAGS="-Wl,-z,max-page-size=16384" \
+            -DONNXRUNTIME_DIR=${{ github.workspace }}/ort-android \
+            -DONNXRUNTIME_INCLUDE_DIR=${{ github.workspace }}/ort-android/include \
+            -DONNXRUNTIME_LIB=${{ github.workspace }}/ort-android/lib/libonnxruntime.so \
+            $CMAKE_EXTRA_FLAGS
+      - name: Build piper_plus
+        run: cmake --build build --config Release --target piper_plus -j$(nproc)
+      - name: Stage native libs
+        run: |
+          mkdir -p staging/${{ matrix.abi }}
+          cp build/libpiper_plus.so staging/${{ matrix.abi }}/ 2>/dev/null \
+            || cp build/lib/libpiper_plus.so staging/${{ matrix.abi }}/
+          cp ort-android/lib/libonnxruntime.so staging/${{ matrix.abi }}/
+      - name: Upload native libs
+        uses: actions/upload-artifact@v7
+        with:
+          name: piper-plus-g2p-native-${{ matrix.abi }}
+          path: staging/${{ matrix.abi }}/
+          if-no-files-found: error
+
+  publish:
+    name: Publish AAR
+    needs: build-native
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+        with: { submodules: true }
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 17 }
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with: { gradle-version: "8.11.1" }
+
+      - name: Download native libs
+        uses: actions/download-artifact@v8
+        with:
+          pattern: piper-plus-g2p-native-*
+          path: native/
+
+      - name: Stage jniLibs
+        run: |
+          mkdir -p android/piper-plus-g2p/src/main/jniLibs
+          for abi in arm64-v8a armeabi-v7a x86_64; do
+            mkdir -p "android/piper-plus-g2p/src/main/jniLibs/${abi}"
+            cp native/piper-plus-g2p-native-${abi}/*.so \
+               "android/piper-plus-g2p/src/main/jniLibs/${abi}/"
+          done
+
+      # ----- Resolve version -----------------------------------------------------
+      # Tag push: derive version from refs/tags/kotlin-g2p-v1.2.3 → 1.2.3
+      # workflow_dispatch: read inputs.version
+      # PR (dry-run): use placeholder "0.0.0-pr"
+      - name: Determine version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "push" ] && [[ "${{ github.ref }}" == refs/tags/kotlin-g2p-v* ]]; then
+            VERSION="${GITHUB_REF##refs/tags/kotlin-g2p-v}"
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="0.0.0-pr"
+          fi
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Resolved publish version: ${VERSION}"
+
+      # ----- Validate POM <-> tag agreement (AC-REL-3) ---------------------------
+      - name: Verify version against tag
+        if: github.event_name == 'push'
+        run: |
+          # Currently no version is hard-coded in build.gradle.kts (we read
+          # `VERSION_NAME` project property), so the only validation we need
+          # is the regex shape.
+          VERSION="${{ steps.version.outputs.version }}"
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([+-][A-Za-z0-9.\-]+)?$ ]] \
+            || { echo "Invalid SemVer: $VERSION"; exit 1; }
+
+      # ----- PR dry-run: publishToMavenLocal -------------------------------------
+      - name: Dry-run publish (PR)
+        if: github.event_name == 'pull_request'
+        working-directory: android
+        env:
+          ORG_GRADLE_PROJECT_VERSION_NAME: ${{ steps.version.outputs.version }}
+        run: |
+          gradle :piper-plus-g2p:publishToMavenLocal --no-daemon --stacktrace
+
+      # ----- Real publish to Maven Central ---------------------------------------
+      - name: Publish to Maven Central
+        if: github.event_name != 'pull_request'
+        working-directory: android
+        env:
+          ORG_GRADLE_PROJECT_VERSION_NAME: ${{ steps.version.outputs.version }}
+          ORG_GRADLE_PROJECT_mavenCentralUsername:           ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          ORG_GRADLE_PROJECT_mavenCentralPassword:           ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+          ORG_GRADLE_PROJECT_signingInMemoryKey:             ${{ secrets.SIGNING_IN_MEMORY_KEY }}
+          ORG_GRADLE_PROJECT_signingInMemoryKeyPassword:     ${{ secrets.SIGNING_IN_MEMORY_KEY_PASSWORD }}
+        run: |
+          gradle :piper-plus-g2p:publishAndReleaseToMavenCentral \
+            --no-daemon --stacktrace --no-configuration-cache

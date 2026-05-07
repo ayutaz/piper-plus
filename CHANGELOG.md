@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### Kotlin/Android G2P AAR を Maven Central に公開 (Issue #388)
+
+8 言語マルチリンガル G2P を Android アプリから利用するための **engine-less Kotlin AAR** を新設。Maven coordinates `io.github.ayutaz:piper-plus-g2p-android`。`implementation("io.github.ayutaz:piper-plus-g2p-android:1.0.0")` 1 行で導入できる。
+
+- **Engine-less C API 拡張**: `piper_plus_g2p_create` / `_phonemize` / `_available_languages` / `_load_custom_dict` / `_set_zh_en_dispatch` / `_is_zh_en_dispatch_enabled` / `_free` の 7 関数を C API に追加 (`src/cpp/piper_plus.h`)。ONNX モデル不要で 8 言語 (ja=0, en=1, zh=2, es=3, fr=4, pt=5, ko=6, sv=7) を phonemize 可能。既存 `piper_plus_phonemize()` と同じ `piper::phonemizeText` を共有するため byte-for-byte 互換 (FR-CAPI-3)。既存 ABI (`PIPER_PLUS_API_VERSION 1`) を破壊しない追加のみ。
+- **JNI bridge**: `android/piper-plus-g2p/src/main/cpp/piper_plus_g2p_jni.cpp`。既存 TTS フル AAR (`android/piper-plus/`) と同じ `JNIStringGuard` RAII / `JNI_OnLoad` 例外 GlobalRef キャッシュ / BORROWED ポインタ即 `NewStringUTF` コピーパターンを踏襲
+- **Kotlin パブリック API**: `PiperPlusG2p` (`AutoCloseable` + `@Synchronized`) / `PhonemeResult` data class / `PiperPlusG2pException` / `OpenJTalkDictionary` (`fromAssets` / `fromPath`) / `DictionaryDownloader` (`downloadFromHuggingFace` suspend、SHA-256 検証付)
+- **Gradle module**: `android/piper-plus-g2p/build.gradle.kts` で vanniktech `gradle-maven-publish-plugin` 0.30.0 + `SonatypeHost.CENTRAL_PORTAL` 採用。3 ABI (arm64-v8a / armeabi-v7a / x86_64)、`-Wl,-z,max-page-size=16384` で 16 KB page size 対応 (Android 15+)、minSdk 24 / compileSdk 35 / Kotlin 2.1.0 / JDK 17。Gradle Managed Devices で Pixel 6 API 34 emulator 自動起動
+- **CI 自動テスト 5 層**: `.github/workflows/kotlin-g2p-ci.yml` で L1 (Pure Kotlin unit) / L3 (Android instrumented on Gradle Managed Devices) / L4 (parity 雛形) / L5 (`readelf -lW` で 16 KB align gate + AAR サイズ < 10 MB gate) を全 PR で実行
+- **Maven Central 自動公開**: `.github/workflows/release-kotlin-g2p.yml` がタグ `kotlin-g2p-v*` push を検知して GPG in-memory key + Sonatype Central Portal credentials で `publishAndReleaseToMavenCentral` を実行。PR では `publishToMavenLocal` の dry-run のみ
+- **辞書配布 3 パターン**: AAR には OpenJTalk 辞書 (~102MB) を同梱せず、(1) App assets バンドル (`OpenJTalkDictionary.fromAssets`)、(2) Play Asset Delivery (`fromPath`)、(3) Runtime DL from Hugging Face Hub (`DictionaryDownloader.downloadFromHuggingFace` + SHA-256 検証) の 3 通りを提供。詳細: `docs/guides/android-g2p-dictionary.md`
+- **GTest 26 ケース** (`src/cpp/tests/test_c_api_g2p.cpp`): lifecycle / NULL safety / `available_languages` order / 規則ベース 3 言語 (es/fr/pt) / ZH-EN dispatch toggle / borrowed pointer 寿命 / custom dict
+- **設計・要件・マイルストーン**: `docs/spec/kotlin-g2p-{design,requirements}.md`、`docs/tickets/kotlin-g2p/{README,MILESTONES}.md`
+
 #### ZH-EN code-switching を全 7 ランタイムに展開 (Issue #384)
 
 中国語テキストに混在する英単語 (acronyms / loanwords / per-letter fallback) を米国英語ではなく Mandarin pinyin で発音する機能を、Python (PR #397 で先行リリース) に続いて Rust × 2 crate / Go / C# / WASM / C++ の **5 ランタイムへ byte-for-byte 同期展開**。

@@ -288,15 +288,15 @@ M0 (Design) ──→ M0.5 (Requirements)
 ```
 M0   Design Phase            ████████████████████  100%  ✅ Done       (commit 25700837)
 M0.5 Requirements Phase      ████████████████████  100%  ✅ Done       (commit 4d641179)
-M1   C API Extension         ░░░░░░░░░░░░░░░░░░░░    0%  📋 Ready
-M2   JNI Bridge              ░░░░░░░░░░░░░░░░░░░░    0%  ⏸ Blocked
-M3   Kotlin Public API       ░░░░░░░░░░░░░░░░░░░░    0%  ⏸ Blocked
-M4   Gradle Module + Build   ░░░░░░░░░░░░░░░░░░░░    0%  ⏸ Blocked
-M5   Automated Tests         ░░░░░░░░░░░░░░░░░░░░    0%  ⏸ Blocked
-M6   Dictionary Distribution ░░░░░░░░░░░░░░░░░░░░    0%  ⏸ Blocked
-M7   Maven Central Publish   ░░░░░░░░░░░░░░░░░░░░    0%  ⏸ Blocked
-M8   Docs & Sample App       ░░░░░░░░░░░░░░░░░░░░    0%  ⏸ Blocked
-M9   GA Release v1.0.0       ░░░░░░░░░░░░░░░░░░░░    0%  🎯 Target
+M1   C API Extension         ████████████████████  100%  ✅ Done       (commit c2696072)
+M2   JNI Bridge              ████████████████████  100%  ✅ Done       (commit c2696072)
+M3   Kotlin Public API       ████████████████████  100%  ✅ Done       (commit c2696072)
+M4   Gradle Module + Build   ████████████████████  100%  ✅ Done       (commit c2696072)
+M5   Automated Tests         ████████████████░░░░   80%  👀 Review     (L1/L3/L5 + L4 stub; L4 parity 拡充は別 PR)
+M6   Dictionary Distribution ████████████████████  100%  ✅ Done       (DictionaryDownloader + ガイド)
+M7   Maven Central Publish   ████████████████████  100%  ✅ Done       (release-kotlin-g2p.yml)
+M8   Docs & Sample App       ████████████████░░░░   80%  👀 Review     (README/CLAUDE/CHANGELOG 同期; サンプルアプリは別 PR)
+M9   GA Release v1.0.0       ░░░░░░░░░░░░░░░░░░░░    0%  🎯 Target      (タグ push 待ち、Q-1/Q-2/Q-7 解決後)
 ```
 
 ---
