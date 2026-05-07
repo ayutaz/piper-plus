@@ -1,9 +1,12 @@
 # Kotlin G2P ライブラリ — チケット INDEX
 
 > **親 Issue**: [#388](https://github.com/ayutaz/piper-plus/issues/388) — 「Kotlin 向けの g2p ライブラリの提供」
+> **要件定義書**: [docs/spec/kotlin-g2p-requirements.md](../../spec/kotlin-g2p-requirements.md) ← **実装着手前に必読**
 > **設計書**: [docs/spec/kotlin-g2p-design.md](../../spec/kotlin-g2p-design.md)
 > **作業ブランチ**: `feat/issue-388-kotlin-g2p`
 > **判定基準**: 自動化可能性 (CLI/CI で完結) を最優先。実装工数は評価軸から除外。
+
+> ⚠️ **要件定義書による追加チケット**: TICKET-01 着手前に **C API 拡張 (engine-less G2P エントリポイント FR-CAPI-1)** が必要。詳細は要件定義書 §5、§6.1 を参照。実装フェーズの Phase 0.5 として TICKET-00 (C API 拡張) を追加する想定。
 
 このドキュメントは [Kotlin G2P 設計書](../../spec/kotlin-g2p-design.md) から派生したチケット群の進捗ハブです。
 
