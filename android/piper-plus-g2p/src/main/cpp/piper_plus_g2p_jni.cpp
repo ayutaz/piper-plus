@@ -10,7 +10,8 @@
 
 #include <jni.h>
 
-#include <cstring>
+#include <cstdio>   // std::snprintf (used in nativePhonemize)
+#include <cstring>  // std::memset
 
 // android/log.h only exists when targeting the Android NDK. The L2
 // linux-jvm-smoke CI job builds this same source on a host JVM (Linux x86_64)
@@ -20,7 +21,6 @@
 #  define LOG_TAG "PiperPlusG2pJNI"
 #  define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
 #else
-#  include <cstdio>
 #  define LOGE(...) do { fprintf(stderr, "[piper-plus-g2p-jni] " __VA_ARGS__); fputc('\n', stderr); } while (0)
 #endif
 
