@@ -255,6 +255,7 @@ piper-plus ships **as several independent packages**, each released and versione
 | `@piper-plus/g2p` (npm) | npm | `src/wasm/g2p/` | `wasm-g2p-v<X.Y.Z>` (e.g. `wasm-g2p-v0.4.0`) | SemVer |
 | `github.com/ayutaz/piper-plus/src/go` | Go module | `src/go/` | (none — uses commit SHA via `go get`) | Go module versioning |
 | C API shared library (`libpiper_plus`) | GitHub Releases | `src/cpp/` | `shared-lib-v<X.Y.Z>` | SemVer |
+| `io.github.ayutaz:piper-plus-g2p-android` (Kotlin G2P) | Maven Central | `android/piper-plus-g2p/` | `kotlin-g2p-v<X.Y.Z>` (e.g. `kotlin-g2p-v1.0.0`) | SemVer |
 
 ### Why independent versioning
 
@@ -279,6 +280,7 @@ Some packages depend on others published to the **same registry**. Publishing th
 | crates.io | `piper-plus-g2p` → `piper-plus` (core) → `piper-plus-cli` | `piper-plus` depends on `piper-plus-g2p`; `piper-plus-cli` depends on `piper-plus`. The `dev-create-release.yml` automation already handles this with `sleep 30` between steps. |
 | PyPI | `piper-plus-g2p` → `piper-plus` → `piper-tts-plus` (stub) | Same dependency chain. Manual Release workflow chains `publish_pypi` → `publish_pypi_stub`. |
 | NuGet | `PiperPlus.Core` → `PiperPlus.Cli` | CLI references Core. |
+| Maven Central | `io.github.ayutaz:piper-plus-g2p-android` (standalone) | No internal dependents — publish via `kotlin-g2p-v<X.Y.Z>` tag triggers `release-kotlin-g2p.yml`. |
 
 **Manual operation needed for npm:** the GitHub Actions Manual Release workflow handles PyPI / NuGet / crates.io automatically, but **npm publishes are gated by separate tag triggers**: `g2p-wasm-ci.yml` listens on `wasm-g2p-v*` tags (publishes `@piper-plus/g2p`), and `npm-publish.yml` listens on `npm-v*` tags (publishes `piper-plus`). To publish a coordinated npm release:
 

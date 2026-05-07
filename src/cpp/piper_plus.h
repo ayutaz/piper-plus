@@ -437,9 +437,12 @@ typedef struct PiperPlusG2pHandle PiperPlusG2pHandle;
  *
  *  CMU / pinyin auxiliary dictionaries (cmudict_data.json, pinyin_single.json,
  *  pinyin_phrases.json) are searched in `dict_dir` first (if non-NULL), then
- *  the standard piper search path (`<exe>/../share/piper/dicts/`,
- *  `PIPER_DICTIONARIES_PATH`). When not found, English/Chinese fall back to
- *  the embedded loanword dataset and rule-based output (still functional).
+ *  the `PIPER_DICTIONARIES_PATH` environment variable. The exe-relative
+ *  `<exe>/../share/piper/dicts/` branch used by the CLI is intentionally NOT
+ *  consulted by the engine-less G2P path because callers (Android AAR, JNI
+ *  consumers) have no installed exe to anchor on. When not found,
+ *  English/Chinese fall back to the embedded loanword dataset and rule-based
+ *  output (still functional).
  *
  *  @param dict_dir  Optional directory containing OpenJTalk and/or CMU/pinyin
  *                   dictionaries. NULL = auto-detect only.

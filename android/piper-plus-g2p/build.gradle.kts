@@ -15,14 +15,19 @@ plugins {
     id("com.android.library")
     id("org.jetbrains.kotlin.android")
     id("com.vanniktech.maven.publish")
+    id("org.jetbrains.dokka")
 }
 
 android {
     namespace  = "com.piperplus.g2p"
     compileSdk = 35
+    // Pin the NDK so reproducibility holds across CI hosts and developer
+    // workstations (NFR-PUB-1). r26d is the LTS the rest of piper-plus uses.
+    ndkVersion = "26.1.10909125"
 
     defaultConfig {
-        minSdk = 24
+        minSdk    = 24
+        targetSdk = 34
         consumerProguardFiles("consumer-rules.pro")
 
         externalNativeBuild {
@@ -83,19 +88,22 @@ android {
         }
     }
 
-    publishing {
-        singleVariant("release") {
-            withSourcesJar()
-            withJavadocJar()
-        }
-    }
+    // Note: variant publishing is configured via the vanniktech
+    // `AndroidSingleVariantLibrary(...)` block below — do NOT also declare
+    // `android.publishing { singleVariant(...) }` here, otherwise the
+    // variant gets configured twice and Gradle warns / fails.
 }
 
 dependencies {
+    // DictionaryDownloader uses kotlinx-coroutines for IO dispatch + cancellation.
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
+
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation("androidx.test:runner:1.6.2")
     androidTestImplementation("org.json:json:20240303")
+    androidTestImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
 }
 
 // Copy the cross-runtime G2P fixture into androidTest assets so the L4 parity
@@ -115,13 +123,17 @@ mavenPublishing {
     publishToMavenCentral(SonatypeHost.CENTRAL_PORTAL)
     signAllPublications()
 
-    val publishVersion = project.findProperty("VERSION_NAME") as? String ?: "0.1.0"
+    val publishVersion = project.findProperty("VERSION_NAME") as? String ?: "1.0.0"
     coordinates(
         groupId    = "io.github.ayutaz",
         artifactId = "piper-plus-g2p-android",
         version    = publishVersion,
     )
 
+    // sourcesJar=true → publish a sources.jar alongside the AAR.
+    // publishJavadocJar=true → vanniktech wires up the dokkaHtml/dokkaJavadoc
+    // task automatically when the dokka plugin is applied above, so the
+    // generated javadoc actually has API content (not just LICENSE.md).
     configure(AndroidSingleVariantLibrary(variant = "release", sourcesJar = true, publishJavadocJar = true))
 
     pom {

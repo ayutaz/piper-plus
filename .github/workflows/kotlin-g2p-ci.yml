@@ -20,6 +20,12 @@ on:
 permissions:
   contents: read
 
+# Cancel in-flight runs from the same branch when a new commit arrives so we
+# don't burn CI minutes / emulator slots on stale work.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   ANDROID_NDK_VERSION: "26.1.10909125"
   ANDROID_API_LEVEL: "24"
@@ -140,6 +146,17 @@ jobs:
                "android/piper-plus-g2p/src/main/jniLibs/${abi}/"
           done
 
+      # AGP runs externalNativeBuild during configure/assemble even when
+      # prebuilt jniLibs are already staged. That requires the NDK to be
+      # installed at the path declared by `android.ndkVersion`.
+      - name: Setup Android SDK + NDK
+        uses: android-actions/setup-android@v3
+        with: { cmdline-tools-version: 11076708 }
+      - name: Install NDK
+        run: |
+          sdkmanager "ndk;${{ env.ANDROID_NDK_VERSION }}"
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/${{ env.ANDROID_NDK_VERSION }}" >> $GITHUB_ENV
+
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
@@ -186,6 +203,14 @@ jobs:
             cp native/piper-plus-g2p-native-${abi}/*.so \
                "android/piper-plus-g2p/src/main/jniLibs/${abi}/"
           done
+
+      - name: Setup Android SDK + NDK
+        uses: android-actions/setup-android@v3
+        with: { cmdline-tools-version: 11076708 }
+      - name: Install NDK
+        run: |
+          sdkmanager "ndk;${{ env.ANDROID_NDK_VERSION }}"
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/${{ env.ANDROID_NDK_VERSION }}" >> $GITHUB_ENV
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
@@ -283,6 +308,14 @@ jobs:
                "android/piper-plus-g2p/src/main/jniLibs/${abi}/"
           done
 
+      - name: Setup Android SDK + NDK
+        uses: android-actions/setup-android@v3
+        with: { cmdline-tools-version: 11076708 }
+      - name: Install NDK
+        run: |
+          sdkmanager "ndk;${{ env.ANDROID_NDK_VERSION }}"
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/${{ env.ANDROID_NDK_VERSION }}" >> $GITHUB_ENV
+
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
@@ -302,6 +335,59 @@ jobs:
           path: android/piper-plus-g2p/build/reports/androidTests/managedDevice/
 
   # ---------------------------------------------------------------------------
+  # L4 dedicated job: regenerate the Python golden on Linux (where g2pk2 +
+  # eunjeon are available, unlike Windows where the local generator skips KO)
+  # and diff against the committed file. Any drift in either direction fails
+  # the gate so we can never silently merge a stale golden.
+  # ---------------------------------------------------------------------------
+  parity-golden:
+    name: L4 cross-runtime parity (golden re-gen)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with: { submodules: true }
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+
+      - name: Install uv
+        run: pipx install uv || pip install --user uv
+
+      - name: Install piper_plus_g2p (editable) + KO deps
+        run: |
+          # eunjeon needs MeCab-ko which is packaged on Linux; install before
+          # the Python wrapper so g2pk2 succeeds.
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends mecab libmecab-dev mecab-ipadic-utf8 || true
+          uv pip install --system --editable ./src/python/g2p
+          uv pip install --system g2pk2 eunjeon || true
+
+      - name: Regenerate golden fixture
+        run: |
+          python tools/generate_g2p_golden.py \
+            --output tests/fixtures/g2p/phoneme_test_cases_golden.regen.json \
+            --allow-failures
+
+      - name: Diff against committed golden (test_cases only)
+        run: |
+          # We compare *only* the test_cases array because the surrounding
+          # metadata (skipped_ko_cases / failed_cases) is intentionally
+          # platform-dependent: Linux has eunjeon, Windows does not. Drift
+          # in the actual phoneme strings still fails the gate.
+          python tools/compare_g2p_golden.py \
+            tests/fixtures/g2p/phoneme_test_cases_golden.json \
+            tests/fixtures/g2p/phoneme_test_cases_golden.regen.json
+
+      - name: Upload regenerated golden (debug)
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: phoneme_test_cases_golden.regen
+          path: tests/fixtures/g2p/phoneme_test_cases_golden.regen.json
+
+  # ---------------------------------------------------------------------------
   # AC-10: sample app assembleDebug from examples/android-g2p-sample/.
   # Uses the composite build wired up in settings.gradle.kts so the sample
   # consumes the in-repo AAR module instead of waiting on Maven Central.
@@ -317,6 +403,15 @@ jobs:
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: 17 }
+
+      - name: Setup Android SDK + NDK
+        uses: android-actions/setup-android@v3
+        with: { cmdline-tools-version: 11076708 }
+      - name: Install NDK
+        run: |
+          sdkmanager "ndk;${{ env.ANDROID_NDK_VERSION }}"
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/${{ env.ANDROID_NDK_VERSION }}" >> $GITHUB_ENV
+
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with: { gradle-version: "8.11.1" }

@@ -19,16 +19,23 @@ import java.io.InputStream
  * 3. **Runtime download** — use `DictionaryDownloader` (M6) to fetch from
  *    Hugging Face Hub on first launch.
  *
- * The returned [path] is what gets passed to [PiperPlusG2p.create] which in
+ * The internal [path] is what gets passed to [PiperPlusG2p.create] which in
  * turn forwards it to the native C API as `dict_dir`.
  */
-class OpenJTalkDictionary internal constructor(val path: String) {
+class OpenJTalkDictionary internal constructor(internal val path: String) {
 
     /** True if the directory exists and contains at least one file. */
     fun exists(): Boolean {
         val dir = File(path)
         return dir.isDirectory && (dir.list()?.isNotEmpty() == true)
     }
+
+    /**
+     * Read-only view of the absolute extracted path. Exposed for diagnostics
+     * (logging, debugging) — do not pass this back into [fromPath] or any
+     * other piper-plus API; use the existing instance instead.
+     */
+    fun absolutePath(): String = path
 
     companion object {
         private const val DEFAULT_ASSET_PATH = "open_jtalk_dic"
@@ -61,11 +68,19 @@ class OpenJTalkDictionary internal constructor(val path: String) {
             OpenJTalkDictionary(absolutePath)
 
         private fun extractAssetTree(context: Context, assetSubdir: String, destDir: File) {
+            val destCanon = destDir.canonicalFile
             val assetManager = context.assets
             val children = assetManager.list(assetSubdir).orEmpty()
             for (entry in children) {
+                if (entry.contains("..") || entry.startsWith("/") || entry.startsWith("\\")) {
+                    throw java.io.IOException("refusing to extract unsafe asset name: $entry")
+                }
                 val assetPath = "$assetSubdir/$entry"
                 val outFile = File(destDir, entry)
+                if (!outFile.canonicalPath.startsWith(destCanon.path + File.separator) &&
+                    outFile.canonicalPath != destCanon.path) {
+                    throw java.io.IOException("refusing to extract outside destDir: $entry")
+                }
                 val nested = assetManager.list(assetPath)
                 if (nested != null && nested.isNotEmpty()) {
                     outFile.mkdirs()

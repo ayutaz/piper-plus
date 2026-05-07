@@ -56,11 +56,14 @@ class PiperPlusG2p private constructor(
         val list = if (phonemes.isEmpty()) {
             emptyList()
         } else {
-            phonemes.split(' ').filter { it.isNotEmpty() }
+            // Defensive: wrap with toList() so the returned List<String> is
+            // a fresh immutable copy — callers can't mutate our internals via
+            // a downcast.
+            phonemes.split(' ').filter { it.isNotEmpty() }.toList()
         }
         return PhonemeResult(
             phonemes = phonemes,
-            phonemeList = list,
+            phonemeList = java.util.Collections.unmodifiableList(list),
             language = resolvedLang,
             numPhonemes = numPhonemes,
         )
@@ -107,6 +110,7 @@ class PiperPlusG2p private constructor(
     }
 
     /** Underlying piper-plus C library version. */
+    @Synchronized
     fun version(): String = PiperPlusG2pNative.nativeVersion()
 
     /** Free the native handle. Idempotent. */
@@ -142,11 +146,11 @@ class PiperPlusG2p private constructor(
             context: Context,
             dictionary: OpenJTalkDictionary? = null,
         ): PiperPlusG2p {
-            // Touch context to silence unused-parameter lint and document the
-            // future contract: when DictionaryDownloader (M6) is wired in we
-            // may use Context here for filesDir / cacheDir lookups.
-            @Suppress("UnusedVariable")
-            val ctx = context.applicationContext
+            // Hold a reference to the application context so we participate
+            // in the standard Android lifecycle — even though the current
+            // native bridge does not need to read from it directly. This
+            // also keeps the API symmetric with the TTS module.
+            context.applicationContext
             val handle = PiperPlusG2pNative.nativeCreate(dictionary?.path)
             if (handle == 0L) {
                 throw PiperPlusG2pException(

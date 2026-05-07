@@ -128,8 +128,15 @@ HF Hub repo に配置するファイル名:
 | `open_jtalk_dic.tar` | naist-jdic を tar アーカイブ化したもの (~102MB) |
 | `open_jtalk_dic.tar.sha256` | 1 行の sha256sum 出力形式 (`<sha>  open_jtalk_dic.tar`) |
 
-リリース時は `tools/build-openjtalk-dict-archive.sh` (M6 で追加予定) で
-両ファイルを生成し、HF Hub の repo にアップロードします。
+リリース時は [`tools/build-openjtalk-dict-archive.sh`](../../tools/build-openjtalk-dict-archive.sh)
+で両ファイルを生成し、HF Hub の repo にアップロードします。
+
+```bash
+# OpenJTalk 辞書 (naist-jdic) を解凍済みディレクトリから tar + sha256 を作る例
+tools/build-openjtalk-dict-archive.sh /data/openjtalk_dic ./dist/open_jtalk_dic
+ls dist/open_jtalk_dic/
+# open_jtalk_dic.tar  open_jtalk_dic.tar.sha256
+```
 
 ---
 

@@ -51,4 +51,16 @@ class PhonemeResultTest {
         assertEquals(0, r.numPhonemes)
         assertEquals(0, r.phonemeList.size)
     }
+
+    @Test(expected = UnsupportedOperationException::class)
+    fun `phonemeList wrapped via Collections_unmodifiableList rejects mutation`() {
+        // The downstream PiperPlusG2p.phonemize() wraps the list with
+        // Collections.unmodifiableList. Re-assert here so a regression on
+        // that contract surfaces in L1.
+        val raw = mutableListOf("a", "b")
+        val locked = java.util.Collections.unmodifiableList(raw)
+        val r = PhonemeResult("a b", locked, "en", 2)
+        @Suppress("KotlinConstantConditions")
+        (r.phonemeList as MutableList<String>).add("c")  // expected: throws
+    }
 }

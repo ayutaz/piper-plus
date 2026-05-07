@@ -24,6 +24,11 @@ on:
 permissions:
   contents: read
 
+# Cancel duplicate runs from the same ref so a re-tag doesn't double-publish.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
 env:
   ANDROID_NDK_VERSION: "26.1.10909125"
   ANDROID_API_LEVEL: "24"
@@ -109,6 +114,17 @@ jobs:
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: 17 }
+
+      # AGP triggers externalNativeBuild during configure; the publish job
+      # therefore needs the same NDK as build-native.
+      - name: Setup Android SDK + NDK
+        uses: android-actions/setup-android@v3
+        with: { cmdline-tools-version: 11076708 }
+      - name: Install NDK
+        run: |
+          sdkmanager "ndk;${{ env.ANDROID_NDK_VERSION }}"
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/${{ env.ANDROID_NDK_VERSION }}" >> $GITHUB_ENV
+
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with: { gradle-version: "8.11.1" }
@@ -147,14 +163,30 @@ jobs:
 
       # ----- Validate POM <-> tag agreement (AC-REL-3) ---------------------------
       - name: Verify version against tag
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
         run: |
-          # Currently no version is hard-coded in build.gradle.kts (we read
-          # `VERSION_NAME` project property), so the only validation we need
-          # is the regex shape.
+          # Validate SemVer shape, supporting pre-release AND build metadata
+          # combinations (SemVer 2.0.0 §10): MAJOR.MINOR.PATCH(-pre)?(+build)?
           VERSION="${{ steps.version.outputs.version }}"
-          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([+-][A-Za-z0-9.\-]+)?$ ]] \
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$ ]] \
             || { echo "Invalid SemVer: $VERSION"; exit 1; }
+          echo "Version $VERSION is well-formed."
+
+      # ----- Fail fast if Sonatype / signing secrets are unset (real publish) ---
+      - name: Check publishing secrets
+        if: github.event_name != 'pull_request'
+        env:
+          USR: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          PWD: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+          KEY: ${{ secrets.SIGNING_IN_MEMORY_KEY }}
+          KPW: ${{ secrets.SIGNING_IN_MEMORY_KEY_PASSWORD }}
+        run: |
+          missing=0
+          for v in USR PWD KEY KPW; do
+            eval val="\$$v"
+            if [ -z "$val" ]; then echo "Secret $v is not configured"; missing=1; fi
+          done
+          [ "$missing" = "0" ] || { echo "Missing publish secrets — aborting."; exit 1; }
 
       # ----- PR dry-run: publishToMavenLocal -------------------------------------
       - name: Dry-run publish (PR)

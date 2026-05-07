@@ -6,7 +6,6 @@ import org.json.JSONObject
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
-import org.junit.Assume.assumeTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -96,7 +95,7 @@ class PhonemeFixtureParityTest {
         }
         val root = JSONObject(raw)
         assertNotNull(root.getJSONArray("test_cases"))
-        assumeTrue(
+        assertTrue(
             "fixture must have a 'version' field",
             root.has("version"),
         )
@@ -122,14 +121,14 @@ class PhonemeFixtureParityTest {
             ctx.assets.open("g2p_fixtures/phoneme_test_cases_golden.json")
                 .bufferedReader().use { it.readText() }
         } catch (e: Exception) {
-            // Golden file not synced yet — skip rather than fail. The
-            // structural check above still catches major regressions.
-            assumeTrue(
-                "phoneme_test_cases_golden.json not present; run " +
-                    "tools/generate_g2p_golden.py to generate",
-                false,
+            // The golden file IS shipped in the repo; if it is missing the
+            // syncG2pFixture Gradle task has broken or the fixture was
+            // not committed — fail loudly rather than silently skip.
+            throw AssertionError(
+                "phoneme_test_cases_golden.json missing from androidTest assets — " +
+                    "syncG2pFixture didn't run or fixture sync regressed",
+                e,
             )
-            return
         }
         val root = JSONObject(rawJson)
         val cases = root.getJSONArray("test_cases")

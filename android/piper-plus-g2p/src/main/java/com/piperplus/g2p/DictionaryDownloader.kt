@@ -7,6 +7,10 @@ import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
 import java.security.MessageDigest
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.withContext
 
 /**
  * Downloads the OpenJTalk dictionary from a remote source (typically
@@ -14,8 +18,9 @@ import java.security.MessageDigest
  *
  * The default repository is `ayousanz/piper-plus-base`, which ships the
  * dictionary as a single tar archive plus a SHA-256 sum. Callers can override
- * the host / repo / file name when they prefer to host the dictionary
- * themselves (e.g. CDN, F-Droid mirror).
+ * the repo / file name; the host must be in [ALLOWED_HOSTS] (see
+ * NFR-SEC-2 — only TLS-enabled, well-known hosts are accepted to keep the
+ * trust model simple).
  *
  * F-Droid note: this method makes a non-deterministic network call, so
  * F-Droid distributions must mark the consumer app with the
@@ -24,12 +29,23 @@ import java.security.MessageDigest
  */
 object DictionaryDownloader {
 
-    private const val DEFAULT_HF_HOST  = "https://huggingface.co"
-    private const val DEFAULT_HF_REPO  = "ayousanz/piper-plus-base"
-    private const val DEFAULT_FILE     = "open_jtalk_dic.tar"
+    /** Hosts the downloader will accept. Add new mirrors here, not via param. */
+    val ALLOWED_HOSTS: Set<String> = setOf(
+        "https://huggingface.co",
+        "https://hf-mirror.com",
+    )
+
+    private const val DEFAULT_HF_HOST     = "https://huggingface.co"
+    private const val DEFAULT_HF_REPO     = "ayousanz/piper-plus-base"
+    private const val DEFAULT_FILE        = "open_jtalk_dic.tar"
     private const val DEFAULT_SHA256_FILE = "open_jtalk_dic.tar.sha256"
-    private const val BUFFER_SIZE      = 32 * 1024
-    private const val DEST_DIR_NAME    = "open_jtalk_dic"
+    private const val BUFFER_SIZE         = 32 * 1024
+    private const val DEST_DIR_NAME       = "open_jtalk_dic"
+
+    // TAR safety bounds — OpenJTalk dict ≈ 102 MB; 256 MB total / 64 MB per
+    // entry leaves comfortable headroom while killing tar-bomb attacks.
+    private const val MAX_TOTAL_BYTES     = 256L * 1024 * 1024
+    private const val MAX_ENTRY_BYTES     =  64L * 1024 * 1024
 
     /**
      * Download the OpenJTalk dictionary archive into `context.filesDir`,
@@ -37,10 +53,13 @@ object DictionaryDownloader {
      * resulting [OpenJTalkDictionary].
      *
      * The function is idempotent: if a previous extraction already exists
-     * (non-empty `filesDir/open_jtalk_dic/`) the function returns immediately
-     * without re-downloading.
+     * (non-empty `filesDir/open_jtalk_dic/` AND a `.complete` marker is
+     * present) the function returns immediately without re-downloading. The
+     * marker is written only after the full extraction succeeds, so a crash
+     * mid-extract leaves the directory in a state we can recover from.
      *
-     * @throws IOException on network / IO / checksum failures.
+     * @throws IOException on network / IO / checksum / unsafe-archive failures.
+     * @throws IllegalArgumentException if [host] is not in [ALLOWED_HOSTS].
      */
     @JvmStatic
     @JvmOverloads
@@ -51,39 +70,64 @@ object DictionaryDownloader {
         shaFile: String = DEFAULT_SHA256_FILE,
         host: String = DEFAULT_HF_HOST,
         onProgress: (bytesRead: Long, total: Long) -> Unit = { _, _ -> },
-    ): OpenJTalkDictionary {
-        val destDir = File(context.filesDir, DEST_DIR_NAME)
-        if (destDir.isDirectory && (destDir.list()?.isNotEmpty() == true)) {
-            return OpenJTalkDictionary(destDir.absolutePath)
+    ): OpenJTalkDictionary = withContext(Dispatchers.IO) {
+        val normalisedHost = host.trimEnd('/')
+        require(normalisedHost in ALLOWED_HOSTS) {
+            "host not in DictionaryDownloader.ALLOWED_HOSTS: $host"
         }
-        destDir.mkdirs()
+        require(normalisedHost.startsWith("https://")) {
+            "host must use TLS: $host"
+        }
 
-        val baseUrl = "${host.trimEnd('/')}/${repo.trim('/')}/resolve/main"
+        val destDir   = File(context.filesDir, DEST_DIR_NAME)
+        val marker    = File(destDir, ".complete")
+        if (marker.exists() && (destDir.list()?.isNotEmpty() == true)) {
+            return@withContext OpenJTalkDictionary(destDir.absolutePath)
+        }
+
+        // Stale partial extraction — wipe and start fresh.
+        if (destDir.exists()) destDir.deleteRecursively()
+
+        // Atomic-ish: extract into a sibling staging directory, then rename.
+        val staging = File(context.filesDir, "$DEST_DIR_NAME.tmp").also {
+            if (it.exists()) it.deleteRecursively()
+            it.mkdirs()
+        }
+
+        val baseUrl    = "$normalisedHost/${repo.trim('/')}/resolve/main"
         val archiveUrl = "$baseUrl/$archiveFile"
         val shaUrl     = "$baseUrl/$shaFile"
 
-        // 1. Download SHA-256 sidecar (small text file) first so we can
-        //    abort early if it's missing.
+        currentCoroutineContext().ensureActive()
         val expectedSha = downloadString(shaUrl).trim().substringBefore(' ')
-        if (expectedSha.length != 64) {
+        if (expectedSha.length != 64 || !expectedSha.all { it.isLetterOrDigit() }) {
             throw IOException("invalid sha256 sidecar at $shaUrl")
         }
 
-        // 2. Download archive into a temp file and verify checksum.
         val tmp = File.createTempFile("piperplus-dic-", ".tar", context.cacheDir)
         try {
             downloadToFile(archiveUrl, tmp, onProgress)
+            currentCoroutineContext().ensureActive()
             val actualSha = sha256(tmp)
             if (!actualSha.equals(expectedSha, ignoreCase = true)) {
                 throw IOException("sha256 mismatch: expected=$expectedSha actual=$actualSha")
             }
-            // 3. Extract the tar archive into destDir.
-            extractTar(tmp, destDir)
+            extractTar(tmp, staging)
+        } catch (t: Throwable) {
+            staging.deleteRecursively()
+            throw t
         } finally {
             tmp.delete()
         }
 
-        return OpenJTalkDictionary(destDir.absolutePath)
+        // Rename staging → destDir. POSIX rename is atomic when both paths
+        // share a filesystem (which they do — both live under filesDir).
+        if (!staging.renameTo(destDir)) {
+            staging.deleteRecursively()
+            throw IOException("could not finalise dict directory: $destDir")
+        }
+        marker.writeText("ok")
+        OpenJTalkDictionary(destDir.absolutePath)
     }
 
     private fun downloadString(url: String): String {
@@ -95,7 +139,7 @@ object DictionaryDownloader {
         }
     }
 
-    private fun downloadToFile(
+    private suspend fun downloadToFile(
         url: String,
         dest: File,
         onProgress: (Long, Long) -> Unit,
@@ -108,10 +152,14 @@ object DictionaryDownloader {
                     val buf = ByteArray(BUFFER_SIZE)
                     var read = 0L
                     while (true) {
+                        currentCoroutineContext().ensureActive()
                         val n = input.read(buf)
                         if (n <= 0) break
                         out.write(buf, 0, n)
                         read += n
+                        if (read > MAX_TOTAL_BYTES) {
+                            throw IOException("dict archive exceeds $MAX_TOTAL_BYTES bytes")
+                        }
                         onProgress(read, total)
                     }
                 }
@@ -150,29 +198,56 @@ object DictionaryDownloader {
 
     /**
      * Minimal POSIX TAR (ustar) extractor sufficient for the OpenJTalk
-     * dictionary distribution. Skips file types other than regular files
-     * and directories. Symlink-safe: refuses entries with absolute paths
-     * or `..` components.
+     * dictionary distribution.
+     *
+     * Hardening (NFR-SEC-2):
+     *  - Honours the ustar `prefix` field (offset 345, len 155) so long paths
+     *    do not silently truncate.
+     *  - Rejects entries whose canonical path escapes [destDir].
+     *  - Rejects symlinks, hardlinks, character/block devices, FIFOs.
+     *  - Caps per-entry size at [MAX_ENTRY_BYTES] and total at
+     *    [MAX_TOTAL_BYTES] to defang TAR-bomb / lying-header attacks.
      */
     private fun extractTar(archive: File, destDir: File) {
+        val destCanon = destDir.canonicalFile
+        var totalExtracted = 0L
         archive.inputStream().use { input ->
             val header = ByteArray(512)
             while (true) {
                 if (!readFully(input, header)) break
                 if (header.all { it == 0.toByte() }) break  // end-of-archive
-                val name    = String(header, 0, 100).trimEndZeros()
-                val sizeStr = String(header, 124, 12).trim().trimEnd(0.toChar())
-                val typeFlag = header[156]
+
+                val nameField   = String(header, 0, 100).trimEndZeros()
+                val prefixField = String(header, 345, 155).trimEndZeros()
+                val name = if (prefixField.isNotEmpty()) "$prefixField/$nameField" else nameField
                 if (name.isEmpty()) continue
 
-                if (name.contains("..") || name.startsWith("/")) {
+                val sizeStr = String(header, 124, 12).trim().trimEnd(0.toChar())
+                val typeFlag = header[156]
+
+                if (name.contains("..") || name.startsWith("/") || name.startsWith("\\")) {
                     throw IOException("refusing to extract unsafe path: $name")
                 }
 
                 val size = if (sizeStr.isNotEmpty()) sizeStr.toLong(8) else 0L
+                if (size < 0 || size > MAX_ENTRY_BYTES) {
+                    throw IOException("entry size $size exceeds limit ($MAX_ENTRY_BYTES) for $name")
+                }
+                totalExtracted += size
+                if (totalExtracted > MAX_TOTAL_BYTES) {
+                    throw IOException("total extracted bytes exceed $MAX_TOTAL_BYTES")
+                }
+
                 val out = File(destDir, name)
+                if (!out.canonicalPath.startsWith(destCanon.path + File.separator) &&
+                    out.canonicalPath != destCanon.path) {
+                    throw IOException("refusing to extract outside destDir: $name")
+                }
+
                 when (typeFlag.toInt()) {
-                    '5'.code -> out.mkdirs()
+                    '5'.code -> {
+                        out.mkdirs()
+                    }
                     '0'.code, 0 -> {
                         out.parentFile?.mkdirs()
                         FileOutputStream(out).use { fos ->
@@ -187,8 +262,17 @@ object DictionaryDownloader {
                             }
                         }
                     }
+                    '1'.code, '2'.code -> {
+                        // Hardlink / symlink — explicit refuse so a malicious
+                        // archive can't redirect a write to /data/.../victim.
+                        throw IOException("refusing tar entry with link type for $name")
+                    }
+                    '3'.code, '4'.code, '6'.code -> {
+                        throw IOException("refusing tar entry with device type for $name")
+                    }
                     else -> {
-                        // Skip unsupported entry types (symlink, etc.)
+                        // Unknown / future ustar extensions — skip the payload
+                        // but don't write anything to disk.
                         skipFully(input, size)
                     }
                 }
