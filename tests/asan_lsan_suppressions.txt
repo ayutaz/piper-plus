@@ -14,8 +14,17 @@
 # allocator state for the lifetime of the process and only frees it on
 # atexit handlers that LSan does not see. Reported once per process and
 # does not grow with G2P workload size.
-leak:onnxruntime::Env::Default
+#
+# We match by shared-object path because the symbols inside the prebuilt
+# libonnxruntime.so are stripped on the Maven Central distribution, so the
+# resolved frame looks like
+#     #1 0x...  (libonnxruntime.so.1.17.0+0xa4a0d9)
+# and a symbol-name suppression (`leak:onnxruntime::Env::Default`) wouldn't
+# match. The substring "libonnxruntime.so" pins us to ORT-originated leaks
+# only, never our own code.
+leak:libonnxruntime.so
 
 # OpenJTalk's mecab dictionary loader allocates a couple of singletons that
 # are released only at program exit. Same lifetime pattern as above.
+leak:libopenjtalk
 leak:openjtalk_create

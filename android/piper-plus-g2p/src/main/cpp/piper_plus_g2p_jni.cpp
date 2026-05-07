@@ -9,15 +9,23 @@
  */
 
 #include <jni.h>
-#include <android/log.h>
 
 #include <cstring>
 #include <string>
 
-#include "piper_plus.h"
+// android/log.h only exists when targeting the Android NDK. The L2
+// linux-jvm-smoke CI job builds this same source on a host JVM (Linux x86_64)
+// where the NDK headers aren't present, so we provide a no-op shim there.
+#ifdef __ANDROID__
+#  include <android/log.h>
+#  define LOG_TAG "PiperPlusG2pJNI"
+#  define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
+#else
+#  include <cstdio>
+#  define LOGE(...) do { fprintf(stderr, "[piper-plus-g2p-jni] " __VA_ARGS__); fputc('\n', stderr); } while (0)
+#endif
 
-#define LOG_TAG "PiperPlusG2pJNI"
-#define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
+#include "piper_plus.h"
 
 // ---------------------------------------------------------------------------
 // RAII helpers

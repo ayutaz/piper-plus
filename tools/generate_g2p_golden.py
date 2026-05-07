@@ -23,6 +23,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from piper_plus_g2p import MultilingualPhonemizer  # type: ignore
+
 
 _LANGUAGES = ["en", "es", "fr", "ja", "ko", "pt", "sv", "zh"]
 _LATIN_LANGS = frozenset({"en", "es", "fr", "pt", "sv"})
@@ -37,8 +39,6 @@ def _load_phonemizer(default_latin: str):
     byte-for-byte compatible we therefore must regenerate the phonemizer
     per case, threading the fixture's ``language`` through.
     """
-    from piper_plus_g2p import MultilingualPhonemizer  # type: ignore
-
     return MultilingualPhonemizer(
         languages=_LANGUAGES,
         default_latin_language=default_latin,

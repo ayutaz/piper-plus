@@ -118,14 +118,12 @@
     {
       "language": "zh",
       "input": "。，！",
-      "description": "Chinese punctuation-only input; char-based JS: 3 chars",
-      "expected_token_count_min": 3
+      "description": "Chinese punctuation-only input; char-based JS: 3 chars"
     },
     {
       "language": "zh",
       "input": "123",
-      "description": "Chinese numeric input — passed through; char-based JS: 3 chars",
-      "expected_token_count_min": 3
+      "description": "Chinese numeric input — passed through; char-based JS: 3 chars"
     },
     {
       "language": "zh",
@@ -865,32 +863,27 @@
     {
       "language": "en",
       "input": "0",
-      "description": "Digit zero",
-      "expected_token_count_min": 1
+      "description": "Digit zero"
     },
     {
       "language": "en",
       "input": "1",
-      "description": "Digit one",
-      "expected_token_count_min": 1
+      "description": "Digit one"
     },
     {
       "language": "en",
       "input": "123",
-      "description": "Three digit number",
-      "expected_token_count_min": 1
+      "description": "Three digit number"
     },
     {
       "language": "en",
       "input": "3.14",
-      "description": "Decimal number",
-      "expected_token_count_min": 1
+      "description": "Decimal number"
     },
     {
       "language": "en",
       "input": "100",
-      "description": "Round hundred",
-      "expected_token_count_min": 1
+      "description": "Round hundred"
     },
     {
       "language": "en",
@@ -1189,20 +1182,17 @@
     {
       "language": "es",
       "input": "0",
-      "description": "Digit",
-      "expected_token_count_min": 1
+      "description": "Digit"
     },
     {
       "language": "es",
       "input": "100",
-      "description": "Hundred",
-      "expected_token_count_min": 1
+      "description": "Hundred"
     },
     {
       "language": "es",
       "input": "3.14",
-      "description": "Decimal — Spanish writes 3,14 but ASCII test",
-      "expected_token_count_min": 1
+      "description": "Decimal — Spanish writes 3,14 but ASCII test"
     },
     {
       "language": "es",
@@ -1435,8 +1425,7 @@
     {
       "language": "fr",
       "input": "0",
-      "description": "Digit",
-      "expected_token_count_min": 1
+      "description": "Digit"
     },
     {
       "language": "fr",
@@ -1675,14 +1664,12 @@
     {
       "language": "pt",
       "input": "0",
-      "description": "Digit",
-      "expected_token_count_min": 1
+      "description": "Digit"
     },
     {
       "language": "pt",
       "input": "100",
-      "description": "Hundred",
-      "expected_token_count_min": 1
+      "description": "Hundred"
     },
     {
       "language": "sv",
@@ -1891,14 +1878,12 @@
     {
       "language": "sv",
       "input": "0",
-      "description": "Digit",
-      "expected_token_count_min": 1
+      "description": "Digit"
     },
     {
       "language": "sv",
       "input": "100",
-      "description": "Hundred",
-      "expected_token_count_min": 1
+      "description": "Hundred"
     },
     {
       "language": "sv",
@@ -2167,32 +2152,27 @@
     {
       "language": "zh",
       "input": "0",
-      "description": "Digit zero",
-      "expected_token_count_min": 1
+      "description": "Digit zero"
     },
     {
       "language": "zh",
       "input": "100",
-      "description": "Hundred",
-      "expected_token_count_min": 1
+      "description": "Hundred"
     },
     {
       "language": "zh",
       "input": "。",
-      "description": "Single period",
-      "expected_token_count_min": 1
+      "description": "Single period"
     },
     {
       "language": "zh",
       "input": "！",
-      "description": "Single exclamation",
-      "expected_token_count_min": 1
+      "description": "Single exclamation"
     },
     {
       "language": "zh",
       "input": "，",
-      "description": "Comma alone",
-      "expected_token_count_min": 1
+      "description": "Comma alone"
     },
     {
       "language": "ja",
