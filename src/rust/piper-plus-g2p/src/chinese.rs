@@ -907,6 +907,232 @@ impl Phonemizer for ChinesePhonemizer {
 }
 
 // =========================================================================
+// ZH-EN code-switching: loanword data + embedded-English phonemization
+// (Issue #384, design §2.1 / §4.1 R1-R5 / §8.5)
+// =========================================================================
+
+/// Default ZH-EN loanword data, embedded at compile time.
+/// Byte-for-byte identical to `src/python/g2p/piper_plus_g2p/data/zh_en_loanword.json`
+/// (CI gate: `scripts/check_loanword_consistency.py`).
+const DEFAULT_LOANWORD_JSON: &str = include_str!("../data/zh_en_loanword.json");
+
+/// ZH-EN code-switching loanword dictionary used by [`phonemize_embedded_english`].
+///
+/// Maps English tokens (acronyms / loanwords / individual letters) to Mandarin
+/// pinyin syllables. Mirrors the Python `_load_loanword_data` schema.
+///
+/// **Forward-compatible loader (YELLOW-5)**: missing sections default to empty;
+/// unknown top-level fields are silently ignored, so a future `schema_version: 2`
+/// adding new fields (e.g. `tone_overrides`) does not break this loader.
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct LoanwordData {
+    pub version: u32,
+    #[serde(default)]
+    pub acronyms: HashMap<String, Vec<String>>,
+    #[serde(default)]
+    pub loanwords: HashMap<String, Vec<String>>,
+    #[serde(default)]
+    pub letter_fallback: HashMap<String, Vec<String>>,
+}
+
+impl Default for LoanwordData {
+    fn default() -> Self {
+        Self {
+            version: 1,
+            acronyms: HashMap::new(),
+            loanwords: HashMap::new(),
+            letter_fallback: HashMap::new(),
+        }
+    }
+}
+
+fn json_type_label(v: &serde_json::Value) -> &'static str {
+    match v {
+        serde_json::Value::Null => "null",
+        serde_json::Value::Bool(_) => "bool",
+        serde_json::Value::Number(_) => "number",
+        serde_json::Value::String(_) => "string",
+        serde_json::Value::Array(_) => "list",
+        serde_json::Value::Object(_) => "dict",
+    }
+}
+
+/// Parse a ZH-EN loanword JSON string into [`LoanwordData`] with Python-compatible
+/// error messages.
+///
+/// Error format mirrors Python `_load_loanword_data` so that cross-runtime CI
+/// can compare verbatim:
+///   `<label>: '<section>.<key>' must be list[str], got <value>`
+pub fn parse_loanword_json(label: &str, json: &str) -> Result<LoanwordData, String> {
+    let raw: serde_json::Value =
+        serde_json::from_str(json).map_err(|e| format!("{label}: invalid JSON: {e}"))?;
+    let obj = raw
+        .as_object()
+        .ok_or_else(|| format!("{label}: top-level must be a JSON object"))?;
+
+    let version = obj
+        .get("version")
+        .and_then(|v| v.as_u64())
+        .ok_or_else(|| format!("{label}: missing or non-int 'version'"))?
+        as u32;
+
+    let mut data = LoanwordData {
+        version,
+        ..LoanwordData::default()
+    };
+
+    for section in ["acronyms", "loanwords", "letter_fallback"] {
+        let map = match obj.get(section) {
+            Some(v) => v.as_object().ok_or_else(|| {
+                format!(
+                    "{label}: section '{section}' must be a mapping, got {}",
+                    json_type_label(v)
+                )
+            })?,
+            None => continue,
+        };
+        let target = match section {
+            "acronyms" => &mut data.acronyms,
+            "loanwords" => &mut data.loanwords,
+            "letter_fallback" => &mut data.letter_fallback,
+            _ => unreachable!(),
+        };
+        for (k, v) in map {
+            let arr = v.as_array().ok_or_else(|| {
+                format!("{label}: '{section}.{k}' must be list[str], got {v}")
+            })?;
+            let mut strs: Vec<String> = Vec::with_capacity(arr.len());
+            for elem in arr {
+                let s = elem.as_str().ok_or_else(|| {
+                    format!("{label}: '{section}.{k}' must be list[str], got {v}")
+                })?;
+                strs.push(s.to_string());
+            }
+            target.insert(k.clone(), strs);
+        }
+    }
+
+    Ok(data)
+}
+
+/// Return the bundled default ZH-EN loanword data (cached, parsed at first call).
+///
+/// Backed by `OnceLock`: the JSON is parsed exactly once per process and the
+/// resulting `&'static LoanwordData` is shared.
+pub fn load_default_loanword_data() -> &'static LoanwordData {
+    static CACHE: OnceLock<LoanwordData> = OnceLock::new();
+    CACHE.get_or_init(|| {
+        parse_loanword_json("zh_en_loanword.json (bundled)", DEFAULT_LOANWORD_JSON)
+            .expect("bundled zh_en_loanword.json: schema must be valid")
+    })
+}
+
+/// Tokenize text into alphanumeric runs (drops punctuation/whitespace).
+/// Mirrors Python's `_RE_TOKEN_SPLIT = re.compile(r"[A-Za-z0-9]+")`.
+fn tokenize_alnum(text: &str) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    let mut current = String::new();
+    for ch in text.chars() {
+        if ch.is_ascii_alphanumeric() {
+            current.push(ch);
+        } else if !current.is_empty() {
+            out.push(std::mem::take(&mut current));
+        }
+    }
+    if !current.is_empty() {
+        out.push(current);
+    }
+    out
+}
+
+/// Convert a list of pinyin syllables (e.g. `["ji4", "pi4", "ai1", "si4"]`)
+/// into IPA tokens with tone markers, then PUA-map multi-char tokens.
+///
+/// Mirrors Python's `phonemize_from_pinyin_syllables(syllables, chinese_text="")`
+/// for the embedded-English case where there is no surrounding Chinese context.
+fn phonemize_from_pinyin_syllables(syllables: &[String]) -> Vec<String> {
+    if syllables.is_empty() {
+        return Vec::new();
+    }
+
+    let mut st: Vec<(String, u8)> = syllables
+        .iter()
+        .map(|s| {
+            let (base, tone) = extract_tone(s);
+            (normalize_pinyin(base), tone)
+        })
+        .collect();
+
+    apply_tone_sandhi(&mut st);
+
+    let mut tokens: Vec<String> = Vec::new();
+    for (normalized, tone) in &st {
+        tokens.extend(pinyin_to_ipa(normalized, *tone));
+    }
+
+    map_sequence(tokens)
+}
+
+/// Phonemize English text embedded in Chinese context as Mandarin pinyin.
+///
+/// Lookup priority (Python-compatible):
+///   1. case-sensitive `loanwords` (e.g. `"Python"`, `"ChatGPT"`)
+///   2. uppercase `acronyms`        (e.g. `"GPS"`, `"USB"`)
+///   3. per-letter `letter_fallback` on uppercased text (digits silently dropped)
+///
+/// Returns an empty vector if no token matched.
+///
+/// Note: the bundled default data is accessible via [`load_default_loanword_data`].
+/// Callers that need to override entries should merge their data on top of the
+/// default (per-section, per-entry, last wins) before calling this function.
+pub fn phonemize_embedded_english(text: &str, data: &LoanwordData) -> Vec<String> {
+    let mut pinyin_syllables: Vec<String> = Vec::new();
+
+    for token in tokenize_alnum(text) {
+        if token.is_empty() {
+            continue;
+        }
+
+        // 1. Case-sensitive loanword
+        if let Some(syllables) = data.loanwords.get(&token) {
+            pinyin_syllables.extend(syllables.iter().cloned());
+            continue;
+        }
+
+        // 2. Uppercase acronym
+        let upper = token.to_uppercase();
+        if let Some(syllables) = data.acronyms.get(&upper) {
+            pinyin_syllables.extend(syllables.iter().cloned());
+            continue;
+        }
+
+        // 3. Letter-by-letter fallback (digits silently dropped unless registered)
+        for ch in upper.chars() {
+            let mut buf = [0u8; 4];
+            let key = ch.encode_utf8(&mut buf);
+            if let Some(syllables) = data.letter_fallback.get(key) {
+                pinyin_syllables.extend(syllables.iter().cloned());
+            }
+        }
+    }
+
+    if pinyin_syllables.is_empty() {
+        Vec::new()
+    } else {
+        phonemize_from_pinyin_syllables(&pinyin_syllables)
+    }
+}
+
+impl ChinesePhonemizer {
+    /// Phonemize embedded English using the bundled default ZH-EN loanword data.
+    ///
+    /// See [`phonemize_embedded_english`] for the underlying lookup logic.
+    pub fn phonemize_embedded_english(&self, text: &str) -> Vec<String> {
+        phonemize_embedded_english(text, load_default_loanword_data())
+    }
+}
+
+// =========================================================================
 // Unit tests
 // =========================================================================
 
@@ -1310,5 +1536,234 @@ mod tests {
         let p = ChinesePhonemizer::from_json_bytes(single_json, phrase_json).unwrap();
         let (tokens, _) = p.phonemize_with_prosody("\u{4e00}\u{4e2a}").unwrap();
         assert!(!tokens.is_empty());
+    }
+
+    // ==========================================================================
+    // ZH-EN code-switching tests (TICKET-01 R5, Issue #384)
+    // ==========================================================================
+
+    #[test]
+    fn test_zh_en_load_default_loanword_data() {
+        let data = load_default_loanword_data();
+        assert_eq!(data.version, 1);
+        // 65 acronyms + 40 loanwords + 26 letters per design (canonical JSON entries)
+        assert!(data.acronyms.len() >= 60, "acronyms count: {}", data.acronyms.len());
+        assert!(data.loanwords.len() >= 35, "loanwords count: {}", data.loanwords.len());
+        assert_eq!(data.letter_fallback.len(), 26, "letter_fallback A-Z");
+    }
+
+    #[test]
+    fn test_zh_en_acronym_gps() {
+        let data = load_default_loanword_data();
+        let tokens = phonemize_embedded_english("GPS", data);
+        // GPS = ji4 + pi4 + ai1 + si4 = 4 pinyin syllables.
+        // Token counts:
+        //   ji4  = t\u0255 + i + tone4         = 3 tokens
+        //   pi4  = p\u02b0 + i + tone4          = 3 tokens
+        //   ai1  = (zero initial) + a\u026a + tone1 = 2 tokens
+        //   si4  = s + \u0268 (alveolar syllabic) + tone4 = 3 tokens
+        // Total = 11 tokens.
+        assert_eq!(tokens.len(), 11, "GPS tokens: {tokens:?}");
+    }
+
+    #[test]
+    fn test_zh_en_loanword_python() {
+        let data = load_default_loanword_data();
+        let tokens = phonemize_embedded_english("Python", data);
+        // Python = pai4 + sen1 = 2 pinyin syllables
+        // Each \u2192 initial + final + tone marker = ~3 tokens
+        assert_eq!(tokens.len(), 6, "Python tokens: {tokens:?}");
+    }
+
+    #[test]
+    fn test_zh_en_loanword_chatgpt() {
+        let data = load_default_loanword_data();
+        let tokens = phonemize_embedded_english("ChatGPT", data);
+        // ChatGPT = chai4 + ti2 + ji4 + pi4 + ti4 = 5 pinyin syllables
+        // Expected: 15 tokens
+        assert_eq!(tokens.len(), 15, "ChatGPT tokens: {tokens:?}");
+    }
+
+    #[test]
+    fn test_zh_en_letter_fallback_zz() {
+        let data = load_default_loanword_data();
+        let tokens_zz = phonemize_embedded_english("ZZ", data);
+        let tokens_z = phonemize_embedded_english("Z", data);
+        // Z = zi4 (1 syllable). ZZ = 2 \u00d7 Z (letter fallback runs per char).
+        assert_eq!(tokens_zz.len(), tokens_z.len() * 2, "ZZ vs Z");
+    }
+
+    #[test]
+    fn test_zh_en_empty_input() {
+        let data = load_default_loanword_data();
+        assert_eq!(phonemize_embedded_english("", data), Vec::<String>::new());
+        assert_eq!(phonemize_embedded_english("   ", data), Vec::<String>::new());
+        assert_eq!(phonemize_embedded_english(",.!?", data), Vec::<String>::new());
+    }
+
+    #[test]
+    fn test_zh_en_loanword_beats_acronym() {
+        // Custom override: "AI" registered as both loanword (with non-canonical
+        // pinyin) and acronym. Loanword should win (case-sensitive lookup is
+        // tried first).
+        let mut data = LoanwordData::default();
+        data.loanwords.insert("AI".to_string(), vec!["ma1".to_string()]); // dummy
+        data.acronyms.insert("AI".to_string(), vec!["ji4".to_string()]); // dummy
+        let tokens = phonemize_embedded_english("AI", &data);
+        // ma1 = m + a + tone1 = 3 IPA tokens; ji4 = t\u0255 + i + tone4 = 3.
+        // Both produce 3 tokens but with different content. We confirm the
+        // result matches the loanword path by comparing against a loanword-only
+        // lookup.
+        let mut data_loan_only = LoanwordData::default();
+        data_loan_only
+            .loanwords
+            .insert("AI".to_string(), vec!["ma1".to_string()]);
+        let tokens_loan = phonemize_embedded_english("AI", &data_loan_only);
+        assert_eq!(tokens, tokens_loan);
+    }
+
+    #[test]
+    fn test_zh_en_acronym_beats_fallback() {
+        // "ZX" \u2014 neither in loanwords nor acronyms by default, so letter_fallback runs.
+        // Add it to acronyms with custom pinyin and verify acronym is preferred over
+        // letter-by-letter fallback.
+        let mut data = LoanwordData::default();
+        data.acronyms.insert("ZX".to_string(), vec!["ma1".to_string()]); // single syllable
+        data.letter_fallback
+            .insert("Z".to_string(), vec!["zi4".to_string()]);
+        data.letter_fallback
+            .insert("X".to_string(), vec!["ai4".to_string()]);
+        let tokens_acronym = phonemize_embedded_english("ZX", &data);
+        // Acronym: 1 syllable -> ~3 IPA. Letter fallback: 2 syllables -> ~6 IPA.
+        assert!(tokens_acronym.len() < 6, "acronym path should beat letter fallback");
+    }
+
+    #[test]
+    fn test_zh_en_python_vs_uppercase() {
+        let data = load_default_loanword_data();
+        let lower = phonemize_embedded_english("Python", data);
+        let upper = phonemize_embedded_english("PYTHON", data);
+        // case-sensitive loanword "Python" exists; "PYTHON" falls through to
+        // letter fallback (P,Y,T,H,O,N = 6 letters, each with multiple ipa).
+        // Both should be non-empty but different lengths.
+        assert!(!lower.is_empty());
+        assert!(!upper.is_empty());
+        assert_ne!(lower, upper, "Python vs PYTHON must differ (case-sensitive loanword vs fallback)");
+    }
+
+    #[test]
+    fn test_zh_en_trailing_punctuation() {
+        let data = load_default_loanword_data();
+        let plain = phonemize_embedded_english("GPS", data);
+        let comma = phonemize_embedded_english("GPS,", data);
+        let period = phonemize_embedded_english("GPS.", data);
+        let exclam = phonemize_embedded_english("GPS!", data);
+        assert_eq!(plain, comma);
+        assert_eq!(plain, period);
+        assert_eq!(plain, exclam);
+    }
+
+    #[test]
+    fn test_zh_en_two_embedded_en() {
+        let data = load_default_loanword_data();
+        let combined = phonemize_embedded_english("ChatGPT \u{548c} Python", data);
+        let chatgpt = phonemize_embedded_english("ChatGPT", data);
+        let python = phonemize_embedded_english("Python", data);
+        // "\u{548c}" (he, "and") is non-ASCII so it's dropped from tokenization.
+        // ChatGPT (5 syllables) + Python (2 syllables) = 7 syllables
+        assert_eq!(combined.len(), chatgpt.len() + python.len());
+    }
+
+    #[test]
+    fn test_zh_en_digits_dropped() {
+        let data = load_default_loanword_data();
+        // Z2Z9 \u2014 Z is in letter_fallback, 2/9 are dropped. Should equal ZZ.
+        let z2z9 = phonemize_embedded_english("Z2Z9", data);
+        let zz = phonemize_embedded_english("ZZ", data);
+        assert_eq!(z2z9, zz, "digits must be dropped from letter_fallback");
+    }
+
+    #[test]
+    fn test_zh_en_acronym_with_digits() {
+        // "MP3" \u2014 direct acronym hit (MP3 includes digit), not letter_fallback path.
+        // (Real default data may or may not contain MP3; we test the override path.)
+        let mut data = LoanwordData::default();
+        data.acronyms
+            .insert("MP3".to_string(), vec!["ai1".to_string()]);
+        data.letter_fallback
+            .insert("M".to_string(), vec!["ai1".to_string(), "mu5".to_string()]);
+        data.letter_fallback
+            .insert("P".to_string(), vec!["pi4".to_string()]);
+        let tokens = phonemize_embedded_english("MP3", &data);
+        // Acronym route: 1 syllable. Letter fallback would be 2 syllables (digit dropped).
+        // Acronym must be picked first.
+        let acronym_only = phonemize_embedded_english(
+            "MP3",
+            &LoanwordData {
+                acronyms: [("MP3".to_string(), vec!["ai1".to_string()])]
+                    .into_iter()
+                    .collect(),
+                ..LoanwordData::default()
+            },
+        );
+        assert_eq!(tokens, acronym_only);
+    }
+
+    #[test]
+    fn test_zh_en_schema_validation_invalid_type() {
+        // value is not list[str] \u2192 must error with Python-equivalent format.
+        let bad = r#"{"version": 1, "acronyms": {"GPS": "not_a_list"}}"#;
+        let err = parse_loanword_json("test.json", bad).unwrap_err();
+        assert!(err.contains("'acronyms.GPS'"), "error should name section.key: {err}");
+        assert!(err.contains("must be list[str]"), "error should mention list[str]: {err}");
+    }
+
+    #[test]
+    fn test_zh_en_schema_validation_section_not_dict() {
+        let bad = r#"{"version": 1, "acronyms": "not_a_dict"}"#;
+        let err = parse_loanword_json("test.json", bad).unwrap_err();
+        assert!(err.contains("'acronyms'"), "error should mention section: {err}");
+        assert!(err.contains("must be a mapping"), "{err}");
+    }
+
+    #[test]
+    fn test_zh_en_loader_accepts_unknown_fields_in_schema_v2() {
+        // YELLOW-5: a future schema_version: 2 that adds new top-level fields
+        // (e.g. tone_overrides, source) must NOT break this loader.
+        let v2 = r#"{
+            "version": 2,
+            "schema_version": 2,
+            "metadata": {"experimental": true},
+            "acronyms": {"GPS": ["ji4"]},
+            "loanwords": {"Python": ["pai4"]},
+            "letter_fallback": {"A": ["ei1"]},
+            "tone_overrides": {"GPS": "high"}
+        }"#;
+        let data = parse_loanword_json("future_v2.json", v2).expect("should parse v2");
+        assert_eq!(data.version, 2);
+        assert!(data.acronyms.contains_key("GPS"));
+        assert!(data.loanwords.contains_key("Python"));
+    }
+
+    #[test]
+    fn test_zh_en_method_on_phonemizer() {
+        // Verify ChinesePhonemizer::phonemize_embedded_english works
+        // (uses bundled default loanword data).
+        let p = make_phonemizer(&[], &[]);
+        let via_method = p.phonemize_embedded_english("GPS");
+        let via_free_fn =
+            phonemize_embedded_english("GPS", load_default_loanword_data());
+        assert_eq!(via_method, via_free_fn);
+    }
+
+    #[test]
+    fn test_zh_en_json_matches_python_source_path() {
+        // Sanity: the JSON byte-content embedded via include_str! must include
+        // the canonical "Python" loanword. This is a coarse check; the byte-for-byte
+        // identity to the Python source is enforced by CI
+        // (scripts/check_loanword_consistency.py).
+        assert!(DEFAULT_LOANWORD_JSON.contains("\"Python\""));
+        assert!(DEFAULT_LOANWORD_JSON.contains("\"GPS\""));
+        assert!(DEFAULT_LOANWORD_JSON.contains("\"ChatGPT\""));
     }
 }
