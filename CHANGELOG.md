@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### ZH-EN code-switching を全 7 ランタイムに展開 (Issue #384)
+
+中国語テキストに混在する英単語 (acronyms / loanwords / per-letter fallback) を米国英語ではなく Mandarin pinyin で発音する機能を、Python (PR #397 で先行リリース) に続いて Rust × 2 crate / Go / C# / WASM / C++ の **5 ランタイムへ byte-for-byte 同期展開**。
+
+- **canonical**: `src/python/g2p/piper_plus_g2p/data/zh_en_loanword.json` (acronyms 65 / loanwords 40 / A-Z fallback、131 entries)
+- **mirror 7 箇所** + **fixture 6 箇所**: CI gate `ZH-EN Loanword Sync Gate / json-sync` が SHA256 一致を強制 (`scripts/check_loanword_consistency.py` + `/check-loanword` skill)
+- **API**: 各ランタイムの `MultilingualPhonemizer` が `[zh,en,zh]` / `[zh,en]` / `[en,zh]` パターンを自動検出し、英語 segment を loanword 経路にディスパッチ。runtime opt-out: `enable_zh_en_dispatch(false)` (Rust) / `SetZhEnDispatch(false)` (Go) / `EnableZhEnDispatch = false` (C#) / `setZhEnDispatch(false)` (WASM)
+- **Forward-compatible loader (YELLOW-5)**: 全ランタイムで `schema_version: 2` の未来フィールドを silent ignore する挙動を pinning test で固定
+- **Two-layer model**: コンパイル時 (Cargo feature `chinese` / csproj `<EmbeddedResource>` / Go `//go:embed` / C++ CMake) + ランタイム (default-on opt-out) の二層管理 (TICKET-01 §7 懸念 5)
+- **111 ZH-EN tests 追加 / regression なし**: Rust 45 / Go 24 / C# 21 / WASM 9 / C++ 12 (フィクスチャ matrix 18 cases、Issue #384 例 3 件)
+- **Issue #384 例**: `请打开 GPS` / `我喜欢用 Python 写代码` / `让我用 ChatGPT 写代码` が全 7 ランタイムで Python と同一 IPA 列を返す
+- 詳細: [`docs/tickets/zh-en-loanword/`](docs/tickets/zh-en-loanword/)
+
 #### iOS shared-lib を xcframework として配布開始 (Issue #377)
 
 iOS 利用シナリオ (Dart FFI / Godot / Swift / SPM) に対応する xcframework 配布を成立させた。device (arm64) + simulator (arm64+x86_64 universal) の両 slice を含む。

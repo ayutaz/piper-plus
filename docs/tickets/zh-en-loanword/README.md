@@ -62,23 +62,27 @@ Day 16     ┃ Phase 8:  統合バッファ (cross-runtime PR review / 最終回
 
 **ステータス凡例**: 📝 Draft / 📋 Ready (チケット作成 + エージェントレビュー反映済) / 🚧 In Progress / 👀 Review / ✅ Done / ⏸ Blocked
 
+> **2026-05-07 Phase 7 完了**: 7 commit (PR-A〜PR-E) で全 7 ランタイム展開を完了。
+> CI gate `ZH-EN Loanword Sync Gate / json-sync` が green、全 mirror byte-for-byte 一致。
+> 残: TICKET-05 P3/P4 (piper.cpp dispatch + C API export) は別 PR で実施予定。
+
 ---
 
 ## 4. 進捗ダッシュボード
 
 ```
 [Phase 0] チケット作成 ████████████████████  100%  ✅ Done (7 チケット作成 + レビュー反映済)
-[Phase 1] Rust         ░░░░░░░░░░░░░░░░░░░░    0%  📋 Ready
-[Phase 2] Go           ░░░░░░░░░░░░░░░░░░░░    0%  📋 Ready
-[Phase 3] C#           ░░░░░░░░░░░░░░░░░░░░    0%  📋 Ready
-[Phase 4] JS/WASM      ░░░░░░░░░░░░░░░░░░░░    0%  📋 Ready
-[Phase 5] C++          ░░░░░░░░░░░░░░░░░░░░    0%  📋 Ready
-[Phase 6] CI Sync      ░░░░░░░░░░░░░░░░░░░░    0%  📋 Ready
-[Phase 7] Docs         ░░░░░░░░░░░░░░░░░░░░    0%  📋 Ready
+[Phase 1] Rust         ████████████████████  100%  ✅ Done (45 tests, 2 crate 対称)
+[Phase 2] Go           ████████████████████  100%  ✅ Done (24 tests, embed.FS)
+[Phase 3] C#           ████████████████████  100%  ✅ Done (21 tests, PinyinToIpa.cs 独立移植)
+[Phase 4] JS/WASM      ████████████████████  100%  ✅ Done (9 tests, setZhEnDispatch FFI)
+[Phase 5] C++          ████████████████████  100%  ✅ Done (12 tests, chinese_loanword.{hpp,cpp} 新規)
+[Phase 6] CI Sync      ████████████████████  100%  ✅ Done (Phase 6a + 6b、7 copy + 6 fixture mirror)
+[Phase 7] Docs         ████████████████████  100%  ✅ Done (CLAUDE.md + INDEX + CHANGELOG + skill)
 ```
 
 **チケット作成進捗**: 7 / 7 完了 (各チケット Plan エージェントレビュー反映済)。
-**実装進捗**: 0 / 7 着手前 (チームレビュー後に開始予定)。
+**実装進捗**: 7 / 7 完了 (~3,700 LOC, 111 ZH-EN tests, regression なし)。
 
 ---
 
