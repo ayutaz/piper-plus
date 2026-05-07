@@ -33,8 +33,12 @@ public sealed class MultilingualPhonemizer : IPhonemizer
     /// ZH-EN code-switching dispatch toggle (TICKET-03 §9.0 #2, Issue #384).
     /// Default-on when both "zh" and "en" phonemizers are registered;
     /// settable via the <c>EnableZhEnDispatch</c> ctor parameter.
+    /// Marked <c>volatile</c> because the surrounding class advertises
+    /// concurrent use; without a memory barrier a writer thread's update
+    /// may not be observed by a reader on weak-memory targets such as
+    /// ARM64 (review note CS-H3).
     /// </summary>
-    private bool _enableZhEnDispatch;
+    private volatile bool _enableZhEnDispatch;
 
     /// <summary>
     /// Per-thread EOS token captured during <see cref="PhonemizeWithProsody"/>
@@ -271,9 +275,14 @@ public sealed class MultilingualPhonemizer : IPhonemizer
                 bool nextIsZh = segIdx + 1 < segments.Count && segments[segIdx + 1].Item1 == "zh";
                 if (prevIsZh || nextIsZh)
                 {
-                    var dispatched = cp.PhonemizeEmbeddedEnglish(segmentText);
-                    foreach (var ph in dispatched)
+                    // Use the prosody-aware variant: each IPA token must carry
+                    // ProsodyInfo(a1=tone, a2=1, a3=1) to match Python and avoid
+                    // dropping tone information at the ONNX layer (review R-C1).
+                    var result = ChineseEmbeddedEnglish.Convert(segmentText);
+                    int n = result.Phonemes.Count;
+                    for (int i = 0; i < n; i++)
                     {
+                        var ph = result.Phonemes[i];
                         if (s_bosEosTokens.Contains(ph))
                         {
                             if (s_eosTokens.Contains(ph))
@@ -281,7 +290,10 @@ public sealed class MultilingualPhonemizer : IPhonemizer
                             continue;
                         }
                         allPhonemes.Add(ph);
-                        allProsody.Add(null); // embedded EN: no prosody
+                        allProsody.Add(new ProsodyInfo(
+                            result.A1[i],
+                            result.A2[i],
+                            result.A3[i]));
                     }
                     continue;
                 }

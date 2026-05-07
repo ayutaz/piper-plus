@@ -14,13 +14,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 中国語テキストに混在する英単語 (acronyms / loanwords / per-letter fallback) を米国英語ではなく Mandarin pinyin で発音する機能を、Python (PR #397 で先行リリース) に続いて Rust × 2 crate / Go / C# / WASM / C++ の **5 ランタイムへ byte-for-byte 同期展開**。
 
 - **canonical**: `src/python/g2p/piper_plus_g2p/data/zh_en_loanword.json` (acronyms 65 / loanwords 40 / A-Z fallback、131 entries)
-- **mirror 7 箇所** + **fixture 6 箇所**: CI gate `ZH-EN Loanword Sync Gate / json-sync` が SHA256 一致を強制 (`scripts/check_loanword_consistency.py` + `/check-loanword` skill)
+- **mirror 7 箇所** + **fixture 6 箇所**: CI gate `ZH-EN Loanword Sync Gate / json-sync` が SHA256 一致を強制 (`scripts/check_loanword_consistency.py` + `/check-loanword` skill)。helper script 自体の挙動を verify する `helper-self-check` job (`--diff` / `--fix` 冪等性) も同 workflow に同居
 - **API**: 各ランタイムの `MultilingualPhonemizer` が `[zh,en,zh]` / `[zh,en]` / `[en,zh]` パターンを自動検出し、英語 segment を loanword 経路にディスパッチ。runtime opt-out: `enable_zh_en_dispatch(false)` (Rust) / `SetZhEnDispatch(false)` (Go) / `EnableZhEnDispatch = false` (C#) / `setZhEnDispatch(false)` (WASM)
-- **Forward-compatible loader (YELLOW-5)**: 全ランタイムで `schema_version: 2` の未来フィールドを silent ignore する挙動を pinning test で固定
+- **Forward-compatible loader (YELLOW-5)**: 全 7 ランタイム (Python + Rust × 2 / Go / C# / WASM / C++) で `schema_version: 2` の未来フィールドを silent ignore する挙動を pinning test で固定
 - **Two-layer model**: コンパイル時 (Cargo feature `chinese` / csproj `<EmbeddedResource>` / Go `//go:embed` / C++ CMake) + ランタイム (default-on opt-out) の二層管理 (TICKET-01 §7 懸念 5)
-- **111 ZH-EN tests 追加 / regression なし**: Rust 45 / Go 24 / C# 21 / WASM 9 / C++ 12 (フィクスチャ matrix 18 cases、Issue #384 例 3 件)
-- **Issue #384 例**: `请打开 GPS` / `我喜欢用 Python 写代码` / `让我用 ChatGPT 写代码` が全 7 ランタイムで Python と同一 IPA 列を返す
-- 詳細: [`docs/tickets/zh-en-loanword/`](docs/tickets/zh-en-loanword/)
+- **ランタイム test カバレッジ**: Rust × 2 / Go / C# / WASM / C++ + Python の各 ZH-EN test スイートで `phonemize_embedded_english` の lookup priority / forward-compat / dispatch / opt-out / per-token prosody (a1=tone, a2=a3=1) を検証
+- **Issue #384 例**: `请打开 GPS` / `我喜欢用 Python 写代码` / `让我用 ChatGPT 写代码` を Python リファレンス test がカバー。各ランタイムの `phonemize_embedded_english` は同 JSON (byte-for-byte 同期) と同 lookup ロジックで動くため Python と等価な IPA 列を返すが、**全 7 ランタイムを横断して同 fixture を食わせる cross-runtime IPA parity CI は今後の課題** (`tests/fixtures/g2p/zh_en_loanword_matrix.json` は現状 Python のみ消費)。詳細は [`docs/tickets/zh-en-loanword/`](docs/tickets/zh-en-loanword/)。
 
 #### iOS shared-lib を xcframework として配布開始 (Issue #377)
 

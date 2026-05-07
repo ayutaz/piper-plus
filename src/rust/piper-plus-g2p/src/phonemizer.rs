@@ -71,6 +71,20 @@ pub trait Phonemizer: Send + Sync {
             .collect();
         Ok(sanitized)
     }
+
+    /// Toggle the ZH-EN code-switching dispatch (Issue #384).
+    ///
+    /// Default is a no-op so single-language phonemizers don't have to know
+    /// about it. `MultilingualPhonemizer` overrides this when the `chinese`
+    /// feature is enabled, routing English-adjacent-to-Chinese segments
+    /// through the loanword path.
+    fn set_zh_en_dispatch(&mut self, _enabled: bool) {}
+
+    /// Returns whether the ZH-EN dispatch is currently enabled.
+    /// Default is `false` for phonemizers that don't implement the toggle.
+    fn is_zh_en_dispatch_enabled(&self) -> bool {
+        false
+    }
 }
 
 /// Language phonemizer registry.

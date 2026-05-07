@@ -66,6 +66,17 @@ pub trait Phonemizer: Send + Sync {
     fn detect_primary_language(&self, _text: &str) -> &str {
         self.language_code()
     }
+
+    /// ZH-EN code-switching dispatch (Issue #384) のトグル。
+    ///
+    /// `MultilingualPhonemizer` を内部で持つ phonemizer のみ意味のある操作。
+    /// それ以外の単言語 phonemizer ではデフォルト no-op。
+    fn set_zh_en_dispatch(&mut self, _enabled: bool) {}
+
+    /// ZH-EN dispatch が現在有効かを返す。デフォルト `false`。
+    fn is_zh_en_dispatch_enabled(&self) -> bool {
+        false
+    }
 }
 
 /// 言語レジストリ

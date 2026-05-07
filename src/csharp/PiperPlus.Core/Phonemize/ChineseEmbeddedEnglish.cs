@@ -17,8 +17,11 @@ public static class ChineseEmbeddedEnglish
     /// <param name="text">English text segment (e.g. <c>"GPS"</c>, <c>"ChatGPT"</c>).</param>
     /// <param name="data">Loanword dictionary (default: <see cref="LoanwordDataLoader.Default"/>).</param>
     /// <returns>
-    /// A <see cref="ChineseG2PResult"/> with PUA-mapped tokens and prosody A1/A2/A3
-    /// filled with zeros (embedded EN has no Chinese-style tone/word context).
+    /// A <see cref="ChineseG2PResult"/> with PUA-mapped tokens and per-token
+    /// prosody (a1=tone, a2=1, a3=1) matching Python's
+    /// <c>phonemize_embedded_english</c> -> <c>phonemize_from_pinyin_syllables(..., chinese_text="")</c>.
+    /// Returning <c>(0,0,0)</c> would silently drop tone information at the
+    /// ONNX prosody tensor (review note R-C1).
     /// </returns>
     public static ChineseG2PResult Convert(string text, LoanwordData? data = null)
     {
@@ -54,23 +57,23 @@ public static class ChineseEmbeddedEnglish
         if (pinyinSyllables.Count == 0)
             return new ChineseG2PResult(System.Array.Empty<string>(), System.Array.Empty<int>(), System.Array.Empty<int>(), System.Array.Empty<int>());
 
-        var tokens = PhonemizeFromPinyinSyllables(pinyinSyllables);
-
-        // Embedded EN: prosody filled with zeros (matches Python ProsodyInfo
-        // contract for the zero-context case; design §8.5).
-        var n = tokens.Count;
-        var zeros = new int[n];
-        return new ChineseG2PResult(tokens, zeros, zeros, zeros);
+        return PhonemizeFromPinyinSyllablesWithProsody(pinyinSyllables);
     }
 
     /// <summary>
-    /// Convert pinyin syllables to PUA-mapped IPA tokens.
-    /// Mirrors Python <c>phonemize_from_pinyin_syllables(..., chinese_text="")</c>.
+    /// Convert pinyin syllables to PUA-mapped IPA tokens, plus per-token
+    /// prosody matching Python's
+    /// <c>phonemize_from_pinyin_syllables(..., chinese_text="")</c>.
     /// </summary>
-    internal static IReadOnlyList<string> PhonemizeFromPinyinSyllables(
+    internal static ChineseG2PResult PhonemizeFromPinyinSyllablesWithProsody(
         IReadOnlyList<string> syllables)
     {
-        if (syllables.Count == 0) return System.Array.Empty<string>();
+        if (syllables.Count == 0)
+            return new ChineseG2PResult(
+                System.Array.Empty<string>(),
+                System.Array.Empty<int>(),
+                System.Array.Empty<int>(),
+                System.Array.Empty<int>());
 
         // Step 1: extract tone, normalize
         var st = new List<(string Syllable, int Tone)>(syllables.Count);
@@ -83,17 +86,41 @@ public static class ChineseEmbeddedEnglish
         // Step 2: tone sandhi
         PinyinToIpa.ApplyToneSandhi(st);
 
-        // Step 3: pinyin -> IPA tokens
-        var tokens = new List<string>(syllables.Count * 3);
+        // Step 3: pinyin -> IPA tokens, recording the syllable's tone
+        // alongside each emitted IPA token for downstream prosody alignment.
+        var tokens = new List<string>(syllables.Count * 3);  // ~ initial + final + tone
+        var perTokenTones = new List<int>(syllables.Count * 3);
         foreach (var (syl, tone) in st)
         {
             var ipa = PinyinToIpa.Convert(syl, tone);
-            tokens.AddRange(ipa);
+            foreach (var t in ipa)
+            {
+                tokens.Add(t);
+                perTokenTones.Add(tone);
+            }
         }
 
-        // Step 4: multi-char IPA -> PUA codepoint mapping
-        return OpenJTalkToPiperMapping.MapSequence(tokens);
+        // Step 4: multi-char IPA -> PUA codepoint mapping (count preserved)
+        var mapped = OpenJTalkToPiperMapping.MapSequence(tokens);
+        if (mapped.Count != perTokenTones.Count)
+        {
+            throw new System.InvalidOperationException(
+                $"PUA mapping changed token count: {tokens.Count} -> {mapped.Count}");
+        }
+
+        var n = mapped.Count;
+        var a1 = perTokenTones.ToArray();
+        var ones = new int[n];
+        for (int i = 0; i < n; i++) ones[i] = 1;
+        return new ChineseG2PResult(mapped, a1, ones, (int[])ones.Clone());
     }
+
+    /// <summary>
+    /// Tokens-only convenience wrapper for callers that don't need prosody.
+    /// </summary>
+    internal static IReadOnlyList<string> PhonemizeFromPinyinSyllables(
+        IReadOnlyList<string> syllables)
+        => PhonemizeFromPinyinSyllablesWithProsody(syllables).Phonemes;
 
     /// <summary>
     /// Tokenize text into alphanumeric runs. Mirrors Python

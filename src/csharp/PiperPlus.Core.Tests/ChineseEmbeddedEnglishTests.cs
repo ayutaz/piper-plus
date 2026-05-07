@@ -42,10 +42,12 @@ public sealed class ChineseEmbeddedEnglishTests
         var result = ChineseEmbeddedEnglish.Convert("GPS");
         // GPS = ji4(3) + pi4(3) + ai1(2 zero initial) + si4(3) = 11
         Assert.Equal(11, result.Phonemes.Count);
-        // Prosody filled with zeros (embedded EN no Chinese context).
-        Assert.All(result.A1, v => Assert.Equal(0, v));
-        Assert.All(result.A2, v => Assert.Equal(0, v));
-        Assert.All(result.A3, v => Assert.Equal(0, v));
+        // Per-token prosody mirrors Python phonemize_from_pinyin_syllables(
+        // ..., chinese_text=""): a1 = syllable tone (1..=5), a2 = a3 = 1
+        // (review note R-C1 — was zero-fill, silently dropping tone).
+        Assert.All(result.A1, v => Assert.InRange(v, 1, 5));
+        Assert.All(result.A2, v => Assert.Equal(1, v));
+        Assert.All(result.A3, v => Assert.Equal(1, v));
     }
 
     [Fact]
@@ -251,5 +253,131 @@ public sealed class ChineseEmbeddedEnglishTests
         Assert.Equal("pʰ", tokens[0]);
         Assert.Equal("aɪ", tokens[1]);
         Assert.Equal("tone4", tokens[2]);
+    }
+
+    // ================================================================
+    // MultilingualPhonemizer dispatch tests (review note CS-H1).
+    // The dispatch routing in MultilingualPhonemizer.PhonemizeCore() is
+    // exercised end-to-end with a passthrough EN stub and the real
+    // ChineseEmbeddedEnglish path so we can verify all 6 ZH-EN
+    // adjacency patterns + the EnableZhEnDispatch toggle.
+    // ================================================================
+
+    /// <summary>Stub EN phonemizer: returns characters as tokens, no prosody.</summary>
+    private sealed class PassthroughEnStub : IPhonemizer
+    {
+        public List<string> Phonemize(string text) =>
+            text.Where(c => !char.IsWhiteSpace(c)).Select(c => c.ToString()).ToList();
+
+        public (List<string>, List<ProsodyInfo?>) PhonemizeWithProsody(string text)
+        {
+            var toks = Phonemize(text);
+            return (toks, new List<ProsodyInfo?>(new ProsodyInfo?[toks.Count]));
+        }
+
+        public Dictionary<string, int[]>? GetPhonemeIdMap() => null;
+    }
+
+    /// <summary>Stub Chinese G2P engine: returns empty for ordinary Chinese
+    /// (we only exercise the embedded-EN default impl which routes through
+    /// <see cref="ChineseEmbeddedEnglish"/>).</summary>
+    private sealed class StubZhEngine : IChineseG2PEngine
+    {
+        public ChineseG2PResult Convert(string text) => new(
+            Array.Empty<string>(),
+            Array.Empty<int>(), Array.Empty<int>(), Array.Empty<int>());
+    }
+
+    private static MultilingualPhonemizer MakeZhEnDispatchPhonemizer() =>
+        new(new Dictionary<string, IPhonemizer>
+        {
+            ["zh"] = new ChinesePhonemizer(new StubZhEngine()),
+            ["en"] = new PassthroughEnStub(),
+        });
+
+    private static int CountPuaToneMarkers(IEnumerable<string> tokens) =>
+        tokens.Count(t => t.Length > 0
+            && (int)t[0] >= 0xE020 && (int)t[0] <= 0xE04A);
+
+    [Fact]
+    public void MultilingualDispatch_ZhEnZh_DispatchedToLoanwordPath()
+    {
+        var mp = MakeZhEnDispatchPhonemizer();
+        var (tokens, _) = mp.PhonemizeWithProsody("你好 GPS 世界");
+        Assert.True(CountPuaToneMarkers(tokens) > 0,
+            "[zh, en, zh] must produce PUA tone markers from loanword path");
+    }
+
+    [Fact]
+    public void MultilingualDispatch_ZhEn_DispatchedToLoanwordPath()
+    {
+        var mp = MakeZhEnDispatchPhonemizer();
+        var (tokens, _) = mp.PhonemizeWithProsody("请打开 GPS");
+        Assert.True(CountPuaToneMarkers(tokens) > 0,
+            "[zh, en] tail must dispatch to loanword path");
+    }
+
+    [Fact]
+    public void MultilingualDispatch_EnZh_DispatchedToLoanwordPath()
+    {
+        var mp = MakeZhEnDispatchPhonemizer();
+        var (tokens, _) = mp.PhonemizeWithProsody("GPS 是什么");
+        Assert.True(CountPuaToneMarkers(tokens) > 0,
+            "[en, zh] head must dispatch to loanword path");
+    }
+
+    [Fact]
+    public void MultilingualDispatch_EnZhEn_BothEndsDispatched()
+    {
+        // Review note R-H1: when en is at both ends with zh in the middle,
+        // both en segments are adjacent to zh and so both should dispatch.
+        var mp = MakeZhEnDispatchPhonemizer();
+        var (tokens, _) = mp.PhonemizeWithProsody("Hello 你好 GPS");
+        Assert.True(CountPuaToneMarkers(tokens) > 0,
+            "[en, zh, en]: at least one en must dispatch to loanword path");
+    }
+
+    [Fact]
+    public void MultilingualDispatch_PureEn_DoesNotDispatch()
+    {
+        var mp = MakeZhEnDispatchPhonemizer();
+        var (tokens, _) = mp.PhonemizeWithProsody("Hello GPS world");
+        Assert.Equal(0, CountPuaToneMarkers(tokens));
+    }
+
+    [Fact]
+    public void MultilingualDispatch_DisabledFlag_FallsThroughToEnglish()
+    {
+        var mp = MakeZhEnDispatchPhonemizer();
+        mp.EnableZhEnDispatch = false;
+        var (tokens, _) = mp.PhonemizeWithProsody("你好 GPS 世界");
+        Assert.Equal(0, CountPuaToneMarkers(tokens));
+    }
+
+    [Fact]
+    public void MultilingualDispatch_CarriesProsodyA1Tone()
+    {
+        // Review note R-C1 / CS-H1: dispatched IPA tokens must carry per-token
+        // prosody (a1=tone, a2=1, a3=1), not null/zero.
+        var mp = MakeZhEnDispatchPhonemizer();
+        var (tokens, prosody) =
+            mp.PhonemizeWithProsody("你好 GPS 世界");
+        Assert.Equal(tokens.Count, prosody.Count);
+        bool found = false;
+        for (int i = 0; i < tokens.Count; i++)
+        {
+            if (tokens[i].Length == 0) continue;
+            var c = (int)tokens[i][0];
+            if (c < 0xE020 || c > 0xE04A) continue;
+            var p = prosody[i];
+            if (p is { } info && info.A1 >= 1 && info.A1 <= 5
+                && info.A2 == 1 && info.A3 == 1)
+            {
+                found = true;
+                break;
+            }
+        }
+        Assert.True(found,
+            "expected at least one dispatched PUA token with (a1=tone, a2=1, a3=1)");
     }
 }

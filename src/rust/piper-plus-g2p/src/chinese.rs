@@ -957,12 +957,17 @@ fn json_type_label(v: &serde_json::Value) -> &'static str {
     }
 }
 
-/// Parse a ZH-EN loanword JSON string into [`LoanwordData`] with Python-compatible
-/// error messages.
+/// Parse a ZH-EN loanword JSON string into [`LoanwordData`] with errors that
+/// share the same shape as Python's `_load_loanword_data`.
 ///
-/// Error format mirrors Python `_load_loanword_data` so that cross-runtime CI
-/// can compare verbatim:
-///   `<label>: '<section>.<key>' must be list[str], got <value>`
+/// **Shape-compatible, not byte-equal.** The substring
+/// `'<section>.<key>' must be list[str]` is preserved verbatim across
+/// runtimes (CI grep-checks for it), but the trailing ``got <value>`` segment
+/// uses each runtime's native repr (Python `repr()`, Rust `serde_json::Value`
+/// Display, etc.) and intentionally differs in quoting / spacing. Python
+/// itself does not validate the `version` field; this loader is more strict
+/// and rejects missing/non-int `version` so that a malformed manifest cannot
+/// silently pass an embedded build (review note R-C4).
 pub fn parse_loanword_json(label: &str, json: &str) -> Result<LoanwordData, String> {
     let raw: serde_json::Value =
         serde_json::from_str(json).map_err(|e| format!("{label}: invalid JSON: {e}"))?;
@@ -970,11 +975,15 @@ pub fn parse_loanword_json(label: &str, json: &str) -> Result<LoanwordData, Stri
         .as_object()
         .ok_or_else(|| format!("{label}: top-level must be a JSON object"))?;
 
+    // Python's `_load_loanword_data` does not validate `version`. To keep
+    // drift between runtimes minimal and to accept future `schema_version: 2`
+    // payloads, we accept either field, fall back to 1, and never fail on
+    // a missing/non-int value (review note R-C4).
     let version = obj
         .get("version")
+        .or_else(|| obj.get("schema_version"))
         .and_then(|v| v.as_u64())
-        .ok_or_else(|| format!("{label}: missing or non-int 'version'"))?
-        as u32;
+        .unwrap_or(1) as u32;
 
     let mut data = LoanwordData {
         version,
@@ -1046,13 +1055,16 @@ fn tokenize_alnum(text: &str) -> Vec<String> {
 }
 
 /// Convert a list of pinyin syllables (e.g. `["ji4", "pi4", "ai1", "si4"]`)
-/// into IPA tokens with tone markers, then PUA-map multi-char tokens.
-///
-/// Mirrors Python's `phonemize_from_pinyin_syllables(syllables, chinese_text="")`
-/// for the embedded-English case where there is no surrounding Chinese context.
-fn phonemize_from_pinyin_syllables(syllables: &[String]) -> Vec<String> {
+/// into IPA tokens with tone markers, then PUA-map multi-char tokens, plus
+/// per-token prosody (a1 = tone, a2 = a3 = 1) matching Python's
+/// `phonemize_from_pinyin_syllables(syllables, chinese_text="")` for the
+/// embedded-English case (no surrounding Chinese context, so word_info is
+/// empty and `(syl_pos, word_len)` falls back to `(1, 1)`).
+fn phonemize_from_pinyin_syllables_with_prosody(
+    syllables: &[String],
+) -> (Vec<String>, Vec<Option<ProsodyInfo>>) {
     if syllables.is_empty() {
-        return Vec::new();
+        return (Vec::new(), Vec::new());
     }
 
     let mut st: Vec<(String, u8)> = syllables
@@ -1066,11 +1078,29 @@ fn phonemize_from_pinyin_syllables(syllables: &[String]) -> Vec<String> {
     apply_tone_sandhi(&mut st);
 
     let mut tokens: Vec<String> = Vec::new();
+    let mut prosody_list: Vec<Option<ProsodyInfo>> = Vec::new();
     for (normalized, tone) in &st {
-        tokens.extend(pinyin_to_ipa(normalized, *tone));
+        let syl_prosody = ProsodyInfo {
+            a1: *tone as i32,
+            a2: 1,
+            a3: 1,
+        };
+        let ipa_tokens = pinyin_to_ipa(normalized, *tone);
+        for ipa in ipa_tokens {
+            tokens.push(ipa);
+            prosody_list.push(Some(syl_prosody));
+        }
     }
 
-    map_sequence(tokens)
+    let mapped = map_sequence(tokens);
+    debug_assert_eq!(mapped.len(), prosody_list.len());
+    (mapped, prosody_list)
+}
+
+#[cfg(test)]
+#[allow(dead_code)]
+fn phonemize_from_pinyin_syllables(syllables: &[String]) -> Vec<String> {
+    phonemize_from_pinyin_syllables_with_prosody(syllables).0
 }
 
 /// Phonemize English text embedded in Chinese context as Mandarin pinyin.
@@ -1086,6 +1116,21 @@ fn phonemize_from_pinyin_syllables(syllables: &[String]) -> Vec<String> {
 /// Callers that need to override entries should merge their data on top of the
 /// default (per-section, per-entry, last wins) before calling this function.
 pub fn phonemize_embedded_english(text: &str, data: &LoanwordData) -> Vec<String> {
+    phonemize_embedded_english_with_prosody(text, data).0
+}
+
+/// Same lookup as [`phonemize_embedded_english`], but also returns per-token
+/// prosody (a1=tone, a2=1, a3=1) matching Python's
+/// `phonemize_embedded_english` -> `phonemize_from_pinyin_syllables(..., chinese_text="")`.
+///
+/// `MultilingualPhonemizer` calls this from the ZH-EN dispatch path so the
+/// same `ProsodyInfo` reaches the ONNX prosody tensor as in the Python
+/// runtime — feeding the embedded-English IPA stream with `(0,0,0)` prosody
+/// would silently drop tone information and degrade output quality.
+pub fn phonemize_embedded_english_with_prosody(
+    text: &str,
+    data: &LoanwordData,
+) -> (Vec<String>, Vec<Option<ProsodyInfo>>) {
     let mut pinyin_syllables: Vec<String> = Vec::new();
 
     for token in tokenize_alnum(text) {
@@ -1117,9 +1162,9 @@ pub fn phonemize_embedded_english(text: &str, data: &LoanwordData) -> Vec<String
     }
 
     if pinyin_syllables.is_empty() {
-        Vec::new()
+        (Vec::new(), Vec::new())
     } else {
-        phonemize_from_pinyin_syllables(&pinyin_syllables)
+        phonemize_from_pinyin_syllables_with_prosody(&pinyin_syllables)
     }
 }
 
@@ -1754,6 +1799,39 @@ mod tests {
         let via_free_fn =
             phonemize_embedded_english("GPS", load_default_loanword_data());
         assert_eq!(via_method, via_free_fn);
+    }
+
+    #[test]
+    fn test_zh_en_with_prosody_returns_tone_a1_a2_a3_one() {
+        // Review note R-C1: Python's phonemize_embedded_english calls
+        // phonemize_from_pinyin_syllables(syllables, chinese_text="") which
+        // produces ProsodyInfo(a1=tone, a2=1, a3=1) for every IPA token.
+        // This regression test pins that behavior in Rust.
+        let data = load_default_loanword_data();
+        let (tokens, prosody) =
+            phonemize_embedded_english_with_prosody("GPS", data);
+        assert_eq!(tokens.len(), prosody.len(), "shape parity");
+        assert!(!tokens.is_empty(), "GPS must produce tokens");
+        for (tok, pros) in tokens.iter().zip(prosody.iter()) {
+            let p = pros.as_ref().unwrap_or_else(|| panic!(
+                "embedded-english tokens must carry prosody (got None for {tok:?})"
+            ));
+            assert!(
+                (1..=5).contains(&p.a1),
+                "a1 must be a Mandarin tone 1..=5, got {} for {tok:?}",
+                p.a1
+            );
+            assert_eq!(p.a2, 1, "a2 must be 1 (chinese_text=\"\"); got {}", p.a2);
+            assert_eq!(p.a3, 1, "a3 must be 1 (chinese_text=\"\"); got {}", p.a3);
+        }
+    }
+
+    #[test]
+    fn test_zh_en_with_prosody_empty_input_empty_output() {
+        let data = load_default_loanword_data();
+        let (tokens, prosody) = phonemize_embedded_english_with_prosody("", data);
+        assert!(tokens.is_empty());
+        assert!(prosody.is_empty());
     }
 
     #[test]

@@ -62,9 +62,17 @@ Day 16     ┃ Phase 8:  統合バッファ (cross-runtime PR review / 最終回
 
 **ステータス凡例**: 📝 Draft / 📋 Ready (チケット作成 + エージェントレビュー反映済) / 🚧 In Progress / 👀 Review / ✅ Done / ⏸ Blocked
 
-> **2026-05-07 Phase 7 完了**: 7 commit (PR-A〜PR-E) で全 7 ランタイム展開を完了。
-> CI gate `ZH-EN Loanword Sync Gate / json-sync` が green、全 mirror byte-for-byte 一致。
-> 残: TICKET-05 P3/P4 (piper.cpp dispatch + C API export) は別 PR で実施予定。
+> **2026-05-07 Phase 7 + Phase 5 残作業 完了**: 11 commit (PR-A〜PR-E + P3/P4/P5
+> follow-up) で全 7 ランタイム展開を完了。CI gate `ZH-EN Loanword Sync Gate /
+> json-sync` が green、全 mirror byte-for-byte 一致。C++ Phase 5 の P3 (piper.cpp
+> dispatch wiring) / P4 (C API export `piper_plus_phonemize_embedded_english`) /
+> P5 (CMake `piper_embed_json_as_header()` for iOS xcframework / Android aar)
+> も同ブランチに含む。
+>
+> **2026-05-07 Phase 7 後追いレビュー対応**: 5 エージェント並列レビューで判明した
+> Critical 8 / High 13 件のうち、即時対応分 (R-C1 prosody zero-fill / Cpp-C1 CMake
+> CRLF / CI-C2 validator drift / Cpp-H1/H2/H3 / R-C3 Voice API 等) を follow-up
+> commit で修正済。残 Medium / Low は個別 PR で対応予定。
 
 ---
 

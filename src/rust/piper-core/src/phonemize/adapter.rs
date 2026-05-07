@@ -76,4 +76,12 @@ impl Phonemizer for G2pAdapter {
     fn detect_primary_language(&self, text: &str) -> &str {
         self.inner.detect_primary_language(text)
     }
+
+    fn set_zh_en_dispatch(&mut self, enabled: bool) {
+        self.inner.set_zh_en_dispatch(enabled);
+    }
+
+    fn is_zh_en_dispatch_enabled(&self) -> bool {
+        self.inner.is_zh_en_dispatch_enabled()
+    }
 }

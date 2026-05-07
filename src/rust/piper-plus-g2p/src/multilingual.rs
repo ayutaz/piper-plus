@@ -557,12 +557,15 @@ impl Phonemizer for MultilingualPhonemizer {
                 let next_is_zh = i + 1 < segments.len() && segments[i + 1].0 == "zh";
                 if prev_is_zh || next_is_zh {
                     let data = crate::chinese::load_default_loanword_data();
-                    let tokens = crate::chinese::phonemize_embedded_english(seg_text, data);
-                    for ph in tokens {
-                        // No prosody from loanword path; embed as `None`
-                        all_phonemes.push(ph);
-                        all_prosody.push(None);
-                    }
+                    // Use `*_with_prosody` so each IPA token carries the
+                    // syllable's tone in `a1` (matches Python: a2=a3=1
+                    // because there is no surrounding chinese_text). Issue
+                    // #384 review note R-C1.
+                    let (tokens, prosody) =
+                        crate::chinese::phonemize_embedded_english_with_prosody(seg_text, data);
+                    debug_assert_eq!(tokens.len(), prosody.len());
+                    all_phonemes.extend(tokens);
+                    all_prosody.extend(prosody);
                     continue;
                 }
             }
@@ -604,6 +607,17 @@ impl Phonemizer for MultilingualPhonemizer {
     fn detect_primary_language(&self, text: &str) -> &str {
         // Delegate to the inherent method
         MultilingualPhonemizer::detect_primary_language(self, text)
+    }
+
+    fn set_zh_en_dispatch(&mut self, enabled: bool) {
+        // Forward through the inherent setter so trait-object users
+        // (e.g. piper-core's `G2pAdapter`) can toggle the dispatch.
+        // (Inherent name is `enable_zh_en_dispatch` for ergonomic use.)
+        MultilingualPhonemizer::enable_zh_en_dispatch(self, enabled);
+    }
+
+    fn is_zh_en_dispatch_enabled(&self) -> bool {
+        MultilingualPhonemizer::is_zh_en_dispatch_enabled(self)
     }
 }
 
@@ -1152,5 +1166,54 @@ mod tests {
             .filter(|t| t.chars().next().is_some_and(|c| (0xE020..=0xE04A).contains(&(c as u32))))
             .count();
         assert_eq!(pua_count, 0, "no zh segment: dispatch must not fire");
+    }
+
+    #[cfg(feature = "chinese")]
+    #[test]
+    fn test_zh_en_dispatch_pattern_en_zh_en() {
+        // Review note R-H1: when `en` is at both ends with `zh` in the
+        // middle, *both* en segments are adjacent to a zh segment and so
+        // both should route through the loanword path.
+        let mp = make_zh_en_dispatch_phonemizer();
+        let (tokens, _) =
+            mp.phonemize_with_prosody("Hello \u{4f60}\u{597d} GPS").unwrap();
+        let pua_count = tokens
+            .iter()
+            .filter(|t| t.chars().next().is_some_and(|c| (0xE020..=0xE04A).contains(&(c as u32))))
+            .count();
+        assert!(
+            pua_count > 0,
+            "[en, zh, en] pattern: at least one en segment must route to loanword path"
+        );
+    }
+
+    #[cfg(feature = "chinese")]
+    #[test]
+    fn test_zh_en_dispatch_carries_prosody_a1_tone() {
+        // Review note R-C1: dispatched IPA tokens must carry per-token
+        // prosody (a1=tone, a2=a3=1), not None.
+        let mp = make_zh_en_dispatch_phonemizer();
+        let (tokens, prosody) =
+            mp.phonemize_with_prosody("\u{4f60}\u{597d} GPS \u{4e16}\u{754c}").unwrap();
+        assert_eq!(tokens.len(), prosody.len(), "shape parity");
+        // Find at least one PUA tone marker token from the dispatch path
+        // and verify its prosody is `Some` with a valid Mandarin tone.
+        let mut found_dispatched_with_tone = false;
+        for (tok, p) in tokens.iter().zip(prosody.iter()) {
+            let first = tok.chars().next().map(|c| c as u32).unwrap_or(0);
+            if (0xE020..=0xE04A).contains(&first) {
+                let info = p.as_ref().unwrap_or_else(|| {
+                    panic!("dispatched token must carry prosody, got None for {tok:?}")
+                });
+                if (1..=5).contains(&info.a1) && info.a2 == 1 && info.a3 == 1 {
+                    found_dispatched_with_tone = true;
+                    break;
+                }
+            }
+        }
+        assert!(
+            found_dispatched_with_tone,
+            "expected at least one dispatched PUA token with (a1=tone, a2=1, a3=1)"
+        );
     }
 }

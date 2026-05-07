@@ -2589,7 +2589,7 @@ void phonemizeText(const Voice &voice, const std::string &text,
             bool nextIsZh = segIdx + 1 < langSegments.size() &&
                              langSegments[segIdx + 1].lang == "zh";
             bool zhEnDispatched = false;
-            if (hasZhSegment && (prevIsZh || nextIsZh)) {
+            if (voice.enableZhEnDispatch && hasZhSegment && (prevIsZh || nextIsZh)) {
               auto loanwordData = piper::getDefaultLoanwordData();
               if (loanwordData) {
                 std::vector<Phoneme> embedded_flat;
@@ -2599,13 +2599,25 @@ void phonemizeText(const Voice &voice, const std::string &text,
                 }
                 zhEnDispatched = true;
               } else {
-                spdlog::debug(
-                    "ZH-EN dispatch requested but loanword data unavailable: {}",
-                    piper::getDefaultLoanwordError());
+                // Match Python: when ZH-EN dispatch fires but loanword data
+                // is unavailable, emit nothing for this en segment instead
+                // of falling back to CMU. Falling back would silently change
+                // the phoneme stream and break cross-runtime fixture parity
+                // (review note Cpp-H1).
+                static bool warnedNoLoanword = false;
+                if (!warnedNoLoanword) {
+                  spdlog::warn(
+                      "ZH-EN dispatch fired but loanword data is unavailable: {}; "
+                      "skipping embedded-en segment(s)",
+                      piper::getDefaultLoanwordError());
+                  warnedNoLoanword = true;
+                }
+                zhEnDispatched = true;
               }
             }
             if (zhEnDispatched) {
-              // Skip the standard English path; loanword tokens already in langPhonemes.
+              // Skip the standard English path; loanword tokens (or nothing,
+              // on data-unavailable) already in langPhonemes.
             } else {
             // English: CMU dictionary-based G2P
             static bool warnedNoCmuDict = false;

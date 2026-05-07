@@ -609,6 +609,38 @@ class TestSchemaValidation:
         assert data["acronyms"]["AB"] == ["ma1"]
         assert data["loanwords"]["Foo"] == ["fu1"]
 
+    def test_loader_accepts_schema_v2_future_fields(self, tmp_path: Path):
+        """YELLOW-5 forward-compat: future ``schema_version: 2`` files with
+        unknown top-level fields (e.g. ``metadata``, ``tone_overrides``) must
+        load successfully — known sections are kept, unknown fields ignored.
+
+        This is the Python-side counterpart of the Rust/Go/C#/WASM/C++
+        ``Loader_AcceptsUnknownFieldsInSchemaV2`` tests; the loader must not
+        require ``version`` either (so a future rename to ``schema_version``
+        does not break clients).
+        """
+        from piper_plus_g2p.chinese import _load_loanword_data
+
+        future = {
+            "schema_version": 2,
+            "metadata": {"experimental": True},
+            "acronyms": {"GPS": ["ji4", "pi4", "ai1", "si4"]},
+            "loanwords": {"Python": ["pai4", "se1"]},
+            "letter_fallback": {"A": ["ei1"]},
+            "tone_overrides": {"GPS": "high"},
+        }
+        path = tmp_path / "future_v2.json"
+        path.write_text(json.dumps(future), encoding="utf-8")
+        data = _load_loanword_data(path)
+        # Known sections roundtrip exactly.
+        assert data["acronyms"]["GPS"] == ["ji4", "pi4", "ai1", "si4"]
+        assert data["loanwords"]["Python"] == ["pai4", "se1"]
+        assert data["letter_fallback"]["A"] == ["ei1"]
+        # Unknown top-level fields are silently dropped (not surfaced).
+        assert "metadata" not in data
+        assert "tone_overrides" not in data
+        assert "schema_version" not in data
+
 
 @requires_zh
 class TestRuntimeBundleSync:

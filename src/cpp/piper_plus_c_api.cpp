@@ -514,6 +514,30 @@ PIPER_PLUS_API int32_t piper_plus_language_id(
     return static_cast<int32_t>(it->second);
 }
 
+// ===== ZH-EN code-switching dispatch toggle (Issue #384) =====
+
+PIPER_PLUS_API PiperPlusStatus piper_plus_set_zh_en_dispatch(
+    PiperPlusEngine *engine,
+    int32_t enabled)
+{
+    if (!engine) {
+        set_error("engine is NULL");
+        return PIPER_PLUS_ERR;
+    }
+    engine->voice.enableZhEnDispatch = (enabled != 0);
+    return PIPER_PLUS_OK;
+}
+
+PIPER_PLUS_API int32_t piper_plus_is_zh_en_dispatch_enabled(
+    const PiperPlusEngine *engine)
+{
+    if (!engine) {
+        set_error("engine is NULL");
+        return -1;
+    }
+    return engine->voice.enableZhEnDispatch ? 1 : 0;
+}
+
 // ===== Iterator / Streaming synthesis =====
 
 PIPER_PLUS_API PiperPlusStatus piper_plus_synth_start(

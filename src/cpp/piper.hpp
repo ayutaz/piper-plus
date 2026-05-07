@@ -145,6 +145,13 @@ struct Voice {
   std::unordered_map<std::string, std::string> cmuDict;
   std::unordered_map<int, std::string> pinyinSingleDict;
   std::unordered_map<std::string, std::string> pinyinPhraseDict;
+
+  // ZH-EN code-switching dispatch (Issue #384). When `true` (default), an
+  // English segment adjacent to a Chinese segment is routed through the
+  // loanword path so e.g. "GPS" sounds Mandarin-style. Set to `false` to
+  // restore the v1.11 CMU-only behavior. Mirrors `enable_zh_en_dispatch`
+  // in Rust / Go / C# / WASM (review note Cpp-H2).
+  bool enableZhEnDispatch = true;
 };
 
 // True if the string is a single UTF-8 codepoint

@@ -427,6 +427,21 @@ impl PiperVoice {
         Ok(ids)
     }
 
+    /// ZH-EN code-switching dispatch (Issue #384) を有効/無効化する。
+    ///
+    /// 多言語モデルで `[zh, en, *]` パターンの英語セグメントを中国語の
+    /// loanword 経路に流すかを制御する。デフォルトは `true` (有効)。
+    /// `false` に設定すると v1.11 と同じ CMU 直行動作に戻る。
+    /// 単言語 phonemizer (例: 日本語のみ) では no-op。
+    pub fn set_zh_en_dispatch(&mut self, enabled: bool) {
+        self.phonemizer.set_zh_en_dispatch(enabled);
+    }
+
+    /// ZH-EN dispatch が現在有効かを返す。
+    pub fn is_zh_en_dispatch_enabled(&self) -> bool {
+        self.phonemizer.is_zh_en_dispatch_enabled()
+    }
+
     /// テキストを WAV ファイルに出力 (デフォルトパラメータ使用)
     pub fn text_to_wav_file(
         &mut self,

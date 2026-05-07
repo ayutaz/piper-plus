@@ -146,6 +146,26 @@ PIPER_PLUS_API int32_t piper_plus_language_id(
     const PiperPlusEngine *engine,
     const char            *language_name);
 
+/* ===== ZH-EN code-switching dispatch (Issue #384) ===== */
+
+/** Toggle the ZH-EN code-switching dispatch path.
+ *
+ *  When enabled (default = 1), an English text segment that is adjacent to
+ *  a Chinese segment is routed through the loanword path so e.g. "GPS" sounds
+ *  Mandarin-style. Set to 0 to restore the v1.11 CMU-only behavior.
+ *
+ *  @param engine   Engine handle.
+ *  @param enabled  0 = disable, non-zero = enable.
+ *  @return         PIPER_PLUS_OK on success, error code on NULL engine. */
+PIPER_PLUS_API PiperPlusStatus piper_plus_set_zh_en_dispatch(
+    PiperPlusEngine *engine,
+    int32_t          enabled);
+
+/** Returns 1 if the ZH-EN code-switching dispatch is currently enabled, 0 if
+ *  disabled, or -1 on error (NULL engine). */
+PIPER_PLUS_API int32_t piper_plus_is_zh_en_dispatch_enabled(
+    const PiperPlusEngine *engine);
+
 /* ===== Audio chunk (for iterator/streaming) ===== */
 
 /**

@@ -47,29 +47,57 @@ public static class LoanwordDataLoader
     }
 
     /// <summary>
-    /// Parse JSON with Python-equivalent error messages
+    /// Parse JSON with shape-compatible Python-style error messages
     /// (<c>"&lt;label&gt;: '&lt;section&gt;.&lt;key&gt;' must be list[str], got &lt;value&gt;"</c>).
+    /// Mirrors the Python loader's behavior: <c>version</c> is optional and
+    /// any unknown top-level fields are silently ignored (forward-compat).
+    /// Wraps <see cref="JsonException"/> as <see cref="LoanwordSchemaException"/>
+    /// so callers only have to catch one exception type.
     /// </summary>
     internal static LoanwordData Parse(string label, Stream stream)
     {
         // Use System.Text.Json with `JsonElement` so we can inspect the raw
-        // structure and produce error messages that match the Python format.
-        using var doc = JsonDocument.Parse(stream);
-        if (doc.RootElement.ValueKind != JsonValueKind.Object)
-            throw new LoanwordSchemaException($"{label}: top-level must be a JSON object");
+        // structure and produce error messages that share the Python format.
+        JsonDocument doc;
+        try
+        {
+            doc = JsonDocument.Parse(stream);
+        }
+        catch (JsonException e)
+        {
+            throw new LoanwordSchemaException($"{label}: invalid JSON: {e.Message}", e);
+        }
+        using (doc)
+        {
+            if (doc.RootElement.ValueKind != JsonValueKind.Object)
+                throw new LoanwordSchemaException($"{label}: top-level must be a JSON object");
 
-        var root = doc.RootElement;
+            var root = doc.RootElement;
 
-        if (!root.TryGetProperty("version", out var versionEl) ||
-            versionEl.ValueKind != JsonValueKind.Number ||
-            !versionEl.TryGetInt32(out int version))
-            throw new LoanwordSchemaException($"{label}: missing or non-int 'version'");
+            // Python's `_load_loanword_data` does not validate `version`. Be
+            // lenient: also accept `schema_version` as a forward-compat alias
+            // and fall back to 1 so a future payload that drops the field
+            // outright still loads (review note R-C4).
+            int version = 1;
+            if (root.TryGetProperty("version", out var v1) &&
+                v1.ValueKind == JsonValueKind.Number &&
+                v1.TryGetInt32(out int parsedV1))
+            {
+                version = parsedV1;
+            }
+            else if (root.TryGetProperty("schema_version", out var v2) &&
+                     v2.ValueKind == JsonValueKind.Number &&
+                     v2.TryGetInt32(out int parsedV2))
+            {
+                version = parsedV2;
+            }
 
-        var acronyms = ParseSection(label, root, "acronyms");
-        var loanwords = ParseSection(label, root, "loanwords");
-        var letterFallback = ParseSection(label, root, "letter_fallback");
+            var acronyms = ParseSection(label, root, "acronyms");
+            var loanwords = ParseSection(label, root, "loanwords");
+            var letterFallback = ParseSection(label, root, "letter_fallback");
 
-        return new LoanwordData(version, acronyms, loanwords, letterFallback);
+            return new LoanwordData(version, acronyms, loanwords, letterFallback);
+        }
     }
 
     private static IReadOnlyDictionary<string, IReadOnlyList<string>> ParseSection(
@@ -101,8 +129,16 @@ public static class LoanwordDataLoader
     }
 }
 
-/// <summary>Thrown when <c>zh_en_loanword.json</c> fails schema validation.</summary>
+/// <summary>
+/// Thrown when <c>zh_en_loanword.json</c> fails schema validation.
+/// Provides the full set of CA1032 ctors so callers can wrap a
+/// <see cref="System.Text.Json.JsonException"/> via the
+/// <c>(message, innerException)</c> overload.
+/// </summary>
 public sealed class LoanwordSchemaException : System.Exception
 {
+    public LoanwordSchemaException() { }
     public LoanwordSchemaException(string message) : base(message) { }
+    public LoanwordSchemaException(string message, System.Exception innerException)
+        : base(message, innerException) { }
 }

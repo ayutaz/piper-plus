@@ -13,14 +13,18 @@ on:
     branches: [dev, main]
     paths:
       - '**/zh_en_loanword.json'
-      - 'tests/fixtures/g2p/zh_en_loanword_matrix.json'
+      - '**/zh_en_loanword_matrix.json'
       - 'scripts/check_loanword_consistency.py'
+      - 'cmake/EmbedJson.cmake'
+      - 'cmake/PiperCommon.cmake'
       - '.github/workflows/zh-en-loanword-sync.yml'
   pull_request:
     paths:
       - '**/zh_en_loanword.json'
-      - 'tests/fixtures/g2p/zh_en_loanword_matrix.json'
+      - '**/zh_en_loanword_matrix.json'
       - 'scripts/check_loanword_consistency.py'
+      - 'cmake/EmbedJson.cmake'
+      - 'cmake/PiperCommon.cmake'
       - '.github/workflows/zh-en-loanword-sync.yml'
   workflow_dispatch:
 
@@ -48,8 +52,8 @@ jobs:
       - name: Byte-for-byte hash check (Phase 6b — full gate, 7 copies + 6 fixture mirrors)
         run: python scripts/check_loanword_consistency.py
 
-  fixture-self-check:
-    name: Helper script self-check (pytest)
+  helper-self-check:
+    name: check_loanword_consistency.py self-check
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -58,13 +62,28 @@ jobs:
         with:
           python-version: '3.13'
 
-      - name: Install pytest
-        run: pip install pytest
+      # `--schema-only` and `--diff` should always succeed against a clean
+      # working tree. `--fix` should be idempotent (a no-op when in sync).
+      # Catches drift in the helper itself before the full gate fires.
+      - name: --schema-only succeeds on clean tree
+        run: python scripts/check_loanword_consistency.py --schema-only
 
-      - name: Run helper script tests
+      - name: --diff produces no real diff on clean tree
         run: |
-          if [ -f tests/test_check_loanword_consistency.py ]; then
-            pytest tests/test_check_loanword_consistency.py -v
-          else
-            echo "No tests yet — placeholder for TICKET-06b."
+          # Status lines like "Source: <hash>" and "OK ..." are allowed; only
+          # actual unified-diff content (---/+++/@@ lines) signals drift.
+          out=$(python scripts/check_loanword_consistency.py --diff)
+          if echo "$out" | grep -qE '^(---|\+\+\+|@@)'; then
+            echo "ERROR: --diff emitted unified-diff content on a clean tree:"
+            echo "$out"
+            exit 1
+          fi
+
+      - name: --fix is idempotent (no git diff after running)
+        run: |
+          python scripts/check_loanword_consistency.py --fix
+          if ! git diff --quiet; then
+            echo "ERROR: --fix changed working tree on a clean repo:"
+            git --no-pager diff
+            exit 1
           fi

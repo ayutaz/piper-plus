@@ -73,10 +73,15 @@ def validate_schema(p: Path) -> None:
 
     エラー書式は Python `_load_loanword_data` と一致させる:
         f"{p}: '{section}.{key}' must be list[str], got {value!r}"
+
+    Forward-compat (YELLOW-5): Python source `_load_loanword_data` は
+    ``version`` フィールドを要求しない (不存在/型違いを silently 受理) ため、
+    ここでも同じ動作を取り、`schema_version: 2` 等の未来形式を block しない。
+    Unknown top-level fields も同様に許容する。
     """
     data = json.loads(p.read_text(encoding="utf-8"))
-    if not isinstance(data.get("version"), int):
-        raise ValueError(f"{p}: missing or non-int 'version' field")
+    if not isinstance(data, dict):
+        raise ValueError(f"{p}: top-level must be a JSON object")
     for section in ("acronyms", "loanwords", "letter_fallback"):
         m = data.get(section, {})
         if not isinstance(m, dict):
