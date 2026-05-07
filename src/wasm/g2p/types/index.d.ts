@@ -466,6 +466,13 @@ export class ChineseG2P {
      * via the bundled loanword dictionary. No-op when no WASM phonemizer
      * is attached.
      *
+     * The argument is coerced to boolean via `Boolean(enabled)` before being
+     * forwarded, so any truthy/falsy value is accepted at runtime even though
+     * the TypeScript signature requires `boolean`. This matches the Rust /
+     * C# / Go / Python / C++ runtime contract where the toggle is strictly
+     * 2-valued. The implicit coercion is *only* a runtime safety net; new
+     * call sites should still pass a real boolean for type-level safety.
+     *
      * @param enabled - Whether to enable ZH-EN dispatch.
      */
     setZhEnDispatch(enabled: boolean): void;

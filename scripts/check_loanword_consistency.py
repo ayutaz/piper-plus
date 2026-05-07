@@ -152,7 +152,7 @@ def main(argv: list[str] | None = None) -> int:
     warnings: list[str] = []
     fixed: list[str] = []
 
-    def _process(target: Path, label: str) -> None:
+    def _process(target: Path) -> None:
         rel = target.relative_to(REPO_ROOT)
         if not target.exists():
             if args.fix:
@@ -176,7 +176,7 @@ def main(argv: list[str] | None = None) -> int:
         failed.append(f"MISMATCH {rel}")
 
     for copy in COPIES:
-        _process(copy, "copy")
+        _process(copy)
 
     if FIXTURE_SRC.exists():
         fx_hash = sha256(FIXTURE_SRC)
