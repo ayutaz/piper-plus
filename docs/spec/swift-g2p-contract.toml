@@ -168,12 +168,17 @@ adds_to_binary_bytes = 6_300_000  # ~6.3 MB total
 
 [xcframework]
 name = "piper_plus_g2p.xcframework"
-zip_artifact = "libpiper_plus_g2p-ios-v${VERSION}.xcframework.zip"
-download_url_template = "https://github.com/ayutaz/piper-plus/releases/download/v${VERSION}/libpiper_plus_g2p-ios-v${VERSION}.xcframework.zip"
+# Renamed from `-ios-` to `-apple-` in v1.14.0 when the macOS slice was
+# added. The old `-ios-` URL is NOT maintained — there is no v1.14.0 with
+# the legacy name. Consumers updating from a pre-merge dev snapshot must
+# also update Package.swift's binaryTarget URL.
+zip_artifact = "libpiper_plus_g2p-apple-v${VERSION}.xcframework.zip"
+download_url_template = "https://github.com/ayutaz/piper-plus/releases/download/v${VERSION}/libpiper_plus_g2p-apple-v${VERSION}.xcframework.zip"
 
 [xcframework.slices]
 "ios-arm64" = { archs = ["arm64"], platform = "iphoneos" }
 "ios-arm64_x86_64-simulator" = { archs = ["arm64", "x86_64"], platform = "iphonesimulator" }
+"macos-arm64_x86_64" = { archs = ["arm64", "x86_64"], platform = "macosx" }
 
 [xcframework.contents]
 header = "Headers/piper_plus_g2p.h"

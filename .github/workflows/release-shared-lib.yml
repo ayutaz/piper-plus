@@ -4,11 +4,11 @@ on:
   push:
     tags:
       - 'v[0-9]*'
-  # PR triggers cover only the G2P iOS jobs (build-g2p-ios +
+  # PR triggers cover only the G2P Apple-platform jobs (build-g2p-apple +
   # assemble-g2p-xcframework). All other jobs and the release job remain
   # gated to push (tags) / workflow_dispatch via per-job `if` conditions.
-  # See Issue #387 — PR-stage smoke check for the iOS G2P xcframework
-  # pipeline.
+  # See Issue #387 — PR-stage smoke check for the Apple G2P xcframework
+  # pipeline (iOS device + iOS simulator + macOS slices since v1.14.0).
   pull_request:
     paths:
       - 'src/rust/piper-plus-g2p/**'
@@ -510,16 +510,21 @@ jobs:
           path: libpiper_plus-ios.xcframework.zip
 
   # ---------------------------------------------------------------------
-  # piper-plus-g2p iOS build (Issue #387)
+  # piper-plus-g2p Apple platforms build (Issue #387)
   # ---------------------------------------------------------------------
   # Pure Rust + bundled dictionaries → no ORT dependency, no CMake. The
   # crate's own ffi.rs C ABI is built directly via `cargo build` for each
-  # iOS target, then `lipo` merges the simulator slices into a universal
-  # archive, and `xcodebuild -create-xcframework` produces the final
-  # xcframework. Consumed by Package.swift via `PiperPlusG2P` product.
+  # target, then `lipo` merges multi-arch slices into a universal archive,
+  # and `xcodebuild -create-xcframework` produces the final xcframework.
+  # Consumed by Package.swift via `PiperPlusG2P` product.
   # See docs/spec/swift-g2p.md §4.4 — §4.5.
-  build-g2p-ios:
-    name: Build piper-plus-g2p iOS ${{ matrix.slice }}
+  #
+  # The macOS slice (added 2026-05) lets `swift run` consumers and macOS
+  # CLI tooling depend on PiperPlusG2P without iOS-only build flags. The
+  # synthesis xcframework remains iOS-only because it bundles ORT, which
+  # has its own macOS distribution path.
+  build-g2p-apple:
+    name: Build piper-plus-g2p Apple ${{ matrix.slice }}
     runs-on: macos-15
     timeout-minutes: 25
     strategy:
@@ -530,6 +535,8 @@ jobs:
             rust_targets: "aarch64-apple-ios"
           - slice: ios-arm64_x86_64-simulator
             rust_targets: "aarch64-apple-ios-sim,x86_64-apple-ios"
+          - slice: macos-arm64_x86_64
+            rust_targets: "aarch64-apple-darwin,x86_64-apple-darwin"
 
     steps:
       - uses: actions/checkout@v6
@@ -548,7 +555,7 @@ jobs:
       - name: Set up Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: aarch64-apple-ios,aarch64-apple-ios-sim,x86_64-apple-ios
+          targets: aarch64-apple-ios,aarch64-apple-ios-sim,x86_64-apple-ios,aarch64-apple-darwin,x86_64-apple-darwin
 
       - name: Cache cargo registry
         uses: actions/cache@v4
@@ -557,9 +564,9 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             src/rust/target
-          key: g2p-ios-${{ matrix.slice }}-${{ hashFiles('src/rust/Cargo.lock', 'src/rust/piper-plus-g2p/Cargo.toml') }}
+          key: g2p-apple-${{ matrix.slice }}-${{ hashFiles('src/rust/Cargo.lock', 'src/rust/piper-plus-g2p/Cargo.toml') }}
           restore-keys: |
-            g2p-ios-${{ matrix.slice }}-
+            g2p-apple-${{ matrix.slice }}-
 
       - name: Cache cbindgen
         uses: actions/cache@v4
@@ -588,33 +595,33 @@ jobs:
               --features all-languages,naist-jdic,bundled-dicts,ffi
           done
 
-      - name: Combine slice (lipo for simulator universal)
+      - name: Combine slice (lipo for multi-arch universal)
         working-directory: src/rust
         run: |
           set -euo pipefail
           IFS=',' read -ra TARGETS <<< "${{ matrix.rust_targets }}"
-          mkdir -p "build-g2p-ios/${{ matrix.slice }}"
+          mkdir -p "build-g2p-apple/${{ matrix.slice }}"
           if [ "${#TARGETS[@]}" -eq 1 ]; then
             cp "target/${TARGETS[0]}/release/libpiper_plus_g2p.a" \
-               "build-g2p-ios/${{ matrix.slice }}/libpiper_plus_g2p.a"
+               "build-g2p-apple/${{ matrix.slice }}/libpiper_plus_g2p.a"
           else
             args=()
             for target in "${TARGETS[@]}"; do
               args+=("target/$target/release/libpiper_plus_g2p.a")
             done
             lipo -create "${args[@]}" \
-              -output "build-g2p-ios/${{ matrix.slice }}/libpiper_plus_g2p.a"
+              -output "build-g2p-apple/${{ matrix.slice }}/libpiper_plus_g2p.a"
           fi
           echo "=== archs ==="
-          lipo -archs "build-g2p-ios/${{ matrix.slice }}/libpiper_plus_g2p.a"
+          lipo -archs "build-g2p-apple/${{ matrix.slice }}/libpiper_plus_g2p.a"
           echo "=== size ==="
-          ls -la "build-g2p-ios/${{ matrix.slice }}/libpiper_plus_g2p.a"
+          ls -la "build-g2p-apple/${{ matrix.slice }}/libpiper_plus_g2p.a"
 
       - name: Verify FFI symbols are exported
         working-directory: src/rust
         run: |
           set -euo pipefail
-          A="build-g2p-ios/${{ matrix.slice }}/libpiper_plus_g2p.a"
+          A="build-g2p-apple/${{ matrix.slice }}/libpiper_plus_g2p.a"
           echo "=== piper_plus_g2p_* symbols (defined) ==="
           # nm output for a universal staticlib is large (~10K lines), and
           # `grep -q` on a piped echo closes the pipe early when the match
@@ -655,7 +662,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p "g2p-slice-out/lib" "g2p-slice-out/include"
-          cp "build-g2p-ios/${{ matrix.slice }}/libpiper_plus_g2p.a" g2p-slice-out/lib/
+          cp "build-g2p-apple/${{ matrix.slice }}/libpiper_plus_g2p.a" g2p-slice-out/lib/
           cp piper-plus-g2p/piper_plus_g2p.h g2p-slice-out/include/
           cat > g2p-slice-out/include/module.modulemap <<'EOF'
           module PiperPlusG2PBinary {
@@ -674,7 +681,7 @@ jobs:
 
   assemble-g2p-xcframework:
     name: Assemble piper_plus_g2p.xcframework
-    needs: build-g2p-ios
+    needs: build-g2p-apple
     runs-on: macos-15
     timeout-minutes: 10
 
@@ -686,22 +693,28 @@ jobs:
           xcodebuild -version
           sw_vers
 
-      - name: Download device slice
+      - name: Download iOS device slice
         uses: actions/download-artifact@v8
         with:
           name: piper-plus-g2p-slice-ios-arm64
           path: g2p-slices/ios-arm64
 
-      - name: Download simulator slice
+      - name: Download iOS simulator slice
         uses: actions/download-artifact@v8
         with:
           name: piper-plus-g2p-slice-ios-arm64_x86_64-simulator
           path: g2p-slices/ios-arm64_x86_64-simulator
 
+      - name: Download macOS slice
+        uses: actions/download-artifact@v8
+        with:
+          name: piper-plus-g2p-slice-macos-arm64_x86_64
+          path: g2p-slices/macos-arm64_x86_64
+
       - name: Verify slice contents
         run: |
           set -euo pipefail
-          for slice in ios-arm64 ios-arm64_x86_64-simulator; do
+          for slice in ios-arm64 ios-arm64_x86_64-simulator macos-arm64_x86_64; do
             echo "=== ${slice} ==="
             ls -la "g2p-slices/${slice}/lib"
             ls -la "g2p-slices/${slice}/include"
@@ -712,7 +725,7 @@ jobs:
                 echo "${archs}" | grep -qx 'arm64' \
                   || { echo "::error::expected arm64 only, got: ${archs}"; exit 1; }
                 ;;
-              ios-arm64_x86_64-simulator)
+              ios-arm64_x86_64-simulator|macos-arm64_x86_64)
                 echo "${archs}" | tr ' ' '\n' | sort | tr '\n' ' ' | grep -q 'arm64 x86_64' \
                   || { echo "::error::expected arm64+x86_64, got: ${archs}"; exit 1; }
                 ;;
@@ -729,6 +742,8 @@ jobs:
             -headers g2p-slices/ios-arm64/include \
             -library g2p-slices/ios-arm64_x86_64-simulator/lib/libpiper_plus_g2p.a \
             -headers g2p-slices/ios-arm64_x86_64-simulator/include \
+            -library g2p-slices/macos-arm64_x86_64/lib/libpiper_plus_g2p.a \
+            -headers g2p-slices/macos-arm64_x86_64/include \
             -output piper_plus_g2p.xcframework
 
           if [ ! -f piper_plus_g2p.xcframework/Info.plist ]; then
@@ -750,16 +765,19 @@ jobs:
       - name: Zip xcframework
         run: |
           set -euo pipefail
-          zip -ry libpiper_plus_g2p-ios.xcframework.zip piper_plus_g2p.xcframework
-          ls -la libpiper_plus_g2p-ios.xcframework.zip
+          # `-apple` (not `-ios`) reflects that the xcframework now ships
+          # iOS device + simulator + macOS slices. Consumers reference this
+          # name in Package.swift's binaryTarget URL.
+          zip -ry libpiper_plus_g2p-apple.xcframework.zip piper_plus_g2p.xcframework
+          ls -la libpiper_plus_g2p-apple.xcframework.zip
           echo "sha256:"
-          shasum -a 256 libpiper_plus_g2p-ios.xcframework.zip
+          shasum -a 256 libpiper_plus_g2p-apple.xcframework.zip
 
       - name: Upload xcframework artifact
         uses: actions/upload-artifact@v7
         with:
-          name: libpiper_plus_g2p-ios-xcframework
-          path: libpiper_plus_g2p-ios.xcframework.zip
+          name: libpiper_plus_g2p-apple-xcframework
+          path: libpiper_plus_g2p-apple.xcframework.zip
 
   build-android:
     name: Build Android arm64-v8a
@@ -921,10 +939,12 @@ jobs:
             mv artifacts/libpiper_plus-ios-xcframework/libpiper_plus-ios.xcframework.zip \
                artifacts/libpiper_plus-ios-xcframework/libpiper_plus-ios-${TAG}.xcframework.zip
           fi
-          # Issue #387: Rename G2P xcframework.zip (PiperPlusG2P, no ORT)
-          if [ -f artifacts/libpiper_plus_g2p-ios-xcframework/libpiper_plus_g2p-ios.xcframework.zip ]; then
-            mv artifacts/libpiper_plus_g2p-ios-xcframework/libpiper_plus_g2p-ios.xcframework.zip \
-               artifacts/libpiper_plus_g2p-ios-xcframework/libpiper_plus_g2p-ios-${TAG}.xcframework.zip
+          # Issue #387: Rename G2P xcframework.zip (PiperPlusG2P, no ORT).
+          # `-apple` reflects iOS + macOS slices since v1.14.0 — consumer
+          # Package.swift references this name in `g2pVersion`'s URL.
+          if [ -f artifacts/libpiper_plus_g2p-apple-xcframework/libpiper_plus_g2p-apple.xcframework.zip ]; then
+            mv artifacts/libpiper_plus_g2p-apple-xcframework/libpiper_plus_g2p-apple.xcframework.zip \
+               artifacts/libpiper_plus_g2p-apple-xcframework/libpiper_plus_g2p-apple-${TAG}.xcframework.zip
           fi
           # Rename Android artifact
           if [ -f artifacts/libpiper_plus-android-arm64-v8a/libpiper_plus-android-arm64-v8a.tar.gz ]; then
@@ -968,8 +988,8 @@ jobs:
           fi
           echo "✓ PiperPlus checksum matches released xcframework"
 
-          # PiperPlusG2P xcframework (Issue #387)
-          G2P_ZIP="artifacts/libpiper_plus_g2p-ios-xcframework/libpiper_plus_g2p-ios-${TAG}.xcframework.zip"
+          # PiperPlusG2P xcframework (Issue #387, iOS + macOS slices since v1.14.0)
+          G2P_ZIP="artifacts/libpiper_plus_g2p-apple-xcframework/libpiper_plus_g2p-apple-${TAG}.xcframework.zip"
           if ! [ -f "${G2P_ZIP}" ]; then
             echo "::error::Released PiperPlusG2P xcframework zip not found at ${G2P_ZIP}"
             exit 1

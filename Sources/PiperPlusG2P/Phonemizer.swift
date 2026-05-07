@@ -30,7 +30,9 @@ public final class Phonemizer: @unchecked Sendable {
         let raw: OpaquePointer? = csv.withCString { ptr in
             piper_plus_g2p_create(ptr)
         }
-        guard let raw else { throw G2PError.initializationFailed }
+        guard let raw else {
+            throw G2PError.initializationFailed(requestedLanguages: languages)
+        }
         self.handle = raw
         self.decoder = JSONDecoder()
     }
@@ -51,7 +53,9 @@ public final class Phonemizer: @unchecked Sendable {
                 piper_plus_g2p_phonemize(handle, textPtr, langPtr)
             }
         }
-        guard let raw else { throw G2PError.phonemizeReturnedNull }
+        guard let raw else {
+            throw G2PError.phonemizeReturnedNull(language: language)
+        }
         defer { piper_plus_g2p_free_string(raw) }
 
         guard let data = String(cString: raw).data(using: .utf8) else {

@@ -156,7 +156,13 @@ final class PhonemizerTests: XCTestCase {
         XCTAssertThrowsError(
             try phonemizer.phonemize("こんにちは", language: .japanese)
         ) { error in
-            XCTAssertEqual(error as? G2PError, G2PError.phonemizeReturnedNull)
+            // Diagnostic payload must echo the language under which the call
+            // was issued — gives multi-language callers a way to triage which
+            // call site failed without correlating against the call stack.
+            XCTAssertEqual(
+                error as? G2PError,
+                G2PError.phonemizeReturnedNull(language: .japanese)
+            )
         }
     }
 
@@ -173,11 +179,35 @@ final class PhonemizerTests: XCTestCase {
             // Empty input may produce zero or a tiny number of tokens;
             // we accept anything as long as it parsed.
             XCTAssertGreaterThanOrEqual(result.tokens.count, 0)
-        } catch G2PError.phonemizeReturnedNull {
-            // Acceptable per the Rust contract.
+        } catch G2PError.phonemizeReturnedNull(let lang) {
+            // Acceptable per the Rust contract. The error must echo the
+            // language the call was issued under (.english here).
+            XCTAssertEqual(lang, .english)
         } catch {
             XCTFail("empty text should yield phonemizeReturnedNull or success, got: \(error)")
         }
+    }
+
+    // Diagnostic information attached to G2PError must surface the failed
+    // configuration / call site without forcing the caller to instrument
+    // the call stack. Triaging "which language failed?" should be a one-line
+    // log of the error itself.
+    func testInitializationFailedDescriptionMentionsRequestedLanguages() {
+        let error = G2PError.initializationFailed(
+            requestedLanguages: [.japanese, .english, .chinese]
+        )
+        let desc = error.description
+        XCTAssertTrue(desc.contains("ja"), "description should include 'ja', got: \(desc)")
+        XCTAssertTrue(desc.contains("en"), "description should include 'en', got: \(desc)")
+        XCTAssertTrue(desc.contains("zh"), "description should include 'zh', got: \(desc)")
+    }
+
+    func testPhonemizeReturnedNullDescriptionMentionsLanguage() {
+        let error = G2PError.phonemizeReturnedNull(language: .korean)
+        XCTAssertTrue(
+            error.description.contains("ko"),
+            "description should include 'ko', got: \(error.description)"
+        )
     }
 
     // M1: availableLanguages must round-trip the requested language set.

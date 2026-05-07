@@ -109,7 +109,9 @@
 | 配布物 | 中身 | サイズ目安 | 用途 |
 |--------|------|-----------|------|
 | `libpiper_plus-ios-v${VERSION}.xcframework.zip` (既存) | C++ 合成 + 内部 G2P + ORT 必須 | ~15 MB (zip) | 合成エンジン |
-| **`libpiper_plus_g2p-ios-v${VERSION}.xcframework.zip` (新規)** | **Rust G2P のみ、ORT 不要** | **~3-5 MB (zip, 言語デフォルト構成)** | **G2P 単独** |
+| **`libpiper_plus_g2p-apple-v${VERSION}.xcframework.zip` (新規, v1.14.0+)** | **Rust G2P のみ、ORT 不要** | **~3-5 MB (zip, 言語デフォルト構成)** | **G2P 単独** |
+
+> **artifact 名**: G2P xcframework は v1.14.0 で macOS slice を加えた際 `-ios-` から `-apple-` に rename。旧 `-ios-` 名は維持しない。
 
 #### 統合せず独立にする理由
 
@@ -125,12 +127,13 @@
 
 ### 3.2 Slice 構成
 
-既存 `libpiper_plus.xcframework` と同じ:
-
 | Slice | アーキテクチャ | 用途 |
 |-------|--------------|------|
 | `ios-arm64` | arm64 (device) | 実機 (iPhone / iPad) |
 | `ios-arm64_x86_64-simulator` | arm64 + x86_64 (universal) | シミュレータ (Apple Silicon Mac / Intel Mac) |
+| `macos-arm64_x86_64` (v1.14.0+) | arm64 + x86_64 (universal) | macOS host (`swift run` / CLI tooling) |
+
+> 合成エンジンの `libpiper_plus.xcframework` には macOS slice は無い (ORT が独自に macOS 配布チャンネルを持つため)。G2P は pure Rust でこの制約がない。
 
 ### 3.3 言語構成 (デフォルト)
 
@@ -341,13 +344,15 @@ lipo -create \
 
 ### 4.5 `.github/workflows/release-shared-lib.yml` 拡張
 
-`build-ios` matrix 完了後、別 matrix `build-g2p-ios` を追加し、最後に `assemble-g2p-xcframework` で `xcodebuild -create-xcframework` を実行。
+`build-ios` matrix 完了後、別 matrix `build-g2p-apple` を追加し、最後に `assemble-g2p-xcframework` で `xcodebuild -create-xcframework` を実行。
+
+> 当初のジョブ名は `build-g2p-ios` だったが、v1.14.0 で macOS slice を追加した際 `build-g2p-apple` に rename。同時に xcframework artifact 名も `libpiper_plus_g2p-ios-` から `libpiper_plus_g2p-apple-` へ変更。
 
 ```yaml
-build-g2p-ios:
-  name: Build piper-plus-g2p iOS ${{ matrix.slice }}
+build-g2p-apple:
+  name: Build piper-plus-g2p Apple ${{ matrix.slice }}
   runs-on: macos-15
-  timeout-minutes: 20
+  timeout-minutes: 25
   strategy:
     fail-fast: false
     matrix:
@@ -356,6 +361,8 @@ build-g2p-ios:
           rust_targets: "aarch64-apple-ios"
         - slice: ios-arm64_x86_64-simulator
           rust_targets: "aarch64-apple-ios-sim,x86_64-apple-ios"
+        - slice: macos-arm64_x86_64
+          rust_targets: "aarch64-apple-darwin,x86_64-apple-darwin"
   steps:
     - uses: actions/checkout@v6
     - uses: dtolnay/rust-toolchain@stable
@@ -393,7 +400,7 @@ build-g2p-ios:
         path: slice-out/
 
 assemble-g2p-xcframework:
-  needs: build-g2p-ios
+  needs: build-g2p-apple
   runs-on: macos-15
   steps:
     - uses: actions/download-artifact@v4
@@ -403,12 +410,14 @@ assemble-g2p-xcframework:
             -headers piper-plus-g2p-slice-ios-arm64/include \
           -library piper-plus-g2p-slice-ios-arm64_x86_64-simulator/lib/libpiper_plus_g2p.a \
             -headers piper-plus-g2p-slice-ios-arm64_x86_64-simulator/include \
+          -library piper-plus-g2p-slice-macos-arm64_x86_64/lib/libpiper_plus_g2p.a \
+            -headers piper-plus-g2p-slice-macos-arm64_x86_64/include \
           -output piper_plus_g2p.xcframework
-        zip -ry libpiper_plus_g2p-ios.xcframework.zip piper_plus_g2p.xcframework
+        zip -ry libpiper_plus_g2p-apple.xcframework.zip piper_plus_g2p.xcframework
     - uses: actions/upload-artifact@v4
       with:
-        name: libpiper_plus_g2p-ios-xcframework
-        path: libpiper_plus_g2p-ios.xcframework.zip
+        name: libpiper_plus_g2p-apple-xcframework
+        path: libpiper_plus_g2p-apple.xcframework.zip
 ```
 
 ### 4.6 `Package.swift` 拡張
@@ -422,7 +431,9 @@ let g2pChecksum = "0000…0000"  // placeholder until v1.14.0 release tag
 
 let package = Package(
     name: "PiperPlus",
-    platforms: [.iOS(.v15)],
+    // macOS が必要なのは G2P xcframework に macos slice が含まれるため
+    // (v1.14.0+)。PiperPlus (合成エンジン) は実質 iOS-only。
+    platforms: [.iOS(.v15), .macOS(.v13)],
     products: [
         .library(name: "PiperPlus",    targets: ["PiperPlus"]),
         .library(name: "PiperPlusG2P", targets: ["PiperPlusG2P"]),  // ← 新規
@@ -440,7 +451,7 @@ let package = Package(
         ),
         .binaryTarget(
             name: "PiperPlusG2PBinary",
-            url: "https://github.com/ayutaz/piper-plus/releases/download/v\(g2pVersion)/libpiper_plus_g2p-ios-v\(g2pVersion).xcframework.zip",
+            url: "https://github.com/ayutaz/piper-plus/releases/download/v\(g2pVersion)/libpiper_plus_g2p-apple-v\(g2pVersion).xcframework.zip",
             checksum: g2pChecksum
         ),
     ]
@@ -451,11 +462,11 @@ let package = Package(
 
 ### 4.7 リリース手順 (Maintainer)
 
-1. `dev` で `release-shared-lib.yml` を `workflow_dispatch` 実行 (no tag) → `libpiper_plus_g2p-ios.xcframework.zip` artifact が出る。
-2. `swift package compute-checksum libpiper_plus_g2p-ios.xcframework.zip` でチェックサム計算。
+1. `dev` で `release-shared-lib.yml` を `workflow_dispatch` 実行 (no tag) → `libpiper_plus_g2p-apple.xcframework.zip` artifact が出る。
+2. `swift package compute-checksum libpiper_plus_g2p-apple.xcframework.zip` でチェックサム計算。
 3. `Package.swift` の `g2pChecksum` と `g2pVersion` を更新。
 4. `chore(spm): bump PiperPlusG2P to v${VERSION}` でコミット → tag push。
-5. release ジョブが `libpiper_plus_g2p-ios-v${VERSION}.xcframework.zip` を Releases に publish。
+5. release ジョブが `libpiper_plus_g2p-apple-v${VERSION}.xcframework.zip` を Releases に publish。
 
 > 既存 `PiperPlusBinary` のチェックサム検証ロジック (sha256 突合) は `PiperPlusG2PBinary` にも適用する。release ジョブの guard を拡張。
 

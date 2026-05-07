@@ -62,6 +62,11 @@ let checksum = "0000000000000000000000000000000000000000000000000000000000000000
 // (which shipped at v1.13.0 per Issue #377). Both follow the same manual
 // release procedure documented in the file header.
 //
+// The G2P xcframework ships iOS device + iOS simulator + macOS slices as
+// of v1.14.0 — the artifact name is `-apple-` (not `-ios-`) to reflect
+// the broader Apple platform coverage. The synthesis xcframework remains
+// iOS-only because its ORT dependency has its own macOS distribution.
+//
 // IMPORTANT: until the v1.14.0 tag publishes the xcframework asset and
 // this checksum is updated, `swift package resolve` against this manifest
 // will fail with "artifact has changed checksum" / "asset not found".
@@ -72,11 +77,18 @@ let g2pChecksum = "0000000000000000000000000000000000000000000000000000000000000
 
 let package = Package(
     name: "PiperPlus",
-    // iOS-only: the released xcframework currently contains
-    // ios-arm64 + ios-arm64_x86_64-simulator slices. macOS / visionOS /
-    // Mac Catalyst slices are not yet supported (see docs/spec/ios-shared-lib.md §6).
+    // Package-level minimum platforms. PiperPlus (synthesis engine) is
+    // effectively iOS-only — its xcframework only contains ios-arm64 +
+    // ios-arm64_x86_64-simulator slices, and consumer linking against it
+    // from a macOS target will fail at SPM resolve time. macOS is declared
+    // here only so PiperPlusG2P (which has a macOS slice in v1.14.0+) can
+    // be consumed from `swift run` / macOS CLI targets without forcing the
+    // consumer to drop iOS-only references entirely. visionOS / Mac
+    // Catalyst slices are not yet supported (see
+    // docs/spec/ios-shared-lib.md §6 and docs/spec/swift-g2p.md §7.1).
     platforms: [
         .iOS(.v15),
+        .macOS(.v13),
     ],
     products: [
         .library(
@@ -134,9 +146,12 @@ let package = Package(
             ],
             path: "Sources/PiperPlusG2P"
         ),
+        // The artifact filename uses `-apple-` (not `-ios-`) since v1.14.0
+        // because the xcframework now bundles iOS device + iOS simulator +
+        // macOS slices. Older `-ios-` URLs are *not* maintained.
         .binaryTarget(
             name: "PiperPlusG2PBinary",
-            url: "https://github.com/ayutaz/piper-plus/releases/download/v\(g2pVersion)/libpiper_plus_g2p-ios-v\(g2pVersion).xcframework.zip",
+            url: "https://github.com/ayutaz/piper-plus/releases/download/v\(g2pVersion)/libpiper_plus_g2p-apple-v\(g2pVersion).xcframework.zip",
             checksum: g2pChecksum
         ),
         // Test target — runs against the resolved binaryTarget. Excluded

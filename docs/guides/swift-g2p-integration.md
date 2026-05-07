@@ -1,8 +1,9 @@
 # Swift G2P Integration Guide
 
-> **Status:** Proposed — implementation tracked in [Issue #387](https://github.com/ayutaz/piper-plus/issues/387)
+> **Status:** Implemented — Swift wrapper, FFI, CI, and Apple xcframework pipeline merged on `dev`. Awaiting v1.14.0 tag for SPM URL resolution.
 > **Spec:** [docs/spec/swift-g2p.md](../spec/swift-g2p.md)
-> **適用バージョン:** v1.14.0+ (予定)
+> **対象バージョン:** v1.14.0+
+> **動作確認サンプル:** [`examples/swift-g2p/HelloG2P/`](../../examples/swift-g2p/HelloG2P/) (CLI demo, macOS)
 
 iOS / Swift プロジェクトから piper-plus の **G2P (Grapheme-to-Phoneme) を単独で利用する**ための統合ガイド。
 合成エンジン (`PiperPlus`) と独立した Swift Package product `PiperPlusG2P` を提供する。
@@ -88,10 +89,10 @@ let package = Package(
 
 ### Xcode プロジェクトの場合 (Package.swift を使わない)
 
-1. **GitHub Releases** から `libpiper_plus_g2p-ios-v${VERSION}.xcframework.zip` をダウンロード
+1. **GitHub Releases** から `libpiper_plus_g2p-apple-v${VERSION}.xcframework.zip` をダウンロード
    ```bash
-   gh release download v1.14.0 -p 'libpiper_plus_g2p-ios-v*.xcframework.zip' --repo ayutaz/piper-plus
-   unzip libpiper_plus_g2p-ios-v*.xcframework.zip
+   gh release download v1.14.0 -p 'libpiper_plus_g2p-apple-v*.xcframework.zip' --repo ayutaz/piper-plus
+   unzip libpiper_plus_g2p-apple-v*.xcframework.zip
    ```
 2. **Project Navigator** に `piper_plus_g2p.xcframework` をドラッグ
 3. **Targets** → **General** → **Frameworks, Libraries, and Embedded Content** で **"Do Not Embed"** (static archive)
@@ -143,12 +144,13 @@ do {
     let phonemizer = try Phonemizer(languages: [.english])
     let result = try phonemizer.phonemize("Hello", language: .japanese) // 未登録
     _ = result
-} catch G2PError.phonemizeReturnedNull {
-    // 渡した language が init で登録されていない、または入力が phonemizer で
-    // 解釈できないケース。init(languages:) の配列を見直す。
-    print("Language not registered, or input was not recognized")
-} catch G2PError.initializationFailed {
-    print("Phonemizer init failed — see Phonemizer.swift")
+} catch G2PError.phonemizeReturnedNull(let language) {
+    // どの言語の呼び出しが NULL を返したか診断情報として受け取れる。
+    // 多言語アプリでは call site を辿らずに失敗箇所を特定できる。
+    print("Phonemize NULL for language=\(language.rawValue) — registered? input valid?")
+} catch G2PError.initializationFailed(let requested) {
+    // init で渡した言語リストが診断情報に入る。
+    print("Init failed for requested=\(requested.map(\.rawValue))")
 } catch G2PError.invalidUTF8 {
     print("FFI returned a non-UTF-8 byte sequence (should not happen)")
 } catch G2PError.decodeFailed(let detail) {
@@ -158,7 +160,13 @@ do {
 }
 ```
 
-> `G2PError` は `initializationFailed / phonemizeReturnedNull / invalidUTF8 / decodeFailed(String)` の 4 ケース。詳細は [`Sources/PiperPlusG2P/G2PError.swift`](../../Sources/PiperPlusG2P/G2PError.swift)。
+> `G2PError` は 4 ケース:
+> - `initializationFailed(requestedLanguages: [Language])` — `Phonemizer.init` の語リストを保持
+> - `phonemizeReturnedNull(language: Language)` — どの言語呼び出しで NULL が返ったか
+> - `invalidUTF8`
+> - `decodeFailed(String)`
+>
+> 詳細は [`Sources/PiperPlusG2P/G2PError.swift`](../../Sources/PiperPlusG2P/G2PError.swift)。
 
 ### SwiftUI から
 
@@ -233,12 +241,14 @@ struct PhonemeView: View {
 | Item | Status | Notes |
 |------|--------|-------|
 | iOS device + simulator | ✓ | `ios-arm64` + `ios-arm64_x86_64-simulator` |
-| Swift `import PiperPlusG2P` | ✓ | `module.modulemap` 同梱 |
-| macOS | ✗ | 別 slice として将来追加予定 ([spec §7.1](../spec/swift-g2p.md#71-macos--visionos-slice-追加)) |
-| visionOS / Mac Catalyst | ✗ | 同上 |
+| **macOS (arm64 + x86_64)** | **✓ (v1.14.0+)** | `macos-arm64_x86_64` slice 同梱。`swift run` / macOS CLI からの利用を想定 |
+| Swift `import PiperPlusG2P` | ✓ | `module.modulemap` 同梱、iOS / macOS 共通 |
+| visionOS / Mac Catalyst | ✗ | 別 slice として将来追加予定 ([spec §7.1](../spec/swift-g2p.md#71-macos--visionos-slice-追加)) |
 | App Extension / App Clip | ⚠ | サイズ次第で可能 (5 言語規則ベースのみなら ~2 MB)、JA/ZH 含めると 10MB を超え App Clip 不可 |
 | Privacy Manifest | ✓ (informational) | xcframework root に空の `PrivacyInfo.xcprivacy` を同梱 (Required Reason API 利用なし) |
-| iOS 14 以下 | ✗ | iOS 15+ のみ (`Package.swift` の platforms 制約) |
+| iOS 14 以下 / macOS 12 以下 | ✗ | iOS 15+ / macOS 13+ のみ (`Package.swift` の platforms 制約) |
+
+> **xcframework artifact 名の変更 (v1.14.0):** macOS slice 追加に伴い `libpiper_plus_g2p-ios-v${VERSION}.xcframework.zip` から `libpiper_plus_g2p-apple-v${VERSION}.xcframework.zip` に rename。`Package.swift` の `binaryTarget(url:)` も新名に更新済み。**v1.14.0 から始まる新規導入のみ対象** — 旧 `-ios-` URL は維持されない。
 
 ---
 
@@ -261,7 +271,8 @@ struct PhonemeView: View {
 
 ## Further Reading
 
+- [HelloG2P CLI sample](../../examples/swift-g2p/HelloG2P/) — `swift run HelloG2P` で 8 言語の動作確認ができる最小プロジェクト
 - [Swift G2P Specification](../spec/swift-g2p.md) — design rationale, alternatives, risks
 - [iOS Integration Guide (合成エンジン)](./ios-integration.md) — フル TTS が必要な場合
 - [piper-plus-g2p crate (Rust)](../../src/rust/piper-plus-g2p/) — 同じロジックの Rust API ドキュメント
-- [Issue #387](https://github.com/ayutaz/piper-plus/issues/387) — 機能リクエスト trackr
+- [Issue #387](https://github.com/ayutaz/piper-plus/issues/387) — 機能リクエスト tracker
