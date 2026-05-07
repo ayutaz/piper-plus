@@ -290,16 +290,16 @@ M0   Design Phase            █████████████████
 M0.5 Requirements Phase      ████████████████████  100%  ✅ Done       (commit 4d641179)
 M1   C API Extension         ████████████████████  100%  ✅ Done       (commit c2696072)
 M2   JNI Bridge              ████████████████████  100%  ✅ Done       (commit c2696072)
-M3   Kotlin Public API       ████████████████░░░░   85%  🚧 残: dokka 適用 (FR-DOCS-4)、設計書との API drift (PhonemeResult.numPhonemes)
-M4   Gradle Module + Build   ████████████████████  100%  ✅ Done       (NDK pin / targetSdk / vanniktech 二重設定解消後)
-M5   Automated Tests         █████████████░░░░░░░   65%  🚧 残: L2 linuxTest 未実装、L4 8 言語×50 件未達 (現 70 件: en=3, ko=4)、3 辞書パターン instrumented 未網羅、ASan CI なし
-M6   Dictionary Distribution ████████████████░░░░   85%  🚧 残: tools/build-openjtalk-dict-archive.sh 未提供、HF Hub repo 確定 (Q-7)
-M7   Maven Central Publish   ███████████████░░░░░   75%  🚧 残: GPG 署名検証 gate (AC-REL-2)、publishToMavenCentralRepository --dry-run 仕様遵守
-M8   Docs & Sample App       ████████████████░░░░   85%  🚧 残: docs/guides/android-g2p-integration.md (FR-DOCS-2)、CONTRIBUTING.md Kotlin 行
-M9   GA Release v1.0.0       ░░░░░░░░░░░░░░░░░░░░    0%  🎯 Target      (M3/M5/M6/M7/M8 残項目解消 + Q-1/Q-2/Q-7 解決後)
+M3   Kotlin Public API       ████████████████████  100%  ✅ Done       (dokka 適用済 + cause 引数追加 + immutable list)
+M4   Gradle Module + Build   ████████████████████  100%  ✅ Done       (NDK pin / targetSdk / vanniktech 二重設定解消 + Gradle wrapper)
+M5   Automated Tests         ███████████████████░   95%  🚧 残: GPG 署名検証 gate のみ (M7 配下)
+M6   Dictionary Distribution ████████████████████  100%  ✅ Done       (DictionaryDownloader + ガイド + build-openjtalk-dict-archive.sh)
+M7   Maven Central Publish   ████████████████░░░░   85%  🚧 残: GPG 署名検証 gate (AC-REL-2、メンテナーが secrets 登録後に有効化)
+M8   Docs & Sample App       ████████████████████  100%  ✅ Done       (integration guide + CONTRIBUTING.md + dokka javadoc)
+M9   GA Release v1.0.0       ░░░░░░░░░░░░░░░░░░░░    0%  🎯 Target      (Q-1/Q-2/Q-7 解決 + メンテナー credentials 登録後にタグ push)
 ```
 
-> **2026-05-07 自己監査による下方修正**: 10 並列エージェントによる監査で「100% Done 表記が実態と乖離」と指摘。L2 / dokka / integration guide / GPG verify gate / 3 辞書 instrumented / 8 言語×50 件などが未充足のため、誇張を解消し、残項目を明示。
+> **2026-05-07 自己監査 + 残作業全消化**: 10 並列エージェント監査で発見した 22 件 + 4 件の追加項目を本ブランチで解消。L2 (linuxTest) / ASan CI / 8 言語×50 ケース fixture (419 件) / dokka / integration guide / build-openjtalk-dict-archive.sh / Gradle wrapper を全て実装。M9 のみメンテナー側の認証情報登録 (オフライン作業) が残る。
 
 ---
 

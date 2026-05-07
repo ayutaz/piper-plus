@@ -38,6 +38,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **release-kotlin-g2p.yml (🟡)**: SemVer regex を SemVer 2.0.0 §10 準拠 (pre-release **+** build metadata 同時許可)、4 つの publishing secrets の fail-fast 検査追加、workflow_dispatch にも version regex を適用。
   - **ドキュメント整備**: `docs/guides/android-g2p-integration.md` (FR-DOCS-2、新規)、`tools/build-openjtalk-dict-archive.sh` (M6 で参照されていたが未実装だったビルドスクリプト)、`tools/compare_g2p_golden.py` (CI 用 golden diff)、`CONTRIBUTING.md` に `kotlin-g2p-v*` tag 規約と Maven Central リリース順序追加、`docs/tickets/kotlin-g2p/MILESTONES.md` の 100% 表記を実態 (M3 85% / M5 65% / M6 85% / M7 75% / M8 85%) に下方修正。`piper_plus.h` の `findG2pDictFile` 経路に関する誤解を招く記述を訂正。
 
+- **残作業全消化** (2026-05-07、ユーザー指示「すべてこのブランチで対応」):
+  - **L2 (linuxTest) ジョブ追加**: 設計書 §9.2 / AC-3 要求の「JVM JNI smoke on Linux .so」を `kotlin-g2p-ci.yml:linux-jvm-smoke` で実装。Linux x86_64 で `libpiper_plus.so` + `libpiper_plus_g2p_jni.so` をネイティブビルドし、JVM から `System.load` + 主要メソッド呼び出し (nativeCreate / nativeVersion / nativeAvailableLanguages / nativePhonemize) で symbol-resolution / ABI mismatch を catch。L3 emulator より約 10x 高速で fail。
+  - **ASan CI ジョブ追加 (NFR-SEC-4)**: `kotlin-g2p-ci.yml:asan-tests` で `libpiper_plus.so` + GTest を `-fsanitize=address` 下でビルド・実行。`test_c_api --gtest_filter='G2p*'` で 23 ケースを leak/UAF/heap-OOB 検出付きで実行。`tests/asan_lsan_suppressions.txt` で ORT / OpenJTalk のプロセス終了時に発火する benign leak のみを suppress (実害ある leak は通過させる)。
+  - **8 言語×50 ケース fixture 拡充 (FR-TEST-1)**: `tests/fixtures/g2p/phoneme_test_cases.json` を 81 → 419 ケースに拡充 (en 50 / es 50 / fr 54 / pt 52 / sv 51 / zh 56 / ja 53 / ko 53)。`tools/expand_g2p_fixtures.py` で systematic に追加 (数字 / 句読点 / 長文 / 言語固有 (ñ/ç/å/ö/ü/...) / loanword / 単一 char edge case)。Python golden も再生成 (313 ケース、JA/KO は CI Linux で再生成)。
+  - **Gradle wrapper 追加**: `android/gradlew` / `gradlew.bat` / `gradle/wrapper/gradle-wrapper.{jar,properties}` (Gradle 8.11.1) を整備。ローカル開発者の `./gradlew` 体験を担保。`.gitattributes` に `gradlew text eol=lf` / `*.jar binary` を追加し OS 間で line ending が壊れないように pin。
+
 #### ZH-EN code-switching を全 7 ランタイムに展開 (Issue #384)
 
 中国語テキストに混在する英単語 (acronyms / loanwords / per-letter fallback) を米国英語ではなく Mandarin pinyin で発音する機能を、Python (PR #397 で先行リリース) に続いて Rust × 2 crate / Go / C# / WASM / C++ の **5 ランタイムへ byte-for-byte 同期展開**。

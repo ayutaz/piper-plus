@@ -1,0 +1,21 @@
+# Leak / behaviour suppressions for AddressSanitizer / LeakSanitizer runs in
+# CI. Each entry is documented so future maintainers can decide whether the
+# masked report is still acceptable.
+#
+# Format: one rule per line.
+#   leak:<substring of stacktrace frame>
+#
+# Add new entries only when (a) the report is not from our code, AND (b) we
+# have triaged the upstream library and confirmed it is benign. Drop entries
+# the moment they stop reproducing — masking real findings is worse than
+# noisy CI.
+
+# ONNX Runtime initialisation in some 1.17.x builds intentionally caches
+# allocator state for the lifetime of the process and only frees it on
+# atexit handlers that LSan does not see. Reported once per process and
+# does not grow with G2P workload size.
+leak:onnxruntime::Env::Default
+
+# OpenJTalk's mecab dictionary loader allocates a couple of singletons that
+# are released only at program exit. Same lifetime pattern as above.
+leak:openjtalk_create

@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "description": "Cross-platform G2P consistency test fixtures for Python, Rust, and JS runtimes. JA cases use structural checks (token_count_min) because OpenJTalk output varies by dictionary version. Rule-based languages (ES/FR/PT) can use exact expected_tokens. EN uses g2p-en which may vary across versions, so structural checks are preferred.",
   "pua_compat_version": 1,
   "test_cases": [
@@ -8,14 +8,22 @@
       "input": "こんにちは",
       "description": "Basic Japanese greeting — 5 morae, tests OpenJTalk pipeline",
       "expected_token_count_min": 7,
-      "expected_contains": ["k", "o", "n", "i", "a"]
+      "expected_contains": [
+        "k",
+        "o",
+        "n",
+        "i",
+        "a"
+      ]
     },
     {
       "language": "ja",
       "input": "東京都に住んでいます。",
       "description": "Japanese sentence with N-phoneme variant (ん before d -> N_n) and long vowel",
       "expected_token_count_min": 12,
-      "expected_contains": ["t"]
+      "expected_contains": [
+        "t"
+      ]
     },
     {
       "language": "ja",
@@ -29,7 +37,9 @@
       "input": "さっぽろは寒いです。",
       "description": "Japanese with geminate consonant (sokuon っ) — tests cl token",
       "expected_token_count_min": 8,
-      "expected_contains": ["cl"]
+      "expected_contains": [
+        "cl"
+      ]
     },
     {
       "language": "ja",
@@ -42,14 +52,18 @@
       "input": "hello",
       "description": "Simple English word — basic g2p-en pipeline test",
       "expected_token_count_min": 3,
-      "expected_contains": ["h"]
+      "expected_contains": [
+        "h"
+      ]
     },
     {
       "language": "en",
       "input": "The quick brown fox jumps.",
       "description": "English sentence with function word stress removal (the)",
       "expected_token_count_min": 10,
-      "expected_contains": ["ð"]
+      "expected_contains": [
+        "ð"
+      ]
     },
     {
       "language": "en",
@@ -123,7 +137,12 @@
       "language": "es",
       "input": "hola",
       "description": "Simple Spanish word — rule-based, deterministic output",
-      "expected_tokens": ["ˈ", "o", "l", "a"],
+      "expected_tokens": [
+        "ˈ",
+        "o",
+        "l",
+        "a"
+      ],
       "expected_token_count_min": 4
     },
     {
@@ -131,21 +150,27 @@
       "input": "¿Cómo estás?",
       "description": "Spanish question with inverted question mark and accent",
       "expected_token_count_min": 6,
-      "expected_contains": ["k"]
+      "expected_contains": [
+        "k"
+      ]
     },
     {
       "language": "es",
       "input": "perro grande",
       "description": "Spanish with trill rr — tests rr PUA token in rule-based phonemizer",
       "expected_token_count_min": 6,
-      "expected_contains": ["rr"]
+      "expected_contains": [
+        "rr"
+      ]
     },
     {
       "language": "es",
       "input": "chico",
       "description": "Spanish affricate ch — tS (PUA E054) in rule-based",
       "expected_token_count_min": 4,
-      "expected_contains": ["k"]
+      "expected_contains": [
+        "k"
+      ]
     },
     {
       "language": "es",
@@ -164,21 +189,28 @@
       "input": "guerra",
       "description": "Spanish gu+e — silent u in rule-based IPA",
       "expected_token_count_min": 4,
-      "expected_contains": ["ɡ", "e"]
+      "expected_contains": [
+        "ɡ",
+        "e"
+      ]
     },
     {
       "language": "es",
       "input": "jota",
       "description": "Spanish j -> velar fricative x in rule-based",
       "expected_token_count_min": 4,
-      "expected_contains": ["x"]
+      "expected_contains": [
+        "x"
+      ]
     },
     {
       "language": "es",
       "input": "rosa",
       "description": "Spanish word-initial r — trill in rule-based",
       "expected_token_count_min": 4,
-      "expected_contains": ["rr"]
+      "expected_contains": [
+        "rr"
+      ]
     },
     {
       "language": "es",
@@ -203,7 +235,9 @@
       "input": "todo",
       "description": "Spanish intervocalic d — allophony to dental fricative in rule-based",
       "expected_token_count_min": 4,
-      "expected_contains": ["ð"]
+      "expected_contains": [
+        "ð"
+      ]
     },
     {
       "language": "es",
@@ -222,7 +256,9 @@
       "input": "bonjour",
       "description": "French greeting — tests nasal vowel and silent final consonant",
       "expected_token_count_min": 3,
-      "expected_contains": ["b"]
+      "expected_contains": [
+        "b"
+      ]
     },
     {
       "language": "fr",
@@ -241,91 +277,128 @@
       "input": "chambre",
       "description": "French ch -> esh in rule-based IPA",
       "expected_token_count_min": 4,
-      "expected_contains": ["ʃ"]
+      "expected_contains": [
+        "ʃ"
+      ]
     },
     {
       "language": "fr",
       "input": "montagne",
       "description": "French gn -> palatal nasal in rule-based IPA",
       "expected_token_count_min": 5,
-      "expected_contains": ["ɲ"]
+      "expected_contains": [
+        "ɲ"
+      ]
     },
     {
       "language": "fr",
       "input": "parler",
       "description": "French -er ending -> /e/ in rule-based IPA",
       "expected_token_count_min": 5,
-      "expected_contains": ["e"]
+      "expected_contains": [
+        "e"
+      ]
     },
     {
       "language": "fr",
       "input": "mer",
       "description": "French -er exception -> open vowel in rule-based IPA",
       "expected_token_count_min": 3,
-      "expected_contains": ["m", "ɛ", "ʁ"]
+      "expected_contains": [
+        "m",
+        "ɛ",
+        "ʁ"
+      ]
     },
     {
       "language": "fr",
       "input": "vin",
       "description": "French nasal vowel nasalized-epsilon in rule-based IPA",
       "expected_token_count_min": 2,
-      "expected_contains": ["v"]
+      "expected_contains": [
+        "v"
+      ]
     },
     {
       "language": "fr",
       "input": "trois",
       "description": "French oi -> wa diphthong in rule-based IPA",
       "expected_token_count_min": 4,
-      "expected_contains": ["w", "a"]
+      "expected_contains": [
+        "w",
+        "a"
+      ]
     },
     {
       "language": "fr",
       "input": "tu",
       "description": "French u -> front rounded y_vowel in rule-based IPA",
       "expected_token_count_min": 2,
-      "expected_contains": ["t", "y_vowel"]
+      "expected_contains": [
+        "t",
+        "y_vowel"
+      ]
     },
     {
       "language": "fr",
       "input": "fille",
       "description": "French -ille -> ij in rule-based IPA",
       "expected_token_count_min": 3,
-      "expected_contains": ["f", "i", "j"]
+      "expected_contains": [
+        "f",
+        "i",
+        "j"
+      ]
     },
     {
       "language": "fr",
       "input": "ville",
       "description": "French -ille exception -> il in rule-based IPA",
       "expected_token_count_min": 3,
-      "expected_contains": ["v", "i", "l"]
+      "expected_contains": [
+        "v",
+        "i",
+        "l"
+      ]
     },
     {
       "language": "fr",
       "input": "nation",
       "description": "French -tion -> nasal vowel in rule-based IPA",
       "expected_token_count_min": 4,
-      "expected_contains": ["n", "a", "s"]
+      "expected_contains": [
+        "n",
+        "a",
+        "s"
+      ]
     },
     {
       "language": "fr",
       "input": "agneau",
       "description": "French gn -> palatal nasal in rule-based IPA (verify not separate g+n)",
       "expected_token_count_min": 3,
-      "expected_contains": ["a", "ɲ"]
+      "expected_contains": [
+        "a",
+        "ɲ"
+      ]
     },
     {
       "language": "fr",
       "input": "eau",
       "description": "French eau trigraph -> /o/ in rule-based IPA",
       "expected_token_count_min": 1,
-      "expected_contains": ["o"]
+      "expected_contains": [
+        "o"
+      ]
     },
     {
       "language": "pt",
       "input": "olá",
       "description": "Portuguese greeting — tests accented vowel stress",
       "expected_token_count_min": 3,
-      "expected_contains": ["o"]
+      "expected_contains": [
+        "o"
+      ]
     },
     {
       "language": "pt",
@@ -344,92 +417,124 @@
       "input": "Brasil",
       "description": "Portuguese coda-l -> w in rule-based IPA",
       "expected_token_count_min": 5,
-      "expected_contains": ["w"]
+      "expected_contains": [
+        "w"
+      ]
     },
     {
       "language": "pt",
       "input": "bom",
       "description": "Portuguese nasal vowel (nasal o) in rule-based IPA",
       "expected_token_count_min": 2,
-      "expected_contains": ["b", "õ"]
+      "expected_contains": [
+        "b",
+        "õ"
+      ]
     },
     {
       "language": "pt",
       "input": "dia",
       "description": "Portuguese d+i palatalization -> dZ in rule-based IPA",
       "expected_token_count_min": 3,
-      "expected_contains": ["dʒ"]
+      "expected_contains": [
+        "dʒ"
+      ]
     },
     {
       "language": "pt",
       "input": "rato",
       "description": "Portuguese word-initial r -> uvular in rule-based IPA",
       "expected_token_count_min": 4,
-      "expected_contains": ["ʁ"]
+      "expected_contains": [
+        "ʁ"
+      ]
     },
     {
       "language": "pt",
       "input": "filho",
       "description": "Portuguese lh -> palatal lateral in rule-based IPA",
       "expected_token_count_min": 4,
-      "expected_contains": ["ʎ"]
+      "expected_contains": [
+        "ʎ"
+      ]
     },
     {
       "language": "pt",
       "input": "junho",
       "description": "Portuguese nh -> palatal nasal in rule-based IPA",
       "expected_token_count_min": 4,
-      "expected_contains": ["ɲ"]
+      "expected_contains": [
+        "ɲ"
+      ]
     },
     {
       "language": "pt",
       "input": "carro",
       "description": "Portuguese rr -> uvular in rule-based IPA",
       "expected_token_count_min": 4,
-      "expected_contains": ["ʁ"]
+      "expected_contains": [
+        "ʁ"
+      ]
     },
     {
       "language": "pt",
       "input": "casa",
       "description": "Portuguese intervocalic s -> z in rule-based IPA",
       "expected_token_count_min": 4,
-      "expected_contains": ["z"]
+      "expected_contains": [
+        "z"
+      ]
     },
     {
       "language": "pt",
       "input": "gato",
       "description": "Portuguese final o reduction -> u in rule-based IPA",
       "expected_token_count_min": 4,
-      "expected_contains": ["u"]
+      "expected_contains": [
+        "u"
+      ]
     },
     {
       "language": "pt",
       "input": "grande",
       "description": "Portuguese final e reduction -> i in rule-based IPA",
       "expected_token_count_min": 5,
-      "expected_contains": ["i"]
+      "expected_contains": [
+        "i"
+      ]
     },
     {
       "language": "pt",
       "input": "manhã",
       "description": "Portuguese nh + nasal tilde vowel in rule-based IPA",
       "expected_token_count_min": 4,
-      "expected_contains": ["ɲ", "ã"]
+      "expected_contains": [
+        "ɲ",
+        "ã"
+      ]
     },
     {
       "language": "pt",
       "input": "massa",
       "description": "Portuguese ss -> s reduction in rule-based IPA",
       "expected_token_count_min": 4,
-      "expected_contains": ["s"]
+      "expected_contains": [
+        "s"
+      ]
     },
     {
       "language": "ja",
       "input": "東京は晴れです。",
       "description": "City name + weather — tests kanji reading",
       "expected_token_count_min": 10,
-      "expected_contains": ["t", "o"],
-      "expected_not_contains": ["x", "q"],
+      "expected_contains": [
+        "t",
+        "o"
+      ],
+      "expected_not_contains": [
+        "x",
+        "q"
+      ],
       "expected_has_question_marker": false
     },
     {
@@ -437,7 +542,11 @@
       "input": "これは何ですか？",
       "description": "Question sentence — tests question marker detection",
       "expected_token_count_min": 8,
-      "expected_contains": ["k", "o", "e"],
+      "expected_contains": [
+        "k",
+        "o",
+        "e"
+      ],
       "expected_has_question_marker": true
     },
     {
@@ -445,35 +554,60 @@
       "input": "가",
       "description": "Single Korean syllable (ㄱ+ㅏ) — basic Hangul decomposition verification",
       "expected_token_count_min": 2,
-      "expected_contains": ["k", "a"]
+      "expected_contains": [
+        "k",
+        "a"
+      ]
     },
     {
       "language": "ko",
       "input": "안녕하세요",
       "description": "Korean greeting — covers basic Hangul decomposition across 5 syllables",
       "expected_token_count_min": 10,
-      "expected_contains": ["a", "n", "h", "s", "e"]
+      "expected_contains": [
+        "a",
+        "n",
+        "h",
+        "s",
+        "e"
+      ]
     },
     {
       "language": "ko",
       "input": "한국어",
       "description": "Korean word with liaison (국어: final ㄱ + initial ㅇ → released k)",
       "expected_token_count_min": 6,
-      "expected_contains": ["h", "a", "n", "k", "u"]
+      "expected_contains": [
+        "h",
+        "a",
+        "n",
+        "k",
+        "u"
+      ]
     },
     {
       "language": "ko",
       "input": "감사합니다",
       "description": "Korean polite phrase — covers nasals (ㅁ,ㄴ) and unreleased stops",
       "expected_token_count_min": 10,
-      "expected_contains": ["k", "a", "m", "s", "n", "i", "t"]
+      "expected_contains": [
+        "k",
+        "a",
+        "m",
+        "s",
+        "n",
+        "i",
+        "t"
+      ]
     },
     {
       "language": "sv",
       "input": "Hej, hur mår du?",
       "description": "Swedish greeting question — tests basic Swedish pipeline",
       "expected_token_count_min": 6,
-      "expected_contains": ["h"]
+      "expected_contains": [
+        "h"
+      ]
     },
     {
       "language": "sv",
@@ -486,93 +620,2237 @@
       "input": "tack",
       "description": "Swedish common word — short a before ck geminate (ck -> k), stress marker",
       "expected_token_count_min": 4,
-      "expected_contains": ["t", "a", "k"]
+      "expected_contains": [
+        "t",
+        "a",
+        "k"
+      ]
     },
     {
       "language": "sv",
       "input": "välkommen",
       "description": "Swedish compound word — short ä (ɛ) before cluster, short o (ɔ) before mm geminate",
       "expected_token_count_min": 10,
-      "expected_contains": ["v", "ɛ", "l", "k", "ɔ", "m", "n"]
+      "expected_contains": [
+        "v",
+        "ɛ",
+        "l",
+        "k",
+        "ɔ",
+        "m",
+        "n"
+      ]
     },
     {
       "language": "sv",
       "input": "Sverige",
       "description": "Swedish country name — long e (eː) before single r, soft g before front vowel -> j",
       "expected_token_count_min": 8,
-      "expected_contains": ["s", "v", "eː", "j"]
+      "expected_contains": [
+        "s",
+        "v",
+        "eː",
+        "j"
+      ]
     },
     {
       "language": "sv",
       "input": "mjölk",
       "description": "Swedish sj-sound exception — mj onset, short ö (œ) before lk cluster",
       "expected_token_count_min": 6,
-      "expected_contains": ["m", "j", "œ", "l", "k"]
+      "expected_contains": [
+        "m",
+        "j",
+        "œ",
+        "l",
+        "k"
+      ]
     },
     {
       "language": "sv",
       "input": "skön",
       "description": "Swedish sk + front vowel ö -> sj-sound (ɧ), long ö (øː) before single n",
       "expected_token_count_min": 4,
-      "expected_contains": ["ɧ", "øː", "n"]
+      "expected_contains": [
+        "ɧ",
+        "øː",
+        "n"
+      ]
     },
     {
       "language": "sv",
       "input": "ljus",
       "description": "Swedish word-initial lj digraph -> j, long u (ʉː) before single s",
       "expected_token_count_min": 4,
-      "expected_contains": ["j", "ʉː", "s"]
+      "expected_contains": [
+        "j",
+        "ʉː",
+        "s"
+      ]
     },
     {
       "language": "sv",
       "input": "kort",
       "description": "Swedish retroflex assimilation — rt -> ʈ, short o (ɔ) before cluster",
       "expected_token_count_min": 4,
-      "expected_contains": ["k", "ɔ", "ʈ"]
+      "expected_contains": [
+        "k",
+        "ɔ",
+        "ʈ"
+      ]
     },
     {
       "language": "sv",
       "input": "barn",
       "description": "Swedish retroflex assimilation — rn -> ɳ, long a (ɑː) before r+single C",
       "expected_token_count_min": 4,
-      "expected_contains": ["b", "ɑː", "ɳ"]
+      "expected_contains": [
+        "b",
+        "ɑː",
+        "ɳ"
+      ]
     },
     {
       "language": "sv",
       "input": "flicka",
       "description": "Swedish hard k exception — k before i stays /k/ (in HARD_K_WORDS), short i (ɪ)",
       "expected_token_count_min": 6,
-      "expected_contains": ["f", "l", "ɪ", "k", "a"]
+      "expected_contains": [
+        "f",
+        "l",
+        "ɪ",
+        "k",
+        "a"
+      ]
     },
     {
       "language": "sv",
       "input": "station",
       "description": "Swedish loanword -tion suffix -> sj-sound (ɧ) + long u (uː) + n, stress on suffix",
       "expected_token_count_min": 7,
-      "expected_contains": ["s", "t", "ɧ", "uː", "n"]
+      "expected_contains": [
+        "s",
+        "t",
+        "ɧ",
+        "uː",
+        "n"
+      ]
+    },
+    {
+      "language": "en",
+      "input": "a",
+      "description": "Single short vowel — minimal English G2P",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "en",
+      "input": "the",
+      "description": "Common function word with theta",
+      "expected_token_count_min": 2
+    },
+    {
+      "language": "en",
+      "input": "cat",
+      "description": "CVC word — three core phonemes",
+      "expected_token_count_min": 3
+    },
+    {
+      "language": "en",
+      "input": "dog",
+      "description": "Voiced stop coda",
+      "expected_token_count_min": 3
+    },
+    {
+      "language": "en",
+      "input": "bird",
+      "description": "rhotacised vowel + voiced stop",
+      "expected_token_count_min": 3
+    },
+    {
+      "language": "en",
+      "input": "school",
+      "description": "Initial consonant cluster + long u",
+      "expected_token_count_min": 4
+    },
+    {
+      "language": "en",
+      "input": "strength",
+      "description": "Triple-cluster onset, fricative coda",
+      "expected_token_count_min": 5
+    },
+    {
+      "language": "en",
+      "input": "photograph",
+      "description": "G2P stress placement on antepenult",
+      "expected_token_count_min": 7
+    },
+    {
+      "language": "en",
+      "input": "photography",
+      "description": "Stress shift vs photograph",
+      "expected_token_count_min": 8
+    },
+    {
+      "language": "en",
+      "input": "Mississippi",
+      "description": "Repeated /s/ + double consonants + final /i/",
+      "expected_token_count_min": 8
+    },
+    {
+      "language": "en",
+      "input": "Albuquerque",
+      "description": "Loanword, multiple syllables",
+      "expected_token_count_min": 7
+    },
+    {
+      "language": "en",
+      "input": "through",
+      "description": "Silent letters + theta",
+      "expected_token_count_min": 3
+    },
+    {
+      "language": "en",
+      "input": "knight",
+      "description": "Silent k + diphthong",
+      "expected_token_count_min": 3
+    },
+    {
+      "language": "en",
+      "input": "rhythm",
+      "description": "Syllabic m, no written vowel between consonants",
+      "expected_token_count_min": 4
+    },
+    {
+      "language": "en",
+      "input": "xylophone",
+      "description": "Initial /z/ from x",
+      "expected_token_count_min": 7
+    },
+    {
+      "language": "en",
+      "input": "zebra",
+      "description": "Initial /z/ + diphthong",
+      "expected_token_count_min": 4
+    },
+    {
+      "language": "en",
+      "input": "queue",
+      "description": "Multi-letter spelling for /kjuː/",
+      "expected_token_count_min": 2
+    },
+    {
+      "language": "en",
+      "input": "uniform",
+      "description": "Initial palatal-glide /j/",
+      "expected_token_count_min": 6
+    },
+    {
+      "language": "en",
+      "input": "hour",
+      "description": "Silent h + diphthong",
+      "expected_token_count_min": 2
+    },
+    {
+      "language": "en",
+      "input": "colonel",
+      "description": "Highly irregular spelling",
+      "expected_token_count_min": 4
+    },
+    {
+      "language": "en",
+      "input": "schedule",
+      "description": "American /sk/ vs British /ʃ/",
+      "expected_token_count_min": 6
+    },
+    {
+      "language": "en",
+      "input": "0",
+      "description": "Digit zero",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "en",
+      "input": "1",
+      "description": "Digit one",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "en",
+      "input": "123",
+      "description": "Three digit number",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "en",
+      "input": "3.14",
+      "description": "Decimal number",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "en",
+      "input": "100",
+      "description": "Round hundred",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "en",
+      "input": "Hello, world!",
+      "description": "Greeting with punctuation",
+      "expected_token_count_min": 4
+    },
+    {
+      "language": "en",
+      "input": "Good morning, everyone.",
+      "description": "Sentence with punctuation and stress",
+      "expected_token_count_min": 8
+    },
+    {
+      "language": "en",
+      "input": "She doesn't know.",
+      "description": "Contraction handling",
+      "expected_token_count_min": 5
+    },
+    {
+      "language": "en",
+      "input": "It's 3 o'clock.",
+      "description": "Mixed digits and apostrophe",
+      "expected_token_count_min": 5
+    },
+    {
+      "language": "en",
+      "input": "I love New York.",
+      "description": "Proper noun handling",
+      "expected_token_count_min": 5
+    },
+    {
+      "language": "en",
+      "input": "ChatGPT and GitHub",
+      "description": "All-caps acronyms",
+      "expected_token_count_min": 6
+    },
+    {
+      "language": "en",
+      "input": "The cat sat on the mat.",
+      "description": "Classic short sentence",
+      "expected_token_count_min": 8
+    },
+    {
+      "language": "en",
+      "input": "a-b-c",
+      "description": "Hyphen-separated letters",
+      "expected_token_count_min": 3
+    },
+    {
+      "language": "en",
+      "input": "\"quoted\" text",
+      "description": "ASCII quotes",
+      "expected_token_count_min": 4
+    },
+    {
+      "language": "en",
+      "input": "e.g. and i.e.",
+      "description": "Abbreviations with periods",
+      "expected_token_count_min": 4
+    },
+    {
+      "language": "en",
+      "input": "uh-huh",
+      "description": "Expressive lowercase token",
+      "expected_token_count_min": 2
+    },
+    {
+      "language": "en",
+      "input": "aaaaa",
+      "description": "Repeated vowels",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "en",
+      "input": "xyz",
+      "description": "Sequence of less-frequent letters",
+      "expected_token_count_min": 3
+    },
+    {
+      "language": "en",
+      "input": "supercalifragilistic",
+      "description": "Very long synthetic word",
+      "expected_token_count_min": 12
+    },
+    {
+      "language": "en",
+      "input": "naïve",
+      "description": "Latin-1 diaeresis on i",
+      "expected_token_count_min": 3
+    },
+    {
+      "language": "en",
+      "input": "café",
+      "description": "Latin-1 acute on e",
+      "expected_token_count_min": 3
+    },
+    {
+      "language": "en",
+      "input": "résumé",
+      "description": "Two acute accents",
+      "expected_token_count_min": 4
+    },
+    {
+      "language": "en",
+      "input": "hello world how are you doing today",
+      "description": "Long sentence",
+      "expected_token_count_min": 14
+    },
+    {
+      "language": "en",
+      "input": "UPPERCASE",
+      "description": "All caps word",
+      "expected_token_count_min": 3
+    },
+    {
+      "language": "en",
+      "input": "MixedCase",
+      "description": "Camel case",
+      "expected_token_count_min": 3
+    },
+    {
+      "language": "en",
+      "input": "'quote'",
+      "description": "Single quotes only",
+      "expected_token_count_min": 2
+    },
+    {
+      "language": "es",
+      "input": "sí",
+      "description": "Affirmation with acute on i",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "es",
+      "input": "no",
+      "description": "Spanish negation",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "es",
+      "input": "adiós",
+      "description": "Goodbye with diphthong + accent",
+      "expected_token_count_min": 4
+    },
+    {
+      "language": "es",
+      "input": "España",
+      "description": "Country name with ñ",
+      "expected_token_count_min": 5
+    },
+    {
+      "language": "es",
+      "input": "año",
+      "description": "Year word, ñ between vowels",
+      "expected_token_count_min": 3
+    },
+    {
+      "language": "es",
+      "input": "niño",
+      "description": "Child word, palatal nasal",
+      "expected_token_count_min": 3
+    },
+    {
+      "language": "es",
+      "input": "mañana",
+      "description": "Tomorrow / morning",
+      "expected_token_count_min": 5
+    },
+    {
+      "language": "es",
+      "input": "señor",
+      "description": "Mr. with palatal nasal",
+      "expected_token_count_min": 4
+    },
+    {
+      "language": "es",
+      "input": "doña",
+      "description": "Title for women",
+      "expected_token_count_min": 3
+    },
+    {
+      "language": "es",
+      "input": "piña",
+      "description": "Pineapple",
+      "expected_token_count_min": 3
+    },
+    {
+      "language": "es",
+      "input": "muñeca",
+      "description": "Doll",
+      "expected_token_count_min": 5
+    },
+    {
+      "language": "es",
+      "input": "perro",
+      "description": "Dog with double r (trill)",
+      "expected_token_count_min": 4
+    },
+    {
+      "language": "es",
+      "input": "carro",
+      "description": "Car with double r",
+      "expected_token_count_min": 4
+    },
+    {
+      "language": "es",
+      "input": "río",
+      "description": "River with stressed i",
+      "expected_token_count_min": 3
+    },
+    {
+      "language": "es",
+      "input": "queso",
+      "description": "Cheese — qu = /k/",
+      "expected_token_count_min": 4
+    },
+    {
+      "language": "es",
+      "input": "aquí",
+      "description": "Here, qu + acute i",
+      "expected_token_count_min": 4
+    },
+    {
+      "language": "es",
+      "input": "pequeño",
+      "description": "Small, qu + ñ",
+      "expected_token_count_min": 6
+    },
+    {
+      "language": "es",
+      "input": "guitarra",
+      "description": "Guitar, gu + double r",
+      "expected_token_count_min": 6
+    },
+    {
+      "language": "es",
+      "input": "cinco",
+      "description": "Five",
+      "expected_token_count_min": 4
+    },
+    {
+      "language": "es",
+      "input": "once",
+      "description": "Eleven (zero-tone)",
+      "expected_token_count_min": 4
+    },
+    {
+      "language": "es",
+      "input": "trece",
+      "description": "Thirteen, soft c",
+      "expected_token_count_min": 4
+    },
+    {
+      "language": "es",
+      "input": "cien",
+      "description": "Hundred with diphthong",
+      "expected_token_count_min": 3
+    },
+    {
+      "language": "es",
+      "input": "mil",
+      "description": "Thousand",
+      "expected_token_count_min": 3
+    },
+    {
+      "language": "es",
+      "input": "Buenos días",
+      "description": "Good morning",
+      "expected_token_count_min": 7
+    },
+    {
+      "language": "es",
+      "input": "Muchas gracias",
+      "description": "Thank you very much",
+      "expected_token_count_min": 8
+    },
+    {
+      "language": "es",
+      "input": "Por favor",
+      "description": "Please",
+      "expected_token_count_min": 5
+    },
+    {
+      "language": "es",
+      "input": "¿Dónde está el baño?",
+      "description": "Where is the bathroom — full question",
+      "expected_token_count_min": 11
+    },
+    {
+      "language": "es",
+      "input": "¡Qué bueno!",
+      "description": "Exclamation with inverted mark",
+      "expected_token_count_min": 5
+    },
+    {
+      "language": "es",
+      "input": "0",
+      "description": "Digit",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "es",
+      "input": "100",
+      "description": "Hundred",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "es",
+      "input": "3.14",
+      "description": "Decimal — Spanish writes 3,14 but ASCII test",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "es",
+      "input": "Madrid es la capital.",
+      "description": "Sentence with proper noun",
+      "expected_token_count_min": 8
+    },
+    {
+      "language": "es",
+      "input": "Yo soy estudiante.",
+      "description": "I am a student",
+      "expected_token_count_min": 7
+    },
+    {
+      "language": "es",
+      "input": "Tú eres mi amigo.",
+      "description": "You are my friend",
+      "expected_token_count_min": 7
+    },
+    {
+      "language": "es",
+      "input": "Hasta luego",
+      "description": "See you later",
+      "expected_token_count_min": 6
+    },
+    {
+      "language": "fr",
+      "input": "oui",
+      "description": "Yes — diphthong",
+      "expected_token_count_min": 2
+    },
+    {
+      "language": "fr",
+      "input": "non",
+      "description": "No — nasal vowel",
+      "expected_token_count_min": 2
+    },
+    {
+      "language": "fr",
+      "input": "salut",
+      "description": "Hi",
+      "expected_token_count_min": 4
+    },
+    {
+      "language": "fr",
+      "input": "au revoir",
+      "description": "Goodbye — liaison candidate",
+      "expected_token_count_min": 6
+    },
+    {
+      "language": "fr",
+      "input": "merci",
+      "description": "Thank you",
+      "expected_token_count_min": 5
+    },
+    {
+      "language": "fr",
+      "input": "ça va",
+      "description": "How's it going",
+      "expected_token_count_min": 4
+    },
+    {
+      "language": "fr",
+      "input": "français",
+      "description": "French language with cedilla",
+      "expected_token_count_min": 5
+    },
+    {
+      "language": "fr",
+      "input": "garçon",
+      "description": "Boy with cedilla",
+      "expected_token_count_min": 5
+    },
+    {
+      "language": "fr",
+      "input": "leçon",
+      "description": "Lesson with cedilla",
+      "expected_token_count_min": 4
+    },
+    {
+      "language": "fr",
+      "input": "français",
+      "description": "Language adjective",
+      "expected_token_count_min": 5
+    },
+    {
+      "language": "fr",
+      "input": "être",
+      "description": "To be — circumflex",
+      "expected_token_count_min": 3
+    },
+    {
+      "language": "fr",
+      "input": "forêt",
+      "description": "Forest — circumflex",
+      "expected_token_count_min": 4
+    },
+    {
+      "language": "fr",
+      "input": "hôtel",
+      "description": "Hotel — circumflex",
+      "expected_token_count_min": 4
+    },
+    {
+      "language": "fr",
+      "input": "Noël",
+      "description": "Christmas — diaeresis",
+      "expected_token_count_min": 3
+    },
+    {
+      "language": "fr",
+      "input": "naïf",
+      "description": "Naive (m.) — diaeresis",
+      "expected_token_count_min": 3
+    },
+    {
+      "language": "fr",
+      "input": "où",
+      "description": "Where — grave accent",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "fr",
+      "input": "là",
+      "description": "There — grave",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "fr",
+      "input": "après",
+      "description": "After — grave",
+      "expected_token_count_min": 4
+    },
+    {
+      "language": "fr",
+      "input": "très",
+      "description": "Very — grave",
+      "expected_token_count_min": 3
+    },
+    {
+      "language": "fr",
+      "input": "école",
+      "description": "School — acute",
+      "expected_token_count_min": 4
+    },
+    {
+      "language": "fr",
+      "input": "élève",
+      "description": "Student — acute + grave",
+      "expected_token_count_min": 4
+    },
+    {
+      "language": "fr",
+      "input": "café",
+      "description": "Coffee — acute",
+      "expected_token_count_min": 4
+    },
+    {
+      "language": "fr",
+      "input": "roi",
+      "description": "King — diphthong /wa/",
+      "expected_token_count_min": 2
+    },
+    {
+      "language": "fr",
+      "input": "loi",
+      "description": "Law — diphthong",
+      "expected_token_count_min": 2
+    },
+    {
+      "language": "fr",
+      "input": "noir",
+      "description": "Black — back diphthong + r",
+      "expected_token_count_min": 3
+    },
+    {
+      "language": "fr",
+      "input": "oiseau",
+      "description": "Bird — multi-vowel",
+      "expected_token_count_min": 4
+    },
+    {
+      "language": "fr",
+      "input": "monsieur",
+      "description": "Sir — irregular pronunciation",
+      "expected_token_count_min": 5
+    },
+    {
+      "language": "fr",
+      "input": "aujourd'hui",
+      "description": "Today — apostrophe",
+      "expected_token_count_min": 6
+    },
+    {
+      "language": "fr",
+      "input": "c'est",
+      "description": "It is — contraction",
+      "expected_token_count_min": 3
+    },
+    {
+      "language": "fr",
+      "input": "un",
+      "description": "Indefinite article — nasal",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "fr",
+      "input": "une",
+      "description": "Indefinite (f.)",
+      "expected_token_count_min": 2
+    },
+    {
+      "language": "fr",
+      "input": "dix",
+      "description": "Ten",
+      "expected_token_count_min": 2
+    },
+    {
+      "language": "fr",
+      "input": "vingt",
+      "description": "Twenty — silent t",
+      "expected_token_count_min": 2
+    },
+    {
+      "language": "fr",
+      "input": "cent",
+      "description": "Hundred — silent t",
+      "expected_token_count_min": 2
+    },
+    {
+      "language": "fr",
+      "input": "0",
+      "description": "Digit",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "fr",
+      "input": "Bonjour, comment allez-vous ?",
+      "description": "Polite greeting + space-question",
+      "expected_token_count_min": 9
+    },
+    {
+      "language": "fr",
+      "input": "Je m'appelle Pierre.",
+      "description": "My name is Pierre",
+      "expected_token_count_min": 6
+    },
+    {
+      "language": "fr",
+      "input": "Voulez-vous danser ?",
+      "description": "Will you dance",
+      "expected_token_count_min": 6
+    },
+    {
+      "language": "fr",
+      "input": "Quelle heure est-il ?",
+      "description": "What time is it",
+      "expected_token_count_min": 5
+    },
+    {
+      "language": "pt",
+      "input": "sim",
+      "description": "Yes — nasal vowel",
+      "expected_token_count_min": 2
+    },
+    {
+      "language": "pt",
+      "input": "não",
+      "description": "No — nasal diphthong with tilde",
+      "expected_token_count_min": 2
+    },
+    {
+      "language": "pt",
+      "input": "oi",
+      "description": "Hi (BR)",
+      "expected_token_count_min": 2
+    },
+    {
+      "language": "pt",
+      "input": "obrigado",
+      "description": "Thanks (m.)",
+      "expected_token_count_min": 6
+    },
+    {
+      "language": "pt",
+      "input": "obrigada",
+      "description": "Thanks (f.)",
+      "expected_token_count_min": 6
+    },
+    {
+      "language": "pt",
+      "input": "Portugal",
+      "description": "Country name",
+      "expected_token_count_min": 6
+    },
+    {
+      "language": "pt",
+      "input": "São Paulo",
+      "description": "City with tilde and capital",
+      "expected_token_count_min": 5
+    },
+    {
+      "language": "pt",
+      "input": "açaí",
+      "description": "Loanword with cedilla + acute",
+      "expected_token_count_min": 4
+    },
+    {
+      "language": "pt",
+      "input": "avião",
+      "description": "Airplane — nasal diphthong",
+      "expected_token_count_min": 4
+    },
+    {
+      "language": "pt",
+      "input": "coração",
+      "description": "Heart — palatalised + nasal diphthong",
+      "expected_token_count_min": 6
+    },
+    {
+      "language": "pt",
+      "input": "anão",
+      "description": "Dwarf — nasal diphthong",
+      "expected_token_count_min": 3
+    },
+    {
+      "language": "pt",
+      "input": "mãe",
+      "description": "Mother — nasal diphthong",
+      "expected_token_count_min": 2
+    },
+    {
+      "language": "pt",
+      "input": "pão",
+      "description": "Bread",
+      "expected_token_count_min": 2
+    },
+    {
+      "language": "pt",
+      "input": "limões",
+      "description": "Lemons (pl.) — nasal diphthong oe",
+      "expected_token_count_min": 4
+    },
+    {
+      "language": "pt",
+      "input": "fé",
+      "description": "Faith — acute on e",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "pt",
+      "input": "pé",
+      "description": "Foot",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "pt",
+      "input": "vovó",
+      "description": "Grandma — acute o",
+      "expected_token_count_min": 3
+    },
+    {
+      "language": "pt",
+      "input": "você",
+      "description": "You (formal)",
+      "expected_token_count_min": 3
+    },
+    {
+      "language": "pt",
+      "input": "comê-lo",
+      "description": "To eat it — circumflex",
+      "expected_token_count_min": 4
+    },
+    {
+      "language": "pt",
+      "input": "dê-me",
+      "description": "Give me — clitic",
+      "expected_token_count_min": 3
+    },
+    {
+      "language": "pt",
+      "input": "já",
+      "description": "Already — acute",
+      "expected_token_count_min": 2
+    },
+    {
+      "language": "pt",
+      "input": "até",
+      "description": "Until — acute",
+      "expected_token_count_min": 3
+    },
+    {
+      "language": "pt",
+      "input": "número",
+      "description": "Number — acute on u",
+      "expected_token_count_min": 5
+    },
+    {
+      "language": "pt",
+      "input": "último",
+      "description": "Last — acute on u",
+      "expected_token_count_min": 5
+    },
+    {
+      "language": "pt",
+      "input": "açúcar",
+      "description": "Sugar — cedilla + acute",
+      "expected_token_count_min": 5
+    },
+    {
+      "language": "pt",
+      "input": "noite",
+      "description": "Night",
+      "expected_token_count_min": 4
+    },
+    {
+      "language": "pt",
+      "input": "amor",
+      "description": "Love",
+      "expected_token_count_min": 3
+    },
+    {
+      "language": "pt",
+      "input": "paz",
+      "description": "Peace",
+      "expected_token_count_min": 3
+    },
+    {
+      "language": "pt",
+      "input": "luz",
+      "description": "Light",
+      "expected_token_count_min": 3
+    },
+    {
+      "language": "pt",
+      "input": "cinco",
+      "description": "Five",
+      "expected_token_count_min": 5
+    },
+    {
+      "language": "pt",
+      "input": "sete",
+      "description": "Seven",
+      "expected_token_count_min": 4
+    },
+    {
+      "language": "pt",
+      "input": "Bom dia",
+      "description": "Good morning",
+      "expected_token_count_min": 5
+    },
+    {
+      "language": "pt",
+      "input": "Boa tarde",
+      "description": "Good afternoon",
+      "expected_token_count_min": 6
+    },
+    {
+      "language": "pt",
+      "input": "Como você está?",
+      "description": "How are you",
+      "expected_token_count_min": 7
+    },
+    {
+      "language": "pt",
+      "input": "Eu te amo.",
+      "description": "I love you",
+      "expected_token_count_min": 5
+    },
+    {
+      "language": "pt",
+      "input": "0",
+      "description": "Digit",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "pt",
+      "input": "100",
+      "description": "Hundred",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "sv",
+      "input": "ja",
+      "description": "Yes",
+      "expected_token_count_min": 2
+    },
+    {
+      "language": "sv",
+      "input": "nej",
+      "description": "No",
+      "expected_token_count_min": 2
+    },
+    {
+      "language": "sv",
+      "input": "hej",
+      "description": "Hi",
+      "expected_token_count_min": 2
+    },
+    {
+      "language": "sv",
+      "input": "hejdå",
+      "description": "Bye — å",
+      "expected_token_count_min": 4
+    },
+    {
+      "language": "sv",
+      "input": "varsågod",
+      "description": "You're welcome — å",
+      "expected_token_count_min": 7
+    },
+    {
+      "language": "sv",
+      "input": "Stockholm",
+      "description": "Capital city",
+      "expected_token_count_min": 7
+    },
+    {
+      "language": "sv",
+      "input": "Göteborg",
+      "description": "Gothenburg — ö + soft g",
+      "expected_token_count_min": 6
+    },
+    {
+      "language": "sv",
+      "input": "Skåne",
+      "description": "Region name with å",
+      "expected_token_count_min": 4
+    },
+    {
+      "language": "sv",
+      "input": "öl",
+      "description": "Beer — ö",
+      "expected_token_count_min": 2
+    },
+    {
+      "language": "sv",
+      "input": "är",
+      "description": "To be (3sg.) — ä",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "sv",
+      "input": "å",
+      "description": "Single rounded back vowel",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "sv",
+      "input": "ö",
+      "description": "Single rounded front vowel",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "sv",
+      "input": "ä",
+      "description": "Single open front vowel",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "sv",
+      "input": "åtta",
+      "description": "Eight — å",
+      "expected_token_count_min": 3
+    },
+    {
+      "language": "sv",
+      "input": "nio",
+      "description": "Nine",
+      "expected_token_count_min": 3
+    },
+    {
+      "language": "sv",
+      "input": "tio",
+      "description": "Ten",
+      "expected_token_count_min": 3
+    },
+    {
+      "language": "sv",
+      "input": "hundra",
+      "description": "Hundred",
+      "expected_token_count_min": 5
+    },
+    {
+      "language": "sv",
+      "input": "tusen",
+      "description": "Thousand",
+      "expected_token_count_min": 4
+    },
+    {
+      "language": "sv",
+      "input": "blå",
+      "description": "Blue — å",
+      "expected_token_count_min": 2
+    },
+    {
+      "language": "sv",
+      "input": "grön",
+      "description": "Green — ö",
+      "expected_token_count_min": 3
+    },
+    {
+      "language": "sv",
+      "input": "röd",
+      "description": "Red — ö",
+      "expected_token_count_min": 2
+    },
+    {
+      "language": "sv",
+      "input": "vit",
+      "description": "White",
+      "expected_token_count_min": 3
+    },
+    {
+      "language": "sv",
+      "input": "svart",
+      "description": "Black",
+      "expected_token_count_min": 5
+    },
+    {
+      "language": "sv",
+      "input": "kärlek",
+      "description": "Love — ä + soft k? (rule says hard before ä)",
+      "expected_token_count_min": 5
+    },
+    {
+      "language": "sv",
+      "input": "stjärna",
+      "description": "Star — sj-sound",
+      "expected_token_count_min": 5
+    },
+    {
+      "language": "sv",
+      "input": "sjö",
+      "description": "Lake — sj + ö",
+      "expected_token_count_min": 2
+    },
+    {
+      "language": "sv",
+      "input": "kyckling",
+      "description": "Chicken — soft k + ng",
+      "expected_token_count_min": 6
+    },
+    {
+      "language": "sv",
+      "input": "smörgås",
+      "description": "Sandwich — ö + å",
+      "expected_token_count_min": 6
+    },
+    {
+      "language": "sv",
+      "input": "räka",
+      "description": "Shrimp — ä + soft k? expected hard",
+      "expected_token_count_min": 4
+    },
+    {
+      "language": "sv",
+      "input": "pojke",
+      "description": "Boy — j",
+      "expected_token_count_min": 5
+    },
+    {
+      "language": "sv",
+      "input": "Tack så mycket",
+      "description": "Thanks a lot",
+      "expected_token_count_min": 8
+    },
+    {
+      "language": "sv",
+      "input": "God morgon",
+      "description": "Good morning",
+      "expected_token_count_min": 6
+    },
+    {
+      "language": "sv",
+      "input": "Hej hej",
+      "description": "Casual hi-hi",
+      "expected_token_count_min": 4
+    },
+    {
+      "language": "sv",
+      "input": "Vad heter du?",
+      "description": "What's your name",
+      "expected_token_count_min": 7
+    },
+    {
+      "language": "sv",
+      "input": "0",
+      "description": "Digit",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "sv",
+      "input": "100",
+      "description": "Hundred",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "sv",
+      "input": "kaffe",
+      "description": "Coffee",
+      "expected_token_count_min": 4
+    },
+    {
+      "language": "sv",
+      "input": "te",
+      "description": "Tea",
+      "expected_token_count_min": 2
+    },
+    {
+      "language": "sv",
+      "input": "vatten",
+      "description": "Water",
+      "expected_token_count_min": 5
+    },
+    {
+      "language": "zh",
+      "input": "是",
+      "description": "Yes / be — single character",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "zh",
+      "input": "不",
+      "description": "No / not",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "zh",
+      "input": "我",
+      "description": "I / me",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "zh",
+      "input": "你",
+      "description": "You",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "zh",
+      "input": "他",
+      "description": "He",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "zh",
+      "input": "她",
+      "description": "She",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "zh",
+      "input": "我们",
+      "description": "We",
+      "expected_token_count_min": 2
+    },
+    {
+      "language": "zh",
+      "input": "你们",
+      "description": "You (pl.)",
+      "expected_token_count_min": 2
+    },
+    {
+      "language": "zh",
+      "input": "他们",
+      "description": "They (m.)",
+      "expected_token_count_min": 2
+    },
+    {
+      "language": "zh",
+      "input": "早上好",
+      "description": "Good morning",
+      "expected_token_count_min": 3
+    },
+    {
+      "language": "zh",
+      "input": "晚上好",
+      "description": "Good evening",
+      "expected_token_count_min": 3
+    },
+    {
+      "language": "zh",
+      "input": "再见",
+      "description": "Goodbye",
+      "expected_token_count_min": 2
+    },
+    {
+      "language": "zh",
+      "input": "谢谢你",
+      "description": "Thank you",
+      "expected_token_count_min": 3
+    },
+    {
+      "language": "zh",
+      "input": "不客气",
+      "description": "You're welcome",
+      "expected_token_count_min": 3
+    },
+    {
+      "language": "zh",
+      "input": "对不起",
+      "description": "Sorry",
+      "expected_token_count_min": 3
+    },
+    {
+      "language": "zh",
+      "input": "没关系",
+      "description": "It's okay",
+      "expected_token_count_min": 3
+    },
+    {
+      "language": "zh",
+      "input": "一",
+      "description": "One",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "zh",
+      "input": "二",
+      "description": "Two",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "zh",
+      "input": "三",
+      "description": "Three",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "zh",
+      "input": "四",
+      "description": "Four",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "zh",
+      "input": "五",
+      "description": "Five",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "zh",
+      "input": "六",
+      "description": "Six",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "zh",
+      "input": "七",
+      "description": "Seven",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "zh",
+      "input": "八",
+      "description": "Eight",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "zh",
+      "input": "九",
+      "description": "Nine",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "zh",
+      "input": "十",
+      "description": "Ten",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "zh",
+      "input": "一百",
+      "description": "Hundred",
+      "expected_token_count_min": 2
+    },
+    {
+      "language": "zh",
+      "input": "一千",
+      "description": "Thousand",
+      "expected_token_count_min": 2
+    },
+    {
+      "language": "zh",
+      "input": "一万",
+      "description": "Ten thousand",
+      "expected_token_count_min": 2
+    },
+    {
+      "language": "zh",
+      "input": "中国",
+      "description": "China",
+      "expected_token_count_min": 2
+    },
+    {
+      "language": "zh",
+      "input": "日本",
+      "description": "Japan",
+      "expected_token_count_min": 2
+    },
+    {
+      "language": "zh",
+      "input": "北京",
+      "description": "Beijing",
+      "expected_token_count_min": 2
+    },
+    {
+      "language": "zh",
+      "input": "上海",
+      "description": "Shanghai",
+      "expected_token_count_min": 2
+    },
+    {
+      "language": "zh",
+      "input": "世界",
+      "description": "World",
+      "expected_token_count_min": 2
+    },
+    {
+      "language": "zh",
+      "input": "电脑",
+      "description": "Computer",
+      "expected_token_count_min": 2
+    },
+    {
+      "language": "zh",
+      "input": "手机",
+      "description": "Mobile phone",
+      "expected_token_count_min": 2
+    },
+    {
+      "language": "zh",
+      "input": "Hello, 你好!",
+      "description": "ZH-EN code-switch with greeting",
+      "expected_token_count_min": 4
+    },
+    {
+      "language": "zh",
+      "input": "我用 GPS 导航",
+      "description": "ZH-EN with acronym GPS",
+      "expected_token_count_min": 4
+    },
+    {
+      "language": "zh",
+      "input": "我喜欢 Python",
+      "description": "ZH-EN with loanword Python",
+      "expected_token_count_min": 3
+    },
+    {
+      "language": "zh",
+      "input": "ChatGPT 很厉害",
+      "description": "ZH-EN sentence start",
+      "expected_token_count_min": 3
+    },
+    {
+      "language": "zh",
+      "input": "Apple 公司",
+      "description": "Loanword + Chinese",
+      "expected_token_count_min": 2
+    },
+    {
+      "language": "zh",
+      "input": "0",
+      "description": "Digit zero",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "zh",
+      "input": "100",
+      "description": "Hundred",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "zh",
+      "input": "。",
+      "description": "Single period",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "zh",
+      "input": "！",
+      "description": "Single exclamation",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "zh",
+      "input": "，",
+      "description": "Comma alone",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "ja",
+      "input": "はい",
+      "description": "Yes (formal)",
+      "expected_token_count_min": 2
+    },
+    {
+      "language": "ja",
+      "input": "いいえ",
+      "description": "No (formal)",
+      "expected_token_count_min": 2
+    },
+    {
+      "language": "ja",
+      "input": "ありがとう",
+      "description": "Thank you",
+      "expected_token_count_min": 5
+    },
+    {
+      "language": "ja",
+      "input": "すみません",
+      "description": "Excuse me / sorry",
+      "expected_token_count_min": 5
+    },
+    {
+      "language": "ja",
+      "input": "おはよう",
+      "description": "Good morning (informal)",
+      "expected_token_count_min": 4
+    },
+    {
+      "language": "ja",
+      "input": "おやすみ",
+      "description": "Good night",
+      "expected_token_count_min": 4
+    },
+    {
+      "language": "ja",
+      "input": "お疲れ様",
+      "description": "Good work / thank you (formal)",
+      "expected_token_count_min": 5
+    },
+    {
+      "language": "ja",
+      "input": "いただきます",
+      "description": "Bon appétit (before meal)",
+      "expected_token_count_min": 5
+    },
+    {
+      "language": "ja",
+      "input": "ごちそうさま",
+      "description": "After meal",
+      "expected_token_count_min": 5
+    },
+    {
+      "language": "ja",
+      "input": "私は学生です。",
+      "description": "I am a student",
+      "expected_token_count_min": 8
+    },
+    {
+      "language": "ja",
+      "input": "あなたは誰ですか？",
+      "description": "Who are you",
+      "expected_token_count_min": 8
+    },
+    {
+      "language": "ja",
+      "input": "何時ですか？",
+      "description": "What time",
+      "expected_token_count_min": 5
+    },
+    {
+      "language": "ja",
+      "input": "どこですか？",
+      "description": "Where",
+      "expected_token_count_min": 5
+    },
+    {
+      "language": "ja",
+      "input": "一",
+      "description": "One",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "ja",
+      "input": "二",
+      "description": "Two",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "ja",
+      "input": "三",
+      "description": "Three",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "ja",
+      "input": "四",
+      "description": "Four",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "ja",
+      "input": "五",
+      "description": "Five",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "ja",
+      "input": "六",
+      "description": "Six",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "ja",
+      "input": "七",
+      "description": "Seven",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "ja",
+      "input": "八",
+      "description": "Eight",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "ja",
+      "input": "九",
+      "description": "Nine",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "ja",
+      "input": "十",
+      "description": "Ten",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "ja",
+      "input": "百",
+      "description": "Hundred",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "ja",
+      "input": "千",
+      "description": "Thousand",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "ja",
+      "input": "万",
+      "description": "Ten thousand",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "ja",
+      "input": "赤",
+      "description": "Red",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "ja",
+      "input": "青",
+      "description": "Blue",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "ja",
+      "input": "白",
+      "description": "White",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "ja",
+      "input": "黒",
+      "description": "Black",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "ja",
+      "input": "猫",
+      "description": "Cat",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "ja",
+      "input": "犬",
+      "description": "Dog",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "ja",
+      "input": "鳥",
+      "description": "Bird",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "ja",
+      "input": "魚",
+      "description": "Fish",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "ja",
+      "input": "水",
+      "description": "Water",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "ja",
+      "input": "火",
+      "description": "Fire",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "ja",
+      "input": "山",
+      "description": "Mountain",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "ja",
+      "input": "川",
+      "description": "River",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "ja",
+      "input": "海",
+      "description": "Sea",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "ja",
+      "input": "空",
+      "description": "Sky",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "ja",
+      "input": "雨",
+      "description": "Rain",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "ja",
+      "input": "雪",
+      "description": "Snow",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "ja",
+      "input": "月",
+      "description": "Moon",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "ja",
+      "input": "日",
+      "description": "Sun / day",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "ja",
+      "input": "お元気ですか？",
+      "description": "How are you",
+      "expected_token_count_min": 6
+    },
+    {
+      "language": "ja",
+      "input": "初めまして",
+      "description": "Nice to meet you",
+      "expected_token_count_min": 4
+    },
+    {
+      "language": "ko",
+      "input": "네",
+      "description": "Yes",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "ko",
+      "input": "아니요",
+      "description": "No",
+      "expected_token_count_min": 2
+    },
+    {
+      "language": "ko",
+      "input": "안녕",
+      "description": "Hi (casual)",
+      "expected_token_count_min": 2
+    },
+    {
+      "language": "ko",
+      "input": "안녕히 가세요",
+      "description": "Goodbye (to leaving person)",
+      "expected_token_count_min": 5
+    },
+    {
+      "language": "ko",
+      "input": "죄송합니다",
+      "description": "I'm sorry",
+      "expected_token_count_min": 4
+    },
+    {
+      "language": "ko",
+      "input": "천만에요",
+      "description": "You're welcome",
+      "expected_token_count_min": 3
+    },
+    {
+      "language": "ko",
+      "input": "실례합니다",
+      "description": "Excuse me",
+      "expected_token_count_min": 4
+    },
+    {
+      "language": "ko",
+      "input": "좋은 아침",
+      "description": "Good morning",
+      "expected_token_count_min": 4
+    },
+    {
+      "language": "ko",
+      "input": "좋은 밤",
+      "description": "Good night",
+      "expected_token_count_min": 3
+    },
+    {
+      "language": "ko",
+      "input": "이름이 뭐예요?",
+      "description": "What's your name",
+      "expected_token_count_min": 6
+    },
+    {
+      "language": "ko",
+      "input": "어디예요?",
+      "description": "Where is it",
+      "expected_token_count_min": 4
+    },
+    {
+      "language": "ko",
+      "input": "얼마예요?",
+      "description": "How much",
+      "expected_token_count_min": 4
+    },
+    {
+      "language": "ko",
+      "input": "일",
+      "description": "One",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "ko",
+      "input": "이",
+      "description": "Two",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "ko",
+      "input": "삼",
+      "description": "Three",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "ko",
+      "input": "사",
+      "description": "Four",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "ko",
+      "input": "오",
+      "description": "Five",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "ko",
+      "input": "육",
+      "description": "Six",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "ko",
+      "input": "칠",
+      "description": "Seven",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "ko",
+      "input": "팔",
+      "description": "Eight",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "ko",
+      "input": "구",
+      "description": "Nine",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "ko",
+      "input": "십",
+      "description": "Ten",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "ko",
+      "input": "백",
+      "description": "Hundred",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "ko",
+      "input": "천",
+      "description": "Thousand",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "ko",
+      "input": "만",
+      "description": "Ten thousand",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "ko",
+      "input": "빨강",
+      "description": "Red",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "ko",
+      "input": "파랑",
+      "description": "Blue",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "ko",
+      "input": "초록",
+      "description": "Green",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "ko",
+      "input": "노랑",
+      "description": "Yellow",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "ko",
+      "input": "물",
+      "description": "Water",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "ko",
+      "input": "불",
+      "description": "Fire",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "ko",
+      "input": "하늘",
+      "description": "Sky",
+      "expected_token_count_min": 2
+    },
+    {
+      "language": "ko",
+      "input": "바다",
+      "description": "Sea",
+      "expected_token_count_min": 2
+    },
+    {
+      "language": "ko",
+      "input": "산",
+      "description": "Mountain",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "ko",
+      "input": "나라",
+      "description": "Country",
+      "expected_token_count_min": 2
+    },
+    {
+      "language": "ko",
+      "input": "사람",
+      "description": "Person",
+      "expected_token_count_min": 2
+    },
+    {
+      "language": "ko",
+      "input": "학교",
+      "description": "School",
+      "expected_token_count_min": 2
+    },
+    {
+      "language": "ko",
+      "input": "선생님",
+      "description": "Teacher",
+      "expected_token_count_min": 3
+    },
+    {
+      "language": "ko",
+      "input": "학생",
+      "description": "Student",
+      "expected_token_count_min": 2
+    },
+    {
+      "language": "ko",
+      "input": "친구",
+      "description": "Friend",
+      "expected_token_count_min": 2
+    },
+    {
+      "language": "ko",
+      "input": "가족",
+      "description": "Family",
+      "expected_token_count_min": 2
+    },
+    {
+      "language": "ko",
+      "input": "사랑해요",
+      "description": "I love you",
+      "expected_token_count_min": 4
+    },
+    {
+      "language": "ko",
+      "input": "커피",
+      "description": "Coffee",
+      "expected_token_count_min": 2
+    },
+    {
+      "language": "ko",
+      "input": "차",
+      "description": "Tea / car",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "ko",
+      "input": "어머니",
+      "description": "Mother",
+      "expected_token_count_min": 3
+    },
+    {
+      "language": "ko",
+      "input": "아버지",
+      "description": "Father",
+      "expected_token_count_min": 3
+    },
+    {
+      "language": "ko",
+      "input": "형",
+      "description": "Older brother",
+      "expected_token_count_min": 1
+    },
+    {
+      "language": "ko",
+      "input": "누나",
+      "description": "Older sister (m. speaker)",
+      "expected_token_count_min": 2
+    },
+    {
+      "language": "ko",
+      "input": "동생",
+      "description": "Younger sibling",
+      "expected_token_count_min": 2
     }
   ],
   "pua_map_count": 99,
   "pua_spot_checks": [
-    { "token": "a:", "codepoint": "0xE000", "description": "JA long vowel a" },
-    { "token": "cl", "codepoint": "0xE005", "description": "JA geminate consonant (sokuon)" },
-    { "token": "ch", "codepoint": "0xE00E", "description": "JA voiceless postalveolar affricate" },
-    { "token": "sh", "codepoint": "0xE010", "description": "JA voiceless postalveolar fricative" },
-    { "token": "N_m", "codepoint": "0xE019", "description": "JA moraic nasal before bilabial" },
-    { "token": "N_n", "codepoint": "0xE01A", "description": "JA moraic nasal before alveolar" },
-    { "token": "N_uvular", "codepoint": "0xE01C", "description": "JA moraic nasal uvular (word-final)" },
-    { "token": "?!", "codepoint": "0xE016", "description": "JA emphatic question marker" },
-    { "token": "rr", "codepoint": "0xE01D", "description": "ES/shared alveolar trill" },
-    { "token": "y_vowel", "codepoint": "0xE01E", "description": "Shared front rounded vowel [y]" },
-    { "token": "tone1", "codepoint": "0xE046", "description": "ZH tone 1 (high level)" },
-    { "token": "tone3", "codepoint": "0xE048", "description": "ZH tone 3 (dipping)" },
-    { "token": "an", "codepoint": "0xE02C", "description": "ZH nasal final an" },
-    { "token": "t\u0283", "codepoint": "0xE054", "description": "ES voiceless postalveolar affricate" },
-    { "token": "\u0251\u0303", "codepoint": "0xE057", "description": "FR nasal open back unrounded vowel" }
+    {
+      "token": "a:",
+      "codepoint": "0xE000",
+      "description": "JA long vowel a"
+    },
+    {
+      "token": "cl",
+      "codepoint": "0xE005",
+      "description": "JA geminate consonant (sokuon)"
+    },
+    {
+      "token": "ch",
+      "codepoint": "0xE00E",
+      "description": "JA voiceless postalveolar affricate"
+    },
+    {
+      "token": "sh",
+      "codepoint": "0xE010",
+      "description": "JA voiceless postalveolar fricative"
+    },
+    {
+      "token": "N_m",
+      "codepoint": "0xE019",
+      "description": "JA moraic nasal before bilabial"
+    },
+    {
+      "token": "N_n",
+      "codepoint": "0xE01A",
+      "description": "JA moraic nasal before alveolar"
+    },
+    {
+      "token": "N_uvular",
+      "codepoint": "0xE01C",
+      "description": "JA moraic nasal uvular (word-final)"
+    },
+    {
+      "token": "?!",
+      "codepoint": "0xE016",
+      "description": "JA emphatic question marker"
+    },
+    {
+      "token": "rr",
+      "codepoint": "0xE01D",
+      "description": "ES/shared alveolar trill"
+    },
+    {
+      "token": "y_vowel",
+      "codepoint": "0xE01E",
+      "description": "Shared front rounded vowel [y]"
+    },
+    {
+      "token": "tone1",
+      "codepoint": "0xE046",
+      "description": "ZH tone 1 (high level)"
+    },
+    {
+      "token": "tone3",
+      "codepoint": "0xE048",
+      "description": "ZH tone 3 (dipping)"
+    },
+    {
+      "token": "an",
+      "codepoint": "0xE02C",
+      "description": "ZH nasal final an"
+    },
+    {
+      "token": "tʃ",
+      "codepoint": "0xE054",
+      "description": "ES voiceless postalveolar affricate"
+    },
+    {
+      "token": "ɑ̃",
+      "codepoint": "0xE057",
+      "description": "FR nasal open back unrounded vowel"
+    }
   ],
   "encode_test_cases": [
     {
-      "tokens": ["k", "o", "a", "i"],
+      "tokens": [
+        "k",
+        "o",
+        "a",
+        "i"
+      ],
       "description": "BOS/PAD/EOS insertion — verifies ^ prefix, $ suffix, and inter-phoneme _ padding",
       "expected_has_bos": true,
       "expected_has_eos": true,
@@ -580,28 +2858,55 @@
       "expected_first_token": "^"
     },
     {
-      "tokens": ["k", "o", "N_n", "n", "i", "ch", "i", "h", "a"],
+      "tokens": [
+        "k",
+        "o",
+        "N_n",
+        "n",
+        "i",
+        "ch",
+        "i",
+        "h",
+        "a"
+      ],
       "description": "Multi-char tokens (N_n, ch) are PUA-mapped before ID lookup",
       "expected_has_bos": true,
       "expected_has_eos": true,
       "expected_min_length": 21
     },
     {
-      "tokens": ["a"],
+      "tokens": [
+        "a"
+      ],
       "description": "Single-token minimal input — still gets BOS + PAD + token + PAD + EOS",
       "expected_has_bos": true,
       "expected_has_eos": true,
       "expected_min_length": 5
     },
     {
-      "tokens": ["sh", "i", "N_m", "b", "u", "N_uvular"],
+      "tokens": [
+        "sh",
+        "i",
+        "N_m",
+        "b",
+        "u",
+        "N_uvular"
+      ],
       "description": "Multi-char JA tokens (sh, N_m, N_uvular) requiring PUA mapping",
       "expected_has_bos": true,
       "expected_has_eos": true,
       "expected_min_length": 15
     },
     {
-      "tokens": ["ts", "u", "ky", "o", "cl", "k", "a"],
+      "tokens": [
+        "ts",
+        "u",
+        "ky",
+        "o",
+        "cl",
+        "k",
+        "a"
+      ],
       "description": "JA tokens with geminate (cl) and palatalized consonant (ky, ts) PUA tokens",
       "expected_has_bos": true,
       "expected_has_eos": true,
@@ -640,74 +2945,74 @@
     "N_uvular": "0xE01C",
     "rr": "0xE01D",
     "y_vowel": "0xE01E",
-    "p\u02b0": "0xE020",
-    "t\u02b0": "0xE021",
-    "k\u02b0": "0xE022",
-    "t\u0255": "0xE023",
-    "t\u0255\u02b0": "0xE024",
-    "t\u0282": "0xE025",
-    "t\u0282\u02b0": "0xE026",
-    "ts\u02b0": "0xE027",
-    "a\u026a": "0xE028",
-    "e\u026a": "0xE029",
-    "a\u028a": "0xE02A",
-    "o\u028a": "0xE02B",
+    "pʰ": "0xE020",
+    "tʰ": "0xE021",
+    "kʰ": "0xE022",
+    "tɕ": "0xE023",
+    "tɕʰ": "0xE024",
+    "tʂ": "0xE025",
+    "tʂʰ": "0xE026",
+    "tsʰ": "0xE027",
+    "aɪ": "0xE028",
+    "eɪ": "0xE029",
+    "aʊ": "0xE02A",
+    "oʊ": "0xE02B",
     "an": "0xE02C",
-    "\u0259n": "0xE02D",
-    "a\u014b": "0xE02E",
-    "\u0259\u014b": "0xE02F",
-    "u\u014b": "0xE030",
+    "ən": "0xE02D",
+    "aŋ": "0xE02E",
+    "əŋ": "0xE02F",
+    "uŋ": "0xE030",
     "ia": "0xE031",
-    "i\u025b": "0xE032",
+    "iɛ": "0xE032",
     "iou": "0xE033",
-    "ia\u028a": "0xE034",
-    "i\u025bn": "0xE035",
+    "iaʊ": "0xE034",
+    "iɛn": "0xE035",
     "in": "0xE036",
-    "ia\u014b": "0xE037",
-    "i\u014b": "0xE038",
-    "iu\u014b": "0xE039",
+    "iaŋ": "0xE037",
+    "iŋ": "0xE038",
+    "iuŋ": "0xE039",
     "ua": "0xE03A",
     "uo": "0xE03B",
-    "ua\u026a": "0xE03C",
-    "ue\u026a": "0xE03D",
+    "uaɪ": "0xE03C",
+    "ueɪ": "0xE03D",
     "uan": "0xE03E",
-    "u\u0259n": "0xE03F",
-    "ua\u014b": "0xE040",
-    "u\u0259\u014b": "0xE041",
-    "y\u025b": "0xE042",
-    "y\u025bn": "0xE043",
+    "uən": "0xE03F",
+    "uaŋ": "0xE040",
+    "uəŋ": "0xE041",
+    "yɛ": "0xE042",
+    "yɛn": "0xE043",
     "yn": "0xE044",
-    "\u027b\u0329": "0xE045",
+    "ɻ̩": "0xE045",
     "tone1": "0xE046",
     "tone2": "0xE047",
     "tone3": "0xE048",
     "tone4": "0xE049",
     "tone5": "0xE04A",
-    "p\u0348": "0xE04B",
-    "t\u0348": "0xE04C",
-    "k\u0348": "0xE04D",
-    "s\u0348": "0xE04E",
-    "t\u0348\u0255": "0xE04F",
-    "k\u031a": "0xE050",
-    "t\u031a": "0xE051",
-    "p\u031a": "0xE052",
-    "t\u0283": "0xE054",
-    "d\u0292": "0xE055",
-    "\u025b\u0303": "0xE056",
-    "\u0251\u0303": "0xE057",
-    "\u0254\u0303": "0xE058",
-    "i\u02d0": "0xE059",
-    "y\u02d0": "0xE05A",
-    "e\u02d0": "0xE05B",
-    "\u025b\u02d0": "0xE05C",
-    "\u00f8\u02d0": "0xE05D",
-    "\u0251\u02d0": "0xE05E",
-    "o\u02d0": "0xE05F",
-    "u\u02d0": "0xE060",
-    "\u0289\u02d0": "0xE061",
-    "\u0254\u026a": "0xE062",
-    "\u0153\u0303": "0xE063",
-    "\u0250\u0303": "0xE064"
+    "p͈": "0xE04B",
+    "t͈": "0xE04C",
+    "k͈": "0xE04D",
+    "s͈": "0xE04E",
+    "t͈ɕ": "0xE04F",
+    "k̚": "0xE050",
+    "t̚": "0xE051",
+    "p̚": "0xE052",
+    "tʃ": "0xE054",
+    "dʒ": "0xE055",
+    "ɛ̃": "0xE056",
+    "ɑ̃": "0xE057",
+    "ɔ̃": "0xE058",
+    "iː": "0xE059",
+    "yː": "0xE05A",
+    "eː": "0xE05B",
+    "ɛː": "0xE05C",
+    "øː": "0xE05D",
+    "ɑː": "0xE05E",
+    "oː": "0xE05F",
+    "uː": "0xE060",
+    "ʉː": "0xE061",
+    "ɔɪ": "0xE062",
+    "œ̃": "0xE063",
+    "ɐ̃": "0xE064"
   },
   "detect_test_cases": [
     {

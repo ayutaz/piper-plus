@@ -335,6 +335,226 @@ jobs:
           path: android/piper-plus-g2p/build/reports/androidTests/managedDevice/
 
   # ---------------------------------------------------------------------------
+  # L2: build libpiper_plus.so + JNI shim for Linux x86_64 host JVM and run a
+  # smoke test that loads them via System.load and exercises the JNI surface.
+  # This catches symbol-resolution / ABI mismatches that L1 (pure JVM,
+  # reflection only) cannot, and fails much faster than spinning up the full
+  # Android emulator (L3).
+  # ---------------------------------------------------------------------------
+  linux-jvm-smoke:
+    name: L2 JVM JNI smoke (Linux x86_64)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+        with: { submodules: true }
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 17 }
+
+      - name: Install build deps
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake ninja-build
+
+      - name: Cache ONNX Runtime Linux
+        id: cache-ort-linux
+        uses: actions/cache@v5
+        with:
+          path: ort-linux/
+          key: ort-linux-${{ env.ONNXRUNTIME_VERSION }}-x64
+
+      - name: Download ONNX Runtime Linux
+        if: steps.cache-ort-linux.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ort-linux
+          curl -sfL "https://github.com/microsoft/onnxruntime/releases/download/v${{ env.ONNXRUNTIME_VERSION }}/onnxruntime-linux-x64-${{ env.ONNXRUNTIME_VERSION }}.tgz" -o /tmp/ort.tgz
+          tar -xzf /tmp/ort.tgz --strip-components=1 -C ort-linux
+
+      - name: Build libpiper_plus.so for Linux x86_64
+        run: |
+          cmake -B build-linux -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DPIPER_PLUS_BUILD_SHARED=ON \
+            -DBUILD_TESTS=OFF \
+            -DONNXRUNTIME_DIR=${{ github.workspace }}/ort-linux \
+            -DONNXRUNTIME_INCLUDE_DIR=${{ github.workspace }}/ort-linux/include \
+            -DONNXRUNTIME_LIB=${{ github.workspace }}/ort-linux/lib/libonnxruntime.so
+          cmake --build build-linux --target piper_plus -j$(nproc)
+
+      - name: Build JNI shim for Linux x86_64
+        run: |
+          # Compile the same JNI source the Android module uses, but link
+          # against the host JVM and Linux libpiper_plus.so.
+          mkdir -p build-jni
+          PIPER_SO=$(find build-linux -name 'libpiper_plus.so' | head -n1)
+          [ -n "$PIPER_SO" ] || { echo "libpiper_plus.so not found"; exit 1; }
+          g++ -std=c++17 -shared -fPIC \
+            -I"$JAVA_HOME/include" -I"$JAVA_HOME/include/linux" \
+            -I src/cpp \
+            android/piper-plus-g2p/src/main/cpp/piper_plus_g2p_jni.cpp \
+            -L"$(dirname "$PIPER_SO")" -lpiper_plus \
+            -Wl,-z,max-page-size=16384 \
+            -o build-jni/libpiper_plus_g2p_jni.so
+          # Stage all needed .so into one directory so System.load can find them.
+          cp "$PIPER_SO" build-jni/
+          cp ort-linux/lib/libonnxruntime.so* build-jni/ 2>/dev/null || true
+
+      - name: Run JVM smoke test
+        run: |
+          mkdir -p build-jni/cls
+          cat > build-jni/SmokeTest.java <<'JAVA'
+          public class SmokeTest {
+              public static native long nativeCreate(String dictDir);
+              public static native void nativeFree(long handle);
+              public static native String nativeVersion();
+              public static native String nativeAvailableLanguages(long handle);
+              public static native String[] nativePhonemize(long handle, String text, String language);
+              public static void main(String[] args) {
+                  // Load piper_plus first (the shim depends on its symbols).
+                  System.load(args[0] + "/libpiper_plus.so");
+                  System.load(args[0] + "/libpiper_plus_g2p_jni.so");
+                  String v = nativeVersion();
+                  if (v == null || v.isEmpty()) throw new RuntimeException("empty version");
+                  long h = nativeCreate(null);
+                  if (h == 0L) throw new RuntimeException("create returned 0");
+                  String langs = nativeAvailableLanguages(h);
+                  if (langs == null || !langs.contains("en")) {
+                      throw new RuntimeException("unexpected langs: " + langs);
+                  }
+                  String[] r = nativePhonemize(h, "hola mundo", "es");
+                  if (r == null || r.length != 3) throw new RuntimeException("phonemize result shape");
+                  if (r[0] == null || r[0].isEmpty()) throw new RuntimeException("empty phonemes");
+                  System.out.println("smoke OK: version=" + v + " langs=" + langs +
+                      " es:'hola mundo' -> '" + r[0] + "' (lang=" + r[1] + ")");
+                  nativeFree(h);
+              }
+          }
+          JAVA
+          # The smoke test deliberately uses different external method symbols
+          # than the Kotlin wrapper (no Java_com_piperplus_g2p_PiperPlusG2pNative_*
+          # prefix), so we use JNI's "short" name resolution by registering
+          # them via a top-level class. Kotlin's compiled bytecode mangles names
+          # the same way, so reuse the production .class files directly.
+          # Rather than compile a parallel test, just run the production
+          # JAR's bytecode via the Kotlin Native bridge:
+          rm -f build-jni/SmokeTest.java
+          # Load the real Kotlin native bridge class instead.
+          cat > build-jni/SmokeTest.java <<'JAVA'
+          import com.piperplus.g2p.PiperPlusG2pNative;
+          public class SmokeTest {
+              public static void main(String[] args) {
+                  // Load the unprefixed library names used by Kotlin's
+                  // System.loadLibrary("piper_plus") + ("piper_plus_g2p_jni").
+                  System.load(args[0] + "/libpiper_plus.so");
+                  System.load(args[0] + "/libpiper_plus_g2p_jni.so");
+                  String v = PiperPlusG2pNative.nativeVersion();
+                  if (v == null || v.isEmpty()) throw new RuntimeException("empty version");
+                  long h = PiperPlusG2pNative.nativeCreate(null);
+                  if (h == 0L) throw new RuntimeException("create returned 0");
+                  String langs = PiperPlusG2pNative.nativeAvailableLanguages(h);
+                  if (langs == null || !langs.contains("en")) {
+                      throw new RuntimeException("unexpected langs: " + langs);
+                  }
+                  String[] r = PiperPlusG2pNative.nativePhonemize(h, "hola mundo", "es");
+                  if (r == null || r.length != 3) throw new RuntimeException("phonemize result shape");
+                  if (r[0] == null || r[0].isEmpty()) throw new RuntimeException("empty phonemes");
+                  System.out.println("smoke OK: version=" + v + " langs=" + langs +
+                      " es:'hola mundo' -> '" + r[0] + "' (lang=" + r[1] + ")");
+                  PiperPlusG2pNative.nativeFree(h);
+              }
+          }
+          JAVA
+          # Compile against the Kotlin-built classes if present, otherwise
+          # bail with an explicit stub message.
+          KCLASSES_JAR="$(find android -name 'piper-plus-g2p-*-release.jar' 2>/dev/null | head -n1)"
+          if [ -z "$KCLASSES_JAR" ]; then
+              # No prebuilt jar — compile a minimal facade by hand.
+              mkdir -p build-jni/com/piperplus/g2p
+              cat > build-jni/com/piperplus/g2p/PiperPlusG2pNative.java <<'JAVA'
+          package com.piperplus.g2p;
+          public final class PiperPlusG2pNative {
+              public static native long   nativeCreate(String dictDir);
+              public static native void   nativeFree(long handle);
+              public static native String nativeVersion();
+              public static native String nativeAvailableLanguages(long handle);
+              public static native String[] nativePhonemize(long handle, String text, String language);
+              public static native void   nativeLoadCustomDict(long handle, String path);
+              public static native void   nativeSetZhEnDispatch(long handle, boolean enabled);
+              public static native boolean nativeIsZhEnDispatchEnabled(long handle);
+          }
+          JAVA
+              javac -d build-jni/cls build-jni/com/piperplus/g2p/PiperPlusG2pNative.java
+              KCLASSES_JAR="build-jni/cls"
+          fi
+          javac -cp "$KCLASSES_JAR" -d build-jni/cls build-jni/SmokeTest.java
+          java -cp "$KCLASSES_JAR:build-jni/cls" SmokeTest "$PWD/build-jni"
+
+  # ---------------------------------------------------------------------------
+  # NFR-SEC-4: re-build libpiper_plus + GTest under AddressSanitizer and run
+  # the C API G2P test suite. Fails on any leak/UAF/heap-OOB.
+  # ---------------------------------------------------------------------------
+  asan-tests:
+    name: ASan C API GTest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+        with: { submodules: true }
+
+      - name: Install build deps
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake ninja-build
+
+      - name: Cache ONNX Runtime Linux
+        id: cache-ort-asan
+        uses: actions/cache@v5
+        with:
+          path: ort-linux/
+          key: ort-linux-${{ env.ONNXRUNTIME_VERSION }}-x64
+
+      - name: Download ONNX Runtime Linux
+        if: steps.cache-ort-asan.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ort-linux
+          curl -sfL "https://github.com/microsoft/onnxruntime/releases/download/v${{ env.ONNXRUNTIME_VERSION }}/onnxruntime-linux-x64-${{ env.ONNXRUNTIME_VERSION }}.tgz" -o /tmp/ort.tgz
+          tar -xzf /tmp/ort.tgz --strip-components=1 -C ort-linux
+
+      - name: Configure with ASan
+        run: |
+          cmake -B build-asan -G Ninja \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DBUILD_TESTS=ON \
+            -DPIPER_PLUS_BUILD_SHARED=ON \
+            -DCMAKE_C_FLAGS="-fsanitize=address -fno-omit-frame-pointer -g" \
+            -DCMAKE_CXX_FLAGS="-fsanitize=address -fno-omit-frame-pointer -g" \
+            -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address" \
+            -DCMAKE_SHARED_LINKER_FLAGS="-fsanitize=address" \
+            -DONNXRUNTIME_DIR=${{ github.workspace }}/ort-linux \
+            -DONNXRUNTIME_INCLUDE_DIR=${{ github.workspace }}/ort-linux/include \
+            -DONNXRUNTIME_LIB=${{ github.workspace }}/ort-linux/lib/libonnxruntime.so
+
+      - name: Build test_c_api under ASan
+        run: cmake --build build-asan --target test_c_api -j$(nproc)
+
+      - name: Run test_c_api under ASan
+        env:
+          # Suppress the harmless ORT-internal allocator pattern that some
+          # versions of ORT 1.17 trip but is irrelevant to our test scope.
+          # Add explicit suppressions if real findings are masked.
+          ASAN_OPTIONS: detect_leaks=1:halt_on_error=1:abort_on_error=1:print_stacktrace=1:strict_string_checks=1
+          LSAN_OPTIONS: suppressions=tests/asan_lsan_suppressions.txt:print_suppressions=0
+        run: |
+          # Find the executable; CMake places it under build-asan/.
+          BIN=$(find build-asan -type f -name 'test_c_api' -executable | head -n1)
+          [ -n "$BIN" ] || { echo "test_c_api not built"; exit 1; }
+          # Filter to the G2P subset to keep the run focused on Issue #388.
+          "$BIN" --gtest_filter='G2p*'
+
+  # ---------------------------------------------------------------------------
   # L4 dedicated job: regenerate the Python golden on Linux (where g2pk2 +
   # eunjeon are available, unlike Windows where the local generator skips KO)
   # and diff against the committed file. Any drift in either direction fails
