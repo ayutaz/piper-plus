@@ -23,7 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **GTest 26 ケース** (`src/cpp/tests/test_c_api_g2p.cpp`): lifecycle / NULL safety / `available_languages` order / 規則ベース 3 言語 (es/fr/pt) / ZH-EN dispatch toggle / borrowed pointer 寿命 / custom dict
 - **L4 byte-for-byte parity**: `tools/generate_g2p_golden.py` で Python `MultilingualPhonemizer` から 70 ケースの IPA 列を pre-compute し `tests/fixtures/g2p/phoneme_test_cases_golden.json` に固定。Kotlin instrumented `PhonemeFixtureParityTest.byte_for_byte_parity_with_python_golden` が strict diff で drift を検知 (FR-CAPI-3 / FR-TEST-1)
 - **サンプル Compose アプリ**: `examples/android-g2p-sample/` (8 言語タブ + TextField → phonemize → カード表示)。Gradle composite build で in-repo AAR を直接消費。`.github/workflows/kotlin-g2p-ci.yml` の `sample-app` ジョブで `assembleDebug` を CI gate (AC-10)
-- **設計・要件・マイルストーン**: `docs/spec/kotlin-g2p-{design,requirements}.md`、`docs/tickets/kotlin-g2p/{README,MILESTONES}.md`
+- **設計・要件**: `docs/spec/kotlin-g2p-{design,requirements}.md`
 - **10 並列エージェント自己監査による 22 件の修正** (2026-05-07):
   - **CI 修正 (🔴 Critical)**: NDK install を 4 つの Gradle ジョブ (unit-tests / build-aar / instrumented-tests / sample-app) と release publish に追加 (externalNativeBuild が常に NDK を要求するため、無いと全失敗していた)。`concurrency` block 追加でブランチ重複実行を防止。L4 専用 `parity-golden` ジョブ追加: Linux で eunjeon インストール後に `tools/generate_g2p_golden.py` を再実行し、`tools/compare_g2p_golden.py` で `expected_phonemes` の drift だけを strict 検査 (KO の skip / failed_cases メタデータは platform 固有なので除外)。
   - **L4 default_latin_language の golden 修正 (🔴 Critical)**: 既存 golden は `default_latin_language="en"` で全ケース生成していたため PT/ES/FR/SV テキストが英語 G2P 経由で誤った IPA を保持していた (例: `"hola"` → `h ˈ o ʊ l ə` 英語フォニックス)。C API 側 `piper.cpp` は `synthesisConfig.languageId` から `defaultLatin` を選ぶため runtime と divergence。`generate_g2p_golden.py` を per-case `default_latin_language=lang` に修正 + golden を再生成 (`"hola"` → `ˈ o l a` Spanish)。`schema_version: 2` で `failed_cases` / `skipped_ko_cases` を追加。
@@ -36,7 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **L1 ユニットテスト 5 → 18 件 (🟡)**: `DictionaryDownloaderTest` (host allowlist) / `OpenJTalkDictionaryTest` (`fromPath` / `exists` / `absolutePath`) / `PiperPlusG2pNativeTest` (JNI shape reflection) / `PhonemeResultTest` (immutability) / `PiperPlusG2pExceptionTest` (cause) を追加。
   - **L3 instrumented 拡充**: `OpenJTalkDictionaryInstrumentedTest` で 3 辞書配布パターン (assets / fromPath / Downloader allowlist) と `create(context, dict)` 統合を網羅 (FR-DICT-1 / FR-TEST-4)。`PhonemeFixtureParityTest.byte_for_byte_parity_with_python_golden` を `assumeTrue(false)` silent skip → `AssertionError` に変更し golden 欠落を loud fail に。
   - **release-kotlin-g2p.yml (🟡)**: SemVer regex を SemVer 2.0.0 §10 準拠 (pre-release **+** build metadata 同時許可)、4 つの publishing secrets の fail-fast 検査追加、workflow_dispatch にも version regex を適用。
-  - **ドキュメント整備**: `docs/guides/android-g2p-integration.md` (FR-DOCS-2、新規)、`tools/build-openjtalk-dict-archive.sh` (M6 で参照されていたが未実装だったビルドスクリプト)、`tools/compare_g2p_golden.py` (CI 用 golden diff)、`CONTRIBUTING.md` に `kotlin-g2p-v*` tag 規約と Maven Central リリース順序追加、`docs/tickets/kotlin-g2p/MILESTONES.md` の 100% 表記を実態 (M3 85% / M5 65% / M6 85% / M7 75% / M8 85%) に下方修正。`piper_plus.h` の `findG2pDictFile` 経路に関する誤解を招く記述を訂正。
+  - **ドキュメント整備**: `docs/guides/android-g2p-integration.md` (FR-DOCS-2、新規)、`tools/build-openjtalk-dict-archive.sh` (M6 で参照されていたが未実装だったビルドスクリプト)、`tools/compare_g2p_golden.py` (CI 用 golden diff)、`CONTRIBUTING.md` に `kotlin-g2p-v*` tag 規約と Maven Central リリース順序追加。`piper_plus.h` の `findG2pDictFile` 経路に関する誤解を招く記述を訂正。
 
 - **残作業全消化** (2026-05-07、ユーザー指示「すべてこのブランチで対応」):
   - **L2 (linuxTest) ジョブ追加**: 設計書 §9.2 / AC-3 要求の「JVM JNI smoke on Linux .so」を `kotlin-g2p-ci.yml:linux-jvm-smoke` で実装。Linux x86_64 で `libpiper_plus.so` + `libpiper_plus_g2p_jni.so` をネイティブビルドし、JVM から `System.load` + 主要メソッド呼び出し (nativeCreate / nativeVersion / nativeAvailableLanguages / nativePhonemize) で symbol-resolution / ABI mismatch を catch。L3 emulator より約 10x 高速で fail。
@@ -54,7 +54,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Forward-compatible loader (YELLOW-5)**: 全 7 ランタイム (Python + Rust × 2 / Go / C# / WASM / C++) で `schema_version: 2` の未来フィールドを silent ignore する挙動を pinning test で固定
 - **Two-layer model**: コンパイル時 (Cargo feature `chinese` / csproj `<EmbeddedResource>` / Go `//go:embed` / C++ CMake) + ランタイム (default-on opt-out) の二層管理 (TICKET-01 §7 懸念 5)
 - **ランタイム test カバレッジ**: Rust × 2 / Go / C# / WASM / C++ + Python の各 ZH-EN test スイートで `phonemize_embedded_english` の lookup priority / forward-compat / dispatch / opt-out / per-token prosody (a1=tone, a2=a3=1) を検証
-- **Issue #384 例**: `请打开 GPS` / `我喜欢用 Python 写代码` / `让我用 ChatGPT 写代码` を Python リファレンス test がカバー。各ランタイムの `phonemize_embedded_english` は同 JSON (byte-for-byte 同期) と同 lookup ロジックで動くため Python と等価な IPA 列を返す。詳細は [`docs/tickets/zh-en-loanword/`](docs/tickets/zh-en-loanword/)。
+- **Issue #384 例**: `请打开 GPS` / `我喜欢用 Python 写代码` / `让我用 ChatGPT 写代码` を Python リファレンス test がカバー。各ランタイムの `phonemize_embedded_english` は同 JSON (byte-for-byte 同期) と同 lookup ロジックで動くため Python と等価な IPA 列を返す。設計と運用契約: [`docs/spec/zh-en-loanword-runtime-rollout.md`](docs/spec/zh-en-loanword-runtime-rollout.md)。
 
 ##### 既知の制約 / 別 PR フォローアップ予定
 

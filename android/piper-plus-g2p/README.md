@@ -158,7 +158,7 @@ distributed separately is Modified BSD (naist-jdic).
 
 ## Related docs
 
-- [Requirements](../../docs/spec/kotlin-g2p-requirements.md) ([Milestones](../../docs/tickets/kotlin-g2p/MILESTONES.md))
+- [Requirements](../../docs/spec/kotlin-g2p-requirements.md)
 - [Design](../../docs/spec/kotlin-g2p-design.md)
 - [Dictionary distribution guide](../../docs/guides/android-g2p-dictionary.md)
 - [Issue #388](https://github.com/ayutaz/piper-plus/issues/388)

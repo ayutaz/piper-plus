@@ -3,8 +3,6 @@
 > **親 Issue**: [#388](https://github.com/ayutaz/piper-plus/issues/388) — 「Kotlin 向けの g2p ライブラリの提供」
 > **作業ブランチ**: `feat/issue-388-kotlin-g2p`
 > **設計書**: [kotlin-g2p-design.md](kotlin-g2p-design.md) (Phase 0 で先行作成)
-> **チケット INDEX**: [docs/tickets/kotlin-g2p/README.md](../tickets/kotlin-g2p/README.md)
-> **マイルストーン管理**: [docs/tickets/kotlin-g2p/MILESTONES.md](../tickets/kotlin-g2p/MILESTONES.md)
 > **判定基準**: 自動化可能性 (CLI/CI で完結) を最優先。実装工数は評価軸から除外。
 
 ---
@@ -634,7 +632,6 @@ JSON v1.0 / v2.0 schema は既存 (`docs/spec/custom-dictionary-schema.toml` 等
 ## 17. 関連ドキュメント
 
 - [kotlin-g2p-design.md](kotlin-g2p-design.md) — 設計書 (本書の親)
-- [docs/tickets/kotlin-g2p/README.md](../tickets/kotlin-g2p/README.md) — チケット INDEX
 - [src/cpp/piper_plus.h](../../src/cpp/piper_plus.h) — C API ヘッダ (445 行)
 - [src/cpp/piper_plus_c_api.cpp](../../src/cpp/piper_plus_c_api.cpp) — C API 実装
 - [android/piper-plus/](../../android/) — 既存 TTS フル AAR 草案

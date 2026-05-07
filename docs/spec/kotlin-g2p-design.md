@@ -3,8 +3,6 @@
 > **親 Issue**: [#388](https://github.com/ayutaz/piper-plus/issues/388) — 「Kotlin 向けの g2p ライブラリの提供」
 > **作業ブランチ**: `feat/issue-388-kotlin-g2p`
 > **要件定義書**: [kotlin-g2p-requirements.md](kotlin-g2p-requirements.md) (本書策定後の技術調査結果を反映)
-> **対応 INDEX**: [docs/tickets/kotlin-g2p/README.md](../tickets/kotlin-g2p/README.md)
-> **マイルストーン管理**: [docs/tickets/kotlin-g2p/MILESTONES.md](../tickets/kotlin-g2p/MILESTONES.md)
 > **判定基準**: 自動化可能性 (CLI/CI で完結) を最優先。実装工数は評価軸から除外。
 
 > ⚠️ **要件定義書による前提変更**: 本設計書策定後の技術調査で、`piper_plus_phonemize()` は ONNX モデル必須であることが判明 (要件定義書 §5)。Kotlin AAR は **C API に追加する engine-less G2P エントリポイント (FR-CAPI-1)** を呼ぶ前提に変更。本書 §5.4 の JNI bridge 設計は実装着手前に該当部分を更新する。
@@ -370,8 +368,6 @@ Java_com_piperplus_g2p_PiperPlusG2pNative_nativeDestroy(
 
 ## 6. 実装ロードマップ
 
-詳細チケットは [docs/tickets/kotlin-g2p/README.md](../tickets/kotlin-g2p/README.md) を参照。
-
 ```
 Phase 1  ┃ JNI bridge + C API gluing                      [TICKET-01]
 Phase 2  ┃ Kotlin API + data class                        [TICKET-02]
@@ -515,7 +511,6 @@ GitHub Actions の Ubuntu runner は KVM をサポートするため、ヘッド
 
 ## 10. 関連ドキュメント
 
-- [docs/tickets/kotlin-g2p/README.md](../tickets/kotlin-g2p/README.md) — 実装チケット INDEX
 - [docs/spec/ios-shared-lib.md](ios-shared-lib.md) — iOS shared lib 設計 (xcframework パターン参考)
 - [docs/spec/zh-en-loanword-runtime-rollout.md](zh-en-loanword-runtime-rollout.md) — クロスランタイム同期パターン
 - [docs/spec/pua-contract.toml](pua-contract.toml) — PUA codepoint 仕様
