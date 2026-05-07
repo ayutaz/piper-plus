@@ -247,6 +247,10 @@ object DictionaryDownloader {
                 when (typeFlag.toInt()) {
                     '5'.code -> {
                         out.mkdirs()
+                        // POSIX TAR usually stores directories with size=0, but a
+                        // header with non-zero size is technically legal. Skip
+                        // any payload so the next header stays 512-aligned.
+                        skipFully(input, size)
                     }
                     '0'.code, 0 -> {
                         out.parentFile?.mkdirs()
@@ -287,7 +291,13 @@ object DictionaryDownloader {
         var read = 0
         while (read < buf.size) {
             val n = input.read(buf, read, buf.size - read)
-            if (n < 0) return read > 0  // partial = treat as EOF
+            if (n < 0) {
+                // EOF at offset 0 is a clean end-of-stream; mid-header EOF is a
+                // truncated/corrupt archive — surface it instead of letting the
+                // caller parse stale bytes from the previous iteration's buffer.
+                if (read == 0) return false
+                throw IOException("truncated tar header: read $read of ${buf.size} bytes")
+            }
             read += n
         }
         return true
