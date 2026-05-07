@@ -105,20 +105,28 @@ final class GoldenPhonemeTests: XCTestCase {
             }
 
             // Optional: must-contain tokens
+            //
+            // The Rust phonemizer encodes every multi-character token as a
+            // single PUA codepoint (see Sources/PiperPlusG2P/PUAMap.swift),
+            // so for fixture entries like "rr"/"cl" we look up the PUA char
+            // and search for *that* in the result. This mirrors what the
+            // Rust integration test (`test_g2p_golden.rs::assert_case`) does.
             if let needles = golden.expected_contains {
                 for needle in needles {
+                    let lookup = PUAMap.tokenToPua(needle).map(String.init) ?? needle
                     XCTAssertTrue(
-                        result.tokens.contains(needle),
+                        result.tokens.contains(lookup),
                         "\(label): expected token '\(needle)' to be present, got: \(result.tokens)"
                     )
                 }
             }
 
-            // Optional: must-not-contain tokens
+            // Optional: must-not-contain tokens (same PUA-translation logic).
             if let antineedles = golden.expected_not_contains {
                 for antineedle in antineedles {
+                    let lookup = PUAMap.tokenToPua(antineedle).map(String.init) ?? antineedle
                     XCTAssertFalse(
-                        result.tokens.contains(antineedle),
+                        result.tokens.contains(lookup),
                         "\(label): expected token '\(antineedle)' to be absent, got: \(result.tokens)"
                     )
                 }
