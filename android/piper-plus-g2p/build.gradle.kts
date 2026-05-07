@@ -34,7 +34,15 @@ android {
             cmake {
                 cppFlags("-std=c++17")
                 arguments(
-                    "-DANDROID_STL=c++_shared",
+                    // c++_static so libc++_shared.so is NOT bundled into the
+                    // AAR. NDK r26.1's bundled libc++_shared.so is not 16-KB
+                    // aligned, which would fail the L5 page alignment gate
+                    // and break load on Android 15+ (NFR-COMPAT-4). The JNI
+                    // shim only uses std::memset / std::snprintf and never
+                    // shares C++ types across the libpiper_plus.so boundary
+                    // (the C API uses raw char* / handles), so c++_static is
+                    // safe here.
+                    "-DANDROID_STL=c++_static",
                     // 16 KB page size compat (Android 15+, NFR-COMPAT-4).
                     // Doubled here so the JNI .so itself is 16 KB-aligned;
                     // the linker flag is also set in CMakeLists.txt for safety.

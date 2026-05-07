@@ -11,7 +11,6 @@
 #include <jni.h>
 
 #include <cstring>
-#include <string>
 
 // android/log.h only exists when targeting the Android NDK. The L2
 // linux-jvm-smoke CI job builds this same source on a host JVM (Linux x86_64)
