@@ -2,7 +2,7 @@
 
 > **Version:** 1.0 (Draft)
 > **Status:** Proposed
-> **対象 Issue:** [#387](https://github.com/ayutaz/ピper-plus/issues/387)
+> **対象 Issue:** [#387](https://github.com/ayutaz/piper-plus/issues/387)
 > **対象ファイル (新規/改修):**
 > `src/rust/piper-plus-g2p/Cargo.toml`,
 > `src/rust/piper-plus-g2p/src/ffi.rs`,
@@ -190,14 +190,20 @@ public enum Language: String, CaseIterable, Sendable {
 #### `G2PError.swift`
 
 ```swift
-public enum G2PError: Error, Sendable {
+public enum G2PError: Error, Sendable, Equatable {
     case initializationFailed
-    case unsupportedLanguage(String)
-    case phonemizeFailed(reason: String)
+    case phonemizeReturnedNull
     case invalidUTF8
-    case nullResult
+    case decodeFailed(String)
 }
 ```
+
+> 実装: [`Sources/PiperPlusG2P/G2PError.swift`](../../Sources/PiperPlusG2P/G2PError.swift) と一致。
+> ケースの意味:
+> - `initializationFailed` — `piper_plus_g2p_create` が NULL を返した (要求した languages が一つも登録できなかった)。
+> - `phonemizeReturnedNull` — `piper_plus_g2p_phonemize` が NULL を返した (init で登録されていない言語、または入力が phonemizer で解釈できない)。
+> - `invalidUTF8` — FFI からの戻り値が UTF-8 として解釈できない (実装上は不到達)。
+> - `decodeFailed(String)` — JSON envelope の Decodable 失敗 (Rust 側 envelope 変更の早期検出)。
 
 #### `PhonemizeResult.swift`
 
@@ -315,15 +321,15 @@ CI (`release-shared-lib.yml`) の `build-g2p-ios` ステップ内で `cbindgen -
 # device slice (arm64)
 cargo build --manifest-path src/rust/piper-plus-g2p/Cargo.toml \
   --release --target aarch64-apple-ios \
-  --features all-languages,naist-jdic
+  --features all-languages,naist-jdic,bundled-dicts,ffi
 
 # simulator slice (arm64 + x86_64) — 個別ビルド後 lipo で合成
 cargo build --manifest-path src/rust/piper-plus-g2p/Cargo.toml \
   --release --target aarch64-apple-ios-sim \
-  --features all-languages,naist-jdic
+  --features all-languages,naist-jdic,bundled-dicts,ffi
 cargo build --manifest-path src/rust/piper-plus-g2p/Cargo.toml \
   --release --target x86_64-apple-ios \
-  --features all-languages,naist-jdic
+  --features all-languages,naist-jdic,bundled-dicts,ffi
 lipo -create \
   target/aarch64-apple-ios-sim/release/libpiper_plus_g2p.a \
   target/x86_64-apple-ios/release/libpiper_plus_g2p.a \
@@ -363,7 +369,7 @@ build-g2p-ios:
         IFS=',' read -ra TGT <<< "${{ matrix.rust_targets }}"
         for t in "${TGT[@]}"; do
           cargo build --release --target "$t" \
-            --features all-languages,naist-jdic
+            --features all-languages,naist-jdic,bundled-dicts,ffi
         done
         # …lipo logic here for simulator slice…
     - name: Generate piper_plus_g2p.h
@@ -408,8 +414,11 @@ assemble-g2p-xcframework:
 ### 4.6 `Package.swift` 拡張
 
 ```swift
-let g2pVersion = "1.13.0"  // synced with main version
-let g2pChecksum = "0000…0000"  // updated per release (same flow as PiperPlusBinary)
+// G2P xcframework debuts in v1.14.0 (Issue #387) — one tag after the
+// synthesis xcframework which shipped at v1.13.0 (Issue #377). Update
+// `g2pChecksum` manually before each tag push, same flow as PiperPlusBinary.
+let g2pVersion = "1.14.0"
+let g2pChecksum = "0000…0000"  // placeholder until v1.14.0 release tag
 
 let package = Package(
     name: "PiperPlus",

@@ -159,11 +159,14 @@ jobs:
           set -euo pipefail
           mkdir -p build-mac/Headers
           cp build-mac/macos/piper_plus_g2p.h build-mac/Headers/
+          # Use the same modulemap form as release-shared-lib.yml so the
+          # SPM import semantics in CI match those at tag time. binaryTarget
+          # auto-links the staticlib, so `link` directive is not needed.
           cat > build-mac/Headers/module.modulemap <<'MODULEMAP'
           module PiperPlusG2PBinary {
-              header "piper_plus_g2p.h"
-              export *
-              link "piper_plus_g2p"
+            umbrella header "piper_plus_g2p.h"
+            export *
+            module * { export * }
           }
           MODULEMAP
 
@@ -178,55 +181,25 @@ jobs:
           echo "=== xcframework contents ==="
           find build-mac/piper_plus_g2p.xcframework
 
-      - name: Replace Package.swift with G2P-only CI manifest
+      - name: Swap in CI Package.swift (Package.ci.swift → Package.swift)
         run: |
           set -euo pipefail
-          # The release Package.swift declares PiperPlus + PiperPlusG2P with
-          # iOS-only platform support and URL-based binaryTargets pointing
-          # at unreleased GitHub assets. We replace it with a minimal
-          # macOS-only manifest that consumes the locally built xcframework
-          # so PiperPlusG2PTests can actually run pre-release.
-          cat > Package.swift <<'PACKAGE'
-          // swift-tools-version: 5.9
-          //
-          // CI-only Package.swift — replaces the release manifest in
-          // .github/workflows/swift-g2p-ci.yml. Do NOT commit this file
-          // in this form; the workflow regenerates it per run.
-          //
-          // The release Package.swift uses URL-based binaryTargets that
-          // don't exist before tag publication, making pre-release
-          // `swift test` impossible. This minimal manifest:
-          //   - drops PiperPlus (synthesis engine, ORT, iOS-only)
-          //   - keeps PiperPlusG2P + tests
-          //   - points PiperPlusG2PBinary at build-mac/piper_plus_g2p.xcframework
-          //     produced earlier in this workflow
-          import PackageDescription
-
-          let package = Package(
-              name: "PiperPlusG2PTest",
-              platforms: [.macOS(.v13)],
-              products: [
-                  .library(name: "PiperPlusG2P", targets: ["PiperPlusG2P"]),
-              ],
-              targets: [
-                  .target(
-                      name: "PiperPlusG2P",
-                      dependencies: [.target(name: "PiperPlusG2PBinary")],
-                      path: "Sources/PiperPlusG2P"
-                  ),
-                  .binaryTarget(
-                      name: "PiperPlusG2PBinary",
-                      path: "build-mac/piper_plus_g2p.xcframework"
-                  ),
-                  .testTarget(
-                      name: "PiperPlusG2PTests",
-                      dependencies: ["PiperPlusG2P"],
-                      path: "tests/PiperPlusG2PTests"
-                  ),
-              ]
-          )
-          PACKAGE
-          echo "=== Package.swift (CI override) ==="
+          # The release Package.swift uses URL-based binaryTargets at
+          # GitHub Release assets that don't exist before tag publication,
+          # making pre-release `swift test` impossible. We swap in the
+          # tracked Package.ci.swift, which:
+          #   - drops PiperPlus (synthesis engine, ORT, iOS-only)
+          #   - keeps PiperPlusG2P + tests
+          #   - points PiperPlusG2PBinary at build-mac/piper_plus_g2p.xcframework
+          #     produced earlier in this workflow
+          # Tracking Package.ci.swift in git means any drift between the
+          # two manifests is visible in `git diff`, not buried in a heredoc.
+          test -f Package.ci.swift || {
+            echo "::error::Package.ci.swift missing — see swift-g2p-ci.yml comments"
+            exit 1
+          }
+          cp Package.ci.swift Package.swift
+          echo "=== Package.swift (CI override = Package.ci.swift) ==="
           cat Package.swift
 
       - name: Run Swift tests
@@ -237,3 +210,23 @@ jobs:
           # easier to scan when scrolling through.
           echo "=== summary ==="
           grep -E "Test Suite '.*' passed|Test Suite '.*' failed|Executed [0-9]+ tests?" swift-test.log | tail -10 || true
+
+      # ConcurrencyTests asserts `Phonemizer.@unchecked Sendable`. Without
+      # a sanitizer, "60 parallel calls returned non-empty tokens" is a
+      # weak race-detection signal — silent corruption (e.g. a per-instance
+      # cache flushing tokens between threads) would still pass token
+      # checks. Re-run only the ConcurrencyTests under TSan to give the
+      # Sendable claim teeth. Marked `continue-on-error` initially so that
+      # any TSan finding surfaces as a workflow warning rather than a hard
+      # block until the team has triaged early reports — flip to a hard
+      # gate once the race-free baseline is confirmed.
+      - name: Re-run ConcurrencyTests under Thread Sanitizer
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          swift test --filter ConcurrencyTests --sanitize=thread 2>&1 | tee swift-tsan.log
+          echo "=== TSan summary ==="
+          grep -E "WARNING: ThreadSanitizer|Test Suite '.*' passed|Test Suite '.*' failed" swift-tsan.log | tail -20 || true
+          if grep -q "WARNING: ThreadSanitizer" swift-tsan.log; then
+            echo "::warning::Thread Sanitizer reported potential race(s) — see job log"
+          fi

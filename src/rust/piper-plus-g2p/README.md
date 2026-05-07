@@ -91,8 +91,18 @@ piper-plus-g2p = { version = "0.4", features = ["ffi", "all-languages", "naist-j
 ```
 
 The crate exposes 5 C functions with the `piper_plus_g2p_` prefix:
-`create`, `phonemize`, `free_string`, `destroy`, and `version`.
-See `src/ffi.rs` and `cbindgen.toml` for details.
+
+| Function | Purpose |
+|---|---|
+| `piper_plus_g2p_create(const char *langs)` | Create a handle, registering the comma-separated language codes (or NULL for the feature-derived default set). |
+| `piper_plus_g2p_phonemize(handle, text, lang)` | Run G2P; returns an owned UTF-8 JSON string `{"tokens": [...], "language": "..."}` on success, or NULL on failure / panic. |
+| `piper_plus_g2p_available_languages(handle)` | Return an owned UTF-8 comma-separated list of currently registered language codes. |
+| `piper_plus_g2p_free_string(char *)` | Free a string returned by `phonemize` / `available_languages`. No-op on NULL. |
+| `piper_plus_g2p_free(handle)` | Drop the handle. No-op on NULL. |
+
+All entry points are wrapped in `catch_unwind`, so Rust panics never
+cross the FFI boundary. See `src/ffi.rs` and `cbindgen.toml` for the
+canonical signatures.
 
 ### iOS / App Sandbox
 

@@ -840,6 +840,15 @@ impl ChinesePhonemizer {
     /// * `phrase_path` - Path to `pinyin_phrases.json`
     #[cfg(not(target_arch = "wasm32"))]
     pub fn new(single_char_path: &Path, phrase_path: &Path) -> Result<Self, G2pError> {
+        // NOTE: same caveat as `EnglishPhonemizer::new_with_dict`: the
+        // `expect` calls panic on unreadable / malformed dictionaries, and
+        // OnceLock has no `get_or_try_init` on stable — a first-init panic
+        // poisons the cell for the process lifetime. FFI consumers
+        // (iOS Swift wrapper) reach this path only via `new_bundled()`
+        // below (Result-returning), so this is safe in the iOS/Swift
+        // distribution. Rust-only callers should validate dictionary
+        // paths before calling, or use `from_dicts` / `from_json_bytes`
+        // to bypass the cache entirely.
         let (single, phrase) = ZH_DICT_CACHE.get_or_init(|| {
             let s = load_single_char_dict(single_char_path)
                 .expect("pinyin single-char dictionary load failed");

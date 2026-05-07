@@ -8,9 +8,71 @@
 
 [meta]
 spec_version = "1.0"
-last_updated = "2026-05-06"
+last_updated = "2026-05-07"
 issue = 387
 applies_to = ["rust-ffi", "swift-package", "release-shared-lib-yml"]
+
+# ============================================================================
+# Compatibility versioning
+# ============================================================================
+#
+# The ABI is composed of two independently versioned surfaces:
+#
+#   1. C FFI symbols (piper_plus_g2p_*) — versioned via SemVer of the
+#      `piper-plus` Swift package as a whole. Removing or renaming any
+#      symbol or changing a function's signature is a major-version break.
+#
+#   2. PUA mapping table — versioned via PUA_COMPAT_VERSION (see
+#      docs/spec/pua-contract.toml). Trained ONNX models embed a
+#      pua_compat_version; consumers MUST NOT pair a model with a
+#      runtime that has a different version. The Swift mirror in
+#      Sources/PiperPlusG2P/PUAMap.swift carries this same version and
+#      must be bumped in lockstep with the canonical pua.json.
+
+[compat]
+pua_compat_version = 2  # MUST equal pua.json::version, FIXED_PUA_MAP version, PUAMap.compatVersion
+swift_pua_mirror = "Sources/PiperPlusG2P/PUAMap.swift"
+swift_pua_gate   = "scripts/check_pua_consistency.py + .github/workflows/pua-consistency.yml"
+
+[compat.breaking_change_policy]
+# What happens to consumers if each kind of change ships unannounced.
+remove_or_rename_symbol = """
+Link error at consumer build time (`Undefined symbols for architecture
+arm64: _piper_plus_g2p_xxxx`). Detection is immediate, not silent.
+Always bump the package major version when removing/renaming.
+"""
+
+change_signature = """
+Compile error in Sources/PiperPlusG2P/Phonemizer.swift if argument
+types or return types change. cbindgen-generated header keeps Swift
+honest. Always bump the package major version.
+"""
+
+add_field_to_json_envelope = """
+SAFE for existing consumers — JSONDecoder ignores unknown keys. New
+fields should be optional in the Swift Codable struct. Document the
+addition in CHANGELOG and bump minor version.
+"""
+
+remove_field_from_json_envelope = """
+BREAKS Swift consumers — `decodeFailed` is thrown at runtime when the
+required key is missing. Always bump major version + provide migration
+in CHANGELOG.
+"""
+
+bump_pua_compat_version = """
+Trained models embed pua_compat_version. A version mismatch between
+model and runtime is detected by `check_pua_compat()` (Rust) /
+PUAMap.compatVersion (Swift) at load time. Bumping requires
+coordinated updates to all 7 runtime tables (see PUA gate workflow).
+"""
+
+change_default_languages = """
+SAFE if the new default is a superset of the old (consumers see more
+languages than they asked for). REMOVING a default language is a
+runtime behavioral change — some consumers rely on `Phonemizer()`
+without arguments to register `en`. Document in CHANGELOG.
+"""
 
 # ============================================================================
 # C ABI (cbindgen-generated header: piper_plus_g2p.h)

@@ -60,10 +60,27 @@ final class ConcurrencyTests: XCTestCase {
 
     func testRepeatedInitDeinit() throws {
         // Stress deinit path: create + drop 100 instances. Detects FFI
-        // double-free or use-after-free via address-sanitizer if enabled.
-        for _ in 0..<100 {
+        // double-free or use-after-free under address-sanitizer (when CI
+        // is run with `swift test --sanitize=address`); under ordinary
+        // builds, asserts that every iteration produces a usable handle
+        // — i.e. the registry is rebuilt cleanly each time and previous
+        // deinit did not leave a global in a poisoned state.
+        for i in 0..<100 {
             let p = try Phonemizer(languages: [.english])
-            _ = p.availableLanguages
+            let langs = p.availableLanguages
+            XCTAssertTrue(
+                langs.contains(.english),
+                "iteration \(i): repeated init/deinit must continue to register requested languages"
+            )
+
+            // Run a representative phonemize on every 10th iteration to make
+            // sure the pipeline stays functional, not just constructable.
+            // (Doing it every iteration would slow the test 100×.)
+            if i % 10 == 0 {
+                let result = try p.phonemize("hello", language: .english)
+                XCTAssertEqual(result.language, "en", "iteration \(i): language echo mismatch")
+                XCTAssertFalse(result.tokens.isEmpty, "iteration \(i): tokens unexpectedly empty")
+            }
         }
     }
 }

@@ -161,9 +161,42 @@ final class PhonemizerTests: XCTestCase {
     }
 
     func testEmptyTextDoesNotCrash() throws {
+        // Spec (Rust ffi.rs::test_ffi_phonemize_empty_text): empty input may
+        // either succeed with tokens=[] or fail with phonemizeReturnedNull.
+        // The contract is "must not crash", and either outcome is valid.
+        // We assert one of the two explicitly so a future change that throws
+        // a different error case (e.g. .decodeFailed) gets caught.
         let phonemizer = try Phonemizer(languages: [.english])
-        // Empty text may return tokens=[] or throw — both are acceptable as
-        // long as it doesn't crash.
-        _ = try? phonemizer.phonemize("", language: .english)
+        do {
+            let result = try phonemizer.phonemize("", language: .english)
+            XCTAssertEqual(result.language, "en")
+            // Empty input may produce zero or a tiny number of tokens;
+            // we accept anything as long as it parsed.
+            XCTAssertGreaterThanOrEqual(result.tokens.count, 0)
+        } catch G2PError.phonemizeReturnedNull {
+            // Acceptable per the Rust contract.
+        } catch {
+            XCTFail("empty text should yield phonemizeReturnedNull or success, got: \(error)")
+        }
+    }
+
+    // M1: availableLanguages must round-trip the requested language set.
+    // If Rust ever adds a language code Swift's `Language` enum does not know
+    // about, `compactMap(Language(rawValue:))` would silently drop it and the
+    // user would see a missing language with no error. Catch that drift here.
+    func testAvailableLanguagesRoundTripsRequestedSet() throws {
+        let requested: [Language] = [.english, .japanese, .chinese, .korean,
+                                     .spanish, .french, .portuguese, .swedish]
+        let phonemizer = try Phonemizer(languages: requested)
+        let registered = Set(phonemizer.availableLanguages)
+        XCTAssertEqual(
+            registered, Set(requested),
+            """
+            availableLanguages must equal the requested set. Mismatch
+            indicates either (a) Rust failed to register a language at
+            init (init should have thrown) or (b) Rust returned a
+            language code missing from Swift's `Language` enum.
+            """
+        )
     }
 }

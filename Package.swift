@@ -57,9 +57,17 @@ let checksum = "0000000000000000000000000000000000000000000000000000000000000000
 // G2P-only artifact — produced by the same release workflow but as a
 // separate xcframework that does NOT depend on ONNX Runtime. Consumers
 // who need only G2P (text → IPA tokens) can pull just `PiperPlusG2P`.
-// Same release-cadence as the synthesis engine above; checksum is updated
-// manually before each tag push (Issue #387).
-let g2pVersion = "1.13.0"
+// Bumped independently of the synthesis `version` above: the G2P product
+// debuts in v1.14.0 (Issue #387), one tag after the synthesis xcframework
+// (which shipped at v1.13.0 per Issue #377). Both follow the same manual
+// release procedure documented in the file header.
+//
+// IMPORTANT: until the v1.14.0 tag publishes the xcframework asset and
+// this checksum is updated, `swift package resolve` against this manifest
+// will fail with "artifact has changed checksum" / "asset not found".
+// Consumers should depend on a *tagged* version (`from: "1.14.0"`), not
+// the dev branch.
+let g2pVersion = "1.14.0"
 let g2pChecksum = "0000000000000000000000000000000000000000000000000000000000000000"
 
 let package = Package(

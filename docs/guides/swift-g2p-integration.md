@@ -38,18 +38,24 @@ iOS / Swift プロジェクトから piper-plus の **G2P (Grapheme-to-Phoneme) 
 
 ## Supported Languages
 
-| Language | Code | 実装 | 辞書同梱 | バイナリへの寄与 |
+| Language | Code | 実装 | 辞書同梱 | バイナリ寄与 (※) |
 |----------|------|------|---------|----------------|
-| 日本語 | `ja` | jpreprocess (Rust port of OpenJTalk) | NAIST-JDIC 埋込 | ~30 MB |
-| 英語 | `en` | g2p 規則 + CMU 辞書 | あり | ~2 MB |
-| 中国語 (Mandarin) | `zh` | pypinyin 互換 | CC-CEDICT 由来 JSON 埋込 | ~3 MB |
-| 韓国語 | `ko` | Hangul 分解規則 | なし (規則ベース) | <1 MB |
-| スペイン語 | `es` | 規則ベース | なし | <1 MB |
-| フランス語 | `fr` | 規則ベース | なし | <1 MB |
-| ポルトガル語 | `pt` | 規則ベース | なし | <1 MB |
-| スウェーデン語 | `sv` | 規則ベース | なし | <1 MB |
+| 日本語 | `ja` | jpreprocess (Rust port of OpenJTalk) | NAIST-JDIC 埋込 | ~20 MB |
+| 英語 | `en` | g2p 規則 + CMU 辞書 | あり | ~3.7 MB |
+| 中国語 (Mandarin) | `zh` | pypinyin 互換 | pypinyin (CLDR + Han) 由来 JSON 埋込 | ~2.6 MB |
+| 韓国語 | `ko` | Hangul 分解規則 | なし (規則ベース) | <0.1 MB |
+| スペイン語 | `es` | 規則ベース | なし | <0.1 MB |
+| フランス語 | `fr` | 規則ベース | なし | <0.1 MB |
+| ポルトガル語 | `pt` | 規則ベース | なし | <0.1 MB |
+| スウェーデン語 | `sv` | 規則ベース | なし | <0.1 MB |
 
-> 配布される xcframework はデフォルトで **全 8 言語有効**。consumer 側で言語の選択無効化はできない (Cargo features がビルド時に固定化されるため)。サイズ制約のあるアプリ向け lite slice の提供は将来検討中 ([spec §7.4](../spec/swift-g2p.md#74-lite-slice-ja-除外--言語選択ビルド))。
+> ※ **「バイナリ寄与」は埋込辞書ファイルの非圧縮サイズ。** xcframework に最終的に追加されるサイズは debuginfo / 圧縮で前後します。代表値は次の通り (release ビルド、aarch64-apple-ios slice):
+> - **xcframework.zip ダウンロードサイズ**: ~3-5 MB (圧縮後、SwiftPM が GitHub から取得する物理サイズ)
+> - **app への増分**: ~30-35 MB (`bundled-dicts` + jpreprocess + NAIST-JDIC) — App Store の `over-the-air` 制限 (iOS 16 で 200 MB → 制限緩和) には収まるが、App Clip の 10 MB 制約は **超える**
+> - **未 strip staticlib (CI 中間成果物)**: ~84 MB — リリース時に xcodebuild 側で symbol strip され体感サイズが縮む
+
+> 配布される xcframework はデフォルトで **全 8 言語有効**。consumer 側で言語の選択無効化はできない (Cargo features がビルド時に固定化されるため)。
+> **学習済み TTS モデルは現状 6 言語 (ja/en/zh/es/fr/pt) のみ** — Swift G2P で `ko` / `sv` の音素列を取得しても、それを ONNX 合成エンジンに食わせるための学習済みモデルが piper-plus 配布物に存在しない点に注意 (`docs/migration/v1.11-to-v1.12.md` の言語表参照)。サイズ制約のあるアプリ向け lite slice の提供は将来検討中 ([spec §7.4](../spec/swift-g2p.md#74-lite-slice-ja-除外--言語選択ビルド))。
 
 ---
 
@@ -136,12 +142,23 @@ import PiperPlusG2P
 do {
     let phonemizer = try Phonemizer(languages: [.english])
     let result = try phonemizer.phonemize("Hello", language: .japanese) // 未登録
-} catch G2PError.unsupportedLanguage(let code) {
-    print("Language not registered: \(code)")
+    _ = result
+} catch G2PError.phonemizeReturnedNull {
+    // 渡した language が init で登録されていない、または入力が phonemizer で
+    // 解釈できないケース。init(languages:) の配列を見直す。
+    print("Language not registered, or input was not recognized")
+} catch G2PError.initializationFailed {
+    print("Phonemizer init failed — see Phonemizer.swift")
+} catch G2PError.invalidUTF8 {
+    print("FFI returned a non-UTF-8 byte sequence (should not happen)")
+} catch G2PError.decodeFailed(let detail) {
+    print("JSON decode failed: \(detail)")
 } catch {
     print("Other error: \(error)")
 }
 ```
+
+> `G2PError` は `initializationFailed / phonemizeReturnedNull / invalidUTF8 / decodeFailed(String)` の 4 ケース。詳細は [`Sources/PiperPlusG2P/G2PError.swift`](../../Sources/PiperPlusG2P/G2PError.swift)。
 
 ### SwiftUI から
 
@@ -185,7 +202,8 @@ struct PhonemeView: View {
 | `swift package resolve` で checksum mismatch | `Package.swift` の checksum が tag commit と不一致 | リポジトリの該当タグを check out するか、`Package.swift` を最新タグに合わせる |
 | `import PiperPlusG2P` が見つからない | `dependencies` に product を追加し忘れ | `.product(name: "PiperPlusG2P", package: "piper-plus")` を targets の dependencies に追加 |
 | `Phonemizer(languages:)` が `initializationFailed` を投げる | 内部で全言語の registration が失敗 (極稀) | デバッグ用に `languages: [.english]` のみで試して subset を絞る |
-| `phonemize(_:language:)` が `nullResult` を返す | `Phonemizer` 初期化時に渡していない言語を呼んだ | `init(languages:)` の配列に対象言語を含める |
+| `phonemize(_:language:)` が `phonemizeReturnedNull` を投げる | `Phonemizer` 初期化時に渡していない言語を呼んだ、または入力が phonemizer で解釈できない | `init(languages:)` の配列に対象言語を含める。空文字 / 制御文字のみの入力なら正常に空配列を返すため無視してよい |
+| `phonemize(_:language:)` が `decodeFailed` を投げる | Rust 側の JSON envelope が想定外 (基本的に発生しない) | piper-plus crate と xcframework のバージョンを揃える |
 | 中国語の結果が空 | `ChinesePhonemizer` の埋込辞書が読めていない | xcframework のバージョン確認。`v1.14.0+` で埋込辞書サポート |
 | 日本語の結果が文字化け | iOS 側で SourceFile encoding が UTF-8 でない | Xcode → File Inspector → Text Encoding を `Unicode (UTF-8)` に |
 | `_piper_plus_g2p_*` undefined symbol (link time) | xcframework が target に追加されていない | Step 1 を確認。手動追加の場合は **Frameworks, Libraries** で **Do Not Embed** で **Linked** になっているか |
@@ -230,14 +248,14 @@ struct PhonemeView: View {
 
 | 言語 | 辞書 | ライセンス | 同梱形態 |
 |------|------|-----------|---------|
-| 日本語 | NAIST-JDIC | BSD-3-Clause + Modified-BSD | バイナリ埋込 (consumer の app に複製される) |
-| 中国語 | CC-CEDICT 由来 (派生) | Creative Commons Attribution-Share Alike 4.0 | バイナリ埋込 |
-| 英語 | CMU Pronouncing Dictionary | BSD-2-Clause | バイナリ埋込 |
+| 日本語 | NAIST-JDIC (jpreprocess 経由) | BSD-3-Clause ([NAIST-JDIC 公式](https://osdn.net/projects/naist-jdic/)) | バイナリ埋込 (consumer の app に複製される) |
+| 中国語 | pypinyin (Unicode CLDR + Han database 由来) | MIT ([pypinyin](https://github.com/mozillazg/python-pinyin)) | バイナリ埋込 |
+| 英語 | CMU Pronouncing Dictionary v0.7b | BSD-style ([CMU](http://www.speech.cs.cmu.edu/cgi-bin/cmudict)) | バイナリ埋込 |
 | 他 | (規則ベースのみ、辞書なし) | — | — |
 
-詳細: [src/rust/piper-plus-g2p/THIRD_PARTY_LICENSES.md](../../src/rust/piper-plus-g2p/THIRD_PARTY_LICENSES.md)
+詳細とライセンス全文: [src/rust/piper-plus-g2p/THIRD_PARTY_LICENSES.md](../../src/rust/piper-plus-g2p/THIRD_PARTY_LICENSES.md)
 
-> **App Store 配布時の注意**: アプリの License/About 画面に上記ライセンス表記を含めること推奨。CC BY-SA 4.0 (CC-CEDICT) 派生部分について、由来表示が義務付けられる。
+> **App Store 配布時の注意**: アプリの License/About 画面に上記ライセンス表記を含めること推奨。CMU dict は再配布時に "This product includes data from the Carnegie Mellon Pronouncing Dictionary" 旨の acknowledgment が必要 (BSD-style 5 条件目)。pypinyin と NAIST-JDIC は Permissive ライセンスで attribution のみ要求。**copyleft / share-alike なライセンスは含まれない**ため、アプリ全体のライセンス選択への伝播はない。
 
 ---
 

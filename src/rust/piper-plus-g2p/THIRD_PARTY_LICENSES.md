@@ -21,13 +21,45 @@ direct dependencies.
 
 ### NAIST-JDIC Dictionary (`--features naist-jdic`)
 
-| Asset | License | Purpose |
-|-------|---------|---------|
-| NAIST-JDIC | BSD-3-Clause | MeCab dictionary for Japanese morphological analysis |
+| Asset | License | Source | Purpose |
+|-------|---------|--------|---------|
+| NAIST-JDIC | BSD-3-Clause | [NAIST-JDIC project (osdn.net)](https://osdn.net/projects/naist-jdic/) | MeCab dictionary for Japanese morphological analysis |
+
+> **Distribution note:** Bundled inside the `jpreprocess` crate at
+> compile time when `naist-jdic` is enabled. Adds approximately 20 MB
+> to the binary. The license requires the BSD copyright notice and
+> the disclaimer to be retained in redistributed binary form — see
+> the BSD-3-Clause license text below.
+
+#### NAIST-JDIC License (BSD-3-Clause)
+
+> Copyright (c) 2009, Nara Institute of Science and Technology, Japan.
+> All rights reserved.
+>
+> Redistribution and use in source and binary forms, with or without
+> modification, are permitted provided that the following conditions
+> are met:
+>
+> 1. Redistributions of source code must retain the above copyright
+>    notice, this list of conditions and the following disclaimer.
+> 2. Redistributions in binary form must reproduce the above copyright
+>    notice, this list of conditions and the following disclaimer in
+>    the documentation and/or other materials provided with the
+>    distribution.
+> 3. Neither the name of the Nara Institute of Science and Technology
+>    (NAIST) nor the names of its contributors may be used to endorse
+>    or promote products derived from this software without specific
+>    prior written permission.
+>
+> THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+> "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+> LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+> FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
 
 > **Note:** The `naist-jdic` feature bundles the dictionary (~20 MB)
-> into the binary. For size-constrained targets (mobile, WASM), prefer
-> runtime dictionary loading.
+> into the binary. For size-constrained targets (WASM, App Clip), prefer
+> runtime dictionary loading. For iOS (App Sandbox), use the bundled
+> form — runtime dictionary loading from external paths is impractical.
 
 ## Bundled Data Files (`--features bundled-dicts`)
 
@@ -91,8 +123,9 @@ binary via `include_str!` / `include_bytes!`. This is required for iOS
 > **Note:** `bundled-dicts` adds approximately 6.3 MB to the binary
 > (cmudict 3.7 MB + pinyin_single 705 KB + pinyin_phrases 1.9 MB).
 > For Rust-only consumers that can ship JSON files alongside the
-> binary, prefer `EnglishPhonemizer::new_from_path()` /
-> `ChinesePhonemizer::new_from_paths()` over `new_bundled()`.
+> binary, prefer `EnglishPhonemizer::new_with_dict(&path)` /
+> `ChinesePhonemizer::new(single_path, phrases_path)` over the
+> `new_bundled()` constructors so the binary itself stays small.
 
 ## No copyleft licenses
 
