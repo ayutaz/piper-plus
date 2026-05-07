@@ -32,3 +32,11 @@ Dockerfile* text eol=lf
 # Windows scripts (keep CRLF)
 *.bat text eol=crlf
 *.ps1 text eol=crlf
+
+# Gradle wrapper (must stay POSIX LF; otherwise `./gradlew` fails on Linux/macOS)
+gradlew text eol=lf
+*/gradlew text eol=lf
+gradle/wrapper/gradle-wrapper.properties text eol=lf
+
+# Gradle wrapper jar is binary
+*.jar binary

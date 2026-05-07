@@ -6,7 +6,7 @@ name: "ZH-EN Loanword Sync Gate"
 # the Python source-of-truth is now blocked at this gate.
 #
 # Source of truth: src/python/g2p/piper_plus_g2p/data/zh_en_loanword.json
-# See docs/tickets/zh-en-loanword/TICKET-06-ci-sync.md for the full contract.
+# See docs/spec/zh-en-loanword-runtime-rollout.md for the full contract.
 
 on:
   push:

@@ -12,13 +12,17 @@
 #include "piper.hpp"
 #include "chinese_loanword.hpp"
 #include "custom_dictionary.hpp"
+#include "english_phonemize.hpp"
+#include "chinese_phonemize.hpp"
 #include "library_path.h"
+#include "openjtalk_dictionary_manager.h"
 
 #include <algorithm>
 #include <atomic>
 #include <climits>
 #include <cstdlib>
 #include <cstring>
+#include <filesystem>
 #include <memory>
 #include <mutex>
 #include <stdexcept>
@@ -1292,6 +1296,251 @@ PIPER_PLUS_API PiperPlusStatus piper_plus_phonemize_embedded_english(
         set_error("Unknown error in piper_plus_phonemize_embedded_english");
         return PIPER_PLUS_ERR;
     }
+}
+
+// ===== Engine-less G2P (Issue #388) =====
+
+struct PiperPlusG2pHandle {
+    piper::Voice voice;  // ONNX session intentionally uninitialized.
+                         // phonemizeText() reads only modelConfig / phonemizeConfig
+                         // / cmuDict / pinyin* / enableZhEnDispatch — not session.
+    std::unique_ptr<piper::CustomDictionary> customDict;
+    std::string g2pPhonemeStr;
+    std::string g2pLanguage;
+    std::string availableLanguagesStr;
+};
+
+namespace {
+
+// Encode a Unicode codepoint as UTF-8 onto `out`. Mirrors piper_plus_phonemize().
+void appendUtf8(std::string &out, uint32_t cp) {
+    if (cp < 0x80) {
+        out += static_cast<char>(cp);
+    } else if (cp < 0x800) {
+        out += static_cast<char>(0xC0 | (cp >> 6));
+        out += static_cast<char>(0x80 | (cp & 0x3F));
+    } else if (cp < 0x10000) {
+        out += static_cast<char>(0xE0 | (cp >> 12));
+        out += static_cast<char>(0x80 | ((cp >> 6) & 0x3F));
+        out += static_cast<char>(0x80 | (cp & 0x3F));
+    } else if (cp < 0x110000) {
+        out += static_cast<char>(0xF0 | (cp >> 18));
+        out += static_cast<char>(0x80 | ((cp >> 12) & 0x3F));
+        out += static_cast<char>(0x80 | ((cp >> 6) & 0x3F));
+        out += static_cast<char>(0x80 | (cp & 0x3F));
+    }
+}
+
+// Lookup a dictionary file in the engine-less G2P search path:
+//   1. <dictDir>/<filename>   if dictDir is non-empty
+//   2. PIPER_DICTIONARIES_PATH/<filename>
+// Returns "" when not found. Engine-less callers don't have an exe-relative
+// share/piper/dicts path, so we skip that branch.
+std::string findG2pDictFile(const std::string &filename,
+                             const std::string &dictDir) {
+    namespace fs = std::filesystem;
+    if (!dictDir.empty()) {
+        fs::path p = fs::path(dictDir) / filename;
+        std::error_code ec;
+        if (fs::exists(p, ec) && !ec) return p.string();
+    }
+    const char *envPath = std::getenv("PIPER_DICTIONARIES_PATH");
+    if (envPath && envPath[0] != '\0') {
+        fs::path p = fs::path(envPath) / filename;
+        std::error_code ec;
+        if (fs::exists(p, ec) && !ec) return p.string();
+    }
+    return {};
+}
+
+} // anonymous namespace
+
+PIPER_PLUS_API PiperPlusG2pHandle *piper_plus_g2p_create(const char *dict_dir) {
+    try {
+        auto handle = std::make_unique<PiperPlusG2pHandle>();
+
+        // Configure the embedded Voice as an engine-less multilingual phonemizer.
+        handle->voice.phonemizeConfig.phonemeType = piper::MultilingualPhonemes;
+        handle->voice.enableZhEnDispatch = true;  // Issue #384 default
+        // session.hasProsodyInput stays false → phonemizeText skips prosody path.
+
+        // Built-in 8-language ID map. Order matches the trained 6lang model
+        // (ja=0, en=1, zh=2, es=3, fr=4, pt=5) plus ko=6, sv=7 for the two
+        // languages with code-only support (FR-CAPI-2).
+        std::map<std::string, piper::LanguageId> langMap = {
+            {"ja", 0}, {"en", 1}, {"zh", 2}, {"es", 3},
+            {"fr", 4}, {"pt", 5}, {"ko", 6}, {"sv", 7},
+        };
+        handle->voice.modelConfig.languageIdMap = std::move(langMap);
+        handle->voice.modelConfig.numLanguages = 8;
+
+        std::string dictDir = (dict_dir && dict_dir[0]) ? dict_dir : std::string();
+
+        // Resolve OpenJTalk dictionary location. Accept either the dict dir
+        // itself or a parent that contains an `open_jtalk_dic/` subdirectory.
+        if (!dictDir.empty()) {
+            namespace fs = std::filesystem;
+            std::error_code ec;
+            fs::path nested = fs::path(dictDir) / "open_jtalk_dic";
+            std::string ojDir = (fs::is_directory(nested, ec) && !ec)
+                                  ? nested.string() : dictDir;
+            force_openjtalk_dictionary_path(ojDir.c_str());
+        }
+
+        // Optional dictionaries — failure to find is fine, English/Chinese
+        // gracefully degrade (rule-based + embedded loanword still work).
+        std::string cmuPath = findG2pDictFile("cmudict_data.json", dictDir);
+        if (!cmuPath.empty()) {
+            piper::loadCmuDict(cmuPath, handle->voice.cmuDict);
+        }
+        std::string pyS = findG2pDictFile("pinyin_single.json", dictDir);
+        std::string pyP = findG2pDictFile("pinyin_phrases.json", dictDir);
+        if (!pyS.empty()) {
+            piper::loadPinyinDicts(pyS, pyP,
+                                   handle->voice.pinyinSingleDict,
+                                   handle->voice.pinyinPhraseDict);
+        }
+
+        return handle.release();
+    } catch (const std::exception &e) {
+        set_error(e.what());
+        return nullptr;
+    } catch (...) {
+        set_error("Unknown error in piper_plus_g2p_create");
+        return nullptr;
+    }
+}
+
+PIPER_PLUS_API void piper_plus_g2p_free(PiperPlusG2pHandle *handle) {
+    delete handle;
+}
+
+PIPER_PLUS_API PiperPlusStatus piper_plus_g2p_phonemize(
+    PiperPlusG2pHandle *handle, const char *text,
+    const char *language, PiperPlusPhonemeResult *out_result) {
+    if (!handle)     { set_error("handle is NULL");     return PIPER_PLUS_ERR; }
+    if (!out_result) { set_error("out_result is NULL"); return PIPER_PLUS_ERR; }
+
+    const std::string inText = text ? text : "";
+
+    try {
+        // Snapshot synthesisConfig so an explicit language hint doesn't leak
+        // across calls. (No BusyGuard needed — the contract is single-threaded.)
+        ConfigGuard cfgGuard(handle->voice.synthesisConfig);
+
+        std::optional<int64_t> explicitLangId;
+        if (language && language[0] != '\0' &&
+            handle->voice.modelConfig.languageIdMap) {
+            auto it = handle->voice.modelConfig.languageIdMap->find(language);
+            if (it == handle->voice.modelConfig.languageIdMap->end()) {
+                set_error(std::string("Unknown language: ") + language);
+                return PIPER_PLUS_ERR_TEXT;
+            }
+            explicitLangId = it->second;
+            handle->voice.synthesisConfig.languageId = it->second;
+        }
+
+        std::string processedText = inText;
+        if (handle->customDict) {
+            processedText = handle->customDict->applyToText(processedText);
+        }
+
+        piper::PhonemizeResult phonResult;
+        piper::phonemizeText(handle->voice, processedText, phonResult);
+
+        std::optional<int64_t> effectiveLangId = explicitLangId;
+        if (!effectiveLangId && phonResult.detectedLanguageId) {
+            effectiveLangId = phonResult.detectedLanguageId;
+        }
+        if (!effectiveLangId) {
+            effectiveLangId = handle->voice.synthesisConfig.languageId;
+        }
+
+        handle->g2pLanguage = "unknown";
+        if (effectiveLangId && handle->voice.modelConfig.languageIdMap) {
+            for (const auto &[code, id] : *handle->voice.modelConfig.languageIdMap) {
+                if (id == *effectiveLangId) {
+                    handle->g2pLanguage = code;
+                    break;
+                }
+            }
+        }
+
+        handle->g2pPhonemeStr.clear();
+        int32_t count = 0;
+        for (const auto &sentence : phonResult.phonemes) {
+            for (auto ph : sentence) {
+                if (!handle->g2pPhonemeStr.empty()) handle->g2pPhonemeStr += ' ';
+                appendUtf8(handle->g2pPhonemeStr, static_cast<uint32_t>(ph));
+                count++;
+            }
+        }
+
+        std::memset(out_result, 0, sizeof(*out_result));
+        out_result->phonemes     = handle->g2pPhonemeStr.c_str();
+        out_result->language     = handle->g2pLanguage.c_str();
+        out_result->num_phonemes = count;
+        return PIPER_PLUS_OK;
+    } catch (const std::exception &e) {
+        set_error(e.what());
+        return PIPER_PLUS_ERR;
+    } catch (...) {
+        set_error("Unknown error in piper_plus_g2p_phonemize");
+        return PIPER_PLUS_ERR;
+    }
+}
+
+PIPER_PLUS_API const char *piper_plus_g2p_available_languages(
+    PiperPlusG2pHandle *handle) {
+    if (!handle) return "";
+    if (!handle->voice.modelConfig.languageIdMap) {
+        handle->availableLanguagesStr.clear();
+        return handle->availableLanguagesStr.c_str();
+    }
+    std::vector<std::string> codes;
+    codes.reserve(handle->voice.modelConfig.languageIdMap->size());
+    for (const auto &[code, id] : *handle->voice.modelConfig.languageIdMap) {
+        codes.push_back(code);
+    }
+    std::sort(codes.begin(), codes.end());
+
+    handle->availableLanguagesStr.clear();
+    for (const auto &code : codes) {
+        if (!handle->availableLanguagesStr.empty())
+            handle->availableLanguagesStr += ',';
+        handle->availableLanguagesStr += code;
+    }
+    return handle->availableLanguagesStr.c_str();
+}
+
+PIPER_PLUS_API PiperPlusStatus piper_plus_g2p_load_custom_dict(
+    PiperPlusG2pHandle *handle, const char *dict_path) {
+    if (!handle)    { set_error("handle is NULL");    return PIPER_PLUS_ERR; }
+    if (!dict_path) { set_error("dict_path is NULL"); return PIPER_PLUS_ERR; }
+    try {
+        handle->customDict =
+            std::make_unique<piper::CustomDictionary>(std::string(dict_path));
+        return PIPER_PLUS_OK;
+    } catch (const std::exception &e) {
+        set_error(e.what());
+        return PIPER_PLUS_ERR;
+    } catch (...) {
+        set_error("Unknown error in piper_plus_g2p_load_custom_dict");
+        return PIPER_PLUS_ERR;
+    }
+}
+
+PIPER_PLUS_API PiperPlusStatus piper_plus_g2p_set_zh_en_dispatch(
+    PiperPlusG2pHandle *handle, int32_t enabled) {
+    if (!handle) { set_error("handle is NULL"); return PIPER_PLUS_ERR; }
+    handle->voice.enableZhEnDispatch = (enabled != 0);
+    return PIPER_PLUS_OK;
+}
+
+PIPER_PLUS_API int32_t piper_plus_g2p_is_zh_en_dispatch_enabled(
+    const PiperPlusG2pHandle *handle) {
+    if (!handle) { set_error("handle is NULL"); return -1; }
+    return handle->voice.enableZhEnDispatch ? 1 : 0;
 }
 
 } // extern "C"
