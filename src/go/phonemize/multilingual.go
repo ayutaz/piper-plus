@@ -37,22 +37,49 @@ type MultilingualPhonemizer struct {
 	defaultLatinLanguage string
 	detector             *UnicodeLanguageDetector
 	phonemizers          map[string]Phonemizer
+	// enableZhEnDispatch toggles ZH-EN code-switching (Issue #384).
+	// When true (default with both "zh" and "en" registered), English
+	// segments adjacent to Chinese are routed through the loanword
+	// dictionary instead of the standard English phonemizer.
+	//
+	// Two-layer control (TICKET-02 §7 + TICKET-01 §7 懸念 5):
+	// - Compile-time: always available (Go has no feature flags here)
+	// - Runtime: opt-out via SetZhEnDispatch(false)
+	enableZhEnDispatch bool
 }
 
 // NewMultilingualPhonemizer creates a MultilingualPhonemizer for the given
 // languages. phonemizers maps language codes to their Phonemizer implementations.
+//
+// ZH-EN code-switching dispatch is enabled by default when both "zh" and "en"
+// phonemizers are registered. Use SetZhEnDispatch(false) to opt out.
 func NewMultilingualPhonemizer(
 	languages []string,
 	defaultLatinLang string,
 	phonemizers map[string]Phonemizer,
 ) *MultilingualPhonemizer {
 	detector := NewUnicodeLanguageDetector(languages, defaultLatinLang)
+	_, hasZh := phonemizers["zh"]
+	_, hasEn := phonemizers["en"]
 	return &MultilingualPhonemizer{
 		languages:            languages,
 		defaultLatinLanguage: defaultLatinLang,
 		detector:             detector,
 		phonemizers:          phonemizers,
+		enableZhEnDispatch:   hasZh && hasEn,
 	}
+}
+
+// SetZhEnDispatch toggles the ZH-EN code-switching dispatch.
+// When false, embedded English in Chinese context falls through to the
+// standard English phonemizer instead of being mapped to Mandarin pinyin.
+func (m *MultilingualPhonemizer) SetZhEnDispatch(enabled bool) {
+	m.enableZhEnDispatch = enabled
+}
+
+// IsZhEnDispatchEnabled returns whether ZH-EN code-switching dispatch is on.
+func (m *MultilingualPhonemizer) IsZhEnDispatchEnabled() bool {
+	return m.enableZhEnDispatch
 }
 
 // LanguageCode returns the joined language codes (e.g., "ja-en-zh-es-fr-pt").
@@ -82,7 +109,53 @@ func (m *MultilingualPhonemizer) PhonemizeWithProsody(text string) (*PhonemizeRe
 	// (e.g., "?", "?!", "?.", "?~"). This matches Python's behavior.
 	lastEOS := "$"
 
-	for _, seg := range segments {
+	// Pre-compute whether text contains any zh segment for ZH-EN dispatch.
+	hasZhSegment := false
+	if m.enableZhEnDispatch {
+		for _, s := range segments {
+			if s.Language == "zh" {
+				hasZhSegment = true
+				break
+			}
+		}
+	}
+
+	// ZH-EN dispatch needs access to the chinese phonemizer's embedded-english
+	// path. Cache the type-asserted handle once.
+	var zhCP *ChinesePhonemizer
+	if m.enableZhEnDispatch && hasZhSegment {
+		if cp, ok := m.phonemizers["zh"].(*ChinesePhonemizer); ok {
+			zhCP = cp
+		}
+	}
+	var loanwordD *LoanwordData
+	if zhCP != nil {
+		loanwordD, _ = LoadLoanwordData()
+	}
+
+	for i, seg := range segments {
+		// ZH-EN dispatch: route embedded en (with adjacent zh) through
+		// chinese loanword phonemizer. Issue #384, design §2.2.
+		if m.enableZhEnDispatch && hasZhSegment && zhCP != nil && loanwordD != nil &&
+			seg.Language == "en" {
+			prevIsZh := i > 0 && segments[i-1].Language == "zh"
+			nextIsZh := i+1 < len(segments) && segments[i+1].Language == "zh"
+			if prevIsZh || nextIsZh {
+				tokens := zhCP.PhonemizeEmbeddedEnglish(seg.Text, loanwordD)
+				for _, tok := range tokens {
+					if bosEosTokens[tok] {
+						if eosOnlyTokens[tok] {
+							lastEOS = tok
+						}
+						continue
+					}
+					allTokens = append(allTokens, tok)
+					allProsody = append(allProsody, nil)
+				}
+				continue
+			}
+		}
+
 		phonemizer, ok := m.phonemizers[seg.Language]
 		if !ok {
 			slog.Warn("no phonemizer registered for language, skipping segment",
