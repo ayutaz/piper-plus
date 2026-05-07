@@ -320,6 +320,17 @@ pub struct MultilingualPhonemizer {
     /// Dynamic EOS token captured during the last `phonemize_with_prosody`
     /// call. Accessible via `last_eos()`.
     last_eos: Mutex<String>,
+    /// ZH-EN code-switching dispatch toggle (Issue #384).
+    ///
+    /// When enabled (default with `chinese` feature), English segments
+    /// adjacent to Chinese (`[zh, en, *]` / `[en, zh]` / `[zh, en, zh]`)
+    /// are phonemized as Mandarin pinyin via the loanword dictionary
+    /// instead of the standard English phonemizer.
+    ///
+    /// **Two-layer control (TICKET-01 §7 懸念 5)**:
+    /// - **Cargo feature `chinese`**: compile-time switch (default-on)
+    /// - **`enable_zh_en_dispatch`**: runtime switch (default-on, opt-out)
+    enable_zh_en_dispatch: bool,
 }
 
 impl MultilingualPhonemizer {
@@ -352,7 +363,25 @@ impl MultilingualPhonemizer {
             detector,
             phonemizers,
             last_eos: Mutex::new("$".to_string()),
+            // Default-on when chinese feature is compiled in (TICKET-01 §7 懸念 5)
+            enable_zh_en_dispatch: cfg!(feature = "chinese"),
         }
+    }
+
+    /// Toggle ZH-EN code-switching dispatch (default-on with `chinese` feature).
+    ///
+    /// When `false`, embedded English in Chinese context is routed to the
+    /// standard English phonemizer instead of being mapped to Mandarin pinyin
+    /// via the loanword dictionary. Useful for callers who want to keep
+    /// embedded English pronounced in English voice.
+    pub fn enable_zh_en_dispatch(&mut self, enabled: bool) -> &mut Self {
+        self.enable_zh_en_dispatch = enabled;
+        self
+    }
+
+    /// Return whether ZH-EN code-switching dispatch is enabled.
+    pub fn is_zh_en_dispatch_enabled(&self) -> bool {
+        self.enable_zh_en_dispatch
     }
 
     /// Replace the phonemizer for a given language.
@@ -515,13 +544,38 @@ impl Phonemizer for MultilingualPhonemizer {
         let mut all_prosody: Vec<Option<ProsodyInfo>> = Vec::new();
         let mut last_eos = "$".to_string();
 
-        for (lang, segment_text) in &segments {
+        // Pre-compute whether text contains any zh segment, used for ZH-EN dispatch.
+        #[cfg(feature = "chinese")]
+        let has_zh_segment = segments.iter().any(|(lang, _)| lang == "zh");
+
+        for (i, (lang, seg_text)) in segments.iter().enumerate() {
+            // ZH-EN code-switching: route embedded en (with adjacent zh) through
+            // chinese loanword phonemizer. Issue #384, design §2.1.
+            #[cfg(feature = "chinese")]
+            if self.enable_zh_en_dispatch && lang == "en" && has_zh_segment {
+                let prev_is_zh = i > 0 && segments[i - 1].0 == "zh";
+                let next_is_zh = i + 1 < segments.len() && segments[i + 1].0 == "zh";
+                if prev_is_zh || next_is_zh {
+                    let data = crate::chinese::load_default_loanword_data();
+                    // Use `*_with_prosody` so each IPA token carries the
+                    // syllable's tone in `a1` (matches Python: a2=a3=1
+                    // because there is no surrounding chinese_text). Issue
+                    // #384 review note R-C1.
+                    let (tokens, prosody) =
+                        crate::chinese::phonemize_embedded_english_with_prosody(seg_text, data);
+                    debug_assert_eq!(tokens.len(), prosody.len());
+                    all_phonemes.extend(tokens);
+                    all_prosody.extend(prosody);
+                    continue;
+                }
+            }
+
             let phonemizer = self
                 .phonemizers
                 .get(lang)
                 .ok_or_else(|| G2pError::UnsupportedLanguage { code: lang.clone() })?;
 
-            let (phonemes, prosody_list) = phonemizer.phonemize_with_prosody(segment_text)?;
+            let (phonemes, prosody_list) = phonemizer.phonemize_with_prosody(seg_text)?;
 
             // Strip BOS/EOS from individual segments.
             // This includes PUA-encoded question markers from Japanese.
@@ -553,6 +607,17 @@ impl Phonemizer for MultilingualPhonemizer {
     fn detect_primary_language(&self, text: &str) -> &str {
         // Delegate to the inherent method
         MultilingualPhonemizer::detect_primary_language(self, text)
+    }
+
+    fn set_zh_en_dispatch(&mut self, enabled: bool) {
+        // Forward through the inherent setter so trait-object users
+        // (e.g. piper-core's `G2pAdapter`) can toggle the dispatch.
+        // (Inherent name is `enable_zh_en_dispatch` for ergonomic use.)
+        MultilingualPhonemizer::enable_zh_en_dispatch(self, enabled);
+    }
+
+    fn is_zh_en_dispatch_enabled(&self) -> bool {
+        MultilingualPhonemizer::is_zh_en_dispatch_enabled(self)
     }
 }
 
@@ -1010,6 +1075,216 @@ mod tests {
         assert_eq!(
             tokens_hint, tokens_auto,
             "ja hint should match auto-detected ja"
+        );
+    }
+
+    // ===== ZH-EN code-switching dispatch (TICKET-01 R3) =====
+
+    #[cfg(feature = "chinese")]
+    fn make_zh_en_dispatch_phonemizer() -> MultilingualPhonemizer {
+        // ZhEnDispatch only fires when both `zh` and `en` are registered.
+        // We use PassthroughPhonemizer for both: zh dispatch is bypassed by
+        // the chinese loanword path, but the ZhPhonemizer instance must exist
+        // in the registry so the lang segment isn't rejected.
+        let mut phonemizers: HashMap<String, Box<dyn Phonemizer>> = HashMap::new();
+        phonemizers.insert("zh".to_string(), Box::new(PassthroughPhonemizer::new("zh")));
+        phonemizers.insert("en".to_string(), Box::new(PassthroughPhonemizer::new("en")));
+        MultilingualPhonemizer::new(
+            vec!["zh".to_string(), "en".to_string()],
+            "en".to_string(),
+            phonemizers,
+        )
+    }
+
+    #[cfg(feature = "chinese")]
+    #[test]
+    fn test_zh_en_dispatch_default_enabled() {
+        let mp = make_zh_en_dispatch_phonemizer();
+        assert!(mp.is_zh_en_dispatch_enabled());
+    }
+
+    #[cfg(feature = "chinese")]
+    #[test]
+    fn test_zh_en_dispatch_pattern_zh_en_zh() {
+        // [zh, en, zh] — embedded English routes to loanword path
+        let mp = make_zh_en_dispatch_phonemizer();
+        let (tokens_dispatch, _) = mp
+            .phonemize_with_prosody("\u{4f60}\u{597d} GPS \u{4e16}\u{754c}")
+            .unwrap();
+        // tokens contain GPS-mapped pinyin IPA tokens (PUA codepoints in 0xE020-0xE04A range)
+        assert!(!tokens_dispatch.is_empty());
+        let pua_count = tokens_dispatch
+            .iter()
+            .filter(|t| {
+                t.chars()
+                    .next()
+                    .is_some_and(|c| (0xE020..=0xE04A).contains(&(c as u32)))
+            })
+            .count();
+        assert!(
+            pua_count > 0,
+            "expected PUA tone markers from loanword path"
+        );
+    }
+
+    #[cfg(feature = "chinese")]
+    #[test]
+    fn test_zh_en_dispatch_pattern_zh_en() {
+        // [zh, en] — `en` segment after zh routes to loanword path
+        let mp = make_zh_en_dispatch_phonemizer();
+        let (tokens, _) = mp
+            .phonemize_with_prosody("\u{8bf7}\u{6253}\u{5f00} GPS")
+            .unwrap();
+        // The `en` segment "GPS" (with leading space absorbed into prior zh segment
+        // or its own) should route through the loanword path.
+        assert!(!tokens.is_empty());
+    }
+
+    #[cfg(feature = "chinese")]
+    #[test]
+    fn test_zh_en_dispatch_disabled_falls_through_to_english() {
+        let mut mp = make_zh_en_dispatch_phonemizer();
+        mp.enable_zh_en_dispatch(false);
+        assert!(!mp.is_zh_en_dispatch_enabled());
+        // With dispatch disabled, "GPS" goes through the (passthrough) english path.
+        let (tokens, _) = mp.phonemize_with_prosody("\u{4f60}\u{597d} GPS").unwrap();
+        // Passthrough produces character-level tokens like "G", "P", "S" — none of
+        // them are PUA tone markers from the loanword path.
+        let pua_count = tokens
+            .iter()
+            .filter(|t| {
+                t.chars()
+                    .next()
+                    .is_some_and(|c| (0xE020..=0xE04A).contains(&(c as u32)))
+            })
+            .count();
+        assert_eq!(
+            pua_count, 0,
+            "dispatch disabled: no loanword PUA markers expected"
+        );
+    }
+
+    #[cfg(feature = "chinese")]
+    #[test]
+    fn test_zh_en_dispatch_pure_zh_unaffected() {
+        let mp = make_zh_en_dispatch_phonemizer();
+        // Pure zh — no en segment, dispatch doesn't fire.
+        let (tokens, _) = mp
+            .phonemize_with_prosody("\u{4f60}\u{597d}\u{4e16}\u{754c}")
+            .unwrap();
+        assert!(!tokens.is_empty());
+    }
+
+    #[cfg(feature = "chinese")]
+    #[test]
+    fn test_zh_en_dispatch_pure_en_unaffected() {
+        let mp = make_zh_en_dispatch_phonemizer();
+        // Pure en — no zh segment, has_zh_segment is false, dispatch doesn't fire.
+        let (tokens, _) = mp.phonemize_with_prosody("Hello GPS world").unwrap();
+        let pua_count = tokens
+            .iter()
+            .filter(|t| {
+                t.chars()
+                    .next()
+                    .is_some_and(|c| (0xE020..=0xE04A).contains(&(c as u32)))
+            })
+            .count();
+        assert_eq!(pua_count, 0, "no zh segment: dispatch must not fire");
+    }
+
+    #[cfg(feature = "chinese")]
+    #[test]
+    fn test_zh_en_dispatch_pattern_en_zh_en() {
+        // Review note R-H1: when `en` is at both ends with `zh` in the
+        // middle, *both* en segments are adjacent to a zh segment and so
+        // both should route through the loanword path.
+        let mp = make_zh_en_dispatch_phonemizer();
+        let (tokens, _) = mp
+            .phonemize_with_prosody("Hello \u{4f60}\u{597d} GPS")
+            .unwrap();
+        let pua_count = tokens
+            .iter()
+            .filter(|t| {
+                t.chars()
+                    .next()
+                    .is_some_and(|c| (0xE020..=0xE04A).contains(&(c as u32)))
+            })
+            .count();
+        assert!(
+            pua_count > 0,
+            "[en, zh, en] pattern: at least one en segment must route to loanword path"
+        );
+    }
+
+    #[cfg(feature = "chinese")]
+    #[test]
+    fn test_zh_en_dispatch_carries_prosody_a1_tone() {
+        // Review note R-C1: dispatched IPA tokens must carry per-token
+        // prosody (a1=tone, a2=a3=1), not None.
+        let mp = make_zh_en_dispatch_phonemizer();
+        let (tokens, prosody) = mp
+            .phonemize_with_prosody("\u{4f60}\u{597d} GPS \u{4e16}\u{754c}")
+            .unwrap();
+        assert_eq!(tokens.len(), prosody.len(), "shape parity");
+        // Find at least one PUA tone marker token from the dispatch path
+        // and verify its prosody is `Some` with a valid Mandarin tone.
+        let mut found_dispatched_with_tone = false;
+        for (tok, p) in tokens.iter().zip(prosody.iter()) {
+            let first = tok.chars().next().map(|c| c as u32).unwrap_or(0);
+            if (0xE020..=0xE04A).contains(&first) {
+                let info = p.as_ref().unwrap_or_else(|| {
+                    panic!("dispatched token must carry prosody, got None for {tok:?}")
+                });
+                if (1..=5).contains(&info.a1) && info.a2 == 1 && info.a3 == 1 {
+                    found_dispatched_with_tone = true;
+                    break;
+                }
+            }
+        }
+        assert!(
+            found_dispatched_with_tone,
+            "expected at least one dispatched PUA token with (a1=tone, a2=1, a3=1)"
+        );
+    }
+
+    #[cfg(feature = "chinese")]
+    #[test]
+    fn test_zh_en_dispatch_via_phonemizer_trait() {
+        // R-C3 followup: set_zh_en_dispatch / is_zh_en_dispatch_enabled must
+        // round-trip through the Phonemizer trait (dyn dispatch), not just the
+        // inherent methods. WASM/Go bindings call through the trait.
+        let mut mp: Box<dyn Phonemizer> = Box::new(make_zh_en_dispatch_phonemizer());
+        assert!(
+            mp.is_zh_en_dispatch_enabled(),
+            "default ON under `chinese` feature"
+        );
+        mp.set_zh_en_dispatch(false);
+        assert!(
+            !mp.is_zh_en_dispatch_enabled(),
+            "set_zh_en_dispatch(false) must propagate through trait"
+        );
+        mp.set_zh_en_dispatch(true);
+        assert!(
+            mp.is_zh_en_dispatch_enabled(),
+            "set_zh_en_dispatch(true) must propagate through trait"
+        );
+    }
+
+    #[test]
+    fn test_zh_en_dispatch_trait_default_noop_for_other_phonemizers() {
+        // R-C3 followup: Phonemizer trait has a default no-op for
+        // set/is_zh_en_dispatch_enabled so non-multilingual phonemizers
+        // (e.g. PassthroughPhonemizer) silently report "disabled" and ignore
+        // toggle calls. This guarantees capability discovery is meaningful.
+        let mut p = PassthroughPhonemizer::new("en");
+        assert!(
+            !p.is_zh_en_dispatch_enabled(),
+            "non-multilingual phonemizer default = disabled"
+        );
+        p.set_zh_en_dispatch(true);
+        assert!(
+            !p.is_zh_en_dispatch_enabled(),
+            "default no-op: set_zh_en_dispatch(true) does not change state"
         );
     }
 }

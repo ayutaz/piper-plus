@@ -971,6 +971,285 @@ impl Phonemizer for ChinesePhonemizer {
 }
 
 // =========================================================================
+// ZH-EN code-switching: loanword data + embedded-English phonemization
+// (Issue #384, design §2.1 / §4.1 R1-R5 / §8.5; mirror of piper-plus-g2p)
+//
+// REVIEW NOTE R-C2 (2026-05-07):
+// Production code paths in piper-core route through `piper_plus_g2p`'s
+// `MultilingualPhonemizer` (see voice.rs::create_phonemizer), so this entire
+// section is consumed only by the `tests/test_zh_en_two_crate.rs` parity gate
+// and the local unit tests below. The duplication is intentional — it gives
+// the cross-crate parity test something concrete to compare against — but it
+// is also drift-prone. Always update piper-plus-g2p's `chinese.rs` first,
+// then mirror the change here, and finally re-run the parity gate. Non-trivial
+// future changes should consider replacing this section with a thin
+// `pub use piper_plus_g2p::chinese::*` re-export.
+// =========================================================================
+
+/// Default ZH-EN loanword data, embedded at compile time.
+/// Byte-for-byte identical to `src/python/g2p/piper_plus_g2p/data/zh_en_loanword.json`
+/// (CI gate: `scripts/check_loanword_consistency.py`).
+const DEFAULT_LOANWORD_JSON: &str = include_str!("../../data/zh_en_loanword.json");
+
+/// ZH-EN code-switching loanword dictionary used by [`phonemize_embedded_english`].
+///
+/// Mirror of `piper_plus_g2p::chinese::LoanwordData`. Both crates must produce
+/// byte-for-byte identical IPA output for the same input
+/// (`tests/test_two_crate_consistency.rs`).
+///
+/// **Forward-compatible loader (YELLOW-5)**: missing sections default to empty;
+/// unknown top-level fields are silently ignored, so a future `schema_version: 2`
+/// adding new fields does not break this loader.
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct LoanwordData {
+    pub version: u32,
+    #[serde(default)]
+    pub acronyms: HashMap<String, Vec<String>>,
+    #[serde(default)]
+    pub loanwords: HashMap<String, Vec<String>>,
+    #[serde(default)]
+    pub letter_fallback: HashMap<String, Vec<String>>,
+}
+
+impl Default for LoanwordData {
+    fn default() -> Self {
+        Self {
+            version: 1,
+            acronyms: HashMap::new(),
+            loanwords: HashMap::new(),
+            letter_fallback: HashMap::new(),
+        }
+    }
+}
+
+fn json_type_label(v: &serde_json::Value) -> &'static str {
+    match v {
+        serde_json::Value::Null => "null",
+        serde_json::Value::Bool(_) => "bool",
+        serde_json::Value::Number(_) => "number",
+        serde_json::Value::String(_) => "string",
+        serde_json::Value::Array(_) => "list",
+        serde_json::Value::Object(_) => "dict",
+    }
+}
+
+/// Parse a ZH-EN loanword JSON string into [`LoanwordData`] with Python-compatible
+/// error messages.
+///
+/// Error format mirrors Python `_load_loanword_data` so that cross-runtime CI
+/// can compare verbatim:
+///   `<label>: '<section>.<key>' must be list[str], got <value>`
+pub fn parse_loanword_json(label: &str, json: &str) -> Result<LoanwordData, String> {
+    let raw: serde_json::Value =
+        serde_json::from_str(json).map_err(|e| format!("{label}: invalid JSON: {e}"))?;
+    let obj = raw
+        .as_object()
+        .ok_or_else(|| format!("{label}: top-level must be a JSON object"))?;
+
+    // Match Python: `version` is optional and never validated. Accept
+    // `schema_version` as a forward-compat alias and default to 1 so a future
+    // payload that drops `version` entirely doesn't break this loader
+    // (review note R-C4).
+    let version = obj
+        .get("version")
+        .or_else(|| obj.get("schema_version"))
+        .and_then(|v| v.as_u64())
+        .unwrap_or(1) as u32;
+
+    let mut data = LoanwordData {
+        version,
+        ..LoanwordData::default()
+    };
+
+    for section in ["acronyms", "loanwords", "letter_fallback"] {
+        let map = match obj.get(section) {
+            Some(v) => v.as_object().ok_or_else(|| {
+                format!(
+                    "{label}: section '{section}' must be a mapping, got {}",
+                    json_type_label(v)
+                )
+            })?,
+            None => continue,
+        };
+        let target = match section {
+            "acronyms" => &mut data.acronyms,
+            "loanwords" => &mut data.loanwords,
+            "letter_fallback" => &mut data.letter_fallback,
+            _ => unreachable!(),
+        };
+        for (k, v) in map {
+            let arr = v
+                .as_array()
+                .ok_or_else(|| format!("{label}: '{section}.{k}' must be list[str], got {v}"))?;
+            let mut strs: Vec<String> = Vec::with_capacity(arr.len());
+            for elem in arr {
+                let s = elem.as_str().ok_or_else(|| {
+                    format!("{label}: '{section}.{k}' must be list[str], got {v}")
+                })?;
+                strs.push(s.to_string());
+            }
+            target.insert(k.clone(), strs);
+        }
+    }
+
+    Ok(data)
+}
+
+/// Return the bundled default ZH-EN loanword data (cached, parsed at first call).
+///
+/// Reviewer feedback (R-M3): the previous implementation `expect`-panic'd on a
+/// corrupted bundled JSON, taking the whole process down on the first call.
+/// We now log once and return an empty `LoanwordData` so the runtime
+/// gracefully falls back to the standard English path.
+pub fn load_default_loanword_data() -> &'static LoanwordData {
+    static CACHE: OnceLock<LoanwordData> = OnceLock::new();
+    CACHE.get_or_init(|| {
+        match parse_loanword_json("zh_en_loanword.json (bundled)", DEFAULT_LOANWORD_JSON) {
+            Ok(data) => data,
+            Err(err) => {
+                eprintln!(
+                    "[piper-core] WARN: bundled zh_en_loanword.json failed to parse — \
+                     ZH-EN dispatch disabled, embedded English will fall through to the \
+                     standard English path. Error: {err}"
+                );
+                LoanwordData::default()
+            }
+        }
+    })
+}
+
+/// Tokenize text into alphanumeric runs (drops punctuation/whitespace).
+fn tokenize_alnum(text: &str) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    let mut current = String::new();
+    for ch in text.chars() {
+        if ch.is_ascii_alphanumeric() {
+            current.push(ch);
+        } else if !current.is_empty() {
+            out.push(std::mem::take(&mut current));
+        }
+    }
+    if !current.is_empty() {
+        out.push(current);
+    }
+    out
+}
+
+/// Convert a list of pinyin syllables into IPA tokens with tone markers
+/// (then PUA-map multi-char tokens). Mirrors Python's
+/// `phonemize_from_pinyin_syllables(..., chinese_text="")`.
+/// Convert pinyin syllables to IPA + per-token prosody (a1=tone, a2=a3=1)
+/// matching Python's `phonemize_from_pinyin_syllables(..., chinese_text="")`.
+fn phonemize_from_pinyin_syllables_with_prosody(
+    syllables: &[String],
+) -> (Vec<String>, Vec<Option<ProsodyInfo>>) {
+    if syllables.is_empty() {
+        return (Vec::new(), Vec::new());
+    }
+
+    let mut st: Vec<(String, u8)> = syllables
+        .iter()
+        .map(|s| {
+            let (base, tone) = extract_tone(s);
+            (normalize_pinyin(base), tone)
+        })
+        .collect();
+
+    apply_tone_sandhi(&mut st);
+
+    let mut tokens: Vec<String> = Vec::new();
+    let mut prosody_list: Vec<Option<ProsodyInfo>> = Vec::new();
+    for (normalized, tone) in &st {
+        let syl_prosody = ProsodyInfo {
+            a1: *tone as i32,
+            a2: 1,
+            a3: 1,
+        };
+        let ipa_tokens = pinyin_to_ipa(normalized, *tone);
+        for ipa in ipa_tokens {
+            tokens.push(ipa);
+            prosody_list.push(Some(syl_prosody));
+        }
+    }
+
+    let mapped = map_sequence(tokens);
+    debug_assert_eq!(mapped.len(), prosody_list.len());
+    (mapped, prosody_list)
+}
+
+#[cfg(test)]
+#[allow(dead_code)]
+fn phonemize_from_pinyin_syllables(syllables: &[String]) -> Vec<String> {
+    phonemize_from_pinyin_syllables_with_prosody(syllables).0
+}
+
+/// Phonemize English text embedded in Chinese context as Mandarin pinyin.
+///
+/// See [`piper_plus_g2p::chinese::phonemize_embedded_english`] for the canonical
+/// reference; this is a byte-for-byte mirror per design §8.5 (2-crate duplication).
+/// Tokens-only convenience wrapper around
+/// [`phonemize_embedded_english_with_prosody`].
+pub fn phonemize_embedded_english(text: &str, data: &LoanwordData) -> Vec<String> {
+    phonemize_embedded_english_with_prosody(text, data).0
+}
+
+/// Phonemize embedded English with per-token prosody.
+///
+/// Each IPA token gets `ProsodyInfo { a1: tone, a2: 1, a3: 1 }` matching
+/// Python's `phonemize_embedded_english` -> `phonemize_from_pinyin_syllables(..., chinese_text="")`.
+/// Returning `(0,0,0)` would silently drop tone information at the ONNX
+/// prosody tensor and degrade output quality. Issue #384 review note R-C1.
+pub fn phonemize_embedded_english_with_prosody(
+    text: &str,
+    data: &LoanwordData,
+) -> (Vec<String>, Vec<Option<ProsodyInfo>>) {
+    let mut pinyin_syllables: Vec<String> = Vec::new();
+
+    for token in tokenize_alnum(text) {
+        if token.is_empty() {
+            continue;
+        }
+        if let Some(syllables) = data.loanwords.get(&token) {
+            pinyin_syllables.extend(syllables.iter().cloned());
+            continue;
+        }
+        let upper = token.to_uppercase();
+        if let Some(syllables) = data.acronyms.get(&upper) {
+            pinyin_syllables.extend(syllables.iter().cloned());
+            continue;
+        }
+        for ch in upper.chars() {
+            let mut buf = [0u8; 4];
+            let key = ch.encode_utf8(&mut buf);
+            if let Some(syllables) = data.letter_fallback.get(key) {
+                pinyin_syllables.extend(syllables.iter().cloned());
+            }
+        }
+    }
+
+    if pinyin_syllables.is_empty() {
+        (Vec::new(), Vec::new())
+    } else {
+        phonemize_from_pinyin_syllables_with_prosody(&pinyin_syllables)
+    }
+}
+
+impl ChinesePhonemizer {
+    /// Phonemize embedded English using the bundled default ZH-EN loanword data.
+    pub fn phonemize_embedded_english(&self, text: &str) -> Vec<String> {
+        phonemize_embedded_english(text, load_default_loanword_data())
+    }
+
+    /// Same as [`Self::phonemize_embedded_english`] but with per-token prosody.
+    pub fn phonemize_embedded_english_with_prosody(
+        &self,
+        text: &str,
+    ) -> (Vec<String>, Vec<Option<ProsodyInfo>>) {
+        phonemize_embedded_english_with_prosody(text, load_default_loanword_data())
+    }
+}
+
+// =========================================================================
 // Unit tests
 // =========================================================================
 
@@ -1458,5 +1737,218 @@ mod tests {
         // bincode deserialization が失敗し、None が返ること
         let result: Option<HashMap<char, String>> = try_load_bincode_cache(&json_path);
         assert!(result.is_none(), "corrupted bincode should return None");
+    }
+
+    // ==========================================================================
+    // ZH-EN code-switching tests (TICKET-01 R5, mirror of piper-plus-g2p)
+    // ==========================================================================
+
+    #[test]
+    fn test_zh_en_load_default_loanword_data() {
+        let data = load_default_loanword_data();
+        assert_eq!(data.version, 1);
+        assert!(data.acronyms.len() >= 60);
+        assert!(data.loanwords.len() >= 35);
+        assert_eq!(data.letter_fallback.len(), 26);
+    }
+
+    #[test]
+    fn test_zh_en_acronym_gps() {
+        let data = load_default_loanword_data();
+        let tokens = phonemize_embedded_english("GPS", data);
+        // ji4(3) + pi4(3) + ai1(2, zero initial) + si4(3) = 11
+        assert_eq!(tokens.len(), 11, "GPS tokens: {tokens:?}");
+    }
+
+    #[test]
+    fn test_zh_en_loanword_python() {
+        let data = load_default_loanword_data();
+        let tokens = phonemize_embedded_english("Python", data);
+        // pai4(3) + sen1(3) = 6
+        assert_eq!(tokens.len(), 6, "Python tokens: {tokens:?}");
+    }
+
+    #[test]
+    fn test_zh_en_loanword_chatgpt() {
+        let data = load_default_loanword_data();
+        let tokens = phonemize_embedded_english("ChatGPT", data);
+        // chai4 + ti2 + ji4 + pi4 + ti4 = 5 syllables × 3 = 15
+        assert_eq!(tokens.len(), 15, "ChatGPT tokens: {tokens:?}");
+    }
+
+    #[test]
+    fn test_zh_en_letter_fallback_zz() {
+        let data = load_default_loanword_data();
+        let tokens_zz = phonemize_embedded_english("ZZ", data);
+        let tokens_z = phonemize_embedded_english("Z", data);
+        assert_eq!(tokens_zz.len(), tokens_z.len() * 2);
+    }
+
+    #[test]
+    fn test_zh_en_empty_input() {
+        let data = load_default_loanword_data();
+        assert_eq!(phonemize_embedded_english("", data), Vec::<String>::new());
+        assert_eq!(
+            phonemize_embedded_english("   ", data),
+            Vec::<String>::new()
+        );
+        assert_eq!(
+            phonemize_embedded_english(",.!?", data),
+            Vec::<String>::new()
+        );
+    }
+
+    #[test]
+    fn test_zh_en_loanword_beats_acronym() {
+        let mut data = LoanwordData::default();
+        data.loanwords
+            .insert("AI".to_string(), vec!["ma1".to_string()]);
+        data.acronyms
+            .insert("AI".to_string(), vec!["ji4".to_string()]);
+        let tokens = phonemize_embedded_english("AI", &data);
+        let mut data_loan_only = LoanwordData::default();
+        data_loan_only
+            .loanwords
+            .insert("AI".to_string(), vec!["ma1".to_string()]);
+        let tokens_loan = phonemize_embedded_english("AI", &data_loan_only);
+        assert_eq!(tokens, tokens_loan);
+    }
+
+    #[test]
+    fn test_zh_en_acronym_beats_fallback() {
+        let mut data = LoanwordData::default();
+        data.acronyms
+            .insert("ZX".to_string(), vec!["ma1".to_string()]);
+        data.letter_fallback
+            .insert("Z".to_string(), vec!["zi4".to_string()]);
+        data.letter_fallback
+            .insert("X".to_string(), vec!["ai4".to_string()]);
+        let tokens_acronym = phonemize_embedded_english("ZX", &data);
+        assert!(tokens_acronym.len() < 6);
+    }
+
+    #[test]
+    fn test_zh_en_python_vs_uppercase() {
+        let data = load_default_loanword_data();
+        let lower = phonemize_embedded_english("Python", data);
+        let upper = phonemize_embedded_english("PYTHON", data);
+        assert!(!lower.is_empty());
+        assert!(!upper.is_empty());
+        assert_ne!(lower, upper);
+    }
+
+    #[test]
+    fn test_zh_en_trailing_punctuation() {
+        let data = load_default_loanword_data();
+        let plain = phonemize_embedded_english("GPS", data);
+        let comma = phonemize_embedded_english("GPS,", data);
+        let period = phonemize_embedded_english("GPS.", data);
+        let exclam = phonemize_embedded_english("GPS!", data);
+        assert_eq!(plain, comma);
+        assert_eq!(plain, period);
+        assert_eq!(plain, exclam);
+    }
+
+    #[test]
+    fn test_zh_en_two_embedded_en() {
+        let data = load_default_loanword_data();
+        let combined = phonemize_embedded_english("ChatGPT \u{548c} Python", data);
+        let chatgpt = phonemize_embedded_english("ChatGPT", data);
+        let python = phonemize_embedded_english("Python", data);
+        assert_eq!(combined.len(), chatgpt.len() + python.len());
+    }
+
+    #[test]
+    fn test_zh_en_digits_dropped() {
+        let data = load_default_loanword_data();
+        let z2z9 = phonemize_embedded_english("Z2Z9", data);
+        let zz = phonemize_embedded_english("ZZ", data);
+        assert_eq!(z2z9, zz);
+    }
+
+    #[test]
+    fn test_zh_en_acronym_with_digits() {
+        let mut data = LoanwordData::default();
+        data.acronyms
+            .insert("MP3".to_string(), vec!["ai1".to_string()]);
+        data.letter_fallback
+            .insert("M".to_string(), vec!["ai1".to_string(), "mu5".to_string()]);
+        data.letter_fallback
+            .insert("P".to_string(), vec!["pi4".to_string()]);
+        let tokens = phonemize_embedded_english("MP3", &data);
+        let acronym_only = phonemize_embedded_english(
+            "MP3",
+            &LoanwordData {
+                acronyms: [("MP3".to_string(), vec!["ai1".to_string()])]
+                    .into_iter()
+                    .collect(),
+                ..LoanwordData::default()
+            },
+        );
+        assert_eq!(tokens, acronym_only);
+    }
+
+    #[test]
+    fn test_zh_en_schema_validation_invalid_type() {
+        let bad = r#"{"version": 1, "acronyms": {"GPS": "not_a_list"}}"#;
+        let err = parse_loanword_json("test.json", bad).unwrap_err();
+        assert!(err.contains("'acronyms.GPS'"));
+        assert!(err.contains("must be list[str]"));
+    }
+
+    #[test]
+    fn test_zh_en_schema_validation_section_not_dict() {
+        let bad = r#"{"version": 1, "acronyms": "not_a_dict"}"#;
+        let err = parse_loanword_json("test.json", bad).unwrap_err();
+        assert!(err.contains("'acronyms'"));
+        assert!(err.contains("must be a mapping"));
+    }
+
+    #[test]
+    fn test_zh_en_loader_accepts_unknown_fields_in_schema_v2() {
+        // YELLOW-5: forward-compat loader must accept unknown top-level fields.
+        let v2 = r#"{
+            "version": 2,
+            "schema_version": 2,
+            "metadata": {"experimental": true},
+            "acronyms": {"GPS": ["ji4"]},
+            "loanwords": {"Python": ["pai4"]},
+            "letter_fallback": {"A": ["ei1"]},
+            "tone_overrides": {"GPS": "high"}
+        }"#;
+        let data = parse_loanword_json("future_v2.json", v2).expect("should parse v2");
+        assert_eq!(data.version, 2);
+        assert!(data.acronyms.contains_key("GPS"));
+    }
+
+    #[test]
+    fn test_zh_en_with_prosody_returns_tone_a1_a2_a3_one() {
+        // Review note R-C1: Python emits ProsodyInfo(a1=tone, a2=1, a3=1).
+        // Previously this crate filled (0,0,0), silently dropping tone.
+        let data = load_default_loanword_data();
+        let (tokens, prosody) = phonemize_embedded_english_with_prosody("GPS", data);
+        assert_eq!(
+            tokens.len(),
+            prosody.len(),
+            "tokens/prosody length mismatch"
+        );
+        assert!(!tokens.is_empty());
+        for (tok, pros) in tokens.iter().zip(prosody.iter()) {
+            let p = pros.unwrap_or_else(|| panic!("expected Some prosody for {tok:?}"));
+            assert!(
+                (1..=5).contains(&p.a1),
+                "a1 must be a Mandarin tone 1..=5, got {} for {tok:?}",
+                p.a1
+            );
+            assert_eq!(p.a2, 1);
+            assert_eq!(p.a3, 1);
+        }
+    }
+
+    #[test]
+    fn test_zh_en_json_matches_python_source_path() {
+        assert!(DEFAULT_LOANWORD_JSON.contains("\"Python\""));
+        assert!(DEFAULT_LOANWORD_JSON.contains("\"GPS\""));
+        assert!(DEFAULT_LOANWORD_JSON.contains("\"ChatGPT\""));
     }
 }

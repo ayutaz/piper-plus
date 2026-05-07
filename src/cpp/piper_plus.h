@@ -146,6 +146,38 @@ PIPER_PLUS_API int32_t piper_plus_language_id(
     const PiperPlusEngine *engine,
     const char            *language_name);
 
+/* ===== ZH-EN code-switching dispatch (Issue #384) ===== */
+
+/** Toggle the ZH-EN code-switching dispatch path.
+ *
+ *  When enabled (default = 1), an English text segment that is adjacent to
+ *  a Chinese segment is routed through the loanword path so e.g. "GPS" sounds
+ *  Mandarin-style. Set to 0 to restore the v1.11 CMU-only behavior.
+ *
+ *  @threading Inherits ``PiperPlusEngine``'s "one engine per thread" contract.
+ *    This function MUST NOT be called concurrently with synthesis or any
+ *    other engine call on the same handle. The toggle is a plain (non-atomic)
+ *    write because the engine is already single-threaded; if you need to
+ *    flip the flag from another thread, serialize the call yourself or use a
+ *    dedicated control engine.
+ *
+ *  @param engine   Engine handle.
+ *  @param enabled  0 = disable, non-zero = enable.
+ *  @return         PIPER_PLUS_OK on success, error code on NULL engine. */
+PIPER_PLUS_API PiperPlusStatus piper_plus_set_zh_en_dispatch(
+    PiperPlusEngine *engine,
+    int32_t          enabled);
+
+/** Returns 1 if the ZH-EN code-switching dispatch is currently enabled, 0 if
+ *  disabled, or -1 on error (NULL engine).
+ *
+ *  @warning Callers MUST check the -1 sentinel before any boolean coercion.
+ *    A naive ``if (piper_plus_is_zh_en_dispatch_enabled(eng))`` will treat
+ *    -1 (error) as enabled. The signed-int pattern is shared with
+ *    ``piper_plus_language_id``. */
+PIPER_PLUS_API int32_t piper_plus_is_zh_en_dispatch_enabled(
+    const PiperPlusEngine *engine);
+
 /* ===== Audio chunk (for iterator/streaming) ===== */
 
 /**
@@ -312,6 +344,60 @@ PIPER_PLUS_API PiperPlusStatus piper_plus_phonemize(
  *          same engine. Returns "" (empty string) on error (NULL engine or
  *          no language map). Caller MUST copy if persistence is needed. */
 PIPER_PLUS_API const char *piper_plus_available_languages(PiperPlusEngine *engine);
+
+/* ===== ZH-EN code-switching loanword (Issue #384, TICKET-05 P4) =====
+ *
+ * Standalone API to phonemize English tokens embedded in Chinese context as
+ * Mandarin pinyin. Independent of the synthesis engine — useful for callers
+ * (Dart FFI / Godot / Unity) that want to compute the loanword IPA tokens
+ * separately from the audio pipeline.
+ *
+ * Output format: space-separated IPA phoneme string with PUA-mapped tone
+ * markers (U+E020..E04A). Caller copies the string if persistence is needed.
+ *
+ * Lifecycle:
+ *   PiperPlusLoanwordHandle *h = piper_plus_loanword_load_default();
+ *   if (h) {
+ *       PiperPlusPhonemeResult result;
+ *       piper_plus_phonemize_embedded_english(h, "GPS", &result);
+ *       // result.phonemes valid until the next call on h
+ *       piper_plus_loanword_free(h);
+ *   }
+ */
+typedef struct PiperPlusLoanwordHandle PiperPlusLoanwordHandle;
+
+/** Load the bundled default ZH-EN loanword data.
+ *  @return Handle on success, NULL on failure (call piper_plus_get_last_error()).
+ *  @threading Safe to call concurrently; the underlying default-data init is
+ *             single-flight. The returned handles are independent and may be
+ *             freed in any order. */
+PIPER_PLUS_API PiperPlusLoanwordHandle *piper_plus_loanword_load_default(void);
+
+/** Load loanword data from a custom JSON file path.
+ *  @param path  UTF-8 path to a zh_en_loanword.json-shaped file.
+ *  @return Handle on success, NULL on failure (call piper_plus_get_last_error()). */
+PIPER_PLUS_API PiperPlusLoanwordHandle *piper_plus_loanword_load_from_path(
+    const char *path);
+
+/** Free a loanword handle. Safe to pass NULL. */
+PIPER_PLUS_API void piper_plus_loanword_free(PiperPlusLoanwordHandle *handle);
+
+/** Phonemize embedded English text using the given loanword data.
+ *
+ *  Output is written into `out_result` (BORROWED pointers, valid until the
+ *  next call on the same handle).
+ *
+ *  @param handle      Loanword handle from piper_plus_loanword_load_default()
+ *                     or piper_plus_loanword_load_from_path().
+ *  @param text        UTF-8 input text. Empty / whitespace-only / punctuation
+ *                     yields zero phonemes (PIPER_PLUS_OK with num_phonemes=0).
+ *  @param out_result  Receives a borrowed pointer to a space-separated IPA
+ *                     phoneme string + token count.
+ *  @return PIPER_PLUS_OK on success, PIPER_PLUS_ERR on invalid arguments. */
+PIPER_PLUS_API PiperPlusStatus piper_plus_phonemize_embedded_english(
+    PiperPlusLoanwordHandle *handle,
+    const char              *text,
+    PiperPlusPhonemeResult  *out_result);
 
 /* ===== Speaker Encoder (EXPERIMENTAL -- not yet implemented) ========= */
 

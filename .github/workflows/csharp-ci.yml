@@ -5,11 +5,15 @@ on:
     branches: [dev]
     paths:
       - 'src/csharp/**'
+      - 'src/python/g2p/piper_plus_g2p/data/zh_en_loanword.json'
+      - 'tests/fixtures/g2p/zh_en_loanword_matrix.json'
       - '.github/workflows/csharp-ci.yml'
   push:
     branches: [dev]
     paths:
       - 'src/csharp/**'
+      - 'src/python/g2p/piper_plus_g2p/data/zh_en_loanword.json'
+      - 'tests/fixtures/g2p/zh_en_loanword_matrix.json'
       - '.github/workflows/csharp-ci.yml'
 
 concurrency:

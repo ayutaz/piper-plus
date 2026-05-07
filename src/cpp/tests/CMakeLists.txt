@@ -61,6 +61,7 @@ set(TEST_SOURCES
     test_swedish_phonemize.cpp
     test_short_text_mitigation.cpp
     test_split_sentences.cpp
+    test_zh_en_loanword.cpp
 )
 
 # Add Unix-only tests (require open_jtalk binary or Unix APIs)
@@ -136,6 +137,37 @@ foreach(test_source ${TEST_SOURCES})
         )
         target_include_directories(${test_name} PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/..
+        )
+    endif()
+
+    # ZH-EN loanword test depends on chinese_loanword + chinese_phonemize
+    # (TICKET-05 P6). chinese_phonemize.cpp uses utf8.h / json.hpp (header-only).
+    if(${test_name} STREQUAL "test_zh_en_loanword")
+        target_sources(${test_name} PRIVATE
+            ../chinese_loanword.cpp
+            ../chinese_phonemize.cpp
+            ../phoneme_parser.cpp
+            ../library_path.c
+        )
+        target_include_directories(${test_name} PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/..
+            ${CMAKE_BINARY_DIR}/si/include
+            ${CMAKE_BINARY_DIR}/fi/include
+        )
+        if(UNIX AND NOT APPLE)
+            target_link_libraries(${test_name} dl)
+        endif()
+        # ``getDefaultLoanwordData()`` resolves data via the exe-relative
+        # ``<exe-dir>/data/zh_en_loanword.json`` layout (matching desktop install).
+        # Copy the JSON next to the test binary so the bundled-data path is
+        # populated for ``ZhEnLoanwordTest.FixtureMatrixLoadable``.
+        add_custom_command(TARGET ${test_name} POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E make_directory
+                $<TARGET_FILE_DIR:${test_name}>/data
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                ${CMAKE_SOURCE_DIR}/src/cpp/data/zh_en_loanword.json
+                $<TARGET_FILE_DIR:${test_name}>/data/zh_en_loanword.json
+            COMMENT "Staging zh_en_loanword.json next to ${test_name}"
         )
     endif()
 
@@ -233,6 +265,7 @@ foreach(test_source ${TEST_SOURCES})
             ../piper.cpp
             ../phoneme_parser.cpp
             ../custom_dictionary.cpp
+            ../chinese_loanword.cpp
             ../model_manager.cpp
             ../library_path.c
             ../language_detector.cpp
@@ -315,6 +348,7 @@ foreach(test_source ${TEST_SOURCES})
             ../piper.cpp
             ../phoneme_parser.cpp
             ../custom_dictionary.cpp
+            ../chinese_loanword.cpp
             ../model_manager.cpp
             ../library_path.c
             ../language_detector.cpp
@@ -435,6 +469,7 @@ foreach(test_source ${TEST_SOURCES})
             ../piper.cpp
             ../phoneme_parser.cpp
             ../custom_dictionary.cpp
+            ../chinese_loanword.cpp
             ../model_manager.cpp
             ../library_path.c
             ../language_detector.cpp

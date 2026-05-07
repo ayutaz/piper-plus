@@ -34,6 +34,7 @@ jobs:
       ci-config-python: ${{ steps.filter.outputs.ci-config-python }}
       ci-config-rust: ${{ steps.filter.outputs.ci-config-rust }}
       ci-config-wasm: ${{ steps.filter.outputs.ci-config-wasm }}
+      zh-en-data: ${{ steps.filter.outputs.zh-en-data }}
       docs: ${{ steps.filter.outputs.docs }}
     steps:
       - uses: actions/checkout@v6
@@ -81,13 +82,23 @@ jobs:
               - '.github/workflows/ci.yml'
               - '.github/workflows/wasm-build.yml'
               - '.github/workflows/npm-publish.yml'
+            zh-en-data:
+              # Source-of-truth + 6 mirrors. Any drift in any mirror should
+              # trigger every per-runtime test job, not just the JSON sync gate.
+              - '**/zh_en_loanword.json'
+              # Cross-runtime test matrix and per-runtime fixture mirrors.
+              - '**/zh_en_loanword_matrix.json'
+              - 'scripts/check_loanword_consistency.py'
+              - 'cmake/EmbedJson.cmake'
+              - 'cmake/PiperCommon.cmake'
+              - '.github/workflows/zh-en-loanword-sync.yml'
             docs:
               - 'docs/**'
               - 'README*'
 
   cpp-tests:
     needs: [changes]
-    if: ${{ needs.changes.outputs.cpp == 'true' || needs.changes.outputs.ci-config-cpp == 'true' }}
+    if: ${{ needs.changes.outputs.cpp == 'true' || needs.changes.outputs.ci-config-cpp == 'true' || needs.changes.outputs.zh-en-data == 'true' }}
     uses: ./.github/workflows/_build-test-cpp.yml
     with:
       run-integration-tests: true
@@ -97,7 +108,7 @@ jobs:
 
   csharp-tests:
     needs: [changes]
-    if: ${{ needs.changes.outputs.csharp == 'true' || needs.changes.outputs.ci-config-csharp == 'true' }}
+    if: ${{ needs.changes.outputs.csharp == 'true' || needs.changes.outputs.ci-config-csharp == 'true' || needs.changes.outputs.zh-en-data == 'true' }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     strategy:
@@ -147,7 +158,7 @@ jobs:
   csharp-build:
     runs-on: ${{ matrix.os }}
     needs: [changes, csharp-tests]
-    if: ${{ needs.changes.outputs.csharp == 'true' || needs.changes.outputs.ci-config-csharp == 'true' }}
+    if: ${{ needs.changes.outputs.csharp == 'true' || needs.changes.outputs.ci-config-csharp == 'true' || needs.changes.outputs.zh-en-data == 'true' }}
     timeout-minutes: 20
     strategy:
       fail-fast: false
@@ -212,7 +223,7 @@ jobs:
 
   python-tests:
     needs: [changes]
-    if: ${{ needs.changes.outputs.python == 'true' || needs.changes.outputs.ci-config-python == 'true' }}
+    if: ${{ needs.changes.outputs.python == 'true' || needs.changes.outputs.ci-config-python == 'true' || needs.changes.outputs.zh-en-data == 'true' }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -307,7 +318,7 @@ jobs:
 
   rust-tests:
     needs: [changes]
-    if: ${{ needs.changes.outputs.rust == 'true' || needs.changes.outputs.ci-config-rust == 'true' }}
+    if: ${{ needs.changes.outputs.rust == 'true' || needs.changes.outputs.ci-config-rust == 'true' || needs.changes.outputs.zh-en-data == 'true' }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -338,6 +349,12 @@ jobs:
       - name: Run tests (naist-jdic)
         run: cargo test -p piper-plus --features naist-jdic --no-fail-fast
 
+      - name: Run g2p chinese feature tests (ZH-EN dispatch via Phonemizer trait)
+        # `chinese` is enabled by piper-plus-g2p's default features, so this
+        # also runs the #[cfg(feature = "chinese")] dispatch tests added in
+        # multilingual.rs (test_zh_en_dispatch_via_phonemizer_trait etc).
+        run: cargo test -p piper-plus-g2p --no-fail-fast
+
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
@@ -347,7 +364,7 @@ jobs:
 
   npm-package-tests:
     needs: [changes]
-    if: ${{ needs.changes.outputs.wasm == 'true' || needs.changes.outputs.rust == 'true' || needs.changes.outputs.ci-config-wasm == 'true' }}
+    if: ${{ needs.changes.outputs.wasm == 'true' || needs.changes.outputs.rust == 'true' || needs.changes.outputs.ci-config-wasm == 'true' || needs.changes.outputs.zh-en-data == 'true' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     defaults:

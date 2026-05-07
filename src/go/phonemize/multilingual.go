@@ -3,6 +3,8 @@ package phonemize
 import (
 	"log/slog"
 	"strings"
+	"sync"
+	"sync/atomic"
 
 	"golang.org/x/text/unicode/norm"
 )
@@ -29,30 +31,77 @@ var eosOnlyTokens = map[string]bool{
 // MultilingualPhonemizer routes text segments to language-specific phonemizers.
 //
 // Thread safety: MultilingualPhonemizer is safe for concurrent use.
-// All mutable state (EOSToken tracking) is passed through return values,
-// not shared fields. The underlying per-language phonemizers must also be
-// safe for concurrent use.
+// All transient mutable state (EOSToken tracking, per-call dispatch
+// computation) is passed through return values or local variables; the only
+// configuration field that can change after construction is
+// ``enableZhEnDispatch``, which is stored as ``atomic.Bool`` so concurrent
+// SetZhEnDispatch / IsZhEnDispatchEnabled / PhonemizeWithProsody calls do not
+// race. The underlying per-language phonemizers must also be safe for
+// concurrent use.
 type MultilingualPhonemizer struct {
 	languages            []string
 	defaultLatinLanguage string
 	detector             *UnicodeLanguageDetector
 	phonemizers          map[string]Phonemizer
+	// enableZhEnDispatch toggles ZH-EN code-switching (Issue #384).
+	// When true (default with both "zh" and "en" registered), English
+	// segments adjacent to Chinese are routed through the loanword
+	// dictionary instead of the standard English phonemizer.
+	//
+	// Two-layer control (TICKET-02 §7 + TICKET-01 §7 懸念 5):
+	// - Compile-time: always available (Go has no feature flags here)
+	// - Runtime: opt-out via SetZhEnDispatch(false)
+	//
+	// Stored as atomic.Bool so SetZhEnDispatch / IsZhEnDispatchEnabled /
+	// PhonemizeWithProsody can be called from different goroutines without
+	// data races (the docstring above relies on this).
+	enableZhEnDispatch atomic.Bool
+
+	// loanwordWarnOnce ensures a corrupted bundled JSON is logged at most
+	// once across the lifetime of the phonemizer (mirrors the C++ side's
+	// ``warnedNoLoanword`` pattern). Without this, every segment that hits
+	// the dispatch path on a corrupted JSON would silently fall through to
+	// the standard English phonemizer, with no log at all.
+	loanwordWarnOnce sync.Once
 }
 
 // NewMultilingualPhonemizer creates a MultilingualPhonemizer for the given
 // languages. phonemizers maps language codes to their Phonemizer implementations.
+//
+// ZH-EN code-switching dispatch is enabled by default when both "zh" and "en"
+// phonemizers are registered. Use SetZhEnDispatch(false) to opt out.
 func NewMultilingualPhonemizer(
 	languages []string,
 	defaultLatinLang string,
 	phonemizers map[string]Phonemizer,
 ) *MultilingualPhonemizer {
 	detector := NewUnicodeLanguageDetector(languages, defaultLatinLang)
-	return &MultilingualPhonemizer{
+	_, hasZh := phonemizers["zh"]
+	_, hasEn := phonemizers["en"]
+	mp := &MultilingualPhonemizer{
 		languages:            languages,
 		defaultLatinLanguage: defaultLatinLang,
 		detector:             detector,
 		phonemizers:          phonemizers,
 	}
+	mp.enableZhEnDispatch.Store(hasZh && hasEn)
+	return mp
+}
+
+// SetZhEnDispatch toggles the ZH-EN code-switching dispatch.
+// When false, embedded English in Chinese context falls through to the
+// standard English phonemizer instead of being mapped to Mandarin pinyin.
+//
+// Safe to call concurrently with IsZhEnDispatchEnabled / PhonemizeWithProsody.
+func (m *MultilingualPhonemizer) SetZhEnDispatch(enabled bool) {
+	m.enableZhEnDispatch.Store(enabled)
+}
+
+// IsZhEnDispatchEnabled returns whether ZH-EN code-switching dispatch is on.
+//
+// Safe to call concurrently with SetZhEnDispatch / PhonemizeWithProsody.
+func (m *MultilingualPhonemizer) IsZhEnDispatchEnabled() bool {
+	return m.enableZhEnDispatch.Load()
 }
 
 // LanguageCode returns the joined language codes (e.g., "ja-en-zh-es-fr-pt").
@@ -82,7 +131,69 @@ func (m *MultilingualPhonemizer) PhonemizeWithProsody(text string) (*PhonemizeRe
 	// (e.g., "?", "?!", "?.", "?~"). This matches Python's behavior.
 	lastEOS := "$"
 
-	for _, seg := range segments {
+	// Snapshot the dispatch flag once at the start of the call so that a
+	// concurrent SetZhEnDispatch does not flip behavior mid-text.
+	dispatchOn := m.enableZhEnDispatch.Load()
+
+	// Pre-compute whether text contains any zh segment for ZH-EN dispatch.
+	hasZhSegment := false
+	if dispatchOn {
+		for _, s := range segments {
+			if s.Language == "zh" {
+				hasZhSegment = true
+				break
+			}
+		}
+	}
+
+	// ZH-EN dispatch needs access to the chinese phonemizer's embedded-english
+	// path. Cache the type-asserted handle once.
+	var zhCP *ChinesePhonemizer
+	if dispatchOn && hasZhSegment {
+		if cp, ok := m.phonemizers["zh"].(*ChinesePhonemizer); ok {
+			zhCP = cp
+		}
+	}
+	var loanwordD *LoanwordData
+	if zhCP != nil {
+		var err error
+		loanwordD, err = LoadLoanwordData()
+		if err != nil {
+			// Log once per phonemizer instance — the C++ mirror uses
+			// ``warnedNoLoanword`` for the same purpose. Subsequent
+			// dispatch attempts simply fall through to the standard
+			// English phonemizer with no further log noise.
+			m.loanwordWarnOnce.Do(func() {
+				slog.Warn("ZH-EN dispatch disabled: failed to load bundled loanword data",
+					"error", err,
+				)
+			})
+		}
+	}
+
+	for i, seg := range segments {
+		// ZH-EN dispatch: route embedded en (with adjacent zh) through
+		// chinese loanword phonemizer. Issue #384, design §2.2.
+		if dispatchOn && hasZhSegment && zhCP != nil && loanwordD != nil &&
+			seg.Language == "en" {
+			prevIsZh := i > 0 && segments[i-1].Language == "zh"
+			nextIsZh := i+1 < len(segments) && segments[i+1].Language == "zh"
+			if prevIsZh || nextIsZh {
+				tokens := zhCP.PhonemizeEmbeddedEnglish(seg.Text, loanwordD)
+				for _, tok := range tokens {
+					if bosEosTokens[tok] {
+						if eosOnlyTokens[tok] {
+							lastEOS = tok
+						}
+						continue
+					}
+					allTokens = append(allTokens, tok)
+					allProsody = append(allProsody, nil)
+				}
+				continue
+			}
+		}
+
 		phonemizer, ok := m.phonemizers[seg.Language]
 		if !ok {
 			slog.Warn("no phonemizer registered for language, skipping segment",

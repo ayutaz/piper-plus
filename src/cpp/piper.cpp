@@ -39,6 +39,7 @@
 #include "portuguese_phonemize.hpp"
 #include "english_phonemize.hpp"
 #include "chinese_phonemize.hpp"
+#include "chinese_loanword.hpp"
 #include "korean_phonemize.hpp"
 #include "swedish_phonemize.hpp"
 
@@ -2520,7 +2521,16 @@ void phonemizeText(const Voice &voice, const std::string &text,
         std::vector<Phoneme> allPhonemes;
         std::vector<ProsodyFeature> allProsody;
 
-        for (const auto& langSeg : langSegments) {
+        // Pre-compute whether any zh segment exists, used for ZH-EN dispatch
+        // (Issue #384, TICKET-05 P3). The actual prev/next adjacency check
+        // is done per-iteration with the segIdx counter.
+        bool hasZhSegment = false;
+        for (const auto& s : langSegments) {
+          if (s.lang == "zh") { hasZhSegment = true; break; }
+        }
+
+        for (size_t segIdx = 0; segIdx < langSegments.size(); ++segIdx) {
+          const auto& langSeg = langSegments[segIdx];
           std::vector<std::vector<Phoneme>> langPhonemes;
           std::vector<std::vector<ProsodyFeature>> langProsody;
 
@@ -2571,6 +2581,44 @@ void phonemizeText(const Voice &voice, const std::string &text,
             // Portuguese: native rule-based phonemizer
             phonemize_portuguese(langSeg.text, langPhonemes);
           } else if (langSeg.lang == "en") {
+            // ZH-EN code-switching dispatch (Issue #384, TICKET-05 P3).
+            // When the en segment is adjacent to zh, route through the
+            // loanword path instead of CMU; embedded_flat is wrapped into
+            // langPhonemes to keep the existing vector<vector<Phoneme>> ABI.
+            bool prevIsZh = segIdx > 0 && langSegments[segIdx - 1].lang == "zh";
+            bool nextIsZh = segIdx + 1 < langSegments.size() &&
+                             langSegments[segIdx + 1].lang == "zh";
+            bool zhEnDispatched = false;
+            if (voice.enableZhEnDispatch && hasZhSegment && (prevIsZh || nextIsZh)) {
+              auto loanwordData = piper::getDefaultLoanwordData();
+              if (loanwordData) {
+                std::vector<Phoneme> embedded_flat;
+                piper::phonemizeEmbeddedEnglish(langSeg.text, embedded_flat, *loanwordData);
+                if (!embedded_flat.empty()) {
+                  langPhonemes.emplace_back(std::move(embedded_flat));
+                }
+                zhEnDispatched = true;
+              } else {
+                // Match Python: when ZH-EN dispatch fires but loanword data
+                // is unavailable, emit nothing for this en segment instead
+                // of falling back to CMU. Falling back would silently change
+                // the phoneme stream and break cross-runtime fixture parity
+                // (review note Cpp-H1).
+                static bool warnedNoLoanword = false;
+                if (!warnedNoLoanword) {
+                  spdlog::warn(
+                      "ZH-EN dispatch fired but loanword data is unavailable: {}; "
+                      "skipping embedded-en segment(s)",
+                      piper::getDefaultLoanwordError());
+                  warnedNoLoanword = true;
+                }
+                zhEnDispatched = true;
+              }
+            }
+            if (zhEnDispatched) {
+              // Skip the standard English path; loanword tokens (or nothing,
+              // on data-unavailable) already in langPhonemes.
+            } else {
             // English: CMU dictionary-based G2P
             static bool warnedNoCmuDict = false;
             if (voice.cmuDict.empty() && !warnedNoCmuDict) {
@@ -2586,6 +2634,7 @@ void phonemizeText(const Voice &voice, const std::string &text,
             if (!hasAnyPhonemes) {
               spdlog::debug("English segment '{}' has no CMU dict matches; skipping", langSeg.text);
             }
+            }  // end ZH-EN dispatch else branch
           } else if (langSeg.lang == "zh") {
             // Chinese: pypinyin-based G2P
             static bool warnedNoPinyinDict = false;

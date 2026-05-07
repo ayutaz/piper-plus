@@ -9,6 +9,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### ZH-EN code-switching を全 7 ランタイムに展開 (Issue #384)
+
+中国語テキストに混在する英単語 (acronyms / loanwords / per-letter fallback) を米国英語ではなく Mandarin pinyin で発音する機能を、Python (PR #397 で先行リリース) に続いて Rust × 2 crate / Go / C# / WASM / C++ の **5 ランタイムへ byte-for-byte 同期展開**。
+
+- **canonical**: `src/python/g2p/piper_plus_g2p/data/zh_en_loanword.json` (acronyms 65 / loanwords 40 / A-Z fallback、131 entries)
+- **mirror 7 箇所** + **fixture 6 箇所**: CI gate `ZH-EN Loanword Sync Gate / json-sync` が SHA256 一致を強制 (`scripts/check_loanword_consistency.py` + `/check-loanword` skill)。helper script 自体の挙動を verify する `helper-self-check` job (`--diff` / `--fix` 冪等性) も同 workflow に同居
+- **API**: 各ランタイムの `MultilingualPhonemizer` が `[zh,en,zh]` / `[zh,en]` / `[en,zh]` パターンを自動検出し、英語 segment を loanword 経路にディスパッチ。runtime opt-out: `enable_zh_en_dispatch(false)` (Rust) / `SetZhEnDispatch(false)` (Go) / `EnableZhEnDispatch = false` (C#) / `setZhEnDispatch(false)` (WASM)
+- **Forward-compatible loader (YELLOW-5)**: 全 7 ランタイム (Python + Rust × 2 / Go / C# / WASM / C++) で `schema_version: 2` の未来フィールドを silent ignore する挙動を pinning test で固定
+- **Two-layer model**: コンパイル時 (Cargo feature `chinese` / csproj `<EmbeddedResource>` / Go `//go:embed` / C++ CMake) + ランタイム (default-on opt-out) の二層管理 (TICKET-01 §7 懸念 5)
+- **ランタイム test カバレッジ**: Rust × 2 / Go / C# / WASM / C++ + Python の各 ZH-EN test スイートで `phonemize_embedded_english` の lookup priority / forward-compat / dispatch / opt-out / per-token prosody (a1=tone, a2=a3=1) を検証
+- **Issue #384 例**: `请打开 GPS` / `我喜欢用 Python 写代码` / `让我用 ChatGPT 写代码` を Python リファレンス test がカバー。各ランタイムの `phonemize_embedded_english` は同 JSON (byte-for-byte 同期) と同 lookup ロジックで動くため Python と等価な IPA 列を返す。詳細は [`docs/tickets/zh-en-loanword/`](docs/tickets/zh-en-loanword/)。
+
+##### 既知の制約 / 別 PR フォローアップ予定
+
+本 PR では JSON 同期と各ランタイムへの dispatch wiring を成立させたが、以下の hardening / 拡張は別 PR で取り組む:
+
+- **Cross-runtime IPA parity CI**: `tests/fixtures/g2p/zh_en_loanword_matrix.json` の各 case を全ランタイムに食わせて token 列が一致することを検証する gate (現状は per-runtime に loadable + per-case `expected_token_count` strict check のみ — Python が IPA 列を JSONL で pre-compute して全ランタイムが同じ列を返すか確認する parity job は未実装)。
+- **Loader hardening (Tier 1-2 セキュリティガード)**: `MAX_LOANWORD_FILE_SIZE` / `MAX_LOANWORD_ENTRIES` / `MAX_LOANWORD_DEPTH` をユーザー指定 override path 受付経路 (`--zh-en-loanword-dict-paths` 等) に追加。bundled JSON は安全だが攻撃者が用意した巨大/深い JSON を読ませた場合の DoS 防止。
+- **Python opt-out API parity**: 現状 Python は `set_zh_en_dispatch` を持たず常時 ON。他 6 ランタイムと API parity を取るために将来 `MultilingualPhonemizer.set_zh_en_dispatch(bool)` を no-op or 実機能として追加検討 (test `test_dispatch_no_optout_api_exposed` で現状を pin 中)。
+- **WASM JS 実配線**: `ChineseG2P.setZhEnDispatch` の wrapper は整備済だが、`G2P.create()` も `piper-plus` 側もまだ `wasmPhonemizer` を注入していないため、JS-only 実行では dispatch は no-op (Rust WASM 直叩きでは動作)。`G2P.create({ wasmPhonemizer })` 統合が次フェーズ。
+- **Rust piper-core / piper-plus-g2p の chinese.rs 重複**: `piper-core/src/phonemize/chinese.rs` は piper-plus-g2p の ~470 行のコピー (CI parity test で drift 防止)。`pub use piper_plus_g2p::chinese::*` への置換で長期メンテナンスコストを下げる予定。
+- **Rust `last_eos` Mutex のセマンティクス改善**: 現状 `Mutex<String>` は単一スレッド前提で安全だが論理的にはスナップショット。中期的には `phonemize_with_prosody` の戻り値型に EOS を含める設計に変更予定。
+
 #### iOS shared-lib を xcframework として配布開始 (Issue #377)
 
 iOS 利用シナリオ (Dart FFI / Godot / Swift / SPM) に対応する xcframework 配布を成立させた。device (arm64) + simulator (arm64+x86_64 universal) の両 slice を含む。

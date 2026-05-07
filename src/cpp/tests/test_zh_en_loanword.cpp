@@ -1,0 +1,383 @@
+// ZH-EN code-switching tests (TICKET-05 P6, mirror of TICKET-01 R5).
+
+#include <gtest/gtest.h>
+
+#include <cstdint>
+#include <thread>
+#include <vector>
+
+#include "chinese_loanword.hpp"
+#include "phoneme_parser.hpp"
+
+using namespace piper;
+
+namespace {
+
+// Build a minimal LoanwordData for unit tests (avoids depending on the
+// bundled JSON). Mirrors the canonical sub-section of zh_en_loanword.json.
+LoanwordData makeTestData() {
+    LoanwordData d;
+    d.version = 1;
+    d.acronyms["GPS"] = {"ji4", "pi4", "ai1", "si4"};
+    d.acronyms["USB"] = {"you1", "ai1", "si4", "bi4"};
+    d.acronyms["MP3"] = {"ai1"};  // override for digit test
+    d.loanwords["Python"] = {"pai4", "sen1"};
+    d.loanwords["ChatGPT"] = {"chai4", "ti2", "ji4", "pi4", "ti4"};
+    for (char c = 'A'; c <= 'Z'; ++c) {
+        d.letter_fallback[std::string(1, c)] = {"ei1"};  // dummy single syllable
+    }
+    return d;
+}
+
+}  // namespace
+
+// =========================================================================
+// Loader / parse tests
+// =========================================================================
+
+TEST(ZhEnLoanwordTest, ParseLoanwordJson_ValidV1) {
+    const std::string json = R"({
+        "version": 1,
+        "acronyms": {"GPS": ["ji4"]},
+        "loanwords": {"Python": ["pai4"]},
+        "letter_fallback": {"A": ["ei1"]}
+    })";
+    auto data = parseLoanwordJson("test.json", json);
+    EXPECT_EQ(data.version, 1);
+    EXPECT_EQ(data.acronyms.at("GPS"), std::vector<std::string>{"ji4"});
+    EXPECT_EQ(data.loanwords.at("Python"), std::vector<std::string>{"pai4"});
+    EXPECT_EQ(data.letter_fallback.at("A"), std::vector<std::string>{"ei1"});
+}
+
+// Review feedback C-1: forward-compat. The loader is now lenient about
+// ``version`` to match the Python / Rust / C# / Go peers — a missing or
+// non-integer ``version`` silently defaults to 1 (or falls back to
+// ``schema_version`` if present). Previously this threw, which fragmented the
+// cross-runtime contract and would have broken any future schema_v2 manifest.
+TEST(ZhEnLoanwordTest, ParseLoanwordJson_MissingVersion_DefaultsToOne) {
+    const std::string json = R"({"acronyms": {"GPS": ["ji4"]}})";
+    auto data = parseLoanwordJson("test.json", json);
+    EXPECT_EQ(data.version, 1);
+    EXPECT_NE(data.acronyms.find("GPS"), data.acronyms.end());
+}
+
+TEST(ZhEnLoanwordTest, ParseLoanwordJson_SchemaVersionFallback) {
+    // ``version`` absent but ``schema_version`` present — must use the latter.
+    const std::string json = R"({
+        "schema_version": 2,
+        "acronyms": {"GPS": ["ji4"]}
+    })";
+    auto data = parseLoanwordJson("test.json", json);
+    EXPECT_EQ(data.version, 2);
+}
+
+TEST(ZhEnLoanwordTest, ParseLoanwordJson_NonIntVersion_DefaultsToOne) {
+    // A non-int version (e.g. string) is silently ignored, defaulting to 1.
+    const std::string json = R"({"version": "two", "acronyms": {}})";
+    auto data = parseLoanwordJson("test.json", json);
+    EXPECT_EQ(data.version, 1);
+}
+
+TEST(ZhEnLoanwordTest, ParseLoanwordJson_NonListValue_Throws) {
+    const std::string json = R"({"version": 1, "acronyms": {"GPS": "not_a_list"}})";
+    try {
+        parseLoanwordJson("test.json", json);
+        FAIL() << "expected LoanwordSchemaError";
+    } catch (const LoanwordSchemaError& e) {
+        std::string msg = e.what();
+        EXPECT_NE(msg.find("'acronyms.GPS'"), std::string::npos) << msg;
+        EXPECT_NE(msg.find("must be list[str]"), std::string::npos) << msg;
+    }
+}
+
+TEST(ZhEnLoanwordTest, ParseLoanwordJson_NonDictSection_Throws) {
+    const std::string json = R"({"version": 1, "acronyms": "not_a_dict"})";
+    try {
+        parseLoanwordJson("test.json", json);
+        FAIL() << "expected LoanwordSchemaError";
+    } catch (const LoanwordSchemaError& e) {
+        std::string msg = e.what();
+        EXPECT_NE(msg.find("'acronyms'"), std::string::npos) << msg;
+        EXPECT_NE(msg.find("must be a mapping"), std::string::npos) << msg;
+    }
+}
+
+TEST(ZhEnLoanwordTest, Loader_AcceptsUnknownFieldsInSchemaV2) {
+    // YELLOW-5: forward-compat — unknown top-level fields must not fail.
+    const std::string v2 = R"({
+        "version": 2,
+        "schema_version": 2,
+        "metadata": {"experimental": true},
+        "acronyms": {"GPS": ["ji4"]},
+        "loanwords": {"Python": ["pai4"]},
+        "letter_fallback": {"A": ["ei1"]},
+        "tone_overrides": {"GPS": "high"}
+    })";
+    auto data = parseLoanwordJson("future_v2.json", v2);
+    EXPECT_EQ(data.version, 2);
+    EXPECT_NE(data.acronyms.find("GPS"), data.acronyms.end());
+}
+
+// =========================================================================
+// phonemizeEmbeddedEnglish tests
+// =========================================================================
+
+TEST(ZhEnLoanwordTest, EmbeddedEnglish_Acronym_GPS) {
+    auto data = makeTestData();
+    std::vector<Phoneme> out;
+    phonemizeEmbeddedEnglish("GPS", out, data);
+    // GPS = ji4 + pi4 + ai1 + si4 = 4 syllables
+    // ji4(3) + pi4(3) + ai1(2 zero initial) + si4(3) = 11 phonemes
+    EXPECT_EQ(out.size(), 11u);
+}
+
+TEST(ZhEnLoanwordTest, EmbeddedEnglish_Loanword_Python_CaseSensitive) {
+    auto data = makeTestData();
+    std::vector<Phoneme> lower;
+    phonemizeEmbeddedEnglish("Python", lower, data);
+    // pai4(3) + sen1(3) = 6
+    EXPECT_EQ(lower.size(), 6u);
+
+    // PYTHON falls through to letter_fallback (not in our test data as
+    // case-sensitive loanword) — should differ from "Python".
+    std::vector<Phoneme> upper;
+    phonemizeEmbeddedEnglish("PYTHON", upper, data);
+    EXPECT_NE(lower.size(), upper.size());
+}
+
+TEST(ZhEnLoanwordTest, EmbeddedEnglish_ChatGPT_FiveSyllables) {
+    auto data = makeTestData();
+    std::vector<Phoneme> out;
+    phonemizeEmbeddedEnglish("ChatGPT", out, data);
+    // 5 syllables × 3 phonemes = 15
+    EXPECT_EQ(out.size(), 15u);
+}
+
+TEST(ZhEnLoanwordTest, EmbeddedEnglish_Empty_ReturnsEmpty) {
+    auto data = makeTestData();
+    std::vector<Phoneme> out;
+    phonemizeEmbeddedEnglish("", out, data);
+    EXPECT_TRUE(out.empty());
+    phonemizeEmbeddedEnglish(",.!?", out, data);
+    EXPECT_TRUE(out.empty());
+    phonemizeEmbeddedEnglish("   ", out, data);
+    EXPECT_TRUE(out.empty());
+}
+
+TEST(ZhEnLoanwordTest, EmbeddedEnglish_TrailingPunctuation) {
+    auto data = makeTestData();
+    std::vector<Phoneme> plain;
+    phonemizeEmbeddedEnglish("GPS", plain, data);
+    for (const auto& suffix : {",", ".", "!", ":"}) {
+        std::vector<Phoneme> got;
+        phonemizeEmbeddedEnglish(std::string("GPS") + suffix, got, data);
+        EXPECT_EQ(plain, got) << "suffix=" << suffix;
+    }
+}
+
+TEST(ZhEnLoanwordTest, EmbeddedEnglish_LookupPriority_LoanwordBeatsAcronym) {
+    LoanwordData d;
+    d.version = 1;
+    d.loanwords["AI"] = {"ma1"};
+    d.acronyms["AI"] = {"ji4"};
+    std::vector<Phoneme> got;
+    phonemizeEmbeddedEnglish("AI", got, d);
+
+    // Expected: same as loanword-only path
+    LoanwordData d2;
+    d2.version = 1;
+    d2.loanwords["AI"] = {"ma1"};
+    std::vector<Phoneme> loan_only;
+    phonemizeEmbeddedEnglish("AI", loan_only, d2);
+    EXPECT_EQ(got, loan_only);
+}
+
+TEST(ZhEnLoanwordTest, EmbeddedEnglish_AcronymWithDigits_MP3) {
+    auto data = makeTestData();  // has acronyms.MP3 = {"ai1"}
+    std::vector<Phoneme> got;
+    phonemizeEmbeddedEnglish("MP3", got, data);
+
+    // Compare against acronym-only path (no letter_fallback contamination)
+    LoanwordData d;
+    d.version = 1;
+    d.acronyms["MP3"] = {"ai1"};
+    std::vector<Phoneme> acronym_only;
+    phonemizeEmbeddedEnglish("MP3", acronym_only, d);
+    EXPECT_EQ(got, acronym_only);
+}
+
+TEST(ZhEnLoanwordTest, EmbeddedEnglish_DigitsDropped) {
+    LoanwordData d;
+    d.version = 1;
+    d.letter_fallback["Z"] = {"zi4"};
+    std::vector<Phoneme> z2z9;
+    std::vector<Phoneme> zz;
+    phonemizeEmbeddedEnglish("Z2Z9", z2z9, d);
+    phonemizeEmbeddedEnglish("ZZ", zz, d);
+    EXPECT_EQ(z2z9, zz);
+}
+
+TEST(ZhEnLoanwordTest, EmbeddedEnglish_TwoEmbeddedEn) {
+    auto data = makeTestData();
+    std::vector<Phoneme> combined;
+    phonemizeEmbeddedEnglish("ChatGPT \xe5\x92\x8c Python", combined, data);  // \xe5\x92\x8c = 和
+    std::vector<Phoneme> chatgpt;
+    phonemizeEmbeddedEnglish("ChatGPT", chatgpt, data);
+    std::vector<Phoneme> python;
+    phonemizeEmbeddedEnglish("Python", python, data);
+    EXPECT_EQ(combined.size(), chatgpt.size() + python.size());
+}
+
+// =========================================================================
+// Concurrent access (TICKET-05 P6 §8.14)
+// =========================================================================
+
+TEST(ZhEnLoanwordTest, ConcurrentAccess) {
+    auto data = std::make_shared<LoanwordData>(makeTestData());
+    std::vector<std::thread> threads;
+    for (int i = 0; i < 8; ++i) {
+        threads.emplace_back([data]() {
+            for (int j = 0; j < 200; ++j) {
+                std::vector<Phoneme> out;
+                phonemizeEmbeddedEnglish("GPS", out, *data);
+                EXPECT_EQ(out.size(), 11u);
+            }
+        });
+    }
+    for (auto& t : threads) t.join();
+    SUCCEED();
+}
+
+// =========================================================================
+// Cpp-C1 regression: bundled JSON must contain no carriage returns.
+// On Windows the Git working tree can have CRLF line endings; if those bytes
+// flow into the iOS/Android embedded array (cmake/EmbedJson.cmake) the
+// bundled binary picks up 147+ extra CR bytes that drift the JSON byte-hash
+// off the cross-runtime sync gate. We strip CR at HEX level in
+// `cmake/EmbedJson.cmake`; this test pins the contract by reading the
+// shipped JSON file from disk and asserting no '\r' is present.
+// =========================================================================
+
+#include <fstream>
+#include <sstream>
+#include <filesystem>
+
+namespace {
+
+// Locate the source-of-truth bundled JSON regardless of working directory.
+// Tests run with WORKING_DIRECTORY = ${CMAKE_SOURCE_DIR}, so a relative
+// search starting from the repo root is sufficient.
+std::string findBundledJson() {
+    namespace fs = std::filesystem;
+    const std::vector<std::string> candidates = {
+        "src/cpp/data/zh_en_loanword.json",
+        "../src/cpp/data/zh_en_loanword.json",
+        "src/python/g2p/piper_plus_g2p/data/zh_en_loanword.json",
+    };
+    for (const auto& c : candidates) {
+        if (fs::exists(c)) return c;
+    }
+    return "";
+}
+
+}  // namespace
+
+TEST(ZhEnLoanwordTest, BundledJsonHasNoCarriageReturn) {
+    const std::string path = findBundledJson();
+    if (path.empty()) {
+        GTEST_SKIP() << "bundled JSON not found from working dir; "
+                     << "this test runs from the repo root in CI";
+    }
+    std::ifstream ifs(path, std::ios::binary);
+    ASSERT_TRUE(ifs.is_open()) << "could not open: " << path;
+    std::stringstream ss;
+    ss << ifs.rdbuf();
+    const std::string bytes = ss.str();
+    size_t cr_count = 0;
+    for (char c : bytes) {
+        if (c == '\r') ++cr_count;
+    }
+    EXPECT_EQ(cr_count, 0u)
+        << "bundled JSON " << path << " contains " << cr_count
+        << " CR bytes (raw size=" << bytes.size() << "). "
+        << "If you regenerated this from a Windows checkout, the build's "
+        << "embedded copy will diverge from the cross-runtime hash. Re-save "
+        << "the file with LF endings or run `dos2unix`.";
+}
+
+// =========================================================================
+// CI-C1: cross-runtime fixture matrix consumer (C++ side).
+// `src/cpp/tests/fixtures/zh_en_loanword_matrix.json` is mirrored from
+// `tests/fixtures/g2p/zh_en_loanword_matrix.json` by the JSON sync gate.
+//
+// Strict per-case checks (review feedback C-M2): the bundled (full) JSON is
+// loaded via ``getDefaultLoanwordData()`` so each case's
+// ``expected_token_count`` MUST match exactly. The previous variant of this
+// test ran against ``makeTestData()`` (a small subset) and only checked
+// ``total > 0``, so per-runtime token-count drift would rot silently.
+// =========================================================================
+
+#include "json.hpp"
+
+TEST(ZhEnLoanwordTest, FixtureMatrixLoadable) {
+    namespace fs = std::filesystem;
+    const std::vector<std::string> candidates = {
+        "src/cpp/tests/fixtures/zh_en_loanword_matrix.json",
+        "tests/fixtures/zh_en_loanword_matrix.json",
+        "../tests/fixtures/zh_en_loanword_matrix.json",
+        "tests/fixtures/g2p/zh_en_loanword_matrix.json",
+    };
+    std::string path;
+    for (const auto& c : candidates) {
+        if (fs::exists(c)) { path = c; break; }
+    }
+    if (path.empty()) {
+        GTEST_SKIP() << "matrix fixture not found from working dir="
+                     << fs::current_path().string();
+    }
+
+    std::ifstream ifs(path);
+    ASSERT_TRUE(ifs.is_open()) << "could not open: " << path;
+    nlohmann::json json;
+    ASSERT_NO_THROW(ifs >> json) << "matrix is not valid JSON: " << path;
+    ASSERT_TRUE(json.contains("cases")) << "matrix missing `cases` array";
+    const auto& cases = json["cases"];
+    ASSERT_TRUE(cases.is_array() && !cases.empty())
+        << "matrix `cases` must be a non-empty array";
+
+    // Use the bundled JSON (same data the runtime sees) so ``expected_token_count``
+    // can be checked strictly. ``getDefaultLoanwordData`` may return null only if
+    // the embedded JSON is corrupted — that's a separate test (load failure).
+    auto data = getDefaultLoanwordData();
+    ASSERT_NE(data, nullptr) << "bundled loanword data unavailable: "
+                              << getDefaultLoanwordError();
+
+    int total = 0;
+    for (const auto& c : cases) {
+        ASSERT_TRUE(c.contains("name") && c["name"].is_string())
+            << "case missing `name`: " << c.dump();
+        if (!c.contains("input") || !c["input"].is_string()) {
+            // Loader-only cases (e.g. schema_v2_forward_compat_loader).
+            continue;
+        }
+        if (!c.contains("expected_token_count") ||
+            !c["expected_token_count"].is_number()) {
+            continue;
+        }
+        const std::string name = c["name"].get<std::string>();
+        const std::string input = c["input"].get<std::string>();
+        const auto expected = c["expected_token_count"].get<size_t>();
+        std::vector<Phoneme> out;
+        phonemizeEmbeddedEnglish(input, out, *data);
+        total++;
+        EXPECT_EQ(out.size(), expected)
+            << "matrix case " << name << " (input=\"" << input
+            << "\"): expected_token_count=" << expected
+            << ", got " << out.size()
+            << "\n  → if this is intentional, update "
+               "tests/fixtures/g2p/zh_en_loanword_matrix.json and re-sync via "
+               "`python scripts/check_loanword_consistency.py --fix`";
+    }
+    EXPECT_GT(total, 0)
+        << "no cases had expected_token_count — fixture is stale";
+}

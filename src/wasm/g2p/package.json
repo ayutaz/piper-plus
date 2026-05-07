@@ -5,7 +5,7 @@
   "type": "module",
   "main": "src/index.js",
   "scripts": {
-    "test": "node --test test/test-encode.js test/test-english.js test/test-g2p.js test/test-languages.js test/test-detect.js test/test-pua-map.js test/test-swedish.js test/test-korean.js test/test-custom-dict.js test/test-strict-mode.js test/test-spanish.js test/test-french.js test/test-portuguese.js test/test-chinese.js test/test-latin-common.js test/test-g2p-golden.js test/test-g2p-contract.js"
+    "test": "node --test test/test-encode.js test/test-english.js test/test-g2p.js test/test-g2p-contract.js test/test-g2p-integration.js test/test-languages.js test/test-detect.js test/test-pua-map.js test/test-swedish.js test/test-korean.js test/test-custom-dict.js test/test-strict-mode.js test/test-spanish.js test/test-french.js test/test-portuguese.js test/test-chinese.js test/test-chinese-zh-en.js test/test-latin-common.js test/test-exports.js test/test-g2p-golden.js"
   },
   "exports": {
     ".": "./src/index.js",

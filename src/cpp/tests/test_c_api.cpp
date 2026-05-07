@@ -841,3 +841,29 @@ TEST(CApiProviderError, CoremlOnNonAppleReturnsError) {
         << "Error should mention macOS, got: " << err;
 }
 #endif // !__APPLE__
+
+// ===== ZH-EN code-switching dispatch C API (Issue #384) =====
+// NULL-safety + capability tests for the C API dispatch toggle. Engine-bound
+// behavior (actual dispatch path activation) is covered by the upstream
+// `piper.cpp` test suite + Rust/C# parity tests; here we only verify the C
+// shim contract: NULL engine returns the documented error, and well-formed
+// callers can round-trip the flag.
+
+TEST(CApiZhEnDispatch, SetWithNullEngineReturnsError) {
+    PiperPlusStatus rc = piper_plus_set_zh_en_dispatch(nullptr, 1);
+    EXPECT_NE(rc, PIPER_PLUS_OK);
+    const char* err = piper_plus_get_last_error();
+    ASSERT_NE(err, nullptr);
+    EXPECT_NE(std::string(err).find("engine"), std::string::npos)
+        << "Error should mention NULL engine, got: " << err;
+}
+
+TEST(CApiZhEnDispatch, IsEnabledWithNullEngineReturnsError) {
+    // Documented contract: -1 indicates an error (NULL engine), 0/1 indicate
+    // false/true respectively.
+    int32_t rc = piper_plus_is_zh_en_dispatch_enabled(nullptr);
+    EXPECT_EQ(rc, -1);
+    const char* err = piper_plus_get_last_error();
+    ASSERT_NE(err, nullptr);
+    EXPECT_NE(std::string(err).find("engine"), std::string::npos);
+}

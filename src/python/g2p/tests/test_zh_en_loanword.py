@@ -593,6 +593,22 @@ class TestSchemaValidation:
         with pytest.raises(ValueError, match=r"letter_fallback.*mapping"):
             _load_loanword_data(path)
 
+    def test_top_level_not_mapping_rejected(self, tmp_path: Path):
+        """A top-level JSON that is not an object raises ValueError.
+
+        Covers the loader / ``scripts/check_loanword_consistency.py`` parity:
+        both must reject malformed top-level shapes (list, primitive) with a
+        clear ``ValueError`` rather than the bare ``AttributeError`` raised by
+        ``data.get(...)`` on a non-dict.
+        """
+        from piper_plus_g2p.chinese import _load_loanword_data
+
+        for bad in ([1, 2, 3], "not-a-mapping", 42, None):
+            path = tmp_path / "bad.json"
+            path.write_text(json.dumps(bad), encoding="utf-8")
+            with pytest.raises(ValueError, match=r"top-level JSON must be"):
+                _load_loanword_data(path)
+
     def test_valid_json_accepted(self, tmp_path: Path):
         """A well-formed JSON loads without error."""
         from piper_plus_g2p.chinese import _load_loanword_data
@@ -608,6 +624,228 @@ class TestSchemaValidation:
         data = _load_loanword_data(path)
         assert data["acronyms"]["AB"] == ["ma1"]
         assert data["loanwords"]["Foo"] == ["fu1"]
+
+    def test_loader_accepts_schema_v2_future_fields(self, tmp_path: Path):
+        """YELLOW-5 forward-compat: future ``schema_version: 2`` files with
+        unknown top-level fields (e.g. ``metadata``, ``tone_overrides``) must
+        load successfully — known sections are kept, unknown fields ignored.
+
+        This is the Python-side counterpart of the Rust/Go/C#/WASM/C++
+        ``Loader_AcceptsUnknownFieldsInSchemaV2`` tests; the loader must not
+        require ``version`` either (so a future rename to ``schema_version``
+        does not break clients).
+        """
+        from piper_plus_g2p.chinese import _load_loanword_data
+
+        future = {
+            "schema_version": 2,
+            "metadata": {"experimental": True},
+            "acronyms": {"GPS": ["ji4", "pi4", "ai1", "si4"]},
+            "loanwords": {"Python": ["pai4", "se1"]},
+            "letter_fallback": {"A": ["ei1"]},
+            "tone_overrides": {"GPS": "high"},
+        }
+        path = tmp_path / "future_v2.json"
+        path.write_text(json.dumps(future), encoding="utf-8")
+        data = _load_loanword_data(path)
+        # Known sections roundtrip exactly.
+        assert data["acronyms"]["GPS"] == ["ji4", "pi4", "ai1", "si4"]
+        assert data["loanwords"]["Python"] == ["pai4", "se1"]
+        assert data["letter_fallback"]["A"] == ["ei1"]
+        # Unknown top-level fields are silently dropped (not surfaced).
+        assert "metadata" not in data
+        assert "tone_overrides" not in data
+        assert "schema_version" not in data
+
+
+@requires_zh
+class TestDispatchDefaultBehavior:
+    """Python's MultilingualPhonemizer ZH-EN dispatch is always-on by design.
+
+    Other runtimes (Rust, Go, C#, WASM, C++) expose ``set_zh_en_dispatch(bool)``
+    as an opt-out, but Python intentionally has no toggle: it is the
+    source-of-truth that defines the canonical loanword-path IPA output. If a
+    future PR adds a Python opt-out, both tests below must be updated to also
+    cover the disabled state.
+    """
+
+    def test_dispatch_always_on_by_default(self):
+        """[zh, en] with `GPS` routes through the loanword path (default behavior)."""
+        from piper_plus_g2p.registry import get_phonemizer
+
+        p = get_phonemizer("zh-en")
+        # If dispatch were disabled, "GPS" would be passed to the en path and
+        # would NOT produce tone markers. With dispatch ON it must.
+        tokens, _ = p.phonemize_with_prosody("请打开 GPS")
+        tone_tokens = [t for t in tokens if t.startswith("tone")]
+        assert len(tone_tokens) >= 4, (
+            "Default dispatch behavior: GPS in zh context must produce "
+            "Mandarin tone markers (4 syllables = 4 tones)"
+        )
+
+    def test_dispatch_no_optout_api_exposed(self):
+        """``MultilingualPhonemizer`` intentionally has no dispatch toggle API.
+
+        This pins the API surface so future PRs that add
+        ``set_zh_en_dispatch`` / ``is_zh_en_dispatch_enabled`` know to also
+        update the multi-runtime parity contract.
+        """
+        from piper_plus_g2p.multilingual import MultilingualPhonemizer
+
+        assert not hasattr(MultilingualPhonemizer, "set_zh_en_dispatch"), (
+            "Python is source-of-truth; dispatch is always-on by design. If "
+            "you are adding this method, also extend the parity contract in "
+            "docs/tickets/zh-en-loanword/ and update this test."
+        )
+        assert not hasattr(MultilingualPhonemizer, "is_zh_en_dispatch_enabled"), (
+            "Python is source-of-truth; dispatch is always-on by design."
+        )
+
+
+@requires_zh
+class TestFixtureMatrixConsumer:
+    """Cross-runtime fixture matrix consumer (Python source-of-truth side).
+
+    ``tests/fixtures/g2p/zh_en_loanword_matrix.json`` is mirrored into each
+    runtime's test tree and locks the per-input token-count contract. Without
+    a Python consumer, the fixture risks rotting (no one ever loaded it). This
+    class is the canonical reference: the Python implementation must produce
+    the exact ``expected_token_count`` for every concrete-input case.
+    """
+
+    def _load_matrix(self) -> dict:
+        repo_root = Path(__file__).resolve().parents[4]
+        matrix_path = (
+            repo_root / "tests" / "fixtures" / "g2p" / "zh_en_loanword_matrix.json"
+        )
+        if not matrix_path.exists():
+            pytest.skip(f"Matrix fixture not found: {matrix_path}")
+        with open(matrix_path, encoding="utf-8") as f:
+            return json.load(f)
+
+    def test_matrix_loads_and_well_formed(self):
+        """Matrix file exists, is valid JSON, and every case has a name."""
+        data = self._load_matrix()
+        assert "cases" in data, "matrix must have a `cases` array"
+        assert isinstance(data["cases"], list)
+        assert len(data["cases"]) > 0, "matrix must contain at least one case"
+        for case in data["cases"]:
+            assert "name" in case, f"case missing `name`: {case}"
+
+    def test_matrix_strict_token_counts(self):
+        """Every case with ``expected_token_count`` must match exactly.
+
+        This is the strictest contract — drift here means the Python
+        source-of-truth has changed and all 6 mirror runtimes need to be
+        re-validated.
+        """
+        from piper_plus_g2p.chinese import ChinesePhonemizer
+
+        p = ChinesePhonemizer()
+        data = self._load_matrix()
+        for case in data["cases"]:
+            if "input" not in case or "expected_token_count" not in case:
+                continue
+            tokens, _ = p.phonemize_embedded_english(case["input"])
+            actual = len(tokens)
+            expected = case["expected_token_count"]
+            assert actual == expected, (
+                f"{case['name']!r}: input {case['input']!r} expected "
+                f"{expected} tokens, got {actual}: {tokens}"
+            )
+
+    def test_matrix_equivalence_cases(self):
+        """``expected_token_count_equiv`` cases must produce the SAME tokens."""
+        from piper_plus_g2p.chinese import ChinesePhonemizer
+
+        p = ChinesePhonemizer()
+        data = self._load_matrix()
+        cache: dict[str, list[str]] = {}
+
+        def tokens_for(text: str) -> list[str]:
+            if text not in cache:
+                cache[text] = p.phonemize_embedded_english(text)[0]
+            return cache[text]
+
+        for case in data["cases"]:
+            equiv = case.get("expected_token_count_equiv")
+            if equiv is None or "input" not in case:
+                continue
+            actual = tokens_for(case["input"])
+            ref = tokens_for(equiv)
+            assert actual == ref, (
+                f"{case['name']!r}: tokens for {case['input']!r} should equal "
+                f"tokens for {equiv!r}. Got {actual} vs {ref}"
+            )
+
+    def test_matrix_differs_cases(self):
+        """``expected_token_count_differs_from`` cases must NOT match."""
+        from piper_plus_g2p.chinese import ChinesePhonemizer
+
+        p = ChinesePhonemizer()
+        data = self._load_matrix()
+        for case in data["cases"]:
+            differs = case.get("expected_token_count_differs_from")
+            if differs is None or "input" not in case:
+                continue
+            actual_tokens, _ = p.phonemize_embedded_english(case["input"])
+            ref_tokens, _ = p.phonemize_embedded_english(differs)
+            assert len(actual_tokens) != len(ref_tokens), (
+                f"{case['name']!r}: token count for {case['input']!r} "
+                f"({len(actual_tokens)}) must differ from {differs!r} "
+                f"({len(ref_tokens)})"
+            )
+
+    def test_matrix_relation_2x_of_input_z(self):
+        """``letter_fallback_zz_doubles_z``: ZZ must produce 2x the tokens of Z."""
+        from piper_plus_g2p.chinese import ChinesePhonemizer
+
+        p = ChinesePhonemizer()
+        data = self._load_matrix()
+        target_name = "letter_fallback_zz_doubles_z"
+        z_case = next(
+            (c for c in data["cases"] if c.get("name") == target_name),
+            None,
+        )
+        if z_case is None:
+            pytest.skip("letter_fallback_zz_doubles_z case not present in matrix")
+        zz_tokens, _ = p.phonemize_embedded_english("ZZ")
+        z_tokens, _ = p.phonemize_embedded_english("Z")
+        assert len(zz_tokens) == 2 * len(z_tokens), (
+            f"ZZ ({len(zz_tokens)}) must be exactly 2x Z ({len(z_tokens)}) "
+            f"per letter-fallback contract"
+        )
+
+    def test_matrix_schema_v2_loader_case(self):
+        """``schema_v2_forward_compat_loader`` case: the embedded JSON loads."""
+        from piper_plus_g2p.chinese import _load_loanword_data
+
+        data = self._load_matrix()
+        target_name = "schema_v2_forward_compat_loader"
+        case = next(
+            (c for c in data["cases"] if c.get("name") == target_name),
+            None,
+        )
+        if case is None:
+            pytest.skip("schema_v2_forward_compat_loader case not present in matrix")
+        json_data = case.get("input_json")
+        assert json_data is not None, "case must include `input_json`"
+        # Write to a temp file and feed through the real loader.
+        import tempfile
+
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".json", delete=False, encoding="utf-8"
+        ) as f:
+            json.dump(json_data, f)
+            tmp_path = f.name
+        try:
+            loaded = _load_loanword_data(Path(tmp_path))
+            # Known sections must round-trip
+            for section in ("acronyms", "loanwords", "letter_fallback"):
+                if section in json_data:
+                    assert loaded[section] == json_data[section]
+        finally:
+            Path(tmp_path).unlink(missing_ok=True)
 
 
 @requires_zh

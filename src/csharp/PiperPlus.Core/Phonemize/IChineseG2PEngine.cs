@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using PiperPlus.Core.Phonemize.Data;
 
 namespace PiperPlus.Core.Phonemize;
 
@@ -70,4 +71,30 @@ public interface IChineseG2PEngine
     /// A <see cref="ChineseG2PResult"/> whose lists are all the same length.
     /// </returns>
     ChineseG2PResult Convert(string text);
+
+    /// <summary>
+    /// Convert English <paramref name="text"/> embedded in Chinese context to
+    /// Mandarin pinyin IPA (ZH-EN code-switching, Issue #384). Default
+    /// implementation routes to <see cref="ChineseEmbeddedEnglish.Convert"/>,
+    /// which is independent of any specific Chinese G2P backend (NuGet or otherwise).
+    /// Engine implementations may override for alternative pipelines.
+    /// </summary>
+    /// <param name="text">English text segment (e.g. <c>"GPS"</c>, <c>"ChatGPT"</c>).</param>
+    /// <param name="loanwordData">
+    /// Loanword dictionary; defaults to <see cref="LoanwordDataLoader.Default"/>.
+    /// </param>
+    /// <returns>
+    /// A <see cref="ChineseG2PResult"/> with PUA-mapped tokens. Prosody
+    /// (A1/A2/A3) carries per-token tone information matching Python's
+    /// <c>phonemize_embedded_english</c> pipeline:
+    /// <list type="bullet">
+    ///   <item><description><c>A1 = tone</c> (1-4 lexical tones, 5 neutral)</description></item>
+    ///   <item><description><c>A2 = 1</c> (syllable position; embedded English has no word context)</description></item>
+    ///   <item><description><c>A3 = 1</c> (word length in syllables; same)</description></item>
+    /// </list>
+    /// Returning zeros would silently drop tone information at the ONNX
+    /// prosody tensor (review note R-C1).
+    /// </returns>
+    ChineseG2PResult ConvertEmbeddedEnglish(string text, LoanwordData? loanwordData = null) =>
+        ChineseEmbeddedEnglish.Convert(text, loanwordData);
 }

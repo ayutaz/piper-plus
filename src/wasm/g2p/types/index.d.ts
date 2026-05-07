@@ -2,6 +2,39 @@
 // Multilingual G2P (Grapheme-to-Phoneme) for TTS -- eSpeak-ng free, MIT licensed
 
 // ---------------------------------------------------------------------------
+// ZH-EN code-switching loanword data (TICKET-04 W4, Issue #384)
+// ---------------------------------------------------------------------------
+
+/**
+ * Schema of the bundled `data/zh_en_loanword.json` file. Maps English
+ * tokens (acronyms / loanwords / individual letters) to Mandarin pinyin
+ * syllables for ZH-EN code-switching.
+ *
+ * Byte-for-byte identical to `src/python/g2p/piper_plus_g2p/data/zh_en_loanword.json`
+ * (CI gate: `scripts/check_loanword_consistency.py`).
+ *
+ * Forward-compatible: a future `schema_version: 2` may rename `version` or
+ * add unknown top-level fields. The Python / Rust / Go / C++ / C# loaders all
+ * tolerate a missing `version` (falling back to `schema_version`, then
+ * defaulting to `1`); this TypeScript declaration mirrors that lenient
+ * contract by marking `version` optional. Consumers that need the extra
+ * context can still read unknown fields from the parsed object via
+ * type assertions.
+ */
+export interface LoanwordData {
+    /** Schema version (currently 1; absent in some future schema_v2 manifests). */
+    version?: number;
+    /** Forward-compat alias used by future schema_v2 files. */
+    schema_version?: number;
+    /** Uppercase acronyms (e.g. `"GPS" -> ["ji4", "pi4", "ai1", "si4"]`). */
+    acronyms: Record<string, string[]>;
+    /** Case-sensitive loanwords (e.g. `"Python" -> ["pai4", "sen1"]`). */
+    loanwords: Record<string, string[]>;
+    /** Per-letter A-Z fallback. */
+    letter_fallback: Record<string, string[]>;
+}
+
+// ---------------------------------------------------------------------------
 // Basic types
 // ---------------------------------------------------------------------------
 
@@ -402,8 +435,12 @@ export class ChineseG2P {
     /**
      * @param options - Configuration options.
      * @param options.phonemeIdMap - Phoneme-to-ID mapping for character-based fallback.
+     * @param options.wasmPhonemizer - Optional WASM-backed phonemizer (Rust `WasmPhonemizer`).
      */
-    constructor(options?: { phonemeIdMap?: Record<string, number[]> });
+    constructor(options?: {
+        phonemeIdMap?: Record<string, number[]>;
+        wasmPhonemizer?: object;
+    });
 
     /**
      * Convert Chinese text to phoneme tokens.
@@ -420,6 +457,31 @@ export class ChineseG2P {
      * @returns Phonemize result with phoneme tokens (prosody entries are null).
      */
     phonemizeWithProsody(text: string): PhonemizeResult;
+
+    /**
+     * Toggle ZH-EN code-switching dispatch (Issue #384, TICKET-04 W3).
+     *
+     * Forwarded to the underlying WASM phonemizer. When enabled (default),
+     * embedded English in Chinese context is phonemized as Mandarin pinyin
+     * via the bundled loanword dictionary. No-op when no WASM phonemizer
+     * is attached.
+     *
+     * The argument is coerced to boolean via `Boolean(enabled)` before being
+     * forwarded, so any truthy/falsy value is accepted at runtime even though
+     * the TypeScript signature requires `boolean`. This matches the Rust /
+     * C# / Go / Python / C++ runtime contract where the toggle is strictly
+     * 2-valued. The implicit coercion is *only* a runtime safety net; new
+     * call sites should still pass a real boolean for type-level safety.
+     *
+     * @param enabled - Whether to enable ZH-EN dispatch.
+     */
+    setZhEnDispatch(enabled: boolean): void;
+
+    /**
+     * Whether ZH-EN dispatch is enabled in the underlying WASM phonemizer.
+     * Returns `null` when no WASM phonemizer is attached.
+     */
+    isZhEnDispatchEnabled(): boolean | null;
 }
 
 /**

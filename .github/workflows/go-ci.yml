@@ -5,11 +5,15 @@ on:
     branches: [dev]
     paths:
       - 'src/go/**'
+      - 'src/python/g2p/piper_plus_g2p/data/zh_en_loanword.json'
+      - 'tests/fixtures/g2p/zh_en_loanword_matrix.json'
       - '.github/workflows/go-ci.yml'
   push:
     branches: [dev]
     paths:
       - 'src/go/**'
+      - 'src/python/g2p/piper_plus_g2p/data/zh_en_loanword.json'
+      - 'tests/fixtures/g2p/zh_en_loanword_matrix.json'
   workflow_call:
 
 concurrency:
