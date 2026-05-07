@@ -13,13 +13,19 @@
  * Byte-for-byte identical to `src/python/g2p/piper_plus_g2p/data/zh_en_loanword.json`
  * (CI gate: `scripts/check_loanword_consistency.py`).
  *
- * Forward-compatible: a future `schema_version: 2` may add new top-level
- * fields; `JSON.parse` retains them on the resulting object so consumers
- * that need the extra context keep working.
+ * Forward-compatible: a future `schema_version: 2` may rename `version` or
+ * add unknown top-level fields. The Python / Rust / Go / C++ / C# loaders all
+ * tolerate a missing `version` (falling back to `schema_version`, then
+ * defaulting to `1`); this TypeScript declaration mirrors that lenient
+ * contract by marking `version` optional. Consumers that need the extra
+ * context can still read unknown fields from the parsed object via
+ * type assertions.
  */
 export interface LoanwordData {
-    /** Schema version (currently 1). */
-    version: number;
+    /** Schema version (currently 1; absent in some future schema_v2 manifests). */
+    version?: number;
+    /** Forward-compat alias used by future schema_v2 files. */
+    schema_version?: number;
     /** Uppercase acronyms (e.g. `"GPS" -> ["ji4", "pi4", "ai1", "si4"]`). */
     acronyms: Record<string, string[]>;
     /** Case-sensitive loanwords (e.g. `"Python" -> ["pai4", "sen1"]`). */

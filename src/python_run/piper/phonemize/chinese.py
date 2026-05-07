@@ -292,6 +292,12 @@ def _build_word_info(text: str) -> dict[int, tuple[int, int]]:
     Returns a dict mapping character index → (syllable_position, word_length)
     where syllable_position is 1-based and word_length is the total number of
     Chinese characters in the contiguous group.
+
+    Currently unused at runtime (the training-side counterpart in
+    ``src/python/g2p/piper_plus_g2p/chinese.py`` consumes the result for
+    prosody assembly). Kept here for byte-for-byte parity with the
+    training-side helper so future runtime prosody work can adopt it without
+    re-deriving the algorithm.
     """
     info: dict[int, tuple[int, int]] = {}
     group_start: int | None = None
@@ -337,9 +343,6 @@ def _phonemize_chinese_raw(text: str) -> list[str]:
 
     # Get per-character pinyin for the entire text
     py_result = pinyin(text, style=Style.TONE3, neutral_tone_with_five=True)
-
-    # Build word groups: contiguous Chinese character ranges for prosody
-    _build_word_info(text)
 
     # --- Build per-character pinyin lookup ---
     # pypinyin groups consecutive non-Chinese characters into single entries,
@@ -483,6 +486,12 @@ def _load_loanword_data(path: Path | str) -> dict:
     with open(p, encoding="utf-8") as f:
         data = json.load(f)
 
+    if not isinstance(data, dict):
+        raise ValueError(
+            f"{p}: top-level JSON must be an object/mapping, got "
+            f"{type(data).__name__}"
+        )
+
     result: dict[str, dict[str, list[str]]] = {
         "acronyms": {},
         "loanwords": {},
@@ -598,6 +607,8 @@ def phonemize_embedded_english(text: str) -> list[str]:
     Returns tokens after map_sequence (PUA-mapped). BOS/EOS are added so
     the output shape matches :func:`phonemize_chinese`.
     """
+    # ``_phonemize_embedded_english_raw`` already returns map_sequence-applied
+    # tokens. ``^`` and ``$`` are single-codepoint registered tokens, so we
+    # can splice them directly without re-mapping the whole sequence.
     phonemes = _phonemize_embedded_english_raw(text)
-    tokens = ["^"] + phonemes + ["$"]
-    return map_sequence(tokens)
+    return ["^"] + phonemes + ["$"]

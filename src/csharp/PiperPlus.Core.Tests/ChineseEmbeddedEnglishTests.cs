@@ -288,6 +288,31 @@ public sealed class ChineseEmbeddedEnglishTests
             Array.Empty<int>(), Array.Empty<int>(), Array.Empty<int>());
     }
 
+    /// <summary>
+    /// Dispatch-tracking stub: counts <c>ConvertEmbeddedEnglish</c> invocations
+    /// so the multilingual dispatch path can be verified to honor an injected
+    /// engine (review feedback CS-H1).
+    /// </summary>
+    private sealed class CountingZhEngine : IChineseG2PEngine
+    {
+        public int EmbeddedEnglishCalls;
+        public string? LastEmbeddedEnglishInput;
+
+        public ChineseG2PResult Convert(string text) => new(
+            Array.Empty<string>(),
+            Array.Empty<int>(), Array.Empty<int>(), Array.Empty<int>());
+
+        public ChineseG2PResult ConvertEmbeddedEnglish(
+            string text, LoanwordData? loanwordData = null)
+        {
+            EmbeddedEnglishCalls++;
+            LastEmbeddedEnglishInput = text;
+            // Delegate to the canonical default to keep the rest of the
+            // pipeline behavior intact for the test assertions.
+            return ChineseEmbeddedEnglish.Convert(text, loanwordData);
+        }
+    }
+
     private static MultilingualPhonemizer MakeZhEnDispatchPhonemizer() =>
         new(new Dictionary<string, IPhonemizer>
         {
@@ -352,6 +377,31 @@ public sealed class ChineseEmbeddedEnglishTests
         mp.EnableZhEnDispatch = false;
         var (tokens, _) = mp.PhonemizeWithProsody("你好 GPS 世界");
         Assert.Equal(0, CountPuaToneMarkers(tokens));
+    }
+
+    [Fact]
+    public void MultilingualDispatch_RoutesThroughInjectedEngine()
+    {
+        // Review feedback CS-H1: the dispatch path must call
+        // ChinesePhonemizer.Engine.ConvertEmbeddedEnglish(...) instead of the
+        // static ChineseEmbeddedEnglish.Convert helper, so callers that wire
+        // a custom IChineseG2PEngine see their override honored. Pin that
+        // contract by counting invocations on a tracking engine.
+        var counting = new CountingZhEngine();
+        var mp = new MultilingualPhonemizer(new Dictionary<string, IPhonemizer>
+        {
+            ["zh"] = new ChinesePhonemizer(counting),
+            ["en"] = new PassthroughEnStub(),
+        });
+        var (_, _) = mp.PhonemizeWithProsody("你好 GPS 世界");
+        Assert.True(counting.EmbeddedEnglishCalls >= 1,
+            "MultilingualPhonemizer must route ZH-EN dispatch through " +
+            "ChinesePhonemizer.Engine.ConvertEmbeddedEnglish, not the static helper");
+        // Segmenter may include adjacent whitespace; just verify the engine
+        // saw the GPS token.
+        Assert.NotNull(counting.LastEmbeddedEnglishInput);
+        Assert.Contains("GPS", counting.LastEmbeddedEnglishInput,
+            StringComparison.Ordinal);
     }
 
     [Fact]
@@ -484,10 +534,10 @@ public sealed class ChineseEmbeddedEnglishTests
                 }
                 System.Threading.Thread.SpinWait(500);
             }
-        });
+        }, stop.Token);
 
         // Give the reader a moment to start spinning, then flip the flag.
-        await System.Threading.Tasks.Task.Delay(50);
+        await System.Threading.Tasks.Task.Delay(50, stop.Token);
         mp.EnableZhEnDispatch = false;
 
         await reader;

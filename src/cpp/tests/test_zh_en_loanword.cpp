@@ -49,9 +49,33 @@ TEST(ZhEnLoanwordTest, ParseLoanwordJson_ValidV1) {
     EXPECT_EQ(data.letter_fallback.at("A"), std::vector<std::string>{"ei1"});
 }
 
-TEST(ZhEnLoanwordTest, ParseLoanwordJson_MissingVersion_Throws) {
-    const std::string json = R"({"acronyms": {}})";
-    EXPECT_THROW(parseLoanwordJson("test.json", json), LoanwordSchemaError);
+// Review feedback C-1: forward-compat. The loader is now lenient about
+// ``version`` to match the Python / Rust / C# / Go peers — a missing or
+// non-integer ``version`` silently defaults to 1 (or falls back to
+// ``schema_version`` if present). Previously this threw, which fragmented the
+// cross-runtime contract and would have broken any future schema_v2 manifest.
+TEST(ZhEnLoanwordTest, ParseLoanwordJson_MissingVersion_DefaultsToOne) {
+    const std::string json = R"({"acronyms": {"GPS": ["ji4"]}})";
+    auto data = parseLoanwordJson("test.json", json);
+    EXPECT_EQ(data.version, 1);
+    EXPECT_NE(data.acronyms.find("GPS"), data.acronyms.end());
+}
+
+TEST(ZhEnLoanwordTest, ParseLoanwordJson_SchemaVersionFallback) {
+    // ``version`` absent but ``schema_version`` present — must use the latter.
+    const std::string json = R"({
+        "schema_version": 2,
+        "acronyms": {"GPS": ["ji4"]}
+    })";
+    auto data = parseLoanwordJson("test.json", json);
+    EXPECT_EQ(data.version, 2);
+}
+
+TEST(ZhEnLoanwordTest, ParseLoanwordJson_NonIntVersion_DefaultsToOne) {
+    // A non-int version (e.g. string) is silently ignored, defaulting to 1.
+    const std::string json = R"({"version": "two", "acronyms": {}})";
+    auto data = parseLoanwordJson("test.json", json);
+    EXPECT_EQ(data.version, 1);
 }
 
 TEST(ZhEnLoanwordTest, ParseLoanwordJson_NonListValue_Throws) {
@@ -285,10 +309,12 @@ TEST(ZhEnLoanwordTest, BundledJsonHasNoCarriageReturn) {
 // CI-C1: cross-runtime fixture matrix consumer (C++ side).
 // `src/cpp/tests/fixtures/zh_en_loanword_matrix.json` is mirrored from
 // `tests/fixtures/g2p/zh_en_loanword_matrix.json` by the JSON sync gate.
-// Until this test landed it had no consumer in C++ (the file would silently
-// rot if its expectations diverged from the implementation). Like the Rust
-// counterpart, we only fail when zero matches — fixture authoring vs.
-// per-runtime token-counting conventions are tracked as TICKET-06b followup.
+//
+// Strict per-case checks (review feedback C-M2): the bundled (full) JSON is
+// loaded via ``getDefaultLoanwordData()`` so each case's
+// ``expected_token_count`` MUST match exactly. The previous variant of this
+// test ran against ``makeTestData()`` (a small subset) and only checked
+// ``total > 0``, so per-runtime token-count drift would rot silently.
 // =========================================================================
 
 #include "json.hpp"
@@ -306,7 +332,8 @@ TEST(ZhEnLoanwordTest, FixtureMatrixLoadable) {
         if (fs::exists(c)) { path = c; break; }
     }
     if (path.empty()) {
-        GTEST_SKIP() << "matrix fixture not found from working dir";
+        GTEST_SKIP() << "matrix fixture not found from working dir="
+                     << fs::current_path().string();
     }
 
     std::ifstream ifs(path);
@@ -318,30 +345,39 @@ TEST(ZhEnLoanwordTest, FixtureMatrixLoadable) {
     ASSERT_TRUE(cases.is_array() && !cases.empty())
         << "matrix `cases` must be a non-empty array";
 
-    auto data = makeTestData();
-    int total = 0, matches = 0;
+    // Use the bundled JSON (same data the runtime sees) so ``expected_token_count``
+    // can be checked strictly. ``getDefaultLoanwordData`` may return null only if
+    // the embedded JSON is corrupted — that's a separate test (load failure).
+    auto data = getDefaultLoanwordData();
+    ASSERT_NE(data, nullptr) << "bundled loanword data unavailable: "
+                              << getDefaultLoanwordError();
+
+    int total = 0;
     for (const auto& c : cases) {
         ASSERT_TRUE(c.contains("name") && c["name"].is_string())
             << "case missing `name`: " << c.dump();
         if (!c.contains("input") || !c["input"].is_string()) {
-            // Loader-only cases (e.g. schema_v2_forward_compat_loader)
+            // Loader-only cases (e.g. schema_v2_forward_compat_loader).
             continue;
         }
         if (!c.contains("expected_token_count") ||
             !c["expected_token_count"].is_number()) {
             continue;
         }
+        const std::string name = c["name"].get<std::string>();
         const std::string input = c["input"].get<std::string>();
         const auto expected = c["expected_token_count"].get<size_t>();
         std::vector<Phoneme> out;
-        phonemizeEmbeddedEnglish(input, out, data);
+        phonemizeEmbeddedEnglish(input, out, *data);
         total++;
-        if (out.size() == expected) matches++;
+        EXPECT_EQ(out.size(), expected)
+            << "matrix case " << name << " (input=\"" << input
+            << "\"): expected_token_count=" << expected
+            << ", got " << out.size()
+            << "\n  → if this is intentional, update "
+               "tests/fixtures/g2p/zh_en_loanword_matrix.json and re-sync via "
+               "`python scripts/check_loanword_consistency.py --fix`";
     }
-    // Matrix uses the bundled (full) JSON for its expected counts, while this
-    // test runs against `makeTestData()` (a small subset). We don't expect
-    // every case to match the bundled-data counts, but the file must be
-    // loadable and well-formed. Pin this minimum so the fixture isn't dead.
     EXPECT_GT(total, 0)
         << "no cases had expected_token_count — fixture is stale";
 }

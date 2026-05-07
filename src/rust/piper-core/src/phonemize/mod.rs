@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use crate::config::PhonemeIdMap;
 use crate::error::PiperError;
 
-// Re-export from piper-g2p for backward compatibility
+// Re-export from piper-plus-g2p for backward compatibility
 pub use piper_plus_g2p::G2pError;
 pub use piper_plus_g2p::PhonemeIdMap as G2pPhonemeIdMap;
 

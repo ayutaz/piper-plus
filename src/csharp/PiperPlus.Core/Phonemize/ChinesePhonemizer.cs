@@ -42,8 +42,37 @@ public sealed class ChinesePhonemizer : IPhonemizer
     /// BOS/EOS/padding); use through <see cref="MultilingualPhonemizer"/> for
     /// the full pipeline.
     /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Tone information is dropped from this overload.</b> The returned
+    /// list contains only IPA phoneme strings, not the per-token
+    /// <c>(a1, a2, a3)</c> prosody features that carry Mandarin tone. If you
+    /// feed the result to a Piper model that conditions on prosody, the
+    /// embedded-English tones will be silenced. Use
+    /// <see cref="Engine"/>.<c>ConvertEmbeddedEnglish</c> directly when you
+    /// need the prosody-aware variant — that is the path
+    /// <see cref="MultilingualPhonemizer"/> takes internally
+    /// (review feedback CS-H2, R-C1).
+    /// </para>
+    /// </remarks>
     public IReadOnlyList<string> PhonemizeEmbeddedEnglish(string text) =>
         _engine.ConvertEmbeddedEnglish(text).Phonemes;
+
+    /// <summary>
+    /// Prosody-aware variant of <see cref="PhonemizeEmbeddedEnglish"/>:
+    /// returns IPA tokens together with <see cref="ProsodyInfo"/> per token
+    /// so Mandarin tone information is preserved end-to-end. This is the
+    /// shape <see cref="MultilingualPhonemizer"/> consumes when dispatching
+    /// embedded English in Chinese context.
+    /// </summary>
+    public (IReadOnlyList<string> Phonemes,
+            IReadOnlyList<int> A1,
+            IReadOnlyList<int> A2,
+            IReadOnlyList<int> A3) PhonemizeEmbeddedEnglishWithProsody(string text)
+    {
+        var result = _engine.ConvertEmbeddedEnglish(text);
+        return (result.Phonemes, result.A1, result.A2, result.A3);
+    }
 
     /// <inheritdoc />
     public List<string> Phonemize(string text)

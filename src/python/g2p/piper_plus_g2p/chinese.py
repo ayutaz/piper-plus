@@ -619,6 +619,12 @@ def _load_loanword_data(path: Path | str) -> dict:
     with open(p, encoding="utf-8") as f:
         data = json.load(f)
 
+    if not isinstance(data, dict):
+        raise ValueError(
+            f"{p}: top-level JSON must be an object/mapping, got "
+            f"{type(data).__name__}"
+        )
+
     result: dict[str, dict[str, list[str]]] = {
         "acronyms": {},
         "loanwords": {},

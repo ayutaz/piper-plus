@@ -1,6 +1,6 @@
 //! Adapter from `piper_plus_g2p::Phonemizer` to `piper_core::phonemize::Phonemizer`.
 //!
-//! `piper-g2p`'s `Phonemizer` trait is IPA-first: it returns clean token lists
+//! `piper-plus-g2p`'s `Phonemizer` trait is IPA-first: it returns clean token lists
 //! without BOS/EOS/padding or `phoneme_id_map` knowledge.  The adapter fills
 //! in `get_phoneme_id_map()` (always `None` -- use config.json) and
 //! `post_process_ids()` (delegates to `default_post_process_ids` for non-JA

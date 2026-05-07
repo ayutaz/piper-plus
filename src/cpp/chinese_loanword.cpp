@@ -146,11 +146,25 @@ LoanwordData parseLoanwordJson(const std::string& label, const std::string& json
     }
 
     LoanwordData data;
+    // Lenient version handling for forward-compat (review feedback C-1, R-C4).
+    // Match Python / Rust / C# / Go loaders:
+    //   1. Accept ``version`` if present and numeric.
+    //   2. Fall back to ``schema_version`` if ``version`` is absent.
+    //   3. Silently default to 1 if neither is present or the value is not a
+    //      number.
+    // Previously this loader required ``version`` to be a non-negative
+    // integer, which made a future ``schema_version: 2`` manifest fail to
+    // load in C++/Go even though Rust/Python/C# silently accepted it.
+    data.version = 1;
     auto vit = root.find("version");
-    if (vit == root.end() || !vit->is_number_integer()) {
-        throw LoanwordSchemaError(label + ": missing or non-int 'version'");
+    if (vit != root.end() && vit->is_number_integer()) {
+        data.version = vit->get<int>();
+    } else {
+        auto svit = root.find("schema_version");
+        if (svit != root.end() && svit->is_number_integer()) {
+            data.version = svit->get<int>();
+        }
     }
-    data.version = vit->get<int>();
 
     parse_section(root, label, "acronyms", data.acronyms);
     parse_section(root, label, "loanwords", data.loanwords);

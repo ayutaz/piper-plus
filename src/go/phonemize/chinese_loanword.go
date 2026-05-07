@@ -83,17 +83,28 @@ func parseLoanwordJSON(label string, raw []byte) (*LoanwordData, error) {
 		return nil, fmt.Errorf("%w: %s: %v", ErrLoanwordParse, label, err)
 	}
 
-	versionAny, ok := top["version"]
-	if !ok {
-		return nil, fmt.Errorf("%w: %s: missing 'version'", ErrLoanwordSchema, label)
-	}
-	versionFloat, ok := versionAny.(float64)
-	if !ok {
-		return nil, fmt.Errorf("%w: %s: 'version' must be int", ErrLoanwordSchema, label)
+	// Lenient version handling for forward-compat (review feedback C-1, R-C4).
+	// Match Python / Rust / C# loaders, which:
+	//   1. accept ``version`` if present and numeric;
+	//   2. fall back to ``schema_version`` if ``version`` is absent;
+	//   3. silently default to 1 if neither is present or the value is not
+	//      a number.
+	// This ensures a future schema_v2 file with only ``schema_version`` set
+	// still loads here. The previous strict policy (missing version =&gt; error)
+	// fragmented the cross-runtime contract.
+	version := 1
+	if v, ok := top["version"]; ok {
+		if f, ok := v.(float64); ok {
+			version = int(f)
+		}
+	} else if v, ok := top["schema_version"]; ok {
+		if f, ok := v.(float64); ok {
+			version = int(f)
+		}
 	}
 
 	out := &LoanwordData{
-		Version:        int(versionFloat),
+		Version:        version,
 		Acronyms:       map[string][]string{},
 		Loanwords:      map[string][]string{},
 		LetterFallback: map[string][]string{},

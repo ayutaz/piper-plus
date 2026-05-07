@@ -593,6 +593,22 @@ class TestSchemaValidation:
         with pytest.raises(ValueError, match=r"letter_fallback.*mapping"):
             _load_loanword_data(path)
 
+    def test_top_level_not_mapping_rejected(self, tmp_path: Path):
+        """A top-level JSON that is not an object raises ValueError.
+
+        Covers the loader / ``scripts/check_loanword_consistency.py`` parity:
+        both must reject malformed top-level shapes (list, primitive) with a
+        clear ``ValueError`` rather than the bare ``AttributeError`` raised by
+        ``data.get(...)`` on a non-dict.
+        """
+        from piper_plus_g2p.chinese import _load_loanword_data
+
+        for bad in ([1, 2, 3], "not-a-mapping", 42, None):
+            path = tmp_path / "bad.json"
+            path.write_text(json.dumps(bad), encoding="utf-8")
+            with pytest.raises(ValueError, match=r"top-level JSON must be"):
+                _load_loanword_data(path)
+
     def test_valid_json_accepted(self, tmp_path: Path):
         """A well-formed JSON loads without error."""
         from piper_plus_g2p.chinese import _load_loanword_data

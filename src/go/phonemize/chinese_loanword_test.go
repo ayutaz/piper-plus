@@ -4,7 +4,6 @@ package phonemize
 
 import (
 	"encoding/json"
-	"fmt"
 	"os"
 	"strings"
 	"testing"
@@ -243,6 +242,45 @@ func TestLoaderAcceptsUnknownFieldsInSchemaV2(t *testing.T) {
 	}
 }
 
+// Review feedback C-1: a future ``schema_version: 2`` manifest may legitimately
+// drop the legacy ``version`` field. The loader must accept that, falling back
+// to ``schema_version`` (and silently to 1 if neither is present) so the
+// runtime stays in sync with Rust / Python / C# / C++ peers.
+func TestLoaderForwardCompat_VersionAbsent_UsesSchemaVersion(t *testing.T) {
+	noVersion := []byte(`{
+		"schema_version": 2,
+		"metadata": {"experimental": true},
+		"acronyms": {"GPS": ["ji4"]},
+		"loanwords": {"Python": ["pai4"]},
+		"letter_fallback": {"A": ["ei1"]}
+	}`)
+	data, err := LoadLoanwordDataFromBytes("future_no_version.json", noVersion)
+	if err != nil {
+		t.Fatalf("loader rejected schema_version-only manifest: %v", err)
+	}
+	if data.Version != 2 {
+		t.Errorf("version = %d, want 2 (from schema_version fallback)", data.Version)
+	}
+	if _, ok := data.Acronyms["GPS"]; !ok {
+		t.Error("GPS acronym not loaded")
+	}
+}
+
+func TestLoaderForwardCompat_NeitherVersionNorSchemaVersion_DefaultsToOne(t *testing.T) {
+	noVersionField := []byte(`{
+		"acronyms": {"GPS": ["ji4"]},
+		"loanwords": {"Python": ["pai4"]},
+		"letter_fallback": {"A": ["ei1"]}
+	}`)
+	data, err := LoadLoanwordDataFromBytes("no_version.json", noVersionField)
+	if err != nil {
+		t.Fatalf("loader rejected manifest without any version field: %v", err)
+	}
+	if data.Version != 1 {
+		t.Errorf("version = %d, want 1 (default)", data.Version)
+	}
+}
+
 func TestEmbedConsistency(t *testing.T) {
 	// The embedded JSON must contain canonical keys.
 	raw, err := loanwordFS.ReadFile("data/zh_en_loanword.json")
@@ -411,18 +449,20 @@ func TestZhEnDispatch_PureEnUnaffected(t *testing.T) {
 // Until this consumer landed the file had no test depending on it in the Go
 // runtime, so a drift between the matrix and the implementation would have
 // gone unnoticed. Mirrors `test_fixture_matrix_loadable_and_well_formed` in
-// piper-core (Rust). We assert the file loads and is well-formed; we do
-// NOT fail per-case mismatches because the matrix's `expected_token_count`
-// uses the bundled (full) JSON while the test runs with the same loader,
-// so most counts agree but counting conventions can drift across runtimes
-// (tracked as TICKET-06b followup).
+// piper-core (Rust).
+//
+// Strict per-case checks (review feedback G-M2): every case with both
+// ``input`` and ``expected_token_count`` MUST match exactly. The previous
+// "log-only" form let drift rot silently. If a counting convention legitimately
+// changes, update the matrix in ``tests/fixtures/g2p/`` and re-sync via
+// ``python scripts/check_loanword_consistency.py --fix``.
 // =========================================================================
 
 func TestFixtureMatrixLoadable(t *testing.T) {
 	type matrixCase struct {
-		Name                string `json:"name"`
-		Input               *string `json:"input,omitempty"`
-		ExpectedTokenCount  *int   `json:"expected_token_count,omitempty"`
+		Name               string  `json:"name"`
+		Input              *string `json:"input,omitempty"`
+		ExpectedTokenCount *int    `json:"expected_token_count,omitempty"`
 	}
 	type matrix struct {
 		SchemaVersion int          `json:"schema_version"`
@@ -452,8 +492,7 @@ func TestFixtureMatrixLoadable(t *testing.T) {
 		t.Fatalf("LoadLoanwordData: %v", err)
 	}
 
-	total, matches := 0, 0
-	mismatches := []string{}
+	total := 0
 	for _, c := range m.Cases {
 		if c.Input == nil || c.ExpectedTokenCount == nil {
 			// Loader-only / equivalence cases don't have direct counts.
@@ -461,24 +500,16 @@ func TestFixtureMatrixLoadable(t *testing.T) {
 		}
 		tokens := cp.PhonemizeEmbeddedEnglish(*c.Input, data)
 		total++
-		if len(tokens) == *c.ExpectedTokenCount {
-			matches++
-		} else {
-			mismatches = append(mismatches, fmt.Sprintf(
-				"  %q (input=%q): expected %d, got %d",
-				c.Name, *c.Input, *c.ExpectedTokenCount, len(tokens),
-			))
+		if len(tokens) != *c.ExpectedTokenCount {
+			t.Errorf(
+				"matrix case %q (input=%q): expected_token_count=%d, got %d (tokens=%v)\n"+
+					"  → if this is intentional, update tests/fixtures/g2p/zh_en_loanword_matrix.json "+
+					"and re-sync via `python scripts/check_loanword_consistency.py --fix`",
+				c.Name, *c.Input, *c.ExpectedTokenCount, len(tokens), tokens,
+			)
 		}
 	}
 	if total == 0 {
 		t.Fatal("no cases had `expected_token_count` — matrix is stale")
-	}
-	t.Logf("[matrix] %d / %d cases match expected_token_count exactly", matches, total)
-	if len(mismatches) > 0 {
-		t.Logf("mismatches (tracked as TICKET-06b followup):\n%s",
-			strings.Join(mismatches, "\n"))
-	}
-	if matches == 0 {
-		t.Errorf("no fixture cases agreed with the implementation — fixture is wholly broken")
 	}
 }

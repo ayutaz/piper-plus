@@ -67,13 +67,12 @@ export class ChineseG2P {
      * Toggle ZH-EN code-switching dispatch (TICKET-04 W3, Issue #384).
      *
      * Forwarded to the underlying WASM phonemizer's
-     * `setZhEnDispatch(enabled)` method. When enabled (default), embedded
-     * English in Chinese context is phonemized as Mandarin pinyin via the
-     * loanword dictionary. When disabled, embedded English falls through
-     * to the standard English phonemizer.
-     *
-     * No-op when no WASM phonemizer is attached (character-level
-     * passthrough does not perform code-switching dispatch).
+     * `setZhEnDispatch(enabled)` method. The default-on behavior is owned by
+     * the WASM (Rust) side — this JS class itself does not maintain any
+     * dispatch state and is a pure forwarder. When no WASM phonemizer is
+     * attached this method is a no-op (character-level passthrough does not
+     * perform code-switching dispatch), and `isZhEnDispatchEnabled()` will
+     * return `null`.
      *
      * @param {boolean} enabled
      */
@@ -85,8 +84,9 @@ export class ChineseG2P {
 
     /**
      * Whether ZH-EN code-switching dispatch is currently enabled in the
-     * WASM phonemizer. Returns `null` if the WASM phonemizer is not
-     * attached or does not support the API.
+     * WASM phonemizer. Returns `null` if the WASM phonemizer is not attached
+     * or does not support the API — *not* `true`/`false` — so callers can
+     * distinguish "not configured" from "explicitly off".
      *
      * @returns {boolean|null}
      */

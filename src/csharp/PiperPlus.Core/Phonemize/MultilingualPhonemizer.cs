@@ -32,10 +32,10 @@ public sealed class MultilingualPhonemizer : IPhonemizer
     /// <summary>
     /// ZH-EN code-switching dispatch toggle (TICKET-03 §9.0 #2, Issue #384).
     /// Default-on when both "zh" and "en" phonemizers are registered;
-    /// settable via the <c>EnableZhEnDispatch</c> ctor parameter.
-    /// Marked <c>volatile</c> because the surrounding class advertises
-    /// concurrent use; without a memory barrier a writer thread's update
-    /// may not be observed by a reader on weak-memory targets such as
+    /// flip post-construction via the <see cref="EnableZhEnDispatch"/>
+    /// property setter. Marked <c>volatile</c> because the surrounding class
+    /// advertises concurrent use; without a memory barrier a writer thread's
+    /// update may not be observed by a reader on weak-memory targets such as
     /// ARM64 (review note CS-H3).
     /// </summary>
     private volatile bool _enableZhEnDispatch;
@@ -268,6 +268,12 @@ public sealed class MultilingualPhonemizer : IPhonemizer
 
             // ZH-EN code-switching dispatch: route embedded en (with adjacent
             // zh) through the chinese loanword path. Issue #384, design §2.3.
+            //
+            // The dispatch goes through the registered ChinesePhonemizer's
+            // IChineseG2PEngine so any custom engine (e.g. a NuGet-provided
+            // implementation, or a unit-test fake) is honored — the previous
+            // form called the static ChineseEmbeddedEnglish.Convert directly,
+            // which silently bypassed engine overrides (review feedback CS-H1).
             if (_enableZhEnDispatch && hasZhSegment && lang == "en" &&
                 _phonemizers["zh"] is ChinesePhonemizer cp)
             {
@@ -278,7 +284,7 @@ public sealed class MultilingualPhonemizer : IPhonemizer
                     // Use the prosody-aware variant: each IPA token must carry
                     // ProsodyInfo(a1=tone, a2=1, a3=1) to match Python and avoid
                     // dropping tone information at the ONNX layer (review R-C1).
-                    var result = ChineseEmbeddedEnglish.Convert(segmentText);
+                    var result = cp.Engine.ConvertEmbeddedEnglish(segmentText);
                     int n = result.Phonemes.Count;
                     for (int i = 0; i < n; i++)
                     {

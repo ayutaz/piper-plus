@@ -154,6 +154,13 @@ PIPER_PLUS_API int32_t piper_plus_language_id(
  *  a Chinese segment is routed through the loanword path so e.g. "GPS" sounds
  *  Mandarin-style. Set to 0 to restore the v1.11 CMU-only behavior.
  *
+ *  @threading Inherits ``PiperPlusEngine``'s "one engine per thread" contract.
+ *    This function MUST NOT be called concurrently with synthesis or any
+ *    other engine call on the same handle. The toggle is a plain (non-atomic)
+ *    write because the engine is already single-threaded; if you need to
+ *    flip the flag from another thread, serialize the call yourself or use a
+ *    dedicated control engine.
+ *
  *  @param engine   Engine handle.
  *  @param enabled  0 = disable, non-zero = enable.
  *  @return         PIPER_PLUS_OK on success, error code on NULL engine. */
@@ -162,7 +169,12 @@ PIPER_PLUS_API PiperPlusStatus piper_plus_set_zh_en_dispatch(
     int32_t          enabled);
 
 /** Returns 1 if the ZH-EN code-switching dispatch is currently enabled, 0 if
- *  disabled, or -1 on error (NULL engine). */
+ *  disabled, or -1 on error (NULL engine).
+ *
+ *  @warning Callers MUST check the -1 sentinel before any boolean coercion.
+ *    A naive ``if (piper_plus_is_zh_en_dispatch_enabled(eng))`` will treat
+ *    -1 (error) as enabled. The signed-int pattern is shared with
+ *    ``piper_plus_language_id``. */
 PIPER_PLUS_API int32_t piper_plus_is_zh_en_dispatch_enabled(
     const PiperPlusEngine *engine);
 

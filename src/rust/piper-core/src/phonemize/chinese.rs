@@ -1096,11 +1096,25 @@ pub fn parse_loanword_json(label: &str, json: &str) -> Result<LoanwordData, Stri
 }
 
 /// Return the bundled default ZH-EN loanword data (cached, parsed at first call).
+///
+/// Reviewer feedback (R-M3): the previous implementation `expect`-panic'd on a
+/// corrupted bundled JSON, taking the whole process down on the first call.
+/// We now log once and return an empty `LoanwordData` so the runtime
+/// gracefully falls back to the standard English path.
 pub fn load_default_loanword_data() -> &'static LoanwordData {
     static CACHE: OnceLock<LoanwordData> = OnceLock::new();
     CACHE.get_or_init(|| {
-        parse_loanword_json("zh_en_loanword.json (bundled)", DEFAULT_LOANWORD_JSON)
-            .expect("bundled zh_en_loanword.json: schema must be valid")
+        match parse_loanword_json("zh_en_loanword.json (bundled)", DEFAULT_LOANWORD_JSON) {
+            Ok(data) => data,
+            Err(err) => {
+                eprintln!(
+                    "[piper-core] WARN: bundled zh_en_loanword.json failed to parse — \
+                     ZH-EN dispatch disabled, embedded English will fall through to the \
+                     standard English path. Error: {err}"
+                );
+                LoanwordData::default()
+            }
+        }
     })
 }
 

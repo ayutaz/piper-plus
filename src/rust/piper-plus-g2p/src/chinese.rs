@@ -1028,11 +1028,28 @@ pub fn parse_loanword_json(label: &str, json: &str) -> Result<LoanwordData, Stri
 ///
 /// Backed by `OnceLock`: the JSON is parsed exactly once per process and the
 /// resulting `&'static LoanwordData` is shared.
+///
+/// If the embedded JSON ever becomes corrupted (e.g. a future malformed mirror
+/// slipped past the CI sync gate), the previous implementation `panic!`'d via
+/// `expect`. Reviewer feedback (R-M3) flagged that as fatal because the
+/// corruption surfaces on the first call from any consumer, not at startup.
+/// We now log the parse error once and fall back to an empty
+/// [`LoanwordData`] so embedded English degrades to the standard CMU path
+/// instead of taking the whole process down.
 pub fn load_default_loanword_data() -> &'static LoanwordData {
     static CACHE: OnceLock<LoanwordData> = OnceLock::new();
     CACHE.get_or_init(|| {
-        parse_loanword_json("zh_en_loanword.json (bundled)", DEFAULT_LOANWORD_JSON)
-            .expect("bundled zh_en_loanword.json: schema must be valid")
+        match parse_loanword_json("zh_en_loanword.json (bundled)", DEFAULT_LOANWORD_JSON) {
+            Ok(data) => data,
+            Err(err) => {
+                eprintln!(
+                    "[piper-plus-g2p] WARN: bundled zh_en_loanword.json failed to parse — \
+                     ZH-EN dispatch disabled, embedded English will fall through to the \
+                     standard English path. Error: {err}"
+                );
+                LoanwordData::default()
+            }
+        }
     })
 }
 

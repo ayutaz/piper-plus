@@ -83,8 +83,11 @@ jobs:
               - '.github/workflows/wasm-build.yml'
               - '.github/workflows/npm-publish.yml'
             zh-en-data:
-              - 'src/python/g2p/piper_plus_g2p/data/zh_en_loanword.json'
-              - 'tests/fixtures/g2p/zh_en_loanword_matrix.json'
+              # Source-of-truth + 6 mirrors. Any drift in any mirror should
+              # trigger every per-runtime test job, not just the JSON sync gate.
+              - '**/zh_en_loanword.json'
+              # Cross-runtime test matrix and per-runtime fixture mirrors.
+              - '**/zh_en_loanword_matrix.json'
               - 'scripts/check_loanword_consistency.py'
               - 'cmake/EmbedJson.cmake'
               - 'cmake/PiperCommon.cmake'
