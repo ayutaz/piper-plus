@@ -616,10 +616,12 @@ jobs:
           set -euo pipefail
           A="build-g2p-ios/${{ matrix.slice }}/libpiper_plus_g2p.a"
           echo "=== piper_plus_g2p_* symbols (defined) ==="
-          # macOS nm can return non-zero when iterating archive members with
-          # no external symbols (the symbols are still exported correctly).
-          # Capture output once via `|| true` so pipefail doesn't kill the
-          # step, then verify each FFI symbol explicitly.
+          # nm output for a universal staticlib is large (~10K lines), and
+          # `grep -q` on a piped echo closes the pipe early when the match
+          # is found, which makes echo/awk return SIGPIPE. Combined with
+          # `set -euo pipefail`, that turns a successful match into a
+          # failed step. Avoid pipes entirely by using `case` string
+          # matching against the captured nm output.
           nm_out=$(nm -gU "$A" 2>/dev/null || true)
           for sym in \
             piper_plus_g2p_create \
@@ -628,11 +630,12 @@ jobs:
             piper_plus_g2p_free_string \
             piper_plus_g2p_available_languages
           do
-            echo "$nm_out" | awk '$2 ~ /^[TDSR]$/ {print $NF}' | grep -q "^_${sym}\$" \
-              || { echo "::error::staticlib missing FFI symbol: $sym"; \
-                   echo "$nm_out" | grep piper_plus_g2p_ || true; \
-                   exit 1; }
-            echo "  ok: $sym"
+            case "$nm_out" in
+              *" T _${sym}"*) echo "  ok: $sym" ;;
+              *) echo "::error::staticlib missing FFI symbol: $sym"
+                 printf '%s\n' "$nm_out" | grep piper_plus_g2p_ || true
+                 exit 1 ;;
+            esac
           done
 
       - name: Generate piper_plus_g2p.h via cbindgen
