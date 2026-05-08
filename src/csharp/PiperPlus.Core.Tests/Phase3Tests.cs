@@ -752,10 +752,11 @@ public sealed class Phase3Tests : IDisposable
     [Fact]
     public void TimingWriter_WriteJson_ToFile_CreatesValidFile()
     {
+        // Spec-conforming: PhonemeTimingEntry now stores ms; JSON keys are start_ms/end_ms/duration_ms.
         var entries = new List<TimingWriter.PhonemeTimingEntry>
         {
-            new("k", 0.0f, 0.058f, 0.058f),
-            new("a", 0.058f, 0.116f, 0.058f),
+            new("k", 0.0f, 58.0f, 58.0f),
+            new("a", 58.0f, 116.0f, 58.0f),
         };
 
         string path = Path.Combine(Path.GetTempPath(), $"piper_test_{Guid.NewGuid():N}.json");
@@ -773,16 +774,17 @@ public sealed class Phase3Tests : IDisposable
         Assert.Equal(2, root.GetArrayLength());
         Assert.Equal("k", root[0].GetProperty("phoneme").GetString());
         Assert.Equal("a", root[1].GetProperty("phoneme").GetString());
-        Assert.True(root[0].GetProperty("start").GetSingle() < root[0].GetProperty("end").GetSingle());
+        Assert.True(root[0].GetProperty("start_ms").GetSingle() < root[0].GetProperty("end_ms").GetSingle());
     }
 
     [Fact]
     public void TimingWriter_WriteTsv_ToFile_CreatesValidFile()
     {
+        // Spec-conforming: PhonemeTimingEntry stores ms; TSV header is start_ms/end_ms/duration_ms.
         var entries = new List<TimingWriter.PhonemeTimingEntry>
         {
-            new("k", 0.0f, 0.058f, 0.058f),
-            new("a", 0.058f, 0.116f, 0.058f),
+            new("k", 0.0f, 58.0f, 58.0f),
+            new("a", 58.0f, 116.0f, 58.0f),
         };
 
         string path = Path.Combine(Path.GetTempPath(), $"piper_test_{Guid.NewGuid():N}.tsv");
@@ -796,7 +798,7 @@ public sealed class Phase3Tests : IDisposable
 
         // Header line
         Assert.True(lines.Length >= 3, "Expected header + 2 data lines");
-        Assert.Equal("start\tend\tduration\tphoneme", lines[0]);
+        Assert.Equal("start_ms\tend_ms\tduration_ms\tphoneme", lines[0]);
 
         // First data row
         string[] cols1 = lines[1].Split('\t');
