@@ -1,0 +1,598 @@
+{
+  "schema_version": 1,
+  "language": "es",
+  "description": "Spanish G2P golden phoneme matrix (pins current implementation output).",
+  "metadata": {
+    "source": "Python piper_plus_g2p — pinned by scripts/regenerate_g2p_golden_fixtures.py. The expected values capture the *current* implementation output. Drift in any rule will fail src/python/g2p/tests/test_golden_fixtures.py.",
+    "py_runtime": "src/python/g2p/piper_plus_g2p/spanish.py",
+    "version": 1
+  },
+  "cases": [
+    {
+      "text": "hola",
+      "expected_phonemes": [
+        "ˈ",
+        "o",
+        "l",
+        "a"
+      ],
+      "notes": "basic word"
+    },
+    {
+      "text": "gracias",
+      "expected_phonemes": [
+        "ɡ",
+        "ɾ",
+        "ˈ",
+        "a",
+        "s",
+        "i",
+        "a",
+        "s"
+      ],
+      "notes": "basic word"
+    },
+    {
+      "text": "sí",
+      "expected_phonemes": [
+        "s",
+        "ˈ",
+        "i"
+      ],
+      "notes": "accent on i"
+    },
+    {
+      "text": "no",
+      "expected_phonemes": [
+        "n",
+        "o"
+      ],
+      "notes": "function word, no stress"
+    },
+    {
+      "text": "bueno",
+      "expected_phonemes": [
+        "b",
+        "ˈ",
+        "u",
+        "e",
+        "n",
+        "o"
+      ],
+      "notes": "diphthong ue"
+    },
+    {
+      "text": "día",
+      "expected_phonemes": [
+        "d",
+        "ˈ",
+        "i",
+        "a"
+      ],
+      "notes": "accent on i, hiatus"
+    },
+    {
+      "text": "casa",
+      "expected_phonemes": [
+        "k",
+        "ˈ",
+        "a",
+        "s",
+        "a"
+      ],
+      "notes": "basic word"
+    },
+    {
+      "text": "agua",
+      "expected_phonemes": [
+        "ˈ",
+        "a",
+        "ɣ",
+        "u",
+        "a"
+      ],
+      "notes": "spirantization g→ɣ intervocalic"
+    },
+    {
+      "text": "perro",
+      "expected_phonemes": [
+        "p",
+        "ˈ",
+        "e",
+        "rr",
+        "o"
+      ],
+      "notes": "rr digraph"
+    },
+    {
+      "text": "carro",
+      "expected_phonemes": [
+        "k",
+        "ˈ",
+        "a",
+        "rr",
+        "o"
+      ],
+      "notes": "rr digraph"
+    },
+    {
+      "text": "lluvia",
+      "expected_phonemes": [
+        "ʝ",
+        "ˈ",
+        "u",
+        "β",
+        "i",
+        "a"
+      ],
+      "notes": "ll → ʝ"
+    },
+    {
+      "text": "calle",
+      "expected_phonemes": [
+        "k",
+        "ˈ",
+        "a",
+        "ʝ",
+        "e"
+      ],
+      "notes": "ll → ʝ"
+    },
+    {
+      "text": "gato",
+      "expected_phonemes": [
+        "ɡ",
+        "ˈ",
+        "a",
+        "t",
+        "o"
+      ],
+      "notes": "g initial (no spirantization)"
+    },
+    {
+      "text": "haba",
+      "expected_phonemes": [
+        "ˈ",
+        "a",
+        "β",
+        "a"
+      ],
+      "notes": "b spirantization between vowels (silent h)"
+    },
+    {
+      "text": "vida",
+      "expected_phonemes": [
+        "b",
+        "ˈ",
+        "i",
+        "ð",
+        "a"
+      ],
+      "notes": "v→b, d spirantization"
+    },
+    {
+      "text": "mañana",
+      "expected_phonemes": [
+        "m",
+        "a",
+        "ɲ",
+        "ˈ",
+        "a",
+        "n",
+        "a"
+      ],
+      "notes": "ñ → ɲ"
+    },
+    {
+      "text": "niño",
+      "expected_phonemes": [
+        "n",
+        "ˈ",
+        "i",
+        "ɲ",
+        "o"
+      ],
+      "notes": "ñ → ɲ"
+    },
+    {
+      "text": "año",
+      "expected_phonemes": [
+        "ˈ",
+        "a",
+        "ɲ",
+        "o"
+      ],
+      "notes": "ñ → ɲ initial-ish"
+    },
+    {
+      "text": "chico",
+      "expected_phonemes": [
+        "tʃ",
+        "ˈ",
+        "i",
+        "k",
+        "o"
+      ],
+      "notes": "ch → tʃ"
+    },
+    {
+      "text": "queso",
+      "expected_phonemes": [
+        "k",
+        "ˈ",
+        "e",
+        "s",
+        "o"
+      ],
+      "notes": "qu → k"
+    },
+    {
+      "text": "guitarra",
+      "expected_phonemes": [
+        "ɡ",
+        "i",
+        "t",
+        "ˈ",
+        "a",
+        "rr",
+        "a"
+      ],
+      "notes": "gui → gi (silent u), rr digraph"
+    },
+    {
+      "text": "guerra",
+      "expected_phonemes": [
+        "ɡ",
+        "ˈ",
+        "e",
+        "rr",
+        "a"
+      ],
+      "notes": "gue → ge (silent u)"
+    },
+    {
+      "text": "canción",
+      "expected_phonemes": [
+        "k",
+        "a",
+        "n",
+        "s",
+        "ˈ",
+        "i",
+        "o",
+        "n"
+      ],
+      "notes": "accent on penult o"
+    },
+    {
+      "text": "café",
+      "expected_phonemes": [
+        "k",
+        "a",
+        "f",
+        "ˈ",
+        "e"
+      ],
+      "notes": "accent on final e"
+    },
+    {
+      "text": "fácil",
+      "expected_phonemes": [
+        "f",
+        "ˈ",
+        "a",
+        "s",
+        "i",
+        "l"
+      ],
+      "notes": "accent on a"
+    },
+    {
+      "text": "música",
+      "expected_phonemes": [
+        "m",
+        "ˈ",
+        "u",
+        "s",
+        "i",
+        "k",
+        "a"
+      ],
+      "notes": "accent on antepenult u"
+    },
+    {
+      "text": "hierro",
+      "expected_phonemes": [
+        "ˈ",
+        "i",
+        "e",
+        "rr",
+        "o"
+      ],
+      "notes": "ie diphthong + rr (silent h)"
+    },
+    {
+      "text": "piedra",
+      "expected_phonemes": [
+        "p",
+        "ˈ",
+        "i",
+        "e",
+        "ð",
+        "ɾ",
+        "a"
+      ],
+      "notes": "ie diphthong + dr cluster"
+    },
+    {
+      "text": "ciudad",
+      "expected_phonemes": [
+        "s",
+        "i",
+        "u",
+        "ð",
+        "ˈ",
+        "a",
+        "ð"
+      ],
+      "notes": "iu diphthong"
+    },
+    {
+      "text": "de",
+      "expected_phonemes": [
+        "d",
+        "e"
+      ],
+      "notes": "function word"
+    },
+    {
+      "text": "la",
+      "expected_phonemes": [
+        "l",
+        "a"
+      ],
+      "notes": "function word"
+    },
+    {
+      "text": "el",
+      "expected_phonemes": [
+        "e",
+        "l"
+      ],
+      "notes": "function word"
+    },
+    {
+      "text": "en",
+      "expected_phonemes": [
+        "e",
+        "n"
+      ],
+      "notes": "function word"
+    },
+    {
+      "text": "y",
+      "expected_phonemes": [
+        "i"
+      ],
+      "notes": "function word"
+    },
+    {
+      "text": "transporte",
+      "expected_phonemes": [
+        "t",
+        "ɾ",
+        "a",
+        "n",
+        "s",
+        "p",
+        "ˈ",
+        "o",
+        "ɾ",
+        "t",
+        "e"
+      ],
+      "notes": "transp- cluster"
+    },
+    {
+      "text": "obstáculo",
+      "expected_phonemes": [
+        "o",
+        "β",
+        "s",
+        "t",
+        "ˈ",
+        "a",
+        "k",
+        "u",
+        "l",
+        "o"
+      ],
+      "notes": "bs cluster + accent"
+    },
+    {
+      "text": "instrumento",
+      "expected_phonemes": [
+        "i",
+        "n",
+        "s",
+        "t",
+        "ɾ",
+        "u",
+        "m",
+        "ˈ",
+        "e",
+        "n",
+        "t",
+        "o"
+      ],
+      "notes": "nstr cluster"
+    },
+    {
+      "text": "zapato",
+      "expected_phonemes": [
+        "s",
+        "a",
+        "p",
+        "ˈ",
+        "a",
+        "t",
+        "o"
+      ],
+      "notes": "z → s (seseo)"
+    },
+    {
+      "text": "cinco",
+      "expected_phonemes": [
+        "s",
+        "ˈ",
+        "i",
+        "n",
+        "k",
+        "o"
+      ],
+      "notes": "ce/ci → s"
+    },
+    {
+      "text": "examen",
+      "expected_phonemes": [
+        "e",
+        "k",
+        "s",
+        "ˈ",
+        "a",
+        "m",
+        "e",
+        "n"
+      ],
+      "notes": "x intervocalic"
+    },
+    {
+      "text": "comer",
+      "expected_phonemes": [
+        "k",
+        "o",
+        "m",
+        "ˈ",
+        "e",
+        "ɾ"
+      ],
+      "notes": "stress on -er ending"
+    },
+    {
+      "text": "vivir",
+      "expected_phonemes": [
+        "b",
+        "i",
+        "β",
+        "ˈ",
+        "i",
+        "ɾ"
+      ],
+      "notes": "ir verb"
+    },
+    {
+      "text": "hablar",
+      "expected_phonemes": [
+        "a",
+        "β",
+        "l",
+        "ˈ",
+        "a",
+        "ɾ"
+      ],
+      "notes": "ar verb (silent h)"
+    },
+    {
+      "text": "rojo",
+      "expected_phonemes": [
+        "rr",
+        "ˈ",
+        "o",
+        "x",
+        "o"
+      ],
+      "notes": "j → x"
+    },
+    {
+      "text": "amigo",
+      "expected_phonemes": [
+        "a",
+        "m",
+        "ˈ",
+        "i",
+        "ɣ",
+        "o"
+      ],
+      "notes": "stress on penult"
+    },
+    {
+      "text": "hueso",
+      "expected_phonemes": [
+        "ˈ",
+        "u",
+        "e",
+        "s",
+        "o"
+      ],
+      "notes": "silent h before ue"
+    },
+    {
+      "text": "yerno",
+      "expected_phonemes": [
+        "ʝ",
+        "ˈ",
+        "e",
+        "ɾ",
+        "n",
+        "o"
+      ],
+      "notes": "y as consonant"
+    },
+    {
+      "text": "quien",
+      "expected_phonemes": [
+        "k",
+        "ˈ",
+        "i",
+        "e",
+        "n"
+      ],
+      "notes": "qu + ie"
+    },
+    {
+      "text": "ahora",
+      "expected_phonemes": [
+        "a",
+        "ˈ",
+        "o",
+        "ɾ",
+        "a"
+      ],
+      "notes": "silent h between vowels"
+    },
+    {
+      "text": "cero",
+      "expected_phonemes": [
+        "s",
+        "ˈ",
+        "e",
+        "ɾ",
+        "o"
+      ],
+      "notes": "ce → s"
+    },
+    {
+      "text": "rápido",
+      "expected_phonemes": [
+        "rr",
+        "ˈ",
+        "a",
+        "p",
+        "i",
+        "ð",
+        "o"
+      ],
+      "notes": "rr at word start (single r)"
+    }
+  ]
+}
