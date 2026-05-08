@@ -38,8 +38,10 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 
 SOURCE = REPO_ROOT / "src/python/g2p/piper_plus_g2p/data/zh_en_loanword.json"
 
-# 7 mirror copies (Python source を含めると計 8 ファイル). 各 TICKET-01〜05 が
-# 自分のランタイム copy を追加してゆく.
+# 9 mirror copies (Python source を含めると計 10 ファイル). 各 TICKET-01〜05 が
+# 自分のランタイム copy を追加してゆく. Kotlin Android G2P と Swift G2P は Rust
+# crate 経由で transitively 担保されていたが、CI gate を直接担保にするため
+# 両ランタイムの own mirror を sync 対象に追加 (Issue #388 / #387 follow-up).
 COPIES: list[Path] = [
     REPO_ROOT / "src/python_run/piper/phonemize/data/zh_en_loanword.json",
     # Rust 2 crate (§8.5: piper-plus-g2p と piper-core の重複維持)
@@ -49,6 +51,12 @@ COPIES: list[Path] = [
     REPO_ROOT / "src/csharp/PiperPlus.Core/Phonemize/Data/zh_en_loanword.json",
     REPO_ROOT / "src/wasm/g2p/data/zh_en_loanword.json",
     REPO_ROOT / "src/cpp/data/zh_en_loanword.json",
+    # Kotlin Android G2P AAR (io.github.ayutaz:piper-plus-g2p-android) — bundled
+    # into AAR `assets/` by AGP, accessible via `Context.assets.open(...)`.
+    REPO_ROOT / "android/piper-plus-g2p/src/main/assets/zh_en_loanword.json",
+    # Swift G2P (PiperPlusG2P SPM product) — declared as a `.process` resource
+    # in Package.swift so it ships inside `Bundle.module` for both iOS and macOS.
+    REPO_ROOT / "Sources/PiperPlusG2P/Resources/zh_en_loanword.json",
 ]
 
 # Cross-runtime fixture matrix. TICKET-06b (Day 14) で導入.
@@ -61,6 +69,14 @@ FIXTURE_MIRRORS: list[Path] = [
     # YELLOW-3: Rust 2 crate 対称テストのため両 crate 配下に mirror
     REPO_ROOT / "src/rust/piper-plus-g2p/tests/fixtures/zh_en_loanword_matrix.json",
     REPO_ROOT / "src/rust/piper-core/tests/fixtures/zh_en_loanword_matrix.json",
+    # Kotlin Android G2P androidTest assets — same g2p_fixtures/ subdir layout
+    # the existing syncG2pFixture Gradle task uses for phoneme_test_cases.json.
+    # Committed as a static mirror so the sync gate enforces it directly
+    # (rather than relying on a build-time copy task).
+    REPO_ROOT / "android/piper-plus-g2p/src/androidTest/assets/g2p_fixtures/zh_en_loanword_matrix.json",
+    # Swift G2P XCTest — placed under Tests/.../Fixtures/ so it can be loaded
+    # via Bundle.module once the testTarget gains a `resources:` declaration.
+    REPO_ROOT / "tests/PiperPlusG2PTests/Fixtures/zh_en_loanword_matrix.json",
 ]
 
 
