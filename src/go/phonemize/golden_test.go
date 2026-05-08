@@ -651,18 +651,32 @@ func TestGolden_DetectLanguage(t *testing.T) {
 				}
 			}
 
-			detected := ""
+			// Find max vote count first (deterministic across platforms).
 			maxVotes := 0
-			for lang, count := range votes {
+			for _, count := range votes {
 				if count > maxVotes {
 					maxVotes = count
-					detected = lang
 				}
 			}
 
-			if detected != dc.ExpectedLanguage {
-				t.Errorf("detection mismatch: got %q, expected %q (votes: %v)",
-					detected, dc.ExpectedLanguage, votes)
+			// Collect all languages tied at max — Go map iteration is
+			// non-deterministic, so any tie-resolved single winner would
+			// flake on Windows vs Linux. Accept the expected language as
+			// long as it is among the top-voted set.
+			expectedInTop := false
+			topLangs := []string{}
+			for lang, count := range votes {
+				if count == maxVotes {
+					topLangs = append(topLangs, lang)
+					if lang == dc.ExpectedLanguage {
+						expectedInTop = true
+					}
+				}
+			}
+
+			if !expectedInTop {
+				t.Errorf("detection mismatch: top-voted langs %v (max=%d), expected %q (votes: %v)",
+					topLangs, maxVotes, dc.ExpectedLanguage, votes)
 			}
 		})
 	}
