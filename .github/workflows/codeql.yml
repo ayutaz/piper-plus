@@ -13,10 +13,19 @@ name: CodeQL
 #              glue であり、SAST 価値が低い。Swift コンパイラ診断 +
 #              `swift test (PiperPlusG2PTests, macOS)` job + 背後の Rust crate
 #              の clippy/cargo-audit で実効的にカバーされている。
-#   - Kotlin : `build-mode: none` を使用。AAR build は事前ビルド済み
-#              libpiper_plus.so が jniLibs/<abi>/ に staged されている前提で、
-#              CodeQL autobuild 環境には存在しない。no-build mode で syntactic
-#              解析を行う (SAST の主要 query は build artifact 不要)。
+#   - Kotlin : `build-mode: manual` を使用。
+#              理由: AAR の autobuild は事前ビルド済み libpiper_plus.so が
+#              jniLibs/<abi>/ に staged されている前提で、CodeQL 環境には
+#              存在しない (libpiper_plus.so は release-shared-lib.yml が別
+#              workflow で生成し、kotlin-g2p-ci.yml が Stage する)。
+#              `build-mode: none` は Android SDK classpath を持たず Android
+#              import を解決できないため extractor が "could not process any
+#              of it" で fail。
+#              よって manual mode で Kotlin コンパイル task のみ明示実行
+#              (`compileReleaseKotlin`) し、native build (CMake / .so link)
+#              は除外。Kotlin コードに残る path-injection / URL-redirection
+#              のような実 SAST 価値は確保しつつ、native artifact 依存を
+#              切り離す。JNI/native 側の SAST は C++ CodeQL でカバー。
 
 on:
   pull_request:
@@ -111,10 +120,8 @@ jobs:
             # CodeQL の Kotlin 解析は java-kotlin として扱う。matrix の表示名
             # は kotlin だが init 内部で java-kotlin にマップする (下の step
             # で `languages: java-kotlin` を渡す)。
-            # no-build mode: AGP/Gradle の jniLibs/<abi>/libpiper_plus.so
-            # 依存を回避 (CodeQL 環境には事前ビルド済み .so が存在しない)。
             os: ubuntu-24.04
-            build-mode: none
+            build-mode: manual
 
     steps:
       - name: Skip if no relevant changes
@@ -172,6 +179,19 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y cmake build-essential
 
+      - name: Setup JDK (Kotlin)
+        if: steps.should-skip.outputs.skip != 'true' && matrix.language == 'kotlin'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Android SDK (Kotlin)
+        if: steps.should-skip.outputs.skip != 'true' && matrix.language == 'kotlin'
+        uses: android-actions/setup-android@v3
+        with:
+          cmdline-tools-version: 11076708
+
       - name: Initialize CodeQL
         if: steps.should-skip.outputs.skip != 'true'
         uses: github/codeql-action/init@v3
@@ -199,6 +219,24 @@ jobs:
         run: |
           cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF
           cmake --build build --parallel 2
+
+      - name: Manual build (Kotlin)
+        if: steps.should-skip.outputs.skip != 'true' && matrix.language == 'kotlin'
+        working-directory: android
+        # Kotlin コンパイル task のみ明示実行 (compileReleaseKotlin)。
+        # native build (externalNativeBuild / configureCMake) は除外して
+        # libpiper_plus.so / .so link 依存を切り離す。
+        # CodeQL Java extractor がこの compile に hook して .kt の AST を
+        # 正確に抽出する (Android SDK classpath が解決された状態)。
+        run: |
+          ./gradlew \
+            :piper-plus-g2p:compileReleaseKotlin \
+            :piper-plus:compileReleaseKotlin \
+            -x externalNativeBuildRelease \
+            -x externalNativeBuildDebug \
+            -x configureCMakeRelease \
+            -x configureCMakeDebug \
+            --no-daemon --stacktrace
 
       - name: Perform CodeQL Analysis
         if: steps.should-skip.outputs.skip != 'true'
