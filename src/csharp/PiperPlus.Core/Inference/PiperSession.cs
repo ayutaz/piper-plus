@@ -44,7 +44,44 @@ public record SynthesisInput(
     float LengthScale = 1.0f,
     float NoiseW = 0.8f,
     float[]? SpeakerEmbedding = null
-);
+)
+{
+    /// <summary>
+    /// Validates that <see cref="SpeakerId"/> and <see cref="SpeakerEmbedding"/>
+    /// are not both used in the same synthesis call.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Speaker selection is mutually exclusive: a model is conditioned on either
+    /// a discrete speaker index (<c>sid</c>) or a continuous speaker embedding
+    /// vector (<c>speaker_embedding</c>), never both. Mixing them yields an
+    /// undefined identity and is treated as a caller error rather than silently
+    /// preferring one branch. <see cref="SpeakerId"/> is considered "set" when
+    /// it is non-zero (the record's default is <c>0</c>); a non-empty
+    /// <see cref="SpeakerEmbedding"/> array is considered "set".
+    /// </para>
+    /// <para>
+    /// Mirrors the same check applied by the Python / Rust / Go runtimes when
+    /// the user passes both <c>speaker_id</c> and a reference audio / embedding.
+    /// </para>
+    /// </remarks>
+    /// <exception cref="ArgumentException">
+    /// Thrown when both a non-zero <see cref="SpeakerId"/> and a non-empty
+    /// <see cref="SpeakerEmbedding"/> are supplied.
+    /// </exception>
+    public void Validate()
+    {
+        bool hasSpeakerId = SpeakerId != 0;
+        bool hasSpeakerEmbedding = SpeakerEmbedding is not null && SpeakerEmbedding.Length > 0;
+
+        if (hasSpeakerId && hasSpeakerEmbedding)
+        {
+            throw new ArgumentException(
+                "SpeakerId and SpeakerEmbedding are mutually exclusive",
+                nameof(SpeakerEmbedding));
+        }
+    }
+}
 
 /// <summary>
 /// Runs ONNX inference against a loaded <see cref="PiperModel"/> and converts
@@ -104,6 +141,7 @@ public sealed class PiperSession
     public short[] Synthesize(SynthesisInput input)
     {
         ArgumentNullException.ThrowIfNull(input);
+        input.Validate();
 
         float[] raw = SynthesizeToFloat(input);
         short[] pcm = ConvertToInt16(raw);
@@ -130,6 +168,7 @@ public sealed class PiperSession
     public float[] SynthesizeToFloat(SynthesisInput input)
     {
         ArgumentNullException.ThrowIfNull(input);
+        input.Validate();
 
         if (input.PhonemeIds.Length == 0)
             return [];
@@ -151,6 +190,7 @@ public sealed class PiperSession
     public SynthesisResult SynthesizeWithDurations(SynthesisInput input)
     {
         ArgumentNullException.ThrowIfNull(input);
+        input.Validate();
 
         if (input.PhonemeIds.Length == 0)
             return new SynthesisResult([], null);

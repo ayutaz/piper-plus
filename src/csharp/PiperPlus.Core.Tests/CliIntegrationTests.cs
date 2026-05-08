@@ -501,4 +501,26 @@ public sealed class CliIntegrationTests
             || exitCode != 0,
             $"Expected model resolution attempt. ExitCode={exitCode}, Output: {combined}");
     }
+
+    // ================================================================
+    // --speaker × voice-cloning mutual exclusion
+    // ================================================================
+
+    [Fact]
+    [Trait("Category", "CLI")]
+    public async Task Speaker_AndReferenceAudio_AreMutuallyExclusive()
+    {
+        // The CLI must reject combining --speaker with voice-cloning sources
+        // (--reference-audio / --speaker-embedding) before any model load,
+        // mirroring the SynthesisInput.Validate() contract in PiperPlus.Core.
+        var (exitCode, stdout, stderr) = await RunCliAsync(
+            "--model", "tsukuyomi",
+            "--text", "テスト",
+            "--speaker", "5",
+            "--reference-audio", "/nonexistent/ref.wav");
+        SkipIfBuildFailed(exitCode, stderr);
+
+        string combined = stdout + stderr;
+        Assert.Contains("mutually exclusive", combined, StringComparison.OrdinalIgnoreCase);
+    }
 }
