@@ -122,6 +122,7 @@ check_*.py
 !scripts/check_ort_session_contract.py
 !scripts/check_text_splitter_contract.py
 !scripts/check_language_id_map_contract.py
+!scripts/check_ssml_contract.py
 create_comprehensive_*.py
 add_missing_*.py
 retrain_*.py

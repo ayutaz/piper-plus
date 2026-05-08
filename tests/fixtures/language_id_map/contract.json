@@ -35,6 +35,26 @@
       "es",
       "fr",
       "pt"
+    ],
+    "extended_language_id_map": {
+      "ja": 0,
+      "en": 1,
+      "zh": 2,
+      "es": 3,
+      "fr": 4,
+      "pt": 5,
+      "sv": 6,
+      "ko": 7
+    },
+    "extended_languages": [
+      "ja",
+      "en",
+      "zh",
+      "es",
+      "fr",
+      "pt",
+      "sv",
+      "ko"
     ]
   },
   "invariants": {
@@ -80,8 +100,9 @@
     {
       "runtime": "rust_wasm",
       "path": "src/rust/piper-wasm/src/lib.rs",
-      "kind": "inline_substring_7lang",
-      "expected": "language_id_map"
+      "kind": "inline_substring_8lang",
+      "expected": "extended_language_id_map",
+      "note": "Future-facing 8-language sample config (sv=6, ko=7)."
     },
     {
       "runtime": "go",

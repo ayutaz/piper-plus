@@ -359,3 +359,170 @@ class TestSpeakerBalancedBatchSampler:
             language_group_balance=None,
         )
         assert sampler.language_group_balance is False
+
+
+# ---------------------------------------------------------------------------
+# Edge case: DDP rank-disjoint batches (audit gap #6)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.training
+class TestSpeakerBalancedSamplerDDP:
+    """Verify DDP rank partitioning is disjoint and consistent across world_size.
+
+    The sampler's ``__iter__`` yields ``all_batches[idx]`` only when
+    ``idx % world_size == rank`` (dataset.py L580).  Each rank therefore
+    sees a disjoint subset.  We simulate DDP by directly setting the
+    ``rank`` / ``world_size`` attributes on already-constructed sampler
+    instances — no real ``torch.distributed`` init required.
+
+    Sample indices form natural identity within an epoch (no duplicates
+    inside a single iter), so cross-rank disjointness is asserted via
+    set intersection over per-rank-collected indices.
+    """
+
+    @pytest.fixture
+    def big_dataset(self):
+        """Large enough dataset to produce many batches across ranks."""
+        # 32 speakers * 100 samples each; batch_size=16, samples_per_speaker=4
+        # → 4 speakers/batch, ~lots of batches before exhaustion.
+        return MockDataset(num_speakers=32, samples_per_speaker=100)
+
+    def _make_rank_sampler(self, dataset, batch_size, samples_per_speaker, world_size, rank):
+        """Build a sampler then patch (rank, world_size) post-init.
+
+        The sampler reads ``torch.distributed.is_initialized()`` only
+        during ``__init__``. Overwriting the cached attributes afterward
+        gives identical behaviour to a real DDP environment.
+        """
+        sampler = SpeakerBalancedBatchSampler(
+            dataset,
+            batch_size=batch_size,
+            samples_per_speaker=samples_per_speaker,
+        )
+        sampler.rank = rank
+        sampler.world_size = world_size
+        return sampler
+
+    @pytest.mark.unit
+    def test_rank_disjoint_world_size_2(self, big_dataset):
+        """world_size=2: rank=0 and rank=1 produce disjoint batch sets.
+
+        Each rank yields ``len(all_batches) // 2`` batches; together they
+        cover every usable batch exactly once.
+        """
+        batch_size = 16
+        samples_per_speaker = 4
+
+        sampler_r0 = self._make_rank_sampler(
+            big_dataset, batch_size, samples_per_speaker, world_size=2, rank=0
+        )
+        sampler_r1 = self._make_rank_sampler(
+            big_dataset, batch_size, samples_per_speaker, world_size=2, rank=1
+        )
+        # Same epoch -> same RNG seed -> same all_batches order.
+        sampler_r0.set_epoch(0)
+        sampler_r1.set_epoch(0)
+
+        batches_r0 = [tuple(b) for b in sampler_r0]
+        batches_r1 = [tuple(b) for b in sampler_r1]
+
+        # Both ranks must produce at least one batch
+        assert len(batches_r0) > 0, "rank=0 produced no batches"
+        assert len(batches_r1) > 0, "rank=1 produced no batches"
+
+        # Disjoint: no batch tuple appears in both ranks
+        set_r0 = set(batches_r0)
+        set_r1 = set(batches_r1)
+        intersection = set_r0 & set_r1
+        assert intersection == set(), (
+            f"rank=0 and rank=1 batches overlap: {len(intersection)} shared batches"
+        )
+
+        # Stronger: per-sample disjointness within an epoch
+        idx_r0 = {idx for batch in batches_r0 for idx in batch}
+        idx_r1 = {idx for batch in batches_r1 for idx in batch}
+        assert idx_r0 & idx_r1 == set(), (
+            f"Sample indices overlap across ranks: "
+            f"{len(idx_r0 & idx_r1)} shared indices"
+        )
+
+    @pytest.mark.unit
+    def test_rank_disjoint_world_size_4(self, big_dataset):
+        """world_size=4: all four ranks produce mutually disjoint batches."""
+        batch_size = 16
+        samples_per_speaker = 4
+        world_size = 4
+
+        samplers = [
+            self._make_rank_sampler(
+                big_dataset, batch_size, samples_per_speaker,
+                world_size=world_size, rank=r,
+            )
+            for r in range(world_size)
+        ]
+        # Identical epoch on every rank
+        for s in samplers:
+            s.set_epoch(0)
+
+        per_rank_batches = [[tuple(b) for b in s] for s in samplers]
+        # Every rank yields at least one batch
+        for r, b in enumerate(per_rank_batches):
+            assert len(b) > 0, f"rank={r} produced no batches"
+
+        # Pairwise disjoint check
+        for i in range(world_size):
+            for j in range(i + 1, world_size):
+                shared = set(per_rank_batches[i]) & set(per_rank_batches[j])
+                assert shared == set(), (
+                    f"rank={i} and rank={j} share {len(shared)} batches"
+                )
+
+        # All-rank sample-index disjointness
+        all_indices = []
+        for r in range(world_size):
+            ranked = {idx for batch in per_rank_batches[r] for idx in batch}
+            for prior in all_indices:
+                assert ranked & prior == set(), (
+                    f"rank={r} indices overlap with a prior rank"
+                )
+            all_indices.append(ranked)
+
+    @pytest.mark.unit
+    def test_rank_consistent_count_world_size_2(self, big_dataset):
+        """world_size=2: each rank receives the same number of batches.
+
+        The sampler trims ``all_batches`` to a multiple of ``world_size``
+        (line 578) so both ranks get exactly ``len(all_batches) // 2``.
+        """
+        batch_size = 16
+        samples_per_speaker = 4
+
+        sampler_r0 = self._make_rank_sampler(
+            big_dataset, batch_size, samples_per_speaker, world_size=2, rank=0
+        )
+        sampler_r1 = self._make_rank_sampler(
+            big_dataset, batch_size, samples_per_speaker, world_size=2, rank=1
+        )
+        sampler_r0.set_epoch(0)
+        sampler_r1.set_epoch(0)
+
+        n_r0 = sum(1 for _ in sampler_r0)
+        n_r1 = sum(1 for _ in sampler_r1)
+        assert n_r0 == n_r1, (
+            f"rank=0 yielded {n_r0} batches but rank=1 yielded {n_r1}; "
+            "world_size truncation should equalize them"
+        )
+
+        # Also verify against single-rank baseline (world_size=1).
+        sampler_full = self._make_rank_sampler(
+            big_dataset, batch_size, samples_per_speaker, world_size=1, rank=0
+        )
+        sampler_full.set_epoch(0)
+        n_full = sum(1 for _ in sampler_full)
+        # Per-rank count is ~ (n_full - n_full % 2) / 2
+        expected_per_rank = (n_full // 2) * 2 // 2
+        assert n_r0 == expected_per_rank, (
+            f"rank=0 batches ({n_r0}) != expected ({expected_per_rank}) "
+            f"derived from world_size=1 baseline ({n_full})"
+        )

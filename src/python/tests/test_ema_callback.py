@@ -397,20 +397,28 @@ class TestEMAWithRemoveWeightNorm:
         assert skipped == 0
 
     def test_apply_ema_after_remove_weight_norm_fails(self):
-        """remove_weight_norm 後に EMA shadow を適用すると全てが skipped になる.
+        """remove_weight_norm 後に EMA shadow を適用すると weight_g/v が skipped される.
 
         Pin the regression: weight_g/weight_v keys vanish after
-        remove_weight_norm(), and ``applied`` becomes 0 with all
-        shadow keys reported as skipped.
+        remove_weight_norm() (only "bias" and the fused "weight" remain).
+        Shadow params keyed under weight_g/weight_v become unmatchable
+        and are reported as skipped — this is the failure mode the
+        export_onnx.py L428 critical comment warns about.
         """
         from piper_train.export_onnx import apply_ema_shadow_params
 
         decoder = self._make_decoder_with_weight_norm()
         # Capture shadow params BEFORE remove_weight_norm (these have weight_g/v keys)
         shadow_params = self._make_shadow_params(decoder)
+        # Count weight-norm-specific keys (weight_g, weight_v) — these are the
+        # ones that disappear after remove_weight_norm. "bias" persists.
+        wn_keys = [k for k in shadow_params if "weight_g" in k or "weight_v" in k]
+        non_wn_keys = [k for k in shadow_params if k not in wn_keys]
+        assert len(wn_keys) >= 2, (
+            f"weight_norm should produce ≥2 weight_g/weight_v keys, got {wn_keys}"
+        )
 
         # Now remove weight norm — fuses weight_g + weight_v into single "weight"
-        # Find the wrapped Conv1d module and unwrap it
         from torch.nn.utils import remove_weight_norm
 
         for module in decoder.modules():
@@ -422,13 +430,20 @@ class TestEMAWithRemoveWeightNorm:
         assert not any("weight_g" in n for n in post_names), (
             f"weight_g should be removed, got {post_names}"
         )
-
-        # Now apply_ema_shadow_params: all shadow keys are unmatched
-        applied, skipped = apply_ema_shadow_params(decoder, shadow_params)
-        assert applied == 0, (
-            f"After remove_weight_norm(), no weight_g/v keys remain to apply "
-            f"(applied={applied}, expected=0)"
+        assert not any("weight_v" in n for n in post_names), (
+            f"weight_v should be removed, got {post_names}"
         )
-        assert skipped == len(shadow_params), (
-            f"All {len(shadow_params)} shadow keys should be skipped, got {skipped}"
+
+        # Now apply_ema_shadow_params: weight_g/v are unmatched (skipped),
+        # but "bias" still matches (applied). Pin the failure mode:
+        # the EMA payload for weight_norm parameters is silently skipped.
+        applied, skipped = apply_ema_shadow_params(decoder, shadow_params)
+        assert skipped == len(wn_keys), (
+            f"weight_g/weight_v keys ({len(wn_keys)}) should be skipped "
+            f"after remove_weight_norm(), got skipped={skipped}"
+        )
+        # Only non-weight_norm keys (e.g. "bias") survive matching.
+        assert applied == len(non_wn_keys), (
+            f"Only non-weight_norm keys ({len(non_wn_keys)}) should still be "
+            f"applied (e.g. bias), got applied={applied}"
         )
