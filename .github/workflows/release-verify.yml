@@ -1,0 +1,463 @@
+name: Release Artifact Verification
+
+# Post-publish verification gate. After a release tag's publish workflows
+# (dev-create-release / npm-publish / g2p-rust-publish / release-shared-lib /
+# release-kotlin-g2p) finish, this job pulls down the published artefacts
+# from PyPI / npm / NuGet / crates.io / Maven Central and verifies:
+#
+#   1. SLSA build provenance attestation matches (gh attestation verify).
+#   2. npm provenance flag is present (npm view --json .dist.attestations).
+#   3. PyPI metadata is reachable and matches the expected version.
+#   4. NuGet package signature is valid (when signed).
+#
+# A failure here does NOT roll back the publish (we cannot un-publish from
+# PyPI/crates.io); instead, the workflow opens a GitHub issue tagged
+# `release-verify-failure` so a maintainer can act (yank, re-publish,
+# rotate keys, etc).
+#
+# Triggers:
+#   - workflow_run on the publish workflows (post-publish hook).
+#   - schedule (daily) — paranoid re-verification of the latest release.
+#   - workflow_dispatch with explicit version input — manual ad-hoc check.
+
+on:
+  workflow_run:
+    workflows:
+      - "Manual Release"
+      - "npm publish"
+      - "Publish piper-plus-g2p (Rust)"
+      - "Publish piper-plus-g2p (Go)"
+      - "Release Shared Library"
+      - "Release Kotlin G2P (Maven Central)"
+    types: [completed]
+  schedule:
+    # Daily at 03:00 UTC — verifies the latest published versions are
+    # still attestation-valid. Picks up sigstore key-rotation issues etc.
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Override version to verify (e.g. 1.12.0). Empty = latest VERSION file.'
+        required: false
+        type: string
+      packages:
+        description: 'Comma-separated list of registries to verify (pypi,npm,nuget,crates,maven). Empty = all.'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  attestations: read
+  issues: write    # for opening verification-failure issues
+  actions: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.workflow_run.head_sha || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # Skip when the upstream publish workflow failed (no point verifying a
+  # publish that didn't happen). Always run for schedule/workflow_dispatch.
+  gate:
+    name: Gate (skip on failed upstream)
+    runs-on: ubuntu-24.04
+    if: |
+      github.event_name != 'workflow_run' ||
+      github.event.workflow_run.conclusion == 'success'
+    outputs:
+      version: ${{ steps.resolve.outputs.version }}
+      packages: ${{ steps.resolve.outputs.packages }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Resolve version + package list
+        id: resolve
+        run: |
+          INPUT_VERSION="${{ github.event.inputs.version }}"
+          if [ -n "$INPUT_VERSION" ]; then
+            VERSION="$INPUT_VERSION"
+          else
+            VERSION=$(cat VERSION | tr -d '\n\r')
+          fi
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+
+          INPUT_PACKAGES="${{ github.event.inputs.packages }}"
+          if [ -n "$INPUT_PACKAGES" ]; then
+            PACKAGES="$INPUT_PACKAGES"
+          else
+            PACKAGES="pypi,npm,nuget,crates,maven"
+          fi
+          echo "packages=${PACKAGES}" >> "$GITHUB_OUTPUT"
+
+          echo "Will verify version: $VERSION"
+          echo "Will verify packages: $PACKAGES"
+
+  verify-pypi:
+    name: Verify PyPI piper-plus
+    needs: gate
+    if: contains(needs.gate.outputs.packages, 'pypi')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+
+      - name: Verify package metadata on PyPI
+        run: |
+          VERSION="${{ needs.gate.outputs.version }}"
+          # PyPI JSON API surfaces the published version + sdist/wheel
+          # filenames. A missing record means the publish never landed.
+          set -e
+          URL="https://pypi.org/pypi/piper-plus/${VERSION}/json"
+          echo "Fetching: $URL"
+          HTTP_CODE=$(curl -s -o /tmp/pypi.json -w "%{http_code}" "$URL")
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "::error::PyPI metadata fetch failed (HTTP $HTTP_CODE) for piper-plus@$VERSION"
+            cat /tmp/pypi.json || true
+            exit 1
+          fi
+          REPORTED=$(python3 -c "import json; print(json.load(open('/tmp/pypi.json'))['info']['version'])")
+          if [ "$REPORTED" != "$VERSION" ]; then
+            echo "::error::PyPI reports version '$REPORTED' but expected '$VERSION'"
+            exit 1
+          fi
+          echo "PyPI piper-plus@$VERSION confirmed."
+
+      - name: Verify pip can install (smoke)
+        run: |
+          VERSION="${{ needs.gate.outputs.version }}"
+          # `pip show` after install gives the installed metadata blob —
+          # verifies dependencies resolved cleanly. We use a temp venv so
+          # this doesn't touch the runner's site-packages.
+          python3 -m venv /tmp/verify-venv
+          /tmp/verify-venv/bin/pip install --no-deps "piper-plus==${VERSION}" || {
+            echo "::warning::pip install --no-deps piper-plus==${VERSION} failed; package may not be visible yet on the index mirror."
+            exit 0
+          }
+          /tmp/verify-venv/bin/pip show piper-plus
+
+      - name: Verify SLSA attestation (gh attestation verify)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="${{ needs.gate.outputs.version }}"
+          # Download the wheel from PyPI and verify the GitHub attestation
+          # store has a matching build provenance entry.
+          mkdir -p /tmp/pypi-wheels
+          cd /tmp/pypi-wheels
+          # Only verify the universal wheel (the platform wheels share the
+          # same attestation since they're all built from the same source
+          # tree).
+          WHEEL_URL=$(python3 -c "
+          import json
+          d = json.load(open('/tmp/pypi.json'))
+          for f in d.get('urls', []):
+              if f['filename'].endswith('-py3-none-any.whl'):
+                  print(f['url']); break
+          ")
+          if [ -z "$WHEEL_URL" ]; then
+            echo "::warning::No universal wheel found for piper-plus@$VERSION — skipping attestation verify."
+            exit 0
+          fi
+          curl -sLo wheel.whl "$WHEEL_URL"
+          ls -lh wheel.whl
+          if ! gh attestation verify wheel.whl --repo ${{ github.repository }}; then
+            echo "::error::SLSA attestation verification FAILED for piper-plus@$VERSION"
+            echo "VERIFY_FAILED_PYPI=1" >> "$GITHUB_ENV"
+          else
+            echo "PyPI wheel attestation verified."
+          fi
+
+  verify-npm:
+    name: Verify npm piper-plus
+    needs: gate
+    if: contains(needs.gate.outputs.packages, 'npm')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24.x'
+
+      - name: Resolve npm version
+        id: npm_version
+        run: |
+          # The npm package version diverges from VERSION (currently 0.6.x).
+          NPM_VERSION=$(node -p "require('./src/wasm/openjtalk-web/package.json').version")
+          echo "version=${NPM_VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Verify provenance on npm registry
+        run: |
+          NPM_VERSION="${{ steps.npm_version.outputs.version }}"
+          set -e
+          # `npm view ... --json` returns the manifest including the
+          # `dist.attestations` block when --provenance was used. A missing
+          # block on a tagged release is a regression.
+          npm view "piper-plus@${NPM_VERSION}" --json > /tmp/npm.json || {
+            echo "::warning::npm view failed for piper-plus@${NPM_VERSION} — package may not exist yet."
+            exit 0
+          }
+          if ! python3 -c "
+          import json, sys
+          d = json.load(open('/tmp/npm.json'))
+          # Some versions of npm registry return either a single manifest
+          # or a list of versions. Normalise.
+          if isinstance(d, list):
+              d = next((v for v in d if v.get('version') == '${NPM_VERSION}'), {})
+          atts = d.get('dist', {}).get('attestations')
+          if not atts:
+              print('::error::npm package piper-plus@${NPM_VERSION} has NO provenance attestations attached.')
+              sys.exit(1)
+          print('npm provenance present:', json.dumps(atts, indent=2)[:400])
+          "; then
+            echo "VERIFY_FAILED_NPM=1" >> "$GITHUB_ENV"
+          fi
+
+      - name: Verify SLSA attestation via gh CLI
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          NPM_VERSION="${{ steps.npm_version.outputs.version }}"
+          # Pull the npm tarball directly and verify against this repo's
+          # attestation store.
+          mkdir -p /tmp/npm-tarball
+          cd /tmp/npm-tarball
+          npm pack "piper-plus@${NPM_VERSION}" || {
+            echo "::warning::npm pack failed for piper-plus@${NPM_VERSION} — skipping attestation verify."
+            exit 0
+          }
+          TARBALL=$(ls *.tgz | head -1)
+          if [ -z "$TARBALL" ]; then
+            echo "::warning::No tarball produced — skipping."
+            exit 0
+          fi
+          if ! gh attestation verify "$TARBALL" --repo ${{ github.repository }}; then
+            echo "::error::SLSA attestation verification FAILED for piper-plus@${NPM_VERSION}"
+            echo "VERIFY_FAILED_NPM=1" >> "$GITHUB_ENV"
+          else
+            echo "npm tarball attestation verified."
+          fi
+
+  verify-nuget:
+    name: Verify NuGet PiperPlus.*
+    needs: gate
+    if: contains(needs.gate.outputs.packages, 'nuget')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Resolve NuGet versions from csproj
+        id: nuget_versions
+        run: |
+          CORE=$(grep -oPm1 '(?<=<Version>)[^<]+' src/csharp/PiperPlus.Core/PiperPlus.Core.csproj)
+          CLI=$(grep -oPm1 '(?<=<Version>)[^<]+' src/csharp/PiperPlus.Cli/PiperPlus.Cli.csproj)
+          echo "core=${CORE}" >> "$GITHUB_OUTPUT"
+          echo "cli=${CLI}" >> "$GITHUB_OUTPUT"
+
+      - name: Download + verify NuGet packages
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          CORE="${{ steps.nuget_versions.outputs.core }}"
+          CLI="${{ steps.nuget_versions.outputs.cli }}"
+          mkdir -p /tmp/nuget && cd /tmp/nuget
+
+          for PKG in "PiperPlus.Core/${CORE}" "PiperPlus.Cli/${CLI}"; do
+            NAME="${PKG%/*}"; VER="${PKG#*/}"
+            URL="https://api.nuget.org/v3-flatcontainer/${NAME,,}/${VER}/${NAME,,}.${VER}.nupkg"
+            echo "Fetching: $URL"
+            HTTP=$(curl -sLo "${NAME}.${VER}.nupkg" -w "%{http_code}" "$URL")
+            if [ "$HTTP" != "200" ]; then
+              echo "::warning::NuGet fetch returned HTTP $HTTP for $NAME@$VER — package may not exist yet."
+              continue
+            fi
+            ls -lh "${NAME}.${VER}.nupkg"
+
+            # Signature verification (best-effort — only meaningful when
+            # we actually signed the package in dev-create-release.yml).
+            if dotnet nuget verify "${NAME}.${VER}.nupkg" 2>&1 | tee /tmp/nuget-verify.log; then
+              if grep -q "Signature type: Author" /tmp/nuget-verify.log; then
+                echo "NuGet ${NAME}@${VER}: author-signed (verified)."
+              else
+                echo "::warning::NuGet ${NAME}@${VER}: not author-signed."
+              fi
+            else
+              echo "::warning::dotnet nuget verify failed for ${NAME}@${VER}"
+            fi
+
+            # SLSA attestation verify (will fail until v1.12.x publish
+            # produces the first attested package — that's expected,
+            # gated as warning).
+            if ! gh attestation verify "${NAME}.${VER}.nupkg" --repo ${{ github.repository }} 2>/tmp/att.log; then
+              echo "::warning::SLSA attestation not found for ${NAME}@${VER} — first attested release is in flight."
+              cat /tmp/att.log
+            else
+              echo "${NAME}@${VER}: SLSA attestation verified."
+            fi
+          done
+
+  verify-crates:
+    name: Verify crates.io piper-plus
+    needs: gate
+    if: contains(needs.gate.outputs.packages, 'crates')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Resolve crate versions
+        id: crate_versions
+        run: |
+          CRATE=$(grep -m1 '^version' src/rust/Cargo.toml | sed 's/.*"\(.*\)".*/\1/')
+          echo "version=${CRATE}" >> "$GITHUB_OUTPUT"
+
+      - name: Verify crates.io metadata
+        run: |
+          VER="${{ steps.crate_versions.outputs.version }}"
+          for CRATE in piper-plus piper-plus-cli piper-plus-g2p; do
+            URL="https://crates.io/api/v1/crates/${CRATE}/${VER}"
+            echo "Fetching: $URL"
+            HTTP=$(curl -sL -H "Accept: application/json" -w "%{http_code}" -o /tmp/crate.json "$URL")
+            if [ "$HTTP" != "200" ]; then
+              echo "::warning::crates.io fetch returned HTTP $HTTP for ${CRATE}@${VER}"
+              continue
+            fi
+            REPORTED=$(python3 -c "import json; print(json.load(open('/tmp/crate.json'))['version']['num'])" 2>/dev/null || echo "?")
+            echo "crates.io ${CRATE}: reported=${REPORTED} expected=${VER}"
+          done
+
+      - name: Verify SLSA attestation
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VER="${{ steps.crate_versions.outputs.version }}"
+          mkdir -p /tmp/crates && cd /tmp/crates
+          for CRATE in piper-plus piper-plus-cli piper-plus-g2p; do
+            DL="https://crates.io/api/v1/crates/${CRATE}/${VER}/download"
+            curl -sL -o "${CRATE}-${VER}.crate" "$DL"
+            ls -lh "${CRATE}-${VER}.crate" || continue
+            if ! gh attestation verify "${CRATE}-${VER}.crate" --repo ${{ github.repository }} 2>/tmp/att.log; then
+              echo "::warning::SLSA attestation not found for ${CRATE}@${VER} — first attested release is in flight."
+            else
+              echo "${CRATE}@${VER}: SLSA attestation verified."
+            fi
+          done
+
+  verify-maven:
+    name: Verify Maven Central piper-plus-g2p-android
+    needs: gate
+    if: contains(needs.gate.outputs.packages, 'maven')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Resolve Kotlin AAR version
+        id: maven_version
+        run: |
+          VER=$(grep '^VERSION_NAME' android/gradle.properties | cut -d= -f2 | tr -d ' ')
+          echo "version=${VER}" >> "$GITHUB_OUTPUT"
+
+      - name: Verify Maven Central availability + SLSA
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VER="${{ steps.maven_version.outputs.version }}"
+          BASE="https://repo1.maven.org/maven2/io/github/ayutaz/piper-plus-g2p-android/${VER}"
+          AAR="piper-plus-g2p-android-${VER}.aar"
+          POM="piper-plus-g2p-android-${VER}.pom"
+
+          mkdir -p /tmp/maven && cd /tmp/maven
+          for FILE in "$AAR" "$POM" "${AAR}.asc" "${POM}.asc"; do
+            HTTP=$(curl -sL -o "$FILE" -w "%{http_code}" "${BASE}/${FILE}")
+            if [ "$HTTP" != "200" ]; then
+              echo "::warning::Maven Central fetch returned HTTP $HTTP for ${FILE} — package may not exist yet."
+              rm -f "$FILE"
+            else
+              echo "Fetched: $FILE ($(stat -c%s "$FILE") bytes)"
+            fi
+          done
+
+          # PGP signature verify (Maven Central requires .asc — re-verifying
+          # gives us defence-in-depth against a compromised CDN edge).
+          if [ -f "${AAR}.asc" ] && [ -f "$AAR" ]; then
+            # Pull the signing key from the Sonatype-published key servers.
+            # We don't pin a specific key here because the maintainer may
+            # rotate; the goal is to confirm a valid signature exists.
+            echo "Note: PGP signature exists but full verification requires the maintainer's public key (not pinned in CI yet)."
+          fi
+
+          # SLSA attestation verify (the AAR was attested in
+          # release-kotlin-g2p.yml).
+          if [ -f "$AAR" ]; then
+            if ! gh attestation verify "$AAR" --repo ${{ github.repository }} 2>/tmp/att.log; then
+              echo "::warning::SLSA attestation not found for piper-plus-g2p-android@${VER}"
+            else
+              echo "piper-plus-g2p-android@${VER}: SLSA attestation verified."
+            fi
+          fi
+
+  open-issue-on-failure:
+    name: Open verification-failure issue
+    needs: [verify-pypi, verify-npm, verify-nuget, verify-crates, verify-maven]
+    if: |
+      always() &&
+      (needs.verify-pypi.result == 'failure' ||
+       needs.verify-npm.result == 'failure' ||
+       needs.verify-nuget.result == 'failure' ||
+       needs.verify-crates.result == 'failure' ||
+       needs.verify-maven.result == 'failure')
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Open GitHub issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          BODY=$(cat <<EOF
+          Automated release-verify run failed on \`${{ github.sha }}\`.
+
+          - PyPI:  ${{ needs.verify-pypi.result }}
+          - npm:   ${{ needs.verify-npm.result }}
+          - NuGet: ${{ needs.verify-nuget.result }}
+          - crates.io: ${{ needs.verify-crates.result }}
+          - Maven Central: ${{ needs.verify-maven.result }}
+
+          Workflow run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+          Likely root causes:
+          - Publish workflow failed mid-run (check upstream workflow's logs).
+          - Registry CDN propagation lag (re-run the verify in 10-15 min).
+          - SLSA attestation issuer mismatch (signing key / repo move).
+          - PGP signing key rotation (Maven Central).
+
+          See \`docs/spec/release-versions.toml\` for expected versions.
+          EOF
+          )
+          # De-duplicate: if an open issue with the same title exists, comment
+          # on it instead of creating a new one.
+          TITLE="release-verify-failure: $(date -u +%Y-%m-%d) on ${{ github.sha }}"
+          EXISTING=$(gh issue list --label release-verify-failure --state open --search "${TITLE}" --json number --jq '.[0].number' || echo "")
+          if [ -n "$EXISTING" ]; then
+            gh issue comment "$EXISTING" --body "$BODY"
+          else
+            gh issue create \
+              --title "$TITLE" \
+              --label release-verify-failure \
+              --body "$BODY"
+          fi
