@@ -56,15 +56,18 @@ func TestFindDictionaryFile_NotFoundAnywhere(t *testing.T) {
 func TestFindDictionaryFile_EmptyFilename(t *testing.T) {
 	// When filename is empty, filepath.Join(modelDir, "") resolves to the
 	// directory itself, which passes os.Stat. This is by design: the caller
-	// is responsible for providing a non-empty filename. Verify the function
-	// does not panic and returns a deterministic result.
+	// is responsible for providing a non-empty filename. Pin the current
+	// behaviour explicitly so any future change is intentional.
 	t.Setenv("PIPER_DICTIONARIES_PATH", "")
 
-	got := findDictionaryFile("", t.TempDir())
-	// The function returns modelDir itself (a directory) because Stat succeeds.
-	// This is acceptable: callers always supply real filenames.
-	if got == "" {
-		t.Log("findDictionaryFile returned empty string for empty filename (implementation may guard against it)")
+	modelDir := t.TempDir()
+	got := findDictionaryFile("", modelDir)
+	// Current contract: returns modelDir verbatim because Stat(modelDir)
+	// succeeds. If future hardening adds a non-empty-filename guard, this
+	// assertion will fail and the test should be updated to reflect the
+	// new contract (return "" for empty filename).
+	if got != modelDir {
+		t.Errorf("findDictionaryFile(\"\", %q) = %q, want %q (modelDir verbatim)", modelDir, got, modelDir)
 	}
 }
 
