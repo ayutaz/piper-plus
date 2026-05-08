@@ -1,0 +1,173 @@
+name: CodeQL
+
+# CodeQL static analysis. Runs on PR / push to dev / weekly schedule.
+# Rust は GitHub CodeQL 未対応のため除外。
+# Java/Kotlin (android/) は将来の対応として保留 (現状 Kotlin G2P のみで surface 小)。
+
+on:
+  pull_request:
+    branches: [ dev ]
+  push:
+    branches: [ dev ]
+  schedule:
+    - cron: '0 8 * * 1'  # Monday 08:00 UTC
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  actions: read
+  contents: read
+  security-events: write
+
+jobs:
+  filter:
+    runs-on: ubuntu-latest
+    outputs:
+      python: ${{ steps.changes.outputs.python }}
+      javascript-typescript: ${{ steps.changes.outputs.javascript-typescript }}
+      go: ${{ steps.changes.outputs.go }}
+      csharp: ${{ steps.changes.outputs.csharp }}
+      cpp: ${{ steps.changes.outputs.cpp }}
+    steps:
+      - uses: actions/checkout@v6
+      - id: changes
+        # On schedule we run all languages; on PR we filter via paths.
+        if: github.event_name == 'pull_request' || github.event_name == 'push'
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            python:
+              - 'src/python/**'
+              - 'src/python_run/**'
+              - 'docker/python-inference/**'
+              - 'docker/webui/**'
+              - 'docker/wyoming/**'
+              - 'scripts/**'
+              - '.github/workflows/codeql.yml'
+            javascript-typescript:
+              - 'src/wasm/**'
+              - '.github/workflows/codeql.yml'
+            go:
+              - 'src/go/**'
+              - '.github/workflows/codeql.yml'
+            csharp:
+              - 'src/csharp/**'
+              - '.github/workflows/codeql.yml'
+            cpp:
+              - 'src/cpp/**'
+              - 'cmake/**'
+              - 'CMakeLists.txt'
+              - '.github/workflows/codeql.yml'
+
+  analyze:
+    needs: filter
+    name: Analyze (${{ matrix.language }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: python
+            os: ubuntu-24.04
+            build-mode: none
+          - language: javascript-typescript
+            os: ubuntu-24.04
+            build-mode: none
+          - language: go
+            os: ubuntu-24.04
+            build-mode: autobuild
+          - language: csharp
+            os: ubuntu-24.04
+            build-mode: manual
+          - language: cpp
+            os: ubuntu-24.04
+            build-mode: manual
+
+    steps:
+      - name: Skip if no relevant changes
+        id: should-skip
+        run: |
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            echo "skip=false" >> $GITHUB_OUTPUT
+          elif [ "${{ matrix.language }}" = "python" ] && [ "${{ needs.filter.outputs.python }}" = "true" ]; then
+            echo "skip=false" >> $GITHUB_OUTPUT
+          elif [ "${{ matrix.language }}" = "javascript-typescript" ] && [ "${{ needs.filter.outputs.javascript-typescript }}" = "true" ]; then
+            echo "skip=false" >> $GITHUB_OUTPUT
+          elif [ "${{ matrix.language }}" = "go" ] && [ "${{ needs.filter.outputs.go }}" = "true" ]; then
+            echo "skip=false" >> $GITHUB_OUTPUT
+          elif [ "${{ matrix.language }}" = "csharp" ] && [ "${{ needs.filter.outputs.csharp }}" = "true" ]; then
+            echo "skip=false" >> $GITHUB_OUTPUT
+          elif [ "${{ matrix.language }}" = "cpp" ] && [ "${{ needs.filter.outputs.cpp }}" = "true" ]; then
+            echo "skip=false" >> $GITHUB_OUTPUT
+          else
+            echo "skip=true" >> $GITHUB_OUTPUT
+          fi
+
+      - uses: actions/checkout@v6
+        if: steps.should-skip.outputs.skip != 'true'
+
+      - name: Setup Go
+        if: steps.should-skip.outputs.skip != 'true' && matrix.language == 'go'
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.26'
+          cache-dependency-path: src/go/go.sum
+
+      - name: Setup .NET
+        if: steps.should-skip.outputs.skip != 'true' && matrix.language == 'csharp'
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Setup Python
+        if: steps.should-skip.outputs.skip != 'true' && matrix.language == 'python'
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+
+      - name: Setup Node.js
+        if: steps.should-skip.outputs.skip != 'true' && matrix.language == 'javascript-typescript'
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24.x'
+
+      - name: Setup C++ build deps
+        if: steps.should-skip.outputs.skip != 'true' && matrix.language == 'cpp'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake build-essential
+
+      - name: Initialize CodeQL
+        if: steps.should-skip.outputs.skip != 'true'
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+          queries: security-and-quality
+
+      - name: Build (Go autobuild)
+        if: steps.should-skip.outputs.skip != 'true' && matrix.build-mode == 'autobuild'
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Manual build (C#)
+        if: steps.should-skip.outputs.skip != 'true' && matrix.language == 'csharp'
+        run: dotnet build src/csharp/PiperPlus.sln -c Release
+
+      - name: Manual build (C++)
+        if: steps.should-skip.outputs.skip != 'true' && matrix.language == 'cpp'
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF
+          cmake --build build --parallel 2
+
+      - name: Perform CodeQL Analysis
+        if: steps.should-skip.outputs.skip != 'true'
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{ matrix.language }}"
