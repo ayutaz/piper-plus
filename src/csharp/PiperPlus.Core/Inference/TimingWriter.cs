@@ -129,40 +129,78 @@ public static class TimingWriter
     // ------------------------------------------------------------------
 
     /// <summary>
-    /// Writes timing entries as a JSON array to the specified file path.
+    /// Sentinel sample-rate value used by the legacy 2-arg
+    /// <see cref="WriteJson(string, List{PhonemeTimingEntry})"/> /
+    /// <see cref="WriteJson(Stream, List{PhonemeTimingEntry})"/> overloads
+    /// when the caller did not supply a sample rate. Encoded as
+    /// <c>"sample_rate": 0</c> in the output JSON to signal "unknown".
+    /// </summary>
+    public const int UnknownSampleRate = 0;
+
+    /// <summary>
+    /// Writes timing entries to the specified file path as spec-conforming JSON.
     /// </summary>
     /// <remarks>
-    /// Spec-conforming format (snake_case, milliseconds):
+    /// Spec-conforming object shape (<c>docs/spec/phoneme-timing-contract.toml</c>
+    /// <c>[output_formats.json_pretty]</c>, snake_case, milliseconds):
     /// <code>
-    /// [
-    ///   {"phoneme": "^", "start_ms": 0.0, "end_ms": 58.0, "duration_ms": 58.0},
-    ///   ...
-    /// ]
+    /// {
+    ///   "phonemes": [
+    ///     {"phoneme": "^", "start_ms": 0.0, "end_ms": 58.0, "duration_ms": 58.0},
+    ///     ...
+    ///   ],
+    ///   "total_duration_ms": 580.4988,
+    ///   "sample_rate": 22050
+    /// }
     /// </code>
+    /// <para>
+    /// <c>total_duration_ms</c> is the maximum <c>end_ms</c> across the entries
+    /// (cursor-walk semantics), or <c>0</c> when the list is empty.
+    /// </para>
+    /// <para>
     /// Uses the source-generated <see cref="TimingJsonContext"/> for trim-safe serialization.
+    /// </para>
     /// </remarks>
-    public static void WriteJson(string filePath, List<PhonemeTimingEntry> entries)
+    public static void WriteJson(string filePath, List<PhonemeTimingEntry> entries, int sampleRate)
     {
         if (string.IsNullOrWhiteSpace(filePath))
             throw new ArgumentException("File path must not be empty.", nameof(filePath));
         ArgumentNullException.ThrowIfNull(entries);
 
-        var dtos = ConvertToDtos(entries);
+        var result = ConvertToResultDto(entries, sampleRate);
         using var stream = new FileStream(filePath, FileMode.Create, FileAccess.Write);
-        JsonSerializer.Serialize(stream, dtos, TimingJsonContext.Default.ListTimingDto);
+        JsonSerializer.Serialize(stream, result, TimingJsonContext.Default.TimingResultDto);
     }
 
     /// <summary>
-    /// Writes timing entries as a JSON array to the given stream.
+    /// Writes timing entries to the given stream as spec-conforming JSON
+    /// (<c>{phonemes, total_duration_ms, sample_rate}</c>).
     /// </summary>
-    public static void WriteJson(Stream stream, List<PhonemeTimingEntry> entries)
+    public static void WriteJson(Stream stream, List<PhonemeTimingEntry> entries, int sampleRate)
     {
         ArgumentNullException.ThrowIfNull(stream);
         ArgumentNullException.ThrowIfNull(entries);
 
-        var dtos = ConvertToDtos(entries);
-        JsonSerializer.Serialize(stream, dtos, TimingJsonContext.Default.ListTimingDto);
+        var result = ConvertToResultDto(entries, sampleRate);
+        JsonSerializer.Serialize(stream, result, TimingJsonContext.Default.TimingResultDto);
     }
+
+    /// <summary>
+    /// Backward-compatible overload: emits spec-conforming JSON with
+    /// <c>sample_rate</c> set to the <see cref="UnknownSampleRate"/> sentinel.
+    /// </summary>
+    /// <remarks>
+    /// Existing pre-spec callers used the 2-argument signature without a sample
+    /// rate. To avoid a breaking change, the call still emits the canonical
+    /// <c>{phonemes, total_duration_ms, sample_rate}</c> shape, but with
+    /// <c>"sample_rate": 0</c>. New code should pass an explicit sample rate.
+    /// </remarks>
+    public static void WriteJson(string filePath, List<PhonemeTimingEntry> entries)
+        => WriteJson(filePath, entries, UnknownSampleRate);
+
+    /// <inheritdoc cref="WriteJson(string, List{PhonemeTimingEntry})"/>
+    public static void WriteJson(Stream stream, List<PhonemeTimingEntry> entries)
+        => WriteJson(stream, entries, UnknownSampleRate);
 
     // ------------------------------------------------------------------
     // TSV output
@@ -280,6 +318,45 @@ public static class TimingWriter
         }
 
         return dtos;
+    }
+
+    /// <summary>
+    /// Builds the spec-conforming <see cref="TimingResultDto"/>:
+    /// <c>{phonemes:[…], total_duration_ms, sample_rate}</c>.
+    /// </summary>
+    /// <remarks>
+    /// <c>total_duration_ms</c> is the maximum <c>end_ms</c> over the
+    /// entries (matching the cursor-walk algorithm in
+    /// <see cref="CalculateTiming"/> where each phoneme's <c>end_ms</c> is
+    /// the running cursor). For an empty list the value is <c>0</c>.
+    /// The <c>double</c> field type preserves sub-millisecond precision
+    /// (≥ 3 decimal digits) without the <c>float</c> rounding that the
+    /// per-phoneme entries undergo.
+    /// </remarks>
+    private static TimingResultDto ConvertToResultDto(
+        List<PhonemeTimingEntry> entries,
+        int sampleRate)
+    {
+        var phonemes = ConvertToDtos(entries);
+
+        double totalDurationMs = 0d;
+        foreach (var e in entries)
+        {
+            // cursor-walk: total = max end_ms (the last non-empty entry's end).
+            // Use double to keep sub-ms precision intact.
+            double endMs = e.EndMs;
+            if (endMs > totalDurationMs)
+            {
+                totalDurationMs = endMs;
+            }
+        }
+
+        return new TimingResultDto
+        {
+            Phonemes = phonemes,
+            TotalDurationMs = Math.Round(totalDurationMs, 3),
+            SampleRate = sampleRate,
+        };
     }
 
     private static void WriteTsvCore(StreamWriter writer, List<PhonemeTimingEntry> entries)
@@ -402,8 +479,9 @@ public static class TimingWriter
 // ------------------------------------------------------------------
 
 /// <summary>
-/// DTO for JSON serialization with snake_case property names matching
-/// <c>docs/spec/phoneme-timing-contract.toml</c> v1.0.
+/// DTO for a single phoneme entry. Snake_case property names match
+/// <c>docs/spec/phoneme-timing-contract.toml</c> v1.0
+/// (<c>[types.phoneme_timing_info]</c>).
 /// </summary>
 internal sealed class TimingDto
 {
@@ -421,9 +499,28 @@ internal sealed class TimingDto
 }
 
 /// <summary>
-/// Source-generated JSON serializer context for <see cref="TimingDto"/>.
-/// Ensures trim-safe / AOT-safe serialization without reflection.
+/// DTO for the top-level timing result, matching the spec
+/// <c>{phonemes, total_duration_ms, sample_rate}</c>
+/// (<c>docs/spec/phoneme-timing-contract.toml [types.timing_result]</c>).
+/// </summary>
+internal sealed class TimingResultDto
+{
+    [JsonPropertyName("phonemes")]
+    public List<TimingDto> Phonemes { get; set; } = [];
+
+    [JsonPropertyName("total_duration_ms")]
+    public double TotalDurationMs { get; set; }
+
+    [JsonPropertyName("sample_rate")]
+    public int SampleRate { get; set; }
+}
+
+/// <summary>
+/// Source-generated JSON serializer context for <see cref="TimingDto"/>
+/// and <see cref="TimingResultDto"/>. Ensures trim-safe / AOT-safe
+/// serialization without reflection.
 /// </summary>
 [JsonSerializable(typeof(List<TimingDto>))]
+[JsonSerializable(typeof(TimingResultDto))]
 [JsonSourceGenerationOptions(WriteIndented = true)]
 internal partial class TimingJsonContext : JsonSerializerContext;
