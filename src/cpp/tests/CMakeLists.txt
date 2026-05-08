@@ -691,6 +691,24 @@ target_link_libraries(test_phoneme_timing
 
 add_test(NAME test_phoneme_timing COMMAND test_phoneme_timing)
 
+# Cross-runtime phoneme timing parity test.
+# Reads tests/fixtures/phoneme_timing/golden_matrix.json (generated from the
+# Python canonical timing.py) and asserts the spec cursor-walk algorithm in
+# C++ produces matching output. Self-contained: only links gtest + json.hpp,
+# no piper-library dependency.
+add_executable(test_phoneme_timing_parity test_phoneme_timing_parity.cpp)
+target_include_directories(test_phoneme_timing_parity PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../
+)
+target_link_libraries(test_phoneme_timing_parity
+    gtest_main
+)
+add_test(NAME test_phoneme_timing_parity COMMAND test_phoneme_timing_parity)
+set_tests_properties(test_phoneme_timing_parity PROPERTIES
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+
 # ---- test_library_path: library_path.c unit tests ----
 add_executable(test_library_path
     test_library_path.cpp

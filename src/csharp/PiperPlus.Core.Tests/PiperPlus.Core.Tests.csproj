@@ -20,4 +20,12 @@
     <ProjectReference Include="..\PiperPlus.Core\PiperPlus.Core.csproj" />
   </ItemGroup>
 
+  <!-- Cross-runtime test fixtures (copied to test output, read by Tests). -->
+  <ItemGroup>
+    <Content Include="..\..\..\tests\fixtures\short_text\contract.json">
+      <Link>TestData\short_text_contract.json</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
 </Project>
