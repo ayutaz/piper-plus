@@ -752,7 +752,8 @@ public sealed class Phase3Tests : IDisposable
     [Fact]
     public void TimingWriter_WriteJson_ToFile_CreatesValidFile()
     {
-        // Spec-conforming: PhonemeTimingEntry now stores ms; JSON keys are start_ms/end_ms/duration_ms.
+        // Spec-conforming: top-level object {phonemes, total_duration_ms, sample_rate}
+        // (docs/spec/phoneme-timing-contract.toml [output_formats.json_pretty]).
         var entries = new List<TimingWriter.PhonemeTimingEntry>
         {
             new("k", 0.0f, 58.0f, 58.0f),
@@ -762,7 +763,8 @@ public sealed class Phase3Tests : IDisposable
         string path = Path.Combine(Path.GetTempPath(), $"piper_test_{Guid.NewGuid():N}.json");
         _tempFiles.Add(path);
 
-        TimingWriter.WriteJson(path, entries);
+        const int sampleRate = 22050;
+        TimingWriter.WriteJson(path, entries, sampleRate);
 
         Assert.True(File.Exists(path));
 
@@ -770,11 +772,17 @@ public sealed class Phase3Tests : IDisposable
         using var doc = JsonDocument.Parse(json);
         var root = doc.RootElement;
 
-        Assert.Equal(JsonValueKind.Array, root.ValueKind);
-        Assert.Equal(2, root.GetArrayLength());
-        Assert.Equal("k", root[0].GetProperty("phoneme").GetString());
-        Assert.Equal("a", root[1].GetProperty("phoneme").GetString());
-        Assert.True(root[0].GetProperty("start_ms").GetSingle() < root[0].GetProperty("end_ms").GetSingle());
+        Assert.Equal(JsonValueKind.Object, root.ValueKind);
+        var phonemes = root.GetProperty("phonemes");
+        Assert.Equal(JsonValueKind.Array, phonemes.ValueKind);
+        Assert.Equal(2, phonemes.GetArrayLength());
+        Assert.Equal("k", phonemes[0].GetProperty("phoneme").GetString());
+        Assert.Equal("a", phonemes[1].GetProperty("phoneme").GetString());
+        Assert.True(phonemes[0].GetProperty("start_ms").GetSingle()
+            < phonemes[0].GetProperty("end_ms").GetSingle());
+
+        Assert.Equal(sampleRate, root.GetProperty("sample_rate").GetInt32());
+        Assert.Equal(116.0d, root.GetProperty("total_duration_ms").GetDouble(), precision: 3);
     }
 
     [Fact]

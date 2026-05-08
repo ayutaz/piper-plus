@@ -114,7 +114,7 @@ public sealed class TimingWriterTests
     }
 
     // ================================================================
-    // 4. WriteJson_ValidOutput (snake_case ms keys per spec)
+    // 4. WriteJson_ValidOutput (spec-conforming object shape)
     // ================================================================
 
     [Fact]
@@ -127,29 +127,35 @@ public sealed class TimingWriterTests
         var entries = TimingWriter.CalculateTiming(phonemeIds, durations, map, SampleRate, HopSize);
 
         using var ms = new MemoryStream();
-        TimingWriter.WriteJson(ms, entries);
+        TimingWriter.WriteJson(ms, entries, SampleRate);
 
         ms.Position = 0;
         using var doc = JsonDocument.Parse(ms);
         var root = doc.RootElement;
 
-        // Output is a JSON array of timing objects.
-        Assert.Equal(JsonValueKind.Array, root.ValueKind);
-        Assert.Equal(2, root.GetArrayLength());
+        // Spec shape: top-level object {phonemes, total_duration_ms, sample_rate}.
+        Assert.Equal(JsonValueKind.Object, root.ValueKind);
+        Assert.True(root.TryGetProperty("phonemes", out var phonemes));
+        Assert.True(root.TryGetProperty("total_duration_ms", out _));
+        Assert.True(root.TryGetProperty("sample_rate", out var sampleRateProp));
+        Assert.Equal(SampleRate, sampleRateProp.GetInt32());
 
-        // First element — spec field names
-        var first = root[0];
+        Assert.Equal(JsonValueKind.Array, phonemes.ValueKind);
+        Assert.Equal(2, phonemes.GetArrayLength());
+
+        // First element — spec per-phoneme field names.
+        var first = phonemes[0];
         Assert.Equal("a", first.GetProperty("phoneme").GetString());
         Assert.True(first.TryGetProperty("start_ms", out _));
         Assert.True(first.TryGetProperty("end_ms", out _));
         Assert.True(first.TryGetProperty("duration_ms", out _));
-        // Legacy field names must NOT appear (spec compliance)
+        // Legacy field names must NOT appear (spec compliance).
         Assert.False(first.TryGetProperty("start", out _));
         Assert.False(first.TryGetProperty("end", out _));
         Assert.False(first.TryGetProperty("duration", out _));
 
         // Second element
-        var second = root[1];
+        var second = phonemes[1];
         Assert.Equal("k", second.GetProperty("phoneme").GetString());
         Assert.True(second.GetProperty("end_ms").GetSingle() > second.GetProperty("start_ms").GetSingle());
     }
@@ -232,7 +238,7 @@ public sealed class TimingWriterTests
         Assert.Equal("a", entries[0].Phoneme);
 
         using var ms = new MemoryStream();
-        TimingWriter.WriteJson(ms, entries);
+        TimingWriter.WriteJson(ms, entries, SampleRate);
 
         // Verify valid JSON was written to the stream.
         Assert.True(ms.Length > 0, "Stream should contain JSON data");
@@ -240,9 +246,12 @@ public sealed class TimingWriterTests
         ms.Position = 0;
         using var doc = JsonDocument.Parse(ms);
         var root = doc.RootElement;
-        Assert.Equal(JsonValueKind.Array, root.ValueKind);
-        Assert.Equal(1, root.GetArrayLength());
-        Assert.Equal("a", root[0].GetProperty("phoneme").GetString());
+        // Spec shape — top-level object with `phonemes` array.
+        Assert.Equal(JsonValueKind.Object, root.ValueKind);
+        var phonemes = root.GetProperty("phonemes");
+        Assert.Equal(1, phonemes.GetArrayLength());
+        Assert.Equal("a", phonemes[0].GetProperty("phoneme").GetString());
+        Assert.Equal(SampleRate, root.GetProperty("sample_rate").GetInt32());
     }
 
     // ================================================================
@@ -313,5 +322,179 @@ public sealed class TimingWriterTests
         string srt = reader.ReadToEnd();
 
         Assert.Contains("00:00:00,000 --> 01:01:01,500", srt);
+    }
+
+    // ================================================================
+    // Spec-conformance tests for WriteJson
+    // (docs/spec/phoneme-timing-contract.toml v1.0)
+    // ================================================================
+
+    /// <summary>
+    /// Helper: synthesize 2 simple entries (a=10 frames, k=5 frames at 22050/256).
+    /// </summary>
+    private static List<TimingWriter.PhonemeTimingEntry> SampleEntries()
+    {
+        var map = MakeMap();
+        long[] phonemeIds = [10, 12];
+        float[] durations = [10f, 5f];
+        return TimingWriter.CalculateTiming(phonemeIds, durations, map, SampleRate, HopSize);
+    }
+
+    /// <summary>
+    /// Spec key 1: top-level <c>phonemes</c> field is present and an array.
+    /// </summary>
+    [Fact]
+    public void WriteJson_OutputHasPhonemesField()
+    {
+        var entries = SampleEntries();
+
+        using var ms = new MemoryStream();
+        TimingWriter.WriteJson(ms, entries, SampleRate);
+
+        ms.Position = 0;
+        using var doc = JsonDocument.Parse(ms);
+        var root = doc.RootElement;
+
+        Assert.Equal(JsonValueKind.Object, root.ValueKind);
+        Assert.True(root.TryGetProperty("phonemes", out var phonemes),
+            "spec field 'phonemes' must be present");
+        Assert.Equal(JsonValueKind.Array, phonemes.ValueKind);
+        Assert.Equal(entries.Count, phonemes.GetArrayLength());
+    }
+
+    /// <summary>
+    /// Spec key 2: top-level <c>total_duration_ms</c> field is present and numeric.
+    /// </summary>
+    [Fact]
+    public void WriteJson_OutputHasTotalDurationMs()
+    {
+        var entries = SampleEntries();
+
+        using var ms = new MemoryStream();
+        TimingWriter.WriteJson(ms, entries, SampleRate);
+
+        ms.Position = 0;
+        using var doc = JsonDocument.Parse(ms);
+        var root = doc.RootElement;
+
+        Assert.True(root.TryGetProperty("total_duration_ms", out var total),
+            "spec field 'total_duration_ms' must be present");
+        Assert.Equal(JsonValueKind.Number, total.ValueKind);
+        Assert.True(total.GetDouble() > 0d, "non-empty entries should yield positive total");
+    }
+
+    /// <summary>
+    /// Spec key 3: top-level <c>sample_rate</c> field round-trips the value passed in.
+    /// </summary>
+    [Fact]
+    public void WriteJson_OutputHasSampleRate()
+    {
+        var entries = SampleEntries();
+
+        using var ms = new MemoryStream();
+        TimingWriter.WriteJson(ms, entries, SampleRate);
+
+        ms.Position = 0;
+        using var doc = JsonDocument.Parse(ms);
+        var root = doc.RootElement;
+
+        Assert.True(root.TryGetProperty("sample_rate", out var sr),
+            "spec field 'sample_rate' must be present");
+        Assert.Equal(JsonValueKind.Number, sr.ValueKind);
+        Assert.Equal(SampleRate, sr.GetInt32());
+    }
+
+    /// <summary>
+    /// Spec key 4: each phoneme entry uses snake_case <c>start_ms / end_ms / duration_ms</c>
+    /// (not <c>start / end / duration</c>).
+    /// </summary>
+    [Fact]
+    public void WriteJson_PhonemeFieldsAreStartMsEndMsDurationMs()
+    {
+        var entries = SampleEntries();
+
+        using var ms = new MemoryStream();
+        TimingWriter.WriteJson(ms, entries, SampleRate);
+
+        ms.Position = 0;
+        using var doc = JsonDocument.Parse(ms);
+        var phonemes = doc.RootElement.GetProperty("phonemes");
+
+        for (int i = 0; i < phonemes.GetArrayLength(); i++)
+        {
+            var p = phonemes[i];
+            Assert.True(p.TryGetProperty("phoneme", out _), $"entry[{i}] missing 'phoneme'");
+            Assert.True(p.TryGetProperty("start_ms", out _), $"entry[{i}] missing 'start_ms'");
+            Assert.True(p.TryGetProperty("end_ms", out _), $"entry[{i}] missing 'end_ms'");
+            Assert.True(p.TryGetProperty("duration_ms", out _), $"entry[{i}] missing 'duration_ms'");
+            // Legacy short names must NOT be present.
+            Assert.False(p.TryGetProperty("start", out _), $"entry[{i}] has legacy 'start'");
+            Assert.False(p.TryGetProperty("end", out _), $"entry[{i}] has legacy 'end'");
+            Assert.False(p.TryGetProperty("duration", out _), $"entry[{i}] has legacy 'duration'");
+        }
+    }
+
+    /// <summary>
+    /// Spec requirement: serialized millisecond fields preserve at least
+    /// 3 decimal digits of precision (matches Python <c>{:.3f}</c> and Rust
+    /// <c>{:.3}</c> contracts).
+    /// </summary>
+    [Fact]
+    public void WriteJson_MillisecondPrecision()
+    {
+        // Hand-craft an entry with sub-millisecond fractional times so that
+        // dropping precision (e.g. integer rounding) would be detectable.
+        var entries = new List<TimingWriter.PhonemeTimingEntry>
+        {
+            new("a", 11.609f, 23.219f, 11.610f), // 22050/256 ≈ 11.6099 ms/frame
+        };
+
+        using var ms = new MemoryStream();
+        TimingWriter.WriteJson(ms, entries, SampleRate);
+
+        ms.Position = 0;
+        using var doc = JsonDocument.Parse(ms);
+        var first = doc.RootElement.GetProperty("phonemes")[0];
+
+        // Each ms field must keep ≥ 3 decimals of fidelity (within 0.0005 ms).
+        Assert.Equal(11.609f, first.GetProperty("start_ms").GetSingle(), precision: 3);
+        Assert.Equal(23.219f, first.GetProperty("end_ms").GetSingle(), precision: 3);
+        Assert.Equal(11.610f, first.GetProperty("duration_ms").GetSingle(), precision: 3);
+
+        // The serialized text must contain a decimal point — guards against
+        // any future regression that emits integer-only timestamps.
+        ms.Position = 0;
+        using var reader = new StreamReader(ms, Encoding.UTF8);
+        string json = reader.ReadToEnd();
+        Assert.Contains(".", json);
+    }
+
+    /// <summary>
+    /// Spec [calculation.cursor_walk]: <c>total_duration_ms</c> equals the
+    /// last (max) <c>end_ms</c> — the cursor's final position.
+    /// </summary>
+    [Fact]
+    public void WriteJson_TotalDurationMs_EqualsLastEndMs()
+    {
+        var entries = SampleEntries();
+        Assert.NotEmpty(entries);
+        float expectedTotal = entries[^1].EndMs;
+
+        using var ms = new MemoryStream();
+        TimingWriter.WriteJson(ms, entries, SampleRate);
+
+        ms.Position = 0;
+        using var doc = JsonDocument.Parse(ms);
+        var root = doc.RootElement;
+
+        double actualTotal = root.GetProperty("total_duration_ms").GetDouble();
+        Assert.Equal(expectedTotal, (float)actualTotal, precision: 3);
+
+        // And the last phoneme's end_ms in the JSON must match.
+        var phonemes = root.GetProperty("phonemes");
+        double lastEndMs = phonemes[phonemes.GetArrayLength() - 1]
+            .GetProperty("end_ms").GetDouble();
+        Assert.Equal(expectedTotal, (float)lastEndMs, precision: 3);
+        Assert.Equal(actualTotal, lastEndMs, precision: 3);
     }
 }
