@@ -609,8 +609,8 @@ mod tests {
     }
 
     // ---------------------------------------------------------------
-     // 22b. Phoneme name containing newline in TSV output
-     // ---------------------------------------------------------------
+    // 22b. Phoneme name containing newline in TSV output
+    // ---------------------------------------------------------------
 
     #[test]
     fn test_tsv_phoneme_with_newline() {

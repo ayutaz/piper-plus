@@ -1576,10 +1576,7 @@ mod wasm_tests {
         let v: serde_json::Value = serde_json::from_str(&json).unwrap();
         let arr = v.as_array().unwrap();
         // Two text-bearing segments; break_ms attaches to the first.
-        let total_break: u64 = arr
-            .iter()
-            .map(|s| s["breakMs"].as_u64().unwrap_or(0))
-            .sum();
+        let total_break: u64 = arr.iter().map(|s| s["breakMs"].as_u64().unwrap_or(0)).sum();
         assert_eq!(
             total_break, 500,
             "break time=500ms must surface as breakMs=500 across segments",
@@ -1595,8 +1592,8 @@ mod wasm_tests {
     #[wasm_bindgen_test]
     fn test_wasm_parse_ssml_prosody_rate_applies() {
         // <prosody rate="slow"> maps to length_scale=1.25 per W3C named rates.
-        let json = parse_ssml(r#"<speak><prosody rate="slow">slow text</prosody></speak>"#)
-            .unwrap();
+        let json =
+            parse_ssml(r#"<speak><prosody rate="slow">slow text</prosody></speak>"#).unwrap();
         let v: serde_json::Value = serde_json::from_str(&json).unwrap();
         let arr = v.as_array().unwrap();
         let any_slow = arr.iter().any(|s| {
