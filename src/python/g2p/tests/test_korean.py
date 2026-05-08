@@ -6,6 +6,8 @@ All tests are gated with ``@requires_ko`` since g2pk2 is an optional
 dependency.
 """
 
+import pytest
+
 from tests.conftest import requires_ko
 
 # ===========================================================================
@@ -603,3 +605,242 @@ class TestModuleFunctions:
         assert "phonemize_korean" in korean.__all__
         assert "phonemize_korean_with_prosody" in korean.__all__
         assert "KoreanPhonemizer" in korean.__all__
+
+
+# ===========================================================================
+# Liaison (연음화) Exact-String Pin Tests
+# ===========================================================================
+
+
+@requires_ko
+class TestKoreanLiaison:
+    """Pin g2pk2's actual liaison output for batchim + vowel-onset patterns.
+
+    These tests use exact-string assertions on the IPA token list to lock in
+    g2pk2's documented behavior for 연음화 (liaison), 격음화 (aspiration),
+    and ㅎ-elision rules. Expected values reflect g2pk2's *actual* output,
+    not the linguistically ideal form.
+    """
+
+    def test_liaison_옷이(self):
+        """옷 (ㅅ batchim) + 이 → 오시 → ['o', 's', 'i']."""
+        # Liaison: ㅅ moves to onset of 이, no tensification.
+        assert _phonemes("옷이") == ["o", "s", "i"]
+
+    def test_liaison_값이(self):
+        """값 (ㅄ batchim) + 이 → 갑씨 → ['k','a','p̚','s͈','i'].
+
+        g2pk2 simplifies ㅄ to ㅂ (unreleased) and tensifies ㅅ → ㅆ
+        when ㅂ-batchim is followed by ㅅ-onset (경음화).
+        """
+        assert _phonemes("값이") == ["k", "a", "p̚", "s͈", "i"]
+
+    def test_liaison_없어(self):
+        """없 (ㅄ batchim) + 어 → 업써 → ['ʌ','p̚','s͈','ʌ'].
+
+        Same ㅄ simplification + ㅅ tensification as 값이.
+        """
+        assert _phonemes("없어") == ["ʌ", "p̚", "s͈", "ʌ"]
+
+    def test_liaison_읽어(self):
+        """읽 (ㄺ batchim) + 어 → 일거 → ['i','l','k','ʌ'].
+
+        g2pk2 splits ㄺ to ㄹ (lateral, kept as final) + ㄱ (moved to onset).
+        Note ㄱ appears as ['k'] (initial onset), not unreleased final.
+        """
+        assert _phonemes("읽어") == ["i", "l", "k", "ʌ"]
+
+    def test_liaison_삶이(self):
+        """삶 (ㄻ batchim) + 이 → 살미 → ['s','a','l','m','i'].
+
+        g2pk2 splits ㄻ: ㄹ remains as final, ㅁ moves to onset of 이.
+        """
+        assert _phonemes("삶이") == ["s", "a", "l", "m", "i"]
+
+    def test_liaison_앉아(self):
+        """앉 (ㄵ batchim) + 아 → 안자 → ['a','n','tɕ','a'].
+
+        g2pk2 splits ㄵ: ㄴ remains as final, ㅈ moves to onset → tɕ.
+        """
+        assert _phonemes("앉아") == ["a", "n", "tɕ", "a"]
+
+    def test_liaison_많아(self):
+        """많 (ㄶ batchim) + 아 → 마나 → ['m','a','n','a'].
+
+        g2pk2 elides ㅎ from ㄶ; ㄴ moves to onset of 아 (h-elision rule).
+        """
+        assert _phonemes("많아") == ["m", "a", "n", "a"]
+
+    def test_liaison_싫어(self):
+        """싫 (ㅀ batchim) + 어 → 시러 → ['s','i','ɾ','ʌ'].
+
+        g2pk2 elides ㅎ from ㅀ; ㄹ moves to onset → ɾ (flap in onset position).
+        """
+        assert _phonemes("싫어") == ["s", "i", "ɾ", "ʌ"]
+
+    def test_liaison_no_change_with_consonant(self):
+        """옷 + 가 (consonant onset) → 옫까 → ['o','t̚','k͈','a'].
+
+        No liaison occurs because the next syllable starts with a consonant.
+        Instead: ㅅ is realized as t̚ (unreleased) and ㄱ tensifies to k͈.
+        """
+        assert _phonemes("옷가") == ["o", "t̚", "k͈", "a"]
+
+    def test_liaison_with_h_aspirated(self):
+        """좋 (ㅎ batchim) + 아 → 조아 → ['tɕ','o','a'].
+
+        g2pk2 elides ㅎ entirely (ㅎ-elision before vowel onset).
+        """
+        assert _phonemes("좋아") == ["tɕ", "o", "a"]
+
+
+# ===========================================================================
+# Batchim Devoicing & Consonant Cluster Simplification Pin Tests
+# ===========================================================================
+
+
+@requires_ko
+class TestKoreanBatchimDevoicing:
+    """Pin g2pk2's batchim devoicing (불파음화) and ㄳㄵㄶㄺㄻㄼㄾㄿㅄ
+    consonant-cluster simplification (자음군 단순화) for word-final position.
+    """
+
+    # ----- Unreleased final stops (불파음화) -----
+
+    def test_unreleased_p(self):
+        """입 (ㅂ batchim, no liaison context) → ['i','p̚']."""
+        assert _phonemes("입") == ["i", "p̚"]
+
+    def test_unreleased_t(self):
+        """앗 (ㅅ batchim, no liaison context) → ['a','t̚'].
+
+        ㅅ in word-final position is realized as t̚ (unreleased alveolar stop).
+        """
+        assert _phonemes("앗") == ["a", "t̚"]
+
+    def test_unreleased_k(self):
+        """옥 (ㄱ batchim, no liaison context) → ['o','k̚']."""
+        assert _phonemes("옥") == ["o", "k̚"]
+
+    # ----- Consonant cluster simplification (자음군 단순화) -----
+
+    def test_consonant_simplification_ㄺ(self):
+        """닭 (ㄺ batchim, word-final) → 닥 → ['t','a','k̚'].
+
+        ㄺ → ㄱ (k̚) when not followed by vowel onset.
+        """
+        assert _phonemes("닭") == ["t", "a", "k̚"]
+
+    def test_consonant_simplification_ㄻ(self):
+        """삶 (ㄻ batchim, word-final) → 삼 → ['s','a','m'].
+
+        ㄻ → ㅁ (m) when not followed by vowel onset.
+        """
+        assert _phonemes("삶") == ["s", "a", "m"]
+
+    def test_consonant_simplification_ㄼ(self):
+        """밟 (ㄼ batchim, word-final) → 밥 → ['p','a','p̚'].
+
+        ㄼ → ㅂ (p̚) — note: g2pk2 picks ㅂ for the verb stem 밟.
+        """
+        assert _phonemes("밟") == ["p", "a", "p̚"]
+
+    def test_consonant_simplification_ㄾ(self):
+        """핥 (ㄾ batchim, word-final) → 할 → ['h','a','l'].
+
+        g2pk2 picks ㄹ (l) for ㄾ in this isolated form.
+        """
+        assert _phonemes("핥") == ["h", "a", "l"]
+
+    def test_consonant_simplification_ㄿ(self):
+        """읊 (ㄿ batchim, word-final) → 읍 → ['ɯ','p̚'].
+
+        ㄿ → ㅂ (p̚).
+        """
+        assert _phonemes("읊") == ["ɯ", "p̚"]
+
+    def test_consonant_simplification_ㅄ(self):
+        """값 (ㅄ batchim, word-final) → 갑 → ['k','a','p̚'].
+
+        ㅄ → ㅂ (p̚) when not followed by vowel onset.
+        """
+        assert _phonemes("값") == ["k", "a", "p̚"]
+
+
+# ===========================================================================
+# g2pk2 Availability / Fallback Tests
+# ===========================================================================
+
+
+@requires_ko
+class TestKoreanG2pk2Fallback:
+    """Pin behavior of _apply_g2p when g2pk2 is unavailable or fails.
+
+    Reflects current implementation:
+    - Missing g2pk2 (or mecab): raises ``ImportError``.
+    - Other runtime exceptions during ``G2p()(text)`` are caught and the
+      original text is returned (graceful fallback at line 193-197).
+    """
+
+    def _reset_globals(self):
+        """Reset the cached g2pk2 instance/flag between tests."""
+        from piper_plus_g2p import korean as ko_mod
+
+        ko_mod._g2p_instance = None
+        ko_mod._g2p_unavailable = False
+
+    def test_g2pk2_unavailable_fallback(self, monkeypatch):
+        """When _g2p_unavailable is True, _apply_g2p raises ImportError.
+
+        This pins the **current** behavior (no graceful Hangul-only fallback).
+        Callers must catch ImportError if they need to handle absence of g2pk2.
+        """
+        from piper_plus_g2p import korean as ko_mod
+
+        self._reset_globals()
+        # Simulate "g2pk2 already determined unavailable"
+        monkeypatch.setattr(ko_mod, "_g2p_unavailable", True)
+
+        with pytest.raises(ImportError, match="g2pk2"):
+            ko_mod._apply_g2p("안녕")
+
+        # Cleanup so subsequent tests get a clean slate.
+        self._reset_globals()
+
+    def test_g2pk2_runtime_exception_caught(self, monkeypatch):
+        """Generic exceptions raised by G2p()(text) → return original text.
+
+        Pins the ``except Exception`` branch (line 193-197): unexpected runtime
+        errors are logged at DEBUG level and the *original* text is returned
+        unchanged so the caller can still produce something via Hangul
+        decomposition.
+        """
+        from piper_plus_g2p import korean as ko_mod
+
+        self._reset_globals()
+
+        class _BoomG2p:
+            """Stand-in for g2pk2.G2p that always raises a runtime error."""
+
+            def __call__(self, text):
+                raise RuntimeError("mecab boom")
+
+        # Inject a fake instance so _apply_g2p skips the import / construction.
+        monkeypatch.setattr(ko_mod, "_g2p_instance", _BoomG2p())
+        monkeypatch.setattr(ko_mod, "_g2p_unavailable", False)
+
+        # Should NOT raise — returns original text unchanged.
+        out = ko_mod._apply_g2p("안녕")
+        assert out == "안녕"
+
+        # AttributeError is treated specially (mecab missing) → ImportError.
+        class _AttrG2p:
+            def __call__(self, text):
+                raise AttributeError("mecab is None")
+
+        monkeypatch.setattr(ko_mod, "_g2p_instance", _AttrG2p())
+        monkeypatch.setattr(ko_mod, "_g2p_unavailable", False)
+        with pytest.raises(ImportError, match="mecab"):
+            ko_mod._apply_g2p("안녕")
+
+        self._reset_globals()
