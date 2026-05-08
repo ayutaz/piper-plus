@@ -191,7 +191,7 @@ func TestOrtSessionContract_EnvVarNames(t *testing.T) {
 	}
 }
 
-// NOTE: configureSessionOptions() requires ONNX Runtime to be initialised
+// NOTE: configureSessionOptions() requires ONNX Runtime to be initialized
 // (ort.InitializeEnvironment()), which is not available in the unit-test
 // path. Smoke checks for that helper live in integration_test.go behind
 // the `integration` build tag. Drift detection of the contract values

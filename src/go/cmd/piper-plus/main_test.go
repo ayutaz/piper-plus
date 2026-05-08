@@ -81,7 +81,7 @@ func TestRootCmd_PersistentFlags_Defined(t *testing.T) {
 	}
 }
 
-// TestRootCmd_LocalFlags_Defined pins the synthesise-mode flags that are
+// TestRootCmd_LocalFlags_Defined pins the synthesize-mode flags that are
 // shared with the Rust / Python / C# CLIs.
 func TestRootCmd_LocalFlags_Defined(t *testing.T) {
 	flags := []string{
