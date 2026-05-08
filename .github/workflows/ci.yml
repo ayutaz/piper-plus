@@ -125,6 +125,7 @@ jobs:
 
       - name: Cache NuGet packages
         uses: actions/cache@v5
+        continue-on-error: true
         with:
           path: ~/.nuget/packages
           key: ${{ runner.os }}-nuget-${{ hashFiles('src/csharp/**/*.csproj') }}
@@ -192,10 +193,12 @@ jobs:
 
       - name: Cache NuGet packages
         uses: actions/cache@v5
+        continue-on-error: true
         with:
           path: ~/.nuget/packages
-          key: ${{ runner.os }}-nuget-${{ hashFiles('src/csharp/**/*.csproj') }}
+          key: ${{ runner.os }}-nuget-${{ matrix.rid }}-${{ hashFiles('src/csharp/**/*.csproj') }}
           restore-keys: |
+            ${{ runner.os }}-nuget-${{ matrix.rid }}-
             ${{ runner.os }}-nuget-
 
       - name: Publish self-contained binary
