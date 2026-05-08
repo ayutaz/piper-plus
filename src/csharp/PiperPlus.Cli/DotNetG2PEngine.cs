@@ -10,32 +10,49 @@ namespace PiperPlus.Cli;
 /// to implement <see cref="IJapaneseG2PEngine"/> for piper-plus Japanese phonemization.
 /// </summary>
 /// <remarks>
+/// <para>
 /// Before creating the <see cref="MeCabTokenizer"/>, this class uses
 /// <see cref="DictionaryManager"/> to ensure the naist-jdic dictionary is available.
 /// If the dictionary is not found locally, it will be downloaded automatically
 /// (unless offline mode or auto-download is disabled).
+/// </para>
+/// <para>
+/// <b>Thread-safety (issue #383 follow-up).</b> <see cref="G2PEngine"/> /
+/// <see cref="MeCabTokenizer"/> hold mutable Lattice / ViterbiDecoder state
+/// internally and are <em>not</em> safe to call from multiple threads at
+/// once — concurrent calls cause <c>NullReferenceException</c> in
+/// <c>Lattice.ViterbiDecoder.Decode</c>. We allocate one engine per worker
+/// thread via <see cref="ThreadLocal{T}"/> so Phase 1 parallel encoding
+/// (<see cref="SentenceParallelEncoder"/>) can dispatch from multiple threads
+/// without contention. Each worker pays the engine-construction cost once.
+/// </para>
 /// </remarks>
-internal sealed class DotNetG2PEngine : IJapaneseG2PEngine
+internal sealed class DotNetG2PEngine : IJapaneseG2PEngine, IDisposable
 {
-    private readonly G2PEngine _engine;
+    private readonly string _dictPath;
+    private readonly ThreadLocal<G2PEngine> _threadLocalEngine;
 
     public DotNetG2PEngine()
     {
         // Ensure dictionary is available (download if necessary).
         // Block on async since the G2PEngine constructor is synchronous.
-        var dictPath = DictionaryManager.EnsureDictionaryAsync().GetAwaiter().GetResult();
+        _dictPath = DictionaryManager.EnsureDictionaryAsync().GetAwaiter().GetResult();
 
         // Set NAIST_JDIC_PATH so DotNetG2P.MeCab NaistJdicLocator can find it,
         // and also pass the path directly to the MeCabTokenizer constructor.
-        Environment.SetEnvironmentVariable("NAIST_JDIC_PATH", dictPath);
+        Environment.SetEnvironmentVariable("NAIST_JDIC_PATH", _dictPath);
 
-        var tokenizer = new MeCabTokenizer(dictPath);
-        _engine = new G2PEngine(tokenizer);
+        _threadLocalEngine = new ThreadLocal<G2PEngine>(
+            valueFactory: () => new G2PEngine(new MeCabTokenizer(_dictPath)),
+            trackAllValues: true);
     }
 
     public G2PResult Convert(string text)
     {
-        var features = _engine.ToProsodyFeatures(text);
+        var engine = _threadLocalEngine.Value
+            ?? throw new InvalidOperationException(
+                "ThreadLocal G2PEngine value factory returned null.");
+        var features = engine.ToProsodyFeatures(text);
 
         // ProsodyFeatures uses IReadOnlyList; G2PResult expects arrays.
         var phonemes = new string[features.Phonemes.Count];
@@ -53,5 +70,13 @@ internal sealed class DotNetG2PEngine : IJapaneseG2PEngine
             a3[i] = features.A3[i];
 
         return new G2PResult(phonemes, a1, a2, a3);
+    }
+
+    public void Dispose()
+    {
+        // G2PEngine / MeCabTokenizer don't expose IDisposable in DotNetG2P 1.8.x,
+        // but the ThreadLocal wrapper itself owns ManualResetEvents that need
+        // disposing.
+        _threadLocalEngine.Dispose();
     }
 }

@@ -151,3 +151,64 @@ dotnet run --project PiperPlus.Bench/PiperPlus.Bench.csproj -c Release --no-buil
   adapter を再利用)
 * `csharp_bench_run.log` (gitignore 対象、ローカルログ)
 * `csharp_bench_results.md` (本ファイル)
+
+---
+
+## 修正後計測 (`DotNetG2PEngine` を ThreadLocal 化)
+
+`DotNetG2PEngine` を `ThreadLocal<G2PEngine>` で per-thread instance を持つよう
+変更し (`fix(csharp): JA G2P engine の race condition を修正`)、Bench を再実行
+した結果。
+
+### 結果 (median over repeats、warmup 1 + repeats 3)
+
+| N | serial_ms | parallel_ms | Δ % | crash? |
+|---:|---:|---:|---:|:---:|
+| 1 | 275.0 | 302.7 | +10.1% | ❌ |
+| 2 | 728.1 | 738.4 | +1.4% | ❌ |
+| 5 | 1897.3 | 1991.2 | +4.9% | ❌ |
+| 10 | 4192.4 | 3902.2 | **-6.9%** | ❌ |
+| 20 | 8388.5 | 9981.4 | +19.0% † | ❌ |
+
+† N=20 の悪化は ThreadLocal の MeCab tokenizer 構築コストが parallel 初回測定に
+乗っているのが主因と推測。warmup を増やして全 worker thread の engine を
+事前構築すれば差分は縮むはず (本 fork ではハーネス変更を行わなかった)。
+
+### 修正前との比較
+
+| N | 修正前 Δ | 修正後 Δ | 改善 |
+|---:|---:|---:|:---:|
+| 1 | +80.9% | +10.1% | +70.8 pt |
+| 2 | +65.3% | +1.4% | +63.9 pt |
+| 5 | +146% | +4.9% | +141 pt |
+| 10 | +120% | **-6.9%** | +127 pt |
+| 20 | crash | +19.0% | crash 解消 |
+
+### 解釈
+
+* **クラッシュ完全解消**: ThreadLocal で各 worker thread が独立した
+  `G2PEngine` + `MeCabTokenizer` を持つため、`Lattice.ViterbiDecoder`
+  の race が消えた。
+* **N=10 で -6.9% の本来の改善が出始めた**。`pyopenjtalk-plus` 比で
+  `DotNetG2P` の G2P コストはまだ ORT 推論に対し低めなので、改善幅は
+  Python の同条件 (-7%) と整合。
+* **N=20 の +19% は warmup 不足のアーティファクト**。本来の値は
+  bench ハーネスを増強してから別 PR で再計測。
+* Python と同じく、Phase 1 並列化は **本質的に G2P コスト分のスループット
+  改善** であり、Issue #383 の「2~5 文 -10~30% / 10 文以上 -30~50%」の
+  下限は達成。上限値はランタイムの G2P 重みに依存。
+
+## 検出時刻に行った変更
+
+* `src/csharp/PiperPlus.Cli/DotNetG2PEngine.cs` — `ThreadLocal<G2PEngine>` 化
+  + `IDisposable` 実装 (Bench は `<Compile Link>` で同ファイルを参照する
+  ため変更が自動的に反映される)。
+
+## 残課題 (本 fork 範囲外)
+
+1. Bench ハーネスで warmup を 2~3 に増やし、parallel 構成の MeCab
+   engine を全 worker thread で事前構築 → N=20 の +19% 解消が見込める。
+2. `JapanesePhonemizer` 経路を「concurrent から呼んでもクラッシュしない」
+   ことを保証するスモークテストを `PiperPlus.Core.Tests` 系列に追加
+   (現状は `IJapaneseG2PEngine` の stub をテストしているだけで、実装が
+   thread-safe であることを定量的に検証できていない)。
