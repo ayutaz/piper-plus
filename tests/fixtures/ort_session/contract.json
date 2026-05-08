@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "comment": "ORT session contract fixture. Regenerate via `python scripts/regenerate_ort_session_fixture.py`. Source: docs/spec/ort-session-contract.toml. Each runtime asserts its own session/warmup/cache/env_vars constants match.",
+  "session": {
+    "graph_optimization_level": "ORT_ENABLE_ALL",
+    "execution_mode": "SEQUENTIAL",
+    "max_intra_threads": 4,
+    "inter_op_threads": 1,
+    "enable_cpu_mem_arena": true,
+    "enable_memory_pattern": true,
+    "dynamic_block_base": 4
+  },
+  "warmup": {
+    "phoneme_length": 100,
+    "bos_token": 1,
+    "eos_token": 2,
+    "dummy_phoneme": 8,
+    "default_runs": 2,
+    "noise_scale": 0.667,
+    "length_scale": 1.0,
+    "noise_w": 0.8
+  },
+  "cache": {
+    "optimized_extension": "opt.onnx",
+    "sentinel_extension": "opt.onnx.ok",
+    "sentinel_content": "ok",
+    "device_label_cpu": "cpu",
+    "device_label_cuda_format": "cuda{device_id}"
+  },
+  "env_vars": {
+    "disable_warmup": "PIPER_DISABLE_WARMUP",
+    "disable_cache": "PIPER_DISABLE_CACHE",
+    "intra_threads": "PIPER_INTRA_THREADS"
+  }
+}

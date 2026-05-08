@@ -29,7 +29,8 @@ use crate::error::PiperError;
 
 /// VITS 小モデルの intra-op スレッド上限。
 /// 4 以上では待機コストが推論時間を上回る。
-const MAX_INTRA_THREADS: usize = 4;
+/// docs/spec/ort-session-contract.toml の session.max_intra_threads と同期。
+pub const MAX_INTRA_THREADS: usize = 4;
 
 /// デフォルトの warmup 実行回数。
 /// ORT JIT キャッシュは 1-2 回で安定するが、安全マージンとして 2 回。
@@ -37,7 +38,8 @@ pub const DEFAULT_WARMUP_RUNS: usize = 2;
 
 /// warmup 用のダミー phoneme 入力長。
 /// 本番入力 (50-200) と同程度の形状で ORT メモリアロケーションを温める。
-const WARMUP_PHONEME_LENGTH: usize = 100;
+/// docs/spec/ort-session-contract.toml の warmup.phoneme_length と同期。
+pub const WARMUP_PHONEME_LENGTH: usize = 100;
 
 // ---------------------------------------------------------------------------
 // 短テキスト緩和策の定数 (Strategy A + B)

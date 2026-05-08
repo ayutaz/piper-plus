@@ -12,8 +12,10 @@ on:
       - 'tests/fixtures/g2p/zh_en_loanword_matrix.json'
       - 'tests/fixtures/phoneme_timing/**'
       - 'tests/fixtures/short_text/**'
+      - 'tests/fixtures/ort_session/**'
       - 'docs/spec/phoneme-timing-contract.toml'
       - 'docs/spec/short-text-contract.toml'
+      - 'docs/spec/ort-session-contract.toml'
       - 'docker/wyoming/**'
       - '.github/workflows/python-tests.yml'
 
