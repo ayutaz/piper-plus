@@ -291,6 +291,31 @@ export function timingToSrt(result: TimingResult): string;
  */
 export const DEFAULT_HOP_LENGTH: number;
 
+// ---------------------------------------------------------------------------
+// ORT session contract constants (cross-runtime parity)
+//
+// Pinned by tests/fixtures/ort_session/contract.json, mirrored in Python /
+// Rust / Go / C# / C++. Drift in any of these = warmup behavior diverges from
+// the canonical Python `ort_utils.py:warmup_onnx_session()`.
+// ---------------------------------------------------------------------------
+
+/** Phoneme sequence length used by warmup runs (excludes BOS/EOS). */
+export const WARMUP_PHONEME_LENGTH: number;
+/** BOS token id seeded into warmup phoneme sequences. */
+export const WARMUP_BOS_TOKEN: number;
+/** EOS token id seeded into warmup phoneme sequences. */
+export const WARMUP_EOS_TOKEN: number;
+/** Phoneme id used to fill warmup phoneme positions between BOS/EOS. */
+export const WARMUP_DUMMY_PHONEME: number;
+/** Default number of warmup runs after session creation. */
+export const WARMUP_DEFAULT_RUNS: number;
+/** noise_scale value used in warmup forward passes. */
+export const WARMUP_NOISE_SCALE: number;
+/** length_scale value used in warmup forward passes. */
+export const WARMUP_LENGTH_SCALE: number;
+/** noise_w value used in warmup forward passes. */
+export const WARMUP_NOISE_W: number;
+
 /**
  * Build a reverse lookup map from phoneme ID to phoneme token string.
  *
