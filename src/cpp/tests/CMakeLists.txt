@@ -88,13 +88,39 @@ foreach(test_source ${TEST_SOURCES})
         gtest
         gtest_main
     )
-    
+
     # Add Windows-specific library directories for all tests
     if(WIN32)
         target_link_directories(${test_name} PRIVATE
             ${CMAKE_BINARY_DIR}/fi/lib
             ${CMAKE_BINARY_DIR}/si/lib
         )
+
+        # Issue #383 follow-up: Windows ML ships an out-of-date
+        # onnxruntime.dll under C:\Windows\System32. When a test exe has no
+        # DLL alongside it, the loader picks up that older DLL and ORT
+        # rejects the modern model with "The given version [N] is not
+        # supported, only version 1 to 10 is supported in this build."
+        # Copy the bundled ORT DLLs next to every test exe so the loader
+        # finds the matching version first.
+        if(ONNXRUNTIME_DLL)
+            add_custom_command(TARGET ${test_name} POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    "${ONNXRUNTIME_DLL}"
+                    "$<TARGET_FILE_DIR:${test_name}>/onnxruntime.dll"
+                COMMENT "Staging onnxruntime.dll next to ${test_name}"
+            )
+            get_filename_component(_ORT_DLL_DIR "${ONNXRUNTIME_DLL}" DIRECTORY)
+            file(GLOB _ORT_PROVIDER_DLLS "${_ORT_DLL_DIR}/onnxruntime_providers*.dll")
+            foreach(_ort_dll ${_ORT_PROVIDER_DLLS})
+                add_custom_command(TARGET ${test_name} POST_BUILD
+                    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                        "${_ort_dll}"
+                        "$<TARGET_FILE_DIR:${test_name}>/"
+                    COMMENT "Staging ORT provider DLL next to ${test_name}"
+                )
+            endforeach()
+        endif()
     endif()
     
     # Add spdlog/fmt dependencies for all tests
