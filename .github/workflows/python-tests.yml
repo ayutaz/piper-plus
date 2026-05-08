@@ -10,6 +10,11 @@ on:
       - 'test/**'
       - 'tools/benchmark/**'
       - 'tests/fixtures/g2p/zh_en_loanword_matrix.json'
+      - 'tests/fixtures/phoneme_timing/**'
+      - 'tests/fixtures/short_text/**'
+      - 'docs/spec/phoneme-timing-contract.toml'
+      - 'docs/spec/short-text-contract.toml'
+      - 'docker/wyoming/**'
       - '.github/workflows/python-tests.yml'
 
 concurrency:
@@ -121,10 +126,10 @@ jobs:
       env:
         PYTHONUTF8: '1'
 
-    - name: Run runtime full tests (config, training manager, CLI, timing, streaming, short-text, zh-en)
+    - name: Run runtime full tests (config, training manager, CLI, timing, streaming, short-text, zh-en, webui)
       run: |
         cd src/python_run
-        pytest tests/test_config_fallback.py tests/test_english_phonemization.py tests/test_runtime.py tests/test_util_impl.py tests/test_cli_models.py tests/test_training_manager.py tests/test_training_integration.py tests/test_phoneme_timing.py tests/test_voice_timing.py tests/test_http_timing.py tests/test_voice_streaming.py tests/test_text_splitter.py tests/test_short_text_mitigation.py tests/test_zh_en_loanword_runtime.py -v --tb=short --override-ini="addopts="
+        pytest tests/test_config_fallback.py tests/test_english_phonemization.py tests/test_runtime.py tests/test_util_impl.py tests/test_cli_models.py tests/test_training_manager.py tests/test_training_integration.py tests/test_phoneme_timing.py tests/test_voice_timing.py tests/test_http_timing.py tests/test_voice_streaming.py tests/test_text_splitter.py tests/test_short_text_mitigation.py tests/test_zh_en_loanword_runtime.py tests/test_webui.py -v --tb=short --override-ini="addopts="
       env:
         PYTHONUTF8: '1'
 
