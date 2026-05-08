@@ -1,11 +1,11 @@
 # Kotlin G2P ライブラリ設計書 (Issue #388)
 
+> **ステータス**: Implemented (Issue #388, PR #400 / dev に merge 済み)
 > **親 Issue**: [#388](https://github.com/ayutaz/piper-plus/issues/388) — 「Kotlin 向けの g2p ライブラリの提供」
-> **作業ブランチ**: `feat/issue-388-kotlin-g2p`
-> **要件定義書**: [kotlin-g2p-requirements.md](kotlin-g2p-requirements.md) (本書策定後の技術調査結果を反映)
-> **判定基準**: 自動化可能性 (CLI/CI で完結) を最優先。実装工数は評価軸から除外。
+> **要件定義書**: [kotlin-g2p-requirements.md](kotlin-g2p-requirements.md)
+> **判定基準** (実装着手前): 自動化可能性 (CLI/CI で完結) を最優先。実装工数は評価軸から除外。
 
-> ⚠️ **要件定義書による前提変更**: 本設計書策定後の技術調査で、`piper_plus_phonemize()` は ONNX モデル必須であることが判明 (要件定義書 §5)。Kotlin AAR は **C API に追加する engine-less G2P エントリポイント (FR-CAPI-1)** を呼ぶ前提に変更。本書 §5.4 の JNI bridge 設計は実装着手前に該当部分を更新する。
+> **注**: 本書は実装着手前の設計記録。Day-by-Day ロードマップ (§6) / 受け入れ基準チェックリスト (§9) / 改訂履歴 (§12) は実装完了に伴い削除済み (詳細は git log と PR #400)。残置されているのはアプローチ比較・既存資産整理・自動化戦略・競合事例といった、後続メンテで再利用価値のあるセクション。
 
 ---
 
@@ -366,28 +366,7 @@ Java_com_piperplus_g2p_PiperPlusG2pNative_nativeDestroy(
 
 ---
 
-## 6. 実装ロードマップ
-
-```
-Phase 1  ┃ JNI bridge + C API gluing                      [TICKET-01]
-Phase 2  ┃ Kotlin API + data class                        [TICKET-02]
-Phase 3  ┃ Gradle module + Maven publish 設定             [TICKET-03]
-Phase 4  ┃ 自動テスト整備 (L1-L5)                         [TICKET-04]
-Phase 5  ┃ 辞書配布戦略 (assets / HF Hub DL)              [TICKET-05]
-Phase 6  ┃ Maven Central 公開自動化 (GitHub Actions)      [TICKET-06]
-Phase 7  ┃ ドキュメント / サンプルアプリ                  [TICKET-07]
-```
-
-**並列着手可能箇所**:
-- Phase 1 (JNI) + Phase 2 (Kotlin API) は並列着手可 (シグネチャ合意後)
-- Phase 4 (テスト) は Phase 1 完了後すぐ開始可能
-- Phase 6 (Maven 公開) は Phase 3 完了後すぐ準備可能 (タグ push まで dry-run)
-
-**クリティカルパス**: Phase 1 → Phase 2 → Phase 3 → Phase 4 (instrumented test) → Phase 6 (Maven 公開)
-
----
-
-## 7. 自動化戦略 (本設計の肝)
+## 6. 自動化戦略 (本設計の肝)
 
 ユーザー指針「**実機テストが多いのは嫌、CLI/CI で完結したい**」に対する具体的な担保策。
 
@@ -479,7 +458,7 @@ GitHub Actions の Ubuntu runner は KVM をサポートするため、ヘッド
 
 ---
 
-## 8. リスクと対策
+## 7. リスクと対策
 
 | リスク | 影響 | 対策 |
 |-------|------|-----|
@@ -495,21 +474,7 @@ GitHub Actions の Ubuntu runner は KVM をサポートするため、ヘッド
 
 ---
 
-## 9. 受け入れ基準 (PR マージ条件)
-
-- [ ] `./gradlew :piper-plus-g2p:test` 全 PASS
-- [ ] `./gradlew :piper-plus-g2p:pixel6api34DebugAndroidTest` 全 PASS (CI emulator)
-- [ ] Cross-runtime parity test で Python と byte 一致 (8 言語 × 代表ケース)
-- [ ] ABI 整合性 (`max-page-size=16384`) 検証 PASS
-- [ ] `./gradlew publishToMavenCentralRepository --dry-run` 成功
-- [ ] AAR サイズ < 5MB (jniLibs/ 含めて、辞書を除く)
-- [ ] README.md (`android/piper-plus-g2p/README.md`) でクイックスタート提示
-- [ ] サンプルアプリ (`examples/android-g2p-sample/`) で実動作確認
-- [ ] CHANGELOG / メイン README 更新 (8 言語 G2P が「Python/Rust/Go/JS-WASM/C#/C++/Kotlin」の 7 ランタイム対応に)
-
----
-
-## 10. 関連ドキュメント
+## 8. 関連ドキュメント
 
 - [docs/spec/ios-shared-lib.md](ios-shared-lib.md) — iOS shared lib 設計 (xcframework パターン参考)
 - [docs/spec/zh-en-loanword-runtime-rollout.md](zh-en-loanword-runtime-rollout.md) — クロスランタイム同期パターン
@@ -521,7 +486,7 @@ GitHub Actions の Ubuntu runner は KVM をサポートするため、ヘッド
 
 ---
 
-## 11. 競合事例の参考リンク
+## 9. 競合事例の参考リンク
 
 | プロジェクト | 参考にした点 | URL |
 |------------|-----------|-----|
@@ -533,8 +498,5 @@ GitHub Actions の Ubuntu runner は KVM をサポートするため、ヘッド
 
 ---
 
-## 12. 改訂履歴
+<!-- 改訂履歴は git log に統合 (実装完了に伴い削除、2026-05-08) -->
 
-| 日付 | 版 | 変更内容 |
-|------|----|---------|
-| 2026-05-07 | v1 | 設計書初版。3 エージェント並列調査 (codebase / concept / competitor) の結果を統合。アプローチ A (JNI + AAR + Maven Central) を採択、自動化最優先で 7 phase ロードマップを定義。 |

@@ -6,7 +6,10 @@ Cross-runtime guide for integrating piper-plus into iOS projects (Dart / Flutter
 > - [Dart / Flutter quick reference](../../examples/dart/README.md#ios-integration)
 > - [Godot iOS notes](../../examples/godot/README.md#ios-v1130)
 > - [Swift example (manual drag-and-drop, SPM via Package.swift)](../../examples/swift/README.md)
+> - [**Swift G2P-only integration** (no synthesis engine)](swift-g2p-integration.md) — Issue #387
 > - [Specification](../spec/ios-shared-lib.md) (design rationale)
+
+> **Need only G2P, not synthesis?** → See [swift-g2p-integration.md](swift-g2p-integration.md). The `PiperPlusG2P` SPM product does not depend on ONNX Runtime and is significantly smaller (~6 MB vs ~31 MB).
 
 ## Prerequisites
 
@@ -26,6 +29,7 @@ piper-plus v1.13.0 ships **two iOS artifacts** during the migration period:
 | Flutter / Dart FFI for iOS | **xcframework.zip** | Xcode treats xcframework as first-class; supports device + simulator |
 | Godot GDExtension for iOS | **xcframework.zip** | `ios.dependencies` in `.gdextension` expects xcframework |
 | Swift project (SPM-aware) | **xcframework.zip + Package.swift** | M4 ships `Package.swift` at the repo root for `import PiperPlus` |
+| **Swift / G2P-only (no synthesis)** | [**`PiperPlusG2P` SPM product**](swift-g2p-integration.md) | Issue #387: no ORT dependency, ~6 MB xcframework, 8 languages |
 | Existing CMake project (v1.12.0 or earlier) | tar.gz (deprecated) | `libpiper_plus-ios-arm64-${VERSION}.tar.gz`; **removed in v1.14.0** |
 | You want simulator support | **xcframework.zip only** | tar.gz is device-only |
 

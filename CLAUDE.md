@@ -163,6 +163,7 @@ nohup /data/piper/.venv/bin/python -m piper_train \
 | C API | `libpiper_plus` | shared lib | C/Dart/Godot サンプル | `src/cpp/piper_plus.{h,c_api.cpp}`, `cmake/PiperPlusShared.cmake` |
 | iOS xcframework + SPM | `piper-plus` (Swift Package) | 1.13.0+ (M4) | release-shared-lib CI | `Package.swift`, `Sources/PiperPlus/`, `cmake/PrivacyInfo.xcprivacy` |
 | **Kotlin/Android G2P (Maven Central)** | `io.github.ayutaz:piper-plus-g2p-android` | 1.0.0+ | L1〜L5 (kotlin-g2p-ci.yml) | `android/piper-plus-g2p/` |
+| iOS / macOS Swift G2P (SPM) | `PiperPlusG2P` (Swift product, 別 xcframework `-apple-`) | 1.14.0+ | XCTest (CI) + `examples/swift-g2p/HelloG2P` CLI | `Sources/PiperPlusG2P/`, `Tests/PiperPlusG2PTests/`, `examples/swift-g2p/`, `Package.swift` (Issue #387) |
 | 独立 G2P | `piper-plus-g2p` (Py/Rust)、`@piper-plus/g2p` (npm)、`src/go/phonemize` (Go)、`io.github.ayutaz:piper-plus-g2p-android` (Kotlin) | 同上 | — | `src/{python/g2p,rust/piper-plus-g2p,wasm/g2p,go/phonemize}/`、`android/piper-plus-g2p/` |
 
 **主な追加機能 (全ランタイム共通):** モデル名自動解決 (`--model tsukuyomi` でエイリアス + 自動 DL)、カスタム辞書 (JSON v1/v2 / TSV)、`[[ phoneme ]]` インライン音素記法 (C#/Python)、`--sentence-silence` / `--phoneme-silence` 制御、`--list-models` 言語フィルタ。

@@ -12,6 +12,9 @@ categories = ["text-processing", "multimedia::audio"]
 documentation = "https://docs.rs/piper-plus-g2p"
 readme = "README.md"
 
+[lib]
+crate-type = ["staticlib", "cdylib", "rlib"]
+
 [features]
 default = ["english", "chinese", "korean", "spanish", "french", "portuguese", "swedish"]
 japanese = ["dep:jpreprocess", "dep:bincode"]
@@ -24,6 +27,7 @@ french = []
 portuguese = []
 swedish = []
 ffi = []
+bundled-dicts = []
 all-languages = ["japanese", "english", "chinese", "korean", "spanish", "french", "portuguese", "swedish"]
 
 [dependencies]

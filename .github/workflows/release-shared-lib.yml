@@ -4,6 +4,19 @@ on:
   push:
     tags:
       - 'v[0-9]*'
+  # PR triggers cover only the G2P Apple-platform jobs (build-g2p-apple +
+  # assemble-g2p-xcframework). All other jobs and the release job remain
+  # gated to push (tags) / workflow_dispatch via per-job `if` conditions.
+  # See Issue #387 — PR-stage smoke check for the Apple G2P xcframework
+  # pipeline (iOS device + iOS simulator + macOS slices since v1.14.0).
+  pull_request:
+    paths:
+      - 'src/rust/piper-plus-g2p/**'
+      - 'Sources/PiperPlusG2P/**'
+      - 'tests/PiperPlusG2PTests/**'
+      - 'Package.swift'
+      - 'cmake/PrivacyInfo.xcprivacy'
+      - '.github/workflows/release-shared-lib.yml'
   workflow_dispatch:
 
 # Workflow-level permissions are read-only; the `release` job opts into
@@ -17,6 +30,7 @@ env:
 jobs:
   build-shared:
     name: Build ${{ matrix.name }}
+    if: github.event_name != 'pull_request'
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     strategy:
@@ -130,6 +144,7 @@ jobs:
 
   build-ios:
     name: Build iOS ${{ matrix.slice }}
+    if: github.event_name != 'pull_request'
     runs-on: macos-15
     timeout-minutes: 30
     strategy:
@@ -400,6 +415,7 @@ jobs:
 
   assemble-xcframework:
     name: Assemble piper_plus.xcframework
+    if: github.event_name != 'pull_request'
     needs: build-ios
     runs-on: macos-15
     timeout-minutes: 15
@@ -493,8 +509,279 @@ jobs:
           name: libpiper_plus-ios-xcframework
           path: libpiper_plus-ios.xcframework.zip
 
+  # ---------------------------------------------------------------------
+  # piper-plus-g2p Apple platforms build (Issue #387)
+  # ---------------------------------------------------------------------
+  # Pure Rust + bundled dictionaries → no ORT dependency, no CMake. The
+  # crate's own ffi.rs C ABI is built directly via `cargo build` for each
+  # target, then `lipo` merges multi-arch slices into a universal archive,
+  # and `xcodebuild -create-xcframework` produces the final xcframework.
+  # Consumed by Package.swift via `PiperPlusG2P` product.
+  # See docs/spec/swift-g2p.md §4.4 — §4.5.
+  #
+  # The macOS slice (added 2026-05) lets `swift run` consumers and macOS
+  # CLI tooling depend on PiperPlusG2P without iOS-only build flags. The
+  # synthesis xcframework remains iOS-only because it bundles ORT, which
+  # has its own macOS distribution path.
+  build-g2p-apple:
+    name: Build piper-plus-g2p Apple ${{ matrix.slice }}
+    runs-on: macos-15
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - slice: ios-arm64
+            rust_targets: "aarch64-apple-ios"
+          - slice: ios-arm64_x86_64-simulator
+            rust_targets: "aarch64-apple-ios-sim,x86_64-apple-ios"
+          - slice: macos-arm64_x86_64
+            rust_targets: "aarch64-apple-darwin,x86_64-apple-darwin"
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Validate version tag
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        run: |
+          TAG="${GITHUB_REF#refs/tags/v}"
+          if ! echo "$TAG" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+([-+][A-Za-z0-9.-]+)?$'; then
+            echo "::error::Invalid version tag: v$TAG"
+            exit 1
+          fi
+          echo "Version: $TAG"
+
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios,aarch64-apple-ios-sim,x86_64-apple-ios,aarch64-apple-darwin,x86_64-apple-darwin
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            src/rust/target
+          key: g2p-apple-${{ matrix.slice }}-${{ hashFiles('src/rust/Cargo.lock', 'src/rust/piper-plus-g2p/Cargo.toml') }}
+          restore-keys: |
+            g2p-apple-${{ matrix.slice }}-
+
+      - name: Cache cbindgen
+        uses: actions/cache@v4
+        id: cbindgen-cache
+        with:
+          path: ~/.cargo/bin/cbindgen
+          key: cbindgen-v0.29.2-${{ runner.os }}
+
+      - name: Install cbindgen
+        if: steps.cbindgen-cache.outputs.cache-hit != 'true'
+        run: cargo install cbindgen --version 0.29.2 --locked
+
+      - name: Build slice (cargo per target)
+        working-directory: src/rust
+        env:
+          CARGO_INCREMENTAL: "0"
+        run: |
+          set -euo pipefail
+          IFS=',' read -ra TARGETS <<< "${{ matrix.rust_targets }}"
+          for target in "${TARGETS[@]}"; do
+            echo "=== Building $target ==="
+            cargo build \
+              -p piper-plus-g2p \
+              --target "$target" \
+              --release \
+              --features all-languages,naist-jdic,bundled-dicts,ffi
+          done
+
+      - name: Combine slice (lipo for multi-arch universal)
+        working-directory: src/rust
+        run: |
+          set -euo pipefail
+          IFS=',' read -ra TARGETS <<< "${{ matrix.rust_targets }}"
+          mkdir -p "build-g2p-apple/${{ matrix.slice }}"
+          if [ "${#TARGETS[@]}" -eq 1 ]; then
+            cp "target/${TARGETS[0]}/release/libpiper_plus_g2p.a" \
+               "build-g2p-apple/${{ matrix.slice }}/libpiper_plus_g2p.a"
+          else
+            args=()
+            for target in "${TARGETS[@]}"; do
+              args+=("target/$target/release/libpiper_plus_g2p.a")
+            done
+            lipo -create "${args[@]}" \
+              -output "build-g2p-apple/${{ matrix.slice }}/libpiper_plus_g2p.a"
+          fi
+          echo "=== archs ==="
+          lipo -archs "build-g2p-apple/${{ matrix.slice }}/libpiper_plus_g2p.a"
+          echo "=== size ==="
+          ls -la "build-g2p-apple/${{ matrix.slice }}/libpiper_plus_g2p.a"
+
+      - name: Verify FFI symbols are exported
+        working-directory: src/rust
+        run: |
+          set -euo pipefail
+          A="build-g2p-apple/${{ matrix.slice }}/libpiper_plus_g2p.a"
+          echo "=== piper_plus_g2p_* symbols (defined) ==="
+          # nm output for a universal staticlib is large (~10K lines), and
+          # `grep -q` on a piped echo closes the pipe early when the match
+          # is found, which makes echo/awk return SIGPIPE. Combined with
+          # `set -euo pipefail`, that turns a successful match into a
+          # failed step. Avoid pipes entirely by using `case` string
+          # matching against the captured nm output.
+          nm_out=$(nm -gU "$A" 2>/dev/null || true)
+          for sym in \
+            piper_plus_g2p_create \
+            piper_plus_g2p_phonemize \
+            piper_plus_g2p_free \
+            piper_plus_g2p_free_string \
+            piper_plus_g2p_available_languages
+          do
+            case "$nm_out" in
+              *" T _${sym}"*) echo "  ok: $sym" ;;
+              *) echo "::error::staticlib missing FFI symbol: $sym"
+                 printf '%s\n' "$nm_out" | grep piper_plus_g2p_ || true
+                 exit 1 ;;
+            esac
+          done
+
+      - name: Generate piper_plus_g2p.h via cbindgen
+        working-directory: src/rust/piper-plus-g2p
+        run: |
+          set -euo pipefail
+          cbindgen --config cbindgen.toml --crate piper-plus-g2p --output piper_plus_g2p.h
+          echo "=== generated header ==="
+          cat piper_plus_g2p.h
+          # Sanity: must declare all 5 FFI functions
+          for sym in piper_plus_g2p_create piper_plus_g2p_phonemize piper_plus_g2p_free piper_plus_g2p_free_string piper_plus_g2p_available_languages; do
+            grep -q "$sym" piper_plus_g2p.h || { echo "::error::missing $sym in header"; exit 1; }
+          done
+
+      - name: Stage slice for xcframework
+        working-directory: src/rust
+        run: |
+          set -euo pipefail
+          mkdir -p "g2p-slice-out/lib" "g2p-slice-out/include"
+          cp "build-g2p-apple/${{ matrix.slice }}/libpiper_plus_g2p.a" g2p-slice-out/lib/
+          cp piper-plus-g2p/piper_plus_g2p.h g2p-slice-out/include/
+          cat > g2p-slice-out/include/module.modulemap <<'EOF'
+          module PiperPlusG2PBinary {
+            umbrella header "piper_plus_g2p.h"
+            export *
+            module * { export * }
+          }
+          EOF
+          ls -la g2p-slice-out/lib g2p-slice-out/include
+
+      - name: Upload G2P slice artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: piper-plus-g2p-slice-${{ matrix.slice }}
+          path: src/rust/g2p-slice-out/
+
+  assemble-g2p-xcframework:
+    name: Assemble piper_plus_g2p.xcframework
+    needs: build-g2p-apple
+    runs-on: macos-15
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Show toolchain
+        run: |
+          xcodebuild -version
+          sw_vers
+
+      - name: Download iOS device slice
+        uses: actions/download-artifact@v8
+        with:
+          name: piper-plus-g2p-slice-ios-arm64
+          path: g2p-slices/ios-arm64
+
+      - name: Download iOS simulator slice
+        uses: actions/download-artifact@v8
+        with:
+          name: piper-plus-g2p-slice-ios-arm64_x86_64-simulator
+          path: g2p-slices/ios-arm64_x86_64-simulator
+
+      - name: Download macOS slice
+        uses: actions/download-artifact@v8
+        with:
+          name: piper-plus-g2p-slice-macos-arm64_x86_64
+          path: g2p-slices/macos-arm64_x86_64
+
+      - name: Verify slice contents
+        run: |
+          set -euo pipefail
+          for slice in ios-arm64 ios-arm64_x86_64-simulator macos-arm64_x86_64; do
+            echo "=== ${slice} ==="
+            ls -la "g2p-slices/${slice}/lib"
+            ls -la "g2p-slices/${slice}/include"
+            archs=$(lipo -archs "g2p-slices/${slice}/lib/libpiper_plus_g2p.a")
+            echo "archs: ${archs}"
+            case "${slice}" in
+              ios-arm64)
+                echo "${archs}" | grep -qx 'arm64' \
+                  || { echo "::error::expected arm64 only, got: ${archs}"; exit 1; }
+                ;;
+              ios-arm64_x86_64-simulator|macos-arm64_x86_64)
+                echo "${archs}" | tr ' ' '\n' | sort | tr '\n' ' ' | grep -q 'arm64 x86_64' \
+                  || { echo "::error::expected arm64+x86_64, got: ${archs}"; exit 1; }
+                ;;
+            esac
+            test -f "g2p-slices/${slice}/include/piper_plus_g2p.h"
+            test -f "g2p-slices/${slice}/include/module.modulemap"
+          done
+
+      - name: Create xcframework
+        run: |
+          set -euo pipefail
+          xcodebuild -create-xcframework \
+            -library g2p-slices/ios-arm64/lib/libpiper_plus_g2p.a \
+            -headers g2p-slices/ios-arm64/include \
+            -library g2p-slices/ios-arm64_x86_64-simulator/lib/libpiper_plus_g2p.a \
+            -headers g2p-slices/ios-arm64_x86_64-simulator/include \
+            -library g2p-slices/macos-arm64_x86_64/lib/libpiper_plus_g2p.a \
+            -headers g2p-slices/macos-arm64_x86_64/include \
+            -output piper_plus_g2p.xcframework
+
+          if [ ! -f piper_plus_g2p.xcframework/Info.plist ]; then
+            echo "::error::xcframework Info.plist not generated"
+            exit 1
+          fi
+
+          # Same Privacy Manifest as the synthesis xcframework — the G2P
+          # crate doesn't call any Required Reason API, so the empty manifest
+          # is accurate.
+          cp cmake/PrivacyInfo.xcprivacy piper_plus_g2p.xcframework/PrivacyInfo.xcprivacy
+
+          echo "=== xcframework structure ==="
+          ls -la piper_plus_g2p.xcframework/
+          plutil -p piper_plus_g2p.xcframework/Info.plist
+          find piper_plus_g2p.xcframework -name "libpiper_plus_g2p.a" -exec lipo -archs {} \;
+          find piper_plus_g2p.xcframework -name "module.modulemap" -print -exec cat {} \;
+
+      - name: Zip xcframework
+        run: |
+          set -euo pipefail
+          # `-apple` (not `-ios`) reflects that the xcframework now ships
+          # iOS device + simulator + macOS slices. Consumers reference this
+          # name in Package.swift's binaryTarget URL.
+          zip -ry libpiper_plus_g2p-apple.xcframework.zip piper_plus_g2p.xcframework
+          ls -la libpiper_plus_g2p-apple.xcframework.zip
+          echo "sha256:"
+          shasum -a 256 libpiper_plus_g2p-apple.xcframework.zip
+
+      - name: Upload xcframework artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: libpiper_plus_g2p-apple-xcframework
+          path: libpiper_plus_g2p-apple.xcframework.zip
+
   build-android:
     name: Build Android arm64-v8a
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
 
@@ -580,7 +867,7 @@ jobs:
 
   release:
     name: Create Release
-    needs: [build-shared, build-ios, build-android, assemble-xcframework]
+    needs: [build-shared, build-ios, build-android, assemble-xcframework, assemble-g2p-xcframework]
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-24.04
     # GitHub Release creation requires `contents: write`. Scoped to this job
@@ -597,39 +884,41 @@ jobs:
             Package.swift
           sparse-checkout-cone-mode: false
 
-      - name: Verify Package.swift checksum is non-placeholder
+      - name: Verify Package.swift checksums are non-placeholder
         # Catches the C3 footgun: tag was pushed before the maintainer ran
         # `swift package compute-checksum` and updated Package.swift. SwiftPM
         # consumers would hit `error: artifact has changed checksum` because
         # the all-zero placeholder doesn't match the released asset.
         # See Package.swift header comment for the manual update procedure.
+        # Both `checksum` (synthesis xcframework) and `g2pChecksum`
+        # (PiperPlusG2P xcframework, Issue #387) are validated.
         run: |
           set -euo pipefail
           if ! [ -f Package.swift ]; then
             echo "::error::Package.swift not found at tag commit"
             exit 1
           fi
-          CHECKSUM=$(grep -E '^let checksum' Package.swift | sed -E 's/.*"([^"]+)".*/\1/')
-          if [ -z "${CHECKSUM}" ]; then
-            echo "::error::Could not extract checksum from Package.swift"
-            exit 1
-          fi
-          # all-zero (64 hex chars of '0') is the placeholder.
-          if echo "${CHECKSUM}" | grep -qE '^0+$'; then
-            echo "::error::Package.swift checksum is the placeholder '${CHECKSUM}'."
-            echo "::error::Maintainer must update Package.swift BEFORE tagging:"
-            echo "::error::  1. Run 'workflow_dispatch' to produce libpiper_plus-ios.xcframework.zip"
-            echo "::error::  2. Run 'swift package compute-checksum libpiper_plus-ios.xcframework.zip'"
-            echo "::error::  3. Update 'let checksum = \"...\"' in Package.swift"
-            echo "::error::  4. Commit on dev, then tag the same commit"
-            exit 1
-          fi
-          # Sanity-check: SHA-256 hex is exactly 64 chars [0-9a-f].
-          if ! echo "${CHECKSUM}" | grep -qE '^[0-9a-f]{64}$'; then
-            echo "::error::Package.swift checksum '${CHECKSUM}' is not a valid SHA-256 hex string"
-            exit 1
-          fi
-          echo "✓ Package.swift checksum is set: ${CHECKSUM}"
+          for var in checksum g2pChecksum; do
+            VAL=$(grep -E "^let ${var}" Package.swift | sed -E 's/.*"([^"]+)".*/\1/')
+            if [ -z "${VAL}" ]; then
+              echo "::error::Could not extract ${var} from Package.swift"
+              exit 1
+            fi
+            if echo "${VAL}" | grep -qE '^0+$'; then
+              echo "::error::Package.swift ${var} is the placeholder '${VAL}'."
+              echo "::error::Maintainer must update Package.swift BEFORE tagging:"
+              echo "::error::  1. Run 'workflow_dispatch' to produce both xcframework zips"
+              echo "::error::  2. Run 'swift package compute-checksum <zip>' for each"
+              echo "::error::  3. Update 'let checksum' AND 'let g2pChecksum' in Package.swift"
+              echo "::error::  4. Commit on dev, then tag the same commit"
+              exit 1
+            fi
+            if ! echo "${VAL}" | grep -qE '^[0-9a-f]{64}$'; then
+              echo "::error::Package.swift ${var} '${VAL}' is not a valid SHA-256 hex string"
+              exit 1
+            fi
+            echo "✓ Package.swift ${var} is set: ${VAL}"
+          done
 
       - name: Download artifacts
         uses: actions/download-artifact@v8
@@ -650,6 +939,13 @@ jobs:
             mv artifacts/libpiper_plus-ios-xcframework/libpiper_plus-ios.xcframework.zip \
                artifacts/libpiper_plus-ios-xcframework/libpiper_plus-ios-${TAG}.xcframework.zip
           fi
+          # Issue #387: Rename G2P xcframework.zip (PiperPlusG2P, no ORT).
+          # `-apple` reflects iOS + macOS slices since v1.14.0 — consumer
+          # Package.swift references this name in `g2pVersion`'s URL.
+          if [ -f artifacts/libpiper_plus_g2p-apple-xcframework/libpiper_plus_g2p-apple.xcframework.zip ]; then
+            mv artifacts/libpiper_plus_g2p-apple-xcframework/libpiper_plus_g2p-apple.xcframework.zip \
+               artifacts/libpiper_plus_g2p-apple-xcframework/libpiper_plus_g2p-apple-${TAG}.xcframework.zip
+          fi
           # Rename Android artifact
           if [ -f artifacts/libpiper_plus-android-arm64-v8a/libpiper_plus-android-arm64-v8a.tar.gz ]; then
             mv artifacts/libpiper_plus-android-arm64-v8a/libpiper_plus-android-arm64-v8a.tar.gz \
@@ -663,31 +959,51 @@ jobs:
           find . -type f \( -name "*.tar.gz" -o -name "*.zip" \) -exec sha256sum {} \; > checksums-sha256.txt
           cat checksums-sha256.txt
 
-      - name: Verify Package.swift checksum matches xcframework asset
+      - name: Verify Package.swift checksums match xcframework assets
         # Cross-check: the SHA-256 declared in Package.swift MUST match the
         # actually-released xcframework zip. If they differ, SwiftPM consumers
         # hit `error: artifact has changed checksum`. This catches the case
         # where the maintainer updated Package.swift but used a checksum from
-        # a different (e.g. preview) build.
+        # a different (e.g. preview) build. Both PiperPlus and PiperPlusG2P
+        # xcframework checksums are verified.
         shell: bash
         run: |
           set -euo pipefail
           TAG="${GITHUB_REF#refs/tags/}"
+
+          # PiperPlus (synthesis engine) xcframework
           XCF_ZIP="artifacts/libpiper_plus-ios-xcframework/libpiper_plus-ios-${TAG}.xcframework.zip"
           if ! [ -f "${XCF_ZIP}" ]; then
-            echo "::error::Released xcframework zip not found at ${XCF_ZIP}"
+            echo "::error::Released PiperPlus xcframework zip not found at ${XCF_ZIP}"
             exit 1
           fi
           ACTUAL=$(sha256sum "${XCF_ZIP}" | awk '{print $1}')
           DECLARED=$(grep -E '^let checksum' Package.swift | sed -E 's/.*"([^"]+)".*/\1/')
-          echo "Released xcframework SHA-256:    ${ACTUAL}"
+          echo "PiperPlus xcframework SHA-256:   ${ACTUAL}"
           echo "Package.swift declared checksum: ${DECLARED}"
           if [ "${ACTUAL}" != "${DECLARED}" ]; then
-            echo "::error::Checksum mismatch: SwiftPM consumers will fail to resolve."
+            echo "::error::PiperPlus checksum mismatch: SwiftPM consumers will fail to resolve."
             echo "::error::Run 'swift package compute-checksum ${XCF_ZIP}' locally and update Package.swift, then re-tag."
             exit 1
           fi
-          echo "✓ Package.swift checksum matches released xcframework"
+          echo "✓ PiperPlus checksum matches released xcframework"
+
+          # PiperPlusG2P xcframework (Issue #387, iOS + macOS slices since v1.14.0)
+          G2P_ZIP="artifacts/libpiper_plus_g2p-apple-xcframework/libpiper_plus_g2p-apple-${TAG}.xcframework.zip"
+          if ! [ -f "${G2P_ZIP}" ]; then
+            echo "::error::Released PiperPlusG2P xcframework zip not found at ${G2P_ZIP}"
+            exit 1
+          fi
+          G2P_ACTUAL=$(sha256sum "${G2P_ZIP}" | awk '{print $1}')
+          G2P_DECLARED=$(grep -E '^let g2pChecksum' Package.swift | sed -E 's/.*"([^"]+)".*/\1/')
+          echo "PiperPlusG2P xcframework SHA-256: ${G2P_ACTUAL}"
+          echo "Package.swift declared g2p:       ${G2P_DECLARED}"
+          if [ "${G2P_ACTUAL}" != "${G2P_DECLARED}" ]; then
+            echo "::error::PiperPlusG2P checksum mismatch: SwiftPM consumers will fail to resolve."
+            echo "::error::Run 'swift package compute-checksum ${G2P_ZIP}' locally and update Package.swift, then re-tag."
+            exit 1
+          fi
+          echo "✓ PiperPlusG2P checksum matches released xcframework"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2

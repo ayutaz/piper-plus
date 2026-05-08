@@ -231,10 +231,11 @@ jobs:
           docker run --rm --entrypoint piper piper-cpp-inference:test --version
 
       - name: Copy G2P dictionary files next to models
+        # Source of truth: src/rust/piper-plus-g2p/data/ (Issue #387)
         run: |
-          cp -f ${{ github.workspace }}/src/cpp/cmudict_data.json ${{ github.workspace }}/test/models/ 2>/dev/null || true
-          cp -f ${{ github.workspace }}/src/cpp/pinyin_single.json ${{ github.workspace }}/test/models/ 2>/dev/null || true
-          cp -f ${{ github.workspace }}/src/cpp/pinyin_phrases.json ${{ github.workspace }}/test/models/ 2>/dev/null || true
+          cp -f ${{ github.workspace }}/src/rust/piper-plus-g2p/data/cmudict_data.json ${{ github.workspace }}/test/models/ 2>/dev/null || true
+          cp -f ${{ github.workspace }}/src/rust/piper-plus-g2p/data/pinyin_single.json ${{ github.workspace }}/test/models/ 2>/dev/null || true
+          cp -f ${{ github.workspace }}/src/rust/piper-plus-g2p/data/pinyin_phrases.json ${{ github.workspace }}/test/models/ 2>/dev/null || true
 
       - name: Inference test - English
         run: |
@@ -300,9 +301,10 @@ jobs:
           cp ${{ github.workspace }}/test/models/multilingual-test-medium.onnx /tmp/fallback-test-cpp/multilingual-test-medium.onnx
           cp ${{ github.workspace }}/test/models/multilingual-test-medium.onnx.json /tmp/fallback-test-cpp/config.json
           # Copy G2P dictionary files for multilingual inference
-          cp ${{ github.workspace }}/src/cpp/cmudict_data.json /tmp/fallback-test-cpp/ 2>/dev/null || true
-          cp ${{ github.workspace }}/src/cpp/pinyin_single.json /tmp/fallback-test-cpp/ 2>/dev/null || true
-          cp ${{ github.workspace }}/src/cpp/pinyin_phrases.json /tmp/fallback-test-cpp/ 2>/dev/null || true
+          # Source of truth: src/rust/piper-plus-g2p/data/ (Issue #387)
+          cp ${{ github.workspace }}/src/rust/piper-plus-g2p/data/cmudict_data.json /tmp/fallback-test-cpp/ 2>/dev/null || true
+          cp ${{ github.workspace }}/src/rust/piper-plus-g2p/data/pinyin_single.json /tmp/fallback-test-cpp/ 2>/dev/null || true
+          cp ${{ github.workspace }}/src/rust/piper-plus-g2p/data/pinyin_phrases.json /tmp/fallback-test-cpp/ 2>/dev/null || true
 
           echo "Fallback config test." | docker run --rm -i \
             -v /tmp/fallback-test-cpp:/models/fallback \

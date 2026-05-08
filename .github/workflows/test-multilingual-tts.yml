@@ -346,9 +346,10 @@ jobs:
           MODEL="${{ github.workspace }}/test/models/multilingual-test-medium.onnx"
 
           # Copy dictionary files next to model
-          cp -f "${{ github.workspace }}/src/cpp/cmudict_data.json" "${{ github.workspace }}/test/models/" 2>/dev/null || true
-          cp -f "${{ github.workspace }}/src/cpp/pinyin_single.json" "${{ github.workspace }}/test/models/" 2>/dev/null || true
-          cp -f "${{ github.workspace }}/src/cpp/pinyin_phrases.json" "${{ github.workspace }}/test/models/" 2>/dev/null || true
+          # Source of truth: src/rust/piper-plus-g2p/data/ (Issue #387)
+          cp -f "${{ github.workspace }}/src/rust/piper-plus-g2p/data/cmudict_data.json" "${{ github.workspace }}/test/models/" 2>/dev/null || true
+          cp -f "${{ github.workspace }}/src/rust/piper-plus-g2p/data/pinyin_single.json" "${{ github.workspace }}/test/models/" 2>/dev/null || true
+          cp -f "${{ github.workspace }}/src/rust/piper-plus-g2p/data/pinyin_phrases.json" "${{ github.workspace }}/test/models/" 2>/dev/null || true
 
           OUTDIR="${RUNNER_TEMP}/multilingual_test"
           mkdir -p "$OUTDIR"

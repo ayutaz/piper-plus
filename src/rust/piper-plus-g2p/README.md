@@ -14,7 +14,7 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-piper-plus-g2p = { version = "0.1", features = ["naist-jdic"] }
+piper-plus-g2p = { version = "0.4", features = ["naist-jdic"] }
 ```
 
 ```rust
@@ -46,12 +46,14 @@ let (tokens, prosody) = phonemizer
 | `japanese` | off | Enable Japanese phonemizer (pulls in `jpreprocess`) |
 | `naist-jdic` | off | Bundle the NAIST-JDIC dictionary for Japanese (implies `japanese`) |
 | `all-languages` | off | Enable all language backends including `japanese` |
+| `ffi` | off | Expose C-compatible FFI symbols (`piper_plus_g2p_*`) for mobile bindings |
+| `bundled-dicts` | off | Embed `cmudict_data.json` / `pinyin_*.json` via `include_str!`/`include_bytes!`. Required for iOS App Sandbox. Adds ~6.3 MB to the binary. |
 
 To use only specific languages, disable defaults:
 
 ```toml
 [dependencies]
-piper-plus-g2p = { version = "0.1", default-features = false, features = ["english", "japanese"] }
+piper-plus-g2p = { version = "0.4", default-features = false, features = ["english", "japanese"] }
 ```
 
 ## Supported Languages
@@ -82,11 +84,36 @@ let phoneme_ids = encoder.encode(&tokens)?;
 ## C FFI (Mobile Bindings)
 
 Enable the `ffi` feature for C-compatible functions suitable for
-iOS (Swift) and Android (Kotlin) bindings via UniFFI:
+iOS (Swift) and Android (Kotlin) bindings:
 
 ```toml
-piper-plus-g2p = { version = "0.1", features = ["ffi", "english"] }
+piper-plus-g2p = { version = "0.4", features = ["ffi", "all-languages", "naist-jdic", "bundled-dicts"] }
 ```
+
+The crate exposes 5 C functions with the `piper_plus_g2p_` prefix:
+
+| Function | Purpose |
+|---|---|
+| `piper_plus_g2p_create(const char *langs)` | Create a handle, registering the comma-separated language codes (or NULL for the feature-derived default set). |
+| `piper_plus_g2p_phonemize(handle, text, lang)` | Run G2P; returns an owned UTF-8 JSON string `{"tokens": [...], "language": "..."}` on success, or NULL on failure / panic. |
+| `piper_plus_g2p_available_languages(handle)` | Return an owned UTF-8 comma-separated list of currently registered language codes. |
+| `piper_plus_g2p_free_string(char *)` | Free a string returned by `phonemize` / `available_languages`. No-op on NULL. |
+| `piper_plus_g2p_free(handle)` | Drop the handle. No-op on NULL. |
+
+All entry points are wrapped in `catch_unwind`, so Rust panics never
+cross the FFI boundary. See `src/ffi.rs` and `cbindgen.toml` for the
+canonical signatures.
+
+### iOS / App Sandbox
+
+For iOS — where loading external dictionary files is impractical due
+to App Sandbox — enable `bundled-dicts` to embed JSON dictionaries
+into the binary. Use `EnglishPhonemizer::new_bundled()` and
+`ChinesePhonemizer::new_bundled()` for in-memory initialization.
+
+The Swift wrapper is distributed separately as the `PiperPlusG2P`
+SPM product (xcframework). See
+[docs/guides/swift-g2p-integration.md](../../../docs/guides/swift-g2p-integration.md).
 
 ## Cross-Platform Consistency
 

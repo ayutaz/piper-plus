@@ -25,6 +25,11 @@ WORKDIR /workspace
 COPY CMakeLists.txt VERSION ./
 COPY cmake/ cmake/
 COPY src/cpp/ src/cpp/
+# Phonemizer dictionaries (CMU English, Chinese pinyin) live with the
+# Rust G2P crate so both Rust's include_bytes! and CMake's install rules
+# read from a single source. cpp-inference doesn't compile the Rust crate,
+# but cmake/Install.cmake still installs these JSONs to share/piper/dicts/.
+COPY src/rust/piper-plus-g2p/data/ src/rust/piper-plus-g2p/data/
 
 # Build piper (all C++ deps resolved via CMake ExternalProject)
 RUN mkdir -p build && cd build && \

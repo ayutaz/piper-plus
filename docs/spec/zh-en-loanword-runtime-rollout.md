@@ -1,9 +1,10 @@
 # ZH-EN Code-Switching: 全ランタイム展開設計書
 
-**ステータス**: Draft
-**対象ブランチ**: `feat/zh-en-loanword-runtimes`
-**前提 PR**: [#397](https://github.com/ayutaz/piper-plus/pull/397) (Python 学習側 + Python ランタイム側完了)
-**フォローアップ Issue**: #384 の Out of Scope で予告
+**ステータス**: Implemented (Issue #384, PR #399 / dev に merge 済み)
+**前提 PR**: [#397](https://github.com/ayutaz/piper-plus/pull/397) (Python 学習側 + Python ランタイム側)
+**親 Issue**: [#384](https://github.com/ayutaz/piper-plus/issues/384) (Out of Scope で予告された全ランタイム同期実装)
+
+> **注**: 本書は実装着手前の調査・設計記録。ロードマップ (§4.1 タスク表 / §5 ブランチ戦略 / §6 Day 1-14 計画) と改訂履歴は実装完了に伴い削除済み (詳細は git log)。残置されているのは設計判断の根拠・運用 SOP・将来拡張の参考として価値あるセクションのみ。
 
 ---
 
@@ -160,43 +161,11 @@ Step 4. ユニットテスト + CI 同期ガード
 
 ---
 
-## 4. 対応する必要がある課題リスト
+## 4. 横断的な設計課題
 
-### 4.1 ランタイム別の必須タスク
+> ランタイム別の実装タスク表 (R1-R5 / G1-G5 / C1-C4 / W1-W5 / P1-P6) は git log と PR #399 / #392 / #393 / #394 / #395 / #396 に履歴を引き継ぎ、本書からは削除した。
 
-| # | ランタイム | タスク | 行数目安 | 難易度 |
-|---|----------|-------|---------|-------|
-| R1 | Rust | `chinese.rs` に `phonemize_embedded_english` 関数追加 (2 箇所 †1) | ~300 | 中 |
-| R2 | Rust | `LoanwordData` struct + `load_loanword_data()` (schema validation) | ~80 | 低 |
-| R3 | Rust | `multilingual.rs` で `[zh,en,*]` パターン dispatch | ~50 | 低 |
-| R4 | Rust | `data/zh_en_loanword.json` 同梱 (`include_str!`) | ~5 | 低 |
-| R5 | Rust | テスト追加 (unit + integration、2 箇所同期確認含む) | ~150 | 中 |
-
-> **†1 Rust の重要な制約**: 中国語実装が `piper-plus-g2p/src/chinese.rs` (WASM 用) と `piper-core/src/phonemize/chinese.rs` (デスクトップ + ProsodyInfo 統合) の **2 箇所に存在** (詳細: §8.5)。両方に実装が必要なため、当初見積 ~400 行 → **~600 行**。同期テストを追加して整合性を担保する。
-| G1 | Go | `chinese_loanword.go` 新規 (Loanword struct + load) | ~120 | 低 |
-| G2 | Go | `chinese.go` の `PhonemizeEmbeddedEnglish` 関数追加 | ~100 | 中 |
-| G3 | Go | `multilingual.go` dispatch 追加 | ~50 | 低 |
-| G4 | Go | `//go:embed` で JSON 埋め込み | ~5 | 低 |
-| G5 | Go | テスト追加 | ~80 | 中 |
-| C1 | C# | `Core/Phonemize/ChineseEmbeddedEnglish.cs` 新規 | ~250 | 高 (NuGet 経由しない pinyin→IPA を C# 側に再実装) |
-| C2 | C# | `Core/Resources/zh_en_loanword.json` を `<EmbeddedResource>` で同梱 | ~10 (csproj) | 低 |
-| C3 | C# | `MultilingualPhonemizer.cs` の dispatch 拡張 | ~50 | 低 |
-| C4 | C# | テスト追加 (xUnit) | ~150 | 中 |
-| W1 | JS/WASM | Rust 側の R1-R5 完了が前提 (Rust WASM 経由) | — | — |
-| W2 | JS/WASM | Rust に `setChineseLoanwordData()` FFI 追加 | ~30 | 低 |
-| W3 | JS/WASM | JS 側 `ChineseG2P` に薄ラッパ追加 | ~80 | 低 |
-| W4 | JS/WASM | TypeScript 型定義 (`types/index.d.ts`) 更新 | ~20 | 低 |
-| W5 | JS/WASM | テスト追加 (`test-chinese.js`) | ~120 | 中 |
-| P1 | C++ | `chinese_loanword.hpp/cpp` 新規 | ~300 | 中 |
-| P2 | C++ | `phonemize_embedded_english()` C++ 実装 | ~150 | 中 |
-| P3 | C++ | `piper.cpp` dispatch 拡張 | ~50 | 低 |
-| P4 | C++ | C API export 追加 (`piper_plus_phonemize_embedded_english`) | ~80 | 中 |
-| P5 | C++ | iOS/Android リソース同梱 (`PiperPlusShared.cmake` / `ios.toolchain.cmake`) | ~30 | 高 |
-| P6 | C++ | テスト追加 (現状 2 ケースのみ → 拡充必要) | ~200 | 中 |
-
-**合計**: 約 **2,300 行** (テスト含む)
-
-### 4.2 横断的な課題
+### 4.1 横断的な課題
 
 | # | 課題 | 詳細 | 対応方針 |
 |---|------|------|---------|
@@ -209,7 +178,7 @@ Step 4. ユニットテスト + CI 同期ガード
 | X7 | **C# DotNetG2P.Chinese 制約** | NuGet 外部ライブラリは改修不可、独立 pinyin→IPA を C# に実装 | Python の `pinyin_to_ipa` を C# に移植 (~200 行) |
 | X8 | **JS/WASM の二層** | JS 側と Rust 側どちらに loanword ロジックを置くか | **Rust 側に集約**、JS は FFI 薄ラッパに留める |
 
-### 4.3 統一テストマトリックス
+### 4.2 統一テストマトリックス
 
 各ランタイムで以下を網羅:
 
@@ -256,62 +225,7 @@ Step 4. ユニットテスト + CI 同期ガード
 
 ---
 
-## 5. 1 ブランチ戦略のリスクと対策
-
-ユーザー要望により **1 ブランチで 5 ランタイム同時対応** する。リスクと対策:
-
-| リスク | 対策 |
-|-------|------|
-| PR が巨大化 (~2,300 行) でレビュー困難 | コミットを **ランタイム単位**で分割 (5 commit + 統合 commit)、PR description に章立て |
-| 1 ランタイムの問題で全体 block | **ランタイム間に依存なし**にする (W1 のみ R 完了が前提)、独立コミット化 |
-| CI 並列実行時間が長くなる | CI は元々全ランタイムを回しているので追加コストなし |
-| マージコンフリクト確率上昇 | 短期間でマージ完了を目指す (作業期間 1-2 週間目標)、可能なら毎日 dev からリベース |
-| テスト失敗の切り分け困難 | 各ランタイムの実装は **ファイル分離** で行い、失敗ログで即特定可能に |
-
----
-
-## 6. ロールアウト計画
-
-### 6.1 実装順序 (依存関係を考慮)
-
-```
-Day 1-3: Rust    (パターン確立、後続のリファレンス)
-Day 4-5: Go     (Rust と類似、移植ベース)
-Day 6-8: C#     (NuGet 制約があるため独立実装、ロジック分量多)
-Day 9:    JS/WASM (Rust 完了済みなので薄ラッパ + WASM rebuild)
-Day 10-12: C++ (最大の難所、iOS/Android リソース対応含む)
-Day 13: 統合テスト + CI 同期ガード追加 + ドキュメント更新
-Day 14: PR レビュー対応
-```
-
-### 6.2 コミット粒度
-
-```
-1. docs(spec): zh-en loanword runtime rollout 設計書追加 (本書)
-2. feat(rust): ZH-EN code-switching 実装 (R1-R5)
-3. feat(go): ZH-EN code-switching 実装 (G1-G5)
-4. feat(csharp): ZH-EN code-switching 実装 (C1-C4)
-5. feat(wasm): ZH-EN code-switching 実装 (W2-W5)
-6. feat(cpp): ZH-EN code-switching 実装 (P1-P6)
-7. ci: zh_en_loanword.json 同期ガード追加 (X5)
-8. docs: 各ランタイムの README/CHANGELOG 更新
-```
-
-### 6.3 受け入れ基準
-
-PR マージの最低条件:
-
-- [ ] 5 ランタイムすべてで Issue #384 例 3 つが期待 IPA 列を出す
-- [ ] 各ランタイムで上記テストマトリックス全件 PASS
-- [ ] `zh_en_loanword.json` が **7 箇所** (Rust 2 crate 含む) すべてで byte-for-byte 一致 (CI ガード)
-- [ ] 既存の純中国語 / 純英語 / `[ja,en]` パターンにリグレッションなし
-- [ ] CI 全 job green (lint, ruff format, build matrix, runtime tests)
-- [ ] 各ランタイムの README/CHANGELOG 更新
-- [ ] iOS xcframework / Android aar ビルドで JSON 同梱確認
-
----
-
-## 7. 関連ドキュメント
+## 5. 関連ドキュメント
 
 - 親 PR (Python): [#397](https://github.com/ayutaz/piper-plus/pull/397)
 - 元 Issue: [#384](https://github.com/ayutaz/piper-plus/issues/384)
@@ -976,51 +890,6 @@ func (ld *LoanwordData) Validate() error {
 | `Validate()` メソッド | ✓ | schema 整合性、早期エラー検出 |
 | `fmt.Errorf("%w", err)` wrap | ✓ | 既存コード慣習、エラーチェーン |
 
-### 8.11 リリース戦略
-
-**現状バージョン**:
-
-| Registry | パッケージ | 現行版 | 推奨 bump | bump 後 |
-|----------|----------|-------|---------|--------|
-| PyPI | `piper-plus-g2p` | 0.2.0 | minor | **0.3.0** |
-| crates.io | `piper-plus`, `piper-plus-g2p`, `piper-plus-cli` | 0.4.0 | minor | **0.5.0** |
-| NuGet | `PiperPlus.Core`, `PiperPlus.Cli` | 0.3.0 | minor | **0.4.0** |
-| npm | `@piper-plus/g2p` | 0.4.0 | minor | **0.5.0** |
-| Go module | tag-based | latest | リポジトリ tag | **v1.13.0** |
-| C API | `libpiper_plus` | v1.13.0+ | リリースタグ連動 | **v1.13.0** |
-
-**全ランタイム共通: minor bump** (新規 API 追加、breaking change なし)
-
-**配信順序の依存関係**:
-
-```
-1. CHANGELOG 更新 (リポジトリルート + src/python/g2p/)
-2. Rust crates.io   (cargo publish: g2p → core → cli の順)
-3. git tag push     (Go module 自動解決 + release-shared-lib.yml 自動実行)
-4. npm registry     (Rust 0.5.0 完了待ち)
-5. PyPI             (piper-plus-g2p 0.3.0)
-6. NuGet            (PiperPlus.Core/Cli 0.4.0、手動 dotnet nuget push)
-7. GitHub Release 確認 (Package.swift checksum 検証済み)
-```
-
-**チェックリスト** (PR マージ後):
-
-- [ ] CHANGELOG.md (root) [Unreleased] → [0.5.0] / [Date] に bump
-- [ ] src/python/g2p/CHANGELOG.md [Unreleased] → [0.3.0]
-- [ ] src/rust/Cargo.toml workspace version → 0.5.0
-- [ ] src/csharp/*.csproj Version → 0.4.0
-- [ ] src/wasm/g2p/package.json version → 0.5.0
-- [ ] `cargo publish` (3 crates、依存順)
-- [ ] `git tag v1.13.0 && git push --tags` (Go module + GitHub Release 自動)
-- [ ] `npm publish` (Rust crates 完了後)
-- [ ] `pip install piper-plus-g2p==0.3.0` で動作確認
-- [ ] `dotnet nuget push PiperPlus.Core.0.4.0.nupkg`
-- [ ] Package.swift checksum 自動検証 (CI 出力確認)
-
-**Migration guide**: **不要** (新機能のみ、既存 API 非変更)。各 README の "What's New" セクションに記載で十分。
-
-**リリース時間目安**: マニュアル工程 5-10 分 (cargo publish ~3 分 + npm publish ~1 分 + pip publish ~2 分 + dotnet nuget push ~2 分、並列可)
-
 ### 8.12 後方互換性戦略
 
 **Breaking change 評価**: **なし** (詳細分析済)
@@ -1238,83 +1107,6 @@ TEST(ZhEnLoanwordTest, ConcurrentAccess) {
     for (auto& t : threads) t.join();
 }
 ```
-
-### 8.15 CI ジョブ整合性
-
-**既存 CI 構成**: 41 workflow、`ci-required` が branch protection 必須
-
-**本 PR の CI 影響見積**:
-
-| Workflow | 現行 | 追加 | 新計 | 備考 |
-|---------|------|------|------|------|
-| python-lint | 2 分 | +10 秒 | 2:10 | ruff format (新ファイル) |
-| python-tests | 7 分 | +45 秒 | 7:45 | 3 OS × 3 Python、pytest +35 ケース |
-| g2p-cross-platform | 20 分 | +2 分 | 22 分 | JSON 同期 step + ZH-EN 検証 |
-| Rust tests | (matrix) | +1-2 分 | — | cargo test +20 ケース |
-| Go tests | — | +30 秒 | — | go test +20 ケース |
-| C# tests | (matrix) | +30 秒 | — | xUnit +20 ケース |
-| WASM tests | — | +30 秒 | — | node:test +20 ケース |
-| C++ tests | (matrix) | +1 分 | — | gtest +20 ケース |
-| **PR 全体 (critical path)** | **~28 分** | **+2 分** | **~30 分** | 並列実行で許容範囲 |
-
-**新規 CI ジョブ**: `zh-en-loanword-sync.yml`
-
-```yaml
-name: ZH-EN Loanword Sync
-on:
-  pull_request:
-    paths:
-      - '**/zh_en_loanword.json'
-jobs:
-  json-sync:
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@v6
-      - name: Verify all 7 copies match (sha256)
-        run: |
-          SOURCE=src/python/g2p/piper_plus_g2p/data/zh_en_loanword.json
-          HASH=$(sha256sum "$SOURCE" | cut -d' ' -f1)
-          for copy in \
-            src/python_run/piper/phonemize/data/zh_en_loanword.json \
-            src/rust/piper-plus-g2p/data/zh_en_loanword.json \
-            src/rust/piper-core/data/zh_en_loanword.json \
-            src/go/phonemize/data/zh_en_loanword.json \
-            src/csharp/PiperPlus.Core/Phonemize/Data/zh_en_loanword.json \
-            src/wasm/g2p/data/zh_en_loanword.json \
-            src/cpp/data/zh_en_loanword.json; do
-            [ -f "$copy" ] || { echo "MISSING: $copy"; exit 1; }
-            COPY_HASH=$(sha256sum "$copy" | cut -d' ' -f1)
-            [ "$HASH" = "$COPY_HASH" ] || { echo "MISMATCH: $copy"; exit 1; }
-          done
-      - name: Schema validation (Python)
-        run: |
-          python3 -c "
-          import json
-          with open('src/python/g2p/piper_plus_g2p/data/zh_en_loanword.json') as f:
-              d = json.load(f)
-          for s in ('acronyms','loanwords','letter_fallback'):
-              assert isinstance(d[s], dict), f'{s} must be dict'
-              for k, v in d[s].items():
-                  assert isinstance(v, list) and all(isinstance(e,str) for e in v), \
-                      f'{s}.{k} must be list[str]'
-          print(f'✓ {len(d[\"acronyms\"])} acronyms, {len(d[\"loanwords\"])} loanwords, {len(d[\"letter_fallback\"])} letters')
-          "
-```
-
-**`ci-required` への追加**: `needs: [zh-en-loanword-sync, ...]`
-
-**CI 失敗時の切り分け**:
-
-```
-JSON hash mismatch    → 6 copy のいずれかを編集し忘れ
-Schema fail          → loanword.json が malformed
-{lang}-tests fail    → 各ランタイム実装ロジック問題
-g2p-cross-platform   → ランタイム間で出力が分岐
-zh-en-loanword-sync  → JSON 同期忘れ (gate)
-```
-
----
 
 ### 8.16 メモリ管理戦略
 
@@ -1943,16 +1735,5 @@ jobs:
 
 ---
 
-## 9. 改訂履歴
+<!-- 改訂履歴は git log に統合 (実装完了に伴い削除、2026-05-08) -->
 
-| 日付 | バージョン | 変更内容 | 著者 |
-|------|---------|---------|------|
-| 2026-05-06 | Draft v1 | 初版作成 (調査結果 + 対応計画) | Claude |
-| 2026-05-06 | Draft v2 | 深堀り 3 項目追加 (C++ iOS/Android リソース、C# 独立実装、JSON 同期 CI) | Claude |
-| 2026-05-06 | Draft v3 | 深堀り 3 項目追加 (JS/WASM 二層 FFI、Rust crate 重複、C++ テストフレーム) — Rust 2 箇所実装必要 | Claude |
-| 2026-05-06 | Draft v4 | 深堀り 3 項目追加 (テストデータ統一、dispatcher エッジケース、エラーハンドリング統一) | Claude |
-| 2026-05-06 | Draft v5 | 深堀り 3 項目追加 (Go embed/JSON tag、リリース戦略、後方互換性 + opt-out flag) — 計 12 項目で実装フェーズ移行可能 | Claude |
-| 2026-05-07 | Draft v6 | 深堀り 3 項目追加 (パフォーマンス目標 <100μs、C++ thread safety with shared_ptr<const>、CI ジョブ整合性 +2分) | Claude |
-| 2026-05-07 | Draft v7 | 深堀り 3 項目追加 (メモリ管理: Arc/Lazy/shared_ptr、i18n 拡張: data/loanword/ ディレクトリ化、セキュリティ: 1MB/10K entry/depth 100 のガード) | Claude |
-| 2026-05-07 | Draft v8 | 深堀り 3 項目追加 (API ドキュメント統一: 共通用語集 + 言語別テンプレート、デバッグ・トレース: PIPER_DEBUG_ZH_EN 環境変数、データセット運用: PR/Issue テンプレート + validate スクリプト) | Claude |
-| 2026-05-07 | Draft v9 | 深堀り 3 項目追加 (WASM サイズ最適化: feature gate `zh-en` で +8-12 KB、Cross-compile: CMake `file(READ HEX)` で xxd 不要、テストカバレッジ: 新機能 90%+ + 統合 CI workflow) | Claude |

@@ -85,6 +85,8 @@ A fast, high-quality neural text-to-speech (TTS) system. Built on the [VITS](htt
 - **[WebUI (Gradio)](docs/features/webui.md)** — Inference and training, Docker-ready
 - **C++ CLI** — Streaming, CUDA inference, **phoneme timing output (JSON/TSV/SRT)**, custom dictionary
 - **[C API Shared Library](examples/c-api/README.md)** — `libpiper_plus.so/.dylib/.dll`, FFI-ready (Flutter/Godot/Swift etc.), streaming API
+- **[iOS xcframework + SPM](docs/guides/ios-integration.md)** — `PiperPlus` Swift Package, synthesis engine shipped as iOS arm64 device + simulator universal xcframework
+- **[iOS Swift G2P (SPM)](docs/guides/swift-g2p-integration.md)** — `PiperPlusG2P` standalone Swift Package: 8-language G2P on iOS without ONNX Runtime (Issue #387)
 - **[WebAssembly](src/wasm/openjtalk-web/README.npm.md)** — Fully runs in browser, **phoneme timing output (JSON/TSV/SRT)**, no server
 - **[Docker](docker/README.md)** — 5 images for inference, training, WebUI, and C++
 - **PyPI (`pip install piper-plus`)** — Easy install, multilingual, **phoneme timing output (JSON/TSV/SRT)**, streaming, HTTP API

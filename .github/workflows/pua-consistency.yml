@@ -5,7 +5,7 @@ name: "PUA Consistency Gate"
 #
 # This workflow runs on every push/PR that touches:
 #   - the canonical pua.json
-#   - any of the 6 runtime PUA tables (Python/Rust/Go/JS/C#/C++)
+#   - any of the 7 runtime PUA tables (Python/Rust/Go/JS/C#/C++/Swift)
 #   - the inventory lists in id_maps.py
 #   - the contract spec or this workflow itself
 
@@ -23,6 +23,7 @@ on:
       - 'src/csharp/PiperPlus.Core/Mapping/OpenJTalkToPiperMapping.cs'
       - 'src/cpp/phoneme_parser.cpp'
       - 'src/python/piper_train/update_model_config.py'
+      - 'Sources/PiperPlusG2P/PUAMap.swift'
       - 'docs/spec/pua-contract.toml'
       - 'scripts/check_pua_consistency.py'
       - '.github/workflows/pua-consistency.yml'
@@ -38,6 +39,7 @@ on:
       - 'src/csharp/PiperPlus.Core/Mapping/OpenJTalkToPiperMapping.cs'
       - 'src/cpp/phoneme_parser.cpp'
       - 'src/python/piper_train/update_model_config.py'
+      - 'Sources/PiperPlusG2P/PUAMap.swift'
       - 'docs/spec/pua-contract.toml'
       - 'scripts/check_pua_consistency.py'
       - '.github/workflows/pua-consistency.yml'
@@ -51,7 +53,7 @@ permissions:
 
 jobs:
   cross-runtime-table-consistency:
-    name: All 6 runtime PUA tables match pua.json
+    name: All 7 runtime PUA tables match pua.json
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

@@ -628,6 +628,17 @@ impl EnglishPhonemizer {
         // get_or_init ensures the dictionary is loaded exactly once.
         // If a different path is passed on a later call, the first-loaded
         // dictionary is still used (consistent with single-dict semantics).
+        //
+        // NOTE: `expect` here panics if the path is unreadable / malformed.
+        // OnceLock has no `get_or_try_init` on stable, so a panic during
+        // first-init poisons the cell for the process lifetime — subsequent
+        // `new_with_dict` calls will re-panic. For FFI consumers (iOS Swift
+        // wrapper) this path is not reached: `piper_plus_g2p_create` uses
+        // `new_bundled()` (below) which returns Result properly, and
+        // `catch_unwind` in ffi.rs converts any residual panic to a NULL
+        // return rather than crashing the host process. Rust-only callers
+        // outside the FFI should validate the dictionary path before
+        // calling, or use `new_with_hashmap` to bypass the cache entirely.
         let dict = CMU_DICT_CACHE
             .get_or_init(|| load_cmu_dict(dict_path).expect("CMU dictionary load failed"));
 
@@ -644,6 +655,16 @@ impl EnglishPhonemizer {
         Self {
             cmu_dict: DictRef::Owned(dict),
         }
+    }
+
+    #[cfg(feature = "bundled-dicts")]
+    pub fn new_bundled() -> Result<Self, G2pError> {
+        const CMU_DICT_JSON: &str = include_str!("../data/cmudict_data.json");
+        let dict: HashMap<String, String> =
+            serde_json::from_str(CMU_DICT_JSON).map_err(|e| G2pError::DictionaryLoad {
+                path: format!("(bundled cmudict): {e}"),
+            })?;
+        Ok(Self::new_with_hashmap(dict))
     }
 
     /// Search well-known locations for the CMU dictionary JSON file.

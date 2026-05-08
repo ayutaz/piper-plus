@@ -1,0 +1,232 @@
+name: "Swift G2P CI"
+
+# PR-stage smoke check for the PiperPlusG2P SPM product (Issue #387).
+#
+# The release Package.swift uses URL-based `binaryTarget`s that don't exist
+# before tag publication, which makes `swift test` impossible for the Swift
+# wrapper before a release lands. This workflow:
+#
+#   1. Builds piper-plus-g2p as a macOS staticlib (universal arm64 + x86_64).
+#   2. Generates the C header via cbindgen.
+#   3. Assembles a local macOS xcframework.
+#   4. Replaces the release Package.swift with a G2P-only CI manifest that
+#      points PiperPlusG2PBinary at the locally built xcframework.
+#   5. Runs `swift test --filter PiperPlusG2PTests` against the real Rust
+#      FFI, exercising PhonemizerTests, GoldenPhonemeTests, and
+#      ConcurrencyTests.
+#
+# The release manifest is overwritten in-place; this is safe because the CI
+# workspace is ephemeral and the change is never committed back. See
+# docs/spec/swift-g2p.md (release flow / consumer pinning).
+
+on:
+  push:
+    branches: [dev, main]
+    paths:
+      - 'src/rust/piper-plus-g2p/**'
+      - 'Sources/PiperPlusG2P/**'
+      - 'tests/PiperPlusG2PTests/**'
+      - 'tests/fixtures/g2p/**'
+      - 'Package.swift'
+      - '.github/workflows/swift-g2p-ci.yml'
+  pull_request:
+    paths:
+      - 'src/rust/piper-plus-g2p/**'
+      - 'Sources/PiperPlusG2P/**'
+      - 'tests/PiperPlusG2PTests/**'
+      - 'tests/fixtures/g2p/**'
+      - 'Package.swift'
+      - '.github/workflows/swift-g2p-ci.yml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  swift-test:
+    name: swift test (PiperPlusG2PTests, macOS)
+    runs-on: macos-15
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Toolchain versions
+        run: |
+          swift --version
+          xcodebuild -version
+          rustc --version
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - name: Cache cargo registry + target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            src/rust/target
+          key: swift-g2p-mac-${{ hashFiles('src/rust/Cargo.lock', 'src/rust/piper-plus-g2p/Cargo.toml') }}
+          restore-keys: |
+            swift-g2p-mac-
+
+      - name: Cache cbindgen
+        uses: actions/cache@v4
+        id: cbindgen-cache
+        with:
+          path: ~/.cargo/bin/cbindgen
+          key: cbindgen-v0.29.2-${{ runner.os }}
+
+      - name: Install cbindgen
+        if: steps.cbindgen-cache.outputs.cache-hit != 'true'
+        run: cargo install cbindgen --version 0.29.2 --locked
+
+      - name: Build piper-plus-g2p staticlib (universal macOS)
+        working-directory: src/rust
+        env:
+          CARGO_INCREMENTAL: "0"
+        run: |
+          set -euo pipefail
+          for target in aarch64-apple-darwin x86_64-apple-darwin; do
+            echo "=== Building $target ==="
+            cargo build \
+              -p piper-plus-g2p \
+              --target "$target" \
+              --release \
+              --features all-languages,naist-jdic,bundled-dicts,ffi
+          done
+          mkdir -p ../../build-mac/macos
+          lipo -create \
+            target/aarch64-apple-darwin/release/libpiper_plus_g2p.a \
+            target/x86_64-apple-darwin/release/libpiper_plus_g2p.a \
+            -output ../../build-mac/macos/libpiper_plus_g2p.a
+          echo "=== archs ==="
+          lipo -archs ../../build-mac/macos/libpiper_plus_g2p.a
+          echo "=== size ==="
+          ls -la ../../build-mac/macos/libpiper_plus_g2p.a
+
+      - name: Generate C header (cbindgen)
+        run: |
+          set -euo pipefail
+          cd src/rust/piper-plus-g2p
+          cbindgen \
+            --config cbindgen.toml \
+            --crate piper-plus-g2p \
+            --output ../../../build-mac/macos/piper_plus_g2p.h
+          echo "=== header preview ==="
+          head -40 ../../../build-mac/macos/piper_plus_g2p.h
+          # Verify all 5 FFI symbols appear in the generated header.
+          for sym in \
+            piper_plus_g2p_create \
+            piper_plus_g2p_phonemize \
+            piper_plus_g2p_free_string \
+            piper_plus_g2p_free \
+            piper_plus_g2p_available_languages
+          do
+            grep -q "$sym" ../../../build-mac/macos/piper_plus_g2p.h \
+              || { echo "::error::cbindgen output missing symbol: $sym"; exit 1; }
+          done
+          # Verify the same symbols are exported by the staticlib.
+          # Note: nm output for a universal staticlib is large (~10K lines),
+          # and `grep -q` on a piped echo closes the pipe early when the
+          # match is found, which makes echo/awk return SIGPIPE. Combined
+          # with `set -euo pipefail`, that turns a successful match into a
+          # failed step. We avoid pipes entirely by using `case` string
+          # matching against the captured nm output.
+          echo "=== nm symbols ==="
+          nm_out=$(nm -gU ../../../build-mac/macos/libpiper_plus_g2p.a 2>/dev/null || true)
+          for sym in \
+            piper_plus_g2p_create \
+            piper_plus_g2p_phonemize \
+            piper_plus_g2p_free_string \
+            piper_plus_g2p_free \
+            piper_plus_g2p_available_languages
+          do
+            case "$nm_out" in
+              *" T _${sym}"*) echo "  ok: $sym" ;;
+              *) echo "::error::staticlib missing FFI symbol: $sym"
+                 printf '%s\n' "$nm_out" | grep piper_plus_g2p_ || true
+                 exit 1 ;;
+            esac
+          done
+
+      - name: Stage Headers + module.modulemap
+        run: |
+          set -euo pipefail
+          mkdir -p build-mac/Headers
+          cp build-mac/macos/piper_plus_g2p.h build-mac/Headers/
+          # Use the same modulemap form as release-shared-lib.yml so the
+          # SPM import semantics in CI match those at tag time. binaryTarget
+          # auto-links the staticlib, so `link` directive is not needed.
+          cat > build-mac/Headers/module.modulemap <<'MODULEMAP'
+          module PiperPlusG2PBinary {
+            umbrella header "piper_plus_g2p.h"
+            export *
+            module * { export * }
+          }
+          MODULEMAP
+
+      - name: Assemble local macOS xcframework
+        run: |
+          set -euo pipefail
+          rm -rf build-mac/piper_plus_g2p.xcframework
+          xcodebuild -create-xcframework \
+            -library build-mac/macos/libpiper_plus_g2p.a \
+            -headers build-mac/Headers \
+            -output build-mac/piper_plus_g2p.xcframework
+          echo "=== xcframework contents ==="
+          find build-mac/piper_plus_g2p.xcframework
+
+      - name: Swap in CI Package.swift (Package.ci.swift → Package.swift)
+        run: |
+          set -euo pipefail
+          # The release Package.swift uses URL-based binaryTargets at
+          # GitHub Release assets that don't exist before tag publication,
+          # making pre-release `swift test` impossible. We swap in the
+          # tracked Package.ci.swift, which:
+          #   - drops PiperPlus (synthesis engine, ORT, iOS-only)
+          #   - keeps PiperPlusG2P + tests
+          #   - points PiperPlusG2PBinary at build-mac/piper_plus_g2p.xcframework
+          #     produced earlier in this workflow
+          # Tracking Package.ci.swift in git means any drift between the
+          # two manifests is visible in `git diff`, not buried in a heredoc.
+          test -f Package.ci.swift || {
+            echo "::error::Package.ci.swift missing — see swift-g2p-ci.yml comments"
+            exit 1
+          }
+          cp Package.ci.swift Package.swift
+          echo "=== Package.swift (CI override = Package.ci.swift) ==="
+          cat Package.swift
+
+      - name: Run Swift tests
+        run: |
+          set -euo pipefail
+          swift test --filter PiperPlusG2PTests 2>&1 | tee swift-test.log
+          # Surface a one-line summary at the end so the workflow log is
+          # easier to scan when scrolling through.
+          echo "=== summary ==="
+          grep -E "Test Suite '.*' passed|Test Suite '.*' failed|Executed [0-9]+ tests?" swift-test.log | tail -10 || true
+
+      # ConcurrencyTests asserts `Phonemizer.@unchecked Sendable`. Without
+      # a sanitizer, "60 parallel calls returned non-empty tokens" is a
+      # weak race-detection signal — silent corruption (e.g. a per-instance
+      # cache flushing tokens between threads) would still pass token
+      # checks. Re-run only the ConcurrencyTests under TSan to give the
+      # Sendable claim teeth. Marked `continue-on-error` initially so that
+      # any TSan finding surfaces as a workflow warning rather than a hard
+      # block until the team has triaged early reports — flip to a hard
+      # gate once the race-free baseline is confirmed.
+      - name: Re-run ConcurrencyTests under Thread Sanitizer
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          swift test --filter ConcurrencyTests --sanitize=thread 2>&1 | tee swift-tsan.log
+          echo "=== TSan summary ==="
+          grep -E "WARNING: ThreadSanitizer|Test Suite '.*' passed|Test Suite '.*' failed" swift-tsan.log | tail -20 || true
+          if grep -q "WARNING: ThreadSanitizer" swift-tsan.log; then
+            echo "::warning::Thread Sanitizer reported potential race(s) — see job log"
+          fi

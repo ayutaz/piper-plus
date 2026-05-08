@@ -12,6 +12,7 @@ Runtimes covered:
   - Go (src/go/phonemize/pua.go)
   - JavaScript / WASM (src/wasm/g2p/src/pua-map.js)
   - C# (src/csharp/PiperPlus.Core/Mapping/OpenJTalkToPiperMapping.cs)
+  - Swift (Sources/PiperPlusG2P/PUAMap.swift)
 
 Exit codes:
   0 -- all runtimes match pua.json
@@ -39,6 +40,7 @@ RUST_TOKEN_MAP = REPO_ROOT / "src/rust/piper-plus-g2p/src/token_map.rs"
 GO_PUA = REPO_ROOT / "src/go/phonemize/pua.go"
 JS_PUA = REPO_ROOT / "src/wasm/g2p/src/pua-map.js"
 CSHARP_PUA = REPO_ROOT / "src/csharp/PiperPlus.Core/Mapping/OpenJTalkToPiperMapping.cs"
+SWIFT_PUA = REPO_ROOT / "Sources/PiperPlusG2P/PUAMap.swift"
 
 
 def load_canonical() -> tuple[int, dict[str, int]]:
@@ -193,6 +195,30 @@ def parse_csharp() -> tuple[int | None, dict[str, int]]:
     return None, mapping
 
 
+def parse_swift() -> tuple[int | None, dict[str, int]]:
+    """Parse fixedMap from PUAMap.swift.
+
+    Swift tuple syntax `("a:", 0xE000)` matches the Rust syntax exactly,
+    so we reuse the same regex + the Rust escape handler (`\\u{XXXX}`).
+    """
+    text = SWIFT_PUA.read_text(encoding="utf-8")
+
+    # `public static let compatVersion: UInt32 = 2`
+    m = re.search(r"compatVersion\s*:\s*UInt32\s*=\s*(\d+)", text)
+    version = int(m.group(1)) if m else None
+
+    pattern = re.compile(
+        r'\(\s*"((?:[^"\\]|\\.)+)"\s*,\s*0x([0-9A-Fa-f]+)\s*\)', re.MULTILINE
+    )
+    mapping: dict[str, int] = {}
+    for m2 in pattern.finditer(text):
+        token = _decode_string_literal(m2.group(1), rust=True)
+        codepoint = int(m2.group(2), 16)
+        if 0xE000 <= codepoint <= 0xF8FF:
+            mapping[token] = codepoint
+    return version, mapping
+
+
 # ---------------------------------------------------------------------------
 # Comparison
 # ---------------------------------------------------------------------------
@@ -255,6 +281,7 @@ def main(argv: list[str] | None = None) -> int:
         ("Go (pua.go)", parse_go()),
         ("JavaScript (pua-map.js)", parse_js()),
         ("C# (OpenJTalkToPiperMapping.cs)", parse_csharp()),
+        ("Swift (PUAMap.swift)", parse_swift()),
     ]
 
     all_errors: list[str] = []
