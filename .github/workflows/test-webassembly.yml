@@ -93,6 +93,15 @@ jobs:
         test -f dist/openjtalk.wasm
         echo "Build outputs verified"
     
+    # Fast pre-flight: types/index.d.ts auto-gen drift gate.
+    # Runs before any heavy WASM/test setup so drift fails fast (~1 sec) with
+    # a clear `npm run regenerate:types` fix command. Eliminates the previous
+    # symptom-treatment cycle where types-vs-src drift was caught minutes
+    # later inside test-npm-package.js with an unclear error message.
+    - name: Check types/index.d.ts auto-gen consistency
+      working-directory: src/wasm/openjtalk-web
+      run: npm run check:types
+
     - name: Run import map validation tests
       working-directory: src/wasm/openjtalk-web
       run: node --test test/js/test-importmap.js

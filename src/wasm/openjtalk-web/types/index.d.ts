@@ -97,32 +97,10 @@ export interface StreamingSynthesizeOptions extends SynthesizeOptions {
 
 // ---------------------------------------------------------------------------
 // Short-text mitigation helpers (Strategy A + B)
+// Numeric constants (MIN_PHONEME_IDS, MIN_BODY_FOR_STRATEGY_A,
+// TRIM_EOS_MAX_FRAMES, DEFAULT_HOP_SIZE) live in the AUTO-GENERATED block
+// at the bottom of this file — projected from src/index.js exports.
 // ---------------------------------------------------------------------------
-
-/**
- * Minimum phoneme ID count below which Strategy A padding is applied.
- * See docs/spec/short-text-contract.toml.
- */
-export const MIN_PHONEME_IDS: number;
-
-/**
- * Minimum body length (= phoneme IDs minus BOS/EOS) for Strategy A to
- * apply. Below this threshold pad-token audio dominates the actual
- * content (issue #356); the runtime emits raw VITS output instead.
- */
-export const MIN_BODY_FOR_STRATEGY_A: number;
-
-/**
- * Number of EOS frames retained by `trimPaddingByDurations`. Defaults
- * to 0 (drop the entire EOS) — see issue #356.
- */
-export const TRIM_EOS_MAX_FRAMES: number;
-
-/**
- * Default hop length when `config.json` does not declare
- * `audio.hop_size`. Used by `trimPaddingByDurations`.
- */
-export const DEFAULT_HOP_SIZE: number;
 
 /**
  * Strategy A: Pad short phoneme ID sequences with silence tokens.
@@ -288,33 +266,13 @@ export function timingToSrt(result: TimingResult): string;
 
 /**
  * STFT hop length used by VITS medium-quality models.
+ *
+ * NOTE: this is re-exported from `./timing.js` (not declared as `export const`
+ * in `src/index.js`), so it stays as a hand-written declaration here. The
+ * AUTO-GENERATED block at the bottom of this file only covers
+ * `export const NAME = VALUE` declarations from `src/index.js` itself.
  */
 export const DEFAULT_HOP_LENGTH: number;
-
-// ---------------------------------------------------------------------------
-// ORT session contract constants (cross-runtime parity)
-//
-// Pinned by tests/fixtures/ort_session/contract.json, mirrored in Python /
-// Rust / Go / C# / C++. Drift in any of these = warmup behavior diverges from
-// the canonical Python `ort_utils.py:warmup_onnx_session()`.
-// ---------------------------------------------------------------------------
-
-/** Phoneme sequence length used by warmup runs (excludes BOS/EOS). */
-export const WARMUP_PHONEME_LENGTH: number;
-/** BOS token id seeded into warmup phoneme sequences. */
-export const WARMUP_BOS_TOKEN: number;
-/** EOS token id seeded into warmup phoneme sequences. */
-export const WARMUP_EOS_TOKEN: number;
-/** Phoneme id used to fill warmup phoneme positions between BOS/EOS. */
-export const WARMUP_DUMMY_PHONEME: number;
-/** Default number of warmup runs after session creation. */
-export const WARMUP_DEFAULT_RUNS: number;
-/** noise_scale value used in warmup forward passes. */
-export const WARMUP_NOISE_SCALE: number;
-/** length_scale value used in warmup forward passes. */
-export const WARMUP_LENGTH_SCALE: number;
-/** noise_w value used in warmup forward passes. */
-export const WARMUP_NOISE_W: number;
 
 /**
  * Build a reverse lookup map from phoneme ID to phoneme token string.
@@ -785,3 +743,49 @@ export class TypedArrayPool {
   /** Return pool statistics. */
   getStats(): TypedArrayPoolStats;
 }
+
+// ===========================================================================
+// AUTO-GENERATED CONSTANTS START — do not edit by hand
+//
+// Generated from src/index.js by scripts/regenerate-types-constants.mjs
+// To update: edit src/index.js, then run `npm run regenerate:types`.
+// CI gates this via `npm run check:types` in test-webassembly.yml.
+
+/** STFT hop length used by VITS medium-quality models (alias of DEFAULT_HOP_LENGTH). */
+export const DEFAULT_HOP_SIZE: number;
+
+/** Minimum body length required to apply Strategy A padding. */
+export const MIN_BODY_FOR_STRATEGY_A: number;
+
+/** Minimum total phoneme-id sequence length before Strategy A padding kicks in. */
+export const MIN_PHONEME_IDS: number;
+
+/** Maximum number of trailing frames trimmed when collapsing EOS silence. */
+export const TRIM_EOS_MAX_FRAMES: number;
+
+/** BOS token id seeded into warmup phoneme sequences. */
+export const WARMUP_BOS_TOKEN: number;
+
+/** Default number of warmup runs after session creation. */
+export const WARMUP_DEFAULT_RUNS: number;
+
+/** Phoneme id used to fill warmup phoneme positions between BOS/EOS. */
+export const WARMUP_DUMMY_PHONEME: number;
+
+/** EOS token id seeded into warmup phoneme sequences. */
+export const WARMUP_EOS_TOKEN: number;
+
+/** length_scale value used in warmup forward passes. */
+export const WARMUP_LENGTH_SCALE: number;
+
+/** noise_scale value used in warmup forward passes. */
+export const WARMUP_NOISE_SCALE: number;
+
+/** noise_w value used in warmup forward passes. */
+export const WARMUP_NOISE_W: number;
+
+/** Phoneme sequence length used by warmup runs (excludes BOS/EOS). */
+export const WARMUP_PHONEME_LENGTH: number;
+
+// AUTO-GENERATED CONSTANTS END
+// ===========================================================================
