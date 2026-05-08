@@ -195,8 +195,7 @@ class TestXmlProcessingInstructionIgnored:
 
     def test_xml_processing_instruction_ignored(self):
         payload = (
-            '<?xml-stylesheet type="text/xsl" href="evil.xsl"?>'
-            "<speak>Hello</speak>"
+            '<?xml-stylesheet type="text/xsl" href="evil.xsl"?><speak>Hello</speak>'
         )
         # No fetch / no error / completes quickly.
         segments = SSMLParser.parse(payload)

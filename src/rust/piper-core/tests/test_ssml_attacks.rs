@@ -93,10 +93,7 @@ fn build_billion_laughs(depth: usize, fanout: usize) -> String {
         decls.push_str(&format!(r#"<!ENTITY {} "{}">"#, name, kids));
         prev = name;
     }
-    format!(
-        "<!DOCTYPE lolz [{}]><speak>&{};</speak>",
-        decls, prev
-    )
+    format!("<!DOCTYPE lolz [{}]><speak>&{};</speak>", decls, prev)
 }
 
 /// 9-deep, fan-out-10 billion laughs. Even the unbounded textual
