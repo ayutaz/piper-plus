@@ -55,6 +55,16 @@ all_languages = ["ja", "en", "zh", "es", "fr", "pt", "sv"]
 trained_language_id_map = { ja = 0, en = 1, zh = 2, es = 3, fr = 4, pt = 5 }
 trained_languages = ["ja", "en", "zh", "es", "fr", "pt"]
 
+# Extended/future-model side (8 languages — adds ko=7). Used by piper-wasm's
+# sample multilingual config generator (`piper-wasm/src/lib.rs`) to project
+# the full 8-language phoneme inventory documented in
+# `src/python/g2p/piper_plus_g2p/encode/id_maps.py:140` ("ja-en-zh-es-fr-pt-ko-sv").
+# IMPORTANT: ja..pt indexes match `language_id_map` (the 7-lang form) exactly;
+# `sv` and `ko` are the only added entries, in that order. Any future trained
+# model that includes ko MUST keep ko=7.
+extended_language_id_map = { ja = 0, en = 1, zh = 2, es = 3, fr = 4, pt = 5, sv = 6, ko = 7 }
+extended_languages = ["ja", "en", "zh", "es", "fr", "pt", "sv", "ko"]
+
 [invariants]
 # These properties hold for every (canonical|trained) language_id_map and are
 # enforced by `scripts/check_language_id_map_contract.py`.
@@ -74,6 +84,7 @@ en_is_one = true                    # en=1 is load-bearing for legacy ckpts
 #   python_list_literal     — Python `NAME = [...]` list assignment
 #   inline_substring_6lang  — file must contain the 6-lang JSON literal
 #   inline_substring_7lang  — file must contain the 7-lang JSON literal
+#   inline_substring_8lang  — file must contain the 8-lang JSON literal (sv+ko)
 #   json_field              — JSON file's `language_id_map` field
 #   none                    — data-driven from config; nothing to verify here
 
@@ -114,8 +125,9 @@ expected = "trained_language_id_map"
 [[runtime_sources.entries]]
 runtime = "rust_wasm"
 path = "src/rust/piper-wasm/src/lib.rs"
-kind = "inline_substring_7lang"
-expected = "language_id_map"
+kind = "inline_substring_8lang"
+expected = "extended_language_id_map"
+note = "Future-facing 8-language sample config (sv=6, ko=7)."
 
 [[runtime_sources.entries]]
 runtime = "go"

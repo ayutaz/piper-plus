@@ -1,0 +1,68 @@
+name: SSML Contract Parity
+
+# Cross-runtime SSML subset parity gate.
+#
+# 4 ランタイム (Python / Rust / Go / C#) はそれぞれ独立に SSML サブセット
+# (<speak>, <break>, <prosody rate>) のパーサを実装している。BREAK_STRENGTH
+# (none/x-weak/weak/medium/strong/x-strong = 0/100/200/400/700/1000ms) と
+# RATE_NAMES (x-slow=1.5..x-fast=0.6) は本来 byte-for-byte 一致しなくては
+# ならない。
+#
+# このジョブは Python canonical (src/python/g2p/piper_plus_g2p/ssml.py) と
+# docs/spec/ssml-contract.toml と tests/fixtures/ssml/contract.json の
+# 三方向 drift を強制する。
+#
+# 各ランタイム個別の parity 検証 (Rust/Go/C# で contract.json を読み込む
+# behavioral test) は per-runtime CI 側で導入する。ここはあくまで
+# canonical Python ↔ spec toml ↔ JSON fixture の drift 検出 gate。
+
+on:
+  pull_request:
+    branches: [ dev ]
+    paths:
+      - 'docs/spec/ssml-contract.toml'
+      - 'src/python/g2p/piper_plus_g2p/ssml.py'
+      - 'scripts/check_ssml_contract.py'
+      - 'scripts/regenerate_ssml_fixture.py'
+      - 'tests/fixtures/ssml/**'
+      - '.github/workflows/ssml-parity.yml'
+  push:
+    branches: [ dev ]
+    paths:
+      - 'docs/spec/ssml-contract.toml'
+      - 'src/python/g2p/piper_plus_g2p/ssml.py'
+      - 'scripts/check_ssml_contract.py'
+      - 'scripts/regenerate_ssml_fixture.py'
+      - 'tests/fixtures/ssml/**'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  contract-drift-check:
+    name: SSML contract drift check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+
+      - name: Verify contract toml ↔ Python canonical ↔ JSON fixture
+        # tomllib is in stdlib (Python 3.11+); no third-party install needed.
+        # The Python ssml.py is loaded directly via importlib so we don't
+        # depend on the heavier piper_plus_g2p package being installed.
+        run: |
+          python scripts/check_ssml_contract.py --verbose
+
+      - name: Verify JSON fixture matches contract toml byte-for-byte
+        # Per-runtime parity tests (Rust/Go/C#) consume contract.json,
+        # so the fixture must stay byte-equivalent with the toml + the
+        # constants in src/python/g2p/piper_plus_g2p/ssml.py.
+        run: |
+          python scripts/regenerate_ssml_fixture.py --check

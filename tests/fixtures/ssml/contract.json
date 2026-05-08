@@ -1,0 +1,69 @@
+{
+  "schema_version": 1,
+  "comment": "SSML contract fixture. Regenerate via `python scripts/regenerate_ssml_fixture.py`. Sources: docs/spec/ssml-contract.toml + src/python/g2p/piper_plus_g2p/ssml.py. Each non-Python runtime (Rust/Go/C#) asserts its own constants match these values byte-for-byte.",
+  "break_strength": {
+    "case_insensitive": true,
+    "default_strength": "medium",
+    "default_ms": 400,
+    "unknown_strength_fallback_ms": 400,
+    "map": {
+      "medium": 400,
+      "none": 0,
+      "strong": 700,
+      "weak": 200,
+      "x-strong": 1000,
+      "x-weak": 100
+    }
+  },
+  "prosody_rate": {
+    "default_rate": 1.0,
+    "case_insensitive_named": true,
+    "named_map": {
+      "fast": 0.8,
+      "medium": 1.0,
+      "slow": 1.25,
+      "x-fast": 0.6,
+      "x-slow": 1.5
+    },
+    "parsing": {
+      "percent_formula": "length_scale = 100.0 / percent",
+      "percent_min_exclusive": 0.0,
+      "bare_float_min_exclusive": 0.0,
+      "fallback_rate": 1.0
+    }
+  },
+  "break_time": {
+    "ms_suffix": "ms",
+    "seconds_suffix": "s",
+    "bare_number_assumes": "ms",
+    "case_insensitive_suffix": true,
+    "unparseable_fallback_ms": 0
+  },
+  "detection": {
+    "regex": "^\\s*<speak[\\s>]",
+    "flags": "DOTALL",
+    "matches_at": "start_of_string",
+    "case_sensitive": true
+  },
+  "fallback": {
+    "strip_regex": "<[^>]*>",
+    "strip_then_trim": true,
+    "empty_strip_yields_original_text": true
+  },
+  "size_limit": {
+    "python_max_ssml_bytes": 100000,
+    "python_only": true,
+    "on_exceed": "raise ValueError"
+  },
+  "segment_defaults": {
+    "text": "",
+    "break_ms": 0,
+    "rate": 1.0
+  },
+  "walk_semantics": {
+    "tail_inherits_parent_rate": true,
+    "merge_drops_empty_zero_break": true,
+    "empty_result_replacement": "single empty segment",
+    "strip_xml_namespace_for_tag_match": true
+  }
+}

@@ -143,6 +143,8 @@ def main() -> int:
     canonical_7_list = list(contract["canonical"]["all_languages"])
     canonical_6 = dict(contract["canonical"]["trained_language_id_map"])
     canonical_6_list = list(contract["canonical"]["trained_languages"])
+    canonical_8 = dict(contract["canonical"]["extended_language_id_map"])
+    canonical_8_list = list(contract["canonical"]["extended_languages"])
 
     # Map of expected-name -> resolved value used by per-entry checks.
     expected_resolvers: dict[str, object] = {
@@ -150,13 +152,19 @@ def main() -> int:
         "all_languages": canonical_7_list,
         "trained_language_id_map": canonical_6,
         "trained_languages": canonical_6_list,
+        "extended_language_id_map": canonical_8,
+        "extended_languages": canonical_8_list,
     }
 
     errors: list[str] = []
 
     # ---- 1. Invariants on the canonical map itself --------------------------
     invariants = contract["invariants"]
-    for name, mapping in (("language_id_map", canonical_7), ("trained_language_id_map", canonical_6)):
+    for name, mapping in (
+        ("language_id_map", canonical_7),
+        ("trained_language_id_map", canonical_6),
+        ("extended_language_id_map", canonical_8),
+    ):
         keys = list(mapping.keys())
         values = list(mapping.values())
         if invariants["keys_lowercase"] and any(k != k.lower() for k in keys):
@@ -173,12 +181,19 @@ def main() -> int:
         if invariants["en_is_one"] and mapping.get("en") != 1:
             errors.append(f"  {name}: en_is_one invariant violated (en={mapping.get('en')!r})")
     if invariants["values_consecutive_from_zero"]:
-        # Cross-form: 6-lang and 7-lang must agree on every shared key.
+        # Cross-form: every shared key must agree across the 6/7/8-lang forms.
+        # (Adding sv or ko must NEVER renumber an existing language.)
         for k, v in canonical_6.items():
             if canonical_7.get(k) != v:
                 errors.append(
                     f"  trained_language_id_map[{k!r}]={v!r} disagrees with "
                     f"language_id_map[{k!r}]={canonical_7.get(k)!r}"
+                )
+        for k, v in canonical_7.items():
+            if canonical_8.get(k) != v:
+                errors.append(
+                    f"  language_id_map[{k!r}]={v!r} disagrees with "
+                    f"extended_language_id_map[{k!r}]={canonical_8.get(k)!r}"
                 )
 
     # ---- 2. Per-runtime source extraction ----------------------------------
@@ -240,8 +255,16 @@ def main() -> int:
             elif args.verbose:
                 print(f"  OK [{runtime}] inline list {expected!r} present")
 
-        elif kind in ("inline_substring_6lang", "inline_substring_7lang"):
-            target_map = canonical_6 if kind.endswith("_6lang") else canonical_7
+        elif kind in (
+            "inline_substring_6lang",
+            "inline_substring_7lang",
+            "inline_substring_8lang",
+        ):
+            target_map = {
+                "inline_substring_6lang": canonical_6,
+                "inline_substring_7lang": canonical_7,
+                "inline_substring_8lang": canonical_8,
+            }[kind]
             ok = _extract_inline_substring_map(path, target_map)
             if not ok:
                 errors.append(
@@ -266,29 +289,64 @@ def main() -> int:
 
     # ---- 3. Forbidden patterns elsewhere -----------------------------------
     # Lightweight allowlist sweep: forbidden_outside_sources should not appear
-    # except inside docs/spec/language-id-map-contract.toml itself or this
-    # script. We only sweep src/, since tests / docs may legitimately discuss
-    # these patterns.
+    # in any source file under src/. We constrain to a fixed extension list
+    # and prune noisy directories so the sweep runs in <1 s on CI.
     allowlisted_paths = {
         REPO_ROOT / "docs/spec/language-id-map-contract.toml",
         Path(__file__).resolve(),
         REPO_ROOT / "tests/fixtures/language_id_map/contract.json",
         REPO_ROOT / "scripts/regenerate_language_id_map_fixture.py",
     }
+    # Source-code-ish extensions only — skip binaries, generated files, models.
+    sweep_extensions = {
+        ".py", ".rs", ".go", ".cs", ".cpp", ".cc", ".c", ".h", ".hpp",
+        ".js", ".ts", ".mjs", ".cjs", ".json", ".toml", ".yaml", ".yml",
+        ".kt", ".swift",
+    }
+    # Directory names to prune entirely (anywhere in path).
+    skip_dirs = {
+        "node_modules", "target", "build", "dist", "bin", "obj",
+        "__pycache__", ".pytest_cache", ".venv", "venv", "vendor",
+        "pkg",  # Go module cache
+        # Tests legitimately exercise edge cases including non-canonical
+        # language_id_map literals (e.g. http_server fallback paths). The
+        # contract verifies SOURCE drift, not test fixture diversity.
+        "tests", "test", "testdata", "TestData", "fixtures",
+    }
     forbidden = contract["expected_not_found"]["forbidden_outside_sources"]
-    for forbidden_pat in forbidden:
-        for path in (REPO_ROOT / "src").rglob("*"):
-            if not path.is_file():
-                continue
-            if path in allowlisted_paths:
-                continue
-            # Skip binary/large files.
-            if path.suffix in {".onnx", ".bin", ".wav", ".png", ".jpg", ".pyc"}:
-                continue
-            try:
-                content = path.read_text(encoding="utf-8", errors="ignore")
-            except (OSError, UnicodeDecodeError):
-                continue
+    sweep_root = REPO_ROOT / "src"
+    files_to_scan: list[Path] = []
+    for path in sweep_root.rglob("*"):
+        if not path.is_file():
+            continue
+        if path.suffix not in sweep_extensions:
+            continue
+        if any(part in skip_dirs for part in path.parts):
+            continue
+        # Explicit per-file skip: any file whose name starts with `test_` or
+        # ends with `_test.<ext>` / `Test.<ext>` / `Tests.<ext>` is a test.
+        name = path.name
+        if (
+            name.startswith("test_")
+            or name.endswith("_test.go")
+            or name.endswith(".test.js")
+            or name.endswith(".test.ts")
+            or name.endswith(".spec.ts")
+            or name.endswith(".spec.js")
+            or name.endswith("Test.cs")
+            or name.endswith("Tests.cs")
+        ):
+            continue
+        if path in allowlisted_paths:
+            continue
+        files_to_scan.append(path)
+
+    for path in files_to_scan:
+        try:
+            content = path.read_text(encoding="utf-8", errors="ignore")
+        except (OSError, UnicodeDecodeError):
+            continue
+        for forbidden_pat in forbidden:
             if forbidden_pat in content:
                 errors.append(
                     f"  forbidden pattern {forbidden_pat!r} found in "
