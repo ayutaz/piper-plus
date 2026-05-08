@@ -794,10 +794,9 @@ def _split_words(text: str) -> list[str]:
             elif k < len(parts) - 1 and part.lower() in _ELISION_CLITICS:
                 # This part is a clitic; start merging with next part.
                 buf = part
-            else:
-                # Not a clitic; emit as standalone token.
-                if part:
-                    tokens.append(part)
+            # Not a clitic; emit as standalone token.
+            elif part:
+                tokens.append(part)
         if buf:
             tokens.append(buf)
 
