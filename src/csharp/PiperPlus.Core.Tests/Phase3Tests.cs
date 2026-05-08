@@ -688,9 +688,13 @@ public sealed class Phase3Tests : IDisposable
     // ================================================================
 
     [Fact]
-    public void TimingWriter_CalculateTiming_DurationsShorterThanPhonemeIds()
+    public void TimingWriter_CalculateTiming_DurationsShorterThanPhonemeIds_Throws()
     {
-        // 3 phoneme IDs but only 2 durations → processes min(3, 2) = 2 entries.
+        // Length mismatch MUST throw per docs/spec/phoneme-timing-contract.toml
+        // [validation.length_consistency]. Previously this method silently
+        // truncated via Math.Min, which violated the cross-runtime contract
+        // (Rust/Go/Python all throw). PR #401 brought the C# implementation
+        // into compliance — this test now pins the throw behavior.
         var phonemeIdMap = new Dictionary<string, int[]>
         {
             ["a"] = [10],
@@ -699,15 +703,11 @@ public sealed class Phase3Tests : IDisposable
         };
 
         long[] phonemeIds = [10, 11, 12];
-        float[] durations = [5.0f, 3.0f]; // only 2 durations
+        float[] durations = [5.0f, 3.0f]; // length mismatch — must throw
 
-        var entries = TimingWriter.CalculateTiming(
-            phonemeIds, durations, phonemeIdMap, sampleRate: 22050);
-
-        // Only the first 2 phonemes are processed.
-        Assert.Equal(2, entries.Count);
-        Assert.Equal("a", entries[0].Phoneme);
-        Assert.Equal("b", entries[1].Phoneme);
+        Assert.Throws<ArgumentException>(() =>
+            TimingWriter.CalculateTiming(
+                phonemeIds, durations, phonemeIdMap, sampleRate: 22050));
     }
 
     [Fact]
