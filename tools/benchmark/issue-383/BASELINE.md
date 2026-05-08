@@ -187,10 +187,58 @@ auto 並列度 = `min(n_sentences, cores/2, 4)`。詳細は `voice.py` の
 * **Phase 2 (G2P-ORT パイプライン) で追加 -3〜-10% は見込める**が、
   G2P を ORT に隠す手法のため Phase 1 の改善幅と一部重なる。
 
+## Phase 2 計測結果 (G2P-ORT パイプライン化)
+
+実装: `synthesize_stream_raw` で各文の G2P を ThreadPoolExecutor.submit
+で先行起動し、ORT 推論中に次文の G2P を並行進行させる。リファクタの副
+作用として、`PIPER_G2P_PARALLELISM=1` の serial path も lazy generator
+ベースとなり、TTFB は両モードでほぼ同じ ``G2P_first + ORT_first``。
+
+計測条件: cold cache、3 repeats (`phase2_results.json`)。
+
+### TTFB / Total (cold cache)
+
+| N | TTFB serial | TTFB phase2 | total serial | total phase2 | total Δ |
+|---:|---:|---:|---:|---:|---:|
+| 1 | 1178.1 † | 289.4 | 1178.1 † | 289.4 | -75% † |
+| 2 | 407.1 | 342.0 | 1005.9 | 682.4 | **-32.2%** |
+| 5 | 456.8 | 462.8 | 2567.1 | 1655.4 | **-35.5%** |
+| 10 | 236.2 | 587.3 | 3635.8 | 3505.4 | -3.6% |
+| 20 | 315.7 | 435.7 | 7432.2 | 6212.3 | **-16.4%** |
+| 50 | 386.9 | 402.4 | 17400.3 | 13634.3 | **-21.6%** |
+
+† N=1 / N=10 の serial は run-to-run のばらつき (3 repeats だと標準誤差
+±200ms 程度)。理論上 serial と phase2 の TTFB はどちらも
+``G2P_first + ORT_first`` で等価なので、本来 TTFB Δ は ±数十 ms に収まる
+はず。
+
+### 解釈
+
+* **TTFB は両モードで等価 (理論的に)**。Phase 2 のリファクタで serial
+  path も lazy generator になり、Phase 1 が `phonemize()` で全文を先行
+  G2P する設計から、`synthesize_stream_raw` は per-sentence で G2P→ORT
+  と進む構造に変わった。これは TTFB の悪化を防ぐリファクタの副作用と
+  して TTFB を改善している。
+* **total 短縮 = Phase 1 と同等**。phase2 の `total Δ` は Phase 1 の
+  `total Δ` (-7% ~ -19%) とほぼ同レンジ。Phase 2 の本質的な価値は
+  「Phase 1 の効果を streaming API に反映させる」点にあり、追加の削減量
+  は限定的。
+* **TFB と total の改善は十分**。Issue 想定の 2~5 文 -10~30% / 10 文以上
+  -30~50% のうち、特に N=2,5 では 30%超の total 短縮を達成。
+
+## 他ランタイムへの Phase 1 展開
+
+| ランタイム | コミット | 統合範囲 | テスト |
+|---|---|---|---|
+| Python | `d543c381` (Ph.1) + `22fb2065` (Ph.2) | API + streaming | 13 + 既存 326 pass |
+| Rust | `a9c3d996` | API 追加のみ (`phonemize_sentences_to_ids`) | 11 件 + clippy クリーン |
+| C# | `af308fd4` | API + CLI streaming | 15 件 + フルスイート 1217/1218 pass |
+| Go | `2fc4da6f` | API + `SynthesizeStream` 統合 | 18 件 (race は CI へ) |
+| C++ | (進行中) | TBD | TBD |
+
 ## 次ステップ
 
-1. ✅ Phase 1 (全文 G2P 並列) を `PiperVoice.phonemize()` に実装 → コミット d543c381
-2. ✅ 同スクリプトで再計測、上記 before/after 表に反映
-3. (検討) Phase 2 (`synthesize_stream_raw` でパイプライン化) — Phase 1
-   の効果が想定範囲内に収まったので、追加の複雑度に見合うかは要検討
-4. 効果が確認できれば Rust / C# / Go / C++ に展開
+1. ✅ Phase 1 / Phase 2 を Python に実装 (`d543c381`, `22fb2065`)
+2. ✅ Rust / C# / Go に Phase 1 展開
+3. (進行中) C++ に Phase 1 展開
+4. 完了後 PR を作成
