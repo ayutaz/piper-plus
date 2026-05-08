@@ -2,11 +2,25 @@ name: LANGUAGE_ID_MAP Contract Parity
 
 # Cross-runtime LANGUAGE_ID_MAP drift gate.
 #
-# 6 ランタイム (Python/C#/Rust/Go/WASM/C++) は LANGUAGE_ID_MAP =
-# {ja:0, en:1, zh:2, es:3, fr:4, pt:5, sv:6} を共有する。drift = emb_lang
-# lookup 失敗 = 学習済モデル全破壊なので、Python canonical (prepare_multilingual_dataset.py)
-# と docs/spec/language-id-map-contract.toml + JSON fixture の整合性、
-# および各ランタイム実装位置の正規表現抽出比較を強制する。
+# 6 ランタイム (Python train / Python runtime / Rust core / Rust wasm / Go /
+# WASM-openjtalk) は、`{ja:0, en:1, zh:2, es:3, fr:4, pt:5, sv:6}` という
+# canonical な language code -> ID 対応で完全一致しなければならない。
+# Drift = `emb_lang` lookup 失敗 = 学習済 multilingual checkpoint が
+# silently に壊れる、回復不能。C# / C++ は config JSON 駆動なので contract
+# 上は kind=none で記録だけ残す。
+#
+# このジョブが行うこと:
+#   1. Python canonical (`prepare_multilingual_dataset.py:LANGUAGE_ID_MAP`)
+#      が docs/spec/language-id-map-contract.toml と一致
+#   2. Rust core/wasm の inline JSON literal が同じく一致
+#   3. Go testdata + WASM-openjtalk sample model config の JSON field が一致
+#   4. tests/fixtures/language_id_map/contract.json が toml から再生成可能
+#   5. forbidden な mapping (e.g. `"en": 0, "ja": 1`) が source code (test を除く)
+#      に紛れ込んでいない
+#
+# 各ランタイムの parity 検証 (Rust/Go 等で fixture を読み込む behavioral test)
+# は per-runtime CI 側で実行する。ここはあくまで canonical Python ↔ spec toml
+# ↔ JSON fixture ↔ 6 runtime sources の drift 検出 + JSON fixture 同期 gate。
 
 on:
   pull_request:
@@ -15,7 +29,13 @@ on:
       - 'docs/spec/language-id-map-contract.toml'
       - 'src/python/piper_train/tools/prepare_multilingual_dataset.py'
       - 'src/python_run/piper/voice.py'
-      - 'src/python/piper_train/infer_onnx.py'
+      - 'src/rust/piper-core/src/config.rs'
+      - 'src/rust/piper-core/src/wasm.rs'
+      - 'src/rust/piper-wasm/src/lib.rs'
+      - 'src/go/piperplus/testdata/valid_multilingual_config.json'
+      - 'src/wasm/openjtalk-web/models/multilingual-test-medium.onnx.json'
+      - 'src/csharp/PiperPlus.Core/Config/PiperConfig.cs'
+      - 'src/cpp/piper.cpp'
       - 'scripts/check_language_id_map_contract.py'
       - 'scripts/regenerate_language_id_map_fixture.py'
       - 'tests/fixtures/language_id_map/**'
@@ -26,7 +46,13 @@ on:
       - 'docs/spec/language-id-map-contract.toml'
       - 'src/python/piper_train/tools/prepare_multilingual_dataset.py'
       - 'src/python_run/piper/voice.py'
-      - 'src/python/piper_train/infer_onnx.py'
+      - 'src/rust/piper-core/src/config.rs'
+      - 'src/rust/piper-core/src/wasm.rs'
+      - 'src/rust/piper-wasm/src/lib.rs'
+      - 'src/go/piperplus/testdata/valid_multilingual_config.json'
+      - 'src/wasm/openjtalk-web/models/multilingual-test-medium.onnx.json'
+      - 'src/csharp/PiperPlus.Core/Config/PiperConfig.cs'
+      - 'src/cpp/piper.cpp'
       - 'scripts/check_language_id_map_contract.py'
       - 'scripts/regenerate_language_id_map_fixture.py'
       - 'tests/fixtures/language_id_map/**'
@@ -49,11 +75,15 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Verify contract matches Python canonical and 6-runtime mirrors
+      - name: Verify contract matches Python canonical and 6 runtime sources
         # tomllib is in stdlib (Python 3.11+); no third-party install needed.
+        # Drift in any of the 6 runtimes = catastrophic emb_lang corruption
+        # of every trained multilingual checkpoint.
         run: |
           python scripts/check_language_id_map_contract.py --verbose
 
       - name: Verify JSON fixture matches contract toml
+        # Per-runtime parity tests consume contract.json; the fixture must
+        # stay byte-equivalent with the toml.
         run: |
           python scripts/regenerate_language_id_map_fixture.py --check
