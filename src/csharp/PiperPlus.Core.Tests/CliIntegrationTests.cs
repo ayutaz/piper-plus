@@ -556,7 +556,7 @@ public sealed class CliIntegrationTests
         string tmpPath = Path.GetTempFileName();
         try
         {
-            await File.WriteAllBytesAsync(tmpPath, new byte[7]);
+            await File.WriteAllBytesAsync(tmpPath, new byte[7], TestContext.Current.CancellationToken);
 
             var (exitCode, stdout, stderr) = await RunCliAsync(
                 "--test-mode",
@@ -583,7 +583,7 @@ public sealed class CliIntegrationTests
         string tmpPath = Path.GetTempFileName();
         try
         {
-            await File.WriteAllBytesAsync(tmpPath, []);
+            await File.WriteAllBytesAsync(tmpPath, [], TestContext.Current.CancellationToken);
 
             var (exitCode, stdout, stderr) = await RunCliAsync(
                 "--test-mode",
