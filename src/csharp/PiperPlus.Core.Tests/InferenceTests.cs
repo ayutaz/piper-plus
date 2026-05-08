@@ -339,4 +339,85 @@ public class InferenceTests
         Assert.Equal(0, input.SpeakerId);
         Assert.Null(input.ProsodyFeatures);
     }
+
+    // ----------------------------------------------------------------
+    // SpeakerId × SpeakerEmbedding mutual-exclusion validation
+    //
+    // PiperSession routes every Synthesize* entry point through
+    // SynthesisInput.Validate(), which enforces that callers cannot
+    // simultaneously condition the model on a discrete sid and a
+    // continuous embedding. The four facts below pin every corner of
+    // the (sid, embedding) truth table so the contract regresses
+    // loudly if either branch is ever loosened.
+    // ----------------------------------------------------------------
+
+    [Fact]
+    public void Synthesize_SpeakerIdOnly_DoesNotThrow()
+    {
+        // SpeakerId set, SpeakerEmbedding unset -> the classic multi-speaker
+        // path. Validate() must succeed so callers can keep using sid-only
+        // inputs without breaking.
+        var input = new SynthesisInput(
+            PhonemeIds: [1, 2, 3],
+            SpeakerId: 5);
+
+        Assert.Null(input.SpeakerEmbedding);
+        var ex = Record.Exception(() => input.Validate());
+        Assert.Null(ex);
+    }
+
+    [Fact]
+    public void Synthesize_SpeakerEmbeddingOnly_DoesNotThrow()
+    {
+        // SpeakerEmbedding set, SpeakerId left at the default (0). The
+        // record cannot distinguish "user picked sid 0" from "user did not
+        // set sid", so the embedding-only path is permitted whenever sid
+        // equals the default.
+        float[] embedding = new float[256];
+        for (int i = 0; i < embedding.Length; i++)
+        {
+            embedding[i] = 0.01f * i;
+        }
+
+        var input = new SynthesisInput(
+            PhonemeIds: [1, 2, 3],
+            SpeakerEmbedding: embedding);
+
+        Assert.Equal(0, input.SpeakerId);
+        Assert.NotNull(input.SpeakerEmbedding);
+        var ex = Record.Exception(() => input.Validate());
+        Assert.Null(ex);
+    }
+
+    [Fact]
+    public void Synthesize_BothSet_ThrowsArgumentException()
+    {
+        // Non-default SpeakerId AND non-empty SpeakerEmbedding -> the
+        // mutex contract fires. The message is asserted to keep the
+        // diagnostic stable across runtimes (Python / Rust / Go raise
+        // the same wording).
+        float[] embedding = new float[256];
+        embedding[0] = 0.5f;
+
+        var input = new SynthesisInput(
+            PhonemeIds: [1, 2, 3],
+            SpeakerId: 5,
+            SpeakerEmbedding: embedding);
+
+        var ex = Assert.Throws<ArgumentException>(() => input.Validate());
+        Assert.Contains("mutually exclusive", ex.Message);
+    }
+
+    [Fact]
+    public void Synthesize_NeitherSet_DoesNotThrow()
+    {
+        // Default sid (0) and no embedding -> single-speaker / non-cloning
+        // case. Must remain a no-op so basic invocations do not regress.
+        var input = new SynthesisInput(PhonemeIds: [1, 2, 3]);
+
+        Assert.Equal(0, input.SpeakerId);
+        Assert.Null(input.SpeakerEmbedding);
+        var ex = Record.Exception(() => input.Validate());
+        Assert.Null(ex);
+    }
 }

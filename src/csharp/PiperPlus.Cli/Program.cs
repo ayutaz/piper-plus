@@ -548,6 +548,28 @@ internal static class Program
                     return;
                 }
 
+                // Validate --speaker × voice-cloning options are mutually exclusive.
+                // A model is conditioned on either a discrete sid or a speaker
+                // embedding, never both. We detect "user passed --speaker"
+                // explicitly via GetResult so the default --speaker 0 path is
+                // not penalised.
+                string? referenceAudioPath = parseResult.GetValue(referenceAudioOption);
+                string? speakerEmbeddingPath = parseResult.GetValue(speakerEmbeddingOption);
+                bool speakerExplicit = parseResult.GetResult(speakerOption) is not null;
+                bool hasCloningSource =
+                    !string.IsNullOrEmpty(referenceAudioPath)
+                    || !string.IsNullOrEmpty(speakerEmbeddingPath);
+
+                if (speakerExplicit && hasCloningSource)
+                {
+                    LogError(
+                        "--speaker and voice-cloning options "
+                        + "(--reference-audio / --speaker-embedding) "
+                        + "are mutually exclusive.");
+                    Environment.ExitCode = 1;
+                    return;
+                }
+
                 // ============================================================
                 // --test-mode + --text: output phoneme IDs and exit
                 // ============================================================
