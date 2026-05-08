@@ -30,18 +30,28 @@ from pathlib import Path
 
 import pytest
 
-
 # Ensure the runtime piper package is importable from the python_run tree.
 _RUNTIME_DIR = Path(__file__).resolve().parents[3] / "python_run"
 if str(_RUNTIME_DIR) not in sys.path:
     sys.path.insert(0, str(_RUNTIME_DIR))
 
+# `piper.phonemize.french` is a leaf module that does NOT depend on
+# onnxruntime, but importing through `piper.phonemize` triggers
+# `piper/__init__.py` → `piper.voice` → `import onnxruntime`.  CI lint /
+# pure-G2P jobs install only `g2p[all]` without onnxruntime, so skip the
+# whole module when the runtime stack is unavailable.  PyPI consumers and
+# the inference job both have onnxruntime installed and run these tests.
+pytest.importorskip(
+    "onnxruntime",
+    reason="runtime mirror imports go through piper.voice which needs onnxruntime",
+)
+
 from piper.phonemize.french import (  # noqa: E402
     _phonemize_french_raw as runtime_phonemize_french_raw,
 )
 from piper.phonemize.token_mapper import CHAR2TOKEN  # noqa: E402
-from piper_plus_g2p.french import FrenchPhonemizer  # noqa: E402
 
+from piper_plus_g2p.french import FrenchPhonemizer  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -193,6 +203,7 @@ class TestFrenchLiaisonElisionExpectedPhonemes:
         assert "v" in tokens, "expected /v/ from 'ville'"
         v_idx = tokens.index("v")
         # After v: i then l (not j).  The trailing 'e' is silent.
-        assert tokens[v_idx : v_idx + 3] == ["v", "i", "l"], (
-            f"expected /v i l/ for 'ville' (ille exception), got {tokens[v_idx : v_idx + 3]}"
+        actual = tokens[v_idx : v_idx + 3]
+        assert actual == ["v", "i", "l"], (
+            f"expected /v i l/ for 'ville' (ille exception), got {actual}"
         )

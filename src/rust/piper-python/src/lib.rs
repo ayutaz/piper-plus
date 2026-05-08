@@ -496,9 +496,9 @@ fn piper_plus(m: &Bound<'_, PyModule>) -> PyResult<()> {
 // and is unaffected.
 #[cfg(test)]
 mod tests {
-    use super::{piper_err_to_pyerr, SendPtr};
-    use pyo3::exceptions::{PyIOError, PyRuntimeError, PyValueError};
+    use super::{SendPtr, piper_err_to_pyerr};
     use pyo3::Python;
+    use pyo3::exceptions::{PyIOError, PyRuntimeError, PyValueError};
 
     // -----------------------------------------------------------------
     // SendPtr: unsafe Send invariants
