@@ -396,8 +396,17 @@ class TestVoiceIntegration:
         mock_config.phoneme_type = PhonemeType.OPENJTALK
 
         # Create mock voice
-        voice = MagicMock()
+        voice = MagicMock(spec=PiperVoice)
         voice.config = mock_config
+        # Phase 2 (issue #383): phonemize() routes through _split_sentences()
+        # and _phonemize_one_factory(); we still want to verify that the
+        # OPENJTALK branch ends up calling phonemize_japanese on the
+        # produced sentence list, so stub _split_sentences explicitly and
+        # let _phonemize_one_factory run unmocked.
+        voice._split_sentences = MagicMock(return_value=["こんにちは"])
+        voice._phonemize_one_factory = (
+            lambda: PiperVoice._phonemize_one_factory(voice)
+        )
 
         # Test that phonemize method uses the JA phonemizer
         with patch("piper.phonemize.japanese.phonemize_japanese") as mock_phonemize:
