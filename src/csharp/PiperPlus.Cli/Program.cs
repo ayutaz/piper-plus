@@ -574,6 +574,75 @@ internal static class Program
                     return;
                 }
 
+                // Resolve voice-cloning input into a speaker embedding (if provided).
+                //   --speaker-embedding: raw float32 binary file (e.g. 256×4 = 1024 bytes
+                //                        for ECAPA-TDNN); loaded as-is.
+                //   --reference-audio:   WAV file fed through SpeakerEncoder ONNX
+                //                        (path supplied via --speaker-encoder-model).
+                // Cross-runtime parity: src/rust/piper-cli/src/main.rs:381-390,
+                //                       src/go/cmd/piper-plus/main.go:108-109,232-241.
+                // The --speaker × cloning mutex is enforced earlier (line 413),
+                // so by the time we reach here the two inputs are not both set
+                // alongside an explicit --speaker.
+                float[]? speakerEmbedding = null;
+                {
+                    string? referenceAudioPath = parseResult.GetValue(referenceAudioOption);
+                    string? speakerEmbeddingPath = parseResult.GetValue(speakerEmbeddingOption);
+                    string? speakerEncoderModelPath = parseResult.GetValue(speakerEncoderModelOption);
+
+                    if (!string.IsNullOrEmpty(speakerEmbeddingPath))
+                    {
+                        // Direct embedding file (raw little-endian float32 binary).
+                        try
+                        {
+                            byte[] rawBytes = File.ReadAllBytes(speakerEmbeddingPath);
+                            if (rawBytes.Length == 0 || rawBytes.Length % sizeof(float) != 0)
+                            {
+                                LogError(
+                                    $"--speaker-embedding file size ({rawBytes.Length} bytes) "
+                                    + "is invalid: must be a non-zero multiple of 4 bytes (float32).");
+                                Environment.ExitCode = 1;
+                                return;
+                            }
+                            speakerEmbedding = new float[rawBytes.Length / sizeof(float)];
+                            Buffer.BlockCopy(rawBytes, 0, speakerEmbedding, 0, rawBytes.Length);
+                            LogDebug(debug, quiet,
+                                $"Loaded speaker embedding: {speakerEmbedding.Length} dims from {speakerEmbeddingPath}");
+                        }
+                        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                        {
+                            LogError($"Failed to read --speaker-embedding file: {ex.Message}");
+                            Environment.ExitCode = 1;
+                            return;
+                        }
+                    }
+                    else if (!string.IsNullOrEmpty(referenceAudioPath))
+                    {
+                        // Encode reference WAV via Speaker Encoder ONNX model.
+                        if (string.IsNullOrEmpty(speakerEncoderModelPath))
+                        {
+                            LogError(
+                                "--reference-audio requires --speaker-encoder-model "
+                                + "(path to the speaker encoder ONNX model).");
+                            Environment.ExitCode = 1;
+                            return;
+                        }
+                        try
+                        {
+                            using var encoder = new SpeakerEncoder(speakerEncoderModelPath);
+                            speakerEmbedding = encoder.EncodeFile(referenceAudioPath);
+                            LogDebug(debug, quiet,
+                                $"Encoded {referenceAudioPath} -> {speakerEmbedding.Length}-dim embedding");
+                        }
+                        catch (Exception ex)
+                        {
+                            LogError($"Failed to encode reference audio: {ex.Message}");
+                            Environment.ExitCode = 1;
+                            return;
+                        }
+                    }
+                }
+
                 // ============================================================
                 // --test-mode + --text: output phoneme IDs and exit
                 // ============================================================
@@ -965,7 +1034,8 @@ internal static class Program
                         audio = SynthesizeWithPhonemeSilence(
                             piperSession, phonemeIdsLong, prosodyFlat,
                             speaker, languageId, noiseScale, lengthScale, noiseW,
-                            phonemeSilenceMap, config.PhonemeIdMap, sampleRate);
+                            phonemeSilenceMap, config.PhonemeIdMap, sampleRate,
+                            speakerEmbedding);
                     }
                     catch (Exception ex)
                     {
@@ -1052,7 +1122,8 @@ internal static class Program
                                     chunkAudio = SynthesizeWithPhonemeSilence(
                                         piperSession, entry.PhonemeIds, entry.Prosody,
                                         speaker, languageId, noiseScale, lengthScale, noiseW,
-                                        phonemeSilenceMap, config.PhonemeIdMap, sampleRate);
+                                        phonemeSilenceMap, config.PhonemeIdMap, sampleRate,
+                                        speakerEmbedding);
                                 }
                                 catch (Exception ex)
                                 {
@@ -1133,7 +1204,8 @@ internal static class Program
                                 audio = SynthesizeWithPhonemeSilence(
                                     piperSession, phonemeIdsLong, null,
                                     speaker, languageId, noiseScale, lengthScale, noiseW,
-                                    phonemeSilenceMap, config.PhonemeIdMap, sampleRate);
+                                    phonemeSilenceMap, config.PhonemeIdMap, sampleRate,
+                                    speakerEmbedding);
                             }
                             catch (Exception ex)
                             {
@@ -1336,7 +1408,8 @@ internal static class Program
                                 audio = SynthesizeWithPhonemeSilence(
                                     piperSession, phonemeIdsLong, prosodyFlat,
                                     uttSpeaker, uttLanguageId, noiseScale, lengthScale, noiseW,
-                                    phonemeSilenceMap, config.PhonemeIdMap, sampleRate);
+                                    phonemeSilenceMap, config.PhonemeIdMap, sampleRate,
+                                    speakerEmbedding);
                             }
                             catch (Exception ex)
                             {
@@ -1411,19 +1484,30 @@ internal static class Program
         float noiseW,
         Dictionary<string, float>? phonemeSilenceMap,
         Dictionary<string, int[]> phonemeIdMap,
-        int sampleRate)
+        int sampleRate,
+        float[]? speakerEmbedding = null)
     {
+        // When a speaker embedding is supplied, the discrete sid is dropped
+        // (the two are mutually exclusive — see SynthesisInput.Validate). The
+        // CLI mutex check at line 413 already prevents an *explicit* --speaker
+        // alongside cloning options, so the only sid value that can reach this
+        // method when speakerEmbedding != null is the default 0 — which the
+        // record's Validate() also treats as "unset". We still null it out
+        // explicitly to make the intent obvious to readers.
+        int effectiveSpeaker = speakerEmbedding is null ? speaker : 0;
+
         // Normal (non-split) path
         if (phonemeSilenceMap is null || phonemeSilenceMap.Count == 0)
         {
             var input = new SynthesisInput(
                 PhonemeIds: phonemeIdsLong,
-                SpeakerId: speaker,
+                SpeakerId: effectiveSpeaker,
                 LanguageId: languageId,
                 ProsodyFeatures: prosodyFlat,
                 NoiseScale: noiseScale,
                 LengthScale: lengthScale,
-                NoiseW: noiseW);
+                NoiseW: noiseW,
+                SpeakerEmbedding: speakerEmbedding);
             return piperSession.Synthesize(input);
         }
 
@@ -1445,12 +1529,13 @@ internal static class Program
 
             var input = new SynthesisInput(
                 PhonemeIds: phraseIds,
-                SpeakerId: speaker,
+                SpeakerId: effectiveSpeaker,
                 LanguageId: languageId,
                 ProsodyFeatures: phraseProsody,
                 NoiseScale: noiseScale,
                 LengthScale: lengthScale,
-                NoiseW: noiseW);
+                NoiseW: noiseW,
+                SpeakerEmbedding: speakerEmbedding);
 
             short[] phraseAudio = piperSession.Synthesize(input);
             segments.Add((phraseAudio, phrase.SilenceSamples));

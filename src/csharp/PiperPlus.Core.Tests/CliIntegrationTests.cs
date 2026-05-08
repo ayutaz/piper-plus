@@ -523,4 +523,86 @@ public sealed class CliIntegrationTests
         string combined = stdout + stderr;
         Assert.Contains("mutually exclusive", combined, StringComparison.OrdinalIgnoreCase);
     }
+
+    // ================================================================
+    // Voice-cloning option wiring (--reference-audio / --speaker-embedding)
+    // ================================================================
+
+    [Fact]
+    [Trait("Category", "CLI")]
+    public async Task ReferenceAudio_WithoutSpeakerEncoderModel_Errors()
+    {
+        // --reference-audio requires --speaker-encoder-model (the encoder ONNX
+        // path) to compute the speaker embedding. The CLI must fail fast with
+        // a precise message instead of the generic "Synthesis failed".
+        var (exitCode, stdout, stderr) = await RunCliAsync(
+            "--test-mode",
+            "--text", "test",
+            "--reference-audio", "/nonexistent/ref.wav");
+        SkipIfBuildFailed(exitCode, stderr);
+
+        Assert.NotEqual(0, exitCode);
+        string combined = stdout + stderr;
+        Assert.Contains("--speaker-encoder-model", combined, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Category", "CLI")]
+    public async Task SpeakerEmbedding_InvalidFileSize_Errors()
+    {
+        // A raw float32 binary embedding file must be a non-zero multiple of
+        // 4 bytes. A 7-byte file (not divisible by 4) must be rejected with a
+        // precise error before synthesis is attempted.
+        string tmpPath = Path.GetTempFileName();
+        try
+        {
+            await File.WriteAllBytesAsync(tmpPath, new byte[7]);
+
+            var (exitCode, stdout, stderr) = await RunCliAsync(
+                "--test-mode",
+                "--text", "test",
+                "--speaker-embedding", tmpPath);
+            SkipIfBuildFailed(exitCode, stderr);
+
+            Assert.NotEqual(0, exitCode);
+            string combined = stdout + stderr;
+            Assert.Contains("multiple of 4", combined, StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            try { File.Delete(tmpPath); } catch { /* best-effort cleanup */ }
+        }
+    }
+
+    [Fact]
+    [Trait("Category", "CLI")]
+    public async Task SpeakerEmbedding_EmptyFile_Errors()
+    {
+        // An empty embedding file is also rejected — we can't synthesize from
+        // a zero-dim vector.
+        string tmpPath = Path.GetTempFileName();
+        try
+        {
+            await File.WriteAllBytesAsync(tmpPath, []);
+
+            var (exitCode, stdout, stderr) = await RunCliAsync(
+                "--test-mode",
+                "--text", "test",
+                "--speaker-embedding", tmpPath);
+            SkipIfBuildFailed(exitCode, stderr);
+
+            Assert.NotEqual(0, exitCode);
+            string combined = stdout + stderr;
+            // Either "invalid" or our specific "multiple of 4" message — both
+            // are precise (the implementation reports both invariants together).
+            Assert.True(
+                combined.Contains("invalid", StringComparison.OrdinalIgnoreCase)
+                    || combined.Contains("multiple of 4", StringComparison.OrdinalIgnoreCase),
+                $"expected an embedding-validation error, got: {combined}");
+        }
+        finally
+        {
+            try { File.Delete(tmpPath); } catch { /* best-effort cleanup */ }
+        }
+    }
 }
