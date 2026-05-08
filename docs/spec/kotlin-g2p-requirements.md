@@ -1,9 +1,11 @@
 # Kotlin G2P ライブラリ 要件定義書 (Issue #388)
 
+> **ステータス**: Implemented (Issue #388, PR #400 / dev に merge 済み)
 > **親 Issue**: [#388](https://github.com/ayutaz/piper-plus/issues/388) — 「Kotlin 向けの g2p ライブラリの提供」
-> **作業ブランチ**: `feat/issue-388-kotlin-g2p`
-> **設計書**: [kotlin-g2p-design.md](kotlin-g2p-design.md) (Phase 0 で先行作成)
-> **判定基準**: 自動化可能性 (CLI/CI で完結) を最優先。実装工数は評価軸から除外。
+> **設計書**: [kotlin-g2p-design.md](kotlin-g2p-design.md)
+> **判定基準** (実装着手前): 自動化可能性 (CLI/CI で完結) を最優先。実装工数は評価軸から除外。
+
+> **注**: 本書は実装着手前の要件定義。受け入れ基準チェックリスト (§14) / オープンクエスチョン (§15) / リスク表 (§13) / 改訂履歴 (§18) は実装完了に伴い削除済み (詳細は git log と PR #400)。残置されているのは「核心的な技術的決定事項」「機能要件」「非機能要件」「制約条件」「テスト要件」「インターフェース要件」「スコープ外」など、後続メンテで規範性を持つセクション。
 
 ---
 
@@ -560,76 +562,9 @@ JSON v1.0 / v2.0 schema は既存 (`docs/spec/custom-dictionary-schema.toml` 等
 
 ---
 
-## 13. リスクと緩和策
-
-| ID | リスク | 影響 | 確率 | 緩和策 |
-|----|-------|------|-----|-------|
-| **R-1** | engine-less C API 追加で内部実装が大幅にリファクタ必要 | 工数増 | 中 | 既存 `Voice` 構造を保ったまま `languageIdMap` だけ内蔵データに置換する設計で最小化 |
-| **R-2** | Gradle Managed Devices CI 不安定 | テスト遅延 | 中 | 公式ドキュメント通りの retry 設定、KVM 必須、API level 30+ 固定 |
-| **R-3** | Maven Central 公開 credentials 漏洩 | セキュリティ | 低 | GitHub Actions secrets、PR では publish skip、定期 rotation |
-| **R-4** | 16 KB page size 非対応 | Android 15+ で `.so` ロード失敗 | 中 | `max-page-size=16384` 必須化、L5 で検証 |
-| **R-5** | JNI BORROWED ポインタ寿命誤認 | クラッシュ | 中 | `NewStringUTF()` 即コピー、AddressSanitizer CI |
-| **R-6** | OpenJTalk 辞書配布 UX 悪化 | ユーザー離脱 | 中 | 3 パターン (assets / fromPath / HF Hub) でユーザー選択肢提供 |
-| **R-7** | 既存 `android/piper-plus/` namespace 衝突 | ビルドエラー | 低 | `com.piperplus.g2p` で分離 (CONSTRAINT-2) |
-| **R-8** | 8 言語クロスランタイムドリフト | parity 失敗 | 中 | mirror 増やさず C API 経由で既存埋込データ参照、L4 CI gate |
-| **R-9** | vanniktech plugin Sonatype Central Portal 対応が beta | publish 失敗 | 低 | JReleaser を fallback として準備、ドキュメント化 |
-| **R-10** | Issue #388 タイトル「Kotolin」(タイポ) の解釈 | 仕様誤認 | 極低 | Kotlin として進める旨を本書冒頭で明示 (要件定義で確定) |
-
 ---
 
-## 14. 受け入れ基準 (Acceptance Criteria)
-
-### 14.1 PR マージ条件
-
-- [ ] **AC-1**: C API に engine-less G2P エントリポイント (FR-CAPI-1) が追加され、既存 ABI を壊さず追加された
-- [ ] **AC-2**: `./gradlew :piper-plus-g2p:test` 全 PASS (L1)
-- [ ] **AC-3**: `./gradlew :piper-plus-g2p:linuxTest` 全 PASS (L2)
-- [ ] **AC-4**: `./gradlew :piper-plus-g2p:pixel6api34DebugAndroidTest` 全 PASS (L3、CI emulator)
-- [ ] **AC-5**: Cross-runtime parity test で Python と byte 一致 (8 言語 × 50 ケース、L4)
-- [ ] **AC-6**: ABI 整合性 (`max-page-size=16384`) 検証 PASS (L5)
-- [ ] **AC-7**: `./gradlew publishToMavenCentralRepository --dry-run` 成功
-- [ ] **AC-8**: AAR サイズ < 10 MB (3 ABI、辞書を除く)、目標 < 5 MB
-- [ ] **AC-9**: README (`android/piper-plus-g2p/README.md`) でクイックスタート提示
-- [ ] **AC-10**: サンプルアプリ (`examples/android-g2p-sample/`) で動作確認 + CI ビルド成功
-- [ ] **AC-11**: CHANGELOG / メイン README / CLAUDE.md 更新 (Kotlin/Android 行追加で全 7 ランタイム揃う)
-- [ ] **AC-12**: 8 言語の `phonemize()` 動作確認、特に ja は OpenJTalk 辞書ロードを含む
-- [ ] **AC-13**: ZH-EN code-switching が Python と byte 一致
-
-### 14.2 リリース条件 (タグ push → Maven Central 反映)
-
-- [ ] **AC-REL-1**: タグ `kotlin-g2p-v*` push → 30 分以内に Maven Central で検索可能
-- [ ] **AC-REL-2**: GPG 署名検証 PASS
-- [ ] **AC-REL-3**: バージョン乖離 (POM vs git tag) を CI gate で検知
-- [ ] **AC-REL-4**: 公開後 `implementation("io.github.ayutaz:piper-plus-g2p-android:VERSION")` で実際にプロジェクトから取得可能
-
----
-
-## 15. オープンクエスチョン (要追加調査)
-
-実装フェーズで確認が必要な未確定事項:
-
-| ID | 質問 | 影響範囲 | 解決方法 |
-|----|------|--------|--------|
-| **Q-1** | C API 新 engine-less エントリポイント追加に対する保守者承認 | 実装着手の前提 | PR レビューでの確認、または別 issue 切り出し |
-| **Q-2** | `io.github.ayutaz` Maven Central namespace の登録状況 | 公開可能性 | Sonatype Central Portal で確認 (実装者が実施) |
-| **Q-3** | 既存 `tests/fixtures/g2p/*.json` の構造と PUA / prosody / SSML カバー率 | L4 parity test の網羅性 | TICKET-04 着手時に既存 fixture を読んで補強 |
-| **Q-4** | g2pk2 / pypinyin の C++ 実装内辞書サイズ実測値 | NFR-SIZE-1 達成可能性 | TICKET-03 で `assembleRelease` 後に測定 |
-| **Q-5** | Custom Dictionary JSON v1.0/v2.0 schema の正式仕様 | FR-DICT-CUSTOM-1 実装 | `docs/spec/` を再確認、別途技術調査 |
-| **Q-6** | ORT 1.17.0 の armeabi-v7a / x86_64 AAR が Maven Central にあるか | NFR-COMPAT-5 達成可能性 | 実装着手時に Maven Central で確認 |
-| **Q-7** | OpenJTalk 辞書の HF Hub 配布リポジトリ確定 (ayousanz/piper-plus-base or 別) | FR-DICT-2 (HF Hub DL パス) | リポジトリオーナーと調整 |
-| **Q-8** | engine-less API の language ID は 6lang モデルと整合 (ja=0, en=1, …) させるべきか、別体系で良いか | FR-CAPI-2 仕様 | 設計レビューで確定 |
-| **Q-9** | Gradle Managed Devices で OpenJTalk 辞書 (~102MB) を assets バンドル時の emulator メモリ要件 | L3 instrumented test の現実性 | 実装時に小型 fixture 辞書で代替する選択肢検討 |
-| **Q-10** | サンプルアプリ (`examples/android-g2p-sample/`) のディレクトリは既存 `examples/` と整合させるか | FR-TEST-SAMPLE-1 配置 | リポジトリ構造に合わせる |
-
----
-
-## 16. 用語・略語一覧 (再掲)
-
-§2 を参照。
-
----
-
-## 17. 関連ドキュメント
+## 13. 関連ドキュメント
 
 - [kotlin-g2p-design.md](kotlin-g2p-design.md) — 設計書 (本書の親)
 - [src/cpp/piper_plus.h](../../src/cpp/piper_plus.h) — C API ヘッダ (445 行)
@@ -643,8 +578,5 @@ JSON v1.0 / v2.0 schema は既存 (`docs/spec/custom-dictionary-schema.toml` 等
 
 ---
 
-## 18. 改訂履歴
+<!-- 改訂履歴は git log に統合 (実装完了に伴い削除、2026-05-08) -->
 
-| 日付 | 版 | 変更内容 |
-|------|----|---------|
-| 2026-05-07 | v1 | 要件定義書初版。設計書策定後の 4 並列技術調査エージェントの結果を反映。特に「`piper_plus_phonemize()` は engine 必須 = ONNX モデル必須」という核心的発見を §5 で明示し、解決アプローチとして B-1 (engine-less C API 追加) を採択。8 言語サポート、5 層自動テスト、Maven Central 公開自動化を要件として確定。オープンクエスチョン 10 件を §15 に整理。 |
