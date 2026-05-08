@@ -16,9 +16,22 @@ name = "piper_plus"
 crate-type = ["cdylib"]
 
 [dependencies]
+# NOTE: pyo3's `extension-module` feature is *not* enabled here.
+# It is added by maturin via `pyproject.toml`'s
+# `[tool.maturin] features = ["pyo3/extension-module"]` for the wheel
+# build.  Keeping it out of the default dependency line lets `cargo test`
+# link against libpython directly via the `auto-initialize` dev-dependency
+# feature without colliding with the cdylib's "Python is the host" mode.
 piper_core = { package = "piper-plus", path = "../piper-core", version = "0.4.0", features = ["naist-jdic", "onnx"] }
-pyo3 = { version = "0.24", features = ["extension-module"] }
+pyo3 = { version = "0.24" }
 numpy = "0.24"
+
+# Dev deps: enable auto-initialize so unit tests can acquire the GIL with
+# Python::with_gil without an external Python embedding setup.  This pulls
+# in the libpython runtime only for the `cargo test` binary; the wheel
+# build still receives `extension-module` via maturin (see comment above).
+[dev-dependencies]
+pyo3 = { version = "0.24", features = ["auto-initialize"] }
 
 [features]
 default = []
