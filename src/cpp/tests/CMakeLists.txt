@@ -675,6 +675,44 @@ set_tests_properties(test_phoneme_timing_parity PROPERTIES
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
 )
 
+# Cross-runtime speaker encoder mel parity test.
+# Reads test/fixtures/speaker_encoder_golden.json (generated from the Python
+# torchaudio reference) and asserts the spec mel pipeline (Hann + slaney mel
+# filterbank + STFT magnitude → log-mel) in C++ produces matching output.
+# Self-contained: only links gtest + json.hpp, no piper-library dependency.
+# (The C API speaker_encoder symbols are EXPERIMENTAL/unimplemented; this
+# test re-implements the spec independently as a forward-compat gate.)
+add_executable(test_speaker_encoder_parity test_speaker_encoder_parity.cpp)
+target_include_directories(test_speaker_encoder_parity PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../
+)
+target_link_libraries(test_speaker_encoder_parity
+    gtest_main
+)
+add_test(NAME test_speaker_encoder_parity COMMAND test_speaker_encoder_parity)
+set_tests_properties(test_speaker_encoder_parity PROPERTIES
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+
+# Cross-runtime short-text mitigation contract test.
+# Reads tests/fixtures/short_text/contract.json (generated from
+# docs/spec/short-text-contract.toml) and asserts the C++ constants in
+# piper.cpp match the canonical values. Self-contained: only links gtest
+# + json.hpp, no piper-library dependency.
+add_executable(test_short_text_contract test_short_text_contract.cpp)
+target_include_directories(test_short_text_contract PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../
+)
+target_link_libraries(test_short_text_contract
+    gtest_main
+)
+add_test(NAME test_short_text_contract COMMAND test_short_text_contract)
+set_tests_properties(test_short_text_contract PROPERTIES
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+
 # ---- test_library_path: library_path.c unit tests ----
 add_executable(test_library_path
     test_library_path.cpp

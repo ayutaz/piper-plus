@@ -158,12 +158,20 @@ function resampleLinear(samples, fromRate, toRate) {
 
 /**
  * Compute log mel spectrogram.
+ *
+ * Uses Math.fround at every accumulation step to simulate float32 arithmetic,
+ * matching the precision profile of Python (numpy float32) / Rust / Go / C#.
+ * Without fround, JS double-precision accumulation cancels low-energy
+ * spectral leakage that float32 platforms preserve, which breaks
+ * cross-runtime mel parity for silent / out-of-band frequency bins.
+ *
  * @param {Float32Array} samples - Mono 16kHz audio.
  * @returns {Float32Array} Flattened [n_mels * n_frames] in mel-major order.
  */
 function computeMelSpectrogram(samples) {
   const melFilters = createMelFilterbank();
   const window = hannWindow(MEL_N_FFT);
+  const fround = Math.fround;
 
   const nFrames = samples.length >= MEL_N_FFT
     ? Math.floor((samples.length - MEL_N_FFT) / MEL_HOP_LENGTH) + 1
@@ -175,27 +183,31 @@ function computeMelSpectrogram(samples) {
   for (let frameIdx = 0; frameIdx < nFrames; frameIdx++) {
     const start = frameIdx * MEL_HOP_LENGTH;
 
-    // Power spectrum via DFT
+    // Power spectrum via DFT (float32-emulated for cross-runtime parity).
+    // Angles stay in double precision (matches Go's float64 angle calc) but
+    // sample, cos/sin, products, and accumulator are float32 (matches C#/Go
+    // float32 reduction). Without this, JS double accumulators cancel
+    // low-energy spectral leakage that float32 platforms preserve.
     const powerSpec = new Float32Array(fftBins);
     for (let k = 0; k < fftBins; k++) {
       let real = 0, imag = 0;
       const freq = -2 * Math.PI * k / MEL_N_FFT;
       for (let n = 0; n < MEL_N_FFT; n++) {
         const sample = (start + n < samples.length)
-          ? samples[start + n] * window[n]
+          ? fround(samples[start + n] * window[n])
           : 0;
         const angle = freq * n;
-        real += sample * Math.cos(angle);
-        imag += sample * Math.sin(angle);
+        real = fround(real + fround(sample * fround(Math.cos(angle))));
+        imag = fround(imag + fround(sample * fround(Math.sin(angle))));
       }
-      powerSpec[k] = real * real + imag * imag;
+      powerSpec[k] = fround(fround(real * real) + fround(imag * imag));
     }
 
-    // Apply mel filterbank
+    // Apply mel filterbank (float32-emulated).
     for (let melIdx = 0; melIdx < MEL_N_MELS; melIdx++) {
       let energy = 0;
       for (let k = 0; k < fftBins; k++) {
-        energy += melFilters[melIdx * fftBins + k] * powerSpec[k];
+        energy = fround(energy + fround(melFilters[melIdx * fftBins + k] * powerSpec[k]));
       }
       melSpec[melIdx * nFrames + frameIdx] = Math.log(Math.max(energy, 1e-10));
     }
@@ -274,3 +286,20 @@ function hzToMel(hz) {
 function melToHz(mel) {
   return 700 * (Math.pow(10, mel / 2595) - 1);
 }
+
+// Internal exports for cross-runtime parity tests.
+// Not part of the public API; do not import in application code.
+export const _internalForTesting = Object.freeze({
+  MEL_SAMPLE_RATE,
+  MEL_N_FFT,
+  MEL_HOP_LENGTH,
+  MEL_N_MELS,
+  MEL_FMIN,
+  MEL_FMAX,
+  hannWindow,
+  createMelFilterbank,
+  computeMelSpectrogram,
+  resampleLinear,
+  hzToMel,
+  melToHz,
+});
