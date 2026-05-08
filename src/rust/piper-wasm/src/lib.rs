@@ -1150,9 +1150,11 @@ mod wasm_tests {
     use super::*;
     use wasm_bindgen_test::*;
 
-    // NOTE: run_in_browser is NOT set — these tests run in Node.js via
-    // `wasm-pack test --node`, which avoids WebDriver/chromedriver issues.
-    // None of these tests use browser-specific APIs (DOM, fetch, etc.).
+    // Run in Node.js via `wasm-pack test --node`. Node is the default runner
+    // for wasm-bindgen-test 0.3, so we deliberately do NOT call
+    // `wasm_bindgen_test_configure!(run_in_browser)` — that arm is the only
+    // one the macro accepts and would force WebDriver/chromedriver. None of
+    // these tests use browser-specific APIs (DOM, fetch, etc.).
 
     // -------------------------------------------------------------------
     // Constructor tests
