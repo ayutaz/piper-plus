@@ -136,6 +136,13 @@ func (e *OnnxEngine) Synthesize(ctx context.Context, req *SynthesisRequest) (*Sy
 		return nil, ErrEmptyPhonemeIDs
 	}
 
+	// Cross-field invariants (e.g. speaker_id × speaker_embedding mutual
+	// exclusion). Run before any tensor allocation so callers receive a
+	// fast, deterministic error matching the Python/Rust runtimes.
+	if err := req.Validate(); err != nil {
+		return nil, err
+	}
+
 	// Check for pre-canceled context.
 	if err := ctx.Err(); err != nil {
 		return nil, err

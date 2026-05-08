@@ -225,15 +225,31 @@ void phonemesToAudioStreaming(PiperConfig &config, Voice &voice,
                               const std::function<void(const std::vector<int16_t>&)> &chunkCallback,
                               size_t phonemesPerChunk = 10);
 
-// Output phoneme timing information as JSON
+// Output phoneme timing information as JSON.
+//
+// Emits the spec-canonical fields (`start_ms`, `end_ms`, `duration_ms`,
+// `total_duration_ms`, `sample_rate`, `frame_shift_ms`) alongside the legacy
+// fields (`start`, `end`, `start_frame`, `end_frame`, `total_duration`) for
+// backward compatibility.  `hopSize` defaults to 256 (VITS default) and is
+// used for the `frame_shift_ms` calculation.
 void outputTimingsAsJSON(const std::vector<PhonemeInfo> &timings,
                          std::ostream &output,
                          const std::string &text = "",
-                         int sampleRate = 22050);
+                         int sampleRate = 22050,
+                         int hopSize = 256);
 
-// Output phoneme timing information as TSV
+// Output phoneme timing information as TSV with both spec-canonical
+// millisecond columns and legacy seconds/frame columns.
+//   phoneme\tstart_ms\tend_ms\tduration_ms\tstart\tend\tstart_frame\tend_frame
 void outputTimingsAsTSV(const std::vector<PhonemeInfo> &timings,
                         std::ostream &output);
+
+// Output phoneme timing information as SubRip (SRT) subtitles.
+// Format: HH:MM:SS,mmm timestamps, 1-based index, UTF-8 (no BOM).
+void outputTimingsAsSRT(const std::vector<PhonemeInfo> &timings,
+                        std::ostream &output,
+                        double sampleRate = 22050.0,
+                        int hopSize = 256);
 
 // Phonemize result (extracted from textToAudio)
 struct PhonemizeResult {

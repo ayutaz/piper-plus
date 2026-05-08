@@ -2,6 +2,7 @@
 #include <array>
 #include <chrono>
 #include <cmath>
+#include <cstdio>
 #include <fstream>
 #include <limits>
 #include <set>
@@ -2910,17 +2911,47 @@ void phonemesToAudioStreaming(PiperConfig &config, Voice &voice,
 
 } /* phonemesToAudioStreaming */
 
-// Output phoneme timing information as JSON
+// Output phoneme timing information as JSON.
+//
+// Spec (docs/spec/phoneme-timing-contract.toml) defines the canonical
+// snake_case schema with millisecond fields:
+//   { phonemes: [{phoneme, start_ms, end_ms, duration_ms}],
+//     total_duration_ms, sample_rate }
+//
+// For backward compatibility we additionally emit the legacy fields
+// (`start`, `end`, `start_frame`, `end_frame`, `total_duration`) so existing
+// consumers keep working. New consumers should use the *_ms fields.
 void outputTimingsAsJSON(const std::vector<PhonemeInfo> &timings,
                          std::ostream &output,
                          const std::string &text,
-                         int sampleRate) {
+                         int sampleRate,
+                         int hopSize) {
+    // Spec [calculation]: frame_time_ms = (hop_length / sample_rate) * 1000
+    const double frameShiftMs =
+        sampleRate > 0
+            ? (static_cast<double>(hopSize) / static_cast<double>(sampleRate)) *
+                  1000.0
+            : 0.0;
+
     json result;
     json phonemesArray = json::array();
 
+    double maxEndMs = 0.0;
     for (const auto &info : timings) {
+        const double startMs = static_cast<double>(info.start_time) * 1000.0;
+        const double endMs = static_cast<double>(info.end_time) * 1000.0;
+        const double durationMs = endMs - startMs;
+        if (endMs > maxEndMs) {
+            maxEndMs = endMs;
+        }
+
         json phonemeObj;
         phonemeObj["phoneme"] = info.phoneme;
+        // Spec-canonical millisecond fields
+        phonemeObj["start_ms"] = startMs;
+        phonemeObj["end_ms"] = endMs;
+        phonemeObj["duration_ms"] = durationMs;
+        // Legacy fields (kept for backward compatibility)
         phonemeObj["start"] = info.start_time;
         phonemeObj["end"] = info.end_time;
         phonemeObj["start_frame"] = info.start_frame;
@@ -2932,24 +2963,92 @@ void outputTimingsAsJSON(const std::vector<PhonemeInfo> &timings,
     if (!text.empty()) {
         result["text"] = text;
     }
-    result["total_duration"] = timings.empty() ? 0.0 : timings.back().end_time;
+    // Spec-canonical fields
+    result["total_duration_ms"] = timings.empty() ? 0.0 : maxEndMs;
     result["sample_rate"] = sampleRate;
-    result["frame_shift_ms"] = 256.0 / sampleRate * 1000;  // hop_size in ms
+    result["frame_shift_ms"] = frameShiftMs;
+    // Legacy field (kept for backward compatibility)
+    result["total_duration"] = timings.empty() ? 0.0 : timings.back().end_time;
 
     output << result.dump(2) << std::endl;
 }
 
-// Output phoneme timing information as TSV
+// Output phoneme timing information as TSV.
+//
+// Header combines the spec-canonical millisecond columns with the legacy
+// frame/seconds columns so both old and new consumers can parse the file.
+//   phoneme\tstart_ms\tend_ms\tduration_ms\tstart\tend\tstart_frame\tend_frame
 void outputTimingsAsTSV(const std::vector<PhonemeInfo> &timings,
                         std::ostream &output) {
-    output << "phoneme\tstart\tend\tstart_frame\tend_frame" << std::endl;
+    output << "phoneme\tstart_ms\tend_ms\tduration_ms\tstart\tend\tstart_frame\tend_frame"
+           << std::endl;
+
+    // Use fixed precision (3 decimals) for ms columns per spec
+    // [output_formats.tsv].float_precision = 3.
+    const std::ios_base::fmtflags savedFlags = output.flags();
+    const std::streamsize savedPrecision = output.precision();
+    output.setf(std::ios_base::fixed, std::ios_base::floatfield);
+    output.precision(3);
 
     for (const auto &info : timings) {
+        const double startMs = static_cast<double>(info.start_time) * 1000.0;
+        const double endMs = static_cast<double>(info.end_time) * 1000.0;
+        const double durationMs = endMs - startMs;
+
         output << info.phoneme << "\t"
+               << startMs << "\t"
+               << endMs << "\t"
+               << durationMs << "\t"
                << info.start_time << "\t"
                << info.end_time << "\t"
                << info.start_frame << "\t"
                << info.end_frame << std::endl;
+    }
+
+    output.flags(savedFlags);
+    output.precision(savedPrecision);
+}
+
+// Output phoneme timing information as SubRip subtitle (SRT) format.
+//
+// Spec [output_formats.srt]:
+//   timestamp_format = "HH:MM:SS,mmm"
+//   cue_format       = "{index}\n{start} --> {end}\n{phoneme}\n\n"
+//   indexing starts at 1
+// Encoding: UTF-8 without BOM (default for ofstream — we just emit raw text).
+void outputTimingsAsSRT(const std::vector<PhonemeInfo> &timings,
+                        std::ostream &output,
+                        double /*sampleRate*/,
+                        int /*hopSize*/) {
+    auto formatTimestamp = [](double ms) -> std::string {
+        if (ms < 0.0) {
+            ms = 0.0;
+        }
+        // Round to nearest millisecond before splitting (matches Rust impl).
+        const long long total_ms = static_cast<long long>(ms + 0.5);
+        const long long millis = total_ms % 1000;
+        const long long total_secs = total_ms / 1000;
+        const long long secs = total_secs % 60;
+        const long long total_mins = total_secs / 60;
+        const long long mins = total_mins % 60;
+        const long long hours = total_mins / 60;
+
+        char buf[32];
+        std::snprintf(buf, sizeof(buf), "%02lld:%02lld:%02lld,%03lld",
+                      hours, mins, secs, millis);
+        return std::string(buf);
+    };
+
+    for (size_t i = 0; i < timings.size(); ++i) {
+        const auto &info = timings[i];
+        const double startMs = static_cast<double>(info.start_time) * 1000.0;
+        const double endMs = static_cast<double>(info.end_time) * 1000.0;
+
+        // 1-based index per spec.
+        output << (i + 1) << "\n"
+               << formatTimestamp(startMs) << " --> "
+               << formatTimestamp(endMs) << "\n"
+               << info.phoneme << "\n\n";
     }
 }
 

@@ -229,6 +229,18 @@ func runSynthesize(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("input modes are mutually exclusive: specify only one of --text, --batch, or piped stdin JSONL")
 	}
 
+	// Validate voice-cloning flags. --reference-audio and --speaker-embedding
+	// are mutually exclusive (matches Rust CLI behavior). When either is
+	// specified, an explicit --speaker is also rejected because the embedding
+	// path overrides speaker_id selection inside the engine and combining the
+	// two is ambiguous (matches piperplus.SynthesisRequest.Validate).
+	if referenceAudio != "" && speakerEmbedding != "" {
+		return fmt.Errorf("--reference-audio and --speaker-embedding are mutually exclusive")
+	}
+	if (referenceAudio != "" || speakerEmbedding != "") && cmd.Flags().Changed("speaker") {
+		return fmt.Errorf("--speaker and --reference-audio/--speaker-embedding are mutually exclusive (speaker_id and speaker_embedding cannot both be specified)")
+	}
+
 	// Initialize ONNX Runtime.
 	if err := piperplus.Init(""); err != nil {
 		return fmt.Errorf("failed to initialize ONNX Runtime: %w", err)

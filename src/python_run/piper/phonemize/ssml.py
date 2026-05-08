@@ -89,8 +89,8 @@ except ImportError:
             if tag == "break":
                 bms = SSMLParser._resolve_break(element)
                 segments.append(SSMLSegment(text="", break_ms=bms, rate=rate))
-                if element.tail and element.tail.strip():
-                    segments.append(SSMLSegment(text=element.tail.strip(), rate=rate))
+                # tail emitted by parent loop (avoid double-emit; mirrors
+                # piper_plus_g2p.ssml fix)
                 return
             if tag == "prosody":
                 ra = element.get("rate")

@@ -798,10 +798,20 @@ jobs:
           path: libpiper_plus_g2p-apple.xcframework.zip
 
   build-android:
-    name: Build Android arm64-v8a
+    name: Build Android ${{ matrix.abi }}
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    # 3-ABI distribution (arm64-v8a / armeabi-v7a / x86_64) matches
+    # android-build.yml + kotlin-g2p-ci.yml. Pixel 8a / Android 15+ ship 16 KB
+    # pages by default — the 64-bit slices link with `-z,max-page-size=16384`
+    # and are gated by a readelf PT_LOAD alignment check. armeabi-v7a is
+    # exempt because 32-bit Android kernels still use 4 KB pages
+    # (kotlin-g2p-ci.yml comment, NFR-COMPAT-4 / R-4).
+    strategy:
+      fail-fast: false
+      matrix:
+        abi: [arm64-v8a, armeabi-v7a, x86_64]
 
     steps:
       - uses: actions/checkout@v6
@@ -834,8 +844,8 @@ jobs:
           unzip -q onnxruntime-android.aar -d onnxruntime-android
           # Prepare ORT directory structure for CMake
           mkdir -p ort-android/lib ort-android/include
-          # Copy arm64-v8a shared library
-          cp onnxruntime-android/jni/arm64-v8a/libonnxruntime.so ort-android/lib/
+          # Copy ABI-specific shared library (matrix-driven)
+          cp "onnxruntime-android/jni/${{ matrix.abi }}/libonnxruntime.so" ort-android/lib/
           # Copy headers
           HEADER_DIR=$(find onnxruntime-android -name "onnxruntime_cxx_api.h" -exec dirname {} \; | head -1)
           if [ -n "${HEADER_DIR}" ]; then
@@ -854,34 +864,92 @@ jobs:
         env:
           ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
         run: |
+          # 16 KB page-size alignment for 64-bit ABIs (Pixel 8a / Android 15+).
+          # armeabi-v7a is exempt because 32-bit kernels use 4 KB pages — adding
+          # the flag is harmless but we keep parity with kotlin-g2p-ci.yml /
+          # android-build.yml convention. The flag is set on both SHARED and EXE
+          # linker flag lists so any auxiliary executables produced by the build
+          # also satisfy the alignment requirement.
+          PAGE_ALIGN_FLAGS=""
+          if [ "${{ matrix.abi }}" != "armeabi-v7a" ]; then
+            PAGE_ALIGN_FLAGS="-Wl,-z,max-page-size=16384"
+          fi
+          # armeabi-v7a requires NEON for ONNX Runtime
+          CMAKE_EXTRA_FLAGS=""
+          if [ "${{ matrix.abi }}" = "armeabi-v7a" ]; then
+            CMAKE_EXTRA_FLAGS="-DANDROID_ARM_NEON=ON"
+          fi
           cmake -B build-android \
             -DCMAKE_TOOLCHAIN_FILE="${ANDROID_NDK_HOME}/build/cmake/android.toolchain.cmake" \
             -DCMAKE_BUILD_TYPE=Release \
-            -DANDROID_ABI=arm64-v8a \
+            -DANDROID_ABI=${{ matrix.abi }} \
             -DANDROID_PLATFORM=android-24 \
             -DPIPER_PLUS_BUILD_SHARED=ON \
+            -DCMAKE_SHARED_LINKER_FLAGS="${PAGE_ALIGN_FLAGS}" \
+            -DCMAKE_EXE_LINKER_FLAGS="${PAGE_ALIGN_FLAGS}" \
             -DONNXRUNTIME_DIR="${ORT_ANDROID_DIR}" \
             -DONNXRUNTIME_LIB="${ORT_ANDROID_LIB}" \
-            -DONNXRUNTIME_INCLUDE_DIR="${ORT_ANDROID_DIR}/include"
+            -DONNXRUNTIME_INCLUDE_DIR="${ORT_ANDROID_DIR}/include" \
+            $CMAKE_EXTRA_FLAGS
 
       - name: Build (Android)
         run: cmake --build build-android --config Release -j$(nproc)
 
+      - name: Locate libpiper_plus.so
+        id: locate-so
+        run: |
+          set -euo pipefail
+          # CMake may emit the .so directly under build-android/ or under
+          # build-android/lib/ depending on PiperPlusShared.cmake's output dir
+          # configuration. Resolve once and export for downstream steps.
+          if [ -f build-android/libpiper_plus.so ]; then
+            SO_PATH="build-android/libpiper_plus.so"
+          elif [ -f build-android/lib/libpiper_plus.so ]; then
+            SO_PATH="build-android/lib/libpiper_plus.so"
+          else
+            echo "::error::libpiper_plus.so not found under build-android/"
+            find build-android -name "libpiper_plus.so" -print || true
+            exit 1
+          fi
+          echo "so-path=${SO_PATH}" >> "$GITHUB_OUTPUT"
+          echo "Resolved: ${SO_PATH}"
+
+      - name: Verify 16 KB page-alignment (NFR-COMPAT-4, R-4)
+        # Pixel 8a / Android 15+ default to 16 KB pages; libpiper_plus.so must
+        # have PT_LOAD alignment 0x4000 (16 KB) or 0x10000 (64 KB) or `mmap`
+        # fails at app launch. armeabi-v7a is exempt because 32-bit Android
+        # kernels still use 4 KB pages — see kotlin-g2p-ci.yml comment.
+        # Pattern mirrors kotlin-g2p-ci.yml's "Verify 16 KB page alignment"
+        # gate (FR-TEST-5).
+        if: matrix.abi != 'armeabi-v7a'
+        run: |
+          set -e
+          LIB="${{ steps.locate-so.outputs.so-path }}"
+          echo "=== readelf -lW ${LIB} (LOAD segments) ==="
+          readelf -lW "$LIB" | grep "LOAD" | head -1
+          if ! readelf -lW "$LIB" | awk '/LOAD/ {print $NF}' | grep -qE '0x4000|0x10000'; then
+            echo "::error::PT_LOAD alignment is not 16 KB (0x4000) or 64 KB (0x10000) for ${{ matrix.abi }}"
+            echo "Full LOAD segment dump:"
+            readelf -lW "$LIB" | grep "LOAD" || true
+            exit 1
+          fi
+          echo "OK: ${{ matrix.abi }} libpiper_plus.so is 16 KB page-aligned"
+
       - name: Package
         run: |
           mkdir -p artifacts/lib artifacts/include
-          cp build-android/libpiper_plus.so artifacts/lib/
+          cp "${{ steps.locate-so.outputs.so-path }}" artifacts/lib/
           cp src/cpp/piper_plus.h artifacts/include/
           # Include ONNX Runtime shared library for Android
           cp "${ORT_ANDROID_LIB}" artifacts/lib/
           cd artifacts
-          tar -czf ${{ github.workspace }}/libpiper_plus-android-arm64-v8a.tar.gz .
+          tar -czf "${{ github.workspace }}/libpiper_plus-android-${{ matrix.abi }}.tar.gz" .
 
       - name: Upload artifact
         uses: actions/upload-artifact@v7
         with:
-          name: libpiper_plus-android-arm64-v8a
-          path: libpiper_plus-android-arm64-v8a.tar.gz
+          name: libpiper_plus-android-${{ matrix.abi }}
+          path: libpiper_plus-android-${{ matrix.abi }}.tar.gz
 
   release:
     name: Create Release
@@ -968,11 +1036,16 @@ jobs:
             mv artifacts/libpiper_plus_g2p-apple-xcframework/libpiper_plus_g2p-apple.xcframework.zip \
                artifacts/libpiper_plus_g2p-apple-xcframework/libpiper_plus_g2p-apple-${TAG}.xcframework.zip
           fi
-          # Rename Android artifact
-          if [ -f artifacts/libpiper_plus-android-arm64-v8a/libpiper_plus-android-arm64-v8a.tar.gz ]; then
-            mv artifacts/libpiper_plus-android-arm64-v8a/libpiper_plus-android-arm64-v8a.tar.gz \
-               artifacts/libpiper_plus-android-arm64-v8a/libpiper_plus-android-arm64-v8a-${TAG}.tar.gz
-          fi
+          # Rename Android artifacts (3 ABIs: arm64-v8a / armeabi-v7a / x86_64).
+          # The build-android matrix produces one tar.gz per ABI; each is
+          # renamed to embed the version tag for the GitHub Release upload.
+          for abi in arm64-v8a armeabi-v7a x86_64; do
+            SRC="artifacts/libpiper_plus-android-${abi}/libpiper_plus-android-${abi}.tar.gz"
+            DST="artifacts/libpiper_plus-android-${abi}/libpiper_plus-android-${abi}-${TAG}.tar.gz"
+            if [ -f "${SRC}" ]; then
+              mv "${SRC}" "${DST}"
+            fi
+          done
 
       - name: Generate checksums
         shell: bash
