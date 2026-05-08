@@ -79,6 +79,17 @@ public static class TimingWriter
         ArgumentNullException.ThrowIfNull(durations);
         ArgumentNullException.ThrowIfNull(phonemeIdMap);
 
+        // spec [validation.length_consistency]: phoneme_tokens (when provided)
+        // and durations must have the same length. Cross-runtime parity:
+        //   - Rust:   src/rust/piper-core/src/timing.rs:95-99
+        //   - Python: src/python_run/piper/timing.py:99-101 (ValueError)
+        //   - Go:     src/go/piperplus/timing.go:33-34
+        // ArgumentException is the .NET equivalent of Python ValueError.
+        if (phonemeIds.Length != durations.Length)
+            throw new ArgumentException(
+                $"durations length ({durations.Length}) != phoneme_tokens length ({phonemeIds.Length})",
+                nameof(durations));
+
         if (sampleRate <= 0)
             throw new ArgumentOutOfRangeException(nameof(sampleRate), "Sample rate must be positive.");
         if (hopSize <= 0)
@@ -91,7 +102,7 @@ public static class TimingWriter
         // — see docs/spec/phoneme-timing-contract.toml [calculation].
         float frameLengthMs = (float)hopSize / sampleRate * 1000f;
         float currentTimeMs = 0f;
-        int count = Math.Min(phonemeIds.Length, durations.Length);
+        int count = phonemeIds.Length;
         var entries = new List<PhonemeTimingEntry>(count);
 
         for (int i = 0; i < count; i++)

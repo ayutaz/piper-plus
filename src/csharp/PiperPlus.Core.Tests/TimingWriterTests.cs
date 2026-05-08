@@ -497,4 +497,40 @@ public sealed class TimingWriterTests
         Assert.Equal(expectedTotal, (float)lastEndMs, precision: 3);
         Assert.Equal(actualTotal, lastEndMs, precision: 3);
     }
+
+    // ================================================================
+    // Length-mismatch validation (spec [validation.length_consistency]):
+    // phoneme_tokens.Length != durations.Length must throw, not silent
+    // truncate. Cross-runtime parity with Rust/Python/Go.
+    // ================================================================
+
+    [Fact]
+    public void CalculateTiming_LengthMismatch_DurationsShorter_Throws()
+    {
+        var map = MakeMap();
+        long[] phonemeIds = [10, 12, 10];
+        float[] durations = [5f, 3f]; // intentionally shorter
+
+        var ex = Assert.Throws<ArgumentException>(() =>
+            TimingWriter.CalculateTiming(phonemeIds, durations, map, SampleRate, HopSize));
+
+        Assert.Equal("durations", ex.ParamName);
+        Assert.Contains("durations length (2)", ex.Message);
+        Assert.Contains("phoneme_tokens length (3)", ex.Message);
+    }
+
+    [Fact]
+    public void CalculateTiming_LengthMismatch_PhonemesShorter_Throws()
+    {
+        var map = MakeMap();
+        long[] phonemeIds = [10];
+        float[] durations = [5f, 3f, 2f]; // intentionally longer
+
+        var ex = Assert.Throws<ArgumentException>(() =>
+            TimingWriter.CalculateTiming(phonemeIds, durations, map, SampleRate, HopSize));
+
+        Assert.Equal("durations", ex.ParamName);
+        Assert.Contains("durations length (3)", ex.Message);
+        Assert.Contains("phoneme_tokens length (1)", ex.Message);
+    }
 }
