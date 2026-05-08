@@ -3,7 +3,7 @@ package piperplus
 // Cross-runtime parity test: Go SplitSentences against contract.json.
 //
 // Loads tests/fixtures/text_splitter/contract.json and asserts that the Go
-// streaming module's behaviour matches the runtimes.go.* projection of the
+// streaming module's behavior matches the runtimes.go.* projection of the
 // toml-generated fixture. Go uses a depth-tracking strategy (vs post-consume
 // in Python/Rust/C#/C++), so the assertions differ:
 //
@@ -12,7 +12,7 @@ package piperplus
 //   2. Each sentence-terminator codepoint listed in runtimes.go.sentence_terminators
 //      triggers a split.
 //   3. Codepoints listed in canonical.closing_punctuation but ABSENT from
-//      runtimes.go.closing_punctuation are NOT recognised by isCloseBracket
+//      runtimes.go.closing_punctuation are NOT recognized by isCloseBracket
 //      (current divergence — Go's isCloseBracket is an 8/14 subset).
 //
 // The drift gate (text-splitter-parity.yml) ensures the fixture stays in sync
@@ -112,7 +112,7 @@ func TestTextSplitterContract_GoSentenceTerminatorsMatchFixture(t *testing.T) {
 }
 
 func TestTextSplitterContract_GoDepthTrackingKeepsParensTogether(t *testing.T) {
-	// Behavioural pin: depth-tracking strategy means a sentence terminator
+	// Behavioral pin: depth-tracking strategy means a sentence terminator
 	// inside parens does NOT trigger a split. (post-consume in Rust/C#/Py
 	// would behave identically here because parens don't open a new chunk.)
 	chunks := SplitSentences("She said (Hello.) Then left.")
