@@ -132,7 +132,17 @@ describe('exports バリデーション', () => {
     for (const name of exportedNames) {
       assert.ok(
         dtsContent.includes(name),
-        `Export "${name}" is not referenced in types/index.d.ts`,
+        `Export "${name}" is not referenced in types/index.d.ts.\n` +
+          `\n` +
+          `Numeric \`export const\` declarations from src/index.js are projected\n` +
+          `into the AUTO-GENERATED block at the bottom of types/index.d.ts.\n` +
+          `\n` +
+          `Fix:\n` +
+          `  npm run regenerate:types   # regenerate the auto-gen block\n` +
+          `  npm run check:types        # verify drift in CI\n` +
+          `\n` +
+          `For non-numeric / function / class exports, add the declaration to\n` +
+          `the manual section of types/index.d.ts (above the AUTO-GENERATED block)`,
       );
     }
   });
