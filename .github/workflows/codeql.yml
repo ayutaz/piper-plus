@@ -2,7 +2,10 @@ name: CodeQL
 
 # CodeQL static analysis. Runs on PR / push to dev / weekly schedule.
 # Rust は GitHub CodeQL 未対応のため除外。
-# Java/Kotlin (android/) は将来の対応として保留 (現状 Kotlin G2P のみで surface 小)。
+# Swift / Kotlin は段階的導入のため continue-on-error: true で warning のみ。
+# (Swift autobuild は SPM/Xcode のサンドボックス、Kotlin autobuild は Android
+# Gradle の Android SDK セットアップの差で初回失敗の可能性が高いため、
+# 既存 python/cpp/etc を壊さないよう非ブロックで導入し段階的に harden する。)
 
 on:
   pull_request:
@@ -30,6 +33,8 @@ jobs:
       go: ${{ steps.changes.outputs.go }}
       csharp: ${{ steps.changes.outputs.csharp }}
       cpp: ${{ steps.changes.outputs.cpp }}
+      swift: ${{ steps.changes.outputs.swift }}
+      kotlin: ${{ steps.changes.outputs.kotlin }}
     steps:
       - uses: actions/checkout@v6
       - id: changes
@@ -60,12 +65,25 @@ jobs:
               - 'cmake/**'
               - 'CMakeLists.txt'
               - '.github/workflows/codeql.yml'
+            swift:
+              - 'Sources/**'
+              - 'Tests/**'
+              - 'Package.swift'
+              - 'examples/swift-g2p/**'
+              - '.github/workflows/codeql.yml'
+            kotlin:
+              - 'android/**'
+              - '.github/workflows/codeql.yml'
 
   analyze:
     needs: filter
     name: Analyze (${{ matrix.language }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
+    # Swift / Kotlin は段階的導入のため、初回失敗時もワークフロー全体を
+    # 落とさない (既存 python/cpp/csharp/go/js の SAST を維持しながら新規
+    # 言語の build environment を harden するため)。harden 完了後に外す。
+    continue-on-error: ${{ matrix.experimental == true }}
     permissions:
       actions: read
       contents: read
@@ -89,6 +107,17 @@ jobs:
           - language: cpp
             os: ubuntu-24.04
             build-mode: manual
+          - language: swift
+            os: macos-15
+            build-mode: autobuild
+            experimental: true
+          - language: kotlin
+            # CodeQL の Kotlin 解析は java-kotlin として扱う。matrix の表示名
+            # は kotlin だが init 内部で java-kotlin にマップする (下の step
+            # で `languages: java-kotlin` を渡す)。
+            os: ubuntu-24.04
+            build-mode: autobuild
+            experimental: true
 
     steps:
       - name: Skip if no relevant changes
@@ -105,6 +134,10 @@ jobs:
           elif [ "${{ matrix.language }}" = "csharp" ] && [ "${{ needs.filter.outputs.csharp }}" = "true" ]; then
             echo "skip=false" >> $GITHUB_OUTPUT
           elif [ "${{ matrix.language }}" = "cpp" ] && [ "${{ needs.filter.outputs.cpp }}" = "true" ]; then
+            echo "skip=false" >> $GITHUB_OUTPUT
+          elif [ "${{ matrix.language }}" = "swift" ] && [ "${{ needs.filter.outputs.swift }}" = "true" ]; then
+            echo "skip=false" >> $GITHUB_OUTPUT
+          elif [ "${{ matrix.language }}" = "kotlin" ] && [ "${{ needs.filter.outputs.kotlin }}" = "true" ]; then
             echo "skip=false" >> $GITHUB_OUTPUT
           else
             echo "skip=true" >> $GITHUB_OUTPUT
@@ -144,17 +177,36 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y cmake build-essential
 
+      - name: Setup JDK (Kotlin)
+        if: steps.should-skip.outputs.skip != 'true' && matrix.language == 'kotlin'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Setup Android SDK (Kotlin)
+        if: steps.should-skip.outputs.skip != 'true' && matrix.language == 'kotlin'
+        uses: android-actions/setup-android@v3
+        with:
+          cmdline-tools-version: 11076708
+
       - name: Initialize CodeQL
         if: steps.should-skip.outputs.skip != 'true'
         uses: github/codeql-action/init@v3
         with:
-          languages: ${{ matrix.language }}
+          # CodeQL は Kotlin を `java-kotlin` 言語として識別する。matrix の
+          # 表示用 `kotlin` を init 渡し用にここでマップする。
+          languages: ${{ matrix.language == 'kotlin' && 'java-kotlin' || matrix.language }}
           build-mode: ${{ matrix.build-mode }}
           queries: security-and-quality
 
-      - name: Build (Go autobuild)
+      - name: Build (autobuild for Go / Swift / Kotlin)
         if: steps.should-skip.outputs.skip != 'true' && matrix.build-mode == 'autobuild'
         uses: github/codeql-action/autobuild@v3
+        with:
+          # Kotlin autobuild は android/ ディレクトリを Gradle root として扱う。
+          # Swift autobuild は repo root の Package.swift を検出する。
+          working-directory: ${{ matrix.language == 'kotlin' && 'android' || '.' }}
 
       - name: Manual build (C#)
         if: steps.should-skip.outputs.skip != 'true' && matrix.language == 'csharp'
@@ -170,4 +222,4 @@ jobs:
         if: steps.should-skip.outputs.skip != 'true'
         uses: github/codeql-action/analyze@v3
         with:
-          category: "/language:${{ matrix.language }}"
+          category: "/language:${{ matrix.language == 'kotlin' && 'java-kotlin' || matrix.language }}"
