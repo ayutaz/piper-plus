@@ -9,6 +9,15 @@ namespace PiperPlus.Core.Tests;
 /// Edge-case tests for <see cref="SessionFactory"/>, covering input validation
 /// and the private <c>ResolveGpuDeviceId</c> logic (tested via reflection).
 /// </summary>
+/// <remarks>
+/// Member of the <c>EnvVars</c> collection: many tests in this class mutate
+/// process-wide environment variables (PIPER_GPU_DEVICE_ID, PIPER_INTRA_THREADS,
+/// PIPER_DISABLE_WARMUP, PIPER_DISABLE_CACHE). xUnit v3 runs tests across
+/// classes in parallel by default, so they MUST be serialised with other
+/// env-var-mutating classes (<see cref="DictionaryManagerTests"/>) to avoid
+/// observation drift.
+/// </remarks>
+[Collection("EnvVars")]
 public sealed class SessionFactoryTests
 {
     // ================================================================
@@ -224,61 +233,98 @@ public sealed class SessionFactoryTests
         Assert.EndsWith(".cpu.opt.onnx.ok", sentinel);
     }
 
+    // ----------------------------------------------------------------
+    // Cache contract — sentinel-paired writes guarantee atomicity.
+    //
+    // The previous "Simulate: both files must exist for cache hit"
+    // tests just exercised local boolean expressions and asserted no
+    // SessionFactory behaviour. They have been replaced by tests that
+    // drive Create() with real filesystem state so the actual cache
+    // policy is pinned (CodeQL-style: "do not assert on test data").
+    // ----------------------------------------------------------------
+
     [Fact]
-    public void CacheHit_RequiresBothOptAndSentinel()
+    public void Cache_OnlyOptOnnx_NoSentinel_OrphanIsCleanedUp()
     {
-        // Simulate: both files must exist for cache hit
-        bool optExists = true;
-        bool sentinelExists = true;
-        bool useCached = optExists && sentinelExists;
-        Assert.True(useCached);
+        // SessionFactory production policy: when the optimised model file
+        // exists but its sentinel does not, the .opt.onnx is treated as
+        // an interrupted write and is REMOVED before the source model is
+        // loaded fresh. This pin guards against a regression where stale
+        // caches accumulate (caused subtle inference inconsistencies in
+        // pre-v1.12 builds before the sentinel was introduced).
+        var tmpDir = Path.Join(Path.GetTempPath(),
+            "piper-cache-no-sentinel-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tmpDir);
+        try
+        {
+            var modelPath = Path.Join(tmpDir, "model.onnx");
+            File.WriteAllText(modelPath, "placeholder model");
+            var optPath = Path.ChangeExtension(modelPath, ".cpu.opt.onnx");
+            File.WriteAllText(optPath, "stale optimised cache");
+            // No sentinel (.ok) file — simulates an interrupted previous write.
+
+            // Create() will fail at the source model load step (not real
+            // ONNX), but the orphan .opt.onnx must be cleaned up first.
+            Assert.ThrowsAny<Exception>(() => SessionFactory.Create(modelPath));
+
+            // Stale .opt.onnx without sentinel was removed by Create().
+            Assert.False(File.Exists(optPath),
+                "orphan .opt.onnx must be cleaned up when the sentinel is missing");
+        }
+        finally
+        {
+            try { Directory.Delete(tmpDir, recursive: true); }
+            catch (IOException) { /* best effort */ }
+            catch (UnauthorizedAccessException) { /* best effort */ }
+        }
     }
 
     [Fact]
-    public void CacheMiss_WhenSentinelMissing()
+    public void Cache_OnlySentinel_NoOpt_TreatedAsMiss()
     {
-        // Simulate: opt exists but sentinel is missing (interrupted write)
-        bool optExists = true;
-        bool sentinelExists = false;
-        bool useCached = optExists && sentinelExists;
-        Assert.False(useCached);
+        // Sentinel without the .opt.onnx file — ORT cannot use a sentinel
+        // alone, so this is a degenerate state. Create() must not crash.
+        var tmpDir = Path.Join(Path.GetTempPath(),
+            "piper-cache-no-opt-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tmpDir);
+        try
+        {
+            var modelPath = Path.Join(tmpDir, "model.onnx");
+            File.WriteAllText(modelPath, "placeholder model");
+            var optPath = Path.ChangeExtension(modelPath, ".cpu.opt.onnx");
+            var sentinelPath = optPath + ".ok";
+            File.WriteAllText(sentinelPath, "ok");
+            // No optPath file — sentinel orphan.
+
+            Assert.ThrowsAny<Exception>(() => SessionFactory.Create(modelPath));
+
+            // The orphan sentinel must remain (Create() must not silently
+            // mutate the on-disk cache state on its own).
+            Assert.True(File.Exists(sentinelPath),
+                "orphan sentinel must remain after cache-miss Create()");
+        }
+        finally
+        {
+            try { Directory.Delete(tmpDir, recursive: true); }
+            catch (IOException) { /* best effort */ }
+            catch (UnauthorizedAccessException) { /* best effort */ }
+        }
     }
 
-    [Fact]
-    public void CacheMiss_WhenOptMissing()
+    [Theory]
+    [InlineData("/data/models/voice.onnx", "cpu", "voice.cpu.opt.onnx")]
+    [InlineData("/data/models/voice.onnx", "cuda0", "voice.cuda0.opt.onnx")]
+    [InlineData("/data/models/voice.onnx", "cuda1", "voice.cuda1.opt.onnx")]
+    [InlineData("/data/models/voice.onnx", "coreml", "voice.coreml.opt.onnx")]
+    public void OptimizedModelPath_Format(string modelPath, string device, string expectedFile)
     {
-        // Simulate: neither file exists
-        bool optExists = false;
-        bool sentinelExists = false;
-        bool useCached = optExists && sentinelExists;
-        Assert.False(useCached);
-    }
-
-    [Fact]
-    public void DeviceLabel_Cpu()
-    {
-        bool useCuda = false;
-        int deviceId = 0;
-        var label = useCuda ? $"cuda{deviceId}" : "cpu";
-        Assert.Equal("cpu", label);
-    }
-
-    [Fact]
-    public void DeviceLabel_Cuda0()
-    {
-        bool useCuda = true;
-        int deviceId = 0;
-        var label = useCuda ? $"cuda{deviceId}" : "cpu";
-        Assert.Equal("cuda0", label);
-    }
-
-    [Fact]
-    public void DeviceLabel_Cuda1()
-    {
-        bool useCuda = true;
-        int deviceId = 1;
-        var label = useCuda ? $"cuda{deviceId}" : "cpu";
-        Assert.Equal("cuda1", label);
+        // The cache-path construction policy ("<base>.<device>.opt.onnx") is
+        // a contract — drift would silently invalidate previously-built
+        // caches. Pin the exact filename + the device label format, not
+        // the helper's internal logic.
+        var optimized = BuildCachePath(modelPath, device);
+        Assert.Equal(expectedFile, Path.GetFileName(optimized));
+        Assert.EndsWith($".{device}.opt.onnx", optimized);
     }
 
     // ================================================================

@@ -7,6 +7,15 @@ namespace PiperPlus.Core.Tests;
 /// Tests cover dictionary search order, validation, control flags, and error paths.
 /// Network-dependent tests (actual download) are excluded; only local logic is tested.
 /// </summary>
+/// <remarks>
+/// Member of the <c>EnvVars</c> collection: every test in this class mutates
+/// process-wide environment variables (OPENJTALK_DICTIONARY_PATH,
+/// DOTNETG2P_NAIST_JDIC_PATH, NAIST_JDIC_PATH, PIPER_OFFLINE_MODE,
+/// PIPER_AUTO_DOWNLOAD_DICT, XDG_DATA_HOME). xUnit v3 runs tests across
+/// classes in parallel by default, so they MUST be serialised with other
+/// env-var-mutating classes (<see cref="SessionFactoryTests"/>).
+/// </remarks>
+[Collection("EnvVars")]
 public sealed class DictionaryManagerTests : IDisposable
 {
     // Environment variables we may modify during tests
