@@ -935,22 +935,67 @@ mod tests {
 
     #[test]
     fn test_intra_threads_capped_at_max() {
+        // Lock down both ends: at minimum 1 (so single-core machines still
+        // get a thread), and never more than MAX_INTRA_THREADS regardless of
+        // host CPU count. This is the actual contract documented in
+        // docs/spec/ort-session-contract.toml.
         let available = std::thread::available_parallelism()
             .map(|n| n.get())
             .unwrap_or(2);
         let num_intra_threads = available.min(MAX_INTRA_THREADS);
-        assert!(num_intra_threads >= 1);
-        assert!(num_intra_threads <= MAX_INTRA_THREADS);
+        assert!(
+            num_intra_threads >= 1,
+            "must reserve at least 1 thread, got {num_intra_threads}"
+        );
+        assert!(
+            num_intra_threads <= MAX_INTRA_THREADS,
+            "must not exceed MAX_INTRA_THREADS={MAX_INTRA_THREADS}, got {num_intra_threads}"
+        );
+    }
+
+    /// Selects the lower of the two values, mirroring the engine's
+    /// `available_parallelism().min(MAX_INTRA_THREADS)` clamp. Kept private
+    /// so the tautological-style tests below exercise the helper rather
+    /// than `usize::min` directly.
+    fn select_intra_threads(host_cpus: usize) -> usize {
+        host_cpus.min(MAX_INTRA_THREADS)
     }
 
     #[test]
     fn test_thread_count_low_cpu() {
-        assert_eq!(2_usize.min(MAX_INTRA_THREADS), 2);
+        // 2-core host: must use both cores (no artificial floor above 1).
+        assert_eq!(select_intra_threads(2), 2);
+        // 1-core host: must still produce 1 (not 0).
+        assert_eq!(select_intra_threads(1), 1);
     }
 
     #[test]
     fn test_thread_count_high_cpu() {
-        assert_eq!(32_usize.min(MAX_INTRA_THREADS), MAX_INTRA_THREADS);
+        // Above MAX, the clamp must kick in for any host CPU count, not just
+        // the single 32 we previously checked.
+        for cpus in [MAX_INTRA_THREADS + 1, 16, 32, 64, 128] {
+            assert_eq!(
+                select_intra_threads(cpus),
+                MAX_INTRA_THREADS,
+                "host_cpus={cpus} must clamp to MAX_INTRA_THREADS={MAX_INTRA_THREADS}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_thread_count_at_boundary() {
+        // Boundary: host CPUs == MAX_INTRA_THREADS must use exactly MAX
+        // (regression guard for off-by-one drift between `<` and `<=`).
+        assert_eq!(
+            select_intra_threads(MAX_INTRA_THREADS),
+            MAX_INTRA_THREADS,
+            "boundary: cpus == MAX must yield MAX"
+        );
+        assert_eq!(
+            select_intra_threads(MAX_INTRA_THREADS - 1),
+            MAX_INTRA_THREADS - 1,
+            "boundary: cpus == MAX-1 must yield MAX-1"
+        );
     }
 
     #[test]
