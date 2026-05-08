@@ -454,4 +454,146 @@ class TestWavLMIntegration:
             assert len(fmap_rs[0]) == 3  # 3 layers
 
 
+# ---------------------------------------------------------------------------
+# Edge cases: gradient_checkpointing & mixed precision (audit gap #1)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+@pytest.mark.training
+class TestWavLMGradientCheckpointing:
+    """Verify gradient_checkpointing is enabled by __init__ and survives backward.
+
+    The constructor calls ``self.wavlm.gradient_checkpointing_enable()``
+    (vits/models.py L520).  These tests pin that the flag is actually set
+    on the underlying transformers WavLMModel and that backward still
+    completes when checkpointing is on.
+    """
+
+    @pytest.fixture(scope="class")
+    def wavlm_disc_gc(self):
+        from piper_train.vits.models import WavLMDiscriminator
+
+        # No `eval()` here: gradient_checkpointing only runs in training mode.
+        return WavLMDiscriminator(
+            model_name="microsoft/wavlm-base-plus",
+            use_layers=[6, 9, 12],
+            freeze_feature_extractor=True,
+        )
+
+    def test_gradient_checkpointing_enabled(self, wavlm_disc_gc):
+        """After __init__, the WavLM submodule reports gradient_checkpointing=True."""
+        # Older transformers expose `is_gradient_checkpointing`; fall back to
+        # `gradient_checkpointing` attribute if the property is not present.
+        wavlm = wavlm_disc_gc.wavlm
+        if hasattr(wavlm, "is_gradient_checkpointing"):
+            assert wavlm.is_gradient_checkpointing is True
+        else:
+            # PreTrainedModel sets `.gradient_checkpointing` on submodules
+            assert getattr(wavlm, "gradient_checkpointing", False) is True
+
+    def test_gradient_checkpointing_backward(self, wavlm_disc_gc):
+        """Backward through the classifier runs without error when GC is on.
+
+        We avoid the transformers WavLM "non-leaf requires_grad" limitation
+        (see TestWavLMGradientFlow docstring) by using leaf inputs and
+        checking gradients only on classifier params.
+        """
+        from piper_train.vits.losses import discriminator_loss
+
+        wavlm_disc_gc.train()
+        # Re-enable explicitly in case a prior test toggled it.
+        wavlm_disc_gc.wavlm.gradient_checkpointing_enable()
+
+        batch_size = 2
+        audio_length = 22050
+        y_real = torch.randn(batch_size, 1, audio_length)
+        y_fake = torch.randn(batch_size, 1, audio_length)
+
+        y_d_rs, y_d_gs, _, _ = wavlm_disc_gc(y_real, y_fake)
+        loss, _, _ = discriminator_loss(y_d_rs, y_d_gs)
+        loss.backward()
+
+        # Classifier params receive gradients with consistent shape
+        for name, param in wavlm_disc_gc.classifier.named_parameters():
+            assert param.grad is not None, f"{name} should have grad"
+            assert param.grad.shape == param.shape, (
+                f"{name}: grad shape {param.grad.shape} != param shape {param.shape}"
+            )
+            assert not torch.isnan(param.grad).any()
+
+
+@pytest.mark.unit
+@pytest.mark.training
+class TestWavLMMixedPrecision:
+    """Verify FP16/bfloat16 input is handled correctly by the FP32 cast path.
+
+    ``_extract_features`` converts audio to float32 (vits/models.py L592)
+    because WavLM does not support FP16 weights.  These tests pin that
+    behaviour and that wrapping in ``torch.autocast`` does not break
+    forward/backward.
+    """
+
+    @pytest.fixture(scope="class")
+    def wavlm_disc_mp(self):
+        from piper_train.vits.models import WavLMDiscriminator
+
+        disc = WavLMDiscriminator(
+            model_name="microsoft/wavlm-base-plus",
+            use_layers=[6, 9, 12],
+            freeze_feature_extractor=True,
+        )
+        disc.eval()
+        return disc
+
+    def test_fp16_audio_input_cast_to_fp32(self, wavlm_disc_mp):
+        """FP16 audio input runs forward path with internal FP32 cast.
+
+        The audio is cast to ``.float()`` (FP32) inside both ``_resample``
+        and ``_extract_features``.  Verify outputs are FP32 and finite.
+        """
+        batch_size = 2
+        audio_length = 22050
+
+        y_real_fp16 = torch.randn(batch_size, 1, audio_length).half()
+        y_fake_fp16 = torch.randn(batch_size, 1, audio_length).half()
+        assert y_real_fp16.dtype == torch.float16
+
+        with torch.no_grad():
+            y_d_rs, y_d_gs, fmap_rs, fmap_gs = wavlm_disc_mp(y_real_fp16, y_fake_fp16)
+
+        # WavLM weights are FP32 -> outputs are FP32 (NOT fp16 propagated)
+        assert y_d_rs[0].dtype == torch.float32, (
+            "audio.float() + FP32 weights should produce FP32 output, "
+            f"got {y_d_rs[0].dtype}"
+        )
+        # All feature maps should be FP32 and finite
+        for fmap in fmap_rs[0]:
+            assert fmap.dtype == torch.float32
+            assert torch.isfinite(fmap).all()
+
+    def test_autocast_compatibility(self, wavlm_disc_mp):
+        """torch.autocast (CPU bfloat16) wrapping does not produce NaN/Inf.
+
+        The internal ``audio.float()`` should still be respected even
+        when the surrounding context is autocast.
+        """
+        from piper_train.vits.losses import discriminator_loss
+
+        batch_size = 2
+        audio_length = 22050
+        y_real = torch.randn(batch_size, 1, audio_length)
+        y_fake = torch.randn(batch_size, 1, audio_length)
+
+        # CPU autocast supports bfloat16 (FP16 on CPU is unstable).
+        with torch.autocast(device_type="cpu", dtype=torch.bfloat16):
+            with torch.no_grad():
+                y_d_rs, y_d_gs, fmap_rs, fmap_gs = wavlm_disc_mp(y_real, y_fake)
+                loss, _, _ = discriminator_loss(y_d_rs, y_d_gs)
+
+        assert torch.isfinite(loss), f"loss should be finite, got {loss.item()}"
+        for fmap in fmap_rs[0]:
+            assert torch.isfinite(fmap).all(), "feature maps should be finite"
+
+
 # Run tests with: pytest test_wavlm_discriminator.py -v
