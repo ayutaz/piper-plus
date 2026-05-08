@@ -16,6 +16,7 @@
  */
 
 #include <gtest/gtest.h>
+#include <cmath>
 #include <cstring>
 #include <cstdio>
 #include <fstream>
