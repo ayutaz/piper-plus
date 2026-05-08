@@ -506,10 +506,14 @@ public sealed class SessionFactoryTests
         // sentinel. Since Create() also fails on a missing real model, we
         // assert via the truthiness probe + by leaving the staged cache
         // intact.
-        var tmpDir = Path.Combine(Path.GetTempPath(),
+        // Use Path.Join (vs Path.Combine) to avoid CodeQL's "may silently
+        // drop earlier arguments" warning. Path.GetTempPath() is absolute, so
+        // Combine's drop semantics are a false positive here, but Join has no
+        // such pitfall and reads more safely.
+        var tmpDir = Path.Join(Path.GetTempPath(),
             "piper-cache-disable-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(tmpDir);
-        var modelPath = Path.Combine(tmpDir, "model.onnx");
+        var modelPath = Path.Join(tmpDir, "model.onnx");
         // Body content irrelevant — we only need File.Exists() to return true.
         File.WriteAllText(modelPath, "not a real onnx");
         var optPath = Path.ChangeExtension(modelPath, ".cpu.opt.onnx");
@@ -548,7 +552,12 @@ public sealed class SessionFactoryTests
         }
         finally
         {
-            try { Directory.Delete(tmpDir, recursive: true); } catch { /* best effort */ }
+            // Best-effort cleanup. We catch only the specific I/O exceptions
+            // documented for Directory.Delete instead of a generic `catch`
+            // (CodeQL "Generic catch clause" hygiene).
+            try { Directory.Delete(tmpDir, recursive: true); }
+            catch (IOException) { /* best effort */ }
+            catch (UnauthorizedAccessException) { /* best effort */ }
         }
     }
 
