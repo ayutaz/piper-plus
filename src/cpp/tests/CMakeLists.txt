@@ -62,6 +62,7 @@ set(TEST_SOURCES
     test_short_text_mitigation.cpp
     test_split_sentences.cpp
     test_zh_en_loanword.cpp
+    test_g2p_parallelism.cpp
 )
 
 # Add Unix-only tests (require open_jtalk binary or Unix APIs)
@@ -125,6 +126,13 @@ foreach(test_source ${TEST_SOURCES})
     
     # Link utf8_utils.hpp include path for split sentences test
     if(${test_name} STREQUAL "test_split_sentences")
+        target_include_directories(${test_name} PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/..
+        )
+    endif()
+
+    # Issue #383 Phase 1: parallelism helper test needs src/cpp on include path.
+    if(${test_name} STREQUAL "test_g2p_parallelism")
         target_include_directories(${test_name} PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/..
         )

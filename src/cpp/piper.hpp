@@ -200,11 +200,27 @@ void textToWavFile(PiperConfig &config, Voice &voice, std::string text,
                    const std::vector<ProsodyFeature> *externalProsody = nullptr);
 
 // Synthesize audio directly from phonemes
-void phonemesToAudio(PiperConfig &config, Voice &voice, 
+void phonemesToAudio(PiperConfig &config, Voice &voice,
                      const std::vector<Phoneme> &phonemes,
-                     std::vector<int16_t> &audioBuffer, 
+                     std::vector<int16_t> &audioBuffer,
                      SynthesisResult &result,
                      const std::function<void()> &audioCallback = nullptr);
+
+// Float32 variant of phonemesToAudio — accepts a pre-phonemized sentence
+// (with optional prosody features) and appends synthesized samples to
+// audioBuffer. Mirrors the per-sentence body of textToAudioFloat() but
+// skips the phonemizeText() step. Phase 1 of issue #383 uses this so
+// synth_start can pre-phonemize all sentences in parallel.
+//
+// The trailing sentence-silence padding from synthesisConfig is NOT added
+// by this function — callers (e.g. synth_next) handle inter-sentence gaps
+// themselves.
+void phonemesToAudioFloat(PiperConfig &config, Voice &voice,
+                          const std::vector<Phoneme> &phonemes,
+                          const std::vector<ProsodyFeature> *prosodyFeatures,
+                          std::vector<float> &audioBuffer,
+                          SynthesisResult &result,
+                          const std::function<void()> &audioCallback = nullptr);
 
 // Synthesize audio directly from phonemes to WAV file
 void phonemesToWavFile(PiperConfig &config, Voice &voice,
