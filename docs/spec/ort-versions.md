@@ -15,7 +15,7 @@ so that version drift can be detected early.
 | Rust     | 2.0.0-rc.12 (`ort` crate) | `ort` (crates.io) |
 | C#       | 1.24.3      | `Microsoft.ML.OnnxRuntime` (NuGet) |
 | Go       | 1.27.0      | `github.com/yalue/onnxruntime_go` |
-| C++      | 1.17.0      | source build via CMake |
+| C++      | 1.20.0      | source build via CMake (issue #383: 1.17.0 では test model 読込で "version 14 not supported" エラー、1.20.0 で解消) |
 | iOS      | 1.17.0      | xcframework (Microsoft CDN: `download.onnxruntime.ai/pod-archive-onnxruntime-c-1.17.0.zip`, sha256 `1623e1150507d9e5...db871`, 検証日 2026-05-04) |
 | Android (release) | 1.17.0 | AAR (Maven Central) |
 | Android (PR CI)   | 1.17.0 | AAR (Maven Central) |

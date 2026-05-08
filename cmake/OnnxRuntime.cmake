@@ -6,7 +6,14 @@ if(WIN32)
   include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/find_onnxruntime_windows.cmake)
 elseif(NOT DEFINED ONNXRUNTIME_DIR)
   # Linux/macOS: Download pre-built ONNX Runtime if not already available
-  set(ONNXRUNTIME_VERSION "1.17.0")
+  #
+  # Issue #383 follow-up: ORT 1.17.0 では multilingual-test-medium.onnx の
+  # 読み込み時に "The given version [14] is not supported, only version 1 to 10"
+  # エラーで model-loading test が SEH crash する。1.20.0 以降の ortformat
+  # / operator schema バージョンで解消される。Kotlin G2P CI でも既に 1.20.0
+  # を採用済み (.github/workflows/kotlin-g2p-ci.yml)。iOS/Android release
+  # workflow の固定値 (1.17.0) はこの PR の範囲外で別途検証。
+  set(ONNXRUNTIME_VERSION "1.20.0")
   if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|ARM64")
     if(APPLE)
       set(ONNXRUNTIME_ARCH "arm64")
