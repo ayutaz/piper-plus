@@ -9,6 +9,9 @@ pub enum PiperError {
     #[error("invalid config: {reason}")]
     InvalidConfig { reason: String },
 
+    #[error("invalid argument: {reason}")]
+    InvalidArgument { reason: String },
+
     #[error("model load failed: {0}")]
     ModelLoad(String),
 

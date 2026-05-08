@@ -303,6 +303,15 @@ fn main() -> Result<()> {
         anyhow::bail!("--text and --batch are mutually exclusive");
     }
 
+    // Speaker conditioning の排他チェック (model 読み込みより前に fail-fast)。
+    // engine 側 `SynthesisRequest::validate()` と仕様一致。
+    if cli.reference_audio.is_some() && cli.speaker_embedding.is_some() {
+        anyhow::bail!("--reference-audio and --speaker-embedding are mutually exclusive");
+    }
+    if cli.speaker.is_some() && cli.speaker_embedding.is_some() {
+        anyhow::bail!("--speaker-id and --speaker-embedding are mutually exclusive");
+    }
+
     // --model は standalone コマンド以外では必須 (env: PIPER_DEFAULT_MODEL)
     // ファイルパス、モデル名、エイリアスのいずれかで指定可能
     let model_path = {
@@ -367,9 +376,8 @@ fn main() -> Result<()> {
     }
 
     // --- Voice cloning: resolve speaker embedding ---
-    if cli.reference_audio.is_some() && cli.speaker_embedding.is_some() {
-        anyhow::bail!("--reference-audio and --speaker-embedding are mutually exclusive");
-    }
+    // 排他チェックは早期に main() 入口で完了済み (model 読み込み前 fail-fast)。
+    // ここではエンコーダーモデル必須チェックのみ。
     if cli.reference_audio.is_some() && cli.speaker_encoder_model.is_none() {
         anyhow::bail!("--speaker-encoder-model is required when using --reference-audio");
     }
