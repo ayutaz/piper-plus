@@ -52,6 +52,77 @@ SILENCE_PAD_MS = 300
 TRIM_THRESHOLD_RMS = 0.01
 TRIM_MIN_SAMPLES = 2205  # 22050 Hz * 0.1 s
 
+# Phase 1 of issue #383: parallelize G2P across sentences. The ORT inference
+# itself is unchanged — only the per-sentence phonemize() call is run in a
+# ThreadPoolExecutor when there are 2+ sentences. The benchmark in
+# tools/benchmark/issue-383/ shows G2P accounts for 19~26% of total cold-cache
+# latency on multi-sentence inputs, so this is the dominant low-risk win.
+#
+# Auto cap is 4 because (a) the process-level ORT session uses ~4 intra-op
+# threads which we do not want to oversubscribe, and (b) most G2P backends
+# wrap C code (pyopenjtalk-plus, pypinyin) where 2~4 threads already saturate
+# the available work given GIL handoffs around C calls. Setting
+# ``PIPER_G2P_PARALLELISM=1`` restores the pre-issue-383 strictly-serial path
+# for users who hit a thread-safety issue in a third-party G2P backend.
+_G2P_AUTO_PARALLELISM_CAP = 4
+
+
+def _resolve_g2p_parallelism(n_sentences: int) -> int:
+    """Resolve effective G2P parallelism for phonemize().
+
+    Returns ``1`` to take the strictly-serial path (zero ThreadPoolExecutor
+    overhead). Returns ``>= 2`` to use ``ThreadPoolExecutor.map`` with the
+    given worker count.
+
+    Resolution order:
+      * ``PIPER_G2P_PARALLELISM=1``: force serial.
+      * ``PIPER_G2P_PARALLELISM=N`` (N >= 2): force N workers (capped at
+        ``n_sentences``).
+      * Otherwise (auto): ``min(n_sentences, max(2, cores // 2),
+        _G2P_AUTO_PARALLELISM_CAP)``. Falls back to 1 when ``n_sentences <= 1``.
+    """
+    raw = os.environ.get("PIPER_G2P_PARALLELISM", "").strip()
+    if raw:
+        try:
+            n = int(raw)
+        except ValueError:
+            _LOGGER.warning(
+                "Ignoring invalid PIPER_G2P_PARALLELISM=%r; falling back to auto", raw
+            )
+        else:
+            if n <= 1:
+                return 1
+            return max(1, min(n, n_sentences))
+
+    if n_sentences <= 1:
+        return 1
+
+    try:
+        cores = len(os.sched_getaffinity(0))  # type: ignore[attr-defined]
+    except (AttributeError, OSError):
+        cores = os.cpu_count() or 2
+
+    return max(1, min(n_sentences, max(2, cores // 2), _G2P_AUTO_PARALLELISM_CAP))
+
+
+def _map_sentences(
+    fn,
+    sentences: list[str],
+    parallelism: int,
+):
+    """Apply ``fn`` to each sentence, optionally in parallel.
+
+    Uses ``ThreadPoolExecutor.map`` for parallelism>=2 to preserve sentence
+    order in the output. Returns a list with one result per sentence.
+    """
+    if parallelism <= 1 or len(sentences) <= 1:
+        return [fn(s) for s in sentences]
+
+    from concurrent.futures import ThreadPoolExecutor  # local import: cheap
+
+    with ThreadPoolExecutor(max_workers=parallelism) as pool:
+        return list(pool.map(fn, sentences))
+
 # Optional: use shared ORT utilities when piper_train is available
 try:
     from piper_train.ort_utils import (
@@ -479,13 +550,19 @@ class PiperVoice:
                     else ["ja", "en", "zh", "es", "fr", "pt"]
                 )
                 mp = MultilingualPhonemizer(languages=languages)
-                results: list[list[str]] = []
-                for sentence in sentences:
-                    phonemes = mp.phonemize(sentence)
-                    _LOGGER.debug(
-                        "MultilingualPhonemizer: '%s' -> %s", sentence, phonemes
-                    )
-                    results.append(phonemes)
+                parallelism = _resolve_g2p_parallelism(len(sentences))
+                # MultilingualPhonemizer instances are immutable after init
+                # (regex patterns, language sets) so concurrent .phonemize()
+                # calls are safe. The downstream per-language backends are
+                # also free of mutable shared state.
+                results: list[list[str]] = _map_sentences(
+                    mp.phonemize, sentences, parallelism
+                )
+                if _LOGGER.isEnabledFor(logging.DEBUG):
+                    for sentence, phonemes in zip(sentences, results):
+                        _LOGGER.debug(
+                            "MultilingualPhonemizer: '%s' -> %s", sentence, phonemes
+                        )
                 return results
 
         if self.config.phoneme_type in (
@@ -499,15 +576,14 @@ class PiperVoice:
             )
 
             custom_dict = get_default_dictionary()
-            results = []
-            for sentence in sentences:
-                result = (
-                    phonemize_japanese(sentence, custom_dict=custom_dict)
-                    if custom_dict
-                    else phonemize_japanese(sentence)
-                )
-                results.append(result)
-            return results
+
+            def _ja_one(sentence: str) -> list[str]:
+                if custom_dict:
+                    return phonemize_japanese(sentence, custom_dict=custom_dict)
+                return phonemize_japanese(sentence)
+
+            parallelism = _resolve_g2p_parallelism(len(sentences))
+            return _map_sentences(_ja_one, sentences, parallelism)
 
         raise ValueError(f"Unsupported phoneme type: {self.config.phoneme_type}")
 
