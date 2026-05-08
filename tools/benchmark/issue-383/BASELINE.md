@@ -228,20 +228,117 @@ auto 並列度 = `min(n_sentences, cores/2, 4)`。詳細は `voice.py` の
 
 ## 他ランタイムへの Phase 1 展開
 
-| ランタイム | コミット | 統合範囲 | テスト |
-|---|---|---|---|
-| Python | `d543c381` (Ph.1) + `22fb2065` (Ph.2) | API + streaming | 13 + 既存 326 pass |
-| Rust | `a9c3d996` | API 追加のみ (`phonemize_sentences_to_ids`) | 11 件 + clippy クリーン |
-| C# | `af308fd4` | API + CLI streaming | 15 件 + フルスイート 1217/1218 pass |
-| Go | `2fc4da6f` | API + `SynthesizeStream` 統合 | 18 件 (race は CI へ) |
-| C++ | `5e0597c5` | API + C-API streaming (`synth_start`) | 7 件 + model-free 12/12 pass † |
+| ランタイム | 実装コミット | follow-up | 統合範囲 | テスト |
+|---|---|---|---|---|
+| Python | `d543c381` + `22fb2065` (Ph.2) | — | API + streaming | 13 + 既存 326 pass |
+| Rust | `a9c3d996` | — | API 追加 (`phonemize_sentences_to_ids`) | 11 + clippy クリーン |
+| C# | `af308fd4` | `c567f5be` (JA race fix) | API + CLI streaming + ThreadLocal G2P | 15 + フルスイート pass |
+| Go | `2fc4da6f` | — | API + `SynthesizeStream` | 18 (CGO race は CI へ) |
+| C++ | `5e0597c5` | `37c7c72a` (ORT 1.20), `734aa5c6` (DLL staging), `a8e776d9` (Iterator parity) | API + C-API `synth_start` | **29/29 pass** |
+
+## 実機ベンチ結果 (各ランタイム)
+
+各ランタイムでベンチハーネスを追加して serial vs parallel を計測。
+`tools/benchmark/issue-383/{rust,go,csharp}_bench_results.md` 参照。
+
+### Rust (`bench_phase1`、`phonemize_sentences_to_ids` 単独計測)
+
+| N | serial ms | auto ms | Δ | 備考 |
+|---:|---:|---:|---:|---|
+| 1 | 0.32 | 0.34 | +6.3% | parallelism=1 (no spawn) |
+| 2 | 0.76 | 1.59 | **+109%** | スレッド起動コストが G2P を上回り悪化 |
+| 5 | 2.64 | 2.16 | **-18.2%** | |
+| 10 | 3.45 | 3.55 | +2.9% | |
+| 20 | 6.04 | 5.43 | **-10.1%** | |
+
+> **重要**: Rust の `jpreprocess` は Python `pyopenjtalk-plus` の **約 100× 高速**
+> (N=20 cold で Python 639ms vs Rust 6ms)。よって Phase 1 並列化の絶対値改善は
+> ms オーダーに留まり、N=2 ではスレッド起動コストが G2P 時間を上回る。
+> **N≥5 で 10〜20% の相対改善** を確認。
+
+### Go (マイクロベンチのみ、CGO 不要パッケージで計測)
+
+| Bench | 値 | 解釈 |
+|---|---:|---|
+| `Resolve_Auto` | 424 ns/op | per-call overhead 無視可 |
+| `Map_Serial_N10` (fake 5ms G2P) | 53.7 ms | 理論直列 50 ms |
+| `Map_Parallel4_N10` | 16.2 ms | **3.31× speedup** |
+| `Map_Parallel4_N20` | 27.2 ms | **3.96× speedup** (理論 4× の 99%) |
+| `Map_Parallel_OneSentence` | 49.6 ns/op | **1 文時 zero-overhead** (goroutine 非生成) |
+
+> 実機 (`SynthesizeStream`) は CGO + onnxruntime_go 必須で Windows ローカル
+> 実行不可、CI に委ねる。fake G2P (5ms) で並列効果上限を確認: 並列度 = G2P
+> コストに比例した speedup が出る。
+
+### C# (修正後)
+
+| N | serial ms | parallel ms | Δ |
+|---:|---:|---:|---:|
+| 1 | 275.0 | 302.7 | +10.1% |
+| 2 | 728.1 | 738.4 | +1.4% |
+| 5 | 1897.3 | 1991.2 | +4.9% |
+| 10 | 4192.4 | **3902.2** | **-6.9%** |
+| 20 | 8388.5 | 9981.4 | +19.0% † |
+
+† warmup 不足の影響と推測 (1 → 2~3 で改善見込み、別作業)。
+
+> **修正前 (af308fd4 の Phase 1 のみ): JA で `MeCabTokenizer` race condition
+> によりクラッシュ + 並列が常に +65~146% 悪化**。`c567f5be` で
+> `ThreadLocal<G2PEngine>` を導入して根治。修正後は Python の N=10 cold
+> -7% と整合する -6.9% を確認。
+
+### C++ (実機ベンチは未実施)
+
+`5e0597c5` の Phase 1 + 3 つの follow-up で 29/29 pass 達成 (Iterator path
+の 4 件 parity 違反を `a8e776d9` で解消)。実機ベンチは PR 後に CI で実施
+予定。Iterator path のテストが pass している = 並列化が one-shot と
+byte-for-byte 一致するレベルで動作している、という担保はある。
 
 † C++ の model-loading test (test_streaming / test_c_api 等) は pre-existing
 の ORT バージョン非互換 (test model schema=14、ORT 1.17 上限=10) で SEH crash。
 Phase 1 変更とは無関係。model-free 系は 12/12 pass。
 
+## 重要な発見と教訓
+
+### C# JA G2P の race condition (修正済)
+
+C# 実機ベンチ (`csharp_bench_results.md`) で発覚: `DotNetG2P.MeCab.MeCabTokenizer`
+がスレッドセーフでなく、JA テキストの並列処理で確実にクラッシュ。修正前の
+ベンチでは parallel が serial より +65~146% 遅延。
+
+**教訓**: Phase 1 fork の元のテスト (`SentenceParallelEncoderTests`) が
+非 JA テキストでしか並列実行を検証していなかったため race を捕捉できなかった。
+`ThreadLocal<G2PEngine>` で根治、JA 並列で N=10 -6.9% (Python と整合) を達成。
+
+### C++ Windows DLL search order
+
+C++ Phase 1 fork が "ORT version 14 not supported" エラーで model-loading
+test 全滅と報告 → 真因は ORT バージョンではなく、Windows DLL loader が
+`C:\Windows\System32\onnxruntime.dll` (Windows ML 同梱の古い ORT) を
+拾っていたこと。test exe ディレクトリへの DLL staging 不足 (`734aa5c6`)。
+
+ただし ORT 1.17 → 1.20 アップグレード (`37c7c72a`) は他ランタイム (Python
+1.24, C# 1.24, Go 1.27, Kotlin G2P CI 1.20) との整合性のため残す。
+
+### C++ Iterator path の sentence-silence 欠落
+
+`phonemesToAudioFloat` (Phase 1 で追加) が `sentenceSilenceSeconds × sample_rate`
+分の trailing silence を append していなかったため、`textToAudioFloat`
+(one-shot) との parity 違反 (`a8e776d9` で 7 行修正)。`14592 / 4410 ≈ 3.3`
+の関係から特定。Phase 1 fork は SEH crash で model-loading test が動かず
+回帰検出できなかった。
+
+### Rust の G2P 速度
+
+Rust の `jpreprocess` は Python `pyopenjtalk-plus` の **約 100× 高速**。
+このため Phase 1 並列化の絶対値改善は ms オーダーで、N=2 ではスレッド
+起動コストが G2P 時間を上回り悪化する。並列化が効くのは N≥5 から。
+
 ## 次ステップ
 
 1. ✅ Phase 1 / Phase 2 を Python に実装 (`d543c381`, `22fb2065`)
-2. ✅ Rust / C# / Go / C++ に Phase 1 展開
-3. PR 作成 (`feat/383-g2p-inference-pipeline` → `dev`)
+2. ✅ Rust / C# / Go / C++ に Phase 1 展開 + 各種 follow-up 修正
+3. ✅ 各ランタイムで実機 / マイクロベンチ実施 (C++ は test pass で間接担保)
+4. PR 作成 (`feat/383-g2p-inference-pipeline` → `dev`)
+5. (将来) iOS / Android release workflow の ORT を 1.20+ に揃えるかは別途検討
+6. (将来) C++ 実機ベンチを CI で取得
