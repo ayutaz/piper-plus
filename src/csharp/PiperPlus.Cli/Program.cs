@@ -574,12 +574,6 @@ internal static class Program
                     return;
                 }
 
-                // (--speaker × voice-cloning mutex check is performed earlier,
-                // before model resolution, to give a precise error instead of
-                // "Model not found" for the joint case.)
-                string? referenceAudioPath = parseResult.GetValue(referenceAudioOption);
-                string? speakerEmbeddingPath = parseResult.GetValue(speakerEmbeddingOption);
-
                 // ============================================================
                 // --test-mode + --text: output phoneme IDs and exit
                 // ============================================================
