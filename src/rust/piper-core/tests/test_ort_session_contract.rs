@@ -6,6 +6,13 @@
 //!
 //! Sister tests in Python/Go/C# load the same fixture and assert their
 //! own runtime constants — drift in any of them is caught locally.
+//!
+//! Engine constants live behind the `onnx` Cargo feature, so this whole
+//! test file is gated to that feature; default `cargo test` simply skips it.
+//! CI runs it via the dedicated `--features onnx --test test_ort_session_contract`
+//! step in `rust-tests.yml` (mirroring `test_short_text_contract`).
+
+#![cfg(feature = "onnx")]
 
 use std::path::PathBuf;
 

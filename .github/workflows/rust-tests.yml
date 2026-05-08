@@ -86,6 +86,12 @@ jobs:
       # exercised in CI.
       run: cargo test -p piper-plus --features onnx --test test_short_text_contract --no-fail-fast
 
+    - name: Run ORT session contract tests (onnx feature)
+      # test_ort_session_contract.rs imports MAX_INTRA_THREADS / WARMUP_PHONEME_LENGTH
+      # from piper_core::engine which is gated behind onnx; mirror the short-text
+      # gate so the per-runtime drift assert runs in CI.
+      run: cargo test -p piper-plus --features onnx --test test_ort_session_contract --no-fail-fast
+
     - name: Run CLI tests
       run: cargo test -p piper-plus-cli --no-fail-fast
 
