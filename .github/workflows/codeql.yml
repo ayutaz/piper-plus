@@ -224,18 +224,20 @@ jobs:
         if: steps.should-skip.outputs.skip != 'true' && matrix.language == 'kotlin'
         working-directory: android
         # Kotlin コンパイル task のみ明示実行 (compileReleaseKotlin)。
-        # native build (externalNativeBuild / configureCMake) は除外して
-        # libpiper_plus.so / .so link 依存を切り離す。
+        # native build (externalNativeBuild / configureCMake) は task graph 上
+        # `compileReleaseKotlin` に依存しないため、トップレベル `gradle build`
+        # と違いここでは起動されない (libpiper_plus.so / .so link 依存を
+        # 自然に回避)。
+        # `-x configureCMakeRelease` 等の防御的 exclude は task が ABI suffix
+        # 付き (`configureCMakeRelease[arm64-v8a]`) で動的生成されるため
+        # exact match で `Task not found` エラーになる。除外せず task graph
+        # に任せる。
         # CodeQL Java extractor がこの compile に hook して .kt の AST を
         # 正確に抽出する (Android SDK classpath が解決された状態)。
         run: |
           ./gradlew \
             :piper-plus-g2p:compileReleaseKotlin \
             :piper-plus:compileReleaseKotlin \
-            -x externalNativeBuildRelease \
-            -x externalNativeBuildDebug \
-            -x configureCMakeRelease \
-            -x configureCMakeDebug \
             --no-daemon --stacktrace
 
       - name: Perform CodeQL Analysis
