@@ -132,6 +132,15 @@ jobs:
           test/js/test-resampler.js \
           test/js/test-streaming-pipeline.js \
           test/js/test-webgpu-session.js
+
+    - name: Run timing & short-text tests (Issue #346 / phoneme-timing-contract)
+      working-directory: src/wasm/openjtalk-web
+      run: |
+        node --test \
+          test/js/test-audio-result-timing.js \
+          test/js/test-phoneme-timing.js \
+          test/js/test-piper-plus-timing.js \
+          test/js/test-short-text-mitigation.js
     
     - name: Check file sizes
       working-directory: src/wasm/openjtalk-web
