@@ -985,31 +985,46 @@ internal static class Program
                         }
                         else
                         {
-                            // Multiple sentences: synthesize each independently for
-                            // lower time-to-first-audio
+                            // Multiple sentences: encode all G2P up-front in parallel
+                            // (Phase 1, issue #383) and then run ORT inference sequentially.
+                            // This keeps audio order stable and shaves the ~19~26% G2P
+                            // cost on cold-cache multi-sentence inputs. Set
+                            // PIPER_G2P_PARALLELISM=1 to fall back to the prior
+                            // strictly-serial path.
+                            var encoded = SentenceParallelEncoder.EncodeAll(
+                                sentences,
+                                sentence =>
+                                {
+                                    string sentenceText = sentence;
+                                    if (customDict is not null)
+                                        sentenceText = customDict.ApplyToText(sentenceText);
+
+                                    // Strategy C: per-sentence short text detection
+                                    string sentenceWrapped = ShortTextProcessor.WrapShortTextWithBreaks(sentenceText);
+                                    bool isSentenceShort = !ReferenceEquals(sentenceWrapped, sentenceText)
+                                        && !string.Equals(sentenceWrapped, sentenceText, StringComparison.Ordinal);
+
+                                    var (sentencePhonemeIds, sentenceProsody) =
+                                        PhonemeEncoder.EncodeDirect(
+                                            phonemizer, sentenceText, phonemeIdMap);
+
+                                    if (!model.HasProsody) sentenceProsody = null;
+
+                                    return (
+                                        OriginalText: sentence,
+                                        IsShort: isSentenceShort,
+                                        PhonemeIds: sentencePhonemeIds,
+                                        Prosody: sentenceProsody);
+                                });
+
                             using var stdout = Console.OpenStandardOutput();
-                            foreach (var sentence in sentences)
+                            foreach (var entry in encoded)
                             {
-                                string sentenceText = sentence;
-                                if (customDict is not null)
-                                    sentenceText = customDict.ApplyToText(sentenceText);
-
-                                // Strategy C: per-sentence short text detection
-                                string sentenceWrapped = ShortTextProcessor.WrapShortTextWithBreaks(sentenceText);
-                                bool isSentenceShort = !ReferenceEquals(sentenceWrapped, sentenceText)
-                                    && !string.Equals(sentenceWrapped, sentenceText, StringComparison.Ordinal);
-
-                                var (sentencePhonemeIds, sentenceProsody) =
-                                    PhonemeEncoder.EncodeDirect(
-                                        phonemizer, sentenceText, phonemeIdMap);
-
-                                if (!model.HasProsody) sentenceProsody = null;
-
                                 short[] chunkAudio;
                                 try
                                 {
                                     chunkAudio = SynthesizeWithPhonemeSilence(
-                                        piperSession, sentencePhonemeIds, sentenceProsody,
+                                        piperSession, entry.PhonemeIds, entry.Prosody,
                                         speaker, languageId, noiseScale, lengthScale, noiseW,
                                         phonemeSilenceMap, config.PhonemeIdMap, sampleRate);
                                 }
@@ -1021,14 +1036,14 @@ internal static class Program
                                 }
 
                                 // Strategy C: pad silence for short sentences
-                                if (isSentenceShort)
+                                if (entry.IsShort)
                                 {
                                     chunkAudio = ShortTextProcessor.PadSilenceForShortText(chunkAudio, sampleRate);
                                 }
 
                                 StreamingWriter.WriteChunked(stdout, chunkAudio);
                                 LogDebug(debug, quiet,
-                                    $"Streamed sentence: \"{sentence}\" ({chunkAudio.Length} samples)");
+                                    $"Streamed sentence: \"{entry.OriginalText}\" ({chunkAudio.Length} samples)");
                             }
                             streamedCount = sentences.Count;
                         }
