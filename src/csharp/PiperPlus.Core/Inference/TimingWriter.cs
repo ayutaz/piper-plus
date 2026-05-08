@@ -8,17 +8,18 @@ namespace PiperPlus.Core.Inference;
 
 /// <summary>
 /// Computes per-phoneme timing from the ONNX <c>durations</c> output tensor and
-/// writes the result as JSON or TSV.
+/// writes the result as JSON, TSV, or SRT.
 /// </summary>
 /// <remarks>
 /// <para>
-/// This mirrors the C++ implementation in <c>piper.cpp:extractTimingsFromDurations</c>
-/// and <c>outputTimingsAsJSON</c> / <c>outputTimingsAsTSV</c>.
+/// Conforms to <c>docs/spec/phoneme-timing-contract.toml</c> v1.0:
+/// fields are <c>start_ms</c>, <c>end_ms</c>, <c>duration_ms</c> (snake_case,
+/// milliseconds) and three output formats — JSON, TSV, SRT.
 /// </para>
 /// <para>
-/// Each element <c>durations[i]</c> is the number of spectrogram frames assigned to
-/// <c>phonemeIds[i]</c>. Multiplying by <c>hopSize / sampleRate</c> converts frames
-/// to seconds.
+/// Each element <c>durations[i]</c> is the number of spectrogram frames
+/// assigned to <c>phonemeIds[i]</c>. <c>hopSize / sampleRate * 1000</c>
+/// converts a frame count to milliseconds.
 /// </para>
 /// </remarks>
 public static class TimingWriter
@@ -31,14 +32,14 @@ public static class TimingWriter
     /// One phoneme's start / end timing, calculated from the model's duration output.
     /// </summary>
     /// <param name="Phoneme">Human-readable phoneme string (PUA codepoints are resolved to multi-char tokens like <c>a:</c>).</param>
-    /// <param name="StartSeconds">Start time in seconds from the beginning of the utterance.</param>
-    /// <param name="EndSeconds">End time in seconds from the beginning of the utterance.</param>
-    /// <param name="DurationSeconds">Duration in seconds (<c>EndSeconds - StartSeconds</c>).</param>
+    /// <param name="StartMs">Start time in milliseconds from the beginning of the utterance.</param>
+    /// <param name="EndMs">End time in milliseconds from the beginning of the utterance.</param>
+    /// <param name="DurationMs">Duration in milliseconds (<c>EndMs - StartMs</c>).</param>
     public record PhonemeTimingEntry(
         string Phoneme,
-        float StartSeconds,
-        float EndSeconds,
-        float DurationSeconds);
+        float StartMs,
+        float EndMs,
+        float DurationMs);
 
     // ------------------------------------------------------------------
     // Calculation
@@ -86,8 +87,10 @@ public static class TimingWriter
         // Build reverse map: phoneme ID -> human-readable string.
         var idToString = BuildReverseIdMap(phonemeIdMap);
 
-        float frameLength = (float)hopSize / sampleRate;
-        float currentTime = 0f;
+        // frame_time_ms = (hop_size / sample_rate) * 1000
+        // — see docs/spec/phoneme-timing-contract.toml [calculation].
+        float frameLengthMs = (float)hopSize / sampleRate * 1000f;
+        float currentTimeMs = 0f;
         int count = Math.Min(phonemeIds.Length, durations.Length);
         var entries = new List<PhonemeTimingEntry>(count);
 
@@ -99,21 +102,21 @@ public static class TimingWriter
             // Skip special tokens (PAD=0, BOS=1, EOS=2) — advance clock only.
             if (id is 0 or 1 or 2)
             {
-                currentTime += frameDuration * frameLength;
+                currentTimeMs += frameDuration * frameLengthMs;
                 continue;
             }
 
-            float startTime = currentTime;
-            currentTime += frameDuration * frameLength;
-            float endTime = currentTime;
+            float startMs = currentTimeMs;
+            currentTimeMs += frameDuration * frameLengthMs;
+            float endMs = currentTimeMs;
 
             string phonemeStr = ResolvePhonemeString(id, idToString);
 
             entries.Add(new PhonemeTimingEntry(
                 phonemeStr,
-                startTime,
-                endTime,
-                endTime - startTime));
+                startMs,
+                endMs,
+                endMs - startMs));
         }
 
         return entries;
@@ -127,10 +130,10 @@ public static class TimingWriter
     /// Writes timing entries as a JSON array to the specified file path.
     /// </summary>
     /// <remarks>
-    /// Format:
+    /// Spec-conforming format (snake_case, milliseconds):
     /// <code>
     /// [
-    ///   {"phoneme": "^", "start": 0.0, "end": 0.058, "duration": 0.058},
+    ///   {"phoneme": "^", "start_ms": 0.0, "end_ms": 58.0, "duration_ms": 58.0},
     ///   ...
     /// ]
     /// </code>
@@ -167,13 +170,12 @@ public static class TimingWriter
     /// Writes timing entries as a TSV (tab-separated values) file.
     /// </summary>
     /// <remarks>
-    /// Format:
+    /// Spec-conforming format (column header in milliseconds):
     /// <code>
-    /// start	end	duration	phoneme
-    /// 0.000	0.058	0.058	^
-    /// 0.058	0.116	0.058	k
+    /// start_ms	end_ms	duration_ms	phoneme
+    /// 0.000	58.000	58.000	^
+    /// 58.000	150.800	92.800	k
     /// </code>
-    /// Matches the C++ <c>outputTimingsAsTSV</c> column order.
     /// </remarks>
     public static void WriteTsv(string filePath, List<PhonemeTimingEntry> entries)
     {
@@ -269,9 +271,9 @@ public static class TimingWriter
             dtos.Add(new TimingDto
             {
                 Phoneme = e.Phoneme,
-                Start = MathF.Round(e.StartSeconds, 3),
-                End = MathF.Round(e.EndSeconds, 3),
-                Duration = MathF.Round(e.DurationSeconds, 3),
+                StartMs = MathF.Round(e.StartMs, 3),
+                EndMs = MathF.Round(e.EndMs, 3),
+                DurationMs = MathF.Round(e.DurationMs, 3),
             });
         }
 
@@ -280,18 +282,116 @@ public static class TimingWriter
 
     private static void WriteTsvCore(StreamWriter writer, List<PhonemeTimingEntry> entries)
     {
-        writer.WriteLine("start\tend\tduration\tphoneme");
+        // Spec column header (docs/spec/phoneme-timing-contract.toml [output_formats.tsv]).
+        writer.WriteLine("start_ms\tend_ms\tduration_ms\tphoneme");
 
         foreach (var e in entries)
         {
-            writer.Write(e.StartSeconds.ToString("F3", System.Globalization.CultureInfo.InvariantCulture));
+            writer.Write(e.StartMs.ToString("F3", System.Globalization.CultureInfo.InvariantCulture));
             writer.Write('\t');
-            writer.Write(e.EndSeconds.ToString("F3", System.Globalization.CultureInfo.InvariantCulture));
+            writer.Write(e.EndMs.ToString("F3", System.Globalization.CultureInfo.InvariantCulture));
             writer.Write('\t');
-            writer.Write(e.DurationSeconds.ToString("F3", System.Globalization.CultureInfo.InvariantCulture));
+            writer.Write(e.DurationMs.ToString("F3", System.Globalization.CultureInfo.InvariantCulture));
             writer.Write('\t');
-            writer.WriteLine(e.Phoneme);
+            writer.WriteLine(EscapeForTsv(e.Phoneme));
         }
+    }
+
+    private static string EscapeForTsv(string phoneme)
+    {
+        if (string.IsNullOrEmpty(phoneme))
+        {
+            return phoneme;
+        }
+        // Spec [output_formats.tsv].escape_tab/newline_in_phoneme.
+        if (phoneme.IndexOf('\t') < 0 && phoneme.IndexOf('\n') < 0)
+        {
+            return phoneme;
+        }
+        return phoneme.Replace("\t", "\\t").Replace("\n", "\\n");
+    }
+
+    // ------------------------------------------------------------------
+    // SRT output (docs/spec/phoneme-timing-contract.toml [output_formats.srt])
+    // ------------------------------------------------------------------
+
+    /// <summary>
+    /// Writes timing entries as SubRip (SRT) subtitle text to the given file.
+    /// </summary>
+    /// <remarks>
+    /// Format (1-indexed cues, <c>HH:MM:SS,mmm</c> timestamps):
+    /// <code>
+    /// 1
+    /// 00:00:00,000 --> 00:00:00,058
+    /// ^
+    ///
+    /// 2
+    /// 00:00:00,058 --> 00:00:00,151
+    /// k
+    /// </code>
+    /// </remarks>
+    public static void WriteSrt(string filePath, List<PhonemeTimingEntry> entries)
+    {
+        if (string.IsNullOrWhiteSpace(filePath))
+            throw new ArgumentException("File path must not be empty.", nameof(filePath));
+        ArgumentNullException.ThrowIfNull(entries);
+
+        // Use BOM-less UTF-8 — SRT players often choke on the BOM and the
+        // spec output examples are byte-clean.
+        using var writer = new StreamWriter(
+            filePath,
+            append: false,
+            encoding: new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+        WriteSrtCore(writer, entries);
+    }
+
+    /// <summary>
+    /// Writes timing entries as SRT subtitle text to the given stream.
+    /// </summary>
+    public static void WriteSrt(Stream stream, List<PhonemeTimingEntry> entries)
+    {
+        ArgumentNullException.ThrowIfNull(stream);
+        ArgumentNullException.ThrowIfNull(entries);
+
+        using var writer = new StreamWriter(
+            stream,
+            encoding: new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false),
+            leaveOpen: true);
+        WriteSrtCore(writer, entries);
+    }
+
+    private static void WriteSrtCore(StreamWriter writer, List<PhonemeTimingEntry> entries)
+    {
+        for (int i = 0; i < entries.Count; i++)
+        {
+            var e = entries[i];
+            writer.WriteLine((i + 1).ToString(System.Globalization.CultureInfo.InvariantCulture));
+            writer.Write(FormatSrtTimestamp(e.StartMs));
+            writer.Write(" --> ");
+            writer.WriteLine(FormatSrtTimestamp(e.EndMs));
+            writer.WriteLine(e.Phoneme);
+            writer.WriteLine();
+        }
+    }
+
+    private static string FormatSrtTimestamp(float ms)
+    {
+        // Clamp negatives that may have leaked through.
+        if (ms < 0f)
+        {
+            ms = 0f;
+        }
+        long total_ms = (long)Math.Round(ms);
+        long hours = total_ms / 3_600_000L;
+        long remainder = total_ms % 3_600_000L;
+        long minutes = remainder / 60_000L;
+        remainder %= 60_000L;
+        long seconds = remainder / 1_000L;
+        long millis = remainder % 1_000L;
+        return string.Format(
+            System.Globalization.CultureInfo.InvariantCulture,
+            "{0:D2}:{1:D2}:{2:D2},{3:D3}",
+            hours, minutes, seconds, millis);
     }
 }
 
@@ -300,21 +400,22 @@ public static class TimingWriter
 // ------------------------------------------------------------------
 
 /// <summary>
-/// DTO for JSON serialization with snake_case property names.
+/// DTO for JSON serialization with snake_case property names matching
+/// <c>docs/spec/phoneme-timing-contract.toml</c> v1.0.
 /// </summary>
 internal sealed class TimingDto
 {
     [JsonPropertyName("phoneme")]
     public string Phoneme { get; set; } = string.Empty;
 
-    [JsonPropertyName("start")]
-    public float Start { get; set; }
+    [JsonPropertyName("start_ms")]
+    public float StartMs { get; set; }
 
-    [JsonPropertyName("end")]
-    public float End { get; set; }
+    [JsonPropertyName("end_ms")]
+    public float EndMs { get; set; }
 
-    [JsonPropertyName("duration")]
-    public float Duration { get; set; }
+    [JsonPropertyName("duration_ms")]
+    public float DurationMs { get; set; }
 }
 
 /// <summary>
