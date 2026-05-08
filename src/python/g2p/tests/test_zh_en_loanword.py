@@ -963,9 +963,13 @@ class TestErhuaInteraction:
         tokens = p.phonemize("我们儿")
         # 我 = uo+tone3, 们 = m+ən+tone5, 儿 = ɚ+tone2
         assert tokens == [
-            "uo", "tone3",
-            "m", "ən", "tone5",
-            "ɚ", "tone2",
+            "uo",
+            "tone3",
+            "m",
+            "ən",
+            "tone5",
+            "ɚ",
+            "tone2",
         ], tokens
 
     def test_erhua_at_word_boundary(self):
@@ -980,9 +984,14 @@ class TestErhuaInteraction:
         tokens = p.phonemize("这儿好")
         # 这 = tʂ+ɤ+tone4, 儿 = ɚ+tone2, 好 = x+aʊ+tone3
         assert tokens == [
-            "tʂ", "ɤ", "tone4",
-            "ɚ", "tone2",
-            "x", "aʊ", "tone3",
+            "tʂ",
+            "ɤ",
+            "tone4",
+            "ɚ",
+            "tone2",
+            "x",
+            "aʊ",
+            "tone3",
         ], tokens
 
 

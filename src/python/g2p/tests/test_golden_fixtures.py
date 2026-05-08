@@ -65,8 +65,7 @@ def test_fixture_schema(language: str) -> None:
     """Each fixture must be schema-version 1 and non-empty."""
     fixture = _load_fixture(language)
     assert fixture["schema_version"] == 1, (
-        f"{language}_golden.json: unexpected schema_version "
-        f"{fixture['schema_version']}"
+        f"{language}_golden.json: unexpected schema_version {fixture['schema_version']}"
     )
     assert fixture["language"] == language, (
         f"{language}_golden.json: 'language' field is "
