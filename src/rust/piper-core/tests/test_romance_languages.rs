@@ -391,7 +391,10 @@ mod french {
 
     #[test]
     fn test_post_process_ids_inserts_bos_eos() {
-        // French post_process_ids does BOS + pad-interspersed IDs + EOS
+        // French post_process_ids does BOS + pad-interspersed IDs + EOS.
+        // Pin the *exact* shape so that any reordering, padding drop, or
+        // duplicate insertion is caught — `.contains(&10)` would happily
+        // pass even if the order was wrong.
         let p = FrenchPhonemizer::new();
         let mut id_map = std::collections::HashMap::new();
         id_map.insert("^".to_string(), vec![1i64]);
@@ -402,17 +405,33 @@ mod french {
         let prosody = vec![Some([0i32, 2, 2]), Some([0, 0, 2])];
 
         let (result_ids, result_prosody) = p.post_process_ids(ids, prosody, &id_map);
-        // Verify BOS and EOS are present
-        assert_eq!(*result_ids.first().unwrap(), 1, "should start with BOS");
-        assert_eq!(*result_ids.last().unwrap(), 2, "should end with EOS");
-        // Verify original phoneme IDs are included
-        assert!(result_ids.contains(&10), "should contain phoneme ID 10");
-        assert!(result_ids.contains(&20), "should contain phoneme ID 20");
+        // Expected layout: ^ _ 10 _ 20 _ $
         assert_eq!(
-            result_ids.len(),
+            result_ids,
+            vec![1, 0, 10, 0, 20, 0, 2],
+            "BOS + pad-interspersed IDs + EOS sequence drifted"
+        );
+        assert_eq!(
             result_prosody.len(),
+            result_ids.len(),
             "IDs and prosody must have same length"
         );
+        // BOS / EOS / pad slots must carry None prosody (only the original
+        // phoneme positions retain prosody).
+        let phoneme_positions = [2usize, 4]; // 10 and 20 sit at indices 2/4
+        for (i, p) in result_prosody.iter().enumerate() {
+            if phoneme_positions.contains(&i) {
+                assert!(
+                    p.is_some(),
+                    "phoneme slot result_prosody[{i}] must keep prosody"
+                );
+            } else {
+                assert!(
+                    p.is_none(),
+                    "BOS/EOS/pad slot result_prosody[{i}] must be None"
+                );
+            }
+        }
     }
 
     #[test]

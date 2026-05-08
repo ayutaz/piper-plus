@@ -92,12 +92,25 @@ mod tests {
     fn test_phonemize_basic() {
         let p = SwedishPhonemizer::new();
         let (tokens, prosody) = p.phonemize_with_prosody("hej").unwrap();
-        assert!(!tokens.is_empty(), "should produce phonemes for 'hej'");
+        // "hej" is 3 graphemes; the rule-based G2P must produce *some* tokens
+        // (≥1) and the wrapper must keep tokens / prosody aligned. We avoid
+        // pinning a specific phoneme string here because that belongs to the
+        // detailed parity tests in `tests/test_swedish_integration.rs`, but we
+        // do pin (a) ≥ 1 token, (b) all-non-empty token strings, and (c) a
+        // matching prosody slot per token.
+        assert!(
+            !tokens.is_empty(),
+            "should produce phonemes for 'hej', got {:?}",
+            tokens
+        );
         assert_eq!(
             tokens.len(),
             prosody.len(),
             "tokens and prosody must have same length"
         );
+        for (i, t) in tokens.iter().enumerate() {
+            assert!(!t.is_empty(), "token[{i}] must not be the empty string");
+        }
     }
 
     #[test]
@@ -106,7 +119,23 @@ mod tests {
         let (tokens, prosody) = p
             .phonemize_with_prosody("God morgon, hur m\u{00e5}r du?")
             .unwrap();
-        assert!(!tokens.is_empty(), "should produce phonemes for a sentence");
+        // A 4-word sentence must produce more tokens than a single word, and
+        // at least one whitespace token must survive (word boundary). This is
+        // a stronger contract than the previous `!is_empty()` check while
+        // still being implementation-neutral.
+        let (single, _) = p.phonemize_with_prosody("hej").unwrap();
+        assert!(
+            tokens.len() > single.len(),
+            "4-word sentence ({} tokens) must produce more tokens than 1-word ({} tokens), got tokens={:?}",
+            tokens.len(),
+            single.len(),
+            tokens
+        );
+        assert!(
+            tokens.iter().any(|t| t == " "),
+            "multi-word input must yield at least one space token, got {:?}",
+            tokens
+        );
         assert_eq!(tokens.len(), prosody.len());
     }
 
@@ -136,12 +165,29 @@ mod tests {
 
         let ids = vec![10, 20, 30];
         let prosody = vec![None, None, None];
-        let (out_ids, _out_prosody) = p.post_process_ids(ids, prosody, &id_map);
+        let (out_ids, out_prosody) = p.post_process_ids(ids, prosody, &id_map);
 
-        // Should start with BOS (1) and end with EOS (2)
-        assert_eq!(*out_ids.first().unwrap(), 1, "should start with BOS");
-        assert_eq!(*out_ids.last().unwrap(), 2, "should end with EOS");
-        // Should have padding between phonemes
-        assert!(out_ids.len() > 5, "should have BOS + padded phonemes + EOS");
+        // Pin the exact intersperse pattern the trait emits today so any
+        // accidental reordering (e.g. dropping BOS, swapping pad/phoneme) is
+        // caught by CI rather than only at runtime.
+        // Expected layout for 3 phoneme IDs:
+        //   ^ _ 10 _ 20 _ 30 _ $
+        assert_eq!(
+            out_ids,
+            vec![1, 0, 10, 0, 20, 0, 30, 0, 2],
+            "BOS + pad-interspersed phonemes + EOS sequence drifted"
+        );
+        assert_eq!(
+            out_prosody.len(),
+            out_ids.len(),
+            "prosody must stay aligned with ids after post_process_ids"
+        );
+        // BOS / EOS / pad slots all have `None` prosody — verify the
+        // out_prosody vec is fully None to lock down current behavior.
+        assert!(
+            out_prosody.iter().all(|p| p.is_none()),
+            "all prosody slots must be None after intersperse; got {:?}",
+            out_prosody
+        );
     }
 }

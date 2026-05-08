@@ -207,19 +207,48 @@ fn test_to_json_contains_all_fields() {
     let json_str = result.to_json().unwrap();
     let parsed: serde_json::Value = serde_json::from_str(&json_str).unwrap();
 
-    // Top-level fields
-    assert!(parsed.get("total_duration_ms").is_some());
-    assert!(parsed.get("sample_rate").is_some());
-    assert!(parsed.get("phonemes").is_some());
+    // Top-level fields are present AND have the expected scalar types so the
+    // observed contract (sample_rate=u64, total_duration_ms=number,
+    // phonemes=array) is locked down — not just "non-null".
+    assert!(
+        parsed["total_duration_ms"].is_number(),
+        "total_duration_ms must be a number, got {:?}",
+        parsed["total_duration_ms"]
+    );
+    assert!(
+        parsed["sample_rate"].is_u64(),
+        "sample_rate must be an unsigned integer, got {:?}",
+        parsed["sample_rate"]
+    );
+    assert_eq!(parsed["sample_rate"].as_u64(), Some(22050));
+    assert!(
+        parsed["phonemes"].is_array(),
+        "phonemes must be an array, got {:?}",
+        parsed["phonemes"]
+    );
 
-    // Phoneme fields
+    // Phoneme fields: pin both presence AND value semantics for every entry.
     let phonemes = parsed["phonemes"].as_array().unwrap();
     assert_eq!(phonemes.len(), 2);
-    for ph in phonemes {
-        assert!(ph.get("phoneme").is_some());
-        assert!(ph.get("start_ms").is_some());
-        assert!(ph.get("end_ms").is_some());
-        assert!(ph.get("duration_ms").is_some());
+    let expected_phonemes = ["a", "b"];
+    for (i, ph) in phonemes.iter().enumerate() {
+        assert_eq!(
+            ph["phoneme"].as_str(),
+            Some(expected_phonemes[i]),
+            "phonemes[{i}].phoneme"
+        );
+        assert!(ph["start_ms"].is_number(), "phonemes[{i}].start_ms");
+        assert!(ph["end_ms"].is_number(), "phonemes[{i}].end_ms");
+        assert!(ph["duration_ms"].is_number(), "phonemes[{i}].duration_ms");
+
+        // Schema invariants: end_ms = start_ms + duration_ms (within rounding).
+        let start = ph["start_ms"].as_f64().unwrap();
+        let end = ph["end_ms"].as_f64().unwrap();
+        let dur = ph["duration_ms"].as_f64().unwrap();
+        assert!(
+            (end - (start + dur)).abs() < 1e-6,
+            "phonemes[{i}]: end_ms ({end}) != start_ms ({start}) + duration_ms ({dur})"
+        );
     }
 }
 
