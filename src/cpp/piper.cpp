@@ -2219,7 +2219,10 @@ void phonemesToAudio(PiperConfig &config, Voice &voice,
 // split, prosody flat conversion, synthesizeFloat) without phonemize step.
 // Used by Phase 1 of issue #383 so synth_start can parallelize phonemize.
 //
-// Note: trailing sentence-silence is NOT added here — callers manage gaps.
+// Output layout matches textToAudioFloat's per-sentence iteration: phrase
+// audio + per-phrase silence + trailing sentenceSilenceSamples. Keeping the
+// trailing silence here lets synth_next emit byte-for-byte parity with
+// piper_plus_synthesize (one-shot) for the same input.
 void phonemesToAudioFloat(PiperConfig &config, Voice &voice,
                           const std::vector<Phoneme> &sentencePhonemes,
                           const std::vector<ProsodyFeature> *sentenceProsody,
@@ -2338,6 +2341,20 @@ void phonemesToAudioFloat(PiperConfig &config, Voice &voice,
     }
 
     phonemeIds.clear();
+  }
+
+  // Trailing sentence-silence — mirrors textToAudioFloat's per-sentence
+  // append so Iterator (synth_next) and one-shot (piper_plus_synthesize)
+  // produce byte-for-byte equal sample counts. Without this, every
+  // sentence in the Iterator path was 0.2 s (default) shorter than the
+  // one-shot path, breaking the IteratorVsOneShot* parity tests.
+  if (voice.synthesisConfig.sentenceSilenceSeconds > 0) {
+    std::size_t sentenceSilenceSamples = static_cast<std::size_t>(
+        voice.synthesisConfig.sentenceSilenceSeconds *
+        voice.synthesisConfig.sampleRate * voice.synthesisConfig.channels);
+    for (std::size_t i = 0; i < sentenceSilenceSamples; ++i) {
+      audioBuffer.push_back(0.0f);
+    }
   }
 
   if (!missingPhonemes.empty()) {
