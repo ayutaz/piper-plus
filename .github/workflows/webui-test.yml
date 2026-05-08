@@ -41,15 +41,15 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
         python-version: ['3.11', '3.12']
-    
+
     steps:
       - uses: actions/checkout@v6
-      
+
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
-      
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
@@ -58,33 +58,33 @@ jobs:
           uv pip install --system pytest pytest-cov
           # Install required runtime dependencies
           uv pip install --system onnxruntime
-      
+
       - name: Test WebUI imports
         run: |
           cd src/python_run
           python -c "from piper.webui import create_interface, get_available_models; print('WebUI imports successful')"
-      
+
       - name: Test model detection
         run: |
           cd src/python_run
           python -c "from pathlib import Path; from piper.webui import get_available_models; models = get_available_models(Path('../../test/models')); print(f'Found {len(models)} test models'); [print(f'  - {name}') for name, path in models]"
-      
+
       - name: Test interface creation
         run: |
           cd src/python_run
           # Skip actual interface creation in CI environment as it requires display
           python -c "from pathlib import Path; from piper.webui import create_interface; print('Interface creation function imported successfully')"
-      
+
       - name: Test template system
         run: |
           cd src/python_run
           python -c "from piper.webui import TEMPLATES, get_language_from_model; print(f'Available languages: {list(TEMPLATES.keys())}'); lang = get_language_from_model('test/models/multilingual-test-medium.onnx'); print(f'Japanese model detected as: {lang}')"
-      
+
       - name: Test sample texts
         run: |
           cd src/python_run
           python -c "from piper.sample_texts import SAMPLE_TEXTS, get_sample_by_category; print(f'Sample text languages: {list(SAMPLE_TEXTS.keys())}'); sample = get_sample_by_category('ja_JP', 'greeting', 0); print(f'Japanese greeting: {sample}')"
-      
+
       - name: Run pytest for WebUI
         run: |
           # Debug: Show current directory and Python path
@@ -129,7 +129,7 @@ jobs:
       - name: Build WebUI Docker image
         run: |
           docker build -t piper-webui:test -f docker/webui/Dockerfile .
-      
+
       - name: Test container startup
         run: |
           # Run container in background

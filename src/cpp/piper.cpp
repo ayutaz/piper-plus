@@ -120,7 +120,7 @@ static std::string phonemeToString(Phoneme ph) {
             return it->second;
         }
     }
-    
+
     // Convert regular character to string
     std::string result;
     utf8::append(ph, std::back_inserter(result));
@@ -346,7 +346,7 @@ std::vector<PhonemeInfo> extractTimingsFromDurations(
     PhonemeType phonemeType
 ) {
     std::vector<PhonemeInfo> timings;
-    
+
     // Build reverse map from phoneme ID to UTF-8 string.
     // idMap key is Phoneme (char32_t); encode it properly so isSingleCodepoint()
     // and the utf8-checked functions never see invalid byte sequences.
@@ -359,22 +359,22 @@ std::vector<PhonemeInfo> extractTimingsFromDurations(
             phonemeIdToStringMap[ids[0]] = std::move(phonemeUtf8);
         }
     }
-    
+
     float frameLength = static_cast<float>(hopSize) / sampleRate;
     float currentTime = 0.0f;
     int currentFrame = 0;
-    
+
     for (size_t i = 0; i < phonemeIds.size() && i < durations.size(); ++i) {
         PhonemeId id = phonemeIds[i];
         float duration = durations[i];  // Duration in frames
-        
+
         // Skip special tokens (PAD, BOS, EOS)
         if (id == 0 || id == 1 || id == 2) {
             currentFrame += static_cast<int>(duration);
             currentTime += duration * frameLength;
             continue;
         }
-        
+
         // Get phoneme string
         std::string phonemeStr = UNKNOWN_PHONEME;
         auto it = phonemeIdToStringMap.find(id);
@@ -386,21 +386,21 @@ std::vector<PhonemeInfo> extractTimingsFromDurations(
                 phonemeStr = std::string(1, static_cast<char>(id));
             }
         }
-        
+
         PhonemeInfo info;
         info.phoneme = phonemeStr;
         info.start_time = currentTime;
         info.start_frame = currentFrame;
-        
+
         currentFrame += static_cast<int>(duration);
         currentTime += duration * frameLength;
-        
+
         info.end_time = currentTime;
         info.end_frame = currentFrame;
-        
+
         timings.push_back(info);
     }
-    
+
     // Adjust timings for Japanese if needed
     if (usesOpenJTalk(phonemeType)) {
         for (size_t i = 0; i < timings.size(); ++i) {
@@ -413,7 +413,7 @@ std::vector<PhonemeInfo> extractTimingsFromDurations(
                     timings[i].phoneme = it->second;
                 }
             }
-            
+
             // Adjust timing for specific phonemes like 'cl' (促音)
             if (timings[i].phoneme == "cl" && i > 0) {
                 // Overlap with previous phoneme
@@ -423,7 +423,7 @@ std::vector<PhonemeInfo> extractTimingsFromDurations(
             }
         }
     }
-    
+
     return timings;
 }
 
@@ -529,7 +529,7 @@ void loadModel(std::string modelPath, ModelSession &session,
   auto endTime = std::chrono::steady_clock::now();
   spdlog::debug("Loaded onnx model in {} second(s)",
                 std::chrono::duration<double>(endTime - startTime).count());
-  
+
   // Check if model has duration output
   size_t numOutputNodes = session.onnx.GetOutputCount();
   if (numOutputNodes >= 2) {
@@ -2170,21 +2170,21 @@ void textToWavFile(PiperConfig &config, Voice &voice, std::string text,
 } /* textToWavFile */
 
 // Synthesize audio directly from phonemes
-void phonemesToAudio(PiperConfig &config, Voice &voice, 
+void phonemesToAudio(PiperConfig &config, Voice &voice,
                      const std::vector<Phoneme> &phonemes,
-                     std::vector<int16_t> &audioBuffer, 
+                     std::vector<int16_t> &audioBuffer,
                      SynthesisResult &result,
                      const std::function<void()> &audioCallback) {
-  
+
   // Convert phonemes to IDs
   std::vector<PhonemeId> phonemeIds;
   std::map<Phoneme, std::size_t> missingPhonemes;
-  
+
   PhonemeIdConfig idConfig;
-  idConfig.phonemeIdMap = 
+  idConfig.phonemeIdMap =
       std::make_shared<PhonemeIdMap>(voice.phonemizeConfig.phonemeIdMap);
   idConfig.interspersePad = voice.phonemizeConfig.interspersePad;
-  
+
   // OpenJTalk: BOS/EOS are already in the phoneme list from phonemizer
   if (usesOpenJTalk(voice.phonemizeConfig.phonemeType)) {
     idConfig.addBos = false;
@@ -2193,44 +2193,44 @@ void phonemesToAudio(PiperConfig &config, Voice &voice,
     idConfig.addBos = true;
     idConfig.addEos = true;
   }
-  
+
   // Convert phonemes to IDs
   phonemes_to_ids(phonemes, idConfig, phonemeIds, missingPhonemes);
-  
+
   // Report missing phonemes
   if (!missingPhonemes.empty()) {
     for (auto& [phoneme, count] : missingPhonemes) {
       spdlog::warn("Missing phoneme: '{}' ({})", phonemeToString(phoneme), count);
     }
   }
-  
+
   // Synthesize audio
   synthesize(phonemeIds, voice.synthesisConfig, voice.session, audioBuffer, result, &voice);
-  
+
   // Call the audio callback if provided
   if (audioCallback) {
     audioCallback();
   }
-  
+
 } /* phonemesToAudio */
 
 // Synthesize audio directly from phonemes to WAV file
 void phonemesToWavFile(PiperConfig &config, Voice &voice,
                        const std::vector<Phoneme> &phonemes,
                        std::ostream &audioFile, SynthesisResult &result) {
-  
+
   std::vector<int16_t> audioBuffer;
   phonemesToAudio(config, voice, phonemes, audioBuffer, result, nullptr);
-  
+
   // Write WAV
   auto synthesisConfig = voice.synthesisConfig;
   writeWavHeader(synthesisConfig.sampleRate, synthesisConfig.sampleWidth,
                  synthesisConfig.channels, (int32_t)audioBuffer.size(),
                  audioFile);
-  
+
   audioFile.write((const char *)audioBuffer.data(),
                   sizeof(int16_t) * audioBuffer.size());
-                  
+
 } /* phonemesToWavFile */
 
 // Helper: is a codepoint a punctuation mark used for density calculation?
@@ -2798,22 +2798,22 @@ void phonemesToAudioStreaming(PiperConfig &config, Voice &voice,
                               size_t phonemesPerChunk) {
   spdlog::debug("phonemesToAudioStreaming: {} phonemes, chunk size={}",
                 phonemes.size(), phonemesPerChunk);
-  
+
   // Clear result
   result.inferSeconds = 0;
   result.audioSeconds = 0;
   result.realTimeFactor = 0;
-  
+
   // Clear output buffer
   audioBuffer.clear();
-  
+
   if (phonemes.empty()) {
     return;
   }
-  
+
   // Setup phoneme ID configuration
   PhonemeIdConfig idConfig;
-  idConfig.phonemeIdMap = 
+  idConfig.phonemeIdMap =
       std::make_shared<PhonemeIdMap>(voice.phonemizeConfig.phonemeIdMap);
   idConfig.interspersePad = voice.phonemizeConfig.interspersePad;
   // OpenJTalk: BOS/EOS are already in the phoneme list from phonemizer
@@ -2845,49 +2845,49 @@ void phonemesToAudioStreaming(PiperConfig &config, Voice &voice,
     if (!usesOpenJTalk(voice.phonemizeConfig.phonemeType)) {
       idConfig.addEos = isLastChunk;
     }
-    
+
     // Convert chunk phonemes to IDs
     phonemeIds.clear();
     phonemes_to_ids(chunkPhonemes, idConfig, phonemeIds, missingPhonemes);
-    
+
     // Log phoneme IDs for debugging
     if (spdlog::should_log(spdlog::level::debug)) {
       std::stringstream phonemeIdsStr;
       for (auto phonemeId : phonemeIds) {
         phonemeIdsStr << phonemeId << ", ";
       }
-      spdlog::debug("Chunk {}: {} phonemes -> {} IDs: {}", 
+      spdlog::debug("Chunk {}: {} phonemes -> {} IDs: {}",
                     (processedPhonemes / phonemesPerChunk) + 1,
                     chunkPhonemes.size(), phonemeIds.size(), phonemeIdsStr.str());
     }
-    
+
     // Synthesize chunk
     chunkAudioBuffer.clear();
     SynthesisResult chunkResult;
-    synthesize(phonemeIds, voice.synthesisConfig, voice.session, 
+    synthesize(phonemeIds, voice.synthesisConfig, voice.session,
                chunkAudioBuffer, chunkResult, &voice);
-    
+
     // Accumulate results
     result.audioSeconds += chunkResult.audioSeconds;
     result.inferSeconds += chunkResult.inferSeconds;
-    
+
     // Append to main buffer
-    audioBuffer.insert(audioBuffer.end(), 
-                       chunkAudioBuffer.begin(), 
+    audioBuffer.insert(audioBuffer.end(),
+                       chunkAudioBuffer.begin(),
                        chunkAudioBuffer.end());
-    
+
     // Call chunk callback
     if (chunkCallback && !chunkAudioBuffer.empty()) {
       chunkCallback(chunkAudioBuffer);
     }
-    
+
     // Move to next chunk
     processedPhonemes = chunkEnd;
-    
+
     // For subsequent chunks, don't add BOS
     idConfig.addBos = false;
   }
-  
+
   // Report missing phonemes
   if (!missingPhonemes.empty()) {
     spdlog::warn("Missing {} phoneme(s) from phoneme/id map!", missingPhonemes.size());
@@ -2898,16 +2898,16 @@ void phonemesToAudioStreaming(PiperConfig &config, Voice &voice,
                    (uint32_t)phoneme, count);
     }
   }
-  
+
   // Calculate final real-time factor
   if (result.audioSeconds > 0) {
     result.realTimeFactor = result.inferSeconds / result.audioSeconds;
   }
-  
+
   spdlog::debug("Streaming phoneme synthesis complete: {} chunks, {:.2f}s audio, RTF={:.2f}",
                 (phonemes.size() + phonemesPerChunk - 1) / phonemesPerChunk,
                 result.audioSeconds, result.realTimeFactor);
-  
+
 } /* phonemesToAudioStreaming */
 
 // Output phoneme timing information as JSON
@@ -2917,7 +2917,7 @@ void outputTimingsAsJSON(const std::vector<PhonemeInfo> &timings,
                          int sampleRate) {
     json result;
     json phonemesArray = json::array();
-    
+
     for (const auto &info : timings) {
         json phonemeObj;
         phonemeObj["phoneme"] = info.phoneme;
@@ -2927,7 +2927,7 @@ void outputTimingsAsJSON(const std::vector<PhonemeInfo> &timings,
         phonemeObj["end_frame"] = info.end_frame;
         phonemesArray.push_back(phonemeObj);
     }
-    
+
     result["phonemes"] = phonemesArray;
     if (!text.empty()) {
         result["text"] = text;
@@ -2935,7 +2935,7 @@ void outputTimingsAsJSON(const std::vector<PhonemeInfo> &timings,
     result["total_duration"] = timings.empty() ? 0.0 : timings.back().end_time;
     result["sample_rate"] = sampleRate;
     result["frame_shift_ms"] = 256.0 / sampleRate * 1000;  // hop_size in ms
-    
+
     output << result.dump(2) << std::endl;
 }
 
@@ -2943,7 +2943,7 @@ void outputTimingsAsJSON(const std::vector<PhonemeInfo> &timings,
 void outputTimingsAsTSV(const std::vector<PhonemeInfo> &timings,
                         std::ostream &output) {
     output << "phoneme\tstart\tend\tstart_frame\tend_frame" << std::endl;
-    
+
     for (const auto &info : timings) {
         output << info.phoneme << "\t"
                << info.start_time << "\t"

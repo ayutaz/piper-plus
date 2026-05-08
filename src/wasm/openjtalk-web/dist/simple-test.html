@@ -31,31 +31,31 @@
 </head>
 <body>
     <h1>OpenJTalk WebAssembly Simple Test</h1>
-    
+
     <h2>Module Loading Test</h2>
     <button onclick="testModuleLoad()">Test Module Load</button>
     <pre id="moduleOutput"></pre>
-    
+
     <h2>Basic Function Test</h2>
     <button onclick="testBasicFunctions()">Test Basic Functions</button>
     <pre id="basicOutput"></pre>
-    
+
     <h2>File System Test</h2>
     <button onclick="testFileSystem()">Test File System</button>
     <pre id="fsOutput"></pre>
 
     <script type="module">
         window.moduleInstance = null;
-        
+
         // Test module loading
         window.testModuleLoad = async function() {
             const output = document.getElementById('moduleOutput');
             output.textContent = 'Loading module...\n';
-            
+
             try {
                 // Import the ES6 module
                 const OpenJTalkModule = (await import('./openjtalk.js')).default;
-                
+
                 // Create instance
                 window.moduleInstance = await OpenJTalkModule({
                     locateFile: (path) => {
@@ -65,48 +65,48 @@
                         return path;
                     }
                 });
-                
+
                 output.textContent += 'Module loaded successfully!\n';
                 output.textContent += `Module type: ${typeof window.moduleInstance}\n`;
-                
+
                 // List available functions
                 const functions = Object.keys(window.moduleInstance).filter(k => k.startsWith('_'));
                 output.textContent += `\nExported functions found: ${functions.length}\n`;
                 functions.forEach(f => {
                     output.textContent += `  - ${f}\n`;
                 });
-                
+
                 output.className = 'success';
-                
+
             } catch (error) {
                 output.textContent += `Error: ${error.message}\n`;
                 output.textContent += `Stack: ${error.stack}\n`;
                 output.className = 'error';
             }
         };
-        
+
         // Test basic functions
         window.testBasicFunctions = async function() {
             const output = document.getElementById('basicOutput');
-            
+
             if (!window.moduleInstance) {
                 output.textContent = 'Module not loaded. Run Module Load Test first.';
                 output.className = 'error';
                 return;
             }
-            
+
             try {
                 output.textContent = 'Testing basic functions...\n\n';
-                
+
                 // Test get_version
                 const versionPtr = window.moduleInstance._get_version();
                 const version = window.moduleInstance.UTF8ToString(versionPtr);
                 output.textContent += `✓ Version: ${version}\n`;
-                
+
                 // Test test_function
                 const result = window.moduleInstance._test_function(5, 3);
                 output.textContent += `✓ Test function (5 + 3): ${result}\n`;
-                
+
                 // Test echo_string
                 const testStr = "Hello WebAssembly!";
                 const strPtr = window.moduleInstance.allocateUTF8(testStr);
@@ -115,7 +115,7 @@
                 output.textContent += `✓ Echo test: ${echo}\n`;
                 window.moduleInstance._free_string(echoPtr);
                 window.moduleInstance._free(strPtr);
-                
+
                 // Test OpenJTalk functions
                 output.textContent += '\nTesting OpenJTalk functions...\n';
 
@@ -127,7 +127,7 @@
                 if (initResult !== 0) {
                     output.textContent += '  (Expected: will fail without dictionary files)\n';
                 }
-                
+
                 // Test synthesis labels
                 const textPtr = window.moduleInstance.allocateUTF8("こんにちは");
                 const labelsPtr = window.moduleInstance._openjtalk_synthesis_labels(textPtr);
@@ -135,30 +135,30 @@
                 output.textContent += `\nSynthesis labels test:\n${labels}\n`;
                 window.moduleInstance._openjtalk_free_string(labelsPtr);
                 window.moduleInstance._free(textPtr);
-                
+
                 output.className = 'success';
-                
+
             } catch (error) {
                 output.textContent += `\nError: ${error.message}\n`;
                 output.textContent += `Stack: ${error.stack}\n`;
                 output.className = 'error';
             }
         };
-        
+
         // Test file system
         window.testFileSystem = function() {
             const output = document.getElementById('fsOutput');
-            
+
             if (!window.moduleInstance) {
                 output.textContent = 'Module not loaded. Run Module Load Test first.';
                 output.className = 'error';
                 return;
             }
-            
+
             try {
                 const FS = window.moduleInstance.FS;
                 output.textContent = 'Testing file system...\n\n';
-                
+
                 // Create test directory
                 try {
                     FS.mkdir('/test');
@@ -170,16 +170,16 @@
                         throw e;
                     }
                 }
-                
+
                 // Write a test file
                 const testContent = 'Hello from WebAssembly file system!';
                 FS.writeFile('/test/hello.txt', testContent);
                 output.textContent += '✓ Wrote test file\n';
-                
+
                 // Read it back
                 const content = FS.readFile('/test/hello.txt', { encoding: 'utf8' });
                 output.textContent += `✓ Read test file: "${content}"\n`;
-                
+
                 // List root directory
                 const rootFiles = FS.readdir('/');
                 output.textContent += `\n✓ Root directory contents:\n`;
@@ -188,7 +188,7 @@
                         output.textContent += `  - ${f}\n`;
                     }
                 });
-                
+
                 // Check for dictionary directory
                 try {
                     FS.mkdir('/dict');
@@ -205,16 +205,16 @@
                         });
                     }
                 }
-                
+
                 output.className = 'success';
-                
+
             } catch (error) {
                 output.textContent += `\nError: ${error.message}\n`;
                 output.textContent += `Stack: ${error.stack}\n`;
                 output.className = 'error';
             }
         };
-        
+
         // Auto-load module on page load
         window.addEventListener('load', () => {
             console.log('Page loaded, ready for testing');

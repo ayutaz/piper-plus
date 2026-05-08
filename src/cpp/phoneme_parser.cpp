@@ -50,14 +50,14 @@ static const std::map<std::string, char32_t> japanesePhonemePUA = {
 std::vector<TextOrPhonemes> parsePhonemeNotation(const std::string& input) {
     std::vector<TextOrPhonemes> result;
     std::regex phonemeRegex(R"(\[\[\s*([^\]]*)\s*\]\])");
-    
+
     size_t lastPos = 0;
     auto begin = std::sregex_iterator(input.begin(), input.end(), phonemeRegex);
     auto end = std::sregex_iterator();
-    
+
     for (std::sregex_iterator i = begin; i != end; ++i) {
         std::smatch match = *i;
-        
+
         // Add text before the phoneme notation
         if (static_cast<size_t>(match.position()) > lastPos) {
             TextOrPhonemes textSegment;
@@ -65,7 +65,7 @@ std::vector<TextOrPhonemes> parsePhonemeNotation(const std::string& input) {
             textSegment.text = input.substr(lastPos, match.position() - lastPos);
             result.push_back(textSegment);
         }
-        
+
         // Add the phonemes
         TextOrPhonemes phonemeSegment;
         phonemeSegment.isPhonemes = true;
@@ -75,10 +75,10 @@ std::vector<TextOrPhonemes> parsePhonemeNotation(const std::string& input) {
         phonemeSegment.text = phonemeStr; // Store trimmed phoneme string
         // Phonemes will be parsed later based on the phoneme type
         result.push_back(phonemeSegment);
-        
+
         lastPos = match.position() + match.length();
     }
-    
+
     // Add any remaining text
     if (lastPos < input.length()) {
         TextOrPhonemes textSegment;
@@ -86,7 +86,7 @@ std::vector<TextOrPhonemes> parsePhonemeNotation(const std::string& input) {
         textSegment.text = input.substr(lastPos);
         result.push_back(textSegment);
     }
-    
+
     return result;
 }
 
@@ -94,11 +94,11 @@ std::vector<Phoneme> parsePhonemeString(const std::string& phonemeStr, PhonemeTy
     std::vector<Phoneme> phonemes;
     std::istringstream iss(phonemeStr);
     std::string token;
-    
+
     // Split by whitespace
     while (iss >> token) {
         if (token.empty()) continue;
-        
+
         if (phonemeType == PHONEME_TYPE_OPENJTALK) {
             // For Japanese, check if it's a multi-character phoneme
             auto it = japanesePhonemePUA.find(token);
@@ -129,11 +129,11 @@ std::vector<Phoneme> parsePhonemeString(const std::string& phonemeStr, PhonemeTy
                 const char* str = token.c_str();
                 size_t len = token.length();
                 size_t i = 0;
-                
+
                 while (i < len) {
                     char32_t codepoint = 0;
                     unsigned char c = str[i];
-                    
+
                     if ((c & 0x80) == 0) {
                         // ASCII character
                         codepoint = c;
@@ -157,7 +157,7 @@ std::vector<Phoneme> parsePhonemeString(const std::string& phonemeStr, PhonemeTy
                     } else if ((c & 0xF8) == 0xF0) {
                         // 4-byte UTF-8
                         if (i + 3 < len) {
-                            codepoint = ((c & 0x07) << 18) | ((str[i+1] & 0x3F) << 12) | 
+                            codepoint = ((c & 0x07) << 18) | ((str[i+1] & 0x3F) << 12) |
                                        ((str[i+2] & 0x3F) << 6) | (str[i+3] & 0x3F);
                             i += 4;
                         } else {
@@ -168,7 +168,7 @@ std::vector<Phoneme> parsePhonemeString(const std::string& phonemeStr, PhonemeTy
                         i++;
                         continue;
                     }
-                    
+
                     if (codepoint > 0) {
                         phonemes.push_back(codepoint);
                     }
@@ -176,7 +176,7 @@ std::vector<Phoneme> parsePhonemeString(const std::string& phonemeStr, PhonemeTy
             }
         }
     }
-    
+
     spdlog::debug("Parsed {} phonemes from string: {}", phonemes.size(), phonemeStr);
     return phonemes;
 }

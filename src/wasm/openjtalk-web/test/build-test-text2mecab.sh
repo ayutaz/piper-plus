@@ -13,7 +13,7 @@ OPEN_JTALK_DIR="$WASM_OPENJTALK_DIR/tools/open_jtalk"
 # Build test
 echo "Building text2mecab test..."
 
-# Include paths  
+# Include paths
 INCLUDE_FLAGS="-I$OPEN_JTALK_DIR/src/text2mecab"
 
 # Compile

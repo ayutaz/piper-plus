@@ -27,4 +27,3 @@ set(patch "\n# Injected by piper-plus build: force UTF-8 on MSVC for all subproj
 file(APPEND "${src}" "${patch}")
 
 message(STATUS "Applied UTF-8 compile options to ${src}")
-

@@ -22,10 +22,10 @@ cat > "$PROJECT_ROOT/demo/espeak-test.html" << 'EOF'
 <body>
     <h1>eSpeak-ng WebAssembly Test</h1>
     <p>Status: <span id="status">Loading...</span></p>
-    
+
     <div>
         <label>Text: <input type="text" id="text" value="Hello world" size="40"></label>
-        <label>Language: 
+        <label>Language:
             <select id="lang">
                 <option value="en">English</option>
                 <option value="es">Spanish</option>
@@ -37,7 +37,7 @@ cat > "$PROJECT_ROOT/demo/espeak-test.html" << 'EOF'
         </label>
         <button onclick="testPhonemes()">Get Phonemes</button>
     </div>
-    
+
     <div>
         <h3>Result:</h3>
         <pre id="result"></pre>
@@ -49,10 +49,10 @@ cat > "$PROJECT_ROOT/demo/espeak-test.html" << 'EOF'
         // 1. Use the official build from espeak-ng/emscripten
         // 2. Use meSpeak.js as a fallback
         // 3. Build our own using Emscripten
-        
+
         const status = document.getElementById('status');
         const result = document.getElementById('result');
-        
+
         // Check if we have the official eSpeak-ng files
         if (typeof eSpeakNG !== 'undefined') {
             status.textContent = 'eSpeak-ng loaded';
@@ -77,11 +77,11 @@ Without Emscripten, we're limited to the simplified phonemizer
 which doesn't match Python's eSpeak-ng quality.
             `;
         }
-        
+
         function testPhonemes() {
             const text = document.getElementById('text').value;
             const lang = document.getElementById('lang').value;
-            
+
             if (typeof eSpeakNG !== 'undefined') {
                 // Use real eSpeak-ng
                 // This would require the proper worker setup

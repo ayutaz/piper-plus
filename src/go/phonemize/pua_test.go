@@ -206,11 +206,11 @@ func TestFixedPUA_NoDuplicateTokens(t *testing.T) {
 // TestFixedPUA_CodepointRanges verifies that each language group uses its documented range.
 func TestFixedPUA_CodepointRanges(t *testing.T) {
 	ranges := map[string][2]rune{
-		"JA":     {0xE000, 0xE01C},
-		"shared": {0xE01D, 0xE01E},
-		"ZH":     {0xE020, 0xE04A},
-		"KO":     {0xE04B, 0xE052},
-		"ES/PT":  {0xE054, 0xE055},
+		"JA":       {0xE000, 0xE01C},
+		"shared":   {0xE01D, 0xE01E},
+		"ZH":       {0xE020, 0xE04A},
+		"KO":       {0xE04B, 0xE052},
+		"ES/PT":    {0xE054, 0xE055},
 		"FR":       {0xE056, 0xE058},
 		"SV":       {0xE059, 0xE061},
 		"MULTI_V2": {0xE062, 0xE064},
@@ -227,11 +227,11 @@ func TestFixedPUA_CodepointRanges(t *testing.T) {
 // TestFixedPUA_GroupCounts verifies each language group has the expected number of entries.
 func TestFixedPUA_GroupCounts(t *testing.T) {
 	expected := map[string]int{
-		"JA":     29,
-		"shared": 2,
-		"ZH":     43,
-		"KO":     8,
-		"ES/PT":  2,
+		"JA":       29,
+		"shared":   2,
+		"ZH":       43,
+		"KO":       8,
+		"ES/PT":    2,
 		"FR":       3,
 		"SV":       9,
 		"MULTI_V2": 3,

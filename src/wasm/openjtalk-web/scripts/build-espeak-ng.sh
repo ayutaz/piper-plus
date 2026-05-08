@@ -88,15 +88,15 @@ EMSCRIPTEN_KEEPALIVE
 const char* espeak_text_to_phonemes(const char* text, const char* voice) {
     static char phonemes[1024];
     espeak_SetVoiceByName(voice);
-    
+
     const void *user_data = NULL;
     unsigned int position = 0;
     espeak_POSITION_TYPE position_type = POS_CHARACTER;
-    
-    espeak_TextToPhonemes(&text, phonemes, sizeof(phonemes), 
-                          espeakCHARS_UTF8 | espeakPHONEMES_IPA, &position, 
+
+    espeak_TextToPhonemes(&text, phonemes, sizeof(phonemes),
+                          espeakCHARS_UTF8 | espeakPHONEMES_IPA, &position,
                           position_type, &user_data);
-    
+
     return phonemes;
 }
 
@@ -153,36 +153,36 @@ cat > "$PROJECT_ROOT/demo/espeak-ng-test.html" << 'EOF'
 
     <script type="module">
         import createEspeakNGModule from '../dist/espeak-ng.js';
-        
+
         let Module;
         let espeakInitialized = false;
-        
+
         window.initEspeak = async function() {
             Module = await createEspeakNGModule();
             const result = Module.ccall('espeak_initialize', 'number', [], []);
             espeakInitialized = result >= 0;
             console.log('eSpeak-ng initialized:', espeakInitialized);
         };
-        
+
         window.convert = function() {
             if (!espeakInitialized) {
                 alert('Please wait for initialization');
                 return;
             }
-            
+
             const text = document.getElementById('text').value;
             const voice = document.getElementById('voice').value;
-            
+
             const phonemes = Module.ccall(
                 'espeak_text_to_phonemes',
                 'string',
                 ['string', 'string'],
                 [text, voice]
             );
-            
+
             document.getElementById('result').innerText = 'Phonemes: ' + phonemes;
         };
-        
+
         // Initialize on load
         initEspeak();
     </script>

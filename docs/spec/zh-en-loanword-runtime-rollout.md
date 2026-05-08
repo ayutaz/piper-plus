@@ -1143,7 +1143,7 @@ let phonemizer2 = ChinesePhonemizer::new(default_loanword_data());
 public class ChinesePhonemizer {
     private static readonly Lazy<LoanwordData> s_default =
         new(() => LoanwordDataLoader.LoadDefault(), LazyThreadSafetyMode.ExecutionAndPublication);
-    
+
     public ChinesePhonemizer(string? customPath = null) {
         _data = customPath == null ? s_default.Value : LoadAndMerge(customPath);
     }
@@ -1736,4 +1736,3 @@ jobs:
 ---
 
 <!-- 改訂履歴は git log に統合 (実装完了に伴い削除、2026-05-08) -->
-

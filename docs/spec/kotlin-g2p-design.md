@@ -499,4 +499,3 @@ GitHub Actions の Ubuntu runner は KVM をサポートするため、ヘッド
 ---
 
 <!-- 改訂履歴は git log に統合 (実装完了に伴い削除、2026-05-08) -->
-

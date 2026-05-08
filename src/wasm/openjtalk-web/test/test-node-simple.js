@@ -53,7 +53,7 @@ try {
     console.log('Dictionary file check:');
     console.log(`- sys.dic size: ${dictData.length} bytes`);
     console.log(`- First 16 bytes (hex): ${dictData.slice(0, 16).toString('hex')}`);
-    
+
     // Check if it starts with MeCab dictionary magic
     if (dictData[0] === 0xDA && dictData[1] === 0xC0) {
         console.log('- Appears to be a valid MeCab dictionary (starts with 0xDAC0)');

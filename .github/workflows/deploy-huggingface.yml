@@ -42,27 +42,27 @@ jobs:
         run: |
           # Create a temporary directory for the Space
           mkdir -p hf-space-deploy
-          
+
           echo "Preparing Hugging Face Space deployment..."
-          
+
           # Copy application files
           cp huggingface-space/app.py hf-space-deploy/
           cp huggingface-space/app_imports.py hf-space-deploy/
           cp huggingface-space/download_models.py hf-space-deploy/
           cp huggingface-space/requirements.txt hf-space-deploy/
           cp huggingface-space/README.md hf-space-deploy/
-          
+
           # Copy actual model files from test/models
           mkdir -p hf-space-deploy/models
           echo "Copying model files..."
-          
+
           # Copy multilingual model
           if [ -f "test/models/multilingual-test-medium.onnx" ]; then
             cp test/models/multilingual-test-medium.onnx hf-space-deploy/models/
             cp test/models/multilingual-test-medium.onnx.json hf-space-deploy/models/
             echo "✓ Copied multilingual model ($(du -h test/models/multilingual-test-medium.onnx | cut -f1))"
           fi
-          
+
           # Show total size of models
           echo "Total model size: $(du -sh hf-space-deploy/models | cut -f1)"
 
@@ -190,16 +190,15 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Space URL**: https://huggingface.co/spaces/ayousanz/piper-plus-demo" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          
+
           # Show model information
           echo "**Deployed Models**:" >> $GITHUB_STEP_SUMMARY
           if [ -f "hf-space-deploy/models/multilingual-test-medium.onnx" ]; then
             echo "- Multilingual Model: $(du -h hf-space-deploy/models/multilingual-test-medium.onnx | cut -f1)" >> $GITHUB_STEP_SUMMARY
           fi
           echo "" >> $GITHUB_STEP_SUMMARY
-          
+
           echo "**Deployed files**:" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
           find hf-space-deploy -type f | sort >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-

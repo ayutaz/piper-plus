@@ -16,22 +16,22 @@ jobs:
     name: Test Multilingual TTS on ARM64
     runs-on: ubuntu-24.04
     timeout-minutes: 90
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
         with:
           submodules: recursive
-          
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v4
         with:
           platforms: arm64
           image: tonistiigi/binfmt:latest
-          
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
-          
+
       - name: Build ARM64 Docker image
         run: |
           # Always build locally for PR since pre-built images are not available yet
@@ -45,7 +45,7 @@ jobs:
             --cache-from type=gha \
             --cache-to type=gha,mode=max \
             -f Dockerfile .
-            
+
       - name: Run ARM64 multilingual build verification
         run: |
           # Run build verification first
@@ -53,27 +53,27 @@ jobs:
             -v "$(pwd)/test":/test \
             piper-arm64-multilingual:latest \
             bash /test/test_arm64_multilingual.sh
-            
+
       - name: Download multilingual test models
         run: |
           mkdir -p test/models
-          
+
           # Download German model
           echo "Downloading German test model..."
           curl -L -o test/models/de_DE-thorsten-high.onnx \
             "https://github.com/rhasspy/piper/releases/download/v1.0.0/de_DE-thorsten-high.onnx"
           curl -L -o test/models/de_DE-thorsten-high.onnx.json \
             "https://github.com/rhasspy/piper/releases/download/v1.0.0/de_DE-thorsten-high.onnx.json"
-          
+
           # Download French model
           echo "Downloading French test model..."
           curl -L -o test/models/fr_FR-siwis-medium.onnx \
             "https://github.com/rhasspy/piper/releases/download/v1.0.0/fr_FR-siwis-medium.onnx"
           curl -L -o test/models/fr_FR-siwis-medium.onnx.json \
             "https://github.com/rhasspy/piper/releases/download/v1.0.0/fr_FR-siwis-medium.onnx.json"
-          
+
           ls -la test/models/
-          
+
       - name: Run German TTS test
         run: |
           docker run --rm \
@@ -90,7 +90,7 @@ jobs:
                 echo '⚠️ German TTS timed out or failed (QEMU limitation)'
                 touch /test/german_arm64.wav
               }
-              
+
               if [ -f /test/german_arm64.wav ]; then
                 echo '✅ German TTS test completed'
                 ls -la /test/german_arm64.wav
@@ -98,7 +98,7 @@ jobs:
                 echo '⚠️ German TTS test skipped'
               fi
             "
-            
+
       - name: Run French TTS test
         run: |
           docker run --rm \
@@ -115,7 +115,7 @@ jobs:
                 echo '⚠️ French TTS timed out or failed (QEMU limitation)'
                 touch /test/french_arm64.wav
               }
-              
+
               if [ -f /test/french_arm64.wav ]; then
                 echo '✅ French TTS test completed'
                 ls -la /test/french_arm64.wav
@@ -123,7 +123,7 @@ jobs:
                 echo '⚠️ French TTS test skipped'
               fi
             "
-            
+
       - name: Test espeak-ng functionality
         run: |
           docker run --rm \
@@ -132,12 +132,12 @@ jobs:
             piper-arm64-multilingual:latest \
             bash -c "
               echo '=== Testing espeak-ng availability ==='
-              
+
               # Check if espeak-ng library is linked
               ldd /build/install/bin/piper | grep -q espeak && \
                 echo '✅ espeak-ng library linked' || \
                 echo '❌ espeak-ng library not found'
-              
+
               # Check espeak-ng data
               if [ -d /build/install/share/espeak-ng-data ]; then
                 echo '✅ espeak-ng data found'
@@ -146,7 +146,7 @@ jobs:
                 echo '⚠️ espeak-ng data not found'
               fi
             "
-      
+
       - name: Upload multilingual test outputs
         uses: actions/upload-artifact@v7
         if: always()

@@ -77,10 +77,10 @@ Language detectLanguage(const std::string& text) {
     // Simple language detection based on character ranges
     bool hasJapanese = false;
     bool hasEnglish = false;
-    
+
     for (const char& c : text) {
         unsigned char uc = static_cast<unsigned char>(c);
-        
+
         // Check for Japanese characters (simplified)
         if (uc >= 0x80) {
             // Multi-byte character, could be Japanese
@@ -89,13 +89,13 @@ Language detectLanguage(const std::string& text) {
             hasEnglish = true;
         }
     }
-    
+
     if (hasJapanese) {
         return Language::JAPANESE;
     } else if (hasEnglish) {
         return Language::ENGLISH;
     }
-    
+
     return Language::OTHER;
 }
 
@@ -114,7 +114,7 @@ int phonemizer_initialize_espeak(const char* data_path) {
     if (result < 0) {
         return result;
     }
-    
+
     // Set default English voice
     espeak_SetVoiceByName("en");
     return 0;
@@ -125,9 +125,9 @@ char* phonemizer_text_to_phonemes(const char* text, const char* language_hint) {
     if (!text || strlen(text) == 0) {
         return strdup("ERROR: Empty text");
     }
-    
+
     Language lang = Language::ENGLISH;
-    
+
     // Use language hint if provided
     if (language_hint && strlen(language_hint) > 0) {
         if (strcmp(language_hint, "ja") == 0 || strcmp(language_hint, "japanese") == 0) {
@@ -139,7 +139,7 @@ char* phonemizer_text_to_phonemes(const char* text, const char* language_hint) {
         // Auto-detect language
         lang = detectLanguage(text);
     }
-    
+
     if (lang == Language::JAPANESE) {
         // Use OpenJTalk for Japanese
         return openjtalk_synthesis_labels(text);
@@ -147,11 +147,11 @@ char* phonemizer_text_to_phonemes(const char* text, const char* language_hint) {
         // Use eSpeak-ng for English and other languages
         const char* textptr = text;
         const char* phonemes = espeak_TextToPhonemes(
-            (const void**)&textptr, 
-            espeakCHARS_UTF8, 
+            (const void**)&textptr,
+            espeakCHARS_UTF8,
             espeakPHONEMES_IPA
         );
-        
+
         if (phonemes) {
             return strdup(phonemes);
         } else {
@@ -163,7 +163,7 @@ char* phonemizer_text_to_phonemes(const char* text, const char* language_hint) {
 EMSCRIPTEN_KEEPALIVE
 void phonemizer_set_language(const char* language) {
     if (!language) return;
-    
+
     if (strcmp(language, "en") == 0 || strcmp(language, "en-us") == 0) {
         espeak_SetVoiceByName("en");
     } else if (strcmp(language, "en-gb") == 0) {

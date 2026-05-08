@@ -87,7 +87,7 @@ foreach(test_source ${TEST_SOURCES})
         gtest
         gtest_main
     )
-    
+
     # Add Windows-specific library directories for all tests
     if(WIN32)
         target_link_directories(${test_name} PRIVATE
@@ -95,7 +95,7 @@ foreach(test_source ${TEST_SOURCES})
             ${CMAKE_BINARY_DIR}/si/lib
         )
     endif()
-    
+
     # Add spdlog/fmt dependencies for all tests
     if(TARGET spdlog_external)
         add_dependencies(${test_name} spdlog_external)
@@ -103,13 +103,13 @@ foreach(test_source ${TEST_SOURCES})
     if(TARGET fmt_external)
         add_dependencies(${test_name} fmt_external)
     endif()
-    
+
     # Add include directories for spdlog/fmt
     target_include_directories(${test_name} PRIVATE
         ${CMAKE_BINARY_DIR}/si/include
         ${CMAKE_BINARY_DIR}/fi/include
     )
-    
+
     # Link additional dependencies for dictionary manager test
     if(${test_name} STREQUAL "test_dictionary_manager" AND NOT WIN32 AND NOT MSVC)
         target_sources(${test_name} PRIVATE
@@ -122,7 +122,7 @@ foreach(test_source ${TEST_SOURCES})
             OPENJTALK_DIC_PATH="../share/open_jtalk/dic"
         )
     endif()
-    
+
     # Link utf8_utils.hpp include path for split sentences test
     if(${test_name} STREQUAL "test_split_sentences")
         target_include_directories(${test_name} PRIVATE

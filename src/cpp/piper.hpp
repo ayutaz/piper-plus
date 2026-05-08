@@ -200,9 +200,9 @@ void textToWavFile(PiperConfig &config, Voice &voice, std::string text,
                    const std::vector<ProsodyFeature> *externalProsody = nullptr);
 
 // Synthesize audio directly from phonemes
-void phonemesToAudio(PiperConfig &config, Voice &voice, 
+void phonemesToAudio(PiperConfig &config, Voice &voice,
                      const std::vector<Phoneme> &phonemes,
-                     std::vector<int16_t> &audioBuffer, 
+                     std::vector<int16_t> &audioBuffer,
                      SynthesisResult &result,
                      const std::function<void()> &audioCallback = nullptr);
 

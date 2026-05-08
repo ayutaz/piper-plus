@@ -25,24 +25,24 @@ const fixtureFile = "../../../tests/fixtures/g2p/phoneme_test_cases.json"
 // ---------------------------------------------------------------------------
 
 type goldenFixture struct {
-	Version          int                `json:"version"`
-	TestCases        []goldenTestCase   `json:"test_cases"`
-	PUAMapCount      int                `json:"pua_map_count"`
-	PUASpotChecks    []puaSpotCheck     `json:"pua_spot_checks"`
-	DetectCases      []detectTestCase   `json:"detect_test_cases"`
-	EncodeTestCases  []encodeTestCase   `json:"encode_test_cases"`
+	Version         int              `json:"version"`
+	TestCases       []goldenTestCase `json:"test_cases"`
+	PUAMapCount     int              `json:"pua_map_count"`
+	PUASpotChecks   []puaSpotCheck   `json:"pua_spot_checks"`
+	DetectCases     []detectTestCase `json:"detect_test_cases"`
+	EncodeTestCases []encodeTestCase `json:"encode_test_cases"`
 }
 
 type goldenTestCase struct {
-	Language              string   `json:"language"`
-	Input                 string   `json:"input"`
-	Description           string   `json:"description"`
-	ExpectedTokens        []string `json:"expected_tokens,omitempty"`
-	ExpectedTokenCountMin int      `json:"expected_token_count_min,omitempty"`
-	ExpectedContains      []string `json:"expected_contains,omitempty"`
-	ExpectedNotContains   []string `json:"expected_not_contains,omitempty"`
-	ExpectedHasQuestion   *bool    `json:"expected_has_question_marker,omitempty"`
-	ExpectedContainsAnyTone *bool  `json:"expected_contains_any_tone,omitempty"`
+	Language                string   `json:"language"`
+	Input                   string   `json:"input"`
+	Description             string   `json:"description"`
+	ExpectedTokens          []string `json:"expected_tokens,omitempty"`
+	ExpectedTokenCountMin   int      `json:"expected_token_count_min,omitempty"`
+	ExpectedContains        []string `json:"expected_contains,omitempty"`
+	ExpectedNotContains     []string `json:"expected_not_contains,omitempty"`
+	ExpectedHasQuestion     *bool    `json:"expected_has_question_marker,omitempty"`
+	ExpectedContainsAnyTone *bool    `json:"expected_contains_any_tone,omitempty"`
 }
 
 type puaSpotCheck struct {

@@ -34,7 +34,7 @@ var eosOnlyTokens = map[string]bool{
 // All transient mutable state (EOSToken tracking, per-call dispatch
 // computation) is passed through return values or local variables; the only
 // configuration field that can change after construction is
-// ``enableZhEnDispatch``, which is stored as ``atomic.Bool`` so concurrent
+// “enableZhEnDispatch“, which is stored as “atomic.Bool“ so concurrent
 // SetZhEnDispatch / IsZhEnDispatchEnabled / PhonemizeWithProsody calls do not
 // race. The underlying per-language phonemizers must also be safe for
 // concurrent use.

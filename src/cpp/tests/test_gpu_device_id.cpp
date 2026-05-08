@@ -22,7 +22,7 @@ protected:
         // Clear environment variable before each test
         unsetenv("PIPER_GPU_DEVICE_ID");
     }
-    
+
     void TearDown() override {
         // Clean up environment variable
         unsetenv("PIPER_GPU_DEVICE_ID");
@@ -36,7 +36,7 @@ TEST_F(GPUDeviceIdTest, EnvironmentVariableParsing) {
     const char* env_value = std::getenv("PIPER_GPU_DEVICE_ID");
     ASSERT_NE(env_value, nullptr);
     EXPECT_EQ(std::stoi(env_value), 2);
-    
+
     // Test invalid values don't crash
     setenv("PIPER_GPU_DEVICE_ID", "invalid", 1);
     env_value = std::getenv("PIPER_GPU_DEVICE_ID");
@@ -56,7 +56,7 @@ TEST_F(GPUDeviceIdTest, DefaultGPUDeviceId) {
     // When no environment variable is set, default should be 0
     const char* env_value = std::getenv("PIPER_GPU_DEVICE_ID");
     EXPECT_EQ(env_value, nullptr);
-    
+
     // In actual usage, the default value in RunConfig should be 0
     // This is verified at compile time by the struct definition
 }
@@ -68,7 +68,7 @@ TEST_F(GPUDeviceIdTest, LargeDeviceIds) {
     const char* env_value = std::getenv("PIPER_GPU_DEVICE_ID");
     ASSERT_NE(env_value, nullptr);
     EXPECT_EQ(std::stoi(env_value), 7);
-    
+
     // Test a very large ID
     setenv("PIPER_GPU_DEVICE_ID", "255", 1);
     env_value = std::getenv("PIPER_GPU_DEVICE_ID");
@@ -82,7 +82,7 @@ TEST_F(GPUDeviceIdTest, NegativeDeviceIds) {
     const char* env_value = std::getenv("PIPER_GPU_DEVICE_ID");
     ASSERT_NE(env_value, nullptr);
     EXPECT_EQ(std::stoi(env_value), -1);
-    
+
     // Negative values should be passed through to CUDA runtime
     // which will handle the error appropriately
 }
@@ -123,13 +123,13 @@ TEST_F(GPUDeviceIdTest, ZeroDeviceId) {
 TEST_F(GPUDeviceIdTest, CommandLineFormatValidation) {
     // This test verifies that the expected command line formats are valid
     // The actual parsing is done in main.cpp
-    
+
     // Valid formats
     std::vector<std::string> valid_args = {
         "--gpu-device-id",
         "--gpu_device_id"
     };
-    
+
     for (const auto& arg : valid_args) {
         // Check that the argument string is well-formed
         EXPECT_FALSE(arg.empty());

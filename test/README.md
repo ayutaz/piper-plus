@@ -7,7 +7,7 @@
 - `models/` - テスト用の音声合成モデル
   - `multilingual-test-medium.onnx` - 日本語テストモデル（カスタム辞書対応）
   - `multilingual-test-medium.onnx.json` - モデルの設定ファイル
-  
+
 - `configs/` - テスト用の設定ファイル
   - `multilingual_test_config.json` - マルチリンガルテスト設定
 

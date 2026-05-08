@@ -13,7 +13,7 @@
     "TTS": {"pronunciation": "ティーティーエス", "priority": 10},
     "ONNX": {"pronunciation": "オニックス", "priority": 10},
     "OpenJTalk": {"pronunciation": "オープンジェイトーク", "priority": 10},
-    
+
     "// プログラミング言語": "",
     "Python": {"pronunciation": "パイソン", "priority": 9},
     "JavaScript": {"pronunciation": "ジャバスクリプト", "priority": 9},
@@ -26,7 +26,7 @@
     "PHP": {"pronunciation": "ピーエイチピー", "priority": 9},
     "Swift": {"pronunciation": "スイフト", "priority": 9},
     "Kotlin": {"pronunciation": "コトリン", "priority": 9},
-    
+
     "// 開発ツール・プラットフォーム": "",
     "Docker": {"pronunciation": "ドッカー", "priority": 9},
     "GitHub": {"pronunciation": "ギットハブ", "priority": 9},
@@ -40,7 +40,7 @@
     "Jenkins": {"pronunciation": "ジェンキンス", "priority": 9},
     "Kubernetes": {"pronunciation": "クバネティス", "priority": 9},
     "k8s": {"pronunciation": "ケーエイツ", "priority": 9},
-    
+
     "// フレームワーク・ライブラリ": "",
     "React": {"pronunciation": "リアクト", "priority": 8},
     "Vue": {"pronunciation": "ビュー", "priority": 8},
@@ -56,7 +56,7 @@
     "TensorFlow": {"pronunciation": "テンソルフロー", "priority": 8},
     "NumPy": {"pronunciation": "ナムパイ", "priority": 8},
     "Pandas": {"pronunciation": "パンダス", "priority": 8},
-    
+
     "// クラウド・インフラ": "",
     "AWS": {"pronunciation": "エーダブリューエス", "priority": 8},
     "Amazon": {"pronunciation": "アマゾン", "priority": 8},
@@ -69,7 +69,7 @@
     "Heroku": {"pronunciation": "ヘロク", "priority": 8},
     "Vercel": {"pronunciation": "バーセル", "priority": 8},
     "Netlify": {"pronunciation": "ネトリファイ", "priority": 8},
-    
+
     "// データベース": "",
     "MySQL": {"pronunciation": "マイエスキューエル", "priority": 7},
     "PostgreSQL": {"pronunciation": "ポストグレスキューエル", "priority": 7},
@@ -78,7 +78,7 @@
     "SQLite": {"pronunciation": "エスキューライト", "priority": 7},
     "Oracle": {"pronunciation": "オラクル", "priority": 7},
     "Elasticsearch": {"pronunciation": "エラスティックサーチ", "priority": 7},
-    
+
     "// Web技術": "",
     "HTML": {"pronunciation": "エイチティーエムエル", "priority": 8},
     "CSS": {"pronunciation": "シーエスエス", "priority": 8},
@@ -90,14 +90,14 @@
     "WebSocket": {"pronunciation": "ウェブソケット", "priority": 8},
     "OAuth": {"pronunciation": "オーオース", "priority": 8},
     "JWT": {"pronunciation": "ジェイダブリューティー", "priority": 8},
-    
+
     "// データフォーマット": "",
     "JSON": {"pronunciation": "ジェイソン", "priority": 9},
     "XML": {"pronunciation": "エックスエムエル", "priority": 8},
     "YAML": {"pronunciation": "ヤムル", "priority": 8},
     "CSV": {"pronunciation": "シーエスブイ", "priority": 8},
     "Markdown": {"pronunciation": "マークダウン", "priority": 8},
-    
+
     "// AI・機械学習": "",
     "AI": {"pronunciation": "エーアイ", "priority": 9},
     "ML": {"pronunciation": "エムエル", "priority": 8},
@@ -113,7 +113,7 @@
     "CPU": {"pronunciation": "シーピーユー", "priority": 9},
     "TPU": {"pronunciation": "ティーピーユー", "priority": 8},
     "CUDA": {"pronunciation": "クーダ", "priority": 8},
-    
+
     "// その他の技術用語": "",
     "WebAssembly": {"pronunciation": "ウェブアセンブリ", "priority": 8},
     "WASM": {"pronunciation": "ワズム", "priority": 8},
@@ -138,7 +138,7 @@
     "UTF-8": {"pronunciation": "ユーティーエフハチ", "priority": 8},
     "ASCII": {"pronunciation": "アスキー", "priority": 8},
     "Base64": {"pronunciation": "ベースロクジュウヨン", "priority": 8},
-    
+
     "// 企業・サービス名": "",
     "Microsoft": {"pronunciation": "マイクロソフト", "priority": 7},
     "Apple": {"pronunciation": "アップル", "priority": 7},

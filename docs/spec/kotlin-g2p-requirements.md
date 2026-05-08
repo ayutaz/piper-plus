@@ -579,4 +579,3 @@ JSON v1.0 / v2.0 schema は既存 (`docs/spec/custom-dictionary-schema.toml` 等
 ---
 
 <!-- 改訂履歴は git log に統合 (実装完了に伴い削除、2026-05-08) -->
-
