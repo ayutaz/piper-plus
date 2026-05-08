@@ -30,7 +30,7 @@ public sealed class ShortTextContractTests
 
     private static JsonElement LoadContract()
     {
-        string path = Path.Combine(
+        string path = Path.Join(
             AppContext.BaseDirectory,
             "TestData",
             "short_text_contract.json");

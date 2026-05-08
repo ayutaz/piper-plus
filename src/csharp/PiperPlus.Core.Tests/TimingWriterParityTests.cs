@@ -152,14 +152,13 @@ public sealed class TimingWriterParityTests
 
     private static JsonElement FindCase(JsonElement fixture, string caseName)
     {
-        foreach (var c in fixture.GetProperty("cases").EnumerateArray())
-        {
-            if (c.GetProperty("name").GetString() == caseName)
-            {
-                return c.Clone();
-            }
-        }
-        throw new KeyNotFoundException($"case not found in fixture: {caseName}");
+        var match = fixture.GetProperty("cases").EnumerateArray()
+            .Where(c => c.GetProperty("name").GetString() == caseName)
+            .Select(c => (JsonElement?)c.Clone())
+            .FirstOrDefault();
+
+        return match ?? throw new KeyNotFoundException(
+            $"case not found in fixture: {caseName}");
     }
 
     /// <summary>
@@ -171,7 +170,7 @@ public sealed class TimingWriterParityTests
         var dir = AppContext.BaseDirectory;
         for (int i = 0; i < 12; i++)
         {
-            var candidate = Path.Combine(
+            var candidate = Path.Join(
                 dir, "tests", "fixtures", "phoneme_timing", "golden_matrix.json");
             if (File.Exists(candidate))
             {

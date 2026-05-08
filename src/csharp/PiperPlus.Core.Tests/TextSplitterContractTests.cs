@@ -33,7 +33,7 @@ public class TextSplitterContractTests
         // First try that path; otherwise walk up to repo root and look in
         // tests/fixtures/text_splitter/.
         var here = Path.GetDirectoryName(typeof(TextSplitterContractTests).Assembly.Location)!;
-        var local = Path.Combine(here, "TestData", "text_splitter_contract.json");
+        var local = Path.Join(here, "TestData", "text_splitter_contract.json");
         if (File.Exists(local))
         {
             return local;
@@ -42,7 +42,7 @@ public class TextSplitterContractTests
         var dir = new DirectoryInfo(here);
         while (dir != null)
         {
-            var candidate = Path.Combine(dir.FullName, "tests", "fixtures", "text_splitter", "contract.json");
+            var candidate = Path.Join(dir.FullName, "tests", "fixtures", "text_splitter", "contract.json");
             if (File.Exists(candidate))
             {
                 return candidate;
