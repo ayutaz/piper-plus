@@ -11,6 +11,13 @@ on:
       - "src/rust/Cargo.lock"
       - "src/wasm/**/package.json"
       - "src/wasm/**/package-lock.json"
+      - "src/go/go.mod"
+      - "src/go/go.sum"
+      - "src/csharp/**/*.csproj"
+      - "src/csharp/PiperPlus.sln"
+      - "docker/python-inference/**"
+      - "docker/wyoming/**"
+      - "docker/webui/**"
       - ".github/workflows/security-audit.yml"
   push:
     branches: [dev, main]
@@ -37,6 +44,9 @@ jobs:
           comment-summary-in-pr: on-failure
 
   # Python: pip-audit
+  # PR では false-negative 防止のため block しないが (`continue-on-error: true`)、
+  # schedule (毎週) と push (dev/main) では真に block する。これにより日常の
+  # PR レビューを止めずに、最新 CVE を確実に検出する 2 階層運用にする。
   pip-audit:
     name: pip-audit (Python)
     runs-on: ubuntu-24.04
@@ -48,12 +58,13 @@ jobs:
       - name: Install pip-audit
         run: pip install pip-audit
       - name: Audit root requirements
-        continue-on-error: true
+        # PR は warning、schedule/push は fail。
+        continue-on-error: ${{ github.event_name == 'pull_request' }}
         run: |
           pip-audit --requirement <(uv pip compile pyproject.toml 2>/dev/null) --strict --vulnerability-service osv || \
           pip-audit --strict --vulnerability-service osv
       - name: Audit src/python_run
-        continue-on-error: true
+        continue-on-error: ${{ github.event_name == 'pull_request' }}
         working-directory: src/python_run
         run: pip-audit --strict --vulnerability-service osv
 
@@ -101,11 +112,113 @@ jobs:
         # production 依存の HIGH 以上のみ失敗扱い (devDependencies は警告)
         run: npm audit --omit=dev --audit-level=high
 
+  # Go: govulncheck
+  # golang.org/x/vuln/cmd/govulncheck で Go モジュールの既知 CVE を検出。
+  # cargo-audit / pip-audit / npm-audit と並列に Go ランタイムをカバー。
+  govulncheck:
+    name: govulncheck (Go)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.26"
+          cache-dependency-path: src/go/go.sum
+      - name: Install govulncheck
+        run: go install golang.org/x/vuln/cmd/govulncheck@latest
+      - name: Run govulncheck
+        working-directory: src/go
+        # ./... で全 package。実 CVE のみ非ゼロ exit。
+        run: govulncheck ./...
+
+  # NuGet: dotnet list package --vulnerable
+  # `dotnet list ... --vulnerable --include-transitive` の出力をパースして
+  # High / Critical severity が 1 件でもあれば fail。
+  nuget-audit:
+    name: nuget-audit (.NET)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+      - name: Restore packages
+        run: dotnet restore src/csharp/PiperPlus.sln
+      - name: Check for vulnerable packages
+        run: |
+          set -o pipefail
+          # `--vulnerable --include-transitive` は dotnet 6+ で利用可能。
+          OUTPUT=$(dotnet list src/csharp/PiperPlus.sln package --vulnerable --include-transitive 2>&1 | tee /tmp/nuget-audit.log)
+          echo "$OUTPUT"
+          # Severity 行 (例: `> Microsoft.X 1.0.0 1.0.0 High`) を抽出。
+          # "no vulnerable" メッセージが出ていれば pass。
+          if echo "$OUTPUT" | grep -qiE "no vulnerable packages"; then
+            echo "::notice::No vulnerable NuGet packages found."
+            exit 0
+          fi
+          # High / Critical を fail 条件にする。
+          if echo "$OUTPUT" | grep -qiE "(>[[:space:]]+\S+.*\b(High|Critical)\b)"; then
+            echo "::error::High/Critical severity vulnerable NuGet package(s) found."
+            exit 1
+          fi
+          # Moderate / Low は warning のみ。
+          if echo "$OUTPUT" | grep -qiE "(>[[:space:]]+\S+.*\b(Moderate|Low)\b)"; then
+            echo "::warning::Moderate/Low severity vulnerable NuGet package(s) found (not blocking)."
+          fi
+
+  # Trivy: Docker image / Dockerfile config scan
+  # `docker/python-inference`, `docker/wyoming`, `docker/webui` の 3 image を
+  # 対象に Dockerfile の misconfig (Trivy config scan) と build した image の
+  # OS package CVE (Trivy image scan) を両方検査。
+  trivy-docker-scan:
+    name: trivy-docker (${{ matrix.image }})
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [python-inference, wyoming, webui]
+    steps:
+      - uses: actions/checkout@v6
+      - name: Trivy config scan (Dockerfile)
+        # Dockerfile の misconfiguration (USER root のまま終わる、HEALTHCHECK
+        # 未設定など) を build なしで検出。CRITICAL/HIGH のみ fail。
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: config
+          scan-ref: docker/${{ matrix.image }}
+          exit-code: "1"
+          severity: "CRITICAL,HIGH"
+          ignore-unfixed: true
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Build image (no push)
+        # image scan のため、push せず local に build。失敗しても次の step
+        # で skip 判定するために `continue-on-error: true`。
+        id: build
+        continue-on-error: true
+        run: |
+          docker build -t piper-plus-${{ matrix.image }}:scan \
+            -f docker/${{ matrix.image }}/Dockerfile docker/${{ matrix.image }}
+      - name: Trivy image scan
+        if: steps.build.outcome == 'success'
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: image
+          image-ref: piper-plus-${{ matrix.image }}:scan
+          exit-code: "1"
+          severity: "CRITICAL,HIGH"
+          ignore-unfixed: true
+          # OS package + lang package 両方をスキャン。
+          vuln-type: "os,library"
+
   # 結果サマリ
   audit-summary:
     name: Audit Summary
     if: always()
-    needs: [pip-audit, cargo-audit, npm-audit]
+    needs: [pip-audit, cargo-audit, npm-audit, govulncheck, nuget-audit, trivy-docker-scan]
     runs-on: ubuntu-24.04
     steps:
       - name: Summary
@@ -114,3 +227,6 @@ jobs:
           echo "- pip-audit: ${{ needs.pip-audit.result }}" >> $GITHUB_STEP_SUMMARY
           echo "- cargo-audit: ${{ needs.cargo-audit.result }}" >> $GITHUB_STEP_SUMMARY
           echo "- npm-audit: ${{ needs.npm-audit.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- govulncheck: ${{ needs.govulncheck.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- nuget-audit: ${{ needs.nuget-audit.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- trivy-docker-scan: ${{ needs.trivy-docker-scan.result }}" >> $GITHUB_STEP_SUMMARY
