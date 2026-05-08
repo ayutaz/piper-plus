@@ -1,9 +1,12 @@
 name: "ZH-EN Loanword Sync Gate"
 
-# Phase 6b (Day 14, TICKET-06b): full byte-for-byte gate across all 7 copies +
-# 6 fixture mirrors. The Phase 6a `--allow-missing` flag was dropped after
-# TICKET-01〜05 landed all runtime copies. Any PR that drifts a copy from
-# the Python source-of-truth is now blocked at this gate.
+# Phase 6b (Day 14, TICKET-06b): full byte-for-byte gate across all 9 copies
+# (Python source + 9 mirrors = 10 files total) and 8 fixture mirrors.
+# The Phase 6a `--allow-missing` flag was dropped after TICKET-01〜05 landed
+# all runtime copies. Kotlin Android (Issue #388) and Swift G2P (Issue #387)
+# follow-ups added 2 additional own mirrors so the gate guards them directly
+# rather than transitively through the Rust crate copies. Any PR that drifts
+# a copy from the Python source-of-truth is now blocked at this gate.
 #
 # Source of truth: src/python/g2p/piper_plus_g2p/data/zh_en_loanword.json
 # See docs/spec/zh-en-loanword-runtime-rollout.md for the full contract.
@@ -37,7 +40,7 @@ permissions:
 
 jobs:
   json-sync:
-    name: 7 zh_en_loanword.json copies match Python source
+    name: 9 zh_en_loanword.json copies match Python source
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -49,7 +52,7 @@ jobs:
       - name: Schema validation (Python source)
         run: python scripts/check_loanword_consistency.py --schema-only
 
-      - name: Byte-for-byte hash check (Phase 6b — full gate, 7 copies + 6 fixture mirrors)
+      - name: Byte-for-byte hash check (Phase 6b — full gate, 9 copies + 8 fixture mirrors)
         run: python scripts/check_loanword_consistency.py
 
   helper-self-check:
@@ -84,6 +87,20 @@ jobs:
           python scripts/check_loanword_consistency.py --fix
           if ! git diff --quiet; then
             echo "ERROR: --fix changed working tree on a clean repo:"
+            git --no-pager diff
+            exit 1
+          fi
+
+      # Meta-test: deliberately drift a single byte in the canonical source
+      # and a single mirror, then assert the gate exits non-zero. Without
+      # this, a regression in the gate (e.g. a regex that no longer matches
+      # a runtime table) could let drift slip through unnoticed.
+      - name: Meta-test (gate fails on intentional drift)
+        run: |
+          python scripts/test_sync_gates_meta.py
+          # Restore must have run; assert tree is clean for the next jobs.
+          if ! git diff --quiet; then
+            echo "ERROR: meta-test left the working tree dirty (restore failed):"
             git --no-pager diff
             exit 1
           fi

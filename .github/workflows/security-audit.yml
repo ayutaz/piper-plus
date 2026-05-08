@@ -26,6 +26,14 @@ on:
     - cron: "0 3 * * 1"
   workflow_dispatch:
 
+# Cancel superseded PR runs (push to PR branch, force-push, retry). Schedule
+# / push-to-dev runs use the static `ref` so they are NOT cancelled by an
+# overlapping PR run, and a re-run of the weekly cron simply queues behind
+# the previous one (cancel-in-progress affects the same group only).
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 permissions:
   contents: read
   security-events: write

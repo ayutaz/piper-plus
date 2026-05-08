@@ -65,6 +65,19 @@ jobs:
       - name: Verify cross-runtime PUA mapping consistency
         run: python scripts/check_pua_consistency.py --verbose --check-version
 
+      # Meta-test: bump pua.json version to a sentinel and assert the gate
+      # exits non-zero with --check-version. Catches regressions in the
+      # version-comparison regex / parser without needing a separate harness.
+      - name: Meta-test (gate fails on intentional version drift)
+        run: |
+          python scripts/test_sync_gates_meta.py
+          # Restore must have run; assert tree is clean for the next jobs.
+          if ! git diff --quiet; then
+            echo "ERROR: meta-test left the working tree dirty (restore failed):"
+            git --no-pager diff
+            exit 1
+          fi
+
   fixture-drift:
     name: Test fixture in sync with pua.json
     runs-on: ubuntu-latest
