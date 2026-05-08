@@ -11,6 +11,7 @@ runtime constants — drift in any of them is caught locally.
 
 from __future__ import annotations
 
+import copy
 import json
 import os
 from pathlib import Path
@@ -140,3 +141,140 @@ class TestFixtureMeta:
 
     def test_fixture_exists(self) -> None:
         assert FIXTURE_PATH.exists()
+
+
+# ---------------------------------------------------------------------------
+# Forward-compat loader (schema_version >= 2)
+# ---------------------------------------------------------------------------
+#
+# Audit finding: 4 runtimes (Py / C# / Rust / Go) currently hard-assert
+# ``schema_version == 1`` in lockstep.  ZH-EN loanword JSON has already
+# adopted a graceful loader (``schema_version: 2`` with unknown fields is
+# silently accepted) but the ORT-session contract has not.  These tests
+# describe the *desired* forward-compat contract for a future
+# ``load_ort_session_contract`` helper: known fields are read, unknown
+# top-level keys are silently dropped, ``schema_version >= 2`` is allowed.
+#
+# The tests operate on a deep-copied fixture rendered to a temp file so
+# the canonical fixture is never mutated.
+
+
+def _render_contract(tmp_path: Path, payload: dict) -> Path:
+    """Write *payload* as JSON to a temp file and return its path."""
+    out = tmp_path / "contract.json"
+    out.write_text(json.dumps(payload), encoding="utf-8")
+    return out
+
+
+def _load_with_forward_compat(contract_path: Path) -> dict:
+    """Reference forward-compat loader for the ORT session contract.
+
+    Mirrors the ``_load_loanword_data`` pattern used by ZH-EN: known
+    sections are extracted by name; ``schema_version`` and unknown
+    top-level keys are dropped from the returned dict.  This is a
+    *reference* used only by these tests — when the production loader
+    lands in ``piper_train.ort_utils``, swap the import.
+    """
+    raw = json.loads(contract_path.read_text(encoding="utf-8"))
+    known_sections = {"session", "warmup", "cache", "env_vars"}
+    return {key: value for key, value in raw.items() if key in known_sections}
+
+
+@pytest.mark.unit
+class TestSchemaV2ForwardCompat:
+    """Forward-compat: future ``schema_version: 2+`` contracts must load.
+
+    Mirrors the ZH-EN ``test_loader_accepts_schema_v2_future_fields``
+    pattern.  The current parity contract (Py/C#/Rust/Go) hard-asserts
+    ``schema_version == 1`` — these tests document the migration target
+    and pin the *graceful loader* invariant once it ships.
+    """
+
+    def test_load_contract_with_schema_version_2(
+        self, contract: dict, tmp_path: Path
+    ) -> None:
+        """``schema_version: 2`` plus a brand-new top-level key must load.
+
+        Known sections must roundtrip exactly; unknown keys are dropped.
+        """
+        future = copy.deepcopy(contract)
+        future["schema_version"] = 2
+        future["thread_pool_policy"] = {"strategy": "adaptive"}  # unknown key
+        future["session"]["future_extension_field"] = "ignored-value"
+
+        contract_path = _render_contract(tmp_path, future)
+        loaded = _load_with_forward_compat(contract_path)
+
+        # Known sections survive unchanged.
+        assert (
+            loaded["session"]["graph_optimization_level"]
+            == contract["session"]["graph_optimization_level"]
+        )
+        assert (
+            loaded["warmup"]["phoneme_length"]
+            == contract["warmup"]["phoneme_length"]
+        )
+        assert (
+            loaded["cache"]["sentinel_extension"]
+            == contract["cache"]["sentinel_extension"]
+        )
+        # schema_version + unknown top-level keys are silently dropped.
+        assert "schema_version" not in loaded
+        assert "thread_pool_policy" not in loaded
+
+    def test_load_contract_unknown_top_level_keys(
+        self, contract: dict, tmp_path: Path
+    ) -> None:
+        """Multiple future top-level fields (``metadata``, ``runtime_overrides``)
+        must coexist with known sections without breaking the loader.
+        """
+        future = copy.deepcopy(contract)
+        future["schema_version"] = 2
+        future["metadata"] = {"author": "future-runtime", "experimental": True}
+        future["runtime_overrides"] = {"rust": {"prefetch": True}}
+        future["telemetry"] = {"endpoint": "https://example/metrics"}
+
+        contract_path = _render_contract(tmp_path, future)
+        loaded = _load_with_forward_compat(contract_path)
+
+        # All four known sections are present.
+        assert set(loaded) == {"session", "warmup", "cache", "env_vars"}
+        # Unknown top-level keys are dropped (not surfaced).
+        for forbidden in ("metadata", "runtime_overrides", "telemetry", "schema_version"):
+            assert forbidden not in loaded
+
+    def test_load_contract_with_schema_version_3(
+        self, contract: dict, tmp_path: Path
+    ) -> None:
+        """``schema_version: 3`` (i.e. arbitrary future bumps) must load
+        the same way ``schema_version: 2`` does — no version pinning beyond
+        the graceful skip.
+        """
+        future = copy.deepcopy(contract)
+        future["schema_version"] = 3
+        future["new_section"] = {"foo": "bar"}
+        # Bump nested fields with unknown names too.
+        future["cache"]["compression_codec"] = "zstd"
+
+        contract_path = _render_contract(tmp_path, future)
+        loaded = _load_with_forward_compat(contract_path)
+
+        # Cache section roundtrips its known fields and tolerates extras.
+        assert loaded["cache"]["optimized_extension"] == "opt.onnx"
+        # Loader does NOT strip unknown nested keys — only top-level
+        # filtering is required (matches the ZH-EN loanword pattern).
+        assert loaded["cache"].get("compression_codec") == "zstd"
+        assert "new_section" not in loaded
+        assert "schema_version" not in loaded
+
+    def test_load_contract_schema_v1_still_loads(
+        self, contract: dict, tmp_path: Path
+    ) -> None:
+        """The reference forward-compat loader is backward-compatible:
+        ``schema_version: 1`` (the current canonical) loads identically.
+        """
+        contract_path = _render_contract(tmp_path, copy.deepcopy(contract))
+        loaded = _load_with_forward_compat(contract_path)
+        assert set(loaded) == {"session", "warmup", "cache", "env_vars"}
+        assert loaded["session"] == contract["session"]
+        assert loaded["warmup"] == contract["warmup"]

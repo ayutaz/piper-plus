@@ -6,6 +6,8 @@ the correct execution providers for each device type.
 """
 
 import logging
+import multiprocessing
+import os
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -627,3 +629,226 @@ class TestVoiceCacheParity:
         voice_sentinel = Path(str(voice_cache) + ".ok")
         assert ort_cache == voice_cache
         assert ort_sentinel == voice_sentinel
+
+
+# ---------------------------------------------------------------------------
+# Concurrent cache race tests
+# ---------------------------------------------------------------------------
+#
+# Audit finding: ``create_session_with_cache`` writes the optimized model
+# (``.opt.onnx``) and sentinel (``.ok``) in two separate, non-atomic steps.
+# Two processes hitting a fresh model concurrently can interleave such that
+# one process observes an in-flight ``.opt.onnx`` without ``.ok``, deletes
+# it, and races a peer that just wrote it. These tests pin the *current*
+# observable behavior so future hardening (atomic rename, fcntl lock, etc.)
+# does not regress the contract silently.
+
+
+# Module-level worker for multiprocessing.  Defined at module scope (not
+# nested in a class) so it is picklable on macOS/Windows ``spawn`` start
+# methods.
+def _concurrent_cache_worker(
+    model_path_str: str, device: str, result_queue: "multiprocessing.Queue"
+) -> None:
+    """Worker process: import ort_utils fresh and call cache creation.
+
+    Uses a real (tiny) ONNX file produced by the parent so each subprocess
+    truly invokes onnxruntime.InferenceSession.  Reports outcome via queue.
+    """
+    try:
+        # Re-import inside child so freshly forked/spawned interpreter has
+        # the module loaded with no leaked patches.
+        from piper_train.ort_utils import (  # local import (subprocess fresh)
+            create_session_with_cache as _create,
+        )
+
+        sess = _create(Path(model_path_str), device=device)
+        result_queue.put(
+            {"ok": True, "providers": list(sess.get_providers()), "pid": os.getpid()}
+        )
+    except Exception as exc:  # pylint: disable=broad-except
+        result_queue.put({"ok": False, "error": f"{type(exc).__name__}: {exc}"})
+
+
+def _make_real_tiny_onnx(path: Path) -> None:
+    """Create a real, valid ONNX model file at *path* (Identity op).
+
+    A real model is required because ``InferenceSession`` will reject a
+    ``b"dummy"`` byte blob.  We use ``onnx`` if available, otherwise
+    fall back to ``skip``.
+    """
+    onnx = pytest.importorskip("onnx")
+    from onnx import TensorProto, helper
+
+    inp = helper.make_tensor_value_info("x", TensorProto.FLOAT, [1])
+    out = helper.make_tensor_value_info("y", TensorProto.FLOAT, [1])
+    node = helper.make_node("Identity", ["x"], ["y"])
+    graph = helper.make_graph([node], "tiny", [inp], [out])
+    model = helper.make_model(graph, opset_imports=[helper.make_opsetid("", 13)])
+    model.ir_version = 7  # broadly compatible
+    onnx.save(model, str(path))
+
+
+@pytest.mark.unit
+class TestCacheConcurrentRace:
+    """Race conditions / sentinel parsing for ``create_session_with_cache``.
+
+    These tests pin the current observable behavior of the cache path:
+    parallel callers must each obtain a valid session, and recovery from
+    a partial write (``.opt.onnx`` present without ``.ok``) is automatic.
+    The sentinel content check is *existence-only* by design (matching
+    Rust/Go/C# runtimes); whitespace/case in ``.ok`` is intentionally
+    irrelevant and this is pinned by ``test_sentinel_with_extra_whitespace``.
+    """
+
+    @pytest.mark.timeout(60)
+    def test_concurrent_cache_creation_no_corruption(self, tmp_path):
+        """Two processes concurrently calling ``create_session_with_cache``
+        for the same fresh model must both obtain a valid session and the
+        resulting ``.opt.onnx`` + ``.ok`` files must not be corrupted.
+
+        Pins: at least one process produces a healthy cache+sentinel pair,
+        and neither process raises an unhandled exception.  Specifically
+        does *not* guarantee that exactly one process writes the cache
+        (current code allows both to attempt it; ORT handles concurrent
+        write in practice via filesystem semantics).
+        """
+        model = tmp_path / "model.onnx"
+        _make_real_tiny_onnx(model)
+
+        # ``spawn`` is the safe default on macOS and is forced here so the
+        # test runs identically across platforms.
+        ctx = multiprocessing.get_context("spawn")
+        queue: multiprocessing.Queue = ctx.Queue()
+        procs = [
+            ctx.Process(
+                target=_concurrent_cache_worker,
+                args=(str(model), "cpu", queue),
+            )
+            for _ in range(2)
+        ]
+        for p in procs:
+            p.start()
+        for p in procs:
+            p.join(timeout=45)
+
+        # Both must have terminated cleanly.
+        for p in procs:
+            assert not p.is_alive(), "concurrent worker did not finish"
+            assert p.exitcode == 0, f"worker exited with {p.exitcode}"
+
+        results = []
+        while not queue.empty():
+            results.append(queue.get_nowait())
+        assert len(results) == 2, f"expected 2 results, got {results}"
+        for r in results:
+            assert r["ok"], f"worker reported failure: {r}"
+            assert "CPUExecutionProvider" in r["providers"]
+
+        # Final state: cache + sentinel must be consistent.  Either both
+        # exist (cache hit landed) or neither does (cache disabled by
+        # filesystem rules).  Pinning the "both-or-neither" invariant —
+        # the bug being protected against is "cache without sentinel".
+        cache_path, sentinel_path = _build_cache_paths(model, "cpu")
+        if cache_path.exists():
+            assert sentinel_path.exists(), (
+                "RACE WINDOW: .opt.onnx present without .ok sentinel — "
+                "next caller will delete the cache file"
+            )
+            # Cache file must be non-empty (not a 0-byte interrupted write).
+            assert cache_path.stat().st_size > 0
+
+    def test_concurrent_cache_partial_write_recovery(self, tmp_path):
+        """Simulate a crash mid-write: ``.opt.onnx`` exists but ``.ok``
+        does not.  The next call must detect the missing sentinel,
+        delete the orphan cache, and rebuild successfully.
+        """
+        model = tmp_path / "model.onnx"
+        model.write_bytes(b"dummy")
+        cache_path, sentinel_path = _build_cache_paths(model, "cpu")
+
+        # Pre-condition: simulate prior crash mid-write.
+        cache_path.write_bytes(b"partial-write-from-crashed-process")
+        assert cache_path.exists()
+        assert not sentinel_path.exists()
+
+        mock_session = MagicMock(spec=onnxruntime.InferenceSession)
+        seen: dict = {"opt_path": None}
+
+        def side_effect(path, sess_options=None, providers=None):
+            # ORT sees the cleaned environment: cache should NOT exist
+            # at the time of InferenceSession() construction (because
+            # the partial-cache cleanup in create_session_with_cache
+            # ran before this).  Capture both the path argued and the
+            # cache state for assertion.
+            seen["opt_path"] = (
+                getattr(sess_options, "optimized_model_filepath", None)
+                if sess_options
+                else None
+            )
+            seen["cache_existed_at_call"] = cache_path.exists()
+            if (
+                sess_options is not None
+                and getattr(sess_options, "optimized_model_filepath", "")
+            ):
+                Path(sess_options.optimized_model_filepath).write_bytes(b"rebuilt")
+            return mock_session
+
+        with patch(
+            "piper_train.ort_utils.onnxruntime.InferenceSession",
+            side_effect=side_effect,
+        ):
+            session = create_session_with_cache(model, device="cpu")
+
+        assert session is mock_session
+        # The orphan partial-write was deleted before the rebuild call.
+        assert seen["cache_existed_at_call"] is False
+        # New cache + sentinel landed.
+        assert cache_path.exists()
+        assert sentinel_path.exists()
+        assert cache_path.read_bytes() == b"rebuilt"
+
+    def test_sentinel_with_extra_whitespace(self, tmp_path):
+        """Pin the *existence-only* sentinel check.
+
+        The sentinel file is currently treated as a presence flag — its
+        content is never parsed by ``create_session_with_cache``.  Files
+        with ``"ok\\n"``, ``" ok "``, or even arbitrary garbage are
+        accepted.  Lockstep with Rust/Go/C# runtimes which also do
+        existence-only checks (per ``ort_session/contract.json``).
+
+        If a future change adds content parsing, this test breaks
+        immediately and the parity contract must be updated in lockstep.
+        """
+        model = tmp_path / "model.onnx"
+        model.write_bytes(b"dummy")
+        cache_path, sentinel_path = _build_cache_paths(model, "cpu")
+        cache_path.write_bytes(b"optimized")
+
+        # Variants that are technically not "ok" but currently accepted.
+        for sentinel_content in ("ok\n", " ok ", "OK", "garbage", ""):
+            sentinel_path.write_text(sentinel_content)
+            captured: dict = {}
+            mock_session = MagicMock(spec=onnxruntime.InferenceSession)
+
+            def side_effect(path, sess_options=None, providers=None):
+                captured["path"] = path
+                captured["level"] = sess_options.graph_optimization_level
+                return mock_session
+
+            with patch(
+                "piper_train.ort_utils.onnxruntime.InferenceSession",
+                side_effect=side_effect,
+            ):
+                session = create_session_with_cache(model, device="cpu")
+
+            assert session is mock_session
+            # Cache hit triggered → ORT_DISABLE_ALL used (loaded from cache).
+            assert captured["path"] == str(cache_path), (
+                f"Sentinel content {sentinel_content!r} should not affect "
+                f"cache-hit dispatch (existence-only contract)"
+            )
+            assert (
+                captured["level"]
+                == onnxruntime.GraphOptimizationLevel.ORT_DISABLE_ALL
+            )
