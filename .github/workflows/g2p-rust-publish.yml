@@ -29,6 +29,10 @@ jobs:
     name: Publish to crates.io
     needs: test
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
     defaults:
       run:
         working-directory: src/rust
@@ -50,6 +54,16 @@ jobs:
             echo "ERROR: Tag version ($TAG_VERSION) does not match Cargo.toml ($CARGO_VERSION)"
             exit 1
           fi
+      - name: Package crate
+        # Produce target/package/piper-plus-g2p-<version>.crate so attestation
+        # covers the exact bytes that cargo publish will upload. cargo publish
+        # also packages internally; running it explicitly here gives us a
+        # stable on-disk path for attest-build-provenance.
+        run: cargo package -p piper-plus-g2p --allow-dirty
+      - name: Generate build provenance attestation
+        uses: actions/attest-build-provenance@v3
+        with:
+          subject-path: 'src/rust/target/package/*.crate'
       - name: Publish piper-plus-g2p
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
