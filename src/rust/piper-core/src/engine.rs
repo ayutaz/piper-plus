@@ -107,6 +107,29 @@ impl Default for SynthesisRequest {
     }
 }
 
+impl SynthesisRequest {
+    /// 入力組み合わせの整合性を検証する。
+    ///
+    /// `speaker_id` と `speaker_embedding` は仕様上排他である:
+    /// - `speaker_id` のみ → multi-speaker モデルの ID 指定モード
+    /// - `speaker_embedding` のみ → voice cloning モード (encoder 由来の埋め込み)
+    /// - 両方 set → どちらの conditioning を採用するか曖昧で silent に
+    ///   両 tensor が ONNX へ流れてしまうため明示的に reject する。
+    /// - 両方 None → multi-speaker モデルでは sid=0 がデフォルトで使われる。
+    ///
+    /// 他ランタイム (CLI / Python / C# / Go) でも同等の排他チェックを行う。
+    pub fn validate(&self) -> Result<(), PiperError> {
+        if self.speaker_id.is_some() && self.speaker_embedding.is_some() {
+            return Err(PiperError::InvalidArgument {
+                reason: "speaker_id and speaker_embedding are mutually exclusive; \
+                         specify one or the other, not both"
+                    .to_string(),
+            });
+        }
+        Ok(())
+    }
+}
+
 /// 合成結果
 #[derive(Debug)]
 pub struct SynthesisResult {
@@ -628,6 +651,9 @@ impl OnnxEngine {
         &mut self,
         request: &SynthesisRequest,
     ) -> Result<SynthesisResult, PiperError> {
+        // 入力組み合わせ検証 (speaker_id × speaker_embedding 排他など)。
+        request.validate()?;
+
         let original_len = request.phoneme_ids.len();
         if original_len == 0 {
             return Err(PiperError::Inference("empty phoneme_ids".to_string()));
@@ -937,6 +963,63 @@ mod tests {
         assert!((req.noise_scale - 0.667).abs() < 1e-6);
         assert!((req.length_scale - 1.0).abs() < 1e-6);
         assert!((req.noise_w - 0.8).abs() < 1e-6);
+    }
+
+    // -----------------------------------------------------------------------
+    // SynthesisRequest::validate() — speaker_id × speaker_embedding 排他
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_validate_speaker_id_only_ok() {
+        let req = SynthesisRequest {
+            speaker_id: Some(3),
+            speaker_embedding: None,
+            ..SynthesisRequest::default()
+        };
+        assert!(req.validate().is_ok());
+    }
+
+    #[test]
+    fn test_validate_speaker_embedding_only_ok() {
+        let req = SynthesisRequest {
+            speaker_id: None,
+            speaker_embedding: Some(vec![0.1f32; 256]),
+            ..SynthesisRequest::default()
+        };
+        assert!(req.validate().is_ok());
+    }
+
+    #[test]
+    fn test_validate_both_set_returns_error() {
+        let req = SynthesisRequest {
+            speaker_id: Some(0),
+            speaker_embedding: Some(vec![0.1f32; 256]),
+            ..SynthesisRequest::default()
+        };
+        let err = req.validate().expect_err("both set must error");
+        match err {
+            PiperError::InvalidArgument { reason } => {
+                assert!(
+                    reason.contains("speaker_id") && reason.contains("speaker_embedding"),
+                    "error message should reference both fields, got: {reason}"
+                );
+                assert!(
+                    reason.contains("mutually exclusive"),
+                    "error message should mention exclusivity, got: {reason}"
+                );
+            }
+            other => panic!("expected InvalidArgument, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_validate_neither_set_ok() {
+        let req = SynthesisRequest {
+            speaker_id: None,
+            speaker_embedding: None,
+            ..SynthesisRequest::default()
+        };
+        assert!(req.validate().is_ok());
     }
 
     #[test]

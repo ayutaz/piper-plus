@@ -118,3 +118,28 @@ fn invalid_phoneme_silence_format_fails() {
         .assert()
         .failure();
 }
+
+/// `--speaker-id` と `--speaker-embedding` は voice conditioning の
+/// 排他的な指定方法であるため、両方与えられた場合は推論を始める前に
+/// reject されること (engine 側 `SynthesisRequest::validate()` と仕様一致)。
+#[test]
+fn rejects_speaker_id_with_speaker_embedding() {
+    cli()
+        .args([
+            "--speaker",
+            "0",
+            "--speaker-embedding",
+            "/nonexistent/embedding.bin",
+            "--text",
+            "test",
+            "--model",
+            "/nonexistent/model.onnx",
+        ])
+        .assert()
+        .failure()
+        .stderr(
+            predicate::str::contains("--speaker-id")
+                .and(predicate::str::contains("--speaker-embedding"))
+                .and(predicate::str::contains("mutually exclusive")),
+        );
+}
