@@ -1,0 +1,83 @@
+name: Pre-commit
+
+# Mirrors the local `pre-commit` hooks defined in .pre-commit-config.yaml.
+# Even if a contributor (or AI agent) forgets `pre-commit install`, this
+# workflow catches ruff/format/PUA drift at PR time — eliminating the
+# "5 separate ruff format commits" cycle of shame seen in PR #401.
+#
+# Why a dedicated workflow (separate from python-lint.yml + pua-consistency.yml):
+#   * Runs ALL hooks declared in .pre-commit-config.yaml at once, so adding
+#     a new hook (e.g. shellcheck, codespell) requires editing only one
+#     manifest — not the workflow + the manifest in lockstep.
+#   * Failure messages match what local users see, so reproduction is trivial.
+#   * Acts as a regression test for the .pre-commit-config.yaml itself
+#     (e.g. ruff version drift between CI's `pip install ruff==X` and
+#     pre-commit's `rev: vX`).
+
+on:
+  pull_request:
+    branches: [ dev ]
+    paths:
+      - '.pre-commit-config.yaml'
+      - '.github/workflows/pre-commit.yml'
+      # Trigger on any source change so all hooks run; pre-commit itself
+      # short-circuits hooks that are scoped via `files:` in the config.
+      - '**/*.py'
+      - '**/*.pyi'
+      - '**/*.json'
+      - '**/*.toml'
+      - 'scripts/**'
+  push:
+    branches: [ dev ]
+    paths:
+      - '.pre-commit-config.yaml'
+      - '.github/workflows/pre-commit.yml'
+      - '**/*.py'
+      - '**/*.pyi'
+      - '**/*.json'
+      - '**/*.toml'
+      - 'scripts/**'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  pre-commit:
+    name: pre-commit run --all-files
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          # `pre-commit run --all-files` works against the worktree, not
+          # diff-vs-base, so a shallow clone is fine.
+          fetch-depth: 1
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+
+      - name: Install pre-commit
+        run: |
+          python -m pip install --upgrade pip
+          # Pin to the latest stable to avoid behavior drift between local
+          # installs and this CI gate.
+          pip install pre-commit==4.0.1
+
+      - name: Cache pre-commit hook environments
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pre-commit
+          key: pre-commit-${{ runner.os }}-py3.11-${{ hashFiles('.pre-commit-config.yaml') }}
+          restore-keys: |
+            pre-commit-${{ runner.os }}-py3.11-
+
+      - name: Run all hooks
+        run: |
+          # --show-diff-on-failure makes drift trivial to fix locally:
+          # contributors see the exact patch the hooks produced.
+          pre-commit run --all-files --show-diff-on-failure

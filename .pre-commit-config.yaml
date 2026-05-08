@@ -1,14 +1,27 @@
 # Pre-commit hooks for piper-plus.
 #
-# Install once with `pre-commit install`. Then every `git commit` will run
-# the hooks below on changed files; if any hook fails, the commit is blocked.
+# # Setup (one-time per clone):
+#   pip install pre-commit  # or `uvx pre-commit`
+#   pre-commit install      # writes .git/hooks/pre-commit
 #
-# These hooks are mirrored by CI (.github/workflows/pua-consistency.yml +
-# ruff job), so the local check just gives faster feedback.
+# # Daily use:
+#   git commit ...          # hooks run automatically on staged files
+#   pre-commit run --all-files  # manual full-repo check
+#
+# # CI mirror:
+#   .github/workflows/pre-commit.yml runs `pre-commit run --all-files` on
+#   every PR. Even contributors that skip `pre-commit install` will see drift
+#   blocked at PR time, not after 5 separate runs of cycle-of-shame ruff
+#   format commits (cf. PR #401 commits 5d9c60e6 / 8dc19e3b).
+#
+# # Version pinning:
+#   ruff version below MUST match the version pinned in
+#   .github/workflows/python-lint.yml (currently 0.12.5). Drift between
+#   pre-commit and CI = local-clean / CI-fail mismatch (PR #401 cause).
 
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.8.5
+    rev: v0.12.5
     hooks:
       - id: ruff
         args: [--fix]
