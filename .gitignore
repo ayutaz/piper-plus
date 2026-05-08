@@ -173,3 +173,9 @@ android/piper-plus-g2p/src/main/jniLibs/
 android/piper-plus-g2p/.cxx/
 android/piper-plus-g2p/build/
 android/.gradle/
+
+# Swift Package Manager: Package.resolved is auto-generated when SPM
+# resolves dependencies. piper-plus ships libraries (PiperPlus /
+# PiperPlusG2P), not an app, so we don't pin transitive dependency
+# versions for downstream consumers — they resolve their own.
+Package.resolved
