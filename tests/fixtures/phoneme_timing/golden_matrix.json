@@ -1,0 +1,314 @@
+{
+  "schema_version": 1,
+  "comment": "Cross-runtime phoneme timing golden fixture. Regenerate via `python scripts/regenerate_timing_fixture.py`. Source: src/python_run/piper/timing.py:durations_to_timing. Spec: docs/spec/phoneme-timing-contract.toml. Do not edit by hand.",
+  "calculation_formula": "frame_time_ms = (hop_length / sample_rate) * 1000",
+  "cases": [
+    {
+      "name": "basic_konnichiwa",
+      "description": "Japanese greeting at 22050Hz / hop=256",
+      "inputs": {
+        "durations": [
+          3,
+          5,
+          8,
+          4,
+          4,
+          5,
+          3,
+          6,
+          4,
+          5,
+          3
+        ],
+        "phoneme_tokens": [
+          "^",
+          "k",
+          "o",
+          "n",
+          "n",
+          "i",
+          "ch",
+          "i",
+          "w",
+          "a",
+          "$"
+        ],
+        "sample_rate": 22050,
+        "hop_length": 256
+      },
+      "expected": {
+        "phonemes": [
+          {
+            "phoneme": "^",
+            "start_ms": 0.0,
+            "end_ms": 34.82993197278911,
+            "duration_ms": 34.82993197278911
+          },
+          {
+            "phoneme": "k",
+            "start_ms": 34.82993197278911,
+            "end_ms": 92.87981859410431,
+            "duration_ms": 58.049886621315196
+          },
+          {
+            "phoneme": "o",
+            "start_ms": 92.87981859410431,
+            "end_ms": 185.75963718820861,
+            "duration_ms": 92.87981859410431
+          },
+          {
+            "phoneme": "n",
+            "start_ms": 185.75963718820861,
+            "end_ms": 232.19954648526078,
+            "duration_ms": 46.439909297052154
+          },
+          {
+            "phoneme": "n",
+            "start_ms": 232.19954648526078,
+            "end_ms": 278.63945578231295,
+            "duration_ms": 46.439909297052154
+          },
+          {
+            "phoneme": "i",
+            "start_ms": 278.63945578231295,
+            "end_ms": 336.68934240362813,
+            "duration_ms": 58.049886621315196
+          },
+          {
+            "phoneme": "ch",
+            "start_ms": 336.68934240362813,
+            "end_ms": 371.51927437641723,
+            "duration_ms": 34.82993197278911
+          },
+          {
+            "phoneme": "i",
+            "start_ms": 371.51927437641723,
+            "end_ms": 441.1791383219954,
+            "duration_ms": 69.65986394557822
+          },
+          {
+            "phoneme": "w",
+            "start_ms": 441.1791383219954,
+            "end_ms": 487.6190476190476,
+            "duration_ms": 46.439909297052154
+          },
+          {
+            "phoneme": "a",
+            "start_ms": 487.6190476190476,
+            "end_ms": 545.6689342403628,
+            "duration_ms": 58.049886621315196
+          },
+          {
+            "phoneme": "$",
+            "start_ms": 545.6689342403628,
+            "end_ms": 580.4988662131519,
+            "duration_ms": 34.82993197278911
+          }
+        ],
+        "total_duration_ms": 580.4988662131519,
+        "sample_rate": 22050
+      }
+    },
+    {
+      "name": "single_phoneme",
+      "description": "Single phoneme — minimum non-empty case",
+      "inputs": {
+        "durations": [
+          10
+        ],
+        "phoneme_tokens": [
+          "a"
+        ],
+        "sample_rate": 22050,
+        "hop_length": 256
+      },
+      "expected": {
+        "phonemes": [
+          {
+            "phoneme": "a",
+            "start_ms": 0.0,
+            "end_ms": 116.09977324263039,
+            "duration_ms": 116.09977324263039
+          }
+        ],
+        "total_duration_ms": 116.09977324263039,
+        "sample_rate": 22050
+      }
+    },
+    {
+      "name": "negative_clamped",
+      "description": "Negative durations are clamped to 0 (graceful degradation)",
+      "inputs": {
+        "durations": [
+          3,
+          -2,
+          5
+        ],
+        "phoneme_tokens": [
+          "a",
+          "b",
+          "c"
+        ],
+        "sample_rate": 22050,
+        "hop_length": 256
+      },
+      "expected": {
+        "phonemes": [
+          {
+            "phoneme": "a",
+            "start_ms": 0.0,
+            "end_ms": 34.82993197278911,
+            "duration_ms": 34.82993197278911
+          },
+          {
+            "phoneme": "b",
+            "start_ms": 34.82993197278911,
+            "end_ms": 34.82993197278911,
+            "duration_ms": 0.0
+          },
+          {
+            "phoneme": "c",
+            "start_ms": 34.82993197278911,
+            "end_ms": 92.87981859410431,
+            "duration_ms": 58.049886621315196
+          }
+        ],
+        "total_duration_ms": 92.87981859410431,
+        "sample_rate": 22050
+      }
+    },
+    {
+      "name": "high_sample_rate",
+      "description": "44100Hz / hop=512 — alternative model config",
+      "inputs": {
+        "durations": [
+          10,
+          10
+        ],
+        "phoneme_tokens": [
+          "x",
+          "y"
+        ],
+        "sample_rate": 44100,
+        "hop_length": 512
+      },
+      "expected": {
+        "phonemes": [
+          {
+            "phoneme": "x",
+            "start_ms": 0.0,
+            "end_ms": 116.09977324263039,
+            "duration_ms": 116.09977324263039
+          },
+          {
+            "phoneme": "y",
+            "start_ms": 116.09977324263039,
+            "end_ms": 232.19954648526078,
+            "duration_ms": 116.09977324263039
+          }
+        ],
+        "total_duration_ms": 232.19954648526078,
+        "sample_rate": 44100
+      }
+    },
+    {
+      "name": "pua_phoneme",
+      "description": "PUA phoneme token (multi-char) is preserved verbatim",
+      "inputs": {
+        "durations": [
+          5,
+          8,
+          3
+        ],
+        "phoneme_tokens": [
+          "a",
+          "U+E019",
+          "b"
+        ],
+        "sample_rate": 22050,
+        "hop_length": 256
+      },
+      "expected": {
+        "phonemes": [
+          {
+            "phoneme": "a",
+            "start_ms": 0.0,
+            "end_ms": 58.049886621315196,
+            "duration_ms": 58.049886621315196
+          },
+          {
+            "phoneme": "U+E019",
+            "start_ms": 58.049886621315196,
+            "end_ms": 150.92970521541952,
+            "duration_ms": 92.87981859410431
+          },
+          {
+            "phoneme": "b",
+            "start_ms": 150.92970521541952,
+            "end_ms": 185.75963718820861,
+            "duration_ms": 34.82993197278911
+          }
+        ],
+        "total_duration_ms": 185.75963718820861,
+        "sample_rate": 22050
+      }
+    },
+    {
+      "name": "empty",
+      "description": "Empty input → empty result, total_duration_ms=0",
+      "inputs": {
+        "durations": [],
+        "phoneme_tokens": [],
+        "sample_rate": 22050,
+        "hop_length": 256
+      },
+      "expected": {
+        "phonemes": [],
+        "total_duration_ms": 0.0,
+        "sample_rate": 22050
+      }
+    },
+    {
+      "name": "all_zero_durations",
+      "description": "All-zero durations → contiguous zero-length boundaries",
+      "inputs": {
+        "durations": [
+          0,
+          0,
+          0
+        ],
+        "phoneme_tokens": [
+          "a",
+          "b",
+          "c"
+        ],
+        "sample_rate": 22050,
+        "hop_length": 256
+      },
+      "expected": {
+        "phonemes": [
+          {
+            "phoneme": "a",
+            "start_ms": 0.0,
+            "end_ms": 0.0,
+            "duration_ms": 0.0
+          },
+          {
+            "phoneme": "b",
+            "start_ms": 0.0,
+            "end_ms": 0.0,
+            "duration_ms": 0.0
+          },
+          {
+            "phoneme": "c",
+            "start_ms": 0.0,
+            "end_ms": 0.0,
+            "duration_ms": 0.0
+          }
+        ],
+        "total_duration_ms": 0.0,
+        "sample_rate": 22050
+      }
+    }
+  ]
+}

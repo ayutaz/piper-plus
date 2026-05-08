@@ -1,0 +1,56 @@
+name: Phoneme Timing Parity
+
+# Cross-runtime phoneme timing parity gate.
+#
+# All 6 runtimes (Python, Rust, Go, C++, C#, WASM/JS) must produce
+# byte-equivalent output for the same (durations, phoneme_tokens,
+# sample_rate, hop_length) inputs. This workflow ensures the canonical
+# golden fixture stays in sync with the Python reference implementation.
+#
+# Each runtime's test suite should load tests/fixtures/phoneme_timing/
+# golden_matrix.json and assert its own implementation matches the
+# `expected` blocks (TODO: per-runtime parity tests still to be added).
+
+on:
+  pull_request:
+    branches: [ dev ]
+    paths:
+      - 'src/python_run/piper/timing.py'
+      - 'tests/fixtures/phoneme_timing/**'
+      - 'scripts/regenerate_timing_fixture.py'
+      - 'docs/spec/phoneme-timing-contract.toml'
+      - '.github/workflows/timing-parity.yml'
+  push:
+    branches: [ dev ]
+    paths:
+      - 'src/python_run/piper/timing.py'
+      - 'tests/fixtures/phoneme_timing/**'
+      - 'scripts/regenerate_timing_fixture.py'
+      - 'docs/spec/phoneme-timing-contract.toml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  drift-check:
+    name: Phoneme timing fixture drift check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+
+      - name: Install canonical runtime (piper-plus)
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e src/python_run
+
+      - name: Verify fixture is in sync with canonical implementation
+        run: |
+          python scripts/regenerate_timing_fixture.py --check
