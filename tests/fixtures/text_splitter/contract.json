@@ -1,0 +1,166 @@
+{
+  "schema_version": 1,
+  "comment": "Text-splitter contract fixture. Regenerate via `python scripts/regenerate_text_splitter_fixture.py`. Source: docs/spec/text-splitter-contract.toml. Each runtime asserts its actual closing-punct + terminator sets match `runtimes.<name>.*` here.",
+  "canonical": {
+    "closing_punctuation": [
+      34,
+      39,
+      41,
+      93,
+      125,
+      187,
+      8217,
+      8221,
+      12301,
+      12303,
+      12305,
+      65289,
+      65341,
+      65379
+    ],
+    "sentence_terminators": [
+      33,
+      46,
+      63,
+      12290,
+      65281,
+      65294,
+      65311
+    ],
+    "strategy": "post-consume"
+  },
+  "runtimes": {
+    "python": {
+      "closing_punctuation": [
+        34,
+        39,
+        41,
+        93,
+        125,
+        187,
+        8217,
+        8221,
+        12301,
+        12303,
+        12305,
+        65289,
+        65341,
+        65379
+      ],
+      "sentence_terminators": [
+        33,
+        46,
+        63,
+        12290,
+        65281,
+        65294,
+        65311
+      ],
+      "strategy": "post-consume"
+    },
+    "rust": {
+      "closing_punctuation": [
+        34,
+        39,
+        41,
+        93,
+        125,
+        187,
+        8217,
+        8221,
+        12301,
+        12303,
+        12305,
+        65289,
+        65341,
+        65379
+      ],
+      "sentence_terminators": [
+        33,
+        46,
+        63,
+        12290,
+        65281,
+        65311
+      ],
+      "strategy": "post-consume"
+    },
+    "csharp": {
+      "closing_punctuation": [
+        34,
+        39,
+        41,
+        93,
+        125,
+        187,
+        8217,
+        8221,
+        12301,
+        12303,
+        12305,
+        65289,
+        65341,
+        65379
+      ],
+      "sentence_terminators": [
+        33,
+        46,
+        63,
+        12290,
+        65281,
+        65311
+      ],
+      "strategy": "post-consume"
+    },
+    "cpp": {
+      "closing_punctuation": [
+        34,
+        39,
+        41,
+        93,
+        125,
+        187,
+        8217,
+        8221,
+        12301,
+        12303,
+        12305,
+        65289,
+        65341,
+        65379
+      ],
+      "sentence_terminators": [
+        33,
+        46,
+        63,
+        12290,
+        65281,
+        65294,
+        65311
+      ],
+      "strategy": "post-consume"
+    },
+    "go": {
+      "closing_punctuation": [
+        41,
+        93,
+        125,
+        8221,
+        12301,
+        12303,
+        12305,
+        65289
+      ],
+      "sentence_terminators": [
+        33,
+        46,
+        63,
+        12290,
+        65281,
+        65294,
+        65311
+      ],
+      "strategy": "depth-tracking"
+    }
+  }
+}
