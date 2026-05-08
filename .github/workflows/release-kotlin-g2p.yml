@@ -109,6 +109,10 @@ jobs:
     needs: build-native
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
     steps:
       - uses: actions/checkout@v6
         with: { submodules: true }
@@ -197,6 +201,24 @@ jobs:
           ORG_GRADLE_PROJECT_VERSION_NAME: ${{ steps.version.outputs.version }}
         run: |
           gradle :piper-plus-g2p:publishToMavenLocal --no-daemon --stacktrace
+
+      # ----- Build AAR before attestation (so the file exists at attest time) --
+      # publishAndReleaseToMavenCentral will rebuild as part of its dep graph,
+      # but assembleRelease is idempotent and gives us a stable file path
+      # (`build/outputs/aar/*.aar`) to feed into attest-build-provenance.
+      - name: Build AAR (release)
+        if: github.event_name != 'pull_request'
+        working-directory: android
+        env:
+          ORG_GRADLE_PROJECT_VERSION_NAME: ${{ steps.version.outputs.version }}
+        run: gradle :piper-plus-g2p:assembleRelease --no-daemon
+
+      - name: Generate build provenance attestation
+        # SLSA provenance for the AAR — tag push / workflow_dispatch only.
+        if: github.event_name != 'pull_request'
+        uses: actions/attest-build-provenance@v3
+        with:
+          subject-path: 'android/piper-plus-g2p/build/outputs/aar/*.aar'
 
       # ----- Real publish to Maven Central ---------------------------------------
       - name: Publish to Maven Central

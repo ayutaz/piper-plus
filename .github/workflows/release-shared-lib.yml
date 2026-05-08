@@ -4,18 +4,23 @@ on:
   push:
     tags:
       - 'v[0-9]*'
-  # PR triggers cover only the G2P Apple-platform jobs (build-g2p-apple +
-  # assemble-g2p-xcframework). All other jobs and the release job remain
-  # gated to push (tags) / workflow_dispatch via per-job `if` conditions.
-  # See Issue #387 — PR-stage smoke check for the Apple G2P xcframework
-  # pipeline (iOS device + iOS simulator + macOS slices since v1.14.0).
+  # PR triggers cover:
+  #   - G2P Apple-platform jobs (build-g2p-apple + assemble-g2p-xcframework)
+  #     since Issue #387.
+  #   - build-shared (Linux + macOS slices) since 2026-05 — Windows は cost
+  #     重いため tag のみ。CMakeLists.txt / src/cpp/** / cmake/** 改変が
+  #     tag 時に初めて壊れる risk を解消する保険。
+  # `assemble-xcframework` / `build-android` / `build-ios` / `release` は
+  # 引き続き push (tags) / workflow_dispatch のみ。
   pull_request:
     paths:
       - 'src/rust/piper-plus-g2p/**'
       - 'Sources/PiperPlusG2P/**'
       - 'tests/PiperPlusG2PTests/**'
       - 'Package.swift'
-      - 'cmake/PrivacyInfo.xcprivacy'
+      - 'cmake/**'
+      - 'src/cpp/**'
+      - 'CMakeLists.txt'
       - '.github/workflows/release-shared-lib.yml'
   workflow_dispatch:
 
@@ -32,7 +37,9 @@ env:
 jobs:
   build-shared:
     name: Build ${{ matrix.name }}
-    if: github.event_name != 'pull_request'
+    # PR では Linux/macOS のみ smoke 実行 (Windows は cost で skip)。
+    # Tag push / workflow_dispatch では 3 OS 全部を build。
+    if: github.event_name != 'pull_request' || matrix.name != 'windows-x64'
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     strategy:
@@ -139,6 +146,8 @@ jobs:
           tar -a -cf "$archivePath" -C "$installDir" .
 
       - name: Upload artifact
+        # PR では smoke build のみで artifact は捨てる (release 用ではない)。
+        if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.artifact }}
@@ -873,8 +882,12 @@ jobs:
     runs-on: ubuntu-24.04
     # GitHub Release creation requires `contents: write`. Scoped to this job
     # only so build / assemble jobs run with workflow-default `contents: read`.
+    # `id-token: write` + `attestations: write` enable SLSA provenance via
+    # actions/attest-build-provenance@v3 (issued on tag push only).
     permissions:
       contents: write
+      id-token: write
+      attestations: write
     steps:
       - name: Checkout tag commit (for Package.swift checksum verification)
         uses: actions/checkout@v6
@@ -1005,6 +1018,17 @@ jobs:
             exit 1
           fi
           echo "✓ PiperPlusG2P checksum matches released xcframework"
+
+      - name: Generate build provenance attestation
+        # SLSA provenance for all release archives (xcframework / shared libs /
+        # AAR / iOS .tar.gz). Tag-push only — workflow_dispatch and PR don't
+        # produce attestations because this job is gated on
+        # startsWith(github.ref, 'refs/tags/').
+        uses: actions/attest-build-provenance@v3
+        with:
+          subject-path: |
+            artifacts/**/*.tar.gz
+            artifacts/**/*.zip
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
