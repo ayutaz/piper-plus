@@ -3,12 +3,24 @@
 Converts Brazilian Portuguese text to IPA phonemes using grapheme-to-phoneme
 rules. No external G2P engine required.
 
+Language code policy
+--------------------
+This phonemizer is registered under language code ``"pt"`` and is also
+reachable via the BCP-47 alias ``"pt-BR"`` (resolved by
+:class:`piper_plus_g2p.registry.PhonemizerRegistry`). The ``"pt-PT"``
+code is intentionally rejected with an explicit error so callers do not
+silently receive BR phonology for European Portuguese input. See
+``docs/spec/pt-dialect-contract.toml`` for the canonical alias /
+fallback matrix.
+
 Known limitations
 -----------------
 * **Brazilian Portuguese (PT-BR) only** -- European Portuguese (PT-PT)
   phonology differs significantly (e.g. vowel reduction patterns,
   sibilant realisations, absence of /tʃ dʒ/ palatalisation) and is
-  not modelled.
+  not modelled. Adding PT-PT requires a separate phonemizer (and
+  ideally EU-Portuguese training data); see the dialect contract for
+  status.
 * The ``x`` grapheme is highly irregular in Portuguese; only a simplified
   positional heuristic is applied (initial/post-consonant -> /ʃ/,
   intervocalic -> /z/).

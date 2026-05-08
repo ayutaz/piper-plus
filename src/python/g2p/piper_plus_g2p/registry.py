@@ -30,6 +30,31 @@ _LOGGER = logging.getLogger(__name__)
 # Latin-script language priority for default_latin_language detection
 _LATIN_PRIORITY = ("en", "es", "pt", "fr")
 
+# BCP-47 dialect aliases. Resolved transparently by `PhonemizerRegistry.get`.
+# Keep entries case-insensitive by registering both upper- and lower-case
+# region subtag forms ("pt-BR" / "pt-br"). For policy / supported codes see
+# `docs/spec/pt-dialect-contract.toml`.
+_LANGUAGE_ALIASES: dict[str, str] = {
+    "pt-BR": "pt",
+    "pt-br": "pt",
+}
+
+# Dialects that are intentionally NOT supported in this release. We raise
+# an explicit error (rather than letting them fall into the composite-code
+# fallback path with a confusing "Missing language" message) so callers
+# discover the unsupported dialect immediately.
+_UNSUPPORTED_DIALECTS: dict[str, str] = {
+    "pt-PT": (
+        "European Portuguese (pt-PT) is not supported in this release. "
+        "The Portuguese phonemizer models Brazilian Portuguese only; use "
+        "'pt' or 'pt-BR'. See docs/spec/pt-dialect-contract.toml."
+    ),
+    "pt-pt": (
+        "European Portuguese (pt-PT) is not supported in this release. "
+        "Use 'pt' or 'pt-BR' for Brazilian Portuguese."
+    ),
+}
+
 # Table of built-in language phonemizers: (code, module, class_name)
 _LANGUAGE_TABLE = [
     ("ja", ".japanese", "JapanesePhonemizer"),
@@ -123,6 +148,22 @@ class PhonemizerRegistry:
             If the language code (or any component of a composite code)
             is not registered.
         """
+        # Reject explicitly unsupported dialects with a helpful message
+        # before falling into composite-code resolution.
+        if language in _UNSUPPORTED_DIALECTS:
+            raise ValueError(_UNSUPPORTED_DIALECTS[language])
+
+        # Resolve BCP-47 dialect aliases (e.g. "pt-BR" -> "pt") before
+        # both direct lookup and composite-code splitting. Without this
+        # step, "pt-BR" would be split into ["pt", "BR"] and fail with a
+        # "Missing language ['BR']" error for callers using the BCP-47
+        # form. Cache the alias so future lookups are O(1).
+        if language in _LANGUAGE_ALIASES:
+            canonical = _LANGUAGE_ALIASES[language]
+            if canonical in self._registry:
+                self._registry[language] = self._registry[canonical]
+                return self._registry[canonical]
+
         if language in self._registry:
             return self._registry[language]
 

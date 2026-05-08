@@ -151,7 +151,9 @@ nohup /data/piper/.venv/bin/python -m piper_train \
 | 英語 | en | EnglishPhonemizer | g2p-en (Apache-2.0) |
 | 中国語 | zh | ChinesePhonemizer | pypinyin (MIT) |
 | 韓国語 | ko | KoreanPhonemizer | g2pk2 (Apache-2.0, optional) |
-| ES/PT/FR/SV | es/pt/fr/sv | 各 Phonemizer | 規則ベース (依存なし) |
+| ES/PT/FR/SV | es/pt(=pt-BR alias)/fr/sv | 各 Phonemizer | 規則ベース (依存なし) |
+
+> **PT alias:** `pt` と `pt-BR` は registry で同一 phonemizer を返す (BR-only 実装)。`pt-PT` (EU) は明示的に `ValueError` を返し、silent な BR fallback を回避。仕様: `docs/spec/pt-dialect-contract.toml`。
 
 > **学習済みモデルは 6 言語 (sv/ko 未含有)、コードは 8 言語対応。**
 

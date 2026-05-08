@@ -1,0 +1,71 @@
+# Portuguese Dialect Contract
+#
+# Canonical contract for how the Portuguese phonemizer accepts language
+# codes. Cross-referenced from `src/python/g2p/piper_plus_g2p/registry.py`
+# (`_LANGUAGE_ALIASES` / `_UNSUPPORTED_DIALECTS`) and from
+# `src/python/g2p/piper_plus_g2p/portuguese.py` (header docstring).
+#
+# Update this file together with both code locations whenever the
+# accepted-codes set or fallback policy changes.
+
+[meta]
+spec_version = 1
+issue = "PR #401 follow-up — pt alias for pt-BR (BCP-47 explicit)"
+
+[language_codes]
+# Codes that resolve to the existing Brazilian Portuguese phonemizer.
+# Both `pt` and `pt-BR` produce identical output (same phonemizer
+# instance, cached after first lookup).
+pt = "pt-BR"
+"pt-BR" = "pt-BR"
+"pt-br" = "pt-BR"   # case-insensitive region subtag
+
+[fallback]
+# Codes that are intentionally NOT supported in this release. The
+# registry must raise an explicit ValueError rather than letting them
+# fall into the composite-code path (which would produce a confusing
+# "Missing language ['PT']" message).
+"pt-PT" = "error"
+"pt-pt" = "error"
+
+[reasoning]
+# Why pt-PT is rejected rather than silently mapped to pt-BR:
+#
+#   The BR/EU phonological differences are large enough that the BR
+#   phonemizer's output is wrong for EU input on multiple frequent
+#   patterns:
+#     - Final -s realisation (BR /s,z/  vs  EU /ʃ,ʒ/)
+#     - /t,d/ palatalisation before /i,e/ (BR /tʃ,dʒ/  vs  EU /t,d/)
+#     - Strong unstressed-vowel reduction in EU ([ɨ], elision)
+#     - Final -l vocalisation (BR /w/  vs  EU /ɫ/)
+#     - r-realisation (BR multiple regional variants  vs  EU uvular)
+#
+#   Silently routing pt-PT through the BR phonemizer would produce TTS
+#   output that any native EU speaker would reject. Returning an
+#   explicit error preserves caller agency: they can either pass `pt`
+#   knowing they get BR, or wait for a future release that ships an EU
+#   phonemizer. CML-TTS Portuguese (the corpus the 6lang model was
+#   trained on) is BR-dominated, so even if EU G2P existed, the audio
+#   model would not produce native EU prosody.
+
+[runtimes]
+# Mirrors required when this contract is implemented across runtimes.
+# Currently Python is the canonical implementation; other runtimes can
+# adopt the same alias / fallback semantics in follow-up commits.
+python_canonical = "src/python/g2p/piper_plus_g2p/registry.py"
+rust = "follow-up: src/rust/piper-core/src/phonemize/portuguese.rs"
+go = "follow-up: src/go/piperplus/phonemize/"
+csharp = "follow-up: src/csharp/PiperPlus.Core/Phonemize/"
+wasm = "follow-up: src/rust/piper-wasm/src/lib.rs"
+cpp = "follow-up: src/cpp/"
+
+[future]
+# When EU Portuguese is added in a future release:
+#   1. Implement `EuropeanPortuguesePhonemizer` (separate file).
+#   2. Move `pt-PT` from `[fallback]` to `[language_codes]` here.
+#   3. Remove `pt-PT` / `pt-pt` from `_UNSUPPORTED_DIALECTS` in
+#      registry.py and add to `_LANGUAGE_ALIASES` (or register
+#      directly under `pt-PT`).
+#   4. Decide the policy for the bare `pt` code: keep aliasing to BR
+#      (status quo, recommended for backward-compat), or raise an
+#      ambiguity warning and require an explicit dialect.
