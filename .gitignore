@@ -117,6 +117,7 @@ check_*.py
 !scripts/check_pua_consistency.py
 !scripts/check_onnx_inputs.py
 !scripts/check_loanword_consistency.py
+!scripts/check_short_text_contract.py
 create_comprehensive_*.py
 add_missing_*.py
 retrain_*.py
