@@ -322,3 +322,165 @@ class TestProsody:
             isinstance(pi, ProsodyInfo) and 1 <= pi.a1 <= 5 for pi in prosody
         )
         assert has_tone, "Expected at least one ProsodyInfo with tone (a1=1..5)"
+
+
+@requires_zh
+class TestTraditionalChinese:
+    """繁体字 (Traditional Chinese) is handled by pypinyin's built-in
+    Trad->Simp tables. The ChinesePhonemizer does not perform an explicit
+    conversion step; it relies on pypinyin to map Traditional characters
+    to the same pinyin as their Simplified equivalents.
+
+    These tests pin the current behaviour as a regression gate.
+    """
+
+    def test_traditional_basic_tokyo(self):
+        """東京 (Trad. for Tokyo) -> dong1 jing1, same as 东京 (Simp.)."""
+        from piper_plus_g2p.chinese import ChinesePhonemizer
+
+        p = ChinesePhonemizer()
+        tokens = p.phonemize("東京")
+        # Expected: dong1 -> [t, uŋ, tone1], jing1 -> [tɕ, iŋ, tone1]
+        assert tokens == ["t", "uŋ", "tone1", "tɕ", "iŋ", "tone1"], tokens
+
+    def test_traditional_dragon(self):
+        """龍 (Trad.) -> long2, identical to 龙 (Simp.)."""
+        from piper_plus_g2p.chinese import ChinesePhonemizer
+
+        p = ChinesePhonemizer()
+        tokens = p.phonemize("龍")
+        # long2 -> [l, uŋ, tone2]
+        assert tokens == ["l", "uŋ", "tone2"], tokens
+
+    def test_traditional_long_sentence(self):
+        """繁体字長文 (Trad. mixed sentence): 請打開東京的龍."""
+        from piper_plus_g2p.chinese import ChinesePhonemizer
+
+        p = ChinesePhonemizer()
+        tokens = p.phonemize("請打開東京的龍")
+        # Expected: qing3 da3 kai1 dong1 jing1 de5 long2
+        # qing3 -> [tɕʰ, iŋ, tone2] (T3+T3 sandhi: 請打 -> tone2+tone3)
+        assert tokens == [
+            "tɕʰ", "iŋ", "tone2",
+            "t", "a", "tone3",
+            "kʰ", "aɪ", "tone1",
+            "t", "uŋ", "tone1",
+            "tɕ", "iŋ", "tone1",
+            "t", "ɤ", "tone5",
+            "l", "uŋ", "tone2",
+        ], tokens
+
+    def test_traditional_simplified_mixed(self):
+        """龍中 (Trad. + Simp. mixed) -> long2 zhong1."""
+        from piper_plus_g2p.chinese import ChinesePhonemizer
+
+        p = ChinesePhonemizer()
+        tokens = p.phonemize("龍中")
+        # long2 + zhong1
+        assert tokens == ["l", "uŋ", "tone2", "tʂ", "uŋ", "tone1"], tokens
+
+    def test_traditional_via_pypinyin_strict(self):
+        """pypinyin strict and non-strict modes both yield same pinyin for 東京.
+
+        Pins our reliance on pypinyin's Trad->Simp conversion: both
+        ``strict=True`` and ``strict=False`` must round-trip 東京 to
+        ``dong1 jing1`` because the conversion happens before strict-mode
+        pinyin assembly. If a future pypinyin upgrade changes this, our
+        Traditional support would silently regress.
+        """
+        from pypinyin import Style, pinyin
+
+        strict = pinyin(
+            "東京", style=Style.TONE3, neutral_tone_with_five=True, strict=True
+        )
+        non_strict = pinyin(
+            "東京", style=Style.TONE3, neutral_tone_with_five=True, strict=False
+        )
+        assert strict == non_strict == [["dong1"], ["jing1"]], (
+            f"strict={strict!r}, non_strict={non_strict!r}"
+        )
+
+
+@requires_zh
+class TestT3SandhiContinuous:
+    """Pin the current (snapshot) behaviour of ``_apply_tone_sandhi`` for
+    runs of 4+ consecutive Tone-3 syllables.
+
+    The Chinese module's docstring explicitly notes this as a Known
+    limitation: the right-to-left pair grouping is uniformly applied
+    without considering morphological word boundaries (which would require
+    something like jieba). These tests pin **what the code does today**,
+    not what an ideal phonological output would be.
+    """
+
+    def test_t3_chain_4syllables_basic(self):
+        """4 consecutive T3 (我也很好) -> all-but-last become T2.
+
+        Phonologically, native speakers might split this as
+        [我也][很好] -> T2-T3 + T2-T3, but the current implementation
+        produces T2+T2+T2+T3 across the entire run.
+        """
+        from piper_plus_g2p.chinese import ChinesePhonemizer
+
+        p = ChinesePhonemizer()
+        tokens = p.phonemize("我也很好")
+        tone_tokens = [t for t in tokens if t.startswith("tone")]
+        # KNOWN LIMITATION: ideal would be tone2,tone3,tone2,tone3 by word
+        # boundary; current uniform run sandhi gives tone2,tone2,tone2,tone3.
+        assert tone_tokens == ["tone2", "tone2", "tone2", "tone3"], tone_tokens
+
+    def test_t3_chain_5syllables(self):
+        """5 consecutive T3 (你想买几本) -> first 4 become T2, last stays T3."""
+        from piper_plus_g2p.chinese import ChinesePhonemizer
+
+        p = ChinesePhonemizer()
+        tokens = p.phonemize("你想买几本")
+        tone_tokens = [t for t in tokens if t.startswith("tone")]
+        # KNOWN LIMITATION: native speakers may pause at word boundaries;
+        # current implementation applies a single 5-syllable sweep.
+        assert tone_tokens == [
+            "tone2", "tone2", "tone2", "tone2", "tone3"
+        ], tone_tokens
+
+    def test_t3_with_loanword_no_cross_sandhi(self):
+        """Tone sandhi does NOT cross loanword/segment boundaries.
+
+        ``我用 GPS`` -- the ZH segment ``我用`` (T3+T4) is processed
+        independently of ``GPS`` (loanword path), so the T3 of 我 stays
+        T3 (no sandhi needed: 用 is T4, not T3). Confirms loanword
+        dispatch breaks the sandhi window.
+        """
+        from piper_plus_g2p.registry import get_phonemizer
+
+        p = get_phonemizer("zh-en")
+        tokens, _ = p.phonemize_with_prosody("我用 GPS")
+        tone_tokens = [t for t in tokens if t.startswith("tone")]
+        # 我=T3, 用=T4, then GPS = ji4 pi4 ai1 si4 -> tone4,tone4,tone1,tone4
+        assert tone_tokens == [
+            "tone3",  # 我 (no sandhi: 用 is T4)
+            "tone4",  # 用
+            "tone4",  # j (ji4)
+            "tone4",  # p (pi4)
+            "tone1",  # i (ai1) -- letter I = ai1
+            "tone4",  # s (si4)
+        ], tone_tokens
+
+    def test_t3_with_morphological_boundary(self):
+        """KNOWN LIMITATION pinning: ``小水果`` ([小][水果]) gets uniform sandhi.
+
+        Phonologically, [小][水果] should be processed as
+        T3 + (T2-T3) since 小 is a separate morpheme. The current
+        implementation has no morphological analyser and applies the
+        right-to-left rule uniformly across the 3-syllable run, yielding
+        T2+T2+T3 for all three. This test pins the **current** behaviour;
+        a future PR adding word-boundary detection (jieba) should update
+        this expectation.
+        """
+        from piper_plus_g2p.chinese import ChinesePhonemizer
+
+        p = ChinesePhonemizer()
+        tokens = p.phonemize("小水果")
+        tone_tokens = [t for t in tokens if t.startswith("tone")]
+        # KNOWN LIMITATION: ideal would be tone3,tone2,tone3 honoring the
+        # [小][水果] morphological split; current impl gives tone2,tone2,tone3.
+        assert tone_tokens == ["tone2", "tone2", "tone3"], tone_tokens
