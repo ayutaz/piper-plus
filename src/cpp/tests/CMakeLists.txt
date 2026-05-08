@@ -842,6 +842,20 @@ endif()
 add_test(NAME test_c_api COMMAND test_c_api)
 set_tests_properties(test_c_api PROPERTIES TIMEOUT 60)
 
+# Stage zh_en_loanword.json next to the test_c_api binary so the bundled
+# loanword default-data path (resolved via piper_plus_get_exe_dir() +
+# "/data/zh_en_loanword.json") is populated for the new CApiLoanword
+# round-trip tests. Without this, those tests skip (gracefully) — staging
+# upgrades them from skip to pass.
+add_custom_command(TARGET test_c_api POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory
+        $<TARGET_FILE_DIR:test_c_api>/data
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${CMAKE_SOURCE_DIR}/src/cpp/data/zh_en_loanword.json
+        $<TARGET_FILE_DIR:test_c_api>/data/zh_en_loanword.json
+    COMMENT "Staging zh_en_loanword.json next to test_c_api"
+)
+
 # ---- test_c_api_integration: C API integration tests (model required) ----
 # Links against the piper_plus shared library (or static lib for embedded build).
 # Uses piper_common static library for the full piper engine. (issue #377)

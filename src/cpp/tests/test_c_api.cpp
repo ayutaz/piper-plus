@@ -867,3 +867,216 @@ TEST(CApiZhEnDispatch, IsEnabledWithNullEngineReturnsError) {
     ASSERT_NE(err, nullptr);
     EXPECT_NE(std::string(err).find("engine"), std::string::npos);
 }
+
+// ===== Loanword (engine-less) C API NULL safety =====
+// The piper_plus_loanword_* surface is part of the public C API but had no
+// tests. These cover NULL-handle and NULL-text contracts, plus a positive
+// round-trip via the bundled default data.
+
+TEST(CApiLoanword, FreeNullHandleIsSafe) {
+    piper_plus_loanword_free(nullptr);
+    SUCCEED();
+}
+
+TEST(CApiLoanword, LoadFromNullPathReturnsNull) {
+    PiperPlusLoanwordHandle *h = piper_plus_loanword_load_from_path(nullptr);
+    EXPECT_EQ(h, nullptr);
+    const char *err = piper_plus_get_last_error();
+    EXPECT_NE(err, nullptr);
+}
+
+TEST(CApiLoanword, LoadFromNonexistentPathReturnsNull) {
+    PiperPlusLoanwordHandle *h =
+        piper_plus_loanword_load_from_path("/nonexistent/missing/loanword.json");
+    EXPECT_EQ(h, nullptr);
+    const char *err = piper_plus_get_last_error();
+    ASSERT_NE(err, nullptr);
+    EXPECT_GT(std::strlen(err), 0u);
+}
+
+TEST(CApiLoanword, PhonemizeWithNullHandleReturnsErr) {
+    PiperPlusPhonemeResult result = {};
+    PiperPlusStatus rc =
+        piper_plus_phonemize_embedded_english(nullptr, "GPS", &result);
+    EXPECT_EQ(rc, PIPER_PLUS_ERR);
+}
+
+TEST(CApiLoanword, PhonemizeWithNullResultReturnsErr) {
+    // Use default-loaded handle if available; otherwise skip the body but
+    // still verify that NULL-handle path is rejected (regardless of bundled
+    // data presence).
+    PiperPlusLoanwordHandle *h = piper_plus_loanword_load_default();
+    if (!h) {
+        // Without bundled data we can still verify NULL handle is rejected:
+        EXPECT_EQ(piper_plus_phonemize_embedded_english(nullptr, "GPS", nullptr),
+                  PIPER_PLUS_ERR);
+        GTEST_SKIP() << "Bundled loanword data unavailable in test sandbox";
+    }
+    PiperPlusStatus rc = piper_plus_phonemize_embedded_english(h, "GPS", nullptr);
+    EXPECT_EQ(rc, PIPER_PLUS_ERR);
+    piper_plus_loanword_free(h);
+}
+
+TEST(CApiLoanword, DefaultHandleProducesDeterministicAcronymPinyin) {
+    PiperPlusLoanwordHandle *h = piper_plus_loanword_load_default();
+    if (!h) {
+        GTEST_SKIP() << "Bundled loanword data unavailable in test sandbox";
+    }
+
+    PiperPlusPhonemeResult r1 = {};
+    ASSERT_EQ(piper_plus_phonemize_embedded_english(h, "GPS", &r1),
+              PIPER_PLUS_OK);
+    ASSERT_NE(r1.phonemes, nullptr);
+    EXPECT_GT(r1.num_phonemes, 0);
+    // Capture before second call invalidates BORROWED pointer.
+    const std::string first(r1.phonemes);
+
+    // Same input -> same output (deterministic).
+    PiperPlusPhonemeResult r2 = {};
+    ASSERT_EQ(piper_plus_phonemize_embedded_english(h, "GPS", &r2),
+              PIPER_PLUS_OK);
+    ASSERT_NE(r2.phonemes, nullptr);
+    EXPECT_EQ(std::string(r2.phonemes), first);
+    EXPECT_EQ(r2.num_phonemes, r1.num_phonemes);
+
+    piper_plus_loanword_free(h);
+}
+
+TEST(CApiLoanword, EmptyTextProducesZeroPhonemes) {
+    PiperPlusLoanwordHandle *h = piper_plus_loanword_load_default();
+    if (!h) {
+        GTEST_SKIP() << "Bundled loanword data unavailable in test sandbox";
+    }
+    PiperPlusPhonemeResult result = {};
+    ASSERT_EQ(piper_plus_phonemize_embedded_english(h, "", &result),
+              PIPER_PLUS_OK);
+    EXPECT_EQ(result.num_phonemes, 0);
+    piper_plus_loanword_free(h);
+}
+
+// ===== Speaker encoder API: NULL safety + experimental contract =====
+// The speaker_encoder API is documented as EXPERIMENTAL — the implementation
+// "currently returns an error or NULL" (piper_plus.h L509). These tests pin
+// that contract so that when the real implementation lands, the NULL-safety
+// behavior remains.
+
+TEST(CApiSpeakerEncoder, CreateWithNullPathReturnsNull) {
+    PiperPlusSpeakerEncoder *enc = piper_plus_speaker_encoder_create(nullptr);
+    EXPECT_EQ(enc, nullptr);
+}
+
+TEST(CApiSpeakerEncoder, CreateWithMissingFileReturnsNull) {
+    PiperPlusSpeakerEncoder *enc =
+        piper_plus_speaker_encoder_create("/nonexistent/encoder.onnx");
+    EXPECT_EQ(enc, nullptr);
+}
+
+TEST(CApiSpeakerEncoder, EncodeWithNullEncoderReturnsNegative) {
+    float embedding[256];
+    int32_t rc = piper_plus_speaker_encoder_encode(
+        nullptr, /*audio*/ nullptr, /*num_samples*/ 0, /*sr*/ 0,
+        embedding, 256);
+    EXPECT_EQ(rc, -1);
+}
+
+TEST(CApiSpeakerEncoder, DestroyNullIsSafe) {
+    piper_plus_speaker_encoder_destroy(nullptr);
+    SUCCEED();
+}
+
+// ===== Memory safety: free_audio idempotency on NULL =====
+// Regression guard for double-free / NULL-free patterns common in FFI
+// consumers (Dart cffi, Godot GDExtension). Calling free_audio repeatedly
+// on a NULL pointer must be a no-op (no crash, no double free).
+
+TEST(CApiMemorySafety, FreeAudioMultipleNullsAreSafe) {
+    piper_plus_free_audio(nullptr);
+    piper_plus_free_audio(nullptr);
+    piper_plus_free_audio(nullptr);
+    SUCCEED();
+}
+
+TEST(CApiMemorySafety, FreeMultipleNullsAreSafe) {
+    piper_plus_free(nullptr);
+    piper_plus_free(nullptr);
+    SUCCEED();
+}
+
+// ===== Issue #356 regression: short-text padding contract =====
+// These don't run the full synthesis pipeline (model required) but assert
+// that the C API constants documented as the cure for issue #356 are
+// actually exposed via the default options surface. If a future refactor
+// strips the noise_w default below the threshold known to trigger
+// "あこんにちはた"-style corruption, this test fails.
+
+TEST(CApiShortTextRegression, NoiseWDefaultProtectsAgainstIssue356) {
+    // Issue #356: noise_w defaulting too low caused front-edge audio
+    // artifacts on padded short text. The fix pins noise_w >= 0.4 (see
+    // docs/spec/short-text-contract.toml NOISE_W_MIN_RATIO=0.4) and the
+    // default at 0.8 stays well above the floor.
+    PiperPlusSynthOptions opts = piper_plus_default_options();
+    EXPECT_GE(opts.noise_w, 0.4f * 1.0f);  // floor * length_scale
+    EXPECT_FLOAT_EQ(opts.noise_w, 0.8f);
+}
+
+TEST(CApiShortTextRegression, NoiseScaleDefaultProtectsAgainstIssue356) {
+    // Same regression: noise_scale floor 0.5 (NOISE_SCALE_MIN_RATIO).
+    PiperPlusSynthOptions opts = piper_plus_default_options();
+    EXPECT_GE(opts.noise_scale, 0.5f * 1.0f);
+    EXPECT_FLOAT_EQ(opts.noise_scale, 0.667f);
+}
+
+// ===== Iterator state safety: synth_next without synth_start =====
+// Calling synth_next on a brand-new engine (or after a synth_next that
+// returned DONE) without first calling synth_start must not crash and must
+// return ERR. NULL-engine path is already covered above; here we cover the
+// "engine valid but no active iterator" path -- which we can't actually
+// instantiate without a model, but we can at least lock the NULL contract
+// for synth_next to never produce a chunk with non-zero samples. (The
+// state-machine integration tests in test_c_api_integration.cpp cover the
+// model-bound case.)
+
+TEST(CApiIterator, SynthNextOnNullEngineLeavesChunkUntouched) {
+    PiperPlusAudioChunk chunk;
+    chunk.samples = reinterpret_cast<const float *>(0xDEADBEEF);  // sentinel
+    chunk.num_samples = 99;
+    chunk.sample_rate = 99;
+    chunk.is_last = 99;
+
+    PiperPlusStatus rc = piper_plus_synth_next(nullptr, &chunk);
+    EXPECT_EQ(rc, PIPER_PLUS_ERR);
+
+    // Implementation MUST NOT scribble chunk fields when returning ERR
+    // -- callers may inspect the same struct after retry. (The Godot/JNI/
+    // Dart consumers in particular reuse the chunk struct across calls.)
+    EXPECT_EQ(chunk.samples, reinterpret_cast<const float *>(0xDEADBEEF));
+    EXPECT_EQ(chunk.num_samples, 99);
+    EXPECT_EQ(chunk.sample_rate, 99);
+    EXPECT_EQ(chunk.is_last, 99);
+}
+
+// ===== Default options self-consistency =====
+
+TEST(CApiDefaultOptions, AllFloatDefaultsAreFiniteAndPositive) {
+    // Defensive guard: if anyone accidentally writes NaN/Inf into the
+    // default constructor (a bug pattern from float literal typos), the
+    // engine would silently emit garbage audio.
+    PiperPlusSynthOptions opts = piper_plus_default_options();
+    EXPECT_TRUE(std::isfinite(opts.noise_scale));
+    EXPECT_TRUE(std::isfinite(opts.length_scale));
+    EXPECT_TRUE(std::isfinite(opts.noise_w));
+    EXPECT_TRUE(std::isfinite(opts.sentence_silence_sec));
+    EXPECT_GT(opts.noise_scale, 0.0f);
+    EXPECT_GT(opts.length_scale, 0.0f);
+    EXPECT_GT(opts.noise_w, 0.0f);
+    EXPECT_GE(opts.sentence_silence_sec, 0.0f);
+}
+
+TEST(CApiDefaultOptions, SpeakerEmbeddingFieldsAreNullByDefault) {
+    // Voice cloning is opt-in; default options must NOT set speaker_embedding
+    // (it would override speaker_id). This pins the v1.12 ABI: the default
+    // value of speaker_embedding is NULL and speaker_embedding_dim is 0.
+    PiperPlusSynthOptions opts = piper_plus_default_options();
+    EXPECT_EQ(opts.speaker_embedding, nullptr);
+    EXPECT_EQ(opts.speaker_embedding_dim, 0);
+}
