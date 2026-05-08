@@ -95,6 +95,52 @@ class TestResolveLanguageId:
         # Both supplied: language_id wins
         assert _resolve_language_id(voice, "0", "ja") == 0
 
+    def test_float_string_rejected_as_unparseable(self):
+        # `int("1.5")` raises ValueError (no implicit float coercion).
+        # Production must fall back to None, not crash.
+        voice = _make_voice(language_id_map={"en": 0, "ja": 1})
+        assert _resolve_language_id(voice, "1.5", None) is None
+
+    def test_empty_string_rejected_as_unparseable(self):
+        # `int("")` raises ValueError. Treat as no input -> None.
+        voice = _make_voice(language_id_map={"en": 0, "ja": 1})
+        assert _resolve_language_id(voice, "", None) is None
+
+    def test_whitespace_only_string_rejected(self):
+        # `int(" ")` raises ValueError too.
+        voice = _make_voice(language_id_map={"en": 0, "ja": 1})
+        assert _resolve_language_id(voice, "   ", None) is None
+
+    def test_negative_int_treated_as_out_of_range_when_map_set(self, caplog):
+        # Negative IDs are not in any map -> warn + None.
+        voice = _make_voice(language_id_map={"en": 0, "ja": 1})
+        with caplog.at_level(logging.WARNING):
+            assert _resolve_language_id(voice, "-1", None) is None
+        assert any("out of range" in r.message for r in caplog.records)
+
+    def test_negative_int_passes_when_map_is_none(self):
+        # Without a map, validation is skipped — even negatives pass through.
+        # Pin this behaviour so a future "always validate" refactor is intentional.
+        voice = _make_voice(language_id_map=None)
+        assert _resolve_language_id(voice, "-1", None) == -1
+
+    def test_empty_language_string_with_map_returns_none(self):
+        # `lmap.get("")` -> None for normal maps; should not crash.
+        voice = _make_voice(language_id_map={"en": 0, "ja": 1})
+        assert _resolve_language_id(voice, None, "") is None
+
+    def test_language_id_with_leading_plus_accepted(self):
+        # `int("+1")` succeeds in Python, so positive-prefixed ids parse.
+        # Pin this behaviour so any future stricter parser fail flags the
+        # change explicitly.
+        voice = _make_voice(language_id_map={"en": 0, "ja": 1})
+        assert _resolve_language_id(voice, "+1", None) == 1
+
+    def test_language_id_with_extra_whitespace_accepted(self):
+        # `int("  1  ")` strips whitespace and parses to 1.
+        voice = _make_voice(language_id_map={"en": 0, "ja": 1})
+        assert _resolve_language_id(voice, "  1  ", None) == 1
+
 
 # ---------------------------------------------------------------------------
 # `_parse_bool_flag` (unit)
