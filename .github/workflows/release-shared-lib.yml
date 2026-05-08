@@ -29,6 +29,15 @@ on:
 permissions:
   contents: read
 
+# Serialise tag-driven release builds against the same ref. We do NOT
+# cancel-in-progress: an interrupted release that has already uploaded
+# the linux/macos slice but not the iOS xcframework leaves an asymmetric
+# GitHub Release that's awkward to clean up. Letting the second run
+# queue is preferable. PR runs are not affected (different ref).
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
 env:
   ONNXRUNTIME_VERSION: "1.17.0"
 

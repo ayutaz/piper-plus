@@ -5,6 +5,13 @@ on:
     tags:
       - 'npm-v*'
 
+# Serialise tag publishes — re-tagging the same npm-v* should not race
+# the in-flight publish run (npm rejects duplicate version uploads but
+# the dist-tags update window is small).
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
 env:
   NODE_VERSION: '24.x'
 

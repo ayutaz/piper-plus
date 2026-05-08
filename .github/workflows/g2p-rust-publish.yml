@@ -7,6 +7,14 @@ on:
 permissions:
   contents: read
 
+# Serialise tag-driven publishes against the same ref — `cargo publish`
+# is non-idempotent past the first successful upload (subsequent runs
+# fail with "already uploaded"), so two parallel runs would partially
+# succeed in uncomfortable ways.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
 env:
   CARGO_TERM_COLOR: always
 

@@ -7,6 +7,13 @@ on:
 permissions:
   contents: write
 
+# Serialise tag-driven publishes — the publish job creates a Go module
+# tag (src/go/phonemize/v*) and pings proxy.golang.org. Concurrent runs
+# would race on `git push` of the module tag.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   test:
     name: go test (phonemize)
