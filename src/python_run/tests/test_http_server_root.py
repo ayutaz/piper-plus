@@ -174,8 +174,23 @@ class TestRequestSizeCap:
         resp = client.post("/", content=body)
         assert resp.status_code != 413
 
-    def test_get_text_over_limit_returns_413(self, client):
-        text = "a" * (MAX_TEXT_BYTES + 1)
+    def test_get_text_over_limit_returns_413(self, monkeypatch):
+        # Why monkeypatch instead of using the real MAX_TEXT_BYTES (1 MiB):
+        # newer httpx (≥ 0.27) and starlette TestClient validate URL length
+        # client-side and raise `httpx.InvalidURL: URL too long` before the
+        # request ever reaches our server. That client-side limit is far
+        # below 1 MiB on Windows. Lowering MAX_TEXT_BYTES to 256 bytes for
+        # this single test pins the *server-side* 413 logic without hitting
+        # the client-side URL length cap, while the canonical 1 MiB limit
+        # remains pinned by the POST tests above (where body length is not
+        # subject to URL parsing).
+        from piper import http_server
+
+        monkeypatch.setattr(http_server, "MAX_TEXT_BYTES", 256)
+        voice = _make_voice(language_id_map={"en": 0, "ja": 1})
+        client = TestClient(create_app(voice, synthesize_args={}))
+
+        text = "a" * (256 + 1)  # 1 byte over the patched limit
         resp = client.get(f"/?text={text}")
         assert resp.status_code == 413
 
