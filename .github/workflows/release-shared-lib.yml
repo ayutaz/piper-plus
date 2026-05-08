@@ -25,7 +25,9 @@ permissions:
   contents: read
 
 env:
-  ONNXRUNTIME_VERSION: "1.17.0"
+  # Issue #383 follow-up: ORT 1.17.0 → 1.20.0
+  # C++ source build / Android PR CI / Kotlin G2P CI と整合 (docs/spec/ort-versions.md)
+  ONNXRUNTIME_VERSION: "1.20.0"
 
 jobs:
   build-shared:
@@ -178,13 +180,12 @@ jobs:
 
       - name: Download ONNX Runtime iOS (Microsoft CDN)
         env:
-          # ORT 1.17.0 sha256 (verified 2026-05-04, Content-Length: 40,771,813)
-          # Source: https://download.onnxruntime.ai/pod-archive-onnxruntime-c-1.17.0.zip
-          # Last-Modified: Wed, 31 Jan 2024 19:39:25 GMT
+          # ORT 1.20.0 sha256 (verified 2026-05-09, Content-Length: 44,218,716)
+          # Source: https://download.onnxruntime.ai/pod-archive-onnxruntime-c-1.20.0.zip
           # Note: This zip is shared with CocoaPods/SPM — Microsoft breaking it
           # would also break those channels, providing a strong invariant.
           # See docs/spec/ios-shared-lib.md §2.1 for details.
-          ORT_IOS_SHA256: "1623e1150507d9e50554e3d3e5cf9abf75e1bfd8324b74a602acfe45343db871"
+          ORT_IOS_SHA256: "50891a8aadd17d4811acb05ed151ba6c394129bb3ab14e843b0fc83a48d450ff"
         run: |
           set -euo pipefail
           PRIMARY_URL="https://download.onnxruntime.ai/pod-archive-onnxruntime-c-${ONNXRUNTIME_VERSION}.zip"

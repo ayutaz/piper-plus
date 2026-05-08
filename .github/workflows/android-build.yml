@@ -25,7 +25,8 @@ jobs:
     env:
       ANDROID_NDK_VERSION: "26.1.10909125"
       ANDROID_API_LEVEL: "24"
-      ONNXRUNTIME_VERSION: "1.17.0"
+      # Issue #383 follow-up: ORT 1.17.0 → 1.20.0 (release-shared-lib / Kotlin G2P CI と整合)
+      ONNXRUNTIME_VERSION: "1.20.0"
 
     steps:
       - uses: actions/checkout@v6

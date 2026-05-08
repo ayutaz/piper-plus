@@ -49,12 +49,12 @@ jobs:
             build-essential cmake ccache wget
 
           # Install ONNX Runtime
-          wget -q https://github.com/microsoft/onnxruntime/releases/download/v1.17.0/onnxruntime-linux-x64-1.17.0.tgz
-          tar -xzf onnxruntime-linux-x64-1.17.0.tgz
-          sudo cp -r onnxruntime-linux-x64-1.17.0/lib/* /usr/local/lib/
-          sudo cp -r onnxruntime-linux-x64-1.17.0/include/* /usr/local/include/
+          wget -q https://github.com/microsoft/onnxruntime/releases/download/v1.20.0/onnxruntime-linux-x64-1.20.0.tgz
+          tar -xzf onnxruntime-linux-x64-1.20.0.tgz
+          sudo cp -r onnxruntime-linux-x64-1.20.0/lib/* /usr/local/lib/
+          sudo cp -r onnxruntime-linux-x64-1.20.0/include/* /usr/local/include/
           sudo ldconfig
-          rm -rf onnxruntime-linux-x64-1.17.0*
+          rm -rf onnxruntime-linux-x64-1.20.0*
 
       - name: Install dependencies (macOS)
         if: runner.os == 'macOS'
@@ -74,18 +74,18 @@ jobs:
 
           if [[ $(uname -m) == "arm64" ]]; then
             echo "Installing ONNX Runtime for Apple Silicon..."
-            wget -q https://github.com/microsoft/onnxruntime/releases/download/v1.17.0/onnxruntime-osx-arm64-1.17.0.tgz
-            tar -xzf onnxruntime-osx-arm64-1.17.0.tgz
-            sudo cp -r onnxruntime-osx-arm64-1.17.0/lib/* /usr/local/lib/ 2>/dev/null || true
-            sudo cp -r onnxruntime-osx-arm64-1.17.0/include/* /usr/local/include/ 2>/dev/null || true
-            rm -rf onnxruntime-osx-arm64-1.17.0*
+            wget -q https://github.com/microsoft/onnxruntime/releases/download/v1.20.0/onnxruntime-osx-arm64-1.20.0.tgz
+            tar -xzf onnxruntime-osx-arm64-1.20.0.tgz
+            sudo cp -r onnxruntime-osx-arm64-1.20.0/lib/* /usr/local/lib/ 2>/dev/null || true
+            sudo cp -r onnxruntime-osx-arm64-1.20.0/include/* /usr/local/include/ 2>/dev/null || true
+            rm -rf onnxruntime-osx-arm64-1.20.0*
           else
             echo "Installing ONNX Runtime for Intel Mac..."
-            wget -q https://github.com/microsoft/onnxruntime/releases/download/v1.17.0/onnxruntime-osx-x86_64-1.17.0.tgz
-            tar -xzf onnxruntime-osx-x86_64-1.17.0.tgz
-            sudo cp -r onnxruntime-osx-x86_64-1.17.0/lib/* /usr/local/lib/ 2>/dev/null || true
-            sudo cp -r onnxruntime-osx-x86_64-1.17.0/include/* /usr/local/include/ 2>/dev/null || true
-            rm -rf onnxruntime-osx-x86_64-1.17.0*
+            wget -q https://github.com/microsoft/onnxruntime/releases/download/v1.20.0/onnxruntime-osx-x86_64-1.20.0.tgz
+            tar -xzf onnxruntime-osx-x86_64-1.20.0.tgz
+            sudo cp -r onnxruntime-osx-x86_64-1.20.0/lib/* /usr/local/lib/ 2>/dev/null || true
+            sudo cp -r onnxruntime-osx-x86_64-1.20.0/include/* /usr/local/include/ 2>/dev/null || true
+            rm -rf onnxruntime-osx-x86_64-1.20.0*
           fi
 
       - name: Install dependencies (Windows)
@@ -93,9 +93,9 @@ jobs:
         shell: pwsh
         run: |
           # cmake is pre-installed on windows-latest runner
-          Invoke-WebRequest -Uri https://github.com/microsoft/onnxruntime/releases/download/v1.17.0/onnxruntime-win-x64-1.17.0.zip -OutFile onnxruntime-win-x64-1.17.0.zip
-          Expand-Archive -Path onnxruntime-win-x64-1.17.0.zip -DestinationPath .
-          echo "ONNXRUNTIME_ROOT_PATH=$PWD/onnxruntime-win-x64-1.17.0" >> $env:GITHUB_ENV
+          Invoke-WebRequest -Uri https://github.com/microsoft/onnxruntime/releases/download/v1.20.0/onnxruntime-win-x64-1.20.0.zip -OutFile onnxruntime-win-x64-1.20.0.zip
+          Expand-Archive -Path onnxruntime-win-x64-1.20.0.zip -DestinationPath .
+          echo "ONNXRUNTIME_ROOT_PATH=$PWD/onnxruntime-win-x64-1.20.0" >> $env:GITHUB_ENV
 
       # ── Build cache ───────────────────────────────────────────
       - name: Setup build cache
