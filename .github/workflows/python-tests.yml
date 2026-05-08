@@ -128,10 +128,27 @@ jobs:
       env:
         PYTHONUTF8: '1'
 
-    - name: Run runtime full tests (config, training manager, CLI, timing, streaming, short-text, zh-en, webui)
+    - name: Run runtime full tests (config, training manager, CLI, timing, streaming, short-text, zh-en, webui, http_server, text_splitter contract)
       run: |
         cd src/python_run
-        pytest tests/test_config_fallback.py tests/test_english_phonemization.py tests/test_runtime.py tests/test_util_impl.py tests/test_cli_models.py tests/test_training_manager.py tests/test_training_integration.py tests/test_phoneme_timing.py tests/test_voice_timing.py tests/test_http_timing.py tests/test_voice_streaming.py tests/test_text_splitter.py tests/test_short_text_mitigation.py tests/test_zh_en_loanword_runtime.py tests/test_webui.py -v --tb=short --override-ini="addopts="
+        pytest tests/test_config_fallback.py tests/test_english_phonemization.py tests/test_runtime.py tests/test_util_impl.py tests/test_cli_models.py tests/test_training_manager.py tests/test_training_integration.py tests/test_phoneme_timing.py tests/test_voice_timing.py tests/test_http_timing.py tests/test_http_server_root.py tests/test_voice_streaming.py tests/test_text_splitter.py tests/test_text_splitter_contract.py tests/test_short_text_mitigation.py tests/test_zh_en_loanword_runtime.py tests/test_webui.py -v --tb=short --override-ini="addopts="
+      env:
+        PYTHONUTF8: '1'
+
+    # ---------------------------------------------------------------
+    # G2P package tests (src/python/g2p/tests/ — piper-plus-g2p PyPI)
+    # ---------------------------------------------------------------
+    # g2p-python-ci.yml は src/python/g2p/** の変更時のみ走る。
+    # python-tests.yml の paths (src/python/**, src/python_run/**, etc.) でも
+    # G2P テストを回し、ランタイム / 学習側の変更が G2P と整合することを保証する。
+    # 依存 (pyopenjtalk-plus / g2p-en / pypinyin / g2pk2) は line 61/69 の
+    # `g2p[all]` extras でインストール済み。ja/en/zh/ko テストは
+    # @requires_* でゲートされており、インポートが失敗した環境では auto-skip する。
+    # ES/PT/FR/SV は依存なしのため常に実行される。
+    - name: Run G2P package tests (multilingual phonemizers, ssml, snapshots, zh-en loanword)
+      run: |
+        cd src/python/g2p
+        pytest tests/ -v --tb=short --override-ini="addopts="
       env:
         PYTHONUTF8: '1'
 
