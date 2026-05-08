@@ -20,6 +20,8 @@ on:
       - 'src/python_run/piper/voice.py'
       - 'src/python/piper_train/infer_onnx.py'
       - 'scripts/check_short_text_contract.py'
+      - 'scripts/regenerate_short_text_fixture.py'
+      - 'tests/fixtures/short_text/**'
       - '.github/workflows/short-text-parity.yml'
   push:
     branches: [ dev ]
@@ -28,6 +30,8 @@ on:
       - 'src/python_run/piper/voice.py'
       - 'src/python/piper_train/infer_onnx.py'
       - 'scripts/check_short_text_contract.py'
+      - 'scripts/regenerate_short_text_fixture.py'
+      - 'tests/fixtures/short_text/**'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
@@ -51,3 +55,9 @@ jobs:
         # tomllib is in stdlib (Python 3.11+); no third-party install needed.
         run: |
           python scripts/check_short_text_contract.py --verbose
+
+      - name: Verify JSON fixture matches contract toml
+        # Per-runtime parity tests (Rust/Go/C++/C#/WASM) consume contract.json,
+        # so the fixture must stay byte-equivalent with the toml.
+        run: |
+          python scripts/regenerate_short_text_fixture.py --check
