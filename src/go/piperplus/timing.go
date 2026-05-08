@@ -119,7 +119,7 @@ func (r *TimingResult) ToSRT() string {
 // formatSRTTimestamp formats milliseconds as the SRT timestamp HH:MM:SS,mmm.
 // The comma (,) before milliseconds is mandated by the SRT format spec
 // (distinct from WebVTT which uses a period). Negative inputs are clamped
-// to 0 to match the Rust/Python behaviour.
+// to 0 to match the Rust/Python behavior.
 func formatSRTTimestamp(ms float64) string {
 	if ms < 0 {
 		ms = 0
