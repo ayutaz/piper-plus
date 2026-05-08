@@ -165,7 +165,7 @@ nohup /data/piper/.venv/bin/python -m piper_train \
 
 ### G2P 詳細機能 (中国語)
 
-- **ZH-EN 混在ピンイン化** (`chinese.py:phonemize_embedded_english`) — 中国語に隣接する英単語 (acronym/loanword) を米国英語ではなく Mandarin pinyin で発音。`MultilingualPhonemizer` が `[zh,en,zh]`/`[zh,en]`/`[en,zh]` パターンを自動検出してディスパッチ。辞書: `data/zh_en_loanword.json` (acronyms 65 / loanwords 40 / A-Z fallback)。カスタム上書きは `ChinesePhonemizer(zh_en_loanword_dict_paths=...)`。**全 7 ランタイム同期** (Python + Rust 2 crate / Go / C# / WASM / C++)。CI gate `ZH-EN Loanword Sync Gate / json-sync` が 7 mirror + 6 fixture の byte-for-byte 一致を強制 (`scripts/check_loanword_consistency.py`、`/check-loanword` skill)。Forward-compat loader: 全ランタイムで `schema_version: 2` の未来フィールド受理を pinning。Issue #384, [docs/tickets/zh-en-loanword/](docs/tickets/zh-en-loanword/)。
+- **ZH-EN 混在ピンイン化** (`chinese.py:phonemize_embedded_english`) — 中国語に隣接する英単語 (acronym/loanword) を米国英語ではなく Mandarin pinyin で発音。`MultilingualPhonemizer` が `[zh,en,zh]`/`[zh,en]`/`[en,zh]` パターンを自動検出してディスパッチ。辞書 (canonical source): `src/python/g2p/piper_plus_g2p/data/zh_en_loanword.json` (acronyms 66 / loanwords 40 / letter_fallback 26 (A-Z))。カスタム上書きは `ChinesePhonemizer(zh_en_loanword_dict_paths=...)`。**全 7 ランタイム同期** (Python + Rust 2 crate / Go / C# / WASM / C++)。CI gate `ZH-EN Loanword Sync Gate / json-sync` が 7 mirror + 6 fixture の byte-for-byte 一致を強制 (`scripts/check_loanword_consistency.py`、`/check-loanword` skill)。Forward-compat loader: 全ランタイムで `schema_version: 2` の未来フィールド受理を pinning。Issue #384, [docs/tickets/zh-en-loanword/](docs/tickets/zh-en-loanword/)。
 
 ### ランタイム共通機能
 

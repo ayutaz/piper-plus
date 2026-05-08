@@ -44,6 +44,16 @@ paths-ignore:
   - 'src/wasm/openjtalk-web/timing-demo.html'
   - 'src/wasm/openjtalk-web/timing-demo-en.html'
   - 'src/wasm/openjtalk-web/timing-demo-zh.html'
+  # Top-level developer demo HTML — manual loading only, not shipped.
+  # These live at openjtalk-web/ root (not under test/) so the **/test/**
+  # glob does not match. Excluded explicitly to prevent CodeQL re-flagging
+  # innerHTML += ${user_input} patterns intended for local MeCab/Unicode
+  # debugging. Not in npm `files` allowlist (package.json), so they never
+  # ship to consumers.
+  - 'src/wasm/openjtalk-web/test_mecab_analysis.html'
+  - 'src/wasm/openjtalk-web/test-path-fix.html'
+  - 'src/wasm/openjtalk-web/test_unicode_debug.html'
+  - 'src/wasm/openjtalk-web/test_mecab_detail.html'
 
   # Build output / generated files
   - '**/dist/**'

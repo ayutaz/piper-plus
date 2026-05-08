@@ -154,10 +154,13 @@ class SSMLParser:
         if tag == "break":
             break_ms = SSMLParser._resolve_break(element)
             segments.append(SSMLSegment(text="", break_ms=break_ms, rate=rate))
-            # <break/> has no children or tail of its own (self-closing),
-            # but handle tail text if present.
-            if element.tail and element.tail.strip():
-                segments.append(SSMLSegment(text=element.tail.strip(), rate=rate))
+            # NOTE: tail text (the text after this element's closing tag)
+            # is intentionally NOT emitted here. The parent's loop already
+            # appends ``child.tail`` after this call returns. Emitting it
+            # in both places caused duplicate segments (Issue: break tail
+            # double-emit). For top-level <speak> there is no parent, but
+            # ElementTree never sets ``tail`` on the root element, so this
+            # is safe.
             return
 
         # Determine rate for this scope

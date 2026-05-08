@@ -6,6 +6,8 @@ Mirrors the Rust test suite in
 cross-runtime byte-for-byte compatibility on the same input.
 """
 
+import time
+
 import pytest
 
 from piper.text_splitter import split_sentences
@@ -143,3 +145,109 @@ class TestSplitSentencesContractCompliance:
     def test_fullwidth_full_stop_with_closing_bracket(self):
         result = split_sentences("「やった．」次の文．")
         assert result == ["「やった．」", "次の文．"]
+
+
+class TestSplitSentencesNewlineHandling:
+    """Pin behavior for newline / whitespace edge cases.
+
+    The contract (``docs/spec/text-splitter-contract.toml``) does not enumerate
+    which whitespace characters act as inter-sentence separators. The Python
+    implementation relies on :py:meth:`str.isspace` after a sentence
+    terminator, which covers ``\\n``, ``\\r``, ``\\t``, U+2028 (LINE
+    SEPARATOR) and U+2029 (PARAGRAPH SEPARATOR). These tests pin that
+    behavior so future refactors do not silently regress.
+
+    Crucially, none of these whitespace characters are themselves sentence
+    *terminators* — they only separate already-terminated chunks. Whitespace
+    appearing inside an un-terminated run remains inline (no split).
+    """
+
+    @pytest.mark.unit
+    def test_crlf_separator(self):
+        # Windows-style line endings: ``\r\n`` between two terminated
+        # sentences should produce two clean chunks (no embedded \r or \n).
+        result = split_sentences("A.\r\nB.")
+        assert result == ["A.", "B."]
+
+    @pytest.mark.unit
+    def test_cr_only_separator(self):
+        # Classic-Mac-style ``\r`` is whitespace per ``str.isspace`` and is
+        # consumed after a terminator, yielding two chunks.
+        result = split_sentences("A.\rB.")
+        assert result == ["A.", "B."]
+
+    @pytest.mark.unit
+    def test_unicode_line_separator_u2028(self):
+        # U+2028 LINE SEPARATOR is whitespace per Python — consumed as
+        # post-terminator whitespace, yielding two chunks with no inline
+        # separator surviving in either chunk.
+        result = split_sentences("A. B.")
+        assert result == ["A.", "B."]
+
+    @pytest.mark.unit
+    def test_unicode_paragraph_separator_u2029(self):
+        # U+2029 PARAGRAPH SEPARATOR — same treatment as U+2028.
+        result = split_sentences("A. B.")
+        assert result == ["A.", "B."]
+
+    @pytest.mark.unit
+    def test_mixed_lf_crlf(self):
+        # Mixing ``\n`` and ``\r\n`` between terminated sentences must still
+        # yield exactly three chunks with no surviving newline characters.
+        result = split_sentences("A.\nB.\r\nC.")
+        assert result == ["A.", "B.", "C."]
+
+    @pytest.mark.unit
+    def test_tab_only_separation(self):
+        # Tab is whitespace per ``str.isspace``. After a terminator it is
+        # consumed as inter-sentence whitespace, producing two chunks.
+        result = split_sentences("A.\tB.")
+        assert result == ["A.", "B."]
+
+    @pytest.mark.unit
+    def test_inline_newline_without_terminator(self):
+        # No terminator means no split, regardless of embedded whitespace.
+        # ``\n`` here must remain inline in the single emitted chunk.
+        result = split_sentences("A\nB")
+        assert result == ["A\nB"]
+
+    @pytest.mark.unit
+    def test_inline_u2028_without_terminator(self):
+        # U+2028 inside an un-terminated run stays inline (1 chunk).
+        result = split_sentences("A B")
+        assert result == ["A B"]
+
+
+class TestSplitSentencesAdditionalEdgeCases:
+    """Behavior pinning for runs of consecutive terminators and huge inputs."""
+
+    @pytest.mark.unit
+    def test_consecutive_terminators_bang_q_bang(self):
+        # "!?!" — each terminator triggers an independent split: 3 chunks.
+        result = split_sentences("!?!")
+        assert result == ["!", "?", "!"]
+
+    @pytest.mark.unit
+    def test_consecutive_terminators_double_q(self):
+        # "??" — two terminators, two chunks.
+        result = split_sentences("??")
+        assert result == ["?", "?"]
+
+    @pytest.mark.unit
+    def test_consecutive_terminators_double_period(self):
+        # ".." — two terminators, two chunks.
+        result = split_sentences("..")
+        assert result == [".", "."]
+
+    @pytest.mark.unit
+    def test_huge_input_no_crash(self):
+        # ~1.3 MB input must complete quickly (no pathological backtracking
+        # — the splitter is a single linear pass). 5s is a generous ceiling.
+        text = "Hello world. " * 100_000
+        start = time.monotonic()
+        result = split_sentences(text)
+        elapsed = time.monotonic() - start
+        assert elapsed < 5.0, f"split_sentences took {elapsed:.2f}s on 1MB+ input"
+        assert len(result) == 100_000
+        assert result[0] == "Hello world."
+        assert result[-1] == "Hello world."

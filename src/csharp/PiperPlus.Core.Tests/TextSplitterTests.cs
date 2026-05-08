@@ -216,4 +216,66 @@ public class TextSplitterTests
         Assert.Equal("A.", result[0]);
         Assert.Equal("B.", result[1]);
     }
+
+    // ================================================================
+    // SSML envelope preservation (text-splitter-contract.toml)
+    //
+    // `<speak>...</speak>` MUST be preserved as a single unit; the inner
+    // sentence terminators MUST NOT trigger a split that would corrupt the
+    // XML. Mirrors the Rust implementation in
+    // piper-core/src/streaming.rs::split_sentences.
+    // ================================================================
+
+    [Fact]
+    public void SplitSentences_PreservesSpeakEnvelope()
+    {
+        // `<speak>A. B.</speak>` must be yielded as a single unit; the inner
+        // periods MUST NOT trigger a split that would corrupt the XML.
+        var result = TextSplitter.SplitSentences("<speak>A. B.</speak>");
+        Assert.Single(result);
+        Assert.Equal("<speak>A. B.</speak>", result[0]);
+    }
+
+    [Fact]
+    public void SplitSentences_SpeakWithAttributes()
+    {
+        // The opening tag may carry attributes; envelope detection must
+        // still succeed (we match on the `<speak` prefix, not `<speak>`).
+        var result = TextSplitter.SplitSentences("<speak version=\"1.0\">A. B.</speak>");
+        Assert.Single(result);
+        Assert.Equal("<speak version=\"1.0\">A. B.</speak>", result[0]);
+    }
+
+    [Fact]
+    public void SplitSentences_SpeakWithInnerPeriods()
+    {
+        // Many consecutive inner periods (acronym-style) must remain intact.
+        var result = TextSplitter.SplitSentences("<speak>A.B.C.</speak>");
+        Assert.Single(result);
+        Assert.Equal("<speak>A.B.C.</speak>", result[0]);
+    }
+
+    [Fact]
+    public void SplitSentences_TextAfterSpeakCloseSplitsNormally()
+    {
+        // Text that follows `</speak>` is treated as plain text and split
+        // normally. The envelope itself counts as 1 unit.
+        var result = TextSplitter.SplitSentences("<speak>A.</speak> Plain. Text.");
+        Assert.Equal(3, result.Count);
+        Assert.Equal("<speak>A.</speak>", result[0]);
+        Assert.Equal("Plain.", result[1]);
+        Assert.Equal("Text.", result[2]);
+    }
+
+    [Fact]
+    public void SplitSentences_UnclosedSpeakFallsBackToNormalSplit()
+    {
+        // An unclosed `<speak>` tag is treated as plain text and split
+        // normally on sentence terminators (degenerate input — must not
+        // hang, panic, or drop content).
+        var result = TextSplitter.SplitSentences("<speak>A. B.");
+        Assert.Equal(2, result.Count);
+        Assert.Equal("<speak>A.", result[0]);
+        Assert.Equal("B.", result[1]);
+    }
 }

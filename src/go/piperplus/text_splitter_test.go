@@ -264,3 +264,91 @@ func TestSplitTextForStreaming_Short(t *testing.T) {
 		t.Errorf("unexpected: %v", chunks)
 	}
 }
+
+// ---------------------------------------------------------------------------
+// SSML envelope preservation
+// ---------------------------------------------------------------------------
+// Per docs/spec/text-splitter-contract.toml, an SSML `<speak>...</speak>`
+// envelope must be preserved as a single unit so that the inner XML structure
+// is not destroyed by sentence-terminator splitting.
+
+func TestSplitSentences_PreservesSpeakEnvelope(t *testing.T) {
+	got := SplitSentences("<speak>A. B.</speak>")
+	want := []string{"<speak>A. B.</speak>"}
+
+	if len(got) != len(want) {
+		t.Fatalf("expected %d unit(s), got %d: %v", len(want), len(got), got)
+	}
+	if got[0] != want[0] {
+		t.Errorf("expected %q, got %q", want[0], got[0])
+	}
+}
+
+func TestSplitSentences_SpeakWithAttributes(t *testing.T) {
+	input := `<speak version="1.0">A. B.</speak>`
+	got := SplitSentences(input)
+	want := []string{input}
+
+	if len(got) != len(want) {
+		t.Fatalf("expected %d unit(s), got %d: %v", len(want), len(got), got)
+	}
+	if got[0] != want[0] {
+		t.Errorf("expected %q, got %q", want[0], got[0])
+	}
+}
+
+func TestSplitSentences_SpeakWithInnerPeriods(t *testing.T) {
+	got := SplitSentences("<speak>A.B.C.</speak>")
+	want := []string{"<speak>A.B.C.</speak>"}
+
+	if len(got) != len(want) {
+		t.Fatalf("expected %d unit(s), got %d: %v", len(want), len(got), got)
+	}
+	if got[0] != want[0] {
+		t.Errorf("expected %q, got %q", want[0], got[0])
+	}
+}
+
+func TestSplitSentences_TextAfterSpeakCloseSplitsNormally(t *testing.T) {
+	// Per spec, the envelope is one unit; trailing text is split normally.
+	got := SplitSentences("<speak>X.</speak> Plain. Text.")
+
+	if len(got) < 2 {
+		t.Fatalf("expected at least 2 units, got %d: %v", len(got), got)
+	}
+	// First unit must be the full envelope (no trailing text fused in).
+	if got[0] != "<speak>X.</speak>" {
+		t.Errorf("expected first unit %q, got %q", "<speak>X.</speak>", got[0])
+	}
+	// Subsequent units must come from splitting the tail "Plain. Text."
+	tail := got[1:]
+	wantTail := []string{"Plain.", "Text."}
+	if len(tail) != len(wantTail) {
+		t.Fatalf("expected tail %v, got %v", wantTail, tail)
+	}
+	for i := range wantTail {
+		if tail[i] != wantTail[i] {
+			t.Errorf("tail[%d]: expected %q, got %q", i, wantTail[i], tail[i])
+		}
+	}
+}
+
+func TestSplitSentences_UnclosedSpeakFallsBackToNormalSplit(t *testing.T) {
+	// No matching </speak> — must NOT preserve as a single unit; instead
+	// fall back to the regular sentence splitter.
+	got := SplitSentences("<speak>A. B.")
+	if len(got) <= 1 {
+		t.Fatalf("expected normal split (>1 sentence), got %d: %v", len(got), got)
+	}
+	// Verify we got the same chunks as the fallback splitter would
+	// produce (no SSML preservation).
+	want := []string{"<speak>A.", "B."}
+	if len(got) != len(want) {
+		t.Fatalf("expected %v, got %v", want, got)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("unit[%d]: expected %q, got %q", i, want[i], got[i])
+		}
+	}
+}
