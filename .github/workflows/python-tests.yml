@@ -164,7 +164,8 @@ jobs:
       if: runner.os != 'Windows'
       run: |
         cd docker/wyoming
-        python -m pytest test_integration.py -v --tb=short
+        PYTHONPATH="${GITHUB_WORKSPACE}/src/python:${PYTHONPATH:-}" \
+          python -m pytest test_integration.py -v --tb=short
       env:
         PYTHONUTF8: '1'
 
