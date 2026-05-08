@@ -674,8 +674,8 @@ func TestGolden_DetectLanguage(t *testing.T) {
 
 func TestGolden_FixtureVersion(t *testing.T) {
 	f := loadGoldenFixture(t)
-	if f.Version != 1 {
-		t.Errorf("fixture version = %d, want 1", f.Version)
+	if f.Version != 2 {
+		t.Errorf("fixture version = %d, want 2", f.Version)
 	}
 }
 
