@@ -97,7 +97,9 @@ public static class TimingWriter
         for (int i = 0; i < count; i++)
         {
             long id = phonemeIds[i];
-            float frameDuration = durations[i];
+            // Negative durations are clamped to 0 — matches Python canonical
+            // (durations_to_timing) and the cross-runtime golden fixture.
+            float frameDuration = Math.Max(0f, durations[i]);
 
             // Skip special tokens (PAD=0, BOS=1, EOS=2) — advance clock only.
             if (id is 0 or 1 or 2)
