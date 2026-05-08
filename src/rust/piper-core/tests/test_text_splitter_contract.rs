@@ -118,5 +118,9 @@ fn rust_does_not_recognise_omitted_terminator() {
     let input = "a\u{FF0E} b\u{FF0E}";
     let chunks = split_sentences(input);
     // No split: rust treats U+FF0E as a regular char.
-    assert_eq!(chunks.len(), 1, "U+FF0E should NOT split in rust today; got {chunks:?}");
+    assert_eq!(
+        chunks.len(),
+        1,
+        "U+FF0E should NOT split in rust today; got {chunks:?}"
+    );
 }

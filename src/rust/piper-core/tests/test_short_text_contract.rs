@@ -77,8 +77,7 @@ fn load_fixture() -> Fixture {
         panic!(
             "Failed to read short-text contract fixture at {}: {}\n\
              Run `python scripts/regenerate_short_text_fixture.py` to (re)generate.",
-            FIXTURE_PATH,
-            e
+            FIXTURE_PATH, e
         )
     });
     serde_json::from_slice(&bytes).expect("contract fixture JSON is malformed")
@@ -152,8 +151,8 @@ fn private_engine_constants_match_contract() {
     let fixture = load_fixture();
     let src = read_source(ENGINE_RS);
 
-    let pause_lit =
-        extract_const_literal(&src, "PAUSE_TOKEN_ID").expect("PAUSE_TOKEN_ID not found in engine.rs");
+    let pause_lit = extract_const_literal(&src, "PAUSE_TOKEN_ID")
+        .expect("PAUSE_TOKEN_ID not found in engine.rs");
     assert_eq!(
         pause_lit.parse::<i64>().unwrap(),
         fixture.padding.pause_token_id,
