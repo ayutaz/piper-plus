@@ -199,6 +199,10 @@ jobs:
           languages: ${{ matrix.language == 'kotlin' && 'java-kotlin' || matrix.language }}
           build-mode: ${{ matrix.build-mode }}
           queries: security-and-quality
+          # paths-ignore (test/demo/dist exclusions): see config-file rationale.
+          # Centralizes false-positive suppressions in one location instead of
+          # duplicating into per-job conditionals.
+          config-file: ./.github/codeql/codeql-config.yml
 
       - name: Build (autobuild for Go / Swift / Kotlin)
         if: steps.should-skip.outputs.skip != 'true' && matrix.build-mode == 'autobuild'
