@@ -611,6 +611,63 @@ describe('buildPhonemeIdToTokenMap', () => {
     // First occurrence ("a") wins
     assert.strictEqual(map[7], 'a');
   });
+
+  // Wave 5 (WASM) — additional regression coverage for buildPhonemeIdToTokenMap
+  it('mixed regular + PUA + explicit-PUA mappings render correctly', () => {
+    const phonemeIdMap = {
+      _: [0],
+      '^': [1],
+      $: [2],
+      a: [7],
+      '': [15], // explicit name -> 'ch'
+      '': [40], // unmapped -> 'U+E019'
+    };
+    const puaMap = { '': 'ch' };
+    const map = buildPhonemeIdToTokenMap(phonemeIdMap, puaMap);
+    // Plain ASCII passes through
+    assert.strictEqual(map[0], '_');
+    assert.strictEqual(map[1], '^');
+    assert.strictEqual(map[2], '$');
+    assert.strictEqual(map[7], 'a');
+    // Explicit PUA mapping wins
+    assert.strictEqual(map[15], 'ch');
+    // Unmapped PUA falls back to U+XXXX uppercase hex
+    assert.strictEqual(map[40], 'U+E019');
+  });
+
+  it('ignores phoneme entries with empty id arrays without throwing', () => {
+    const phonemeIdMap = {
+      a: [], // empty — must be skipped, not crash
+      b: [5],
+    };
+    // Behaviour: empty arrays are gracefully ignored or use undefined.
+    // We assert that the map is built and 'b' is mapped.
+    const map = buildPhonemeIdToTokenMap(phonemeIdMap);
+    assert.strictEqual(map[5], 'b');
+  });
+
+  it('PUA renders with uppercase hex (matches Python f"{ord(c):04X}")', () => {
+    // Lower-range PUA char must render as uppercase 4-digit hex.
+    const phonemeIdMap = { '': [99] };
+    const map = buildPhonemeIdToTokenMap(phonemeIdMap);
+    assert.strictEqual(map[99], 'U+E001');
+    // No lowercase letters in the rendered string.
+    assert.ok(!/[a-f]/.test(map[99]), 'hex must be uppercase');
+  });
+
+  it('PUA U+F8FF (boundary) renders correctly', () => {
+    // Upper boundary of the PUA block — must NOT be excluded.
+    const phonemeIdMap = { '': [55] };
+    const map = buildPhonemeIdToTokenMap(phonemeIdMap);
+    assert.strictEqual(map[55], 'U+F8FF');
+  });
+
+  it('non-PUA non-ASCII phoneme passes through verbatim', () => {
+    // Unicode characters outside PUA must be preserved as-is (e.g. IPA tʃ).
+    const phonemeIdMap = { 'ʃ': [80] };
+    const map = buildPhonemeIdToTokenMap(phonemeIdMap);
+    assert.strictEqual(map[80], 'ʃ');
+  });
 });
 
 
