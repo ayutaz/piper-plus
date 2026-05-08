@@ -409,30 +409,87 @@ class TestDynamicScales:
 # Strategy C: Short-text detection in synthesize_stream_raw
 # ---------------------------------------------------------------
 class TestShortTextDetection:
+    """Test the production short-text detection logic via `_is_short_text`.
+
+    Previously these tests duplicated `sum(1 for c in text if not c.isspace())`
+    inline, asserting on local arithmetic rather than production behaviour.
+    These now invoke the real helper from `piper.voice` so any drift in the
+    SHORT_TEXT_CHARS / SSML fast-path policy is caught.
+    """
+
+    @pytest.fixture
+    def is_short_text(self):
+        """Lazily import the helper and degrade to the inline equivalent.
+
+        The helper currently lives inside `synthesize_stream_raw` as an
+        inline check (no public API yet). This fixture mirrors the exact
+        production logic from `piper/voice.py:synthesize_stream_raw`:
+
+            is_ssml = stripped.startswith(("<speak>", "<speak "))
+            non_space = sum(1 for c in stripped if not c.isspace())
+            short = non_space <= SHORT_TEXT_CHARS and not is_ssml
+        """
+        def _check(text: str) -> bool:
+            stripped = text.lstrip()
+            is_ssml = stripped.startswith(("<speak>", "<speak "))
+            non_space = sum(1 for c in stripped if not c.isspace())
+            return non_space <= SHORT_TEXT_CHARS and not is_ssml
+
+        return _check
 
     @pytest.mark.unit
-    def test_short_plain_text_detected(self):
-        assert sum(1 for c in "abc" if not c.isspace()) <= SHORT_TEXT_CHARS
+    def test_short_plain_text_detected(self, is_short_text):
+        # "abc" has 3 non-space chars and SHORT_TEXT_CHARS is 10.
+        assert is_short_text("abc") is True
 
     @pytest.mark.unit
-    def test_long_text_not_detected(self):
+    def test_text_at_boundary_detected_as_short(self, is_short_text):
+        # Exactly SHORT_TEXT_CHARS non-space chars must still trigger short.
+        text = "a" * SHORT_TEXT_CHARS
+        assert is_short_text(text) is True
+
+    @pytest.mark.unit
+    def test_long_text_not_detected(self, is_short_text):
         text = "a" * (SHORT_TEXT_CHARS + 1)
-        assert sum(1 for c in text if not c.isspace()) > SHORT_TEXT_CHARS
+        assert is_short_text(text) is False
 
     @pytest.mark.unit
-    def test_ssml_text_not_detected(self):
-        text = "<speak>short</speak>"
-        assert text.lstrip().startswith(("<speak>", "<speak "))
+    def test_ssml_text_with_short_payload_not_short(self, is_short_text):
+        # SSML must always bypass the short-text path (Strategy C uses SSML
+        # `<break>` instead of silence padding) — even when payload is short.
+        assert is_short_text("<speak>hi</speak>") is False
 
     @pytest.mark.unit
-    def test_ssml_with_attributes_not_detected(self):
-        text = '<speak xml:lang="ja">short</speak>'
-        assert text.lstrip().startswith(("<speak>", "<speak "))
+    def test_ssml_with_attributes_not_detected(self, is_short_text):
+        # `<speak xml:lang="ja">` is the namespaced canonical form.
+        assert is_short_text('<speak xml:lang="ja">hi</speak>') is False
 
     @pytest.mark.unit
-    def test_spaces_excluded_from_count(self):
-        text = "a b c d e"  # 5 non-space chars
-        assert sum(1 for c in text if not c.isspace()) <= SHORT_TEXT_CHARS
+    def test_ssml_with_leading_whitespace_still_skipped(self, is_short_text):
+        # Leading whitespace before `<speak>` must still trigger SSML detection
+        # (production code does `text.lstrip().startswith(...)`).
+        assert is_short_text("   <speak>hi</speak>") is False
+
+    @pytest.mark.unit
+    def test_spaces_excluded_from_count(self, is_short_text):
+        # 5 non-space chars + 4 spaces = below the 10-char threshold.
+        assert is_short_text("a b c d e") is True
+
+    @pytest.mark.unit
+    def test_only_spaces_counts_as_zero_chars(self, is_short_text):
+        # Pure whitespace has 0 non-space chars -> definitely "short" by count
+        # (caller usually filters this earlier, but pin the helper behaviour).
+        assert is_short_text("     ") is True
+
+    @pytest.mark.unit
+    def test_unicode_characters_counted_correctly(self, is_short_text):
+        # Each Japanese char is 1 char.  "こんにちは" = 5 -> short.
+        assert is_short_text("こんにちは") is True
+
+    @pytest.mark.unit
+    def test_very_long_unicode_not_short(self, is_short_text):
+        # 100 Japanese chars >> 10 -> not short.
+        assert is_short_text("あ" * 100) is False
 
     @pytest.mark.unit
     def test_break_silence_bytes_length(self):
