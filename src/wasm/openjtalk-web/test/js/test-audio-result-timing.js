@@ -236,14 +236,138 @@ describe('AudioResult.timing - immutability', () => {
   });
 
   it('mutating input timing object after construction does NOT affect result', () => {
+    'use strict';
     const samples = new Float32Array([0.1, 0.2]);
     const originalTiming = makeSampleTiming();
     const result = new AudioResult(samples, 22050, originalTiming);
 
     // The constructor deep-froze the passed reference, so mutations on the
-    // same object will also fail in strict mode. We verify the result still
-    // reflects the frozen snapshot.
+    // same object must fail in strict mode. Verify by attempting writes.
+    assert.throws(() => {
+      originalTiming.phonemes[0].start_ms = 999;
+    }, TypeError);
+    assert.throws(() => {
+      originalTiming.total_duration_ms = -1;
+    }, TypeError);
+    assert.throws(() => {
+      originalTiming.phonemes.push({
+        phoneme: 'x',
+        start_ms: 0,
+        end_ms: 1,
+        duration_ms: 1,
+      });
+    }, TypeError);
+
+    // The result still reflects the original (unmutated) snapshot.
     assert.strictEqual(result.timing.phonemes[0].start_ms, 0);
     assert.strictEqual(result.timing.phonemes[0].end_ms, 58);
+  });
+
+  // ---------------------------------------------------------
+  // Additional immutability coverage (Wave 5: WASM)
+  // ---------------------------------------------------------
+
+  it('result.timing IS the same frozen reference as the input (idempotent freeze)', () => {
+    const samples = new Float32Array([0.1]);
+    const timing = makeSampleTiming();
+    // Freeze before passing — constructor must accept and not double-wrap.
+    Object.freeze(timing.phonemes[0]);
+    Object.freeze(timing.phonemes[1]);
+    Object.freeze(timing.phonemes);
+    Object.freeze(timing);
+    const result = new AudioResult(samples, 22050, timing);
+
+    // Reference identity preserved (no defensive clone, per spec backward_compat).
+    assert.strictEqual(result.timing, timing);
+    // All levels still frozen post-construction.
+    assert.ok(Object.isFrozen(result.timing));
+    assert.ok(Object.isFrozen(result.timing.phonemes));
+    for (const p of result.timing.phonemes) {
+      assert.ok(Object.isFrozen(p));
+    }
+  });
+
+  it('attempting to set a new property on result.timing throws in strict mode', () => {
+    'use strict';
+    const samples = new Float32Array([0.1]);
+    const result = new AudioResult(samples, 22050, makeSampleTiming());
+    // Primitive fields can't be re-assigned, and adding new fields must fail.
+    assert.throws(() => {
+      result.timing.new_field = 123;
+    }, TypeError);
+    assert.throws(() => {
+      result.timing.total_duration_ms = 999;
+    }, TypeError);
+    assert.throws(() => {
+      result.timing.sample_rate = 8000;
+    }, TypeError);
+  });
+
+  it('attempting to delete a property on result.timing throws in strict mode', () => {
+    'use strict';
+    const samples = new Float32Array([0.1]);
+    const result = new AudioResult(samples, 22050, makeSampleTiming());
+    assert.throws(() => {
+      delete result.timing.total_duration_ms;
+    }, TypeError);
+    assert.throws(() => {
+      delete result.timing.phonemes;
+    }, TypeError);
+  });
+
+  it('attempting to splice/sort/reverse timing.phonemes throws in strict mode', () => {
+    'use strict';
+    const samples = new Float32Array([0.1]);
+    const result = new AudioResult(samples, 22050, makeSampleTiming());
+    // splice modifies the array in place — must throw.
+    assert.throws(() => result.timing.phonemes.splice(0, 1), TypeError);
+    assert.throws(() => result.timing.phonemes.sort(), TypeError);
+    assert.throws(() => result.timing.phonemes.reverse(), TypeError);
+    assert.throws(() => result.timing.phonemes.shift(), TypeError);
+    assert.throws(() => result.timing.phonemes.unshift({}), TypeError);
+    assert.throws(() => result.timing.phonemes.pop(), TypeError);
+  });
+
+  it('result.timing returns a deeply frozen object even when input was not pre-frozen', () => {
+    const samples = new Float32Array([0.1]);
+    const livingTiming = makeSampleTiming();
+    // Sanity: input is NOT frozen prior to construction.
+    assert.ok(!Object.isFrozen(livingTiming));
+    assert.ok(!Object.isFrozen(livingTiming.phonemes));
+    assert.ok(!Object.isFrozen(livingTiming.phonemes[0]));
+
+    const result = new AudioResult(samples, 22050, livingTiming);
+
+    // Constructor must have applied the deep freeze to the same reference.
+    assert.ok(Object.isFrozen(livingTiming));
+    assert.ok(Object.isFrozen(livingTiming.phonemes));
+    assert.ok(Object.isFrozen(livingTiming.phonemes[0]));
+    assert.ok(Object.isFrozen(livingTiming.phonemes[1]));
+  });
+
+  it('null timing does not throw and remains null on the getter', () => {
+    const samples = new Float32Array([0.1]);
+    // Constructor must accept null without invoking deepFreezeTiming.
+    const result = new AudioResult(samples, 22050, null);
+    assert.strictEqual(result.timing, null);
+    assert.strictEqual(result.hasTimingInfo, false);
+  });
+
+  it('empty phonemes array is also frozen', () => {
+    const samples = new Float32Array([0.1]);
+    const empty = { phonemes: [], total_duration_ms: 0, sample_rate: 22050 };
+    const result = new AudioResult(samples, 22050, empty);
+    assert.ok(Object.isFrozen(result.timing));
+    assert.ok(Object.isFrozen(result.timing.phonemes));
+    // Cannot push into the empty frozen array.
+    assert.throws(() => {
+      'use strict';
+      result.timing.phonemes.push({
+        phoneme: 'a',
+        start_ms: 0,
+        end_ms: 0,
+        duration_ms: 0,
+      });
+    }, TypeError);
   });
 });

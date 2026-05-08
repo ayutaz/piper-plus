@@ -392,6 +392,68 @@ describe('trimPaddingByDurations (Strategy A - precise post-trim)', { skip }, ()
     assert.equal(TRIM_EOS_MAX_FRAMES, 0);
     assert.equal(DEFAULT_HOP_SIZE, 256);
   });
+
+  // Wave 5 (WASM) — additional regression tests for issue #356
+  it('handles zero-duration entries without removing audio inappropriately', () => {
+    // Zero-duration phoneme entries (could occur in degenerate ONNX output) —
+    // the trim must not over-aggressively cut audio.
+    const durations = new Float32Array([0, 0, 5, 5, 0, 0]);
+    const hop = 100;
+    const total = 1000; // = sum * hop
+    const audio = new Float32Array(total);
+    const result = trimPaddingByDurations(audio, durations, 1, 1, hop);
+    // BOS(0) + frontPad(0) = 0 frames trimmed front
+    // backPad(0) + EOS(0 capped at 0) = 0 frames trimmed back
+    // Audio should be unchanged (1000 samples).
+    assert.equal(result.length, total);
+  });
+
+  it('trim is bounded: cannot remove more than audio length', () => {
+    // Extreme case: trim values far exceed audio length — must clamp gracefully.
+    const durations = new Float32Array([100, 100, 1, 100]);
+    const hop = 100;
+    const audio = new Float32Array(500); // smaller than total durations imply
+    const result = trimPaddingByDurations(audio, durations, 1, 1, hop);
+    // Result must be a Float32Array (may be empty but must not error/return null).
+    assert.ok(result instanceof Float32Array);
+    assert.ok(result.length >= 0);
+    assert.ok(result.length <= audio.length);
+  });
+
+  it('Strategy A invariant: BOS=durations[0] is always trimmed when wasPadded', () => {
+    // After Strategy A padding, BOS occupies index 0 of durations and must be
+    // included in the front trim. This guards against off-by-one in BOS handling.
+    const durations = new Float32Array([3, 2, 2, 5, 2, 2, 1]);
+    const hop = 100;
+    const total = 1700;
+    const audio = new Float32Array(total);
+    const result = trimPaddingByDurations(audio, durations, 2, 2, hop);
+    // BOS(3) + frontPad(2+2) = 7 frames = 700 samples
+    // backPad(2+2) + EOS(1, no clamp) = 5 frames = 500 samples
+    assert.equal(result.length, total - 700 - 500);
+  });
+
+  it('handles single-phoneme audio (BOS + body=0 + EOS only)', () => {
+    // body=0 case is skipped by Strategy A, so frontPad=backPad=0.
+    // trimPaddingByDurations must still be a no-op when called with 0 padding.
+    const durations = new Float32Array([2, 1]);
+    const hop = 100;
+    const total = 300;
+    const audio = new Float32Array(total);
+    const result = trimPaddingByDurations(audio, durations, 0, 0, hop);
+    assert.equal(result.length, total);
+  });
+
+  it('explicit eosMaxFrames=0 preserves the spec default behaviour', () => {
+    // The default (TRIM_EOS_MAX_FRAMES = 0) means EOS is ALWAYS fully stripped.
+    const durations = new Float32Array([2, 2, 2, 2, 2, 50]);
+    const hop = 100;
+    const total = 6000;
+    const audio = new Float32Array(total);
+    const result = trimPaddingByDurations(audio, durations, 1, 1, hop, 0);
+    // BOS(2) + frontPad(2) = 400, backPad(2) + EOS(50) = 5200
+    assert.equal(result.length, total - 400 - 5200);
+  });
 });
 
 
