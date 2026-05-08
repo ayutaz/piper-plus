@@ -519,7 +519,11 @@ class TestSpeakerEmbeddingMaskMixedBatch:
             attn_mask = torch.unsqueeze(x_mask, 2) * torch.unsqueeze(y_mask, -1)
             attn = commons.generate_path(w_ceil, attn_mask)
             m_p = torch.matmul(attn.squeeze(1), m_p.transpose(1, 2)).transpose(1, 2)
-            logs_p = torch.matmul(attn.squeeze(1), logs_p.transpose(1, 2)).transpose(1, 2)
+            # logs_p reshape mirrors infer() in models.py:VitsModel for ONNX
+            # trace fidelity. The variance term is required by the trace even
+            # though the deterministic path uses z_p = m_p (no sampling), so
+            # we keep the assignment to pin the trace shape.
+            _ = torch.matmul(attn.squeeze(1), logs_p.transpose(1, 2)).transpose(1, 2)
             z_p = m_p
             z = model.flow(z_p, y_mask, g=g, reverse=True)
             o = model.dec((z * y_mask), g=g)
