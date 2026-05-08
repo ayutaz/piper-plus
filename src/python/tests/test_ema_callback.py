@@ -254,3 +254,181 @@ class TestEMACallbackLifecycle:
         callback_b.on_load_checkpoint(_DummyTrainer(), model_b, checkpoint)
         assert callback_b.ema_generator is not None
         assert callback_b.ema_generator.num_updates == callback_a.ema_generator.num_updates
+
+
+# ---------------------------------------------------------------------------
+# Edge case: decay validation (audit gap #2)
+# ---------------------------------------------------------------------------
+
+
+class TestEMADecayValidation:
+    """Pin behaviour for boundary / pathological decay values.
+
+    The current implementation does NOT validate decay (no ValueError).
+    These tests pin observable behaviour so future stricter validation
+    will signal an intentional change.
+    """
+
+    def test_decay_zero_immediate_follow(self):
+        """decay=0.0, use_num_updates=False -> shadow tracks current immediately.
+
+        Update rule: shadow = decay*shadow + (1-decay)*current. With
+        decay=0, shadow becomes current after a single update.
+        """
+        model = _DummyDecoder()
+        ema = ExponentialMovingAverage(model, decay=0.0, use_num_updates=False)
+        with torch.no_grad():
+            model.linear.weight.fill_(5.0)
+        ema.update()
+        assert torch.allclose(
+            ema.shadow_params["linear.weight"],
+            torch.full_like(model.linear.weight, 5.0),
+        )
+
+    def test_decay_one_freeze_shadow(self):
+        """decay=1.0, use_num_updates=False -> shadow frozen at init.
+
+        Update rule with decay=1: shadow = 1*shadow + 0*current = shadow.
+        Shadow stays at the initial value regardless of model param drift.
+        """
+        model = _DummyDecoder()
+        ema = ExponentialMovingAverage(model, decay=1.0, use_num_updates=False)
+        # Drive model away from init (1.0 -> 9.0)
+        with torch.no_grad():
+            model.linear.weight.fill_(9.0)
+        for _ in range(10):
+            ema.update()
+        assert torch.allclose(
+            ema.shadow_params["linear.weight"],
+            torch.full_like(model.linear.weight, 1.0),
+        )
+
+    def test_decay_negative_diverges_pin(self):
+        """decay=-1.0 (use_num_updates=False) -> no error, divergent behaviour pinned.
+
+        With decay=-1: shadow = -1*shadow + 2*current = 2*current - shadow.
+        Starting shadow=1, current=2 (constant): step1=2*2-1=3, step2=2*2-3=1,
+        oscillates between 3 and 1. We just pin "no exception is raised".
+        """
+        model = _DummyDecoder()
+        # Should not raise (no validation in current code)
+        ema = ExponentialMovingAverage(model, decay=-1.0, use_num_updates=False)
+        with torch.no_grad():
+            model.linear.weight.fill_(2.0)
+        # Multiple updates — should not raise
+        for _ in range(5):
+            ema.update()
+        # Shadow values are still tensors (no NaN guard expected here)
+        assert "linear.weight" in ema.shadow_params
+
+    def test_decay_nan_handling(self):
+        """decay=NaN -> no exception, shadow becomes NaN. Pin current behaviour."""
+        model = _DummyDecoder()
+        ema = ExponentialMovingAverage(
+            model, decay=float("nan"), use_num_updates=False
+        )
+        with torch.no_grad():
+            model.linear.weight.fill_(2.0)
+        ema.update()
+        # Pin: NaN propagates into shadow without raising
+        assert torch.isnan(ema.shadow_params["linear.weight"]).any()
+
+    def test_decay_inf_handling(self):
+        """decay=+inf -> no exception, shadow may become inf/NaN. Pin behaviour."""
+        model = _DummyDecoder()
+        ema = ExponentialMovingAverage(
+            model, decay=float("inf"), use_num_updates=False
+        )
+        with torch.no_grad():
+            model.linear.weight.fill_(2.0)
+        ema.update()
+        # Pin: no exception. shadow = inf*1 + (1-inf)*2 -> inf or nan.
+        shadow = ema.shadow_params["linear.weight"]
+        assert (
+            torch.isinf(shadow).any() or torch.isnan(shadow).any()
+        ), f"decay=inf should produce inf or NaN values, got {shadow}"
+
+
+# ---------------------------------------------------------------------------
+# Edge case: apply_ema_weights vs remove_weight_norm() ordering (audit gap #4)
+# ---------------------------------------------------------------------------
+
+
+class TestEMAWithRemoveWeightNorm:
+    """Regression test for export_onnx.py L428-L431 critical comment.
+
+    EMA shadow params reference ``weight_g``/``weight_v`` keys created by
+    ``torch.nn.utils.weight_norm``.  ``remove_weight_norm()`` fuses them
+    into a single ``weight`` tensor, after which ``apply_ema_shadow_params``
+    cannot find any matching key.
+    """
+
+    def _make_decoder_with_weight_norm(self):
+        """Build a small Conv1d wrapped in weight_norm (mimics HiFi-GAN ResBlock)."""
+        from torch.nn.utils import weight_norm
+
+        decoder = nn.Sequential(weight_norm(nn.Conv1d(4, 4, kernel_size=3, padding=1)))
+        return decoder
+
+    def _make_shadow_params(self, decoder):
+        """Build shadow params from current decoder state (matches weight_g/v)."""
+        return {
+            name: param.data.clone() + 0.1
+            for name, param in decoder.named_parameters()
+        }
+
+    def test_apply_ema_before_remove_weight_norm_succeeds(self):
+        """正常 path: EMA を weight_norm 解除 *前* に適用すれば weight_g/v が一致."""
+        from piper_train.export_onnx import apply_ema_shadow_params
+
+        decoder = self._make_decoder_with_weight_norm()
+        shadow_params = self._make_shadow_params(decoder)
+        # Sanity: weight_norm produces weight_g and weight_v
+        names = set(dict(decoder.named_parameters()).keys())
+        assert any("weight_g" in n for n in names), (
+            f"weight_norm should expose weight_g, got {names}"
+        )
+
+        applied, skipped = apply_ema_shadow_params(decoder, shadow_params)
+        assert applied == len(shadow_params), (
+            f"All shadow params should match weight_g/weight_v keys "
+            f"(applied={applied}, expected={len(shadow_params)})"
+        )
+        assert skipped == 0
+
+    def test_apply_ema_after_remove_weight_norm_fails(self):
+        """remove_weight_norm 後に EMA shadow を適用すると全てが skipped になる.
+
+        Pin the regression: weight_g/weight_v keys vanish after
+        remove_weight_norm(), and ``applied`` becomes 0 with all
+        shadow keys reported as skipped.
+        """
+        from piper_train.export_onnx import apply_ema_shadow_params
+
+        decoder = self._make_decoder_with_weight_norm()
+        # Capture shadow params BEFORE remove_weight_norm (these have weight_g/v keys)
+        shadow_params = self._make_shadow_params(decoder)
+
+        # Now remove weight norm — fuses weight_g + weight_v into single "weight"
+        # Find the wrapped Conv1d module and unwrap it
+        from torch.nn.utils import remove_weight_norm
+
+        for module in decoder.modules():
+            if isinstance(module, nn.Conv1d):
+                remove_weight_norm(module)
+
+        # Verify weight_g/v are gone
+        post_names = set(dict(decoder.named_parameters()).keys())
+        assert not any("weight_g" in n for n in post_names), (
+            f"weight_g should be removed, got {post_names}"
+        )
+
+        # Now apply_ema_shadow_params: all shadow keys are unmatched
+        applied, skipped = apply_ema_shadow_params(decoder, shadow_params)
+        assert applied == 0, (
+            f"After remove_weight_norm(), no weight_g/v keys remain to apply "
+            f"(applied={applied}, expected=0)"
+        )
+        assert skipped == len(shadow_params), (
+            f"All {len(shadow_params)} shadow keys should be skipped, got {skipped}"
+        )
