@@ -57,7 +57,7 @@ func TestFindDictionaryFile_EmptyFilename(t *testing.T) {
 	// When filename is empty, filepath.Join(modelDir, "") resolves to the
 	// directory itself, which passes os.Stat. This is by design: the caller
 	// is responsible for providing a non-empty filename. Pin the current
-	// behaviour explicitly so any future change is intentional.
+	// behavior explicitly so any future change is intentional.
 	t.Setenv("PIPER_DICTIONARIES_PATH", "")
 
 	modelDir := t.TempDir()

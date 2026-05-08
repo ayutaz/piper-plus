@@ -1,6 +1,6 @@
 // Adversarial tests for the ssml package — XXE / billion-laughs / DTD / PI.
 //
-// These tests pin the *current* defensive behaviour of Parse against
+// These tests pin the *current* defensive behavior of Parse against
 // well-known XML attack vectors. The cases mirror analogous fixtures in
 // the Python / Rust / C# runtimes so cross-runtime drift can be detected.
 //
@@ -12,7 +12,7 @@
 //     OR encoding/xml returns an error and Parse falls back to stripped
 //     plain text. In both branches no entity reference value leaks.
 //
-// encoding/xml behaviour pinned here:
+// encoding/xml behavior pinned here:
 //   - Undeclared entity references -> "invalid character entity" error
 //     -> Parse fallback -> stripped plain text segment.
 //   - DOCTYPE Directive -> emitted as xml.Directive, ignored by walk().
@@ -181,7 +181,7 @@ func TestAttack_BillionLaughsSpeakFirstFallsBackSafely(t *testing.T) {
 func TestAttack_ExternalDtdNotFetched(t *testing.T) {
 	// encoding/xml emits a Directive token for DOCTYPE, never fetches
 	// external SYSTEM IDs. IsSSML regex rejects DOCTYPE-prefixed input
-	// as a first defence.
+	// as a first defense.
 	payload := `<!DOCTYPE speak SYSTEM "http://example.invalid/external.dtd"><speak>Hello</speak>`
 
 	start := time.Now()
@@ -290,7 +290,7 @@ func TestAttack_AttributeWithXxeEntityDoctypePrefix(t *testing.T) {
 	// resolve to file content. Mirrors Python
 	// test_attribute_with_xxe_entity_falls_back and C#
 	// AttributeWithXxeEntity_DoctypePrefix_FallsBackSafely so all 4
-	// runtimes pin the same observable behaviour.
+	// runtimes pin the same observable behavior.
 	payload := `<!DOCTYPE foo [<!ENTITY xxe SYSTEM "file:///etc/passwd">]><speak><break time="&xxe;"/></speak>`
 
 	segments := Parse(payload)
@@ -312,7 +312,7 @@ func TestAttack_AttributeWithXxeEntityDoctypePrefix(t *testing.T) {
 func TestAttack_DoctypePrefixTreatedAsPlainText(t *testing.T) {
 	// IsSSML regex (^\s*<speak[\s>]) is identical across all four
 	// runtimes. If this test changes, double-check Python / Rust / C#
-	// analogues for drift.
+	// analogs for drift.
 	cases := []string{
 		`<!DOCTYPE speak><speak>Hi</speak>`,
 		`<!DOCTYPE foo [<!ENTITY x 'y'>]><speak>Hi</speak>`,

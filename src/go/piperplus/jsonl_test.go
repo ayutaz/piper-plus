@@ -177,7 +177,7 @@ func TestReadJSONL(t *testing.T) {
 // TestReadJSONL_StopsOnFirstError verifies that without ContinueOnError, the
 // scanner halts at the first malformed line. After the bad line, no further
 // inputs should arrive on inputCh, even if subsequent lines are valid. This
-// pins the default fail-fast behaviour at jsonl.go:74-89.
+// pins the default fail-fast behavior at jsonl.go:74-89.
 func TestReadJSONL_StopsOnFirstError(t *testing.T) {
 	data := strings.Join([]string{
 		`{"phoneme_ids": [1, 2]}`,
@@ -208,7 +208,7 @@ func TestReadJSONL_StopsOnFirstError(t *testing.T) {
 
 // TestReadJSONL_ContinueOnError verifies that with ContinueOnError, the
 // scanner skips malformed lines and keeps emitting subsequent valid inputs.
-// This pins the recovery behaviour at jsonl.go:74-82.
+// This pins the recovery behavior at jsonl.go:74-82.
 func TestReadJSONL_ContinueOnError(t *testing.T) {
 	data := strings.Join([]string{
 		`{"phoneme_ids": [1, 2]}`,
@@ -249,7 +249,7 @@ func TestReadJSONL_ContinueOnError(t *testing.T) {
 }
 
 // TestReadJSONL_ContextCancelledDuringSelectSend verifies that when ctx is
-// cancelled while the producer goroutine is blocked on `inputCh <- input`
+// canceled while the producer goroutine is blocked on `inputCh <- input`
 // (because the consumer is slow), it exits via the `<-ctx.Done()` branch
 // at jsonl.go:91-95 instead of leaking. We use an unbuffered consumer and
 // never read from inputCh to force the send to block.
@@ -284,7 +284,7 @@ func TestReadJSONL_ContextCancelledDuringSelectSend(t *testing.T) {
 
 	select {
 	case <-closed:
-		// Producer honoured ctx.Done() in the select.
+		// Producer honored ctx.Done() in the select.
 	case <-time.After(2 * time.Second):
 		t.Fatal("ReadJSONL goroutine did not exit after ctx cancellation in select-send")
 	}
