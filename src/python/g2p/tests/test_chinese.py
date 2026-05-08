@@ -361,13 +361,27 @@ class TestTraditionalChinese:
         # Expected: qing3 da3 kai1 dong1 jing1 de5 long2
         # qing3 -> [tɕʰ, iŋ, tone2] (T3+T3 sandhi: 請打 -> tone2+tone3)
         assert tokens == [
-            "tɕʰ", "iŋ", "tone2",
-            "t", "a", "tone3",
-            "kʰ", "aɪ", "tone1",
-            "t", "uŋ", "tone1",
-            "tɕ", "iŋ", "tone1",
-            "t", "ɤ", "tone5",
-            "l", "uŋ", "tone2",
+            "tɕʰ",
+            "iŋ",
+            "tone2",
+            "t",
+            "a",
+            "tone3",
+            "kʰ",
+            "aɪ",
+            "tone1",
+            "t",
+            "uŋ",
+            "tone1",
+            "tɕ",
+            "iŋ",
+            "tone1",
+            "t",
+            "ɤ",
+            "tone5",
+            "l",
+            "uŋ",
+            "tone2",
         ], tokens
 
     def test_traditional_simplified_mixed(self):
@@ -438,9 +452,7 @@ class TestT3SandhiContinuous:
         tone_tokens = [t for t in tokens if t.startswith("tone")]
         # KNOWN LIMITATION: native speakers may pause at word boundaries;
         # current implementation applies a single 5-syllable sweep.
-        assert tone_tokens == [
-            "tone2", "tone2", "tone2", "tone2", "tone3"
-        ], tone_tokens
+        assert tone_tokens == ["tone2", "tone2", "tone2", "tone2", "tone3"], tone_tokens
 
     def test_t3_with_loanword_no_cross_sandhi(self):
         """Tone sandhi does NOT cross loanword/segment boundaries.
