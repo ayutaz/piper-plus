@@ -492,13 +492,34 @@ class TestMixedInput:
         assert len(tokens) > 0
         assert "!" in tokens
 
-    def test_latin_characters_pass_through(self):
-        """Latin characters in input are passed through."""
+    def test_latin_characters_routed_to_english_g2p(self):
+        """Latin characters in input are routed through the English G2P
+        path (not raw pass-through). ``"OK"`` becomes IPA tokens like
+        ``['o', 'kʰ', 'e', 'i']``; the previous 'pass-through' contract
+        was a pre-MultilingualPhonemizer artifact and is no longer the
+        intended behavior — embedded Latin in Korean text should be
+        spoken, not echoed back as graphemes (otherwise the synthesizer
+        would emit silence for unknown letters at inference time).
+
+        Pinned by PR #401 after CI surfacing: this test was previously
+        unwired (g2p tests not invoked by python-tests.yml until commit
+        4f367337) and the old expectation passed locally only because
+        the test was never run against the post-MultilingualPhonemizer
+        codepath.
+        """
         tokens = _phonemes("OK")
-        # Latin characters should appear in the output
         joined = "".join(tokens)
-        assert "O" in joined or "K" in joined, (
-            f"Expected Latin pass-through in {tokens}"
+        assert len(tokens) > 0
+        # Output must NOT contain raw uppercase Latin (= regression to
+        # the old grapheme pass-through path).
+        assert "O" not in joined and "K" not in joined, (
+            f"raw Latin uppercase leaked into Korean tokens: {tokens}. "
+            "Expected EN G2P routing (IPA phonemes)."
+        )
+        # Output SHOULD contain at least one IPA phoneme from English
+        # G2P of 'OK' (o, k, kʰ, e, i — letter-by-letter spelling).
+        assert any(c in joined for c in ("o", "k", "ʰ", "e", "i")), (
+            f"Expected IPA from EN G2P in tokens: {tokens}"
         )
 
     def test_mixed_hangul_numbers(self):
