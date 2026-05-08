@@ -8,7 +8,7 @@
 +#elif defined(__EMSCRIPTEN__)
 +      // Emscripten uses a different fpos_t structure
 +      return (size_t) ftell((FILE *) fp->pointer);
-+#else 
++#else
        return (size_t) pos.__pos;
  #endif                          /* _WIN32 || __CYGWIN__ || __APPLE__ || __ANDROID__ */
     } else if (fp->type == HTS_DATA) {

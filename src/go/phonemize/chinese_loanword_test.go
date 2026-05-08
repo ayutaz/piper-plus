@@ -242,9 +242,9 @@ func TestLoaderAcceptsUnknownFieldsInSchemaV2(t *testing.T) {
 	}
 }
 
-// Review feedback C-1: a future ``schema_version: 2`` manifest may legitimately
-// drop the legacy ``version`` field. The loader must accept that, falling back
-// to ``schema_version`` (and silently to 1 if neither is present) so the
+// Review feedback C-1: a future “schema_version: 2“ manifest may legitimately
+// drop the legacy “version“ field. The loader must accept that, falling back
+// to “schema_version“ (and silently to 1 if neither is present) so the
 // runtime stays in sync with Rust / Python / C# / C++ peers.
 func TestLoaderForwardCompat_VersionAbsent_UsesSchemaVersion(t *testing.T) {
 	noVersion := []byte(`{

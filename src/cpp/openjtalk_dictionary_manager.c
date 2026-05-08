@@ -32,9 +32,9 @@ static int verify_checksum(const char* file_path, const char* expected_sha256) {
     char cmd[2048];
     char result[256] = {0};
     FILE* fp;
-    
+
     fprintf(stderr, "Verifying checksum...\n");
-    
+
 #ifdef _WIN32
     // Use PowerShell on Windows
     snprintf(cmd, sizeof(cmd),
@@ -51,7 +51,7 @@ static int verify_checksum(const char* file_path, const char* expected_sha256) {
         return 0; // Skip verification if no tool available
     }
 #endif
-    
+
 #ifdef _WIN32
     fp = _popen(cmd, "r");
 #else
@@ -61,26 +61,26 @@ static int verify_checksum(const char* file_path, const char* expected_sha256) {
         fprintf(stderr, "Warning: Failed to compute checksum, skipping verification\n");
         return 0;
     }
-    
+
     if (fgets(result, sizeof(result), fp) != NULL) {
         // Remove newline
         size_t len = strlen(result);
         if (len > 0 && result[len-1] == '\n') {
             result[len-1] = '\0';
         }
-        
+
         // Convert to lowercase for comparison
         for (int i = 0; result[i]; i++) {
             result[i] = tolower(result[i]);
         }
-        
+
         // Compare with expected checksum (also in lowercase)
         char expected_lower[256];
         strncpy(expected_lower, expected_sha256, sizeof(expected_lower) - 1);
         for (int i = 0; expected_lower[i]; i++) {
             expected_lower[i] = tolower(expected_lower[i]);
         }
-        
+
         if (strcmp(result, expected_lower) == 0) {
             fprintf(stderr, "Checksum verified successfully\n");
 #ifdef _WIN32
@@ -99,7 +99,7 @@ static int verify_checksum(const char* file_path, const char* expected_sha256) {
             return -1;
         }
     }
-    
+
 #ifdef _WIN32
     _pclose(fp);
 #else
@@ -114,12 +114,12 @@ static int mkdir_p(const char* path) {
     char tmp[1024];
     char* p = NULL;
     size_t len;
-    
+
     snprintf(tmp, sizeof(tmp), "%s", path);
     len = strlen(tmp);
     if (tmp[len - 1] == '/')
         tmp[len - 1] = 0;
-    
+
     for (p = tmp + 1; *p; p++) {
         if (*p == '/' || *p == '\\') {
             *p = 0;
@@ -134,18 +134,18 @@ static int mkdir_p(const char* path) {
 // Get the base directory for data files
 static const char* get_data_dir() {
     static char data_dir[1024] = {0};
-    
+
     if (data_dir[0] != '\0') {
         return data_dir;
     }
-    
+
     // Check environment variable first
     const char* env_dir = getenv("OPENJTALK_DATA_DIR");
     if (env_dir && access(env_dir, F_OK) == 0) {
         strncpy(data_dir, env_dir, sizeof(data_dir) - 1);
         return data_dir;
     }
-    
+
 #ifdef _WIN32
     // On Windows, try AppData
     const char* appdata = getenv("APPDATA");
@@ -185,13 +185,13 @@ static const char* get_data_dir() {
         }
     }
 #endif
-    
+
     // Create directory if it doesn't exist
     struct stat st = {0};
     if (stat(data_dir, &st) == -1) {
         mkdir_p(data_dir);
     }
-    
+
     return data_dir;
 }
 
@@ -255,11 +255,11 @@ static const char* get_exe_relative_dict_path() {
 // Get the path to the OpenJTalk dictionary
 const char* get_openjtalk_dictionary_path() {
     static char dict_path[1024] = {0};
-    
+
     if (dict_path[0] != '\0') {
         return dict_path;
     }
-    
+
     // Check environment variable first
     const char* env_dict = getenv("OPENJTALK_DICTIONARY_PATH");
     if (env_dict && access(env_dict, F_OK) == 0) {
@@ -289,18 +289,18 @@ const char* get_openjtalk_dictionary_path() {
 #endif
         NULL
     };
-    
+
     for (int i = 0; system_paths[i] != NULL; i++) {
         if (access(system_paths[i], F_OK) == 0) {
             strncpy(dict_path, system_paths[i], sizeof(dict_path) - 1);
             return dict_path;
         }
     }
-    
+
     // Use local data directory
     const char* data_dir = get_data_dir();
     snprintf(dict_path, sizeof(dict_path), "%s/%s", data_dir, DICTIONARY_DIR);
-    
+
     return dict_path;
 }
 
@@ -329,12 +329,12 @@ static int download_and_extract_dictionary() {
     char archive_path[1024];
     char extract_cmd[2048];
     char download_cmd[2048];
-    
+
     snprintf(archive_path, sizeof(archive_path), "%s/%s", data_dir, DICTIONARY_FILENAME);
-    
+
     // Download the dictionary archive
     fprintf(stderr, "Downloading OpenJTalk dictionary from %s...\n", DICTIONARY_URL);
-    
+
 #ifdef _WIN32
     // Use PowerShell on Windows
     snprintf(download_cmd, sizeof(download_cmd),
@@ -355,22 +355,22 @@ static int download_and_extract_dictionary() {
         return -1;
     }
 #endif
-    
+
     if (system(download_cmd) != 0) {
         fprintf(stderr, "Error: Failed to download dictionary\n");
         return -1;
     }
-    
+
     // Verify checksum
     if (verify_checksum(archive_path, DICTIONARY_SHA256) != 0) {
         fprintf(stderr, "Error: Dictionary download corrupted\n");
         unlink(archive_path);
         return -1;
     }
-    
+
     // Extract the archive
     fprintf(stderr, "Extracting dictionary...\n");
-    
+
 #ifdef _WIN32
     // Use PowerShell to extract on Windows
     snprintf(extract_cmd, sizeof(extract_cmd),
@@ -382,16 +382,16 @@ static int download_and_extract_dictionary() {
              "cd \"%s\" && tar -xzf \"%s\"",
              data_dir, DICTIONARY_FILENAME);
 #endif
-    
+
     if (system(extract_cmd) != 0) {
         fprintf(stderr, "Error: Failed to extract dictionary\n");
         unlink(archive_path);
         return -1;
     }
-    
+
     // Clean up archive
     unlink(archive_path);
-    
+
     fprintf(stderr, "OpenJTalk dictionary installed successfully\n");
     return 0;
 }
@@ -399,12 +399,12 @@ static int download_and_extract_dictionary() {
 // Ensure the OpenJTalk dictionary is available
 int ensure_openjtalk_dictionary() {
     const char* dict_path = get_openjtalk_dictionary_path();
-    
+
     // Check if dictionary already exists
     if (access(dict_path, F_OK) == 0) {
         return 0;
     }
-    
+
     // Check if we're in offline mode
     const char* offline_mode = getenv("PIPER_OFFLINE_MODE");
     if (offline_mode && strcmp(offline_mode, "1") == 0) {
@@ -419,14 +419,14 @@ int ensure_openjtalk_dictionary() {
                     "Please provide the dictionary via OPENJTALK_DICTIONARY_PATH or the dict_dir API parameter.\n");
     return -1;
 #endif
-    
+
     // Check if auto-download is disabled
     const char* auto_download = getenv("PIPER_AUTO_DOWNLOAD_DICT");
     if (auto_download && strcmp(auto_download, "0") == 0) {
         fprintf(stderr, "Failed to ensure OpenJTalk dictionary: Auto-download is disabled. Please download and install the dictionary manually.\n");
         return -1;
     }
-    
+
     // Download and extract dictionary
     return download_and_extract_dictionary();
 }

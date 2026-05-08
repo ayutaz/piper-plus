@@ -27,27 +27,27 @@ jobs:
   test-openjtalk-web:
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    
+
     steps:
     - uses: actions/checkout@v6
       with:
         submodules: recursive
-    
+
     - name: Setup Node.js
       uses: actions/setup-node@v6
       with:
         node-version: ${{ env.NODE_VERSION }}
-    
+
     - name: Setup Emscripten
       uses: mymindstorm/setup-emsdk@v14
       with:
         version: '3.1.47'
-    
+
     - name: Install dependencies
       run: |
         sudo apt-get update
         sudo apt-get install -y cmake build-essential
-    
+
     - name: Create build scripts
       working-directory: src/wasm/openjtalk-web
       run: |
@@ -57,7 +57,7 @@ jobs:
         #!/bin/bash
         echo "=== CI Build for OpenJTalk WebAssembly ==="
         echo "Creating placeholder files for CI testing..."
-        
+
         # Create placeholder JavaScript module
         cat > dist/openjtalk.js << 'JSEOF'
         // Placeholder OpenJTalk module for CI
@@ -74,17 +74,17 @@ jobs:
           });
         }
         JSEOF
-        
+
         # Create placeholder WASM file
         echo "Placeholder WASM content" > dist/openjtalk.wasm
-        
+
         echo "Build complete!"
         ls -la dist/
         EOF
-        
+
         chmod +x build-ci.sh
         ./build-ci.sh
-    
+
     - name: Verify build outputs
       working-directory: src/wasm/openjtalk-web
       run: |
@@ -92,7 +92,7 @@ jobs:
         test -f dist/openjtalk.js
         test -f dist/openjtalk.wasm
         echo "Build outputs verified"
-    
+
     # Fast pre-flight: types/index.d.ts auto-gen drift gate.
     # Runs before any heavy WASM/test setup so drift fails fast (~1 sec) with
     # a clear `npm run regenerate:types` fix command. Eliminates the previous
@@ -162,32 +162,32 @@ jobs:
           test/js/test-short-text-contract.js \
           test/js/test-speaker-encoder-parity.js \
           test/js/test-ort-session-contract.js
-    
+
     - name: Check file sizes
       working-directory: src/wasm/openjtalk-web
       run: |
         echo "Build artifact sizes:"
         ls -lh dist/openjtalk.js dist/openjtalk.wasm
-        
+
         # Check that files are reasonably sized
         wasm_size=$(stat -c%s dist/openjtalk.wasm)
         js_size=$(stat -c%s dist/openjtalk.js)
-        
+
         echo "WASM size: $wasm_size bytes"
         echo "JS size: $js_size bytes"
-        
+
         # Fail if WASM is larger than 1MB (reasonable for OpenJTalk)
         if [ $wasm_size -gt 1048576 ]; then
           echo "ERROR: WASM file is larger than 1MB"
           exit 1
         fi
-        
+
         # Fail if JS is larger than 100KB
         if [ $js_size -gt 102400 ]; then
           echo "ERROR: JS file is larger than 100KB"
           exit 1
         fi
-    
+
     - name: Upload artifacts
       uses: actions/upload-artifact@v7
       if: always()

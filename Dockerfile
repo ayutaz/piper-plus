@@ -175,7 +175,7 @@ RUN if [ "$TARGETARCH" = "arm" ]; then \
          cmake --build build --config Release --parallel 1 --verbose); \
     fi
 
-# Install step  
+# Install step
 RUN cmake --install build
 
 # Check piper-phonemize build results

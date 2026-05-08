@@ -163,12 +163,12 @@ TEST(PhonemizeTest, KatakanaToPhonemesPatterns) {
         {"ワ", {"w", "a"}},
         {"ン", {"N"}}
     };
-    
+
     // Test consonant-vowel combinations
     for (const auto& [katakana, expected] : katakanaPatterns) {
         auto result = piper::mapPhonemes(expected);
         EXPECT_EQ(result.size(), expected.size());
-        
+
         // For single phonemes, should be unchanged
         if (expected.size() == 1) {
             EXPECT_EQ(result[0], expected[0]);
@@ -186,15 +186,15 @@ TEST(PhonemizeTest, LongVowelHandling) {
         {{"k", "e", "e"}, "kee"},  // ケー
         {{"k", "o", "o"}, "koo"},  // コー
     };
-    
+
     for (const auto& [phonemes, description] : testCases) {
         auto result = piper::mapPhonemes(phonemes);
         EXPECT_EQ(result.size(), phonemes.size());
-        
+
         // Check that vowels are preserved (not modified)
         EXPECT_EQ(result[1], phonemes[1]);
         EXPECT_EQ(result[2], phonemes[2]);
-        
+
         // Verify they are the same vowel (long vowel)
         EXPECT_EQ(result[1], result[2]);
     }
@@ -209,14 +209,14 @@ TEST(PhonemizeTest, InvalidInputHandling) {
     EXPECT_EQ(result[0], "a");
     EXPECT_EQ(result[1], "");
     EXPECT_EQ(result[2], "b");
-    
+
     // Test with very long phoneme (should handle gracefully)
     std::string longPhoneme(100, 'a');
     std::vector<std::string> long_input = {longPhoneme};
     auto long_result = piper::mapPhonemes(long_input);
     EXPECT_EQ(long_result.size(), 1);
     EXPECT_EQ(long_result[0], longPhoneme); // Should be unchanged
-    
+
     // Test with special characters
     std::vector<std::string> special_chars = {"!", "?", ".", ","};
     auto special_result = piper::mapPhonemes(special_chars);
@@ -233,11 +233,11 @@ TEST(PhonemizeTest, BufferOverflowProtection) {
             large_input.push_back("ch"); // Add some multi-char phonemes
         }
     }
-    
+
     // Should handle without crashing
     auto result = piper::mapPhonemes(large_input);
     EXPECT_EQ(result.size(), large_input.size());
-    
+
     // Verify some mappings still work
     for (size_t i = 0; i < large_input.size(); ++i) {
         if (large_input[i] == "ch") {
@@ -253,19 +253,19 @@ TEST(PhonemizeTest, ConcurrentAccess) {
     // Note: This is a basic test. Real concurrent testing would need thread support
     std::vector<std::string> input1 = {"a", "ch", "i"};
     std::vector<std::string> input2 = {"k", "ts", "u"};
-    
+
     // Simulate concurrent access by interleaving calls
     auto result1 = piper::mapPhonemes(input1);
     auto result2 = piper::mapPhonemes(input2);
-    
+
     // Verify both results are correct
     EXPECT_EQ(result1.size(), 3);
     EXPECT_EQ(result2.size(), 3);
-    
+
     EXPECT_EQ(result1[0], "a");
     EXPECT_NE(result1[1], "ch"); // Should be mapped
     EXPECT_EQ(result1[2], "i");
-    
+
     EXPECT_EQ(result2[0], "k");
     EXPECT_NE(result2[1], "ts"); // Should be mapped
     EXPECT_EQ(result2[2], "u");
@@ -276,7 +276,7 @@ TEST(PhonemizeTest, SmallTsuHandling) {
     // Small tsu is represented as 'q' in phonemes
     std::vector<std::string> input = {"g", "a", "q", "k", "o", "u"}; // がっこう
     auto result = piper::mapPhonemes(input);
-    
+
     EXPECT_EQ(result.size(), input.size());
     EXPECT_EQ(result[2], "q"); // Small tsu should be preserved
 }
@@ -285,13 +285,13 @@ TEST(PhonemizeTest, SmallTsuHandling) {
 TEST(PhonemizeTest, CompoundKanaPhonemes) {
     // Test compound phonemes like kya, shu, cho etc.
     std::vector<std::string> compounds = {"ky", "sh", "ch", "ny", "hy", "my", "ry", "gy", "by", "py"};
-    
+
     for (const auto& compound : compounds) {
         std::vector<std::string> input = {compound, "a"};
         auto result = piper::mapPhonemes(input);
-        
+
         EXPECT_EQ(result.size(), 2);
-        
+
         // Multi-char compounds should be mapped if in the mapping table
         if (piper::testMultiCharToPUA.find(compound) != piper::testMultiCharToPUA.end()) {
             EXPECT_NE(result[0], compound);

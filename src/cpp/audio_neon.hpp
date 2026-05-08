@@ -12,7 +12,7 @@ namespace piper {
 float findMaxAudioValueNEON(const float* audio, size_t audioCount);
 
 // Scale and convert audio from float to int16 using NEON
-void scaleAndConvertAudioNEON(const float* audio, int16_t* output, 
+void scaleAndConvertAudioNEON(const float* audio, int16_t* output,
                                size_t audioCount, float audioScale);
 
 #endif // USE_ARM64_NEON

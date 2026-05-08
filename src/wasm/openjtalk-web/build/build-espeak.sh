@@ -30,12 +30,12 @@ cd "$ESPEAK_DIR"
 # Apply patches if needed
 if [ ! -f ".emscripten_patched" ]; then
     echo "=== Preparing eSpeak-ng for Emscripten ==="
-    
+
     # Fix autogen.sh if needed
     if grep -q "ChangeLog.md" autogen.sh 2>/dev/null; then
         sed -i.bak 's/ChangeLog.md/CHANGELOG.md/g' autogen.sh
     fi
-    
+
     touch ".emscripten_patched"
 fi
 
@@ -43,7 +43,7 @@ fi
 if [ ! -f "Makefile" ]; then
     echo "=== Running autogen.sh ==="
     ./autogen.sh
-    
+
     echo "=== Configuring for native build ==="
     ./configure
 fi

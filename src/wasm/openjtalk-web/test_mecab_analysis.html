@@ -41,7 +41,7 @@
 </head>
 <body>
     <h1>MeCab解析テスト - 英単語の処理</h1>
-    
+
     <div class="test-box">
         <button onclick="runTests()">テスト実行</button>
         <div id="results"></div>
@@ -52,7 +52,7 @@
         window.runTests = async function() {
             const resultsDiv = document.getElementById('results');
             resultsDiv.innerHTML = '<p>処理中...</p>';
-            
+
             try {
                 // OpenJTalkモジュールをロード
                 const OpenJTalkModule = (await import('../dist/openjtalk.js')).default;
@@ -64,10 +64,10 @@
                         return path;
                     }
                 });
-                
+
                 // 辞書とボイスファイルをロード（簡略化のため省略）
                 console.log('OpenJTalk module loaded');
-                
+
                 // テストケース
                 const testCases = [
                     'OpenJTalkとPiperを使った',
@@ -80,37 +80,37 @@
                     'オープンジェートーク',
                     'パイパー'
                 ];
-                
+
                 let html = '<h2>MeCab解析結果（コンソールログを確認）</h2>';
-                
+
                 for (const text of testCases) {
                     html += `<div class="analysis">`;
                     html += `<h3>${text}</h3>`;
                     html += `<p>※ コンソールログでMeCabの解析結果を確認してください</p>`;
-                    
+
                     // OpenJTalkに渡してログを観察
                     console.log(`\n=== Testing: "${text}" ===`);
-                    
+
                     const textPtr = openjtalkModule.allocateUTF8(text);
                     try {
                         const labelsPtr = openjtalkModule._openjtalk_synthesis_labels(textPtr);
                         const labels = openjtalkModule.UTF8ToString(labelsPtr);
                         openjtalkModule._openjtalk_free_string(labelsPtr);
-                        
+
                         // ラベルから音素を抽出
                         const lines = labels.split('\n').filter(line => line.trim());
                         const phonemes = [];
-                        
+
                         for (const line of lines) {
                             const match = line.match(/\-([^+]+)\+/);
                             if (match && match[1] !== 'sil' && match[1] !== 'pau') {
                                 phonemes.push(match[1]);
                             }
                         }
-                        
+
                         html += `<p><strong>音素:</strong> ${phonemes.join(' ')}</p>`;
                         html += `<p><strong>音素数:</strong> ${phonemes.length}</p>`;
-                        
+
                         // 英単語の特徴を分析
                         if (text.includes('OpenJTalk')) {
                             const openPhonemes = phonemes.slice(0, 10).join(' ');
@@ -130,18 +130,18 @@
                                 html += `<p><strong>"Piper"部分（推定）:</strong> ${piperPhonemes}</p>`;
                             }
                         }
-                        
+
                     } catch (error) {
                         html += `<p style="color: red;">エラー: ${error.message}</p>`;
                     } finally {
                         openjtalkModule._free(textPtr);
                     }
-                    
+
                     html += `</div>`;
                 }
-                
+
                 resultsDiv.innerHTML = html;
-                
+
             } catch (error) {
                 resultsDiv.innerHTML = `<p style="color: red;">エラー: ${error.message}</p>`;
                 console.error(error);

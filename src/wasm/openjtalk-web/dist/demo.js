@@ -185,7 +185,7 @@ function speak() {
   console.log('  Creating pusher... done');
 
   var user_text = document.getElementById('texttospeak').value;
-  
+
   // actual synthesis
   console.log('  Calling synthesize...');
   tts.synthesize(
@@ -210,20 +210,20 @@ function speak() {
       //console.log('  Leaving synt cb');
     } // end of function cb
   ); // end of tts.synthesize()
-  console.log('  Calling synthesize... done');  
+  console.log('  Calling synthesize... done');
   console.log('Leaving speak()');
 } // end of speak()
 
 function ipa() {
-  
+
   console.log("Synthesizing ipa ... ");
   var ts = new Date();
   var user_text = document.getElementById('texttospeak').value;
 
  //user_text = user_text.repeat(50);
-  
+
   tts.set_voice(document.getElementById('voice').value);
-  tts.synthesize_ipa(user_text, function(result) { 
+  tts.synthesize_ipa(user_text, function(result) {
     var te = new Date();
     document.getElementById('ipaarea').value = result.ipa;
     console.log("Ipa synthesis done in " + (te-ts) + " ms.")
@@ -281,6 +281,6 @@ function initializeDemo() {
       console.log('Leaving cb1');
     } // end of function cb1
   );
-    
+
   console.log('Creating eSpeakNG instance... done');
 }

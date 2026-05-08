@@ -137,28 +137,28 @@ OpenJTalkのWebAssembly実装をテストしています。
 
         async function loadOriginalWasm() {
             updateStatus('originalStatus', '読み込み中...', 'info');
-            
+
             try {
                 // 実際にはwasm_open_jtalkのファイルが必要
                 // ここではエラーになることを想定
                 const script = document.createElement('script');
                 script.src = 'https://unpkg.com/wasm_open_jtalk@0.0.1/js/open_jtalk.js';
                 script.onerror = () => {
-                    updateStatus('originalStatus', 
+                    updateStatus('originalStatus',
                         'エラー: Node.js専用のため、ブラウザでは動作しません。<br>' +
                         'Error: require is not defined (Node.js modules)',
                         'error'
                     );
                 };
                 script.onload = () => {
-                    updateStatus('originalStatus', 
+                    updateStatus('originalStatus',
                         '予期しない成功？実際にはNode.js依存のためエラーになるはず',
                         'info'
                     );
                 };
                 document.head.appendChild(script);
             } catch (error) {
-                updateStatus('originalStatus', 
+                updateStatus('originalStatus',
                     `エラー: ${error.message}`,
                     'error'
                 );
@@ -166,7 +166,7 @@ OpenJTalkのWebAssembly実装をテストしています。
         }
 
         function loadBrowserWasm() {
-            updateStatus('browserStatus', 
+            updateStatus('browserStatus',
                 'ブラウザ対応版は未実装です。実装手順は上記を参照してください。',
                 'info'
             );
@@ -183,11 +183,11 @@ OpenJTalkのWebAssembly実装をテストしています。
 
         // ページ読み込み時の説明
         window.onload = () => {
-            updateStatus('originalStatus', 
+            updateStatus('originalStatus',
                 'ボタンをクリックして、オリジナルのwasm_open_jtalkの読み込みを試みます',
                 'info'
             );
-            updateStatus('browserStatus', 
+            updateStatus('browserStatus',
                 'ブラウザ対応版は、上記の変更を実装後に利用可能になります',
                 'info'
             );

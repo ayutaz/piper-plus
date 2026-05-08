@@ -8,10 +8,10 @@
 <body>
     <h1>Testing Path Fix</h1>
     <pre id="output"></pre>
-    
+
     <script type="module">
         const output = document.getElementById('output');
-        
+
         // Test adjustPathForDeployment function
         function adjustPathForDeployment(path, deploymentConfig) {
             if (deploymentConfig.basePath) {
@@ -21,7 +21,7 @@
             }
             return path;
         }
-        
+
         // Test cases
         const testCases = [
             {
@@ -45,14 +45,14 @@
                 expected: '/piper-plus/dist/openjtalk.js'
             }
         ];
-        
+
         let allPassed = true;
-        
+
         testCases.forEach((test, index) => {
             const result = adjustPathForDeployment(test.path, test.deploymentConfig);
             const passed = result === test.expected;
             allPassed = allPassed && passed;
-            
+
             output.innerHTML += `Test ${index + 1}:\n`;
             output.innerHTML += `  Input: ${test.path}\n`;
             output.innerHTML += `  Base: ${test.deploymentConfig.basePath}\n`;
@@ -60,7 +60,7 @@
             output.innerHTML += `  Got: ${result}\n`;
             output.innerHTML += `  ${passed ? '✅ PASSED' : '❌ FAILED'}\n\n`;
         });
-        
+
         output.innerHTML += `\n${allPassed ? '✅ All tests passed!' : '❌ Some tests failed!'}\n`;
     </script>
 </body>

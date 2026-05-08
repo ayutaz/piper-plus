@@ -11,15 +11,15 @@ jobs:
     name: Generate Combined Performance Report
     if: ${{ github.event.workflow_run.event == 'pull_request' }}
     runs-on: ubuntu-latest
-    
+
     steps:
       - uses: actions/checkout@v6
-      
+
       - name: Setup Python
         uses: actions/setup-python@v6
         with:
           python-version: '3.11'
-      
+
       # Download artifacts from both workflows
       - name: Download Japanese TTS results
         uses: dawidd6/action-download-artifact@v19
@@ -29,7 +29,7 @@ jobs:
           name: japanese-combined-summary-*
           path: japanese-results
         continue-on-error: true
-      
+
       - name: Download Multilingual TTS results
         uses: dawidd6/action-download-artifact@v19
         with:
@@ -38,28 +38,28 @@ jobs:
           name: multilingual-combined-summary-*
           path: multilingual-results
         continue-on-error: true
-      
+
       - name: Combine all results
         run: |
           echo "Combining all test results..."
-          
+
           # Create combined directory
           mkdir -p all-combined-results/performance
-          
+
           # Copy Japanese results
           if [ -d "japanese-results" ]; then
             find japanese-results -name "*.json" -print0 | xargs -0 -r cp -t all-combined-results/performance/
           fi
-          
+
           # Copy Multilingual results
           if [ -d "multilingual-results" ]; then
             find multilingual-results -name "*.json" -print0 | xargs -0 -r cp -t all-combined-results/performance/
           fi
-          
+
           # List all collected files
           echo "Collected performance files:"
           find all-combined-results -name "*.json" -type f
-      
+
       - name: Generate final combined summary
         run: |
           if [ -d "all-combined-results" ] && [ "$(find all-combined-results -name '*.json' -type f | wc -l)" -gt 0 ]; then
@@ -71,7 +71,7 @@ jobs:
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "パフォーマンスデータが見つかりませんでした。" >> $GITHUB_STEP_SUMMARY
           fi
-      
+
       - name: Upload final combined report
         if: always()
         uses: actions/upload-artifact@v7

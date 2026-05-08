@@ -35,7 +35,7 @@
 
     <script type="module">
         const results = document.getElementById('results');
-        
+
         function log(message, isError = false) {
             const div = document.createElement('div');
             div.className = `test-item ${isError ? 'error' : 'success'}`;
@@ -86,7 +86,7 @@
         // Test actual file loading
         async function testFileLoading() {
             log('\nTesting actual file loading:');
-            
+
             const testUrls = [
                 `${basePath}/dist/openjtalk.wasm`,
                 new URL(`${basePath}/dist/openjtalk.wasm`, window.location.origin).href
@@ -98,13 +98,13 @@
                     const response = await fetch(url);
                     const contentType = response.headers.get('content-type');
                     const contentLength = response.headers.get('content-length');
-                    
+
                     if (response.ok) {
                         // Check if it's actually a WASM file
                         const buffer = await response.arrayBuffer();
                         const view = new Uint8Array(buffer, 0, 4);
                         const magic = Array.from(view).map(b => b.toString(16).padStart(2, '0')).join(' ');
-                        
+
                         log(`  Status: ${response.status} OK
   Content-Type: ${contentType}
   Content-Length: ${contentLength} bytes
@@ -124,8 +124,8 @@
         // Recommended solution
         log(`\nRecommended solution for GitHub Pages:
 Use absolute paths with repository name:
-  const basePath = window.location.hostname.includes('github.io') 
-    ? '/' + window.location.pathname.split('/')[1] 
+  const basePath = window.location.hostname.includes('github.io')
+    ? '/' + window.location.pathname.split('/')[1]
     : '';
   const wasmPath = basePath + '/dist/openjtalk.wasm';`);
     </script>

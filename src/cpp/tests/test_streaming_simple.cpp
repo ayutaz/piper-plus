@@ -11,21 +11,21 @@
 TEST(StreamingSimpleTest, TextChunkingEnglish) {
     std::string text = "Hello world. This is a test. Multiple sentences here!";
     std::regex sentenceBoundary("([.!?,;:]+|\\s+(?:and|or|but|because|while|when|if|that|which)\\s+)");
-    
+
     std::vector<std::string> chunks;
     std::sregex_token_iterator iter(text.begin(), text.end(), sentenceBoundary, {-1, 1});
     std::sregex_token_iterator end;
-    
+
     std::string currentChunk;
     for (; iter != end; ++iter) {
         std::string token = *iter;
         if (token.empty()) continue;
-        
+
         // Check if this is a delimiter
         if (std::regex_match(token, sentenceBoundary)) {
             // Add delimiter to current chunk
             currentChunk += token;
-            if (!currentChunk.empty() && 
+            if (!currentChunk.empty() &&
                 (token.find_first_of(".!?") != std::string::npos ||
                  currentChunk.length() > 100)) {
                 // End of sentence or chunk is getting long
@@ -37,12 +37,12 @@ TEST(StreamingSimpleTest, TextChunkingEnglish) {
             currentChunk += token;
         }
     }
-    
+
     // Add any remaining text
     if (!currentChunk.empty()) {
         chunks.push_back(currentChunk);
     }
-    
+
     EXPECT_EQ(chunks.size(), 3) << "Expected 3 chunks for 3 sentences";
     EXPECT_EQ(chunks[0], "Hello world.");
     EXPECT_EQ(chunks[1], " This is a test.");
@@ -54,13 +54,13 @@ TEST(StreamingSimpleTest, TextChunkingJapanese) {
     // Use simple character-by-character parsing for Japanese
     std::vector<std::string> chunks;
     std::string currentChunk;
-    
+
     for (size_t i = 0; i < text.length(); ) {
         // Check for Japanese punctuation (3-byte UTF-8 characters)
         if (i + 2 < text.length()) {
             std::string threeByte = text.substr(i, 3);
             currentChunk += threeByte;
-            
+
             // Check if it's a sentence-ending punctuation
             if (threeByte == u8"。" || threeByte == u8"！" || threeByte == u8"？") {
                 chunks.push_back(currentChunk);
@@ -73,12 +73,12 @@ TEST(StreamingSimpleTest, TextChunkingJapanese) {
             i++;
         }
     }
-    
+
     if (!currentChunk.empty()) {
         chunks.push_back(currentChunk);
     }
-    
-    
+
+
     EXPECT_EQ(chunks.size(), 3) << "Expected 3 chunks for 3 sentences";
     EXPECT_EQ(chunks[0], u8"こんにちは。");
     EXPECT_EQ(chunks[1], u8"今日はいい天気ですね。");
@@ -88,11 +88,11 @@ TEST(StreamingSimpleTest, TextChunkingJapanese) {
 TEST(StreamingSimpleTest, EmptyTextProducesNoChunks) {
     std::string text = "";
     std::regex sentenceBoundary("([.!?,;:]+)");
-    
+
     std::vector<std::string> chunks;
     std::sregex_token_iterator iter(text.begin(), text.end(), sentenceBoundary, {-1, 1});
     std::sregex_token_iterator end;
-    
+
     std::string currentChunk;
     for (; iter != end; ++iter) {
         std::string token = *iter;
@@ -100,23 +100,23 @@ TEST(StreamingSimpleTest, EmptyTextProducesNoChunks) {
             chunks.push_back(token);
         }
     }
-    
+
     EXPECT_EQ(chunks.size(), 0) << "Empty text should produce no chunks";
 }
 
 TEST(StreamingSimpleTest, SingleSentenceProducesOneChunk) {
     std::string text = "This is a single sentence.";
     std::regex sentenceBoundary("([.!?,;:]+)");
-    
+
     std::vector<std::string> chunks;
     std::sregex_token_iterator iter(text.begin(), text.end(), sentenceBoundary, {-1, 1});
     std::sregex_token_iterator end;
-    
+
     std::string currentChunk;
     for (; iter != end; ++iter) {
         std::string token = *iter;
         if (token.empty()) continue;
-        
+
         if (std::regex_match(token, sentenceBoundary)) {
             currentChunk += token;
             if (token.find_first_of(".!?") != std::string::npos) {
@@ -127,11 +127,11 @@ TEST(StreamingSimpleTest, SingleSentenceProducesOneChunk) {
             currentChunk += token;
         }
     }
-    
+
     if (!currentChunk.empty()) {
         chunks.push_back(currentChunk);
     }
-    
+
     EXPECT_EQ(chunks.size(), 1) << "Single sentence should produce one chunk";
     EXPECT_EQ(chunks[0], "This is a single sentence.");
 }
@@ -197,59 +197,59 @@ TEST(StreamingSimpleTest, CrossfadeAudioChunks) {
             output.insert(output.end(), newChunk.begin(), newChunk.end());
             return;
         }
-        
+
         size_t actualOverlap = std::min({overlapSamples, prevChunk.size() / 4, newChunk.size() / 4});
         if (actualOverlap < 2) {
             output.insert(output.end(), newChunk.begin(), newChunk.end());
             return;
         }
-        
+
         if (output.size() >= actualOverlap) {
             output.resize(output.size() - actualOverlap);
         }
-        
+
         for (size_t i = 0; i < actualOverlap; ++i) {
             float fadeOut = 1.0f - (static_cast<float>(i) / actualOverlap);
             float fadeIn = static_cast<float>(i) / actualOverlap;
-            
+
             size_t prevIdx = prevChunk.size() - actualOverlap + i;
             int16_t mixed = static_cast<int16_t>(
                 prevChunk[prevIdx] * fadeOut + newChunk[i] * fadeIn
             );
             output.push_back(mixed);
         }
-        
+
         output.insert(output.end(), newChunk.begin() + actualOverlap, newChunk.end());
     };
-    
+
     // Test basic crossfade
     std::vector<int16_t> chunk1 = {100, 200, 300, 400};
     std::vector<int16_t> chunk2 = {500, 600, 700, 800};
     std::vector<int16_t> output;
-    
+
     // First chunk
     output.insert(output.end(), chunk1.begin(), chunk1.end());
-    
+
     // Crossfade second chunk
     // actualOverlap will be min(2, 4/4, 4/4) = 1
     // So overlap is too small (<2), it will just append chunk2
     crossfadeAudioChunks(chunk1, chunk2, output, 2);
-    
+
     // Since actualOverlap=1 < 2, it just appends chunk2
     EXPECT_EQ(output.size(), 8) << "Output should have both chunks appended";
-    
+
     // Test with larger chunks for actual crossfade
     std::vector<int16_t> bigChunk1 = {100, 200, 300, 400, 500, 600, 700, 800};
     std::vector<int16_t> bigChunk2 = {1000, 1100, 1200, 1300, 1400, 1500, 1600, 1700};
     std::vector<int16_t> output3;
-    
+
     output3.insert(output3.end(), bigChunk1.begin(), bigChunk1.end());
     crossfadeAudioChunks(bigChunk1, bigChunk2, output3, 4);
-    
+
     // actualOverlap = min(4, 8/4, 8/4) = 2
     // output3 will be resized by 2, then 2 mixed samples + 6 from bigChunk2
     EXPECT_EQ(output3.size(), 14) << "Output should have correct size with crossfade";
-    
+
     // Test empty chunk handling
     std::vector<int16_t> emptyChunk;
     std::vector<int16_t> output2;

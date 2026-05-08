@@ -29,7 +29,7 @@ This document lists all environment variables that can be used to configure Pipe
   ```bash
   # Windows
   set OPENJTALK_DATA_DIR=D:\piper-data
-  
+
   # Linux/macOS
   export OPENJTALK_DATA_DIR=/opt/piper-data
   ```

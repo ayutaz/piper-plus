@@ -23,11 +23,11 @@ char* echo_string(const char* input) {
     if (!input) {
         return strdup("NULL input");
     }
-    
+
     // Create a copy with prefix
     std::string result = "Echo: ";
     result += input;
-    
+
     return strdup(result.c_str());
 }
 

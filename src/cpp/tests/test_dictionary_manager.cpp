@@ -28,10 +28,10 @@ protected:
         char temp_path[MAX_PATH];
         DWORD result = GetTempPathA(MAX_PATH, temp_path);
         ASSERT_GT(result, 0);
-        
+
         char temp_dir[MAX_PATH];
         snprintf(temp_dir, sizeof(temp_dir), "%spiper_test_%d", temp_path, GetCurrentProcessId());
-        
+
         // Create directory
         _mkdir(temp_dir);
         test_dir = _strdup(temp_dir);
@@ -40,13 +40,13 @@ protected:
         test_dir = mkdtemp(temp_template);
         ASSERT_NE(test_dir, nullptr);
 #endif
-        
+
         // Save original environment variables
         original_home = getenv("HOME");
         original_dict_dir = getenv("OPENJTALK_DICTIONARY_PATH");
         original_auto_download = getenv("PIPER_AUTO_DOWNLOAD_DICT");
         original_offline = getenv("PIPER_OFFLINE_MODE");
-        
+
         // Set test HOME
 #ifdef _WIN32
         SetEnvironmentVariableA("HOME", test_dir);
@@ -54,7 +54,7 @@ protected:
         setenv("HOME", test_dir, 1);
 #endif
     }
-    
+
     void TearDown() override {
         // Restore original environment variables
         if (original_home) {
@@ -70,7 +70,7 @@ protected:
             unsetenv("HOME");
 #endif
         }
-        
+
         if (original_dict_dir) {
 #ifdef _WIN32
             SetEnvironmentVariableA("OPENJTALK_DICTIONARY_PATH", original_dict_dir);
@@ -84,7 +84,7 @@ protected:
             unsetenv("OPENJTALK_DICTIONARY_PATH");
 #endif
         }
-        
+
         if (original_auto_download) {
 #ifdef _WIN32
             SetEnvironmentVariableA("PIPER_AUTO_DOWNLOAD_DICT", original_auto_download);
@@ -98,7 +98,7 @@ protected:
             unsetenv("PIPER_AUTO_DOWNLOAD_DICT");
 #endif
         }
-        
+
         if (original_offline) {
 #ifdef _WIN32
             SetEnvironmentVariableA("PIPER_OFFLINE_MODE", original_offline);
@@ -112,7 +112,7 @@ protected:
             unsetenv("PIPER_OFFLINE_MODE");
 #endif
         }
-        
+
         // Reset dictionary cache so other test suites are not affected
         reset_openjtalk_dictionary_cache();
 
@@ -124,7 +124,7 @@ protected:
 #endif
         }
     }
-    
+
     char* test_dir = nullptr;
     const char* original_home = nullptr;
     const char* original_dict_dir = nullptr;
@@ -136,7 +136,7 @@ protected:
 // TODO: Implement openjtalk_get_default_dict_path function
 // TEST_F(DictionaryManagerTest, GetDefaultDictPath) {
 //     char buffer[1024];
-//     
+//
 //     // Test default path (should use HOME)
 //     EXPECT_EQ(openjtalk_get_default_dict_path(buffer, sizeof(buffer)), 0);
 //     EXPECT_TRUE(strstr(buffer, test_dir) != nullptr);
@@ -147,23 +147,23 @@ protected:
 TEST_F(DictionaryManagerTest, CustomDictPath) {
     const char* custom_path = "/custom/dict/path";
     setenv("OPENJTALK_DICTIONARY_PATH", custom_path, 1);
-    
+
     // Create dummy dictionary files
     mkdir("/tmp", 0755);
     mkdir("/tmp/custom_dict_test", 0755);
     setenv("OPENJTALK_DICTIONARY_PATH", "/tmp/custom_dict_test", 1);
-    
+
     // Create dummy dictionary files
     FILE* fp = fopen("/tmp/custom_dict_test/sys.dic", "w");
     if (fp) fclose(fp);
     fp = fopen("/tmp/custom_dict_test/unk.dic", "w");
     if (fp) fclose(fp);
-    
+
     // TODO: Implement openjtalk_get_default_dict_path function
     // char buffer[1024];
     // EXPECT_EQ(openjtalk_get_default_dict_path(buffer, sizeof(buffer)), 0);
     // EXPECT_STREQ(buffer, "/tmp/custom_dict_test");
-    
+
     // Clean up
     unlink("/tmp/custom_dict_test/sys.dic");
     unlink("/tmp/custom_dict_test/unk.dic");
@@ -175,25 +175,25 @@ TEST_F(DictionaryManagerTest, CustomDictPath) {
 // TEST_F(DictionaryManagerTest, CheckDictionary) {
 //     // Non-existent path
 //     EXPECT_EQ(openjtalk_check_dictionary("/nonexistent/path"), 0);
-//     
+//
 //     // Create a test directory with dictionary files
 //     char test_dict_path[256];
 //     snprintf(test_dict_path, sizeof(test_dict_path), "%s/test_dict", test_dir);
 //     mkdir(test_dict_path, 0755);
-//     
+//
 //     // Without dictionary files
 //     EXPECT_EQ(openjtalk_check_dictionary(test_dict_path), 0);
-//     
+//
 //     // Create dictionary files
 //     char sys_dic[256], unk_dic[256];
 //     snprintf(sys_dic, sizeof(sys_dic), "%s/sys.dic", test_dict_path);
 //     snprintf(unk_dic, sizeof(unk_dic), "%s/unk.dic", test_dict_path);
-//     
+//
 //     FILE* fp = fopen(sys_dic, "w");
 //     if (fp) fclose(fp);
 //     fp = fopen(unk_dic, "w");
 //     if (fp) fclose(fp);
-//     
+//
 //     // With dictionary files
 //     EXPECT_EQ(openjtalk_check_dictionary(test_dict_path), 1);
 // }
@@ -237,7 +237,7 @@ TEST_F(DictionaryManagerTest, AutoDownloadDisabled) {
 //     int count = openjtalk_get_available_versions(versions, 10);
 //     EXPECT_GT(count, 0);
 //     EXPECT_STREQ(versions[0], "1.11");  // First version should be 1.11
-//     
+//
 //     // Test setting dictionary version
 //     openjtalk_set_dict_version("1.10");
 //     // This would affect subsequent dictionary downloads

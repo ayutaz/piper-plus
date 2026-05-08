@@ -205,7 +205,7 @@ inline-quotes = "double"
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401", "F403"]
 "src/python/tests/*" = ["ARG", "PLC0415"]  # Allow conditional imports in tests
-"scripts/*" = ["ARG", "PLC0415"]  # Allow conditional imports in scripts  
+"scripts/*" = ["ARG", "PLC0415"]  # Allow conditional imports in scripts
 # token_mapper.py: グローバル変数を使用した音素マッピングシステム
 "src/python/piper_train/phonemize/token_mapper.py" = ["PLW0603"]
 # korean.py: G2p()インスタンスのモジュールレベルキャッシュ

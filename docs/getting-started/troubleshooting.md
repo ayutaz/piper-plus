@@ -15,7 +15,7 @@ This guide helps resolve common issues when using Piper, especially with Japanes
 
 ### "Model not found" Error
 
-**Symptoms**: 
+**Symptoms**:
 ```
 Error: Model file not found: model.onnx
 ```
@@ -77,7 +77,7 @@ Model config doesn't exist
    ```bash
    # Enable auto-download
    export PIPER_AUTO_DOWNLOAD_DICT=1
-   
+
    # Or specify manually
    export OPENJTALK_DICTIONARY_PATH=/path/to/dictionary
    ```
@@ -108,7 +108,7 @@ Auto-download is disabled. Please download and install the dictionary manually.
    ```bash
    # Download dictionary
    wget https://github.com/r9y9/open_jtalk/releases/download/v1.11.1/open_jtalk_dic_utf_8-1.11.tar.gz
-   
+
    # Extract to data directory
    # Windows: %APPDATA%\piper\
    # Linux/macOS: ~/.local/share/piper/
@@ -142,7 +142,7 @@ Error: Checksum mismatch! Expected abc123..., got def456...
    ```bash
    # Windows
    chcp 65001
-   
+
    # Save text as UTF-8
    echo "テスト" > test.txt  # Use UTF-8 editor
    ```
@@ -251,10 +251,10 @@ cmake .. -DONNXRUNTIME_DIR=/path/to/onnxruntime
    ```bash
    # Ubuntu/Debian
    sudo apt-get install build-essential cmake
-   
+
    # macOS
    brew install cmake ninja
-   
+
    # Windows
    # Install Visual Studio with C++ support
    ```

@@ -65,15 +65,15 @@ jobs:
         run: |
           mkdir -p deploy
           echo "Deploying PiperPlus WebAssembly demo"
-          
+
           # Function to copy model files from fallback location
           copy_models_fallback() {
             local source_dir="$1"
             local dest_dir="$2"
-            
+
             if [ -d "$source_dir" ]; then
               echo "Attempting to copy models from $source_dir..."
-              
+
               # Copy ONNX files with explicit error handling
               if ls "$source_dir"/*.onnx 1>/dev/null 2>&1; then
                 cp "$source_dir"/*.onnx "$dest_dir/"
@@ -81,7 +81,7 @@ jobs:
               else
                 echo "WARNING: No .onnx model files found in $source_dir"
               fi
-              
+
               # Copy JSON files with explicit error handling
               if ls "$source_dir"/*.json 1>/dev/null 2>&1; then
                 cp "$source_dir"/*.json "$dest_dir/"
@@ -89,13 +89,13 @@ jobs:
               else
                 echo "WARNING: No .json config files found in $source_dir"
               fi
-              
+
               ls -la "$dest_dir/"
             else
               echo "WARNING: Fallback directory $source_dir does not exist"
             fi
           }
-          
+
           # Copy WebAssembly artifacts (only rust-wasm, exclude legacy espeak-ng)
           if [ -d "src/wasm/openjtalk-web/dist/rust-wasm" ]; then
             mkdir -p deploy/dist
@@ -105,13 +105,13 @@ jobs:
             echo "Please build the WASM files before deployment."
             exit 1
           fi
-          
+
           if [ -d "src/wasm/openjtalk-web/assets" ]; then
             cp -r src/wasm/openjtalk-web/assets deploy/
           else
             mkdir -p deploy/assets
           fi
-          
+
           # Handle models directory
           if [ -d "src/wasm/openjtalk-web/models" ]; then
             echo "Copying models directory..."
@@ -119,7 +119,7 @@ jobs:
             cp -r src/wasm/openjtalk-web/models deploy/
             echo "Models copied to deploy/models"
             ls -la deploy/models/
-            
+
             # Ensure Japanese model is present, fallback to test/models if needed
             if [ ! -f "deploy/models/multilingual-test-medium.onnx" ]; then
               echo "WARNING: multilingual-test-medium.onnx not found in src/wasm/openjtalk-web/models"
@@ -132,7 +132,7 @@ jobs:
                 exit 1
               fi
             fi
-            
+
             # Dynamically verify all model files from source are present in deploy
             echo "Verifying model files..."
             if [ -d "src/wasm/openjtalk-web/models" ]; then
@@ -146,7 +146,7 @@ jobs:
                 fi
               done
             fi
-            
+
             # Additionally verify critical model files are present
             CRITICAL_MODELS="multilingual-test-medium.onnx"
             for model in $CRITICAL_MODELS; do
@@ -167,7 +167,7 @@ jobs:
             # Use the fallback function to copy from test/models
             copy_models_fallback "test/models" "deploy/models"
           fi
-          
+
           # Copy multilingual demo as the main index page
           if [ -f "src/wasm/openjtalk-web/test/multilingual-demo/index.html" ]; then
             cp src/wasm/openjtalk-web/test/multilingual-demo/index.html deploy/index.html
@@ -196,8 +196,8 @@ jobs:
               fi
             done
           fi
-          
-          
+
+
           # Copy all JS src files for PiperPlus API (index.js + all dependencies)
           if [ -d "src/wasm/openjtalk-web/src" ]; then
             mkdir -p deploy/src
@@ -216,15 +216,15 @@ jobs:
             mkdir -p deploy/g2p/src
             cp -r src/wasm/g2p/src/* deploy/g2p/src/
           fi
-          
+
           # Create 404 page
           cp deploy/index.html deploy/404.html
-          
+
           # Add deployment info
           echo "Deployment: ${{ github.event.inputs.deploy_message || 'Automated deployment' }}" > deploy/deployment-info.txt
           echo "Commit: ${{ github.sha }}" >> deploy/deployment-info.txt
           echo "Date: $(date -u +"%Y-%m-%d %H:%M:%S UTC")" >> deploy/deployment-info.txt
-      
+
       - name: Validate import maps in deployed HTML
         run: |
           echo "Validating import maps in deploy/ HTML files..."
@@ -289,12 +289,12 @@ jobs:
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
-      
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v4
         with:
           path: ./deploy
-  
+
   deploy:
     environment:
       name: github-pages

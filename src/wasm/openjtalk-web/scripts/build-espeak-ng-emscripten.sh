@@ -49,14 +49,14 @@ export class ESpeakNGPhonemizer {
         this.initialized = false;
         this.espeakNG = null;
     }
-    
+
     async initialize() {
         // Initialize eSpeak-ng
         this.espeakNG = new eSpeakNG('../dist/espeakng_worker.js', () => {
             this.initialized = true;
             console.log('eSpeak-ng initialized successfully');
         });
-        
+
         // Wait for initialization
         return new Promise((resolve) => {
             const checkInit = () => {
@@ -69,7 +69,7 @@ export class ESpeakNGPhonemizer {
             checkInit();
         });
     }
-    
+
     /**
      * Convert text to phonemes using eSpeak-ng
      * This provides the same quality as Python's implementation
@@ -78,7 +78,7 @@ export class ESpeakNGPhonemizer {
         if (!this.initialized) {
             throw new Error('eSpeak-ng not initialized');
         }
-        
+
         return new Promise((resolve) => {
             // Get IPA phonemes
             this.espeakNG.synthesize(text, {
@@ -94,7 +94,7 @@ export class ESpeakNGPhonemizer {
             });
         });
     }
-    
+
     /**
      * Get list of available voices
      */
@@ -102,7 +102,7 @@ export class ESpeakNGPhonemizer {
         if (!this.initialized) {
             throw new Error('eSpeak-ng not initialized');
         }
-        
+
         return new Promise((resolve) => {
             this.espeakNG.list_voices((voices) => {
                 resolve(voices);

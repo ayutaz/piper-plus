@@ -52,15 +52,15 @@ const char* openjtalk_error_to_string(OpenJTalkError error) {
 
 void openjtalk_set_result(OpenJTalkResult* result, OpenJTalkError code, const char* format, ...) {
     if (!result) return;
-    
+
     result->code = code;
-    
+
     if (format) {
         va_list args;
         va_start(args, format);
         vsnprintf(result->message, sizeof(result->message), format, args);
         va_end(args);
-        
+
         // Ensure null termination
         result->message[sizeof(result->message) - 1] = '\0';
     } else {

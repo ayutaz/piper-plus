@@ -18,7 +18,7 @@ check_file() {
     if [ -f "$1" ]; then
         SIZE=$(stat -f%z "$1" 2>/dev/null || stat -c%s "$1" 2>/dev/null)
         echo -e "  ${GREEN}✓${NC} $1 (${SIZE} bytes)"
-        
+
         # Additional checks for specific files
         if [[ "$1" == *.wasm ]]; then
             # Check if it's a valid WASM file
@@ -29,7 +29,7 @@ check_file() {
                 FAILED=1
             fi
         fi
-        
+
         # Check dictionary files
         if [[ "$1" == *.bin ]] || [[ "$1" == *.dic ]]; then
             if [ $SIZE -eq 0 ]; then
@@ -37,7 +37,7 @@ check_file() {
                 FAILED=1
             fi
         fi
-        
+
         return 0
     else
         echo -e "  ${RED}✗${NC} $1 - Not found"
