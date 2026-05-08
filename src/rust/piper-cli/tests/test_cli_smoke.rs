@@ -28,10 +28,7 @@ fn shows_version() {
 
 #[test]
 fn rejects_invalid_flag() {
-    cli()
-        .arg("--definitely-not-a-real-flag")
-        .assert()
-        .failure();
+    cli().arg("--definitely-not-a-real-flag").assert().failure();
 }
 
 #[test]
@@ -74,18 +71,14 @@ fn help_advertises_voice_cloning_flags() {
 #[test]
 fn help_advertises_streaming_and_timing_flags() {
     let out = cli().arg("--help").assert().success();
-    out.stdout(
-        predicate::str::contains("--stream")
-            .and(predicate::str::contains("--timing")),
-    );
+    out.stdout(predicate::str::contains("--stream").and(predicate::str::contains("--timing")));
 }
 
 #[test]
 fn help_advertises_list_devices_and_list_models() {
     let out = cli().arg("--help").assert().success();
     out.stdout(
-        predicate::str::contains("--list-devices")
-            .and(predicate::str::contains("--list-models")),
+        predicate::str::contains("--list-devices").and(predicate::str::contains("--list-models")),
     );
 }
 
@@ -102,8 +95,7 @@ fn help_advertises_default_noise_scale() {
 fn help_advertises_length_and_noise_w_flags() {
     let out = cli().arg("--help").assert().success();
     out.stdout(
-        predicate::str::contains("--length-scale")
-            .and(predicate::str::contains("--noise-w")),
+        predicate::str::contains("--length-scale").and(predicate::str::contains("--noise-w")),
     );
 }
 

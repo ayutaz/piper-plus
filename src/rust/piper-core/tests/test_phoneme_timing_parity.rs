@@ -80,7 +80,10 @@ fn fixture_schema_version_is_supported() {
         fixture.schema_version, 1,
         "Unknown fixture schema_version. Adapt this test or regenerate the fixture."
     );
-    assert!(!fixture.cases.is_empty(), "fixture must contain at least one case");
+    assert!(
+        !fixture.cases.is_empty(),
+        "fixture must contain at least one case"
+    );
 }
 
 #[test]

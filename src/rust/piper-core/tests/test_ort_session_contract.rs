@@ -128,10 +128,7 @@ fn test_cache_extensions_match_contract() {
         fixture["cache"]["sentinel_extension"].as_str().unwrap(),
         "opt.onnx.ok"
     );
-    assert_eq!(
-        fixture["cache"]["sentinel_content"].as_str().unwrap(),
-        "ok"
-    );
+    assert_eq!(fixture["cache"]["sentinel_content"].as_str().unwrap(), "ok");
 }
 
 #[test]

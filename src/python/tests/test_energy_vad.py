@@ -9,7 +9,11 @@ behaviour cannot reach the training pipeline.
 import numpy as np
 import pytest
 
-from piper_train.norm_audio import energy_vad_numpy
+# piper_train.norm_audio.__init__ imports torchaudio at module top-level,
+# so we must skip the entire test module when torchaudio is unavailable.
+pytest.importorskip("torchaudio")
+
+from piper_train.norm_audio import energy_vad_numpy  # noqa: E402
 
 
 @pytest.mark.unit
