@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "comment": "Short-text contract fixture. Regenerate via `python scripts/regenerate_short_text_fixture.py`. Source: docs/spec/short-text-contract.toml. Each runtime asserts its own constants match these values.",
+  "padding": {
+    "min_phoneme_ids": 15,
+    "min_body_for_strategy_a": 3,
+    "pause_token_id": 0,
+    "split": "front_back_even",
+    "prosody_fill": 0
+  },
+  "trim": {
+    "threshold_rms": 0.01,
+    "min_samples": 2205,
+    "window_size": 256,
+    "sample_rate": 22050
+  },
+  "scales": {
+    "noise_scale_min_ratio": 0.5,
+    "noise_w_min_ratio": 0.4
+  },
+  "ssml_injection": {
+    "short_text_chars": 10,
+    "silence_pad_ms": 300,
+    "skip_if_ssml": true
+  }
+}
