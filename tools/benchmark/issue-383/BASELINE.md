@@ -234,11 +234,14 @@ auto 並列度 = `min(n_sentences, cores/2, 4)`。詳細は `voice.py` の
 | Rust | `a9c3d996` | API 追加のみ (`phonemize_sentences_to_ids`) | 11 件 + clippy クリーン |
 | C# | `af308fd4` | API + CLI streaming | 15 件 + フルスイート 1217/1218 pass |
 | Go | `2fc4da6f` | API + `SynthesizeStream` 統合 | 18 件 (race は CI へ) |
-| C++ | (進行中) | TBD | TBD |
+| C++ | `5e0597c5` | API + C-API streaming (`synth_start`) | 7 件 + model-free 12/12 pass † |
+
+† C++ の model-loading test (test_streaming / test_c_api 等) は pre-existing
+の ORT バージョン非互換 (test model schema=14、ORT 1.17 上限=10) で SEH crash。
+Phase 1 変更とは無関係。model-free 系は 12/12 pass。
 
 ## 次ステップ
 
 1. ✅ Phase 1 / Phase 2 を Python に実装 (`d543c381`, `22fb2065`)
-2. ✅ Rust / C# / Go に Phase 1 展開
-3. (進行中) C++ に Phase 1 展開
-4. 完了後 PR を作成
+2. ✅ Rust / C# / Go / C++ に Phase 1 展開
+3. PR 作成 (`feat/383-g2p-inference-pipeline` → `dev`)
