@@ -1,0 +1,59 @@
+name: LANGUAGE_ID_MAP Contract Parity
+
+# Cross-runtime LANGUAGE_ID_MAP drift gate.
+#
+# 6 ランタイム (Python/C#/Rust/Go/WASM/C++) は LANGUAGE_ID_MAP =
+# {ja:0, en:1, zh:2, es:3, fr:4, pt:5, sv:6} を共有する。drift = emb_lang
+# lookup 失敗 = 学習済モデル全破壊なので、Python canonical (prepare_multilingual_dataset.py)
+# と docs/spec/language-id-map-contract.toml + JSON fixture の整合性、
+# および各ランタイム実装位置の正規表現抽出比較を強制する。
+
+on:
+  pull_request:
+    branches: [ dev ]
+    paths:
+      - 'docs/spec/language-id-map-contract.toml'
+      - 'src/python/piper_train/tools/prepare_multilingual_dataset.py'
+      - 'src/python_run/piper/voice.py'
+      - 'src/python/piper_train/infer_onnx.py'
+      - 'scripts/check_language_id_map_contract.py'
+      - 'scripts/regenerate_language_id_map_fixture.py'
+      - 'tests/fixtures/language_id_map/**'
+      - '.github/workflows/language-id-map-parity.yml'
+  push:
+    branches: [ dev ]
+    paths:
+      - 'docs/spec/language-id-map-contract.toml'
+      - 'src/python/piper_train/tools/prepare_multilingual_dataset.py'
+      - 'src/python_run/piper/voice.py'
+      - 'src/python/piper_train/infer_onnx.py'
+      - 'scripts/check_language_id_map_contract.py'
+      - 'scripts/regenerate_language_id_map_fixture.py'
+      - 'tests/fixtures/language_id_map/**'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  contract-drift-check:
+    name: LANGUAGE_ID_MAP contract drift check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+
+      - name: Verify contract matches Python canonical and 6-runtime mirrors
+        # tomllib is in stdlib (Python 3.11+); no third-party install needed.
+        run: |
+          python scripts/check_language_id_map_contract.py --verbose
+
+      - name: Verify JSON fixture matches contract toml
+        run: |
+          python scripts/regenerate_language_id_map_fixture.py --check
