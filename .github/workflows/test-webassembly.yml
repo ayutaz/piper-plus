@@ -7,6 +7,7 @@ on:
       - 'src/wasm/**'
       - 'tests/fixtures/phoneme_timing/**'
       - 'tests/fixtures/short_text/**'
+      - 'test/fixtures/speaker_encoder_golden.json'
       - '.github/workflows/test-webassembly.yml'
   pull_request:
     branches: [ dev ]
@@ -14,6 +15,7 @@ on:
       - 'src/wasm/**'
       - 'tests/fixtures/phoneme_timing/**'
       - 'tests/fixtures/short_text/**'
+      - 'test/fixtures/speaker_encoder_golden.json'
       - '.github/workflows/test-webassembly.yml'
 
 env:
@@ -146,7 +148,8 @@ jobs:
           test/js/test-piper-plus-timing.js \
           test/js/test-short-text-mitigation.js \
           test/js/test-phoneme-timing-parity.js \
-          test/js/test-short-text-contract.js
+          test/js/test-short-text-contract.js \
+          test/js/test-speaker-encoder-parity.js
     
     - name: Check file sizes
       working-directory: src/wasm/openjtalk-web

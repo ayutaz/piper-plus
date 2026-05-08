@@ -10,6 +10,7 @@ on:
       - 'tests/fixtures/g2p/zh_en_loanword_matrix.json'
       - 'tests/fixtures/phoneme_timing/**'
       - 'tests/fixtures/short_text/**'
+      - 'test/fixtures/speaker_encoder_golden.json'
       - '.github/workflows/rust-tests.yml'
   push:
     branches: [ dev ]
@@ -19,6 +20,7 @@ on:
       - 'tests/fixtures/g2p/zh_en_loanword_matrix.json'
       - 'tests/fixtures/phoneme_timing/**'
       - 'tests/fixtures/short_text/**'
+      - 'test/fixtures/speaker_encoder_golden.json'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
