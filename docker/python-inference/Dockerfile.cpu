@@ -1,0 +1,110 @@
+# CPU-only Python Inference image for piper-plus.
+#
+# Mirrors docker/python-inference/Dockerfile but drops the NVIDIA CUDA base
+# so the image can build on linux/arm64 (Raspberry Pi, Apple Silicon, AWS
+# Graviton, Home Assistant boxes). The CUDA-based variant cannot be built
+# for arm64 because nvidia/cuda:* tags don't ship a linux/arm64 manifest
+# (they target NVIDIA Jetson via different repos).
+#
+# Behaviour parity with the CUDA variant:
+#   - Same FastAPI app (inference.py) and Gradio WebUI (webui.py)
+#   - Same /health, /synthesize, /v1/audio/speech endpoints
+#   - Same exposed ports (8000 FastAPI, 7860 Gradio)
+#   - Same NLTK data preload, healthcheck, non-root user
+#
+# Differences:
+#   - Base image: python:3.11-slim-trixie (no CUDA, multi-arch native)
+#   - piper_train installed with [inference] extras (onnxruntime CPU wheels),
+#     not [inference-gpu]. onnxruntime-gpu has no aarch64 wheel on PyPI as
+#     of 1.18.x, so the GPU variant would fail to install on arm64 anyway.
+#
+# Build (from project root):
+#   docker buildx build --platform linux/arm64,linux/amd64 \
+#     -f docker/python-inference/Dockerfile.cpu -t piper-plus-cpu .
+#
+# Run:
+#   docker run --rm -p 8000:8000 -v $PWD/models:/app/models:ro piper-plus-cpu \
+#     python inference.py --server --model /app/models/your-model.onnx --port 8000
+FROM python:3.11-slim-trixie
+
+ENV PYTHONUNBUFFERED=1
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Runtime + build-time system dependencies. build-essential / cmake / g++
+# are required because pyopenjtalk-plus (a transitive dep of piper-plus-g2p
+# via the [all] extra) builds C extensions from source on arm64; PyPI
+# currently ships pre-built wheels only for x86_64.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    cmake \
+    g++ \
+    libsndfile1 \
+    libsndfile1-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Pin uv to the same major version range used by docker/wyoming/Dockerfile
+# (workspace-editable handling is uv version-sensitive).
+RUN pip install --no-cache-dir "uv>=0.9,<1"
+
+WORKDIR /app
+
+# Copy source tree for piper-plus install. setup.py reads ../../VERSION
+# relative to src/python/, so VERSION must be at /app/VERSION.
+COPY VERSION /app/VERSION
+COPY pyproject.toml /app/pyproject.toml
+COPY src/python/ /app/src/python/
+
+# Install piper_plus_g2p (standalone G2P package) and piper_train with the
+# CPU [inference] extras (onnxruntime CPU + soundfile + fastapi + uvicorn).
+RUN uv pip install --system "/app/src/python/g2p[all]"
+RUN uv pip install --system "/app/src/python[inference]"
+
+# Install Gradio WebUI requirements (parity with the CUDA Dockerfile so
+# `--webui` mode works on arm64 as well).
+COPY src/python_run/requirements_webui.txt /app/requirements_webui.txt
+RUN uv pip install --system -r /app/requirements_webui.txt
+
+# Pre-download NLTK data for g2p-en (English phonemizer). Uses a shared
+# path so data is accessible after USER switch to non-root piper.
+ENV NLTK_DATA=/usr/share/nltk_data
+RUN python -c "import nltk; \
+nltk.download('averaged_perceptron_tagger', download_dir='/usr/share/nltk_data'); \
+nltk.download('averaged_perceptron_tagger_eng', download_dir='/usr/share/nltk_data'); \
+nltk.download('cmudict', download_dir='/usr/share/nltk_data')"
+
+# Create directories for models and output.
+RUN mkdir -p /app/models /app/output
+
+# Copy inference script, test script, and WebUI app (parity with CUDA image).
+COPY docker/python-inference/inference.py /app/
+COPY docker/python-inference/test.py /app/
+COPY docker/webui/app.py /app/webui.py
+
+# Expose FastAPI (8000) and Gradio (7860) ports.
+EXPOSE 8000 7860
+
+# Gradio environment defaults.
+ENV GRADIO_SERVER_NAME=0.0.0.0
+ENV GRADIO_SERVER_PORT=7860
+
+# Healthcheck: verify the API server is responding. start-period allows
+# the model to load before checks begin.
+HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
+  CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')" || exit 1
+
+# Build-time smoke test. Print arch + ORT providers so multi-arch logs
+# clearly show whether we're on arm64 or amd64.
+RUN python --version && \
+    python -c "import platform; print(f'arch: {platform.machine()}')" && \
+    python -c "import onnxruntime as ort; print(f'ONNX Runtime: {ort.__version__}'); print(f'Providers: {ort.get_available_providers()}')" && \
+    python -c "import piper_train; print('piper_train installed')" && \
+    python -c "import gradio; print(f'Gradio: {gradio.__version__}')"
+
+# Run as non-root user for security.
+RUN useradd -m -u 1000 piper && \
+    chown -R piper:piper /app/models /app/output
+USER piper
+
+# CPU-only image; default uvicorn entrypoint matches the OpenAI-compat
+# FastAPI server. Override at `docker run` time for CLI/WebUI modes.
+CMD ["python", "inference.py", "--server", "--model", "/app/models/model.onnx", "--port", "8000"]

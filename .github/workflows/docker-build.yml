@@ -1,5 +1,22 @@
 name: Docker Build and Push
 
+# Multi-arch publishing strategy (Issue: HA Raspberry Pi user, dev audit):
+#
+# Most images target both linux/amd64 and linux/arm64 via QEMU emulation
+# (set up by docker/setup-qemu-action). emulated arm64 builds are 3-5x
+# slower than native amd64; we accept that to keep a single workflow.
+#
+# python-inference is CUDA-based and has NO arm64 image available
+# upstream (nvidia/cuda:* manifests are amd64-only outside Jetson).
+# Two build-* jobs handle this:
+#   * build-python-inference          -> amd64 only, CUDA (Dockerfile)
+#   * build-python-inference-cpu      -> arm64 (+ amd64), CPU (Dockerfile.cpu)
+# Same ghcr.io image; tags carry a `-cpu` suffix on the CPU variant so HA
+# users on Raspberry Pi can pull `:dev-cpu` and not the CUDA tag.
+#
+# Other images (wyoming, webui, cpp-dev, cpp-inference, python-train) use
+# CUDA-free or arm64-compatible bases and build natively on both arches.
+
 on:
   push:
     branches: [dev]
@@ -33,6 +50,7 @@ jobs:
           sudo apt-get clean
 
       - uses: actions/checkout@v6
+      - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v4
 
       - name: Log in to ghcr.io
@@ -57,6 +75,9 @@ jobs:
         with:
           context: .
           file: ./docker/python-inference/Dockerfile
+          # CUDA base nvidia/cuda:* is amd64-only; arm64 build is published
+          # by the build-python-inference-cpu job below.
+          platforms: linux/amd64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -108,11 +129,70 @@ jobs:
         with:
           context: .
           file: ./docker/python-inference/Dockerfile
+          platforms: linux/amd64
           push: true
           tags: ${{ steps.meta-dockerhub.outputs.tags }}
           labels: ${{ steps.meta-dockerhub.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  # CPU-only variant of python-inference for arm64 (HA Raspberry Pi /
+  # Apple Silicon / AWS Graviton). nvidia/cuda:* base used by the CUDA
+  # variant has no arm64 manifest, so we ship a separate image built from
+  # docker/python-inference/Dockerfile.cpu. The image is tagged with a
+  # `-cpu` suffix on ghcr.io so consumers can pin explicitly:
+  #   ghcr.io/.../python-inference:dev-cpu
+  build-python-inference-cpu:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost "$AGENT_TOOLSDIRECTORY" /usr/local/lib/android /opt/hostedtoolcache/CodeQL
+          sudo docker image prune --all --force
+          sudo apt-get clean
+
+      - uses: actions/checkout@v6
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Log in to ghcr.io
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/python-inference
+          # `-cpu` suffix distinguishes from the CUDA-default tags above.
+          # type=ref produces e.g. `dev-cpu`, type=semver produces `1.12.0-cpu`.
+          flavor: |
+            suffix=-cpu,onlatest=true
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=sha
+
+      - name: Build and push CPU image (multi-arch)
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ./docker/python-inference/Dockerfile.cpu
+          # arm64 first so multi-arch manifest defaults to the value HA
+          # users care about. amd64 also published for Apple Silicon devs
+          # who don't want CUDA pulls.
+          platforms: linux/arm64,linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=python-inference-cpu
+          cache-to: type=gha,mode=max,scope=python-inference-cpu
 
   build-python-train:
     runs-on: ubuntu-latest
@@ -127,6 +207,7 @@ jobs:
           sudo apt-get clean
 
       - uses: actions/checkout@v6
+      - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v4
 
       - name: Log in to ghcr.io
@@ -151,6 +232,10 @@ jobs:
         with:
           context: .
           file: ./docker/python-train/Dockerfile
+          # python-train uses nvidia/cuda:12.1.0-cudnn8-* which has no
+          # arm64 manifest, and arm64 model training is unsupported (no
+          # PyTorch CUDA wheels). amd64 only.
+          platforms: linux/amd64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -170,6 +255,7 @@ jobs:
           sudo apt-get clean
 
       - uses: actions/checkout@v6
+      - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v4
 
       - name: Log in to ghcr.io
@@ -194,6 +280,11 @@ jobs:
         with:
           context: .
           file: ./docker/cpp-dev/Dockerfile
+          # cpp-dev's Dockerfile downloads onnxruntime-linux-x64-1.17.0.tgz
+          # (architecture-pinned), so multi-arch needs a deeper rewrite.
+          # Keep amd64-only until that lands; cpp-inference's CMake-built
+          # ORT path is already arm64-friendly and IS multi-arch below.
+          platforms: linux/amd64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -205,6 +296,11 @@ jobs:
     permissions:
       contents: read
       packages: write
+    # ORT ExternalProject + Open JTalk dictionary build is already heavy
+    # under amd64; arm64 emulation roughly doubles wall time. Bump the
+    # default 360-min timeout headroom explicitly so builds don't get
+    # killed mid-`ninja install`.
+    timeout-minutes: 240
     steps:
       - name: Free disk space
         run: |
@@ -213,6 +309,7 @@ jobs:
           sudo apt-get clean
 
       - uses: actions/checkout@v6
+      - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v4
 
       - name: Log in to ghcr.io
@@ -237,17 +334,30 @@ jobs:
         with:
           context: .
           file: ./docker/cpp-inference/Dockerfile
+          # cmake/ExternalDeps.cmake handles aarch64 — see
+          # CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64" branch. arm64 build
+          # via QEMU emulation is slow (~2x amd64) but produces a valid
+          # native arm64 image.
+          platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+  # Multi-arch is critical here: Home Assistant ships on Raspberry Pi
+  # (arm64) and the docker-build job is the only path users have to a
+  # working wyoming-piper-plus tag. CPU-only image, no CUDA pinning.
   build-wyoming:
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
+    # arm64 emulated build for pyopenjtalk (C++ extension compile from
+    # source) takes ~25 min per arch on QEMU; default 360-min is plenty,
+    # but we set an explicit headroom so a hung `pip install` is killed
+    # before it consumes the whole queue slot.
+    timeout-minutes: 120
     steps:
       - name: Free disk space
         run: |
@@ -256,6 +366,7 @@ jobs:
           sudo apt-get clean
 
       - uses: actions/checkout@v6
+      - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v4
 
       - name: Log in to ghcr.io
@@ -280,6 +391,11 @@ jobs:
         with:
           context: .
           file: ./docker/wyoming/Dockerfile
+          # python:3.11-slim-trixie has a native arm64 manifest; the
+          # wyoming Dockerfile already builds pyopenjtalk from source in
+          # stage 1 (build-essential + cmake + g++), so arm64 works
+          # without further changes.
+          platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -331,6 +447,7 @@ jobs:
         with:
           context: .
           file: ./docker/wyoming/Dockerfile
+          platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta-dockerhub.outputs.tags }}
           labels: ${{ steps.meta-dockerhub.outputs.labels }}
@@ -342,6 +459,7 @@ jobs:
     permissions:
       contents: read
       packages: write
+    timeout-minutes: 90
     steps:
       - name: Free disk space
         run: |
@@ -350,6 +468,7 @@ jobs:
           sudo apt-get clean
 
       - uses: actions/checkout@v6
+      - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v4
 
       - name: Log in to ghcr.io
@@ -374,6 +493,8 @@ jobs:
         with:
           context: .
           file: ./docker/webui/Dockerfile
+          # Pure Python + Gradio + slim-trixie -> arm64 native available.
+          platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -425,6 +546,7 @@ jobs:
         with:
           context: .
           file: ./docker/webui/Dockerfile
+          platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta-dockerhub.outputs.tags }}
           labels: ${{ steps.meta-dockerhub.outputs.labels }}

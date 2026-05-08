@@ -28,6 +28,8 @@ on:
       - 'tests/PiperPlusG2PTests/**'
       - 'tests/fixtures/g2p/**'
       - 'Package.swift'
+      - 'Package.ci.swift'
+      - 'examples/swift-g2p/HelloG2P/**'
       - '.github/workflows/swift-g2p-ci.yml'
   pull_request:
     paths:
@@ -36,6 +38,8 @@ on:
       - 'tests/PiperPlusG2PTests/**'
       - 'tests/fixtures/g2p/**'
       - 'Package.swift'
+      - 'Package.ci.swift'
+      - 'examples/swift-g2p/HelloG2P/**'
       - '.github/workflows/swift-g2p-ci.yml'
 
 concurrency:
@@ -181,6 +185,22 @@ jobs:
           echo "=== xcframework contents ==="
           find build-mac/piper_plus_g2p.xcframework
 
+      # Share the staticlib + xcframework with the hellog2p-smoke job so
+      # it doesn't have to redo the (slow) cargo + lipo + cbindgen +
+      # xcodebuild dance. Workflow-scoped artifact, retained 1 day —
+      # this is intermediate build output, not a release artifact.
+      - name: Upload xcframework + staticlib for downstream jobs
+        uses: actions/upload-artifact@v4
+        with:
+          name: piper-plus-g2p-mac-xcframework
+          path: |
+            build-mac/piper_plus_g2p.xcframework
+            build-mac/macos/libpiper_plus_g2p.a
+            build-mac/macos/piper_plus_g2p.h
+            build-mac/Headers
+          retention-days: 1
+          if-no-files-found: error
+
       - name: Swap in CI Package.swift (Package.ci.swift → Package.swift)
         run: |
           set -euo pipefail
@@ -230,3 +250,130 @@ jobs:
           if grep -q "WARNING: ThreadSanitizer" swift-tsan.log; then
             echo "::warning::Thread Sanitizer reported potential race(s) — see job log"
           fi
+
+  # Standalone-consumer smoke for the HelloG2P SPM example
+  # (examples/swift-g2p/HelloG2P/). Caught the same kind of regression as
+  # `swift-test` above (URL-based binaryTarget pre-tag failures, ABI
+  # drift between Sources/PiperPlusG2P and the Rust FFI), but from the
+  # *external consumer* angle: HelloG2P depends on the workspace via
+  # SPM exactly the way a downstream user would, so a green job here
+  # means example breakage is impossible without also breaking the test
+  # suite.
+  #
+  # Reuses the xcframework artifact uploaded by `swift-test` to skip the
+  # ~6-min cargo + lipo + cbindgen rebuild.
+  hellog2p-smoke:
+    name: HelloG2P CLI smoke (swift run)
+    runs-on: macos-15
+    needs: swift-test
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Toolchain versions
+        run: |
+          swift --version
+          xcodebuild -version
+
+      - name: Download xcframework artifact from swift-test
+        uses: actions/download-artifact@v4
+        with:
+          name: piper-plus-g2p-mac-xcframework
+          # Restore exact upload-artifact paths so build-mac/* resolves
+          # the same way as in the swift-test job.
+          path: .
+
+      - name: Verify xcframework restored
+        run: |
+          set -euo pipefail
+          test -d build-mac/piper_plus_g2p.xcframework || {
+            echo "::error::artifact missing build-mac/piper_plus_g2p.xcframework"
+            exit 1
+          }
+          find build-mac/piper_plus_g2p.xcframework -maxdepth 2 | sort
+
+      - name: Swap repo-root Package.swift to Package.ci.swift
+        run: |
+          set -euo pipefail
+          # Same pattern as swift-test: the release Package.swift's
+          # binaryTarget URL doesn't resolve pre-tag. Package.ci.swift
+          # already points PiperPlusG2PBinary at build-mac/piper_plus_g2p.xcframework.
+          test -f Package.ci.swift || {
+            echo "::error::Package.ci.swift missing — see swift-g2p-ci.yml comments"
+            exit 1
+          }
+          cp Package.ci.swift Package.swift
+
+      - name: Swap HelloG2P Package.swift to Package.ci.swift
+        working-directory: examples/swift-g2p/HelloG2P
+        run: |
+          set -euo pipefail
+          # The release HelloG2P/Package.swift uses
+          # `from: "1.14.0"` against an unpublished tag; HelloG2P/Package.ci.swift
+          # switches it to `path: "../../.."` so SwiftPM resolves
+          # against the swapped repo-root manifest.
+          test -f Package.ci.swift || {
+            echo "::error::HelloG2P/Package.ci.swift missing"
+            exit 1
+          }
+          cp Package.ci.swift Package.swift
+          echo "=== HelloG2P/Package.swift (CI override) ==="
+          cat Package.swift
+
+      - name: swift package resolve
+        working-directory: examples/swift-g2p/HelloG2P
+        run: |
+          set -euo pipefail
+          swift package resolve 2>&1 | tee resolve.log
+          # Defensive: if resolve picked up the URL-based dep instead of
+          # the path: form, the smoke would hit the unpublished tag and
+          # silently succeed against an incorrect manifest. Assert the
+          # resolved package URL is the local path.
+          if grep -q 'github.com/ayutaz/piper-plus' resolve.log; then
+            echo "::error::HelloG2P resolved against URL form, not local path — Package.ci.swift swap failed"
+            exit 1
+          fi
+
+      - name: swift build
+        working-directory: examples/swift-g2p/HelloG2P
+        run: |
+          set -euo pipefail
+          swift build 2>&1 | tee build.log
+
+      - name: swift run HelloG2P "ja:こんにちは"
+        working-directory: examples/swift-g2p/HelloG2P
+        run: |
+          set -euo pipefail
+          # Capture stdout to assert non-empty output. main.swift exits
+          # 2 on argument parse error and 1 on phonemizer init error,
+          # so any non-zero exit fails the step. We additionally
+          # require that `tokens (` appears in stdout (the per-input
+          # output line) to catch the case where main.swift "succeeds"
+          # but emits zero phonemes.
+          swift run HelloG2P "ja:こんにちは" 2>&1 | tee run.log
+          rc=${PIPESTATUS[0]}
+          if [ "$rc" -ne 0 ]; then
+            echo "::error::HelloG2P exited with code $rc"
+            exit 1
+          fi
+          if [ ! -s run.log ]; then
+            echo "::error::HelloG2P produced empty stdout"
+            exit 1
+          fi
+          if ! grep -q 'tokens (' run.log; then
+            echo "::error::HelloG2P stdout missing 'tokens (' line — phonemize() returned nothing"
+            exit 1
+          fi
+          echo "=== HelloG2P run.log ==="
+          cat run.log
+
+      - name: Restore tracked manifests on failure (debugging)
+        if: failure()
+        run: |
+          # `cp Package.ci.swift Package.swift` mutates the worktree.
+          # On failure, restore the tracked release manifests so the
+          # workflow logs accurately reflect what's checked in (helps
+          # when reproducing locally).
+          git checkout -- Package.swift examples/swift-g2p/HelloG2P/Package.swift || true
+          echo "=== git status ==="
+          git status
