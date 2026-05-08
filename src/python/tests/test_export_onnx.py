@@ -561,7 +561,10 @@ class TestSpeakerEmbeddingMaskMixedBatch:
         return onnx_path
 
     def _run_session(self, session, batch_size, mask_values, sid_values):
-        """Helper: run ONNX session for a given batch with mask/sid arrays."""
+        """Helper: run ONNX session for a given batch with mask/sid arrays.
+
+        Returns the audio output (first output of the session).
+        """
         text = np.tile(np.array([1, 8, 5, 10, 20, 30, 15, 2], dtype=np.int64), (batch_size, 1))
         text_lengths = np.array([text.shape[1]] * batch_size, dtype=np.int64)
         scales = np.array([0.0, 1.0, 0.8], dtype=np.float32)
@@ -569,7 +572,7 @@ class TestSpeakerEmbeddingMaskMixedBatch:
         np.random.seed(42)
         spk_emb = np.random.randn(batch_size, 256).astype(np.float32)
         mask = np.array(mask_values, dtype=np.int64).reshape(batch_size, 1)
-        return session.run(None, {
+        outputs = session.run(None, {
             "input": text,
             "input_lengths": text_lengths,
             "scales": scales,
@@ -577,6 +580,8 @@ class TestSpeakerEmbeddingMaskMixedBatch:
             "speaker_embedding": spk_emb,
             "speaker_embedding_mask": mask,
         })
+        # First output is audio, second is durations
+        return outputs[0]
 
     def test_mask_mix_batch_3_examples(self, onnx_mixed_mask_model):
         """mask=[1,0,1] batch — middle example uses sid, others use embedding.
@@ -589,7 +594,7 @@ class TestSpeakerEmbeddingMaskMixedBatch:
 
         session = onnxruntime.InferenceSession(str(onnx_mixed_mask_model))
         # Mixed batch [1, 0, 1] — embedding, sid, embedding
-        out_mix, _ = self._run_session(
+        out_mix = self._run_session(
             session, batch_size=3, mask_values=[1, 0, 1], sid_values=[0, 1, 2]
         )
 
