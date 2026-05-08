@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"math"
+
+	"github.com/ayutaz/piper-plus/src/go/piperplus/internal/parallelism"
 )
 
 // AudioSink receives audio chunks during streaming synthesis.
@@ -45,6 +47,14 @@ func (s *WriterAudioSink) Close() error {
 // SentenceSilence seconds (default 0.2) is inserted between sentences.
 // Adjacent sentence chunks are crossfaded using CrossfadeChunks to reduce
 // click/pop artifacts at boundaries.
+//
+// Phase 1 of issue #383: G2P for every sentence is run in parallel up front
+// (via mapSentencesParallel), then ORT inference is invoked sequentially
+// in input order. The ORT session itself is not cloned per-sentence, so
+// concurrent engine.Synthesize() calls would oversubscribe intra-op
+// threads — keeping inference serial is intentional. Phase 2 (overlapping
+// G2P with the previous sentence's inference) can be layered on later
+// without re-touching the public API.
 func (v *Voice) SynthesizeStream(
 	ctx context.Context,
 	text string,
@@ -69,22 +79,52 @@ func (v *Voice) SynthesizeStream(
 		}
 	}()
 
-	so := applySynthesisOptions(opts)
+	// Resolve options once. defaultSynthesisOptions() does not pull from
+	// config.Inference — we mirror Synthesize()'s preference for those
+	// defaults so streaming behaves identically to synthesizing each
+	// sentence independently.
+	so := defaultSynthesisOptions()
+	so.NoiseScale = v.config.Inference.NoiseScale
+	so.LengthScale = v.config.Inference.LengthScale
+	so.NoiseW = v.config.Inference.NoiseW
+	for _, fn := range opts {
+		fn(&so)
+	}
 	sentenceSilence := so.SentenceSilence
+
+	// Phase 1: phonemize all sentences in parallel.
+	type prepResult struct {
+		req           *SynthesisRequest
+		needsBreakPad bool
+	}
+	workers := parallelism.Resolve(len(sentences))
+	preps, prepErr := parallelism.Map(ctx, sentences, workers,
+		func(sentence string) (prepResult, error) {
+			req, npad, err := v.prepareSynthesisRequest(sentence, so)
+			if err != nil {
+				return prepResult{}, err
+			}
+			return prepResult{req: req, needsBreakPad: npad}, nil
+		})
+	if prepErr != nil {
+		synthErr = fmt.Errorf("piperplus: streaming phonemization failed: %w", prepErr)
+		return synthErr
+	}
 
 	var prevChunkF32 []float32
 
-	for i, sentence := range sentences {
+	for i, p := range preps {
 		if err := ctx.Err(); err != nil {
 			synthErr = err
 			return synthErr
 		}
 
-		result, err := v.Synthesize(ctx, sentence, opts...)
+		result, err := v.engine.Synthesize(ctx, p.req)
 		if err != nil {
 			synthErr = fmt.Errorf("piperplus: streaming synthesis failed on sentence %d: %w", i, err)
 			return synthErr
 		}
+		applyShortTextPadding(result, p.needsBreakPad)
 
 		curChunkF32 := int16ToFloat32(result.Audio)
 
