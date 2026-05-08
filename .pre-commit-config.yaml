@@ -27,6 +27,66 @@ repos:
         args: [--fix]
       - id: ruff-format
 
+  # ---------------------------------------------------------------------------
+  # Standard whitespace / syntax hooks (cross-language drift catchers).
+  # Addresses recurring symptom-treatment commits that should be auto-fixed
+  # at commit time instead of round-trip through CI.
+  # ---------------------------------------------------------------------------
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+        # Markdown intentional double-space-newline = forced line break.
+        args: [--markdown-linebreak-ext=md]
+      - id: end-of-file-fixer
+      - id: check-merge-conflict
+      - id: check-yaml
+        # Some workflows use GitHub Actions extensions (`!reference`) that
+        # PyYAML can't parse without `--unsafe`. Workflow YAML is validated
+        # in actual job runs anyway; this is a syntax-error-only catch.
+        args: [--unsafe]
+      - id: check-json
+        # Exclude:
+        #   - invalid_json.json: intentionally malformed test fixture for
+        #     parsers that need to handle unparseable input gracefully.
+        #   - default_common_dict.json: dictionary uses duplicate keys by
+        #     design (e.g. "Debug" entry appears twice with different
+        #     contexts) — application spec, not a JSON correctness issue.
+        exclude: |
+          (?x)^(
+            src/go/piperplus/testdata/invalid_json\.json |
+            data/dictionaries/default_common_dict\.json |
+            src/wasm/openjtalk-web/assets/default_common_dict\.json
+          )$
+      - id: check-added-large-files
+        # Block accidental large model checkpoint commits. Use git LFS or
+        # external storage instead.
+        args: [--maxkb=2048]
+
+  # ---------------------------------------------------------------------------
+  # Rust formatter — addresses ae68abc1 (rustfmt drift across 5+ .rs files).
+  # `cargo fmt --check` exits non-zero if any .rs file needs reformatting.
+  # We use a `language: system` local hook so the version follows the
+  # project's pinned toolchain (rust-toolchain.toml) instead of a vendored
+  # rev that drifts from CI.
+  # ---------------------------------------------------------------------------
+  - repo: local
+    hooks:
+      - id: cargo-fmt
+        name: cargo fmt --check (Rust)
+        entry: bash -c 'cd src/rust && cargo fmt --all -- --check'
+        language: system
+        files: \.rs$
+        pass_filenames: false
+      - id: gofmt
+        name: gofmt -l (Go)
+        # gofmt -l prints files that are not gofmt'd; we treat any output
+        # as a failure. Use awk to convert "any line of output" -> exit 1.
+        entry: bash -c 'out=$(gofmt -l src/go); if [ -n "$out" ]; then echo "gofmt drift:"; echo "$out"; exit 1; fi'
+        language: system
+        files: \.go$
+        pass_filenames: false
+
   # PUA-related checks. These only run when files in the regression-prone
   # set actually change, so the typical `git commit` is unaffected.
   - repo: local
