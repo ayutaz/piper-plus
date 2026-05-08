@@ -279,9 +279,13 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: piper-plus-g2p-mac-xcframework
-          # Restore exact upload-artifact paths so build-mac/* resolves
-          # the same way as in the swift-test job.
-          path: .
+          # `actions/upload-artifact@v4` strips the common ancestor of the
+          # uploaded paths (build-mac/), so the zip contains
+          # `piper_plus_g2p.xcframework/`, `macos/`, `Headers/` at root.
+          # Downloading into `build-mac/` reconstructs the original
+          # `build-mac/piper_plus_g2p.xcframework` layout that
+          # Package.ci.swift's binaryTarget references.
+          path: build-mac
 
       - name: Verify xcframework restored
         run: |
