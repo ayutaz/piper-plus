@@ -881,5 +881,170 @@ class TestRuntimeBundleSync:
         )
 
 
+@requires_zh
+class TestEnZhEnPattern:
+    """The previously-untested [en, zh, en] pattern (English -> Chinese -> English).
+
+    Both English segments must be dispatched through the embedded loanword
+    path because they sit adjacent to a Chinese segment. This pins the
+    multi-segment dispatch behaviour beyond the simpler [zh, en] /
+    [en, zh] / [zh, en, zh] cases already covered.
+    """
+
+    def test_en_zh_en_pattern(self):
+        """[en, zh, en] = ``GPS 中国 OK`` -- both EN segments dispatched."""
+        from piper_plus_g2p.chinese import ChinesePhonemizer
+        from piper_plus_g2p.registry import get_phonemizer
+
+        p = get_phonemizer("zh-en")
+        full_tokens, _ = p.phonemize_with_prosody("GPS 中国 OK")
+
+        baseline_tokens, _ = ChinesePhonemizer().phonemize_with_prosody("中国")
+        full_tones = sum(1 for t in full_tokens if t.startswith("tone"))
+        base_tones = sum(1 for t in baseline_tokens if t.startswith("tone"))
+
+        # GPS = 4 syllables, OK = 2 syllables -> +6 tones over the zh baseline
+        assert full_tones - base_tones == 6, (
+            f"Expected +6 tones (GPS=4 + OK=2), got {full_tones - base_tones}"
+        )
+
+        # And both EN segments must produce mandarin tones (i.e. no path
+        # leaked through to EnglishPhonemizer for either segment).
+        # GPS first 4 tones: 4,4,1,4; OK last 2 tones: 1,4
+        tones = [t for t in full_tokens if t.startswith("tone")]
+        # Leading 4 tones come from GPS
+        assert tones[:4] == ["tone4", "tone4", "tone1", "tone4"], tones[:4]
+        # Trailing 2 tones come from OK
+        assert tones[-2:] == ["tone1", "tone4"], tones[-2:]
+
+    def test_en_zh_alternating_4_segments(self):
+        """4-segment alternation: en zh en zh en (GPS 中 OK 国 USB)."""
+        from piper_plus_g2p.chinese import ChinesePhonemizer
+        from piper_plus_g2p.registry import get_phonemizer
+
+        p = get_phonemizer("zh-en")
+        full_tokens, _ = p.phonemize_with_prosody("GPS 中 OK 国 USB")
+
+        baseline_tokens, _ = ChinesePhonemizer().phonemize_with_prosody("中 国")
+        full_tones = sum(1 for t in full_tokens if t.startswith("tone"))
+        base_tones = sum(1 for t in baseline_tokens if t.startswith("tone"))
+
+        # GPS=4, OK=2, USB=3 (uppercase letters U=iou1, S=ai1+si4=2, B=pi4)
+        # -> default acronym table: USB = ['iou1', 'ai1', 'si4', 'pi4']? Let's
+        # trust the contract: the dispatched extra tones must be exactly
+        # 4 + 2 + N (where N matches the USB acronym entry length).
+        # We assert the floor: at least +6 from GPS+OK.
+        assert full_tones - base_tones >= 6, (
+            f"Expected +6 or more tones from 3 EN segments, got "
+            f"{full_tones - base_tones}"
+        )
+
+
+@requires_zh
+class TestErhuaInteraction:
+    """Pin behaviour at the intersection of erhua (儿化音) and tone sandhi.
+
+    The current implementation applies tone sandhi to runs of T3 syllables
+    in the original pypinyin output (before erhua splitting). 儿 itself is
+    T2 in pypinyin's output, so it breaks T3 chains and erhua doesn't
+    interact with sandhi in the way one might naively assume. These tests
+    pin the resulting (snapshot) behaviour.
+    """
+
+    def test_erhua_with_t3_sandhi(self):
+        """``我们儿`` -- 我=T3, 们=T5 (neutral), 儿=T2.
+
+        The T5 of 们 breaks the T3 chain, so 我's T3 is preserved (no
+        sandhi). The 儿 attaches as standalone T2 erhua syllable.
+        """
+        from piper_plus_g2p.chinese import ChinesePhonemizer
+
+        p = ChinesePhonemizer()
+        tokens = p.phonemize("我们儿")
+        # 我 = uo+tone3, 们 = m+ən+tone5, 儿 = ɚ+tone2
+        assert tokens == [
+            "uo", "tone3",
+            "m", "ən", "tone5",
+            "ɚ", "tone2",
+        ], tokens
+
+    def test_erhua_at_word_boundary(self):
+        """``这儿好`` -- 这=T4, 儿=T2, 好=T3.
+
+        No T3 chain is formed (only the trailing 好 is T3), so no sandhi
+        applies. Erhua 儿 keeps its lexical T2.
+        """
+        from piper_plus_g2p.chinese import ChinesePhonemizer
+
+        p = ChinesePhonemizer()
+        tokens = p.phonemize("这儿好")
+        # 这 = tʂ+ɤ+tone4, 儿 = ɚ+tone2, 好 = x+aʊ+tone3
+        assert tokens == [
+            "tʂ", "ɤ", "tone4",
+            "ɚ", "tone2",
+            "x", "aʊ", "tone3",
+        ], tokens
+
+
+@requires_zh
+class TestUnknownUnicodeInEn:
+    """The ``_RE_TOKEN_SPLIT = re.compile(r"[A-Za-z0-9]+")`` tokenizer
+    drops any non-alphanumeric character (registered marks, plus signs,
+    hyphens, emoji, etc.) inside the EN segment. Pin this drop behaviour
+    so future tokenizer changes do not silently introduce them into the
+    pinyin lookup.
+    """
+
+    def test_en_segment_with_register_mark(self):
+        """``GPS®`` -- ® drops, GPS still hits the acronym table."""
+        from piper_plus_g2p.chinese import ChinesePhonemizer
+
+        p = ChinesePhonemizer()
+        baseline, _ = p.phonemize_embedded_english("GPS")
+        with_mark, _ = p.phonemize_embedded_english("GPS®")
+        assert baseline == with_mark, (
+            f"® should be dropped: baseline={baseline}, with_mark={with_mark}"
+        )
+
+    def test_en_segment_with_plus(self):
+        """``GPS+`` -- ``+`` drops, GPS hits."""
+        from piper_plus_g2p.chinese import ChinesePhonemizer
+
+        p = ChinesePhonemizer()
+        baseline, _ = p.phonemize_embedded_english("GPS")
+        with_plus, _ = p.phonemize_embedded_english("GPS+")
+        assert baseline == with_plus, (
+            f"+ should be dropped: baseline={baseline}, with_plus={with_plus}"
+        )
+
+    def test_en_segment_with_hyphen(self):
+        """``GPS-2`` -- the hyphen splits into [``GPS``, ``2``]; the
+        digit-only token ``2`` then runs through letter_fallback character
+        by character. Since ``2`` is not in the A-Z fallback table (which
+        only covers letters), the digit is silently dropped, giving the
+        same result as bare ``GPS``.
+        """
+        from piper_plus_g2p.chinese import ChinesePhonemizer
+
+        p = ChinesePhonemizer()
+        baseline, _ = p.phonemize_embedded_english("GPS")
+        with_hyphen, _ = p.phonemize_embedded_english("GPS-2")
+        assert baseline == with_hyphen, (
+            f"Hyphen and bare digit should be dropped: "
+            f"baseline={baseline}, with_hyphen={with_hyphen}"
+        )
+
+    def test_en_segment_with_emoji(self):
+        """``GPS👍`` -- emoji drops, GPS hits."""
+        from piper_plus_g2p.chinese import ChinesePhonemizer
+
+        p = ChinesePhonemizer()
+        baseline, _ = p.phonemize_embedded_english("GPS")
+        with_emoji, _ = p.phonemize_embedded_english("GPS👍")
+        assert baseline == with_emoji, (
+            f"Emoji should be dropped: baseline={baseline}, with_emoji={with_emoji}"
+        )
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

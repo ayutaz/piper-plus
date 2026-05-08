@@ -42,6 +42,87 @@ class TestUnicodeDetector:
         )
         assert detector.detect_char("\uac00") == "ko"  # Hangul syllable 'ga'
 
+    def test_unicode_detector_hangul_compat_jamo(self):
+        """UnicodeLanguageDetector classifies Hangul Compat Jamo (U+3130-U+318F)
+        as Korean.
+
+        Regression for the previously-unclear branch ordering: the Compat
+        Jamo block sits inside the U+3040-U+31FF kana super-range, but must
+        be routed to "ko" rather than "ja" or None.
+        """
+        from piper_plus_g2p.multilingual import UnicodeLanguageDetector
+
+        detector = UnicodeLanguageDetector(
+            ["ja", "en", "ko"], default_latin_language="en"
+        )
+        # Boundaries and a representative character in the middle.
+        assert detector.detect_char("\u3130") == "ko"  # block start
+        assert detector.detect_char("\u3131") == "ko"  # \u3131 (kiyeok)
+        assert detector.detect_char("\u3134") == "ko"  # \u3134 (nieun)
+        assert detector.detect_char("\u3137") == "ko"  # \u3137 (tikeut)
+        assert detector.detect_char("\u3147") == "ko"  # \u3147 (ieung)
+        assert detector.detect_char("\u318f") == "ko"  # block end
+
+    def test_unicode_detector_hangul_compat_jamo_no_ko(self):
+        """Compat Jamo returns None when Korean is not in the language set."""
+        from piper_plus_g2p.multilingual import UnicodeLanguageDetector
+
+        detector = UnicodeLanguageDetector(["ja", "en"], default_latin_language="en")
+        assert detector.detect_char("\u3131") is None
+        assert detector.detect_char("\u3147") is None
+
+    def test_unicode_detector_kana_still_works_after_compat_jamo_hoist(self):
+        """Hoisting the Compat Jamo branch must not regress kana detection."""
+        from piper_plus_g2p.multilingual import UnicodeLanguageDetector
+
+        detector = UnicodeLanguageDetector(
+            ["ja", "en", "ko"], default_latin_language="en"
+        )
+        # Hiragana and Katakana proper still map to JA.
+        assert detector.detect_char("\u3042") == "ja"  # \u3042
+        assert detector.detect_char("\u30a2") == "ja"  # \u30a2
+        # Katakana Phonetic Extensions (U+31F0-U+31FF) still map to JA.
+        assert detector.detect_char("\u31f0") == "ja"
+        assert detector.detect_char("\u31ff") == "ja"
+        # Bopomofo / Hangul Jamo Extended-A in the same super-range stay
+        # neutral (None).
+        assert detector.detect_char("\u3100") is None  # Bopomofo block start
+        assert detector.detect_char("\u312f") is None  # Bopomofo end
+        assert detector.detect_char("\u3190") is None  # Kanbun start
+
+    def test_segment_compat_jamo_only(self):
+        """Pure Hangul Compat Jamo input segments to a single 'ko' chunk."""
+        from piper_plus_g2p.multilingual import MultilingualPhonemizer
+
+        # Use ko + a rule-based language so we don't require g2pk2 to instantiate.
+        p = MultilingualPhonemizer(["ko", "es"], default_latin_language="es")
+        segments = p.segment_text("\u3131\u3134\u3137")  # \u3131\u3134\u3137
+        assert len(segments) == 1
+        assert segments[0]["language"] == "ko"
+        assert segments[0]["text"] == "\u3131\u3134\u3137"
+
+    def test_segment_hangul_syllable_plus_compat_jamo(self):
+        """Hangul Syllable + Compat Jamo merges into one 'ko' segment."""
+        from piper_plus_g2p.multilingual import MultilingualPhonemizer
+
+        p = MultilingualPhonemizer(["ko", "es"], default_latin_language="es")
+        segments = p.segment_text("\ud55c\u3131")  # \ud55c\u3131
+        assert len(segments) == 1
+        assert segments[0]["language"] == "ko"
+        assert segments[0]["text"] == "\ud55c\u3131"
+
+    def test_segment_compat_jamo_plus_latin(self):
+        """Compat Jamo followed by Latin produces two correctly-typed segments."""
+        from piper_plus_g2p.multilingual import MultilingualPhonemizer
+
+        p = MultilingualPhonemizer(["ko", "es"], default_latin_language="es")
+        segments = p.segment_text("\u3131hola")  # \u3131hola
+        assert len(segments) == 2
+        assert segments[0]["language"] == "ko"
+        assert segments[0]["text"] == "\u3131"
+        assert segments[1]["language"] == "es"
+        assert segments[1]["text"] == "hola"
+
     def test_unicode_detector_neutral(self):
         """Neutral characters (digits, whitespace) return None."""
         from piper_plus_g2p.multilingual import UnicodeLanguageDetector

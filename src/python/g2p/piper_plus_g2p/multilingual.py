@@ -68,15 +68,20 @@ class UnicodeLanguageDetector:
         """
         code = ord(ch)
 
+        # Hangul Compatibility Jamo: U+3130-U+318F.  Checked before the kana
+        # block below so it is unambiguously routed to Korean instead of
+        # falling through the Hiragana/Katakana range check.
+        if 0x3130 <= code <= 0x318F:
+            return "ko" if self._has_ko else None
+
         # Hiragana U+3040-309F, Katakana U+30A0-30FF, Katakana Phonetic U+31F0-31FF
         if 0x3040 <= code <= 0x31FF:
-            # Skip Bopomofo (U+3100-U+312F) and Hangul Compat Jamo (U+3130-U+318F)
-            # that fall within this range but are not kana.
+            # Within this range, kana proper occupies U+3040-30FF and
+            # U+31F0-31FF.  Bopomofo (U+3100-U+312F) and Hangul Jamo
+            # Extended-A (U+3190-U+31EF) — Compat Jamo is handled above —
+            # are returned as neutral.
             if code <= 0x30FF or code >= 0x31F0:
                 return "ja" if self._has_ja else None
-            # Hangul Compatibility Jamo: U+3130-318F
-            if 0x3130 <= code <= 0x318F:
-                return "ko" if self._has_ko else None
             return None
 
         # Hangul Jamo: U+1100-11FF
