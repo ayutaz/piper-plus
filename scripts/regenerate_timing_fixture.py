@@ -22,12 +22,14 @@ import sys
 from dataclasses import asdict
 from pathlib import Path
 
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 # Make the runtime package importable without installation.
 sys.path.insert(0, str(REPO_ROOT / "src/python_run"))
 
 from piper.timing import durations_to_timing  # noqa: E402
+
 
 FIXTURE_PATH = REPO_ROOT / "tests/fixtures/phoneme_timing/golden_matrix.json"
 

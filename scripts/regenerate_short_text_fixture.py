@@ -21,6 +21,7 @@ import sys
 import tomllib
 from pathlib import Path
 
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 CONTRACT_PATH = REPO_ROOT / "docs/spec/short-text-contract.toml"
 FIXTURE_PATH = REPO_ROOT / "tests/fixtures/short_text/contract.json"
