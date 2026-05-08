@@ -11,6 +11,7 @@ fixtures written to ``tmp_path``.
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 import pytest
@@ -221,7 +222,7 @@ class TestParseAishell3:
         assert text == "广州"
         assert pinyin == ["guang3", "zhou1"]
         assert speaker == "SSB0005"
-        assert wav_path.endswith("SSB00050001.wav")
+        assert wav_path.endswith("SSB00050001.wav")  # filename only, no separator
         assert speaker_counts == {"SSB0005": 2, "SSB0012": 1}
 
     def test_returns_empty_when_content_txt_missing(self, tmp_path: Path) -> None:
@@ -351,7 +352,7 @@ class TestParseCmlTts:
         text, wav_path, client_id = entries[0]
         assert text == "Hola mundo"
         assert client_id == "spk_a"
-        assert wav_path.endswith("audio/spk_a/u1.wav")
+        assert wav_path.endswith(os.path.join("audio", "spk_a", "u1.wav"))
         assert speaker_counts == {"spk_a": 2, "spk_b": 1}
 
     def test_returns_empty_when_train_csv_missing(self, tmp_path: Path) -> None:
