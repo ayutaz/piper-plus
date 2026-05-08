@@ -95,10 +95,14 @@ public class SsmlAttackBillionLaughsTests
     {
         var decls = new System.Text.StringBuilder();
         decls.Append("<!ENTITY lol \"lol\">");
+        // Reuse a single StringBuilder across the loop iterations (Clear() per
+        // iteration) instead of allocating a fresh one each time
+        // (CodeQL "StringBuilder creation in loop" hygiene).
+        var kids = new System.Text.StringBuilder();
         var prev = "lol";
         for (int d = 2; d <= depth; d++)
         {
-            var kids = new System.Text.StringBuilder();
+            kids.Clear();
             for (int i = 0; i < fanout; i++)
                 kids.Append('&').Append(prev).Append(';');
             var name = $"lol{d}";
