@@ -161,5 +161,17 @@ let package = Package(
             dependencies: ["PiperPlusG2P"],
             path: "tests/PiperPlusG2PTests"
         ),
+        // Synthesis-engine smoke tests. Like PiperPlusG2PTests, these
+        // cannot be exercised from the release manifest until the
+        // matching xcframework asset is published (placeholder checksum
+        // above prevents `swift package resolve` pre-tag). See
+        // tests/PiperPlusTests/PiperPlusSmokeTests.swift header for the
+        // CI-swap path required to run these on PRs (needs a macOS
+        // slice in libpiper_plus, not yet built — Issue tracking TBD).
+        .testTarget(
+            name: "PiperPlusTests",
+            dependencies: ["PiperPlus"],
+            path: "tests/PiperPlusTests"
+        ),
     ]
 )
