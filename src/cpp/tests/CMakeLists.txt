@@ -713,6 +713,26 @@ set_tests_properties(test_short_text_contract PROPERTIES
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
 )
 
+# Cross-runtime ORT session contract test.
+# Reads tests/fixtures/ort_session/contract.json (generated from
+# docs/spec/ort-session-contract.toml) and asserts the C++ session/warmup
+# constants in piper.cpp match the canonical values that Python/Rust/Go/C#
+# also assert. Self-contained: only links gtest + json.hpp, no piper-library
+# dependency. Cache + env_var rows are pinned to the fixture for
+# forward-compat drift detection (C++ does not implement those features).
+add_executable(test_ort_session_contract test_ort_session_contract.cpp)
+target_include_directories(test_ort_session_contract PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../
+)
+target_link_libraries(test_ort_session_contract
+    gtest_main
+)
+add_test(NAME test_ort_session_contract COMMAND test_ort_session_contract)
+set_tests_properties(test_ort_session_contract PROPERTIES
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+
 # ---- test_library_path: library_path.c unit tests ----
 add_executable(test_library_path
     test_library_path.cpp

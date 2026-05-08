@@ -12,6 +12,7 @@ on:
       - 'tests/fixtures/g2p/zh_en_loanword_matrix.json'
       - 'tests/fixtures/phoneme_timing/**'
       - 'tests/fixtures/short_text/**'
+      - 'tests/fixtures/ort_session/**'
       - 'test/fixtures/speaker_encoder_golden.json'
       - '.github/workflows/cpp-tests.yml'
       - '.github/workflows/_build-test-cpp.yml'

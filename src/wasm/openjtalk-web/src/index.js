@@ -63,6 +63,24 @@ const DEFAULT_LENGTH_SCALE = 1.0;
 const DEFAULT_NOISE_W = 0.8;
 const DEFAULT_SAMPLE_RATE = 22050;
 
+// ORT session contract constants (keep in sync with other runtimes —
+// docs/spec/ort-session-contract.toml). These are exposed as exports so
+// the cross-runtime parity test (test/js/test-ort-session-contract.js) can
+// pin the production values byte-for-byte to the canonical fixture.
+//
+// The WASM runtime does not expose ORT intra/inter-thread / dynamic_block
+// settings (those are forced by onnxruntime-web's WebGPU/WASM EPs), so
+// the relevant fixture rows are pinned for forward-compat drift detection
+// only — see [env_vars.implementation_status] in the spec.
+export const WARMUP_PHONEME_LENGTH = 100;
+export const WARMUP_BOS_TOKEN = 1;
+export const WARMUP_EOS_TOKEN = 2;
+export const WARMUP_DUMMY_PHONEME = 8;
+export const WARMUP_DEFAULT_RUNS = 2;
+export const WARMUP_NOISE_SCALE = DEFAULT_NOISE_SCALE;
+export const WARMUP_LENGTH_SCALE = DEFAULT_LENGTH_SCALE;
+export const WARMUP_NOISE_W = DEFAULT_NOISE_W;
+
 // Short-text mitigation constants (keep in sync with other runtimes —
 // docs/spec/short-text-contract.toml).
 //
@@ -900,21 +918,25 @@ export class PiperPlus {
   /**
    * ORT グラフ最適化キャッシュをバックグラウンドで温める。
    * 本番と同程度の形状 (長さ100) でダミー推論を実行する。
+   *
+   * Constants pinned by docs/spec/ort-session-contract.toml — see
+   * `WARMUP_*` exports above and test/js/test-ort-session-contract.js.
    * @private
    */
-  async _runWarmup(runs = 2) {
-    const WARMUP_LENGTH = 100;
-    const dummyIds = new Array(WARMUP_LENGTH);
-    dummyIds[0] = 1; // BOS
-    for (let i = 1; i < WARMUP_LENGTH - 1; i++) dummyIds[i] = 8;
-    dummyIds[WARMUP_LENGTH - 1] = 2; // EOS
+  async _runWarmup(runs = WARMUP_DEFAULT_RUNS) {
+    const dummyIds = new Array(WARMUP_PHONEME_LENGTH);
+    dummyIds[0] = WARMUP_BOS_TOKEN; // BOS
+    for (let i = 1; i < WARMUP_PHONEME_LENGTH - 1; i++) {
+      dummyIds[i] = WARMUP_DUMMY_PHONEME;
+    }
+    dummyIds[WARMUP_PHONEME_LENGTH - 1] = WARMUP_EOS_TOKEN; // EOS
 
     for (let i = 0; i < runs; i++) {
       try {
         await this._infer(dummyIds, null, {
-          noiseScale: DEFAULT_NOISE_SCALE,
-          lengthScale: DEFAULT_LENGTH_SCALE,
-          noiseW: DEFAULT_NOISE_W,
+          noiseScale: WARMUP_NOISE_SCALE,
+          lengthScale: WARMUP_LENGTH_SCALE,
+          noiseW: WARMUP_NOISE_W,
         });
       } catch (e) {
         console.warn(`[piper-plus] warmup run ${i + 1}/${runs} failed:`, e);
