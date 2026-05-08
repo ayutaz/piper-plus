@@ -50,9 +50,7 @@ Mirrors: see ``test_speaker_encoder_parity.cpp`` and friends.
 
 from __future__ import annotations
 
-import hashlib
 import json
-import math
 from pathlib import Path
 
 import numpy as np
@@ -404,11 +402,9 @@ class TestSpeakerEncoderGoldenFixture:
         py_band_means = mel.mean(axis=1)
         py_dominant = int(np.argmax(py_band_means))
 
-        # Reconstruct golden's per-band means from the dense flattened
-        # mel array stored in the fixture (sampled every 10).
-        golden_flat = np.array(tc["mel_sampled_every_10"], dtype=np.float64)
-        # The fixture stores mel.flatten()[::10]; we cannot fully invert,
-        # but for parity we use the corner values which ARE stored.
+        # The fixture stores mel.flatten()[::10] (downsampled), which is
+        # not enough to fully reconstruct per-band means. For parity we
+        # use the corner values which ARE stored verbatim.
         golden_top_left = tc["mel_corner_values"]["top_left"]
 
         # The top_left corner of mel is mel[0, 0] in (n_mels, n_frames)
