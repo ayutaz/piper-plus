@@ -83,31 +83,6 @@ const generateMultitone = (freqs, durationS, sr) => {
   return samples;
 };
 
-const cornerValueOk = (name, actual, expected) => {
-  const relErr =
-    Math.abs(expected) > 1e-10
-      ? Math.abs((actual - expected) / expected)
-      : Math.abs(actual - expected);
-  assert.ok(
-    relErr < 0.02,
-    `${name}: expected ${expected}, got ${actual} (rel err ${relErr.toFixed(6)})`,
-  );
-};
-
-const relativeL2 = (actual, expected) => {
-  if (actual.length !== expected.length) {
-    throw new Error(`length mismatch: ${actual.length} vs ${expected.length}`);
-  }
-  let diffSq = 0;
-  let refSq = 0;
-  for (let i = 0; i < actual.length; i++) {
-    const d = actual[i] - expected[i];
-    diffSq += d * d;
-    refSq += expected[i] * expected[i];
-  }
-  return refSq < 1e-20 ? Math.sqrt(diffSq) : Math.sqrt(diffSq / refSq);
-};
-
 describe('Speaker Encoder mel parity (WASM/JS ↔ canonical Python)', () => {
   // -----------------------------------------------------------------
   // Mel parameters — must match all runtimes

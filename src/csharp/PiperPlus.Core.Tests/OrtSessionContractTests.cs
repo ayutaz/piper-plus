@@ -27,7 +27,7 @@ public class OrtSessionContractTests
         var dir = new DirectoryInfo(AppContext.BaseDirectory);
         while (dir is not null)
         {
-            var candidate = Path.Combine(
+            var candidate = Path.Join(
                 dir.FullName, "tests", "fixtures", "ort_session", "contract.json");
             if (File.Exists(candidate))
             {
