@@ -61,6 +61,8 @@ def build_fixture() -> dict:
             "all_languages": canonical["all_languages"],
             "trained_language_id_map": canonical["trained_language_id_map"],
             "trained_languages": canonical["trained_languages"],
+            "extended_language_id_map": canonical["extended_language_id_map"],
+            "extended_languages": canonical["extended_languages"],
         },
         "invariants": {
             "keys_lowercase": invariants["keys_lowercase"],
