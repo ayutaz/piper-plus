@@ -145,7 +145,9 @@ def _serialize(fixture: dict) -> str:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     parser.add_argument(
         "--check",
         action="store_true",
@@ -158,12 +160,21 @@ def main() -> int:
 
     if args.check:
         if not FIXTURE_PATH.exists():
-            print(f"ERROR: {rel} does not exist. Run `python scripts/regenerate_timing_fixture.py`.", file=sys.stderr)
+            print(
+                f"ERROR: {rel} does not exist. Run `python scripts/regenerate_timing_fixture.py`.",
+                file=sys.stderr,
+            )
             return 1
         existing = FIXTURE_PATH.read_text(encoding="utf-8")
         if existing != serialized:
-            print(f"ERROR: {rel} is out of sync with canonical Python implementation.", file=sys.stderr)
-            print("Run `python scripts/regenerate_timing_fixture.py` to regenerate.", file=sys.stderr)
+            print(
+                f"ERROR: {rel} is out of sync with canonical Python implementation.",
+                file=sys.stderr,
+            )
+            print(
+                "Run `python scripts/regenerate_timing_fixture.py` to regenerate.",
+                file=sys.stderr,
+            )
             return 1
         print(f"OK: {rel} is up-to-date with src/python_run/piper/timing.py.")
         return 0

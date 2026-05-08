@@ -69,7 +69,9 @@ def _serialize(fixture: dict) -> str:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     parser.add_argument(
         "--check",
         action="store_true",
@@ -83,12 +85,21 @@ def main() -> int:
 
     if args.check:
         if not FIXTURE_PATH.exists():
-            print(f"ERROR: {rel} does not exist. Run `python scripts/regenerate_short_text_fixture.py`.", file=sys.stderr)
+            print(
+                f"ERROR: {rel} does not exist. Run `python scripts/regenerate_short_text_fixture.py`.",
+                file=sys.stderr,
+            )
             return 1
         existing = FIXTURE_PATH.read_text(encoding="utf-8")
         if existing != serialized:
-            print(f"ERROR: {rel} is out of sync with {CONTRACT_PATH.relative_to(REPO_ROOT)}.", file=sys.stderr)
-            print("Run `python scripts/regenerate_short_text_fixture.py` to regenerate.", file=sys.stderr)
+            print(
+                f"ERROR: {rel} is out of sync with {CONTRACT_PATH.relative_to(REPO_ROOT)}.",
+                file=sys.stderr,
+            )
+            print(
+                "Run `python scripts/regenerate_short_text_fixture.py` to regenerate.",
+                file=sys.stderr,
+            )
             return 1
         print(f"OK: {rel} is up-to-date.")
         return 0

@@ -45,29 +45,29 @@ FIXTURE_PATH = REPO_ROOT / "tests/fixtures/text_splitter/contract.json"
 
 # Codepoints that each runtime currently OMITS from the canonical close set.
 RUNTIME_CLOSING_OMITS: dict[str, list[int]] = {
-    "python": [],   # 14/14
-    "rust":   [],   # 14/14 after Issue #346
-    "csharp": [],   # 14/14 after Issue #346
-    "cpp":    [],   # 14/14 after Issue #346
-    "go":     [0x0022, 0x0027, 0xFF3D, 0xFF63, 0x2019, 0x00BB],  # 8/14
+    "python": [],  # 14/14
+    "rust": [],  # 14/14 after Issue #346
+    "csharp": [],  # 14/14 after Issue #346
+    "cpp": [],  # 14/14 after Issue #346
+    "go": [0x0022, 0x0027, 0xFF3D, 0xFF63, 0x2019, 0x00BB],  # 8/14
 }
 
 # Codepoints that each runtime currently OMITS from the canonical terminator set.
 RUNTIME_TERMINATOR_OMITS: dict[str, list[int]] = {
-    "python": [],          # 7/7
-    "rust":   [0xFF0E],    # 6/7 (missing fullwidth full stop)
-    "csharp": [0xFF0E],    # 6/7
-    "cpp":    [],          # 7/7
-    "go":     [],          # 7/7
+    "python": [],  # 7/7
+    "rust": [0xFF0E],  # 6/7 (missing fullwidth full stop)
+    "csharp": [0xFF0E],  # 6/7
+    "cpp": [],  # 7/7
+    "go": [],  # 7/7
 }
 
 # Per-runtime split strategy. The toml [behavior].strategy is canonical = post-consume.
 RUNTIME_STRATEGY: dict[str, str] = {
     "python": "post-consume",
-    "rust":   "post-consume",
+    "rust": "post-consume",
     "csharp": "post-consume",
-    "cpp":    "post-consume",
-    "go":     "depth-tracking",
+    "cpp": "post-consume",
+    "go": "depth-tracking",
 }
 
 
@@ -81,8 +81,12 @@ def _parse_codepoint(token: str) -> int:
 def build_fixture() -> dict:
     contract = tomllib.loads(CONTRACT_PATH.read_text(encoding="utf-8"))
 
-    canonical_close = sorted(_parse_codepoint(e["codepoint"]) for e in contract["closing_punctuation"])
-    canonical_term = sorted(_parse_codepoint(e["codepoint"]) for e in contract["sentence_terminators"])
+    canonical_close = sorted(
+        _parse_codepoint(e["codepoint"]) for e in contract["closing_punctuation"]
+    )
+    canonical_term = sorted(
+        _parse_codepoint(e["codepoint"]) for e in contract["sentence_terminators"]
+    )
     canonical_strategy = contract["behavior"]["strategy"]
 
     runtimes: dict[str, dict] = {}
