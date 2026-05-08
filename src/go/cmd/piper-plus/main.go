@@ -96,7 +96,7 @@ func init() {
 	f.BoolVar(&streaming, "streaming", false, "write raw PCM int16 to stdout (no WAV header)")
 	f.StringVar(&batchFile, "batch", "", "batch file with one text line per utterance")
 	f.StringVar(&timingOutput, "output-timing", "", "write phoneme timing to file")
-	f.StringVar(&timingFormat, "timing-format", "json", "timing output format (json or tsv)")
+	f.StringVar(&timingFormat, "timing-format", "json", "timing output format (json, tsv, or srt)")
 	f.BoolVar(&version, "version", false, "print version and exit")
 	f.BoolVar(&outputRaw, "output-raw", false, "output raw PCM audio to stdout (no WAV header)")
 	f.BoolVar(&jsonInput, "json-input", false, "read stdin as JSON lines")
@@ -561,12 +561,16 @@ func writeTiming(result *piperplus.SynthesisResult, logger *slog.Logger) error {
 	switch strings.ToLower(timingFormat) {
 	case "tsv":
 		data = []byte(timing.ToTSV())
-	default:
+	case "srt":
+		data = []byte(timing.ToSRT())
+	case "json", "":
 		data, err = timing.ToJSON()
 		if err != nil {
 			return fmt.Errorf("failed to marshal timing JSON: %w", err)
 		}
 		data = append(data, '\n')
+	default:
+		return fmt.Errorf("unknown timing format: %q (expected json, tsv, or srt)", timingFormat)
 	}
 
 	if timingOutput == "-" {
