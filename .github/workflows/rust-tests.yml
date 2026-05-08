@@ -87,6 +87,34 @@ jobs:
     - name: Run CLI tests
       run: cargo test -p piper-plus-cli --no-fail-fast
 
+  wasm-test:
+    name: piper-wasm wasm-bindgen tests (wasm32)
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: src/rust/piper-wasm
+    steps:
+    - uses: actions/checkout@v6
+    - uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: wasm32-unknown-unknown
+    - uses: Swatinem/rust-cache@v2
+      with:
+        workspaces: src/rust -> target
+    - uses: actions/setup-node@v6
+      with:
+        node-version: '24'
+    - name: Install wasm-pack
+      uses: jetli/wasm-pack-action@v0.4.0
+      with:
+        version: 'latest'
+    - name: Run wasm-bindgen tests in Node (multilingual-external)
+      # 22 #[wasm_bindgen_test] functions in src/lib.rs are gated on
+      # target_arch = "wasm32" so they only run via wasm-pack — `cargo test`
+      # on the host never touches them. multilingual-external enables all
+      # 8 language G2P paths with runtime-loaded JA/ZH dictionaries.
+      run: wasm-pack test --node --features multilingual-external
+
   fmt:
     name: rustfmt
     runs-on: ubuntu-24.04
