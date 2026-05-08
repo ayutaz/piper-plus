@@ -124,6 +124,26 @@ fn test_billion_laughs_bounded() {
     );
 }
 
+/// `<speak>`-first variant: undefined entity refs reach `quick-xml`,
+/// which returns `Err(UnrecognizedEntity)` per character — no
+/// expansion possible. Mirrors the Python
+/// ``test_billion_laughs_speak_first_falls_back_safely`` parity case
+/// to lock down behaviour when the DOCTYPE shield does not fire.
+#[test]
+fn test_billion_laughs_speak_first_falls_back_safely() {
+    // Internal entity ref without DOCTYPE — undefined entity.
+    let payload = r#"<speak><prosody rate="slow">&lol;&lol;&lol;</prosody></speak>"#;
+    let segments = SsmlParser::parse(payload);
+    assert!(!segments.is_empty());
+    let full = all_text(&segments);
+    // Should not have ballooned. Small bound regardless of fallback path.
+    assert!(
+        full.len() < 1000,
+        "speak-first billion-laughs ballooned: {}",
+        full.len()
+    );
+}
+
 // =====================================================================
 // DTD — external SYSTEM declaration
 // =====================================================================
@@ -145,6 +165,39 @@ fn test_dtd_inline_safely_handled() {
     let full = all_text(&segments);
     // The "Hello" content (or the literal payload) should be present.
     assert!(full.contains("Hello") || full.contains("speak"));
+}
+
+/// External SYSTEM DTD preceded by an XML prolog. Mirrors the Python
+/// ``test_dtd_external_with_xml_prolog`` parity case so that all four
+/// runtimes share both DTD shapes (with and without prolog).
+#[test]
+fn test_dtd_external_with_xml_prolog() {
+    let payload = concat!(
+        r#"<?xml version="1.0"?>"#,
+        r#"<!DOCTYPE speak SYSTEM "http://example.invalid/external.dtd">"#,
+        r#"<speak>Hello</speak>"#
+    );
+    let start = std::time::Instant::now();
+    let segments = SsmlParser::parse(payload);
+    let elapsed = start.elapsed();
+    // Still no network fetch — must be fast.
+    assert!(
+        elapsed.as_millis() < 500,
+        "external DTD parse took too long: {:?}",
+        elapsed
+    );
+    assert!(!segments.is_empty());
+}
+
+/// Bare XML prolog with no DOCTYPE in front of `<speak>`. The
+/// `is_ssml` regex still rejects this (since `<?` precedes `<speak>`)
+/// so the entire payload is returned as plain text. Mirrors Python
+/// ``test_xml_prolog_only`` for parity.
+#[test]
+fn test_xml_prolog_only() {
+    let payload = r#"<?xml version="1.0" encoding="UTF-8"?><speak>Hi</speak>"#;
+    let segments = SsmlParser::parse(payload);
+    assert!(!segments.is_empty());
 }
 
 // =====================================================================
@@ -188,6 +241,24 @@ fn test_attribute_with_entity_reference() {
     let full = all_text(&segments);
     assert!(!full.contains("root:"));
     assert!(!full.contains("/etc/passwd"));
+}
+
+/// DOCTYPE-prefixed XXE inside a `<break>` attribute. The `is_ssml`
+/// regex rejects the DOCTYPE prefix, so the payload is returned as
+/// plain text — but the `&xxe;` token must NEVER expand to file
+/// content. Mirrors Python ``test_attribute_with_xxe_entity_falls_back``
+/// and C# ``AttributeWithXxeEntity_DoctypePrefix_FallsBackSafely``.
+#[test]
+fn test_attribute_with_xxe_entity_doctype_prefix() {
+    let payload = concat!(
+        r#"<!DOCTYPE foo [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>"#,
+        r#"<speak><break time="&xxe;"/></speak>"#
+    );
+    let segments = SsmlParser::parse(payload);
+    assert!(!segments.is_empty());
+    let full = all_text(&segments);
+    assert!(!full.contains("root:"));
+    assert!(!full.contains("/bin/"));
 }
 
 // =====================================================================
