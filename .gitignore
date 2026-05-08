@@ -118,6 +118,8 @@ check_*.py
 !scripts/check_onnx_inputs.py
 !scripts/check_loanword_consistency.py
 !scripts/check_short_text_contract.py
+!scripts/check_ort_session_contract.py
+!scripts/check_text_splitter_contract.py
 create_comprehensive_*.py
 add_missing_*.py
 retrain_*.py
