@@ -100,22 +100,19 @@ def _extract_inline_substring_map(
     """Check that an inline JSON-shaped literal exists in the source file.
 
     Used for Rust source files where `language_id_map` appears as an embedded
-    JSON literal inside a `r#"..."#` raw string (e.g. config.rs test fixtures
-    and piper-wasm sample configs). We render the canonical mapping in two
-    spacing variants (single-line, both with and without trailing braces) and
-    require at least one to appear verbatim.
+    JSON literal inside a `serde_json::json!()` macro or `r#"..."#` raw
+    string. The braces may live on separate lines from the body; what we
+    verify is that the *ordered key-value sequence* appears as a single line
+    inside the file (with one of two common spacings).
     """
     text = path.read_text(encoding="utf-8")
-    # Variant 1: tightly packed, comma-space separated (matches Rust style).
+    # Variant 1: comma-space separated, full `"k": v` form.
     body1 = ", ".join(f'"{k}": {v}' for k, v in expected_map.items())
-    if "{" + body1 + "}" in text:
+    if body1 in text:
         return True
-    # Variant 2: spaced after braces (`{ "ja": 0, ... }`).
-    if "{ " + body1 + " }" in text:
-        return True
-    # Variant 3: with trailing space + brace.
-    body3 = ", ".join(f'"{k}":{v}' for k, v in expected_map.items())
-    if "{" + body3 + "}" in text:
+    # Variant 2: comma + no-space form (`"k":v`).
+    body2 = ", ".join(f'"{k}":{v}' for k, v in expected_map.items())
+    if body2 in text:
         return True
     return False
 
