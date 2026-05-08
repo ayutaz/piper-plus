@@ -134,6 +134,25 @@ public class SsmlAttackBillionLaughsTests
         Assert.True(full.Length <= payload.Length * 2,
             $"output ballooned: input={payload.Length}, output={full.Length}");
     }
+
+    [Fact]
+    public void BillionLaughs_SpeakFirst_FallsBackSafely()
+    {
+        // <speak>-first variant: undefined entity refs reach
+        // XDocument.Parse, which throws XmlException; the parser
+        // falls back to stripped plain text — no expansion possible.
+        // Mirrors the Python test_billion_laughs_speak_first_falls_back_safely
+        // and Rust test_billion_laughs_speak_first_falls_back_safely
+        // parity cases so all 4 runtimes lock in the no-expansion
+        // guarantee even when the DOCTYPE shield does not fire.
+        var payload = "<speak><prosody rate=\"slow\">&lol;&lol;&lol;</prosody></speak>";
+
+        var segments = SsmlParser.Parse(payload);
+        Assert.NotEmpty(segments);
+        var full = AllText(segments);
+        Assert.True(full.Length < 1000,
+            $"speak-first billion-laughs ballooned: {full.Length}");
+    }
 }
 
 public class SsmlAttackDtdTests
@@ -200,6 +219,20 @@ public class SsmlAttackProcessingInstructionTests
 
         var full = AllText(segments);
         Assert.Contains("Hello", full);
+    }
+
+    [Fact]
+    public void XmlPrologOnly_TreatedAsPlainText()
+    {
+        // Bare XML prolog with no DOCTYPE in front of <speak>. IsSsml
+        // still rejects this (since `<?` precedes `<speak>`), so the
+        // entire payload is returned as plain text. Mirrors Python
+        // test_xml_prolog_only and Rust test_xml_prolog_only parity
+        // cases.
+        var payload = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><speak>Hi</speak>";
+
+        var segments = SsmlParser.Parse(payload);
+        Assert.NotEmpty(segments);
     }
 }
 

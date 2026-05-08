@@ -155,6 +155,25 @@ func TestAttack_BillionLaughsBounded(t *testing.T) {
 	}
 }
 
+func TestAttack_BillionLaughsSpeakFirstFallsBackSafely(t *testing.T) {
+	// <speak>-first variant: undefined entity refs reach encoding/xml,
+	// which raises "invalid character entity" and Parse falls back to
+	// stripped plain text — no expansion possible. Mirrors the Python
+	// test_billion_laughs_speak_first_falls_back_safely parity case so
+	// that all 4 runtimes lock in the no-expansion guarantee even when
+	// the DOCTYPE shield does not fire.
+	payload := `<speak><prosody rate="slow">&lol;&lol;&lol;</prosody></speak>`
+
+	segments := Parse(payload)
+	if len(segments) == 0 {
+		t.Fatal("must produce at least one segment")
+	}
+	full := allText(segments)
+	if len(full) >= 1000 {
+		t.Errorf("speak-first billion-laughs ballooned: %d", len(full))
+	}
+}
+
 // =====================================================================
 // DTD — external SYSTEM declaration
 // =====================================================================
@@ -180,6 +199,25 @@ func TestAttack_ExternalDtdNotFetched(t *testing.T) {
 	full := allText(segments)
 	if !strings.Contains(full, "Hello") && !strings.Contains(full, "speak") {
 		t.Errorf("expected text recoverable, got: %q", full)
+	}
+}
+
+func TestAttack_ExternalDtdWithXmlPrologNotFetched(t *testing.T) {
+	// External SYSTEM DTD preceded by an XML prolog. Mirrors the Python
+	// test_dtd_external_with_xml_prolog and C# ExternalDtdWithXmlProlog_NotFetched
+	// parity cases so all 4 runtimes share both DTD shapes (with and
+	// without prolog).
+	payload := `<?xml version="1.0"?><!DOCTYPE speak SYSTEM "http://example.invalid/external.dtd"><speak>Hello</speak>`
+
+	start := time.Now()
+	segments := Parse(payload)
+	elapsed := time.Since(start)
+
+	if elapsed > time.Second {
+		t.Fatalf("DTD-with-prolog parse took too long: %v", elapsed)
+	}
+	if len(segments) == 0 {
+		t.Fatal("must produce at least one segment")
 	}
 }
 
@@ -209,6 +247,19 @@ func TestAttack_XmlStylesheetPiIgnored(t *testing.T) {
 	}
 }
 
+func TestAttack_XmlPrologOnly(t *testing.T) {
+	// Bare XML prolog with no DOCTYPE. The IsSSML regex still rejects
+	// input prefixed by `<?` (not <speak), so the payload is returned
+	// verbatim as plain text. Mirrors the Python test_xml_prolog_only
+	// parity case.
+	payload := `<?xml version="1.0" encoding="UTF-8"?><speak>Hi</speak>`
+
+	segments := Parse(payload)
+	if len(segments) == 0 {
+		t.Fatal("must produce at least one segment")
+	}
+}
+
 // =====================================================================
 // Attribute with entity reference
 // =====================================================================
@@ -229,6 +280,27 @@ func TestAttack_AttributeWithEntityReference(t *testing.T) {
 	for _, marker := range []string{"root:", "/etc/passwd"} {
 		if strings.Contains(full, marker) {
 			t.Errorf("entity expansion leaked %q: %q", marker, full)
+		}
+	}
+}
+
+func TestAttack_AttributeWithXxeEntityDoctypePrefix(t *testing.T) {
+	// DOCTYPE-prefixed XXE inside a <break> attribute. IsSSML rejects
+	// the DOCTYPE prefix → plain text. The &xxe; token must NEVER
+	// resolve to file content. Mirrors Python
+	// test_attribute_with_xxe_entity_falls_back and C#
+	// AttributeWithXxeEntity_DoctypePrefix_FallsBackSafely so all 4
+	// runtimes pin the same observable behaviour.
+	payload := `<!DOCTYPE foo [<!ENTITY xxe SYSTEM "file:///etc/passwd">]><speak><break time="&xxe;"/></speak>`
+
+	segments := Parse(payload)
+	if len(segments) == 0 {
+		t.Fatal("must produce at least one segment")
+	}
+	full := allText(segments)
+	for _, marker := range []string{"root:", "/bin/"} {
+		if strings.Contains(full, marker) {
+			t.Errorf("DOCTYPE-prefixed XXE attr leaked %q: %q", marker, full)
 		}
 	}
 }
