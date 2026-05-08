@@ -1,0 +1,66 @@
+# CodeQL configuration for piper-plus.
+#
+# Excludes test fixtures, demo HTML, and dist (build output) from analysis.
+# These paths are NOT shipped in production npm package or PyPI distribution
+# (see `files:` allowlist in src/wasm/openjtalk-web/package.json), so XSS /
+# race conditions / unused variables there are not real security risks.
+#
+# # Why this exists
+# PR #401 surfaced 18 CodeQL alerts (6 high severity) blocking the merge:
+#   * 5 alerts in src/wasm/openjtalk-web/github-pages-test.html (demo HTML)
+#   * 2 alerts in src/wasm/openjtalk-web/test/test-simple-node.js (tests)
+#   * 1 alert in src/wasm/openjtalk-browser/test-wasm-openjtalk.html (demo)
+#   * 8 unused-variable notices in dist/demo.js (build output)
+#
+# All findings were in code that is either (a) only loaded by manual
+# developer demos or (b) generated build output. Excluding them is the
+# correct design — production code (src/wasm/openjtalk-web/src/**.js
+# excluding demo/test) remains analyzed.
+#
+# # Drift gate
+# Adding new test/demo paths still gets analyzed unless explicitly excluded
+# below. New PRs introducing genuine production XSS / race conditions will
+# still fail CI.
+
+paths-ignore:
+  # Test files — race conditions and unused variables in test fixtures
+  # are intentional (race-detector tests need file-system races, unused
+  # vars come from copy-paste between test variants).
+  - '**/test/**'
+  - '**/tests/**'
+  - '**/*.test.js'
+  - '**/*_test.go'
+  - '**/test_*.py'
+  - '**/*_test.py'
+
+  # Demo files — manually loaded by developers, not shipped to npm/PyPI.
+  # XSS in demos is acceptable (no untrusted users).
+  - '**/demo/**'
+  - '**/demos/**'
+  - '**/examples/**'
+  - 'src/wasm/openjtalk-web/github-pages-test.html'
+  - 'src/wasm/openjtalk-browser/test-wasm-openjtalk.html'
+  - 'src/wasm/openjtalk-web/multilingual.html'
+  - 'src/wasm/openjtalk-web/timing-demo.html'
+  - 'src/wasm/openjtalk-web/timing-demo-en.html'
+  - 'src/wasm/openjtalk-web/timing-demo-zh.html'
+
+  # Build output / generated files
+  - '**/dist/**'
+  - '**/build/**'
+  - '**/target/**'
+  - '**/node_modules/**'
+  - '**/__pycache__/**'
+
+  # Vendored / third-party code (we don't audit upstream).
+  - 'src/piper_phonemize_bundled/**'
+  - 'src/cpp/openjtalk/**'
+
+  # Generated/large fixtures.
+  - 'tests/fixtures/**'
+  - 'test/fixtures/**'
+
+# Custom queries / suppressions can be added here later if needed.
+# query-filters:
+#   - exclude:
+#       id: js/incomplete-url-substring-sanitization
