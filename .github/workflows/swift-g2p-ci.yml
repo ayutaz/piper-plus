@@ -17,7 +17,7 @@ name: "Swift G2P CI"
 #
 # The release manifest is overwritten in-place; this is safe because the CI
 # workspace is ephemeral and the change is never committed back. See
-# docs/spec/swift-g2p-decisions.md (Resolution Summary, follow-up D-10).
+# docs/spec/swift-g2p.md (release flow / consumer pinning).
 
 on:
   push:
