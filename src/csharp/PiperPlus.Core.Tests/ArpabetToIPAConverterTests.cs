@@ -116,8 +116,11 @@ public sealed class ArpabetToIPAConverterTests
             ["ZH"] = "\u0292",  // ʒ
         };
 
-        // ArpabetToIpa has 39 entries (33 base + some aliases)
-        Assert.Equal(expected.Count, expected.Count); // self-check, real validation is below
+        // Pin the size of the expected reference set so any silent
+        // additions/removals to this test's local table fail loudly
+        // (the previous line `Assert.Equal(expected.Count, expected.Count)`
+        // was a tautology that asserted nothing).
+        Assert.Equal(39, expected.Count);
 
         foreach (var (arpa, expectedIpa) in expected)
         {
