@@ -84,65 +84,76 @@ jobs:
           docker compose up -d --build
           docker compose ps
 
-      - name: Wait for Wyoming TCP port
-        run: |
-          set -euo pipefail
-          # The container's healthcheck only checks `socket.connect`,
-          # which can succeed before the wyoming AsyncServer accepts
-          # protocol events. We do both: bare TCP first, then a real
-          # Describe round-trip in the next step.
-          for attempt in $(seq 1 60); do
-            if python -c "import socket; s=socket.socket(); s.settimeout(2); s.connect(('localhost', 10200)); s.close()" 2>/dev/null; then
-              echo "TCP port 10200 reachable on attempt ${attempt}"
-              exit 0
-            fi
-            echo "TCP not yet up (attempt ${attempt}/60); sleeping 5s"
-            sleep 5
-          done
-          echo "::error::Wyoming TCP port 10200 never came up"
-          docker compose -f docker/wyoming/docker-compose.yml logs --tail=200 || true
-          exit 1
-
-      - name: Smoke test — Describe round-trip
+      - name: Wait for Wyoming server (Describe-level readiness)
         run: |
           python <<'PY'
-          # Send a Describe event over the Wyoming protocol and assert
-          # we receive an Info response naming our TTS program. Catches:
-          # - handler.build_info() raising on import
-          # - protocol-version mismatch with installed wyoming lib
-          # - server crashing on first incoming event
+          # Why retry at Describe-level instead of bare TCP:
+          # The wyoming AsyncServer binds the TCP listening socket BEFORE
+          # the model is loaded, so a successful socket.connect() does not
+          # mean the server can answer protocol events. Connecting to a
+          # not-yet-ready server gets `ConnectionResetError: 104` because
+          # the model-load coroutine hasn't yielded control to the read
+          # loop. We retry the full Describe → Info round-trip until the
+          # server actually completes a handshake. This is the canonical
+          # readiness check Home Assistant uses internally as well.
           import asyncio
           import sys
 
           from wyoming.client import AsyncTcpClient
           from wyoming.info import Describe, Info
 
+          async def try_describe() -> Info | str:
+              try:
+                  async with AsyncTcpClient("localhost", 10200) as client:
+                      await client.write_event(Describe().event())
+                      event = await asyncio.wait_for(client.read_event(), timeout=10.0)
+                      if event is None:
+                          return "connection closed before Info"
+                      if not Info.is_type(event.type):
+                          return f"unexpected event type: {event.type}"
+                      return Info.from_event(event)
+              except (
+                  ConnectionResetError,
+                  ConnectionRefusedError,
+                  asyncio.TimeoutError,
+                  OSError,
+              ) as e:
+                  return f"{type(e).__name__}: {e}"
+
           async def main() -> int:
-              async with AsyncTcpClient("localhost", 10200) as client:
-                  await client.write_event(Describe().event())
-                  # Up to 30s for model-loading + first response.
-                  try:
-                      event = await asyncio.wait_for(client.read_event(), timeout=30.0)
-                  except asyncio.TimeoutError:
-                      print("::error::Describe timed out after 30s", file=sys.stderr)
-                      return 1
-                  if event is None:
-                      print("::error::Describe returned None (connection closed)", file=sys.stderr)
-                      return 1
-                  if not Info.is_type(event.type):
-                      print(f"::error::expected Info, got {event.type}", file=sys.stderr)
-                      return 1
-                  info = Info.from_event(event)
-                  programs = info.tts or []
-                  if not programs:
-                      print("::error::Info.tts is empty — no TtsProgram advertised", file=sys.stderr)
-                      return 1
-                  prog = programs[0]
-                  voices = prog.voices or []
-                  print(f"ok: TtsProgram={prog.name!r} voices={len(voices)}")
-                  for v in voices[:3]:
-                      print(f"  voice: name={getattr(v, 'name', '?')} languages={getattr(v, 'languages', '?')}")
-                  return 0
+              # 60 attempts × 5s = 5 min total budget for cold-start with
+              # model auto-download + ONNX session init.
+              for attempt in range(1, 61):
+                  result = await try_describe()
+                  if isinstance(result, Info):
+                      programs = result.tts or []
+                      if programs:
+                          prog = programs[0]
+                          voices = prog.voices or []
+                          print(
+                              f"ok (attempt {attempt}): TtsProgram={prog.name!r} "
+                              f"voices={len(voices)}"
+                          )
+                          for v in voices[:3]:
+                              print(
+                                  f"  voice: name={getattr(v, 'name', '?')} "
+                                  f"languages={getattr(v, 'languages', '?')}"
+                              )
+                          return 0
+                      print(
+                          f"attempt {attempt}: Info received but Info.tts is empty — "
+                          f"server still initializing, retrying"
+                      )
+                  else:
+                      print(f"attempt {attempt}: not ready yet ({result})")
+                  await asyncio.sleep(5)
+
+              print(
+                  "::error::Wyoming server never answered Describe with a "
+                  "non-empty TtsProgram list within 5 minutes",
+                  file=sys.stderr,
+              )
+              return 1
 
           sys.exit(asyncio.run(main()))
           PY
