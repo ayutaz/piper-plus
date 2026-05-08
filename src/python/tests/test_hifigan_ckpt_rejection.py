@@ -12,7 +12,9 @@ These tests pin the detection logic in
 
 import pytest
 
-from piper_train.__main__ import (
+pytest.importorskip("torch")
+
+from piper_train.__main__ import (  # noqa: E402
     _LEGACY_HIFIGAN_MESSAGE,
     _is_legacy_hifigan_checkpoint,
 )

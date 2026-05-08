@@ -8,7 +8,9 @@ deliberate, reviewed code edit — not a refactor side-effect.
 
 import pytest
 
-from piper_train.tools.prepare_multilingual_dataset import (
+pytest.importorskip("torch")
+
+from piper_train.tools.prepare_multilingual_dataset import (  # noqa: E402
     ALL_LANGUAGES,
     LANGUAGE_ID_MAP,
 )

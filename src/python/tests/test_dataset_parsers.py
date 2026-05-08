@@ -16,7 +16,9 @@ from pathlib import Path
 
 import pytest
 
-from piper_train.tools.prepare_multilingual_dataset import (
+pytest.importorskip("torch")
+
+from piper_train.tools.prepare_multilingual_dataset import (  # noqa: E402
     load_ja_en_dataset,
     parse_aishell3,
     parse_cml_tts,
