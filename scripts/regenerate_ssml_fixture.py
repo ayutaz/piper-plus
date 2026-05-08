@@ -64,7 +64,9 @@ def _load_python_canonical() -> dict[str, Any]:
     }
 
 
-def _verify_toml_matches_python(contract: dict[str, Any], py: dict[str, Any]) -> list[str]:
+def _verify_toml_matches_python(
+    contract: dict[str, Any], py: dict[str, Any]
+) -> list[str]:
     """Return a list of mismatch messages (empty list = OK)."""
     errors: list[str] = []
 
@@ -76,21 +78,29 @@ def _verify_toml_matches_python(contract: dict[str, Any], py: dict[str, Any]) ->
         )
 
     # default + unknown_strength fallback should match python's "medium"
-    if int(contract["break_strength"]["default_ms"]) != py["BREAK_STRENGTH_MS"]["medium"]:
+    if (
+        int(contract["break_strength"]["default_ms"])
+        != py["BREAK_STRENGTH_MS"]["medium"]
+    ):
         errors.append(
             f"break_strength.default_ms ({contract['break_strength']['default_ms']}) "
             f"!= python medium ({py['BREAK_STRENGTH_MS']['medium']})"
         )
-    if int(contract["break_strength"]["unknown_strength_fallback_ms"]) != py["BREAK_STRENGTH_MS"]["medium"]:
+    if (
+        int(contract["break_strength"]["unknown_strength_fallback_ms"])
+        != py["BREAK_STRENGTH_MS"]["medium"]
+    ):
         errors.append(
-            f"break_strength.unknown_strength_fallback_ms drift vs python medium"
+            "break_strength.unknown_strength_fallback_ms drift vs python medium"
         )
 
     # prosody_rate.named_map
     toml_rate = {k: float(v) for k, v in contract["prosody_rate"]["named_map"].items()}
     py_rate = {k: float(v) for k, v in py["RATE_NAMES"].items()}
     if toml_rate != py_rate:
-        errors.append(f"prosody_rate.named_map drift: toml={toml_rate} python={py_rate}")
+        errors.append(
+            f"prosody_rate.named_map drift: toml={toml_rate} python={py_rate}"
+        )
 
     # detection regex
     if contract["detection"]["regex"] != py["RE_SSML_PATTERN"]:
@@ -148,32 +158,44 @@ def build_fixture() -> dict[str, Any]:
             "unknown_strength_fallback_ms": int(
                 contract["break_strength"]["unknown_strength_fallback_ms"]
             ),
-            "map": {k: int(v) for k, v in sorted(contract["break_strength"]["map"].items())},
+            "map": {
+                k: int(v) for k, v in sorted(contract["break_strength"]["map"].items())
+            },
         },
         "prosody_rate": {
             "default_rate": float(contract["prosody_rate"]["default_rate"]),
-            "case_insensitive_named": bool(contract["prosody_rate"]["case_insensitive_named"]),
+            "case_insensitive_named": bool(
+                contract["prosody_rate"]["case_insensitive_named"]
+            ),
             "named_map": {
                 k: float(v)
                 for k, v in sorted(contract["prosody_rate"]["named_map"].items())
             },
             "parsing": {
-                "percent_formula": str(contract["prosody_rate"]["parsing"]["percent_formula"]),
+                "percent_formula": str(
+                    contract["prosody_rate"]["parsing"]["percent_formula"]
+                ),
                 "percent_min_exclusive": float(
                     contract["prosody_rate"]["parsing"]["percent_min_exclusive"]
                 ),
                 "bare_float_min_exclusive": float(
                     contract["prosody_rate"]["parsing"]["bare_float_min_exclusive"]
                 ),
-                "fallback_rate": float(contract["prosody_rate"]["parsing"]["fallback_rate"]),
+                "fallback_rate": float(
+                    contract["prosody_rate"]["parsing"]["fallback_rate"]
+                ),
             },
         },
         "break_time": {
             "ms_suffix": str(contract["break_time"]["ms_suffix"]),
             "seconds_suffix": str(contract["break_time"]["seconds_suffix"]),
             "bare_number_assumes": str(contract["break_time"]["bare_number_assumes"]),
-            "case_insensitive_suffix": bool(contract["break_time"]["case_insensitive_suffix"]),
-            "unparseable_fallback_ms": int(contract["break_time"]["unparseable_fallback_ms"]),
+            "case_insensitive_suffix": bool(
+                contract["break_time"]["case_insensitive_suffix"]
+            ),
+            "unparseable_fallback_ms": int(
+                contract["break_time"]["unparseable_fallback_ms"]
+            ),
         },
         "detection": {
             "regex": str(contract["detection"]["regex"]),
@@ -189,7 +211,9 @@ def build_fixture() -> dict[str, Any]:
             ),
         },
         "size_limit": {
-            "python_max_ssml_bytes": int(contract["size_limit"]["python_max_ssml_bytes"]),
+            "python_max_ssml_bytes": int(
+                contract["size_limit"]["python_max_ssml_bytes"]
+            ),
             "python_only": bool(contract["size_limit"]["python_only"]),
             "on_exceed": str(contract["size_limit"]["on_exceed"]),
         },

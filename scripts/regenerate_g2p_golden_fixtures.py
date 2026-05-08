@@ -28,8 +28,9 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable
+
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 FIXTURE_DIR = REPO_ROOT / "tests/fixtures/g2p"
@@ -380,9 +381,7 @@ def _build_for_language(language: str) -> dict:
         desc = "Spanish G2P golden phoneme matrix (pins current implementation output)."
     elif language == "pt":
         cases = _build_cases(fn, PT_CASES)
-        desc = (
-            "Brazilian Portuguese G2P golden phoneme matrix (pins current implementation output)."
-        )
+        desc = "Brazilian Portuguese G2P golden phoneme matrix (pins current implementation output)."
     elif language == "fr":
         cases = _build_cases(fn, FR_CASES)
         desc = "French G2P golden phoneme matrix (pins current implementation output)."
