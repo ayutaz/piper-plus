@@ -2,10 +2,16 @@ name: CodeQL
 
 # CodeQL static analysis. Runs on PR / push to dev / weekly schedule.
 # Rust は GitHub CodeQL 未対応のため除外。
-# Swift / Kotlin は段階的導入のため continue-on-error: true で warning のみ。
-# (Swift autobuild は SPM/Xcode のサンドボックス、Kotlin autobuild は Android
-# Gradle の Android SDK セットアップの差で初回失敗の可能性が高いため、
-# 既存 python/cpp/etc を壊さないよう非ブロックで導入し段階的に harden する。)
+# Swift / Kotlin は `build-mode: none` (CodeQL CLI 2.18.4+ の no-build mode)
+# を使用。理由:
+#   - Swift: Package.swift が未公開 release tag (v1.13.0 / v1.14.0) の
+#     binary target を参照するため、`swift build` は dev branch で 404 失敗。
+#     これは tag-time 確定方式 (Package.swift header 参照) の設計。
+#   - Kotlin: AAR build は事前ビルド済み libpiper_plus.so が jniLibs/<abi>/
+#     に staged されている前提で、CodeQL autobuild 環境では存在しない。
+# no-build mode は syntactic 解析のみだが、SAST の主要 query は build
+# artifact 不要で動作するため十分。tag-time の release CI で binary を
+# build する別 job を追加すれば semantic 解析に格上げ可能 (将来課題)。
 
 on:
   pull_request:
@@ -80,10 +86,6 @@ jobs:
     name: Analyze (${{ matrix.language }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
-    # Swift / Kotlin は段階的導入のため、初回失敗時もワークフロー全体を
-    # 落とさない (既存 python/cpp/csharp/go/js の SAST を維持しながら新規
-    # 言語の build environment を harden するため)。harden 完了後に外す。
-    continue-on-error: ${{ matrix.experimental == true }}
     permissions:
       actions: read
       contents: read
@@ -109,15 +111,18 @@ jobs:
             build-mode: manual
           - language: swift
             os: macos-15
-            build-mode: autobuild
-            experimental: true
+            # no-build mode: SPM binary target の release artifact 解決を
+            # 回避 (Package.swift header の tag-time 確定方式設計のため、
+            # dev branch では 404 が正常)。
+            build-mode: none
           - language: kotlin
             # CodeQL の Kotlin 解析は java-kotlin として扱う。matrix の表示名
             # は kotlin だが init 内部で java-kotlin にマップする (下の step
             # で `languages: java-kotlin` を渡す)。
+            # no-build mode: AGP/Gradle の jniLibs/<abi>/libpiper_plus.so
+            # 依存を回避 (CodeQL 環境には事前ビルド済み .so が存在しない)。
             os: ubuntu-24.04
-            build-mode: autobuild
-            experimental: true
+            build-mode: none
 
     steps:
       - name: Skip if no relevant changes
@@ -177,19 +182,6 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y cmake build-essential
 
-      - name: Setup JDK (Kotlin)
-        if: steps.should-skip.outputs.skip != 'true' && matrix.language == 'kotlin'
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: 17
-
-      - name: Setup Android SDK (Kotlin)
-        if: steps.should-skip.outputs.skip != 'true' && matrix.language == 'kotlin'
-        uses: android-actions/setup-android@v3
-        with:
-          cmdline-tools-version: 11076708
-
       - name: Initialize CodeQL
         if: steps.should-skip.outputs.skip != 'true'
         uses: github/codeql-action/init@v3
@@ -204,13 +196,9 @@ jobs:
           # duplicating into per-job conditionals.
           config-file: ./.github/codeql/codeql-config.yml
 
-      - name: Build (autobuild for Go / Swift / Kotlin)
+      - name: Build (autobuild for Go)
         if: steps.should-skip.outputs.skip != 'true' && matrix.build-mode == 'autobuild'
         uses: github/codeql-action/autobuild@v3
-        with:
-          # Kotlin autobuild は android/ ディレクトリを Gradle root として扱う。
-          # Swift autobuild は repo root の Package.swift を検出する。
-          working-directory: ${{ matrix.language == 'kotlin' && 'android' || '.' }}
 
       - name: Manual build (C#)
         if: steps.should-skip.outputs.skip != 'true' && matrix.language == 'csharp'
