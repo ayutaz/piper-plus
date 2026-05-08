@@ -10,6 +10,7 @@ on:
       - 'examples/c-api/**'
       - 'src/python/g2p/piper_plus_g2p/data/zh_en_loanword.json'
       - 'tests/fixtures/g2p/zh_en_loanword_matrix.json'
+      - 'tests/fixtures/phoneme_timing/**'
       - '.github/workflows/cpp-tests.yml'
       - '.github/workflows/_build-test-cpp.yml'
   workflow_dispatch:

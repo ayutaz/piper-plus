@@ -8,6 +8,8 @@ on:
       - 'src/rust/**'
       - 'src/python/g2p/piper_plus_g2p/data/zh_en_loanword.json'
       - 'tests/fixtures/g2p/zh_en_loanword_matrix.json'
+      - 'tests/fixtures/phoneme_timing/**'
+      - 'tests/fixtures/short_text/**'
       - '.github/workflows/rust-tests.yml'
   push:
     branches: [ dev ]
@@ -15,6 +17,8 @@ on:
       - 'src/rust/**'
       - 'src/python/g2p/piper_plus_g2p/data/zh_en_loanword.json'
       - 'tests/fixtures/g2p/zh_en_loanword_matrix.json'
+      - 'tests/fixtures/phoneme_timing/**'
+      - 'tests/fixtures/short_text/**'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
@@ -71,6 +75,12 @@ jobs:
       # also runs the #[cfg(feature = "chinese")] dispatch tests added in
       # multilingual.rs (test_zh_en_dispatch_via_phonemizer_trait etc).
       run: cargo test -p piper-plus-g2p --no-fail-fast
+
+    - name: Run short-text contract tests (onnx feature)
+      # test_short_text_contract.rs imports piper_core::engine which is gated
+      # behind the onnx feature. Run it explicitly so the parity gate is
+      # exercised in CI.
+      run: cargo test -p piper-plus --features onnx --test test_short_text_contract --no-fail-fast
 
     - name: Run CLI tests
       run: cargo test -p piper-plus-cli --no-fail-fast

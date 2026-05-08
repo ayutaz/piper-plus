@@ -5,11 +5,15 @@ on:
     branches: [ dev ]
     paths:
       - 'src/wasm/**'
+      - 'tests/fixtures/phoneme_timing/**'
+      - 'tests/fixtures/short_text/**'
       - '.github/workflows/test-webassembly.yml'
   pull_request:
     branches: [ dev ]
     paths:
       - 'src/wasm/**'
+      - 'tests/fixtures/phoneme_timing/**'
+      - 'tests/fixtures/short_text/**'
       - '.github/workflows/test-webassembly.yml'
 
 env:
@@ -140,7 +144,9 @@ jobs:
           test/js/test-audio-result-timing.js \
           test/js/test-phoneme-timing.js \
           test/js/test-piper-plus-timing.js \
-          test/js/test-short-text-mitigation.js
+          test/js/test-short-text-mitigation.js \
+          test/js/test-phoneme-timing-parity.js \
+          test/js/test-short-text-contract.js
     
     - name: Check file sizes
       working-directory: src/wasm/openjtalk-web
