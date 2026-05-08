@@ -72,8 +72,8 @@ jobs:
       # multilingual.rs (test_zh_en_dispatch_via_phonemizer_trait etc).
       run: cargo test -p piper-plus-g2p --no-fail-fast
 
-    - name: Run CLI check
-      run: cargo check -p piper-plus-cli
+    - name: Run CLI tests
+      run: cargo test -p piper-plus-cli --no-fail-fast
 
   fmt:
     name: rustfmt

@@ -52,6 +52,17 @@ jobs:
           print('All smoke tests passed')
           "
 
+      - name: OpenAI-compatible API tests
+        run: |
+          # Run docker/python-inference/test_openai_api.py inside the built image.
+          # The test uses FastAPI TestClient with a mocked PiperInferenceEngine,
+          # so no ONNX model is required.
+          docker run --rm \
+            -v ${{ github.workspace }}/docker/python-inference/test_openai_api.py:/app/test_openai_api.py \
+            -e PYTHONUNBUFFERED=1 \
+            piper-python-inference:test \
+            bash -c "pip install --user --no-cache-dir pytest httpx && python -m pytest /app/test_openai_api.py -v --tb=short"
+
       - name: WebUI smoke test
         run: |
           docker run --rm piper-python-inference:test python -c "
