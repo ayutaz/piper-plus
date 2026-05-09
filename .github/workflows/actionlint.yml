@@ -1,0 +1,42 @@
+name: actionlint
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/**'
+      - '.github/actions/**'
+  push:
+    branches: [dev, main]
+    paths:
+      - '.github/workflows/**'
+      - '.github/actions/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  actionlint:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Run actionlint
+        # rhysd/actionlint with built-in shellcheck integration
+        # https://github.com/rhysd/actionlint
+        uses: rhysd/actionlint@v1
+        with:
+          shellcheck: '0.10.0'
+          # Don't fail on issues we accept (TBD via actionlint.yaml config)
+          # Workflows are validated for:
+          #   - YAML syntax
+          #   - Action input/output types
+          #   - Shell script (bash/sh/pwsh) via shellcheck
+          #   - Workflow trigger types
+          #   - Job dependencies
+          # Note: docs/spec/* migration drift may cause warnings; we'll
+          # tighten over time via .github/actionlint.yaml.

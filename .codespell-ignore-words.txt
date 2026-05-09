@@ -1,0 +1,72 @@
+# Project-specific terminology / proper nouns:
+piper
+piperplus
+ayutaz
+ayousanz
+voicebox
+tsukuyomi
+moe
+naist
+jdic
+pyopenjtalk
+openjtalk
+kanji
+katakana
+hiragana
+romaji
+mora
+jpreprocess
+sudachi
+sudachipy
+mecab
+
+# Technical terms / acronyms:
+hop
+hops
+fft
+ffts
+istft
+mb-istft
+mbistft
+gan
+hifi-gan
+hifigan
+vits
+mel
+mfcc
+mfccs
+prosody
+phoneme
+phonemes
+phonemizer
+phonemizers
+phonemize
+phonemes
+pinyin
+pinyins
+loanword
+loanwords
+
+# Common false positives:
+nd                      # 2nd, 3rd in ordinals
+te                      # variable name (texture)
+crate                   # Rust
+nin                     # Korean phoneme
+ist                     # iSTFT abbreviation
+ot                      # ordinal abbreviations
+ans                     # answer
+hist                    # history (variable)
+fo                      # F0 (fundamental frequency)
+oder                    # decoder/encoder substring
+
+# Library / tool names:
+fmt                     # fmt library, MISSPELL flag would be wrong
+ndarray
+onnxruntime
+ortdef
+openjtalk
+spdlog
+quickxml
+pypinyin
+g2pen
+g2pk2

@@ -1,0 +1,34 @@
+# hadolint configuration for piper-plus
+# https://github.com/hadolint/hadolint
+
+# Ignored rules (with rationale):
+ignored:
+  - DL3008  # Pin versions in apt-get install
+            # Rationale: piper-plus uses apt-get with `--no-install-recommends`
+            # but versions are not always pinned for libonnxruntime-dev /
+            # libsndfile-dev which we want to track Ubuntu LTS updates.
+  - DL3013  # Pin versions in pip install
+            # Rationale: pip is invoked via uv lock-file which already pins;
+            # individual `pip install` lines may use unpinned for utility tools.
+  - DL3007  # Always tag the version of an image explicitly (latest)
+            # Rationale: not applicable in our Dockerfiles (we use specific tags)
+  - DL3018  # Pin versions in apk add
+            # Rationale: only relevant if alpine-based; our images use debian/ubuntu
+
+trustedRegistries:
+  - docker.io
+  - ghcr.io
+  - quay.io
+  - registry.hub.docker.com
+  - nvcr.io
+  - mcr.microsoft.com
+
+# Failure threshold: error (DL3xxx warnings won't fail, DL3xxx errors will)
+# Use --failure-threshold error to make hadolint exit non-zero only on errors.
+override:
+  error:
+    - DL3000  # absolute WORKDIR
+    - DL3002  # last USER root
+    - DL3025  # JSON arrays form for CMD/ENTRYPOINT
+    - DL4000  # MAINTAINER deprecated
+    - DL4006  # Set the SHELL option -o pipefail before RUN with a pipe

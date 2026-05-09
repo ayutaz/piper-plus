@@ -1,0 +1,62 @@
+name: hadolint
+
+on:
+  pull_request:
+    paths:
+      - 'docker/**/Dockerfile*'
+      - '.hadolint.yaml'
+      - '.github/workflows/hadolint.yml'
+  push:
+    branches: [dev, main]
+    paths:
+      - 'docker/**/Dockerfile*'
+      - '.hadolint.yaml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+  security-events: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  hadolint:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        dockerfile:
+          - docker/cpp-dev/Dockerfile
+          - docker/cpp-inference/Dockerfile
+          - docker/cpp-inference/Dockerfile.test
+          - docker/python-inference/Dockerfile
+          - docker/python-inference/Dockerfile.cpu
+          - docker/python-train/Dockerfile
+          - docker/wyoming/Dockerfile
+          - docker/webui/Dockerfile
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Run hadolint on ${{ matrix.dockerfile }}
+        uses: hadolint/hadolint-action@v3
+        with:
+          dockerfile: ${{ matrix.dockerfile }}
+          config: .hadolint.yaml
+          format: sarif
+          output-file: hadolint-${{ strategy.job-index }}.sarif
+          # Continue with warnings, fail only on errors (override config)
+          failure-threshold: error
+          no-color: false
+          verbose: true
+
+      - name: Upload SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: hadolint-${{ strategy.job-index }}.sarif
+          category: hadolint-${{ strategy.job-index }}
+        continue-on-error: true  # SARIF upload is best-effort

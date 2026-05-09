@@ -1,0 +1,218 @@
+name: sbom
+
+on:
+  pull_request:
+    branches: [dev]
+    paths:
+      - 'src/**'
+      - 'pyproject.toml'
+      - 'Cargo.toml'
+      - 'src/rust/**/Cargo.toml'
+      - 'src/csharp/**/*.csproj'
+      - 'go.mod'
+      - 'src/wasm/**/package.json'
+      - 'android/**/build.gradle.kts'
+      - '.github/workflows/sbom.yml'
+  push:
+    branches: [dev, main]
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+  attestations: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ----------------------------------------------------------------
+  # 1) Repository-level SBOM (all source files, polyglot project)
+  # ----------------------------------------------------------------
+  syft-repo:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Generate SBOM (SPDX JSON)
+        uses: anchore/sbom-action@v0
+        with:
+          path: .
+          format: spdx-json
+          output-file: sbom-repo.spdx.json
+          artifact-name: sbom-repo-spdx
+
+      - name: Generate SBOM (CycloneDX JSON)
+        uses: anchore/sbom-action@v0
+        with:
+          path: .
+          format: cyclonedx-json
+          output-file: sbom-repo.cyclonedx.json
+          artifact-name: sbom-repo-cyclonedx
+
+  # ----------------------------------------------------------------
+  # 2) Python package SBOM (piper-plus runtime + g2p)
+  # ----------------------------------------------------------------
+  cyclonedx-python:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+
+      - name: Install cyclonedx-py
+        run: pip install --no-cache-dir cyclonedx-py
+
+      - name: Generate Python SBOM (runtime)
+        run: |
+          cd src/python_run
+          cyclonedx-py environment -o ../../sbom-python-runtime.cyclonedx.json
+        continue-on-error: true
+
+      - name: Generate Python SBOM (g2p)
+        run: |
+          cd src/python/g2p
+          cyclonedx-py environment -o ../../../sbom-python-g2p.cyclonedx.json
+        continue-on-error: true
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: sbom-python
+          path: |
+            sbom-python-runtime.cyclonedx.json
+            sbom-python-g2p.cyclonedx.json
+          retention-days: 30
+
+  # ----------------------------------------------------------------
+  # 3) Rust workspace SBOM (cargo-cyclonedx)
+  # ----------------------------------------------------------------
+  cyclonedx-rust:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cargo-cyclonedx
+        run: cargo install cargo-cyclonedx --locked
+
+      - name: Generate Rust SBOM
+        working-directory: src/rust
+        run: cargo cyclonedx --format json --override-filename ../../sbom-rust
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: sbom-rust
+          path: sbom-rust*.json
+          retention-days: 30
+
+  # ----------------------------------------------------------------
+  # 4) Go module SBOM (cyclonedx-gomod)
+  # ----------------------------------------------------------------
+  cyclonedx-go:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: src/go/go.mod
+
+      - name: Install cyclonedx-gomod
+        run: go install github.com/CycloneDX/cyclonedx-gomod/cmd/cyclonedx-gomod@latest
+
+      - name: Generate Go SBOM
+        working-directory: src/go
+        run: cyclonedx-gomod app -json -output ../../sbom-go.cyclonedx.json
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: sbom-go
+          path: sbom-go.cyclonedx.json
+          retention-days: 30
+
+  # ----------------------------------------------------------------
+  # 5) C# project SBOM (CycloneDX-DotNet)
+  # ----------------------------------------------------------------
+  cyclonedx-dotnet:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Install CycloneDX.DotNet tool
+        run: dotnet tool install --global CycloneDX
+
+      - name: Generate C# SBOM
+        run: |
+          dotnet CycloneDX src/csharp/PiperPlus.sln \
+            --json --filename sbom-csharp.cyclonedx.json --output .
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: sbom-csharp
+          path: sbom-csharp.cyclonedx.json
+          retention-days: 30
+
+  # ----------------------------------------------------------------
+  # 6) NPM package SBOM (cyclonedx-bom for both g2p + openjtalk-web)
+  # ----------------------------------------------------------------
+  cyclonedx-npm:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+
+      - name: Install @cyclonedx/cyclonedx-npm
+        run: npm install -g @cyclonedx/cyclonedx-npm
+
+      - name: Generate NPM SBOM (g2p)
+        run: |
+          cd src/wasm/g2p
+          cyclonedx-npm --output-file ../../../sbom-npm-g2p.cyclonedx.json
+        continue-on-error: true
+
+      - name: Generate NPM SBOM (openjtalk-web)
+        run: |
+          cd src/wasm/openjtalk-web
+          cyclonedx-npm --output-file ../../../sbom-npm-openjtalk.cyclonedx.json
+        continue-on-error: true
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: sbom-npm
+          path: |
+            sbom-npm-g2p.cyclonedx.json
+            sbom-npm-openjtalk.cyclonedx.json
+          retention-days: 30
+
+  # ----------------------------------------------------------------
+  # 7) Aggregate + attach to release
+  # ----------------------------------------------------------------
+  aggregate:
+    needs: [syft-repo, cyclonedx-python, cyclonedx-rust, cyclonedx-go, cyclonedx-dotnet, cyclonedx-npm]
+    runs-on: ubuntu-24.04
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - uses: actions/download-artifact@v6
+        with:
+          path: ./sbom-artifacts
+
+      - name: Generate provenance attestation
+        uses: actions/attest-build-provenance@v3
+        with:
+          subject-path: ./sbom-artifacts/**/*.json
+
+      - name: Attach to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ./sbom-artifacts/**/*.json
+          fail_on_unmatched_files: false

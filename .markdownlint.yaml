@@ -1,0 +1,41 @@
+# markdownlint configuration for piper-plus
+# https://github.com/DavidAnson/markdownlint
+default: true
+
+# Disabled rules (with rationale):
+MD013: false   # Line length
+              # Rationale: docs include long URLs, code blocks, table cells
+              # that would be ugly to wrap. Editors fold long lines.
+MD024:        # Multiple headers with the same content
+  siblings_only: true
+MD026: false   # Trailing punctuation in header
+              # Rationale: 「概要」「使い方」など日本語ヘッダで:を許容
+MD033:        # Inline HTML
+  allowed_elements:
+    - br
+    - details
+    - summary
+    - kbd
+    - sub
+    - sup
+    - table
+    - tr
+    - td
+    - th
+MD041: false   # First line in file should be a top-level header
+              # Rationale: some files start with frontmatter / license
+
+# Strict rules:
+MD009:        # Trailing whitespace
+  br_spaces: 2
+  list_item_empty_lines: false
+  strict: true
+MD010:        # Hard tabs
+  code_blocks: false
+MD012:        # Multiple blank lines
+  maximum: 2
+MD030:        # Spaces after list markers
+  ul_single: 1
+  ul_multi: 1
+  ol_single: 1
+  ol_multi: 1

@@ -1,0 +1,64 @@
+# Lychee link checker configuration
+# https://github.com/lycheeverse/lychee
+
+# Cache config to avoid re-checking unchanged links
+cache = true
+max_cache_age = "1d"
+
+# What to scan
+include_verbatim = false
+include_mail = false
+
+# Network config
+max_redirects = 5
+max_concurrency = 10
+timeout = 20
+retry_wait_time = 2
+
+# Don't fail on these (transient + private)
+accept = [
+  "200..=204",
+  "206",  # partial content
+  "300..=308",
+  "403",  # private GitHub repos / docs
+  "429"   # rate limited (will retry)
+]
+
+# Excluded patterns (regex)
+exclude = [
+  # Local file references
+  "^file://",
+  "^mailto:",
+  # Private / internal
+  "^https?://localhost",
+  "^https?://127\\.0\\.0\\.1",
+  "^https?://0\\.0\\.0\\.0",
+  # Examples in docs
+  "^https?://example\\.com",
+  "^https?://example\\.org",
+  # Internal references that don't always work in CI
+  "^https?://huggingface\\.co/[a-zA-Z0-9_-]+/.*\\.onnx$",  # gated models
+  # GitHub anchors (often missed by link checker)
+  "^https?://github\\.com/.*#",
+  # Slack invites (private)
+  "^https?://[a-z]+\\.slack\\.com",
+  # Wandb private projects
+  "^https?://wandb\\.ai/private/",
+]
+
+# Files to scan
+include_paths = [
+  "README*.md",
+  "CHANGELOG.md",
+  "CONTRIBUTING.md",
+  "docs/**/*.md",
+]
+
+exclude_path = [
+  "node_modules",
+  ".git",
+  "build",
+  "dist",
+  "target",
+  "test/models",
+]
