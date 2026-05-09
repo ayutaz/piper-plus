@@ -15,6 +15,13 @@ namespace piper {
 void phonemize_portuguese(const std::string &text,
                           std::vector<std::vector<Phoneme>> &phonemes);
 
+// Phonemize European Portuguese (pt-PT) text. Mirror of Python
+// `_apply_eu_postprocessing`. Reuses `phonemize_portuguese` and applies the
+// 5 BR↔EU contrast rewrites in-place. See
+// `docs/spec/pt-dialect-contract.toml` (spec_version 2).
+void phonemize_european_portuguese(const std::string &text,
+                                   std::vector<std::vector<Phoneme>> &phonemes);
+
 } // namespace piper
 
 #endif // PORTUGUESE_PHONEMIZE_HPP
