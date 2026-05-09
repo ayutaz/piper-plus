@@ -104,7 +104,9 @@ def measure_stream(
     )
 
 
-def aggregate(label: str, runs: list[StreamRun], sample_rate: int = 22050) -> StreamAggregate:
+def aggregate(
+    label: str, runs: list[StreamRun], sample_rate: int = 22050
+) -> StreamAggregate:
     ttfbs = sorted(r.ttfb_ms for r in runs)
     totals = sorted(r.total_ms for r in runs)
     audio_samples_median = statistics.median(r.audio_samples for r in runs)
@@ -154,7 +156,7 @@ def main() -> int:
     print(f"[bench] loading voice: {args.model}")
     t0 = time.perf_counter()
     voice = PiperVoice.load(args.model, args.config)
-    print(f"[bench] voice loaded in {(time.perf_counter()-t0)*1000:.1f} ms")
+    print(f"[bench] voice loaded in {(time.perf_counter() - t0) * 1000:.1f} ms")
 
     base_sentences = load_sentences(Path(args.text))
     print(f"[bench] {len(base_sentences)} seed sentences")
@@ -221,10 +223,10 @@ def main() -> int:
         },
         "configs": {
             cfg: {
-                "runs": {str(n): [asdict(r) for r in runs] for n, runs in per_n.items()},
-                "aggregates": [
-                    asdict(aggregate(cfg, runs)) for runs in per_n.values()
-                ],
+                "runs": {
+                    str(n): [asdict(r) for r in runs] for n, runs in per_n.items()
+                },
+                "aggregates": [asdict(aggregate(cfg, runs)) for runs in per_n.values()],
             }
             for cfg, per_n in runs_per_config.items()
         },
@@ -237,9 +239,7 @@ def main() -> int:
 
     # Summary
     print(f"\n=== SUMMARY [{args.cache_mode} cache] (median over repeats) ===")
-    print(
-        f"{'cfg':<8} {'N':>4} {'ttfb_ms':>10} {'total_ms':>10} {'audio_s':>8}"
-    )
+    print(f"{'cfg':<8} {'N':>4} {'ttfb_ms':>10} {'total_ms':>10} {'audio_s':>8}")
     for cfg, per_n in runs_per_config.items():
         for n, runs in per_n.items():
             agg = aggregate(cfg, runs)
@@ -250,8 +250,9 @@ def main() -> int:
 
     # Δ per N
     print("\n=== DELTA serial -> phase2 ===")
-    print(f"{'N':>4} {'ttfb_serial':>12} {'ttfb_phase2':>12} {'TTFB Δ':>8} "
-          f"{'total_Δ':>8}")
+    print(
+        f"{'N':>4} {'ttfb_serial':>12} {'ttfb_phase2':>12} {'TTFB Δ':>8} {'total_Δ':>8}"
+    )
     for n in args.ns:
         ser = aggregate("serial", runs_per_config["serial"][n])
         ph2 = aggregate("phase2", runs_per_config["phase2"][n])

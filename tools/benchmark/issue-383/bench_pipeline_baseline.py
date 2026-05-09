@@ -74,7 +74,11 @@ class AggregatedResult:
 
 
 def load_sentences(text_path: Path) -> list[str]:
-    return [line.strip() for line in text_path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    return [
+        line.strip()
+        for line in text_path.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
 
 
 def build_text(base_sentences: list[str], n: int) -> str:
@@ -165,14 +169,18 @@ def aggregate(results: list[RunResult]) -> AggregatedResult:
     sample_rate = 22050  # piper-plus のデフォルト
     audio_seconds_median = audio_samples_median / sample_rate
     total_seconds_median = statistics.median(totals) / 1000.0
-    rtf = total_seconds_median / audio_seconds_median if audio_seconds_median > 0 else 0.0
+    rtf = (
+        total_seconds_median / audio_seconds_median if audio_seconds_median > 0 else 0.0
+    )
 
     return AggregatedResult(
         n_sentences=results[0].n_sentences,
         repeats=len(results),
         total_ms_median=statistics.median(totals),
         total_ms_mean=statistics.mean(totals),
-        total_ms_p95=totals[int(len(totals) * 0.95)] if len(totals) >= 20 else totals[-1],
+        total_ms_p95=totals[int(len(totals) * 0.95)]
+        if len(totals) >= 20
+        else totals[-1],
         total_ms_min=totals[0],
         total_ms_max=totals[-1],
         g2p_ms_median=statistics.median(g2ps),
@@ -218,7 +226,9 @@ def main() -> int:
     )
     parser.add_argument(
         "--out",
-        default=str(REPO_ROOT / "tools" / "benchmark" / "issue-383" / "baseline_results.json"),
+        default=str(
+            REPO_ROOT / "tools" / "benchmark" / "issue-383" / "baseline_results.json"
+        ),
         help="output JSON path",
     )
     parser.add_argument("--speaker-id", type=int, default=0)
@@ -228,7 +238,7 @@ def main() -> int:
     print(f"[bench] loading voice: {args.model}")
     t0 = time.perf_counter()
     voice = PiperVoice.load(args.model, args.config)
-    print(f"[bench] voice loaded in {(time.perf_counter()-t0)*1000:.1f} ms")
+    print(f"[bench] voice loaded in {(time.perf_counter() - t0) * 1000:.1f} ms")
 
     base_sentences = load_sentences(Path(args.text))
     print(f"[bench] {len(base_sentences)} seed sentences from {args.text}")
@@ -238,7 +248,12 @@ def main() -> int:
     # Voice-level warmup (model first-run is much slower).
     print("[bench] global warmup (3 short runs)...")
     for _ in range(3):
-        run_once(voice, build_text(base_sentences, 2), speaker_id=args.speaker_id, language_id=args.language_id)
+        run_once(
+            voice,
+            build_text(base_sentences, 2),
+            speaker_id=args.speaker_id,
+            language_id=args.language_id,
+        )
 
     modes = ["cold", "warm"] if args.cache_mode == "both" else [args.cache_mode]
     for mode in modes:
@@ -247,21 +262,33 @@ def main() -> int:
         for n in args.ns:
             text = build_text(base_sentences, n)
             char_count = sum(1 for c in text if not c.isspace())
-            print(f"[bench] N={n} (chars={char_count}) - {args.warmups} warmup + {args.repeats} repeats")
+            print(
+                f"[bench] N={n} (chars={char_count}) - {args.warmups} warmup + {args.repeats} repeats"
+            )
             # Per-N warmup (always hot for ORT). For cold mode we still want the
             # cache to be cleared right before each measured repeat below.
             for _ in range(args.warmups):
-                run_once(voice, text, speaker_id=args.speaker_id, language_id=args.language_id)
+                run_once(
+                    voice,
+                    text,
+                    speaker_id=args.speaker_id,
+                    language_id=args.language_id,
+                )
             results: list[RunResult] = []
             for r in range(args.repeats):
                 if mode == "cold":
                     clear_phonemize_cache()
-                res = run_once(voice, text, speaker_id=args.speaker_id, language_id=args.language_id)
+                res = run_once(
+                    voice,
+                    text,
+                    speaker_id=args.speaker_id,
+                    language_id=args.language_id,
+                )
                 res.repeat_idx = r
                 results.append(res)
                 print(
                     f"  rep {r}: total={res.total_ms:7.1f}ms  "
-                    f"g2p={res.g2p_total_ms:6.1f}ms ({res.g2p_total_ms/res.total_ms*100:5.1f}%)  "
+                    f"g2p={res.g2p_total_ms:6.1f}ms ({res.g2p_total_ms / res.total_ms * 100:5.1f}%)  "
                     f"ort={res.ort_total_ms:7.1f}ms  ids={res.ids_total_ms:5.1f}ms  "
                     f"oh={res.overhead_ms:5.1f}ms"
                 )
@@ -283,8 +310,7 @@ def main() -> int:
         "modes": {
             mode: {
                 "runs": {
-                    str(n): [asdict(r) for r in runs]
-                    for n, runs in runs_per_n.items()
+                    str(n): [asdict(r) for r in runs] for n, runs in runs_per_n.items()
                 },
                 "aggregates": [asdict(aggregate(rs)) for rs in runs_per_n.values()],
             }
@@ -311,7 +337,7 @@ def main() -> int:
                 f"{a.g2p_ms_median:>8.1f} "
                 f"{a.ort_ms_median:>8.1f} "
                 f"{a.ids_ms_median:>7.1f} "
-                f"{a.g2p_ratio_median*100:>5.1f}% "
+                f"{a.g2p_ratio_median * 100:>5.1f}% "
                 f"{a.audio_seconds_median:>8.2f} "
                 f"{a.rtf_median:>6.3f}"
             )

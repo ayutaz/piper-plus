@@ -123,6 +123,7 @@ def _map_sentences(
     with ThreadPoolExecutor(max_workers=parallelism) as pool:
         return list(pool.map(fn, sentences))
 
+
 # Optional: use shared ORT utilities when piper_train is available
 try:
     from piper_train.ort_utils import (
