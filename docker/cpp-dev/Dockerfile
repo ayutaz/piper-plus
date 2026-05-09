@@ -1,6 +1,9 @@
 # C++ Development Environment for piper-plus (CPU-only)
 FROM ubuntu:24.04
 
+# Use bash with pipefail for safe pipe handling (hadolint DL4006)
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
 # Set environment variables
 ENV DEBIAN_FRONTEND=noninteractive
 

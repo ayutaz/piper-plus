@@ -61,4 +61,3 @@ jobs:
             --failure-threshold error \
             --no-color \
             ${{ matrix.dockerfile }}
-        continue-on-error: true  # 初回 baseline 確立まで warn-only

@@ -143,9 +143,9 @@ ignore_errors = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-# g2p は本来 coverage 80% を目指すが、Wave 1 で 80% を強制すると
-# 現状の 66.5% で CI が fail する。一時的に 60% に下げ、Wave 後段で
-# テスト追加して 80% に戻す。
+# g2p package は coverage 80% を維持する。
+# 補足テスト (test_coverage_supplemental.py) と omit 拡張で実測 ~85% を確保し、
+# 80% 閾値に対して margin を持たせている。
 addopts = [
     "--strict-markers",
     "--tb=short",
@@ -153,7 +153,7 @@ addopts = [
     "--cov=piper_plus_g2p",
     "--cov-report=term-missing",
     "--cov-report=xml",
-    "--cov-fail-under=60",
+    "--cov-fail-under=80",
 ]
 # pytest-asyncio: 将来の async G2P API を preempt
 asyncio_mode = "auto"
@@ -165,13 +165,18 @@ asyncio_mode = "auto"
 branch = true
 source = ["piper_plus_g2p"]
 omit = [
+    # Test files (never measured)
     "*/tests/*",
     "*/test_*.py",
-    "*/__main__.py",
+    # CLI entry-point — argparse plumbing, hard to unit-test
+    "*/piper_plus_g2p/__main__.py",
+    # Bundled data Python helpers (if any) — pure JSON/data, no logic to cover
+    "*/piper_plus_g2p/data/*.py",
 ]
 
 [tool.coverage.report]
-fail_under = 60   # Wave 1 で 80% を目標としていたが現状 66.5%、Wave 後段で 80% 復帰予定
+fail_under = 80
+# 実測 coverage は ~85% で 80% 閾値に対して 5pt の margin がある。
 show_missing = true
 skip_covered = false
 precision = 2
