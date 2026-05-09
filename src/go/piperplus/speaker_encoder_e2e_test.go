@@ -42,7 +42,7 @@ type e2eGate struct {
 	EncoderONNX       e2eEncoderRef        `json:"encoder_onnx"`
 	ReferenceWav      e2eReferenceWav      `json:"reference_wav"`
 	ExpectedEmbedding e2eExpectedEmbedding `json:"expected_embedding"`
-	CosineThreshold  float32 `json:"cosine_threshold"`
+	CosineThreshold   float32              `json:"cosine_threshold"`
 }
 
 type e2eFixture struct {

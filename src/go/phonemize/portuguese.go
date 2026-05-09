@@ -547,7 +547,7 @@ func euTokFirstRune(s string) rune {
 	return 0
 }
 
-func euStartsCons(s string) bool { return euConsonantChars[euTokFirstRune(s)] }
+func euStartsCons(s string) bool  { return euConsonantChars[euTokFirstRune(s)] }
 func euStartsVowel(s string) bool { return euVowelChars[euTokFirstRune(s)] }
 
 func euNextNonSpaceVowel(toks []string, i int) bool {

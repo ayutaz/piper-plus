@@ -1113,8 +1113,8 @@ const IPA_VOWEL_CHARS: &[char] = &[
     'a', 'e', 'i', 'o', 'u', 'ɛ', 'ɔ', 'ã', 'ẽ', 'ĩ', 'õ', 'ũ', 'ɨ',
 ];
 const IPA_CONSONANT_CHARS: &[char] = &[
-    'b', 'd', 'f', 'k', 'l', 'm', 'n', 'p', 'r', 's', 't', 'v', 'w', 'z',
-    'ɡ', 'ɲ', 'ɾ', 'ʁ', 'ʃ', 'ʎ', 'ʒ', 'ʔ', 'h', 'ɫ',
+    'b', 'd', 'f', 'k', 'l', 'm', 'n', 'p', 'r', 's', 't', 'v', 'w', 'z', 'ɡ', 'ɲ', 'ɾ', 'ʁ', 'ʃ',
+    'ʎ', 'ʒ', 'ʔ', 'h', 'ɫ',
 ];
 
 fn token_starts_with_consonant(token: &str) -> bool {
@@ -1147,7 +1147,9 @@ fn next_non_space_starts_with_vowel(tokens: &[String], idx: usize) -> bool {
 
 fn apply_eu_postprocessing(tokens: &mut [String]) {
     let n = tokens.len();
-    let punct: &[&str] = &[",", ".", ";", ":", "!", "?", "\u{2014}", "\u{2013}", "\u{2026}"];
+    let punct: &[&str] = &[
+        ",", ".", ";", ":", "!", "?", "\u{2014}", "\u{2013}", "\u{2026}",
+    ];
 
     // Pass 1: undo BR t/d palatalisation + final -e centralisation.
     // BR pattern: ... [tʃ/dʒ] [i] [end / space / punct]
@@ -1156,7 +1158,11 @@ fn apply_eu_postprocessing(tokens: &mut [String]) {
         if tokens[i] != "i" {
             continue;
         }
-        let next = if i + 1 < n { tokens[i + 1].as_str() } else { "" };
+        let next = if i + 1 < n {
+            tokens[i + 1].as_str()
+        } else {
+            ""
+        };
         let is_final = next.is_empty() || next == " " || punct.contains(&next);
         if !is_final {
             continue;
@@ -1183,7 +1189,11 @@ fn apply_eu_postprocessing(tokens: &mut [String]) {
         if tokens[i] != "s" && tokens[i] != "z" {
             continue;
         }
-        let next = if i + 1 < n { tokens[i + 1].as_str() } else { "" };
+        let next = if i + 1 < n {
+            tokens[i + 1].as_str()
+        } else {
+            ""
+        };
         let is_word_end = next.is_empty() || next == " " || punct.contains(&next);
         if is_word_end {
             // Sandhi voicing before vowel-initial next word
@@ -1208,7 +1218,11 @@ fn apply_eu_postprocessing(tokens: &mut [String]) {
         if !token_starts_with_vowel(&tokens[i - 1]) {
             continue;
         }
-        let next = if i + 1 < n { tokens[i + 1].as_str() } else { "" };
+        let next = if i + 1 < n {
+            tokens[i + 1].as_str()
+        } else {
+            ""
+        };
         let is_coda = next.is_empty()
             || next == " "
             || punct.contains(&next)

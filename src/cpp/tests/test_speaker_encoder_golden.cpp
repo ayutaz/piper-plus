@@ -240,14 +240,19 @@ std::string extract_value_after(const std::string& text, const std::string& key)
     while (pos < text.size() && std::isspace(static_cast<unsigned char>(text[pos]))) ++pos;
     if (pos >= text.size()) return {};
 
-    if (text[pos] == '[') {
-        // Match brackets.
+    if (text[pos] == '[' || text[pos] == '{') {
+        // Match brackets/braces (only the outer pair). The fixture nests
+        // dicts (e.g. "hann_window": { "first_5": [...] }) so callers that
+        // re-parse the body must see a dict body, not the truncated
+        // up-to-first-`,` slice.
+        const char open = text[pos];
+        const char close = (open == '[') ? ']' : '}';
         std::size_t depth = 1;
         std::size_t start = pos + 1;
         std::size_t end = start;
         while (end < text.size() && depth > 0) {
-            if (text[end] == '[') ++depth;
-            else if (text[end] == ']') --depth;
+            if (text[end] == open) ++depth;
+            else if (text[end] == close) --depth;
             if (depth > 0) ++end;
         }
         return text.substr(start, end - start);

@@ -79,10 +79,7 @@ fn fixture_path() -> PathBuf {
 
 fn repo_root() -> PathBuf {
     let crate_root = env!("CARGO_MANIFEST_DIR");
-    PathBuf::from(crate_root)
-        .join("..")
-        .join("..")
-        .join("..")
+    PathBuf::from(crate_root).join("..").join("..").join("..")
 }
 
 fn sha256_file(path: &Path) -> std::io::Result<String> {
