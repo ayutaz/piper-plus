@@ -102,8 +102,12 @@ jobs:
         run: cargo install cargo-cyclonedx --locked
 
       - name: Generate Rust SBOM
+        # cargo-cyclonedx の --override-filename は filename のみ受け取り
+        # path separator を含めると "Invalid filename" error。
+        # workspace root で実行 → 各 crate root に bom.json が作成される。
+        # upload-artifact 側で `**/bom.json` を pickup する。
         working-directory: src/rust
-        run: cargo cyclonedx --format json --override-filename ../../sbom-rust
+        run: cargo cyclonedx --format json
 
       - uses: actions/upload-artifact@v7
         with:
@@ -126,8 +130,12 @@ jobs:
         run: go install github.com/CycloneDX/cyclonedx-gomod/cmd/cyclonedx-gomod@latest
 
       - name: Generate Go SBOM
+        # `app` mode は main package が ./ 直下にある前提だが、piper-plus は
+        # src/go/cmd/piper-plus/ 配下に main があり src/go 直下には Go file
+        # が無い ('no Go files in /home/runner/.../src/go' エラー)。
+        # `mod` mode で go.mod 全体の dependency tree を SBOM 化する。
         working-directory: src/go
-        run: cyclonedx-gomod app -json -output ../../sbom-go.cyclonedx.json
+        run: cyclonedx-gomod mod -json -output ../../sbom-go.cyclonedx.json
 
       - uses: actions/upload-artifact@v7
         with:

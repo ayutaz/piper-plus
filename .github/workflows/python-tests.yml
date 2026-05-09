@@ -193,8 +193,10 @@ jobs:
       if: runner.os != 'Windows'
       run: |
         cd docker/wyoming
+        # `--no-cov` で coverage 計測を無効化 (root pyproject の
+        # --cov-fail-under=70 が継承されると Wyoming は 0% で fail する)
         PYTHONPATH="${GITHUB_WORKSPACE}/src/python:${PYTHONPATH:-}" \
-          python -m pytest test_integration.py -v --tb=short
+          python -m pytest test_integration.py -v --tb=short --no-cov
       env:
         PYTHONUTF8: '1'
 
