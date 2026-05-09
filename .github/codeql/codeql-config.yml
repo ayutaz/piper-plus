@@ -84,3 +84,9 @@ query-filters:
   # MeCab (open_jtalk_external) under build/o/src/openjtalk_external/...
   - exclude:
       id: cpp/inconsistent-null-check
+  # fmt/chrono.h: `gmtime_r` 等の dangerous-function suppression。
+  # bundled fmt 経由で再 include される third-party header の判定で、
+  # 我々のコードでは該当 API を直接使っていない (使う場合は code review で
+  # 補足検討)。
+  - exclude:
+      id: cpp/potentially-dangerous-function
