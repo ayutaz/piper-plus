@@ -1,0 +1,299 @@
+# ONNX Runtime Execution Provider Contract
+# ==========================================
+# This file pins the canonical execution provider (EP) matrix that every
+# piper-plus runtime MUST honour. It is the cross-runtime companion to
+# ort-session-contract.toml: while ort-session-contract.toml defines
+# session-level knobs (graph_optimization_level, threads, warmup), this
+# file defines which providers are supported, on what platforms, with what
+# numerical-equivalence guarantees vs. CPU.
+#
+# The two files are read together. When [session] settings from
+# ort-session-contract.toml conflict with provider-side defaults (e.g.
+# CUDA EP ignores enable_memory_pattern), the [providers.<name>.notes]
+# field below is the canonical statement of truth.
+#
+# This file serves as a design-time cross-language contract. Implementations
+# and tests are expected to be kept in sync with these values manually unless
+# and until automated contract-verification tests are added.
+#
+# Implementations:
+#   Rust:   src/rust/piper-core/src/engine.rs
+#   C#:     src/csharp/PiperPlus.Core/Inference/SessionFactory.cs
+#   C++:    src/cpp/piper.cpp
+#   Python: src/python/piper_train/ort_utils.py, src/python_run/piper/voice.py
+#   Go:     src/go/piperplus/engine.go
+#   WASM:   src/wasm/openjtalk-web/src/index.js  (CPU only via ort-web)
+
+[meta]
+spec_version = "1.0"
+last_updated = "2026-05-09"
+applies_to = ["python", "rust", "csharp", "cpp", "go", "wasm-js"]
+companion_contract = "docs/spec/ort-session-contract.toml"
+
+# ============================================================================
+# Supported provider matrix
+# ============================================================================
+# Each entry pins one execution provider. The `platforms` field uses the
+# canonical OS/arch labels:
+#   - linux-x86_64, linux-arm64
+#   - windows-x86_64, windows-arm64
+#   - macos-x86_64, macos-arm64
+#   - ios-arm64, ios-simulator-arm64, ios-simulator-x86_64
+#   - android-arm64-v8a, android-armeabi-v7a, android-x86_64
+#   - browser-wasm
+#
+# `default` indicates the provider is auto-selected when no explicit
+# choice is made. There is exactly one default per platform; the loader
+# falls back to CPU if that default fails to register.
+
+# ---------------------------------------------------------------------------
+# CPUExecutionProvider — universal fallback
+# ---------------------------------------------------------------------------
+[[providers]]
+name = "CPUExecutionProvider"
+short_name = "cpu"
+platforms = [
+    "linux-x86_64", "linux-arm64",
+    "windows-x86_64", "windows-arm64",
+    "macos-x86_64", "macos-arm64",
+    "ios-arm64", "ios-simulator-arm64", "ios-simulator-x86_64",
+    "android-arm64-v8a", "android-armeabi-v7a", "android-x86_64",
+    "browser-wasm",
+]
+default_on = "all platforms (final fallback)"
+deterministic = true
+fp16_support = "weights only (computed in fp32)"
+notes = """
+The CPU EP is the reference implementation for numerical comparisons —
+every other provider is measured against CPU output. The CPU EP honours
+all session-level settings from ort-session-contract.toml verbatim.
+"""
+
+# ---------------------------------------------------------------------------
+# CUDAExecutionProvider — NVIDIA GPU (Linux / Windows)
+# ---------------------------------------------------------------------------
+[[providers]]
+name = "CUDAExecutionProvider"
+short_name = "cuda"
+platforms = ["linux-x86_64", "windows-x86_64"]
+required_runtime = "CUDA 12.x + cuDNN 9.x"
+default_on = "none"  # opt-in via CLI / config
+deterministic = "best-effort"
+fp16_support = "native (model can be FP16 at weights and compute)"
+notes = """
+cuDNN convolution autotuning may pick different kernels across runs even
+with identical seeds, producing tiny output drift. The CUDA EP does not
+honour `enable_memory_pattern` (CUDA uses its own allocator). Per-device
+selection uses cuda{device_id} format from ort-session-contract.toml's
+[cache] table for cache labelling.
+"""
+
+# ---------------------------------------------------------------------------
+# CoreMLExecutionProvider — Apple Silicon / iOS
+# ---------------------------------------------------------------------------
+[[providers]]
+name = "CoreMLExecutionProvider"
+short_name = "coreml"
+platforms = ["macos-arm64", "ios-arm64"]
+default_on = "ios-arm64"
+deterministic = "best-effort"
+fp16_support = "native (Apple Neural Engine FP16 path is the fast path)"
+notes = """
+CoreML EP transparently quantises some operators to FP16 for ANE
+execution. This produces noticeably larger drift vs. CPU than CUDA does
+(the FP16 path is the dominant compute path, not just storage). Use the
+[output_equivalence.cpu_vs_coreml] tolerance below — NOT the CUDA
+tolerance — when validating CoreML output.
+"""
+
+# ---------------------------------------------------------------------------
+# DirectMLExecutionProvider — Windows (any DX12 GPU)
+# ---------------------------------------------------------------------------
+[[providers]]
+name = "DirectMLExecutionProvider"
+short_name = "dml"
+platforms = ["windows-x86_64", "windows-arm64"]
+default_on = "none"  # opt-in via CLI / config
+deterministic = "best-effort"
+fp16_support = "yes (selected via session option)"
+notes = """
+DirectML routes through the user's installed DX12 GPU (NVIDIA / AMD /
+Intel). Numerical drift vs. CPU is small at FP32 but noticeable at FP16;
+treat FP16 the same as the CoreML FP16 path for tolerance purposes.
+"""
+
+# ---------------------------------------------------------------------------
+# TensorrtExecutionProvider — NVIDIA TensorRT (optional)
+# ---------------------------------------------------------------------------
+[[providers]]
+name = "TensorrtExecutionProvider"
+short_name = "tensorrt"
+platforms = ["linux-x86_64", "windows-x86_64"]
+required_runtime = "TensorRT 10.x"
+default_on = "none"  # opt-in only
+deterministic = "best-effort"
+fp16_support = "native (TRT FP16 / INT8 quantisation paths)"
+notes = """
+TensorRT is supported as an opt-in provider for power users; first-run
+engine compilation is expensive (minutes) and is cached separately from
+the ORT .opt.onnx cache (see ort-session-contract.toml). TRT may reject
+ops that other providers accept — fall back to CUDA on registration
+failure.
+"""
+
+# ============================================================================
+# Provider selection priority (auto-detect)
+# ============================================================================
+# When no explicit provider is requested, the loader consults this priority
+# list and picks the first registrable provider for the current platform.
+# Listed in highest -> lowest priority. The list is identical across all
+# runtimes; deviations are bugs.
+
+[selection.auto_detect_priority]
+linux-x86_64    = ["CUDAExecutionProvider", "CPUExecutionProvider"]
+linux-arm64     = ["CPUExecutionProvider"]
+windows-x86_64  = ["CUDAExecutionProvider", "DirectMLExecutionProvider", "CPUExecutionProvider"]
+windows-arm64   = ["DirectMLExecutionProvider", "CPUExecutionProvider"]
+macos-x86_64    = ["CPUExecutionProvider"]                                # CoreML on Intel Macs is unreliable
+macos-arm64     = ["CoreMLExecutionProvider", "CPUExecutionProvider"]
+ios-arm64       = ["CoreMLExecutionProvider", "CPUExecutionProvider"]
+android         = ["CPUExecutionProvider"]                                 # NNAPI not yet integrated
+browser-wasm    = ["CPUExecutionProvider"]                                 # ort-web only
+
+[selection.cli_override]
+flag = "--provider <short_name>"
+fallback_on_register_failure = "CPUExecutionProvider"
+log_level_on_fallback = "warning"
+
+# ============================================================================
+# Output equivalence target
+# ============================================================================
+# Numerical-equivalence target between providers, measured on the warmup
+# phoneme sequence (see ort-session-contract.toml [warmup]) using the
+# same scales = [0.667, 1.0, 0.8]. The metric is RMS difference of the
+# audio output tensor.
+
+[output_equivalence.cpu_vs_cuda]
+metric = "max RMS diff (audio output, FP32 model)"
+threshold = 1e-3
+note = "FP16 CUDA is allowed cpu_vs_coreml's tolerance instead."
+
+[output_equivalence.cpu_vs_coreml]
+metric = "max RMS diff (audio output)"
+threshold = 5e-3
+note = """
+Higher tolerance reflects the dominant FP16 path on Apple Neural Engine.
+Falling outside this bound is a model-side regression (e.g. attention
+overflow), not a CoreML EP bug.
+"""
+
+[output_equivalence.cpu_vs_dml]
+metric = "max RMS diff (audio output, FP32 model)"
+threshold = 1e-3
+fp16_threshold = 5e-3
+note = "FP32 path matches CUDA tolerance; FP16 path matches CoreML tolerance."
+
+[output_equivalence.cpu_vs_tensorrt]
+metric = "max RMS diff (audio output, FP32 model)"
+threshold = 1e-3
+fp16_threshold = 5e-3
+int8_threshold = 2e-2
+note = "INT8 is opt-in and requires per-model calibration; threshold above is informational."
+
+# ============================================================================
+# Numerical determinism
+# ============================================================================
+# Determinism guarantees per provider. CPU is the only provider with full
+# seed-controlled determinism. All others are best-effort: identical inputs
+# produce visually identical audio but may differ at the sub-LSB level.
+
+[determinism]
+
+[determinism.cpu]
+guarantee = "deterministic"
+how = "seed-controlled (numpy RNG / torch RNG / VITS internal stochastic flag)"
+
+[determinism.cuda]
+guarantee = "best-effort"
+sources_of_drift = [
+    "cuDNN convolution autotuner picks per-run kernels",
+    "atomic-add reductions in attention layers (rare for piper VITS)",
+]
+mitigation = "set CUDA_LAUNCH_BLOCKING=1 + cudnn_conv_algo_search=DEFAULT (slows by ~20%)"
+
+[determinism.coreml]
+guarantee = "best-effort"
+sources_of_drift = [
+    "FP16 quantisation of attention weights",
+    "per-device ANE vs. GPU dispatch can differ across iOS releases",
+]
+
+[determinism.dml]
+guarantee = "best-effort"
+sources_of_drift = ["DX12 driver-side scheduling (NVIDIA / AMD / Intel)"]
+
+[determinism.tensorrt]
+guarantee = "best-effort"
+sources_of_drift = ["TRT engine builder picks per-build tactics", "FP16/INT8 quantisation"]
+
+# ============================================================================
+# E2E provider parity verification
+# ============================================================================
+# Opt-in test that compares each available provider's output against CPU on
+# a fixed phoneme sequence. Disabled by default because some providers
+# (CUDA / CoreML) require host-specific runtime libs.
+
+[parity_test]
+opt_in_env = "PIPER_ORT_PROVIDER_PARITY"
+opt_in_values = ["1", "true", "yes"]
+test_phoneme_length = 100
+test_scales = [0.667, 1.0, 0.8]
+test_speaker_id = 0
+test_language_id = 0
+
+# Each available provider is run, and the audio output is compared to the
+# CPU reference using the threshold from [output_equivalence.<pair>].
+verdicts = ["pass", "warn-soft-fail", "fail"]
+soft_fail_threshold_multiplier = 2.0    # 2x the threshold => warn but not fail
+hard_fail_threshold_multiplier = 10.0   # 10x the threshold => fail
+
+# ============================================================================
+# Session option compatibility
+# ============================================================================
+# Cross-reference: which session options from ort-session-contract.toml are
+# honoured by which provider. "✓" = honoured, "ignored" = silently dropped,
+# "override" = provider replaces with its own value.
+#
+#                                    CPU      CUDA     CoreML    DML      TRT
+# graph_optimization_level=ALL       ✓        ✓        ignored   ✓        override
+# execution_mode (SEQ/PARALLEL)      ✓        ignored  ignored   ignored  ignored
+# intra_op_num_threads               ✓        ignored  ignored   ignored  ignored
+# inter_op_num_threads               ✓        ignored  ignored   ignored  ignored
+# enable_cpu_mem_arena               ✓        ignored  ignored   ignored  ignored
+# enable_memory_pattern              ✓        ignored  ignored   ignored  ignored
+# dynamic_block_base                 ✓        ignored  ignored   ignored  ignored
+
+[session_option_compat.notes]
+sequential_for_streaming = """
+Streaming synthesis (see streaming-api-contract.toml) requires
+execution_mode=SEQUENTIAL on CPU to keep per-sentence inference latency
+predictable. Setting PARALLEL on CPU is allowed but reduces stream
+smoothness. Other providers ignore the setting entirely.
+"""
+
+# ============================================================================
+# Implementation status
+# ============================================================================
+
+[implementation_status]
+# Which runtimes can register each provider. ✓ = fully supported, CLI = via
+# CLI flag, build = behind a build flag, - = not supported in that runtime.
+#
+#                            Python   Rust    C#      C++     Go      WASM
+# CPUExecutionProvider       ✓        ✓       ✓       ✓       ✓       ✓
+# CUDAExecutionProvider      ✓        build   build   build   build   -
+# CoreMLExecutionProvider    ✓        build   build   build   build   -
+# DirectMLExecutionProvider  ✓        -       build   build   -       -
+# TensorrtExecutionProvider  ✓        -       -       build   -       -
+# Auto-detect priority       ✓        ✓       ✓       ✓       ✓       N/A
+# E2E parity test            ✓        -       -       -       -       -
