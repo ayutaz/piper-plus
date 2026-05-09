@@ -92,6 +92,45 @@ func TestResolve_EnvZeroForce1(t *testing.T) {
 	}
 }
 
+// TestResolve_EnvWhitespaceTrimmed pins the contract that env values with
+// surrounding whitespace (e.g. trailing newline from a shell rc) parse the
+// same as the unpadded value. Mirrors Python (.strip()) and Rust (.trim())
+// — Issue #383 follow-up review (PR #403 Copilot comment).
+func TestResolve_EnvWhitespaceTrimmed(t *testing.T) {
+	cases := []struct {
+		env  string
+		want int
+		desc string
+	}{
+		{"  4", 4, "leading spaces"},
+		{"4  ", 4, "trailing spaces"},
+		{"  4  ", 4, "both sides"},
+		{"\t4", 4, "leading tab"},
+		{"4\n", 4, "trailing newline"},
+		{"\t  1  \t", 1, "tabs and spaces around 1 still forces serial"},
+	}
+	for _, c := range cases {
+		t.Run(c.desc, func(t *testing.T) {
+			t.Setenv(EnvVarName, c.env)
+			if got := Resolve(20); got != c.want {
+				t.Errorf("Resolve(20) with env=%q = %d, want %d (whitespace must be trimmed)",
+					c.env, got, c.want)
+			}
+		})
+	}
+}
+
+// TestResolve_EnvWhitespaceOnlyFallsBackToAuto pins that an env value
+// containing only whitespace is treated like "unset" (auto path), not as
+// an invalid value that warns and then falls back. Trim must happen before
+// the empty check.
+func TestResolve_EnvWhitespaceOnlyFallsBackToAuto(t *testing.T) {
+	t.Setenv(EnvVarName, "   \t  ")
+	if got := Resolve(8); got < 2 {
+		t.Errorf("Resolve(8) with whitespace-only env = %d, want >= 2 (auto path)", got)
+	}
+}
+
 // ---------------------------------------------------------------------------
 // Map
 // ---------------------------------------------------------------------------

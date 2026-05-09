@@ -602,8 +602,6 @@ class PiperVoice:
         parallelism = _resolve_g2p_parallelism(len(sentences))
         return _map_sentences(fn, sentences, parallelism)
 
-        raise ValueError(f"Unsupported phoneme type: {self.config.phoneme_type}")
-
     def phonemes_to_ids(self, phonemes: list[str]) -> list[int]:
         """Phonemes to ids."""
         id_map = self.config.phoneme_id_map
@@ -738,6 +736,7 @@ class PiperVoice:
             )
             return
 
+        from collections import deque
         from concurrent.futures import ThreadPoolExecutor
 
         # try/finally with explicit shutdown(wait=False, cancel_futures=True)
@@ -749,11 +748,37 @@ class PiperVoice:
         # ``break``.
         pool = ThreadPoolExecutor(max_workers=parallelism)
         try:
-            futures = [pool.submit(phonemize_one, s) for s in sentences]
+            # Bounded pipeline: keep at most ``2 * parallelism`` G2P futures
+            # in flight at any time. ``parallelism`` of them are actively
+            # running on the pool's worker threads; the remaining
+            # ``parallelism`` are queued and act as a small prefetch buffer
+            # so an ORT inference does not stall waiting for the next G2P.
+            # This bounds memory/queue growth at O(parallelism) rather than
+            # O(n_sentences) — important for very long inputs (books, etc.)
+            # while keeping the G2P/ORT overlap that motivates this path.
+            max_in_flight = 2 * parallelism
+            sentence_iter = iter(sentences)
+            in_flight: deque = deque()
+            for _ in range(max_in_flight):
+                try:
+                    s = next(sentence_iter)
+                except StopIteration:
+                    break
+                in_flight.append(pool.submit(phonemize_one, s))
 
             def _phoneme_iter() -> Iterable[list[str]]:
-                for future in futures:
-                    yield future.result()
+                while in_flight:
+                    future = in_flight.popleft()
+                    phonemes = future.result()
+                    # Top up the pipeline as soon as a slot frees up so the
+                    # worker pool stays busy while the consumer drains.
+                    try:
+                        nxt = next(sentence_iter)
+                    except StopIteration:
+                        pass
+                    else:
+                        in_flight.append(pool.submit(phonemize_one, nxt))
+                    yield phonemes
 
             yield from self._stream_phonemes_to_audio(
                 _phoneme_iter(),

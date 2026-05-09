@@ -14,6 +14,7 @@ import (
 	"os"
 	"runtime"
 	"strconv"
+	"strings"
 	"sync"
 )
 
@@ -37,7 +38,11 @@ const EnvVarName = "PIPER_G2P_PARALLELISM"
 //     AutoParallelismCap)
 //   - nSentences ≤ 1              → 1
 func Resolve(nSentences int) int {
-	if raw := os.Getenv(EnvVarName); raw != "" {
+	// Trim surrounding whitespace so values like "  4" (or values pulled
+	// from a shell rc that left a trailing newline) parse cleanly. Mirrors
+	// Python (.strip()) and Rust (.trim()) so the contract stays uniform
+	// across runtimes.
+	if raw := strings.TrimSpace(os.Getenv(EnvVarName)); raw != "" {
 		n, err := strconv.Atoi(raw)
 		if err != nil {
 			slog.Warn("ignoring invalid PIPER_G2P_PARALLELISM; falling back to auto",

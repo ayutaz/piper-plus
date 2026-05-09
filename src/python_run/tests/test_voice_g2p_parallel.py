@@ -193,6 +193,86 @@ def test_synthesize_stream_raw_early_break_cancels_queued_g2p(monkeypatch):
     )
 
 
+def test_synthesize_stream_raw_bounded_pipeline_caps_in_flight(monkeypatch):
+    """Pipelined G2P must keep in-flight futures at O(parallelism), not O(n).
+
+    Issue #383 follow-up review (PR #403): an unbounded
+    ``[pool.submit(fn, s) for s in sentences]`` would let a 1000-sentence
+    book input queue 1000 G2P futures before yielding the first audio
+    chunk, scaling memory/queue with sentence count. The bounded
+    implementation keeps in-flight at ``2 * parallelism`` (active +
+    prefetch) while still overlapping G2P with ORT inference.
+    """
+    import threading
+    from unittest.mock import MagicMock
+
+    from piper.config import PhonemeType, PiperConfig
+    from piper.voice import PiperVoice
+
+    config = PiperConfig(
+        num_symbols=100,
+        num_speakers=1,
+        sample_rate=22050,
+        length_scale=1.0,
+        noise_scale=0.667,
+        noise_w=0.8,
+        phoneme_id_map={"_": [0], "^": [1], "$": [2], "a": [10]},
+        phoneme_type=PhonemeType.MULTILINGUAL,
+    )
+
+    voice = MagicMock(spec=PiperVoice)
+    voice.config = config
+    voice.session = MagicMock()
+
+    n_sentences = 100
+    parallelism = 4
+    sentences = [f"sentence_{i}." for i in range(n_sentences)]
+    voice._split_sentences = MagicMock(return_value=sentences)
+
+    submit_count = 0
+    counter_lock = threading.Lock()
+
+    def counted_phonemize(sentence: str) -> list[str]:
+        nonlocal submit_count
+        with counter_lock:
+            submit_count += 1
+        return ["a"]
+
+    voice._phonemize_one_factory = MagicMock(return_value=counted_phonemize)
+    voice.phonemes_to_ids = MagicMock(return_value=[1, 10, 2])
+
+    yielded = 0
+    max_in_flight = 0
+
+    def tracking_stream(phonemes_iter, break_b, silence_b, **kw):
+        nonlocal yielded, max_in_flight
+        for phonemes in phonemes_iter:
+            with counter_lock:
+                in_flight = submit_count - yielded
+                if in_flight > max_in_flight:
+                    max_in_flight = in_flight
+            yielded += 1
+            yield break_b + b"AUDIO" + break_b + silence_b
+
+    voice._stream_phonemes_to_audio = tracking_stream
+
+    monkeypatch.setenv("PIPER_G2P_PARALLELISM", str(parallelism))
+
+    chunks = list(PiperVoice.synthesize_stream_raw(voice, "x" * 500))
+
+    assert len(chunks) == n_sentences, "every sentence must produce a chunk"
+    assert submit_count == n_sentences, "every sentence must be phonemized"
+    # Allow one extra parallelism worth of slack for benign races (a
+    # worker may finish and the producer may submit before the consumer
+    # observes), but in-flight must be O(parallelism), not O(n_sentences).
+    upper_bound = 3 * parallelism
+    assert max_in_flight <= upper_bound, (
+        f"bounded pipeline broken: observed {max_in_flight} in-flight "
+        f"futures with parallelism={parallelism}, n_sentences={n_sentences}; "
+        f"expected <= {upper_bound}"
+    )
+
+
 # ---------------------------------------------------------------------------
 # Integration: PiperVoice.phonemize() — serial vs parallel result must match.
 # Skipped if the test model / pyopenjtalk-plus are not available.

@@ -81,7 +81,16 @@ where
     }
 
     let n = items.len();
-    let chunk_size = n.div_ceil(parallelism);
+    // Clamp the worker count to the number of items so that callers passing
+    // in a parallelism larger than `items.len()` (e.g. via direct API use,
+    // not through `resolve_g2p_parallelism`) do not spawn one thread per
+    // item. With `chunk_size = n.div_ceil(parallelism)` an unclamped
+    // `parallelism > n` collapses to `chunk_size = 1` and silently
+    // oversubscribes the system. Resolving via `resolve_g2p_parallelism`
+    // already caps at `n_sentences`, but keep this defence-in-depth so the
+    // helper is correct under any reasonable input.
+    let workers = parallelism.min(n).max(1);
+    let chunk_size = n.div_ceil(workers);
     let mut results: Vec<Option<O>> = (0..n).map(|_| None).collect();
 
     std::thread::scope(|scope| {
@@ -1410,5 +1419,38 @@ mod tests {
         let items: Vec<i32> = (0..7).collect();
         let r: Vec<i32> = map_sentences_parallel(&items, 4, |x| x * 10);
         assert_eq!(r, vec![0, 10, 20, 30, 40, 50, 60]);
+    }
+
+    /// Pin the clamp behaviour for `parallelism > items.len()` (Issue #383
+    /// follow-up review on PR #403). Direct callers that bypass
+    /// `resolve_g2p_parallelism` (or future ones) must not silently
+    /// oversubscribe the system: `chunk_size = n.div_ceil(workers)` would
+    /// collapse to 1 and spawn `items.len()` threads. The clamp keeps the
+    /// effective worker count bounded by `items.len()`.
+    #[test]
+    fn test_map_sentences_parallel_clamps_excess_parallelism() {
+        use std::collections::HashSet;
+        use std::sync::Mutex;
+        use std::thread::ThreadId;
+
+        let items: Vec<i32> = (0..3).collect();
+        let observed_threads: Mutex<HashSet<ThreadId>> = Mutex::new(HashSet::new());
+
+        let r: Vec<i32> = map_sentences_parallel(&items, 100, |x| {
+            observed_threads
+                .lock()
+                .unwrap()
+                .insert(std::thread::current().id());
+            x * 10
+        });
+
+        assert_eq!(r, vec![0, 10, 20]);
+        let n_threads = observed_threads.lock().unwrap().len();
+        assert!(
+            n_threads <= 3,
+            "parallelism=100 with 3 items must clamp to <= 3 worker threads; \
+             observed {} unique thread IDs",
+            n_threads
+        );
     }
 }
