@@ -5,14 +5,26 @@ name: "ORT Version Sync Gate"
 # (sed pattern が x86_64 / win-x64 を網羅していなかったため)。今後同じ取りこぼしを
 # CI で検出するための gate。
 #
+# Issue #372 follow-up: 各ランタイム ecosystem (Python / C# / Go / WASM) の
+# 依存定義ファイルが C++ canonical を下回らないことも CI gate で検証
+# (Option C 方針: bit-exactness は捨てつつも floor を統一)。
+#
 # Source of truth: cmake/OnnxRuntime.cmake の set(ONNXRUNTIME_VERSION "X.Y.Z")
-# 検査範囲: cmake / GitHub Actions workflow のみ (docs/ は人間がレビュー)
+# 検査範囲:
+#   - exact-match group: cmake / GitHub Actions workflow / docker/cpp-dev/Dockerfile
+#   - floor-check group: 各ランタイムの dep ファイル (Cargo.toml は対象外、
+#     ort crate stable 未公開のため。docs/spec/ort-versions.md で別途記録)
 
 on:
   push:
     branches: [dev, main]
     paths:
+      # Source of truth + script
       - 'cmake/OnnxRuntime.cmake'
+      - 'scripts/check_ort_versions.py'
+      - 'scripts/test_check_ort_versions.py'
+      - '.github/workflows/ort-version-sync.yml'
+      # Exact-match group
       - 'cmake/find_onnxruntime_windows.cmake'
       - '.github/workflows/release-shared-lib.yml'
       - '.github/workflows/android-build.yml'
@@ -20,12 +32,23 @@ on:
       - '.github/workflows/kotlin-g2p-ci.yml'
       - '.github/workflows/build-piper.yml'
       - '.github/workflows/_build-test-cpp.yml'
-      - 'scripts/check_ort_versions.py'
-      - 'scripts/test_check_ort_versions.py'
-      - '.github/workflows/ort-version-sync.yml'
+      - 'docker/cpp-dev/Dockerfile'
+      # Floor-check group (Issue #372)
+      - 'src/python/pyproject.toml'
+      - 'src/python_run/requirements.txt'
+      - 'src/python_run/requirements_gpu.txt'
+      - 'src/python_run/setup.py'
+      - 'src/csharp/**/*.csproj'
+      - 'src/go/go.mod'
+      - 'src/wasm/openjtalk-web/package.json'
   pull_request:
     paths:
+      # Source of truth + script
       - 'cmake/OnnxRuntime.cmake'
+      - 'scripts/check_ort_versions.py'
+      - 'scripts/test_check_ort_versions.py'
+      - '.github/workflows/ort-version-sync.yml'
+      # Exact-match group
       - 'cmake/find_onnxruntime_windows.cmake'
       - '.github/workflows/release-shared-lib.yml'
       - '.github/workflows/android-build.yml'
@@ -33,9 +56,15 @@ on:
       - '.github/workflows/kotlin-g2p-ci.yml'
       - '.github/workflows/build-piper.yml'
       - '.github/workflows/_build-test-cpp.yml'
-      - 'scripts/check_ort_versions.py'
-      - 'scripts/test_check_ort_versions.py'
-      - '.github/workflows/ort-version-sync.yml'
+      - 'docker/cpp-dev/Dockerfile'
+      # Floor-check group (Issue #372)
+      - 'src/python/pyproject.toml'
+      - 'src/python_run/requirements.txt'
+      - 'src/python_run/requirements_gpu.txt'
+      - 'src/python_run/setup.py'
+      - 'src/csharp/**/*.csproj'
+      - 'src/go/go.mod'
+      - 'src/wasm/openjtalk-web/package.json'
   workflow_dispatch:
 
 concurrency:

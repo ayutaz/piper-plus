@@ -22,7 +22,8 @@ train = [
     "torchmetrics>=1.0",
     "transformers>=4.38",
     "onnx>=1.21.0",
-    "onnxruntime>=1.17",
+    # Issue #372: floor must be >= C++ canonical (cmake/OnnxRuntime.cmake)
+    "onnxruntime>=1.20.0",
     "pyopenjtalk-plus",
     "mecab-python3>=1.0",
     "unidic-lite>=1.0",
@@ -41,7 +42,8 @@ train = [
 ]
 
 inference = [
-    "onnxruntime>=1.17",
+    # Issue #372: floor must be >= C++ canonical (cmake/OnnxRuntime.cmake)
+    "onnxruntime>=1.20.0",
     "soundfile>=0.12",
     "piper-plus-g2p[all]",
     "fastapi>=0.110",
@@ -49,7 +51,8 @@ inference = [
 ]
 
 inference-gpu = [
-    "onnxruntime-gpu>=1.17",
+    # Issue #372: floor must be >= C++ canonical (cmake/OnnxRuntime.cmake)
+    "onnxruntime-gpu>=1.20.0",
     "soundfile>=0.12",
     "piper-plus-g2p[all]",
     "fastapi>=0.110",
