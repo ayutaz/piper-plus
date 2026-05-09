@@ -23,16 +23,13 @@ jobs:
         with:
           fail-on-severity: high
           comment-summary-in-pr: on-failure
-          # ライセンス互換性チェック
-          license-check: true
+          # ライセンス互換性チェック (allow-licenses と deny-licenses は同時指定不可)
+          # allow-licenses にあるものだけ通過、それ以外は暗黙拒否。
+          # GPL/AGPL/LGPL は当然 list にないので拒否される。
           allow-licenses: >-
             MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC,
             Unicode-DFS-2016, Unicode-3.0, CC0-1.0, MPL-2.0,
             Zlib, OpenSSL, BSL-1.0, 0BSD, Apache-2.0 WITH LLVM-exception
-          # 拒否ライセンス (copy-left strict)
-          deny-licenses: >-
-            GPL-2.0, GPL-3.0, AGPL-1.0, AGPL-3.0,
-            LGPL-2.0, LGPL-3.0
           # 自動 fail にせず、PR comment で報告
           warn-only: false
           # vulnerability scope
