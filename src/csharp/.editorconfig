@@ -10,10 +10,23 @@ end_of_line = lf
 insert_final_newline = true
 
 # C# coding conventions
-csharp_style_namespace_declarations = file_scoped:suggestion
-csharp_style_var_for_built_in_types = false:suggestion
-csharp_style_var_when_type_is_apparent = true:suggestion
-csharp_style_var_elsewhere = false:suggestion
+# Namespace declarations promoted to error: file-scoped is the repo standard
+# (verified: existing codebase already uses file-scoped). Demote to warning if
+# a legacy block-scoped file appears.
+csharp_style_namespace_declarations = file_scoped:error
+csharp_style_var_for_built_in_types = false:warning
+csharp_style_var_when_type_is_apparent = true:warning
+csharp_style_var_elsewhere = false:warning
+
+# Predefined types (use `int` not `Int32`) — promoted from suggestion to warning
+dotnet_style_predefined_type_for_locals_parameters_members = true:warning
+dotnet_style_predefined_type_for_member_access = true:warning
+
+# Disable `this.` qualification (repo style is bare member access)
+dotnet_style_qualification_for_field = false:warning
+dotnet_style_qualification_for_property = false:warning
+dotnet_style_qualification_for_method = false:warning
+dotnet_style_qualification_for_event = false:warning
 
 # Naming conventions
 dotnet_naming_rule.private_fields_should_be_camel_case.severity = suggestion
@@ -27,6 +40,55 @@ dotnet_naming_style.camel_case_underscore_prefix.capitalization = camel_case
 # Expression-level preferences
 csharp_prefer_simple_using_statement = true:suggestion
 csharp_style_expression_bodied_methods = when_on_single_line:suggestion
+
+# ============================================================================
+# Analyzer rule overrides (Wave 1 quality-gate baseline)
+# ============================================================================
+# StyleCop.Analyzers — silence rules that would flood existing code with
+# warnings under TreatWarningsAsErrors=true. These are mostly stylistic /
+# documentation rules whose absence is intentional in this codebase.
+# Re-enable per-rule in a follow-up PR after dedicated cleanup.
+
+# SA1101: Prefix local calls with `this.` — repo style is bare access
+dotnet_diagnostic.SA1101.severity = none
+# SA1200: `using` directives must be inside namespace — file-scoped + outside
+dotnet_diagnostic.SA1200.severity = none
+# SA1201/SA1202/SA1203/SA1204: Element ordering — too noisy on existing code
+dotnet_diagnostic.SA1201.severity = none
+dotnet_diagnostic.SA1202.severity = none
+dotnet_diagnostic.SA1203.severity = none
+dotnet_diagnostic.SA1204.severity = none
+# SA1309: Field names must not begin with underscore — conflicts with our
+# private_fields_should_be_camel_case rule (`_field` prefix is repo style)
+dotnet_diagnostic.SA1309.severity = none
+# SA1413: Use trailing comma in multi-line initializers — too noisy
+dotnet_diagnostic.SA1413.severity = none
+# SA1500/SA1501/SA1502/SA1503/SA1519: Brace placement / single-line blocks
+dotnet_diagnostic.SA1500.severity = none
+dotnet_diagnostic.SA1503.severity = none
+dotnet_diagnostic.SA1519.severity = none
+# SA1600/SA1601/SA1602: Element / partial-element / enum item must be documented
+# (Wave 1: GenerateDocumentationFile=true makes this load-bearing for the public
+# API surface only — silence repo-wide; PublicApiAnalyzers tracks the surface.)
+dotnet_diagnostic.SA1600.severity = none
+dotnet_diagnostic.SA1601.severity = none
+dotnet_diagnostic.SA1602.severity = none
+# SA1633: File header copyright — would require touching every .cs file
+dotnet_diagnostic.SA1633.severity = none
+# SA1623/SA1629: Doc summary text format — irrelevant when SA1600 is off
+dotnet_diagnostic.SA1623.severity = none
+dotnet_diagnostic.SA1629.severity = none
+# SA1649: File name must match first type — false-positives on partial types
+dotnet_diagnostic.SA1649.severity = none
+
+# CS1591: Missing XML comment on publicly visible type/member — paired with
+# SA1600 silencing above. PublicApiAnalyzers (RS00xx) is the authoritative
+# public-API contract enforcer for this repo.
+dotnet_diagnostic.CS1591.severity = none
+
+# CA1303: Localize literal strings — TTS library emits English diagnostics by
+# design (no localization story planned for v1.x).
+dotnet_diagnostic.CA1303.severity = none
 
 # XML files
 [*.{csproj,props,targets}]

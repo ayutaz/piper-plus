@@ -2,6 +2,32 @@
 members = ["piper-plus-g2p", "piper-core", "piper-cli", "piper-python", "piper-wasm"]
 resolver = "2"
 
+# Workspace-wide lint policy (Rust 1.74+ via [workspace.lints]).
+#
+# These defaults apply only to member crates that opt in with
+# `[lints] workspace = true` in their own Cargo.toml. We are introducing
+# this gradually, so member crates currently keep their existing lint
+# config; flipping individual crates to workspace inheritance is tracked
+# as follow-up work. CI does not yet pass `-D warnings`, so the levels
+# below are warnings only. Promote to `deny` per crate (or globally) as
+# violations are cleaned up.
+[workspace.lints.clippy]
+# 段階的導入のため pedantic は warn にとどめる (メンバー crate は手動 opt-in)
+pedantic = { level = "warn", priority = -1 }
+nursery = { level = "warn", priority = -1 }
+cargo = { level = "warn", priority = -1 }
+# 重要なものは deny
+unwrap_used = "warn"
+expect_used = "warn"
+panic = "warn"
+todo = "warn"
+unimplemented = "warn"
+
+[workspace.lints.rust]
+unsafe_op_in_unsafe_fn = "warn"
+missing_docs = "warn"
+rust_2018_idioms = { level = "warn", priority = -1 }
+
 [workspace.package]
 version = "0.4.0"
 edition = "2024"

@@ -8,5 +8,42 @@
     <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
     <IsTrimmable>true</IsTrimmable>
     <JsonSerializerIsReflectionEnabledByDefault>false</JsonSerializerIsReflectionEnabledByDefault>
+
+    <!-- Static analysis (Wave 1: quality gate) -->
+    <AnalysisLevel>latest</AnalysisLevel>
+    <AnalysisMode>AllEnabledByDefault</AnalysisMode>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
+    <Deterministic>true</Deterministic>
+
+    <!-- Public API tracking (Microsoft.CodeAnalysis.PublicApiAnalyzers) -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
   </PropertyGroup>
+
+  <!-- Wire stylecop.json so StyleCop.Analyzers can read repo-wide settings.
+       Path is resolved against MSBuildThisFileDirectory (this Directory.Build.props
+       is at src/csharp/, alongside stylecop.json). -->
+  <ItemGroup>
+    <AdditionalFiles Include="$(MSBuildThisFileDirectory)stylecop.json" Visible="false" />
+  </ItemGroup>
+
+  <!-- Public API contract files (Microsoft.CodeAnalysis.PublicApiAnalyzers).
+       Each project that needs public API tracking creates its own
+       PublicAPI.{Shipped,Unshipped}.txt; the analyzer auto-discovers them
+       via this Condition. PiperPlus.Core is the primary library — others
+       are CLI/Tests/Bench (no public API surface to track). -->
+  <ItemGroup Condition="Exists('$(MSBuildProjectDirectory)\PublicAPI.Shipped.txt')">
+    <AdditionalFiles Include="PublicAPI.Shipped.txt" />
+    <AdditionalFiles Include="PublicAPI.Unshipped.txt" />
+  </ItemGroup>
+
+  <!-- Analyzer packages applied to every project under src/csharp/ via
+       Directory.Build.props inheritance. PrivateAssets="all" prevents these
+       analyzer-only packages from leaking into downstream NuGet consumers. -->
+  <ItemGroup>
+    <PackageReference Include="StyleCop.Analyzers" Version="1.2.0-beta.556" PrivateAssets="all" />
+    <PackageReference Include="Roslynator.Analyzers" Version="4.15.0" PrivateAssets="all" />
+    <PackageReference Include="SonarAnalyzer.CSharp" Version="10.25.0.139117" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" Version="3.11.0-beta1.24454.1" PrivateAssets="all" />
+  </ItemGroup>
 </Project>

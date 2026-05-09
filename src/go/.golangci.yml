@@ -3,8 +3,21 @@ version: "2"
 run:
   timeout: 5m
 
+# NOTE on rollout strategy:
+# Many of the linters below (gosec, gocyclo, dupl, nestif, errorlint, prealloc,
+# unparam, nakedret) are likely to flag a non-trivial number of issues in the
+# existing tree. We intentionally do NOT switch the CI gate to hard-fail
+# immediately; the corresponding GitHub workflow change (Wave 2) should keep
+# `continue-on-error: true` while we drain the warning backlog. Treat this
+# config as the *target* state that surfaces problems for triage.
+#
+# fieldalignment (govet) is intentionally NOT enabled here. Struct memory
+# layout reorganisation is invasive and should be done in a dedicated PR with
+# careful review of public-facing types (config.Config, voice.Voice, ...).
+
 linters:
   enable:
+    # --- existing baseline ---
     - errcheck
     - govet
     - staticcheck
@@ -12,9 +25,30 @@ linters:
     - ineffassign
     - gocritic
     - misspell
+    # --- security ---
+    - gosec          # SQL injection / hardcoded creds / unsafe os/exec / G304 path traversal
+    # --- idiom & style ---
+    - revive         # Go idiom check (drop-in golint replacement)
+    - predeclared    # don't shadow builtin identifiers (new, len, error, ...)
+    - unconvert      # remove redundant type conversions
+    - whitespace     # leading/trailing whitespace inside blocks
+    # --- complexity ---
+    - gocyclo        # cyclomatic complexity (threshold 15)
+    - cyclop         # package-level cyclomatic complexity gate (threshold 15)
+    - nestif         # nested if depth (>=5 = warn)
+    - dupl           # near-duplicate code blocks (token threshold 100)
+    - nakedret       # naked return inside long funcs
+    # --- correctness ---
+    - errorlint      # errors.Is / errors.As / fmt.Errorf("%w") wrap correctness
+    - bodyclose      # HTTP response body must be closed
+    - tparallel      # tests that use t.Parallel() correctly
+    - unparam        # unused function parameters / return values
+    # --- performance ---
+    - prealloc       # slice preallocation hint
   disable:
     - exhaustruct  # too strict for this project
     - wrapcheck    # error wrapping is handled case-by-case
+
   settings:
     gocritic:
       enabled-checks:
@@ -23,16 +57,140 @@ linters:
         - nestingReduce
     misspell:
       locale: US
+    gocyclo:
+      min-complexity: 15
+    cyclop:
+      max-complexity: 15
+    nestif:
+      min-complexity: 5
+    dupl:
+      threshold: 100
+    nakedret:
+      # Naked returns are only flagged in funcs whose body exceeds this many lines.
+      max-func-lines: 30
+    revive:
+      # Default rule set; we intentionally avoid bumping confidence to keep
+      # the signal:noise ratio reasonable while we triage the backlog.
+      rules:
+        - name: blank-imports
+        - name: context-as-argument
+        - name: context-keys-type
+        - name: dot-imports
+        - name: error-return
+        - name: error-strings
+        - name: error-naming
+        - name: exported
+          disabled: true   # too noisy for the current docstring coverage
+        - name: increment-decrement
+        - name: var-naming
+        - name: var-declaration
+        - name: package-comments
+          disabled: true   # re-enable once doc.go coverage is uniform
+        - name: range
+        - name: receiver-naming
+        - name: time-naming
+        - name: unexported-return
+        - name: indent-error-flow
+        - name: errorf
+        - name: empty-block
+        - name: superfluous-else
+        - name: unused-parameter
+          disabled: true   # unparam handles this with better precision
+        - name: unreachable-code
+        - name: redefines-builtin-id
+    gosec:
+      # Focus on path injection (G304) and credential leaks (G101) which were
+      # called out as high-priority. Other rules stay at default severity.
+      includes:
+        - G101  # hardcoded credentials
+        - G102  # bind to all interfaces
+        - G103  # unsafe block usage
+        - G104  # audit errors not checked (errcheck overlaps; keep loud)
+        - G106  # ssh.InsecureIgnoreHostKey
+        - G107  # url provided to HTTP request as taint input
+        - G108  # /debug/pprof exposed
+        - G109  # int overflow in Atoi -> int32
+        - G110  # decompression bombs
+        - G201  # SQL injection (format string)
+        - G202  # SQL injection (concat)
+        - G203  # html/template unescaped
+        - G204  # exec with subprocess
+        - G301  # poor file perms (dir)
+        - G302  # poor file perms (chmod)
+        - G303  # tmpfile predictable name
+        - G304  # file path provided as taint input  <-- HIGH PRIORITY
+        - G305  # zip slip
+        - G306  # poor file perms (writefile)
+        - G401  # weak crypto
+        - G402  # bad TLS config
+        - G403  # weak RSA key
+        - G404  # weak random source
+        - G501  # blocklisted import md5
+        - G502  # blocklisted import des
+        - G503  # blocklisted import rc4
+        - G504  # blocklisted import net/http/cgi
+        - G505  # blocklisted import sha1
+        - G601  # implicit memory alias in for-range (Go <1.22 only; harmless on 1.26)
+      config:
+        # Tune G304 to allow the small number of legitimate user-supplied paths
+        # via an annotation (#nosec G304 -- justification) on a case-by-case
+        # basis rather than a wholesale exclude.
+        G306: "0644"
+
   exclusions:
     rules:
+      # --- _test.go files: pragmatic relaxation ---
       - path: _test\.go
         linters:
-          - errcheck  # test error checking is more relaxed
+          - errcheck   # test error checking is more relaxed
+          - gosec      # tests legitimately read fixture paths, use weak rng, etc.
+          - gocyclo    # table-driven tests can balloon complexity
+          - cyclop
+          - dupl       # parallel test cases are intentionally similar
+          - funlen
+          - nestif
+          - unparam
+          - nakedret
+      # --- testdata fixtures: ignore everything ---
+      - path: testdata/
+        linters:
+          - all
+      - path: _testdata/
+        linters:
+          - all
+      # --- examples/: lower bar (illustrative code) ---
       - path: examples/
         linters:
           - errcheck
+          - gosec
+          - gocyclo
+          - cyclop
+          - dupl
+          - prealloc
+          - unparam
+      # --- generated / vendored data ---
+      - path: phonemize/data/
+        linters:
+          - all
+      # --- main.go in CLIs is allowed to be long & branchy ---
+      - path: cmd/.*/main\.go
+        linters:
+          - gocyclo
+          - cyclop
+          - nestif
+          - funlen
+
+issues:
+  # 0 = no cap; we want to see every warning while we drain the backlog.
+  max-issues-per-linter: 0
+  max-same-issues: 0
 
 formatters:
   enable:
     - gofmt
     - goimports
+    - gofumpt    # stricter superset of gofmt (no go.mod changes required)
+  settings:
+    gofumpt:
+      # Keep the default module-path detection; explicit field documents intent.
+      extra-rules: false
