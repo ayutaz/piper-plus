@@ -32,28 +32,17 @@ _LATIN_PRIORITY = ("en", "es", "pt", "fr")
 
 # BCP-47 dialect aliases. Resolved transparently by `PhonemizerRegistry.get`.
 # Keep entries case-insensitive by registering both upper- and lower-case
-# region subtag forms ("pt-BR" / "pt-br"). For policy / supported codes see
+# region subtag forms. For policy / supported codes see
 # `docs/spec/pt-dialect-contract.toml`.
 _LANGUAGE_ALIASES: dict[str, str] = {
-    "pt-BR": "pt",
+    "pt-BR": "pt",       # BR is the default; bare `pt` resolves to BR
     "pt-br": "pt",
+    "pt-pt": "pt-PT",    # case-insensitive EU alias
 }
 
-# Dialects that are intentionally NOT supported in this release. We raise
-# an explicit error (rather than letting them fall into the composite-code
-# fallback path with a confusing "Missing language" message) so callers
-# discover the unsupported dialect immediately.
-_UNSUPPORTED_DIALECTS: dict[str, str] = {
-    "pt-PT": (
-        "European Portuguese (pt-PT) is not supported in this release. "
-        "The Portuguese phonemizer models Brazilian Portuguese only; use "
-        "'pt' or 'pt-BR'. See docs/spec/pt-dialect-contract.toml."
-    ),
-    "pt-pt": (
-        "European Portuguese (pt-PT) is not supported in this release. "
-        "Use 'pt' or 'pt-BR' for Brazilian Portuguese."
-    ),
-}
+# Dialects that are intentionally NOT supported. Empty in this release —
+# pt-PT moved to `_LANGUAGE_TABLE` once EU phonemizer shipped.
+_UNSUPPORTED_DIALECTS: dict[str, str] = {}
 
 # Table of built-in language phonemizers: (code, module, class_name)
 _LANGUAGE_TABLE = [
@@ -64,6 +53,7 @@ _LANGUAGE_TABLE = [
     ("es", ".spanish", "SpanishPhonemizer"),
     ("fr", ".french", "FrenchPhonemizer"),
     ("pt", ".portuguese", "PortuguesePhonemizer"),
+    ("pt-PT", ".portuguese", "EuropeanPortuguesePhonemizer"),
     ("sv", ".swedish", "SwedishPhonemizer"),
 ]
 
