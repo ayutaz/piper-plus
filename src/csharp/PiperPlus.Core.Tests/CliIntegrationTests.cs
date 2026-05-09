@@ -570,7 +570,9 @@ public sealed class CliIntegrationTests
         }
         finally
         {
-            try { File.Delete(tmpPath); } catch { /* best-effort cleanup */ }
+            try { File.Delete(tmpPath); }
+            catch (IOException) { /* best-effort cleanup */ }
+            catch (UnauthorizedAccessException) { /* best-effort cleanup */ }
         }
     }
 
@@ -602,7 +604,9 @@ public sealed class CliIntegrationTests
         }
         finally
         {
-            try { File.Delete(tmpPath); } catch { /* best-effort cleanup */ }
+            try { File.Delete(tmpPath); }
+            catch (IOException) { /* best-effort cleanup */ }
+            catch (UnauthorizedAccessException) { /* best-effort cleanup */ }
         }
     }
 }

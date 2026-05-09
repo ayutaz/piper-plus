@@ -634,7 +634,13 @@ internal static class Program
                             LogDebug(debug, quiet,
                                 $"Encoded {referenceAudioPath} -> {speakerEmbedding.Length}-dim embedding");
                         }
-                        catch (Exception ex)
+                        catch (Exception ex) when (
+                            ex is FileNotFoundException
+                            or InvalidDataException
+                            or NotSupportedException
+                            or ArgumentException
+                            or IOException
+                            or OnnxRuntimeException)
                         {
                             LogError($"Failed to encode reference audio: {ex.Message}");
                             Environment.ExitCode = 1;
