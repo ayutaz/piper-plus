@@ -648,3 +648,122 @@ def phonemize_portuguese(text: str) -> list[str]:
     phonemes = _phonemize_portuguese_raw(text)
     tokens = ["^"] + phonemes + ["$"]
     return map_sequence(tokens)
+
+
+# ---------------------------------------------------------------------------
+# European Portuguese (pt-PT) — runtime mirror
+# ---------------------------------------------------------------------------
+# Mirror of `_apply_eu_postprocessing` in
+# `src/python/g2p/piper_plus_g2p/portuguese.py`. Operates on PUA-mapped
+# tokens (BR's tʃ/dʒ are single PUA codepoints by the time they reach
+# this layer; see `token_mapper.py:_PUA_MAPPING`).
+
+_PUA_TCH = ""  # tʃ (BR palatalised t before i)
+_PUA_DZH = ""  # dʒ (BR palatalised d before i)
+
+_EU_VOWEL_CHARS = set("aeiouɛɔãẽĩõũɨ")
+_EU_CONSONANT_CHARS = set("bdfklmnprstvwzɡɲɾʁʃʎʒʔhɫ")
+
+
+def _eu_token_starts_with_consonant(tok: str) -> bool:
+    return bool(tok) and tok[0] in _EU_CONSONANT_CHARS
+
+
+def _eu_token_starts_with_vowel(tok: str) -> bool:
+    return bool(tok) and tok[0] in _EU_VOWEL_CHARS
+
+
+def _eu_next_non_space_starts_with_vowel(tokens: list[str], idx: int) -> bool:
+    j = idx + 1
+    while j < len(tokens) and tokens[j] == " ":
+        j += 1
+    if j < len(tokens):
+        return _eu_token_starts_with_vowel(tokens[j])
+    return False
+
+
+def _apply_eu_postprocessing(tokens: list[str]) -> list[str]:
+    """Apply European Portuguese post-processing to PUA-mapped BR tokens.
+
+    Five canonical transformations (see contract spec, spec_version 2):
+      1. PUA(tʃ) + i → t + ɨ;  PUA(dʒ) + i → d + ɨ
+      2. final unstressed -e: BR i → EU ɨ (when preceded by a consonant)
+      3. coda /s/: s → ʃ (with sandhi voicing → ʒ before vowel-init)
+      4. coda /w/ (BR's l-vocalisation): w → ɫ (when preceded by a vowel)
+      5. h → ʁ (canonicalisation of BR's debuccalised /r/)
+    """
+    n = len(tokens)
+    result = list(tokens)
+    punct = set(",.;:!?—–…")
+
+    # Pass 1
+    for i in range(n):
+        if result[i] != "i":
+            continue
+        nxt = result[i + 1] if i + 1 < n else ""
+        is_final = (not nxt) or nxt == " " or nxt in punct
+        if not is_final:
+            continue
+        if i >= 1 and result[i - 1] == _PUA_TCH:
+            result[i - 1] = "t"
+            result[i] = "ɨ"
+            continue
+        if i >= 1 and result[i - 1] == _PUA_DZH:
+            result[i - 1] = "d"
+            result[i] = "ɨ"
+            continue
+        if i >= 1 and _eu_token_starts_with_consonant(result[i - 1]):
+            result[i] = "ɨ"
+
+    # Pass 2: coda /s/, /z/
+    for i in range(n):
+        if result[i] not in ("s", "z"):
+            continue
+        nxt = result[i + 1] if i + 1 < n else ""
+        is_word_end = (not nxt) or nxt == " " or nxt in punct
+        if is_word_end:
+            if _eu_next_non_space_starts_with_vowel(result, i):
+                result[i] = "ʒ"
+                continue
+            result[i] = "ʃ" if result[i] == "s" else "ʒ"
+        elif _eu_token_starts_with_consonant(nxt) and not _eu_token_starts_with_vowel(nxt):
+            result[i] = "ʃ" if result[i] == "s" else "ʒ"
+
+    # Pass 3: coda /w/ → /ɫ/ (only when preceded by a vowel)
+    for i in range(n):
+        if result[i] != "w" or i == 0:
+            continue
+        if not _eu_token_starts_with_vowel(result[i - 1]):
+            continue
+        nxt = result[i + 1] if i + 1 < n else ""
+        is_coda = (
+            (not nxt)
+            or nxt == " "
+            or nxt in punct
+            or (
+                _eu_token_starts_with_consonant(nxt)
+                and not _eu_token_starts_with_vowel(nxt)
+            )
+        )
+        if is_coda:
+            result[i] = "ɫ"
+
+    # Pass 4: h → ʁ
+    for i in range(n):
+        if result[i] == "h":
+            result[i] = "ʁ"
+
+    return result
+
+
+def _phonemize_european_portuguese_raw(text: str) -> list[str]:
+    """Convert European Portuguese text to raw PUA-mapped phonemes."""
+    br_tokens = _phonemize_portuguese_raw(text)
+    return _apply_eu_postprocessing(br_tokens)
+
+
+def phonemize_european_portuguese(text: str) -> list[str]:
+    """Phonemize European Portuguese text. Returns tokens after map_sequence."""
+    phonemes = _phonemize_european_portuguese_raw(text)
+    tokens = ["^"] + phonemes + ["$"]
+    return map_sequence(tokens)
