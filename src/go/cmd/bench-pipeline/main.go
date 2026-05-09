@@ -47,9 +47,9 @@ func main() {
 	}
 }
 
-// run holds the bench logic so ``defer voice.Close()`` actually fires;
-// having ``os.Exit`` after a defer in ``main`` was flagged by gocritic
-// (exitAfterDefer) — splitting into ``main`` + ``run`` is the standard
+// run holds the bench logic so “defer voice.Close()“ actually fires;
+// having “os.Exit“ after a defer in “main“ was flagged by gocritic
+// (exitAfterDefer) — splitting into “main“ + “run“ is the standard
 // Go idiom for that lint.
 func run() error {
 	modelFlag := flag.String("model", "test/models/multilingual-test-medium.onnx", "ONNX model path")
@@ -80,7 +80,11 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("LoadVoice failed: %w", err)
 	}
-	defer voice.Close()
+	defer func() {
+		if cerr := voice.Close(); cerr != nil {
+			fmt.Fprintf(os.Stderr, "voice.Close failed: %v\n", cerr)
+		}
+	}()
 	fmt.Fprintf(os.Stderr, "[bench] voice loaded in %.1f ms\n", float64(time.Since(loadStart).Microseconds())/1000.0)
 
 	// Global warmup so per-N runs don't pay the model first-call cost.
