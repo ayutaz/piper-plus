@@ -82,10 +82,10 @@ def _resolve_g2p_parallelism(n_sentences: int) -> int:
     given worker count.
 
     Resolution order:
-      * ``PIPER_G2P_PARALLELISM=1``: force serial.
-      * ``PIPER_G2P_PARALLELISM=N`` (N >= 2): force N workers (capped at
+        * ``PIPER_G2P_PARALLELISM=1``: force serial.
+        * ``PIPER_G2P_PARALLELISM=N`` (N >= 2): force N workers (capped at
         ``n_sentences``).
-      * Otherwise (auto): ``min(n_sentences, max(2, cores // 2),
+        * Otherwise (auto): ``min(n_sentences, max(2, cores // 2),
         _G2P_AUTO_PARALLELISM_CAP)``. Falls back to 1 when ``n_sentences <= 1``.
     """
     raw = os.environ.get("PIPER_G2P_PARALLELISM", "").strip()
@@ -400,13 +400,13 @@ def _trim_padding_by_durations(
     Trimming policy (issue #356):
 
     * **BOS + front padding**: stripped completely. VITS produces an
-      audible "あ" at the start under the padded context.
+        audible "あ" at the start under the padded context.
     * **Back padding**: stripped completely.
     * **EOS**: keep only the first ``eos_max_frames`` frames (default
-      ``TRIM_EOS_MAX_FRAMES`` = 0, i.e. drop the entire EOS region).
-      0 was chosen empirically because even modest clamping (6 frames)
-      left an audible "だぁ"-like tail under the padded context. Callers
-      can pass a larger value to preserve a natural utterance tail.
+        ``TRIM_EOS_MAX_FRAMES`` = 0, i.e. drop the entire EOS region).
+        0 was chosen empirically because even modest clamping (6 frames)
+        left an audible "だぁ"-like tail under the padded context. Callers
+        can pass a larger value to preserve a natural utterance tail.
 
     Returns ``audio`` unchanged when inputs are inconsistent.
     """
@@ -578,8 +578,15 @@ class PiperVoice:
 
                     def _multi_one_debug(sentence: str) -> list[str]:
                         result = mp.phonemize(sentence)
+                        # Strip CR/LF from user-supplied input so it cannot
+                        # forge or split log lines (CodeQL py/log-injection).
+                        # The sanitised value is only used for logging — the
+                        # original `sentence` is still passed to phonemize.
+                        safe_sentence = sentence.replace("\n", "\\n").replace(
+                            "\r", "\\r"
+                        )
                         _LOGGER.debug(
-                            "MultilingualPhonemizer: '%s' -> %s", sentence, result
+                            "MultilingualPhonemizer: '%s' -> %s", safe_sentence, result
                         )
                         return result
 
@@ -857,7 +864,7 @@ class PiperVoice:
         Internal method that runs the full synthesis pipeline:
 
         1. Applies short-text mitigation (Strategy A padding + Strategy B
-           noise scale adjustment) for inputs shorter than ``MIN_PHONEME_IDS``.
+            noise scale adjustment) for inputs shorter than ``MIN_PHONEME_IDS``.
         2. Runs ONNX inference with the configured parameters.
         3. Trims silence introduced by padding (when applicable).
 
@@ -876,11 +883,11 @@ class PiperVoice:
 
             - ``audio_bytes`` : PCM 16-bit mono audio (silence trimmed if padded).
             - ``durations`` : 1-D float32 array of frame counts per phoneme,
-              or ``None`` if the model has no ``durations`` output.
-              Length matches the *padded* phoneme sequence; callers should
-              align with ``original_phoneme_ids`` length when computing timing.
+                or ``None`` if the model has no ``durations`` output.
+                Length matches the *padded* phoneme sequence; callers should
+                align with ``original_phoneme_ids`` length when computing timing.
             - ``original_phoneme_ids`` : The input ``phoneme_ids`` list,
-              preserved before any padding mutation.
+                preserved before any padding mutation.
 
         Notes
         -----
@@ -1096,8 +1103,8 @@ class PiperVoice:
 
             - ``wav_bytes`` : Complete WAV file content (RIFF header + PCM).
             - ``timing_result`` : :class:`piper.timing.TimingResult` with
-              per-phoneme entries, or ``None`` if the model does not output
-              a ``durations`` tensor (check ``self.has_duration_output``).
+                per-phoneme entries, or ``None`` if the model does not output
+                a ``durations`` tensor (check ``self.has_duration_output``).
 
         Notes
         -----
