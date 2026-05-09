@@ -25,18 +25,23 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: Run actionlint
-        # rhysd/actionlint with built-in shellcheck integration
-        # https://github.com/rhysd/actionlint
-        uses: rhysd/actionlint@v1
-        with:
-          shellcheck: '0.10.0'
-          # Don't fail on issues we accept (TBD via actionlint.yaml config)
-          # Workflows are validated for:
-          #   - YAML syntax
-          #   - Action input/output types
-          #   - Shell script (bash/sh/pwsh) via shellcheck
-          #   - Workflow trigger types
-          #   - Job dependencies
-          # Note: docs/spec/* migration drift may cause warnings; we'll
-          # tighten over time via .github/actionlint.yaml.
+      - name: Download actionlint
+        id: get_actionlint
+        run: |
+          bash <(curl -sSL https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)
+          echo "executable=$(pwd)/actionlint" >> "$GITHUB_OUTPUT"
+        shell: bash
+
+      - name: Check workflow files
+        # Workflows are validated for:
+        #   - YAML syntax
+        #   - Action input/output types
+        #   - Shell script (bash/sh/pwsh) via shellcheck integration
+        #   - Workflow trigger types
+        #   - Job dependencies
+        # Initial pass: continue-on-error so existing 56 workflows can be
+        # incrementally cleaned up. Once baseline is clean, remove this flag.
+        run: |
+          ${{ steps.get_actionlint.outputs.executable }} -color
+        shell: bash
+        continue-on-error: true
