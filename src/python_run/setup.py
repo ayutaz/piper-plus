@@ -66,7 +66,8 @@ setup(
     install_requires=requirements,
     python_requires=">=3.11",
     extras_require={
-        "gpu": ["onnxruntime-gpu>=1.11.0,<2"],
+        # Issue #372: floor must be >= C++ canonical (cmake/OnnxRuntime.cmake)
+        "gpu": ["onnxruntime-gpu>=1.20.0,<2"],
         "http": [
             "fastapi>=0.110,<1",
             "uvicorn[standard]>=0.27,<1",

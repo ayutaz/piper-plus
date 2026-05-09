@@ -37,12 +37,14 @@ RUN apt-get update && apt-get install -y \
 # piper-plus uses self-contained G2P for all 7 languages (JA/EN/ZH/ES/FR/PT/SV).
 
 # Install ONNX Runtime (CPU, Linux x64)
-RUN wget -q https://github.com/microsoft/onnxruntime/releases/download/v1.17.0/onnxruntime-linux-x64-1.17.0.tgz && \
-    tar -xzf onnxruntime-linux-x64-1.17.0.tgz && \
-    cp onnxruntime-linux-x64-1.17.0/lib/* /usr/local/lib/ && \
-    cp -r onnxruntime-linux-x64-1.17.0/include/* /usr/local/include/ && \
+# Issue #372: must match canonical (cmake/OnnxRuntime.cmake) — enforced by
+# scripts/check_ort_versions.py. Bump alongside the C++ pipeline canonical.
+RUN wget -q https://github.com/microsoft/onnxruntime/releases/download/v1.20.0/onnxruntime-linux-x64-1.20.0.tgz && \
+    tar -xzf onnxruntime-linux-x64-1.20.0.tgz && \
+    cp onnxruntime-linux-x64-1.20.0/lib/* /usr/local/lib/ && \
+    cp -r onnxruntime-linux-x64-1.20.0/include/* /usr/local/include/ && \
     ldconfig && \
-    rm -rf onnxruntime-linux-x64-1.17.0*
+    rm -rf onnxruntime-linux-x64-1.20.0*
 
 # Install OpenJTalk and dependencies
 RUN apt-get update && apt-get install -y \

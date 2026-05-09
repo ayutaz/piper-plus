@@ -1,1 +1,2 @@
-onnxruntime-gpu>=1.11.0,<2
+# Issue #372: floor must be >= C++ canonical (cmake/OnnxRuntime.cmake)
+onnxruntime-gpu>=1.20.0,<2
