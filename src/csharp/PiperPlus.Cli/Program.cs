@@ -298,7 +298,7 @@ internal static class Program
                         ?? Assembly.GetExecutingAssembly().GetName().Version?.ToString()
                         ?? "unknown";
                     Console.WriteLine(version);
-                    return;
+                    return Environment.ExitCode;
                 }
 
                 bool debug = parseResult.GetValue(debugOption);
@@ -311,7 +311,7 @@ internal static class Program
                 {
                     string? listModelsLang = parseResult.GetValue(listModelsOption);
                     ModelManager.ListModels(string.IsNullOrEmpty(listModelsLang) ? null : listModelsLang);
-                    return;
+                    return Environment.ExitCode;
                 }
 
                 string? downloadModelName = parseResult.GetValue(downloadModelOption);
@@ -339,7 +339,7 @@ internal static class Program
                     {
                         Environment.ExitCode = 1;
                     }
-                    return;
+                    return Environment.ExitCode;
                 }
 
                 // ============================================================
@@ -417,7 +417,7 @@ internal static class Program
                             + "(--reference-audio / --speaker-embedding) "
                             + "are mutually exclusive.");
                         Environment.ExitCode = 1;
-                        return;
+                        return Environment.ExitCode;
                     }
                 }
 
@@ -439,7 +439,7 @@ internal static class Program
                 {
                     LogError("--model is required (or set PIPER_DEFAULT_MODEL).");
                     Environment.ExitCode = 1;
-                    return;
+                    return Environment.ExitCode;
                 }
 
                 // Resolve model name/alias to a file path (with auto-download)
@@ -460,13 +460,13 @@ internal static class Program
                     {
                         LogError(ex.Message);
                         Environment.ExitCode = 1;
-                        return;
+                        return Environment.ExitCode;
                     }
                     catch (InvalidOperationException ex)
                     {
                         LogError(ex.Message);
                         Environment.ExitCode = 1;
-                        return;
+                        return Environment.ExitCode;
                     }
                 }
 
@@ -483,7 +483,7 @@ internal static class Program
                         $"{Path.GetDirectoryName(modelPath)}/config.json. " +
                         "Use --config to specify.");
                     Environment.ExitCode = 1;
-                    return;
+                    return Environment.ExitCode;
                 }
 
                 LogDebug(debug, quiet, $"Config path: {configPath}");
@@ -499,7 +499,7 @@ internal static class Program
                     {
                         LogError($"Failed to load config: {ex.Message}");
                         Environment.ExitCode = 1;
-                        return;
+                        return Environment.ExitCode;
                     }
                 }
 
@@ -519,7 +519,7 @@ internal static class Program
                     {
                         LogError($"Invalid --phoneme_silence: {ex.Message}");
                         Environment.ExitCode = 1;
-                        return;
+                        return Environment.ExitCode;
                     }
                 }
 
@@ -571,7 +571,7 @@ internal static class Program
                 {
                     LogError("--text and --json-input are mutually exclusive.");
                     Environment.ExitCode = 1;
-                    return;
+                    return Environment.ExitCode;
                 }
 
                 // Resolve voice-cloning input into a speaker embedding (if provided).
@@ -602,7 +602,7 @@ internal static class Program
                                     $"--speaker-embedding file size ({rawBytes.Length} bytes) "
                                     + "is invalid: must be a non-zero multiple of 4 bytes (float32).");
                                 Environment.ExitCode = 1;
-                                return;
+                                return Environment.ExitCode;
                             }
                             speakerEmbedding = new float[rawBytes.Length / sizeof(float)];
                             Buffer.BlockCopy(rawBytes, 0, speakerEmbedding, 0, rawBytes.Length);
@@ -613,7 +613,7 @@ internal static class Program
                         {
                             LogError($"Failed to read --speaker-embedding file: {ex.Message}");
                             Environment.ExitCode = 1;
-                            return;
+                            return Environment.ExitCode;
                         }
                     }
                     else if (!string.IsNullOrEmpty(referenceAudioPath))
@@ -625,7 +625,7 @@ internal static class Program
                                 "--reference-audio requires --speaker-encoder-model "
                                 + "(path to the speaker encoder ONNX model).");
                             Environment.ExitCode = 1;
-                            return;
+                            return Environment.ExitCode;
                         }
                         try
                         {
@@ -638,7 +638,7 @@ internal static class Program
                         {
                             LogError($"Failed to encode reference audio: {ex.Message}");
                             Environment.ExitCode = 1;
-                            return;
+                            return Environment.ExitCode;
                         }
                     }
                 }
@@ -661,7 +661,7 @@ internal static class Program
                     {
                         LogError(ex.Message);
                         Environment.ExitCode = 1;
-                        return;
+                        return Environment.ExitCode;
                     }
 
                     // Apply custom dict before phonemization
@@ -721,7 +721,7 @@ internal static class Program
                         $"[test-mode] phoneme_ids({phonemeIdsLong.Length}): " +
                         $"[{string.Join(", ", phonemeIdsLong)}]");
 
-                    return;
+                    return Environment.ExitCode;
                 }
 
                 // ============================================================
@@ -774,7 +774,7 @@ internal static class Program
                         }
                     }
 
-                    return;
+                    return Environment.ExitCode;
                 }
 
                 // ============================================================
@@ -784,7 +784,7 @@ internal static class Program
                 {
                     LogError("--model is required (or set PIPER_DEFAULT_MODEL).");
                     Environment.ExitCode = 1;
-                    return;
+                    return Environment.ExitCode;
                 }
 
                 if (config is null)
@@ -794,7 +794,7 @@ internal static class Program
                         $"{Path.GetDirectoryName(modelPath)}/config.json. " +
                         "Use --config to specify.");
                     Environment.ExitCode = 1;
-                    return;
+                    return Environment.ExitCode;
                 }
 
                 LogDebug(debug, quiet, $"Model path: {modelPath}");
@@ -814,7 +814,7 @@ internal static class Program
                 {
                     LogError($"Failed to load ONNX model: {ex.Message}");
                     Environment.ExitCode = 1;
-                    return;
+                    return Environment.ExitCode;
                 }
 
                 using var model = new PiperModel(session, config);
@@ -938,7 +938,7 @@ internal static class Program
                     {
                         LogError(ex.Message);
                         Environment.ExitCode = 1;
-                        return;
+                        return Environment.ExitCode;
                     }
 
                     // Use the phonemizer's own ID map if available, else fall back to config
@@ -1041,7 +1041,7 @@ internal static class Program
                     {
                         LogError($"Synthesis failed: {ex.Message}");
                         Environment.ExitCode = 1;
-                        return;
+                        return Environment.ExitCode;
                     }
 
                     // Strategy C: pad silence for short text
@@ -1129,7 +1129,7 @@ internal static class Program
                                 {
                                     LogError($"Synthesis failed for sentence: {ex.Message}");
                                     Environment.ExitCode = 1;
-                                    return;
+                                    return Environment.ExitCode;
                                 }
 
                                 // Strategy C: pad silence for short sentences
@@ -1155,7 +1155,7 @@ internal static class Program
                         LogInfo(quiet, "Synthesized 1 utterance(s).");
                     }
 
-                    return;
+                    return Environment.ExitCode;
                 }
 
                 // ================================================================
@@ -1211,7 +1211,7 @@ internal static class Program
                             {
                                 LogError($"Synthesis failed on line {utteranceIndex + 1}: {ex.Message}");
                                 Environment.ExitCode = 1;
-                                return;
+                                return Environment.ExitCode;
                             }
 
                             WriteUtteranceOutput(
@@ -1229,7 +1229,7 @@ internal static class Program
                         stdoutStream?.Dispose();
                     }
 
-                    return;
+                    return Environment.ExitCode;
                 }
 
                 // ================================================================
@@ -1278,7 +1278,7 @@ internal static class Program
                             {
                                 LogError($"Invalid JSON on line {utteranceIndex + 1}: {ex.Message}");
                                 Environment.ExitCode = 1;
-                                return;
+                                return Environment.ExitCode;
                             }
 
                             // ---------------------------------------------------
@@ -1338,7 +1338,7 @@ internal static class Program
                                     {
                                         LogError(ex.Message);
                                         Environment.ExitCode = 1;
-                                        return;
+                                        return Environment.ExitCode;
                                     }
                                 }
 
@@ -1373,7 +1373,7 @@ internal static class Program
                                 {
                                     LogError($"Missing or empty phoneme_ids (and no text) on line {utteranceIndex + 1}.");
                                     Environment.ExitCode = 1;
-                                    return;
+                                    return Environment.ExitCode;
                                 }
 
                                 // Convert int[] -> long[] for ONNX tensor (int64)
@@ -1415,7 +1415,7 @@ internal static class Program
                             {
                                 LogError($"Synthesis failed on line {utteranceIndex + 1}: {ex.Message}");
                                 Environment.ExitCode = 1;
-                                return;
+                                return Environment.ExitCode;
                             }
 
                             // Strategy C: pad silence for short JSONL text
@@ -1439,7 +1439,7 @@ internal static class Program
                         {
                             LogError("No input received on stdin.");
                             Environment.ExitCode = 1;
-                            return;
+                            return Environment.ExitCode;
                         }
 
                         // --output-timing: warn once at end if no timing data
@@ -1457,6 +1457,15 @@ internal static class Program
                         stdoutStream?.Dispose();
                     }
                 }
+
+                // Explicit fallthrough exit code: success unless an earlier
+                // branch set Environment.ExitCode to non-zero. Returning the
+                // int here is what makes C# pick the Func<ParseResult,int>
+                // SetAction overload (vs the void-returning Action<ParseResult>
+                // overload, which would cause Invoke() to always return 0 and
+                // swallow validation errors).
+                // See docs/csharp-cli-exit-code-rootcause.md for the diagnostic.
+                return Environment.ExitCode;
             });
 
         return rootCommand;
