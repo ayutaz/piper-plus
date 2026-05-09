@@ -77,6 +77,21 @@ jobs:
             pre-commit-${{ runner.os }}-py3.11-
 
       - name: Run all hooks
+        env:
+          # Skip the heavy cross-language lint hooks here. Each is already
+          # gated by a dedicated CI workflow with the right toolchain
+          # installed (cargo + libasound2-dev for clippy, .NET 10 for
+          # dotnet format, Go + golangci-lint for go vet / golangci-lint,
+          # uv for mypy). Running them here would require installing four
+          # SDKs in this otherwise-fast Python-only gate, and would
+          # double-bill minutes for drift that is already detected upstream:
+          #   * cargo-clippy / cargo-fmt   → rust-tests.yml
+          #   * gofmt / go-vet / golangci-lint → go-ci.yml
+          #   * dotnet-format             → csharp-ci.yml + ci.yml
+          #   * mypy-g2p                  → g2p-python-ci.yml
+          # The corresponding *local* pre-commit hooks still run so
+          # contributors catch drift before push.
+          SKIP: cargo-clippy,cargo-fmt,gofmt,go-vet,golangci-lint,mypy-g2p,dotnet-format
         run: |
           # --show-diff-on-failure makes drift trivial to fix locally:
           # contributors see the exact patch the hooks produced.

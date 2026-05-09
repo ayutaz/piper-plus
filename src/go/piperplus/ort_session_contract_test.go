@@ -203,7 +203,7 @@ func TestOrtSessionContract_EnvVarNames(t *testing.T) {
 // **fixture-side** drift (someone editing tests/fixtures/ort_session/contract.json),
 // not Go production drift. This is intentional — see
 // docs/spec/ort-session-contract.toml for the canonical values that the
-// Go runtime is expected (but not enforced at unit-test time) to honour.
+// Go runtime is expected (but not enforced at unit-test time) to honor.
 
 func abs(f float64) float64 {
 	if f < 0 {
