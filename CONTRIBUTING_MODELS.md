@@ -19,8 +19,7 @@ Community contributions are welcome.
 7. [ONNX エクスポート手順 / ONNX Export Steps](#onnx-エクスポート手順--onnx-export-steps)
 8. [voices.json エントリ / voices.json Entry](#voicesjson-エントリ--voicesjson-entry)
 9. [投稿プロセス / Submission Process](#投稿プロセス--submission-process)
-<!-- markdownlint-disable-next-line MD051 -->
-10. [FAQ](#faq)
+10. [FAQ](#faq) <!-- markdownlint-disable-line MD051 -->
 
 ---
 
