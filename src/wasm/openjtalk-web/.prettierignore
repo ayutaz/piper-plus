@@ -1,0 +1,11 @@
+dist/
+node_modules/
+build/
+demo/
+models/
+voices/
+patches/
+*.wasm
+*.min.js
+pkg/
+types/

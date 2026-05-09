@@ -1,0 +1,6 @@
+dist/
+node_modules/
+*.wasm
+*.min.js
+pkg/
+types/
