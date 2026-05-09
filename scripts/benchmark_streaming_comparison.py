@@ -153,7 +153,7 @@ def main():
             # Streaming mode (3 runs)
             streaming_latencies = []
             for _ in range(3):
-                latency, total_time, bytes_count = measure_streaming_latency(
+                latency, _total_time, _bytes_count = measure_streaming_latency(
                     piper_path, str(model_full_path), text
                 )
                 if latency:

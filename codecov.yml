@@ -1,0 +1,145 @@
+# -----------------------------------------------------------------------------
+# Codecov configuration for piper-plus
+# -----------------------------------------------------------------------------
+# 段階的導入方針 (Wave 1 / Wave 2):
+#   - 初期は `informational: true` で status check は出すが merge block しない
+#   - threshold/precision/round の挙動を local の `[tool.coverage.report]` と
+#     一致させ、CI/local 同基準で coverage を観察する
+#   - target は project=70%, patch=80% (g2p は 80% / 85% で別 flag)
+#   - M2-M3 で informational 解除 (status を required check 化)
+#
+# 公式仕様: https://docs.codecov.com/docs/codecov-yaml
+# -----------------------------------------------------------------------------
+
+codecov:
+  # 個別の token を要求しない (public repo)
+  require_ci_to_pass: true
+  # CI が遅い時に coverage report が来るのを 12h まで待つ
+  max_report_age: 12
+  # PR 上の全コメントは 1 つにまとめる
+  notify:
+    after_n_builds: 1
+    wait_for_ci: true
+
+# -----------------------------------------------------------------------------
+# Coverage report parsing
+# -----------------------------------------------------------------------------
+coverage:
+  # 表示桁
+  precision: 2
+  # 0.5 単位で四捨五入
+  round: down
+  # 値域
+  range: "60...95"
+
+  # ---------------------------------------------------------------------------
+  # Status checks: project / patch
+  # ---------------------------------------------------------------------------
+  # 初期段階では `informational: true` で merge block しない。
+  # M2-M3 で `informational: false` に変更して status を required にする予定。
+  status:
+    project:
+      default:
+        target: 70%
+        threshold: 1%
+        # 既存 base に対して 1% 以上下がったら fail (informational なので block せず)
+        if_ci_failed: error
+        informational: true
+        only_pulls: false
+        flags:
+          - python_train
+          - python_runtime
+      g2p:
+        # g2p は独立パッケージで coverage 目標を高めに設定
+        target: 80%
+        threshold: 1%
+        informational: true
+        flags:
+          - g2p
+        paths:
+          - "src/python/g2p/piper_plus_g2p"
+
+    patch:
+      default:
+        target: 80%
+        threshold: 1%
+        # 新規追加コードは 80% カバーすることを推奨
+        informational: true
+        if_ci_failed: error
+      g2p:
+        target: 85%
+        threshold: 1%
+        informational: true
+        flags:
+          - g2p
+
+  # ---------------------------------------------------------------------------
+  # 修正コードの一覧
+  # ---------------------------------------------------------------------------
+  notify:
+    require_ci_to_pass: true
+
+# -----------------------------------------------------------------------------
+# Flags: 領域別に coverage を切り分ける
+# -----------------------------------------------------------------------------
+flags:
+  python_train:
+    paths:
+      - src/python/piper_train/
+    carryforward: true
+  python_runtime:
+    paths:
+      - src/python_run/piper/
+    carryforward: true
+  g2p:
+    paths:
+      - src/python/g2p/piper_plus_g2p/
+    carryforward: true
+
+# -----------------------------------------------------------------------------
+# Ignore: coverage 計測対象外
+# -----------------------------------------------------------------------------
+ignore:
+  - "**/tests/**"
+  - "**/test_*.py"
+  - "**/*_test.py"
+  - "**/__main__.py"
+  - "**/conftest.py"
+  - "src/python/piper_train/vits/monotonic_align/**"  # Cython generated
+  - "**/build/**"
+  - "**/dist/**"
+  - ".venv/**"
+  - "scripts/**"
+  - "tools/**"
+  - "docker/**"
+  - "huggingface-space/**"
+  - "examples/**"
+  # 他言語ランタイム (coverage 対象外)
+  - "src/csharp/**"
+  - "src/rust/**"
+  - "src/go/**"
+  - "src/wasm/**"
+  - "src/cpp/**"
+  - "android/**"
+
+# -----------------------------------------------------------------------------
+# PR 上に表示するコメント
+# -----------------------------------------------------------------------------
+comment:
+  layout: "reach,diff,flags,tree,reach,footer"
+  behavior: default
+  require_changes: false
+  require_base: false
+  require_head: true
+  show_carryforward_flags: true
+
+# -----------------------------------------------------------------------------
+# Parsers
+# -----------------------------------------------------------------------------
+parsers:
+  gcov:
+    branch_detection:
+      conditional: true
+      loop: true
+      method: false
+      macro: false

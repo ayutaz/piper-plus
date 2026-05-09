@@ -439,7 +439,7 @@ class TestProsody:
         p = _make()
         # "안녕" has 2 syllables; "하세요" has 3 syllables
         # g2pk2 may merge or split differently, so test a simpler case
-        tokens, prosody = p.phonemize_with_prosody("가나다")
+        _tokens, prosody = p.phonemize_with_prosody("가나다")
         # "가나다" = 3 syllables, so a3 should be 3 for all phoneme tokens
         for pi in prosody:
             if pi is not None and pi.a3 > 0:

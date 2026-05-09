@@ -516,8 +516,7 @@ def _read_riff_chunk(fid):
     else:
         # There are also .wav files with "FFIR" or "XFIR" signatures?
         raise ValueError(
-            f"File format {repr(str1)} not understood. Only "
-            "'RIFF' and 'RIFX' supported."
+            f"File format {str1!r} not understood. Only 'RIFF' and 'RIFX' supported."
         )
 
     # Size of entire file
@@ -525,7 +524,7 @@ def _read_riff_chunk(fid):
 
     str2 = fid.read(4)
     if str2 != b"WAVE":
-        raise ValueError(f"Not a WAV file. RIFF form type is {repr(str2)}.")
+        raise ValueError(f"Not a WAV file. RIFF form type is {str2!r}.")
 
     return file_size, is_big_endian
 
@@ -667,7 +666,7 @@ def read(filename, mmap=False):
 
                 raise ValueError("Unexpected end of file.")
             if len(chunk_id) < 4:
-                msg = f"Incomplete chunk ID: {repr(chunk_id)}"
+                msg = f"Incomplete chunk ID: {chunk_id!r}"
                 # If we have the data, ignore the broken chunk
                 if fmt_chunk_received and data_chunk_received:
                     warnings.warn(msg + ", ignoring it.", WavFileWarning, stacklevel=2)
@@ -780,7 +779,7 @@ def write(filename, rate, data):
 
     try:
         dkind = data.dtype.kind
-        if not (dkind in ("i", "f") or dkind == "u" and data.dtype.itemsize == 1):
+        if not (dkind in ("i", "f") or (dkind == "u" and data.dtype.itemsize == 1)):
             raise ValueError(f"Unsupported data type '{data.dtype}'")
 
         header_data = b""

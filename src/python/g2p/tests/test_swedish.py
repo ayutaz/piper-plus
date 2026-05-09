@@ -469,7 +469,7 @@ class TestProsody:
     def test_prosody_stress_value(self):
         """Stressed phonemes have a2=2 in prosody info."""
         p = SwedishPhonemizer()
-        tokens, prosody = p.phonemize_with_prosody("Hej")
+        _tokens, prosody = p.phonemize_with_prosody("Hej")
         has_stress = any(isinstance(pi, ProsodyInfo) and pi.a2 == 2 for pi in prosody)
         assert has_stress, "Expected at least one ProsodyInfo with a2=2 (stress)"
 

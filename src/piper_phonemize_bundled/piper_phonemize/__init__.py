@@ -91,13 +91,13 @@ except ImportError as e:
 
 # Public API
 __all__ = [
-    "phonemize_espeak",
-    "phonemize_codepoints",
-    "phoneme_ids_espeak",
-    "tashkeel_run",
     "DEFAULT_PHONEME_ID_MAP",
-    "phonemize",  # High-level function
     "is_available",
+    "phoneme_ids_espeak",
+    "phonemize",  # High-level function
+    "phonemize_codepoints",
+    "phonemize_espeak",
+    "tashkeel_run",
 ]
 
 

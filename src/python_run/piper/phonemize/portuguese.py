@@ -84,10 +84,7 @@ def _is_intervocalic(i: int, word: str) -> bool:
 
 def _has_accent(word: str) -> bool:
     """Check if word has any accent mark."""
-    for ch in word:
-        if ch in _ACCENTED:
-            return True
-    return False
+    return any(ch in _ACCENTED for ch in word)
 
 
 def _count_vowel_groups(word: str) -> int:

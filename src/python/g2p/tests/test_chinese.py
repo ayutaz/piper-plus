@@ -317,7 +317,7 @@ class TestProsody:
         from piper_plus_g2p.chinese import ChinesePhonemizer
 
         p = ChinesePhonemizer()
-        tokens, prosody = p.phonemize_with_prosody("你好")
+        _tokens, prosody = p.phonemize_with_prosody("你好")
         has_tone = any(
             isinstance(pi, ProsodyInfo) and 1 <= pi.a1 <= 5 for pi in prosody
         )

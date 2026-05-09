@@ -66,7 +66,7 @@ def test_server_files():
             size = len(response.read())
             print(f"  ✓ {file} ({size:,} bytes)")
         except Exception as e:
-            print(f"  ✗ {file} - {str(e)}")
+            print(f"  ✗ {file} - {e!s}")
             all_ok = False
 
     return all_ok

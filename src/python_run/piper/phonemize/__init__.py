@@ -12,16 +12,16 @@ from .token_mapper import map_sequence, register
 
 
 __all__ = [
-    "phonemize_chinese",
-    "phonemize_english",
-    "phonemize_french",
-    "phonemize_japanese",
-    "phonemize_european_portuguese",
-    "phonemize_portuguese",
-    "phonemize_spanish",
+    "SynthesisSegment",
     "get_japanese_id_map",
     "map_sequence",
-    "register",
-    "SynthesisSegment",
+    "phonemize_chinese",
+    "phonemize_english",
+    "phonemize_european_portuguese",
+    "phonemize_french",
+    "phonemize_japanese",
+    "phonemize_portuguese",
+    "phonemize_spanish",
     "process_ssml",
+    "register",
 ]

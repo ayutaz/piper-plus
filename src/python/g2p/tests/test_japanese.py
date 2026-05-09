@@ -230,6 +230,6 @@ class TestProsody:
         from piper_plus_g2p.japanese import JapanesePhonemizer
 
         p = JapanesePhonemizer()
-        tokens, prosody = p.phonemize_with_prosody("こんにちは")
+        _tokens, prosody = p.phonemize_with_prosody("こんにちは")
         has_info = any(isinstance(pi, ProsodyInfo) for pi in prosody)
         assert has_info, "Expected at least one non-None ProsodyInfo entry"

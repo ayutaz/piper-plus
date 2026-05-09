@@ -613,9 +613,8 @@ def _convert_word(word: str) -> list[str]:
                         consonant_count += 1
                     else:
                         break
-                if (
-                    consonant_count >= 2
-                    or all(c in _CONSONANTS for c in remaining)
+                if consonant_count >= 2 or (
+                    all(c in _CONSONANTS for c in remaining)
                     and any(c not in _SILENT_FINAL for c in remaining)
                 ):
                     phonemes.append("ɛ")
@@ -824,10 +823,9 @@ def _split_words(text: str) -> list[str]:
             elif k < len(parts) - 1 and part.lower() in _ELISION_CLITICS:
                 # This part is a clitic; start merging with next part.
                 buf = part
-            else:
-                # Not a clitic; emit as standalone token.
-                if part:
-                    tokens.append(part)
+            # Not a clitic; emit as standalone token.
+            elif part:
+                tokens.append(part)
         if buf:
             tokens.append(buf)
 

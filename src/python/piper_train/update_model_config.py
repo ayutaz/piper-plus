@@ -201,7 +201,7 @@ def main():
             print(f"\nError: {config_path} does not exist")
             continue
 
-        if not config_path.suffix == ".json":
+        if config_path.suffix != ".json":
             print(f"\nWarning: {config_path} is not a JSON file, skipping")
             continue
 

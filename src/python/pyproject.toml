@@ -82,3 +82,62 @@ piper_train = ["VERSION"]
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["piper_train*"]
+
+# -----------------------------------------------------------------------------
+# mypy configuration (piper_train)
+# -----------------------------------------------------------------------------
+# 段階的型付け: ignore_missing_imports でサードパーティ stub 不在を許容。
+# strict は M2-M3 で逐次有効化予定。
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true
+warn_unused_ignores = true
+warn_return_any = true
+warn_redundant_casts = true
+warn_unused_configs = true
+files = ["piper_train"]
+
+[[tool.mypy.overrides]]
+module = "torch.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "pytorch_lightning.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "onnxruntime.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "onnx.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "librosa.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "pyopenjtalk.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "g2p_en.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "pypinyin.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "g2pk2.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "wandb.*"
+ignore_missing_imports = true
+
+# テストは段階的に厳密化 (現状は緩和)
+[[tool.mypy.overrides]]
+module = "tests.*"
+ignore_errors = true

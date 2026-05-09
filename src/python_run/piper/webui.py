@@ -344,7 +344,7 @@ def synthesize_speech(
         return voice.config.sample_rate, audio
     except Exception as e:
         logger.error(f"Synthesis error: {e}")
-        raise gr.Error(f"Synthesis failed: {str(e)}") from e
+        raise gr.Error(f"Synthesis failed: {e!s}") from e
 
 
 def validate_dataset(dataset_path: str) -> dict:

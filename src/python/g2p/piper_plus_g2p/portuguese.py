@@ -849,10 +849,12 @@ def _apply_eu_postprocessing(phonemes: list[str]) -> list[str]:
             or next_ph == " "
             or next_ph in _PUNCTUATION
             or (
-                next_ph in _IPA_CONSONANTS
-                or (len(next_ph) > 1 and next_ph[0] in _IPA_CONSONANTS)
+                (
+                    next_ph in _IPA_CONSONANTS
+                    or (len(next_ph) > 1 and next_ph[0] in _IPA_CONSONANTS)
+                )
+                and next_ph not in _IPA_VOWELS
             )
-            and next_ph not in _IPA_VOWELS
         )
         if is_coda:
             result[i] = "ɫ"

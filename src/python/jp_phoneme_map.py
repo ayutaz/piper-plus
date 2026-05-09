@@ -201,9 +201,9 @@ if __name__ == "__main__":
                 if pua == phoneme:
                     original = orig
                     break
-            print(f"{i:3d}: {repr(phoneme)} (PUA for '{original}')")
+            print(f"{i:3d}: {phoneme!r} (PUA for '{original}')")
         else:
-            print(f"{i:3d}: {repr(phoneme)}")
+            print(f"{i:3d}: {phoneme!r}")
 
     print(f"\nTotal phonemes: {len(phoneme_list)}")
 

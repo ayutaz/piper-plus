@@ -67,13 +67,118 @@ target-version = "py311"
 line-length = 88
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "I", "UP", "B", "SIM"]
+# 段階的に root pyproject.toml と同じセットに揃える。
+# g2p は依存関係が薄いので S/PERF/RUF/PL も追加。
+select = [
+    "E",    # pycodestyle errors
+    "F",    # pyflakes
+    "W",    # pycodestyle warnings
+    "I",    # isort
+    "UP",   # pyupgrade
+    "B",    # flake8-bugbear
+    "SIM",  # flake8-simplify
+    "S",    # flake8-bandit (security)
+    "PERF", # perflint
+    "RUF",  # ruff-specific
+    "PL",   # pylint
+]
+ignore = [
+    "E501",     # line too long
+    "PLR0913",  # too many arguments
+    "PLR2004",  # magic value
+    "PLR0912",  # too many branches
+    "PLR0915",  # too many statements
+    "PLR0911",  # too many returns
+    "S101",     # assert (test で使用)
+    "S105",     # hardcoded password (token/phoneme false positive)
+    "S107",     # hardcoded password default
+    "S110",     # try-except-pass (graceful degradation)
+    "S301",     # pickle
+    "S311",     # pseudo-random (TTS で使用)
+    "SIM102",   # collapsible if (可読性)
+    "SIM108",   # ternary (可読性)
+    "SIM117",   # nested with (可読性)
+    "SIM118",   # in dict.keys()
+    "PERF203",  # try-except in loop
+    "PERF401",  # list comprehension (可読性)
+    "PERF403",  # manual dict comprehension
+    "RUF001",   # ambiguous unicode (CJK)
+    "RUF002",
+    "RUF003",
+    "RUF005",   # collection literal concatenation
+    "RUF012",   # mutable class default
+    "RUF022",   # unsorted __all__ (順序を意図的に保つ場面あり)
+    "RUF100",   # unused noqa (ruff version drift)
+    "PLW0603",  # global statement (cache用途で意図的)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401", "F403"]
+# tests: 日本語/CJK 識別子 (テスト関数名や fixture 名) を許容
+"tests/**/*" = [
+    "ARG",
+    "PLC0415",
+    "S",
+    "PLR2004",
+    "SIM117",
+    "PERF",
+    "PLC2401",  # non-ascii name (test 関数名で日本語使用可)
+    "RUF015",
+]
+"benchmarks/**/*" = ["S", "PLR2004", "PERF", "PLC0415"]
+"tools/**/*" = ["S", "PLC0415"]
 
 [tool.mypy]
 python_version = "3.11"
 ignore_missing_imports = true
 warn_return_any = true
 warn_unused_configs = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+ignore_errors = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# g2p は coverage 閾値を高め (80%) に設定。
+# 本パッケージは独立した PyPI / npm / crates.io リリース対象のため、
+# 他の learning/runtime コードよりも厳しいゲートを敷く。
+addopts = [
+    "--strict-markers",
+    "--tb=short",
+    "-v",
+    "--cov=piper_plus_g2p",
+    "--cov-report=term-missing",
+    "--cov-report=xml",
+    "--cov-fail-under=80",
+]
+# pytest-asyncio: 将来の async G2P API を preempt
+asyncio_mode = "auto"
+
+# -----------------------------------------------------------------------------
+# Coverage configuration (g2p package)
+# -----------------------------------------------------------------------------
+[tool.coverage.run]
+branch = true
+source = ["piper_plus_g2p"]
+omit = [
+    "*/tests/*",
+    "*/test_*.py",
+    "*/__main__.py",
+]
+
+[tool.coverage.report]
+fail_under = 80
+show_missing = true
+skip_covered = false
+precision = 2
+exclude_lines = [
+    "pragma: no cover",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+    "@overload",
+    "\\.\\.\\.",
+]
