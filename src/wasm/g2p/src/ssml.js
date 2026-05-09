@@ -332,9 +332,21 @@ function mergeSegments(segments) {
 /**
  * Strip any tags from a chunk of text, returning only the inner text.
  * Used as a fallback when XML parsing fails.
+ *
+ * Multi-pass to defeat reconstruction attacks like `<scr<script>ipt>`,
+ * where a single pass removes the inner `<script>` and leaves the
+ * outer fragments to re-form `<script>`. Loop until the string is
+ * stable; since each pass only removes complete `<...>` tags, the
+ * loop converges in O(depth) steps.
  */
 function stripTags(text) {
-  return text.replace(/<[^>]*>/g, '').trim();
+  let result = text;
+  let prev;
+  do {
+    prev = result;
+    result = result.replace(/<[^>]*>/g, '');
+  } while (result !== prev);
+  return result.trim();
 }
 
 /**
