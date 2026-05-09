@@ -405,7 +405,11 @@ TEST(SpeakerEncoderE2E, CosineGateAgainstPinnedEmbedding) {
     opts.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_ALL);
     opts.SetIntraOpNumThreads(2);
 
-    Ort::Session session(env, encoder_path.c_str(), opts);
+    // Ort::Session expects ORTCHAR_T*: wchar_t* on Windows, char* on Unix.
+    // Routing the std::string through std::filesystem::path picks the
+    // correct OS-native pointer type via path::c_str().
+    const std::filesystem::path encoder_fs_path(encoder_path);
+    Ort::Session session(env, encoder_fs_path.c_str(), opts);
 
     Ort::AllocatorWithDefaultOptions alloc;
     const auto input_name_ptr = session.GetInputNameAllocated(0, alloc);

@@ -30,20 +30,25 @@ int main(int argc, char *argv[]) {
   auto modelPath = std::string(argv[1]);
   auto outputPath = std::string(argv[2]);
 
-  // Skip test if model file is not available
+  // Skip test if model file is not available. Pass std::filesystem::path
+  // objects directly to ifstream (C++17) — `path::c_str()` returns
+  // wchar_t* on MSVC which conflicts with the const char* overloads.
   {
     auto safeModelPath = piper_plus::sanitizeCliPath(modelPath);
     if (!safeModelPath) {
       std::cout << "SKIPPED: Invalid model path: " << modelPath << std::endl;
       return 77;
     }
-    std::ifstream modelCheck(safeModelPath->c_str());
+    std::ifstream modelCheck(*safeModelPath);
     if (!modelCheck.good()) {
       std::cout << "SKIPPED: Model file not found: " << modelPath << std::endl;
       return 77; // CTest SKIP_RETURN_CODE
     }
     auto safeConfigPath = piper_plus::sanitizeCliPath(modelPath + ".json");
-    std::ifstream configCheck(safeConfigPath ? safeConfigPath->c_str() : (modelPath + ".json").c_str());
+    const std::filesystem::path configPathToOpen = safeConfigPath
+        ? *safeConfigPath
+        : std::filesystem::path(modelPath + ".json");
+    std::ifstream configCheck(configPathToOpen);
     if (!configCheck.good()) {
       std::cout << "SKIPPED: Config file not found: " << modelPath + ".json" << std::endl;
       return 77;
@@ -63,7 +68,10 @@ int main(int argc, char *argv[]) {
 
   // Output audio to WAV file
   auto safeOutputPath = piper_plus::sanitizeCliPath(outputPath);
-  ofstream audioFile(safeOutputPath ? safeOutputPath->c_str() : outputPath.c_str(), ios::binary);
+  const std::filesystem::path outputPathToOpen = safeOutputPath
+      ? *safeOutputPath
+      : std::filesystem::path(outputPath);
+  ofstream audioFile(outputPathToOpen, ios::binary);
 
   piper::SynthesisResult result;
   piper::textToWavFile(piperConfig, voice, "This is a test.", audioFile,

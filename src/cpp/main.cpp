@@ -998,9 +998,13 @@ void parseArgs(int argc, char *argv[], RunConfig &runConfig) {
     return;
   }
 
-  // Verify model file exists; if not, try resolving as a model name/alias
+  // Verify model file exists; if not, try resolving as a model name/alias.
+  // Pass path objects directly to ifstream (C++17) so MSVC's wchar_t-based
+  // `path::c_str()` does not conflict with the const char* overloads.
   auto safeModelPath = piper_plus::sanitizeCliPath(runConfig.modelPath);
-  ifstream modelFile(safeModelPath ? safeModelPath->c_str() : runConfig.modelPath.c_str(), ios::binary);
+  const std::filesystem::path& modelPathToOpen =
+      safeModelPath ? *safeModelPath : runConfig.modelPath;
+  ifstream modelFile(modelPathToOpen, ios::binary);
   if (!modelFile.good()) {
     auto modelDir = runConfig.modelDir.value_or(piper::getDefaultModelDir());
     auto resolved = piper::resolveModelPath(runConfig.modelPath.string(), modelDir);
@@ -1008,7 +1012,7 @@ void parseArgs(int argc, char *argv[], RunConfig &runConfig) {
       spdlog::info("Resolved model name '{}' to {}", runConfig.modelPath.string(), resolved->string());
       runConfig.modelPath = resolved.value();
       auto safeResolvedPath = piper_plus::sanitizeCliPath(runConfig.modelPath);
-      modelFile.open(safeResolvedPath ? safeResolvedPath->c_str() : runConfig.modelPath.c_str(), ios::binary);
+      modelFile.open(safeResolvedPath ? *safeResolvedPath : runConfig.modelPath, ios::binary);
     }
     if (!modelFile.good()) {
       // Check if it looks like a model name (no path separators or extension)
@@ -1048,7 +1052,9 @@ void parseArgs(int argc, char *argv[], RunConfig &runConfig) {
 
   // Verify model config exists
   auto safeModelConfigPath = piper_plus::sanitizeCliPath(runConfig.modelConfigPath);
-  ifstream modelConfigFile(safeModelConfigPath ? safeModelConfigPath->c_str() : runConfig.modelConfigPath.c_str());
+  const std::filesystem::path& modelConfigPathToOpen =
+      safeModelConfigPath ? *safeModelConfigPath : runConfig.modelConfigPath;
+  ifstream modelConfigFile(modelConfigPathToOpen);
   if (!modelConfigFile.good()) {
     throw runtime_error("Model config doesn't exist");
   }
