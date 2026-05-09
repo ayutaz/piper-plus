@@ -198,3 +198,133 @@ class TestProsody:
         p = PortuguesePhonemizer()
         _, prosody = p.phonemize_with_prosody("Olá")
         assert any(isinstance(pi, ProsodyInfo) and pi.a2 == 2 for pi in prosody)
+
+
+class TestEuropeanPortuguese:
+    """Pin the five BR↔EU contrasts captured by `_apply_eu_postprocessing`.
+
+    See ``docs/spec/pt-dialect-contract.toml`` (spec_version 2,
+    ``[implementation.differences]``) for the typological references
+    (Cruz-Ferreira 1995; Mateus & d'Andrade 2000).
+    """
+
+    def test_dialect_enum_default_is_br(self):
+        from piper_plus_g2p.portuguese import Dialect, PortuguesePhonemizer
+
+        p = PortuguesePhonemizer()
+        assert p.dialect == Dialect.BR
+        assert p.language_code == "pt"
+
+    def test_european_phonemizer_language_code(self):
+        from piper_plus_g2p.portuguese import (
+            Dialect,
+            EuropeanPortuguesePhonemizer,
+        )
+
+        eu = EuropeanPortuguesePhonemizer()
+        assert eu.dialect == Dialect.EU
+        assert eu.language_code == "pt-PT"
+
+    def test_parametric_eu_equals_subclass(self):
+        from piper_plus_g2p.portuguese import (
+            Dialect,
+            EuropeanPortuguesePhonemizer,
+            PortuguesePhonemizer,
+        )
+
+        param = PortuguesePhonemizer(dialect=Dialect.EU)
+        sub = EuropeanPortuguesePhonemizer()
+        for word in ["noite", "cidade", "mais", "Brasil", "carro", "olá mundo"]:
+            assert param.phonemize(word) == sub.phonemize(word), (
+                f"divergence on {word!r}: {param.phonemize(word)} "
+                f"vs {sub.phonemize(word)}"
+            )
+
+    # ---- 5 differences pinned individually ----
+
+    def test_difference1_no_td_palatalisation_before_final_e(self):
+        from piper_plus_g2p.portuguese import (
+            EuropeanPortuguesePhonemizer,
+            PortuguesePhonemizer,
+        )
+
+        br = PortuguesePhonemizer().phonemize("noite")
+        eu = EuropeanPortuguesePhonemizer().phonemize("noite")
+        assert "tʃ" in br and "ɨ" not in br, f"BR baseline drift: {br}"
+        assert "t" in eu and "tʃ" not in eu, f"EU palatalisation leaked: {eu}"
+        assert "ɨ" in eu, f"EU final-e centralisation missing: {eu}"
+
+    def test_difference2_final_unstressed_e_to_central_vowel(self):
+        from piper_plus_g2p.portuguese import (
+            EuropeanPortuguesePhonemizer,
+            PortuguesePhonemizer,
+        )
+
+        br = PortuguesePhonemizer().phonemize("cidade")
+        eu = EuropeanPortuguesePhonemizer().phonemize("cidade")
+        assert br[-1] == "i", f"BR final-e reduction broke: {br}"
+        assert eu[-1] == "ɨ", f"EU final-ɨ centralisation broke: {eu}"
+
+    def test_difference3_coda_s_to_postalveolar(self):
+        from piper_plus_g2p.portuguese import (
+            EuropeanPortuguesePhonemizer,
+            PortuguesePhonemizer,
+        )
+
+        br = PortuguesePhonemizer().phonemize("mais")
+        eu = EuropeanPortuguesePhonemizer().phonemize("mais")
+        assert br[-1] == "s", f"BR coda-s drift: {br}"
+        assert eu[-1] == "ʃ", f"EU coda-s → ʃ broke: {eu}"
+
+    def test_difference4_coda_l_velarisation(self):
+        from piper_plus_g2p.portuguese import (
+            EuropeanPortuguesePhonemizer,
+            PortuguesePhonemizer,
+        )
+
+        br = PortuguesePhonemizer().phonemize("Brasil")
+        eu = EuropeanPortuguesePhonemizer().phonemize("Brasil")
+        assert br[-1] == "w", f"BR coda-l vocalisation drift: {br}"
+        assert eu[-1] == "ɫ", f"EU coda-l → ɫ broke: {eu}"
+
+    def test_difference5_r_canonicalisation_to_uvular(self):
+        from piper_plus_g2p.portuguese import EuropeanPortuguesePhonemizer
+
+        eu = EuropeanPortuguesePhonemizer()
+        for word in ["cantar", "carro", "rato"]:
+            tokens = eu.phonemize(word)
+            assert "h" not in tokens, (
+                f"EU left BR's debuccalised /h/ in output for {word!r}: {tokens}"
+            )
+
+    # ---- Phoneme-count preservation (prosody alignment) ----
+
+    def test_eu_postprocessing_preserves_phoneme_count(self):
+        from piper_plus_g2p.portuguese import (
+            EuropeanPortuguesePhonemizer,
+            PortuguesePhonemizer,
+        )
+
+        for word in [
+            "noite",
+            "cidade",
+            "mais",
+            "Brasil",
+            "obrigado",
+            "olá mundo",
+            "telefone",
+        ]:
+            br = PortuguesePhonemizer().phonemize(word)
+            eu = EuropeanPortuguesePhonemizer().phonemize(word)
+            assert len(br) == len(eu), (
+                f"phoneme-count drift for {word!r}: BR={len(br)} EU={len(eu)} "
+                f"(BR={br} EU={eu})"
+            )
+
+    def test_eu_prosody_alignment(self):
+        from piper_plus_g2p.portuguese import EuropeanPortuguesePhonemizer
+
+        eu = EuropeanPortuguesePhonemizer()
+        for sentence in ["noite calma", "Brasil é grande", "cidade fria"]:
+            phonemes, prosody = eu.phonemize_with_prosody(sentence)
+            assert len(phonemes) == len(prosody)

@@ -78,32 +78,31 @@ class TestPortugueseDialectAlias:
         registry.register("pt", dummy)
         assert registry.get("pt-br") is dummy
 
-    def test_pt_PT_raises_explicit_error(self):
-        """pt-PT (European Portuguese) must raise an explicit ValueError
-        rather than silently routing through the BR phonemizer.
-        """
-        registry = PhonemizerRegistry()
-        dummy = _DummyPhonemizer()
-        registry.register("pt", dummy)
-        with pytest.raises(ValueError, match="European Portuguese"):
-            registry.get("pt-PT")
+    def test_pt_PT_resolves_to_european_phonemizer(self):
+        """pt-PT must resolve to the EU phonemizer (NOT the BR one)."""
+        from piper_plus_g2p.portuguese import (
+            EuropeanPortuguesePhonemizer,
+            PortuguesePhonemizer,
+        )
 
-    def test_pt_pt_lowercase_also_rejected(self):
         registry = PhonemizerRegistry()
-        registry.register("pt", _DummyPhonemizer())
-        with pytest.raises(ValueError, match="European Portuguese"):
-            registry.get("pt-pt")
+        registry.register("pt", PortuguesePhonemizer())
+        registry.register("pt-PT", EuropeanPortuguesePhonemizer())
+        eu = registry.get("pt-PT")
+        assert isinstance(eu, EuropeanPortuguesePhonemizer)
+        # And it must NOT be the same instance as `pt` (which is BR).
+        assert eu is not registry.get("pt")
 
-    def test_pt_PT_error_does_not_leak_into_composite_path(self):
-        """The pt-PT rejection must NOT be a side effect of the
-        composite-code splitter — it must fire even if PT is registered
-        as a separate language.
-        """
+    def test_pt_pt_lowercase_alias_also_resolves_to_eu(self):
+        from piper_plus_g2p.portuguese import (
+            EuropeanPortuguesePhonemizer,
+            PortuguesePhonemizer,
+        )
+
         registry = PhonemizerRegistry()
-        registry.register("pt", _DummyPhonemizer())
-        registry.register("PT", _DummyPhonemizer())  # hypothetical
-        with pytest.raises(ValueError, match="European Portuguese"):
-            registry.get("pt-PT")
+        registry.register("pt", PortuguesePhonemizer())
+        registry.register("pt-PT", EuropeanPortuguesePhonemizer())
+        assert registry.get("pt-pt") is registry.get("pt-PT")
 
     def test_alias_is_cached_after_first_lookup(self):
         """The first pt-BR lookup must populate the registry under
@@ -115,13 +114,12 @@ class TestPortugueseDialectAlias:
         registry.get("pt-BR")
         assert "pt-BR" in registry.available()
 
-    def test_unsupported_dialect_does_not_pollute_registry(self):
-        """A failed pt-PT lookup must NOT add 'pt-PT' to the registry
-        (no silent side effect from the failure path).
-        """
+    def test_eu_alias_is_cached_after_first_lookup(self):
+        """The first pt-pt lookup must populate the registry under 'pt-pt'."""
+        from piper_plus_g2p.portuguese import EuropeanPortuguesePhonemizer
+
         registry = PhonemizerRegistry()
-        registry.register("pt", _DummyPhonemizer())
-        with pytest.raises(ValueError):
-            registry.get("pt-PT")
-        assert "pt-PT" not in registry.available()
+        registry.register("pt-PT", EuropeanPortuguesePhonemizer())
         assert "pt-pt" not in registry.available()
+        registry.get("pt-pt")
+        assert "pt-pt" in registry.available()
