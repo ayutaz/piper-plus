@@ -13,34 +13,34 @@ Issue #383 follow-up で ORT 1.17.0 → 1.20.0 に上げた際、6 ファイル 
 検査対象 (2 種類):
 
 1. **Exact-match group** — canonical と完全一致するべき (C++ パイプライン
-   の hard-coded URL / env / cache key / Dockerfile)。drift があれば fail。
+    の hard-coded URL / env / cache key / Dockerfile)。drift があれば fail。
 
-   * ``cmake/find_onnxruntime_windows.cmake`` (Windows pre-built)
-   * ``.github/workflows/release-shared-lib.yml`` (iOS xcframework + Android release)
-   * ``.github/workflows/android-build.yml`` (Android PR CI)
-   * ``.github/workflows/release-kotlin-g2p.yml`` (Kotlin G2P AAR release)
-   * ``.github/workflows/kotlin-g2p-ci.yml`` (Kotlin G2P PR CI)
-   * ``.github/workflows/build-piper.yml`` (Linux/macOS source build)
-   * ``.github/workflows/_build-test-cpp.yml`` (Linux/macOS arm64/x86_64/Windows pre-built)
-   * ``docker/cpp-dev/Dockerfile`` (CPU-only dev image; Issue #372)
+    * ``cmake/find_onnxruntime_windows.cmake`` (Windows pre-built)
+    * ``.github/workflows/release-shared-lib.yml`` (iOS xcframework + Android release)
+    * ``.github/workflows/android-build.yml`` (Android PR CI)
+    * ``.github/workflows/release-kotlin-g2p.yml`` (Kotlin G2P AAR release)
+    * ``.github/workflows/kotlin-g2p-ci.yml`` (Kotlin G2P PR CI)
+    * ``.github/workflows/build-piper.yml`` (Linux/macOS source build)
+    * ``.github/workflows/_build-test-cpp.yml`` (Linux/macOS arm64/x86_64/Windows pre-built)
+    * ``docker/cpp-dev/Dockerfile`` (CPU-only dev image; Issue #372)
 
 2. **Floor-check group** — canonical より低い floor pin は禁止 (Issue
-   #372 Option C 方針)。pinned version の場合も canonical 以上を要求。
+    #372 Option C 方針)。pinned version の場合も canonical 以上を要求。
 
-   * ``src/python/pyproject.toml`` (train / inference / inference-gpu extras)
-   * ``src/python_run/requirements.txt`` (runtime CPU)
-   * ``src/python_run/requirements_gpu.txt`` (runtime GPU)
-   * ``src/python_run/setup.py`` (runtime extras_require)
-   * ``src/csharp/PiperPlus.{Core,Cli,Cli.Tests,Core.Tests,Bench}.csproj``
-   * ``src/go/go.mod``
-   * ``src/wasm/openjtalk-web/package.json`` (peerDependencies)
+    * ``src/python/pyproject.toml`` (train / inference / inference-gpu extras)
+    * ``src/python_run/requirements.txt`` (runtime CPU)
+    * ``src/python_run/requirements_gpu.txt`` (runtime GPU)
+    * ``src/python_run/setup.py`` (runtime extras_require)
+    * ``src/csharp/PiperPlus.{Core,Cli,Cli.Tests,Core.Tests,Bench}.csproj``
+    * ``src/go/go.mod``
+    * ``src/wasm/openjtalk-web/package.json`` (peerDependencies)
 
 検査範囲外:
 
-* Rust ``src/rust/piper-core/Cargo.toml`` の ``ort`` crate
-  — ``ort`` のバージョンは upstream ORT と 1:1 対応せず (RC 系列の
-  ``2.0.0-rc.X`` は ORT 1.20 系をラップ)、また stable 版が未公開
-  (2026-05 時点)。``docs/spec/ort-versions.md`` で別途トラッキング。
+* Rust ``src/rust/piper-core/Cargo.toml`` の ``ort`` Rust package
+    — ``ort`` のバージョンは upstream ORT と 1:1 対応せず (RC 系列の
+    ``2.0.0-rc.X`` は ORT 1.20 系をラップ)、また stable 版が未公開
+    (2026-05 時点)。``docs/spec/ort-versions.md`` で別途トラッキング。
 * ``docs/`` (history を含むため自動検査せず、人間がレビューする)
 
 Usage:

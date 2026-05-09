@@ -52,9 +52,9 @@ jobs:
     # Wave 3 で 14 hook (markdownlint / codespell / gitleaks / hadolint /
     # editorconfig-checker / validate-pyproject 等) 追加 + cargo clippy
     # workspace.lints opt-in で重くなり、10 分で timeout していた。
-    # 25 分に延長 (markdownlint で 276 .md scan + cargo clippy で workspace
-    # build が大半を占める)。
-    timeout-minutes: 25
+    # 25 分でも 14:59 → 15:24 = 25:15 で再 timeout (PR #401, run 25604145168)
+    # したため 35 分に延長 + 専用 workflow のある hook を更に SKIP に追加。
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v6
         with:
@@ -94,9 +94,12 @@ jobs:
           #   * gofmt / go-vet / golangci-lint → go-ci.yml
           #   * dotnet-format             → csharp-ci.yml + ci.yml
           #   * mypy-g2p                  → g2p-python-ci.yml
+          #   * markdownlint-cli2         → markdownlint.yml
+          #   * codespell                 → codespell.yml
+          #   * hadolint                  → hadolint.yml
           # The corresponding *local* pre-commit hooks still run so
           # contributors catch drift before push.
-          SKIP: cargo-clippy,cargo-fmt,gofmt,go-vet,golangci-lint,mypy-g2p,dotnet-format
+          SKIP: cargo-clippy,cargo-fmt,gofmt,go-vet,golangci-lint,mypy-g2p,dotnet-format,markdownlint-cli2,codespell,hadolint
         run: |
           # --show-diff-on-failure makes drift trivial to fix locally:
           # contributors see the exact patch the hooks produced.

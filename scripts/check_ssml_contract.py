@@ -2,9 +2,9 @@
 """Three-way drift check for the SSML subset contract.
 
 Verifies byte-for-byte agreement across the three sources of truth:
-  1. ``docs/spec/ssml-contract.toml``                        — human-edited spec
-  2. ``src/python/g2p/piper_plus_g2p/ssml.py``               — Python canonical
-  3. ``tests/fixtures/ssml/contract.json``                   — JSON fixture
+    1. ``docs/spec/ssml-contract.toml``                        — human-edited spec
+    2. ``src/python/g2p/piper_plus_g2p/ssml.py``               — Python canonical
+    3. ``tests/fixtures/ssml/contract.json``                   — JSON fixture
                                                                 consumed by
                                                                 Rust/Go/C# tests
 

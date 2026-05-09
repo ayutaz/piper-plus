@@ -5,12 +5,12 @@ The contract toml (`docs/spec/language-id-map-contract.toml`) lists a canonical
 language code -> integer ID mapping that ALL trained piper-plus checkpoints
 agree on. This script verifies:
 
-  1. Python canonical (`prepare_multilingual_dataset.py:LANGUAGE_ID_MAP`,
-     `ALL_LANGUAGES`) matches the toml exactly.
-  2. Each per-runtime literal listed under `[[runtime_sources.entries]]`
-     contains the expected mapping (7-lang or 6-lang form), byte-for-byte.
-  3. C# / C++ entries (kind = "none") still point at existing files but are
-     intentionally NOT compared (they are data-driven from config JSON).
+    1. Python canonical (`prepare_multilingual_dataset.py:LANGUAGE_ID_MAP`,
+        `ALL_LANGUAGES`) matches the toml exactly.
+    2. Each per-runtime literal listed under `[[runtime_sources.entries]]`
+        contains the expected mapping (7-lang or 6-lang form), byte-for-byte.
+    3. C# / C++ entries (kind = "none") still point at existing files but are
+        intentionally NOT compared (they are data-driven from config JSON).
 
 Drift here is catastrophic — see `docs/spec/language-id-map-contract.toml` for
 the rationale. A change to LANGUAGE_ID_MAP requires editing every runtime
