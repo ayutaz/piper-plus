@@ -1,15 +1,18 @@
 # GitHub Pages デプロイメント手順
 
 ## 概要
+
 このドキュメントでは、WebAssembly版Piperのデモページを GitHub Pages にデプロイする手順を説明します。
 
 ## 必要な修正
 
 ### 1. 相対パスの調整
+
 現在の実装では、すべてのリソースが `../` で始まる相対パスを使用しています。
 GitHub Pages でホストする場合は、これらのパスを調整する必要があります。
 
 ### 2. config.js の設定
+
 `demo/config.js` を以下のように編集：
 
 ```javascript

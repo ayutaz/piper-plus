@@ -17,6 +17,7 @@ allowed-tools: Bash(uv run *) Bash(cargo test *) Bash(dotnet test *) Bash(go tes
 ## ターゲット選択
 
 `$ARGUMENTS`:
+
 - `python` → Python 全体
 - `rust` → Rust workspace
 - `cs` → .NET solution
@@ -42,6 +43,7 @@ cd ../../..
 ```
 
 **注意:**
+
 - pytest.ini の `--cov` を `-o addopts=""` で上書き (pytest-cov が無い環境向け)
 - 学習・ベンチマーク系テストは除外 (`-m "unit and not training and not benchmark"` も可)
 

@@ -17,6 +17,7 @@ allowed-tools: Bash(uv run *) Bash(cargo *) Bash(dotnet *) Bash(go test *) Bash(
 ## スコープ判定
 
 引数 `$ARGUMENTS`:
+
 - `python` → src/python/ + src/python_run/ のみ
 - `rust` → src/rust/ のみ
 - `cs` → src/csharp/ のみ

@@ -110,6 +110,7 @@ pwsh -File tools/benchmark/issue-383/bench_pipeline_cpp.ps1
 ```
 
 成果物:
+
 * `bench_pipeline_cpp.ps1` — 計測スクリプト
 * `cpp_bench_results.json` — JSON 形式の生データ (next run で生成)
 * `cpp_bench_results.md` — 本ファイル

@@ -29,6 +29,7 @@ for each (duration_frames, phoneme_token):
 ```
 
 **デフォルト値:**
+
 - `hop_length`: 256 (VITS medium quality)
 - `sample_rate`: モデル設定 (`config.json` の `audio.sample_rate`、通常 22050)
 
@@ -51,6 +52,7 @@ for each (duration_frames, phoneme_token):
 ```
 
 ### JSON (compact)
+
 単一行の JSON。ネットワーク送信や log 出力向け。
 
 ### TSV
@@ -144,6 +146,7 @@ curl "http://localhost:5000/api/phoneme-timing?text=Hello&format=tsv"
 ## ユースケース
 
 ### リップシンク
+
 3D アバター (VRM, Live2D) や 2D キャラクターの口の形状を音素に同期させる:
 
 ```javascript
@@ -162,6 +165,7 @@ result.timing.phonemes.forEach(p => {
 ```
 
 ### カラオケ字幕
+
 歌詞を音素単位でハイライト表示:
 
 ```python
@@ -170,6 +174,7 @@ for p in timing.phonemes:
 ```
 
 ### 動画字幕生成
+
 SRT を直接動画編集ソフト (DaVinci Resolve, Premiere) にインポート:
 
 ```python

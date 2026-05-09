@@ -341,6 +341,7 @@ cat test.jsonl | uv run python -m piper_train.infer_onnx --model <model.onnx> --
 v3 → v4 → v4-freeze-dp → v4-emb-lang-fix → 6lang-v2 と段階的改善。
 
 **Key learnings:**
+
 - `emb_lang[0]` → `emb_lang[1:N]` コピーで声質統一 (ONNX エクスポート前の後処理)
 - `--freeze-dp` で DP catastrophic forgetting 防止
 - `--resume-from-multispeaker-checkpoint` で自動変換 (emb_g 除去 + emb_lang 補正 + freeze-dp)

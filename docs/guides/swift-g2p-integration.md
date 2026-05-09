@@ -51,6 +51,7 @@ iOS / Swift プロジェクトから piper-plus の **G2P (Grapheme-to-Phoneme) 
 | スウェーデン語 | `sv` | 規則ベース | なし | <0.1 MB |
 
 > ※ **「バイナリ寄与」は埋込辞書ファイルの非圧縮サイズ。** xcframework に最終的に追加されるサイズは debuginfo / 圧縮で前後します。代表値は次の通り (release ビルド、aarch64-apple-ios slice):
+>
 > - **xcframework.zip ダウンロードサイズ**: ~3-5 MB (圧縮後、SwiftPM が GitHub から取得する物理サイズ)
 > - **app への増分**: ~30-35 MB (`bundled-dicts` + jpreprocess + NAIST-JDIC) — App Store の `over-the-air` 制限 (iOS 16 で 200 MB → 制限緩和) には収まるが、App Clip の 10 MB 制約は **超える**
 > - **未 strip staticlib (CI 中間成果物)**: ~84 MB — リリース時に xcodebuild 側で symbol strip され体感サイズが縮む
@@ -163,6 +164,7 @@ do {
 ```
 
 > `G2PError` は 4 ケース:
+>
 > - `initializationFailed(requestedLanguages: [Language])` — `Phonemizer.init` の語リストを保持
 > - `phonemizeReturnedNull(language: Language)` — どの言語呼び出しで NULL が返ったか
 > - `invalidUTF8`

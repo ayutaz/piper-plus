@@ -38,6 +38,7 @@
 > **テスト文**: "Hello, how are you doing today?" (英語, 25 音素)
 > **計測パラメータ**: warmup 5 回 / 計測 30 回 (intra-op threads = auto)
 > **使用モデル**:
+>
 > - piper-plus: 6lang MB-iSTFT 75epoch ONNX (PR #320 で導入された統一 Decoder)
 > - Piper 本家: `en_US-lessac-medium` (rhasspy/piper-voices v1.0.0)
 > - sherpa-onnx: `vits-piper-en_US-amy-low` (k2-fsa リリース)

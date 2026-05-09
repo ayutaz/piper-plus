@@ -26,15 +26,18 @@ jobs:
       - uses: actions/checkout@v6
 
       - uses: DavidAnson/markdownlint-cli2-action@v17
-        continue-on-error: true  # baseline 確立まで warn-only (Wave 後段で strict 化)
         with:
           globs: |
             **/*.md
             !node_modules
+            !**/node_modules/**
             !.git
+            !.build/**
+            !**/.venv/**
             !**/CHANGELOG.md
             !test/models/**
             !**/build/**
+            !build-*/**
             !**/dist/**
             !**/target/**
           config: .markdownlint.yaml

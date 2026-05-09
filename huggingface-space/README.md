@@ -42,6 +42,7 @@ A web-based demo for [piper-plus](https://github.com/ayutaz/piper-plus), featuri
 ## Models
 
 This demo uses a multilingual model trained on 6 languages with 571 speakers and 508,187 utterances:
+
 - **Multilingual 6-lang (Medium)**: Supports Japanese, English, Chinese, Spanish, French, and Portuguese with a unified 173-symbol model
 
 ## Usage

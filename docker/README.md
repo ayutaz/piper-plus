@@ -138,6 +138,7 @@ response.stream_to_file("output.wav")
 ```
 
 対応エンドポイント:
+
 - `POST /v1/audio/speech` — 音声合成
 - `GET /v1/models` — モデル一覧
 - `GET /v1/audio/speech/languages` — 対応言語一覧

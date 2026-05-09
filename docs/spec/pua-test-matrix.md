@@ -7,6 +7,7 @@ multi-codepoint keys in the distributed `tsukuyomi` config).
 **Contract source:** [`docs/spec/pua-contract.toml`](pua-contract.toml)
 
 **CI workflows:**
+
 - [`.github/workflows/pua-consistency.yml`](../../.github/workflows/pua-consistency.yml)
   — runs on every PR touching PUA-related files
 - [`.github/workflows/g2p-cross-platform-ci.yml`](../../.github/workflows/g2p-cross-platform-ci.yml)

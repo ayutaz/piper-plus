@@ -34,6 +34,7 @@ the canonical cross-EP gate used by SpeechBrain and other ECAPA-TDNN consumers.
 | Resampling | linear interpolation, float32 | `resample_linear` |
 
 Fixture: `test/fixtures/speaker_encoder_golden.json`. Includes:
+
 - `hann_window` (length, first_5, last_5, mid_value, sha-256 checksum)
 - `mel_filterbank` (shape, per-band sums, total sum, checksum)
 - 4 deterministic test cases (sine 440Hz, sine 1000Hz, multitone, resample
@@ -130,6 +131,7 @@ This mirrors the TTS model alias pattern (`hf_hub_download` in
 | C/C++ | ✅ scaffold (uses `Ort::Session` directly; the C API stub remains documented as EXPERIMENTAL) | `src/cpp/tests/test_speaker_encoder_e2e.cpp` |
 
 All 6 runtimes share the same skip semantics:
+
 1. Skip when fixture lacks `e2e_cosine_gate` block.
 2. Skip when `PIPER_SPEAKER_ENCODER_ONNX_PATH` is unset (and Python's
    `PIPER_SPEAKER_ENCODER_E2E=1` HF download path is also unset).

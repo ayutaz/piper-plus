@@ -85,6 +85,7 @@ https://download.onnxruntime.ai/pod-archive-onnxruntime-c-${ONNXRUNTIME_VERSION}
 > (static archive) を出力していたが、**現行 CDN zip は `.framework` バンドル形式の
 > Mach-O dynamic library のみを提供**する。`.a` static archive は同梱されない。
 > したがって:
+>
 > - 旧来の `.a` を CMake で static link する CI ロジックは流用不可、`.framework`
 >   ベースに書き直す必要がある
 > - iOS では dylib 単体配布は App Store が拒否するため、消費者側で
@@ -226,14 +227,14 @@ Plan A の xcframework ビルドロジック (`xcodebuild -create-xcframework`) 
 
 ## 7. 関連リンク
 
-- Issue #377: https://github.com/ayutaz/piper-plus/issues/377
-- Failed v1.12.0 run: https://github.com/ayutaz/piper-plus/actions/runs/25304553360
-- ONNX Runtime iOS Build Docs: https://onnxruntime.ai/docs/build/ios.html
-- ONNX Runtime SPM Repo: https://github.com/microsoft/onnxruntime-swift-package-manager
-- 業界事例 (sherpa-onnx): https://github.com/k2-fsa/sherpa-onnx/blob/master/.github/workflows/build-xcframework.yaml
-- 業界事例 (whisper.cpp): https://github.com/ggml-org/whisper.cpp/blob/master/build-xcframework.sh
-- 業界事例 (VOICEVOX/onnxruntime-builder): https://github.com/VOICEVOX/onnxruntime-builder/releases
-- ORT issue #21181 (CocoaPods archive zip 欠番): https://github.com/microsoft/onnxruntime/issues/21181
+- Issue #377: <https://github.com/ayutaz/piper-plus/issues/377>
+- Failed v1.12.0 run: <https://github.com/ayutaz/piper-plus/actions/runs/25304553360>
+- ONNX Runtime iOS Build Docs: <https://onnxruntime.ai/docs/build/ios.html>
+- ONNX Runtime SPM Repo: <https://github.com/microsoft/onnxruntime-swift-package-manager>
+- 業界事例 (sherpa-onnx): <https://github.com/k2-fsa/sherpa-onnx/blob/master/.github/workflows/build-xcframework.yaml>
+- 業界事例 (whisper.cpp): <https://github.com/ggml-org/whisper.cpp/blob/master/build-xcframework.sh>
+- 業界事例 (VOICEVOX/onnxruntime-builder): <https://github.com/VOICEVOX/onnxruntime-builder/releases>
+- ORT issue #21181 (CocoaPods archive zip 欠番): <https://github.com/microsoft/onnxruntime/issues/21181>
 
 ---
 

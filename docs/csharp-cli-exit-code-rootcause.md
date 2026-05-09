@@ -5,6 +5,7 @@
 `PiperPlus.Cli` の voice-cloning validation が `LogError(...) + Environment.ExitCode = 1 + return;` を実行しても、 `--test-mode` 経路では process exit code が 0 のまま (validation 由来の non-zero が伝搬しない)。
 
 CI で fail した test:
+
 - `CliIntegrationTests.ReferenceAudio_WithoutSpeakerEncoderModel_Errors`
 - `CliIntegrationTests.SpeakerEmbedding_InvalidFileSize_Errors`
 - `CliIntegrationTests.SpeakerEmbedding_EmptyFile_Errors`
@@ -64,6 +65,7 @@ PR #401 で 3 新規 test (`ReferenceAudio_WithoutSpeakerEncoderModel_Errors` et
 4. C# overload resolution は lambda の int return から `Func<ParseResult, int>` を選択 → `Invoke()` が int を返す → Main の exit code に伝搬
 
 `return Environment.ExitCode;` (vs `return 1;` の直接置換) を採用する理由:
+
 - 既存 28 箇所の `Environment.ExitCode = 1; return;` の直前 set を保持 → 振る舞い等価で diff 最小
 - 既存 success path (`return;` のみ) は `Environment.ExitCode` 初期値 0 を返す → 等価
 

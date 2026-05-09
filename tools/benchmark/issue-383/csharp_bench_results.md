@@ -69,6 +69,7 @@ System.NullReferenceException
 ### 問題 2: parallel mode が serial より大幅に遅い (機能 regression)
 
 クラッシュしない範囲でも、parallel mode は serial mode より一貫して **遅い**:
+
 * N=1 (parallelism=1, serial path のはず): +80.9%
 * N=2: +65.3%
 * N=5 (1 rep 完走): +146.0%
@@ -76,6 +77,7 @@ System.NullReferenceException
 
 N=1 は `SentenceParallelEncoder.EncodeAll` の serial 分岐 (`parallelism <= 1
 || sentences.Count <= 1`) を通るはずなのに、それでも +80% 遅い。原因候補:
+
 1. `Parallel.For` の `ParallelOptions` 構築コスト (これは N>=2 のみだが…)
 2. ORT の `intra_op_num_threads` と並列 G2P のスレッド競合
 3. MeCab の Lattice race による invalid state からのリカバリ
@@ -147,6 +149,7 @@ dotnet run --project PiperPlus.Bench/PiperPlus.Bench.csproj -c Release --no-buil
 ```
 
 成果物:
+
 * `src/csharp/PiperPlus.Bench/` — bench ハーネス (link import で CLI
   adapter を再利用)
 * `csharp_bench_run.log` (gitignore 対象、ローカルログ)
@@ -201,7 +204,7 @@ dotnet run --project PiperPlus.Bench/PiperPlus.Bench.csproj -c Release --no-buil
 ## 検出時刻に行った変更
 
 * `src/csharp/PiperPlus.Cli/DotNetG2PEngine.cs` — `ThreadLocal<G2PEngine>` 化
-  + `IDisposable` 実装 (Bench は `<Compile Link>` で同ファイルを参照する
+  * `IDisposable` 実装 (Bench は `<Compile Link>` で同ファイルを参照する
   ため変更が自動的に反映される)。
 
 ## 残課題 (本 fork 範囲外)

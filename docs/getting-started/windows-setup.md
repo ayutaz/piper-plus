@@ -1,6 +1,7 @@
 # Windows環境でのOpenJTalkセットアップガイド
 
 ## 概要
+
 このガイドでは、Windows環境でPiperとOpenJTalkを使用して日本語音声合成を行うための手順を説明します。
 
 > **ビルド不要で使いたい方へ**: [GitHub Releases](https://github.com/ayutaz/piper-plus/releases) からプリビルドバイナリ (`piper-windows-x64.zip`) をダウンロードすれば、ビルドせずにすぐ使えます。ビルドが必要なのは、ソースコードを変更したい開発者のみです。
@@ -161,7 +162,7 @@ New-Item -ItemType Directory -Path $dictPath -Force
 
 C++ ビルドの代わりに C# CLI を使用する場合:
 
-1. **.NET 10 SDK** のインストール: https://dotnet.microsoft.com/download/dotnet/10.0
+1. **.NET 10 SDK** のインストール: <https://dotnet.microsoft.com/download/dotnet/10.0>
 2. ビルド:
 
 ```powershell
@@ -489,12 +490,15 @@ foreach ($chunk in $chunks) {
 ## 既知の問題と回避策
 
 ### 1. テキストサイズ制限
+
 - **問題**: ~~4KB以上のテキストは処理できません~~ — **解決済み (#69)**。`main.cpp` のstdinループは `getline()` で行単位読み取りを行うため、4KBの上限はありません。
 
 ### 2. パスの文字エンコーディング
+
 - **問題**: ~~非ASCII文字を含むパスで問題が発生~~ — **解決済み (#71)**。コードは `std::filesystem::path` を使用し、Windows上でのUTF-8引数を正しく処理します。
 
 ### 3. 同時実行の制限
+
 - **現状**: 単一のエンジンインスタンスはスレッドセーフではありません。ただし、スレッドごとに独立したインスタンスを使用することで、複数スレッドからの並列実行が可能です。
 - **回避策**:
 
@@ -511,6 +515,7 @@ foreach ($chunk in $chunks) {
   ```
 
 ### 4. ウイルス対策ソフトの誤検知
+
 - **問題**: ビルドした実行ファイルがウイルスとして誤検知される場合がある
 - **解決方法**: Windows Defenderの除外リストに追加
 

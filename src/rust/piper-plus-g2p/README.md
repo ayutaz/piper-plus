@@ -118,6 +118,7 @@ SPM product (xcframework). See
 ## Cross-Platform Consistency
 
 Also available as:
+
 - **Python**: `piper-plus-g2p` on PyPI
 - **npm**: `@piper-plus/g2p` for browser/WASM
 - **Go**: `go get github.com/ayutaz/piper-plus/src/go/phonemize`

@@ -6,6 +6,7 @@ phoneme keys (`ɔɪ`, `œ̃`, `ɐ̃`) that the C++ runtime rejects with
 so the bug only surfaced for Windows users running the C++ CLI.
 
 This guide describes how to:
+
 1. Verify whether a config.json is affected.
 2. Regenerate it with PUA v2 mappings.
 3. Push the fixed config to HuggingFace.
@@ -30,6 +31,7 @@ python scripts/regenerate_tsukuyomi_config.py --source path/to/config.json
 ```
 
 The script:
+
 - Downloads the original config.json (or loads a local one).
 - Runs `update_phoneme_id_map(strict=True)` to PUA-encode all keys.
 - Saves both the original (`tmp/config.original.json`) and the fixed
@@ -73,12 +75,14 @@ Inspect each `tmp/<repo>/config.json` and push the ones that changed.
 See [`docs/spec/pua-contract.toml`](../spec/pua-contract.toml) and
 [`docs/spec/pua-test-matrix.md`](../spec/pua-test-matrix.md) for the full root-cause
 analysis. In short:
+
 - `pua.json` had registration gaps for `ɔɪ`, `œ̃`, `ɐ̃`.
 - The encode helper `map_token()` fell back to `warnings.warn()` instead of failing.
 - The release pipeline never validated that distributed configs had only
   single-codepoint keys.
 
 The fix in this PR ([details](../spec/pua-test-matrix.md)):
+
 - Added the 3 missing entries to `pua.json` and synced all 6 runtime tables.
 - Made `update_phoneme_id_map(strict=True)` (default) raise on unmapped keys.
 - Added `scripts/check_pua_consistency.py` as a CI gate to prevent drift.

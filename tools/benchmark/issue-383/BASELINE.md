@@ -135,6 +135,7 @@ PYTHONIOENCODING=utf-8 uv run python tools/benchmark/issue-383/bench_pipeline_ba
 ```
 
 成果物:
+
 * `bench_pipeline_baseline.py` — 計測スクリプト
 * `baseline_results.json` — 全 repeat の生データ
 * `baseline_run.log` — stdout 全文

@@ -216,6 +216,7 @@ CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
 ```
 
 **重要:**
+
 - デフォルトで FP16 変換が適用されます (モデルサイズ ~50% 削減)
 - シングルスピーカー多言語モデルでは `--unify-emb-lang` が自動有効化され、声質が統一されます
 - `CUDA_VISIBLE_DEVICES=""` で CPU モードを使用してください

@@ -19,19 +19,21 @@ This guide explains how to test the multilingual Text-to-Speech (TTS) implementa
    ```
 
 2. **Open test pages in your browser:**
-   - Simple Multilingual Demo: http://localhost:8080/test/multilingual-demo/simple-multilingual.html
-   - Japanese Demo: http://localhost:8080/test/multilingual-demo/index.html
+   - Simple Multilingual Demo: <http://localhost:8080/test/multilingual-demo/simple-multilingual.html>
+   - Japanese Demo: <http://localhost:8080/test/multilingual-demo/index.html>
 
 ## Test Scenarios
 
 ### 1. Basic Functionality Test
 
 **Japanese:**
+
 - Input: "こんにちは、世界！"
 - Expected: Clear Japanese speech output
 - Phonemes should show Japanese phonemes (e.g., k, o, n, n, i, ch, i, w, a)
 
 **English:**
+
 - Input: "Hello world!"
 - Expected: English speech output (may sound robotic with simple phonemizer)
 - Phonemes should show IPA symbols (e.g., h, ɛ, l, oʊ)
@@ -48,20 +50,24 @@ This guide explains how to test the multilingual Text-to-Speech (TTS) implementa
 ### 3. Edge Cases
 
 **Mixed Language:**
+
 - Input: "Hello 世界" (Mixed English/Japanese)
 - System should detect primary language
 
 **Unknown Words (English):**
+
 - Input: "Supercalifragilisticexpialidocious"
 - Should fall back to letter-by-letter phonemization
 
 **Special Characters:**
+
 - Input: "Hello! How are you?"
 - Punctuation should be handled gracefully
 
 ## Implementation Status
 
 ### Completed ✅
+
 - Japanese TTS using OpenJTalk
 - Simple English phonemizer (dictionary-based)
 - Language switching UI
@@ -69,11 +75,13 @@ This guide explains how to test the multilingual Text-to-Speech (TTS) implementa
 - Test pages and demos
 
 ### In Progress 🚧
+
 - Full eSpeak-ng WebAssembly integration
 - Comprehensive English pronunciation dictionary
 - Performance optimization
 
 ### Limitations
+
 - English pronunciation is simplified (no eSpeak-ng yet)
 - Limited English word dictionary (~60 common words)
 - Unknown English words use basic letter-to-sound rules
@@ -84,7 +92,7 @@ This guide explains how to test the multilingual Text-to-Speech (TTS) implementa
 
 1. **"CORS policy" errors:**
    - Use the provided test server, not file:// URLs
-   - Ensure you're accessing via http://localhost:8080
+   - Ensure you're accessing via <http://localhost:8080>
 
 2. **Model loading fails:**
    - Check that .onnx files exist in models/ directory
@@ -104,6 +112,7 @@ This guide explains how to test the multilingual Text-to-Speech (TTS) implementa
 ### Model Configuration
 
 The multilingual model accepts phonemes from all supported languages. Current implementation maps:
+
 - Simple phonemes / IPA symbols → Model IDs
 
 See `models/multilingual-test-medium.onnx.json` for phoneme mappings.

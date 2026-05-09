@@ -38,10 +38,12 @@
 ```
 
 **codepoint の選び方**: `docs/spec/pua-contract.toml` の `[ranges]` セクションを見て、未割当の連続する空き範囲から取る。Examples:
+
 - 既存最大 `0xE064` の次は `0xE065`
 - 言語別ブロック (例: 韓国語拡張なら `0xE04B-E052` の次の空き) に詰めるのが好ましい
 
 **禁則**:
+
 - 既存 entry の codepoint は **絶対に変更しない** (トレーニング済みモデルが壊れる)
 - 既存 entry を **削除しない** (古いモデルとの互換性)
 - version は **下げない**
@@ -124,6 +126,7 @@ python scripts/regenerate_test_fixture.py --check
 ### 7. PR
 
 CI が:
+
 - `PUA Consistency Gate` workflow (6 jobs: cross-runtime, inventory, fixture drift, Rust/Go/JS PUA tests, pre-flight)
 - `cross-platform consistency` workflow (Python/Rust/Go/JS/C# 出力比較)
 - 各ランタイムの個別 test suite
@@ -142,12 +145,15 @@ CI が:
 ## トラブルシューティング
 
 ### Q. C++ runtime が `phoneme_id_map` を読み込めない (multi-codepoint key 警告)
+
 A. `pua.json` 登録漏れ。新 entry を `pua.json` に追加し、`update_model_config.py --validate-only` を通すこと (`scripts/upload_model_to_hf.py` 経由なら自動)。
 
 ### Q. fixture drift CI が失敗する
+
 A. `python scripts/regenerate_test_fixture.py` を引数なしで実行して再生成、commit。
 
 ### Q. cross-runtime job だけ失敗する
+
 A. `python scripts/check_pua_consistency.py --verbose` で差分を見て、該当ランタイムのテーブルを `pua.json` に揃える。
 
 ## 関連リソース

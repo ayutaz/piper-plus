@@ -14,6 +14,7 @@
 `piper-plus-g2p` ファミリーに **Kotlin/Android 向けの公式 G2P ライブラリ**を追加し、Android アプリ開発者が他言語ランタイム (Python/Rust/Go/npm) と同じ G2P を Kotlin から呼び出せる状態を作る。
 
 **主要 KPI**:
+
 - Android アプリから `implementation("io.github.ayutaz:piper-plus-g2p-android:X.Y.Z")` 1 行で導入可能
 - 8 言語 (JA/EN/ZH/KO/ES/FR/PT/SV) すべてで Python ランタイムと **byte-for-byte 一致** する IPA / PUA トークン列を返す
 - 既存ランタイムと同じ `zh_en_loanword.json` を共有 (CI で同期検証)
@@ -21,6 +22,7 @@
 - Maven Central 公開も GitHub Actions で完全自動化 (人手介入ゼロ)
 
 **スコープ外**:
+
 - TTS フル機能 (合成エンジン) — 既存 `android/piper-plus/` の AAR 草案で別途扱う
 - Android System TTS Engine 化 (`TextToSpeechService`) — G2P ライブラリ Issue とは別、必要なら別 Issue で扱う
 - iOS 共通化 (KMP) — iOS は xcframework + SPM で既に対応済、Kotlin G2P と無関係
@@ -128,6 +130,7 @@ android/
 ```
 
 **ギャップ**:
+
 - `phonemize()` JNI wrapper / Kotlin API なし
 - `PhonemeResult` data class なし
 - G2P 単体配布用の独立 Gradle module なし
@@ -144,6 +147,7 @@ android/
 | npm | `@piper-plus/g2p` (npm) | subpath imports: `/ja`, `/en`, ... | WASM module 同梱 (`dist/openjtalk.wasm`) | `src/wasm/g2p/package.json` |
 
 **Kotlin の選択**:
+
 - **命名**: `piper-plus-g2p-android` (Maven artifactId) / Kotlin パッケージ `com.piperplus.g2p`
 - **言語選択**: 単一 AAR に全言語コードを含む。日本語辞書だけ別 AAR (`piper-plus-g2p-android-openjtalk`) か Hugging Face DL でオプトイン
 - **辞書**: AAR には含めない (assets として消費者が配置 or 初回 DL)
@@ -175,6 +179,7 @@ android/
 | **L5: ABI 整合性** | `objdump -p` / `nm -D` で `.so` の symbol/ABI 検証 | Linux runner | 16 KB page size 対応 (`max-page-size=16384`) |
 
 **配布自動化**:
+
 - `vanniktech/gradle-maven-publish-plugin` (Sonatype Central Portal 対応) で GPG 署名・publish を 1 タスク化
 - GitHub Actions secrets: `MAVEN_CENTRAL_USERNAME`, `MAVEN_CENTRAL_PASSWORD`, `SIGNING_IN_MEMORY_KEY`, `SIGNING_IN_MEMORY_KEY_PASSWORD`
 - タグ `kotlin-g2p-v*` push で自動 release (既存の `release-*` ワークフローパターンを踏襲)
@@ -192,12 +197,14 @@ version:    1.0.0
 ### 4.2 B. Pure Kotlin / JVM 移植 — 部分採用
 
 **部分採用提案**: 規則ベース 4 言語 (ES/PT/FR/SV) は Pure Kotlin でも十分実装可能。ただし:
+
 - **判断**: 既存 C++ 実装と byte 一致を保つには重複実装によるドリフトリスクあり (PUA 仕様の同期が 1 mirror 増えるだけで負荷増)
 - **結論**: 全 8 言語を C API 経由に統一。AAR サイズ最適化のため将来的に「ルールベース言語のみ Pure Kotlin」を別 AAR (`piper-plus-g2p-pure`) として出す可能性は残す
 
 ### 4.3 C. KMP — 採用しない
 
 **理由**:
+
 - iOS は既に xcframework + SPM で完成。KMP で再構築するメリットなし
 - cinterop は JVM ターゲットでは使えず、Android 側は結局 JNI を書くことになる
 - multi-target metadata jar の Maven Central 公開は複雑で自動化難度が高い
@@ -350,6 +357,7 @@ Java_com_piperplus_g2p_PiperPlusG2pNative_nativeDestroy(
 ```
 
 **重要規約**:
+
 - BORROWED ポインタは即座に `NewStringUTF()` でコピー
 - `JNIStringGuard` RAII で UTF-8 文字列リーク防止 (既存 `android/piper-plus/src/main/cpp/piper_plus_jni.cpp` パターン踏襲)
 - C API エラー時は `PiperPlusG2pException` を `ThrowNew()`
@@ -444,6 +452,7 @@ GitHub Actions の Ubuntu runner は KVM をサポートするため、ヘッド
 ### 7.4 Maven Central 公開の自動化
 
 `vanniktech/gradle-maven-publish-plugin` で:
+
 - GPG 署名: `signing.in-memory.key`, `signing.in-memory.key.password`
 - Sonatype Central Portal: `mavenCentralUsername`, `mavenCentralPassword`
 - 自動 release: `publishToMavenCentral` タスク後 `closeAndReleaseRepository`
@@ -491,11 +500,11 @@ GitHub Actions の Ubuntu runner は KVM をサポートするため、ヘッド
 
 | プロジェクト | 参考にした点 | URL |
 |------------|-----------|-----|
-| **sherpa-onnx** (k2-fsa) | AAR モジュール分離、JNI 構造、Kotlin API 設計、release.sh によるアーカイブ | https://github.com/k2-fsa/sherpa-onnx/tree/master/android/SherpaOnnxAar |
-| **Vosk Android** | Maven Central 公式公開パターン (`com.alphacephei:vosk-android`) | https://github.com/alphacep/vosk-api/tree/master/android |
-| **espeak-ng Android** | NDK CMake 設定、`SpeechSynthesis.java` の JNI bridge 設計 | https://github.com/espeak-ng/espeak-ng/tree/master/android |
-| **vanniktech/gradle-maven-publish-plugin** | Maven Central 公開自動化のリファレンス | https://github.com/vanniktech/gradle-maven-publish-plugin |
-| **Android Gradle Managed Devices** | CI で完結する instrumented test | https://developer.android.com/studio/test/gradle-managed-devices |
+| **sherpa-onnx** (k2-fsa) | AAR モジュール分離、JNI 構造、Kotlin API 設計、release.sh によるアーカイブ | <https://github.com/k2-fsa/sherpa-onnx/tree/master/android/SherpaOnnxAar> |
+| **Vosk Android** | Maven Central 公式公開パターン (`com.alphacephei:vosk-android`) | <https://github.com/alphacep/vosk-api/tree/master/android> |
+| **espeak-ng Android** | NDK CMake 設定、`SpeechSynthesis.java` の JNI bridge 設計 | <https://github.com/espeak-ng/espeak-ng/tree/master/android> |
+| **vanniktech/gradle-maven-publish-plugin** | Maven Central 公開自動化のリファレンス | <https://github.com/vanniktech/gradle-maven-publish-plugin> |
+| **Android Gradle Managed Devices** | CI で完結する instrumented test | <https://developer.android.com/studio/test/gradle-managed-devices> |
 
 ---
 
