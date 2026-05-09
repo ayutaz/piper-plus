@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using System.Threading;
 using PiperPlus.Core.Phonemize;
 
 namespace PiperPlus.Core.Tests;
@@ -41,6 +42,41 @@ public sealed class CustomDictionaryTests : IDisposable
         File.WriteAllText(path, content, Encoding.UTF8);
         _tempFiles.Add(path);
         return path;
+    }
+
+    /// <summary>
+    /// Recursively deletes a directory with retry-on-IOException. Windows
+    /// occasionally fails the delete with "being used by another process"
+    /// right after a test that calls <see cref="Directory.SetCurrentDirectory(string)"/>
+    /// — Windows holds an internal handle to the cwd that briefly outlives
+    /// the switch back, and antivirus / indexer scans on the temp directory
+    /// add more contention. Retrying with a short backoff after a forced GC
+    /// is the standard mitigation; deterministic behaviour without depending
+    /// on ambient OS timing.
+    /// </summary>
+    private static void DeleteDirectoryWithRetry(string path)
+    {
+        const int maxAttempts = 6;
+        for (int attempt = 1; attempt <= maxAttempts; attempt++)
+        {
+            try
+            {
+                Directory.Delete(path, recursive: true);
+                return;
+            }
+            catch (IOException) when (attempt < maxAttempts)
+            {
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+                Thread.Sleep(100 * attempt);
+            }
+            catch (UnauthorizedAccessException) when (attempt < maxAttempts)
+            {
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+                Thread.Sleep(100 * attempt);
+            }
+        }
     }
 
     // ================================================================
@@ -781,7 +817,7 @@ public sealed class CustomDictionaryTests : IDisposable
         }
         finally
         {
-            Directory.Delete(baseDir, true);
+            DeleteDirectoryWithRetry(baseDir);
         }
     }
 
@@ -824,7 +860,7 @@ public sealed class CustomDictionaryTests : IDisposable
         }
         finally
         {
-            Directory.Delete(baseDir, true);
+            DeleteDirectoryWithRetry(baseDir);
         }
     }
 
@@ -872,7 +908,7 @@ public sealed class CustomDictionaryTests : IDisposable
         }
         finally
         {
-            Directory.Delete(baseDir, true);
+            DeleteDirectoryWithRetry(baseDir);
         }
     }
 
@@ -914,7 +950,7 @@ public sealed class CustomDictionaryTests : IDisposable
         }
         finally
         {
-            Directory.Delete(baseDir, true);
+            DeleteDirectoryWithRetry(baseDir);
         }
     }
 
@@ -1116,7 +1152,7 @@ public sealed class CustomDictionaryTests : IDisposable
         }
         finally
         {
-            Directory.Delete(baseDir, true);
+            DeleteDirectoryWithRetry(baseDir);
         }
     }
 }

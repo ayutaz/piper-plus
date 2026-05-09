@@ -41,6 +41,17 @@ type record struct {
 }
 
 func main() {
+	if err := run(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+}
+
+// run holds the bench logic so ``defer voice.Close()`` actually fires;
+// having ``os.Exit`` after a defer in ``main`` was flagged by gocritic
+// (exitAfterDefer) — splitting into ``main`` + ``run`` is the standard
+// Go idiom for that lint.
+func run() error {
 	modelFlag := flag.String("model", "test/models/multilingual-test-medium.onnx", "ONNX model path")
 	configFlag := flag.String("config", "", "config.json path (defaults to <model>.json)")
 	textFile := flag.String("text-file", "tools/benchmark/texts/ja.txt", "seed text path")
@@ -52,12 +63,10 @@ func main() {
 
 	seed, err := loadSentences(*textFile)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to load %s: %v\n", *textFile, err)
-		os.Exit(1)
+		return fmt.Errorf("failed to load %s: %w", *textFile, err)
 	}
 	if len(seed) == 0 {
-		fmt.Fprintln(os.Stderr, "no seed sentences")
-		os.Exit(1)
+		return fmt.Errorf("no seed sentences in %s", *textFile)
 	}
 
 	ctx := context.Background()
@@ -69,8 +78,7 @@ func main() {
 	loadStart := time.Now()
 	voice, err := piperplus.LoadVoice(ctx, *modelFlag, loadOpts...)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "LoadVoice failed: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("LoadVoice failed: %w", err)
 	}
 	defer voice.Close()
 	fmt.Fprintf(os.Stderr, "[bench] voice loaded in %.1f ms\n", float64(time.Since(loadStart).Microseconds())/1000.0)
@@ -82,17 +90,20 @@ func main() {
 
 	ns, err := parseNs(*nsFlag)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "invalid --ns: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("invalid --ns: %w", err)
 	}
 
 	var records []record
 
 	for _, cfg := range []string{"serial", "auto"} {
 		if cfg == "serial" {
-			os.Setenv("PIPER_G2P_PARALLELISM", "1")
+			if err := os.Setenv("PIPER_G2P_PARALLELISM", "1"); err != nil {
+				return fmt.Errorf("setenv PIPER_G2P_PARALLELISM: %w", err)
+			}
 		} else {
-			os.Unsetenv("PIPER_G2P_PARALLELISM")
+			if err := os.Unsetenv("PIPER_G2P_PARALLELISM"); err != nil {
+				return fmt.Errorf("unsetenv PIPER_G2P_PARALLELISM: %w", err)
+			}
 		}
 
 		fmt.Fprintf(os.Stderr, "\n[bench] === config: %s ===\n", cfg)
@@ -105,8 +116,7 @@ func main() {
 			for i := 0; i < *repeats; i++ {
 				start := time.Now()
 				if err := runOnce(ctx, voice, text); err != nil {
-					fmt.Fprintf(os.Stderr, "synth failed N=%d rep=%d: %v\n", n, i, err)
-					os.Exit(1)
+					return fmt.Errorf("synth failed N=%d rep=%d: %w", n, i, err)
 				}
 				elapsed := float64(time.Since(start).Microseconds()) / 1000.0
 				ms = append(ms, elapsed)
@@ -119,13 +129,13 @@ func main() {
 	out := buildMarkdown(records, ns, *modelFlag, *textFile, *repeats, *warmups)
 	if *outFile == "" {
 		fmt.Print(out)
-		return
+		return nil
 	}
 	if err := os.WriteFile(*outFile, []byte(out), 0o644); err != nil {
-		fmt.Fprintf(os.Stderr, "write %s failed: %v\n", *outFile, err)
-		os.Exit(1)
+		return fmt.Errorf("write %s failed: %w", *outFile, err)
 	}
 	fmt.Fprintf(os.Stderr, "[bench] wrote %s\n", *outFile)
+	return nil
 }
 
 func runOnce(ctx context.Context, v *piperplus.Voice, text string) error {
