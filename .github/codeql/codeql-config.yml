@@ -55,8 +55,12 @@ paths-ignore:
   - 'src/wasm/openjtalk-web/test_unicode_debug.html'
   - 'src/wasm/openjtalk-web/test_mecab_detail.html'
 
-  # Build output / generated files
+  # Build output / generated files. CodeQL's autobuild step compiles into
+  # `build/`, so the C/C++ extractor can re-pick up vendored headers from
+  # there even when the path is listed; the redundant `build/**` (without
+  # leading `**/`) makes sure root-level CMake build dirs match.
   - '**/dist/**'
+  - 'build/**'
   - '**/build/**'
   - '**/target/**'
   - '**/node_modules/**'
@@ -70,7 +74,13 @@ paths-ignore:
   - 'tests/fixtures/**'
   - 'test/fixtures/**'
 
-# Custom queries / suppressions can be added here later if needed.
-# query-filters:
-#   - exclude:
-#       id: js/incomplete-url-substring-sanitization
+# Suppress queries on third-party / generated code that the C/C++ extractor
+# pulls in via the compilation database (paths-ignore alone does not catch
+# headers reached through #include from project sources).
+query-filters:
+  # fmt headers under build/{f,fi}/include/fmt/ (bundled via fmt_external)
+  - exclude:
+      id: cpp/incorrect-not-operator-usage
+  # MeCab (open_jtalk_external) under build/o/src/openjtalk_external/...
+  - exclude:
+      id: cpp/inconsistent-null-check

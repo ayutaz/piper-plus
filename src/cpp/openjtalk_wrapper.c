@@ -10,6 +10,8 @@
 #ifdef _WIN32
 #include <windows.h>
 #include <io.h>
+#include <fcntl.h>
+#include <sys/stat.h>
 #define F_OK 0
 #define access _access
 #define popen _popen
@@ -19,12 +21,15 @@
 #else
 #include <unistd.h>
 #include <pthread.h>
+#include <fcntl.h>
+#include <sys/stat.h>
 #endif
 
 #include "openjtalk_dictionary_manager.h"
 #include "openjtalk_error.h"
 #include "openjtalk_security.h"
 #include "openjtalk_api.h"
+#include "safe_exec.h"
 
 // Define a safe maximum value for buffer size calculations
 #define OPENJTALK_SIZE_MAX ((size_t)-1)
@@ -566,14 +571,21 @@ static OpenJTalkProsodyResult* openjtalk_text_to_phonemes_with_prosody_api(const
             }
         }
 
-        // Add phoneme to result
+        // Add phoneme to result. The if-guard already bounds the total
+        // length, but strncat with explicit remaining-capacity also
+        // satisfies cpp/unbounded-write — the dataflow into the strcat
+        // sink is now visibly bounded.
         size_t space_needed = (total_phoneme_len > 0 ? 1 : 0) + strlen(phoneme) + 1;
         if (total_phoneme_len + space_needed < OPENJTALK_MAX_BUFFER - 1) {
-            if (total_phoneme_len > 0) {
-                strcat(prosody_result->phonemes, " ");
+            size_t remaining = (OPENJTALK_MAX_BUFFER > total_phoneme_len + 1)
+                ? (OPENJTALK_MAX_BUFFER - total_phoneme_len - 1)
+                : 0;
+            if (total_phoneme_len > 0 && remaining >= 1) {
+                strncat(prosody_result->phonemes, " ", remaining);
                 total_phoneme_len++;
+                remaining--;
             }
-            strcat(prosody_result->phonemes, phoneme);
+            strncat(prosody_result->phonemes, phoneme, remaining);
             total_phoneme_len += strlen(phoneme);
 
             // Store prosody values
@@ -805,8 +817,17 @@ static OpenJTalkError write_input_text(const char* filename, const char* text) {
         return OPENJTALK_ERROR_IO_WRITE;
     }
 #else
-    FILE* fp = fopen(filename, "w");
+    // Use open() with explicit owner-only mode (0600) instead of fopen("w"),
+    // whose default permission (0666 modulo umask) trips
+    // cpp/world-writable-file-creation. The temp file holds the user's plain
+    // text input — readable by other local users would be a privacy leak.
+    int fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
+    if (fd < 0) {
+        return OPENJTALK_ERROR_IO_WRITE;
+    }
+    FILE* fp = fdopen(fd, "w");
     if (!fp) {
+        close(fd);
         return OPENJTALK_ERROR_IO_WRITE;
     }
     if (fprintf(fp, "%s", text) < 0) {
@@ -822,6 +843,19 @@ static OpenJTalkError write_input_text(const char* filename, const char* text) {
 static OpenJTalkError execute_openjtalk_command(const char* command, OpenJTalkResult* result) {
     if (!command) {
         return OPENJTALK_ERROR_NULL_INPUT;
+    }
+
+    // Defense in depth: gate system() on a sanitizer that rejects shell
+    // metacharacters. openjtalk_validate_command() already runs upstream
+    // for legacy paths, but CodeQL's taint-flow analysis does not always
+    // recognize that helper as a sanitizer — adding this explicit check
+    // breaks the taint flow visibly.
+    if (!piper_is_safe_command_string(command)) {
+        if (result) {
+            openjtalk_set_result(result, OPENJTALK_ERROR_SECURITY,
+                                "Unsafe characters in command string");
+        }
+        return OPENJTALK_ERROR_SECURITY;
     }
 
     // Use system() for simplicity and compatibility
@@ -951,14 +985,22 @@ static char* read_and_parse_output(const char* filename, OpenJTalkResult* result
                                 phoneme_buffer_size = new_size;
                             }
 
-                            // Add space if not first phoneme
-                            if (total_phoneme_len > 0) {
-                                strcat(phonemes, " ");
+                            // Add space if not first phoneme. Use strncat
+                            // with explicit remaining-capacity to satisfy
+                            // cpp/unbounded-write — the surrounding realloc
+                            // guarantees a non-zero remainder but CodeQL's
+                            // flow tracking does not see that.
+                            size_t remaining = (phoneme_buffer_size > total_phoneme_len + 1)
+                                ? (phoneme_buffer_size - total_phoneme_len - 1)
+                                : 0;
+                            if (total_phoneme_len > 0 && remaining >= 1) {
+                                strncat(phonemes, " ", remaining);
                                 total_phoneme_len++;
+                                remaining--;
                             }
 
-                            // Add phoneme
-                            strcat(phonemes, phoneme);
+                            // Add phoneme (bounded by remaining capacity).
+                            strncat(phonemes, phoneme, remaining);
                             total_phoneme_len += strlen(phoneme);
                         }
                     }
@@ -1126,14 +1168,21 @@ static OpenJTalkProsodyResult* read_and_parse_output_with_prosody(
             }
         }
 
-        // Add phoneme to result
+        // Add phoneme to result. The if-guard already bounds the total
+        // length, but strncat with explicit remaining-capacity also
+        // satisfies cpp/unbounded-write — the dataflow into the strcat
+        // sink is now visibly bounded.
         size_t space_needed = (total_phoneme_len > 0 ? 1 : 0) + strlen(phoneme) + 1;
         if (total_phoneme_len + space_needed < OPENJTALK_MAX_BUFFER - 1) {
-            if (total_phoneme_len > 0) {
-                strcat(prosody_result->phonemes, " ");
+            size_t remaining = (OPENJTALK_MAX_BUFFER > total_phoneme_len + 1)
+                ? (OPENJTALK_MAX_BUFFER - total_phoneme_len - 1)
+                : 0;
+            if (total_phoneme_len > 0 && remaining >= 1) {
+                strncat(prosody_result->phonemes, " ", remaining);
                 total_phoneme_len++;
+                remaining--;
             }
-            strcat(prosody_result->phonemes, phoneme);
+            strncat(prosody_result->phonemes, phoneme, remaining);
             total_phoneme_len += strlen(phoneme);
 
             // Store prosody values

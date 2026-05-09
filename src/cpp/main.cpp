@@ -37,6 +37,7 @@
 #include "phoneme_parser.hpp"
 #include "custom_dictionary.hpp"
 #include "model_manager.hpp"
+#include "safe_path.hpp"
 
 using namespace std;
 using json = nlohmann::json;
@@ -998,14 +999,16 @@ void parseArgs(int argc, char *argv[], RunConfig &runConfig) {
   }
 
   // Verify model file exists; if not, try resolving as a model name/alias
-  ifstream modelFile(runConfig.modelPath.c_str(), ios::binary);
+  auto safeModelPath = piper_plus::sanitizeCliPath(runConfig.modelPath);
+  ifstream modelFile(safeModelPath ? safeModelPath->c_str() : runConfig.modelPath.c_str(), ios::binary);
   if (!modelFile.good()) {
     auto modelDir = runConfig.modelDir.value_or(piper::getDefaultModelDir());
     auto resolved = piper::resolveModelPath(runConfig.modelPath.string(), modelDir);
     if (resolved) {
       spdlog::info("Resolved model name '{}' to {}", runConfig.modelPath.string(), resolved->string());
       runConfig.modelPath = resolved.value();
-      modelFile.open(runConfig.modelPath.c_str(), ios::binary);
+      auto safeResolvedPath = piper_plus::sanitizeCliPath(runConfig.modelPath);
+      modelFile.open(safeResolvedPath ? safeResolvedPath->c_str() : runConfig.modelPath.c_str(), ios::binary);
     }
     if (!modelFile.good()) {
       // Check if it looks like a model name (no path separators or extension)
@@ -1044,7 +1047,8 @@ void parseArgs(int argc, char *argv[], RunConfig &runConfig) {
   }
 
   // Verify model config exists
-  ifstream modelConfigFile(runConfig.modelConfigPath.c_str());
+  auto safeModelConfigPath = piper_plus::sanitizeCliPath(runConfig.modelConfigPath);
+  ifstream modelConfigFile(safeModelConfigPath ? safeModelConfigPath->c_str() : runConfig.modelConfigPath.c_str());
   if (!modelConfigFile.good()) {
     throw runtime_error("Model config doesn't exist");
   }

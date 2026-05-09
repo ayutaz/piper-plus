@@ -5,6 +5,8 @@
 #include <sys/stat.h>
 #include <ctype.h>
 
+#include "safe_exec.h"
+
 #ifdef _WIN32
 #include <windows.h>
 #include <direct.h>
@@ -41,16 +43,24 @@ static int verify_checksum(const char* file_path, const char* expected_sha256) {
              "powershell -Command \"(Get-FileHash -Path '%s' -Algorithm SHA256).Hash\"",
              file_path);
 #else
-    // Try sha256sum first, then shasum -a 256
+    // Try sha256sum first, then shasum -a 256.
+    // Avoid the `| cut` shell pipeline so the resulting command string
+    // contains no shell metacharacters; we slice the leading hash token
+    // from the output ourselves below.
     if (system("which sha256sum > /dev/null 2>&1") == 0) {
-        snprintf(cmd, sizeof(cmd), "sha256sum \"%s\" | cut -d' ' -f1", file_path);
+        snprintf(cmd, sizeof(cmd), "sha256sum \"%s\"", file_path);
     } else if (system("which shasum > /dev/null 2>&1") == 0) {
-        snprintf(cmd, sizeof(cmd), "shasum -a 256 \"%s\" | cut -d' ' -f1", file_path);
+        snprintf(cmd, sizeof(cmd), "shasum -a 256 \"%s\"", file_path);
     } else {
         fprintf(stderr, "Warning: No checksum tool available, skipping verification\n");
         return 0; // Skip verification if no tool available
     }
 #endif
+
+    if (!piper_is_safe_command_string(cmd)) {
+        fprintf(stderr, "Warning: unsafe checksum command, skipping verification\n");
+        return 0;
+    }
 
 #ifdef _WIN32
     fp = _popen(cmd, "r");
@@ -67,6 +77,18 @@ static int verify_checksum(const char* file_path, const char* expected_sha256) {
         size_t len = strlen(result);
         if (len > 0 && result[len-1] == '\n') {
             result[len-1] = '\0';
+        }
+
+        // sha256sum / shasum emit "<hash>  <filename>"; truncate at the
+        // first whitespace so we are left with the bare hash token (this
+        // replaces the previous `| cut -d' ' -f1` shell pipeline, which
+        // had to be removed to keep the command string free of shell
+        // metacharacters).
+        for (int i = 0; result[i]; i++) {
+            if (result[i] == ' ' || result[i] == '\t') {
+                result[i] = '\0';
+                break;
+            }
         }
 
         // Convert to lowercase for comparison
@@ -356,6 +378,10 @@ static int download_and_extract_dictionary() {
     }
 #endif
 
+    if (!piper_is_safe_command_string(download_cmd)) {
+        fprintf(stderr, "Error: unsafe download command\n");
+        return -1;
+    }
     if (system(download_cmd) != 0) {
         fprintf(stderr, "Error: Failed to download dictionary\n");
         return -1;
@@ -371,18 +397,27 @@ static int download_and_extract_dictionary() {
     // Extract the archive
     fprintf(stderr, "Extracting dictionary...\n");
 
+    // Use tar's -C flag to change directory before extraction so the
+    // command string contains no shell metacharacters (no '&&', no ';').
+    // This both simplifies the command and lets piper_is_safe_command_string
+    // recognise it as a clean sanitizer gate for CodeQL's taint tracker.
+    // archive_path was already constructed from data_dir + filename above.
 #ifdef _WIN32
-    // Use PowerShell to extract on Windows
+    // Windows tar (BSD tar shipped with Win10+) accepts -C / -xzf identically
     snprintf(extract_cmd, sizeof(extract_cmd),
-             "powershell -Command \"cd '%s'; tar -xzf '%s'\"",
-             data_dir, DICTIONARY_FILENAME);
+             "tar -xzf \"%s\" -C \"%s\"",
+             archive_path, data_dir);
 #else
-    // Use tar on Unix-like systems
     snprintf(extract_cmd, sizeof(extract_cmd),
-             "cd \"%s\" && tar -xzf \"%s\"",
-             data_dir, DICTIONARY_FILENAME);
+             "tar -xzf \"%s\" -C \"%s\"",
+             archive_path, data_dir);
 #endif
 
+    if (!piper_is_safe_command_string(extract_cmd)) {
+        fprintf(stderr, "Error: unsafe extract command\n");
+        unlink(archive_path);
+        return -1;
+    }
     if (system(extract_cmd) != 0) {
         fprintf(stderr, "Error: Failed to extract dictionary\n");
         unlink(archive_path);

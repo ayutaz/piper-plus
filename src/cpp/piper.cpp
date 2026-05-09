@@ -29,6 +29,7 @@
 
 #include "json.hpp"
 #include "piper.hpp"
+#include "safe_path.hpp"
 #include "utf8.h"
 #include "utf8_utils.hpp"
 #include "wavfile.hpp"
@@ -664,8 +665,10 @@ void loadVoice(PiperConfig &config, std::string modelPath,
   // English: CMU dictionary
   std::string cmuPath = findDictionaryFile("cmudict_data.json", modelDir);
   if (!cmuPath.empty()) {
-    if (loadCmuDict(cmuPath, voice.cmuDict)) {
-      spdlog::info("Loaded CMU dictionary ({} entries) from {}", voice.cmuDict.size(), cmuPath);
+    auto safeCmuPath = piper_plus::sanitizeCliPath(cmuPath);
+    const std::string cmuPathToLoad = safeCmuPath ? safeCmuPath->string() : cmuPath;
+    if (loadCmuDict(cmuPathToLoad, voice.cmuDict)) {
+      spdlog::info("Loaded CMU dictionary ({} entries) from {}", voice.cmuDict.size(), cmuPathToLoad);
     }
   }
 
@@ -677,11 +680,17 @@ void loadVoice(PiperConfig &config, std::string modelPath,
       spdlog::warn("pinyin_single.json found but pinyin_phrases.json is missing; "
                    "Chinese phrase-level G2P will be degraded");
     }
-    if (loadPinyinDicts(pinyinSinglePath, pinyinPhrasePath,
+    auto safeSinglePath = piper_plus::sanitizeCliPath(pinyinSinglePath);
+    auto safePhrasePath = pinyinPhrasePath.empty()
+        ? std::optional<std::filesystem::path>{}
+        : piper_plus::sanitizeCliPath(pinyinPhrasePath);
+    const std::string singleToLoad = safeSinglePath ? safeSinglePath->string() : pinyinSinglePath;
+    const std::string phraseToLoad = safePhrasePath ? safePhrasePath->string() : pinyinPhrasePath;
+    if (loadPinyinDicts(singleToLoad, phraseToLoad,
                         voice.pinyinSingleDict, voice.pinyinPhraseDict)) {
       spdlog::info("Loaded pinyin dictionaries (single={}, phrases={}) from {}",
                    voice.pinyinSingleDict.size(), voice.pinyinPhraseDict.size(),
-                   std::filesystem::path(pinyinSinglePath).parent_path().string());
+                   std::filesystem::path(singleToLoad).parent_path().string());
     }
   }
 

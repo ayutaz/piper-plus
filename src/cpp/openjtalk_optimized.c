@@ -6,6 +6,7 @@
 #include "openjtalk_dictionary_manager.h"
 #include "openjtalk_error.h"
 #include "openjtalk_security.h"
+#include "safe_exec.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -248,6 +249,16 @@ static char* execute_with_pipes_unix(const char* openjtalk_bin, const char* dic_
         // Standard open_jtalk does not support "-" for stdin/stdout;
         // use /dev/stdin and /dev/stdout instead.
         int is_phonemizer = strstr(openjtalk_bin, "phonemizer") != NULL ? 1 : 0;
+
+        if (!piper_is_safe_exec_arg(openjtalk_bin) ||
+            !piper_is_safe_exec_arg(dic_path)) {
+            // Defense in depth: openjtalk_is_safe_path was already checked
+            // in the parent above, but make the taint-flow break visible
+            // to CodeQL by gating the exec call on a sanitizer that
+            // rejects control characters in argv elements.
+            perror("unsafe exec arguments");
+            _exit(1);
+        }
 
         if (is_phonemizer) {
             execlp(openjtalk_bin, openjtalk_bin, "-x", dic_path, "-ot", "/dev/stdout", "/dev/stdin", NULL);

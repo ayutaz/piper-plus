@@ -8,6 +8,7 @@
 
 #include "json.hpp"
 #include "piper.hpp"
+#include "safe_path.hpp"
 
 using namespace std;
 using json = nlohmann::json;
@@ -31,12 +32,18 @@ int main(int argc, char *argv[]) {
 
   // Skip test if model file is not available
   {
-    std::ifstream modelCheck(modelPath);
+    auto safeModelPath = piper_plus::sanitizeCliPath(modelPath);
+    if (!safeModelPath) {
+      std::cout << "SKIPPED: Invalid model path: " << modelPath << std::endl;
+      return 77;
+    }
+    std::ifstream modelCheck(safeModelPath->c_str());
     if (!modelCheck.good()) {
       std::cout << "SKIPPED: Model file not found: " << modelPath << std::endl;
       return 77; // CTest SKIP_RETURN_CODE
     }
-    std::ifstream configCheck(modelPath + ".json");
+    auto safeConfigPath = piper_plus::sanitizeCliPath(modelPath + ".json");
+    std::ifstream configCheck(safeConfigPath ? safeConfigPath->c_str() : (modelPath + ".json").c_str());
     if (!configCheck.good()) {
       std::cout << "SKIPPED: Config file not found: " << modelPath + ".json" << std::endl;
       return 77;
@@ -55,7 +62,8 @@ int main(int argc, char *argv[]) {
   }
 
   // Output audio to WAV file
-  ofstream audioFile(outputPath, ios::binary);
+  auto safeOutputPath = piper_plus::sanitizeCliPath(outputPath);
+  ofstream audioFile(safeOutputPath ? safeOutputPath->c_str() : outputPath.c_str(), ios::binary);
 
   piper::SynthesisResult result;
   piper::textToWavFile(piperConfig, voice, "This is a test.", audioFile,

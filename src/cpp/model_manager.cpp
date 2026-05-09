@@ -21,6 +21,7 @@
 #include <spdlog/spdlog.h>
 #include "json.hpp"
 #include "model_manager.hpp"
+#include "safe_exec.h"
 
 using json = nlohmann::json;
 namespace fs = std::filesystem;
@@ -277,6 +278,10 @@ static bool downloadFile(const std::string& url,
 #endif
 
     spdlog::info("Downloading {} ...", url);
+    if (!piper_is_safe_command_string(cmd.c_str())) {
+        spdlog::error("Refusing to run unsafe download command: {}", cmd);
+        return false;
+    }
     int rc = std::system(cmd.c_str());
     return rc == 0;
 }
