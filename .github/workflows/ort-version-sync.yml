@@ -1,0 +1,58 @@
+name: "ORT Version Sync Gate"
+
+# Issue #383 follow-up: 1.17.0 → 1.20.0 アップグレードで 6 ファイル + sha256 を
+# 同時更新する必要があり、build-piper.yml の wget URL を取りこぼした実例があった
+# (sed pattern が x86_64 / win-x64 を網羅していなかったため)。今後同じ取りこぼしを
+# CI で検出するための gate。
+#
+# Source of truth: cmake/OnnxRuntime.cmake の set(ONNXRUNTIME_VERSION "X.Y.Z")
+# 検査範囲: cmake / GitHub Actions workflow のみ (docs/ は人間がレビュー)
+
+on:
+  push:
+    branches: [dev, main]
+    paths:
+      - 'cmake/OnnxRuntime.cmake'
+      - 'cmake/find_onnxruntime_windows.cmake'
+      - '.github/workflows/release-shared-lib.yml'
+      - '.github/workflows/android-build.yml'
+      - '.github/workflows/release-kotlin-g2p.yml'
+      - '.github/workflows/kotlin-g2p-ci.yml'
+      - '.github/workflows/build-piper.yml'
+      - '.github/workflows/_build-test-cpp.yml'
+      - 'scripts/check_ort_versions.py'
+      - '.github/workflows/ort-version-sync.yml'
+  pull_request:
+    paths:
+      - 'cmake/OnnxRuntime.cmake'
+      - 'cmake/find_onnxruntime_windows.cmake'
+      - '.github/workflows/release-shared-lib.yml'
+      - '.github/workflows/android-build.yml'
+      - '.github/workflows/release-kotlin-g2p.yml'
+      - '.github/workflows/kotlin-g2p-ci.yml'
+      - '.github/workflows/build-piper.yml'
+      - '.github/workflows/_build-test-cpp.yml'
+      - 'scripts/check_ort_versions.py'
+      - '.github/workflows/ort-version-sync.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  ort-version-sync:
+    name: cmake / workflows ORT versions match
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Run ORT version sync gate
+        run: python scripts/check_ort_versions.py --verbose
