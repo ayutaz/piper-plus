@@ -113,28 +113,66 @@ VERSION_PATTERNS: list[re.Pattern[str]] = [
 # Floor-check group: canonical 以上を要求 (Issue #372 Option C)
 # ---------------------------------------------------------------------------
 
-# Each ecosystem has its own version-spec syntax. Regex captures
-# (package, version) so the floor check can attribute violations to a
-# specific dependency line.
+# Each ecosystem has its own version-spec syntax. Regex captures the
+# package name (``pkg``) and the LOWER-BOUND version (``ver``) via named
+# groups so the floor check can attribute violations to a specific
+# dependency line regardless of attribute order (csproj XML) or
+# operator (==, >=, ~=, ^, ~, exact pin).
+#
+# We deliberately capture only operators that constrain the LOW end of
+# the resolvable range. ``<`` / ``<=`` are upper bounds and a `<1.20.0`
+# pin can still resolve to a very old release, so a separate gate would
+# be needed to detect those (out of scope for Issue #372 — none of the
+# tracked files use upper-bound-only specs today).
 FLOOR_PATTERNS_BY_ECOSYSTEM: dict[str, list[re.Pattern[str]]] = {
-    # PEP 508 / pip requirements: onnxruntime>=1.20.0 / onnxruntime-gpu>=1.20.0,<2
-    # Also matches setup.py extras_require strings like "onnxruntime-gpu>=1.20.0,<2".
+    # PEP 508 / pip requirements:
+    #   onnxruntime>=1.20.0 / onnxruntime-gpu>=1.20.0,<2 (range)
+    #   onnxruntime==1.20.0 (exact pin)
+    #   onnxruntime~=1.20.0 (compatible release: >=1.20.0, <1.21.0)
+    # Also matches setup.py extras_require strings like
+    # "onnxruntime-gpu>=1.20.0,<2".
     "python": [
-        re.compile(r"\b(onnxruntime(?:-gpu)?)\s*>=\s*(\d+(?:\.\d+){0,2})"),
+        re.compile(
+            r"\b(?P<pkg>onnxruntime(?:-gpu)?)\s*(?:==|>=|~=)\s*(?P<ver>\d+(?:\.\d+){0,2})"
+        ),
     ],
     # C# csproj: <PackageReference Include="Microsoft.ML.OnnxRuntime[.Managed]" Version="X.Y.Z" />
+    # XML attribute order is NOT semantically significant. Accept both
+    # ``Include`` first and ``Version`` first orderings so a future
+    # csproj edit (or tooling that reorders attributes) cannot bypass
+    # the gate.
     "csharp": [
+        # Include then Version
         re.compile(
-            r'Include="(Microsoft\.ML\.OnnxRuntime(?:\.Managed)?)"\s+Version="(\d+\.\d+\.\d+)"'
+            r"<PackageReference\b[^>]*?"
+            r'Include="(?P<pkg>Microsoft\.ML\.OnnxRuntime(?:\.Managed)?)"'
+            r"[^>]*?"
+            r'Version="(?P<ver>\d+\.\d+\.\d+)"'
+        ),
+        # Version then Include (attribute order swapped)
+        re.compile(
+            r"<PackageReference\b[^>]*?"
+            r'Version="(?P<ver>\d+\.\d+\.\d+)"'
+            r"[^>]*?"
+            r'Include="(?P<pkg>Microsoft\.ML\.OnnxRuntime(?:\.Managed)?)"'
         ),
     ],
     # Go go.mod: github.com/yalue/onnxruntime_go vX.Y.Z
     "go": [
-        re.compile(r"(github\.com/yalue/onnxruntime_go)\s+v(\d+\.\d+\.\d+)"),
+        re.compile(
+            r"(?P<pkg>github\.com/yalue/onnxruntime_go)\s+v(?P<ver>\d+\.\d+\.\d+)"
+        ),
     ],
-    # npm package.json peerDependencies: "onnxruntime-web": ">=X.Y.Z"
+    # npm package.json peerDependencies. Accept the four common range
+    # specifiers + bare exact pins:
+    #   "onnxruntime-web": ">=1.20.0"  (range)
+    #   "onnxruntime-web": "^1.21.0"   (caret: >=1.21.0, <2.0.0)
+    #   "onnxruntime-web": "~1.21.0"   (tilde: >=1.21.0, <1.22.0)
+    #   "onnxruntime-web": "1.21.0"    (exact pin)
     "npm": [
-        re.compile(r'"(onnxruntime-web)"\s*:\s*">=(\d+\.\d+\.\d+)"'),
+        re.compile(
+            r'"(?P<pkg>onnxruntime-web)"\s*:\s*"(?:>=|\^|~)?\s*(?P<ver>\d+\.\d+\.\d+)"'
+        ),
     ],
 }
 
@@ -202,13 +240,17 @@ def find_floor_violations(
     sorts strictly below ``floor``. Equal-or-greater versions pass (this
     permits C# 1.24.3 / Go 1.27.0 to coexist with C++ canonical 1.20.0
     under Option C).
+
+    All floor patterns use named groups (``pkg`` / ``ver``), which lets
+    the C# csproj patterns capture either attribute order without
+    swapping positional groups.
     """
     floor_tuple = parse_version(floor)
     violations: list[tuple[str, str]] = []
     seen: set[tuple[str, str]] = set()
     for pat in FLOOR_PATTERNS_BY_ECOSYSTEM[ecosystem]:
         for m in pat.finditer(text):
-            pkg, ver = m.group(1), m.group(2)
+            pkg, ver = m.group("pkg"), m.group("ver")
             key = (pkg, ver)
             if key in seen:
                 continue
@@ -224,7 +266,7 @@ def find_floor_versions(text: str, ecosystem: str) -> list[tuple[str, str]]:
     out: list[tuple[str, str]] = []
     for pat in FLOOR_PATTERNS_BY_ECOSYSTEM[ecosystem]:
         for m in pat.finditer(text):
-            key = (m.group(1), m.group(2))
+            key = (m.group("pkg"), m.group("ver"))
             if key in seen:
                 continue
             seen.add(key)
@@ -241,10 +283,19 @@ def main() -> int:
     print(f"[info] canonical ORT version (from {CMAKE_FILE}): {canonical}")
 
     # ----- Exact-match group ------------------------------------------------
+    # Missing files are a HARD failure: every TARGETS entry is a known
+    # in-repo file the gate must verify. A file moved/renamed/deleted
+    # without updating the gate's TARGETS list silently disables drift
+    # detection for that file, which is the failure mode this gate
+    # exists to prevent.
     failures: list[str] = []
     for target in TARGETS:
         if not target.exists():
-            print(f"[warn] target missing, skipping: {target}")
+            failures.append(
+                f"{target}: required file missing — gate cannot verify drift "
+                "(if this file was intentionally renamed/removed, update "
+                "TARGETS in scripts/check_ort_versions.py)"
+            )
             continue
         text = target.read_text(encoding="utf-8")
         versions = find_versions(text)
@@ -260,10 +311,19 @@ def main() -> int:
             )
 
     # ----- Floor-check group ------------------------------------------------
+    # Missing files are a HARD failure here too: the FLOOR_TARGETS list
+    # enumerates every in-repo dependency manifest the gate must verify.
+    # A silent skip on missing would let a refactor accidentally exempt
+    # a runtime from the floor check.
     floor_failures: list[str] = []
     for target, ecosystem in FLOOR_TARGETS:
         if not target.exists():
-            print(f"[warn] floor target missing, skipping: {target}")
+            floor_failures.append(
+                f"{target} ({ecosystem}): required file missing — gate "
+                "cannot verify floor (if this file was intentionally "
+                "renamed/removed, update FLOOR_TARGETS in "
+                "scripts/check_ort_versions.py)"
+            )
             continue
         text = target.read_text(encoding="utf-8")
 

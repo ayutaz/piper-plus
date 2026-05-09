@@ -196,7 +196,12 @@ def test_parse_version_orders_correctly(cov):
         ),
         # short version form
         ("onnxruntime>=1.17", "python", [("onnxruntime", "1.17")]),
-        # C# csproj
+        # PR #404 review feedback (Comment 1): also accept ``==`` (exact pin)
+        # and ``~=`` (compatible release) operators so a future edit using
+        # those PEP 440 specifiers does not silently bypass the gate.
+        ("onnxruntime==1.20.0", "python", [("onnxruntime", "1.20.0")]),
+        ("onnxruntime~=1.20.0", "python", [("onnxruntime", "1.20.0")]),
+        # C# csproj — Include first (canonical order in this repo)
         (
             '<PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.24.3" />',
             "csharp",
@@ -207,15 +212,54 @@ def test_parse_version_orders_correctly(cov):
             "csharp",
             [("Microsoft.ML.OnnxRuntime.Managed", "1.24.3")],
         ),
+        # PR #404 review feedback (Comment 3): XML attribute order is not
+        # semantically significant. Version-first must extract the same
+        # (pkg, ver) pair so a tooling-driven attribute reorder cannot
+        # silently disable the floor check.
+        (
+            '<PackageReference Version="1.24.3" Include="Microsoft.ML.OnnxRuntime" />',
+            "csharp",
+            [("Microsoft.ML.OnnxRuntime", "1.24.3")],
+        ),
+        (
+            '<PackageReference Version="1.24.3" Include="Microsoft.ML.OnnxRuntime.Managed" />',
+            "csharp",
+            [("Microsoft.ML.OnnxRuntime.Managed", "1.24.3")],
+        ),
+        # csproj with an unrelated attribute between Include and Version
+        (
+            '<PackageReference Include="Microsoft.ML.OnnxRuntime" '
+            'PrivateAssets="all" Version="1.24.3" />',
+            "csharp",
+            [("Microsoft.ML.OnnxRuntime", "1.24.3")],
+        ),
         # Go go.mod
         (
             "require github.com/yalue/onnxruntime_go v1.27.0",
             "go",
             [("github.com/yalue/onnxruntime_go", "1.27.0")],
         ),
-        # npm package.json peerDep
+        # npm package.json peerDep, ``>=`` form
         (
             '"onnxruntime-web": ">=1.21.0"',
+            "npm",
+            [("onnxruntime-web", "1.21.0")],
+        ),
+        # PR #404 review feedback (Comment 1): also accept npm caret /
+        # tilde / exact pin so a future package.json edit using those
+        # standard SemVer range specifiers does not bypass the gate.
+        (
+            '"onnxruntime-web": "^1.21.0"',
+            "npm",
+            [("onnxruntime-web", "1.21.0")],
+        ),
+        (
+            '"onnxruntime-web": "~1.21.0"',
+            "npm",
+            [("onnxruntime-web", "1.21.0")],
+        ),
+        (
+            '"onnxruntime-web": "1.21.0"',
             "npm",
             [("onnxruntime-web", "1.21.0")],
         ),
@@ -224,6 +268,31 @@ def test_parse_version_orders_correctly(cov):
 def test_floor_pattern_extracts_package_and_version(cov, text, ecosystem, expected):
     found = cov.find_floor_versions(text, ecosystem)
     assert found == expected, f"ecosystem={ecosystem} text={text!r}"
+
+
+# ---------------------------------------------------------------------------
+# PR #404 review feedback (Comment 1): operator-level drift detection.
+# A pin below the floor must be flagged regardless of which lower-bound
+# operator is used (``>=``, ``==``, ``~=`` for Python; bare / ``^`` / ``~``
+# for npm).
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("text", "ecosystem", "expected_violation"),
+    [
+        ("onnxruntime==1.19.0", "python", ("onnxruntime", "1.19.0")),
+        ("onnxruntime~=1.17.0", "python", ("onnxruntime", "1.17.0")),
+        ('"onnxruntime-web": "^1.19.0"', "npm", ("onnxruntime-web", "1.19.0")),
+        ('"onnxruntime-web": "~1.18.0"', "npm", ("onnxruntime-web", "1.18.0")),
+        ('"onnxruntime-web": "1.10.0"', "npm", ("onnxruntime-web", "1.10.0")),
+    ],
+)
+def test_floor_violation_detected_across_operators(
+    cov, text, ecosystem, expected_violation
+):
+    violations = cov.find_floor_violations(text, ecosystem, floor="1.20.0")
+    assert violations == [expected_violation]
 
 
 def test_floor_violation_detected(cov):
@@ -273,3 +342,68 @@ def test_floor_dedup_within_file(cov):
     """
     violations = cov.find_floor_violations(text, "python", floor="1.20.0")
     assert violations == [("onnxruntime", "1.11.0")]
+
+
+# ---------------------------------------------------------------------------
+# PR #404 review feedback (Comment 2): missing required files must fail
+# the gate. The previous behaviour was warn + skip, which silently
+# disabled drift / floor verification for moved or renamed files.
+# ---------------------------------------------------------------------------
+
+
+def _setup_main_with_canonical(monkeypatch, tmp_path, cov, canonical: str = "1.20.0"):
+    """Point ``cov.CMAKE_FILE`` at a fake canonical and stub argv so
+    ``cov.main()`` can be invoked from a unit test."""
+    fake_cmake = tmp_path / "OnnxRuntime.cmake"
+    fake_cmake.write_text(f'set(ONNXRUNTIME_VERSION "{canonical}")\n')
+    monkeypatch.setattr(cov, "CMAKE_FILE", fake_cmake)
+    monkeypatch.setattr(sys, "argv", ["check_ort_versions.py"])
+
+
+def test_missing_exact_match_target_fails(cov, monkeypatch, tmp_path, capsys):
+    """If a TARGETS path no longer exists (file moved/renamed), the
+    gate must FAIL, not silently warn."""
+    _setup_main_with_canonical(monkeypatch, tmp_path, cov)
+    monkeypatch.setattr(cov, "TARGETS", [tmp_path / "absent.cmake"])
+    monkeypatch.setattr(cov, "FLOOR_TARGETS", [])
+
+    rc = cov.main()
+    captured = capsys.readouterr()
+    assert rc == 1, f"expected fail, stdout was: {captured.out}"
+    assert "required file missing" in captured.out
+    assert "absent.cmake" in captured.out
+
+
+def test_missing_floor_target_fails(cov, monkeypatch, tmp_path, capsys):
+    """Same as above for FLOOR_TARGETS — a missing floor file must FAIL
+    so the gate cannot silently exempt a runtime."""
+    _setup_main_with_canonical(monkeypatch, tmp_path, cov)
+    monkeypatch.setattr(cov, "TARGETS", [])
+    monkeypatch.setattr(
+        cov, "FLOOR_TARGETS", [(tmp_path / "absent_pyproject.toml", "python")]
+    )
+
+    rc = cov.main()
+    captured = capsys.readouterr()
+    assert rc == 1, f"expected fail, stdout was: {captured.out}"
+    assert "required file missing" in captured.out
+    assert "absent_pyproject.toml" in captured.out
+
+
+def test_all_targets_present_passes(cov, monkeypatch, tmp_path, capsys):
+    """Sanity check the missing-file logic is not over-eager: a real
+    file with canonical content must still pass when it's the only
+    target (regression guard for the warn → fail flip)."""
+    _setup_main_with_canonical(monkeypatch, tmp_path, cov)
+    fake_target = tmp_path / "fake_workflow.yml"
+    fake_target.write_text('  ONNXRUNTIME_VERSION: "1.20.0"\n')
+    monkeypatch.setattr(cov, "TARGETS", [fake_target])
+
+    fake_floor = tmp_path / "fake_pyproject.toml"
+    fake_floor.write_text('"onnxruntime>=1.20.0",\n')
+    monkeypatch.setattr(cov, "FLOOR_TARGETS", [(fake_floor, "python")])
+
+    rc = cov.main()
+    captured = capsys.readouterr()
+    assert rc == 0, f"expected pass, stdout was: {captured.out}"
+    assert "all ORT version references match" in captured.out
