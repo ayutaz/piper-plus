@@ -1,6 +1,7 @@
 package phonemize
 
 import (
+	"fmt"
 	"strings"
 	"unicode"
 )
@@ -514,4 +515,163 @@ func (p *PortuguesePhonemizer) PhonemizeWithProsody(text string) (*PhonemizeResu
 	}
 	phons = MapSequence(phons)
 	return &PhonemizeResult{Tokens: phons, Prosody: pros, EOSToken: eos}, nil
+}
+
+// ---------------------------------------------------------------------------
+// European Portuguese (pt-PT) — mirror of Python `_apply_eu_postprocessing`.
+// See `docs/spec/pt-dialect-contract.toml` (spec_version 2).
+// ---------------------------------------------------------------------------
+
+const (
+	puaTchStr = "" // tʃ
+	puaDzhStr = "" // dʒ
+)
+
+var euVowelChars = map[rune]bool{
+	'a': true, 'e': true, 'i': true, 'o': true, 'u': true,
+	'ɛ': true, 'ɔ': true, 'ã': true, 'ẽ': true, 'ĩ': true,
+	'õ': true, 'ũ': true, 'ɨ': true,
+}
+
+var euConsonantChars = map[rune]bool{
+	'b': true, 'd': true, 'f': true, 'k': true, 'l': true, 'm': true,
+	'n': true, 'p': true, 'r': true, 's': true, 't': true, 'v': true,
+	'w': true, 'z': true, 'ɡ': true, 'ɲ': true, 'ɾ': true, 'ʁ': true,
+	'ʃ': true, 'ʎ': true, 'ʒ': true, 'ʔ': true, 'h': true, 'ɫ': true,
+}
+
+func euTokFirstRune(s string) rune {
+	for _, r := range s {
+		return r
+	}
+	return 0
+}
+
+func euStartsCons(s string) bool { return euConsonantChars[euTokFirstRune(s)] }
+func euStartsVowel(s string) bool { return euVowelChars[euTokFirstRune(s)] }
+
+func euNextNonSpaceVowel(toks []string, i int) bool {
+	for j := i + 1; j < len(toks); j++ {
+		if toks[j] == " " {
+			continue
+		}
+		return euStartsVowel(toks[j])
+	}
+	return false
+}
+
+func applyEUPostprocessing(toks []string) []string {
+	out := append([]string(nil), toks...)
+	n := len(out)
+	punct := map[string]bool{",": true, ".": true, ";": true, ":": true,
+		"!": true, "?": true, "—": true, "–": true, "…": true}
+
+	// Pass 1: undo BR t/d palatalisation + final-e centralisation.
+	for i := 0; i < n; i++ {
+		if out[i] != "i" {
+			continue
+		}
+		var nxt string
+		if i+1 < n {
+			nxt = out[i+1]
+		}
+		isFinal := nxt == "" || nxt == " " || punct[nxt]
+		if !isFinal {
+			continue
+		}
+		if i >= 1 && out[i-1] == puaTchStr {
+			out[i-1] = "t"
+			out[i] = "ɨ"
+			continue
+		}
+		if i >= 1 && out[i-1] == puaDzhStr {
+			out[i-1] = "d"
+			out[i] = "ɨ"
+			continue
+		}
+		if i >= 1 && euStartsCons(out[i-1]) {
+			out[i] = "ɨ"
+		}
+	}
+	// Pass 2: coda /s/ → /ʃ/, /z/ → /ʒ/.
+	for i := 0; i < n; i++ {
+		if out[i] != "s" && out[i] != "z" {
+			continue
+		}
+		var nxt string
+		if i+1 < n {
+			nxt = out[i+1]
+		}
+		isWordEnd := nxt == "" || nxt == " " || punct[nxt]
+		if isWordEnd {
+			if euNextNonSpaceVowel(out, i) {
+				out[i] = "ʒ"
+				continue
+			}
+			if out[i] == "s" {
+				out[i] = "ʃ"
+			} else {
+				out[i] = "ʒ"
+			}
+		} else if euStartsCons(nxt) && !euStartsVowel(nxt) {
+			if out[i] == "s" {
+				out[i] = "ʃ"
+			} else {
+				out[i] = "ʒ"
+			}
+		}
+	}
+	// Pass 3: coda /w/ → /ɫ/.
+	for i := 0; i < n; i++ {
+		if out[i] != "w" || i == 0 {
+			continue
+		}
+		if !euStartsVowel(out[i-1]) {
+			continue
+		}
+		var nxt string
+		if i+1 < n {
+			nxt = out[i+1]
+		}
+		isCoda := nxt == "" || nxt == " " || punct[nxt] ||
+			(euStartsCons(nxt) && !euStartsVowel(nxt))
+		if isCoda {
+			out[i] = "ɫ"
+		}
+	}
+	// Pass 4: h → ʁ.
+	for i := 0; i < n; i++ {
+		if out[i] == "h" {
+			out[i] = "ʁ"
+		}
+	}
+	return out
+}
+
+// EuropeanPortuguesePhonemizer implements pt-PT (European Portuguese).
+type EuropeanPortuguesePhonemizer struct {
+	br *PortuguesePhonemizer
+}
+
+// NewEuropeanPortuguesePhonemizer constructs the EU phonemizer.
+func NewEuropeanPortuguesePhonemizer() *EuropeanPortuguesePhonemizer {
+	return &EuropeanPortuguesePhonemizer{br: NewPortuguesePhonemizer()}
+}
+
+// LanguageCode returns "pt-PT".
+func (e *EuropeanPortuguesePhonemizer) LanguageCode() string { return "pt-PT" }
+
+// PhonemizeWithProsody runs the BR pipeline and applies EU post-processing.
+func (e *EuropeanPortuguesePhonemizer) PhonemizeWithProsody(text string) (*PhonemizeResult, error) {
+	res, err := e.br.PhonemizeWithProsody(text)
+	if err != nil {
+		return nil, err
+	}
+	res.Tokens = applyEUPostprocessing(res.Tokens)
+	if len(res.Tokens) != len(res.Prosody) {
+		// Should never happen — EU post-processing is in-place.
+		return nil, fmt.Errorf("EU post-processing token count drift: %d vs %d",
+			len(res.Tokens), len(res.Prosody))
+	}
+	return res, nil
 }
