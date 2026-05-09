@@ -12,7 +12,7 @@ import { EnglishG2P } from './en/index.js';
 import { ChineseG2P } from './zh/index.js';
 import { SpanishG2P } from './es/index.js';
 import { FrenchG2P } from './fr/index.js';
-import { PortugueseG2P } from './pt/index.js';
+import { EuropeanPortugueseG2P, PortugueseG2P } from './pt/index.js';
 import { SwedishG2P } from './sv/index.js';
 import { KoreanG2P } from './ko/index.js';
 import { UnicodeLanguageDetector } from './detect.js';
@@ -21,7 +21,7 @@ import { Encoder } from './encode.js';
 // ---- Constants ---------------------------------------------------------------
 
 /** All supported language codes. */
-const ALL_LANGUAGES = ['ja', 'en', 'zh', 'ko', 'es', 'fr', 'pt', 'sv'];
+const ALL_LANGUAGES = ['ja', 'en', 'zh', 'ko', 'es', 'fr', 'pt', 'pt-PT', 'sv'];
 
 /** Map from language code to G2P constructor (for non-JA languages). */
 const LANGUAGE_FACTORIES = {
@@ -31,6 +31,7 @@ const LANGUAGE_FACTORIES = {
   es: () => new SpanishG2P(),
   fr: () => new FrenchG2P(),
   pt: () => new PortugueseG2P(),
+  'pt-PT': () => new EuropeanPortugueseG2P(),
   sv: () => new SwedishG2P(),
 };
 
@@ -327,7 +328,7 @@ export { EnglishG2P } from './en/index.js';
 export { ChineseG2P } from './zh/index.js';
 export { SpanishG2P } from './es/index.js';
 export { FrenchG2P } from './fr/index.js';
-export { PortugueseG2P } from './pt/index.js';
+export { EuropeanPortugueseG2P, PortugueseG2P } from './pt/index.js';
 export { SwedishG2P } from './sv/index.js';
 export { KoreanG2P } from './ko/index.js';
 export { DictLoader } from './dict-loader.js';

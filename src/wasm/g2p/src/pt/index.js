@@ -929,3 +929,135 @@ export class PortugueseG2P {
         return { tokens, prosody };
     }
 }
+
+// =============================================================================
+// European Portuguese (pt-PT) — mirror of Python `_apply_eu_postprocessing`.
+// See `docs/spec/pt-dialect-contract.toml` (spec_version 2).
+// =============================================================================
+
+const EU_VOWEL_CHARS = new Set([
+    'a', 'e', 'i', 'o', 'u', 'ɛ', 'ɔ',  // ɛ, ɔ
+    NASAL_A, NASAL_E, NASAL_I, NASAL_O, NASAL_U,
+    'ɨ',  // ɨ
+]);
+
+const EU_CONSONANT_CHARS = new Set([
+    'b', 'd', 'f', 'k', 'l', 'm', 'n', 'p', 'r', 's', 't', 'v', 'w', 'z',
+    'ɡ', 'ɲ', 'ɾ', 'ʁ', 'ʃ', 'ʎ', 'ʒ',
+    'ʔ', 'h', 'ɫ',  // ɫ
+]);
+
+const EU_PUNCT = new Set([',', '.', ';', ':', '!', '?', '—', '–', '…']);
+
+function euFirstChar(s) { return (typeof s === 'string' && s.length > 0) ? s[0] : ''; }
+function euStartsCons(s) { return EU_CONSONANT_CHARS.has(euFirstChar(s)); }
+function euStartsVowel(s) { return EU_VOWEL_CHARS.has(euFirstChar(s)); }
+
+function euNextNonSpaceStartsVowel(tokens, idx) {
+    for (let j = idx + 1; j < tokens.length; j++) {
+        if (tokens[j] === ' ') continue;
+        return euStartsVowel(tokens[j]);
+    }
+    return false;
+}
+
+/**
+ * Apply European Portuguese post-processing to BR token list.
+ * Five passes: t/d palatalisation undo, final-e centralisation,
+ * coda-/s/, coda-/l/, h→ʁ.
+ *
+ * @param {string[]} tokensIn
+ * @returns {string[]}
+ */
+export function applyEuPostprocessing(tokensIn) {
+    const tokens = tokensIn.slice();
+    const n = tokens.length;
+
+    // Pass 1: undo BR t/d palatalisation + final-e centralisation.
+    for (let i = 0; i < n; i++) {
+        if (tokens[i] !== 'i') continue;
+        const nxt = (i + 1 < n) ? tokens[i + 1] : '';
+        const isFinal = nxt === '' || nxt === ' ' || EU_PUNCT.has(nxt);
+        if (!isFinal) continue;
+        if (i >= 1 && tokens[i - 1] === PUA_AFFRICATE_TCH) {
+            tokens[i - 1] = 't';
+            tokens[i] = 'ɨ';  // ɨ
+            continue;
+        }
+        if (i >= 1 && tokens[i - 1] === PUA_AFFRICATE_DZH) {
+            tokens[i - 1] = 'd';
+            tokens[i] = 'ɨ';
+            continue;
+        }
+        if (i >= 1 && euStartsCons(tokens[i - 1])) {
+            tokens[i] = 'ɨ';
+        }
+    }
+
+    // Pass 2: coda /s/, /z/.
+    for (let i = 0; i < n; i++) {
+        if (tokens[i] !== 's' && tokens[i] !== 'z') continue;
+        const nxt = (i + 1 < n) ? tokens[i + 1] : '';
+        const isWordEnd = nxt === '' || nxt === ' ' || EU_PUNCT.has(nxt);
+        if (isWordEnd) {
+            if (euNextNonSpaceStartsVowel(tokens, i)) {
+                tokens[i] = 'ʒ';  // ʒ
+                continue;
+            }
+            tokens[i] = (tokens[i] === 's') ? 'ʃ' : 'ʒ';  // ʃ / ʒ
+        } else if (euStartsCons(nxt) && !euStartsVowel(nxt)) {
+            tokens[i] = (tokens[i] === 's') ? 'ʃ' : 'ʒ';
+        }
+    }
+
+    // Pass 3: coda /w/ → /ɫ/.
+    for (let i = 0; i < n; i++) {
+        if (tokens[i] !== 'w' || i === 0) continue;
+        if (!euStartsVowel(tokens[i - 1])) continue;
+        const nxt = (i + 1 < n) ? tokens[i + 1] : '';
+        const isCoda =
+            nxt === '' || nxt === ' ' || EU_PUNCT.has(nxt) ||
+            (euStartsCons(nxt) && !euStartsVowel(nxt));
+        if (isCoda) {
+            tokens[i] = 'ɫ';  // ɫ
+        }
+    }
+
+    // Pass 4: h → ʁ.
+    for (let i = 0; i < n; i++) {
+        if (tokens[i] === 'h') {
+            tokens[i] = 'ʁ';  // ʁ
+        }
+    }
+
+    return tokens;
+}
+
+/**
+ * European Portuguese (pt-PT) G2P.
+ * Reuses BR `PortugueseG2P` and applies EU post-processing.
+ */
+export class EuropeanPortugueseG2P {
+    constructor(options = {}) {
+        this.brG2P = new PortugueseG2P(options);
+        this.phonemeIdMap = this.brG2P.phonemeIdMap;
+    }
+
+    /** @type {string} */
+    get languageCode() {
+        return 'pt-PT';
+    }
+
+    phonemize(text) {
+        const result = this.brG2P.phonemizeWithProsody(text);
+        return applyEuPostprocessing(result.tokens);
+    }
+
+    phonemizeWithProsody(text) {
+        const result = this.brG2P.phonemizeWithProsody(text);
+        return {
+            tokens: applyEuPostprocessing(result.tokens),
+            prosody: result.prosody,
+        };
+    }
+}
