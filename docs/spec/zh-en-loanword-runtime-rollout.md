@@ -1562,6 +1562,7 @@ en = ["piper-plus-g2p/english"]
 - ABI 安定性: feature gate により API は cargo level で制御
 
 **既存 wasm-opt 設定** (`piper-wasm/Cargo.toml`):
+
 ```toml
 [package.metadata.wasm-pack.profile.release]
 wasm-opt = ['-Os']  # サイズ重視最適化

@@ -23,7 +23,7 @@ direct dependencies.
 
 | Asset | License | Source | Purpose |
 |-------|---------|--------|---------|
-| NAIST-JDIC | BSD-3-Clause | [NAIST-JDIC project (osdn.net)](https://osdn.net/projects/naist-jdic/) | MeCab dictionary for Japanese morphological analysis |
+| NAIST-JDIC | BSD-3-Clause | [NAIST-JDIC mirror (jpreprocess/naist-jdic)](https://github.com/jpreprocess/naist-jdic) | MeCab dictionary for Japanese morphological analysis |
 
 > **Distribution note:** Bundled inside the `jpreprocess` crate at
 > compile time when `naist-jdic` is enabled. Adds approximately 20 MB

@@ -45,10 +45,12 @@ huggingface-cli upload ayousanz/piper-plus-tsukuyomi-chan tmp/config.json config
 ```
 
 After push, end-users running:
+
 ```
 piper.exe --download-model tsukuyomi
 piper.exe --model tsukuyomi --text "..." --output_file out.wav
 ```
+
 will receive the corrected config and synthesize successfully on Windows.
 
 ## Other affected models

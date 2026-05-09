@@ -15,7 +15,7 @@ cmake --build . --config Release
 Prerequisites: C++17 compiler, CMake 3.15+
 
 - **Linux**: Dependencies (ONNX Runtime, OpenJTalk, etc.) are downloaded automatically by CMake
-- **Windows**: See [Windows Setup Guide](docs/getting-started/windows-setup.md)
+- **Windows**: See [Windows Setup Guide](../getting-started/windows-setup.md)
 - **macOS**: Dependencies are downloaded automatically
 
 ## Building C# CLI (PiperPlus)
@@ -29,7 +29,7 @@ dotnet test src/csharp/PiperPlus.Core.Tests/
 
 Prerequisites: .NET 10 SDK or later
 
-#### C# CLI Usage Examples
+### C# CLI Usage Examples
 
 ```bash
 # Inference with model name (auto-download supported, defaults to output.wav)
@@ -58,7 +58,7 @@ piper-plus --list-models ja
 piper-plus --model model.onnx --test-mode --text "hello" --language en
 ```
 
-#### Rust CLI Usage Examples
+### Rust CLI Usage Examples
 
 ```bash
 # Inference with model name (auto-download supported)

@@ -28,21 +28,28 @@ examples/godot/
 
 1. **Godot 4.3+** installed
 2. **piper-plus shared library** installed and discoverable via `pkg-config`:
+
    ```bash
    # Verify installation
    pkg-config --cflags --libs piper_plus
    ```
+
    If not installed, download from [GitHub Releases](https://github.com/ayutaz/piper-plus/releases) and extract:
+
    ```bash
    tar -xzf piper-plus-shared-linux-x64.tar.gz -C /usr/local
    ```
+
 3. **godot-cpp** (Godot C++ bindings):
+
    ```bash
    cd examples/godot
    git clone --depth 1 --branch godot-4.3-stable \
      https://github.com/godotengine/godot-cpp.git
    ```
+
 4. **SCons** build system:
+
    ```bash
    pip install scons
    ```

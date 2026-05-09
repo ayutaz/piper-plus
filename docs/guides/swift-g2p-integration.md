@@ -90,10 +90,12 @@ let package = Package(
 ### Xcode プロジェクトの場合 (Package.swift を使わない)
 
 1. **GitHub Releases** から `libpiper_plus_g2p-apple-v${VERSION}.xcframework.zip` をダウンロード
+
    ```bash
    gh release download v1.14.0 -p 'libpiper_plus_g2p-apple-v*.xcframework.zip' --repo ayutaz/piper-plus
    unzip libpiper_plus_g2p-apple-v*.xcframework.zip
    ```
+
 2. **Project Navigator** に `piper_plus_g2p.xcframework` をドラッグ
 3. **Targets** → **General** → **Frameworks, Libraries, and Embedded Content** で **"Do Not Embed"** (static archive)
 4. Swift から `import PiperPlusG2PBinary` で C API を直接利用するか、`Sources/PiperPlusG2P/*.swift` を手動コピーして `import PiperPlusG2P` を使う
@@ -258,7 +260,7 @@ struct PhonemeView: View {
 
 | 言語 | 辞書 | ライセンス | 同梱形態 |
 |------|------|-----------|---------|
-| 日本語 | NAIST-JDIC (jpreprocess 経由) | BSD-3-Clause ([NAIST-JDIC 公式](https://osdn.net/projects/naist-jdic/)) | バイナリ埋込 (consumer の app に複製される) |
+| 日本語 | NAIST-JDIC (jpreprocess 経由) | BSD-3-Clause ([NAIST-JDIC mirror](https://github.com/jpreprocess/naist-jdic)) | バイナリ埋込 (consumer の app に複製される) |
 | 中国語 | pypinyin (Unicode CLDR + Han database 由来) | MIT ([pypinyin](https://github.com/mozillazg/python-pinyin)) | バイナリ埋込 |
 | 英語 | CMU Pronouncing Dictionary v0.7b | BSD-style ([CMU](http://www.speech.cs.cmu.edu/cgi-bin/cmudict)) | バイナリ埋込 |
 | 他 | (規則ベースのみ、辞書なし) | — | — |

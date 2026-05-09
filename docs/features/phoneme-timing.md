@@ -54,6 +54,7 @@ for each (duration_frames, phoneme_token):
 単一行の JSON。ネットワーク送信や log 出力向け。
 
 ### TSV
+
 ```
 start_ms	end_ms	duration_ms	phoneme
 0.000	58.000	58.000	^
@@ -64,6 +65,7 @@ start_ms	end_ms	duration_ms	phoneme
 タブ・改行は phoneme 文字列内で `\t` / `\n` にエスケープされます。
 
 ### SRT (字幕)
+
 ```
 1
 00:00:00,000 --> 00:00:00,058
@@ -79,6 +81,7 @@ VLC など標準的な字幕プレイヤーで再生可能。
 ## 使用例
 
 ### Python
+
 ```python
 from piper import PiperVoice
 from piper.timing import timing_to_json, timing_to_srt
@@ -93,6 +96,7 @@ if timing:
 ```
 
 ### JavaScript / WASM
+
 ```javascript
 import { PiperPlus, timingToJson, timingToSrt } from 'piper-plus';
 
@@ -110,24 +114,28 @@ if (result.hasTimingInfo) {
 ```
 
 ### Rust CLI
+
 ```bash
 piper-plus -m model.onnx --text "Hello" \
   --output-timing timing.json --timing-format json
 ```
 
 ### Go CLI
+
 ```bash
 piper-plus --model model.onnx --text "Hello" \
   --output-timing timing.json --timing-format json
 ```
 
 ### C++ CLI
+
 ```bash
 echo "Hello" | piper --model model.onnx -f speech.wav \
   --output-timing timing.json --timing-format json
 ```
 
 ### HTTP API (Python `piper.http_server`)
+
 ```bash
 curl "http://localhost:5000/api/phoneme-timing?text=Hello&format=json"
 curl "http://localhost:5000/api/phoneme-timing?text=Hello&format=tsv"
@@ -176,7 +184,7 @@ with open("output.srt", "w") as f:
 
 - Python: [`src/python_run/README.md`](../../src/python_run/README.md)
 - WASM: [`src/wasm/openjtalk-web/README.npm.md`](../../src/wasm/openjtalk-web/README.npm.md)
-- Rust: [`src/rust/piper-cli/README.md`](../../src/rust/piper-cli/README.md)
+- Rust: [`src/rust/piper-core/src/timing.rs`](../../src/rust/piper-core/src/timing.rs)
 - Go: [`src/go/README.md`](../../src/go/README.md)
 
 ## 関連仕様

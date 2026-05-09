@@ -84,7 +84,7 @@ pre-commit run --all-files
 
 - `cargo fmt` and `cargo clippy`
 
-### C#
+### C\#
 
 - Follow existing code style (no editorconfig enforced yet)
 
@@ -115,7 +115,7 @@ cd src/python_run && uv run python -m pytest
 cd src/rust && cargo test --workspace
 ```
 
-### C#
+### C\#
 
 ```bash
 dotnet test src/csharp/PiperPlus.Core.Tests/

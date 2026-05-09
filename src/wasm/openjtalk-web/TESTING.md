@@ -7,10 +7,13 @@ This guide explains how to test the multilingual Text-to-Speech (TTS) implementa
 ## Quick Start
 
 1. **Start the test server:**
+
    ```bash
    python3 test-server.py
    ```
+
    Or use Python's built-in server:
+
    ```bash
    python3 -m http.server 8080
    ```

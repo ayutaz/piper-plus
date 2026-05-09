@@ -388,6 +388,7 @@ piper-plus --model <model-name> --text "こんにちは"
 # C#
 piper-plus --model <model-name> --text "こんにちは"
 ```
+
 ```
 
 ### Step 3: GitHub Issue で投稿

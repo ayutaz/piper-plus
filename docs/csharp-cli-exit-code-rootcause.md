@@ -24,6 +24,7 @@ CI で fail した test:
 ## Root cause (仮説 1 の詳細)
 
 `Program.cs:71`:
+
 ```csharp
 return rootCommand.Parse(args).Invoke();
 ```
@@ -34,6 +35,7 @@ Main の return value が process exit code。 `Invoke()` の戻り値は SetAct
 - **`SetAction(Func<ParseResult, int>)` overload**: lambda の int return 値が `Invoke()` 戻り値となり Main 経由で process exit code に。
 
 現状の `Program.cs:290`:
+
 ```csharp
 rootCommand.SetAction((parseResult) =>
     {

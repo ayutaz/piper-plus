@@ -47,6 +47,7 @@ my-app/
 2. 展開: `tar -xf open_jtalk_dic.tar -C app/src/main/assets/`
 3. `aaptOptions { noCompress 'bin', 'dic' }` を `android { }` ブロックに追加 (任意 — 既に圧縮するメリットは薄い)
 4. Kotlin:
+
 ```kotlin
 val dict = OpenJTalkDictionary.fromAssets(context)
 val g2p = PiperPlusG2p.create(context, dict)

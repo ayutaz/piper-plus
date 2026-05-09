@@ -11,6 +11,7 @@ piper-plus v0.2.0 replaces the Emscripten-compiled OpenJTalk C WASM with a Rust-
 The `initialize()` method now accepts a `PhonemizerInitConfig` object with a `configJson` property (the model's `config.json` as a string) instead of the previous empty-or-path-based initialization.
 
 **v0.1.x:**
+
 ```js
 const phonemizer = new SimpleUnifiedPhonemizer();
 await phonemizer.initialize();
@@ -19,6 +20,7 @@ await phonemizer.initialize({ basePath: '/my-app' });
 ```
 
 **v0.2.0:**
+
 ```js
 const phonemizer = new SimpleUnifiedPhonemizer();
 await phonemizer.initialize({
@@ -33,6 +35,7 @@ The `configJson` is required for the Rust WASM phonemizer to resolve `phoneme_id
 The `DictManager` class and all dictionary download/cache logic have been removed. The dictionary is now embedded in the WASM binary.
 
 **v0.1.x:**
+
 ```js
 import { DictManager } from 'piper-plus';
 
@@ -42,6 +45,7 @@ await dictManager.loadDictionary();
 ```
 
 **v0.2.0:**
+
 ```js
 // No equivalent needed. Dictionary is bundled in WASM.
 // Just initialize the phonemizer:
@@ -109,6 +113,7 @@ Delete any IndexedDB cleanup code that was specific to the dictionary cache (`pi
 If you use `SimpleUnifiedPhonemizer` directly:
 
 **Before:**
+
 ```js
 import { SimpleUnifiedPhonemizer } from 'piper-plus/phonemizer';
 
@@ -117,6 +122,7 @@ await phonemizer.initialize();
 ```
 
 **After:**
+
 ```js
 import { SimpleUnifiedPhonemizer } from 'piper-plus/phonemizer';
 
@@ -149,12 +155,14 @@ await audio.play();
 If you used `ESpeakPhonemeExtractor` or `espeak_phonemizer`, replace them with `SimpleUnifiedPhonemizer` which now handles all 8 languages through the Rust WASM backend:
 
 **Before:**
+
 ```js
 import { ESpeakPhonemeExtractor } from 'piper-plus';
 const extractor = new ESpeakPhonemeExtractor();
 ```
 
 **After:**
+
 ```js
 import { SimpleUnifiedPhonemizer } from 'piper-plus/phonemizer';
 const phonemizer = new SimpleUnifiedPhonemizer();
@@ -324,6 +332,7 @@ If you are using the high-level `PiperPlus` API, **no code changes are required*
 If you use `JapaneseG2P` or `DictLoader` directly from `@piper-plus/g2p`:
 
 **Before (v0.2.0):**
+
 ```js
 const ja = new JapaneseG2P({
   jaDict: { dictFiles: {...}, voiceData: {...} }
@@ -331,6 +340,7 @@ const ja = new JapaneseG2P({
 ```
 
 **After (v0.3.0+):**
+
 ```js
 const loader = new DictLoader();
 const jaDict = await loader.loadJaDict();
@@ -364,11 +374,13 @@ for (const db of dbs) {
 ## Migration Steps
 
 1. Update packages:
+
    ```bash
    npm install piper-plus@0.4.0
    ```
 
 2. If using `@piper-plus/g2p` directly:
+
    ```bash
    npm install @piper-plus/g2p@0.3.0
    ```

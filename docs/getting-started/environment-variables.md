@@ -13,6 +13,7 @@ This document lists all environment variables that can be used to configure Pipe
   - Linux: `~/.local/share/piper/open_jtalk_dic_utf_8-1.11`
   - macOS: `~/.local/share/piper/open_jtalk_dic_utf_8-1.11`
 - **Example**:
+
   ```bash
   # Windows
   set OPENJTALK_DICTIONARY_PATH=C:\openjtalk\dictionary
@@ -26,6 +27,7 @@ This document lists all environment variables that can be used to configure Pipe
 - **Used by**: C++, C#, Rust (dictionary download manager)
 - **Default**: Platform-specific user data directory
 - **Example**:
+
   ```bash
   # Windows
   set OPENJTALK_DATA_DIR=D:\piper-data
@@ -41,6 +43,7 @@ This document lists all environment variables that can be used to configure Pipe
 - **Used by**: C++, Go
 - **Search order**: model directory -> executable-relative directory -> `PIPER_DICTIONARIES_PATH`
 - **Example**:
+
   ```bash
   export PIPER_DICTIONARIES_PATH=/opt/piper/dictionaries
   ```
@@ -50,6 +53,7 @@ This document lists all environment variables that can be used to configure Pipe
 - **Used by**: Rust (piper-plus, piper-plus-g2p)
 - **Default**: Bundled `naist-jdic` feature, or auto-detected from known locations
 - **Example**:
+
   ```bash
   export JPREPROCESS_DICT=/opt/naist-jdic
   ```
@@ -59,6 +63,7 @@ This document lists all environment variables that can be used to configure Pipe
 - **Used by**: Rust (piper-plus, piper-plus-g2p)
 - **Default**: Auto-detected from known locations
 - **Example**:
+
   ```bash
   export CMUDICT_PATH=/opt/piper/cmudict_data.json
   ```
@@ -68,6 +73,7 @@ This document lists all environment variables that can be used to configure Pipe
 - **Used by**: Rust (piper-plus)
 - **Default**: Auto-detected next to the model file
 - **Example**:
+
   ```bash
   export PINYIN_SINGLE_PATH=/opt/piper/pinyin_single.json
   export PINYIN_PHRASES_PATH=/opt/piper/pinyin_phrases.json
@@ -78,6 +84,7 @@ This document lists all environment variables that can be used to configure Pipe
 - **Used by**: C# (PiperPlus.Core)
 - **Default**: Auto-downloaded to user data directory
 - **Example**:
+
   ```bash
   export DOTNETG2P_NAIST_JDIC_PATH=/opt/naist-jdic
   # or
@@ -92,6 +99,7 @@ This document lists all environment variables that can be used to configure Pipe
   - `1` (default): Enable automatic download
   - `0`: Disable automatic download
 - **Example**:
+
   ```bash
   # Disable auto-download
   export PIPER_AUTO_DOWNLOAD_DICT=0
@@ -103,6 +111,7 @@ This document lists all environment variables that can be used to configure Pipe
   - `0` (default): Allow network access
   - `1`: Offline mode - prevent all downloads
 - **Example**:
+
   ```bash
   # Enable offline mode
   export PIPER_OFFLINE_MODE=1
@@ -115,6 +124,7 @@ This document lists all environment variables that can be used to configure Pipe
 - **Used by**: Rust, C#
 - **Default**: None (must be specified via CLI or this variable)
 - **Example**:
+
   ```bash
   # Windows
   set PIPER_DEFAULT_MODEL=C:\models\ja_JP-tsukuyomi-medium.onnx
@@ -128,6 +138,7 @@ This document lists all environment variables that can be used to configure Pipe
 - **Used by**: Rust, C#
 - **Default**: None (auto-detected from model path if not set)
 - **Example**:
+
   ```bash
   # Windows
   set PIPER_DEFAULT_CONFIG=C:\models\ja_JP-tsukuyomi-medium.onnx.json
@@ -144,6 +155,7 @@ This document lists all environment variables that can be used to configure Pipe
   - Linux: `~/.local/share/piper/models`
   - macOS: `~/.local/share/piper/models`
 - **Example**:
+
   ```bash
   # Windows
   set PIPER_MODEL_DIR=D:\piper-models
@@ -163,6 +175,7 @@ This document lists all environment variables that can be used to configure Pipe
 - **Description**: GPU device ID to use for CUDA inference
 - **Default**: `0` (first GPU)
 - **Example**:
+
   ```bash
   # Use the second GPU
   export PIPER_GPU_DEVICE_ID=1
@@ -173,6 +186,7 @@ This document lists all environment variables that can be used to configure Pipe
 - **Used by**: Python inference scripts (`infer_onnx.py`, `voice.py`, Docker inference, WebUI)
 - **Use cases**: Reducing startup time in embedded environments, debugging
 - **Example**:
+
   ```bash
   export PIPER_DISABLE_WARMUP=1
   ```
@@ -182,6 +196,7 @@ This document lists all environment variables that can be used to configure Pipe
 - **Used by**: Python inference scripts
 - **Use cases**: Read-only file systems, CI environments, debugging
 - **Example**:
+
   ```bash
   export PIPER_DISABLE_CACHE=1
   ```
@@ -191,6 +206,7 @@ This document lists all environment variables that can be used to configure Pipe
 - **Used by**: Python inference scripts
 - **Use cases**: Tuning performance with Docker `--cpus` constraints, manual thread control
 - **Example**:
+
   ```bash
   export PIPER_INTRA_THREADS=2
   ```
@@ -199,6 +215,7 @@ This document lists all environment variables that can be used to configure Pipe
 - **Description**: Path to the ONNX Runtime shared library (`libonnxruntime.so` / `libonnxruntime.dylib`). Required for Go integration tests and applications.
 - **Used by**: Go (piperplus)
 - **Example**:
+
   ```bash
   export ONNX_RUNTIME_SHARED_LIBRARY_PATH=/usr/lib/libonnxruntime.so
   ```
@@ -209,6 +226,7 @@ This document lists all environment variables that can be used to configure Pipe
 - **Used by**: Legacy preprocessing pipeline (`preprocess.py`) only
 - **Values**: Any non-empty value enables debug output
 - **Example**:
+
   ```bash
   export PIPER_PHONEMIZE_DEBUG=1
   ```
@@ -217,6 +235,7 @@ This document lists all environment variables that can be used to configure Pipe
 - **Description**: Library search path for shared libraries
 - **Usage**: May need to include piper/lib directory
 - **Example**:
+
   ```bash
   export LD_LIBRARY_PATH=/path/to/piper/lib:$LD_LIBRARY_PATH
   ```
@@ -225,6 +244,7 @@ This document lists all environment variables that can be used to configure Pipe
 - **Description**: Library search path for dynamic libraries
 - **Usage**: May need to include piper/lib directory
 - **Example**:
+
   ```bash
   export DYLD_LIBRARY_PATH=/path/to/piper/lib:$DYLD_LIBRARY_PATH
   ```
@@ -232,12 +252,14 @@ This document lists all environment variables that can be used to configure Pipe
 ## Usage Examples
 
 ### Basic Japanese TTS (auto-download enabled)
+
 ```bash
 # No environment variables needed - will auto-download on first use
 echo "こんにちは" | piper --model ja_JP-model.onnx --output_file hello.wav
 ```
 
 ### Custom dictionary location
+
 ```bash
 # Windows
 set OPENJTALK_DICTIONARY_PATH=C:\my-dictionary
@@ -249,6 +271,7 @@ echo "テスト" | piper --model ja_JP-model.onnx --output_file test.wav
 ```
 
 ### Offline mode (no downloads)
+
 ```bash
 # Must have dictionary files already installed
 export PIPER_OFFLINE_MODE=1

@@ -121,9 +121,11 @@ tts.dispose();
   get stripped and `DynamicLibrary.process()` returns `Symbol not found` at
   the first FFI call. **Fix**: in `ios/Runner.xcodeproj` → Build Settings →
   **Other Linker Flags**, add:
+
   ```
   -force_load $(BUILT_PRODUCTS_DIR)/PiperPlus/piper_plus.xcframework/ios-arm64/libpiper_plus.a
   ```
+
   (or the matching simulator path for sim builds). Alternatively, use
   `DynamicLibrary.open(...)` with an explicit path to the framework binary
   inside the app bundle if you switched to a dynamic framework variant.

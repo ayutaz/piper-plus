@@ -180,6 +180,7 @@ android/
 - タグ `kotlin-g2p-v*` push で自動 release (既存の `release-*` ワークフローパターンを踏襲)
 
 **Maven coordinates**:
+
 ```
 groupId:    io.github.ayutaz
 artifactId: piper-plus-g2p-android

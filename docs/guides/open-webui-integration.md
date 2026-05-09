@@ -161,7 +161,7 @@ Open WebUI の管理画面から以下の設定を行います。
 - Open WebUI がホストマシンから piper-api にアクセスする場合: `http://localhost:8000/v1`
 - Open WebUI が別の Docker ネットワークにある場合: `http://host.docker.internal:8000/v1` (Docker Desktop) または ホストの実 IP を指定
 
-4. **Save** をクリック
+1. **Save** をクリック
 
 ---
 
@@ -249,35 +249,44 @@ piper-plus が提供する OpenAI 互換エンドポイントの一覧です。
 ### 「Connection refused」エラー
 
 - piper-api コンテナが起動しているか確認:
+
   ```bash
   docker ps | grep piper-api
   ```
+
 - ヘルスチェックの状態を確認:
+
   ```bash
   docker inspect --format='{{json .State.Health}}' piper-api
   ```
+
 - TTS Base URL が正しいか確認。同一 Docker ネットワーク内なら `http://piper-api:8000/v1`、外部からなら `http://localhost:8000/v1`
 
 ### 音声が再生されない
 
 - ブラウザの開発者ツール (Network タブ) で `/v1/audio/speech` リクエストのステータスコードを確認
 - piper-api のログを確認:
+
   ```bash
   docker logs piper-api
   ```
+
 - `response_format` の問題: piper-plus は `wav` のみ対応。Open WebUI が他の形式を要求している場合は 400 エラーが返ります
 
 ### モデルが見つからない
 
 - コンテナ内のモデルパスを確認:
+
   ```bash
   docker exec piper-api ls -la /app/models/
   ```
+
 - `model.onnx` と `config.json` (または `model.onnx.json`) の両方が必要
 
 ### GPU を使用したい場合
 
 Docker 起動時に GPU パススルーを有効化:
+
 ```bash
 docker run -d --gpus all \
   --name piper-api \

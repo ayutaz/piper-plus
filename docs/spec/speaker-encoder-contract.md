@@ -142,6 +142,7 @@ All 6 runtimes share the same skip semantics:
 Once the encoder ONNX is published:
 
 1. **Generate fixture data**:
+
    ```bash
    uv run python test/generate_speaker_encoder_golden.py \
      --encoder-onnx /local/path/to/encoder.onnx \
@@ -149,6 +150,7 @@ Once the encoder ONNX is published:
      --hf-repo ayousanz/piper-plus-speaker-encoder \
      --hf-revision v1.0.0
    ```
+
    Commit the updated `test/fixtures/speaker_encoder_golden.json`.
 
 2. **Reference WAV** — commit a CC0 short reference WAV (mono 16kHz,
@@ -156,6 +158,7 @@ Once the encoder ONNX is published:
    referenced by the fixture).
 
 3. **CI lane activation** — add to each runtime workflow:
+
    ```yaml
    - name: Download speaker encoder ONNX (cached)
      uses: actions/cache@v4

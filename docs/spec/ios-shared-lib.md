@@ -52,6 +52,7 @@ https://download.onnxruntime.ai/pod-archive-onnxruntime-c-${ONNXRUNTIME_VERSION}
 - **sha256 (1.17.0):** `1623e1150507d9e50554e3d3e5cf9abf75e1bfd8324b74a602acfe45343db871` (40,771,813 bytes、参考)
 - **sha256 (1.20.0、現用):** `50891a8aadd17d4811acb05ed151ba6c394129bb3ab14e843b0fc83a48d450ff` (44,218,716 bytes、検証 2026-05-09、Issue #383 follow-up で 1.17.0 から昇格)
 - **Zip 構造:**
+
   ```
   onnxruntime.xcframework/
   ├── Info.plist
@@ -206,7 +207,7 @@ iOS 行を更新:
 
 | リスク | 確度 | 対応 |
 |--------|------|------|
-| Microsoft CDN URL の変更/失効 | 低 (CocoaPods/SPM 共有のため不変条件強) | csukuangfj/onnxruntime-libs ミラーへの fallback を追加 (`||` で連鎖) |
+| Microsoft CDN URL の変更/失効 | 低 (CocoaPods/SPM 共有のため不変条件強) | csukuangfj/onnxruntime-libs ミラーへの fallback を追加 (`\|\|` で連鎖) |
 | 特定パッチバージョンが CDN に未公開 (例: 1.20.1) | 中 | メジャー・マイナーで version pin、欠番回避は `ort-versions.md` で管理 |
 | xcframework slice path の変更 | 低 | `find -name "onnxruntime.xcframework" -type d` で動的解決 (既存ロジック流用) |
 | Xcode メジャーバージョン更新による破壊変更 | 中 | runner image を `macos-15` (Xcode 16.4 デフォルト、Xcode 26 も installed) でピン留め、必要時のみ更新。次の昇格候補は `macos-26` (Xcode 26.x、iOS 26 SDK) |

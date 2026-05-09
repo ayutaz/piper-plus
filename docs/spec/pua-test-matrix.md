@@ -122,10 +122,12 @@ language's nasal vowel), follow this checklist to keep all gates green:
    - `src/go/phonemize/pua_test.go` (`allFixedPUA` table + `want` constants)
    - `src/rust/piper-plus-g2p/src/token_map.rs::test_fixed_pua_count`
 6. **Run the gate locally:**
+
    ```bash
    python scripts/check_pua_consistency.py --verbose --check-version
    uv run pytest src/python/g2p/tests/test_pua_invariants.py -v
    ```
+
 7. **CI must be green** on `pua-consistency.yml` before merging.
 
 If any of these steps is skipped, the CI gate refuses the PR.

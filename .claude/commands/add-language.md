@@ -32,6 +32,7 @@ for _token in [LANG]_PHONEMES:
 - `_PUA_START` を新言語の最終 PUA + 3 に更新 (将来拡張用)
 
 **衝突チェック:**
+
 ```
 JA: 0xE000-0xE01C (29), ZH: 0xE020-0xE04A (43), KO: 0xE04B-0xE052 (8)
 ES/PT: 0xE054-0xE055 (2), FR: 0xE056-0xE058 (3), SV: 0xE059-0xE061 (9)
@@ -42,6 +43,7 @@ ES/PT: 0xE054-0xE055 (2), FR: 0xE056-0xE058 (3), SV: 0xE059-0xE061 (9)
 **新規作成:** `src/python/piper_train/phonemize/$ARGUMENTS.py`
 
 必須クラス:
+
 ```python
 class [Lang]Phonemizer(Phonemizer):
     def phonemize(self, text: str) -> list[str]: ...
@@ -63,6 +65,7 @@ Prosody: `a1=0, a2=stress(0/1/2), a3=word_phoneme_count`
 ### 1.3 レジストリ + 多言語統合
 
 **修正:** `src/python/piper_train/phonemize/registry.py`
+
 ```python
 try:
     from .$ARGUMENTS import [Lang]Phonemizer
@@ -70,9 +73,11 @@ try:
 except ImportError:
     pass
 ```
+
 - ラテン文字言語なら `latin_langs` にも追加
 
 **修正:** `src/python/piper_train/phonemize/multilingual_id_map.py`
+
 ```python
 try:
     from .$ARGUMENTS_id_map import [LANG]_PHONEMES

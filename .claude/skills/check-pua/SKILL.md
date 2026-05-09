@@ -20,7 +20,7 @@ PUA (Private Use Area) 関連の不変条件を一括検査します。`pua.json
 
 加えて:
 
-5. **Fixture drift** — `tests/fixtures/g2p/phoneme_test_cases.json` の `pua_map` / `pua_map_count` が `pua.json` と一致 (PR #389 で踏んだバグ class)
+1. **Fixture drift** — `tests/fixtures/g2p/phoneme_test_cases.json` の `pua_map` / `pua_map_count` が `pua.json` と一致 (PR #389 で踏んだバグ class)
 
 ## 実行ステップ
 

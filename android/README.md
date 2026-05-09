@@ -8,7 +8,7 @@ Wraps the piper-plus C shared library via JNI and exposes a Kotlin-friendly API 
 
 - Android SDK: compileSdk 35, minSdk 24
 - NDK (for JNI compilation)
-- Pre-built `libpiper_plus.so` for arm64-v8a (from [M4-4 NDK build](../docs/tickets/M4-4-android-ndk-build.md))
+- Pre-built `libpiper_plus.so` for arm64-v8a (built via [release-shared-lib workflow](../.github/workflows/release-shared-lib.yml))
 
 ## Project structure
 

@@ -275,31 +275,37 @@ pip install piper-plus
 ### 从包管理器安装
 
 **Python (PyPI):**
+
 ```bash
 pip install piper-plus
 ```
 
 **npm (浏览器 WASM):**
+
 ```bash
 npm install piper-plus onnxruntime-web
 ```
 
 **C# CLI (.NET 全局工具):**
+
 ```bash
 dotnet tool install -g PiperPlus.Cli
 ```
 
 **Rust CLI (crates.io):**
+
 ```bash
 cargo install piper-plus-cli
 ```
 
 **C# 库 (NuGet):**
+
 ```bash
 dotnet add package PiperPlus.Core
 ```
 
 **Rust 库 (crates.io):**
+
 ```toml
 [dependencies]
 piper-plus = "0.4"

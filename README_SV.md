@@ -263,31 +263,37 @@ pip install piper-plus
 ### Paketinstallation
 
 **Python (PyPI):**
+
 ```bash
 pip install piper-plus
 ```
 
 **npm (webbläsar-WASM):**
+
 ```bash
 npm install piper-plus onnxruntime-web
 ```
 
 **C# CLI (.NET Global Tool):**
+
 ```bash
 dotnet tool install -g PiperPlus.Cli
 ```
 
 **Rust CLI (crates.io):**
+
 ```bash
 cargo install piper-plus-cli
 ```
 
 **C#-bibliotek (NuGet):**
+
 ```bash
 dotnet add package PiperPlus.Core
 ```
 
 **Rust-bibliotek (crates.io):**
+
 ```toml
 [dependencies]
 piper-plus = "0.4"

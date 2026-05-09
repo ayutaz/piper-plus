@@ -45,6 +45,7 @@ git --version
 ### 2. リポジトリのクローン
 
 **PowerShell:**
+
 ```powershell
 # 作業ディレクトリを作成
 New-Item -ItemType Directory -Path C:\workspace -Force
@@ -56,6 +57,7 @@ Set-Location piper-plus
 ```
 
 **コマンドプロンプト (cmd):**
+
 ```cmd
 REM 作業ディレクトリを作成
 mkdir C:\workspace
@@ -69,6 +71,7 @@ cd piper-plus
 ### 3. ビルドの実行
 
 **PowerShell:**
+
 ```powershell
 # ビルドディレクトリを作成
 New-Item -ItemType Directory -Path build -Force
@@ -85,6 +88,7 @@ Get-ChildItem -Path .\Release -Filter "*.exe"
 ```
 
 **コマンドプロンプト (cmd):**
+
 ```cmd
 REM ビルドディレクトリを作成
 mkdir build
@@ -159,10 +163,13 @@ C++ ビルドの代わりに C# CLI を使用する場合:
 
 1. **.NET 10 SDK** のインストール: https://dotnet.microsoft.com/download/dotnet/10.0
 2. ビルド:
+
 ```powershell
 dotnet build src\csharp\PiperPlus.sln -c Release
 ```
-3. 実行:
+
+1. 実行:
+
 ```powershell
 dotnet run --project src\csharp\PiperPlus.Cli -- --model path\to\model.onnx --text "テスト"
 ```
@@ -172,12 +179,14 @@ dotnet run --project src\csharp\PiperPlus.Cli -- --model path\to\model.onnx --te
 ### 基本的な使用方法
 
 **PowerShell:**
+
 ```powershell
 # 日本語テキストを音声ファイルに変換
 echo "こんにちは世界" | .\piper.exe --model ja_JP-voice.onnx --output_file hello.wav
 ```
 
 **コマンドプロンプト (cmd):**
+
 ```cmd
 REM 日本語テキストを音声ファイルに変換（chcp 65001でUTF-8に切り替え）
 chcp 65001
@@ -233,6 +242,7 @@ Write-Host "音声ファイルを生成しました: $OutputFile"
 ```
 
 使用方法：
+
 ```powershell
 .\japanese_tts.ps1 -Text "今日はいい天気ですね" -OutputFile weather.wav
 ```
@@ -335,6 +345,7 @@ echo こんにちは世界 | piper.exe --model ja_JP-voice.onnx --output_file he
 UTF-8 (BOMなし) のテキストファイルを作成し、`type` コマンドで渡します。
 
 **PowerShell:**
+
 ```powershell
 # UTF-8 BOMなしテキストファイルを作成
 $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
@@ -345,6 +356,7 @@ Get-Content "input.txt" -Encoding UTF8 | .\Release\piper.exe --model ja_JP-voice
 ```
 
 **コマンドプロンプト (cmd):**
+
 ```cmd
 chcp 65001
 type input.txt | piper.exe --model ja_JP-voice.onnx --output_file output.wav
@@ -381,6 +393,7 @@ endlocal
 ```
 
 使用方法：
+
 ```cmd
 speak.bat "今日はいい天気ですね"
 ```
@@ -461,12 +474,14 @@ foreach ($chunk in $chunks) {
 ### 高速化のヒント
 
 1. **RAMディスクの使用**
+
    ```powershell
    $env:TEMP = "R:\Temp"  # RAMディスクを一時ファイルに使用
    ```
 
 2. **バッチ処理**
    複数のテキストを一度に処理する場合は、プロセスの起動を最小限に：
+
    ```powershell
    Get-Content texts.txt | .\piper.exe --model ja_JP-voice.onnx --output_raw > output.pcm
    ```
@@ -482,6 +497,7 @@ foreach ($chunk in $chunks) {
 ### 3. 同時実行の制限
 - **現状**: 単一のエンジンインスタンスはスレッドセーフではありません。ただし、スレッドごとに独立したインスタンスを使用することで、複数スレッドからの並列実行が可能です。
 - **回避策**:
+
   ```powershell
   # 単一インスタンスを共有する場合はミューテックスで排他制御
   $mutex = New-Object System.Threading.Mutex($false, "PiperTTSMutex")
