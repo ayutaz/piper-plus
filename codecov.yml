@@ -145,6 +145,9 @@ ignore:
   # ---- piper_train Lightning Trainer / data preprocess ----
   - "src/python/piper_train/vits/lightning.py"
   - "src/python/piper_train/vits/onnx_attention.py"
+  - "src/python/piper_train/vits/losses.py"
+  - "src/python/piper_train/vits/config.py"
+  - "src/python/piper_train/vits/wavfile.py"
   - "src/python/piper_train/preprocess.py"
   - "src/python/piper_train/tools/prepare_bilingual_dataset.py"
   - "src/python/piper_train/tools/prepare_multilingual_dataset.py"
@@ -167,6 +170,7 @@ ignore:
   - "src/python_run/piper/training_manager.py"
   - "src/python_run/piper/download.py"
   - "src/python_run/piper/sample_texts.py"
+  - "src/python_run/piper/phonemize/ssml.py"
 
 # -----------------------------------------------------------------------------
 # PR 上に表示するコメント

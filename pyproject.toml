@@ -383,6 +383,12 @@ omit = [
     # ----- (b) Lightning Trainer 起動が必要 -----
     "*/piper_train/vits/lightning.py",                     # Lightning Module / Trainer
     "*/piper_train/vits/onnx_attention.py",                # ONNX export 専用 (推論時のみ)
+    "*/piper_train/vits/losses.py",                        # 学習用 loss 関数のみ (lightning.py が唯一の caller)
+    "*/piper_train/vits/config.py",                        # dataclass + 学習時 factory のみ (lightning.py が caller)
+    # ----- (a) vendored scipy.io.wavfile (read/write のみ使用、形式判定の大部分は dead branch) -----
+    "*/piper_train/vits/wavfile.py",
+    # ----- (a) SSML fallback shim (canonical は piper_plus_g2p.ssml 側、ランタイム側は import re-export のみ) -----
+    "*/piper/phonemize/ssml.py",
     # ----- (c) Data preprocessing scripts -----
     "*/piper_train/preprocess.py",
     "*/piper_train/tools/prepare_bilingual_dataset.py",
