@@ -10,14 +10,27 @@ Rust/C#/Go with **float32 arithmetic** (via numpy), so that the golden
 values are directly comparable across all runtimes.
 
 Usage:
+    # Mel parity only (no ONNX needed):
     uv run python test/generate_speaker_encoder_golden.py
+
+    # Add the layer-2 E2E cosine gate block (requires onnxruntime):
+    uv run python test/generate_speaker_encoder_golden.py \\
+        --encoder-onnx path/to/encoder.onnx \\
+        --reference-wav path/to/reference.wav \\
+        --hf-repo ayousanz/piper-plus-speaker-encoder \\
+        --hf-revision v1.0.0
+
+See docs/spec/speaker-encoder-contract.md for the contract this fixture
+realizes.
 """
 
 from __future__ import annotations
 
+import argparse
 import hashlib
 import json
 import math
+import wave
 from pathlib import Path
 
 import numpy as np
@@ -219,7 +232,140 @@ def to_list(arr) -> list:
 # ---------------------------------------------------------------------------
 
 
+# ---------------------------------------------------------------------------
+# Layer 2: E2E cosine gate helpers (opt-in, requires --encoder-onnx)
+# ---------------------------------------------------------------------------
+
+
+def _sha256_file(path: Path) -> str:
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(65536), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def _load_wav_mono16k(path: Path) -> tuple[np.ndarray, int]:
+    """Read a WAV file as float32 in [-1, 1]. Returns (samples, sample_rate).
+
+    Mono only; multi-channel files raise. Caller is expected to feed a
+    16 kHz mono WAV. We deliberately do **not** auto-resample here so the
+    fixture's recorded `sample_rate` field stays truthful.
+    """
+    with wave.open(str(path), "rb") as wf:
+        if wf.getnchannels() != 1:
+            raise ValueError(f"reference WAV must be mono, got {wf.getnchannels()} channels")
+        sample_rate = wf.getframerate()
+        sampwidth = wf.getsampwidth()
+        n_frames = wf.getnframes()
+        raw = wf.readframes(n_frames)
+
+    if sampwidth == 2:
+        samples_int = np.frombuffer(raw, dtype=np.int16).astype(np.float32)
+        samples = samples_int / np.float32(32768.0)
+    elif sampwidth == 4:
+        samples_int = np.frombuffer(raw, dtype=np.int32).astype(np.float32)
+        samples = samples_int / np.float32(2147483648.0)
+    else:
+        raise ValueError(f"unsupported WAV sample width: {sampwidth} bytes")
+
+    return samples, sample_rate
+
+
+def _compute_e2e_embedding(encoder_path: Path, wav_path: Path) -> tuple[np.ndarray, int]:
+    """Run the encoder on the reference WAV. Returns (l2-normalized embedding, sr).
+
+    Imports onnxruntime lazily so the mel-only path doesn't require it.
+    """
+    import onnxruntime as ort  # noqa: PLC0415 — opt-in, see module docstring
+
+    samples, sr = _load_wav_mono16k(wav_path)
+    if sr != SR:
+        # Resample to 16k using the same linear path the runtimes use.
+        samples = resample_linear(samples, sr, SR)
+
+    mel = compute_mel_spectrogram(samples)
+    n_frames = len(mel) // N_MELS
+    # Reshape to [1, N_MELS, n_frames] (typical SpeechBrain ECAPA layout;
+    # the actual ONNX may want [1, n_frames, N_MELS] — caller's onnx
+    # input metadata determines axes).
+    sess = ort.InferenceSession(str(encoder_path), providers=["CPUExecutionProvider"])
+    input_meta = sess.get_inputs()[0]
+    input_shape = list(input_meta.shape)
+    mel_2d = mel.reshape(N_MELS, n_frames)
+    if len(input_shape) == 3 and input_shape[1] == N_MELS:
+        feed = mel_2d.reshape(1, N_MELS, n_frames).astype(np.float32)
+    elif len(input_shape) == 3 and input_shape[2] == N_MELS:
+        feed = mel_2d.T.reshape(1, n_frames, N_MELS).astype(np.float32)
+    else:
+        # Unknown layout: assume [1, N_MELS, T] and let the runtime fail
+        # loudly rather than silently producing garbage.
+        feed = mel_2d.reshape(1, N_MELS, n_frames).astype(np.float32)
+
+    out = sess.run(None, {input_meta.name: feed})[0].squeeze()
+    out = out.astype(np.float32)
+    norm = float(np.linalg.norm(out))
+    if norm > 0:
+        out = out / np.float32(norm)
+    return out, sr
+
+
+def _build_e2e_block(
+    encoder_path: Path,
+    wav_path: Path,
+    hf_repo: str,
+    hf_revision: str,
+    hf_filename: str,
+    cosine_threshold: float,
+) -> dict:
+    embedding, sr = _compute_e2e_embedding(encoder_path, wav_path)
+    samples, _ = _load_wav_mono16k(wav_path)
+    return {
+        "version": 1,
+        "encoder_onnx": {
+            "hf_repo": hf_repo,
+            "hf_filename": hf_filename,
+            "hf_revision": hf_revision,
+            "sha256": _sha256_file(encoder_path),
+        },
+        "reference_wav": {
+            "path": str(wav_path),
+            "sha256": _sha256_file(wav_path),
+            "license": "CC0",
+            "duration_s": len(samples) / float(sr),
+            "sample_rate": sr,
+        },
+        "expected_embedding": {
+            "dim": int(embedding.shape[0]),
+            "values": [float(v) for v in embedding.tolist()],
+            "checksum": checksum_floats(embedding.tolist()),
+        },
+        "cosine_threshold": cosine_threshold,
+    }
+
+
+def _parse_args() -> argparse.Namespace:
+    p = argparse.ArgumentParser(description="Generate speaker encoder golden fixture")
+    p.add_argument("--encoder-onnx", type=Path, default=None,
+                   help="Optional: path to encoder ONNX. If supplied with --reference-wav, "
+                        "appends the layer-2 e2e_cosine_gate block to the fixture.")
+    p.add_argument("--reference-wav", type=Path, default=None,
+                   help="Optional: path to reference WAV (mono, 16kHz). Required when "
+                        "--encoder-onnx is supplied.")
+    p.add_argument("--hf-repo", default="ayousanz/piper-plus-speaker-encoder",
+                   help="HF Hub repo id pinned in the fixture.")
+    p.add_argument("--hf-filename", default="encoder.onnx",
+                   help="HF filename pinned in the fixture.")
+    p.add_argument("--hf-revision", default="v1.0.0",
+                   help="HF revision (tag) pinned in the fixture.")
+    p.add_argument("--cosine-threshold", type=float, default=0.999,
+                   help="Cosine similarity threshold pinned in the fixture.")
+    return p.parse_args()
+
+
 def main() -> None:
+    args = _parse_args()
+
     test_cases = []
 
     # --- Case 1: 440Hz sine, 1s, 16kHz ---
@@ -361,6 +507,27 @@ def main() -> None:
         },
         "test_cases": test_cases,
     }
+
+    # Layer 2: optional E2E cosine gate block.
+    if args.encoder_onnx is not None or args.reference_wav is not None:
+        if args.encoder_onnx is None or args.reference_wav is None:
+            raise SystemExit(
+                "--encoder-onnx and --reference-wav must be supplied together."
+            )
+        golden["e2e_cosine_gate"] = _build_e2e_block(
+            encoder_path=args.encoder_onnx,
+            wav_path=args.reference_wav,
+            hf_repo=args.hf_repo,
+            hf_revision=args.hf_revision,
+            hf_filename=args.hf_filename,
+            cosine_threshold=args.cosine_threshold,
+        )
+        print(
+            "  e2e_cosine_gate populated: "
+            f"dim={golden['e2e_cosine_gate']['expected_embedding']['dim']}, "
+            f"checksum={golden['e2e_cosine_gate']['expected_embedding']['checksum']}, "
+            f"threshold={golden['e2e_cosine_gate']['cosine_threshold']}"
+        )
 
     OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
     with open(OUTPUT_PATH, "w", encoding="utf-8") as f:
