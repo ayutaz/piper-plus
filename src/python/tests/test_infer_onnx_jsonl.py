@@ -16,10 +16,12 @@ because the test exercises the canonical implementation, not a fixture-side copy
 from __future__ import annotations
 
 import io
+import json  # noqa: F401  -- referenced by test_invalid_json_raises_decode_error
 
 import pytest
 
 from piper_train.infer_onnx import parse_jsonl_stream as _parse_jsonl_stream
+
 
 pytestmark = pytest.mark.unit
 
@@ -77,31 +79,17 @@ class TestJsonlBasicParsing:
 
 class TestJsonlSkipBehavior:
     def test_empty_lines_are_skipped(self):
-        text = (
-            '{"phoneme_ids": [1]}\n'
-            "\n"
-            '{"phoneme_ids": [2]}\n'
-            "\n"
-            "\n"
-        )
+        text = '{"phoneme_ids": [1]}\n\n{"phoneme_ids": [2]}\n\n\n'
         utts = _parse_jsonl_stream(io.StringIO(text))
         assert len(utts) == 2
 
     def test_whitespace_only_lines_are_skipped(self):
-        text = (
-            '{"phoneme_ids": [1]}\n'
-            "   \n"
-            '{"phoneme_ids": [2]}\n'
-            "\t\t\n"
-        )
+        text = '{"phoneme_ids": [1]}\n   \n{"phoneme_ids": [2]}\n\t\t\n'
         utts = _parse_jsonl_stream(io.StringIO(text))
         assert len(utts) == 2
 
     def test_leading_trailing_whitespace_is_stripped(self):
-        text = (
-            '   {"phoneme_ids": [1]}   \n'
-            '\t{"phoneme_ids": [2]}\t\n'
-        )
+        text = '   {"phoneme_ids": [1]}   \n\t{"phoneme_ids": [2]}\t\n'
         utts = _parse_jsonl_stream(io.StringIO(text))
         assert len(utts) == 2
 

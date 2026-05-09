@@ -45,6 +45,8 @@ def parse_jsonl_stream(stream) -> list[dict]:
         if line:
             utterances.append(json.loads(line))
     return utterances
+
+
 # Minimum body length (excluding BOS/EOS) for Strategy A to apply.
 # Bodies smaller than this would have padding ratio so high that pad-token
 # audio dominates over actual content; raw VITS output is preferable.

@@ -146,6 +146,7 @@ def is_short_text(text: str) -> bool:
     non_space = sum(1 for c in stripped if not c.isspace())
     return non_space <= SHORT_TEXT_CHARS
 
+
 # Optional: use shared ORT utilities when piper_train is available
 try:
     from piper_train.ort_utils import (
