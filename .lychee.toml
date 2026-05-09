@@ -49,12 +49,19 @@ exclude = [
   # Local Wyoming protocol UDP/TCP placeholders
   "^tcp://",
   "^udp://",
-  # .claude/skills/* の SKILL.md は relative path で他 SKILL.md を参照する。
-  # lychee --root-dir 利用時に path resolution が誤って二重化される
-  # (例: /home/runner/work/.../check-loanword/.claude/skills/check-pua/...)
-  # ため、.claude/skills/ 配下の internal cross-skill link は除外。
+  # .claude/skills/* の SKILL.md は repo root-relative path で他 SKILL.md /
+  # docs / tests / .github を参照する。lychee --root-dir 利用時に path
+  # resolution が誤って二重化される (例: /home/runner/.../check-loanword/.claude/...)
+  # ため、.claude/skills/ 配下の internal cross-references を全て除外。
   "^file://.*\\.claude/skills/.*/\\.claude/",
   "^file://.*\\.claude/skills/.*/\\.github/",
+  "^file://.*\\.claude/skills/.*/docs/",
+  "^file://.*\\.claude/skills/.*/tests/",
+  "^file://.*\\.claude/skills/.*/scripts/",
+  "^file://.*\\.claude/skills/.*/src/",
+  # .github/CONTRIBUTING.md の anchor link を許容 (anchor は ad hoc 名で
+  # markdownlint と相性悪く、別 PR で追加予定)
+  "^file://.*\\.github/CONTRIBUTING\\.md#",
 ]
 
 # Excluded paths (regex matched against full path)
