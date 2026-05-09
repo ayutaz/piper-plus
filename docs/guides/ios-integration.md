@@ -68,7 +68,7 @@ ORT is **not bundled** with `piper_plus.xcframework` (consumer chooses). Options
 
 ```ruby
 # ios/Podfile
-pod 'onnxruntime-c', '1.17.0'
+pod 'onnxruntime-c', '1.20.0'
 ```
 
 ```bash
@@ -82,21 +82,21 @@ cd ios && pod install
 dependencies: [
     .package(
         url: "https://github.com/microsoft/onnxruntime-swift-package-manager",
-        from: "1.17.0"  // semver range: 1.17.x compatible; bump cautiously
+        from: "1.20.0"  // semver range: 1.20.x compatible; bump cautiously
     ),
 ]
 ```
 
-> **Version compatibility**: piper-plus is currently link-tested against ORT 1.17.0. See [`docs/spec/ort-versions.md`](../spec/ort-versions.md) for the full per-runtime ORT matrix. `from:` allows minor/patch bumps within the 1.x line; if a future ORT release introduces a breaking ABI change, downgrade with `exact:` until piper-plus is recompiled. Consumers using the SPM `piper-plus` package don't need to declare ORT themselves — it's pulled transitively (v1.13.0+).
+> **Version compatibility**: piper-plus is currently link-tested against ORT 1.20.0 (issue #383 follow-up: 1.17.0 から昇格、Windows DLL search order の問題で C++ 側が test model を読めない問題と並行して修正)。See [`docs/spec/ort-versions.md`](../spec/ort-versions.md) for the full per-runtime ORT matrix. `from:` allows minor/patch bumps within the 1.x line; if a future ORT release introduces a breaking ABI change, downgrade with `exact:` until piper-plus is recompiled. Consumers using the SPM `piper-plus` package don't need to declare ORT themselves — it's pulled transitively (v1.13.0+).
 
 ### Option C: Microsoft CDN (manual)
 
 ```bash
-curl -LO https://download.onnxruntime.ai/pod-archive-onnxruntime-c-1.17.0.zip
-unzip pod-archive-onnxruntime-c-1.17.0.zip
+curl -LO https://download.onnxruntime.ai/pod-archive-onnxruntime-c-1.20.0.zip
+unzip pod-archive-onnxruntime-c-1.20.0.zip
 ```
 
-> **sha256 (1.17.0)**: `1623e1150507d9e50554e3d3e5cf9abf75e1bfd8324b74a602acfe45343db871`
+> **sha256 (1.20.0)**: `50891a8aadd17d4811acb05ed151ba6c394129bb3ab14e843b0fc83a48d450ff` (44,218,716 bytes、検証 2026-05-09)
 
 ## Step 3: Link PiperPlus + Embed & Sign ORT
 

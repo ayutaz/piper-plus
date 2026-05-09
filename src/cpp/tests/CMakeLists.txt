@@ -62,6 +62,7 @@ set(TEST_SOURCES
     test_short_text_mitigation.cpp
     test_split_sentences.cpp
     test_zh_en_loanword.cpp
+    test_g2p_parallelism.cpp
 )
 
 # Add Unix-only tests (require open_jtalk binary or Unix APIs)
@@ -87,13 +88,39 @@ foreach(test_source ${TEST_SOURCES})
         gtest
         gtest_main
     )
-    
+
     # Add Windows-specific library directories for all tests
     if(WIN32)
         target_link_directories(${test_name} PRIVATE
             ${CMAKE_BINARY_DIR}/fi/lib
             ${CMAKE_BINARY_DIR}/si/lib
         )
+
+        # Issue #383 follow-up: Windows ML ships an out-of-date
+        # onnxruntime.dll under C:\Windows\System32. When a test exe has no
+        # DLL alongside it, the loader picks up that older DLL and ORT
+        # rejects the modern model with "The given version [N] is not
+        # supported, only version 1 to 10 is supported in this build."
+        # Copy the bundled ORT DLLs next to every test exe so the loader
+        # finds the matching version first.
+        if(ONNXRUNTIME_DLL)
+            add_custom_command(TARGET ${test_name} POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    "${ONNXRUNTIME_DLL}"
+                    "$<TARGET_FILE_DIR:${test_name}>/onnxruntime.dll"
+                COMMENT "Staging onnxruntime.dll next to ${test_name}"
+            )
+            get_filename_component(_ORT_DLL_DIR "${ONNXRUNTIME_DLL}" DIRECTORY)
+            file(GLOB _ORT_PROVIDER_DLLS "${_ORT_DLL_DIR}/onnxruntime_providers*.dll")
+            foreach(_ort_dll ${_ORT_PROVIDER_DLLS})
+                add_custom_command(TARGET ${test_name} POST_BUILD
+                    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                        "${_ort_dll}"
+                        "$<TARGET_FILE_DIR:${test_name}>/"
+                    COMMENT "Staging ORT provider DLL next to ${test_name}"
+                )
+            endforeach()
+        endif()
     endif()
     
     # Add spdlog/fmt dependencies for all tests
@@ -125,6 +152,13 @@ foreach(test_source ${TEST_SOURCES})
     
     # Link utf8_utils.hpp include path for split sentences test
     if(${test_name} STREQUAL "test_split_sentences")
+        target_include_directories(${test_name} PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/..
+        )
+    endif()
+
+    # Issue #383 Phase 1: parallelism helper test needs src/cpp on include path.
+    if(${test_name} STREQUAL "test_g2p_parallelism")
         target_include_directories(${test_name} PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/..
         )
@@ -927,6 +961,116 @@ add_test(NAME test_c_api_audio_regression COMMAND test_c_api_audio_regression)
 
 # Set working directory to project root for model path resolution
 set_tests_properties(test_c_api_audio_regression PROPERTIES
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    TIMEOUT 300
+)
+
+# ---- test_c_api_concurrent_ja: JA concurrent + Iterator parity stress (Issue #383 follow-up) ----
+# Adds three regression tests:
+#   - ConcurrentJaSynthesis_NoCrash         (4 threads × per-thread engine)
+#   - ConcurrentJaSynthesis_DeterministicLength (length parity within ±20%)
+#   - IteratorVsOneShotJapanese            (JA equivalent of IteratorVsOneShot)
+#
+# These would have caught (a) the C# `MeCabTokenizer` race that Phase 1 missed
+# until commit c567f5be, and (b) the C++ phonemesToAudioFloat sentence-silence
+# regression fixed in a8e776d9. Same dependency set as test_c_api_integration.
+add_executable(test_c_api_concurrent_ja
+    test_c_api_concurrent_ja.cpp
+    ../piper_plus_c_api.cpp
+)
+
+target_link_libraries(test_c_api_concurrent_ja PRIVATE
+    piper_common
+    gtest
+    gtest_main
+)
+
+target_compile_definitions(test_c_api_concurrent_ja PRIVATE
+    PIPER_PLUS_BUILDING_DLL
+    _PIPER_VERSION=${piper_version}
+)
+
+target_include_directories(test_c_api_concurrent_ja PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+    ${CMAKE_BINARY_DIR}/fi/include
+    ${CMAKE_BINARY_DIR}/si/include
+    ${ORT_INCLUDE_DIR}
+    ${CMAKE_BINARY_DIR}/oj/include
+    ${CMAKE_BINARY_DIR}/oj/include/openjtalk
+)
+
+target_link_directories(test_c_api_concurrent_ja PRIVATE
+    ${CMAKE_BINARY_DIR}/fi/lib
+    ${CMAKE_BINARY_DIR}/si/lib
+    ${ORT_LIB_DIR}
+)
+
+if(WIN32)
+    target_link_libraries(test_c_api_concurrent_ja PRIVATE
+        optimized ${CMAKE_BINARY_DIR}/fi/lib/fmt.lib
+        debug ${CMAKE_BINARY_DIR}/fi/lib/fmtd.lib
+        optimized ${CMAKE_BINARY_DIR}/si/lib/spdlog.lib
+        debug ${CMAKE_BINARY_DIR}/si/lib/spdlogd.lib
+        ${ORT_LIB_DIR}/onnxruntime.lib
+    )
+    target_link_libraries(test_c_api_concurrent_ja PRIVATE ${CMAKE_BINARY_DIR}/oj/lib/openjtalk.lib)
+
+    # Issue #383 follow-up: stage onnxruntime.dll next to the test exe so the
+    # Windows DLL loader does not pick up the older System32 onnxruntime.dll
+    # (Windows ML). Mirrors the logic in the standard TEST_SOURCES loop.
+    if(ONNXRUNTIME_DLL)
+        add_custom_command(TARGET test_c_api_concurrent_ja POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${ONNXRUNTIME_DLL}"
+                "$<TARGET_FILE_DIR:test_c_api_concurrent_ja>/onnxruntime.dll"
+            COMMENT "Staging onnxruntime.dll next to test_c_api_concurrent_ja"
+        )
+        get_filename_component(_ORT_DLL_DIR "${ONNXRUNTIME_DLL}" DIRECTORY)
+        file(GLOB _ORT_PROVIDER_DLLS "${_ORT_DLL_DIR}/onnxruntime_providers*.dll")
+        foreach(_ort_dll ${_ORT_PROVIDER_DLLS})
+            add_custom_command(TARGET test_c_api_concurrent_ja POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    "${_ort_dll}"
+                    "$<TARGET_FILE_DIR:test_c_api_concurrent_ja>/"
+                COMMENT "Staging ORT provider DLL next to test_c_api_concurrent_ja"
+            )
+        endforeach()
+    endif()
+else()
+    target_link_libraries(test_c_api_concurrent_ja PRIVATE
+        fmt
+        spdlog
+        onnxruntime
+    )
+    target_link_libraries(test_c_api_concurrent_ja PRIVATE ${CMAKE_BINARY_DIR}/oj/lib/libopenjtalk.a)
+endif()
+
+if(TARGET hts_engine_stub)
+    target_link_libraries(test_c_api_concurrent_ja PRIVATE hts_engine_stub)
+endif()
+
+if(UNIX)
+    find_package(Threads REQUIRED)
+    target_link_libraries(test_c_api_concurrent_ja PRIVATE Threads::Threads)
+    if(NOT APPLE)
+        target_link_libraries(test_c_api_concurrent_ja PRIVATE dl)
+    endif()
+endif()
+
+if(TARGET fmt_external)
+    add_dependencies(test_c_api_concurrent_ja fmt_external)
+endif()
+if(TARGET spdlog_external)
+    add_dependencies(test_c_api_concurrent_ja spdlog_external)
+endif()
+if(TARGET openjtalk_external)
+    add_dependencies(test_c_api_concurrent_ja openjtalk_external)
+endif()
+
+add_test(NAME test_c_api_concurrent_ja COMMAND test_c_api_concurrent_ja)
+
+# Concurrent threads + JA G2P + 3 sub-tests can take a while in Debug.
+set_tests_properties(test_c_api_concurrent_ja PROPERTIES
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
     TIMEOUT 300
 )

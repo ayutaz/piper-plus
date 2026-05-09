@@ -32,7 +32,8 @@ concurrency:
 env:
   ANDROID_NDK_VERSION: "26.1.10909125"
   ANDROID_API_LEVEL: "24"
-  ONNXRUNTIME_VERSION: "1.17.0"
+  # Issue #383 follow-up: 1.17.0 → 1.20.0 (kotlin-g2p-ci.yml と整合)
+  ONNXRUNTIME_VERSION: "1.20.0"
 
 jobs:
   build-native:

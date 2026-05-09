@@ -52,6 +52,78 @@ SILENCE_PAD_MS = 300
 TRIM_THRESHOLD_RMS = 0.01
 TRIM_MIN_SAMPLES = 2205  # 22050 Hz * 0.1 s
 
+# Phase 1 of issue #383: parallelize G2P across sentences. The ORT inference
+# itself is unchanged — only the per-sentence phonemize() call is run in a
+# ThreadPoolExecutor when there are 2+ sentences. The benchmark in
+# tools/benchmark/issue-383/ shows G2P accounts for 19~26% of total cold-cache
+# latency on multi-sentence inputs, so this is the dominant low-risk win.
+#
+# Auto cap is 4 because (a) the process-level ORT session uses ~4 intra-op
+# threads which we do not want to oversubscribe, and (b) most G2P backends
+# wrap C code (pyopenjtalk-plus, pypinyin) where 2~4 threads already saturate
+# the available work given GIL handoffs around C calls. Setting
+# ``PIPER_G2P_PARALLELISM=1`` restores the pre-issue-383 strictly-serial path
+# for users who hit a thread-safety issue in a third-party G2P backend.
+_G2P_AUTO_PARALLELISM_CAP = 4
+
+
+def _resolve_g2p_parallelism(n_sentences: int) -> int:
+    """Resolve effective G2P parallelism for phonemize().
+
+    Returns ``1`` to take the strictly-serial path (zero ThreadPoolExecutor
+    overhead). Returns ``>= 2`` to use ``ThreadPoolExecutor.map`` with the
+    given worker count.
+
+    Resolution order:
+      * ``PIPER_G2P_PARALLELISM=1``: force serial.
+      * ``PIPER_G2P_PARALLELISM=N`` (N >= 2): force N workers (capped at
+        ``n_sentences``).
+      * Otherwise (auto): ``min(n_sentences, max(2, cores // 2),
+        _G2P_AUTO_PARALLELISM_CAP)``. Falls back to 1 when ``n_sentences <= 1``.
+    """
+    raw = os.environ.get("PIPER_G2P_PARALLELISM", "").strip()
+    if raw:
+        try:
+            n = int(raw)
+        except ValueError:
+            _LOGGER.warning(
+                "Ignoring invalid PIPER_G2P_PARALLELISM=%r; falling back to auto", raw
+            )
+        else:
+            if n <= 1:
+                return 1
+            return max(1, min(n, n_sentences))
+
+    if n_sentences <= 1:
+        return 1
+
+    try:
+        cores = len(os.sched_getaffinity(0))  # type: ignore[attr-defined]
+    except (AttributeError, OSError):
+        cores = os.cpu_count() or 2
+
+    return max(1, min(n_sentences, max(2, cores // 2), _G2P_AUTO_PARALLELISM_CAP))
+
+
+def _map_sentences(
+    fn,
+    sentences: list[str],
+    parallelism: int,
+):
+    """Apply ``fn`` to each sentence, optionally in parallel.
+
+    Uses ``ThreadPoolExecutor.map`` for parallelism>=2 to preserve sentence
+    order in the output. Returns a list with one result per sentence.
+    """
+    if parallelism <= 1 or len(sentences) <= 1:
+        return [fn(s) for s in sentences]
+
+    from concurrent.futures import ThreadPoolExecutor  # local import: cheap
+
+    with ThreadPoolExecutor(max_workers=parallelism) as pool:
+        return list(pool.map(fn, sentences))
+
+
 # Optional: use shared ORT utilities when piper_train is available
 try:
     from piper_train.ort_utils import (
@@ -427,17 +499,12 @@ class PiperVoice:
             session=session,
         )
 
-    def phonemize(self, text: str) -> list[list[str]]:
-        """Text to phonemes grouped by sentence.
+    def _split_sentences(self, text: str) -> list[str]:
+        """Split ``text`` into sentences using the same rules as :meth:`phonemize`.
 
-        Plain text is split at sentence boundaries (`.`, `!`, `?`, `。`,
-        `！`, `？`, `．`, including trailing closing punctuation) so callers
-        such as :meth:`synthesize_stream_raw` can yield audio incrementally.
-        SSML markup (``<speak>...``) is treated as a single unit to preserve
-        its structure.
-
-        Empty or whitespace-only input returns ``[]`` (no sentences) so
-        callers do not waste cycles synthesizing a BOS/EOS-only chunk.
+        Returns an empty list for empty / whitespace-only input. SSML markup
+        (``<speak>...``) is returned as a single-element list to preserve
+        markup structure.
         """
         from .text_splitter import split_sentences
 
@@ -447,20 +514,25 @@ class PiperVoice:
             or stripped[len("<speak")] in (">", " ", "\t", "\n", "\r")
         )
         if is_ssml:
-            sentences = [text]
-        elif not text.strip():
-            sentences = []
-        else:
-            sentences = split_sentences(text) or [text]
+            return [text]
+        if not text.strip():
+            return []
+        return split_sentences(text) or [text]
 
+    def _phonemize_one_factory(self):
+        """Return a callable that phonemizes a single sentence.
+
+        Selecting the per-language backend once (here) lets both the
+        list-returning :meth:`phonemize` (Phase 1) and the streaming
+        pipeline in :meth:`synthesize_stream_raw` (Phase 2) submit each
+        sentence to a thread pool without re-running the dispatch logic.
+        """
         # NOTE: PhonemeType.BILINGUAL is a legacy compatibility branch for
         # v3/v4 JA+EN datasets that predate the 6-language multilingual model
         # (PR #218, v1.7). Modern models use MULTILINGUAL exclusively.
-        # Deprecated: scheduled for removal in a future major release; new
-        # models must not set phoneme_type="bilingual".
         if self.config.phoneme_type in (
             PhonemeType.MULTILINGUAL,
-            PhonemeType.BILINGUAL,  # Deprecated: legacy v3/v4 bilingual datasets
+            PhonemeType.BILINGUAL,
         ):
             try:
                 from .phonemize.multilingual import MultilingualPhonemizer
@@ -469,24 +541,27 @@ class PiperVoice:
                     "MultilingualPhonemizer unavailable; falling back to JA phonemizer"
                 )
             else:
-                # Legacy bilingual = JA+EN only; multilingual = 6 trained languages.
-                # SV/KO have G2P implementations but are not in any trained model
-                # yet (see CLAUDE.md: "学習済みモデルは 6 言語"), so they are not
-                # listed here.
                 languages = (
                     ["ja", "en"]
                     if self.config.phoneme_type == PhonemeType.BILINGUAL
                     else ["ja", "en", "zh", "es", "fr", "pt"]
                 )
                 mp = MultilingualPhonemizer(languages=languages)
-                results: list[list[str]] = []
-                for sentence in sentences:
-                    phonemes = mp.phonemize(sentence)
-                    _LOGGER.debug(
-                        "MultilingualPhonemizer: '%s' -> %s", sentence, phonemes
-                    )
-                    results.append(phonemes)
-                return results
+                # MultilingualPhonemizer instances are immutable after init
+                # (regex patterns, language sets) so concurrent .phonemize()
+                # calls are safe. The downstream per-language backends are
+                # also free of mutable shared state.
+                if _LOGGER.isEnabledFor(logging.DEBUG):
+
+                    def _multi_one_debug(sentence: str) -> list[str]:
+                        result = mp.phonemize(sentence)
+                        _LOGGER.debug(
+                            "MultilingualPhonemizer: '%s' -> %s", sentence, result
+                        )
+                        return result
+
+                    return _multi_one_debug
+                return mp.phonemize
 
         if self.config.phoneme_type in (
             PhonemeType.OPENJTALK,
@@ -499,17 +574,34 @@ class PiperVoice:
             )
 
             custom_dict = get_default_dictionary()
-            results = []
-            for sentence in sentences:
-                result = (
-                    phonemize_japanese(sentence, custom_dict=custom_dict)
-                    if custom_dict
-                    else phonemize_japanese(sentence)
-                )
-                results.append(result)
-            return results
+
+            def _ja_one(sentence: str) -> list[str]:
+                if custom_dict:
+                    return phonemize_japanese(sentence, custom_dict=custom_dict)
+                return phonemize_japanese(sentence)
+
+            return _ja_one
 
         raise ValueError(f"Unsupported phoneme type: {self.config.phoneme_type}")
+
+    def phonemize(self, text: str) -> list[list[str]]:
+        """Text to phonemes grouped by sentence.
+
+        Plain text is split at sentence boundaries (`.`, `!`, `?`, `。`,
+        `！`, `？`, `．`, including trailing closing punctuation) so callers
+        such as :meth:`synthesize_stream_raw` can yield audio incrementally.
+        SSML markup (``<speak>...``) is treated as a single unit to preserve
+        its structure.
+
+        Empty or whitespace-only input returns ``[]`` (no sentences) so
+        callers do not waste cycles synthesizing a BOS/EOS-only chunk.
+        """
+        sentences = self._split_sentences(text)
+        if not sentences:
+            return []
+        fn = self._phonemize_one_factory()
+        parallelism = _resolve_g2p_parallelism(len(sentences))
+        return _map_sentences(fn, sentences, parallelism)
 
     def phonemes_to_ids(self, phonemes: list[str]) -> list[int]:
         """Phonemes to ids."""
@@ -602,7 +694,19 @@ class PiperVoice:
             and sum(1 for c in text if not c.isspace()) <= SHORT_TEXT_CHARS
         )
 
-        sentence_phonemes = self.phonemize(text)
+        # Phase 2 (issue #383): G2P-ORT pipeline. Submit every sentence's G2P
+        # to a thread pool up-front so that while the ORT inference of
+        # sentence i runs, the G2P of sentences i+1, i+2, ... is already in
+        # flight. The first chunk's TTFB drops from
+        # ``G2P_total + ORT_first`` (Phase 1) down to
+        # ``G2P_first + ORT_first`` (Phase 2) — useful for streaming clients
+        # that play audio as it arrives.
+        sentences = self._split_sentences(text)
+        if not sentences:
+            return
+
+        phonemize_one = self._phonemize_one_factory()
+        parallelism = _resolve_g2p_parallelism(len(sentences))
 
         # 16-bit mono
         num_silence_samples = int(sentence_silence * self.config.sample_rate)
@@ -615,7 +719,97 @@ class PiperVoice:
         else:
             break_bytes = b""
 
-        for phonemes in sentence_phonemes:
+        if parallelism <= 1 or len(sentences) <= 1:
+            # Strictly serial path — zero ThreadPoolExecutor overhead. Used
+            # for SSML / single-sentence input and when the user sets
+            # PIPER_G2P_PARALLELISM=1.
+            phonemes_iter: Iterable[list[str]] = (phonemize_one(s) for s in sentences)
+            yield from self._stream_phonemes_to_audio(
+                phonemes_iter,
+                break_bytes,
+                silence_bytes,
+                speaker_id=speaker_id,
+                length_scale=length_scale,
+                noise_scale=noise_scale,
+                noise_w=noise_w,
+                volume=volume,
+                language_id=language_id,
+            )
+            return
+
+        from collections import deque
+        from concurrent.futures import ThreadPoolExecutor
+
+        # try/finally with explicit shutdown(wait=False, cancel_futures=True)
+        # is used instead of ``with ThreadPoolExecutor`` so that an early
+        # break on the consumer side (or any other generator abandonment)
+        # cancels still-queued G2P tasks instead of waiting for them. The
+        # plain context-manager exit defaults to ``wait=True`` which would
+        # add up to ``G2P_total - G2P_first`` of useless latency to caller's
+        # ``break``.
+        pool = ThreadPoolExecutor(max_workers=parallelism)
+        try:
+            # Bounded pipeline: keep at most ``2 * parallelism`` G2P futures
+            # in flight at any time. ``parallelism`` of them are actively
+            # running on the pool's worker threads; the remaining
+            # ``parallelism`` are queued and act as a small prefetch buffer
+            # so an ORT inference does not stall waiting for the next G2P.
+            # This bounds memory/queue growth at O(parallelism) rather than
+            # O(n_sentences) — important for very long inputs (books, etc.)
+            # while keeping the G2P/ORT overlap that motivates this path.
+            max_in_flight = 2 * parallelism
+            sentence_iter = iter(sentences)
+            in_flight: deque = deque()
+            for _ in range(max_in_flight):
+                try:
+                    s = next(sentence_iter)
+                except StopIteration:
+                    break
+                in_flight.append(pool.submit(phonemize_one, s))
+
+            def _phoneme_iter() -> Iterable[list[str]]:
+                while in_flight:
+                    future = in_flight.popleft()
+                    phonemes = future.result()
+                    # Top up the pipeline as soon as a slot frees up so the
+                    # worker pool stays busy while the consumer drains.
+                    try:
+                        nxt = next(sentence_iter)
+                    except StopIteration:
+                        pass
+                    else:
+                        in_flight.append(pool.submit(phonemize_one, nxt))
+                    yield phonemes
+
+            yield from self._stream_phonemes_to_audio(
+                _phoneme_iter(),
+                break_bytes,
+                silence_bytes,
+                speaker_id=speaker_id,
+                length_scale=length_scale,
+                noise_scale=noise_scale,
+                noise_w=noise_w,
+                volume=volume,
+                language_id=language_id,
+            )
+        finally:
+            pool.shutdown(wait=False, cancel_futures=True)
+
+    def _stream_phonemes_to_audio(
+        self,
+        phonemes_iter: "Iterable[list[str]]",
+        break_bytes: bytes,
+        silence_bytes: bytes,
+        *,
+        speaker_id: int | None,
+        length_scale: float | None,
+        noise_scale: float | None,
+        noise_w: float | None,
+        volume: float,
+        language_id: int | None,
+    ) -> Iterable[bytes]:
+        """Run ORT inference per sentence and yield the wrapped audio chunk."""
+        for phonemes in phonemes_iter:
             phoneme_ids = self.phonemes_to_ids(phonemes)
             audio_bytes = self.synthesize_ids_to_raw(
                 phoneme_ids,

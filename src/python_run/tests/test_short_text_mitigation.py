@@ -466,13 +466,20 @@ class TestShortTextDetection:
         voice.config = config
         voice.session = MagicMock()
 
-        # Mock phonemize to return a simple phoneme list
-        voice.phonemize = MagicMock(return_value=[["a"]])
+        # Phase 2 (issue #383): synthesize_stream_raw drives G2P through
+        # _split_sentences + _phonemize_one_factory (instead of phonemize()
+        # directly) so we can pipeline G2P with ORT inference.
+        voice._split_sentences = MagicMock(return_value=["hi"])
+        voice._phonemize_one_factory = MagicMock(return_value=lambda s: ["a"])
         voice.phonemes_to_ids = MagicMock(return_value=[1, 10, 2])
 
-        # Mock synthesize_ids_to_raw to return known audio bytes
+        # Stub the helper that actually runs ORT inference.
         audio_marker = b"\x01\x02" * 100
-        voice.synthesize_ids_to_raw = MagicMock(return_value=audio_marker)
+        voice._stream_phonemes_to_audio = (
+            lambda phonemes_iter, break_b, silence_b, **kw: (
+                break_b + audio_marker + break_b + silence_b for _ in phonemes_iter
+            )
+        )
 
         short_text = "hi"
         results = list(
@@ -512,13 +519,20 @@ class TestShortTextDetection:
         voice.config = config
         voice.session = MagicMock()
 
-        voice.phonemize = MagicMock(return_value=[["a"] * 20])
+        long_text = "a" * (SHORT_TEXT_CHARS + 1)
+
+        # Phase 2: drive through the new internal hooks.
+        voice._split_sentences = MagicMock(return_value=[long_text])
+        voice._phonemize_one_factory = MagicMock(return_value=lambda s: ["a"] * 20)
         voice.phonemes_to_ids = MagicMock(return_value=list(range(50)))
 
         audio_marker = b"\xff\xfe" * 100
-        voice.synthesize_ids_to_raw = MagicMock(return_value=audio_marker)
+        voice._stream_phonemes_to_audio = (
+            lambda phonemes_iter, break_b, silence_b, **kw: (
+                break_b + audio_marker + break_b + silence_b for _ in phonemes_iter
+            )
+        )
 
-        long_text = "a" * (SHORT_TEXT_CHARS + 1)
         results = list(
             PiperVoice.synthesize_stream_raw(voice, long_text)
         )

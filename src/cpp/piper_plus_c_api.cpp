@@ -16,6 +16,9 @@
 #include "chinese_phonemize.hpp"
 #include "library_path.h"
 #include "openjtalk_dictionary_manager.h"
+#include "g2p_parallelism.hpp"
+
+#include <spdlog/spdlog.h>
 
 #include <algorithm>
 #include <atomic>
@@ -23,10 +26,12 @@
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
+#include <future>
 #include <memory>
 #include <mutex>
 #include <stdexcept>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include <sys/stat.h>
@@ -66,6 +71,16 @@ struct IteratorState {
     bool active = false;
     piper::SynthesisConfig configSnapshot_;  // saved by synth_start, restored by finish()
 
+    // Phase 1 of issue #383: pre-phonemized sentence data filled in synth_start.
+    // When usePrePhonemes==true, synth_next bypasses textToAudioFloat's
+    // internal phonemizeText() call and instead feeds these phonemes
+    // directly to piper::phonemesToAudioFloat. parallelism is recorded for
+    // diagnostics only.
+    std::vector<std::vector<piper::Phoneme>> prePhonemes;
+    std::vector<std::vector<piper::ProsodyFeature>> preProsody;
+    bool usePrePhonemes = false;
+    int parallelism = 1;
+
     // M5-3: crossfade between sentence chunks
     static constexpr size_t CROSSFADE_SAMPLES = 220; // 10ms @ 22050Hz
     std::vector<float> prevTail; // previous chunk's tail samples for crossfade
@@ -75,6 +90,9 @@ struct IteratorState {
         liveConfig = configSnapshot_;
         active = false;
         prevTail.clear();
+        prePhonemes.clear();
+        preProsody.clear();
+        usePrePhonemes = false;
         inProgress.store(false, std::memory_order_release);
     }
 };
@@ -596,12 +614,96 @@ PIPER_PLUS_API PiperPlusStatus piper_plus_synth_start(
         engine->iterState.currentChunkSamples.clear();
         engine->iterState.prevTail.clear();  // M5-3: reset crossfade state
         engine->iterState.active = true;
+        engine->iterState.prePhonemes.clear();
+        engine->iterState.preProsody.clear();
+        engine->iterState.usePrePhonemes = false;
+        engine->iterState.parallelism = 1;
 
         // Empty sentences: mark done immediately (let BusyGuard release)
         if (engine->iterState.sentences.empty()) {
             engine->iterState.active = false;
             // armed_ remains true → destructor releases inProgress
         } else {
+            // Phase 1 (issue #383): phonemize all sentences in parallel
+            // before yielding any audio. Each sentence is fed through
+            // piper::phonemizeText, which is "pure" w.r.t. voice (per its
+            // docstring) and runs each language's phonemizer in isolation.
+            // synth_next then uses piper::phonemesToAudioFloat with the
+            // cached results, skipping the redundant phonemize step.
+            //
+            // If anything throws during parallel phonemize we fall back
+            // gracefully to the per-sentence textToAudioFloat path.
+            const size_t nSentences = engine->iterState.sentences.size();
+            const int parallelism = piper_plus::resolveG2pParallelism(nSentences);
+            engine->iterState.parallelism = parallelism;
+
+            try {
+                engine->iterState.prePhonemes.resize(nSentences);
+                engine->iterState.preProsody.resize(nSentences);
+                std::vector<std::optional<int64_t>> detected(nSentences);
+
+                auto phonemizeOne = [&engine, &detected](size_t idx,
+                                                         const std::string &sentenceText) {
+                    piper::PhonemizeResult res;
+                    piper::phonemizeText(engine->voice, sentenceText, res, nullptr);
+                    detected[idx] = res.detectedLanguageId;
+                    if (!res.phonemes.empty()) {
+                        engine->iterState.prePhonemes[idx] = std::move(res.phonemes.front());
+                    }
+                    if (!res.prosody.empty()) {
+                        engine->iterState.preProsody[idx] = std::move(res.prosody.front());
+                    }
+                };
+
+                if (parallelism <= 1 || nSentences == 1) {
+                    for (size_t i = 0; i < nSentences; ++i) {
+                        phonemizeOne(i, engine->iterState.sentences[i]);
+                    }
+                } else {
+                    // Run a wave of `parallelism` futures at a time so we
+                    // never spawn more threads than allowed. std::async with
+                    // launch::async forces a real thread; the destructor of
+                    // each future joins it, so exceptions surface as throw
+                    // on .get() below.
+                    for (size_t base = 0; base < nSentences; base += parallelism) {
+                        const size_t end = std::min(base + static_cast<size_t>(parallelism),
+                                                    nSentences);
+                        std::vector<std::future<void>> futures;
+                        futures.reserve(end - base);
+                        for (size_t i = base; i < end; ++i) {
+                            futures.emplace_back(std::async(
+                                std::launch::async,
+                                phonemizeOne, i, std::cref(engine->iterState.sentences[i])));
+                        }
+                        for (auto &f : futures) {
+                            f.get();
+                        }
+                    }
+                }
+
+                // Apply auto-detected language id (first non-empty wins) only
+                // if the caller did not explicitly set one — mirrors what
+                // textToAudioFloat does internally.
+                if (!engine->voice.synthesisConfig.languageId.has_value()) {
+                    for (auto &id : detected) {
+                        if (id.has_value()) {
+                            engine->voice.synthesisConfig.languageId = id;
+                            break;
+                        }
+                    }
+                }
+
+                engine->iterState.usePrePhonemes = true;
+            } catch (const std::exception &exc) {
+                // Best-effort: fall back to the legacy per-sentence path.
+                spdlog::warn(
+                    "Phase 1 parallel phonemize failed (falling back to serial): {}",
+                    exc.what());
+                engine->iterState.prePhonemes.clear();
+                engine->iterState.preProsody.clear();
+                engine->iterState.usePrePhonemes = false;
+            }
+
             // Non-empty: keep inProgress=true for synth_next to use
             busy.disarm();
         }
@@ -655,13 +757,30 @@ PIPER_PLUS_API PiperPlusStatus piper_plus_synth_next(
             return PIPER_PLUS_DONE;
         }
 
-        // Synthesize current sentence directly to float32
+        // Synthesize current sentence directly to float32. Phase 1 of
+        // issue #383: if we successfully pre-phonemized in synth_start,
+        // feed those phonemes straight into phonemesToAudioFloat and skip
+        // the per-sentence phonemize work that textToAudioFloat would
+        // otherwise repeat.
         const std::string &sentence = state.sentences[state.currentIndex];
         std::vector<float> audioBuffer;
         piper::SynthesisResult synthResult;
 
-        piper::textToAudioFloat(engine->config, engine->voice, sentence,
-                                audioBuffer, synthResult, nullptr);
+        if (state.usePrePhonemes &&
+            state.currentIndex < state.prePhonemes.size()) {
+            const auto &phonemes = state.prePhonemes[state.currentIndex];
+            const std::vector<piper::ProsodyFeature> *prosodyPtr = nullptr;
+            if (state.currentIndex < state.preProsody.size() &&
+                !state.preProsody[state.currentIndex].empty()) {
+                prosodyPtr = &state.preProsody[state.currentIndex];
+            }
+            piper::phonemesToAudioFloat(engine->config, engine->voice,
+                                        phonemes, prosodyPtr,
+                                        audioBuffer, synthResult, nullptr);
+        } else {
+            piper::textToAudioFloat(engine->config, engine->voice, sentence,
+                                    audioBuffer, synthResult, nullptr);
+        }
 
         // M4-2: Cache timing info from last synthesis
         engine->lastSynthResult = synthResult;

@@ -48,3 +48,14 @@ bincode = "1"
 [dev-dependencies]
 tempfile = "3"
 hound = "3.5"
+
+# ``bench_phase1`` calls ``PiperVoice::load`` which is gated behind the
+# ``onnx`` feature (see lib.rs ``#[cfg(feature = "onnx")]``). The default
+# CI matrix runs ``cargo test -p piper-plus`` without ``--features onnx``,
+# so without ``required-features`` the example would fail with E0432
+# "unresolved imports `piper_plus::PiperVoice`". Marking it here lets cargo
+# silently skip the example when ``onnx`` isn't enabled, while still
+# building it under feature jobs that include ORT.
+[[example]]
+name = "bench_phase1"
+required-features = ["onnx"]

@@ -1,0 +1,41 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>PiperPlus.Bench</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <!-- Suppress ILLink trim warnings: same intent as Cli.csproj — the G2P
+         engines are referenced by reflection in MultilingualPhonemizer's
+         delegating dispatch path. -->
+    <SuppressTrimAnalysisWarnings>true</SuppressTrimAnalysisWarnings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.24.3" />
+    <PackageReference Include="DotNetG2P" Version="1.8.0" />
+    <PackageReference Include="DotNetG2P.MeCab" Version="1.8.0" />
+    <PackageReference Include="DotNetG2P.English" Version="1.8.0" />
+    <PackageReference Include="DotNetG2P.Chinese" Version="1.8.0" />
+    <PackageReference Include="DotNetG2P.Spanish" Version="1.8.0" />
+    <PackageReference Include="DotNetG2P.French" Version="1.8.0" />
+    <PackageReference Include="DotNetG2P.Portuguese" Version="1.8.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\PiperPlus.Core\PiperPlus.Core.csproj" />
+  </ItemGroup>
+
+  <!-- Re-use the CLI's per-language IPhonemizer engine adapters via source
+       link so the bench process can construct phonemizers identical to the
+       CLI without duplicating the wrapper code. -->
+  <ItemGroup>
+    <Compile Include="..\PiperPlus.Cli\DotNetG2PEngine.cs" Link="Adapters\DotNetG2PEngine.cs" />
+    <Compile Include="..\PiperPlus.Cli\DotNetEnglishG2PEngine.cs" Link="Adapters\DotNetEnglishG2PEngine.cs" />
+    <Compile Include="..\PiperPlus.Cli\DotNetChineseG2PEngine.cs" Link="Adapters\DotNetChineseG2PEngine.cs" />
+    <Compile Include="..\PiperPlus.Cli\DotNetSpanishG2PEngine.cs" Link="Adapters\DotNetSpanishG2PEngine.cs" />
+    <Compile Include="..\PiperPlus.Cli\DotNetFrenchG2PEngine.cs" Link="Adapters\DotNetFrenchG2PEngine.cs" />
+    <Compile Include="..\PiperPlus.Cli\DotNetPortugueseG2PEngine.cs" Link="Adapters\DotNetPortugueseG2PEngine.cs" />
+  </ItemGroup>
+
+</Project>

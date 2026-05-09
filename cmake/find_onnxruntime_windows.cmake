@@ -1,6 +1,8 @@
 # Find or download ONNX Runtime for Windows
 if(WIN32)
-  set(ONNXRUNTIME_VERSION "1.17.0")
+  # See cmake/OnnxRuntime.cmake for the rationale behind 1.20.0
+  # (issue #383 follow-up: 1.17.0 cannot load multilingual-test-medium.onnx).
+  set(ONNXRUNTIME_VERSION "1.20.0")
   if(CMAKE_SIZEOF_VOID_P EQUAL 8)
     set(ONNX_ARCH "x64")
   else()

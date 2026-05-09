@@ -10,6 +10,110 @@ use crate::error::PiperError;
 use crate::phonemize::Phonemizer;
 use crate::phonemize::adapter::G2pAdapter;
 
+// === Issue #383 Phase 1: G2P parallelism across sentences ===
+//
+// Phase 1 of issue #383 parallelises G2P across sentences. The ORT inference
+// itself is unchanged — only the per-sentence `phonemize_to_ids` call is run
+// in a `std::thread::scope` thread pool when there are 2+ sentences.
+//
+// Auto cap is 4 because (a) the ONNX session uses ~4 intra-op threads which
+// we do not want to oversubscribe, and (b) most G2P backends wrap C code
+// where 2~4 threads already saturate the available work. Setting
+// `PIPER_G2P_PARALLELISM=1` restores the strictly-serial path for users who
+// hit a thread-safety issue in a third-party G2P backend.
+const G2P_AUTO_PARALLELISM_CAP: usize = 4;
+
+/// Resolve the effective G2P parallelism for a batch of `n_sentences`.
+///
+/// * Returns `1` when the strictly-serial path should be taken (no spawned
+///   threads, zero overhead).
+/// * Returns `>= 2` to use the threaded path with that many workers.
+///
+/// Resolution order mirrors the Python runtime
+/// (`src/python_run/piper/voice.py::_resolve_g2p_parallelism`):
+///   * `PIPER_G2P_PARALLELISM=1`: force serial.
+///   * `PIPER_G2P_PARALLELISM=N` (N >= 2): force N workers (capped at
+///     `n_sentences`).
+///   * Otherwise (auto): `min(n_sentences, max(2, cores / 2),
+///     G2P_AUTO_PARALLELISM_CAP)`. Falls back to 1 when `n_sentences <= 1`.
+pub fn resolve_g2p_parallelism(n_sentences: usize) -> usize {
+    let raw = std::env::var("PIPER_G2P_PARALLELISM").unwrap_or_default();
+    let raw = raw.trim();
+    if !raw.is_empty() {
+        match raw.parse::<usize>() {
+            Ok(0) | Ok(1) => return 1,
+            Ok(n) => return n.min(n_sentences).max(1),
+            Err(_) => {
+                tracing::warn!(
+                    "Invalid PIPER_G2P_PARALLELISM={:?}; falling back to auto",
+                    raw
+                );
+            }
+        }
+    }
+
+    if n_sentences <= 1 {
+        return 1;
+    }
+
+    let cores = std::thread::available_parallelism()
+        .map(|n| n.get())
+        .unwrap_or(2);
+
+    n_sentences
+        .min((cores / 2).max(2))
+        .min(G2P_AUTO_PARALLELISM_CAP)
+}
+
+/// Apply `f` to each item, optionally in parallel.
+///
+/// Spawns a `std::thread::scope` pool with up to `parallelism` workers when
+/// `parallelism >= 2 && items.len() >= 2`. Otherwise runs strictly in the
+/// caller's thread (no spawned threads). Output order matches input order.
+pub(crate) fn map_sentences_parallel<I, O, F>(items: &[I], parallelism: usize, f: F) -> Vec<O>
+where
+    I: Sync,
+    O: Send,
+    F: Fn(&I) -> O + Sync,
+{
+    if parallelism <= 1 || items.len() <= 1 {
+        return items.iter().map(&f).collect();
+    }
+
+    let n = items.len();
+    // Clamp the worker count to the number of items so that callers passing
+    // in a parallelism larger than `items.len()` (e.g. via direct API use,
+    // not through `resolve_g2p_parallelism`) do not spawn one thread per
+    // item. With `chunk_size = n.div_ceil(parallelism)` an unclamped
+    // `parallelism > n` collapses to `chunk_size = 1` and silently
+    // oversubscribes the system. Resolving via `resolve_g2p_parallelism`
+    // already caps at `n_sentences`, but keep this defence-in-depth so the
+    // helper is correct under any reasonable input.
+    let workers = parallelism.min(n).max(1);
+    let chunk_size = n.div_ceil(workers);
+    let mut results: Vec<Option<O>> = (0..n).map(|_| None).collect();
+
+    std::thread::scope(|scope| {
+        let mut item_offset = 0usize;
+        for result_chunk in results.chunks_mut(chunk_size) {
+            let chunk_len = result_chunk.len();
+            let item_chunk = &items[item_offset..item_offset + chunk_len];
+            item_offset += chunk_len;
+            let f_ref = &f;
+            scope.spawn(move || {
+                for (slot, item) in result_chunk.iter_mut().zip(item_chunk.iter()) {
+                    *slot = Some(f_ref(item));
+                }
+            });
+        }
+    });
+
+    results
+        .into_iter()
+        .map(|o| o.expect("each result slot must be filled by the worker pool"))
+        .collect()
+}
+
 /// テキストレベルの合成パラメータ。
 ///
 /// `PiperVoice::synthesize_with_params()` で使用する高レベル構造体。
@@ -425,6 +529,35 @@ impl PiperVoice {
                 .post_process_ids(ids, prosody_feats, phoneme_id_map);
 
         Ok(ids)
+    }
+
+    /// 複数文を並列で音素化して phoneme IDs 列を返す (Issue #383 Phase 1)
+    ///
+    /// 各文に対する [`Self::phonemize_to_ids`] を `std::thread::scope` で
+    /// 並列実行する。出力は入力と同じ順序を保つ。
+    ///
+    /// 並列度は環境変数 `PIPER_G2P_PARALLELISM` で制御可能
+    /// ([`resolve_g2p_parallelism`] 参照)。1 文時 / `parallelism=1` 時は
+    /// スレッドを一切 spawn せず、`phonemize_to_ids` を順次呼び出すだけ。
+    ///
+    /// # Examples
+    /// ```ignore
+    /// let sentences = piper_plus::streaming::split_sentences(text);
+    /// let id_lists: Vec<Result<Vec<i64>, _>> = voice.phonemize_sentences_to_ids(&sentences);
+    /// for ids in id_lists.into_iter().flatten() {
+    ///     // ORT 推論は順次 (engine は &mut self)
+    ///     let request = SynthesisRequest { phoneme_ids: ids, ..Default::default() };
+    ///     let _ = voice_engine.synthesize(&request)?;
+    /// }
+    /// ```
+    pub fn phonemize_sentences_to_ids<S: AsRef<str> + Sync>(
+        &self,
+        sentences: &[S],
+    ) -> Vec<Result<Vec<i64>, PiperError>> {
+        let parallelism = resolve_g2p_parallelism(sentences.len());
+        map_sentences_parallel(sentences, parallelism, |s| {
+            self.phonemize_to_ids(s.as_ref())
+        })
     }
 
     /// ZH-EN code-switching dispatch (Issue #384) を有効/無効化する。
@@ -1164,5 +1297,162 @@ mod tests {
         let debug = format!("{:?}", params);
         assert!(debug.contains("SynthesisParams"));
         assert!(debug.contains("noise_scale"));
+    }
+
+    // === Issue #383 Phase 1 — resolve_g2p_parallelism / map_sentences_parallel ===
+    //
+    // These tests serialise on a single env mutex because Rust's tests run in
+    // parallel by default and `PIPER_G2P_PARALLELISM` is process-global.
+
+    fn with_env_var<R>(key: &str, value: Option<&str>, f: impl FnOnce() -> R) -> R {
+        // SAFETY: tests share the env, but the lock guarantees no other
+        // test in this module mutates PIPER_G2P_PARALLELISM concurrently.
+        use std::sync::Mutex;
+        static ENV_LOCK: Mutex<()> = Mutex::new(());
+        let _guard = ENV_LOCK.lock().unwrap_or_else(|p| p.into_inner());
+        let prev = std::env::var(key).ok();
+        // SAFETY: env mutation is gated by ENV_LOCK above.
+        unsafe {
+            match value {
+                Some(v) => std::env::set_var(key, v),
+                None => std::env::remove_var(key),
+            }
+        }
+        let r = f();
+        // SAFETY: same lock still held.
+        unsafe {
+            match prev {
+                Some(v) => std::env::set_var(key, v),
+                None => std::env::remove_var(key),
+            }
+        }
+        r
+    }
+
+    #[test]
+    fn test_resolve_returns_1_for_zero_or_one_sentence() {
+        with_env_var("PIPER_G2P_PARALLELISM", None, || {
+            assert_eq!(resolve_g2p_parallelism(0), 1);
+            assert_eq!(resolve_g2p_parallelism(1), 1);
+        });
+    }
+
+    #[test]
+    fn test_resolve_auto_parallel_for_multiple_sentences() {
+        with_env_var("PIPER_G2P_PARALLELISM", None, || {
+            let n = resolve_g2p_parallelism(8);
+            assert!(
+                (2..=G2P_AUTO_PARALLELISM_CAP).contains(&n),
+                "expected 2..=cap, got {}",
+                n
+            );
+            assert!(n <= 8);
+        });
+    }
+
+    #[test]
+    fn test_resolve_auto_capped_by_n_sentences() {
+        with_env_var("PIPER_G2P_PARALLELISM", None, || {
+            assert!(resolve_g2p_parallelism(2) <= 2);
+        });
+    }
+
+    #[test]
+    fn test_resolve_explicit_1_forces_serial() {
+        with_env_var("PIPER_G2P_PARALLELISM", Some("1"), || {
+            assert_eq!(resolve_g2p_parallelism(10), 1);
+        });
+    }
+
+    #[test]
+    fn test_resolve_explicit_n_overrides_auto() {
+        with_env_var("PIPER_G2P_PARALLELISM", Some("8"), || {
+            // capped at n_sentences
+            assert_eq!(resolve_g2p_parallelism(3), 3);
+            assert_eq!(resolve_g2p_parallelism(20), 8);
+        });
+    }
+
+    #[test]
+    fn test_resolve_invalid_falls_back_to_auto() {
+        with_env_var("PIPER_G2P_PARALLELISM", Some("not_a_number"), || {
+            let n = resolve_g2p_parallelism(8);
+            assert!(n >= 2);
+        });
+    }
+
+    #[test]
+    fn test_resolve_zero_treated_as_serial() {
+        with_env_var("PIPER_G2P_PARALLELISM", Some("0"), || {
+            assert_eq!(resolve_g2p_parallelism(10), 1);
+        });
+    }
+
+    #[test]
+    fn test_map_sentences_parallel_zero_items() {
+        let items: Vec<&str> = vec![];
+        let r: Vec<usize> = map_sentences_parallel(&items, 4, |s| s.len());
+        assert!(r.is_empty());
+    }
+
+    #[test]
+    fn test_map_sentences_parallel_one_item_no_thread() {
+        // parallelism > 1 but len == 1 → must take the serial branch.
+        let items = vec!["only-one"];
+        let r: Vec<usize> = map_sentences_parallel(&items, 4, |s| s.len());
+        assert_eq!(r, vec![8]);
+    }
+
+    #[test]
+    fn test_map_sentences_parallel_preserves_order() {
+        let items: Vec<String> = (0..16).map(|i| format!("item_{}", i)).collect();
+        let serial: Vec<String> = map_sentences_parallel(&items, 1, |s| s.to_uppercase());
+        let parallel: Vec<String> = map_sentences_parallel(&items, 4, |s| s.to_uppercase());
+        assert_eq!(serial, parallel);
+        // Sanity: order matches input
+        for (i, out) in parallel.iter().enumerate() {
+            assert_eq!(out, &format!("ITEM_{}", i));
+        }
+    }
+
+    #[test]
+    fn test_map_sentences_parallel_uneven_chunks() {
+        // 7 items / 4 workers → chunks of [2,2,2,1]
+        let items: Vec<i32> = (0..7).collect();
+        let r: Vec<i32> = map_sentences_parallel(&items, 4, |x| x * 10);
+        assert_eq!(r, vec![0, 10, 20, 30, 40, 50, 60]);
+    }
+
+    /// Pin the clamp behaviour for `parallelism > items.len()` (Issue #383
+    /// follow-up review on PR #403). Direct callers that bypass
+    /// `resolve_g2p_parallelism` (or future ones) must not silently
+    /// oversubscribe the system: `chunk_size = n.div_ceil(workers)` would
+    /// collapse to 1 and spawn `items.len()` threads. The clamp keeps the
+    /// effective worker count bounded by `items.len()`.
+    #[test]
+    fn test_map_sentences_parallel_clamps_excess_parallelism() {
+        use std::collections::HashSet;
+        use std::sync::Mutex;
+        use std::thread::ThreadId;
+
+        let items: Vec<i32> = (0..3).collect();
+        let observed_threads: Mutex<HashSet<ThreadId>> = Mutex::new(HashSet::new());
+
+        let r: Vec<i32> = map_sentences_parallel(&items, 100, |x| {
+            observed_threads
+                .lock()
+                .unwrap()
+                .insert(std::thread::current().id());
+            x * 10
+        });
+
+        assert_eq!(r, vec![0, 10, 20]);
+        let n_threads = observed_threads.lock().unwrap().len();
+        assert!(
+            n_threads <= 3,
+            "parallelism=100 with 3 items must clamp to <= 3 worker threads; \
+             observed {} unique thread IDs",
+            n_threads
+        );
     }
 }

@@ -2214,6 +2214,167 @@ void phonemesToAudio(PiperConfig &config, Voice &voice,
   
 } /* phonemesToAudio */
 
+// Float32 variant — accepts pre-phonemized sentence + optional prosody.
+// Mirrors per-sentence body of textToAudioFloat (phoneme-silence phrase
+// split, prosody flat conversion, synthesizeFloat) without phonemize step.
+// Used by Phase 1 of issue #383 so synth_start can parallelize phonemize.
+//
+// Output layout matches textToAudioFloat's per-sentence iteration: phrase
+// audio + per-phrase silence + trailing sentenceSilenceSamples. Keeping the
+// trailing silence here lets synth_next emit byte-for-byte parity with
+// piper_plus_synthesize (one-shot) for the same input.
+void phonemesToAudioFloat(PiperConfig &config, Voice &voice,
+                          const std::vector<Phoneme> &sentencePhonemes,
+                          const std::vector<ProsodyFeature> *sentenceProsody,
+                          std::vector<float> &audioBuffer,
+                          SynthesisResult &result,
+                          const std::function<void()> &audioCallback) {
+  if (sentencePhonemes.empty()) {
+    return;
+  }
+
+  bool useProsody = (sentenceProsody != nullptr) && !sentenceProsody->empty() &&
+                    voice.session.hasProsodyInput &&
+                    usesOpenJTalk(voice.phonemizeConfig.phonemeType);
+
+  std::vector<std::shared_ptr<std::vector<Phoneme>>> phrasePhonemes;
+  std::vector<SynthesisResult> phraseResults;
+  std::vector<size_t> phraseSilenceSamples;
+
+  PhonemeIdConfig idConfig;
+  idConfig.phonemeIdMap =
+      std::make_shared<PhonemeIdMap>(voice.phonemizeConfig.phonemeIdMap);
+  idConfig.interspersePad = voice.phonemizeConfig.interspersePad;
+
+  if (usesOpenJTalk(voice.phonemizeConfig.phonemeType)) {
+    idConfig.addBos = false;
+    idConfig.addEos = false;
+  }
+
+  if (voice.synthesisConfig.phonemeSilenceSeconds) {
+    std::map<Phoneme, float> &phonemeSilenceSeconds =
+        *voice.synthesisConfig.phonemeSilenceSeconds;
+
+    auto currentPhrasePhonemes = std::make_shared<std::vector<Phoneme>>();
+    phrasePhonemes.push_back(currentPhrasePhonemes);
+
+    for (auto it = sentencePhonemes.begin(); it != sentencePhonemes.end(); ++it) {
+      Phoneme currentPhoneme = *it;
+      currentPhrasePhonemes->push_back(currentPhoneme);
+
+      if (phonemeSilenceSeconds.count(currentPhoneme) > 0) {
+        phraseSilenceSamples.push_back(
+            (std::size_t)(phonemeSilenceSeconds[currentPhoneme] *
+                          voice.synthesisConfig.sampleRate *
+                          voice.synthesisConfig.channels));
+
+        currentPhrasePhonemes = std::make_shared<std::vector<Phoneme>>();
+        phrasePhonemes.push_back(currentPhrasePhonemes);
+      }
+    }
+  } else {
+    phrasePhonemes.push_back(
+        std::make_shared<std::vector<Phoneme>>(sentencePhonemes));
+  }
+
+  while (phraseResults.size() < phrasePhonemes.size()) {
+    phraseResults.emplace_back();
+  }
+
+  while (phraseSilenceSamples.size() < phrasePhonemes.size()) {
+    phraseSilenceSamples.push_back(0);
+  }
+
+  std::vector<PhonemeId> phonemeIds;
+  std::map<Phoneme, std::size_t> missingPhonemes;
+
+  for (size_t phraseIdx = 0; phraseIdx < phrasePhonemes.size(); phraseIdx++) {
+    if (phrasePhonemes[phraseIdx]->size() == 0) {
+      continue;
+    }
+
+    phonemes_to_ids(*(phrasePhonemes[phraseIdx]), idConfig, phonemeIds,
+                    missingPhonemes);
+
+    std::vector<int64_t> *prosodyPtr = nullptr;
+    std::vector<int64_t> prosodyFlat;
+
+    if (useProsody) {
+      size_t numPhonemeIds = phonemeIds.size();
+      prosodyFlat.resize(numPhonemeIds * 3, 0);
+
+      if (voice.phonemizeConfig.interspersePad) {
+        size_t prosodyIdx = 0;
+        for (size_t i = 1; i < numPhonemeIds && prosodyIdx < sentenceProsody->size(); i += 2) {
+          prosodyFlat[i * 3 + 0] = (*sentenceProsody)[prosodyIdx].a1;
+          prosodyFlat[i * 3 + 1] = (*sentenceProsody)[prosodyIdx].a2;
+          prosodyFlat[i * 3 + 2] = (*sentenceProsody)[prosodyIdx].a3;
+          prosodyIdx++;
+        }
+      } else {
+        for (size_t i = 0; i < numPhonemeIds && i < sentenceProsody->size(); i++) {
+          prosodyFlat[i * 3 + 0] = (*sentenceProsody)[i].a1;
+          prosodyFlat[i * 3 + 1] = (*sentenceProsody)[i].a2;
+          prosodyFlat[i * 3 + 2] = (*sentenceProsody)[i].a3;
+        }
+      }
+
+      prosodyPtr = &prosodyFlat;
+    }
+
+    synthesizeFloat(phonemeIds, voice.synthesisConfig, voice.session,
+                    audioBuffer, phraseResults[phraseIdx], &voice, prosodyPtr);
+
+    for (std::size_t i = 0; i < phraseSilenceSamples[phraseIdx]; i++) {
+      audioBuffer.push_back(0.0f);
+    }
+
+    result.audioSeconds += phraseResults[phraseIdx].audioSeconds;
+    result.inferSeconds += phraseResults[phraseIdx].inferSeconds;
+
+    // Forward timing/durations from the first phrase so callers like
+    // synth_next that consume one phoneme sentence get the timing data
+    // they expect (mirrors the textToAudioFloat path).
+    if (phraseIdx == 0) {
+      result.phonemeTimings = phraseResults[phraseIdx].phonemeTimings;
+      result.hasTimingInfo = phraseResults[phraseIdx].hasTimingInfo;
+    }
+
+    phonemeIds.clear();
+  }
+
+  // Trailing sentence-silence — mirrors textToAudioFloat's per-sentence
+  // append so Iterator (synth_next) and one-shot (piper_plus_synthesize)
+  // produce byte-for-byte equal sample counts. Without this, every
+  // sentence in the Iterator path was 0.2 s (default) shorter than the
+  // one-shot path, breaking the IteratorVsOneShot* parity tests.
+  if (voice.synthesisConfig.sentenceSilenceSeconds > 0) {
+    std::size_t sentenceSilenceSamples = static_cast<std::size_t>(
+        voice.synthesisConfig.sentenceSilenceSeconds *
+        voice.synthesisConfig.sampleRate * voice.synthesisConfig.channels);
+    for (std::size_t i = 0; i < sentenceSilenceSamples; ++i) {
+      audioBuffer.push_back(0.0f);
+    }
+  }
+
+  if (!missingPhonemes.empty()) {
+    for (auto &phonemeCount : missingPhonemes) {
+      std::string phonemeStr;
+      utf8::append(phonemeCount.first, std::back_inserter(phonemeStr));
+      spdlog::warn("Missing \"{}\" (\\u{:04X}): {} time(s)", phonemeStr,
+                   (uint32_t)phonemeCount.first, phonemeCount.second);
+    }
+  }
+
+  if (result.audioSeconds > 0) {
+    result.realTimeFactor = result.inferSeconds / result.audioSeconds;
+  }
+
+  if (audioCallback) {
+    audioCallback();
+  }
+}
+
 // Synthesize audio directly from phonemes to WAV file
 void phonemesToWavFile(PiperConfig &config, Voice &voice,
                        const std::vector<Phoneme> &phonemes,

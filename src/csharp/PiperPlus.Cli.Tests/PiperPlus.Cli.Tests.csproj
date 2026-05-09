@@ -1,0 +1,42 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>PiperPlus.Cli.Tests</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <IsTrimmable>false</IsTrimmable>
+    <!-- Suppress trim warnings: we source-link the CLI engine adapters
+         (DotNetG2PEngine etc.) which use reflection in MultilingualPhonemizer's
+         delegating dispatch path. Same intent as PiperPlus.Cli.csproj /
+         PiperPlus.Bench.csproj. -->
+    <SuppressTrimAnalysisWarnings>true</SuppressTrimAnalysisWarnings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="xunit.v3" Version="3.2.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.13.0" />
+    <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.24.3" />
+    <PackageReference Include="DotNetG2P" Version="1.8.0" />
+    <PackageReference Include="DotNetG2P.MeCab" Version="1.8.0" />
+    <PackageReference Include="DotNetG2P.English" Version="1.8.0" />
+    <PackageReference Include="coverlet.collector" Version="6.0.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\PiperPlus.Core\PiperPlus.Core.csproj" />
+  </ItemGroup>
+
+  <!-- Source-link the CLI's per-language engine adapters so the test process
+       exercises the exact same JA/EN engine wiring the CLI uses. The
+       DotNetG2PEngine class is internal to PiperPlus.Cli (not transitively
+       reachable from PiperPlus.Core.Tests), so source-linking is the only way
+       to test its concurrency contract without making it public API. Same
+       approach as PiperPlus.Bench.csproj. -->
+  <ItemGroup>
+    <Compile Include="..\PiperPlus.Cli\DotNetG2PEngine.cs" Link="Adapters\DotNetG2PEngine.cs" />
+    <Compile Include="..\PiperPlus.Cli\DotNetEnglishG2PEngine.cs" Link="Adapters\DotNetEnglishG2PEngine.cs" />
+  </ItemGroup>
+
+</Project>

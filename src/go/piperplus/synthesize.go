@@ -134,28 +134,21 @@ func phonemizerForLanguage(lang string, dicts *dictData) (phonemize.Phonemizer, 
 	}
 }
 
-// Synthesize converts text to speech using the configured phonemizer.
-// This is the high-level API that phonemizes text then runs inference.
-func (v *Voice) Synthesize(ctx context.Context, text string, opts ...SynthesisOption) (*SynthesisResult, error) {
-	if v.closed.Load() {
-		return nil, ErrModelClosed
-	}
-
+// prepareSynthesisRequest converts text into a SynthesisRequest ready for
+// engine.Synthesize. Carries no state, performs no inference, and is safe to
+// invoke concurrently from multiple goroutines as long as the underlying
+// phonemizer is — which the bundled phonemizers all are (Japanese guards its
+// CGO MeCab handle with a mutex; the others are pure Go with no shared
+// mutable state).
+//
+// The second return value (`needsBreakPad`) is the Strategy C detection bit
+// the caller must apply *after* engine.Synthesize.
+func (v *Voice) prepareSynthesisRequest(text string, so SynthesisOptions) (*SynthesisRequest, bool, error) {
 	if v.phonemizer == nil {
-		return nil, fmt.Errorf("piperplus: phonemizer not configured; use SynthesizeFromIDs for direct phoneme input")
+		return nil, false, fmt.Errorf("piperplus: phonemizer not configured; use SynthesizeFromIDs for direct phoneme input")
 	}
-
 	if text == "" {
-		return nil, ErrEmptyText
-	}
-
-	// Apply options, filling defaults from config.Inference.
-	so := defaultSynthesisOptions()
-	so.NoiseScale = v.config.Inference.NoiseScale
-	so.LengthScale = v.config.Inference.LengthScale
-	so.NoiseW = v.config.Inference.NoiseW
-	for _, fn := range opts {
-		fn(&so)
+		return nil, false, ErrEmptyText
 	}
 
 	// Apply custom dictionary text substitution before phonemization.
@@ -163,16 +156,14 @@ func (v *Voice) Synthesize(ctx context.Context, text string, opts ...SynthesisOp
 		text = v.textDict.ApplyToText(text)
 	}
 
-	// Phonemize text.
 	result, err := v.phonemizer.PhonemizeWithProsody(text)
 	if err != nil {
-		return nil, fmt.Errorf("piperplus: phonemization failed: %w", err)
+		return nil, false, fmt.Errorf("piperplus: phonemization failed: %w", err)
 	}
 
 	// Convert tokens to IDs and post-process.
 	var phonemeIDs []int64
 	var prosody []*phonemize.ProsodyInfo
-
 	if v.config.IsMultilingual() {
 		phonemeIDs, prosody = phonemize.PostProcessMultilingualIDs(result, v.config.PhonemeIDMap)
 	} else {
@@ -181,10 +172,9 @@ func (v *Voice) Synthesize(ctx context.Context, text string, opts ...SynthesisOp
 	}
 
 	if len(phonemeIDs) == 0 {
-		return nil, ErrEmptyPhonemeIDs
+		return nil, false, ErrEmptyPhonemeIDs
 	}
 
-	// Convert prosody to [][3]int64 for SynthesisRequest.
 	var prosodyFeatures [][3]int64
 	if len(prosody) > 0 {
 		prosodyFeatures = make([][3]int64, len(prosody))
@@ -203,7 +193,7 @@ func (v *Voice) Synthesize(ctx context.Context, text string, opts ...SynthesisOp
 	if so.Language != "" {
 		lid, ok := v.config.LanguageIDMap[so.Language]
 		if !ok {
-			return nil, fmt.Errorf("piperplus: unknown language %q; available: %v", so.Language, v.config.LanguageIDMap)
+			return nil, false, fmt.Errorf("piperplus: unknown language %q; available: %v", so.Language, v.config.LanguageIDMap)
 		}
 		languageID = lid
 	} else if v.config.IsMultilingual() {
@@ -218,7 +208,6 @@ func (v *Voice) Synthesize(ctx context.Context, text string, opts ...SynthesisOp
 	// --- Strategy C: detect short text and mark for silence padding ---
 	_, needsBreakPad := wrapShortTextWithBreaks(text)
 
-	// Build request and delegate to engine.
 	req := &SynthesisRequest{
 		PhonemeIDs:      phonemeIDs,
 		SpeakerID:       so.SpeakerID,
@@ -228,21 +217,50 @@ func (v *Voice) Synthesize(ctx context.Context, text string, opts ...SynthesisOp
 		NoiseW:          so.NoiseW,
 		ProsodyFeatures: prosodyFeatures,
 	}
+	return req, needsBreakPad, nil
+}
+
+// applyShortTextPadding rewrites the synthesis result in-place to add the
+// Strategy C silence padding mandated by the short-text contract. No-op
+// when needsBreakPad is false or the audio buffer is empty.
+func applyShortTextPadding(result *SynthesisResult, needsBreakPad bool) {
+	if !needsBreakPad || result == nil || len(result.Audio) == 0 {
+		return
+	}
+	result.Audio = prependSilence(result.Audio, result.SampleRate, silencePadMs)
+	result.Audio = appendSilence(result.Audio, result.SampleRate, silencePadMs)
+	if result.SampleRate > 0 {
+		result.Duration = time.Duration(int64(len(result.Audio)) * int64(time.Second) / int64(result.SampleRate))
+	}
+}
+
+// Synthesize converts text to speech using the configured phonemizer.
+// This is the high-level API that phonemizes text then runs inference.
+func (v *Voice) Synthesize(ctx context.Context, text string, opts ...SynthesisOption) (*SynthesisResult, error) {
+	if v.closed.Load() {
+		return nil, ErrModelClosed
+	}
+
+	// Apply options, filling defaults from config.Inference.
+	so := defaultSynthesisOptions()
+	so.NoiseScale = v.config.Inference.NoiseScale
+	so.LengthScale = v.config.Inference.LengthScale
+	so.NoiseW = v.config.Inference.NoiseW
+	for _, fn := range opts {
+		fn(&so)
+	}
+
+	req, needsBreakPad, err := v.prepareSynthesisRequest(text, so)
+	if err != nil {
+		return nil, err
+	}
 
 	synthResult, synthErr := v.engine.Synthesize(ctx, req)
 	if synthErr != nil {
 		return nil, synthErr
 	}
 
-	// --- Strategy C post-process: add silence padding for short text ---
-	if needsBreakPad && synthResult != nil && len(synthResult.Audio) > 0 {
-		synthResult.Audio = prependSilence(synthResult.Audio, synthResult.SampleRate, silencePadMs)
-		synthResult.Audio = appendSilence(synthResult.Audio, synthResult.SampleRate, silencePadMs)
-		// Recalculate duration after padding.
-		if synthResult.SampleRate > 0 {
-			synthResult.Duration = time.Duration(int64(len(synthResult.Audio)) * int64(time.Second) / int64(synthResult.SampleRate))
-		}
-	}
+	applyShortTextPadding(synthResult, needsBreakPad)
 
 	return synthResult, nil
 }
