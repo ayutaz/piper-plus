@@ -185,9 +185,7 @@ class TestCustomDictErrorPaths:
             json.dumps({"version": "1.0", "entries": {"a": "あ"}}),
             encoding="utf-8",
         )
-        monkeypatch.setattr(
-            "piper_plus_g2p.custom_dict.MAX_DICT_FILE_SIZE", 5
-        )
+        monkeypatch.setattr("piper_plus_g2p.custom_dict.MAX_DICT_FILE_SIZE", 5)
         d = CustomDictionary(load_defaults=False)
         with pytest.raises(ValueError, match="too large"):
             d.load_dictionary(str(big))
