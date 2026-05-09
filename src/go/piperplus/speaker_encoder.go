@@ -56,7 +56,7 @@ func (se *SpeakerEncoder) Encode(audio []float32, sampleRate int) ([]float32, er
 	// Resample to 16kHz if needed
 	resampled := audio
 	if sampleRate != melSampleRate {
-		resampled = resampleLinear(audio, sampleRate, melSampleRate)
+		resampled = resampleLinear(audio, sampleRate)
 	}
 
 	// Compute mel spectrogram
@@ -240,13 +240,13 @@ func readWavFileForEncoder(path string) ([]float32, int, error) {
 	return nil, 0, fmt.Errorf("no data chunk found in WAV file: %s", path)
 }
 
-// resampleLinear resamples audio via linear interpolation.
-func resampleLinear(samples []float32, fromRate, toRate int) []float32 {
-	if fromRate == toRate || len(samples) == 0 {
+// resampleLinear resamples audio via linear interpolation to melSampleRate.
+func resampleLinear(samples []float32, fromRate int) []float32 {
+	if fromRate == melSampleRate || len(samples) == 0 {
 		return samples
 	}
 
-	ratio := float64(fromRate) / float64(toRate)
+	ratio := float64(fromRate) / float64(melSampleRate)
 	outputLen := int(math.Ceil(float64(len(samples)) / ratio))
 	output := make([]float32, outputLen)
 
@@ -285,7 +285,7 @@ func computeMelSpectrogram(samples []float32) []float32 {
 		// Power spectrum via DFT
 		powerSpec := make([]float32, fftBins)
 		for k := 0; k < fftBins; k++ {
-			var real, imag float32
+			var realPart, imagPart float32
 			freq := -2.0 * math.Pi * float64(k) / float64(melNFFT)
 			for n := 0; n < melNFFT; n++ {
 				var sample float32
@@ -293,10 +293,10 @@ func computeMelSpectrogram(samples []float32) []float32 {
 					sample = samples[start+n] * window[n]
 				}
 				angle := freq * float64(n)
-				real += sample * float32(math.Cos(angle))
-				imag += sample * float32(math.Sin(angle))
+				realPart += sample * float32(math.Cos(angle))
+				imagPart += sample * float32(math.Sin(angle))
 			}
-			powerSpec[k] = real*real + imag*imag
+			powerSpec[k] = realPart*realPart + imagPart*imagPart
 		}
 
 		// Apply mel filterbank

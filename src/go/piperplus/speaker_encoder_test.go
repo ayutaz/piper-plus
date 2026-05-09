@@ -466,7 +466,7 @@ func TestGolden_Resample48kTo16k_OutputLength(t *testing.T) {
 		t.Fatalf("input length: expected %d, got %d", tc.InputSamplesCount, len(audio48k))
 	}
 
-	resampled := resampleLinear(audio48k, 48000, melSampleRate)
+	resampled := resampleLinear(audio48k, 48000)
 	if len(resampled) != tc.ExpectedOutputCount {
 		t.Errorf("output length: expected %d, got %d", tc.ExpectedOutputCount, len(resampled))
 	}
@@ -477,7 +477,7 @@ func TestGolden_Resample48kTo16k_Values(t *testing.T) {
 	tc := findTestCase(t, g, "resample_48k_to_16k")
 
 	audio48k := generateSineGo(440, 0.1, 48000)
-	resampled := resampleLinear(audio48k, 48000, melSampleRate)
+	resampled := resampleLinear(audio48k, 48000)
 
 	for i, expected := range tc.OutputFirst10 {
 		if math.Abs(float64(resampled[i])-expected) > 1e-4 {
@@ -541,7 +541,7 @@ func TestGolden_ShortAudio_EmptyMel(t *testing.T) {
 
 func TestGolden_ResampleSameRate(t *testing.T) {
 	samples := []float32{1, 2, 3, 4}
-	result := resampleLinear(samples, 16000, 16000)
+	result := resampleLinear(samples, 16000)
 	if len(result) != len(samples) {
 		t.Fatalf("expected %d samples, got %d", len(samples), len(result))
 	}
@@ -553,7 +553,7 @@ func TestGolden_ResampleSameRate(t *testing.T) {
 }
 
 func TestGolden_ResampleEmpty(t *testing.T) {
-	result := resampleLinear([]float32{}, 48000, 16000)
+	result := resampleLinear([]float32{}, 48000)
 	if len(result) != 0 {
 		t.Errorf("expected empty, got %d samples", len(result))
 	}
@@ -564,7 +564,7 @@ func TestGolden_ResampleDownsample(t *testing.T) {
 	for i := range samples {
 		samples[i] = float32(math.Sin(float64(i)))
 	}
-	result := resampleLinear(samples, 48000, 16000)
+	result := resampleLinear(samples, 48000)
 	// 48kHz -> 16kHz = 1/3 ratio, expect ~334 samples
 	if math.Abs(float64(len(result))-334.0) > 2 {
 		t.Errorf("expected ~334 samples, got %d", len(result))
