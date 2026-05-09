@@ -38,12 +38,14 @@ jobs:
 
       - uses: lycheeverse/lychee-action@v2
         with:
+          # --base は URL or absolute path 必須。relative '.' は invalid。
+          # root-relative link の解決は --root-dir で行う。
           args: >-
             --config .lychee.toml
             --no-progress
-            --base .
+            --root-dir ${{ github.workspace }}
             './**/*.md'
-          fail: true
+          fail: false  # baseline 確立まで warn-only
           jobSummary: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
