@@ -1,0 +1,398 @@
+# Inference Input Contract
+# ========================
+# This file defines the canonical input shape, range, and validation rules
+# that ALL piper-plus runtimes (Python, Rust, Go, C#, C/C++, WASM/JS,
+# Kotlin, Swift) MUST agree on for synthesis-time inputs to the VITS
+# inference graph and the surrounding API surface.
+#
+# These constraints come from three sources:
+#
+#   1. Model graph constraints — fixed by ONNX shape signatures emitted
+#      by `export_onnx.py`. Violating them surfaces as
+#      `onnxruntime.InvalidArgument` at session.run time.
+#
+#   2. API safety caps — chosen by the runtime authors (HTTP server text
+#      cap, etc.) to prevent denial-of-service from over-large requests.
+#
+#   3. Empirically-discovered numerical safe ranges — for `noise_scale`,
+#      `length_scale`, `noise_w`. Below the lower bound output collapses
+#      to silence; above the upper bound output diverges into noise.
+#
+# Cross-runtime drift on these values produces silent, hard-to-debug
+# failures (HTTP 500 in one runtime / garbled audio in another / OOM in
+# a third). This contract anchors them.
+#
+# This file serves as a design-time cross-language contract. Implementations
+# and tests are expected to be kept in sync with these values manually.
+#
+# Implementations:
+#   Python (runtime):   src/python_run/piper/voice.py            (PiperVoice.synthesize / phonemize)
+#                       src/python_run/piper/http_server.py      (MAX_TEXT_BYTES, validation)
+#                       src/python_run/piper/cli.py              (CLI argument parsing)
+#   Python (training):  src/python/piper_train/infer_onnx.py     (--noise-scale / --length-scale defaults)
+#   Rust:               src/rust/piper-core/src/engine.rs        (PiperEngine::synthesize)
+#                       src/rust/piper-core/src/config.rs        (config validation)
+#   Go:                 src/go/piperplus/synth.go                (Synthesize)
+#                       src/go/piperplus/config.go               (config parsing)
+#   C#:                 src/csharp/PiperPlus.Core/Inference/PiperSession.cs
+#                       src/csharp/PiperPlus.Core/Config/PiperConfig.cs
+#   C/C++:              src/cpp/piper_plus.cpp                   (synthesize / load_voice)
+#   WASM/JS:            src/wasm/openjtalk-web/src/index.js      (synthesize entry)
+#   Kotlin/Android:     android/piper-plus-g2p/                  (G2P-only; no synthesis)
+#   Swift:              Sources/PiperPlus/                       (FFI bridge to Rust core)
+
+[meta]
+spec_version = "1.0"
+last_updated = "2026-05-09"
+contract_version = 1
+status = "stable"
+applies_to = ["python", "rust", "go", "csharp", "cpp", "wasm-js", "swift"]
+canonical_source = "src/python_run/piper/voice.py:PiperVoice.synthesize"
+
+# ===========================================================================
+# Text input
+# ===========================================================================
+# Input text is UTF-8 encoded and may contain any Unicode codepoint that
+# the configured G2P inventory understands. Unknown characters are passed
+# through to the language-specific phonemizer, which decides whether to
+# drop them, treat them as punctuation, or raise.
+#
+# The HTTP server (FastAPI) imposes a hard byte cap (MAX_TEXT_BYTES) to
+# prevent unbounded memory use from chunked uploads. The Python library
+# API (PiperVoice.synthesize) imposes no size cap — caller is responsible.
+# Other runtimes follow the same library-vs-server split.
+
+[text]
+# Library API (PiperVoice.synthesize, equivalents in Rust/Go/C#/C++/WASM):
+#   No size cap. Memory usage scales O(text_length); callers pre-split
+#   long text via text_splitter.py / streaming.rs / etc. to avoid OOM.
+library_max_chars = 0          # 0 = unlimited; cap is the caller's responsibility
+
+# HTTP server cap (POST body or GET ?text=). Any submission whose UTF-8
+# byte length exceeds this is rejected with HTTP 413 Request Entity Too
+# Large. The cap is generous (1 MiB) because practical Piper utterances
+# are well under 10 KiB but legitimate batched / SSML uploads may grow.
+#
+# IMPLEMENTATION NOTE: The original ticket directive of 8000 chars was
+# the *practical* user-facing limit (exceeding it produces audibly
+# degraded output from a single un-split utterance). The server-side
+# cap is 1 MiB bytes; the library deliberately splits long input into
+# per-sentence chunks before phonemizing.
+#
+# RECOMMENDED PER-UTTERANCE LIMIT (post-text-splitter): 8000 characters.
+# Above this, callers SHOULD pre-split via text_splitter (which terminates
+# on `.` / `!` / `?` / `。` / `！` / `？`).
+http_max_bytes = 1048576       # 1 MiB; src/python_run/piper/http_server.py:MAX_TEXT_BYTES
+recommended_per_utterance_chars = 8000  # soft guideline; auto-split above
+encoding = "utf-8"
+normalization = "NFC"          # Unicode NFC pre-normalization in language-specific
+                               # phonemizers (spanish.py, swedish.py); other
+                               # languages accept either form because their
+                               # tokenizers are codepoint-equivalence-aware.
+
+[text.error_codes]
+# Stable error-message prefix for log scrapers.
+prefix = "piper-plus: input text: "
+codes = [
+    "exceeds-max-bytes",        # body > http_max_bytes
+    "invalid-utf8",             # bytes did not decode as UTF-8
+    "empty-input",              # text.strip() == "" after decoding
+]
+
+# ===========================================================================
+# Phoneme ID sequence (post-G2P, pre-VITS)
+# ===========================================================================
+# After G2P + ID-mapping the text becomes a `phoneme_ids: int64[B, T]`
+# tensor that feeds the VITS encoder. The model graph signature is
+# emitted by export_onnx.py and is fixed at the time of export.
+
+[phoneme_ids]
+dtype = "int64"                # ONNX `tensor(int64)`; runtimes alias to i64
+shape = "(batch, length)"      # batch is always 1 at synthesis time
+                               # (training uses larger batches; not exposed)
+
+# Lower bound: 1 phoneme is technically valid but produces unstable audio.
+# Strategy A in short-text-contract.toml pads up to min_phoneme_ids = 15
+# with pause tokens (id = 0) to stabilize the Duration Predictor.
+min_length = 1                 # absolute minimum the graph accepts
+
+# Upper bound: derived from training-time --max-phoneme-ids 400 default
+# and the dataset filter; the graph itself supports longer sequences.
+# 2048 is a *runtime* safety cap chosen to preserve ~10 sec of audio
+# (avg ~5 phonemes/sec * 22050 Hz output at length_scale=1.0 produces
+# ~10 sec from 50 phonemes; 2048 phonemes ≈ 410 sec / 6.8 min single
+# utterance).  In practice the text-splitter chunks sentences first
+# and individual chunks are well under this bound.
+#
+# IMPLEMENTATION NOTE: Runtimes that pre-allocate phoneme_ids buffers
+# (Rust Vec capacity hint, Go slice capacity, etc.) MAY use this as
+# the initial reserve.
+max_length = 2048              # runtime-level safety ceiling
+
+# Special token IDs (locked by piper_train symbol ordering; see
+# docs/spec/phoneme-set-version.toml for the full inventory).
+pause_token_id = 0             # "_" — short pause / pad
+bos_token_id = 1               # "^" — beginning of sequence
+eos_token_id = 2               # "$" — end of sequence (declarative)
+
+[phoneme_ids.error_codes]
+prefix = "piper-plus: phoneme_ids: "
+codes = [
+    "below-min-length",
+    "exceeds-max-length",
+    "invalid-id-out-of-vocab",  # id >= num_symbols
+    "wrong-dtype",
+    "wrong-rank",               # not a 2-D tensor
+]
+
+# ===========================================================================
+# input_lengths
+# ===========================================================================
+
+[input_lengths]
+dtype = "int64"
+shape = "(batch,)"
+# Equals phoneme_ids.shape[1] for a single-utterance batch (batch=1).
+# Multi-utterance batched inference is NOT exposed at synthesis time
+# (training-only); runtimes always pass [phoneme_ids.shape[1]].
+
+# ===========================================================================
+# scales (noise_scale, length_scale, noise_w)
+# ===========================================================================
+# ONNX input `scales: float32[3]` — packed as
+# [noise_scale, length_scale, noise_w]. The packing order is fixed at
+# export time and MUST be preserved by every runtime.
+#
+# Lower bound > 0.0 because zero collapses the stochastic Duration
+# Predictor and the variance posterior to delta functions, producing
+# silent or unintelligible output. The graph does not crash on 0.0;
+# the audio quality just disappears.
+#
+# Upper bound = 5.0 was chosen as a round generous cap. Production
+# values rarely exceed 1.5; the graph remains stable up to ~3.0,
+# beyond which output diverges into noise.
+
+[scales]
+dtype = "float32"
+shape = "(3,)"
+order = ["noise_scale", "length_scale", "noise_w"]
+
+# Default values (match piper_train.infer_onnx CLI defaults and the
+# `inference` block written into config.json by export_onnx.py).
+default_noise_scale = 0.667
+default_length_scale = 1.0
+default_noise_w = 0.8
+
+# Acceptance ranges. Each runtime SHOULD validate at the API boundary
+# and reject out-of-range inputs with the prefixed error code.
+# Range is half-open: 0.0 is excluded; 5.0 is the inclusive ceiling.
+noise_scale_range  = { min_exclusive = 0.0, max_inclusive = 5.0 }
+length_scale_range = { min_exclusive = 0.0, max_inclusive = 5.0 }
+noise_w_range      = { min_exclusive = 0.0, max_inclusive = 5.0 }
+
+[scales.error_codes]
+prefix = "piper-plus: scales: "
+codes = [
+    "noise-scale-out-of-range",
+    "length-scale-out-of-range",
+    "noise-w-out-of-range",
+    "wrong-dtype",
+    "wrong-shape",
+]
+
+# ===========================================================================
+# speaker_id (sid) — multi-speaker models only
+# ===========================================================================
+# Optional ONNX input `sid: int64[1]`. Only present in multi-speaker
+# models (config.num_speakers > 1). For single-speaker models the
+# runtime MUST NOT pass `sid`; passing it triggers
+# `onnxruntime.InvalidArgument: too many inputs`.
+#
+# For multi-speaker models with `sid` declared but no caller-provided
+# value, runtimes default to speaker 0.
+#
+# Out-of-range values: the embedding lookup will silently index into
+# adjacent speakers (or crash on a CUDA bound check, depending on EP).
+# Runtimes SHOULD validate before passing.
+
+[speaker_id]
+dtype = "int64"
+shape = "(1,)"
+present_when = "config.num_speakers > 1"
+default_value = 0
+range_min_inclusive = 0
+range_max_exclusive = "num_speakers"     # i.e. valid IDs are [0, num_speakers - 1]
+
+[speaker_id.error_codes]
+prefix = "piper-plus: speaker_id: "
+codes = [
+    "out-of-range",                        # >= num_speakers or < 0
+    "passed-to-single-speaker-model",      # sid given but num_speakers <= 1
+    "wrong-dtype",
+]
+
+# ===========================================================================
+# language_id (lid) — multilingual models only
+# ===========================================================================
+# Optional ONNX input `lid: int64[1]`. Present iff the model graph
+# declares `lid` (i.e. multilingual checkpoints). Mapping from
+# language code to ID is locked by language-id-map-contract.toml.
+#
+# Out-of-range / unparseable language values fall back to None (which
+# the HTTP server treats as "unspecified", and the synthesis path then
+# defaults to lid=0 for declared-multilingual models).
+
+[language_id]
+dtype = "int64"
+shape = "(1,)"
+present_when = "model graph declares 'lid' input"
+default_value = 0
+range = "see docs/spec/language-id-map-contract.toml"
+
+[language_id.error_codes]
+prefix = "piper-plus: language_id: "
+codes = [
+    "out-of-range",
+    "unknown-language-code",  # code not in language_id_map
+    "wrong-dtype",
+]
+
+# ===========================================================================
+# speaker_embedding — voice cloning input
+# ===========================================================================
+# Optional ONNX input `speaker_embedding: float32[1, emb_dim]`. Always
+# declared by export_onnx.py (forward-compat hook), but only meaningfully
+# trained when the checkpoint includes a Speaker Encoder integration.
+# When `speaker_embedding_mask = 0` the model graph ignores this input
+# and falls back to speaker_id / lid conditioning.
+#
+# Embedding is L2-normalized and produced by the ECAPA-TDNN speaker
+# encoder (see docs/spec/speaker-encoder-contract.md).
+
+[speaker_embedding]
+dtype = "float32"
+shape = "(1, 256)"          # 1 = batch; 256 = ECAPA-TDNN emb_dim
+emb_dim = 256               # locked by ECAPA-TDNN architecture
+                            # (src/python/piper_train/speaker_encoder/ecapa_tdnn.py:227)
+l2_normalized = true        # L2 norm == 1.0 ± 1e-3 expected
+range_per_value = "unbounded"  # post-L2-norm components are typically in [-0.3, 0.3]
+
+# Companion mask input: 0 disables embedding-conditioned synthesis,
+# 1 enables it. Default 0 for non-cloning calls.
+mask_dtype = "float32"
+mask_shape = "(1,)"
+mask_default = 0.0
+mask_enabled_value = 1.0
+
+[speaker_embedding.error_codes]
+prefix = "piper-plus: speaker_embedding: "
+codes = [
+    "wrong-dim",                # dim != 256
+    "not-l2-normalized",        # |norm - 1| > 1e-3
+    "wrong-dtype",
+    "wrong-rank",
+]
+
+# ===========================================================================
+# prosody_features — Japanese A1/A2/A3 conditioning
+# ===========================================================================
+# Optional ONNX input `prosody_features: int64[1, T, prosody_dim]`.
+# Present when the model was trained with --prosody-dim > 0
+# (default 16 for current 6lang training; see CLAUDE.md training
+# templates). Components A1/A2/A3 derive from OpenJTalk fullcontext
+# labels (mora position in accent phrase, accent type, etc.).
+#
+# When the input is required by the graph but the caller doesn't have
+# OpenJTalk-derived features (e.g. non-Japanese text or runtime without
+# the OpenJTalk pipeline), runtimes pass a zero-filled tensor of the
+# correct shape. The model handles the zero-conditioning case gracefully
+# during training (see piper_train/preprocess.py).
+
+[prosody_features]
+dtype = "int64"
+shape = "(1, phoneme_length, prosody_dim)"
+prosody_dim_default = 3       # historical; first 3 dims are A1/A2/A3
+prosody_dim_v1_12 = 16        # extended in v1.12; full inventory
+fill_value_when_unavailable = 0
+present_when = "model graph declares 'prosody_features' input"
+
+[prosody_features.error_codes]
+prefix = "piper-plus: prosody_features: "
+codes = [
+    "wrong-shape-time-dim",   # T != phoneme_length
+    "wrong-shape-feature-dim",
+    "wrong-dtype",
+    "wrong-rank",
+]
+
+# ===========================================================================
+# Language detection input (G2P pre-stage)
+# ===========================================================================
+# UnicodeLanguageDetector (multilingual.py) reads UTF-8 codepoints and
+# routes them to per-language phonemizers based on Unicode block
+# membership (Hiragana/Katakana → JA, Hangul → KO, Han → ZH, etc.).
+# It expects NFC-normalized input; downstream phonemizers also call
+# unicodedata.normalize("NFC", text) defensively.
+
+[language_detector]
+input_encoding = "utf-8"
+input_normalization = "NFC"
+output = "per-segment-language-tag"
+fallback_language_for_latin = "en"  # configurable via MultilingualPhonemizer
+
+# ===========================================================================
+# Cross-runtime error message convention
+# ===========================================================================
+# Every runtime SHOULD emit input-validation errors with the prefix
+# "piper-plus: " followed by a stable code from the relevant section.
+# This anchors log scraping across language boundaries.
+#
+# Format:
+#   "piper-plus: <subsystem>: <code> <details>"
+# Examples:
+#   "piper-plus: input text: exceeds-max-bytes (1234567 > 1048576)"
+#   "piper-plus: scales: noise-scale-out-of-range (got -0.5, must be > 0)"
+#   "piper-plus: speaker_id: out-of-range (got 999, max 570 for 571-speaker model)"
+#
+# The code portion is enumerated above per-section and MUST be stable
+# (case-sensitive, hyphen-separated). The (parenthesised details) portion
+# is free-form and may include locale-specific formatting.
+
+[error_format]
+template = "piper-plus: {subsystem}: {code} ({details})"
+case = "lowercase-hyphen-separated"
+details_required = false
+details_format = "free-form"
+log_grep_pattern = "^piper-plus: "
+
+# ===========================================================================
+# Implementation status (informational)
+# ===========================================================================
+# ✓ = validates with prefix message; - = pass-through to ORT graph; N/A
+#                       Python  Rust  Go  C#  C++  WASM  Swift
+# text size cap         ✓       -     -   -   -    -     -
+# phoneme_ids range     -       -     -   -   -    -     -
+# scales range          -       -     -   -   -    -     -
+# speaker_id range      ✓       -     -   -   -    -     -    (HTTP server warns)
+# language_id range     ✓       -     -   -   -    -     -    (HTTP server falls back)
+# emb_dim verify        ✓       -     -   -   -    -     -    (Python infer-time)
+# graph-shape mismatch  ORT     ORT   ORT ORT ORT  ORT   ORT  (delegated)
+
+[implementation_status]
+notes = """
+Most graph-shape and dtype validation is delegated to ONNX Runtime
+itself, which raises `onnxruntime.InvalidArgument` (Python) /
+`OrtException` (C#) / `OnnxRuntimeError` (C++) / `OrtError` (Rust)
+on mismatch. The error messages from ORT are stable but verbose;
+runtimes that re-wrap them SHOULD prepend "piper-plus: " and a code.
+
+API-level validation (text byte cap, scale ranges, speaker_id range)
+is currently implemented patchily — the Python HTTP server has the
+strongest enforcement; library callers and other-language runtimes
+mostly trust the caller. Future work: harmonize per-runtime validation
+against this contract.
+
+Kotlin/Android ships only a G2P package (no synthesis), so the
+phoneme_ids / scales / speaker_id sections do not apply on that
+target. The text-input section (NFC, UTF-8) does apply.
+"""

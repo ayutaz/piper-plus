@@ -1,0 +1,239 @@
+# Audio Output Format Contract
+# =============================
+# This file defines the canonical WAV output format that ALL piper-plus
+# runtimes (Python, Rust, Go, C#, C/C++, WASM/JS, Kotlin/Android, Swift)
+# MUST emit when synthesizing speech. The format is dictated by the
+# trained VITS model on the generation side and by the WAV container
+# specification on the bytes-on-the-wire side.
+#
+# Drift surface (catastrophic):
+#   - sample_rate mismatch: silent pitch shift / playback rate change.
+#     E.g. 16000 model output played at 22050 → 1.378x faster, ~5 semitones up.
+#   - bit_depth mismatch:   amplitude clipping or zero-volume output.
+#   - channels mismatch:    stereo players treat int16 mono as half-rate stereo.
+#   - byte_order mismatch:  garbage audio (RIFF is fixed little-endian).
+#
+# This file serves as a design-time cross-language contract. Runtime
+# tests and golden fixtures are expected to be kept in sync with these
+# values manually.
+#
+# Implementations:
+#   Python (runtime):   src/python_run/piper/voice.py            (wave.Wave_write.setsampwidth/setnchannels/setframerate)
+#                       src/python_run/piper/http_server.py      (_build_streaming_wav_header — manual RIFF assembly)
+#                       src/python_run/piper/webui.py            (Gradio output)
+#   Rust:               src/rust/piper-core/src/engine.rs        (synth → f32 → i16 → WAV)
+#   Go:                 src/go/piperplus/synth.go                (encoding/binary little-endian writes)
+#   C#:                 src/csharp/PiperPlus.Core/Inference/PiperSession.cs  (BinaryWriter)
+#   C/C++:              src/cpp/piper_plus.cpp                   (manual RIFF assembly)
+#   WASM/JS:            src/wasm/openjtalk-web/src/index.js      (DataView little-endian writes)
+#   Kotlin/Android:     (G2P-only package; no audio output)
+#   Swift (synthesis):  Sources/PiperPlus/                       (FFI bridge to Rust shared lib)
+
+[meta]
+spec_version = "1.0"
+last_updated = "2026-05-09"
+contract_version = 1
+status = "stable"
+applies_to = ["python", "rust", "go", "csharp", "cpp", "wasm-js", "swift"]
+canonical_source = "src/python_run/piper/http_server.py:_build_streaming_wav_header"
+
+# ===========================================================================
+# Sample format — locked by the trained model
+# ===========================================================================
+# These values are fixed for every piper-plus model shipped to date and
+# baked into the VITS generator's terminal upsample chain (HiFi-GAN ckpts
+# pre-v1.12 used the same; MB-iSTFT v1.12+ uses upsample_rates=(4,4) +
+# iSTFT(4x) + PQMF(4x) = 256x, which combined with hop_length=256 and
+# audio.sample_rate=22050 in config.json yields the same output rate).
+#
+# Changing any value below requires retraining a new model with a different
+# audio.sample_rate / target sample width and is therefore a model-format
+# break, not a runtime bug fix.
+
+[format]
+sample_rate = 22050        # Hz; locked by VITS medium-quality 22050Hz training
+                           # All current piper-plus checkpoints (6lang base,
+                           # tsukuyomi FT, CSS10 JA 6lang) emit 22050Hz audio.
+bit_depth = 16             # bits per sample; signed integer PCM
+sample_format = "int16"    # signed 16-bit little-endian PCM
+                           # Range: [-32768, 32767]; clipping at boundaries.
+channels = 1               # mono; speech synthesis output is single-channel
+byte_order = "little-endian"  # WAV / RIFF specification — fixed
+                           # (RIFX big-endian variant is NOT emitted)
+
+# Block alignment (informational, derivable):
+#   block_align = channels * bit_depth / 8 = 1 * 16 / 8 = 2 bytes/frame
+#   byte_rate   = sample_rate * block_align = 22050 * 2 = 44100 bytes/sec
+
+[format.derived]
+# Convenience constants implementations may reference. They are NOT new
+# axes of freedom — they MUST equal the values computed from `format`.
+block_align_bytes = 2      # 1 ch * 16 bits / 8 = 2
+byte_rate = 44100          # 22050 Hz * 2 bytes/frame = 44100 B/s
+
+# ===========================================================================
+# WAV container layout
+# ===========================================================================
+# Every emitted WAV file MUST be a well-formed RIFF/WAVE container with at
+# minimum a `fmt ` chunk and a `data` chunk. The Python runtime relies on
+# wave.Wave_write to write canonical headers; runtimes that hand-roll
+# headers (Rust, Go, C++, JS, C#) must produce byte-equivalent output for
+# the same PCM payload.
+#
+# Streaming mode:
+#   - HTTP server (`?streaming=true`) writes a placeholder header with
+#     0xFFFFFFFF for both RIFF and data chunk sizes — the conventional
+#     "unknown length" sentinel accepted by browsers and ffmpeg. This is
+#     the ONLY context where size fields differ from the actual byte
+#     count; non-streaming mode MUST write accurate sizes.
+
+[container]
+magic = "RIFF"             # Bytes 0..4: ASCII "RIFF" (0x52 0x49 0x46 0x46)
+form_type = "WAVE"         # Bytes 8..12: ASCII "WAVE" (0x57 0x41 0x56 0x45)
+fmt_chunk_id = "fmt "      # 4 bytes; trailing space mandatory (0x20)
+fmt_chunk_size = 16        # PCM format chunk is exactly 16 bytes
+                           # (compressed formats use 18+ with cbSize)
+audio_format_code = 1      # WAVE_FORMAT_PCM = 1; uncompressed signed PCM
+                           # (NOT 3 = IEEE float, NOT 6/7 = µ-law/A-law)
+data_chunk_id = "data"     # 4 bytes ASCII "data"
+streaming_size_sentinel = 0xFFFFFFFF  # used for streaming chunked output
+
+[container.field_order]
+# RIFF / fmt / data field layout, in byte order. Each implementation
+# packs these little-endian (struct.pack "<") with the specified widths.
+# (Width "u32" = unsigned 32-bit, "u16" = unsigned 16-bit.)
+fields = [
+    { offset =  0, name = "RIFF",            width = "ascii4" },
+    { offset =  4, name = "RIFF_chunk_size", width = "u32"    },  # = file_size - 8 (or sentinel for streaming)
+    { offset =  8, name = "WAVE",            width = "ascii4" },
+    { offset = 12, name = "fmt_id",          width = "ascii4" },  # "fmt "
+    { offset = 16, name = "fmt_size",        width = "u32"    },  # = 16
+    { offset = 20, name = "audio_format",    width = "u16"    },  # = 1 (PCM)
+    { offset = 22, name = "channels",        width = "u16"    },  # = 1
+    { offset = 24, name = "sample_rate",     width = "u32"    },  # = 22050
+    { offset = 28, name = "byte_rate",       width = "u32"    },  # = 44100
+    { offset = 32, name = "block_align",     width = "u16"    },  # = 2
+    { offset = 34, name = "bit_depth",       width = "u16"    },  # = 16
+    { offset = 36, name = "data_id",         width = "ascii4" },  # "data"
+    { offset = 40, name = "data_size",       width = "u32"    },  # = num_samples * 2 (or sentinel)
+    { offset = 44, name = "PCM_payload",     width = "bytes"  },  # data_size bytes of int16 LE samples
+]
+
+# ===========================================================================
+# Header validation (runtime parsers / fixture loaders)
+# ===========================================================================
+# Implementations that READ piper-emitted WAVs (test harnesses, golden
+# fixture loaders, downstream consumers) SHOULD validate the following
+# invariants and reject files that fail them. The intent is to fail
+# loudly when a runtime produces non-canonical output rather than letting
+# bad audio propagate downstream.
+
+[validation]
+require_riff_magic = true              # First 4 bytes MUST be "RIFF"
+require_wave_form_type = true          # Bytes 8..12 MUST be "WAVE"
+require_fmt_chunk = true               # `fmt ` chunk MUST be present
+require_data_chunk = true              # `data` chunk MUST be present
+require_pcm_format = true              # audio_format MUST equal 1
+require_mono = true                    # channels MUST equal 1
+require_int16 = true                   # bit_depth MUST equal 16
+allow_streaming_size_sentinel = true   # data_size = 0xFFFFFFFF acceptable
+                                       # (only when streaming was requested)
+
+[validation.error_messages]
+# Each runtime that performs validation SHOULD use a stable error-message
+# prefix so log scrapers can grep across languages. Format:
+#   "piper-plus: <code> <details>"
+prefix = "piper-plus: invalid wav: "
+codes = [
+    "missing-riff-magic",
+    "missing-wave-form-type",
+    "missing-fmt-chunk",
+    "missing-data-chunk",
+    "non-pcm-format",
+    "non-mono-channels",
+    "non-int16-bit-depth",
+    "byte-order-mismatch",
+]
+
+# ===========================================================================
+# Forward-compatibility plan: alternative sample rates
+# ===========================================================================
+# As of v1.12.0 the only trained piper-plus models emit 22050 Hz audio.
+# Future work may produce models targeting other rates:
+#
+#   - 16000 Hz: Lower-bandwidth voices; reduced model size; some embedded /
+#     telephony targets prefer this. The speaker_encoder pipeline already
+#     uses 16000 Hz internally (see docs/spec/speaker-encoder-contract.md).
+#     A 16000 Hz synthesis model would require a new "low" quality preset
+#     in piper_train (mel hop/win parameters tuned to fs=16000).
+#   - 44100 Hz: CD-quality voices; larger model; longer inference time.
+#     Would require a "high" quality preset.
+#
+# When such models ship:
+#   1. config.json's audio.sample_rate field MUST reflect the actual rate
+#      (already the case — it's not hardcoded in runtime code; runtimes
+#      read voice.config.sample_rate at synthesis time).
+#   2. WAV header field "sample_rate" (offset 24) MUST equal the model's
+#      audio.sample_rate.
+#   3. byte_rate (offset 28) MUST equal sample_rate * block_align and is
+#      derived; no separate validation rule is needed.
+#   4. bit_depth, channels, byte_order, container layout REMAIN UNCHANGED
+#      (they are not properties of the model's training rate).
+#   5. All runtime synthesis paths already pass voice.config.sample_rate
+#      through to the WAV writer; no source-level changes are required
+#      beyond shipping the new model.
+#
+# This contract intentionally does NOT pin the trained-model sample_rate
+# to 22050 — only the current-release-shipped value. The container layout,
+# bit depth, channel count, byte order, and validation rules are the
+# stable axes; sample rate is parameterized.
+
+[forward_compat]
+current_supported_sample_rates = [22050]
+planned_supported_sample_rates = [16000, 22050, 44100]
+parameterized_field = "sample_rate"            # may vary across models
+fixed_fields = ["bit_depth", "channels", "byte_order", "audio_format_code"]
+
+# ===========================================================================
+# Cross-runtime byte-equivalence guarantee
+# ===========================================================================
+# For the same trained model, the same input text, and identical inference
+# parameters (noise_scale, length_scale, noise_w, seed if applicable),
+# every runtime MUST produce a WAV file with:
+#   - byte-identical RIFF/fmt/data chunk headers (modulo the streaming
+#     sentinel mentioned above).
+#   - PCM payload differences bounded only by float32 EP variance
+#     (CUDA EP vs CPU EP, AVX-512 vs ARM NEON, etc.). Cross-EP audio is
+#     NOT bit-identical; cross-EP HEADERS are.
+#
+# Header-level equivalence is enforced by golden fixture tests that
+# compare the first 44 bytes of emitted WAVs across runtimes.
+
+[invariants]
+header_first_44_bytes_constant_for_fixed_sample_rate = true
+pcm_payload_cross_ep_byte_identical = false  # float EP variance, expected
+pcm_payload_cross_runtime_cosine_threshold = 0.999  # informational; mel-level comparison only
+
+# ===========================================================================
+# Implementation status (informational)
+# ===========================================================================
+# ✓ = produces canonical WAV; - = not applicable / not yet verified
+#                    Python  Rust  Go  C#  C++  WASM  Kotlin  Swift
+# RIFF magic         ✓       ✓     ✓   ✓   ✓    ✓     N/A     ✓
+# fmt chunk          ✓       ✓     ✓   ✓   ✓    ✓     N/A     ✓
+# data chunk         ✓       ✓     ✓   ✓   ✓    ✓     N/A     ✓
+# little-endian      ✓       ✓     ✓   ✓   ✓    ✓     N/A     ✓
+# 22050/16/mono      ✓       ✓     ✓   ✓   ✓    ✓     N/A     ✓
+# streaming sentinel ✓       -     -   -   -    -     N/A     -
+
+[implementation_status]
+notes = """
+Kotlin/Android currently ships a G2P-only package
+(io.github.ayutaz:piper-plus-g2p-android) and does not perform synthesis;
+it produces no WAV output. Synthesis on Android proceeds via the C-API
+shared library and inherits the C++ writer's WAV format.
+
+WASM/JS streaming sentinel support is tracked separately: the
+synthesize-and-return path produces fully-sized headers (the ArrayBuffer
+length is known); only the HTTP server uses the sentinel form.
+"""
