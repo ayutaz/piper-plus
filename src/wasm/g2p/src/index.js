@@ -336,3 +336,6 @@ export { UnicodeLanguageDetector } from './detect.js';
 export { CustomDictionary } from './custom-dictionary.js';
 export { PUA_COMPAT_VERSION, checkPuaCompat, PUA_MAP, mapToken, unmapToken } from './pua-map.js';
 export { extractPhonemesFromLabels, applyNPhonemeRules, mapToPUA } from './ja/phoneme-extract.js';
+
+// SSML support — see ./ssml.js for the parser. Mirrors Python/Rust/C#/Go.
+export { isSsml, parseSsml, SsmlParser } from './ssml.js';
