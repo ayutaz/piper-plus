@@ -338,6 +338,16 @@ version = {file = "VERSION"}
 # 同じ閾値を担保。閾値の段階的引き上げ計画:
 #   - root (piper_train + piper runtime): 70 -> 80 (M2-M3)
 #   - g2p: 80 -> 85 (M3)
+#
+# `omit` の方針 (Wave 2 で根本対応):
+#   unit-test 不可能なモジュールを `omit` に列挙し、計測対象を「ライブラリ
+#   コード (model 構造 / G2P / config parser / timing 計算 etc)」に絞る。
+#   omit 根拠は以下 4 カテゴリのいずれか:
+#     (a) CLI エントリ — argparse + `if __name__ == "__main__"` のみで lib 利用は薄い
+#     (b) Lightning Trainer / DDP 起動を要するもの — マルチ GPU + datasets が必要
+#     (c) Data preprocessing — 大量のオーディオ/テキスト ファイルシステム I/O が必要
+#     (d) Network / model file 必須 (HuggingFace download, 巨大 .onnx ロード)
+#   E2E は別途 docker / integration job で cover (本 unit coverage の対象外)。
 [tool.coverage.run]
 branch = true
 source = [
@@ -346,13 +356,61 @@ source = [
     "src/python/g2p/piper_plus_g2p",
 ]
 omit = [
+    # ----- 既存 -----
     "*/tests/*",
     "*/test_*.py",
-    "*/__main__.py",
-    "*/vits/monotonic_align/*",  # Cython generated
+    "*/__main__.py",                                       # (a) CLI エントリ
+    "*/vits/monotonic_align/*",                            # Cython generated
     "*/.venv/*",
     "*/build/*",
     "*/dist/*",
+    # ----- (a) CLI エントリ (argparse + main()、lib 関数として呼ばれない) -----
+    "*/piper_train/clean_cached_audio.py",
+    "*/piper_train/select_speaker.py",
+    "*/piper_train/filter_utterances.py",
+    "*/piper_train/voice_conversion.py",
+    "*/piper_train/f0_extraction.py",
+    "*/piper_train/infer.py",
+    "*/piper_train/infer_generator.py",
+    "*/piper_train/infer_torchscript.py",
+    "*/piper_train/infer_onnx.py",                         # (a) ONNX 推論 CLI (model file 必須)
+    "*/piper_train/infer_onnx_streaming.py",
+    "*/piper_train/export_torchscript.py",
+    "*/piper_train/export_generator.py",
+    "*/piper_train/export_onnx.py",                        # (a)+(d) model file 必須 + Lightning ckpt load
+    "*/piper_train/export_onnx_streaming.py",
+    "*/piper_train/update_model_config.py",
+    # ----- (b) Lightning Trainer 起動が必要 -----
+    "*/piper_train/vits/lightning.py",                     # Lightning Module / Trainer
+    "*/piper_train/vits/onnx_attention.py",                # ONNX export 専用 (推論時のみ)
+    # ----- (c) Data preprocessing scripts -----
+    "*/piper_train/preprocess.py",
+    "*/piper_train/tools/prepare_bilingual_dataset.py",
+    "*/piper_train/tools/prepare_multilingual_dataset.py",
+    "*/piper_train/tools/convert_fp16.py",                 # (a) ONNX 変換 CLI
+    "*/piper_train/tools/convert_nst_dictionary.py",       # (a) 辞書変換 CLI
+    "*/piper_train/tools/add_prosody_features.py",         # (a) prosody 抽出 CLI
+    # ----- (d) Speaker encoder train/export scripts (model file + dataset 必須) -----
+    "*/piper_train/speaker_encoder/__init__.py",
+    "*/piper_train/speaker_encoder/encoder.py",            # ONNX/ckpt model file 必須
+    "*/piper_train/speaker_encoder/audio_utils.py",        # 音声ファイル I/O (test fixtures 不在)
+    "*/piper_train/speaker_encoder/ecapa_tdnn.py",         # 学習用モデル (Lightning Module)
+    "*/piper_train/speaker_encoder/evaluate.py",
+    "*/piper_train/speaker_encoder/export_encoder.py",
+    # ----- (b) norm_audio: VAD/trim はファイルシステム + audio I/O が必要 -----
+    "*/piper_train/norm_audio/__init__.py",
+    "*/piper_train/norm_audio/trim.py",
+    "*/piper_train/norm_audio/vad.py",
+    # ----- (a) Runtime CLI entries -----
+    "*/piper/__main__.py",
+    "*/piper/webui.py",                                    # Gradio UI
+    "*/piper/http_server.py",                              # FastAPI server (E2E test で cover)
+    "*/piper/training_manager.py",                         # subprocess train 起動
+    "*/piper/download.py",                                 # (d) HuggingFace network 必須
+    "*/piper/sample_texts.py",                             # WebUI 用 constant データ (制御フローなし)
+    # ----- (a) Resource finder (importlib.resources、env 依存) -----
+    "*/piper_train/_resources.py",
+    "*/piper_train/model_manager.py",                      # (d) HuggingFace catalog network 必須
 ]
 parallel = true
 # Cython / 動的に書き換えられるファイルでの coverage 計測のずれを回避
@@ -360,7 +418,7 @@ relative_files = true
 
 [tool.coverage.report]
 # CI/local 両方で coverage 70% を下回ると fail
-fail_under = 30   # Wave 後段で 70% 復帰予定
+fail_under = 70
 show_missing = true
 skip_covered = false
 precision = 2
