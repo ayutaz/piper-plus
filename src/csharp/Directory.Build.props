@@ -33,16 +33,20 @@
 
          残った rule (NoWarn 維持の理由):
          - CS1573/CS1574/CS1591/CS1734: XML doc 関連 (GenerateDocumentationFile=false なので影響軽微)
+         - CS8600: tuple deconstruction で nullable 推論が想定と外れた箇所 (テストのみ、別 PR)
          - SA0001: XML comment analysis disabled (GenerateDocumentationFile=false の副作用)
          - SA1101: this. 不要 (repo style)
          - SA1108: block statements with embedded comments (auto-fix なし、別 PR)
          - SA1117: parameters on same line (auto-fix なし、大規模リフォーマット必要)
+         - SA1118: parameter spans multiple lines (auto-fix なし)
          - SA1137: same indentation (auto-fix なし)
          - SA1200: using directive 位置 (file-scoped namespace と相性悪い)
          - SA1201/SA1202/SA1203/SA1204: element ordering (大規模再配置必要)
          - SA1214: readonly fields ordering (リフォーマット必要)
          - SA1309: _field 命名 (repo style)
          - SA1310: S_xxx field naming (repo style: thread-local static)
+         - SA1312: variable `_` lowercase (test discard tuple)
+         - SA1401: public field (テスト fixture のため許容)
          - SA1402: SingleType per file (大規模分割必要、別 PR)
          - SA1413: trailing comma (auto-fix できない箇所多数)
          - SA1600/SA1601/SA1602: 公開 API ドキュメント (GenerateDocumentationFile=false なので影響軽微)
@@ -55,11 +59,15 @@
          - CA1031: catch general exception (CLI 層のフォールバック多数)
          - CA1002: List<T> public API (大規模 API 変更必要、別 PR)
          - RS0016/RS0017: PublicAPI baseline (空のため別 PR で baseline 充填)
+         - RS0037: PublicAPI.txt missing #nullable enable (PublicAPI baseline が空なので連動)
          - SonarAnalyzer Sxxxx: code-quality 提案 (auto-fix なし、別 PR で個別対応):
+           S108 (empty body), S125 (commented-out code),
            S1066 (merge if), S1075 (hardcoded path), S1199 (extract block),
-           S1450 (field as local), S1871 (identical branches), S1905 (cast),
-           S2325 (static method), S3260 (sealed class), S3267 (LINQ Where),
-           S3963 (static ctor), S6667 (log exception), S6966 (await Async) -->
+           S1215 (GC.Collect), S1244 (float exact equality), S1450 (field as local),
+           S1481 (unused local), S1871 (identical branches), S1905 (unnecessary cast),
+           S2325 (static method), S2699 (no assertion in test),
+           S3260 (sealed class), S3267 (LINQ Where), S3963 (static ctor),
+           S4144 (identical methods), S6667 (log exception), S6966 (await Async) -->
     <NoWarn>$(NoWarn);CS1573;CS1574;CS1591;CS1734;CS8600;SA0001;SA1101;SA1108;SA1117;SA1118;SA1137;SA1200;SA1201;SA1202;SA1203;SA1204;SA1214;SA1309;SA1310;SA1312;SA1401;SA1402;SA1413;SA1600;SA1601;SA1602;SA1623;SA1629;SA1633;SA1649;CA1303;CA1062;CA2007;CA1031;CA1002;RS0016;RS0017;RS0037;S108;S125;S1066;S1075;S1199;S1215;S1244;S1450;S1481;S1871;S1905;S2325;S2699;S3260;S3267;S3963;S4144;S6667;S6966</NoWarn>
   </PropertyGroup>
 

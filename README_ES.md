@@ -326,7 +326,7 @@ dotnet test src/csharp/PiperPlus.Core.Tests/
 
 Requisitos previos: .NET 10 SDK o superior
 
-#### Ejemplos de uso del CLI C #
+#### Ejemplos de uso del CLI C\#
 
 ```bash
 # Inferencia por nombre de modelo (descarga automatica, sin --output-file genera output.wav)
