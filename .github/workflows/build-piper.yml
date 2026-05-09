@@ -42,10 +42,10 @@ jobs:
     outputs:
       artifact-name: ${{ steps.set-artifact-name.outputs.name }}
       build-path: ${{ steps.set-build-path.outputs.path }}
-    
+
     steps:
       - uses: actions/checkout@v6
-      
+
       - name: Set artifact name
         id: set-artifact-name
         shell: bash
@@ -55,13 +55,13 @@ jobs:
           else
             echo "name=piper-${{ runner.os }}-${{ github.sha }}" >> $GITHUB_OUTPUT
           fi
-      
+
       - name: Set build path
         id: set-build-path
         shell: bash
         run: |
           echo "path=${{ github.workspace }}/build" >> $GITHUB_OUTPUT
-      
+
       # Cache for Linux dependencies
       - name: Cache Linux dependencies
         if: runner.os == 'Linux'
@@ -71,7 +71,7 @@ jobs:
             /usr/local/lib/libonnxruntime*
             /usr/local/include/onnxruntime*
           key: ${{ inputs.cache-key-prefix }}-linux-onnxruntime-1.20.0-v3
-      
+
       # Cache for macOS dependencies
       - name: Cache macOS dependencies
         if: runner.os == 'macOS'
@@ -81,7 +81,7 @@ jobs:
             /usr/local/lib/libonnxruntime*
             /usr/local/include/onnxruntime*
           key: ${{ inputs.cache-key-prefix }}-macos-${{ runner.arch }}-onnxruntime-1.20.0-v3
-      
+
       # Install dependencies
       - name: Install dependencies (Ubuntu)
         if: runner.os == 'Linux'
@@ -89,7 +89,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y cmake build-essential curl wget \
             autoconf automake libtool m4 pkg-config
-          
+
           # Check if ONNX Runtime is already cached
           if [ ! -f "/usr/local/lib/libonnxruntime.so" ]; then
             echo "Installing ONNX Runtime..."
@@ -103,7 +103,7 @@ jobs:
             echo "Using cached ONNX Runtime"
             sudo ldconfig
           fi
-      
+
       - name: Install dependencies (macOS)
         if: runner.os == 'macOS'
         run: |
@@ -111,12 +111,12 @@ jobs:
           brew unlink cmake || true
           # Install or upgrade cmake from homebrew/core
           brew install --overwrite cmake ninja wget || brew upgrade cmake ninja wget
-          
+
           # Check if ONNX Runtime is already cached
           if [ ! -f "/usr/local/lib/libonnxruntime.dylib" ]; then
             echo "Installing ONNX Runtime for Apple Silicon..."
             sudo mkdir -p /usr/local/lib /usr/local/include
-            
+
             # Only support arm64 (Apple Silicon)
             wget https://github.com/microsoft/onnxruntime/releases/download/v1.20.0/onnxruntime-osx-arm64-1.20.0.tgz
             tar -xzf onnxruntime-osx-arm64-1.20.0.tgz
@@ -126,26 +126,26 @@ jobs:
           else
             echo "Using cached ONNX Runtime"
           fi
-      
+
       - name: Setup MSVC (Windows)
         if: runner.os == 'Windows'
         uses: ilammy/msvc-dev-cmd@v1
-      
+
       # Build Piper
       - name: Build piper (Unix)
         if: runner.os != 'Windows'
         run: |
           mkdir -p build
           cd build
-          
+
           # Set CMAKE flags
           CMAKE_FLAGS="-DCMAKE_BUILD_TYPE=${{ inputs.build-type }}"
           if [ "${{ inputs.include-tests }}" = "true" ]; then
             CMAKE_FLAGS="$CMAKE_FLAGS -DBUILD_TESTS=ON"
           fi
-          
+
           echo "Building with flags: $CMAKE_FLAGS"
-          
+
           # Retry cmake configuration up to 3 times with delay for rate limiting
           for i in 1 2 3; do
             if cmake .. $CMAKE_FLAGS; then
@@ -161,19 +161,19 @@ jobs:
               fi
             fi
           done
-          
+
           if ! make -j$(nproc 2>/dev/null || sysctl -n hw.ncpu); then
             echo "❌ Build failed"
             exit 1
           fi
           echo "Build succeeded"
-          
+
           # For test builds, ensure OpenJTalk binary is in expected locations
           if [ "${{ inputs.include-tests }}" = "true" ] && [ -f "oj/bin/open_jtalk" ]; then
             cp oj/bin/open_jtalk ./
             mkdir -p bin && cp oj/bin/open_jtalk bin/
           fi
-          
+
           # Run tests if enabled
           if [ "${{ inputs.include-tests }}" = "true" ]; then
             echo "Running C++ tests..."
@@ -183,21 +183,21 @@ jobs:
               echo "No tests configured, skipping test execution"
             fi
           fi
-      
+
       - name: Build piper (Windows)
         if: runner.os == 'Windows'
         run: |
           New-Item -ItemType Directory -Force -Path build | Out-Null
           cd build
-          
+
           # Set CMAKE flags
           $cmakeFlags = @("-G", "Visual Studio 17 2022", "-A", "x64", "-DCMAKE_BUILD_TYPE=${{ inputs.build-type }}")
           if ("${{ inputs.include-tests }}" -eq "true") {
             $cmakeFlags += "-DBUILD_TESTS=ON"
           }
-          
+
           Write-Host "Building with flags: $($cmakeFlags -join ' ')"
-          
+
           # Retry cmake configuration up to 3 times with delay for rate limiting
           $retryCount = 3
           for ($i = 1; $i -le $retryCount; $i++) {
@@ -217,7 +217,7 @@ jobs:
               }
             }
           }
-          
+
           # 出力をキャプチャせず stdout/stderr を直接表示する
           # ($var = cmake --build ...) は build ログが見えなくなり、piper.exe が
           # 生成されない原因の特定が困難になる。
@@ -236,7 +236,7 @@ jobs:
             Get-ChildItem -Recurse -Filter "*.dll" | Select-Object -First 30 | Format-Table FullName
             exit 1
           }
-          
+
           # Run tests if enabled
           if ("${{ inputs.include-tests }}" -eq "true") {
             Write-Host "Running C++ tests..."
@@ -247,7 +247,7 @@ jobs:
               Write-Host "Some tests failed, but continuing"
             }
           }
-      
+
       # Create distribution package
       - name: Create distribution package (Unix)
         if: runner.os != 'Windows'
@@ -255,7 +255,7 @@ jobs:
           mkdir -p dist/piper/bin
           mkdir -p dist/piper/lib
           mkdir -p dist/piper/share
-          
+
           # Copy main binary
           if [ -f "build/piper" ]; then
             cp build/piper dist/piper/bin/
@@ -273,7 +273,7 @@ jobs:
               exit 1
             fi
           fi
-          
+
           # Copy espeak-ng data
           if [ -d "build/ei/share/espeak-ng-data" ]; then
             cp -r build/ei/share/espeak-ng-data dist/piper/share/
@@ -282,7 +282,7 @@ jobs:
           elif [ -d "build/pi/share/espeak-ng-data" ]; then
             cp -r build/pi/share/espeak-ng-data dist/piper/share/
           fi
-          
+
           # Copy libraries
           if [ "${{ runner.os }}" = "Linux" ]; then
             # Copy main libraries
@@ -340,7 +340,7 @@ jobs:
               break
             fi
           done
-          
+
           # Copy OpenJTalk phonemizer binary
           for oj_path in "build/oj/bin/open_jtalk_phonemizer" "build/open_jtalk_phonemizer" "build/bin/open_jtalk_phonemizer"; do
             if [ -f "$oj_path" ]; then
@@ -373,21 +373,21 @@ jobs:
 
           # Create archive
           tar -czf piper-${{ runner.os }}.tar.gz -C dist piper
-          
+
           # Create a debug info file
           echo "Distribution package contents:" > dist-contents.txt
           find dist -type f | sort >> dist-contents.txt
           echo "" >> dist-contents.txt
           echo "Build directory OpenJTalk search:" >> dist-contents.txt
           find build -name "open_jtalk" -type f 2>/dev/null | head -10 >> dist-contents.txt || echo "No open_jtalk found in build" >> dist-contents.txt
-      
+
       - name: Create distribution package (Windows)
         if: runner.os == 'Windows'
         run: |
           New-Item -ItemType Directory -Force -Path dist/piper/bin
           New-Item -ItemType Directory -Force -Path dist/piper/lib
           New-Item -ItemType Directory -Force -Path dist/piper/share
-          
+
           # Copy main binary
           if (Test-Path "build/${{ inputs.build-type }}/piper.exe") {
             Copy-Item "build/${{ inputs.build-type }}/piper.exe" -Destination dist/piper/bin/
@@ -396,10 +396,10 @@ jobs:
           } else {
             Write-Host "Warning: piper.exe not found, creating minimal package"
           }
-          
+
           # Copy required DLLs (exclude test files like .wav)
           Get-ChildItem "build/${{ inputs.build-type }}/*.dll" -ErrorAction SilentlyContinue | Copy-Item -Destination dist/piper/bin/
-          
+
           # Copy espeak-ng data
           $espeakPaths = @(
             "build/ei/share/espeak-ng-data",
@@ -412,7 +412,7 @@ jobs:
               break
             }
           }
-          
+
           # Copy OpenJTalk executable
           $ojPaths = @(
             "build/oj/bin/open_jtalk.exe",
@@ -426,7 +426,7 @@ jobs:
               break
             }
           }
-          
+
           # Copy OpenJTalk phonemizer executable
           $ojPhonemizerPaths = @(
             "build/oj/bin/open_jtalk_phonemizer.exe",
@@ -471,14 +471,14 @@ jobs:
 
           # Create archive
           Compress-Archive -Path dist/piper -DestinationPath piper-${{ runner.os }}.zip
-          
+
           # Create a debug info file
           "Distribution package contents:" | Out-File -FilePath dist-contents.txt
           Get-ChildItem -Path dist -Recurse | Select-Object FullName | Sort-Object FullName | Out-File -FilePath dist-contents.txt -Append
           "" | Out-File -FilePath dist-contents.txt -Append
           "Build directory OpenJTalk search:" | Out-File -FilePath dist-contents.txt -Append
           Get-ChildItem -Path build -Filter "open_jtalk.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 10 | Select-Object FullName | Out-File -FilePath dist-contents.txt -Append
-      
+
       # Upload artifacts
       - name: Upload build artifact
         uses: actions/upload-artifact@v7
@@ -489,7 +489,7 @@ jobs:
             piper-${{ runner.os }}.zip
             dist-contents.txt
           retention-days: 1
-      
+
       # Upload build logs on failure
       - name: Upload build logs on failure
         if: failure()
