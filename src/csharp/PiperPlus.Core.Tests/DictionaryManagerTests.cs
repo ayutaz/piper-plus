@@ -211,7 +211,7 @@ public sealed class DictionaryManagerTests : IDisposable
     }
 
     [Fact]
-    public void FindDictionary_NoDictionaryAnywhere_ReturnsNull()
+    public void FindDictionary_NoDictionaryAnywhere_ReturnsNullOrExistingPath()
     {
         // Clear all env vars that might point to a dictionary
         Environment.SetEnvironmentVariable("OPENJTALK_DICTIONARY_PATH", null);
@@ -219,10 +219,15 @@ public sealed class DictionaryManagerTests : IDisposable
         Environment.SetEnvironmentVariable("NAIST_JDIC_PATH", null);
 
         // FindDictionary checks env vars, exe-relative, system paths, and data dir.
-        // If none of those contain a valid dict, it returns null.
-        // This test may still find a real dictionary if one is installed on the system,
-        // so we just verify the method does not throw.
-        _ = DictionaryManager.FindDictionary();
+        // If none contain a valid dict it returns null. On dev machines a system
+        // OpenJTalk dictionary may exist (Homebrew /opt/homebrew/.../etc), so the
+        // test environment determines which branch is exercised. Either way, the
+        // contract is "null OR an existing directory path" — silently returning
+        // a non-existent path would be a bug.
+        var result = DictionaryManager.FindDictionary();
+        Assert.True(
+            result is null || Directory.Exists(result),
+            $"FindDictionary returned non-null but non-existent path: {result}");
     }
 
     // ================================================================

@@ -27,6 +27,18 @@ struct PhonemeInfo {
 // These mirror the production code in src/cpp/piper.cpp byte-for-byte so the
 // test catches drift between the spec and the implementation. When piper.cpp
 // is updated, these helpers must be updated to match.
+//
+// **Documented limitation (test-quality audit, 2026-05):** because we do
+// NOT link piper.cpp, drift between this in-test mirror and the real
+// production functions (`outputTimingsAsJSON` / `_TSV` / `_SRT` in
+// src/cpp/piper.cpp) is **not** automatically detected. Spec ↔ Python ↔
+// in-test mirror parity is verified by Python canonical fixtures
+// (`tests/fixtures/phoneme_timing/golden_matrix.json`, see
+// `test_phoneme_timing_parity.cpp`). End-to-end drift between the in-test
+// mirror and `src/cpp/piper.cpp` itself relies on manual review when
+// either side is edited. A future integration test that links piper.cpp
+// (paying the onnxruntime/spdlog/fmt cost on a single CI runner) would
+// close this gap, but is out of scope for the present PR.
 // ---------------------------------------------------------------------------
 
 namespace {

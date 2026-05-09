@@ -933,30 +933,17 @@ mod tests {
     // COLD-M1: スレッド設定テスト
     // -----------------------------------------------------------------------
 
-    #[test]
-    fn test_intra_threads_capped_at_max() {
-        // Lock down both ends: at minimum 1 (so single-core machines still
-        // get a thread), and never more than MAX_INTRA_THREADS regardless of
-        // host CPU count. This is the actual contract documented in
-        // docs/spec/ort-session-contract.toml.
-        let available = std::thread::available_parallelism()
-            .map(|n| n.get())
-            .unwrap_or(2);
-        let num_intra_threads = available.min(MAX_INTRA_THREADS);
-        assert!(
-            num_intra_threads >= 1,
-            "must reserve at least 1 thread, got {num_intra_threads}"
-        );
-        assert!(
-            num_intra_threads <= MAX_INTRA_THREADS,
-            "must not exceed MAX_INTRA_THREADS={MAX_INTRA_THREADS}, got {num_intra_threads}"
-        );
-    }
-
     /// Selects the lower of the two values, mirroring the engine's
     /// `available_parallelism().min(MAX_INTRA_THREADS)` clamp. Kept private
-    /// so the tautological-style tests below exercise the helper rather
-    /// than `usize::min` directly.
+    /// so the boundary tests below exercise the helper rather than
+    /// `usize::min` directly.
+    ///
+    /// 旧 `test_intra_threads_capped_at_max` は
+    /// `assert!(num_intra_threads >= 1) && <= MAX_INTRA_THREADS)` を
+    /// 試していたが、`available.min(MAX_INTRA_THREADS)` が型システム上常に
+    /// この範囲に収まるためタウトロジーだった (3 兄弟テスト
+    /// `test_thread_count_low_cpu` / `_high_cpu` / `_at_boundary` が
+    /// 同じ実装を網羅的に exercise しているので削除)。
     fn select_intra_threads(host_cpus: usize) -> usize {
         host_cpus.min(MAX_INTRA_THREADS)
     }

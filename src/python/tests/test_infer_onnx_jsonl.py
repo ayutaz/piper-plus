@@ -1,43 +1,27 @@
 """Unit tests for the JSONL stdin input path of `piper_train.infer_onnx`.
 
-The JSONL loop at `infer_onnx.py:766-771` is the canonical batch input path
-for downstream training-side tooling. It accepts one JSON object per line
-with `phoneme_ids` (required) and optional `speaker_id` / `language_id` /
-`prosody_features` fields.
-
-These tests pin the contract of that loop:
+These tests pin the contract of the JSONL loop:
 - valid JSONL lines parse into utterance dicts
 - empty lines are skipped
 - whitespace is stripped before parsing
 - malformed JSON raises (downstream caller surfaces the error)
 - the per-utterance field shape matches what the inference loop expects
   (`phoneme_ids` required; speaker/language/prosody optional)
+
+Each test invokes the production helper ``piper_train.infer_onnx.parse_jsonl_stream``
+directly. Drift between the spec and the production loop is caught immediately
+because the test exercises the canonical implementation, not a fixture-side copy.
 """
 
 from __future__ import annotations
 
 import io
-import json
-from typing import Any
 
 import pytest
 
+from piper_train.infer_onnx import parse_jsonl_stream as _parse_jsonl_stream
+
 pytestmark = pytest.mark.unit
-
-
-def _parse_jsonl_stream(stream) -> list[dict[str, Any]]:
-    """Mirror of `infer_onnx.py:766-771` for unit testing.
-
-    Kept byte-for-byte equivalent to the inference loop. Any drift between
-    this helper and the production logic should be caught by these tests
-    + a future refactor that replaces both with a shared helper.
-    """
-    utterances = []
-    for line in stream:
-        line = line.strip()
-        if line:
-            utterances.append(json.loads(line))
-    return utterances
 
 
 # ---------------------------------------------------------------------------
@@ -154,36 +138,8 @@ class TestJsonlMalformed:
 
 
 # ---------------------------------------------------------------------------
-# Drift gate — ensure the helper above stays a faithful mirror of the
-# production inference loop. If `infer_onnx.py:766-771` changes shape, this
-# test serves as a reminder to update both sides.
+# Drift gate — superseded by direct invocation of `parse_jsonl_stream`.
+# Each test in this file now imports the canonical production helper, so
+# any refactor of the loop is caught immediately by the unit tests
+# themselves rather than by source-level regex grep.
 # ---------------------------------------------------------------------------
-
-
-class TestProductionLoopMirror:
-    def test_helper_matches_infer_onnx_jsonl_loop_shape(self):
-        """Source-level smoke: assert the production loop still uses
-        `for line in sys.stdin: line = line.strip(); if line:
-        utterances.append(json.loads(line))`.
-
-        This catches refactors that introduce e.g. `if not line: continue`
-        but also accidental drop of `.strip()` (which would change
-        whitespace handling).
-        """
-        from pathlib import Path
-
-        infer_path = (
-            Path(__file__).resolve().parents[1]
-            / "piper_train"
-            / "infer_onnx.py"
-        )
-        src = infer_path.read_text(encoding="utf-8")
-        # The four canonical lines must coexist in close proximity.
-        # Pin the keywords rather than exact whitespace.
-        assert "for line in sys.stdin" in src
-        assert "line = line.strip()" in src
-        assert "json.loads(line)" in src
-        # Skipping is via `if line:` (positive guard) — assert the pattern
-        # to avoid silently changing semantics to e.g. `if not line: continue`.
-        # Allow any indentation but require literal `if line:`.
-        assert "if line:" in src

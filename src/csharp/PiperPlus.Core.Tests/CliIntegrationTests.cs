@@ -66,6 +66,46 @@ public sealed class CliIntegrationTests
     }
 
     /// <summary>
+    /// Verifies the CLI <c>--test-mode</c> output is in a valid state.
+    /// Two paths are valid: G2P succeeded (<c>phoneme_ids</c> emitted) OR the
+    /// G2P engine reported itself as unavailable (<c>not yet available</c> /
+    /// <c>DotNetG2P</c>). The two paths are mutually exclusive — if BOTH or
+    /// NEITHER appear, the CLI is in an unexpected state and we fail loudly.
+    /// </summary>
+    /// <remarks>
+    /// Replaces the original 9-call OR-chain pattern. The earlier
+    /// <c>Assert.True(success || unavail-msg-1 || unavail-msg-2, …)</c> form
+    /// silently passed both when the CLI emitted nothing AND when the CLI
+    /// emitted both messages, defeating the purpose of the smoke check.
+    /// </remarks>
+    private static void AssertCliTestModeOutput(string combined, int exitCode, string context)
+    {
+        bool hasPhonemeIds = combined.Contains("phoneme_ids", StringComparison.Ordinal);
+        bool hasG2pUnavailable =
+            combined.Contains("not yet available", StringComparison.OrdinalIgnoreCase)
+            || combined.Contains("DotNetG2P", StringComparison.Ordinal);
+
+        Assert.True(
+            hasPhonemeIds || hasG2pUnavailable,
+            $"[{context}] Neither phoneme_ids nor G2P-unavailable message found — " +
+            $"CLI silently produced unrecognized output. ExitCode={exitCode}, Output: {combined}");
+
+        Assert.False(
+            hasPhonemeIds && hasG2pUnavailable,
+            $"[{context}] BOTH phoneme_ids AND G2P-unavailable message found — " +
+            $"CLI is in an inconsistent state. ExitCode={exitCode}, Output: {combined}");
+
+        if (hasPhonemeIds)
+        {
+            // Success path: phoneme_ids must come with exitCode == 0
+            Assert.True(
+                exitCode == 0,
+                $"[{context}] phoneme_ids emitted but exitCode={exitCode} (expected 0). " +
+                $"Output: {combined}");
+        }
+    }
+
+    /// <summary>
     /// Launches the CLI as a subprocess and captures exit code, stdout, and stderr.
     /// </summary>
     private static async Task<(int ExitCode, string StdOut, string StdErr)> RunCliAsync(
@@ -236,12 +276,7 @@ public sealed class CliIntegrationTests
 
         // Either the phonemizer succeeds and outputs phoneme_ids,
         // or it fails because the G2P engine is not available.
-        Assert.True(
-            combined.Contains("phoneme_ids", StringComparison.Ordinal)
-            || combined.Contains("not yet available", StringComparison.OrdinalIgnoreCase)
-            || combined.Contains("DotNetG2P", StringComparison.Ordinal),
-            $"Expected phoneme_ids output or G2P unavailable message. " +
-            $"ExitCode={exitCode}, Output: {combined}");
+        AssertCliTestModeOutput(combined, exitCode, "WithText_en");
     }
 
     [Fact]
@@ -253,11 +288,7 @@ public sealed class CliIntegrationTests
         SkipIfBuildFailed(exitCode, stderr);
 
         string combined = stdout + stderr;
-        Assert.True(
-            combined.Contains("phoneme_ids", StringComparison.Ordinal)
-            || combined.Contains("not yet available", StringComparison.OrdinalIgnoreCase)
-            || combined.Contains("DotNetG2P", StringComparison.Ordinal),
-            $"Expected phoneme_ids or G2P unavailable. ExitCode={exitCode}, Output: {combined}");
+        AssertCliTestModeOutput(combined, exitCode, "Chinese_zh");
     }
 
     [Fact]
@@ -269,11 +300,7 @@ public sealed class CliIntegrationTests
         SkipIfBuildFailed(exitCode, stderr);
 
         string combined = stdout + stderr;
-        Assert.True(
-            combined.Contains("phoneme_ids", StringComparison.Ordinal)
-            || combined.Contains("not yet available", StringComparison.OrdinalIgnoreCase)
-            || combined.Contains("DotNetG2P", StringComparison.Ordinal),
-            $"Expected phoneme_ids or G2P unavailable. ExitCode={exitCode}, Output: {combined}");
+        AssertCliTestModeOutput(combined, exitCode, "Spanish_es");
     }
 
     [Fact]
@@ -285,11 +312,7 @@ public sealed class CliIntegrationTests
         SkipIfBuildFailed(exitCode, stderr);
 
         string combined = stdout + stderr;
-        Assert.True(
-            combined.Contains("phoneme_ids", StringComparison.Ordinal)
-            || combined.Contains("not yet available", StringComparison.OrdinalIgnoreCase)
-            || combined.Contains("DotNetG2P", StringComparison.Ordinal),
-            $"Expected phoneme_ids or G2P unavailable. ExitCode={exitCode}, Output: {combined}");
+        AssertCliTestModeOutput(combined, exitCode, "French_fr");
     }
 
     [Fact]
@@ -301,11 +324,7 @@ public sealed class CliIntegrationTests
         SkipIfBuildFailed(exitCode, stderr);
 
         string combined = stdout + stderr;
-        Assert.True(
-            combined.Contains("phoneme_ids", StringComparison.Ordinal)
-            || combined.Contains("not yet available", StringComparison.OrdinalIgnoreCase)
-            || combined.Contains("DotNetG2P", StringComparison.Ordinal),
-            $"Expected phoneme_ids or G2P unavailable. ExitCode={exitCode}, Output: {combined}");
+        AssertCliTestModeOutput(combined, exitCode, "Portuguese_pt");
     }
 
     [Fact]
@@ -343,12 +362,7 @@ public sealed class CliIntegrationTests
 
         // Either phonemizer succeeds and outputs phoneme_ids,
         // or it fails because a G2P engine is not available.
-        Assert.True(
-            combined.Contains("phoneme_ids", StringComparison.Ordinal)
-            || combined.Contains("not yet available", StringComparison.OrdinalIgnoreCase)
-            || combined.Contains("DotNetG2P", StringComparison.Ordinal),
-            $"Expected phoneme_ids output or G2P unavailable message. " +
-            $"ExitCode={exitCode}, Output: {combined}");
+        AssertCliTestModeOutput(combined, exitCode, "Multilingual_ja-en");
     }
 
     // ================================================================
@@ -373,12 +387,7 @@ public sealed class CliIntegrationTests
         // the default output.wav logic is not reached. However,
         // a successful run (phoneme_ids emitted) confirms the CLI
         // accepts --text without --output-file.
-        Assert.True(
-            combined.Contains("phoneme_ids", StringComparison.Ordinal)
-            || combined.Contains("not yet available", StringComparison.OrdinalIgnoreCase)
-            || combined.Contains("DotNetG2P", StringComparison.Ordinal),
-            $"Expected successful test-mode run with default output. " +
-            $"ExitCode={exitCode}, Output: {combined}");
+        AssertCliTestModeOutput(combined, exitCode, "DefaultOutputWav_en");
     }
 
     // ================================================================
@@ -441,11 +450,7 @@ public sealed class CliIntegrationTests
         // Either phonemizer succeeds and outputs phoneme_ids (which would include
         // IDs from both the phonemized "hello" and the raw phoneme tokens),
         // or the G2P engine is not available.
-        Assert.True(
-            combined.Contains("phoneme_ids", StringComparison.Ordinal)
-            || combined.Contains("not yet available", StringComparison.OrdinalIgnoreCase)
-            || combined.Contains("DotNetG2P", StringComparison.Ordinal),
-            $"Expected phoneme_ids or G2P unavailable. ExitCode={exitCode}, Output: {combined}");
+        AssertCliTestModeOutput(combined, exitCode, "InlinePhonemes_ja-en");
     }
 
     [Fact]
@@ -459,12 +464,7 @@ public sealed class CliIntegrationTests
         SkipIfBuildFailed(exitCode, stderr);
 
         string combined = stdout + stderr;
-
-        Assert.True(
-            combined.Contains("phoneme_ids", StringComparison.Ordinal)
-            || combined.Contains("not yet available", StringComparison.OrdinalIgnoreCase)
-            || combined.Contains("DotNetG2P", StringComparison.Ordinal),
-            $"Expected phoneme_ids output. ExitCode={exitCode}, Output: {combined}");
+        AssertCliTestModeOutput(combined, exitCode, "InlinePhonemes_ja_brackets_only");
     }
 
     // ================================================================

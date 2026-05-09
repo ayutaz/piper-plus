@@ -27,6 +27,24 @@ MIN_PHONEME_IDS = 15
 # [scales] in docs/spec/short-text-contract.toml.
 NOISE_SCALE_MIN_RATIO = 0.5
 NOISE_W_MIN_RATIO = 0.4
+
+
+def parse_jsonl_stream(stream) -> list[dict]:
+    """Parse a JSONL stream into a list of utterance dicts.
+
+    Canonical implementation of the JSONL stdin input path used by
+    ``piper_train.infer_onnx``. Empty lines (including pure whitespace)
+    are skipped; remaining lines are parsed via ``json.loads``. Errors
+    are propagated to the caller. Exposed at module scope so unit tests
+    in ``test_infer_onnx_jsonl.py`` can exercise the canonical loop
+    without copying it.
+    """
+    utterances: list[dict] = []
+    for line in stream:
+        line = line.strip()
+        if line:
+            utterances.append(json.loads(line))
+    return utterances
 # Minimum body length (excluding BOS/EOS) for Strategy A to apply.
 # Bodies smaller than this would have padding ratio so high that pad-token
 # audio dominates over actual content; raw VITS output is preferable.
@@ -770,11 +788,7 @@ def main():
         ]
     else:
         # Read from stdin (JSONL mode)
-        utterances = []
-        for line in sys.stdin:
-            line = line.strip()
-            if line:
-                utterances.append(json.loads(line))
+        utterances = parse_jsonl_stream(sys.stdin)
 
     for i, utt in enumerate(utterances):
         utt_id = str(i)

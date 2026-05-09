@@ -45,7 +45,17 @@ fn test_xxe_external_entity_blocked() {
     let segments = SsmlParser::parse(payload);
     assert!(!segments.is_empty(), "must produce at least one segment");
     let full = all_text(&segments);
-    // No /etc/passwd content should leak.
+
+    // Positive contract: the entity reference `&xxe;` is preserved verbatim
+    // (DOCTYPE prefix bypasses XML parsing entirely → no expansion). This
+    // catches "silent expansion" regressions where the parser starts
+    // resolving SYSTEM entities and the leak strings happen to be absent.
+    assert!(
+        full.contains("&xxe;") || full.contains("&amp;xxe;"),
+        "expected entity reference preserved verbatim, got: {full:?}"
+    );
+
+    // Negative contract: no /etc/passwd content should leak.
     assert!(!full.contains("root:"), "unexpected file content leaked");
     assert!(!full.contains("/bin/bash"));
     assert!(!full.contains("/bin/sh"));

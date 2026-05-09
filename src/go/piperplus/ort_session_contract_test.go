@@ -194,8 +194,16 @@ func TestOrtSessionContract_EnvVarNames(t *testing.T) {
 // NOTE: configureSessionOptions() requires ONNX Runtime to be initialized
 // (ort.InitializeEnvironment()), which is not available in the unit-test
 // path. Smoke checks for that helper live in integration_test.go behind
-// the `integration` build tag. Drift detection of the contract values
-// themselves is covered by the fixture-based tests above.
+// the `integration` build tag.
+//
+// Documented limitation: the Go runtime delegates to ORT defaults and does
+// not expose the contract values as named constants (unlike the Python /
+// Rust / C# runtimes which check `MIN_PHONEME_IDS` / `MAX_INTRA_THREADS`
+// against TOML). The fixture-based tests above therefore only catch
+// **fixture-side** drift (someone editing tests/fixtures/ort_session/contract.json),
+// not Go production drift. This is intentional — see
+// docs/spec/ort-session-contract.toml for the canonical values that the
+// Go runtime is expected (but not enforced at unit-test time) to honour.
 
 func abs(f float64) float64 {
 	if f < 0 {

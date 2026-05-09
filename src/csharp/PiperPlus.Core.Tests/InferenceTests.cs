@@ -46,14 +46,16 @@ public class InferenceTests
         // Peak = 0.001, scale = 32767 / 0.01 = 3276700 (minimum peak 0.01 applies).
         // 0.001 * 3276700 = 3276.7 -> (short)3276 after Clamp truncation.
         // -0.001 * 3276700 = -3276.7 -> (short)-3276.
+        //
+        // Golden values are hard-coded so the test fails if production drifts
+        // (recomputing the formula in-test matches drift in either direction).
         float[] audio = [0.001f, -0.001f];
 
         short[] result = PiperSession.ConvertToInt16(audio);
 
         Assert.Equal(2, result.Length);
-        // Math.Clamp returns float, cast to short truncates toward zero.
-        Assert.Equal((short)(0.001f * (32767.0f / 0.01f)), result[0]);
-        Assert.Equal((short)(-0.001f * (32767.0f / 0.01f)), result[1]);
+        Assert.Equal((short)3276, result[0]);
+        Assert.Equal((short)-3276, result[1]);
     }
 
     [Fact]
@@ -104,9 +106,8 @@ public class InferenceTests
         short[] result = PiperSession.ConvertToInt16(audio);
 
         Assert.Equal(2, result.Length);
-        float scale = 32767.0f / 0.5f;
-        Assert.Equal((short)(0.1f * scale), result[0]);
-        Assert.Equal(-32767, result[1]);
+        Assert.Equal((short)6553, result[0]);
+        Assert.Equal((short)-32767, result[1]);
     }
 
     [Fact]
@@ -139,8 +140,7 @@ public class InferenceTests
         short[] result = PiperSession.ConvertToInt16(audio);
 
         Assert.Single(result);
-        float scale = 32767.0f / 0.01f;
-        Assert.Equal((short)Math.Clamp(0.01f * scale, -32767f, 32767f), result[0]);
+        Assert.Equal((short)32767, result[0]);
     }
 
     [Fact]
@@ -154,8 +154,7 @@ public class InferenceTests
         short[] result = PiperSession.ConvertToInt16(audio);
 
         Assert.Single(result);
-        float scale = 32767.0f / 0.01f; // minimum peak applies
-        Assert.Equal((short)Math.Clamp(0.005f * scale, -32767f, 32767f), result[0]);
+        Assert.Equal((short)16383, result[0]);
     }
 
     [Fact]
@@ -169,8 +168,7 @@ public class InferenceTests
         short[] result = PiperSession.ConvertToInt16(audio);
 
         Assert.Single(result);
-        float scale = 32767.0f / 0.02f; // actual peak used
-        Assert.Equal((short)Math.Clamp(0.02f * scale, -32767f, 32767f), result[0]);
+        Assert.Equal((short)32767, result[0]);
     }
 
     [Fact]
@@ -178,15 +176,17 @@ public class InferenceTests
     {
         // Peak = max(|-0.5|, |-1.0|, |-0.3|) = 1.0.
         // scale = 32767 / 1.0 = 32767.
+        // -0.5 * 32767 = -16383.5 -> (short)-16383
+        // -1.0 * 32767 = -32767 -> (short)-32767
+        // -0.3 * 32767 = -9830.1 -> (short)-9830
         float[] audio = [-0.5f, -1.0f, -0.3f];
 
         short[] result = PiperSession.ConvertToInt16(audio);
 
         Assert.Equal(3, result.Length);
-        float scale = 32767.0f / 1.0f;
-        Assert.Equal((short)Math.Clamp(-0.5f * scale, -32767f, 32767f), result[0]);
-        Assert.Equal((short)Math.Clamp(-1.0f * scale, -32767f, 32767f), result[1]);
-        Assert.Equal((short)Math.Clamp(-0.3f * scale, -32767f, 32767f), result[2]);
+        Assert.Equal((short)-16383, result[0]);
+        Assert.Equal((short)-32767, result[1]);
+        Assert.Equal((short)-9830, result[2]);
     }
 
     [Fact]
@@ -201,10 +201,9 @@ public class InferenceTests
         short[] result = PiperSession.ConvertToInt16(audio);
 
         Assert.Equal(3, result.Length);
-        float scale = 32767.0f / 1.0f;
-        Assert.Equal((short)(0.001f * scale), result[0]);
-        Assert.Equal(32767, result[1]);
-        Assert.Equal((short)(0.001f * scale), result[2]);
+        Assert.Equal((short)32, result[0]);
+        Assert.Equal((short)32767, result[1]);
+        Assert.Equal((short)32, result[2]);
     }
 
     [Fact]

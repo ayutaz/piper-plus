@@ -131,6 +131,21 @@ def _map_sentences(
         return list(pool.map(fn, sentences))
 
 
+def is_short_text(text: str) -> bool:
+    """Return True iff ``text`` qualifies for Strategy C silence padding.
+
+    Mirror of the inline check in :py:meth:`PiperVoice.synthesize_stream_raw`.
+    Exposed at module scope so tests can exercise the canonical decision
+    without re-implementing the rule (see test_short_text_mitigation.py:
+    ``TestShortTextDetection``). SSML payloads always bypass Strategy C.
+    """
+    stripped = text.lstrip()
+    is_ssml = stripped.startswith(("<speak>", "<speak "))
+    if is_ssml:
+        return False
+    non_space = sum(1 for c in stripped if not c.isspace())
+    return non_space <= SHORT_TEXT_CHARS
+
 # Optional: use shared ORT utilities when piper_train is available
 try:
     from piper_train.ort_utils import (
@@ -696,10 +711,7 @@ class PiperVoice:
         Strategy C silence padding around every chunk.
         """
         # Strategy C: auto-inject silence padding for very short plain text
-        is_short_text = (
-            not text.lstrip().startswith(("<speak>", "<speak "))
-            and sum(1 for c in text if not c.isspace()) <= SHORT_TEXT_CHARS
-        )
+        is_short = is_short_text(text)
 
         # Phase 2 (issue #383): G2P-ORT pipeline. Submit every sentence's G2P
         # to a thread pool up-front so that while the ORT inference of
@@ -720,7 +732,7 @@ class PiperVoice:
         silence_bytes = bytes(num_silence_samples * 2)
 
         # Pre-compute break silence for Strategy C
-        if is_short_text:
+        if is_short:
             break_samples = int(self.config.sample_rate * SILENCE_PAD_MS / 1000)
             break_bytes = bytes(break_samples * 2)
         else:

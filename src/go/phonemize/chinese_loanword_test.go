@@ -414,9 +414,22 @@ func TestZhEnDispatch_PureZhUnaffected(t *testing.T) {
 	if err != nil {
 		t.Fatalf("PhonemizeWithProsody: %v", err)
 	}
-	// ChinesePhonemizer with empty dicts produces nothing for these chars,
-	// but the call must not error — that's the regression we care about.
-	_ = result
+	// Pure ZH must NOT introduce loanword PUA markers (0xE020-0xE04A) —
+	// those are reserved for the ZH-EN code-switching pinyin path. If they
+	// appear here it means the dispatch is firing on pure ZH input.
+	puaCount := 0
+	for _, tok := range result.Tokens {
+		for _, r := range tok {
+			if r >= 0xE020 && r <= 0xE04A {
+				puaCount++
+				break
+			}
+		}
+	}
+	if puaCount != 0 {
+		t.Errorf("pure ZH input introduced %d loanword PUA marker(s) in %v",
+			puaCount, result.Tokens)
+	}
 }
 
 func TestZhEnDispatch_PureEnUnaffected(t *testing.T) {
