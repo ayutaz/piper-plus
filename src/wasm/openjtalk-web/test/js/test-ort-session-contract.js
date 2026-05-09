@@ -26,11 +26,11 @@
  *     renames that would later catch the runtime out.
  */
 
-import { describe, it } from 'node:test';
-import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { dirname, resolve } from 'node:path';
+import { describe, it } from "node:test";
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, resolve } from "node:path";
 
 import {
   WARMUP_PHONEME_LENGTH,
@@ -41,30 +41,27 @@ import {
   WARMUP_NOISE_SCALE,
   WARMUP_LENGTH_SCALE,
   WARMUP_NOISE_W,
-} from '../../src/index.js';
+} from "../../src/index.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const FIXTURE_PATH = resolve(
-  __dirname,
-  '../../../../../tests/fixtures/ort_session/contract.json',
-);
+const FIXTURE_PATH = resolve(__dirname, "../../../../../tests/fixtures/ort_session/contract.json");
 
-const fixture = JSON.parse(readFileSync(FIXTURE_PATH, 'utf-8'));
+const fixture = JSON.parse(readFileSync(FIXTURE_PATH, "utf-8"));
 
 // ---------------------------------------------------------------------------
 // 1. Fixture sanity
 // ---------------------------------------------------------------------------
 
-describe('ORT session contract — fixture sanity', () => {
-  it('schema_version is 1', () => {
+describe("ORT session contract — fixture sanity", () => {
+  it("schema_version is 1", () => {
     assert.strictEqual(fixture.schema_version, 1);
   });
 
-  it('has all required top-level sections', () => {
-    for (const section of ['session', 'warmup', 'cache', 'env_vars']) {
+  it("has all required top-level sections", () => {
+    for (const section of ["session", "warmup", "cache", "env_vars"]) {
       assert.ok(
         Object.prototype.hasOwnProperty.call(fixture, section),
-        `fixture missing '${section}' section`,
+        `fixture missing '${section}' section`
       );
     }
   });
@@ -74,45 +71,45 @@ describe('ORT session contract — fixture sanity', () => {
 // 2. Warmup constants — production values exported from src/index.js
 // ---------------------------------------------------------------------------
 
-describe('ORT session contract — WASM/JS warmup exported constants', () => {
-  it('WARMUP_PHONEME_LENGTH matches contract warmup.phoneme_length', () => {
+describe("ORT session contract — WASM/JS warmup exported constants", () => {
+  it("WARMUP_PHONEME_LENGTH matches contract warmup.phoneme_length", () => {
     assert.strictEqual(WARMUP_PHONEME_LENGTH, fixture.warmup.phoneme_length);
   });
 
-  it('WARMUP_DEFAULT_RUNS matches contract warmup.default_runs', () => {
+  it("WARMUP_DEFAULT_RUNS matches contract warmup.default_runs", () => {
     assert.strictEqual(WARMUP_DEFAULT_RUNS, fixture.warmup.default_runs);
   });
 
-  it('WARMUP_BOS_TOKEN matches contract warmup.bos_token', () => {
+  it("WARMUP_BOS_TOKEN matches contract warmup.bos_token", () => {
     assert.strictEqual(WARMUP_BOS_TOKEN, fixture.warmup.bos_token);
   });
 
-  it('WARMUP_EOS_TOKEN matches contract warmup.eos_token', () => {
+  it("WARMUP_EOS_TOKEN matches contract warmup.eos_token", () => {
     assert.strictEqual(WARMUP_EOS_TOKEN, fixture.warmup.eos_token);
   });
 
-  it('WARMUP_DUMMY_PHONEME matches contract warmup.dummy_phoneme', () => {
+  it("WARMUP_DUMMY_PHONEME matches contract warmup.dummy_phoneme", () => {
     assert.strictEqual(WARMUP_DUMMY_PHONEME, fixture.warmup.dummy_phoneme);
   });
 
-  it('WARMUP_NOISE_SCALE matches contract warmup.noise_scale (within 1e-9)', () => {
+  it("WARMUP_NOISE_SCALE matches contract warmup.noise_scale (within 1e-9)", () => {
     assert.ok(
       Math.abs(WARMUP_NOISE_SCALE - fixture.warmup.noise_scale) < 1e-9,
-      `WARMUP_NOISE_SCALE=${WARMUP_NOISE_SCALE} vs fixture=${fixture.warmup.noise_scale}`,
+      `WARMUP_NOISE_SCALE=${WARMUP_NOISE_SCALE} vs fixture=${fixture.warmup.noise_scale}`
     );
   });
 
-  it('WARMUP_LENGTH_SCALE matches contract warmup.length_scale (within 1e-9)', () => {
+  it("WARMUP_LENGTH_SCALE matches contract warmup.length_scale (within 1e-9)", () => {
     assert.ok(
       Math.abs(WARMUP_LENGTH_SCALE - fixture.warmup.length_scale) < 1e-9,
-      `WARMUP_LENGTH_SCALE=${WARMUP_LENGTH_SCALE} vs fixture=${fixture.warmup.length_scale}`,
+      `WARMUP_LENGTH_SCALE=${WARMUP_LENGTH_SCALE} vs fixture=${fixture.warmup.length_scale}`
     );
   });
 
-  it('WARMUP_NOISE_W matches contract warmup.noise_w (within 1e-9)', () => {
+  it("WARMUP_NOISE_W matches contract warmup.noise_w (within 1e-9)", () => {
     assert.ok(
       Math.abs(WARMUP_NOISE_W - fixture.warmup.noise_w) < 1e-9,
-      `WARMUP_NOISE_W=${WARMUP_NOISE_W} vs fixture=${fixture.warmup.noise_w}`,
+      `WARMUP_NOISE_W=${WARMUP_NOISE_W} vs fixture=${fixture.warmup.noise_w}`
     );
   });
 });
@@ -128,35 +125,32 @@ describe('ORT session contract — WASM/JS warmup exported constants', () => {
 // it diverges across native runtimes.
 // ---------------------------------------------------------------------------
 
-describe('ORT session contract — fixture-only session pins (WASM N/A)', () => {
-  it('graph_optimization_level is ORT_ENABLE_ALL on the canonical contract', () => {
-    assert.strictEqual(
-      fixture.session.graph_optimization_level,
-      'ORT_ENABLE_ALL',
-    );
+describe("ORT session contract — fixture-only session pins (WASM N/A)", () => {
+  it("graph_optimization_level is ORT_ENABLE_ALL on the canonical contract", () => {
+    assert.strictEqual(fixture.session.graph_optimization_level, "ORT_ENABLE_ALL");
   });
 
-  it('execution_mode is SEQUENTIAL on the canonical contract', () => {
-    assert.strictEqual(fixture.session.execution_mode, 'SEQUENTIAL');
+  it("execution_mode is SEQUENTIAL on the canonical contract", () => {
+    assert.strictEqual(fixture.session.execution_mode, "SEQUENTIAL");
   });
 
-  it('max_intra_threads is 4 on the canonical contract', () => {
+  it("max_intra_threads is 4 on the canonical contract", () => {
     assert.strictEqual(fixture.session.max_intra_threads, 4);
   });
 
-  it('inter_op_threads is 1 on the canonical contract', () => {
+  it("inter_op_threads is 1 on the canonical contract", () => {
     assert.strictEqual(fixture.session.inter_op_threads, 1);
   });
 
-  it('dynamic_block_base is 4 on the canonical contract', () => {
+  it("dynamic_block_base is 4 on the canonical contract", () => {
     assert.strictEqual(fixture.session.dynamic_block_base, 4);
   });
 
-  it('enable_cpu_mem_arena is true on the canonical contract', () => {
+  it("enable_cpu_mem_arena is true on the canonical contract", () => {
     assert.strictEqual(fixture.session.enable_cpu_mem_arena, true);
   });
 
-  it('enable_memory_pattern is true on the canonical contract', () => {
+  it("enable_memory_pattern is true on the canonical contract", () => {
     assert.strictEqual(fixture.session.enable_memory_pattern, true);
   });
 });
@@ -170,17 +164,17 @@ describe('ORT session contract — fixture-only session pins (WASM N/A)', () => 
 // IS implemented (src/python/piper_train/ort_utils.py).
 // ---------------------------------------------------------------------------
 
-describe('ORT session contract — fixture-only cache pins (WASM N/A)', () => {
+describe("ORT session contract — fixture-only cache pins (WASM N/A)", () => {
   it('cache.optimized_extension is "opt.onnx"', () => {
-    assert.strictEqual(fixture.cache.optimized_extension, 'opt.onnx');
+    assert.strictEqual(fixture.cache.optimized_extension, "opt.onnx");
   });
 
   it('cache.sentinel_extension is "opt.onnx.ok"', () => {
-    assert.strictEqual(fixture.cache.sentinel_extension, 'opt.onnx.ok');
+    assert.strictEqual(fixture.cache.sentinel_extension, "opt.onnx.ok");
   });
 
   it('cache.sentinel_content is "ok"', () => {
-    assert.strictEqual(fixture.cache.sentinel_content, 'ok');
+    assert.strictEqual(fixture.cache.sentinel_content, "ok");
   });
 });
 
@@ -193,16 +187,16 @@ describe('ORT session contract — fixture-only cache pins (WASM N/A)', () => {
 // honoured.
 // ---------------------------------------------------------------------------
 
-describe('ORT session contract — fixture-only env var pins (WASM N/A)', () => {
+describe("ORT session contract — fixture-only env var pins (WASM N/A)", () => {
   it('env_vars.disable_warmup is "PIPER_DISABLE_WARMUP"', () => {
-    assert.strictEqual(fixture.env_vars.disable_warmup, 'PIPER_DISABLE_WARMUP');
+    assert.strictEqual(fixture.env_vars.disable_warmup, "PIPER_DISABLE_WARMUP");
   });
 
   it('env_vars.disable_cache is "PIPER_DISABLE_CACHE"', () => {
-    assert.strictEqual(fixture.env_vars.disable_cache, 'PIPER_DISABLE_CACHE');
+    assert.strictEqual(fixture.env_vars.disable_cache, "PIPER_DISABLE_CACHE");
   });
 
   it('env_vars.intra_threads is "PIPER_INTRA_THREADS"', () => {
-    assert.strictEqual(fixture.env_vars.intra_threads, 'PIPER_INTRA_THREADS');
+    assert.strictEqual(fixture.env_vars.intra_threads, "PIPER_INTRA_THREADS");
   });
 });

@@ -63,7 +63,7 @@ export function durationsToTiming(
   durations,
   sampleRate,
   hopLength = DEFAULT_HOP_LENGTH,
-  phonemeTokens = null,
+  phonemeTokens = null
 ) {
   if (!Number.isFinite(sampleRate) || sampleRate <= 0) {
     throw new TypeError(`sampleRate must be a positive finite number (Hz), got ${sampleRate}`);
@@ -71,9 +71,9 @@ export function durationsToTiming(
   if (!Number.isFinite(hopLength) || hopLength <= 0) {
     throw new TypeError(`hopLength must be a positive finite number (samples), got ${hopLength}`);
   }
-  if (durations == null || typeof durations.length !== 'number') {
+  if (durations == null || typeof durations.length !== "number") {
     throw new TypeError(
-      'durations must be a Float32Array, Array, or indexable with a numeric length property',
+      "durations must be a Float32Array, Array, or indexable with a numeric length property"
     );
   }
 
@@ -81,11 +81,11 @@ export function durationsToTiming(
 
   if (phonemeTokens != null) {
     if (!Array.isArray(phonemeTokens)) {
-      throw new TypeError('phonemeTokens must be an array of strings');
+      throw new TypeError("phonemeTokens must be an array of strings");
     }
     if (phonemeTokens.length !== length) {
       throw new RangeError(
-        `length mismatch: durations has ${length} elements but phonemeTokens has ${phonemeTokens.length}`,
+        `length mismatch: durations has ${length} elements but phonemeTokens has ${phonemeTokens.length}`
       );
     }
   }
@@ -102,7 +102,7 @@ export function durationsToTiming(
     const raw = durations[i];
     if (raw < 0) {
       globalThis.console?.warn?.(
-        `negative phoneme duration clamped to 0 (index=${i}, value=${raw})`,
+        `negative phoneme duration clamped to 0 (index=${i}, value=${raw})`
       );
     }
     const frames = raw > 0 ? raw : 0;
@@ -161,13 +161,14 @@ export function timingToJsonCompact(result) {
  */
 export function timingToTsv(result) {
   const rows = new Array(result.phonemes.length + 1);
-  rows[0] = 'start_ms\tend_ms\tduration_ms\tphoneme';
+  rows[0] = "start_ms\tend_ms\tduration_ms\tphoneme";
   for (let i = 0; i < result.phonemes.length; i++) {
     const p = result.phonemes[i];
-    const escaped = String(p.phoneme).replace(/\t/g, '\\t').replace(/\n/g, '\\n');
-    rows[i + 1] = `${p.start_ms.toFixed(3)}\t${p.end_ms.toFixed(3)}\t${p.duration_ms.toFixed(3)}\t${escaped}`;
+    const escaped = String(p.phoneme).replace(/\t/g, "\\t").replace(/\n/g, "\\n");
+    rows[i + 1] =
+      `${p.start_ms.toFixed(3)}\t${p.end_ms.toFixed(3)}\t${p.duration_ms.toFixed(3)}\t${escaped}`;
   }
-  return rows.join('\n') + '\n';
+  return rows.join("\n") + "\n";
 }
 
 /**
@@ -179,7 +180,7 @@ export function timingToTsv(result) {
  * @returns {string}
  */
 export function timingToSrt(result) {
-  let buf = '';
+  let buf = "";
   for (let i = 0; i < result.phonemes.length; i++) {
     const p = result.phonemes[i];
     const idx = i + 1;
@@ -207,13 +208,12 @@ function formatSrtTimestamp(ms) {
   const mins = totalMins % 60;
   const hours = Math.floor(totalMins / 60);
 
-  const hh = String(hours).padStart(2, '0');
-  const mm = String(mins).padStart(2, '0');
-  const ss = String(secs).padStart(2, '0');
-  const mmm = String(millis).padStart(3, '0');
+  const hh = String(hours).padStart(2, "0");
+  const mm = String(mins).padStart(2, "0");
+  const ss = String(secs).padStart(2, "0");
+  const mmm = String(millis).padStart(3, "0");
   return `${hh}:${mm}:${ss},${mmm}`;
 }
-
 
 /**
  * Build a reverse lookup map from phoneme ID to phoneme token string.
@@ -234,10 +234,14 @@ function formatSrtTimestamp(ms) {
  */
 export function buildPhonemeIdToTokenMap(phonemeIdMap, puaToMultiChar = null) {
   const reverse = {};
-  if (!phonemeIdMap) return reverse;
+  if (!phonemeIdMap) {
+    return reverse;
+  }
 
   for (const [char, ids] of Object.entries(phonemeIdMap)) {
-    if (!Array.isArray(ids)) continue;
+    if (!Array.isArray(ids)) {
+      continue;
+    }
 
     // Determine display name for this character.
     let display = char;
@@ -245,13 +249,13 @@ export function buildPhonemeIdToTokenMap(phonemeIdMap, puaToMultiChar = null) {
       display = puaToMultiChar[char];
     } else if (char.length === 1) {
       const code = char.charCodeAt(0);
-      if (code >= 0xE000 && code <= 0xF8FF) {
-        display = `U+${code.toString(16).toUpperCase().padStart(4, '0')}`;
+      if (code >= 0xe000 && code <= 0xf8ff) {
+        display = `U+${code.toString(16).toUpperCase().padStart(4, "0")}`;
       }
     }
 
     for (const id of ids) {
-      if (typeof id === 'number' && !(id in reverse)) {
+      if (typeof id === "number" && !(id in reverse)) {
         reverse[id] = display;
       }
     }

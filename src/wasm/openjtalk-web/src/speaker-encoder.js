@@ -36,19 +36,17 @@ export class SpeakerEncoder {
     const instance = new SpeakerEncoder();
     const ort = options.ort || globalThis.ort;
     if (!ort) {
-      throw new Error(
-        'onnxruntime-web is required. Pass it via options.ort or load it globally.'
-      );
+      throw new Error("onnxruntime-web is required. Pass it via options.ort or load it globally.");
     }
     instance._ort = ort;
 
     if (!options.modelUrl) {
-      throw new Error('options.modelUrl is required for SpeakerEncoder');
+      throw new Error("options.modelUrl is required for SpeakerEncoder");
     }
 
     instance._session = await ort.InferenceSession.create(options.modelUrl, {
-      executionProviders: ['wasm'],
-      graphOptimizationLevel: 'all',
+      executionProviders: ["wasm"],
+      graphOptimizationLevel: "all",
     });
 
     return instance;
@@ -65,13 +63,13 @@ export class SpeakerEncoder {
    */
   async encode(audio, sampleRate) {
     if (!this._session) {
-      throw new Error('SpeakerEncoder not initialized. Call SpeakerEncoder.initialize() first.');
+      throw new Error("SpeakerEncoder not initialized. Call SpeakerEncoder.initialize() first.");
     }
 
     let samples;
     let rate;
 
-    if (typeof AudioBuffer !== 'undefined' && audio instanceof AudioBuffer) {
+    if (typeof AudioBuffer !== "undefined" && audio instanceof AudioBuffer) {
       // Extract first channel
       samples = audio.getChannelData(0);
       rate = audio.sampleRate;
@@ -79,29 +77,28 @@ export class SpeakerEncoder {
       samples = audio;
       rate = sampleRate || MEL_SAMPLE_RATE;
     } else {
-      throw new TypeError('audio must be an AudioBuffer or Float32Array');
+      throw new TypeError("audio must be an AudioBuffer or Float32Array");
     }
 
     if (samples.length === 0) {
-      throw new Error('Audio samples cannot be empty');
+      throw new Error("Audio samples cannot be empty");
     }
 
     // Resample to 16kHz if needed
-    const resampled = rate !== MEL_SAMPLE_RATE
-      ? resampleLinear(samples, rate, MEL_SAMPLE_RATE)
-      : samples;
+    const resampled =
+      rate !== MEL_SAMPLE_RATE ? resampleLinear(samples, rate, MEL_SAMPLE_RATE) : samples;
 
     // Compute mel spectrogram
     const mel = computeMelSpectrogram(resampled);
     const nFrames = mel.length / MEL_N_MELS;
 
     if (nFrames === 0) {
-      throw new Error('Audio is too short for mel spectrogram computation');
+      throw new Error("Audio is too short for mel spectrogram computation");
     }
 
     // Create input tensor: [1, n_mels, n_frames]
     const ort = this._ort;
-    const melTensor = new ort.Tensor('float32', mel, [1, MEL_N_MELS, nFrames]);
+    const melTensor = new ort.Tensor("float32", mel, [1, MEL_N_MELS, nFrames]);
 
     const results = await this._session.run({ input: melTensor });
     const outputTensor = results.output || results[Object.keys(results)[0]];
@@ -114,7 +111,7 @@ export class SpeakerEncoder {
    */
   dispose() {
     if (this._session) {
-      if (typeof this._session.release === 'function') {
+      if (typeof this._session.release === "function") {
         this._session.release();
       }
       this._session = null;
@@ -135,7 +132,9 @@ export class SpeakerEncoder {
  * @returns {Float32Array}
  */
 function resampleLinear(samples, fromRate, toRate) {
-  if (fromRate === toRate) return samples;
+  if (fromRate === toRate) {
+    return samples;
+  }
 
   const ratio = fromRate / toRate;
   const outputLen = Math.ceil(samples.length / ratio);
@@ -170,9 +169,8 @@ export function computeMelSpectrogram(samples) {
   const melFilters = createMelFilterbank();
   const window = hannWindow(MEL_N_FFT);
 
-  const nFrames = samples.length >= MEL_N_FFT
-    ? Math.floor((samples.length - MEL_N_FFT) / MEL_HOP_LENGTH) + 1
-    : 0;
+  const nFrames =
+    samples.length >= MEL_N_FFT ? Math.floor((samples.length - MEL_N_FFT) / MEL_HOP_LENGTH) + 1 : 0;
 
   const fftBins = Math.floor(MEL_N_FFT / 2) + 1;
   const melSpec = new Float32Array(MEL_N_MELS * nFrames);
@@ -184,12 +182,12 @@ export function computeMelSpectrogram(samples) {
     // mirrors Python's F32 alias to keep checksums byte-for-byte equal).
     const powerSpec = new Float32Array(fftBins);
     for (let k = 0; k < fftBins; k++) {
-      let real = fr32(0), imag = fr32(0);
-      const freq = fr32(fr32(-2 * Math.PI) * fr32(k) / fr32(MEL_N_FFT));
+      let real = fr32(0),
+        imag = fr32(0);
+      const freq = fr32((fr32(-2 * Math.PI) * fr32(k)) / fr32(MEL_N_FFT));
       for (let n = 0; n < MEL_N_FFT; n++) {
-        const winSample = (start + n < samples.length)
-          ? fr32(fr32(samples[start + n]) * fr32(window[n]))
-          : fr32(0);
+        const winSample =
+          start + n < samples.length ? fr32(fr32(samples[start + n]) * fr32(window[n])) : fr32(0);
         const angle = fr32(freq * fr32(n));
         real = fr32(real + fr32(winSample * fr32(Math.cos(angle))));
         imag = fr32(imag + fr32(winSample * fr32(Math.sin(angle))));
@@ -216,7 +214,7 @@ export function computeMelSpectrogram(samples) {
 export function hannWindow(length) {
   const window = new Float32Array(length);
   for (let n = 0; n < length; n++) {
-    window[n] = fr32(fr32(0.5) * fr32(1 - Math.cos(fr32(2 * Math.PI) * fr32(n) / fr32(length))));
+    window[n] = fr32(fr32(0.5) * fr32(1 - Math.cos((fr32(2 * Math.PI) * fr32(n)) / fr32(length))));
   }
   return window;
 }
@@ -232,17 +230,17 @@ export function createMelFilterbank() {
   for (let i = 0; i <= MEL_N_MELS + 1; i++) {
     // Python: F32(mel_fmin) + (mel_fmax - mel_fmin) * F32(i) / F32(N_MELS + 1)
     melPoints.push(
-      fr32(melFmin + fr32(fr32(melFmax - melFmin) * fr32(i) / fr32(MEL_N_MELS + 1)))
+      fr32(melFmin + fr32((fr32(melFmax - melFmin) * fr32(i)) / fr32(MEL_N_MELS + 1)))
     );
   }
 
-  const binPoints = melPoints.map(m =>
-    fr32(fr32(melToHz(m)) * fr32(MEL_N_FFT) / fr32(MEL_SAMPLE_RATE))
+  const binPoints = melPoints.map((m) =>
+    fr32((fr32(melToHz(m)) * fr32(MEL_N_FFT)) / fr32(MEL_SAMPLE_RATE))
   );
 
   for (let m = 0; m < MEL_N_MELS; m++) {
     // Convert to integer bin indices (matching Python's np.floor().astype(int))
-    let left = Math.floor(binPoints[m]);
+    const left = Math.floor(binPoints[m]);
     let center = Math.floor(binPoints[m + 1]);
     let right = Math.floor(binPoints[m + 2]);
 

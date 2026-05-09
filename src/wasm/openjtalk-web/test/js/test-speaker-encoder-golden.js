@@ -15,25 +15,25 @@
  * Run: node --test src/wasm/openjtalk-web/test/js/test-speaker-encoder-golden.js
  */
 
-import { describe, it } from 'node:test';
-import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { dirname, join, resolve } from 'node:path';
+import { describe, it } from "node:test";
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, join, resolve } from "node:path";
 
 import {
   computeMelSpectrogram,
   createMelFilterbank,
   hannWindow,
   resampleLinearForTesting,
-} from '../../src/speaker-encoder.js';
+} from "../../src/speaker-encoder.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const REPO_ROOT = resolve(__dirname, '..', '..', '..', '..', '..');
-const FIXTURE_PATH = join(REPO_ROOT, 'test', 'fixtures', 'speaker_encoder_golden.json');
+const REPO_ROOT = resolve(__dirname, "..", "..", "..", "..", "..");
+const FIXTURE_PATH = join(REPO_ROOT, "test", "fixtures", "speaker_encoder_golden.json");
 
-const FIXTURE = JSON.parse(readFileSync(FIXTURE_PATH, 'utf8'));
+const FIXTURE = JSON.parse(readFileSync(FIXTURE_PATH, "utf8"));
 
 const SR = FIXTURE.mel_params.sr;
 const N_FFT = FIXTURE.mel_params.n_fft;
@@ -47,13 +47,16 @@ const N_MELS = FIXTURE.mel_params.n_mels;
 const TOLERANCE = 0.02;
 
 function l2RelativeDistance(actual, expected) {
-  let num = 0, den = 0;
+  let num = 0,
+    den = 0;
   for (let i = 0; i < actual.length; i++) {
     const d = actual[i] - expected[i];
     num += d * d;
     den += expected[i] * expected[i];
   }
-  if (den === 0) return num === 0 ? 0 : Infinity;
+  if (den === 0) {
+    return num === 0 ? 0 : Infinity;
+  }
   return Math.sqrt(num) / Math.sqrt(den);
 }
 
@@ -67,7 +70,7 @@ function generateSine(freqHz, durationS, sr) {
   const n = Math.floor(durationS * sr);
   const out = new Float32Array(n);
   for (let i = 0; i < n; i++) {
-    out[i] = fr32(Math.sin(fr32(fr32(2 * Math.PI) * fr32(freqHz) * fr32(i) / fr32(sr))));
+    out[i] = fr32(Math.sin(fr32((fr32(2 * Math.PI) * fr32(freqHz) * fr32(i)) / fr32(sr))));
   }
   return out;
 }
@@ -78,7 +81,7 @@ function generateMultitone(freqs, durationS, sr) {
   for (let i = 0; i < n; i++) {
     let acc = fr32(0);
     for (const f of freqs) {
-      acc = fr32(acc + fr32(Math.sin(fr32(fr32(2 * Math.PI) * fr32(f) * fr32(i) / fr32(sr)))));
+      acc = fr32(acc + fr32(Math.sin(fr32((fr32(2 * Math.PI) * fr32(f) * fr32(i)) / fr32(sr)))));
     }
     out[i] = acc;
   }
@@ -86,7 +89,9 @@ function generateMultitone(freqs, durationS, sr) {
   let peak = 0;
   for (let i = 0; i < n; i++) {
     const a = Math.abs(out[i]);
-    if (a > peak) peak = a;
+    if (a > peak) {
+      peak = a;
+    }
   }
   if (peak > 0) {
     for (let i = 0; i < n; i++) {
@@ -100,8 +105,8 @@ function generateMultitone(freqs, durationS, sr) {
 // Tests
 // ---------------------------------------------------------------------------
 
-describe('Speaker Encoder — mel parity (layer 1)', () => {
-  it('hann window matches fixture (sampled values, 1e-6 abs tol)', () => {
+describe("Speaker Encoder — mel parity (layer 1)", () => {
+  it("hann window matches fixture (sampled values, 1e-6 abs tol)", () => {
     const w = hannWindow(N_FFT);
     assert.equal(w.length, FIXTURE.hann_window.length);
 
@@ -119,10 +124,10 @@ describe('Speaker Encoder — mel parity (layer 1)', () => {
         `hann_window last_5[${i}]: ${last5[i]} vs ${FIXTURE.hann_window.last_5[i]}`
       );
     }
-    assert.ok(Math.abs(mid - FIXTURE.hann_window.mid_value) < 1e-6, 'hann_window mid');
+    assert.ok(Math.abs(mid - FIXTURE.hann_window.mid_value) < 1e-6, "hann_window mid");
   });
 
-  it('mel filterbank shape and band sums match fixture', () => {
+  it("mel filterbank shape and band sums match fixture", () => {
     const fb = createMelFilterbank();
     const fftBins = N_FFT / 2 + 1;
     assert.equal(fb.length, N_MELS * fftBins);
@@ -140,7 +145,9 @@ describe('Speaker Encoder — mel parity (layer 1)', () => {
     }
 
     let total = 0;
-    for (const v of fb) total += v;
+    for (const v of fb) {
+      total += v;
+    }
     assert.ok(
       Math.abs(total - FIXTURE.mel_filterbank.total_sum) < 1e-3,
       `mel filterbank total drift: js=${total} py=${FIXTURE.mel_filterbank.total_sum}`
@@ -153,7 +160,7 @@ describe('Speaker Encoder — mel parity (layer 1)', () => {
   // test so the parity gate exists, and the sampled-values sub-test below
   // gives a fast smoke without paying the full DFT cost.
   for (const tc of FIXTURE.test_cases) {
-    if (tc.id === 'resample_48k_to_16k') {
+    if (tc.id === "resample_48k_to_16k") {
       it(`resample_linear matches fixture (${tc.id})`, () => {
         const audio48k = generateSine(tc.audio_params.freq_hz, tc.audio_params.duration_s, 48000);
         assert.equal(audio48k.length, tc.input_samples_count);
@@ -184,16 +191,20 @@ describe('Speaker Encoder — mel parity (layer 1)', () => {
       let audio;
       if (tc.audio_params.freqs_hz) {
         audio = generateMultitone(
-          tc.audio_params.freqs_hz, tc.audio_params.duration_s, tc.audio_params.sr
+          tc.audio_params.freqs_hz,
+          tc.audio_params.duration_s,
+          tc.audio_params.sr
         );
       } else {
         audio = generateSine(
-          tc.audio_params.freq_hz, tc.audio_params.duration_s, tc.audio_params.sr
+          tc.audio_params.freq_hz,
+          tc.audio_params.duration_s,
+          tc.audio_params.sr
         );
       }
       assert.equal(audio.length, tc.audio_samples_count);
 
-      const fullDft = process.env.PIPER_SPEAKER_ENCODER_FULL_DFT === '1';
+      const fullDft = process.env.PIPER_SPEAKER_ENCODER_FULL_DFT === "1";
       if (!fullDft) {
         // Cheap smoke: 5-frame slice. Shape only, no values.
         const slice = audio.slice(0, N_FFT + 4 * 160);
@@ -204,23 +215,24 @@ describe('Speaker Encoder — mel parity (layer 1)', () => {
 
       const mel = computeMelSpectrogram(audio);
       const nFrames = mel.length / N_MELS;
-      assert.equal(nFrames, tc.expected_mel_shape[1], 'mel n_frames drift');
-      assert.equal(N_MELS, tc.expected_mel_shape[0], 'mel n_mels drift');
+      assert.equal(nFrames, tc.expected_mel_shape[1], "mel n_frames drift");
+      assert.equal(N_MELS, tc.expected_mel_shape[0], "mel n_mels drift");
 
       // Sampled-value parity: same gate the Rust runtime uses
       // (test_speaker_encoder_golden.rs:434, tol=0.02).
       const expected = tc.mel_sampled_every_10;
-      assert.ok(Array.isArray(expected) && expected.length > 0,
-        'fixture missing mel_sampled_every_10 for ' + tc.id);
+      assert.ok(
+        Array.isArray(expected) && expected.length > 0,
+        "fixture missing mel_sampled_every_10 for " + tc.id
+      );
 
       const actualSampled = [];
-      for (let i = 0; i < mel.length; i += 10) actualSampled.push(mel[i]);
+      for (let i = 0; i < mel.length; i += 10) {
+        actualSampled.push(mel[i]);
+      }
 
       const minLen = Math.min(actualSampled.length, expected.length);
-      const dist = l2RelativeDistance(
-        actualSampled.slice(0, minLen),
-        expected.slice(0, minLen),
-      );
+      const dist = l2RelativeDistance(actualSampled.slice(0, minLen), expected.slice(0, minLen));
       assert.ok(
         dist < TOLERANCE,
         `${tc.id}: mel sampled L2 distance ${dist.toFixed(6)} >= ${TOLERANCE} (2% tol)`

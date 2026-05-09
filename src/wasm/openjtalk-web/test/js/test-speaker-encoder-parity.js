@@ -18,13 +18,13 @@
  *   - C#:     src/csharp/PiperPlus.Core.Tests/SpeakerEncoderTests.cs
  */
 
-import { describe, it } from 'node:test';
-import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { dirname, resolve } from 'node:path';
+import { describe, it } from "node:test";
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, resolve } from "node:path";
 
-import { _internalForTesting } from '../../src/speaker-encoder.js';
+import { _internalForTesting } from "../../src/speaker-encoder.js";
 
 const {
   MEL_SAMPLE_RATE: SR,
@@ -42,16 +42,15 @@ const {
 } = _internalForTesting;
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const FIXTURE_PATH = resolve(
-  __dirname,
-  '../../../../../test/fixtures/speaker_encoder_golden.json',
-);
+const FIXTURE_PATH = resolve(__dirname, "../../../../../test/fixtures/speaker_encoder_golden.json");
 
-const fixture = JSON.parse(readFileSync(FIXTURE_PATH, 'utf-8'));
+const fixture = JSON.parse(readFileSync(FIXTURE_PATH, "utf-8"));
 
 const findCase = (id) => {
   const tc = fixture.test_cases.find((c) => c.id === id);
-  if (!tc) throw new Error(`fixture is missing test case '${id}'`);
+  if (!tc) {
+    throw new Error(`fixture is missing test case '${id}'`);
+  }
   return tc;
 };
 
@@ -75,20 +74,24 @@ const generateMultitone = (freqs, durationS, sr) => {
   let peak = 0;
   for (let i = 0; i < n; i++) {
     const a = Math.abs(samples[i]);
-    if (a > peak) peak = a;
+    if (a > peak) {
+      peak = a;
+    }
   }
   if (peak > 0) {
-    for (let i = 0; i < n; i++) samples[i] /= peak;
+    for (let i = 0; i < n; i++) {
+      samples[i] /= peak;
+    }
   }
   return samples;
 };
 
-describe('Speaker Encoder mel parity (WASM/JS ↔ canonical Python)', () => {
+describe("Speaker Encoder mel parity (WASM/JS ↔ canonical Python)", () => {
   // -----------------------------------------------------------------
   // Mel parameters — must match all runtimes
   // -----------------------------------------------------------------
 
-  it('mel_params match runtime constants', () => {
+  it("mel_params match runtime constants", () => {
     const p = fixture.mel_params;
     assert.strictEqual(p.sr, SR);
     assert.strictEqual(p.n_fft, NFFT);
@@ -102,39 +105,39 @@ describe('Speaker Encoder mel parity (WASM/JS ↔ canonical Python)', () => {
   // Hann window
   // -----------------------------------------------------------------
 
-  it('Hann window first 5 samples match', () => {
+  it("Hann window first 5 samples match", () => {
     const hw = fixture.hann_window;
     const w = hannWindow(hw.length);
     for (let i = 0; i < hw.first_5.length; i++) {
       assert.ok(
         Math.abs(w[i] - hw.first_5[i]) < 1e-5,
-        `hann[${i}]: expected ${hw.first_5[i]}, got ${w[i]}`,
+        `hann[${i}]: expected ${hw.first_5[i]}, got ${w[i]}`
       );
     }
   });
 
-  it('Hann window last 5 samples match', () => {
+  it("Hann window last 5 samples match", () => {
     const hw = fixture.hann_window;
     const w = hannWindow(hw.length);
     for (let i = 0; i < hw.last_5.length; i++) {
       const idx = hw.length - 5 + i;
       assert.ok(
         Math.abs(w[idx] - hw.last_5[i]) < 1e-5,
-        `hann[${idx}]: expected ${hw.last_5[i]}, got ${w[idx]}`,
+        `hann[${idx}]: expected ${hw.last_5[i]}, got ${w[idx]}`
       );
     }
   });
 
-  it('Hann window mid value is 1.0', () => {
+  it("Hann window mid value is 1.0", () => {
     const hw = fixture.hann_window;
     const w = hannWindow(hw.length);
     assert.ok(
       Math.abs(w[hw.length / 2] - hw.mid_value) < 1e-5,
-      `hann mid: expected ${hw.mid_value}, got ${w[hw.length / 2]}`,
+      `hann mid: expected ${hw.mid_value}, got ${w[hw.length / 2]}`
     );
   });
 
-  it('Hann window endpoints are near zero', () => {
+  it("Hann window endpoints are near zero", () => {
     const w = hannWindow(NFFT);
     assert.strictEqual(w.length, NFFT);
     assert.ok(Math.abs(w[0]) < 1e-6);
@@ -144,7 +147,7 @@ describe('Speaker Encoder mel parity (WASM/JS ↔ canonical Python)', () => {
   // Mel filterbank
   // -----------------------------------------------------------------
 
-  it('mel filterbank has shape [80, 257]', () => {
+  it("mel filterbank has shape [80, 257]", () => {
     const fftBins = NFFT / 2 + 1;
     const expected = fixture.mel_filterbank.shape;
     const fb = createMelFilterbank();
@@ -153,7 +156,7 @@ describe('Speaker Encoder mel parity (WASM/JS ↔ canonical Python)', () => {
     assert.strictEqual(fb.length, N_MELS * fftBins);
   });
 
-  it('mel filterbank band sums match (within 2%)', () => {
+  it("mel filterbank band sums match (within 2%)", () => {
     const expectedSums = fixture.mel_filterbank.band_sums;
     const fb = createMelFilterbank();
     const fftBins = NFFT / 2 + 1;
@@ -168,29 +171,33 @@ describe('Speaker Encoder mel parity (WASM/JS ↔ canonical Python)', () => {
           : Math.abs(bandSum - expectedSums[m]);
       assert.ok(
         relErr < 0.02,
-        `band[${m}]: expected ${expectedSums[m]}, got ${bandSum} (rel err ${relErr.toFixed(6)})`,
+        `band[${m}]: expected ${expectedSums[m]}, got ${bandSum} (rel err ${relErr.toFixed(6)})`
       );
     }
   });
 
-  it('mel filterbank total sum matches (within 2%)', () => {
+  it("mel filterbank total sum matches (within 2%)", () => {
     const expectedTotal = fixture.mel_filterbank.total_sum;
     const fb = createMelFilterbank();
     let total = 0;
-    for (let i = 0; i < fb.length; i++) total += fb[i];
+    for (let i = 0; i < fb.length; i++) {
+      total += fb[i];
+    }
     const relErr = Math.abs((total - expectedTotal) / expectedTotal);
     assert.ok(
       relErr < 0.02,
-      `total: expected ${expectedTotal}, got ${total} (rel err ${relErr.toFixed(6)})`,
+      `total: expected ${expectedTotal}, got ${total} (rel err ${relErr.toFixed(6)})`
     );
   });
 
-  it('all filterbank bands have non-zero total weight', () => {
+  it("all filterbank bands have non-zero total weight", () => {
     const fb = createMelFilterbank();
     const fftBins = NFFT / 2 + 1;
     for (let m = 0; m < N_MELS; m++) {
       let bandSum = 0;
-      for (let k = 0; k < fftBins; k++) bandSum += fb[m * fftBins + k];
+      for (let k = 0; k < fftBins; k++) {
+        bandSum += fb[m * fftBins + k];
+      }
       assert.ok(bandSum > 0, `band[${m}] has zero total weight`);
     }
   });
@@ -218,19 +225,16 @@ describe('Speaker Encoder mel parity (WASM/JS ↔ canonical Python)', () => {
     const diff = Math.abs(actual - expected);
     assert.ok(
       diff < LOG_DIFF_TOL,
-      `${name}: golden=${expected}, js=${actual} (diff ${diff.toFixed(4)})`,
+      `${name}: golden=${expected}, js=${actual} (diff ${diff.toFixed(4)})`
     );
   };
 
   const bottomCornerNegative = (name, actual) => {
-    assert.ok(
-      actual < 0,
-      `${name} should be negative (log-mel), got ${actual}`,
-    );
+    assert.ok(actual < 0, `${name} should be negative (log-mel), got ${actual}`);
   };
 
-  it('sine_440hz_1s: mel shape matches', () => {
-    const tc = findCase('sine_440hz_1s');
+  it("sine_440hz_1s: mel shape matches", () => {
+    const tc = findCase("sine_440hz_1s");
     const audio = generateSine(440, 1.0, SR);
     assert.strictEqual(audio.length, tc.audio_samples_count);
     const mel = computeMelSpectrogram(audio);
@@ -239,25 +243,25 @@ describe('Speaker Encoder mel parity (WASM/JS ↔ canonical Python)', () => {
     assert.strictEqual(tc.expected_mel_shape[1], nFrames);
   });
 
-  it('sine_440hz_1s: mel top corners agree with golden (log-diff < 2.0)', () => {
-    const tc = findCase('sine_440hz_1s');
+  it("sine_440hz_1s: mel top corners agree with golden (log-diff < 2.0)", () => {
+    const tc = findCase("sine_440hz_1s");
     const corners = tc.mel_corner_values;
     const audio = generateSine(440, 1.0, SR);
     const mel = computeMelSpectrogram(audio);
     const nFrames = mel.length / N_MELS;
-    topCornerAbsDiff('top_left', mel[0], corners.top_left);
-    topCornerAbsDiff('top_right', mel[nFrames - 1], corners.top_right);
+    topCornerAbsDiff("top_left", mel[0], corners.top_left);
+    topCornerAbsDiff("top_right", mel[nFrames - 1], corners.top_right);
   });
 
-  it('sine_440hz_1s: mel bottom corners are negative', () => {
+  it("sine_440hz_1s: mel bottom corners are negative", () => {
     const audio = generateSine(440, 1.0, SR);
     const mel = computeMelSpectrogram(audio);
     const nFrames = mel.length / N_MELS;
-    bottomCornerNegative('bottom_left', mel[(N_MELS - 1) * nFrames]);
-    bottomCornerNegative('bottom_right', mel[N_MELS * nFrames - 1]);
+    bottomCornerNegative("bottom_left", mel[(N_MELS - 1) * nFrames]);
+    bottomCornerNegative("bottom_right", mel[N_MELS * nFrames - 1]);
   });
 
-  it('sine_440hz_1s: low-freq bins dominate high-freq bins (active-bins)', () => {
+  it("sine_440hz_1s: low-freq bins dominate high-freq bins (active-bins)", () => {
     const audio = generateSine(440, 1.0, SR);
     const mel = computeMelSpectrogram(audio);
     const nFrames = mel.length / N_MELS;
@@ -267,11 +271,15 @@ describe('Speaker Encoder mel parity (WASM/JS ↔ canonical Python)', () => {
     // energy than bins 60-80 (closer to 7600Hz, no signal energy).
     let lowEnergy = 0;
     let highEnergy = 0;
-    for (let m = 5; m < 25; m++) lowEnergy += mel[m * nFrames + midFrame];
-    for (let m = 60; m < N_MELS; m++) highEnergy += mel[m * nFrames + midFrame];
+    for (let m = 5; m < 25; m++) {
+      lowEnergy += mel[m * nFrames + midFrame];
+    }
+    for (let m = 60; m < N_MELS; m++) {
+      highEnergy += mel[m * nFrames + midFrame];
+    }
     assert.ok(
       lowEnergy / 20 > highEnergy / 20,
-      `low-freq mean (${(lowEnergy / 20).toFixed(2)}) should exceed high-freq mean (${(highEnergy / 20).toFixed(2)})`,
+      `low-freq mean (${(lowEnergy / 20).toFixed(2)}) should exceed high-freq mean (${(highEnergy / 20).toFixed(2)})`
     );
   });
 
@@ -279,72 +287,73 @@ describe('Speaker Encoder mel parity (WASM/JS ↔ canonical Python)', () => {
   // Mel spectrogram — sine 1000Hz, 0.5s
   // -----------------------------------------------------------------
 
-  it('sine_1000hz_0.5s: mel top corners agree with golden (log-diff < 2.0)', () => {
-    const tc = findCase('sine_1000hz_0.5s');
+  it("sine_1000hz_0.5s: mel top corners agree with golden (log-diff < 2.0)", () => {
+    const tc = findCase("sine_1000hz_0.5s");
     const corners = tc.mel_corner_values;
     const audio = generateSine(1000, 0.5, SR);
     const mel = computeMelSpectrogram(audio);
     const nFrames = mel.length / N_MELS;
-    topCornerAbsDiff('top_left', mel[0], corners.top_left);
+    topCornerAbsDiff("top_left", mel[0], corners.top_left);
     // top_right may diverge if sine cycles align; structural check only.
-    bottomCornerNegative('top_right', mel[nFrames - 1]);
+    bottomCornerNegative("top_right", mel[nFrames - 1]);
   });
 
-  it('sine_1000hz_0.5s: mel bottom corners are negative', () => {
+  it("sine_1000hz_0.5s: mel bottom corners are negative", () => {
     const audio = generateSine(1000, 0.5, SR);
     const mel = computeMelSpectrogram(audio);
     const nFrames = mel.length / N_MELS;
-    bottomCornerNegative('bottom_left', mel[(N_MELS - 1) * nFrames]);
-    bottomCornerNegative('bottom_right', mel[N_MELS * nFrames - 1]);
+    bottomCornerNegative("bottom_left", mel[(N_MELS - 1) * nFrames]);
+    bottomCornerNegative("bottom_right", mel[N_MELS * nFrames - 1]);
   });
 
   // -----------------------------------------------------------------
   // Mel spectrogram — multitone 200/600/2000Hz, 0.5s
   // -----------------------------------------------------------------
 
-  it('multitone: mel top corners agree with golden (log-diff < 2.0)', () => {
-    const tc = findCase('multitone_200_600_2000hz_0.5s');
+  it("multitone: mel top corners agree with golden (log-diff < 2.0)", () => {
+    const tc = findCase("multitone_200_600_2000hz_0.5s");
     const corners = tc.mel_corner_values;
     const audio = generateMultitone([200, 600, 2000], 0.5, SR);
     const mel = computeMelSpectrogram(audio);
     const nFrames = mel.length / N_MELS;
-    topCornerAbsDiff('top_left', mel[0], corners.top_left);
-    topCornerAbsDiff('top_right', mel[nFrames - 1], corners.top_right);
+    topCornerAbsDiff("top_left", mel[0], corners.top_left);
+    topCornerAbsDiff("top_right", mel[nFrames - 1], corners.top_right);
   });
 
-  it('multitone: mel bottom corners are negative', () => {
+  it("multitone: mel bottom corners are negative", () => {
     const audio = generateMultitone([200, 600, 2000], 0.5, SR);
     const mel = computeMelSpectrogram(audio);
     const nFrames = mel.length / N_MELS;
-    bottomCornerNegative('bottom_left', mel[(N_MELS - 1) * nFrames]);
-    bottomCornerNegative('bottom_right', mel[N_MELS * nFrames - 1]);
+    bottomCornerNegative("bottom_left", mel[(N_MELS - 1) * nFrames]);
+    bottomCornerNegative("bottom_right", mel[N_MELS * nFrames - 1]);
   });
 
-  it('multitone: mel sampled distribution matches direction (Spearman-like)', () => {
+  it("multitone: mel sampled distribution matches direction (Spearman-like)", () => {
     // Looser cross-runtime check: the rank order of sampled values should
     // correlate with the golden, even if exact values differ. Threshold
     // chosen to detect catastrophic drift, not precision-level differences.
-    const tc = findCase('multitone_200_600_2000hz_0.5s');
+    const tc = findCase("multitone_200_600_2000hz_0.5s");
     const audio = generateMultitone([200, 600, 2000], 0.5, SR);
     const mel = computeMelSpectrogram(audio);
     const sampled = [];
-    for (let i = 0; i < mel.length; i += 10) sampled.push(mel[i]);
+    for (let i = 0; i < mel.length; i += 10) {
+      sampled.push(mel[i]);
+    }
     const expected = tc.mel_sampled_every_10;
-    assert.strictEqual(
-      sampled.length,
-      expected.length,
-      'sampled length mismatch',
-    );
+    assert.strictEqual(sampled.length, expected.length, "sampled length mismatch");
     // Pearson correlation on log-mel values
     const n = sampled.length;
-    let mxA = 0, mxB = 0;
+    let mxA = 0,
+      mxB = 0;
     for (let i = 0; i < n; i++) {
       mxA += sampled[i];
       mxB += expected[i];
     }
     mxA /= n;
     mxB /= n;
-    let num = 0, denA = 0, denB = 0;
+    let num = 0,
+      denA = 0,
+      denB = 0;
     for (let i = 0; i < n; i++) {
       const a = sampled[i] - mxA;
       const b = expected[i] - mxB;
@@ -355,7 +364,7 @@ describe('Speaker Encoder mel parity (WASM/JS ↔ canonical Python)', () => {
     const corr = num / Math.sqrt(denA * denB);
     assert.ok(
       corr > 0.9,
-      `mel sampled correlation ${corr.toFixed(4)} below 0.9 — catastrophic drift`,
+      `mel sampled correlation ${corr.toFixed(4)} below 0.9 — catastrophic drift`
     );
   });
 
@@ -363,23 +372,23 @@ describe('Speaker Encoder mel parity (WASM/JS ↔ canonical Python)', () => {
   // Resampling 48k → 16k
   // -----------------------------------------------------------------
 
-  it('resample 48k→16k: output length matches', () => {
-    const tc = findCase('resample_48k_to_16k');
+  it("resample 48k→16k: output length matches", () => {
+    const tc = findCase("resample_48k_to_16k");
     const audio48k = generateSine(440, 0.1, 48000);
     assert.strictEqual(audio48k.length, tc.input_samples_count);
     const resampled = resampleLinear(audio48k, 48000, SR);
     assert.strictEqual(resampled.length, tc.expected_output_count);
   });
 
-  it('resample 48k→16k: first/last 10 values match', () => {
-    const tc = findCase('resample_48k_to_16k');
+  it("resample 48k→16k: first/last 10 values match", () => {
+    const tc = findCase("resample_48k_to_16k");
     const audio48k = generateSine(440, 0.1, 48000);
     const resampled = resampleLinear(audio48k, 48000, SR);
     const first = tc.output_first_10;
     for (let i = 0; i < first.length; i++) {
       assert.ok(
         Math.abs(resampled[i] - first[i]) < 1e-4,
-        `resample first[${i}]: expected ${first[i]}, got ${resampled[i]}`,
+        `resample first[${i}]: expected ${first[i]}, got ${resampled[i]}`
       );
     }
     const last = tc.output_last_10;
@@ -387,7 +396,7 @@ describe('Speaker Encoder mel parity (WASM/JS ↔ canonical Python)', () => {
       const idx = resampled.length - 10 + i;
       assert.ok(
         Math.abs(resampled[idx] - last[i]) < 1e-4,
-        `resample last[${i}]: expected ${last[i]}, got ${resampled[idx]}`,
+        `resample last[${i}]: expected ${last[i]}, got ${resampled[idx]}`
       );
     }
   });
@@ -396,7 +405,7 @@ describe('Speaker Encoder mel parity (WASM/JS ↔ canonical Python)', () => {
   // Edge cases
   // -----------------------------------------------------------------
 
-  it('silent audio produces finite mel values', () => {
+  it("silent audio produces finite mel values", () => {
     const silence = new Float32Array(SR);
     const mel = computeMelSpectrogram(silence);
     assert.ok(mel.length > 0);
@@ -405,13 +414,13 @@ describe('Speaker Encoder mel parity (WASM/JS ↔ canonical Python)', () => {
     }
   });
 
-  it('audio shorter than n_fft produces empty mel', () => {
+  it("audio shorter than n_fft produces empty mel", () => {
     const shortAudio = new Float32Array(100);
     const mel = computeMelSpectrogram(shortAudio);
     assert.strictEqual(mel.length, 0);
   });
 
-  it('resample with same rate returns equivalent samples', () => {
+  it("resample with same rate returns equivalent samples", () => {
     const samples = new Float32Array([1, 2, 3, 4]);
     const result = resampleLinear(samples, SR, SR);
     assert.strictEqual(result.length, samples.length);
@@ -420,13 +429,10 @@ describe('Speaker Encoder mel parity (WASM/JS ↔ canonical Python)', () => {
     }
   });
 
-  it('hzToMel ↔ melToHz round-trip', () => {
+  it("hzToMel ↔ melToHz round-trip", () => {
     const hz = 1000;
     const mel = hzToMel(hz);
     const hzBack = melToHz(mel);
-    assert.ok(
-      Math.abs(hz - hzBack) < 0.01,
-      `Hz roundtrip: ${hz} → ${mel} → ${hzBack}`,
-    );
+    assert.ok(Math.abs(hz - hzBack) < 0.01, `Hz roundtrip: ${hz} → ${mel} → ${hzBack}`);
   });
 });

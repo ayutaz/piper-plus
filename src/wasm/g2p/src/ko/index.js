@@ -22,8 +22,8 @@
 // Hangul syllable block range
 // ---------------------------------------------------------------------------
 
-const HANGUL_START = 0xAC00;
-const HANGUL_END = 0xD7A3;
+const HANGUL_START = 0xac00;
+const HANGUL_END = 0xd7a3;
 
 // Decomposition constants
 const N_INITIALS = 19;
@@ -36,33 +36,33 @@ const N_FINALS = 28;
 // ---------------------------------------------------------------------------
 
 // Aspirated consonants (shared with Chinese)
-const PUA_PH  = '\uE020'; // p\u02B0  (aspirated bilabial stop)
-const PUA_TH  = '\uE021'; // t\u02B0  (aspirated alveolar stop)
-const PUA_KH  = '\uE022'; // k\u02B0  (aspirated velar stop)
+const PUA_PH = "\uE020"; // p\u02B0  (aspirated bilabial stop)
+const PUA_TH = "\uE021"; // t\u02B0  (aspirated alveolar stop)
+const PUA_KH = "\uE022"; // k\u02B0  (aspirated velar stop)
 
 // Affricates (shared with Chinese)
-const PUA_TC  = '\uE023'; // t\u0255  (alveolo-palatal affricate)
-const PUA_TCH = '\uE024'; // t\u0255\u02B0  (aspirated alveolo-palatal affricate)
+const PUA_TC = "\uE023"; // t\u0255  (alveolo-palatal affricate)
+const PUA_TCH = "\uE024"; // t\u0255\u02B0  (aspirated alveolo-palatal affricate)
 
 // Tense consonants (Korean-only)
-const PUA_PP   = '\uE04B'; // p\u0348  (tense bilabial stop)
-const PUA_TT   = '\uE04C'; // t\u0348  (tense alveolar stop)
-const PUA_KK   = '\uE04D'; // k\u0348  (tense velar stop)
-const PUA_SS   = '\uE04E'; // s\u0348  (tense sibilant fricative)
-const PUA_TTCH = '\uE04F'; // t\u0348\u0255  (tense alveolo-palatal affricate)
+const PUA_PP = "\uE04B"; // p\u0348  (tense bilabial stop)
+const PUA_TT = "\uE04C"; // t\u0348  (tense alveolar stop)
+const PUA_KK = "\uE04D"; // k\u0348  (tense velar stop)
+const PUA_SS = "\uE04E"; // s\u0348  (tense sibilant fricative)
+const PUA_TTCH = "\uE04F"; // t\u0348\u0255  (tense alveolo-palatal affricate)
 
 // Unreleased finals (Korean-only)
-const PUA_K_UNREL = '\uE050'; // k\u031A  (unreleased velar stop)
-const PUA_T_UNREL = '\uE051'; // t\u031A  (unreleased alveolar stop)
-const PUA_P_UNREL = '\uE052'; // p\u031A  (unreleased bilabial stop)
+const PUA_K_UNREL = "\uE050"; // k\u031A  (unreleased velar stop)
+const PUA_T_UNREL = "\uE051"; // t\u031A  (unreleased alveolar stop)
+const PUA_P_UNREL = "\uE052"; // p\u031A  (unreleased bilabial stop)
 
 // Single IPA codepoints used in output
-const IPA_FLAP           = '\u027E'; // ɾ  alveolar flap (ㄹ initial)
-const IPA_ENG            = '\u014B'; // ŋ  velar nasal (ㅇ coda)
-const IPA_OPEN_E         = '\u025B'; // ɛ  open-mid front unrounded (ㅐ)
-const IPA_OPEN_MID_BACK  = '\u028C'; // ʌ  open-mid back unrounded (ㅓ)
-const IPA_CLOSE_BACK_UNR = '\u026F'; // ɯ  close back unrounded (ㅡ)
-const IPA_VELAR_APPROX   = '\u0270'; // ɰ  velar approximant (ㅢ)
+const IPA_FLAP = "\u027E"; // ɾ  alveolar flap (ㄹ initial)
+const IPA_ENG = "\u014B"; // ŋ  velar nasal (ㅇ coda)
+const IPA_OPEN_E = "\u025B"; // ɛ  open-mid front unrounded (ㅐ)
+const IPA_OPEN_MID_BACK = "\u028C"; // ʌ  open-mid back unrounded (ㅓ)
+const IPA_CLOSE_BACK_UNR = "\u026F"; // ɯ  close back unrounded (ㅡ)
+const IPA_VELAR_APPROX = "\u0270"; // ɰ  velar approximant (ㅢ)
 
 // ---------------------------------------------------------------------------
 // Initial consonants (초성) -- 19 entries, index -> IPA char or null
@@ -70,25 +70,25 @@ const IPA_VELAR_APPROX   = '\u0270'; // ɰ  velar approximant (ㅢ)
 // ---------------------------------------------------------------------------
 
 const INITIAL_TABLE = [
-    'k',       //  0: ㄱ
-    PUA_KK,    //  1: ㄲ (tense)
-    'n',       //  2: ㄴ
-    't',       //  3: ㄷ
-    PUA_TT,    //  4: ㄸ (tense)
-    IPA_FLAP,  //  5: ㄹ
-    'm',       //  6: ㅁ
-    'p',       //  7: ㅂ
-    PUA_PP,    //  8: ㅃ (tense)
-    's',       //  9: ㅅ
-    PUA_SS,    // 10: ㅆ (tense)
-    null,      // 11: ㅇ (silent in initial)
-    PUA_TC,    // 12: ㅈ
-    PUA_TTCH,  // 13: ㅉ (tense)
-    PUA_TCH,   // 14: ㅊ (aspirated)
-    PUA_KH,    // 15: ㅋ (aspirated)
-    PUA_TH,    // 16: ㅌ (aspirated)
-    PUA_PH,    // 17: ㅍ (aspirated)
-    'h',       // 18: ㅎ
+  "k", //  0: ㄱ
+  PUA_KK, //  1: ㄲ (tense)
+  "n", //  2: ㄴ
+  "t", //  3: ㄷ
+  PUA_TT, //  4: ㄸ (tense)
+  IPA_FLAP, //  5: ㄹ
+  "m", //  6: ㅁ
+  "p", //  7: ㅂ
+  PUA_PP, //  8: ㅃ (tense)
+  "s", //  9: ㅅ
+  PUA_SS, // 10: ㅆ (tense)
+  null, // 11: ㅇ (silent in initial)
+  PUA_TC, // 12: ㅈ
+  PUA_TTCH, // 13: ㅉ (tense)
+  PUA_TCH, // 14: ㅊ (aspirated)
+  PUA_KH, // 15: ㅋ (aspirated)
+  PUA_TH, // 16: ㅌ (aspirated)
+  PUA_PH, // 17: ㅍ (aspirated)
+  "h", // 18: ㅎ
 ];
 
 // ---------------------------------------------------------------------------
@@ -97,27 +97,27 @@ const INITIAL_TABLE = [
 // ---------------------------------------------------------------------------
 
 const MEDIAL_TABLE = [
-    ['a', null],                        //  0: ㅏ
-    [IPA_OPEN_E, null],                 //  1: ㅐ
-    ['j', 'a'],                         //  2: ㅑ
-    ['j', IPA_OPEN_E],                  //  3: ㅒ
-    [IPA_OPEN_MID_BACK, null],          //  4: ㅓ
-    ['e', null],                        //  5: ㅔ
-    ['j', IPA_OPEN_MID_BACK],           //  6: ㅕ
-    ['j', 'e'],                         //  7: ㅖ
-    ['o', null],                        //  8: ㅗ
-    ['w', 'a'],                         //  9: ㅘ
-    ['w', IPA_OPEN_E],                  // 10: ㅙ
-    ['w', 'e'],                         // 11: ㅚ (modern Seoul: [we])
-    ['j', 'o'],                         // 12: ㅛ
-    ['u', null],                        // 13: ㅜ
-    ['w', IPA_OPEN_MID_BACK],           // 14: ㅝ
-    ['w', 'e'],                         // 15: ㅞ
-    ['w', 'i'],                         // 16: ㅟ
-    ['j', 'u'],                         // 17: ㅠ
-    [IPA_CLOSE_BACK_UNR, null],         // 18: ㅡ
-    [IPA_VELAR_APPROX, 'i'],            // 19: ㅢ
-    ['i', null],                        // 20: ㅣ
+  ["a", null], //  0: ㅏ
+  [IPA_OPEN_E, null], //  1: ㅐ
+  ["j", "a"], //  2: ㅑ
+  ["j", IPA_OPEN_E], //  3: ㅒ
+  [IPA_OPEN_MID_BACK, null], //  4: ㅓ
+  ["e", null], //  5: ㅔ
+  ["j", IPA_OPEN_MID_BACK], //  6: ㅕ
+  ["j", "e"], //  7: ㅖ
+  ["o", null], //  8: ㅗ
+  ["w", "a"], //  9: ㅘ
+  ["w", IPA_OPEN_E], // 10: ㅙ
+  ["w", "e"], // 11: ㅚ (modern Seoul: [we])
+  ["j", "o"], // 12: ㅛ
+  ["u", null], // 13: ㅜ
+  ["w", IPA_OPEN_MID_BACK], // 14: ㅝ
+  ["w", "e"], // 15: ㅞ
+  ["w", "i"], // 16: ㅟ
+  ["j", "u"], // 17: ㅠ
+  [IPA_CLOSE_BACK_UNR, null], // 18: ㅡ
+  [IPA_VELAR_APPROX, "i"], // 19: ㅢ
+  ["i", null], // 20: ㅣ
 ];
 
 // ---------------------------------------------------------------------------
@@ -134,34 +134,34 @@ const MEDIAL_TABLE = [
 // ---------------------------------------------------------------------------
 
 const FINAL_TABLE = [
-    { ph: null,        liaisonInitial: -1, residualFinal:  0 }, //  0: (none)
-    { ph: PUA_K_UNREL, liaisonInitial:  0, residualFinal:  0 }, //  1: ㄱ
-    { ph: PUA_K_UNREL, liaisonInitial:  1, residualFinal:  0 }, //  2: ㄲ
-    { ph: PUA_K_UNREL, liaisonInitial:  9, residualFinal:  1 }, //  3: ㄳ -> ㅅ, residual ㄱ
-    { ph: 'n',         liaisonInitial: -1, residualFinal:  0 }, //  4: ㄴ
-    { ph: 'n',         liaisonInitial: 12, residualFinal:  4 }, //  5: ㄵ -> ㅈ, residual ㄴ
-    { ph: 'n',         liaisonInitial: -1, residualFinal:  0 }, //  6: ㄶ (ㄴ+ㅎ -> n)
-    { ph: PUA_T_UNREL, liaisonInitial:  3, residualFinal:  0 }, //  7: ㄷ
-    { ph: 'l',         liaisonInitial:  5, residualFinal:  0 }, //  8: ㄹ
-    { ph: PUA_K_UNREL, liaisonInitial:  0, residualFinal:  8 }, //  9: ㄺ -> ㄱ, residual ㄹ
-    { ph: 'm',         liaisonInitial:  6, residualFinal:  8 }, // 10: ㄻ -> ㅁ, residual ㄹ
-    { ph: 'l',         liaisonInitial:  7, residualFinal:  8 }, // 11: ㄼ -> ㅂ, residual ㄹ
-    { ph: 'l',         liaisonInitial:  9, residualFinal:  8 }, // 12: ㄽ -> ㅅ, residual ㄹ
-    { ph: 'l',         liaisonInitial: 16, residualFinal:  8 }, // 13: ㄾ -> ㅌ, residual ㄹ
-    { ph: 'l',         liaisonInitial: 17, residualFinal:  8 }, // 14: ㄿ -> ㅍ, residual ㄹ
-    { ph: 'l',         liaisonInitial: -1, residualFinal:  0 }, // 15: ㅀ (ㄹ+ㅎ -> l)
-    { ph: 'm',         liaisonInitial: -1, residualFinal:  0 }, // 16: ㅁ
-    { ph: PUA_P_UNREL, liaisonInitial:  7, residualFinal:  0 }, // 17: ㅂ
-    { ph: PUA_P_UNREL, liaisonInitial:  9, residualFinal: 17 }, // 18: ㅄ -> ㅅ, residual ㅂ
-    { ph: PUA_T_UNREL, liaisonInitial:  9, residualFinal:  0 }, // 19: ㅅ
-    { ph: PUA_T_UNREL, liaisonInitial: 10, residualFinal:  0 }, // 20: ㅆ
-    { ph: IPA_ENG,     liaisonInitial: -1, residualFinal:  0 }, // 21: ㅇ (velar nasal)
-    { ph: PUA_T_UNREL, liaisonInitial: 12, residualFinal:  0 }, // 22: ㅈ
-    { ph: PUA_T_UNREL, liaisonInitial: 14, residualFinal:  0 }, // 23: ㅊ
-    { ph: PUA_K_UNREL, liaisonInitial: 15, residualFinal:  0 }, // 24: ㅋ
-    { ph: PUA_T_UNREL, liaisonInitial: 16, residualFinal:  0 }, // 25: ㅌ
-    { ph: PUA_P_UNREL, liaisonInitial: 17, residualFinal:  0 }, // 26: ㅍ
-    { ph: PUA_T_UNREL, liaisonInitial: -1, residualFinal:  0 }, // 27: ㅎ (h dropped)
+  { ph: null, liaisonInitial: -1, residualFinal: 0 }, //  0: (none)
+  { ph: PUA_K_UNREL, liaisonInitial: 0, residualFinal: 0 }, //  1: ㄱ
+  { ph: PUA_K_UNREL, liaisonInitial: 1, residualFinal: 0 }, //  2: ㄲ
+  { ph: PUA_K_UNREL, liaisonInitial: 9, residualFinal: 1 }, //  3: ㄳ -> ㅅ, residual ㄱ
+  { ph: "n", liaisonInitial: -1, residualFinal: 0 }, //  4: ㄴ
+  { ph: "n", liaisonInitial: 12, residualFinal: 4 }, //  5: ㄵ -> ㅈ, residual ㄴ
+  { ph: "n", liaisonInitial: -1, residualFinal: 0 }, //  6: ㄶ (ㄴ+ㅎ -> n)
+  { ph: PUA_T_UNREL, liaisonInitial: 3, residualFinal: 0 }, //  7: ㄷ
+  { ph: "l", liaisonInitial: 5, residualFinal: 0 }, //  8: ㄹ
+  { ph: PUA_K_UNREL, liaisonInitial: 0, residualFinal: 8 }, //  9: ㄺ -> ㄱ, residual ㄹ
+  { ph: "m", liaisonInitial: 6, residualFinal: 8 }, // 10: ㄻ -> ㅁ, residual ㄹ
+  { ph: "l", liaisonInitial: 7, residualFinal: 8 }, // 11: ㄼ -> ㅂ, residual ㄹ
+  { ph: "l", liaisonInitial: 9, residualFinal: 8 }, // 12: ㄽ -> ㅅ, residual ㄹ
+  { ph: "l", liaisonInitial: 16, residualFinal: 8 }, // 13: ㄾ -> ㅌ, residual ㄹ
+  { ph: "l", liaisonInitial: 17, residualFinal: 8 }, // 14: ㄿ -> ㅍ, residual ㄹ
+  { ph: "l", liaisonInitial: -1, residualFinal: 0 }, // 15: ㅀ (ㄹ+ㅎ -> l)
+  { ph: "m", liaisonInitial: -1, residualFinal: 0 }, // 16: ㅁ
+  { ph: PUA_P_UNREL, liaisonInitial: 7, residualFinal: 0 }, // 17: ㅂ
+  { ph: PUA_P_UNREL, liaisonInitial: 9, residualFinal: 17 }, // 18: ㅄ -> ㅅ, residual ㅂ
+  { ph: PUA_T_UNREL, liaisonInitial: 9, residualFinal: 0 }, // 19: ㅅ
+  { ph: PUA_T_UNREL, liaisonInitial: 10, residualFinal: 0 }, // 20: ㅆ
+  { ph: IPA_ENG, liaisonInitial: -1, residualFinal: 0 }, // 21: ㅇ (velar nasal)
+  { ph: PUA_T_UNREL, liaisonInitial: 12, residualFinal: 0 }, // 22: ㅈ
+  { ph: PUA_T_UNREL, liaisonInitial: 14, residualFinal: 0 }, // 23: ㅊ
+  { ph: PUA_K_UNREL, liaisonInitial: 15, residualFinal: 0 }, // 24: ㅋ
+  { ph: PUA_T_UNREL, liaisonInitial: 16, residualFinal: 0 }, // 25: ㅌ
+  { ph: PUA_P_UNREL, liaisonInitial: 17, residualFinal: 0 }, // 26: ㅍ
+  { ph: PUA_T_UNREL, liaisonInitial: -1, residualFinal: 0 }, // 27: ㅎ (h dropped)
 ];
 
 // ---------------------------------------------------------------------------
@@ -169,12 +169,17 @@ const FINAL_TABLE = [
 // ---------------------------------------------------------------------------
 
 const PUNCTUATION = new Set([
-    ',', '.', ';', ':', '!', '?',
-    '\u3002', // 。 CJK period
-    '\uFF0C', // ， CJK comma
-    '\uFF01', // ！ CJK exclamation
-    '\uFF1F', // ？ CJK question
-    '\u3001', // 、 CJK enumeration comma
+  ",",
+  ".",
+  ";",
+  ":",
+  "!",
+  "?",
+  "\u3002", // 。 CJK period
+  "\uFF0C", // ， CJK comma
+  "\uFF01", // ！ CJK exclamation
+  "\uFF1F", // ？ CJK question
+  "\u3001", // 、 CJK enumeration comma
 ]);
 
 // ---------------------------------------------------------------------------
@@ -187,7 +192,7 @@ const PUNCTUATION = new Set([
  * @returns {boolean}
  */
 function isHangulSyllable(code) {
-    return code >= HANGUL_START && code <= HANGUL_END;
+  return code >= HANGUL_START && code <= HANGUL_END;
 }
 
 /**
@@ -196,11 +201,11 @@ function isHangulSyllable(code) {
  * @returns {{ initial: number, medial: number, final_: number }}
  */
 function decompose(code) {
-    const offset = code - HANGUL_START;
-    const initial = Math.floor(offset / (N_MEDIALS * N_FINALS));
-    const medial = Math.floor((offset % (N_MEDIALS * N_FINALS)) / N_FINALS);
-    const final_ = offset % N_FINALS;
-    return { initial, medial, final_ };
+  const offset = code - HANGUL_START;
+  const initial = Math.floor(offset / (N_MEDIALS * N_FINALS));
+  const medial = Math.floor((offset % (N_MEDIALS * N_FINALS)) / N_FINALS);
+  const final_ = offset % N_FINALS;
+  return { initial, medial, final_ };
 }
 
 // ---------------------------------------------------------------------------
@@ -216,7 +221,7 @@ function decompose(code) {
  * @returns {boolean}
  */
 function isLeadingJamo(code) {
-    return code >= 0x1100 && code <= 0x1112;
+  return code >= 0x1100 && code <= 0x1112;
 }
 
 /**
@@ -225,7 +230,7 @@ function isLeadingJamo(code) {
  * @returns {boolean}
  */
 function isVowelJamo(code) {
-    return code >= 0x1161 && code <= 0x1175;
+  return code >= 0x1161 && code <= 0x1175;
 }
 
 /**
@@ -234,7 +239,7 @@ function isVowelJamo(code) {
  * @returns {boolean}
  */
 function isTrailingJamo(code) {
-    return code >= 0x11A8 && code <= 0x11C2;
+  return code >= 0x11a8 && code <= 0x11c2;
 }
 
 /**
@@ -244,33 +249,31 @@ function isTrailingJamo(code) {
  * @returns {number[]} Recomposed codepoints.
  */
 function composeHangulJamo(codepoints) {
-    const out = [];
-    const n = codepoints.length;
-    let i = 0;
+  const out = [];
+  const n = codepoints.length;
+  let i = 0;
 
-    while (i < n) {
-        if (isLeadingJamo(codepoints[i]) &&
-            i + 1 < n &&
-            isVowelJamo(codepoints[i + 1])) {
-            const leading = codepoints[i] - 0x1100;
-            const vowel = codepoints[i + 1] - 0x1161;
-            let trailing;
-            if (i + 2 < n && isTrailingJamo(codepoints[i + 2])) {
-                trailing = codepoints[i + 2] - 0x11A8 + 1;
-                i += 3;
-            } else {
-                trailing = 0;
-                i += 2;
-            }
-            const composed = (leading * 21 + vowel) * 28 + trailing + 0xAC00;
-            out.push(composed);
-        } else {
-            out.push(codepoints[i]);
-            i += 1;
-        }
+  while (i < n) {
+    if (isLeadingJamo(codepoints[i]) && i + 1 < n && isVowelJamo(codepoints[i + 1])) {
+      const leading = codepoints[i] - 0x1100;
+      const vowel = codepoints[i + 1] - 0x1161;
+      let trailing;
+      if (i + 2 < n && isTrailingJamo(codepoints[i + 2])) {
+        trailing = codepoints[i + 2] - 0x11a8 + 1;
+        i += 3;
+      } else {
+        trailing = 0;
+        i += 2;
+      }
+      const composed = (leading * 21 + vowel) * 28 + trailing + 0xac00;
+      out.push(composed);
+    } else {
+      out.push(codepoints[i]);
+      i += 1;
     }
+  }
 
-    return out;
+  return out;
 }
 
 // ---------------------------------------------------------------------------
@@ -283,30 +286,30 @@ function composeHangulJamo(codepoints) {
  * @param {string[]} out - Output array to push phoneme chars into.
  */
 function emitSyllable(syl, out) {
-    // Initial consonant
-    if (syl.initial < N_INITIALS) {
-        const ph = INITIAL_TABLE[syl.initial];
-        if (ph !== null) {
-            out.push(ph);
-        }
+  // Initial consonant
+  if (syl.initial < N_INITIALS) {
+    const ph = INITIAL_TABLE[syl.initial];
+    if (ph !== null) {
+      out.push(ph);
     }
+  }
 
-    // Medial vowel (1-2 phonemes)
-    if (syl.medial < N_MEDIALS) {
-        const [ph1, ph2] = MEDIAL_TABLE[syl.medial];
-        out.push(ph1);
-        if (ph2 !== null) {
-            out.push(ph2);
-        }
+  // Medial vowel (1-2 phonemes)
+  if (syl.medial < N_MEDIALS) {
+    const [ph1, ph2] = MEDIAL_TABLE[syl.medial];
+    out.push(ph1);
+    if (ph2 !== null) {
+      out.push(ph2);
     }
+  }
 
-    // Final consonant
-    if (syl.final_ > 0 && syl.final_ < N_FINALS) {
-        const entry = FINAL_TABLE[syl.final_];
-        if (entry.ph !== null) {
-            out.push(entry.ph);
-        }
+  // Final consonant
+  if (syl.final_ > 0 && syl.final_ < N_FINALS) {
+    const entry = FINAL_TABLE[syl.final_];
+    if (entry.ph !== null) {
+      out.push(entry.ph);
     }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -327,38 +330,38 @@ function emitSyllable(syl, out) {
  * @param {string[]} out - Output array to push phoneme chars into.
  */
 function processHangulRun(codes, out) {
-    if (codes.length === 0) {
-        return;
+  if (codes.length === 0) {
+    return;
+  }
+
+  // Decompose all syllables
+  const syls = codes.map((code) => decompose(code));
+
+  // Apply basic liaison (연음화)
+  for (let i = 0; i < syls.length - 1; i++) {
+    const fi = syls[i].final_;
+    if (fi === 0 || fi >= N_FINALS) {
+      continue;
+    }
+    if (syls[i + 1].initial !== 11) {
+      continue;
     }
 
-    // Decompose all syllables
-    const syls = codes.map(code => decompose(code));
-
-    // Apply basic liaison (연음화)
-    for (let i = 0; i < syls.length - 1; i++) {
-        const fi = syls[i].final_;
-        if (fi === 0 || fi >= N_FINALS) {
-            continue;
-        }
-        if (syls[i + 1].initial !== 11) {
-            continue;
-        }
-
-        const entry = FINAL_TABLE[fi];
-        if (entry.liaisonInitial < 0) {
-            continue;
-        }
-
-        // Move final -> next initial (released form)
-        syls[i + 1].initial = entry.liaisonInitial;
-        // For complex finals, keep residual; for simple finals, clears entirely.
-        syls[i].final_ = entry.residualFinal;
+    const entry = FINAL_TABLE[fi];
+    if (entry.liaisonInitial < 0) {
+      continue;
     }
 
-    // Emit phonemes for all syllables
-    for (const syl of syls) {
-        emitSyllable(syl, out);
-    }
+    // Move final -> next initial (released form)
+    syls[i + 1].initial = entry.liaisonInitial;
+    // For complex finals, keep residual; for simple finals, clears entirely.
+    syls[i].final_ = entry.residualFinal;
+  }
+
+  // Emit phonemes for all syllables
+  for (const syl of syls) {
+    emitSyllable(syl, out);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -382,76 +385,76 @@ function processHangulRun(codes, out) {
  * @returns {string[]} Array of single-character IPA phoneme tokens.
  */
 function textToPhonemeChars(text) {
-    if (!text) {
-        return [];
+  if (!text) {
+    return [];
+  }
+
+  // Convert to array of codepoints
+  let codepoints = [];
+  for (const ch of text) {
+    codepoints.push(ch.codePointAt(0));
+  }
+
+  // Recompose NFD Hangul jamo sequences (macOS) into NFC precomposed syllables
+  codepoints = composeHangulJamo(codepoints);
+
+  const sentence = [];
+  let needSpace = false;
+
+  const n = codepoints.length;
+  let i = 0;
+
+  while (i < n) {
+    const code = codepoints[i];
+    const ch = String.fromCodePoint(code);
+
+    // Whitespace -> mark word boundary
+    if (ch === " " || ch === "\t" || ch === "\n" || ch === "\r") {
+      needSpace = true;
+      i++;
+      continue;
     }
 
-    // Convert to array of codepoints
-    let codepoints = [];
-    for (const ch of text) {
-        codepoints.push(ch.codePointAt(0));
+    // Punctuation -> emit directly
+    if (PUNCTUATION.has(ch)) {
+      sentence.push(ch);
+      needSpace = false;
+      i++;
+      continue;
     }
 
-    // Recompose NFD Hangul jamo sequences (macOS) into NFC precomposed syllables
-    codepoints = composeHangulJamo(codepoints);
+    // Hangul syllable run
+    if (isHangulSyllable(code)) {
+      if (needSpace && sentence.length > 0) {
+        sentence.push(" ");
+      }
 
-    const sentence = [];
-    let needSpace = false;
-
-    const n = codepoints.length;
-    let i = 0;
-
-    while (i < n) {
-        const code = codepoints[i];
-        const ch = String.fromCodePoint(code);
-
-        // Whitespace -> mark word boundary
-        if (ch === ' ' || ch === '\t' || ch === '\n' || ch === '\r') {
-            needSpace = true;
-            i++;
-            continue;
-        }
-
-        // Punctuation -> emit directly
-        if (PUNCTUATION.has(ch)) {
-            sentence.push(ch);
-            needSpace = false;
-            i++;
-            continue;
-        }
-
-        // Hangul syllable run
-        if (isHangulSyllable(code)) {
-            if (needSpace && sentence.length > 0) {
-                sentence.push(' ');
-            }
-
-            // Find the extent of the Hangul run
-            const runStart = i;
-            while (i < n && isHangulSyllable(codepoints[i])) {
-                i++;
-            }
-            processHangulRun(codepoints.slice(runStart, i), sentence);
-            needSpace = true;
-            continue;
-        }
-
-        // Latin alphabetic -> pass through lowercase
-        if ((code >= 0x41 && code <= 0x5A) || (code >= 0x61 && code <= 0x7A)) {
-            if (needSpace && sentence.length > 0) {
-                sentence.push(' ');
-            }
-            sentence.push(ch.toLowerCase());
-            needSpace = true;
-            i++;
-            continue;
-        }
-
-        // Unknown character -> skip
+      // Find the extent of the Hangul run
+      const runStart = i;
+      while (i < n && isHangulSyllable(codepoints[i])) {
         i++;
+      }
+      processHangulRun(codepoints.slice(runStart, i), sentence);
+      needSpace = true;
+      continue;
     }
 
-    return sentence;
+    // Latin alphabetic -> pass through lowercase
+    if ((code >= 0x41 && code <= 0x5a) || (code >= 0x61 && code <= 0x7a)) {
+      if (needSpace && sentence.length > 0) {
+        sentence.push(" ");
+      }
+      sentence.push(ch.toLowerCase());
+      needSpace = true;
+      i++;
+      continue;
+    }
+
+    // Unknown character -> skip
+    i++;
+  }
+
+  return sentence;
 }
 
 // ---------------------------------------------------------------------------
@@ -459,62 +462,62 @@ function textToPhonemeChars(text) {
 // ---------------------------------------------------------------------------
 
 export class KoreanG2P {
-    /**
-     * Create a KoreanG2P instance.
-     * @param {object} [options] - Reserved for future options.
-     */
-    constructor(options = {}) {
-        this._options = options;
+  /**
+   * Create a KoreanG2P instance.
+   * @param {object} [options] - Reserved for future options.
+   */
+  constructor(options = {}) {
+    this._options = options;
+  }
+
+  /**
+   * Language code for this G2P instance.
+   * @type {string}
+   */
+  get languageCode() {
+    return "ko";
+  }
+
+  /**
+   * Convert Korean text to phoneme tokens.
+   *
+   * Returns an object with `tokens` (array of single-character IPA strings)
+   * and `prosody` (array of nulls, since Korean G2P does not provide
+   * prosody information via this method).
+   *
+   * Hangul syllables are decomposed into jamo and mapped to IPA phonemes.
+   * Basic liaison (연음법칙) is applied when a final consonant is followed
+   * by a syllable starting with ㅇ (silent initial).
+   *
+   * @param {string} text - Input Korean text.
+   * @returns {{ tokens: string[], prosody: null[] }}
+   */
+  phonemize(text) {
+    if (!text || typeof text !== "string") {
+      return { tokens: [], prosody: [] };
     }
 
-    /**
-     * Language code for this G2P instance.
-     * @type {string}
-     */
-    get languageCode() {
-        return 'ko';
+    const tokens = textToPhonemeChars(text);
+    const prosody = new Array(tokens.length).fill(null);
+    return { tokens, prosody };
+  }
+
+  /**
+   * Convert Korean text to phoneme tokens with prosody information.
+   *
+   * Korean prosody: A1=0, A2=0, A3=0 (fixed; Korean does not use
+   * pitch accent or stress-based prosody features in this G2P).
+   *
+   * @param {string} text - Input Korean text.
+   * @returns {{ tokens: string[], prosody: ({ a1: number, a2: number, a3: number })[] }}
+   */
+  phonemizeWithProsody(text) {
+    if (!text || typeof text !== "string") {
+      return { tokens: [], prosody: [] };
     }
 
-    /**
-     * Convert Korean text to phoneme tokens.
-     *
-     * Returns an object with `tokens` (array of single-character IPA strings)
-     * and `prosody` (array of nulls, since Korean G2P does not provide
-     * prosody information via this method).
-     *
-     * Hangul syllables are decomposed into jamo and mapped to IPA phonemes.
-     * Basic liaison (연음법칙) is applied when a final consonant is followed
-     * by a syllable starting with ㅇ (silent initial).
-     *
-     * @param {string} text - Input Korean text.
-     * @returns {{ tokens: string[], prosody: null[] }}
-     */
-    phonemize(text) {
-        if (!text || typeof text !== 'string') {
-            return { tokens: [], prosody: [] };
-        }
-
-        const tokens = textToPhonemeChars(text);
-        const prosody = new Array(tokens.length).fill(null);
-        return { tokens, prosody };
-    }
-
-    /**
-     * Convert Korean text to phoneme tokens with prosody information.
-     *
-     * Korean prosody: A1=0, A2=0, A3=0 (fixed; Korean does not use
-     * pitch accent or stress-based prosody features in this G2P).
-     *
-     * @param {string} text - Input Korean text.
-     * @returns {{ tokens: string[], prosody: ({ a1: number, a2: number, a3: number })[] }}
-     */
-    phonemizeWithProsody(text) {
-        if (!text || typeof text !== 'string') {
-            return { tokens: [], prosody: [] };
-        }
-
-        const tokens = textToPhonemeChars(text);
-        const prosody = tokens.map(() => ({ a1: 0, a2: 0, a3: 0 }));
-        return { tokens, prosody };
-    }
+    const tokens = textToPhonemeChars(text);
+    const prosody = tokens.map(() => ({ a1: 0, a2: 0, a3: 0 }));
+    return { tokens, prosody };
+  }
 }

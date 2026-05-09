@@ -40,36 +40,40 @@ export class RustWasmAdapter {
       wasmModule = await options.wasmLoader();
     } else {
       const url = options.wasmUrl;
-      if (!url) throw new Error('Either wasmUrl or wasmLoader must be provided');
+      if (!url) {
+        throw new Error("Either wasmUrl or wasmLoader must be provided");
+      }
       wasmModule = await import(url);
       await wasmModule.default(); // init() — load WASM binary
     }
     const wasm = new wasmModule.WasmPhonemizer(configJson);
 
     // Load Chinese pinyin dictionaries if setChineseDictionary is available
-    if (typeof wasm.setChineseDictionary === 'function') {
+    if (typeof wasm.setChineseDictionary === "function") {
       try {
-        const dictBase = options.zhDictBaseUrl
-          || new URL('../../assets/', import.meta.url).href;
+        const dictBase = options.zhDictBaseUrl || new URL("../../assets/", import.meta.url).href;
         const [singleResp, phraseResp] = await Promise.all([
-          fetch(new URL('pinyin_single.json', dictBase)),
-          fetch(new URL('pinyin_phrases.json', dictBase)),
+          fetch(new URL("pinyin_single.json", dictBase)),
+          fetch(new URL("pinyin_phrases.json", dictBase)),
         ]);
         if (singleResp.ok && phraseResp.ok) {
           const singleBytes = new Uint8Array(await singleResp.arrayBuffer());
           const phraseBytes = new Uint8Array(await phraseResp.arrayBuffer());
           wasm.setChineseDictionary(singleBytes, phraseBytes);
         } else {
-          console.warn('[piper-plus] Chinese pinyin dictionaries not found, zh will use passthrough');
+          console.warn(
+            "[piper-plus] Chinese pinyin dictionaries not found, zh will use passthrough"
+          );
         }
       } catch (e) {
-        console.warn('[piper-plus] Failed to load Chinese dictionaries:', e.message);
+        console.warn("[piper-plus] Failed to load Chinese dictionaries:", e.message);
       }
     }
 
-    const languages = typeof wasm.getSupportedLanguages === 'function'
-      ? Array.from(wasm.getSupportedLanguages())
-      : ['ja', 'en', 'zh', 'ko', 'es', 'fr', 'pt', 'sv'];
+    const languages =
+      typeof wasm.getSupportedLanguages === "function"
+        ? Array.from(wasm.getSupportedLanguages())
+        : ["ja", "en", "zh", "ko", "es", "fr", "pt", "sv"];
     return new RustWasmAdapter(wasm, languages);
   }
 
@@ -115,7 +119,9 @@ export class RustWasmAdapter {
 
   /** Release WASM resources. Safe to call multiple times. */
   dispose() {
-    if (this._disposed) return;
+    if (this._disposed) {
+      return;
+    }
     this._disposed = true;
     this._wasm.free();
   }

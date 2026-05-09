@@ -13,9 +13,9 @@
  * 影響を受けないことも併せて検証する。
  */
 
-import { describe, it } from 'node:test';
-import assert from 'node:assert/strict';
-import { AudioResult } from '../../src/audio-result.js';
+import { describe, it } from "node:test";
+import assert from "node:assert/strict";
+import { AudioResult } from "../../src/audio-result.js";
 
 // -----------------------------------------------------------
 // Sample TimingResult-like object used across tests.
@@ -23,19 +23,19 @@ import { AudioResult } from '../../src/audio-result.js';
 function makeSampleTiming() {
   return {
     phonemes: [
-      { phoneme: 'ph_0', start_ms: 0, end_ms: 58, duration_ms: 58 },
-      { phoneme: 'ph_1', start_ms: 58, end_ms: 150.8, duration_ms: 92.8 },
+      { phoneme: "ph_0", start_ms: 0, end_ms: 58, duration_ms: 58 },
+      { phoneme: "ph_1", start_ms: 58, end_ms: 150.8, duration_ms: 92.8 },
     ],
     total_duration_ms: 150.8,
     sample_rate: 22050,
   };
 }
 
-describe('AudioResult.timing / hasTimingInfo', () => {
+describe("AudioResult.timing / hasTimingInfo", () => {
   // -------------------------------------------------------
   // 1. constructor without timing
   // -------------------------------------------------------
-  it('constructor without timing -> timing === null, hasTimingInfo === false', () => {
+  it("constructor without timing -> timing === null, hasTimingInfo === false", () => {
     const samples = new Float32Array([0.1, 0.2, 0.3]);
     const result = new AudioResult(samples, 22050);
     assert.strictEqual(result.timing, null);
@@ -45,7 +45,7 @@ describe('AudioResult.timing / hasTimingInfo', () => {
   // -------------------------------------------------------
   // 2. constructor with explicit null timing
   // -------------------------------------------------------
-  it('constructor with explicit null timing -> timing === null, hasTimingInfo === false', () => {
+  it("constructor with explicit null timing -> timing === null, hasTimingInfo === false", () => {
     const samples = new Float32Array([0.1, 0.2, 0.3]);
     const result = new AudioResult(samples, 22050, null);
     assert.strictEqual(result.timing, null);
@@ -55,7 +55,7 @@ describe('AudioResult.timing / hasTimingInfo', () => {
   // -------------------------------------------------------
   // 3. constructor with timing object
   // -------------------------------------------------------
-  it('constructor with timing object -> getter returns the same object', () => {
+  it("constructor with timing object -> getter returns the same object", () => {
     const samples = new Float32Array([0.1, 0.2, 0.3]);
     const timing = makeSampleTiming();
     const result = new AudioResult(samples, 22050, timing);
@@ -66,7 +66,7 @@ describe('AudioResult.timing / hasTimingInfo', () => {
   // -------------------------------------------------------
   // 4. hasTimingInfo true when timing is provided
   // -------------------------------------------------------
-  it('hasTimingInfo === true when timing is provided', () => {
+  it("hasTimingInfo === true when timing is provided", () => {
     const samples = new Float32Array([0.1, 0.2, 0.3]);
     const timing = makeSampleTiming();
     const result = new AudioResult(samples, 22050, timing);
@@ -76,7 +76,7 @@ describe('AudioResult.timing / hasTimingInfo', () => {
   // -------------------------------------------------------
   // 5. hasTimingInfo false with explicit null
   // -------------------------------------------------------
-  it('hasTimingInfo === false when timing is explicit null', () => {
+  it("hasTimingInfo === false when timing is explicit null", () => {
     const samples = new Float32Array([0.1, 0.2, 0.3]);
     const result = new AudioResult(samples, 22050, null);
     assert.strictEqual(result.hasTimingInfo, false);
@@ -85,7 +85,7 @@ describe('AudioResult.timing / hasTimingInfo', () => {
   // -------------------------------------------------------
   // 6. hasTimingInfo false with undefined
   // -------------------------------------------------------
-  it('hasTimingInfo === false when timing is undefined', () => {
+  it("hasTimingInfo === false when timing is undefined", () => {
     const samples = new Float32Array([0.1, 0.2, 0.3]);
     // Passing undefined should fall back to the constructor default (null)
     // and therefore behave identically to omitting the argument.
@@ -97,7 +97,7 @@ describe('AudioResult.timing / hasTimingInfo', () => {
   // -------------------------------------------------------
   // 7. timing getter returns the same reference for repeated calls
   // -------------------------------------------------------
-  it('timing getter returns the same reference for repeated calls', () => {
+  it("timing getter returns the same reference for repeated calls", () => {
     const samples = new Float32Array([0.1, 0.2, 0.3]);
     const timing = makeSampleTiming();
     const result = new AudioResult(samples, 22050, timing);
@@ -110,7 +110,7 @@ describe('AudioResult.timing / hasTimingInfo', () => {
   // -------------------------------------------------------
   // 8. backward compatibility: omitting the timing argument
   // -------------------------------------------------------
-  it('backward compatibility: omitting the timing argument defaults to null', () => {
+  it("backward compatibility: omitting the timing argument defaults to null", () => {
     const samples = new Float32Array([0.1, 0.2, 0.3]);
     // Two-argument form (samples, sampleRate) used by all pre-timing callers.
     const result = new AudioResult(samples, 22050);
@@ -126,7 +126,7 @@ describe('AudioResult.timing / hasTimingInfo', () => {
   // -------------------------------------------------------
   // 9. samples getter still works with timing
   // -------------------------------------------------------
-  it('samples getter is unaffected by timing', () => {
+  it("samples getter is unaffected by timing", () => {
     const samples = new Float32Array([0.5, -0.5, 0.0, 0.25]);
     const timing = makeSampleTiming();
     const result = new AudioResult(samples, 22050, timing);
@@ -137,7 +137,7 @@ describe('AudioResult.timing / hasTimingInfo', () => {
   // -------------------------------------------------------
   // 10. sampleRate getter still works with timing
   // -------------------------------------------------------
-  it('sampleRate getter is unaffected by timing', () => {
+  it("sampleRate getter is unaffected by timing", () => {
     const samples = new Float32Array(100);
     const timing = makeSampleTiming();
     const result = new AudioResult(samples, 44100, timing);
@@ -147,7 +147,7 @@ describe('AudioResult.timing / hasTimingInfo', () => {
   // -------------------------------------------------------
   // 11. duration getter still works with timing
   // -------------------------------------------------------
-  it('duration getter is unaffected by timing', () => {
+  it("duration getter is unaffected by timing", () => {
     // 22050 samples / 22050 Hz = 1.0 second.
     const samples = new Float32Array(22050);
     const timing = makeSampleTiming();
@@ -158,7 +158,7 @@ describe('AudioResult.timing / hasTimingInfo', () => {
   // -------------------------------------------------------
   // 12. toWav() still works with timing
   // -------------------------------------------------------
-  it('toWav() returns a valid ArrayBuffer when timing is provided', () => {
+  it("toWav() returns a valid ArrayBuffer when timing is provided", () => {
     const samples = new Float32Array(100);
     const timing = makeSampleTiming();
     const result = new AudioResult(samples, 22050, timing);
@@ -169,24 +169,23 @@ describe('AudioResult.timing / hasTimingInfo', () => {
   });
 });
 
-
 // ---------------------------------------------------------------------------
 // Immutability (timing should be frozen)
 // ---------------------------------------------------------------------------
 
-describe('AudioResult.timing - immutability', () => {
+describe("AudioResult.timing - immutability", () => {
   function makeSampleTiming() {
     return {
       phonemes: [
-        { phoneme: '^', start_ms: 0, end_ms: 58, duration_ms: 58 },
-        { phoneme: 'k', start_ms: 58, end_ms: 150.8, duration_ms: 92.8 },
+        { phoneme: "^", start_ms: 0, end_ms: 58, duration_ms: 58 },
+        { phoneme: "k", start_ms: 58, end_ms: 150.8, duration_ms: 92.8 },
       ],
       total_duration_ms: 150.8,
       sample_rate: 22050,
     };
   }
 
-  it('timing object is frozen', () => {
+  it("timing object is frozen", () => {
     const samples = new Float32Array([0.1, 0.2]);
     const timing = makeSampleTiming();
     const result = new AudioResult(samples, 22050, timing);
@@ -194,14 +193,14 @@ describe('AudioResult.timing - immutability', () => {
     assert.ok(Object.isFrozen(result.timing));
   });
 
-  it('timing.phonemes array is frozen', () => {
+  it("timing.phonemes array is frozen", () => {
     const samples = new Float32Array([0.1, 0.2]);
     const result = new AudioResult(samples, 22050, makeSampleTiming());
 
     assert.ok(Object.isFrozen(result.timing.phonemes));
   });
 
-  it('individual phoneme entries are frozen', () => {
+  it("individual phoneme entries are frozen", () => {
     const samples = new Float32Array([0.1, 0.2]);
     const result = new AudioResult(samples, 22050, makeSampleTiming());
 
@@ -210,8 +209,8 @@ describe('AudioResult.timing - immutability', () => {
     }
   });
 
-  it('attempting to mutate timing.phonemes[0].start_ms throws in strict mode', () => {
-    'use strict';
+  it("attempting to mutate timing.phonemes[0].start_ms throws in strict mode", () => {
+    "use strict";
     const samples = new Float32Array([0.1, 0.2]);
     const result = new AudioResult(samples, 22050, makeSampleTiming());
 
@@ -220,14 +219,14 @@ describe('AudioResult.timing - immutability', () => {
     }, TypeError);
   });
 
-  it('attempting to push to timing.phonemes throws in strict mode', () => {
-    'use strict';
+  it("attempting to push to timing.phonemes throws in strict mode", () => {
+    "use strict";
     const samples = new Float32Array([0.1, 0.2]);
     const result = new AudioResult(samples, 22050, makeSampleTiming());
 
     assert.throws(() => {
       result.timing.phonemes.push({
-        phoneme: 'x',
+        phoneme: "x",
         start_ms: 0,
         end_ms: 1,
         duration_ms: 1,
@@ -235,8 +234,8 @@ describe('AudioResult.timing - immutability', () => {
     }, TypeError);
   });
 
-  it('mutating input timing object after construction does NOT affect result', () => {
-    'use strict';
+  it("mutating input timing object after construction does NOT affect result", () => {
+    "use strict";
     const samples = new Float32Array([0.1, 0.2]);
     const originalTiming = makeSampleTiming();
     const result = new AudioResult(samples, 22050, originalTiming);
@@ -251,7 +250,7 @@ describe('AudioResult.timing - immutability', () => {
     }, TypeError);
     assert.throws(() => {
       originalTiming.phonemes.push({
-        phoneme: 'x',
+        phoneme: "x",
         start_ms: 0,
         end_ms: 1,
         duration_ms: 1,
@@ -267,7 +266,7 @@ describe('AudioResult.timing - immutability', () => {
   // Additional immutability coverage (Wave 5: WASM)
   // ---------------------------------------------------------
 
-  it('result.timing IS the same frozen reference as the input (idempotent freeze)', () => {
+  it("result.timing IS the same frozen reference as the input (idempotent freeze)", () => {
     const samples = new Float32Array([0.1]);
     const timing = makeSampleTiming();
     // Freeze before passing — constructor must accept and not double-wrap.
@@ -287,8 +286,8 @@ describe('AudioResult.timing - immutability', () => {
     }
   });
 
-  it('attempting to set a new property on result.timing throws in strict mode', () => {
-    'use strict';
+  it("attempting to set a new property on result.timing throws in strict mode", () => {
+    "use strict";
     const samples = new Float32Array([0.1]);
     const result = new AudioResult(samples, 22050, makeSampleTiming());
     // Primitive fields can't be re-assigned, and adding new fields must fail.
@@ -303,8 +302,8 @@ describe('AudioResult.timing - immutability', () => {
     }, TypeError);
   });
 
-  it('attempting to delete a property on result.timing throws in strict mode', () => {
-    'use strict';
+  it("attempting to delete a property on result.timing throws in strict mode", () => {
+    "use strict";
     const samples = new Float32Array([0.1]);
     const result = new AudioResult(samples, 22050, makeSampleTiming());
     assert.throws(() => {
@@ -315,8 +314,8 @@ describe('AudioResult.timing - immutability', () => {
     }, TypeError);
   });
 
-  it('attempting to splice/sort/reverse timing.phonemes throws in strict mode', () => {
-    'use strict';
+  it("attempting to splice/sort/reverse timing.phonemes throws in strict mode", () => {
+    "use strict";
     const samples = new Float32Array([0.1]);
     const result = new AudioResult(samples, 22050, makeSampleTiming());
     // splice modifies the array in place — must throw.
@@ -328,7 +327,7 @@ describe('AudioResult.timing - immutability', () => {
     assert.throws(() => result.timing.phonemes.pop(), TypeError);
   });
 
-  it('result.timing returns a deeply frozen object even when input was not pre-frozen', () => {
+  it("result.timing returns a deeply frozen object even when input was not pre-frozen", () => {
     const samples = new Float32Array([0.1]);
     const livingTiming = makeSampleTiming();
     // Sanity: input is NOT frozen prior to construction.
@@ -345,7 +344,7 @@ describe('AudioResult.timing - immutability', () => {
     assert.ok(Object.isFrozen(livingTiming.phonemes[1]));
   });
 
-  it('null timing does not throw and remains null on the getter', () => {
+  it("null timing does not throw and remains null on the getter", () => {
     const samples = new Float32Array([0.1]);
     // Constructor must accept null without invoking deepFreezeTiming.
     const result = new AudioResult(samples, 22050, null);
@@ -353,7 +352,7 @@ describe('AudioResult.timing - immutability', () => {
     assert.strictEqual(result.hasTimingInfo, false);
   });
 
-  it('empty phonemes array is also frozen', () => {
+  it("empty phonemes array is also frozen", () => {
     const samples = new Float32Array([0.1]);
     const empty = { phonemes: [], total_duration_ms: 0, sample_rate: 22050 };
     const result = new AudioResult(samples, 22050, empty);
@@ -361,9 +360,9 @@ describe('AudioResult.timing - immutability', () => {
     assert.ok(Object.isFrozen(result.timing.phonemes));
     // Cannot push into the empty frozen array.
     assert.throws(() => {
-      'use strict';
+      "use strict";
       result.timing.phonemes.push({
-        phoneme: 'a',
+        phoneme: "a",
         start_ms: 0,
         end_ms: 0,
         duration_ms: 0,

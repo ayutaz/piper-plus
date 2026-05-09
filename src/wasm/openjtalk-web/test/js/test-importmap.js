@@ -9,11 +9,11 @@
  * Run: node --test test/js/test-importmap.js
  */
 
-import { strict as assert } from 'node:assert';
-import { describe, it } from 'node:test';
-import { readFileSync, existsSync, readdirSync } from 'node:fs';
-import { join, resolve, dirname, basename } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { strict as assert } from "node:assert";
+import { describe, it } from "node:test";
+import { readFileSync, existsSync, readdirSync } from "node:fs";
+import { join, resolve, dirname, basename } from "node:path";
+import { fileURLToPath } from "node:url";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -23,13 +23,13 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 /** Project root: src/wasm/openjtalk-web/ */
-const PROJECT_ROOT = resolve(__dirname, '..', '..');
+const PROJECT_ROOT = resolve(__dirname, "..", "..");
 
 /** Directory containing source JS modules that will be loaded in-browser. */
-const SRC_DIR = join(PROJECT_ROOT, 'src');
+const SRC_DIR = join(PROJECT_ROOT, "src");
 
 /** Demo HTML directory */
-const DEMO_DIR = join(PROJECT_ROOT, 'test', 'multilingual-demo');
+const DEMO_DIR = join(PROJECT_ROOT, "test", "multilingual-demo");
 
 /**
  * Known bare-specifier → source-tree package root mapping.
@@ -38,7 +38,7 @@ const DEMO_DIR = join(PROJECT_ROOT, 'test', 'multilingual-demo');
  * verify the underlying package file actually exists.
  */
 const BARE_SPECIFIER_SOURCE_MAP = {
-  '@piper-plus/g2p': resolve(PROJECT_ROOT, '..', 'g2p', 'src', 'index.js'),
+  "@piper-plus/g2p": resolve(PROJECT_ROOT, "..", "g2p", "src", "index.js"),
 };
 
 /**
@@ -49,7 +49,7 @@ const BARE_SPECIFIER_SOURCE_MAP = {
  * @returns {string[]} Unique bare specifiers
  */
 function extractBareSpecifiers(filePath) {
-  const content = readFileSync(filePath, 'utf-8');
+  const content = readFileSync(filePath, "utf-8");
   const specifiers = new Set();
 
   // Match: import ... from 'specifier'  or  import ... from "specifier"
@@ -63,7 +63,7 @@ function extractBareSpecifiers(filePath) {
     while ((match = regex.exec(content)) !== null) {
       const specifier = match[1];
       // Bare specifiers don't start with . or /
-      if (!specifier.startsWith('.') && !specifier.startsWith('/')) {
+      if (!specifier.startsWith(".") && !specifier.startsWith("/")) {
         specifiers.add(specifier);
       }
     }
@@ -79,9 +79,11 @@ function extractBareSpecifiers(filePath) {
  * @returns {{ imports: Record<string, string> } | null}
  */
 function parseImportMap(htmlPath) {
-  const content = readFileSync(htmlPath, 'utf-8');
+  const content = readFileSync(htmlPath, "utf-8");
   const match = content.match(/<script\s+type=["']importmap["']\s*>([\s\S]*?)<\/script>/);
-  if (!match) return null;
+  if (!match) {
+    return null;
+  }
   try {
     return JSON.parse(match[1]);
   } catch {
@@ -96,9 +98,11 @@ function parseImportMap(htmlPath) {
  * @returns {string[]}
  */
 function htmlFiles(dir) {
-  if (!existsSync(dir)) return [];
+  if (!existsSync(dir)) {
+    return [];
+  }
   return readdirSync(dir)
-    .filter((f) => f.endsWith('.html'))
+    .filter((f) => f.endsWith(".html"))
     .map((f) => join(dir, f));
 }
 
@@ -109,9 +113,11 @@ function htmlFiles(dir) {
  * @returns {string[]}
  */
 function jsFiles(dir) {
-  if (!existsSync(dir)) return [];
+  if (!existsSync(dir)) {
+    return [];
+  }
   return readdirSync(dir)
-    .filter((f) => f.endsWith('.js'))
+    .filter((f) => f.endsWith(".js"))
     .map((f) => join(dir, f));
 }
 
@@ -130,18 +136,18 @@ for (const jsFile of jsFiles(SRC_DIR)) {
 // Tests
 // ---------------------------------------------------------------------------
 
-describe('Import map coverage', () => {
-  it('src/*.js files use at least one bare specifier (sanity check)', () => {
+describe("Import map coverage", () => {
+  it("src/*.js files use at least one bare specifier (sanity check)", () => {
     assert.ok(
       allBareSpecifiers.size > 0,
-      'Expected at least one bare module specifier in src/*.js — ' +
-        'if none exist, this test suite can be removed'
+      "Expected at least one bare module specifier in src/*.js — " +
+        "if none exist, this test suite can be removed"
     );
   });
 
   const htmlPaths = htmlFiles(DEMO_DIR);
 
-  it('demo directory contains HTML files', () => {
+  it("demo directory contains HTML files", () => {
     assert.ok(htmlPaths.length > 0, `No HTML files found in ${DEMO_DIR}`);
   });
 
@@ -149,15 +155,19 @@ describe('Import map coverage', () => {
     const fileName = basename(htmlPath);
 
     // Only test HTML files that actually import from src/ (i.e. use ES modules)
-    const htmlContent = existsSync(htmlPath) ? readFileSync(htmlPath, 'utf-8') : '';
-    const usesModules = htmlContent.includes('type="module"') || htmlContent.includes("type='module'");
-    if (!usesModules) continue;
+    const htmlContent = existsSync(htmlPath) ? readFileSync(htmlPath, "utf-8") : "";
+    const usesModules =
+      htmlContent.includes('type="module"') || htmlContent.includes("type='module'");
+    if (!usesModules) {
+      continue;
+    }
 
     // Check if this HTML imports from src/ (directly or indirectly)
     const importsSrc =
-      htmlContent.includes('/src/index.js') ||
-      htmlContent.includes('/src/phonemizer-compat.js');
-    if (!importsSrc) continue;
+      htmlContent.includes("/src/index.js") || htmlContent.includes("/src/phonemizer-compat.js");
+    if (!importsSrc) {
+      continue;
+    }
 
     describe(`${fileName}`, () => {
       it('has a <script type="importmap"> block', () => {
@@ -166,7 +176,7 @@ describe('Import map coverage', () => {
         assert.ok(importMap.imports, `${fileName} import map has no "imports" key`);
       });
 
-      it('covers all bare module specifiers used by src/*.js', () => {
+      it("covers all bare module specifiers used by src/*.js", () => {
         const importMap = parseImportMap(htmlPath);
         assert.ok(importMap, `${fileName} is missing import map`);
 
@@ -180,11 +190,11 @@ describe('Import map coverage', () => {
         assert.strictEqual(
           missing.length,
           0,
-          `${fileName} import map is missing entries for: ${missing.join(', ')}`
+          `${fileName} import map is missing entries for: ${missing.join(", ")}`
         );
       });
 
-      it('import map targets point to packages that exist in source tree', () => {
+      it("import map targets point to packages that exist in source tree", () => {
         const importMap = parseImportMap(htmlPath);
         assert.ok(importMap, `${fileName} is missing import map`);
 
@@ -194,9 +204,7 @@ describe('Import map coverage', () => {
           // against the known source-tree location instead.
           const sourcePath = BARE_SPECIFIER_SOURCE_MAP[specifier];
           if (!sourcePath) {
-            broken.push(
-              `${specifier} — no entry in BARE_SPECIFIER_SOURCE_MAP (add one)`
-            );
+            broken.push(`${specifier} — no entry in BARE_SPECIFIER_SOURCE_MAP (add one)`);
           } else if (!existsSync(sourcePath)) {
             broken.push(`${specifier} -> ${sourcePath} (file not found)`);
           }
@@ -205,7 +213,7 @@ describe('Import map coverage', () => {
         assert.strictEqual(
           broken.length,
           0,
-          `${fileName} has import map entries pointing to missing packages:\n  ${broken.join('\n  ')}`
+          `${fileName} has import map entries pointing to missing packages:\n  ${broken.join("\n  ")}`
         );
       });
     });

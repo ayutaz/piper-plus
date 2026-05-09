@@ -5,12 +5,12 @@
  * テスト対象: src/wasm/openjtalk-web/src/resampler.js (未実装)
  */
 
-import { strict as assert } from 'assert';
-import { describe, it } from 'node:test';
+import { strict as assert } from "assert";
+import { describe, it } from "node:test";
 
 let SimpleResampler;
 try {
-  const mod = await import('../../src/resampler.js');
+  const mod = await import("../../src/resampler.js");
   SimpleResampler = mod.SimpleResampler || mod.default;
 } catch {
   SimpleResampler = null;
@@ -18,16 +18,16 @@ try {
 
 const skip = SimpleResampler === null;
 
-describe('SimpleResampler', { skip }, () => {
-  describe('アップサンプリング (22050Hz → 48000Hz)', () => {
-    it('出力長が正しい (ratio ≈ 2.177)', () => {
+describe("SimpleResampler", { skip }, () => {
+  describe("アップサンプリング (22050Hz → 48000Hz)", () => {
+    it("出力長が正しい (ratio ≈ 2.177)", () => {
       const resampler = new SimpleResampler(22050, 48000);
       const input = new Float32Array(22050); // 1秒分
       const output = resampler.resample(input);
       assert.equal(output.length, 48000);
     });
 
-    it('無音入力には無音が出力される', () => {
+    it("無音入力には無音が出力される", () => {
       const resampler = new SimpleResampler(22050, 48000);
       const input = new Float32Array(1000); // ゼロ埋め
       const output = resampler.resample(input);
@@ -35,7 +35,7 @@ describe('SimpleResampler', { skip }, () => {
       assert.equal(maxAbs, 0);
     });
 
-    it('DC信号 (定数) は変換後も同じ値', () => {
+    it("DC信号 (定数) は変換後も同じ値", () => {
       const resampler = new SimpleResampler(22050, 48000);
       const input = new Float32Array(1000).fill(0.5);
       const output = resampler.resample(input);
@@ -45,12 +45,12 @@ describe('SimpleResampler', { skip }, () => {
       }
     });
 
-    it('出力値が-1.0〜1.0の範囲内', () => {
+    it("出力値が-1.0〜1.0の範囲内", () => {
       const resampler = new SimpleResampler(22050, 48000);
       const input = new Float32Array(1000);
       // 正弦波 (440Hz)
       for (let i = 0; i < input.length; i++) {
-        input[i] = Math.sin(2 * Math.PI * 440 * i / 22050);
+        input[i] = Math.sin((2 * Math.PI * 440 * i) / 22050);
       }
       const output = resampler.resample(input);
       for (let i = 0; i < output.length; i++) {
@@ -59,8 +59,8 @@ describe('SimpleResampler', { skip }, () => {
     });
   });
 
-  describe('ダウンサンプリング (48000Hz → 22050Hz)', () => {
-    it('出力長が正しい', () => {
+  describe("ダウンサンプリング (48000Hz → 22050Hz)", () => {
+    it("出力長が正しい", () => {
       const resampler = new SimpleResampler(48000, 22050);
       const input = new Float32Array(48000);
       const output = resampler.resample(input);
@@ -68,8 +68,8 @@ describe('SimpleResampler', { skip }, () => {
     });
   });
 
-  describe('同一レート (22050Hz → 22050Hz)', () => {
-    it('入力と同じデータが出力される', () => {
+  describe("同一レート (22050Hz → 22050Hz)", () => {
+    it("入力と同じデータが出力される", () => {
       const resampler = new SimpleResampler(22050, 22050);
       const input = new Float32Array([0.1, 0.2, 0.3, 0.4, 0.5]);
       const output = resampler.resample(input);
@@ -80,14 +80,14 @@ describe('SimpleResampler', { skip }, () => {
     });
   });
 
-  describe('エッジケース', () => {
-    it('空の入力には空の出力', () => {
+  describe("エッジケース", () => {
+    it("空の入力には空の出力", () => {
       const resampler = new SimpleResampler(22050, 48000);
       const output = resampler.resample(new Float32Array(0));
       assert.equal(output.length, 0);
     });
 
-    it('1サンプル入力', () => {
+    it("1サンプル入力", () => {
       const resampler = new SimpleResampler(22050, 48000);
       const output = resampler.resample(new Float32Array([0.7]));
       assert.ok(output.length >= 1);

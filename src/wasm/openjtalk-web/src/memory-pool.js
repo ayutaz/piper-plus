@@ -16,7 +16,7 @@ const TYPE_CTORS = {
   biguint64: BigUint64Array,
 };
 
-const BIGINT_TYPES = new Set(['bigint64', 'biguint64']);
+const BIGINT_TYPES = new Set(["bigint64", "biguint64"]);
 
 export class TypedArrayPool {
   static MAX_POOL_SIZE = 50;
@@ -56,9 +56,15 @@ export class TypedArrayPool {
    */
   returnArray(type, length, array) {
     const Ctor = TYPE_CTORS[type];
-    if (!Ctor) throw new Error(`Unknown typed-array type: ${type}`);
-    if (!(array instanceof Ctor)) throw new TypeError(`Expected ${Ctor.name} but got ${array.constructor.name}`);
-    if (array.length !== length) throw new RangeError(`Expected length ${length} but got ${array.length}`);
+    if (!Ctor) {
+      throw new Error(`Unknown typed-array type: ${type}`);
+    }
+    if (!(array instanceof Ctor)) {
+      throw new TypeError(`Expected ${Ctor.name} but got ${array.constructor.name}`);
+    }
+    if (array.length !== length) {
+      throw new RangeError(`Expected length ${length} but got ${array.length}`);
+    }
 
     // Zero-clear — BigInt arrays need 0n
     if (BIGINT_TYPES.has(type)) {
@@ -86,7 +92,7 @@ export class TypedArrayPool {
   cleanup() {
     const now = Date.now();
     for (const [key, bucket] of this._buckets) {
-      const kept = bucket.filter(e => (now - e.ts) < this._maxAgeMs);
+      const kept = bucket.filter((e) => now - e.ts < this._maxAgeMs);
       if (kept.length === 0) {
         this._buckets.delete(key);
       } else {
@@ -99,7 +105,9 @@ export class TypedArrayPool {
   getStats() {
     let totalPools = 0;
     for (const bucket of this._buckets.values()) {
-      if (bucket.length > 0) totalPools++;
+      if (bucket.length > 0) {
+        totalPools++;
+      }
     }
     return {
       hits: this._hits,
@@ -113,7 +121,9 @@ export class TypedArrayPool {
 
   _totalEntries() {
     let n = 0;
-    for (const b of this._buckets.values()) n += b.length;
+    for (const b of this._buckets.values()) {
+      n += b.length;
+    }
     return n;
   }
 
@@ -135,7 +145,9 @@ export class TypedArrayPool {
     if (oldestKey !== null) {
       const bucket = this._buckets.get(oldestKey);
       bucket.splice(oldestIdx, 1);
-      if (bucket.length === 0) this._buckets.delete(oldestKey);
+      if (bucket.length === 0) {
+        this._buckets.delete(oldestKey);
+      }
       this._evictions++;
     }
   }

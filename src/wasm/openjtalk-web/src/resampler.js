@@ -35,7 +35,7 @@ export class SimpleResampler {
       return new Float32Array(0);
     }
 
-    const outputLen = Math.round(inputLen * this.outputRate / this.inputRate);
+    const outputLen = Math.round((inputLen * this.outputRate) / this.inputRate);
     if (outputLen === 0) {
       return new Float32Array(0);
     }
