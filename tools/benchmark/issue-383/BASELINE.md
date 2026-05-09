@@ -334,11 +334,42 @@ Rust の `jpreprocess` は Python `pyopenjtalk-plus` の **約 100× 高速**。
 このため Phase 1 並列化の絶対値改善は ms オーダーで、N=2 ではスレッド
 起動コストが G2P 時間を上回り悪化する。並列化が効くのは N≥5 から。
 
+## テストカバレッジ強化 (回帰防止)
+
+self-review で「並列化バグはテスト範囲外で発覚しがち」(C# JA race / C++
+Iterator parity / C++ DLL staging はいずれも fork 後の追加検証で初めて
+判明) という教訓に基づき、5 ランタイム + CI 全体に回帰防止層を追加。
+
+| 対象 | 追加内容 | コミット |
+|---|---|---|
+| Python | `synthesize_stream_raw` 早期 abort 時の G2P キャンセル + テスト | `f129524e` |
+| Python | (既存) pyopenjtalk concurrent test 20 並列 | `d543c381` |
+| Rust | JA concurrent stress test 3 件 (panic / serial-vs-parallel / determinism) | `51c995f2` |
+| Go | JA concurrent stress 2 件 (CGO 不要 Map / CGO 必須 Stream) | `fab90ea8` |
+| C# | `PiperPlus.Cli.Tests` 新設 + JA stress 4 件 (`DotNetG2PEngine` を `<Compile Link>` で参照) | `3d807e51` |
+| C++ | JA concurrent + Iterator vs OneShot parity (JA 版) 3 件 | `2077f0df` |
+| CI | `scripts/check_ort_versions.py` + `ort-version-sync.yml` workflow | `77d03ee4` |
+| iOS / Android workflow | ORT 1.17.0 → 1.20.0 統一 (xcframework sha256 更新含む) | `76bbc9fa` |
+
+これで Issue #383 で踏んだ 4 種類の回帰が CI で検出可能になった:
+
+* JA G2P backend の race (テストが非 JA 入力しか見ていなかった bug)
+* Iterator path と one-shot path の数値 parity 違反
+* ORT バージョン取りこぼし (workflow / cmake 不整合)
+* `synthesize_stream_raw` の abort 待ち時間 (consumer break 時の停止性)
+
+## 最終コミット履歴 (25 commits, `feat/383-g2p-inference-pipeline`)
+
+実装系 (Phase 1+2): `d543c381` `22fb2065` `a9c3d996` `af308fd4` `2fc4da6f` `5e0597c5`
+ベンチハーネス: `68c5527d` `cf2fcac3` `e0181930` `1164726e`
+ベンチレポート: `e06a9a4f` `d60ace16` `d46f4904` `dbbb8edb`
+follow-up 修正: `c567f5be` `37c7c72a` `734aa5c6` `a8e776d9` `76bbc9fa` `f129524e`
+回帰防止テスト: `51c995f2` `3d807e51` `fab90ea8` `2077f0df` `77d03ee4`
+
 ## 次ステップ
 
-1. ✅ Phase 1 / Phase 2 を Python に実装 (`d543c381`, `22fb2065`)
-2. ✅ Rust / C# / Go / C++ に Phase 1 展開 + 各種 follow-up 修正
-3. ✅ 各ランタイムで実機 / マイクロベンチ実施 (C++ は test pass で間接担保)
+1. ✅ 5 ランタイムに Phase 1 + Python に Phase 2
+2. ✅ 4 件の bug を発見・修正
+3. ✅ 5 ランタイム + CI に回帰防止テスト追加
 4. PR 作成 (`feat/383-g2p-inference-pipeline` → `dev`)
-5. (将来) iOS / Android release workflow の ORT を 1.20+ に揃えるかは別途検討
-6. (将来) C++ 実機ベンチを CI で取得
+5. (将来 / 別 PR) C++ 実機ベンチを in-process 計測に切り替え (out-of-process は spawn コストでノイズが支配)
