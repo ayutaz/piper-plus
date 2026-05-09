@@ -45,7 +45,7 @@ jobs:
             --no-progress
             --root-dir ${{ github.workspace }}
             './**/*.md'
-          fail: false  # baseline 確立まで warn-only
+          fail: true  # strict gate — broken link は PR / push を block
           jobSummary: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

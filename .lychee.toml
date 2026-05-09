@@ -26,39 +26,42 @@ accept = [
 
 # Excluded patterns (regex)
 exclude = [
-  # Local file references
-  "^file://",
+  # mailto links cannot be validated
   "^mailto:",
   # Private / internal
   "^https?://localhost",
   "^https?://127\\.0\\.0\\.1",
   "^https?://0\\.0\\.0\\.0",
-  # Examples in docs
+  # Examples in docs (placeholders, not real)
   "^https?://example\\.com",
   "^https?://example\\.org",
-  # Internal references that don't always work in CI
-  "^https?://huggingface\\.co/[a-zA-Z0-9_-]+/.*\\.onnx$",  # gated models
-  # GitHub anchors (often missed by link checker)
-  "^https?://github\\.com/.*#",
-  # Slack invites (private)
+  "^https?://your-",
+  # HuggingFace gated/auth-required model files (return 200 only with token)
+  "^https?://huggingface\\.co/.*/resolve/.*\\.onnx",
+  # Slack invites (private workspace)
   "^https?://[a-z]+\\.slack\\.com",
   # Wandb private projects
   "^https?://wandb\\.ai/private/",
+  # shields.io badges (frequently 5xx, also redirect through CDN)
+  "^https?://img\\.shields\\.io/",
+  # GitHub badge svg redirects (often 302 to camo)
+  "^https?://github\\.com/.*/actions/workflows/.*\\.svg",
+  # Local Wyoming protocol UDP/TCP placeholders
+  "^tcp://",
+  "^udp://",
 ]
 
-# Files to scan
-include_paths = [
-  "README*.md",
-  "CHANGELOG.md",
-  "CONTRIBUTING.md",
-  "docs/**/*.md",
-]
-
+# Excluded paths (regex matched against full path)
 exclude_path = [
   "node_modules",
-  ".git",
-  "build",
-  "dist",
-  "target",
-  "test/models",
+  "\\.git/",
+  "(^|/)build/",
+  "(^|/)build-full/",       # local CMake build artifacts (3rd-party READMEs)
+  "(^|/)build-shared/",     # local CMake build artifacts (3rd-party READMEs)
+  "(^|/)dist/",
+  "(^|/)target/",
+  "(^|/)test/models/",
+  "(^|/)pkg/",
+  "\\.pytest_cache/",
+  "(^|/)CHANGELOG\\.md$",   # historical, contains many old links
 ]

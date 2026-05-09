@@ -184,3 +184,4 @@ android/.gradle/
 # PiperPlusG2P), not an app, so we don't pin transitive dependency
 # versions for downstream consumers — they resolve their own.
 Package.resolved
+.lycheecache
