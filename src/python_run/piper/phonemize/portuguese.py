@@ -726,7 +726,9 @@ def _apply_eu_postprocessing(tokens: list[str]) -> list[str]:
                 result[i] = "ʒ"
                 continue
             result[i] = "ʃ" if result[i] == "s" else "ʒ"
-        elif _eu_token_starts_with_consonant(nxt) and not _eu_token_starts_with_vowel(nxt):
+        elif _eu_token_starts_with_consonant(nxt) and not _eu_token_starts_with_vowel(
+            nxt
+        ):
             result[i] = "ʃ" if result[i] == "s" else "ʒ"
 
     # Pass 3: coda /w/ → /ɫ/ (only when preceded by a vowel)

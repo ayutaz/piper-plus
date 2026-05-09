@@ -115,7 +115,9 @@ public class SpeakerEncoderE2ETests
         }
 
         string raw = File.ReadAllText(fixturePath);
+#pragma warning disable IL2026 // RequiresUnreferencedCode -- E2EFixture POCO members are declared inline and trim-safe in test assembly
         E2EFixture? fixture = System.Text.Json.JsonSerializer.Deserialize<E2EFixture>(raw);
+#pragma warning restore IL2026
         if (fixture?.E2ECosineGate is null)
         {
             Assert.Skip("fixture has no e2e_cosine_gate block — generator was run " +

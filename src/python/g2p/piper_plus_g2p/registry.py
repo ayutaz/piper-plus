@@ -35,9 +35,9 @@ _LATIN_PRIORITY = ("en", "es", "pt", "fr")
 # region subtag forms. For policy / supported codes see
 # `docs/spec/pt-dialect-contract.toml`.
 _LANGUAGE_ALIASES: dict[str, str] = {
-    "pt-BR": "pt",       # BR is the default; bare `pt` resolves to BR
+    "pt-BR": "pt",  # BR is the default; bare `pt` resolves to BR
     "pt-br": "pt",
-    "pt-pt": "pt-PT",    # case-insensitive EU alias
+    "pt-pt": "pt-PT",  # case-insensitive EU alias
 }
 
 # Dialects that are intentionally NOT supported. Empty in this release —

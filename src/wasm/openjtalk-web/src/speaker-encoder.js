@@ -293,3 +293,22 @@ export function melToHz(mel) {
 export function resampleLinearForTesting(samples, fromRate, toRate) {
   return resampleLinear(samples, fromRate, toRate);
 }
+
+// Aggregator for cross-runtime golden-fixture parity tests
+// (test/js/test-speaker-encoder-parity.js). Bundles the constants and
+// internal helpers the test harness destructures, so callers see one
+// stable shape rather than touching ten named imports.
+export const _internalForTesting = {
+  MEL_SAMPLE_RATE,
+  MEL_N_FFT,
+  MEL_HOP_LENGTH,
+  MEL_N_MELS,
+  MEL_FMIN,
+  MEL_FMAX,
+  hannWindow,
+  createMelFilterbank,
+  computeMelSpectrogram,
+  resampleLinear,
+  hzToMel,
+  melToHz,
+};

@@ -254,7 +254,9 @@ def _load_wav_mono16k(path: Path) -> tuple[np.ndarray, int]:
     """
     with wave.open(str(path), "rb") as wf:
         if wf.getnchannels() != 1:
-            raise ValueError(f"reference WAV must be mono, got {wf.getnchannels()} channels")
+            raise ValueError(
+                f"reference WAV must be mono, got {wf.getnchannels()} channels"
+            )
         sample_rate = wf.getframerate()
         sampwidth = wf.getsampwidth()
         n_frames = wf.getnframes()
@@ -272,7 +274,9 @@ def _load_wav_mono16k(path: Path) -> tuple[np.ndarray, int]:
     return samples, sample_rate
 
 
-def _compute_e2e_embedding(encoder_path: Path, wav_path: Path) -> tuple[np.ndarray, int]:
+def _compute_e2e_embedding(
+    encoder_path: Path, wav_path: Path
+) -> tuple[np.ndarray, int]:
     """Run the encoder on the reference WAV. Returns (l2-normalized embedding, sr).
 
     Imports onnxruntime lazily so the mel-only path doesn't require it.
@@ -346,20 +350,41 @@ def _build_e2e_block(
 
 def _parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Generate speaker encoder golden fixture")
-    p.add_argument("--encoder-onnx", type=Path, default=None,
-                   help="Optional: path to encoder ONNX. If supplied with --reference-wav, "
-                        "appends the layer-2 e2e_cosine_gate block to the fixture.")
-    p.add_argument("--reference-wav", type=Path, default=None,
-                   help="Optional: path to reference WAV (mono, 16kHz). Required when "
-                        "--encoder-onnx is supplied.")
-    p.add_argument("--hf-repo", default="ayousanz/piper-plus-speaker-encoder",
-                   help="HF Hub repo id pinned in the fixture.")
-    p.add_argument("--hf-filename", default="encoder.onnx",
-                   help="HF filename pinned in the fixture.")
-    p.add_argument("--hf-revision", default="v1.0.0",
-                   help="HF revision (tag) pinned in the fixture.")
-    p.add_argument("--cosine-threshold", type=float, default=0.999,
-                   help="Cosine similarity threshold pinned in the fixture.")
+    p.add_argument(
+        "--encoder-onnx",
+        type=Path,
+        default=None,
+        help="Optional: path to encoder ONNX. If supplied with --reference-wav, "
+        "appends the layer-2 e2e_cosine_gate block to the fixture.",
+    )
+    p.add_argument(
+        "--reference-wav",
+        type=Path,
+        default=None,
+        help="Optional: path to reference WAV (mono, 16kHz). Required when "
+        "--encoder-onnx is supplied.",
+    )
+    p.add_argument(
+        "--hf-repo",
+        default="ayousanz/piper-plus-speaker-encoder",
+        help="HF Hub repo id pinned in the fixture.",
+    )
+    p.add_argument(
+        "--hf-filename",
+        default="encoder.onnx",
+        help="HF filename pinned in the fixture.",
+    )
+    p.add_argument(
+        "--hf-revision",
+        default="v1.0.0",
+        help="HF revision (tag) pinned in the fixture.",
+    )
+    p.add_argument(
+        "--cosine-threshold",
+        type=float,
+        default=0.999,
+        help="Cosine similarity threshold pinned in the fixture.",
+    )
     return p.parse_args()
 
 

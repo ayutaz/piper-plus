@@ -784,11 +784,7 @@ def _apply_eu_postprocessing(phonemes: list[str]) -> list[str]:
         # heuristic as the BR final-vowel reduction: at end of list, or
         # next phoneme is space / punctuation.
         next_ph = result[i + 1] if i + 1 < n else None
-        is_final = (
-            next_ph is None
-            or next_ph == " "
-            or next_ph in _PUNCTUATION
-        )
+        is_final = next_ph is None or next_ph == " " or next_ph in _PUNCTUATION
         if not is_final:
             continue
         # Lookback for tʃ / dʒ (BR palatalisation)
