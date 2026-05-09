@@ -151,9 +151,9 @@ nohup /data/piper/.venv/bin/python -m piper_train \
 | 英語 | en | EnglishPhonemizer | g2p-en (Apache-2.0) |
 | 中国語 | zh | ChinesePhonemizer | pypinyin (MIT) |
 | 韓国語 | ko | KoreanPhonemizer | g2pk2 (Apache-2.0, optional) |
-| ES/PT/FR/SV | es/pt(=pt-BR alias)/fr/sv | 各 Phonemizer | 規則ベース (依存なし) |
+| ES/PT/FR/SV | es/pt(=pt-BR)/pt-PT/fr/sv | 各 Phonemizer | 規則ベース (依存なし) |
 
-> **PT alias:** `pt` と `pt-BR` は registry で同一 phonemizer を返す (BR-only 実装)。`pt-PT` (EU) は明示的に `ValueError` を返し、silent な BR fallback を回避。仕様: `docs/spec/pt-dialect-contract.toml`。
+> **PT BR/EU 切替:** `pt` と `pt-BR` は Brazilian Portuguese (BR、 後方互換のため `pt` は BR alias を維持)、 `pt-PT`/`pt-pt` は European Portuguese (EU、 全 8 ランタイム実装)。 `PortuguesePhonemizer(dialect=Dialect.BR | Dialect.EU)` で同一クラス内 dialect 切替。 EU は BR との 5 主要差分 (t/d palatalisation / final-e / final-s / coda-l / r-realization) を post-processing で表現。 IPA 専用 codepoint `ɨ` (中央母音) と `ɫ` (velarised lateral) を PUA contract に追加。 仕様: `docs/spec/pt-dialect-contract.toml`。
 
 > **学習済みモデルは 6 言語 (sv/ko 未含有)、コードは 8 言語対応。**
 
