@@ -656,8 +656,9 @@ mod tests {
         fn rodio_player_zero_target_rate_errors() {
             let result = RodioPlayer::with_sample_rate(0);
             assert!(result.is_err());
+            let err = result.err().expect("just asserted is_err");
             assert!(
-                result.unwrap_err().to_string().contains("sample rate"),
+                err.to_string().contains("sample rate"),
                 "error message should mention sample rate"
             );
         }
@@ -724,26 +725,44 @@ mod tests {
         #[test]
         fn rodio_linear_resample_boundary_values() {
             // Test with extreme i16 values (MIN and MAX) to verify
-            // clamping and interpolation do not overflow or wrap
+            // clamping and interpolation do not overflow or wrap.
+            //
+            // 注: `sample >= i16::MIN && sample <= i16::MAX` を assert しても
+            // output の型が `Vec<i16>` の時点で型システム上常に true で
+            // 検出力が無い (タウトロジー)。代わりに「extreme 入力値が
+            // 出力にそのまま伝播するか」を確認することで、resample 中の
+            // 中間 i32 計算が意図せず縮退して saturate したり丸めで
+            // 0 に潰れる回帰を捕捉する。
             let input = vec![i16::MIN, i16::MAX, i16::MIN, i16::MAX, 0];
             let output = RodioPlayer::linear_resample(&input, 22050, 48000);
 
-            assert!(!output.is_empty(), "resampled output should not be empty");
+            // Up-sampling 22050→48000 は input.len() 以上を返す
+            assert!(
+                output.len() >= input.len(),
+                "up-sampled output ({}) should be at least input length ({})",
+                output.len(),
+                input.len()
+            );
 
-            // Every output sample must stay within valid i16 range
-            for (i, &sample) in output.iter().enumerate() {
-                assert!(
-                    sample >= i16::MIN && sample <= i16::MAX,
-                    "sample[{i}] = {sample} is out of i16 range"
-                );
-            }
-
-            // Verify the extreme values appear in the output (first and
-            // last input samples map directly to output positions)
+            // First / last input sample が output endpoint に保存される
             assert_eq!(
                 output[0],
                 i16::MIN,
-                "first output sample should be i16::MIN"
+                "first output sample should preserve i16::MIN endpoint"
+            );
+            assert_eq!(
+                *output.last().expect("non-empty"),
+                0,
+                "last output sample should preserve 0 endpoint"
+            );
+
+            // Extreme 値が範囲外に逃げていないこと: resample 後も
+            // 元の peak amplitude と同程度の絶対値が観測できる
+            // (内部で 0 に潰れていないことを保証)。
+            let max_abs = output.iter().map(|&s| (s as i32).abs()).max().unwrap_or(0);
+            assert!(
+                max_abs >= (i16::MAX as i32) / 2,
+                "resample collapsed extreme amplitude (max_abs={max_abs})"
             );
         }
     }

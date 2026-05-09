@@ -178,124 +178,16 @@ public sealed class Phase3Tests : IDisposable
     }
 
     // ================================================================
-    // TimingWriter.CalculateTiming
+    // TimingWriter / TimingWriter.WriteJson / TimingWriter.WriteTsv
+    //
+    // 旧 3 テスト (TimingWriter_CalculateTiming_BasicDurations /
+    // TimingWriter_WriteJson_ValidOutput / TimingWriter_WriteTsv_ValidOutput)
+    // は SUT 未呼出 (test 内で計算した数値を test 内で assert /
+    // 匿名 object をシリアライズして自分が書いた値を assert /
+    // StringBuilder で TSV を組んで string.Split を assert) に該当し、
+    // production schema (`total_duration_ms`/`start_ms`/`end_ms`) とも
+    // 矛盾していたため削除。本物の検証は TimingWriterTests.cs に存在。
     // ================================================================
-
-    [Fact]
-    public void TimingWriter_CalculateTiming_BasicDurations()
-    {
-        // This test validates the timing calculation algorithm that mirrors
-        // extractTimingsFromDurations in C++ piper.cpp:
-        //   frameLength = hopSize / sampleRate
-        //   For each phoneme: start = currentTime, end = start + duration * frameLength
-        //   Special tokens (PAD=0, BOS=1, EOS=2) are skipped in output but advance time.
-
-        const int hopSize = 256;
-        const int sampleRate = 22050;
-        float frameLength = (float)hopSize / sampleRate;
-
-        // durations in frames for 3 phonemes
-        float[] durations = [2.0f, 3.0f, 4.0f];
-
-        // Cumulative time check
-        float expectedEnd0 = 2.0f * frameLength;
-        float expectedEnd1 = 5.0f * frameLength; // (2+3) * frameLength
-        float expectedEnd2 = 9.0f * frameLength; // (2+3+4) * frameLength
-
-        Assert.True(Math.Abs(expectedEnd0 - 0.02322f) < 0.001f);
-        Assert.True(expectedEnd1 > expectedEnd0);
-        Assert.True(expectedEnd2 > expectedEnd1);
-    }
-
-    [Fact]
-    public void TimingWriter_WriteJson_ValidOutput()
-    {
-        // Validate JSON timing output format matches C++ outputTimingsAsJSON:
-        // {
-        //   "phonemes": [{ "phoneme": "h", "start": 0.0, "end": 0.045, ... }],
-        //   "text": "...",
-        //   "total_duration": ...,
-        //   "sample_rate": 22050,
-        //   "frame_shift_ms": ...
-        // }
-
-        using var ms = new MemoryStream();
-        using var writer = new StreamWriter(ms, Encoding.UTF8, leaveOpen: true);
-
-        var timingJson = new
-        {
-            phonemes = new[]
-            {
-                new { phoneme = "h", start = 0.0, end = 0.045, start_frame = 0, end_frame = 4 },
-                new { phoneme = "e", start = 0.045, end = 0.120, start_frame = 4, end_frame = 10 },
-            },
-            text = "Hello",
-            total_duration = 0.120,
-            sample_rate = 22050,
-            frame_shift_ms = 256.0 / 22050 * 1000,
-        };
-
-#pragma warning disable IL2026 // Trim analysis — acceptable in test code
-        var jsonOptions = new JsonSerializerOptions
-        {
-            WriteIndented = true,
-            TypeInfoResolver = new System.Text.Json.Serialization.Metadata.DefaultJsonTypeInfoResolver()
-        };
-        string json = JsonSerializer.Serialize(timingJson, jsonOptions);
-#pragma warning restore IL2026
-        writer.Write(json);
-        writer.Flush();
-
-        ms.Position = 0;
-        using var reader = new StreamReader(ms, Encoding.UTF8);
-        string output = reader.ReadToEnd();
-
-        // Parse it back and verify structure
-        using var doc = JsonDocument.Parse(output);
-        var root = doc.RootElement;
-
-        Assert.Equal("Hello", root.GetProperty("text").GetString());
-        Assert.Equal(22050, root.GetProperty("sample_rate").GetInt32());
-        Assert.Equal(2, root.GetProperty("phonemes").GetArrayLength());
-        Assert.Equal("h", root.GetProperty("phonemes")[0].GetProperty("phoneme").GetString());
-        Assert.True(root.GetProperty("total_duration").GetDouble() > 0);
-        Assert.True(root.GetProperty("frame_shift_ms").GetDouble() > 0);
-    }
-
-    [Fact]
-    public void TimingWriter_WriteTsv_ValidOutput()
-    {
-        // Validate TSV timing output format matches C++ outputTimingsAsTSV:
-        // phoneme\tstart\tend\tstart_frame\tend_frame
-        // h\t0\t0.045\t0\t4
-
-        var sb = new StringBuilder();
-        sb.AppendLine("phoneme\tstart\tend\tstart_frame\tend_frame");
-        sb.AppendLine("h\t0\t0.045\t0\t4");
-        sb.AppendLine("e\t0.045\t0.120\t4\t10");
-
-        string tsv = sb.ToString();
-        string[] lines = tsv.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
-
-        // Header
-        Assert.Equal("phoneme\tstart\tend\tstart_frame\tend_frame", lines[0]);
-
-        // First data row
-        string[] cols1 = lines[1].Split('\t');
-        Assert.Equal(5, cols1.Length);
-        Assert.Equal("h", cols1[0]);
-        Assert.Equal("0", cols1[1]);
-        Assert.Equal("0.045", cols1[2]);
-        Assert.Equal("0", cols1[3]);
-        Assert.Equal("4", cols1[4]);
-
-        // Second data row
-        string[] cols2 = lines[2].Split('\t');
-        Assert.Equal("e", cols2[0]);
-        Assert.True(float.TryParse(cols2[1], NumberStyles.Float, CultureInfo.InvariantCulture, out float start2));
-        Assert.True(float.TryParse(cols2[2], NumberStyles.Float, CultureInfo.InvariantCulture, out float end2));
-        Assert.True(end2 > start2);
-    }
 
     // ================================================================
     // StreamingWriter.WriteChunked

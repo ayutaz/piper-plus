@@ -144,14 +144,14 @@ fn e2e_cosine_gate_against_pinned_embedding() {
         );
     }
 
-    if let Some(expected_sha) = gate.encoder_onnx.sha256.as_deref() {
-        if !expected_sha.is_empty() {
-            let actual_sha = sha256_file(&encoder_path).expect("sha256");
-            assert_eq!(
-                actual_sha, expected_sha,
-                "encoder ONNX sha256 mismatch (silent upstream replacement?)"
-            );
-        }
+    if let Some(expected_sha) = gate.encoder_onnx.sha256.as_deref()
+        && !expected_sha.is_empty()
+    {
+        let actual_sha = sha256_file(&encoder_path).expect("sha256");
+        assert_eq!(
+            actual_sha, expected_sha,
+            "encoder ONNX sha256 mismatch (silent upstream replacement?)"
+        );
     }
 
     let wav_path = {

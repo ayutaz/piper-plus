@@ -73,9 +73,13 @@ def main() -> int:
         ("voice.py SHORT_TEXT_CHARS", VOICE_PATH, "SHORT_TEXT_CHARS", contract["ssml_injection"]["short_text_chars"]),
         ("voice.py SILENCE_PAD_MS", VOICE_PATH, "SILENCE_PAD_MS", contract["ssml_injection"]["silence_pad_ms"]),
         ("voice.py TRIM_THRESHOLD_RMS", VOICE_PATH, "TRIM_THRESHOLD_RMS", contract["trim"]["threshold_rms"]),
+        ("voice.py NOISE_SCALE_MIN_RATIO", VOICE_PATH, "NOISE_SCALE_MIN_RATIO", contract["scales"]["noise_scale_min_ratio"]),
+        ("voice.py NOISE_W_MIN_RATIO", VOICE_PATH, "NOISE_W_MIN_RATIO", contract["scales"]["noise_w_min_ratio"]),
         ("infer_onnx.py MIN_PHONEME_IDS", INFER_ONNX_PATH, "MIN_PHONEME_IDS", contract["padding"]["min_phoneme_ids"]),
         ("infer_onnx.py MIN_BODY_FOR_STRATEGY_A", INFER_ONNX_PATH, "MIN_BODY_FOR_STRATEGY_A", contract["padding"]["min_body_for_strategy_a"]),
         ("infer_onnx.py TRIM_THRESHOLD_RMS", INFER_ONNX_PATH, "TRIM_THRESHOLD_RMS", contract["trim"]["threshold_rms"]),
+        ("infer_onnx.py NOISE_SCALE_MIN_RATIO", INFER_ONNX_PATH, "NOISE_SCALE_MIN_RATIO", contract["scales"]["noise_scale_min_ratio"]),
+        ("infer_onnx.py NOISE_W_MIN_RATIO", INFER_ONNX_PATH, "NOISE_W_MIN_RATIO", contract["scales"]["noise_w_min_ratio"]),
     ]
 
     errors: list[str] = []

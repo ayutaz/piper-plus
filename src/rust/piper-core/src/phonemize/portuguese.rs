@@ -1233,9 +1233,9 @@ fn apply_eu_postprocessing(tokens: &mut [String]) {
     }
 
     // Pass 4: r-canonicalisation (h → ʁ).
-    for i in 0..n {
-        if tokens[i] == "h" {
-            tokens[i] = "ʁ".to_string();
+    for token in tokens.iter_mut().take(n) {
+        if token == "h" {
+            *token = "ʁ".to_string();
         }
     }
 }

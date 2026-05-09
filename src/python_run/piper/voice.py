@@ -66,6 +66,13 @@ TRIM_MIN_SAMPLES = 2205  # 22050 Hz * 0.1 s
 # for users who hit a thread-safety issue in a third-party G2P backend.
 _G2P_AUTO_PARALLELISM_CAP = 4
 
+# Strategy B: noise floor multipliers for short sequences. The contract gate
+# (scripts/check_short_text_contract.py) requires named constants so the
+# values can be drift-checked against [scales] in
+# docs/spec/short-text-contract.toml; do not inline.
+NOISE_SCALE_MIN_RATIO = 0.5
+NOISE_W_MIN_RATIO = 0.4
+
 
 def _resolve_g2p_parallelism(n_sentences: int) -> int:
     """Resolve effective G2P parallelism for phonemize().
@@ -884,8 +891,8 @@ class PiperVoice:
         original_len = len(phoneme_ids)
         if original_len < MIN_PHONEME_IDS:
             ratio = max(0.0, min(original_len / MIN_PHONEME_IDS, 1.0))
-            noise_scale *= max(0.5, ratio)
-            noise_w *= max(0.4, ratio)
+            noise_scale *= max(NOISE_SCALE_MIN_RATIO, ratio)
+            noise_w *= max(NOISE_W_MIN_RATIO, ratio)
 
         # Strategy A: pad short sequences with silence tokens
         pad_id = 0

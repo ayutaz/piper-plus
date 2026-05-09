@@ -81,10 +81,33 @@ TEST(PhonemeMappingTest, NVariantsAreContiguous) {
     // applyNPhonemeRules() and consumed downstream as N_m / N_n / N_ng /
     // N_uvular. They must form a contiguous block so that token_mapper /
     // phoneme_parser can iterate in order.
-    EXPECT_EQ(0xE019u, 0xE019u);  // N_m
-    EXPECT_EQ(0xE01Au - 0xE019u, 1u);
-    EXPECT_EQ(0xE01Bu - 0xE01Au, 1u);
-    EXPECT_EQ(0xE01Cu - 0xE01Bu, 1u);
+    //
+    // Look up the codepoints from kCanonicalPuaMap (the canonical map
+    // shared with the rest of the test suite) so this test exercises the
+    // map itself rather than asserting `0xE019 == 0xE019` (tautology).
+    auto find_codepoint = [](const std::string &phoneme) -> uint32_t {
+        for (const auto &c : kCanonicalPuaMap) {
+            if (c.phoneme == phoneme) {
+                return c.codepoint;
+            }
+        }
+        return 0u;  // sentinel: not found
+    };
+
+    const uint32_t nm = find_codepoint("N_m");
+    const uint32_t nn = find_codepoint("N_n");
+    const uint32_t nng = find_codepoint("N_ng");
+    const uint32_t nuvular = find_codepoint("N_uvular");
+
+    ASSERT_NE(nm, 0u) << "N_m absent from kCanonicalPuaMap";
+    ASSERT_NE(nn, 0u) << "N_n absent from kCanonicalPuaMap";
+    ASSERT_NE(nng, 0u) << "N_ng absent from kCanonicalPuaMap";
+    ASSERT_NE(nuvular, 0u) << "N_uvular absent from kCanonicalPuaMap";
+
+    EXPECT_EQ(nn, nm + 1u) << "N_m -> N_n is not contiguous (nm=" << std::hex
+                           << nm << " nn=" << nn << ")";
+    EXPECT_EQ(nng, nn + 1u) << "N_n -> N_ng is not contiguous";
+    EXPECT_EQ(nuvular, nng + 1u) << "N_ng -> N_uvular is not contiguous";
 }
 
 // =========================================================================
