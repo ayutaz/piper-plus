@@ -7,12 +7,22 @@ if(WIN32)
 elseif(NOT DEFINED ONNXRUNTIME_DIR)
   # Linux/macOS: Download pre-built ONNX Runtime if not already available
   #
-  # Issue #383 follow-up: ORT 1.17.0 では multilingual-test-medium.onnx の
-  # 読み込み時に "The given version [14] is not supported, only version 1 to 10"
-  # エラーで model-loading test が SEH crash する。1.20.0 以降の ortformat
-  # / operator schema バージョンで解消される。Kotlin G2P CI でも既に 1.20.0
-  # を採用済み (.github/workflows/kotlin-g2p-ci.yml)。iOS/Android release
-  # workflow の固定値 (1.17.0) はこの PR の範囲外で別途検証。
+  # Source of truth for the C++ pipeline ORT version. The CI gate
+  # `scripts/check_ort_versions.py` (workflow: ort-version-sync.yml) cross-
+  # checks every cmake / GitHub Actions reference against this value.
+  #
+  # Issue #383 follow-up: bumped 1.17.0 → 1.20.0 alongside the parallelism
+  # work. The proximate trigger was a Windows model-load SEH (`The given
+  # version [14] is not supported, only version 1 to 10`); investigation in
+  # `tools/benchmark/issue-383/cpp_ort_upgrade.md` showed the real root
+  # cause was the loader picking up an older `onnxruntime.dll` from
+  # System32, not 1.17.0 itself. Fixed by staging the bundled DLL next to
+  # test executables (commit 734aa5c6) and by upgrading the pipeline ORT
+  # to 1.20.0 across cmake + the iOS/Android release workflows
+  # (`release-shared-lib.yml`, `android-build.yml`, `release-kotlin-g2p.yml`,
+  # `build-piper.yml`, `_build-test-cpp.yml`) so all artefacts ship the
+  # same runtime version. Updating this constant is the canonical change;
+  # the CI gate fails if any of the above drift away from it.
   set(ONNXRUNTIME_VERSION "1.20.0")
   if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|ARM64")
     if(APPLE)

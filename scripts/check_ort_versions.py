@@ -74,7 +74,12 @@ VERSION_PATTERNS: list[re.Pattern[str]] = [
         r'github\.com/microsoft/onnxruntime/releases/download/v(\d+\.\d+\.\d+)/'
     ),
     # archive file names: onnxruntime-{linux,osx,win}-*-1.20.0.{tgz,zip}
-    re.compile(r'onnxruntime-(?:linux|osx|win|android)-[a-z0-9_]+-(\d+\.\d+\.\d+)'),
+    # The arch segment allows hyphens (e.g. ``x64-gpu``) so suffix variants
+    # such as ``onnxruntime-linux-x64-gpu-1.20.0.tgz`` (GPU build) or
+    # ``onnxruntime-win-x64-cuda-1.20.0.zip`` are still picked up by the
+    # gate; otherwise a workflow could drift on a GPU/CUDA archive name
+    # while keeping the surrounding ``vX.Y.Z`` URL aligned.
+    re.compile(r'onnxruntime-(?:linux|osx|win|android)-[a-z0-9_-]+-(\d+\.\d+\.\d+)'),
     # Microsoft CDN pod-archive
     re.compile(r'download\.onnxruntime\.ai/pod-archive-onnxruntime-c-(\d+\.\d+\.\d+)'),
     # Maven Central onnxruntime-android/<version>/onnxruntime-android-<version>.aar
