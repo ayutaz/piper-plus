@@ -6,6 +6,10 @@
     <RootNamespace>PiperPlus.Core.Tests</RootNamespace>
     <IsPackable>false</IsPackable>
     <IsTrimmable>false</IsTrimmable>
+    <!-- Test assembly never goes through trimming/AOT, so reflection-based
+         JSON deserialization is safe and matches developer expectations.
+         Overrides Directory.Build.props which disables it for production. -->
+    <JsonSerializerIsReflectionEnabledByDefault>true</JsonSerializerIsReflectionEnabledByDefault>
   </PropertyGroup>
 
   <ItemGroup>

@@ -400,12 +400,14 @@ internal static class Program
                 // error instead of a misleading "Model not found" when both
                 // are passed together.  A model is conditioned on either a
                 // discrete sid or a speaker embedding, never both.
-                // `GetResult(speakerOption)` distinguishes an explicit
-                // `--speaker N` from the default `0` value.
+                // System.CommandLine v2 returns a non-null OptionResult even
+                // for the default value, so distinguish "user typed --speaker"
+                // from "default 0 applied" via Tokens.Count > 0.
                 {
                     string? earlyReferenceAudioPath = parseResult.GetValue(referenceAudioOption);
                     string? earlySpeakerEmbeddingPath = parseResult.GetValue(speakerEmbeddingOption);
-                    bool earlySpeakerExplicit = parseResult.GetResult(speakerOption) is not null;
+                    var earlySpeakerResult = parseResult.GetResult(speakerOption);
+                    bool earlySpeakerExplicit = earlySpeakerResult is { Tokens.Count: > 0 };
                     bool earlyHasCloningSource =
                         !string.IsNullOrEmpty(earlyReferenceAudioPath)
                         || !string.IsNullOrEmpty(earlySpeakerEmbeddingPath);
