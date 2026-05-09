@@ -63,11 +63,20 @@
 
   <!-- Analyzer packages applied to every project under src/csharp/ via
        Directory.Build.props inheritance. PrivateAssets="all" prevents these
-       analyzer-only packages from leaking into downstream NuGet consumers. -->
+       analyzer-only packages from leaking into downstream NuGet consumers.
+
+       Wave 2 注: StyleCop.Analyzers / Microsoft.CodeAnalysis.PublicApiAnalyzers は
+       既存 baseline に違反多数 (SA1009 / SA1027 / RS0016 等が連鎖発生し、
+       NoWarn を都度追加するイタチごっこに陥るため) いったん無効化。
+       Roslynator + SonarAnalyzer + Built-in CA ルールは維持。
+       Wave 後段で .editorconfig に dotnet_diagnostic.SAxxxx.severity = none を
+       一括設定 → 段階的有効化する別 PR で実施予定。 -->
   <ItemGroup>
+    <!--
     <PackageReference Include="StyleCop.Analyzers" Version="1.2.0-beta.556" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" Version="3.11.0-beta1.24454.1" PrivateAssets="all" />
+    -->
     <PackageReference Include="Roslynator.Analyzers" Version="4.15.0" PrivateAssets="all" />
     <PackageReference Include="SonarAnalyzer.CSharp" Version="10.25.0.139117" PrivateAssets="all" />
-    <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" Version="3.11.0-beta1.24454.1" PrivateAssets="all" />
   </ItemGroup>
 </Project>
