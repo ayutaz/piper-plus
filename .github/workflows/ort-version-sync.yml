@@ -64,7 +64,10 @@ jobs:
         # silently dropped GPU/CUDA suffix shapes (e.g. linux-x64-gpu) until
         # the `[a-z0-9_-]+` fix. Run the unit tests so a future regex tweak
         # cannot regress detection without CI noticing.
-        run: pytest scripts/test_check_ort_versions.py -v
+        # Override pytest.ini's addopts (which include --cov flags requiring
+        # pytest-cov) so this gate stays self-contained — the script lives at
+        # scripts/ and has no production code to cover.
+        run: pytest scripts/test_check_ort_versions.py -v --override-ini="addopts="
 
       - name: Run ORT version sync gate
         run: python scripts/check_ort_versions.py --verbose

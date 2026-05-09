@@ -89,7 +89,8 @@ fn ja_concurrent_stress_no_panic() {
     }
 
     for (i, h) in handles.into_iter().enumerate() {
-        h.join().unwrap_or_else(|_| panic!("worker thread {} panicked", i));
+        h.join()
+            .unwrap_or_else(|_| panic!("worker thread {} panicked", i));
     }
 }
 

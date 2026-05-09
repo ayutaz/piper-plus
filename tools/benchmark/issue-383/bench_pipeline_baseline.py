@@ -16,21 +16,21 @@ from __future__ import annotations
 import argparse
 import json
 import statistics
+import sys
 import time
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 import numpy as np
 
-# Allow running without `pip install -e` for python_run.
-import sys
 
+# Allow running without `pip install -e` for python_run.
 REPO_ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(REPO_ROOT / "src" / "python_run"))
 sys.path.insert(0, str(REPO_ROOT / "src" / "python"))
 
-from piper.voice import PiperVoice  # noqa: E402
 from piper.phonemize.japanese import clear_phonemize_cache  # noqa: E402
+from piper.voice import PiperVoice  # noqa: E402
 
 
 @dataclass
@@ -92,7 +92,6 @@ def run_once(
     language_id: int | None = 0,
 ) -> RunResult:
     """1 回分の計測。voice.synthesize_stream_raw と同じパスを再現。"""
-    n_sentences_target = -1  # filled later
     t_total_start = time.perf_counter()
 
     # Step 1: phonemize() — 全文の G2P (現状はループで sentence ごとに実行)

@@ -77,7 +77,10 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let load_start = Instant::now();
     let voice = PiperVoice::load(&model_path, Some(&config_path), "cpu")?;
-    eprintln!("voice loaded in {:.1} ms", load_start.elapsed().as_secs_f64() * 1000.0);
+    eprintln!(
+        "voice loaded in {:.1} ms",
+        load_start.elapsed().as_secs_f64() * 1000.0
+    );
 
     // Print resolved parallelism for sanity check
     for &n in &ns {

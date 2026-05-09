@@ -555,7 +555,9 @@ impl PiperVoice {
         sentences: &[S],
     ) -> Vec<Result<Vec<i64>, PiperError>> {
         let parallelism = resolve_g2p_parallelism(sentences.len());
-        map_sentences_parallel(sentences, parallelism, |s| self.phonemize_to_ids(s.as_ref()))
+        map_sentences_parallel(sentences, parallelism, |s| {
+            self.phonemize_to_ids(s.as_ref())
+        })
     }
 
     /// ZH-EN code-switching dispatch (Issue #384) を有効/無効化する。

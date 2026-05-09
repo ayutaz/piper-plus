@@ -1,3 +1,5 @@
+//go:build integration
+
 package piperplus
 
 // Issue #383 follow-up: regression coverage for JA-specific G2P races
@@ -9,9 +11,10 @@ package piperplus
 // phonemize backend.
 //
 // Skips when PIPER_TEST_MODEL is unset (no CGO model fixture available).
-// This mirrors the CGO-gating already used by every model-loading test in
-// this package — keeping the convention avoids duplicating fixture setup
-// or introducing a new build tag the CI matrix isn't aware of.
+// The `//go:build integration` tag matches engine_test.go / init_test.go so
+// the model-loading helpers (testModelPath, TestMain runtime init) are
+// visible — without it `go vet` and golangci-lint can't see them and fail
+// with "undefined: testModelPath".
 
 import (
 	"bytes"

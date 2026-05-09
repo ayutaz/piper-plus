@@ -64,7 +64,7 @@ func main() {
 
 	loadOpts := []piperplus.LoadOption{}
 	if *configFlag != "" {
-		loadOpts = append(loadOpts, piperplus.WithConfigPath(*configFlag))
+		loadOpts = append(loadOpts, piperplus.WithConfig(*configFlag))
 	}
 	loadStart := time.Now()
 	voice, err := piperplus.LoadVoice(ctx, *modelFlag, loadOpts...)

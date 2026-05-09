@@ -81,4 +81,20 @@ func TestShutdown(t *testing.T) {
 	if err := Shutdown(); err != nil {
 		t.Fatalf("Shutdown returned error: %v", err)
 	}
+	// Re-init the runtime for subsequent tests in the same `go test` run.
+	// Issue #383 follow-up (PR #403): TestShutdown left the runtime down,
+	// causing later integration tests (alphabetically-after, e.g.
+	// streaming_stress_test.go's TestSynthesizeStream_JaConcurrent) to fail
+	// LoadVoice with "InitializeRuntime() has either not yet been called".
+	// t.Cleanup runs after the test body completes, so the next test sees a
+	// ready runtime. TestMain.Shutdown still fires at the end of the run.
+	t.Cleanup(func() {
+		libPath := os.Getenv("ONNX_RUNTIME_SHARED_LIBRARY_PATH")
+		if libPath == "" {
+			return
+		}
+		if err := Init(libPath); err != nil {
+			t.Logf("re-init after TestShutdown failed: %v", err)
+		}
+	})
 }
