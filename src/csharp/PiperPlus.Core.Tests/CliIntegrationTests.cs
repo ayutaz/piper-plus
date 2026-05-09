@@ -528,7 +528,7 @@ public sealed class CliIntegrationTests
     // Voice-cloning option wiring (--reference-audio / --speaker-embedding)
     // ================================================================
 
-    [Fact(Skip = "Voice-cloning validation does not propagate non-zero exit code through --test-mode path; tracked as P3 follow-up issue")]
+    [Fact]
     [Trait("Category", "CLI")]
     public async Task ReferenceAudio_WithoutSpeakerEncoderModel_Errors()
     {
@@ -546,7 +546,7 @@ public sealed class CliIntegrationTests
         Assert.Contains("--speaker-encoder-model", combined, StringComparison.Ordinal);
     }
 
-    [Fact(Skip = "Voice-cloning validation does not propagate non-zero exit code through --test-mode path; tracked as P3 follow-up issue")]
+    [Fact]
     [Trait("Category", "CLI")]
     public async Task SpeakerEmbedding_InvalidFileSize_Errors()
     {
@@ -574,7 +574,7 @@ public sealed class CliIntegrationTests
         }
     }
 
-    [Fact(Skip = "Voice-cloning validation does not propagate non-zero exit code through --test-mode path; tracked as P3 follow-up issue")]
+    [Fact]
     [Trait("Category", "CLI")]
     public async Task SpeakerEmbedding_EmptyFile_Errors()
     {
