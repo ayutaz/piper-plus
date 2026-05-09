@@ -21,6 +21,7 @@ on:
       - '.github/workflows/build-piper.yml'
       - '.github/workflows/_build-test-cpp.yml'
       - 'scripts/check_ort_versions.py'
+      - 'scripts/test_check_ort_versions.py'
       - '.github/workflows/ort-version-sync.yml'
   pull_request:
     paths:
@@ -33,6 +34,7 @@ on:
       - '.github/workflows/build-piper.yml'
       - '.github/workflows/_build-test-cpp.yml'
       - 'scripts/check_ort_versions.py'
+      - 'scripts/test_check_ort_versions.py'
       - '.github/workflows/ort-version-sync.yml'
   workflow_dispatch:
 
@@ -53,6 +55,16 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
+
+      - name: Install pytest
+        run: python -m pip install --upgrade pip pytest
+
+      - name: Pin regex contract (test_check_ort_versions.py)
+        # Issue #383 follow-up review on PR #403: the archive-filename regex
+        # silently dropped GPU/CUDA suffix shapes (e.g. linux-x64-gpu) until
+        # the `[a-z0-9_-]+` fix. Run the unit tests so a future regex tweak
+        # cannot regress detection without CI noticing.
+        run: pytest scripts/test_check_ort_versions.py -v
 
       - name: Run ORT version sync gate
         run: python scripts/check_ort_versions.py --verbose
