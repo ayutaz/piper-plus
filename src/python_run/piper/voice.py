@@ -740,9 +740,15 @@ class PiperVoice:
 
         from concurrent.futures import ThreadPoolExecutor
 
-        # Use a context manager so the pool shuts down even if the caller
-        # abandons the generator (e.g. early break on the consumer side).
-        with ThreadPoolExecutor(max_workers=parallelism) as pool:
+        # try/finally with explicit shutdown(wait=False, cancel_futures=True)
+        # is used instead of ``with ThreadPoolExecutor`` so that an early
+        # break on the consumer side (or any other generator abandonment)
+        # cancels still-queued G2P tasks instead of waiting for them. The
+        # plain context-manager exit defaults to ``wait=True`` which would
+        # add up to ``G2P_total - G2P_first`` of useless latency to caller's
+        # ``break``.
+        pool = ThreadPoolExecutor(max_workers=parallelism)
+        try:
             futures = [pool.submit(phonemize_one, s) for s in sentences]
 
             def _phoneme_iter() -> Iterable[list[str]]:
@@ -760,6 +766,8 @@ class PiperVoice:
                 volume=volume,
                 language_id=language_id,
             )
+        finally:
+            pool.shutdown(wait=False, cancel_futures=True)
 
     def _stream_phonemes_to_audio(
         self,

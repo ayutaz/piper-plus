@@ -111,6 +111,89 @@ def test_map_sentences_propagates_exceptions():
 
 
 # ---------------------------------------------------------------------------
+# synthesize_stream_raw early-abort behaviour (issue #383 follow-up).
+#
+# `with ThreadPoolExecutor as pool` defaults to ``wait=True, cancel_futures=False``,
+# which would force the consumer's ``break`` to wait until every queued G2P
+# finishes. The implementation uses an explicit
+# ``shutdown(wait=False, cancel_futures=True)`` so an early break truly cuts
+# the rest of the work.
+# ---------------------------------------------------------------------------
+
+
+def test_synthesize_stream_raw_early_break_cancels_queued_g2p(monkeypatch):
+    """Consumer-side ``break`` should cancel still-queued G2P submissions.
+
+    We feed many slow sentences and break after the first chunk. The total
+    number of G2P calls should be far less than the sentence count (the
+    queued futures are cancelled when the generator is abandoned).
+    """
+    import threading
+    import time
+    from unittest.mock import MagicMock
+
+    from piper.config import PhonemeType, PiperConfig
+    from piper.voice import PiperVoice
+
+    config = PiperConfig(
+        num_symbols=100,
+        num_speakers=1,
+        sample_rate=22050,
+        length_scale=1.0,
+        noise_scale=0.667,
+        noise_w=0.8,
+        phoneme_id_map={"_": [0], "^": [1], "$": [2], "a": [10]},
+        phoneme_type=PhonemeType.MULTILINGUAL,
+    )
+
+    voice = MagicMock(spec=PiperVoice)
+    voice.config = config
+    voice.session = MagicMock()
+
+    sentences = [f"sentence_{i}." for i in range(50)]
+    voice._split_sentences = MagicMock(return_value=sentences)
+
+    g2p_call_count = 0
+    g2p_lock = threading.Lock()
+
+    def slow_phonemize(sentence: str) -> list[str]:
+        nonlocal g2p_call_count
+        with g2p_lock:
+            g2p_call_count += 1
+        # Simulate a slow G2P backend so the test can break before all
+        # queued sentences complete. 50ms × 50 sentences ≈ 2.5s if all
+        # ran serially; with parallelism=4 still ~600ms.
+        time.sleep(0.05)
+        return ["a"]
+
+    voice._phonemize_one_factory = MagicMock(return_value=slow_phonemize)
+    voice.phonemes_to_ids = MagicMock(return_value=[1, 10, 2])
+    voice._stream_phonemes_to_audio = (
+        lambda phonemes_iter, break_b, silence_b, **kw: (
+            break_b + b"AUDIO" + break_b + silence_b for _ in phonemes_iter
+        )
+    )
+
+    monkeypatch.setenv("PIPER_G2P_PARALLELISM", "4")
+
+    gen = PiperVoice.synthesize_stream_raw(voice, "x" * 200)  # bypass short-text
+    # Pull just one chunk and abandon.
+    first = next(gen)
+    assert b"AUDIO" in first
+    gen.close()
+
+    # If shutdown waited or cancel_futures was disabled, all 50 sentences
+    # would eventually run. With cancel_futures=True we expect well below
+    # half (1 returned + max_workers=4 in flight + a few queued before
+    # cancel kicks in).
+    assert g2p_call_count < len(sentences) // 2, (
+        f"Expected most G2P tasks to be cancelled, but {g2p_call_count}/"
+        f"{len(sentences)} ran. Did shutdown(wait=False, cancel_futures=True) "
+        f"break?"
+    )
+
+
+# ---------------------------------------------------------------------------
 # Integration: PiperVoice.phonemize() — serial vs parallel result must match.
 # Skipped if the test model / pyopenjtalk-plus are not available.
 # ---------------------------------------------------------------------------
