@@ -87,6 +87,74 @@ repos:
         files: \.go$
         pass_filenames: false
 
+  # ---------------------------------------------------------------------------
+  # Cross-language lint hooks — added 2026-05 after PR #401 cycle of shame.
+  #
+  # Why these run at commit time (not push / CI only): repeated round-trips
+  # through CI to fix lint drift cost much more than waiting locally. The
+  # heaviest hooks (cargo clippy ~30-120s, dotnet format ~30-60s on a cold
+  # cache) are still cheaper than a CI red mark + push round-trip.
+  #
+  # Skip rules (user-side):
+  #   git commit --no-verify              # bypass once (CI still gates)
+  #   SKIP=cargo-clippy git commit ...    # skip a specific hook
+  #   SKIP=cargo-clippy,dotnet-format ... # skip multiple
+  # ---------------------------------------------------------------------------
+  - repo: local
+    hooks:
+      - id: mypy-g2p
+        name: mypy --ignore-missing-imports (g2p, Python)
+        # Mirror of .github/workflows/g2p-python-ci.yml step.
+        entry: bash -c 'cd src/python/g2p && uv run mypy --ignore-missing-imports piper_plus_g2p/'
+        language: system
+        files: ^src/python/g2p/piper_plus_g2p/.*\.py$
+        pass_filenames: false
+
+      - id: cargo-clippy
+        name: cargo clippy --workspace --all-features --all-targets -- -D warnings (Rust)
+        # Mirror of .github/workflows/rust-tests.yml step. Catches issues
+        # like needless_range_loop / collapsible_if / items_after_test_module
+        # / absurd_extreme_comparisons before they hit CI (PR #401 needed
+        # 4 follow-up commits for these).
+        entry: bash -c 'cd src/rust && cargo clippy --workspace --all-features --all-targets -- -D warnings'
+        language: system
+        files: \.rs$
+        pass_filenames: false
+
+      - id: go-vet
+        name: go vet (Go)
+        # Mirror of .github/workflows/go-ci.yml step. Catches assignments
+        # to undefined fields, unreachable code, etc.
+        entry: bash -c 'cd src/go && go vet ./... ./phonemize/...'
+        language: system
+        files: \.go$
+        pass_filenames: false
+
+      - id: dotnet-format
+        name: dotnet format --verify-no-changes (C#)
+        # Mirror of .github/workflows/csharp-ci.yml + ci.yml. Heavy on a cold
+        # cache (~60s) but seconds once the SDK has materialized the analyzer
+        # cache. Use SKIP=dotnet-format on tiny non-C# commits if needed.
+        #
+        # Requires .NET SDK matching global.json (currently 10.0.100).
+        # If the SDK is missing the hook *skips with a warning* rather than
+        # blocking commits — CI still gates merges. Install .NET 10 from
+        # https://dotnet.microsoft.com/download/dotnet/10.0 to enable.
+        entry: scripts/hooks/dotnet-format-check.sh
+        language: system
+        files: \.cs$
+        pass_filenames: false
+
+      - id: golangci-lint
+        name: golangci-lint run (Go)
+        # Mirror of .github/workflows/go-ci.yml + g2p-go-publish.yml. Skips
+        # with a warning when the binary is absent — CI still gates. Install
+        # via `brew install golangci-lint` to enable locally.
+        entry: scripts/hooks/golangci-lint-check.sh
+        language: system
+        files: ^src/go/.*\.go$
+        pass_filenames: false
+
   # PUA-related checks. These only run when files in the regression-prone
   # set actually change, so the typical `git commit` is unaffected.
   - repo: local
