@@ -107,7 +107,9 @@ jobs:
 
       - name: Run PUA invariant tests (G2P)
         working-directory: src/python/g2p
-        run: uv run pytest tests/test_pua_invariants.py -v
+        # `--no-cov` で coverage 計測を無効化 (test_pua_invariants.py のみ
+        # 実行するため、coverage 閾値 80% を満たさない誤検知を回避)
+        run: uv run pytest tests/test_pua_invariants.py -v --no-cov
 
       - name: Install piper_train deps
         working-directory: src/python
@@ -115,7 +117,9 @@ jobs:
 
       - name: Run update_model_config validate tests
         working-directory: src/python
-        run: uv run pytest tests/test_update_model_config.py -v
+        # `--no-cov` で coverage 計測を無効化 (単一テスト実行で coverage 閾値 70%
+        # を満たさない誤検知を回避)
+        run: uv run pytest tests/test_update_model_config.py -v --no-cov
 
   rust-pua-tests:
     name: Rust PUA table tests

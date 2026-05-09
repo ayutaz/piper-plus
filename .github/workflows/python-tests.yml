@@ -93,13 +93,15 @@ jobs:
       if: runner.os != 'Windows'
       run: |
         cd src/python
-        pytest tests/ -v --tb=short -m "integration and not benchmark"
+        # `--no-cov` で coverage 計測を無効化 (subset 実行のため 70% 閾値を
+        # 満たさず誤検知。ガッツリ unit test 側の "Run unit tests" で計測)
+        pytest tests/ -v --tb=short -m "integration and not benchmark" --no-cov
 
     - name: Run inference tests (Unix only)
       if: runner.os != 'Windows'
       run: |
         cd src/python
-        pytest tests/ -v --tb=short -m "inference and unit"
+        pytest tests/ -v --tb=short -m "inference and unit" --no-cov
 
     - name: Run training tests (Unix only)
       # Issue #XXX: training-marked tests (WavLM Discriminator + SpeakerBalancedBatchSampler 等)
@@ -107,7 +109,7 @@ jobs:
       if: runner.os != 'Windows'
       run: |
         cd src/python
-        pytest tests/ -v --tb=short -m "training and unit"
+        pytest tests/ -v --tb=short -m "training and unit" --no-cov
 
     # ---------------------------------------------------------------
     # Runtime package tests (src/python_run — PyPI piper-plus)

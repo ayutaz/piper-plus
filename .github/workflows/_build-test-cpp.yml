@@ -127,6 +127,11 @@ jobs:
           fi
 
           # Sanitizer flags (caller-driven; default 'none' is a no-op)
+          # Note: SANITIZER_FLAGS が空白を含むため、`-DCMAKE_CXX_FLAGS=...` を
+          # CMAKE_ARGS に inline すると shell word splitting で `-g` が独立した
+          # CMake argument と誤認識される (CMake Error: Unknown argument -g)。
+          # 環境変数 CXXFLAGS / CFLAGS / LDFLAGS 経由で CMake に渡すことで
+          # quoting 問題を完全回避する。
           SANITIZER_FLAGS=""
           case "${{ inputs.sanitizer }}" in
             asan) SANITIZER_FLAGS="-fsanitize=address -fno-omit-frame-pointer -g" ;;
@@ -136,8 +141,10 @@ jobs:
             *) echo "Unknown sanitizer: ${{ inputs.sanitizer }}" >&2; exit 1 ;;
           esac
           if [ -n "$SANITIZER_FLAGS" ]; then
-            echo "Enabling sanitizer flags: $SANITIZER_FLAGS"
-            CMAKE_ARGS="${CMAKE_ARGS} -DCMAKE_CXX_FLAGS=${SANITIZER_FLAGS} -DCMAKE_C_FLAGS=${SANITIZER_FLAGS} -DCMAKE_EXE_LINKER_FLAGS=${SANITIZER_FLAGS} -DCMAKE_SHARED_LINKER_FLAGS=${SANITIZER_FLAGS}"
+            echo "Enabling sanitizer flags via env: $SANITIZER_FLAGS"
+            export CXXFLAGS="$SANITIZER_FLAGS"
+            export CFLAGS="$SANITIZER_FLAGS"
+            export LDFLAGS="$SANITIZER_FLAGS"
           fi
 
           if [ "${{ runner.os }}" == "Windows" ]; then
