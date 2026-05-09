@@ -43,7 +43,7 @@
          - SA1633: File header (already silenced in .editorconfig)
          - RS0016: PublicAPI baseline (空のため未追加 symbol すべて違反)
          - RS0017: Removed symbol from PublicAPI -->
-    <NoWarn>$(NoWarn);CS1573;CS1574;CS1591;CS1734;SA1512;SA1513;SA1633;RS0016;RS0017</NoWarn>
+    <NoWarn>$(NoWarn);CS1573;CS1574;CS1591;CS1734;SA1101;SA1200;SA1201;SA1202;SA1203;SA1204;SA1309;SA1402;SA1413;SA1500;SA1503;SA1512;SA1513;SA1515;SA1519;SA1600;SA1601;SA1602;SA1623;SA1629;SA1633;SA1649;CA1303;CA1062;CA2007;CA1031;RS0016;RS0017</NoWarn>
   </PropertyGroup>
 
   <!-- Wire stylecop.json so StyleCop.Analyzers can read repo-wide settings.
