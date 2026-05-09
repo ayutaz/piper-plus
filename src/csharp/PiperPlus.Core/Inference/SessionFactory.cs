@@ -119,7 +119,8 @@ public static class SessionFactory
         // COLD-M5 + F1/D5: 最適化済みモデルキャッシュ
         // キャッシュパスにデバイス名を含める (D5: CPU/CUDA 混用防止)。
         // センチネルファイル (.ok) で書き込み完了を保証 (F1: 中断耐性)。
-        var deviceLabel = useCuda ? $"cuda{resolvedDeviceId}" : "cpu";
+        var deviceStr = useCuda ? $"cuda:{resolvedDeviceId}" : "cpu";
+        var deviceLabel = GetDeviceLabel(deviceStr);
         var optimizedPath = Path.ChangeExtension(modelPath, $".{deviceLabel}.opt.onnx");
         var sentinelPath = optimizedPath + ".ok";
         string effectiveModelPath;
@@ -334,6 +335,59 @@ public static class SessionFactory
     }
 
     // ------------------------------------------------------------------
+    // Public EP resolution helpers
+    // ------------------------------------------------------------------
+
+    /// <summary>
+    /// Resolves the effective device string, applying the
+    /// <c>PIPER_EXECUTION_PROVIDER</c> environment variable when set.
+    /// Priority: env var &gt; <paramref name="device"/> parameter.
+    /// </summary>
+    /// <param name="device">
+    /// Device string from the CLI (e.g. <c>"auto"</c>, <c>"cpu"</c>,
+    /// <c>"cuda:0"</c>, <c>"coreml"</c>). Defaults to <c>"auto"</c>.
+    /// </param>
+    /// <returns>
+    /// Lower-cased device string with leading/trailing whitespace removed.
+    /// </returns>
+    public static string ResolveDevice(string device = "auto")
+    {
+        var ep = Environment.GetEnvironmentVariable("PIPER_EXECUTION_PROVIDER");
+        if (!string.IsNullOrWhiteSpace(ep))
+            return ep.Trim().ToLowerInvariant();
+        return device.ToLowerInvariant();
+    }
+
+    /// <summary>
+    /// Returns the cache-file device label for the given device string.
+    /// </summary>
+    /// <remarks>
+    /// Examples: <c>"cuda:1"</c> → <c>"cuda1"</c>,
+    /// <c>"coreml"</c> → <c>"coreml"</c>,
+    /// <c>"directml"</c> → <c>"directml0"</c>.
+    /// </remarks>
+    public static string GetDeviceLabel(string device)
+    {
+        var resolved = ResolveDevice(device);
+        if (resolved is "cpu" or "")
+            return "cpu";
+
+        var parts = resolved.Split(':', 2);
+        var key = parts[0];
+        var id = parts.Length > 1 && int.TryParse(parts[1], out var n) ? n : 0;
+
+        return key switch
+        {
+            "cuda" => $"cuda{id}",
+            "coreml" => "coreml",
+            "directml" => $"directml{id}",
+            "openvino" => "openvino",
+            "tensorrt" => $"tensorrt{id}",
+            _ => "cpu",
+        };
+    }
+
+    // ------------------------------------------------------------------
     // Internal helpers
     // ------------------------------------------------------------------
 
@@ -399,7 +453,7 @@ public static class SessionFactory
     /// <summary>
     /// Attempts to append the CUDA execution provider. On failure (typically
     /// because <c>Microsoft.ML.OnnxRuntime.Gpu</c> is not installed), logs a
-    /// warning and falls back to CPU execution.
+    /// warning and returns <c>false</c>.
     /// </summary>
     /// <remarks>
     /// The C++ implementation in <c>piper.cpp</c> sets:
@@ -412,7 +466,8 @@ public static class SessionFactory
     /// The managed API accepts a <c>Dictionary&lt;string, string&gt;</c> with the
     /// equivalent option keys.
     /// </remarks>
-    private static void TryAppendCudaProvider(
+    /// <returns><c>true</c> if the CUDA EP was successfully appended; otherwise <c>false</c>.</returns>
+    private static bool TryAppendCudaProvider(
         SessionOptions options, int deviceId, ILogger logger)
     {
         try
@@ -424,15 +479,94 @@ public static class SessionFactory
 
             logger.LogInformation(
                 "CUDA execution provider enabled (device_id={DeviceId})", deviceId);
+            return true;
         }
         catch (Exception ex)
         {
             // The CUDA EP is an optional native library. When absent, the
             // managed wrapper throws (typically an EntryPointNotFoundException
-            // or DllNotFoundException). Fall back to CPU gracefully.
+            // or DllNotFoundException). Fall back to next EP gracefully.
             logger.LogWarning(
-                "CUDA execution provider unavailable, falling back to CPU: {Message}",
+                "CUDA execution provider unavailable, falling back: {Message}",
                 ex.Message);
+            return false;
         }
+    }
+
+    /// <summary>
+    /// Attempts to append the CoreML execution provider (macOS/iOS only).
+    /// On failure logs a warning and returns <c>false</c>.
+    /// </summary>
+    /// <returns><c>true</c> if CoreML EP was successfully appended; otherwise <c>false</c>.</returns>
+    private static bool TryAppendCoreML(SessionOptions options, ILogger logger)
+    {
+        try
+        {
+            // CoreML EP is available on macOS/iOS.
+            // uint flags: 0 = default (CoreMLFlags.COREML_FLAG_ONLY_ENABLE_DEVICE_WITH_ANE
+            // may be OR-ed in for ANE-only mode, but 0 works for all CoreML-capable devices).
+            options.AppendExecutionProvider_CoreML((CoreMLFlags)0);
+            logger.LogInformation("CoreML execution provider enabled");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(
+                "CoreML execution provider unavailable, falling back to CPU: {Message}",
+                ex.Message);
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Attempts to append the DirectML execution provider (Windows only).
+    /// On failure logs a warning and returns <c>false</c>.
+    /// </summary>
+    /// <returns><c>true</c> if DirectML EP was successfully appended; otherwise <c>false</c>.</returns>
+    private static bool TryAppendDirectML(SessionOptions options, int deviceId, ILogger logger)
+    {
+        try
+        {
+            options.AppendExecutionProvider_DML(deviceId);
+            logger.LogInformation(
+                "DirectML execution provider enabled (device_id={DeviceId})", deviceId);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(
+                "DirectML execution provider unavailable, falling back to CPU: {Message}",
+                ex.Message);
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Auto-detects the best available hardware execution provider and configures
+    /// <paramref name="options"/> accordingly. Falls through from CUDA → CoreML →
+    /// DirectML → CPU.
+    /// </summary>
+    /// <returns>
+    /// The device label string that was selected (e.g. <c>"cuda0"</c>,
+    /// <c>"coreml"</c>, <c>"directml0"</c>, or <c>"cpu"</c>).
+    /// </returns>
+    private static string AutoDetectAndConfigureEP(SessionOptions options, ILogger logger)
+    {
+        var available = OrtEnv.Instance().GetAvailableProviders();
+
+        if (Array.IndexOf(available, "CUDAExecutionProvider") >= 0
+            && TryAppendCudaProvider(options, 0, logger))
+            return "cuda0";
+
+        if (Array.IndexOf(available, "CoreMLExecutionProvider") >= 0
+            && TryAppendCoreML(options, logger))
+            return "coreml";
+
+        if (Array.IndexOf(available, "DmlExecutionProvider") >= 0
+            && TryAppendDirectML(options, 0, logger))
+            return "directml0";
+
+        logger.LogInformation("No hardware EP available, using CPU");
+        return "cpu";
     }
 }

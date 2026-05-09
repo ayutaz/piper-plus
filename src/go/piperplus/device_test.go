@@ -69,3 +69,37 @@ func TestDeviceType_String(t *testing.T) {
 		})
 	}
 }
+
+func TestSelectDeviceWithEnv(t *testing.T) {
+	tests := []struct {
+		envVal string
+		device string
+		want   string
+	}{
+		{envVal: "cpu", device: "auto", want: "cpu"},
+		{envVal: "cuda", device: "auto", want: "cuda"},
+		{envVal: "coreml", device: "cpu", want: "coreml"},
+		{envVal: "", device: "cpu", want: "cpu"},
+		{envVal: "", device: "cuda", want: "cuda"},
+		{envVal: "", device: "auto", want: "auto"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.envVal+"_"+tt.device, func(t *testing.T) {
+			t.Setenv("PIPER_EXECUTION_PROVIDER", tt.envVal)
+			got := selectDeviceWithEnv(tt.device)
+			if got != tt.want {
+				t.Errorf("selectDeviceWithEnv(%q) with env=%q = %q, want %q",
+					tt.device, tt.envVal, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestConfigureSessionOptionsEnvVar(t *testing.T) {
+	// PIPER_EXECUTION_PROVIDER=cpu の場合は selectDeviceWithEnv が "cpu" を返すこと
+	t.Setenv("PIPER_EXECUTION_PROVIDER", "cpu")
+	result := selectDeviceWithEnv("auto")
+	if result != "cpu" {
+		t.Errorf("selectDeviceWithEnv(auto) with PIPER_EXECUTION_PROVIDER=cpu = %q, want %q", result, "cpu")
+	}
+}

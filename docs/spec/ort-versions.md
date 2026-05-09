@@ -28,6 +28,22 @@ so that version drift can be detected early.
 | `release-shared-lib.yml` | `env.ONNXRUNTIME_VERSION` (top-level) | iOS + Android release builds |
 | `android-build.yml` | `env.ONNXRUNTIME_VERSION` (job-level) | Android PR CI builds |
 
+## Execution Provider Support Matrix
+
+| Runtime  | CUDA | CoreML | DirectML | OpenVINO | TensorRT |
+|----------|------|--------|----------|----------|----------|
+| Python   | ✓ (`onnxruntime-gpu`) | ✓ (`onnxruntime`, macOS) | ✓ (`onnxruntime-directml`) | ✓ (`onnxruntime-openvino`) | ✓ (`onnxruntime-gpu`) |
+| Rust     | ✓ (feature `cuda`) | ✓ (feature `coreml`) | ✓ (feature `directml`) | — | ✓ (feature `tensorrt`) |
+| C#       | ✓ (`OnnxRuntime.Gpu`) | ✓ (`OnnxRuntime`, macOS) | ✓ (`OnnxRuntime.DirectML`) | — | ✓ (`OnnxRuntime.Gpu`) |
+| Go       | ✓ | ✓ | ✓ | — | ✓ |
+| C++      | ✓ | ✓ (macOS) | ✓ (Windows) | — | — |
+| JS/WASM  | — (sandbox) | — | — | — | — |
+
+Auto-detect order: CUDA → CoreML → DirectML → OpenVINO → CPU  
+TensorRT: explicit only (`PIPER_EXECUTION_PROVIDER=tensorrt`)  
+OpenVINO: Python only  
+Install: `pip install piper-plus[gpu]` / `pip install piper-plus[directml]` / `pip install piper-plus[openvino]`
+
 ## Updating
 
 When bumping the ONNX Runtime version for a specific runtime:

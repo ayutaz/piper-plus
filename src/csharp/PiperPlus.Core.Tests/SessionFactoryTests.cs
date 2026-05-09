@@ -346,4 +346,78 @@ public sealed class SessionFactoryTests
         // The dynamic_block_base entry is set inside the method.
         using var options = SessionFactory.ConfigureSessionOptions();
     }
+
+    // ================================================================
+    // ResolveDevice — PIPER_EXECUTION_PROVIDER env var tests
+    // ================================================================
+
+    [Fact]
+    public void ResolveDevice_EnvVarCpu_ReturnsCpu()
+    {
+        Environment.SetEnvironmentVariable("PIPER_EXECUTION_PROVIDER", "cpu");
+        try
+        {
+            var result = SessionFactory.ResolveDevice("auto");
+            Assert.Equal("cpu", result);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("PIPER_EXECUTION_PROVIDER", null);
+        }
+    }
+
+    [Fact]
+    public void ResolveDevice_EnvVarCoreML_ReturnsCoreML()
+    {
+        Environment.SetEnvironmentVariable("PIPER_EXECUTION_PROVIDER", "coreml");
+        try
+        {
+            var result = SessionFactory.ResolveDevice("auto");
+            Assert.Equal("coreml", result);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("PIPER_EXECUTION_PROVIDER", null);
+        }
+    }
+
+    [Fact]
+    public void ResolveDevice_NoEnvVar_ReturnsParam()
+    {
+        Environment.SetEnvironmentVariable("PIPER_EXECUTION_PROVIDER", null);
+        var result = SessionFactory.ResolveDevice("cpu");
+        Assert.Equal("cpu", result);
+    }
+
+    // ================================================================
+    // GetDeviceLabel — device string to cache-file label mapping
+    // ================================================================
+
+    [Fact]
+    public void GetDeviceLabel_CoreML_ReturnsCoreML()
+    {
+        var label = SessionFactory.GetDeviceLabel("coreml");
+        Assert.Equal("coreml", label);
+    }
+
+    [Fact]
+    public void GetDeviceLabel_DirectML_ReturnsDirectML0()
+    {
+        var label = SessionFactory.GetDeviceLabel("directml");
+        Assert.Equal("directml0", label);
+    }
+
+    [Fact]
+    public void GetDeviceLabel_Cpu_ReturnsCpu()
+    {
+        var label = SessionFactory.GetDeviceLabel("cpu");
+        Assert.Equal("cpu", label);
+    }
+
+    [Fact]
+    public void GetDeviceLabel_Cuda1_ReturnsCuda1()
+    {
+        var label = SessionFactory.GetDeviceLabel("cuda:1");
+        Assert.Equal("cuda1", label);
+    }
 }
