@@ -69,7 +69,7 @@ public sealed class EnglishPostProcessIdsTests
             new ProsodyInfo(0, 0, 3),
         };
 
-        (List<int>? ids, List<ProsodyInfo?>? prosody) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
+        (List<int>? ids, List<ProsodyInfo?> _) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
 
         // BOS(1), PAD(0), 10, PAD(0), 11, PAD(0), 12, PAD(0), EOS(2)
         Assert.Equal([1, 0, 10, 0, 11, 0, 12, 0, 2], ids);
@@ -144,7 +144,7 @@ public sealed class EnglishPostProcessIdsTests
         var inputIds = new List<int> { 10, 11, 12 };
         var inputProsody = new List<ProsodyInfo?> { p1, p2, p3 };
 
-        (List<int>? ids, List<ProsodyInfo?>? prosody) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
+        (List<int> _, List<ProsodyInfo?>? prosody) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
 
         // Expected: [null, null, p1, null, p2, null, p3, null, null]
         //            BOS   PAD  10   PAD  11   PAD  12   PAD  EOS
@@ -451,7 +451,7 @@ public sealed class EnglishPostProcessIdsTests
     [Fact]
     public void Integration_EncodeCallsPostProcessIds()
     {
-        // Build a G2P engine that returns a single word "hel" → ["HH", "EH1", "L"]
+        // Build a G2P engine that returns a single 3-phoneme test word: ["HH", "EH1", "L"]
         var stubEngine = new SingleWordG2PEngine([["HH", "EH1", "L"]]);
         var phonemizer = new EnglishPhonemizer(stubEngine);
 

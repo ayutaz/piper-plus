@@ -38,17 +38,13 @@ export {
 
 import { checkPuaCompat } from "@piper-plus/g2p";
 import { WebGPUSessionManager } from "./webgpu-session-manager.js";
-import { StreamingTTSPipeline, TextChunker } from "./streaming-pipeline.js";
+import { StreamingTTSPipeline } from "./streaming-pipeline.js";
 import { ModelManager } from "./model-manager.js";
 import { AudioResult } from "./audio-result.js";
 import {
   DEFAULT_HOP_LENGTH,
   buildPhonemeIdToTokenMap,
   durationsToTiming,
-  timingToJson,
-  timingToJsonCompact,
-  timingToSrt,
-  timingToTsv,
 } from "./timing.js";
 import { RustWasmAdapter } from "./phonemizer/rust-wasm-adapter.js";
 import { JsG2pAdapter } from "./phonemizer/js-g2p-adapter.js";

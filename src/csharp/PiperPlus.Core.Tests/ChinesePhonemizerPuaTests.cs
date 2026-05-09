@@ -72,7 +72,7 @@ public sealed class ChinesePhonemizerPuaTests
             A3: [2, 2, 2, 2, 2, 2, 2]);
 
         var phonemizer = new ChinesePhonemizer(new ToneStubEngine(g2p));
-        (List<string>? tokens, List<ProsodyInfo?>? prosody) = phonemizer.PhonemizeWithProsody("你好");
+        (List<string>? tokens, List<ProsodyInfo?> _) = phonemizer.PhonemizeWithProsody("你好");
 
         // Should contain exactly the 7 tokens including tone markers
         Assert.Equal(7, tokens.Count);

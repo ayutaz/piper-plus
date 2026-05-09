@@ -22,8 +22,9 @@ public sealed class CustomDictionaryTests : IDisposable
             {
                 File.Delete(path);
             }
-            catch
-            { /* best-effort cleanup */
+            catch (IOException ex)
+            {
+                Console.Error.WriteLine($"[Test cleanup] {ex.Message}");
             }
         }
     }

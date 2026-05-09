@@ -41,7 +41,10 @@ const PUA_MAP = {
 };
 
 // Regex patterns matching the Python implementation
-const RE_PHONEME = /-([^+]+)\+/;
+// Capture the current-phoneme segment between `-` and `+` in OpenJTalk full-context labels.
+// `[^-+]+` (vs `[^+]+`) avoids quadratic backtracking on inputs like `--…-` because the
+// engine cannot retry the inner repetition over `-` boundaries (CodeQL js/polynomial-redos).
+const RE_PHONEME = /-([^-+]+)\+/;
 const RE_A1 = /\/A:([\d-]+)\+/;
 const RE_A2 = /\+([0-9]+)\+/;
 const RE_A3 = /\+([0-9]+)\//;

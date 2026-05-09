@@ -346,8 +346,9 @@ public sealed class ModelManagerTests : IDisposable
             {
                 File.Delete(tempFile);
             }
-            catch
-            { /* best-effort */
+            catch (IOException ex)
+            {
+                Console.Error.WriteLine($"[Test cleanup] {ex.Message}");
             }
         }
     }
@@ -405,8 +406,9 @@ public sealed class ModelManagerTests : IDisposable
             {
                 Directory.Delete(tempDir, true);
             }
-            catch
+            catch (IOException ex)
             {
+                Console.Error.WriteLine($"[Test cleanup] {ex.Message}");
             }
         }
     }
@@ -442,8 +444,9 @@ public sealed class ModelManagerTests : IDisposable
             {
                 Directory.Delete(tempDir, true);
             }
-            catch
-            { /* best-effort */
+            catch (IOException ex)
+            {
+                Console.Error.WriteLine($"[Test cleanup] {ex.Message}");
             }
         }
     }
@@ -478,8 +481,9 @@ public sealed class ModelManagerTests : IDisposable
             {
                 Directory.Delete(tempDir, true);
             }
-            catch
-            { /* best-effort */
+            catch (IOException ex)
+            {
+                Console.Error.WriteLine($"[Test cleanup] {ex.Message}");
             }
         }
     }
@@ -517,8 +521,9 @@ public sealed class ModelManagerTests : IDisposable
             {
                 Directory.Delete(tempDir, true);
             }
-            catch
+            catch (IOException ex)
             {
+                Console.Error.WriteLine($"[Test cleanup] {ex.Message}");
             }
         }
     }
@@ -548,8 +553,9 @@ public sealed class ModelManagerTests : IDisposable
             {
                 Directory.Delete(tempDir, true);
             }
-            catch
-            { /* best-effort */
+            catch (IOException ex)
+            {
+                Console.Error.WriteLine($"[Test cleanup] {ex.Message}");
             }
         }
     }

@@ -20,7 +20,6 @@
 
 import {
   collapseNfdAccents,
-  isPunctuation,
   PUNCTUATION,
   tokenize,
   normalizeWhitespace,
@@ -48,9 +47,6 @@ const IPA_PALATAL_N = "\u0272"; // palatal nasal
 const IPA_TURNED_H = "\u0265"; // labial-palatal approximant
 const IPA_SLASHED_O = "\u00F8"; // close-mid front rounded
 const IPA_OE_LIG = "\u0153"; // open-mid front rounded
-
-// Stress marker
-const STRESS_MARK = "\u02C8"; // primary stress
 
 // ---------------------------------------------------------------------------
 // Character classification
@@ -116,7 +112,7 @@ const FRONT_VOWELS_CG = new Set([
   "\u00EF",
 ]);
 
-// PUNCTUATION / isPunctuation imported from latin-common
+// PUNCTUATION imported from latin-common
 
 /**
  * Check if a character is a French letter (lowercase ASCII + accented).
@@ -655,7 +651,7 @@ function convertWord(word) {
       }
     }
 
-    // "yn", "ym" -> nasal-epsilon-tilde (syndicat, symbole)
+    // "yn", "ym" -> nasal-epsilon-tilde (e.g., before n/m closing the syllable)
     if (ch === "y") {
       const result = tryNasalVowel(word, i, n, PUA_NASAL_EIN, phonemes);
       if (result !== false) {

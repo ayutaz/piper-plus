@@ -70,7 +70,7 @@ public sealed class DictionaryManagerTests : IDisposable
     [Fact]
     public void IsValidDictionary_EmptyDirectory_ReturnsFalse()
     {
-        var tempDir = Path.Combine(Path.GetTempPath(), $"dict_test_{Guid.NewGuid():N}");
+        var tempDir = Path.Join(Path.GetTempPath(), $"dict_test_{Guid.NewGuid():N}");
         Directory.CreateDirectory(tempDir);
         try
         {
@@ -85,13 +85,13 @@ public sealed class DictionaryManagerTests : IDisposable
     [Fact]
     public void IsValidDictionary_PartialFiles_ReturnsFalse()
     {
-        var tempDir = Path.Combine(Path.GetTempPath(), $"dict_test_{Guid.NewGuid():N}");
+        var tempDir = Path.Join(Path.GetTempPath(), $"dict_test_{Guid.NewGuid():N}");
         Directory.CreateDirectory(tempDir);
         try
         {
             // Create only 2 of the 4 required files
-            File.WriteAllText(Path.Combine(tempDir, "sys.dic"), string.Empty);
-            File.WriteAllText(Path.Combine(tempDir, "matrix.bin"), string.Empty);
+            File.WriteAllText(Path.Join(tempDir, "sys.dic"), string.Empty);
+            File.WriteAllText(Path.Join(tempDir, "matrix.bin"), string.Empty);
 
             Assert.False(DictionaryManager.IsValidDictionary(tempDir));
         }
@@ -104,15 +104,15 @@ public sealed class DictionaryManagerTests : IDisposable
     [Fact]
     public void IsValidDictionary_AllFilesPresent_ReturnsTrue()
     {
-        var tempDir = Path.Combine(Path.GetTempPath(), $"dict_test_{Guid.NewGuid():N}");
+        var tempDir = Path.Join(Path.GetTempPath(), $"dict_test_{Guid.NewGuid():N}");
         Directory.CreateDirectory(tempDir);
         try
         {
             // Create all 4 required files
-            File.WriteAllText(Path.Combine(tempDir, "sys.dic"), string.Empty);
-            File.WriteAllText(Path.Combine(tempDir, "matrix.bin"), string.Empty);
-            File.WriteAllText(Path.Combine(tempDir, "char.bin"), string.Empty);
-            File.WriteAllText(Path.Combine(tempDir, "unk.dic"), string.Empty);
+            File.WriteAllText(Path.Join(tempDir, "sys.dic"), string.Empty);
+            File.WriteAllText(Path.Join(tempDir, "matrix.bin"), string.Empty);
+            File.WriteAllText(Path.Join(tempDir, "char.bin"), string.Empty);
+            File.WriteAllText(Path.Join(tempDir, "unk.dic"), string.Empty);
 
             Assert.True(DictionaryManager.IsValidDictionary(tempDir));
         }
@@ -312,11 +312,11 @@ public sealed class DictionaryManagerTests : IDisposable
     [Fact]
     public void IsValidDictionary_OneOfFourFiles_ReturnsFalse()
     {
-        var dir = Path.Combine(Path.GetTempPath(), $"dict_test_{Guid.NewGuid():N}");
+        var dir = Path.Join(Path.GetTempPath(), $"dict_test_{Guid.NewGuid():N}");
         try
         {
             Directory.CreateDirectory(dir);
-            File.WriteAllBytes(Path.Combine(dir, "sys.dic"), new byte[] { 0 });
+            File.WriteAllBytes(Path.Join(dir, "sys.dic"), new byte[] { 0 });
             Assert.False(DictionaryManager.IsValidDictionary(dir));
         }
         finally
@@ -331,13 +331,13 @@ public sealed class DictionaryManagerTests : IDisposable
     [Fact]
     public void IsValidDictionary_ThreeOfFourFiles_ReturnsFalse()
     {
-        var dir = Path.Combine(Path.GetTempPath(), $"dict_test_{Guid.NewGuid():N}");
+        var dir = Path.Join(Path.GetTempPath(), $"dict_test_{Guid.NewGuid():N}");
         try
         {
             Directory.CreateDirectory(dir);
-            File.WriteAllBytes(Path.Combine(dir, "sys.dic"), new byte[] { 0 });
-            File.WriteAllBytes(Path.Combine(dir, "matrix.bin"), new byte[] { 0 });
-            File.WriteAllBytes(Path.Combine(dir, "char.bin"), new byte[] { 0 });
+            File.WriteAllBytes(Path.Join(dir, "sys.dic"), new byte[] { 0 });
+            File.WriteAllBytes(Path.Join(dir, "matrix.bin"), new byte[] { 0 });
+            File.WriteAllBytes(Path.Join(dir, "char.bin"), new byte[] { 0 });
 
             // Missing unk.dic
             Assert.False(DictionaryManager.IsValidDictionary(dir));
@@ -387,14 +387,14 @@ public sealed class DictionaryManagerTests : IDisposable
     public async Task EnsureDictionaryAsync_OfflineModeWithValidDict_ReturnsPath()
     {
         // Even in offline mode, if dictionary exists locally, it should be returned
-        var dir = Path.Combine(Path.GetTempPath(), $"dict_test_{Guid.NewGuid():N}");
+        var dir = Path.Join(Path.GetTempPath(), $"dict_test_{Guid.NewGuid():N}");
         try
         {
             Directory.CreateDirectory(dir);
-            File.WriteAllBytes(Path.Combine(dir, "sys.dic"), new byte[] { 0 });
-            File.WriteAllBytes(Path.Combine(dir, "matrix.bin"), new byte[] { 0 });
-            File.WriteAllBytes(Path.Combine(dir, "char.bin"), new byte[] { 0 });
-            File.WriteAllBytes(Path.Combine(dir, "unk.dic"), new byte[] { 0 });
+            File.WriteAllBytes(Path.Join(dir, "sys.dic"), new byte[] { 0 });
+            File.WriteAllBytes(Path.Join(dir, "matrix.bin"), new byte[] { 0 });
+            File.WriteAllBytes(Path.Join(dir, "char.bin"), new byte[] { 0 });
+            File.WriteAllBytes(Path.Join(dir, "unk.dic"), new byte[] { 0 });
 
             Environment.SetEnvironmentVariable("OPENJTALK_DICTIONARY_PATH", dir);
             Environment.SetEnvironmentVariable("PIPER_OFFLINE_MODE", "1");
@@ -422,16 +422,16 @@ public sealed class DictionaryManagerTests : IDisposable
         // On non-Windows we can control this via XDG_DATA_HOME; on Windows via %APPDATA%.
         // We verify that FindDictionary checks the data-dir candidate by creating a
         // valid dictionary there and clearing all other env-var candidates.
-        var baseDir = Path.Combine(Path.GetTempPath(), $"dict_test_{Guid.NewGuid():N}");
-        var piperDir = Path.Combine(baseDir, "piper");
-        var dictDir = Path.Combine(piperDir, "open_jtalk_dic_utf_8-1.11");
+        var baseDir = Path.Join(Path.GetTempPath(), $"dict_test_{Guid.NewGuid():N}");
+        var piperDir = Path.Join(baseDir, "piper");
+        var dictDir = Path.Join(piperDir, "open_jtalk_dic_utf_8-1.11");
         try
         {
             Directory.CreateDirectory(dictDir);
-            File.WriteAllBytes(Path.Combine(dictDir, "sys.dic"), new byte[] { 0 });
-            File.WriteAllBytes(Path.Combine(dictDir, "matrix.bin"), new byte[] { 0 });
-            File.WriteAllBytes(Path.Combine(dictDir, "char.bin"), new byte[] { 0 });
-            File.WriteAllBytes(Path.Combine(dictDir, "unk.dic"), new byte[] { 0 });
+            File.WriteAllBytes(Path.Join(dictDir, "sys.dic"), new byte[] { 0 });
+            File.WriteAllBytes(Path.Join(dictDir, "matrix.bin"), new byte[] { 0 });
+            File.WriteAllBytes(Path.Join(dictDir, "char.bin"), new byte[] { 0 });
+            File.WriteAllBytes(Path.Join(dictDir, "unk.dic"), new byte[] { 0 });
 
             // Clear all env-var candidates so they don't short-circuit
             Environment.SetEnvironmentVariable("OPENJTALK_DICTIONARY_PATH", null);
@@ -477,13 +477,13 @@ public sealed class DictionaryManagerTests : IDisposable
     /// </summary>
     private static string CreateFakeDictionary()
     {
-        var tempDir = Path.Combine(Path.GetTempPath(), $"dict_test_{Guid.NewGuid():N}");
+        var tempDir = Path.Join(Path.GetTempPath(), $"dict_test_{Guid.NewGuid():N}");
         Directory.CreateDirectory(tempDir);
 
-        File.WriteAllText(Path.Combine(tempDir, "sys.dic"), "fake");
-        File.WriteAllText(Path.Combine(tempDir, "matrix.bin"), "fake");
-        File.WriteAllText(Path.Combine(tempDir, "char.bin"), "fake");
-        File.WriteAllText(Path.Combine(tempDir, "unk.dic"), "fake");
+        File.WriteAllText(Path.Join(tempDir, "sys.dic"), "fake");
+        File.WriteAllText(Path.Join(tempDir, "matrix.bin"), "fake");
+        File.WriteAllText(Path.Join(tempDir, "char.bin"), "fake");
+        File.WriteAllText(Path.Join(tempDir, "unk.dic"), "fake");
 
         return tempDir;
     }
