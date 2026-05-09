@@ -99,6 +99,9 @@ flags:
 # -----------------------------------------------------------------------------
 # Ignore: coverage 計測対象外
 # -----------------------------------------------------------------------------
+# `pyproject.toml [tool.coverage.run] omit` と同じ方針で、unit-test 不可能な
+# モジュール (CLI / Lightning Trainer / 大規模 data preprocess / network 必須)
+# を除外する。 詳細根拠は pyproject.toml のコメント参照。
 ignore:
   - "**/tests/**"
   - "**/test_*.py"
@@ -121,6 +124,49 @@ ignore:
   - "src/wasm/**"
   - "src/cpp/**"
   - "android/**"
+  # ---- piper_train CLI / 学習エントリ (unit test 不可) ----
+  - "src/python/piper_train/clean_cached_audio.py"
+  - "src/python/piper_train/select_speaker.py"
+  - "src/python/piper_train/filter_utterances.py"
+  - "src/python/piper_train/voice_conversion.py"
+  - "src/python/piper_train/f0_extraction.py"
+  - "src/python/piper_train/infer.py"
+  - "src/python/piper_train/infer_generator.py"
+  - "src/python/piper_train/infer_torchscript.py"
+  - "src/python/piper_train/infer_onnx.py"
+  - "src/python/piper_train/infer_onnx_streaming.py"
+  - "src/python/piper_train/export_torchscript.py"
+  - "src/python/piper_train/export_generator.py"
+  - "src/python/piper_train/export_onnx.py"
+  - "src/python/piper_train/export_onnx_streaming.py"
+  - "src/python/piper_train/update_model_config.py"
+  - "src/python/piper_train/_resources.py"
+  - "src/python/piper_train/model_manager.py"
+  # ---- piper_train Lightning Trainer / data preprocess ----
+  - "src/python/piper_train/vits/lightning.py"
+  - "src/python/piper_train/vits/onnx_attention.py"
+  - "src/python/piper_train/preprocess.py"
+  - "src/python/piper_train/tools/prepare_bilingual_dataset.py"
+  - "src/python/piper_train/tools/prepare_multilingual_dataset.py"
+  - "src/python/piper_train/tools/convert_fp16.py"
+  - "src/python/piper_train/tools/convert_nst_dictionary.py"
+  - "src/python/piper_train/tools/add_prosody_features.py"
+  # ---- piper_train speaker_encoder train/export (model file 必須) ----
+  - "src/python/piper_train/speaker_encoder/__init__.py"
+  - "src/python/piper_train/speaker_encoder/encoder.py"
+  - "src/python/piper_train/speaker_encoder/audio_utils.py"
+  - "src/python/piper_train/speaker_encoder/ecapa_tdnn.py"
+  - "src/python/piper_train/speaker_encoder/evaluate.py"
+  - "src/python/piper_train/speaker_encoder/export_encoder.py"
+  # ---- piper_train norm_audio (audio I/O 必須) ----
+  - "src/python/piper_train/norm_audio/**"
+  # ---- piper runtime CLI / E2E (unit test 不可) ----
+  - "src/python_run/piper/__main__.py"
+  - "src/python_run/piper/webui.py"
+  - "src/python_run/piper/http_server.py"
+  - "src/python_run/piper/training_manager.py"
+  - "src/python_run/piper/download.py"
+  - "src/python_run/piper/sample_texts.py"
 
 # -----------------------------------------------------------------------------
 # PR 上に表示するコメント
