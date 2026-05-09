@@ -29,11 +29,11 @@ public sealed class TimingWriterParityTests
     [MemberData(nameof(CaseNames))]
     public void Parity_GoldenMatrix(string caseName)
     {
-        var fixture = LoadFixture();
-        var caseElement = FindCase(fixture, caseName);
+        JsonElement fixture = LoadFixture();
+        JsonElement caseElement = FindCase(fixture, caseName);
 
-        var inputs = caseElement.GetProperty("inputs");
-        var expected = caseElement.GetProperty("expected");
+        JsonElement inputs = caseElement.GetProperty("inputs");
+        JsonElement expected = caseElement.GetProperty("expected");
 
         var phonemeTokens = inputs.GetProperty("phoneme_tokens")
             .EnumerateArray()
@@ -46,9 +46,9 @@ public sealed class TimingWriterParityTests
         int sampleRate = inputs.GetProperty("sample_rate").GetInt32();
         int hopLength = inputs.GetProperty("hop_length").GetInt32();
 
-        BuildIdMapping(phonemeTokens, out var phonemeIds, out var phonemeIdMap);
+        BuildIdMapping(phonemeTokens, out var phonemeIds, out Dictionary<string, int[]>? phonemeIdMap);
 
-        var entries = TimingWriter.CalculateTiming(
+        List<TimingWriter.PhonemeTimingEntry> entries = TimingWriter.CalculateTiming(
             phonemeIds, durations, phonemeIdMap, sampleRate, hopLength);
 
         var expectedPhonemes = expected.GetProperty("phonemes").EnumerateArray().ToList();
@@ -56,8 +56,8 @@ public sealed class TimingWriterParityTests
 
         for (int i = 0; i < entries.Count; i++)
         {
-            var actual = entries[i];
-            var exp = expectedPhonemes[i];
+            TimingWriter.PhonemeTimingEntry actual = entries[i];
+            JsonElement exp = expectedPhonemes[i];
 
             Assert.Equal(exp.GetProperty("phoneme").GetString(), actual.Phoneme);
             Assert.Equal(
@@ -78,12 +78,12 @@ public sealed class TimingWriterParityTests
     [Fact]
     public void Parity_TotalDuration_MatchesAllCases()
     {
-        var fixture = LoadFixture();
-        foreach (var caseElement in fixture.GetProperty("cases").EnumerateArray())
+        JsonElement fixture = LoadFixture();
+        foreach (JsonElement caseElement in fixture.GetProperty("cases").EnumerateArray())
         {
             string name = caseElement.GetProperty("name").GetString()!;
-            var inputs = caseElement.GetProperty("inputs");
-            var expected = caseElement.GetProperty("expected");
+            JsonElement inputs = caseElement.GetProperty("inputs");
+            JsonElement expected = caseElement.GetProperty("expected");
 
             var phonemeTokens = inputs.GetProperty("phoneme_tokens")
                 .EnumerateArray()
@@ -96,9 +96,9 @@ public sealed class TimingWriterParityTests
             int sampleRate = inputs.GetProperty("sample_rate").GetInt32();
             int hopLength = inputs.GetProperty("hop_length").GetInt32();
 
-            BuildIdMapping(phonemeTokens, out var phonemeIds, out var phonemeIdMap);
+            BuildIdMapping(phonemeTokens, out var phonemeIds, out Dictionary<string, int[]>? phonemeIdMap);
 
-            var entries = TimingWriter.CalculateTiming(
+            List<TimingWriter.PhonemeTimingEntry> entries = TimingWriter.CalculateTiming(
                 phonemeIds, durations, phonemeIdMap, sampleRate, hopLength);
 
             float expectedTotal = (float)expected.GetProperty("total_duration_ms").GetDouble();
@@ -111,7 +111,7 @@ public sealed class TimingWriterParityTests
     [Fact]
     public void Fixture_SchemaVersion_IsOne()
     {
-        var fixture = LoadFixture();
+        JsonElement fixture = LoadFixture();
         Assert.Equal(1, fixture.GetProperty("schema_version").GetInt32());
     }
 
@@ -138,6 +138,7 @@ public sealed class TimingWriterParityTests
                 existing = [newId];
                 phonemeIdMap[token] = existing;
             }
+
             phonemeIds[i] = existing[0];
         }
     }
@@ -152,7 +153,7 @@ public sealed class TimingWriterParityTests
 
     private static JsonElement FindCase(JsonElement fixture, string caseName)
     {
-        var match = fixture.GetProperty("cases").EnumerateArray()
+        JsonElement? match = fixture.GetProperty("cases").EnumerateArray()
             .Where(c => c.GetProperty("name").GetString() == caseName)
             .Select(c => (JsonElement?)c.Clone())
             .FirstOrDefault();
@@ -177,11 +178,12 @@ public sealed class TimingWriterParityTests
                 return candidate;
             }
 
-            var parent = Directory.GetParent(dir);
+            DirectoryInfo? parent = Directory.GetParent(dir);
             if (parent is null)
             {
                 break;
             }
+
             dir = parent.FullName;
         }
 

@@ -23,6 +23,7 @@ public sealed class KoreanPhonemizer : IPhonemizer
     private readonly IKoreanG2PEngine _engine;
 
     /// <summary>
+    /// Initializes a new instance of the <see cref="KoreanPhonemizer"/> class.
     /// Create a new <see cref="KoreanPhonemizer"/> backed by the given G2P engine.
     /// </summary>
     /// <param name="engine">
@@ -36,7 +37,7 @@ public sealed class KoreanPhonemizer : IPhonemizer
     /// <inheritdoc />
     public List<string> Phonemize(string text)
     {
-        var (tokens, _) = PhonemizeCore(text);
+        (List<string>? tokens, List<ProsodyInfo?> _) = PhonemizeCore(text);
         return tokens;
     }
 
@@ -87,17 +88,19 @@ public sealed class KoreanPhonemizer : IPhonemizer
     /// </summary>
     private (List<string> Tokens, List<ProsodyInfo?> Prosody) PhonemizeCore(string text)
     {
-        var result = _engine.Convert(text);
-        var phonemes = result.Phonemes;
-        var a1 = result.A1;
-        var a2 = result.A2;
-        var a3 = result.A3;
+        KoreanG2PResult result = _engine.Convert(text);
+        IReadOnlyList<string> phonemes = result.Phonemes;
+        IReadOnlyList<int> a1 = result.A1;
+        IReadOnlyList<int> a2 = result.A2;
+        IReadOnlyList<int> a3 = result.A3;
 
         int count = phonemes.Count;
 
         if (a1.Count != count || a2.Count != count || a3.Count != count)
+        {
             throw new InvalidOperationException(
                 $"Korean G2P result lists have inconsistent lengths: phonemes={count}, A1={a1.Count}, A2={a2.Count}, A3={a3.Count}");
+        }
 
         var tokens = new List<string>(count);
         var prosody = new List<ProsodyInfo?>(count);

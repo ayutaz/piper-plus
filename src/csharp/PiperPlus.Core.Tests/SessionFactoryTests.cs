@@ -23,7 +23,6 @@ public sealed class SessionFactoryTests
     // ================================================================
     // Input validation — no real ONNX files needed
     // ================================================================
-
     [Fact]
     public void Create_NullModelPath_ThrowsArgumentException()
     {
@@ -35,13 +34,13 @@ public sealed class SessionFactoryTests
     public void Create_EmptyModelPath_ThrowsArgumentException()
     {
         Assert.Throws<ArgumentException>(
-            () => SessionFactory.Create(modelPath: ""));
+            () => SessionFactory.Create(modelPath: string.Empty));
     }
 
     [Fact]
     public void Create_FileNotFound_ThrowsFileNotFoundException()
     {
-        var ex = Assert.Throws<FileNotFoundException>(
+        FileNotFoundException ex = Assert.Throws<FileNotFoundException>(
             () => SessionFactory.Create(modelPath: "/nonexistent/path/model.onnx"));
 
         Assert.Contains("model.onnx", ex.Message);
@@ -59,7 +58,6 @@ public sealed class SessionFactoryTests
     // ================================================================
     // ResolveGpuDeviceId — tested via reflection on the private method
     // ================================================================
-
     private static readonly MethodInfo ResolveGpuDeviceIdMethod =
         typeof(SessionFactory).GetMethod(
             "ResolveGpuDeviceId",
@@ -138,7 +136,7 @@ public sealed class SessionFactoryTests
         string? original = Environment.GetEnvironmentVariable("PIPER_GPU_DEVICE_ID");
         try
         {
-            Environment.SetEnvironmentVariable("PIPER_GPU_DEVICE_ID", "");
+            Environment.SetEnvironmentVariable("PIPER_GPU_DEVICE_ID", string.Empty);
 
             int resolved = InvokeResolveGpuDeviceId(cliDeviceId: 0);
 
@@ -153,16 +151,15 @@ public sealed class SessionFactoryTests
     // ================================================================
     // Warmup — signature and behaviour tests
     // ================================================================
-
     [Fact]
     public void Warmup_MethodExists_WithCorrectSignature()
     {
-        var method = typeof(SessionFactory).GetMethod("Warmup");
+        MethodInfo? method = typeof(SessionFactory).GetMethod("Warmup");
         Assert.NotNull(method);
         Assert.True(method!.IsStatic);
 
         // Should accept (InferenceSession, int, ILogger?)
-        var parameters = method.GetParameters();
+        ParameterInfo[] parameters = method.GetParameters();
         Assert.Equal(3, parameters.Length);
         Assert.Equal(typeof(InferenceSession), parameters[0].ParameterType);
         Assert.Equal(typeof(int), parameters[1].ParameterType);
@@ -242,7 +239,6 @@ public sealed class SessionFactoryTests
     // drive Create() with real filesystem state so the actual cache
     // policy is pinned (CodeQL-style: "do not assert on test data").
     // ----------------------------------------------------------------
-
     [Fact]
     public void Cache_OnlyOptOnnx_NoSentinel_OrphanIsCleanedUp()
     {
@@ -252,7 +248,8 @@ public sealed class SessionFactoryTests
         // loaded fresh. This pin guards against a regression where stale
         // caches accumulate (caused subtle inference inconsistencies in
         // pre-v1.12 builds before the sentinel was introduced).
-        var tmpDir = Path.Join(Path.GetTempPath(),
+        var tmpDir = Path.Join(
+            Path.GetTempPath(),
             "piper-cache-no-sentinel-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(tmpDir);
         try
@@ -261,6 +258,7 @@ public sealed class SessionFactoryTests
             File.WriteAllText(modelPath, "placeholder model");
             var optPath = Path.ChangeExtension(modelPath, ".cpu.opt.onnx");
             File.WriteAllText(optPath, "stale optimised cache");
+
             // No sentinel (.ok) file — simulates an interrupted previous write.
 
             // Create() will fail at the source model load step (not real
@@ -268,14 +266,22 @@ public sealed class SessionFactoryTests
             Assert.ThrowsAny<Exception>(() => SessionFactory.Create(modelPath));
 
             // Stale .opt.onnx without sentinel was removed by Create().
-            Assert.False(File.Exists(optPath),
+            Assert.False(
+                File.Exists(optPath),
                 "orphan .opt.onnx must be cleaned up when the sentinel is missing");
         }
         finally
         {
-            try { Directory.Delete(tmpDir, recursive: true); }
-            catch (IOException) { /* best effort */ }
-            catch (UnauthorizedAccessException) { /* best effort */ }
+            try
+            {
+                Directory.Delete(tmpDir, recursive: true);
+            }
+            catch (IOException)
+            { /* best effort */
+            }
+            catch (UnauthorizedAccessException)
+            { /* best effort */
+            }
         }
     }
 
@@ -284,7 +290,8 @@ public sealed class SessionFactoryTests
     {
         // Sentinel without the .opt.onnx file — ORT cannot use a sentinel
         // alone, so this is a degenerate state. Create() must not crash.
-        var tmpDir = Path.Join(Path.GetTempPath(),
+        var tmpDir = Path.Join(
+            Path.GetTempPath(),
             "piper-cache-no-opt-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(tmpDir);
         try
@@ -294,20 +301,28 @@ public sealed class SessionFactoryTests
             var optPath = Path.ChangeExtension(modelPath, ".cpu.opt.onnx");
             var sentinelPath = optPath + ".ok";
             File.WriteAllText(sentinelPath, "ok");
-            // No optPath file — sentinel orphan.
 
+            // No optPath file — sentinel orphan.
             Assert.ThrowsAny<Exception>(() => SessionFactory.Create(modelPath));
 
             // The orphan sentinel must remain (Create() must not silently
             // mutate the on-disk cache state on its own).
-            Assert.True(File.Exists(sentinelPath),
+            Assert.True(
+                File.Exists(sentinelPath),
                 "orphan sentinel must remain after cache-miss Create()");
         }
         finally
         {
-            try { Directory.Delete(tmpDir, recursive: true); }
-            catch (IOException) { /* best effort */ }
-            catch (UnauthorizedAccessException) { /* best effort */ }
+            try
+            {
+                Directory.Delete(tmpDir, recursive: true);
+            }
+            catch (IOException)
+            { /* best effort */
+            }
+            catch (UnauthorizedAccessException)
+            { /* best effort */
+            }
         }
     }
 
@@ -331,25 +346,24 @@ public sealed class SessionFactoryTests
     // ConfigureSessionOptions — tests for the extracted internal method
     // that configures SessionOptions with VITS-optimized settings.
     // ================================================================
-
     [Fact]
     public void ConfigureSessionOptions_GraphOptimizationLevel_IsEnableAll()
     {
-        using var options = SessionFactory.ConfigureSessionOptions();
+        using SessionOptions options = SessionFactory.ConfigureSessionOptions();
         Assert.Equal(GraphOptimizationLevel.ORT_ENABLE_ALL, options.GraphOptimizationLevel);
     }
 
     [Fact]
     public void ConfigureSessionOptions_ExecutionMode_IsSequential()
     {
-        using var options = SessionFactory.ConfigureSessionOptions();
+        using SessionOptions options = SessionFactory.ConfigureSessionOptions();
         Assert.Equal(ExecutionMode.ORT_SEQUENTIAL, options.ExecutionMode);
     }
 
     [Fact]
     public void ConfigureSessionOptions_IntraOpNumThreads_IsHalfProcessorsCappedAt4()
     {
-        using var options = SessionFactory.ConfigureSessionOptions();
+        using SessionOptions options = SessionFactory.ConfigureSessionOptions();
 
         int expected = Math.Max(Math.Min(Environment.ProcessorCount / 2, 4), 1);
         Assert.Equal(expected, options.IntraOpNumThreads);
@@ -358,29 +372,30 @@ public sealed class SessionFactoryTests
     [Fact]
     public void ConfigureSessionOptions_IntraOpNumThreads_AtLeastOne()
     {
-        using var options = SessionFactory.ConfigureSessionOptions();
-        Assert.True(options.IntraOpNumThreads >= 1,
+        using SessionOptions options = SessionFactory.ConfigureSessionOptions();
+        Assert.True(
+            options.IntraOpNumThreads >= 1,
             $"IntraOpNumThreads should be >= 1, but was {options.IntraOpNumThreads}");
     }
 
     [Fact]
     public void ConfigureSessionOptions_InterOpNumThreads_IsOne()
     {
-        using var options = SessionFactory.ConfigureSessionOptions();
+        using SessionOptions options = SessionFactory.ConfigureSessionOptions();
         Assert.Equal(1, options.InterOpNumThreads);
     }
 
     [Fact]
     public void ConfigureSessionOptions_EnableCpuMemArena_IsTrue()
     {
-        using var options = SessionFactory.ConfigureSessionOptions();
+        using SessionOptions options = SessionFactory.ConfigureSessionOptions();
         Assert.True(options.EnableCpuMemArena);
     }
 
     [Fact]
     public void ConfigureSessionOptions_EnableMemoryPattern_IsTrue()
     {
-        using var options = SessionFactory.ConfigureSessionOptions();
+        using SessionOptions options = SessionFactory.ConfigureSessionOptions();
         Assert.True(options.EnableMemoryPattern);
     }
 
@@ -390,7 +405,7 @@ public sealed class SessionFactoryTests
         // ORT C# API does not expose a getter for session config entries,
         // so we verify that ConfigureSessionOptions completes without throwing.
         // The dynamic_block_base entry is set inside the method.
-        using var options = SessionFactory.ConfigureSessionOptions();
+        using SessionOptions options = SessionFactory.ConfigureSessionOptions();
     }
 
     // ================================================================
@@ -417,7 +432,6 @@ public sealed class SessionFactoryTests
     }
 
     // ---- PIPER_INTRA_THREADS -----------------------------------------------
-
     [Fact]
     public void EnvIntraThreads_ValidValue_AppliedToSessionOptions()
     {
@@ -425,14 +439,14 @@ public sealed class SessionFactoryTests
         // override the auto-detected default unconditionally.
         WithEnv("PIPER_INTRA_THREADS", "2", () =>
         {
-            using var options = SessionFactory.ConfigureSessionOptions();
+            using SessionOptions options = SessionFactory.ConfigureSessionOptions();
             Assert.Equal(2, options.IntraOpNumThreads);
         });
 
         // Also verify the clamp: a value above the cap is clamped to MaxIntraThreads (4).
         WithEnv("PIPER_INTRA_THREADS", "16", () =>
         {
-            using var options = SessionFactory.ConfigureSessionOptions();
+            using SessionOptions options = SessionFactory.ConfigureSessionOptions();
             Assert.Equal(4, options.IntraOpNumThreads);
         });
     }
@@ -446,7 +460,7 @@ public sealed class SessionFactoryTests
         // Non-numeric env value → ignored, fall back to auto.
         WithEnv("PIPER_INTRA_THREADS", "not-a-number", () =>
         {
-            using var options = SessionFactory.ConfigureSessionOptions();
+            using SessionOptions options = SessionFactory.ConfigureSessionOptions();
             Assert.Equal(autoDefault, options.IntraOpNumThreads);
         });
 
@@ -454,20 +468,20 @@ public sealed class SessionFactoryTests
         // value < 1 fails the validity guard in ResolveIntraOpThreads).
         WithEnv("PIPER_INTRA_THREADS", "0", () =>
         {
-            using var options = SessionFactory.ConfigureSessionOptions();
+            using SessionOptions options = SessionFactory.ConfigureSessionOptions();
             Assert.Equal(autoDefault, options.IntraOpNumThreads);
         });
 
         WithEnv("PIPER_INTRA_THREADS", "-3", () =>
         {
-            using var options = SessionFactory.ConfigureSessionOptions();
+            using SessionOptions options = SessionFactory.ConfigureSessionOptions();
             Assert.Equal(autoDefault, options.IntraOpNumThreads);
         });
 
         // Empty string is treated as unset → auto.
-        WithEnv("PIPER_INTRA_THREADS", "", () =>
+        WithEnv("PIPER_INTRA_THREADS", string.Empty, () =>
         {
-            using var options = SessionFactory.ConfigureSessionOptions();
+            using SessionOptions options = SessionFactory.ConfigureSessionOptions();
             Assert.Equal(autoDefault, options.IntraOpNumThreads);
         });
     }
@@ -529,7 +543,7 @@ public sealed class SessionFactoryTests
         });
 
         // Also: empty string and arbitrary non-truthy strings should NOT skip.
-        foreach (var v in new[] { "", "0", "false", "no", "off", "maybe" })
+        foreach (var v in new[] { string.Empty, "0", "false", "no", "off", "maybe" })
         {
             WithEnv("PIPER_DISABLE_WARMUP", v, () =>
             {
@@ -541,7 +555,6 @@ public sealed class SessionFactoryTests
     }
 
     // ---- PIPER_DISABLE_CACHE -----------------------------------------------
-
     [Fact]
     public void EnvDisableCache_True_SkipsCacheReadAndWrite()
     {
@@ -556,10 +569,12 @@ public sealed class SessionFactoryTests
         // drop earlier arguments" warning. Path.GetTempPath() is absolute, so
         // Combine's drop semantics are a false positive here, but Join has no
         // such pitfall and reads more safely.
-        var tmpDir = Path.Join(Path.GetTempPath(),
+        var tmpDir = Path.Join(
+            Path.GetTempPath(),
             "piper-cache-disable-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(tmpDir);
         var modelPath = Path.Join(tmpDir, "model.onnx");
+
         // Body content irrelevant — we only need File.Exists() to return true.
         File.WriteAllText(modelPath, "not a real onnx");
         var optPath = Path.ChangeExtension(modelPath, ".cpu.opt.onnx");
@@ -580,9 +595,11 @@ public sealed class SessionFactoryTests
                 Assert.ThrowsAny<Exception>(() =>
                     SessionFactory.Create(modelPath));
 
-                Assert.True(File.Exists(optPath),
+                Assert.True(
+                    File.Exists(optPath),
                     "PIPER_DISABLE_CACHE=1 must not delete cache files");
-                Assert.True(File.Exists(sentinelPath),
+                Assert.True(
+                    File.Exists(sentinelPath),
                     "PIPER_DISABLE_CACHE=1 must not delete sentinel files");
             });
 
@@ -601,9 +618,16 @@ public sealed class SessionFactoryTests
             // Best-effort cleanup. We catch only the specific I/O exceptions
             // documented for Directory.Delete instead of a generic `catch`
             // (CodeQL "Generic catch clause" hygiene).
-            try { Directory.Delete(tmpDir, recursive: true); }
-            catch (IOException) { /* best effort */ }
-            catch (UnauthorizedAccessException) { /* best effort */ }
+            try
+            {
+                Directory.Delete(tmpDir, recursive: true);
+            }
+            catch (IOException)
+            { /* best effort */
+            }
+            catch (UnauthorizedAccessException)
+            { /* best effort */
+            }
         }
     }
 
@@ -618,7 +642,7 @@ public sealed class SessionFactoryTests
             Assert.False(InvokeIsTruthyEnv("PIPER_DISABLE_CACHE"));
         });
 
-        foreach (var v in new[] { "", "0", "false", "no", "off" })
+        foreach (var v in new[] { string.Empty, "0", "false", "no", "off" })
         {
             WithEnv("PIPER_DISABLE_CACHE", v, () =>
             {

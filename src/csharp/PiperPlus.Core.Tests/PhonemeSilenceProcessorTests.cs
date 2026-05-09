@@ -35,11 +35,10 @@ public sealed class PhonemeSilenceProcessorTests
     // ----------------------------------------------------------------
     // 1. Single phoneme specification
     // ----------------------------------------------------------------
-
     [Fact]
     public void Parse_SingleEntry_ReturnsSingleMapping()
     {
-        var result = PhonemeSilenceProcessor.Parse("_ 0.5");
+        Dictionary<string, float> result = PhonemeSilenceProcessor.Parse("_ 0.5");
 
         Assert.Single(result);
         Assert.Equal(0.5f, result["_"]);
@@ -48,11 +47,10 @@ public sealed class PhonemeSilenceProcessorTests
     // ----------------------------------------------------------------
     // 2. Multiple comma-separated entries
     // ----------------------------------------------------------------
-
     [Fact]
     public void Parse_MultipleEntries_ReturnsAllMappings()
     {
-        var result = PhonemeSilenceProcessor.Parse("_ 0.5,# 0.3");
+        Dictionary<string, float> result = PhonemeSilenceProcessor.Parse("_ 0.5,# 0.3");
 
         Assert.Equal(2, result.Count);
         Assert.Equal(0.5f, result["_"]);
@@ -62,11 +60,10 @@ public sealed class PhonemeSilenceProcessorTests
     // ----------------------------------------------------------------
     // 3. Whitespace around entries is trimmed
     // ----------------------------------------------------------------
-
     [Fact]
     public void Parse_WhitespaceAroundEntries_Trimmed()
     {
-        var result = PhonemeSilenceProcessor.Parse("  _ 0.5 , # 0.3  ");
+        Dictionary<string, float> result = PhonemeSilenceProcessor.Parse("  _ 0.5 , # 0.3  ");
 
         Assert.Equal(2, result.Count);
         Assert.Equal(0.5f, result["_"]);
@@ -76,11 +73,10 @@ public sealed class PhonemeSilenceProcessorTests
     // ----------------------------------------------------------------
     // 4. Decimal precision preserved
     // ----------------------------------------------------------------
-
     [Fact]
     public void Parse_DecimalPrecision_Preserved()
     {
-        var result = PhonemeSilenceProcessor.Parse("_ 0.125");
+        Dictionary<string, float> result = PhonemeSilenceProcessor.Parse("_ 0.125");
 
         Assert.Equal(0.125f, result["_"]);
     }
@@ -88,11 +84,10 @@ public sealed class PhonemeSilenceProcessorTests
     // ----------------------------------------------------------------
     // 5. Integer seconds value accepted
     // ----------------------------------------------------------------
-
     [Fact]
     public void Parse_IntegerSeconds_Accepted()
     {
-        var result = PhonemeSilenceProcessor.Parse("_ 1");
+        Dictionary<string, float> result = PhonemeSilenceProcessor.Parse("_ 1");
 
         Assert.Equal(1.0f, result["_"]);
     }
@@ -100,11 +95,10 @@ public sealed class PhonemeSilenceProcessorTests
     // ----------------------------------------------------------------
     // 6. Duplicate phoneme — last value wins
     // ----------------------------------------------------------------
-
     [Fact]
     public void Parse_DuplicatePhoneme_LastValueWins()
     {
-        var result = PhonemeSilenceProcessor.Parse("_ 0.5,_ 0.8");
+        Dictionary<string, float> result = PhonemeSilenceProcessor.Parse("_ 0.5,_ 0.8");
 
         Assert.Single(result);
         Assert.Equal(0.8f, result["_"]);
@@ -117,7 +111,6 @@ public sealed class PhonemeSilenceProcessorTests
     // ----------------------------------------------------------------
     // 7. Null specification throws
     // ----------------------------------------------------------------
-
     [Fact]
     public void Parse_Null_ThrowsArgumentException()
     {
@@ -128,18 +121,16 @@ public sealed class PhonemeSilenceProcessorTests
     // ----------------------------------------------------------------
     // 8. Empty string throws
     // ----------------------------------------------------------------
-
     [Fact]
     public void Parse_EmptyString_ThrowsArgumentException()
     {
         Assert.Throws<ArgumentException>(
-            () => PhonemeSilenceProcessor.Parse(""));
+            () => PhonemeSilenceProcessor.Parse(string.Empty));
     }
 
     // ----------------------------------------------------------------
     // 9. Whitespace-only string throws
     // ----------------------------------------------------------------
-
     [Fact]
     public void Parse_WhitespaceOnly_ThrowsArgumentException()
     {
@@ -150,7 +141,6 @@ public sealed class PhonemeSilenceProcessorTests
     // ----------------------------------------------------------------
     // 10. Missing seconds value throws
     // ----------------------------------------------------------------
-
     [Fact]
     public void Parse_MissingSeconds_ThrowsArgumentException()
     {
@@ -161,7 +151,6 @@ public sealed class PhonemeSilenceProcessorTests
     // ----------------------------------------------------------------
     // 11. Non-numeric seconds throws
     // ----------------------------------------------------------------
-
     [Fact]
     public void Parse_NonNumericSeconds_ThrowsArgumentException()
     {
@@ -172,7 +161,6 @@ public sealed class PhonemeSilenceProcessorTests
     // ----------------------------------------------------------------
     // 12. Entry with only a space throws (empty phoneme)
     // ----------------------------------------------------------------
-
     [Fact]
     public void Parse_SpaceOnlyEntry_ThrowsArgumentException()
     {
@@ -189,15 +177,14 @@ public sealed class PhonemeSilenceProcessorTests
     // ----------------------------------------------------------------
     // 13. No silence phonemes — single phrase, zero silence
     // ----------------------------------------------------------------
-
     [Fact]
     public void Split_NoSilencePhonemes_SinglePhrase()
     {
         long[] ids = [1, 10, 11, 2]; // ^ a i $
         var silence = new Dictionary<string, float> { ["_"] = 0.5f };
-        var map = MakeIdMap();
+        Dictionary<string, int[]> map = MakeIdMap();
 
-        var phrases = PhonemeSilenceProcessor.SplitAtPhonemeSilence(
+        List<PhonemeSilenceProcessor.Phrase> phrases = PhonemeSilenceProcessor.SplitAtPhonemeSilence(
             ids, prosodyFlat: null, silence, map, sampleRate: 22050);
 
         Assert.Single(phrases);
@@ -209,7 +196,6 @@ public sealed class PhonemeSilenceProcessorTests
     // ----------------------------------------------------------------
     // 14. Single silence phoneme — two phrases
     // ----------------------------------------------------------------
-
     [Fact]
     public void Split_OneSilenceMarker_TwoPhrases()
     {
@@ -217,9 +203,9 @@ public sealed class PhonemeSilenceProcessorTests
         // "_" maps to ID 0, and has 0.5s silence.
         long[] ids = [1, 10, 0, 11, 2];
         var silence = new Dictionary<string, float> { ["_"] = 0.5f };
-        var map = MakeIdMap();
+        Dictionary<string, int[]> map = MakeIdMap();
 
-        var phrases = PhonemeSilenceProcessor.SplitAtPhonemeSilence(
+        List<PhonemeSilenceProcessor.Phrase> phrases = PhonemeSilenceProcessor.SplitAtPhonemeSilence(
             ids, prosodyFlat: null, silence, map, sampleRate: 22050);
 
         Assert.Equal(2, phrases.Count);
@@ -236,7 +222,6 @@ public sealed class PhonemeSilenceProcessorTests
     // ----------------------------------------------------------------
     // 15. Multiple silence markers — three phrases
     // ----------------------------------------------------------------
-
     [Fact]
     public void Split_MultipleSilenceMarkers_MultiplePhrases()
     {
@@ -248,9 +233,9 @@ public sealed class PhonemeSilenceProcessorTests
             ["_"] = 0.5f,
             ["#"] = 0.3f,
         };
-        var map = MakeIdMap();
+        Dictionary<string, int[]> map = MakeIdMap();
 
-        var phrases = PhonemeSilenceProcessor.SplitAtPhonemeSilence(
+        List<PhonemeSilenceProcessor.Phrase> phrases = PhonemeSilenceProcessor.SplitAtPhonemeSilence(
             ids, prosodyFlat: null, silence, map, sampleRate: 22050);
 
         Assert.Equal(3, phrases.Count);
@@ -271,7 +256,6 @@ public sealed class PhonemeSilenceProcessorTests
     // ----------------------------------------------------------------
     // 16. Silence at the very end — trailing empty phrase
     // ----------------------------------------------------------------
-
     [Fact]
     public void Split_SilenceAtEnd_TrailingEmptyPhrase()
     {
@@ -279,9 +263,9 @@ public sealed class PhonemeSilenceProcessorTests
         // The silence phoneme is the last ID, so the trailing phrase is empty.
         long[] ids = [1, 10, 0];
         var silence = new Dictionary<string, float> { ["_"] = 0.5f };
-        var map = MakeIdMap();
+        Dictionary<string, int[]> map = MakeIdMap();
 
-        var phrases = PhonemeSilenceProcessor.SplitAtPhonemeSilence(
+        List<PhonemeSilenceProcessor.Phrase> phrases = PhonemeSilenceProcessor.SplitAtPhonemeSilence(
             ids, prosodyFlat: null, silence, map, sampleRate: 22050);
 
         Assert.Equal(2, phrases.Count);
@@ -297,15 +281,14 @@ public sealed class PhonemeSilenceProcessorTests
     // ----------------------------------------------------------------
     // 17. Empty input — single empty phrase
     // ----------------------------------------------------------------
-
     [Fact]
     public void Split_EmptyInput_SingleEmptyPhrase()
     {
         long[] ids = [];
         var silence = new Dictionary<string, float> { ["_"] = 0.5f };
-        var map = MakeIdMap();
+        Dictionary<string, int[]> map = MakeIdMap();
 
-        var phrases = PhonemeSilenceProcessor.SplitAtPhonemeSilence(
+        List<PhonemeSilenceProcessor.Phrase> phrases = PhonemeSilenceProcessor.SplitAtPhonemeSilence(
             ids, prosodyFlat: null, silence, map, sampleRate: 22050);
 
         Assert.Single(phrases);
@@ -316,15 +299,14 @@ public sealed class PhonemeSilenceProcessorTests
     // ----------------------------------------------------------------
     // 18. Single phoneme (non-silence) — single phrase
     // ----------------------------------------------------------------
-
     [Fact]
     public void Split_SinglePhonemeNonSilence_SinglePhrase()
     {
         long[] ids = [10]; // just "a"
         var silence = new Dictionary<string, float> { ["_"] = 0.5f };
-        var map = MakeIdMap();
+        Dictionary<string, int[]> map = MakeIdMap();
 
-        var phrases = PhonemeSilenceProcessor.SplitAtPhonemeSilence(
+        List<PhonemeSilenceProcessor.Phrase> phrases = PhonemeSilenceProcessor.SplitAtPhonemeSilence(
             ids, prosodyFlat: null, silence, map, sampleRate: 22050);
 
         Assert.Single(phrases);
@@ -335,15 +317,14 @@ public sealed class PhonemeSilenceProcessorTests
     // ----------------------------------------------------------------
     // 19. Single phoneme that IS a silence marker
     // ----------------------------------------------------------------
-
     [Fact]
     public void Split_SinglePhonemeSilence_TwoPhrasesOneEmpty()
     {
         long[] ids = [0]; // just "_"
         var silence = new Dictionary<string, float> { ["_"] = 0.5f };
-        var map = MakeIdMap();
+        Dictionary<string, int[]> map = MakeIdMap();
 
-        var phrases = PhonemeSilenceProcessor.SplitAtPhonemeSilence(
+        List<PhonemeSilenceProcessor.Phrase> phrases = PhonemeSilenceProcessor.SplitAtPhonemeSilence(
             ids, prosodyFlat: null, silence, map, sampleRate: 22050);
 
         Assert.Equal(2, phrases.Count);
@@ -356,15 +337,14 @@ public sealed class PhonemeSilenceProcessorTests
     // ----------------------------------------------------------------
     // 20. All phonemes are silence markers
     // ----------------------------------------------------------------
-
     [Fact]
     public void Split_AllSilencePhonemes_EachSplits()
     {
         long[] ids = [0, 0, 0]; // three "_" in a row
         var silence = new Dictionary<string, float> { ["_"] = 0.5f };
-        var map = MakeIdMap();
+        Dictionary<string, int[]> map = MakeIdMap();
 
-        var phrases = PhonemeSilenceProcessor.SplitAtPhonemeSilence(
+        List<PhonemeSilenceProcessor.Phrase> phrases = PhonemeSilenceProcessor.SplitAtPhonemeSilence(
             ids, prosodyFlat: null, silence, map, sampleRate: 22050);
 
         // Each "_" closes a phrase, plus a trailing empty phrase.
@@ -374,6 +354,7 @@ public sealed class PhonemeSilenceProcessorTests
             Assert.Equal([0L], phrases[i].PhonemeIds);
             Assert.Equal(11025, phrases[i].SilenceSamples);
         }
+
         Assert.Empty(phrases[3].PhonemeIds);
         Assert.Equal(0, phrases[3].SilenceSamples);
     }
@@ -385,18 +366,18 @@ public sealed class PhonemeSilenceProcessorTests
     // ----------------------------------------------------------------
     // 21. Prosody flat array is split in sync with phoneme IDs
     // ----------------------------------------------------------------
-
     [Fact]
     public void Split_WithProsody_SlicedCorrectly()
     {
         // Sequence: a _ i (IDs: 10, 0, 11)
         long[] ids = [10, 0, 11];
+
         // Prosody: 3 values per phoneme -> 9 total
         long[] prosody = [1, 2, 3, 4, 5, 6, 7, 8, 9];
         var silence = new Dictionary<string, float> { ["_"] = 0.5f };
-        var map = MakeIdMap();
+        Dictionary<string, int[]> map = MakeIdMap();
 
-        var phrases = PhonemeSilenceProcessor.SplitAtPhonemeSilence(
+        List<PhonemeSilenceProcessor.Phrase> phrases = PhonemeSilenceProcessor.SplitAtPhonemeSilence(
             ids, prosody, silence, map, sampleRate: 22050);
 
         Assert.Equal(2, phrases.Count);
@@ -415,18 +396,17 @@ public sealed class PhonemeSilenceProcessorTests
     // ----------------------------------------------------------------
     // 22. Null prosody — all phrases have null ProsodyFlat
     // ----------------------------------------------------------------
-
     [Fact]
     public void Split_NullProsody_AllPhrasesHaveNullProsody()
     {
         long[] ids = [10, 0, 11];
         var silence = new Dictionary<string, float> { ["_"] = 0.5f };
-        var map = MakeIdMap();
+        Dictionary<string, int[]> map = MakeIdMap();
 
-        var phrases = PhonemeSilenceProcessor.SplitAtPhonemeSilence(
+        List<PhonemeSilenceProcessor.Phrase> phrases = PhonemeSilenceProcessor.SplitAtPhonemeSilence(
             ids, prosodyFlat: null, silence, map, sampleRate: 22050);
 
-        foreach (var phrase in phrases)
+        foreach (PhonemeSilenceProcessor.Phrase phrase in phrases)
         {
             Assert.Null(phrase.ProsodyFlat);
         }
@@ -435,21 +415,21 @@ public sealed class PhonemeSilenceProcessorTests
     // ----------------------------------------------------------------
     // 23. Wrong-length prosody treated as no prosody
     // ----------------------------------------------------------------
-
     [Fact]
     public void Split_WrongLengthProsody_TreatedAsNoProsody()
     {
         long[] ids = [10, 0, 11];
+
         // Wrong length: should be 3*3=9 but is 5.
         long[] prosody = [1, 2, 3, 4, 5];
         var silence = new Dictionary<string, float> { ["_"] = 0.5f };
-        var map = MakeIdMap();
+        Dictionary<string, int[]> map = MakeIdMap();
 
-        var phrases = PhonemeSilenceProcessor.SplitAtPhonemeSilence(
+        List<PhonemeSilenceProcessor.Phrase> phrases = PhonemeSilenceProcessor.SplitAtPhonemeSilence(
             ids, prosody, silence, map, sampleRate: 22050);
 
         // Prosody length mismatch -> treated as no prosody.
-        foreach (var phrase in phrases)
+        foreach (PhonemeSilenceProcessor.Phrase phrase in phrases)
         {
             Assert.Null(phrase.ProsodyFlat);
         }
@@ -458,7 +438,6 @@ public sealed class PhonemeSilenceProcessorTests
     // ----------------------------------------------------------------
     // 24. Prosody on trailing empty phrase is empty (not null)
     // ----------------------------------------------------------------
-
     [Fact]
     public void Split_ProsodyOnTrailingEmptyPhrase_IsEmptyList()
     {
@@ -466,9 +445,9 @@ public sealed class PhonemeSilenceProcessorTests
         long[] ids = [10, 0];
         long[] prosody = [1, 2, 3, 4, 5, 6];
         var silence = new Dictionary<string, float> { ["_"] = 0.5f };
-        var map = MakeIdMap();
+        Dictionary<string, int[]> map = MakeIdMap();
 
-        var phrases = PhonemeSilenceProcessor.SplitAtPhonemeSilence(
+        List<PhonemeSilenceProcessor.Phrase> phrases = PhonemeSilenceProcessor.SplitAtPhonemeSilence(
             ids, prosody, silence, map, sampleRate: 22050);
 
         Assert.Equal(2, phrases.Count);
@@ -485,7 +464,6 @@ public sealed class PhonemeSilenceProcessorTests
     // ----------------------------------------------------------------
     // 25. Sample rate affects silence samples
     // ----------------------------------------------------------------
-
     [Theory]
     [InlineData(22050, 0.5f, 11025)]
     [InlineData(44100, 0.5f, 22050)]
@@ -496,9 +474,9 @@ public sealed class PhonemeSilenceProcessorTests
     {
         long[] ids = [10, 0]; // a _
         var silence = new Dictionary<string, float> { ["_"] = seconds };
-        var map = MakeIdMap();
+        Dictionary<string, int[]> map = MakeIdMap();
 
-        var phrases = PhonemeSilenceProcessor.SplitAtPhonemeSilence(
+        List<PhonemeSilenceProcessor.Phrase> phrases = PhonemeSilenceProcessor.SplitAtPhonemeSilence(
             ids, prosodyFlat: null, silence, map, sampleRate: sampleRate);
 
         Assert.Equal(expectedSamples, phrases[0].SilenceSamples);
@@ -511,16 +489,16 @@ public sealed class PhonemeSilenceProcessorTests
     // ----------------------------------------------------------------
     // 26. Silence phoneme not in ID map — ignored silently
     // ----------------------------------------------------------------
-
     [Fact]
     public void Split_SilencePhonemeNotInIdMap_NoSplit()
     {
         long[] ids = [1, 10, 11, 2];
+
         // "z" is in the silence spec but not in the phoneme_id_map.
         var silence = new Dictionary<string, float> { ["z"] = 0.5f };
-        var map = MakeIdMap();
+        Dictionary<string, int[]> map = MakeIdMap();
 
-        var phrases = PhonemeSilenceProcessor.SplitAtPhonemeSilence(
+        List<PhonemeSilenceProcessor.Phrase> phrases = PhonemeSilenceProcessor.SplitAtPhonemeSilence(
             ids, prosodyFlat: null, silence, map, sampleRate: 22050);
 
         // No split — "z" is not in the map so it cannot match any ID.
@@ -531,7 +509,6 @@ public sealed class PhonemeSilenceProcessorTests
     // ----------------------------------------------------------------
     // 27. Multi-ID phoneme — split triggers on last ID only
     // ----------------------------------------------------------------
-
     [Fact]
     public void Split_MultiIdPhoneme_SplitsOnLastId()
     {
@@ -544,10 +521,11 @@ public sealed class PhonemeSilenceProcessorTests
 
         // "x" maps to [50, 51], silence triggers on 51 (last ID).
         var silence = new Dictionary<string, float> { ["x"] = 0.5f };
+
         // Sequence: a x[0] x[1] a  (IDs: 10, 50, 51, 10)
         long[] ids = [10, 50, 51, 10];
 
-        var phrases = PhonemeSilenceProcessor.SplitAtPhonemeSilence(
+        List<PhonemeSilenceProcessor.Phrase> phrases = PhonemeSilenceProcessor.SplitAtPhonemeSilence(
             ids, prosodyFlat: null, silence, map, sampleRate: 22050);
 
         Assert.Equal(2, phrases.Count);
@@ -563,7 +541,6 @@ public sealed class PhonemeSilenceProcessorTests
     // ----------------------------------------------------------------
     // 28. Empty phoneme ID map — no splits possible
     // ----------------------------------------------------------------
-
     [Fact]
     public void Split_EmptyPhonemeIdMap_NoSplits()
     {
@@ -571,7 +548,7 @@ public sealed class PhonemeSilenceProcessorTests
         var silence = new Dictionary<string, float> { ["_"] = 0.5f };
         var map = new Dictionary<string, int[]>();
 
-        var phrases = PhonemeSilenceProcessor.SplitAtPhonemeSilence(
+        List<PhonemeSilenceProcessor.Phrase> phrases = PhonemeSilenceProcessor.SplitAtPhonemeSilence(
             ids, prosodyFlat: null, silence, map, sampleRate: 22050);
 
         // No phoneme can be resolved, so no splits.
@@ -586,12 +563,11 @@ public sealed class PhonemeSilenceProcessorTests
     // ----------------------------------------------------------------
     // 29. Null phonemeIds throws
     // ----------------------------------------------------------------
-
     [Fact]
     public void Split_NullPhonemeIds_ThrowsArgumentNullException()
     {
         var silence = new Dictionary<string, float> { ["_"] = 0.5f };
-        var map = MakeIdMap();
+        Dictionary<string, int[]> map = MakeIdMap();
 
         Assert.Throws<ArgumentNullException>(
             () => PhonemeSilenceProcessor.SplitAtPhonemeSilence(
@@ -601,12 +577,11 @@ public sealed class PhonemeSilenceProcessorTests
     // ----------------------------------------------------------------
     // 30. Null phonemeSilence throws
     // ----------------------------------------------------------------
-
     [Fact]
     public void Split_NullPhonemeSilence_ThrowsArgumentNullException()
     {
         long[] ids = [1, 10, 2];
-        var map = MakeIdMap();
+        Dictionary<string, int[]> map = MakeIdMap();
 
         Assert.Throws<ArgumentNullException>(
             () => PhonemeSilenceProcessor.SplitAtPhonemeSilence(
@@ -616,7 +591,6 @@ public sealed class PhonemeSilenceProcessorTests
     // ----------------------------------------------------------------
     // 31. Null phonemeIdMap throws
     // ----------------------------------------------------------------
-
     [Fact]
     public void Split_NullPhonemeIdMap_ThrowsArgumentNullException()
     {
@@ -635,15 +609,14 @@ public sealed class PhonemeSilenceProcessorTests
     // ----------------------------------------------------------------
     // 32. Empty silence map — whole sequence in one phrase
     // ----------------------------------------------------------------
-
     [Fact]
     public void Split_EmptySilenceMap_SinglePhrase()
     {
         long[] ids = [1, 10, 0, 11, 2];
         var silence = new Dictionary<string, float>();
-        var map = MakeIdMap();
+        Dictionary<string, int[]> map = MakeIdMap();
 
-        var phrases = PhonemeSilenceProcessor.SplitAtPhonemeSilence(
+        List<PhonemeSilenceProcessor.Phrase> phrases = PhonemeSilenceProcessor.SplitAtPhonemeSilence(
             ids, prosodyFlat: null, silence, map, sampleRate: 22050);
 
         Assert.Single(phrases);
@@ -658,7 +631,6 @@ public sealed class PhonemeSilenceProcessorTests
     // ----------------------------------------------------------------
     // 33. Phrase record equality
     // ----------------------------------------------------------------
-
     [Fact]
     public void Phrase_RecordEquality_Works()
     {
@@ -685,16 +657,16 @@ public sealed class PhonemeSilenceProcessorTests
     // ----------------------------------------------------------------
     // 34. Parse output feeds directly into Split
     // ----------------------------------------------------------------
-
     [Fact]
     public void ParseThenSplit_RoundTrip_Works()
     {
-        var silence = PhonemeSilenceProcessor.Parse("_ 0.5,# 0.3");
-        var map = MakeIdMap();
+        Dictionary<string, float> silence = PhonemeSilenceProcessor.Parse("_ 0.5,# 0.3");
+        Dictionary<string, int[]> map = MakeIdMap();
+
         // Sequence: ^ a _ i # k $
         long[] ids = [1, 10, 0, 11, 20, 12, 2];
 
-        var phrases = PhonemeSilenceProcessor.SplitAtPhonemeSilence(
+        List<PhonemeSilenceProcessor.Phrase> phrases = PhonemeSilenceProcessor.SplitAtPhonemeSilence(
             ids, prosodyFlat: null, silence, map, sampleRate: 22050);
 
         Assert.Equal(3, phrases.Count);
@@ -710,7 +682,6 @@ public sealed class PhonemeSilenceProcessorTests
     // ----------------------------------------------------------------
     // 35. Consecutive silence markers of different types
     // ----------------------------------------------------------------
-
     [Fact]
     public void Split_ConsecutiveDifferentSilenceMarkers_EachSplits()
     {
@@ -721,9 +692,9 @@ public sealed class PhonemeSilenceProcessorTests
             ["_"] = 0.5f,
             ["#"] = 0.3f,
         };
-        var map = MakeIdMap();
+        Dictionary<string, int[]> map = MakeIdMap();
 
-        var phrases = PhonemeSilenceProcessor.SplitAtPhonemeSilence(
+        List<PhonemeSilenceProcessor.Phrase> phrases = PhonemeSilenceProcessor.SplitAtPhonemeSilence(
             ids, prosodyFlat: null, silence, map, sampleRate: 22050);
 
         Assert.Equal(3, phrases.Count);

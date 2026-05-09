@@ -13,18 +13,18 @@ public sealed class ChinesePhonemizerTests
     // ================================================================
     // Stub G2P engine
     // ================================================================
-
     private class StubChineseG2PEngine : IChineseG2PEngine
     {
         private readonly ChineseG2PResult _result;
+
         public StubChineseG2PEngine(ChineseG2PResult result) => _result = result;
+
         public ChineseG2PResult Convert(string text) => _result;
     }
 
     // ================================================================
     // Shared phoneme ID map for PostProcessIds tests
     // ================================================================
-
     private static Dictionary<string, int[]> MakeMap() => new()
     {
         ["_"] = [0],
@@ -38,7 +38,6 @@ public sealed class ChinesePhonemizerTests
     // ================================================================
     // 1. BasicPhonemes_PassedThrough
     // ================================================================
-
     [Fact]
     public void BasicPhonemes_PassedThrough()
     {
@@ -47,11 +46,10 @@ public sealed class ChinesePhonemizerTests
             Phonemes: ["n", "i", "x", "a", "o"],
             A1: [3, 3, 3, 3, 3],
             A2: [1, 1, 1, 1, 1],
-            A3: [1, 1, 1, 1, 1]
-        );
+            A3: [1, 1, 1, 1, 1]);
 
         var phonemizer = new ChinesePhonemizer(new StubChineseG2PEngine(g2p));
-        var (tokens, _) = phonemizer.PhonemizeWithProsody("你好");
+        (List<string>? tokens, List<ProsodyInfo?> _) = phonemizer.PhonemizeWithProsody("你好");
 
         Assert.Equal(["n", "i", "x", "a", "o"], tokens);
     }
@@ -59,7 +57,6 @@ public sealed class ChinesePhonemizerTests
     // ================================================================
     // 2. ProsodyAlignment_Maintained
     // ================================================================
-
     [Fact]
     public void ProsodyAlignment_Maintained()
     {
@@ -67,11 +64,10 @@ public sealed class ChinesePhonemizerTests
             Phonemes: ["n", "i", "x", "a", "o"],
             A1: [3, 3, 3, 3, 3],
             A2: [1, 1, 2, 2, 2],
-            A3: [2, 2, 2, 2, 2]
-        );
+            A3: [2, 2, 2, 2, 2]);
 
         var phonemizer = new ChinesePhonemizer(new StubChineseG2PEngine(g2p));
-        var (tokens, prosody) = phonemizer.PhonemizeWithProsody("你好");
+        (List<string>? tokens, List<ProsodyInfo?>? prosody) = phonemizer.PhonemizeWithProsody("你好");
 
         Assert.Equal(tokens.Count, prosody.Count);
     }
@@ -79,7 +75,6 @@ public sealed class ChinesePhonemizerTests
     // ================================================================
     // 3. Prosody_ToneValues
     // ================================================================
-
     [Fact]
     public void Prosody_ToneValues()
     {
@@ -88,14 +83,13 @@ public sealed class ChinesePhonemizerTests
             Phonemes: ["n", "i", "x", "a", "o"],
             A1: [3, 3, 3, 3, 3],
             A2: [1, 1, 2, 2, 2],
-            A3: [2, 2, 2, 2, 2]
-        );
+            A3: [2, 2, 2, 2, 2]);
 
         var phonemizer = new ChinesePhonemizer(new StubChineseG2PEngine(g2p));
-        var (_, prosody) = phonemizer.PhonemizeWithProsody("你好");
+        (List<string> _, List<ProsodyInfo?>? prosody) = phonemizer.PhonemizeWithProsody("你好");
 
         // All A1 values should be tone 3 (preserved from engine).
-        foreach (var p in prosody)
+        foreach (ProsodyInfo? p in prosody)
         {
             Assert.NotNull(p);
             Assert.Equal(3, p!.Value.A1);
@@ -105,7 +99,6 @@ public sealed class ChinesePhonemizerTests
     // ================================================================
     // 4. GetPhonemeIdMap_ReturnsNull
     // ================================================================
-
     [Fact]
     public void GetPhonemeIdMap_ReturnsNull()
     {
@@ -113,8 +106,7 @@ public sealed class ChinesePhonemizerTests
             Phonemes: [],
             A1: [],
             A2: [],
-            A3: []
-        );
+            A3: []);
 
         var phonemizer = new ChinesePhonemizer(new StubChineseG2PEngine(g2p));
 
@@ -125,7 +117,6 @@ public sealed class ChinesePhonemizerTests
     // ================================================================
     // 5. PostProcessIds_AddsBosEos
     // ================================================================
-
     [Fact]
     public void PostProcessIds_AddsBosEos()
     {
@@ -133,19 +124,19 @@ public sealed class ChinesePhonemizerTests
             Phonemes: [],
             A1: [],
             A2: [],
-            A3: []
-        );
+            A3: []);
 
         var phonemizer = new ChinesePhonemizer(new StubChineseG2PEngine(g2p));
 
         var inputIds = new List<int> { 10 };
         var inputProsody = new List<ProsodyInfo?> { null };
-        var map = MakeMap();
+        Dictionary<string, int[]> map = MakeMap();
 
-        var (ids, _) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
+        (List<int>? ids, List<ProsodyInfo?> _) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
 
         // First ID should be BOS (^) = 1.
         Assert.Equal(1, ids[0]);
+
         // Last ID should be EOS ($) = 2.
         Assert.Equal(2, ids[^1]);
     }
@@ -153,7 +144,6 @@ public sealed class ChinesePhonemizerTests
     // ================================================================
     // 6. PostProcessIds_InsertsInterPhonemePad
     // ================================================================
-
     [Fact]
     public void PostProcessIds_InsertsInterPhonemePad()
     {
@@ -161,16 +151,15 @@ public sealed class ChinesePhonemizerTests
             Phonemes: [],
             A1: [],
             A2: [],
-            A3: []
-        );
+            A3: []);
 
         var phonemizer = new ChinesePhonemizer(new StubChineseG2PEngine(g2p));
 
         var inputIds = new List<int> { 10, 11 };
         var inputProsody = new List<ProsodyInfo?> { null, null };
-        var map = MakeMap();
+        Dictionary<string, int[]> map = MakeMap();
 
-        var (ids, _) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
+        (List<int>? ids, List<ProsodyInfo?> _) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
 
         // Pattern: BOS(1), PAD(0), 10, PAD(0), 11, PAD(0), EOS(2)
         // Check that PAD (0) appears between phoneme IDs.
@@ -181,7 +170,6 @@ public sealed class ChinesePhonemizerTests
     // ================================================================
     // 7. PostProcessIds_FullSequence
     // ================================================================
-
     [Fact]
     public void PostProcessIds_FullSequence()
     {
@@ -189,8 +177,7 @@ public sealed class ChinesePhonemizerTests
             Phonemes: [],
             A1: [],
             A2: [],
-            A3: []
-        );
+            A3: []);
 
         var phonemizer = new ChinesePhonemizer(new StubChineseG2PEngine(g2p));
 
@@ -200,9 +187,9 @@ public sealed class ChinesePhonemizerTests
         {
             new(3, 1, 1), new(3, 1, 1),
         };
-        var map = MakeMap();
+        Dictionary<string, int[]> map = MakeMap();
 
-        var (ids, prosody) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
+        (List<int>? ids, List<ProsodyInfo?>? prosody) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
 
         // Expected:
         // BOS(1), PAD(0), 10, PAD(0), 11, PAD(0), EOS(2)
@@ -216,7 +203,6 @@ public sealed class ChinesePhonemizerTests
     // ================================================================
     // 8. MismatchedArrayLengths_Throws
     // ================================================================
-
     [Fact]
     public void MismatchedArrayLengths_Throws()
     {
@@ -225,12 +211,11 @@ public sealed class ChinesePhonemizerTests
             Phonemes: ["n", "i", "x", "a", "o"],
             A1: [3, 3],              // length 2, mismatched with phonemes length 5
             A2: [1, 1, 2, 2, 2],
-            A3: [2, 2, 2, 2, 2]
-        );
+            A3: [2, 2, 2, 2, 2]);
 
         var phonemizer = new ChinesePhonemizer(new StubChineseG2PEngine(g2p));
 
-        var ex = Assert.Throws<InvalidOperationException>(
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(
             () => phonemizer.PhonemizeWithProsody("你好"));
 
         Assert.Contains("inconsistent lengths", ex.Message);
@@ -239,7 +224,6 @@ public sealed class ChinesePhonemizerTests
     // ================================================================
     // 9. EmptyInput_ReturnsEmpty
     // ================================================================
-
     [Fact]
     public void EmptyInput_ReturnsEmpty()
     {
@@ -247,11 +231,10 @@ public sealed class ChinesePhonemizerTests
             Phonemes: [],
             A1: [],
             A2: [],
-            A3: []
-        );
+            A3: []);
 
         var phonemizer = new ChinesePhonemizer(new StubChineseG2PEngine(g2p));
-        var (tokens, prosody) = phonemizer.PhonemizeWithProsody("");
+        (List<string>? tokens, List<ProsodyInfo?>? prosody) = phonemizer.PhonemizeWithProsody(string.Empty);
 
         Assert.Empty(tokens);
         Assert.Empty(prosody);
@@ -260,7 +243,6 @@ public sealed class ChinesePhonemizerTests
     // ================================================================
     // 10. PostProcessIds_SkipsPadAfterPadToken
     // ================================================================
-
     [Fact]
     public void PostProcessIds_SkipsPadAfterPadToken()
     {
@@ -268,17 +250,16 @@ public sealed class ChinesePhonemizerTests
             Phonemes: [],
             A1: [],
             A2: [],
-            A3: []
-        );
+            A3: []);
 
         var phonemizer = new ChinesePhonemizer(new StubChineseG2PEngine(g2p));
 
         // Input contains a PAD token (0) between two phoneme IDs.
         var inputIds = new List<int> { 10, 0, 11 };
         var inputProsody = new List<ProsodyInfo?> { null, null, null };
-        var map = MakeMap();
+        Dictionary<string, int[]> map = MakeMap();
 
-        var (ids, _) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
+        (List<int>? ids, List<ProsodyInfo?> _) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
 
         // The PAD token (0) should not get another PAD inserted after it.
         // Expected: BOS(1), PAD(0), 10, PAD(0), 0, 11, PAD(0), EOS(2)
@@ -287,7 +268,8 @@ public sealed class ChinesePhonemizerTests
         // Verify no consecutive PAD-PAD-PAD (triple PAD) exists.
         for (int i = 0; i < ids.Count - 2; i++)
         {
-            Assert.False(ids[i] == 0 && ids[i + 1] == 0 && ids[i + 2] == 0,
+            Assert.False(
+                ids[i] == 0 && ids[i + 1] == 0 && ids[i + 2] == 0,
                 "Triple consecutive PAD tokens should not occur.");
         }
     }
@@ -295,7 +277,6 @@ public sealed class ChinesePhonemizerTests
     // ================================================================
     // 11. PostProcessIds_EmptyInput
     // ================================================================
-
     [Fact]
     public void PostProcessIds_EmptyInput()
     {
@@ -303,16 +284,15 @@ public sealed class ChinesePhonemizerTests
             Phonemes: [],
             A1: [],
             A2: [],
-            A3: []
-        );
+            A3: []);
 
         var phonemizer = new ChinesePhonemizer(new StubChineseG2PEngine(g2p));
 
         var inputIds = new List<int>();
         var inputProsody = new List<ProsodyInfo?>();
-        var map = MakeMap();
+        Dictionary<string, int[]> map = MakeMap();
 
-        var (ids, prosody) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
+        (List<int>? ids, List<ProsodyInfo?>? prosody) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
 
         // Empty input should still produce BOS(1), PAD(0), EOS(2).
         Assert.Equal([1, 0, 2], ids);
@@ -322,7 +302,6 @@ public sealed class ChinesePhonemizerTests
     // ================================================================
     // 12. Phonemize_ReturnsTokensOnly
     // ================================================================
-
     [Fact]
     public void Phonemize_ReturnsTokensOnly()
     {
@@ -330,13 +309,12 @@ public sealed class ChinesePhonemizerTests
             Phonemes: ["n", "i", "x", "a", "o"],
             A1: [3, 3, 3, 3, 3],
             A2: [1, 1, 2, 2, 2],
-            A3: [2, 2, 2, 2, 2]
-        );
+            A3: [2, 2, 2, 2, 2]);
 
         var phonemizer = new ChinesePhonemizer(new StubChineseG2PEngine(g2p));
 
         // Call Phonemize() (not PhonemizeWithProsody) and verify it returns tokens.
-        var tokens = phonemizer.Phonemize("你好");
+        List<string> tokens = phonemizer.Phonemize("你好");
 
         Assert.Equal(["n", "i", "x", "a", "o"], tokens);
     }
@@ -344,7 +322,6 @@ public sealed class ChinesePhonemizerTests
     // ================================================================
     // 13. PhonemizeWithProsody_EmptyInput
     // ================================================================
-
     [Fact]
     public void PhonemizeWithProsody_EmptyInput()
     {
@@ -353,11 +330,10 @@ public sealed class ChinesePhonemizerTests
             Phonemes: [],
             A1: [],
             A2: [],
-            A3: []
-        );
+            A3: []);
 
         var phonemizer = new ChinesePhonemizer(new StubChineseG2PEngine(g2p));
-        var (tokens, prosody) = phonemizer.PhonemizeWithProsody("任意のテキスト");
+        (List<string>? tokens, List<ProsodyInfo?>? prosody) = phonemizer.PhonemizeWithProsody("任意のテキスト");
 
         Assert.Empty(tokens);
         Assert.Empty(prosody);
@@ -366,7 +342,6 @@ public sealed class ChinesePhonemizerTests
     // ================================================================
     // 14. PostProcessIds_ProsodyAlignmentWithPadSkip
     // ================================================================
-
     [Fact]
     public void PostProcessIds_ProsodyAlignmentWithPadSkip()
     {
@@ -374,8 +349,7 @@ public sealed class ChinesePhonemizerTests
             Phonemes: [],
             A1: [],
             A2: [],
-            A3: []
-        );
+            A3: []);
 
         var phonemizer = new ChinesePhonemizer(new StubChineseG2PEngine(g2p));
 
@@ -385,9 +359,9 @@ public sealed class ChinesePhonemizerTests
         {
             new(3, 1, 1), null, new(3, 2, 1),
         };
-        var map = MakeMap();
+        Dictionary<string, int[]> map = MakeMap();
 
-        var (ids, prosody) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
+        (List<int>? ids, List<ProsodyInfo?>? prosody) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
 
         // Prosody list length must always match IDs list length.
         Assert.Equal(ids.Count, prosody.Count);

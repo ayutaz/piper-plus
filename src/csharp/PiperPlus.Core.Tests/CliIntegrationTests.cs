@@ -39,7 +39,8 @@ public sealed class CliIntegrationTests
         {
             // Fallback: resolve relative to the working directory
             return Path.GetFullPath(
-                Path.Combine(Directory.GetCurrentDirectory(),
+                Path.Combine(
+                    Directory.GetCurrentDirectory(),
                     "..", "..", "..", "..", "PiperPlus.Cli"));
         }
 
@@ -136,8 +137,8 @@ public sealed class CliIntegrationTests
         process.Start();
 
         // Read stdout and stderr concurrently to avoid deadlocks
-        var stdoutTask = process.StandardOutput.ReadToEndAsync();
-        var stderrTask = process.StandardError.ReadToEndAsync();
+        Task<string> stdoutTask = process.StandardOutput.ReadToEndAsync();
+        Task<string> stderrTask = process.StandardError.ReadToEndAsync();
 
         using var cts = new CancellationTokenSource(ProcessTimeoutMs);
         try
@@ -161,12 +162,11 @@ public sealed class CliIntegrationTests
     // ================================================================
     // --version
     // ================================================================
-
     [Fact]
     [Trait("Category", "CLI")]
     public async Task Version_Flag_PrintsVersion()
     {
-        var (exitCode, stdout, stderr) = await RunCliAsync("--version");
+        (int exitCode, string? stdout, string? stderr) = await RunCliAsync("--version");
         SkipIfBuildFailed(exitCode, stderr);
 
         Assert.Equal(0, exitCode);
@@ -181,12 +181,11 @@ public sealed class CliIntegrationTests
     // ================================================================
     // --list-models
     // ================================================================
-
     [Fact]
     [Trait("Category", "CLI")]
     public async Task ListModels_NoFilter_OutputsModels()
     {
-        var (exitCode, _, stderr) = await RunCliAsync("--list-models");
+        (int exitCode, string _, string? stderr) = await RunCliAsync("--list-models");
         SkipIfBuildFailed(exitCode, stderr);
 
         Assert.Equal(0, exitCode);
@@ -197,7 +196,7 @@ public sealed class CliIntegrationTests
     [Trait("Category", "CLI")]
     public async Task ListModels_JapaneseFilter_OutputsJapaneseModels()
     {
-        var (exitCode, _, stderr) = await RunCliAsync("--list-models", "ja");
+        (int exitCode, string _, string? stderr) = await RunCliAsync("--list-models", "ja");
         SkipIfBuildFailed(exitCode, stderr);
 
         Assert.Equal(0, exitCode);
@@ -208,7 +207,7 @@ public sealed class CliIntegrationTests
     [Trait("Category", "CLI")]
     public async Task ListModels_UnknownLanguage_ShowsNotFound()
     {
-        var (exitCode, _, stderr) = await RunCliAsync("--list-models", "xx");
+        (int exitCode, string _, string? stderr) = await RunCliAsync("--list-models", "xx");
         SkipIfBuildFailed(exitCode, stderr);
 
         Assert.Equal(0, exitCode);
@@ -218,13 +217,12 @@ public sealed class CliIntegrationTests
     // ================================================================
     // Error cases
     // ================================================================
-
     [Fact]
     [Trait("Category", "CLI")]
     public async Task NoModel_NoInput_ShowsError()
     {
         // Running with no arguments should fail because --model is required
-        var (exitCode, stdout, stderr) = await RunCliAsync();
+        (int exitCode, string? stdout, string? stderr) = await RunCliAsync();
         SkipIfBuildFailed(exitCode, stderr);
 
         string combined = stdout + stderr;
@@ -242,7 +240,7 @@ public sealed class CliIntegrationTests
     [Trait("Category", "CLI")]
     public async Task InvalidModel_ShowsError()
     {
-        var (exitCode, _, stderr) = await RunCliAsync(
+        (int exitCode, string _, string? stderr) = await RunCliAsync(
             "--model", "/nonexistent/path/model.onnx", "--text", "test");
         SkipIfBuildFailed(exitCode, stderr);
 
@@ -260,7 +258,6 @@ public sealed class CliIntegrationTests
     // ================================================================
     // --test-mode
     // ================================================================
-
     [Fact]
     [Trait("Category", "CLI")]
     public async Task TestMode_WithText_OutputsPhonemeIds()
@@ -268,7 +265,7 @@ public sealed class CliIntegrationTests
         // --test-mode with --text skips ONNX inference and outputs phoneme IDs.
         // The G2P engine (DotNetEnglishG2PEngine) is resolved via reflection
         // and may not be available, in which case the CLI reports an error.
-        var (exitCode, stdout, stderr) = await RunCliAsync(
+        (int exitCode, string? stdout, string? stderr) = await RunCliAsync(
             "--test-mode", "--text", "hello", "--language", "en");
         SkipIfBuildFailed(exitCode, stderr);
 
@@ -283,7 +280,7 @@ public sealed class CliIntegrationTests
     [Trait("Category", "CLI")]
     public async Task TestMode_Chinese_OutputsPhonemeIds()
     {
-        var (exitCode, stdout, stderr) = await RunCliAsync(
+        (int exitCode, string? stdout, string? stderr) = await RunCliAsync(
             "--test-mode", "--text", "你好", "--language", "zh");
         SkipIfBuildFailed(exitCode, stderr);
 
@@ -295,7 +292,7 @@ public sealed class CliIntegrationTests
     [Trait("Category", "CLI")]
     public async Task TestMode_Spanish_OutputsPhonemeIds()
     {
-        var (exitCode, stdout, stderr) = await RunCliAsync(
+        (int exitCode, string? stdout, string? stderr) = await RunCliAsync(
             "--test-mode", "--text", "Hola", "--language", "es");
         SkipIfBuildFailed(exitCode, stderr);
 
@@ -307,7 +304,7 @@ public sealed class CliIntegrationTests
     [Trait("Category", "CLI")]
     public async Task TestMode_French_OutputsPhonemeIds()
     {
-        var (exitCode, stdout, stderr) = await RunCliAsync(
+        (int exitCode, string? stdout, string? stderr) = await RunCliAsync(
             "--test-mode", "--text", "Bonjour", "--language", "fr");
         SkipIfBuildFailed(exitCode, stderr);
 
@@ -319,7 +316,7 @@ public sealed class CliIntegrationTests
     [Trait("Category", "CLI")]
     public async Task TestMode_Portuguese_OutputsPhonemeIds()
     {
-        var (exitCode, stdout, stderr) = await RunCliAsync(
+        (int exitCode, string? stdout, string? stderr) = await RunCliAsync(
             "--test-mode", "--text", "Olá", "--language", "pt");
         SkipIfBuildFailed(exitCode, stderr);
 
@@ -331,7 +328,7 @@ public sealed class CliIntegrationTests
     [Trait("Category", "CLI")]
     public async Task TestMode_UnsupportedLanguage_ShowsError()
     {
-        var (exitCode, stdout, stderr) = await RunCliAsync(
+        (int exitCode, string? stdout, string? stderr) = await RunCliAsync(
             "--test-mode", "--text", "test", "--language", "xx");
         SkipIfBuildFailed(exitCode, stderr);
 
@@ -348,13 +345,12 @@ public sealed class CliIntegrationTests
     // ================================================================
     // --test-mode multilingual
     // ================================================================
-
     [Fact]
     [Trait("Category", "CLI")]
     public async Task TestMode_Multilingual_JaEn_OutputsPhonemeIds()
     {
         // Multi-language code "ja-en" should phonemize mixed-language text
-        var (exitCode, stdout, stderr) = await RunCliAsync(
+        (int exitCode, string? stdout, string? stderr) = await RunCliAsync(
             "--test-mode", "--text", "こんにちはhello", "--language", "ja-en");
         SkipIfBuildFailed(exitCode, stderr);
 
@@ -368,7 +364,6 @@ public sealed class CliIntegrationTests
     // ================================================================
     // Default output.wav behavior
     // ================================================================
-
     [Fact]
     [Trait("Category", "CLI")]
     public async Task TextMode_NoOutputFile_DefaultsToOutputWav()
@@ -377,7 +372,7 @@ public sealed class CliIntegrationTests
         // the CLI should default to "output.wav" as the output path.
         // In --test-mode, no actual WAV is written, but the phonemizer
         // runs successfully with exit code 0 and emits phoneme_ids.
-        var (exitCode, stdout, stderr) = await RunCliAsync(
+        (int exitCode, string? stdout, string? stderr) = await RunCliAsync(
             "--test-mode", "--text", "hello", "--language", "en");
         SkipIfBuildFailed(exitCode, stderr);
 
@@ -393,14 +388,13 @@ public sealed class CliIntegrationTests
     // ================================================================
     // --model with model name/alias (auto-resolve)
     // ================================================================
-
     [Fact]
     [Trait("Category", "CLI")]
     public async Task Model_NonexistentNameOrFile_ShowsError()
     {
         // --model with a string that is neither a file nor a known model name
         // should display an error message.
-        var (exitCode, _, stderr) = await RunCliAsync(
+        (int exitCode, string _, string? stderr) = await RunCliAsync(
             "--model", "totally-fake-nonexistent-model-xyz",
             "--text", "test");
         SkipIfBuildFailed(exitCode, stderr);
@@ -413,13 +407,12 @@ public sealed class CliIntegrationTests
     // ================================================================
     // --download-model with alias
     // ================================================================
-
     [Fact]
     [Trait("Category", "CLI")]
     public async Task DownloadModel_InvalidName_ShowsError()
     {
         // --download-model with a name that doesn't exist in the catalog
-        var (exitCode, _, stderr) = await RunCliAsync(
+        (int exitCode, string _, string? stderr) = await RunCliAsync(
             "--download-model", "totally-nonexistent-model-xyz");
         SkipIfBuildFailed(exitCode, stderr);
 
@@ -433,14 +426,13 @@ public sealed class CliIntegrationTests
     // ================================================================
     // --test-mode with [[ inline phonemes ]] notation
     // ================================================================
-
     [Fact]
     [Trait("Category", "CLI")]
     public async Task TestMode_InlinePhonemes_JapaneseWithNotation()
     {
         // The [[ ... ]] inline phoneme notation should be recognized in test-mode.
         // Mix plain text with inline phonemes: "hello [[ k o N n i ch i w a ]]"
-        var (exitCode, stdout, stderr) = await RunCliAsync(
+        (int exitCode, string? stdout, string? stderr) = await RunCliAsync(
             "--test-mode", "--text", "hello [[ k o N n i ch i w a ]]",
             "--language", "ja-en");
         SkipIfBuildFailed(exitCode, stderr);
@@ -458,7 +450,7 @@ public sealed class CliIntegrationTests
     public async Task TestMode_InlinePhonemes_OnlyBrackets()
     {
         // Input with only [[ ... ]] notation (no plain text part)
-        var (exitCode, stdout, stderr) = await RunCliAsync(
+        (int exitCode, string? stdout, string? stderr) = await RunCliAsync(
             "--test-mode", "--text", "[[ a i u e o ]]",
             "--language", "ja");
         SkipIfBuildFailed(exitCode, stderr);
@@ -470,7 +462,6 @@ public sealed class CliIntegrationTests
     // ================================================================
     // --model accepts string (not just FileInfo)
     // ================================================================
-
     [Fact]
     [Trait("Category", "CLI")]
     public async Task Model_AcceptsModelNameString_NotJustFilePath()
@@ -479,7 +470,7 @@ public sealed class CliIntegrationTests
         // With --test-mode, a known model name should be recognized
         // (though it may fail at download since we're in test mode).
         // An unknown name should produce an appropriate error.
-        var (exitCode, stdout, stderr) = await RunCliAsync(
+        (int exitCode, string? stdout, string? stderr) = await RunCliAsync(
             "--model", "tsukuyomi", "--text", "テスト");
         SkipIfBuildFailed(exitCode, stderr);
 
@@ -505,7 +496,6 @@ public sealed class CliIntegrationTests
     // ================================================================
     // --speaker × voice-cloning mutual exclusion
     // ================================================================
-
     [Fact]
     [Trait("Category", "CLI")]
     public async Task Speaker_AndReferenceAudio_AreMutuallyExclusive()
@@ -513,7 +503,7 @@ public sealed class CliIntegrationTests
         // The CLI must reject combining --speaker with voice-cloning sources
         // (--reference-audio / --speaker-embedding) before any model load,
         // mirroring the SynthesisInput.Validate() contract in PiperPlus.Core.
-        var (exitCode, stdout, stderr) = await RunCliAsync(
+        (int exitCode, string? stdout, string? stderr) = await RunCliAsync(
             "--model", "tsukuyomi",
             "--text", "テスト",
             "--speaker", "5",
@@ -527,7 +517,6 @@ public sealed class CliIntegrationTests
     // ================================================================
     // Voice-cloning option wiring (--reference-audio / --speaker-embedding)
     // ================================================================
-
     [Fact]
     [Trait("Category", "CLI")]
     public async Task ReferenceAudio_WithoutSpeakerEncoderModel_Errors()
@@ -535,7 +524,7 @@ public sealed class CliIntegrationTests
         // --reference-audio requires --speaker-encoder-model (the encoder ONNX
         // path) to compute the speaker embedding. The CLI must fail fast with
         // a precise message instead of the generic "Synthesis failed".
-        var (exitCode, stdout, stderr) = await RunCliAsync(
+        (int exitCode, string? stdout, string? stderr) = await RunCliAsync(
             "--test-mode",
             "--text", "test",
             "--reference-audio", "/nonexistent/ref.wav");
@@ -558,7 +547,7 @@ public sealed class CliIntegrationTests
         {
             await File.WriteAllBytesAsync(tmpPath, new byte[7], TestContext.Current.CancellationToken);
 
-            var (exitCode, stdout, stderr) = await RunCliAsync(
+            (int exitCode, string? stdout, string? stderr) = await RunCliAsync(
                 "--test-mode",
                 "--text", "test",
                 "--speaker-embedding", tmpPath);
@@ -570,9 +559,16 @@ public sealed class CliIntegrationTests
         }
         finally
         {
-            try { File.Delete(tmpPath); }
-            catch (IOException) { /* best-effort cleanup */ }
-            catch (UnauthorizedAccessException) { /* best-effort cleanup */ }
+            try
+            {
+                File.Delete(tmpPath);
+            }
+            catch (IOException)
+            { /* best-effort cleanup */
+            }
+            catch (UnauthorizedAccessException)
+            { /* best-effort cleanup */
+            }
         }
     }
 
@@ -587,7 +583,7 @@ public sealed class CliIntegrationTests
         {
             await File.WriteAllBytesAsync(tmpPath, [], TestContext.Current.CancellationToken);
 
-            var (exitCode, stdout, stderr) = await RunCliAsync(
+            (int exitCode, string? stdout, string? stderr) = await RunCliAsync(
                 "--test-mode",
                 "--text", "test",
                 "--speaker-embedding", tmpPath);
@@ -595,6 +591,7 @@ public sealed class CliIntegrationTests
 
             Assert.NotEqual(0, exitCode);
             string combined = stdout + stderr;
+
             // Either "invalid" or our specific "multiple of 4" message — both
             // are precise (the implementation reports both invariants together).
             Assert.True(
@@ -604,9 +601,16 @@ public sealed class CliIntegrationTests
         }
         finally
         {
-            try { File.Delete(tmpPath); }
-            catch (IOException) { /* best-effort cleanup */ }
-            catch (UnauthorizedAccessException) { /* best-effort cleanup */ }
+            try
+            {
+                File.Delete(tmpPath);
+            }
+            catch (IOException)
+            { /* best-effort cleanup */
+            }
+            catch (UnauthorizedAccessException)
+            { /* best-effort cleanup */
+            }
         }
     }
 }

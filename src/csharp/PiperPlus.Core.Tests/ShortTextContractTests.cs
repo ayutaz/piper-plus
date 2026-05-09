@@ -25,7 +25,6 @@ public sealed class ShortTextContractTests
     // ------------------------------------------------------------------
     // Fixture loader (cached across all facts in this class)
     // ------------------------------------------------------------------
-
     private static readonly JsonElement Contract = LoadContract();
 
     private static JsonElement LoadContract()
@@ -40,7 +39,8 @@ public sealed class ShortTextContractTests
                 $"short_text_contract.json not found at {path}. " +
                 "Run `python scripts/regenerate_short_text_fixture.py` and rebuild.");
         }
-        using var stream = File.OpenRead(path);
+
+        using FileStream stream = File.OpenRead(path);
         var doc = JsonDocument.Parse(stream);
         return doc.RootElement.Clone();
     }
@@ -60,7 +60,6 @@ public sealed class ShortTextContractTests
     // ------------------------------------------------------------------
     // 1. Padding constants (named)
     // ------------------------------------------------------------------
-
     [Fact]
     public void Padding_MinPhonemeIds_MatchesContract()
     {
@@ -91,7 +90,7 @@ public sealed class ShortTextContractTests
         // Body of length 4 + BOS + EOS = 6 phonemes; deficit = 15 - 6 = 9 (odd).
         // Expected: front = 4, back = 5 (back gets the extra token).
         long[] phonemeIds = [1L, 10L, 10L, 10L, 10L, 2L]; // BOS, 4×body, EOS
-        var (paddedIds, _, frontPad, backPad) = ShortTextProcessor.PadPhonemeIds(phonemeIds, prosodyFlat: null);
+        (long[]? paddedIds, long[] _, int frontPad, int backPad) = ShortTextProcessor.PadPhonemeIds(phonemeIds, prosodyFlat: null);
 
         Assert.Equal(ShortTextProcessor.MinPhonemeIds, paddedIds.Length);
         Assert.Equal(9, frontPad + backPad);
@@ -105,7 +104,7 @@ public sealed class ShortTextContractTests
         // Body of length 5 + BOS + EOS = 7; deficit = 15 - 7 = 8 (even).
         // Expected: front = back = 4.
         long[] phonemeIds = [1L, 10L, 10L, 10L, 10L, 10L, 2L];
-        var (_, _, frontPad, backPad) = ShortTextProcessor.PadPhonemeIds(phonemeIds, prosodyFlat: null);
+        (long[] _, long[] _, int frontPad, int backPad) = ShortTextProcessor.PadPhonemeIds(phonemeIds, prosodyFlat: null);
         Assert.Equal(8, frontPad + backPad);
         Assert.Equal(frontPad, backPad);
     }
@@ -131,7 +130,7 @@ public sealed class ShortTextContractTests
             51L, 52L, 53L,  // EOS
         ];
 
-        var (paddedIds, paddedProsody, frontPad, backPad) = ShortTextProcessor.PadPhonemeIds(
+        (long[]? paddedIds, long[]? paddedProsody, int frontPad, int backPad) = ShortTextProcessor.PadPhonemeIds(
             phonemeIds, prosodyFlat);
 
         Assert.NotNull(paddedProsody);
@@ -166,7 +165,6 @@ public sealed class ShortTextContractTests
     // ------------------------------------------------------------------
     // 2. Trim constants (named)
     // ------------------------------------------------------------------
-
     [Fact]
     public void Trim_ThresholdRms_MatchesContract()
     {
@@ -196,7 +194,6 @@ public sealed class ShortTextContractTests
     // ------------------------------------------------------------------
     // 3. Scales (behavioural — values are inlined inside AdjustScales)
     // ------------------------------------------------------------------
-
     [Fact]
     public void Scales_NoiseScaleMinRatio_MatchesContract()
     {
@@ -204,12 +201,13 @@ public sealed class ShortTextContractTests
         // With phonemeIdCount = 0, ratio = 0, so adjusted = noiseScale * noise_scale_min_ratio.
         // For a baseline noiseScale of 1.0, adjusted equals noise_scale_min_ratio directly.
         float expectedRatio = GetFloat("scales", "noise_scale_min_ratio");
-        var (adjustedNoiseScale, _) = ShortTextProcessor.AdjustScales(
+        (float adjustedNoiseScale, float _) = ShortTextProcessor.AdjustScales(
             phonemeIdCount: 0,
             noiseScale: 1.0f,
             noiseW: 1.0f);
 
         Assert.Equal(expectedRatio, adjustedNoiseScale, precision: 5);
+
         // Pin the canonical contract value alongside the behavioural check.
         Assert.Equal(0.5f, expectedRatio);
     }
@@ -218,7 +216,7 @@ public sealed class ShortTextContractTests
     public void Scales_NoiseWMinRatio_MatchesContract()
     {
         float expectedRatio = GetFloat("scales", "noise_w_min_ratio");
-        var (_, adjustedNoiseW) = ShortTextProcessor.AdjustScales(
+        (float _, float adjustedNoiseW) = ShortTextProcessor.AdjustScales(
             phonemeIdCount: 0,
             noiseScale: 1.0f,
             noiseW: 1.0f);
@@ -231,7 +229,7 @@ public sealed class ShortTextContractTests
     public void Scales_NoTreatmentForLongInputs()
     {
         // Sequences >= MinPhonemeIds must not be touched by AdjustScales.
-        var (noiseScale, noiseW) = ShortTextProcessor.AdjustScales(
+        (float noiseScale, float noiseW) = ShortTextProcessor.AdjustScales(
             phonemeIdCount: ShortTextProcessor.MinPhonemeIds + 5,
             noiseScale: 0.667f,
             noiseW: 0.8f);
@@ -242,7 +240,6 @@ public sealed class ShortTextContractTests
     // ------------------------------------------------------------------
     // 4. SSML injection (named + behavioural)
     // ------------------------------------------------------------------
-
     [Fact]
     public void Ssml_ShortTextChars_MatchesContract()
     {

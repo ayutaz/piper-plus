@@ -32,7 +32,6 @@ public sealed class IPhonemizerDefaultTests
     // ================================================================
     // 1. PostProcessIds_DefaultImplementation_ReturnsInputsUnchanged
     // ================================================================
-
     [Fact]
     public void PostProcessIds_DefaultImplementation_ReturnsInputsUnchanged()
     {
@@ -48,7 +47,7 @@ public sealed class IPhonemizerDefaultTests
         };
         var map = new Dictionary<string, int[]> { ["a"] = [10] };
 
-        var (resultIds, resultProsody) = phonemizer.PostProcessIds(ids, prosody, map);
+        (List<int>? resultIds, List<ProsodyInfo?>? resultProsody) = phonemizer.PostProcessIds(ids, prosody, map);
 
         Assert.Equal([1, 10, 11, 2], resultIds);
         Assert.Equal(4, resultProsody.Count);
@@ -61,7 +60,6 @@ public sealed class IPhonemizerDefaultTests
     // ================================================================
     // 2. PostProcessIds_DefaultImpl_ReturnsSameReferences
     // ================================================================
-
     [Fact]
     public void PostProcessIds_DefaultImpl_ReturnsSameReferences()
     {
@@ -71,7 +69,7 @@ public sealed class IPhonemizerDefaultTests
         var prosody = new List<ProsodyInfo?> { null, null, null };
         var map = new Dictionary<string, int[]> { ["a"] = [10] };
 
-        var (resultIds, resultProsody) = phonemizer.PostProcessIds(ids, prosody, map);
+        (List<int>? resultIds, List<ProsodyInfo?>? resultProsody) = phonemizer.PostProcessIds(ids, prosody, map);
 
         // The default implementation returns the exact same list instances.
         Assert.Same(ids, resultIds);

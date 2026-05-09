@@ -25,14 +25,17 @@ public sealed class EuropeanPortuguesePhonemizer : IPhonemizer
         new[] { 'a', 'e', 'i', 'o', 'u', 'ɛ', 'ɔ', 'ã', 'ẽ', 'ĩ', 'õ', 'ũ', 'ɨ' });
 
     private static readonly HashSet<char> EuConsonants = new(
-        new[] { 'b', 'd', 'f', 'k', 'l', 'm', 'n', 'p', 'r', 's', 't',
+        new[]
+        {
+            'b', 'd', 'f', 'k', 'l', 'm', 'n', 'p', 'r', 's', 't',
                 'v', 'w', 'z', 'ɡ', 'ɲ', 'ɾ', 'ʁ', 'ʃ', 'ʎ', 'ʒ', 'ʔ',
-                'h', 'ɫ' });
+                'h', 'ɫ'
+        });
 
     private static readonly HashSet<string> Punctuation =
         [".", ",", ";", ":", "!", "?", "¡", "¿", "—", "–", "…"];
 
-    /// <summary>Construct the EU phonemizer with the same G2P engine as BR.</summary>
+    /// <summary>Initializes a new instance of the <see cref="EuropeanPortuguesePhonemizer"/> class.Construct the EU phonemizer with the same G2P engine as BR.</summary>
     public EuropeanPortuguesePhonemizer(IPortugueseG2PEngine engine)
     {
         _br = new PortuguesePhonemizer(engine ?? throw new ArgumentNullException(nameof(engine)));
@@ -41,15 +44,15 @@ public sealed class EuropeanPortuguesePhonemizer : IPhonemizer
     /// <inheritdoc />
     public List<string> Phonemize(string text)
     {
-        var (tokens, _) = _br.PhonemizeWithProsody(text);
+        (List<string>? tokens, List<ProsodyInfo?> _) = _br.PhonemizeWithProsody(text);
         return ApplyEuPostprocessing(tokens);
     }
 
     /// <inheritdoc />
     public (List<string> Tokens, List<ProsodyInfo?> Prosody) PhonemizeWithProsody(string text)
     {
-        var (tokens, prosody) = _br.PhonemizeWithProsody(text);
-        var euTokens = ApplyEuPostprocessing(tokens);
+        (List<string>? tokens, List<ProsodyInfo?>? prosody) = _br.PhonemizeWithProsody(text);
+        List<string> euTokens = ApplyEuPostprocessing(tokens);
         return (euTokens, prosody);
     }
 
@@ -68,9 +71,10 @@ public sealed class EuropeanPortuguesePhonemizer : IPhonemizer
     // -----------------------------------------------------------------
     // EU post-processing — five passes (mirror of Python).
     // -----------------------------------------------------------------
-
     private static char FirstChar(string s) => string.IsNullOrEmpty(s) ? '\0' : s[0];
+
     private static bool StartsCons(string s) => EuConsonants.Contains(FirstChar(s));
+
     private static bool StartsVowel(string s) => EuVowels.Contains(FirstChar(s));
 
     private static bool NextNonSpaceStartsVowel(List<string> tokens, int idx)
@@ -81,8 +85,10 @@ public sealed class EuropeanPortuguesePhonemizer : IPhonemizer
             {
                 continue;
             }
+
             return StartsVowel(tokens[j]);
         }
+
         return false;
     }
 
@@ -102,22 +108,32 @@ public sealed class EuropeanPortuguesePhonemizer : IPhonemizer
         int n = tokens.Count;
         for (int i = 0; i < n; i++)
         {
-            if (tokens[i] != "i") continue;
-            string nxt = (i + 1 < n) ? tokens[i + 1] : "";
+            if (tokens[i] != "i")
+            {
+                continue;
+            }
+
+            string nxt = (i + 1 < n) ? tokens[i + 1] : string.Empty;
             bool isFinal = string.IsNullOrEmpty(nxt) || nxt == " " || Punctuation.Contains(nxt);
-            if (!isFinal) continue;
+            if (!isFinal)
+            {
+                continue;
+            }
+
             if (i >= 1 && tokens[i - 1] == PuaTch)
             {
                 tokens[i - 1] = "t";
                 tokens[i] = "ɨ";
                 continue;
             }
+
             if (i >= 1 && tokens[i - 1] == PuaDzh)
             {
                 tokens[i - 1] = "d";
                 tokens[i] = "ɨ";
                 continue;
             }
+
             if (i >= 1 && StartsCons(tokens[i - 1]))
             {
                 tokens[i] = "ɨ";
@@ -131,8 +147,12 @@ public sealed class EuropeanPortuguesePhonemizer : IPhonemizer
         int n = tokens.Count;
         for (int i = 0; i < n; i++)
         {
-            if (tokens[i] != "s" && tokens[i] != "z") continue;
-            string nxt = (i + 1 < n) ? tokens[i + 1] : "";
+            if (tokens[i] != "s" && tokens[i] != "z")
+            {
+                continue;
+            }
+
+            string nxt = (i + 1 < n) ? tokens[i + 1] : string.Empty;
             bool isWordEnd = string.IsNullOrEmpty(nxt) || nxt == " " || Punctuation.Contains(nxt);
             if (isWordEnd)
             {
@@ -141,6 +161,7 @@ public sealed class EuropeanPortuguesePhonemizer : IPhonemizer
                     tokens[i] = "ʒ";
                     continue;
                 }
+
                 tokens[i] = (tokens[i] == "s") ? "ʃ" : "ʒ";
             }
             else if (StartsCons(nxt) && !StartsVowel(nxt))
@@ -156,9 +177,17 @@ public sealed class EuropeanPortuguesePhonemizer : IPhonemizer
         int n = tokens.Count;
         for (int i = 0; i < n; i++)
         {
-            if (tokens[i] != "w" || i == 0) continue;
-            if (!StartsVowel(tokens[i - 1])) continue;
-            string nxt = (i + 1 < n) ? tokens[i + 1] : "";
+            if (tokens[i] != "w" || i == 0)
+            {
+                continue;
+            }
+
+            if (!StartsVowel(tokens[i - 1]))
+            {
+                continue;
+            }
+
+            string nxt = (i + 1 < n) ? tokens[i + 1] : string.Empty;
             bool isCoda =
                 string.IsNullOrEmpty(nxt) || nxt == " " || Punctuation.Contains(nxt) ||
                 (StartsCons(nxt) && !StartsVowel(nxt));

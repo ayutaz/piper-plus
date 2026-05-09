@@ -13,18 +13,18 @@ public sealed class FrenchPhonemizerTests
     // ================================================================
     // Stub G2P engine
     // ================================================================
-
     private class StubFrenchG2PEngine : IFrenchG2PEngine
     {
         private readonly List<string> _tokens;
+
         public StubFrenchG2PEngine(List<string> tokens) => _tokens = tokens;
+
         public List<string> ToPhonemeList(string text) => _tokens;
     }
 
     // ================================================================
     // Shared phoneme ID map for PostProcessIds tests
     // ================================================================
-
     private static Dictionary<string, int[]> MakeMap() => new()
     {
         ["_"] = [0],
@@ -41,7 +41,6 @@ public sealed class FrenchPhonemizerTests
     // ================================================================
     // 1. LastVowel_GetsStress
     // ================================================================
-
     [Fact]
     public void LastVowel_GetsStress()
     {
@@ -50,19 +49,18 @@ public sealed class FrenchPhonemizerTests
         var tokens = new List<string> { "b", "\u0254\u0303", "\u0292", "u", "\u0281" };
 
         var phonemizer = new FrenchPhonemizer(new StubFrenchG2PEngine(tokens));
-        var (_, prosody) = phonemizer.PhonemizeWithProsody("bonjour");
+        (List<string> _, List<ProsodyInfo?>? prosody) = phonemizer.PhonemizeWithProsody("bonjour");
 
         // Find the prosody entry for "u" (index 3 in the word).
         // u is the last vowel, so it should get A2=2.
         var nonNull = prosody.Where(p => p is not null).ToList();
-        var uProsody = nonNull[3]; // b(0), ɔ̃(1), ʒ(2), u(3)
+        ProsodyInfo? uProsody = nonNull[3]; // b(0), ɔ̃(1), ʒ(2), u(3)
         Assert.Equal(2, uProsody!.Value.A2);
     }
 
     // ================================================================
     // 2. OtherPhonemes_NoStress
     // ================================================================
-
     [Fact]
     public void OtherPhonemes_NoStress()
     {
@@ -71,7 +69,7 @@ public sealed class FrenchPhonemizerTests
         var tokens = new List<string> { "b", "\u0254\u0303", "\u0292", "u", "\u0281" };
 
         var phonemizer = new FrenchPhonemizer(new StubFrenchG2PEngine(tokens));
-        var (_, prosody) = phonemizer.PhonemizeWithProsody("bonjour");
+        (List<string> _, List<ProsodyInfo?>? prosody) = phonemizer.PhonemizeWithProsody("bonjour");
 
         // ɔ̃ at index 1 is a vowel but not the last -> A2=0.
         var nonNull = prosody.Where(p => p is not null).ToList();
@@ -81,7 +79,6 @@ public sealed class FrenchPhonemizerTests
     // ================================================================
     // 3. Consonant_NoStress
     // ================================================================
-
     [Fact]
     public void Consonant_NoStress()
     {
@@ -90,7 +87,7 @@ public sealed class FrenchPhonemizerTests
         var tokens = new List<string> { "b", "\u0254\u0303", "\u0292", "u", "\u0281" };
 
         var phonemizer = new FrenchPhonemizer(new StubFrenchG2PEngine(tokens));
-        var (_, prosody) = phonemizer.PhonemizeWithProsody("bonjour");
+        (List<string> _, List<ProsodyInfo?>? prosody) = phonemizer.PhonemizeWithProsody("bonjour");
 
         var nonNull = prosody.Where(p => p is not null).ToList();
         Assert.Equal(0, nonNull[0]!.Value.A2); // b
@@ -101,7 +98,6 @@ public sealed class FrenchPhonemizerTests
     // ================================================================
     // 4. A3_IsWordPhonemeCount
     // ================================================================
-
     [Fact]
     public void A3_IsWordPhonemeCount()
     {
@@ -110,7 +106,7 @@ public sealed class FrenchPhonemizerTests
         var tokens = new List<string> { "b", "\u0254\u0303", "\u0292", "u", "\u0281" };
 
         var phonemizer = new FrenchPhonemizer(new StubFrenchG2PEngine(tokens));
-        var (_, prosody) = phonemizer.PhonemizeWithProsody("bonjour");
+        (List<string> _, List<ProsodyInfo?>? prosody) = phonemizer.PhonemizeWithProsody("bonjour");
 
         var a3Values = prosody
             .Where(p => p is not null)
@@ -125,7 +121,6 @@ public sealed class FrenchPhonemizerTests
     // ================================================================
     // 5. NoStressMarkerInOutput
     // ================================================================
-
     [Fact]
     public void NoStressMarkerInOutput()
     {
@@ -133,7 +128,7 @@ public sealed class FrenchPhonemizerTests
         var tokens = new List<string> { "b", "\u0254\u0303", "\u0292", "u", "\u0281" };
 
         var phonemizer = new FrenchPhonemizer(new StubFrenchG2PEngine(tokens));
-        var (outputTokens, _) = phonemizer.PhonemizeWithProsody("bonjour");
+        (List<string>? outputTokens, List<ProsodyInfo?> _) = phonemizer.PhonemizeWithProsody("bonjour");
 
         Assert.DoesNotContain("\u02c8", outputTokens); // no ˈ
         Assert.DoesNotContain("\u02cc", outputTokens); // no ˌ
@@ -142,7 +137,6 @@ public sealed class FrenchPhonemizerTests
     // ================================================================
     // 6. WordBoundary_Spaces
     // ================================================================
-
     [Fact]
     public void WordBoundary_Spaces()
     {
@@ -150,7 +144,7 @@ public sealed class FrenchPhonemizerTests
         var tokens = new List<string> { "l", "\u0259", " ", "\u0283", "a" };
 
         var phonemizer = new FrenchPhonemizer(new StubFrenchG2PEngine(tokens));
-        var (outputTokens, _) = phonemizer.PhonemizeWithProsody("le chat");
+        (List<string>? outputTokens, List<ProsodyInfo?> _) = phonemizer.PhonemizeWithProsody("le chat");
 
         Assert.Contains(" ", outputTokens);
     }
@@ -158,7 +152,6 @@ public sealed class FrenchPhonemizerTests
     // ================================================================
     // 7. Punctuation_HasZeroProsody
     // ================================================================
-
     [Fact]
     public void Punctuation_HasZeroProsody()
     {
@@ -166,10 +159,10 @@ public sealed class FrenchPhonemizerTests
         var tokens = new List<string> { "u", "i", "," };
 
         var phonemizer = new FrenchPhonemizer(new StubFrenchG2PEngine(tokens));
-        var (_, prosody) = phonemizer.PhonemizeWithProsody("oui,");
+        (List<string> _, List<ProsodyInfo?>? prosody) = phonemizer.PhonemizeWithProsody("oui,");
 
         // The comma should have A1=0, A2=0, A3=0.
-        var commaProsody = prosody[^1];
+        ProsodyInfo? commaProsody = prosody[^1];
         Assert.NotNull(commaProsody);
         Assert.Equal(0, commaProsody!.Value.A1);
         Assert.Equal(0, commaProsody!.Value.A2);
@@ -179,7 +172,6 @@ public sealed class FrenchPhonemizerTests
     // ================================================================
     // 8. NasalVowel_IsVowel
     // ================================================================
-
     [Fact]
     public void NasalVowel_IsVowel()
     {
@@ -188,7 +180,7 @@ public sealed class FrenchPhonemizerTests
         var tokens = new List<string> { "b", "\u0254\u0303" }; // b ɔ̃
 
         var phonemizer = new FrenchPhonemizer(new StubFrenchG2PEngine(tokens));
-        var (_, prosody) = phonemizer.PhonemizeWithProsody("bon");
+        (List<string> _, List<ProsodyInfo?>? prosody) = phonemizer.PhonemizeWithProsody("bon");
 
         var nonNull = prosody.Where(p => p is not null).ToList();
         Assert.Equal(2, nonNull[1]!.Value.A2); // ɔ̃ is last vowel -> stressed
@@ -196,14 +188,14 @@ public sealed class FrenchPhonemizerTests
         // Also test ɛ̃ and ɑ̃.
         var tokens2 = new List<string> { "v", "\u025b\u0303" }; // v ɛ̃
         var phonemizer2 = new FrenchPhonemizer(new StubFrenchG2PEngine(tokens2));
-        var (_, prosody2) = phonemizer2.PhonemizeWithProsody("vin");
+        (List<string> _, List<ProsodyInfo?>? prosody2) = phonemizer2.PhonemizeWithProsody("vin");
 
         var nonNull2 = prosody2.Where(p => p is not null).ToList();
         Assert.Equal(2, nonNull2[1]!.Value.A2); // ɛ̃ is last vowel -> stressed
 
         var tokens3 = new List<string> { "l", "\u0251\u0303" }; // l ɑ̃
         var phonemizer3 = new FrenchPhonemizer(new StubFrenchG2PEngine(tokens3));
-        var (_, prosody3) = phonemizer3.PhonemizeWithProsody("lent");
+        (List<string> _, List<ProsodyInfo?>? prosody3) = phonemizer3.PhonemizeWithProsody("lent");
 
         var nonNull3 = prosody3.Where(p => p is not null).ToList();
         Assert.Equal(2, nonNull3[1]!.Value.A2); // ɑ̃ is last vowel -> stressed
@@ -212,7 +204,6 @@ public sealed class FrenchPhonemizerTests
     // ================================================================
     // 9. ProsodyAlignment_Maintained
     // ================================================================
-
     [Fact]
     public void ProsodyAlignment_Maintained()
     {
@@ -221,7 +212,7 @@ public sealed class FrenchPhonemizerTests
         var tokens = new List<string> { "l", "\u0259", " ", "\u0283", "a" };
 
         var phonemizer = new FrenchPhonemizer(new StubFrenchG2PEngine(tokens));
-        var (outputTokens, prosody) = phonemizer.PhonemizeWithProsody("le chat");
+        (List<string>? outputTokens, List<ProsodyInfo?>? prosody) = phonemizer.PhonemizeWithProsody("le chat");
 
         Assert.Equal(outputTokens.Count, prosody.Count);
     }
@@ -229,7 +220,6 @@ public sealed class FrenchPhonemizerTests
     // ================================================================
     // 10. GetPhonemeIdMap_ReturnsNull
     // ================================================================
-
     [Fact]
     public void GetPhonemeIdMap_ReturnsNull()
     {
@@ -243,7 +233,6 @@ public sealed class FrenchPhonemizerTests
     // ================================================================
     // 11. PostProcessIds_FullSequence
     // ================================================================
-
     [Fact]
     public void PostProcessIds_FullSequence()
     {
@@ -256,9 +245,9 @@ public sealed class FrenchPhonemizerTests
         {
             new(0, 0, 3), new(0, 2, 3), new(0, 0, 3),
         };
-        var map = MakeMap();
+        Dictionary<string, int[]> map = MakeMap();
 
-        var (ids, prosody) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
+        (List<int>? ids, List<ProsodyInfo?>? prosody) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
 
         // Expected:
         // BOS(1), PAD(0), 10, PAD(0), 11, PAD(0), 12, PAD(0), EOS(2)
@@ -276,7 +265,6 @@ public sealed class FrenchPhonemizerTests
     // ================================================================
     // 12. PostProcessIds_SkipsPadAfterPadToken
     // ================================================================
-
     [Fact]
     public void PostProcessIds_SkipsPadAfterPadToken()
     {
@@ -290,9 +278,9 @@ public sealed class FrenchPhonemizerTests
         {
             new(0, 0, 3), null, new(0, 2, 3),
         };
-        var map = MakeMap();
+        Dictionary<string, int[]> map = MakeMap();
 
-        var (ids, prosody) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
+        (List<int>? ids, List<ProsodyInfo?>? prosody) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
 
         // Expected:
         // BOS(1), PAD(0), 10, PAD(0), 0, 11, PAD(0), EOS(2)
@@ -307,7 +295,6 @@ public sealed class FrenchPhonemizerTests
     // ================================================================
     // 13. PostProcessIds_EmptyInput
     // ================================================================
-
     [Fact]
     public void PostProcessIds_EmptyInput()
     {
@@ -317,9 +304,9 @@ public sealed class FrenchPhonemizerTests
         // Empty input: no phoneme IDs at all.
         var inputIds = new List<int>();
         var inputProsody = new List<ProsodyInfo?>();
-        var map = MakeMap();
+        Dictionary<string, int[]> map = MakeMap();
 
-        var (ids, prosody) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
+        (List<int>? ids, List<ProsodyInfo?>? prosody) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
 
         // Expected: BOS(1), PAD(0), EOS(2) = [1, 0, 2]
         Assert.Equal([1, 0, 2], ids);
@@ -331,7 +318,6 @@ public sealed class FrenchPhonemizerTests
     // ================================================================
     // 14. Phonemize_ReturnsTokensOnly
     // ================================================================
-
     [Fact]
     public void Phonemize_ReturnsTokensOnly()
     {
@@ -339,7 +325,7 @@ public sealed class FrenchPhonemizerTests
         var tokens = new List<string> { "b", "\u0254\u0303", "\u0292", "u", "\u0281" };
 
         var phonemizer = new FrenchPhonemizer(new StubFrenchG2PEngine(tokens));
-        var result = phonemizer.Phonemize("bonjour");
+        List<string> result = phonemizer.Phonemize("bonjour");
 
         // Phonemize() should return tokens (possibly PUA-mapped).
         Assert.NotNull(result);
@@ -350,7 +336,6 @@ public sealed class FrenchPhonemizerTests
     // ================================================================
     // 15. PhonemizeWithProsody_EmptyInput
     // ================================================================
-
     [Fact]
     public void PhonemizeWithProsody_EmptyInput()
     {
@@ -358,7 +343,7 @@ public sealed class FrenchPhonemizerTests
         var phonemizer = new FrenchPhonemizer(
             new StubFrenchG2PEngine([]));
 
-        var (outputTokens, prosody) = phonemizer.PhonemizeWithProsody("");
+        (List<string>? outputTokens, List<ProsodyInfo?>? prosody) = phonemizer.PhonemizeWithProsody(string.Empty);
 
         Assert.Empty(outputTokens);
         Assert.Empty(prosody);
@@ -367,7 +352,6 @@ public sealed class FrenchPhonemizerTests
     // ================================================================
     // 16. Punctuation_InvertedMarks
     // ================================================================
-
     [Fact]
     public void Punctuation_InvertedMarks()
     {
@@ -375,7 +359,7 @@ public sealed class FrenchPhonemizerTests
         var tokens = new List<string> { "\u00bf", "u", "i", "\u00a1" }; // ¿ u i ¡
 
         var phonemizer = new FrenchPhonemizer(new StubFrenchG2PEngine(tokens));
-        var (_, prosody) = phonemizer.PhonemizeWithProsody("\u00bfoui\u00a1");
+        (List<string> _, List<ProsodyInfo?>? prosody) = phonemizer.PhonemizeWithProsody("\u00bfoui\u00a1");
 
         // ¿ at index 0 should be punctuation with zero prosody.
         Assert.NotNull(prosody[0]);
@@ -393,7 +377,6 @@ public sealed class FrenchPhonemizerTests
     // ================================================================
     // 17. Punctuation_Guillemets
     // ================================================================
-
     [Fact]
     public void Punctuation_Guillemets()
     {
@@ -401,7 +384,7 @@ public sealed class FrenchPhonemizerTests
         var tokens = new List<string> { "\u00ab", "u", "i", "\u00bb" }; // « u i »
 
         var phonemizer = new FrenchPhonemizer(new StubFrenchG2PEngine(tokens));
-        var (_, prosody) = phonemizer.PhonemizeWithProsody("\u00aboui\u00bb");
+        (List<string> _, List<ProsodyInfo?>? prosody) = phonemizer.PhonemizeWithProsody("\u00aboui\u00bb");
 
         // « at index 0 should be punctuation with zero prosody.
         Assert.NotNull(prosody[0]);
@@ -419,7 +402,6 @@ public sealed class FrenchPhonemizerTests
     // ================================================================
     // 18. YVowel_TreatedAsVowel
     // ================================================================
-
     [Fact]
     public void YVowel_TreatedAsVowel()
     {
@@ -428,7 +410,7 @@ public sealed class FrenchPhonemizerTests
         var tokens = new List<string> { "k", "y_vowel" };
 
         var phonemizer = new FrenchPhonemizer(new StubFrenchG2PEngine(tokens));
-        var (_, prosody) = phonemizer.PhonemizeWithProsody("test");
+        (List<string> _, List<ProsodyInfo?>? prosody) = phonemizer.PhonemizeWithProsody("test");
 
         var nonNull = prosody.Where(p => p is not null).ToList();
         Assert.Equal(0, nonNull[0]!.Value.A2);  // k = consonant -> no stress
@@ -438,7 +420,6 @@ public sealed class FrenchPhonemizerTests
     // ================================================================
     // 19. Schwa_TreatedAsVowel
     // ================================================================
-
     [Fact]
     public void Schwa_TreatedAsVowel()
     {
@@ -447,7 +428,7 @@ public sealed class FrenchPhonemizerTests
         var tokens = new List<string> { "l", "\u0259" }; // l ə
 
         var phonemizer = new FrenchPhonemizer(new StubFrenchG2PEngine(tokens));
-        var (_, prosody) = phonemizer.PhonemizeWithProsody("le");
+        (List<string> _, List<ProsodyInfo?>? prosody) = phonemizer.PhonemizeWithProsody("le");
 
         var nonNull = prosody.Where(p => p is not null).ToList();
         Assert.Equal(0, nonNull[0]!.Value.A2);  // l = consonant -> no stress

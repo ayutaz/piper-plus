@@ -49,7 +49,6 @@ public sealed class DictionaryManagerTests : IDisposable
     // ================================================================
     // IsValidDictionary
     // ================================================================
-
     [Fact]
     public void IsValidDictionary_NullPath_ReturnsFalse()
     {
@@ -59,7 +58,7 @@ public sealed class DictionaryManagerTests : IDisposable
     [Fact]
     public void IsValidDictionary_EmptyPath_ReturnsFalse()
     {
-        Assert.False(DictionaryManager.IsValidDictionary(""));
+        Assert.False(DictionaryManager.IsValidDictionary(string.Empty));
     }
 
     [Fact]
@@ -91,8 +90,8 @@ public sealed class DictionaryManagerTests : IDisposable
         try
         {
             // Create only 2 of the 4 required files
-            File.WriteAllText(Path.Combine(tempDir, "sys.dic"), "");
-            File.WriteAllText(Path.Combine(tempDir, "matrix.bin"), "");
+            File.WriteAllText(Path.Combine(tempDir, "sys.dic"), string.Empty);
+            File.WriteAllText(Path.Combine(tempDir, "matrix.bin"), string.Empty);
 
             Assert.False(DictionaryManager.IsValidDictionary(tempDir));
         }
@@ -110,10 +109,10 @@ public sealed class DictionaryManagerTests : IDisposable
         try
         {
             // Create all 4 required files
-            File.WriteAllText(Path.Combine(tempDir, "sys.dic"), "");
-            File.WriteAllText(Path.Combine(tempDir, "matrix.bin"), "");
-            File.WriteAllText(Path.Combine(tempDir, "char.bin"), "");
-            File.WriteAllText(Path.Combine(tempDir, "unk.dic"), "");
+            File.WriteAllText(Path.Combine(tempDir, "sys.dic"), string.Empty);
+            File.WriteAllText(Path.Combine(tempDir, "matrix.bin"), string.Empty);
+            File.WriteAllText(Path.Combine(tempDir, "char.bin"), string.Empty);
+            File.WriteAllText(Path.Combine(tempDir, "unk.dic"), string.Empty);
 
             Assert.True(DictionaryManager.IsValidDictionary(tempDir));
         }
@@ -126,7 +125,6 @@ public sealed class DictionaryManagerTests : IDisposable
     // ================================================================
     // FindDictionary — environment variable search order
     // ================================================================
-
     [Fact]
     public void FindDictionary_OpenJtalkEnvVar_TakesPriority()
     {
@@ -134,6 +132,7 @@ public sealed class DictionaryManagerTests : IDisposable
         try
         {
             Environment.SetEnvironmentVariable("OPENJTALK_DICTIONARY_PATH", tempDir);
+
             // Clear others to ensure they don't interfere
             Environment.SetEnvironmentVariable("DOTNETG2P_NAIST_JDIC_PATH", null);
             Environment.SetEnvironmentVariable("NAIST_JDIC_PATH", null);
@@ -196,6 +195,7 @@ public sealed class DictionaryManagerTests : IDisposable
         {
             // Point OPENJTALK_DICTIONARY_PATH to an invalid (nonexistent) path
             Environment.SetEnvironmentVariable("OPENJTALK_DICTIONARY_PATH", "/nonexistent/path");
+
             // Point NAIST_JDIC_PATH to a valid dictionary
             Environment.SetEnvironmentVariable("DOTNETG2P_NAIST_JDIC_PATH", null);
             Environment.SetEnvironmentVariable("NAIST_JDIC_PATH", tempDir);
@@ -233,7 +233,6 @@ public sealed class DictionaryManagerTests : IDisposable
     // ================================================================
     // EnsureDictionaryAsync — control flags
     // ================================================================
-
     [Fact]
     public async Task EnsureDictionaryAsync_OfflineMode_ThrowsWhenNotFound()
     {
@@ -251,6 +250,7 @@ public sealed class DictionaryManagerTests : IDisposable
         {
             var path = await DictionaryManager.EnsureDictionaryAsync(
                 TestContext.Current.CancellationToken);
+
             // If we get here, a local dictionary was found — that's fine
             Assert.True(DictionaryManager.IsValidDictionary(path));
         }
@@ -303,7 +303,6 @@ public sealed class DictionaryManagerTests : IDisposable
     // ================================================================
     // IsValidDictionary — edge cases
     // ================================================================
-
     [Fact]
     public void IsValidDictionary_WhitespacePath_ReturnsFalse()
     {
@@ -322,7 +321,10 @@ public sealed class DictionaryManagerTests : IDisposable
         }
         finally
         {
-            if (Directory.Exists(dir)) Directory.Delete(dir, true);
+            if (Directory.Exists(dir))
+            {
+                Directory.Delete(dir, true);
+            }
         }
     }
 
@@ -336,19 +338,22 @@ public sealed class DictionaryManagerTests : IDisposable
             File.WriteAllBytes(Path.Combine(dir, "sys.dic"), new byte[] { 0 });
             File.WriteAllBytes(Path.Combine(dir, "matrix.bin"), new byte[] { 0 });
             File.WriteAllBytes(Path.Combine(dir, "char.bin"), new byte[] { 0 });
+
             // Missing unk.dic
             Assert.False(DictionaryManager.IsValidDictionary(dir));
         }
         finally
         {
-            if (Directory.Exists(dir)) Directory.Delete(dir, true);
+            if (Directory.Exists(dir))
+            {
+                Directory.Delete(dir, true);
+            }
         }
     }
 
     // ================================================================
     // Control flag edge cases
     // ================================================================
-
     [Fact]
     public async Task IsOfflineMode_OnlyExactOneIsTrue()
     {
@@ -356,6 +361,7 @@ public sealed class DictionaryManagerTests : IDisposable
         Environment.SetEnvironmentVariable("OPENJTALK_DICTIONARY_PATH", null);
         Environment.SetEnvironmentVariable("DOTNETG2P_NAIST_JDIC_PATH", null);
         Environment.SetEnvironmentVariable("NAIST_JDIC_PATH", null);
+
         // "1" should be offline, but "0" should not be
         // Set PIPER_OFFLINE_MODE=0 and PIPER_AUTO_DOWNLOAD_DICT=0
         // If "0" were treated as offline, we'd get "offline mode" error;
@@ -366,6 +372,7 @@ public sealed class DictionaryManagerTests : IDisposable
         try
         {
             var path = await DictionaryManager.EnsureDictionaryAsync(CancellationToken.None);
+
             // If we get here, a system dictionary was found — that's acceptable
             Assert.True(DictionaryManager.IsValidDictionary(path));
         }
@@ -397,14 +404,16 @@ public sealed class DictionaryManagerTests : IDisposable
         }
         finally
         {
-            if (Directory.Exists(dir)) Directory.Delete(dir, true);
+            if (Directory.Exists(dir))
+            {
+                Directory.Delete(dir, true);
+            }
         }
     }
 
     // ================================================================
     // Data directory resolution
     // ================================================================
-
     [Fact]
     public void FindDictionary_DataDirFallback_Checked()
     {
@@ -451,7 +460,10 @@ public sealed class DictionaryManagerTests : IDisposable
         }
         finally
         {
-            if (Directory.Exists(baseDir)) Directory.Delete(baseDir, true);
+            if (Directory.Exists(baseDir))
+            {
+                Directory.Delete(baseDir, true);
+            }
         }
     }
 

@@ -42,11 +42,10 @@ public sealed class VoiceCatalogTests : IDisposable
     // ================================================================
     // Built-in catalog tests
     // ================================================================
-
     [Fact]
     public void LoadBuiltInCatalog_ReturnsTwoModels()
     {
-        var catalog = VoiceCatalog.LoadBuiltInCatalog();
+        IReadOnlyList<VoiceInfo> catalog = VoiceCatalog.LoadBuiltInCatalog();
 
         Assert.Equal(2, catalog.Count);
     }
@@ -54,8 +53,8 @@ public sealed class VoiceCatalogTests : IDisposable
     [Fact]
     public void Tsukuyomi_HasCorrectProperties()
     {
-        var catalog = VoiceCatalog.LoadBuiltInCatalog();
-        var tsukuyomi = catalog.Single(v => v.Key == "ja_JP-tsukuyomi-chan-medium");
+        IReadOnlyList<VoiceInfo> catalog = VoiceCatalog.LoadBuiltInCatalog();
+        VoiceInfo tsukuyomi = catalog.Single(v => v.Key == "ja_JP-tsukuyomi-chan-medium");
 
         Assert.Equal("tsukuyomi-chan", tsukuyomi.Name);
         Assert.Equal("ja_JP", tsukuyomi.LanguageCode);
@@ -69,8 +68,8 @@ public sealed class VoiceCatalogTests : IDisposable
     [Fact]
     public void Tsukuyomi_HasCorrectAliases()
     {
-        var catalog = VoiceCatalog.LoadBuiltInCatalog();
-        var tsukuyomi = catalog.Single(v => v.Key == "ja_JP-tsukuyomi-chan-medium");
+        IReadOnlyList<VoiceInfo> catalog = VoiceCatalog.LoadBuiltInCatalog();
+        VoiceInfo tsukuyomi = catalog.Single(v => v.Key == "ja_JP-tsukuyomi-chan-medium");
 
         Assert.Equal(3, tsukuyomi.Aliases.Count);
         Assert.Contains("tsukuyomi", tsukuyomi.Aliases);
@@ -81,8 +80,8 @@ public sealed class VoiceCatalogTests : IDisposable
     [Fact]
     public void Tsukuyomi_HasTwoFiles()
     {
-        var catalog = VoiceCatalog.LoadBuiltInCatalog();
-        var tsukuyomi = catalog.Single(v => v.Key == "ja_JP-tsukuyomi-chan-medium");
+        IReadOnlyList<VoiceInfo> catalog = VoiceCatalog.LoadBuiltInCatalog();
+        VoiceInfo tsukuyomi = catalog.Single(v => v.Key == "ja_JP-tsukuyomi-chan-medium");
 
         Assert.Equal(2, tsukuyomi.Files.Count);
         Assert.Contains(tsukuyomi.Files, f => f.RelativePath.EndsWith(".onnx", StringComparison.Ordinal));
@@ -92,8 +91,8 @@ public sealed class VoiceCatalogTests : IDisposable
     [Fact]
     public void Css10_Has1Speaker()
     {
-        var catalog = VoiceCatalog.LoadBuiltInCatalog();
-        var css10 = catalog.Single(v => v.Key == "ja_JP-css10-6lang-medium");
+        IReadOnlyList<VoiceInfo> catalog = VoiceCatalog.LoadBuiltInCatalog();
+        VoiceInfo css10 = catalog.Single(v => v.Key == "ja_JP-css10-6lang-medium");
 
         Assert.Equal(1, css10.NumSpeakers);
     }
@@ -101,8 +100,8 @@ public sealed class VoiceCatalogTests : IDisposable
     [Fact]
     public void Css10_HasCorrectAliases()
     {
-        var catalog = VoiceCatalog.LoadBuiltInCatalog();
-        var css10 = catalog.Single(v => v.Key == "ja_JP-css10-6lang-medium");
+        IReadOnlyList<VoiceInfo> catalog = VoiceCatalog.LoadBuiltInCatalog();
+        VoiceInfo css10 = catalog.Single(v => v.Key == "ja_JP-css10-6lang-medium");
 
         Assert.Equal(4, css10.Aliases.Count);
         Assert.Contains("css10", css10.Aliases);
@@ -114,11 +113,10 @@ public sealed class VoiceCatalogTests : IDisposable
     // ================================================================
     // External catalog merge tests
     // ================================================================
-
     [Fact]
     public void LoadMergedCatalog_NoExternalFile_ReturnsBuiltIn()
     {
-        var catalog = VoiceCatalog.LoadMergedCatalog(externalVoicesJsonPath: null);
+        IReadOnlyList<VoiceInfo> catalog = VoiceCatalog.LoadMergedCatalog(externalVoicesJsonPath: null);
 
         // Should contain the 2 built-in models
         Assert.Equal(2, catalog.Count);
@@ -150,7 +148,7 @@ public sealed class VoiceCatalogTests : IDisposable
         """;
 
         var path = WriteTempJson(externalJson);
-        var catalog = VoiceCatalog.LoadMergedCatalog(externalVoicesJsonPath: path);
+        IReadOnlyList<VoiceInfo> catalog = VoiceCatalog.LoadMergedCatalog(externalVoicesJsonPath: path);
 
         // 2 built-in + 1 external = 3
         Assert.Equal(3, catalog.Count);
@@ -159,7 +157,7 @@ public sealed class VoiceCatalogTests : IDisposable
         Assert.Contains(catalog, v => v.Key == "en_US-amy-medium");
 
         // Verify external entry properties
-        var amy = catalog.Single(v => v.Key == "en_US-amy-medium");
+        VoiceInfo amy = catalog.Single(v => v.Key == "en_US-amy-medium");
         Assert.Equal("amy", amy.Name);
         Assert.Equal("en_US", amy.LanguageCode);
         Assert.Equal("en", amy.LanguageFamily);
@@ -196,10 +194,10 @@ public sealed class VoiceCatalogTests : IDisposable
         """;
 
         var path = WriteTempJson(externalJson);
-        var catalog = VoiceCatalog.LoadMergedCatalog(externalVoicesJsonPath: path);
+        IReadOnlyList<VoiceInfo> catalog = VoiceCatalog.LoadMergedCatalog(externalVoicesJsonPath: path);
 
         // The built-in tsukuyomi should win — external entry with the same key is discarded.
-        var tsukuyomi = catalog.Single(v => v.Key == "ja_JP-tsukuyomi-chan-medium");
+        VoiceInfo tsukuyomi = catalog.Single(v => v.Key == "ja_JP-tsukuyomi-chan-medium");
         Assert.Equal("tsukuyomi-chan", tsukuyomi.Name);
         Assert.Equal("piper-plus", tsukuyomi.Source);
         Assert.Equal(1, tsukuyomi.NumSpeakers);
@@ -209,7 +207,6 @@ public sealed class VoiceCatalogTests : IDisposable
     // ================================================================
     // VoiceInfo record equality tests
     // ================================================================
-
     [Fact]
     public void VoiceInfo_Equality()
     {
@@ -247,7 +244,7 @@ public sealed class VoiceCatalogTests : IDisposable
         Assert.NotSame(a, b);
 
         // Same-reference instances are equal.
-        var c = a;
+        VoiceInfo c = a;
         Assert.Equal(a, c);
         Assert.True(a == c);
     }
@@ -273,14 +270,13 @@ public sealed class VoiceCatalogTests : IDisposable
     // ================================================================
     // Caching, sorting, and catalog-wide invariant tests
     // ================================================================
-
     [Fact]
     public void LoadMergedCatalog_CachingVerification_ReturnsSameReference()
     {
         // When called without an external path, the result is cached via Lazy<T>.
         // Two consecutive calls should return the exact same object reference.
-        var first = VoiceCatalog.LoadMergedCatalog();
-        var second = VoiceCatalog.LoadMergedCatalog();
+        IReadOnlyList<VoiceInfo> first = VoiceCatalog.LoadMergedCatalog();
+        IReadOnlyList<VoiceInfo> second = VoiceCatalog.LoadMergedCatalog();
 
         Assert.Same(first, second);
     }
@@ -290,12 +286,12 @@ public sealed class VoiceCatalogTests : IDisposable
     {
         // LoadMergedCatalog sorts by LanguageCode then Key.
         // Verify the merged catalog (which wraps built-in) maintains this order.
-        var catalog = VoiceCatalog.LoadMergedCatalog();
+        IReadOnlyList<VoiceInfo> catalog = VoiceCatalog.LoadMergedCatalog();
 
         for (int i = 1; i < catalog.Count; i++)
         {
-            var prev = catalog[i - 1];
-            var curr = catalog[i];
+            VoiceInfo prev = catalog[i - 1];
+            VoiceInfo curr = catalog[i];
 
             int langCmp = string.Compare(
                 prev.LanguageCode, curr.LanguageCode, StringComparison.Ordinal);
@@ -304,13 +300,15 @@ public sealed class VoiceCatalogTests : IDisposable
             {
                 int keyCmp = string.Compare(
                     prev.Key, curr.Key, StringComparison.Ordinal);
-                Assert.True(keyCmp <= 0,
+                Assert.True(
+                    keyCmp <= 0,
                     $"Catalog not sorted by key within same language: " +
                     $"'{prev.Key}' should come before '{curr.Key}'");
             }
             else
             {
-                Assert.True(langCmp < 0,
+                Assert.True(
+                    langCmp < 0,
                     $"Catalog not sorted by language code: " +
                     $"'{prev.LanguageCode}' should come before '{curr.LanguageCode}'");
             }
@@ -320,11 +318,12 @@ public sealed class VoiceCatalogTests : IDisposable
     [Fact]
     public void VoiceInfo_AllCatalogEntries_HaveNonEmptyKey()
     {
-        var catalog = VoiceCatalog.LoadMergedCatalog();
+        IReadOnlyList<VoiceInfo> catalog = VoiceCatalog.LoadMergedCatalog();
 
-        foreach (var voice in catalog)
+        foreach (VoiceInfo voice in catalog)
         {
-            Assert.False(string.IsNullOrWhiteSpace(voice.Key),
+            Assert.False(
+                string.IsNullOrWhiteSpace(voice.Key),
                 "Every catalog entry must have a non-empty Key");
         }
     }
@@ -332,11 +331,12 @@ public sealed class VoiceCatalogTests : IDisposable
     [Fact]
     public void VoiceInfo_AllCatalogEntries_HaveFiles()
     {
-        var catalog = VoiceCatalog.LoadMergedCatalog();
+        IReadOnlyList<VoiceInfo> catalog = VoiceCatalog.LoadMergedCatalog();
 
-        foreach (var voice in catalog)
+        foreach (VoiceInfo voice in catalog)
         {
-            Assert.True(voice.Files.Count >= 1,
+            Assert.True(
+                voice.Files.Count >= 1,
                 $"Voice '{voice.Key}' must have at least 1 file");
         }
     }
@@ -344,9 +344,9 @@ public sealed class VoiceCatalogTests : IDisposable
     [Fact]
     public void VoiceInfo_AllCatalogEntries_HaveValidRepoId()
     {
-        var catalog = VoiceCatalog.LoadMergedCatalog();
+        IReadOnlyList<VoiceInfo> catalog = VoiceCatalog.LoadMergedCatalog();
 
-        foreach (var voice in catalog)
+        foreach (VoiceInfo voice in catalog)
         {
             int slashCount = voice.RepoId.Count(c => c == '/');
             Assert.Equal(1, slashCount);
@@ -356,13 +356,14 @@ public sealed class VoiceCatalogTests : IDisposable
     [Fact]
     public void VoiceFileInfo_AllFiles_HaveNonEmptyRelativePath()
     {
-        var catalog = VoiceCatalog.LoadMergedCatalog();
+        IReadOnlyList<VoiceInfo> catalog = VoiceCatalog.LoadMergedCatalog();
 
-        foreach (var voice in catalog)
+        foreach (VoiceInfo voice in catalog)
         {
-            foreach (var file in voice.Files)
+            foreach (VoiceFileInfo file in voice.Files)
             {
-                Assert.False(string.IsNullOrWhiteSpace(file.RelativePath),
+                Assert.False(
+                    string.IsNullOrWhiteSpace(file.RelativePath),
                     $"File in voice '{voice.Key}' must have a non-empty RelativePath");
             }
         }

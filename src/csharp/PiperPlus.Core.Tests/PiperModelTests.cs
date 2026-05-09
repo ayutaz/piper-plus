@@ -1,6 +1,6 @@
+using Microsoft.ML.OnnxRuntime;
 using PiperPlus.Core.Config;
 using PiperPlus.Core.Inference;
-using Microsoft.ML.OnnxRuntime;
 
 namespace PiperPlus.Core.Tests;
 
@@ -41,13 +41,12 @@ public class PiperModelTests
     // ----------------------------------------------------------------
     // Constructor validation
     // ----------------------------------------------------------------
-
     [Fact]
     public void Constructor_NullSession_ThrowsArgumentNullException()
     {
-        var config = CreateConfig();
+        PiperConfig config = CreateConfig();
 
-        var ex = Assert.Throws<ArgumentNullException>(
+        ArgumentNullException ex = Assert.Throws<ArgumentNullException>(
             () => new PiperModel(null!, config));
 
         Assert.Equal("session", ex.ParamName);
@@ -63,7 +62,7 @@ public class PiperModelTests
         //
         // Verify that the guard exists by catching the expected exception when
         // both are null and confirming it fires for "session" first.
-        var ex = Assert.Throws<ArgumentNullException>(
+        ArgumentNullException ex = Assert.Throws<ArgumentNullException>(
             () => new PiperModel(null!, null!));
 
         // The session null-check fires before the config null-check.
@@ -78,14 +77,13 @@ public class PiperModelTests
     // accesses _session.InputMetadata). Without a real ONNX model file we cannot
     // instantiate PiperModel. The following tests document this design constraint
     // and verify the config object that feeds SampleRate.
-
     [Theory]
     [InlineData(16000)]
     [InlineData(22050)]
     [InlineData(44100)]
     public void AudioConfig_SampleRate_PreservesValue(int expectedRate)
     {
-        var config = CreateConfig(expectedRate);
+        PiperConfig config = CreateConfig(expectedRate);
 
         Assert.Equal(expectedRate, config.Audio.SampleRate);
     }
@@ -114,7 +112,6 @@ public class PiperModelTests
     //   _disposed = true;
     //
     // Integration tests with real ONNX models should cover these paths.
-
     [Fact]
     public void Constructor_NullSession_DoesNotLeakOnException()
     {
@@ -146,7 +143,6 @@ public class PiperModelTests
     // ----------------------------------------------------------------
     // SynthesisInput record tests
     // ----------------------------------------------------------------
-
     [Fact]
     public void SynthesisInput_DefaultValues_Correct()
     {
@@ -229,7 +225,7 @@ public class PiperModelTests
     public void SynthesisInput_WithExpression_CreatesModifiedCopy()
     {
         var original = new SynthesisInput(PhonemeIds: [1, 2, 3], SpeakerId: 0);
-        var modified = original with { SpeakerId = 5 };
+        SynthesisInput modified = original with { SpeakerId = 5 };
 
         Assert.Equal(0, original.SpeakerId);
         Assert.Equal(5, modified.SpeakerId);
@@ -239,7 +235,6 @@ public class PiperModelTests
     // ----------------------------------------------------------------
     // SynthesisResult record tests
     // ----------------------------------------------------------------
-
     [Fact]
     public void SynthesisResult_NullDurations_Allowed()
     {

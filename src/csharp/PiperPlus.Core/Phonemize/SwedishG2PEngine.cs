@@ -28,7 +28,6 @@ public sealed class SwedishG2PEngine : ISwedishG2PEngine
     // =================================================================
     // Character classification
     // =================================================================
-
     private static readonly HashSet<char> FrontVowels =
         ['e', 'i', 'y', '\u00e4', '\u00f6']; // e i y ä ö
 
@@ -48,13 +47,14 @@ public sealed class SwedishG2PEngine : ISwedishG2PEngine
     {
         AllVowels = new HashSet<char>(FrontVowels);
         foreach (char c in BackVowels)
+        {
             AllVowels.Add(c);
+        }
     }
 
     // =================================================================
     // Default consonant -> IPA (single-letter fallback)
     // =================================================================
-
     private static readonly Dictionary<char, string> ConsonantDefault = new()
     {
         ['b'] = "b",
@@ -82,7 +82,6 @@ public sealed class SwedishG2PEngine : ISwedishG2PEngine
     // =================================================================
     // Exception word lists (match Python exactly)
     // =================================================================
-
     private static readonly HashSet<string> HardKWords =
     [
         "kille", "kissa", "kiosk", "kebab", "kennel", "keps", "ketchup",
@@ -171,7 +170,6 @@ public sealed class SwedishG2PEngine : ISwedishG2PEngine
     // =================================================================
     // Vowel mappings (Complementary Quantity)
     // =================================================================
-
     private static readonly Dictionary<char, string> LongVowelMap = new()
     {
         ['a'] = "\u0251\u02d0",       // ɑː
@@ -201,7 +199,6 @@ public sealed class SwedishG2PEngine : ISwedishG2PEngine
     // =================================================================
     // Retroflex assimilation
     // =================================================================
-
     private static readonly Dictionary<string, string> RetroflexMap = new()
     {
         ["t"] = "\u0288",   // ʈ
@@ -219,7 +216,6 @@ public sealed class SwedishG2PEngine : ISwedishG2PEngine
     // =================================================================
     // Stress detection
     // =================================================================
-
     private static readonly string[] UnstressedPrefixes =
         ["för", "be", "ge", "er", "an"];
 
@@ -232,7 +228,6 @@ public sealed class SwedishG2PEngine : ISwedishG2PEngine
     // =================================================================
     // Loanword suffix rules
     // =================================================================
-
     private static readonly (string Suffix, string[] Phonemes)[] LoanwordSuffixRules =
     [
         ("ssion", ["\u0267", "u\u02d0", "n"]),              // ɧ uː n
@@ -247,7 +242,6 @@ public sealed class SwedishG2PEngine : ISwedishG2PEngine
     // =================================================================
     // Tokenizer regex
     // =================================================================
-
     private static readonly Regex TokenRegex = new(
         @"([a-z\u00e5\u00e4\u00f6\u00e9\u00e0\u00fc\u00e1\u00e8\u00eb\u00ef]+|[,.;:!?]+)",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
@@ -260,7 +254,7 @@ public sealed class SwedishG2PEngine : ISwedishG2PEngine
     public List<string> ToPhonemeList(string text)
     {
         string normalized = Normalize(text);
-        var matches = TokenRegex.Matches(normalized);
+        MatchCollection matches = TokenRegex.Matches(normalized);
 
         var phonemes = new List<string>(normalized.Length * 2);
         bool needSpace = false;
@@ -273,15 +267,20 @@ public sealed class SwedishG2PEngine : ISwedishG2PEngine
             if (IsAllPunctuation(token))
             {
                 for (int i = 0; i < token.Length; i++)
+                {
                     phonemes.Add(token[i].ToString());
+                }
+
                 continue;
             }
 
             // Word token
             if (needSpace)
+            {
                 phonemes.Add(" ");
+            }
 
-            var wordPhonemes = PhonemizeWord(token);
+            List<string> wordPhonemes = PhonemizeWord(token);
             phonemes.AddRange(wordPhonemes);
             needSpace = true;
         }
@@ -292,7 +291,6 @@ public sealed class SwedishG2PEngine : ISwedishG2PEngine
     // =================================================================
     // Stage 1: Normalization
     // =================================================================
-
     private static string Normalize(string text)
     {
         return text.ToLowerInvariant().Normalize(NormalizationForm.FormC);
@@ -303,26 +301,30 @@ public sealed class SwedishG2PEngine : ISwedishG2PEngine
         for (int i = 0; i < token.Length; i++)
         {
             if (!Punctuation.Contains(token[i]))
+            {
                 return false;
+            }
         }
+
         return true;
     }
 
     // =================================================================
     // Full word pipeline (Stage 2-6)
     // =================================================================
-
     private static List<string> PhonemizeWord(string word)
     {
         if (string.IsNullOrEmpty(word))
+        {
             return [];
+        }
 
         // Stage 6 prep: Detect stress syllable
         int stressedSyl = DetectStress(word);
 
         // Stage 2: Check loanword suffix
         List<string> rawPhonemes;
-        var loanword = DetectLoanwordSuffix(word);
+        (string Stem, string[] Phonemes)? loanword = DetectLoanwordSuffix(word);
         if (loanword != null)
         {
             string stem = loanword.Value.Stem;
@@ -331,7 +333,7 @@ public sealed class SwedishG2PEngine : ISwedishG2PEngine
             // Stem syllables before suffix stress -> unstressed
             int stemSylCount = CountSyllables(stem);
             int stemStressed = stressedSyl >= stemSylCount ? -1 : stressedSyl;
-            var stemPhonemes = ConvertWordNative(stem, word, stemStressed);
+            List<string> stemPhonemes = ConvertWordNative(stem, word, stemStressed);
             rawPhonemes = stemPhonemes;
             rawPhonemes.AddRange(suffixPhonemes);
         }
@@ -342,7 +344,7 @@ public sealed class SwedishG2PEngine : ISwedishG2PEngine
         }
 
         // Stage 5: Retroflex assimilation
-        var phonemes = ApplyRetroflex(rawPhonemes);
+        List<string> phonemes = ApplyRetroflex(rawPhonemes);
 
         // Stage 6: Stress markers
         phonemes = InsertStressMarker(phonemes, stressedSyl);
@@ -353,20 +355,23 @@ public sealed class SwedishG2PEngine : ISwedishG2PEngine
     // =================================================================
     // Stage 2: Loanword suffix detection
     // =================================================================
-
     private static (string Stem, string[] Phonemes)? DetectLoanwordSuffix(string word)
     {
-        foreach (var (suffix, phonemes) in LoanwordSuffixRules)
+        foreach ((string? suffix, string[]? phonemes) in LoanwordSuffixRules)
         {
             if (word.EndsWith(suffix, StringComparison.Ordinal) && word.Length > suffix.Length)
             {
                 // Check native exceptions for -age
                 if (suffix == "age" && AgeNativeWords.Contains(word))
+                {
                     continue;
+                }
+
                 string stem = word[..^suffix.Length];
                 return (stem, phonemes);
             }
         }
+
         return null;
     }
 
@@ -390,11 +395,30 @@ public sealed class SwedishG2PEngine : ISwedishG2PEngine
         if (remaining >= 3)
         {
             string tri = word.Substring(pos, 3);
-            if (tri == "skj") return (new List<string> { "\u0267" }, 3);       // ɧ
-            if (tri == "stj") return (new List<string> { "\u0267" }, 3);       // ɧ
-            if (tri == "sch") return (new List<string> { "\u0267" }, 3);       // ɧ
-            if (tri == "sng") return (new List<string> { "s", "n" }, 3);       // simplified
-            if (tri == "ckj") return (new List<string> { "\u0255" }, 3);       // ɕ
+            if (tri == "skj")
+            {
+                return (new List<string> { "\u0267" }, 3);       // ɧ
+            }
+
+            if (tri == "stj")
+            {
+                return (new List<string> { "\u0267" }, 3);       // ɧ
+            }
+
+            if (tri == "sch")
+            {
+                return (new List<string> { "\u0267" }, 3);       // ɧ
+            }
+
+            if (tri == "sng")
+            {
+                return (new List<string> { "s", "n" }, 3);       // simplified
+            }
+
+            if (tri == "ckj")
+            {
+                return (new List<string> { "\u0255" }, 3);       // ɕ
+            }
         }
 
         // === 2-char patterns ===
@@ -410,44 +434,101 @@ public sealed class SwedishG2PEngine : ISwedishG2PEngine
                     // sk + front vowel -> /ɧ/ (sj-sound)
                     // Exception: SkBackVowelExceptions
                     if (!SkBackVowelExceptions.Contains(fullWord))
+                    {
                         return (new List<string> { "\u0267" }, 2);   // ɧ
+                    }
                 }
+
                 // sk + back vowel / consonant / word-final -> /sk/
                 return (new List<string> { "s", "k" }, 2);
             }
 
-            if (di == "sj") return (new List<string> { "\u0267" }, 2);   // ɧ
-            if (di == "sh") return (new List<string> { "\u0267" }, 2);   // ɧ (loanword)
+            if (di == "sj")
+            {
+                return (new List<string> { "\u0267" }, 2);   // ɧ
+            }
+
+            if (di == "sh")
+            {
+                return (new List<string> { "\u0267" }, 2);   // ɧ (loanword)
+            }
 
             if (di == "ch")
             {
                 // Check exceptions where ch = /k/
                 if (ChExceptionsK.Contains(fullWord))
+                {
                     return (new List<string> { "k" }, 2);
+                }
+
                 return (new List<string> { "\u0267" }, 2);   // ɧ (loanword)
             }
 
-            if (di == "ph") return (new List<string> { "f" }, 2);       // loanword
-            if (di == "th") return (new List<string> { "t" }, 2);       // loanword
-            if (di == "tj") return (new List<string> { "\u0255" }, 2);  // ɕ
-            if (di == "kj") return (new List<string> { "\u0255" }, 2);  // ɕ
+            if (di == "ph")
+            {
+                return (new List<string> { "f" }, 2);       // loanword
+            }
+
+            if (di == "th")
+            {
+                return (new List<string> { "t" }, 2);       // loanword
+            }
+
+            if (di == "tj")
+            {
+                return (new List<string> { "\u0255" }, 2);  // ɕ
+            }
+
+            if (di == "kj")
+            {
+                return (new List<string> { "\u0255" }, 2);  // ɕ
+            }
 
             if (di == "gn")
             {
                 // word-initial gn -> /ɡn/, elsewhere /ŋn/
                 if (pos == 0)
+                {
                     return (new List<string> { "\u0261", "n" }, 2);  // ɡn
+                }
+
                 return (new List<string> { "\u014b", "n" }, 2);      // ŋn
             }
 
-            if (di == "ng") return (new List<string> { "\u014b" }, 2);       // ŋ
-            if (di == "nk") return (new List<string> { "\u014b", "k" }, 2);  // ŋk
-            if (di == "ck") return (new List<string> { "k" }, 2);            // geminate
+            if (di == "ng")
+            {
+                return (new List<string> { "\u014b" }, 2);       // ŋ
+            }
 
-            if (di == "gj" && pos == 0) return (new List<string> { "j" }, 2);
-            if (di == "lj" && pos == 0) return (new List<string> { "j" }, 2);
-            if (di == "dj" && pos == 0) return (new List<string> { "j" }, 2);
-            if (di == "hj" && pos == 0) return (new List<string> { "j" }, 2);
+            if (di == "nk")
+            {
+                return (new List<string> { "\u014b", "k" }, 2);  // ŋk
+            }
+
+            if (di == "ck")
+            {
+                return (new List<string> { "k" }, 2);            // geminate
+            }
+
+            if (di == "gj" && pos == 0)
+            {
+                return (new List<string> { "j" }, 2);
+            }
+
+            if (di == "lj" && pos == 0)
+            {
+                return (new List<string> { "j" }, 2);
+            }
+
+            if (di == "dj" && pos == 0)
+            {
+                return (new List<string> { "j" }, 2);
+            }
+
+            if (di == "hj" && pos == 0)
+            {
+                return (new List<string> { "j" }, 2);
+            }
         }
 
         // === 1-char patterns ===
@@ -456,7 +537,10 @@ public sealed class SwedishG2PEngine : ISwedishG2PEngine
         if (ch == 'k' && FrontVowels.Contains(nextCh))
         {
             if (IsHardK(fullWord))
+            {
                 return (new List<string> { "k" }, 1);
+            }
+
             return (new List<string> { "\u0255" }, 1);  // ɕ
         }
 
@@ -464,25 +548,35 @@ public sealed class SwedishG2PEngine : ISwedishG2PEngine
         if (ch == 'g' && FrontVowels.Contains(nextCh))
         {
             if (IsHardG(fullWord))
+            {
                 return (new List<string> { "\u0261" }, 1);  // ɡ
+            }
+
             return (new List<string> { "j" }, 1);
         }
 
         // g + back vowel / consonant -> /ɡ/
         if (ch == 'g')
+        {
             return (new List<string> { "\u0261" }, 1);  // ɡ
+        }
 
         // c before e/i -> /s/, otherwise /k/
         if (ch == 'c')
         {
             if (nextCh == 'e' || nextCh == 'i')
+            {
                 return (new List<string> { "s" }, 1);
+            }
+
             return (new List<string> { "k" }, 1);
         }
 
         // x -> /ks/
         if (ch == 'x')
+        {
             return (new List<string> { "k", "s" }, 1);
+        }
 
         // Default single consonant
         if (ConsonantDefault.TryGetValue(ch, out string? ipa))
@@ -491,9 +585,13 @@ public sealed class SwedishG2PEngine : ISwedishG2PEngine
             {
                 var result = new List<string>(ipa.Length);
                 for (int i = 0; i < ipa.Length; i++)
+                {
                     result.Add(ipa[i].ToString());
+                }
+
                 return (result, 1);
             }
+
             return (new List<string> { ipa }, 1);
         }
 
@@ -504,11 +602,13 @@ public sealed class SwedishG2PEngine : ISwedishG2PEngine
     // =================================================================
     // Soft/Hard consonant decision
     // =================================================================
-
     private static bool IsHardK(string word)
     {
         if (HardKWords.Contains(word))
+        {
             return true;
+        }
+
         // Morphological heuristic: strip common suffixes, check stems
         for (int suffixLen = 3; suffixLen >= 1; suffixLen--)
         {
@@ -516,52 +616,69 @@ public sealed class SwedishG2PEngine : ISwedishG2PEngine
             {
                 string stem = word[..^suffixLen];
                 if (HardKStems.Contains(stem))
+                {
                     return true;
+                }
             }
         }
+
         return false;
     }
 
     private static bool IsHardG(string word)
     {
         if (HardGWords.Contains(word))
+        {
             return true;
+        }
+
         // -era verb heuristic
         if (word.EndsWith("era", StringComparison.Ordinal) ||
             word.EndsWith("erar", StringComparison.Ordinal) ||
             word.EndsWith("erade", StringComparison.Ordinal))
+        {
             return true;
+        }
+
         for (int suffixLen = 3; suffixLen >= 1; suffixLen--)
         {
             if (word.Length > suffixLen)
             {
                 string stem = word[..^suffixLen];
                 if (HardGStems.Contains(stem))
+                {
                     return true;
+                }
             }
         }
+
         return false;
     }
 
     // =================================================================
     // Stage 4: Vowel phoneme assignment (Complementary Quantity)
     // =================================================================
-
     private static string GetVowelPhoneme(string word, int pos, string fullWord, bool isStressed)
     {
         char ch = word[pos];
 
         // Unstressed -> short
         if (!isStressed)
+        {
             return ShortVowelMap.GetValueOrDefault(ch, ch.ToString());
+        }
 
         // Function word -> short
         if (FunctionWords.Contains(fullWord))
+        {
             return ShortVowelMap.GetValueOrDefault(ch, ch.ToString());
+        }
 
         // Final-m exception -> short
         if (FinalMShortWords.Contains(fullWord))
+        {
             return ShortVowelMap.GetValueOrDefault(ch, ch.ToString());
+        }
 
         // Count following consonants
         int nFollowing = CountFollowingConsonants(word, pos);
@@ -571,7 +688,10 @@ public sealed class SwedishG2PEngine : ISwedishG2PEngine
         {
             string vowel = LongVowelMap.GetValueOrDefault(ch, ch.ToString());
             if (ch == 'o' && OLongAsOo.Contains(fullWord))
+            {
                 vowel = "o\u02d0";  // oː
+            }
+
             return vowel;
         }
 
@@ -585,13 +705,18 @@ public sealed class SwedishG2PEngine : ISwedishG2PEngine
 
         // Geminate / cluster (2+ consonants) -> short
         if (nFollowing >= 2)
+        {
             return ShortVowelMap.GetValueOrDefault(ch, ch.ToString());
+        }
 
         // Single consonant -> long
         {
             string vowel = LongVowelMap.GetValueOrDefault(ch, ch.ToString());
             if (ch == 'o' && OLongAsOo.Contains(fullWord))
+            {
                 vowel = "o\u02d0";  // oː
+            }
+
             return vowel;
         }
     }
@@ -605,13 +730,13 @@ public sealed class SwedishG2PEngine : ISwedishG2PEngine
             count++;
             i++;
         }
+
         return count;
     }
 
     // =================================================================
     // Native word conversion (Stage 4)
     // =================================================================
-
     private static List<string> ConvertWordNative(string word, string fullWord, int stressedSyl)
     {
         var phonemes = new List<string>(word.Length * 2);
@@ -638,13 +763,14 @@ public sealed class SwedishG2PEngine : ISwedishG2PEngine
                     string vowel = ShortVowelMap.GetValueOrDefault(ch, ch.ToString());
                     phonemes.Add(vowel);
                 }
+
                 prevWasVowel = true;
                 pos++;
             }
             else if (Consonants.Contains(ch))
             {
                 prevWasVowel = false;
-                var (ipaList, consumed) = ConvertConsonant(word, pos, fullWord);
+                (List<string>? ipaList, int consumed) = ConvertConsonant(word, pos, fullWord);
                 phonemes.AddRange(ipaList);
                 pos += consumed;
             }
@@ -670,6 +796,7 @@ public sealed class SwedishG2PEngine : ISwedishG2PEngine
     /// <summary>
     /// Apply retroflex assimilation. Exposed for testing.
     /// </summary>
+    /// <returns></returns>
     public static List<string> ApplyRetroflex(List<string> phonemes)
     {
         var result = new List<string>(phonemes.Count);
@@ -689,6 +816,7 @@ public sealed class SwedishG2PEngine : ISwedishG2PEngine
                         i++;
                         continue;
                     }
+
                     result.Add(ph);
                     break;
 
@@ -704,9 +832,13 @@ public sealed class SwedishG2PEngine : ISwedishG2PEngine
                     {
                         result.Add(retro);
                         if (PropagatingRetroflexes.Contains(retro))
+                        {
                             state = 2; // CASCADING
+                        }
                         else
+                        {
                             state = 0; // ɭ stops cascade
+                        }
                     }
                     else
                     {
@@ -715,6 +847,7 @@ public sealed class SwedishG2PEngine : ISwedishG2PEngine
                         result.Add(ph);
                         state = 0;
                     }
+
                     break;
 
                 case 2: // CASCADING
@@ -722,13 +855,16 @@ public sealed class SwedishG2PEngine : ISwedishG2PEngine
                     {
                         result.Add(cascadeRetro);
                         if (!PropagatingRetroflexes.Contains(cascadeRetro))
+                        {
                             state = 0; // ɭ stops cascade
+                        }
                     }
                     else
                     {
                         result.Add(ph);
                         state = 0;
                     }
+
                     break;
             }
 
@@ -737,7 +873,9 @@ public sealed class SwedishG2PEngine : ISwedishG2PEngine
 
         // Flush pending r
         if (state == 1)
+        {
             result.Add("r");
+        }
 
         return result;
     }
@@ -753,14 +891,19 @@ public sealed class SwedishG2PEngine : ISwedishG2PEngine
     /// <summary>
     /// Detect primary stress syllable index (0-based). Exposed for testing.
     /// </summary>
+    /// <returns></returns>
     public static int DetectStress(string word)
     {
         if (FunctionWords.Contains(word))
+        {
             return -1;
+        }
 
         int nSyl = CountSyllables(word);
         if (nSyl <= 1)
+        {
             return 0;
+        }
 
         // Check stress-attracting suffixes
         foreach (string suffix in StressAttractingSuffixes)
@@ -793,6 +936,7 @@ public sealed class SwedishG2PEngine : ISwedishG2PEngine
     /// <summary>
     /// Count syllables by counting vowel clusters. Exposed for testing.
     /// </summary>
+    /// <returns></returns>
     public static int CountSyllables(string word)
     {
         int count = 0;
@@ -802,7 +946,10 @@ public sealed class SwedishG2PEngine : ISwedishG2PEngine
             if (AllVowels.Contains(word[i]))
             {
                 if (!prevVowel)
+                {
                     count++;
+                }
+
                 prevVowel = true;
             }
             else
@@ -810,6 +957,7 @@ public sealed class SwedishG2PEngine : ISwedishG2PEngine
                 prevVowel = false;
             }
         }
+
         return Math.Max(count, 1);
     }
 
@@ -819,7 +967,9 @@ public sealed class SwedishG2PEngine : ISwedishG2PEngine
     private static List<string> InsertStressMarker(List<string> phonemes, int stressSyl)
     {
         if (stressSyl < 0 || phonemes.Count == 0)
+        {
             return phonemes;
+        }
 
         // 1. Find the index of the first vowel of the target syllable
         int sylCount = 0;
@@ -836,6 +986,7 @@ public sealed class SwedishG2PEngine : ISwedishG2PEngine
                     vowelIdx = i;
                     break;
                 }
+
                 sylCount++;
                 prevWasVowel = true;
             }
@@ -846,23 +997,35 @@ public sealed class SwedishG2PEngine : ISwedishG2PEngine
         }
 
         if (vowelIdx < 0)
+        {
             return phonemes;
+        }
 
         // 2. Walk backwards to find syllable onset (consonants before the vowel)
         int onsetIdx = vowelIdx;
         while (onsetIdx > 0 && !IsIpaVowel(phonemes[onsetIdx - 1]))
+        {
             onsetIdx--;
+        }
 
         // For syllable 0, onset starts at beginning
         if (stressSyl == 0)
+        {
             onsetIdx = 0;
+        }
 
         var result = new List<string>(phonemes.Count + 1);
         for (int i = 0; i < onsetIdx; i++)
+        {
             result.Add(phonemes[i]);
+        }
+
         result.Add("\u02c8");  // ˈ
         for (int i = onsetIdx; i < phonemes.Count; i++)
+        {
             result.Add(phonemes[i]);
+        }
+
         return result;
     }
 
@@ -877,8 +1040,11 @@ public sealed class SwedishG2PEngine : ISwedishG2PEngine
         {
             char c = ph[i];
             if (IsIpaVowelChar(c))
+            {
                 return true;
+            }
         }
+
         return false;
     }
 

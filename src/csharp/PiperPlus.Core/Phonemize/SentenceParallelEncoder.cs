@@ -68,8 +68,10 @@ public static class SentenceParallelEncoder
                 {
                     return 1;
                 }
+
                 return Math.Max(1, Math.Min(n, sentenceCount));
             }
+
             // Invalid: fall through to auto.
         }
 
@@ -111,6 +113,7 @@ public static class SentenceParallelEncoder
             {
                 results[i] = encodeOne(sentences[i]);
             }
+
             return results;
         }
 

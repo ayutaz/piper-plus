@@ -34,6 +34,7 @@ public sealed class SwedishPhonemizer : IPhonemizer
         [".", ",", ";", ":", "!", "?"];
 
     /// <summary>
+    /// Initializes a new instance of the <see cref="SwedishPhonemizer"/> class.
     /// Create a new <see cref="SwedishPhonemizer"/> backed by the given G2P engine.
     /// </summary>
     /// <param name="engine">
@@ -47,7 +48,7 @@ public sealed class SwedishPhonemizer : IPhonemizer
     /// <inheritdoc />
     public List<string> Phonemize(string text)
     {
-        var (tokens, _) = PhonemizeCore(text);
+        (List<string>? tokens, List<ProsodyInfo?> _) = PhonemizeCore(text);
         return tokens;
     }
 
@@ -131,7 +132,7 @@ public sealed class SwedishPhonemizer : IPhonemizer
         FlushWord(currentWord, tokens, prosody);
 
         // Step 3: Map multi-character tokens (long vowels, etc.) to PUA codepoints.
-        var mapped = PiperPhonemeConverter.MapSequence(tokens);
+        IReadOnlyList<string> mapped = PiperPhonemeConverter.MapSequence(tokens);
 
         var result = new List<string>(mapped.Count);
         for (int i = 0; i < mapped.Count; i++)
@@ -165,14 +166,18 @@ public sealed class SwedishPhonemizer : IPhonemizer
         List<ProsodyInfo?> outProsody)
     {
         if (wordTokens.Count == 0)
+        {
             return;
+        }
 
         // A3 = phoneme count excluding stress markers "ˈ" (U+02C8) and "ˌ" (U+02CC).
         int phonemeCount = 0;
         for (int i = 0; i < wordTokens.Count; i++)
         {
             if (wordTokens[i] != "\u02C8" && wordTokens[i] != "\u02CC")
+            {
                 phonemeCount++;
+            }
         }
 
         for (int i = 0; i < wordTokens.Count; i++)

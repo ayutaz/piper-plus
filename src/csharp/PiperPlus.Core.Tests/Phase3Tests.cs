@@ -19,7 +19,13 @@ public sealed class Phase3Tests : IDisposable
     {
         foreach (var path in _tempFiles)
         {
-            try { File.Delete(path); } catch { /* best-effort cleanup */ }
+            try
+            {
+                File.Delete(path);
+            }
+            catch
+            { /* best-effort cleanup */
+            }
         }
     }
 
@@ -37,11 +43,10 @@ public sealed class Phase3Tests : IDisposable
     // ================================================================
     // PhonemeSilenceProcessor.Parse
     // ================================================================
-
     [Fact]
     public void PhonemeSilenceProcessor_Parse_ValidInput()
     {
-        var result = PhonemeSilenceProcessor.Parse("_ 0.5");
+        Dictionary<string, float> result = PhonemeSilenceProcessor.Parse("_ 0.5");
 
         Assert.Single(result);
         Assert.True(result.ContainsKey("_"));
@@ -51,7 +56,7 @@ public sealed class Phase3Tests : IDisposable
     [Fact]
     public void PhonemeSilenceProcessor_Parse_MultipleEntries()
     {
-        var result = PhonemeSilenceProcessor.Parse("_ 0.5,# 0.3");
+        Dictionary<string, float> result = PhonemeSilenceProcessor.Parse("_ 0.5,# 0.3");
 
         Assert.Equal(2, result.Count);
         Assert.Equal(0.5f, result["_"]);
@@ -61,7 +66,7 @@ public sealed class Phase3Tests : IDisposable
     [Fact]
     public void PhonemeSilenceProcessor_Parse_EmptyString_Throws()
     {
-        Assert.Throws<ArgumentException>(() => PhonemeSilenceProcessor.Parse(""));
+        Assert.Throws<ArgumentException>(() => PhonemeSilenceProcessor.Parse(string.Empty));
     }
 
     [Fact]
@@ -91,7 +96,6 @@ public sealed class Phase3Tests : IDisposable
     // ================================================================
     // PhonemeSilenceProcessor.SplitAtPhonemeSilence
     // ================================================================
-
     [Fact]
     public void PhonemeSilenceProcessor_SplitAtPhonemeSilence_Basic()
     {
@@ -111,7 +115,7 @@ public sealed class Phase3Tests : IDisposable
 
         const int sampleRate = 22050;
 
-        var phrases = PhonemeSilenceProcessor.SplitAtPhonemeSilence(
+        List<PhonemeSilenceProcessor.Phrase> phrases = PhonemeSilenceProcessor.SplitAtPhonemeSilence(
             phonemeIds, prosodyFlat: null, phonemeSilence, phonemeIdMap, sampleRate);
 
         // Expect 2 phrases: [10, 5] with silence, [11] without silence
@@ -139,7 +143,7 @@ public sealed class Phase3Tests : IDisposable
         var phonemeSilence = new Dictionary<string, float> { ["_"] = 0.5f };
         long[] phonemeIds = [10, 11];
 
-        var phrases = PhonemeSilenceProcessor.SplitAtPhonemeSilence(
+        List<PhonemeSilenceProcessor.Phrase> phrases = PhonemeSilenceProcessor.SplitAtPhonemeSilence(
             phonemeIds, null, phonemeSilence, phonemeIdMap, 22050);
 
         // No split: single trailing phrase with 0 silence
@@ -160,10 +164,11 @@ public sealed class Phase3Tests : IDisposable
         var phonemeSilence = new Dictionary<string, float> { ["_"] = 0.2f };
 
         long[] phonemeIds = [10, 5, 10];
+
         // Prosody: 3 values per phoneme-ID = 9 values total
         long[] prosodyFlat = [1, 2, 3, 4, 5, 6, 7, 8, 9];
 
-        var phrases = PhonemeSilenceProcessor.SplitAtPhonemeSilence(
+        List<PhonemeSilenceProcessor.Phrase> phrases = PhonemeSilenceProcessor.SplitAtPhonemeSilence(
             phonemeIds, prosodyFlat, phonemeSilence, phonemeIdMap, 22050);
 
         Assert.Equal(2, phrases.Count);
@@ -192,7 +197,6 @@ public sealed class Phase3Tests : IDisposable
     // ================================================================
     // StreamingWriter.WriteChunked
     // ================================================================
-
     [Fact]
     public void StreamingWriter_WriteChunked_CorrectBytes()
     {
@@ -303,7 +307,6 @@ public sealed class Phase3Tests : IDisposable
     // ================================================================
     // CustomDictionary.LoadDictionary
     // ================================================================
-
     [Fact]
     public void CustomDictionary_LoadDictionary_ValidFile()
     {
@@ -414,9 +417,9 @@ public sealed class Phase3Tests : IDisposable
         var dict = new CustomDictionary();
         dict.LoadDictionary(path);
 
-        string result = dict.ApplyToText("");
+        string result = dict.ApplyToText(string.Empty);
 
-        Assert.Equal("", result);
+        Assert.Equal(string.Empty, result);
     }
 
     [Fact]
@@ -445,7 +448,6 @@ public sealed class Phase3Tests : IDisposable
     // ================================================================
     // SessionFactory
     // ================================================================
-
     [Fact]
     public void SessionFactory_Create_NullModelPath_Throws()
     {
@@ -457,7 +459,7 @@ public sealed class Phase3Tests : IDisposable
     public void SessionFactory_Create_EmptyModelPath_Throws()
     {
         Assert.Throws<ArgumentException>(
-            () => SessionFactory.Create(modelPath: ""));
+            () => SessionFactory.Create(modelPath: string.Empty));
     }
 
     [Fact]
@@ -475,7 +477,7 @@ public sealed class Phase3Tests : IDisposable
         // is thrown before the file-existence check.
         // The FileNotFoundException confirms the factory reached the file
         // validation step rather than failing on CUDA EP setup.
-        var ex = Assert.Throws<FileNotFoundException>(
+        FileNotFoundException ex = Assert.Throws<FileNotFoundException>(
             () => SessionFactory.Create(
                 modelPath: "/tmp/nonexistent_model.onnx",
                 useCuda: false));
@@ -489,7 +491,7 @@ public sealed class Phase3Tests : IDisposable
         // Even with useCuda=true, the factory validates the model path first.
         // The FileNotFoundException confirms we reach path validation
         // regardless of the CUDA flag.
-        var ex = Assert.Throws<FileNotFoundException>(
+        FileNotFoundException ex = Assert.Throws<FileNotFoundException>(
             () => SessionFactory.Create(
                 modelPath: "/tmp/nonexistent_model.onnx",
                 useCuda: true,
@@ -501,7 +503,6 @@ public sealed class Phase3Tests : IDisposable
     // ================================================================
     // PhonemeSilenceProcessor — additional edge-case tests
     // ================================================================
-
     [Fact]
     public void PhonemeSilenceProcessor_SplitAtPhonemeSilence_EmptySilenceMap_SinglePhrase()
     {
@@ -516,7 +517,7 @@ public sealed class Phase3Tests : IDisposable
 
         long[] phonemeIds = [10, 11, 10];
 
-        var phrases = PhonemeSilenceProcessor.SplitAtPhonemeSilence(
+        List<PhonemeSilenceProcessor.Phrase> phrases = PhonemeSilenceProcessor.SplitAtPhonemeSilence(
             phonemeIds, prosodyFlat: null, phonemeSilence, phonemeIdMap, 22050);
 
         // All phonemes land in a single trailing phrase with 0 silence.
@@ -530,7 +531,7 @@ public sealed class Phase3Tests : IDisposable
     {
         // Two entries for the same phoneme "_"; the dictionary overwrites,
         // so the last value (0.3) should win.
-        var result = PhonemeSilenceProcessor.Parse("_ 0.5, _ 0.3");
+        Dictionary<string, float> result = PhonemeSilenceProcessor.Parse("_ 0.5, _ 0.3");
 
         Assert.Single(result);
         Assert.True(result.ContainsKey("_"));
@@ -541,7 +542,7 @@ public sealed class Phase3Tests : IDisposable
     public void PhonemeSilenceProcessor_Parse_NegativeSeconds_Accepted()
     {
         // Negative seconds are syntactically valid floats; Parse should accept them.
-        var result = PhonemeSilenceProcessor.Parse("_ -0.5");
+        Dictionary<string, float> result = PhonemeSilenceProcessor.Parse("_ -0.5");
 
         Assert.Single(result);
         Assert.Equal(-0.5f, result["_"]);
@@ -564,7 +565,7 @@ public sealed class Phase3Tests : IDisposable
         long[] phonemeIds = [10, 5, 6, 10];
         const int sampleRate = 22050;
 
-        var phrases = PhonemeSilenceProcessor.SplitAtPhonemeSilence(
+        List<PhonemeSilenceProcessor.Phrase> phrases = PhonemeSilenceProcessor.SplitAtPhonemeSilence(
             phonemeIds, prosodyFlat: null, phonemeSilence, phonemeIdMap, sampleRate);
 
         // Expect 2 phrases: [10, 5, 6] with silence, [10] trailing.
@@ -578,7 +579,6 @@ public sealed class Phase3Tests : IDisposable
     // ================================================================
     // TimingWriter — additional edge-case tests
     // ================================================================
-
     [Fact]
     public void TimingWriter_CalculateTiming_DurationsShorterThanPhonemeIds_Throws()
     {
@@ -614,7 +614,7 @@ public sealed class Phase3Tests : IDisposable
         long[] phonemeIds = [999];
         float[] durations = [4.0f];
 
-        var entries = TimingWriter.CalculateTiming(
+        List<TimingWriter.PhonemeTimingEntry> entries = TimingWriter.CalculateTiming(
             phonemeIds, durations, phonemeIdMap, sampleRate: 22050);
 
         Assert.Single(entries);
@@ -634,7 +634,7 @@ public sealed class Phase3Tests : IDisposable
         long[] phonemeIds = [65];
         float[] durations = [2.0f];
 
-        var entries = TimingWriter.CalculateTiming(
+        List<TimingWriter.PhonemeTimingEntry> entries = TimingWriter.CalculateTiming(
             phonemeIds, durations, phonemeIdMap, sampleRate: 22050);
 
         Assert.Single(entries);
@@ -662,10 +662,10 @@ public sealed class Phase3Tests : IDisposable
 
         string json = File.ReadAllText(path);
         using var doc = JsonDocument.Parse(json);
-        var root = doc.RootElement;
+        JsonElement root = doc.RootElement;
 
         Assert.Equal(JsonValueKind.Object, root.ValueKind);
-        var phonemes = root.GetProperty("phonemes");
+        JsonElement phonemes = root.GetProperty("phonemes");
         Assert.Equal(JsonValueKind.Array, phonemes.ValueKind);
         Assert.Equal(2, phonemes.GetArrayLength());
         Assert.Equal("k", phonemes[0].GetProperty("phoneme").GetString());

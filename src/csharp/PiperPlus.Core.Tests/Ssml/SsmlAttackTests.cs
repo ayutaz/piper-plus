@@ -29,7 +29,6 @@ namespace PiperPlus.Core.Tests.Ssml;
 //   - SYSTEM external IDs: not auto-fetched (no XmlResolver).
 //   - Undeclared entity references: throw XmlException.
 // =====================================================================
-
 public class SsmlAttackXxeTests
 {
     private static string AllText(IEnumerable<SsmlSegment> segments) =>
@@ -44,7 +43,7 @@ public class SsmlAttackXxeTests
             "<!DOCTYPE foo [<!ENTITY xxe SYSTEM \"file:///etc/passwd\">]>" +
             "<speak>&xxe;</speak>";
 
-        var segments = SsmlParser.Parse(payload);
+        List<SsmlSegment> segments = SsmlParser.Parse(payload);
         Assert.NotEmpty(segments);
 
         // No /etc/passwd content should leak into any segment.
@@ -62,7 +61,7 @@ public class SsmlAttackXxeTests
             "<!DOCTYPE foo [<!ENTITY xxe SYSTEM \"file:///etc/passwd\">]>" +
             "<speak>&xxe;</speak>";
 
-        var segments = SsmlParser.Parse(payload);
+        List<SsmlSegment> segments = SsmlParser.Parse(payload);
         Assert.NotEmpty(segments);
 
         var full = AllText(segments);
@@ -76,7 +75,7 @@ public class SsmlAttackXxeTests
         // XmlException, the parser catches and falls back to stripped text.
         var payload = "<speak>&xxe;</speak>";
 
-        var segments = SsmlParser.Parse(payload);
+        List<SsmlSegment> segments = SsmlParser.Parse(payload);
         Assert.NotEmpty(segments);
 
         var full = AllText(segments);
@@ -95,6 +94,7 @@ public class SsmlAttackBillionLaughsTests
     {
         var decls = new System.Text.StringBuilder();
         decls.Append("<!ENTITY lol \"lol\">");
+
         // Reuse a single StringBuilder across the loop iterations (Clear() per
         // iteration) instead of allocating a fresh one each time
         // (CodeQL "StringBuilder creation in loop" hygiene).
@@ -104,11 +104,15 @@ public class SsmlAttackBillionLaughsTests
         {
             kids.Clear();
             for (int i = 0; i < fanout; i++)
+            {
                 kids.Append('&').Append(prev).Append(';');
+            }
+
             var name = $"lol{d}";
             decls.Append("<!ENTITY ").Append(name).Append(" \"").Append(kids).Append("\">");
             prev = name;
         }
+
         return $"<!DOCTYPE lolz [{decls}]><speak>&{prev};</speak>";
     }
 
@@ -122,16 +126,18 @@ public class SsmlAttackBillionLaughsTests
         var payload = BuildBillionLaughs(depth: 9, fanout: 10);
 
         var sw = System.Diagnostics.Stopwatch.StartNew();
-        var segments = SsmlParser.Parse(payload);
+        List<SsmlSegment> segments = SsmlParser.Parse(payload);
         sw.Stop();
 
-        Assert.True(sw.Elapsed.TotalSeconds < 5,
+        Assert.True(
+            sw.Elapsed.TotalSeconds < 5,
             $"billion laughs took too long: {sw.Elapsed}");
         Assert.NotEmpty(segments);
 
         // No expansion can have occurred — output bounded relative to input.
         var full = AllText(segments);
-        Assert.True(full.Length <= payload.Length * 2,
+        Assert.True(
+            full.Length <= payload.Length * 2,
             $"output ballooned: input={payload.Length}, output={full.Length}");
     }
 
@@ -147,10 +153,11 @@ public class SsmlAttackBillionLaughsTests
         // guarantee even when the DOCTYPE shield does not fire.
         var payload = "<speak><prosody rate=\"slow\">&lol;&lol;&lol;</prosody></speak>";
 
-        var segments = SsmlParser.Parse(payload);
+        List<SsmlSegment> segments = SsmlParser.Parse(payload);
         Assert.NotEmpty(segments);
         var full = AllText(segments);
-        Assert.True(full.Length < 1000,
+        Assert.True(
+            full.Length < 1000,
             $"speak-first billion-laughs ballooned: {full.Length}");
     }
 }
@@ -171,7 +178,7 @@ public class SsmlAttackDtdTests
             "<speak>Hello</speak>";
 
         var sw = System.Diagnostics.Stopwatch.StartNew();
-        var segments = SsmlParser.Parse(payload);
+        List<SsmlSegment> segments = SsmlParser.Parse(payload);
         sw.Stop();
 
         // No network fetch — must complete fast.
@@ -179,6 +186,7 @@ public class SsmlAttackDtdTests
         Assert.NotEmpty(segments);
 
         var full = AllText(segments);
+
         // "Hello" should be reachable (parsed or in fallback plain text).
         Assert.True(full.Contains("Hello") || full.Contains("speak"));
     }
@@ -191,7 +199,7 @@ public class SsmlAttackDtdTests
             "<!DOCTYPE speak SYSTEM \"http://example.invalid/external.dtd\">" +
             "<speak>Hello</speak>";
 
-        var segments = SsmlParser.Parse(payload);
+        List<SsmlSegment> segments = SsmlParser.Parse(payload);
         Assert.NotEmpty(segments);
     }
 }
@@ -211,7 +219,7 @@ public class SsmlAttackProcessingInstructionTests
             "<speak>Hello</speak>";
 
         var sw = System.Diagnostics.Stopwatch.StartNew();
-        var segments = SsmlParser.Parse(payload);
+        List<SsmlSegment> segments = SsmlParser.Parse(payload);
         sw.Stop();
 
         Assert.True(sw.ElapsedMilliseconds < 1000);
@@ -231,7 +239,7 @@ public class SsmlAttackProcessingInstructionTests
         // cases.
         var payload = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><speak>Hi</speak>";
 
-        var segments = SsmlParser.Parse(payload);
+        List<SsmlSegment> segments = SsmlParser.Parse(payload);
         Assert.NotEmpty(segments);
     }
 }
@@ -250,7 +258,7 @@ public class SsmlAttackAttributeEntityTests
         // Should not crash. The attr value resolves to "&500ms" which
         // the break-time parser rejects as invalid (-> 0ms), filtered
         // out by Merge. We only assert no exception escapes.
-        var segments = SsmlParser.Parse(payload);
+        List<SsmlSegment> segments = SsmlParser.Parse(payload);
         Assert.NotNull(segments);
     }
 
@@ -261,7 +269,7 @@ public class SsmlAttackAttributeEntityTests
         // the parser catches and falls back to stripped text.
         var payload = "<speak><break time=\"&xxe;\"/></speak>";
 
-        var segments = SsmlParser.Parse(payload);
+        List<SsmlSegment> segments = SsmlParser.Parse(payload);
         Assert.NotEmpty(segments);
 
         var full = AllText(segments);
@@ -277,7 +285,7 @@ public class SsmlAttackAttributeEntityTests
             "<!DOCTYPE foo [<!ENTITY xxe SYSTEM \"file:///etc/passwd\">]>" +
             "<speak><break time=\"&xxe;\"/></speak>";
 
-        var segments = SsmlParser.Parse(payload);
+        List<SsmlSegment> segments = SsmlParser.Parse(payload);
         Assert.NotEmpty(segments);
 
         var full = AllText(segments);
@@ -302,9 +310,10 @@ public class SsmlAttackDriftSentinelTests
         };
         foreach (var payload in cases)
         {
-            Assert.False(SsmlParser.IsSsml(payload),
+            Assert.False(
+                SsmlParser.IsSsml(payload),
                 $"unexpected IsSsml=true for {payload}");
-            var segments = SsmlParser.Parse(payload);
+            List<SsmlSegment> segments = SsmlParser.Parse(payload);
             Assert.Single(segments);
             Assert.Equal(payload, segments[0].Text);
         }

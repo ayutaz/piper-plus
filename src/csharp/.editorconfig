@@ -64,9 +64,10 @@ dotnet_diagnostic.SA1309.severity = none
 # SA1413: Use trailing comma in multi-line initializers — too noisy
 dotnet_diagnostic.SA1413.severity = none
 # SA1500/SA1501/SA1502/SA1503/SA1519: Brace placement / single-line blocks
-dotnet_diagnostic.SA1500.severity = none
-dotnet_diagnostic.SA1503.severity = none
-dotnet_diagnostic.SA1519.severity = none
+# (Wave 2: dotnet format で auto-fix 済。再発防止のため warning 維持。)
+dotnet_diagnostic.SA1500.severity = warning
+dotnet_diagnostic.SA1503.severity = warning
+dotnet_diagnostic.SA1519.severity = warning
 # SA1600/SA1601/SA1602: Element / partial-element / enum item must be documented
 # (Wave 1: GenerateDocumentationFile=true makes this load-bearing for the public
 # API surface only — silence repo-wide; PublicApiAnalyzers tracks the surface.)

@@ -12,12 +12,11 @@ public sealed class OpenJTalkMappingTests
     // ================================================================
     // 1. CharToToken_RoundTrip_ConsistentWithTokenToChar
     // ================================================================
-
     [Fact]
     public void CharToToken_RoundTrip_ConsistentWithTokenToChar()
     {
         // For every (token, char) in TokenToChar, CharToToken[char] must == token.
-        foreach (var (token, ch) in OpenJTalkToPiperMapping.TokenToChar)
+        foreach ((string? token, char ch) in OpenJTalkToPiperMapping.TokenToChar)
         {
             Assert.True(
                 OpenJTalkToPiperMapping.CharToToken.ContainsKey(ch),
@@ -30,7 +29,6 @@ public sealed class OpenJTalkMappingTests
     // ================================================================
     // 2. MapToken_UnknownMultiCharToken_PassThrough
     // ================================================================
-
     [Fact]
     public void MapToken_UnknownMultiCharToken_PassThrough()
     {
@@ -43,11 +41,10 @@ public sealed class OpenJTalkMappingTests
     // ================================================================
     // 3. MapSequence_EmptyInput_ReturnsEmpty
     // ================================================================
-
     [Fact]
     public void MapSequence_EmptyInput_ReturnsEmpty()
     {
-        var result = OpenJTalkToPiperMapping.MapSequence(Array.Empty<string>());
+        IReadOnlyList<string> result = OpenJTalkToPiperMapping.MapSequence(Array.Empty<string>());
 
         Assert.Empty(result);
     }
@@ -55,16 +52,16 @@ public sealed class OpenJTalkMappingTests
     // ================================================================
     // 4. MapToken_AllPuaEntries_ProduceCorrectChar
     // ================================================================
-
     public static TheoryData<string, char> AllPuaEntries
     {
         get
         {
             var data = new TheoryData<string, char>();
-            foreach (var (token, ch) in OpenJTalkToPiperMapping.TokenToChar)
+            foreach ((string? token, char ch) in OpenJTalkToPiperMapping.TokenToChar)
             {
                 data.Add(token, ch);
             }
+
             return data;
         }
     }
@@ -81,7 +78,6 @@ public sealed class OpenJTalkMappingTests
     // ================================================================
     // 5. MapToken_SingleChar_PassThrough
     // ================================================================
-
     [Theory]
     [InlineData("a")]
     [InlineData("k")]
@@ -96,13 +92,12 @@ public sealed class OpenJTalkMappingTests
     // ================================================================
     // 6. MapSequence_AllSingleChars_AllPassThrough
     // ================================================================
-
     [Fact]
     public void MapSequence_AllSingleChars_AllPassThrough()
     {
         var input = new[] { "a", "k", "o" };
 
-        var result = OpenJTalkToPiperMapping.MapSequence(input);
+        IReadOnlyList<string> result = OpenJTalkToPiperMapping.MapSequence(input);
 
         Assert.Equal(input, result);
     }
@@ -110,14 +105,13 @@ public sealed class OpenJTalkMappingTests
     // ================================================================
     // 7. MapSequence_MixedTokens_CorrectMapping
     // ================================================================
-
     [Fact]
     public void MapSequence_MixedTokens_CorrectMapping()
     {
         // Mix of single chars (pass-through) and PUA tokens (mapped)
         var input = new[] { "a", "ch", "o", "N_m" };
 
-        var result = OpenJTalkToPiperMapping.MapSequence(input);
+        IReadOnlyList<string> result = OpenJTalkToPiperMapping.MapSequence(input);
 
         Assert.Equal(new[] { "a", "\uE00E", "o", "\uE019" }, result);
     }
@@ -125,7 +119,6 @@ public sealed class OpenJTalkMappingTests
     // ================================================================
     // 8. ChineseAffricates_MappedCorrectly
     // ================================================================
-
     [Fact]
     public void ChineseAffricates_MappedCorrectly()
     {
@@ -138,7 +131,6 @@ public sealed class OpenJTalkMappingTests
     // ================================================================
     // 9. FrenchNasalVowels_MappedCorrectly
     // ================================================================
-
     [Fact]
     public void FrenchNasalVowels_MappedCorrectly()
     {
@@ -151,7 +143,6 @@ public sealed class OpenJTalkMappingTests
     // ================================================================
     // 10. KoreanTensed_MappedCorrectly
     // ================================================================
-
     [Fact]
     public void KoreanTensed_MappedCorrectly()
     {

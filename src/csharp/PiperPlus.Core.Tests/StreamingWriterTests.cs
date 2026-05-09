@@ -11,7 +11,6 @@ public sealed class StreamingWriterTests
     // ================================================================
     // WriteChunked
     // ================================================================
-
     [Fact]
     public void WriteChunked_CorrectTotalBytes()
     {
@@ -89,7 +88,9 @@ public sealed class StreamingWriterTests
         // With 2048 samples and default chunkSamples=1024, exactly 2 full chunks.
         short[] samples = new short[2048];
         for (int i = 0; i < samples.Length; i++)
+        {
             samples[i] = (short)(i % short.MaxValue);
+        }
 
         using var ms = new MemoryStream();
 
@@ -147,7 +148,9 @@ public sealed class StreamingWriterTests
         const int count = 100_000;
         short[] samples = new short[count];
         for (int i = 0; i < count; i++)
-            samples[i] = (short)(i % 30000 - 15000);
+        {
+            samples[i] = (short)((i % 30000) - 15000);
+        }
 
         using var ms = new MemoryStream();
 
@@ -173,7 +176,6 @@ public sealed class StreamingWriterTests
     // ================================================================
     // WriteImmediate
     // ================================================================
-
     [Fact]
     public void WriteImmediate_SingleWrite_CorrectBytes()
     {

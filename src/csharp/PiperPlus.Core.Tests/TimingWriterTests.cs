@@ -38,11 +38,11 @@ public sealed class TimingWriterTests
     // ================================================================
     // 1. CalculateTiming_BasicDurations
     // ================================================================
-
     [Fact]
     public void CalculateTiming_BasicDurations()
     {
-        var map = MakeMap();
+        Dictionary<string, int[]> map = MakeMap();
+
         // frame_time_ms = (hop_size / sample_rate) * 1000 (spec)
         float frameLengthMs = (float)HopSize / SampleRate * 1000f;
 
@@ -50,7 +50,7 @@ public sealed class TimingWriterTests
         long[] phonemeIds = [10, 12];
         float[] durations = [10f, 5f];
 
-        var entries = TimingWriter.CalculateTiming(phonemeIds, durations, map, SampleRate, HopSize);
+        List<TimingWriter.PhonemeTimingEntry> entries = TimingWriter.CalculateTiming(phonemeIds, durations, map, SampleRate, HopSize);
 
         Assert.Equal(2, entries.Count);
 
@@ -70,18 +70,17 @@ public sealed class TimingWriterTests
     // ================================================================
     // 2. CalculateTiming_SkipsSpecialTokens
     // ================================================================
-
     [Fact]
     public void CalculateTiming_SkipsSpecialTokens()
     {
-        var map = MakeMap();
+        Dictionary<string, int[]> map = MakeMap();
         float frameLengthMs = (float)HopSize / SampleRate * 1000f;
 
         // Sequence: PAD(0), BOS(1), a(10), EOS(2)
         long[] phonemeIds = [0, 1, 10, 2];
         float[] durations = [2f, 3f, 4f, 1f];
 
-        var entries = TimingWriter.CalculateTiming(phonemeIds, durations, map, SampleRate, HopSize);
+        List<TimingWriter.PhonemeTimingEntry> entries = TimingWriter.CalculateTiming(phonemeIds, durations, map, SampleRate, HopSize);
 
         // Only "a" should appear -- PAD, BOS, EOS are skipped.
         Assert.Single(entries);
@@ -90,23 +89,22 @@ public sealed class TimingWriterTests
         // "a" starts after PAD (2 frames) + BOS (3 frames) = 5 frames
         float expectedStartMs = 5f * frameLengthMs;
         Assert.Equal(expectedStartMs, entries[0].StartMs, precision: 3);
-        Assert.Equal(expectedStartMs + 4f * frameLengthMs, entries[0].EndMs, precision: 3);
+        Assert.Equal(expectedStartMs + (4f * frameLengthMs), entries[0].EndMs, precision: 3);
     }
 
     // ================================================================
     // 3. CalculateTiming_PuaReverseMapping
     // ================================================================
-
     [Fact]
     public void CalculateTiming_PuaReverseMapping()
     {
-        var map = MakeMap();
+        Dictionary<string, int[]> map = MakeMap();
 
         // PUA phoneme ID 17 (U+E000) should resolve to "a:" via CharToToken.
         long[] phonemeIds = [17, 40];
         float[] durations = [3f, 2f];
 
-        var entries = TimingWriter.CalculateTiming(phonemeIds, durations, map, SampleRate, HopSize);
+        List<TimingWriter.PhonemeTimingEntry> entries = TimingWriter.CalculateTiming(phonemeIds, durations, map, SampleRate, HopSize);
 
         Assert.Equal(2, entries.Count);
         Assert.Equal("a:", entries[0].Phoneme);
@@ -116,46 +114,46 @@ public sealed class TimingWriterTests
     // ================================================================
     // 4. WriteJson_ValidOutput (spec-conforming object shape)
     // ================================================================
-
     [Fact]
     public void WriteJson_ValidOutput()
     {
-        var map = MakeMap();
+        Dictionary<string, int[]> map = MakeMap();
         long[] phonemeIds = [10, 12];
         float[] durations = [10f, 5f];
 
-        var entries = TimingWriter.CalculateTiming(phonemeIds, durations, map, SampleRate, HopSize);
+        List<TimingWriter.PhonemeTimingEntry> entries = TimingWriter.CalculateTiming(phonemeIds, durations, map, SampleRate, HopSize);
 
         using var ms = new MemoryStream();
         TimingWriter.WriteJson(ms, entries, SampleRate);
 
         ms.Position = 0;
         using var doc = JsonDocument.Parse(ms);
-        var root = doc.RootElement;
+        JsonElement root = doc.RootElement;
 
         // Spec shape: top-level object {phonemes, total_duration_ms, sample_rate}.
         Assert.Equal(JsonValueKind.Object, root.ValueKind);
-        Assert.True(root.TryGetProperty("phonemes", out var phonemes));
+        Assert.True(root.TryGetProperty("phonemes", out JsonElement phonemes));
         Assert.True(root.TryGetProperty("total_duration_ms", out _));
-        Assert.True(root.TryGetProperty("sample_rate", out var sampleRateProp));
+        Assert.True(root.TryGetProperty("sample_rate", out JsonElement sampleRateProp));
         Assert.Equal(SampleRate, sampleRateProp.GetInt32());
 
         Assert.Equal(JsonValueKind.Array, phonemes.ValueKind);
         Assert.Equal(2, phonemes.GetArrayLength());
 
         // First element — spec per-phoneme field names.
-        var first = phonemes[0];
+        JsonElement first = phonemes[0];
         Assert.Equal("a", first.GetProperty("phoneme").GetString());
         Assert.True(first.TryGetProperty("start_ms", out _));
         Assert.True(first.TryGetProperty("end_ms", out _));
         Assert.True(first.TryGetProperty("duration_ms", out _));
+
         // Legacy field names must NOT appear (spec compliance).
         Assert.False(first.TryGetProperty("start", out _));
         Assert.False(first.TryGetProperty("end", out _));
         Assert.False(first.TryGetProperty("duration", out _));
 
         // Second element
-        var second = phonemes[1];
+        JsonElement second = phonemes[1];
         Assert.Equal("k", second.GetProperty("phoneme").GetString());
         Assert.True(second.GetProperty("end_ms").GetSingle() > second.GetProperty("start_ms").GetSingle());
     }
@@ -163,15 +161,14 @@ public sealed class TimingWriterTests
     // ================================================================
     // 5. WriteTsv_ValidOutput (snake_case ms header per spec)
     // ================================================================
-
     [Fact]
     public void WriteTsv_ValidOutput()
     {
-        var map = MakeMap();
+        Dictionary<string, int[]> map = MakeMap();
         long[] phonemeIds = [10, 12];
         float[] durations = [10f, 5f];
 
-        var entries = TimingWriter.CalculateTiming(phonemeIds, durations, map, SampleRate, HopSize);
+        List<TimingWriter.PhonemeTimingEntry> entries = TimingWriter.CalculateTiming(phonemeIds, durations, map, SampleRate, HopSize);
 
         using var ms = new MemoryStream();
         TimingWriter.WriteTsv(ms, entries);
@@ -209,13 +206,12 @@ public sealed class TimingWriterTests
     // ================================================================
     // 6. CalculateTiming_EmptyInput
     // ================================================================
-
     [Fact]
     public void CalculateTiming_EmptyInput()
     {
-        var map = MakeMap();
+        Dictionary<string, int[]> map = MakeMap();
 
-        var entries = TimingWriter.CalculateTiming([], [], map, SampleRate, HopSize);
+        List<TimingWriter.PhonemeTimingEntry> entries = TimingWriter.CalculateTiming([], [], map, SampleRate, HopSize);
 
         Assert.Empty(entries);
     }
@@ -223,15 +219,14 @@ public sealed class TimingWriterTests
     // ================================================================
     // 7. WriteJson_ToStream
     // ================================================================
-
     [Fact]
     public void WriteJson_ToStream()
     {
-        var map = MakeMap();
+        Dictionary<string, int[]> map = MakeMap();
         long[] phonemeIds = [1, 10, 2]; // BOS, a, EOS
         float[] durations = [2f, 8f, 1f];
 
-        var entries = TimingWriter.CalculateTiming(phonemeIds, durations, map, SampleRate, HopSize);
+        List<TimingWriter.PhonemeTimingEntry> entries = TimingWriter.CalculateTiming(phonemeIds, durations, map, SampleRate, HopSize);
 
         // Only "a" should be in the output (BOS/EOS skipped).
         Assert.Single(entries);
@@ -245,10 +240,11 @@ public sealed class TimingWriterTests
 
         ms.Position = 0;
         using var doc = JsonDocument.Parse(ms);
-        var root = doc.RootElement;
+        JsonElement root = doc.RootElement;
+
         // Spec shape — top-level object with `phonemes` array.
         Assert.Equal(JsonValueKind.Object, root.ValueKind);
-        var phonemes = root.GetProperty("phonemes");
+        JsonElement phonemes = root.GetProperty("phonemes");
         Assert.Equal(1, phonemes.GetArrayLength());
         Assert.Equal("a", phonemes[0].GetProperty("phoneme").GetString());
         Assert.Equal(SampleRate, root.GetProperty("sample_rate").GetInt32());
@@ -257,15 +253,14 @@ public sealed class TimingWriterTests
     // ================================================================
     // 8. WriteSrt_ValidOutput (HH:MM:SS,mmm cue format per spec)
     // ================================================================
-
     [Fact]
     public void WriteSrt_ValidOutput()
     {
-        var map = MakeMap();
+        Dictionary<string, int[]> map = MakeMap();
         long[] phonemeIds = [10, 12];
         float[] durations = [10f, 5f];
 
-        var entries = TimingWriter.CalculateTiming(phonemeIds, durations, map, SampleRate, HopSize);
+        List<TimingWriter.PhonemeTimingEntry> entries = TimingWriter.CalculateTiming(phonemeIds, durations, map, SampleRate, HopSize);
 
         using var ms = new MemoryStream();
         TimingWriter.WriteSrt(ms, entries);
@@ -292,7 +287,6 @@ public sealed class TimingWriterTests
     // ================================================================
     // 9. WriteSrt_EmptyEntriesEmitsNothing
     // ================================================================
-
     [Fact]
     public void WriteSrt_EmptyEntriesEmitsNothing()
     {
@@ -304,7 +298,6 @@ public sealed class TimingWriterTests
     // ================================================================
     // 10. SrtTimestampRollsOverHoursMinutesSeconds
     // ================================================================
-
     [Fact]
     public void SrtTimestamp_RollsOverHoursMinutesSeconds()
     {
@@ -334,7 +327,7 @@ public sealed class TimingWriterTests
     /// </summary>
     private static List<TimingWriter.PhonemeTimingEntry> SampleEntries()
     {
-        var map = MakeMap();
+        Dictionary<string, int[]> map = MakeMap();
         long[] phonemeIds = [10, 12];
         float[] durations = [10f, 5f];
         return TimingWriter.CalculateTiming(phonemeIds, durations, map, SampleRate, HopSize);
@@ -346,17 +339,18 @@ public sealed class TimingWriterTests
     [Fact]
     public void WriteJson_OutputHasPhonemesField()
     {
-        var entries = SampleEntries();
+        List<TimingWriter.PhonemeTimingEntry> entries = SampleEntries();
 
         using var ms = new MemoryStream();
         TimingWriter.WriteJson(ms, entries, SampleRate);
 
         ms.Position = 0;
         using var doc = JsonDocument.Parse(ms);
-        var root = doc.RootElement;
+        JsonElement root = doc.RootElement;
 
         Assert.Equal(JsonValueKind.Object, root.ValueKind);
-        Assert.True(root.TryGetProperty("phonemes", out var phonemes),
+        Assert.True(
+            root.TryGetProperty("phonemes", out JsonElement phonemes),
             "spec field 'phonemes' must be present");
         Assert.Equal(JsonValueKind.Array, phonemes.ValueKind);
         Assert.Equal(entries.Count, phonemes.GetArrayLength());
@@ -368,16 +362,17 @@ public sealed class TimingWriterTests
     [Fact]
     public void WriteJson_OutputHasTotalDurationMs()
     {
-        var entries = SampleEntries();
+        List<TimingWriter.PhonemeTimingEntry> entries = SampleEntries();
 
         using var ms = new MemoryStream();
         TimingWriter.WriteJson(ms, entries, SampleRate);
 
         ms.Position = 0;
         using var doc = JsonDocument.Parse(ms);
-        var root = doc.RootElement;
+        JsonElement root = doc.RootElement;
 
-        Assert.True(root.TryGetProperty("total_duration_ms", out var total),
+        Assert.True(
+            root.TryGetProperty("total_duration_ms", out JsonElement total),
             "spec field 'total_duration_ms' must be present");
         Assert.Equal(JsonValueKind.Number, total.ValueKind);
         Assert.True(total.GetDouble() > 0d, "non-empty entries should yield positive total");
@@ -389,16 +384,17 @@ public sealed class TimingWriterTests
     [Fact]
     public void WriteJson_OutputHasSampleRate()
     {
-        var entries = SampleEntries();
+        List<TimingWriter.PhonemeTimingEntry> entries = SampleEntries();
 
         using var ms = new MemoryStream();
         TimingWriter.WriteJson(ms, entries, SampleRate);
 
         ms.Position = 0;
         using var doc = JsonDocument.Parse(ms);
-        var root = doc.RootElement;
+        JsonElement root = doc.RootElement;
 
-        Assert.True(root.TryGetProperty("sample_rate", out var sr),
+        Assert.True(
+            root.TryGetProperty("sample_rate", out JsonElement sr),
             "spec field 'sample_rate' must be present");
         Assert.Equal(JsonValueKind.Number, sr.ValueKind);
         Assert.Equal(SampleRate, sr.GetInt32());
@@ -411,22 +407,23 @@ public sealed class TimingWriterTests
     [Fact]
     public void WriteJson_PhonemeFieldsAreStartMsEndMsDurationMs()
     {
-        var entries = SampleEntries();
+        List<TimingWriter.PhonemeTimingEntry> entries = SampleEntries();
 
         using var ms = new MemoryStream();
         TimingWriter.WriteJson(ms, entries, SampleRate);
 
         ms.Position = 0;
         using var doc = JsonDocument.Parse(ms);
-        var phonemes = doc.RootElement.GetProperty("phonemes");
+        JsonElement phonemes = doc.RootElement.GetProperty("phonemes");
 
         for (int i = 0; i < phonemes.GetArrayLength(); i++)
         {
-            var p = phonemes[i];
+            JsonElement p = phonemes[i];
             Assert.True(p.TryGetProperty("phoneme", out _), $"entry[{i}] missing 'phoneme'");
             Assert.True(p.TryGetProperty("start_ms", out _), $"entry[{i}] missing 'start_ms'");
             Assert.True(p.TryGetProperty("end_ms", out _), $"entry[{i}] missing 'end_ms'");
             Assert.True(p.TryGetProperty("duration_ms", out _), $"entry[{i}] missing 'duration_ms'");
+
             // Legacy short names must NOT be present.
             Assert.False(p.TryGetProperty("start", out _), $"entry[{i}] has legacy 'start'");
             Assert.False(p.TryGetProperty("end", out _), $"entry[{i}] has legacy 'end'");
@@ -454,7 +451,7 @@ public sealed class TimingWriterTests
 
         ms.Position = 0;
         using var doc = JsonDocument.Parse(ms);
-        var first = doc.RootElement.GetProperty("phonemes")[0];
+        JsonElement first = doc.RootElement.GetProperty("phonemes")[0];
 
         // Each ms field must keep ≥ 3 decimals of fidelity (within 0.0005 ms).
         Assert.Equal(11.609f, first.GetProperty("start_ms").GetSingle(), precision: 3);
@@ -476,7 +473,7 @@ public sealed class TimingWriterTests
     [Fact]
     public void WriteJson_TotalDurationMs_EqualsLastEndMs()
     {
-        var entries = SampleEntries();
+        List<TimingWriter.PhonemeTimingEntry> entries = SampleEntries();
         Assert.NotEmpty(entries);
         float expectedTotal = entries[^1].EndMs;
 
@@ -485,13 +482,13 @@ public sealed class TimingWriterTests
 
         ms.Position = 0;
         using var doc = JsonDocument.Parse(ms);
-        var root = doc.RootElement;
+        JsonElement root = doc.RootElement;
 
         double actualTotal = root.GetProperty("total_duration_ms").GetDouble();
         Assert.Equal(expectedTotal, (float)actualTotal, precision: 3);
 
         // And the last phoneme's end_ms in the JSON must match.
-        var phonemes = root.GetProperty("phonemes");
+        JsonElement phonemes = root.GetProperty("phonemes");
         double lastEndMs = phonemes[phonemes.GetArrayLength() - 1]
             .GetProperty("end_ms").GetDouble();
         Assert.Equal(expectedTotal, (float)lastEndMs, precision: 3);
@@ -503,15 +500,14 @@ public sealed class TimingWriterTests
     // phoneme_tokens.Length != durations.Length must throw, not silent
     // truncate. Cross-runtime parity with Rust/Python/Go.
     // ================================================================
-
     [Fact]
     public void CalculateTiming_LengthMismatch_DurationsShorter_Throws()
     {
-        var map = MakeMap();
+        Dictionary<string, int[]> map = MakeMap();
         long[] phonemeIds = [10, 12, 10];
         float[] durations = [5f, 3f]; // intentionally shorter
 
-        var ex = Assert.Throws<ArgumentException>(() =>
+        ArgumentException ex = Assert.Throws<ArgumentException>(() =>
             TimingWriter.CalculateTiming(phonemeIds, durations, map, SampleRate, HopSize));
 
         Assert.Equal("durations", ex.ParamName);
@@ -522,11 +518,11 @@ public sealed class TimingWriterTests
     [Fact]
     public void CalculateTiming_LengthMismatch_PhonemesShorter_Throws()
     {
-        var map = MakeMap();
+        Dictionary<string, int[]> map = MakeMap();
         long[] phonemeIds = [10];
         float[] durations = [5f, 3f, 2f]; // intentionally longer
 
-        var ex = Assert.Throws<ArgumentException>(() =>
+        ArgumentException ex = Assert.Throws<ArgumentException>(() =>
             TimingWriter.CalculateTiming(phonemeIds, durations, map, SampleRate, HopSize));
 
         Assert.Equal("durations", ex.ParamName);

@@ -19,6 +19,7 @@ public sealed class PiperModel : IDisposable
     private bool _disposed;
 
     /// <summary>
+    /// Initializes a new instance of the <see cref="PiperModel"/> class.
     /// Initializes a new <see cref="PiperModel"/> by inspecting the session's
     /// input metadata for optional capabilities.
     /// </summary>

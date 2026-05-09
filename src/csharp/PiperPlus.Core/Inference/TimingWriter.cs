@@ -86,17 +86,24 @@ public static class TimingWriter
         //   - Go:     src/go/piperplus/timing.go:33-34
         // ArgumentException is the .NET equivalent of Python ValueError.
         if (phonemeIds.Length != durations.Length)
+        {
             throw new ArgumentException(
                 $"durations length ({durations.Length}) != phoneme_tokens length ({phonemeIds.Length})",
                 nameof(durations));
+        }
 
         if (sampleRate <= 0)
+        {
             throw new ArgumentOutOfRangeException(nameof(sampleRate), "Sample rate must be positive.");
+        }
+
         if (hopSize <= 0)
+        {
             throw new ArgumentOutOfRangeException(nameof(hopSize), "Hop size must be positive.");
+        }
 
         // Build reverse map: phoneme ID -> human-readable string.
-        var idToString = BuildReverseIdMap(phonemeIdMap);
+        Dictionary<long, string> idToString = BuildReverseIdMap(phonemeIdMap);
 
         // frame_time_ms = (hop_size / sample_rate) * 1000
         // — see docs/spec/phoneme-timing-contract.toml [calculation].
@@ -108,6 +115,7 @@ public static class TimingWriter
         for (int i = 0; i < count; i++)
         {
             long id = phonemeIds[i];
+
             // Negative durations are clamped to 0 — matches Python canonical
             // (durations_to_timing) and the cross-runtime golden fixture.
             float frameDuration = Math.Max(0f, durations[i]);
@@ -175,10 +183,13 @@ public static class TimingWriter
     public static void WriteJson(string filePath, List<PhonemeTimingEntry> entries, int sampleRate)
     {
         if (string.IsNullOrWhiteSpace(filePath))
+        {
             throw new ArgumentException("File path must not be empty.", nameof(filePath));
+        }
+
         ArgumentNullException.ThrowIfNull(entries);
 
-        var result = ConvertToResultDto(entries, sampleRate);
+        TimingResultDto result = ConvertToResultDto(entries, sampleRate);
         using var stream = new FileStream(filePath, FileMode.Create, FileAccess.Write);
         JsonSerializer.Serialize(stream, result, TimingJsonContext.Default.TimingResultDto);
     }
@@ -192,7 +203,7 @@ public static class TimingWriter
         ArgumentNullException.ThrowIfNull(stream);
         ArgumentNullException.ThrowIfNull(entries);
 
-        var result = ConvertToResultDto(entries, sampleRate);
+        TimingResultDto result = ConvertToResultDto(entries, sampleRate);
         JsonSerializer.Serialize(stream, result, TimingJsonContext.Default.TimingResultDto);
     }
 
@@ -223,15 +234,18 @@ public static class TimingWriter
     /// <remarks>
     /// Spec-conforming format (column header in milliseconds):
     /// <code>
-    /// start_ms	end_ms	duration_ms	phoneme
-    /// 0.000	58.000	58.000	^
-    /// 58.000	150.800	92.800	k
+    /// start_ms    end_ms  duration_ms phoneme
+    /// 0.000   58.000  58.000  ^
+    /// 58.000  150.800 92.800  k
     /// </code>
     /// </remarks>
     public static void WriteTsv(string filePath, List<PhonemeTimingEntry> entries)
     {
         if (string.IsNullOrWhiteSpace(filePath))
+        {
             throw new ArgumentException("File path must not be empty.", nameof(filePath));
+        }
+
         ArgumentNullException.ThrowIfNull(entries);
 
         using var writer = new StreamWriter(filePath, append: false, encoding: System.Text.Encoding.UTF8);
@@ -253,14 +267,16 @@ public static class TimingWriter
     // ------------------------------------------------------------------
     // Static caches
     // ------------------------------------------------------------------
-
-    private static readonly string[] s_asciiStrings = InitAsciiStrings();
+    private static readonly string[] S_asciiStrings = InitAsciiStrings();
 
     private static string[] InitAsciiStrings()
     {
         var arr = new string[128];
         for (int i = 0; i < 128; i++)
+        {
             arr[i] = ((char)i).ToString();
+        }
+
         return arr;
     }
 
@@ -277,7 +293,7 @@ public static class TimingWriter
         Dictionary<string, int[]> phonemeIdMap)
     {
         var reverse = new Dictionary<long, string>(phonemeIdMap.Count);
-        foreach (var (phonemeStr, ids) in phonemeIdMap)
+        foreach ((string? phonemeStr, int[]? ids) in phonemeIdMap)
         {
             if (ids is { Length: > 0 })
             {
@@ -311,13 +327,13 @@ public static class TimingWriter
         }
 
         // Fallback: printable ASCII characters (cached to avoid per-call allocation).
-        return id is > 2 and < 128 ? s_asciiStrings[id] : "?";
+        return id is > 2 and < 128 ? S_asciiStrings[id] : "?";
     }
 
     private static List<TimingDto> ConvertToDtos(List<PhonemeTimingEntry> entries)
     {
         var dtos = new List<TimingDto>(entries.Count);
-        foreach (var e in entries)
+        foreach (PhonemeTimingEntry e in entries)
         {
             dtos.Add(new TimingDto
             {
@@ -348,10 +364,10 @@ public static class TimingWriter
         List<PhonemeTimingEntry> entries,
         int sampleRate)
     {
-        var phonemes = ConvertToDtos(entries);
+        List<TimingDto> phonemes = ConvertToDtos(entries);
 
         double totalDurationMs = 0d;
-        foreach (var e in entries)
+        foreach (PhonemeTimingEntry e in entries)
         {
             // cursor-walk: total = max end_ms (the last non-empty entry's end).
             // Use double to keep sub-ms precision intact.
@@ -375,7 +391,7 @@ public static class TimingWriter
         // Spec column header (docs/spec/phoneme-timing-contract.toml [output_formats.tsv]).
         writer.WriteLine("start_ms\tend_ms\tduration_ms\tphoneme");
 
-        foreach (var e in entries)
+        foreach (PhonemeTimingEntry e in entries)
         {
             writer.Write(e.StartMs.ToString("F3", System.Globalization.CultureInfo.InvariantCulture));
             writer.Write('\t');
@@ -393,11 +409,13 @@ public static class TimingWriter
         {
             return phoneme;
         }
+
         // Spec [output_formats.tsv].escape_tab/newline_in_phoneme.
         if (phoneme.IndexOf('\t') < 0 && phoneme.IndexOf('\n') < 0)
         {
             return phoneme;
         }
+
         return phoneme.Replace("\t", "\\t").Replace("\n", "\\n");
     }
 
@@ -423,7 +441,10 @@ public static class TimingWriter
     public static void WriteSrt(string filePath, List<PhonemeTimingEntry> entries)
     {
         if (string.IsNullOrWhiteSpace(filePath))
+        {
             throw new ArgumentException("File path must not be empty.", nameof(filePath));
+        }
+
         ArgumentNullException.ThrowIfNull(entries);
 
         // Use BOM-less UTF-8 — SRT players often choke on the BOM and the
@@ -454,7 +475,7 @@ public static class TimingWriter
     {
         for (int i = 0; i < entries.Count; i++)
         {
-            var e = entries[i];
+            PhonemeTimingEntry e = entries[i];
             writer.WriteLine((i + 1).ToString(System.Globalization.CultureInfo.InvariantCulture));
             writer.Write(FormatSrtTimestamp(e.StartMs));
             writer.Write(" --> ");
@@ -471,6 +492,7 @@ public static class TimingWriter
         {
             ms = 0f;
         }
+
         long total_ms = (long)Math.Round(ms);
         long hours = total_ms / 3_600_000L;
         long remainder = total_ms % 3_600_000L;

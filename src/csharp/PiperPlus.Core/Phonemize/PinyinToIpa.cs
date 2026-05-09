@@ -107,25 +107,32 @@ internal static class PinyinToIpa
     /// Normalize pinyin y/w conventions and v→ü to canonical form.
     /// e.g. yi→i, ya→ia, wu→u, wa→ua, nv→nü.
     /// </summary>
+    /// <returns></returns>
     internal static string NormalizePinyin(string py)
     {
         var s = py.Replace("v", "ü");
         if (s.StartsWith("yu"))
+        {
             return s.Length > 2 ? "ü" + s.Substring(2) : "ü";
-        if (s.StartsWith("y"))
+        }
+
+        if (s.StartsWith('y'))
         {
             var rest = s.Substring(1);
-            return rest.StartsWith("i") ? rest : "i" + rest;
+            return rest.StartsWith('i') ? rest : "i" + rest;
         }
-        if (s.StartsWith("w"))
+
+        if (s.StartsWith('w'))
         {
             var rest = s.Substring(1);
-            return rest.StartsWith("u") ? rest : "u" + rest;
+            return rest.StartsWith('u') ? rest : "u" + rest;
         }
+
         return s;
     }
 
     /// <summary>Split a normalized pinyin syllable into (initial, final).</summary>
+    /// <returns></returns>
     internal static (string Initial, string Final) SplitPinyin(string pinyin)
     {
         foreach (var init in InitialsOrder)
@@ -135,24 +142,44 @@ internal static class PinyinToIpa
                 var final = pinyin.Substring(init.Length);
                 if (final == "i")
                 {
-                    if (RetroflexInitials.Contains(init)) return (init, "-i_retroflex");
-                    if (AlveolarInitials.Contains(init)) return (init, "-i_alveolar");
+                    if (RetroflexInitials.Contains(init))
+                    {
+                        return (init, "-i_retroflex");
+                    }
+
+                    if (AlveolarInitials.Contains(init))
+                    {
+                        return (init, "-i_alveolar");
+                    }
                 }
-                if ((init == "j" || init == "q" || init == "x") && final.StartsWith("u"))
+
+                if ((init == "j" || init == "q" || init == "x") && final.StartsWith('u'))
+                {
                     final = "ü" + final.Substring(1);
+                }
+
                 return (init, final);
             }
         }
-        return ("", pinyin);
+
+        return (string.Empty, pinyin);
     }
 
     /// <summary>Extract trailing tone digit (1-5) from a pinyin syllable.</summary>
+    /// <returns></returns>
     internal static (string Base, int Tone) ExtractTone(string syllable)
     {
-        if (syllable.Length == 0) return ("", 5);
+        if (syllable.Length == 0)
+        {
+            return (string.Empty, 5);
+        }
+
         var last = syllable[syllable.Length - 1];
         if (last >= '1' && last <= '5')
+        {
             return (syllable.Substring(0, syllable.Length - 1), last - '0');
+        }
+
         return (syllable, 5);
     }
 
@@ -160,18 +187,23 @@ internal static class PinyinToIpa
     /// Convert a single pinyin syllable (without tone digit) to IPA tokens.
     /// Tone marker is appended as <c>"toneN"</c>.
     /// </summary>
+    /// <returns></returns>
     internal static List<string> Convert(string syllable, int tone)
     {
-        var (initial, final) = SplitPinyin(syllable);
+        (string? initial, string? final) = SplitPinyin(syllable);
         var tokens = new List<string>();
 
         if (initial.Length > 0 && InitialToIpa.TryGetValue(initial, out var initIpa))
+        {
             tokens.Add(initIpa);
+        }
 
         if (final.Length > 0)
         {
             if (FinalToIpa.TryGetValue(final, out var finalIpa))
+            {
                 tokens.Add(finalIpa);
+            }
             else
             {
                 // Fallback: decompose unknown finals char-by-char
@@ -179,15 +211,21 @@ internal static class PinyinToIpa
                 {
                     var key = ch.ToString();
                     if (FinalToIpa.TryGetValue(key, out var chIpa))
+                    {
                         tokens.Add(chIpa);
+                    }
                     else if (char.IsLetter(ch))
+                    {
                         tokens.Add(key);
+                    }
                 }
             }
         }
 
         if (tone >= 1 && tone <= 5)
+        {
             tokens.Add($"tone{tone}");
+        }
 
         return tokens;
     }
@@ -208,18 +246,27 @@ internal static class PinyinToIpa
                 st[i] = (st[i].Syllable, 2);
                 continue;
             }
+
             // Rule 2 & 3: yi tone sandhi
             if (st[i].Syllable == "i" && toneI == 1)
             {
                 if (toneNext == 4)
+                {
                     st[i] = (st[i].Syllable, 2);
+                }
                 else if (toneNext >= 1 && toneNext <= 3)
+                {
                     st[i] = (st[i].Syllable, 4);
+                }
+
                 continue;
             }
+
             // Rule 4: bu T4 + T4 -> T2 + T4
             if (st[i].Syllable == "bu" && toneI == 4 && toneNext == 4)
+            {
                 st[i] = (st[i].Syllable, 2);
+            }
         }
     }
 }

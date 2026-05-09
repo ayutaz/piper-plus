@@ -23,11 +23,10 @@ public class WavWriterTests
     // ----------------------------------------------------------------
     // 1. EmptyAudio_WritesValidHeader
     // ----------------------------------------------------------------
-
     [Fact]
     public void EmptyAudio_WritesValidHeader()
     {
-        using var ms = WriteToMemoryStream([]);
+        using MemoryStream ms = WriteToMemoryStream([]);
 
         Assert.Equal(HeaderSize, ms.Length);
     }
@@ -35,12 +34,11 @@ public class WavWriterTests
     // ----------------------------------------------------------------
     // 2. Header_RiffChunk
     // ----------------------------------------------------------------
-
     [Fact]
     public void Header_RiffChunk()
     {
         short[] samples = [100, -200, 300];
-        using var ms = WriteToMemoryStream(samples);
+        using MemoryStream ms = WriteToMemoryStream(samples);
         using var reader = new BinaryReader(ms, Encoding.ASCII, leaveOpen: true);
 
         // ChunkID = "RIFF"
@@ -48,7 +46,7 @@ public class WavWriterTests
         Assert.Equal("RIFF", chunkId);
 
         // ChunkSize = 36 + NumSamples * 2
-        int expectedChunkSize = 36 + samples.Length * 2;
+        int expectedChunkSize = 36 + (samples.Length * 2);
         Assert.Equal(expectedChunkSize, reader.ReadInt32());
 
         // Format = "WAVE"
@@ -59,12 +57,11 @@ public class WavWriterTests
     // ----------------------------------------------------------------
     // 3. Header_FmtChunk
     // ----------------------------------------------------------------
-
     [Fact]
     public void Header_FmtChunk()
     {
         short[] samples = [1, 2, 3];
-        using var ms = WriteToMemoryStream(samples);
+        using MemoryStream ms = WriteToMemoryStream(samples);
         using var reader = new BinaryReader(ms, Encoding.ASCII, leaveOpen: true);
 
         // Skip RIFF header (12 bytes)
@@ -99,12 +96,11 @@ public class WavWriterTests
     // ----------------------------------------------------------------
     // 4. Header_DataChunk
     // ----------------------------------------------------------------
-
     [Fact]
     public void Header_DataChunk()
     {
         short[] samples = [10, 20, 30, 40, 50];
-        using var ms = WriteToMemoryStream(samples);
+        using MemoryStream ms = WriteToMemoryStream(samples);
         using var reader = new BinaryReader(ms, Encoding.ASCII, leaveOpen: true);
 
         // Skip to data sub-chunk (offset 36)
@@ -122,12 +118,11 @@ public class WavWriterTests
     // ----------------------------------------------------------------
     // 5. SampleData_CorrectlyWritten
     // ----------------------------------------------------------------
-
     [Fact]
     public void SampleData_CorrectlyWritten()
     {
         short[] samples = [short.MinValue, -1, 0, 1, short.MaxValue];
-        using var ms = WriteToMemoryStream(samples);
+        using MemoryStream ms = WriteToMemoryStream(samples);
         using var reader = new BinaryReader(ms, Encoding.ASCII, leaveOpen: true);
 
         // Skip header
@@ -144,13 +139,12 @@ public class WavWriterTests
     // ----------------------------------------------------------------
     // 6. DifferentSampleRate_UpdatesHeader
     // ----------------------------------------------------------------
-
     [Fact]
     public void DifferentSampleRate_UpdatesHeader()
     {
         const int sampleRate = 44100;
         short[] samples = [100, 200];
-        using var ms = WriteToMemoryStream(samples, sampleRate);
+        using MemoryStream ms = WriteToMemoryStream(samples, sampleRate);
         using var reader = new BinaryReader(ms, Encoding.ASCII, leaveOpen: true);
 
         // Skip to SampleRate field (offset 24)
@@ -166,21 +160,19 @@ public class WavWriterTests
     // ----------------------------------------------------------------
     // 7. TotalFileSize
     // ----------------------------------------------------------------
-
     [Fact]
     public void TotalFileSize()
     {
         short[] samples = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
-        using var ms = WriteToMemoryStream(samples);
+        using MemoryStream ms = WriteToMemoryStream(samples);
 
-        long expectedSize = HeaderSize + samples.Length * 2;
+        long expectedSize = HeaderSize + (samples.Length * 2);
         Assert.Equal(expectedSize, ms.Length);
     }
 
     // ----------------------------------------------------------------
     // 8. WriteToFile_CreatesValidWav
     // ----------------------------------------------------------------
-
     [Fact]
     public void WriteToFile_CreatesValidWav()
     {
@@ -194,7 +186,7 @@ public class WavWriterTests
             Assert.True(File.Exists(tempPath));
 
             byte[] bytes = File.ReadAllBytes(tempPath);
-            long expectedSize = HeaderSize + samples.Length * 2;
+            long expectedSize = HeaderSize + (samples.Length * 2);
             Assert.Equal(expectedSize, bytes.Length);
 
             // Verify via MemoryStream + BinaryReader
@@ -203,7 +195,7 @@ public class WavWriterTests
 
             // RIFF header
             Assert.Equal("RIFF", Encoding.ASCII.GetString(reader.ReadBytes(4)));
-            Assert.Equal(36 + samples.Length * 2, reader.ReadInt32());
+            Assert.Equal(36 + (samples.Length * 2), reader.ReadInt32());
             Assert.Equal("WAVE", Encoding.ASCII.GetString(reader.ReadBytes(4)));
 
             // Skip to data samples (offset 44): fmt sub-chunk (24) + data header (8) = 32

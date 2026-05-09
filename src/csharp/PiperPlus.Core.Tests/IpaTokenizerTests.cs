@@ -12,11 +12,10 @@ public sealed class IpaTokenizerTests
     // ================================================================
     // Basic tokenization (no digraphs)
     // ================================================================
-
     [Fact]
     public void Tokenize_SimpleChars_NoDigraphs()
     {
-        var result = IpaTokenizer.Tokenize("abc");
+        List<string> result = IpaTokenizer.Tokenize("abc");
 
         Assert.Equal(["a", "b", "c"], result);
     }
@@ -24,7 +23,7 @@ public sealed class IpaTokenizerTests
     [Fact]
     public void Tokenize_SpaceBecomesStandaloneToken()
     {
-        var result = IpaTokenizer.Tokenize("a b");
+        List<string> result = IpaTokenizer.Tokenize("a b");
 
         Assert.Equal(["a", " ", "b"], result);
     }
@@ -32,7 +31,7 @@ public sealed class IpaTokenizerTests
     [Fact]
     public void Tokenize_EmptyString_ReturnsEmpty()
     {
-        var result = IpaTokenizer.Tokenize("");
+        List<string> result = IpaTokenizer.Tokenize(string.Empty);
 
         Assert.Empty(result);
     }
@@ -40,7 +39,7 @@ public sealed class IpaTokenizerTests
     [Fact]
     public void Tokenize_OnlySpaces_EachIsToken()
     {
-        var result = IpaTokenizer.Tokenize("  ");
+        List<string> result = IpaTokenizer.Tokenize("  ");
 
         Assert.Equal([" ", " "], result);
     }
@@ -48,12 +47,11 @@ public sealed class IpaTokenizerTests
     // ================================================================
     // Combining marks
     // ================================================================
-
     [Fact]
     public void Tokenize_CombiningTilde_MergesWithBase()
     {
         // U+025B (ɛ) + U+0303 (combining tilde) -> single token "ɛ̃"
-        var result = IpaTokenizer.Tokenize("\u025b\u0303");
+        List<string> result = IpaTokenizer.Tokenize("\u025b\u0303");
 
         Assert.Single(result);
         Assert.Equal("\u025b\u0303", result[0]);
@@ -64,7 +62,7 @@ public sealed class IpaTokenizerTests
     {
         // base + 2 combining marks -> single token
         // e.g. "a" + U+0303 (combining tilde) + U+0301 (combining acute)
-        var result = IpaTokenizer.Tokenize("a\u0303\u0301");
+        List<string> result = IpaTokenizer.Tokenize("a\u0303\u0301");
 
         Assert.Single(result);
         Assert.Equal("a\u0303\u0301", result[0]);
@@ -75,7 +73,7 @@ public sealed class IpaTokenizerTests
     {
         // U+025B (ɛ) + U+0303 (combining tilde) -> single token
         // French nasal vowel; no digraph needed because combining mark is auto-merged
-        var result = IpaTokenizer.Tokenize("\u025b\u0303");
+        List<string> result = IpaTokenizer.Tokenize("\u025b\u0303");
 
         Assert.Single(result);
         Assert.Equal("\u025b\u0303", result[0]);
@@ -86,7 +84,7 @@ public sealed class IpaTokenizerTests
     {
         // U+00E3 "ã" is a precomposed character (NFC), not base + combining mark.
         // It should be emitted as a single token.
-        var result = IpaTokenizer.Tokenize("\u00e3");
+        List<string> result = IpaTokenizer.Tokenize("\u00e3");
 
         Assert.Single(result);
         Assert.Equal("\u00e3", result[0]);
@@ -95,13 +93,12 @@ public sealed class IpaTokenizerTests
     // ================================================================
     // Digraph handling
     // ================================================================
-
     [Fact]
     public void Tokenize_SpanishDigraph_rr()
     {
         var digraphs = new HashSet<string> { "rr" };
 
-        var result = IpaTokenizer.Tokenize("rr", digraphs);
+        List<string> result = IpaTokenizer.Tokenize("rr", digraphs);
 
         Assert.Single(result);
         Assert.Equal("rr", result[0]);
@@ -113,7 +110,7 @@ public sealed class IpaTokenizerTests
         // "tʃ" = "t" + U+0283 (ʃ), treated as digraph
         var digraphs = new HashSet<string> { "t\u0283" };
 
-        var result = IpaTokenizer.Tokenize("t\u0283", digraphs);
+        List<string> result = IpaTokenizer.Tokenize("t\u0283", digraphs);
 
         Assert.Single(result);
         Assert.Equal("t\u0283", result[0]);
@@ -125,7 +122,7 @@ public sealed class IpaTokenizerTests
         // "dʒ" = "d" + U+0292 (ʒ), treated as digraph
         var digraphs = new HashSet<string> { "d\u0292" };
 
-        var result = IpaTokenizer.Tokenize("d\u0292", digraphs);
+        List<string> result = IpaTokenizer.Tokenize("d\u0292", digraphs);
 
         Assert.Single(result);
         Assert.Equal("d\u0292", result[0]);
@@ -137,7 +134,7 @@ public sealed class IpaTokenizerTests
         // "atʃo" -> ["a", "tʃ", "o"]
         var digraphs = new HashSet<string> { "t\u0283" };
 
-        var result = IpaTokenizer.Tokenize("at\u0283o", digraphs);
+        List<string> result = IpaTokenizer.Tokenize("at\u0283o", digraphs);
 
         Assert.Equal(["a", "t\u0283", "o"], result);
     }
@@ -148,7 +145,7 @@ public sealed class IpaTokenizerTests
         // "arr" with {"rr"} -> ["a", "rr"]
         var digraphs = new HashSet<string> { "rr" };
 
-        var result = IpaTokenizer.Tokenize("arr", digraphs);
+        List<string> result = IpaTokenizer.Tokenize("arr", digraphs);
 
         Assert.Equal(["a", "rr"], result);
     }
@@ -159,7 +156,7 @@ public sealed class IpaTokenizerTests
         // "rra" with {"rr"} -> ["rr", "a"]
         var digraphs = new HashSet<string> { "rr" };
 
-        var result = IpaTokenizer.Tokenize("rra", digraphs);
+        List<string> result = IpaTokenizer.Tokenize("rra", digraphs);
 
         Assert.Equal(["rr", "a"], result);
     }
@@ -170,7 +167,7 @@ public sealed class IpaTokenizerTests
         // "rs" with {"rr"} -> ["r", "s"] (no digraph match)
         var digraphs = new HashSet<string> { "rr" };
 
-        var result = IpaTokenizer.Tokenize("rs", digraphs);
+        List<string> result = IpaTokenizer.Tokenize("rs", digraphs);
 
         Assert.Equal(["r", "s"], result);
     }
@@ -178,7 +175,7 @@ public sealed class IpaTokenizerTests
     [Fact]
     public void Tokenize_NullDigraphSet_SameAsNoDigraphs()
     {
-        var result = IpaTokenizer.Tokenize("abc", null);
+        List<string> result = IpaTokenizer.Tokenize("abc", null);
 
         Assert.Equal(["a", "b", "c"], result);
     }
@@ -186,12 +183,11 @@ public sealed class IpaTokenizerTests
     // ================================================================
     // Stress markers and suprasegmentals
     // ================================================================
-
     [Fact]
     public void Tokenize_StressMarker_StandaloneToken()
     {
         // U+02C8 (ˈ) primary stress marker -> standalone token
-        var result = IpaTokenizer.Tokenize("\u02c8");
+        List<string> result = IpaTokenizer.Tokenize("\u02c8");
 
         Assert.Single(result);
         Assert.Equal("\u02c8", result[0]);
@@ -200,13 +196,12 @@ public sealed class IpaTokenizerTests
     // ================================================================
     // Complex realistic inputs
     // ================================================================
-
     [Fact]
     public void Tokenize_ComplexFrenchSequence()
     {
         // "bɔ̃ʒuʁ" = b + ɔ̃ (U+0254 + U+0303) + ʒ (U+0292) + u + ʁ (U+0281)
         // No digraphs needed; combining mark handles the nasal vowel
-        var result = IpaTokenizer.Tokenize("b\u0254\u0303\u0292u\u0281");
+        List<string> result = IpaTokenizer.Tokenize("b\u0254\u0303\u0292u\u0281");
 
         Assert.Equal(["b", "\u0254\u0303", "\u0292", "u", "\u0281"], result);
     }
@@ -214,7 +209,6 @@ public sealed class IpaTokenizerTests
     // ================================================================
     // Theory: parameterized edge cases
     // ================================================================
-
     [Theory]
     [InlineData("a", new[] { "a" })]
     [InlineData("ab", new[] { "a", "b" })]
@@ -222,7 +216,7 @@ public sealed class IpaTokenizerTests
     [InlineData("a b c", new[] { "a", " ", "b", " ", "c" })]
     public void Tokenize_VariousSimpleInputs(string input, string[] expected)
     {
-        var result = IpaTokenizer.Tokenize(input);
+        List<string> result = IpaTokenizer.Tokenize(input);
 
         Assert.Equal(expected, result);
     }
@@ -235,7 +229,7 @@ public sealed class IpaTokenizerTests
     {
         var digraphs = new HashSet<string> { "rr" };
 
-        var result = IpaTokenizer.Tokenize(input, digraphs);
+        List<string> result = IpaTokenizer.Tokenize(input, digraphs);
 
         Assert.Equal(expected, result);
     }

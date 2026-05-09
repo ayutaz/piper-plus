@@ -93,6 +93,7 @@ public sealed class UnicodeLanguageDetector
     public string DefaultLatinLanguage { get; }
 
     /// <summary>
+    /// Initializes a new instance of the <see cref="UnicodeLanguageDetector"/> class.
     /// Create a new <see cref="UnicodeLanguageDetector"/>.
     /// </summary>
     /// <param name="languages">
@@ -122,7 +123,9 @@ public sealed class UnicodeLanguageDetector
         foreach (string lang in languages)
         {
             if (lang is "en" or "es" or "pt" or "fr" or "sv")
+            {
                 latinLangCount++;
+            }
         }
 
         // Enable Swedish detection when sv is present alongside other Latin langs.
@@ -163,8 +166,17 @@ public sealed class UnicodeLanguageDetector
                 // Disambiguate: if context has kana, it's Japanese
                 return contextHasKana ? "ja" : "zh";
             }
-            if (_hasJa) return "ja";
-            if (_hasZh) return "zh";
+
+            if (_hasJa)
+            {
+                return "ja";
+            }
+
+            if (_hasZh)
+            {
+                return "zh";
+            }
+
             return null;
         }
 
@@ -303,11 +315,13 @@ public sealed class UnicodeLanguageDetector
 
         // If the default Latin language is already Swedish, nothing to refine.
         if (defaultLang == "sv")
+        {
             return segments;
+        }
 
         var result = new List<(string Lang, string Text)>(segments.Count);
 
-        foreach (var (lang, segText) in segments)
+        foreach ((string? lang, string? segText) in segments)
         {
             if (lang != defaultLang)
             {
@@ -321,7 +335,9 @@ public sealed class UnicodeLanguageDetector
             {
                 string word = rawWord.Trim('.', ',', ';', ':', '!', '?').ToLowerInvariant();
                 if (word.Length == 0)
+                {
                     continue;
+                }
 
                 // Swedish-specific characters
                 bool hasSwedishChar = false;

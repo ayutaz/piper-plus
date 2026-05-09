@@ -16,22 +16,22 @@ namespace PiperPlus.Core.Config;
 internal sealed class VoiceJsonEntry
 {
     [JsonPropertyName("name")]
-    public string Name { get; set; } = "";
+    public string Name { get; set; } = string.Empty;
 
     [JsonPropertyName("language")]
     public VoiceLanguageJson? Language { get; set; }
 
     [JsonPropertyName("quality")]
-    public string Quality { get; set; } = "";
+    public string Quality { get; set; } = string.Empty;
 
     [JsonPropertyName("num_speakers")]
     public int NumSpeakers { get; set; } = 1;
 
     [JsonPropertyName("source")]
-    public string Source { get; set; } = "";
+    public string Source { get; set; } = string.Empty;
 
     [JsonPropertyName("repo")]
-    public string Repo { get; set; } = "";
+    public string Repo { get; set; } = string.Empty;
 
     [JsonPropertyName("files")]
     public Dictionary<string, VoiceFileJson>? Files { get; set; }
@@ -40,7 +40,7 @@ internal sealed class VoiceJsonEntry
     public List<string>? Aliases { get; set; }
 
     [JsonPropertyName("description")]
-    public string Description { get; set; } = "";
+    public string Description { get; set; } = string.Empty;
 
     [JsonPropertyName("speaker_id_map")]
     public Dictionary<string, int>? SpeakerIdMap { get; set; }
@@ -52,16 +52,16 @@ internal sealed class VoiceJsonEntry
 internal sealed class VoiceLanguageJson
 {
     [JsonPropertyName("code")]
-    public string Code { get; set; } = "";
+    public string Code { get; set; } = string.Empty;
 
     [JsonPropertyName("family")]
-    public string Family { get; set; } = "";
+    public string Family { get; set; } = string.Empty;
 
     [JsonPropertyName("name_native")]
-    public string NameNative { get; set; } = "";
+    public string NameNative { get; set; } = string.Empty;
 
     [JsonPropertyName("name_english")]
-    public string NameEnglish { get; set; } = "";
+    public string NameEnglish { get; set; } = string.Empty;
 }
 
 /// <summary>
@@ -73,7 +73,7 @@ internal sealed class VoiceFileJson
     public long SizeBytes { get; set; }
 
     [JsonPropertyName("md5_digest")]
-    public string Md5Digest { get; set; } = "";
+    public string Md5Digest { get; set; } = string.Empty;
 }
 
 /// <summary>
@@ -90,6 +90,7 @@ internal static class VoiceJsonConverter
     /// Fallback value for <see cref="VoiceInfo.Source"/> when the entry has no
     /// explicit "source" field. Matches the C++ <c>parseVoiceEntry</c> semantics.
     /// </param>
+    /// <returns></returns>
     public static VoiceInfo ToVoiceInfo(
         string key,
         VoiceJsonEntry entry,
@@ -99,21 +100,21 @@ internal static class VoiceJsonConverter
         var files = new List<VoiceFileInfo>();
         if (entry.Files is not null)
         {
-            foreach (var (relativePath, fileJson) in entry.Files)
+            foreach ((string? relativePath, VoiceFileJson? fileJson) in entry.Files)
             {
                 files.Add(new VoiceFileInfo(relativePath, fileJson.SizeBytes, fileJson.Md5Digest));
             }
         }
 
-        var lang = entry.Language;
+        VoiceLanguageJson? lang = entry.Language;
 
         return new VoiceInfo(
             Key: key,
             Name: entry.Name,
-            LanguageCode: lang?.Code ?? "",
-            LanguageFamily: lang?.Family ?? "",
-            LanguageNameNative: lang?.NameNative ?? "",
-            LanguageNameEnglish: lang?.NameEnglish ?? "",
+            LanguageCode: lang?.Code ?? string.Empty,
+            LanguageFamily: lang?.Family ?? string.Empty,
+            LanguageNameNative: lang?.NameNative ?? string.Empty,
+            LanguageNameEnglish: lang?.NameEnglish ?? string.Empty,
             Quality: entry.Quality,
             NumSpeakers: entry.NumSpeakers,
             Source: string.IsNullOrEmpty(entry.Source) ? defaultSource : entry.Source,

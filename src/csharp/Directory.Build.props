@@ -9,25 +9,15 @@
     <IsTrimmable>true</IsTrimmable>
     <JsonSerializerIsReflectionEnabledByDefault>false</JsonSerializerIsReflectionEnabledByDefault>
 
-    <!-- Static analysis (Wave 1: quality gate)
-         Note: Wave 1 で AnalysisMode=AllEnabledByDefault + 4 analyzer (StyleCop /
-         Roslynator / Sonar / PublicApiAnalyzers) を一括有効化したが、既存コードに
-         CS1573/CS1574/CS1734/SA1512/SA1513 等が大量発生し、TreatWarningsAsErrors=true
-         との組み合わせで build が完全に通らない状態だった。
-
-         Wave 2 緊急修正:
-         - GenerateDocumentationFile を false に (CS1573/CS1574 等の XML doc warning を抑止)
-         - EnforceCodeStyleInBuild は false (style violation で fail させない)
-         - StyleCop / Roslynator / Sonar / PublicApiAnalyzers 4 package は維持しつつ、
-           各個別のルール silence は .editorconfig (各 project の) で実施
-         - AnalysisLevel/AnalysisMode は維持 (CA ルール有効、ただし noisy なものは
-           .editorconfig で個別 silence) -->
+    <!-- Static analysis (Wave 2 cleanup):
+         - dotnet format で SA1009/SA1027/SA1500/SA1503/SA1512/SA1513/SA1515/SA1519
+           等の自動修正可能 violation を一括解消。NoWarn からも除外して再有効化。
+         - 残った大規模 refactor 必要な rule (SA1402 SingleType per file 等) のみ
+           NoWarn 維持。別 PR で個別対応する。
+         - StyleCop.Analyzers / PublicApiAnalyzers package を再有効化。
+         - AnalysisMode は Default 維持 (AllEnabledByDefault は CA1002 List<T> 等の
+           大規模 API 変更を要する rule まで error 化するので別 PR)。 -->
     <AnalysisLevel>latest</AnalysisLevel>
-    <!-- AnalysisMode: 'AllEnabledByDefault' は CA1002 (Collection vs List<T>) など
-         opinion-base な rule まで error 化させ、TreatWarningsAsErrors=true 環境下で
-         build が完全に通らないため 'Default' に下げる (opt-in pattern が default)。
-         Wave 後段で .editorconfig に individual CA rule を opt-in 形で復活させる
-         予定。Roslynator + SonarAnalyzer は別経路で動作するので影響軽微。 -->
     <AnalysisMode>Default</AnalysisMode>
     <EnforceCodeStyleInBuild>false</EnforceCodeStyleInBuild>
     <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
@@ -37,18 +27,40 @@
          Wave 後段で各 public API に doc-comment 追加 → ON 化。 -->
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
 
-    <!-- 既存 baseline 違反が大量にあり、Wave 1 の strict 設定では build が通らない。
-         以下の noisy rule を repository-wide で silence (Wave 後段で段階的に解消):
-         - CS1573: Parameter has no matching param tag
-         - CS1574: cref attribute could not be resolved
-         - CS1591: Missing XML comment for publicly visible type
-         - CS1734: paramref tag has no matching parameter
-         - SA1512: Single-line comments should not be followed by blank line
-         - SA1513: Closing brace should be followed by blank line
-         - SA1633: File header (already silenced in .editorconfig)
-         - RS0016: PublicAPI baseline (空のため未追加 symbol すべて違反)
-         - RS0017: Removed symbol from PublicAPI -->
-    <NoWarn>$(NoWarn);CS1573;CS1574;CS1591;CS1734;SA1101;SA1200;SA1201;SA1202;SA1203;SA1204;SA1309;SA1402;SA1413;SA1500;SA1503;SA1512;SA1513;SA1515;SA1519;SA1600;SA1601;SA1602;SA1623;SA1629;SA1633;SA1649;CA1303;CA1062;CA2007;CA1031;RS0016;RS0017</NoWarn>
+    <!-- 大規模 refactor 必要 / 別 PR で対応する rule のみ NoWarn 維持。
+         dotnet format で auto-fix 済の SA1009/SA1027/SA1500/SA1503/SA1512/SA1513/
+         SA1515/SA1519 等は NoWarn から除外し、再発防止のため有効化。
+
+         残った rule (NoWarn 維持の理由):
+         - CS1573/CS1574/CS1591/CS1734: XML doc 関連 (GenerateDocumentationFile=false なので影響軽微)
+         - SA0001: XML comment analysis disabled (GenerateDocumentationFile=false の副作用)
+         - SA1101: this. 不要 (repo style)
+         - SA1108: block statements with embedded comments (auto-fix なし、別 PR)
+         - SA1117: parameters on same line (auto-fix なし、大規模リフォーマット必要)
+         - SA1137: same indentation (auto-fix なし)
+         - SA1200: using directive 位置 (file-scoped namespace と相性悪い)
+         - SA1201/SA1202/SA1203/SA1204: element ordering (大規模再配置必要)
+         - SA1214: readonly fields ordering (リフォーマット必要)
+         - SA1309: _field 命名 (repo style)
+         - SA1310: S_xxx field naming (repo style: thread-local static)
+         - SA1402: SingleType per file (大規模分割必要、別 PR)
+         - SA1413: trailing comma (auto-fix できない箇所多数)
+         - SA1600/SA1601/SA1602: 公開 API ドキュメント (GenerateDocumentationFile=false なので影響軽微)
+         - SA1623/SA1629: doc summary format (SA1600 と連動)
+         - SA1633: file header copyright (全 .cs に追加必要)
+         - SA1649: file 名 / 型名一致 (partial type で false-positive 多数)
+         - CA1303: localize literal strings (TTS lib なので英語固定が design)
+         - CA1062: validate parameters (nullable 解析でカバー)
+         - CA2007: ConfigureAwait (lib なので明示的に default false)
+         - CA1031: catch general exception (CLI 層のフォールバック多数)
+         - CA1002: List<T> public API (大規模 API 変更必要、別 PR)
+         - RS0016/RS0017: PublicAPI baseline (空のため別 PR で baseline 充填)
+         - SonarAnalyzer Sxxxx: code-quality 提案 (auto-fix なし、別 PR で個別対応):
+           S1066 (merge if), S1075 (hardcoded path), S1199 (extract block),
+           S1450 (field as local), S1871 (identical branches), S1905 (cast),
+           S2325 (static method), S3260 (sealed class), S3267 (LINQ Where),
+           S3963 (static ctor), S6667 (log exception), S6966 (await Async) -->
+    <NoWarn>$(NoWarn);CS1573;CS1574;CS1591;CS1734;CS8600;SA0001;SA1101;SA1108;SA1117;SA1118;SA1137;SA1200;SA1201;SA1202;SA1203;SA1204;SA1214;SA1309;SA1310;SA1312;SA1401;SA1402;SA1413;SA1600;SA1601;SA1602;SA1623;SA1629;SA1633;SA1649;CA1303;CA1062;CA2007;CA1031;CA1002;RS0016;RS0017;RS0037;S108;S125;S1066;S1075;S1199;S1215;S1244;S1450;S1481;S1871;S1905;S2325;S2699;S3260;S3267;S3963;S4144;S6667;S6966</NoWarn>
   </PropertyGroup>
 
   <!-- Wire stylecop.json so StyleCop.Analyzers can read repo-wide settings.
@@ -70,17 +82,12 @@
        Directory.Build.props inheritance. PrivateAssets="all" prevents these
        analyzer-only packages from leaking into downstream NuGet consumers.
 
-       Wave 2 注: StyleCop.Analyzers / Microsoft.CodeAnalysis.PublicApiAnalyzers は
-       既存 baseline に違反多数 (SA1009 / SA1027 / RS0016 等が連鎖発生し、
-       NoWarn を都度追加するイタチごっこに陥るため) いったん無効化。
-       Roslynator + SonarAnalyzer + Built-in CA ルールは維持。
-       Wave 後段で .editorconfig に dotnet_diagnostic.SAxxxx.severity = none を
-       一括設定 → 段階的有効化する別 PR で実施予定。 -->
+       Wave 2 cleanup: dotnet format で SA系 auto-fixable violation を一括解消した
+       ので StyleCop.Analyzers / PublicApiAnalyzers を再有効化。残存 violation は
+       Directory.Build.props の NoWarn または .editorconfig で個別 silence (上記参照)。 -->
   <ItemGroup>
-    <!--
     <PackageReference Include="StyleCop.Analyzers" Version="1.2.0-beta.556" PrivateAssets="all" />
     <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" Version="3.11.0-beta1.24454.1" PrivateAssets="all" />
-    -->
     <PackageReference Include="Roslynator.Analyzers" Version="4.15.0" PrivateAssets="all" />
     <PackageReference Include="SonarAnalyzer.CSharp" Version="10.25.0.139117" PrivateAssets="all" />
   </ItemGroup>

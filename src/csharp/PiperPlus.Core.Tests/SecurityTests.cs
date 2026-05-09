@@ -19,7 +19,6 @@ public sealed class SecurityTests
     // data" pattern is gone — these tests now actually exercise
     // IsSafeVoiceKey / IsSafeRepoId production logic.
     // ================================================================
-
     private static readonly MethodInfo IsSafeVoiceKeyMethod =
         typeof(ModelManager).GetMethod(
             "IsSafeVoiceKey",
@@ -43,7 +42,6 @@ public sealed class SecurityTests
     // ================================================================
     // FindVoice — path traversal via voice key
     // ================================================================
-
     [Theory]
     [InlineData("../../../etc/passwd")]
     [InlineData("..\\..\\..\\Windows\\System32\\config\\SAM")]
@@ -53,7 +51,7 @@ public sealed class SecurityTests
     [InlineData("model/../model")]
     public void FindVoice_PathTraversalKeys_ReturnsNull(string maliciousKey)
     {
-        var voice = ModelManager.FindVoice(maliciousKey);
+        VoiceInfo? voice = ModelManager.FindVoice(maliciousKey);
 
         Assert.Null(voice);
     }
@@ -67,7 +65,7 @@ public sealed class SecurityTests
     [InlineData("\\\\unc\\share")]
     public void FindVoice_SlashContainingKeys_ReturnsNull(string keyWithSlash)
     {
-        var voice = ModelManager.FindVoice(keyWithSlash);
+        VoiceInfo? voice = ModelManager.FindVoice(keyWithSlash);
 
         Assert.Null(voice);
     }
@@ -75,7 +73,6 @@ public sealed class SecurityTests
     // ================================================================
     // DownloadModelAsync — path traversal model names
     // ================================================================
-
     [Theory]
     [InlineData("../../../etc/passwd")]
     [InlineData("..\\..\\Windows\\System32")]
@@ -107,15 +104,14 @@ public sealed class SecurityTests
     // ================================================================
     // Catalog integrity — all voice keys pass IsSafeVoiceKey
     // ================================================================
-
     [Fact]
     public void AllCatalogVoiceKeys_AreSafe()
     {
-        var catalog = VoiceCatalog.LoadMergedCatalog();
+        IReadOnlyList<VoiceInfo> catalog = VoiceCatalog.LoadMergedCatalog();
 
         Assert.NotEmpty(catalog);
 
-        foreach (var voice in catalog)
+        foreach (VoiceInfo voice in catalog)
         {
             // Keys must not contain path traversal characters
             Assert.DoesNotContain("..", voice.Key);
@@ -123,7 +119,8 @@ public sealed class SecurityTests
             Assert.DoesNotContain("\\", voice.Key);
 
             // Keys must be non-empty
-            Assert.False(string.IsNullOrEmpty(voice.Key),
+            Assert.False(
+                string.IsNullOrEmpty(voice.Key),
                 $"Voice key must not be null or empty");
         }
     }
@@ -131,13 +128,13 @@ public sealed class SecurityTests
     [Fact]
     public void AllCatalogVoiceKeys_FoundByFindVoice()
     {
-        var catalog = VoiceCatalog.LoadMergedCatalog();
+        IReadOnlyList<VoiceInfo> catalog = VoiceCatalog.LoadMergedCatalog();
 
         Assert.NotEmpty(catalog);
 
-        foreach (var voice in catalog)
+        foreach (VoiceInfo voice in catalog)
         {
-            var found = ModelManager.FindVoice(voice.Key);
+            VoiceInfo? found = ModelManager.FindVoice(voice.Key);
 
             Assert.NotNull(found);
             Assert.Equal(voice.Key, found!.Key);
@@ -147,15 +144,14 @@ public sealed class SecurityTests
     // ================================================================
     // Catalog integrity — all repo IDs have valid owner/repo format
     // ================================================================
-
     [Fact]
     public void AllCatalogRepoIds_HaveValidFormat()
     {
-        var catalog = VoiceCatalog.LoadMergedCatalog();
+        IReadOnlyList<VoiceInfo> catalog = VoiceCatalog.LoadMergedCatalog();
 
         Assert.NotEmpty(catalog);
 
-        foreach (var voice in catalog)
+        foreach (VoiceInfo voice in catalog)
         {
             if (string.IsNullOrEmpty(voice.RepoId))
             {
@@ -169,15 +165,21 @@ public sealed class SecurityTests
             // Must not be empty on either side of the slash
             string[] parts = voice.RepoId.Split('/');
             Assert.Equal(2, parts.Length);
-            Assert.False(string.IsNullOrEmpty(parts[0]),
+            Assert.False(
+                string.IsNullOrEmpty(parts[0]),
                 $"Repo ID '{voice.RepoId}' has empty owner");
-            Assert.False(string.IsNullOrEmpty(parts[1]),
+            Assert.False(
+                string.IsNullOrEmpty(parts[1]),
                 $"Repo ID '{voice.RepoId}' has empty repo name");
 
             // Must contain only safe characters (alphanumeric, hyphen, underscore, dot)
             foreach (char c in voice.RepoId)
             {
-                if (c == '/') continue;
+                if (c == '/')
+                {
+                    continue;
+                }
+
                 Assert.True(
                     char.IsAsciiLetterOrDigit(c) || c == '-' || c == '_' || c == '.',
                     $"Repo ID '{voice.RepoId}' contains unsafe character '{c}'");
@@ -188,17 +190,17 @@ public sealed class SecurityTests
     // ================================================================
     // Catalog integrity — all aliases are non-empty and safe
     // ================================================================
-
     [Fact]
     public void AllCatalogAliases_AreSafe()
     {
-        var catalog = VoiceCatalog.LoadMergedCatalog();
+        IReadOnlyList<VoiceInfo> catalog = VoiceCatalog.LoadMergedCatalog();
 
-        foreach (var voice in catalog)
+        foreach (VoiceInfo voice in catalog)
         {
             foreach (var alias in voice.Aliases)
             {
-                Assert.False(string.IsNullOrWhiteSpace(alias),
+                Assert.False(
+                    string.IsNullOrWhiteSpace(alias),
                     $"Voice '{voice.Key}' has an empty alias");
                 Assert.DoesNotContain("..", alias);
                 Assert.DoesNotContain("/", alias);
@@ -215,7 +217,6 @@ public sealed class SecurityTests
     // IsSafeVoiceKey is reached in DownloadModelAsync), we verify the
     // behavior through the FindVoice null-return + catalog invariants.
     // ================================================================
-
     [Theory]
     [InlineData("..")]
     [InlineData("foo..bar")]
@@ -229,7 +230,7 @@ public sealed class SecurityTests
         // No catalog entry should ever match an unsafe key pattern.
         // This verifies that even if someone adds a malicious catalog entry,
         // FindVoice won't return it for path-traversal-like inputs.
-        var voice = ModelManager.FindVoice(unsafePattern);
+        VoiceInfo? voice = ModelManager.FindVoice(unsafePattern);
 
         Assert.Null(voice);
     }
@@ -237,7 +238,6 @@ public sealed class SecurityTests
     // ================================================================
     // IsSafeVoiceKey — direct reflection-driven contract pinning
     // ================================================================
-
     [Theory]
     [InlineData("ja_JP-tsukuyomi-chan-medium")]
     [InlineData("en_US-test-low")]
@@ -247,7 +247,8 @@ public sealed class SecurityTests
     [InlineData("voice_with_underscore")]
     public void IsSafeVoiceKey_LegitimateKeys_ReturnTrue(string key)
     {
-        Assert.True(InvokeIsSafeVoiceKey(key),
+        Assert.True(
+            InvokeIsSafeVoiceKey(key),
             $"Legitimate key '{key}' must pass IsSafeVoiceKey");
     }
 
@@ -263,7 +264,8 @@ public sealed class SecurityTests
     [InlineData("..\\..\\Windows\\System32\\config\\SAM")]
     public void IsSafeVoiceKey_PathTraversalKeys_ReturnFalse(string key)
     {
-        Assert.False(InvokeIsSafeVoiceKey(key),
+        Assert.False(
+            InvokeIsSafeVoiceKey(key),
             $"Path-traversal key '{key}' must be rejected by IsSafeVoiceKey");
     }
 
@@ -278,7 +280,6 @@ public sealed class SecurityTests
     // ================================================================
     // IsSafeRepoId — direct reflection-driven contract pinning
     // ================================================================
-
     [Theory]
     [InlineData("ayousanz/piper-plus-tsukuyomi-chan")]
     [InlineData("rhasspy/piper-voices")]
@@ -287,40 +288,43 @@ public sealed class SecurityTests
     [InlineData("A/B")]
     public void IsSafeRepoId_LegitimateOwnerRepo_ReturnsTrue(string repoId)
     {
-        Assert.True(InvokeIsSafeRepoId(repoId),
+        Assert.True(
+            InvokeIsSafeRepoId(repoId),
             $"Legitimate repo ID '{repoId}' must pass IsSafeRepoId");
     }
 
     [Theory]
-    [InlineData("no-slash-at-all")]      // Missing slash separator
-    [InlineData("too/many/slashes")]      // 2 slashes (must be exactly 1)
-    [InlineData("a/b/c/d")]               // 3 slashes
-    [InlineData("")]                      // Empty
+    [InlineData("no-slash-at-all")] // Missing slash separator
+    [InlineData("too/many/slashes")] // 2 slashes (must be exactly 1)
+    [InlineData("a/b/c/d")] // 3 slashes
+    [InlineData("")] // Empty
     public void IsSafeRepoId_InvalidSlashCount_ReturnsFalse(string repoId)
     {
-        Assert.False(InvokeIsSafeRepoId(repoId),
+        Assert.False(
+            InvokeIsSafeRepoId(repoId),
             $"Repo ID '{repoId}' must be rejected (slash-count violation)");
     }
 
     [Theory]
     [InlineData("owner/repo with spaces")] // Space character
-    [InlineData("owner/repo@version")]      // @ character
-    [InlineData("owner/repo#branch")]       // # character
-    [InlineData("own!er/repo")]             // ! character
-    [InlineData("owner/rep$o")]             // $ character
-    [InlineData("owner/repo;rm -rf")]       // Shell injection attempt
-    [InlineData("owner/repo`whoami`")]      // Backtick injection
-    [InlineData("owner/repo&&exit")]        // && command chain
-    [InlineData("owner/repo|cat")]          // Pipe character
-    [InlineData("owner/repo<script>")]      // HTML-like injection
-    [InlineData("owner/repo\0null")]   // Embedded NUL byte
-    [InlineData("owner/repo%2e%2e")]        // URL-encoded ".."
+    [InlineData("owner/repo@version")] // @ character
+    [InlineData("owner/repo#branch")] // # character
+    [InlineData("own!er/repo")] // ! character
+    [InlineData("owner/rep$o")] // $ character
+    [InlineData("owner/repo;rm -rf")] // Shell injection attempt
+    [InlineData("owner/repo`whoami`")] // Backtick injection
+    [InlineData("owner/repo&&exit")] // && command chain
+    [InlineData("owner/repo|cat")] // Pipe character
+    [InlineData("owner/repo<script>")] // HTML-like injection
+    [InlineData("owner/repo\0null")] // Embedded NUL byte
+    [InlineData("owner/repo%2e%2e")] // URL-encoded ".."
     public void IsSafeRepoId_UnsafeCharacters_ReturnsFalse(string repoId)
     {
         // Verify the validator rejects each unsafe character class.
         // Without this guard, a malicious catalog could inject shell
         // metacharacters into the resolved Hugging Face URL.
-        Assert.False(InvokeIsSafeRepoId(repoId),
+        Assert.False(
+            InvokeIsSafeRepoId(repoId),
             $"Repo ID '{repoId}' must be rejected (unsafe character)");
     }
 
@@ -332,7 +336,8 @@ public sealed class SecurityTests
         // Note: IsSafeRepoId only enforces slashCount==1 + char set; the
         // empty-owner / empty-repo case is caught by AllCatalogRepoIds_HaveValidFormat.
         // This is a pin on the actual private behaviour.
-        Assert.True(InvokeIsSafeRepoId("/leading-slash"),
+        Assert.True(
+            InvokeIsSafeRepoId("/leading-slash"),
             "IsSafeRepoId currently accepts leading slash; if this changes, " +
             "update the related guard test in AllCatalogRepoIds_HaveValidFormat.");
     }
@@ -343,7 +348,8 @@ public sealed class SecurityTests
         // Same as leading: trailing slash passes char-class + slash-count
         // checks. The "owner/repo with non-empty parts" guarantee comes
         // from the catalog-load layer, not from this private validator.
-        Assert.True(InvokeIsSafeRepoId("trailing-slash/"),
+        Assert.True(
+            InvokeIsSafeRepoId("trailing-slash/"),
             "IsSafeRepoId currently accepts trailing slash; if this changes, " +
             "update the related guard test in AllCatalogRepoIds_HaveValidFormat.");
     }
@@ -351,24 +357,25 @@ public sealed class SecurityTests
     // ================================================================
     // File path safety in DownloadModelAsync — relative path with ".."
     // ================================================================
-
     [Fact]
     public void AllCatalogFiles_HaveSafeRelativePaths()
     {
-        var catalog = VoiceCatalog.LoadMergedCatalog();
+        IReadOnlyList<VoiceInfo> catalog = VoiceCatalog.LoadMergedCatalog();
 
-        foreach (var voice in catalog)
+        foreach (VoiceInfo voice in catalog)
         {
-            foreach (var file in voice.Files)
+            foreach (VoiceFileInfo file in voice.Files)
             {
-                Assert.False(string.IsNullOrEmpty(file.RelativePath),
+                Assert.False(
+                    string.IsNullOrEmpty(file.RelativePath),
                     $"Voice '{voice.Key}' has a file with empty relative path");
 
                 Assert.DoesNotContain("..", file.RelativePath);
 
                 // GetFileName should return a non-empty value
                 string localName = Path.GetFileName(file.RelativePath);
-                Assert.False(string.IsNullOrEmpty(localName),
+                Assert.False(
+                    string.IsNullOrEmpty(localName),
                     $"Voice '{voice.Key}' file '{file.RelativePath}' " +
                     "has no valid filename component");
             }
@@ -378,14 +385,13 @@ public sealed class SecurityTests
     // ================================================================
     // URL scheme enforcement — all catalog entries produce HTTPS URLs
     // ================================================================
-
     [Fact]
     public void AllCatalogVoices_ProduceHttpsUrls()
     {
         const string huggingFacePrefix = "https://huggingface.co/";
-        var catalog = VoiceCatalog.LoadMergedCatalog();
+        IReadOnlyList<VoiceInfo> catalog = VoiceCatalog.LoadMergedCatalog();
 
-        foreach (var voice in catalog)
+        foreach (VoiceInfo voice in catalog)
         {
             string baseUrl;
             if (string.Equals(voice.Source, "piper-plus", StringComparison.Ordinal))
@@ -397,7 +403,7 @@ public sealed class SecurityTests
                 baseUrl = $"{huggingFacePrefix}rhasspy/piper-voices/resolve/v1.0.0/";
             }
 
-            foreach (var file in voice.Files)
+            foreach (VoiceFileInfo file in voice.Files)
             {
                 string fullUrl = baseUrl + file.RelativePath;
                 Assert.StartsWith(huggingFacePrefix, fullUrl);

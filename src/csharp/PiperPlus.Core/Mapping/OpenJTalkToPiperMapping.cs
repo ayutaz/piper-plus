@@ -74,6 +74,7 @@ public static class OpenJTalkToPiperMapping
             // =============================================================
             ["rr"] = '\uE01D',       // Spanish trill r
             ["y_vowel"] = '\uE01E',  // Close front rounded vowel [y] (FR/ZH)
+
             // 0xE01F reserved
 
             // =============================================================
@@ -154,6 +155,7 @@ public static class OpenJTalkToPiperMapping
             ["k\u031A"] = '\uE050',          // k̚  unreleased velar
             ["t\u031A"] = '\uE051',          // t̚  unreleased alveolar
             ["p\u031A"] = '\uE052',          // p̚  unreleased bilabial
+
             // 0xE053 reserved
 
             // =============================================================
@@ -199,7 +201,7 @@ public static class OpenJTalkToPiperMapping
         BuildReverse(TokenToChar);
 
     /// <summary>Pre-computed char→string cache to avoid per-call ToString() allocations.</summary>
-    private static readonly Dictionary<char, string> s_charToString = BuildCharToString();
+    private static readonly Dictionary<char, string> S_charToString = BuildCharToString();
 
     // ----------------------------------------------------------------
     // Public helpers
@@ -215,6 +217,7 @@ public static class OpenJTalkToPiperMapping
     ///         unchanged (no dynamic allocation in Phase 2).</item>
     /// </list>
     /// </summary>
+    /// <returns></returns>
     public static string MapToken(string token)
     {
         if (token.Length <= 1)
@@ -223,13 +226,14 @@ public static class OpenJTalkToPiperMapping
         }
 
         return TokenToChar.TryGetValue(token, out var pua)
-            ? s_charToString[pua]
+            ? S_charToString[pua]
             : token;
     }
 
     /// <summary>
     /// Convert every token in <paramref name="tokens"/> using <see cref="MapToken"/>.
     /// </summary>
+    /// <returns></returns>
     public static IReadOnlyList<string> MapSequence(IReadOnlyList<string> tokens)
     {
         var result = new string[tokens.Count];
@@ -244,12 +248,11 @@ public static class OpenJTalkToPiperMapping
     // ----------------------------------------------------------------
     // Internal helpers
     // ----------------------------------------------------------------
-
     private static ReadOnlyDictionary<char, string> BuildReverse(
         IReadOnlyDictionary<string, char> forward)
     {
         var reverse = new Dictionary<char, string>(forward.Count);
-        foreach (var (token, ch) in forward)
+        foreach ((string? token, char ch) in forward)
         {
             reverse[ch] = token;
         }
@@ -260,10 +263,11 @@ public static class OpenJTalkToPiperMapping
     private static Dictionary<char, string> BuildCharToString()
     {
         var dict = new Dictionary<char, string>(TokenToChar.Count);
-        foreach (var (_, ch) in TokenToChar)
+        foreach ((string _, char ch) in TokenToChar)
         {
             dict[ch] = ch.ToString();
         }
+
         return dict;
     }
 }

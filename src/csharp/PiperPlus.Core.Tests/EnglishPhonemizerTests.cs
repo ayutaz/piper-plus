@@ -14,18 +14,18 @@ public sealed class EnglishPhonemizerTests
     // ================================================================
     // Stub G2P engine
     // ================================================================
-
     private class StubEnglishG2PEngine : IEnglishG2PEngine
     {
         private readonly List<List<string>> _words;
+
         public StubEnglishG2PEngine(List<List<string>> words) => _words = words;
+
         public List<List<string>> ConvertToArpabet(string text) => _words;
     }
 
     // ================================================================
     // Shared phoneme ID map for PostProcessIds tests
     // ================================================================
-
     private static Dictionary<string, int[]> MakeMap() => new()
     {
         ["_"] = [0],
@@ -49,7 +49,6 @@ public sealed class EnglishPhonemizerTests
     // ================================================================
     // 1. StressMarkers_Inserted
     // ================================================================
-
     [Fact]
     public void StressMarkers_Inserted()
     {
@@ -61,10 +60,11 @@ public sealed class EnglishPhonemizerTests
         };
 
         var phonemizer = new EnglishPhonemizer(new StubEnglishG2PEngine(words));
-        var (tokens, _) = phonemizer.PhonemizeWithProsody("hello");
+        (List<string>? tokens, List<ProsodyInfo?> _) = phonemizer.PhonemizeWithProsody("hello");
 
         Assert.Contains("\u02c8", tokens); // ˈ
         int idx = tokens.IndexOf("\u02c8");
+
         // The stressed vowel OW1 -> oʊ; first char "o" follows the marker.
         Assert.Equal("o", tokens[idx + 1]);
     }
@@ -72,7 +72,6 @@ public sealed class EnglishPhonemizerTests
     // ================================================================
     // 2. SecondaryStress_Marker
     // ================================================================
-
     [Fact]
     public void SecondaryStress_Marker()
     {
@@ -84,7 +83,7 @@ public sealed class EnglishPhonemizerTests
         };
 
         var phonemizer = new EnglishPhonemizer(new StubEnglishG2PEngine(words));
-        var (tokens, _) = phonemizer.PhonemizeWithProsody("information");
+        (List<string>? tokens, List<ProsodyInfo?> _) = phonemizer.PhonemizeWithProsody("information");
 
         Assert.Contains("\u02cc", tokens); // ˌ
     }
@@ -92,7 +91,6 @@ public sealed class EnglishPhonemizerTests
     // ================================================================
     // 3. NoStress_NoMarker
     // ================================================================
-
     [Fact]
     public void NoStress_NoMarker()
     {
@@ -104,7 +102,7 @@ public sealed class EnglishPhonemizerTests
         };
 
         var phonemizer = new EnglishPhonemizer(new StubEnglishG2PEngine(words));
-        var (tokens, _) = phonemizer.PhonemizeWithProsody("hello");
+        (List<string>? tokens, List<ProsodyInfo?> _) = phonemizer.PhonemizeWithProsody("hello");
 
         int schwaIdx = tokens.IndexOf("\u0259"); // ə
         Assert.True(schwaIdx >= 0, "Schwa should be present");
@@ -118,7 +116,6 @@ public sealed class EnglishPhonemizerTests
     // ================================================================
     // 4. FunctionWord_NoStress
     // ================================================================
-
     [Fact]
     public void FunctionWord_NoStress()
     {
@@ -131,7 +128,7 @@ public sealed class EnglishPhonemizerTests
         };
 
         var phonemizer = new EnglishPhonemizer(new StubEnglishG2PEngine(words));
-        var (tokens, _) = phonemizer.PhonemizeWithProsody("the");
+        (List<string>? tokens, List<ProsodyInfo?> _) = phonemizer.PhonemizeWithProsody("the");
 
         // Stress marker should NOT appear (function word).
         Assert.DoesNotContain("\u02c8", tokens); // no ˈ
@@ -141,7 +138,6 @@ public sealed class EnglishPhonemizerTests
     // ================================================================
     // 5. ContentWord_KeepsStress
     // ================================================================
-
     [Fact]
     public void ContentWord_KeepsStress()
     {
@@ -152,7 +148,7 @@ public sealed class EnglishPhonemizerTests
         };
 
         var phonemizer = new EnglishPhonemizer(new StubEnglishG2PEngine(words));
-        var (tokens, _) = phonemizer.PhonemizeWithProsody("cat");
+        (List<string>? tokens, List<ProsodyInfo?> _) = phonemizer.PhonemizeWithProsody("cat");
 
         Assert.Contains("\u02c8", tokens); // ˈ should be present
     }
@@ -160,7 +156,6 @@ public sealed class EnglishPhonemizerTests
     // ================================================================
     // 6. WordBoundary_Spaces
     // ================================================================
-
     [Fact]
     public void WordBoundary_Spaces()
     {
@@ -172,7 +167,7 @@ public sealed class EnglishPhonemizerTests
         };
 
         var phonemizer = new EnglishPhonemizer(new StubEnglishG2PEngine(words));
-        var (tokens, _) = phonemizer.PhonemizeWithProsody("hello world");
+        (List<string>? tokens, List<ProsodyInfo?> _) = phonemizer.PhonemizeWithProsody("hello world");
 
         Assert.Contains(" ", tokens);
     }
@@ -180,7 +175,6 @@ public sealed class EnglishPhonemizerTests
     // ================================================================
     // 7. NoLeadingSpace
     // ================================================================
-
     [Fact]
     public void NoLeadingSpace()
     {
@@ -191,7 +185,7 @@ public sealed class EnglishPhonemizerTests
         };
 
         var phonemizer = new EnglishPhonemizer(new StubEnglishG2PEngine(words));
-        var (tokens, _) = phonemizer.PhonemizeWithProsody("hello world");
+        (List<string>? tokens, List<ProsodyInfo?> _) = phonemizer.PhonemizeWithProsody("hello world");
 
         Assert.NotEqual(" ", tokens[0]);
     }
@@ -199,7 +193,6 @@ public sealed class EnglishPhonemizerTests
     // ================================================================
     // 8. Punctuation_AttachedToPrevious
     // ================================================================
-
     [Fact]
     public void Punctuation_AttachedToPrevious()
     {
@@ -213,10 +206,11 @@ public sealed class EnglishPhonemizerTests
         };
 
         var phonemizer = new EnglishPhonemizer(new StubEnglishG2PEngine(words));
-        var (tokens, _) = phonemizer.PhonemizeWithProsody("Hello, world");
+        (List<string>? tokens, List<ProsodyInfo?> _) = phonemizer.PhonemizeWithProsody("Hello, world");
 
         int commaIdx = tokens.IndexOf(",");
         Assert.True(commaIdx > 0, "Comma should be present and not first");
+
         // No space before comma.
         Assert.NotEqual(" ", tokens[commaIdx - 1]);
     }
@@ -224,7 +218,6 @@ public sealed class EnglishPhonemizerTests
     // ================================================================
     // 9. PrimaryStress_MapsTo_A2_2
     // ================================================================
-
     [Fact]
     public void PrimaryStress_MapsTo_A2_2()
     {
@@ -236,7 +229,7 @@ public sealed class EnglishPhonemizerTests
         };
 
         var phonemizer = new EnglishPhonemizer(new StubEnglishG2PEngine(words));
-        var (_, prosody) = phonemizer.PhonemizeWithProsody("go");
+        (List<string> _, List<ProsodyInfo?>? prosody) = phonemizer.PhonemizeWithProsody("go");
 
         var a2Values = prosody.Where(p => p is not null).Select(p => p!.Value.A2).ToList();
         Assert.Contains(2, a2Values);
@@ -245,7 +238,6 @@ public sealed class EnglishPhonemizerTests
     // ================================================================
     // 10. Unstressed_MapsTo_A2_0
     // ================================================================
-
     [Fact]
     public void Unstressed_MapsTo_A2_0()
     {
@@ -256,7 +248,7 @@ public sealed class EnglishPhonemizerTests
         };
 
         var phonemizer = new EnglishPhonemizer(new StubEnglishG2PEngine(words));
-        var (_, prosody) = phonemizer.PhonemizeWithProsody("the");
+        (List<string> _, List<ProsodyInfo?>? prosody) = phonemizer.PhonemizeWithProsody("the");
 
         var a2Values = prosody.Where(p => p is not null).Select(p => p!.Value.A2).ToList();
         Assert.Contains(0, a2Values);
@@ -265,7 +257,6 @@ public sealed class EnglishPhonemizerTests
     // ================================================================
     // 11. A1_AlwaysZero
     // ================================================================
-
     [Fact]
     public void A1_AlwaysZero()
     {
@@ -277,9 +268,9 @@ public sealed class EnglishPhonemizerTests
         };
 
         var phonemizer = new EnglishPhonemizer(new StubEnglishG2PEngine(words));
-        var (_, prosody) = phonemizer.PhonemizeWithProsody("hello world");
+        (List<string> _, List<ProsodyInfo?>? prosody) = phonemizer.PhonemizeWithProsody("hello world");
 
-        foreach (var p in prosody)
+        foreach (ProsodyInfo? p in prosody)
         {
             if (p is not null)
             {
@@ -291,7 +282,6 @@ public sealed class EnglishPhonemizerTests
     // ================================================================
     // 12. PostProcessIds_InsertsInterPhonemePad
     // ================================================================
-
     [Fact]
     public void PostProcessIds_InsertsInterPhonemePad()
     {
@@ -300,9 +290,9 @@ public sealed class EnglishPhonemizerTests
 
         var inputIds = new List<int> { 10, 59 };
         var inputProsody = new List<ProsodyInfo?> { null, null };
-        var map = MakeMap();
+        Dictionary<string, int[]> map = MakeMap();
 
-        var (ids, _) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
+        (List<int>? ids, List<ProsodyInfo?> _) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
 
         // Pattern: BOS(1), PAD(0), 10, PAD(0), 59, PAD(0), EOS(2)
         // Check that PAD (0) appears between phoneme IDs.
@@ -314,7 +304,6 @@ public sealed class EnglishPhonemizerTests
     // ================================================================
     // 13. PostProcessIds_AddsBosEos
     // ================================================================
-
     [Fact]
     public void PostProcessIds_AddsBosEos()
     {
@@ -323,12 +312,13 @@ public sealed class EnglishPhonemizerTests
 
         var inputIds = new List<int> { 10 };
         var inputProsody = new List<ProsodyInfo?> { null };
-        var map = MakeMap();
+        Dictionary<string, int[]> map = MakeMap();
 
-        var (ids, _) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
+        (List<int>? ids, List<ProsodyInfo?> _) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
 
         // First ID should be BOS (^) = 1.
         Assert.Equal(1, ids[0]);
+
         // Last ID should be EOS ($) = 2.
         Assert.Equal(2, ids[^1]);
     }
@@ -336,7 +326,6 @@ public sealed class EnglishPhonemizerTests
     // ================================================================
     // 14. PostProcessIds_FullSequence
     // ================================================================
-
     [Fact]
     public void PostProcessIds_FullSequence()
     {
@@ -349,9 +338,9 @@ public sealed class EnglishPhonemizerTests
         {
             new(0, 0, 3), new(0, 2, 3), new(0, 2, 3),
         };
-        var map = MakeMap();
+        Dictionary<string, int[]> map = MakeMap();
 
-        var (ids, prosody) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
+        (List<int>? ids, List<ProsodyInfo?>? prosody) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
 
         // Expected:
         // BOS(1), PAD(0), 10, PAD(0), 59, PAD(0), 24, PAD(0), EOS(2)
@@ -365,7 +354,6 @@ public sealed class EnglishPhonemizerTests
     // ================================================================
     // 15. PostProcessIds_ProsodyAlignment
     // ================================================================
-
     [Fact]
     public void PostProcessIds_ProsodyAlignment()
     {
@@ -378,9 +366,9 @@ public sealed class EnglishPhonemizerTests
             new(0, 0, 5), new(0, 2, 5), new(0, 2, 5),
             new(0, 0, 5), new(0, 0, 5),
         };
-        var map = MakeMap();
+        Dictionary<string, int[]> map = MakeMap();
 
-        var (ids, prosody) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
+        (List<int>? ids, List<ProsodyInfo?>? prosody) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
 
         Assert.Equal(ids.Count, prosody.Count);
 
@@ -392,7 +380,6 @@ public sealed class EnglishPhonemizerTests
     // ================================================================
     // 16. Phonemize_ReturnsTokensOnly
     // ================================================================
-
     [Fact]
     public void Phonemize_ReturnsTokensOnly()
     {
@@ -403,10 +390,11 @@ public sealed class EnglishPhonemizerTests
         };
 
         var phonemizer = new EnglishPhonemizer(new StubEnglishG2PEngine(words));
-        var tokens = phonemizer.Phonemize("cat");
+        List<string> tokens = phonemizer.Phonemize("cat");
 
         Assert.IsType<List<string>>(tokens);
         Assert.NotEmpty(tokens);
+
         // Should contain the IPA phonemes for "cat": k, æ, t (plus stress marker).
         Assert.Contains("k", tokens);
         Assert.Contains("t", tokens);
@@ -415,7 +403,6 @@ public sealed class EnglishPhonemizerTests
     // ================================================================
     // 17. PhonemizeWithProsody_EmptyInput
     // ================================================================
-
     [Fact]
     public void PhonemizeWithProsody_EmptyInput()
     {
@@ -423,7 +410,7 @@ public sealed class EnglishPhonemizerTests
         var words = new List<List<string>>();
 
         var phonemizer = new EnglishPhonemizer(new StubEnglishG2PEngine(words));
-        var (tokens, prosody) = phonemizer.PhonemizeWithProsody("");
+        (List<string>? tokens, List<ProsodyInfo?>? prosody) = phonemizer.PhonemizeWithProsody(string.Empty);
 
         Assert.Empty(tokens);
         Assert.Empty(prosody);
@@ -432,7 +419,6 @@ public sealed class EnglishPhonemizerTests
     // ================================================================
     // 18. GetPhonemeIdMap_ReturnsNull
     // ================================================================
-
     [Fact]
     public void GetPhonemeIdMap_ReturnsNull()
     {
@@ -446,7 +432,6 @@ public sealed class EnglishPhonemizerTests
     // ================================================================
     // 19. ProsodyAlignment_Maintained
     // ================================================================
-
     [Fact]
     public void ProsodyAlignment_Maintained()
     {
@@ -459,7 +444,7 @@ public sealed class EnglishPhonemizerTests
         };
 
         var phonemizer = new EnglishPhonemizer(new StubEnglishG2PEngine(words));
-        var (tokens, prosody) = phonemizer.PhonemizeWithProsody("Hello, world");
+        (List<string>? tokens, List<ProsodyInfo?>? prosody) = phonemizer.PhonemizeWithProsody("Hello, world");
 
         Assert.Equal(tokens.Count, prosody.Count);
     }
@@ -467,7 +452,6 @@ public sealed class EnglishPhonemizerTests
     // ================================================================
     // 20. ProsodyA3_IsWordPhonemeCount
     // ================================================================
-
     [Fact]
     public void ProsodyA3_IsWordPhonemeCount()
     {
@@ -479,7 +463,7 @@ public sealed class EnglishPhonemizerTests
         };
 
         var phonemizer = new EnglishPhonemizer(new StubEnglishG2PEngine(words));
-        var (tokens, prosody) = phonemizer.PhonemizeWithProsody("cat");
+        (List<string>? tokens, List<ProsodyInfo?>? prosody) = phonemizer.PhonemizeWithProsody("cat");
 
         // Count actual IPA characters (excluding stress markers)
         // K->k(1), AE1->æ(1), T->t(1), total=3
@@ -497,7 +481,6 @@ public sealed class EnglishPhonemizerTests
     // ================================================================
     // 21. SecondaryStress_MapsTo_A2_1
     // ================================================================
-
     [Fact]
     public void SecondaryStress_MapsTo_A2_1()
     {
@@ -510,7 +493,7 @@ public sealed class EnglishPhonemizerTests
         };
 
         var phonemizer = new EnglishPhonemizer(new StubEnglishG2PEngine(words));
-        var (_, prosody) = phonemizer.PhonemizeWithProsody("replay");
+        (List<string> _, List<ProsodyInfo?>? prosody) = phonemizer.PhonemizeWithProsody("replay");
 
         var a2Values = prosody.Where(p => p is not null).Select(p => p!.Value.A2).ToList();
         Assert.Contains(1, a2Values);
@@ -519,7 +502,6 @@ public sealed class EnglishPhonemizerTests
     // ================================================================
     // 22. MultipleStressMarkers_InSingleWord
     // ================================================================
-
     [Fact]
     public void MultipleStressMarkers_InSingleWord()
     {
@@ -532,7 +514,7 @@ public sealed class EnglishPhonemizerTests
         };
 
         var phonemizer = new EnglishPhonemizer(new StubEnglishG2PEngine(words));
-        var (tokens, _) = phonemizer.PhonemizeWithProsody("information");
+        (List<string>? tokens, List<ProsodyInfo?> _) = phonemizer.PhonemizeWithProsody("information");
 
         Assert.Contains("\u02cc", tokens); // ˌ (secondary)
         Assert.Contains("\u02c8", tokens); // ˈ (primary)
@@ -540,7 +522,8 @@ public sealed class EnglishPhonemizerTests
         // ˌ should appear before ˈ in the token sequence.
         int secondaryIdx = tokens.IndexOf("\u02cc");
         int primaryIdx = tokens.IndexOf("\u02c8");
-        Assert.True(secondaryIdx < primaryIdx,
+        Assert.True(
+            secondaryIdx < primaryIdx,
             "Secondary stress marker should appear before primary stress marker");
     }
 }

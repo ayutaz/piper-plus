@@ -5,7 +5,6 @@ namespace PiperPlus.Core.Tests.Ssml;
 // =====================================================================
 // IsSsml()
 // =====================================================================
-
 public class SsmlParserIsSsmlTests
 {
     [Fact]
@@ -41,7 +40,7 @@ public class SsmlParserIsSsmlTests
     [Fact]
     public void EmptyString_NotDetected()
     {
-        Assert.False(SsmlParser.IsSsml(""));
+        Assert.False(SsmlParser.IsSsml(string.Empty));
     }
 
     [Fact]
@@ -66,7 +65,6 @@ public class SsmlParserIsSsmlTests
 // =====================================================================
 // ParseBreakTime()
 // =====================================================================
-
 public class SsmlParserBreakTimeTests
 {
     [Fact]
@@ -127,7 +125,6 @@ public class SsmlParserBreakTimeTests
 // =====================================================================
 // ParseRate()
 // =====================================================================
-
 public class SsmlParserRateTests
 {
     [Fact]
@@ -216,14 +213,13 @@ public class SsmlParserRateTests
 // =====================================================================
 // Parse() -- break tags
 // =====================================================================
-
 public class SsmlParserBreakTests
 {
     [Fact]
     public void BreakTimeMs()
     {
         var ssml = "<speak>Hello<break time=\"500ms\"/>world</speak>";
-        var segments = SsmlParser.Parse(ssml);
+        List<SsmlSegment> segments = SsmlParser.Parse(ssml);
         var texts = segments.Where(s => !string.IsNullOrEmpty(s.Text)).Select(s => s.Text).ToList();
         var breaks = segments.Where(s => s.BreakMs > 0).Select(s => s.BreakMs).ToList();
         Assert.Contains("Hello", texts);
@@ -235,7 +231,7 @@ public class SsmlParserBreakTests
     public void BreakTimeSeconds()
     {
         var ssml = "<speak>A<break time=\"2s\"/>B</speak>";
-        var segments = SsmlParser.Parse(ssml);
+        List<SsmlSegment> segments = SsmlParser.Parse(ssml);
         var breaks = segments.Where(s => s.BreakMs > 0).Select(s => s.BreakMs).ToList();
         Assert.Contains(2000, breaks);
     }
@@ -244,7 +240,7 @@ public class SsmlParserBreakTests
     public void BreakStrength()
     {
         var ssml = "<speak>A<break strength=\"strong\"/>B</speak>";
-        var segments = SsmlParser.Parse(ssml);
+        List<SsmlSegment> segments = SsmlParser.Parse(ssml);
         var breaks = segments.Where(s => s.BreakMs > 0).Select(s => s.BreakMs).ToList();
         Assert.Contains(700, breaks);
     }
@@ -253,7 +249,7 @@ public class SsmlParserBreakTests
     public void BreakNoAttributes_DefaultsToMedium()
     {
         var ssml = "<speak>A<break/>B</speak>";
-        var segments = SsmlParser.Parse(ssml);
+        List<SsmlSegment> segments = SsmlParser.Parse(ssml);
         var breaks = segments.Where(s => s.BreakMs > 0).Select(s => s.BreakMs).ToList();
         Assert.Contains(400, breaks);
     }
@@ -262,7 +258,7 @@ public class SsmlParserBreakTests
     public void StandaloneBreak()
     {
         var ssml = "<speak><break time=\"1s\"/></speak>";
-        var segments = SsmlParser.Parse(ssml);
+        List<SsmlSegment> segments = SsmlParser.Parse(ssml);
         Assert.Contains(segments, s => s.BreakMs == 1000);
     }
 }
@@ -270,14 +266,13 @@ public class SsmlParserBreakTests
 // =====================================================================
 // Parse() -- prosody rate
 // =====================================================================
-
 public class SsmlParserProsodyRateTests
 {
     [Fact]
     public void ProsodyRateSlow()
     {
         var ssml = "<speak><prosody rate=\"slow\">Hello</prosody></speak>";
-        var segments = SsmlParser.Parse(ssml);
+        List<SsmlSegment> segments = SsmlParser.Parse(ssml);
         Assert.Single(segments);
         Assert.Equal("Hello", segments[0].Text);
         Assert.Equal(1.25f, segments[0].Rate);
@@ -287,7 +282,7 @@ public class SsmlParserProsodyRateTests
     public void ProsodyRateFast()
     {
         var ssml = "<speak><prosody rate=\"fast\">Quick</prosody></speak>";
-        var segments = SsmlParser.Parse(ssml);
+        List<SsmlSegment> segments = SsmlParser.Parse(ssml);
         Assert.Equal(0.8f, segments[0].Rate);
     }
 
@@ -295,7 +290,7 @@ public class SsmlParserProsodyRateTests
     public void ProsodyRatePercentage()
     {
         var ssml = "<speak><prosody rate=\"150%\">Faster</prosody></speak>";
-        var segments = SsmlParser.Parse(ssml);
+        List<SsmlSegment> segments = SsmlParser.Parse(ssml);
         Assert.Equal(100.0f / 150.0f, segments[0].Rate, precision: 3);
     }
 
@@ -303,7 +298,7 @@ public class SsmlParserProsodyRateTests
     public void DefaultRateWhenAbsent()
     {
         var ssml = "<speak>Normal text</speak>";
-        var segments = SsmlParser.Parse(ssml);
+        List<SsmlSegment> segments = SsmlParser.Parse(ssml);
         Assert.Equal(1.0f, segments[0].Rate);
     }
 
@@ -311,7 +306,7 @@ public class SsmlParserProsodyRateTests
     public void ProsodyWithoutRateAttr_UsesDefault()
     {
         var ssml = "<speak><prosody>Text</prosody></speak>";
-        var segments = SsmlParser.Parse(ssml);
+        List<SsmlSegment> segments = SsmlParser.Parse(ssml);
         Assert.Equal(1.0f, segments[0].Rate);
     }
 }
@@ -319,14 +314,13 @@ public class SsmlParserProsodyRateTests
 // =====================================================================
 // Parse() -- nested tags
 // =====================================================================
-
 public class SsmlParserNestedTests
 {
     [Fact]
     public void BreakInsideProsody()
     {
         var ssml = "<speak><prosody rate=\"slow\">Before<break time=\"300ms\"/>After</prosody></speak>";
-        var segments = SsmlParser.Parse(ssml);
+        List<SsmlSegment> segments = SsmlParser.Parse(ssml);
         var texts = segments.Where(s => !string.IsNullOrEmpty(s.Text)).Select(s => s.Text).ToList();
         Assert.Contains("Before", texts);
         Assert.Contains("After", texts);
@@ -339,7 +333,7 @@ public class SsmlParserNestedTests
     public void MultipleProsodySections()
     {
         var ssml = "<speak><prosody rate=\"slow\">Slow</prosody><prosody rate=\"fast\">Fast</prosody></speak>";
-        var segments = SsmlParser.Parse(ssml);
+        List<SsmlSegment> segments = SsmlParser.Parse(ssml);
         var slowSegs = segments.Where(s => s.Rate == 1.25f).ToList();
         var fastSegs = segments.Where(s => s.Rate == 0.8f).ToList();
         Assert.True(slowSegs.Count >= 1);
@@ -352,14 +346,13 @@ public class SsmlParserNestedTests
 // =====================================================================
 // Parse() -- combined break + prosody
 // =====================================================================
-
 public class SsmlParserCombinedTests
 {
     [Fact]
     public void BreakBetweenProsody()
     {
         var ssml = "<speak><prosody rate=\"slow\">Slow</prosody><break time=\"500ms\"/><prosody rate=\"fast\">Fast</prosody></speak>";
-        var segments = SsmlParser.Parse(ssml);
+        List<SsmlSegment> segments = SsmlParser.Parse(ssml);
         var texts = segments.Where(s => !string.IsNullOrEmpty(s.Text)).Select(s => s.Text).ToList();
         Assert.Contains("Slow", texts);
         Assert.Contains("Fast", texts);
@@ -370,7 +363,7 @@ public class SsmlParserCombinedTests
     public void ComplexMixed()
     {
         var ssml = "<speak>Hello <break time=\"200ms\"/><prosody rate=\"fast\">Quick part</prosody><break time=\"1s\"/>End</speak>";
-        var segments = SsmlParser.Parse(ssml);
+        List<SsmlSegment> segments = SsmlParser.Parse(ssml);
         var texts = segments.Where(s => !string.IsNullOrEmpty(s.Text)).Select(s => s.Text).ToList();
         Assert.Contains("Hello", texts);
         Assert.Contains("Quick part", texts);
@@ -381,14 +374,13 @@ public class SsmlParserCombinedTests
 // =====================================================================
 // Parse() -- XML error fallback
 // =====================================================================
-
 public class SsmlParserFallbackTests
 {
     [Fact]
     public void UnclosedTag_Fallback()
     {
         var ssml = "<speak>Hello <break";
-        var segments = SsmlParser.Parse(ssml);
+        List<SsmlSegment> segments = SsmlParser.Parse(ssml);
         Assert.True(segments.Count >= 1);
         var fullText = string.Join(" ", segments.Select(s => s.Text));
         Assert.Contains("Hello", fullText);
@@ -398,7 +390,7 @@ public class SsmlParserFallbackTests
     public void InvalidXml_ReturnsStrippedText()
     {
         var ssml = "<speak>Some text <invalid></speak>";
-        var segments = SsmlParser.Parse(ssml);
+        List<SsmlSegment> segments = SsmlParser.Parse(ssml);
         Assert.True(segments.Count >= 1);
         var fullText = string.Join(" ", segments.Select(s => s.Text));
         Assert.True(fullText.Contains("Some text") || fullText.Contains("text"));
@@ -408,14 +400,13 @@ public class SsmlParserFallbackTests
 // =====================================================================
 // Parse() -- plain text (non-SSML)
 // =====================================================================
-
 public class SsmlParserPlainTextTests
 {
     [Fact]
     public void PlainText_Passthrough()
     {
         var text = "Hello, world!";
-        var segments = SsmlParser.Parse(text);
+        List<SsmlSegment> segments = SsmlParser.Parse(text);
         Assert.Single(segments);
         Assert.Equal(text, segments[0].Text);
         Assert.Equal(0, segments[0].BreakMs);
@@ -425,23 +416,22 @@ public class SsmlParserPlainTextTests
     [Fact]
     public void EmptyString()
     {
-        var segments = SsmlParser.Parse("");
+        List<SsmlSegment> segments = SsmlParser.Parse(string.Empty);
         Assert.Single(segments);
-        Assert.Equal("", segments[0].Text);
+        Assert.Equal(string.Empty, segments[0].Text);
     }
 }
 
 // =====================================================================
 // Parse() -- Japanese text
 // =====================================================================
-
 public class SsmlParserJapaneseTests
 {
     [Fact]
     public void JapaneseInSpeak()
     {
         var ssml = "<speak>\u3053\u3093\u306b\u3061\u306f\u3001\u4e16\u754c\u3002</speak>";
-        var segments = SsmlParser.Parse(ssml);
+        List<SsmlSegment> segments = SsmlParser.Parse(ssml);
         Assert.Single(segments);
         Assert.Contains("\u3053\u3093\u306b\u3061\u306f", segments[0].Text);
     }
@@ -450,7 +440,7 @@ public class SsmlParserJapaneseTests
     public void JapaneseWithBreak()
     {
         var ssml = "<speak>\u304a\u306f\u3088\u3046<break time=\"500ms\"/>\u3054\u3056\u3044\u307e\u3059</speak>";
-        var segments = SsmlParser.Parse(ssml);
+        List<SsmlSegment> segments = SsmlParser.Parse(ssml);
         var texts = segments.Where(s => !string.IsNullOrEmpty(s.Text)).Select(s => s.Text).ToList();
         Assert.Contains("\u304a\u306f\u3088\u3046", texts);
         Assert.Contains("\u3054\u3056\u3044\u307e\u3059", texts);
@@ -460,7 +450,7 @@ public class SsmlParserJapaneseTests
     public void JapaneseWithProsody()
     {
         var ssml = "<speak><prosody rate=\"slow\">\u3086\u3063\u304f\u308a\u8a71\u3057\u307e\u3059</prosody></speak>";
-        var segments = SsmlParser.Parse(ssml);
+        List<SsmlSegment> segments = SsmlParser.Parse(ssml);
         Assert.Equal("\u3086\u3063\u304f\u308a\u8a71\u3057\u307e\u3059", segments[0].Text);
         Assert.Equal(1.25f, segments[0].Rate);
     }
@@ -469,7 +459,7 @@ public class SsmlParserJapaneseTests
     public void MixedJapaneseEnglish()
     {
         var ssml = "<speak>\u3053\u3093\u306b\u3061\u306f<break time=\"300ms\"/><prosody rate=\"fast\">Hello world</prosody></speak>";
-        var segments = SsmlParser.Parse(ssml);
+        List<SsmlSegment> segments = SsmlParser.Parse(ssml);
         var texts = segments.Where(s => !string.IsNullOrEmpty(s.Text)).Select(s => s.Text).ToList();
         Assert.Contains("\u3053\u3093\u306b\u3061\u306f", texts);
         Assert.Contains("Hello world", texts);
@@ -479,14 +469,13 @@ public class SsmlParserJapaneseTests
 // =====================================================================
 // Parse() -- unknown tags (graceful degradation)
 // =====================================================================
-
 public class SsmlParserUnknownTagTests
 {
     [Fact]
     public void UnknownTag_TextExtracted()
     {
         var ssml = "<speak><emphasis>Important</emphasis></speak>";
-        var segments = SsmlParser.Parse(ssml);
+        List<SsmlSegment> segments = SsmlParser.Parse(ssml);
         var texts = segments.Where(s => !string.IsNullOrEmpty(s.Text)).Select(s => s.Text).ToList();
         Assert.Contains("Important", texts);
     }
@@ -495,7 +484,7 @@ public class SsmlParserUnknownTagTests
     public void NestedUnknownTags_TextExtracted()
     {
         var ssml = "<speak><say-as interpret-as=\"date\">2026-04-08</say-as></speak>";
-        var segments = SsmlParser.Parse(ssml);
+        List<SsmlSegment> segments = SsmlParser.Parse(ssml);
         var texts = segments.Where(s => !string.IsNullOrEmpty(s.Text)).Select(s => s.Text).ToList();
         Assert.Contains("2026-04-08", texts);
     }
@@ -504,7 +493,6 @@ public class SsmlParserUnknownTagTests
 // =====================================================================
 // SsmlSegment record
 // =====================================================================
-
 public class SsmlSegmentTests
 {
     [Fact]
@@ -535,8 +523,8 @@ public class SsmlSegmentTests
     [Fact]
     public void SilenceSegment()
     {
-        var seg = new SsmlSegment("", BreakMs: 1000);
-        Assert.Equal("", seg.Text);
+        var seg = new SsmlSegment(string.Empty, BreakMs: 1000);
+        Assert.Equal(string.Empty, seg.Text);
         Assert.Equal(1000, seg.BreakMs);
     }
 }

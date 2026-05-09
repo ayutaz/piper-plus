@@ -11,7 +11,6 @@ public class InferenceTests
     // ----------------------------------------------------------------
     // ConvertToInt16 tests
     // ----------------------------------------------------------------
-
     [Fact]
     public void ConvertToInt16_ZeroArray_ReturnsAllZeros()
     {
@@ -121,6 +120,7 @@ public class InferenceTests
         short[] result = PiperSession.ConvertToInt16(audio);
 
         Assert.Equal(3, result.Length);
+
         // Values are so small that even with the minimum-peak scale they round to 0.
         Assert.All(result, sample => Assert.Equal(0, sample));
     }
@@ -128,7 +128,6 @@ public class InferenceTests
     // ----------------------------------------------------------------
     // ConvertToInt16 boundary value tests
     // ----------------------------------------------------------------
-
     [Fact]
     public void ConvertToInt16_PeakExactlyAtMinimum_0_01()
     {
@@ -220,7 +219,8 @@ public class InferenceTests
         // Peak = 1.5, scale = 32767 / 1.5 = 21844.666...
         // -1.5 * 21844.666 = -32767 (exactly at clamp boundary).
         // Verify clamped to -32767, not -32768.
-        Assert.True(result[1] >= -32767,
+        Assert.True(
+            result[1] >= -32767,
             $"Expected >= -32767 but got {result[1]}; symmetric clamp must not produce -32768");
     }
 
@@ -234,7 +234,8 @@ public class InferenceTests
 
         short[] result = PiperSession.ConvertToInt16(audio);
 
-        Assert.True(result[0] <= 32767,
+        Assert.True(
+            result[0] <= 32767,
             $"Expected <= 32767 but got {result[0]}; positive clamp must be 32767");
         Assert.Equal(32767, result[0]);
     }
@@ -272,12 +273,13 @@ public class InferenceTests
         var rng = new Random(42);
         for (int i = 0; i < count; i++)
         {
-            audio[i] = (float)(rng.NextDouble() * 2.0 - 1.0); // range [-1, 1]
+            audio[i] = (float)((rng.NextDouble() * 2.0) - 1.0); // range [-1, 1]
         }
 
         short[] result = PiperSession.ConvertToInt16(audio);
 
         Assert.Equal(count, result.Length);
+
         // All values must be within the symmetric int16 range.
         Assert.All(result, s => Assert.InRange(s, (short)-32767, (short)32767));
     }
@@ -285,7 +287,6 @@ public class InferenceTests
     // ----------------------------------------------------------------
     // SynthesisInput record tests
     // ----------------------------------------------------------------
-
     [Fact]
     public void SynthesisInput_WithCustomScales_ValuesPreserved()
     {
@@ -294,8 +295,7 @@ public class InferenceTests
             SpeakerId: 5,
             NoiseScale: 0.33f,
             LengthScale: 1.5f,
-            NoiseW: 0.4f
-        );
+            NoiseW: 0.4f);
 
         Assert.Equal(0.33f, input.NoiseScale);
         Assert.Equal(1.5f, input.LengthScale);
@@ -307,13 +307,13 @@ public class InferenceTests
     public void SynthesisInput_WithProsodyFeatures_Preserved()
     {
         long[] phonemes = [1, 2, 3];
+
         // 3 phonemes * 3 features = 9 values: [a1_0, a2_0, a3_0, a1_1, ...]
         long[] prosody = [1, 2, 5, -1, 3, 4, 0, 1, 3];
 
         var input = new SynthesisInput(
             PhonemeIds: phonemes,
-            ProsodyFeatures: prosody
-        );
+            ProsodyFeatures: prosody);
 
         Assert.NotNull(input.ProsodyFeatures);
         Assert.Equal(9, input.ProsodyFeatures.Length);
@@ -349,7 +349,6 @@ public class InferenceTests
     // the (sid, embedding) truth table so the contract regresses
     // loudly if either branch is ever loosened.
     // ----------------------------------------------------------------
-
     [Fact]
     public void Synthesize_SpeakerIdOnly_DoesNotThrow()
     {
@@ -361,7 +360,7 @@ public class InferenceTests
             SpeakerId: 5);
 
         Assert.Null(input.SpeakerEmbedding);
-        var ex = Record.Exception(() => input.Validate());
+        Exception? ex = Record.Exception(() => input.Validate());
         Assert.Null(ex);
     }
 
@@ -384,7 +383,7 @@ public class InferenceTests
 
         Assert.Equal(0, input.SpeakerId);
         Assert.NotNull(input.SpeakerEmbedding);
-        var ex = Record.Exception(() => input.Validate());
+        Exception? ex = Record.Exception(() => input.Validate());
         Assert.Null(ex);
     }
 
@@ -403,7 +402,7 @@ public class InferenceTests
             SpeakerId: 5,
             SpeakerEmbedding: embedding);
 
-        var ex = Assert.Throws<ArgumentException>(() => input.Validate());
+        ArgumentException ex = Assert.Throws<ArgumentException>(() => input.Validate());
         Assert.Contains("mutually exclusive", ex.Message);
     }
 
@@ -416,7 +415,7 @@ public class InferenceTests
 
         Assert.Equal(0, input.SpeakerId);
         Assert.Null(input.SpeakerEmbedding);
-        var ex = Record.Exception(() => input.Validate());
+        Exception? ex = Record.Exception(() => input.Validate());
         Assert.Null(ex);
     }
 }

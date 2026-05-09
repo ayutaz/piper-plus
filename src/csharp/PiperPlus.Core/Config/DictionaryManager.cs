@@ -28,7 +28,6 @@ public static class DictionaryManager
     // ---------------------------------------------------------------
     // Constants (matching C++ openjtalk_dictionary_manager.c)
     // ---------------------------------------------------------------
-
     private const string DictionaryUrl =
         "https://github.com/r9y9/open_jtalk/releases/download/v1.11.1/open_jtalk_dic_utf_8-1.11.tar.gz";
 
@@ -45,7 +44,7 @@ public static class DictionaryManager
         "unk.dic",
     };
 
-    private static readonly HttpClient s_httpClient = CreateHttpClient();
+    private static readonly HttpClient S_httpClient = CreateHttpClient();
 
     private static HttpClient CreateHttpClient()
     {
@@ -65,12 +64,15 @@ public static class DictionaryManager
     /// Searches the standard locations for an existing dictionary without downloading.
     /// Returns the path to the dictionary directory, or <c>null</c> if not found.
     /// </summary>
+    /// <returns></returns>
     public static string? FindDictionary()
     {
         foreach (var candidate in EnumerateCandidates())
         {
             if (IsValidDictionary(candidate))
+            {
                 return candidate;
+            }
         }
 
         return null;
@@ -91,7 +93,9 @@ public static class DictionaryManager
         // 1. Try to find an existing dictionary
         var existing = FindDictionary();
         if (existing is not null)
+        {
             return existing;
+        }
 
         // 2. Check control flags
         if (IsOfflineMode())
@@ -127,15 +131,20 @@ public static class DictionaryManager
     /// <summary>
     /// Validates that the given directory contains the 4 required dictionary files.
     /// </summary>
+    /// <returns></returns>
     public static bool IsValidDictionary(string? path)
     {
         if (string.IsNullOrWhiteSpace(path) || !Directory.Exists(path))
+        {
             return false;
+        }
 
         for (int i = 0; i < RequiredFiles.Length; i++)
         {
             if (!File.Exists(Path.Combine(path, RequiredFiles[i])))
+            {
                 return false;
+            }
         }
 
         return true;
@@ -144,27 +153,34 @@ public static class DictionaryManager
     // ---------------------------------------------------------------
     // Candidate enumeration (search order matching C++ implementation)
     // ---------------------------------------------------------------
-
     private static IEnumerable<string> EnumerateCandidates()
     {
         // 1. OPENJTALK_DICTIONARY_PATH
         var env = Environment.GetEnvironmentVariable("OPENJTALK_DICTIONARY_PATH");
         if (!string.IsNullOrWhiteSpace(env))
+        {
             yield return env;
+        }
 
         // 2. DotNetG2P compatibility env vars
         env = Environment.GetEnvironmentVariable("DOTNETG2P_NAIST_JDIC_PATH");
         if (!string.IsNullOrWhiteSpace(env))
+        {
             yield return env;
+        }
 
         env = Environment.GetEnvironmentVariable("NAIST_JDIC_PATH");
         if (!string.IsNullOrWhiteSpace(env))
+        {
             yield return env;
+        }
 
         // 3. Executable-relative: <exe_dir>/../share/open_jtalk/dic
         var exeRelative = GetExeRelativeDictPath();
         if (exeRelative is not null)
+        {
             yield return exeRelative;
+        }
 
         // 4. System paths (OS-specific)
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
@@ -188,11 +204,15 @@ public static class DictionaryManager
         {
             var exePath = Environment.ProcessPath;
             if (string.IsNullOrEmpty(exePath))
+            {
                 return null;
+            }
 
             var exeDir = Path.GetDirectoryName(exePath);
             if (string.IsNullOrEmpty(exeDir))
+            {
                 return null;
+            }
 
             var dictPath = Path.GetFullPath(
                 Path.Combine(exeDir, "..", "share", "open_jtalk", "dic"));
@@ -207,7 +227,6 @@ public static class DictionaryManager
     // ---------------------------------------------------------------
     // Data directory (matching C++ get_data_dir)
     // ---------------------------------------------------------------
-
     private static string GetDataDir()
     {
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
@@ -222,7 +241,9 @@ public static class DictionaryManager
         // Unix: XDG_DATA_HOME or ~/.local/share/piper
         var xdgData = Environment.GetEnvironmentVariable("XDG_DATA_HOME");
         if (!string.IsNullOrEmpty(xdgData))
+        {
             return Path.Combine(xdgData, "piper");
+        }
 
         var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         return !string.IsNullOrEmpty(home)
@@ -233,7 +254,6 @@ public static class DictionaryManager
     // ---------------------------------------------------------------
     // Control flags
     // ---------------------------------------------------------------
-
     private static bool IsOfflineMode()
     {
         var value = Environment.GetEnvironmentVariable("PIPER_OFFLINE_MODE");
@@ -249,7 +269,6 @@ public static class DictionaryManager
     // ---------------------------------------------------------------
     // Download, verify, and extract
     // ---------------------------------------------------------------
-
     private static async Task DownloadAndExtractAsync(
         string dataDir, CancellationToken ct)
     {
@@ -264,7 +283,7 @@ public static class DictionaryManager
             Console.Error.WriteLine(
                 $"Downloading OpenJTalk dictionary from {DictionaryUrl} ...");
 
-            using (var response = await s_httpClient
+            using (HttpResponseMessage response = await S_httpClient
                 .GetAsync(DictionaryUrl, HttpCompletionOption.ResponseHeadersRead, ct)
                 .ConfigureAwait(false))
             {
@@ -272,7 +291,7 @@ public static class DictionaryManager
 
                 var totalBytes = response.Content.Headers.ContentLength;
 
-                await using var contentStream = await response.Content
+                await using Stream contentStream = await response.Content
                     .ReadAsStreamAsync(ct)
                     .ConfigureAwait(false);
                 await using var fileStream = new FileStream(
@@ -394,13 +413,18 @@ public static class DictionaryManager
                 int read = await gzipStream.ReadAsync(
                     headerBuf.AsMemory(totalRead, 512 - totalRead), ct).ConfigureAwait(false);
                 if (read == 0)
+                {
                     return; // end of stream
+                }
+
                 totalRead += read;
             }
 
             // Two consecutive zero blocks = end of archive
             if (IsZeroBlock(headerBuf))
+            {
                 return;
+            }
 
             // Parse header fields
             var name = ReadTarString(headerBuf, 0, 100);
@@ -414,7 +438,9 @@ public static class DictionaryManager
                 : prefix + "/" + name;
 
             if (string.IsNullOrEmpty(fullName))
+            {
                 return;
+            }
 
             // Parse size (octal)
             long fileSize = 0;
@@ -454,7 +480,9 @@ public static class DictionaryManager
                     // Ensure parent directory exists
                     var parentDir = Path.GetDirectoryName(outputPath);
                     if (!string.IsNullOrEmpty(parentDir))
+                    {
                         Directory.CreateDirectory(parentDir);
+                    }
 
                     await ExtractFileAsync(gzipStream, outputPath, fileSize, ct).ConfigureAwait(false);
                     break;
@@ -482,8 +510,11 @@ public static class DictionaryManager
             int toRead = (int)Math.Min(remaining, buffer.Length);
             int read = await tarStream.ReadAsync(buffer.AsMemory(0, toRead), ct).ConfigureAwait(false);
             if (read == 0)
+            {
                 throw new InvalidOperationException(
                     $"Unexpected end of tar stream while extracting {outputPath}");
+            }
+
             await outFile.WriteAsync(buffer.AsMemory(0, read), ct).ConfigureAwait(false);
             remaining -= read;
         }
@@ -491,7 +522,9 @@ public static class DictionaryManager
         // Tar entries are padded to 512-byte boundaries
         long padding = (512 - (fileSize % 512)) % 512;
         if (padding > 0)
+        {
             await SkipBytesAsync(tarStream, padding, ct).ConfigureAwait(false);
+        }
     }
 
     private static async Task SkipTarDataAsync(
@@ -512,7 +545,10 @@ public static class DictionaryManager
             int toRead = (int)Math.Min(remaining, buffer.Length);
             int read = await stream.ReadAsync(buffer.AsMemory(0, toRead), ct).ConfigureAwait(false);
             if (read == 0)
+            {
                 return; // end of stream
+            }
+
             remaining -= read;
         }
     }
@@ -522,8 +558,11 @@ public static class DictionaryManager
         for (int i = 0; i < block.Length; i++)
         {
             if (block[i] != 0)
+            {
                 return false;
+            }
         }
+
         return true;
     }
 
@@ -532,13 +571,21 @@ public static class DictionaryManager
         int end = offset;
         int limit = offset + length;
         while (end < limit && buffer[end] != 0)
+        {
             end++;
+        }
+
         return System.Text.Encoding.ASCII.GetString(buffer, offset, end - offset);
     }
 
     private static void TryDelete(string path)
     {
-        try { File.Delete(path); }
-        catch { /* best-effort cleanup */ }
+        try
+        {
+            File.Delete(path);
+        }
+        catch
+        { /* best-effort cleanup */
+        }
     }
 }

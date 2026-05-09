@@ -40,7 +40,9 @@ public static class TextSplitter
     public static List<string> SplitSentences(string text)
     {
         if (string.IsNullOrEmpty(text))
+        {
             return new List<string>();
+        }
 
         // SSML envelope detection: if the text starts with `<speak` (after
         // leading whitespace), preserve the entire envelope as a single
@@ -58,14 +60,17 @@ public static class TextSplitter
                 {
                     result.Add(envelope);
                 }
+
                 // Any trailing text after </speak> is split normally.
                 string tail = trimmedStart.Substring(envelopeEnd).Trim();
                 if (tail.Length > 0)
                 {
                     result.AddRange(SplitSentencesPlain(tail));
                 }
+
                 return result;
             }
+
             // Unclosed <speak> tag: fall through to normal splitting on the
             // original (untrimmed) text so we don't drop content.
         }
@@ -81,7 +86,9 @@ public static class TextSplitter
     private static List<string> SplitSentencesPlain(string text)
     {
         if (string.IsNullOrEmpty(text))
+        {
             return new List<string>();
+        }
 
         var sentences = new List<string>();
         var current = new System.Text.StringBuilder();
@@ -110,6 +117,7 @@ public static class TextSplitter
                 {
                     sentences.Add(trimmed);
                 }
+
                 current.Clear();
 
                 // Skip leading whitespace before the next sentence

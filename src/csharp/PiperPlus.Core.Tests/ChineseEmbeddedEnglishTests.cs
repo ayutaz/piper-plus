@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using PiperPlus.Core.Phonemize;
 using PiperPlus.Core.Phonemize.Data;
 using Xunit;
@@ -20,7 +21,7 @@ public sealed class ChineseEmbeddedEnglishTests
     [Fact]
     public void Loader_DefaultEmbedded_Loads()
     {
-        var data = LoanwordDataLoader.Default;
+        LoanwordData data = LoanwordDataLoader.Default;
         Assert.NotNull(data);
         Assert.Equal(1, data.Version);
         Assert.True(data.Acronyms.Count >= 60, $"acronyms count: {data.Acronyms.Count}");
@@ -31,17 +32,19 @@ public sealed class ChineseEmbeddedEnglishTests
     [Fact]
     public void Loader_OnceOnly_SameInstance()
     {
-        var d1 = LoanwordDataLoader.Default;
-        var d2 = LoanwordDataLoader.Default;
+        LoanwordData d1 = LoanwordDataLoader.Default;
+        LoanwordData d2 = LoanwordDataLoader.Default;
         Assert.Same(d1, d2);
     }
 
     [Fact]
     public void EmbeddedEnglish_AcronymGPS()
     {
-        var result = ChineseEmbeddedEnglish.Convert("GPS");
+        ChineseG2PResult result = ChineseEmbeddedEnglish.Convert("GPS");
+
         // GPS = ji4(3) + pi4(3) + ai1(2 zero initial) + si4(3) = 11
         Assert.Equal(11, result.Phonemes.Count);
+
         // Per-token prosody mirrors Python phonemize_from_pinyin_syllables(
         // ..., chinese_text=""): a1 = syllable tone (1..=5), a2 = a3 = 1
         // (review note R-C1 — was zero-fill, silently dropping tone).
@@ -53,7 +56,8 @@ public sealed class ChineseEmbeddedEnglishTests
     [Fact]
     public void EmbeddedEnglish_LoanwordPython_CaseSensitive()
     {
-        var result = ChineseEmbeddedEnglish.Convert("Python");
+        ChineseG2PResult result = ChineseEmbeddedEnglish.Convert("Python");
+
         // pai4(3) + sen1(3) = 6
         Assert.Equal(6, result.Phonemes.Count);
     }
@@ -61,7 +65,8 @@ public sealed class ChineseEmbeddedEnglishTests
     [Fact]
     public void EmbeddedEnglish_ChatGPT_FiveSyllables()
     {
-        var result = ChineseEmbeddedEnglish.Convert("ChatGPT");
+        ChineseG2PResult result = ChineseEmbeddedEnglish.Convert("ChatGPT");
+
         // 5 syllables × 3 IPA = 15
         Assert.Equal(15, result.Phonemes.Count);
     }
@@ -69,15 +74,15 @@ public sealed class ChineseEmbeddedEnglishTests
     [Fact]
     public void EmbeddedEnglish_LetterFallback_ZZ()
     {
-        var zz = ChineseEmbeddedEnglish.Convert("ZZ");
-        var z = ChineseEmbeddedEnglish.Convert("Z");
+        ChineseG2PResult zz = ChineseEmbeddedEnglish.Convert("ZZ");
+        ChineseG2PResult z = ChineseEmbeddedEnglish.Convert("Z");
         Assert.Equal(z.Phonemes.Count * 2, zz.Phonemes.Count);
     }
 
     [Fact]
     public void EmbeddedEnglish_Empty_ReturnsEmpty()
     {
-        Assert.Empty(ChineseEmbeddedEnglish.Convert("").Phonemes);
+        Assert.Empty(ChineseEmbeddedEnglish.Convert(string.Empty).Phonemes);
         Assert.Empty(ChineseEmbeddedEnglish.Convert("   ").Phonemes);
         Assert.Empty(ChineseEmbeddedEnglish.Convert(",.!?").Phonemes);
     }
@@ -90,9 +95,9 @@ public sealed class ChineseEmbeddedEnglishTests
             Acronyms: new Dictionary<string, IReadOnlyList<string>> { ["AI"] = new[] { "ji4" } },
             Loanwords: new Dictionary<string, IReadOnlyList<string>> { ["AI"] = new[] { "ma1" } },
             LetterFallback: new Dictionary<string, IReadOnlyList<string>>());
-        var got = ChineseEmbeddedEnglish.Convert("AI", data);
+        ChineseG2PResult got = ChineseEmbeddedEnglish.Convert("AI", data);
 
-        var loanOnly = ChineseEmbeddedEnglish.Convert("AI", new LoanwordData(
+        ChineseG2PResult loanOnly = ChineseEmbeddedEnglish.Convert("AI", new LoanwordData(
             Version: 1,
             Acronyms: new Dictionary<string, IReadOnlyList<string>>(),
             Loanwords: new Dictionary<string, IReadOnlyList<string>> { ["AI"] = new[] { "ma1" } },
@@ -112,19 +117,21 @@ public sealed class ChineseEmbeddedEnglishTests
                 ["Z"] = new[] { "zi4" },
                 ["X"] = new[] { "ai4" },
             });
-        var got = ChineseEmbeddedEnglish.Convert("ZX", data);
+        ChineseG2PResult got = ChineseEmbeddedEnglish.Convert("ZX", data);
+
         // Acronym path: 1 syllable -> ~3 IPA. Letter fallback would be 2 syllables -> ~6.
-        Assert.True(got.Phonemes.Count < 6,
+        Assert.True(
+            got.Phonemes.Count < 6,
             $"acronym path produced {got.Phonemes.Count} tokens, expected fewer than letter-fallback (6)");
     }
 
     [Fact]
     public void Punctuation_TrailingComma_Equivalent()
     {
-        var plain = ChineseEmbeddedEnglish.Convert("GPS").Phonemes;
+        IReadOnlyList<string> plain = ChineseEmbeddedEnglish.Convert("GPS").Phonemes;
         foreach (var suffix in new[] { ",", ".", "!", ":" })
         {
-            var got = ChineseEmbeddedEnglish.Convert("GPS" + suffix).Phonemes;
+            IReadOnlyList<string> got = ChineseEmbeddedEnglish.Convert("GPS" + suffix).Phonemes;
             Assert.Equal(plain, got);
         }
     }
@@ -132,17 +139,17 @@ public sealed class ChineseEmbeddedEnglishTests
     [Fact]
     public void MultiSegment_TwoEmbeddedEn()
     {
-        var combined = ChineseEmbeddedEnglish.Convert("ChatGPT 和 Python").Phonemes;
-        var chatgpt = ChineseEmbeddedEnglish.Convert("ChatGPT").Phonemes;
-        var python = ChineseEmbeddedEnglish.Convert("Python").Phonemes;
+        IReadOnlyList<string> combined = ChineseEmbeddedEnglish.Convert("ChatGPT 和 Python").Phonemes;
+        IReadOnlyList<string> chatgpt = ChineseEmbeddedEnglish.Convert("ChatGPT").Phonemes;
+        IReadOnlyList<string> python = ChineseEmbeddedEnglish.Convert("Python").Phonemes;
         Assert.Equal(chatgpt.Count + python.Count, combined.Count);
     }
 
     [Fact]
     public void Digits_Z2Z9_EqualsZZ()
     {
-        var z2z9 = ChineseEmbeddedEnglish.Convert("Z2Z9").Phonemes;
-        var zz = ChineseEmbeddedEnglish.Convert("ZZ").Phonemes;
+        IReadOnlyList<string> z2z9 = ChineseEmbeddedEnglish.Convert("Z2Z9").Phonemes;
+        IReadOnlyList<string> zz = ChineseEmbeddedEnglish.Convert("ZZ").Phonemes;
         Assert.Equal(zz, z2z9);
     }
 
@@ -158,8 +165,8 @@ public sealed class ChineseEmbeddedEnglishTests
                 ["M"] = new[] { "ai1", "mu5" },
                 ["P"] = new[] { "pi4" },
             });
-        var got = ChineseEmbeddedEnglish.Convert("MP3", data);
-        var acronymOnly = ChineseEmbeddedEnglish.Convert("MP3", new LoanwordData(
+        ChineseG2PResult got = ChineseEmbeddedEnglish.Convert("MP3", data);
+        ChineseG2PResult acronymOnly = ChineseEmbeddedEnglish.Convert("MP3", new LoanwordData(
             Version: 1,
             Acronyms: new Dictionary<string, IReadOnlyList<string>> { ["MP3"] = new[] { "ai1" } },
             Loanwords: new Dictionary<string, IReadOnlyList<string>>(),
@@ -170,8 +177,8 @@ public sealed class ChineseEmbeddedEnglishTests
     [Fact]
     public void CaseSensitivity_PythonVsPYTHON()
     {
-        var lower = ChineseEmbeddedEnglish.Convert("Python").Phonemes;
-        var upper = ChineseEmbeddedEnglish.Convert("PYTHON").Phonemes;
+        IReadOnlyList<string> lower = ChineseEmbeddedEnglish.Convert("Python").Phonemes;
+        IReadOnlyList<string> upper = ChineseEmbeddedEnglish.Convert("PYTHON").Phonemes;
         Assert.NotEmpty(lower);
         Assert.NotEmpty(upper);
         Assert.NotEqual(lower, upper);
@@ -182,7 +189,7 @@ public sealed class ChineseEmbeddedEnglishTests
     {
         var bad = System.Text.Encoding.UTF8.GetBytes(
             @"{""version"": 1, ""acronyms"": {""GPS"": ""not_a_list""}}");
-        var ex = Assert.Throws<LoanwordSchemaException>(() =>
+        LoanwordSchemaException ex = Assert.Throws<LoanwordSchemaException>(() =>
             LoanwordDataLoader.LoadFromBytes("test.json", bad));
         Assert.Contains("'acronyms.GPS'", ex.Message);
         Assert.Contains("must be list[str]", ex.Message);
@@ -193,7 +200,7 @@ public sealed class ChineseEmbeddedEnglishTests
     {
         var bad = System.Text.Encoding.UTF8.GetBytes(
             @"{""version"": 1, ""acronyms"": ""not_a_dict""}");
-        var ex = Assert.Throws<LoanwordSchemaException>(() =>
+        LoanwordSchemaException ex = Assert.Throws<LoanwordSchemaException>(() =>
             LoanwordDataLoader.LoadFromBytes("test.json", bad));
         Assert.Contains("'acronyms'", ex.Message);
         Assert.Contains("must be a mapping", ex.Message);
@@ -212,7 +219,7 @@ public sealed class ChineseEmbeddedEnglishTests
             ""letter_fallback"": {""A"": [""ei1""]},
             ""tone_overrides"": {""GPS"": ""high""}
         }");
-        var data = LoanwordDataLoader.LoadFromBytes("future_v2.json", v2);
+        LoanwordData data = LoanwordDataLoader.LoadFromBytes("future_v2.json", v2);
         Assert.Equal(2, data.Version);
         Assert.Contains("GPS", data.Acronyms.Keys);
     }
@@ -223,7 +230,7 @@ public sealed class ChineseEmbeddedEnglishTests
         // The embedded JSON is byte-identical to Python source per CI gate.
         // We sanity-check canonical keys here; full byte parity is enforced by
         // scripts/check_loanword_consistency.py.
-        var data = LoanwordDataLoader.Default;
+        LoanwordData data = LoanwordDataLoader.Default;
         Assert.Contains("GPS", data.Acronyms.Keys);
         Assert.Contains("USB", data.Acronyms.Keys);
         Assert.Contains("Python", data.Loanwords.Keys);
@@ -248,7 +255,7 @@ public sealed class ChineseEmbeddedEnglishTests
     public void PinyinToIpa_FullSyllable_pai4()
     {
         // pai4 = pʰ + aɪ + tone4 = 3 IPA tokens before PUA mapping
-        var tokens = PinyinToIpa.Convert("pai", 4);
+        List<string> tokens = PinyinToIpa.Convert("pai", 4);
         Assert.Equal(3, tokens.Count);
         Assert.Equal("pʰ", tokens[0]);
         Assert.Equal("aɪ", tokens[1]);
@@ -271,7 +278,7 @@ public sealed class ChineseEmbeddedEnglishTests
 
         public (List<string>, List<ProsodyInfo?>) PhonemizeWithProsody(string text)
         {
-            var toks = Phonemize(text);
+            List<string> toks = Phonemize(text);
             return (toks, new List<ProsodyInfo?>(new ProsodyInfo?[toks.Count]));
         }
 
@@ -307,6 +314,7 @@ public sealed class ChineseEmbeddedEnglishTests
         {
             EmbeddedEnglishCalls++;
             LastEmbeddedEnglishInput = text;
+
             // Delegate to the canonical default to keep the rest of the
             // pipeline behavior intact for the test assertions.
             return ChineseEmbeddedEnglish.Convert(text, loanwordData);
@@ -327,27 +335,30 @@ public sealed class ChineseEmbeddedEnglishTests
     [Fact]
     public void MultilingualDispatch_ZhEnZh_DispatchedToLoanwordPath()
     {
-        var mp = MakeZhEnDispatchPhonemizer();
-        var (tokens, _) = mp.PhonemizeWithProsody("你好 GPS 世界");
-        Assert.True(CountPuaToneMarkers(tokens) > 0,
+        MultilingualPhonemizer mp = MakeZhEnDispatchPhonemizer();
+        (List<string>? tokens, List<ProsodyInfo?> _) = mp.PhonemizeWithProsody("你好 GPS 世界");
+        Assert.True(
+            CountPuaToneMarkers(tokens) > 0,
             "[zh, en, zh] must produce PUA tone markers from loanword path");
     }
 
     [Fact]
     public void MultilingualDispatch_ZhEn_DispatchedToLoanwordPath()
     {
-        var mp = MakeZhEnDispatchPhonemizer();
-        var (tokens, _) = mp.PhonemizeWithProsody("请打开 GPS");
-        Assert.True(CountPuaToneMarkers(tokens) > 0,
+        MultilingualPhonemizer mp = MakeZhEnDispatchPhonemizer();
+        (List<string>? tokens, List<ProsodyInfo?> _) = mp.PhonemizeWithProsody("请打开 GPS");
+        Assert.True(
+            CountPuaToneMarkers(tokens) > 0,
             "[zh, en] tail must dispatch to loanword path");
     }
 
     [Fact]
     public void MultilingualDispatch_EnZh_DispatchedToLoanwordPath()
     {
-        var mp = MakeZhEnDispatchPhonemizer();
-        var (tokens, _) = mp.PhonemizeWithProsody("GPS 是什么");
-        Assert.True(CountPuaToneMarkers(tokens) > 0,
+        MultilingualPhonemizer mp = MakeZhEnDispatchPhonemizer();
+        (List<string>? tokens, List<ProsodyInfo?> _) = mp.PhonemizeWithProsody("GPS 是什么");
+        Assert.True(
+            CountPuaToneMarkers(tokens) > 0,
             "[en, zh] head must dispatch to loanword path");
     }
 
@@ -356,26 +367,27 @@ public sealed class ChineseEmbeddedEnglishTests
     {
         // Review note R-H1: when en is at both ends with zh in the middle,
         // both en segments are adjacent to zh and so both should dispatch.
-        var mp = MakeZhEnDispatchPhonemizer();
-        var (tokens, _) = mp.PhonemizeWithProsody("Hello 你好 GPS");
-        Assert.True(CountPuaToneMarkers(tokens) > 0,
+        MultilingualPhonemizer mp = MakeZhEnDispatchPhonemizer();
+        (List<string>? tokens, List<ProsodyInfo?> _) = mp.PhonemizeWithProsody("Hello 你好 GPS");
+        Assert.True(
+            CountPuaToneMarkers(tokens) > 0,
             "[en, zh, en]: at least one en must dispatch to loanword path");
     }
 
     [Fact]
     public void MultilingualDispatch_PureEn_DoesNotDispatch()
     {
-        var mp = MakeZhEnDispatchPhonemizer();
-        var (tokens, _) = mp.PhonemizeWithProsody("Hello GPS world");
+        MultilingualPhonemizer mp = MakeZhEnDispatchPhonemizer();
+        (List<string>? tokens, List<ProsodyInfo?> _) = mp.PhonemizeWithProsody("Hello GPS world");
         Assert.Equal(0, CountPuaToneMarkers(tokens));
     }
 
     [Fact]
     public void MultilingualDispatch_DisabledFlag_FallsThroughToEnglish()
     {
-        var mp = MakeZhEnDispatchPhonemizer();
+        MultilingualPhonemizer mp = MakeZhEnDispatchPhonemizer();
         mp.EnableZhEnDispatch = false;
-        var (tokens, _) = mp.PhonemizeWithProsody("你好 GPS 世界");
+        (List<string>? tokens, List<ProsodyInfo?> _) = mp.PhonemizeWithProsody("你好 GPS 世界");
         Assert.Equal(0, CountPuaToneMarkers(tokens));
     }
 
@@ -393,10 +405,12 @@ public sealed class ChineseEmbeddedEnglishTests
             ["zh"] = new ChinesePhonemizer(counting),
             ["en"] = new PassthroughEnStub(),
         });
-        var (_, _) = mp.PhonemizeWithProsody("你好 GPS 世界");
-        Assert.True(counting.EmbeddedEnglishCalls >= 1,
+        (List<string> _, List<ProsodyInfo?> _) = mp.PhonemizeWithProsody("你好 GPS 世界");
+        Assert.True(
+            counting.EmbeddedEnglishCalls >= 1,
             "MultilingualPhonemizer must route ZH-EN dispatch through " +
             "ChinesePhonemizer.Engine.ConvertEmbeddedEnglish, not the static helper");
+
         // Segmenter may include adjacent whitespace; just verify the engine
         // saw the GPS token.
         Assert.NotNull(counting.LastEmbeddedEnglishInput);
@@ -409,17 +423,25 @@ public sealed class ChineseEmbeddedEnglishTests
     {
         // Review note R-C1 / CS-H1: dispatched IPA tokens must carry per-token
         // prosody (a1=tone, a2=1, a3=1), not null/zero.
-        var mp = MakeZhEnDispatchPhonemizer();
-        var (tokens, prosody) =
+        MultilingualPhonemizer mp = MakeZhEnDispatchPhonemizer();
+        (List<string>? tokens, List<ProsodyInfo?>? prosody) =
             mp.PhonemizeWithProsody("你好 GPS 世界");
         Assert.Equal(tokens.Count, prosody.Count);
         bool found = false;
         for (int i = 0; i < tokens.Count; i++)
         {
-            if (tokens[i].Length == 0) continue;
+            if (tokens[i].Length == 0)
+            {
+                continue;
+            }
+
             var c = (int)tokens[i][0];
-            if (c < 0xE020 || c > 0xE04A) continue;
-            var p = prosody[i];
+            if (c < 0xE020 || c > 0xE04A)
+            {
+                continue;
+            }
+
+            ProsodyInfo? p = prosody[i];
             if (p is { } info && info.A1 >= 1 && info.A1 <= 5
                 && info.A2 == 1 && info.A3 == 1)
             {
@@ -427,14 +449,15 @@ public sealed class ChineseEmbeddedEnglishTests
                 break;
             }
         }
-        Assert.True(found,
+
+        Assert.True(
+            found,
             "expected at least one dispatched PUA token with (a1=tone, a2=1, a3=1)");
     }
 
     // ================================================================
     // CS-H2: LoanwordDataLoader exception wrapping (CA1032 + JSON wrap)
     // ================================================================
-
     [Fact]
     public void Loader_MalformedJson_WrapsAsSchemaException()
     {
@@ -442,9 +465,10 @@ public sealed class ChineseEmbeddedEnglishTests
         // The loader must wrap that as LoanwordSchemaException so callers
         // need to catch only one exception type.
         var bad = System.Text.Encoding.UTF8.GetBytes(@"{""version"": 1, ""acron");
-        var ex = Assert.Throws<LoanwordSchemaException>(() =>
+        LoanwordSchemaException ex = Assert.Throws<LoanwordSchemaException>(() =>
             LoanwordDataLoader.LoadFromBytes("malformed.json", bad));
         Assert.Contains("invalid JSON", ex.Message, StringComparison.OrdinalIgnoreCase);
+
         // The original JsonException is preserved as InnerException.
         Assert.NotNull(ex.InnerException);
         Assert.IsAssignableFrom<System.Text.Json.JsonException>(ex.InnerException);
@@ -456,7 +480,7 @@ public sealed class ChineseEmbeddedEnglishTests
         // Top-level JSON array (not object) — handled by the value-kind check,
         // not the JsonException path, so InnerException is null.
         var arr = System.Text.Encoding.UTF8.GetBytes(@"[1, 2, 3]");
-        var ex = Assert.Throws<LoanwordSchemaException>(() =>
+        LoanwordSchemaException ex = Assert.Throws<LoanwordSchemaException>(() =>
             LoanwordDataLoader.LoadFromBytes("array.json", arr));
         Assert.Contains("top-level must be a JSON object", ex.Message);
     }
@@ -483,21 +507,21 @@ public sealed class ChineseEmbeddedEnglishTests
     // bounded number of polls, and (c) the field is actually marked volatile
     // (reflection check — fails if a future refactor drops the modifier).
     // ================================================================
-
     [Fact]
     public void EnableZhEnDispatch_IsMarkedVolatile()
     {
         // Pin the volatile modifier via reflection so a future refactor that
         // accidentally drops it (and thus reintroduces the memory-visibility
         // hazard) is caught at CI time.
-        var field = typeof(MultilingualPhonemizer).GetField(
+        FieldInfo? field = typeof(MultilingualPhonemizer).GetField(
             "_enableZhEnDispatch",
             System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
         Assert.NotNull(field);
+
         // C# `volatile` is encoded as `IsVolatile()` modifier on the type.
-        var mods = field!.GetRequiredCustomModifiers();
+        Type[] mods = field!.GetRequiredCustomModifiers();
         bool isVolatile = false;
-        foreach (var m in mods)
+        foreach (Type m in mods)
         {
             if (m.FullName == "System.Runtime.CompilerServices.IsVolatile")
             {
@@ -505,7 +529,9 @@ public sealed class ChineseEmbeddedEnglishTests
                 break;
             }
         }
-        Assert.True(isVolatile,
+
+        Assert.True(
+            isVolatile,
             "MultilingualPhonemizer._enableZhEnDispatch must remain `volatile bool` " +
             "(CS-H3) — without it, writers on one thread are not guaranteed to be " +
             "visible to readers on another thread.");
@@ -514,7 +540,7 @@ public sealed class ChineseEmbeddedEnglishTests
     [Fact]
     public async System.Threading.Tasks.Task EnableZhEnDispatch_VisibleAcrossThreads()
     {
-        var mp = MakeZhEnDispatchPhonemizer();
+        MultilingualPhonemizer mp = MakeZhEnDispatchPhonemizer();
         Assert.True(mp.EnableZhEnDispatch, "default = on under chinese feature");
 
         // Spawn a reader that polls the flag while a writer flips it. The
@@ -523,7 +549,8 @@ public sealed class ChineseEmbeddedEnglishTests
         using var stop = new System.Threading.CancellationTokenSource(
             TimeSpan.FromSeconds(2));
         var observedFalse = false;
-        var reader = System.Threading.Tasks.Task.Run(() =>
+        var reader = System.Threading.Tasks.Task.Run(
+            () =>
         {
             while (!stop.IsCancellationRequested)
             {
@@ -532,6 +559,7 @@ public sealed class ChineseEmbeddedEnglishTests
                     observedFalse = true;
                     return;
                 }
+
                 System.Threading.Thread.SpinWait(500);
             }
         }, stop.Token);
@@ -541,7 +569,8 @@ public sealed class ChineseEmbeddedEnglishTests
         mp.EnableZhEnDispatch = false;
 
         await reader;
-        Assert.True(observedFalse,
+        Assert.True(
+            observedFalse,
             "reader thread must observe EnableZhEnDispatch=false after the writer " +
             "flipped it. If this fails, the volatile modifier may have been removed.");
     }

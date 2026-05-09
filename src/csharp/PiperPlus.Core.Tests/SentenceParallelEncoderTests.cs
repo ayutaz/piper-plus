@@ -18,11 +18,13 @@ public class SentenceParallelEncoderTests
     private sealed class EnvScope : IDisposable
     {
         private readonly string? _previous;
+
         public EnvScope(string? value)
         {
             _previous = Environment.GetEnvironmentVariable(SentenceParallelEncoder.ParallelismEnvVar);
             Environment.SetEnvironmentVariable(SentenceParallelEncoder.ParallelismEnvVar, value);
         }
+
         public void Dispose() =>
             Environment.SetEnvironmentVariable(SentenceParallelEncoder.ParallelismEnvVar, _previous);
     }
@@ -30,7 +32,6 @@ public class SentenceParallelEncoderTests
     // ================================================================
     // ResolveParallelism
     // ================================================================
-
     [Fact]
     public void ResolveParallelism_ZeroOrOneSentence_ReturnsOne()
     {
@@ -88,7 +89,6 @@ public class SentenceParallelEncoderTests
     // ================================================================
     // EncodeAll
     // ================================================================
-
     [Fact]
     public void EncodeAll_EmptyInput_ReturnsEmptyArray()
     {
@@ -131,8 +131,8 @@ public class SentenceParallelEncoderTests
         var sentences = Enumerable.Range(0, 20).Select(i => $"sentence_{i}").ToArray();
         Func<string, (string Text, int Len)> encode = s => (s, s.Length);
 
-        var serial = SentenceParallelEncoder.EncodeAll(sentences, encode, parallelismOverride: 1);
-        var parallel = SentenceParallelEncoder.EncodeAll(sentences, encode, parallelismOverride: 4);
+        (string Text, int Len)[] serial = SentenceParallelEncoder.EncodeAll(sentences, encode, parallelismOverride: 1);
+        (string Text, int Len)[] parallel = SentenceParallelEncoder.EncodeAll(sentences, encode, parallelismOverride: 4);
 
         Assert.Equal(serial, parallel);
     }
@@ -141,7 +141,7 @@ public class SentenceParallelEncoderTests
     public void EncodeAll_PropagatesExceptions()
     {
         var sentences = new[] { "ok", "fail", "ok2" };
-        var ex = Assert.Throws<AggregateException>(() =>
+        AggregateException ex = Assert.Throws<AggregateException>(() =>
             SentenceParallelEncoder.EncodeAll(
                 sentences,
                 s =>
@@ -150,6 +150,7 @@ public class SentenceParallelEncoderTests
                     {
                         throw new InvalidOperationException("kaboom");
                     }
+
                     return s;
                 },
                 parallelismOverride: 4));
@@ -173,6 +174,7 @@ public class SentenceParallelEncoderTests
             parallelismOverride: 1);
 
         Assert.Equal(sentences, result);
+
         // All work observed on the caller thread.
         Assert.All(seen, tid => Assert.Equal(callerTid, tid));
     }
@@ -210,7 +212,11 @@ public class SentenceParallelEncoderTests
             {
                 // Non-trivial work per item to keep workers active.
                 int sum = 0;
-                for (int i = 0; i < 100; i++) sum += i;
+                for (int i = 0; i < 100; i++)
+                {
+                    sum += i;
+                }
+
                 return $"{s}_{sum}";
             },
             parallelismOverride: 4);

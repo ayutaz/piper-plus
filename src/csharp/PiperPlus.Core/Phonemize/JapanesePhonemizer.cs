@@ -63,6 +63,7 @@ public sealed class JapanesePhonemizer : IPhonemizer
     private readonly IJapaneseG2PEngine _engine;
 
     /// <summary>
+    /// Initializes a new instance of the <see cref="JapanesePhonemizer"/> class.
     /// Create a new <see cref="JapanesePhonemizer"/> backed by the given G2P engine.
     /// </summary>
     /// <param name="engine">
@@ -76,7 +77,7 @@ public sealed class JapanesePhonemizer : IPhonemizer
     /// <inheritdoc />
     public List<string> Phonemize(string text)
     {
-        var (tokens, _) = PhonemizeCore(text);
+        (List<string>? tokens, List<ProsodyInfo?> _) = PhonemizeCore(text);
         return tokens;
     }
 
@@ -106,20 +107,23 @@ public sealed class JapanesePhonemizer : IPhonemizer
     /// </summary>
     private (List<string> Tokens, List<ProsodyInfo?> Prosody) PhonemizeCore(string text)
     {
-        var g2p = _engine.Convert(text);
+        G2PResult g2p = _engine.Convert(text);
         var phonemes = g2p.Phonemes;
         var a1Arr = g2p.A1;
         var a2Arr = g2p.A2;
         var a3Arr = g2p.A3;
 
         int count = phonemes.Length;
+
         // Each phoneme may emit itself + one prosody mark (], #, or [), so ~2x capacity.
         var tokens = new List<string>(count * 2);
         var prosody = new List<ProsodyInfo?>(count * 2);
 
         if (a1Arr.Length != count || a2Arr.Length != count || a3Arr.Length != count)
+        {
             throw new System.InvalidOperationException(
                 $"G2P result arrays have inconsistent lengths: phonemes={count}, A1={a1Arr.Length}, A2={a2Arr.Length}, A3={a3Arr.Length}");
+        }
 
         for (int idx = 0; idx < count; idx++)
         {
@@ -194,7 +198,7 @@ public sealed class JapanesePhonemizer : IPhonemizer
         tokens = PiperPhonemeConverter.ApplyNPhonemeRules(tokens);
 
         // Step 5: Map multi-character tokens to single PUA codepoints.
-        var mapped = PiperPhonemeConverter.MapSequence(tokens);
+        IReadOnlyList<string> mapped = PiperPhonemeConverter.MapSequence(tokens);
 
         // Convert IReadOnlyList<string> back to List<string> for the interface.
         var result = new List<string>(mapped.Count);

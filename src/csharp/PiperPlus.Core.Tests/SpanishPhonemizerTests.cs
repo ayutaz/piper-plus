@@ -13,18 +13,18 @@ public sealed class SpanishPhonemizerTests
     // ================================================================
     // Stub G2P engine
     // ================================================================
-
     private class StubSpanishG2PEngine : ISpanishG2PEngine
     {
         private readonly List<string> _tokens;
+
         public StubSpanishG2PEngine(List<string> tokens) => _tokens = tokens;
+
         public List<string> ToPhonemeList(string text) => _tokens;
     }
 
     // ================================================================
     // Shared phoneme ID map for PostProcessIds tests
     // ================================================================
-
     private static Dictionary<string, int[]> MakeMap() => new()
     {
         ["_"] = [0],
@@ -42,7 +42,6 @@ public sealed class SpanishPhonemizerTests
     // ================================================================
     // 1. StressMarker_InOutput
     // ================================================================
-
     [Fact]
     public void StressMarker_InOutput()
     {
@@ -51,7 +50,7 @@ public sealed class SpanishPhonemizerTests
         var tokens = new List<string> { "\u02c8", "o", "l", "a" };
 
         var phonemizer = new SpanishPhonemizer(new StubSpanishG2PEngine(tokens));
-        var (result, _) = phonemizer.PhonemizeWithProsody("hola");
+        (List<string>? result, List<ProsodyInfo?> _) = phonemizer.PhonemizeWithProsody("hola");
 
         Assert.Contains("\u02c8", result); // ˈ
     }
@@ -59,7 +58,6 @@ public sealed class SpanishPhonemizerTests
     // ================================================================
     // 2. StressMarker_A2_Is2
     // ================================================================
-
     [Fact]
     public void StressMarker_A2_Is2()
     {
@@ -67,7 +65,7 @@ public sealed class SpanishPhonemizerTests
         var tokens = new List<string> { "\u02c8", "o", "l", "a" };
 
         var phonemizer = new SpanishPhonemizer(new StubSpanishG2PEngine(tokens));
-        var (result, prosody) = phonemizer.PhonemizeWithProsody("hola");
+        (List<string>? result, List<ProsodyInfo?>? prosody) = phonemizer.PhonemizeWithProsody("hola");
 
         int idx = result.IndexOf("\u02c8");
         Assert.True(idx >= 0, "Stress marker should be present");
@@ -78,7 +76,6 @@ public sealed class SpanishPhonemizerTests
     // ================================================================
     // 3. StressedVowel_A2_Is2
     // ================================================================
-
     [Fact]
     public void StressedVowel_A2_Is2()
     {
@@ -86,7 +83,7 @@ public sealed class SpanishPhonemizerTests
         var tokens = new List<string> { "\u02c8", "o", "l", "a" };
 
         var phonemizer = new SpanishPhonemizer(new StubSpanishG2PEngine(tokens));
-        var (result, prosody) = phonemizer.PhonemizeWithProsody("hola");
+        (List<string>? result, List<ProsodyInfo?>? prosody) = phonemizer.PhonemizeWithProsody("hola");
 
         int stressIdx = result.IndexOf("\u02c8");
         int vowelIdx = stressIdx + 1;
@@ -98,7 +95,6 @@ public sealed class SpanishPhonemizerTests
     // ================================================================
     // 4. UnstressedPhoneme_A2_Is0
     // ================================================================
-
     [Fact]
     public void UnstressedPhoneme_A2_Is0()
     {
@@ -107,7 +103,7 @@ public sealed class SpanishPhonemizerTests
         var tokens = new List<string> { "\u02c8", "o", "l", "a" };
 
         var phonemizer = new SpanishPhonemizer(new StubSpanishG2PEngine(tokens));
-        var (result, prosody) = phonemizer.PhonemizeWithProsody("hola");
+        (List<string>? result, List<ProsodyInfo?>? prosody) = phonemizer.PhonemizeWithProsody("hola");
 
         // Find "l" -- it should be unstressed.
         int lIdx = result.IndexOf("l");
@@ -125,7 +121,6 @@ public sealed class SpanishPhonemizerTests
     // ================================================================
     // 5. A3_IsWordPhonemeCount
     // ================================================================
-
     [Fact]
     public void A3_IsWordPhonemeCount()
     {
@@ -134,7 +129,7 @@ public sealed class SpanishPhonemizerTests
         var tokens = new List<string> { "\u02c8", "o", "l", "a" };
 
         var phonemizer = new SpanishPhonemizer(new StubSpanishG2PEngine(tokens));
-        var (_, prosody) = phonemizer.PhonemizeWithProsody("hola");
+        (List<string> _, List<ProsodyInfo?>? prosody) = phonemizer.PhonemizeWithProsody("hola");
 
         var a3Values = prosody
             .Where(p => p is not null)
@@ -149,7 +144,6 @@ public sealed class SpanishPhonemizerTests
     // ================================================================
     // 6. WordBoundary_Spaces
     // ================================================================
-
     [Fact]
     public void WordBoundary_Spaces()
     {
@@ -162,7 +156,7 @@ public sealed class SpanishPhonemizerTests
         };
 
         var phonemizer = new SpanishPhonemizer(new StubSpanishG2PEngine(tokens));
-        var (result, _) = phonemizer.PhonemizeWithProsody("hola mundo");
+        (List<string>? result, List<ProsodyInfo?> _) = phonemizer.PhonemizeWithProsody("hola mundo");
 
         Assert.Contains(" ", result);
     }
@@ -170,7 +164,6 @@ public sealed class SpanishPhonemizerTests
     // ================================================================
     // 7. Punctuation_HasZeroProsody
     // ================================================================
-
     [Fact]
     public void Punctuation_HasZeroProsody()
     {
@@ -182,7 +175,7 @@ public sealed class SpanishPhonemizerTests
         };
 
         var phonemizer = new SpanishPhonemizer(new StubSpanishG2PEngine(tokens));
-        var (result, prosody) = phonemizer.PhonemizeWithProsody("hola,");
+        (List<string>? result, List<ProsodyInfo?>? prosody) = phonemizer.PhonemizeWithProsody("hola,");
 
         int commaIdx = result.IndexOf(",");
         Assert.True(commaIdx >= 0, "Comma should be present");
@@ -195,7 +188,6 @@ public sealed class SpanishPhonemizerTests
     // ================================================================
     // 8. ProsodyAlignment_Maintained
     // ================================================================
-
     [Fact]
     public void ProsodyAlignment_Maintained()
     {
@@ -209,7 +201,7 @@ public sealed class SpanishPhonemizerTests
         };
 
         var phonemizer = new SpanishPhonemizer(new StubSpanishG2PEngine(tokens));
-        var (result, prosody) = phonemizer.PhonemizeWithProsody("hola mundo.");
+        (List<string>? result, List<ProsodyInfo?>? prosody) = phonemizer.PhonemizeWithProsody("hola mundo.");
 
         Assert.Equal(result.Count, prosody.Count);
     }
@@ -217,7 +209,6 @@ public sealed class SpanishPhonemizerTests
     // ================================================================
     // 9. GetPhonemeIdMap_ReturnsNull
     // ================================================================
-
     [Fact]
     public void GetPhonemeIdMap_ReturnsNull()
     {
@@ -231,7 +222,6 @@ public sealed class SpanishPhonemizerTests
     // ================================================================
     // 10. PostProcessIds_FullSequence
     // ================================================================
-
     [Fact]
     public void PostProcessIds_FullSequence()
     {
@@ -244,9 +234,9 @@ public sealed class SpanishPhonemizerTests
         {
             new(0, 2, 3), new(0, 0, 3), new(0, 0, 3),
         };
-        var map = MakeMap();
+        Dictionary<string, int[]> map = MakeMap();
 
-        var (ids, prosody) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
+        (List<int>? ids, List<ProsodyInfo?>? prosody) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
 
         // Expected:
         // BOS(1), PAD(0), 10, PAD(0), 11, PAD(0), 12, PAD(0), EOS(2)
@@ -264,7 +254,6 @@ public sealed class SpanishPhonemizerTests
     // ================================================================
     // 11. PostProcessIds_SkipsPadAfterPadToken
     // ================================================================
-
     [Fact]
     public void PostProcessIds_SkipsPadAfterPadToken()
     {
@@ -277,9 +266,9 @@ public sealed class SpanishPhonemizerTests
         {
             new(0, 2, 3), null, new(0, 0, 3),
         };
-        var map = MakeMap();
+        Dictionary<string, int[]> map = MakeMap();
 
-        var (ids, prosody) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
+        (List<int>? ids, List<ProsodyInfo?>? prosody) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
 
         // Expected:
         // BOS(1), PAD(0), 10, PAD(0), 0, 11, PAD(0), EOS(2)
@@ -291,7 +280,6 @@ public sealed class SpanishPhonemizerTests
     // ================================================================
     // 12. PostProcessIds_EmptyInput
     // ================================================================
-
     [Fact]
     public void PostProcessIds_EmptyInput()
     {
@@ -300,9 +288,9 @@ public sealed class SpanishPhonemizerTests
 
         var inputIds = new List<int>();
         var inputProsody = new List<ProsodyInfo?>();
-        var map = MakeMap();
+        Dictionary<string, int[]> map = MakeMap();
 
-        var (ids, prosody) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
+        (List<int>? ids, List<ProsodyInfo?>? prosody) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
 
         // Empty input → BOS(1), PAD(0), EOS(2) only.
         Assert.Equal([1, 0, 2], ids);
@@ -312,7 +300,6 @@ public sealed class SpanishPhonemizerTests
     // ================================================================
     // 13. Phonemize_ReturnsTokensOnly
     // ================================================================
-
     [Fact]
     public void Phonemize_ReturnsTokensOnly()
     {
@@ -320,8 +307,8 @@ public sealed class SpanishPhonemizerTests
         var tokens = new List<string> { "\u02c8", "o", "l", "a" };
 
         var phonemizer = new SpanishPhonemizer(new StubSpanishG2PEngine(tokens));
-        var plain = phonemizer.Phonemize("hola");
-        var (withProsody, _) = phonemizer.PhonemizeWithProsody("hola");
+        List<string> plain = phonemizer.Phonemize("hola");
+        (List<string>? withProsody, List<ProsodyInfo?> _) = phonemizer.PhonemizeWithProsody("hola");
 
         Assert.Equal(withProsody, plain);
     }
@@ -329,7 +316,6 @@ public sealed class SpanishPhonemizerTests
     // ================================================================
     // 14. PhonemizeWithProsody_EmptyInput
     // ================================================================
-
     [Fact]
     public void PhonemizeWithProsody_EmptyInput()
     {
@@ -337,7 +323,7 @@ public sealed class SpanishPhonemizerTests
         var phonemizer = new SpanishPhonemizer(
             new StubSpanishG2PEngine([]));
 
-        var (result, prosody) = phonemizer.PhonemizeWithProsody("");
+        (List<string>? result, List<ProsodyInfo?>? prosody) = phonemizer.PhonemizeWithProsody(string.Empty);
 
         Assert.Empty(result);
         Assert.Empty(prosody);
@@ -346,7 +332,6 @@ public sealed class SpanishPhonemizerTests
     // ================================================================
     // 15. Punctuation_InvertedMarks
     // ================================================================
-
     [Fact]
     public void Punctuation_InvertedMarks()
     {
@@ -360,7 +345,7 @@ public sealed class SpanishPhonemizerTests
         };
 
         var phonemizer = new SpanishPhonemizer(new StubSpanishG2PEngine(tokens));
-        var (result, prosody) = phonemizer.PhonemizeWithProsody("¿hola?");
+        (List<string>? result, List<ProsodyInfo?>? prosody) = phonemizer.PhonemizeWithProsody("¿hola?");
 
         // ¿ should be present with zero prosody.
         int invertedIdx = result.IndexOf("\u00bf");
@@ -382,7 +367,6 @@ public sealed class SpanishPhonemizerTests
     // ================================================================
     // 16. StressMarker_AtEndOfWord
     // ================================================================
-
     [Fact]
     public void StressMarker_AtEndOfWord()
     {
@@ -391,7 +375,7 @@ public sealed class SpanishPhonemizerTests
         var tokens = new List<string> { "k", "a", "\u02c8" };
 
         var phonemizer = new SpanishPhonemizer(new StubSpanishG2PEngine(tokens));
-        var (result, prosody) = phonemizer.PhonemizeWithProsody("ka");
+        (List<string>? result, List<ProsodyInfo?>? prosody) = phonemizer.PhonemizeWithProsody("ka");
 
         int stressIdx = result.IndexOf("\u02c8");
         Assert.True(stressIdx >= 0, "Stress marker should be present");

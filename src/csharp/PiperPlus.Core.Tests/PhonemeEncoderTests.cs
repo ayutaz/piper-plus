@@ -51,7 +51,10 @@ public class PhonemeEncoderTests
         {
             PostProcessIdsCalled = true;
             if (_postProcess is not null)
+            {
                 return _postProcess(phonemeIds, prosodyFeatures, phonemeIdMap);
+            }
+
             return (phonemeIds, prosodyFeatures);
         }
     }
@@ -59,7 +62,6 @@ public class PhonemeEncoderTests
     // ================================================================
     // Shared phoneme ID map
     // ================================================================
-
     private static Dictionary<string, int[]> MakeMap() => new()
     {
         ["_"] = [0],
@@ -78,7 +80,6 @@ public class PhonemeEncoderTests
     // ----------------------------------------------------------------
     // 1. BasicTokens_ConvertToIds
     // ----------------------------------------------------------------
-
     [Fact]
     public void Encode_BasicTokens_ConvertToIds()
     {
@@ -86,7 +87,7 @@ public class PhonemeEncoderTests
             ["^", "a", "i", "$"],
             [null, null, null, null]);
 
-        var (ids, _) = PhonemeEncoder.Encode(phonemizer, "dummy", MakeMap());
+        (List<int>? ids, List<ProsodyInfo?> _) = PhonemeEncoder.Encode(phonemizer, "dummy", MakeMap());
 
         Assert.Equal([1, 10, 11, 2], ids);
     }
@@ -94,7 +95,6 @@ public class PhonemeEncoderTests
     // ----------------------------------------------------------------
     // 2. ProsodyInfo_MappedCorrectly
     // ----------------------------------------------------------------
-
     [Fact]
     public void Encode_ProsodyInfo_MappedCorrectly()
     {
@@ -105,7 +105,7 @@ public class PhonemeEncoderTests
             ["a", "k"],
             [p0, p1]);
 
-        var (ids, prosody) = PhonemeEncoder.Encode(phonemizer, "dummy", MakeMap());
+        (List<int>? ids, List<ProsodyInfo?>? prosody) = PhonemeEncoder.Encode(phonemizer, "dummy", MakeMap());
 
         Assert.Equal([10, 12], ids);
         Assert.Equal(2, prosody.Count);
@@ -116,7 +116,6 @@ public class PhonemeEncoderTests
     // ----------------------------------------------------------------
     // 3. UnknownToken_Skipped
     // ----------------------------------------------------------------
-
     [Fact]
     public void Encode_UnknownToken_Skipped()
     {
@@ -125,7 +124,7 @@ public class PhonemeEncoderTests
             ["a", "z", "i"],
             [null, null, null]);
 
-        var (ids, prosody) = PhonemeEncoder.Encode(phonemizer, "dummy", MakeMap());
+        (List<int>? ids, List<ProsodyInfo?>? prosody) = PhonemeEncoder.Encode(phonemizer, "dummy", MakeMap());
 
         Assert.Equal([10, 11], ids);
         Assert.Equal(2, prosody.Count);
@@ -134,12 +133,11 @@ public class PhonemeEncoderTests
     // ----------------------------------------------------------------
     // 4. MultiIdToken
     // ----------------------------------------------------------------
-
     [Fact]
     public void Encode_MultiIdToken_DuplicatesProsody()
     {
         // Override "a" to map to two IDs.
-        var map = MakeMap();
+        Dictionary<string, int[]> map = MakeMap();
         map["a"] = [10, 11];
 
         var prosodyA = new ProsodyInfo(1, 2, 3);
@@ -147,11 +145,12 @@ public class PhonemeEncoderTests
             ["a", "k"],
             [prosodyA, null]);
 
-        var (ids, prosody) = PhonemeEncoder.Encode(phonemizer, "dummy", map);
+        (List<int>? ids, List<ProsodyInfo?>? prosody) = PhonemeEncoder.Encode(phonemizer, "dummy", map);
 
         // "a" expands to [10, 11], "k" stays [12].
         Assert.Equal([10, 11, 12], ids);
         Assert.Equal(3, prosody.Count);
+
         // Prosody is duplicated for each ID of the multi-ID token.
         Assert.Equal(prosodyA, prosody[0]);
         Assert.Equal(prosodyA, prosody[1]);
@@ -161,13 +160,12 @@ public class PhonemeEncoderTests
     // ----------------------------------------------------------------
     // 5. EmptyInput_ReturnsEmpty
     // ----------------------------------------------------------------
-
     [Fact]
     public void Encode_EmptyInput_ReturnsEmpty()
     {
         var phonemizer = new StubPhonemizer([], []);
 
-        var (ids, prosody) = PhonemeEncoder.Encode(phonemizer, "", MakeMap());
+        (List<int>? ids, List<ProsodyInfo?>? prosody) = PhonemeEncoder.Encode(phonemizer, string.Empty, MakeMap());
 
         Assert.Empty(ids);
         Assert.Empty(prosody);
@@ -180,7 +178,6 @@ public class PhonemeEncoderTests
     // ----------------------------------------------------------------
     // 6. ConvertToLongArray
     // ----------------------------------------------------------------
-
     [Fact]
     public void EncodeDirect_ConvertToLongArray()
     {
@@ -188,7 +185,7 @@ public class PhonemeEncoderTests
             ["^", "a", "$"],
             [null, null, null]);
 
-        var (phonemeIds, _) = PhonemeEncoder.EncodeDirect(phonemizer, "dummy", MakeMap());
+        (long[]? phonemeIds, long[] _) = PhonemeEncoder.EncodeDirect(phonemizer, "dummy", MakeMap());
 
         Assert.Equal([1L, 10L, 2L], phonemeIds);
         Assert.IsType<long[]>(phonemeIds);
@@ -197,7 +194,6 @@ public class PhonemeEncoderTests
     // ----------------------------------------------------------------
     // 7. ProsodyFlat_CorrectLayout
     // ----------------------------------------------------------------
-
     [Fact]
     public void EncodeDirect_ProsodyFlat_CorrectLayout()
     {
@@ -209,7 +205,7 @@ public class PhonemeEncoderTests
             ["a", "k", "i"],
             [p0, null, p2]);
 
-        var (phonemeIds, prosodyFlat) = PhonemeEncoder.EncodeDirect(phonemizer, "dummy", MakeMap());
+        (long[]? phonemeIds, long[]? prosodyFlat) = PhonemeEncoder.EncodeDirect(phonemizer, "dummy", MakeMap());
 
         Assert.Equal([10L, 12L, 11L], phonemeIds);
         Assert.NotNull(prosodyFlat);
@@ -222,7 +218,6 @@ public class PhonemeEncoderTests
     // ----------------------------------------------------------------
     // 8. NoProsody_ReturnsNull
     // ----------------------------------------------------------------
-
     [Fact]
     public void EncodeDirect_NoProsody_ReturnsNull()
     {
@@ -230,7 +225,7 @@ public class PhonemeEncoderTests
             ["a", "i"],
             [null, null]);
 
-        var (_, prosodyFlat) = PhonemeEncoder.EncodeDirect(phonemizer, "dummy", MakeMap());
+        (long[] _, long[]? prosodyFlat) = PhonemeEncoder.EncodeDirect(phonemizer, "dummy", MakeMap());
 
         Assert.Null(prosodyFlat);
     }
@@ -238,7 +233,6 @@ public class PhonemeEncoderTests
     // ----------------------------------------------------------------
     // 9. PostProcessIds_Called
     // ----------------------------------------------------------------
-
     [Fact]
     public void EncodeDirect_PostProcessIds_Called()
     {
@@ -258,14 +252,16 @@ public class PhonemeEncoderTests
                     newIds.Add(0);       // padding
                     newProsody.Add(null);
                 }
+
                 newIds.Add(2);
                 newProsody.Add(null);
                 return (newIds, newProsody);
             });
 
-        var (phonemeIds, _) = PhonemeEncoder.EncodeDirect(phonemizer, "dummy", MakeMap());
+        (long[]? phonemeIds, long[] _) = PhonemeEncoder.EncodeDirect(phonemizer, "dummy", MakeMap());
 
         Assert.True(phonemizer.PostProcessIdsCalled);
+
         // Expected: [BOS=1, a=10, pad=0, i=11, pad=0, EOS=2]
         Assert.Equal([1L, 10L, 0L, 11L, 0L, 2L], phonemeIds);
     }
@@ -273,7 +269,6 @@ public class PhonemeEncoderTests
     // ----------------------------------------------------------------
     // 10. NullPhonemizer_ThrowsArgumentNullException
     // ----------------------------------------------------------------
-
     [Fact]
     public void Encode_NullPhonemizer_ThrowsArgumentNullException()
     {
@@ -284,7 +279,6 @@ public class PhonemeEncoderTests
     // ----------------------------------------------------------------
     // 11. LargeProsodyValues_EncodedCorrectly
     // ----------------------------------------------------------------
-
     [Fact]
     public void EncodeDirect_LargeProsodyValues_EncodedCorrectly()
     {
@@ -294,7 +288,7 @@ public class PhonemeEncoderTests
             ["a"],
             [pMax]);
 
-        var (phonemeIds, prosodyFlat) = PhonemeEncoder.EncodeDirect(phonemizer, "dummy", MakeMap());
+        (long[]? phonemeIds, long[]? prosodyFlat) = PhonemeEncoder.EncodeDirect(phonemizer, "dummy", MakeMap());
 
         Assert.Equal([10L], phonemeIds);
         Assert.NotNull(prosodyFlat);

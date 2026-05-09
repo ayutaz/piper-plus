@@ -11,6 +11,7 @@ internal static class TempFileHelper
     /// Creates a temp file with the given <paramref name="content"/> and returns its path.
     /// The caller is responsible for deleting the file when done.
     /// </summary>
+    /// <returns></returns>
     public static string CreateTempFile(string content)
     {
         var path = Path.GetTempFileName();
@@ -24,6 +25,7 @@ internal static class TempFileHelper
     /// </summary>
     /// <param name="numSpeakers">Value for <c>num_speakers</c>.</param>
     /// <param name="sampleRate">Value for <c>audio.sample_rate</c>.</param>
+    /// <returns></returns>
     public static string CreateTempJsonConfig(int numSpeakers = 1, int sampleRate = 22050)
     {
         var json = $$"""
@@ -102,6 +104,7 @@ internal sealed class PhonemeIdMapBuilder
     /// <summary>
     /// Add a phoneme mapped to one or more IDs.
     /// </summary>
+    /// <returns></returns>
     public PhonemeIdMapBuilder Add(string phoneme, params int[] ids)
     {
         _map[phoneme] = ids;
@@ -114,6 +117,7 @@ internal sealed class PhonemeIdMapBuilder
     /// <c>_</c> (PAD), <c>^</c> (BOS), <c>$</c> (EOS), space, plus
     /// <c>a-z</c> mapped to IDs 10-35.
     /// </summary>
+    /// <returns></returns>
     public PhonemeIdMapBuilder AddStandard()
     {
         _map["_"] = [0];
@@ -135,5 +139,6 @@ internal sealed class PhonemeIdMapBuilder
     /// Return a new dictionary containing all accumulated entries.
     /// The builder can be reused after calling <see cref="Build"/>.
     /// </summary>
+    /// <returns></returns>
     public Dictionary<string, int[]> Build() => new(_map);
 }

@@ -18,7 +18,13 @@ public sealed class CustomDictionaryTests : IDisposable
     {
         foreach (var path in _tempFiles)
         {
-            try { File.Delete(path); } catch { /* best-effort cleanup */ }
+            try
+            {
+                File.Delete(path);
+            }
+            catch
+            { /* best-effort cleanup */
+            }
         }
     }
 
@@ -82,7 +88,6 @@ public sealed class CustomDictionaryTests : IDisposable
     // ================================================================
     // LoadDictionary
     // ================================================================
-
     [Fact]
     public void LoadDictionary_ValidFile_LoadsEntries()
     {
@@ -208,7 +213,6 @@ public sealed class CustomDictionaryTests : IDisposable
     // ================================================================
     // ApplyToText
     // ================================================================
-
     [Fact]
     public void ApplyToText_SingleReplacement()
     {
@@ -282,7 +286,7 @@ public sealed class CustomDictionaryTests : IDisposable
         var dict = new CustomDictionary();
         dict.LoadDictionary(path);
 
-        Assert.Equal("", dict.ApplyToText(""));
+        Assert.Equal(string.Empty, dict.ApplyToText(string.Empty));
     }
 
     [Fact]
@@ -312,6 +316,7 @@ public sealed class CustomDictionaryTests : IDisposable
 
         // Second apply -- must rebuild cache and include new entries
         Assert.Equal("bar", dict.ApplyToText("foo"));
+
         // Original entries should still work
         Assert.Equal("world", dict.ApplyToText("hello"));
     }
@@ -319,7 +324,6 @@ public sealed class CustomDictionaryTests : IDisposable
     // ================================================================
     // JSON dictionary tests
     // ================================================================
-
     [Fact]
     public void LoadJsonV1_SimpleFormat()
     {
@@ -433,6 +437,7 @@ public sealed class CustomDictionaryTests : IDisposable
                 }
             }
             """;
+
         // Second file: priority 8 — should win
         string json2 = """
             {
@@ -465,6 +470,7 @@ public sealed class CustomDictionaryTests : IDisposable
                 }
             }
             """;
+
         // Second file: priority 3 — should be rejected
         string json2 = """
             {
@@ -573,7 +579,6 @@ public sealed class CustomDictionaryTests : IDisposable
     // ================================================================
     // Word boundary matching (ASCII keys)
     // ================================================================
-
     [Fact]
     public void ApplyToText_WordBoundary_API_NotInsideRapid()
     {
@@ -616,7 +621,6 @@ public sealed class CustomDictionaryTests : IDisposable
     // ================================================================
     // Case-insensitive matching (all-upper / all-lower keys)
     // ================================================================
-
     [Fact]
     public void ApplyToText_CaseInsensitive_AllLowerMatchesAnyCase()
     {
@@ -650,7 +654,6 @@ public sealed class CustomDictionaryTests : IDisposable
     // ================================================================
     // Case-sensitive matching (mixed-case keys)
     // ================================================================
-
     [Fact]
     public void ApplyToText_CaseSensitive_MixedCaseExactOnly()
     {
@@ -683,7 +686,6 @@ public sealed class CustomDictionaryTests : IDisposable
     // ================================================================
     // Non-ASCII (Japanese/Chinese) — substring replacement, no boundary
     // ================================================================
-
     [Fact]
     public void ApplyToText_NonAscii_JapaneseSubstringReplacement()
     {
@@ -714,7 +716,6 @@ public sealed class CustomDictionaryTests : IDisposable
     // ================================================================
     // Combined: word boundary + case sensitivity
     // ================================================================
-
     [Fact]
     public void ApplyToText_WordBoundaryAndCaseInsensitive_Combined()
     {
@@ -749,6 +750,7 @@ public sealed class CustomDictionaryTests : IDisposable
 
         Assert.Equal("テンソルフロー v2", dict.ApplyToText("TensorFlow v2"));
         Assert.Equal("tensorflow v2", dict.ApplyToText("tensorflow v2"));
+
         // Should not match inside a larger word
         Assert.Equal("TensorFlowLite", dict.ApplyToText("TensorFlowLite"));
     }
@@ -756,7 +758,6 @@ public sealed class CustomDictionaryTests : IDisposable
     // ================================================================
     // LoadDefaults
     // ================================================================
-
     [Fact]
     public void LoadDefaults_NoDictionaryDirectory_DoesNotThrow()
     {
@@ -764,6 +765,7 @@ public sealed class CustomDictionaryTests : IDisposable
         // LoadDefaults should simply return without error.
         var dict = new CustomDictionary();
         dict.LoadDefaults(); // Must not throw
+
         // Count may be 0 or > 0 depending on the working directory;
         // just verify it does not crash.
     }
@@ -957,7 +959,6 @@ public sealed class CustomDictionaryTests : IDisposable
     // ================================================================
     // Case-insensitive deduplication
     // ================================================================
-
     [Fact]
     public void AddEntry_CaseInsensitiveDedup_AllUpperAndAllLower()
     {
@@ -989,8 +990,10 @@ public sealed class CustomDictionaryTests : IDisposable
         dict.LoadDictionary(path);
 
         Assert.Equal(2, dict.Count);
+
         // "PyTorch" matches the case-sensitive entry
         Assert.Equal("ミックス is here", dict.ApplyToText("PyTorch is here"));
+
         // "PYTORCH" matches the case-insensitive entry (all-lower "pytorch")
         Assert.Equal("インセンシティブ is here", dict.ApplyToText("PYTORCH is here"));
     }
@@ -998,7 +1001,6 @@ public sealed class CustomDictionaryTests : IDisposable
     // ================================================================
     // Word boundary: multiple occurrences
     // ================================================================
-
     [Fact]
     public void ApplyToText_WordBoundary_MultipleOccurrences()
     {
@@ -1009,7 +1011,8 @@ public sealed class CustomDictionaryTests : IDisposable
         var dict = new CustomDictionary();
         dict.LoadDictionary(path);
 
-        Assert.Equal("エーアイ is エーアイ but AIDS is not",
+        Assert.Equal(
+            "エーアイ is エーアイ but AIDS is not",
             dict.ApplyToText("AI is AI but AIDS is not"));
     }
 
@@ -1023,7 +1026,8 @@ public sealed class CustomDictionaryTests : IDisposable
         var dict = new CustomDictionary();
         dict.LoadDictionary(path);
 
-        Assert.Equal("エーアイ, エーアイ. エーアイ!",
+        Assert.Equal(
+            "エーアイ, エーアイ. エーアイ!",
             dict.ApplyToText("AI, AI. AI!"));
     }
 
@@ -1043,7 +1047,6 @@ public sealed class CustomDictionaryTests : IDisposable
     // ================================================================
     // Regex special characters in keys
     // ================================================================
-
     [Fact]
     public void ApplyToText_SpecialRegexChars_EscapedProperly()
     {
@@ -1082,7 +1085,6 @@ public sealed class CustomDictionaryTests : IDisposable
     // ================================================================
     // Non-ASCII case insensitivity
     // ================================================================
-
     [Fact]
     public void ApplyToText_NonAscii_CaseInsensitive_JapaneseUnchanged()
     {
@@ -1100,7 +1102,6 @@ public sealed class CustomDictionaryTests : IDisposable
     // ================================================================
     // LoadDefaults with explicit --custom-dict integration
     // ================================================================
-
     [Fact]
     public void LoadDefaults_ThenUserFile_UserOverridesDefaults()
     {

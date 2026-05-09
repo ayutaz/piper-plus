@@ -132,7 +132,7 @@ public static class SessionFactory
         // uses the default value (0), mirroring the C++ parseArgs behaviour.
         int resolvedDeviceId = ResolveGpuDeviceId(gpuDeviceId, logger);
 
-        var options = ConfigureSessionOptions();
+        SessionOptions options = ConfigureSessionOptions();
 
         if (useCuda)
         {
@@ -174,7 +174,13 @@ public static class SessionFactory
             {
                 logger.LogWarning(
                     "Removing incomplete cache {Path} (missing sentinel)", optimizedPath);
-                try { File.Delete(optimizedPath); } catch { /* best effort */ }
+                try
+                {
+                    File.Delete(optimizedPath);
+                }
+                catch
+                { /* best effort */
+                }
             }
 
             try
@@ -272,7 +278,10 @@ public static class SessionFactory
             long[] phonemeIds = new long[WarmupPhonemeLength];
             phonemeIds[0] = 1; // BOS
             for (int j = 1; j < WarmupPhonemeLength - 1; j++)
+            {
                 phonemeIds[j] = 8; // dummy phoneme
+            }
+
             phonemeIds[WarmupPhonemeLength - 1] = 2; // EOS
             int phonemeLength = phonemeIds.Length;
 
@@ -292,7 +301,7 @@ public static class SessionFactory
             var inputValues = new List<OrtValue>(6) { inputTensor, inputLengths, scalesTensor };
 
             // ---- Dynamically add optional inputs based on model metadata ----
-            var metadata = session.InputMetadata;
+            IReadOnlyDictionary<string, NodeMetadata> metadata = session.InputMetadata;
 
             OrtValue? sidTensor = null;
             if (metadata.ContainsKey("sid"))
@@ -331,7 +340,7 @@ public static class SessionFactory
             if (metadata.ContainsKey("speaker_embedding"))
             {
                 int embDim = 256; // ECAPA-TDNN default
-                if (metadata.TryGetValue("speaker_embedding", out var embMeta)
+                if (metadata.TryGetValue("speaker_embedding", out NodeMetadata? embMeta)
                     && embMeta.Dimensions.Length >= 2 && embMeta.Dimensions[1] > 0)
                 {
                     embDim = embMeta.Dimensions[1];
@@ -357,7 +366,7 @@ public static class SessionFactory
                 for (int i = 0; i < runs; i++)
                 {
                     using var runOptions = new RunOptions();
-                    using var results = session.Run(
+                    using IDisposableReadOnlyCollection<OrtValue> results = session.Run(
                         runOptions, inputNames, inputValues, outputNames);
                 }
             }
@@ -412,6 +421,7 @@ public static class SessionFactory
             Math.Min(Environment.ProcessorCount / 2, MaxIntraThreads), 1);
         options.IntraOpNumThreads = ResolveIntraOpThreads(autoIntraThreads);
         options.InterOpNumThreads = 1;
+
         // VITS は単一グラフで並列サブグラフがないため Sequential が最適。
         options.ExecutionMode = ExecutionMode.ORT_SEQUENTIAL;
 
@@ -438,6 +448,7 @@ public static class SessionFactory
         {
             return false;
         }
+
         var normalized = value.Trim().ToLowerInvariant();
         return normalized is "1" or "true" or "yes";
     }
@@ -448,6 +459,7 @@ public static class SessionFactory
     /// <c>[1, MaxIntraThreads]</c>. Otherwise returns <paramref name="autoDetected"/>.
     /// Mirrors Python <c>ort_utils.create_session_options</c>.
     /// </summary>
+    /// <returns></returns>
     internal static int ResolveIntraOpThreads(int autoDetected)
     {
         var envValue = Environment.GetEnvironmentVariable(IntraThreadsEnvVar);

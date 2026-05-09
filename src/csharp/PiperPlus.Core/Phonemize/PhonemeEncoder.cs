@@ -19,7 +19,7 @@ namespace PiperPlus.Core.Phonemize;
 /// </summary>
 public static class PhonemeEncoder
 {
-    private static ILogger s_logger = NullLogger.Instance;
+    private static ILogger logger = NullLogger.Instance;
 
     /// <summary>
     /// Replace the default (no-op) logger used for unknown-phoneme warnings.
@@ -27,7 +27,7 @@ public static class PhonemeEncoder
     /// </summary>
     public static void SetLogger(ILogger logger)
     {
-        s_logger = logger ?? NullLogger.Instance;
+        PhonemeEncoder.logger = logger ?? NullLogger.Instance;
     }
 
     /// <summary>
@@ -56,7 +56,7 @@ public static class PhonemeEncoder
         ArgumentNullException.ThrowIfNull(phonemeIdMap);
 
         // Step 1: Phonemize text into tokens + prosody.
-        var (tokens, prosodyList) = phonemizer.PhonemizeWithProsody(text);
+        (List<string>? tokens, List<ProsodyInfo?>? prosodyList) = phonemizer.PhonemizeWithProsody(text);
 
         // Step 2: Map tokens to IDs, duplicating prosody for multi-ID tokens.
         var phonemeIds = new List<int>(tokens.Count * 2);
@@ -77,7 +77,7 @@ public static class PhonemeEncoder
             }
             else
             {
-                s_logger.LogWarning("Unknown phoneme: {Phoneme}", token);
+                logger.LogWarning("Unknown phoneme: {Phoneme}", token);
             }
         }
 
@@ -116,7 +116,7 @@ public static class PhonemeEncoder
         string text,
         Dictionary<string, int[]> phonemeIdMap)
     {
-        var (ids, prosody) = Encode(phonemizer, text, phonemeIdMap);
+        (List<int>? ids, List<ProsodyInfo?>? prosody) = Encode(phonemizer, text, phonemeIdMap);
 
         // Convert int IDs to long for ONNX tensor compatibility.
         var phonemeIdsLong = new long[ids.Count];
@@ -152,6 +152,7 @@ public static class PhonemeEncoder
                 flat[offset + 1] = p.A2;
                 flat[offset + 2] = p.A3;
             }
+
             // null entries remain [0, 0, 0] (default long[] initialization).
         }
 

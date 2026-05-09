@@ -12,11 +12,10 @@ public sealed class ArpabetToIPAConverterTests
     // ================================================================
     // ConvertToken tests
     // ================================================================
-
     [Fact]
     public void ConvertToken_Consonant_NoStress()
     {
-        var (ipa, stress) = ArpabetToIPAConverter.ConvertToken("B");
+        (string? ipa, int stress) = ArpabetToIPAConverter.ConvertToken("B");
 
         Assert.Equal("b", ipa);
         Assert.Equal(-1, stress);
@@ -25,7 +24,7 @@ public sealed class ArpabetToIPAConverterTests
     [Fact]
     public void ConvertToken_Vowel_PrimaryStress()
     {
-        var (ipa, stress) = ArpabetToIPAConverter.ConvertToken("AH1");
+        (string? ipa, int stress) = ArpabetToIPAConverter.ConvertToken("AH1");
 
         Assert.Equal("\u028c", ipa); // ʌ
         Assert.Equal(1, stress);
@@ -34,7 +33,7 @@ public sealed class ArpabetToIPAConverterTests
     [Fact]
     public void ConvertToken_Vowel_SecondaryStress()
     {
-        var (ipa, stress) = ArpabetToIPAConverter.ConvertToken("AH2");
+        (string? ipa, int stress) = ArpabetToIPAConverter.ConvertToken("AH2");
 
         Assert.Equal("\u028c", ipa); // ʌ
         Assert.Equal(2, stress);
@@ -44,7 +43,7 @@ public sealed class ArpabetToIPAConverterTests
     public void ConvertToken_Vowel_Unstressed_AH0_IsSchwa()
     {
         // Special case: unstressed AH maps to schwa
-        var (ipa, stress) = ArpabetToIPAConverter.ConvertToken("AH0");
+        (string? ipa, int stress) = ArpabetToIPAConverter.ConvertToken("AH0");
 
         Assert.Equal("\u0259", ipa); // ə
         Assert.Equal(0, stress);
@@ -53,7 +52,7 @@ public sealed class ArpabetToIPAConverterTests
     [Fact]
     public void ConvertToken_AH_Stressed_NotSchwa()
     {
-        var (ipa, stress) = ArpabetToIPAConverter.ConvertToken("AH1");
+        (string? ipa, int stress) = ArpabetToIPAConverter.ConvertToken("AH1");
 
         Assert.Equal("\u028c", ipa); // ʌ (not schwa)
         Assert.Equal(1, stress);
@@ -62,7 +61,7 @@ public sealed class ArpabetToIPAConverterTests
     [Fact]
     public void ConvertToken_Punctuation_Passthrough()
     {
-        var (ipa, stress) = ArpabetToIPAConverter.ConvertToken(",");
+        (string? ipa, int stress) = ArpabetToIPAConverter.ConvertToken(",");
 
         Assert.Equal(",", ipa);
         Assert.Equal(-1, stress);
@@ -122,9 +121,9 @@ public sealed class ArpabetToIPAConverterTests
         // was a tautology that asserted nothing).
         Assert.Equal(39, expected.Count);
 
-        foreach (var (arpa, expectedIpa) in expected)
+        foreach ((string? arpa, string? expectedIpa) in expected)
         {
-            var (ipa, stress) = ArpabetToIPAConverter.ConvertToken(arpa);
+            (string? ipa, int stress) = ArpabetToIPAConverter.ConvertToken(arpa);
 
             Assert.Equal(expectedIpa, ipa);
             Assert.Equal(-1, stress); // no stress digit -> -1
@@ -134,7 +133,7 @@ public sealed class ArpabetToIPAConverterTests
     [Fact]
     public void ConvertToken_ER_Unstressed()
     {
-        var (ipa, stress) = ArpabetToIPAConverter.ConvertToken("ER0");
+        (string? ipa, int stress) = ArpabetToIPAConverter.ConvertToken("ER0");
 
         Assert.Equal("\u025a", ipa); // ɚ
         Assert.Equal(0, stress);
@@ -143,12 +142,11 @@ public sealed class ArpabetToIPAConverterTests
     // ================================================================
     // ConvertWord tests (context-dependent)
     // ================================================================
-
     [Fact]
     public void ConvertWord_AA_R_MergesToLongVowel()
     {
         // AA1 + R -> single ɑːɹ token
-        var result = ArpabetToIPAConverter.ConvertWord(["AA1", "R"]);
+        List<(string Ipa, int Stress)> result = ArpabetToIPAConverter.ConvertWord(["AA1", "R"]);
 
         Assert.Single(result);
         Assert.Equal("\u0251\u02d0\u0279", result[0].Ipa); // ɑːɹ
@@ -159,7 +157,7 @@ public sealed class ArpabetToIPAConverterTests
     public void ConvertWord_StressedER_BecomesLong()
     {
         // ER1 -> ɜː (stressed r-colored vowel)
-        var result = ArpabetToIPAConverter.ConvertWord(["ER1"]);
+        List<(string Ipa, int Stress)> result = ArpabetToIPAConverter.ConvertWord(["ER1"]);
 
         Assert.Single(result);
         Assert.Equal("\u025c\u02d0", result[0].Ipa); // ɜː
@@ -170,7 +168,7 @@ public sealed class ArpabetToIPAConverterTests
     public void ConvertWord_UnstressedER_BecomesSchwaR()
     {
         // ER0 -> ɚ (unstressed r-colored vowel)
-        var result = ArpabetToIPAConverter.ConvertWord(["ER0"]);
+        List<(string Ipa, int Stress)> result = ArpabetToIPAConverter.ConvertWord(["ER0"]);
 
         Assert.Single(result);
         Assert.Equal("\u025a", result[0].Ipa); // ɚ
@@ -181,7 +179,7 @@ public sealed class ArpabetToIPAConverterTests
     public void ConvertWord_NormalWord()
     {
         // "hello" = HH AH0 L OW1 -> h ə l oʊ
-        var result = ArpabetToIPAConverter.ConvertWord(["HH", "AH0", "L", "OW1"]);
+        List<(string Ipa, int Stress)> result = ArpabetToIPAConverter.ConvertWord(["HH", "AH0", "L", "OW1"]);
 
         Assert.Equal(4, result.Count);
         Assert.Equal("h", result[0].Ipa);
@@ -197,7 +195,6 @@ public sealed class ArpabetToIPAConverterTests
     // ================================================================
     // IsFunctionWord tests
     // ================================================================
-
     [Fact]
     public void IsFunctionWord_The()
     {
@@ -225,7 +222,6 @@ public sealed class ArpabetToIPAConverterTests
     // ================================================================
     // IsPunctuation tests
     // ================================================================
-
     [Fact]
     public void IsPunctuation_Comma()
     {
@@ -247,12 +243,11 @@ public sealed class ArpabetToIPAConverterTests
     // ================================================================
     // Additional ConvertToken tests
     // ================================================================
-
     [Fact]
     public void ConvertToken_ER_SecondaryStress()
     {
         // ER2 -> ɚ with stress=2 (secondary stress does NOT trigger the ɜː rule)
-        var (ipa, stress) = ArpabetToIPAConverter.ConvertToken("ER2");
+        (string? ipa, int stress) = ArpabetToIPAConverter.ConvertToken("ER2");
 
         Assert.Equal("\u025a", ipa); // ɚ
         Assert.Equal(2, stress);
@@ -261,12 +256,11 @@ public sealed class ArpabetToIPAConverterTests
     // ================================================================
     // Additional ConvertWord tests
     // ================================================================
-
     [Fact]
     public void ConvertWord_AA0_R_MergesToLongVowel()
     {
         // AA0 + R -> single ɑːɹ token with stress=0
-        var result = ArpabetToIPAConverter.ConvertWord(["AA0", "R"]);
+        List<(string Ipa, int Stress)> result = ArpabetToIPAConverter.ConvertWord(["AA0", "R"]);
 
         Assert.Single(result);
         Assert.Equal("\u0251\u02d0\u0279", result[0].Ipa); // ɑːɹ
@@ -277,7 +271,7 @@ public sealed class ArpabetToIPAConverterTests
     public void ConvertWord_AA2_R_MergesToLongVowel()
     {
         // AA2 + R -> single ɑːɹ token with stress=2
-        var result = ArpabetToIPAConverter.ConvertWord(["AA2", "R"]);
+        List<(string Ipa, int Stress)> result = ArpabetToIPAConverter.ConvertWord(["AA2", "R"]);
 
         Assert.Single(result);
         Assert.Equal("\u0251\u02d0\u0279", result[0].Ipa); // ɑːɹ
@@ -287,7 +281,7 @@ public sealed class ArpabetToIPAConverterTests
     [Fact]
     public void ConvertWord_EmptyList_ReturnsEmpty()
     {
-        var result = ArpabetToIPAConverter.ConvertWord([]);
+        List<(string Ipa, int Stress)> result = ArpabetToIPAConverter.ConvertWord([]);
 
         Assert.Empty(result);
     }
@@ -296,7 +290,7 @@ public sealed class ArpabetToIPAConverterTests
     public void ConvertWord_SingleConsonant()
     {
         // ["B"] -> single entry "b" with stress=-1
-        var result = ArpabetToIPAConverter.ConvertWord(["B"]);
+        List<(string Ipa, int Stress)> result = ArpabetToIPAConverter.ConvertWord(["B"]);
 
         Assert.Single(result);
         Assert.Equal("b", result[0].Ipa);
@@ -307,7 +301,7 @@ public sealed class ArpabetToIPAConverterTests
     public void ConvertWord_R_AfterConsonant_NoMerge()
     {
         // ["T", "R"] -> separate entries; merge only applies to AA+R
-        var result = ArpabetToIPAConverter.ConvertWord(["T", "R"]);
+        List<(string Ipa, int Stress)> result = ArpabetToIPAConverter.ConvertWord(["T", "R"]);
 
         Assert.Equal(2, result.Count);
         Assert.Equal("t", result[0].Ipa);
@@ -320,7 +314,7 @@ public sealed class ArpabetToIPAConverterTests
     public void ConvertWord_ER_NoStressDigit()
     {
         // ["ER"] without stress digit -> ɚ with stress=-1
-        var result = ArpabetToIPAConverter.ConvertWord(["ER"]);
+        List<(string Ipa, int Stress)> result = ArpabetToIPAConverter.ConvertWord(["ER"]);
 
         Assert.Single(result);
         Assert.Equal("\u025a", result[0].Ipa); // ɚ
@@ -330,7 +324,6 @@ public sealed class ArpabetToIPAConverterTests
     // ================================================================
     // Additional IsPunctuation tests
     // ================================================================
-
     [Theory]
     [InlineData(",")]
     [InlineData(".")]
@@ -346,13 +339,12 @@ public sealed class ArpabetToIPAConverterTests
     [Fact]
     public void IsPunctuation_EmptyString_ReturnsFalse()
     {
-        Assert.False(ArpabetToIPAConverter.IsPunctuation(""));
+        Assert.False(ArpabetToIPAConverter.IsPunctuation(string.Empty));
     }
 
     // ================================================================
     // Additional IsFunctionWord tests
     // ================================================================
-
     [Theory]
     [InlineData("am")]
     [InlineData("was")]
@@ -370,6 +362,6 @@ public sealed class ArpabetToIPAConverterTests
     [Fact]
     public void IsFunctionWord_EmptyString_ReturnsFalse()
     {
-        Assert.False(ArpabetToIPAConverter.IsFunctionWord(""));
+        Assert.False(ArpabetToIPAConverter.IsFunctionWord(string.Empty));
     }
 }

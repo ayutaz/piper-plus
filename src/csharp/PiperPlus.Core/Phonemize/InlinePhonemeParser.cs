@@ -45,7 +45,9 @@ public static partial class InlinePhonemeParser
     public static List<TextOrPhonemes> Parse(string? input)
     {
         if (string.IsNullOrEmpty(input))
+        {
             return [];
+        }
 
         var result = new List<TextOrPhonemes>();
         int lastPos = 0;

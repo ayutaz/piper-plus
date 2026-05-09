@@ -12,7 +12,6 @@ public sealed class PiperConfig
     // ----------------------------------------------------------------
     // Required fields
     // ----------------------------------------------------------------
-
     [JsonPropertyName("num_speakers")]
     public int NumSpeakers { get; set; }
 
@@ -144,6 +143,7 @@ public sealed class PiperConfig
     /// Throws <see cref="FileNotFoundException"/> if the file does not exist,
     /// <see cref="InvalidOperationException"/> if required fields are missing.
     /// </summary>
+    /// <returns></returns>
     public static PiperConfig LoadFromFile(string configPath)
     {
         if (!File.Exists(configPath))
@@ -152,8 +152,8 @@ public sealed class PiperConfig
                 $"Config file not found: {configPath}", configPath);
         }
 
-        using var stream = File.OpenRead(configPath);
-        var config = JsonSerializer.Deserialize(
+        using FileStream stream = File.OpenRead(configPath);
+        PiperConfig? config = JsonSerializer.Deserialize(
             stream, PiperConfigJsonContext.Default.PiperConfig);
 
         if (config is null)
@@ -169,7 +169,6 @@ public sealed class PiperConfig
     // ----------------------------------------------------------------
     // Validation
     // ----------------------------------------------------------------
-
     private static void Validate(PiperConfig config, string path)
     {
         if (config.PhonemeIdMap is null || config.PhonemeIdMap.Count == 0)

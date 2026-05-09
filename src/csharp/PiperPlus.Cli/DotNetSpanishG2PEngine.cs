@@ -1,5 +1,5 @@
-using PiperPlus.Core.Phonemize;
 using DotNetG2P.Spanish;
+using PiperPlus.Core.Phonemize;
 
 namespace PiperPlus.Cli;
 

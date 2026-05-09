@@ -29,17 +29,17 @@ public sealed class FrenchPhonemizer : IPhonemizer
 
     // French vowels for stress detection (matching Python vowel_phonemes set).
     // Includes oral vowels, nasal vowels (decomposed: base + U+0303), and y_vowel.
-    private static readonly HashSet<string> s_vowels = new()
+    private static readonly HashSet<string> S_vowels = new()
     {
         "a", "e", "\u025b", "i", "o", "\u0254", "u", "y_vowel", "\u0259", "\u00f8", "\u0153",
         "\u025b\u0303", // ɛ̃  (nasal)
         "\u0251\u0303", // ɑ̃  (nasal)
-        "\u0254\u0303"  // ɔ̃  (nasal)
+        "\u0254\u0303" // ɔ̃  (nasal)
     };
 
     // Punctuation characters that appear as standalone tokens.
     // Matches Python _PUNCTUATION: . , ; : ! ? « » — – …
-    private static readonly HashSet<string> s_punctuation = new()
+    private static readonly HashSet<string> S_punctuation = new()
     {
         ".", ",", ";", ":", "!", "?",
         "\u00a1", // ¡
@@ -48,10 +48,11 @@ public sealed class FrenchPhonemizer : IPhonemizer
         "\u00bb", // »
         "\u2014", // —
         "\u2013", // –
-        "\u2026"  // …
+        "\u2026" // …
     };
 
     /// <summary>
+    /// Initializes a new instance of the <see cref="FrenchPhonemizer"/> class.
     /// Create a new <see cref="FrenchPhonemizer"/> backed by the given G2P engine.
     /// </summary>
     /// <param name="engine">
@@ -65,7 +66,7 @@ public sealed class FrenchPhonemizer : IPhonemizer
     /// <inheritdoc />
     public List<string> Phonemize(string text)
     {
-        var (tokens, _) = PhonemizeCore(text);
+        (List<string>? tokens, List<ProsodyInfo?> _) = PhonemizeCore(text);
         return tokens;
     }
 
@@ -149,7 +150,7 @@ public sealed class FrenchPhonemizer : IPhonemizer
         FlushWord(currentWord, tokens, prosody);
 
         // Step 3: Map multi-character tokens (nasal vowels, y_vowel, etc.) to PUA codepoints.
-        var mapped = PiperPhonemeConverter.MapSequence(tokens);
+        IReadOnlyList<string> mapped = PiperPhonemeConverter.MapSequence(tokens);
 
         var result = new List<string>(mapped.Count);
         for (int i = 0; i < mapped.Count; i++)
@@ -177,7 +178,9 @@ public sealed class FrenchPhonemizer : IPhonemizer
         List<ProsodyInfo?> outProsody)
     {
         if (wordTokens.Count == 0)
+        {
             return;
+        }
 
         int phonemeCount = wordTokens.Count;
 
@@ -206,7 +209,7 @@ public sealed class FrenchPhonemizer : IPhonemizer
     /// </summary>
     private static bool IsVowel(string token)
     {
-        return s_vowels.Contains(token);
+        return S_vowels.Contains(token);
     }
 
     /// <summary>
@@ -214,6 +217,6 @@ public sealed class FrenchPhonemizer : IPhonemizer
     /// </summary>
     private static bool IsPunctuation(string token)
     {
-        return s_punctuation.Contains(token);
+        return S_punctuation.Contains(token);
     }
 }

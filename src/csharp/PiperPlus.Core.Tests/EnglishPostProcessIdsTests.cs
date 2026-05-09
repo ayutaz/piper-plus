@@ -58,8 +58,8 @@ public sealed class EnglishPostProcessIdsTests
     [Fact]
     public void BasicSequence_PadAndBosEosInserted()
     {
-        var phonemizer = MakePhonemizer();
-        var map = MakeMap();
+        EnglishPhonemizer phonemizer = MakePhonemizer();
+        Dictionary<string, int[]> map = MakeMap();
 
         var inputIds = new List<int> { 10, 11, 12 };
         var inputProsody = new List<ProsodyInfo?>
@@ -69,7 +69,7 @@ public sealed class EnglishPostProcessIdsTests
             new ProsodyInfo(0, 0, 3),
         };
 
-        var (ids, prosody) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
+        (List<int>? ids, List<ProsodyInfo?>? prosody) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
 
         // BOS(1), PAD(0), 10, PAD(0), 11, PAD(0), 12, PAD(0), EOS(2)
         Assert.Equal([1, 0, 10, 0, 11, 0, 12, 0, 2], ids);
@@ -85,13 +85,13 @@ public sealed class EnglishPostProcessIdsTests
     [Fact]
     public void SinglePhoneme_PadAndBosEosInserted()
     {
-        var phonemizer = MakePhonemizer();
-        var map = MakeMap();
+        EnglishPhonemizer phonemizer = MakePhonemizer();
+        Dictionary<string, int[]> map = MakeMap();
 
         var inputIds = new List<int> { 10 };
         var inputProsody = new List<ProsodyInfo?> { new ProsodyInfo(0, 2, 1) };
 
-        var (ids, _) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
+        (List<int>? ids, List<ProsodyInfo?> _) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
 
         Assert.Equal([1, 0, 10, 0, 2], ids);
     }
@@ -106,13 +106,13 @@ public sealed class EnglishPostProcessIdsTests
     [Fact]
     public void EmptyInput_BosAndEosOnly()
     {
-        var phonemizer = MakePhonemizer();
-        var map = MakeMap();
+        EnglishPhonemizer phonemizer = MakePhonemizer();
+        Dictionary<string, int[]> map = MakeMap();
 
         var inputIds = new List<int>();
         var inputProsody = new List<ProsodyInfo?>();
 
-        var (ids, prosody) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
+        (List<int>? ids, List<ProsodyInfo?>? prosody) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
 
         // BOS(1) + PAD(0) + EOS(2)
         Assert.Equal([1, 0, 2], ids);
@@ -134,8 +134,8 @@ public sealed class EnglishPostProcessIdsTests
     [Fact]
     public void ProsodyAlignment_PadPositionsAreNull()
     {
-        var phonemizer = MakePhonemizer();
-        var map = MakeMap();
+        EnglishPhonemizer phonemizer = MakePhonemizer();
+        Dictionary<string, int[]> map = MakeMap();
 
         var p1 = new ProsodyInfo(0, 2, 3);
         var p2 = new ProsodyInfo(0, 0, 3);
@@ -144,7 +144,7 @@ public sealed class EnglishPostProcessIdsTests
         var inputIds = new List<int> { 10, 11, 12 };
         var inputProsody = new List<ProsodyInfo?> { p1, p2, p3 };
 
-        var (ids, prosody) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
+        (List<int>? ids, List<ProsodyInfo?>? prosody) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
 
         // Expected: [null, null, p1, null, p2, null, p3, null, null]
         //            BOS   PAD  10   PAD  11   PAD  12   PAD  EOS
@@ -172,14 +172,14 @@ public sealed class EnglishPostProcessIdsTests
     [Fact]
     public void NoBOS_BosSkipped()
     {
-        var phonemizer = MakePhonemizer();
-        var map = MakeMap();
+        EnglishPhonemizer phonemizer = MakePhonemizer();
+        Dictionary<string, int[]> map = MakeMap();
         map.Remove("^");
 
         var inputIds = new List<int> { 10 };
         var inputProsody = new List<ProsodyInfo?> { new ProsodyInfo(0, 2, 1) };
 
-        var (ids, prosody) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
+        (List<int>? ids, List<ProsodyInfo?>? prosody) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
 
         // No BOS prefix: just padded IDs + EOS.
         Assert.Equal([10, 0, 2], ids);
@@ -202,14 +202,14 @@ public sealed class EnglishPostProcessIdsTests
     [Fact]
     public void NoEOS_EosSkipped()
     {
-        var phonemizer = MakePhonemizer();
-        var map = MakeMap();
+        EnglishPhonemizer phonemizer = MakePhonemizer();
+        Dictionary<string, int[]> map = MakeMap();
         map.Remove("$");
 
         var inputIds = new List<int> { 10 };
         var inputProsody = new List<ProsodyInfo?> { new ProsodyInfo(0, 2, 1) };
 
-        var (ids, prosody) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
+        (List<int>? ids, List<ProsodyInfo?>? prosody) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
 
         // BOS + PAD + 10 + PAD, no EOS.
         Assert.Equal([1, 0, 10, 0], ids);
@@ -234,8 +234,8 @@ public sealed class EnglishPostProcessIdsTests
     [Fact]
     public void MultiIdPad_AllPadIdsInserted()
     {
-        var phonemizer = MakePhonemizer();
-        var map = MakeMap();
+        EnglishPhonemizer phonemizer = MakePhonemizer();
+        Dictionary<string, int[]> map = MakeMap();
         map["_"] = [0, 99]; // Multi-ID PAD
 
         var inputIds = new List<int> { 10, 11 };
@@ -245,7 +245,7 @@ public sealed class EnglishPostProcessIdsTests
             new ProsodyInfo(0, 0, 2),
         };
 
-        var (ids, prosody) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
+        (List<int>? ids, List<ProsodyInfo?>? prosody) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
 
         // BOS(1) + pad[0]=0 + 10 + 0 + 99 + 11 + 0 + 99 + EOS(2)
         Assert.Equal([1, 0, 10, 0, 99, 11, 0, 99, 2], ids);
@@ -275,8 +275,8 @@ public sealed class EnglishPostProcessIdsTests
     [InlineData(20)]
     public void ProsodyLengthMatchesIds(int inputLength)
     {
-        var phonemizer = MakePhonemizer();
-        var map = MakeMap();
+        EnglishPhonemizer phonemizer = MakePhonemizer();
+        Dictionary<string, int[]> map = MakeMap();
 
         var inputIds = new List<int>();
         var inputProsody = new List<ProsodyInfo?>();
@@ -286,7 +286,7 @@ public sealed class EnglishPostProcessIdsTests
             inputProsody.Add(new ProsodyInfo(0, 0, inputLength));
         }
 
-        var (ids, prosody) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
+        (List<int>? ids, List<ProsodyInfo?>? prosody) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
 
         Assert.Equal(ids.Count, prosody.Count);
     }
@@ -302,8 +302,8 @@ public sealed class EnglishPostProcessIdsTests
     [Fact]
     public void NoBosNoEos_OnlyPaddingApplied()
     {
-        var phonemizer = MakePhonemizer();
-        var map = MakeMap();
+        EnglishPhonemizer phonemizer = MakePhonemizer();
+        Dictionary<string, int[]> map = MakeMap();
         map.Remove("^");
         map.Remove("$");
 
@@ -314,7 +314,7 @@ public sealed class EnglishPostProcessIdsTests
             new ProsodyInfo(0, 0, 2),
         };
 
-        var (ids, prosody) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
+        (List<int>? ids, List<ProsodyInfo?>? prosody) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
 
         // Just padded: 10 + PAD(0) + 11 + PAD(0)
         Assert.Equal([10, 0, 11, 0], ids);
@@ -332,19 +332,19 @@ public sealed class EnglishPostProcessIdsTests
     [Fact]
     public void NoPadInMap_DefaultsToZero()
     {
-        var phonemizer = MakePhonemizer();
+        EnglishPhonemizer phonemizer = MakePhonemizer();
         var map = new Dictionary<string, int[]>
         {
             ["^"] = [1],
             ["$"] = [2],
             ["h"] = [10],
         };
-        // "_" is absent — should default to PAD=[0].
 
+        // "_" is absent — should default to PAD=[0].
         var inputIds = new List<int> { 10 };
         var inputProsody = new List<ProsodyInfo?> { null };
 
-        var (ids, _) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
+        (List<int>? ids, List<ProsodyInfo?> _) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
 
         // BOS(1) + PAD(0) + 10 + PAD(0) + EOS(2)
         Assert.Equal([1, 0, 10, 0, 2], ids);
@@ -362,13 +362,13 @@ public sealed class EnglishPostProcessIdsTests
     [Fact]
     public void AllProsodyNull_StillCorrect()
     {
-        var phonemizer = MakePhonemizer();
-        var map = MakeMap();
+        EnglishPhonemizer phonemizer = MakePhonemizer();
+        Dictionary<string, int[]> map = MakeMap();
 
         var inputIds = new List<int> { 10, 12 };
         var inputProsody = new List<ProsodyInfo?> { null, null };
 
-        var (ids, prosody) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
+        (List<int>? ids, List<ProsodyInfo?>? prosody) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
 
         Assert.Equal([1, 0, 10, 0, 12, 0, 2], ids);
         Assert.Equal(ids.Count, prosody.Count);
@@ -387,7 +387,7 @@ public sealed class EnglishPostProcessIdsTests
     [Fact]
     public void PostProcessIds_SkipsPadAfterPadToken()
     {
-        var phonemizer = MakePhonemizer();
+        EnglishPhonemizer phonemizer = MakePhonemizer();
         var map = new Dictionary<string, int[]>
         {
             ["_"] = [0],
@@ -403,7 +403,7 @@ public sealed class EnglishPostProcessIdsTests
             new ProsodyInfo(0, 2, 3),
         };
 
-        var (ids, pros) = phonemizer.PostProcessIds(phonemeIds, prosody, map);
+        (List<int>? ids, List<ProsodyInfo?>? pros) = phonemizer.PostProcessIds(phonemeIds, prosody, map);
 
         // Expected: [BOS=1, PAD=0, 10, PAD=0, 0(no extra PAD), 11, PAD=0, EOS=2]
         Assert.Equal([1, 0, 10, 0, 0, 11, 0, 2], ids);
@@ -421,7 +421,7 @@ public sealed class EnglishPostProcessIdsTests
     [Fact]
     public void PostProcessIds_AllPadTokens_NoPadInserted()
     {
-        var phonemizer = MakePhonemizer();
+        EnglishPhonemizer phonemizer = MakePhonemizer();
         var map = new Dictionary<string, int[]>
         {
             ["_"] = [0],
@@ -432,7 +432,7 @@ public sealed class EnglishPostProcessIdsTests
         var phonemeIds = new List<int> { 0, 0 };
         var prosody = new List<ProsodyInfo?> { null, null };
 
-        var (ids, pros) = phonemizer.PostProcessIds(phonemeIds, prosody, map);
+        (List<int>? ids, List<ProsodyInfo?>? pros) = phonemizer.PostProcessIds(phonemeIds, prosody, map);
 
         // Expected: [BOS=1, PAD=0, 0, 0, EOS=2] (no extra PADs after the 0s)
         Assert.Equal([1, 0, 0, 0, 2], ids);
@@ -469,7 +469,7 @@ public sealed class EnglishPostProcessIdsTests
             ["l"] = [12],
         };
 
-        var (ids, prosody) = PhonemeEncoder.Encode(phonemizer, "dummy", map);
+        (List<int>? ids, List<ProsodyInfo?>? prosody) = PhonemeEncoder.Encode(phonemizer, "dummy", map);
 
         // First and last IDs must be BOS and EOS.
         Assert.Equal(1, ids[0]);       // BOS
@@ -495,8 +495,8 @@ public sealed class EnglishPostProcessIdsTests
     [Fact]
     public void PostProcessIds_NoBosInMap()
     {
-        var phonemizer = MakePhonemizer();
-        var map = MakeMap();
+        EnglishPhonemizer phonemizer = MakePhonemizer();
+        Dictionary<string, int[]> map = MakeMap();
         map.Remove("^");
 
         var inputIds = new List<int> { 10, 11, 12 };
@@ -507,7 +507,7 @@ public sealed class EnglishPostProcessIdsTests
             new ProsodyInfo(0, 0, 3),
         };
 
-        var (ids, prosody) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
+        (List<int>? ids, List<ProsodyInfo?>? prosody) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
 
         // No BOS: 10 + PAD(0) + 11 + PAD(0) + 12 + PAD(0) + EOS(2)
         Assert.Equal([10, 0, 11, 0, 12, 0, 2], ids);
@@ -515,6 +515,7 @@ public sealed class EnglishPostProcessIdsTests
 
         // First element is phoneme, not BOS null.
         Assert.NotNull(prosody[0]);
+
         // EOS at the end is null.
         Assert.Null(prosody[^1]);
     }
@@ -532,8 +533,8 @@ public sealed class EnglishPostProcessIdsTests
     [Fact]
     public void PostProcessIds_NoEosInMap()
     {
-        var phonemizer = MakePhonemizer();
-        var map = MakeMap();
+        EnglishPhonemizer phonemizer = MakePhonemizer();
+        Dictionary<string, int[]> map = MakeMap();
         map.Remove("$");
 
         var inputIds = new List<int> { 10, 11, 12 };
@@ -544,7 +545,7 @@ public sealed class EnglishPostProcessIdsTests
             new ProsodyInfo(0, 0, 3),
         };
 
-        var (ids, prosody) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
+        (List<int>? ids, List<ProsodyInfo?>? prosody) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
 
         // BOS(1) + PAD(0) + 10 + PAD(0) + 11 + PAD(0) + 12 + PAD(0), no EOS.
         Assert.Equal([1, 0, 10, 0, 11, 0, 12, 0], ids);
@@ -553,8 +554,10 @@ public sealed class EnglishPostProcessIdsTests
         // BOS and its PAD are null.
         Assert.Null(prosody[0]);
         Assert.Null(prosody[1]);
+
         // Last element is a trailing PAD (null), not EOS.
         Assert.Null(prosody[^1]);
+
         // Phoneme at index 6 is the last real phoneme.
         Assert.NotNull(prosody[6]);
     }
@@ -572,7 +575,7 @@ public sealed class EnglishPostProcessIdsTests
     [Fact]
     public void PostProcessIds_NoPadInMap()
     {
-        var phonemizer = MakePhonemizer();
+        EnglishPhonemizer phonemizer = MakePhonemizer();
         var map = new Dictionary<string, int[]>
         {
             ["^"] = [1],
@@ -581,8 +584,8 @@ public sealed class EnglishPostProcessIdsTests
             ["\u0259"] = [11],  // ə
             ["l"] = [12],
         };
-        // "_" is absent — PAD should fall back to [0].
 
+        // "_" is absent — PAD should fall back to [0].
         var inputIds = new List<int> { 10, 11, 12 };
         var inputProsody = new List<ProsodyInfo?>
         {
@@ -591,7 +594,7 @@ public sealed class EnglishPostProcessIdsTests
             new ProsodyInfo(0, 0, 3),
         };
 
-        var (ids, prosody) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
+        (List<int>? ids, List<ProsodyInfo?>? prosody) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
 
         // BOS(1) + PAD(0) + 10 + PAD(0) + 11 + PAD(0) + 12 + PAD(0) + EOS(2)
         Assert.Equal([1, 0, 10, 0, 11, 0, 12, 0, 2], ids);
@@ -616,13 +619,13 @@ public sealed class EnglishPostProcessIdsTests
     [Fact]
     public void PostProcessIds_SinglePhoneme()
     {
-        var phonemizer = MakePhonemizer();
-        var map = MakeMap();
+        EnglishPhonemizer phonemizer = MakePhonemizer();
+        Dictionary<string, int[]> map = MakeMap();
 
         var inputIds = new List<int> { 10 };
         var inputProsody = new List<ProsodyInfo?> { new ProsodyInfo(0, 2, 1) };
 
-        var (ids, prosody) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
+        (List<int>? ids, List<ProsodyInfo?>? prosody) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
 
         // Exact output: [BOS, PAD, 10, PAD, EOS]
         Assert.Equal(5, ids.Count);
@@ -655,8 +658,8 @@ public sealed class EnglishPostProcessIdsTests
     [Fact]
     public void PostProcessIds_ProsodyPreservedThroughPadding()
     {
-        var phonemizer = MakePhonemizer();
-        var map = MakeMap();
+        EnglishPhonemizer phonemizer = MakePhonemizer();
+        Dictionary<string, int[]> map = MakeMap();
 
         var p1 = new ProsodyInfo(A1: -1, A2: 2, A3: 5);
         var p2 = new ProsodyInfo(A1: 0, A2: 1, A3: 5);
@@ -665,7 +668,7 @@ public sealed class EnglishPostProcessIdsTests
         var inputIds = new List<int> { 10, 11, 12 };
         var inputProsody = new List<ProsodyInfo?> { p1, p2, p3 };
 
-        var (ids, prosody) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
+        (List<int>? ids, List<ProsodyInfo?>? prosody) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
 
         // Output layout:
         // idx: 0     1     2    3     4    5     6    7     8
@@ -713,7 +716,7 @@ public sealed class EnglishPostProcessIdsTests
         public SingleWordG2PEngine(IEnumerable<IEnumerable<string>> words)
         {
             _words = new List<List<string>>();
-            foreach (var w in words)
+            foreach (IEnumerable<string> w in words)
             {
                 _words.Add(new List<string>(w));
             }

@@ -45,7 +45,9 @@ public sealed class ChinesePhonemizerPuaTests
     private sealed class ToneStubEngine : IChineseG2PEngine
     {
         private readonly ChineseG2PResult _result;
+
         public ToneStubEngine(ChineseG2PResult result) => _result = result;
+
         public ChineseG2PResult Convert(string text) => _result;
     }
 
@@ -67,11 +69,10 @@ public sealed class ChinesePhonemizerPuaTests
             Phonemes: [PuaN, PuaI, Tone3, PuaX, PuaA, PuaO, Tone3],
             A1: [3, 3, 3, 3, 3, 3, 3],
             A2: [1, 1, 1, 2, 2, 2, 2],
-            A3: [2, 2, 2, 2, 2, 2, 2]
-        );
+            A3: [2, 2, 2, 2, 2, 2, 2]);
 
         var phonemizer = new ChinesePhonemizer(new ToneStubEngine(g2p));
-        var (tokens, prosody) = phonemizer.PhonemizeWithProsody("你好");
+        (List<string>? tokens, List<ProsodyInfo?>? prosody) = phonemizer.PhonemizeWithProsody("你好");
 
         // Should contain exactly the 7 tokens including tone markers
         Assert.Equal(7, tokens.Count);
@@ -95,11 +96,10 @@ public sealed class ChinesePhonemizerPuaTests
             Phonemes: [PuaN, PuaI, Tone3, PuaX, PuaA, PuaO, Tone3],
             A1: [3, 3, 3, 3, 3, 3, 3],
             A2: [1, 1, 1, 2, 2, 2, 2],
-            A3: [2, 2, 2, 2, 2, 2, 2]
-        );
+            A3: [2, 2, 2, 2, 2, 2, 2]);
 
         var phonemizer = new ChinesePhonemizer(new ToneStubEngine(g2p));
-        var (tokens, prosody) = phonemizer.PhonemizeWithProsody("你好");
+        (List<string>? tokens, List<ProsodyInfo?>? prosody) = phonemizer.PhonemizeWithProsody("你好");
 
         // Prosody list must have the same length as tokens
         Assert.Equal(tokens.Count, prosody.Count);
@@ -131,11 +131,10 @@ public sealed class ChinesePhonemizerPuaTests
             Phonemes: [PuaA, Tone1, PuaA, Tone2, PuaA, Tone3, PuaA, Tone4, PuaA, Tone5],
             A1: [1, 1, 2, 2, 3, 3, 4, 4, 5, 5],
             A2: [1, 1, 2, 2, 3, 3, 4, 4, 5, 5],
-            A3: [5, 5, 5, 5, 5, 5, 5, 5, 5, 5]
-        );
+            A3: [5, 5, 5, 5, 5, 5, 5, 5, 5, 5]);
 
         var phonemizer = new ChinesePhonemizer(new ToneStubEngine(g2p));
-        var (tokens, prosody) = phonemizer.PhonemizeWithProsody("妈麻马骂吗");
+        (List<string>? tokens, List<ProsodyInfo?>? prosody) = phonemizer.PhonemizeWithProsody("妈麻马骂吗");
 
         // 5 phonemes + 5 tone markers = 10 tokens
         Assert.Equal(10, tokens.Count);
@@ -171,11 +170,10 @@ public sealed class ChinesePhonemizerPuaTests
             Phonemes: [PuaN, PuaI, Tone3, PuaX, PuaA, PuaO, Tone3, PuaN, PuaA, Tone5],
             A1: [3, 3, 3, 3, 3, 3, 3, 5, 5, 5],
             A2: [1, 1, 1, 2, 2, 2, 2, 3, 3, 3],
-            A3: [3, 3, 3, 3, 3, 3, 3, 3, 3, 3]
-        );
+            A3: [3, 3, 3, 3, 3, 3, 3, 3, 3, 3]);
 
         var phonemizer = new ChinesePhonemizer(new ToneStubEngine(g2p));
-        var (_, prosody) = phonemizer.PhonemizeWithProsody("你好吗");
+        (List<string> _, List<ProsodyInfo?>? prosody) = phonemizer.PhonemizeWithProsody("你好吗");
 
         // First syllable tokens: A2=1
         Assert.Equal(1, prosody[0]!.Value.A2);
@@ -207,11 +205,10 @@ public sealed class ChinesePhonemizerPuaTests
             Phonemes: [PuaN, PuaI, Tone3, PuaX, PuaA, PuaO, Tone3, PuaN, PuaA, Tone5],
             A1: [3, 3, 3, 3, 3, 3, 3, 5, 5, 5],
             A2: [1, 1, 1, 1, 1, 1, 1, 2, 2, 2],
-            A3: [1, 1, 1, 2, 2, 2, 2, 2, 2, 2]
-        );
+            A3: [1, 1, 1, 2, 2, 2, 2, 2, 2, 2]);
 
         var phonemizer = new ChinesePhonemizer(new ToneStubEngine(g2p));
-        var (_, prosody) = phonemizer.PhonemizeWithProsody("你好吗");
+        (List<string> _, List<ProsodyInfo?>? prosody) = phonemizer.PhonemizeWithProsody("你好吗");
 
         // First word (A3=1)
         Assert.Equal(1, prosody[0]!.Value.A3);
@@ -239,8 +236,7 @@ public sealed class ChinesePhonemizerPuaTests
             Phonemes: [PuaA, Tone1],
             A1: [1, 1],
             A2: [1, 1],
-            A3: [1, 1]
-        );
+            A3: [1, 1]);
 
         var phonemizer = new ChinesePhonemizer(new ToneStubEngine(g2p));
 
@@ -257,7 +253,7 @@ public sealed class ChinesePhonemizerPuaTests
         var inputIds = new List<int> { 10, 20 };
         var inputProsody = new List<ProsodyInfo?> { new(1, 1, 1), new(1, 1, 1) };
 
-        var (ids, prosody) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
+        (List<int>? ids, List<ProsodyInfo?>? prosody) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
 
         // Expected: BOS(1), PAD(0), 10, PAD(0), 20, PAD(0), EOS(2)
         Assert.Equal([1, 0, 10, 0, 20, 0, 2], ids);
@@ -279,11 +275,10 @@ public sealed class ChinesePhonemizerPuaTests
             Phonemes: [Tone3],
             A1: [3],
             A2: [1],
-            A3: [1]
-        );
+            A3: [1]);
 
         var phonemizer = new ChinesePhonemizer(new ToneStubEngine(g2p));
-        var (tokens, prosody) = phonemizer.PhonemizeWithProsody("x");
+        (List<string>? tokens, List<ProsodyInfo?>? prosody) = phonemizer.PhonemizeWithProsody("x");
 
         Assert.Single(tokens);
         Assert.Equal(Tone3, tokens[0]);
@@ -308,11 +303,10 @@ public sealed class ChinesePhonemizerPuaTests
             Phonemes: [PuaO, Tone3, PuaA, PuaI, Tone4, PuaN, PuaO, Tone1, PuaN, PuaO, Tone2],
             A1: [3, 3, 4, 4, 4, 1, 1, 1, 2, 2, 2],
             A2: [1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2],
-            A3: [1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2]
-        );
+            A3: [1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2]);
 
         var phonemizer = new ChinesePhonemizer(new ToneStubEngine(g2p));
-        var (tokens, prosody) = phonemizer.PhonemizeWithProsody("我爱中国");
+        (List<string>? tokens, List<ProsodyInfo?>? prosody) = phonemizer.PhonemizeWithProsody("我爱中国");
 
         Assert.Equal(11, tokens.Count);
         Assert.Equal(tokens.Count, prosody.Count);

@@ -26,31 +26,26 @@ public class SpeakerEncoderE2ETests
         [property: JsonPropertyName("hf_repo")] string HfRepo,
         [property: JsonPropertyName("hf_filename")] string HfFilename,
         [property: JsonPropertyName("hf_revision")] string HfRevision,
-        [property: JsonPropertyName("sha256")] string? Sha256
-    );
+        [property: JsonPropertyName("sha256")] string? Sha256);
 
     private sealed record E2EReferenceWav(
         [property: JsonPropertyName("path")] string Path,
-        [property: JsonPropertyName("sha256")] string? Sha256
-    );
+        [property: JsonPropertyName("sha256")] string? Sha256);
 
     private sealed record E2EExpectedEmbedding(
         [property: JsonPropertyName("dim")] int Dim,
         [property: JsonPropertyName("values")] float[] Values,
-        [property: JsonPropertyName("checksum")] string? Checksum
-    );
+        [property: JsonPropertyName("checksum")] string? Checksum);
 
     private sealed record E2EGate(
         [property: JsonPropertyName("version")] int Version,
         [property: JsonPropertyName("encoder_onnx")] E2EEncoderRef EncoderOnnx,
         [property: JsonPropertyName("reference_wav")] E2EReferenceWav ReferenceWav,
         [property: JsonPropertyName("expected_embedding")] E2EExpectedEmbedding ExpectedEmbedding,
-        [property: JsonPropertyName("cosine_threshold")] float CosineThreshold
-    );
+        [property: JsonPropertyName("cosine_threshold")] float CosineThreshold);
 
     private sealed record E2EFixture(
-        [property: JsonPropertyName("e2e_cosine_gate")] E2EGate? E2ECosineGate
-    );
+        [property: JsonPropertyName("e2e_cosine_gate")] E2EGate? E2ECosineGate);
 
     private static string RepoRoot()
     {
@@ -63,8 +58,10 @@ public class SpeakerEncoderE2ETests
             {
                 return d.FullName;
             }
+
             d = d.Parent;
         }
+
         // Fallback: use a path relative to the test source file (Roslyn-resolved at build).
         throw new DirectoryNotFoundException(
             "Could not locate repo root from " + here);
@@ -76,7 +73,7 @@ public class SpeakerEncoderE2ETests
     private static string Sha256File(string path)
     {
         using var sha = SHA256.Create();
-        using var stream = File.OpenRead(path);
+        using FileStream stream = File.OpenRead(path);
         byte[] hash = sha.ComputeHash(stream);
         return Convert.ToHexString(hash).ToLowerInvariant();
     }
@@ -90,11 +87,16 @@ public class SpeakerEncoderE2ETests
             na += (double)a[i] * a[i];
             nb += (double)b[i] * b[i];
         }
+
         // Guard against zero-magnitude vectors. Use `<= 0` rather than `== 0` because
         // double accumulation of `(double)a[i] * a[i]` is non-negative analytically but
         // CodeQL flags exact float equality; `<= 0` is also robust if a future change
         // ever lets the running sum drift to a tiny negative due to compensated math.
-        if (na <= 0 || nb <= 0) return 0f;
+        if (na <= 0 || nb <= 0)
+        {
+            return 0f;
+        }
+
         return (float)(dot / (Math.Sqrt(na) * Math.Sqrt(nb)));
     }
 
@@ -128,6 +130,7 @@ public class SpeakerEncoderE2ETests
                         "without --encoder-onnx; layer-1 mel parity tests still apply");
             return;
         }
+
         E2EGate gate = fixture.E2ECosineGate;
 
         string? encoderPath = Environment.GetEnvironmentVariable("PIPER_SPEAKER_ENCODER_ONNX_PATH");
@@ -137,6 +140,7 @@ public class SpeakerEncoderE2ETests
                         "skipping by default");
             return;
         }
+
         if (!File.Exists(encoderPath))
         {
             throw new FileNotFoundException(
@@ -158,6 +162,7 @@ public class SpeakerEncoderE2ETests
         {
             wavPath = System.IO.Path.Join(RepoRoot(), wavPath);
         }
+
         if (!File.Exists(wavPath))
         {
             Assert.Skip($"reference WAV not found at {wavPath}");

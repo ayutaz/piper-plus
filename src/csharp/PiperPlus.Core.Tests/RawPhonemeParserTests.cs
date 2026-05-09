@@ -12,7 +12,6 @@ public sealed class RawPhonemeParserTests
     // ================================================================
     // Shared phoneme_id_map used by most tests
     // ================================================================
-
     private static Dictionary<string, int[]> MakeMap() => new()
     {
         ["_"] = [0],
@@ -30,11 +29,10 @@ public sealed class RawPhonemeParserTests
     // ================================================================
     // 1. Parse_ValidTokens
     // ================================================================
-
     [Fact]
     public void Parse_ValidTokens()
     {
-        var map = MakeMap();
+        Dictionary<string, int[]> map = MakeMap();
 
         var result = RawPhonemeParser.Parse("^ a i $", map);
 
@@ -44,12 +42,11 @@ public sealed class RawPhonemeParserTests
     // ================================================================
     // 2. Parse_PuaFallback
     // ================================================================
-
     [Fact]
     public void Parse_PuaFallback()
     {
         // Multi-char tokens resolved via OpenJTalkToPiperMapping -> PUA -> map.
-        var map = MakeMap();
+        Dictionary<string, int[]> map = MakeMap();
 
         var result = RawPhonemeParser.Parse("a: ch N_m", map);
 
@@ -59,11 +56,10 @@ public sealed class RawPhonemeParserTests
     // ================================================================
     // 3. Parse_UnknownToken_Skipped
     // ================================================================
-
     [Fact]
     public void Parse_UnknownToken_Skipped()
     {
-        var map = MakeMap();
+        Dictionary<string, int[]> map = MakeMap();
 
         var result = RawPhonemeParser.Parse("^ xyz $", map);
 
@@ -74,13 +70,12 @@ public sealed class RawPhonemeParserTests
     // ================================================================
     // 4. Parse_EmptyString
     // ================================================================
-
     [Fact]
     public void Parse_EmptyString()
     {
-        var map = MakeMap();
+        Dictionary<string, int[]> map = MakeMap();
 
-        var result = RawPhonemeParser.Parse("", map);
+        var result = RawPhonemeParser.Parse(string.Empty, map);
 
         Assert.Empty(result);
     }
@@ -88,12 +83,11 @@ public sealed class RawPhonemeParserTests
     // ================================================================
     // 5. Parse_NullString_ReturnsEmpty
     // ================================================================
-
     [Fact]
     public void Parse_NullString_ReturnsEmpty()
     {
         // The implementation treats null the same as empty/whitespace (returns []).
-        var map = MakeMap();
+        Dictionary<string, int[]> map = MakeMap();
 
         var result = RawPhonemeParser.Parse(null!, map);
 
@@ -103,7 +97,6 @@ public sealed class RawPhonemeParserTests
     // ================================================================
     // 6. Parse_NullMap_Throws
     // ================================================================
-
     [Fact]
     public void Parse_NullMap_Throws()
     {
@@ -114,12 +107,11 @@ public sealed class RawPhonemeParserTests
     // ================================================================
     // 7. Parse_SingleCharTokens
     // ================================================================
-
     [Fact]
     public void Parse_SingleCharTokens()
     {
         // Single-character tokens are looked up directly in the map.
-        var map = MakeMap();
+        Dictionary<string, int[]> map = MakeMap();
 
         var result = RawPhonemeParser.Parse("a k N", map);
 
@@ -129,12 +121,11 @@ public sealed class RawPhonemeParserTests
     // ================================================================
     // 8. Parse_MixedKnownUnknown
     // ================================================================
-
     [Fact]
     public void Parse_MixedKnownUnknown()
     {
         // Mix of direct-lookup tokens, PUA tokens, and unknown tokens.
-        var map = MakeMap();
+        Dictionary<string, int[]> map = MakeMap();
 
         var result = RawPhonemeParser.Parse("^ a zzz ch $ qqq i", map);
 
@@ -145,11 +136,10 @@ public sealed class RawPhonemeParserTests
     // ================================================================
     // 9. Parse_WhitespaceOnlyString_ReturnsEmpty
     // ================================================================
-
     [Fact]
     public void Parse_WhitespaceOnlyString_ReturnsEmpty()
     {
-        var map = MakeMap();
+        Dictionary<string, int[]> map = MakeMap();
 
         var result = RawPhonemeParser.Parse("   \t  ", map);
 
@@ -159,12 +149,11 @@ public sealed class RawPhonemeParserTests
     // ================================================================
     // 10. Parse_MultipleSpacesBetweenTokens_Handled
     // ================================================================
-
     [Fact]
     public void Parse_MultipleSpacesBetweenTokens_Handled()
     {
         // Multiple spaces between tokens should be treated like single spaces.
-        var map = MakeMap();
+        Dictionary<string, int[]> map = MakeMap();
 
         var result = RawPhonemeParser.Parse("^   a    $", map);
 
@@ -174,12 +163,11 @@ public sealed class RawPhonemeParserTests
     // ================================================================
     // 11. Parse_MultiIdPhoneme_AllIdsFlattened
     // ================================================================
-
     [Fact]
     public void Parse_MultiIdPhoneme_AllIdsFlattened()
     {
         // A phoneme mapped to multiple IDs should produce all IDs in order.
-        var map = MakeMap();
+        Dictionary<string, int[]> map = MakeMap();
         map["x"] = [10, 11];
 
         var result = RawPhonemeParser.Parse("^ x $", map);
@@ -190,12 +178,11 @@ public sealed class RawPhonemeParserTests
     // ================================================================
     // 12. Parse_TokenCase_MustBeExact
     // ================================================================
-
     [Fact]
     public void Parse_TokenCase_MustBeExact()
     {
         // "a" is in the map but "A" is not — case-sensitive lookup must skip "A".
-        var map = MakeMap();
+        Dictionary<string, int[]> map = MakeMap();
 
         var result = RawPhonemeParser.Parse("a A i", map);
 
@@ -206,12 +193,11 @@ public sealed class RawPhonemeParserTests
     // ================================================================
     // 13. Parse_OrderPreserved
     // ================================================================
-
     [Fact]
     public void Parse_OrderPreserved()
     {
         // Verify the exact output order matches the input token order.
-        var map = MakeMap();
+        Dictionary<string, int[]> map = MakeMap();
 
         var result = RawPhonemeParser.Parse("$ a ^ a $", map);
 

@@ -32,6 +32,7 @@ public sealed class SpeakerEncoder : IDisposable
     private bool _disposed;
 
     /// <summary>
+    /// Initializes a new instance of the <see cref="SpeakerEncoder"/> class.
     /// Load a speaker encoder model from an ONNX file.
     /// </summary>
     /// <param name="modelPath">Path to the speaker encoder ONNX model.</param>
@@ -39,7 +40,9 @@ public sealed class SpeakerEncoder : IDisposable
     {
         ArgumentException.ThrowIfNullOrEmpty(modelPath);
         if (!File.Exists(modelPath))
+        {
             throw new FileNotFoundException($"Speaker encoder model not found: {modelPath}", modelPath);
+        }
 
         var options = new SessionOptions
         {
@@ -63,7 +66,9 @@ public sealed class SpeakerEncoder : IDisposable
         ArgumentNullException.ThrowIfNull(audioSamples);
 
         if (audioSamples.Length == 0)
+        {
             throw new ArgumentException("Audio samples cannot be empty.", nameof(audioSamples));
+        }
 
         // Resample to 16kHz if needed
         float[] resampled = sampleRate != MelSampleRate
@@ -75,7 +80,9 @@ public sealed class SpeakerEncoder : IDisposable
         int nFrames = mel.Length / MelNMels;
 
         if (nFrames == 0)
+        {
             throw new ArgumentException("Audio is too short for mel spectrogram computation.", nameof(audioSamples));
+        }
 
         // Create input tensor: [1, n_mels, n_frames]
         using var melTensor = OrtValue.CreateTensorValueFromMemory(
@@ -85,10 +92,13 @@ public sealed class SpeakerEncoder : IDisposable
         var inputValues = new List<OrtValue> { melTensor };
 
         string[] outputNames = _session.OutputMetadata.Keys.ToArray();
-        if (outputNames.Length == 0) outputNames = ["output"];
+        if (outputNames.Length == 0)
+        {
+            outputNames = ["output"];
+        }
 
         using var runOptions = new RunOptions();
-        using var results = _session.Run(runOptions, inputNames, inputValues, outputNames);
+        using IDisposableReadOnlyCollection<OrtValue> results = _session.Run(runOptions, inputNames, inputValues, outputNames);
 
         ReadOnlySpan<float> embedding = results[0].GetTensorDataAsSpan<float>();
         return embedding.ToArray();
@@ -103,16 +113,22 @@ public sealed class SpeakerEncoder : IDisposable
     {
         ArgumentException.ThrowIfNullOrEmpty(audioPath);
         if (!File.Exists(audioPath))
+        {
             throw new FileNotFoundException($"Audio file not found: {audioPath}", audioPath);
+        }
 
-        var (samples, sampleRate) = ReadWavFile(audioPath);
+        (float[]? samples, int sampleRate) = ReadWavFile(audioPath);
         return Encode(samples, sampleRate);
     }
 
     /// <inheritdoc />
     public void Dispose()
     {
-        if (_disposed) return;
+        if (_disposed)
+        {
+            return;
+        }
+
         _session.Dispose();
         _disposed = true;
     }
@@ -120,18 +136,24 @@ public sealed class SpeakerEncoder : IDisposable
     // ------------------------------------------------------------------
     // Internal: WAV reading
     // ------------------------------------------------------------------
-
     private static (float[] Samples, int SampleRate) ReadWavFile(string path)
     {
-        using var stream = File.OpenRead(path);
+        using FileStream stream = File.OpenRead(path);
         using var reader = new BinaryReader(stream);
 
         // RIFF header
         string riff = new(reader.ReadChars(4));
-        if (riff != "RIFF") throw new InvalidDataException($"Not a WAV file: {path}");
+        if (riff != "RIFF")
+        {
+            throw new InvalidDataException($"Not a WAV file: {path}");
+        }
+
         reader.ReadInt32(); // file size
         string wave = new(reader.ReadChars(4));
-        if (wave != "WAVE") throw new InvalidDataException($"Not a WAV file: {path}");
+        if (wave != "WAVE")
+        {
+            throw new InvalidDataException($"Not a WAV file: {path}");
+        }
 
         // Find fmt chunk
         int sampleRate = 0;
@@ -153,7 +175,10 @@ public sealed class SpeakerEncoder : IDisposable
                 reader.ReadInt16(); // block align
                 bitsPerSample = reader.ReadInt16();
                 int remaining = chunkSize - 16;
-                if (remaining > 0) reader.ReadBytes(remaining);
+                if (remaining > 0)
+                {
+                    reader.ReadBytes(remaining);
+                }
             }
             else if (chunkId == "data")
             {
@@ -164,13 +189,17 @@ public sealed class SpeakerEncoder : IDisposable
                 {
                     samples = new float[numSamples];
                     for (int i = 0; i < numSamples; i++)
+                    {
                         samples[i] = reader.ReadInt16() / 32768f;
+                    }
                 }
                 else if (bitsPerSample == 32 && audioFormat == 3) // IEEE float
                 {
                     samples = new float[numSamples];
                     for (int i = 0; i < numSamples; i++)
+                    {
                         samples[i] = reader.ReadSingle();
+                    }
                 }
                 else
                 {
@@ -186,9 +215,13 @@ public sealed class SpeakerEncoder : IDisposable
                     {
                         float sum = 0;
                         for (int ch = 0; ch < channels; ch++)
-                            sum += samples[i * channels + ch];
+                        {
+                            sum += samples[(i * channels) + ch];
+                        }
+
                         mono[i] = sum / channels;
                     }
+
                     return (mono, sampleRate);
                 }
 
@@ -206,7 +239,6 @@ public sealed class SpeakerEncoder : IDisposable
     // ------------------------------------------------------------------
     // Internal: Audio processing
     // ------------------------------------------------------------------
-
     private static float[] ResampleLinear(float[] samples, int fromRate, int toRate)
     {
         double ratio = (double)fromRate / toRate;
@@ -220,9 +252,13 @@ public sealed class SpeakerEncoder : IDisposable
             float frac = (float)(srcPos - idx);
 
             if (idx + 1 < samples.Length)
-                output[i] = samples[idx] * (1f - frac) + samples[idx + 1] * frac;
+            {
+                output[i] = (samples[idx] * (1f - frac)) + (samples[idx + 1] * frac);
+            }
             else if (idx < samples.Length)
+            {
                 output[i] = samples[idx];
+            }
         }
 
         return output;
@@ -234,10 +270,10 @@ public sealed class SpeakerEncoder : IDisposable
         float[] window = HannWindow(MelNFft);
 
         int nFrames = samples.Length >= MelNFft
-            ? (samples.Length - MelNFft) / MelHopLength + 1
+            ? ((samples.Length - MelNFft) / MelHopLength) + 1
             : 0;
 
-        int fftBins = MelNFft / 2 + 1;
+        int fftBins = (MelNFft / 2) + 1;
         float[] melSpec = new float[MelNMels * nFrames];
 
         for (int frameIdx = 0; frameIdx < nFrames; frameIdx++)
@@ -259,7 +295,8 @@ public sealed class SpeakerEncoder : IDisposable
                     real += sample * MathF.Cos(angle);
                     imag += sample * MathF.Sin(angle);
                 }
-                powerSpec[k] = real * real + imag * imag;
+
+                powerSpec[k] = (real * real) + (imag * imag);
             }
 
             // Apply mel filterbank
@@ -267,9 +304,11 @@ public sealed class SpeakerEncoder : IDisposable
             {
                 float energy = 0;
                 for (int k = 0; k < fftBins; k++)
-                    energy += melFilters[melIdx * fftBins + k] * powerSpec[k];
+                {
+                    energy += melFilters[(melIdx * fftBins) + k] * powerSpec[k];
+                }
 
-                melSpec[melIdx * nFrames + frameIdx] = MathF.Log(MathF.Max(energy, 1e-10f));
+                melSpec[(melIdx * nFrames) + frameIdx] = MathF.Log(MathF.Max(energy, 1e-10f));
             }
         }
 
@@ -280,13 +319,16 @@ public sealed class SpeakerEncoder : IDisposable
     {
         float[] window = new float[length];
         for (int n = 0; n < length; n++)
+        {
             window[n] = 0.5f * (1f - MathF.Cos(2f * MathF.PI * n / length));
+        }
+
         return window;
     }
 
     private static float[] CreateMelFilterbank()
     {
-        int fftBins = MelNFft / 2 + 1;
+        int fftBins = (MelNFft / 2) + 1;
         float[] filterbank = new float[MelNMels * fftBins];
 
         float melFmin = HzToMel(MelFmin);
@@ -294,11 +336,15 @@ public sealed class SpeakerEncoder : IDisposable
 
         float[] melPoints = new float[MelNMels + 2];
         for (int i = 0; i < melPoints.Length; i++)
-            melPoints[i] = melFmin + (melFmax - melFmin) * i / (MelNMels + 1);
+        {
+            melPoints[i] = melFmin + ((melFmax - melFmin) * i / (MelNMels + 1));
+        }
 
         float[] binPoints = new float[melPoints.Length];
         for (int i = 0; i < melPoints.Length; i++)
+        {
             binPoints[i] = MelToHz(melPoints[i]) * MelNFft / MelSampleRate;
+        }
 
         for (int m = 0; m < MelNMels; m++)
         {
@@ -318,6 +364,7 @@ public sealed class SpeakerEncoder : IDisposable
             {
                 center = Math.Min(center + 1, fftBins - 1);
             }
+
             if (center == right)
             {
                 right = Math.Min(right + 1, fftBins - 1);
@@ -327,24 +374,31 @@ public sealed class SpeakerEncoder : IDisposable
             for (int k = left; k < center; k++)
             {
                 if (center > left)
-                    filterbank[m * fftBins + k] = (float)(k - left) / (center - left);
+                {
+                    filterbank[(m * fftBins) + k] = (float)(k - left) / (center - left);
+                }
             }
 
             // Falling slope
             for (int k = center; k < right; k++)
             {
                 if (right > center)
-                    filterbank[m * fftBins + k] = (float)(right - k) / (right - center);
+                {
+                    filterbank[(m * fftBins) + k] = (float)(right - k) / (right - center);
+                }
             }
 
             // Ensure center bin always has weight >= 1.0
             if (center < fftBins)
-                filterbank[m * fftBins + center] = MathF.Max(filterbank[m * fftBins + center], 1.0f);
+            {
+                filterbank[(m * fftBins) + center] = MathF.Max(filterbank[(m * fftBins) + center], 1.0f);
+            }
         }
 
         return filterbank;
     }
 
-    private static float HzToMel(float hz) => 2595f * MathF.Log10(1f + hz / 700f);
+    private static float HzToMel(float hz) => 2595f * MathF.Log10(1f + (hz / 700f));
+
     private static float MelToHz(float mel) => 700f * (MathF.Pow(10f, mel / 2595f) - 1f);
 }

@@ -31,31 +31,50 @@ public static class ChineseEmbeddedEnglish
         foreach (var token in TokenizeAlnum(text))
         {
             // 1. Case-sensitive loanword
-            if (data.Loanwords.TryGetValue(token, out var loanSyl))
+            if (data.Loanwords.TryGetValue(token, out IReadOnlyList<string>? loanSyl))
             {
-                foreach (var s in loanSyl) pinyinSyllables.Add(s);
+                foreach (var s in loanSyl)
+                {
+                    pinyinSyllables.Add(s);
+                }
+
                 continue;
             }
+
             // 2. Uppercase acronym
             var upper = token.ToUpperInvariant();
-            if (data.Acronyms.TryGetValue(upper, out var acroSyl))
+            if (data.Acronyms.TryGetValue(upper, out IReadOnlyList<string>? acroSyl))
             {
-                foreach (var s in acroSyl) pinyinSyllables.Add(s);
+                foreach (var s in acroSyl)
+                {
+                    pinyinSyllables.Add(s);
+                }
+
                 continue;
             }
+
             // 3. Letter-by-letter fallback (digits silently dropped)
             foreach (var ch in upper)
             {
-                if (char.IsDigit(ch)) continue;
-                if (data.LetterFallback.TryGetValue(ch.ToString(), out var letterSyl))
+                if (char.IsDigit(ch))
                 {
-                    foreach (var s in letterSyl) pinyinSyllables.Add(s);
+                    continue;
+                }
+
+                if (data.LetterFallback.TryGetValue(ch.ToString(), out IReadOnlyList<string>? letterSyl))
+                {
+                    foreach (var s in letterSyl)
+                    {
+                        pinyinSyllables.Add(s);
+                    }
                 }
             }
         }
 
         if (pinyinSyllables.Count == 0)
+        {
             return new ChineseG2PResult(System.Array.Empty<string>(), System.Array.Empty<int>(), System.Array.Empty<int>(), System.Array.Empty<int>());
+        }
 
         return PhonemizeFromPinyinSyllablesWithProsody(pinyinSyllables);
     }
@@ -65,21 +84,24 @@ public static class ChineseEmbeddedEnglish
     /// prosody matching Python's
     /// <c>phonemize_from_pinyin_syllables(..., chinese_text="")</c>.
     /// </summary>
+    /// <returns></returns>
     internal static ChineseG2PResult PhonemizeFromPinyinSyllablesWithProsody(
         IReadOnlyList<string> syllables)
     {
         if (syllables.Count == 0)
+        {
             return new ChineseG2PResult(
                 System.Array.Empty<string>(),
                 System.Array.Empty<int>(),
                 System.Array.Empty<int>(),
                 System.Array.Empty<int>());
+        }
 
         // Step 1: extract tone, normalize
         var st = new List<(string Syllable, int Tone)>(syllables.Count);
         foreach (var s in syllables)
         {
-            var (baseSyl, tone) = PinyinToIpa.ExtractTone(s);
+            (string? baseSyl, int tone) = PinyinToIpa.ExtractTone(s);
             st.Add((PinyinToIpa.NormalizePinyin(baseSyl), tone));
         }
 
@@ -90,9 +112,9 @@ public static class ChineseEmbeddedEnglish
         // alongside each emitted IPA token for downstream prosody alignment.
         var tokens = new List<string>(syllables.Count * 3);  // ~ initial + final + tone
         var perTokenTones = new List<int>(syllables.Count * 3);
-        foreach (var (syl, tone) in st)
+        foreach ((string? syl, int tone) in st)
         {
-            var ipa = PinyinToIpa.Convert(syl, tone);
+            List<string> ipa = PinyinToIpa.Convert(syl, tone);
             foreach (var t in ipa)
             {
                 tokens.Add(t);
@@ -101,7 +123,7 @@ public static class ChineseEmbeddedEnglish
         }
 
         // Step 4: multi-char IPA -> PUA codepoint mapping (count preserved)
-        var mapped = OpenJTalkToPiperMapping.MapSequence(tokens);
+        IReadOnlyList<string> mapped = OpenJTalkToPiperMapping.MapSequence(tokens);
         if (mapped.Count != perTokenTones.Count)
         {
             throw new System.InvalidOperationException(
@@ -111,13 +133,18 @@ public static class ChineseEmbeddedEnglish
         var n = mapped.Count;
         var a1 = perTokenTones.ToArray();
         var ones = new int[n];
-        for (int i = 0; i < n; i++) ones[i] = 1;
+        for (int i = 0; i < n; i++)
+        {
+            ones[i] = 1;
+        }
+
         return new ChineseG2PResult(mapped, a1, ones, (int[])ones.Clone());
     }
 
     /// <summary>
     /// Tokens-only convenience wrapper for callers that don't need prosody.
     /// </summary>
+    /// <returns></returns>
     internal static IReadOnlyList<string> PhonemizeFromPinyinSyllables(
         IReadOnlyList<string> syllables)
         => PhonemizeFromPinyinSyllablesWithProsody(syllables).Phonemes;
@@ -126,6 +153,7 @@ public static class ChineseEmbeddedEnglish
     /// Tokenize text into alphanumeric runs. Mirrors Python
     /// <c>_RE_TOKEN_SPLIT = re.compile(r"[A-Za-z0-9]+")</c>.
     /// </summary>
+    /// <returns></returns>
     internal static List<string> TokenizeAlnum(string text)
     {
         var result = new List<string>();
@@ -134,15 +162,21 @@ public static class ChineseEmbeddedEnglish
         {
             bool isAlnum = (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z') || (ch >= '0' && ch <= '9');
             if (isAlnum)
+            {
                 current.Append(ch);
+            }
             else if (current.Length > 0)
             {
                 result.Add(current.ToString());
                 current.Clear();
             }
         }
+
         if (current.Length > 0)
+        {
             result.Add(current.ToString());
+        }
+
         return result;
     }
 }

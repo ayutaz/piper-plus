@@ -47,12 +47,12 @@ public class TextSplitterContractTests
             {
                 return candidate;
             }
+
             dir = dir.Parent;
         }
 
         throw new FileNotFoundException(
-            "Could not locate tests/fixtures/text_splitter/contract.json. Set PIPER_TEXT_SPLITTER_FIXTURE or copy via PiperPlus.runsettings."
-        );
+            "Could not locate tests/fixtures/text_splitter/contract.json. Set PIPER_TEXT_SPLITTER_FIXTURE or copy via PiperPlus.runsettings.");
     }
 
     private static JsonElement LoadFixture()
@@ -65,16 +65,16 @@ public class TextSplitterContractTests
     [Fact]
     public void Fixture_LoadsAndExposesCsharpRuntime()
     {
-        var fixture = LoadFixture();
+        JsonElement fixture = LoadFixture();
         Assert.Equal(1, fixture.GetProperty("schema_version").GetInt32());
-        var csharp = fixture.GetProperty("runtimes").GetProperty("csharp");
+        JsonElement csharp = fixture.GetProperty("runtimes").GetProperty("csharp");
         Assert.Equal("post-consume", csharp.GetProperty("strategy").GetString());
     }
 
     public static IEnumerable<object[]> CsharpClosingPunctuation()
     {
-        var fixture = LoadFixture();
-        var arr = fixture.GetProperty("runtimes").GetProperty("csharp").GetProperty("closing_punctuation");
+        JsonElement fixture = LoadFixture();
+        JsonElement arr = fixture.GetProperty("runtimes").GetProperty("csharp").GetProperty("closing_punctuation");
         return arr.EnumerateArray().Select(v => new object[] { v.GetInt32() });
     }
 
@@ -84,7 +84,7 @@ public class TextSplitterContractTests
     {
         var close = char.ConvertFromUtf32(codepoint);
         var input = $"Hi.{close} Next.";
-        var chunks = TextSplitter.SplitSentences(input);
+        List<string> chunks = TextSplitter.SplitSentences(input);
         Assert.Equal(2, chunks.Count);
         Assert.EndsWith(close, chunks[0]);
         Assert.False(chunks[1].StartsWith(close), $"closing punct U+{codepoint:X4} leaked into second chunk: {chunks[1]}");
@@ -92,8 +92,8 @@ public class TextSplitterContractTests
 
     public static IEnumerable<object[]> CsharpSentenceTerminators()
     {
-        var fixture = LoadFixture();
-        var arr = fixture.GetProperty("runtimes").GetProperty("csharp").GetProperty("sentence_terminators");
+        JsonElement fixture = LoadFixture();
+        JsonElement arr = fixture.GetProperty("runtimes").GetProperty("csharp").GetProperty("sentence_terminators");
         return arr.EnumerateArray().Select(v => new object[] { v.GetInt32() });
     }
 
@@ -103,7 +103,7 @@ public class TextSplitterContractTests
     {
         var term = char.ConvertFromUtf32(codepoint);
         var input = $"a{term} b{term}";
-        var chunks = TextSplitter.SplitSentences(input);
+        List<string> chunks = TextSplitter.SplitSentences(input);
         Assert.Equal(2, chunks.Count);
     }
 
@@ -113,7 +113,7 @@ public class TextSplitterContractTests
         // U+FF0E is canonical but currently absent from C#'s IsSentenceTerminator.
         // A future realignment PR should update both this test and the OMITS table.
         var input = "a． b．";
-        var chunks = TextSplitter.SplitSentences(input);
+        List<string> chunks = TextSplitter.SplitSentences(input);
         Assert.Single(chunks);
     }
 
@@ -122,9 +122,9 @@ public class TextSplitterContractTests
     {
         // Pin the per-runtime divergence: csharp.closing == canonical.closing,
         // csharp.terminators == canonical.terminators MINUS [U+FF0E].
-        var fixture = LoadFixture();
-        var canonical = fixture.GetProperty("canonical");
-        var csharp = fixture.GetProperty("runtimes").GetProperty("csharp");
+        JsonElement fixture = LoadFixture();
+        JsonElement canonical = fixture.GetProperty("canonical");
+        JsonElement csharp = fixture.GetProperty("runtimes").GetProperty("csharp");
 
         var canonicalClose = canonical.GetProperty("closing_punctuation").EnumerateArray()
             .Select(v => v.GetInt32()).ToHashSet();
