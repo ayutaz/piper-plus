@@ -48,7 +48,9 @@ jobs:
     name: Build ${{ matrix.name }}
     # PR では Linux/macOS のみ smoke 実行 (Windows は cost で skip)。
     # Tag push / workflow_dispatch では 3 OS 全部を build。
-    if: github.event_name != 'pull_request' || matrix.name != 'windows-x64'
+    # NOTE: matrix context は job-level `if:` で評価できないため
+    # (https://docs.github.com/en/actions/learn-github-actions/contexts#context-availability)、
+    # 最初の Skip detection step + 各 step での gate に分割している。
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     strategy:
@@ -69,12 +71,28 @@ jobs:
             archive_ext: zip
 
     steps:
+      - name: Detect PR Windows skip
+        # PR 時の windows-x64 matrix は cost 削減のため build をスキップする。
+        # job-level `if:` だと matrix context が evaluate できず "workflow file issue"
+        # (run が起動できず failure) になるため、この step で flag を立てて
+        # 後続 step は `steps.skip_check.outputs.skip != 'true'` で gate する。
+        id: skip_check
+        shell: bash
+        run: |
+          if [ "${{ matrix.name }}" = "windows-x64" ] && [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "::notice::Skipping windows-x64 build on pull_request (cost optimization). Tag / workflow_dispatch builds run all 3 OS."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - uses: actions/checkout@v6
+        if: steps.skip_check.outputs.skip != 'true'
         with:
           submodules: true
 
       - name: Validate version tag
-        if: startsWith(github.ref, 'refs/tags/')
+        if: steps.skip_check.outputs.skip != 'true' && startsWith(github.ref, 'refs/tags/')
         shell: bash
         run: |
           TAG="${GITHUB_REF#refs/tags/v}"
@@ -92,7 +110,7 @@ jobs:
       # `D:apiper-pluspiper-plus/install/...`. Using ${env:GITHUB_WORKSPACE}
       # in pwsh keeps the path intact.
       - name: Configure CMake (Unix)
-        if: runner.os != 'Windows'
+        if: steps.skip_check.outputs.skip != 'true' && runner.os != 'Windows'
         shell: bash
         run: |
           cmake -B build \
@@ -101,7 +119,7 @@ jobs:
             -DCMAKE_INSTALL_PREFIX="${{ github.workspace }}/install"
 
       - name: Configure CMake (Windows)
-        if: runner.os == 'Windows'
+        if: steps.skip_check.outputs.skip != 'true' && runner.os == 'Windows'
         shell: pwsh
         run: |
           $installDir = "${env:GITHUB_WORKSPACE}/install" -replace '\\','/'
@@ -111,39 +129,40 @@ jobs:
             "-DCMAKE_INSTALL_PREFIX=$installDir"
 
       - name: Build (Unix)
-        if: runner.os != 'Windows'
+        if: steps.skip_check.outputs.skip != 'true' && runner.os != 'Windows'
         shell: bash
         run: cmake --build build --config Release -j$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)
 
       - name: Build (Windows)
-        if: runner.os == 'Windows'
+        if: steps.skip_check.outputs.skip != 'true' && runner.os == 'Windows'
         shell: pwsh
         run: cmake --build build --config Release -j $env:NUMBER_OF_PROCESSORS
 
       - name: Install
+        if: steps.skip_check.outputs.skip != 'true'
         shell: bash
         run: cmake --install build --config Release
 
       - name: Verify install layout (Unix)
-        if: runner.os != 'Windows'
+        if: steps.skip_check.outputs.skip != 'true' && runner.os != 'Windows'
         shell: bash
         run: cmake -DPREFIX="${{ github.workspace }}/install" -P cmake/verify_install_layout.cmake
 
       - name: Verify install layout (Windows)
-        if: runner.os == 'Windows'
+        if: steps.skip_check.outputs.skip != 'true' && runner.os == 'Windows'
         shell: pwsh
         run: |
           $installDir = "${env:GITHUB_WORKSPACE}/install" -replace '\\','/'
           cmake "-DPREFIX=$installDir" -P cmake/verify_install_layout.cmake
 
       - name: Create archive (Unix)
-        if: runner.os != 'Windows'
+        if: steps.skip_check.outputs.skip != 'true' && runner.os != 'Windows'
         run: |
           cd "${{ github.workspace }}/install"
           tar -czf "${{ github.workspace }}/${{ matrix.artifact }}.tar.gz" .
 
       - name: Create archive (Windows)
-        if: runner.os == 'Windows'
+        if: steps.skip_check.outputs.skip != 'true' && runner.os == 'Windows'
         shell: pwsh
         run: |
           # bsdtar (Windows 10+ ships it as `tar`) produces forward-slash POSIX
@@ -156,7 +175,7 @@ jobs:
 
       - name: Upload artifact
         # PR では smoke build のみで artifact は捨てる (release 用ではない)。
-        if: github.event_name != 'pull_request'
+        if: steps.skip_check.outputs.skip != 'true' && github.event_name != 'pull_request'
         uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.artifact }}
@@ -622,7 +641,7 @@ jobs:
           mkdir -p "build-g2p-apple/${{ matrix.slice }}"
           if [ "${#TARGETS[@]}" -eq 1 ]; then
             cp "target/${TARGETS[0]}/release/libpiper_plus_g2p.a" \
-               "build-g2p-apple/${{ matrix.slice }}/libpiper_plus_g2p.a"
+              "build-g2p-apple/${{ matrix.slice }}/libpiper_plus_g2p.a"
           else
             args=()
             for target in "${TARGETS[@]}"; do
@@ -659,8 +678,8 @@ jobs:
             case "$nm_out" in
               *" T _${sym}"*) echo "  ok: $sym" ;;
               *) echo "::error::staticlib missing FFI symbol: $sym"
-                 printf '%s\n' "$nm_out" | grep piper_plus_g2p_ || true
-                 exit 1 ;;
+                printf '%s\n' "$nm_out" | grep piper_plus_g2p_ || true
+                exit 1 ;;
             esac
           done
 
@@ -771,8 +790,8 @@ jobs:
           fi
 
           # Same Privacy Manifest as the synthesis xcframework — the G2P
-          # crate doesn't call any Required Reason API, so the empty manifest
-          # is accurate.
+          # Rust library does not call any Required Reason API, so the
+          # empty manifest is accurate.
           cp cmake/PrivacyInfo.xcprivacy piper_plus_g2p.xcframework/PrivacyInfo.xcprivacy
 
           echo "=== xcframework structure ==="
@@ -1023,19 +1042,19 @@ jobs:
           # Rename iOS M1-compat tar.gz (device slice only)
           if [ -f artifacts/libpiper_plus-ios-arm64/libpiper_plus-ios-arm64.tar.gz ]; then
             mv artifacts/libpiper_plus-ios-arm64/libpiper_plus-ios-arm64.tar.gz \
-               artifacts/libpiper_plus-ios-arm64/libpiper_plus-ios-arm64-${TAG}.tar.gz
+              artifacts/libpiper_plus-ios-arm64/libpiper_plus-ios-arm64-${TAG}.tar.gz
           fi
           # M2: Rename iOS xcframework.zip (device + simulator slices, modulemap + PrivacyInfo bundled)
           if [ -f artifacts/libpiper_plus-ios-xcframework/libpiper_plus-ios.xcframework.zip ]; then
             mv artifacts/libpiper_plus-ios-xcframework/libpiper_plus-ios.xcframework.zip \
-               artifacts/libpiper_plus-ios-xcframework/libpiper_plus-ios-${TAG}.xcframework.zip
+              artifacts/libpiper_plus-ios-xcframework/libpiper_plus-ios-${TAG}.xcframework.zip
           fi
           # Issue #387: Rename G2P xcframework.zip (PiperPlusG2P, no ORT).
           # `-apple` reflects iOS + macOS slices since v1.14.0 — consumer
           # Package.swift references this name in `g2pVersion`'s URL.
           if [ -f artifacts/libpiper_plus_g2p-apple-xcframework/libpiper_plus_g2p-apple.xcframework.zip ]; then
             mv artifacts/libpiper_plus_g2p-apple-xcframework/libpiper_plus_g2p-apple.xcframework.zip \
-               artifacts/libpiper_plus_g2p-apple-xcframework/libpiper_plus_g2p-apple-${TAG}.xcframework.zip
+              artifacts/libpiper_plus_g2p-apple-xcframework/libpiper_plus_g2p-apple-${TAG}.xcframework.zip
           fi
           # Rename Android artifacts (3 ABIs: arm64-v8a / armeabi-v7a / x86_64).
           # The build-android matrix produces one tar.gz per ABI; each is
