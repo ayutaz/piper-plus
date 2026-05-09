@@ -62,6 +62,21 @@ repos:
         # Block accidental large model checkpoint commits. Use git LFS or
         # external storage instead.
         args: [--maxkb=2048]
+      # ----- Standard hygiene additions (2026-05) -----
+      - id: check-toml
+        # Cargo.toml / pyproject.toml syntax check. Drift = local-clean /
+        # CI-fail mismatch when crates.io / PyPI publish refuses parse.
+      - id: check-executables-have-shebangs
+        # Files with executable bit but no shebang are typically a mistake.
+      - id: check-shebang-scripts-are-executable
+        # Inverse of above — shebanged scripts that lack +x silently fail
+        # in CI workflows that call them directly.
+      - id: mixed-line-ending
+        # Force LF endings repo-wide. CRLF leaks on Windows checkouts cause
+        # noisy diffs and break shell scripts when run via WSL/Git Bash.
+        args: [--fix=lf]
+      - id: detect-private-key
+        # Catch accidental commits of SSH/TLS private keys.
 
   # ---------------------------------------------------------------------------
   # Rust formatter — addresses ae68abc1 (rustfmt drift across 5+ .rs files).
@@ -172,4 +187,110 @@ repos:
         entry: python scripts/regenerate_test_fixture.py --check
         language: system
         files: ^(src/python/g2p/piper_plus_g2p/data/pua\.json|tests/fixtures/g2p/phoneme_test_cases\.json)$
+        pass_filenames: false
+
+  # ---------------------------------------------------------------------------
+  # Markdown lint — DavidAnson/markdownlint-cli2 has a dedicated pre-commit
+  # repo (the GitHub Action variant runs only in CI). Config lives in
+  # .markdownlint.yaml at repo root; vendored / generated trees are excluded
+  # so we don't lint third-party docs.
+  # ---------------------------------------------------------------------------
+  - repo: https://github.com/DavidAnson/markdownlint-cli2
+    rev: v0.14.0
+    hooks:
+      - id: markdownlint-cli2
+        args: [--config=.markdownlint.yaml]
+        files: \.(md|markdown)$
+        exclude: ^(node_modules|build|dist|target|test/models)/
+
+  # ---------------------------------------------------------------------------
+  # Spell-checker — codespell honors .codespellrc / pyproject.toml `[tool.codespell]`
+  # for ignore lists. tomli is required for older Python on hosts that lack
+  # tomllib in stdlib (<3.11).
+  # ---------------------------------------------------------------------------
+  - repo: https://github.com/codespell-project/codespell
+    rev: v2.3.0
+    hooks:
+      - id: codespell
+        additional_dependencies: [tomli]
+
+  # ---------------------------------------------------------------------------
+  # Secret detection — gitleaks scans for credentials, API keys, and tokens
+  # locally before they leave the dev machine. Mirrors any CI gitleaks job.
+  # ---------------------------------------------------------------------------
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.21.2
+    hooks:
+      - id: gitleaks
+
+  # ---------------------------------------------------------------------------
+  # Dockerfile lint — hadolint catches common Dockerfile mistakes (apt-get
+  # without --no-install-recommends, missing pinned versions, etc.). Scoped
+  # to docker/ so we don't accidentally lint embedded fixtures.
+  # ---------------------------------------------------------------------------
+  - repo: https://github.com/hadolint/hadolint
+    rev: v2.12.0
+    hooks:
+      - id: hadolint
+        args: [--config=.hadolint.yaml]
+        files: ^docker/.*Dockerfile.*$
+
+  # ---------------------------------------------------------------------------
+  # EditorConfig drift — verifies file encodings, indent style, and final
+  # newline conform to .editorconfig. Excludes vendored / generated trees.
+  # ---------------------------------------------------------------------------
+  - repo: https://github.com/editorconfig-checker/editorconfig-checker.python
+    rev: 3.0.3
+    hooks:
+      - id: editorconfig-checker
+        exclude: ^(node_modules|build|dist|target|\.git|test/models|tools/benchmark/issue-383|src/wasm/openjtalk-web/(build|demo|models|voices|patches))/
+
+  # ---------------------------------------------------------------------------
+  # pyproject.toml schema validation (PEP 621 + PEP 518). Catches typos in
+  # build-system / project metadata before publish-to-PyPI failure.
+  # ---------------------------------------------------------------------------
+  - repo: https://github.com/abravalheri/validate-pyproject
+    rev: v0.21
+    hooks:
+      - id: validate-pyproject
+
+  # ---------------------------------------------------------------------------
+  # Language-specific local hooks — each falls back gracefully when the CLI
+  # is unavailable so commits aren't blocked by a missing toolchain. CI
+  # remains the authoritative gate.
+  # ---------------------------------------------------------------------------
+  - repo: local
+    hooks:
+      - id: gofumpt
+        name: gofumpt -l (Go)
+        # Stricter superset of gofmt. Skip silently if not installed; CI gates.
+        entry: bash -c 'if ! command -v gofumpt &>/dev/null; then echo "::warning::gofumpt missing, skipping"; exit 0; fi; out=$(gofumpt -l src/go); if [ -n "$out" ]; then echo "gofumpt drift:"; echo "$out"; exit 1; fi'
+        language: system
+        files: \.go$
+        pass_filenames: false
+
+      - id: ktlint
+        name: ktlint --android (Kotlin)
+        # Non-blocking until baseline is established. Falls back to a warning
+        # when gradlew is absent (e.g. partial checkouts).
+        entry: bash -c 'cd android && if [ -f gradlew ]; then ./gradlew :piper-plus-g2p:ktlintCheck -q || echo "::warning::ktlint check failed (non-blocking)"; else echo "::warning::gradlew missing, skipping ktlint"; fi'
+        language: system
+        files: \.kt$
+        pass_filenames: false
+
+      - id: swiftformat
+        name: swiftformat --lint (Swift)
+        # Lint-only (no auto-format) so the commit isn't silently rewritten.
+        # Skip if CLI absent; CI gates.
+        entry: bash -c 'if ! command -v swiftformat &>/dev/null; then echo "::warning::swiftformat missing, skipping"; exit 0; fi; swiftformat --lint Sources/'
+        language: system
+        files: \.swift$
+        pass_filenames: false
+
+      - id: taplo
+        name: taplo fmt --check (TOML)
+        # TOML formatter check. Skip if CLI absent; CI gates.
+        entry: bash -c 'if ! command -v taplo &>/dev/null; then echo "::warning::taplo missing, skipping"; exit 0; fi; taplo fmt --check'
+        language: system
+        files: \.toml$
         pass_filenames: false

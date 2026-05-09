@@ -63,3 +63,6 @@ wasm-bindgen-test = "0.3"
 
 [package.metadata.wasm-pack.profile.release]
 wasm-opt = ['-Os']
+
+[lints]
+workspace = true

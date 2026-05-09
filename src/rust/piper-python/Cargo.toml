@@ -38,9 +38,13 @@ default = []
 japanese = ["piper_core/japanese"]
 naist-jdic = ["piper_core/naist-jdic"]
 
+[lints]
+workspace = true
+
 [lints.clippy]
 # PyO3 #[pymethods] macro generates code that triggers useless_conversion
 # when map_err(piper_err_to_pyerr) is used for custom exception mapping.
+# (workspace lints からの override)
 useless_conversion = "allow"
 
 # Part of the piper-plus workspace (../Cargo.toml)

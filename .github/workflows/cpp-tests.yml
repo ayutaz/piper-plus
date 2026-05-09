@@ -33,6 +33,31 @@ jobs:
       os-matrix: '["ubuntu-latest", "macos-latest"]'
       build-type-matrix: '["Release"]'
 
+  # Sanitizer runs gated behind the main suite to avoid burning CI on red PRs.
+  # Debug + asan/ubsan on Ubuntu only (clang on macOS asan path differs and
+  # we get the most signal from Linux for the C API surface).
+  cpp-tests-asan:
+    needs: [cpp-tests]
+    if: ${{ needs.cpp-tests.result == 'success' }}
+    uses: ./.github/workflows/_build-test-cpp.yml
+    with:
+      run-integration-tests: false
+      os-matrix: '["ubuntu-24.04"]'
+      build-type-matrix: '["Debug"]'
+      sanitizer: 'asan'
+      timeout-minutes: 30
+
+  cpp-tests-ubsan:
+    needs: [cpp-tests]
+    if: ${{ needs.cpp-tests.result == 'success' }}
+    uses: ./.github/workflows/_build-test-cpp.yml
+    with:
+      run-integration-tests: false
+      os-matrix: '["ubuntu-24.04"]'
+      build-type-matrix: '["Debug"]'
+      sanitizer: 'ubsan'
+      timeout-minutes: 30
+
   c-api-examples-compile:
     # examples/c-api/{basic,streaming,multi_language}.c が現行 piper_plus.h
     # に対してコンパイルできるかを軽量に確認 (リンクは別ジョブ)。

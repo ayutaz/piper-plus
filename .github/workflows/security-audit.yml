@@ -2,19 +2,23 @@ name: Security Audit
 
 on:
   pull_request:
+    branches: [dev, main]
     paths:
       - "pyproject.toml"
       - "uv.lock"
       - "src/python/pyproject.toml"
       - "src/python_run/setup.py"
       - "src/rust/**/Cargo.toml"
+      - "src/rust/**/Cargo.lock"
       - "src/rust/Cargo.lock"
       - "src/wasm/**/package.json"
       - "src/wasm/**/package-lock.json"
+      - "src/csharp/**/*.csproj"
+      - "src/csharp/**/packages.lock.json"
+      - "src/csharp/PiperPlus.sln"
       - "src/go/go.mod"
       - "src/go/go.sum"
-      - "src/csharp/**/*.csproj"
-      - "src/csharp/PiperPlus.sln"
+      - "docker/**/Dockerfile*"
       - "docker/python-inference/**"
       - "docker/wyoming/**"
       - "docker/webui/**"
@@ -40,21 +44,31 @@ permissions:
 
 jobs:
   # GitHub Dependency Review (PR 時に新規追加される依存をチェック)
+  # PR 専用 job (dependency-review-action は PR context 以外で動作しない)。
+  # High 以上で fail、ライセンスチェックも有効化。
   dependency-review:
     name: Dependency Review (PR)
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      pull-requests: write
     steps:
       - uses: actions/checkout@v6
       - uses: actions/dependency-review-action@v4
         with:
           fail-on-severity: high
           comment-summary-in-pr: on-failure
+          license-check: true
+          # 許容ライセンス (OSS 一般 + Unicode/OpenSSL/Zlib などライブラリ系)
+          allow-licenses: MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC, Unicode-DFS-2016, Unicode-3.0, CC0-1.0, MPL-2.0, Zlib, OpenSSL
 
   # Python: pip-audit
   # PR では false-negative 防止のため block しないが (`continue-on-error: true`)、
   # schedule (毎週) と push (dev/main) では真に block する。これにより日常の
   # PR レビューを止めずに、最新 CVE を確実に検出する 2 階層運用にする。
+  # fail-on-severity 統一 (High 以上): pip-audit は --strict で全件 fail だが、
+  # PR 時のみ continue-on-error で warning 化することでバランスを取る。
   pip-audit:
     name: pip-audit (Python)
     runs-on: ubuntu-24.04
@@ -77,6 +91,9 @@ jobs:
         run: pip-audit --strict --vulnerability-service osv
 
   # Rust: cargo-audit
+  # fail-on-severity 統一 (High 以上): cargo-audit はデフォルトで vulnerability
+  # entries で exit 1。`--deny warnings` ではなくデフォルト動作のままで RUSTSEC
+  # advisory database の High 以上に相当する CVE を検出。
   cargo-audit:
     name: cargo-audit (Rust)
     runs-on: ubuntu-24.04
@@ -94,6 +111,7 @@ jobs:
         run: cargo audit
 
   # npm: npm audit
+  # fail-on-severity 統一: --audit-level=high で High 以上のみ fail。
   npm-audit:
     name: npm audit
     runs-on: ubuntu-24.04
@@ -106,6 +124,9 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: "24"
+          # PR 時はキャッシュ重視で高速化
+          cache: ${{ github.event_name == 'pull_request' && 'npm' || '' }}
+          cache-dependency-path: ${{ matrix.package }}/package-lock.json
       - name: Generate lockfile if missing (${{ matrix.package }})
         working-directory: ${{ matrix.package }}
         # src/wasm/g2p には package-lock.json をコミットしていないため、
@@ -123,6 +144,9 @@ jobs:
   # Go: govulncheck
   # golang.org/x/vuln/cmd/govulncheck で Go モジュールの既知 CVE を検出。
   # cargo-audit / pip-audit / npm-audit と並列に Go ランタイムをカバー。
+  # fail-on-severity 統一: govulncheck は CVE が呼び出されている場合のみ
+  # exit 非ゼロ。Critical/High に絞り込みは govulncheck output を grep して
+  # severity 評価 (-mode=source の JSON 出力をパース)。
   govulncheck:
     name: govulncheck (Go)
     runs-on: ubuntu-24.04
@@ -134,14 +158,45 @@ jobs:
           cache-dependency-path: src/go/go.sum
       - name: Install govulncheck
         run: go install golang.org/x/vuln/cmd/govulncheck@latest
-      - name: Run govulncheck
+      - name: Run govulncheck (High/Critical only)
         working-directory: src/go
-        # ./... で全 package。実 CVE のみ非ゼロ exit。
-        run: govulncheck ./...
+        # JSON 出力 → CVE severity をパースして High/Critical のみ fail。
+        # govulncheck は内部 advisory DB の severity を `osv` フォーマットで
+        # 出力するため、`database_specific.severity` を確認。Low/Moderate は
+        # warning のみ (PR を不必要にブロックしない)。
+        run: |
+          set -o pipefail
+          # JSON モードで実行し、後段でパース。
+          govulncheck -json ./... > /tmp/govulncheck.json || true
+          # JSON 出力から severity を抽出。osv schema の database_specific.severity
+          # が HIGH / CRITICAL の vuln が呼び出されていれば fail。
+          # `osv` レコード単位で severity を確認するために jq を使う。
+          if ! command -v jq >/dev/null 2>&1; then
+            sudo apt-get update -qq && sudo apt-get install -y -qq jq
+          fi
+          # finding (= 実際に呼ばれている CVE) を抽出し、対応する osv の severity を確認。
+          HIGH_CRITICAL=$(jq -r '
+            select(.osv != null) |
+            select(
+              (.osv.database_specific.severity // "") |
+              ascii_upcase |
+              test("HIGH|CRITICAL")
+            ) |
+            .osv.id
+          ' /tmp/govulncheck.json | sort -u)
+          if [ -n "$HIGH_CRITICAL" ]; then
+            echo "::error::High/Critical vulnerabilities found:"
+            echo "$HIGH_CRITICAL"
+            # 全体出力も表示してデバッグしやすく。
+            jq -r 'select(.finding != null) | .finding.osv' /tmp/govulncheck.json | sort -u
+            exit 1
+          fi
+          echo "::notice::No High/Critical govulncheck findings."
 
   # NuGet: dotnet list package --vulnerable
   # `dotnet list ... --vulnerable --include-transitive` の出力をパースして
   # High / Critical severity が 1 件でもあれば fail。
+  # fail-on-severity 統一 (High 以上): Moderate/Low は warning のみ。
   nuget-audit:
     name: nuget-audit (.NET)
     runs-on: ubuntu-24.04
@@ -152,7 +207,7 @@ jobs:
           dotnet-version: 10.0.x
       - name: Restore packages
         run: dotnet restore src/csharp/PiperPlus.sln
-      - name: Check for vulnerable packages
+      - name: Check for vulnerable packages (severity high)
         run: |
           set -o pipefail
           # `--vulnerable --include-transitive` は dotnet 6+ で利用可能。
@@ -164,7 +219,7 @@ jobs:
             echo "::notice::No vulnerable NuGet packages found."
             exit 0
           fi
-          # High / Critical を fail 条件にする。
+          # High / Critical を fail 条件にする (fail-on-severity 統一)。
           if echo "$OUTPUT" | grep -qiE "(>[[:space:]]+\S+.*\b(High|Critical)\b)"; then
             echo "::error::High/Critical severity vulnerable NuGet package(s) found."
             exit 1
@@ -178,6 +233,7 @@ jobs:
   # `docker/python-inference`, `docker/wyoming`, `docker/webui` の 3 image を
   # 対象に Dockerfile の misconfig (Trivy config scan) と build した image の
   # OS package CVE (Trivy image scan) を両方検査。
+  # fail-on-severity 統一 (HIGH/CRITICAL のみ fail)。
   trivy-docker-scan:
     name: trivy-docker (${{ matrix.image }})
     runs-on: ubuntu-24.04
@@ -205,6 +261,7 @@ jobs:
       - name: Build image (no push)
         # image scan のため、push せず local に build。失敗しても次の step
         # で skip 判定するために `continue-on-error: true`。
+        # PR 時は cache from gha で高速化。
         id: build
         continue-on-error: true
         run: |

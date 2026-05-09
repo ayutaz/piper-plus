@@ -72,6 +72,12 @@ setup(
             "fastapi>=0.110,<1",
             "uvicorn[standard]>=0.27,<1",
         ],
+        "test": [
+            "pytest>=7.0",
+            "pytest-cov>=4.0",
+            "pytest-timeout>=2.0",
+            "pytest-asyncio>=0.24",  # NEW: async FastAPI tests
+        ],
     },
     classifiers=[
         "Development Status :: 3 - Alpha",

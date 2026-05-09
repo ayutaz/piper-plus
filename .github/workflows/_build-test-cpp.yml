@@ -23,6 +23,10 @@ on:
         description: "Job timeout in minutes"
         type: number
         default: 25
+      sanitizer:
+        description: 'Sanitizer to enable: none, asan, ubsan, asan-ubsan'
+        type: string
+        default: 'none'
 
 jobs:
   build-and-test:
@@ -120,6 +124,20 @@ jobs:
           # Append caller-provided extra args
           if [ -n "${{ inputs.cmake-args }}" ]; then
             CMAKE_ARGS="${CMAKE_ARGS} ${{ inputs.cmake-args }}"
+          fi
+
+          # Sanitizer flags (caller-driven; default 'none' is a no-op)
+          SANITIZER_FLAGS=""
+          case "${{ inputs.sanitizer }}" in
+            asan) SANITIZER_FLAGS="-fsanitize=address -fno-omit-frame-pointer -g" ;;
+            ubsan) SANITIZER_FLAGS="-fsanitize=undefined -fno-omit-frame-pointer -g" ;;
+            asan-ubsan) SANITIZER_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer -g" ;;
+            none|"") SANITIZER_FLAGS="" ;;
+            *) echo "Unknown sanitizer: ${{ inputs.sanitizer }}" >&2; exit 1 ;;
+          esac
+          if [ -n "$SANITIZER_FLAGS" ]; then
+            echo "Enabling sanitizer flags: $SANITIZER_FLAGS"
+            CMAKE_ARGS="${CMAKE_ARGS} -DCMAKE_CXX_FLAGS=${SANITIZER_FLAGS} -DCMAKE_C_FLAGS=${SANITIZER_FLAGS} -DCMAKE_EXE_LINKER_FLAGS=${SANITIZER_FLAGS} -DCMAKE_SHARED_LINKER_FLAGS=${SANITIZER_FLAGS}"
           fi
 
           if [ "${{ runner.os }}" == "Windows" ]; then
@@ -303,6 +321,31 @@ jobs:
             echo '```' >> "$GITHUB_STEP_SUMMARY"
             echo "</details>" >> "$GITHUB_STEP_SUMMARY"
           fi
+
+      # ── Coverage (Ubuntu Debug only) ─────────────────────────
+      # NOTE: produces empty coverage report unless the build adds
+      # -fprofile-arcs -ftest-coverage to CMAKE_C/CXX_FLAGS. This step
+      # is wired up so a follow-up CMakeLists change can flip coverage on
+      # without touching workflows. ignore-errors keeps the job green when
+      # gcov data is absent.
+      - name: Generate coverage report (Ubuntu Debug)
+        if: matrix.os == 'ubuntu-24.04' && matrix.build-type == 'Debug'
+        shell: bash
+        run: |
+          sudo apt-get install -y lcov
+          cd build
+          lcov --capture --directory . --output-file coverage.info --ignore-errors source 2>/dev/null || true
+          lcov --remove coverage.info '/usr/*' '*/build/*' '*/_deps/*' '*/tests/*' --output-file coverage.info.cleaned 2>/dev/null || true
+          lcov --list coverage.info.cleaned 2>/dev/null || true
+
+      - name: Upload coverage to Codecov (C++)
+        if: matrix.os == 'ubuntu-24.04' && matrix.build-type == 'Debug'
+        uses: codecov/codecov-action@v5
+        with:
+          files: build/coverage.info.cleaned
+          flags: cpp
+          fail_ci_if_error: false
+        continue-on-error: true
 
       # ── Post-build verification ───────────────────────────────
       - name: Install shared library

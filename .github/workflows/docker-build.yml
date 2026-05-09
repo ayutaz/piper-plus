@@ -42,6 +42,8 @@ jobs:
     permissions:
       contents: read
       packages: write
+      id-token: write    # NEW: for OIDC sigstore signing
+      attestations: write  # NEW: for build provenance attestation
     steps:
       - name: Free disk space
         run: |
@@ -71,6 +73,7 @@ jobs:
             type=sha
 
       - name: Build and push to ghcr.io
+        id: build
         uses: docker/build-push-action@v7
         with:
           context: .
@@ -83,6 +86,27 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          # NEW: SLSA provenance + SBOM attestation
+          provenance: true
+          sbom: true
+
+      - name: Install Cosign
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: sigstore/cosign-installer@v4
+        with:
+          cosign-release: 'v2.4.1'
+
+      - name: Sign the published image
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          TAGS: ${{ steps.meta.outputs.tags }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          images=""
+          for tag in ${TAGS}; do
+            images+="${tag}@${DIGEST} "
+          done
+          cosign sign --yes ${images}
 
       # --- Docker Hub publish (tag push or workflow_dispatch only) ---
       - name: Check Docker Hub credentials
@@ -147,6 +171,8 @@ jobs:
     permissions:
       contents: read
       packages: write
+      id-token: write    # NEW: for OIDC sigstore signing
+      attestations: write  # NEW: for build provenance attestation
     steps:
       - name: Free disk space
         run: |
@@ -180,6 +206,7 @@ jobs:
             type=sha
 
       - name: Build and push CPU image (multi-arch)
+        id: build
         uses: docker/build-push-action@v7
         with:
           context: .
@@ -193,12 +220,35 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=python-inference-cpu
           cache-to: type=gha,mode=max,scope=python-inference-cpu
+          # NEW: SLSA provenance + SBOM attestation
+          provenance: true
+          sbom: true
+
+      - name: Install Cosign
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: sigstore/cosign-installer@v4
+        with:
+          cosign-release: 'v2.4.1'
+
+      - name: Sign the published image
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          TAGS: ${{ steps.meta.outputs.tags }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          images=""
+          for tag in ${TAGS}; do
+            images+="${tag}@${DIGEST} "
+          done
+          cosign sign --yes ${images}
 
   build-python-train:
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
+      id-token: write    # NEW: for OIDC sigstore signing
+      attestations: write  # NEW: for build provenance attestation
     steps:
       - name: Free disk space
         run: |
@@ -228,6 +278,7 @@ jobs:
             type=sha
 
       - name: Build and push
+        id: build
         uses: docker/build-push-action@v7
         with:
           context: .
@@ -241,12 +292,35 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          # NEW: SLSA provenance + SBOM attestation
+          provenance: true
+          sbom: true
+
+      - name: Install Cosign
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: sigstore/cosign-installer@v4
+        with:
+          cosign-release: 'v2.4.1'
+
+      - name: Sign the published image
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          TAGS: ${{ steps.meta.outputs.tags }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          images=""
+          for tag in ${TAGS}; do
+            images+="${tag}@${DIGEST} "
+          done
+          cosign sign --yes ${images}
 
   build-cpp-dev:
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
+      id-token: write    # NEW: for OIDC sigstore signing
+      attestations: write  # NEW: for build provenance attestation
     steps:
       - name: Free disk space
         run: |
@@ -276,6 +350,7 @@ jobs:
             type=sha
 
       - name: Build and push
+        id: build
         uses: docker/build-push-action@v7
         with:
           context: .
@@ -290,12 +365,35 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          # NEW: SLSA provenance + SBOM attestation
+          provenance: true
+          sbom: true
+
+      - name: Install Cosign
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: sigstore/cosign-installer@v4
+        with:
+          cosign-release: 'v2.4.1'
+
+      - name: Sign the published image
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          TAGS: ${{ steps.meta.outputs.tags }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          images=""
+          for tag in ${TAGS}; do
+            images+="${tag}@${DIGEST} "
+          done
+          cosign sign --yes ${images}
 
   build-cpp-inference:
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
+      id-token: write    # NEW: for OIDC sigstore signing
+      attestations: write  # NEW: for build provenance attestation
     # ORT ExternalProject + Open JTalk dictionary build is already heavy
     # under amd64; arm64 emulation roughly doubles wall time. Bump the
     # default 360-min timeout headroom explicitly so builds don't get
@@ -330,6 +428,7 @@ jobs:
             type=sha
 
       - name: Build and push
+        id: build
         uses: docker/build-push-action@v7
         with:
           context: .
@@ -344,6 +443,27 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          # NEW: SLSA provenance + SBOM attestation
+          provenance: true
+          sbom: true
+
+      - name: Install Cosign
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: sigstore/cosign-installer@v4
+        with:
+          cosign-release: 'v2.4.1'
+
+      - name: Sign the published image
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          TAGS: ${{ steps.meta.outputs.tags }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          images=""
+          for tag in ${TAGS}; do
+            images+="${tag}@${DIGEST} "
+          done
+          cosign sign --yes ${images}
 
   # Multi-arch is critical here: Home Assistant ships on Raspberry Pi
   # (arm64) and the docker-build job is the only path users have to a
@@ -353,6 +473,8 @@ jobs:
     permissions:
       contents: read
       packages: write
+      id-token: write    # NEW: for OIDC sigstore signing
+      attestations: write  # NEW: for build provenance attestation
     # arm64 emulated build for pyopenjtalk (C++ extension compile from
     # source) takes ~25 min per arch on QEMU; default 360-min is plenty,
     # but we set an explicit headroom so a hung `pip install` is killed
@@ -387,6 +509,7 @@ jobs:
             type=sha
 
       - name: Build and push to ghcr.io
+        id: build
         uses: docker/build-push-action@v7
         with:
           context: .
@@ -401,6 +524,27 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          # NEW: SLSA provenance + SBOM attestation
+          provenance: true
+          sbom: true
+
+      - name: Install Cosign
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: sigstore/cosign-installer@v4
+        with:
+          cosign-release: 'v2.4.1'
+
+      - name: Sign the published image
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          TAGS: ${{ steps.meta.outputs.tags }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          images=""
+          for tag in ${TAGS}; do
+            images+="${tag}@${DIGEST} "
+          done
+          cosign sign --yes ${images}
 
       # --- Docker Hub publish (tag push or workflow_dispatch only) ---
       - name: Check Docker Hub credentials
@@ -459,6 +603,8 @@ jobs:
     permissions:
       contents: read
       packages: write
+      id-token: write    # NEW: for OIDC sigstore signing
+      attestations: write  # NEW: for build provenance attestation
     timeout-minutes: 90
     steps:
       - name: Free disk space
@@ -489,6 +635,7 @@ jobs:
             type=sha
 
       - name: Build and push to ghcr.io
+        id: build
         uses: docker/build-push-action@v7
         with:
           context: .
@@ -500,6 +647,27 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          # NEW: SLSA provenance + SBOM attestation
+          provenance: true
+          sbom: true
+
+      - name: Install Cosign
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: sigstore/cosign-installer@v4
+        with:
+          cosign-release: 'v2.4.1'
+
+      - name: Sign the published image
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          TAGS: ${{ steps.meta.outputs.tags }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          images=""
+          for tag in ${TAGS}; do
+            images+="${tag}@${DIGEST} "
+          done
+          cosign sign --yes ${images}
 
       # --- Docker Hub publish (tag push or workflow_dispatch only) ---
       - name: Check Docker Hub credentials

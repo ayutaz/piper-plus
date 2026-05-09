@@ -60,3 +60,6 @@ sha2 = "0.10"
 [[example]]
 name = "bench_phase1"
 required-features = ["onnx"]
+
+[lints]
+workspace = true

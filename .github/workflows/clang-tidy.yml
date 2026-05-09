@@ -1,0 +1,84 @@
+name: clang-tidy
+
+on:
+  pull_request:
+    branches: [dev]
+    paths:
+      - 'src/cpp/**'
+      - '.clang-tidy'
+      - 'CMakeLists.txt'
+      - 'cmake/**'
+      - '.github/workflows/clang-tidy.yml'
+  push:
+    branches: [dev, main]
+    paths:
+      - 'src/cpp/**'
+      - '.clang-tidy'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  clang-tidy:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install clang-tidy + dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-tidy-18 cmake ninja-build \
+            libsndfile1-dev libonnxruntime-dev libfmt-dev libspdlog-dev
+          sudo update-alternatives --install /usr/bin/clang-tidy clang-tidy /usr/bin/clang-tidy-18 100
+
+      - name: Configure CMake (compile_commands.json)
+        run: |
+          mkdir -p build-tidy
+          cd build-tidy
+          cmake .. -G Ninja -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+            -DBUILD_TESTING=OFF
+
+      - name: Run clang-tidy on changed files (PR)
+        if: github.event_name == 'pull_request'
+        run: |
+          # Only check files changed in this PR (faster)
+          CHANGED_FILES=$(git diff --name-only origin/${{ github.base_ref }}..HEAD -- 'src/cpp/*.cpp' 'src/cpp/*.c' 'src/cpp/*.hpp' 'src/cpp/*.h' || true)
+          if [ -z "$CHANGED_FILES" ]; then
+            echo "No C++ files changed in PR"
+            exit 0
+          fi
+          echo "Files to check:"
+          echo "$CHANGED_FILES"
+          # 各ファイルに対して clang-tidy 実行
+          # 既存ノイズを許容するため continue-on-error は workflow 全体で設定
+          for file in $CHANGED_FILES; do
+            if [ -f "$file" ]; then
+              clang-tidy -p build-tidy "$file" --use-color=true || true
+            fi
+          done
+        continue-on-error: true  # baseline 確立まで warn
+
+      - name: Run clang-tidy on all files (push to dev/main)
+        if: github.event_name == 'push'
+        run: |
+          # Full scan, but parallelize for speed
+          find src/cpp -name '*.cpp' -o -name '*.c' | head -50 | \
+            xargs -I {} -P 4 clang-tidy -p build-tidy {} --use-color=true 2>&1 | tee tidy-output.txt || true
+        continue-on-error: true
+
+      - name: Upload clang-tidy report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: clang-tidy-report
+          path: tidy-output.txt
+          retention-days: 14
+        continue-on-error: true

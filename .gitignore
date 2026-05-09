@@ -123,6 +123,11 @@ check_*.py
 !scripts/check_text_splitter_contract.py
 !scripts/check_language_id_map_contract.py
 !scripts/check_ssml_contract.py
+!scripts/check_onnx_export_contract.py
+!scripts/check_ort_version_drift.py
+!scripts/check_dictionary_versions.py
+!scripts/check_phoneme_set_version.py
+!scripts/verify_model_checksums.py
 create_comprehensive_*.py
 add_missing_*.py
 retrain_*.py

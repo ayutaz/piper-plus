@@ -39,3 +39,6 @@ quick-xml = "0.37"
 tracing = "0.1"
 jpreprocess = { version = "0.9", optional = true }
 bincode = { version = "1", optional = true }
+
+[lints]
+workspace = true

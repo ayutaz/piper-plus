@@ -103,6 +103,26 @@ def export_speaker_encoder(
 
     _LOGGER.info("Exported ONNX model to %s (opset %d)", output_path, opset_version)
 
+    # ONNX validation pipeline (per docs/spec/onnx-export-contract.toml):
+    #   1. onnx.checker.check_model() — corruption / opset / type validation
+    #   2. onnx.shape_inference.infer_shapes() — downstream shape mismatch detection
+    import onnx as _onnx_validator  # noqa: PLC0415
+
+    _LOGGER.info("Validating exported ONNX model...")
+    try:
+        _model = _onnx_validator.load(str(output_path))
+        _onnx_validator.checker.check_model(_model, full_check=False)
+        _LOGGER.info("✓ onnx.checker.check_model passed")
+        _inferred = _onnx_validator.shape_inference.infer_shapes(_model)
+        _LOGGER.info(
+            "✓ onnx.shape_inference.infer_shapes passed (output graph: %d nodes)",
+            len(_inferred.graph.node),
+        )
+    except _onnx_validator.checker.ValidationError as e:
+        _LOGGER.error("ONNX model validation FAILED: %s", e)
+        raise
+    del _model, _inferred  # release memory
+
     # Verify the ONNX model
     _verify_onnx(output_path, model, dummy_mel)
 
