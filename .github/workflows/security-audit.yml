@@ -124,9 +124,12 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: "24"
-          # PR 時はキャッシュ重視で高速化
-          cache: ${{ github.event_name == 'pull_request' && 'npm' || '' }}
-          cache-dependency-path: ${{ matrix.package }}/package-lock.json
+          # cache は package-lock.json が repo にコミットされている
+          # openjtalk-web のみ有効化。g2p は lockfile を .gitignore しているため
+          # path 解決失敗で 'Some specified paths were not resolved' fail する。
+          # g2p は次の "Generate lockfile if missing" step で生成して audit する。
+          cache: ${{ matrix.package == 'src/wasm/openjtalk-web' && 'npm' || '' }}
+          cache-dependency-path: ${{ matrix.package == 'src/wasm/openjtalk-web' && format('{0}/package-lock.json', matrix.package) || '' }}
       - name: Generate lockfile if missing (${{ matrix.package }})
         working-directory: ${{ matrix.package }}
         # src/wasm/g2p には package-lock.json をコミットしていないため、
