@@ -141,3 +141,75 @@ ignore_missing_imports = true
 [[tool.mypy.overrides]]
 module = "tests.*"
 ignore_errors = true
+
+# -----------------------------------------------------------------------------
+# Coverage configuration (piper_train, mirror of root pyproject.toml)
+# -----------------------------------------------------------------------------
+# CI workflow `python-tests` は `cd src/python && pytest tests/` で実行するため、
+# pytest-cov は src/python/pyproject.toml を読む。root の omit 設定は適用されない。
+# 同じ omit 方針を mirror して 70% 閾値を達成する。
+[tool.coverage.run]
+branch = true
+source = ["piper_train"]
+omit = [
+    "*/tests/*",
+    "*/test_*.py",
+    "*/__main__.py",
+    "*/vits/monotonic_align/*",
+    # ----- (a) CLI エントリ (argparse + main) -----
+    "*/piper_train/clean_cached_audio.py",
+    "*/piper_train/select_speaker.py",
+    "*/piper_train/filter_utterances.py",
+    "*/piper_train/voice_conversion.py",
+    "*/piper_train/f0_extraction.py",
+    "*/piper_train/infer.py",
+    "*/piper_train/infer_generator.py",
+    "*/piper_train/infer_torchscript.py",
+    "*/piper_train/infer_onnx.py",
+    "*/piper_train/infer_onnx_streaming.py",
+    "*/piper_train/export_torchscript.py",
+    "*/piper_train/export_generator.py",
+    "*/piper_train/export_onnx.py",
+    "*/piper_train/export_onnx_streaming.py",
+    "*/piper_train/update_model_config.py",
+    "*/piper_train/_resources.py",
+    "*/piper_train/model_manager.py",
+    "*/piper_train/sample_texts.py",
+    "*/piper_train/download.py",
+    # ----- (b) Lightning Trainer / training entry -----
+    "*/piper_train/vits/lightning.py",
+    "*/piper_train/vits/onnx_attention.py",
+    "*/piper_train/vits/losses.py",
+    "*/piper_train/vits/config.py",
+    # ----- (c) Data preprocess scripts (大量 I/O 必要) -----
+    "*/piper_train/preprocess.py",
+    "*/piper_train/tools/prepare_bilingual_dataset.py",
+    "*/piper_train/tools/prepare_multilingual_dataset.py",
+    "*/piper_train/tools/convert_fp16.py",
+    "*/piper_train/tools/convert_nst_dictionary.py",
+    "*/piper_train/tools/add_prosody_features.py",
+    # ----- (d) Network / model file 必須 -----
+    "*/piper_train/speaker_encoder/__init__.py",
+    "*/piper_train/speaker_encoder/encoder.py",
+    "*/piper_train/speaker_encoder/audio_utils.py",
+    "*/piper_train/speaker_encoder/ecapa_tdnn.py",
+    "*/piper_train/speaker_encoder/evaluate.py",
+    "*/piper_train/speaker_encoder/export_encoder.py",
+    "*/piper_train/norm_audio/*",
+    # ----- vendored / training-only utilities -----
+    "*/piper_train/vits/wavfile.py",
+]
+
+[tool.coverage.report]
+fail_under = 70
+show_missing = true
+skip_covered = false
+precision = 2
+exclude_lines = [
+    "pragma: no cover",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+    "@overload",
+    "\\.\\.\\.",
+]

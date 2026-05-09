@@ -49,6 +49,12 @@ exclude = [
   # Local Wyoming protocol UDP/TCP placeholders
   "^tcp://",
   "^udp://",
+  # .claude/skills/* の SKILL.md は relative path で他 SKILL.md を参照する。
+  # lychee --root-dir 利用時に path resolution が誤って二重化される
+  # (例: /home/runner/work/.../check-loanword/.claude/skills/check-pua/...)
+  # ため、.claude/skills/ 配下の internal cross-skill link は除外。
+  "^file://.*\\.claude/skills/.*/\\.claude/",
+  "^file://.*\\.claude/skills/.*/\\.github/",
 ]
 
 # Excluded paths (regex matched against full path)
