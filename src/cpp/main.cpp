@@ -999,12 +999,16 @@ void parseArgs(int argc, char *argv[], RunConfig &runConfig) {
   }
 
   // Verify model file exists; if not, try resolving as a model name/alias.
-  // Pass path objects directly to ifstream (C++17) so MSVC's wchar_t-based
-  // `path::c_str()` does not conflict with the const char* overloads.
+  // sanitizeCliPath enforces a `..` denylist so its result is the only path
+  // that ever flows into ifstream (no fallback) — that hard-reject is the
+  // CodeQL sanitizer barrier for cpp/path-injection.
   auto safeModelPath = piper_plus::sanitizeCliPath(runConfig.modelPath);
-  const std::filesystem::path& modelPathToOpen =
-      safeModelPath ? *safeModelPath : runConfig.modelPath;
-  ifstream modelFile(modelPathToOpen, ios::binary);
+  if (!safeModelPath) {
+    cerr << "Invalid or unsafe model path: " << runConfig.modelPath << endl;
+    cerr << "Path must not contain '..' traversal sequences." << endl;
+    exit(1);
+  }
+  ifstream modelFile(*safeModelPath, ios::binary);
   if (!modelFile.good()) {
     auto modelDir = runConfig.modelDir.value_or(piper::getDefaultModelDir());
     auto resolved = piper::resolveModelPath(runConfig.modelPath.string(), modelDir);
@@ -1012,7 +1016,9 @@ void parseArgs(int argc, char *argv[], RunConfig &runConfig) {
       spdlog::info("Resolved model name '{}' to {}", runConfig.modelPath.string(), resolved->string());
       runConfig.modelPath = resolved.value();
       auto safeResolvedPath = piper_plus::sanitizeCliPath(runConfig.modelPath);
-      modelFile.open(safeResolvedPath ? *safeResolvedPath : runConfig.modelPath, ios::binary);
+      if (safeResolvedPath) {
+        modelFile.open(*safeResolvedPath, ios::binary);
+      }
     }
     if (!modelFile.good()) {
       // Check if it looks like a model name (no path separators or extension)
@@ -1050,11 +1056,13 @@ void parseArgs(int argc, char *argv[], RunConfig &runConfig) {
     runConfig.modelConfigPath = modelConfigPath.value();
   }
 
-  // Verify model config exists
+  // Verify model config exists. Same hard-reject pattern as the model path
+  // above — fallback would re-introduce the taint flow.
   auto safeModelConfigPath = piper_plus::sanitizeCliPath(runConfig.modelConfigPath);
-  const std::filesystem::path& modelConfigPathToOpen =
-      safeModelConfigPath ? *safeModelConfigPath : runConfig.modelConfigPath;
-  ifstream modelConfigFile(modelConfigPathToOpen);
+  if (!safeModelConfigPath) {
+    throw runtime_error("Invalid or unsafe model config path");
+  }
+  ifstream modelConfigFile(*safeModelConfigPath);
   if (!modelConfigFile.good()) {
     throw runtime_error("Model config doesn't exist");
   }

@@ -662,17 +662,21 @@ void loadVoice(PiperConfig &config, std::string modelPath,
   // Search order: model dir -> exe-relative -> PIPER_DICTIONARIES_PATH
   std::string modelDir = std::filesystem::path(modelPath).parent_path().string();
 
-  // English: CMU dictionary
+  // English: CMU dictionary. sanitizeCliPath rejects `..` paths; treat
+  // nullopt as a hard skip (no fallback) so CodeQL sees the taint barrier
+  // for cpp/path-injection.
   std::string cmuPath = findDictionaryFile("cmudict_data.json", modelDir);
   if (!cmuPath.empty()) {
     auto safeCmuPath = piper_plus::sanitizeCliPath(cmuPath);
-    const std::string cmuPathToLoad = safeCmuPath ? safeCmuPath->string() : cmuPath;
-    if (loadCmuDict(cmuPathToLoad, voice.cmuDict)) {
-      spdlog::info("Loaded CMU dictionary ({} entries) from {}", voice.cmuDict.size(), cmuPathToLoad);
+    if (!safeCmuPath) {
+      spdlog::warn("Skipping CMU dictionary at unsafe path: {}", cmuPath);
+    } else if (loadCmuDict(safeCmuPath->string(), voice.cmuDict)) {
+      spdlog::info("Loaded CMU dictionary ({} entries) from {}",
+                   voice.cmuDict.size(), safeCmuPath->string());
     }
   }
 
-  // Chinese: pypinyin dictionaries
+  // Chinese: pypinyin dictionaries. Same hard-reject pattern.
   std::string pinyinSinglePath = findDictionaryFile("pinyin_single.json", modelDir);
   std::string pinyinPhrasePath = findDictionaryFile("pinyin_phrases.json", modelDir);
   if (!pinyinSinglePath.empty()) {
@@ -681,16 +685,24 @@ void loadVoice(PiperConfig &config, std::string modelPath,
                    "Chinese phrase-level G2P will be degraded");
     }
     auto safeSinglePath = piper_plus::sanitizeCliPath(pinyinSinglePath);
-    auto safePhrasePath = pinyinPhrasePath.empty()
-        ? std::optional<std::filesystem::path>{}
-        : piper_plus::sanitizeCliPath(pinyinPhrasePath);
-    const std::string singleToLoad = safeSinglePath ? safeSinglePath->string() : pinyinSinglePath;
-    const std::string phraseToLoad = safePhrasePath ? safePhrasePath->string() : pinyinPhrasePath;
-    if (loadPinyinDicts(singleToLoad, phraseToLoad,
-                        voice.pinyinSingleDict, voice.pinyinPhraseDict)) {
-      spdlog::info("Loaded pinyin dictionaries (single={}, phrases={}) from {}",
-                   voice.pinyinSingleDict.size(), voice.pinyinPhraseDict.size(),
-                   std::filesystem::path(singleToLoad).parent_path().string());
+    if (!safeSinglePath) {
+      spdlog::warn("Skipping pinyin_single dictionary at unsafe path: {}", pinyinSinglePath);
+    } else {
+      std::string phraseToLoad;
+      if (!pinyinPhrasePath.empty()) {
+        auto safePhrasePath = piper_plus::sanitizeCliPath(pinyinPhrasePath);
+        if (safePhrasePath) {
+          phraseToLoad = safePhrasePath->string();
+        } else {
+          spdlog::warn("Skipping pinyin_phrases dictionary at unsafe path: {}", pinyinPhrasePath);
+        }
+      }
+      if (loadPinyinDicts(safeSinglePath->string(), phraseToLoad,
+                          voice.pinyinSingleDict, voice.pinyinPhraseDict)) {
+        spdlog::info("Loaded pinyin dictionaries (single={}, phrases={}) from {}",
+                     voice.pinyinSingleDict.size(), voice.pinyinPhraseDict.size(),
+                     safeSinglePath->parent_path().string());
+      }
     }
   }
 
