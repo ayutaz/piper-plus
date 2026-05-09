@@ -1,0 +1,36 @@
+# clang-tidy configuration for piper-plus C/C++ code
+#
+# Wave 1: install configuration only — warnings are emitted but never
+# fail the build. Werror gating is deferred to Wave 2 once the existing
+# backlog is triaged.
+#
+# Coverage: src/cpp/, src/c/, headers under include/. third_party / build /
+# external / _deps trees are excluded via HeaderFilterRegex below.
+#
+# To run locally:
+#   cmake -S . -B build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+#   clang-tidy -p build src/cpp/<file>.cpp
+---
+Checks: >
+  -*,
+  modernize-*,
+  performance-*,
+  readability-*,
+  bugprone-*,
+  misc-*,
+  cppcoreguidelines-*,
+  -modernize-use-trailing-return-type,
+  -readability-magic-numbers,
+  -readability-identifier-length,
+  -cppcoreguidelines-pro-type-vararg,
+  -cppcoreguidelines-pro-bounds-array-to-pointer-decay,
+  -cppcoreguidelines-pro-bounds-pointer-arithmetic,
+  -cppcoreguidelines-avoid-magic-numbers,
+  -cppcoreguidelines-non-private-member-variables-in-classes,
+  -bugprone-easily-swappable-parameters,
+  -misc-non-private-member-variables-in-classes
+WarningsAsErrors: ''
+HeaderFilterRegex: '^(?!.*(third_party|build|external|_deps)).*'
+FormatStyle: file
+CheckOptions:
+  readability-function-cognitive-complexity.Threshold: '40'
