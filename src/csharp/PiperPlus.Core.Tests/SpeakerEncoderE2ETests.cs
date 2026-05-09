@@ -59,7 +59,7 @@ public class SpeakerEncoderE2ETests
         DirectoryInfo? d = new(here);
         for (int i = 0; i < 8 && d is not null; i++)
         {
-            if (Directory.Exists(System.IO.Path.Combine(d.FullName, "test", "fixtures")))
+            if (Directory.Exists(System.IO.Path.Join(d.FullName, "test", "fixtures")))
             {
                 return d.FullName;
             }
@@ -71,7 +71,7 @@ public class SpeakerEncoderE2ETests
     }
 
     private static string FixturePath() =>
-        System.IO.Path.Combine(RepoRoot(), "test", "fixtures", "speaker_encoder_golden.json");
+        System.IO.Path.Join(RepoRoot(), "test", "fixtures", "speaker_encoder_golden.json");
 
     private static string Sha256File(string path)
     {
@@ -90,7 +90,11 @@ public class SpeakerEncoderE2ETests
             na += (double)a[i] * a[i];
             nb += (double)b[i] * b[i];
         }
-        if (na == 0 || nb == 0) return 0f;
+        // Guard against zero-magnitude vectors. Use `<= 0` rather than `== 0` because
+        // double accumulation of `(double)a[i] * a[i]` is non-negative analytically but
+        // CodeQL flags exact float equality; `<= 0` is also robust if a future change
+        // ever lets the running sum drift to a tiny negative due to compensated math.
+        if (na <= 0 || nb <= 0) return 0f;
         return (float)(dot / (Math.Sqrt(na) * Math.Sqrt(nb)));
     }
 
@@ -152,7 +156,7 @@ public class SpeakerEncoderE2ETests
         string wavPath = gate.ReferenceWav.Path;
         if (!System.IO.Path.IsPathRooted(wavPath))
         {
-            wavPath = System.IO.Path.Combine(RepoRoot(), wavPath);
+            wavPath = System.IO.Path.Join(RepoRoot(), wavPath);
         }
         if (!File.Exists(wavPath))
         {

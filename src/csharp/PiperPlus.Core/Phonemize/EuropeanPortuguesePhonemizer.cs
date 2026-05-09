@@ -89,9 +89,17 @@ public sealed class EuropeanPortuguesePhonemizer : IPhonemizer
     internal static List<string> ApplyEuPostprocessing(List<string> tokensIn)
     {
         var tokens = new List<string>(tokensIn);
-        int n = tokens.Count;
+        ApplyPassPalatalisationAndCentralisation(tokens);
+        ApplyPassCodaSibilants(tokens);
+        ApplyPassCodaW(tokens);
+        ApplyPassRhoticH(tokens);
+        return tokens;
+    }
 
-        // Pass 1: undo BR t/d palatalisation + final-e centralisation.
+    // Pass 1: undo BR t/d palatalisation + final-e centralisation.
+    private static void ApplyPassPalatalisationAndCentralisation(List<string> tokens)
+    {
+        int n = tokens.Count;
         for (int i = 0; i < n; i++)
         {
             if (tokens[i] != "i") continue;
@@ -115,8 +123,12 @@ public sealed class EuropeanPortuguesePhonemizer : IPhonemizer
                 tokens[i] = "ɨ";
             }
         }
+    }
 
-        // Pass 2: coda /s/, /z/.
+    // Pass 2: coda /s/, /z/.
+    private static void ApplyPassCodaSibilants(List<string> tokens)
+    {
+        int n = tokens.Count;
         for (int i = 0; i < n; i++)
         {
             if (tokens[i] != "s" && tokens[i] != "z") continue;
@@ -136,8 +148,12 @@ public sealed class EuropeanPortuguesePhonemizer : IPhonemizer
                 tokens[i] = (tokens[i] == "s") ? "ʃ" : "ʒ";
             }
         }
+    }
 
-        // Pass 3: coda /w/ → /ɫ/.
+    // Pass 3: coda /w/ → /ɫ/.
+    private static void ApplyPassCodaW(List<string> tokens)
+    {
+        int n = tokens.Count;
         for (int i = 0; i < n; i++)
         {
             if (tokens[i] != "w" || i == 0) continue;
@@ -151,8 +167,12 @@ public sealed class EuropeanPortuguesePhonemizer : IPhonemizer
                 tokens[i] = "ɫ";
             }
         }
+    }
 
-        // Pass 4: h → ʁ.
+    // Pass 4: h → ʁ.
+    private static void ApplyPassRhoticH(List<string> tokens)
+    {
+        int n = tokens.Count;
         for (int i = 0; i < n; i++)
         {
             if (tokens[i] == "h")
@@ -160,7 +180,5 @@ public sealed class EuropeanPortuguesePhonemizer : IPhonemizer
                 tokens[i] = "ʁ";
             }
         }
-
-        return tokens;
     }
 }
