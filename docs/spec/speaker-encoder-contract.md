@@ -47,8 +47,8 @@ Fixture: `test/fixtures/speaker_encoder_golden.json`. Includes:
 | Rust | ✅ 16 tests | `src/rust/piper-core/tests/test_speaker_encoder_golden.rs` |
 | Go | ✅ ~26 tests | `src/go/piperplus/speaker_encoder_test.go` |
 | C# | ✅ ~23 facts | `src/csharp/PiperPlus.Core.Tests/SpeakerEncoderTests.cs` |
-| WASM/JS | ⏳ stub exists at `src/wasm/openjtalk-web/src/speaker-encoder.js` — **parity test pending** |
-| C/C++ | ⏳ symbol exists in C API — **parity test pending** |
+| WASM/JS | ✅ 6 tests (`Math.fround` f32 narrowing + 2% L2 tol) | `src/wasm/openjtalk-web/test/js/test-speaker-encoder-golden.js` |
+| C/C++ | ✅ 5 tests (inline mel port, 2% L2 tol) | `src/cpp/tests/test_speaker_encoder_golden.cpp` |
 
 ## Layer 2 — E2E cosine gate
 
@@ -122,33 +122,68 @@ This mirrors the TTS model alias pattern (`hf_hub_download` in
 
 | Runtime | Status | Test path |
 |---|---|---|
-| Python (canonical) | ⏳ scaffold (skips when fixture lacks block) | `test/test_speaker_encoder_e2e.py` |
-| Rust | ⏳ scaffold (skips when env var unset) | `src/rust/piper-core/tests/test_speaker_encoder_e2e.rs` |
-| Go | ⏳ scaffold | `src/go/piperplus/speaker_encoder_e2e_test.go` |
-| C# | ⏳ scaffold | `src/csharp/PiperPlus.Core.Tests/SpeakerEncoderE2ETests.cs` |
-| WASM/JS | ❌ not started — depends on layer 1 first |
-| C/C++ | ❌ not started — depends on layer 1 first |
+| Python (canonical) | ✅ scaffold (skips when fixture lacks block) | `test/test_speaker_encoder_e2e.py` |
+| Rust | ✅ scaffold (skips when env var unset) | `src/rust/piper-core/tests/test_speaker_encoder_e2e.rs` |
+| Go | ✅ scaffold | `src/go/piperplus/speaker_encoder_e2e_test.go` |
+| C# | ✅ scaffold | `src/csharp/PiperPlus.Core.Tests/SpeakerEncoderE2ETests.cs` |
+| WASM/JS | ✅ scaffold (uses `onnxruntime-node` when active) | `src/wasm/openjtalk-web/test/js/test-speaker-encoder-e2e.js` |
+| C/C++ | ✅ scaffold (uses `Ort::Session` directly; the C API stub remains documented as EXPERIMENTAL) | `src/cpp/tests/test_speaker_encoder_e2e.cpp` |
 
-## Remaining work (out of scope for the present PR)
+All 6 runtimes share the same skip semantics:
+1. Skip when fixture lacks `e2e_cosine_gate` block.
+2. Skip when `PIPER_SPEAKER_ENCODER_ONNX_PATH` is unset (and Python's
+   `PIPER_SPEAKER_ENCODER_E2E=1` HF download path is also unset).
+3. Skip when reference WAV not locally available.
+4. Otherwise: verify encoder ONNX sha256, run inference, assert
+   `cosine(actual, expected) >= cosine_threshold`.
 
-The following are intentionally deferred, with each decision pinned here so
-the gap is explicit rather than implicit:
+## Activation procedure
 
-1. **WASM/JS layer 1 mel parity** — `speaker-encoder.js` predates the
-   golden fixture; needs a `test-speaker-encoder-golden.js` test that loads
-   `test/fixtures/speaker_encoder_golden.json` and verifies the JS mel
-   output against the same checksums.
-2. **C/C++ layer 1 mel parity** — same, in `src/cpp/tests/`.
-3. **HF publication** — the actual `ayousanz/piper-plus-speaker-encoder`
-   HF repo + revision tag must be created and the fixture's `sha256` /
-   `expected_embedding` populated by running
-   `python test/generate_speaker_encoder_golden.py --encoder-onnx <path>
-    --reference-wav <path>`.
-4. **CI lanes** — once (3) is done, each runtime CI workflow gains a
-   conditional step that downloads the encoder via HF and sets
-   `PIPER_SPEAKER_ENCODER_E2E=1`. Caching key:
-   `speaker-encoder-onnx-${{ hashfiles('test/fixtures/speaker_encoder_golden.json') }}`.
-5. **WASM/C++ layer 2 E2E** — depends on (1) and (2).
+Once the encoder ONNX is published:
 
-The skip semantics in step (2) of "Test semantics" guarantee none of the
-above blocks merging this scaffolding.
+1. **Generate fixture data**:
+   ```bash
+   uv run python test/generate_speaker_encoder_golden.py \
+     --encoder-onnx /local/path/to/encoder.onnx \
+     --reference-wav /local/path/to/reference.wav \
+     --hf-repo ayousanz/piper-plus-speaker-encoder \
+     --hf-revision v1.0.0
+   ```
+   Commit the updated `test/fixtures/speaker_encoder_golden.json`.
+
+2. **Reference WAV** — commit a CC0 short reference WAV (mono 16kHz,
+   ~1 second) at `test/fixtures/speaker_encoder/reference.wav` (path
+   referenced by the fixture).
+
+3. **CI lane activation** — add to each runtime workflow:
+   ```yaml
+   - name: Download speaker encoder ONNX (cached)
+     uses: actions/cache@v4
+     with:
+       path: ~/.cache/piper-plus/speaker-encoder.onnx
+       key: speaker-encoder-onnx-${{ hashFiles('test/fixtures/speaker_encoder_golden.json') }}
+   - name: Fetch encoder if cache miss
+     run: |
+       if [ ! -f ~/.cache/piper-plus/speaker-encoder.onnx ]; then
+         huggingface-cli download ayousanz/piper-plus-speaker-encoder \
+           encoder.onnx --revision v1.0.0 \
+           --local-dir ~/.cache/piper-plus/
+       fi
+     env:
+       HF_HUB_DISABLE_TELEMETRY: 1
+   - name: Run E2E gate
+     env:
+       PIPER_SPEAKER_ENCODER_ONNX_PATH: ~/.cache/piper-plus/speaker-encoder.onnx
+     run: <runtime-specific test command>
+   ```
+
+   Until that lane is added, the gate stays opt-in — local devs can run it
+   by setting the env var, and PR CI continues to pass via the skip path.
+
+## Closing notes
+
+The two-layer split (mel parity is mandatory; E2E cosine gate is opt-in)
+is intentional: layer 1 catches algorithm bugs without any external
+dependency, while layer 2 catches the harder shape/axis/scaling drifts
+that only manifest end-to-end with the real ONNX. Together they form the
+complete cross-runtime contract for the speaker encoder.
