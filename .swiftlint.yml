@@ -1,0 +1,66 @@
+# SwiftLint configuration for piper-plus
+# Used by:
+#   - Local development: `brew install swiftlint && swiftlint`
+#   - CI: .github/workflows/swift-g2p-ci.yml runs `swiftlint --strict`
+#
+# Rules tuning rationale:
+#   - line_length disabled: enforced via swiftformat (--maxwidth 120) instead
+#   - file_length disabled: large G2P tables in source files are intentional
+#   - force_unwrapping = error: catches all `try!` / `as!` / `!`
+
+disabled_rules:
+  - todo
+  - line_length  # we'll enforce via swiftformat instead
+  - file_length
+
+opt_in_rules:
+  - empty_count
+  - explicit_init
+  - first_where
+  - force_unwrapping
+  - implicit_return
+  - last_where
+  - prefer_self_in_static_references
+  - redundant_nil_coalescing
+  - sorted_first_last
+  - toggle_bool
+  - unused_optional_binding
+
+excluded:
+  - .build
+  - .swiftpm
+  - Tests
+  - Pods
+  - DerivedData
+  - .xcframework
+  - vendor
+
+force_cast: warning
+force_try: warning
+force_unwrapping: error
+
+cyclomatic_complexity:
+  warning: 12
+  error: 20
+
+function_body_length:
+  warning: 60
+  error: 120
+
+type_body_length:
+  warning: 300
+  error: 500
+
+identifier_name:
+  min_length: 2
+  excluded:
+    - id
+    - g
+    - x
+    - y
+    - z
+    - i
+    - j
+    - k
+
+reporter: "xcode"

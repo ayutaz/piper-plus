@@ -1,0 +1,29 @@
+# EditorConfig for piper-plus Android module — read by ktlint (1.3.x) and
+# IntelliJ/Android Studio. Wave 1 quality gate.
+#
+# Only Kotlin (.kt) / Kotlin script (.kts) settings live here; the rest of
+# the repo has its own conventions. Keep this file aligned with
+# detekt.yml + ktlint plugin config in android/piper-plus-g2p/build.gradle.kts.
+
+root = false
+
+[*.{kt,kts}]
+indent_style = space
+indent_size = 4
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+charset = utf-8
+max_line_length = 140
+
+# ktlint rule knobs — pinned explicitly so behaviour does not drift if
+# ktlint default policy changes between minor versions.
+ktlint_standard_no-wildcard-imports = enabled
+ktlint_standard_filename = enabled
+ktlint_standard_function-naming = enabled
+ktlint_standard_property-naming = enabled
+ktlint_standard_no-empty-first-line-in-method-block = enabled
+
+# Allow trailing commas (Kotlin 1.4+ idiom; matches existing source style).
+ij_kotlin_allow_trailing_comma = true
+ij_kotlin_allow_trailing_comma_on_call_site = true
