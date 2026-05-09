@@ -8,7 +8,7 @@ This example demonstrates how to wrap the piper-plus C API into a `PiperTTS` nod
 
 ## Directory Structure
 
-```
+```text
 examples/godot/
   SConstruct                   # SCons build script (~15 lines)
   src/
@@ -154,7 +154,7 @@ On Linux/macOS, set `LD_LIBRARY_PATH` / `DYLD_LIBRARY_PATH` if the shared librar
 
 ### Before (Source Copy)
 
-```
+```text
 godot-piper-plus/
   src/
     piper_tts.h / .cpp         # GDExtension wrapper
@@ -173,7 +173,7 @@ godot-piper-plus/
 
 ### After (C API Shared Library)
 
-```
+```text
 examples/godot/
   src/
     piper_tts_node.h / .cpp    # GDExtension wrapper (~150 lines)

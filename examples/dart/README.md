@@ -66,7 +66,7 @@ dart run example/streaming.dart multilingual-test-medium.onnx /usr/local/share/o
 
 ## Project structure
 
-```
+```text
 examples/dart/
   pubspec.yaml                      # Dart package definition (sdk >=3.1.0)
   ffigen.yaml                       # ffigen config for piper_plus.h
@@ -122,7 +122,7 @@ tts.dispose();
   the first FFI call. **Fix**: in `ios/Runner.xcodeproj` → Build Settings →
   **Other Linker Flags**, add:
 
-  ```
+  ```text
   -force_load $(BUILT_PRODUCTS_DIR)/PiperPlus/piper_plus.xcframework/ios-arm64/libpiper_plus.a
   ```
 

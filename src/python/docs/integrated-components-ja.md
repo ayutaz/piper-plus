@@ -53,7 +53,7 @@ python -m piper_train \
 
 ### 辞書ファイルの場所
 
-```
+```text
 data/dictionaries/
 ├── user_custom_dict.json  # ユーザーカスタム辞書（478エントリ）
 ├── default_tech_dict.json  # 技術用語辞書
@@ -66,7 +66,7 @@ data/dictionaries/
 
 ## 3. データフローの概要
 
-```
+```text
 入力テキスト
     ↓
 カスタム辞書適用（推論時）

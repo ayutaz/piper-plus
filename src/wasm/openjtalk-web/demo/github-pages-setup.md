@@ -18,7 +18,7 @@ This document describes how to deploy the PiperPlus WebAssembly TTS demo to GitH
 
 ### Source layout (repository)
 
-```
+```text
 src/wasm/openjtalk-web/
 ├── demo/
 │   ├── index.html                   # Main demo page
@@ -44,7 +44,7 @@ src/wasm/openjtalk-web/
 
 ### Deployed layout (GitHub Pages root)
 
-```
+```text
 / (GitHub Pages root)
 ├── index.html              (from test/multilingual-demo/index.html, paths rewritten)
 ├── 404.html                (copy of index.html)

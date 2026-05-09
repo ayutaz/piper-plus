@@ -151,7 +151,7 @@ Open `survey.html` in any modern browser, rate each clip 1-5, then click
 
 ### Example HTML output structure
 
-```
+```text
 <!DOCTYPE html>
 <html>
   <head> ... inline <style> ... </head>

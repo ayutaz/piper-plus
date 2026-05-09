@@ -72,7 +72,7 @@ Accepted models are registered in `piper_plus_voices.json` and become available 
 
 LJSpeech 形式 (フラットディレクトリ + `metadata.csv`) を使用してください。
 
-```
+```text
 dataset/
   wavs/
     utterance_001.wav
@@ -390,7 +390,7 @@ piper-plus --model <model-name> --text "こんにちは"
 piper-plus --model <model-name> --text "こんにちは"
 ```
 
-```
+```text
 
 ### Step 3: GitHub Issue で投稿
 

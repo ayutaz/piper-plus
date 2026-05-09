@@ -72,7 +72,7 @@ query($pr: Int!) {
 
 各コメントに対して、以下のテンプレートで返信を投稿:
 
-```
+```text
 対応しました (commit <hash>)。
 
 <修正内容の 1-3 行要約>
@@ -115,7 +115,7 @@ mutation ResolveThread($id: ID!) {
 
 ### フェーズ 5: 最終レポート
 
-```
+```text
 ## レビュー対応完了
 
 ### PR #<N>
@@ -138,7 +138,7 @@ mutation ResolveThread($id: ID!) {
 
 ## 使用例
 
-```
+```text
 # PR #349 のレビューに返信+resolve (コミットは HEAD)
 /reply-review 349
 

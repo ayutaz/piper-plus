@@ -34,7 +34,7 @@ for _token in [LANG]_PHONEMES:
 
 **衝突チェック:**
 
-```
+```text
 JA: 0xE000-0xE01C (29), ZH: 0xE020-0xE04A (43), KO: 0xE04B-0xE052 (8)
 ES/PT: 0xE054-0xE055 (2), FR: 0xE056-0xE058 (3), SV: 0xE059-0xE061 (9)
 ```
@@ -223,7 +223,7 @@ except ImportError:
 
 ## 実装順序 (依存関係)
 
-```
+```text
 Phase 1.1 (音素定義) → Phase 1.2 (Python G2P) → Phase 1.3 (統合)
                                                     ↓
                                     ┌───────────────┼───────────────┐

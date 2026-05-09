@@ -4,7 +4,7 @@
 
 ## ファイル一覧
 
-```
+```text
 .claude/
 ├── README.md                       # このファイル
 ├── settings.json                   # プロジェクト共有 hooks 定義 (git 管理)
@@ -141,7 +141,7 @@ winget install jqlang.jq
 
 CRLF で保存されると Git Bash で以下のエラーが出ます:
 
-```
+```text
 bash: $'\r': command not found
 ```
 

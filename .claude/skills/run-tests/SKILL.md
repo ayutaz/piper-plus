@@ -94,7 +94,7 @@ ctest --test-dir build -C Release --output-on-failure
 
 各ターゲット完了後、以下の形式で報告:
 
-```
+```text
 ## テスト実行結果
 
 | ランタイム | Pass | Fail | Skip | 時間 |

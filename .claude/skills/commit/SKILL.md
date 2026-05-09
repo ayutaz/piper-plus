@@ -120,7 +120,7 @@ pre-commit hook (例: ruff format hook) が失敗したら:
 
 ### 8. 成功後の報告
 
-```
+```text
 ✅ コミット成功
 - ハッシュ: abc1234
 - メッセージ: feat(python): ...

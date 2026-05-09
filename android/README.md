@@ -12,7 +12,7 @@ Wraps the piper-plus C shared library via JNI and exposes a Kotlin-friendly API 
 
 ## Project structure
 
-```
+```text
 android/
   build.gradle.kts              Root Gradle build
   settings.gradle.kts           Project settings

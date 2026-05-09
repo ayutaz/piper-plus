@@ -6,7 +6,7 @@
 
 ## 全体フロー
 
-```
+```text
 [1] pua.json 編集     ← canonical source
 [2] 6 ランタイムのテーブル更新
 [3] inventory に登録
@@ -103,7 +103,7 @@ python scripts/regenerate_test_fixture.py
 
 ### 6. ローカル検証
 
-```
+```text
 /check-pua
 ```
 

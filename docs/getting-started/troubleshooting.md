@@ -18,7 +18,7 @@ This guide helps resolve common issues when using Piper, especially with Japanes
 
 **Symptoms**:
 
-```
+```text
 Error: Model file not found: model.onnx
 ```
 
@@ -33,7 +33,7 @@ Error: Model file not found: model.onnx
 
 **症状**:
 
-```
+```text
 Model config doesn't exist
 ```
 
@@ -78,7 +78,7 @@ Model config doesn't exist
 
 **Symptoms**:
 
-```
+```text
 [error] OpenJTalk is not available or failed to process Japanese text
 ```
 
@@ -104,7 +104,7 @@ Model config doesn't exist
 
 **Symptoms**:
 
-```
+```text
 Error: Failed to download dictionary
 Auto-download is disabled. Please download and install the dictionary manually.
 ```
@@ -139,7 +139,7 @@ Auto-download is disabled. Please download and install the dictionary manually.
 
 **Symptoms**:
 
-```
+```text
 Error: Checksum mismatch! Expected abc123..., got def456...
 ```
 

@@ -81,7 +81,7 @@ allowed-tools: Agent Bash(git diff *) Bash(git log *) Bash(git status *) Read Gl
 
 6 エージェントの結果を収集し、以下の形式で **統合レポート** を作成:
 
-```
+```text
 ## ドキュメント監査結果
 
 ### 🔴 更新必須 (機能との不整合)
@@ -124,7 +124,7 @@ allowed-tools: Agent Bash(git diff *) Bash(git log *) Bash(git status *) Read Gl
 
 ## 実行例
 
-```
+```text
 /sync-docs
 → フェーズ 1-3 を実行し、監査レポートを提示
 → ユーザー承認後、フェーズ 4-5 を実行

@@ -45,7 +45,7 @@ unzip libpiper_plus-ios-*.xcframework.zip
 
 Result:
 
-```
+```text
 piper_plus.xcframework/
 ├── Info.plist
 ├── PrivacyInfo.xcprivacy            ← empty (no tracking, no Required Reason API)

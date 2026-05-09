@@ -68,7 +68,7 @@ N≤2 では純粋に悪化する。
 
 ### resolve_g2p_parallelism は期待通り
 
-```
+```text
 resolve_g2p_parallelism(1)  = 1   ← 1 文時はスレッド非生成 (zero overhead)
 resolve_g2p_parallelism(2)  = 2
 resolve_g2p_parallelism(5)  = 4

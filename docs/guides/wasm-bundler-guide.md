@@ -99,7 +99,7 @@ ONNX Runtime Web の `.wasm` ファイルがサーバーから配信可能な場
 
 ONNX Runtime Web のマルチスレッド版は `SharedArrayBuffer` が必要です。以下のヘッダーをサーバーに設定してください:
 
-```
+```text
 Cross-Origin-Opener-Policy: same-origin
 Cross-Origin-Embedder-Policy: require-corp
 ```

@@ -101,7 +101,7 @@ piper_plus_free_audio(outputBuffer)
 
 ## Project Structure (when using SPM)
 
-```
+```text
 MyApp/
 ├── Package.swift                    # depends on ayutaz/piper-plus + onnxruntime-spm
 ├── Package.resolved                 # locks piper-plus + ORT versions
@@ -112,7 +112,7 @@ MyApp/
 
 ## Project Structure (when using manual drag-and-drop)
 
-```
+```text
 MyApp/
 ├── Frameworks/
 │   ├── piper_plus.xcframework/      # device + simulator slices, modulemap, PrivacyInfo

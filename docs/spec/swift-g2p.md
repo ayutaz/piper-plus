@@ -56,7 +56,7 @@
 
 ### 2.1 アーキテクチャ
 
-```
+```text
 ┌────────────────────────────────────────────────┐
 │ Swift consumer (iOS / macOS app)               │
 │   import PiperPlusG2P                          │
@@ -166,7 +166,7 @@ API/JSON envelope/ABI の規範は [`docs/spec/swift-g2p-contract.toml`](./swift
 
 ### 3.6 module.modulemap (xcframework 内)
 
-```
+```text
 module PiperPlusG2PBinary {
   umbrella header "piper_plus_g2p.h"
   export *

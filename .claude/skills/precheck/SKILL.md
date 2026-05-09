@@ -88,7 +88,7 @@ ctest --test-dir build -C Release --output-on-failure
 
 各ステップ完了後、以下の形式で結果を報告:
 
-```
+```text
 ## Precheck 結果
 
 | ステップ | 結果 | 詳細 |

@@ -48,7 +48,7 @@ huggingface-cli upload ayousanz/piper-plus-tsukuyomi-chan tmp/config.json config
 
 After push, end-users running:
 
-```
+```text
 piper.exe --download-model tsukuyomi
 piper.exe --model tsukuyomi --text "..." --output_file out.wav
 ```

@@ -467,7 +467,7 @@ docker run -p 8080:8080 -v /path/to/models:/models \
 
 ## Project Structure / プロジェクト構造
 
-```
+```text
 src/go/
   go.mod                          # Module: github.com/ayutaz/piper-plus/src/go
   go.sum

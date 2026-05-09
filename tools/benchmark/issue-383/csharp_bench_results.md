@@ -50,7 +50,7 @@ CLI ではなく `PiperPlus.Core` API を直接叩いて、プロセス起動 + 
 状態が複数スレッド間で共有されていて、片方のスレッドが Decode 中に他スレッド
 が状態を書き換えるため。
 
-```
+```text
 System.NullReferenceException
    at DotNetG2P.MeCab.Lattice.ViterbiDecoder.Decode(...)
    at DotNetG2P.MeCab.MeCabTokenizer.Tokenize(String text)

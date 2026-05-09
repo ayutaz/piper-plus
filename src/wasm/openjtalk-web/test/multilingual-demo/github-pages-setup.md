@@ -89,7 +89,7 @@ jobs:
 
 GitHub Pages で正しく動作するには、以下の構造が必要：
 
-```
+```text
 /（GitHub Pages ルート）
 ├── index.html (demo/index.html)
 ├── config.js

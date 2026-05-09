@@ -111,7 +111,7 @@ val g2p = PiperPlusG2p.create(
 
 `android/piper-plus/` には既にフル TTS AAR の草案がある:
 
-```
+```text
 android/
 ├── build.gradle.kts            # AGP 8.7.3, Kotlin 2.1.0
 ├── settings.gradle.kts
@@ -186,7 +186,7 @@ android/
 
 **Maven coordinates**:
 
-```
+```text
 groupId:    io.github.ayutaz
 artifactId: piper-plus-g2p-android
 version:    1.0.0
@@ -221,7 +221,7 @@ version:    1.0.0
 
 ### 5.1 アーキテクチャ
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────┐
 │ Consumer App (Kotlin/Java)                                  │
 │   implementation("io.github.ayutaz:piper-plus-g2p-android") │
@@ -258,7 +258,7 @@ version:    1.0.0
 
 ### 5.2 Gradle module 構成
 
-```
+```text
 android/
 ├── build.gradle.kts
 ├── settings.gradle.kts                  # include(":piper-plus", ":piper-plus-g2p") に拡張

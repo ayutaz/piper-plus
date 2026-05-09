@@ -84,7 +84,7 @@ The fixture optionally contains an `e2e_cosine_gate` block:
 
 ### Test semantics (every runtime)
 
-```
+```text
 if fixture has no e2e_cosine_gate block:
     skip                      # mel parity only — gate not yet activated
 elif encoder ONNX is not locally available (env var or download cache):
