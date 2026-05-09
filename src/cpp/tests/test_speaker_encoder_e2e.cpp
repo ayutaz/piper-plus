@@ -34,6 +34,10 @@
 
 namespace {
 
+// Portable π — see test_speaker_encoder_golden.cpp for rationale (MSVC's
+// <cmath> does not expose M_PI without _USE_MATH_DEFINES).
+constexpr float kPi = 3.14159265358979323846f;
+
 // Reuse the mel parameters from layer 1.
 constexpr int MEL_SAMPLE_RATE = 16000;
 constexpr std::size_t MEL_N_FFT = 512;
@@ -58,7 +62,7 @@ float mel_to_hz_e2e(float mel) {
 std::vector<float> hann_window_e2e(std::size_t length) {
     std::vector<float> w(length);
     for (std::size_t n = 0; n < length; ++n) {
-        w[n] = 0.5f * (1.0f - std::cos(2.0f * static_cast<float>(M_PI) *
+        w[n] = 0.5f * (1.0f - std::cos(2.0f * kPi *
                                        static_cast<float>(n) / static_cast<float>(length)));
     }
     return w;
@@ -126,7 +130,7 @@ std::vector<float> compute_mel_spectrogram_e2e(const std::vector<float>& samples
         const std::size_t start = f * MEL_HOP_LENGTH;
         for (std::size_t k = 0; k < fft_bins; ++k) {
             float real = 0.0f, imag = 0.0f;
-            const float freq = -2.0f * static_cast<float>(M_PI) *
+            const float freq = -2.0f * kPi *
                                static_cast<float>(k) / static_cast<float>(MEL_N_FFT);
             for (std::size_t n = 0; n < MEL_N_FFT; ++n) {
                 float v = 0.0f;

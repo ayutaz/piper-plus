@@ -502,6 +502,37 @@ foreach(test_source ${TEST_SOURCES})
         endif()
     endif()
 
+    # Link additional dependencies for speaker encoder E2E test (Layer 2).
+    # Same shape as test_prosody_inference: pure unit test that #includes
+    # <onnxruntime_cxx_api.h> directly, so it needs ${ORT_INCLUDE_DIR} on the
+    # include path and onnxruntime on the link line.
+    if(${test_name} STREQUAL "test_speaker_encoder_e2e")
+        target_include_directories(${test_name} PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/..
+            ${CMAKE_BINARY_DIR}/fi/include
+            ${CMAKE_BINARY_DIR}/si/include
+            ${ORT_INCLUDE_DIR}
+        )
+        target_link_directories(${test_name} PRIVATE
+            ${CMAKE_BINARY_DIR}/fi/lib
+            ${CMAKE_BINARY_DIR}/si/lib
+            ${ORT_LIB_DIR}
+        )
+        if(WIN32)
+            target_link_libraries(${test_name}
+                ${ORT_LIB_DIR}/onnxruntime.lib
+            )
+        else()
+            target_link_libraries(${test_name}
+                onnxruntime
+            )
+        endif()
+        if(UNIX)
+            find_package(Threads REQUIRED)
+            target_link_libraries(${test_name} Threads::Threads)
+        endif()
+    endif()
+
     # Link additional dependencies for streaming raw phonemes test
     if(${test_name} STREQUAL "test_streaming_raw_phonemes")
         target_sources(${test_name} PRIVATE

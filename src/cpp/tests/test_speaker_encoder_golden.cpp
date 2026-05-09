@@ -29,6 +29,11 @@
 
 namespace {
 
+// MSVC's <cmath> does not expose M_PI without _USE_MATH_DEFINES (and even
+// then only in <math.h>). Define our own portable constant so the test
+// builds identically on GCC/Clang/MSVC without preprocessor gymnastics.
+constexpr float kPi = 3.14159265358979323846f;
+
 // Mel parameters — must match all runtimes (see
 // docs/spec/speaker-encoder-contract.md).
 constexpr int MEL_SAMPLE_RATE = 16000;
@@ -55,7 +60,7 @@ float mel_to_hz(float mel) {
 std::vector<float> hann_window(std::size_t length) {
     std::vector<float> w(length);
     for (std::size_t n = 0; n < length; ++n) {
-        w[n] = 0.5f * (1.0f - std::cos(2.0f * static_cast<float>(M_PI) *
+        w[n] = 0.5f * (1.0f - std::cos(2.0f * kPi *
                                        static_cast<float>(n) / static_cast<float>(length)));
     }
     return w;
@@ -134,7 +139,7 @@ std::vector<float> compute_mel_spectrogram(const std::vector<float>& samples) {
         const std::size_t start = frame * MEL_HOP_LENGTH;
         for (std::size_t k = 0; k < fft_bins; ++k) {
             float real = 0.0f, imag = 0.0f;
-            const float freq = -2.0f * static_cast<float>(M_PI) *
+            const float freq = -2.0f * kPi *
                                static_cast<float>(k) / static_cast<float>(MEL_N_FFT);
             for (std::size_t n = 0; n < MEL_N_FFT; ++n) {
                 float v = 0.0f;
@@ -193,7 +198,7 @@ std::vector<float> generate_sine(double freq_hz, double duration_s, int sr) {
     const std::size_t n = static_cast<std::size_t>(duration_s * sr);
     std::vector<float> out(n);
     for (std::size_t i = 0; i < n; ++i) {
-        out[i] = std::sin(2.0f * static_cast<float>(M_PI) * static_cast<float>(freq_hz) *
+        out[i] = std::sin(2.0f * kPi * static_cast<float>(freq_hz) *
                           static_cast<float>(i) / static_cast<float>(sr));
     }
     return out;
@@ -205,7 +210,7 @@ std::vector<float> generate_multitone(const std::vector<double>& freqs,
     std::vector<float> out(n, 0.0f);
     for (std::size_t i = 0; i < n; ++i) {
         for (double f : freqs) {
-            out[i] += std::sin(2.0f * static_cast<float>(M_PI) * static_cast<float>(f) *
+            out[i] += std::sin(2.0f * kPi * static_cast<float>(f) *
                                static_cast<float>(i) / static_cast<float>(sr));
         }
     }
