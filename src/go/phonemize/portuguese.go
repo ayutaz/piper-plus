@@ -24,17 +24,23 @@ var ptVowels = map[rune]bool{
 	'\u00f3': true, '\u00f4': true, '\u00f5': true,
 	'\u00fa': true, '\u00fc': true,
 }
+
 var ptAccBase = map[rune]rune{
 	'\u00e1': 'a', '\u00e0': 'a', '\u00e2': 'a', '\u00e3': 'a',
 	'\u00e9': 'e', '\u00ea': 'e', '\u00ed': 'i',
 	'\u00f3': 'o', '\u00f4': 'o', '\u00f5': 'o',
 	'\u00fa': 'u', '\u00fc': 'u',
 }
-var ptAcute = map[rune]bool{'\u00e1': true, '\u00e9': true, '\u00ed': true, '\u00f3': true, '\u00fa': true}
-var ptCirc = map[rune]bool{'\u00e2': true, '\u00ea': true, '\u00f4': true}
-var ptTild = map[rune]bool{'\u00e3': true, '\u00f5': true}
-var ptPunct = map[rune]bool{'.': true, ',': true, ';': true, ':': true, '!': true, '?': true,
-	'\u00a1': true, '\u00bf': true, '\u2014': true, '\u2013': true, '\u2026': true}
+
+var (
+	ptAcute = map[rune]bool{'\u00e1': true, '\u00e9': true, '\u00ed': true, '\u00f3': true, '\u00fa': true}
+	ptCirc  = map[rune]bool{'\u00e2': true, '\u00ea': true, '\u00f4': true}
+	ptTild  = map[rune]bool{'\u00e3': true, '\u00f5': true}
+	ptPunct = map[rune]bool{
+		'.': true, ',': true, ';': true, ':': true, '!': true, '?': true,
+		'\u00a1': true, '\u00bf': true, '\u2014': true, '\u2013': true, '\u2026': true,
+	}
+)
 
 // ptConsStr is a string-based consonant phoneme set that includes multi-char
 // phonemes (e.g. "tʃ", "dʒ") that a rune-based set cannot represent.
@@ -76,6 +82,7 @@ func ptNasal(b rune) string {
 	}
 	return string(b)
 }
+
 func ptOpen(b rune) string {
 	switch b {
 	case 'e':
@@ -563,8 +570,10 @@ func euNextNonSpaceVowel(toks []string, i int) bool {
 func applyEUPostprocessing(toks []string) []string {
 	out := append([]string(nil), toks...)
 	n := len(out)
-	punct := map[string]bool{",": true, ".": true, ";": true, ":": true,
-		"!": true, "?": true, "—": true, "–": true, "…": true}
+	punct := map[string]bool{
+		",": true, ".": true, ";": true, ":": true,
+		"!": true, "?": true, "—": true, "–": true, "…": true,
+	}
 
 	// Pass 1: undo BR t/d palatalisation + final-e centralisation.
 	for i := 0; i < n; i++ {

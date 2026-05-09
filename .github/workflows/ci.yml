@@ -296,12 +296,14 @@ jobs:
         run: |
           # Run tests properly
           cd src/python
+          # `--no-cov` で coverage 計測を無効化 (subset 実行で 70% 閾値を満たさず誤検知)。
+          # 完全な coverage は python-tests.yml の "Run unit tests" で計測。
           if [ "${{ runner.os }}" == "Windows" ]; then
-            python -m pytest tests/ -v --tb=short -m "unit and not phonemize and not training" -k "not test_phonemize and not test_japanese"
+            python -m pytest tests/ -v --tb=short -m "unit and not phonemize and not training" -k "not test_phonemize and not test_japanese" --no-cov
           else
             # Exclude inference tests - they require PyTorch and are covered by python-tests.yml
             # Use --ignore to prevent collection (import) of files that require torch
-            python -m pytest tests/ -v --tb=short -m "unit and not training and not benchmark and not inference" \
+            python -m pytest tests/ -v --tb=short -m "unit and not training and not benchmark and not inference" --no-cov \
               --ignore=tests/test_pytorch_onnx_parity.py \
               --ignore=tests/test_export_onnx.py \
               --ignore=tests/test_export_onnx_mb_istft.py \

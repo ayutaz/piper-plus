@@ -252,7 +252,8 @@ func loadDictionaries(modelDir string, languages map[string]int64, logger *slog.
 			} else {
 				dd.pinyinSingle = single
 				dd.pinyinPhrase = phrases
-				logger.Info("loaded pinyin dictionaries",
+				logger.Info(
+					"loaded pinyin dictionaries",
 					"single_path", singlePath,
 					"phrase_path", phrasePath,
 					"single_entries", len(single),

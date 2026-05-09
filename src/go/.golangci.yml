@@ -54,6 +54,10 @@ linters:
     - nestif
     - dupl
     - errorlint
+    # revive / prealloc も既存コードに大量違反 (var-naming 等)、Wave 後段で
+    # 個別 fix or disable rule。現状は warn のみ:
+    - revive
+    - prealloc
 
   settings:
     gocritic:

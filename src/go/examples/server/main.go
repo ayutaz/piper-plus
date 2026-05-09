@@ -46,7 +46,8 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
 
-	voice, err := piperplus.LoadVoice(ctx, *modelPath,
+	voice, err := piperplus.LoadVoice(
+		ctx, *modelPath,
 		piperplus.WithDevice(*device),
 		piperplus.WithLogger(logger),
 	)

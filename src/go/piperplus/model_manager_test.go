@@ -71,7 +71,7 @@ func TestModelManager_ListModels_NonExistentDir(t *testing.T) {
 func TestModelManager_ListModels_FlatFile(t *testing.T) {
 	dir := t.TempDir()
 	onnxPath := filepath.Join(dir, "mymodel.onnx")
-	if err := os.WriteFile(onnxPath, []byte("fake-onnx"), 0644); err != nil {
+	if err := os.WriteFile(onnxPath, []byte("fake-onnx"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -94,16 +94,16 @@ func TestModelManager_ListModels_FlatFile(t *testing.T) {
 func TestModelManager_ListModels_Subdirectory(t *testing.T) {
 	dir := t.TempDir()
 	subDir := filepath.Join(dir, "tsukuyomi-6lang-v2")
-	if err := os.MkdirAll(subDir, 0755); err != nil {
+	if err := os.MkdirAll(subDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
 
 	onnxPath := filepath.Join(subDir, "model.onnx")
 	cfgPath := filepath.Join(subDir, "config.json")
-	if err := os.WriteFile(onnxPath, []byte("fake-onnx"), 0644); err != nil {
+	if err := os.WriteFile(onnxPath, []byte("fake-onnx"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(cfgPath, []byte("{}"), 0644); err != nil {
+	if err := os.WriteFile(cfgPath, []byte("{}"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -143,7 +143,7 @@ func TestModelManager_FindModel_NotFound(t *testing.T) {
 func TestModelManager_FindModel_FlatFile(t *testing.T) {
 	dir := t.TempDir()
 	onnxPath := filepath.Join(dir, "mymodel.onnx")
-	if err := os.WriteFile(onnxPath, []byte("fake-onnx"), 0644); err != nil {
+	if err := os.WriteFile(onnxPath, []byte("fake-onnx"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -160,12 +160,12 @@ func TestModelManager_FindModel_FlatFile(t *testing.T) {
 func TestModelManager_FindModel_Subdirectory(t *testing.T) {
 	dir := t.TempDir()
 	subDir := filepath.Join(dir, "voice1")
-	if err := os.MkdirAll(subDir, 0755); err != nil {
+	if err := os.MkdirAll(subDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
 
 	onnxPath := filepath.Join(subDir, "voice1.onnx")
-	if err := os.WriteFile(onnxPath, []byte("fake-onnx"), 0644); err != nil {
+	if err := os.WriteFile(onnxPath, []byte("fake-onnx"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 

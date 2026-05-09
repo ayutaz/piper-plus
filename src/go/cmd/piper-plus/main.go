@@ -334,7 +334,8 @@ func runTextMode(ctx context.Context, voice *piperplus.Voice, logger *slog.Logge
 		return fmt.Errorf("synthesis failed: %w", err)
 	}
 
-	logger.Info("synthesized",
+	logger.Info(
+		"synthesized",
 		"duration", result.Duration,
 		"infer_time", result.InferTime,
 		"rtf", fmt.Sprintf("%.3f", result.RTF()),
@@ -384,7 +385,8 @@ func runBatchMode(ctx context.Context, voice *piperplus.Voice, logger *slog.Logg
 			return err
 		}
 
-		logger.Info("synthesized",
+		logger.Info(
+			"synthesized",
 			"line", lineNum,
 			"duration", result.Duration,
 			"rtf", fmt.Sprintf("%.3f", result.RTF()),
@@ -427,7 +429,8 @@ func runJSONLMode(ctx context.Context, voice *piperplus.Voice, logger *slog.Logg
 			return err
 		}
 
-		logger.Info("synthesized",
+		logger.Info(
+			"synthesized",
 			"line", lineNum,
 			"duration", result.Duration,
 			"rtf", fmt.Sprintf("%.3f", result.RTF()),

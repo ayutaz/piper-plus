@@ -16,7 +16,7 @@ func TestFindDictionaryFile_ModelDirFound(t *testing.T) {
 	dir := t.TempDir()
 	filename := "test_dict.json"
 	path := filepath.Join(dir, filename)
-	if err := os.WriteFile(path, []byte(`{}`), 0644); err != nil {
+	if err := os.WriteFile(path, []byte(`{}`), 0o644); err != nil {
 		t.Fatalf("failed to create test file: %v", err)
 	}
 
@@ -30,7 +30,7 @@ func TestFindDictionaryFile_EnvVarFound(t *testing.T) {
 	envDir := t.TempDir()
 	filename := "env_dict.json"
 	path := filepath.Join(envDir, filename)
-	if err := os.WriteFile(path, []byte(`{}`), 0644); err != nil {
+	if err := os.WriteFile(path, []byte(`{}`), 0o644); err != nil {
 		t.Fatalf("failed to create test file: %v", err)
 	}
 
@@ -75,7 +75,7 @@ func TestFindDictionaryFile_EmptyModelDir(t *testing.T) {
 	envDir := t.TempDir()
 	filename := "fallback.json"
 	path := filepath.Join(envDir, filename)
-	if err := os.WriteFile(path, []byte(`{}`), 0644); err != nil {
+	if err := os.WriteFile(path, []byte(`{}`), 0o644); err != nil {
 		t.Fatalf("failed to create test file: %v", err)
 	}
 
@@ -95,10 +95,10 @@ func TestFindDictionaryFile_ModelDirPriority(t *testing.T) {
 
 	modelPath := filepath.Join(modelDir, filename)
 	envPath := filepath.Join(envDir, filename)
-	if err := os.WriteFile(modelPath, []byte(`{"source":"model"}`), 0644); err != nil {
+	if err := os.WriteFile(modelPath, []byte(`{"source":"model"}`), 0o644); err != nil {
 		t.Fatalf("failed to create model file: %v", err)
 	}
-	if err := os.WriteFile(envPath, []byte(`{"source":"env"}`), 0644); err != nil {
+	if err := os.WriteFile(envPath, []byte(`{"source":"env"}`), 0o644); err != nil {
 		t.Fatalf("failed to create env file: %v", err)
 	}
 
@@ -118,7 +118,7 @@ func TestLoadCmuDict_ValidJSON(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "cmudict.json")
 	content := `{"hello": "HH AH0 L OW1", "world": "W ER1 L D"}`
-	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		t.Fatalf("failed to write test file: %v", err)
 	}
 
@@ -159,7 +159,7 @@ func TestLoadCmuDict_ValidJSON(t *testing.T) {
 func TestLoadCmuDict_EmptyJSON(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "empty.json")
-	if err := os.WriteFile(path, []byte(`{}`), 0644); err != nil {
+	if err := os.WriteFile(path, []byte(`{}`), 0o644); err != nil {
 		t.Fatalf("failed to write test file: %v", err)
 	}
 
@@ -177,7 +177,7 @@ func TestLoadCmuDict_SingleEntry(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "single.json")
 	content := `{"test": "T EH1 S T"}`
-	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		t.Fatalf("failed to write test file: %v", err)
 	}
 
@@ -212,7 +212,7 @@ func TestLoadCmuDict_FileNotFound(t *testing.T) {
 func TestLoadCmuDict_InvalidJSON(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "invalid.json")
-	if err := os.WriteFile(path, []byte(`{invalid json`), 0644); err != nil {
+	if err := os.WriteFile(path, []byte(`{invalid json`), 0o644); err != nil {
 		t.Fatalf("failed to write test file: %v", err)
 	}
 
@@ -227,7 +227,7 @@ func TestLoadCmuDict_LargeEntry(t *testing.T) {
 	path := filepath.Join(dir, "large.json")
 	// "IH2 N T ER0 N AE2 SH AH0 N AH0 L IH0 Z EY1 SH AH0 N" = 17 tokens
 	content := `{"internationalization": "IH2 N T ER0 N AE2 SH AH0 N AH0 L IH0 Z EY1 SH AH0 N"}`
-	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		t.Fatalf("failed to write test file: %v", err)
 	}
 
@@ -247,7 +247,7 @@ func TestLoadCmuDict_EmptyValueSkipped(t *testing.T) {
 	path := filepath.Join(dir, "empty_val.json")
 	// An entry with empty string value produces no tokens; it should be skipped.
 	content := `{"good": "G UH1 D", "bad": ""}`
-	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		t.Fatalf("failed to write test file: %v", err)
 	}
 
@@ -273,7 +273,7 @@ func TestLoadPinyinDicts_ValidSingle(t *testing.T) {
 	singlePath := filepath.Join(dir, "pinyin_single.json")
 	// 你=20320, 好=22909
 	content := `{"20320": "ni3", "22909": "hao3"}`
-	if err := os.WriteFile(singlePath, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(singlePath, []byte(content), 0o644); err != nil {
 		t.Fatalf("failed to write test file: %v", err)
 	}
 
@@ -304,7 +304,7 @@ func TestLoadPinyinDicts_CommaSeparatedAlternatives(t *testing.T) {
 	singlePath := filepath.Join(dir, "pinyin_single.json")
 	// 人=20154 has alternative readings
 	content := `{"20154": "ren2,jen2"}`
-	if err := os.WriteFile(singlePath, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(singlePath, []byte(content), 0o644); err != nil {
 		t.Fatalf("failed to write test file: %v", err)
 	}
 
@@ -323,7 +323,7 @@ func TestLoadPinyinDicts_ValidPhrase_NestedArray(t *testing.T) {
 	dir := t.TempDir()
 	phrasePath := filepath.Join(dir, "pinyin_phrases.json")
 	content := `{"你好": [["ni3"], ["hao3"]]}`
-	if err := os.WriteFile(phrasePath, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(phrasePath, []byte(content), 0o644); err != nil {
 		t.Fatalf("failed to write test file: %v", err)
 	}
 
@@ -349,7 +349,7 @@ func TestLoadPinyinDicts_ValidPhrase_FlatArray(t *testing.T) {
 	dir := t.TempDir()
 	phrasePath := filepath.Join(dir, "pinyin_phrases.json")
 	content := `{"你好": ["ni3", "hao3"]}`
-	if err := os.WriteFile(phrasePath, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(phrasePath, []byte(content), 0o644); err != nil {
 		t.Fatalf("failed to write test file: %v", err)
 	}
 
@@ -387,7 +387,7 @@ func TestLoadPinyinDicts_SinglePathOnly(t *testing.T) {
 	dir := t.TempDir()
 	singlePath := filepath.Join(dir, "pinyin_single.json")
 	content := `{"20320": "ni3"}`
-	if err := os.WriteFile(singlePath, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(singlePath, []byte(content), 0o644); err != nil {
 		t.Fatalf("failed to write test file: %v", err)
 	}
 
@@ -408,7 +408,7 @@ func TestLoadPinyinDicts_PhrasePathOnly(t *testing.T) {
 	dir := t.TempDir()
 	phrasePath := filepath.Join(dir, "pinyin_phrases.json")
 	content := `{"你好": [["ni3"], ["hao3"]]}`
-	if err := os.WriteFile(phrasePath, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(phrasePath, []byte(content), 0o644); err != nil {
 		t.Fatalf("failed to write test file: %v", err)
 	}
 
@@ -428,7 +428,7 @@ func TestLoadPinyinDicts_PhrasePathOnly(t *testing.T) {
 func TestLoadPinyinDicts_InvalidSingleJSON(t *testing.T) {
 	dir := t.TempDir()
 	singlePath := filepath.Join(dir, "bad.json")
-	if err := os.WriteFile(singlePath, []byte(`{broken`), 0644); err != nil {
+	if err := os.WriteFile(singlePath, []byte(`{broken`), 0o644); err != nil {
 		t.Fatalf("failed to write test file: %v", err)
 	}
 
@@ -441,7 +441,7 @@ func TestLoadPinyinDicts_InvalidSingleJSON(t *testing.T) {
 func TestLoadPinyinDicts_InvalidPhraseJSON(t *testing.T) {
 	dir := t.TempDir()
 	phrasePath := filepath.Join(dir, "bad.json")
-	if err := os.WriteFile(phrasePath, []byte(`not json`), 0644); err != nil {
+	if err := os.WriteFile(phrasePath, []byte(`not json`), 0o644); err != nil {
 		t.Fatalf("failed to write test file: %v", err)
 	}
 
@@ -456,7 +456,7 @@ func TestLoadPinyinDicts_InvalidCodepointKeySkipped(t *testing.T) {
 	singlePath := filepath.Join(dir, "pinyin_single.json")
 	// "abc" is not a valid codepoint; "20320" is valid.
 	content := `{"abc": "bad", "20320": "ni3"}`
-	if err := os.WriteFile(singlePath, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(singlePath, []byte(content), 0o644); err != nil {
 		t.Fatalf("failed to write test file: %v", err)
 	}
 
@@ -490,7 +490,7 @@ func TestLoadPinyinDicts_MultiCharPhrase(t *testing.T) {
 	dir := t.TempDir()
 	phrasePath := filepath.Join(dir, "phrases.json")
 	content := `{"一丁不识": [["yi1"], ["ding1"], ["bu4"], ["shi2"]]}`
-	if err := os.WriteFile(phrasePath, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(phrasePath, []byte(content), 0o644); err != nil {
 		t.Fatalf("failed to write test file: %v", err)
 	}
 
@@ -518,7 +518,7 @@ func TestLoadDictionaries_ENLanguage(t *testing.T) {
 		"hello": "HH AH0 L OW1",
 		"world": "W ER1 L D",
 	})
-	if err := os.WriteFile(filepath.Join(dir, "cmudict_data.json"), cmuContent, 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "cmudict_data.json"), cmuContent, 0o644); err != nil {
 		t.Fatalf("failed to write cmudict: %v", err)
 	}
 
@@ -550,10 +550,10 @@ func TestLoadDictionaries_ZHLanguage(t *testing.T) {
 		"22909": "hao3",
 	})
 	phraseContent := `{"你好": [["ni3"], ["hao3"]]}`
-	if err := os.WriteFile(filepath.Join(dir, "pinyin_single.json"), singleContent, 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "pinyin_single.json"), singleContent, 0o644); err != nil {
 		t.Fatalf("failed to write pinyin_single: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "pinyin_phrases.json"), []byte(phraseContent), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "pinyin_phrases.json"), []byte(phraseContent), 0o644); err != nil {
 		t.Fatalf("failed to write pinyin_phrases: %v", err)
 	}
 
@@ -604,17 +604,17 @@ func TestLoadDictionaries_BothENandZH(t *testing.T) {
 
 	// CMU dict.
 	cmuContent, _ := json.Marshal(map[string]string{"cat": "K AE1 T"})
-	if err := os.WriteFile(filepath.Join(dir, "cmudict_data.json"), cmuContent, 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "cmudict_data.json"), cmuContent, 0o644); err != nil {
 		t.Fatalf("failed to write cmudict: %v", err)
 	}
 
 	// Pinyin dicts.
 	singleContent, _ := json.Marshal(map[string]string{"20320": "ni3"})
 	phraseContent := `{"你好": [["ni3"], ["hao3"]]}`
-	if err := os.WriteFile(filepath.Join(dir, "pinyin_single.json"), singleContent, 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "pinyin_single.json"), singleContent, 0o644); err != nil {
 		t.Fatalf("failed to write pinyin_single: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "pinyin_phrases.json"), []byte(phraseContent), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "pinyin_phrases.json"), []byte(phraseContent), 0o644); err != nil {
 		t.Fatalf("failed to write pinyin_phrases: %v", err)
 	}
 
@@ -648,7 +648,7 @@ func TestLoadDictionaries_DictFilesExist(t *testing.T) {
 		"brown": "B R AW1 N",
 		"fox":   "F AA1 K S",
 	})
-	if err := os.WriteFile(filepath.Join(dir, "cmudict_data.json"), cmuContent, 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "cmudict_data.json"), cmuContent, 0o644); err != nil {
 		t.Fatalf("failed to write cmudict: %v", err)
 	}
 

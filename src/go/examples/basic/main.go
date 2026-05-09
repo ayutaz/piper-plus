@@ -37,7 +37,8 @@ func main() {
 
 	// Load voice model
 	ctx := context.Background()
-	voice, err := piperplus.LoadVoice(ctx, *modelPath,
+	voice, err := piperplus.LoadVoice(
+		ctx, *modelPath,
 		piperplus.WithDevice(*device),
 	)
 	if err != nil {
@@ -47,7 +48,8 @@ func main() {
 
 	// Synthesize
 	start := time.Now()
-	result, err := voice.Synthesize(ctx, *text,
+	result, err := voice.Synthesize(
+		ctx, *text,
 		piperplus.WithLanguage(*language),
 	)
 	if err != nil {

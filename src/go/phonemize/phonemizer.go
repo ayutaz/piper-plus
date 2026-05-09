@@ -32,7 +32,8 @@ func TokensToIDs(tokens []string, phonemeIDMap map[string][]int64) []int64 {
 		if idList, ok := phonemeIDMap[mapped]; ok {
 			ids = append(ids, idList...)
 		} else {
-			slog.Warn("unknown phoneme token, skipping",
+			slog.Warn(
+				"unknown phoneme token, skipping",
 				"token", tok,
 				"mapped", mapped,
 			)

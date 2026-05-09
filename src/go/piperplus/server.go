@@ -149,7 +149,8 @@ func (s *Server) handleSynthesize(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.logger.Info("synthesized",
+	s.logger.Info(
+		"synthesized",
 		"text_len", len(req.Text),
 		"duration", result.Duration,
 		"rtf", fmt.Sprintf("%.2f", result.RTF()),

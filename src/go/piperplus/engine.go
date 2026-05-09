@@ -101,7 +101,8 @@ func newOnnxEngine(modelPath string, config *VoiceConfig, sessOpts *ort.SessionO
 		}
 	}
 
-	logger.Info("loaded ONNX model",
+	logger.Info(
+		"loaded ONNX model",
 		"path", modelPath,
 		"has_speaker_id", caps.HasSpeakerID,
 		"has_language_id", caps.HasLanguageID,
@@ -426,7 +427,8 @@ func (e *OnnxEngine) Synthesize(ctx context.Context, req *SynthesisRequest) (*Sy
 		audioDuration = time.Duration(int64(len(audio)) * int64(time.Second) / int64(e.sampleRate))
 	}
 
-	e.logger.Debug("inference complete",
+	e.logger.Debug(
+		"inference complete",
 		"phoneme_len", phonemeLen,
 		"audio_samples", len(audio),
 		"audio_duration", audioDuration,

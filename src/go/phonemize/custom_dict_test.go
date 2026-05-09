@@ -541,17 +541,17 @@ func TestLoadTextDictJSONFiles_MultipleMerge(t *testing.T) {
 func TestFindDefaultDicts_ModelDir(t *testing.T) {
 	dir := t.TempDir()
 	dictDir := filepath.Join(dir, "dictionaries")
-	if err := os.MkdirAll(dictDir, 0755); err != nil {
+	if err := os.MkdirAll(dictDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dictDir, "test.json"), []byte(`{}`), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dictDir, "test.json"), []byte(`{}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dictDir, "other.json"), []byte(`{}`), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dictDir, "other.json"), []byte(`{}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	// Non-JSON file should be ignored.
-	if err := os.WriteFile(filepath.Join(dictDir, "readme.txt"), []byte("ignore me"), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dictDir, "readme.txt"), []byte("ignore me"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -563,7 +563,7 @@ func TestFindDefaultDicts_ModelDir(t *testing.T) {
 
 func TestFindDefaultDicts_EnvVar(t *testing.T) {
 	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "env_dict.json"), []byte(`{}`), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "env_dict.json"), []byte(`{}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -627,7 +627,7 @@ func writeTempJSON(t *testing.T, content string) string {
 	t.Helper()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "dict.json")
-	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		t.Fatalf("write temp JSON: %v", err)
 	}
 	return path
