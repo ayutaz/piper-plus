@@ -128,7 +128,7 @@ public sealed class PiperConfig
         var modelDir = Path.GetDirectoryName(modelPath);
         if (!string.IsNullOrEmpty(modelDir))
         {
-            var dirConfigPath = Path.Combine(modelDir, "config.json");
+            var dirConfigPath = Path.Join(modelDir, "config.json");
             if (File.Exists(dirConfigPath))
             {
                 return dirConfigPath;

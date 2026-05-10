@@ -299,12 +299,12 @@ public sealed class CustomDictionary
         // Exe-relative paths (matches C++ findDictDir candidates)
         var exeDir = AppContext.BaseDirectory.TrimEnd(
             Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-        searchPaths.Add(Path.Combine(exeDir, "data", "dictionaries"));
-        searchPaths.Add(Path.Combine(exeDir, "..", "data", "dictionaries"));
-        searchPaths.Add(Path.Combine(exeDir, "..", "..", "data", "dictionaries"));
+        searchPaths.Add(Path.Join(exeDir, "data", "dictionaries"));
+        searchPaths.Add(Path.Join(exeDir, "..", "data", "dictionaries"));
+        searchPaths.Add(Path.Join(exeDir, "..", "..", "data", "dictionaries"));
 
         // Working directory
-        searchPaths.Add(Path.Combine(
+        searchPaths.Add(Path.Join(
             Directory.GetCurrentDirectory(), "data", "dictionaries"));
 
         foreach (var searchPath in searchPaths)

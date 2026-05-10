@@ -1754,7 +1754,7 @@ internal static class Program
 
             case OutputMode.Directory:
                 {
-                    var wavPath = Path.Combine(outputDir.FullName, "0.wav");
+                    var wavPath = Path.Join(outputDir.FullName, "0.wav");
 
                     var parentDir = Path.GetDirectoryName(wavPath);
                     if (!string.IsNullOrEmpty(parentDir) && !Directory.Exists(parentDir))
@@ -1828,7 +1828,7 @@ internal static class Program
                             return;
                         }
 
-                        wavPath = Path.GetFullPath(Path.Combine(outputDir.FullName, uttOutputFile));
+                        wavPath = Path.GetFullPath(Path.Join(outputDir.FullName, uttOutputFile));
                         if (!wavPath.StartsWith(outputDir.FullName))
                         {
                             LogError($"Rejected output_file outside output directory: {uttOutputFile}");
@@ -1838,7 +1838,7 @@ internal static class Program
                     }
                     else
                     {
-                        wavPath = Path.Combine(
+                        wavPath = Path.Join(
                             outputDir.FullName, $"{utteranceIndex}.wav");
                     }
 

@@ -114,7 +114,7 @@ public static class DictionaryManager
 
         // 3. Download to the data directory
         var dataDir = GetDataDir();
-        var dictPath = Path.Combine(dataDir, DictionaryDirName);
+        var dictPath = Path.Join(dataDir, DictionaryDirName);
 
         await DownloadAndExtractAsync(dataDir, ct).ConfigureAwait(false);
 
@@ -141,7 +141,7 @@ public static class DictionaryManager
 
         for (int i = 0; i < RequiredFiles.Length; i++)
         {
-            if (!File.Exists(Path.Combine(path, RequiredFiles[i])))
+            if (!File.Exists(Path.Join(path, RequiredFiles[i])))
             {
                 return false;
             }
@@ -195,7 +195,7 @@ public static class DictionaryManager
         }
 
         // 5. Data directory: <data_dir>/open_jtalk_dic_utf_8-1.11
-        yield return Path.Combine(GetDataDir(), DictionaryDirName);
+        yield return Path.Join(GetDataDir(), DictionaryDirName);
     }
 
     private static string? GetExeRelativeDictPath()
@@ -215,7 +215,7 @@ public static class DictionaryManager
             }
 
             var dictPath = Path.GetFullPath(
-                Path.Combine(exeDir, "..", "share", "open_jtalk", "dic"));
+                Path.Join(exeDir, "..", "share", "open_jtalk", "dic"));
             return Directory.Exists(dictPath) ? dictPath : null;
         }
         catch
@@ -234,21 +234,21 @@ public static class DictionaryManager
             var appData = Environment.GetFolderPath(
                 Environment.SpecialFolder.ApplicationData);
             return !string.IsNullOrEmpty(appData)
-                ? Path.Combine(appData, "piper")
-                : Path.Combine(Environment.CurrentDirectory, "data");
+                ? Path.Join(appData, "piper")
+                : Path.Join(Environment.CurrentDirectory, "data");
         }
 
         // Unix: XDG_DATA_HOME or ~/.local/share/piper
         var xdgData = Environment.GetEnvironmentVariable("XDG_DATA_HOME");
         if (!string.IsNullOrEmpty(xdgData))
         {
-            return Path.Combine(xdgData, "piper");
+            return Path.Join(xdgData, "piper");
         }
 
         var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         return !string.IsNullOrEmpty(home)
-            ? Path.Combine(home, ".local", "share", "piper")
-            : Path.Combine(Environment.CurrentDirectory, "data");
+            ? Path.Join(home, ".local", "share", "piper")
+            : Path.Join(Environment.CurrentDirectory, "data");
     }
 
     // ---------------------------------------------------------------
@@ -274,7 +274,7 @@ public static class DictionaryManager
     {
         Directory.CreateDirectory(dataDir);
 
-        var archivePath = Path.Combine(dataDir, "open_jtalk_dic_utf_8-1.11.tar.gz");
+        var archivePath = Path.Join(dataDir, "open_jtalk_dic_utf_8-1.11.tar.gz");
         var tempPath = archivePath + ".tmp";
 
         try
@@ -465,7 +465,7 @@ public static class DictionaryManager
                 continue;
             }
 
-            var outputPath = Path.Combine(outputDir, fullName.Replace('/', Path.DirectorySeparatorChar));
+            var outputPath = Path.Join(outputDir, fullName.Replace('/', Path.DirectorySeparatorChar));
 
             switch (typeFlag)
             {

@@ -51,7 +51,7 @@ public static class ModelManager
             var appData = Environment.GetFolderPath(
                 Environment.SpecialFolder.ApplicationData);
             return !string.IsNullOrEmpty(appData)
-                ? Path.Combine(appData, "piper", "models")
+                ? Path.Join(appData, "piper", "models")
                 : "models";
         }
 
@@ -60,7 +60,7 @@ public static class ModelManager
             var home = Environment.GetFolderPath(
                 Environment.SpecialFolder.UserProfile);
             return !string.IsNullOrEmpty(home)
-                ? Path.Combine(home, "Library", "Application Support",
+                ? Path.Join(home, "Library", "Application Support",
                                "piper", "models")
                 : "models";
         }
@@ -69,13 +69,13 @@ public static class ModelManager
         var xdgData = Environment.GetEnvironmentVariable("XDG_DATA_HOME");
         if (!string.IsNullOrEmpty(xdgData))
         {
-            return Path.Combine(xdgData, "piper", "models");
+            return Path.Join(xdgData, "piper", "models");
         }
 
         var linuxHome = Environment.GetFolderPath(
             Environment.SpecialFolder.UserProfile);
         return !string.IsNullOrEmpty(linuxHome)
-            ? Path.Combine(linuxHome, ".local", "share", "piper", "models")
+            ? Path.Join(linuxHome, ".local", "share", "piper", "models")
             : "models";
     }
 
@@ -297,7 +297,7 @@ public static class ModelManager
             }
 
             // Use just the filename as the local name (flat directory layout)
-            var localPath = Path.Combine(modelDir, localName);
+            var localPath = Path.Join(modelDir, localName);
 
             // Skip if file already exists with correct size
             if (File.Exists(localPath) && file.SizeBytes > 0)
@@ -347,7 +347,7 @@ public static class ModelManager
                 var fn = Path.GetFileName(file.RelativePath);
                 if (fn.EndsWith(".onnx", StringComparison.OrdinalIgnoreCase))
                 {
-                    onnxFile = Path.Combine(modelDir, fn);
+                    onnxFile = Path.Join(modelDir, fn);
                     break;
                 }
             }
@@ -417,7 +417,7 @@ public static class ModelManager
         // Check if already cached locally
         if (onnxFile is not null)
         {
-            var cachedPath = Path.Combine(dir, Path.GetFileName(onnxFile.RelativePath));
+            var cachedPath = Path.Join(dir, Path.GetFileName(onnxFile.RelativePath));
             if (File.Exists(cachedPath))
             {
                 return cachedPath;
@@ -435,7 +435,7 @@ public static class ModelManager
 
         if (onnxFile is not null)
         {
-            var downloadedPath = Path.Combine(dir, Path.GetFileName(onnxFile.RelativePath));
+            var downloadedPath = Path.Join(dir, Path.GetFileName(onnxFile.RelativePath));
             if (File.Exists(downloadedPath))
             {
                 return downloadedPath;
