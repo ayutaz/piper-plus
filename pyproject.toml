@@ -143,6 +143,11 @@ dev-dependencies = [
     "black==26.3.1",
     "fastapi>=0.135.1",
     "httpx>=0.28.1",
+    # OpenAI SDK for end-to-end tests against /v1/audio/speech via
+    # docker/python-inference/test_openai_api.py::TestOpenAISDKEndToEnd. Tests
+    # auto-skip when the SDK is not installed; this entry just ensures uv-managed
+    # dev environments and CI runners pick it up.
+    "openai>=1.50.0",
 ]
 
 [tool.ruff]

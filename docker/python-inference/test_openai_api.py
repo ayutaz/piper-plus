@@ -319,3 +319,115 @@ class TestCORS:
             },
         )
         assert resp.headers.get("access-control-allow-origin") is not None
+
+
+# ---- Real OpenAI SDK end-to-end ----
+#
+# The TestClient-based tests above exercise the FastAPI app directly. They
+# do not validate that the *real* `openai` Python SDK can talk to our
+# OpenAI-compatible endpoints. Downstream consumers (existing OpenAI-using
+# apps re-pointed at our server via `base_url`) are the actual integration
+# surface, so we drive a real `openai.AsyncOpenAI` client through
+# `httpx.ASGITransport` straight at our ASGI app — no uvicorn process, no
+# port binding, but the request/response path goes through the SDK's
+# serialisation, retry, and response-parsing code exactly as it would in
+# production. AsyncOpenAI is required because httpx.ASGITransport is
+# async-only; a sync openai.OpenAI client wrapped around it deadlocks.
+try:
+    import httpx
+    from openai import AsyncOpenAI
+
+    OPENAI_SDK_AVAILABLE = True
+except ImportError:  # pragma: no cover - exercised only when openai is absent
+    OPENAI_SDK_AVAILABLE = False
+
+
+@pytest.mark.skipif(
+    not OPENAI_SDK_AVAILABLE,
+    reason="openai / httpx SDK not installed in this environment",
+)
+@pytest.mark.asyncio
+class TestOpenAISDKEndToEnd:
+    """E2E tests using the real openai Python SDK against our ASGI app.
+
+    Catches issues that mock-style tests miss: SDK version drift,
+    request/response serialisation, parameter coercion (e.g. speed type),
+    and rejection of unsupported response_format values.
+    """
+
+    def _make_sdk_client(self, mock_engine) -> "AsyncOpenAI":
+        app = create_app(mock_engine, __file__)
+        transport = httpx.ASGITransport(app=app)
+        http_client = httpx.AsyncClient(
+            transport=transport,
+            base_url="http://piper-plus.test",
+            timeout=30.0,
+        )
+        return AsyncOpenAI(
+            api_key="sk-piper-test-not-a-real-key",
+            base_url="http://piper-plus.test/v1",
+            http_client=http_client,
+        )
+
+    async def test_audio_speech_create_returns_wav_bytes(self, mock_engine):
+        sdk = self._make_sdk_client(mock_engine)
+        try:
+            response = await sdk.audio.speech.create(
+                model="piper-plus",
+                voice="ja",
+                input="こんにちは",
+            )
+            data = await response.aread()
+            assert len(data) > 0
+            # Real WAV (RIFF header) rather than HTML/JSON error body.
+            assert data[:4] == b"RIFF", f"expected RIFF header, got {data[:8]!r}"
+            assert data[8:12] == b"WAVE"
+            mock_engine.synthesize.assert_called_once()
+        finally:
+            await sdk.close()
+
+    async def test_audio_speech_speed_propagates_through_sdk(self, mock_engine):
+        sdk = self._make_sdk_client(mock_engine)
+        try:
+            await sdk.audio.speech.create(
+                model="piper-plus",
+                voice="en",
+                input="hello",
+                speed=2.0,
+            )
+            call_kwargs = mock_engine.synthesize.call_args.kwargs
+            assert call_kwargs["length_scale"] == pytest.approx(0.5)
+        finally:
+            await sdk.close()
+
+    async def test_audio_speech_unsupported_response_format_rejected(self, mock_engine):
+        sdk = self._make_sdk_client(mock_engine)
+        # APIStatusError 400 expected; catch via openai's generic exception so
+        # the test does not depend on internal class paths that vary between
+        # SDK majors.
+        from openai import OpenAIError
+
+        try:
+            with pytest.raises(OpenAIError):
+                await sdk.audio.speech.create(
+                    model="piper-plus",
+                    voice="ja",
+                    input="hi",
+                    response_format="mp3",
+                )
+        finally:
+            await sdk.close()
+
+    async def test_audio_speech_streaming_iter_bytes(self, mock_engine):
+        sdk = self._make_sdk_client(mock_engine)
+        try:
+            async with sdk.audio.speech.with_streaming_response.create(
+                model="piper-plus",
+                voice="ja",
+                input="streaming",
+            ) as response:
+                chunks = [chunk async for chunk in response.iter_bytes(1024)]
+            assert len(chunks) > 0
+            assert b"".join(chunks)[:4] == b"RIFF"
+        finally:
+            await sdk.close()
