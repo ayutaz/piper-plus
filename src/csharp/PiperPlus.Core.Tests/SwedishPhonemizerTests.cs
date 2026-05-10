@@ -1675,13 +1675,8 @@ public sealed class SwedishG2PEngineTests
     [Fact]
     public void Trigraph_Ckj_ProducesTjSound()
     {
-        var input = new List<string> { "a" };
-
-        // Test via full word containing ckj... (rare but we test the rule)
-        // Since ckj is unusual, let's test via the engine
-        // "rackjobb" is not a real word but tests the trigraph
-        // Let's just test the retroflex helper doesn't interfere
-        // Actually test with a constructed word
+        // Test via full word containing ckj — the trigraph is rare so we use
+        // a constructed word ("rackjobb") to exercise the rule end-to-end.
         List<string> tokens = _engine.ToPhonemeList("rackjobb");
 
         // ckj -> ɕ

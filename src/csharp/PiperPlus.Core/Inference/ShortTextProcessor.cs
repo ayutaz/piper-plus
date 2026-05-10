@@ -565,7 +565,11 @@ public static class ShortTextProcessor
             return audio;
         }
 
-        int silenceSamples = (int)(sampleRate * SilencePadMs / 1000.0f);
+        // Cast one operand to long before the multiply so CodeQL's
+        // cs/loss-of-precision rule does not flag the int*int -> float cast.
+        // The expression is mathematically identical for all realistic sample
+        // rates; the long-cast just narrows the range CodeQL must consider.
+        int silenceSamples = (int)((long)sampleRate * SilencePadMs / 1000L);
         var padded = new short[silenceSamples + audio.Length + silenceSamples];
         audio.CopyTo(padded.AsSpan(silenceSamples));
 

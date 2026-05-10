@@ -878,7 +878,7 @@ public class ShortTextProcessorTests
     {
         short[] audio = [100, 200, 300];
         int sampleRate = 22050;
-        int expectedSilenceSamples = (int)(sampleRate * ShortTextProcessor.SilencePadMs / 1000.0f);
+        int expectedSilenceSamples = (int)((long)sampleRate * ShortTextProcessor.SilencePadMs / 1000L);
 
         short[] padded = ShortTextProcessor.PadSilenceForShortText(audio, sampleRate);
 
@@ -890,7 +890,7 @@ public class ShortTextProcessorTests
     {
         short[] audio = [100, 200, 300];
         int sampleRate = 22050;
-        int silenceSamples = (int)(sampleRate * ShortTextProcessor.SilencePadMs / 1000.0f);
+        int silenceSamples = (int)((long)sampleRate * ShortTextProcessor.SilencePadMs / 1000L);
 
         short[] padded = ShortTextProcessor.PadSilenceForShortText(audio, sampleRate);
 
@@ -906,7 +906,7 @@ public class ShortTextProcessorTests
     {
         short[] audio = [100, 200, 300];
         int sampleRate = 22050;
-        int silenceSamples = (int)(sampleRate * ShortTextProcessor.SilencePadMs / 1000.0f);
+        int silenceSamples = (int)((long)sampleRate * ShortTextProcessor.SilencePadMs / 1000L);
 
         short[] padded = ShortTextProcessor.PadSilenceForShortText(audio, sampleRate);
 
@@ -922,7 +922,7 @@ public class ShortTextProcessorTests
     {
         short[] audio = [100, 200, 300, 400, 500];
         int sampleRate = 22050;
-        int silenceSamples = (int)(sampleRate * ShortTextProcessor.SilencePadMs / 1000.0f);
+        int silenceSamples = (int)((long)sampleRate * ShortTextProcessor.SilencePadMs / 1000L);
 
         short[] padded = ShortTextProcessor.PadSilenceForShortText(audio, sampleRate);
 
@@ -952,7 +952,7 @@ public class ShortTextProcessorTests
         short[] padded = ShortTextProcessor.PadSilenceForShortText(audio, sampleRate);
 
         // Each silence block = sampleRate * SilencePadMs / 1000
-        int expectedSilenceSamples = (int)(sampleRate * ShortTextProcessor.SilencePadMs / 1000.0f);
+        int expectedSilenceSamples = (int)((long)sampleRate * ShortTextProcessor.SilencePadMs / 1000L);
         int expectedTotal = expectedSilenceSamples + 1 + expectedSilenceSamples;
         Assert.Equal(expectedTotal, padded.Length);
     }
@@ -965,7 +965,7 @@ public class ShortTextProcessorTests
 
         short[] padded = ShortTextProcessor.PadSilenceForShortText(audio, sampleRate);
 
-        int expectedSilenceSamples = (int)(sampleRate * ShortTextProcessor.SilencePadMs / 1000.0f);
+        int expectedSilenceSamples = (int)((long)sampleRate * ShortTextProcessor.SilencePadMs / 1000L);
         Assert.Equal(1 + (2 * expectedSilenceSamples), padded.Length);
     }
 
