@@ -164,6 +164,13 @@ func loadPinyinDicts(singlePath, phrasePath string) (map[rune]string, map[string
 			if err != nil {
 				continue // skip malformed keys
 			}
+			// Reject out-of-range codepoints before the rune cast: strconv.Atoi
+			// returns int (architecture-dependent, up to 64 bits), and rune is
+			// int32. Unicode codepoints fit in 0..0x10FFFF, so anything outside
+			// that range is a malformed dictionary entry — silently drop it.
+			if cp < 0 || cp > 0x10FFFF {
+				continue
+			}
 			single[rune(cp)] = val
 		}
 	}

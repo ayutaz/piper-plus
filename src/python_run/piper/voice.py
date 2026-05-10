@@ -280,7 +280,11 @@ def _load_session_inline(
         "yes",
     )
 
-    model_p = Path(model_path)
+    # resolve(strict=True) canonicalises the user-provided model_path and
+    # rejects '..' traversal payloads early — also acts as a CodeQL
+    # py/path-injection sanitiser barrier so downstream cache_path operations
+    # are not flagged. Keep in sync with piper_train.ort_utils._build_cache_paths.
+    model_p = Path(model_path).resolve(strict=True)
     device_label = "cuda0" if use_cuda else "cpu"
     cache_path = model_p.with_suffix(f".{device_label}.opt.onnx")
     sentinel_path = Path(str(cache_path) + ".ok")

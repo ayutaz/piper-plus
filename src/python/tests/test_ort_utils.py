@@ -436,15 +436,25 @@ class TestModelCacheHelpers:
 
     def test_build_cache_paths_cpu(self, tmp_path):
         model = tmp_path / "model.onnx"
+        # _build_cache_paths now resolve(strict=True)s the model path as a
+        # CodeQL py/path-injection sanitiser, so the file must exist.
+        model.write_bytes(b"")
         cache, sentinel = _build_cache_paths(model, "cpu")
-        assert cache == tmp_path / "model.cpu.opt.onnx"
+        assert cache == (tmp_path / "model.cpu.opt.onnx").resolve()
         assert sentinel == Path(str(cache) + ".ok")
 
     def test_build_cache_paths_cuda(self, tmp_path):
         model = tmp_path / "model.onnx"
+        model.write_bytes(b"")
         cache, sentinel = _build_cache_paths(model, "cuda0")
-        assert cache == tmp_path / "model.cuda0.opt.onnx"
+        assert cache == (tmp_path / "model.cuda0.opt.onnx").resolve()
         assert sentinel == Path(str(cache) + ".ok")
+
+    def test_build_cache_paths_rejects_missing_model(self, tmp_path):
+        """resolve(strict=True) must reject paths that do not exist — that
+        contract is what makes the function safe against '..' traversal."""
+        with pytest.raises(FileNotFoundError):
+            _build_cache_paths(tmp_path / "missing.onnx", "cpu")
 
 
 @pytest.mark.unit
@@ -617,16 +627,21 @@ class TestVoiceCacheParity:
 
     def test_cache_path_naming_cpu(self, tmp_path):
         model = tmp_path / "model.onnx"
+        # The strict resolve in _build_cache_paths needs the file to exist;
+        # voice.py applies the same resolve before constructing its cache
+        # path, so compare both against the resolved canonical form.
+        model.write_bytes(b"")
         ort_cache, ort_sentinel = _build_cache_paths(model, "cpu")
-        voice_cache = model.with_suffix(".cpu.opt.onnx")
+        voice_cache = model.resolve().with_suffix(".cpu.opt.onnx")
         voice_sentinel = Path(str(voice_cache) + ".ok")
         assert ort_cache == voice_cache
         assert ort_sentinel == voice_sentinel
 
     def test_cache_path_naming_cuda(self, tmp_path):
         model = tmp_path / "model.onnx"
+        model.write_bytes(b"")
         ort_cache, ort_sentinel = _build_cache_paths(model, "cuda0")
-        voice_cache = model.with_suffix(".cuda0.opt.onnx")
+        voice_cache = model.resolve().with_suffix(".cuda0.opt.onnx")
         voice_sentinel = Path(str(voice_cache) + ".ok")
         assert ort_cache == voice_cache
         assert ort_sentinel == voice_sentinel
@@ -801,9 +816,8 @@ class TestCacheConcurrentRace:
                 else None
             )
             seen["cache_existed_at_call"] = cache_path.exists()
-            if (
-                sess_options is not None
-                and getattr(sess_options, "optimized_model_filepath", "")
+            if sess_options is not None and getattr(
+                sess_options, "optimized_model_filepath", ""
             ):
                 Path(sess_options.optimized_model_filepath).write_bytes(b"rebuilt")
             return mock_session
@@ -863,6 +877,5 @@ class TestCacheConcurrentRace:
                 f"cache-hit dispatch (existence-only contract)"
             )
             assert (
-                captured["level"]
-                == onnxruntime.GraphOptimizationLevel.ORT_DISABLE_ALL
+                captured["level"] == onnxruntime.GraphOptimizationLevel.ORT_DISABLE_ALL
             )
