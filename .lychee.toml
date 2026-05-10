@@ -62,6 +62,13 @@ exclude = [
   # .github/CONTRIBUTING.md の anchor link を許容 (anchor は ad hoc 名で
   # markdownlint と相性悪く、別 PR で追加予定)
   "^file://.*\\.github/CONTRIBUTING\\.md#",
+  # CMU Pronouncing Dictionary canonical citation URL.
+  # The host (www.speech.cs.cmu.edu) is unreliable and times out roughly
+  # half the time; the URL is referenced from the upstream BSD license text
+  # of cmudict (THIRD_PARTY_LICENSES.md:103) which we cannot legally modify,
+  # plus citation tables in docs/. Excluding the canonical URL is safer
+  # than racing against the host's uptime on every PR.
+  "^https?://www\\.speech\\.cs\\.cmu\\.edu/cgi-bin/cmudict",
 ]
 
 # Excluded paths (regex matched against full path)
