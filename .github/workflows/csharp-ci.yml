@@ -100,14 +100,16 @@ jobs:
 
       - name: Verify coverage threshold (Ubuntu)
         if: matrix.os == 'ubuntu-24.04'
+        # Baseline as of 2026-05-10: line coverage 78.5%, branch 72.2%, method
+        # 80.7% (run 25627587120). 70% line is the contractual floor — drop
+        # below this and CI fails. Raise the threshold incrementally as
+        # coverage grows so regressions are caught early.
         run: |
-          # Extract line coverage from Summary.txt
           LINE_COV=$(grep -oP 'Line coverage:\s+\K[\d.]+' coverage-report/Summary.txt | head -1)
           echo "Line coverage: $LINE_COV%"
           THRESHOLD=70
           awk -v cov="$LINE_COV" -v thr="$THRESHOLD" 'BEGIN { if (cov+0 < thr+0) { print "::error::Coverage " cov "% below threshold " thr "%"; exit 1 } }'
         shell: bash
-        continue-on-error: true  # baseline 確立まで warn
 
       - name: Upload coverage to Codecov
         if: matrix.os == 'ubuntu-24.04'
