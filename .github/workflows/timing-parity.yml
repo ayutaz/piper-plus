@@ -4,12 +4,23 @@ name: Phoneme Timing Parity
 #
 # All 6 runtimes (Python, Rust, Go, C++, C#, WASM/JS) must produce
 # byte-equivalent output for the same (durations, phoneme_tokens,
-# sample_rate, hop_length) inputs. This workflow ensures the canonical
-# golden fixture stays in sync with the Python reference implementation.
+# sample_rate, hop_length) inputs. Two layers protect that contract:
 #
-# Each runtime's test suite should load tests/fixtures/phoneme_timing/
-# golden_matrix.json and assert its own implementation matches the
-# `expected` blocks (TODO: per-runtime parity tests still to be added).
+#  1. drift-check (this workflow): regenerate the golden fixture from the
+#     Python canonical timing.py and assert the committed copy matches.
+#  2. per-runtime parity tests (each runtime's own CI): every runtime
+#     loads tests/fixtures/phoneme_timing/golden_matrix.json and asserts
+#     its implementation matches the `expected` blocks. Files:
+#       Python : src/python_run/tests/test_phoneme_timing_parity.py
+#       Rust   : src/rust/piper-core/tests/test_phoneme_timing_parity.rs
+#       Go     : src/go/piperplus/timing_parity_test.go
+#       C++    : src/cpp/tests/test_phoneme_timing_parity.cpp
+#       C#     : src/csharp/PiperPlus.Core.Tests/TimingWriterParityTests.cs
+#       WASM/JS: src/wasm/openjtalk-web/test/js/test-phoneme-timing-parity.js
+#
+# A meta-presence job below guards against silent removal of any of those
+# files. If you remove a parity test, this workflow fails — that is
+# intentional; replace the test before deleting it.
 
 on:
   pull_request:
@@ -54,3 +65,32 @@ jobs:
       - name: Verify fixture is in sync with canonical implementation
         run: |
           python scripts/regenerate_timing_fixture.py --check
+
+  per-runtime-presence:
+    name: Verify each runtime ships a parity test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Assert all 6 per-runtime parity test files exist
+        run: |
+          set -e
+          missing=0
+          check() {
+            if [ ! -f "$1" ]; then
+              echo "::error::missing per-runtime parity test: $1"
+              missing=1
+            else
+              echo "  ok: $1"
+            fi
+          }
+          check src/python_run/tests/test_phoneme_timing_parity.py
+          check src/rust/piper-core/tests/test_phoneme_timing_parity.rs
+          check src/go/piperplus/timing_parity_test.go
+          check src/cpp/tests/test_phoneme_timing_parity.cpp
+          check src/csharp/PiperPlus.Core.Tests/TimingWriterParityTests.cs
+          check src/wasm/openjtalk-web/test/js/test-phoneme-timing-parity.js
+          if [ "$missing" -ne 0 ]; then
+            echo "::error::one or more parity tests are missing — replace before removing"
+            exit 1
+          fi
