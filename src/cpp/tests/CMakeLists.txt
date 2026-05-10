@@ -725,6 +725,25 @@ foreach(test_source ${TEST_SOURCES})
     )
 endforeach()
 
+# Direct unit tests for piper_proc_exec.c (argv-based process spawn helpers).
+# Self-contained: compiles piper_proc_exec.c directly + links gtest. No other
+# piper-library symbols required. PR #401 introduced these helpers to remove
+# shell-based system()/popen() and clear CodeQL command-line-injection
+# alerts; this test file gives them direct coverage that previously only
+# existed indirectly through model_manager / dictionary_manager.
+add_executable(test_piper_proc_exec
+    test_piper_proc_exec.cpp
+    ../piper_proc_exec.c
+)
+target_include_directories(test_piper_proc_exec PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../
+)
+target_link_libraries(test_piper_proc_exec gtest_main)
+add_test(NAME test_piper_proc_exec COMMAND test_piper_proc_exec)
+set_tests_properties(test_piper_proc_exec PROPERTIES
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+
 # Add test_phoneme_timing - only uses gtest and json.hpp (no spdlog/fmt)
 add_executable(test_phoneme_timing test_phoneme_timing.cpp)
 target_include_directories(test_phoneme_timing PRIVATE
