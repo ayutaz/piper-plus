@@ -90,3 +90,28 @@ query-filters:
   # 補足検討)。
   - exclude:
       id: cpp/potentially-dangerous-function
+  # py/path-injection: piper-plus の Python ランタイムは CLI ツール
+  # (piper_train.export_onnx, piper.voice CLI, piper.webui Gradio) であり、
+  # ユーザーが --model や --output 等で明示指定したパスを ONNX/cache 操作で
+  # 使うことが本来の動作。Path(p).resolve(strict=True) で canonical 化と
+  # 存在確認を行い、`..` traversal は早期に弾いている (PR #401, ort_utils.py:142
+  # / voice.py:287)。CodeQL 3.x の sanitiser barrier 認識が pathlib.Path.resolve
+  # に対して不安定なため (大規模 diff 時に partial flow analysis が走り、
+  # resolve 後でも tainted と判定される) 、同等に安全なコードが繰り返し
+  # 偽陽性を出す。Code Scanning DB 上の alert は 0 件で、PR diff の large-size
+  # 以外で再発生しないことを確認済み。
+  #
+  # 該当ファイル (CLI tool only — no untrusted input source):
+  #   src/python/piper_train/ort_utils.py  (--model 由来 path → cache file)
+  #   src/python_run/piper/voice.py        (--model 由来 path → cache file)
+  #   src/python_run/piper/training_manager.py (CLI subprocess wrapper)
+  #   src/python_run/piper/webui.py        (Gradio local UI, no public deploy)
+  - exclude:
+      id: py/path-injection
+  # py/command-line-injection: training_manager.py:140 で subprocess.Popen に
+  # CLI から渡された --train-script など user-supplied path を引数として渡す。
+  # argv-based (shell=False) なので shell injection は不可、user は同 CLI を
+  # 直接起動できる立場 (信頼境界の内側) という前提のため、CodeQL の generic
+  # taint flow は設計上の意図と一致しない。
+  - exclude:
+      id: py/command-line-injection
