@@ -29,6 +29,7 @@
 #include "openjtalk_error.h"
 #include "openjtalk_security.h"
 #include "openjtalk_api.h"
+#include "piper_proc_exec.h"
 #include "safe_exec.h"
 
 // Define a safe maximum value for buffer size calculations
@@ -64,7 +65,7 @@ typedef struct {
 // Helper function prototypes (binary fallback path)
 static OpenJTalkError create_temp_files(char* input_file, char* output_file, size_t size);
 static OpenJTalkError write_input_text(const char* filename, const char* text);
-static OpenJTalkError execute_openjtalk_command(const char* command, OpenJTalkResult* result);
+static OpenJTalkError execute_openjtalk_argv(const char* const argv[], OpenJTalkResult* result);
 static char* read_and_parse_output(const char* filename, OpenJTalkResult* result);
 static void cleanup_temp_files(const char* input_file, const char* output_file);
 
@@ -389,41 +390,40 @@ char* openjtalk_text_to_phonemes(const char* text) {
         return NULL;
     }
 
-    // Construct and execute OpenJTalk command
-    char command[OPENJTALK_MAX_COMMAND];
+    // Build argv for OpenJTalk binary (no shell interpretation).
     int is_phonemizer = strstr(openjtalk_bin, "phonemizer") != NULL ? 1 : 0;
 
+#ifdef _WIN32
+    // On Windows, GetShortPathName works around CreateProcess limitations
+    // with spaces in the binary / dictionary paths. Each value still flows
+    // through _spawnvp as a discrete argv slot — no cmd.exe parsing.
+    char short_bin[OPENJTALK_MAX_PATH];
+    char short_dic[OPENJTALK_MAX_PATH];
+    GetShortPathName(openjtalk_bin, short_bin, OPENJTALK_MAX_PATH);
+    GetShortPathName(dic_path, short_dic, OPENJTALK_MAX_PATH);
+    const char* prog_path = short_bin;
+    const char* dict_arg = short_dic;
+    const char* null_sink = "NUL";
+#else
+    const char* prog_path = openjtalk_bin;
+    const char* dict_arg = dic_path;
+    const char* null_sink = "/dev/null";
+#endif
+
     if (is_phonemizer) {
-        // Use phonemizer binary
-#ifdef _WIN32
-        char short_bin[OPENJTALK_MAX_PATH];
-        char short_dic[OPENJTALK_MAX_PATH];
-        GetShortPathName(openjtalk_bin, short_bin, OPENJTALK_MAX_PATH);
-        GetShortPathName(dic_path, short_dic, OPENJTALK_MAX_PATH);
-
-        snprintf(command, sizeof(command),
-                 "%s -x %s -ot %s %s",
-                 short_bin, short_dic, output_file, input_file);
-#else
-        snprintf(command, sizeof(command),
-                 "\"%s\" -x \"%s\" -ot \"%s\" \"%s\"",
-                 openjtalk_bin, dic_path, output_file, input_file);
-#endif
+        // Phonemizer binary: prog -x <dict> -ot <output> <input>
+        const char* const argv[] = {
+            prog_path, "-x", dict_arg, "-ot", output_file, input_file, NULL,
+        };
+        err = execute_openjtalk_argv(argv, &result);
     } else {
-        // open_jtalk fallback: phoneme extraction only
-#ifdef _WIN32
-        snprintf(command, sizeof(command),
-                 "\"%s\" -x \"%s\" -ow NUL -ot \"%s\" \"%s\"",
-                 openjtalk_bin, dic_path, output_file, input_file);
-#else
-        snprintf(command, sizeof(command),
-                 "\"%s\" -x \"%s\" -ow /dev/null -ot \"%s\" \"%s\"",
-                 openjtalk_bin, dic_path, output_file, input_file);
-#endif
+        // open_jtalk fallback: prog -x <dict> -ow <null_sink> -ot <output> <input>
+        const char* const argv[] = {
+            prog_path, "-x", dict_arg, "-ow", null_sink,
+            "-ot", output_file, input_file, NULL,
+        };
+        err = execute_openjtalk_argv(argv, &result);
     }
-
-    // Execute command
-    err = execute_openjtalk_command(command, &result);
     unlink(input_file);  // Clean up input file immediately
 
     if (err != OPENJTALK_SUCCESS) {
@@ -688,39 +688,35 @@ static OpenJTalkProsodyResult* openjtalk_text_to_phonemes_with_prosody_binary(co
         return NULL;
     }
 
-    // Construct and execute OpenJTalk command
-    char command[OPENJTALK_MAX_COMMAND];
+    // Build argv for OpenJTalk binary (no shell interpretation).
     int is_phonemizer = strstr(openjtalk_bin, "phonemizer") != NULL ? 1 : 0;
 
-    if (is_phonemizer) {
 #ifdef _WIN32
-        char short_bin[OPENJTALK_MAX_PATH];
-        char short_dic[OPENJTALK_MAX_PATH];
-        GetShortPathName(openjtalk_bin, short_bin, OPENJTALK_MAX_PATH);
-        GetShortPathName(dic_path, short_dic, OPENJTALK_MAX_PATH);
-        snprintf(command, sizeof(command),
-                 "%s -x %s -ot %s %s",
-                 short_bin, short_dic, output_file, input_file);
+    char short_bin[OPENJTALK_MAX_PATH];
+    char short_dic[OPENJTALK_MAX_PATH];
+    GetShortPathName(openjtalk_bin, short_bin, OPENJTALK_MAX_PATH);
+    GetShortPathName(dic_path, short_dic, OPENJTALK_MAX_PATH);
+    const char* prog_path = short_bin;
+    const char* dict_arg = short_dic;
+    const char* null_sink = "NUL";
 #else
-        snprintf(command, sizeof(command),
-                 "\"%s\" -x \"%s\" -ot \"%s\" \"%s\"",
-                 openjtalk_bin, dic_path, output_file, input_file);
+    const char* prog_path = openjtalk_bin;
+    const char* dict_arg = dic_path;
+    const char* null_sink = "/dev/null";
 #endif
-    } else {
-        // open_jtalk fallback: phoneme extraction only
-#ifdef _WIN32
-        snprintf(command, sizeof(command),
-                 "\"%s\" -x \"%s\" -ow NUL -ot \"%s\" \"%s\"",
-                 openjtalk_bin, dic_path, output_file, input_file);
-#else
-        snprintf(command, sizeof(command),
-                 "\"%s\" -x \"%s\" -ow /dev/null -ot \"%s\" \"%s\"",
-                 openjtalk_bin, dic_path, output_file, input_file);
-#endif
-    }
 
-    // Execute command
-    err = execute_openjtalk_command(command, &result);
+    if (is_phonemizer) {
+        const char* const argv[] = {
+            prog_path, "-x", dict_arg, "-ot", output_file, input_file, NULL,
+        };
+        err = execute_openjtalk_argv(argv, &result);
+    } else {
+        const char* const argv[] = {
+            prog_path, "-x", dict_arg, "-ow", null_sink,
+            "-ot", output_file, input_file, NULL,
+        };
+        err = execute_openjtalk_argv(argv, &result);
+    }
     unlink(input_file);
 
     if (err != OPENJTALK_SUCCESS) {
@@ -839,27 +835,32 @@ static OpenJTalkError write_input_text(const char* filename, const char* text) {
     return OPENJTALK_SUCCESS;
 }
 
-// Execute OpenJTalk command
-static OpenJTalkError execute_openjtalk_command(const char* command, OpenJTalkResult* result) {
-    if (!command) {
+// Execute OpenJTalk via argv (no shell). Each element is passed verbatim
+// to posix_spawnp / _spawnvp so shell metacharacters cannot be interpreted —
+// the prior `piper_is_safe_command_string` validator that protected the
+// system() path is no longer strictly necessary, but we still validate each
+// argv slot defensively for paths reaching the binary unchanged.
+static OpenJTalkError execute_openjtalk_argv(const char* const argv[],
+                                             OpenJTalkResult* result) {
+    if (!argv || !argv[0]) {
         return OPENJTALK_ERROR_NULL_INPUT;
     }
 
-    // Defense in depth: gate system() on a sanitizer that rejects shell
-    // metacharacters. openjtalk_validate_command() already runs upstream
-    // for legacy paths, but CodeQL's taint-flow analysis does not always
-    // recognize that helper as a sanitizer — adding this explicit check
-    // breaks the taint flow visibly.
-    if (!piper_is_safe_command_string(command)) {
-        if (result) {
-            openjtalk_set_result(result, OPENJTALK_ERROR_SECURITY,
-                                "Unsafe characters in command string");
+    // Defense in depth: validate each argv entry (the binary path and the
+    // operands all originate from internal config / temp file paths, but
+    // running them through the same allow-list keeps a single sanitizer
+    // contract in the tree).
+    for (size_t i = 0; argv[i]; i++) {
+        if (!piper_is_safe_command_string(argv[i])) {
+            if (result) {
+                openjtalk_set_result(result, OPENJTALK_ERROR_SECURITY,
+                                    "Unsafe characters in argv[%zu]", i);
+            }
+            return OPENJTALK_ERROR_SECURITY;
         }
-        return OPENJTALK_ERROR_SECURITY;
     }
 
-    // Use system() for simplicity and compatibility
-    int exit_code = system(command);
+    int exit_code = piper_run_argv(argv);
 
     if (exit_code != 0) {
         if (result) {
