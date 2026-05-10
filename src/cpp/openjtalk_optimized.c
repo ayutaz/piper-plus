@@ -18,6 +18,11 @@
 #include <io.h>
 #include <process.h>
 #define F_OK 0
+// Windows _access() has no execute-permission mode (X_OK is POSIX-only).
+// Approximate by testing for existence only — the allow-list contains fixed
+// paths, so existence is a sufficient gate before piper_run_argv() takes
+// over and the OS itself enforces execute permission at spawn time.
+#define X_OK 0
 #define access _access
 #define popen _popen
 #define pclose _pclose
