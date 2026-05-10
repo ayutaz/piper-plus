@@ -78,7 +78,10 @@ repos:
       - id: mixed-line-ending
         # Force LF endings repo-wide. CRLF leaks on Windows checkouts cause
         # noisy diffs and break shell scripts when run via WSL/Git Bash.
+        # `.bat` / `.ps1` / `.cmd` は .gitattributes で `eol=crlf` を強制
+        # しているため、 hook 側でも除外して衝突を回避。
         args: [--fix=lf]
+        exclude: '\.(bat|ps1|cmd)$'
       - id: detect-private-key
         # Catch accidental commits of SSH/TLS private keys.
 
