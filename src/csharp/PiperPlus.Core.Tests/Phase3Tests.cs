@@ -23,8 +23,9 @@ public sealed class Phase3Tests : IDisposable
             {
                 File.Delete(path);
             }
-            catch
-            { /* best-effort cleanup */
+            catch (IOException ex)
+            {
+                Console.Error.WriteLine($"[Test cleanup] {ex.Message}");
             }
         }
     }

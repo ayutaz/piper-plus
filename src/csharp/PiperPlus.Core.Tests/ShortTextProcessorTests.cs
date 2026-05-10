@@ -213,7 +213,7 @@ public class ShortTextProcessorTests
         long[] ids = [1, 10, 11, 12, 2]; // 5 elements (body=3)
         long[] prosody = [1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4, 5, 5, 5];
 
-        (long[]? padded, long[]? paddedProsody, int _, int _) = ShortTextProcessor.PadPhonemeIds(ids, prosody);
+        (long[]? _, long[]? paddedProsody, int _, int _) = ShortTextProcessor.PadPhonemeIds(ids, prosody);
 
         Assert.NotNull(paddedProsody);
 
