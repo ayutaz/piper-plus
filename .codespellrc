@@ -1,6 +1,7 @@
 [codespell]
-# Skip directories:
-skip = ./.git,./node_modules,./build,./dist,./target,./.cache,./test/models,./tools/benchmark/issue-383,./pkg,./.next,./out,./vendor,./third_party,./external,./_deps,./.venv,./venv,./*.lock,./*.min.js,./*.min.css,./*.map
+# Skip directories and non-English READMEs (codespell only ships an English
+# dictionary, so translated READMEs trigger false positives).
+skip = ./.git,./.build,./node_modules,./build,./dist,./target,./.cache,./test/models,./tools/benchmark/issue-383,./pkg,./.next,./out,./vendor,./third_party,./external,./_deps,./.venv,./venv,./*.lock,./*.min.js,./*.min.css,./*.map,./README_DE.md,./README_ES.md,./README_FR.md,./README_HI.md,./README_KO.md,./README_PT.md,./README_RU.md,./README_SV.md,./README_ZH.md
 # Files to skip
 ignore-words = .codespell-ignore-words.txt
 # Don't check these files (typically generated/lockfiles)
