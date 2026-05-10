@@ -106,13 +106,22 @@ int piper_capture_argv(const char* const argv[],
     return -1;
 }
 
-#else // POSIX
+#else // POSIX (Linux / macOS / Android)
 
-#include <spawn.h>
+// Android NDK: posix_spawn was added in API level 28 (Android 9.0). Falling
+// back to fork() + execvp() keeps the build green on lower minSdkVersion
+// settings used by some downstream consumers. Linux / macOS use posix_spawn
+// where available because it avoids fork's deadlock-on-pthread caveat.
+#if defined(__ANDROID__)
+#define PIPER_USE_FORK_EXEC 1
+#endif
+
 #include <sys/wait.h>
 #include <unistd.h>
-
+#if !defined(PIPER_USE_FORK_EXEC)
+#include <spawn.h>
 extern char** environ;
+#endif
 
 int piper_proc_exec_supported(void) { return 1; }
 
@@ -120,6 +129,16 @@ int piper_run_argv(const char* const argv[]) {
     if (!argv || !argv[0]) {
         return -1;
     }
+#if defined(PIPER_USE_FORK_EXEC)
+    pid_t pid = fork();
+    if (pid < 0) {
+        return -1;
+    }
+    if (pid == 0) {
+        execvp(argv[0], (char* const*)argv);
+        _exit(127);  // exec failed in the child
+    }
+#else
     pid_t pid;
     int rc = posix_spawnp(&pid, argv[0], NULL, NULL,
                           (char* const*)argv, environ);
@@ -127,6 +146,7 @@ int piper_run_argv(const char* const argv[]) {
         errno = rc;
         return -1;
     }
+#endif
     int status = 0;
     if (waitpid(pid, &status, 0) == -1) {
         return -1;
@@ -151,6 +171,26 @@ int piper_capture_argv(const char* const argv[],
         return -1;
     }
 
+#if defined(PIPER_USE_FORK_EXEC)
+    pid_t pid = fork();
+    if (pid < 0) {
+        close(pipefd[0]);
+        close(pipefd[1]);
+        if (bytes_read) *bytes_read = 0;
+        return -1;
+    }
+    if (pid == 0) {
+        // Child: redirect stdout to pipe write end, close read end.
+        close(pipefd[0]);
+        if (dup2(pipefd[1], 1) == -1) {
+            _exit(126);
+        }
+        close(pipefd[1]);
+        execvp(argv[0], (char* const*)argv);
+        _exit(127);  // exec failed
+    }
+    close(pipefd[1]);  // parent closes write end
+#else
     posix_spawn_file_actions_t actions;
     if (posix_spawn_file_actions_init(&actions) != 0) {
         close(pipefd[0]);
@@ -176,6 +216,7 @@ int piper_capture_argv(const char* const argv[],
         errno = rc;
         return -1;
     }
+#endif
 
     size_t total = 0;
     while (total < out_size - 1) {
