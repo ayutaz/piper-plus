@@ -17,15 +17,21 @@ var (
 	frSF = mkSet("dghmnpstxz")                              // silent final consonants
 	frSo = mkSet("eiy\u00e9\u00e8\u00ea\u00eb\u00ee\u00ef") // soft c/g triggers
 	frPu = mkSet(",.;:!?\u00a1\u00bf\u2014\u2013\u2026\u00ab\u00bb")
-	frVP = map[string]bool{"a": true, "e": true, "\u025b": true, "i": true, "o": true,
+	frVP = map[string]bool{
+		"a": true, "e": true, "\u025b": true, "i": true, "o": true,
 		"\u0254": true, "u": true, "y_vowel": true, "\u0259": true, "\u00f8": true,
-		"\u0153": true, "\u025b\u0303": true, "\u0251\u0303": true, "\u0254\u0303": true}
-	frSC = map[rune]string{'b': "b", 'd': "d", 'f': "f", 'k': "k", 'l': "l", 'm': "m",
-		'n': "n", 'p': "p", 's': "s", 't': "t", 'v': "v", 'w': "w", 'z': "z"}
+		"\u0153": true, "\u025b\u0303": true, "\u0251\u0303": true, "\u0254\u0303": true,
+	}
+	frSC = map[rune]string{
+		'b': "b", 'd': "d", 'f': "f", 'k': "k", 'l': "l", 'm': "m",
+		'n': "n", 'p': "p", 's': "s", 't': "t", 'v': "v", 'w': "w", 'z': "z",
+	}
 	ilIL = map[string]bool{"ville": true, "mille": true, "tranquille": true}
-	erEH = map[string]bool{"hiver": true, "enfer": true, "amer": true, "cancer": true,
+	erEH = map[string]bool{
+		"hiver": true, "enfer": true, "amer": true, "cancer": true,
 		"super": true, "laser": true, "hamster": true, "master": true, "poster": true,
-		"cluster": true, "starter": true, "leader": true, "transfer": true, "fer": true}
+		"cluster": true, "starter": true, "leader": true, "transfer": true, "fer": true,
+	}
 )
 
 func mkSet(s string) map[rune]bool {

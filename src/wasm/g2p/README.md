@@ -97,6 +97,7 @@ Encodes IPA tokens to Piper-compatible phoneme IDs with BOS/EOS/padding.
 ## Cross-Platform Consistency
 
 Also available as:
+
 - **Python**: `piper-plus-g2p` on PyPI
 - **Rust crate**: `piper-plus-g2p` on crates.io
 - **Go**: `go get github.com/ayutaz/piper-plus/src/go/phonemize`

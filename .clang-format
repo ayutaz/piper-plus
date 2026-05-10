@@ -1,0 +1,14 @@
+# clang-format configuration for piper-plus C/C++ code
+#
+# Based on Google C++ style with 4-space indent and 100-char column limit.
+# Used by clang-tidy (FormatStyle: file) and editor integrations.
+---
+BasedOnStyle: Google
+ColumnLimit: 100
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+DerivePointerAlignment: false
+PointerAlignment: Left
+SortIncludes: CaseSensitive
+IncludeBlocks: Regroup

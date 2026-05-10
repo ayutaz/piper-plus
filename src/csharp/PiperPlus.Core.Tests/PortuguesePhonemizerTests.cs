@@ -13,18 +13,18 @@ public sealed class PortuguesePhonemizerTests
     // ================================================================
     // Stub G2P engine
     // ================================================================
-
     private class StubPortugueseG2PEngine : IPortugueseG2PEngine
     {
         private readonly List<string> _tokens;
+
         public StubPortugueseG2PEngine(List<string> tokens) => _tokens = tokens;
+
         public List<string> ToPhonemeList(string text) => _tokens;
     }
 
     // ================================================================
     // Shared phoneme ID map for PostProcessIds tests
     // ================================================================
-
     private static Dictionary<string, int[]> MakeMap() => new()
     {
         ["_"] = [0],
@@ -42,7 +42,6 @@ public sealed class PortuguesePhonemizerTests
     // ================================================================
     // 1. StressMarker_StrippedFromOutput
     // ================================================================
-
     [Fact]
     public void StressMarker_StrippedFromOutput()
     {
@@ -52,7 +51,7 @@ public sealed class PortuguesePhonemizerTests
         var tokens = new List<string> { "b", "\u027e", "a", "z", "\u02c8", "i", "w" };
 
         var phonemizer = new PortuguesePhonemizer(new StubPortugueseG2PEngine(tokens));
-        var (result, _) = phonemizer.PhonemizeWithProsody("Brasil");
+        (List<string>? result, List<ProsodyInfo?> _) = phonemizer.PhonemizeWithProsody("Brasil");
 
         Assert.DoesNotContain("\u02c8", result); // ˈ must not appear
     }
@@ -60,7 +59,6 @@ public sealed class PortuguesePhonemizerTests
     // ================================================================
     // 2. StressedPhoneme_A2_Is2
     // ================================================================
-
     [Fact]
     public void StressedPhoneme_A2_Is2()
     {
@@ -69,7 +67,7 @@ public sealed class PortuguesePhonemizerTests
         var tokens = new List<string> { "b", "\u027e", "a", "z", "\u02c8", "i", "w" };
 
         var phonemizer = new PortuguesePhonemizer(new StubPortugueseG2PEngine(tokens));
-        var (result, prosody) = phonemizer.PhonemizeWithProsody("Brasil");
+        (List<string>? result, List<ProsodyInfo?>? prosody) = phonemizer.PhonemizeWithProsody("Brasil");
 
         // After stripping ˈ, output is: b ɾ a z i w
         // "i" is at index 4 in the output.
@@ -82,7 +80,6 @@ public sealed class PortuguesePhonemizerTests
     // ================================================================
     // 3. UnstressedPhoneme_A2_Is0
     // ================================================================
-
     [Fact]
     public void UnstressedPhoneme_A2_Is0()
     {
@@ -91,7 +88,7 @@ public sealed class PortuguesePhonemizerTests
         var tokens = new List<string> { "b", "\u027e", "a", "z", "\u02c8", "i", "w" };
 
         var phonemizer = new PortuguesePhonemizer(new StubPortugueseG2PEngine(tokens));
-        var (result, prosody) = phonemizer.PhonemizeWithProsody("Brasil");
+        (List<string>? result, List<ProsodyInfo?>? prosody) = phonemizer.PhonemizeWithProsody("Brasil");
 
         // "b" at index 0 should be unstressed.
         int bIdx = result.IndexOf("b");
@@ -115,7 +112,6 @@ public sealed class PortuguesePhonemizerTests
     // ================================================================
     // 4. A3_IsPhonemeCountExcludingStress
     // ================================================================
-
     [Fact]
     public void A3_IsPhonemeCountExcludingStress()
     {
@@ -124,7 +120,7 @@ public sealed class PortuguesePhonemizerTests
         var tokens = new List<string> { "b", "\u027e", "a", "z", "\u02c8", "i", "w" };
 
         var phonemizer = new PortuguesePhonemizer(new StubPortugueseG2PEngine(tokens));
-        var (_, prosody) = phonemizer.PhonemizeWithProsody("Brasil");
+        (List<string> _, List<ProsodyInfo?>? prosody) = phonemizer.PhonemizeWithProsody("Brasil");
 
         var a3Values = prosody
             .Where(p => p is not null)
@@ -139,7 +135,6 @@ public sealed class PortuguesePhonemizerTests
     // ================================================================
     // 5. WordBoundary_Spaces
     // ================================================================
-
     [Fact]
     public void WordBoundary_Spaces()
     {
@@ -152,7 +147,7 @@ public sealed class PortuguesePhonemizerTests
         };
 
         var phonemizer = new PortuguesePhonemizer(new StubPortugueseG2PEngine(tokens));
-        var (result, _) = phonemizer.PhonemizeWithProsody("bom dia");
+        (List<string>? result, List<ProsodyInfo?> _) = phonemizer.PhonemizeWithProsody("bom dia");
 
         Assert.Contains(" ", result);
     }
@@ -160,7 +155,6 @@ public sealed class PortuguesePhonemizerTests
     // ================================================================
     // 6. Punctuation_HasZeroProsody
     // ================================================================
-
     [Fact]
     public void Punctuation_HasZeroProsody()
     {
@@ -172,7 +166,7 @@ public sealed class PortuguesePhonemizerTests
         };
 
         var phonemizer = new PortuguesePhonemizer(new StubPortugueseG2PEngine(tokens));
-        var (result, prosody) = phonemizer.PhonemizeWithProsody("bom,");
+        (List<string>? result, List<ProsodyInfo?>? prosody) = phonemizer.PhonemizeWithProsody("bom,");
 
         int commaIdx = result.IndexOf(",");
         Assert.True(commaIdx >= 0, "Comma should be present");
@@ -185,7 +179,6 @@ public sealed class PortuguesePhonemizerTests
     // ================================================================
     // 7. ProsodyAlignment_Maintained
     // ================================================================
-
     [Fact]
     public void ProsodyAlignment_Maintained()
     {
@@ -199,7 +192,7 @@ public sealed class PortuguesePhonemizerTests
         };
 
         var phonemizer = new PortuguesePhonemizer(new StubPortugueseG2PEngine(tokens));
-        var (result, prosody) = phonemizer.PhonemizeWithProsody("Brasil bom.");
+        (List<string>? result, List<ProsodyInfo?>? prosody) = phonemizer.PhonemizeWithProsody("Brasil bom.");
 
         Assert.Equal(result.Count, prosody.Count);
     }
@@ -207,7 +200,6 @@ public sealed class PortuguesePhonemizerTests
     // ================================================================
     // 8. GetPhonemeIdMap_ReturnsNull
     // ================================================================
-
     [Fact]
     public void GetPhonemeIdMap_ReturnsNull()
     {
@@ -221,7 +213,6 @@ public sealed class PortuguesePhonemizerTests
     // ================================================================
     // 9. PostProcessIds_FullSequence
     // ================================================================
-
     [Fact]
     public void PostProcessIds_FullSequence()
     {
@@ -234,9 +225,9 @@ public sealed class PortuguesePhonemizerTests
         {
             new(0, 0, 3), new(0, 0, 3), new(0, 0, 3),
         };
-        var map = MakeMap();
+        Dictionary<string, int[]> map = MakeMap();
 
-        var (ids, prosody) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
+        (List<int>? ids, List<ProsodyInfo?>? prosody) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
 
         // Expected:
         // BOS(1), PAD(0), 10, PAD(0), 11, PAD(0), 12, PAD(0), EOS(2)
@@ -254,7 +245,6 @@ public sealed class PortuguesePhonemizerTests
     // ================================================================
     // 10. NoStressMarker_AllUnstressed
     // ================================================================
-
     [Fact]
     public void NoStressMarker_AllUnstressed()
     {
@@ -262,9 +252,9 @@ public sealed class PortuguesePhonemizerTests
         var tokens = new List<string> { "b", "o", "m" };
 
         var phonemizer = new PortuguesePhonemizer(new StubPortugueseG2PEngine(tokens));
-        var (_, prosody) = phonemizer.PhonemizeWithProsody("bom");
+        (List<string> _, List<ProsodyInfo?>? prosody) = phonemizer.PhonemizeWithProsody("bom");
 
-        foreach (var p in prosody)
+        foreach (ProsodyInfo? p in prosody)
         {
             Assert.NotNull(p);
             Assert.Equal(0, p!.Value.A2);
@@ -274,7 +264,6 @@ public sealed class PortuguesePhonemizerTests
     // ================================================================
     // 11. PostProcessIds_SkipsPadAfterPadToken
     // ================================================================
-
     [Fact]
     public void PostProcessIds_SkipsPadAfterPadToken()
     {
@@ -289,9 +278,9 @@ public sealed class PortuguesePhonemizerTests
         {
             new(0, 0, 3), null, new(0, 0, 3),
         };
-        var map = MakeMap();
+        Dictionary<string, int[]> map = MakeMap();
 
-        var (ids, prosody) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
+        (List<int>? ids, List<ProsodyInfo?>? prosody) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
 
         // Expected:
         // BOS(1), PAD(0), 10, PAD(0), 0, 11, PAD(0), EOS(2)
@@ -303,7 +292,6 @@ public sealed class PortuguesePhonemizerTests
     // ================================================================
     // 12. PostProcessIds_EmptyInput
     // ================================================================
-
     [Fact]
     public void PostProcessIds_EmptyInput()
     {
@@ -313,9 +301,9 @@ public sealed class PortuguesePhonemizerTests
 
         var inputIds = new List<int>();
         var inputProsody = new List<ProsodyInfo?>();
-        var map = MakeMap();
+        Dictionary<string, int[]> map = MakeMap();
 
-        var (ids, prosody) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
+        (List<int>? ids, List<ProsodyInfo?>? prosody) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
 
         // Expected: [BOS(1), PAD(0), EOS(2)]
         Assert.Equal([1, 0, 2], ids);
@@ -325,7 +313,6 @@ public sealed class PortuguesePhonemizerTests
     // ================================================================
     // 13. Phonemize_ReturnsTokensOnly
     // ================================================================
-
     [Fact]
     public void Phonemize_ReturnsTokensOnly()
     {
@@ -333,11 +320,13 @@ public sealed class PortuguesePhonemizerTests
         var tokens = new List<string> { "b", "\u027e", "a", "z", "\u02c8", "i", "w" };
 
         var phonemizer = new PortuguesePhonemizer(new StubPortugueseG2PEngine(tokens));
-        var result = phonemizer.Phonemize("Brasil");
+        List<string> result = phonemizer.Phonemize("Brasil");
 
         Assert.NotEmpty(result);
+
         // Stress marker should be stripped (same behavior as PhonemizeWithProsody).
         Assert.DoesNotContain("\u02c8", result);
+
         // Phonemes should be present.
         Assert.Contains("b", result);
         Assert.Contains("i", result);
@@ -346,7 +335,6 @@ public sealed class PortuguesePhonemizerTests
     // ================================================================
     // 14. PhonemizeWithProsody_EmptyInput
     // ================================================================
-
     [Fact]
     public void PhonemizeWithProsody_EmptyInput()
     {
@@ -355,7 +343,7 @@ public sealed class PortuguesePhonemizerTests
         var phonemizer = new PortuguesePhonemizer(
             new StubPortugueseG2PEngine([]));
 
-        var (result, prosody) = phonemizer.PhonemizeWithProsody("");
+        (List<string>? result, List<ProsodyInfo?>? prosody) = phonemizer.PhonemizeWithProsody(string.Empty);
 
         Assert.Empty(result);
         Assert.Empty(prosody);
@@ -364,7 +352,6 @@ public sealed class PortuguesePhonemizerTests
     // ================================================================
     // 15. Punctuation_InvertedMarks
     // ================================================================
-
     [Fact]
     public void Punctuation_InvertedMarks()
     {
@@ -378,7 +365,7 @@ public sealed class PortuguesePhonemizerTests
         };
 
         var phonemizer = new PortuguesePhonemizer(new StubPortugueseG2PEngine(tokens));
-        var (result, prosody) = phonemizer.PhonemizeWithProsody("\u00bfbom\u00a1");
+        (List<string>? result, List<ProsodyInfo?>? prosody) = phonemizer.PhonemizeWithProsody("\u00bfbom\u00a1");
 
         // ¿ should be present with zero prosody.
         int qIdx = result.IndexOf("\u00bf");
@@ -400,7 +387,6 @@ public sealed class PortuguesePhonemizerTests
     // ================================================================
     // 16. Punctuation_Dashes
     // ================================================================
-
     [Fact]
     public void Punctuation_Dashes()
     {
@@ -417,7 +403,7 @@ public sealed class PortuguesePhonemizerTests
         };
 
         var phonemizer = new PortuguesePhonemizer(new StubPortugueseG2PEngine(tokens));
-        var (result, prosody) = phonemizer.PhonemizeWithProsody("bom\u2014bom\u2013bom\u2026");
+        (List<string>? result, List<ProsodyInfo?>? prosody) = phonemizer.PhonemizeWithProsody("bom\u2014bom\u2013bom\u2026");
 
         foreach (var punct in new[] { "\u2014", "\u2013", "\u2026" })
         {
@@ -433,7 +419,6 @@ public sealed class PortuguesePhonemizerTests
     // ================================================================
     // 17. StressMarker_AtEndOfWord
     // ================================================================
-
     [Fact]
     public void StressMarker_AtEndOfWord()
     {
@@ -442,16 +427,18 @@ public sealed class PortuguesePhonemizerTests
         var tokens = new List<string> { "b", "o", "m", "\u02c8" };
 
         var phonemizer = new PortuguesePhonemizer(new StubPortugueseG2PEngine(tokens));
-        var (result, prosody) = phonemizer.PhonemizeWithProsody("bom");
+        (List<string>? result, List<ProsodyInfo?>? prosody) = phonemizer.PhonemizeWithProsody("bom");
 
         // ˈ should be stripped from output.
         Assert.DoesNotContain("\u02c8", result);
+
         // All phonemes should be unstressed (A2=0).
-        foreach (var p in prosody)
+        foreach (ProsodyInfo? p in prosody)
         {
             Assert.NotNull(p);
             Assert.Equal(0, p!.Value.A2);
         }
+
         // The 3 phonemes should still be present.
         Assert.Equal(3, result.Count);
     }
@@ -459,26 +446,29 @@ public sealed class PortuguesePhonemizerTests
     // ================================================================
     // 18. NasalVowel_PreservedInOutput
     // ================================================================
-
     [Fact]
     public void NasalVowel_PreservedInOutput()
     {
         // NFC nasal vowels (ã, õ, etc.) should pass through the
         // phonemizer without being altered or stripped.
         var tokens = new List<string> { "m", "\u00e3", "\u02c8", "\u00f5", "s" };
-        //                                     ã                     õ
 
+        // ã                     õ
         var phonemizer = new PortuguesePhonemizer(new StubPortugueseG2PEngine(tokens));
-        var (result, prosody) = phonemizer.PhonemizeWithProsody("m\u00e3os");
+        (List<string>? result, List<ProsodyInfo?>? prosody) = phonemizer.PhonemizeWithProsody("m\u00e3os");
 
         // ã should be present.
         Assert.Contains("\u00e3", result);
+
         // õ should be present.
         Assert.Contains("\u00f5", result);
+
         // ˈ should be stripped.
         Assert.DoesNotContain("\u02c8", result);
+
         // Alignment check.
         Assert.Equal(result.Count, prosody.Count);
+
         // õ follows the stress marker, so it should have A2=2.
         int oIdx = result.IndexOf("\u00f5");
         Assert.NotNull(prosody[oIdx]);

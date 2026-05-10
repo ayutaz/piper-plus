@@ -11,13 +11,13 @@
 // Re-exports
 // ---------------------------------------------------------------------------
 
-export { WebGPUSessionManager } from './webgpu-session-manager.js';
-export { StreamingTTSPipeline, TextChunker } from './streaming-pipeline.js';
-export { AudioBackendFactory } from './audio-backend-factory.js';
-export { CacheManager } from './cache-manager.js';
-export { ModelManager } from './model-manager.js';
-export { AudioResult } from './audio-result.js';
-export { SpeakerEncoder } from './speaker-encoder.js';
+export { WebGPUSessionManager } from "./webgpu-session-manager.js";
+export { StreamingTTSPipeline, TextChunker } from "./streaming-pipeline.js";
+export { AudioBackendFactory } from "./audio-backend-factory.js";
+export { CacheManager } from "./cache-manager.js";
+export { ModelManager } from "./model-manager.js";
+export { AudioResult } from "./audio-result.js";
+export { SpeakerEncoder } from "./speaker-encoder.js";
 
 // Re-export timing utilities from the main package entry so that users can
 // bring them in alongside the high-level PiperPlus and AudioResult APIs
@@ -30,29 +30,25 @@ export {
   timingToJsonCompact,
   timingToSrt,
   timingToTsv,
-} from './timing.js';
+} from "./timing.js";
 
 // ---------------------------------------------------------------------------
 // Imports used by PiperPlus
 // ---------------------------------------------------------------------------
 
-import { checkPuaCompat } from '@piper-plus/g2p';
-import { WebGPUSessionManager } from './webgpu-session-manager.js';
-import { StreamingTTSPipeline, TextChunker } from './streaming-pipeline.js';
-import { ModelManager } from './model-manager.js';
-import { AudioResult } from './audio-result.js';
+import { checkPuaCompat } from "@piper-plus/g2p";
+import { WebGPUSessionManager } from "./webgpu-session-manager.js";
+import { StreamingTTSPipeline } from "./streaming-pipeline.js";
+import { ModelManager } from "./model-manager.js";
+import { AudioResult } from "./audio-result.js";
 import {
   DEFAULT_HOP_LENGTH,
   buildPhonemeIdToTokenMap,
   durationsToTiming,
-  timingToJson,
-  timingToJsonCompact,
-  timingToSrt,
-  timingToTsv,
-} from './timing.js';
-import { RustWasmAdapter } from './phonemizer/rust-wasm-adapter.js';
-import { JsG2pAdapter } from './phonemizer/js-g2p-adapter.js';
-import { CompositePhonemizer } from './phonemizer/composite-phonemizer.js';
+} from "./timing.js";
+import { RustWasmAdapter } from "./phonemizer/rust-wasm-adapter.js";
+import { JsG2pAdapter } from "./phonemizer/js-g2p-adapter.js";
+import { CompositePhonemizer } from "./phonemizer/composite-phonemizer.js";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -62,6 +58,24 @@ const DEFAULT_NOISE_SCALE = 0.667;
 const DEFAULT_LENGTH_SCALE = 1.0;
 const DEFAULT_NOISE_W = 0.8;
 const DEFAULT_SAMPLE_RATE = 22050;
+
+// ORT session contract constants (keep in sync with other runtimes —
+// docs/spec/ort-session-contract.toml). These are exposed as exports so
+// the cross-runtime parity test (test/js/test-ort-session-contract.js) can
+// pin the production values byte-for-byte to the canonical fixture.
+//
+// The WASM runtime does not expose ORT intra/inter-thread / dynamic_block
+// settings (those are forced by onnxruntime-web's WebGPU/WASM EPs), so
+// the relevant fixture rows are pinned for forward-compat drift detection
+// only — see [env_vars.implementation_status] in the spec.
+export const WARMUP_PHONEME_LENGTH = 100;
+export const WARMUP_BOS_TOKEN = 1;
+export const WARMUP_EOS_TOKEN = 2;
+export const WARMUP_DUMMY_PHONEME = 8;
+export const WARMUP_DEFAULT_RUNS = 2;
+export const WARMUP_NOISE_SCALE = DEFAULT_NOISE_SCALE;
+export const WARMUP_LENGTH_SCALE = DEFAULT_LENGTH_SCALE;
+export const WARMUP_NOISE_W = DEFAULT_NOISE_W;
 
 // Short-text mitigation constants (keep in sync with other runtimes —
 // docs/spec/short-text-contract.toml).
@@ -187,12 +201,18 @@ export function trimPaddingByDurations(
   frontPad,
   backPad,
   hopSize,
-  eosMaxFrames = TRIM_EOS_MAX_FRAMES,
+  eosMaxFrames = TRIM_EOS_MAX_FRAMES
 ) {
-  if (frontPad <= 0 && backPad <= 0) return audio;
-  if (durations == null || hopSize <= 0) return audio;
+  if (frontPad <= 0 && backPad <= 0) {
+    return audio;
+  }
+  if (durations == null || hopSize <= 0) {
+    return audio;
+  }
   const expectedLen = 1 + frontPad + backPad + 1; // BOS + pads + EOS
-  if (durations.length < expectedLen) return audio;
+  if (durations.length < expectedLen) {
+    return audio;
+  }
 
   // Front: BOS + front padding samples (truncated).
   let frontSum = 0;
@@ -218,8 +238,12 @@ export function trimPaddingByDurations(
   const total = audio.length;
   const start = Math.max(0, frontSamples);
   let end = total - backSamples;
-  if (end < start) end = start;
-  if (start >= total || end <= 0 || start >= end) return audio;
+  if (end < start) {
+    end = start;
+  }
+  if (start >= total || end <= 0 || start >= end) {
+    return audio;
+  }
 
   // subarray() avoids a copy; subscribers that mutate must already clone.
   return audio.subarray(start, end);
@@ -258,7 +282,9 @@ export function trimSilence(audio, windowSize = 256) {
     }
     const rms = Math.sqrt(sumSq / windowSize);
     if (rms > TRIM_THRESHOLD_RMS) {
-      if (firstAbove < 0) firstAbove = w;
+      if (firstAbove < 0) {
+        firstAbove = w;
+      }
       lastAbove = w;
     }
   }
@@ -274,7 +300,9 @@ export function trimSilence(audio, windowSize = 256) {
     }
     const rms = Math.sqrt(sumSq / remainder);
     if (rms > TRIM_THRESHOLD_RMS) {
-      if (firstAbove < 0) firstAbove = nWindows; // virtual window index for the partial
+      if (firstAbove < 0) {
+        firstAbove = nWindows;
+      } // virtual window index for the partial
       lastAbove = nWindows;
     }
   }
@@ -288,7 +316,7 @@ export function trimSilence(audio, windowSize = 256) {
   let endSample = Math.min((lastAbove + 1) * windowSize, n);
 
   // Ensure minimum length
-  let length = endSample - startSample;
+  const length = endSample - startSample;
   if (length < TRIM_MIN_SAMPLES) {
     const center = Math.floor((startSample + endSample) / 2);
     const half = Math.floor(TRIM_MIN_SAMPLES / 2);
@@ -389,12 +417,14 @@ export class PiperPlus {
       this._warmupPromise = null;
     }
     if (!text) {
-      throw new Error('text is required');
+      throw new Error("text is required");
     }
 
     const language = options.language || this._detectLanguage(text);
-    let noiseScale = options.noiseScale ?? this._config.inference?.noise_scale ?? DEFAULT_NOISE_SCALE;
-    const lengthScale = options.lengthScale ?? this._config.inference?.length_scale ?? DEFAULT_LENGTH_SCALE;
+    let noiseScale =
+      options.noiseScale ?? this._config.inference?.noise_scale ?? DEFAULT_NOISE_SCALE;
+    const lengthScale =
+      options.lengthScale ?? this._config.inference?.length_scale ?? DEFAULT_LENGTH_SCALE;
     let noiseW = options.noiseW ?? this._config.inference?.noise_w ?? DEFAULT_NOISE_W;
 
     // 1. Phonemize
@@ -437,7 +467,7 @@ export class PiperPlus {
           durations,
           frontPad,
           backPad,
-          hopSize > 0 ? hopSize : DEFAULT_HOP_SIZE,
+          hopSize > 0 ? hopSize : DEFAULT_HOP_SIZE
         );
       } else {
         audioData = trimSilence(audioData);
@@ -469,15 +499,17 @@ export class PiperPlus {
       this._warmupPromise = null;
     }
     if (!text) {
-      throw new Error('text is required');
+      throw new Error("text is required");
     }
     if (!speakerEmbedding || !(speakerEmbedding instanceof Float32Array)) {
-      throw new Error('speakerEmbedding must be a Float32Array');
+      throw new Error("speakerEmbedding must be a Float32Array");
     }
 
     const language = options.language || this._detectLanguage(text);
-    const noiseScale = options.noiseScale ?? this._config.inference?.noise_scale ?? DEFAULT_NOISE_SCALE;
-    const lengthScale = options.lengthScale ?? this._config.inference?.length_scale ?? DEFAULT_LENGTH_SCALE;
+    const noiseScale =
+      options.noiseScale ?? this._config.inference?.noise_scale ?? DEFAULT_NOISE_SCALE;
+    const lengthScale =
+      options.lengthScale ?? this._config.inference?.length_scale ?? DEFAULT_LENGTH_SCALE;
     const noiseW = options.noiseW ?? this._config.inference?.noise_w ?? DEFAULT_NOISE_W;
 
     // 1. Phonemize
@@ -513,12 +545,14 @@ export class PiperPlus {
   async synthesizeStreaming(text, options = {}) {
     this._assertReady();
     if (!text) {
-      throw new Error('text is required');
+      throw new Error("text is required");
     }
 
     const language = options.language || this._detectLanguage(text);
-    const noiseScale = options.noiseScale ?? this._config.inference?.noise_scale ?? DEFAULT_NOISE_SCALE;
-    const lengthScale = options.lengthScale ?? this._config.inference?.length_scale ?? DEFAULT_LENGTH_SCALE;
+    const noiseScale =
+      options.noiseScale ?? this._config.inference?.noise_scale ?? DEFAULT_NOISE_SCALE;
+    const lengthScale =
+      options.lengthScale ?? this._config.inference?.length_scale ?? DEFAULT_LENGTH_SCALE;
     const noiseW = options.noiseW ?? this._config.inference?.noise_w ?? DEFAULT_NOISE_W;
     const onChunk = options.onChunk || (() => {});
 
@@ -532,7 +566,12 @@ export class PiperPlus {
         // requires the full labels which are language-specific.
         // The streaming pipeline expects a Float32Array, so unwrap .audio
         // from the { audio, durations } object returned by _infer().
-        const inferResult = await this._infer(ids, null, { noiseScale, lengthScale, noiseW, language });
+        const inferResult = await this._infer(ids, null, {
+          noiseScale,
+          lengthScale,
+          noiseW,
+          language,
+        });
         return inferResult.audio;
       },
       onAudioChunk: onChunk,
@@ -546,7 +585,7 @@ export class PiperPlus {
    */
   dispose() {
     if (this._session) {
-      if (typeof this._session.release === 'function') {
+      if (typeof this._session.release === "function") {
         this._session.release();
       }
       this._session = null;
@@ -582,9 +621,7 @@ export class PiperPlus {
   async _init(options) {
     const ort = options.ort || globalThis.ort;
     if (!ort) {
-      throw new Error(
-        'onnxruntime-web is required. Pass it via options.ort or load it globally.'
-      );
+      throw new Error("onnxruntime-web is required. Pass it via options.ort or load it globally.");
     }
     this._ort = ort;
 
@@ -593,18 +630,22 @@ export class PiperPlus {
     try {
       // --- 1. Resolve model & config -----------------------------------------
 
-      progress({ stage: 'model', progress: 0, message: 'Resolving model...' });
+      progress({ stage: "model", progress: 0, message: "Resolving model..." });
 
       const modelManager = new ModelManager();
-      const { modelUrl, configUrl, configFallbackUrl } = await modelManager.resolveUrls(options.model);
+      const { modelUrl, configUrl, configFallbackUrl } = await modelManager.resolveUrls(
+        options.model
+      );
 
-      progress({ stage: 'model', progress: 0.1, message: 'Downloading config...' });
+      progress({ stage: "model", progress: 0.1, message: "Downloading config..." });
       let configResponse = await fetch(configUrl);
       if (!configResponse.ok && configResponse.status === 404 && configFallbackUrl) {
         configResponse = await fetch(configFallbackUrl);
       }
       if (!configResponse.ok) {
-        throw new Error(`Failed to fetch config: ${configResponse.status} ${configResponse.statusText}`);
+        throw new Error(
+          `Failed to fetch config: ${configResponse.status} ${configResponse.statusText}`
+        );
       }
       this._config = await configResponse.json();
 
@@ -616,7 +657,7 @@ export class PiperPlus {
 
       // --- 2. Download & cache ONNX model, create session --------------------
 
-      progress({ stage: 'model', progress: 0.3, message: 'Creating ONNX session...' });
+      progress({ stage: "model", progress: 0.3, message: "Creating ONNX session..." });
 
       // VITS models use int64 tensors (input, input_lengths, lid, prosody_features)
       // which WebGPU (WGSL) does not support. Always use WASM CPU backend.
@@ -627,11 +668,11 @@ export class PiperPlus {
       this._modelUrl = modelUrl;
       this._session = await this._sessionManager.createSession(modelUrl);
 
-      progress({ stage: 'model', progress: 0.7, message: 'Model loaded.' });
+      progress({ stage: "model", progress: 0.7, message: "Model loaded." });
 
       // --- 3. Initialise phonemizer (Adapter pattern) --------------------------
 
-      progress({ stage: 'phonemizer', progress: 0, message: 'Initializing phonemizer...' });
+      progress({ stage: "phonemizer", progress: 0, message: "Initializing phonemizer..." });
 
       let languages = this._config.language_id_map
         ? Object.keys(this._config.language_id_map)
@@ -643,22 +684,19 @@ export class PiperPlus {
       // Languages that REQUIRE Rust WASM (no functional JS G2P fallback):
       //   ja — needs jpreprocess (no JS equivalent)
       //   zh — needs pinyin dictionary (JS G2P has no pinyin conversion)
-      const WASM_REQUIRED_LANGUAGES = new Set(['ja', 'zh']);
+      const WASM_REQUIRED_LANGUAGES = new Set(["ja", "zh"]);
 
       // Load Rust WASM phonemizer when any model language benefits from it.
       // When loaded, route ALL languages through WASM — the Rust
       // MultilingualPhonemizer now respects language hints for Latin-script
       // languages (es/fr/pt/sv), so they are phonemized correctly.
-      const needsWasm = languages && languages.some(l => WASM_REQUIRED_LANGUAGES.has(l));
+      const needsWasm = languages && languages.some((l) => WASM_REQUIRED_LANGUAGES.has(l));
       if (needsWasm) {
         try {
-          wasmAdapter = await RustWasmAdapter.create(
-            JSON.stringify(this._config),
-            {
-              wasmUrl: options.wasmG2pUrl || '../../dist/rust-wasm/piper_plus_wasm.js',
-              wasmLoader: options.wasmLoader,
-            },
-          );
+          wasmAdapter = await RustWasmAdapter.create(JSON.stringify(this._config), {
+            wasmUrl: options.wasmG2pUrl || "../../dist/rust-wasm/piper_plus_wasm.js",
+            wasmLoader: options.wasmLoader,
+          });
           // Route all languages through WASM
           const wasmLangs = wasmAdapter.supportedLanguages;
           for (const lang of languages) {
@@ -667,25 +705,25 @@ export class PiperPlus {
             }
           }
         } catch (err) {
-          const excluded = languages.filter(l => WASM_REQUIRED_LANGUAGES.has(l));
+          const excluded = languages.filter((l) => WASM_REQUIRED_LANGUAGES.has(l));
           console.warn(
-            `[piper-plus] Rust WASM G2P failed to load, excluding ${excluded.join(', ')}:`,
-            err.message,
+            `[piper-plus] Rust WASM G2P failed to load, excluding ${excluded.join(", ")}:`,
+            err.message
           );
-          languages = languages.filter(l => !WASM_REQUIRED_LANGUAGES.has(l));
+          languages = languages.filter((l) => !WASM_REQUIRED_LANGUAGES.has(l));
         }
       }
 
       // Languages not covered by WASM use JS G2P as fallback.
       // When languages is undefined (no language_id_map), pass undefined to
       // JsG2pAdapter so G2P.create() initialises all available languages.
-      const jsLanguages = languages?.filter(l => !phonemizerMap.has(l));
+      const jsLanguages = languages?.filter((l) => !phonemizerMap.has(l));
       const needsJsAdapter = !jsLanguages || jsLanguages.length > 0;
       let jsAdapter = null;
       if (needsJsAdapter) {
         jsAdapter = await JsG2pAdapter.create(
-          jsLanguages,  // undefined when no language_id_map
-          this._config.phoneme_id_map,
+          jsLanguages, // undefined when no language_id_map
+          this._config.phoneme_id_map
         );
         if (jsLanguages) {
           for (const lang of jsLanguages) {
@@ -700,12 +738,12 @@ export class PiperPlus {
         detector: wasmAdapter || jsAdapter,
       });
 
-      progress({ stage: 'phonemizer', progress: 1, message: 'Phonemizer ready.' });
+      progress({ stage: "phonemizer", progress: 1, message: "Phonemizer ready." });
 
       // --- Done --------------------------------------------------------------
 
       this._initialized = true;
-      progress({ stage: 'ready', progress: 1, message: 'PiperPlus ready.' });
+      progress({ stage: "ready", progress: 1, message: "PiperPlus ready." });
     } catch (error) {
       // Clean up any partially-initialized resources so the instance
       // does not leak sessions, WASM memory, etc.
@@ -738,9 +776,7 @@ export class PiperPlus {
    */
   _getPhonemeIdToTokenMap() {
     if (this._phonemeIdToTokenMap === undefined) {
-      this._phonemeIdToTokenMap = buildPhonemeIdToTokenMap(
-        this._config?.phoneme_id_map ?? null
-      );
+      this._phonemeIdToTokenMap = buildPhonemeIdToTokenMap(this._config?.phoneme_id_map ?? null);
     }
     return this._phonemeIdToTokenMap;
   }
@@ -756,7 +792,9 @@ export class PiperPlus {
    * @private
    */
   _createTiming(durations, phonemeIds) {
-    if (!durations) return null;
+    if (!durations) {
+      return null;
+    }
 
     const sampleRate = this._config?.audio?.sample_rate ?? DEFAULT_SAMPLE_RATE;
     const idToToken = this._getPhonemeIdToTokenMap();
@@ -775,15 +813,10 @@ export class PiperPlus {
       minLen === durations.length
         ? durations
         : durations.subarray
-        ? durations.subarray(0, minLen)
-        : Array.from(durations).slice(0, minLen);
+          ? durations.subarray(0, minLen)
+          : Array.from(durations).slice(0, minLen);
 
-    return durationsToTiming(
-      alignedDurations,
-      sampleRate,
-      DEFAULT_HOP_LENGTH,
-      tokens,
-    );
+    return durationsToTiming(alignedDurations, sampleRate, DEFAULT_HOP_LENGTH, tokens);
   }
 
   /**
@@ -796,23 +829,27 @@ export class PiperPlus {
    * Returns raw Float32Array of audio samples.
    * @private
    */
-  async _infer(phonemeIds, prosodyFeatures, { noiseScale, lengthScale, noiseW, language, speakerEmbedding }) {
+  async _infer(
+    phonemeIds,
+    prosodyFeatures,
+    { noiseScale, lengthScale, noiseW, language, speakerEmbedding }
+  ) {
     const ort = this._ort;
 
     const inputTensor = new ort.Tensor(
-      'int64',
-      new BigInt64Array(Array.from(phonemeIds, id => BigInt(id))),
+      "int64",
+      new BigInt64Array(Array.from(phonemeIds, (id) => BigInt(id))),
       [1, phonemeIds.length]
     );
 
     const lengthTensor = new ort.Tensor(
-      'int64',
+      "int64",
       new BigInt64Array([BigInt(phonemeIds.length)]),
       [1]
     );
 
     const scalesTensor = new ort.Tensor(
-      'float32',
+      "float32",
       new Float32Array([noiseScale, lengthScale, noiseW]),
       [3]
     );
@@ -827,26 +864,17 @@ export class PiperPlus {
     if (this._config.language_id_map && language) {
       const langId = this._config.language_id_map[language];
       if (langId !== undefined) {
-        feeds.lid = new ort.Tensor(
-          'int64',
-          new BigInt64Array([BigInt(langId)]),
-          [1]
-        );
+        feeds.lid = new ort.Tensor("int64", new BigInt64Array([BigInt(langId)]), [1]);
       }
     }
 
     // Attach speaker embedding for voice cloning
     if (speakerEmbedding && speakerEmbedding.length > 0) {
-      feeds.speaker_embedding = new ort.Tensor(
-        'float32',
-        speakerEmbedding,
-        [1, speakerEmbedding.length]
-      );
-      feeds.speaker_embedding_mask = new ort.Tensor(
-        'int64',
-        new BigInt64Array([1n]),
-        [1]
-      );
+      feeds.speaker_embedding = new ort.Tensor("float32", speakerEmbedding, [
+        1,
+        speakerEmbedding.length,
+      ]);
+      feeds.speaker_embedding_mask = new ort.Tensor("int64", new BigInt64Array([1n]), [1]);
     }
 
     // Attach prosody features when the model supports them
@@ -855,11 +883,11 @@ export class PiperPlus {
       for (const [a1, a2, a3] of prosodyFeatures) {
         flat.push(BigInt(a1), BigInt(a2), BigInt(a3));
       }
-      feeds.prosody_features = new ort.Tensor(
-        'int64',
-        new BigInt64Array(flat),
-        [1, phonemeIds.length, 3]
-      );
+      feeds.prosody_features = new ort.Tensor("int64", new BigInt64Array(flat), [
+        1,
+        phonemeIds.length,
+        3,
+      ]);
     }
 
     let results;
@@ -867,14 +895,16 @@ export class PiperPlus {
       results = await this._session.run(feeds);
     } catch (e) {
       // Detect WebGPU int64 kernel failure and fall back to WASM
-      if (this._sessionManager?.currentProvider === 'webgpu'
-          && e?.message?.includes('Unsupported data type')) {
+      if (
+        this._sessionManager?.currentProvider === "webgpu" &&
+        e?.message?.includes("Unsupported data type")
+      ) {
         console.warn(
-          '[piper-plus] WebGPU inference failed (likely int64 unsupported). '
-          + 'Recreating session with WASM backend.',
+          "[piper-plus] WebGPU inference failed (likely int64 unsupported). " +
+            "Recreating session with WASM backend.",
           e.message
         );
-        if (typeof this._session.release === 'function') {
+        if (typeof this._session.release === "function") {
           await this._session.release();
         }
         // Force WASM by removing GPU reference
@@ -900,21 +930,25 @@ export class PiperPlus {
   /**
    * ORT グラフ最適化キャッシュをバックグラウンドで温める。
    * 本番と同程度の形状 (長さ100) でダミー推論を実行する。
+   *
+   * Constants pinned by docs/spec/ort-session-contract.toml — see
+   * `WARMUP_*` exports above and test/js/test-ort-session-contract.js.
    * @private
    */
-  async _runWarmup(runs = 2) {
-    const WARMUP_LENGTH = 100;
-    const dummyIds = new Array(WARMUP_LENGTH);
-    dummyIds[0] = 1; // BOS
-    for (let i = 1; i < WARMUP_LENGTH - 1; i++) dummyIds[i] = 8;
-    dummyIds[WARMUP_LENGTH - 1] = 2; // EOS
+  async _runWarmup(runs = WARMUP_DEFAULT_RUNS) {
+    const dummyIds = new Array(WARMUP_PHONEME_LENGTH);
+    dummyIds[0] = WARMUP_BOS_TOKEN; // BOS
+    for (let i = 1; i < WARMUP_PHONEME_LENGTH - 1; i++) {
+      dummyIds[i] = WARMUP_DUMMY_PHONEME;
+    }
+    dummyIds[WARMUP_PHONEME_LENGTH - 1] = WARMUP_EOS_TOKEN; // EOS
 
     for (let i = 0; i < runs; i++) {
       try {
         await this._infer(dummyIds, null, {
-          noiseScale: DEFAULT_NOISE_SCALE,
-          lengthScale: DEFAULT_LENGTH_SCALE,
-          noiseW: DEFAULT_NOISE_W,
+          noiseScale: WARMUP_NOISE_SCALE,
+          lengthScale: WARMUP_LENGTH_SCALE,
+          noiseW: WARMUP_NOISE_W,
         });
       } catch (e) {
         console.warn(`[piper-plus] warmup run ${i + 1}/${runs} failed:`, e);
@@ -929,7 +963,7 @@ export class PiperPlus {
    */
   _assertReady() {
     if (!this._initialized) {
-      throw new Error('PiperPlus is not initialized. Call PiperPlus.initialize() first.');
+      throw new Error("PiperPlus is not initialized. Call PiperPlus.initialize() first.");
     }
   }
 }

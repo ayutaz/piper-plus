@@ -1,18 +1,181 @@
 # Pre-commit hooks for piper-plus.
 #
-# Install once with `pre-commit install`. Then every `git commit` will run
-# the hooks below on changed files; if any hook fails, the commit is blocked.
+# # Setup (one-time per clone):
+#   pip install pre-commit  # or `uvx pre-commit`
+#   pre-commit install      # writes .git/hooks/pre-commit
 #
-# These hooks are mirrored by CI (.github/workflows/pua-consistency.yml +
-# ruff job), so the local check just gives faster feedback.
+# # Daily use:
+#   git commit ...          # hooks run automatically on staged files
+#   pre-commit run --all-files  # manual full-repo check
+#
+# # CI mirror:
+#   .github/workflows/pre-commit.yml runs `pre-commit run --all-files` on
+#   every PR. Even contributors that skip `pre-commit install` will see drift
+#   blocked at PR time, not after 5 separate runs of cycle-of-shame ruff
+#   format commits (cf. PR #401 commits 5d9c60e6 / 8dc19e3b).
+#
+# # Version pinning:
+#   ruff version below MUST match the version pinned in
+#   .github/workflows/python-lint.yml (currently 0.12.5). Drift between
+#   pre-commit and CI = local-clean / CI-fail mismatch (PR #401 cause).
 
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.8.5
+    rev: v0.12.5
     hooks:
       - id: ruff
         args: [--fix]
       - id: ruff-format
+
+  # ---------------------------------------------------------------------------
+  # Standard whitespace / syntax hooks (cross-language drift catchers).
+  # Addresses recurring symptom-treatment commits that should be auto-fixed
+  # at commit time instead of round-trip through CI.
+  # ---------------------------------------------------------------------------
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+        # Markdown intentional double-space-newline = forced line break.
+        args: [--markdown-linebreak-ext=md]
+      - id: end-of-file-fixer
+      - id: check-merge-conflict
+      - id: check-yaml
+        # Some workflows use GitHub Actions extensions (`!reference`) that
+        # PyYAML can't parse without `--unsafe`. Workflow YAML is validated
+        # in actual job runs anyway; this is a syntax-error-only catch.
+        args: [--unsafe]
+      - id: check-json
+        # Exclude:
+        #   - invalid_json.json: intentionally malformed test fixture for
+        #     parsers that need to handle unparseable input gracefully.
+        #   - default_common_dict.json: dictionary uses duplicate keys by
+        #     design (e.g. "Debug" entry appears twice with different
+        #     contexts) — application spec, not a JSON correctness issue.
+        exclude: |
+          (?x)^(
+            src/go/piperplus/testdata/invalid_json\.json |
+            data/dictionaries/default_common_dict\.json |
+            src/wasm/openjtalk-web/assets/default_common_dict\.json
+          )$
+      - id: check-added-large-files
+        # Block accidental large model checkpoint commits. Use git LFS or
+        # external storage instead.
+        args: [--maxkb=2048]
+      # ----- Standard hygiene additions (2026-05) -----
+      - id: check-toml
+        # Cargo.toml / pyproject.toml syntax check. Drift = local-clean /
+        # CI-fail mismatch when crates.io / PyPI publish refuses parse.
+      - id: check-executables-have-shebangs
+        # Files with executable bit but no shebang are typically a mistake.
+        # Exclude Rust source — `#![...]` inner attributes look like shebangs
+        # to the heuristic but are valid Rust attributes (false positive).
+        exclude: '\.rs$'
+      - id: check-shebang-scripts-are-executable
+        # Inverse of above — shebanged scripts that lack +x silently fail
+        # in CI workflows that call them directly.
+        exclude: '\.rs$'
+      - id: mixed-line-ending
+        # Force LF endings repo-wide. CRLF leaks on Windows checkouts cause
+        # noisy diffs and break shell scripts when run via WSL/Git Bash.
+        # `.bat` / `.ps1` / `.cmd` は .gitattributes で `eol=crlf` を強制
+        # しているため、 hook 側でも除外して衝突を回避。
+        args: [--fix=lf]
+        exclude: '\.(bat|ps1|cmd)$'
+      - id: detect-private-key
+        # Catch accidental commits of SSH/TLS private keys.
+
+  # ---------------------------------------------------------------------------
+  # Rust formatter — addresses ae68abc1 (rustfmt drift across 5+ .rs files).
+  # `cargo fmt --check` exits non-zero if any .rs file needs reformatting.
+  # We use a `language: system` local hook so the version follows the
+  # project's pinned toolchain (rust-toolchain.toml) instead of a vendored
+  # rev that drifts from CI.
+  # ---------------------------------------------------------------------------
+  - repo: local
+    hooks:
+      - id: cargo-fmt
+        name: cargo fmt --check (Rust)
+        entry: bash -c 'cd src/rust && cargo fmt --all -- --check'
+        language: system
+        files: \.rs$
+        pass_filenames: false
+      - id: gofmt
+        name: gofmt -l (Go)
+        # gofmt -l prints files that are not gofmt'd; we treat any output
+        # as a failure. Use awk to convert "any line of output" -> exit 1.
+        entry: bash -c 'out=$(gofmt -l src/go); if [ -n "$out" ]; then echo "gofmt drift:"; echo "$out"; exit 1; fi'
+        language: system
+        files: \.go$
+        pass_filenames: false
+
+  # ---------------------------------------------------------------------------
+  # Cross-language lint hooks — added 2026-05 after PR #401 cycle of shame.
+  #
+  # Why these run at commit time (not push / CI only): repeated round-trips
+  # through CI to fix lint drift cost much more than waiting locally. The
+  # heaviest hooks (cargo clippy ~30-120s, dotnet format ~30-60s on a cold
+  # cache) are still cheaper than a CI red mark + push round-trip.
+  #
+  # Skip rules (user-side):
+  #   git commit --no-verify              # bypass once (CI still gates)
+  #   SKIP=cargo-clippy git commit ...    # skip a specific hook
+  #   SKIP=cargo-clippy,dotnet-format ... # skip multiple
+  # ---------------------------------------------------------------------------
+  - repo: local
+    hooks:
+      - id: mypy-g2p
+        name: mypy --ignore-missing-imports (g2p, Python)
+        # Mirror of .github/workflows/g2p-python-ci.yml step.
+        entry: bash -c 'cd src/python/g2p && uv run mypy --ignore-missing-imports piper_plus_g2p/'
+        language: system
+        files: ^src/python/g2p/piper_plus_g2p/.*\.py$
+        pass_filenames: false
+
+      - id: cargo-clippy
+        name: cargo clippy --workspace --all-features --all-targets -- -D warnings (Rust)
+        # Mirror of .github/workflows/rust-tests.yml step. Catches issues
+        # like needless_range_loop / collapsible_if / items_after_test_module
+        # / absurd_extreme_comparisons before they hit CI (PR #401 needed
+        # 4 follow-up commits for these).
+        entry: bash -c 'cd src/rust && cargo clippy --workspace --all-features --all-targets -- -D warnings'
+        language: system
+        files: \.rs$
+        pass_filenames: false
+
+      - id: go-vet
+        name: go vet (Go)
+        # Mirror of .github/workflows/go-ci.yml step. Catches assignments
+        # to undefined fields, unreachable code, etc.
+        entry: bash -c 'cd src/go && go vet ./... ./phonemize/...'
+        language: system
+        files: \.go$
+        pass_filenames: false
+
+      - id: dotnet-format
+        name: dotnet format --verify-no-changes (C#)
+        # Mirror of .github/workflows/csharp-ci.yml + ci.yml. Heavy on a cold
+        # cache (~60s) but seconds once the SDK has materialized the analyzer
+        # cache. Use SKIP=dotnet-format on tiny non-C# commits if needed.
+        #
+        # Requires .NET SDK matching global.json (currently 10.0.100).
+        # If the SDK is missing the hook *skips with a warning* rather than
+        # blocking commits — CI still gates merges. Install .NET 10 from
+        # https://dotnet.microsoft.com/download/dotnet/10.0 to enable.
+        entry: scripts/hooks/dotnet-format-check.sh
+        language: system
+        files: \.cs$
+        pass_filenames: false
+
+      - id: golangci-lint
+        name: golangci-lint run (Go)
+        # Mirror of .github/workflows/go-ci.yml + g2p-go-publish.yml. Skips
+        # with a warning when the binary is absent — CI still gates. Install
+        # via `brew install golangci-lint` to enable locally.
+        entry: scripts/hooks/golangci-lint-check.sh
+        language: system
+        files: ^src/go/.*\.go$
+        pass_filenames: false
 
   # PUA-related checks. These only run when files in the regression-prone
   # set actually change, so the typical `git commit` is unaffected.
@@ -31,4 +194,110 @@ repos:
         entry: python scripts/regenerate_test_fixture.py --check
         language: system
         files: ^(src/python/g2p/piper_plus_g2p/data/pua\.json|tests/fixtures/g2p/phoneme_test_cases\.json)$
+        pass_filenames: false
+
+  # ---------------------------------------------------------------------------
+  # Markdown lint — DavidAnson/markdownlint-cli2 has a dedicated pre-commit
+  # repo (the GitHub Action variant runs only in CI). Config lives in
+  # .markdownlint.yaml at repo root; vendored / generated trees are excluded
+  # so we don't lint third-party docs.
+  # ---------------------------------------------------------------------------
+  - repo: https://github.com/DavidAnson/markdownlint-cli2
+    rev: v0.14.0
+    hooks:
+      - id: markdownlint-cli2
+        args: [--config=.markdownlint.yaml]
+        files: \.(md|markdown)$
+        exclude: ^(node_modules|build|dist|target|test/models)/
+
+  # ---------------------------------------------------------------------------
+  # Spell-checker — codespell honors .codespellrc / pyproject.toml `[tool.codespell]`
+  # for ignore lists. tomli is required for older Python on hosts that lack
+  # tomllib in stdlib (<3.11).
+  # ---------------------------------------------------------------------------
+  - repo: https://github.com/codespell-project/codespell
+    rev: v2.3.0
+    hooks:
+      - id: codespell
+        additional_dependencies: [tomli]
+
+  # ---------------------------------------------------------------------------
+  # Secret detection — gitleaks scans for credentials, API keys, and tokens
+  # locally before they leave the dev machine. Mirrors any CI gitleaks job.
+  # ---------------------------------------------------------------------------
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.21.2
+    hooks:
+      - id: gitleaks
+
+  # ---------------------------------------------------------------------------
+  # Dockerfile lint — hadolint catches common Dockerfile mistakes (apt-get
+  # without --no-install-recommends, missing pinned versions, etc.). Scoped
+  # to docker/ so we don't accidentally lint embedded fixtures.
+  # ---------------------------------------------------------------------------
+  - repo: https://github.com/hadolint/hadolint
+    rev: v2.12.0
+    hooks:
+      - id: hadolint
+        args: [--config=.hadolint.yaml]
+        files: ^docker/.*Dockerfile.*$
+
+  # ---------------------------------------------------------------------------
+  # EditorConfig drift — verifies file encodings, indent style, and final
+  # newline conform to .editorconfig. Excludes vendored / generated trees.
+  # ---------------------------------------------------------------------------
+  - repo: https://github.com/editorconfig-checker/editorconfig-checker.python
+    rev: 3.0.3
+    hooks:
+      - id: editorconfig-checker
+        exclude: ^(node_modules|build|dist|target|\.git|test/models|tools/benchmark/issue-383|src/wasm/openjtalk-web/(build|demo|models|voices|patches))/
+
+  # ---------------------------------------------------------------------------
+  # pyproject.toml schema validation (PEP 621 + PEP 518). Catches typos in
+  # build-system / project metadata before publish-to-PyPI failure.
+  # ---------------------------------------------------------------------------
+  - repo: https://github.com/abravalheri/validate-pyproject
+    rev: v0.21
+    hooks:
+      - id: validate-pyproject
+
+  # ---------------------------------------------------------------------------
+  # Language-specific local hooks — each falls back gracefully when the CLI
+  # is unavailable so commits aren't blocked by a missing toolchain. CI
+  # remains the authoritative gate.
+  # ---------------------------------------------------------------------------
+  - repo: local
+    hooks:
+      - id: gofumpt
+        name: gofumpt -l (Go)
+        # Stricter superset of gofmt. Skip silently if not installed; CI gates.
+        entry: bash -c 'if ! command -v gofumpt &>/dev/null; then echo "::warning::gofumpt missing, skipping"; exit 0; fi; out=$(gofumpt -l src/go); if [ -n "$out" ]; then echo "gofumpt drift:"; echo "$out"; exit 1; fi'
+        language: system
+        files: \.go$
+        pass_filenames: false
+
+      - id: ktlint
+        name: ktlint --android (Kotlin)
+        # Non-blocking until baseline is established. Falls back to a warning
+        # when gradlew is absent (e.g. partial checkouts).
+        entry: bash -c 'cd android && if [ -f gradlew ]; then ./gradlew :piper-plus-g2p:ktlintCheck -q || echo "::warning::ktlint check failed (non-blocking)"; else echo "::warning::gradlew missing, skipping ktlint"; fi'
+        language: system
+        files: \.kt$
+        pass_filenames: false
+
+      - id: swiftformat
+        name: swiftformat --lint (Swift)
+        # Lint-only (no auto-format) so the commit isn't silently rewritten.
+        # Skip if CLI absent; CI gates.
+        entry: bash -c 'if ! command -v swiftformat &>/dev/null; then echo "::warning::swiftformat missing, skipping"; exit 0; fi; swiftformat --lint Sources/'
+        language: system
+        files: \.swift$
+        pass_filenames: false
+
+      - id: taplo
+        name: taplo fmt --check (TOML)
+        # TOML formatter check. Skip if CLI absent; CI gates.
+        entry: bash -c 'if ! command -v taplo &>/dev/null; then echo "::warning::taplo missing, skipping"; exit 0; fi; taplo fmt --check'
+        language: system
+        files: \.toml$
         pass_filenames: false

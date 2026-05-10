@@ -13,18 +13,18 @@ public sealed class KoreanPhonemizerTests
     // ================================================================
     // Stub G2P engine
     // ================================================================
-
     private class StubKoreanG2PEngine : IKoreanG2PEngine
     {
         private readonly KoreanG2PResult _result;
+
         public StubKoreanG2PEngine(KoreanG2PResult result) => _result = result;
+
         public KoreanG2PResult Convert(string text) => _result;
     }
 
     // ================================================================
     // Shared phoneme ID map for PostProcessIds tests
     // ================================================================
-
     private static Dictionary<string, int[]> MakeMap() => new()
     {
         ["_"] = [0],
@@ -39,7 +39,6 @@ public sealed class KoreanPhonemizerTests
     // ================================================================
     // 1. BasicPhonemes_PassedThrough
     // ================================================================
-
     [Fact]
     public void BasicPhonemes_PassedThrough()
     {
@@ -48,11 +47,10 @@ public sealed class KoreanPhonemizerTests
             Phonemes: ["k", "a", "n", "a", "t", "a"],
             A1: [0, 0, 0, 0, 0, 0],
             A2: [0, 0, 0, 0, 0, 0],
-            A3: [3, 3, 3, 3, 3, 3]
-        );
+            A3: [3, 3, 3, 3, 3, 3]);
 
         var phonemizer = new KoreanPhonemizer(new StubKoreanG2PEngine(g2p));
-        var (tokens, _) = phonemizer.PhonemizeWithProsody("\uAC00\uB098\uB2E4");
+        (List<string>? tokens, List<ProsodyInfo?> _) = phonemizer.PhonemizeWithProsody("\uAC00\uB098\uB2E4");
 
         Assert.Equal(["k", "a", "n", "a", "t", "a"], tokens);
     }
@@ -60,7 +58,6 @@ public sealed class KoreanPhonemizerTests
     // ================================================================
     // 2. ProsodyAlignment_Maintained
     // ================================================================
-
     [Fact]
     public void ProsodyAlignment_Maintained()
     {
@@ -68,11 +65,10 @@ public sealed class KoreanPhonemizerTests
             Phonemes: ["k", "a", "n", "a"],
             A1: [0, 0, 0, 0],
             A2: [0, 0, 0, 0],
-            A3: [2, 2, 2, 2]
-        );
+            A3: [2, 2, 2, 2]);
 
         var phonemizer = new KoreanPhonemizer(new StubKoreanG2PEngine(g2p));
-        var (tokens, prosody) = phonemizer.PhonemizeWithProsody("\uAC00\uB098");
+        (List<string>? tokens, List<ProsodyInfo?>? prosody) = phonemizer.PhonemizeWithProsody("\uAC00\uB098");
 
         Assert.Equal(tokens.Count, prosody.Count);
     }
@@ -80,7 +76,6 @@ public sealed class KoreanPhonemizerTests
     // ================================================================
     // 3. Prosody_A1A2Zero_A3SyllableCount
     // ================================================================
-
     [Fact]
     public void Prosody_A1A2Zero_A3SyllableCount()
     {
@@ -89,13 +84,12 @@ public sealed class KoreanPhonemizerTests
             Phonemes: ["k", "a", "n", "a"],
             A1: [0, 0, 0, 0],
             A2: [0, 0, 0, 0],
-            A3: [2, 2, 2, 2]
-        );
+            A3: [2, 2, 2, 2]);
 
         var phonemizer = new KoreanPhonemizer(new StubKoreanG2PEngine(g2p));
-        var (_, prosody) = phonemizer.PhonemizeWithProsody("\uAC00\uB098");
+        (List<string> _, List<ProsodyInfo?>? prosody) = phonemizer.PhonemizeWithProsody("\uAC00\uB098");
 
-        foreach (var p in prosody)
+        foreach (ProsodyInfo? p in prosody)
         {
             Assert.NotNull(p);
             Assert.Equal(0, p!.Value.A1);
@@ -107,7 +101,6 @@ public sealed class KoreanPhonemizerTests
     // ================================================================
     // 4. GetPhonemeIdMap_ReturnsNull
     // ================================================================
-
     [Fact]
     public void GetPhonemeIdMap_ReturnsNull()
     {
@@ -115,8 +108,7 @@ public sealed class KoreanPhonemizerTests
             Phonemes: [],
             A1: [],
             A2: [],
-            A3: []
-        );
+            A3: []);
 
         var phonemizer = new KoreanPhonemizer(new StubKoreanG2PEngine(g2p));
 
@@ -127,7 +119,6 @@ public sealed class KoreanPhonemizerTests
     // ================================================================
     // 5. PostProcessIds_AddsBosEos
     // ================================================================
-
     [Fact]
     public void PostProcessIds_AddsBosEos()
     {
@@ -135,19 +126,19 @@ public sealed class KoreanPhonemizerTests
             Phonemes: [],
             A1: [],
             A2: [],
-            A3: []
-        );
+            A3: []);
 
         var phonemizer = new KoreanPhonemizer(new StubKoreanG2PEngine(g2p));
 
         var inputIds = new List<int> { 10 };
         var inputProsody = new List<ProsodyInfo?> { null };
-        var map = MakeMap();
+        Dictionary<string, int[]> map = MakeMap();
 
-        var (ids, _) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
+        (List<int>? ids, List<ProsodyInfo?> _) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
 
         // First ID should be BOS (^) = 1.
         Assert.Equal(1, ids[0]);
+
         // Last ID should be EOS ($) = 2.
         Assert.Equal(2, ids[^1]);
     }
@@ -155,7 +146,6 @@ public sealed class KoreanPhonemizerTests
     // ================================================================
     // 6. PostProcessIds_FullSequence
     // ================================================================
-
     [Fact]
     public void PostProcessIds_FullSequence()
     {
@@ -163,8 +153,7 @@ public sealed class KoreanPhonemizerTests
             Phonemes: [],
             A1: [],
             A2: [],
-            A3: []
-        );
+            A3: []);
 
         var phonemizer = new KoreanPhonemizer(new StubKoreanG2PEngine(g2p));
 
@@ -174,9 +163,9 @@ public sealed class KoreanPhonemizerTests
         {
             new(0, 0, 2), new(0, 0, 2),
         };
-        var map = MakeMap();
+        Dictionary<string, int[]> map = MakeMap();
 
-        var (ids, prosody) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
+        (List<int>? ids, List<ProsodyInfo?>? prosody) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
 
         // Expected:
         // BOS(1), PAD(0), 10, PAD(0), 11, PAD(0), EOS(2)
@@ -190,7 +179,6 @@ public sealed class KoreanPhonemizerTests
     // ================================================================
     // 7. MismatchedArrayLengths_Throws
     // ================================================================
-
     [Fact]
     public void MismatchedArrayLengths_Throws()
     {
@@ -199,12 +187,11 @@ public sealed class KoreanPhonemizerTests
             Phonemes: ["k", "a", "n", "a"],
             A1: [0, 0],              // length 2, mismatched with phonemes length 4
             A2: [0, 0, 0, 0],
-            A3: [2, 2, 2, 2]
-        );
+            A3: [2, 2, 2, 2]);
 
         var phonemizer = new KoreanPhonemizer(new StubKoreanG2PEngine(g2p));
 
-        var ex = Assert.Throws<InvalidOperationException>(
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(
             () => phonemizer.PhonemizeWithProsody("\uAC00\uB098"));
 
         Assert.Contains("inconsistent lengths", ex.Message);
@@ -213,7 +200,6 @@ public sealed class KoreanPhonemizerTests
     // ================================================================
     // 8. EmptyInput_ReturnsEmpty
     // ================================================================
-
     [Fact]
     public void EmptyInput_ReturnsEmpty()
     {
@@ -221,11 +207,10 @@ public sealed class KoreanPhonemizerTests
             Phonemes: [],
             A1: [],
             A2: [],
-            A3: []
-        );
+            A3: []);
 
         var phonemizer = new KoreanPhonemizer(new StubKoreanG2PEngine(g2p));
-        var (tokens, prosody) = phonemizer.PhonemizeWithProsody("");
+        (List<string>? tokens, List<ProsodyInfo?>? prosody) = phonemizer.PhonemizeWithProsody(string.Empty);
 
         Assert.Empty(tokens);
         Assert.Empty(prosody);
@@ -234,7 +219,6 @@ public sealed class KoreanPhonemizerTests
     // ================================================================
     // 9. PostProcessIds_EmptyInput
     // ================================================================
-
     [Fact]
     public void PostProcessIds_EmptyInput()
     {
@@ -242,16 +226,15 @@ public sealed class KoreanPhonemizerTests
             Phonemes: [],
             A1: [],
             A2: [],
-            A3: []
-        );
+            A3: []);
 
         var phonemizer = new KoreanPhonemizer(new StubKoreanG2PEngine(g2p));
 
         var inputIds = new List<int>();
         var inputProsody = new List<ProsodyInfo?>();
-        var map = MakeMap();
+        Dictionary<string, int[]> map = MakeMap();
 
-        var (ids, prosody) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
+        (List<int>? ids, List<ProsodyInfo?>? prosody) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
 
         // Empty input should still produce BOS(1), PAD(0), EOS(2).
         Assert.Equal([1, 0, 2], ids);
@@ -261,7 +244,6 @@ public sealed class KoreanPhonemizerTests
     // ================================================================
     // 10. Phonemize_ReturnsTokensOnly
     // ================================================================
-
     [Fact]
     public void Phonemize_ReturnsTokensOnly()
     {
@@ -269,13 +251,12 @@ public sealed class KoreanPhonemizerTests
             Phonemes: ["k", "a", "n", "a"],
             A1: [0, 0, 0, 0],
             A2: [0, 0, 0, 0],
-            A3: [2, 2, 2, 2]
-        );
+            A3: [2, 2, 2, 2]);
 
         var phonemizer = new KoreanPhonemizer(new StubKoreanG2PEngine(g2p));
 
         // Call Phonemize() (not PhonemizeWithProsody) and verify it returns tokens.
-        var tokens = phonemizer.Phonemize("\uAC00\uB098");
+        List<string> tokens = phonemizer.Phonemize("\uAC00\uB098");
 
         Assert.Equal(["k", "a", "n", "a"], tokens);
     }
@@ -283,7 +264,6 @@ public sealed class KoreanPhonemizerTests
     // ================================================================
     // 11. PhonemizeWithProsody_EmptyInput
     // ================================================================
-
     [Fact]
     public void PhonemizeWithProsody_EmptyInput()
     {
@@ -292,11 +272,10 @@ public sealed class KoreanPhonemizerTests
             Phonemes: [],
             A1: [],
             A2: [],
-            A3: []
-        );
+            A3: []);
 
         var phonemizer = new KoreanPhonemizer(new StubKoreanG2PEngine(g2p));
-        var (tokens, prosody) = phonemizer.PhonemizeWithProsody("any text");
+        (List<string>? tokens, List<ProsodyInfo?>? prosody) = phonemizer.PhonemizeWithProsody("any text");
 
         Assert.Empty(tokens);
         Assert.Empty(prosody);
@@ -305,7 +284,6 @@ public sealed class KoreanPhonemizerTests
     // ================================================================
     // 12. PostProcessIds_SkipsPadAfterPadToken
     // ================================================================
-
     [Fact]
     public void PostProcessIds_SkipsPadAfterPadToken()
     {
@@ -313,17 +291,16 @@ public sealed class KoreanPhonemizerTests
             Phonemes: [],
             A1: [],
             A2: [],
-            A3: []
-        );
+            A3: []);
 
         var phonemizer = new KoreanPhonemizer(new StubKoreanG2PEngine(g2p));
 
         // Input contains a PAD token (0) between two phoneme IDs.
         var inputIds = new List<int> { 10, 0, 11 };
         var inputProsody = new List<ProsodyInfo?> { null, null, null };
-        var map = MakeMap();
+        Dictionary<string, int[]> map = MakeMap();
 
-        var (ids, _) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
+        (List<int>? ids, List<ProsodyInfo?> _) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
 
         // The PAD token (0) should not get another PAD inserted after it.
         // Expected: BOS(1), PAD(0), 10, PAD(0), 0, 11, PAD(0), EOS(2)
@@ -333,7 +310,6 @@ public sealed class KoreanPhonemizerTests
     // ================================================================
     // 13. PostProcessIds_ProsodyAlignmentWithPadSkip
     // ================================================================
-
     [Fact]
     public void PostProcessIds_ProsodyAlignmentWithPadSkip()
     {
@@ -341,8 +317,7 @@ public sealed class KoreanPhonemizerTests
             Phonemes: [],
             A1: [],
             A2: [],
-            A3: []
-        );
+            A3: []);
 
         var phonemizer = new KoreanPhonemizer(new StubKoreanG2PEngine(g2p));
 
@@ -352,9 +327,9 @@ public sealed class KoreanPhonemizerTests
         {
             new(0, 0, 2), null, new(0, 0, 2),
         };
-        var map = MakeMap();
+        Dictionary<string, int[]> map = MakeMap();
 
-        var (ids, prosody) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
+        (List<int>? ids, List<ProsodyInfo?>? prosody) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
 
         // Prosody list length must always match IDs list length.
         Assert.Equal(ids.Count, prosody.Count);

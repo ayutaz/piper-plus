@@ -54,6 +54,7 @@ query($pr: Int!) {
 ```
 
 各 thread について:
+
 - `thread_id`: GraphQL mutation で resolve するための ID
 - `comment.databaseId`: REST API で reply するための ID
 - `comment.path` + `comment.line`: どのファイルのどの行のコメントか
@@ -71,7 +72,7 @@ query($pr: Int!) {
 
 各コメントに対して、以下のテンプレートで返信を投稿:
 
-```
+```text
 対応しました (commit <hash>)。
 
 <修正内容の 1-3 行要約>
@@ -92,6 +93,7 @@ gh api repos/ayutaz/piper-plus/pulls/<PR>/comments \
 ```
 
 **注意**:
+
 - `in_reply_to` は **REST API の comment id (databaseId)** を使う。GraphQL の thread id ではない
 - コメント本文に backtick やクォートを含める場合、変数展開に注意 (ヒアドキュメントか `printf '%s' "$BODY"` 経由を推奨)
 - 1 件ずつループして投稿し、失敗したら残りを続行するか停止するかユーザーに確認
@@ -113,7 +115,7 @@ mutation ResolveThread($id: ID!) {
 
 ### フェーズ 5: 最終レポート
 
-```
+```text
 ## レビュー対応完了
 
 ### PR #<N>
@@ -136,7 +138,7 @@ mutation ResolveThread($id: ID!) {
 
 ## 使用例
 
-```
+```text
 # PR #349 のレビューに返信+resolve (コミットは HEAD)
 /reply-review 349
 

@@ -1,0 +1,11 @@
+# cmakelint configuration for piper-plus
+#
+# https://github.com/cmake-lint/cmake-lint
+# Wave 1: optional — not enforced via pre-commit yet.
+#
+# Disabled checks:
+#   - linelength: 100-char limit is enforced via cmake-format.yaml instead.
+#   - package/consistency: noisy with FetchContent / find_package mix used
+#     in cmake/ExternalDeps.cmake.
+filter=-linelength,-package/consistency
+spaces=4

@@ -157,6 +157,127 @@ class TestMelSpectrogram:
         assert np.all(np.isfinite(mel))
 
 
+class TestLoadAudio:
+    """Tests for load_audio sample-rate handling and error paths.
+
+    The audit (15-agent review, Voice Cloning section) flagged that
+    reference-audio handling was untested across formats and sample
+    rates. load_audio is the single entry point used by the speaker
+    encoder pipeline, so its sample-rate normalisation is the contract
+    that all runtimes must match.
+    """
+
+    def _write_wav(self, path: Path, audio: np.ndarray, sr: int) -> None:
+        import soundfile as sf
+
+        sf.write(str(path), audio, sr, subtype="PCM_16")
+
+    def test_load_at_native_16k(self, tmp_path: Path):
+        from piper_train.speaker_encoder.audio_utils import load_audio
+
+        audio_in = np.linspace(-0.5, 0.5, 16000, dtype=np.float32)
+        wav = tmp_path / "ref_16k.wav"
+        self._write_wav(wav, audio_in, 16000)
+
+        out = load_audio(wav)
+        assert out.dtype == np.float32
+        assert len(out) == 16000
+
+    def test_load_resamples_22050_to_16k(self, tmp_path: Path):
+        from piper_train.speaker_encoder.audio_utils import load_audio
+
+        # 1 second at 22.05kHz → expect ~16000 samples after resample.
+        audio_in = np.linspace(-0.5, 0.5, 22050, dtype=np.float32)
+        wav = tmp_path / "ref_22k.wav"
+        self._write_wav(wav, audio_in, 22050)
+
+        out = load_audio(wav, sr=16000)
+        assert out.dtype == np.float32
+        # Allow ±1 sample wiggle for rounding in scipy.signal.resample
+        assert abs(len(out) - 16000) <= 1
+
+    def test_load_resamples_44100_to_16k(self, tmp_path: Path):
+        from piper_train.speaker_encoder.audio_utils import load_audio
+
+        audio_in = np.linspace(-0.5, 0.5, 44100, dtype=np.float32)
+        wav = tmp_path / "ref_44k.wav"
+        self._write_wav(wav, audio_in, 44100)
+
+        out = load_audio(wav, sr=16000)
+        assert out.dtype == np.float32
+        assert abs(len(out) - 16000) <= 1
+
+    def test_load_stereo_is_averaged_to_mono(self, tmp_path: Path):
+        from piper_train.speaker_encoder.audio_utils import load_audio
+
+        # Stereo: left = +0.5, right = -0.5 → mean = 0.0 across the buffer.
+        left = np.full(16000, 0.5, dtype=np.float32)
+        right = np.full(16000, -0.5, dtype=np.float32)
+        stereo = np.stack([left, right], axis=1)
+        wav = tmp_path / "stereo.wav"
+        self._write_wav(wav, stereo, 16000)
+
+        out = load_audio(wav)
+        assert out.ndim == 1
+        np.testing.assert_allclose(out.mean(), 0.0, atol=1e-3)
+
+    def test_missing_file_raises_filenotfound(self, tmp_path: Path):
+        from piper_train.speaker_encoder.audio_utils import load_audio
+
+        missing = tmp_path / "does_not_exist.wav"
+        with pytest.raises(FileNotFoundError):
+            load_audio(missing)
+
+
+class TestResampleHelper:
+    """Direct unit tests for _resample's behaviour at the sample-rate
+    boundaries the encoder actually receives."""
+
+    def test_no_op_when_rates_match(self):
+        from piper_train.speaker_encoder.audio_utils import _resample
+
+        audio = np.linspace(-1, 1, 1024, dtype=np.float32)
+        out = _resample(audio, 16000, 16000)
+        # When rates match, the function returns the input array unchanged
+        # (no copy required for the no-op path).
+        np.testing.assert_array_equal(out, audio)
+
+    def test_22050_to_16000_length(self):
+        from piper_train.speaker_encoder.audio_utils import _resample
+
+        audio = np.linspace(-1, 1, 22050, dtype=np.float32)
+        out = _resample(audio, 22050, 16000)
+        # ratio = 16000/22050 ≈ 0.7256 → expect ~16000 samples; both scipy
+        # and the linear-interp fallback round to int.
+        assert abs(len(out) - 16000) <= 1
+
+    def test_44100_to_16000_length(self):
+        from piper_train.speaker_encoder.audio_utils import _resample
+
+        audio = np.linspace(-1, 1, 44100, dtype=np.float32)
+        out = _resample(audio, 44100, 16000)
+        assert abs(len(out) - 16000) <= 1
+
+    def test_output_is_float32(self):
+        from piper_train.speaker_encoder.audio_utils import _resample
+
+        audio = np.linspace(-1, 1, 4410, dtype=np.float32)
+        out = _resample(audio, 4410, 1600)
+        assert out.dtype == np.float32
+
+    def test_short_input_does_not_crash(self):
+        """Sub-frame audio (< 256 samples) must not crash the resampler.
+
+        The contract is: resample is best-effort even on tiny input;
+        downstream mel/encoder steps zero-pad if needed."""
+        from piper_train.speaker_encoder.audio_utils import _resample
+
+        audio = np.array([0.1, -0.1, 0.05], dtype=np.float32)
+        out = _resample(audio, 22050, 16000)
+        assert out.dtype == np.float32
+        assert len(out) >= 1
+
+
 class TestNormalizeAudio:
     """Tests for audio peak normalization."""
 

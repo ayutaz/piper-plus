@@ -161,6 +161,42 @@ def create_ort_session(
 
 
 # ---------------------------------------------------------------------------
+# Optional input filling (cross-runtime parity with src/python_run/piper/voice.py)
+# ---------------------------------------------------------------------------
+
+
+def _fill_speaker_embedding_inputs(
+    session: ort.InferenceSession,
+    input_names: set[str],
+    feed: dict,
+) -> None:
+    """Fill ``speaker_embedding`` / ``speaker_embedding_mask`` with zeros + mask=0
+    when the model declares them but the caller is not doing voice cloning.
+
+    The 6lang multilingual checkpoint declares these inputs (forward-compat hook
+    from export_onnx.py) but the trained ``spk_proj`` is never exercised. Feeding
+    zeros + mask=0 makes the ``torch.where`` branch in ``models.py:VitsModel.infer``
+    fall back to ``speaker_id`` / ``lid`` conditioning. Without this filling, the
+    ONNX session raises:
+        ValueError: Required inputs (['speaker_embedding', 'speaker_embedding_mask'])
+        are missing from input feed (['input', 'input_lengths', 'scales', 'lid', ...])
+
+    Mirror of ``src/python_run/piper/voice.py:742-756``. When changing this, keep
+    both paths in sync (the Wyoming smoke test will catch drift).
+    """
+    if "speaker_embedding" not in input_names:
+        return
+    emb_dim = 256
+    for inp in session.get_inputs():
+        if inp.name == "speaker_embedding":
+            if len(inp.shape) >= 2 and isinstance(inp.shape[1], int):
+                emb_dim = inp.shape[1]
+            break
+    feed["speaker_embedding"] = np.zeros((1, emb_dim), dtype=np.float32)
+    feed["speaker_embedding_mask"] = np.array([[0]], dtype=np.int64)
+
+
+# ---------------------------------------------------------------------------
 # Warmup
 # ---------------------------------------------------------------------------
 
@@ -204,6 +240,7 @@ def warmup_session(
             feed["prosody_features"] = np.zeros(
                 (1, WARMUP_PHONEME_LENGTH, 3), dtype=np.int64
             )
+        _fill_speaker_embedding_inputs(session, input_names, feed)
 
         output_names = [o.name for o in session.get_outputs()]
         t0 = time.perf_counter()
@@ -293,6 +330,8 @@ def synthesize(
         else:
             feed["prosody_features"] = np.zeros((1, seq_len, 3), dtype=np.int64)
 
+    _fill_speaker_embedding_inputs(session, input_names, feed)
+
     # Run inference
     output = session.run(None, feed)[0]
 
@@ -356,6 +395,8 @@ def synthesize_float(
             feed["prosody_features"] = prosody_array.reshape(1, seq_len, 3)
         else:
             feed["prosody_features"] = np.zeros((1, seq_len, 3), dtype=np.int64)
+
+    _fill_speaker_embedding_inputs(session, input_names, feed)
 
     output = session.run(None, feed)[0]
     return np.clip(output.squeeze(), -1.0, 1.0).astype(np.float32)

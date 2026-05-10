@@ -20,7 +20,7 @@ namespace PiperPlus.Core.Phonemize;
 /// </summary>
 public static class RawPhonemeParser
 {
-    private static ILogger s_logger = NullLogger.Instance;
+    private static ILogger logger = NullLogger.Instance;
 
     /// <summary>
     /// Replace the default (no-op) logger used for unknown-token warnings.
@@ -28,7 +28,7 @@ public static class RawPhonemeParser
     /// </summary>
     public static void SetLogger(ILogger logger)
     {
-        s_logger = logger ?? NullLogger.Instance;
+        RawPhonemeParser.logger = logger ?? NullLogger.Instance;
     }
 
     /// <summary>
@@ -63,6 +63,7 @@ public static class RawPhonemeParser
         }
 
         var tokens = phonemeString.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+
         // Estimate: each space-separated token maps to ~1-2 IDs
         var result = new List<long>(tokens.Length * 2);
 
@@ -76,6 +77,7 @@ public static class RawPhonemeParser
                 {
                     result.Add(id);
                 }
+
                 continue;
             }
 
@@ -88,11 +90,12 @@ public static class RawPhonemeParser
                 {
                     result.Add(id);
                 }
+
                 continue;
             }
 
             // 3. Unknown token -- warn and skip.
-            s_logger.LogWarning("Raw phoneme parser: unknown token '{Token}' (skipped)", token);
+            logger.LogWarning("Raw phoneme parser: unknown token '{Token}' (skipped)", token);
         }
 
         return result.ToArray();

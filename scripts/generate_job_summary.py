@@ -62,7 +62,7 @@ def generate_japanese_tts_summary(metrics: dict[str, Any]) -> str:
         summary_lines.append("")
 
     # Detailed results table
-    if "test_results" in metrics and metrics["test_results"]:
+    if metrics.get("test_results"):
         summary_lines.append("<details>")
         summary_lines.append("<summary>詳細なテスト結果</summary>")
         summary_lines.append("")
@@ -115,7 +115,7 @@ def generate_multilingual_tts_summary(metrics: dict[str, Any]) -> str:
         summary_lines.append("")
 
     # Language comparison table
-    if "languages" in metrics and metrics["languages"]:
+    if metrics.get("languages"):
         summary_lines.append(
             "| 言語 | モデル | 音声ファイル名 | テストテキスト | RTF | 速度 (文字/秒) | 生成時間 | 音声時間 |"
         )

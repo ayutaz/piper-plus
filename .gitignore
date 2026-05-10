@@ -118,6 +118,17 @@ check_*.py
 !scripts/check_onnx_inputs.py
 !scripts/check_loanword_consistency.py
 !scripts/check_ort_versions.py
+!scripts/check_short_text_contract.py
+!scripts/check_ort_session_contract.py
+!scripts/check_text_splitter_contract.py
+!scripts/check_language_id_map_contract.py
+!scripts/check_ssml_contract.py
+!scripts/check_onnx_export_contract.py
+!scripts/check_ort_version_drift.py
+!scripts/check_dictionary_versions.py
+!scripts/check_phoneme_set_version.py
+!scripts/check_loanword_forward_compat.py
+!scripts/verify_model_checksums.py
 create_comprehensive_*.py
 add_missing_*.py
 retrain_*.py
@@ -156,9 +167,22 @@ test/models/tsukuyomi-chan/
 docs/development/usability-issues-2026-03.md
 src/rust/target/*
 
-# Kotlin G2P AAR (Issue #388): Gradle copies fixtures + native .so at build time
-android/piper-plus-g2p/src/androidTest/assets/g2p_fixtures/
+# Kotlin G2P AAR (Issue #388): Gradle copies fixtures + native .so at build time.
+# Ignore the Gradle-generated entries individually so the static
+# zh_en_loanword_matrix.json mirror (committed for the sync gate, Issue #384
+# follow-up) can sit alongside them without being swept up by a directory ignore.
+# Note: a parent-directory ignore plus a `!file` re-include does NOT work in
+# git, hence the file-by-file ignore.
+android/piper-plus-g2p/src/androidTest/assets/g2p_fixtures/phoneme_test_cases.json
+android/piper-plus-g2p/src/androidTest/assets/g2p_fixtures/phoneme_test_cases_golden.json
 android/piper-plus-g2p/src/main/jniLibs/
 android/piper-plus-g2p/.cxx/
 android/piper-plus-g2p/build/
 android/.gradle/
+
+# Swift Package Manager: Package.resolved is auto-generated when SPM
+# resolves dependencies. piper-plus ships libraries (PiperPlus /
+# PiperPlusG2P), not an app, so we don't pin transitive dependency
+# versions for downstream consumers — they resolve their own.
+Package.resolved
+.lycheecache

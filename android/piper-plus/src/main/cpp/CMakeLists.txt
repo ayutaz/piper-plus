@@ -13,9 +13,15 @@ set_target_properties(piper_plus PROPERTIES
     IMPORTED_LOCATION
         "${CMAKE_SOURCE_DIR}/../jniLibs/${ANDROID_ABI}/libpiper_plus.so"
 )
-# Make the C header visible to the JNI wrapper.
+# Make piper_plus.h visible. Path traversal from CMAKE_SOURCE_DIR
+# (= android/piper-plus/src/main/cpp):
+#   ..      → src/main/
+#   ../..   → src/
+#   ../../../  → piper-plus/
+#   ../../../../  → android/
+#   ../../../../../  → repository root
 target_include_directories(piper_plus INTERFACE
-    "${CMAKE_SOURCE_DIR}/../../../../../../src/cpp"
+    "${CMAKE_SOURCE_DIR}/../../../../../src/cpp"
 )
 
 # -- JNI wrapper -------------------------------------------------------------

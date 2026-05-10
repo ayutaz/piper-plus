@@ -1,0 +1,317 @@
+# Streaming Synthesis API Contract
+# =================================
+# This file pins the canonical streaming-synthesis surface that every
+# piper-plus runtime MUST expose. Streaming yields audio as the model
+# completes each sentence, allowing callers to start playback without
+# waiting for the full utterance.
+#
+# Sentence boundaries are defined by text-splitter-contract.toml; this
+# file does NOT redefine them. The streaming layer simply iterates the
+# splitter output, runs inference per sentence, and yields one chunk per
+# sentence.
+#
+# Sub-sentence streaming (mid-sentence chunks) is intentionally out of
+# scope for this contract — VITS produces all audio for a sentence at
+# once, so chunks below sentence granularity would require a different
+# decoder architecture.
+#
+# This file serves as a design-time cross-language contract. Implementations
+# and tests are expected to be kept in sync with these values manually unless
+# and until automated contract-verification tests are added.
+#
+# Implementations:
+#   Python:   src/python_run/piper/voice.py            PiperVoice.synthesize_stream
+#   Rust:     src/rust/piper-core/src/streaming.rs     PiperVoice::synthesize_stream
+#   C#:       src/csharp/PiperPlus.Core/Inference/PiperSession.cs  ISynthesizer.SynthesizeStream
+#   Go:       src/go/piperplus/streaming.go            Synthesizer.SynthesizeStream
+#   WASM:     src/wasm/openjtalk-web/src/index.js      AudioResult.streaming
+#   C API:    src/cpp/piper_plus.h, piper_plus_c_api.cpp  piper_synthesize_stream_callback
+
+[meta]
+spec_version = "1.0"
+last_updated = "2026-05-09"
+applies_to = ["python", "rust", "csharp", "go", "wasm-js", "c-api"]
+sentence_boundary_source = "docs/spec/text-splitter-contract.toml"
+
+# ============================================================================
+# Per-language API signature
+# ============================================================================
+# Every runtime exposes streaming via the idiomatic concurrency primitive
+# of its host language. The semantics MUST be equivalent: each "step" of
+# the iterator/iterable/channel/callback emits exactly one AudioChunk
+# corresponding to exactly one sentence (with the exception that SSML
+# input is treated as a single sentence — see [buffering] below).
+
+[api_signatures]
+
+[api_signatures.python]
+# Python: synchronous generator yielding bytes per sentence.
+function = "PiperVoice.synthesize_stream(text, *, syn_config=None) -> Iterator[bytes]"
+return_type = "Iterator[bytes]"
+back_pressure = "consumer-paced via generator next()"
+notes = """
+The generator yields raw little-endian int16 PCM bytes (NOT including a
+WAV header). Callers wrap with `wave.Wave_write` if they need a WAV file.
+Cancellation is via generator close() / GC; the implementation MUST stop
+inference at the next sentence boundary on close().
+"""
+
+[api_signatures.rust]
+function = "PiperVoice::synthesize_stream(&self, text: &str, syn_config: Option<SynConfig>) -> impl Iterator<Item = AudioChunk>"
+return_type = "Iterator<AudioChunk>"
+back_pressure = "consumer-paced via Iterator::next()"
+notes = """
+Returned iterator borrows from &self; lifetime ties to the PiperVoice.
+For send-across-threads use cases callers should collect or use a
+channel adapter — the contract does NOT require the iterator be Send.
+"""
+
+[api_signatures.csharp]
+function = "ISynthesizer.SynthesizeStream(string text, SynConfig? config = null) -> IAsyncEnumerable<AudioChunk>"
+return_type = "IAsyncEnumerable<AudioChunk>"
+back_pressure = "consumer-paced via await foreach"
+notes = """
+Cancellation honours CancellationToken passed via WithCancellation().
+Cancellation aborts at the next sentence boundary; the partially-emitted
+sentence's chunk is not yielded.
+"""
+
+[api_signatures.go]
+function = "Synthesizer.SynthesizeStream(ctx context.Context, text string, cfg *SynConfig) (<-chan AudioChunk, error)"
+return_type = "<-chan AudioChunk"
+back_pressure = "channel-buffered (buffer size 1)"
+notes = """
+Channel is closed by the producer when the last sentence has been emitted
+(or when ctx is cancelled). Receivers use the standard `chunk, ok := <-ch`
+pattern to detect end-of-stream. The error return is non-nil only for
+synchronous setup failures (config validation, model load); per-sentence
+inference errors are surfaced via AudioChunk.error_code.
+"""
+
+[api_signatures.wasm_js]
+function = "AudioResult.streaming = AsyncIterable<AudioChunk>"
+return_type = "AsyncIterable<AudioChunk>"
+back_pressure = "consumer-paced via for-await-of"
+notes = """
+Streaming is offered as the `.streaming` property of an AudioResult
+returned by synthesize() with `streaming: true` in opts. The non-stream
+`.audio` property is null in that mode. Browsers can pipe each chunk's
+.data into a Web Audio AudioBuffer for low-latency playback.
+"""
+
+[api_signatures.c_api]
+function = "piper_synthesize_stream_callback(piper, text, callback, user_data) -> int"
+return_type = "int (0 = ok, < 0 = error code)"
+back_pressure = "callback-driven; if callback blocks, inference blocks"
+callback_signature = "void (*callback)(const uint8_t* data, size_t len, const PiperChunkInfo* info, void* user_data)"
+notes = """
+Callback is invoked on the inference thread once per sentence. The data
+pointer is valid only for the duration of the call; callers MUST copy if
+they need to retain bytes. Returning early from inference is via setting
+PiperChunkInfo.cancel = 1 in any callback (see [error_handling]).
+"""
+
+# ============================================================================
+# AudioChunk shape (cross-runtime)
+# ============================================================================
+# AudioChunk is the unit yielded by every streaming API. Field names below
+# are the canonical names; per-runtime serialisation (snake_case for
+# Python/Rust/Go, PascalCase for C#) is allowed but the field semantics
+# MUST match exactly.
+
+[chunk]
+sample_rate = 22050             # int (Hz) — fixed for all official models
+bit_depth   = 16                # int — int16 little-endian PCM
+channels    = 1                 # int — mono
+endianness  = "little"
+encoding    = "pcm_int16"
+
+[chunk.fields]
+data            = "PCM bytes (int16 LE), length = num_samples * 2"
+num_samples     = "int — number of samples in this chunk (data.len() / 2)"
+sentence_index  = "int — 0-based index of the originating sentence"
+is_final        = "bool — true on the final chunk of the stream"
+duration_ms     = "float — chunk duration in ms (= num_samples / sample_rate * 1000)"
+error_code      = "int — 0 on normal chunks, non-zero on error final chunk"
+
+[chunk.field_naming]
+# Per-runtime naming conventions. Field semantics are identical.
+python = "snake_case"
+rust   = "snake_case"
+go     = "PascalCase (exported)"
+csharp = "PascalCase"
+wasm_js = "camelCase"
+c_api  = "snake_case (in PiperChunkInfo struct)"
+
+# ============================================================================
+# Buffering policy
+# ============================================================================
+# Sub-sentence streaming is NOT supported. One AudioChunk per sentence is
+# the contract's granularity. A "sentence" is what text-splitter-contract.toml
+# yields — typically delimited by . / ! / ? / 。 / ！ / ？ — with the
+# exception below for SSML input.
+
+[buffering]
+unit = "sentence"
+sub_sentence_streaming = false
+mid_sentence_yield = false
+sentence_definition_source = "docs/spec/text-splitter-contract.toml"
+
+# SSML input is parsed once and treated as a single emit unit, even when
+# the SSML body contains multiple sentence terminators. This matches the
+# Rust canonical SSML implementation (which routes through a different
+# code path than plain text) and keeps SSML semantics identical to the
+# non-streaming `synthesize` API.
+ssml_emit_unit = "single_chunk"
+ssml_emit_unit_note = """
+SSML calls produce exactly one AudioChunk regardless of internal sentence
+count. Callers needing per-sentence chunking should call synthesize_stream
+on plain text and apply <prosody>/<break> markup at the call site.
+"""
+
+# Long sentences (e.g. >40 phoneme IDs) are NOT split into smaller chunks
+# at the streaming layer. They emit a single (potentially large) chunk.
+long_sentence_split = false
+
+# Short sentences (e.g. <40 phoneme IDs) trigger short-text mitigation per
+# short-text-contract.toml, but still emit as a single chunk per sentence.
+short_sentence_handling = "see docs/spec/short-text-contract.toml"
+
+# ============================================================================
+# is_final semantics
+# ============================================================================
+# Exactly one chunk per stream has is_final = true. That chunk MAY contain
+# audio data (when the final sentence's audio is being delivered) or MAY
+# be a zero-byte sentinel (when an error / cancellation aborts the stream
+# at a sentence boundary).
+#
+# Implementations MUST emit a final chunk even on cancellation, so that
+# consumers can distinguish "stream ended cleanly" from "consumer dropped
+# its receiver".
+
+[is_final]
+exactly_one_per_stream = true
+empty_data_allowed = true
+empty_data_when = ["error abort", "user-cancellation"]
+
+# ============================================================================
+# Error handling semantics
+# ============================================================================
+
+[error_handling]
+
+[error_handling.cancellation]
+description = """
+Cancellation can be initiated by the consumer (close generator, drop
+iterator, cancel token, ctx done, callback returns cancel=1). The
+producer MUST stop at the next sentence boundary, then emit a final
+chunk with is_final=true, error_code=0, data=b"".
+"""
+final_chunk_emitted = true
+final_chunk_error_code = 0
+final_chunk_data = "empty"
+mid_sentence_abort = false  # never mid-sentence — always at boundary
+
+[error_handling.timeout]
+description = """
+Per-sentence inference timeouts (set via SynConfig) abort the offending
+sentence at the next inference checkpoint. Already-yielded chunks are
+unaffected; the timeout chunk is the final chunk with error_code != 0.
+"""
+final_chunk_emitted = true
+final_chunk_error_code = "TIMEOUT (runtime-defined positive value)"
+
+[error_handling.inference_error]
+description = """
+Unrecoverable per-sentence inference errors (NaN output, ORT runtime
+error, OOM) abort the stream at the offending sentence. Already-yielded
+chunks are unaffected; the error chunk is the final chunk with
+error_code != 0 and data=b"".
+"""
+final_chunk_emitted = true
+final_chunk_error_code = "INFERENCE_FAIL (runtime-defined positive value)"
+
+[error_handling.error_code_namespace]
+# Each runtime defines its own error_code constants but the values 0 and
+# negative-numbers are reserved across the ABI:
+#   0       = no error
+#   < 0     = reserved (do not use)
+#   >= 1    = runtime-specific error code (positive integers)
+reserved_zero = "no error"
+reserved_negative = "reserved (do not use)"
+runtime_specific = "positive integers"
+
+# ============================================================================
+# onChunk callback signature stability
+# ============================================================================
+
+[callback_signatures]
+
+[callback_signatures.python]
+shape = "callable(audio_chunk: bytes, info: ChunkInfo) -> None"
+notes = """
+Optional callback passed to PiperVoice.synthesize_stream(on_chunk=...).
+When set, called once per chunk in addition to (not instead of) the
+generator yield. Exceptions raised in the callback propagate out of the
+generator and abort the stream.
+"""
+
+[callback_signatures.c_api]
+shape = "void (*callback)(const uint8_t* data, size_t len, const PiperChunkInfo* info, void* user_data)"
+notes = """
+The data pointer is valid only for the call duration. The PiperChunkInfo
+struct is also stack-allocated by the caller and must NOT be retained.
+Setting info->cancel = 1 inside the callback aborts the stream at the
+next sentence boundary.
+"""
+
+[callback_signatures.stability]
+abi_compat_level = "stable"
+breaking_changes_require = ["MAJOR version bump", "matching changes in all 6 runtimes"]
+adding_optional_field = "MINOR version bump (callbacks read by name not offset where possible)"
+
+# ============================================================================
+# Threading model
+# ============================================================================
+
+[threading]
+
+[threading.python]
+inference_thread = "calling thread"  # generator is synchronous
+gil_release_during_inference = true   # ORT releases GIL
+
+[threading.rust]
+inference_thread = "iterator next() caller"
+send = "iterator is NOT Send by default; use a channel adapter for cross-thread"
+
+[threading.csharp]
+inference_thread = "thread pool (Task-based via IAsyncEnumerable)"
+configure_await = "false (do not capture caller context)"
+
+[threading.go]
+inference_thread = "dedicated goroutine spawned by SynthesizeStream"
+channel_close_initiator = "producer goroutine"
+
+[threading.wasm_js]
+inference_thread = "browser worker thread (when ort-web is configured for WebWorker)"
+fallback = "main thread (with yielding via setTimeout(0) between sentences)"
+
+[threading.c_api]
+inference_thread = "calling thread (callback runs on the same thread as piper_synthesize_stream_callback caller)"
+note = "Callers wanting non-blocking streams should call from a dedicated thread."
+
+# ============================================================================
+# Implementation status
+# ============================================================================
+
+[implementation_status]
+# Which runtimes implement streaming synthesis.
+# ✓ = implemented, partial = some surface implemented, - = not yet.
+#
+#                              Python   Rust    C#      Go      WASM    C API
+# Per-sentence streaming       ✓        ✓       ✓       ✓       ✓       ✓
+# AudioChunk shape (full)      ✓        ✓       ✓       ✓       ✓       ✓
+# is_final on cancellation     ✓        ✓       ✓       ✓       ✓       ✓
+# Error code propagation       ✓        ✓       ✓       ✓       ✓       ✓
+# SSML single-chunk emit       ✓        ✓       ✓       ✓       ✓       ✓
+# Sub-sentence chunks          N/A      N/A     N/A     N/A     N/A     N/A

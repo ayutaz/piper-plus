@@ -2,11 +2,11 @@
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 
-class PhonemeType(str, Enum):
+class PhonemeType(StrEnum):
     OPENJTALK = "openjtalk"
     BILINGUAL = "bilingual"
     MULTILINGUAL = "multilingual"

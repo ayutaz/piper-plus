@@ -1,0 +1,63 @@
+name: hadolint
+
+on:
+  pull_request:
+    paths:
+      - 'docker/**/Dockerfile*'
+      - '.hadolint.yaml'
+      - '.github/workflows/hadolint.yml'
+  push:
+    branches: [dev, main]
+    paths:
+      - 'docker/**/Dockerfile*'
+      - '.hadolint.yaml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+  security-events: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  hadolint:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        dockerfile:
+          - docker/cpp-dev/Dockerfile
+          - docker/cpp-inference/Dockerfile
+          - docker/cpp-inference/Dockerfile.test
+          - docker/python-inference/Dockerfile
+          - docker/python-inference/Dockerfile.cpu
+          - docker/python-train/Dockerfile
+          - docker/wyoming/Dockerfile
+          - docker/webui/Dockerfile
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install hadolint
+        # hadolint/hadolint-action@v3 は存在しないため (最新は v3.1.0 stable
+        # ではない、v2 に戻ると別の API)、公式 binary を直接 download する。
+        run: |
+          HADOLINT_VERSION=2.12.0
+          curl -fsSL -o /tmp/hadolint \
+            "https://github.com/hadolint/hadolint/releases/download/v${HADOLINT_VERSION}/hadolint-Linux-x86_64"
+          chmod +x /tmp/hadolint
+          /tmp/hadolint --version
+
+      - name: Run hadolint on ${{ matrix.dockerfile }}
+        # --failure-threshold error: warning は info で報告、error のみ fail
+        # .hadolint.yaml の override.error で escalated rule (DL3000/DL3002/
+        # DL3025/DL4000/DL4006) のみ fail させる
+        run: |
+          /tmp/hadolint \
+            --config .hadolint.yaml \
+            --failure-threshold error \
+            --no-color \
+            ${{ matrix.dockerfile }}

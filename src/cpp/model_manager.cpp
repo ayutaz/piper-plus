@@ -19,8 +19,13 @@
 #endif
 
 #include <spdlog/spdlog.h>
+#ifndef _WIN32
+#include <unistd.h>  // access(), X_OK — POSIX only; Windows uses PowerShell branch.
+#endif
 #include "json.hpp"
 #include "model_manager.hpp"
+#include "piper_proc_exec.h"
+#include "safe_exec.h"
 
 using json = nlohmann::json;
 namespace fs = std::filesystem;
@@ -259,26 +264,57 @@ static bool downloadFile(const std::string& url,
     // cmake/PiperCommon.cmake (issue #377) — std::system() / popen() / fork()
     // are unavailable in the App Sandbox. Apple-embedded consumers must
     // pre-download models via URLSession and pass the local file path.
-    std::string cmd;
+    spdlog::info("Downloading {} ...", url);
 
 #ifdef _WIN32
-    cmd = "powershell -NoProfile -Command \"Invoke-WebRequest -Uri '"
-        + url + "' -OutFile '" + outStr + "'\"";
-#else
-    // Prefer curl, fall back to wget
-    if (std::system("which curl > /dev/null 2>&1") == 0) {
-        cmd = "curl -L -# -o \"" + outStr + "\" \"" + url + "\"";
-    } else if (std::system("which wget > /dev/null 2>&1") == 0) {
-        cmd = "wget -O \"" + outStr + "\" \"" + url + "\"";
-    } else {
-        spdlog::error("Neither curl nor wget is available for downloading");
-        return false;
-    }
-#endif
-
-    spdlog::info("Downloading {} ...", url);
-    int rc = std::system(cmd.c_str());
+    // Pass URL / OutFile as separate parameters to PowerShell rather than
+    // embedding them in the -Command string — Invoke-WebRequest binds them
+    // to its named parameters without re-parsing.
+    const std::string ps_script =
+        std::string("Invoke-WebRequest -Uri $args[0] -OutFile $args[1]");
+    const char* argv[] = {
+        "powershell", "-NoProfile", "-Command", ps_script.c_str(),
+        url.c_str(), outStr.c_str(), nullptr,
+    };
+    int rc = piper_run_argv(argv);
     return rc == 0;
+#else
+    // Prefer curl, fall back to wget. Look up the binary on PATH locations
+    // directly via access(X_OK) — invoking `which` via system() would re-
+    // introduce a shell taint sink that CodeQL flags.
+    static const char* const CURL_PATHS[] = {
+        "/usr/bin/curl", "/usr/local/bin/curl", "/opt/homebrew/bin/curl",
+        "/bin/curl", nullptr,
+    };
+    static const char* const WGET_PATHS[] = {
+        "/usr/bin/wget", "/usr/local/bin/wget", "/opt/homebrew/bin/wget",
+        "/bin/wget", nullptr,
+    };
+    // CodeQL cpp/no-raw-arrays-in-interfaces: take a pointer-to-pointer
+    // explicitly rather than letting array-to-pointer decay happen across
+    // the lambda boundary. Behavior is identical (still NULL-terminated).
+    auto find_tool = [](const char* const* paths) -> const char* {
+        for (size_t i = 0; paths[i]; ++i) {
+            if (access(paths[i], X_OK) == 0) return paths[i];
+        }
+        return nullptr;
+    };
+
+    if (const char* curl = find_tool(CURL_PATHS); curl != nullptr) {
+        const char* argv[] = {
+            curl, "-L", "-#", "-o", outStr.c_str(), url.c_str(), nullptr,
+        };
+        return piper_run_argv(argv) == 0;
+    }
+    if (const char* wget = find_tool(WGET_PATHS); wget != nullptr) {
+        const char* argv[] = {
+            wget, "-O", outStr.c_str(), url.c_str(), nullptr,
+        };
+        return piper_run_argv(argv) == 0;
+    }
+    spdlog::error("Neither curl nor wget is available for downloading");
+    return false;
+#endif
 }
 
 // ---------------------------------------------------------------------------

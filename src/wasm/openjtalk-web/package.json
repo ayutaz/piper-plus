@@ -48,6 +48,8 @@
     "test:optimization:integration": "node --test test/js/test-phase2-integration.js",
     "test:importmap": "node --test test/js/test-importmap.js",
     "test:npm-package": "node --test test/js/test-npm-package.js",
+    "regenerate:types": "node scripts/regenerate-types-constants.mjs",
+    "check:types": "node scripts/regenerate-types-constants.mjs --check",
     "test:wasm-g2p": "node --test test/js/test-piper-plus-wasm-g2p.js",
     "test:npm-package:all": "node --test test/js/test-audio-result.js test/js/test-audio-result-wav-edge.js test/js/test-audio-result-timing.js test/js/test-piper-plus.js test/js/test-piper-plus-boundary.js test/js/test-piper-plus-init-success.js test/js/test-piper-plus-init-integration.js test/js/test-piper-plus-synthesize-flow.js test/js/test-piper-plus-g2p-init.js test/js/test-piper-plus-wasm-g2p.js test/js/test-piper-plus-timing.js test/js/test-phoneme-timing.js test/js/test-importmap.js test/js/test-model-manager.js test/js/test-model-manager-load.js test/js/test-model-manager-cache.js test/js/test-model-manager-boundary.js test/js/test-dictionary-cache.js test/js/test-g2p-golden.js test/js/test-npm-package.js",
     "setup:wasm": "echo 'Downloading pre-built WASM from GitHub Releases...' && mkdir -p dist/rust-wasm && echo 'Run: gh release download --repo ayutaz/piper-plus --pattern piper-plus-wasm-* -D dist/rust-wasm' && echo 'Or build locally: npm run build:wasm:multilingual'",
@@ -60,10 +62,21 @@
     "build": "npm run build:production",
     "serve": "python3 -m http.server 8081",
     "clean": "rm -rf dist build/build-*",
-    "prepublishOnly": "echo 'Ready to publish'"
+    "prepublishOnly": "echo 'Ready to publish'",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --check .",
+    "format:fix": "prettier --write .",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@piper-plus/g2p": "^0.4.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.10.0",
+    "eslint": "^9.10.0",
+    "prettier": "^3.3.0",
+    "typescript": "^5.5.0"
   },
   "peerDependencies": {
     "onnxruntime-web": ">=1.21.0"

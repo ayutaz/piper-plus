@@ -6,17 +6,17 @@ keys into the HuggingFace-distributed `tsukuyomi` config, breaking C++ inference
 for Windows users.
 
 Workflow:
-  1. Download the current config.json from HuggingFace.
-  2. Run update_phoneme_id_map() in strict mode to PUA-encode all keys.
-     (Strict mode raises if any unmappable multi-codepoint key remains.)
-  3. Write the new config.json locally for human inspection.
-  4. (Manual) Push the corrected config to HuggingFace.
+    1. Download the current config.json from HuggingFace.
+    2. Run update_phoneme_id_map() in strict mode to PUA-encode all keys.
+        (Strict mode raises if any unmappable multi-codepoint key remains.)
+    3. Write the new config.json locally for human inspection.
+    4. (Manual) Push the corrected config to HuggingFace.
 
 Usage:
-  python scripts/regenerate_tsukuyomi_config.py [--repo ayousanz/piper-plus-tsukuyomi-chan] [--out tmp/]
+    python scripts/regenerate_tsukuyomi_config.py [--repo ayousanz/piper-plus-tsukuyomi-chan] [--out tmp/]
 
 Pre-flight check (CI-equivalent):
-  python -m piper_train.update_model_config tmp/config.json --validate-only
+    python -m piper_train.update_model_config tmp/config.json --validate-only
 """
 
 from __future__ import annotations

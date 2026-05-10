@@ -1,15 +1,18 @@
 # GitHub Pages デプロイメント手順
 
 ## 概要
+
 このドキュメントでは、WebAssembly版Piperのデモページを GitHub Pages にデプロイする手順を説明します。
 
 ## 必要な修正
 
 ### 1. 相対パスの調整
+
 現在の実装では、すべてのリソースが `../` で始まる相対パスを使用しています。
 GitHub Pages でホストする場合は、これらのパスを調整する必要があります。
 
 ### 2. config.js の設定
+
 `demo/config.js` を以下のように編集：
 
 ```javascript
@@ -69,12 +72,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      
+
       - name: Setup directories
         run: |
           mkdir -p public
           cp -r src/wasm/openjtalk-web/* public/
-          
+
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
@@ -86,7 +89,7 @@ jobs:
 
 GitHub Pages で正しく動作するには、以下の構造が必要：
 
-```
+```text
 /（GitHub Pages ルート）
 ├── index.html (demo/index.html)
 ├── config.js

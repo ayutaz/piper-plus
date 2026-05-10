@@ -18,7 +18,7 @@ This document describes how to deploy the PiperPlus WebAssembly TTS demo to GitH
 
 ### Source layout (repository)
 
-```
+```text
 src/wasm/openjtalk-web/
 ├── demo/
 │   ├── index.html                   # Main demo page
@@ -44,7 +44,7 @@ src/wasm/openjtalk-web/
 
 ### Deployed layout (GitHub Pages root)
 
-```
+```text
 / (GitHub Pages root)
 ├── index.html              (from test/multilingual-demo/index.html, paths rewritten)
 ├── 404.html                (copy of index.html)
@@ -135,18 +135,22 @@ Note: The current demo HTML files use inline configuration (model name and CDN U
 ## Important Notes
 
 ### File size limits
+
 - GitHub Pages has a 100MB per-file limit. The WASM binary (~15MB) is well within this limit
 - ONNX models are downloaded from HuggingFace at runtime, not bundled in the deployment
 
 ### HTTPS requirement
+
 - `PiperPlus.initialize()` fetches models from HuggingFace via HTTPS
 - GitHub Pages serves content over HTTPS automatically
 
 ### Cross-Origin Isolation
+
 - `onnxruntime-web` WASM threads require `Cross-Origin-Isolation` headers (`Cross-Origin-Opener-Policy: same-origin` + `Cross-Origin-Embedder-Policy: require-corp`)
 - GitHub Pages does not set these headers by default, so onnxruntime-web falls back to the single-threaded `wasm` execution provider (not `wasm-threads`)
 
 ### CORS
+
 - HuggingFace Hub API supports CORS, so model downloads work from any origin
 - All static assets are served from the same origin (no CORS issues)
 

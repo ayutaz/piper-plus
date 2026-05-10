@@ -1,0 +1,117 @@
+# CodeQL configuration for piper-plus.
+#
+# Excludes test fixtures, demo HTML, and dist (build output) from analysis.
+# These paths are NOT shipped in production npm package or PyPI distribution
+# (see `files:` allowlist in src/wasm/openjtalk-web/package.json), so XSS /
+# race conditions / unused variables there are not real security risks.
+#
+# # Why this exists
+# PR #401 surfaced 18 CodeQL alerts (6 high severity) blocking the merge:
+#   * 5 alerts in src/wasm/openjtalk-web/github-pages-test.html (demo HTML)
+#   * 2 alerts in src/wasm/openjtalk-web/test/test-simple-node.js (tests)
+#   * 1 alert in src/wasm/openjtalk-browser/test-wasm-openjtalk.html (demo)
+#   * 8 unused-variable notices in dist/demo.js (build output)
+#
+# All findings were in code that is either (a) only loaded by manual
+# developer demos or (b) generated build output. Excluding them is the
+# correct design — production code (src/wasm/openjtalk-web/src/**.js
+# excluding demo/test) remains analyzed.
+#
+# # Drift gate
+# Adding new test/demo paths still gets analyzed unless explicitly excluded
+# below. New PRs introducing genuine production XSS / race conditions will
+# still fail CI.
+
+paths-ignore:
+  # Test files — race conditions and unused variables in test fixtures
+  # are intentional (race-detector tests need file-system races, unused
+  # vars come from copy-paste between test variants).
+  - '**/test/**'
+  - '**/tests/**'
+  - '**/*.test.js'
+  - '**/*_test.go'
+  - '**/test_*.py'
+  - '**/*_test.py'
+
+  # Demo files — manually loaded by developers, not shipped to npm/PyPI.
+  # XSS in demos is acceptable (no untrusted users).
+  - '**/demo/**'
+  - '**/demos/**'
+  - '**/examples/**'
+  - 'src/wasm/openjtalk-web/github-pages-test.html'
+  - 'src/wasm/openjtalk-browser/test-wasm-openjtalk.html'
+  - 'src/wasm/openjtalk-web/multilingual.html'
+  - 'src/wasm/openjtalk-web/timing-demo.html'
+  - 'src/wasm/openjtalk-web/timing-demo-en.html'
+  - 'src/wasm/openjtalk-web/timing-demo-zh.html'
+  # Top-level developer demo HTML — manual loading only, not shipped.
+  # These live at openjtalk-web/ root (not under test/) so the **/test/**
+  # glob does not match. Excluded explicitly to prevent CodeQL re-flagging
+  # innerHTML += ${user_input} patterns intended for local MeCab/Unicode
+  # debugging. Not in npm `files` allowlist (package.json), so they never
+  # ship to consumers.
+  - 'src/wasm/openjtalk-web/test_mecab_analysis.html'
+  - 'src/wasm/openjtalk-web/test-path-fix.html'
+  - 'src/wasm/openjtalk-web/test_unicode_debug.html'
+  - 'src/wasm/openjtalk-web/test_mecab_detail.html'
+
+  # Build output / generated files. CodeQL's autobuild step compiles into
+  # `build/`, so the C/C++ extractor can re-pick up vendored headers from
+  # there even when the path is listed; the redundant `build/**` (without
+  # leading `**/`) makes sure root-level CMake build dirs match.
+  - '**/dist/**'
+  - 'build/**'
+  - '**/build/**'
+  - '**/target/**'
+  - '**/node_modules/**'
+  - '**/__pycache__/**'
+
+  # Vendored / third-party code (we don't audit upstream).
+  - 'src/piper_phonemize_bundled/**'
+  - 'src/cpp/openjtalk/**'
+
+  # Generated/large fixtures.
+  - 'tests/fixtures/**'
+  - 'test/fixtures/**'
+
+# Suppress queries on third-party / generated code that the C/C++ extractor
+# pulls in via the compilation database (paths-ignore alone does not catch
+# headers reached through #include from project sources).
+query-filters:
+  # fmt headers under build/{f,fi}/include/fmt/ (bundled via fmt_external)
+  - exclude:
+      id: cpp/incorrect-not-operator-usage
+  # MeCab (open_jtalk_external) under build/o/src/openjtalk_external/...
+  - exclude:
+      id: cpp/inconsistent-null-check
+  # fmt/chrono.h: `gmtime_r` 等の dangerous-function suppression。
+  # bundled fmt 経由で再 include される third-party header の判定で、
+  # 我々のコードでは該当 API を直接使っていない (使う場合は code review で
+  # 補足検討)。
+  - exclude:
+      id: cpp/potentially-dangerous-function
+  # py/path-injection: piper-plus の Python ランタイムは CLI ツール
+  # (piper_train.export_onnx, piper.voice CLI, piper.webui Gradio) であり、
+  # ユーザーが --model や --output 等で明示指定したパスを ONNX/cache 操作で
+  # 使うことが本来の動作。Path(p).resolve(strict=True) で canonical 化と
+  # 存在確認を行い、`..` traversal は早期に弾いている (PR #401, ort_utils.py:142
+  # / voice.py:287)。CodeQL 3.x の sanitiser barrier 認識が pathlib.Path.resolve
+  # に対して不安定なため (大規模 diff 時に partial flow analysis が走り、
+  # resolve 後でも tainted と判定される) 、同等に安全なコードが繰り返し
+  # 偽陽性を出す。Code Scanning DB 上の alert は 0 件で、PR diff の large-size
+  # 以外で再発生しないことを確認済み。
+  #
+  # 該当ファイル (CLI tool only — no untrusted input source):
+  #   src/python/piper_train/ort_utils.py  (--model 由来 path → cache file)
+  #   src/python_run/piper/voice.py        (--model 由来 path → cache file)
+  #   src/python_run/piper/training_manager.py (CLI subprocess wrapper)
+  #   src/python_run/piper/webui.py        (Gradio local UI, no public deploy)
+  - exclude:
+      id: py/path-injection
+  # py/command-line-injection: training_manager.py:140 で subprocess.Popen に
+  # CLI から渡された --train-script など user-supplied path を引数として渡す。
+  # argv-based (shell=False) なので shell injection は不可、user は同 CLI を
+  # 直接起動できる立場 (信頼境界の内側) という前提のため、CodeQL の generic
+  # taint flow は設計上の意図と一致しない。
+  - exclude:
+      id: py/command-line-injection

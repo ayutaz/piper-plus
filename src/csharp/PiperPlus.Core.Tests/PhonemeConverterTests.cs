@@ -14,7 +14,6 @@ public sealed class PhonemeConverterTests
     // ================================================================
     // PUA Mapping tests
     // ================================================================
-
     [Fact]
     public void All29Entries_MatchPythonMapping()
     {
@@ -29,8 +28,10 @@ public sealed class PhonemeConverterTests
             ["u:"] = '\uE002',
             ["e:"] = '\uE003',
             ["o:"] = '\uE004',
+
             // Special consonants
             ["cl"] = '\uE005',
+
             // Palatalized consonants
             ["ky"] = '\uE006',
             ["kw"] = '\uE007',
@@ -40,20 +41,24 @@ public sealed class PhonemeConverterTests
             ["dy"] = '\uE00B',
             ["py"] = '\uE00C',
             ["by"] = '\uE00D',
+
             // Affricates and special sounds
             ["ch"] = '\uE00E',
             ["ts"] = '\uE00F',
             ["sh"] = '\uE010',
             ["zy"] = '\uE011',
             ["hy"] = '\uE012',
+
             // Palatalized nasals / liquids
             ["ny"] = '\uE013',
             ["my"] = '\uE014',
             ["ry"] = '\uE015',
+
             // Question type markers (Issue #204)
             ["?!"] = '\uE016',
             ["?."] = '\uE017',
             ["?~"] = '\uE018',
+
             // N phoneme variants (Issue #207)
             ["N_m"] = '\uE019',
             ["N_n"] = '\uE01A',
@@ -61,16 +66,17 @@ public sealed class PhonemeConverterTests
             ["N_uvular"] = '\uE01C',
         };
 
-        var actual = OpenJTalkToPiperMapping.TokenToChar;
+        IReadOnlyDictionary<string, char> actual = OpenJTalkToPiperMapping.TokenToChar;
 
         // Sanity: the table is populated. The strong invariant ("byte-for-byte
         // identical to pua.json") is enforced by the cross-runtime-table-consistency
         // CI gate; baking in an absolute count would only duplicate that check
         // and drift on every PUA bump (the bug class behind PR #389).
-        Assert.True(actual.Count >= 50,
+        Assert.True(
+            actual.Count >= 50,
             $"OpenJTalkToPiperMapping.TokenToChar unexpectedly small: {actual.Count}");
 
-        foreach (var (token, expectedChar) in expected)
+        foreach ((string? token, char expectedChar) in expected)
         {
             Assert.True(actual.ContainsKey(token), $"Missing token: {token}");
             Assert.Equal(expectedChar, actual[token]);
@@ -96,7 +102,7 @@ public sealed class PhonemeConverterTests
     {
         var input = new List<string> { "^", "k", "o", "N_m", "ch", "i", "$" };
 
-        var result = OpenJTalkToPiperMapping.MapSequence(input);
+        IReadOnlyList<string> result = OpenJTalkToPiperMapping.MapSequence(input);
 
         Assert.Equal(7, result.Count);
         Assert.Equal("^", result[0]);                                  // single char pass-through
@@ -111,7 +117,6 @@ public sealed class PhonemeConverterTests
     // ================================================================
     // GetQuestionType tests
     // ================================================================
-
     [Fact]
     public void EmphasisQuestion()
     {
@@ -167,7 +172,7 @@ public sealed class PhonemeConverterTests
     [Fact]
     public void EmptyString()
     {
-        Assert.Equal("$", PiperPhonemeConverter.GetQuestionType(""));
+        Assert.Equal("$", PiperPhonemeConverter.GetQuestionType(string.Empty));
     }
 
     [Fact]
@@ -179,14 +184,13 @@ public sealed class PhonemeConverterTests
     // ================================================================
     // ApplyNPhonemeRules tests
     // ================================================================
-
     [Fact]
     public void N_Before_m()
     {
         // さんぽ: s a N p o -> N becomes N_m (p is bilabial)
         var input = new List<string> { "s", "a", "N", "p", "o" };
 
-        var result = PiperPhonemeConverter.ApplyNPhonemeRules(input);
+        List<string> result = PiperPhonemeConverter.ApplyNPhonemeRules(input);
 
         Assert.Equal(["s", "a", "N_m", "p", "o"], result);
     }
@@ -197,7 +201,7 @@ public sealed class PhonemeConverterTests
         // あんない: a N n a i -> N becomes N_n (n is alveolar)
         var input = new List<string> { "a", "N", "n", "a", "i" };
 
-        var result = PiperPhonemeConverter.ApplyNPhonemeRules(input);
+        List<string> result = PiperPhonemeConverter.ApplyNPhonemeRules(input);
 
         Assert.Equal(["a", "N_n", "n", "a", "i"], result);
     }
@@ -208,7 +212,7 @@ public sealed class PhonemeConverterTests
         // ぎんこう: g i N k o o -> N becomes N_ng (k is velar)
         var input = new List<string> { "g", "i", "N", "k", "o", "o" };
 
-        var result = PiperPhonemeConverter.ApplyNPhonemeRules(input);
+        List<string> result = PiperPhonemeConverter.ApplyNPhonemeRules(input);
 
         Assert.Equal(["g", "i", "N_ng", "k", "o", "o"], result);
     }
@@ -219,7 +223,7 @@ public sealed class PhonemeConverterTests
         // ほん: h o N -> N becomes N_uvular (end of phrase)
         var input = new List<string> { "h", "o", "N" };
 
-        var result = PiperPhonemeConverter.ApplyNPhonemeRules(input);
+        List<string> result = PiperPhonemeConverter.ApplyNPhonemeRules(input);
 
         Assert.Equal(["h", "o", "N_uvular"], result);
     }
@@ -230,7 +234,7 @@ public sealed class PhonemeConverterTests
         // N before vowel -> N_uvular
         var input = new List<string> { "N", "a" };
 
-        var result = PiperPhonemeConverter.ApplyNPhonemeRules(input);
+        List<string> result = PiperPhonemeConverter.ApplyNPhonemeRules(input);
 
         Assert.Equal(["N_uvular", "a"], result);
     }
@@ -241,7 +245,7 @@ public sealed class PhonemeConverterTests
         // N followed by skip token "_" then "k" -> N_ng (skips "_", sees "k")
         var input = new List<string> { "N", "_", "k", "a" };
 
-        var result = PiperPhonemeConverter.ApplyNPhonemeRules(input);
+        List<string> result = PiperPhonemeConverter.ApplyNPhonemeRules(input);
 
         Assert.Equal(["N_ng", "_", "k", "a"], result);
     }
@@ -252,7 +256,7 @@ public sealed class PhonemeConverterTests
         // Two N tokens: first before p (bilabial), second before k (velar)
         var input = new List<string> { "N", "p", "o", "N", "k", "a" };
 
-        var result = PiperPhonemeConverter.ApplyNPhonemeRules(input);
+        List<string> result = PiperPhonemeConverter.ApplyNPhonemeRules(input);
 
         Assert.Equal(["N_m", "p", "o", "N_ng", "k", "a"], result);
     }
@@ -263,7 +267,7 @@ public sealed class PhonemeConverterTests
         // No N tokens -> unchanged
         var input = new List<string> { "k", "a", "k", "i" };
 
-        var result = PiperPhonemeConverter.ApplyNPhonemeRules(input);
+        List<string> result = PiperPhonemeConverter.ApplyNPhonemeRules(input);
 
         Assert.Equal(["k", "a", "k", "i"], result);
     }
@@ -271,7 +275,6 @@ public sealed class PhonemeConverterTests
     // ================================================================
     // Exhaustive N phoneme variant tests
     // ================================================================
-
     [Theory]
     [InlineData("m")]
     [InlineData("my")]
@@ -284,7 +287,7 @@ public sealed class PhonemeConverterTests
         // N before any bilabial phoneme -> N_m
         var input = new List<string> { "a", "N", following, "a" };
 
-        var result = PiperPhonemeConverter.ApplyNPhonemeRules(input);
+        List<string> result = PiperPhonemeConverter.ApplyNPhonemeRules(input);
 
         Assert.Equal("N_m", result[1]);
     }
@@ -303,7 +306,7 @@ public sealed class PhonemeConverterTests
         // N before any alveolar phoneme -> N_n
         var input = new List<string> { "a", "N", following, "a" };
 
-        var result = PiperPhonemeConverter.ApplyNPhonemeRules(input);
+        List<string> result = PiperPhonemeConverter.ApplyNPhonemeRules(input);
 
         Assert.Equal("N_n", result[1]);
     }
@@ -320,7 +323,7 @@ public sealed class PhonemeConverterTests
         // N before any velar phoneme -> N_ng
         var input = new List<string> { "a", "N", following, "a" };
 
-        var result = PiperPhonemeConverter.ApplyNPhonemeRules(input);
+        List<string> result = PiperPhonemeConverter.ApplyNPhonemeRules(input);
 
         Assert.Equal("N_ng", result[1]);
     }
@@ -336,7 +339,7 @@ public sealed class PhonemeConverterTests
         // N before any vowel -> N_uvular
         var input = new List<string> { "N", vowel };
 
-        var result = PiperPhonemeConverter.ApplyNPhonemeRules(input);
+        List<string> result = PiperPhonemeConverter.ApplyNPhonemeRules(input);
 
         Assert.Equal("N_uvular", result[0]);
     }
@@ -347,9 +350,10 @@ public sealed class PhonemeConverterTests
         // N followed by "_", "#", then "p" -> N_m (skips both "_" and "#", sees "p")
         var input = new List<string> { "N", "_", "#", "p", "a" };
 
-        var result = PiperPhonemeConverter.ApplyNPhonemeRules(input);
+        List<string> result = PiperPhonemeConverter.ApplyNPhonemeRules(input);
 
         Assert.Equal("N_m", result[0]);
+
         // The remaining tokens are unchanged
         Assert.Equal(["N_m", "_", "#", "p", "a"], result);
     }
@@ -360,7 +364,7 @@ public sealed class PhonemeConverterTests
         // N followed by only skip tokens (no real phoneme) -> N_uvular
         var input = new List<string> { "a", "N", "_", "#", "$" };
 
-        var result = PiperPhonemeConverter.ApplyNPhonemeRules(input);
+        List<string> result = PiperPhonemeConverter.ApplyNPhonemeRules(input);
 
         Assert.Equal("N_uvular", result[1]);
         Assert.Equal(["a", "N_uvular", "_", "#", "$"], result);
@@ -372,7 +376,7 @@ public sealed class PhonemeConverterTests
         // N before an unknown phoneme "x" -> N_uvular (fallback)
         var input = new List<string> { "N", "x" };
 
-        var result = PiperPhonemeConverter.ApplyNPhonemeRules(input);
+        List<string> result = PiperPhonemeConverter.ApplyNPhonemeRules(input);
 
         Assert.Equal("N_uvular", result[0]);
         Assert.Equal(["N_uvular", "x"], result);
@@ -381,7 +385,6 @@ public sealed class PhonemeConverterTests
     // ================================================================
     // Additional GetQuestionType tests
     // ================================================================
-
     [Fact]
     public void GetQuestionType_NullInput_ReturnsDefault()
     {
@@ -402,7 +405,6 @@ public sealed class PhonemeConverterTests
     // ================================================================
     // EspeakPostProcessIds tests
     // ================================================================
-
     [Fact]
     public void EspeakPostProcessIds_BasicSequence()
     {
@@ -415,7 +417,7 @@ public sealed class PhonemeConverterTests
             ["$"] = [2],
         };
 
-        var (resultIds, resultPros) = PiperPhonemeConverter.EspeakPostProcessIds(ids, prosody, map);
+        (List<int>? resultIds, List<ProsodyInfo?>? resultPros) = PiperPhonemeConverter.EspeakPostProcessIds(ids, prosody, map);
 
         Assert.Equal([1, 0, 10, 0, 11, 0, 2], resultIds);
         Assert.Equal(resultIds.Count, resultPros.Count);
@@ -433,7 +435,7 @@ public sealed class PhonemeConverterTests
             ["$"] = [2],
         };
 
-        var (resultIds, resultPros) = PiperPhonemeConverter.EspeakPostProcessIds(ids, prosody, map);
+        (List<int>? resultIds, List<ProsodyInfo?>? resultPros) = PiperPhonemeConverter.EspeakPostProcessIds(ids, prosody, map);
 
         // 0 is a PAD token -> no extra PAD after it
         Assert.Equal([1, 0, 10, 0, 0, 11, 0, 2], resultIds);
@@ -452,7 +454,7 @@ public sealed class PhonemeConverterTests
             ["$"] = [2],
         };
 
-        var (resultIds, resultPros) = PiperPhonemeConverter.EspeakPostProcessIds(ids, prosody, map);
+        (List<int>? resultIds, List<ProsodyInfo?>? resultPros) = PiperPhonemeConverter.EspeakPostProcessIds(ids, prosody, map);
 
         Assert.Equal([1, 0, 2], resultIds);
         Assert.Equal(resultIds.Count, resultPros.Count);

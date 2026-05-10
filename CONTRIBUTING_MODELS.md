@@ -19,7 +19,7 @@ Community contributions are welcome.
 7. [ONNX エクスポート手順 / ONNX Export Steps](#onnx-エクスポート手順--onnx-export-steps)
 8. [voices.json エントリ / voices.json Entry](#voicesjson-エントリ--voicesjson-entry)
 9. [投稿プロセス / Submission Process](#投稿プロセス--submission-process)
-10. [FAQ](#faq)
+10. [FAQ](#faq) <!-- markdownlint-disable-line MD051 -->
 
 ---
 
@@ -72,7 +72,7 @@ Accepted models are registered in `piper_plus_voices.json` and become available 
 
 LJSpeech 形式 (フラットディレクトリ + `metadata.csv`) を使用してください。
 
-```
+```text
 dataset/
   wavs/
     utterance_001.wav
@@ -216,6 +216,7 @@ CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
 ```
 
 **重要:**
+
 - デフォルトで FP16 変換が適用されます (モデルサイズ ~50% 削減)
 - シングルスピーカー多言語モデルでは `--unify-emb-lang` が自動有効化され、声質が統一されます
 - `CUDA_VISIBLE_DEVICES=""` で CPU モードを使用してください
@@ -388,7 +389,8 @@ piper-plus --model <model-name> --text "こんにちは"
 # C#
 piper-plus --model <model-name> --text "こんにちは"
 ```
-```
+
+```text
 
 ### Step 3: GitHub Issue で投稿
 

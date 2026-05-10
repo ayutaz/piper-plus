@@ -50,7 +50,7 @@ namespace PiperPlus.Core.Phonemize;
 /// </remarks>
 public sealed class CustomDictionary
 {
-    private static ILogger s_logger = NullLogger.Instance;
+    private static ILogger logger = NullLogger.Instance;
 
     private static readonly ConcurrentDictionary<string, Regex> _regexCache = new();
 
@@ -60,7 +60,7 @@ public sealed class CustomDictionary
     /// </summary>
     public static void SetLogger(ILogger logger)
     {
-        s_logger = logger ?? NullLogger.Instance;
+        CustomDictionary.logger = logger ?? NullLogger.Instance;
     }
 
     private static Regex GetOrCreateRegex(string key, bool caseSensitive)
@@ -69,8 +69,12 @@ public sealed class CustomDictionary
         return _regexCache.GetOrAdd(cacheKey, _ =>
         {
             var pattern = @"\b" + Regex.Escape(key) + @"\b";
-            var options = RegexOptions.Compiled | RegexOptions.CultureInvariant;
-            if (!caseSensitive) options |= RegexOptions.IgnoreCase;
+            RegexOptions options = RegexOptions.Compiled | RegexOptions.CultureInvariant;
+            if (!caseSensitive)
+            {
+                options |= RegexOptions.IgnoreCase;
+            }
+
             return new Regex(pattern, options);
         });
     }
@@ -136,15 +140,18 @@ public sealed class CustomDictionary
         }
 
         if (filePath.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
+        {
             LoadJsonDictionary(filePath);
+        }
         else
+        {
             LoadTsvDictionary(filePath);
+        }
     }
 
     // ----------------------------------------------------------------
     // TSV loading (original format)
     // ----------------------------------------------------------------
-
     private void LoadTsvDictionary(string filePath)
     {
         using var reader = new StreamReader(filePath, Encoding.UTF8);
@@ -154,22 +161,30 @@ public sealed class CustomDictionary
         {
             // Skip empty lines.
             if (string.IsNullOrWhiteSpace(line))
+            {
                 continue;
+            }
 
             // Skip comment lines.
             if (line.StartsWith('#'))
+            {
                 continue;
+            }
 
             // Split on the first tab.
             int tabIndex = line.IndexOf('\t');
             if (tabIndex < 0)
+            {
                 continue; // Malformed line — no tab found; skip silently.
+            }
 
             string key = line[..tabIndex];
             string value = line[(tabIndex + 1)..];
 
             if (key.Length == 0)
+            {
                 continue; // Empty key — skip.
+            }
 
             AddEntry(key, value, 5);
         }
@@ -178,16 +193,15 @@ public sealed class CustomDictionary
     // ----------------------------------------------------------------
     // JSON loading (v1.0 / v2.0 — matches C++/Rust format)
     // ----------------------------------------------------------------
-
     private void LoadJsonDictionary(string filePath)
     {
         string json = File.ReadAllText(filePath, Encoding.UTF8);
         using var doc = JsonDocument.Parse(json);
-        var root = doc.RootElement;
+        JsonElement root = doc.RootElement;
 
         // Get entries — either from "entries" key or root level.
         JsonElement entries;
-        if (root.TryGetProperty("entries", out var entriesObj)
+        if (root.TryGetProperty("entries", out JsonElement entriesObj)
             && entriesObj.ValueKind == JsonValueKind.Object)
         {
             entries = entriesObj;
@@ -197,26 +211,30 @@ public sealed class CustomDictionary
             entries = root;
         }
 
-        foreach (var prop in entries.EnumerateObject())
+        foreach (JsonProperty prop in entries.EnumerateObject())
         {
             string word = prop.Name;
 
             // Skip metadata keys.
             if (word is "version" or "description" or "metadata")
+            {
                 continue;
+            }
 
             // Skip comment keys (v2.0 convention).
             if (word.StartsWith("//"))
+            {
                 continue;
+            }
 
             if (prop.Value.ValueKind == JsonValueKind.Object)
             {
                 // V2.0: { "pronunciation": "...", "priority": N }
-                if (prop.Value.TryGetProperty("pronunciation", out var pronEl))
+                if (prop.Value.TryGetProperty("pronunciation", out JsonElement pronEl))
                 {
-                    string pronunciation = pronEl.GetString() ?? "";
+                    string pronunciation = pronEl.GetString() ?? string.Empty;
                     int priority = 5;
-                    if (prop.Value.TryGetProperty("priority", out var priEl)
+                    if (prop.Value.TryGetProperty("priority", out JsonElement priEl)
                         && priEl.ValueKind == JsonValueKind.Number)
                     {
                         priority = priEl.GetInt32();
@@ -228,7 +246,7 @@ public sealed class CustomDictionary
             else if (prop.Value.ValueKind == JsonValueKind.String)
             {
                 // V1.0: "word": "pronunciation"
-                AddEntry(word, prop.Value.GetString() ?? "", 5);
+                AddEntry(word, prop.Value.GetString() ?? string.Empty, 5);
             }
         }
     }
@@ -236,7 +254,6 @@ public sealed class CustomDictionary
     // ----------------------------------------------------------------
     // Priority-aware entry insertion
     // ----------------------------------------------------------------
-
     private void AddEntry(string key, string value, int priority)
     {
         bool caseSensitive = IsMixedCase(key);
@@ -251,7 +268,9 @@ public sealed class CustomDictionary
         if (existing >= 0)
         {
             if (priority <= _entries[existing].Priority)
+            {
                 return; // Existing has higher or equal priority — keep it.
+            }
 
             _entries[existing] = new DictionaryEntry(key, value, priority, caseSensitive);
         }
@@ -280,18 +299,20 @@ public sealed class CustomDictionary
         // Exe-relative paths (matches C++ findDictDir candidates)
         var exeDir = AppContext.BaseDirectory.TrimEnd(
             Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-        searchPaths.Add(Path.Combine(exeDir, "data", "dictionaries"));
-        searchPaths.Add(Path.Combine(exeDir, "..", "data", "dictionaries"));
-        searchPaths.Add(Path.Combine(exeDir, "..", "..", "data", "dictionaries"));
+        searchPaths.Add(Path.Join(exeDir, "data", "dictionaries"));
+        searchPaths.Add(Path.Join(exeDir, "..", "data", "dictionaries"));
+        searchPaths.Add(Path.Join(exeDir, "..", "..", "data", "dictionaries"));
 
         // Working directory
-        searchPaths.Add(Path.Combine(
+        searchPaths.Add(Path.Join(
             Directory.GetCurrentDirectory(), "data", "dictionaries"));
 
         foreach (var searchPath in searchPaths)
         {
             if (!Directory.Exists(searchPath))
+            {
                 continue;
+            }
 
             // Load in sorted order (matching C++ behaviour)
             var files = Directory.GetFiles(searchPath, "*.json")
@@ -306,7 +327,7 @@ public sealed class CustomDictionary
                 }
                 catch (Exception ex)
                 {
-                    s_logger.LogWarning(
+                    logger.LogWarning(
                         "Failed to load default dictionary {File}: {Message}",
                         file, ex.Message);
                 }
@@ -337,7 +358,7 @@ public sealed class CustomDictionary
             }
             catch (Exception ex)
             {
-                s_logger.LogWarning(
+                logger.LogWarning(
                     "Failed to load dictionary {FilePath}: {Message}",
                     filePath, ex.Message);
             }
@@ -360,7 +381,9 @@ public sealed class CustomDictionary
     public string ApplyToText(string text)
     {
         if (string.IsNullOrEmpty(text) || _entries.Count == 0)
+        {
             return text;
+        }
 
         // Rebuild sorted snapshot when entries have changed.
         if (_dirty || _sorted is null)
@@ -378,22 +401,24 @@ public sealed class CustomDictionary
             }
         }
 
-        foreach (var entry in _sorted)
+        foreach (DictionaryEntry entry in _sorted)
         {
             if (StartsWithAscii(entry.Key))
             {
                 // Fast pre-check: skip regex if the key doesn't appear at all.
                 if (text.IndexOf(entry.Key, entry.IsCaseSensitive ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase) < 0)
+                {
                     continue;
+                }
 
                 // ASCII words: use \b word boundary to prevent partial matches.
-                var regex = GetOrCreateRegex(entry.Key, entry.IsCaseSensitive);
+                Regex regex = GetOrCreateRegex(entry.Key, entry.IsCaseSensitive);
                 text = regex.Replace(text, entry.Value);
             }
             else
             {
                 // Non-ASCII (Japanese, Chinese, etc.): simple substring replacement.
-                var comparison = entry.IsCaseSensitive
+                StringComparison comparison = entry.IsCaseSensitive
                     ? StringComparison.Ordinal
                     : StringComparison.OrdinalIgnoreCase;
                 text = text.Replace(entry.Key, entry.Value, comparison);
@@ -418,10 +443,22 @@ public sealed class CustomDictionary
         bool hasUpper = false, hasLower = false;
         foreach (char c in word)
         {
-            if (char.IsUpper(c)) hasUpper = true;
-            if (char.IsLower(c)) hasLower = true;
-            if (hasUpper && hasLower) return true;
+            if (char.IsUpper(c))
+            {
+                hasUpper = true;
+            }
+
+            if (char.IsLower(c))
+            {
+                hasLower = true;
+            }
+
+            if (hasUpper && hasLower)
+            {
+                return true;
+            }
         }
+
         return false;
     }
 

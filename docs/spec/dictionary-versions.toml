@@ -1,0 +1,416 @@
+# G2P Dictionary Versions Contract
+# =================================
+# This file pins the canonical version, source URL, and (where applicable)
+# SHA-256 hash for every external linguistic dictionary that any piper-plus
+# G2P runtime depends on. The intent is two-fold:
+#
+#   1. Reproducibility — a fresh checkout that pulls exactly these versions
+#      MUST produce byte-identical phoneme sequences for the same text input
+#      across runtime upgrades. Drift in any of these tables silently changes
+#      the input to the model and degrades synthesis quality.
+#
+#   2. Cross-runtime parity — the canonical Python G2P pipeline and every
+#      mirror (Rust, Go, C#, C++, WASM/JS, Kotlin/Android, Swift) MUST
+#      consume the same underlying dictionary data. Where mirrors ship a
+#      pre-converted JSON snapshot (e.g. cmudict_data.json, pinyin_*.json),
+#      the snapshot's source upstream version MUST match the version pinned
+#      here.
+#
+# This file is design-time documentation. Hash verification is enforced at
+# build time via the cmake/SetupOpenJTalk.cmake URL_HASH directive (C++) and
+# Cargo.lock checksum (Rust); the JSON-mirror parity is enforced by
+# scripts/check_loanword_consistency.py for the only non-pinyin/cmudict
+# JSON we maintain (zh_en_loanword.json).
+#
+# Implementations:
+#   Python (training):  src/python/piper_train/phonemize/                 (japanese, english, chinese, korean)
+#   Python (G2P pkg):   src/python/g2p/piper_plus_g2p/                    (canonical 8-language)
+#   Python (runtime):   src/python_run/piper/phonemize/                   (mirrors g2p package)
+#   Rust:               src/rust/piper-plus-g2p/                          (cmudict / pinyin / jpreprocess + naist-jdic)
+#   Go:                 src/go/phonemize/                                 (cmudict / pinyin mirrors)
+#   C#:                 src/csharp/PiperPlus.Core/Phonemize/              (DotNetG2P / NuGet)
+#   C/C++:              src/cpp/                                          (OpenJTalk fork, libopenjtalk)
+#   WASM/JS:            src/wasm/openjtalk-web/                           (OpenJTalk WASM build + JSON mirrors)
+#   WASM/JS G2P:        src/wasm/g2p/                                     (npm @piper-plus/g2p)
+#   Kotlin/Android:     android/piper-plus-g2p/                           (G2P-only)
+#   Swift:              Sources/PiperPlusG2P/                             (FFI bridge to Rust core)
+
+[meta]
+spec_version = "1.0"
+last_updated = "2026-05-09"
+contract_version = 1
+status = "stable"
+applies_to = ["python", "rust", "go", "csharp", "cpp", "wasm-js", "kotlin", "swift"]
+update_policy = """
+Bumping any pinned version below requires:
+  1. Updating ALL runtime mirrors that bundle a snapshot of the data.
+  2. Re-running the G2P golden fixture tests (test/fixtures/) and
+     confirming any phoneme-output drift is intentional and audible
+     differences (if any) are documented in the bump PR.
+  3. Updating the SHA-256 hash field where present.
+  4. Bumping last_updated and (if the upstream source itself is
+     versioned) bumping contract_version.
+"""
+
+# ===========================================================================
+# Japanese — OpenJTalk + NAIST-JDIC
+# ===========================================================================
+# Japanese G2P uses the OpenJTalk pipeline (MeCab tokenizer + NJD prosody
+# rules + JPCommon fullcontext label generator). Two distinct upstreams:
+#
+#   - Training side (Python): pyopenjtalk-plus, a fork of pyopenjtalk that
+#     bundles the OpenJTalk shared library + NAIST-JDIC dictionary as a
+#     PyPI wheel.
+#   - Rust side: jpreprocess (a pure-Rust reimplementation of OpenJTalk)
+#     with optional `naist-jdic` feature that compiles the dictionary into
+#     the binary at build time (~20 MB).
+#   - C++/C-API side: cmake/ExternalDeps.cmake downloads the same
+#     pyopenjtalk-plus tarball and builds the C library + extracts the
+#     dictionary from the archive's `pyopenjtalk/dictionary/` directory.
+
+[japanese.pyopenjtalk_plus]
+# Canonical Python source for OpenJTalk + NAIST-JDIC bundle.
+# Distributed as a PyPI sdist that contains both the C source for
+# libopenjtalk and the binary NAIST-JDIC dictionary files.
+package = "pyopenjtalk-plus"
+version = "0.4.1.post7"
+pypi_constraint = ">=0.4"   # constraint pinned in pyproject.toml
+sdist_url = "https://files.pythonhosted.org/packages/82/4e/1e2c165b04dd250dbcb1c270df8517681eed5c20b755c72bec2b42853851/pyopenjtalk_plus-0.4.1.post7.tar.gz"
+sdist_sha256 = "555fdf86310d6d72f4a37e92beb251cdc2114aafc133d4c77b136a07a4b17119"
+includes = [
+    "libopenjtalk source (lib/open_jtalk/src)",
+    "NAIST-JDIC binary dictionary (pyopenjtalk/dictionary/{sys.dic,unk.dic,matrix.bin,*-id.def,char.bin,rewrite.def,COPYING})",
+]
+license = "Modified BSD (NAIST-JDIC) + MIT (pyopenjtalk wrapper)"
+canonical_for = ["python-train", "python-runtime", "cpp", "wasm-cpp"]
+
+[japanese.jpreprocess]
+# Rust pure-implementation of the OpenJTalk pipeline. Used by piper-core
+# and the npm @piper-plus/g2p package (via WASM compilation of piper-wasm).
+package = "jpreprocess"
+crates_io_version = "0.9.1"
+embedded_dictionary_feature = "naist-jdic"
+embedded_dictionary_size_mb_approx = 20
+license = "MIT (jpreprocess), BSD-3-Clause (NAIST-JDIC bundled)"
+canonical_for = ["rust", "wasm-rust", "swift", "kotlin"]
+note = """
+jpreprocess-naist-jdic 0.9.1 bundles the same NAIST-JDIC corpus as the
+pyopenjtalk-plus 0.4.1.post7 distribution (both ultimately derive from
+the upstream NAIST-JDIC project). Cross-runtime phoneme parity has been
+verified empirically against piper_train's Python output via the
+fullcontext-label fixtures in test/fixtures/.
+"""
+
+[japanese.naist_jdic]
+# Underlying corpus shared by both bundling routes above.
+upstream_source = "NAIST-JDIC project (https://osdn.net/projects/naist-jdic/)"
+license = "BSD-3-Clause"
+copyright_holder = "Nara Institute of Science and Technology"
+copyright_year = 2009
+distribution_note = "Always bundled inside pyopenjtalk-plus (Python) or jpreprocess-naist-jdic (Rust); no standalone download."
+
+[japanese.mirrors]
+# Per-runtime locations where Japanese G2P data lives or is produced.
+python_train = "via pyopenjtalk-plus PyPI install"
+python_runtime = "via pyopenjtalk-plus PyPI install"
+rust_g2p = "src/rust/piper-plus-g2p/Cargo.toml feature [naist-jdic] (jpreprocess crate)"
+csharp_g2p = "DotNetG2P NuGet package (user-installed; not bundled with PiperPlus.Core)"
+cpp = "cmake/ExternalDeps.cmake openjtalk_external + openjtalk_dic_download (downloads pyopenjtalk-plus 0.4.1.post7)"
+wasm_cpp = "src/wasm/openjtalk-web (Emscripten build of libopenjtalk; same source)"
+wasm_g2p_npm = "src/wasm/g2p (compiled from piper-plus-g2p Rust → WASM via piper-wasm; embeds jpreprocess + naist-jdic)"
+android = "android/piper-plus-g2p/ (Kotlin AAR; loads the Rust shared lib via JNI; embeds jpreprocess + naist-jdic)"
+swift = "Sources/PiperPlusG2P/ (Swift package; loads the Rust shared lib via FFI; embeds jpreprocess + naist-jdic)"
+
+# ===========================================================================
+# English — CMU Pronouncing Dictionary
+# ===========================================================================
+# English G2P uses the CMU Pronouncing Dictionary (cmudict.0.7b), an
+# ARPABET-format word→phoneme lookup, plus a neural fallback for OOV
+# words (via g2p-en's bundled BiLSTM model on the Python side; rule-based
+# fallback on the Rust/Go/C#/JS side).
+
+[english.cmudict]
+canonical_version = "0.7b"
+upstream_source = "Carnegie Mellon University Pronouncing Dictionary"
+upstream_url = "http://www.speech.cs.cmu.edu/cgi-bin/cmudict"
+copyright_holder = "Carnegie Mellon University"
+copyright_years = "1993-2015"
+license = "BSD-style (CMU Pronouncing Dictionary License)"
+format = "ARPABET (e.g. CAT → K AE1 T)"
+
+[english.g2p_en]
+# Python wrapper that bundles cmudict 0.7b + a BiLSTM OOV model.
+package = "g2p-en"
+version = "2.1.0"
+pypi_constraint = ">=2.1.0,<3"
+license = "Apache-2.0"
+includes = [
+    "checkpoint20.npz (BiLSTM OOV model weights)",
+    "homographs.en (homograph disambiguation table)",
+    "embedded cmudict (within g2p_en/)",
+]
+canonical_for = ["python-train", "python-runtime"]
+
+[english.cmudict_json_mirror]
+# Pre-converted CMU dictionary in JSON form, embedded in non-Python runtimes
+# that cannot link against g2p-en. The canonical conversion step extracts
+# (word, ARPABET-string) pairs from cmudict.0.7b.
+shared_format = "JSON object: { \"word\": \"PHONEME PHONEME ...\" }"
+size_mb_approx = 3.7
+license = "BSD-style (CMU)"
+mirrors = [
+    "src/rust/piper-plus-g2p/data/cmudict_data.json",
+    "src/go/phonemize/data/cmudict_data.json",  # symlink or copy in Go runtime
+    "test/models/cmudict_data.json",            # test fixture mirror
+]
+note = """
+The JSON mirror is regenerated by a script that wraps g2p-en's
+cmudict accessor. Conversion is deterministic; same input cmudict
+0.7b → byte-identical JSON output. No CI gate currently enforces
+sync between the JSON mirrors and the g2p-en package version, but
+the empirically observed mirrors match the g2p-en 2.1.0 snapshot.
+"""
+
+# ===========================================================================
+# Chinese — Pinyin tables (single + phrases)
+# ===========================================================================
+# Chinese G2P pipeline:
+#   1. Hanzi text → pinyin via pypinyin (Python) or JSON-table lookup (other).
+#   2. Pinyin → IPA via deterministic rule transformation (chinese.py /
+#      chinese.rs / chinese.go).
+#
+# The pinyin tables ship in two parts:
+#   - pinyin_single.json: single-character → pinyin lookup (~700 KB).
+#   - pinyin_phrases.json: multi-character phrase → pinyin list (~1.9 MB).
+# Both are derived from pypinyin's bundled data (which itself derives from
+# Unicode CLDR + the Han Database), serialized as JSON for non-Python
+# runtimes.
+
+[chinese.pypinyin]
+package = "pypinyin"
+version = "0.55.0"
+pypi_constraint = ">=0.55.0,<1"  # current pin in src/python/g2p/pyproject.toml
+license = "MIT"
+copyright_holder = "mozillazg, 闲耘"
+upstream_url = "https://github.com/mozillazg/python-pinyin"
+includes = [
+    "Single character pinyin table (pypinyin/pinyin_dict.py)",
+    "Phrase pinyin table (pypinyin/phrases_dict.py)",
+    "Phrase list (pypinyin/phrases.py)",
+]
+canonical_for = ["python-train", "python-runtime"]
+
+[chinese.pinyin_json_mirrors]
+# Pre-converted JSON form for non-Python runtimes.
+shared_format_single = "JSON object: { \"hanzi\": \"pinyin1\" }"
+shared_format_phrases = "JSON object: { \"phrase\": [\"pinyin1\", \"pinyin2\", ...] }"
+size_mb_approx_single = 0.7
+size_mb_approx_phrases = 1.9
+license = "MIT (pypinyin)"
+mirrors_single = [
+    "src/rust/piper-plus-g2p/data/pinyin_single.json",
+    "src/wasm/openjtalk-web/assets/pinyin_single.json",
+    "test/models/pinyin_single.json",
+]
+mirrors_phrases = [
+    "src/rust/piper-plus-g2p/data/pinyin_phrases.json",
+    "src/wasm/openjtalk-web/assets/pinyin_phrases.json",
+    "test/models/pinyin_phrases.json",
+]
+
+# ===========================================================================
+# ZH-EN code-switching loanword dictionary (cross-runtime mirror, Issue #384)
+# ===========================================================================
+# Custom dictionary maintained in this repository (NOT an upstream package).
+# Maps Chinese-context English acronyms / loanwords / single letters to
+# Mandarin pinyin to avoid US-English pronunciation in mixed text.
+#
+# Schema and 7 mirror byte-for-byte equality is enforced by the CI gate
+# `ZH-EN Loanword Sync Gate / json-sync` (scripts/check_loanword_consistency.py).
+# See docs/spec/zh-en-loanword-runtime-rollout.md for details.
+
+[chinese_english.zh_en_loanword]
+canonical_source = "src/python/g2p/piper_plus_g2p/data/zh_en_loanword.json"
+schema_version = 2
+size_categories = { acronyms = 66, loanwords = 40, letter_fallback = 26 }
+license = "MIT (this repository)"
+mirrors_canonical_plus_runtimes = [
+    "src/python/g2p/piper_plus_g2p/data/zh_en_loanword.json",                # canonical
+    "src/python_run/piper/phonemize/data/zh_en_loanword.json",               # Python runtime
+    "src/rust/piper-plus-g2p/data/zh_en_loanword.json",                      # Rust G2P
+    "src/rust/piper-core/data/zh_en_loanword.json",                          # Rust core
+    "src/go/phonemize/data/zh_en_loanword.json",                             # Go
+    "src/csharp/PiperPlus.Core/Phonemize/Data/zh_en_loanword.json",          # C#
+    "src/wasm/g2p/data/zh_en_loanword.json",                                 # npm
+    "src/cpp/data/zh_en_loanword.json",                                      # C++
+    "android/piper-plus-g2p/src/main/assets/zh_en_loanword.json",            # Kotlin/Android
+    "Sources/PiperPlusG2P/Resources/zh_en_loanword.json",                    # Swift
+]
+ci_gate = "scripts/check_loanword_consistency.py + .github/workflows/zh-en-loanword.yml"
+
+# ===========================================================================
+# Korean — g2pK2
+# ===========================================================================
+# Korean G2P uses g2pK2, a fork of g2pK (Park Kyubyong's MIT-licensed
+# Korean G2P library). Pure rule-based; no external corpus lookup beyond
+# its built-in dictionary. Optional dependency (Python only) — runtimes
+# without g2pK2 fall back to a rule-based KoreanPhonemizer in
+# piper_plus_g2p.korean.
+
+[korean.g2pk2]
+package = "g2pk2"
+version = "0.0.3"
+pypi_constraint = ">=0.0.3,<1"
+license = "Apache-2.0"
+upstream_source = "https://github.com/Kyubyong/g2pK"
+canonical_for = ["python-train", "python-runtime"]
+optional = true       # not required; rule-based fallback exists
+
+[korean.fallback]
+# Pure-Python / Rust / Go / etc. rule-based KoreanPhonemizer covering the
+# standard Hangul → IPA mapping. No external dictionary; ships in source.
+implementation = "src/python/g2p/piper_plus_g2p/korean.py + per-runtime mirrors"
+license = "MIT (this repository)"
+
+# ===========================================================================
+# Spanish / Portuguese / French / Swedish — rule-based, no external dict
+# ===========================================================================
+# These four languages use deterministic rule-based phonemizers shipped
+# in source form. There is no external dictionary dependency; each
+# runtime carries its own ported implementation.
+
+[romance_germanic.no_external_dict]
+languages = ["es", "pt-BR", "pt-PT", "fr", "sv"]
+implementation = "Rule-based (no external corpus)"
+canonical_source = "src/python/g2p/piper_plus_g2p/{spanish,portuguese,french,swedish}.py"
+mirrors = """
+Per-runtime ports under:
+  src/rust/piper-plus-g2p/src/{spanish,portuguese,french,swedish}.rs
+  src/go/phonemize/{spanish,portuguese,french,swedish}.go
+  src/csharp/PiperPlus.Core/Phonemize/{Spanish,Portuguese,French,Swedish}Phonemizer.cs
+  src/wasm/g2p/src/{spanish,portuguese,french,swedish}.js
+  src/cpp/g2p/{spanish,portuguese,french,swedish}.cpp
+  android/piper-plus-g2p/src/main/kotlin/...
+  Sources/PiperPlusG2P/{Spanish,Portuguese,French,Swedish}.swift
+"""
+license = "MIT (this repository)"
+note = "Cross-runtime parity is enforced by per-language test fixtures (test/fixtures/{es,pt,fr,sv}/)."
+
+# ===========================================================================
+# eSpeak / eSpeak NG — historical, no longer used by piper-plus core
+# ===========================================================================
+# Some upstream Piper voice models reference eSpeak NG phoneme inventories.
+# piper-plus uses its own multilingual phoneme inventory (see
+# docs/spec/phoneme-set-version.toml) and does NOT depend on eSpeak NG at
+# runtime for synthesis. The only remaining references are:
+#
+#   - src/wasm/openjtalk-web/dist/espeak-ng/  — historical bundled WASM
+#     build artifact preserved for browser demos that mix piper voices
+#     with upstream-Piper voices. Not loaded by the synthesize pipeline
+#     of piper-plus models.
+#   - src/python/jp_phoneme_map.py — legacy mapping table that mentions
+#     "espeak" as an output format; not active in any runtime path.
+
+[espeak_ng]
+status = "not-used-by-runtime"
+historical_artifacts = [
+    "src/wasm/openjtalk-web/dist/espeak-ng/  (browser demo only)",
+    "src/python/jp_phoneme_map.py            (dormant mapping table)",
+]
+note = """
+piper-plus models trained from v1.10 onwards use the multilingual G2P
+inventory documented in phoneme-set-version.toml; eSpeak NG IPA output
+is not used by any synthesis path. Future trained models WILL NOT
+introduce an eSpeak NG dependency.
+"""
+
+# ===========================================================================
+# PUA mapping table (cross-runtime mirror)
+# ===========================================================================
+# Internal-only data file (not a third-party dictionary), included here
+# because it functions as a fixed shared lookup table that all G2P
+# runtimes must agree on. See docs/spec/pua-contract.toml for the
+# full invariant specification.
+
+[pua]
+canonical_source = "src/python/g2p/piper_plus_g2p/data/pua.json"
+canonical_version_field = "version"
+current_pua_compat_version = 2
+license = "MIT (this repository)"
+ci_gate = "scripts/check_pua_consistency.py + .github/workflows/pua-consistency.yml"
+mirrors_runtime_constants = [
+    "src/python/g2p/piper_plus_g2p/encode/pua.py:PUA_COMPAT_VERSION",
+    "src/wasm/g2p/src/pua-map.js:PUA_COMPAT_VERSION",
+    "src/rust/piper-plus-g2p/src/token_map.rs:PUA_COMPAT_VERSION",
+    "Sources/PiperPlusG2P/PUAMap.swift:compatVersion",
+]
+note = "See pua-contract.toml for full mirror table and invariants."
+
+# ===========================================================================
+# Update / synchronization policy
+# ===========================================================================
+# Bump procedure:
+#
+#   1. Identify the canonical-source change (e.g. pyopenjtalk-plus
+#      0.4.1.post7 → 0.5.0; cmudict 0.7b → 0.7c).
+#
+#   2. Update the version + sha256 fields in this file in the same PR
+#      that bumps the upstream dependency declaration (pyproject.toml /
+#      Cargo.toml / cmake/ExternalDeps.cmake).
+#
+#   3. For dictionaries with JSON mirrors (cmudict, pinyin_*, pua,
+#      zh_en_loanword): regenerate the mirrors via the conversion
+#      script and verify CI gates pass:
+#        - check_loanword_consistency.py (zh_en_loanword)
+#        - check_pua_consistency.py     (pua)
+#        - cargo build --features bundled-dicts (Rust JSON mirrors)
+#
+#   4. Run the G2P golden fixture tests for every affected language and
+#      document phoneme-output differences in the bump PR. Audible
+#      regressions (sometimes intentional, e.g. better OOV pronunciation)
+#      MUST be linked to the dependency bump in CHANGELOG.
+#
+#   5. Bump `last_updated` in this file's [meta] block.
+
+[update_procedure]
+canonical_pin_files = [
+    "pyproject.toml (Python)",
+    "src/python/g2p/pyproject.toml (G2P pkg)",
+    "src/rust/Cargo.toml (Rust workspace)",
+    "src/rust/Cargo.lock (Rust lock)",
+    "cmake/ExternalDeps.cmake (C++)",
+    "android/piper-plus-g2p/build.gradle.kts (Kotlin)",
+    "Package.swift (Swift)",
+]
+ci_gates_to_pass_post_bump = [
+    "ZH-EN Loanword Sync Gate / json-sync",
+    "PUA consistency / .github/workflows/pua-consistency.yml",
+    "Per-language fixture tests (test/fixtures/)",
+    "Cross-runtime phoneme parity (test/test_*_phonemizer*.py)",
+]
+
+# ===========================================================================
+# Implementation status (informational)
+# ===========================================================================
+# ✓ = uses canonical source; M = uses mirror snapshot; - = not applicable
+#                       Python  Rust  Go  C#         C++  WASM  Kotlin  Swift
+# pyopenjtalk-plus      ✓       -     -   -          ✓    ✓     -       -
+# jpreprocess+naist     -       ✓     -   via NuGet  -    ✓     ✓       ✓
+# g2p-en (cmudict)      ✓       -     -   -          -    -     -       -
+# cmudict JSON mirror   -       M     M   M          -    M     -       -
+# pypinyin              ✓       -     -   -          -    -     -       -
+# pinyin JSON mirror    -       M     -   -          -    M     -       -
+# g2pK2 (Korean)        ✓       -     -   -          -    -     -       -
+# rule-based ko/es/...  ✓       ✓     ✓   ✓          ✓    ✓     ✓       ✓
+# zh_en_loanword JSON   ✓       M     M   M          M    M     M       M
+
+[implementation_status]
+notes = """
+Cross-runtime phoneme parity is verified empirically against the Python
+canonical pipeline using golden test fixtures. Drift between the Python
+canonical and any mirror (e.g. a stale cmudict_data.json) would surface
+as audible synthesis differences in cross-runtime audio comparison
+tests. The CI gates listed under [update_procedure] are not exhaustive
+— they cover the structurally-checkable mirrors (zh_en_loanword, pua),
+not the binary dictionary blobs (NAIST-JDIC, etc.).
+"""

@@ -1,0 +1,47 @@
+# detekt config for piper-plus-g2p (Android) — Wave 1 quality gate.
+#
+# Used together with `buildUponDefaultConfig = true`, so this file only
+# overrides what we want to deviate from upstream defaults. Run:
+#   ./gradlew detekt
+# to lint, or:
+#   ./gradlew detektGenerateConfig
+# to regenerate the upstream defaults if you need to compare.
+#
+# Versions are kept in sync with android/piper-plus-g2p/build.gradle.kts
+# (toolVersion = "1.23.7") — bump both together.
+
+build:
+  maxIssues: 0
+  excludeCorrectable: false
+
+config:
+  validation: true
+  warningsAsErrors: false
+  excludes: ''
+
+complexity:
+  active: true
+  ComplexCondition:
+    active: true
+    threshold: 4
+  ComplexInterface:
+    active: true
+    threshold: 10
+  ComplexMethod:
+    active: true
+    threshold: 15
+  LongMethod:
+    active: true
+    threshold: 60
+
+style:
+  active: true
+  MagicNumber:
+    active: true
+    excludes: ['**/test/**', '**/androidTest/**']
+    ignoreNumbers: ['-1', '0', '1', '2']
+
+formatting:
+  active: true
+  android: true
+  autoCorrect: false

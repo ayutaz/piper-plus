@@ -213,6 +213,11 @@ jobs:
       github.event_name == 'push' && startsWith(github.ref, 'refs/tags/phonemize-v') ||
       github.event_name == 'workflow_dispatch' && github.event.inputs.publish == 'true'
 
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+
     environment:
       name: pypi
       url: https://pypi.org/project/piper-phonemize/
@@ -229,6 +234,12 @@ jobs:
         run: |
           ls -la dist/
           echo "Total wheels: $(ls -1 dist/*.whl | wc -l)"
+
+      - name: Generate build provenance attestation
+        # SLSA provenance for all wheels before they are uploaded to PyPI.
+        uses: actions/attest-build-provenance@v3
+        with:
+          subject-path: 'dist/*.whl'
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1

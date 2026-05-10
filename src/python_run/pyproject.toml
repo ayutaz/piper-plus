@@ -1,0 +1,56 @@
+# -----------------------------------------------------------------------------
+# piper-plus runtime: tool configuration
+# -----------------------------------------------------------------------------
+# このファイルは tool 設定 (mypy / ruff / pytest) のみを保持する。
+# パッケージ build はレガシーな `setup.py` が引き続き担当しているため、
+# `[build-system]` / `[project]` テーブルは置かない (setup.py と二重定義しない)。
+#
+# 段階的型付け方針:
+#   - mypy strict は使わず、ignore_missing_imports で onnxruntime 等を許容
+#   - 既存の `mypy.ini` の override 設定は維持しつつ、
+#     g2p (`src/python/g2p/pyproject.toml`) の設定を概ね mirror する
+#   - `warn_return_any` / `warn_unused_ignores` を入れて漏れを検知
+# -----------------------------------------------------------------------------
+
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true
+warn_unused_ignores = true
+warn_return_any = true
+warn_redundant_casts = true
+warn_unused_configs = true
+# 段階的導入: 当面は strict は使わない (M2-M3 で逐次有効化予定)
+# strict = true
+# disallow_untyped_defs = true
+# disallow_incomplete_defs = true
+files = ["piper"]
+
+# 既存 mypy.ini の override を保持 (third-party stub 不在の依存)
+[[tool.mypy.overrides]]
+module = "onnxruntime.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "piper_phonemize.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "pyopenjtalk.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "g2p_en.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "pypinyin.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "g2pk2.*"
+ignore_missing_imports = true
+
+# テストコードは型注釈不要 (段階的に厳密化)
+[[tool.mypy.overrides]]
+module = "tests.*"
+ignore_errors = true

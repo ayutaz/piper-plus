@@ -48,6 +48,7 @@ bincode = "1"
 [dev-dependencies]
 tempfile = "3"
 hound = "3.5"
+sha2 = "0.10"
 
 # ``bench_phase1`` calls ``PiperVoice::load`` which is gated behind the
 # ``onnx`` feature (see lib.rs ``#[cfg(feature = "onnx")]``). The default
@@ -59,3 +60,6 @@ hound = "3.5"
 [[example]]
 name = "bench_phase1"
 required-features = ["onnx"]
+
+[lints]
+workspace = true

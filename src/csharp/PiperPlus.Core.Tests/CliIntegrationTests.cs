@@ -39,7 +39,8 @@ public sealed class CliIntegrationTests
         {
             // Fallback: resolve relative to the working directory
             return Path.GetFullPath(
-                Path.Combine(Directory.GetCurrentDirectory(),
+                Path.Combine(
+                    Directory.GetCurrentDirectory(),
                     "..", "..", "..", "..", "PiperPlus.Cli"));
         }
 
@@ -62,6 +63,46 @@ public sealed class CliIntegrationTests
             Assert.Skip(
                 "CLI project could not be built in this environment (SDK version mismatch). " +
                 $"stderr: {stderr[..Math.Min(stderr.Length, 500)]}");
+        }
+    }
+
+    /// <summary>
+    /// Verifies the CLI <c>--test-mode</c> output is in a valid state.
+    /// Two paths are valid: G2P succeeded (<c>phoneme_ids</c> emitted) OR the
+    /// G2P engine reported itself as unavailable (<c>not yet available</c> /
+    /// <c>DotNetG2P</c>). The two paths are mutually exclusive — if BOTH or
+    /// NEITHER appear, the CLI is in an unexpected state and we fail loudly.
+    /// </summary>
+    /// <remarks>
+    /// Replaces the original 9-call OR-chain pattern. The earlier
+    /// <c>Assert.True(success || unavail-msg-1 || unavail-msg-2, …)</c> form
+    /// silently passed both when the CLI emitted nothing AND when the CLI
+    /// emitted both messages, defeating the purpose of the smoke check.
+    /// </remarks>
+    private static void AssertCliTestModeOutput(string combined, int exitCode, string context)
+    {
+        bool hasPhonemeIds = combined.Contains("phoneme_ids", StringComparison.Ordinal);
+        bool hasG2pUnavailable =
+            combined.Contains("not yet available", StringComparison.OrdinalIgnoreCase)
+            || combined.Contains("DotNetG2P", StringComparison.Ordinal);
+
+        Assert.True(
+            hasPhonemeIds || hasG2pUnavailable,
+            $"[{context}] Neither phoneme_ids nor G2P-unavailable message found — " +
+            $"CLI silently produced unrecognized output. ExitCode={exitCode}, Output: {combined}");
+
+        Assert.False(
+            hasPhonemeIds && hasG2pUnavailable,
+            $"[{context}] BOTH phoneme_ids AND G2P-unavailable message found — " +
+            $"CLI is in an inconsistent state. ExitCode={exitCode}, Output: {combined}");
+
+        if (hasPhonemeIds)
+        {
+            // Success path: phoneme_ids must come with exitCode == 0
+            Assert.True(
+                exitCode == 0,
+                $"[{context}] phoneme_ids emitted but exitCode={exitCode} (expected 0). " +
+                $"Output: {combined}");
         }
     }
 
@@ -96,8 +137,8 @@ public sealed class CliIntegrationTests
         process.Start();
 
         // Read stdout and stderr concurrently to avoid deadlocks
-        var stdoutTask = process.StandardOutput.ReadToEndAsync();
-        var stderrTask = process.StandardError.ReadToEndAsync();
+        Task<string> stdoutTask = process.StandardOutput.ReadToEndAsync();
+        Task<string> stderrTask = process.StandardError.ReadToEndAsync();
 
         using var cts = new CancellationTokenSource(ProcessTimeoutMs);
         try
@@ -121,12 +162,11 @@ public sealed class CliIntegrationTests
     // ================================================================
     // --version
     // ================================================================
-
     [Fact]
     [Trait("Category", "CLI")]
     public async Task Version_Flag_PrintsVersion()
     {
-        var (exitCode, stdout, stderr) = await RunCliAsync("--version");
+        (int exitCode, string? stdout, string? stderr) = await RunCliAsync("--version");
         SkipIfBuildFailed(exitCode, stderr);
 
         Assert.Equal(0, exitCode);
@@ -141,12 +181,11 @@ public sealed class CliIntegrationTests
     // ================================================================
     // --list-models
     // ================================================================
-
     [Fact]
     [Trait("Category", "CLI")]
     public async Task ListModels_NoFilter_OutputsModels()
     {
-        var (exitCode, _, stderr) = await RunCliAsync("--list-models");
+        (int exitCode, string _, string? stderr) = await RunCliAsync("--list-models");
         SkipIfBuildFailed(exitCode, stderr);
 
         Assert.Equal(0, exitCode);
@@ -157,7 +196,7 @@ public sealed class CliIntegrationTests
     [Trait("Category", "CLI")]
     public async Task ListModels_JapaneseFilter_OutputsJapaneseModels()
     {
-        var (exitCode, _, stderr) = await RunCliAsync("--list-models", "ja");
+        (int exitCode, string _, string? stderr) = await RunCliAsync("--list-models", "ja");
         SkipIfBuildFailed(exitCode, stderr);
 
         Assert.Equal(0, exitCode);
@@ -168,7 +207,7 @@ public sealed class CliIntegrationTests
     [Trait("Category", "CLI")]
     public async Task ListModels_UnknownLanguage_ShowsNotFound()
     {
-        var (exitCode, _, stderr) = await RunCliAsync("--list-models", "xx");
+        (int exitCode, string _, string? stderr) = await RunCliAsync("--list-models", "xx");
         SkipIfBuildFailed(exitCode, stderr);
 
         Assert.Equal(0, exitCode);
@@ -178,13 +217,12 @@ public sealed class CliIntegrationTests
     // ================================================================
     // Error cases
     // ================================================================
-
     [Fact]
     [Trait("Category", "CLI")]
     public async Task NoModel_NoInput_ShowsError()
     {
         // Running with no arguments should fail because --model is required
-        var (exitCode, stdout, stderr) = await RunCliAsync();
+        (int exitCode, string? stdout, string? stderr) = await RunCliAsync();
         SkipIfBuildFailed(exitCode, stderr);
 
         string combined = stdout + stderr;
@@ -202,7 +240,7 @@ public sealed class CliIntegrationTests
     [Trait("Category", "CLI")]
     public async Task InvalidModel_ShowsError()
     {
-        var (exitCode, _, stderr) = await RunCliAsync(
+        (int exitCode, string _, string? stderr) = await RunCliAsync(
             "--model", "/nonexistent/path/model.onnx", "--text", "test");
         SkipIfBuildFailed(exitCode, stderr);
 
@@ -220,7 +258,6 @@ public sealed class CliIntegrationTests
     // ================================================================
     // --test-mode
     // ================================================================
-
     [Fact]
     [Trait("Category", "CLI")]
     public async Task TestMode_WithText_OutputsPhonemeIds()
@@ -228,7 +265,7 @@ public sealed class CliIntegrationTests
         // --test-mode with --text skips ONNX inference and outputs phoneme IDs.
         // The G2P engine (DotNetEnglishG2PEngine) is resolved via reflection
         // and may not be available, in which case the CLI reports an error.
-        var (exitCode, stdout, stderr) = await RunCliAsync(
+        (int exitCode, string? stdout, string? stderr) = await RunCliAsync(
             "--test-mode", "--text", "hello", "--language", "en");
         SkipIfBuildFailed(exitCode, stderr);
 
@@ -236,83 +273,62 @@ public sealed class CliIntegrationTests
 
         // Either the phonemizer succeeds and outputs phoneme_ids,
         // or it fails because the G2P engine is not available.
-        Assert.True(
-            combined.Contains("phoneme_ids", StringComparison.Ordinal)
-            || combined.Contains("not yet available", StringComparison.OrdinalIgnoreCase)
-            || combined.Contains("DotNetG2P", StringComparison.Ordinal),
-            $"Expected phoneme_ids output or G2P unavailable message. " +
-            $"ExitCode={exitCode}, Output: {combined}");
+        AssertCliTestModeOutput(combined, exitCode, "WithText_en");
     }
 
     [Fact]
     [Trait("Category", "CLI")]
     public async Task TestMode_Chinese_OutputsPhonemeIds()
     {
-        var (exitCode, stdout, stderr) = await RunCliAsync(
+        (int exitCode, string? stdout, string? stderr) = await RunCliAsync(
             "--test-mode", "--text", "你好", "--language", "zh");
         SkipIfBuildFailed(exitCode, stderr);
 
         string combined = stdout + stderr;
-        Assert.True(
-            combined.Contains("phoneme_ids", StringComparison.Ordinal)
-            || combined.Contains("not yet available", StringComparison.OrdinalIgnoreCase)
-            || combined.Contains("DotNetG2P", StringComparison.Ordinal),
-            $"Expected phoneme_ids or G2P unavailable. ExitCode={exitCode}, Output: {combined}");
+        AssertCliTestModeOutput(combined, exitCode, "Chinese_zh");
     }
 
     [Fact]
     [Trait("Category", "CLI")]
     public async Task TestMode_Spanish_OutputsPhonemeIds()
     {
-        var (exitCode, stdout, stderr) = await RunCliAsync(
+        (int exitCode, string? stdout, string? stderr) = await RunCliAsync(
             "--test-mode", "--text", "Hola", "--language", "es");
         SkipIfBuildFailed(exitCode, stderr);
 
         string combined = stdout + stderr;
-        Assert.True(
-            combined.Contains("phoneme_ids", StringComparison.Ordinal)
-            || combined.Contains("not yet available", StringComparison.OrdinalIgnoreCase)
-            || combined.Contains("DotNetG2P", StringComparison.Ordinal),
-            $"Expected phoneme_ids or G2P unavailable. ExitCode={exitCode}, Output: {combined}");
+        AssertCliTestModeOutput(combined, exitCode, "Spanish_es");
     }
 
     [Fact]
     [Trait("Category", "CLI")]
     public async Task TestMode_French_OutputsPhonemeIds()
     {
-        var (exitCode, stdout, stderr) = await RunCliAsync(
+        (int exitCode, string? stdout, string? stderr) = await RunCliAsync(
             "--test-mode", "--text", "Bonjour", "--language", "fr");
         SkipIfBuildFailed(exitCode, stderr);
 
         string combined = stdout + stderr;
-        Assert.True(
-            combined.Contains("phoneme_ids", StringComparison.Ordinal)
-            || combined.Contains("not yet available", StringComparison.OrdinalIgnoreCase)
-            || combined.Contains("DotNetG2P", StringComparison.Ordinal),
-            $"Expected phoneme_ids or G2P unavailable. ExitCode={exitCode}, Output: {combined}");
+        AssertCliTestModeOutput(combined, exitCode, "French_fr");
     }
 
     [Fact]
     [Trait("Category", "CLI")]
     public async Task TestMode_Portuguese_OutputsPhonemeIds()
     {
-        var (exitCode, stdout, stderr) = await RunCliAsync(
+        (int exitCode, string? stdout, string? stderr) = await RunCliAsync(
             "--test-mode", "--text", "Olá", "--language", "pt");
         SkipIfBuildFailed(exitCode, stderr);
 
         string combined = stdout + stderr;
-        Assert.True(
-            combined.Contains("phoneme_ids", StringComparison.Ordinal)
-            || combined.Contains("not yet available", StringComparison.OrdinalIgnoreCase)
-            || combined.Contains("DotNetG2P", StringComparison.Ordinal),
-            $"Expected phoneme_ids or G2P unavailable. ExitCode={exitCode}, Output: {combined}");
+        AssertCliTestModeOutput(combined, exitCode, "Portuguese_pt");
     }
 
     [Fact]
     [Trait("Category", "CLI")]
     public async Task TestMode_UnsupportedLanguage_ShowsError()
     {
-        var (exitCode, stdout, stderr) = await RunCliAsync(
+        (int exitCode, string? stdout, string? stderr) = await RunCliAsync(
             "--test-mode", "--text", "test", "--language", "xx");
         SkipIfBuildFailed(exitCode, stderr);
 
@@ -329,13 +345,12 @@ public sealed class CliIntegrationTests
     // ================================================================
     // --test-mode multilingual
     // ================================================================
-
     [Fact]
     [Trait("Category", "CLI")]
     public async Task TestMode_Multilingual_JaEn_OutputsPhonemeIds()
     {
         // Multi-language code "ja-en" should phonemize mixed-language text
-        var (exitCode, stdout, stderr) = await RunCliAsync(
+        (int exitCode, string? stdout, string? stderr) = await RunCliAsync(
             "--test-mode", "--text", "こんにちはhello", "--language", "ja-en");
         SkipIfBuildFailed(exitCode, stderr);
 
@@ -343,18 +358,12 @@ public sealed class CliIntegrationTests
 
         // Either phonemizer succeeds and outputs phoneme_ids,
         // or it fails because a G2P engine is not available.
-        Assert.True(
-            combined.Contains("phoneme_ids", StringComparison.Ordinal)
-            || combined.Contains("not yet available", StringComparison.OrdinalIgnoreCase)
-            || combined.Contains("DotNetG2P", StringComparison.Ordinal),
-            $"Expected phoneme_ids output or G2P unavailable message. " +
-            $"ExitCode={exitCode}, Output: {combined}");
+        AssertCliTestModeOutput(combined, exitCode, "Multilingual_ja-en");
     }
 
     // ================================================================
     // Default output.wav behavior
     // ================================================================
-
     [Fact]
     [Trait("Category", "CLI")]
     public async Task TextMode_NoOutputFile_DefaultsToOutputWav()
@@ -363,7 +372,7 @@ public sealed class CliIntegrationTests
         // the CLI should default to "output.wav" as the output path.
         // In --test-mode, no actual WAV is written, but the phonemizer
         // runs successfully with exit code 0 and emits phoneme_ids.
-        var (exitCode, stdout, stderr) = await RunCliAsync(
+        (int exitCode, string? stdout, string? stderr) = await RunCliAsync(
             "--test-mode", "--text", "hello", "--language", "en");
         SkipIfBuildFailed(exitCode, stderr);
 
@@ -373,25 +382,19 @@ public sealed class CliIntegrationTests
         // the default output.wav logic is not reached. However,
         // a successful run (phoneme_ids emitted) confirms the CLI
         // accepts --text without --output-file.
-        Assert.True(
-            combined.Contains("phoneme_ids", StringComparison.Ordinal)
-            || combined.Contains("not yet available", StringComparison.OrdinalIgnoreCase)
-            || combined.Contains("DotNetG2P", StringComparison.Ordinal),
-            $"Expected successful test-mode run with default output. " +
-            $"ExitCode={exitCode}, Output: {combined}");
+        AssertCliTestModeOutput(combined, exitCode, "DefaultOutputWav_en");
     }
 
     // ================================================================
     // --model with model name/alias (auto-resolve)
     // ================================================================
-
     [Fact]
     [Trait("Category", "CLI")]
     public async Task Model_NonexistentNameOrFile_ShowsError()
     {
         // --model with a string that is neither a file nor a known model name
         // should display an error message.
-        var (exitCode, _, stderr) = await RunCliAsync(
+        (int exitCode, string _, string? stderr) = await RunCliAsync(
             "--model", "totally-fake-nonexistent-model-xyz",
             "--text", "test");
         SkipIfBuildFailed(exitCode, stderr);
@@ -404,13 +407,12 @@ public sealed class CliIntegrationTests
     // ================================================================
     // --download-model with alias
     // ================================================================
-
     [Fact]
     [Trait("Category", "CLI")]
     public async Task DownloadModel_InvalidName_ShowsError()
     {
         // --download-model with a name that doesn't exist in the catalog
-        var (exitCode, _, stderr) = await RunCliAsync(
+        (int exitCode, string _, string? stderr) = await RunCliAsync(
             "--download-model", "totally-nonexistent-model-xyz");
         SkipIfBuildFailed(exitCode, stderr);
 
@@ -424,14 +426,13 @@ public sealed class CliIntegrationTests
     // ================================================================
     // --test-mode with [[ inline phonemes ]] notation
     // ================================================================
-
     [Fact]
     [Trait("Category", "CLI")]
     public async Task TestMode_InlinePhonemes_JapaneseWithNotation()
     {
         // The [[ ... ]] inline phoneme notation should be recognized in test-mode.
         // Mix plain text with inline phonemes: "hello [[ k o N n i ch i w a ]]"
-        var (exitCode, stdout, stderr) = await RunCliAsync(
+        (int exitCode, string? stdout, string? stderr) = await RunCliAsync(
             "--test-mode", "--text", "hello [[ k o N n i ch i w a ]]",
             "--language", "ja-en");
         SkipIfBuildFailed(exitCode, stderr);
@@ -441,11 +442,7 @@ public sealed class CliIntegrationTests
         // Either phonemizer succeeds and outputs phoneme_ids (which would include
         // IDs from both the phonemized "hello" and the raw phoneme tokens),
         // or the G2P engine is not available.
-        Assert.True(
-            combined.Contains("phoneme_ids", StringComparison.Ordinal)
-            || combined.Contains("not yet available", StringComparison.OrdinalIgnoreCase)
-            || combined.Contains("DotNetG2P", StringComparison.Ordinal),
-            $"Expected phoneme_ids or G2P unavailable. ExitCode={exitCode}, Output: {combined}");
+        AssertCliTestModeOutput(combined, exitCode, "InlinePhonemes_ja-en");
     }
 
     [Fact]
@@ -453,24 +450,18 @@ public sealed class CliIntegrationTests
     public async Task TestMode_InlinePhonemes_OnlyBrackets()
     {
         // Input with only [[ ... ]] notation (no plain text part)
-        var (exitCode, stdout, stderr) = await RunCliAsync(
+        (int exitCode, string? stdout, string? stderr) = await RunCliAsync(
             "--test-mode", "--text", "[[ a i u e o ]]",
             "--language", "ja");
         SkipIfBuildFailed(exitCode, stderr);
 
         string combined = stdout + stderr;
-
-        Assert.True(
-            combined.Contains("phoneme_ids", StringComparison.Ordinal)
-            || combined.Contains("not yet available", StringComparison.OrdinalIgnoreCase)
-            || combined.Contains("DotNetG2P", StringComparison.Ordinal),
-            $"Expected phoneme_ids output. ExitCode={exitCode}, Output: {combined}");
+        AssertCliTestModeOutput(combined, exitCode, "InlinePhonemes_ja_brackets_only");
     }
 
     // ================================================================
     // --model accepts string (not just FileInfo)
     // ================================================================
-
     [Fact]
     [Trait("Category", "CLI")]
     public async Task Model_AcceptsModelNameString_NotJustFilePath()
@@ -479,7 +470,7 @@ public sealed class CliIntegrationTests
         // With --test-mode, a known model name should be recognized
         // (though it may fail at download since we're in test mode).
         // An unknown name should produce an appropriate error.
-        var (exitCode, stdout, stderr) = await RunCliAsync(
+        (int exitCode, string? stdout, string? stderr) = await RunCliAsync(
             "--model", "tsukuyomi", "--text", "テスト");
         SkipIfBuildFailed(exitCode, stderr);
 
@@ -500,5 +491,126 @@ public sealed class CliIntegrationTests
             || combined.Contains("Error", StringComparison.OrdinalIgnoreCase)
             || exitCode != 0,
             $"Expected model resolution attempt. ExitCode={exitCode}, Output: {combined}");
+    }
+
+    // ================================================================
+    // --speaker × voice-cloning mutual exclusion
+    // ================================================================
+    [Fact]
+    [Trait("Category", "CLI")]
+    public async Task Speaker_AndReferenceAudio_AreMutuallyExclusive()
+    {
+        // The CLI must reject combining --speaker with voice-cloning sources
+        // (--reference-audio / --speaker-embedding) before any model load,
+        // mirroring the SynthesisInput.Validate() contract in PiperPlus.Core.
+        (int exitCode, string? stdout, string? stderr) = await RunCliAsync(
+            "--model", "tsukuyomi",
+            "--text", "テスト",
+            "--speaker", "5",
+            "--reference-audio", "/nonexistent/ref.wav");
+        SkipIfBuildFailed(exitCode, stderr);
+
+        string combined = stdout + stderr;
+        Assert.Contains("mutually exclusive", combined, StringComparison.OrdinalIgnoreCase);
+    }
+
+    // ================================================================
+    // Voice-cloning option wiring (--reference-audio / --speaker-embedding)
+    // ================================================================
+    [Fact]
+    [Trait("Category", "CLI")]
+    public async Task ReferenceAudio_WithoutSpeakerEncoderModel_Errors()
+    {
+        // --reference-audio requires --speaker-encoder-model (the encoder ONNX
+        // path) to compute the speaker embedding. The CLI must fail fast with
+        // a precise message instead of the generic "Synthesis failed".
+        (int exitCode, string? stdout, string? stderr) = await RunCliAsync(
+            "--test-mode",
+            "--text", "test",
+            "--reference-audio", "/nonexistent/ref.wav");
+        SkipIfBuildFailed(exitCode, stderr);
+
+        Assert.NotEqual(0, exitCode);
+        string combined = stdout + stderr;
+        Assert.Contains("--speaker-encoder-model", combined, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Category", "CLI")]
+    public async Task SpeakerEmbedding_InvalidFileSize_Errors()
+    {
+        // A raw float32 binary embedding file must be a non-zero multiple of
+        // 4 bytes. A 7-byte file (not divisible by 4) must be rejected with a
+        // precise error before synthesis is attempted.
+        string tmpPath = Path.GetTempFileName();
+        try
+        {
+            await File.WriteAllBytesAsync(tmpPath, new byte[7], TestContext.Current.CancellationToken);
+
+            (int exitCode, string? stdout, string? stderr) = await RunCliAsync(
+                "--test-mode",
+                "--text", "test",
+                "--speaker-embedding", tmpPath);
+            SkipIfBuildFailed(exitCode, stderr);
+
+            Assert.NotEqual(0, exitCode);
+            string combined = stdout + stderr;
+            Assert.Contains("multiple of 4", combined, StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            try
+            {
+                File.Delete(tmpPath);
+            }
+            catch (IOException)
+            { /* best-effort cleanup */
+            }
+            catch (UnauthorizedAccessException)
+            { /* best-effort cleanup */
+            }
+        }
+    }
+
+    [Fact]
+    [Trait("Category", "CLI")]
+    public async Task SpeakerEmbedding_EmptyFile_Errors()
+    {
+        // An empty embedding file is also rejected — we can't synthesize from
+        // a zero-dim vector.
+        string tmpPath = Path.GetTempFileName();
+        try
+        {
+            await File.WriteAllBytesAsync(tmpPath, [], TestContext.Current.CancellationToken);
+
+            (int exitCode, string? stdout, string? stderr) = await RunCliAsync(
+                "--test-mode",
+                "--text", "test",
+                "--speaker-embedding", tmpPath);
+            SkipIfBuildFailed(exitCode, stderr);
+
+            Assert.NotEqual(0, exitCode);
+            string combined = stdout + stderr;
+
+            // Either "invalid" or our specific "multiple of 4" message — both
+            // are precise (the implementation reports both invariants together).
+            Assert.True(
+                combined.Contains("invalid", StringComparison.OrdinalIgnoreCase)
+                    || combined.Contains("multiple of 4", StringComparison.OrdinalIgnoreCase),
+                $"expected an embedding-validation error, got: {combined}");
+        }
+        finally
+        {
+            try
+            {
+                File.Delete(tmpPath);
+            }
+            catch (IOException)
+            { /* best-effort cleanup */
+            }
+            catch (UnauthorizedAccessException)
+            { /* best-effort cleanup */
+            }
+        }
     }
 }

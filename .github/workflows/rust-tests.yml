@@ -8,6 +8,10 @@ on:
       - 'src/rust/**'
       - 'src/python/g2p/piper_plus_g2p/data/zh_en_loanword.json'
       - 'tests/fixtures/g2p/zh_en_loanword_matrix.json'
+      - 'tests/fixtures/phoneme_timing/**'
+      - 'tests/fixtures/short_text/**'
+      - 'tests/fixtures/ort_session/**'
+      - 'test/fixtures/speaker_encoder_golden.json'
       - '.github/workflows/rust-tests.yml'
   push:
     branches: [ dev ]
@@ -15,6 +19,10 @@ on:
       - 'src/rust/**'
       - 'src/python/g2p/piper_plus_g2p/data/zh_en_loanword.json'
       - 'tests/fixtures/g2p/zh_en_loanword_matrix.json'
+      - 'tests/fixtures/phoneme_timing/**'
+      - 'tests/fixtures/short_text/**'
+      - 'tests/fixtures/ort_session/**'
+      - 'test/fixtures/speaker_encoder_golden.json'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
@@ -72,8 +80,48 @@ jobs:
       # multilingual.rs (test_zh_en_dispatch_via_phonemizer_trait etc).
       run: cargo test -p piper-plus-g2p --no-fail-fast
 
-    - name: Run CLI check
-      run: cargo check -p piper-plus-cli
+    - name: Run short-text contract tests (onnx feature)
+      # test_short_text_contract.rs imports piper_core::engine which is gated
+      # behind the onnx feature. Run it explicitly so the parity gate is
+      # exercised in CI.
+      run: cargo test -p piper-plus --features onnx --test test_short_text_contract --no-fail-fast
+
+    - name: Run ORT session contract tests (onnx feature)
+      # test_ort_session_contract.rs imports MAX_INTRA_THREADS / WARMUP_PHONEME_LENGTH
+      # from piper_core::engine which is gated behind onnx; mirror the short-text
+      # gate so the per-runtime drift assert runs in CI.
+      run: cargo test -p piper-plus --features onnx --test test_ort_session_contract --no-fail-fast
+
+    - name: Run CLI tests
+      run: cargo test -p piper-plus-cli --no-fail-fast
+
+  wasm-test:
+    name: piper-wasm wasm-bindgen tests (wasm32)
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: src/rust/piper-wasm
+    steps:
+    - uses: actions/checkout@v6
+    - uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: wasm32-unknown-unknown
+    - uses: Swatinem/rust-cache@v2
+      with:
+        workspaces: src/rust -> target
+    - uses: actions/setup-node@v6
+      with:
+        node-version: '24'
+    - name: Install wasm-pack
+      uses: jetli/wasm-pack-action@v0.4.0
+      with:
+        version: 'latest'
+    - name: Run wasm-bindgen tests in Node (multilingual-external)
+      # 22 #[wasm_bindgen_test] functions in src/lib.rs are gated on
+      # target_arch = "wasm32" so they only run via wasm-pack — `cargo test`
+      # on the host never touches them. multilingual-external enables all
+      # 8 language G2P paths with runtime-loaded JA/ZH dictionaries.
+      run: wasm-pack test --node --features multilingual-external
 
   fmt:
     name: rustfmt

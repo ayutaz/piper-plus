@@ -26,16 +26,24 @@ public static class WavWriter
     public static void Write(Stream stream, ReadOnlySpan<short> samples, int sampleRate)
     {
         if (stream is null)
+        {
             throw new ArgumentNullException(nameof(stream));
+        }
+
         if (sampleRate <= 0)
+        {
             throw new ArgumentOutOfRangeException(nameof(sampleRate), "Sample rate must be positive.");
+        }
 
         using var writer = new BinaryWriter(stream, Encoding.ASCII, leaveOpen: true);
 
         long dataSize64 = (long)samples.Length * BytesPerSample;
         if (dataSize64 > int.MaxValue)
+        {
             throw new ArgumentException(
                 $"Audio data ({samples.Length} samples) exceeds WAV format limit.");
+        }
+
         int dataSize = (int)dataSize64;
         int byteRate = sampleRate * NumChannels * BytesPerSample;
         short blockAlign = (short)(NumChannels * BytesPerSample);
@@ -60,7 +68,7 @@ public static class WavWriter
         writer.Write(dataSize);                           // Subchunk2Size  (4)
 
         // --- PCM samples (bulk write) ---
-        var bytes = MemoryMarshal.AsBytes(samples);
+        ReadOnlySpan<byte> bytes = MemoryMarshal.AsBytes(samples);
         writer.Write(bytes);
     }
 
@@ -74,7 +82,9 @@ public static class WavWriter
     public static void Write(string filePath, ReadOnlySpan<short> samples, int sampleRate)
     {
         if (string.IsNullOrWhiteSpace(filePath))
+        {
             throw new ArgumentException("File path must not be empty.", nameof(filePath));
+        }
 
         using var fs = new FileStream(filePath, FileMode.Create, FileAccess.Write);
         Write(fs, samples, sampleRate);

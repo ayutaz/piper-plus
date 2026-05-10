@@ -36,19 +36,17 @@ export class SpeakerEncoder {
     const instance = new SpeakerEncoder();
     const ort = options.ort || globalThis.ort;
     if (!ort) {
-      throw new Error(
-        'onnxruntime-web is required. Pass it via options.ort or load it globally.'
-      );
+      throw new Error("onnxruntime-web is required. Pass it via options.ort or load it globally.");
     }
     instance._ort = ort;
 
     if (!options.modelUrl) {
-      throw new Error('options.modelUrl is required for SpeakerEncoder');
+      throw new Error("options.modelUrl is required for SpeakerEncoder");
     }
 
     instance._session = await ort.InferenceSession.create(options.modelUrl, {
-      executionProviders: ['wasm'],
-      graphOptimizationLevel: 'all',
+      executionProviders: ["wasm"],
+      graphOptimizationLevel: "all",
     });
 
     return instance;
@@ -65,13 +63,13 @@ export class SpeakerEncoder {
    */
   async encode(audio, sampleRate) {
     if (!this._session) {
-      throw new Error('SpeakerEncoder not initialized. Call SpeakerEncoder.initialize() first.');
+      throw new Error("SpeakerEncoder not initialized. Call SpeakerEncoder.initialize() first.");
     }
 
     let samples;
     let rate;
 
-    if (typeof AudioBuffer !== 'undefined' && audio instanceof AudioBuffer) {
+    if (typeof AudioBuffer !== "undefined" && audio instanceof AudioBuffer) {
       // Extract first channel
       samples = audio.getChannelData(0);
       rate = audio.sampleRate;
@@ -79,29 +77,28 @@ export class SpeakerEncoder {
       samples = audio;
       rate = sampleRate || MEL_SAMPLE_RATE;
     } else {
-      throw new TypeError('audio must be an AudioBuffer or Float32Array');
+      throw new TypeError("audio must be an AudioBuffer or Float32Array");
     }
 
     if (samples.length === 0) {
-      throw new Error('Audio samples cannot be empty');
+      throw new Error("Audio samples cannot be empty");
     }
 
     // Resample to 16kHz if needed
-    const resampled = rate !== MEL_SAMPLE_RATE
-      ? resampleLinear(samples, rate, MEL_SAMPLE_RATE)
-      : samples;
+    const resampled =
+      rate !== MEL_SAMPLE_RATE ? resampleLinear(samples, rate, MEL_SAMPLE_RATE) : samples;
 
     // Compute mel spectrogram
     const mel = computeMelSpectrogram(resampled);
     const nFrames = mel.length / MEL_N_MELS;
 
     if (nFrames === 0) {
-      throw new Error('Audio is too short for mel spectrogram computation');
+      throw new Error("Audio is too short for mel spectrogram computation");
     }
 
     // Create input tensor: [1, n_mels, n_frames]
     const ort = this._ort;
-    const melTensor = new ort.Tensor('float32', mel, [1, MEL_N_MELS, nFrames]);
+    const melTensor = new ort.Tensor("float32", mel, [1, MEL_N_MELS, nFrames]);
 
     const results = await this._session.run({ input: melTensor });
     const outputTensor = results.output || results[Object.keys(results)[0]];
@@ -114,7 +111,7 @@ export class SpeakerEncoder {
    */
   dispose() {
     if (this._session) {
-      if (typeof this._session.release === 'function') {
+      if (typeof this._session.release === "function") {
         this._session.release();
       }
       this._session = null;
@@ -135,7 +132,9 @@ export class SpeakerEncoder {
  * @returns {Float32Array}
  */
 function resampleLinear(samples, fromRate, toRate) {
-  if (fromRate === toRate) return samples;
+  if (fromRate === toRate) {
+    return samples;
+  }
 
   const ratio = fromRate / toRate;
   const outputLen = Math.ceil(samples.length / ratio);
@@ -161,13 +160,17 @@ function resampleLinear(samples, fromRate, toRate) {
  * @param {Float32Array} samples - Mono 16kHz audio.
  * @returns {Float32Array} Flattened [n_mels * n_frames] in mel-major order.
  */
-function computeMelSpectrogram(samples) {
+// fr32 forces a value to its nearest float32 representation. Used at every
+// arithmetic step so the JS path matches Python's float32 semantics
+// byte-for-byte (see test/generate_speaker_encoder_golden.py — F32 alias).
+const fr32 = Math.fround;
+
+export function computeMelSpectrogram(samples) {
   const melFilters = createMelFilterbank();
   const window = hannWindow(MEL_N_FFT);
 
-  const nFrames = samples.length >= MEL_N_FFT
-    ? Math.floor((samples.length - MEL_N_FFT) / MEL_HOP_LENGTH) + 1
-    : 0;
+  const nFrames =
+    samples.length >= MEL_N_FFT ? Math.floor((samples.length - MEL_N_FFT) / MEL_HOP_LENGTH) + 1 : 0;
 
   const fftBins = Math.floor(MEL_N_FFT / 2) + 1;
   const melSpec = new Float32Array(MEL_N_MELS * nFrames);
@@ -175,60 +178,69 @@ function computeMelSpectrogram(samples) {
   for (let frameIdx = 0; frameIdx < nFrames; frameIdx++) {
     const start = frameIdx * MEL_HOP_LENGTH;
 
-    // Power spectrum via DFT
+    // Power spectrum via DFT in float32 (Math.fround at every step
+    // mirrors Python's F32 alias to keep checksums byte-for-byte equal).
     const powerSpec = new Float32Array(fftBins);
     for (let k = 0; k < fftBins; k++) {
-      let real = 0, imag = 0;
-      const freq = -2 * Math.PI * k / MEL_N_FFT;
+      let real = fr32(0),
+        imag = fr32(0);
+      const freq = fr32((fr32(-2 * Math.PI) * fr32(k)) / fr32(MEL_N_FFT));
       for (let n = 0; n < MEL_N_FFT; n++) {
-        const sample = (start + n < samples.length)
-          ? samples[start + n] * window[n]
-          : 0;
-        const angle = freq * n;
-        real += sample * Math.cos(angle);
-        imag += sample * Math.sin(angle);
+        const winSample =
+          start + n < samples.length ? fr32(fr32(samples[start + n]) * fr32(window[n])) : fr32(0);
+        const angle = fr32(freq * fr32(n));
+        real = fr32(real + fr32(winSample * fr32(Math.cos(angle))));
+        imag = fr32(imag + fr32(winSample * fr32(Math.sin(angle))));
       }
-      powerSpec[k] = real * real + imag * imag;
+      powerSpec[k] = fr32(fr32(real * real) + fr32(imag * imag));
     }
 
-    // Apply mel filterbank
+    // Apply mel filterbank — float32 arithmetic.
     for (let melIdx = 0; melIdx < MEL_N_MELS; melIdx++) {
-      let energy = 0;
+      let energy = fr32(0);
       for (let k = 0; k < fftBins; k++) {
-        energy += melFilters[melIdx * fftBins + k] * powerSpec[k];
+        energy = fr32(energy + fr32(melFilters[melIdx * fftBins + k] * powerSpec[k]));
       }
-      melSpec[melIdx * nFrames + frameIdx] = Math.log(Math.max(energy, 1e-10));
+      // np.log accepts a Python float (f64); the output is then cast to f32
+      // when stored in mel_spec (which is dtype=F32). Match that here:
+      // log of f32-clamped energy, then cast result to f32.
+      melSpec[melIdx * nFrames + frameIdx] = fr32(Math.log(Math.max(fr32(energy), 1e-10)));
     }
   }
 
   return melSpec;
 }
 
-function hannWindow(length) {
+export function hannWindow(length) {
   const window = new Float32Array(length);
   for (let n = 0; n < length; n++) {
-    window[n] = 0.5 * (1 - Math.cos(2 * Math.PI * n / length));
+    window[n] = fr32(fr32(0.5) * fr32(1 - Math.cos((fr32(2 * Math.PI) * fr32(n)) / fr32(length))));
   }
   return window;
 }
 
-function createMelFilterbank() {
+export function createMelFilterbank() {
   const fftBins = Math.floor(MEL_N_FFT / 2) + 1;
   const filterbank = new Float32Array(MEL_N_MELS * fftBins);
 
-  const melFmin = hzToMel(MEL_FMIN);
-  const melFmax = hzToMel(MEL_FMAX);
+  const melFmin = hzToMel(fr32(MEL_FMIN));
+  const melFmax = hzToMel(fr32(MEL_FMAX));
 
   const melPoints = [];
   for (let i = 0; i <= MEL_N_MELS + 1; i++) {
-    melPoints.push(melFmin + (melFmax - melFmin) * i / (MEL_N_MELS + 1));
+    // Python: F32(mel_fmin) + (mel_fmax - mel_fmin) * F32(i) / F32(N_MELS + 1)
+    melPoints.push(
+      fr32(melFmin + fr32((fr32(melFmax - melFmin) * fr32(i)) / fr32(MEL_N_MELS + 1)))
+    );
   }
 
-  const binPoints = melPoints.map(m => melToHz(m) * MEL_N_FFT / MEL_SAMPLE_RATE);
+  const binPoints = melPoints.map((m) =>
+    fr32((fr32(melToHz(m)) * fr32(MEL_N_FFT)) / fr32(MEL_SAMPLE_RATE))
+  );
 
   for (let m = 0; m < MEL_N_MELS; m++) {
     // Convert to integer bin indices (matching Python's np.floor().astype(int))
-    let left = Math.floor(binPoints[m]);
+    const left = Math.floor(binPoints[m]);
     let center = Math.floor(binPoints[m + 1]);
     let right = Math.floor(binPoints[m + 2]);
 
@@ -244,21 +256,22 @@ function createMelFilterbank() {
       right = Math.min(right + 1, fftBins - 1);
     }
 
-    // Rising slope
+    // Rising slope — float32 arithmetic.
     for (let k = left; k < center; k++) {
       if (center > left) {
-        filterbank[m * fftBins + k] = (k - left) / (center - left);
+        filterbank[m * fftBins + k] = fr32(fr32(k - left) / fr32(center - left));
       }
     }
 
-    // Falling slope
+    // Falling slope.
     for (let k = center; k < right; k++) {
       if (right > center) {
-        filterbank[m * fftBins + k] = (right - k) / (right - center);
+        filterbank[m * fftBins + k] = fr32(fr32(right - k) / fr32(right - center));
       }
     }
 
-    // Ensure center bin always has weight >= 1.0
+    // Ensure center bin always has weight >= 1.0 (the Python reference
+    // upcasts to f64 inside max() and stores the f64 1.0 as f32 1.0).
     if (center < fftBins) {
       filterbank[m * fftBins + center] = Math.max(filterbank[m * fftBins + center], 1.0);
     }
@@ -267,10 +280,33 @@ function createMelFilterbank() {
   return filterbank;
 }
 
-function hzToMel(hz) {
-  return 2595 * Math.log10(1 + hz / 700);
+export function hzToMel(hz) {
+  return fr32(fr32(2595) * fr32(Math.log10(fr32(1 + fr32(hz) / fr32(700)))));
 }
 
-function melToHz(mel) {
-  return 700 * (Math.pow(10, mel / 2595) - 1);
+export function melToHz(mel) {
+  return fr32(fr32(700) * fr32(Math.pow(10, fr32(mel) / fr32(2595)) - 1));
 }
+
+export function resampleLinearForTesting(samples, fromRate, toRate) {
+  return resampleLinear(samples, fromRate, toRate);
+}
+
+// Aggregator for cross-runtime golden-fixture parity tests
+// (test/js/test-speaker-encoder-parity.js). Bundles the constants and
+// internal helpers the test harness destructures, so callers see one
+// stable shape rather than touching ten named imports.
+export const _internalForTesting = {
+  MEL_SAMPLE_RATE,
+  MEL_N_FFT,
+  MEL_HOP_LENGTH,
+  MEL_N_MELS,
+  MEL_FMIN,
+  MEL_FMAX,
+  hannWindow,
+  createMelFilterbank,
+  computeMelSpectrogram,
+  resampleLinear,
+  hzToMel,
+  melToHz,
+};

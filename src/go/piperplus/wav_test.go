@@ -59,24 +59,80 @@ func TestPeakNormalize_Silence(t *testing.T) {
 func TestPeakNormalize_SmallValues(t *testing.T) {
 	// Peak 0.001 < 0.01 → clamped to 0.01.
 	// scale = 32767 / 0.01 = 3276700.
-	// 0.001 * 3276700 ≈ 3276 (clamped within int16 range).
+	// 0.001 * 3276700 = 3276.7 → int16(3276) (truncation).
 	in := []float32{0.001, -0.001}
 	out := peakNormalize(in)
 
 	if len(out) != 2 {
 		t.Fatalf("expected 2 samples, got %d", len(out))
 	}
-	// Should not panic or produce extreme values.
-	// Note: out is []int16, so values are inherently within [-32768, 32767].
-	// Verify no clipping to extremes occurred.
-	for i, s := range out {
-		if int(s) < -32767 || int(s) > 32767 {
-			t.Errorf("sample[%d] out of expected range: %d", i, s)
-		}
+	// Pin the exact arithmetic: peak floor at 0.01, scale = 32767/0.01 = 3276700,
+	// 0.001 * 3276700 = 3276 (truncation; not 3277 / not 0). Cross-runtime
+	// drift in the floor or rounding mode would change this value.
+	const wantMag = int16(3276)
+	if out[0] != wantMag {
+		t.Errorf("sample[0]: expected %d (peak floor 0.01), got %d", wantMag, out[0])
 	}
-	// Verify nonzero output (scale was clamped, not zero-divided).
-	if out[0] == 0 {
-		t.Error("expected nonzero output for 0.001 input")
+	if out[1] != -wantMag {
+		t.Errorf("sample[1]: expected %d, got %d", -wantMag, out[1])
+	}
+}
+
+// TestPeakNormalize_NaNAndInfSkipped pins the explicit NaN/Inf guard at
+// wav.go: NaN/Inf samples must NOT contribute to the peak (which would corrupt
+// the scale factor). Without the guard, math.Abs(NaN) returns NaN and propagates.
+func TestPeakNormalize_NaNAndInfSkipped(t *testing.T) {
+	in := []float32{
+		float32(math.NaN()),
+		0.5,
+		float32(math.Inf(1)),
+		-0.25,
+		float32(math.Inf(-1)),
+	}
+	out := peakNormalize(in)
+
+	if len(out) != len(in) {
+		t.Fatalf("expected %d samples, got %d", len(in), len(out))
+	}
+	// Peak should be 0.5 (NaN/Inf skipped). scale = 32767/0.5 = 65534.
+	// in[1]=0.5 → 0.5 * 65534 = 32767 (full scale).
+	if out[1] != 32767 {
+		t.Errorf("sample[1]: expected 32767 (full scale, peak=0.5), got %d", out[1])
+	}
+	// in[3]=-0.25 → -0.25 * 65534 = -16383.5 → int16(-16383) (truncation).
+	if out[3] != -16383 {
+		t.Errorf("sample[3]: expected -16383, got %d", out[3])
+	}
+	// NaN/Inf samples themselves get clamped to int16 range without panicking
+	// (the multiply produces NaN/±Inf, which are then clamped via the
+	// MaxInt16 / MinInt16 comparisons).
+}
+
+// TestPeakNormalize_AllNaN verifies that an all-NaN input does not produce
+// scale = inf (which would result in undefined int16 casts). The peak floor
+// of 0.01 should kick in.
+func TestPeakNormalize_AllNaN(t *testing.T) {
+	in := []float32{
+		float32(math.NaN()),
+		float32(math.NaN()),
+	}
+	out := peakNormalize(in)
+	if len(out) != 2 {
+		t.Fatalf("expected 2 samples, got %d", len(out))
+	}
+	// All NaN: peak stays 0, hits the 0.01 floor. NaN * scale is still NaN
+	// which is then handled by the clamp; the implementation produces 0
+	// (NaN > MaxInt16 is false, NaN < MinInt16 is false, so int16(NaN)).
+	// Pin the deterministic outcome: int16 cast of NaN is implementation-
+	// defined but Go consistently produces 0 here. If that changes, this test
+	// needs an update.
+	for i, v := range out {
+		// Only assert it's not MaxInt16/MinInt16 (i.e., the clamp didn't
+		// erroneously fire on a NaN comparison) — this catches a regression
+		// in the NaN-skip logic.
+		if v == math.MaxInt16 || v == math.MinInt16 {
+			t.Errorf("sample[%d]: NaN should not produce clamped extremes, got %d", i, v)
+		}
 	}
 }
 

@@ -1,20 +1,47 @@
-"""Rule-based Brazilian Portuguese phonemizer for piper-g2p.
+"""Rule-based Portuguese phonemizer for piper-g2p (BR + EU dialects).
 
-Converts Brazilian Portuguese text to IPA phonemes using grapheme-to-phoneme
-rules. No external G2P engine required.
+Converts Portuguese text to IPA phonemes using grapheme-to-phoneme rules.
+No external G2P engine required.
+
+Language code policy
+--------------------
+This module registers two phonemizers:
+
+* :class:`PortuguesePhonemizer` — language code ``"pt"`` (default = BR).
+  Also reachable via the BCP-47 alias ``"pt-BR"``.
+* :class:`EuropeanPortuguesePhonemizer` — language code ``"pt-PT"``.
+  Also reachable via the case-insensitive alias ``"pt-pt"``.
+
+Both classes share the underlying grapheme conversion (``_convert_word``)
+and differ only in post-processing. The split is captured in
+``docs/spec/pt-dialect-contract.toml`` (spec_version 2).
+
+The shared :class:`Dialect` enum lets callers parameterise either class:
+
+>>> PortuguesePhonemizer(dialect=Dialect.EU).phonemize("noite")
+['n', 'o', 'j', 't', 'ɨ']
+
+References
+----------
+* Cruz-Ferreira (1995) "European Portuguese", Journal of the IPA, 25(2):90-94
+* Mateus & d'Andrade (2000) The Phonology of Portuguese, Oxford University Press
 
 Known limitations
 -----------------
-* **Brazilian Portuguese (PT-BR) only** -- European Portuguese (PT-PT)
-  phonology differs significantly (e.g. vowel reduction patterns,
-  sibilant realisations, absence of /tʃ dʒ/ palatalisation) and is
-  not modelled.
 * The ``x`` grapheme is highly irregular in Portuguese; only a simplified
   positional heuristic is applied (initial/post-consonant -> /ʃ/,
   intervocalic -> /z/).
-* Vowel harmony and pretonic mid-vowel raising are not implemented.
+* Pretonic mid-vowel raising (e/o → ɨ/u in EU unstressed pretonic
+  syllables) is NOT implemented; only the 5 most salient BR↔EU
+  contrasts are captured (see contract spec).
+* Vowel deletion in tightly-clustered consonant environments
+  (e.g. EU "pequeno" → [pkenu]) is NOT implemented.
+* EU sandhi voicing of word-final /s/ before vowel-initial next word
+  is captured for adjacent intra-utterance tokens but not across
+  multi-clause boundaries.
 """
 
+import enum
 import logging
 import re
 import unicodedata
@@ -23,10 +50,22 @@ from .base import Phonemizer, ProsodyInfo
 
 _LOGGER = logging.getLogger(__name__)
 
+
+class Dialect(enum.Enum):
+    """Portuguese dialect selector for :class:`PortuguesePhonemizer`."""
+
+    BR = "pt-BR"
+    EU = "pt-PT"
+
+
 __all__ = [
+    "Dialect",
     "phonemize_portuguese",
     "phonemize_portuguese_with_prosody",
+    "phonemize_european_portuguese",
+    "phonemize_european_portuguese_with_prosody",
     "PortuguesePhonemizer",
+    "EuropeanPortuguesePhonemizer",
 ]
 
 # Punctuation characters (attached to previous word, no space before)
@@ -680,17 +719,220 @@ def phonemize_portuguese(text: str) -> list[str]:
     return phonemes
 
 
+# ---------------------------------------------------------------------------
+# European Portuguese (pt-PT) — post-processing layer
+# ---------------------------------------------------------------------------
+# The EU phonemizer reuses the BR grapheme→IPA conversion and then applies
+# the 5 most perceptually-dominant BR↔EU contrasts as a post-processing
+# pass. The transformations work on the BR output (which has already had
+# `_apply_coda_l_vocalization` and `_apply_br_postprocessing` applied) and
+# rewrite them into EU canonical forms.
+#
+# See `docs/spec/pt-dialect-contract.toml` (spec_version 2,
+# `[implementation.differences]`) for the BR↔EU contrast matrix and the
+# typological references behind each rule.
+
+# Word-final and pre-consonantal /s/ → /ʃ/ (and /z/ → /ʒ/)
+# In EU the alveolar sibilant centralises to postalveolar in coda
+# position. We detect "coda" via the same heuristic as
+# `_apply_coda_l_vocalization`: end of phoneme list, before space, before
+# punctuation, or before a consonant.
+
+# Pre-vowel sandhi: word-final /s/ before vowel-initial next word stays
+# voiced /ʒ/ (not /ʃ/). We approximate this by checking whether the
+# next phoneme (skipping spaces) is a vowel.
+
+
+def _next_non_space_phoneme(phonemes: list[str], idx: int) -> str | None:
+    """Return the phoneme at the next non-space index, or None."""
+    j = idx + 1
+    while j < len(phonemes) and phonemes[j] == " ":
+        j += 1
+    if j < len(phonemes):
+        return phonemes[j]
+    return None
+
+
+def _apply_eu_postprocessing(phonemes: list[str]) -> list[str]:
+    """Apply European Portuguese post-processing to BR-default phonemes.
+
+    Five canonical transformations (see contract spec):
+
+    1. **Undo BR t/d palatalisation**: ``tʃ → t`` and ``dʒ → d`` when the
+       affricate appears immediately before a final ``i`` that came from
+       BR's ``e → i`` reduction (EU keeps the stop + ``ɨ``).
+    2. **Reduced final -e**: word-final unstressed ``i`` (which BR
+       produced from ``e``) becomes ``ɨ``.
+    3. **Coda /s/ ↔ /ʃ/**: word-final and pre-consonantal ``s`` becomes
+       ``ʃ``. Voiced sandhi (pre-vowel ``s → z`` in BR) becomes ``ʒ``
+       in EU.
+    4. **Coda /l/ → /ɫ/**: word-final and pre-consonantal ``w`` (which
+       BR produced via ``l → w`` vocalisation) becomes ``ɫ``.
+    5. **r-canonicalisation**: BR's debuccalised ``h`` (one of the BR
+       regional realisations of strong /r/) becomes uvular ``ʁ``.
+    """
+    result = list(phonemes)
+    n = len(result)
+
+    # --- Pass 1: undo BR t/d palatalisation + final -e centralisation ---
+    # BR pattern: ... [tʃ/dʒ] [i] [optional punct/space/end]
+    # EU mapping: ... [t/d]   [ɨ] (...)
+    for i in range(n):
+        if result[i] != "i":
+            continue
+        # Must be word-final unstressed `i` (BR's reduced e). Use the same
+        # heuristic as the BR final-vowel reduction: at end of list, or
+        # next phoneme is space / punctuation.
+        next_ph = result[i + 1] if i + 1 < n else None
+        is_final = next_ph is None or next_ph == " " or next_ph in _PUNCTUATION
+        if not is_final:
+            continue
+        # Lookback for tʃ / dʒ (BR palatalisation)
+        if i >= 1 and result[i - 1] == "tʃ":
+            result[i - 1] = "t"
+            result[i] = "ɨ"
+            continue
+        if i >= 1 and result[i - 1] == "dʒ":
+            result[i - 1] = "d"
+            result[i] = "ɨ"
+            continue
+        # General final-e reduction case: BR i → EU ɨ
+        # Only rewrite when the i directly follows a consonant (= came
+        # from final-e), not when it is part of a diphthong like /aj/.
+        if i >= 1 and result[i - 1] in _IPA_CONSONANTS:
+            result[i] = "ɨ"
+
+    # --- Pass 2: coda /s/ → /ʃ/, /z/ → /ʒ/ ---
+    for i in range(n):
+        if result[i] not in ("s", "z"):
+            continue
+        next_ph = result[i + 1] if i + 1 < n else None
+        # End-of-phoneme-list, end-of-word (space), or before punctuation
+        if next_ph is None or next_ph == " " or next_ph in _PUNCTUATION:
+            # Sandhi: if next non-space phoneme is a vowel, voice it
+            # (z-realisation in EU coda before vowel-initial word).
+            sandhi_target = _next_non_space_phoneme(result, i)
+            if sandhi_target is not None and (
+                sandhi_target in _IPA_ORAL_VOWELS
+                or (len(sandhi_target) == 1 and sandhi_target in _IPA_VOWELS)
+            ):
+                result[i] = "ʒ"
+            else:
+                result[i] = "ʃ" if result[i] == "s" else "ʒ"
+            continue
+        # Pre-consonantal: if next phoneme is a non-vowel, also coda
+        if (
+            next_ph in _IPA_CONSONANTS
+            or (len(next_ph) > 1 and next_ph[0] in _IPA_CONSONANTS)
+        ) and next_ph not in _IPA_VOWELS:
+            result[i] = "ʃ" if result[i] == "s" else "ʒ"
+
+    # --- Pass 3: coda /w/ → /ɫ/ (undo BR l-vocalisation) ---
+    # BR's `_apply_coda_l_vocalization` rewrote l → w in coda position.
+    # We reverse that to ɫ. We can ONLY do this safely for w that came
+    # from coda-l, not for w that came from a real /w/ glide. The
+    # heuristic: w is in coda position (end / before space / before
+    # consonant) AND immediately preceded by a vowel.
+    for i in range(n):
+        if result[i] != "w":
+            continue
+        prev_ph = result[i - 1] if i >= 1 else None
+        if prev_ph is None:
+            continue
+        # Only rewrite if previous phoneme is a vowel (= w came from
+        # coda /l/ following a vowel, the typical case).
+        if prev_ph not in _IPA_VOWELS:
+            continue
+        next_ph = result[i + 1] if i + 1 < n else None
+        is_coda = (
+            next_ph is None
+            or next_ph == " "
+            or next_ph in _PUNCTUATION
+            or (
+                (
+                    next_ph in _IPA_CONSONANTS
+                    or (len(next_ph) > 1 and next_ph[0] in _IPA_CONSONANTS)
+                )
+                and next_ph not in _IPA_VOWELS
+            )
+        )
+        if is_coda:
+            result[i] = "ɫ"
+
+    # --- Pass 4: r-canonicalisation (BR h → EU ʁ) ---
+    for i in range(n):
+        if result[i] == "h":
+            result[i] = "ʁ"
+
+    return result
+
+
+def phonemize_european_portuguese_with_prosody(
+    text: str,
+) -> tuple[list[str], list[ProsodyInfo | None]]:
+    """Convert European Portuguese text to phoneme list and prosody features.
+
+    Reuses the BR grapheme conversion and applies EU post-processing.
+    """
+    phonemes, prosody_list = phonemize_portuguese_with_prosody(text)
+    eu_phonemes = _apply_eu_postprocessing(phonemes)
+    # Phoneme count is preserved by every transformation in
+    # _apply_eu_postprocessing (every rule rewrites in place; no insertions
+    # or deletions), so prosody alignment is intact.
+    assert len(eu_phonemes) == len(prosody_list), (
+        "EU post-processing must preserve phoneme count "
+        f"(got {len(eu_phonemes)} vs {len(prosody_list)})"
+    )
+    return eu_phonemes, prosody_list
+
+
+def phonemize_european_portuguese(text: str) -> list[str]:
+    """Convert European Portuguese text to phoneme list (without prosody)."""
+    phonemes, _ = phonemize_european_portuguese_with_prosody(text)
+    return phonemes
+
+
 class PortuguesePhonemizer(Phonemizer):
-    """Brazilian Portuguese rule-based phonemizer."""
+    """Portuguese rule-based phonemizer (BR by default; EU via Dialect enum).
+
+    Parameters
+    ----------
+    dialect:
+        :class:`Dialect.BR` (default, backward-compat) or
+        :class:`Dialect.EU` for European Portuguese post-processing.
+    """
+
+    def __init__(self, dialect: Dialect = Dialect.BR) -> None:
+        self._dialect = dialect
 
     @property
     def language_code(self) -> str:
-        return "pt"
+        return "pt-PT" if self._dialect == Dialect.EU else "pt"
+
+    @property
+    def dialect(self) -> Dialect:
+        return self._dialect
 
     def phonemize(self, text: str) -> list[str]:
+        if self._dialect == Dialect.EU:
+            return phonemize_european_portuguese(text)
         return phonemize_portuguese(text)
 
     def phonemize_with_prosody(
         self, text: str
     ) -> tuple[list[str], list[ProsodyInfo | None]]:
+        if self._dialect == Dialect.EU:
+            return phonemize_european_portuguese_with_prosody(text)
         return phonemize_portuguese_with_prosody(text)
+
+
+class EuropeanPortuguesePhonemizer(PortuguesePhonemizer):
+    """European Portuguese (pt-PT) phonemizer.
+
+    Equivalent to ``PortuguesePhonemizer(dialect=Dialect.EU)``; provided as
+    a separate class so the registry can map the ``"pt-PT"`` language code
+    directly without an alias hop.
+    """
+
+    def __init__(self) -> None:
+        super().__init__(dialect=Dialect.EU)

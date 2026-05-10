@@ -1,0 +1,121 @@
+# piper-plus Release Version Pinning
+# ==================================
+# This file is the canonical "expected version" table used by the
+# `version-consistency` workflow (.github/workflows/version-consistency.yml)
+# to detect *unintentional* version drift across the polyglot package
+# manifests.
+#
+# The piper-plus polyrepo intentionally ships per-runtime versions:
+#
+#   - PyPI            piper-plus           — main project version
+#   - crates.io       piper-plus / piper-plus-cli / piper-plus-g2p
+#   - NuGet           PiperPlus.Core / PiperPlus.Cli
+#   - npm             piper-plus  (synthesis)  + @piper-plus/g2p
+#   - SwiftPM         PiperPlus (synthesis)    + PiperPlusG2P
+#   - Maven Central   io.github.ayutaz:piper-plus-g2p-android
+#
+# These move on independent cadences. This file pins the *current expected
+# major.minor* (or `prefix` for matching beyond patch) per manifest so the
+# CI workflow can warn when a developer bumps one and forgets the others
+# (or, conversely, accidentally rolls all of them in lock-step when only
+# one was intended).
+#
+# Update procedure
+# ----------------
+# When you bump a manifest's version on `dev`, update the matching
+# `expected_prefix` field below in the same commit (or the next commit
+# before merging the release PR). The workflow runs `mode = "warn"` by
+# default for safe staged hardening — flip to `mode = "fail"` once we
+# trust the table.
+#
+# Implementations / sources
+# -------------------------
+#   piper-plus                         VERSION (root)
+#   piper-plus / piper-plus-cli /
+#     piper-plus-g2p (Rust)            src/rust/Cargo.toml (workspace.package.version)
+#   PiperPlus.Core / PiperPlus.Cli     src/csharp/PiperPlus.Core/PiperPlus.Core.csproj
+#                                      src/csharp/PiperPlus.Cli/PiperPlus.Cli.csproj
+#   piper-plus (npm)                   src/wasm/openjtalk-web/package.json
+#   @piper-plus/g2p (npm)              src/wasm/g2p/package.json
+#   PiperPlus (Swift)                  Package.swift  (let version)
+#   PiperPlusG2P (Swift)               Package.swift  (let g2pVersion)
+#   io.github.ayutaz:piper-plus-g2p
+#     -android (Kotlin)                android/gradle.properties (VERSION_NAME)
+
+[meta]
+schema_version = 1
+# `mode` controls workflow behaviour when a manifest doesn't match
+# `expected_prefix`:
+#   - "warn"  → emit ::warning:: but exit 0 (initial-introduction safe).
+#   - "fail"  → emit ::error:: and exit 1 (post-hardening).
+mode = "warn"
+
+# ---------------------------------------------------------------------------
+# Python — PyPI piper-plus (main project)
+# ---------------------------------------------------------------------------
+[python]
+manifest = "VERSION"
+# expected_prefix is matched as a literal string prefix against the version
+# field. "1.12." matches 1.12.0, 1.12.1, 1.12.0.dev1 etc.
+expected_prefix = "1.12."
+
+[python.pyproject]
+manifest = "pyproject.toml"
+# pyproject.toml uses dynamic version (reads VERSION); the workflow only
+# verifies the file declares `dynamic = ["version"]`.
+dynamic = true
+
+# ---------------------------------------------------------------------------
+# Rust — crates.io piper-plus / piper-plus-cli / piper-plus-g2p
+# ---------------------------------------------------------------------------
+[rust]
+manifest = "src/rust/Cargo.toml"
+# Workspace-level version inherited by piper-plus, piper-plus-cli,
+# piper-plus-g2p, piper-wasm, piper-python via `version.workspace = true`.
+expected_prefix = "0.4."
+
+# ---------------------------------------------------------------------------
+# C# / .NET — NuGet PiperPlus.Core / PiperPlus.Cli
+# ---------------------------------------------------------------------------
+[dotnet.core]
+manifest = "src/csharp/PiperPlus.Core/PiperPlus.Core.csproj"
+expected_prefix = "0.3."
+
+[dotnet.cli]
+manifest = "src/csharp/PiperPlus.Cli/PiperPlus.Cli.csproj"
+expected_prefix = "0.3."
+
+# ---------------------------------------------------------------------------
+# npm — piper-plus (browser WASM synthesis) + @piper-plus/g2p
+# ---------------------------------------------------------------------------
+[npm.synthesis]
+manifest = "src/wasm/openjtalk-web/package.json"
+expected_prefix = "0.6."
+
+[npm.g2p]
+manifest = "src/wasm/g2p/package.json"
+expected_prefix = "0.4."
+
+# ---------------------------------------------------------------------------
+# SwiftPM — PiperPlus (synthesis xcframework) + PiperPlusG2P
+# ---------------------------------------------------------------------------
+# Both versions live in Package.swift as `let version` / `let g2pVersion`.
+# The workflow extracts them via a regex; placeholder checksums are NOT
+# version-checked here (a separate pre-tag CI guard verifies them).
+[swift.synthesis]
+manifest = "Package.swift"
+field = "version"
+expected_prefix = "1.13."
+
+[swift.g2p]
+manifest = "Package.swift"
+field = "g2pVersion"
+expected_prefix = "1.14."
+
+# ---------------------------------------------------------------------------
+# Maven Central — io.github.ayutaz:piper-plus-g2p-android
+# ---------------------------------------------------------------------------
+[kotlin.android_g2p]
+manifest = "android/gradle.properties"
+field = "VERSION_NAME"
+expected_prefix = "1.0."

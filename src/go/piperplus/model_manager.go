@@ -73,7 +73,7 @@ func (m *ModelManager) CacheDir() string {
 
 // EnsureDir creates the cache directory if it does not exist.
 func (m *ModelManager) EnsureDir() error {
-	return os.MkdirAll(m.cacheDir, 0700)
+	return os.MkdirAll(m.cacheDir, 0o700)
 }
 
 // ListModels returns all downloaded models found in the cache directory.
@@ -188,7 +188,7 @@ func (m *ModelManager) DownloadModel(ctx context.Context, rawURL string) (string
 	}
 
 	// Restrict file permissions to owner-only.
-	if chmodErr := os.Chmod(tmpPath, 0600); chmodErr != nil {
+	if chmodErr := os.Chmod(tmpPath, 0o600); chmodErr != nil {
 		_ = os.Remove(tmpPath)
 		return "", fmt.Errorf("piperplus: download model: chmod: %w", chmodErr)
 	}

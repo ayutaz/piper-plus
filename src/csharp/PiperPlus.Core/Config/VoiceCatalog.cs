@@ -11,7 +11,6 @@ public static class VoiceCatalog
     // -------------------------------------------------------------------
     // Built-in catalog (object initializers — no JSON parsing at runtime)
     // -------------------------------------------------------------------
-
     private static readonly VoiceInfo[] BuiltInVoices =
     [
         new VoiceInfo(
@@ -27,8 +26,8 @@ public static class VoiceCatalog
             RepoId: "ayousanz/piper-plus-tsukuyomi-chan",
             Files:
             [
-                new VoiceFileInfo("tsukuyomi-chan-6lang-fp16.onnx", 39652717, ""),
-                new VoiceFileInfo("config.json", 6279, ""),
+                new VoiceFileInfo("tsukuyomi-chan-6lang-fp16.onnx", 39652717, string.Empty),
+                new VoiceFileInfo("config.json", 6279, string.Empty),
             ],
             Aliases: ["tsukuyomi", "tsukuyomi-chan", "ja-tsukuyomi"],
             Description: "Tsukuyomi-chan 6-language TTS model fine-tuned from multilingual base (FP16, MB-iSTFT)"),
@@ -46,8 +45,8 @@ public static class VoiceCatalog
             RepoId: "ayousanz/piper-plus-css10-ja-6lang",
             Files:
             [
-                new VoiceFileInfo("css10-ja-6lang-fp16.onnx", 39652717, ""),
-                new VoiceFileInfo("config.json", 5912, ""),
+                new VoiceFileInfo("css10-ja-6lang-fp16.onnx", 39652717, string.Empty),
+                new VoiceFileInfo("config.json", 5912, string.Empty),
             ],
             Aliases: ["css10", "css10-6lang", "css10-ja", "ja-css10"],
             Description: "CSS10 Japanese 6-language TTS model fine-tuned from multilingual base (FP16, MB-iSTFT, 6841 utterances)"),
@@ -56,6 +55,7 @@ public static class VoiceCatalog
     /// <summary>
     /// Returns the embedded piper-plus catalog (no I/O).
     /// </summary>
+    /// <returns></returns>
     public static IReadOnlyList<VoiceInfo> LoadBuiltInCatalog()
         => BuiltInVoices;
 
@@ -65,6 +65,7 @@ public static class VoiceCatalog
     /// </summary>
     /// <exception cref="FileNotFoundException">Thrown when <paramref name="path"/> does not exist.</exception>
     /// <exception cref="InvalidOperationException">Thrown when deserialization fails.</exception>
+    /// <returns></returns>
     public static IReadOnlyList<VoiceInfo> LoadFromFile(string path)
     {
         if (!File.Exists(path))
@@ -73,8 +74,8 @@ public static class VoiceCatalog
                 $"Voices catalog file not found: {path}", path);
         }
 
-        using var stream = File.OpenRead(path);
-        var dict = JsonSerializer.Deserialize(
+        using FileStream stream = File.OpenRead(path);
+        Dictionary<string, VoiceJsonEntry>? dict = JsonSerializer.Deserialize(
             stream,
             VoiceCatalogJsonContext.Default.DictionaryStringVoiceJsonEntry);
 
@@ -85,7 +86,7 @@ public static class VoiceCatalog
         }
 
         var result = new List<VoiceInfo>(dict.Count);
-        foreach (var (key, entry) in dict)
+        foreach ((string? key, VoiceJsonEntry? entry) in dict)
         {
             result.Add(VoiceJsonConverter.ToVoiceInfo(key, entry));
         }
@@ -93,7 +94,7 @@ public static class VoiceCatalog
         return result;
     }
 
-    private static readonly Lazy<IReadOnlyList<VoiceInfo>> s_cachedCatalog =
+    private static readonly Lazy<IReadOnlyList<VoiceInfo>> S_cachedCatalog =
         new(() => LoadMergedCatalogInternal(null));
 
     /// <summary>
@@ -103,10 +104,13 @@ public static class VoiceCatalog
     /// When <paramref name="externalVoicesJsonPath"/> is <c>null</c>, the result is cached
     /// (thread-safe via <see cref="Lazy{T}"/>).
     /// </summary>
+    /// <returns></returns>
     public static IReadOnlyList<VoiceInfo> LoadMergedCatalog(string? externalVoicesJsonPath = null)
     {
         if (externalVoicesJsonPath is null)
-            return s_cachedCatalog.Value;
+        {
+            return S_cachedCatalog.Value;
+        }
 
         // External file specified — bypass cache
         return LoadMergedCatalogInternal(externalVoicesJsonPath);
@@ -114,7 +118,7 @@ public static class VoiceCatalog
 
     private static IReadOnlyList<VoiceInfo> LoadMergedCatalogInternal(string? externalVoicesJsonPath)
     {
-        var builtIn = LoadBuiltInCatalog();
+        IReadOnlyList<VoiceInfo> builtIn = LoadBuiltInCatalog();
 
         if (string.IsNullOrEmpty(externalVoicesJsonPath) || !File.Exists(externalVoicesJsonPath))
         {
@@ -139,12 +143,12 @@ public static class VoiceCatalog
         var merged = new Dictionary<string, VoiceInfo>(
             builtIn.Count + external.Count, StringComparer.Ordinal);
 
-        foreach (var voice in builtIn)
+        foreach (VoiceInfo voice in builtIn)
         {
             merged[voice.Key] = voice;
         }
 
-        foreach (var voice in external)
+        foreach (VoiceInfo voice in external)
         {
             merged.TryAdd(voice.Key, voice);
         }

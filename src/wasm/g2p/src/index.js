@@ -7,21 +7,21 @@
  * @module @piper-plus/g2p
  */
 
-import { JapaneseG2P } from './ja/index.js';
-import { EnglishG2P } from './en/index.js';
-import { ChineseG2P } from './zh/index.js';
-import { SpanishG2P } from './es/index.js';
-import { FrenchG2P } from './fr/index.js';
-import { PortugueseG2P } from './pt/index.js';
-import { SwedishG2P } from './sv/index.js';
-import { KoreanG2P } from './ko/index.js';
-import { UnicodeLanguageDetector } from './detect.js';
-import { Encoder } from './encode.js';
+import { JapaneseG2P } from "./ja/index.js";
+import { EnglishG2P } from "./en/index.js";
+import { ChineseG2P } from "./zh/index.js";
+import { SpanishG2P } from "./es/index.js";
+import { FrenchG2P } from "./fr/index.js";
+import { EuropeanPortugueseG2P, PortugueseG2P } from "./pt/index.js";
+import { SwedishG2P } from "./sv/index.js";
+import { KoreanG2P } from "./ko/index.js";
+import { UnicodeLanguageDetector } from "./detect.js";
+import { Encoder } from "./encode.js";
 
 // ---- Constants ---------------------------------------------------------------
 
 /** All supported language codes. */
-const ALL_LANGUAGES = ['ja', 'en', 'zh', 'ko', 'es', 'fr', 'pt', 'sv'];
+const ALL_LANGUAGES = ["ja", "en", "zh", "ko", "es", "fr", "pt", "pt-PT", "sv"];
 
 /** Map from language code to G2P constructor (for non-JA languages). */
 const LANGUAGE_FACTORIES = {
@@ -31,6 +31,7 @@ const LANGUAGE_FACTORIES = {
   es: () => new SpanishG2P(),
   fr: () => new FrenchG2P(),
   pt: () => new PortugueseG2P(),
+  "pt-PT": () => new EuropeanPortugueseG2P(),
   sv: () => new SwedishG2P(),
 };
 
@@ -91,7 +92,7 @@ export class G2P {
     if (languages.length === 0) {
       throw new Error(
         `G2P.create(): no valid languages specified. ` +
-        `Supported languages: ${ALL_LANGUAGES.join(', ')}`
+          `Supported languages: ${ALL_LANGUAGES.join(", ")}`
       );
     }
 
@@ -99,23 +100,25 @@ export class G2P {
     const detector = new UnicodeLanguageDetector(languages);
 
     // Initialise Japanese (async -- requires WASM + dict)
-    if (languages.includes('ja')) {
+    if (languages.includes("ja")) {
       const jaG2P = new JapaneseG2P({
         openjtalkModule: options.openjtalkModule,
         jaDict: options.jaDict,
       });
       await jaG2P.initialize();
-      phonemizers.set('ja', jaG2P);
+      phonemizers.set("ja", jaG2P);
     }
 
     // Initialise rule-based languages (sync)
     for (const lang of languages) {
-      if (lang === 'ja') continue;
+      if (lang === "ja") {
+        continue;
+      }
       const factory = LANGUAGE_FACTORIES[lang];
       if (factory) {
         const g2p = factory();
         // Apply custom dicts if the G2P instance supports it
-        if (options.customDicts && typeof g2p.setCustomDicts === 'function') {
+        if (options.customDicts && typeof g2p.setCustomDicts === "function") {
           g2p.setCustomDicts(options.customDicts);
         }
         phonemizers.set(lang, g2p);
@@ -179,7 +182,7 @@ export class G2P {
     const language = this._resolveLanguage(text, options);
     const g2p = this._getPhonemizerOrThrow(language);
 
-    if (typeof g2p.phonemizeWithProsody === 'function') {
+    if (typeof g2p.phonemizeWithProsody === "function") {
       const result = g2p.phonemizeWithProsody(text);
       return {
         tokens: result.tokens,
@@ -258,10 +261,12 @@ export class G2P {
    * Primarily needed to free OpenJTalk WASM memory for Japanese.
    */
   dispose() {
-    if (this._disposed) return;
+    if (this._disposed) {
+      return;
+    }
     this._disposed = true;
     for (const [, g2p] of this._phonemizers) {
-      if (typeof g2p.dispose === 'function') {
+      if (typeof g2p.dispose === "function") {
         g2p.dispose();
       }
     }
@@ -299,8 +304,8 @@ export class G2P {
       const available = [...this._phonemizers.keys()];
       throw new Error(
         `G2P: language "${language}" is not initialised. ` +
-        `Available languages: [${available.join(', ')}]. ` +
-        `Pass the language in G2P.create({ languages: [...] }) to enable it.`
+          `Available languages: [${available.join(", ")}]. ` +
+          `Pass the language in G2P.create({ languages: [...] }) to enable it.`
       );
     }
     return g2p;
@@ -313,26 +318,27 @@ export class G2P {
    */
   _ensureNotDisposed() {
     if (this._disposed) {
-      throw new Error(
-        'G2P: instance has been disposed. Create a new instance with G2P.create().'
-      );
+      throw new Error("G2P: instance has been disposed. Create a new instance with G2P.create().");
     }
   }
 }
 
 // ---- Re-exports --------------------------------------------------------------
 
-export { JapaneseG2P } from './ja/index.js';
-export { EnglishG2P } from './en/index.js';
-export { ChineseG2P } from './zh/index.js';
-export { SpanishG2P } from './es/index.js';
-export { FrenchG2P } from './fr/index.js';
-export { PortugueseG2P } from './pt/index.js';
-export { SwedishG2P } from './sv/index.js';
-export { KoreanG2P } from './ko/index.js';
-export { DictLoader } from './dict-loader.js';
-export { Encoder } from './encode.js';
-export { UnicodeLanguageDetector } from './detect.js';
-export { CustomDictionary } from './custom-dictionary.js';
-export { PUA_COMPAT_VERSION, checkPuaCompat, PUA_MAP, mapToken, unmapToken } from './pua-map.js';
-export { extractPhonemesFromLabels, applyNPhonemeRules, mapToPUA } from './ja/phoneme-extract.js';
+export { JapaneseG2P } from "./ja/index.js";
+export { EnglishG2P } from "./en/index.js";
+export { ChineseG2P } from "./zh/index.js";
+export { SpanishG2P } from "./es/index.js";
+export { FrenchG2P } from "./fr/index.js";
+export { EuropeanPortugueseG2P, PortugueseG2P } from "./pt/index.js";
+export { SwedishG2P } from "./sv/index.js";
+export { KoreanG2P } from "./ko/index.js";
+export { DictLoader } from "./dict-loader.js";
+export { Encoder } from "./encode.js";
+export { UnicodeLanguageDetector } from "./detect.js";
+export { CustomDictionary } from "./custom-dictionary.js";
+export { PUA_COMPAT_VERSION, checkPuaCompat, PUA_MAP, mapToken, unmapToken } from "./pua-map.js";
+export { extractPhonemesFromLabels, applyNPhonemeRules, mapToPUA } from "./ja/phoneme-extract.js";
+
+// SSML support — see ./ssml.js for the parser. Mirrors Python/Rust/C#/Go.
+export { isSsml, parseSsml, SsmlParser } from "./ssml.js";

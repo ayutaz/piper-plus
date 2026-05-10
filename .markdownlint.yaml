@@ -1,0 +1,58 @@
+# markdownlint configuration for piper-plus
+# https://github.com/DavidAnson/markdownlint
+default: true
+
+# Disabled rules (with rationale):
+MD013: false   # Line length
+              # Rationale: docs include long URLs, code blocks, table cells
+              # that would be ugly to wrap. Editors fold long lines.
+MD024:        # Multiple headers with the same content
+  siblings_only: true
+MD025:        # Multiple top-level H1
+  front_matter_title: ""
+              # Rationale: HuggingFace space README が YAML frontmatter title:
+              # と本文 # H1 を併用するため、frontmatter は H1 集計から除外
+MD026: false   # Trailing punctuation in header
+              # Rationale: 「概要」「使い方」など日本語ヘッダで:を許容
+MD033:        # Inline HTML
+  allowed_elements:
+    - br
+    - details
+    - summary
+    - kbd
+    - sub
+    - sup
+    - table
+    - tr
+    - td
+    - th
+MD041: false   # First line in file should be a top-level header
+              # Rationale: some files start with frontmatter / license
+
+# Stylistic rules disabled (intentional patterns in our docs;
+# auto-fix で機械的に直せず、ドキュメント意図を破壊するもの):
+MD028: false  # No blank lines in blockquote
+              # Rationale: 隣接する独立した blockquote (> 注 1 / > 注 2) を
+              # GitHub renderer は問題なく描画する。意図的な分離。
+MD036: false  # Emphasis used instead of a heading
+              # Rationale: **Step 1: ...** のような sub-section ラベルが
+              # 多言語 README + docs で一貫使用されており、heading 化は
+              # 翻訳構造を破壊する。
+MD060: false  # Table column style (consistent: aligned vs compact)
+              # Rationale: markdownlint v0.40.0 で追加された新ルール。
+              # auto-fix が効かず、技術ドキュメントで table style を
+              # 厳密に統一する実益が低い (compact / aligned 混在許容)。
+
+# Strict rules (auto-fix で機械的に修正可能なものを有効化、
+# baseline violation を許容しない):
+MD009:        # Trailing whitespace
+  br_spaces: 2
+MD010:        # Hard tabs
+  code_blocks: false
+MD012:        # Multiple blank lines
+  maximum: 3
+MD030:        # Spaces after list markers
+  ul_single: 1
+  ul_multi: 1
+  ol_single: 1
+  ol_multi: 1

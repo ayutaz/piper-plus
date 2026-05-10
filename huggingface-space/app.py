@@ -139,7 +139,7 @@ def synthesize_speech(
         model = _get_session(model_info["path"])
     except Exception as e:
         logger.error(f"Failed to load model: {e}")
-        raise gr.Error(f"Failed to load model: {str(e)}") from e
+        raise gr.Error(f"Failed to load model: {e!s}") from e
 
     # Prepare inputs
     text_array = np.expand_dims(np.array(phoneme_ids, dtype=np.int64), 0)
@@ -201,7 +201,7 @@ def synthesize_speech(
 
     except Exception as e:
         logger.error(f"Inference failed: {e}")
-        raise gr.Error(f"Failed to generate speech: {str(e)}") from e
+        raise gr.Error(f"Failed to generate speech: {e!s}") from e
 
 
 def on_model_change(model_name: str) -> str:
@@ -228,7 +228,7 @@ def create_interface():
                 model_dropdown = gr.Dropdown(
                     choices=list(MODELS.keys()),
                     label="Select Model",
-                    value=list(MODELS.keys())[0],
+                    value=next(iter(MODELS.keys())),
                 )
 
                 text_input = gr.Textbox(
@@ -355,7 +355,7 @@ def create_minimal_interface():
         model_dropdown = gr.Dropdown(
             choices=list(MODELS.keys()),
             label="Select Model",
-            value=list(MODELS.keys())[0],
+            value=next(iter(MODELS.keys())),
         )
 
         synthesize_btn = gr.Button("Generate Speech", variant="primary")

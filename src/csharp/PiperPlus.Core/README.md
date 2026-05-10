@@ -95,4 +95,4 @@ Capabilities like multi-speaker (`HasSpeakerId`), multilingual (`HasLanguageId`)
 
 ## License
 
-MIT. See [LICENSE](https://github.com/ayutaz/piper-plus/blob/dev/LICENSE).
+MIT. See [LICENSE](https://github.com/ayutaz/piper-plus/blob/dev/LICENSE.md).

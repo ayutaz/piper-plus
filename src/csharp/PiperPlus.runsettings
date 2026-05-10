@@ -3,6 +3,26 @@
   <RunConfiguration>
     <MaxCpuCount>0</MaxCpuCount>
     <ResultsDirectory>./TestResults</ResultsDirectory>
+    <!-- Wall-clock cap for the entire test session (5 min). -->
     <TestSessionTimeout>300000</TestSessionTimeout>
+    <!-- Per-test hang timeout (30s). Equivalent of dotnet test
+         "blame-hang-timeout 30s" CLI option so a single deadlocked test
+         does not consume the full TestSessionTimeout budget.
+         (XML comments cannot contain double-hyphen, so the CLI flag is
+         shown without the leading dashes here.) -->
+    <TestSessionHangTimeout>30000</TestSessionHangTimeout>
   </RunConfiguration>
+
+  <!-- Blame data collector: capture process dumps + sequence files when a
+       test hangs or crashes, so CI can post-mortem flaky tests. -->
+  <DataCollectionRunSettings>
+    <DataCollectors>
+      <DataCollector friendlyName="blame" enabled="True">
+        <Configuration>
+          <CollectDump DumpType="Full" />
+          <CollectDumpOnTestSessionHang TestTimeout="30000" HangDumpType="Full" />
+        </Configuration>
+      </DataCollector>
+    </DataCollectors>
+  </DataCollectionRunSettings>
 </RunSettings>

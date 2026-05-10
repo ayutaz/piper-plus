@@ -17,9 +17,9 @@ namespace piper {
 struct DictionaryEntry {
     std::string pronunciation;  // カタカナ読み
     int priority = 5;          // 優先度（0-10）
-    
+
     DictionaryEntry() = default;
-    DictionaryEntry(const std::string& pron, int pri = 5) 
+    DictionaryEntry(const std::string& pron, int pri = 5)
         : pronunciation(pron), priority(pri) {}
 };
 
@@ -32,22 +32,22 @@ public:
     CustomDictionary();
     explicit CustomDictionary(const std::string& dictPath);
     explicit CustomDictionary(const std::vector<std::string>& dictPaths);
-    
+
     // 辞書の読み込み
     void loadDictionary(const std::string& dictPath);
     void loadDefaultDictionaries();
-    
+
     // テキスト処理
     std::string applyToText(const std::string& text) const;
-    
+
     // 単語管理
     void addWord(const std::string& word, const std::string& pronunciation, int priority = 5);
     bool removeWord(const std::string& word);
     std::optional<std::string> getPronunciation(const std::string& word) const;
-    
+
     // 辞書の保存
     void saveDictionary(const std::string& outputPath) const;
-    
+
     // 統計情報
     struct Stats {
         size_t totalEntries;
@@ -59,16 +59,16 @@ public:
 private:
     // 大文字小文字を区別しないエントリ（正規化済み）
     std::unordered_map<std::string, DictionaryEntry> entries_;
-    
+
     // 大文字小文字を区別するエントリ
     std::unordered_map<std::string, DictionaryEntry> caseSensitiveEntries_;
-    
+
     // 正規表現パターンのキャッシュ
     mutable std::unordered_map<std::string, std::regex> patternCache_;
-    
+
     // デフォルト辞書ディレクトリ
     std::filesystem::path defaultDictDir_;
-    
+
     // ヘルパー関数
     void addEntry(const std::string& word, const DictionaryEntry& entry);
     std::string toLowerCase(const std::string& str) const;
@@ -78,7 +78,7 @@ private:
 
 // 便利な関数
 std::unique_ptr<CustomDictionary> createDefaultDictionary();
-std::string applyCustomDictionary(const std::string& text, 
+std::string applyCustomDictionary(const std::string& text,
                                  const std::vector<std::string>& dictPaths = {});
 
 } // namespace piper

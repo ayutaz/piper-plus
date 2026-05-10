@@ -104,11 +104,15 @@ public static class ShortTextProcessor
     /// <see cref="MinBodyForStrategyA"/> — see issue #356.
     /// </para>
     /// </summary>
+    /// <returns></returns>
     internal static bool NeedsPadding(long[] phonemeIds)
     {
         int bodyLength = phonemeIds.Length - 2; // exclude BOS / EOS
         if (bodyLength < MinBodyForStrategyA)
+        {
             return false;
+        }
+
         return phonemeIds.Length < MinPhonemeIds;
     }
 
@@ -135,9 +139,14 @@ public static class ShortTextProcessor
         // Skip Strategy A for very short bodies — see NeedsPadding / issue #356.
         int bodyLengthGuard = phonemeIds.Length - 2;
         if (bodyLengthGuard < MinBodyForStrategyA)
+        {
             return (phonemeIds, prosodyFlat, 0, 0);
+        }
+
         if (phonemeIds.Length >= MinPhonemeIds)
+        {
             return (phonemeIds, prosodyFlat, 0, 0);
+        }
 
         int deficit = MinPhonemeIds - phonemeIds.Length;
         int afterBos = deficit / 2;       // pause IDs inserted after index 0 (BOS)
@@ -151,7 +160,9 @@ public static class ShortTextProcessor
 
         // Insert pause IDs after BOS
         for (int i = 1; i <= afterBos; i++)
+        {
             padded[i] = PauseId;
+        }
 
         // Copy: body (everything between BOS and EOS)
         int bodyStart = 1;
@@ -162,7 +173,9 @@ public static class ShortTextProcessor
         // Insert pause IDs before EOS
         int eosInsertStart = 1 + afterBos + bodyLength;
         for (int i = 0; i < beforeEos; i++)
+        {
             padded[eosInsertStart + i] = PauseId;
+        }
 
         // Copy: EOS
         padded[newLength - 1] = phonemeIds[phonemeIds.Length - 1];
@@ -229,13 +242,20 @@ public static class ShortTextProcessor
         int eosMaxFrames = TrimEosMaxFrames)
     {
         if (frontPad <= 0 && backPad <= 0)
+        {
             return audio;
+        }
+
         if (durations is null || hopSize <= 0)
+        {
             return audio;
+        }
 
         int expectedLen = 1 + frontPad + backPad + 1;
         if (durations.Length < expectedLen)
+        {
             return audio;
+        }
 
         // Front: BOS + front padding samples (truncated).
         float frontSum = 0f;
@@ -243,6 +263,7 @@ public static class ShortTextProcessor
         {
             frontSum += durations[i];
         }
+
         int frontSamples = (int)(frontSum * hopSize);
 
         // Back: back padding samples + EOS excess (over eosMaxFrames).
@@ -256,18 +277,33 @@ public static class ShortTextProcessor
                 backPadSum += durations[i];
             }
         }
+
         int backPadSamples = (int)(backPadSum * hopSize);
 
         float eosFrames = durations[^1];
         float eosExcess = eosFrames - eosMaxFrames;
-        if (eosExcess < 0f) eosExcess = 0f;
+        if (eosExcess < 0f)
+        {
+            eosExcess = 0f;
+        }
+
         int backSamples = backPadSamples + (int)(eosExcess * hopSize);
 
-        if (frontSamples < 0) frontSamples = 0;
+        if (frontSamples < 0)
+        {
+            frontSamples = 0;
+        }
+
         int end = audio.Length - backSamples;
-        if (end < frontSamples) end = frontSamples;
+        if (end < frontSamples)
+        {
+            end = frontSamples;
+        }
+
         if (frontSamples >= audio.Length || end <= 0 || frontSamples >= end)
+        {
             return audio;
+        }
 
         int newLength = end - frontSamples;
         var trimmed = new float[newLength];
@@ -288,11 +324,15 @@ public static class ShortTextProcessor
     internal static float[] TrimSilence(float[] audio)
     {
         if (audio.Length <= TrimMinSamples)
+        {
             return audio;
+        }
 
         int totalWindows = audio.Length / TrimWindowSize;
         if (totalWindows < 2)
+        {
             return audio;
+        }
 
         // Find first non-silent window (from the front)
         int firstNonSilent = 0;
@@ -350,13 +390,15 @@ public static class ShortTextProcessor
         {
             // Centre the minimum window around the midpoint of the detected range
             int midpoint = (firstNonSilent + lastNonSilentEnd) / 2;
-            firstNonSilent = Math.Max(0, midpoint - TrimMinSamples / 2);
+            firstNonSilent = Math.Max(0, midpoint - (TrimMinSamples / 2));
             lastNonSilentEnd = Math.Min(audio.Length, firstNonSilent + TrimMinSamples);
             firstNonSilent = Math.Max(0, lastNonSilentEnd - TrimMinSamples);
         }
 
         if (firstNonSilent == 0 && lastNonSilentEnd == audio.Length)
+        {
             return audio;
+        }
 
         return audio.AsSpan(firstNonSilent, lastNonSilentEnd - firstNonSilent).ToArray();
     }
@@ -370,11 +412,15 @@ public static class ShortTextProcessor
         int end = Math.Min(offset + TrimWindowSize, audio.Length);
         int count = end - offset;
         if (count <= 0)
+        {
             return 0f;
+        }
 
         float sumSq = 0f;
         for (int i = offset; i < end; i++)
+        {
             sumSq += audio[i] * audio[i];
+        }
 
         return MathF.Sqrt(sumSq / count);
     }
@@ -396,7 +442,9 @@ public static class ShortTextProcessor
         int phonemeIdCount, float noiseScale, float noiseW)
     {
         if (phonemeIdCount >= MinPhonemeIds)
+        {
             return (noiseScale, noiseW);
+        }
 
         float ratio = Math.Clamp((float)phonemeIdCount / MinPhonemeIds, 0f, 1f);
         float adjustedNoiseScale = noiseScale * Math.Max(0.5f, ratio);
@@ -428,24 +476,32 @@ public static class ShortTextProcessor
     public static string WrapShortTextWithBreaks(string text)
     {
         if (string.IsNullOrEmpty(text))
+        {
             return text;
+        }
 
         // Already SSML?
         var trimmedStart = text.TrimStart();
         if (trimmedStart.StartsWith("<speak>", StringComparison.OrdinalIgnoreCase)
             || trimmedStart.StartsWith("<speak ", StringComparison.OrdinalIgnoreCase))
+        {
             return text;
+        }
 
         // Count non-whitespace characters
         int charCount = 0;
         foreach (char c in text)
         {
             if (!char.IsWhiteSpace(c))
+            {
                 charCount++;
+            }
         }
 
         if (charCount > ShortTextChars)
+        {
             return text;
+        }
 
         return $"<speak><break time=\"{SilencePadMs}ms\"/>{System.Security.SecurityElement.Escape(text)}<break time=\"{SilencePadMs}ms\"/></speak>";
     }
@@ -454,21 +510,28 @@ public static class ShortTextProcessor
     /// Check whether the given text qualifies as "short text" for Strategy C
     /// (not SSML, non-whitespace character count &lt;= <see cref="ShortTextChars"/>).
     /// </summary>
+    /// <returns></returns>
     internal static bool IsShortPlainText(string text)
     {
         if (string.IsNullOrEmpty(text))
+        {
             return false;
+        }
 
         var trimmedStart = text.TrimStart();
         if (trimmedStart.StartsWith("<speak>", StringComparison.OrdinalIgnoreCase)
             || trimmedStart.StartsWith("<speak ", StringComparison.OrdinalIgnoreCase))
+        {
             return false;
+        }
 
         int charCount = 0;
         foreach (char c in text)
         {
             if (!char.IsWhiteSpace(c))
+            {
                 charCount++;
+            }
         }
 
         return charCount <= ShortTextChars;
@@ -498,11 +561,18 @@ public static class ShortTextProcessor
     public static short[] PadSilenceForShortText(short[] audio, int sampleRate)
     {
         if (audio.Length == 0)
+        {
             return audio;
+        }
 
-        int silenceSamples = (int)(sampleRate * SilencePadMs / 1000.0f);
+        // Cast one operand to long before the multiply so CodeQL's
+        // cs/loss-of-precision rule does not flag the int*int -> float cast.
+        // The expression is mathematically identical for all realistic sample
+        // rates; the long-cast just narrows the range CodeQL must consider.
+        int silenceSamples = (int)((long)sampleRate * SilencePadMs / 1000L);
         var padded = new short[silenceSamples + audio.Length + silenceSamples];
         audio.CopyTo(padded.AsSpan(silenceSamples));
+
         // Leading and trailing silence are zero-initialized.
         return padded;
     }

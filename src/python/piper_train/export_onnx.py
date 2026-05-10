@@ -543,6 +543,26 @@ def main() -> None:
     mode = "stochastic" if args.stochastic else "deterministic"
     _LOGGER.info("Exported model to %s (mode: %s)", args.output, mode)
 
+    # ONNX validation pipeline (per docs/spec/onnx-export-contract.toml):
+    #   1. onnx.checker.check_model() — corruption / opset / type validation
+    #   2. onnx.shape_inference.infer_shapes() — downstream shape mismatch detection
+    import onnx as _onnx_validator  # noqa: PLC0415
+
+    _LOGGER.info("Validating exported ONNX model...")
+    try:
+        _model = _onnx_validator.load(str(args.output))
+        _onnx_validator.checker.check_model(_model, full_check=False)
+        _LOGGER.info("✓ onnx.checker.check_model passed")
+        _inferred = _onnx_validator.shape_inference.infer_shapes(_model)
+        _LOGGER.info(
+            "✓ onnx.shape_inference.infer_shapes passed (output graph: %d nodes)",
+            len(_inferred.graph.node),
+        )
+    except _onnx_validator.checker.ValidationError as e:
+        _LOGGER.error("ONNX model validation FAILED: %s", e)
+        raise
+    del _model, _inferred  # release memory
+
     # Apply ONNX simplification if requested
     # Skip simplification for prosody models to avoid numerical precision issues
     if args.simplify:

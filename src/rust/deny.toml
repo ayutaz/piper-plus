@@ -1,0 +1,47 @@
+# cargo-deny configuration for the piper-plus Rust workspace.
+# Run with: `cargo deny --manifest-path src/rust/Cargo.toml check`
+#
+# Schema is the cargo-deny pre-v2 layout (compatible with 0.14+).
+# Some keys (db-path, confidence-threshold) emit deprecation warnings on
+# very recent cargo-deny releases but remain functional.
+
+[graph]
+all-features = true
+
+[advisories]
+db-path = "~/.cargo/advisory-db"
+db-urls = ["https://github.com/rustsec/advisory-db"]
+yanked = "warn"
+ignore = []
+
+[licenses]
+allow = [
+  "MIT",
+  "Apache-2.0",
+  "Apache-2.0 WITH LLVM-exception",
+  "BSD-2-Clause",
+  "BSD-3-Clause",
+  "ISC",
+  "Unicode-DFS-2016",
+  "Unicode-3.0",
+  "CC0-1.0",
+  "MPL-2.0",
+  "Zlib",
+  "OpenSSL",
+]
+confidence-threshold = 0.93
+exceptions = []
+
+[bans]
+multiple-versions = "warn"
+wildcards = "warn"
+highlight = "all"
+allow = []
+deny = []
+skip = []
+skip-tree = []
+
+[sources]
+unknown-registry = "warn"
+unknown-git = "warn"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]

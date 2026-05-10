@@ -4,7 +4,7 @@
  * Works with both real IndexedDB and the lightweight MockIndexedDB used in tests.
  */
 
-const STORE_NAME = 'cache';
+const STORE_NAME = "cache";
 const IOS_QUOTA = 50 * 1024 * 1024; // 50 MB
 
 const PRIORITY_ORDER = { high: 0, medium: 1, low: 2 };
@@ -14,13 +14,13 @@ export class CacheManager {
    * Async factory for real IndexedDB usage.
    * Handles indexedDB.open() and onupgradeneeded.
    */
-  static async create({ dbName = 'piper-cache', dbVersion = 1, storeName = 'cache' } = {}) {
+  static async create({ dbName = "piper-cache", dbVersion = 1, storeName = "cache" } = {}) {
     const db = await new Promise((resolve, reject) => {
       const req = indexedDB.open(dbName, dbVersion);
       req.onupgradeneeded = (e) => {
         const db = e.target.result;
         if (!db.objectStoreNames.contains(storeName)) {
-          db.createObjectStore(storeName, { keyPath: 'key' });
+          db.createObjectStore(storeName, { keyPath: "key" });
         }
       };
       req.onsuccess = () => resolve(req.result);
@@ -33,12 +33,12 @@ export class CacheManager {
    * @param {{ dbFactory: () => object }} options
    */
   constructor({ dbFactory } = {}) {
-    if (typeof dbFactory !== 'function') {
-      throw new TypeError('CacheManager requires a dbFactory function');
+    if (typeof dbFactory !== "function") {
+      throw new TypeError("CacheManager requires a dbFactory function");
     }
     this._db = dbFactory();
-    if (!this._db || typeof this._db.transaction !== 'function') {
-      throw new TypeError('dbFactory must return an object with a transaction() method');
+    if (!this._db || typeof this._db.transaction !== "function") {
+      throw new TypeError("dbFactory must return an object with a transaction() method");
     }
     this._inflight = new Map();
   }
@@ -47,7 +47,7 @@ export class CacheManager {
   // Internal helpers that wrap the mock/real IDB request objects in Promises.
   // ---------------------------------------------------------------------------
 
-  _store(mode = 'readonly') {
+  _store(mode = "readonly") {
     const tx = this._db.transaction(STORE_NAME, mode);
     return tx.objectStore(STORE_NAME);
   }
@@ -74,9 +74,9 @@ export class CacheManager {
       }
 
       // Real IDBRequest — wait for completion via events.
-      if (typeof request.addEventListener === 'function') {
-        request.addEventListener('success', () => resolve(request.result));
-        request.addEventListener('error', () => reject(request.error));
+      if (typeof request.addEventListener === "function") {
+        request.addEventListener("success", () => resolve(request.result));
+        request.addEventListener("error", () => reject(request.error));
         return;
       }
 
@@ -84,14 +84,19 @@ export class CacheManager {
       // This path is kept for older IDB shims that expose settable onsuccess/onerror
       // but lack addEventListener.  If neither mechanism is available the promise
       // would hang forever, so we reject early.
-      if (typeof request.onsuccess === 'undefined'
-          && !('onsuccess' in request)
-          && typeof Object.getOwnPropertyDescriptor(
-               Object.getPrototypeOf(request) || request, 'onsuccess'
-             ) === 'undefined') {
-        reject(new TypeError(
-          'IDB request object has no supported completion mechanism (_mock, addEventListener, or settable onsuccess)'
-        ));
+      if (
+        typeof request.onsuccess === "undefined" &&
+        !("onsuccess" in request) &&
+        typeof Object.getOwnPropertyDescriptor(
+          Object.getPrototypeOf(request) || request,
+          "onsuccess"
+        ) === "undefined"
+      ) {
+        reject(
+          new TypeError(
+            "IDB request object has no supported completion mechanism (_mock, addEventListener, or settable onsuccess)"
+          )
+        );
         return;
       }
       request.onsuccess = () => resolve(request.result);
@@ -110,15 +115,15 @@ export class CacheManager {
    * @param {ArrayBuffer} data
    * @param {{ version: string, priority?: string }} meta
    */
-  async set(key, data, { version, priority = 'medium' } = {}) {
+  async set(key, data, { version, priority = "medium" } = {}) {
     const byteLength = data && data.byteLength ? data.byteLength : 0;
 
     // Check quota BEFORE writing.
     const usage = await this.getUsage();
     // When overwriting, subtract the old entry's size.
     const existing = await this.get(key);
-    const existingSize = existing && existing.data && existing.data.byteLength
-      ? existing.data.byteLength : 0;
+    const existingSize =
+      existing && existing.data && existing.data.byteLength ? existing.data.byteLength : 0;
     const projectedUsed = usage.used - existingSize + byteLength;
 
     if (projectedUsed > IOS_QUOTA) {
@@ -128,16 +133,20 @@ export class CacheManager {
       // Re-check after eviction.
       const usageAfter = await this.getUsage();
       const existingAfter = await this.get(key);
-      const existingSizeAfter = existingAfter && existingAfter.data && existingAfter.data.byteLength
-        ? existingAfter.data.byteLength : 0;
+      const existingSizeAfter =
+        existingAfter && existingAfter.data && existingAfter.data.byteLength
+          ? existingAfter.data.byteLength
+          : 0;
       const projectedAfter = usageAfter.used - existingSizeAfter + byteLength;
 
       if (projectedAfter > IOS_QUOTA) {
-        throw new Error(`Cache quota exceeded: cannot store ${byteLength} bytes (storage limit ${IOS_QUOTA})`);
+        throw new Error(
+          `Cache quota exceeded: cannot store ${byteLength} bytes (storage limit ${IOS_QUOTA})`
+        );
       }
     }
 
-    const store = this._store('readwrite');
+    const store = this._store("readwrite");
     const record = {
       key,
       data,
@@ -152,7 +161,7 @@ export class CacheManager {
    * Retrieve a cached entry. Returns `{ version, data, ... }` or `null`.
    */
   async get(key) {
-    const store = this._store('readonly');
+    const store = this._store("readonly");
     const result = await this._wrap(store.get(key));
     return result || null;
   }
@@ -161,7 +170,7 @@ export class CacheManager {
    * Remove a single key.
    */
   async delete(key) {
-    const store = this._store('readwrite');
+    const store = this._store("readwrite");
     await this._wrap(store.delete(key));
   }
 
@@ -170,7 +179,9 @@ export class CacheManager {
    */
   async isValid(key, version) {
     const entry = await this.get(key);
-    if (!entry) return false;
+    if (!entry) {
+      return false;
+    }
     return entry.version === version;
   }
 
@@ -179,7 +190,7 @@ export class CacheManager {
    * ArrayBuffer byte lengths.
    */
   async getUsage() {
-    const store = this._store('readonly');
+    const store = this._store("readonly");
     const all = await this._wrap(store.getAll());
     let used = 0;
     for (const entry of all) {
@@ -204,7 +215,7 @@ export class CacheManager {
    * Return an array of all stored keys.
    */
   async getKeys() {
-    const store = this._store('readonly');
+    const store = this._store("readonly");
     const all = await this._wrap(store.getAll());
     return all.map((entry) => entry.key);
   }
@@ -218,7 +229,7 @@ export class CacheManager {
    * @param {function(): Promise<ArrayBuffer>} fetcherFn
    * @param {{ priority?: string }} options
    */
-  async getOrFetch(key, version, fetcherFn, { priority = 'medium' } = {}) {
+  async getOrFetch(key, version, fetcherFn, { priority = "medium" } = {}) {
     const entry = await this.get(key);
     if (entry && entry.version === version) {
       return entry.data;
@@ -253,22 +264,26 @@ export class CacheManager {
    * then medium. High-priority entries are never evicted.
    */
   async _evict(bytesNeeded) {
-    const store = this._store('readonly');
+    const store = this._store("readonly");
     const all = await this._wrap(store.getAll());
 
     // Sort: low priority first, then medium. High is never evicted.
     const evictable = all
-      .filter((e) => (e.priority || 'medium') !== 'high')
+      .filter((e) => (e.priority || "medium") !== "high")
       .sort((a, b) => {
-        const pa = PRIORITY_ORDER[a.priority || 'medium'] || 1;
-        const pb = PRIORITY_ORDER[b.priority || 'medium'] || 1;
-        if (pa !== pb) return pb - pa; // higher numeric = lower priority = evict first
+        const pa = PRIORITY_ORDER[a.priority || "medium"] || 1;
+        const pb = PRIORITY_ORDER[b.priority || "medium"] || 1;
+        if (pa !== pb) {
+          return pb - pa;
+        } // higher numeric = lower priority = evict first
         return (a.storedAt || 0) - (b.storedAt || 0); // oldest first within same priority
       });
 
     let freed = 0;
     for (const entry of evictable) {
-      if (freed >= bytesNeeded) break;
+      if (freed >= bytesNeeded) {
+        break;
+      }
       await this.delete(entry.key);
       freed += entry.data && entry.data.byteLength ? entry.data.byteLength : 0;
     }

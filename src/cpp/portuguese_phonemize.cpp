@@ -1001,4 +1001,144 @@ void phonemize_portuguese(const std::string &text,
     }
 }
 
+// ---------------------------------------------------------------------------
+// European Portuguese (pt-PT) — post-processing layer
+// ---------------------------------------------------------------------------
+// Mirror of Python `_apply_eu_postprocessing`. Operates on char32_t (Phoneme)
+// because BR's tʃ / dʒ have already been collapsed to single PUA codepoints
+// by `phonemize_portuguese`. See `docs/spec/pt-dialect-contract.toml`
+// (spec_version 2, `[implementation.differences]`).
+
+namespace {
+
+// PUA codepoints for BR's affricates (must match phoneme_parser PUA mapping).
+constexpr Phoneme PUA_TCH = U'\xE054';
+constexpr Phoneme PUA_DZH = U'\xE055';
+
+// IPA single-codepoint phonemes used by EU. Names are EU-prefixed to avoid
+// collision with the existing `IPA_ESH` / `IPA_EZH` etc. defined at file-top
+// (those live in a separate anonymous namespace but share file linkage).
+constexpr Phoneme EU_BARRED_I = U'ɨ';  // ɨ centralised vowel
+constexpr Phoneme EU_VEL_L    = U'ɫ';  // ɫ velarised lateral
+constexpr Phoneme EU_ESH      = U'ʃ';  // ʃ
+constexpr Phoneme EU_EZH      = U'ʒ';  // ʒ
+constexpr Phoneme EU_UVU_R    = U'ʁ';  // ʁ
+
+inline bool isEUVowel(Phoneme p) {
+    switch (p) {
+        case U'a': case U'e': case U'i': case U'o': case U'u':
+        case U'ɛ': /* ɛ */ case U'ɔ': /* ɔ */
+        case U'ã': /* ã */ case U'ẽ': /* ẽ */
+        case U'ĩ': /* ĩ */ case U'õ': /* õ */
+        case U'ũ': /* ũ */ case EU_BARRED_I:
+            return true;
+        default:
+            return false;
+    }
+}
+
+inline bool isEUConsonant(Phoneme p) {
+    switch (p) {
+        case U'b': case U'd': case U'f': case U'k': case U'l': case U'm':
+        case U'n': case U'p': case U'r': case U's': case U't': case U'v':
+        case U'w': case U'z':
+        case U'ɡ': /* ɡ */ case U'ɲ': /* ɲ */
+        case U'ɾ': /* ɾ */ case EU_UVU_R:
+        case IPA_ESH: case U'ʎ': /* ʎ */ case IPA_EZH:
+        case U'ʔ': /* ʔ */ case U'h': case EU_VEL_L:
+            return true;
+        default:
+            return false;
+    }
+}
+
+inline bool isEUPunct(Phoneme p) {
+    switch (p) {
+        case U',': case U'.': case U';': case U':': case U'!': case U'?':
+        case U'—': case U'–': case U'…':
+            return true;
+        default:
+            return false;
+    }
+}
+
+bool nextNonSpaceIsVowel(const std::vector<Phoneme> &p, size_t i) {
+    for (size_t j = i + 1; j < p.size(); ++j) {
+        if (p[j] == U' ') continue;
+        return isEUVowel(p[j]);
+    }
+    return false;
+}
+
+void applyEUPostprocessing(std::vector<Phoneme> &p) {
+    const size_t n = p.size();
+
+    // Pass 1: undo BR t/d palatalisation + final-e centralisation.
+    for (size_t i = 0; i < n; ++i) {
+        if (p[i] != U'i') continue;
+        Phoneme nxt = (i + 1 < n) ? p[i + 1] : U'\0';
+        bool isFinal = (nxt == U'\0' || nxt == U' ' || isEUPunct(nxt));
+        if (!isFinal) continue;
+        if (i >= 1 && p[i - 1] == PUA_TCH) {
+            p[i - 1] = U't';
+            p[i] = EU_BARRED_I;
+            continue;
+        }
+        if (i >= 1 && p[i - 1] == PUA_DZH) {
+            p[i - 1] = U'd';
+            p[i] = EU_BARRED_I;
+            continue;
+        }
+        if (i >= 1 && isEUConsonant(p[i - 1])) {
+            p[i] = EU_BARRED_I;
+        }
+    }
+
+    // Pass 2: coda /s/, /z/.
+    for (size_t i = 0; i < n; ++i) {
+        if (p[i] != U's' && p[i] != U'z') continue;
+        Phoneme nxt = (i + 1 < n) ? p[i + 1] : U'\0';
+        bool isWordEnd = (nxt == U'\0' || nxt == U' ' || isEUPunct(nxt));
+        if (isWordEnd) {
+            if (nextNonSpaceIsVowel(p, i)) {
+                p[i] = EU_EZH;
+                continue;
+            }
+            p[i] = (p[i] == U's') ? EU_ESH : EU_EZH;
+        } else if (isEUConsonant(nxt) && !isEUVowel(nxt)) {
+            p[i] = (p[i] == U's') ? EU_ESH : EU_EZH;
+        }
+    }
+
+    // Pass 3: coda /w/ → /ɫ/.
+    for (size_t i = 0; i < n; ++i) {
+        if (p[i] != U'w' || i == 0) continue;
+        if (!isEUVowel(p[i - 1])) continue;
+        Phoneme nxt = (i + 1 < n) ? p[i + 1] : U'\0';
+        bool isCoda =
+            nxt == U'\0' || nxt == U' ' || isEUPunct(nxt) ||
+            (isEUConsonant(nxt) && !isEUVowel(nxt));
+        if (isCoda) {
+            p[i] = EU_VEL_L;
+        }
+    }
+
+    // Pass 4: h → ʁ.
+    for (size_t i = 0; i < n; ++i) {
+        if (p[i] == U'h') {
+            p[i] = EU_UVU_R;
+        }
+    }
+}
+
+} // anonymous namespace (EU)
+
+void phonemize_european_portuguese(const std::string &text,
+                                   std::vector<std::vector<Phoneme>> &phonemes) {
+    phonemize_portuguese(text, phonemes);
+    for (auto &sentence : phonemes) {
+        applyEUPostprocessing(sentence);
+    }
+}
+
 } // namespace piper

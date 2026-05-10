@@ -419,9 +419,15 @@ class EnglishPhonemizer(Phonemizer):
         return "en"
 
     def phonemize(self, text: str) -> list[str]:
+        text = self._sanitize_input(text)
+        if not text:
+            return []
         return phonemize_english(text)
 
     def phonemize_with_prosody(
         self, text: str
     ) -> tuple[list[str], list[ProsodyInfo | None]]:
+        text = self._sanitize_input(text)
+        if not text:
+            return [], []
         return phonemize_english_with_prosody(text)

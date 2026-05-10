@@ -51,6 +51,7 @@ iOS / Swift プロジェクトから piper-plus の **G2P (Grapheme-to-Phoneme) 
 | スウェーデン語 | `sv` | 規則ベース | なし | <0.1 MB |
 
 > ※ **「バイナリ寄与」は埋込辞書ファイルの非圧縮サイズ。** xcframework に最終的に追加されるサイズは debuginfo / 圧縮で前後します。代表値は次の通り (release ビルド、aarch64-apple-ios slice):
+>
 > - **xcframework.zip ダウンロードサイズ**: ~3-5 MB (圧縮後、SwiftPM が GitHub から取得する物理サイズ)
 > - **app への増分**: ~30-35 MB (`bundled-dicts` + jpreprocess + NAIST-JDIC) — App Store の `over-the-air` 制限 (iOS 16 で 200 MB → 制限緩和) には収まるが、App Clip の 10 MB 制約は **超える**
 > - **未 strip staticlib (CI 中間成果物)**: ~84 MB — リリース時に xcodebuild 側で symbol strip され体感サイズが縮む
@@ -90,10 +91,12 @@ let package = Package(
 ### Xcode プロジェクトの場合 (Package.swift を使わない)
 
 1. **GitHub Releases** から `libpiper_plus_g2p-apple-v${VERSION}.xcframework.zip` をダウンロード
+
    ```bash
    gh release download v1.14.0 -p 'libpiper_plus_g2p-apple-v*.xcframework.zip' --repo ayutaz/piper-plus
    unzip libpiper_plus_g2p-apple-v*.xcframework.zip
    ```
+
 2. **Project Navigator** に `piper_plus_g2p.xcframework` をドラッグ
 3. **Targets** → **General** → **Frameworks, Libraries, and Embedded Content** で **"Do Not Embed"** (static archive)
 4. Swift から `import PiperPlusG2PBinary` で C API を直接利用するか、`Sources/PiperPlusG2P/*.swift` を手動コピーして `import PiperPlusG2P` を使う
@@ -161,6 +164,7 @@ do {
 ```
 
 > `G2PError` は 4 ケース:
+>
 > - `initializationFailed(requestedLanguages: [Language])` — `Phonemizer.init` の語リストを保持
 > - `phonemizeReturnedNull(language: Language)` — どの言語呼び出しで NULL が返ったか
 > - `invalidUTF8`
@@ -258,7 +262,7 @@ struct PhonemeView: View {
 
 | 言語 | 辞書 | ライセンス | 同梱形態 |
 |------|------|-----------|---------|
-| 日本語 | NAIST-JDIC (jpreprocess 経由) | BSD-3-Clause ([NAIST-JDIC 公式](https://osdn.net/projects/naist-jdic/)) | バイナリ埋込 (consumer の app に複製される) |
+| 日本語 | NAIST-JDIC (jpreprocess 経由) | BSD-3-Clause ([NAIST-JDIC mirror](https://github.com/jpreprocess/naist-jdic)) | バイナリ埋込 (consumer の app に複製される) |
 | 中国語 | pypinyin (Unicode CLDR + Han database 由来) | MIT ([pypinyin](https://github.com/mozillazg/python-pinyin)) | バイナリ埋込 |
 | 英語 | CMU Pronouncing Dictionary v0.7b | BSD-style ([CMU](http://www.speech.cs.cmu.edu/cgi-bin/cmudict)) | バイナリ埋込 |
 | 他 | (規則ベースのみ、辞書なし) | — | — |

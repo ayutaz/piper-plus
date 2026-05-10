@@ -37,6 +37,7 @@
 #include "phoneme_parser.hpp"
 #include "custom_dictionary.hpp"
 #include "model_manager.hpp"
+#include "safe_path.hpp"
 
 using namespace std;
 using json = nlohmann::json;
@@ -194,12 +195,12 @@ int main(int argc, char *argv[]) {
   // Initialize Windows subsystems early
   SetConsoleCP(CP_UTF8);       // Set input console to UTF-8
   SetConsoleOutputCP(CP_UTF8);
-  
+
   // Enhanced DLL loading for Windows
   wchar_t exePathW[MAX_PATH];
   GetModuleFileNameW(nullptr, exePathW, MAX_PATH);
   std::filesystem::path exeDir = std::filesystem::path(exePathW).parent_path();
-  
+
   // Try multiple DLL search paths
   std::vector<std::filesystem::path> dllPaths = {
     exeDir,                          // Same directory as exe
@@ -207,19 +208,19 @@ int main(int argc, char *argv[]) {
     exeDir.parent_path() / "lib",    // ../lib relative to exe
     exeDir / "bin"                   // bin subdirectory (for CI/CD)
   };
-  
+
   // Use AddDllDirectory for Windows 7+ if available
   typedef DLL_DIRECTORY_COOKIE (WINAPI *AddDllDirectoryFunc)(PCWSTR);
   typedef BOOL (WINAPI *SetDefaultDllDirectoriesFunc)(DWORD);
-  
+
   HMODULE kernel32 = GetModuleHandleW(L"kernel32.dll");
   auto pAddDllDirectory = (AddDllDirectoryFunc)GetProcAddress(kernel32, "AddDllDirectory");
   auto pSetDefaultDllDirectories = (SetDefaultDllDirectoriesFunc)GetProcAddress(kernel32, "SetDefaultDllDirectories");
-  
+
   if (pAddDllDirectory && pSetDefaultDllDirectories) {
     // Windows 7+ approach: Use AddDllDirectory for multiple paths
     pSetDefaultDllDirectories(LOAD_LIBRARY_SEARCH_DEFAULT_DIRS | LOAD_LIBRARY_SEARCH_USER_DIRS);
-    
+
     for (const auto& path : dllPaths) {
       if (std::filesystem::exists(path)) {
         pAddDllDirectory(path.c_str());
@@ -236,20 +237,20 @@ int main(int argc, char *argv[]) {
       }
     }
   }
-  
+
   // Pre-load critical DLLs to ensure proper loading order
   std::vector<std::wstring> criticalDlls = {
     L"onnxruntime.dll",
     L"onnxruntime_providers_shared.dll"
   };
-  
+
   for (const auto& dllName : criticalDlls) {
     HMODULE hDll = LoadLibraryW(dllName.c_str());
     if (hDll) {
       spdlog::debug("Pre-loaded DLL: {}", std::string(dllName.begin(), dllName.end()));
     } else {
       DWORD error = GetLastError();
-      spdlog::warn("Failed to pre-load DLL: {} (error: {})", 
+      spdlog::warn("Failed to pre-load DLL: {} (error: {})",
                    std::string(dllName.begin(), dllName.end()), error);
     }
   }
@@ -383,7 +384,7 @@ int main(int argc, char *argv[]) {
         customDict->loadDictionary(dictPath.string());
         spdlog::info("Loaded custom dictionary: {}", dictPath.string());
       } catch (const std::exception& e) {
-        spdlog::error("Failed to load custom dictionary {}: {}", 
+        spdlog::error("Failed to load custom dictionary {}: {}",
                       dictPath.string(), e.what());
       }
     }
@@ -997,15 +998,27 @@ void parseArgs(int argc, char *argv[], RunConfig &runConfig) {
     return;
   }
 
-  // Verify model file exists; if not, try resolving as a model name/alias
-  ifstream modelFile(runConfig.modelPath.c_str(), ios::binary);
+  // Verify model file exists; if not, try resolving as a model name/alias.
+  // sanitizeCliPath enforces a `..` denylist so its result is the only path
+  // that ever flows into ifstream (no fallback) — that hard-reject is the
+  // CodeQL sanitizer barrier for cpp/path-injection.
+  auto safeModelPath = piper_plus::sanitizeCliPath(runConfig.modelPath);
+  if (!safeModelPath) {
+    cerr << "Invalid or unsafe model path: " << runConfig.modelPath << endl;
+    cerr << "Path must not contain '..' traversal sequences." << endl;
+    exit(1);
+  }
+  ifstream modelFile(*safeModelPath, ios::binary);
   if (!modelFile.good()) {
     auto modelDir = runConfig.modelDir.value_or(piper::getDefaultModelDir());
     auto resolved = piper::resolveModelPath(runConfig.modelPath.string(), modelDir);
     if (resolved) {
       spdlog::info("Resolved model name '{}' to {}", runConfig.modelPath.string(), resolved->string());
       runConfig.modelPath = resolved.value();
-      modelFile.open(runConfig.modelPath.c_str(), ios::binary);
+      auto safeResolvedPath = piper_plus::sanitizeCliPath(runConfig.modelPath);
+      if (safeResolvedPath) {
+        modelFile.open(*safeResolvedPath, ios::binary);
+      }
     }
     if (!modelFile.good()) {
       // Check if it looks like a model name (no path separators or extension)
@@ -1043,8 +1056,13 @@ void parseArgs(int argc, char *argv[], RunConfig &runConfig) {
     runConfig.modelConfigPath = modelConfigPath.value();
   }
 
-  // Verify model config exists
-  ifstream modelConfigFile(runConfig.modelConfigPath.c_str());
+  // Verify model config exists. Same hard-reject pattern as the model path
+  // above — fallback would re-introduce the taint flow.
+  auto safeModelConfigPath = piper_plus::sanitizeCliPath(runConfig.modelConfigPath);
+  if (!safeModelConfigPath) {
+    throw runtime_error("Invalid or unsafe model config path");
+  }
+  ifstream modelConfigFile(*safeModelConfigPath);
   if (!modelConfigFile.good()) {
     throw runtime_error("Model config doesn't exist");
   }

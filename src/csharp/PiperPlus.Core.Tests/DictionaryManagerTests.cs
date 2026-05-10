@@ -7,6 +7,15 @@ namespace PiperPlus.Core.Tests;
 /// Tests cover dictionary search order, validation, control flags, and error paths.
 /// Network-dependent tests (actual download) are excluded; only local logic is tested.
 /// </summary>
+/// <remarks>
+/// Member of the <c>EnvVars</c> collection: every test in this class mutates
+/// process-wide environment variables (OPENJTALK_DICTIONARY_PATH,
+/// DOTNETG2P_NAIST_JDIC_PATH, NAIST_JDIC_PATH, PIPER_OFFLINE_MODE,
+/// PIPER_AUTO_DOWNLOAD_DICT, XDG_DATA_HOME). xUnit v3 runs tests across
+/// classes in parallel by default, so they MUST be serialised with other
+/// env-var-mutating classes (<see cref="SessionFactoryTests"/>).
+/// </remarks>
+[Collection("EnvVars")]
 public sealed class DictionaryManagerTests : IDisposable
 {
     // Environment variables we may modify during tests
@@ -40,7 +49,6 @@ public sealed class DictionaryManagerTests : IDisposable
     // ================================================================
     // IsValidDictionary
     // ================================================================
-
     [Fact]
     public void IsValidDictionary_NullPath_ReturnsFalse()
     {
@@ -50,7 +58,7 @@ public sealed class DictionaryManagerTests : IDisposable
     [Fact]
     public void IsValidDictionary_EmptyPath_ReturnsFalse()
     {
-        Assert.False(DictionaryManager.IsValidDictionary(""));
+        Assert.False(DictionaryManager.IsValidDictionary(string.Empty));
     }
 
     [Fact]
@@ -62,7 +70,7 @@ public sealed class DictionaryManagerTests : IDisposable
     [Fact]
     public void IsValidDictionary_EmptyDirectory_ReturnsFalse()
     {
-        var tempDir = Path.Combine(Path.GetTempPath(), $"dict_test_{Guid.NewGuid():N}");
+        var tempDir = Path.Join(Path.GetTempPath(), $"dict_test_{Guid.NewGuid():N}");
         Directory.CreateDirectory(tempDir);
         try
         {
@@ -77,13 +85,13 @@ public sealed class DictionaryManagerTests : IDisposable
     [Fact]
     public void IsValidDictionary_PartialFiles_ReturnsFalse()
     {
-        var tempDir = Path.Combine(Path.GetTempPath(), $"dict_test_{Guid.NewGuid():N}");
+        var tempDir = Path.Join(Path.GetTempPath(), $"dict_test_{Guid.NewGuid():N}");
         Directory.CreateDirectory(tempDir);
         try
         {
             // Create only 2 of the 4 required files
-            File.WriteAllText(Path.Combine(tempDir, "sys.dic"), "");
-            File.WriteAllText(Path.Combine(tempDir, "matrix.bin"), "");
+            File.WriteAllText(Path.Join(tempDir, "sys.dic"), string.Empty);
+            File.WriteAllText(Path.Join(tempDir, "matrix.bin"), string.Empty);
 
             Assert.False(DictionaryManager.IsValidDictionary(tempDir));
         }
@@ -96,15 +104,15 @@ public sealed class DictionaryManagerTests : IDisposable
     [Fact]
     public void IsValidDictionary_AllFilesPresent_ReturnsTrue()
     {
-        var tempDir = Path.Combine(Path.GetTempPath(), $"dict_test_{Guid.NewGuid():N}");
+        var tempDir = Path.Join(Path.GetTempPath(), $"dict_test_{Guid.NewGuid():N}");
         Directory.CreateDirectory(tempDir);
         try
         {
             // Create all 4 required files
-            File.WriteAllText(Path.Combine(tempDir, "sys.dic"), "");
-            File.WriteAllText(Path.Combine(tempDir, "matrix.bin"), "");
-            File.WriteAllText(Path.Combine(tempDir, "char.bin"), "");
-            File.WriteAllText(Path.Combine(tempDir, "unk.dic"), "");
+            File.WriteAllText(Path.Join(tempDir, "sys.dic"), string.Empty);
+            File.WriteAllText(Path.Join(tempDir, "matrix.bin"), string.Empty);
+            File.WriteAllText(Path.Join(tempDir, "char.bin"), string.Empty);
+            File.WriteAllText(Path.Join(tempDir, "unk.dic"), string.Empty);
 
             Assert.True(DictionaryManager.IsValidDictionary(tempDir));
         }
@@ -117,7 +125,6 @@ public sealed class DictionaryManagerTests : IDisposable
     // ================================================================
     // FindDictionary — environment variable search order
     // ================================================================
-
     [Fact]
     public void FindDictionary_OpenJtalkEnvVar_TakesPriority()
     {
@@ -125,6 +132,7 @@ public sealed class DictionaryManagerTests : IDisposable
         try
         {
             Environment.SetEnvironmentVariable("OPENJTALK_DICTIONARY_PATH", tempDir);
+
             // Clear others to ensure they don't interfere
             Environment.SetEnvironmentVariable("DOTNETG2P_NAIST_JDIC_PATH", null);
             Environment.SetEnvironmentVariable("NAIST_JDIC_PATH", null);
@@ -187,6 +195,7 @@ public sealed class DictionaryManagerTests : IDisposable
         {
             // Point OPENJTALK_DICTIONARY_PATH to an invalid (nonexistent) path
             Environment.SetEnvironmentVariable("OPENJTALK_DICTIONARY_PATH", "/nonexistent/path");
+
             // Point NAIST_JDIC_PATH to a valid dictionary
             Environment.SetEnvironmentVariable("DOTNETG2P_NAIST_JDIC_PATH", null);
             Environment.SetEnvironmentVariable("NAIST_JDIC_PATH", tempDir);
@@ -202,7 +211,7 @@ public sealed class DictionaryManagerTests : IDisposable
     }
 
     [Fact]
-    public void FindDictionary_NoDictionaryAnywhere_ReturnsNull()
+    public void FindDictionary_NoDictionaryAnywhere_ReturnsNullOrExistingPath()
     {
         // Clear all env vars that might point to a dictionary
         Environment.SetEnvironmentVariable("OPENJTALK_DICTIONARY_PATH", null);
@@ -210,16 +219,20 @@ public sealed class DictionaryManagerTests : IDisposable
         Environment.SetEnvironmentVariable("NAIST_JDIC_PATH", null);
 
         // FindDictionary checks env vars, exe-relative, system paths, and data dir.
-        // If none of those contain a valid dict, it returns null.
-        // This test may still find a real dictionary if one is installed on the system,
-        // so we just verify the method does not throw.
-        _ = DictionaryManager.FindDictionary();
+        // If none contain a valid dict it returns null. On dev machines a system
+        // OpenJTalk dictionary may exist (Homebrew /opt/homebrew/.../etc), so the
+        // test environment determines which branch is exercised. Either way, the
+        // contract is "null OR an existing directory path" — silently returning
+        // a non-existent path would be a bug.
+        var result = DictionaryManager.FindDictionary();
+        Assert.True(
+            result is null || Directory.Exists(result),
+            $"FindDictionary returned non-null but non-existent path: {result}");
     }
 
     // ================================================================
     // EnsureDictionaryAsync — control flags
     // ================================================================
-
     [Fact]
     public async Task EnsureDictionaryAsync_OfflineMode_ThrowsWhenNotFound()
     {
@@ -237,6 +250,7 @@ public sealed class DictionaryManagerTests : IDisposable
         {
             var path = await DictionaryManager.EnsureDictionaryAsync(
                 TestContext.Current.CancellationToken);
+
             // If we get here, a local dictionary was found — that's fine
             Assert.True(DictionaryManager.IsValidDictionary(path));
         }
@@ -289,7 +303,6 @@ public sealed class DictionaryManagerTests : IDisposable
     // ================================================================
     // IsValidDictionary — edge cases
     // ================================================================
-
     [Fact]
     public void IsValidDictionary_WhitespacePath_ReturnsFalse()
     {
@@ -299,42 +312,48 @@ public sealed class DictionaryManagerTests : IDisposable
     [Fact]
     public void IsValidDictionary_OneOfFourFiles_ReturnsFalse()
     {
-        var dir = Path.Combine(Path.GetTempPath(), $"dict_test_{Guid.NewGuid():N}");
+        var dir = Path.Join(Path.GetTempPath(), $"dict_test_{Guid.NewGuid():N}");
         try
         {
             Directory.CreateDirectory(dir);
-            File.WriteAllBytes(Path.Combine(dir, "sys.dic"), new byte[] { 0 });
+            File.WriteAllBytes(Path.Join(dir, "sys.dic"), new byte[] { 0 });
             Assert.False(DictionaryManager.IsValidDictionary(dir));
         }
         finally
         {
-            if (Directory.Exists(dir)) Directory.Delete(dir, true);
+            if (Directory.Exists(dir))
+            {
+                Directory.Delete(dir, true);
+            }
         }
     }
 
     [Fact]
     public void IsValidDictionary_ThreeOfFourFiles_ReturnsFalse()
     {
-        var dir = Path.Combine(Path.GetTempPath(), $"dict_test_{Guid.NewGuid():N}");
+        var dir = Path.Join(Path.GetTempPath(), $"dict_test_{Guid.NewGuid():N}");
         try
         {
             Directory.CreateDirectory(dir);
-            File.WriteAllBytes(Path.Combine(dir, "sys.dic"), new byte[] { 0 });
-            File.WriteAllBytes(Path.Combine(dir, "matrix.bin"), new byte[] { 0 });
-            File.WriteAllBytes(Path.Combine(dir, "char.bin"), new byte[] { 0 });
+            File.WriteAllBytes(Path.Join(dir, "sys.dic"), new byte[] { 0 });
+            File.WriteAllBytes(Path.Join(dir, "matrix.bin"), new byte[] { 0 });
+            File.WriteAllBytes(Path.Join(dir, "char.bin"), new byte[] { 0 });
+
             // Missing unk.dic
             Assert.False(DictionaryManager.IsValidDictionary(dir));
         }
         finally
         {
-            if (Directory.Exists(dir)) Directory.Delete(dir, true);
+            if (Directory.Exists(dir))
+            {
+                Directory.Delete(dir, true);
+            }
         }
     }
 
     // ================================================================
     // Control flag edge cases
     // ================================================================
-
     [Fact]
     public async Task IsOfflineMode_OnlyExactOneIsTrue()
     {
@@ -342,6 +361,7 @@ public sealed class DictionaryManagerTests : IDisposable
         Environment.SetEnvironmentVariable("OPENJTALK_DICTIONARY_PATH", null);
         Environment.SetEnvironmentVariable("DOTNETG2P_NAIST_JDIC_PATH", null);
         Environment.SetEnvironmentVariable("NAIST_JDIC_PATH", null);
+
         // "1" should be offline, but "0" should not be
         // Set PIPER_OFFLINE_MODE=0 and PIPER_AUTO_DOWNLOAD_DICT=0
         // If "0" were treated as offline, we'd get "offline mode" error;
@@ -352,6 +372,7 @@ public sealed class DictionaryManagerTests : IDisposable
         try
         {
             var path = await DictionaryManager.EnsureDictionaryAsync(CancellationToken.None);
+
             // If we get here, a system dictionary was found — that's acceptable
             Assert.True(DictionaryManager.IsValidDictionary(path));
         }
@@ -366,14 +387,14 @@ public sealed class DictionaryManagerTests : IDisposable
     public async Task EnsureDictionaryAsync_OfflineModeWithValidDict_ReturnsPath()
     {
         // Even in offline mode, if dictionary exists locally, it should be returned
-        var dir = Path.Combine(Path.GetTempPath(), $"dict_test_{Guid.NewGuid():N}");
+        var dir = Path.Join(Path.GetTempPath(), $"dict_test_{Guid.NewGuid():N}");
         try
         {
             Directory.CreateDirectory(dir);
-            File.WriteAllBytes(Path.Combine(dir, "sys.dic"), new byte[] { 0 });
-            File.WriteAllBytes(Path.Combine(dir, "matrix.bin"), new byte[] { 0 });
-            File.WriteAllBytes(Path.Combine(dir, "char.bin"), new byte[] { 0 });
-            File.WriteAllBytes(Path.Combine(dir, "unk.dic"), new byte[] { 0 });
+            File.WriteAllBytes(Path.Join(dir, "sys.dic"), new byte[] { 0 });
+            File.WriteAllBytes(Path.Join(dir, "matrix.bin"), new byte[] { 0 });
+            File.WriteAllBytes(Path.Join(dir, "char.bin"), new byte[] { 0 });
+            File.WriteAllBytes(Path.Join(dir, "unk.dic"), new byte[] { 0 });
 
             Environment.SetEnvironmentVariable("OPENJTALK_DICTIONARY_PATH", dir);
             Environment.SetEnvironmentVariable("PIPER_OFFLINE_MODE", "1");
@@ -383,14 +404,16 @@ public sealed class DictionaryManagerTests : IDisposable
         }
         finally
         {
-            if (Directory.Exists(dir)) Directory.Delete(dir, true);
+            if (Directory.Exists(dir))
+            {
+                Directory.Delete(dir, true);
+            }
         }
     }
 
     // ================================================================
     // Data directory resolution
     // ================================================================
-
     [Fact]
     public void FindDictionary_DataDirFallback_Checked()
     {
@@ -399,16 +422,16 @@ public sealed class DictionaryManagerTests : IDisposable
         // On non-Windows we can control this via XDG_DATA_HOME; on Windows via %APPDATA%.
         // We verify that FindDictionary checks the data-dir candidate by creating a
         // valid dictionary there and clearing all other env-var candidates.
-        var baseDir = Path.Combine(Path.GetTempPath(), $"dict_test_{Guid.NewGuid():N}");
-        var piperDir = Path.Combine(baseDir, "piper");
-        var dictDir = Path.Combine(piperDir, "open_jtalk_dic_utf_8-1.11");
+        var baseDir = Path.Join(Path.GetTempPath(), $"dict_test_{Guid.NewGuid():N}");
+        var piperDir = Path.Join(baseDir, "piper");
+        var dictDir = Path.Join(piperDir, "open_jtalk_dic_utf_8-1.11");
         try
         {
             Directory.CreateDirectory(dictDir);
-            File.WriteAllBytes(Path.Combine(dictDir, "sys.dic"), new byte[] { 0 });
-            File.WriteAllBytes(Path.Combine(dictDir, "matrix.bin"), new byte[] { 0 });
-            File.WriteAllBytes(Path.Combine(dictDir, "char.bin"), new byte[] { 0 });
-            File.WriteAllBytes(Path.Combine(dictDir, "unk.dic"), new byte[] { 0 });
+            File.WriteAllBytes(Path.Join(dictDir, "sys.dic"), new byte[] { 0 });
+            File.WriteAllBytes(Path.Join(dictDir, "matrix.bin"), new byte[] { 0 });
+            File.WriteAllBytes(Path.Join(dictDir, "char.bin"), new byte[] { 0 });
+            File.WriteAllBytes(Path.Join(dictDir, "unk.dic"), new byte[] { 0 });
 
             // Clear all env-var candidates so they don't short-circuit
             Environment.SetEnvironmentVariable("OPENJTALK_DICTIONARY_PATH", null);
@@ -437,7 +460,10 @@ public sealed class DictionaryManagerTests : IDisposable
         }
         finally
         {
-            if (Directory.Exists(baseDir)) Directory.Delete(baseDir, true);
+            if (Directory.Exists(baseDir))
+            {
+                Directory.Delete(baseDir, true);
+            }
         }
     }
 
@@ -451,13 +477,13 @@ public sealed class DictionaryManagerTests : IDisposable
     /// </summary>
     private static string CreateFakeDictionary()
     {
-        var tempDir = Path.Combine(Path.GetTempPath(), $"dict_test_{Guid.NewGuid():N}");
+        var tempDir = Path.Join(Path.GetTempPath(), $"dict_test_{Guid.NewGuid():N}");
         Directory.CreateDirectory(tempDir);
 
-        File.WriteAllText(Path.Combine(tempDir, "sys.dic"), "fake");
-        File.WriteAllText(Path.Combine(tempDir, "matrix.bin"), "fake");
-        File.WriteAllText(Path.Combine(tempDir, "char.bin"), "fake");
-        File.WriteAllText(Path.Combine(tempDir, "unk.dic"), "fake");
+        File.WriteAllText(Path.Join(tempDir, "sys.dic"), "fake");
+        File.WriteAllText(Path.Join(tempDir, "matrix.bin"), "fake");
+        File.WriteAllText(Path.Join(tempDir, "char.bin"), "fake");
+        File.WriteAllText(Path.Join(tempDir, "unk.dic"), "fake");
 
         return tempDir;
     }

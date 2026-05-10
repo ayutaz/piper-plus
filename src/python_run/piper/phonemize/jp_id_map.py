@@ -1,7 +1,7 @@
 from .token_mapper import register
 
 
-__all__ = ["get_japanese_id_map", "JAPANESE_PHONEMES", "SPECIAL_TOKENS"]
+__all__ = ["JAPANESE_PHONEMES", "SPECIAL_TOKENS", "get_japanese_id_map"]
 
 # -----------------------------------------------------------------------------
 # Japanese phoneme inventory (Open JTalk style) + prosody/special tokens

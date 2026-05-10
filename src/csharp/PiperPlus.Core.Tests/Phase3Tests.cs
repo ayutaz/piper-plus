@@ -19,7 +19,14 @@ public sealed class Phase3Tests : IDisposable
     {
         foreach (var path in _tempFiles)
         {
-            try { File.Delete(path); } catch { /* best-effort cleanup */ }
+            try
+            {
+                File.Delete(path);
+            }
+            catch (IOException ex)
+            {
+                Console.Error.WriteLine($"[Test cleanup] {ex.Message}");
+            }
         }
     }
 
@@ -37,11 +44,10 @@ public sealed class Phase3Tests : IDisposable
     // ================================================================
     // PhonemeSilenceProcessor.Parse
     // ================================================================
-
     [Fact]
     public void PhonemeSilenceProcessor_Parse_ValidInput()
     {
-        var result = PhonemeSilenceProcessor.Parse("_ 0.5");
+        Dictionary<string, float> result = PhonemeSilenceProcessor.Parse("_ 0.5");
 
         Assert.Single(result);
         Assert.True(result.ContainsKey("_"));
@@ -51,7 +57,7 @@ public sealed class Phase3Tests : IDisposable
     [Fact]
     public void PhonemeSilenceProcessor_Parse_MultipleEntries()
     {
-        var result = PhonemeSilenceProcessor.Parse("_ 0.5,# 0.3");
+        Dictionary<string, float> result = PhonemeSilenceProcessor.Parse("_ 0.5,# 0.3");
 
         Assert.Equal(2, result.Count);
         Assert.Equal(0.5f, result["_"]);
@@ -61,7 +67,7 @@ public sealed class Phase3Tests : IDisposable
     [Fact]
     public void PhonemeSilenceProcessor_Parse_EmptyString_Throws()
     {
-        Assert.Throws<ArgumentException>(() => PhonemeSilenceProcessor.Parse(""));
+        Assert.Throws<ArgumentException>(() => PhonemeSilenceProcessor.Parse(string.Empty));
     }
 
     [Fact]
@@ -91,7 +97,6 @@ public sealed class Phase3Tests : IDisposable
     // ================================================================
     // PhonemeSilenceProcessor.SplitAtPhonemeSilence
     // ================================================================
-
     [Fact]
     public void PhonemeSilenceProcessor_SplitAtPhonemeSilence_Basic()
     {
@@ -111,7 +116,7 @@ public sealed class Phase3Tests : IDisposable
 
         const int sampleRate = 22050;
 
-        var phrases = PhonemeSilenceProcessor.SplitAtPhonemeSilence(
+        List<PhonemeSilenceProcessor.Phrase> phrases = PhonemeSilenceProcessor.SplitAtPhonemeSilence(
             phonemeIds, prosodyFlat: null, phonemeSilence, phonemeIdMap, sampleRate);
 
         // Expect 2 phrases: [10, 5] with silence, [11] without silence
@@ -139,7 +144,7 @@ public sealed class Phase3Tests : IDisposable
         var phonemeSilence = new Dictionary<string, float> { ["_"] = 0.5f };
         long[] phonemeIds = [10, 11];
 
-        var phrases = PhonemeSilenceProcessor.SplitAtPhonemeSilence(
+        List<PhonemeSilenceProcessor.Phrase> phrases = PhonemeSilenceProcessor.SplitAtPhonemeSilence(
             phonemeIds, null, phonemeSilence, phonemeIdMap, 22050);
 
         // No split: single trailing phrase with 0 silence
@@ -160,10 +165,11 @@ public sealed class Phase3Tests : IDisposable
         var phonemeSilence = new Dictionary<string, float> { ["_"] = 0.2f };
 
         long[] phonemeIds = [10, 5, 10];
+
         // Prosody: 3 values per phoneme-ID = 9 values total
         long[] prosodyFlat = [1, 2, 3, 4, 5, 6, 7, 8, 9];
 
-        var phrases = PhonemeSilenceProcessor.SplitAtPhonemeSilence(
+        List<PhonemeSilenceProcessor.Phrase> phrases = PhonemeSilenceProcessor.SplitAtPhonemeSilence(
             phonemeIds, prosodyFlat, phonemeSilence, phonemeIdMap, 22050);
 
         Assert.Equal(2, phrases.Count);
@@ -178,129 +184,20 @@ public sealed class Phase3Tests : IDisposable
     }
 
     // ================================================================
-    // TimingWriter.CalculateTiming
+    // TimingWriter / TimingWriter.WriteJson / TimingWriter.WriteTsv
+    //
+    // 旧 3 テスト (TimingWriter_CalculateTiming_BasicDurations /
+    // TimingWriter_WriteJson_ValidOutput / TimingWriter_WriteTsv_ValidOutput)
+    // は SUT 未呼出 (test 内で計算した数値を test 内で assert /
+    // 匿名 object をシリアライズして自分が書いた値を assert /
+    // StringBuilder で TSV を組んで string.Split を assert) に該当し、
+    // production schema (`total_duration_ms`/`start_ms`/`end_ms`) とも
+    // 矛盾していたため削除。本物の検証は TimingWriterTests.cs に存在。
     // ================================================================
-
-    [Fact]
-    public void TimingWriter_CalculateTiming_BasicDurations()
-    {
-        // This test validates the timing calculation algorithm that mirrors
-        // extractTimingsFromDurations in C++ piper.cpp:
-        //   frameLength = hopSize / sampleRate
-        //   For each phoneme: start = currentTime, end = start + duration * frameLength
-        //   Special tokens (PAD=0, BOS=1, EOS=2) are skipped in output but advance time.
-
-        const int hopSize = 256;
-        const int sampleRate = 22050;
-        float frameLength = (float)hopSize / sampleRate;
-
-        // durations in frames for 3 phonemes
-        float[] durations = [2.0f, 3.0f, 4.0f];
-
-        // Cumulative time check
-        float expectedEnd0 = 2.0f * frameLength;
-        float expectedEnd1 = 5.0f * frameLength; // (2+3) * frameLength
-        float expectedEnd2 = 9.0f * frameLength; // (2+3+4) * frameLength
-
-        Assert.True(Math.Abs(expectedEnd0 - 0.02322f) < 0.001f);
-        Assert.True(expectedEnd1 > expectedEnd0);
-        Assert.True(expectedEnd2 > expectedEnd1);
-    }
-
-    [Fact]
-    public void TimingWriter_WriteJson_ValidOutput()
-    {
-        // Validate JSON timing output format matches C++ outputTimingsAsJSON:
-        // {
-        //   "phonemes": [{ "phoneme": "h", "start": 0.0, "end": 0.045, ... }],
-        //   "text": "...",
-        //   "total_duration": ...,
-        //   "sample_rate": 22050,
-        //   "frame_shift_ms": ...
-        // }
-
-        using var ms = new MemoryStream();
-        using var writer = new StreamWriter(ms, Encoding.UTF8, leaveOpen: true);
-
-        var timingJson = new
-        {
-            phonemes = new[]
-            {
-                new { phoneme = "h", start = 0.0, end = 0.045, start_frame = 0, end_frame = 4 },
-                new { phoneme = "e", start = 0.045, end = 0.120, start_frame = 4, end_frame = 10 },
-            },
-            text = "Hello",
-            total_duration = 0.120,
-            sample_rate = 22050,
-            frame_shift_ms = 256.0 / 22050 * 1000,
-        };
-
-#pragma warning disable IL2026 // Trim analysis — acceptable in test code
-        var jsonOptions = new JsonSerializerOptions
-        {
-            WriteIndented = true,
-            TypeInfoResolver = new System.Text.Json.Serialization.Metadata.DefaultJsonTypeInfoResolver()
-        };
-        string json = JsonSerializer.Serialize(timingJson, jsonOptions);
-#pragma warning restore IL2026
-        writer.Write(json);
-        writer.Flush();
-
-        ms.Position = 0;
-        using var reader = new StreamReader(ms, Encoding.UTF8);
-        string output = reader.ReadToEnd();
-
-        // Parse it back and verify structure
-        using var doc = JsonDocument.Parse(output);
-        var root = doc.RootElement;
-
-        Assert.Equal("Hello", root.GetProperty("text").GetString());
-        Assert.Equal(22050, root.GetProperty("sample_rate").GetInt32());
-        Assert.Equal(2, root.GetProperty("phonemes").GetArrayLength());
-        Assert.Equal("h", root.GetProperty("phonemes")[0].GetProperty("phoneme").GetString());
-        Assert.True(root.GetProperty("total_duration").GetDouble() > 0);
-        Assert.True(root.GetProperty("frame_shift_ms").GetDouble() > 0);
-    }
-
-    [Fact]
-    public void TimingWriter_WriteTsv_ValidOutput()
-    {
-        // Validate TSV timing output format matches C++ outputTimingsAsTSV:
-        // phoneme\tstart\tend\tstart_frame\tend_frame
-        // h\t0\t0.045\t0\t4
-
-        var sb = new StringBuilder();
-        sb.AppendLine("phoneme\tstart\tend\tstart_frame\tend_frame");
-        sb.AppendLine("h\t0\t0.045\t0\t4");
-        sb.AppendLine("e\t0.045\t0.120\t4\t10");
-
-        string tsv = sb.ToString();
-        string[] lines = tsv.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
-
-        // Header
-        Assert.Equal("phoneme\tstart\tend\tstart_frame\tend_frame", lines[0]);
-
-        // First data row
-        string[] cols1 = lines[1].Split('\t');
-        Assert.Equal(5, cols1.Length);
-        Assert.Equal("h", cols1[0]);
-        Assert.Equal("0", cols1[1]);
-        Assert.Equal("0.045", cols1[2]);
-        Assert.Equal("0", cols1[3]);
-        Assert.Equal("4", cols1[4]);
-
-        // Second data row
-        string[] cols2 = lines[2].Split('\t');
-        Assert.Equal("e", cols2[0]);
-        Assert.True(float.TryParse(cols2[1], NumberStyles.Float, CultureInfo.InvariantCulture, out float start2));
-        Assert.True(float.TryParse(cols2[2], NumberStyles.Float, CultureInfo.InvariantCulture, out float end2));
-        Assert.True(end2 > start2);
-    }
 
     // ================================================================
     // StreamingWriter.WriteChunked
     // ================================================================
-
     [Fact]
     public void StreamingWriter_WriteChunked_CorrectBytes()
     {
@@ -411,7 +308,6 @@ public sealed class Phase3Tests : IDisposable
     // ================================================================
     // CustomDictionary.LoadDictionary
     // ================================================================
-
     [Fact]
     public void CustomDictionary_LoadDictionary_ValidFile()
     {
@@ -522,9 +418,9 @@ public sealed class Phase3Tests : IDisposable
         var dict = new CustomDictionary();
         dict.LoadDictionary(path);
 
-        string result = dict.ApplyToText("");
+        string result = dict.ApplyToText(string.Empty);
 
-        Assert.Equal("", result);
+        Assert.Equal(string.Empty, result);
     }
 
     [Fact]
@@ -553,7 +449,6 @@ public sealed class Phase3Tests : IDisposable
     // ================================================================
     // SessionFactory
     // ================================================================
-
     [Fact]
     public void SessionFactory_Create_NullModelPath_Throws()
     {
@@ -565,7 +460,7 @@ public sealed class Phase3Tests : IDisposable
     public void SessionFactory_Create_EmptyModelPath_Throws()
     {
         Assert.Throws<ArgumentException>(
-            () => SessionFactory.Create(modelPath: ""));
+            () => SessionFactory.Create(modelPath: string.Empty));
     }
 
     [Fact]
@@ -583,7 +478,7 @@ public sealed class Phase3Tests : IDisposable
         // is thrown before the file-existence check.
         // The FileNotFoundException confirms the factory reached the file
         // validation step rather than failing on CUDA EP setup.
-        var ex = Assert.Throws<FileNotFoundException>(
+        FileNotFoundException ex = Assert.Throws<FileNotFoundException>(
             () => SessionFactory.Create(
                 modelPath: "/tmp/nonexistent_model.onnx",
                 useCuda: false));
@@ -597,7 +492,7 @@ public sealed class Phase3Tests : IDisposable
         // Even with useCuda=true, the factory validates the model path first.
         // The FileNotFoundException confirms we reach path validation
         // regardless of the CUDA flag.
-        var ex = Assert.Throws<FileNotFoundException>(
+        FileNotFoundException ex = Assert.Throws<FileNotFoundException>(
             () => SessionFactory.Create(
                 modelPath: "/tmp/nonexistent_model.onnx",
                 useCuda: true,
@@ -609,7 +504,6 @@ public sealed class Phase3Tests : IDisposable
     // ================================================================
     // PhonemeSilenceProcessor — additional edge-case tests
     // ================================================================
-
     [Fact]
     public void PhonemeSilenceProcessor_SplitAtPhonemeSilence_EmptySilenceMap_SinglePhrase()
     {
@@ -624,7 +518,7 @@ public sealed class Phase3Tests : IDisposable
 
         long[] phonemeIds = [10, 11, 10];
 
-        var phrases = PhonemeSilenceProcessor.SplitAtPhonemeSilence(
+        List<PhonemeSilenceProcessor.Phrase> phrases = PhonemeSilenceProcessor.SplitAtPhonemeSilence(
             phonemeIds, prosodyFlat: null, phonemeSilence, phonemeIdMap, 22050);
 
         // All phonemes land in a single trailing phrase with 0 silence.
@@ -638,7 +532,7 @@ public sealed class Phase3Tests : IDisposable
     {
         // Two entries for the same phoneme "_"; the dictionary overwrites,
         // so the last value (0.3) should win.
-        var result = PhonemeSilenceProcessor.Parse("_ 0.5, _ 0.3");
+        Dictionary<string, float> result = PhonemeSilenceProcessor.Parse("_ 0.5, _ 0.3");
 
         Assert.Single(result);
         Assert.True(result.ContainsKey("_"));
@@ -649,7 +543,7 @@ public sealed class Phase3Tests : IDisposable
     public void PhonemeSilenceProcessor_Parse_NegativeSeconds_Accepted()
     {
         // Negative seconds are syntactically valid floats; Parse should accept them.
-        var result = PhonemeSilenceProcessor.Parse("_ -0.5");
+        Dictionary<string, float> result = PhonemeSilenceProcessor.Parse("_ -0.5");
 
         Assert.Single(result);
         Assert.Equal(-0.5f, result["_"]);
@@ -672,7 +566,7 @@ public sealed class Phase3Tests : IDisposable
         long[] phonemeIds = [10, 5, 6, 10];
         const int sampleRate = 22050;
 
-        var phrases = PhonemeSilenceProcessor.SplitAtPhonemeSilence(
+        List<PhonemeSilenceProcessor.Phrase> phrases = PhonemeSilenceProcessor.SplitAtPhonemeSilence(
             phonemeIds, prosodyFlat: null, phonemeSilence, phonemeIdMap, sampleRate);
 
         // Expect 2 phrases: [10, 5, 6] with silence, [10] trailing.
@@ -686,11 +580,14 @@ public sealed class Phase3Tests : IDisposable
     // ================================================================
     // TimingWriter — additional edge-case tests
     // ================================================================
-
     [Fact]
-    public void TimingWriter_CalculateTiming_DurationsShorterThanPhonemeIds()
+    public void TimingWriter_CalculateTiming_DurationsShorterThanPhonemeIds_Throws()
     {
-        // 3 phoneme IDs but only 2 durations → processes min(3, 2) = 2 entries.
+        // Length mismatch MUST throw per docs/spec/phoneme-timing-contract.toml
+        // [validation.length_consistency]. Previously this method silently
+        // truncated via Math.Min, which violated the cross-runtime contract
+        // (Rust/Go/Python all throw). PR #401 brought the C# implementation
+        // into compliance — this test now pins the throw behavior.
         var phonemeIdMap = new Dictionary<string, int[]>
         {
             ["a"] = [10],
@@ -699,15 +596,11 @@ public sealed class Phase3Tests : IDisposable
         };
 
         long[] phonemeIds = [10, 11, 12];
-        float[] durations = [5.0f, 3.0f]; // only 2 durations
+        float[] durations = [5.0f, 3.0f]; // length mismatch — must throw
 
-        var entries = TimingWriter.CalculateTiming(
-            phonemeIds, durations, phonemeIdMap, sampleRate: 22050);
-
-        // Only the first 2 phonemes are processed.
-        Assert.Equal(2, entries.Count);
-        Assert.Equal("a", entries[0].Phoneme);
-        Assert.Equal("b", entries[1].Phoneme);
+        Assert.Throws<ArgumentException>(() =>
+            TimingWriter.CalculateTiming(
+                phonemeIds, durations, phonemeIdMap, sampleRate: 22050));
     }
 
     [Fact]
@@ -722,7 +615,7 @@ public sealed class Phase3Tests : IDisposable
         long[] phonemeIds = [999];
         float[] durations = [4.0f];
 
-        var entries = TimingWriter.CalculateTiming(
+        List<TimingWriter.PhonemeTimingEntry> entries = TimingWriter.CalculateTiming(
             phonemeIds, durations, phonemeIdMap, sampleRate: 22050);
 
         Assert.Single(entries);
@@ -742,7 +635,7 @@ public sealed class Phase3Tests : IDisposable
         long[] phonemeIds = [65];
         float[] durations = [2.0f];
 
-        var entries = TimingWriter.CalculateTiming(
+        List<TimingWriter.PhonemeTimingEntry> entries = TimingWriter.CalculateTiming(
             phonemeIds, durations, phonemeIdMap, sampleRate: 22050);
 
         Assert.Single(entries);
@@ -752,37 +645,47 @@ public sealed class Phase3Tests : IDisposable
     [Fact]
     public void TimingWriter_WriteJson_ToFile_CreatesValidFile()
     {
+        // Spec-conforming: top-level object {phonemes, total_duration_ms, sample_rate}
+        // (docs/spec/phoneme-timing-contract.toml [output_formats.json_pretty]).
         var entries = new List<TimingWriter.PhonemeTimingEntry>
         {
-            new("k", 0.0f, 0.058f, 0.058f),
-            new("a", 0.058f, 0.116f, 0.058f),
+            new("k", 0.0f, 58.0f, 58.0f),
+            new("a", 58.0f, 116.0f, 58.0f),
         };
 
         string path = Path.Combine(Path.GetTempPath(), $"piper_test_{Guid.NewGuid():N}.json");
         _tempFiles.Add(path);
 
-        TimingWriter.WriteJson(path, entries);
+        const int sampleRate = 22050;
+        TimingWriter.WriteJson(path, entries, sampleRate);
 
         Assert.True(File.Exists(path));
 
         string json = File.ReadAllText(path);
         using var doc = JsonDocument.Parse(json);
-        var root = doc.RootElement;
+        JsonElement root = doc.RootElement;
 
-        Assert.Equal(JsonValueKind.Array, root.ValueKind);
-        Assert.Equal(2, root.GetArrayLength());
-        Assert.Equal("k", root[0].GetProperty("phoneme").GetString());
-        Assert.Equal("a", root[1].GetProperty("phoneme").GetString());
-        Assert.True(root[0].GetProperty("start").GetSingle() < root[0].GetProperty("end").GetSingle());
+        Assert.Equal(JsonValueKind.Object, root.ValueKind);
+        JsonElement phonemes = root.GetProperty("phonemes");
+        Assert.Equal(JsonValueKind.Array, phonemes.ValueKind);
+        Assert.Equal(2, phonemes.GetArrayLength());
+        Assert.Equal("k", phonemes[0].GetProperty("phoneme").GetString());
+        Assert.Equal("a", phonemes[1].GetProperty("phoneme").GetString());
+        Assert.True(phonemes[0].GetProperty("start_ms").GetSingle()
+            < phonemes[0].GetProperty("end_ms").GetSingle());
+
+        Assert.Equal(sampleRate, root.GetProperty("sample_rate").GetInt32());
+        Assert.Equal(116.0d, root.GetProperty("total_duration_ms").GetDouble(), precision: 3);
     }
 
     [Fact]
     public void TimingWriter_WriteTsv_ToFile_CreatesValidFile()
     {
+        // Spec-conforming: PhonemeTimingEntry stores ms; TSV header is start_ms/end_ms/duration_ms.
         var entries = new List<TimingWriter.PhonemeTimingEntry>
         {
-            new("k", 0.0f, 0.058f, 0.058f),
-            new("a", 0.058f, 0.116f, 0.058f),
+            new("k", 0.0f, 58.0f, 58.0f),
+            new("a", 58.0f, 116.0f, 58.0f),
         };
 
         string path = Path.Combine(Path.GetTempPath(), $"piper_test_{Guid.NewGuid():N}.tsv");
@@ -796,7 +699,7 @@ public sealed class Phase3Tests : IDisposable
 
         // Header line
         Assert.True(lines.Length >= 3, "Expected header + 2 data lines");
-        Assert.Equal("start\tend\tduration\tphoneme", lines[0]);
+        Assert.Equal("start_ms\tend_ms\tduration_ms\tphoneme", lines[0]);
 
         // First data row
         string[] cols1 = lines[1].Split('\t');

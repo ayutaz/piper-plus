@@ -16,6 +16,15 @@ permissions:
   contents: write
   packages: read
 
+# Serialise tag-driven publish runs against the same ref so a re-tag (or
+# the rare retry from the GitHub UI) cannot race the in-flight publish and
+# double-upload. We do NOT cancel-in-progress: an interrupted publish can
+# leave half-uploaded artefacts on PyPI / NuGet / crates.io that are awkward
+# to clean up.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   # Create Release
   create_release:
@@ -103,7 +112,7 @@ jobs:
           else
             echo "name=Release ${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
           fi
-          
+
           echo "tag_name=v${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
 
       - name: Generate release notes
@@ -117,12 +126,12 @@ jobs:
           echo "**Commit:** ${{ github.sha }}" >> $GITHUB_OUTPUT
           echo "**Branch:** ${{ github.ref_name }}" >> $GITHUB_OUTPUT
           echo "" >> $GITHUB_OUTPUT
-          
+
           # Get recent commits
           echo "### 📝 Recent Changes" >> $GITHUB_OUTPUT
           git log --oneline -10 --pretty=format:"- %s (%h)" >> $GITHUB_OUTPUT
           echo "" >> $GITHUB_OUTPUT
-          
+
           echo "### 📦 Installation" >> $GITHUB_OUTPUT
           echo "\`\`\`bash" >> $GITHUB_OUTPUT
           echo "# Python" >> $GITHUB_OUTPUT
@@ -159,14 +168,14 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           TAG_NAME="${{ steps.get_release_name.outputs.tag_name }}"
-          
+
           # Check if tag already exists
           if gh release view "$TAG_NAME" >/dev/null 2>&1; then
             echo "::warning::Tag $TAG_NAME already exists. Deleting existing release and tag."
             gh release delete "$TAG_NAME" --yes || true
             git push origin --delete "$TAG_NAME" || true
           fi
-          
+
           # Create release without --json flag (not supported by gh release create)
           echo "Creating release with tag: $TAG_NAME"
           gh release create "$TAG_NAME" \
@@ -177,23 +186,23 @@ jobs:
             echo "::error::Failed to create release"
             exit 1
           }
-          
+
           # Get release information using gh release view with --json
           echo "Fetching release information..."
           RELEASE_JSON=$(gh release view "$TAG_NAME" --json id,url,uploadUrl)
-          
+
           # Parse JSON output to get release information
           RELEASE_ID=$(echo "$RELEASE_JSON" | jq -r '.id')
           RELEASE_URL=$(echo "$RELEASE_JSON" | jq -r '.url')
           UPLOAD_URL=$(echo "$RELEASE_JSON" | jq -r '.uploadUrl')
-          
+
           # Verify we got valid values
           if [ -z "$RELEASE_ID" ] || [ "$RELEASE_ID" = "null" ]; then
             echo "::error::Failed to get release ID"
             echo "Response was: $RELEASE_JSON"
             exit 1
           fi
-          
+
           echo "upload_url=${UPLOAD_URL}" >> $GITHUB_OUTPUT
           echo "release_url=${RELEASE_URL}" >> $GITHUB_OUTPUT
           echo "release_id=${RELEASE_ID}" >> $GITHUB_OUTPUT
@@ -216,9 +225,21 @@ jobs:
     name: Publish to PyPI
     needs: [build_all]
     if: |
-      always() && 
+      always() &&
       needs.build_all.result == 'success'
     runs-on: ubuntu-24.04
+    # Trusted Publishing (PEP 740): PyPI verifies the OIDC token issued to
+    # this job instead of accepting a long-lived API token. This requires
+    # the project to be configured with a "Trusted Publisher" entry on
+    # PyPI matching repository=ayutaz/piper-plus, workflow=dev-create-release.yml,
+    # environment=pypi.
+    environment:
+      name: pypi
+      url: https://pypi.org/p/piper-plus
+    permissions:
+      contents: read
+      id-token: write       # OIDC for PyPI Trusted Publishing
+      attestations: write   # SLSA build provenance attestation
     steps:
       - uses: actions/checkout@v6
 
@@ -246,17 +267,24 @@ jobs:
             echo "No wheel files found, skipping check"
           fi
 
-      - name: Publish to PyPI
-        env:
-          TWINE_USERNAME: __token__
-          TWINE_PASSWORD: ${{ secrets.PIPY_TOKEN }}
-        run: |
-          # Only publish if we have the token and wheels
-          if [ -n "$TWINE_PASSWORD" ] && ls dist/*.whl 1> /dev/null 2>&1; then
-            twine upload --skip-existing dist/*.whl
-          else
-            echo "⚠️ PyPI token not found or no wheels to upload, skipping"
-          fi
+      - name: Generate SLSA build provenance attestation (wheels)
+        # Attest the exact byte content that PyPI will publish. The
+        # attestation lands in the repo's GitHub attestation store and
+        # can later be verified with `gh attestation verify`.
+        if: hashFiles('dist/*.whl') != ''
+        uses: actions/attest-build-provenance@v3
+        with:
+          subject-path: 'dist/*.whl'
+
+      - name: Publish to PyPI (Trusted Publisher)
+        # No password env var — the action uses the OIDC id-token to mint
+        # a short-lived PyPI upload credential. PIPY_TOKEN is intentionally
+        # NOT referenced anymore (kept as a fallback secret only for emergency).
+        if: hashFiles('dist/*.whl') != ''
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/
+          skip-existing: true
 
   # Publish stub package (piper-tts-plus -> piper-plus redirect)
   publish_pypi_stub:
@@ -266,6 +294,15 @@ jobs:
       always() &&
       needs.publish_pypi.result == 'success'
     runs-on: ubuntu-24.04
+    # Stub package has its own Trusted Publisher entry on PyPI (separate
+    # project name `piper-tts-plus`).
+    environment:
+      name: pypi-stub
+      url: https://pypi.org/p/piper-tts-plus
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
     steps:
       - uses: actions/checkout@v6
 
@@ -287,16 +324,16 @@ jobs:
         working-directory: src/python_stub
         run: python -m build
 
-      - name: Publish stub to PyPI
-        env:
-          TWINE_USERNAME: __token__
-          TWINE_PASSWORD: ${{ secrets.PIPY_TOKEN }}
-        run: |
-          if [ -n "$TWINE_PASSWORD" ]; then
-            twine upload --skip-existing src/python_stub/dist/*
-          else
-            echo "⚠️ PyPI token not found, skipping stub publish"
-          fi
+      - name: Generate SLSA build provenance attestation (stub)
+        uses: actions/attest-build-provenance@v3
+        with:
+          subject-path: 'src/python_stub/dist/*'
+
+      - name: Publish stub to PyPI (Trusted Publisher)
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: src/python_stub/dist/
+          skip-existing: true
 
   # C# CLI builds
   csharp-cli:
@@ -383,6 +420,10 @@ jobs:
     name: Publish to NuGet
     needs: create_release
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      id-token: write       # required by attest-build-provenance
+      attestations: write
     steps:
       - uses: actions/checkout@v6
 
@@ -400,6 +441,42 @@ jobs:
             -c Release -o nupkgs/
           echo "Packages created:"
           ls -lh nupkgs/
+
+      - name: Sign NuGet packages
+        # Code-sign the .nupkg files so consumers can verify authorship
+        # via `nuget verify -All`. Requires the secrets `NuGetSignCert`
+        # (PFX, base64) and `NuGetSignCertPassword`. If neither is set,
+        # we emit a warning and continue — signing is opt-in until the
+        # cert is provisioned (Azure Trusted Signing / Sectigo / etc).
+        env:
+          NUGET_SIGN_CERT_BASE64: ${{ secrets.NuGetSignCert }}
+          NUGET_SIGN_CERT_PASSWORD: ${{ secrets.NuGetSignCertPassword }}
+        run: |
+          if [ -z "$NUGET_SIGN_CERT_BASE64" ] || [ -z "$NUGET_SIGN_CERT_PASSWORD" ]; then
+            echo "::warning::NuGetSignCert / NuGetSignCertPassword secret not set — skipping NuGet code signing. Packages will publish unsigned."
+            exit 0
+          fi
+          echo "$NUGET_SIGN_CERT_BASE64" | base64 -d > /tmp/nuget-sign.pfx
+          for pkg in nupkgs/*.nupkg; do
+            echo "Signing: $pkg"
+            dotnet nuget sign "$pkg" \
+              --certificate-path /tmp/nuget-sign.pfx \
+              --certificate-password "$NUGET_SIGN_CERT_PASSWORD" \
+              --timestamper http://timestamp.digicert.com \
+              || { echo "::error::Failed to sign $pkg"; exit 1; }
+          done
+          rm -f /tmp/nuget-sign.pfx
+          echo "Signed packages:"
+          ls -lh nupkgs/
+
+      - name: Generate SLSA build provenance attestation (NuGet)
+        # Attest the *signed* nupkgs (or unsigned if signing was skipped).
+        # `gh attestation verify` against the published package downloads
+        # the .nupkg and matches it against this attestation.
+        if: hashFiles('nupkgs/*.nupkg') != ''
+        uses: actions/attest-build-provenance@v3
+        with:
+          subject-path: 'nupkgs/*.nupkg'
 
       - name: Publish to NuGet
         env:
@@ -421,6 +498,10 @@ jobs:
     name: Publish to crates.io
     needs: create_release
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      id-token: write       # required by attest-build-provenance
+      attestations: write
     steps:
       - uses: actions/checkout@v6
 
@@ -437,6 +518,25 @@ jobs:
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
+
+      - name: Package crates (for attestation)
+        # Run `cargo package` ahead of `cargo publish` so the .crate files
+        # exist on disk for attest-build-provenance. cargo publish below
+        # repackages internally but produces byte-identical bundles when
+        # the working tree is unchanged.
+        working-directory: src/rust
+        run: |
+          cargo package -p piper-plus-g2p --allow-dirty
+          cargo package -p piper-plus --allow-dirty
+          cargo package -p piper-plus-cli --allow-dirty
+          echo "Packaged crates:"
+          ls -lh target/package/*.crate
+
+      - name: Generate SLSA build provenance attestation (crates)
+        if: hashFiles('src/rust/target/package/*.crate') != ''
+        uses: actions/attest-build-provenance@v3
+        with:
+          subject-path: 'src/rust/target/package/*.crate'
 
       - name: Publish piper-plus-g2p (dependency)
         env:

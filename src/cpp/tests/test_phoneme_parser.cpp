@@ -32,13 +32,13 @@ TEST_F(PhonemeParserTest, ParseSinglePhonemeNotation) {
 TEST_F(PhonemeParserTest, ParseMixedTextAndPhonemes) {
     auto result = parsePhonemeNotation("Hello [[ h ə l oʊ ]] world");
     ASSERT_EQ(result.size(), 3);
-    
+
     EXPECT_FALSE(result[0].isPhonemes);
     EXPECT_EQ(result[0].text, "Hello ");
-    
+
     EXPECT_TRUE(result[1].isPhonemes);
     EXPECT_EQ(result[1].text, "h ə l oʊ");
-    
+
     EXPECT_FALSE(result[2].isPhonemes);
     EXPECT_EQ(result[2].text, " world");
 }
@@ -46,13 +46,13 @@ TEST_F(PhonemeParserTest, ParseMixedTextAndPhonemes) {
 TEST_F(PhonemeParserTest, ParseMultiplePhonemeNotations) {
     auto result = parsePhonemeNotation("[[ h ə l oʊ ]] and [[ w ɝ l d ]]");
     ASSERT_EQ(result.size(), 3);
-    
+
     EXPECT_TRUE(result[0].isPhonemes);
     EXPECT_EQ(result[0].text, "h ə l oʊ");
-    
+
     EXPECT_FALSE(result[1].isPhonemes);
     EXPECT_EQ(result[1].text, " and ");
-    
+
     EXPECT_TRUE(result[2].isPhonemes);
     EXPECT_EQ(result[2].text, "w ɝ l d");
 }

@@ -23,6 +23,10 @@ on:
         description: "Job timeout in minutes"
         type: number
         default: 25
+      sanitizer:
+        description: 'Sanitizer to enable: none, asan, ubsan, asan-ubsan'
+        type: string
+        default: 'none'
 
 jobs:
   build-and-test:
@@ -120,6 +124,27 @@ jobs:
           # Append caller-provided extra args
           if [ -n "${{ inputs.cmake-args }}" ]; then
             CMAKE_ARGS="${CMAKE_ARGS} ${{ inputs.cmake-args }}"
+          fi
+
+          # Sanitizer flags (caller-driven; default 'none' is a no-op)
+          # Note: SANITIZER_FLAGS が空白を含むため、`-DCMAKE_CXX_FLAGS=...` を
+          # CMAKE_ARGS に inline すると shell word splitting で `-g` が独立した
+          # CMake argument と誤認識される (CMake Error: Unknown argument -g)。
+          # 環境変数 CXXFLAGS / CFLAGS / LDFLAGS 経由で CMake に渡すことで
+          # quoting 問題を完全回避する。
+          SANITIZER_FLAGS=""
+          case "${{ inputs.sanitizer }}" in
+            asan) SANITIZER_FLAGS="-fsanitize=address -fno-omit-frame-pointer -g" ;;
+            ubsan) SANITIZER_FLAGS="-fsanitize=undefined -fno-omit-frame-pointer -g" ;;
+            asan-ubsan) SANITIZER_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer -g" ;;
+            none|"") SANITIZER_FLAGS="" ;;
+            *) echo "Unknown sanitizer: ${{ inputs.sanitizer }}" >&2; exit 1 ;;
+          esac
+          if [ -n "$SANITIZER_FLAGS" ]; then
+            echo "Enabling sanitizer flags via env: $SANITIZER_FLAGS"
+            export CXXFLAGS="$SANITIZER_FLAGS"
+            export CFLAGS="$SANITIZER_FLAGS"
+            export LDFLAGS="$SANITIZER_FLAGS"
           fi
 
           if [ "${{ runner.os }}" == "Windows" ]; then
@@ -304,6 +329,31 @@ jobs:
             echo "</details>" >> "$GITHUB_STEP_SUMMARY"
           fi
 
+      # ── Coverage (Ubuntu Debug only) ─────────────────────────
+      # NOTE: produces empty coverage report unless the build adds
+      # -fprofile-arcs -ftest-coverage to CMAKE_C/CXX_FLAGS. This step
+      # is wired up so a follow-up CMakeLists change can flip coverage on
+      # without touching workflows. ignore-errors keeps the job green when
+      # gcov data is absent.
+      - name: Generate coverage report (Ubuntu Debug)
+        if: matrix.os == 'ubuntu-24.04' && matrix.build-type == 'Debug'
+        shell: bash
+        run: |
+          sudo apt-get install -y lcov
+          cd build
+          lcov --capture --directory . --output-file coverage.info --ignore-errors source 2>/dev/null || true
+          lcov --remove coverage.info '/usr/*' '*/build/*' '*/_deps/*' '*/tests/*' --output-file coverage.info.cleaned 2>/dev/null || true
+          lcov --list coverage.info.cleaned 2>/dev/null || true
+
+      - name: Upload coverage to Codecov (C++)
+        if: matrix.os == 'ubuntu-24.04' && matrix.build-type == 'Debug'
+        uses: codecov/codecov-action@v5
+        with:
+          files: build/coverage.info.cleaned
+          flags: cpp
+          fail_ci_if_error: false
+        continue-on-error: true
+
       # ── Post-build verification ───────────────────────────────
       - name: Install shared library
         if: success() && runner.os != 'Windows'
@@ -374,6 +424,82 @@ jobs:
             -DCMAKE_BUILD_TYPE=${{ matrix.build-type }}
           cmake --build build-examples
           echo "C API examples compiled successfully: basic, streaming, multi_language"
+
+      - name: Run C API examples (smoke)
+        # Linker + dynamic-symbol resolution smoke for basic / streaming /
+        # multi_language. All three examples print "Usage: ..." and exit 1
+        # when invoked without args (see examples/c-api/*.c main() argc<2 path).
+        # Running them therefore proves: (1) the binary linked against
+        # libpiper_plus, (2) every piper_plus_* symbol referenced from the
+        # example resolves at process startup (would otherwise fail loader
+        # before reaching main()), (3) main() actually executes.
+        # We deliberately do NOT pass a model: a real synthesis run is already
+        # exercised by the C API integration tests (test_c_api_integration),
+        # and re-running it here would just duplicate cost.
+        if: success() && runner.os != 'Windows'
+        shell: bash
+        run: |
+          INSTALL_DIR="${{ github.workspace }}/test-install"
+          # Find the dir containing libpiper_plus.{so,dylib} (lib/ on Debian/
+          # Ubuntu/macOS; could be lib64/ on some RHEL-family distros) and
+          # prepend it to the platform's runtime loader path. We resolve via
+          # the actual library file rather than hard-coding lib/.
+          if [ "${{ runner.os }}" == "macOS" ]; then
+            LIB_FILE=$(find "$INSTALL_DIR" -name "libpiper_plus*.dylib" -not -name "*onnx*" | head -1)
+          else
+            LIB_FILE=$(find "$INSTALL_DIR" -name "libpiper_plus.so" | head -1)
+          fi
+          if [ -z "$LIB_FILE" ]; then
+            echo "FAIL: libpiper_plus shared library not found under $INSTALL_DIR"
+            exit 1
+          fi
+          LIB_DIR=$(dirname "$LIB_FILE")
+          echo "Using LIB_DIR=$LIB_DIR"
+          if [ "${{ runner.os }}" == "macOS" ]; then
+            export DYLD_LIBRARY_PATH="$LIB_DIR:${DYLD_LIBRARY_PATH:-}"
+          else
+            export LD_LIBRARY_PATH="$LIB_DIR:${LD_LIBRARY_PATH:-}"
+          fi
+
+          cd build-examples
+          # Locate executables (cmake may place them in . or in subdirs
+          # depending on generator; single-config Makefile/Ninja => .).
+          BASIC_BIN=$(find . -maxdepth 3 -name basic -type f -perm -u+x | head -1)
+          STREAM_BIN=$(find . -maxdepth 3 -name streaming -type f -perm -u+x | head -1)
+          MULTI_BIN=$(find . -maxdepth 3 -name multi_language -type f -perm -u+x | head -1)
+
+          for bin in "$BASIC_BIN" "$STREAM_BIN" "$MULTI_BIN"; do
+            if [ -z "$bin" ] || [ ! -x "$bin" ]; then
+              echo "FAIL: example binary missing or not executable: '$bin'"
+              exit 1
+            fi
+          done
+
+          # No-arg smoke: each example writes a "Usage:" message to stderr
+          # and returns 1. We assert exit==1 AND stderr contains "Usage:".
+          run_smoke() {
+            local name="$1"
+            local bin="$2"
+            local out err rc
+            out=$("$bin" 2>/tmp/smoke_err) && rc=$? || rc=$?
+            err=$(cat /tmp/smoke_err)
+            echo "  [$name] exit=$rc"
+            echo "  [$name] stderr: $(echo "$err" | head -1)"
+            if [ "$rc" -ne 1 ]; then
+              echo "FAIL: $name returned $rc, expected 1 (no-arg usage path)"
+              exit 1
+            fi
+            if ! echo "$err" | grep -q "Usage:"; then
+              echo "FAIL: $name did not print 'Usage:' on stderr"
+              exit 1
+            fi
+          }
+
+          echo "Running C API example smoke tests (no-arg usage path)..."
+          run_smoke basic "$BASIC_BIN"
+          run_smoke streaming "$STREAM_BIN"
+          run_smoke multi_language "$MULTI_BIN"
+          echo "All C API examples link and execute successfully."
 
       - name: Upload test results on failure
         if: failure()

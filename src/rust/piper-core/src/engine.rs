@@ -29,7 +29,8 @@ use crate::error::PiperError;
 
 /// VITS 小モデルの intra-op スレッド上限。
 /// 4 以上では待機コストが推論時間を上回る。
-const MAX_INTRA_THREADS: usize = 4;
+/// docs/spec/ort-session-contract.toml の session.max_intra_threads と同期。
+pub const MAX_INTRA_THREADS: usize = 4;
 
 /// デフォルトの warmup 実行回数。
 /// ORT JIT キャッシュは 1-2 回で安定するが、安全マージンとして 2 回。
@@ -37,7 +38,8 @@ pub const DEFAULT_WARMUP_RUNS: usize = 2;
 
 /// warmup 用のダミー phoneme 入力長。
 /// 本番入力 (50-200) と同程度の形状で ORT メモリアロケーションを温める。
-const WARMUP_PHONEME_LENGTH: usize = 100;
+/// docs/spec/ort-session-contract.toml の warmup.phoneme_length と同期。
+pub const WARMUP_PHONEME_LENGTH: usize = 100;
 
 // ---------------------------------------------------------------------------
 // 短テキスト緩和策の定数 (Strategy A + B)
@@ -102,6 +104,29 @@ impl Default for SynthesisRequest {
             noise_w: 0.8,
             speaker_embedding: None,
         }
+    }
+}
+
+impl SynthesisRequest {
+    /// 入力組み合わせの整合性を検証する。
+    ///
+    /// `speaker_id` と `speaker_embedding` は仕様上排他である:
+    /// - `speaker_id` のみ → multi-speaker モデルの ID 指定モード
+    /// - `speaker_embedding` のみ → voice cloning モード (encoder 由来の埋め込み)
+    /// - 両方 set → どちらの conditioning を採用するか曖昧で silent に
+    ///   両 tensor が ONNX へ流れてしまうため明示的に reject する。
+    /// - 両方 None → multi-speaker モデルでは sid=0 がデフォルトで使われる。
+    ///
+    /// 他ランタイム (CLI / Python / C# / Go) でも同等の排他チェックを行う。
+    pub fn validate(&self) -> Result<(), PiperError> {
+        if self.speaker_id.is_some() && self.speaker_embedding.is_some() {
+            return Err(PiperError::InvalidArgument {
+                reason: "speaker_id and speaker_embedding are mutually exclusive; \
+                         specify one or the other, not both"
+                    .to_string(),
+            });
+        }
+        Ok(())
     }
 }
 
@@ -626,6 +651,9 @@ impl OnnxEngine {
         &mut self,
         request: &SynthesisRequest,
     ) -> Result<SynthesisResult, PiperError> {
+        // 入力組み合わせ検証 (speaker_id × speaker_embedding 排他など)。
+        request.validate()?;
+
         let original_len = request.phoneme_ids.len();
         if original_len == 0 {
             return Err(PiperError::Inference("empty phoneme_ids".to_string()));
@@ -905,24 +933,56 @@ mod tests {
     // COLD-M1: スレッド設定テスト
     // -----------------------------------------------------------------------
 
-    #[test]
-    fn test_intra_threads_capped_at_max() {
-        let available = std::thread::available_parallelism()
-            .map(|n| n.get())
-            .unwrap_or(2);
-        let num_intra_threads = available.min(MAX_INTRA_THREADS);
-        assert!(num_intra_threads >= 1);
-        assert!(num_intra_threads <= MAX_INTRA_THREADS);
+    /// Selects the lower of the two values, mirroring the engine's
+    /// `available_parallelism().min(MAX_INTRA_THREADS)` clamp. Kept private
+    /// so the boundary tests below exercise the helper rather than
+    /// `usize::min` directly.
+    ///
+    /// 旧 `test_intra_threads_capped_at_max` は
+    /// `assert!(num_intra_threads >= 1) && <= MAX_INTRA_THREADS)` を
+    /// 試していたが、`available.min(MAX_INTRA_THREADS)` が型システム上常に
+    /// この範囲に収まるためタウトロジーだった (3 兄弟テスト
+    /// `test_thread_count_low_cpu` / `_high_cpu` / `_at_boundary` が
+    /// 同じ実装を網羅的に exercise しているので削除)。
+    fn select_intra_threads(host_cpus: usize) -> usize {
+        host_cpus.min(MAX_INTRA_THREADS)
     }
 
     #[test]
     fn test_thread_count_low_cpu() {
-        assert_eq!(2_usize.min(MAX_INTRA_THREADS), 2);
+        // 2-core host: must use both cores (no artificial floor above 1).
+        assert_eq!(select_intra_threads(2), 2);
+        // 1-core host: must still produce 1 (not 0).
+        assert_eq!(select_intra_threads(1), 1);
     }
 
     #[test]
     fn test_thread_count_high_cpu() {
-        assert_eq!(32_usize.min(MAX_INTRA_THREADS), MAX_INTRA_THREADS);
+        // Above MAX, the clamp must kick in for any host CPU count, not just
+        // the single 32 we previously checked.
+        for cpus in [MAX_INTRA_THREADS + 1, 16, 32, 64, 128] {
+            assert_eq!(
+                select_intra_threads(cpus),
+                MAX_INTRA_THREADS,
+                "host_cpus={cpus} must clamp to MAX_INTRA_THREADS={MAX_INTRA_THREADS}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_thread_count_at_boundary() {
+        // Boundary: host CPUs == MAX_INTRA_THREADS must use exactly MAX
+        // (regression guard for off-by-one drift between `<` and `<=`).
+        assert_eq!(
+            select_intra_threads(MAX_INTRA_THREADS),
+            MAX_INTRA_THREADS,
+            "boundary: cpus == MAX must yield MAX"
+        );
+        assert_eq!(
+            select_intra_threads(MAX_INTRA_THREADS - 1),
+            MAX_INTRA_THREADS - 1,
+            "boundary: cpus == MAX-1 must yield MAX-1"
+        );
     }
 
     #[test]
@@ -935,6 +995,63 @@ mod tests {
         assert!((req.noise_scale - 0.667).abs() < 1e-6);
         assert!((req.length_scale - 1.0).abs() < 1e-6);
         assert!((req.noise_w - 0.8).abs() < 1e-6);
+    }
+
+    // -----------------------------------------------------------------------
+    // SynthesisRequest::validate() — speaker_id × speaker_embedding 排他
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_validate_speaker_id_only_ok() {
+        let req = SynthesisRequest {
+            speaker_id: Some(3),
+            speaker_embedding: None,
+            ..SynthesisRequest::default()
+        };
+        assert!(req.validate().is_ok());
+    }
+
+    #[test]
+    fn test_validate_speaker_embedding_only_ok() {
+        let req = SynthesisRequest {
+            speaker_id: None,
+            speaker_embedding: Some(vec![0.1f32; 256]),
+            ..SynthesisRequest::default()
+        };
+        assert!(req.validate().is_ok());
+    }
+
+    #[test]
+    fn test_validate_both_set_returns_error() {
+        let req = SynthesisRequest {
+            speaker_id: Some(0),
+            speaker_embedding: Some(vec![0.1f32; 256]),
+            ..SynthesisRequest::default()
+        };
+        let err = req.validate().expect_err("both set must error");
+        match err {
+            PiperError::InvalidArgument { reason } => {
+                assert!(
+                    reason.contains("speaker_id") && reason.contains("speaker_embedding"),
+                    "error message should reference both fields, got: {reason}"
+                );
+                assert!(
+                    reason.contains("mutually exclusive"),
+                    "error message should mention exclusivity, got: {reason}"
+                );
+            }
+            other => panic!("expected InvalidArgument, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_validate_neither_set_ok() {
+        let req = SynthesisRequest {
+            speaker_id: None,
+            speaker_embedding: None,
+            ..SynthesisRequest::default()
+        };
+        assert!(req.validate().is_ok());
     }
 
     #[test]

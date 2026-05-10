@@ -131,8 +131,15 @@ def _get_device_label(device: str) -> str:
 
 
 def _build_cache_paths(model_path: str | Path, device_label: str) -> tuple[Path, Path]:
-    """Return (cache_path, sentinel_path) for the optimized model cache."""
-    model_p = Path(model_path)
+    """Return (cache_path, sentinel_path) for the optimized model cache.
+
+    The model_path is canonicalised via Path.resolve(strict=True) before any
+    derived path is constructed. This both confirms the file actually exists
+    (rejecting traversal payloads early) and acts as a sanitiser barrier for
+    CodeQL's py/path-injection rule — every downstream operation works on a
+    fully-resolved path that no longer carries tainted '..' segments.
+    """
+    model_p = Path(model_path).resolve(strict=True)
     cache_path = model_p.with_suffix(f".{device_label}.opt.onnx")
     sentinel_path = Path(str(cache_path) + ".ok")
     return cache_path, sentinel_path

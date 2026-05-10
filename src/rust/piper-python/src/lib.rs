@@ -467,3 +467,339 @@ fn piper_plus(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<SynthesisResult>()?;
     Ok(())
 }
+
+// ---------------------------------------------------------------------------
+// Tests: unsafe invariants and error mapping
+// ---------------------------------------------------------------------------
+//
+// These tests guard the two non-trivial pieces of unsafe / FFI logic in this
+// crate:
+//
+//   1. `SendPtr<T>` -- a hand-rolled `unsafe impl Send` wrapper used to
+//      satisfy PyO3's `Ungil` bound when releasing the GIL via
+//      `py.allow_threads`.  If the `Send` bound regresses (e.g. an `*mut T`
+//      field is accidentally replaced by a non-`Send` type) the wrapper would
+//      silently lose its GIL-release capability.  These tests pin the
+//      contract at compile time + run time.
+//
+//   2. `piper_err_to_pyerr` -- maps `piper_core::PiperError` variants to the
+//      correct Python exception class.  The five `PyValueError` arms
+//      (ConfigNotFound / InvalidConfig / UnsupportedLanguage / UnknownPhoneme
+//      / PhonemeIdNotFound), the two `PyIOError` arms (AudioOutput /
+//      WavWrite), and the catch-all `PyRuntimeError` fallback are all
+//      exercised below.  A miscategorised error would surface in Python as
+//      the wrong exception type, breaking user `try/except` blocks.
+//
+// PyO3 0.24 requires a Python interpreter for any type introspection on
+// `PyErr`, so the `auto-initialize` feature is enabled in `[dev-dependencies]`
+// (Cargo.toml).  The cdylib (production wheel) keeps `extension-module` only
+// and is unaffected.
+#[cfg(test)]
+mod tests {
+    use super::{SendPtr, piper_err_to_pyerr};
+    use pyo3::Python;
+    use pyo3::exceptions::{PyIOError, PyRuntimeError, PyValueError};
+
+    // -----------------------------------------------------------------
+    // SendPtr: unsafe Send invariants
+    // -----------------------------------------------------------------
+
+    /// `SendPtr<T>` must implement `Send` at compile time.
+    ///
+    /// Regression guard: if someone removes the `unsafe impl Send` (or
+    /// changes the wrapped type to something that breaks auto-trait
+    /// derivation in a future Rust release), this will fail to compile.
+    #[test]
+    fn test_send_ptr_is_send() {
+        fn assert_send<T: Send>() {}
+        assert_send::<SendPtr<i32>>();
+        assert_send::<SendPtr<u8>>();
+        // Even non-Send inner types: Send is asserted unconditionally for
+        // any T because the wrapper's contract is "raw pointer, caller is
+        // responsible for invariants".
+        assert_send::<SendPtr<std::cell::RefCell<i32>>>();
+        assert_send::<SendPtr<*mut u8>>();
+    }
+
+    /// A `SendPtr` value can actually move across an `std::thread::spawn`
+    /// boundary -- run-time confirmation that the trait bound is honoured.
+    ///
+    /// This mirrors what `py.allow_threads` does internally: the closure
+    /// (which captures `SendPtr`) must be `Send` to be scheduled.
+    #[test]
+    fn test_send_ptr_can_cross_thread_boundary() {
+        // Use `Box::into_raw` so the underlying allocation is `'static` and
+        // safely outlives the spawned thread (avoids a borrow-of-stack
+        // hazard if `join` were elided).  The closure captures `SendPtr`
+        // by move; the bare `*mut i64` field is *not* `Send`, but the
+        // wrapper is, which is exactly what we want to validate.
+        let leaked: *mut i64 = Box::into_raw(Box::new(12345_i64));
+        let ptr = SendPtr(leaked);
+        let handle = std::thread::spawn(move || {
+            // SAFETY: `leaked` is exclusively owned and not freed until
+            // after `join` below.
+            unsafe { *ptr.as_mut() }
+        });
+        let observed = handle.join().expect("spawned thread panicked");
+        assert_eq!(observed, 12345);
+        // SAFETY: reclaim the allocation so it is freed exactly once.
+        let _reclaimed = unsafe { Box::from_raw(leaked) };
+    }
+
+    /// `SendPtr::as_mut` should yield a usable `&mut T`, and a manually
+    /// constructed `Box::leak` pointer should be reclaimable via
+    /// `Box::from_raw` without UB after the wrapper is dropped.
+    #[test]
+    fn test_send_ptr_drop_safety() {
+        let leaked: *mut Vec<u32> = Box::into_raw(Box::new(vec![1, 2, 3]));
+        let ptr = SendPtr(leaked);
+        // SAFETY: `leaked` is a valid, uniquely owned pointer; nothing else
+        // aliases it for the duration of this block.
+        unsafe {
+            let r = ptr.as_mut();
+            r.push(4);
+            assert_eq!(r, &mut vec![1, 2, 3, 4]);
+        }
+        // Dropping the wrapper must NOT free the pointee (it's just a raw
+        // pointer wrapper, not an owning smart pointer).  We can still
+        // safely reclaim the box afterwards.  We use `let _ = ` rather
+        // than `drop(ptr)` because `SendPtr` deliberately does *not*
+        // implement `Drop` (that's part of the contract under test);
+        // clippy::drop_non_drop flags `drop()` on non-Drop types.
+        let _ = ptr;
+        // SAFETY: `leaked` is still the only pointer, and we never freed it.
+        let reclaimed = unsafe { Box::from_raw(leaked) };
+        assert_eq!(*reclaimed, vec![1, 2, 3, 4]);
+        // `reclaimed` is dropped here, freeing the original allocation.
+    }
+
+    /// `SendPtr::as_mut` should round-trip a written value through the raw
+    /// pointer -- guards against accidental copy-by-value bugs in the
+    /// dereference helper.
+    #[test]
+    fn test_send_ptr_as_mut_dereferences_correctly() {
+        let mut storage: i32 = 0;
+        let ptr = SendPtr(&mut storage as *mut i32);
+        // SAFETY: storage outlives this scope; ptr is the only access path.
+        unsafe {
+            *ptr.as_mut() = 42;
+        }
+        assert_eq!(storage, 42);
+    }
+
+    // -----------------------------------------------------------------
+    // piper_err_to_pyerr: PiperError -> PyErr mapping
+    // -----------------------------------------------------------------
+    //
+    // The actual mapping (per src/lib.rs):
+    //   ConfigNotFound | InvalidConfig | UnsupportedLanguage |
+    //   UnknownPhoneme | PhonemeIdNotFound       -> PyValueError
+    //   AudioOutput(io::Error) | WavWrite(_)     -> PyIOError
+    //   _ (everything else, incl. InvalidArgument, Inference, Streaming,
+    //     ModelLoad, Phonemize, ...)             -> PyRuntimeError
+    //
+    // Every test below acquires the GIL via `Python::with_gil`; this
+    // requires the `pyo3/auto-initialize` dev-dependency feature.
+
+    /// `AudioOutput(std::io::Error)` should map to `PyIOError`.  This is
+    /// the variant the user-facing task description calls "Io".
+    #[test]
+    fn test_piper_err_to_pyerr_io_error_maps_to_py_io_error() {
+        let io_err = std::io::Error::new(std::io::ErrorKind::NotFound, "missing.wav");
+        let err = piper_core::PiperError::AudioOutput(io_err);
+        let py_err = piper_err_to_pyerr(err);
+        Python::with_gil(|py| {
+            assert!(
+                py_err.is_instance_of::<PyIOError>(py),
+                "AudioOutput should map to PyIOError, got: {}",
+                py_err
+            );
+        });
+    }
+
+    /// `WavWrite(_)` is the second IOError-producing variant.
+    #[test]
+    fn test_piper_err_to_pyerr_wav_write_maps_to_py_io_error() {
+        let err = piper_core::PiperError::WavWrite("disk full".to_string());
+        let py_err = piper_err_to_pyerr(err);
+        Python::with_gil(|py| {
+            assert!(
+                py_err.is_instance_of::<PyIOError>(py),
+                "WavWrite should map to PyIOError, got: {}",
+                py_err
+            );
+        });
+    }
+
+    /// `ConfigNotFound` is the canonical validation-style error and must
+    /// produce `PyValueError`.
+    #[test]
+    fn test_piper_err_to_pyerr_config_not_found_maps_to_py_value_error() {
+        let err = piper_core::PiperError::ConfigNotFound {
+            path: "/tmp/missing.json".to_string(),
+        };
+        let py_err = piper_err_to_pyerr(err);
+        Python::with_gil(|py| {
+            assert!(
+                py_err.is_instance_of::<PyValueError>(py),
+                "ConfigNotFound should map to PyValueError, got: {}",
+                py_err
+            );
+        });
+    }
+
+    /// `InvalidConfig` -> `PyValueError`.
+    #[test]
+    fn test_piper_err_to_pyerr_invalid_config_maps_to_py_value_error() {
+        let err = piper_core::PiperError::InvalidConfig {
+            reason: "missing audio.sample_rate".to_string(),
+        };
+        let py_err = piper_err_to_pyerr(err);
+        Python::with_gil(|py| {
+            assert!(
+                py_err.is_instance_of::<PyValueError>(py),
+                "InvalidConfig should map to PyValueError, got: {}",
+                py_err
+            );
+        });
+    }
+
+    /// `UnsupportedLanguage` -> `PyValueError`.
+    #[test]
+    fn test_piper_err_to_pyerr_unsupported_language_maps_to_py_value_error() {
+        let err = piper_core::PiperError::UnsupportedLanguage {
+            code: "xx".to_string(),
+        };
+        let py_err = piper_err_to_pyerr(err);
+        Python::with_gil(|py| {
+            assert!(
+                py_err.is_instance_of::<PyValueError>(py),
+                "UnsupportedLanguage should map to PyValueError, got: {}",
+                py_err
+            );
+        });
+    }
+
+    /// `UnknownPhoneme` -> `PyValueError`.
+    #[test]
+    fn test_piper_err_to_pyerr_unknown_phoneme_maps_to_py_value_error() {
+        let err = piper_core::PiperError::UnknownPhoneme {
+            phoneme: "ʈʃ".to_string(),
+        };
+        let py_err = piper_err_to_pyerr(err);
+        Python::with_gil(|py| {
+            assert!(
+                py_err.is_instance_of::<PyValueError>(py),
+                "UnknownPhoneme should map to PyValueError, got: {}",
+                py_err
+            );
+        });
+    }
+
+    /// `PhonemeIdNotFound` -> `PyValueError`.  Final branch of the explicit
+    /// ValueError match arm.
+    #[test]
+    fn test_piper_err_to_pyerr_phoneme_id_not_found_maps_to_py_value_error() {
+        let err = piper_core::PiperError::PhonemeIdNotFound {
+            phoneme: "_PAD_".to_string(),
+        };
+        let py_err = piper_err_to_pyerr(err);
+        Python::with_gil(|py| {
+            assert!(
+                py_err.is_instance_of::<PyValueError>(py),
+                "PhonemeIdNotFound should map to PyValueError, got: {}",
+                py_err
+            );
+        });
+    }
+
+    /// `InvalidArgument` falls through to the `_` arm -> `PyRuntimeError`.
+    /// The task description called this case "value_error", but the source
+    /// code maps it to `PyRuntimeError` (no explicit arm).  Pin the actual
+    /// behaviour so any future re-categorisation is intentional.
+    #[test]
+    fn test_piper_err_to_pyerr_invalid_argument_maps_to_py_runtime_error() {
+        let err = piper_core::PiperError::InvalidArgument {
+            reason: "speaker_id out of range".to_string(),
+        };
+        let py_err = piper_err_to_pyerr(err);
+        Python::with_gil(|py| {
+            assert!(
+                py_err.is_instance_of::<PyRuntimeError>(py),
+                "InvalidArgument falls through to PyRuntimeError (NOT \
+                 PyValueError -- there is no explicit match arm).  \
+                 Got: {}",
+                py_err
+            );
+        });
+    }
+
+    /// `Inference(...)` is the canonical runtime-style failure (ONNX
+    /// execution error).  `PiperError::Runtime` does not exist as a
+    /// variant; `Inference` is its semantic equivalent.
+    #[test]
+    fn test_piper_err_to_pyerr_runtime_error_maps_to_py_runtime_error() {
+        let err = piper_core::PiperError::Inference("ORT session failed".to_string());
+        let py_err = piper_err_to_pyerr(err);
+        Python::with_gil(|py| {
+            assert!(
+                py_err.is_instance_of::<PyRuntimeError>(py),
+                "Inference should map to PyRuntimeError, got: {}",
+                py_err
+            );
+        });
+    }
+
+    /// `Streaming(...)` represents a synthesis-pipeline failure (the
+    /// closest analogue to a hypothetical `Synthesis` variant).  Falls
+    /// through to `PyRuntimeError`.
+    #[test]
+    fn test_piper_err_to_pyerr_synthesis_error_maps_correctly() {
+        let err = piper_core::PiperError::Streaming("sentence boundary failure".to_string());
+        let py_err = piper_err_to_pyerr(err);
+        Python::with_gil(|py| {
+            assert!(
+                py_err.is_instance_of::<PyRuntimeError>(py),
+                "Streaming should map to PyRuntimeError, got: {}",
+                py_err
+            );
+        });
+    }
+
+    /// Catch-all "unknown" runtime variant such as `ModelLoad` should also
+    /// fall through to `PyRuntimeError` -- guards the `_` fallback arm.
+    #[test]
+    fn test_piper_err_to_pyerr_unknown_error_maps_to_py_runtime_error() {
+        let err = piper_core::PiperError::ModelLoad("opaque ORT failure".to_string());
+        let py_err = piper_err_to_pyerr(err);
+        Python::with_gil(|py| {
+            assert!(
+                py_err.is_instance_of::<PyRuntimeError>(py),
+                "ModelLoad (fallback _) should map to PyRuntimeError, got: {}",
+                py_err
+            );
+        });
+    }
+
+    /// The Python-side error message must preserve the original
+    /// `Display` rendering of the `PiperError` -- regression guard against
+    /// silently losing context (e.g. via `format!("{:?}", err)` -> Debug).
+    #[test]
+    fn test_piper_err_to_pyerr_preserves_display_message() {
+        let err = piper_core::PiperError::ConfigNotFound {
+            path: "/var/tmp/no-such.json".to_string(),
+        };
+        let expected = err.to_string();
+        let py_err = piper_err_to_pyerr(err);
+        // PyErr's Display prints `<ExceptionName>: <message>`; check the
+        // message portion contains our original text.
+        let rendered = py_err.to_string();
+        assert!(
+            rendered.contains(&expected),
+            "PyErr rendering '{}' should contain original PiperError \
+             Display '{}'",
+            rendered,
+            expected,
+        );
+    }
+}

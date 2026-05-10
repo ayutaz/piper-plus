@@ -1,0 +1,255 @@
+name: "Wyoming Protocol Smoke Test"
+
+# Real Wyoming protocol smoke test against the running docker/wyoming
+# image (Issue: dev audit — test_integration.py is fully mocked).
+#
+# Boots the Wyoming TTS server in a container, then:
+#   1. Sends Describe -> expects an Info event back with TtsProgram +
+#      voices.
+#   2. Sends Synthesize -> expects AudioStart + N x AudioChunk + AudioStop.
+#
+# This catches regressions that pure-mock tests don't (handler wiring,
+# wyoming-protocol version drift, model auto-download, port binding,
+# OpenJTalk dictionary install path, healthcheck contract).
+
+on:
+  push:
+    branches: [dev, main]
+    paths:
+      - 'docker/wyoming/**'
+      - 'src/python/piper_wyoming/**'
+      - 'src/python/piper_plus/**'
+      - 'src/python/piper_train/**'
+      - 'src/python/g2p/**'
+      - 'pyproject.toml'
+      - 'VERSION'
+      - '.github/workflows/wyoming-smoke.yml'
+  pull_request:
+    paths:
+      - 'docker/wyoming/**'
+      - 'src/python/piper_wyoming/**'
+      - 'src/python/piper_plus/**'
+      - 'src/python/piper_train/**'
+      - 'src/python/g2p/**'
+      - 'pyproject.toml'
+      - 'VERSION'
+      - '.github/workflows/wyoming-smoke.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  wyoming-smoke:
+    name: docker compose up + wyoming protocol round-trip
+    runs-on: ubuntu-latest
+    # Local image build (with pyopenjtalk source compile) takes ~6-8 min;
+    # model auto-download from HuggingFace adds 1-2 min on a cold runner.
+    # 25-min budget leaves room for transient network slowness.
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost \
+            "$AGENT_TOOLSDIRECTORY" /usr/local/lib/android \
+            /opt/hostedtoolcache/CodeQL || true
+          sudo docker image prune --all --force || true
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # `wyoming-cli` is not a separate PyPI distribution; the `wyoming`
+      # package itself ships the protocol client classes we use below
+      # (AsyncTcpClient, Describe, Synthesize, AudioChunk). This pin
+      # matches the >=1.7,<2 version range used by docker/wyoming/Dockerfile
+      # so the client's protocol version cannot drift from the server.
+      - name: Install Wyoming protocol client
+        run: python -m pip install --no-cache-dir "wyoming>=1.7,<2"
+
+      - name: Build and start Wyoming server
+        working-directory: docker/wyoming
+        run: |
+          set -euxo pipefail
+          # `docker compose up -d --build` returns once the container is
+          # started, but the Wyoming server itself takes 30-90s to load
+          # the ONNX model + OpenJTalk dictionary. The wait step below
+          # polls the TCP port + sends a Describe to confirm readiness.
+          docker compose up -d --build
+          docker compose ps
+
+      - name: Wait for Wyoming server (Describe-level readiness)
+        run: |
+          python <<'PY'
+          # Why retry at Describe-level instead of bare TCP:
+          # The wyoming AsyncServer binds the TCP listening socket BEFORE
+          # the model is loaded, so a successful socket.connect() does not
+          # mean the server can answer protocol events. Connecting to a
+          # not-yet-ready server gets `ConnectionResetError: 104` because
+          # the model-load coroutine hasn't yielded control to the read
+          # loop. We retry the full Describe → Info round-trip until the
+          # server actually completes a handshake. This is the canonical
+          # readiness check Home Assistant uses internally as well.
+          import asyncio
+          import sys
+
+          from wyoming.client import AsyncTcpClient
+          from wyoming.info import Describe, Info
+
+          async def try_describe() -> Info | str:
+              try:
+                  async with AsyncTcpClient("localhost", 10200) as client:
+                      await client.write_event(Describe().event())
+                      event = await asyncio.wait_for(client.read_event(), timeout=10.0)
+                      if event is None:
+                          return "connection closed before Info"
+                      if not Info.is_type(event.type):
+                          return f"unexpected event type: {event.type}"
+                      return Info.from_event(event)
+              except (
+                  ConnectionResetError,
+                  ConnectionRefusedError,
+                  asyncio.TimeoutError,
+                  OSError,
+              ) as e:
+                  return f"{type(e).__name__}: {e}"
+
+          async def main() -> int:
+              # 60 attempts × 5s = 5 min total budget for cold-start with
+              # model auto-download + ONNX session init.
+              for attempt in range(1, 61):
+                  result = await try_describe()
+                  if isinstance(result, Info):
+                      programs = result.tts or []
+                      if programs:
+                          prog = programs[0]
+                          voices = prog.voices or []
+                          print(
+                              f"ok (attempt {attempt}): TtsProgram={prog.name!r} "
+                              f"voices={len(voices)}"
+                          )
+                          for v in voices[:3]:
+                              print(
+                                  f"  voice: name={getattr(v, 'name', '?')} "
+                                  f"languages={getattr(v, 'languages', '?')}"
+                              )
+                          return 0
+                      print(
+                          f"attempt {attempt}: Info received but Info.tts is empty — "
+                          f"server still initializing, retrying"
+                      )
+                  else:
+                      print(f"attempt {attempt}: not ready yet ({result})")
+                  await asyncio.sleep(5)
+
+              print(
+                  "::error::Wyoming server never answered Describe with a "
+                  "non-empty TtsProgram list within 5 minutes",
+                  file=sys.stderr,
+              )
+              return 1
+
+          sys.exit(asyncio.run(main()))
+          PY
+
+      - name: Smoke test — Synthesize event sequence
+        run: |
+          python <<'PY'
+          # Send Synthesize and verify the canonical event sequence:
+          #   AudioStart -> 1+ AudioChunk -> AudioStop
+          # Also asserts the chunks contain non-empty PCM bytes (catches
+          # silent regressions where the model returns zeros).
+          import asyncio
+          import sys
+
+          from wyoming.audio import AudioChunk, AudioStart, AudioStop
+          from wyoming.client import AsyncTcpClient
+          from wyoming.tts import Synthesize
+
+          async def main() -> int:
+              # Plain ASCII to side-step any encoding subtlety in stage-1
+              # smoke. JA models map "Hello" through the en phonemizer
+              # (fallback to default_language="ja" -> JA G2P over latin
+              # chars yields a small but non-empty audio buffer).
+              text = "Hello"
+              async with AsyncTcpClient("localhost", 10200) as client:
+                  await client.write_event(Synthesize(text=text).event())
+
+                  saw_audio_start = False
+                  chunk_count = 0
+                  total_bytes = 0
+                  saw_audio_stop = False
+
+                  # Cap total wall time so a stuck server doesn't hang
+                  # the whole job. Audio for "Hello" is well under 1s
+                  # of synthesis.
+                  deadline = asyncio.get_event_loop().time() + 60.0
+
+                  while True:
+                      remaining = deadline - asyncio.get_event_loop().time()
+                      if remaining <= 0:
+                          print("::error::synthesize deadline exceeded", file=sys.stderr)
+                          return 1
+                      try:
+                          event = await asyncio.wait_for(client.read_event(), timeout=remaining)
+                      except asyncio.TimeoutError:
+                          print("::error::read_event timeout", file=sys.stderr)
+                          return 1
+                      if event is None:
+                          print("::error::server closed connection mid-stream", file=sys.stderr)
+                          return 1
+
+                      if AudioStart.is_type(event.type):
+                          start = AudioStart.from_event(event)
+                          print(f"AudioStart rate={start.rate} width={start.width} channels={start.channels}")
+                          saw_audio_start = True
+                      elif AudioChunk.is_type(event.type):
+                          chunk = AudioChunk.from_event(event)
+                          chunk_count += 1
+                          total_bytes += len(chunk.audio)
+                      elif AudioStop.is_type(event.type):
+                          saw_audio_stop = True
+                          print(f"AudioStop after {chunk_count} chunks, {total_bytes} bytes total")
+                          break
+                      else:
+                          # Unknown event types are tolerated — handler
+                          # contract is "ignore unknown" — but log them.
+                          print(f"info: ignoring event type={event.type}")
+
+                  if not saw_audio_start:
+                      print("::error::no AudioStart event received", file=sys.stderr)
+                      return 1
+                  if not saw_audio_stop:
+                      print("::error::no AudioStop event received", file=sys.stderr)
+                      return 1
+                  if chunk_count == 0:
+                      print("::error::no AudioChunk events between Start and Stop", file=sys.stderr)
+                      return 1
+                  if total_bytes == 0:
+                      print("::error::AudioChunks were all empty (silent audio)", file=sys.stderr)
+                      return 1
+                  print(f"ok: AudioStart + {chunk_count} chunks ({total_bytes} bytes) + AudioStop")
+                  return 0
+
+          sys.exit(asyncio.run(main()))
+          PY
+
+      - name: Dump server logs on failure
+        if: failure()
+        working-directory: docker/wyoming
+        run: |
+          echo "=== docker compose ps ==="
+          docker compose ps || true
+          echo "=== wyoming-piper-plus logs (tail 500) ==="
+          docker compose logs --tail=500 wyoming-piper-plus || true
+
+      - name: Tear down
+        if: always()
+        working-directory: docker/wyoming
+        run: docker compose down -v --remove-orphans || true

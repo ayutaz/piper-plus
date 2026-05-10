@@ -12,7 +12,7 @@
     "Piper": {"pronunciation": "パイパー", "priority": 10},
     "PIPER": {"pronunciation": "パイパー", "priority": 10},
     "piper": {"pronunciation": "パイパー", "priority": 10},
-    
+
     "// 基本的な技術用語": "",
     "Docker": {"pronunciation": "ドッカー", "priority": 9},
     "DOCKER": {"pronunciation": "ドッカー", "priority": 9},

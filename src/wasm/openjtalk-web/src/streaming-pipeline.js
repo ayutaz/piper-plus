@@ -5,7 +5,8 @@
 
 // --- TextChunker ---
 
-const ABBREVIATIONS = /(?:Mr|Dr|Mrs|Ms|Prof|Sr|Jr|St|Mt|Inc|Ltd|Corp|Co|vs|etc|Vol|Dept|Est|approx|Gen|Gov|Sgt|Cpl|Pvt|Capt|Lt|Col|Maj|Rev|Ph\.D)\./gi;
+const ABBREVIATIONS =
+  /(?:Mr|Dr|Mrs|Ms|Prof|Sr|Jr|St|Mt|Inc|Ltd|Corp|Co|vs|etc|Vol|Dept|Est|approx|Gen|Gov|Sgt|Cpl|Pvt|Capt|Lt|Col|Maj|Rev|Ph\.D)\./gi;
 
 export class TextChunker {
   /**
@@ -15,9 +16,11 @@ export class TextChunker {
    * @returns {string[]}
    */
   static split(text, lang) {
-    if (!text) return [];
+    if (!text) {
+      return [];
+    }
 
-    if (lang === 'ja') {
+    if (lang === "ja") {
       return TextChunker._splitJapanese(text);
     }
     return TextChunker._splitEnglish(text);
@@ -26,12 +29,12 @@ export class TextChunker {
   static _splitJapanese(text) {
     // Split on 。！？!? keeping the delimiter attached to the chunk
     const chunks = [];
-    let current = '';
+    let current = "";
     for (let i = 0; i < text.length; i++) {
       current += text[i];
-      if ('。！？!?'.includes(text[i])) {
+      if ("。！？!?".includes(text[i])) {
         chunks.push(current);
-        current = '';
+        current = "";
       }
     }
     if (current) {
@@ -42,7 +45,7 @@ export class TextChunker {
 
   static _splitEnglish(text) {
     // Replace abbreviation periods with a placeholder to avoid splitting on them
-    const placeholder = '\x00';
+    const placeholder = "\x00";
     const abbrPositions = [];
     const replaced = text.replace(ABBREVIATIONS, (match, offset) => {
       abbrPositions.push({ offset, match });
@@ -52,21 +55,21 @@ export class TextChunker {
 
     // Split on sentence-ending punctuation (. ! ?)
     const chunks = [];
-    let current = '';
+    let current = "";
     for (let i = 0; i < replaced.length; i++) {
       current += replaced[i];
-      if ('.!?'.includes(replaced[i])) {
+      if (".!?".includes(replaced[i])) {
         // Restore placeholders and push
-        chunks.push(current.replaceAll(placeholder, '.'));
-        current = '';
+        chunks.push(current.replaceAll(placeholder, "."));
+        current = "";
       }
     }
     if (current) {
-      chunks.push(current.replaceAll(placeholder, '.'));
+      chunks.push(current.replaceAll(placeholder, "."));
     }
 
     // Trim leading whitespace from chunks (except the first)
-    return chunks.map((c, i) => i === 0 ? c : c.trimStart()).filter(c => c.length > 0);
+    return chunks.map((c, i) => (i === 0 ? c : c.trimStart())).filter((c) => c.length > 0);
   }
 }
 
@@ -106,7 +109,9 @@ export class RingBuffer {
    * @returns {Float32Array|null}
    */
   dequeue() {
-    if (this._count === 0) return null;
+    if (this._count === 0) {
+      return null;
+    }
     const item = this._buffer[this._head];
     this._buffer[this._head] = undefined;
     this._head = (this._head + 1) % this._capacity;
@@ -145,7 +150,7 @@ export class ChunkCrossfader {
       return new Float32Array(0);
     }
 
-    const fadeLen = Math.ceil(this._sampleRate * this._crossfadeMs / 1000);
+    const fadeLen = Math.ceil((this._sampleRate * this._crossfadeMs) / 1000);
 
     if (this._prevTail === null || fadeLen === 0) {
       // First chunk or no crossfade: store tail and return a copy
@@ -198,9 +203,15 @@ export class StreamingTTSPipeline {
    * @param {function(Float32Array): void} opts.onAudioChunk
    */
   constructor({ phonemize, synthesize, onAudioChunk }) {
-    if (typeof phonemize !== 'function') throw new TypeError('phonemize must be a function');
-    if (typeof synthesize !== 'function') throw new TypeError('synthesize must be a function');
-    if (typeof onAudioChunk !== 'function') throw new TypeError('onAudioChunk must be a function');
+    if (typeof phonemize !== "function") {
+      throw new TypeError("phonemize must be a function");
+    }
+    if (typeof synthesize !== "function") {
+      throw new TypeError("synthesize must be a function");
+    }
+    if (typeof onAudioChunk !== "function") {
+      throw new TypeError("onAudioChunk must be a function");
+    }
     this._phonemize = phonemize;
     this._synthesize = synthesize;
     this._onAudioChunk = onAudioChunk;
@@ -213,7 +224,9 @@ export class StreamingTTSPipeline {
    */
   async synthesizeAndPlay(text, lang) {
     const chunks = TextChunker.split(text, lang);
-    if (chunks.length === 0) return;
+    if (chunks.length === 0) {
+      return;
+    }
 
     // Phonemize the first chunk
     let nextPhonemeIds = await this._phonemize(chunks[0]);
@@ -222,10 +235,9 @@ export class StreamingTTSPipeline {
       const currentIds = nextPhonemeIds;
 
       // Pipeline: synthesize current chunk while phonemizing next chunk
-      let synthesizePromise = this._synthesize(currentIds);
-      let phonemizePromise = (i + 1 < chunks.length)
-        ? this._phonemize(chunks[i + 1])
-        : Promise.resolve(null);
+      const synthesizePromise = this._synthesize(currentIds);
+      const phonemizePromise =
+        i + 1 < chunks.length ? this._phonemize(chunks[i + 1]) : Promise.resolve(null);
 
       const [audio, nextIds] = await Promise.all([synthesizePromise, phonemizePromise]);
 

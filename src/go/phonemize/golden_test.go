@@ -25,24 +25,24 @@ const fixtureFile = "../../../tests/fixtures/g2p/phoneme_test_cases.json"
 // ---------------------------------------------------------------------------
 
 type goldenFixture struct {
-	Version          int                `json:"version"`
-	TestCases        []goldenTestCase   `json:"test_cases"`
-	PUAMapCount      int                `json:"pua_map_count"`
-	PUASpotChecks    []puaSpotCheck     `json:"pua_spot_checks"`
-	DetectCases      []detectTestCase   `json:"detect_test_cases"`
-	EncodeTestCases  []encodeTestCase   `json:"encode_test_cases"`
+	Version         int              `json:"version"`
+	TestCases       []goldenTestCase `json:"test_cases"`
+	PUAMapCount     int              `json:"pua_map_count"`
+	PUASpotChecks   []puaSpotCheck   `json:"pua_spot_checks"`
+	DetectCases     []detectTestCase `json:"detect_test_cases"`
+	EncodeTestCases []encodeTestCase `json:"encode_test_cases"`
 }
 
 type goldenTestCase struct {
-	Language              string   `json:"language"`
-	Input                 string   `json:"input"`
-	Description           string   `json:"description"`
-	ExpectedTokens        []string `json:"expected_tokens,omitempty"`
-	ExpectedTokenCountMin int      `json:"expected_token_count_min,omitempty"`
-	ExpectedContains      []string `json:"expected_contains,omitempty"`
-	ExpectedNotContains   []string `json:"expected_not_contains,omitempty"`
-	ExpectedHasQuestion   *bool    `json:"expected_has_question_marker,omitempty"`
-	ExpectedContainsAnyTone *bool  `json:"expected_contains_any_tone,omitempty"`
+	Language                string   `json:"language"`
+	Input                   string   `json:"input"`
+	Description             string   `json:"description"`
+	ExpectedTokens          []string `json:"expected_tokens,omitempty"`
+	ExpectedTokenCountMin   int      `json:"expected_token_count_min,omitempty"`
+	ExpectedContains        []string `json:"expected_contains,omitempty"`
+	ExpectedNotContains     []string `json:"expected_not_contains,omitempty"`
+	ExpectedHasQuestion     *bool    `json:"expected_has_question_marker,omitempty"`
+	ExpectedContainsAnyTone *bool    `json:"expected_contains_any_tone,omitempty"`
 }
 
 type puaSpotCheck struct {
@@ -651,18 +651,32 @@ func TestGolden_DetectLanguage(t *testing.T) {
 				}
 			}
 
-			detected := ""
+			// Find max vote count first (deterministic across platforms).
 			maxVotes := 0
-			for lang, count := range votes {
+			for _, count := range votes {
 				if count > maxVotes {
 					maxVotes = count
-					detected = lang
 				}
 			}
 
-			if detected != dc.ExpectedLanguage {
-				t.Errorf("detection mismatch: got %q, expected %q (votes: %v)",
-					detected, dc.ExpectedLanguage, votes)
+			// Collect all languages tied at max — Go map iteration is
+			// non-deterministic, so any tie-resolved single winner would
+			// flake on Windows vs Linux. Accept the expected language as
+			// long as it is among the top-voted set.
+			expectedInTop := false
+			topLangs := []string{}
+			for lang, count := range votes {
+				if count == maxVotes {
+					topLangs = append(topLangs, lang)
+					if lang == dc.ExpectedLanguage {
+						expectedInTop = true
+					}
+				}
+			}
+
+			if !expectedInTop {
+				t.Errorf("detection mismatch: top-voted langs %v (max=%d), expected %q (votes: %v)",
+					topLangs, maxVotes, dc.ExpectedLanguage, votes)
 			}
 		})
 	}
@@ -674,8 +688,8 @@ func TestGolden_DetectLanguage(t *testing.T) {
 
 func TestGolden_FixtureVersion(t *testing.T) {
 	f := loadGoldenFixture(t)
-	if f.Version != 1 {
-		t.Errorf("fixture version = %d, want 1", f.Version)
+	if f.Version != 2 {
+		t.Errorf("fixture version = %d, want 2", f.Version)
 	}
 }
 

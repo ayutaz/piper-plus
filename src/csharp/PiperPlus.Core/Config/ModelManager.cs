@@ -9,7 +9,7 @@ namespace PiperPlus.Core.Config;
 /// </summary>
 public static class ModelManager
 {
-    private static readonly HttpClient s_httpClient = CreateHttpClient();
+    private static readonly HttpClient S_httpClient = CreateHttpClient();
 
     private static HttpClient CreateHttpClient()
     {
@@ -37,6 +37,7 @@ public static class ModelManager
     /// </list>
     /// Override with the <c>PIPER_MODEL_DIR</c> environment variable.
     /// </summary>
+    /// <returns></returns>
     public static string GetDefaultModelDir()
     {
         var envDir = Environment.GetEnvironmentVariable("PIPER_MODEL_DIR");
@@ -50,7 +51,7 @@ public static class ModelManager
             var appData = Environment.GetFolderPath(
                 Environment.SpecialFolder.ApplicationData);
             return !string.IsNullOrEmpty(appData)
-                ? Path.Combine(appData, "piper", "models")
+                ? Path.Join(appData, "piper", "models")
                 : "models";
         }
 
@@ -59,7 +60,7 @@ public static class ModelManager
             var home = Environment.GetFolderPath(
                 Environment.SpecialFolder.UserProfile);
             return !string.IsNullOrEmpty(home)
-                ? Path.Combine(home, "Library", "Application Support",
+                ? Path.Join(home, "Library", "Application Support",
                                "piper", "models")
                 : "models";
         }
@@ -68,28 +69,30 @@ public static class ModelManager
         var xdgData = Environment.GetEnvironmentVariable("XDG_DATA_HOME");
         if (!string.IsNullOrEmpty(xdgData))
         {
-            return Path.Combine(xdgData, "piper", "models");
+            return Path.Join(xdgData, "piper", "models");
         }
 
         var linuxHome = Environment.GetFolderPath(
             Environment.SpecialFolder.UserProfile);
         return !string.IsNullOrEmpty(linuxHome)
-            ? Path.Combine(linuxHome, ".local", "share", "piper", "models")
+            ? Path.Join(linuxHome, ".local", "share", "piper", "models")
             : "models";
     }
 
     // ------------------------------------------------------------------
     // FindVoice
     // ------------------------------------------------------------------
-
-    private static Dictionary<string, VoiceInfo>? s_voiceLookup;
+    private static Dictionary<string, VoiceInfo>? voiceLookup;
 
     private static Dictionary<string, VoiceInfo> GetVoiceLookup(IReadOnlyList<VoiceInfo> catalog)
     {
-        if (s_voiceLookup is not null) return s_voiceLookup;
+        if (voiceLookup is not null)
+        {
+            return voiceLookup;
+        }
 
         var lookup = new Dictionary<string, VoiceInfo>(catalog.Count * 4, StringComparer.Ordinal);
-        foreach (var voice in catalog)
+        foreach (VoiceInfo voice in catalog)
         {
             lookup.TryAdd(voice.Key, voice);
             foreach (var alias in voice.Aliases)
@@ -97,7 +100,8 @@ public static class ModelManager
                 lookup.TryAdd(alias, voice);
             }
         }
-        s_voiceLookup = lookup;
+
+        voiceLookup = lookup;
         return lookup;
     }
 
@@ -106,12 +110,17 @@ public static class ModelManager
     /// Uses a cached dictionary for O(1) lookup.
     /// Returns <c>null</c> when no match is found.
     /// </summary>
+    /// <returns></returns>
     public static VoiceInfo? FindVoice(string nameOrAlias)
     {
-        if (nameOrAlias is null) return null;
-        var catalog = VoiceCatalog.LoadMergedCatalog();
-        var lookup = GetVoiceLookup(catalog);
-        return lookup.TryGetValue(nameOrAlias, out var voice) ? voice : null;
+        if (nameOrAlias is null)
+        {
+            return null;
+        }
+
+        IReadOnlyList<VoiceInfo> catalog = VoiceCatalog.LoadMergedCatalog();
+        Dictionary<string, VoiceInfo> lookup = GetVoiceLookup(catalog);
+        return lookup.TryGetValue(nameOrAlias, out VoiceInfo? voice) ? voice : null;
     }
 
     // ------------------------------------------------------------------
@@ -127,7 +136,7 @@ public static class ModelManager
     /// </param>
     public static void ListModels(string? languageFilter = null)
     {
-        var catalog = VoiceCatalog.LoadMergedCatalog();
+        IReadOnlyList<VoiceInfo> catalog = VoiceCatalog.LoadMergedCatalog();
 
         if (catalog.Count == 0)
         {
@@ -144,7 +153,7 @@ public static class ModelManager
         else
         {
             var list = new List<VoiceInfo>();
-            foreach (var voice in catalog)
+            foreach (VoiceInfo voice in catalog)
             {
                 if (string.Equals(voice.LanguageFamily, languageFilter,
                                    StringComparison.Ordinal) ||
@@ -169,8 +178,8 @@ public static class ModelManager
         Console.Error.WriteLine("Available voice models:");
 
         // Group by language code (catalog is already sorted by language, then key)
-        string currentLang = "";
-        foreach (var voice in filtered)
+        string currentLang = string.Empty;
+        foreach (VoiceInfo voice in filtered)
         {
             if (!string.Equals(voice.LanguageCode, currentLang,
                                 StringComparison.Ordinal))
@@ -219,7 +228,7 @@ public static class ModelManager
     public static async Task<bool> DownloadModelAsync(
         string modelName, string modelDir, CancellationToken ct = default)
     {
-        var voice = FindVoice(modelName);
+        VoiceInfo? voice = FindVoice(modelName);
         if (voice is null)
         {
             Console.Error.WriteLine(
@@ -264,7 +273,7 @@ public static class ModelManager
 
         bool allOk = true;
 
-        foreach (var file in voice.Files)
+        foreach (VoiceFileInfo file in voice.Files)
         {
             // Security: validate file path safety (no path traversal)
             var localName = Path.GetFileName(file.RelativePath);
@@ -288,7 +297,7 @@ public static class ModelManager
             }
 
             // Use just the filename as the local name (flat directory layout)
-            var localPath = Path.Combine(modelDir, localName);
+            var localPath = Path.Join(modelDir, localName);
 
             // Skip if file already exists with correct size
             if (File.Exists(localPath) && file.SizeBytes > 0)
@@ -315,10 +324,10 @@ public static class ModelManager
                 if (!string.IsNullOrEmpty(file.Md5Digest))
                 {
                     using var md5 = System.Security.Cryptography.MD5.Create();
-                    using var fileStream = File.OpenRead(localPath);
+                    using FileStream fileStream = File.OpenRead(localPath);
                     var hashBytes = md5.ComputeHash(fileStream);
                     var actualHash = BitConverter.ToString(hashBytes)
-                        .Replace("-", "").ToLowerInvariant();
+                        .Replace("-", string.Empty).ToLowerInvariant();
                     if (actualHash != file.Md5Digest.ToLowerInvariant())
                     {
                         Console.Error.WriteLine(
@@ -333,12 +342,12 @@ public static class ModelManager
         {
             // Find the .onnx file to show the --model path
             string? onnxFile = null;
-            foreach (var file in voice.Files)
+            foreach (VoiceFileInfo file in voice.Files)
             {
                 var fn = Path.GetFileName(file.RelativePath);
                 if (fn.EndsWith(".onnx", StringComparison.OrdinalIgnoreCase))
                 {
-                    onnxFile = Path.Combine(modelDir, fn);
+                    onnxFile = Path.Join(modelDir, fn);
                     break;
                 }
             }
@@ -386,10 +395,12 @@ public static class ModelManager
     {
         // 1. Direct file path
         if (File.Exists(modelStr))
+        {
             return Path.GetFullPath(modelStr);
+        }
 
         // 2. Try as model name/alias
-        var voice = FindVoice(modelStr);
+        VoiceInfo? voice = FindVoice(modelStr);
         if (voice is null)
         {
             throw new FileNotFoundException(
@@ -400,15 +411,17 @@ public static class ModelManager
         var dir = modelDir ?? GetDefaultModelDir();
 
         // Find the .onnx file entry in the voice catalog
-        var onnxFile = voice.Files
+        VoiceFileInfo? onnxFile = voice.Files
             .FirstOrDefault(f => f.RelativePath.EndsWith(".onnx", StringComparison.OrdinalIgnoreCase));
 
         // Check if already cached locally
         if (onnxFile is not null)
         {
-            var cachedPath = Path.Combine(dir, Path.GetFileName(onnxFile.RelativePath));
+            var cachedPath = Path.Join(dir, Path.GetFileName(onnxFile.RelativePath));
             if (File.Exists(cachedPath))
+            {
                 return cachedPath;
+            }
         }
 
         // 3. Auto-download
@@ -422,9 +435,11 @@ public static class ModelManager
 
         if (onnxFile is not null)
         {
-            var downloadedPath = Path.Combine(dir, Path.GetFileName(onnxFile.RelativePath));
+            var downloadedPath = Path.Join(dir, Path.GetFileName(onnxFile.RelativePath));
             if (File.Exists(downloadedPath))
+            {
                 return downloadedPath;
+            }
         }
 
         throw new FileNotFoundException(
@@ -434,14 +449,13 @@ public static class ModelManager
     // ------------------------------------------------------------------
     // Private: file download via HttpClient
     // ------------------------------------------------------------------
-
     private static async Task<bool> DownloadFileAsync(
         string url, string outputPath, CancellationToken ct)
     {
         var tempPath = outputPath + ".tmp";
         try
         {
-            using var response = await s_httpClient
+            using HttpResponseMessage response = await S_httpClient
                 .GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct)
                 .ConfigureAwait(false);
             response.EnsureSuccessStatusCode();
@@ -453,7 +467,7 @@ public static class ModelManager
                 Directory.CreateDirectory(dir);
             }
 
-            await using var contentStream = await response.Content
+            await using Stream contentStream = await response.Content
                 .ReadAsStreamAsync(ct)
                 .ConfigureAwait(false);
             await using var fileStream = new FileStream(
@@ -475,7 +489,13 @@ public static class ModelManager
             Console.Error.WriteLine($"  Download error: {ex.Message}");
 
             // Clean up partial temp file
-            try { File.Delete(tempPath); } catch { /* best-effort */ }
+            try
+            {
+                File.Delete(tempPath);
+            }
+            catch
+            { /* best-effort */
+            }
 
             return false;
         }
@@ -491,10 +511,26 @@ public static class ModelManager
     /// </summary>
     private static bool IsSafeVoiceKey(string key)
     {
-        if (string.IsNullOrEmpty(key)) return false;
-        if (key.Contains("..")) return false;
-        if (key.Contains('/')) return false;
-        if (key.Contains('\\')) return false;
+        if (string.IsNullOrEmpty(key))
+        {
+            return false;
+        }
+
+        if (key.Contains(".."))
+        {
+            return false;
+        }
+
+        if (key.Contains('/'))
+        {
+            return false;
+        }
+
+        if (key.Contains('\\'))
+        {
+            return false;
+        }
+
         return true;
     }
 
@@ -504,7 +540,10 @@ public static class ModelManager
     /// </summary>
     private static bool IsSafeRepoId(string repoId)
     {
-        if (string.IsNullOrEmpty(repoId)) return false;
+        if (string.IsNullOrEmpty(repoId))
+        {
+            return false;
+        }
 
         int slashCount = 0;
         foreach (char c in repoId)
@@ -512,7 +551,10 @@ public static class ModelManager
             if (c == '/')
             {
                 slashCount++;
-                if (slashCount > 1) return false;
+                if (slashCount > 1)
+                {
+                    return false;
+                }
             }
             else if (!char.IsAsciiLetterOrDigit(c) &&
                      c != '-' && c != '_' && c != '.')

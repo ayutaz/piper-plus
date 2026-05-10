@@ -1040,6 +1040,167 @@ impl Phonemizer for PortuguesePhonemizer {
 }
 
 // ---------------------------------------------------------------------------
+// European Portuguese (pt-PT) — mirror of piper-core EU implementation.
+// See `docs/spec/pt-dialect-contract.toml` (spec_version 2).
+// ---------------------------------------------------------------------------
+
+const PUA_AFFRICATE_TCH_STR: &str = "\u{E054}";
+const PUA_AFFRICATE_DZH_STR: &str = "\u{E055}";
+
+const EU_IPA_VOWEL_CHARS: &[char] = &[
+    'a', 'e', 'i', 'o', 'u', 'ɛ', 'ɔ', 'ã', 'ẽ', 'ĩ', 'õ', 'ũ', 'ɨ',
+];
+const EU_IPA_CONSONANT_CHARS: &[char] = &[
+    'b', 'd', 'f', 'k', 'l', 'm', 'n', 'p', 'r', 's', 't', 'v', 'w', 'z', 'ɡ', 'ɲ', 'ɾ', 'ʁ', 'ʃ',
+    'ʎ', 'ʒ', 'ʔ', 'h', 'ɫ',
+];
+
+fn eu_token_starts_with_consonant(token: &str) -> bool {
+    token
+        .chars()
+        .next()
+        .map(|c| EU_IPA_CONSONANT_CHARS.contains(&c))
+        .unwrap_or(false)
+}
+
+fn eu_token_starts_with_vowel(token: &str) -> bool {
+    token
+        .chars()
+        .next()
+        .map(|c| EU_IPA_VOWEL_CHARS.contains(&c))
+        .unwrap_or(false)
+}
+
+fn eu_next_non_space_starts_with_vowel(tokens: &[String], idx: usize) -> bool {
+    let mut j = idx + 1;
+    while j < tokens.len() && tokens[j] == " " {
+        j += 1;
+    }
+    if j < tokens.len() {
+        eu_token_starts_with_vowel(&tokens[j])
+    } else {
+        false
+    }
+}
+
+fn apply_eu_postprocessing(tokens: &mut [String]) {
+    let n = tokens.len();
+    let punct: &[&str] = &[
+        ",", ".", ";", ":", "!", "?", "\u{2014}", "\u{2013}", "\u{2026}",
+    ];
+
+    for i in 0..n {
+        if tokens[i] != "i" {
+            continue;
+        }
+        let next = if i + 1 < n {
+            tokens[i + 1].as_str()
+        } else {
+            ""
+        };
+        let is_final = next.is_empty() || next == " " || punct.contains(&next);
+        if !is_final {
+            continue;
+        }
+        if i >= 1 && tokens[i - 1] == PUA_AFFRICATE_TCH_STR {
+            tokens[i - 1] = "t".to_string();
+            tokens[i] = "ɨ".to_string();
+            continue;
+        }
+        if i >= 1 && tokens[i - 1] == PUA_AFFRICATE_DZH_STR {
+            tokens[i - 1] = "d".to_string();
+            tokens[i] = "ɨ".to_string();
+            continue;
+        }
+        if i >= 1 && eu_token_starts_with_consonant(&tokens[i - 1]) {
+            tokens[i] = "ɨ".to_string();
+        }
+    }
+
+    for i in 0..n {
+        if tokens[i] != "s" && tokens[i] != "z" {
+            continue;
+        }
+        let next = if i + 1 < n {
+            tokens[i + 1].as_str()
+        } else {
+            ""
+        };
+        let is_word_end = next.is_empty() || next == " " || punct.contains(&next);
+        if is_word_end {
+            if eu_next_non_space_starts_with_vowel(tokens, i) {
+                tokens[i] = "ʒ".to_string();
+                continue;
+            }
+            tokens[i] = if tokens[i] == "s" { "ʃ" } else { "ʒ" }.to_string();
+        } else if eu_token_starts_with_consonant(next) && !eu_token_starts_with_vowel(next) {
+            tokens[i] = if tokens[i] == "s" { "ʃ" } else { "ʒ" }.to_string();
+        }
+    }
+
+    for i in 0..n {
+        if tokens[i] != "w" {
+            continue;
+        }
+        if i == 0 {
+            continue;
+        }
+        if !eu_token_starts_with_vowel(&tokens[i - 1]) {
+            continue;
+        }
+        let next = if i + 1 < n {
+            tokens[i + 1].as_str()
+        } else {
+            ""
+        };
+        let is_coda = next.is_empty()
+            || next == " "
+            || punct.contains(&next)
+            || (eu_token_starts_with_consonant(next) && !eu_token_starts_with_vowel(next));
+        if is_coda {
+            tokens[i] = "ɫ".to_string();
+        }
+    }
+
+    for token in tokens.iter_mut().take(n) {
+        if token == "h" {
+            *token = "ʁ".to_string();
+        }
+    }
+}
+
+/// European Portuguese (pt-PT) phonemizer.
+pub struct EuropeanPortuguesePhonemizer;
+
+impl EuropeanPortuguesePhonemizer {
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+impl Default for EuropeanPortuguesePhonemizer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Phonemizer for EuropeanPortuguesePhonemizer {
+    fn phonemize_with_prosody(
+        &self,
+        text: &str,
+    ) -> Result<(Vec<String>, Vec<Option<ProsodyInfo>>), G2pError> {
+        let (mut tokens, prosody) = phonemize_sentence_with_prosody(text);
+        apply_eu_postprocessing(&mut tokens);
+        debug_assert_eq!(tokens.len(), prosody.len());
+        Ok((tokens, prosody))
+    }
+
+    fn language_code(&self) -> &str {
+        "pt-PT"
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Unit tests
 // ---------------------------------------------------------------------------
 

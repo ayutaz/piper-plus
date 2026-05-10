@@ -27,7 +27,7 @@ export class BenchmarkRunner {
    * @returns {Array<{name: string, duration: string}>}
    */
   getSummary() {
-    return this._entries.map(e => ({
+    return this._entries.map((e) => ({
       name: e.name,
       duration: `${e.duration.toFixed(2)}ms`,
     }));
@@ -45,8 +45,8 @@ export class BenchmarkRunner {
  * Metric-specific regression thresholds (percentage).
  */
 const THRESHOLDS = {
-  'Inference': 10,
-  'WASM Load': 5,
+  Inference: 10,
+  "WASM Load": 5,
 };
 const DEFAULT_THRESHOLD = 5;
 
@@ -63,23 +63,29 @@ export class RegressionDetector {
     const regressions = [];
 
     for (const metric of Object.keys(baseline)) {
-      if (!(metric in current)) continue;
+      if (!(metric in current)) {
+        continue;
+      }
 
       const base = baseline[metric];
       const curr = current[metric];
       const delta = curr - base;
 
       // Only positive delta (slower) counts as regression
-      if (delta <= 0) continue;
+      if (delta <= 0) {
+        continue;
+      }
 
       // Skip metrics with zero baseline to avoid division by zero
-      if (base === 0) continue;
+      if (base === 0) {
+        continue;
+      }
 
       const percentage = (delta / base) * 100;
       const threshold = THRESHOLDS[metric] ?? DEFAULT_THRESHOLD;
 
       if (percentage > threshold) {
-        const severity = percentage > 20 ? 'critical' : 'high';
+        const severity = percentage > 20 ? "critical" : "high";
         regressions.push({ metric, severity, delta, percentage });
       }
     }

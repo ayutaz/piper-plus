@@ -1,0 +1,55 @@
+name: coverage-aggregation
+
+on:
+  workflow_run:
+    workflows: [python-tests, rust-tests, go-ci, csharp-ci, cpp-tests]
+    types:
+      - completed
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+  pull-requests: write
+
+jobs:
+  aggregate:
+    runs-on: ubuntu-24.04
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Download coverage artifacts from triggering workflow
+        uses: actions/download-artifact@v6
+        with:
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ./artifacts
+        continue-on-error: true
+
+      - name: List downloaded artifacts
+        run: |
+          find ./artifacts -type f | head -30 || true
+
+      - name: Upload aggregated coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          directory: ./artifacts
+          flags: aggregated
+          fail_ci_if_error: false
+        continue-on-error: true
+
+      - name: Coverage summary comment
+        if: github.event.workflow_run.event == 'pull_request'
+        run: |
+          echo "## Coverage Aggregation Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Language | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|--------|" >> $GITHUB_STEP_SUMMARY
+          for lang in python rust go csharp cpp; do
+            if find ./artifacts -path "*${lang}*" -name "*.xml" 2>/dev/null | head -1 > /dev/null; then
+              echo "| $lang | uploaded |" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "| $lang | missing |" >> $GITHUB_STEP_SUMMARY
+            fi
+          done

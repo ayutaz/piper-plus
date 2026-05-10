@@ -44,20 +44,20 @@ TEST_F(OpenJTalkErrorHandlingTest, ErrorToString) {
 // Test result setting
 TEST_F(OpenJTalkErrorHandlingTest, SetResult) {
     OpenJTalkResult result = {OPENJTALK_SUCCESS, ""};
-    
+
     // Test simple error message
     openjtalk_set_result(&result, OPENJTALK_ERROR_NULL_INPUT, NULL);
     EXPECT_EQ(result.code, OPENJTALK_ERROR_NULL_INPUT);
     EXPECT_STREQ(result.message, "Null input provided");
-    
+
     // Test formatted error message
     openjtalk_set_result(&result, OPENJTALK_ERROR_IO_READ, "Failed to open file: %s", "test.txt");
     EXPECT_EQ(result.code, OPENJTALK_ERROR_IO_READ);
     EXPECT_STREQ(result.message, "Failed to open file: test.txt");
-    
+
     // Test with NULL result pointer (should not crash)
     openjtalk_set_result(NULL, OPENJTALK_ERROR_MEMORY, "Test message");
-    
+
     // Test very long message (should be truncated)
     char long_msg[300];
     memset(long_msg, 'A', sizeof(long_msg) - 1);
@@ -73,7 +73,7 @@ TEST_F(OpenJTalkErrorHandlingTest, InvalidInput) {
     // Test NULL input
     char* phonemes = openjtalk_text_to_phonemes(NULL);
     EXPECT_EQ(phonemes, nullptr);
-    
+
     // Test empty string
     phonemes = openjtalk_text_to_phonemes("");
     EXPECT_EQ(phonemes, nullptr);
@@ -87,11 +87,11 @@ TEST_F(OpenJTalkErrorHandlingTest, InputSizeLimits) {
     if (huge_input) {
         memset(huge_input, 'A', max_size + 99);
         huge_input[max_size + 99] = '\0';
-        
+
         // Should fail gracefully
         char* phonemes = openjtalk_text_to_phonemes(huge_input);
         EXPECT_EQ(phonemes, nullptr);
-        
+
         free(huge_input);
     }
 }
@@ -104,16 +104,16 @@ TEST_F(OpenJTalkErrorHandlingTest, ThreadSafety) {
     std::vector<std::thread> threads;
     std::vector<std::string> test_texts = {
         "こんにちは",
-        "ありがとう", 
+        "ありがとう",
         "さようなら",
         "おはよう"
     };
-    
+
     // Skip this test if OpenJTalk binary is not available
     if (!openjtalk_is_available()) {
         GTEST_SKIP() << "OpenJTalk binary not available";
     }
-    
+
     for (int i = 0; i < num_threads; i++) {
         threads.emplace_back([i, &test_texts]() {
             for (int j = 0; j < 10; j++) {
@@ -124,7 +124,7 @@ TEST_F(OpenJTalkErrorHandlingTest, ThreadSafety) {
             }
         });
     }
-    
+
     for (auto& thread : threads) {
         thread.join();
     }

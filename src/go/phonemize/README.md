@@ -77,6 +77,7 @@ with Piper ONNX model input format.
 ## Cross-Platform Consistency
 
 Also available as:
+
 - **Python**: `piper-plus-g2p` on PyPI (`pip install piper-plus-g2p`)
 - **Rust**: `piper-plus-g2p` on crates.io
 - **npm**: `@piper-plus/g2p` for browser/WASM

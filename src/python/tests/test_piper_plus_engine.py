@@ -40,7 +40,12 @@ from piper_plus.engine import (
 
 
 def _make_mock_session(
-    *, has_sid: bool = False, has_lid: bool = False, has_prosody: bool = False
+    *,
+    has_sid: bool = False,
+    has_lid: bool = False,
+    has_prosody: bool = False,
+    has_speaker_embedding: bool = False,
+    speaker_embedding_dim: int = 256,
 ) -> MagicMock:
     """Create a mock InferenceSession with configurable inputs."""
     session = MagicMock(spec=onnxruntime.InferenceSession)
@@ -61,6 +66,15 @@ def _make_mock_session(
         inp = MagicMock()
         inp.name = "prosody_features"
         inputs.append(inp)
+    if has_speaker_embedding:
+        inp = MagicMock()
+        inp.name = "speaker_embedding"
+        inp.shape = [1, speaker_embedding_dim]
+        inputs.append(inp)
+        mask = MagicMock()
+        mask.name = "speaker_embedding_mask"
+        mask.shape = [1, 1]
+        inputs.append(mask)
     session.get_inputs.return_value = inputs
 
     out = MagicMock()
@@ -415,6 +429,41 @@ class TestWarmupSession:
         feed = session.run.call_args[0][1]
         assert "prosody_features" in feed
         assert feed["prosody_features"].shape == (1, WARMUP_PHONEME_LENGTH, 3)
+
+    def test_warmup_includes_speaker_embedding_when_session_declares_it(self):
+        # Regression for PR #401 Wyoming smoke failure:
+        # 6lang multilingual checkpoints declare speaker_embedding +
+        # speaker_embedding_mask as ONNX-required inputs (forward-compat hook
+        # from export_onnx.py). engine.warmup_session previously omitted them,
+        # so any model with these inputs failed warmup with:
+        #   ValueError: Required inputs (['speaker_embedding',
+        #   'speaker_embedding_mask']) are missing from input feed
+        session = _make_mock_session(has_speaker_embedding=True)
+
+        warmup_session(session)
+
+        feed = session.run.call_args[0][1]
+        assert "speaker_embedding" in feed
+        assert feed["speaker_embedding"].shape == (1, 256)
+        assert feed["speaker_embedding"].dtype == np.float32
+        assert "speaker_embedding_mask" in feed
+        assert feed["speaker_embedding_mask"].shape == (1, 1)
+        # Mask=0 selects the trained speaker_id / lid path inside
+        # models.py:VitsModel.infer (see torch.where branch).
+        assert feed["speaker_embedding_mask"][0, 0] == 0
+
+    def test_warmup_speaker_embedding_dim_follows_session_input_shape(self):
+        # When the model declares emb_dim != 256 (e.g. a custom voice cloning
+        # checkpoint with 192-dim ECAPA), the helper must read it from the
+        # input shape, not hard-code 256.
+        session = _make_mock_session(
+            has_speaker_embedding=True, speaker_embedding_dim=192
+        )
+
+        warmup_session(session)
+
+        feed = session.run.call_args[0][1]
+        assert feed["speaker_embedding"].shape == (1, 192)
 
 
 # ===================================================================

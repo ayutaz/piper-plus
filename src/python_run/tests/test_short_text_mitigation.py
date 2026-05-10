@@ -19,6 +19,7 @@ from piper.voice import (
     _pad_phoneme_ids,
     _trim_padding_by_durations,
     _trim_silence,
+    is_short_text,
 )
 
 
@@ -26,7 +27,6 @@ from piper.voice import (
 # Strategy A: _pad_phoneme_ids
 # ---------------------------------------------------------------
 class TestPadPhonemeIds:
-
     @pytest.mark.unit
     def test_no_pad_when_long_enough(self):
         ids = list(range(MIN_PHONEME_IDS))
@@ -193,9 +193,7 @@ class TestTrimPaddingByDurations:
     def test_trims_both_sides(self):
         # BOS=2, pad×2, body×2, pad×2, EOS=1
         # EOS=1 below eos_max_frames=6 so preserved entirely.
-        durations = np.array(
-            [2.0, 5.0, 5.0, 4.0, 4.0, 5.0, 5.0, 1.0], dtype=np.float32
-        )
+        durations = np.array([2.0, 5.0, 5.0, 4.0, 4.0, 5.0, 5.0, 1.0], dtype=np.float32)
         hop = 100
         total = int(durations.sum() * hop)  # 3100
         audio = np.arange(total, dtype=np.int16)
@@ -251,7 +249,9 @@ class TestTrimPaddingByDurations:
         # durations has fewer entries than 1+front+back+1
         audio = np.arange(1000, dtype=np.int16)
         durations = np.array([1.0, 1.0, 1.0], dtype=np.float32)
-        result = _trim_padding_by_durations(audio, durations, front_pad=5, back_pad=5, hop_size=256)
+        result = _trim_padding_by_durations(
+            audio, durations, front_pad=5, back_pad=5, hop_size=256
+        )
         assert np.array_equal(result, audio)
 
 
@@ -259,7 +259,6 @@ class TestTrimPaddingByDurations:
 # Strategy A: _trim_silence (RMS fallback)
 # ---------------------------------------------------------------
 class TestTrimSilence:
-
     @pytest.mark.unit
     def test_no_trim_for_short_audio(self):
         audio = np.zeros(TRIM_MIN_SAMPLES - 1, dtype=np.int16)
@@ -317,11 +316,10 @@ class TestTrimSilence:
 # Strategy B: Dynamic scales (tested via synthesize_ids_to_raw)
 # ---------------------------------------------------------------
 class TestDynamicScales:
-
     @pytest.mark.unit
     def test_scales_reduced_for_short_ids(self):
         """Verify that noise_scale and noise_w are reduced for short sequences."""
-        from unittest.mock import MagicMock, patch
+        from unittest.mock import MagicMock
 
         from piper.config import PiperConfig
 
@@ -409,44 +407,71 @@ class TestDynamicScales:
 # Strategy C: Short-text detection in synthesize_stream_raw
 # ---------------------------------------------------------------
 class TestShortTextDetection:
+    """Exercise the canonical ``piper.voice.is_short_text`` helper.
+
+    Each test invokes the real production helper directly; if the inline
+    SHORT_TEXT_CHARS / SSML fast-path policy in voice.py drifts, these
+    tests will catch it (no fixture-side copy of the logic).
+    """
 
     @pytest.mark.unit
     def test_short_plain_text_detected(self):
-        assert sum(1 for c in "abc" if not c.isspace()) <= SHORT_TEXT_CHARS
+        # "abc" has 3 non-space chars and SHORT_TEXT_CHARS is 10.
+        assert is_short_text("abc") is True
+
+    @pytest.mark.unit
+    def test_text_at_boundary_detected_as_short(self):
+        # Exactly SHORT_TEXT_CHARS non-space chars must still trigger short.
+        text = "a" * SHORT_TEXT_CHARS
+        assert is_short_text(text) is True
 
     @pytest.mark.unit
     def test_long_text_not_detected(self):
         text = "a" * (SHORT_TEXT_CHARS + 1)
-        assert sum(1 for c in text if not c.isspace()) > SHORT_TEXT_CHARS
+        assert is_short_text(text) is False
 
     @pytest.mark.unit
-    def test_ssml_text_not_detected(self):
-        text = "<speak>short</speak>"
-        assert text.lstrip().startswith(("<speak>", "<speak "))
+    def test_ssml_text_with_short_payload_not_short(self):
+        # SSML must always bypass the short-text path (Strategy C uses SSML
+        # `<break>` instead of silence padding) — even when payload is short.
+        assert is_short_text("<speak>hi</speak>") is False
 
     @pytest.mark.unit
     def test_ssml_with_attributes_not_detected(self):
-        text = '<speak xml:lang="ja">short</speak>'
-        assert text.lstrip().startswith(("<speak>", "<speak "))
+        # `<speak xml:lang="ja">` is the namespaced canonical form.
+        assert is_short_text('<speak xml:lang="ja">hi</speak>') is False
+
+    @pytest.mark.unit
+    def test_ssml_with_leading_whitespace_still_skipped(self):
+        # Leading whitespace before `<speak>` must still trigger SSML detection
+        # (production code does `text.lstrip().startswith(...)`).
+        assert is_short_text("   <speak>hi</speak>") is False
 
     @pytest.mark.unit
     def test_spaces_excluded_from_count(self):
-        text = "a b c d e"  # 5 non-space chars
-        assert sum(1 for c in text if not c.isspace()) <= SHORT_TEXT_CHARS
+        # 5 non-space chars + 4 spaces = below the 10-char threshold.
+        assert is_short_text("a b c d e") is True
 
     @pytest.mark.unit
-    def test_break_silence_bytes_length(self):
-        """Verify break silence byte count matches SILENCE_PAD_MS."""
-        sample_rate = 22050
-        break_samples = int(sample_rate * SILENCE_PAD_MS / 1000)
-        break_bytes = bytes(break_samples * 2)
-        expected_bytes = int(22050 * 0.3) * 2
-        assert len(break_bytes) == expected_bytes
+    def test_only_spaces_counts_as_zero_chars(self):
+        # Pure whitespace has 0 non-space chars -> definitely "short" by count
+        # (caller usually filters this earlier, but pin the helper behaviour).
+        assert is_short_text("     ") is True
+
+    @pytest.mark.unit
+    def test_unicode_characters_counted_correctly(self):
+        # Each Japanese char is 1 char.  "こんにちは" = 5 -> short.
+        assert is_short_text("こんにちは") is True
+
+    @pytest.mark.unit
+    def test_very_long_unicode_not_short(self):
+        # 100 Japanese chars >> 10 -> not short.
+        assert is_short_text("あ" * 100) is False
 
     @pytest.mark.unit
     def test_stream_raw_adds_break_for_short_text(self):
         """synthesize_stream_raw should prepend/append silence for short text."""
-        from unittest.mock import MagicMock, patch
+        from unittest.mock import MagicMock
 
         from piper.config import PiperConfig
         from piper.voice import PiperVoice
@@ -482,9 +507,7 @@ class TestShortTextDetection:
         )
 
         short_text = "hi"
-        results = list(
-            PiperVoice.synthesize_stream_raw(voice, short_text)
-        )
+        results = list(PiperVoice.synthesize_stream_raw(voice, short_text))
 
         assert len(results) == 1
         result = results[0]
@@ -533,9 +556,7 @@ class TestShortTextDetection:
             )
         )
 
-        results = list(
-            PiperVoice.synthesize_stream_raw(voice, long_text)
-        )
+        results = list(PiperVoice.synthesize_stream_raw(voice, long_text))
 
         assert len(results) == 1
         # Should start with the audio directly (no break silence prepended)
@@ -546,7 +567,6 @@ class TestShortTextDetection:
 # Constants consistency
 # ---------------------------------------------------------------
 class TestConstants:
-
     @pytest.mark.unit
     def test_min_phoneme_ids(self):
         # Empirically tuned for tsukuyomi 6lang (issue #356).

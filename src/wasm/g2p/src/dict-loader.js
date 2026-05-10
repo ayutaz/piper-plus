@@ -26,29 +26,28 @@
  * Shared across Rust, C#, C++, and npm implementations.
  */
 const DICT_TAR_GZ_URL =
-  'https://github.com/ayutaz/piper-plus/releases/download/dict-v1.0.0/open_jtalk_dic_utf_8-1.11.tar.gz';
+  "https://github.com/ayutaz/piper-plus/releases/download/dict-v1.0.0/open_jtalk_dic_utf_8-1.11.tar.gz";
 
 /** SHA-256 of the default tar.gz archive. */
-const DICT_SHA256 =
-  'fe6ba0e43542cef98339abdffd903e062008ea170b04e7e2a35da805902f382a';
+const DICT_SHA256 = "fe6ba0e43542cef98339abdffd903e062008ea170b04e7e2a35da805902f382a";
 
 /** Root directory inside the tar archive. */
-const TAR_ROOT_DIR = 'open_jtalk_dic_utf_8-1.11';
+const TAR_ROOT_DIR = "open_jtalk_dic_utf_8-1.11";
 
 /** The 8 MeCab dictionary files required by OpenJTalk. */
 const DICT_FILES = [
-  'char.bin',
-  'matrix.bin',
-  'sys.dic',
-  'unk.dic',
-  'left-id.def',
-  'pos-id.def',
-  'rewrite.def',
-  'right-id.def',
+  "char.bin",
+  "matrix.bin",
+  "sys.dic",
+  "unk.dic",
+  "left-id.def",
+  "pos-id.def",
+  "rewrite.def",
+  "right-id.def",
 ];
 
-const DEFAULT_DB_NAME = 'piper-g2p-dict';
-const STORE_NAME = 'files';
+const DEFAULT_DB_NAME = "piper-g2p-dict";
+const STORE_NAME = "files";
 const DB_VERSION = 1;
 
 // ---- IndexedDB helpers --------------------------------------------------------
@@ -65,7 +64,7 @@ function openDB(dbName) {
     req.onupgradeneeded = (e) => {
       const db = e.target.result;
       if (!db.objectStoreNames.contains(STORE_NAME)) {
-        db.createObjectStore(STORE_NAME, { keyPath: 'key' });
+        db.createObjectStore(STORE_NAME, { keyPath: "key" });
       }
     };
     req.onsuccess = () => resolve(req.result);
@@ -104,10 +103,12 @@ async function fetchWithProgress(url, onProgress) {
     throw new Error(`Failed to fetch ${url}: ${response.status} ${response.statusText}`);
   }
 
-  const contentLength = response.headers.get('Content-Length');
+  const contentLength = response.headers.get("Content-Length");
   if (!contentLength || !response.body) {
     const buffer = await response.arrayBuffer();
-    if (onProgress) onProgress({ loaded: buffer.byteLength, total: buffer.byteLength });
+    if (onProgress) {
+      onProgress({ loaded: buffer.byteLength, total: buffer.byteLength });
+    }
     return buffer;
   }
 
@@ -118,10 +119,14 @@ async function fetchWithProgress(url, onProgress) {
 
   for (;;) {
     const { done, value } = await reader.read();
-    if (done) break;
+    if (done) {
+      break;
+    }
     chunks.push(value);
     loaded += value.byteLength;
-    if (onProgress) onProgress({ loaded, total });
+    if (onProgress) {
+      onProgress({ loaded, total });
+    }
   }
 
   const merged = new Uint8Array(loaded);
@@ -146,15 +151,15 @@ async function fetchWithProgress(url, onProgress) {
 async function verifySha256(buffer, expectedHex) {
   if (!globalThis.crypto?.subtle?.digest) {
     throw new Error(
-      'Web Crypto API (crypto.subtle) is not available. ' +
-      'A secure context (HTTPS) is required for SHA-256 verification.'
+      "Web Crypto API (crypto.subtle) is not available. " +
+        "A secure context (HTTPS) is required for SHA-256 verification."
     );
   }
-  const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", buffer);
   const hashArray = new Uint8Array(hashBuffer);
-  let hex = '';
+  let hex = "";
   for (let i = 0; i < hashArray.length; i++) {
-    hex += hashArray[i].toString(16).padStart(2, '0');
+    hex += hashArray[i].toString(16).padStart(2, "0");
   }
   return hex === expectedHex;
 }
@@ -168,14 +173,14 @@ async function verifySha256(buffer, expectedHex) {
  * @returns {Promise<ArrayBuffer>}
  */
 async function decompressGzip(compressedBuffer) {
-  if (typeof DecompressionStream === 'undefined') {
+  if (typeof DecompressionStream === "undefined") {
     throw new Error(
-      'DecompressionStream API is not available. ' +
-      'Please use a modern browser (Chrome 80+, Firefox 113+, Safari 16.4+).'
+      "DecompressionStream API is not available. " +
+        "Please use a modern browser (Chrome 80+, Firefox 113+, Safari 16.4+)."
     );
   }
   const stream = new Blob([compressedBuffer]).stream();
-  const decompressed = stream.pipeThrough(new DecompressionStream('gzip'));
+  const decompressed = stream.pipeThrough(new DecompressionStream("gzip"));
   return new Response(decompressed).arrayBuffer();
 }
 
@@ -195,25 +200,27 @@ function parseTar(tarBuffer) {
     offset += 512;
 
     // End-of-archive: zero block
-    if (header.every((b) => b === 0)) break;
+    if (header.every((b) => b === 0)) {
+      break;
+    }
 
     // Filename (bytes 0-99)
-    let name = '';
+    let name = "";
     for (let i = 0; i < 100 && header[i] !== 0; i++) {
       name += String.fromCharCode(header[i]);
     }
 
     // UStar prefix (bytes 345-499)
-    let prefix = '';
+    let prefix = "";
     for (let i = 345; i < 500 && header[i] !== 0; i++) {
       prefix += String.fromCharCode(header[i]);
     }
     if (prefix) {
-      name = prefix + '/' + name;
+      name = prefix + "/" + name;
     }
 
     // File size (octal, bytes 124-135)
-    let sizeStr = '';
+    let sizeStr = "";
     for (let i = 124; i < 136 && header[i] !== 0; i++) {
       sizeStr += String.fromCharCode(header[i]);
     }
@@ -253,8 +260,8 @@ async function downloadAndExtractDict(tarGzUrl, onProgress) {
     const valid = await verifySha256(compressedData, DICT_SHA256);
     if (!valid) {
       throw new Error(
-        'Dictionary archive SHA-256 verification failed. ' +
-        'The downloaded file may be corrupted or tampered with.'
+        "Dictionary archive SHA-256 verification failed. " +
+          "The downloaded file may be corrupted or tampered with."
       );
     }
   }
@@ -267,15 +274,15 @@ async function downloadAndExtractDict(tarGzUrl, onProgress) {
   const dictFiles = {};
 
   // Auto-detect tar root directory by looking for the first required file
-  let rootDir = isDefaultUrl ? TAR_ROOT_DIR : '';
+  let rootDir = isDefaultUrl ? TAR_ROOT_DIR : "";
   if (!isDefaultUrl) {
     const firstFile = DICT_FILES[0];
     for (const key of allFiles.keys()) {
-      if (key.endsWith('/' + firstFile)) {
+      if (key.endsWith("/" + firstFile)) {
         rootDir = key.slice(0, -(firstFile.length + 1));
         break;
       } else if (key === firstFile) {
-        rootDir = '';
+        rootDir = "";
         break;
       }
     }
@@ -391,7 +398,7 @@ export class DictLoader {
    */
   async clearCache() {
     const db = await this._openDB();
-    const tx = db.transaction(STORE_NAME, 'readwrite');
+    const tx = db.transaction(STORE_NAME, "readwrite");
     const store = tx.objectStore(STORE_NAME);
     await wrapRequest(store.clear());
   }
@@ -406,11 +413,13 @@ export class DictLoader {
    */
   async _allDictFilesCached(db) {
     try {
-      const tx = db.transaction(STORE_NAME, 'readonly');
+      const tx = db.transaction(STORE_NAME, "readonly");
       const store = tx.objectStore(STORE_NAME);
       for (const filename of DICT_FILES) {
         const result = await wrapRequest(store.get(`dict/${filename}`));
-        if (!result || !result.data) return false;
+        if (!result || !result.data) {
+          return false;
+        }
       }
       return true;
     } catch {
@@ -424,7 +433,9 @@ export class DictLoader {
    * @returns {Promise<IDBDatabase>}
    */
   async _openDB() {
-    if (this._db) return this._db;
+    if (this._db) {
+      return this._db;
+    }
     this._db = await openDB(this._dbName);
     return this._db;
   }
@@ -437,10 +448,12 @@ export class DictLoader {
    * @returns {Promise<ArrayBuffer|null>}
    */
   async _getFromCache(db, key) {
-    const tx = db.transaction(STORE_NAME, 'readonly');
+    const tx = db.transaction(STORE_NAME, "readonly");
     const store = tx.objectStore(STORE_NAME);
     const result = await wrapRequest(store.get(key));
-    if (result && result.data) return result.data;
+    if (result && result.data) {
+      return result.data;
+    }
     return null;
   }
 
@@ -453,7 +466,7 @@ export class DictLoader {
    * @returns {Promise<void>}
    */
   async _putToCache(db, key, data) {
-    const tx = db.transaction(STORE_NAME, 'readwrite');
+    const tx = db.transaction(STORE_NAME, "readwrite");
     const store = tx.objectStore(STORE_NAME);
     await wrapRequest(store.put({ key, data, storedAt: Date.now() }));
   }

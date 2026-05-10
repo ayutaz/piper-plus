@@ -66,7 +66,7 @@ unset OPENJTALK_DICTIONARY_PATH
 echo "Running piper with auto-download..."
 if echo "こんにちは" | "$PIPER_BIN" --model "$PROJECT_ROOT/test/models/multilingual-test-medium.onnx" --output_file "$TEST_DIR/test2.wav" 2>&1 | tee "$TEST_DIR/download.log"; then
     echo "[OK] Test 2 passed: Auto-download succeeded"
-    
+
     # Check if dictionary was downloaded
     if [ -d "$TEST_DIR/.local/share/piper/open_jtalk_dic_utf_8-1.11" ]; then
         echo "[OK] Dictionary downloaded to expected location"

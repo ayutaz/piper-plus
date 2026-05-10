@@ -5,6 +5,13 @@ on:
     tags:
       - 'npm-v*'
 
+# Serialise tag publishes — re-tagging the same npm-v* should not race
+# the in-flight publish run (npm rejects duplicate version uploads but
+# the dist-tags update window is small).
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
 env:
   NODE_VERSION: '24.x'
 
@@ -70,6 +77,7 @@ jobs:
     permissions:
       contents: read
       id-token: write
+      attestations: write
     defaults:
       run:
         working-directory: src/wasm/openjtalk-web
@@ -92,7 +100,22 @@ jobs:
       - name: Verify WASM output
         run: test -f dist/rust-wasm/piper_plus_wasm_bg.wasm
 
+      - name: Pack tarball for attestation
+        # Pack first so attestation covers the exact bytes that get uploaded.
+        # `npm publish <tarball>` below republishes the same file rather than
+        # repacking, which guarantees attest-build-provenance and the npm
+        # provenance flag refer to identical content.
+        run: npm pack
+
+      - name: Generate build provenance attestation
+        uses: actions/attest-build-provenance@v3
+        with:
+          subject-path: 'src/wasm/openjtalk-web/*.tgz'
+
       - name: Publish to npm
-        run: npm publish --provenance --access public
+        # Publishes the already-packed tarball with both SLSA-provenance
+        # (GitHub artifact attestation, attached above) and npm-provenance
+        # (sigstore via --provenance, attached by the registry).
+        run: npm publish *.tgz --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

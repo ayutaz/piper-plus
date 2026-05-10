@@ -11,8 +11,19 @@ try:
 except ImportError:
     torch = None
 
-# Skip all tests in this module if torch is not available
-pytestmark = pytest.mark.skipif(torch is None, reason="torch not installed")
+try:
+    import torchaudio  # noqa: F401
+except ImportError:
+    torchaudio = None
+else:
+    torchaudio = True
+
+# Skip all tests in this module if torch or torchaudio is not available
+# (the WavLM discriminator pulls torchaudio for resampling)
+pytestmark = pytest.mark.skipif(
+    torch is None or torchaudio is None,
+    reason="torch or torchaudio not installed",
+)
 
 if torch is not None:
     from piper_train.vits import commons

@@ -42,46 +42,46 @@ runs:
           local attempt=1
           while [ $attempt -le $MAX_RETRIES ]; do
             echo "Uploading $ASSET_NAME (attempt $attempt/$MAX_RETRIES)..."
-            
+
             # Clean up the URL template
             CLEAN_URL=$(echo "$UPLOAD_URL" | sed 's/{.*}$//')
-            
+
             # Perform upload
             response=$(curl -s -w "\n%{http_code}" \
               -H "Authorization: token $GITHUB_TOKEN" \
               -H "Content-Type: $ASSET_CONTENT_TYPE" \
               --data-binary @"$ASSET_PATH" \
               "${CLEAN_URL}?name=$ASSET_NAME")
-            
+
             # Extract HTTP status code
             http_code=$(echo "$response" | tail -n1)
             body=$(echo "$response" | sed '$d')
-            
+
             if [ "$http_code" -eq 201 ]; then
               echo "✅ Successfully uploaded $ASSET_NAME"
               return 0
             else
               echo "❌ Upload failed with HTTP $http_code"
               echo "Response: $body"
-              
+
               if [ $attempt -lt $MAX_RETRIES ]; then
                 echo "Waiting ${RETRY_DELAY}s before retry..."
                 sleep $RETRY_DELAY
               fi
             fi
-            
+
             attempt=$((attempt + 1))
           done
-          
+
           echo "❌ Failed to upload $ASSET_NAME after $MAX_RETRIES attempts"
           return 1
         }
-        
+
         # Debug logging
         echo "Debug: UPLOAD_URL='$UPLOAD_URL'"
         echo "Debug: ASSET_PATH='$ASSET_PATH'"
         echo "Debug: ASSET_NAME='$ASSET_NAME'"
-        
+
         # Verify upload URL is not empty
         if [ -z "$UPLOAD_URL" ]; then
           echo "❌ Error: Upload URL is empty"
@@ -89,12 +89,12 @@ runs:
           echo "Skipping upload as this appears to be a non-release build"
           exit 0  # Exit successfully to not fail the build
         fi
-        
+
         # Verify file exists
         if [ ! -f "$ASSET_PATH" ]; then
           echo "❌ Error: File not found: $ASSET_PATH"
           exit 1
         fi
-        
+
         # Perform upload with retry
         retry_upload

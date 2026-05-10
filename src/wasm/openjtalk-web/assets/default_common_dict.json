@@ -34,7 +34,7 @@
     "Developer": {"pronunciation": "デベロッパー", "priority": 8},
     "Designer": {"pronunciation": "デザイナー", "priority": 8},
     "Programmer": {"pronunciation": "プログラマー", "priority": 8},
-    
+
     "// 動作・処理": "",
     "Download": {"pronunciation": "ダウンロード", "priority": 8},
     "Upload": {"pronunciation": "アップロード", "priority": 8},
@@ -62,7 +62,7 @@
     "Stop": {"pronunciation": "ストップ", "priority": 8},
     "Restart": {"pronunciation": "リスタート", "priority": 8},
     "Reboot": {"pronunciation": "リブート", "priority": 8},
-    
+
     "// ステータス・状態": "",
     "Online": {"pronunciation": "オンライン", "priority": 8},
     "Offline": {"pronunciation": "オフライン", "priority": 8},
@@ -76,7 +76,7 @@
     "Processing": {"pronunciation": "プロセッシング", "priority": 8},
     "Complete": {"pronunciation": "コンプリート", "priority": 8},
     "Incomplete": {"pronunciation": "インコンプリート", "priority": 8},
-    
+
     "// ネットワーク関連": "",
     "Network": {"pronunciation": "ネットワーク", "priority": 8},
     "Internet": {"pronunciation": "インターネット", "priority": 8},
@@ -93,7 +93,7 @@
     "Packet": {"pronunciation": "パケット", "priority": 8},
     "Bandwidth": {"pronunciation": "バンドウィズ", "priority": 8},
     "Latency": {"pronunciation": "レイテンシー", "priority": 8},
-    
+
     "// セキュリティ関連": "",
     "Security": {"pronunciation": "セキュリティー", "priority": 8},
     "Password": {"pronunciation": "パスワード", "priority": 8},
@@ -110,7 +110,7 @@
     "Firewall": {"pronunciation": "ファイアウォール", "priority": 8},
     "Backup": {"pronunciation": "バックアップ", "priority": 8},
     "Recovery": {"pronunciation": "リカバリー", "priority": 8},
-    
+
     "// 食べ物": "",
     "担々麺": {"pronunciation": "タンタンメン", "priority": 6},
     "麻婆豆腐": {"pronunciation": "マーボードーフ", "priority": 6},

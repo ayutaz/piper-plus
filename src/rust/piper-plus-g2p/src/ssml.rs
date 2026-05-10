@@ -221,12 +221,51 @@ impl SsmlParser {
     }
 
     /// Convert `"500ms"` or `"1s"` to milliseconds. Returns 0 for unparseable values.
+    ///
+    /// Sanitization rules:
+    /// - Negative values are clamped to 0 (silently dropped by `merge`).
+    /// - Values exceeding `MAX_BREAK_MS` (60_000 ms = 1 min) are clamped to that max.
+    /// - `NaN` / `±Inf` are rejected (return 0).
+    /// - Scientific notation (`1e10ms`) is rejected on parse-failure / out-of-range
+    ///   (Rust's `f64::from_str` accepts `1e10` syntactically; the magnitude is
+    ///   handled by the overflow clamp).
+    /// - Unknown suffixes (`"500x"`, `""`) fall back to 0 via the unparseable path.
     fn parse_break_time(time_str: &str) -> u32 {
+        /// Maximum break duration in milliseconds. SSML W3C spec does not
+        /// constrain this, but TTS callers rarely benefit from > 1 min silence
+        /// and unbounded values risk runaway buffer allocation downstream.
+        const MAX_BREAK_MS: u32 = 60_000;
+
+        /// Convert a finite `f64` ms count into a clamped `u32`.
+        /// Returns 0 for NaN / Inf / negative; saturates at `MAX_BREAK_MS` on overflow.
+        fn sanitize_ms(v: f64, raw: &str) -> u32 {
+            if !v.is_finite() {
+                tracing::warn!("Invalid break time (non-finite): {}", raw);
+                return 0;
+            }
+            if v <= 0.0 {
+                if v < 0.0 {
+                    tracing::warn!("Negative break time clamped to 0: {}", raw);
+                }
+                return 0;
+            }
+            if v >= MAX_BREAK_MS as f64 {
+                tracing::warn!(
+                    "Break time {} exceeds max ({}ms); clamped",
+                    raw,
+                    MAX_BREAK_MS
+                );
+                return MAX_BREAK_MS;
+            }
+            // Safe: 0 < v < MAX_BREAK_MS <= u32::MAX
+            v as u32
+        }
+
         let s = time_str.trim().to_ascii_lowercase();
         if let Some(ms_part) = s.strip_suffix("ms") {
             return ms_part
                 .parse::<f64>()
-                .map(|v| v as u32)
+                .map(|v| sanitize_ms(v, time_str))
                 .unwrap_or_else(|_| {
                     tracing::warn!("Invalid break time: {}", time_str);
                     0
@@ -235,17 +274,19 @@ impl SsmlParser {
         if let Some(s_part) = s.strip_suffix('s') {
             return s_part
                 .parse::<f64>()
-                .map(|v| (v * 1000.0) as u32)
+                .map(|v| sanitize_ms(v * 1000.0, time_str))
                 .unwrap_or_else(|_| {
                     tracing::warn!("Invalid break time: {}", time_str);
                     0
                 });
         }
         // Bare number -- assume milliseconds
-        s.parse::<f64>().map(|v| v as u32).unwrap_or_else(|_| {
-            tracing::warn!("Invalid break time: {}", time_str);
-            0
-        })
+        s.parse::<f64>()
+            .map(|v| sanitize_ms(v, time_str))
+            .unwrap_or_else(|_| {
+                tracing::warn!("Invalid break time: {}", time_str);
+                0
+            })
     }
 
     /// Parse a rate specification into a float multiplier.
@@ -704,5 +745,108 @@ mod tests {
         assert!((inside.rate - 0.8).abs() < 0.01);
         let after = segments.iter().find(|s| s.text == "after").unwrap();
         assert!((after.rate - 1.0).abs() < f32::EPSILON);
+    }
+
+    // ---- Break time sanitization (negative / overflow / non-finite) ----
+
+    /// Negative ms / s values must clamp to 0 — they would otherwise wrap to
+    /// near-`u32::MAX` via `as u32` cast (e.g. -500ms -> 4_294_966_796).
+    #[test]
+    fn test_break_negative_time_clamped_to_zero() {
+        // Direct API: negative ms
+        assert_eq!(SsmlParser::parse_break_time("-500ms"), 0);
+        // Negative seconds
+        assert_eq!(SsmlParser::parse_break_time("-1s"), 0);
+        // Negative bare number
+        assert_eq!(SsmlParser::parse_break_time("-1000"), 0);
+
+        // End-to-end: a negative break is filtered out by merge (break_ms == 0).
+        let ssml = r#"<speak>Hello<break time="-500ms"/>world</speak>"#;
+        let segments = SsmlParser::parse(ssml);
+        assert!(
+            !segments.iter().any(|s| s.break_ms != 0),
+            "negative break must not produce a non-zero break segment"
+        );
+        // No accidental wrap to ~u32::MAX
+        for seg in &segments {
+            assert!(
+                seg.break_ms < 4_000_000_000,
+                "wrapped-cast detected: break_ms={}",
+                seg.break_ms
+            );
+        }
+    }
+
+    /// Values larger than `MAX_BREAK_MS` (60_000) saturate at the max — including
+    /// values that exceed `u32::MAX` when expressed in ms (e.g. `999999s` = 9.99e8 ms).
+    #[test]
+    fn test_break_overflow_clamped_to_max() {
+        const MAX: u32 = 60_000;
+
+        // 999_999 s -> 9.99e8 ms, well above u32::MAX-as-ms? No, but above MAX cap.
+        assert_eq!(SsmlParser::parse_break_time("999999s"), MAX);
+        // Massive ms value > u32::MAX (4_294_967_295) — must NOT panic / wrap.
+        assert_eq!(SsmlParser::parse_break_time("99999999999ms"), MAX);
+        // Bare number above MAX
+        assert_eq!(SsmlParser::parse_break_time("60001"), MAX);
+        // Exactly at MAX clamps to MAX (>= MAX_BREAK_MS branch)
+        assert_eq!(SsmlParser::parse_break_time("60000ms"), MAX);
+        // Just below MAX is preserved
+        assert_eq!(SsmlParser::parse_break_time("59999ms"), 59_999);
+    }
+
+    /// Scientific notation: Rust's `f64::from_str` accepts `1e10` etc., so the
+    /// value parses but its magnitude is caught by the overflow clamp. Suffix-
+    /// less `1e10ms` becomes 1e10 ms which clamps to MAX. We pin this behaviour
+    /// so it does not silently wrap or panic.
+    #[test]
+    fn test_break_scientific_notation_rejected() {
+        const MAX: u32 = 60_000;
+
+        // Huge scientific magnitude -> clamped to MAX (not wrapped, not panicking).
+        assert_eq!(SsmlParser::parse_break_time("1e10ms"), MAX);
+        assert_eq!(SsmlParser::parse_break_time("1e30ms"), MAX);
+        // Negative scientific -> clamped to 0
+        assert_eq!(SsmlParser::parse_break_time("-1e5ms"), 0);
+        // Tiny positive scientific that fits is preserved (rounded toward zero).
+        assert_eq!(SsmlParser::parse_break_time("1e2ms"), 100);
+        // Garbled "scientific" with extra suffix is unparseable -> 0.
+        assert_eq!(SsmlParser::parse_break_time("1e10x"), 0);
+    }
+
+    /// `f64::from_str` accepts `inf`, `-inf`, `nan` (case-insensitive). These
+    /// must be rejected explicitly so they cannot wrap via `as u32` cast.
+    #[test]
+    fn test_break_inf_nan_rejected() {
+        assert_eq!(SsmlParser::parse_break_time("inf"), 0);
+        assert_eq!(SsmlParser::parse_break_time("infms"), 0);
+        assert_eq!(SsmlParser::parse_break_time("-infms"), 0);
+        assert_eq!(SsmlParser::parse_break_time("infs"), 0);
+        assert_eq!(SsmlParser::parse_break_time("nan"), 0);
+        assert_eq!(SsmlParser::parse_break_time("NaNms"), 0);
+        // Case-insensitive
+        assert_eq!(SsmlParser::parse_break_time("INF"), 0);
+    }
+
+    /// Zero values (`0ms`, `0s`, `0`) flow through cleanly as 0 — they are
+    /// then dropped by `merge` (consistent with `strength="none"`).
+    #[test]
+    fn test_break_zero_passthrough() {
+        assert_eq!(SsmlParser::parse_break_time("0ms"), 0);
+        assert_eq!(SsmlParser::parse_break_time("0s"), 0);
+        assert_eq!(SsmlParser::parse_break_time("0"), 0);
+        assert_eq!(SsmlParser::parse_break_time("0.0ms"), 0);
+
+        // Existing "0 fallback" for unparseable / unknown suffixes is preserved.
+        assert_eq!(SsmlParser::parse_break_time("500x"), 0);
+        assert_eq!(SsmlParser::parse_break_time(""), 0);
+        assert_eq!(SsmlParser::parse_break_time("abc"), 0);
+
+        // End-to-end: zero break is filtered out.
+        let ssml = r#"<speak>Hello<break time="0ms"/>world</speak>"#;
+        let segments = SsmlParser::parse(ssml);
+        assert_eq!(segments.len(), 2);
+        assert_eq!(segments[0].text, "Hello");
+        assert_eq!(segments[1].text, "world");
     }
 }

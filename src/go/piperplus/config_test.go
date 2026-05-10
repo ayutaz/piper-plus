@@ -178,7 +178,7 @@ func TestLoadConfig_InvalidMultiSpeakerNoSpeakerMap(t *testing.T) {
 func TestFindConfigPath_ExplicitPath(t *testing.T) {
 	dir := t.TempDir()
 	cfgPath := filepath.Join(dir, "my_config.json")
-	if err := os.WriteFile(cfgPath, []byte(`{}`), 0644); err != nil {
+	if err := os.WriteFile(cfgPath, []byte(`{}`), 0o644); err != nil {
 		t.Fatalf("failed to create temp config: %v", err)
 	}
 
@@ -197,7 +197,7 @@ func TestFindConfigPath_Sidecar(t *testing.T) {
 	sidecar := modelPath + ".json"
 
 	// Create the sidecar file.
-	if err := os.WriteFile(sidecar, []byte(`{}`), 0644); err != nil {
+	if err := os.WriteFile(sidecar, []byte(`{}`), 0o644); err != nil {
 		t.Fatalf("failed to create sidecar: %v", err)
 	}
 
@@ -216,7 +216,7 @@ func TestFindConfigPath_DirConfig(t *testing.T) {
 	dirConfig := filepath.Join(dir, "config.json")
 
 	// Create config.json in the model directory (no sidecar).
-	if err := os.WriteFile(dirConfig, []byte(`{}`), 0644); err != nil {
+	if err := os.WriteFile(dirConfig, []byte(`{}`), 0o644); err != nil {
 		t.Fatalf("failed to create dir config: %v", err)
 	}
 
@@ -265,7 +265,7 @@ func TestFindConfigPath_EnvVarFileNotFound(t *testing.T) {
 func TestFindConfigPath_EnvVar(t *testing.T) {
 	dir := t.TempDir()
 	envConfig := filepath.Join(dir, "env_config.json")
-	if err := os.WriteFile(envConfig, []byte(`{}`), 0644); err != nil {
+	if err := os.WriteFile(envConfig, []byte(`{}`), 0o644); err != nil {
 		t.Fatalf("failed to create env config: %v", err)
 	}
 

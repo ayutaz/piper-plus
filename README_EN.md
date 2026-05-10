@@ -38,6 +38,7 @@ A fast, high-quality neural text-to-speech (TTS) system. Built on the [VITS](htt
 > **Test text**: "Hello, how are you doing today?" (English, 25 phonemes)
 > **Run config**: 5 warmup iterations + 30 measured iterations (intra-op threads = auto)
 > **Models used**:
+>
 > - piper-plus: 6lang MB-iSTFT 75epoch ONNX (unified decoder introduced in PR #320)
 > - Piper original: `en_US-lessac-medium` (rhasspy/piper-voices v1.0.0)
 > - sherpa-onnx: `vits-piper-en_US-amy-low` (k2-fsa release)
@@ -277,31 +278,37 @@ pip install piper-plus
 ### Install from Package Managers
 
 **Python (PyPI):**
+
 ```bash
 pip install piper-plus
 ```
 
 **npm (Browser WASM):**
+
 ```bash
 npm install piper-plus onnxruntime-web
 ```
 
 **C# CLI (.NET Global Tool):**
+
 ```bash
 dotnet tool install -g PiperPlus.Cli
 ```
 
 **Rust CLI (crates.io):**
+
 ```bash
 cargo install piper-plus-cli
 ```
 
 **C# Library (NuGet):**
+
 ```bash
 dotnet add package PiperPlus.Core
 ```
 
 **Rust Library (crates.io):**
+
 ```toml
 [dependencies]
 piper-plus = "0.4"

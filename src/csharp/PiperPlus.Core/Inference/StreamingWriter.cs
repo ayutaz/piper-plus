@@ -48,12 +48,19 @@ public static class StreamingWriter
         int chunkSamples = DefaultChunkSamples)
     {
         if (output is null)
+        {
             throw new ArgumentNullException(nameof(output));
+        }
+
         if (chunkSamples <= 0)
+        {
             throw new ArgumentOutOfRangeException(nameof(chunkSamples), "Chunk size must be positive.");
+        }
 
         if (samples.IsEmpty)
+        {
             return;
+        }
 
         int offset = 0;
         while (offset < samples.Length)
@@ -82,10 +89,14 @@ public static class StreamingWriter
     public static void WriteImmediate(Stream output, ReadOnlySpan<short> samples)
     {
         if (output is null)
+        {
             throw new ArgumentNullException(nameof(output));
+        }
 
         if (samples.IsEmpty)
+        {
             return;
+        }
 
         ReadOnlySpan<byte> bytes = MemoryMarshal.AsBytes(samples);
         output.Write(bytes);

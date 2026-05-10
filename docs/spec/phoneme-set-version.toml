@@ -1,0 +1,202 @@
+# Phoneme Set Version Contract
+# =============================
+# This file pins the canonical phoneme symbol inventory shared by every
+# piper-plus runtime (Python training side, Python runtime, Rust, Go, C#,
+# C/C++, WASM/JS, Kotlin/Android, Swift) and used as the input vocabulary
+# of the VITS / MB-iSTFT-VITS2 acoustic model. The trained 6lang
+# multilingual model (and every fine-tune derived from it) was exported
+# with `num_symbols = 173`, so any drift here is a model-breaking change:
+# the embedding table size in `vits.text_encoder.emb` is fixed at training
+# time and any extension requires re-exporting (or post-hoc embedding
+# matrix expansion).
+#
+# Drift surface:
+#   - Adding a new phoneme symbol without bumping `symbol_set_version`
+#     and re-training/re-exporting silently shifts every existing PUA
+#     codepoint mapping → wrong embedding row picked → wrong sound.
+#   - Removing a symbol ⇒ same effect (downstream IDs shift up).
+#   - Reordering ⇒ catastrophic, every existing model breaks.
+#
+# This file is the SOURCE OF TRUTH for the symbol count. The actual
+# symbol-to-id mapping lives in `src/python/g2p/piper_plus_g2p/data/pua.json`
+# (canonical) plus 6 runtime mirrors enforced byte-for-byte by
+# `scripts/check_pua_consistency.py` (see `pua-contract.toml`).
+#
+# Implementations:
+#   - Python (canonical):  src/python/g2p/piper_plus_g2p/data/pua.json
+#   - Python runtime:      src/python_run/piper/phonemize/token_mapper.py
+#   - Rust:                src/rust/piper-plus-g2p/src/token_map.rs
+#   - Go:                  src/go/phonemize/pua.go
+#   - C#:                  src/csharp/PiperPlus.Core/Mapping/OpenJTalkToPiperMapping.cs
+#   - C/C++:               src/cpp/phoneme_parser.cpp
+#   - WASM/JS:             src/wasm/g2p/src/pua-map.js
+#   - Kotlin/Android:      android/piper-plus-g2p/src/main/kotlin/.../PUAMap.kt
+#   - Swift:               Sources/PiperPlusG2P/PUAMap.swift
+#
+# Related contracts:
+#   - pua-contract.toml          — 4 invariants enforced across mirrors
+#   - language-id-map-contract.toml — language id ordering
+#   - dictionary-versions.toml   — upstream dictionary versions
+#   - onnx-export-contract.toml  — model export validation pipeline
+
+[meta]
+spec_version = "1.0.0"
+last_updated = "2026-05-09"
+contract_version = 1
+canonical_source = "src/python/g2p/piper_plus_g2p/data/pua.json"
+status = "active"
+applies_to = [
+    "piper_plus_g2p (Python)",
+    "piper-plus-g2p (Rust crate)",
+    "github.com/ayutaz/piper-plus/src/go/phonemize",
+    "PiperPlus.Core (C# NuGet)",
+    "libpiper_plus (C API)",
+    "@piper-plus/g2p (npm)",
+    "io.github.ayutaz:piper-plus-g2p-android (Maven Central)",
+    "PiperPlusG2P (Swift Package)",
+]
+
+# ---------------------------------------------------------------------------
+# Symbol Inventory
+# ---------------------------------------------------------------------------
+# `num_symbols` is the dimension of the embedding table on the model side.
+# Every PUA codepoint mapped from any language MUST resolve to an index in
+# the range [0, num_symbols).
+#
+# `symbol_set_version` is the semantic version of the phoneme inventory
+# itself. It is independent from the package version. Bumping the major
+# version (1.x → 2.x) signals a model-breaking change. Minor bumps (1.0
+# → 1.1) are reserved for additive, backward-compatible extensions where
+# the new symbols occupy slots that did not exist in older models AND
+# old models continue to load successfully.
+
+[inventory]
+num_symbols = 173
+symbol_set_version = "1.0"
+embedding_dim = 192    # vits.text_encoder.emb.weight.shape = [173, 192]
+
+# Per-language breakdown. The numbers below sum to 173 minus shared
+# symbols (PAD, BOS, EOS, UNK, sentence-break, prosody markers, etc.).
+# Counts are approximate by language because some phonemes are shared
+# (e.g., /a/ between ja-en-zh) — the canonical source is pua.json's
+# inventory section.
+#
+# Counts derived from `src/python/g2p/piper_plus_g2p/data/pua.json`
+# at contract authoring time (2026-05-09).
+
+[[inventory.languages]]
+language = "shared"
+count = 9
+description = "PAD, BOS, EOS, UNK, sentence-break, prosody markers (?, ., !, ~)"
+
+[[inventory.languages]]
+language = "ja"
+count = 55
+description = "Japanese phonemes (vowels 5 + voiced/unvoiced consonants + 4 N variants + special katakana)"
+notes = "Canonical OpenJTalk + NAIST-jdic phoneme set. Includes /N_m/, /N_n/, /N_ng/, /N_uvular/."
+
+[[inventory.languages]]
+language = "en"
+count = 42
+description = "English phonemes (CMU dict ARPAbet, including stress markers)"
+notes = "Sourced via g2p-en. Some symbols overlap with ja (/a/, /i/, /u/, /e/, /o/)."
+
+[[inventory.languages]]
+language = "zh"
+count = 40
+description = "Mandarin pinyin initials + finals + tones"
+notes = "Sourced via pypinyin. Tones encoded as separate symbols (1-5)."
+
+[[inventory.languages]]
+language = "ko"
+count = 27
+description = "Korean Jamo phonemes (initial/medial/final consonants + vowels)"
+notes = "Sourced via g2pk2. Optional dependency."
+
+[[inventory.languages]]
+language = "es-pt-fr-sv"
+count = 0
+description = "European languages reuse en/zh inventory plus IPA extensions"
+notes = "5 IPA-only codepoints (ã/õ/ɐ̃/ɔ̃/œ̃) + 2 EU-PT specific (ɨ/ɫ) added in pua.json without expanding num_symbols."
+
+# ---------------------------------------------------------------------------
+# Forward Compatibility Strategy
+# ---------------------------------------------------------------------------
+# Adding a new language or expanding an existing language's phoneme set
+# REQUIRES one of:
+#   (A) Use an existing free symbol slot (preferred). pua.json reserves
+#       slots 168-172 for future EU-PT/Korean expansion. New symbols here
+#       require ONLY a pua.json + 6-mirror sync (handled by
+#       `scripts/check_pua_consistency.py`); existing models remain
+#       loadable because the embedding rows for these slots are already
+#       trained (initialized to small random values, fine-tuned on
+#       any data that touched them).
+#
+#   (B) Bump `num_symbols` and re-export every model. This is a major
+#       version bump (1.0 → 2.0) and breaks every previously-released
+#       checkpoint. Reserved for cases where (A) is exhausted.
+
+[forward_compat]
+free_slots = [168, 169, 170, 171, 172]
+free_slots_count = 5
+extension_policy = "prefer-A"  # see "Forward Compatibility Strategy" above
+backward_compat_window = "indefinite"  # never break released models silently
+required_change_set_for_minor_bump = [
+    "src/python/g2p/piper_plus_g2p/data/pua.json",
+    "tests/fixtures/g2p/phoneme_test_cases.json",
+    "docs/spec/phoneme-set-version.toml",  # this file (bump symbol_set_version)
+    "docs/spec/pua-contract.toml",         # if invariants change
+]
+
+# ---------------------------------------------------------------------------
+# Backward Compatibility Strategy
+# ---------------------------------------------------------------------------
+# Loading a model trained with an older `symbol_set_version` MUST work
+# transparently in the runtime. Each runtime is responsible for:
+#   1. Reading config.json's `symbol_set_version` field (NEW: optional,
+#      defaults to "1.0" if missing).
+#   2. If the model is on an older version, the runtime MUST NOT use
+#      symbols introduced after that version. Phonemizers MUST emit only
+#      symbols that exist in the older inventory.
+#
+# Adding `symbol_set_version` to config.json is a Wave 2 task tracked in
+# `onnx-export-contract.toml` (config schema validation step).
+
+[backward_compat]
+config_field = "symbol_set_version"  # optional; default "1.0"
+runtime_behavior = "phonemizer-must-respect-model-version"
+incompatible_action = "fail-fast-with-error"  # not silent fallback
+
+# ---------------------------------------------------------------------------
+# Verification (CI Gate)
+# ---------------------------------------------------------------------------
+# A pre-commit hook (Wave 2) and a CI gate (Wave 2: scripts/check_phoneme_set_version.py)
+# enforce that:
+#   - num_symbols matches the count of distinct PUA codepoints in pua.json
+#   - All 6 runtime mirrors agree on the count
+#   - config.json files in test/models/ either lack symbol_set_version
+#     (pre-1.0 grandfathered) or set it to "1.0"
+
+[verification]
+canonical_count_check = "scripts/check_pua_consistency.py --check-version"
+fixture_drift_check  = "scripts/regenerate_test_fixture.py --check"
+mirror_byte_match    = "scripts/check_pua_consistency.py"  # already enforced
+
+[implementation_status]
+python_canonical    = "✓"
+python_runtime      = "✓"
+rust                = "✓"
+go                  = "✓"
+csharp              = "✓"
+cpp                 = "✓"
+wasm_js             = "✓"
+kotlin_android      = "✓"
+swift               = "✓"
+
+# ---------------------------------------------------------------------------
+# Change Log
+# ---------------------------------------------------------------------------
+# 2026-05-09: Initial contract authored. symbol_set_version="1.0",
+#             num_symbols=173, derived from current pua.json inventory.
+#             EU-PT added 2 new IPA codepoints (ɨ, ɫ) within existing
+#             slots — no num_symbols bump.

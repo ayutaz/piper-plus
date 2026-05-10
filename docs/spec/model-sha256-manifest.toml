@@ -1,0 +1,255 @@
+# Official Model SHA-256 Manifest
+# ================================
+# This file is the canonical hash pin for every official piper-plus model
+# (and its companion config.json) that we publish. Every runtime's model
+# resolution path (Python, Rust, C#, Go, WASM, C++) MUST verify the
+# downloaded artifact's SHA-256 against the value pinned here before
+# loading. Hash mismatch is a hard error — never a warning.
+#
+# Why pin: HF mirrors are mutable storage. A silent re-upload (or supply
+# chain compromise) of a model under the same URL would otherwise change
+# inference behaviour without any signal to the user. By pinning we make
+# the change visible: the loader fails fast with a clear "expected X, got
+# Y" message, and the operator can inspect the diff before continuing.
+#
+# Update procedure:
+#   1. Train / re-export the model.
+#   2. Upload to HuggingFace under the canonical mirror URL.
+#   3. Compute SHA-256 of the published bytes (sha256sum / shasum -a 256).
+#   4. Update this file's `sha256` and `bytes` fields IN THE SAME COMMIT
+#      that bumps CHANGELOG.md and (if applicable) release-versions.toml.
+#   5. Publish.
+#
+# CI gate: scripts/check_model_manifest.py (planned) verifies that every
+# `<computed-on-publish>` placeholder is filled in before any release tag
+# is created.
+#
+# Implementations:
+#   Python:    src/python_run/piper/download.py
+#   Rust:      src/rust/piper-cli/src/download.rs
+#   C#:        src/csharp/PiperPlus.Cli/Download/ModelDownloader.cs
+#   Go:        src/go/cmd/piper-plus/download.go
+#   WASM:      src/wasm/openjtalk-web/src/model-download.js (browser fetch + subtle.digest)
+#   C++:       src/cpp/main.cpp (CLI download path)
+
+[meta]
+spec_version = "1.0"
+last_updated = "2026-05-09"
+canonical_source = "docs/spec/model-sha256-manifest.toml"
+hash_algorithm = "SHA-256"
+hash_encoding = "lowercase hex, 64 chars"
+update_policy = """
+Hash and CHANGELOG.md MUST be updated in the same commit. Re-uploading a
+model file under an existing entry without updating both is a release
+process violation.
+"""
+
+# ============================================================================
+# Required config.json fields
+# ============================================================================
+# Every official piper-plus model ships with a sibling config.json. The
+# fields below are required by every runtime loader; missing fields are a
+# hard load error (not a warning). Optional fields may be present and are
+# surfaced via the relevant feature contracts (e.g. `short_text` in
+# short-text-contract.toml).
+
+[config_schema]
+required_fields = [
+    "audio.sample_rate",         # int (Hz) — typically 22050
+    "espeak.voice",              # str — language code for legacy espeak compat
+    "inference.noise_scale",     # float — default 0.667
+    "inference.length_scale",    # float — default 1.0
+    "inference.noise_w",         # float — default 0.8
+    "phoneme_id_map",            # object — single-codepoint string -> int[]
+    "phoneme_type",              # str — typically "espeak" or "text"
+    "num_symbols",               # int — vocabulary size
+    "num_speakers",              # int — 1 for single-speaker models
+    "speaker_id_map",            # object — empty {} for single-speaker
+    "language_id_map",           # object — multilingual models; empty {} otherwise
+    "piper_version",             # str — semver of the producing piper-plus
+]
+
+optional_fields = [
+    "short_text",                # see short-text-contract.toml
+    "prosody",                   # prosody_dim and related fields
+    "version",                   # legacy alias for piper_version (still read)
+]
+
+# ============================================================================
+# Model entries
+# ============================================================================
+# Each [[models]] entry pins one published model. `sha256` placeholders
+# (`<computed-on-publish>`) MUST be filled in before the entry's first
+# tagged release. Entries are listed in the same order as CLAUDE.md's
+# "学習済みモデル (6言語マルチリンガル)" table for ease of cross-reference.
+
+# ---------------------------------------------------------------------------
+# 6lang base (HiFi-GAN, 75 epoch)
+# ---------------------------------------------------------------------------
+[[models]]
+name = "multilingual-6lang-base"
+description = "6lang base model trained for 75 epochs on the v1.11 HiFi-GAN pipeline"
+training_basis = "75 epoch (v1.11 HiFi-GAN)"
+trained_languages = ["ja", "en", "zh", "es", "fr", "pt"]
+local_origin = "/data/piper/output-multilingual-6lang/"
+hf_mirror_repo = "ayousanz/piper-plus-base"
+hf_mirror_url = "https://huggingface.co/ayousanz/piper-plus-base/resolve/main/multilingual-6lang-base.onnx"
+
+[[models.artifacts]]
+filename = "multilingual-6lang-base.onnx"
+sha256 = "<computed-on-publish>"
+bytes = 0  # <computed-on-publish>
+
+[[models.artifacts]]
+filename = "multilingual-6lang-base.onnx.json"
+role = "config"
+sha256 = "<computed-on-publish>"
+bytes = 0  # <computed-on-publish>
+
+# ---------------------------------------------------------------------------
+# 6lang MB-iSTFT (75 epoch, scratch)
+# ---------------------------------------------------------------------------
+[[models]]
+name = "multilingual-6lang-mb-istft"
+description = "6lang base model trained for 75 epochs from scratch with MB-iSTFT decoder"
+training_basis = "75 epoch scratch (MB-iSTFT)"
+trained_languages = ["ja", "en", "zh", "es", "fr", "pt"]
+local_origin = "/data/piper/output-multilingual-6lang-mb-istft/multilingual-6lang-mb-istft-scratch-75epoch.onnx"
+hf_mirror_repo = "ayousanz/piper-plus-base"
+hf_mirror_url = "https://huggingface.co/ayousanz/piper-plus-base/resolve/main/multilingual-6lang-mb-istft-scratch-75epoch.onnx"
+
+[[models.artifacts]]
+filename = "multilingual-6lang-mb-istft-scratch-75epoch.onnx"
+sha256 = "<computed-on-publish>"
+bytes = 0  # <computed-on-publish>
+
+[[models.artifacts]]
+filename = "multilingual-6lang-mb-istft-scratch-75epoch.onnx.json"
+role = "config"
+sha256 = "<computed-on-publish>"
+bytes = 0  # <computed-on-publish>
+
+# ---------------------------------------------------------------------------
+# Tsukuyomi 6lang-v2 (FT 500 epoch from HiFi-GAN base)
+# ---------------------------------------------------------------------------
+[[models]]
+name = "tsukuyomi-6lang-v2"
+description = "Single-speaker fine-tune of the 6lang HiFi-GAN base (500 epochs)"
+training_basis = "FT 500 epoch (HiFi-GAN base)"
+trained_languages = ["ja", "en", "zh", "es", "fr", "pt"]
+local_origin = "/data/piper/output-tsukuyomi-finetune-6lang-v2/tsukuyomi-6lang-v2-fixed.onnx"
+hf_mirror_repo = "ayousanz/piper-plus-tsukuyomi-chan"
+hf_mirror_url = "https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/tsukuyomi-6lang-v2-fixed.onnx"
+
+[[models.artifacts]]
+filename = "tsukuyomi-6lang-v2-fixed.onnx"
+sha256 = "<computed-on-publish>"
+bytes = 0  # <computed-on-publish>
+
+[[models.artifacts]]
+filename = "tsukuyomi-6lang-v2-fixed.onnx.json"
+role = "config"
+sha256 = "<computed-on-publish>"
+bytes = 0  # <computed-on-publish>
+
+# ---------------------------------------------------------------------------
+# Tsukuyomi MB-iSTFT (FT 500 epoch from MB-iSTFT base)
+# ---------------------------------------------------------------------------
+[[models]]
+name = "tsukuyomi-mb-istft"
+description = "Single-speaker fine-tune of the 6lang MB-iSTFT base (500 epochs)"
+training_basis = "FT 500 epoch (MB-iSTFT base)"
+trained_languages = ["ja", "en", "zh", "es", "fr", "pt"]
+local_origin = "/data/piper/output-tsukuyomi-mb-istft-finetune/tsukuyomi-mb-istft-500epoch.onnx"
+hf_mirror_repo = "ayousanz/piper-plus-tsukuyomi-chan"
+hf_mirror_url = "https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/tsukuyomi-mb-istft-500epoch.onnx"
+
+[[models.artifacts]]
+filename = "tsukuyomi-mb-istft-500epoch.onnx"
+sha256 = "<computed-on-publish>"
+bytes = 0  # <computed-on-publish>
+
+[[models.artifacts]]
+filename = "tsukuyomi-mb-istft-500epoch.onnx.json"
+role = "config"
+sha256 = "<computed-on-publish>"
+bytes = 0  # <computed-on-publish>
+
+# ---------------------------------------------------------------------------
+# CSS10 JA 6lang (50 epoch FT from 6lang base)
+# ---------------------------------------------------------------------------
+[[models]]
+name = "css10-ja-6lang"
+description = "CSS10 single-speaker Japanese fine-tune of the 6lang base (50 epochs)"
+training_basis = "FT 50 epoch (6lang base)"
+trained_languages = ["ja", "en", "zh", "es", "fr", "pt"]
+local_origin = "test/models/multilingual-test-medium.onnx"
+hf_mirror_repo = "ayousanz/piper-plus-css10-ja-6lang"
+hf_mirror_url = "https://huggingface.co/ayousanz/piper-plus-css10-ja-6lang/resolve/main/multilingual-test-medium.onnx"
+
+[[models.artifacts]]
+filename = "multilingual-test-medium.onnx"
+sha256 = "<computed-on-publish>"
+bytes = 0  # <computed-on-publish>
+
+[[models.artifacts]]
+filename = "multilingual-test-medium.onnx.json"
+role = "config"
+sha256 = "<computed-on-publish>"
+bytes = 0  # <computed-on-publish>
+
+# ---------------------------------------------------------------------------
+# Speaker Encoder (ECAPA-TDNN) — voice cloning
+# ---------------------------------------------------------------------------
+[[models]]
+name = "speaker-encoder-ecapa-tdnn"
+description = "ECAPA-TDNN 256-dim L2-normalised speaker embedding extractor"
+training_basis = "ECAPA-TDNN reference weights"
+hf_mirror_repo = "ayousanz/piper-plus-base"
+hf_mirror_url = "https://huggingface.co/ayousanz/piper-plus-base/resolve/main/encoder.onnx"
+publish_status = "pending"
+note = "Awaiting first publish; sha256 will be assigned at upload time."
+
+[[models.artifacts]]
+filename = "encoder.onnx"
+sha256 = "<computed-on-publish>"
+bytes = 0  # <computed-on-publish>
+
+# ============================================================================
+# Verification behaviour (runtime side)
+# ============================================================================
+
+[verification]
+# How the loader behaves when the on-disk artifact's SHA-256 differs from
+# the manifest. The same semantics apply across every runtime.
+
+on_mismatch = "fail"
+on_missing_artifact = "download_then_verify"
+on_missing_pin_in_manifest = "warn_then_skip_verify"  # for user-supplied custom models
+
+error_message_format = """
+Hash mismatch for {filename}:
+  expected: {expected_sha256}
+  actual:   {actual_sha256}
+Refusing to load. The downloaded file may be corrupt, mirrored from a
+stale CDN, or tampered with. Delete the local cache and retry, or pin a
+different model name.
+"""
+
+# Checking the config.json hash is just as important as the .onnx hash —
+# config.json contains the phoneme_id_map which directly affects audio
+# output. Tampering only the JSON would silently change inference.
+require_config_hash_match = true
+
+# ============================================================================
+# Custom (user-supplied) models
+# ============================================================================
+
+[custom_models]
+# Models not listed in this manifest are loaded without hash verification
+# (the loader emits a single info-level log line). This is the documented
+# escape hatch for users who train their own models — pinning would not be
+# feasible because the file is local-only.
+allowed = true
+log_level = "info"
+log_message = "Loading unpinned model {filename}; no SHA-256 verification performed."

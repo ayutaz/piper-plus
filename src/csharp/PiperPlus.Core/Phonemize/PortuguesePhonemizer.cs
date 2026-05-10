@@ -34,6 +34,7 @@ public sealed class PortuguesePhonemizer : IPhonemizer
         [".", ",", ";", ":", "!", "?", "\u00a1", "\u00bf", "\u2014", "\u2013", "\u2026"]; // ¡ = U+00A1, ¿ = U+00BF, — = U+2014, – = U+2013, … = U+2026
 
     /// <summary>
+    /// Initializes a new instance of the <see cref="PortuguesePhonemizer"/> class.
     /// Create a new <see cref="PortuguesePhonemizer"/> backed by the given G2P engine.
     /// </summary>
     /// <param name="engine">
@@ -47,7 +48,7 @@ public sealed class PortuguesePhonemizer : IPhonemizer
     /// <inheritdoc />
     public List<string> Phonemize(string text)
     {
-        var (tokens, _) = PhonemizeCore(text);
+        (List<string>? tokens, List<ProsodyInfo?> _) = PhonemizeCore(text);
         return tokens;
     }
 
@@ -131,7 +132,7 @@ public sealed class PortuguesePhonemizer : IPhonemizer
         FlushWord(currentWord, tokens, prosody);
 
         // Step 3: Map multi-character tokens (tʃ, dʒ, etc.) to PUA codepoints.
-        var mapped = PiperPhonemeConverter.MapSequence(tokens);
+        IReadOnlyList<string> mapped = PiperPhonemeConverter.MapSequence(tokens);
 
         var result = new List<string>(mapped.Count);
         for (int i = 0; i < mapped.Count; i++)
@@ -160,7 +161,9 @@ public sealed class PortuguesePhonemizer : IPhonemizer
         List<ProsodyInfo?> outProsody)
     {
         if (wordTokens.Count == 0)
+        {
             return;
+        }
 
         // Find stress position from ˈ marker and build clean token list.
         int stressIdx = -1;

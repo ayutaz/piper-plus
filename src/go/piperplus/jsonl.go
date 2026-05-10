@@ -49,6 +49,10 @@ func ParseJSONLLine(line []byte) (*JSONLInput, error) {
 //
 // By default, the first parse error stops processing. Use ContinueOnError to
 // send errors on errCh and keep reading subsequent lines instead.
+// nolint:gocyclo // ReadJSONL は context cancel / err 配信 / continue-on-error /
+// scanner buffer 拡張など制御フロー的に必要な分岐を集約しているため複雑度 16。
+// 分割すると channel 所有関係が分散して読みにくくなるため、Wave 後段で必要に
+// なれば内部 helper 関数に切り出す方針で別 PR 化予定。
 func ReadJSONL(ctx context.Context, r io.Reader, opts ...JSONLOption) (<-chan *JSONLInput, <-chan error) {
 	cfg := jsonlConfig{}
 	for _, o := range opts {

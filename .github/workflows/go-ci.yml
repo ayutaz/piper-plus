@@ -7,6 +7,10 @@ on:
       - 'src/go/**'
       - 'src/python/g2p/piper_plus_g2p/data/zh_en_loanword.json'
       - 'tests/fixtures/g2p/zh_en_loanword_matrix.json'
+      - 'tests/fixtures/phoneme_timing/**'
+      - 'tests/fixtures/short_text/**'
+      - 'tests/fixtures/ort_session/**'
+      - 'test/fixtures/speaker_encoder_golden.json'
       - '.github/workflows/go-ci.yml'
   push:
     branches: [dev]
@@ -14,6 +18,10 @@ on:
       - 'src/go/**'
       - 'src/python/g2p/piper_plus_g2p/data/zh_en_loanword.json'
       - 'tests/fixtures/g2p/zh_en_loanword_matrix.json'
+      - 'tests/fixtures/phoneme_timing/**'
+      - 'tests/fixtures/short_text/**'
+      - 'tests/fixtures/ort_session/**'
+      - 'test/fixtures/speaker_encoder_golden.json'
   workflow_call:
 
 concurrency:
@@ -46,6 +54,7 @@ jobs:
           sparse-checkout: |
             src/go
             test/fixtures
+            tests/fixtures
       - uses: actions/setup-go@v5
         with:
           go-version: '1.26'

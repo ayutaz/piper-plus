@@ -43,8 +43,44 @@ public record SynthesisInput(
     float NoiseScale = 0.667f,
     float LengthScale = 1.0f,
     float NoiseW = 0.8f,
-    float[]? SpeakerEmbedding = null
-);
+    float[]? SpeakerEmbedding = null)
+{
+    /// <summary>
+    /// Validates that <see cref="SpeakerId"/> and <see cref="SpeakerEmbedding"/>
+    /// are not both used in the same synthesis call.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Speaker selection is mutually exclusive: a model is conditioned on either
+    /// a discrete speaker index (<c>sid</c>) or a continuous speaker embedding
+    /// vector (<c>speaker_embedding</c>), never both. Mixing them yields an
+    /// undefined identity and is treated as a caller error rather than silently
+    /// preferring one branch. <see cref="SpeakerId"/> is considered "set" when
+    /// it is non-zero (the record's default is <c>0</c>); a non-empty
+    /// <see cref="SpeakerEmbedding"/> array is considered "set".
+    /// </para>
+    /// <para>
+    /// Mirrors the same check applied by the Python / Rust / Go runtimes when
+    /// the user passes both <c>speaker_id</c> and a reference audio / embedding.
+    /// </para>
+    /// </remarks>
+    /// <exception cref="ArgumentException">
+    /// Thrown when both a non-zero <see cref="SpeakerId"/> and a non-empty
+    /// <see cref="SpeakerEmbedding"/> are supplied.
+    /// </exception>
+    public void Validate()
+    {
+        bool hasSpeakerId = SpeakerId != 0;
+        bool hasSpeakerEmbedding = SpeakerEmbedding is not null && SpeakerEmbedding.Length > 0;
+
+        if (hasSpeakerId && hasSpeakerEmbedding)
+        {
+            throw new ArgumentException(
+                "SpeakerId and SpeakerEmbedding are mutually exclusive",
+                nameof(SpeakerEmbedding));
+        }
+    }
+}
 
 /// <summary>
 /// Runs ONNX inference against a loaded <see cref="PiperModel"/> and converts
@@ -73,6 +109,7 @@ public sealed class PiperSession
     private readonly PiperModel _model;
 
     /// <summary>
+    /// Initializes a new instance of the <see cref="PiperSession"/> class.
     /// Initializes a new <see cref="PiperSession"/> bound to the given model.
     /// </summary>
     /// <param name="model">
@@ -104,6 +141,7 @@ public sealed class PiperSession
     public short[] Synthesize(SynthesisInput input)
     {
         ArgumentNullException.ThrowIfNull(input);
+        input.Validate();
 
         float[] raw = SynthesizeToFloat(input);
         short[] pcm = ConvertToInt16(raw);
@@ -113,6 +151,7 @@ public sealed class PiperSession
             int silenceSamples = (int)(_model.SampleRate * SentenceSilenceSeconds);
             var result = new short[pcm.Length + silenceSamples];
             pcm.CopyTo(result.AsSpan());
+
             // Remaining elements are already zero-initialized.
             return result;
         }
@@ -130,9 +169,12 @@ public sealed class PiperSession
     public float[] SynthesizeToFloat(SynthesisInput input)
     {
         ArgumentNullException.ThrowIfNull(input);
+        input.Validate();
 
         if (input.PhonemeIds.Length == 0)
+        {
             return [];
+        }
 
         return RunInferenceCore(input, includeDurations: false).Audio;
     }
@@ -151,11 +193,14 @@ public sealed class PiperSession
     public SynthesisResult SynthesizeWithDurations(SynthesisInput input)
     {
         ArgumentNullException.ThrowIfNull(input);
+        input.Validate();
 
         if (input.PhonemeIds.Length == 0)
+        {
             return new SynthesisResult([], null);
+        }
 
-        var (audioFloat, durations) = RunInferenceCore(input, includeDurations: true);
+        (float[]? audioFloat, float[]? durations) = RunInferenceCore(input, includeDurations: true);
         short[] pcm = ConvertToInt16(audioFloat);
 
         // Append sentence silence if configured.
@@ -325,8 +370,8 @@ public sealed class PiperSession
                 // Model supports it but no embedding provided — send zeros + mask=0.
                 // Read embedding dimension from model input metadata; default 256 (ECAPA-TDNN).
                 int embDim = 256;
-                var meta = _model.Session.InputMetadata;
-                if (meta.TryGetValue("speaker_embedding", out var embMeta)
+                IReadOnlyDictionary<string, NodeMetadata> meta = _model.Session.InputMetadata;
+                if (meta.TryGetValue("speaker_embedding", out NodeMetadata? embMeta)
                     && embMeta.Dimensions.Length >= 2 && embMeta.Dimensions[1] > 0)
                 {
                     embDim = embMeta.Dimensions[1];
@@ -354,7 +399,7 @@ public sealed class PiperSession
 
             // ----- Run inference -----
             using var runOptions = new RunOptions();
-            using var results = _model.Session.Run(
+            using IDisposableReadOnlyCollection<OrtValue> results = _model.Session.Run(
                 runOptions,
                 inputNames,
                 inputValues,
@@ -414,7 +459,9 @@ public sealed class PiperSession
 
             // Return the pooled prosody buffer after the tensor is disposed.
             if (rentedProsody is not null)
+            {
                 ArrayPool<long>.Shared.Return(rentedProsody);
+            }
         }
     }
 

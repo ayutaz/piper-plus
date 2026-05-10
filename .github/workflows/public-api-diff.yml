@@ -1,0 +1,127 @@
+name: public-api-diff
+
+on:
+  pull_request:
+    branches: [dev]
+    paths:
+      - 'src/rust/**/src/**'
+      - 'src/rust/**/Cargo.toml'
+      - 'src/go/**/*.go'
+      - 'src/csharp/**/PiperPlus.Core/**/*.cs'
+      - '.github/workflows/public-api-diff.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rust-public-api:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0  # need full history for diff
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src/rust -> target
+
+      - name: Install cargo-public-api
+        run: cargo install cargo-public-api --locked
+
+      - name: Generate public API for current branch
+        working-directory: src/rust
+        run: |
+          cargo public-api --simplified -p piper-plus > /tmp/api-current.txt
+          cargo public-api --simplified -p piper-plus-g2p >> /tmp/api-current.txt
+        continue-on-error: true
+
+      - name: Generate public API for base branch
+        working-directory: src/rust
+        run: |
+          git fetch origin ${{ github.base_ref }}
+          git checkout origin/${{ github.base_ref }} -- .
+          cargo public-api --simplified -p piper-plus > /tmp/api-base.txt
+          cargo public-api --simplified -p piper-plus-g2p >> /tmp/api-base.txt
+          git checkout HEAD -- .
+        continue-on-error: true
+
+      - name: Diff public API
+        run: |
+          if ! diff -u /tmp/api-base.txt /tmp/api-current.txt > /tmp/api-diff.txt; then
+            echo "::warning::Public API has changed. Verify semver bump is needed."
+            echo "## Rust Public API Diff" >> $GITHUB_STEP_SUMMARY
+            echo '```diff' >> $GITHUB_STEP_SUMMARY
+            cat /tmp/api-diff.txt >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          else
+            echo "No public API changes detected"
+          fi
+
+  go-public-api:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: src/go/go.mod
+
+      - name: Install gorelease
+        run: go install golang.org/x/exp/cmd/gorelease@latest
+
+      - name: Run gorelease (compare to base)
+        working-directory: src/go
+        run: |
+          BASE_SHA=$(git merge-base HEAD origin/${{ github.base_ref }})
+          gorelease -base "$BASE_SHA" 2>&1 | tee /tmp/gorelease.txt || true
+          if grep -q "Inferred base version" /tmp/gorelease.txt; then
+            echo "## Go Public API Diff" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            cat /tmp/gorelease.txt >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          fi
+        continue-on-error: true
+
+  csharp-public-api:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Build PiperPlus.Core
+        run: dotnet build src/csharp/PiperPlus.Core/PiperPlus.Core.csproj -c Release
+
+      - name: Verify PublicAPI.{Shipped,Unshipped}.txt is consistent
+        run: |
+          # Microsoft.CodeAnalysis.PublicApiAnalyzers will fail the build
+          # if PublicAPI.Unshipped.txt has uncommitted changes.
+          # If build succeeds, baseline is consistent.
+          echo "PublicAPI baseline check passed (see Roslyn diagnostic RS0016 / RS0017 if missing)"
+
+      - name: Comment PR with API diff (if changed)
+        if: github.event_name == 'pull_request'
+        run: |
+          # PublicAPI.Unshipped.txt の git diff を確認
+          UNSHIPPED_DIFF=$(git diff origin/${{ github.base_ref }}..HEAD -- src/csharp/PiperPlus.Core/PublicAPI.Unshipped.txt 2>/dev/null || echo "")
+          if [ -n "$UNSHIPPED_DIFF" ]; then
+            echo "## C# Public API Diff (PublicAPI.Unshipped.txt)" >> $GITHUB_STEP_SUMMARY
+            echo '```diff' >> $GITHUB_STEP_SUMMARY
+            echo "$UNSHIPPED_DIFF" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          fi
+        continue-on-error: true

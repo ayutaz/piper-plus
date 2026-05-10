@@ -237,8 +237,8 @@ func TestMap_ConcurrencyDoesNotExceedParallelism(t *testing.T) {
 		cur := atomic.AddInt32(&inFlight, 1)
 		// Track high-water mark.
 		for {
-			max := atomic.LoadInt32(&maxInFlight)
-			if cur <= max || atomic.CompareAndSwapInt32(&maxInFlight, max, cur) {
+			hwm := atomic.LoadInt32(&maxInFlight)
+			if cur <= hwm || atomic.CompareAndSwapInt32(&maxInFlight, hwm, cur) {
 				break
 			}
 		}

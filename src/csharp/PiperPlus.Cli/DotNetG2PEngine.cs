@@ -49,7 +49,7 @@ internal sealed class DotNetG2PEngine : IJapaneseG2PEngine, IDisposable
 
     public G2PResult Convert(string text)
     {
-        var engine = _threadLocalEngine.Value
+        G2PEngine engine = _threadLocalEngine.Value
             ?? throw new InvalidOperationException(
                 "ThreadLocal G2PEngine value factory returned null.");
         var features = engine.ToProsodyFeatures(text);
@@ -61,13 +61,24 @@ internal sealed class DotNetG2PEngine : IJapaneseG2PEngine, IDisposable
         var a3 = new int[features.A3.Count];
 
         for (int i = 0; i < features.Phonemes.Count; i++)
+        {
             phonemes[i] = features.Phonemes[i];
+        }
+
         for (int i = 0; i < features.A1.Count; i++)
+        {
             a1[i] = features.A1[i];
+        }
+
         for (int i = 0; i < features.A2.Count; i++)
+        {
             a2[i] = features.A2[i];
+        }
+
         for (int i = 0; i < features.A3.Count; i++)
+        {
             a3[i] = features.A3[i];
+        }
 
         return new G2PResult(phonemes, a1, a2, a3);
     }

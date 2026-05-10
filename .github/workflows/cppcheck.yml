@@ -1,0 +1,60 @@
+name: cppcheck
+
+on:
+  pull_request:
+    branches: [dev]
+    paths:
+      - 'src/cpp/**'
+      - '.github/workflows/cppcheck.yml'
+  push:
+    branches: [dev, main]
+    paths:
+      - 'src/cpp/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  cppcheck:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install cppcheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cppcheck
+
+      - name: Run cppcheck
+        run: |
+          cppcheck --enable=warning,style,performance,portability \
+            --suppress=missingIncludeSystem \
+            --suppress=missingInclude \
+            --suppress=*:*/json.hpp \
+            --suppress=*:*/_deps/* \
+            --suppress=*:*/build/* \
+            --inline-suppr \
+            --error-exitcode=0 \
+            --xml --xml-version=2 \
+            --output-file=cppcheck-report.xml \
+            -j 4 \
+            src/cpp/ 2>&1 | tee cppcheck-output.txt
+          # 初期 baseline は warn のみ
+        continue-on-error: true
+
+      - name: Upload cppcheck report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: cppcheck-report
+          path: |
+            cppcheck-report.xml
+            cppcheck-output.txt
+          retention-days: 14
+        continue-on-error: true

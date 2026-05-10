@@ -26,7 +26,7 @@
     "Vector": {"pronunciation": "ベクター", "priority": 8},
     "RAG": {"pronunciation": "ラグ", "priority": 8},
     "LoRA": {"pronunciation": "ローラ", "priority": 8},
-    
+
     "// 最新フレームワーク・ツール": "",
     "Next.js": {"pronunciation": "ネクストジェイエス", "priority": 9},
     "Nuxt": {"pronunciation": "ナクスト", "priority": 8},
@@ -45,7 +45,7 @@
     "Zod": {"pronunciation": "ゾッド", "priority": 8},
     "Tailwind": {"pronunciation": "テイルウィンド", "priority": 9},
     "TailwindCSS": {"pronunciation": "テイルウィンドシーエスエス", "priority": 9},
-    
+
     "// クラウド・DevOps関連": "",
     "GitHub Actions": {"pronunciation": "ギットハブアクションズ", "priority": 9},
     "GitLab CI": {"pronunciation": "ギットラボシーアイ", "priority": 8},
@@ -62,7 +62,7 @@
     "CloudFormation": {"pronunciation": "クラウドフォーメーション", "priority": 8},
     "CloudWatch": {"pronunciation": "クラウドウォッチ", "priority": 8},
     "Datadog": {"pronunciation": "データドッグ", "priority": 8},
-    
+
     "// プログラミング言語・ランタイム": "",
     "Zig": {"pronunciation": "ジグ", "priority": 8},
     "Elixir": {"pronunciation": "エリクサー", "priority": 8},
@@ -74,7 +74,7 @@
     "OCaml": {"pronunciation": "オーキャムル", "priority": 8},
     "Nim": {"pronunciation": "ニム", "priority": 8},
     "Crystal": {"pronunciation": "クリスタル", "priority": 8},
-    
+
     "// データ・分析関連": "",
     "BigQuery": {"pronunciation": "ビッグクエリー", "priority": 8},
     "Snowflake": {"pronunciation": "スノーフレーク", "priority": 8},
@@ -88,7 +88,7 @@
     "Tableau": {"pronunciation": "タブロー", "priority": 8},
     "Looker": {"pronunciation": "ルッカー", "priority": 8},
     "Metabase": {"pronunciation": "メタベース", "priority": 8},
-    
+
     "// セキュリティ関連": "",
     "OWASP": {"pronunciation": "オワスプ", "priority": 8},
     "XSS": {"pronunciation": "エックスエスエス", "priority": 8},
@@ -104,7 +104,7 @@
     "LDAP": {"pronunciation": "エルダップ", "priority": 8},
     "SAML": {"pronunciation": "サムル", "priority": 8},
     "OIDC": {"pronunciation": "オーアイディーシー", "priority": 8},
-    
+
     "// モバイル・クロスプラットフォーム": "",
     "Flutter": {"pronunciation": "フラッター", "priority": 9},
     "React Native": {"pronunciation": "リアクトネイティブ", "priority": 9},
@@ -115,7 +115,7 @@
     "MAUI": {"pronunciation": "マウイ", "priority": 8},
     "SwiftUI": {"pronunciation": "スイフトユーアイ", "priority": 8},
     "Jetpack Compose": {"pronunciation": "ジェットパックコンポーズ", "priority": 8},
-    
+
     "// ゲームエンジン・グラフィックス": "",
     "Unity": {"pronunciation": "ユニティ", "priority": 9},
     "Unreal": {"pronunciation": "アンリアル", "priority": 9},
@@ -128,7 +128,7 @@
     "DirectX": {"pronunciation": "ダイレクトエックス", "priority": 8},
     "Metal": {"pronunciation": "メタル", "priority": 8},
     "Shader": {"pronunciation": "シェーダー", "priority": 8},
-    
+
     "// ブロックチェーン・Web3": "",
     "Ethereum": {"pronunciation": "イーサリアム", "priority": 8},
     "Solidity": {"pronunciation": "ソリディティ", "priority": 8},
@@ -138,7 +138,7 @@
     "DAO": {"pronunciation": "ダオ", "priority": 8},
     "Metamask": {"pronunciation": "メタマスク", "priority": 8},
     "IPFS": {"pronunciation": "アイピーエフエス", "priority": 8},
-    
+
     "// その他のよく使われる技術用語": "",
     "Webhook": {"pronunciation": "ウェブフック", "priority": 9},
     "Regex": {"pronunciation": "レジェックス", "priority": 8},

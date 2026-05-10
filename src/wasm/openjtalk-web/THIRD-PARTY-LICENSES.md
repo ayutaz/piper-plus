@@ -18,7 +18,7 @@ The `piper-plus` package itself is distributed under the
 The compiled OpenJTalk WASM binary (`dist/openjtalk.wasm`) and its JavaScript
 glue (`dist/openjtalk.js`) are included in this package.
 
-```
+```text
 Copyright (c) 2008-2016  Nagoya Institute of Technology
                          Department of Computer Science
 
@@ -73,7 +73,7 @@ holder and text). See section 1 for the full license text.
 MeCab is the morphological analysis engine used by Open JTalk. It is
 statically linked into the OpenJTalk WASM binary.
 
-```
+```text
 Copyright (c) 2009, Nara Institute of Science and Technology, Japan.
 
 All rights reserved.
@@ -117,7 +117,7 @@ The OpenJTalk dictionary files are not included in the npm package. They are
 downloaded at runtime on first use and cached locally in IndexedDB. The
 dictionary is governed by the following license:
 
-```
+```text
 Copyright (c) 2011-2017, The UniDic Consortium
 All rights reserved.
 
@@ -162,7 +162,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ONNX Runtime Web is declared as a `peerDependency` and is **not** bundled in
 this package. Users must install it separately (`npm install onnxruntime-web`).
 
-```
+```text
 Copyright (c) Microsoft Corporation
 
 MIT License

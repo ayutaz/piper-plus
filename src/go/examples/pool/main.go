@@ -51,7 +51,7 @@ func main() {
 	pool := piperplus.NewVoicePool(*modelPath, *concurrency)
 	defer pool.Close()
 
-	os.MkdirAll(*outDir, 0755)
+	os.MkdirAll(*outDir, 0o755)
 	ctx := context.Background()
 	start := time.Now()
 

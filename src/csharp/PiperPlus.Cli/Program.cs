@@ -1,4 +1,5 @@
 using System.CommandLine;
+using System.CommandLine.Parsing;
 using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using System.Text.Json;
@@ -67,7 +68,7 @@ internal static class Program
     {
         try
         {
-            var rootCommand = BuildRootCommand();
+            RootCommand rootCommand = BuildRootCommand();
             return rootCommand.Parse(args).Invoke();
         }
         catch (Exception ex)
@@ -265,6 +266,7 @@ internal static class Program
             debugOption,
             quietOption,
             versionOption,
+
             // Phase 3 options
             useCudaOption,
             gpuDeviceIdOption,
@@ -281,6 +283,7 @@ internal static class Program
             listModelsOption,
             downloadModelOption,
             modelDirOption,
+
             // Voice cloning options
             referenceAudioOption,
             speakerEmbeddingOption,
@@ -298,7 +301,7 @@ internal static class Program
                         ?? Assembly.GetExecutingAssembly().GetName().Version?.ToString()
                         ?? "unknown";
                     Console.WriteLine(version);
-                    return;
+                    return Environment.ExitCode;
                 }
 
                 bool debug = parseResult.GetValue(debugOption);
@@ -311,21 +314,21 @@ internal static class Program
                 {
                     string? listModelsLang = parseResult.GetValue(listModelsOption);
                     ModelManager.ListModels(string.IsNullOrEmpty(listModelsLang) ? null : listModelsLang);
-                    return;
+                    return Environment.ExitCode;
                 }
 
                 string? downloadModelName = parseResult.GetValue(downloadModelOption);
                 if (!string.IsNullOrEmpty(downloadModelName))
                 {
                     // Resolve alias to canonical key for better UX
-                    var resolvedVoice = ModelManager.FindVoice(downloadModelName);
+                    VoiceInfo? resolvedVoice = ModelManager.FindVoice(downloadModelName);
                     string resolvedName = resolvedVoice?.Key ?? downloadModelName;
                     if (resolvedVoice is not null && resolvedName != downloadModelName)
                     {
                         LogInfo(quiet, $"Resolved '{downloadModelName}' -> '{resolvedName}'");
                     }
 
-                    var dlModelDir = parseResult.GetValue(modelDirOption);
+                    DirectoryInfo? dlModelDir = parseResult.GetValue(modelDirOption);
                     string targetDir = dlModelDir?.FullName
                         ?? Environment.GetEnvironmentVariable("PIPER_MODEL_DIR")
                         ?? ModelManager.GetDefaultModelDir();
@@ -339,7 +342,8 @@ internal static class Program
                     {
                         Environment.ExitCode = 1;
                     }
-                    return;
+
+                    return Environment.ExitCode;
                 }
 
                 // ============================================================
@@ -372,7 +376,7 @@ internal static class Program
                 bool testMode = parseResult.GetValue(testModeOption);
 
                 // --model-dir: resolve from CLI > PIPER_MODEL_DIR env
-                var modelDirInfo = parseResult.GetValue(modelDirOption);
+                DirectoryInfo? modelDirInfo = parseResult.GetValue(modelDirOption);
                 if (modelDirInfo is null)
                 {
                     var envModelDir = Environment.GetEnvironmentVariable("PIPER_MODEL_DIR");
@@ -395,6 +399,34 @@ internal static class Program
                     }
                 }
 
+                // Validate --speaker × voice-cloning options are mutually exclusive.
+                // Run BEFORE model resolution so the user gets a precise mutex
+                // error instead of a misleading "Model not found" when both
+                // are passed together.  A model is conditioned on either a
+                // discrete sid or a speaker embedding, never both.
+                // System.CommandLine v2 returns a non-null OptionResult even
+                // for the default value, so distinguish "user typed --speaker"
+                // from "default 0 applied" via Tokens.Count > 0.
+                {
+                    string? earlyReferenceAudioPath = parseResult.GetValue(referenceAudioOption);
+                    string? earlySpeakerEmbeddingPath = parseResult.GetValue(speakerEmbeddingOption);
+                    OptionResult? earlySpeakerResult = parseResult.GetResult(speakerOption);
+                    bool earlySpeakerExplicit = earlySpeakerResult is { Tokens.Count: > 0 };
+                    bool earlyHasCloningSource =
+                        !string.IsNullOrEmpty(earlyReferenceAudioPath)
+                        || !string.IsNullOrEmpty(earlySpeakerEmbeddingPath);
+
+                    if (earlySpeakerExplicit && earlyHasCloningSource)
+                    {
+                        LogError(
+                            "--speaker and voice-cloning options "
+                            + "(--reference-audio / --speaker-embedding) "
+                            + "are mutually exclusive.");
+                        Environment.ExitCode = 1;
+                        return Environment.ExitCode;
+                    }
+                }
+
                 // Resolve model path: CLI > env > error
                 // --model now accepts file paths, model names, or aliases
                 string? modelPath = parseResult.GetValue(modelOption);
@@ -413,7 +445,7 @@ internal static class Program
                 {
                     LogError("--model is required (or set PIPER_DEFAULT_MODEL).");
                     Environment.ExitCode = 1;
-                    return;
+                    return Environment.ExitCode;
                 }
 
                 // Resolve model name/alias to a file path (with auto-download)
@@ -428,24 +460,25 @@ internal static class Program
                         {
                             LogInfo(quiet, $"Resolved model: {resolvedModelPath}");
                         }
+
                         modelPath = resolvedModelPath;
                     }
                     catch (FileNotFoundException ex)
                     {
                         LogError(ex.Message);
                         Environment.ExitCode = 1;
-                        return;
+                        return Environment.ExitCode;
                     }
                     catch (InvalidOperationException ex)
                     {
                         LogError(ex.Message);
                         Environment.ExitCode = 1;
-                        return;
+                        return Environment.ExitCode;
                     }
                 }
 
                 // Resolve config path
-                var configFileInfo = parseResult.GetValue(configOption);
+                FileInfo? configFileInfo = parseResult.GetValue(configOption);
                 string? explicitConfig = configFileInfo?.FullName;
                 string? configPath = PiperConfig.FindConfigPath(
                     explicitConfig, modelPath);
@@ -457,7 +490,7 @@ internal static class Program
                         $"{Path.GetDirectoryName(modelPath)}/config.json. " +
                         "Use --config to specify.");
                     Environment.ExitCode = 1;
-                    return;
+                    return Environment.ExitCode;
                 }
 
                 LogDebug(debug, quiet, $"Config path: {configPath}");
@@ -473,7 +506,7 @@ internal static class Program
                     {
                         LogError($"Failed to load config: {ex.Message}");
                         Environment.ExitCode = 1;
-                        return;
+                        return Environment.ExitCode;
                     }
                 }
 
@@ -493,7 +526,7 @@ internal static class Program
                     {
                         LogError($"Invalid --phoneme_silence: {ex.Message}");
                         Environment.ExitCode = 1;
-                        return;
+                        return Environment.ExitCode;
                     }
                 }
 
@@ -507,7 +540,8 @@ internal static class Program
                     // then user-specified files (higher priority wins via priority system).
                     customDict = new CustomDictionary();
                     customDict.LoadDefaults();
-                    var paths = customDictPaths.Split(',',
+                    var paths = customDictPaths.Split(
+                        ',',
                         StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
                     customDict.LoadDictionaries(paths);
                     LogDebug(debug, quiet,
@@ -538,14 +572,91 @@ internal static class Program
                 string language = parseResult.GetValue(languageOption)!;
 
                 string? outputFile = parseResult.GetValue(outputFileOption);
-                var outputDir = parseResult.GetValue(outputDirOption)!;
+                DirectoryInfo outputDir = parseResult.GetValue(outputDirOption)!;
 
                 // Validate --text and --json-input are mutually exclusive
                 if (!string.IsNullOrEmpty(textInput) && jsonInput)
                 {
                     LogError("--text and --json-input are mutually exclusive.");
                     Environment.ExitCode = 1;
-                    return;
+                    return Environment.ExitCode;
+                }
+
+                // Resolve voice-cloning input into a speaker embedding (if provided).
+                //   --speaker-embedding: raw float32 binary file (e.g. 256×4 = 1024 bytes
+                //                        for ECAPA-TDNN); loaded as-is.
+                //   --reference-audio:   WAV file fed through SpeakerEncoder ONNX
+                //                        (path supplied via --speaker-encoder-model).
+                // Cross-runtime parity: src/rust/piper-cli/src/main.rs:381-390,
+                //                       src/go/cmd/piper-plus/main.go:108-109,232-241.
+                // The --speaker × cloning mutex is enforced earlier (line 413),
+                // so by the time we reach here the two inputs are not both set
+                // alongside an explicit --speaker.
+                float[]? speakerEmbedding = null;
+                {
+                    string? referenceAudioPath = parseResult.GetValue(referenceAudioOption);
+                    string? speakerEmbeddingPath = parseResult.GetValue(speakerEmbeddingOption);
+                    string? speakerEncoderModelPath = parseResult.GetValue(speakerEncoderModelOption);
+
+                    if (!string.IsNullOrEmpty(speakerEmbeddingPath))
+                    {
+                        // Direct embedding file (raw little-endian float32 binary).
+                        try
+                        {
+                            byte[] rawBytes = File.ReadAllBytes(speakerEmbeddingPath);
+                            if (rawBytes.Length == 0 || rawBytes.Length % sizeof(float) != 0)
+                            {
+                                LogError(
+                                    $"--speaker-embedding file size ({rawBytes.Length} bytes) "
+                                    + "is invalid: must be a non-zero multiple of 4 bytes (float32).");
+                                Environment.ExitCode = 1;
+                                return Environment.ExitCode;
+                            }
+
+                            speakerEmbedding = new float[rawBytes.Length / sizeof(float)];
+                            Buffer.BlockCopy(rawBytes, 0, speakerEmbedding, 0, rawBytes.Length);
+                            LogDebug(debug, quiet,
+                                $"Loaded speaker embedding: {speakerEmbedding.Length} dims from {speakerEmbeddingPath}");
+                        }
+                        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                        {
+                            LogError($"Failed to read --speaker-embedding file: {ex.Message}");
+                            Environment.ExitCode = 1;
+                            return Environment.ExitCode;
+                        }
+                    }
+                    else if (!string.IsNullOrEmpty(referenceAudioPath))
+                    {
+                        // Encode reference WAV via Speaker Encoder ONNX model.
+                        if (string.IsNullOrEmpty(speakerEncoderModelPath))
+                        {
+                            LogError(
+                                "--reference-audio requires --speaker-encoder-model "
+                                + "(path to the speaker encoder ONNX model).");
+                            Environment.ExitCode = 1;
+                            return Environment.ExitCode;
+                        }
+
+                        try
+                        {
+                            using var encoder = new SpeakerEncoder(speakerEncoderModelPath);
+                            speakerEmbedding = encoder.EncodeFile(referenceAudioPath);
+                            LogDebug(debug, quiet,
+                                $"Encoded {referenceAudioPath} -> {speakerEmbedding.Length}-dim embedding");
+                        }
+                        catch (Exception ex) when (
+                            ex is FileNotFoundException
+                            or InvalidDataException
+                            or NotSupportedException
+                            or ArgumentException
+                            or IOException
+                            or OnnxRuntimeException)
+                        {
+                            LogError($"Failed to encode reference audio: {ex.Message}");
+                            Environment.ExitCode = 1;
+                            return Environment.ExitCode;
+                        }
+                    }
                 }
 
                 // ============================================================
@@ -566,7 +677,7 @@ internal static class Program
                     {
                         LogError(ex.Message);
                         Environment.ExitCode = 1;
-                        return;
+                        return Environment.ExitCode;
                     }
 
                     // Apply custom dict before phonemization
@@ -575,20 +686,20 @@ internal static class Program
                         textInput = customDict.ApplyToText(textInput);
                     }
 
-                    var phonemeIdMap = phonemizer.GetPhonemeIdMap()
+                    Dictionary<string, int[]> phonemeIdMap = phonemizer.GetPhonemeIdMap()
                                       ?? config?.PhonemeIdMap
                                       ?? new Dictionary<string, int[]>();
 
                     long[] phonemeIdsLong;
 
                     // Check for [[ phoneme ]] inline notation
-                    var testSegments = InlinePhonemeParser.Parse(textInput);
+                    List<TextOrPhonemes> testSegments = InlinePhonemeParser.Parse(textInput);
                     if (testSegments.Any(s => s.IsPhonemes))
                     {
                         var allIds = new List<long>();
                         for (int segIndex = 0; segIndex < testSegments.Count; segIndex++)
                         {
-                            var seg = testSegments[segIndex];
+                            TextOrPhonemes seg = testSegments[segIndex];
                             bool isFirst = segIndex == 0;
                             bool isLast = segIndex == testSegments.Count - 1;
 
@@ -599,7 +710,7 @@ internal static class Program
                             }
                             else
                             {
-                                var (ids, _) = PhonemeEncoder.EncodeDirect(
+                                (long[]? ids, long[] _) = PhonemeEncoder.EncodeDirect(
                                     phonemizer, seg.Text, phonemeIdMap);
                                 segIds = ids;
                             }
@@ -614,6 +725,7 @@ internal static class Program
                                 allIds.Add(segIds[i]);
                             }
                         }
+
                         phonemeIdsLong = allIds.ToArray();
                     }
                     else
@@ -626,7 +738,7 @@ internal static class Program
                         $"[test-mode] phoneme_ids({phonemeIdsLong.Length}): " +
                         $"[{string.Join(", ", phonemeIdsLong)}]");
 
-                    return;
+                    return Environment.ExitCode;
                 }
 
                 // ============================================================
@@ -644,7 +756,9 @@ internal static class Program
                     while ((line = stdinReader.ReadLine()) is not null)
                     {
                         if (string.IsNullOrWhiteSpace(line))
+                        {
                             continue;
+                        }
 
                         lineNum++;
 
@@ -658,7 +772,7 @@ internal static class Program
                         // JSONL mode
                         try
                         {
-                            var utterance = JsonSerializer.Deserialize(
+                            JsonlUtterance? utterance = JsonSerializer.Deserialize(
                                 line, CliJsonContext.Default.JsonlUtterance);
 
                             if (utterance?.PhonemeIds is not null)
@@ -679,7 +793,7 @@ internal static class Program
                         }
                     }
 
-                    return;
+                    return Environment.ExitCode;
                 }
 
                 // ============================================================
@@ -689,7 +803,7 @@ internal static class Program
                 {
                     LogError("--model is required (or set PIPER_DEFAULT_MODEL).");
                     Environment.ExitCode = 1;
-                    return;
+                    return Environment.ExitCode;
                 }
 
                 if (config is null)
@@ -699,7 +813,7 @@ internal static class Program
                         $"{Path.GetDirectoryName(modelPath)}/config.json. " +
                         "Use --config to specify.");
                     Environment.ExitCode = 1;
-                    return;
+                    return Environment.ExitCode;
                 }
 
                 LogDebug(debug, quiet, $"Model path: {modelPath}");
@@ -719,7 +833,7 @@ internal static class Program
                 {
                     LogError($"Failed to load ONNX model: {ex.Message}");
                     Environment.ExitCode = 1;
-                    return;
+                    return Environment.ExitCode;
                 }
 
                 using var model = new PiperModel(session, config);
@@ -843,17 +957,17 @@ internal static class Program
                     {
                         LogError(ex.Message);
                         Environment.ExitCode = 1;
-                        return;
+                        return Environment.ExitCode;
                     }
 
                     // Use the phonemizer's own ID map if available, else fall back to config
-                    var phonemeIdMap = phonemizer.GetPhonemeIdMap() ?? config.PhonemeIdMap;
+                    Dictionary<string, int[]> phonemeIdMap = phonemizer.GetPhonemeIdMap() ?? config.PhonemeIdMap;
 
                     long[] phonemeIdsLong;
                     long[]? prosodyFlat;
 
                     // Check for [[ phoneme ]] inline notation
-                    var inlineSegments = InlinePhonemeParser.Parse(textInput);
+                    List<TextOrPhonemes> inlineSegments = InlinePhonemeParser.Parse(textInput);
                     if (inlineSegments.Any(s => s.IsPhonemes))
                     {
                         // Mixed mode: process each segment separately
@@ -863,7 +977,7 @@ internal static class Program
 
                         for (int segIndex = 0; segIndex < inlineSegments.Count; segIndex++)
                         {
-                            var seg = inlineSegments[segIndex];
+                            TextOrPhonemes seg = inlineSegments[segIndex];
                             bool isFirst = segIndex == 0;
                             bool isLast = segIndex == inlineSegments.Count - 1;
 
@@ -878,12 +992,14 @@ internal static class Program
                             else
                             {
                                 // Normal text — phonemize
-                                var (ids, prosody) = PhonemeEncoder.EncodeDirect(
+                                (long[]? ids, long[]? prosody) = PhonemeEncoder.EncodeDirect(
                                     phonemizer, seg.Text, phonemeIdMap);
                                 segIds = ids;
                                 segProsody = prosody;
                                 if (prosody != null)
+                                {
                                     hasAnyProsody = true;
+                                }
                             }
 
                             // Trim BOS from non-first segments, EOS from non-last segments
@@ -894,11 +1010,11 @@ internal static class Program
                             for (int i = start; i < end; i++)
                             {
                                 allIds.Add(segIds[i]);
-                                if (segProsody != null && i * 3 + 2 < segProsody.Length)
+                                if (segProsody != null && (i * 3) + 2 < segProsody.Length)
                                 {
                                     allProsody.Add(segProsody[i * 3]);
-                                    allProsody.Add(segProsody[i * 3 + 1]);
-                                    allProsody.Add(segProsody[i * 3 + 2]);
+                                    allProsody.Add(segProsody[(i * 3) + 1]);
+                                    allProsody.Add(segProsody[(i * 3) + 2]);
                                 }
                                 else
                                 {
@@ -924,7 +1040,7 @@ internal static class Program
 
                     LogDebug(debug, quiet,
                         $"Encoded: {phonemeIdsLong.Length} phoneme IDs" +
-                        (prosodyFlat is not null ? $", prosody={prosodyFlat.Length / 3} entries" : ""));
+                        (prosodyFlat is not null ? $", prosody={prosodyFlat.Length / 3} entries" : string.Empty));
 
                     // If model doesn't support prosody, discard the prosody data
                     if (!model.HasProsody)
@@ -939,13 +1055,14 @@ internal static class Program
                         audio = SynthesizeWithPhonemeSilence(
                             piperSession, phonemeIdsLong, prosodyFlat,
                             speaker, languageId, noiseScale, lengthScale, noiseW,
-                            phonemeSilenceMap, config.PhonemeIdMap, sampleRate);
+                            phonemeSilenceMap, config.PhonemeIdMap, sampleRate,
+                            speakerEmbedding);
                     }
                     catch (Exception ex)
                     {
                         LogError($"Synthesis failed: {ex.Message}");
                         Environment.ExitCode = 1;
-                        return;
+                        return Environment.ExitCode;
                     }
 
                     // Strategy C: pad silence for short text
@@ -961,7 +1078,8 @@ internal static class Program
                     // (VITS model does not expose per-phoneme durations in standard output)
                     if (!string.IsNullOrEmpty(outputTimingPath))
                     {
-                        LogInfo(quiet,
+                        LogInfo(
+                            quiet,
                             $"Warning: --output-timing specified but phoneme timing data " +
                             $"is not available from this model. Skipping timing output.");
                     }
@@ -971,13 +1089,13 @@ internal static class Program
                     {
                         // Sentence-level streaming: split text, synthesize each sentence,
                         // and write progressive raw PCM to stdout.
-                        var sentences = TextSplitter.SplitSentences(textInput);
+                        List<string> sentences = TextSplitter.SplitSentences(textInput);
                         int streamedCount;
 
                         if (sentences.Count <= 1)
                         {
                             // Single sentence or no split: write the already-synthesized audio
-                            using var stdout = Console.OpenStandardOutput();
+                            using Stream stdout = Console.OpenStandardOutput();
                             StreamingWriter.WriteChunked(stdout, audio);
                             LogDebug(debug, quiet,
                                 $"Streamed sentence: \"{textInput}\" ({audio.Length} samples)");
@@ -991,24 +1109,29 @@ internal static class Program
                             // cost on cold-cache multi-sentence inputs. Set
                             // PIPER_G2P_PARALLELISM=1 to fall back to the prior
                             // strictly-serial path.
-                            var encoded = SentenceParallelEncoder.EncodeAll(
+                            (string OriginalText, bool IsShort, long[] PhonemeIds, long[]? Prosody)[] encoded = SentenceParallelEncoder.EncodeAll(
                                 sentences,
                                 sentence =>
                                 {
                                     string sentenceText = sentence;
                                     if (customDict is not null)
+                                    {
                                         sentenceText = customDict.ApplyToText(sentenceText);
+                                    }
 
                                     // Strategy C: per-sentence short text detection
                                     string sentenceWrapped = ShortTextProcessor.WrapShortTextWithBreaks(sentenceText);
                                     bool isSentenceShort = !ReferenceEquals(sentenceWrapped, sentenceText)
                                         && !string.Equals(sentenceWrapped, sentenceText, StringComparison.Ordinal);
 
-                                    var (sentencePhonemeIds, sentenceProsody) =
+                                    (long[]? sentencePhonemeIds, long[]? sentenceProsody) =
                                         PhonemeEncoder.EncodeDirect(
                                             phonemizer, sentenceText, phonemeIdMap);
 
-                                    if (!model.HasProsody) sentenceProsody = null;
+                                    if (!model.HasProsody)
+                                    {
+                                        sentenceProsody = null;
+                                    }
 
                                     return (
                                         OriginalText: sentence,
@@ -1017,8 +1140,8 @@ internal static class Program
                                         Prosody: sentenceProsody);
                                 });
 
-                            using var stdout = Console.OpenStandardOutput();
-                            foreach (var entry in encoded)
+                            using Stream stdout = Console.OpenStandardOutput();
+                            foreach ((string OriginalText, bool IsShort, long[] PhonemeIds, long[]? Prosody) entry in encoded)
                             {
                                 short[] chunkAudio;
                                 try
@@ -1026,13 +1149,14 @@ internal static class Program
                                     chunkAudio = SynthesizeWithPhonemeSilence(
                                         piperSession, entry.PhonemeIds, entry.Prosody,
                                         speaker, languageId, noiseScale, lengthScale, noiseW,
-                                        phonemeSilenceMap, config.PhonemeIdMap, sampleRate);
+                                        phonemeSilenceMap, config.PhonemeIdMap, sampleRate,
+                                        speakerEmbedding);
                                 }
                                 catch (Exception ex)
                                 {
                                     LogError($"Synthesis failed for sentence: {ex.Message}");
                                     Environment.ExitCode = 1;
-                                    return;
+                                    return Environment.ExitCode;
                                 }
 
                                 // Strategy C: pad silence for short sentences
@@ -1045,6 +1169,7 @@ internal static class Program
                                 LogDebug(debug, quiet,
                                     $"Streamed sentence: \"{entry.OriginalText}\" ({chunkAudio.Length} samples)");
                             }
+
                             streamedCount = sentences.Count;
                         }
 
@@ -1053,12 +1178,12 @@ internal static class Program
                     else
                     {
                         WriteTextModeOutput(
-                            outputMode, outputRaw, outputFile, outputDir,
+                            outputMode, outputFile, outputDir,
                             audio, sampleRate, quiet);
                         LogInfo(quiet, "Synthesized 1 utterance(s).");
                     }
 
-                    return;
+                    return Environment.ExitCode;
                 }
 
                 // ================================================================
@@ -1083,7 +1208,9 @@ internal static class Program
                         while ((line = stdinReader.ReadLine()) is not null)
                         {
                             if (string.IsNullOrWhiteSpace(line))
+                            {
                                 continue;
+                            }
 
                             // Parse space-separated phonemes via RawPhonemeParser
                             // (handles PUA resolution for multi-char tokens like "a:", "N_m")
@@ -1107,13 +1234,14 @@ internal static class Program
                                 audio = SynthesizeWithPhonemeSilence(
                                     piperSession, phonemeIdsLong, null,
                                     speaker, languageId, noiseScale, lengthScale, noiseW,
-                                    phonemeSilenceMap, config.PhonemeIdMap, sampleRate);
+                                    phonemeSilenceMap, config.PhonemeIdMap, sampleRate,
+                                    speakerEmbedding);
                             }
                             catch (Exception ex)
                             {
                                 LogError($"Synthesis failed on line {utteranceIndex + 1}: {ex.Message}");
                                 Environment.ExitCode = 1;
-                                return;
+                                return Environment.ExitCode;
                             }
 
                             WriteUtteranceOutput(
@@ -1131,7 +1259,7 @@ internal static class Program
                         stdoutStream?.Dispose();
                     }
 
-                    return;
+                    return Environment.ExitCode;
                 }
 
                 // ================================================================
@@ -1139,7 +1267,7 @@ internal static class Program
                 // ================================================================
 
                 // Hint when stdin appears to be a terminal
-                if (!jsonInput && Console.IsInputRedirected == false)
+                if (!jsonInput && !Console.IsInputRedirected)
                 {
                     LogInfo(quiet, "Reading from stdin. Use --text for direct text input, " +
                                    "or pipe JSONL input. Press Ctrl+D (Unix) / Ctrl+Z (Windows) to end.");
@@ -1180,7 +1308,7 @@ internal static class Program
                             {
                                 LogError($"Invalid JSON on line {utteranceIndex + 1}: {ex.Message}");
                                 Environment.ExitCode = 1;
-                                return;
+                                return Environment.ExitCode;
                             }
 
                             // ---------------------------------------------------
@@ -1205,7 +1333,8 @@ internal static class Program
                                 else
                                 {
                                     // C++ compatible: warn and continue (don't exit)
-                                    LogInfo(quiet,
+                                    LogInfo(
+                                        quiet,
                                         $"Warning: Unknown speaker name '{utterance.Speaker}', using default speaker {speaker}");
                                     uttSpeaker = speaker;
                                 }
@@ -1240,7 +1369,7 @@ internal static class Program
                                     {
                                         LogError(ex.Message);
                                         Environment.ExitCode = 1;
-                                        return;
+                                        return Environment.ExitCode;
                                     }
                                 }
 
@@ -1257,9 +1386,9 @@ internal static class Program
                                 uttIsShortText = !ReferenceEquals(uttWrapped, textToPhon)
                                     && !string.Equals(uttWrapped, textToPhon, StringComparison.Ordinal);
 
-                                var phonemeIdMap = jsonlPhonemizer.GetPhonemeIdMap()
+                                Dictionary<string, int[]> phonemeIdMap = jsonlPhonemizer.GetPhonemeIdMap()
                                                   ?? config.PhonemeIdMap;
-                                var encoded = PhonemeEncoder.EncodeDirect(
+                                (long[] PhonemeIds, long[]? ProsodyFlat) encoded = PhonemeEncoder.EncodeDirect(
                                     jsonlPhonemizer, textToPhon, phonemeIdMap);
                                 phonemeIdsLong = encoded.PhonemeIds;
                                 prosodyFlat = model.HasProsody ? encoded.ProsodyFlat : null;
@@ -1275,7 +1404,7 @@ internal static class Program
                                 {
                                     LogError($"Missing or empty phoneme_ids (and no text) on line {utteranceIndex + 1}.");
                                     Environment.ExitCode = 1;
-                                    return;
+                                    return Environment.ExitCode;
                                 }
 
                                 // Convert int[] -> long[] for ONNX tensor (int64)
@@ -1292,8 +1421,8 @@ internal static class Program
                                         if (pf is { Length: >= 3 })
                                         {
                                             prosodyFlat[pi * 3] = pf[0];
-                                            prosodyFlat[pi * 3 + 1] = pf[1];
-                                            prosodyFlat[pi * 3 + 2] = pf[2];
+                                            prosodyFlat[(pi * 3) + 1] = pf[1];
+                                            prosodyFlat[(pi * 3) + 2] = pf[2];
                                         }
                                     }
                                 }
@@ -1310,13 +1439,14 @@ internal static class Program
                                 audio = SynthesizeWithPhonemeSilence(
                                     piperSession, phonemeIdsLong, prosodyFlat,
                                     uttSpeaker, uttLanguageId, noiseScale, lengthScale, noiseW,
-                                    phonemeSilenceMap, config.PhonemeIdMap, sampleRate);
+                                    phonemeSilenceMap, config.PhonemeIdMap, sampleRate,
+                                    speakerEmbedding);
                             }
                             catch (Exception ex)
                             {
                                 LogError($"Synthesis failed on line {utteranceIndex + 1}: {ex.Message}");
                                 Environment.ExitCode = 1;
-                                return;
+                                return Environment.ExitCode;
                             }
 
                             // Strategy C: pad silence for short JSONL text
@@ -1340,13 +1470,14 @@ internal static class Program
                         {
                             LogError("No input received on stdin.");
                             Environment.ExitCode = 1;
-                            return;
+                            return Environment.ExitCode;
                         }
 
                         // --output-timing: warn once at end if no timing data
                         if (!string.IsNullOrEmpty(outputTimingPath))
                         {
-                            LogInfo(quiet,
+                            LogInfo(
+                                quiet,
                                 $"Warning: --output-timing specified but phoneme timing data " +
                                 $"is not available from this model. Skipping timing output.");
                         }
@@ -1358,6 +1489,15 @@ internal static class Program
                         stdoutStream?.Dispose();
                     }
                 }
+
+                // Explicit fallthrough exit code: success unless an earlier
+                // branch set Environment.ExitCode to non-zero. Returning the
+                // int here is what makes C# pick the Func<ParseResult,int>
+                // SetAction overload (vs the void-returning Action<ParseResult>
+                // overload, which would cause Invoke() to always return 0 and
+                // swallow validation errors).
+                // See docs/csharp-cli-exit-code-rootcause.md for the diagnostic.
+                return Environment.ExitCode;
             });
 
         return rootCommand;
@@ -1385,46 +1525,60 @@ internal static class Program
         float noiseW,
         Dictionary<string, float>? phonemeSilenceMap,
         Dictionary<string, int[]> phonemeIdMap,
-        int sampleRate)
+        int sampleRate,
+        float[]? speakerEmbedding = null)
     {
+        // When a speaker embedding is supplied, the discrete sid is dropped
+        // (the two are mutually exclusive — see SynthesisInput.Validate). The
+        // CLI mutex check at line 413 already prevents an *explicit* --speaker
+        // alongside cloning options, so the only sid value that can reach this
+        // method when speakerEmbedding != null is the default 0 — which the
+        // record's Validate() also treats as "unset". We still null it out
+        // explicitly to make the intent obvious to readers.
+        int effectiveSpeaker = speakerEmbedding is null ? speaker : 0;
+
         // Normal (non-split) path
         if (phonemeSilenceMap is null || phonemeSilenceMap.Count == 0)
         {
             var input = new SynthesisInput(
                 PhonemeIds: phonemeIdsLong,
-                SpeakerId: speaker,
+                SpeakerId: effectiveSpeaker,
                 LanguageId: languageId,
                 ProsodyFeatures: prosodyFlat,
                 NoiseScale: noiseScale,
                 LengthScale: lengthScale,
-                NoiseW: noiseW);
+                NoiseW: noiseW,
+                SpeakerEmbedding: speakerEmbedding);
             return piperSession.Synthesize(input);
         }
 
         // Split at phoneme silence boundaries
-        var phrases = PhonemeSilenceProcessor.SplitAtPhonemeSilence(
+        List<PhonemeSilenceProcessor.Phrase> phrases = PhonemeSilenceProcessor.SplitAtPhonemeSilence(
             phonemeIdsLong, prosodyFlat,
             phonemeSilenceMap, phonemeIdMap, sampleRate);
 
         var segments = new List<(short[] Audio, int SilenceSamples)>();
         int totalLength = 0;
 
-        foreach (var phrase in phrases)
+        foreach (PhonemeSilenceProcessor.Phrase phrase in phrases)
         {
             if (phrase.PhonemeIds.Count == 0)
+            {
                 continue;
+            }
 
             long[] phraseIds = phrase.PhonemeIds.ToArray();
             long[]? phraseProsody = phrase.ProsodyFlat?.ToArray();
 
             var input = new SynthesisInput(
                 PhonemeIds: phraseIds,
-                SpeakerId: speaker,
+                SpeakerId: effectiveSpeaker,
                 LanguageId: languageId,
                 ProsodyFeatures: phraseProsody,
                 NoiseScale: noiseScale,
                 LengthScale: lengthScale,
-                NoiseW: noiseW);
+                NoiseW: noiseW,
+                SpeakerEmbedding: speakerEmbedding);
 
             short[] phraseAudio = piperSession.Synthesize(input);
             segments.Add((phraseAudio, phrase.SilenceSamples));
@@ -1434,7 +1588,7 @@ internal static class Program
         // Concatenate segments with silence gaps
         var result = new short[totalLength];
         int offset = 0;
-        foreach (var (audio, silenceSamples) in segments)
+        foreach ((short[]? audio, int silenceSamples) in segments)
         {
             audio.CopyTo(result.AsSpan(offset));
             offset += audio.Length;
@@ -1457,16 +1611,22 @@ internal static class Program
     private static int ResolveLanguageId(PiperConfig config, string? language)
     {
         if (config.LanguageIdMap is null || string.IsNullOrEmpty(language))
+        {
             return 0;
+        }
 
         // Single language code: direct lookup
         if (config.LanguageIdMap.TryGetValue(language, out int id))
+        {
             return id;
+        }
 
         // Combined code (e.g. "ja-en-zh"): default to first language
         string first = language.Split('-')[0];
         if (config.LanguageIdMap.TryGetValue(first, out int firstId))
+        {
             return firstId;
+        }
 
         return 0;
     }
@@ -1563,7 +1723,6 @@ internal static class Program
     /// </summary>
     private static void WriteTextModeOutput(
         OutputMode outputMode,
-        bool outputRaw,
         string? outputFile,
         DirectoryInfo outputDir,
         short[] audio,
@@ -1574,14 +1733,14 @@ internal static class Program
         {
             case OutputMode.RawStdout:
                 {
-                    using var stdout = Console.OpenStandardOutput();
+                    using Stream stdout = Console.OpenStandardOutput();
                     WriteRawPcm(stdout, audio);
                     break;
                 }
 
             case OutputMode.WavStdout:
                 {
-                    using var stdout = Console.OpenStandardOutput();
+                    using Stream stdout = Console.OpenStandardOutput();
                     WavWriter.Write(stdout, audio, sampleRate);
                     break;
                 }
@@ -1595,7 +1754,7 @@ internal static class Program
 
             case OutputMode.Directory:
                 {
-                    var wavPath = Path.Combine(outputDir.FullName, "0.wav");
+                    var wavPath = Path.Join(outputDir.FullName, "0.wav");
 
                     var parentDir = Path.GetDirectoryName(wavPath);
                     if (!string.IsNullOrEmpty(parentDir) && !Directory.Exists(parentDir))
@@ -1649,6 +1808,7 @@ internal static class Program
                     {
                         LogInfo(quiet, $"Warning: --output_file overwrites previous utterance ({outputFile})");
                     }
+
                     var path = outputFile!;
                     WavWriter.Write(path, audio, sampleRate);
                     LogInfo(quiet, path);
@@ -1667,7 +1827,8 @@ internal static class Program
                             Environment.ExitCode = 1;
                             return;
                         }
-                        wavPath = Path.GetFullPath(Path.Combine(outputDir.FullName, uttOutputFile));
+
+                        wavPath = Path.GetFullPath(Path.Join(outputDir.FullName, uttOutputFile));
                         if (!wavPath.StartsWith(outputDir.FullName))
                         {
                             LogError($"Rejected output_file outside output directory: {uttOutputFile}");
@@ -1677,7 +1838,7 @@ internal static class Program
                     }
                     else
                     {
-                        wavPath = Path.Combine(
+                        wavPath = Path.Join(
                             outputDir.FullName, $"{utteranceIndex}.wav");
                     }
 
@@ -1732,7 +1893,6 @@ internal static class Program
     // ----------------------------------------------------------------
     // Logging helpers — all output goes to stderr
     // ----------------------------------------------------------------
-
     private static void LogError(string message)
     {
         Console.Error.WriteLine($"[ERR] {message}");
@@ -1759,10 +1919,13 @@ internal enum OutputMode
 {
     /// <summary>Write individual WAV files to output directory.</summary>
     Directory,
+
     /// <summary>Write a single WAV file to the specified path.</summary>
     SingleFile,
+
     /// <summary>Write WAV binary (with header) to stdout.</summary>
     WavStdout,
+
     /// <summary>Write raw PCM int16 (no header) to stdout.</summary>
     RawStdout,
 }

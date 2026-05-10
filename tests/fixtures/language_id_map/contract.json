@@ -1,0 +1,141 @@
+{
+  "schema_version": 1,
+  "comment": "LANGUAGE_ID_MAP cross-runtime contract fixture. Regenerate via `python scripts/regenerate_language_id_map_fixture.py`. Source: docs/spec/language-id-map-contract.toml. Each runtime (Python train/runtime, Rust core/wasm, Go, WASM/openjtalk-web) asserts its literal language_id_map matches either `canonical.language_id_map` (7-lang) or `canonical.trained_language_id_map` (6-lang).",
+  "canonical": {
+    "language_id_map": {
+      "ja": 0,
+      "en": 1,
+      "zh": 2,
+      "es": 3,
+      "fr": 4,
+      "pt": 5,
+      "sv": 6
+    },
+    "all_languages": [
+      "ja",
+      "en",
+      "zh",
+      "es",
+      "fr",
+      "pt",
+      "sv"
+    ],
+    "trained_language_id_map": {
+      "ja": 0,
+      "en": 1,
+      "zh": 2,
+      "es": 3,
+      "fr": 4,
+      "pt": 5
+    },
+    "trained_languages": [
+      "ja",
+      "en",
+      "zh",
+      "es",
+      "fr",
+      "pt"
+    ],
+    "extended_language_id_map": {
+      "ja": 0,
+      "en": 1,
+      "zh": 2,
+      "es": 3,
+      "fr": 4,
+      "pt": 5,
+      "sv": 6,
+      "ko": 7
+    },
+    "extended_languages": [
+      "ja",
+      "en",
+      "zh",
+      "es",
+      "fr",
+      "pt",
+      "sv",
+      "ko"
+    ]
+  },
+  "invariants": {
+    "keys_lowercase": true,
+    "values_consecutive_from_zero": true,
+    "values_unique": true,
+    "ja_is_zero": true,
+    "en_is_one": true
+  },
+  "runtime_sources": [
+    {
+      "runtime": "python_train",
+      "path": "src/python/piper_train/tools/prepare_multilingual_dataset.py",
+      "kind": "python_dict_literal",
+      "symbol": "LANGUAGE_ID_MAP",
+      "expected": "language_id_map"
+    },
+    {
+      "runtime": "python_train",
+      "path": "src/python/piper_train/tools/prepare_multilingual_dataset.py",
+      "kind": "python_list_literal",
+      "symbol": "ALL_LANGUAGES",
+      "expected": "all_languages"
+    },
+    {
+      "runtime": "python_runtime",
+      "path": "src/python_run/piper/voice.py",
+      "kind": "python_list_literal_inline",
+      "expected": "trained_languages"
+    },
+    {
+      "runtime": "rust_core",
+      "path": "src/rust/piper-core/src/config.rs",
+      "kind": "inline_substring_6lang",
+      "expected": "trained_language_id_map"
+    },
+    {
+      "runtime": "rust_core",
+      "path": "src/rust/piper-core/src/wasm.rs",
+      "kind": "inline_substring_6lang",
+      "expected": "trained_language_id_map"
+    },
+    {
+      "runtime": "rust_wasm",
+      "path": "src/rust/piper-wasm/src/lib.rs",
+      "kind": "inline_substring_8lang",
+      "expected": "extended_language_id_map",
+      "note": "Future-facing 8-language sample config (sv=6, ko=7)."
+    },
+    {
+      "runtime": "go",
+      "path": "src/go/piperplus/testdata/valid_multilingual_config.json",
+      "kind": "json_field",
+      "field": "language_id_map",
+      "expected": "trained_language_id_map"
+    },
+    {
+      "runtime": "wasm_openjtalk",
+      "path": "src/wasm/openjtalk-web/models/multilingual-test-medium.onnx.json",
+      "kind": "json_field",
+      "field": "language_id_map",
+      "expected": "trained_language_id_map"
+    },
+    {
+      "runtime": "csharp",
+      "path": "src/csharp/PiperPlus.Core/Config/PiperConfig.cs",
+      "kind": "none",
+      "note": "Data-driven: LanguageIdMap is parsed from config JSON."
+    },
+    {
+      "runtime": "cpp",
+      "path": "src/cpp/piper.cpp",
+      "kind": "none",
+      "note": "Data-driven: languageIdMap parsed from config JSON (see piper.cpp:318)."
+    }
+  ],
+  "expected_not_found": {
+    "forbidden_outside_sources": [
+      "\"ja\": 0, \"zh\": 1",
+      "\"en\": 0, \"ja\": 1",
+      "\"ja\": 1, \"en\": 0"
+    ]
+  }
+}

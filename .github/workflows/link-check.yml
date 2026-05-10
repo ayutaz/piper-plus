@@ -1,0 +1,51 @@
+name: link-check
+
+on:
+  pull_request:
+    paths:
+      - '**/*.md'
+      - '.lychee.toml'
+  push:
+    branches: [dev, main]
+    paths:
+      - '**/*.md'
+  schedule:
+    - cron: '0 6 * * 1'  # Mondays 06:00 UTC — catch link rot
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write  # for posting summary on schedule
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lychee:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Restore lychee cache
+        id: lychee-cache
+        uses: actions/cache@v5
+        continue-on-error: true
+        with:
+          path: .lycheecache
+          key: lychee-${{ github.sha }}
+          restore-keys: lychee-
+
+      - uses: lycheeverse/lychee-action@v2
+        with:
+          # --base は URL or absolute path 必須。relative '.' は invalid。
+          # root-relative link の解決は --root-dir で行う。
+          args: >-
+            --config .lychee.toml
+            --no-progress
+            --root-dir ${{ github.workspace }}
+            './**/*.md'
+          fail: true  # strict gate — broken link は PR / push を block
+          jobSummary: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -49,6 +49,7 @@ pub mod custom_dict;
 pub mod encode;
 pub mod error;
 pub mod phonemizer;
+pub mod ssml;
 pub mod token_map;
 
 #[cfg(feature = "chinese")]

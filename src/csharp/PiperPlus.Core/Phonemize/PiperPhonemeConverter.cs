@@ -48,21 +48,29 @@ public static class PiperPhonemeConverter
     /// </returns>
     public static string GetQuestionType(string text)
     {
-        var stripped = text.AsSpan().Trim();
+        ReadOnlySpan<char> stripped = text.AsSpan().Trim();
 
         // Multi-char patterns first (longer before shorter)
         if (EndsWith(stripped, "?!") || EndsWith(stripped, "\uFF01\uFF1F") || EndsWith(stripped, "\uFF1F\uFF01"))
+        {
             return "?!";
+        }
 
         if (EndsWith(stripped, "?.") || EndsWith(stripped, "\u3002\uFF1F") || EndsWith(stripped, "\uFF1F\u3002"))
+        {
             return "?.";
+        }
 
         if (EndsWith(stripped, "?~") || EndsWith(stripped, "\uFF5E\uFF1F") || EndsWith(stripped, "\uFF1F\uFF5E"))
+        {
             return "?~";
+        }
 
         // Single ? fallback
         if (stripped.Length > 0 && (stripped[^1] == '?' || stripped[^1] == '\uFF1F'))
+        {
             return "?";
+        }
 
         return "$";
     }
@@ -178,8 +186,9 @@ public static class PiperPhonemeConverter
         // Calculate capacity upfront for a single allocation.
         int bosLen = bosIds?.Length ?? 0;
         int eosLen = eosIds?.Length ?? 0;
+
         // BOS ids + PAD(0) + (phoneme + PAD) per phoneme + EOS ids
-        int capacity = bosLen + 1 + phonemeIds.Count * (1 + padIds.Length) + eosLen;
+        int capacity = bosLen + 1 + (phonemeIds.Count * (1 + padIds.Length)) + eosLen;
 
         var ids = new List<int>(capacity);
         var prosody = new List<ProsodyInfo?>(capacity);

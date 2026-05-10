@@ -44,7 +44,10 @@ pub mod wasm;
 pub mod audio_format;
 pub mod model_download;
 pub mod short_text;
-pub mod ssml;
+// `ssml` lives in piper-plus-g2p so that the G2P-only WASM npm
+// (`@piper-plus/g2p`) can use the same parser. Re-exported here for
+// API compatibility with downstream `piper_plus::ssml::*` consumers.
+pub use piper_plus_g2p::ssml;
 pub mod streaming;
 pub mod text_splitter;
 pub mod timing;

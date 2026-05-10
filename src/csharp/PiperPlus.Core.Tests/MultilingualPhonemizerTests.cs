@@ -146,9 +146,9 @@ public sealed class MultilingualPhonemizerTests
         // Japanese-only input: UnicodeLanguageDetector routes to JA.
         // JA stub returns ["^", "k", "o", "$"].
         // After stripping BOS/EOS, only ["k", "o"] should remain.
-        var multilingual = MakeMultilingual(MakeJaStub(), MakeEnStub());
+        MultilingualPhonemizer multilingual = MakeMultilingual(MakeJaStub(), MakeEnStub());
 
-        var (tokens, prosody) = multilingual.PhonemizeWithProsody("\u3053\u3093");  // こん (kana-only)
+        (List<string>? tokens, List<ProsodyInfo?>? prosody) = multilingual.PhonemizeWithProsody("\u3053\u3093");  // こん (kana-only)
 
         // BOS/EOS should have been stripped
         Assert.DoesNotContain("^", tokens);
@@ -172,10 +172,10 @@ public sealed class MultilingualPhonemizerTests
     [Fact]
     public void MixedLanguages_ConcatenatesSegments()
     {
-        var multilingual = MakeMultilingual(MakeJaStub(), MakeEnStub());
+        MultilingualPhonemizer multilingual = MakeMultilingual(MakeJaStub(), MakeEnStub());
 
         // "\u3053\u3093hello" = "こんhello" -> JA segment + EN segment
-        var (tokens, prosody) = multilingual.PhonemizeWithProsody("\u3053\u3093hello");
+        (List<string>? tokens, List<ProsodyInfo?>? prosody) = multilingual.PhonemizeWithProsody("\u3053\u3093hello");
 
         // JA: ["^", "k", "o", "$"] -> stripped -> ["k", "o"]
         // EN: ["h", "e", "l", "o"] -> no BOS/EOS -> ["h", "e", "l", "o"]
@@ -203,10 +203,10 @@ public sealed class MultilingualPhonemizerTests
     [Fact]
     public void BosEos_StrippedFromSegments()
     {
-        var multilingual = MakeMultilingual(MakeJaStub(), MakeEnStub());
+        MultilingualPhonemizer multilingual = MakeMultilingual(MakeJaStub(), MakeEnStub());
 
         // JA-only input: the stub returns ["^", "k", "o", "$"]
-        var (tokens, prosody) = multilingual.PhonemizeWithProsody("\u3053\u3093");
+        (List<string>? tokens, List<ProsodyInfo?>? prosody) = multilingual.PhonemizeWithProsody("\u3053\u3093");
 
         // "^" and "$" must not appear in the output
         Assert.DoesNotContain("^", tokens);
@@ -235,10 +235,10 @@ public sealed class MultilingualPhonemizerTests
     public void QuestionMarker_TrackedAsLastEos()
     {
         // Use question stub for JA
-        var multilingual = MakeMultilingual(MakeJaQuestionStub(), MakeEnStub());
+        MultilingualPhonemizer multilingual = MakeMultilingual(MakeJaQuestionStub(), MakeEnStub());
 
         // JA-only input with question: stub returns ["^", "k", "a", "?"]
-        var (tokens, _) = multilingual.PhonemizeWithProsody("\u3053\u3093");
+        (List<string>? tokens, List<ProsodyInfo?> _) = multilingual.PhonemizeWithProsody("\u3053\u3093");
 
         // "?" should have been stripped (it's an EOS token)
         Assert.DoesNotContain("?", tokens);
@@ -246,7 +246,7 @@ public sealed class MultilingualPhonemizerTests
         // But PostProcessIds should use "?" as the EOS.
         // Feed the stripped tokens through PostProcessIds with a map
         // that includes both "$" (ID=2) and "?" (ID=3).
-        var map = MakeMap();
+        Dictionary<string, int[]> map = MakeMap();
         var inputIds = new List<int>();
         var inputProsody = new List<ProsodyInfo?>();
         foreach (var token in tokens)
@@ -261,7 +261,7 @@ public sealed class MultilingualPhonemizerTests
             }
         }
 
-        var (resultIds, _) = multilingual.PostProcessIds(inputIds, inputProsody, map);
+        (List<int>? resultIds, List<ProsodyInfo?> _) = multilingual.PostProcessIds(inputIds, inputProsody, map);
 
         // Last ID should be the "?" EOS (ID=3), not "$" (ID=2)
         Assert.Equal(3, resultIds[^1]);
@@ -278,15 +278,15 @@ public sealed class MultilingualPhonemizerTests
     [Fact]
     public void ProsodyAlignment_Maintained()
     {
-        var multilingual = MakeMultilingual(MakeJaStub(), MakeEnStub());
+        MultilingualPhonemizer multilingual = MakeMultilingual(MakeJaStub(), MakeEnStub());
 
         // JA-only
-        var (jaTokens, jaProsody) = multilingual.PhonemizeWithProsody("\u3053\u3093");
+        (List<string>? jaTokens, List<ProsodyInfo?>? jaProsody) = multilingual.PhonemizeWithProsody("\u3053\u3093");
         Assert.Equal(jaTokens.Count, jaProsody.Count);
 
         // Mixed JA + EN
-        var multilingual2 = MakeMultilingual(MakeJaStub(), MakeEnStub());
-        var (mixedTokens, mixedProsody) = multilingual2.PhonemizeWithProsody("\u3053\u3093hello");
+        MultilingualPhonemizer multilingual2 = MakeMultilingual(MakeJaStub(), MakeEnStub());
+        (List<string>? mixedTokens, List<ProsodyInfo?>? mixedProsody) = multilingual2.PhonemizeWithProsody("\u3053\u3093hello");
         Assert.Equal(mixedTokens.Count, mixedProsody.Count);
     }
 
@@ -302,7 +302,7 @@ public sealed class MultilingualPhonemizerTests
     [Fact]
     public void GetPhonemeIdMap_ReturnsNull()
     {
-        var multilingual = MakeMultilingual(MakeJaStub(), MakeEnStub());
+        MultilingualPhonemizer multilingual = MakeMultilingual(MakeJaStub(), MakeEnStub());
 
         Assert.Null(multilingual.GetPhonemeIdMap());
     }
@@ -317,9 +317,9 @@ public sealed class MultilingualPhonemizerTests
     [Fact]
     public void EmptyInput_ReturnsEmpty()
     {
-        var multilingual = MakeMultilingual(MakeJaStub(), MakeEnStub());
+        MultilingualPhonemizer multilingual = MakeMultilingual(MakeJaStub(), MakeEnStub());
 
-        var (tokens, prosody) = multilingual.PhonemizeWithProsody("");
+        (List<string>? tokens, List<ProsodyInfo?>? prosody) = multilingual.PhonemizeWithProsody(string.Empty);
 
         Assert.Empty(tokens);
         Assert.Empty(prosody);
@@ -341,17 +341,18 @@ public sealed class MultilingualPhonemizerTests
     [Fact]
     public void PostProcessIds_UsesLastEos()
     {
-        var map = MakeMap();
+        Dictionary<string, int[]> map = MakeMap();
 
         // --- Declarative case: last EOS is "$" ---
-        var declarativeMultilingual = MakeMultilingual(MakeJaStub(), MakeEnStub());
+        MultilingualPhonemizer declarativeMultilingual = MakeMultilingual(MakeJaStub(), MakeEnStub());
+
         // Trigger PhonemizeWithProsody to capture _lastEos = "$"
         declarativeMultilingual.PhonemizeWithProsody("\u3053\u3093");
 
         var inputIds = new List<int> { 10, 11 };  // k, o
         var inputProsody = new List<ProsodyInfo?> { null, null };
 
-        var (declIds, declProsody) = declarativeMultilingual.PostProcessIds(
+        (List<int>? declIds, List<ProsodyInfo?>? declProsody) = declarativeMultilingual.PostProcessIds(
             inputIds, inputProsody, map);
 
         // Expected: BOS(1), PAD(0), 10, PAD(0), 11, PAD(0), EOS(2)
@@ -360,14 +361,15 @@ public sealed class MultilingualPhonemizerTests
         Assert.Equal(declIds.Count, declProsody.Count);
 
         // --- Question case: last EOS is "?" ---
-        var questionMultilingual = MakeMultilingual(MakeJaQuestionStub(), MakeEnStub());
+        MultilingualPhonemizer questionMultilingual = MakeMultilingual(MakeJaQuestionStub(), MakeEnStub());
+
         // Trigger PhonemizeWithProsody to capture _lastEos = "?"
         questionMultilingual.PhonemizeWithProsody("\u3053\u3093");
 
         var inputIds2 = new List<int> { 10, 12 };  // k, a
         var inputProsody2 = new List<ProsodyInfo?> { null, null };
 
-        var (qIds, qProsody) = questionMultilingual.PostProcessIds(
+        (List<int>? qIds, List<ProsodyInfo?>? qProsody) = questionMultilingual.PostProcessIds(
             inputIds2, inputProsody2, map);
 
         // Expected: BOS(1), PAD(0), 10, PAD(0), 12, PAD(0), EOS(3)
@@ -376,13 +378,13 @@ public sealed class MultilingualPhonemizerTests
         Assert.Equal(qIds.Count, qProsody.Count);
 
         // --- PUA emphasis question case: last EOS is "\uE016" ---
-        var emphMultilingual = MakeMultilingual(MakeJaEmphasisQuestionStub(), MakeEnStub());
+        MultilingualPhonemizer emphMultilingual = MakeMultilingual(MakeJaEmphasisQuestionStub(), MakeEnStub());
         emphMultilingual.PhonemizeWithProsody("\u3053\u3093");
 
         var inputIds3 = new List<int> { 10, 12 };  // k, a
         var inputProsody3 = new List<ProsodyInfo?> { null, null };
 
-        var (emphIds, emphProsody) = emphMultilingual.PostProcessIds(
+        (List<int>? emphIds, List<ProsodyInfo?>? emphProsody) = emphMultilingual.PostProcessIds(
             inputIds3, inputProsody3, map);
 
         // Expected: BOS(1), PAD(0), 10, PAD(0), 12, PAD(0), EOS(4)
@@ -407,16 +409,16 @@ public sealed class MultilingualPhonemizerTests
     [Fact]
     public void AllQuestionMarkerTypes()
     {
-        var map = MakeMap();
+        Dictionary<string, int[]> map = MakeMap();
 
         // --- ?! (PUA U+E016) -> ID 4 ---
         var emphStub = new StubPhonemizer(
             new List<string> { "^", "k", "a", "\uE016" },
             new List<ProsodyInfo?> { null, new ProsodyInfo(-1, 1, 2), new ProsodyInfo(0, 2, 2), null });
-        var emphMultilingual = MakeMultilingual(emphStub, MakeEnStub());
+        MultilingualPhonemizer emphMultilingual = MakeMultilingual(emphStub, MakeEnStub());
         emphMultilingual.PhonemizeWithProsody("\u3053\u3093");
 
-        var (emphIds, _) = emphMultilingual.PostProcessIds(
+        (List<int>? emphIds, List<ProsodyInfo?> _) = emphMultilingual.PostProcessIds(
             new List<int> { 10, 12 }, new List<ProsodyInfo?> { null, null }, map);
         Assert.Equal(4, emphIds[^1]);
 
@@ -424,10 +426,10 @@ public sealed class MultilingualPhonemizerTests
         var neutralStub = new StubPhonemizer(
             new List<string> { "^", "k", "a", "\uE017" },
             new List<ProsodyInfo?> { null, new ProsodyInfo(-1, 1, 2), new ProsodyInfo(0, 2, 2), null });
-        var neutralMultilingual = MakeMultilingual(neutralStub, MakeEnStub());
+        MultilingualPhonemizer neutralMultilingual = MakeMultilingual(neutralStub, MakeEnStub());
         neutralMultilingual.PhonemizeWithProsody("\u3053\u3093");
 
-        var (neutralIds, _) = neutralMultilingual.PostProcessIds(
+        (List<int>? neutralIds, List<ProsodyInfo?> _) = neutralMultilingual.PostProcessIds(
             new List<int> { 10, 12 }, new List<ProsodyInfo?> { null, null }, map);
         Assert.Equal(5, neutralIds[^1]);
 
@@ -435,10 +437,10 @@ public sealed class MultilingualPhonemizerTests
         var tagStub = new StubPhonemizer(
             new List<string> { "^", "k", "a", "\uE018" },
             new List<ProsodyInfo?> { null, new ProsodyInfo(-1, 1, 2), new ProsodyInfo(0, 2, 2), null });
-        var tagMultilingual = MakeMultilingual(tagStub, MakeEnStub());
+        MultilingualPhonemizer tagMultilingual = MakeMultilingual(tagStub, MakeEnStub());
         tagMultilingual.PhonemizeWithProsody("\u3053\u3093");
 
-        var (tagIds, _) = tagMultilingual.PostProcessIds(
+        (List<int>? tagIds, List<ProsodyInfo?> _) = tagMultilingual.PostProcessIds(
             new List<int> { 10, 12 }, new List<ProsodyInfo?> { null, null }, map);
         Assert.Equal(6, tagIds[^1]);
     }
@@ -455,7 +457,7 @@ public sealed class MultilingualPhonemizerTests
     public void PostProcessIds_DynamicEosFallback()
     {
         // Use the emphasis question stub to set _lastEos = "\uE016"
-        var multilingual = MakeMultilingual(MakeJaEmphasisQuestionStub(), MakeEnStub());
+        MultilingualPhonemizer multilingual = MakeMultilingual(MakeJaEmphasisQuestionStub(), MakeEnStub());
         multilingual.PhonemizeWithProsody("\u3053\u3093");
 
         // Build a map that does NOT include "\uE016" -- the PUA token
@@ -468,7 +470,7 @@ public sealed class MultilingualPhonemizerTests
             ["a"] = [12],
         };
 
-        var (ids, prosody) = multilingual.PostProcessIds(
+        (List<int>? ids, List<ProsodyInfo?>? prosody) = multilingual.PostProcessIds(
             new List<int> { 10, 12 },
             new List<ProsodyInfo?> { null, null },
             mapWithoutPua);
@@ -498,10 +500,9 @@ public sealed class MultilingualPhonemizerTests
         // Since both JA segments use the same stub, both will return
         // the same tokens. The result should be:
         // ["k", "o"] + ["h", "e", "l", "o"] + ["k", "o"] = 10 tokens
+        MultilingualPhonemizer multilingual = MakeMultilingual(MakeJaStub(), MakeEnStub());
 
-        var multilingual = MakeMultilingual(MakeJaStub(), MakeEnStub());
-
-        var (tokens, prosody) = multilingual.PhonemizeWithProsody(
+        (List<string>? tokens, List<ProsodyInfo?>? prosody) = multilingual.PhonemizeWithProsody(
             "\u3053\u3093hello\u304B\u306A");  // こんhelloかな
 
         // JA(2) + EN(4) + JA(2) = 8 tokens
@@ -530,11 +531,11 @@ public sealed class MultilingualPhonemizerTests
 
         // Verify the last EOS was tracked: the last JA segment has "$",
         // so PostProcessIds should emit standard EOS.
-        var map = MakeMap();
+        Dictionary<string, int[]> map = MakeMap();
         var inputIds = new List<int> { 10, 11 };
         var inputProsody = new List<ProsodyInfo?> { null, null };
 
-        var (resultIds, _) = multilingual.PostProcessIds(inputIds, inputProsody, map);
+        (List<int>? resultIds, List<ProsodyInfo?> _) = multilingual.PostProcessIds(inputIds, inputProsody, map);
         Assert.Equal(2, resultIds[^1]);  // "$" EOS from last JA segment
     }
 
@@ -550,14 +551,14 @@ public sealed class MultilingualPhonemizerTests
     [Fact]
     public void Phonemize_ReturnsTokensOnly()
     {
-        var multilingual = MakeMultilingual(MakeJaStub(), MakeEnStub());
+        MultilingualPhonemizer multilingual = MakeMultilingual(MakeJaStub(), MakeEnStub());
 
         // Call the non-prosody Phonemize() method
-        var tokens = multilingual.Phonemize("\u3053\u3093hello");
+        List<string> tokens = multilingual.Phonemize("\u3053\u3093hello");
 
         // Should match PhonemizeWithProsody result
-        var multilingual2 = MakeMultilingual(MakeJaStub(), MakeEnStub());
-        var (expectedTokens, _) = multilingual2.PhonemizeWithProsody("\u3053\u3093hello");
+        MultilingualPhonemizer multilingual2 = MakeMultilingual(MakeJaStub(), MakeEnStub());
+        (List<string>? expectedTokens, List<ProsodyInfo?> _) = multilingual2.PhonemizeWithProsody("\u3053\u3093hello");
 
         Assert.Equal(expectedTokens, tokens);
 

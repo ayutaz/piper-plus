@@ -167,6 +167,6 @@ without waiting on Maven Central.
 ## 9. Where to file feedback
 
 - **Bugs / questions**: open an issue at
-  https://github.com/ayutaz/piper-plus/issues with the `kotlin-g2p` label.
+  <https://github.com/ayutaz/piper-plus/issues> with the `kotlin-g2p` label.
 - **Security findings**: please follow the SECURITY.md disclosure path
   rather than the public tracker.

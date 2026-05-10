@@ -11,7 +11,6 @@ public class ShortTextProcessorTests
     // ==================================================================
     // Constants validation
     // ==================================================================
-
     [Fact]
     public void Constants_HaveExpectedValues()
     {
@@ -30,7 +29,6 @@ public class ShortTextProcessorTests
     // ==================================================================
     // Strategy A: NeedsPadding
     // ==================================================================
-
     [Fact]
     public void NeedsPadding_ShortSequence_ReturnsTrue()
     {
@@ -94,14 +92,13 @@ public class ShortTextProcessorTests
     // ==================================================================
     // Strategy A: PadPhonemeIds
     // ==================================================================
-
     [Fact]
     public void PadPhonemeIds_ShortSequence_PaddedToMinLength()
     {
         // BOS=1, body=[10,11,12], EOS=2 => 5 elements
         long[] ids = [1, 10, 11, 12, 2];
 
-        var (padded, _, _, _) = ShortTextProcessor.PadPhonemeIds(ids, null);
+        (long[]? padded, long[] _, int _, int _) = ShortTextProcessor.PadPhonemeIds(ids, null);
 
         Assert.Equal(ShortTextProcessor.MinPhonemeIds, padded.Length);
     }
@@ -112,7 +109,7 @@ public class ShortTextProcessorTests
         // body must be >= MinBodyForStrategyA for Strategy A to apply.
         long[] ids = [1, 10, 11, 12, 2];
 
-        var (padded, _, _, _) = ShortTextProcessor.PadPhonemeIds(ids, null);
+        (long[]? padded, long[] _, int _, int _) = ShortTextProcessor.PadPhonemeIds(ids, null);
 
         Assert.Equal(1L, padded[0]);          // BOS preserved
         Assert.Equal(2L, padded[^1]);         // EOS preserved
@@ -125,13 +122,15 @@ public class ShortTextProcessorTests
         long[] ids = [1, 10, 11, 12, 2]; // body = 3
         var originalSet = new HashSet<long>(ids);
 
-        var (padded, _, _, _) = ShortTextProcessor.PadPhonemeIds(ids, null);
+        (long[]? padded, long[] _, int _, int _) = ShortTextProcessor.PadPhonemeIds(ids, null);
 
         // Every element that wasn't in the original must be PauseId (0)
         foreach (long id in padded)
         {
             if (!originalSet.Contains(id))
+            {
                 Assert.Equal(ShortTextProcessor.PauseId, id);
+            }
         }
     }
 
@@ -140,7 +139,7 @@ public class ShortTextProcessorTests
     {
         // body=2 ("あ。" case) → Strategy A skipped, returns input unchanged.
         long[] ids = [1, 10, 11, 2]; // body = 2
-        var (padded, prosody, _, _) = ShortTextProcessor.PadPhonemeIds(ids, null);
+        (long[]? padded, long[]? prosody, int _, int _) = ShortTextProcessor.PadPhonemeIds(ids, null);
 
         // The current contract is MinBodyForStrategyA == 3, so this body=2
         // input must be returned untouched. If MinBodyForStrategyA is ever
@@ -155,11 +154,11 @@ public class ShortTextProcessorTests
     {
         long[] ids = [1, 10, 11, 12, 13, 2];
 
-        var (padded, _, _, _) = ShortTextProcessor.PadPhonemeIds(ids, null);
+        (long[]? padded, long[] _, int _, int _) = ShortTextProcessor.PadPhonemeIds(ids, null);
 
         // The body elements (10, 11, 12, 13) should appear in order somewhere
         // between the first pause-block and the second pause-block.
-        var paddedList = padded.ToList();
+        List<long> paddedList = padded.ToList();
         int idx10 = paddedList.IndexOf(10);
         int idx11 = paddedList.IndexOf(11);
         int idx12 = paddedList.IndexOf(12);
@@ -179,7 +178,7 @@ public class ShortTextProcessorTests
         ids[0] = 1; // BOS
         ids[^1] = 2; // EOS
 
-        var (padded, _, _, _) = ShortTextProcessor.PadPhonemeIds(ids, null);
+        (long[]? padded, long[] _, int _, int _) = ShortTextProcessor.PadPhonemeIds(ids, null);
 
         Assert.Same(ids, padded); // No allocation when not needed
     }
@@ -191,7 +190,7 @@ public class ShortTextProcessorTests
         long[] ids = [1, 10, 11, 12, 2]; // 5 elements (body=3)
         long[] prosody = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]; // 5 * 3
 
-        var (padded, paddedProsody, _, _) = ShortTextProcessor.PadPhonemeIds(ids, prosody);
+        (long[]? padded, long[]? paddedProsody, int _, int _) = ShortTextProcessor.PadPhonemeIds(ids, prosody);
 
         Assert.NotNull(paddedProsody);
         Assert.Equal(padded.Length * 3, paddedProsody.Length);
@@ -214,7 +213,7 @@ public class ShortTextProcessorTests
         long[] ids = [1, 10, 11, 12, 2]; // 5 elements (body=3)
         long[] prosody = [1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4, 5, 5, 5];
 
-        var (padded, paddedProsody, _, _) = ShortTextProcessor.PadPhonemeIds(ids, prosody);
+        (long[]? _, long[]? paddedProsody, int _, int _) = ShortTextProcessor.PadPhonemeIds(ids, prosody);
 
         Assert.NotNull(paddedProsody);
 
@@ -231,7 +230,7 @@ public class ShortTextProcessorTests
         // body must be >= MinBodyForStrategyA so PadPhonemeIds actually pads.
         long[] ids = [1, 10, 11, 12, 2];
 
-        var (_, paddedProsody, _, _) = ShortTextProcessor.PadPhonemeIds(ids, null);
+        (long[] _, long[]? paddedProsody, int _, int _) = ShortTextProcessor.PadPhonemeIds(ids, null);
 
         Assert.Null(paddedProsody);
     }
@@ -242,7 +241,7 @@ public class ShortTextProcessorTests
         long[] ids = [1, 10, 11, 12, 2];
         long[] prosody = [1, 2]; // wrong length (should be 15)
 
-        var (_, paddedProsody, _, _) = ShortTextProcessor.PadPhonemeIds(ids, prosody);
+        (long[] _, long[]? paddedProsody, int _, int _) = ShortTextProcessor.PadPhonemeIds(ids, prosody);
 
         Assert.Null(paddedProsody);
     }
@@ -253,16 +252,20 @@ public class ShortTextProcessorTests
         // With 5 elements, deficit = 35. afterBos = 17, beforeEos = 18.
         long[] ids = [1, 10, 11, 12, 2];
 
-        var (padded, _, _, _) = ShortTextProcessor.PadPhonemeIds(ids, null);
+        (long[]? padded, long[] _, int _, int _) = ShortTextProcessor.PadPhonemeIds(ids, null);
 
         // Count pause IDs after BOS (index 1) until first body element
         int afterBosPadding = 0;
         for (int i = 1; i < padded.Length; i++)
         {
             if (padded[i] == ShortTextProcessor.PauseId)
+            {
                 afterBosPadding++;
+            }
             else
+            {
                 break;
+            }
         }
 
         // Count pause IDs before EOS (scanning backward from second-to-last)
@@ -270,16 +273,23 @@ public class ShortTextProcessorTests
         for (int i = padded.Length - 2; i >= 0; i--)
         {
             if (padded[i] == ShortTextProcessor.PauseId)
+            {
                 beforeEosPadding++;
+            }
             else
+            {
                 break;
+            }
         }
 
         int totalPadding = afterBosPadding + beforeEosPadding;
+
         // 5 input IDs → deficit = MinPhonemeIds - 5 pause tokens.
         Assert.Equal(ShortTextProcessor.MinPhonemeIds - 5, totalPadding);
+
         // Distribution should be roughly even (difference <= 1)
-        Assert.True(Math.Abs(afterBosPadding - beforeEosPadding) <= 1,
+        Assert.True(
+            Math.Abs(afterBosPadding - beforeEosPadding) <= 1,
             $"Padding should be roughly even: afterBos={afterBosPadding}, beforeEos={beforeEosPadding}");
     }
 
@@ -287,7 +297,6 @@ public class ShortTextProcessorTests
     // Strategy A: TrimPaddingByDurations (precise post-trim, issue #356)
     // ==================================================================
     // Mirrors src/python_run/tests/test_short_text_mitigation.py.
-
     [Fact]
     public void TrimPaddingByDurations_NoOpWhenNoPadding()
     {
@@ -308,6 +317,7 @@ public class ShortTextProcessorTests
         var audio = new float[total];
         var result = ShortTextProcessor.TrimPaddingByDurations(
             audio, durations, frontPad: 3, backPad: 0, hopSize: hop, eosMaxFrames: 6);
+
         // BOS + front padding samples = (2+3+3+3) * 100 = 1100
         Assert.Equal(total - 1100, result.Length);
     }
@@ -321,6 +331,7 @@ public class ShortTextProcessorTests
         var audio = new float[total];
         var result = ShortTextProcessor.TrimPaddingByDurations(
             audio, durations, frontPad: 2, backPad: 2, hopSize: hop);
+
         // BOS + front padding = (2+5+5)*100 = 1200
         // back padding + entire EOS = (5+5+8)*100 = 1800
         Assert.Equal(total - 1200 - 1800, result.Length);
@@ -336,6 +347,7 @@ public class ShortTextProcessorTests
         var audio = new float[total];
         var result = ShortTextProcessor.TrimPaddingByDurations(
             audio, durations, frontPad: 2, backPad: 2, hopSize: hop, eosMaxFrames: 6);
+
         // BOS + front padding = (2+3+3) * 100 = 800
         // back padding + EOS excess = (3+3 + (10-6)) * 100 = 1000
         Assert.Equal(total - 800 - 1000, result.Length);
@@ -381,7 +393,11 @@ public class ShortTextProcessorTests
         var durations = new[] { 0.701f, 0.701f, 2f, 2f, 2f, 0.703f, 0.701f };
         const int hop = 100;
         float sum = 0f;
-        foreach (var d in durations) sum += d;
+        foreach (var d in durations)
+        {
+            sum += d;
+        }
+
         int total = (int)(sum * hop);
         var audio = new float[total];
         var result = ShortTextProcessor.TrimPaddingByDurations(
@@ -392,7 +408,6 @@ public class ShortTextProcessorTests
     // ==================================================================
     // Strategy A: TrimSilence
     // ==================================================================
-
     [Fact]
     public void TrimSilence_AllSilent_KeepsMinSamples()
     {
@@ -401,7 +416,8 @@ public class ShortTextProcessorTests
 
         float[] trimmed = ShortTextProcessor.TrimSilence(audio);
 
-        Assert.True(trimmed.Length >= ShortTextProcessor.TrimMinSamples,
+        Assert.True(
+            trimmed.Length >= ShortTextProcessor.TrimMinSamples,
             $"Expected at least {ShortTextProcessor.TrimMinSamples} samples, got {trimmed.Length}");
     }
 
@@ -435,15 +451,20 @@ public class ShortTextProcessorTests
     {
         // 1000 samples silence + 3000 samples audio + 1000 samples silence
         var audio = new float[5000];
+
         // Fill the middle portion with non-silent audio
         for (int i = 1000; i < 4000; i++)
+        {
             audio[i] = 0.5f;
+        }
 
         float[] trimmed = ShortTextProcessor.TrimSilence(audio);
 
         // Trimmed audio should be shorter than original
-        Assert.True(trimmed.Length < audio.Length,
+        Assert.True(
+            trimmed.Length < audio.Length,
             $"Trimmed ({trimmed.Length}) should be shorter than original ({audio.Length})");
+
         // But should still contain the non-silent portion
         Assert.True(trimmed.Length >= ShortTextProcessor.TrimMinSamples);
     }
@@ -463,14 +484,13 @@ public class ShortTextProcessorTests
     // ==================================================================
     // Strategy B: AdjustScales
     // ==================================================================
-
     [Fact]
     public void AdjustScales_LongSequence_NoChange()
     {
         float noiseScale = 0.667f;
         float noiseW = 0.8f;
 
-        var (adjNoise, adjW) = ShortTextProcessor.AdjustScales(
+        (float adjNoise, float adjW) = ShortTextProcessor.AdjustScales(
             ShortTextProcessor.MinPhonemeIds, noiseScale, noiseW);
 
         Assert.Equal(noiseScale, adjNoise);
@@ -483,7 +503,7 @@ public class ShortTextProcessorTests
         float noiseScale = 0.667f;
         float noiseW = 0.8f;
 
-        var (adjNoise, adjW) = ShortTextProcessor.AdjustScales(100, noiseScale, noiseW);
+        (float adjNoise, float adjW) = ShortTextProcessor.AdjustScales(100, noiseScale, noiseW);
 
         Assert.Equal(noiseScale, adjNoise);
         Assert.Equal(noiseW, adjW);
@@ -495,11 +515,13 @@ public class ShortTextProcessorTests
         float noiseScale = 0.667f;
         float noiseW = 0.8f;
 
-        var (adjNoise, adjW) = ShortTextProcessor.AdjustScales(10, noiseScale, noiseW);
+        (float adjNoise, float adjW) = ShortTextProcessor.AdjustScales(10, noiseScale, noiseW);
 
-        Assert.True(adjNoise < noiseScale,
+        Assert.True(
+            adjNoise < noiseScale,
             $"Adjusted noiseScale ({adjNoise}) should be less than original ({noiseScale})");
-        Assert.True(adjW < noiseW,
+        Assert.True(
+            adjW < noiseW,
             $"Adjusted noiseW ({adjW}) should be less than original ({noiseW})");
     }
 
@@ -510,10 +532,11 @@ public class ShortTextProcessorTests
         float noiseW = 1.0f;
 
         // 1 phoneme: ratio = 1/40 = 0.025, floor applied
-        var (adjNoise, adjW) = ShortTextProcessor.AdjustScales(1, noiseScale, noiseW);
+        (float adjNoise, float adjW) = ShortTextProcessor.AdjustScales(1, noiseScale, noiseW);
 
         // noiseScale floor: max(0.5, 0.025) = 0.5
         Assert.Equal(0.5f, adjNoise);
+
         // noiseW floor: max(0.4, 0.025) = 0.4
         Assert.Equal(0.4f, adjW);
     }
@@ -525,7 +548,7 @@ public class ShortTextProcessorTests
         float noiseW = 1.0f;
         int halfMin = ShortTextProcessor.MinPhonemeIds / 2;
 
-        var (adjNoise, adjW) = ShortTextProcessor.AdjustScales(halfMin, noiseScale, noiseW);
+        (float adjNoise, float adjW) = ShortTextProcessor.AdjustScales(halfMin, noiseScale, noiseW);
 
         // ratio = halfMin / MinPhonemeIds, floors clamp where needed.
         float ratio = (float)halfMin / ShortTextProcessor.MinPhonemeIds;
@@ -541,7 +564,7 @@ public class ShortTextProcessorTests
         float noiseScale = 0.667f;
         float noiseW = 0.8f;
 
-        var (adjNoise, adjW) = ShortTextProcessor.AdjustScales(0, noiseScale, noiseW);
+        (float adjNoise, float adjW) = ShortTextProcessor.AdjustScales(0, noiseScale, noiseW);
 
         // ratio = 0, floor applies
         Assert.Equal(noiseScale * 0.5f, adjNoise, 5);
@@ -553,7 +576,7 @@ public class ShortTextProcessorTests
     {
         // LengthScale is not part of AdjustScales; just verify the API
         // doesn't affect it implicitly by returning only noiseScale + noiseW.
-        var (adjNoise, adjW) = ShortTextProcessor.AdjustScales(10, 0.667f, 0.8f);
+        (float adjNoise, float adjW) = ShortTextProcessor.AdjustScales(10, 0.667f, 0.8f);
 
         // Both returned values should be positive
         Assert.True(adjNoise > 0f);
@@ -563,7 +586,6 @@ public class ShortTextProcessorTests
     // ==================================================================
     // Strategy C: WrapShortTextWithBreaks
     // ==================================================================
-
     [Fact]
     public void WrapShortTextWithBreaks_ShortText_Wrapped()
     {
@@ -588,6 +610,7 @@ public class ShortTextProcessorTests
             count++;
             idx++;
         }
+
         Assert.Equal(2, count);
     }
 
@@ -647,9 +670,9 @@ public class ShortTextProcessorTests
     [Fact]
     public void WrapShortTextWithBreaks_EmptyString_ReturnsEmpty()
     {
-        string result = ShortTextProcessor.WrapShortTextWithBreaks("");
+        string result = ShortTextProcessor.WrapShortTextWithBreaks(string.Empty);
 
-        Assert.Equal("", result);
+        Assert.Equal(string.Empty, result);
     }
 
     [Fact]
@@ -736,7 +759,6 @@ public class ShortTextProcessorTests
     // ==================================================================
     // Strategy C: IsShortPlainText
     // ==================================================================
-
     [Fact]
     public void IsShortPlainText_ShortText_ReturnsTrue()
     {
@@ -758,7 +780,7 @@ public class ShortTextProcessorTests
     [Fact]
     public void IsShortPlainText_Empty_ReturnsFalse()
     {
-        Assert.False(ShortTextProcessor.IsShortPlainText(""));
+        Assert.False(ShortTextProcessor.IsShortPlainText(string.Empty));
     }
 
     [Fact]
@@ -788,7 +810,6 @@ public class ShortTextProcessorTests
     // ==================================================================
     // Integration: PadPhonemeIds + TrimSilence round-trip
     // ==================================================================
-
     [Fact]
     public void PadAndTrim_ShortSequence_OutputReasonableLength()
     {
@@ -796,7 +817,7 @@ public class ShortTextProcessorTests
         // then trim. This tests the intended A-strategy flow.
         long[] ids = [1, 10, 11, 12, 2];
 
-        var (padded, _, _, _) = ShortTextProcessor.PadPhonemeIds(ids, null);
+        (long[]? padded, long[] _, int _, int _) = ShortTextProcessor.PadPhonemeIds(ids, null);
         Assert.Equal(ShortTextProcessor.MinPhonemeIds, padded.Length);
 
         // Simulate audio: silence for padding, non-silent for real phonemes
@@ -807,9 +828,11 @@ public class ShortTextProcessorTests
 
         // Mark body region as non-silent
         int bodyStart = (1 + afterBos) * 256;
-        int bodyEnd = bodyStart + 3 * 256; // 3 body elements
+        int bodyEnd = bodyStart + (3 * 256); // 3 body elements
         for (int i = bodyStart; i < bodyEnd && i < audio.Length; i++)
+        {
             audio[i] = 0.5f;
+        }
 
         float[] trimmed = ShortTextProcessor.TrimSilence(audio);
 
@@ -821,7 +844,6 @@ public class ShortTextProcessorTests
     // ==================================================================
     // Strategy B: AdjustScales with typical default values
     // ==================================================================
-
     [Fact]
     public void AdjustScales_DefaultScales_ShortInput_ReducedButPositive()
     {
@@ -829,7 +851,7 @@ public class ShortTextProcessorTests
         float noiseScale = 0.667f;
         float noiseW = 0.8f;
 
-        var (adjNoise, adjW) = ShortTextProcessor.AdjustScales(5, noiseScale, noiseW);
+        (float adjNoise, float adjW) = ShortTextProcessor.AdjustScales(5, noiseScale, noiseW);
 
         Assert.True(adjNoise > 0f && adjNoise <= noiseScale);
         Assert.True(adjW > 0f && adjW <= noiseW);
@@ -838,7 +860,6 @@ public class ShortTextProcessorTests
     // ==================================================================
     // Strategy C: WrapShortTextWithBreaks format validation
     // ==================================================================
-
     [Fact]
     public void WrapShortTextWithBreaks_OutputFormat_Correct()
     {
@@ -852,17 +873,16 @@ public class ShortTextProcessorTests
     // ==================================================================
     // Strategy C: PadSilenceForShortText (audio-level)
     // ==================================================================
-
     [Fact]
     public void PadSilenceForShortText_AddsLeadingAndTrailingSilence()
     {
         short[] audio = [100, 200, 300];
         int sampleRate = 22050;
-        int expectedSilenceSamples = (int)(sampleRate * ShortTextProcessor.SilencePadMs / 1000.0f);
+        int expectedSilenceSamples = (int)((long)sampleRate * ShortTextProcessor.SilencePadMs / 1000L);
 
         short[] padded = ShortTextProcessor.PadSilenceForShortText(audio, sampleRate);
 
-        Assert.Equal(audio.Length + 2 * expectedSilenceSamples, padded.Length);
+        Assert.Equal(audio.Length + (2 * expectedSilenceSamples), padded.Length);
     }
 
     [Fact]
@@ -870,7 +890,7 @@ public class ShortTextProcessorTests
     {
         short[] audio = [100, 200, 300];
         int sampleRate = 22050;
-        int silenceSamples = (int)(sampleRate * ShortTextProcessor.SilencePadMs / 1000.0f);
+        int silenceSamples = (int)((long)sampleRate * ShortTextProcessor.SilencePadMs / 1000L);
 
         short[] padded = ShortTextProcessor.PadSilenceForShortText(audio, sampleRate);
 
@@ -886,7 +906,7 @@ public class ShortTextProcessorTests
     {
         short[] audio = [100, 200, 300];
         int sampleRate = 22050;
-        int silenceSamples = (int)(sampleRate * ShortTextProcessor.SilencePadMs / 1000.0f);
+        int silenceSamples = (int)((long)sampleRate * ShortTextProcessor.SilencePadMs / 1000L);
 
         short[] padded = ShortTextProcessor.PadSilenceForShortText(audio, sampleRate);
 
@@ -902,7 +922,7 @@ public class ShortTextProcessorTests
     {
         short[] audio = [100, 200, 300, 400, 500];
         int sampleRate = 22050;
-        int silenceSamples = (int)(sampleRate * ShortTextProcessor.SilencePadMs / 1000.0f);
+        int silenceSamples = (int)((long)sampleRate * ShortTextProcessor.SilencePadMs / 1000L);
 
         short[] padded = ShortTextProcessor.PadSilenceForShortText(audio, sampleRate);
 
@@ -932,7 +952,7 @@ public class ShortTextProcessorTests
         short[] padded = ShortTextProcessor.PadSilenceForShortText(audio, sampleRate);
 
         // Each silence block = sampleRate * SilencePadMs / 1000
-        int expectedSilenceSamples = (int)(sampleRate * ShortTextProcessor.SilencePadMs / 1000.0f);
+        int expectedSilenceSamples = (int)((long)sampleRate * ShortTextProcessor.SilencePadMs / 1000L);
         int expectedTotal = expectedSilenceSamples + 1 + expectedSilenceSamples;
         Assert.Equal(expectedTotal, padded.Length);
     }
@@ -945,14 +965,13 @@ public class ShortTextProcessorTests
 
         short[] padded = ShortTextProcessor.PadSilenceForShortText(audio, sampleRate);
 
-        int expectedSilenceSamples = (int)(sampleRate * ShortTextProcessor.SilencePadMs / 1000.0f);
-        Assert.Equal(1 + 2 * expectedSilenceSamples, padded.Length);
+        int expectedSilenceSamples = (int)((long)sampleRate * ShortTextProcessor.SilencePadMs / 1000L);
+        Assert.Equal(1 + (2 * expectedSilenceSamples), padded.Length);
     }
 
     // ==================================================================
     // Strategy C: Integration — WrapShortTextWithBreaks detection
     // ==================================================================
-
     [Fact]
     public void WrapShortTextWithBreaks_DetectsShortText_ForAudioPadding()
     {

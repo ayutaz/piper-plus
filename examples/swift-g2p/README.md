@@ -27,7 +27,7 @@ The published `from: "1.14.0"` URL won't resolve until the maintainer pushes the
 
 1. **Build the xcframework locally** (one-time per branch). From the piper-plus repo root, mirror the steps in `.github/workflows/swift-g2p-ci.yml`:
 
-   ```
+   ```text
    cargo build -p piper-plus-g2p --target {aarch64,x86_64}-apple-darwin --release \
      --features all-languages,naist-jdic,bundled-dicts,ffi
    # → lipo + cbindgen + xcodebuild -create-xcframework

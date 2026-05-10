@@ -14,8 +14,8 @@
  * Run: node --test test/js/test-piper-plus-g2p-init.js
  */
 
-import { describe, it, beforeEach, afterEach } from 'node:test';
-import assert from 'node:assert/strict';
+import { describe, it, beforeEach, afterEach } from "node:test";
+import assert from "node:assert/strict";
 
 // ---------------------------------------------------------------------------
 // Save originals
@@ -38,7 +38,7 @@ function setMockConfig(config) {
 
 function installGlobalMocks() {
   globalThis.fetch = async (url) => {
-    if (typeof url === 'string' && url.endsWith('.json')) {
+    if (typeof url === "string" && url.endsWith(".json")) {
       return {
         ok: true,
         status: 200,
@@ -55,8 +55,8 @@ function installGlobalMocks() {
   globalThis.ort = {
     InferenceSession: {
       create: async () => ({
-        inputNames: ['input', 'input_lengths', 'scales'],
-        outputNames: ['output'],
+        inputNames: ["input", "input_lengths", "scales"],
+        outputNames: ["output"],
         run: async () => ({
           output: { data: new Float32Array(22050), dims: [1, 22050] },
         }),
@@ -92,12 +92,21 @@ function installGlobalMocks() {
               objectStore: () => ({
                 get: () => {
                   const r = {};
-                  setTimeout(() => { r.result = null; if (r.onsuccess) r.onsuccess(); }, 0);
+                  setTimeout(() => {
+                    r.result = null;
+                    if (r.onsuccess) {
+                      r.onsuccess();
+                    }
+                  }, 0);
                   return r;
                 },
                 put: () => {
                   const r = {};
-                  setTimeout(() => { if (r.onsuccess) r.onsuccess(); }, 0);
+                  setTimeout(() => {
+                    if (r.onsuccess) {
+                      r.onsuccess();
+                    }
+                  }, 0);
                   return r;
                 },
               }),
@@ -121,11 +130,11 @@ let PiperPlus, ModelManager, G2P;
 let importError = null;
 
 try {
-  const piperMod = await import('../../src/index.js');
+  const piperMod = await import("../../src/index.js");
   PiperPlus = piperMod.PiperPlus;
   ModelManager = piperMod.ModelManager;
 
-  const g2pMod = await import('@piper-plus/g2p');
+  const g2pMod = await import("@piper-plus/g2p");
   G2P = g2pMod.G2P;
 } catch (e) {
   importError = e;
@@ -143,8 +152,8 @@ function installModelManagerStub() {
   _origResolve = ModelManager.prototype.resolveUrls;
   ModelManager.prototype.resolveUrls = function () {
     return {
-      modelUrl: 'https://mock/model.onnx',
-      configUrl: 'https://mock/model.onnx.json',
+      modelUrl: "https://mock/model.onnx",
+      configUrl: "https://mock/model.onnx.json",
     };
   };
 }
@@ -159,9 +168,13 @@ function removeModelManagerStub() {
 /** Mock G2P instance returned by our spy. */
 function createMockG2PInstance() {
   return {
-    detectLanguage: () => 'en',
+    detectLanguage: () => "en",
     encode: (text, language) => ({ phonemeIds: [1, 7, 2], prosodyFeatures: null }),
-    phonemize: () => ({ tokens: ['h', 'e', 'l', 'o'], prosody: [null, null, null, null], language: 'en' }),
+    phonemize: () => ({
+      tokens: ["h", "e", "l", "o"],
+      prosody: [null, null, null, null],
+      language: "en",
+    }),
     dispose: () => {},
   };
 }
@@ -183,7 +196,9 @@ function spyOnG2PCreate() {
 
   return {
     calls,
-    restore: () => { G2P.create = original; },
+    restore: () => {
+      G2P.create = original;
+    },
   };
 }
 
@@ -194,7 +209,7 @@ function spyOnG2PCreate() {
 const BASE_CONFIG = {
   audio: { sample_rate: 22050 },
   inference: { noise_scale: 0.667, length_scale: 1.0, noise_w: 0.8 },
-  phoneme_id_map: { _: [0], '^': [1], $: [2], a: [7] },
+  phoneme_id_map: { _: [0], "^": [1], $: [2], a: [7] },
   num_speakers: 1,
 };
 
@@ -202,7 +217,7 @@ const BASE_CONFIG = {
 // Tests
 // ---------------------------------------------------------------------------
 
-describe('PiperPlus G2P.create() integration', { skip: skip ? 'Import failed' : false }, () => {
+describe("PiperPlus G2P.create() integration", { skip: skip ? "Import failed" : false }, () => {
   let g2pSpy;
 
   beforeEach(() => {
@@ -215,47 +230,55 @@ describe('PiperPlus G2P.create() integration', { skip: skip ? 'Import failed' : 
     g2pSpy.restore();
   });
 
-  it('config with language_id_map (no WASM-required) passes languages to G2P.create()', async () => {
+  it("config with language_id_map (no WASM-required) passes languages to G2P.create()", async () => {
     setMockConfig({
       ...BASE_CONFIG,
       language_id_map: { en: 0, es: 1, fr: 2 },
     });
 
-    const piper = await PiperPlus.initialize({ model: 'test', ort: globalThis.ort });
+    const piper = await PiperPlus.initialize({ model: "test", ort: globalThis.ort });
     piper.dispose();
 
-    assert.equal(g2pSpy.calls.length, 1, 'G2P.create() should be called once');
+    assert.equal(g2pSpy.calls.length, 1, "G2P.create() should be called once");
     const langs = g2pSpy.calls[0].languages;
-    assert.deepEqual(langs.sort(), ['en', 'es', 'fr'], 'should pass languages from language_id_map');
+    assert.deepEqual(
+      langs.sort(),
+      ["en", "es", "fr"],
+      "should pass languages from language_id_map"
+    );
   });
 
-  it('config without language_id_map passes undefined languages', async () => {
+  it("config without language_id_map passes undefined languages", async () => {
     setMockConfig({ ...BASE_CONFIG });
 
-    const piper = await PiperPlus.initialize({ model: 'test', ort: globalThis.ort });
+    const piper = await PiperPlus.initialize({ model: "test", ort: globalThis.ort });
     piper.dispose();
 
     assert.equal(g2pSpy.calls.length, 1);
-    assert.equal(g2pSpy.calls[0].languages, undefined, 'languages should be undefined when no language_id_map');
+    assert.equal(
+      g2pSpy.calls[0].languages,
+      undefined,
+      "languages should be undefined when no language_id_map"
+    );
   });
 
-  it('config with ja+zh excludes WASM-required langs from JS G2P on WASM fallback', async () => {
+  it("config with ja+zh excludes WASM-required langs from JS G2P on WASM fallback", async () => {
     setMockConfig({
       ...BASE_CONFIG,
       language_id_map: { ja: 0, en: 1, zh: 2, es: 3, fr: 4, pt: 5 },
     });
 
-    const piper = await PiperPlus.initialize({ model: 'test', ort: globalThis.ort });
+    const piper = await PiperPlus.initialize({ model: "test", ort: globalThis.ort });
     piper.dispose();
 
     assert.equal(g2pSpy.calls.length, 1);
     const langs = g2pSpy.calls[0].languages;
-    assert.ok(!langs.includes('ja'), 'ja should be excluded from JS G2P languages');
-    assert.ok(!langs.includes('zh'), 'zh should be excluded from JS G2P languages');
-    assert.deepEqual(langs.sort(), ['en', 'es', 'fr', 'pt']);
+    assert.ok(!langs.includes("ja"), "ja should be excluded from JS G2P languages");
+    assert.ok(!langs.includes("zh"), "zh should be excluded from JS G2P languages");
+    assert.deepEqual(langs.sort(), ["en", "es", "fr", "pt"]);
   });
 
-  it('G2P.create() failure propagates to PiperPlus.initialize()', async () => {
+  it("G2P.create() failure propagates to PiperPlus.initialize()", async () => {
     setMockConfig({
       ...BASE_CONFIG,
       language_id_map: { ja: 0, en: 1 },
@@ -265,21 +288,21 @@ describe('PiperPlus G2P.create() integration', { skip: skip ? 'Import failed' : 
     g2pSpy.restore();
     const original = G2P.create;
     G2P.create = async () => {
-      throw new Error('openjtalkModule is required.');
+      throw new Error("openjtalkModule is required.");
     };
 
     try {
       await assert.rejects(
-        () => PiperPlus.initialize({ model: 'test', ort: globalThis.ort }),
-        (err) => err.message.includes('openjtalkModule'),
-        'PiperPlus.initialize should propagate G2P.create() errors'
+        () => PiperPlus.initialize({ model: "test", ort: globalThis.ort }),
+        (err) => err.message.includes("openjtalkModule"),
+        "PiperPlus.initialize should propagate G2P.create() errors"
       );
     } finally {
       G2P.create = original;
     }
   });
 
-  it('real G2P.create() with ja and no openjtalkModule initializes without ja', async () => {
+  it("real G2P.create() with ja and no openjtalkModule initializes without ja", async () => {
     setMockConfig({
       ...BASE_CONFIG,
       language_id_map: { ja: 0, en: 1 },
@@ -289,12 +312,12 @@ describe('PiperPlus G2P.create() integration', { skip: skip ? 'Import failed' : 
     g2pSpy.restore();
 
     // Should succeed — ja is excluded, en is initialized
-    const piper = await PiperPlus.initialize({ model: 'test', ort: globalThis.ort });
-    assert.ok(piper, 'Should initialize successfully with ja excluded');
+    const piper = await PiperPlus.initialize({ model: "test", ort: globalThis.ort });
+    assert.ok(piper, "Should initialize successfully with ja excluded");
     piper.dispose();
   });
 
-  it('config with only non-ja languages initializes successfully', async () => {
+  it("config with only non-ja languages initializes successfully", async () => {
     setMockConfig({
       ...BASE_CONFIG,
       language_id_map: { en: 0, zh: 1, es: 2 },
@@ -303,8 +326,8 @@ describe('PiperPlus G2P.create() integration', { skip: skip ? 'Import failed' : 
     // Use real G2P.create() (restore spy)
     g2pSpy.restore();
 
-    const piper = await PiperPlus.initialize({ model: 'test', ort: globalThis.ort });
-    assert.ok(piper, 'Should initialize successfully without ja');
+    const piper = await PiperPlus.initialize({ model: "test", ort: globalThis.ort });
+    assert.ok(piper, "Should initialize successfully without ja");
     piper.dispose();
   });
 });
@@ -318,7 +341,7 @@ afterEach(() => {
 });
 
 // Restore on module unload
-process.on('exit', () => {
+process.on("exit", () => {
   globalThis.fetch = _origFetch;
   globalThis.ort = _origOrt;
   globalThis.indexedDB = _origIndexedDB;

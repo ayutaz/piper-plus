@@ -22,15 +22,20 @@ internal sealed class DotNetEnglishG2PEngine : IEnglishG2PEngine
             // Strip leading/trailing punctuation for lookup, keep punct as separate "word"
             string word = token.Trim();
             if (string.IsNullOrEmpty(word))
+            {
                 continue;
+            }
 
-            var phonemes = _engine.LookupWord(word);
+            IReadOnlyList<EnglishPhoneme> phonemes = _engine.LookupWord(word);
             if (phonemes.Count > 0)
             {
                 // EnglishPhoneme.ToString() returns ARPAbet like "HH", "AH0", "L"
                 var wordPhonemes = new List<string>(phonemes.Count);
-                foreach (var p in phonemes)
+                foreach (EnglishPhoneme p in phonemes)
+                {
                     wordPhonemes.Add(p.ToString());
+                }
+
                 result.Add(wordPhonemes);
             }
             else

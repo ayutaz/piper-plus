@@ -1,0 +1,62 @@
+name: model-quality-gate
+
+on:
+  pull_request:
+    branches: [dev]
+    paths:
+      - 'src/python/piper_train/export*.py'
+      - 'src/python/piper_train/speaker_encoder/export_encoder.py'
+      - 'src/python/g2p/piper_plus_g2p/data/pua.json'
+      - 'src/python_run/setup.py'
+      - 'src/python_run/pyproject.toml'
+      - 'src/rust/piper-core/Cargo.toml'
+      - 'src/rust/piper-plus-g2p/Cargo.toml'
+      - 'docs/spec/onnx-export-contract.toml'
+      - 'docs/spec/model-sha256-manifest.toml'
+      - 'docs/spec/dictionary-versions.toml'
+      - 'docs/spec/phoneme-set-version.toml'
+      - 'docs/spec/ort-versions.md'
+      - 'scripts/check_*.py'
+      - 'scripts/verify_*.py'
+      - '.github/workflows/model-quality-gate.yml'
+  push:
+    branches: [dev, main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contracts:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+
+      - name: Install tomli (Python 3.10 fallback only)
+        run: pip install tomli  # Python 3.11+ has tomllib built-in but harmless
+
+      - name: Check ONNX export contract
+        run: python scripts/check_onnx_export_contract.py
+
+      - name: Check phoneme set version contract
+        run: python scripts/check_phoneme_set_version.py
+
+      - name: Check dictionary versions
+        run: python scripts/check_dictionary_versions.py
+        continue-on-error: true  # spec text scan は false negative あり
+
+      - name: Check ORT version drift
+        run: python scripts/check_ort_version_drift.py
+        continue-on-error: true
+
+      - name: Verify model checksums (manifest print)
+        run: python scripts/verify_model_checksums.py --print-manifest
+        continue-on-error: true

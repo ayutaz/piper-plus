@@ -1098,6 +1098,202 @@ impl Phonemizer for PortuguesePhonemizer {
 }
 
 // ---------------------------------------------------------------------------
+// European Portuguese (pt-PT) — post-processing layer
+// ---------------------------------------------------------------------------
+// Mirror of Python `_apply_eu_postprocessing` in
+// `src/python/g2p/piper_plus_g2p/portuguese.py`. Reuses the BR sentence
+// pipeline and rewrites the 5 BR↔EU contrasts in-place. See
+// `docs/spec/pt-dialect-contract.toml` (spec_version 2,
+// `[implementation.differences]`).
+
+const PUA_AFFRICATE_TCH_STR: &str = "\u{E054}";
+const PUA_AFFRICATE_DZH_STR: &str = "\u{E055}";
+
+const IPA_VOWEL_CHARS: &[char] = &[
+    'a', 'e', 'i', 'o', 'u', 'ɛ', 'ɔ', 'ã', 'ẽ', 'ĩ', 'õ', 'ũ', 'ɨ',
+];
+const IPA_CONSONANT_CHARS: &[char] = &[
+    'b', 'd', 'f', 'k', 'l', 'm', 'n', 'p', 'r', 's', 't', 'v', 'w', 'z', 'ɡ', 'ɲ', 'ɾ', 'ʁ', 'ʃ',
+    'ʎ', 'ʒ', 'ʔ', 'h', 'ɫ',
+];
+
+fn token_starts_with_consonant(token: &str) -> bool {
+    token
+        .chars()
+        .next()
+        .map(|c| IPA_CONSONANT_CHARS.contains(&c))
+        .unwrap_or(false)
+}
+
+fn token_starts_with_vowel(token: &str) -> bool {
+    token
+        .chars()
+        .next()
+        .map(|c| IPA_VOWEL_CHARS.contains(&c))
+        .unwrap_or(false)
+}
+
+fn next_non_space_starts_with_vowel(tokens: &[String], idx: usize) -> bool {
+    let mut j = idx + 1;
+    while j < tokens.len() && tokens[j] == " " {
+        j += 1;
+    }
+    if j < tokens.len() {
+        token_starts_with_vowel(&tokens[j])
+    } else {
+        false
+    }
+}
+
+fn apply_eu_postprocessing(tokens: &mut [String]) {
+    let n = tokens.len();
+    let punct: &[&str] = &[
+        ",", ".", ";", ":", "!", "?", "\u{2014}", "\u{2013}", "\u{2026}",
+    ];
+
+    // Pass 1: undo BR t/d palatalisation + final -e centralisation.
+    // BR pattern: ... [tʃ/dʒ] [i] [end / space / punct]
+    // EU mapping: ... [t/d]   [ɨ]
+    for i in 0..n {
+        if tokens[i] != "i" {
+            continue;
+        }
+        let next = if i + 1 < n {
+            tokens[i + 1].as_str()
+        } else {
+            ""
+        };
+        let is_final = next.is_empty() || next == " " || punct.contains(&next);
+        if !is_final {
+            continue;
+        }
+        if i >= 1 && tokens[i - 1] == PUA_AFFRICATE_TCH_STR {
+            tokens[i - 1] = "t".to_string();
+            tokens[i] = "ɨ".to_string();
+            continue;
+        }
+        if i >= 1 && tokens[i - 1] == PUA_AFFRICATE_DZH_STR {
+            tokens[i - 1] = "d".to_string();
+            tokens[i] = "ɨ".to_string();
+            continue;
+        }
+        // General final-e reduction: BR's reduced i → EU ɨ when preceded
+        // by a consonant (not part of a diphthong like /aj/).
+        if i >= 1 && token_starts_with_consonant(&tokens[i - 1]) {
+            tokens[i] = "ɨ".to_string();
+        }
+    }
+
+    // Pass 2: coda /s/ → /ʃ/, /z/ → /ʒ/.
+    for i in 0..n {
+        if tokens[i] != "s" && tokens[i] != "z" {
+            continue;
+        }
+        let next = if i + 1 < n {
+            tokens[i + 1].as_str()
+        } else {
+            ""
+        };
+        let is_word_end = next.is_empty() || next == " " || punct.contains(&next);
+        if is_word_end {
+            // Sandhi voicing before vowel-initial next word
+            if next_non_space_starts_with_vowel(tokens, i) {
+                tokens[i] = "ʒ".to_string();
+                continue;
+            }
+            tokens[i] = if tokens[i] == "s" { "ʃ" } else { "ʒ" }.to_string();
+        } else if token_starts_with_consonant(next) && !token_starts_with_vowel(next) {
+            tokens[i] = if tokens[i] == "s" { "ʃ" } else { "ʒ" }.to_string();
+        }
+    }
+
+    // Pass 3: coda /w/ from BR's l-vocalisation → /ɫ/ (only if preceded by a vowel).
+    for i in 0..n {
+        if tokens[i] != "w" {
+            continue;
+        }
+        if i == 0 {
+            continue;
+        }
+        if !token_starts_with_vowel(&tokens[i - 1]) {
+            continue;
+        }
+        let next = if i + 1 < n {
+            tokens[i + 1].as_str()
+        } else {
+            ""
+        };
+        let is_coda = next.is_empty()
+            || next == " "
+            || punct.contains(&next)
+            || (token_starts_with_consonant(next) && !token_starts_with_vowel(next));
+        if is_coda {
+            tokens[i] = "ɫ".to_string();
+        }
+    }
+
+    // Pass 4: r-canonicalisation (h → ʁ).
+    for token in tokens.iter_mut().take(n) {
+        if token == "h" {
+            *token = "ʁ".to_string();
+        }
+    }
+}
+
+/// European Portuguese (pt-PT) phonemizer.
+///
+/// Reuses the BR grapheme→IPA pipeline and applies EU-specific
+/// post-processing for the 5 BR↔EU contrasts. See
+/// `docs/spec/pt-dialect-contract.toml` for the canonical matrix.
+pub struct EuropeanPortuguesePhonemizer;
+
+impl EuropeanPortuguesePhonemizer {
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+impl Default for EuropeanPortuguesePhonemizer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Phonemizer for EuropeanPortuguesePhonemizer {
+    fn phonemize_with_prosody(
+        &self,
+        text: &str,
+    ) -> Result<(Vec<String>, Vec<Option<ProsodyInfo>>), PiperError> {
+        let (mut tokens, prosody) = phonemize_sentence_with_prosody(text);
+        apply_eu_postprocessing(&mut tokens);
+        debug_assert_eq!(
+            tokens.len(),
+            prosody.len(),
+            "EU post-processing must preserve token count"
+        );
+        Ok((tokens, prosody))
+    }
+
+    fn get_phoneme_id_map(&self) -> Option<&PhonemeIdMap> {
+        None
+    }
+
+    fn post_process_ids(
+        &self,
+        ids: Vec<i64>,
+        prosody: Vec<Option<ProsodyFeature>>,
+        id_map: &PhonemeIdMap,
+    ) -> (Vec<i64>, Vec<Option<ProsodyFeature>>) {
+        // Identical post-processing to BR (BOS/EOS/pad) — delegate to BR.
+        PortuguesePhonemizer::new().post_process_ids(ids, prosody, id_map)
+    }
+
+    fn language_code(&self) -> &str {
+        "pt-PT"
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Unit tests
 // ---------------------------------------------------------------------------
 
@@ -1431,5 +1627,105 @@ mod tests {
     fn test_language_code() {
         let pt = PortuguesePhonemizer::new();
         assert_eq!(pt.language_code(), "pt");
+    }
+
+    // ==================================================================
+    // EU (pt-PT) — pin the 5 BR↔EU contrasts. See
+    // `docs/spec/pt-dialect-contract.toml` (spec_version 2,
+    // `[implementation.differences]`) for the typological references.
+    // ==================================================================
+
+    fn eu_phonemize(text: &str) -> Vec<String> {
+        let eu = EuropeanPortuguesePhonemizer::new();
+        let (tokens, _) = eu.phonemize_with_prosody(text).unwrap();
+        tokens
+    }
+
+    fn br_phonemize(text: &str) -> Vec<String> {
+        let br = PortuguesePhonemizer::new();
+        let (tokens, _) = br.phonemize_with_prosody(text).unwrap();
+        tokens
+    }
+
+    #[test]
+    fn test_eu_language_code() {
+        let eu = EuropeanPortuguesePhonemizer::new();
+        assert_eq!(eu.language_code(), "pt-PT");
+    }
+
+    #[test]
+    fn test_eu_difference1_no_td_palatalisation() {
+        // BR "noite" contains the affricate (PUA E054); EU has plain t + ɨ
+        let br = br_phonemize("noite");
+        let eu = eu_phonemize("noite");
+        assert!(
+            br.iter().any(|t| t == PUA_AFFRICATE_TCH_STR),
+            "BR baseline must contain tʃ affricate: {:?}",
+            br
+        );
+        assert!(
+            !eu.iter().any(|t| t == PUA_AFFRICATE_TCH_STR),
+            "EU must not contain BR's tʃ affricate: {:?}",
+            eu
+        );
+        assert!(
+            eu.iter().any(|t| t == "ɨ"),
+            "EU must produce centralised ɨ: {:?}",
+            eu
+        );
+    }
+
+    #[test]
+    fn test_eu_difference2_final_e_centralisation() {
+        let br = br_phonemize("cidade");
+        let eu = eu_phonemize("cidade");
+        assert_eq!(br.last().map(|s| s.as_str()), Some("i"));
+        assert_eq!(eu.last().map(|s| s.as_str()), Some("ɨ"));
+    }
+
+    #[test]
+    fn test_eu_difference3_coda_s_postalveolar() {
+        let br = br_phonemize("mais");
+        let eu = eu_phonemize("mais");
+        assert_eq!(br.last().map(|s| s.as_str()), Some("s"));
+        assert_eq!(eu.last().map(|s| s.as_str()), Some("ʃ"));
+    }
+
+    #[test]
+    fn test_eu_difference4_coda_l_velarisation() {
+        let br = br_phonemize("Brasil");
+        let eu = eu_phonemize("Brasil");
+        assert_eq!(br.last().map(|s| s.as_str()), Some("w"));
+        assert_eq!(eu.last().map(|s| s.as_str()), Some("ɫ"));
+    }
+
+    #[test]
+    fn test_eu_difference5_no_h_in_output() {
+        // EU canonicalises BR's debuccalised /h/ to ʁ
+        for word in ["cantar", "carro", "rato"] {
+            let eu = eu_phonemize(word);
+            assert!(
+                !eu.iter().any(|t| t == "h"),
+                "EU left BR's debuccalised /h/ in output for {}: {:?}",
+                word,
+                eu
+            );
+        }
+    }
+
+    #[test]
+    fn test_eu_token_count_preserved() {
+        for word in ["noite", "cidade", "mais", "Brasil", "obrigado"] {
+            let br = br_phonemize(word);
+            let eu = eu_phonemize(word);
+            assert_eq!(
+                br.len(),
+                eu.len(),
+                "phoneme count drift for {}: BR={:?} EU={:?}",
+                word,
+                br,
+                eu
+            );
+        }
     }
 }

@@ -108,6 +108,7 @@ PR #397 で **Python (学習側 + ランタイム側)** の ZH-EN code-switching
 **追加 LOC 見込み**: ~500 行 + iOS/Android リソース対応
 
 **特殊な難所**:
+
 1. C API export 追加 (`piper_plus_phonemize_embedded_english`)
 2. iOS xcframework / Android のリソース同梱 (`PrivacyInfo.xcprivacy` 周辺)
 3. テストフレーム自体の拡充 (現状 2 ケースしかない)
@@ -119,7 +120,7 @@ PR #397 で **Python (学習側 + ランタイム側)** の ZH-EN code-switching
 
 全ランタイムで **同一の 4 ステップ**:
 
-```
+```text
 Step 1. zh_en_loanword.json を各ランタイムに同梱
         - Python 側 (src/python/g2p/.../data/zh_en_loanword.json) が source of truth
         - 各ランタイムに byte-for-byte コピーを配置 (CI で同期ガード)
@@ -140,7 +141,7 @@ Step 4. ユニットテスト + CI 同期ガード
 
 ### Lookup priority (全ランタイム共通)
 
-```
+```text
 1. case-sensitive loanwords (例: "Python", "iPhone")
    ↓ ヒットなければ
 2. uppercase acronyms (例: "GPS" → "gps".upper() = "GPS")
@@ -182,7 +183,7 @@ Step 4. ユニットテスト + CI 同期ガード
 
 各ランタイムで以下を網羅:
 
-```
+```text
 [基本]
 - test_acronym_gps              (GPS が acronym テーブルにヒット)
 - test_loanword_python          (Python が loanword、case-sensitive)
@@ -367,7 +368,7 @@ internal static class LoanwordDataLoader {
 
 **段階構成**:
 
-```
+```text
 段階 1: Python 既存テスト保持 (TestRuntimeBundleSync) - 0.5h
 段階 2: 各ランタイムに schema 検証 + byte 比較テスト追加 - 3h
 段階 3: 専用 CI job で sha256 hash 比較 - 1h
@@ -508,7 +509,7 @@ class ChineseG2P {
 
 **重要発見**: 中国語 phonemizer 実装が **2 箇所に存在**:
 
-```
+```text
 src/rust/
 ├── piper-plus-g2p/src/chinese.rs    (1,314 行) — WASM 対応版、crates.io 公開
 └── piper-core/src/phonemize/chinese.rs (1,462 行) — non-WASM、ProsodyInfo 統合
@@ -516,7 +517,7 @@ src/rust/
 
 **依存関係グラフ**:
 
-```
+```text
 piper-cli       → piper-core
 piper-python    → piper-core
 piper-wasm      → piper-core + piper-plus-g2p (feature-gated)
@@ -540,12 +541,13 @@ piper-plus-g2p  → 独立 (crates.io 公開)
 - **`piper-plus-g2p/src/chinese.rs`**: WASM ビルド時の経路 → **同等実装をミラー** (将来 v0.5.0 で統合予定だが本 PR では並列維持)
 
 **両者を一致させるため**:
+
 - 実装の core ロジック (lookup priority、token tokenize 等) を 1 つの module 化検討 (例: `piper-plus-g2p::chinese::loanword` を `piper-core` から re-export)
 - ただし `ProsodyInfo` の差で完全 re-export 困難なら、コミット内で同期確認テストを追加
 
 **推奨アプローチ**:
 
-```
+```text
 1. piper-core/src/phonemize/chinese.rs に embedded_english_phonemize() を主実装
 2. piper-plus-g2p/src/chinese.rs にも同等関数を実装 (WASM 経路用)
 3. 両方の実装が同じ JSON データから同じ結果を生むテストを追加
@@ -630,6 +632,7 @@ TEST_F(ZhEnLoanwordTest, IssueExample_PleaseOpenGPS) {
 **問題**: 5 ランタイム × 20 ケース = **100 テスト**を独立に書くと、メンテ時に整合性ずれが起きる。一元管理したい。
 
 **既存パターン**:
+
 - `tests/fixtures/g2p/phoneme_test_cases.json` — Python/Rust/JS 共有 fixture (15+ ケース実例あり)
 - `docs/spec/pua-contract.toml` — 6 ランタイム PUA mapping spec
 - `scripts/check_pua_consistency.py` — entry-by-entry 比較
@@ -721,7 +724,7 @@ zh-en-cross-platform:
 
 **dispatch decision tree (各ランタイム共通)**:
 
-```
+```text
 IF current_lang == "en" AND zh ∈ supported_languages:
     prev_is_zh = i > 0 AND segments[i-1].lang == "zh"
     next_is_zh = i+1 < len AND segments[i+1].lang == "zh"
@@ -738,6 +741,7 @@ ELSE:
 > ja-en-zh のように **kana を含む 3 言語 mode** では、kana の存在で CJK 全体が ja 化するため、zh セグメントが生成されず embedded English の dispatch が発動しない。これは現状の `UnicodeLanguageDetector` の仕様に従う動作で、本 PR では **変更しない**。将来的に解決するなら段落単位の kana スキャン or 言語切替トークン (issue A3) が必要。
 
 **新規必須テスト** (各ランタイムで実装):
+
 - E: ja-en-zh で kana 化を確認
 - G: zh-en-ja で next が ja の時に English path
 - L: URL は drop されず English path
@@ -747,7 +751,7 @@ ELSE:
 
 **メッセージテンプレート統一**:
 
-```
+```text
 {path}: '{section}.{key}' must be list[str], got {actual_type}
 ```
 
@@ -804,7 +808,7 @@ PIPER_PLUS_API const char* piper_plus_get_last_error(void);
 
 **推奨**:
 
-```
+```text
 src/go/phonemize/
 ├── data/
 │   └── zh_en_loanword.json    ← Python から copy
@@ -902,6 +906,7 @@ func (ld *LoanwordData) Validate() error {
 | ZH-EN mixed (英語発音維持希望) | ⚠ 影響あり | **opt-out flag が必要** |
 
 **Python (PR #397) で確認済み**:
+
 - `test_multilingual_pure_zh_unaffected`: 純 ZH は同一出力 ✓
 - `test_multilingual_pure_english_uses_english_path`: 純 EN は EnglishPhonemizer 経路 ✓
 - 既存 g2p テスト 791 件全 PASS、リグレッションなし
@@ -998,7 +1003,7 @@ MultilingualPhonemizer で中国語に隣接する英単語を自動検出し、
 
 **ホットパス分析** (Python ベース、1 token "GPS"):
 
-```
+```text
 tokenize (re.findall)        ~1 μs
 loanword lookup (dict miss)  ~0.5 μs
 acronym lookup (dict hit)    ~0.5 μs
@@ -1020,6 +1025,7 @@ Total                        ~37 μs/token  ← 目標 100μs 内
 | JS/WASM | `mitata` | `src/wasm/g2p/bench/bench-zh-en.js` |
 
 **キャッシュ戦略 (全ランタイム共通)**: app lifetime 中 1 回のみロード
+
 - Python: `@functools.cache` (実装済)
 - Rust: `OnceLock` / `LazyLock`
 - Go: `sync.Once` (8.10 で確定)
@@ -1143,7 +1149,7 @@ let phonemizer2 = ChinesePhonemizer::new(default_loanword_data());
 public class ChinesePhonemizer {
     private static readonly Lazy<LoanwordData> s_default =
         new(() => LoanwordDataLoader.LoadDefault(), LazyThreadSafetyMode.ExecutionAndPublication);
-    
+
     public ChinesePhonemizer(string? customPath = null) {
         _data = customPath == null ? s_default.Value : LoadAndMerge(customPath);
     }
@@ -1159,7 +1165,7 @@ public class ChinesePhonemizer {
 
 **メモリ overhead 見積**:
 
-```
+```text
 LoanwordData (default):
   acronyms (65)        ~3 KB
   loanwords (40)       ~2 KB
@@ -1416,6 +1422,7 @@ if os.environ.get("PIPER_DEBUG_ZH_EN"):
 ```
 
 **性能影響対策**:
+
 - production build では debug log を出さない (各ランタイムの conditional logging)
 - Python: `_LOGGER.isEnabledFor(logging.DEBUG)` でガード
 - C++: `NDEBUG` macro で compile-time に削除可能
@@ -1558,10 +1565,12 @@ en = ["piper-plus-g2p/english"]
 ```
 
 **feature gate の意義**:
+
 - ZH-EN 機能を必要としないアプリ (例: 日本語専用 TTS) は `default-features = false` で除外可能
 - ABI 安定性: feature gate により API は cargo level で制御
 
 **既存 wasm-opt 設定** (`piper-wasm/Cargo.toml`):
+
 ```toml
 [package.metadata.wasm-pack.profile.release]
 wasm-opt = ['-Os']  # サイズ重視最適化
@@ -1643,6 +1652,7 @@ endif()
 **CI matrix の追加**: **既存 matrix で全 platform カバー可能**、新規 job 不要
 
 **Windows xxd 不要化の追加メリット**:
+
 - Git Bash / WSL のセットアップステップ削減
 - CI ステップ簡素化
 
@@ -1659,7 +1669,7 @@ endif()
 
 **必須 branch 経路**:
 
-```
+```text
 phonemize_embedded_english():
 ├─ loanword_hit (case-sensitive)        ← test_loanword_python_case_sensitive
 ├─ acronym_hit (case-insensitive)       ← test_acronym_gps
@@ -1729,6 +1739,7 @@ jobs:
 | Phase 3 (将来) | C++ | gcov/lcov + 統合ダッシュボード |
 
 **実装工数**:
+
 - Phase 1: 既存基盤利用 → ~2 時間
 - Phase 2: 各ランタイムで CI 設定 → ~5 時間
 - Phase 3: gcov 統合 → ~3 時間
@@ -1736,4 +1747,3 @@ jobs:
 ---
 
 <!-- 改訂履歴は git log に統合 (実装完了に伴い削除、2026-05-08) -->
-

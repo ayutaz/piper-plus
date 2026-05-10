@@ -96,7 +96,7 @@ func init() {
 	f.BoolVar(&streaming, "streaming", false, "write raw PCM int16 to stdout (no WAV header)")
 	f.StringVar(&batchFile, "batch", "", "batch file with one text line per utterance")
 	f.StringVar(&timingOutput, "output-timing", "", "write phoneme timing to file")
-	f.StringVar(&timingFormat, "timing-format", "json", "timing output format (json or tsv)")
+	f.StringVar(&timingFormat, "timing-format", "json", "timing output format (json, tsv, or srt)")
 	f.BoolVar(&version, "version", false, "print version and exit")
 	f.BoolVar(&outputRaw, "output-raw", false, "output raw PCM audio to stdout (no WAV header)")
 	f.BoolVar(&jsonInput, "json-input", false, "read stdin as JSON lines")
@@ -229,6 +229,18 @@ func runSynthesize(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("input modes are mutually exclusive: specify only one of --text, --batch, or piped stdin JSONL")
 	}
 
+	// Validate voice-cloning flags. --reference-audio and --speaker-embedding
+	// are mutually exclusive (matches Rust CLI behavior). When either is
+	// specified, an explicit --speaker is also rejected because the embedding
+	// path overrides speaker_id selection inside the engine and combining the
+	// two is ambiguous (matches piperplus.SynthesisRequest.Validate).
+	if referenceAudio != "" && speakerEmbedding != "" {
+		return fmt.Errorf("--reference-audio and --speaker-embedding are mutually exclusive")
+	}
+	if (referenceAudio != "" || speakerEmbedding != "") && cmd.Flags().Changed("speaker") {
+		return fmt.Errorf("--speaker and --reference-audio/--speaker-embedding are mutually exclusive (speaker_id and speaker_embedding cannot both be specified)")
+	}
+
 	// Initialize ONNX Runtime.
 	if err := piperplus.Init(""); err != nil {
 		return fmt.Errorf("failed to initialize ONNX Runtime: %w", err)
@@ -322,7 +334,8 @@ func runTextMode(ctx context.Context, voice *piperplus.Voice, logger *slog.Logge
 		return fmt.Errorf("synthesis failed: %w", err)
 	}
 
-	logger.Info("synthesized",
+	logger.Info(
+		"synthesized",
 		"duration", result.Duration,
 		"infer_time", result.InferTime,
 		"rtf", fmt.Sprintf("%.3f", result.RTF()),
@@ -372,7 +385,8 @@ func runBatchMode(ctx context.Context, voice *piperplus.Voice, logger *slog.Logg
 			return err
 		}
 
-		logger.Info("synthesized",
+		logger.Info(
+			"synthesized",
 			"line", lineNum,
 			"duration", result.Duration,
 			"rtf", fmt.Sprintf("%.3f", result.RTF()),
@@ -415,7 +429,8 @@ func runJSONLMode(ctx context.Context, voice *piperplus.Voice, logger *slog.Logg
 			return err
 		}
 
-		logger.Info("synthesized",
+		logger.Info(
+			"synthesized",
 			"line", lineNum,
 			"duration", result.Duration,
 			"rtf", fmt.Sprintf("%.3f", result.RTF()),
@@ -549,12 +564,16 @@ func writeTiming(result *piperplus.SynthesisResult, logger *slog.Logger) error {
 	switch strings.ToLower(timingFormat) {
 	case "tsv":
 		data = []byte(timing.ToTSV())
-	default:
+	case "srt":
+		data = []byte(timing.ToSRT())
+	case "json", "":
 		data, err = timing.ToJSON()
 		if err != nil {
 			return fmt.Errorf("failed to marshal timing JSON: %w", err)
 		}
 		data = append(data, '\n')
+	default:
+		return fmt.Errorf("unknown timing format: %q (expected json, tsv, or srt)", timingFormat)
 	}
 
 	if timingOutput == "-" {

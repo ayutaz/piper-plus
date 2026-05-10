@@ -10,6 +10,8 @@
 #ifdef _WIN32
 #include <windows.h>
 #include <io.h>
+#include <fcntl.h>
+#include <sys/stat.h>
 #define F_OK 0
 #define access _access
 #define popen _popen
@@ -19,12 +21,16 @@
 #else
 #include <unistd.h>
 #include <pthread.h>
+#include <fcntl.h>
+#include <sys/stat.h>
 #endif
 
 #include "openjtalk_dictionary_manager.h"
 #include "openjtalk_error.h"
 #include "openjtalk_security.h"
 #include "openjtalk_api.h"
+#include "piper_proc_exec.h"
+#include "safe_exec.h"
 
 // Define a safe maximum value for buffer size calculations
 #define OPENJTALK_SIZE_MAX ((size_t)-1)
@@ -59,7 +65,7 @@ typedef struct {
 // Helper function prototypes (binary fallback path)
 static OpenJTalkError create_temp_files(char* input_file, char* output_file, size_t size);
 static OpenJTalkError write_input_text(const char* filename, const char* text);
-static OpenJTalkError execute_openjtalk_command(const char* command, OpenJTalkResult* result);
+static OpenJTalkError execute_openjtalk_argv(const char* const argv[], OpenJTalkResult* result);
 static char* read_and_parse_output(const char* filename, OpenJTalkResult* result);
 static void cleanup_temp_files(const char* input_file, const char* output_file);
 
@@ -81,7 +87,50 @@ static void ensure_mutex_initialized() {
 }
 #endif
 
-// Find OpenJTalk binary path (used for binary fallback only)
+// Static allow-list of acceptable OpenJTalk binary paths. find_openjtalk_binary()
+// returns pointers exclusively into this table — no shell-derived
+// `which`/`where` lookup, and the OPENJTALK_PHONEMIZER_PATH env-var is only
+// honored if it equals one of the entries verbatim. This makes the path that
+// flows into system()/execlp() a compile-time constant from CodeQL's
+// taint-tracking perspective, eliminating cpp/uncontrolled-process-operation.
+static const char* const OPENJTALK_BINARY_ALLOWLIST[] = {
+#ifdef _WIN32
+    "open_jtalk_phonemizer.exe",
+    "bin\\open_jtalk_phonemizer.exe",
+    ".\\open_jtalk_phonemizer.exe",
+    "..\\bin\\open_jtalk_phonemizer.exe",
+    "piper\\bin\\open_jtalk_phonemizer.exe",
+    "open_jtalk.exe",
+    "bin\\open_jtalk.exe",
+    ".\\open_jtalk.exe",
+    "..\\bin\\open_jtalk.exe",
+    "piper\\bin\\open_jtalk.exe",
+#else
+    "./open_jtalk_phonemizer",
+    "./bin/open_jtalk_phonemizer",
+    "../bin/open_jtalk_phonemizer",
+    "./piper/bin/open_jtalk_phonemizer",
+    "./oj/bin/open_jtalk_phonemizer",
+    "../oj/bin/open_jtalk_phonemizer",
+    "../../oj/bin/open_jtalk_phonemizer",
+    "../../../oj/bin/open_jtalk_phonemizer",
+    "/usr/bin/open_jtalk_phonemizer",
+    "/usr/local/bin/open_jtalk_phonemizer",
+    "/opt/homebrew/bin/open_jtalk_phonemizer",
+    "./open_jtalk",
+    "./bin/open_jtalk",
+    "../bin/open_jtalk",
+    "./piper/bin/open_jtalk",
+    "/usr/bin/open_jtalk",
+    "/usr/local/bin/open_jtalk",
+    "/opt/homebrew/bin/open_jtalk",
+#endif
+    NULL,
+};
+
+// Find OpenJTalk binary path (used for binary fallback only).
+// Returns a pointer into OPENJTALK_BINARY_ALLOWLIST or NULL — never a string
+// derived from runtime input.
 static const char* find_openjtalk_binary() {
 #ifdef _WIN32
     ensure_mutex_initialized();
@@ -99,12 +148,21 @@ static const char* find_openjtalk_binary() {
         return g_openjtalk_bin_path;
     }
 
-    // Check environment variable first
+    // Honor OPENJTALK_PHONEMIZER_PATH ONLY when it equals an allow-list entry
+    // verbatim. Any other value is rejected with a warning so that legacy
+    // env-var consumers fail fast and adopt one of the supported paths
+    // (or symlink their custom binary into a supported location).
     const char* env_path = getenv("OPENJTALK_PHONEMIZER_PATH");
-    if (env_path) {
-        fprintf(stderr, "DEBUG: OPENJTALK_PHONEMIZER_PATH = %s\n", env_path);
-        if (access(env_path, F_OK) == 0 && openjtalk_is_safe_path(env_path)) {
-            strncpy(g_openjtalk_bin_path, env_path, sizeof(g_openjtalk_bin_path) - 1);
+    if (env_path && env_path[0] != '\0') {
+        const char* matched = NULL;
+        for (int i = 0; OPENJTALK_BINARY_ALLOWLIST[i] != NULL; i++) {
+            if (strcmp(env_path, OPENJTALK_BINARY_ALLOWLIST[i]) == 0) {
+                matched = OPENJTALK_BINARY_ALLOWLIST[i];
+                break;
+            }
+        }
+        if (matched != NULL && access(matched, F_OK) == 0) {
+            strncpy(g_openjtalk_bin_path, matched, sizeof(g_openjtalk_bin_path) - 1);
             g_openjtalk_bin_path[sizeof(g_openjtalk_bin_path) - 1] = '\0';
 #ifdef _WIN32
             LeaveCriticalSection(&g_path_mutex);
@@ -112,63 +170,30 @@ static const char* find_openjtalk_binary() {
             pthread_mutex_unlock(&g_path_mutex);
 #endif
             return g_openjtalk_bin_path;
-        } else if (access(env_path, F_OK) == 0) {
-            fprintf(stderr, "WARNING: OPENJTALK_PHONEMIZER_PATH rejected by path validation\n");
-        } else {
-            fprintf(stderr, "DEBUG: File not found at OPENJTALK_PHONEMIZER_PATH\n");
         }
-    } else {
-        fprintf(stderr, "DEBUG: OPENJTALK_PHONEMIZER_PATH not set\n");
+        if (matched == NULL) {
+            fprintf(stderr,
+                "WARNING: OPENJTALK_PHONEMIZER_PATH=%s is not in the allow-list; "
+                "symlink the binary into /usr/local/bin/open_jtalk_phonemizer or "
+                "an equivalent supported location instead.\n", env_path);
+        }
     }
 
-    // Check if open_jtalk_phonemizer binary exists (preferred)
-    const char* paths[] = {
-#ifdef _WIN32
-        "open_jtalk_phonemizer.exe",
-        "bin\\open_jtalk_phonemizer.exe",
-        ".\\open_jtalk_phonemizer.exe",
-        "..\\bin\\open_jtalk_phonemizer.exe",
-        "piper\\bin\\open_jtalk_phonemizer.exe",
-        // Fall back to regular open_jtalk if phonemizer not found
-        "open_jtalk.exe",
-        "bin\\open_jtalk.exe",
-        ".\\open_jtalk.exe",
-        "..\\bin\\open_jtalk.exe",
-        "piper\\bin\\open_jtalk.exe",
-#else
-        "./open_jtalk_phonemizer",
-        "./bin/open_jtalk_phonemizer",
-        "../bin/open_jtalk_phonemizer",
-        "./piper/bin/open_jtalk_phonemizer",
-        "./oj/bin/open_jtalk_phonemizer",
-        "../oj/bin/open_jtalk_phonemizer",
-        "../../oj/bin/open_jtalk_phonemizer",
-        "../../../oj/bin/open_jtalk_phonemizer",
-        "/usr/bin/open_jtalk_phonemizer",
-        "/usr/local/bin/open_jtalk_phonemizer",
-        // Fall back to regular open_jtalk if phonemizer not found
-        "./open_jtalk",
-        "./bin/open_jtalk",
-        "../bin/open_jtalk",
-        "./piper/bin/open_jtalk",
-        "/usr/bin/open_jtalk",
-        "/usr/local/bin/open_jtalk",
-#endif
-        NULL
-    };
-
-    for (int i = 0; paths[i] != NULL; i++) {
-        if (access(paths[i], F_OK) == 0) {
+    // Probe the static allow-list. The returned pointer is into the table
+    // itself, so its taint-tracker view is a constant string literal.
+    for (int i = 0; OPENJTALK_BINARY_ALLOWLIST[i] != NULL; i++) {
+        const char* candidate = OPENJTALK_BINARY_ALLOWLIST[i];
+        if (access(candidate, F_OK) == 0) {
 #ifdef _WIN32
             // Get absolute path on Windows to avoid execution issues
             char abs_path[OPENJTALK_MAX_PATH];
-            if (_fullpath(abs_path, paths[i], OPENJTALK_MAX_PATH) != NULL) {
+            if (_fullpath(abs_path, candidate, OPENJTALK_MAX_PATH) != NULL) {
                 strcpy(g_openjtalk_bin_path, abs_path);
             } else {
-                strcpy(g_openjtalk_bin_path, paths[i]);
+                strcpy(g_openjtalk_bin_path, candidate);
             }
 #else
-            strcpy(g_openjtalk_bin_path, paths[i]);
+            strcpy(g_openjtalk_bin_path, candidate);
 #endif
 #ifdef _WIN32
             LeaveCriticalSection(&g_path_mutex);
@@ -178,39 +203,10 @@ static const char* find_openjtalk_binary() {
             return g_openjtalk_bin_path;
         }
     }
-
-    // Try to find in PATH - first try phonemizer, then regular
-#ifdef _WIN32
-    FILE* fp = popen("where open_jtalk_phonemizer.exe 2>NUL", "r");
-    if (!fp || fgets(g_openjtalk_bin_path, sizeof(g_openjtalk_bin_path), fp) == NULL) {
-        if (fp) pclose(fp);
-        fp = popen("where open_jtalk.exe 2>NUL", "r");
-    }
-#else
-    FILE* fp = popen("which open_jtalk_phonemizer 2>/dev/null", "r");
-    if (!fp || fgets(g_openjtalk_bin_path, sizeof(g_openjtalk_bin_path), fp) == NULL) {
-        if (fp) pclose(fp);
-        fp = popen("which open_jtalk 2>/dev/null", "r");
-    }
-#endif
-    if (fp) {
-        if (fgets(g_openjtalk_bin_path, sizeof(g_openjtalk_bin_path), fp) != NULL) {
-            // Remove newline
-            size_t len = strlen(g_openjtalk_bin_path);
-            if (len > 0 && g_openjtalk_bin_path[len-1] == '\n') {
-                g_openjtalk_bin_path[len-1] = '\0';
-            }
-            pclose(fp);
-#ifdef _WIN32
-            LeaveCriticalSection(&g_path_mutex);
-#else
-            pthread_mutex_unlock(&g_path_mutex);
-#endif
-            return g_openjtalk_bin_path;
-        }
-        pclose(fp);
-    }
-
+    // No PATH lookup via popen("which"/"where") — those are shell-based and
+    // re-introduce the cpp/uncontrolled-process-operation taint sink we're
+    // explicitly avoiding. If none of the allow-list paths exists, we fail
+    // here and report it through the existing NULL-return contract.
 #ifdef _WIN32
     LeaveCriticalSection(&g_path_mutex);
 #else
@@ -384,41 +380,40 @@ char* openjtalk_text_to_phonemes(const char* text) {
         return NULL;
     }
 
-    // Construct and execute OpenJTalk command
-    char command[OPENJTALK_MAX_COMMAND];
+    // Build argv for OpenJTalk binary (no shell interpretation).
     int is_phonemizer = strstr(openjtalk_bin, "phonemizer") != NULL ? 1 : 0;
 
+#ifdef _WIN32
+    // On Windows, GetShortPathName works around CreateProcess limitations
+    // with spaces in the binary / dictionary paths. Each value still flows
+    // through _spawnvp as a discrete argv slot — no cmd.exe parsing.
+    char short_bin[OPENJTALK_MAX_PATH];
+    char short_dic[OPENJTALK_MAX_PATH];
+    GetShortPathName(openjtalk_bin, short_bin, OPENJTALK_MAX_PATH);
+    GetShortPathName(dic_path, short_dic, OPENJTALK_MAX_PATH);
+    const char* prog_path = short_bin;
+    const char* dict_arg = short_dic;
+    const char* null_sink = "NUL";
+#else
+    const char* prog_path = openjtalk_bin;
+    const char* dict_arg = dic_path;
+    const char* null_sink = "/dev/null";
+#endif
+
     if (is_phonemizer) {
-        // Use phonemizer binary
-#ifdef _WIN32
-        char short_bin[OPENJTALK_MAX_PATH];
-        char short_dic[OPENJTALK_MAX_PATH];
-        GetShortPathName(openjtalk_bin, short_bin, OPENJTALK_MAX_PATH);
-        GetShortPathName(dic_path, short_dic, OPENJTALK_MAX_PATH);
-
-        snprintf(command, sizeof(command),
-                 "%s -x %s -ot %s %s",
-                 short_bin, short_dic, output_file, input_file);
-#else
-        snprintf(command, sizeof(command),
-                 "\"%s\" -x \"%s\" -ot \"%s\" \"%s\"",
-                 openjtalk_bin, dic_path, output_file, input_file);
-#endif
+        // Phonemizer binary: prog -x <dict> -ot <output> <input>
+        const char* const argv[] = {
+            prog_path, "-x", dict_arg, "-ot", output_file, input_file, NULL,
+        };
+        err = execute_openjtalk_argv(argv, &result);
     } else {
-        // open_jtalk fallback: phoneme extraction only
-#ifdef _WIN32
-        snprintf(command, sizeof(command),
-                 "\"%s\" -x \"%s\" -ow NUL -ot \"%s\" \"%s\"",
-                 openjtalk_bin, dic_path, output_file, input_file);
-#else
-        snprintf(command, sizeof(command),
-                 "\"%s\" -x \"%s\" -ow /dev/null -ot \"%s\" \"%s\"",
-                 openjtalk_bin, dic_path, output_file, input_file);
-#endif
+        // open_jtalk fallback: prog -x <dict> -ow <null_sink> -ot <output> <input>
+        const char* const argv[] = {
+            prog_path, "-x", dict_arg, "-ow", null_sink,
+            "-ot", output_file, input_file, NULL,
+        };
+        err = execute_openjtalk_argv(argv, &result);
     }
-
-    // Execute command
-    err = execute_openjtalk_command(command, &result);
     unlink(input_file);  // Clean up input file immediately
 
     if (err != OPENJTALK_SUCCESS) {
@@ -566,14 +561,21 @@ static OpenJTalkProsodyResult* openjtalk_text_to_phonemes_with_prosody_api(const
             }
         }
 
-        // Add phoneme to result
+        // Add phoneme to result. The if-guard already bounds the total
+        // length, but strncat with explicit remaining-capacity also
+        // satisfies cpp/unbounded-write — the dataflow into the strcat
+        // sink is now visibly bounded.
         size_t space_needed = (total_phoneme_len > 0 ? 1 : 0) + strlen(phoneme) + 1;
         if (total_phoneme_len + space_needed < OPENJTALK_MAX_BUFFER - 1) {
-            if (total_phoneme_len > 0) {
-                strcat(prosody_result->phonemes, " ");
+            size_t remaining = (OPENJTALK_MAX_BUFFER > total_phoneme_len + 1)
+                ? (OPENJTALK_MAX_BUFFER - total_phoneme_len - 1)
+                : 0;
+            if (total_phoneme_len > 0 && remaining >= 1) {
+                strncat(prosody_result->phonemes, " ", remaining);
                 total_phoneme_len++;
+                remaining--;
             }
-            strcat(prosody_result->phonemes, phoneme);
+            strncat(prosody_result->phonemes, phoneme, remaining);
             total_phoneme_len += strlen(phoneme);
 
             // Store prosody values
@@ -676,39 +678,35 @@ static OpenJTalkProsodyResult* openjtalk_text_to_phonemes_with_prosody_binary(co
         return NULL;
     }
 
-    // Construct and execute OpenJTalk command
-    char command[OPENJTALK_MAX_COMMAND];
+    // Build argv for OpenJTalk binary (no shell interpretation).
     int is_phonemizer = strstr(openjtalk_bin, "phonemizer") != NULL ? 1 : 0;
 
-    if (is_phonemizer) {
 #ifdef _WIN32
-        char short_bin[OPENJTALK_MAX_PATH];
-        char short_dic[OPENJTALK_MAX_PATH];
-        GetShortPathName(openjtalk_bin, short_bin, OPENJTALK_MAX_PATH);
-        GetShortPathName(dic_path, short_dic, OPENJTALK_MAX_PATH);
-        snprintf(command, sizeof(command),
-                 "%s -x %s -ot %s %s",
-                 short_bin, short_dic, output_file, input_file);
+    char short_bin[OPENJTALK_MAX_PATH];
+    char short_dic[OPENJTALK_MAX_PATH];
+    GetShortPathName(openjtalk_bin, short_bin, OPENJTALK_MAX_PATH);
+    GetShortPathName(dic_path, short_dic, OPENJTALK_MAX_PATH);
+    const char* prog_path = short_bin;
+    const char* dict_arg = short_dic;
+    const char* null_sink = "NUL";
 #else
-        snprintf(command, sizeof(command),
-                 "\"%s\" -x \"%s\" -ot \"%s\" \"%s\"",
-                 openjtalk_bin, dic_path, output_file, input_file);
+    const char* prog_path = openjtalk_bin;
+    const char* dict_arg = dic_path;
+    const char* null_sink = "/dev/null";
 #endif
-    } else {
-        // open_jtalk fallback: phoneme extraction only
-#ifdef _WIN32
-        snprintf(command, sizeof(command),
-                 "\"%s\" -x \"%s\" -ow NUL -ot \"%s\" \"%s\"",
-                 openjtalk_bin, dic_path, output_file, input_file);
-#else
-        snprintf(command, sizeof(command),
-                 "\"%s\" -x \"%s\" -ow /dev/null -ot \"%s\" \"%s\"",
-                 openjtalk_bin, dic_path, output_file, input_file);
-#endif
-    }
 
-    // Execute command
-    err = execute_openjtalk_command(command, &result);
+    if (is_phonemizer) {
+        const char* const argv[] = {
+            prog_path, "-x", dict_arg, "-ot", output_file, input_file, NULL,
+        };
+        err = execute_openjtalk_argv(argv, &result);
+    } else {
+        const char* const argv[] = {
+            prog_path, "-x", dict_arg, "-ow", null_sink,
+            "-ot", output_file, input_file, NULL,
+        };
+        err = execute_openjtalk_argv(argv, &result);
+    }
     unlink(input_file);
 
     if (err != OPENJTALK_SUCCESS) {
@@ -805,8 +803,17 @@ static OpenJTalkError write_input_text(const char* filename, const char* text) {
         return OPENJTALK_ERROR_IO_WRITE;
     }
 #else
-    FILE* fp = fopen(filename, "w");
+    // Use open() with explicit owner-only mode (0600) instead of fopen("w"),
+    // whose default permission (0666 modulo umask) trips
+    // cpp/world-writable-file-creation. The temp file holds the user's plain
+    // text input — readable by other local users would be a privacy leak.
+    int fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
+    if (fd < 0) {
+        return OPENJTALK_ERROR_IO_WRITE;
+    }
+    FILE* fp = fdopen(fd, "w");
     if (!fp) {
+        close(fd);
         return OPENJTALK_ERROR_IO_WRITE;
     }
     if (fprintf(fp, "%s", text) < 0) {
@@ -818,14 +825,32 @@ static OpenJTalkError write_input_text(const char* filename, const char* text) {
     return OPENJTALK_SUCCESS;
 }
 
-// Execute OpenJTalk command
-static OpenJTalkError execute_openjtalk_command(const char* command, OpenJTalkResult* result) {
-    if (!command) {
+// Execute OpenJTalk via argv (no shell). Each element is passed verbatim
+// to posix_spawnp / _spawnvp so shell metacharacters cannot be interpreted —
+// the prior `piper_is_safe_command_string` validator that protected the
+// system() path is no longer strictly necessary, but we still validate each
+// argv slot defensively for paths reaching the binary unchanged.
+static OpenJTalkError execute_openjtalk_argv(const char* const argv[],
+                                             OpenJTalkResult* result) {
+    if (!argv || !argv[0]) {
         return OPENJTALK_ERROR_NULL_INPUT;
     }
 
-    // Use system() for simplicity and compatibility
-    int exit_code = system(command);
+    // Defense in depth: validate each argv entry (the binary path and the
+    // operands all originate from internal config / temp file paths, but
+    // running them through the same allow-list keeps a single sanitizer
+    // contract in the tree).
+    for (size_t i = 0; argv[i]; i++) {
+        if (!piper_is_safe_command_string(argv[i])) {
+            if (result) {
+                openjtalk_set_result(result, OPENJTALK_ERROR_SECURITY,
+                                    "Unsafe characters in argv[%zu]", i);
+            }
+            return OPENJTALK_ERROR_SECURITY;
+        }
+    }
+
+    int exit_code = piper_run_argv(argv);
 
     if (exit_code != 0) {
         if (result) {
@@ -951,14 +976,22 @@ static char* read_and_parse_output(const char* filename, OpenJTalkResult* result
                                 phoneme_buffer_size = new_size;
                             }
 
-                            // Add space if not first phoneme
-                            if (total_phoneme_len > 0) {
-                                strcat(phonemes, " ");
+                            // Add space if not first phoneme. Use strncat
+                            // with explicit remaining-capacity to satisfy
+                            // cpp/unbounded-write — the surrounding realloc
+                            // guarantees a non-zero remainder but CodeQL's
+                            // flow tracking does not see that.
+                            size_t remaining = (phoneme_buffer_size > total_phoneme_len + 1)
+                                ? (phoneme_buffer_size - total_phoneme_len - 1)
+                                : 0;
+                            if (total_phoneme_len > 0 && remaining >= 1) {
+                                strncat(phonemes, " ", remaining);
                                 total_phoneme_len++;
+                                remaining--;
                             }
 
-                            // Add phoneme
-                            strcat(phonemes, phoneme);
+                            // Add phoneme (bounded by remaining capacity).
+                            strncat(phonemes, phoneme, remaining);
                             total_phoneme_len += strlen(phoneme);
                         }
                     }
@@ -1126,14 +1159,21 @@ static OpenJTalkProsodyResult* read_and_parse_output_with_prosody(
             }
         }
 
-        // Add phoneme to result
+        // Add phoneme to result. The if-guard already bounds the total
+        // length, but strncat with explicit remaining-capacity also
+        // satisfies cpp/unbounded-write — the dataflow into the strcat
+        // sink is now visibly bounded.
         size_t space_needed = (total_phoneme_len > 0 ? 1 : 0) + strlen(phoneme) + 1;
         if (total_phoneme_len + space_needed < OPENJTALK_MAX_BUFFER - 1) {
-            if (total_phoneme_len > 0) {
-                strcat(prosody_result->phonemes, " ");
+            size_t remaining = (OPENJTALK_MAX_BUFFER > total_phoneme_len + 1)
+                ? (OPENJTALK_MAX_BUFFER - total_phoneme_len - 1)
+                : 0;
+            if (total_phoneme_len > 0 && remaining >= 1) {
+                strncat(prosody_result->phonemes, " ", remaining);
                 total_phoneme_len++;
+                remaining--;
             }
-            strcat(prosody_result->phonemes, phoneme);
+            strncat(prosody_result->phonemes, phoneme, remaining);
             total_phoneme_len += strlen(phoneme);
 
             // Store prosody values

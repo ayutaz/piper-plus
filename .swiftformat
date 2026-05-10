@@ -1,0 +1,32 @@
+--swiftversion 5.9
+--maxwidth 120
+--indent 4
+--tabwidth 4
+--allman false
+--anonymousforeach convert
+--commas inline
+--decimalgrouping ignore
+--elseposition same-line
+--emptybraces no-space
+--exclude .build,.swiftpm,DerivedData,.xcframework,vendor,Tests
+--header strip
+--ifdef no-indent
+--importgrouping testable-bottom
+--linebreaks lf
+--operatorfunc spaced
+--ranges spaced
+--self init-only
+--semicolons never
+--shortoptionals always
+--stripunusedargs closure-only
+--trimwhitespace always
+--wraparguments before-first
+--wrapcollections before-first
+--wrapparameters before-first
+--wraptypealiases preserve
+
+# Disabled rules:
+--disable redundantInternal,redundantReturn,redundantSelf,unusedArguments
+
+# Enabled rules:
+--enable isEmpty,blankLinesAtStartOfScope,blankLinesAtEndOfScope,duplicateImports

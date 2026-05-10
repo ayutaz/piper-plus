@@ -13,18 +13,18 @@ public sealed class JapanesePhonemizerTests
     // ================================================================
     // Stub G2P engine
     // ================================================================
-
     private class StubG2PEngine : IJapaneseG2PEngine
     {
         private readonly G2PResult _result;
+
         public StubG2PEngine(G2PResult result) => _result = result;
+
         public G2PResult Convert(string text) => _result;
     }
 
     // ================================================================
     // 1. BasicPhonemes_ConvertedCorrectly
     // ================================================================
-
     [Fact]
     public void BasicPhonemes_ConvertedCorrectly()
     {
@@ -33,11 +33,10 @@ public sealed class JapanesePhonemizerTests
             Phonemes: ["sil", "k", "o", "N", "n", "i", "ch", "i", "w", "a", "sil"],
             A1: [0, -4, -4, -3, -3, -2, -2, -1, 0, 0, 0],
             A2: [0, 1, 1, 2, 2, 3, 3, 4, 5, 5, 0],
-            A3: [0, 5, 5, 5, 5, 5, 5, 5, 5, 5, 0]
-        );
+            A3: [0, 5, 5, 5, 5, 5, 5, 5, 5, 5, 0]);
 
         var phonemizer = new JapanesePhonemizer(new StubG2PEngine(g2p));
-        var (tokens, prosody) = phonemizer.PhonemizeWithProsody("こんにちは");
+        (List<string>? tokens, List<ProsodyInfo?>? prosody) = phonemizer.PhonemizeWithProsody("こんにちは");
 
         // First "sil" -> "^" (BOS)
         Assert.Equal("^", tokens[0]);
@@ -58,7 +57,6 @@ public sealed class JapanesePhonemizerTests
     // ================================================================
     // 2. QuestionText_GetsQuestionMarker
     // ================================================================
-
     [Fact]
     public void QuestionText_GetsQuestionMarker()
     {
@@ -67,11 +65,10 @@ public sealed class JapanesePhonemizerTests
             Phonemes: ["sil", "k", "a", "sil"],
             A1: [0, -1, 0, 0],
             A2: [0, 1, 2, 0],
-            A3: [0, 2, 2, 0]
-        );
+            A3: [0, 2, 2, 0]);
 
         var phonemizer = new JapanesePhonemizer(new StubG2PEngine(g2p));
-        var (tokens, _) = phonemizer.PhonemizeWithProsody("何ですか\uFF1F");
+        (List<string>? tokens, List<ProsodyInfo?> _) = phonemizer.PhonemizeWithProsody("何ですか\uFF1F");
 
         // Last token should be "?" (mapped by GetQuestionType for full-width ？)
         Assert.Equal("?", tokens[^1]);
@@ -80,7 +77,6 @@ public sealed class JapanesePhonemizerTests
     // ================================================================
     // 3. NMutation_AppliedCorrectly
     // ================================================================
-
     [Fact]
     public void NMutation_AppliedCorrectly()
     {
@@ -89,11 +85,10 @@ public sealed class JapanesePhonemizerTests
             Phonemes: ["sil", "s", "a", "N", "p", "o", "sil"],
             A1: [0, -2, -2, -1, 0, 0, 0],
             A2: [0, 1, 1, 2, 3, 3, 0],
-            A3: [0, 3, 3, 3, 3, 3, 0]
-        );
+            A3: [0, 3, 3, 3, 3, 3, 0]);
 
         var phonemizer = new JapanesePhonemizer(new StubG2PEngine(g2p));
-        var (tokens, _) = phonemizer.PhonemizeWithProsody("さんぽ");
+        (List<string>? tokens, List<ProsodyInfo?> _) = phonemizer.PhonemizeWithProsody("さんぽ");
 
         // N_m is mapped to PUA U+E019
         Assert.Contains("\uE019", tokens);
@@ -108,7 +103,6 @@ public sealed class JapanesePhonemizerTests
     // ================================================================
     // 4. ProsodyAlignment_Maintained
     // ================================================================
-
     [Fact]
     public void ProsodyAlignment_Maintained()
     {
@@ -120,11 +114,10 @@ public sealed class JapanesePhonemizerTests
             Phonemes: ["sil", "k", "a", "k", "i", "pau", "k", "a", "k", "i", "sil"],
             A1: [0, -1, 0, 1, 1, 0, -1, 0, 1, 1, 0],
             A2: [0, 1, 2, 3, 3, 0, 1, 2, 3, 3, 0],
-            A3: [0, 3, 3, 3, 3, 0, 3, 3, 3, 3, 0]
-        );
+            A3: [0, 3, 3, 3, 3, 0, 3, 3, 3, 3, 0]);
 
         var phonemizer = new JapanesePhonemizer(new StubG2PEngine(g2p));
-        var (tokens, prosody) = phonemizer.PhonemizeWithProsody("柿柿");
+        (List<string>? tokens, List<ProsodyInfo?>? prosody) = phonemizer.PhonemizeWithProsody("柿柿");
 
         // Prosody marks (], #, [) have null prosody
         Assert.Equal(tokens.Count, prosody.Count);
@@ -143,7 +136,6 @@ public sealed class JapanesePhonemizerTests
     // ================================================================
     // 5. PauToken_ConvertedToUnderscore
     // ================================================================
-
     [Fact]
     public void PauToken_ConvertedToUnderscore()
     {
@@ -152,11 +144,10 @@ public sealed class JapanesePhonemizerTests
             Phonemes: ["sil", "a", "pau", "i", "sil"],
             A1: [0, 0, 0, 0, 0],
             A2: [0, 1, 0, 1, 0],
-            A3: [0, 1, 0, 1, 0]
-        );
+            A3: [0, 1, 0, 1, 0]);
 
         var phonemizer = new JapanesePhonemizer(new StubG2PEngine(g2p));
-        var (tokens, prosody) = phonemizer.PhonemizeWithProsody("あ、い");
+        (List<string>? tokens, List<ProsodyInfo?>? prosody) = phonemizer.PhonemizeWithProsody("あ、い");
 
         // "pau" should become "_"
         Assert.Contains("_", tokens);
@@ -172,7 +163,6 @@ public sealed class JapanesePhonemizerTests
     // ================================================================
     // 6. AccentMarks_InsertedCorrectly
     // ================================================================
-
     [Fact]
     public void AccentMarks_InsertedCorrectly()
     {
@@ -183,11 +173,10 @@ public sealed class JapanesePhonemizerTests
             Phonemes: ["sil", "k", "a", "k", "i", "k", "o", "sil"],
             A1: [0, -2, -1, 0, 1, 2, 2, 0],
             A2: [0, 1, 2, 3, 4, 5, 5, 0],
-            A3: [0, 5, 5, 5, 5, 5, 5, 0]
-        );
+            A3: [0, 5, 5, 5, 5, 5, 5, 0]);
 
         var phonemizer = new JapanesePhonemizer(new StubG2PEngine(g2p));
-        var (tokens, prosody) = phonemizer.PhonemizeWithProsody("かきこ");
+        (List<string>? tokens, List<ProsodyInfo?>? prosody) = phonemizer.PhonemizeWithProsody("かきこ");
 
         // "]" should be inserted after the phoneme where a1==0 and a2_next==a2+1
         Assert.Contains("]", tokens);
@@ -201,7 +190,6 @@ public sealed class JapanesePhonemizerTests
     // ================================================================
     // 7. GetPhonemeIdMap_ReturnsNull
     // ================================================================
-
     [Fact]
     public void GetPhonemeIdMap_ReturnsNull()
     {
@@ -209,8 +197,7 @@ public sealed class JapanesePhonemizerTests
             Phonemes: ["sil", "a", "sil"],
             A1: [0, 0, 0],
             A2: [0, 1, 0],
-            A3: [0, 1, 0]
-        );
+            A3: [0, 1, 0]);
 
         var phonemizer = new JapanesePhonemizer(new StubG2PEngine(g2p));
 
@@ -221,7 +208,6 @@ public sealed class JapanesePhonemizerTests
     // ================================================================
     // 8. EmptyInput_ReturnsEmpty
     // ================================================================
-
     [Fact]
     public void EmptyInput_ReturnsEmpty()
     {
@@ -229,11 +215,10 @@ public sealed class JapanesePhonemizerTests
             Phonemes: [],
             A1: [],
             A2: [],
-            A3: []
-        );
+            A3: []);
 
         var phonemizer = new JapanesePhonemizer(new StubG2PEngine(g2p));
-        var (tokens, prosody) = phonemizer.PhonemizeWithProsody("");
+        (List<string>? tokens, List<ProsodyInfo?>? prosody) = phonemizer.PhonemizeWithProsody(string.Empty);
 
         Assert.Empty(tokens);
         Assert.Empty(prosody);
@@ -242,7 +227,6 @@ public sealed class JapanesePhonemizerTests
     // ================================================================
     // 9. PhonemizeCore_InvalidG2PResult_MismatchedArrayLengths
     // ================================================================
-
     [Fact]
     public void PhonemizeCore_InvalidG2PResult_MismatchedArrayLengths()
     {
@@ -251,12 +235,11 @@ public sealed class JapanesePhonemizerTests
             Phonemes: ["sil", "k", "a", "sil"],
             A1: [0, -1],            // length 2, mismatched with phonemes length 4
             A2: [0, 1, 2, 0],
-            A3: [0, 2, 2, 0]
-        );
+            A3: [0, 2, 2, 0]);
 
         var phonemizer = new JapanesePhonemizer(new StubG2PEngine(g2p));
 
-        var ex = Assert.Throws<System.InvalidOperationException>(
+        InvalidOperationException ex = Assert.Throws<System.InvalidOperationException>(
             () => phonemizer.PhonemizeWithProsody("テスト"));
 
         Assert.Contains("inconsistent lengths", ex.Message);
@@ -265,7 +248,6 @@ public sealed class JapanesePhonemizerTests
     // ================================================================
     // 10. Phonemize_ReturnsTokensOnly
     // ================================================================
-
     [Fact]
     public void Phonemize_ReturnsTokensOnly()
     {
@@ -274,8 +256,7 @@ public sealed class JapanesePhonemizerTests
             Phonemes: ["sil", "k", "a", "sil"],
             A1: [0, -1, 0, 0],
             A2: [0, 1, 2, 0],
-            A3: [0, 2, 2, 0]
-        );
+            A3: [0, 2, 2, 0]);
 
         var phonemizer = new JapanesePhonemizer(new StubG2PEngine(g2p));
         List<string> tokens = phonemizer.Phonemize("か");
@@ -297,7 +278,6 @@ public sealed class JapanesePhonemizerTests
     // ================================================================
     // 11. PhonemizeWithProsody_EmptyPhonemes
     // ================================================================
-
     [Fact]
     public void PhonemizeWithProsody_EmptyPhonemes()
     {
@@ -306,11 +286,10 @@ public sealed class JapanesePhonemizerTests
             Phonemes: [],
             A1: [],
             A2: [],
-            A3: []
-        );
+            A3: []);
 
         var phonemizer = new JapanesePhonemizer(new StubG2PEngine(g2p));
-        var (tokens, prosody) = phonemizer.PhonemizeWithProsody("何か");
+        (List<string>? tokens, List<ProsodyInfo?>? prosody) = phonemizer.PhonemizeWithProsody("何か");
 
         // Even though input text is non-empty, empty G2P means empty output
         Assert.Empty(tokens);
@@ -320,7 +299,6 @@ public sealed class JapanesePhonemizerTests
     // ================================================================
     // 12. AccentNucleusMark_InsertedAtCorrectPosition
     // ================================================================
-
     [Fact]
     public void AccentNucleusMark_InsertedAtCorrectPosition()
     {
@@ -342,11 +320,10 @@ public sealed class JapanesePhonemizerTests
             Phonemes: ["sil", "k", "a", "k", "i", "sil"],
             A1: [0, -1, 0, 1, 1, 0],
             A2: [0, 1, 1, 2, 2, 0],
-            A3: [0, 2, 2, 2, 2, 0]
-        );
+            A3: [0, 2, 2, 2, 2, 0]);
 
         var phonemizer = new JapanesePhonemizer(new StubG2PEngine(g2p));
-        var (tokens, prosody) = phonemizer.PhonemizeWithProsody("かき");
+        (List<string>? tokens, List<ProsodyInfo?>? prosody) = phonemizer.PhonemizeWithProsody("かき");
 
         // Exactly one "]" should be inserted
         int count = tokens.Count(t => t == "]");
@@ -364,7 +341,6 @@ public sealed class JapanesePhonemizerTests
     // ================================================================
     // 13. AccentPhraseBoundary_InsertedCorrectly
     // ================================================================
-
     [Fact]
     public void AccentPhraseBoundary_InsertedCorrectly()
     {
@@ -385,11 +361,10 @@ public sealed class JapanesePhonemizerTests
             Phonemes: ["sil", "k", "a", "k", "i", "k", "a", "k", "u", "sil"],
             A1: [0, 1, 1, 1, 1, 1, 1, 1, 1, 0],
             A2: [0, 1, 1, 2, 2, 1, 1, 2, 2, 0],
-            A3: [0, 2, 2, 2, 2, 2, 2, 2, 2, 0]
-        );
+            A3: [0, 2, 2, 2, 2, 2, 2, 2, 2, 0]);
 
         var phonemizer = new JapanesePhonemizer(new StubG2PEngine(g2p));
-        var (tokens, prosody) = phonemizer.PhonemizeWithProsody("かきかく");
+        (List<string>? tokens, List<ProsodyInfo?>? prosody) = phonemizer.PhonemizeWithProsody("かきかく");
 
         // "#" should be present
         Assert.Contains("#", tokens);
@@ -411,7 +386,6 @@ public sealed class JapanesePhonemizerTests
     // ================================================================
     // 14. RisingMark_InsertedCorrectly
     // ================================================================
-
     [Fact]
     public void RisingMark_InsertedCorrectly()
     {
@@ -424,11 +398,10 @@ public sealed class JapanesePhonemizerTests
             Phonemes: ["sil", "k", "a", "k", "i", "sil"],
             A1: [0, -1, -1, 0, 0, 0],
             A2: [0, 1, 1, 2, 2, 0],
-            A3: [0, 2, 2, 2, 2, 0]
-        );
+            A3: [0, 2, 2, 2, 2, 0]);
 
         var phonemizer = new JapanesePhonemizer(new StubG2PEngine(g2p));
-        var (tokens, prosody) = phonemizer.PhonemizeWithProsody("かき");
+        (List<string>? tokens, List<ProsodyInfo?>? prosody) = phonemizer.PhonemizeWithProsody("かき");
 
         // "[" should be present
         Assert.Contains("[", tokens);
@@ -448,7 +421,6 @@ public sealed class JapanesePhonemizerTests
     // ================================================================
     // 15. NMutation_UvularAtEndOfPhrase
     // ================================================================
-
     [Fact]
     public void NMutation_UvularAtEndOfPhrase()
     {
@@ -457,11 +429,10 @@ public sealed class JapanesePhonemizerTests
             Phonemes: ["sil", "k", "a", "N", "sil"],
             A1: [0, -1, 0, 1, 0],
             A2: [0, 1, 1, 2, 0],
-            A3: [0, 2, 2, 2, 0]
-        );
+            A3: [0, 2, 2, 2, 0]);
 
         var phonemizer = new JapanesePhonemizer(new StubG2PEngine(g2p));
-        var (tokens, _) = phonemizer.PhonemizeWithProsody("かん");
+        (List<string>? tokens, List<ProsodyInfo?> _) = phonemizer.PhonemizeWithProsody("かん");
 
         // N_uvular is mapped to PUA U+E01C
         Assert.Contains("\uE01C", tokens);

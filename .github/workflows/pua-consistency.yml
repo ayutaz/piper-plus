@@ -65,6 +65,19 @@ jobs:
       - name: Verify cross-runtime PUA mapping consistency
         run: python scripts/check_pua_consistency.py --verbose --check-version
 
+      # Meta-test: bump pua.json version to a sentinel and assert the gate
+      # exits non-zero with --check-version. Catches regressions in the
+      # version-comparison regex / parser without needing a separate harness.
+      - name: Meta-test (gate fails on intentional version drift)
+        run: |
+          python scripts/test_sync_gates_meta.py
+          # Restore must have run; assert tree is clean for the next jobs.
+          if ! git diff --quiet; then
+            echo "ERROR: meta-test left the working tree dirty (restore failed):"
+            git --no-pager diff
+            exit 1
+          fi
+
   fixture-drift:
     name: Test fixture in sync with pua.json
     runs-on: ubuntu-latest
@@ -94,7 +107,9 @@ jobs:
 
       - name: Run PUA invariant tests (G2P)
         working-directory: src/python/g2p
-        run: uv run pytest tests/test_pua_invariants.py -v
+        # `--no-cov` で coverage 計測を無効化 (test_pua_invariants.py のみ
+        # 実行するため、coverage 閾値 80% を満たさない誤検知を回避)
+        run: uv run pytest tests/test_pua_invariants.py -v --no-cov
 
       - name: Install piper_train deps
         working-directory: src/python
@@ -102,7 +117,9 @@ jobs:
 
       - name: Run update_model_config validate tests
         working-directory: src/python
-        run: uv run pytest tests/test_update_model_config.py -v
+        # `--no-cov` で coverage 計測を無効化 (単一テスト実行で coverage 閾値 70%
+        # を満たさない誤検知を回避)
+        run: uv run pytest tests/test_update_model_config.py -v --no-cov
 
   rust-pua-tests:
     name: Rust PUA table tests

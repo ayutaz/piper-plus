@@ -10,6 +10,13 @@ on:
       - 'test/**'
       - 'tools/benchmark/**'
       - 'tests/fixtures/g2p/zh_en_loanword_matrix.json'
+      - 'tests/fixtures/phoneme_timing/**'
+      - 'tests/fixtures/short_text/**'
+      - 'tests/fixtures/ort_session/**'
+      - 'docs/spec/phoneme-timing-contract.toml'
+      - 'docs/spec/short-text-contract.toml'
+      - 'docs/spec/ort-session-contract.toml'
+      - 'docker/wyoming/**'
       - '.github/workflows/python-tests.yml'
 
 concurrency:
@@ -25,26 +32,26 @@ jobs:
       matrix:
         os: [ubuntu-24.04, windows-latest, macos-latest]
         python-version: ["3.11"]
-    
+
     steps:
     - uses: actions/checkout@v6
-    
+
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v6
       with:
         python-version: ${{ matrix.python-version }}
-    
+
     - name: Install system dependencies (Ubuntu)
       if: runner.os == 'Linux'
       run: |
         sudo apt-get update
         sudo apt-get install -y libsndfile1 sox build-essential
-    
+
     - name: Install system dependencies (macOS)
       if: runner.os == 'macOS'
       run: |
         brew install libsndfile sox
-    
+
     - name: Install Python dependencies (Windows)
       if: runner.os == 'Windows'
       run: |
@@ -81,18 +88,28 @@ jobs:
         cd src/python
         # Run unit tests excluding inference tests (which require torch)
         pytest tests/ -v --tb=short -m "unit and not training and not benchmark and not inference"
-    
+
     - name: Run integration tests (Unix only)
       if: runner.os != 'Windows'
       run: |
         cd src/python
-        pytest tests/ -v --tb=short -m "integration and not benchmark"
+        # `--no-cov` で coverage 計測を無効化 (subset 実行のため 70% 閾値を
+        # 満たさず誤検知。ガッツリ unit test 側の "Run unit tests" で計測)
+        pytest tests/ -v --tb=short -m "integration and not benchmark" --no-cov
 
     - name: Run inference tests (Unix only)
       if: runner.os != 'Windows'
       run: |
         cd src/python
-        pytest tests/ -v --tb=short -m "inference and unit"
+        pytest tests/ -v --tb=short -m "inference and unit" --no-cov
+
+    - name: Run training tests (Unix only)
+      # Issue #XXX: training-marked tests (WavLM Discriminator + SpeakerBalancedBatchSampler 等)
+      # は CI でも回す。重い依存は本ステップ前に test/train extras でインストール済み。
+      if: runner.os != 'Windows'
+      run: |
+        cd src/python
+        pytest tests/ -v --tb=short -m "training and unit" --no-cov
 
     # ---------------------------------------------------------------
     # Runtime package tests (src/python_run — PyPI piper-plus)
@@ -102,6 +119,7 @@ jobs:
         pip install pyopenjtalk-plus g2p-en pypinyin
         # HTTP サーバー (FastAPI) のテストに必要な依存。バージョン制約は src/python_run/setup.py の [http] extras で一元管理。
         pip install fastapi 'uvicorn[standard]' httpx
+        pip install pytest-asyncio  # NEW: 既存の test_http_* tests で asyncio_mode=auto を使う
         python -c "import nltk; nltk.download('averaged_perceptron_tagger_eng', quiet=True); nltk.download('cmudict', quiet=True)"
       env:
         PYTHONUTF8: '1'
@@ -113,10 +131,36 @@ jobs:
       env:
         PYTHONUTF8: '1'
 
-    - name: Run runtime full tests (config, training manager, CLI, timing)
+    - name: Run runtime full tests (config, training manager, CLI, timing, streaming, short-text, zh-en, g2p-parallel, webui, http_server, text_splitter contract)
       run: |
         cd src/python_run
-        pytest tests/test_config_fallback.py tests/test_english_phonemization.py tests/test_runtime.py tests/test_util_impl.py tests/test_cli_models.py tests/test_training_manager.py tests/test_training_integration.py tests/test_phoneme_timing.py tests/test_voice_timing.py tests/test_http_timing.py tests/test_voice_g2p_parallel.py tests/test_short_text_mitigation.py -v --tb=short --override-ini="addopts="
+        pytest tests/test_config_fallback.py tests/test_english_phonemization.py tests/test_runtime.py tests/test_util_impl.py tests/test_cli_models.py tests/test_training_manager.py tests/test_training_integration.py tests/test_phoneme_timing.py tests/test_voice_timing.py tests/test_http_timing.py tests/test_http_server_root.py tests/test_voice_streaming.py tests/test_text_splitter.py tests/test_text_splitter_contract.py tests/test_voice_g2p_parallel.py tests/test_short_text_mitigation.py tests/test_zh_en_loanword_runtime.py tests/test_webui.py -v --tb=short --override-ini="addopts="
+      env:
+        PYTHONUTF8: '1'
+
+    - name: Upload coverage to Codecov (runtime + g2p)
+      if: runner.os == 'Linux'
+      uses: codecov/codecov-action@v5
+      with:
+        files: src/python_run/coverage.xml,src/python/g2p/coverage.xml,src/python/coverage.xml
+        flags: python
+        fail_ci_if_error: false
+      continue-on-error: true
+
+    # ---------------------------------------------------------------
+    # G2P package tests (src/python/g2p/tests/ — piper-plus-g2p PyPI)
+    # ---------------------------------------------------------------
+    # g2p-python-ci.yml は src/python/g2p/** の変更時のみ走る。
+    # python-tests.yml の paths (src/python/**, src/python_run/**, etc.) でも
+    # G2P テストを回し、ランタイム / 学習側の変更が G2P と整合することを保証する。
+    # 依存 (pyopenjtalk-plus / g2p-en / pypinyin / g2pk2) は line 61/69 の
+    # `g2p[all]` extras でインストール済み。ja/en/zh/ko テストは
+    # @requires_* でゲートされており、インポートが失敗した環境では auto-skip する。
+    # ES/PT/FR/SV は依存なしのため常に実行される。
+    - name: Run G2P package tests (multilingual phonemizers, ssml, snapshots, zh-en loanword)
+      run: |
+        cd src/python/g2p
+        pytest tests/ -v --tb=short --override-ini="addopts="
       env:
         PYTHONUTF8: '1'
 
@@ -140,6 +184,22 @@ jobs:
       env:
         PYTHONUTF8: '1'
 
+    # ---------------------------------------------------------------
+    # Wyoming integration tests (docker/wyoming/test_integration.py)
+    # ---------------------------------------------------------------
+    # Wyoming/piper_plus は test_integration.py 内で mock されるので、
+    # Docker image を build しなくても pytest で直接実行可能。
+    - name: Run Wyoming integration tests
+      if: runner.os != 'Windows'
+      run: |
+        cd docker/wyoming
+        # `--no-cov` で coverage 計測を無効化 (root pyproject の
+        # --cov-fail-under=70 が継承されると Wyoming は 0% で fail する)
+        PYTHONPATH="${GITHUB_WORKSPACE}/src/python:${PYTHONPATH:-}" \
+          python -m pytest test_integration.py -v --tb=short --no-cov
+      env:
+        PYTHONUTF8: '1'
+
     - name: Upload test results
       if: always()
       uses: actions/upload-artifact@v7
@@ -148,4 +208,7 @@ jobs:
         path: |
           src/python/.pytest_cache
           src/python/htmlcov
+          src/python_run/htmlcov
+          src/python/g2p/htmlcov
+          **/coverage.xml
         retention-days: 7

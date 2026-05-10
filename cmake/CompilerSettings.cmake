@@ -34,6 +34,34 @@ else()
   set(CMAKE_BUILD_WITH_INSTALL_RPATH FALSE)
 endif()
 
+# ---- Wave 1 quality gate: -Wpedantic + opt-in -Werror ---------------------
+#
+# -Wpedantic surfaces non-portable language extensions as plain warnings on
+# all GCC/Clang targets (Linux/macOS/Android/iOS). MSVC has no direct
+# equivalent and is intentionally skipped — /W3 already covers the bulk of
+# portability issues that matter on Windows, and /Wall is too noisy for the
+# vendored headers we depend on (json.hpp, ONNX Runtime).
+#
+# -Werror / /WX is gated behind PIPER_TREAT_WARNINGS_AS_ERRORS (default OFF).
+# The existing tree still has a backlog of -Wall/-Wextra warnings that need
+# to be triaged before we can flip this on by default; until then, CI keeps
+# the option OFF and developers can opt in locally with
+# `cmake -DPIPER_TREAT_WARNINGS_AS_ERRORS=ON ...` to validate clean builds.
+option(PIPER_TREAT_WARNINGS_AS_ERRORS "Treat C/C++ compiler warnings as errors" OFF)
+
+if(NOT MSVC)
+  add_compile_options(-Wpedantic)
+endif()
+
+if(PIPER_TREAT_WARNINGS_AS_ERRORS)
+  if(MSVC)
+    add_compile_options(/WX)
+  else()
+    add_compile_options(-Werror)
+  endif()
+  message(STATUS "PIPER_TREAT_WARNINGS_AS_ERRORS=ON: warnings will fail the build")
+endif()
+
 # ---- Android cross-compilation support ----
 if(ANDROID)
   message(STATUS "Android cross-compilation: ABI=${ANDROID_ABI}, Platform=${ANDROID_PLATFORM}")

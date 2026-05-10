@@ -1,0 +1,247 @@
+name: CodeQL
+
+# CodeQL static analysis. Runs on PR / push to dev / weekly schedule.
+#
+# 言語別の取扱:
+#   - Rust   : GitHub CodeQL 未対応のため除外 (clippy + cargo-audit で代替)。
+#   - Swift  : 除外。Package.swift の binary target は tag-time 確定方式
+#              (Package.swift header 参照) で、dev branch では release URL が
+#              未公開のため SPM resolve が 404 となる。CodeQL Swift は
+#              `build-mode: none` 未対応 (autobuild/manual のみ) で、build
+#              required な解析と Package.swift の設計が本質的に非互換。
+#              Swift ソースは 364 行で大半が `@_exported import` の re-export
+#              glue であり、SAST 価値が低い。Swift コンパイラ診断 +
+#              `swift test (PiperPlusG2PTests, macOS)` job + 背後の Rust crate
+#              の clippy/cargo-audit で実効的にカバーされている。
+#   - Kotlin : `build-mode: manual` を使用。
+#              理由: AAR の autobuild は事前ビルド済み libpiper_plus.so が
+#              jniLibs/<abi>/ に staged されている前提で、CodeQL 環境には
+#              存在しない (libpiper_plus.so は release-shared-lib.yml が別
+#              workflow で生成し、kotlin-g2p-ci.yml が Stage する)。
+#              `build-mode: none` は Android SDK classpath を持たず Android
+#              import を解決できないため extractor が "could not process any
+#              of it" で fail。
+#              よって manual mode で Kotlin コンパイル task のみ明示実行
+#              (`compileReleaseKotlin`) し、native build (CMake / .so link)
+#              は除外。Kotlin コードに残る path-injection / URL-redirection
+#              のような実 SAST 価値は確保しつつ、native artifact 依存を
+#              切り離す。JNI/native 側の SAST は C++ CodeQL でカバー。
+
+on:
+  pull_request:
+    branches: [ dev ]
+  push:
+    branches: [ dev ]
+  schedule:
+    - cron: '0 8 * * 1'  # Monday 08:00 UTC
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  actions: read
+  contents: read
+  security-events: write
+
+jobs:
+  filter:
+    runs-on: ubuntu-latest
+    outputs:
+      python: ${{ steps.changes.outputs.python }}
+      javascript-typescript: ${{ steps.changes.outputs.javascript-typescript }}
+      go: ${{ steps.changes.outputs.go }}
+      csharp: ${{ steps.changes.outputs.csharp }}
+      cpp: ${{ steps.changes.outputs.cpp }}
+      kotlin: ${{ steps.changes.outputs.kotlin }}
+    steps:
+      - uses: actions/checkout@v6
+      - id: changes
+        # On schedule we run all languages; on PR we filter via paths.
+        if: github.event_name == 'pull_request' || github.event_name == 'push'
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            python:
+              - 'src/python/**'
+              - 'src/python_run/**'
+              - 'docker/python-inference/**'
+              - 'docker/webui/**'
+              - 'docker/wyoming/**'
+              - 'scripts/**'
+              - '.github/workflows/codeql.yml'
+            javascript-typescript:
+              - 'src/wasm/**'
+              - '.github/workflows/codeql.yml'
+            go:
+              - 'src/go/**'
+              - '.github/workflows/codeql.yml'
+            csharp:
+              - 'src/csharp/**'
+              - '.github/workflows/codeql.yml'
+            cpp:
+              - 'src/cpp/**'
+              - 'cmake/**'
+              - 'CMakeLists.txt'
+              - '.github/workflows/codeql.yml'
+            kotlin:
+              - 'android/**'
+              - '.github/workflows/codeql.yml'
+
+  analyze:
+    needs: filter
+    name: Analyze (${{ matrix.language }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: python
+            os: ubuntu-24.04
+            build-mode: none
+          - language: javascript-typescript
+            os: ubuntu-24.04
+            build-mode: none
+          - language: go
+            os: ubuntu-24.04
+            build-mode: autobuild
+          - language: csharp
+            os: ubuntu-24.04
+            build-mode: manual
+          - language: cpp
+            os: ubuntu-24.04
+            build-mode: manual
+          - language: kotlin
+            # CodeQL の Kotlin 解析は java-kotlin として扱う。matrix の表示名
+            # は kotlin だが init 内部で java-kotlin にマップする (下の step
+            # で `languages: java-kotlin` を渡す)。
+            os: ubuntu-24.04
+            build-mode: manual
+
+    steps:
+      - name: Skip if no relevant changes
+        id: should-skip
+        run: |
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            echo "skip=false" >> $GITHUB_OUTPUT
+          elif [ "${{ matrix.language }}" = "python" ] && [ "${{ needs.filter.outputs.python }}" = "true" ]; then
+            echo "skip=false" >> $GITHUB_OUTPUT
+          elif [ "${{ matrix.language }}" = "javascript-typescript" ] && [ "${{ needs.filter.outputs.javascript-typescript }}" = "true" ]; then
+            echo "skip=false" >> $GITHUB_OUTPUT
+          elif [ "${{ matrix.language }}" = "go" ] && [ "${{ needs.filter.outputs.go }}" = "true" ]; then
+            echo "skip=false" >> $GITHUB_OUTPUT
+          elif [ "${{ matrix.language }}" = "csharp" ] && [ "${{ needs.filter.outputs.csharp }}" = "true" ]; then
+            echo "skip=false" >> $GITHUB_OUTPUT
+          elif [ "${{ matrix.language }}" = "cpp" ] && [ "${{ needs.filter.outputs.cpp }}" = "true" ]; then
+            echo "skip=false" >> $GITHUB_OUTPUT
+          elif [ "${{ matrix.language }}" = "kotlin" ] && [ "${{ needs.filter.outputs.kotlin }}" = "true" ]; then
+            echo "skip=false" >> $GITHUB_OUTPUT
+          else
+            echo "skip=true" >> $GITHUB_OUTPUT
+          fi
+
+      - uses: actions/checkout@v6
+        if: steps.should-skip.outputs.skip != 'true'
+
+      - name: Setup Go
+        if: steps.should-skip.outputs.skip != 'true' && matrix.language == 'go'
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.26'
+          cache-dependency-path: src/go/go.sum
+
+      - name: Setup .NET
+        if: steps.should-skip.outputs.skip != 'true' && matrix.language == 'csharp'
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Setup Python
+        if: steps.should-skip.outputs.skip != 'true' && matrix.language == 'python'
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+
+      - name: Setup Node.js
+        if: steps.should-skip.outputs.skip != 'true' && matrix.language == 'javascript-typescript'
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24.x'
+
+      - name: Setup C++ build deps
+        if: steps.should-skip.outputs.skip != 'true' && matrix.language == 'cpp'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake build-essential
+
+      - name: Setup JDK (Kotlin)
+        if: steps.should-skip.outputs.skip != 'true' && matrix.language == 'kotlin'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Android SDK (Kotlin)
+        if: steps.should-skip.outputs.skip != 'true' && matrix.language == 'kotlin'
+        uses: android-actions/setup-android@v3
+        with:
+          cmdline-tools-version: 11076708
+
+      - name: Initialize CodeQL
+        if: steps.should-skip.outputs.skip != 'true'
+        uses: github/codeql-action/init@v3
+        with:
+          # CodeQL は Kotlin を `java-kotlin` 言語として識別する。matrix の
+          # 表示用 `kotlin` を init 渡し用にここでマップする。
+          languages: ${{ matrix.language == 'kotlin' && 'java-kotlin' || matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+          queries: security-and-quality
+          # paths-ignore (test/demo/dist exclusions): see config-file rationale.
+          # Centralizes false-positive suppressions in one location instead of
+          # duplicating into per-job conditionals.
+          config-file: ./.github/codeql/codeql-config.yml
+
+      - name: Build (autobuild for Go)
+        if: steps.should-skip.outputs.skip != 'true' && matrix.build-mode == 'autobuild'
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Manual build (C#)
+        if: steps.should-skip.outputs.skip != 'true' && matrix.language == 'csharp'
+        run: dotnet build src/csharp/PiperPlus.sln -c Release
+
+      - name: Manual build (C++)
+        if: steps.should-skip.outputs.skip != 'true' && matrix.language == 'cpp'
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF
+          cmake --build build --parallel 2
+
+      - name: Manual build (Kotlin)
+        if: steps.should-skip.outputs.skip != 'true' && matrix.language == 'kotlin'
+        working-directory: android
+        # Kotlin コンパイル task のみ明示実行 (compileReleaseKotlin)。
+        # native build (externalNativeBuild / configureCMake) は task graph 上
+        # `compileReleaseKotlin` に依存しないため、トップレベル `gradle build`
+        # と違いここでは起動されない (libpiper_plus.so / .so link 依存を
+        # 自然に回避)。
+        # `-x configureCMakeRelease` 等の防御的 exclude は task が ABI suffix
+        # 付き (`configureCMakeRelease[arm64-v8a]`) で動的生成されるため
+        # exact match で `Task not found` エラーになる。除外せず task graph
+        # に任せる。
+        # CodeQL Java extractor がこの compile に hook して .kt の AST を
+        # 正確に抽出する (Android SDK classpath が解決された状態)。
+        run: |
+          ./gradlew \
+            :piper-plus-g2p:compileReleaseKotlin \
+            :piper-plus:compileReleaseKotlin \
+            --no-daemon --stacktrace
+
+      - name: Perform CodeQL Analysis
+        if: steps.should-skip.outputs.skip != 'true'
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{ matrix.language == 'kotlin' && 'java-kotlin' || matrix.language }}"

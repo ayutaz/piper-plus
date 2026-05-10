@@ -121,8 +121,8 @@ var fixedPUA = map[string]rune{
 
 	// Additional multi-codepoint diphthongs / nasal vowels (PUA v2) — 3 entries
 	"ɔɪ": 0xE062, // English diphthong (OY)
-	"œ̃":  0xE063, // French nasal open-mid front rounded vowel
-	"ɐ̃":  0xE064, // Portuguese nasal near-open central vowel
+	"œ̃": 0xE063, // French nasal open-mid front rounded vowel
+	"ɐ̃": 0xE064, // Portuguese nasal near-open central vowel
 }
 
 // reversePUA maps PUA codepoints back to multi-character tokens.

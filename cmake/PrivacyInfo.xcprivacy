@@ -9,6 +9,23 @@
     <key>NSPrivacyCollectedDataTypes</key>
     <array/>
     <key>NSPrivacyAccessedAPITypes</key>
-    <array/>
+    <array>
+        <!-- File timestamp APIs: stat() is used to verify model file presence
+             (piper_plus_c_api.cpp) and dictionary directory presence
+             (openjtalk_dictionary_manager.c). The metadata accessed is for
+             files written and managed by the app itself, never for files
+             belonging to the user or other apps.
+             Reason code DDA9.1: Access file timestamps, size, or other
+             metadata of files inside the app container, app group container,
+             or the app's CloudKit container. -->
+        <dict>
+            <key>NSPrivacyAccessedAPIType</key>
+            <string>NSPrivacyAccessedAPICategoryFileTimestamp</string>
+            <key>NSPrivacyAccessedAPITypeReasons</key>
+            <array>
+                <string>DDA9.1</string>
+            </array>
+        </dict>
+    </array>
 </dict>
 </plist>

@@ -96,3 +96,40 @@ func (r *TimingResult) ToTSV() string {
 	}
 	return b.String()
 }
+
+// ToSRT returns the timing result as SRT-style subtitle blocks.
+//
+// spec [output_formats.srt] (docs/spec/phoneme-timing-contract.toml). Each
+// phoneme is emitted as one cue with a 1-based index, start --> end
+// timestamps in HH:MM:SS,mmm form, and the phoneme as the cue text. Cues
+// are separated by a blank line ("\n\n"). Cross-runtime parity with
+// Rust (src/rust/piper-core/src/timing.rs:55-77) and Python
+// (src/python_run/piper/timing.py:174-204).
+func (r *TimingResult) ToSRT() string {
+	var b strings.Builder
+	for i, p := range r.Phonemes {
+		idx := i + 1
+		start := formatSRTTimestamp(p.StartMs)
+		end := formatSRTTimestamp(p.EndMs)
+		fmt.Fprintf(&b, "%d\n%s --> %s\n%s\n\n", idx, start, end, p.Phoneme)
+	}
+	return b.String()
+}
+
+// formatSRTTimestamp formats milliseconds as the SRT timestamp HH:MM:SS,mmm.
+// The comma (,) before milliseconds is mandated by the SRT format spec
+// (distinct from WebVTT which uses a period). Negative inputs are clamped
+// to 0 to match the Rust/Python behavior.
+func formatSRTTimestamp(ms float64) string {
+	if ms < 0 {
+		ms = 0
+	}
+	totalMs := uint64(math.Round(ms))
+	millis := totalMs % 1000
+	totalSecs := totalMs / 1000
+	secs := totalSecs % 60
+	totalMins := totalSecs / 60
+	mins := totalMins % 60
+	hours := totalMins / 60
+	return fmt.Sprintf("%02d:%02d:%02d,%03d", hours, mins, secs, millis)
+}

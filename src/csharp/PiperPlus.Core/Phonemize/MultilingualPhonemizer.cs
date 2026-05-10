@@ -56,7 +56,7 @@ public sealed class MultilingualPhonemizer : IPhonemizer
     /// Includes BOS (^), standard EOS ($, ?), and PUA-mapped question
     /// markers (?!, ?., ?~).
     /// </summary>
-    private static readonly HashSet<string> s_bosEosTokens = new()
+    private static readonly HashSet<string> S_bosEosTokens = new()
     {
         "^",        // BOS
         "$",        // EOS (standard)
@@ -67,10 +67,10 @@ public sealed class MultilingualPhonemizer : IPhonemizer
     };
 
     /// <summary>
-    /// Subset of <see cref="s_bosEosTokens"/> that are EOS-like tokens.
+    /// Subset of <see cref="S_bosEosTokens"/> that are EOS-like tokens.
     /// Used to track the last EOS seen across segments.
     /// </summary>
-    private static readonly HashSet<string> s_eosTokens = new()
+    private static readonly HashSet<string> S_eosTokens = new()
     {
         "$",        // EOS (standard)
         "?",        // EOS (question)
@@ -80,6 +80,7 @@ public sealed class MultilingualPhonemizer : IPhonemizer
     };
 
     /// <summary>
+    /// Initializes a new instance of the <see cref="MultilingualPhonemizer"/> class.
     /// Create a new <see cref="MultilingualPhonemizer"/>.
     /// </summary>
     /// <param name="phonemizers">
@@ -99,14 +100,16 @@ public sealed class MultilingualPhonemizer : IPhonemizer
     {
         _phonemizers = phonemizers ?? throw new ArgumentNullException(nameof(phonemizers));
         if (_phonemizers.Count == 0)
+        {
             throw new ArgumentException("At least one phonemizer is required.", nameof(phonemizers));
+        }
 
         // Validate that defaultLatinLanguage is one of the supported
         // languages. If not, fall back to the first language.
         if (!_phonemizers.ContainsKey(defaultLatinLanguage))
         {
             // Pick the first key deterministically
-            using var enumerator = _phonemizers.Keys.GetEnumerator();
+            using Dictionary<string, IPhonemizer>.KeyCollection.Enumerator enumerator = _phonemizers.Keys.GetEnumerator();
             enumerator.MoveNext();
             defaultLatinLanguage = enumerator.Current;
         }
@@ -142,7 +145,7 @@ public sealed class MultilingualPhonemizer : IPhonemizer
     /// <inheritdoc />
     public List<string> Phonemize(string text)
     {
-        var (tokens, _) = PhonemizeCore(text);
+        (List<string>? tokens, List<ProsodyInfo?> _) = PhonemizeCore(text);
         return tokens;
     }
 
@@ -183,7 +186,9 @@ public sealed class MultilingualPhonemizer : IPhonemizer
 
         // Try _lastEos (thread-local) first, fall back to "$"
         if (!phonemeIdMap.TryGetValue(_lastEos.Value!, out int[]? eosIds))
+        {
             phonemeIdMap.TryGetValue("$", out eosIds);
+        }
 
         // Step 1: Insert PAD after every phoneme ID.
         var paddedIds = new List<int>(phonemeIds.Count * 2);
@@ -214,6 +219,7 @@ public sealed class MultilingualPhonemizer : IPhonemizer
             {
                 withBosProsody.Add(null);
             }
+
             withBosProsody.AddRange(paddedProsody);
 
             paddedIds = withBos;
@@ -244,9 +250,11 @@ public sealed class MultilingualPhonemizer : IPhonemizer
     /// </summary>
     private (List<string> Tokens, List<ProsodyInfo?> Prosody) PhonemizeCore(string text)
     {
-        var segments = _detector.SegmentText(text);
+        List<(string Lang, string Text)> segments = _detector.SegmentText(text);
         if (segments.Count == 0)
+        {
             return (new List<string>(), new List<ProsodyInfo?>());
+        }
 
         var allPhonemes = new List<string>(segments.Count * 50);
         var allProsody = new List<ProsodyInfo?>(segments.Count * 50);
@@ -256,15 +264,19 @@ public sealed class MultilingualPhonemizer : IPhonemizer
         bool hasZhSegment = false;
         if (_enableZhEnDispatch)
         {
-            foreach (var (lang, _) in segments)
+            foreach ((string? lang, string _) in segments)
             {
-                if (lang == "zh") { hasZhSegment = true; break; }
+                if (lang == "zh")
+                {
+                    hasZhSegment = true;
+                    break;
+                }
             }
         }
 
         for (int segIdx = 0; segIdx < segments.Count; segIdx++)
         {
-            var (lang, segmentText) = segments[segIdx];
+            (string? lang, string? segmentText) = segments[segIdx];
 
             // ZH-EN code-switching dispatch: route embedded en (with adjacent
             // zh) through the chinese loanword path. Issue #384, design §2.3.
@@ -277,50 +289,61 @@ public sealed class MultilingualPhonemizer : IPhonemizer
             if (_enableZhEnDispatch && hasZhSegment && lang == "en" &&
                 _phonemizers["zh"] is ChinesePhonemizer cp)
             {
-                bool prevIsZh = segIdx > 0 && segments[segIdx - 1].Item1 == "zh";
-                bool nextIsZh = segIdx + 1 < segments.Count && segments[segIdx + 1].Item1 == "zh";
+                bool prevIsZh = segIdx > 0 && segments[segIdx - 1].Lang == "zh";
+                bool nextIsZh = segIdx + 1 < segments.Count && segments[segIdx + 1].Lang == "zh";
                 if (prevIsZh || nextIsZh)
                 {
                     // Use the prosody-aware variant: each IPA token must carry
                     // ProsodyInfo(a1=tone, a2=1, a3=1) to match Python and avoid
                     // dropping tone information at the ONNX layer (review R-C1).
-                    var result = cp.Engine.ConvertEmbeddedEnglish(segmentText);
+                    ChineseG2PResult result = cp.Engine.ConvertEmbeddedEnglish(segmentText);
                     int n = result.Phonemes.Count;
                     for (int i = 0; i < n; i++)
                     {
                         var ph = result.Phonemes[i];
-                        if (s_bosEosTokens.Contains(ph))
+                        if (S_bosEosTokens.Contains(ph))
                         {
-                            if (s_eosTokens.Contains(ph))
+                            if (S_eosTokens.Contains(ph))
+                            {
                                 lastEos = ph;
+                            }
+
                             continue;
                         }
+
                         allPhonemes.Add(ph);
                         allProsody.Add(new ProsodyInfo(
                             result.A1[i],
                             result.A2[i],
                             result.A3[i]));
                     }
+
                     continue;
                 }
             }
 
             if (!_phonemizers.TryGetValue(lang, out IPhonemizer? phonemizer))
+            {
                 continue;
+            }
 
-            var (phonemes, prosody) = phonemizer.PhonemizeWithProsody(segmentText);
+            (List<string>? phonemes, List<ProsodyInfo?>? prosody) = phonemizer.PhonemizeWithProsody(segmentText);
 
             // Strip BOS/EOS from individual segments.
             // Track the last EOS token seen (for PostProcessIds).
             for (int i = 0; i < phonemes.Count; i++)
             {
                 string ph = phonemes[i];
-                if (s_bosEosTokens.Contains(ph))
+                if (S_bosEosTokens.Contains(ph))
                 {
-                    if (s_eosTokens.Contains(ph))
+                    if (S_eosTokens.Contains(ph))
+                    {
                         lastEos = ph;
+                    }
+
                     continue;
                 }
+
                 allPhonemes.Add(ph);
                 allProsody.Add(prosody[i]);
             }

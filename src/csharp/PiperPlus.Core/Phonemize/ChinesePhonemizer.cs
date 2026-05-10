@@ -23,6 +23,7 @@ public sealed class ChinesePhonemizer : IPhonemizer
     private readonly IChineseG2PEngine _engine;
 
     /// <summary>
+    /// Initializes a new instance of the <see cref="ChinesePhonemizer"/> class.
     /// Create a new <see cref="ChinesePhonemizer"/> backed by the given G2P engine.
     /// </summary>
     /// <param name="engine">
@@ -55,6 +56,7 @@ public sealed class ChinesePhonemizer : IPhonemizer
     /// (review feedback CS-H2, R-C1).
     /// </para>
     /// </remarks>
+    /// <returns></returns>
     public IReadOnlyList<string> PhonemizeEmbeddedEnglish(string text) =>
         _engine.ConvertEmbeddedEnglish(text).Phonemes;
 
@@ -65,19 +67,20 @@ public sealed class ChinesePhonemizer : IPhonemizer
     /// shape <see cref="MultilingualPhonemizer"/> consumes when dispatching
     /// embedded English in Chinese context.
     /// </summary>
+    /// <returns></returns>
     public (IReadOnlyList<string> Phonemes,
             IReadOnlyList<int> A1,
             IReadOnlyList<int> A2,
             IReadOnlyList<int> A3) PhonemizeEmbeddedEnglishWithProsody(string text)
     {
-        var result = _engine.ConvertEmbeddedEnglish(text);
+        ChineseG2PResult result = _engine.ConvertEmbeddedEnglish(text);
         return (result.Phonemes, result.A1, result.A2, result.A3);
     }
 
     /// <inheritdoc />
     public List<string> Phonemize(string text)
     {
-        var (tokens, _) = PhonemizeCore(text);
+        (List<string>? tokens, List<ProsodyInfo?> _) = PhonemizeCore(text);
         return tokens;
     }
 
@@ -128,17 +131,19 @@ public sealed class ChinesePhonemizer : IPhonemizer
     /// </summary>
     private (List<string> Tokens, List<ProsodyInfo?> Prosody) PhonemizeCore(string text)
     {
-        var result = _engine.Convert(text);
-        var phonemes = result.Phonemes;
-        var a1 = result.A1;
-        var a2 = result.A2;
-        var a3 = result.A3;
+        ChineseG2PResult result = _engine.Convert(text);
+        IReadOnlyList<string> phonemes = result.Phonemes;
+        IReadOnlyList<int> a1 = result.A1;
+        IReadOnlyList<int> a2 = result.A2;
+        IReadOnlyList<int> a3 = result.A3;
 
         int count = phonemes.Count;
 
         if (a1.Count != count || a2.Count != count || a3.Count != count)
+        {
             throw new InvalidOperationException(
                 $"Chinese G2P result lists have inconsistent lengths: phonemes={count}, A1={a1.Count}, A2={a2.Count}, A3={a3.Count}");
+        }
 
         var tokens = new List<string>(count);
         var prosody = new List<ProsodyInfo?>(count);

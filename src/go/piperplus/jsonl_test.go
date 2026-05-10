@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"time"
 )
 
 // ---------------------------------------------------------------------------
@@ -90,6 +91,40 @@ func TestParseJSONLLine_WithProsody(t *testing.T) {
 	}
 }
 
+// TestParseJSONLLine_NegativePhonemeID pins the validation contract: the
+// phoneme_id slot is unsigned-by-convention even though it's stored as int64.
+// A negative ID indicates a corrupt JSONL line and must be rejected with an
+// error that names the offending index — tests the explicit check at
+// jsonl.go:38-42.
+func TestParseJSONLLine_NegativePhonemeID(t *testing.T) {
+	line := []byte(`{"phoneme_ids": [1, 2, -3, 4]}`)
+	_, err := ParseJSONLLine(line)
+	if err == nil {
+		t.Fatal("expected error for negative phoneme_id, got nil")
+	}
+	if !strings.Contains(err.Error(), "negative") {
+		t.Errorf("error %q should mention 'negative'", err.Error())
+	}
+	// The error message must identify the offending index so callers can
+	// locate the bad entry in a multi-line JSONL stream.
+	if !strings.Contains(err.Error(), "2") {
+		t.Errorf("error %q should reference index 2", err.Error())
+	}
+}
+
+// TestParseJSONLLine_NegativeAtIndexZero verifies the index format also works
+// for the first element (boundary case, no off-by-one).
+func TestParseJSONLLine_NegativeAtIndexZero(t *testing.T) {
+	line := []byte(`{"phoneme_ids": [-1]}`)
+	_, err := ParseJSONLLine(line)
+	if err == nil {
+		t.Fatal("expected error for negative phoneme_id at index 0, got nil")
+	}
+	if !strings.Contains(err.Error(), "index 0") {
+		t.Errorf("error %q should reference 'index 0'", err.Error())
+	}
+}
+
 // ---------------------------------------------------------------------------
 // ReadJSONL
 // ---------------------------------------------------------------------------
@@ -136,6 +171,122 @@ func TestReadJSONL(t *testing.T) {
 	}
 	if inputs[2].SpeakerID == nil || *inputs[2].SpeakerID != 2 {
 		t.Errorf("input[2]: expected speaker_id 2, got %v", inputs[2].SpeakerID)
+	}
+}
+
+// TestReadJSONL_StopsOnFirstError verifies that without ContinueOnError, the
+// scanner halts at the first malformed line. After the bad line, no further
+// inputs should arrive on inputCh, even if subsequent lines are valid. This
+// pins the default fail-fast behavior at jsonl.go:74-89.
+func TestReadJSONL_StopsOnFirstError(t *testing.T) {
+	data := strings.Join([]string{
+		`{"phoneme_ids": [1, 2]}`,
+		`{not valid json`,
+		`{"phoneme_ids": [3, 4]}`, // must NOT be delivered
+	}, "\n")
+
+	ctx := context.Background()
+	inputCh, errCh := ReadJSONL(ctx, strings.NewReader(data))
+
+	var inputs []*JSONLInput
+	for inp := range inputCh {
+		inputs = append(inputs, inp)
+	}
+
+	var errs []error
+	for err := range errCh {
+		errs = append(errs, err)
+	}
+
+	if len(inputs) != 1 {
+		t.Errorf("expected exactly 1 input before halt, got %d", len(inputs))
+	}
+	if len(errs) != 1 {
+		t.Errorf("expected exactly 1 error, got %d: %v", len(errs), errs)
+	}
+}
+
+// TestReadJSONL_ContinueOnError verifies that with ContinueOnError, the
+// scanner skips malformed lines and keeps emitting subsequent valid inputs.
+// This pins the recovery behavior at jsonl.go:74-82.
+func TestReadJSONL_ContinueOnError(t *testing.T) {
+	data := strings.Join([]string{
+		`{"phoneme_ids": [1, 2]}`,
+		`{not valid json`,
+		`{"phoneme_ids": [3, 4]}`, // must be delivered after the bad line
+		`{"phoneme_ids": [-9]}`,   // negative ID — also invalid
+		`{"phoneme_ids": [5]}`,    // must still be delivered
+	}, "\n")
+
+	ctx := context.Background()
+	inputCh, errCh := ReadJSONL(ctx, strings.NewReader(data), ContinueOnError())
+
+	var inputs []*JSONLInput
+	for inp := range inputCh {
+		inputs = append(inputs, inp)
+	}
+	var errs []error
+	for err := range errCh {
+		errs = append(errs, err)
+	}
+
+	if len(inputs) != 3 {
+		t.Errorf("expected 3 valid inputs, got %d", len(inputs))
+	}
+	if len(errs) != 2 {
+		t.Errorf("expected 2 errors (bad json + negative id), got %d: %v", len(errs), errs)
+	}
+	// Verify the valid inputs preserve order — phoneme[0] = 1, then 3, then 5.
+	wantFirst := []int64{1, 3, 5}
+	if len(inputs) == 3 {
+		for i, want := range wantFirst {
+			if len(inputs[i].PhonemeIDs) == 0 || inputs[i].PhonemeIDs[0] != want {
+				t.Errorf("input[%d].PhonemeIDs[0] = %v, want %d",
+					i, inputs[i].PhonemeIDs, want)
+			}
+		}
+	}
+}
+
+// TestReadJSONL_ContextCancelledDuringSelectSend verifies that when ctx is
+// canceled while the producer goroutine is blocked on `inputCh <- input`
+// (because the consumer is slow), it exits via the `<-ctx.Done()` branch
+// at jsonl.go:91-95 instead of leaking. We use an unbuffered consumer and
+// never read from inputCh to force the send to block.
+func TestReadJSONL_ContextCancelledDuringSelectSend(t *testing.T) {
+	// One valid line — the producer will scan it successfully and try to
+	// send on inputCh, but we never receive from inputCh, so the send blocks.
+	data := `{"phoneme_ids": [1, 2, 3]}` + "\n" +
+		`{"phoneme_ids": [4, 5, 6]}` + "\n"
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	inputCh, errCh := ReadJSONL(ctx, strings.NewReader(data))
+
+	// Receive only the first input, then cancel before draining the second.
+	select {
+	case <-inputCh:
+	case <-time.After(2 * time.Second):
+		t.Fatal("did not receive first input")
+	}
+	cancel() // producer is now blocked trying to send second input
+
+	// inputCh and errCh must close after cancellation. Drain to confirm.
+	closed := make(chan struct{})
+	go func() {
+		defer close(closed)
+		for range inputCh {
+		}
+		for range errCh {
+		}
+	}()
+
+	select {
+	case <-closed:
+		// Producer honored ctx.Done() in the select.
+	case <-time.After(2 * time.Second):
+		t.Fatal("ReadJSONL goroutine did not exit after ctx cancellation in select-send")
 	}
 }
 

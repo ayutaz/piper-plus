@@ -19,7 +19,41 @@ import (
 //     unbalanced ASCII double-quotes will desynchronise the in-quote state.
 //     Use Unicode quotes (\u201c/\u201d) for reliable nesting via the
 //     bracket depth mechanism.
+//
+// SSML envelopes (`<speak>...</speak>`) are preserved as single units per the
+// canonical `text-splitter-contract.toml` spec. If the text begins with
+// `<speak` (after leading whitespace) and contains a matching `</speak>` close
+// tag, the entire envelope is yielded as one unit and only any trailing text
+// after `</speak>` is split using the normal sentence-splitting logic. If the
+// `<speak>` tag is unclosed, the function falls back to normal splitting.
 func SplitSentences(text string) []string {
+	if len(text) == 0 {
+		return nil
+	}
+
+	// SSML envelope detection: if the text starts with `<speak` (after
+	// leading whitespace) and we find a matching `</speak>` close tag,
+	// preserve the entire envelope as a single unit. Any trailing text
+	// after `</speak>` is split using the normal logic. If the tag is
+	// unclosed, fall back to normal splitting.
+	if envelope, tail, ok := extractSpeakEnvelope(text); ok {
+		var result []string
+		if envelope != "" {
+			result = append(result, envelope)
+		}
+		if tail != "" {
+			result = append(result, splitSentencesPlain(tail)...)
+		}
+		return result
+	}
+
+	return splitSentencesPlain(text)
+}
+
+// splitSentencesPlain is the SSML-unaware sentence splitter. It is invoked by
+// SplitSentences after stripping any SSML envelope (or directly when no
+// envelope is present).
+func splitSentencesPlain(text string) []string {
 	if len(text) == 0 {
 		return nil
 	}
@@ -146,6 +180,72 @@ func SplitTextChunks(text string, maxChars int) []string {
 	}
 
 	return chunks
+}
+
+// extractSpeakEnvelope detects an SSML `<speak>...</speak>` envelope at the
+// start of text (after leading whitespace) and returns:
+//
+//   - envelope: the trimmed envelope string (`<speak ...>...</speak>`)
+//   - tail:     trimmed text after `</speak>` (empty if none)
+//   - ok:       true if a complete envelope was found
+//
+// To qualify as an envelope start, the prefix must be exactly `<speak` followed
+// by `>`, whitespace, or end-of-string (so e.g. `<speaker>` does not match).
+// The closing tag match is case-insensitive on the tag name (matching Python's
+// `re.IGNORECASE` and Rust's `find_speak_close`). If the prefix matches but no
+// `</speak>` is found, ok is false (caller falls back to normal splitting).
+func extractSpeakEnvelope(text string) (envelope, tail string, ok bool) {
+	trimmed := strings.TrimLeft(text, " \t\n\r")
+	const prefix = "<speak"
+	if !strings.HasPrefix(trimmed, prefix) {
+		return "", "", false
+	}
+	// Ensure the prefix is followed by `>`, whitespace, or end-of-string so
+	// that e.g. `<speaker>` does not falsely match.
+	if len(trimmed) > len(prefix) {
+		switch trimmed[len(prefix)] {
+		case '>', ' ', '\t', '\n', '\r':
+			// ok — valid `<speak>` or `<speak ...>`.
+		default:
+			return "", "", false
+		}
+	}
+	closeOff := findSpeakClose(trimmed)
+	if closeOff < 0 {
+		return "", "", false
+	}
+	end := closeOff + len("</speak>")
+	envelope = strings.TrimSpace(trimmed[:end])
+	tail = strings.TrimSpace(trimmed[end:])
+	return envelope, tail, true
+}
+
+// findSpeakClose returns the byte offset of the closing `</speak>` tag in
+// text. The match is case-insensitive on the tag name (matching Python's
+// `re.IGNORECASE` and Rust's `find_speak_close`). Returns -1 if no closing
+// tag is found.
+func findSpeakClose(text string) int {
+	const needleLen = len("</speak>")
+	if len(text) < needleLen {
+		return -1
+	}
+	// Lower-case + upper-case mask for ASCII case-insensitive byte compare.
+	lower := []byte("</speak>")
+	upper := []byte("</SPEAK>")
+	for i := 0; i+needleLen <= len(text); i++ {
+		match := true
+		for j := 0; j < needleLen; j++ {
+			b := text[i+j]
+			if b != lower[j] && b != upper[j] {
+				match = false
+				break
+			}
+		}
+		if match {
+			return i
+		}
+	}
+	return -1
 }
 
 // isSentenceEnd returns true if r is a sentence-ending punctuation mark.

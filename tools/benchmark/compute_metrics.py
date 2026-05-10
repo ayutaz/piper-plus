@@ -327,7 +327,7 @@ Examples:
 
         # RTF from generation results
         rtf_key = f"{sample['model']}/{sample['language']}/{sample['text_id']}"
-        rtf = rtf_lookup.get(rtf_key, None)
+        rtf = rtf_lookup.get(rtf_key)
 
         # UTMOS
         utmos = utmos_scores.get(str(wav_path), None)

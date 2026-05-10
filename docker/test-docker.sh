@@ -20,9 +20,9 @@ TESTS_FAILED=0
 run_test() {
     local test_name="$1"
     local test_command="$2"
-    
+
     echo -n "Testing $test_name... "
-    
+
     if bash -c "$test_command" > /tmp/test_output.log 2>&1; then
         echo -e "${GREEN}PASSED${NC}"
         ((TESTS_PASSED++))
@@ -120,7 +120,7 @@ if [ -z "$SKIP_COMPOSE" ]; then
     # Test docker compose configuration
     run_test "docker compose config validation" \
         "docker compose config > /dev/null"
-    
+
     # Test building with docker compose
     run_test "docker compose build (python-inference only)" \
         "docker compose build --no-cache python-inference"
@@ -143,12 +143,12 @@ import json
 # Load model
 with open(\"/models/text_voice.onnx.json\", \"r\") as f:
     config = json.load(f)
-    
+
 session = ort.InferenceSession(\"/models/text_voice.onnx\")
 
 # Simple inference test
 input_ids = np.array([[1, 20, 18, 24, 24, 27, 2]], dtype=np.int64)  # \"hello\" in phonemes
-scales = np.array([config[\"inference\"][\"noise_scale\"], 
+scales = np.array([config[\"inference\"][\"noise_scale\"],
                    config[\"inference\"][\"length_scale\"]], dtype=np.float32)
 
 outputs = session.run(None, {\"input\": input_ids, \"scales\": scales})

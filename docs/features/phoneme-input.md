@@ -24,6 +24,7 @@ echo "Hello [[ h ə l oʊ ]] world" | piper --model en_US-lessac-medium.onnx -f 
 > **Note:** piper-plus は eSpeak-ng に依存しません。以下の eSpeak 音素形式はレガシー互換のための参考情報です。piper-plus の G2P パイプライン (`piper-plus-g2p`) は独自の IPA ベース音素を使用します。
 
 #### English (eSpeak phonemes)
+
 ```bash
 # Custom pronunciation for a name
 echo "My name is [[ dʒ ɒ n ]] (John)" | piper --model en_US-lessac-medium.onnx -f john.wav
@@ -33,6 +34,7 @@ echo "The [[ aɪ diː iː ]] (IDE) is ready" | piper --model en_US-lessac-medium
 ```
 
 #### Japanese (OpenJTalk phonemes)
+
 ```bash
 # Hiragana with custom reading
 echo "今日は [[ ky o o w a ]] いい天気です" | piper --model multilingual-test-medium.onnx -f weather.wav
@@ -46,12 +48,14 @@ echo "私は [[ m a i k u r u ]] です" | piper --model multilingual-test-mediu
 > **Note:** piper-plus は eSpeak-ng に依存しません。以下の eSpeak 音素形式はレガシー互換のための参考情報です。piper-plus の G2P パイプライン (`piper-plus-g2p`) は独自の IPA ベース音素を使用します。
 
 #### eSpeak-ng (Most Languages)
+
 - Uses IPA (International Phonetic Alphabet) symbols
 - Space-separated phonemes
 - Common symbols: `ə` (schwa), `ɪ` (near-close front unrounded), `ʊ` (near-close back rounded)
 - Reference: [eSpeak-ng Phoneme Documentation](https://github.com/espeak-ng/espeak-ng/blob/master/docs/phonemes.md)
 
 #### OpenJTalk (Japanese)
+
 - Uses romanized Japanese phonemes
 - Space-separated
 - Multi-character phonemes supported: `ky`, `sh`, `ch`, `ts`, etc.
@@ -62,6 +66,7 @@ echo "私は [[ m a i k u r u ]] です" | piper --model multilingual-test-mediu
   - `pau` - pause
 
 #### Chinese (pypinyin-based IPA)
+
 ```bash
 # Mandarin with tone markers
 echo "今天 [[ tɕ in tone1 tʰ iaŋ tone1 ]] 很好" | piper --model multilingual-test-medium.onnx -f today.wav
@@ -71,6 +76,7 @@ echo "[[ pʰ in tone1 i in tone1 ]]" | piper --model multilingual-test-medium.on
 ```
 
 #### Spanish (rule-based IPA)
+
 ```bash
 # Standard greeting
 echo "[[ ˈ o l a ]]" | piper --model multilingual-test-medium.onnx -f hola.wav
@@ -80,6 +86,7 @@ echo "Buenos [[ d i a s ]]" | piper --model multilingual-test-medium.onnx -f bue
 ```
 
 #### Portuguese (Brazilian IPA)
+
 ```bash
 # "obrigado" with nasal vowel
 echo "[[ o b ɾ i ɡ a d u ]]" | piper --model multilingual-test-medium.onnx -f obrigado.wav
@@ -89,6 +96,7 @@ echo "[[ b õ ]]" | piper --model multilingual-test-medium.onnx -f bom.wav
 ```
 
 #### French (rule-based IPA)
+
 ```bash
 # "bonjour"
 echo "[[ b ɔ̃ ʒ u ʁ ]]" | piper --model multilingual-test-medium.onnx -f bonjour.wav
@@ -100,6 +108,7 @@ echo "[[ v ɛ̃ b l ɑ̃ ]]" | piper --model multilingual-test-medium.onnx -f vi
 ### Phoneme System Details
 
 #### pypinyin IPA (Chinese / Mandarin)
+
 - Uses pypinyin for character-to-pinyin conversion, then maps to IPA
 - Space-separated IPA tokens
 - Tone markers appended after each syllable: `tone1` through `tone5`
@@ -157,6 +166,7 @@ echo "[[ v ɛ̃ b l ɑ̃ ]]" | piper --model multilingual-test-medium.onnx -f vi
 | tone5  | 轻声      | Neutral tone    |
 
 #### Rule-based IPA (Spanish)
+
 - Uses IPA directly with rule-based grapheme-to-phoneme conversion
 - Latin American pronunciation by default (seseo: c/z before e/i -> s, yeismo: ll/y -> ʝ)
 - Space-separated IPA phonemes
@@ -200,6 +210,7 @@ echo "[[ v ɛ̃ b l ɑ̃ ]]" | piper --model multilingual-test-medium.onnx -f vi
 | u       | Close back rounded                         | tu               |
 
 #### Rule-based IPA (Brazilian Portuguese)
+
 - Uses IPA with rule-based grapheme-to-phoneme conversion
 - Brazilian Portuguese pronunciation (carioca-style)
 - T/D palatalization: t before i -> tʃ, d before i -> dʒ, also applies to unstressed final -e
@@ -257,6 +268,7 @@ echo "[[ v ɛ̃ b l ɑ̃ ]]" | piper --model multilingual-test-medium.onnx -f vi
 | ũ       | Nasalized u                                | um, algum            |
 
 #### Rule-based IPA (French)
+
 - Uses IPA with rule-based grapheme-to-phoneme conversion
 - No external G2P engine required
 - Nasal vowels: vowel + n/m before consonant or word-end produces a nasal vowel
@@ -316,6 +328,7 @@ echo "[[ v ɛ̃ b l ɑ̃ ]]" | piper --model multilingual-test-medium.onnx -f vi
 ### Advanced Usage
 
 #### Mixed Text and Phonemes
+
 ```bash
 # English with specific pronunciation hints
 echo "The word 'read' can be [[ r iː d ]] or [[ r ɛ d ]]" | piper --model en_US-lessac-medium.onnx -f read.wav
@@ -325,6 +338,7 @@ echo "漢字[[ k a N j i ]]の読み方" | piper --model multilingual-test-mediu
 ```
 
 #### Multiple Phoneme Segments
+
 ```bash
 echo "Say [[ h ə l oʊ ]] and [[ g ʊ d b aɪ ]]" | piper --model en_US-lessac-medium.onnx -f greetings.wav
 ```
@@ -332,6 +346,7 @@ echo "Say [[ h ə l oʊ ]] and [[ g ʊ d b aɪ ]]" | piper --model en_US-lessac-
 ## Implementation Details
 
 ### Text Processing Flow
+
 1. Input text is parsed for `[[ phonemes ]]` patterns
 2. Text is split into segments (regular text and phoneme sections)
 3. Regular text segments are phonemized normally
@@ -339,6 +354,7 @@ echo "Say [[ h ə l oʊ ]] and [[ g ʊ d b aɪ ]]" | piper --model en_US-lessac-
 5. All segments are combined for synthesis
 
 ### Japanese Multi-Character Phonemes
+
 Japanese phonemes like `ky`, `sh`, `ts` are automatically mapped to Private Use Area (PUA) Unicode codepoints for consistency with the training data:
 
 | Phoneme    | PUA Codepoint | Description                    |
@@ -374,6 +390,7 @@ Japanese phonemes like `ky`, `sh`, `ts` are automatically mapped to Private Use 
 | N_uvular   | U+E01C        | N at end or before vowels      |
 
 ### Chinese Multi-Character Phonemes
+
 Chinese phonemes such as aspirated consonants, compound finals, and tone markers are automatically mapped to PUA codepoints:
 
 | Phoneme    | PUA Codepoint | Description                    |
@@ -423,6 +440,7 @@ Chinese phonemes such as aspirated consonants, compound finals, and tone markers
 | tone5      | U+E04A        | Neutral tone                   |
 
 ### Shared Multi-Character Phonemes (ES / PT / FR)
+
 These multi-character phonemes are shared across Spanish, Portuguese, and French:
 
 | Phoneme    | PUA Codepoint | Used by   | Description                    |
@@ -463,6 +481,7 @@ These multi-character phonemes are shared across Spanish, Portuguese, and French
 ### Debug Mode
 
 Enable debug logging to see phoneme processing:
+
 ```bash
 echo "Test [[ t ɛ s t ]]" | piper --model model.onnx --debug -f test.wav
 ```

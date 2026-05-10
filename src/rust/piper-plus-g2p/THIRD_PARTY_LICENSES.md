@@ -23,7 +23,7 @@ direct dependencies.
 
 | Asset | License | Source | Purpose |
 |-------|---------|--------|---------|
-| NAIST-JDIC | BSD-3-Clause | [NAIST-JDIC project (osdn.net)](https://osdn.net/projects/naist-jdic/) | MeCab dictionary for Japanese morphological analysis |
+| NAIST-JDIC | BSD-3-Clause | [NAIST-JDIC mirror (jpreprocess/naist-jdic)](https://github.com/jpreprocess/naist-jdic) | MeCab dictionary for Japanese morphological analysis |
 
 > **Distribution note:** Bundled inside the `jpreprocess` crate at
 > compile time when `naist-jdic` is enabled. Adds approximately 20 MB
@@ -92,7 +92,7 @@ binary via `include_str!` / `include_bytes!`. This is required for iOS
 > 3. The name "Carnegie Mellon University" must not be used to endorse
 >    or promote products derived from this software without prior
 >    written permission. For permission, please contact
->    sphinx@cs.cmu.edu.
+>    <sphinx@cs.cmu.edu>.
 > 4. Products derived from this software may not be called "Carnegie
 >    Mellon Pronouncing Dictionary" nor may "Carnegie Mellon" appear
 >    in their names without prior written permission of Carnegie
@@ -100,7 +100,7 @@ binary via `include_str!` / `include_bytes!`. This is required for iOS
 > 5. Redistributions of any form whatsoever must retain the following
 >    acknowledgment: "This product includes data from the Carnegie
 >    Mellon Pronouncing Dictionary, which is freely available at
->    http://www.speech.cs.cmu.edu/cgi-bin/cmudict."
+>    <http://www.speech.cs.cmu.edu/cgi-bin/cmudict>."
 >
 > THIS SOFTWARE IS PROVIDED BY CARNEGIE MELLON UNIVERSITY "AS IS" AND
 > ANY EXPRESSED OR IMPLIED WARRANTIES ARE DISCLAIMED.

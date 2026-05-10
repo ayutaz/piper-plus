@@ -163,7 +163,7 @@ if (result.hasTimingInfo) {
 
 Example output:
 
-```
+```text
 ^: 0.0 → 58.0 ms
 k: 58.0 → 150.8 ms
 o: 150.8 → 290.0 ms
@@ -198,7 +198,7 @@ const srtStr = timingToSrt(result.timing);
 
 **SRT output** can be saved alongside the audio for playback in media players:
 
-```
+```text
 1
 00:00:00,000 --> 00:00:00,058
 ^

@@ -1,0 +1,43 @@
+name: markdownlint
+
+on:
+  pull_request:
+    paths:
+      - '**/*.md'
+      - '**/*.markdown'
+      - '.markdownlint.yaml'
+  push:
+    branches: [dev, main]
+    paths:
+      - '**/*.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  markdownlint:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: DavidAnson/markdownlint-cli2-action@v17
+        with:
+          globs: |
+            **/*.md
+            !node_modules
+            !**/node_modules/**
+            !.git
+            !.build/**
+            !**/.venv/**
+            !**/CHANGELOG.md
+            !test/models/**
+            !**/build/**
+            !build-*/**
+            !**/dist/**
+            !**/target/**
+          config: .markdownlint.yaml

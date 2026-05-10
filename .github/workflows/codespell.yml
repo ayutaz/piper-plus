@@ -1,0 +1,38 @@
+name: codespell
+
+on:
+  pull_request:
+    paths-ignore:
+      - '**/*.lock'
+      - '**/*.lockfile'
+      - 'tools/benchmark/issue-383/**'
+      - 'test/models/**'
+  push:
+    branches: [dev, main]
+    paths-ignore:
+      - '**/*.lock'
+      - '**/*.lockfile'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  codespell:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: codespell-project/actions-codespell@v2
+        with:
+          # Configuration is read from .codespellrc
+          check_filenames: true
+          check_hidden: true
+          # Don't fail on warnings yet — establishing baseline
+          # Once baseline is clean, set --check-hidden and remove this flag
+          ignore_words_file: .codespell-ignore-words.txt
+          skip: '*.lock,*.lockfile,*.min.js,*.min.css,build,dist,target,node_modules,.git,test/models,tools/benchmark/issue-383'

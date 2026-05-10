@@ -36,6 +36,29 @@ public static class SessionFactory
     private const string GpuDeviceIdEnvVar = "PIPER_GPU_DEVICE_ID";
 
     /// <summary>
+    /// Environment variable to override the intra-op thread count. When set to a
+    /// valid positive integer, the value is clamped to <see cref="MaxIntraThreads"/>
+    /// and overrides the auto-detected default. Invalid values are ignored.
+    /// Mirrors the Python <c>PIPER_INTRA_THREADS</c> behaviour (ort_utils.py).
+    /// </summary>
+    internal const string IntraThreadsEnvVar = "PIPER_INTRA_THREADS";
+
+    /// <summary>
+    /// Environment variable to skip ORT warmup. When set to <c>"1"</c>, <c>"true"</c>
+    /// or <c>"yes"</c> (case-insensitive) <see cref="Warmup"/> returns immediately.
+    /// Mirrors the Python <c>PIPER_DISABLE_WARMUP</c> behaviour (ort_utils.py).
+    /// </summary>
+    internal const string DisableWarmupEnvVar = "PIPER_DISABLE_WARMUP";
+
+    /// <summary>
+    /// Environment variable to skip the optimized model cache (.opt.onnx + .ok).
+    /// When set to <c>"1"</c>, <c>"true"</c> or <c>"yes"</c> (case-insensitive),
+    /// the cache is neither read nor written. Mirrors the Python
+    /// <c>PIPER_DISABLE_CACHE</c> behaviour (ort_utils.py).
+    /// </summary>
+    internal const string DisableCacheEnvVar = "PIPER_DISABLE_CACHE";
+
+    /// <summary>
     /// Default number of warmup inference runs.
     /// ORT JIT cache stabilises in 1-2 runs; 2 provides a safety margin.
     /// </summary>
@@ -109,7 +132,7 @@ public static class SessionFactory
         // uses the default value (0), mirroring the C++ parseArgs behaviour.
         int resolvedDeviceId = ResolveGpuDeviceId(gpuDeviceId, logger);
 
-        var options = ConfigureSessionOptions();
+        SessionOptions options = ConfigureSessionOptions();
 
         if (useCuda)
         {
@@ -124,10 +147,21 @@ public static class SessionFactory
         var sentinelPath = optimizedPath + ".ok";
         string effectiveModelPath;
 
-        // キャッシュ有効: .opt.onnx と .ok の両方が存在する場合のみ
-        bool useCached = File.Exists(optimizedPath) && File.Exists(sentinelPath);
+        // PIPER_DISABLE_CACHE: スキップキャッシュ読み書き (Python ort_utils.py と整合)
+        bool cacheDisabled = IsTruthyEnv(DisableCacheEnvVar);
 
-        if (useCached)
+        // キャッシュ有効: .opt.onnx と .ok の両方が存在する場合のみ
+        bool useCached = !cacheDisabled
+            && File.Exists(optimizedPath)
+            && File.Exists(sentinelPath);
+
+        if (cacheDisabled)
+        {
+            logger.LogInformation(
+                "Model cache disabled via {EnvVar}", DisableCacheEnvVar);
+            effectiveModelPath = modelPath;
+        }
+        else if (useCached)
         {
             logger.LogInformation("Loading pre-optimized model from {Path}", optimizedPath);
             options.GraphOptimizationLevel = GraphOptimizationLevel.ORT_DISABLE_ALL;
@@ -140,7 +174,13 @@ public static class SessionFactory
             {
                 logger.LogWarning(
                     "Removing incomplete cache {Path} (missing sentinel)", optimizedPath);
-                try { File.Delete(optimizedPath); } catch { /* best effort */ }
+                try
+                {
+                    File.Delete(optimizedPath);
+                }
+                catch
+                { /* best effort */
+                }
             }
 
             try
@@ -165,7 +205,9 @@ public static class SessionFactory
         var session = new InferenceSession(effectiveModelPath, options);
 
         // F1: セッション作成成功後にセンチネルファイルを書き込む
-        if (!useCached && File.Exists(optimizedPath))
+        // (cacheDisabled の場合は OptimizedModelFilePath を設定していないので
+        // optimizedPath は生成されない → このブロックも自然にスキップされる)
+        if (!cacheDisabled && !useCached && File.Exists(optimizedPath))
         {
             try
             {
@@ -214,6 +256,20 @@ public static class SessionFactory
         ArgumentNullException.ThrowIfNull(session);
         logger ??= NullLogger.Instance;
 
+        // PIPER_DISABLE_WARMUP: 環境変数で warmup をスキップ
+        // (Python ort_utils.py と整合: "1" / "true" / "yes" で skip)。
+        if (IsTruthyEnv(DisableWarmupEnvVar))
+        {
+            logger.LogInformation(
+                "Warmup skipped via {EnvVar}", DisableWarmupEnvVar);
+            return;
+        }
+
+        if (runs <= 0)
+        {
+            return;
+        }
+
         try
         {
             var sw = Stopwatch.StartNew();
@@ -222,7 +278,10 @@ public static class SessionFactory
             long[] phonemeIds = new long[WarmupPhonemeLength];
             phonemeIds[0] = 1; // BOS
             for (int j = 1; j < WarmupPhonemeLength - 1; j++)
+            {
                 phonemeIds[j] = 8; // dummy phoneme
+            }
+
             phonemeIds[WarmupPhonemeLength - 1] = 2; // EOS
             int phonemeLength = phonemeIds.Length;
 
@@ -242,7 +301,7 @@ public static class SessionFactory
             var inputValues = new List<OrtValue>(6) { inputTensor, inputLengths, scalesTensor };
 
             // ---- Dynamically add optional inputs based on model metadata ----
-            var metadata = session.InputMetadata;
+            IReadOnlyDictionary<string, NodeMetadata> metadata = session.InputMetadata;
 
             OrtValue? sidTensor = null;
             if (metadata.ContainsKey("sid"))
@@ -281,7 +340,7 @@ public static class SessionFactory
             if (metadata.ContainsKey("speaker_embedding"))
             {
                 int embDim = 256; // ECAPA-TDNN default
-                if (metadata.TryGetValue("speaker_embedding", out var embMeta)
+                if (metadata.TryGetValue("speaker_embedding", out NodeMetadata? embMeta)
                     && embMeta.Dimensions.Length >= 2 && embMeta.Dimensions[1] > 0)
                 {
                     embDim = embMeta.Dimensions[1];
@@ -307,7 +366,7 @@ public static class SessionFactory
                 for (int i = 0; i < runs; i++)
                 {
                     using var runOptions = new RunOptions();
-                    using var results = session.Run(
+                    using IDisposableReadOnlyCollection<OrtValue> results = session.Run(
                         runOptions, inputNames, inputValues, outputNames);
                 }
             }
@@ -356,10 +415,13 @@ public static class SessionFactory
         options.GraphOptimizationLevel = GraphOptimizationLevel.ORT_ENABLE_ALL;
 
         // COLD-M1: VITS は小モデルのためスレッド数を制限する。
+        // 優先順位: PIPER_INTRA_THREADS env > 自動検出 (Python ort_utils.py と整合)。
         // 物理コア数の半分（最大4）を intra-op スレッドに割り当て。
-        options.IntraOpNumThreads = Math.Max(
+        int autoIntraThreads = Math.Max(
             Math.Min(Environment.ProcessorCount / 2, MaxIntraThreads), 1);
+        options.IntraOpNumThreads = ResolveIntraOpThreads(autoIntraThreads);
         options.InterOpNumThreads = 1;
+
         // VITS は単一グラフで並列サブグラフがないため Sequential が最適。
         options.ExecutionMode = ExecutionMode.ORT_SEQUENTIAL;
 
@@ -371,6 +433,48 @@ public static class SessionFactory
         options.AddSessionConfigEntry("session.dynamic_block_base", "4");
 
         return options;
+    }
+
+    /// <summary>
+    /// Returns <c>true</c> when the named environment variable is set to one of
+    /// <c>"1"</c>, <c>"true"</c>, or <c>"yes"</c> (case-insensitive). Mirrors the
+    /// Python <c>ort_utils.py</c> truthiness contract used for
+    /// <c>PIPER_DISABLE_WARMUP</c> / <c>PIPER_DISABLE_CACHE</c>.
+    /// </summary>
+    private static bool IsTruthyEnv(string name)
+    {
+        var value = Environment.GetEnvironmentVariable(name);
+        if (string.IsNullOrEmpty(value))
+        {
+            return false;
+        }
+
+        var normalized = value.Trim().ToLowerInvariant();
+        return normalized is "1" or "true" or "yes";
+    }
+
+    /// <summary>
+    /// Resolves the intra-op thread count. When <c>PIPER_INTRA_THREADS</c> is set
+    /// to a valid positive integer, returns that value clamped to
+    /// <c>[1, MaxIntraThreads]</c>. Otherwise returns <paramref name="autoDetected"/>.
+    /// Mirrors Python <c>ort_utils.create_session_options</c>.
+    /// </summary>
+    /// <returns></returns>
+    internal static int ResolveIntraOpThreads(int autoDetected)
+    {
+        var envValue = Environment.GetEnvironmentVariable(IntraThreadsEnvVar);
+        if (string.IsNullOrEmpty(envValue))
+        {
+            return autoDetected;
+        }
+
+        if (int.TryParse(envValue.Trim(), out int parsed) && parsed >= 1)
+        {
+            return Math.Min(parsed, MaxIntraThreads);
+        }
+
+        // 無効値はサイレントに無視し、auto-detected を採用する (Python と同等)。
+        return autoDetected;
     }
 
     /// <summary>

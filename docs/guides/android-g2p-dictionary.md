@@ -43,10 +43,12 @@ my-app/
 ```
 
 **手順:**
+
 1. リリースから取得: `wget https://huggingface.co/ayousanz/piper-plus-base/resolve/main/open_jtalk_dic.tar`
 2. 展開: `tar -xf open_jtalk_dic.tar -C app/src/main/assets/`
 3. `aaptOptions { noCompress 'bin', 'dic' }` を `android { }` ブロックに追加 (任意 — 既に圧縮するメリットは薄い)
 4. Kotlin:
+
 ```kotlin
 val dict = OpenJTalkDictionary.fromAssets(context)
 val g2p = PiperPlusG2p.create(context, dict)

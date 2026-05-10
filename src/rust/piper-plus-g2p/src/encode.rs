@@ -314,10 +314,15 @@ mod tests {
         let encoder = PiperEncoder::new(map, UnknownTokenMode::Skip).unwrap();
         let tokens: Vec<String> = vec!["a", "k"].into_iter().map(String::from).collect();
         let ids = encoder.encode(&tokens).unwrap();
-        assert_eq!(ids[0], 1); // BOS
-        assert_eq!(*ids.last().unwrap(), 2); // EOS
-        assert!(ids.contains(&15));
-        assert!(ids.contains(&30));
+        // Pin the full intersperse pattern (`^ _ <a> _ <k> _ $`) instead of
+        // just spot-checking BOS/EOS + .contains() — that earlier shape
+        // would happily pass even if the encoder emitted ids in the wrong
+        // order, dropped a pad, or duplicated a phoneme.
+        assert_eq!(
+            ids,
+            vec![1, 0, 15, 0, 30, 0, 2],
+            "BOS + pad-interspersed phonemes + EOS sequence drifted"
+        );
     }
 
     #[test]
@@ -334,7 +339,22 @@ mod tests {
         let encoder = PiperEncoder::new(map, UnknownTokenMode::Skip).unwrap();
         let tokens: Vec<String> = vec!["a", "Z"].into_iter().map(String::from).collect();
         let ids = encoder.encode(&tokens).unwrap();
-        assert!(ids.contains(&15));
+        // Skip mode pins the *observed* shape so any silent change (e.g.
+        // dropping the pad slot for the skipped token, or accidentally
+        // injecting a stray placeholder for 'Z') is caught.
+        // Current behavior: the unknown 'Z' is replaced with a pad ID rather
+        // than fully removed, yielding `^ _ <a> _ <pad> _ $`.
+        assert_eq!(
+            ids,
+            vec![1, 0, 15, 0, 0, 2],
+            "Skip mode encoder layout drifted; expected ^_<a>_<pad>_$"
+        );
+        // The unknown token must NOT inherit any "real" ID from the map.
+        assert!(
+            !ids.contains(&99),
+            "Skip mode must not inject phantom IDs, got {:?}",
+            ids
+        );
     }
 
     #[test]

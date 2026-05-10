@@ -17,6 +17,7 @@ allowed-tools: Bash(uv run *) Bash(cargo *) Bash(dotnet *) Bash(go test *) Bash(
 ## スコープ判定
 
 引数 `$ARGUMENTS`:
+
 - `python` → src/python/ + src/python_run/ のみ
 - `rust` → src/rust/ のみ
 - `cs` → src/csharp/ のみ
@@ -87,7 +88,7 @@ ctest --test-dir build -C Release --output-on-failure
 
 各ステップ完了後、以下の形式で結果を報告:
 
-```
+```text
 ## Precheck 結果
 
 | ステップ | 結果 | 詳細 |

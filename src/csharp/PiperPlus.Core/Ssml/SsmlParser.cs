@@ -64,10 +64,13 @@ public static partial class SsmlParser
     /// Detection is based on the presence of a <c>&lt;speak</c> opening tag
     /// near the start of the string.
     /// </summary>
+    /// <returns></returns>
     public static bool IsSsml(string text)
     {
         if (string.IsNullOrEmpty(text))
+        {
             return false;
+        }
 
         return SsmlDetectionRegex().IsMatch(text);
     }
@@ -101,18 +104,20 @@ public static partial class SsmlParser
                 ssmlText.Length > 120 ? ssmlText[..120] : ssmlText);
 
             // Strip XML tags heuristically so the user still gets audio output.
-            var stripped = XmlTagRegex().Replace(ssmlText, "").Trim();
+            var stripped = XmlTagRegex().Replace(ssmlText, string.Empty).Trim();
             return [new SsmlSegment(string.IsNullOrEmpty(stripped) ? ssmlText : stripped)];
         }
 
         if (doc.Root is null)
+        {
             return [new SsmlSegment(ssmlText)];
+        }
 
         var segments = new List<SsmlSegment>();
         Walk(doc.Root, rate: 1.0f, segments);
 
-        var merged = Merge(segments);
-        return merged.Count > 0 ? merged : [new SsmlSegment("")];
+        List<SsmlSegment> merged = Merge(segments);
+        return merged.Count > 0 ? merged : [new SsmlSegment(string.Empty)];
     }
 
     // ------------------------------------------------------------------
@@ -129,7 +134,7 @@ public static partial class SsmlParser
         if (tag == "break")
         {
             var breakMs = ResolveBreak(element);
-            segments.Add(new SsmlSegment("", breakMs, rate));
+            segments.Add(new SsmlSegment(string.Empty, breakMs, rate));
 
             // Handle tail text after <break/> (content following in parent)
             // In XDocument model this is not directly on the element; handled by parent iteration.
@@ -141,13 +146,15 @@ public static partial class SsmlParser
         {
             var rateAttr = (string?)element.Attribute("rate");
             if (rateAttr is not null)
+            {
                 rate = ParseRate(rateAttr);
+            }
         }
 
         // Process mixed content: text nodes and child elements interleaved.
         // XElement nodes contain text as XText children and elements as XElement children,
         // accessible via element.Nodes() in document order.
-        foreach (var node in element.Nodes())
+        foreach (XNode node in element.Nodes())
         {
             switch (node)
             {
@@ -155,9 +162,13 @@ public static partial class SsmlParser
                     {
                         var text = textNode.Value.Trim();
                         if (!string.IsNullOrEmpty(text))
+                        {
                             segments.Add(new SsmlSegment(text, Rate: rate));
+                        }
+
                         break;
                     }
+
                 case XElement childElement:
                     Walk(childElement, rate, segments);
                     break;
@@ -172,11 +183,15 @@ public static partial class SsmlParser
     {
         var timeAttr = (string?)element.Attribute("time");
         if (timeAttr is not null)
+        {
             return ParseBreakTime(timeAttr);
+        }
 
         var strengthAttr = (string?)element.Attribute("strength");
         if (strengthAttr is not null)
+        {
             return BreakStrengthMs.TryGetValue(strengthAttr, out var ms) ? ms : 400;
+        }
 
         // Default break with no attributes -> medium
         return BreakStrengthMs["medium"];
@@ -186,6 +201,7 @@ public static partial class SsmlParser
     /// Convert <c>"500ms"</c> or <c>"1s"</c> to milliseconds.
     /// Returns 0 for unparseable values.
     /// </summary>
+    /// <returns></returns>
     internal static int ParseBreakTime(string timeStr)
     {
         timeStr = timeStr.Trim().ToLowerInvariant();
@@ -195,7 +211,7 @@ public static partial class SsmlParser
             return double.TryParse(timeStr[..^2], out var val) ? (int)val : 0;
         }
 
-        if (timeStr.EndsWith("s"))
+        if (timeStr.EndsWith('s'))
         {
             return double.TryParse(timeStr[..^1], out var val) ? (int)(val * 1000) : 0;
         }
@@ -216,13 +232,16 @@ public static partial class SsmlParser
     /// </para>
     /// The returned value is the length_scale multiplier: &gt; 1.0 is slower, &lt; 1.0 is faster.
     /// </summary>
+    /// <returns></returns>
     internal static float ParseRate(string rateStr)
     {
         rateStr = rateStr.Trim().ToLowerInvariant();
 
         // Named rate
         if (RateNames.TryGetValue(rateStr, out var named))
+        {
             return named;
+        }
 
         // Percentage
         if (rateStr.EndsWith('%'))
@@ -234,6 +253,7 @@ public static partial class SsmlParser
                     Logger.LogWarning("Invalid rate percentage: {Rate}", rateStr);
                     return 1.0f;
                 }
+
                 // 120% speaking rate means faster -> length_scale = 100/120
                 return 100.0f / pct;
             }
@@ -250,6 +270,7 @@ public static partial class SsmlParser
                 Logger.LogWarning("Invalid rate value: {Rate}", rateStr);
                 return 1.0f;
             }
+
             return val;
         }
 

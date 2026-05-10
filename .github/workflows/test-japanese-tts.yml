@@ -39,19 +39,19 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
-      
+
       - name: Download piper artifact
         uses: actions/download-artifact@v8
         with:
           name: piper-japanese-${{ matrix.os }}-${{ github.sha }}
-      
+
       - name: Extract piper (Unix)
         if: runner.os != 'Windows'
         run: |
           tar -xzf piper-${{ runner.os }}.tar.gz
           chmod +x piper/bin/piper
           chmod +x piper/bin/open_jtalk || true
-          
+
           # Set library path for Linux and macOS
           if [ "${{ runner.os }}" = "Linux" ]; then
             export LD_LIBRARY_PATH="${PWD}/piper/lib:${LD_LIBRARY_PATH}"
@@ -60,7 +60,7 @@ jobs:
             export DYLD_LIBRARY_PATH="${PWD}/piper/lib:${DYLD_LIBRARY_PATH}"
             echo "DYLD_LIBRARY_PATH=${PWD}/piper/lib:${DYLD_LIBRARY_PATH}" >> $GITHUB_ENV
           fi
-          
+
           # Verify OpenJTalk is available (check phonemizer version first)
           if [ -f "piper/bin/open_jtalk_phonemizer" ]; then
             echo "✓ OpenJTalk phonemizer binary found"
@@ -74,12 +74,12 @@ jobs:
             echo "Contents of piper/bin:"
             ls -la piper/bin/
           fi
-      
+
       - name: Extract piper (Windows)
         if: runner.os == 'Windows'
         run: |
           Expand-Archive -Path piper-Windows.zip -DestinationPath . -Force
-          
+
           # Verify OpenJTalk is available (check phonemizer version first)
           if (Test-Path "piper/bin/open_jtalk_phonemizer.exe") {
             Write-Host "✓ OpenJTalk phonemizer binary found"
@@ -92,23 +92,23 @@ jobs:
             Write-Host "Contents of piper/bin:"
             Get-ChildItem piper/bin/
           }
-      
+
       - name: Setup Python
         uses: actions/setup-python@v6
         with:
           python-version: '3.11'
-      
+
       - name: Install test dependencies
         run: |
           python -m pip install --upgrade pip
           pip install requests tqdm pytest numpy scipy
-      
+
       - name: Create test model directory
         shell: bash
         run: |
           mkdir -p test/models
           echo "Test model directory created"
-      
+
       - name: Run basic Japanese TTS test
         shell: bash
         run: |
@@ -118,7 +118,7 @@ jobs:
           else
             python scripts/test_japanese_tts.py --basic --piper piper/bin/piper
           fi
-      
+
       - name: Run comprehensive Japanese tests
         if: success()
         shell: bash
@@ -129,8 +129,8 @@ jobs:
           else
             python scripts/test_japanese_tts.py --comprehensive --piper piper/bin/piper
           fi
-      
-      
+
+
       # Organize audio artifacts
       - name: Organize Audio Artifacts
         if: always()
@@ -142,7 +142,7 @@ jobs:
           else
             echo "No test results directory found"
           fi
-      
+
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v7
@@ -155,7 +155,7 @@ jobs:
             test_results/*.txt
             test_results/performance/*.json
           retention-days: 7
-      
+
       - name: Upload audio artifacts
         if: always()
         uses: actions/upload-artifact@v7
@@ -164,7 +164,7 @@ jobs:
           path: |
             audio_artifacts/
           retention-days: 7
-      
+
       - name: Upload test logs on failure
         if: failure()
         uses: actions/upload-artifact@v7
@@ -175,35 +175,35 @@ jobs:
             piper/bin/
             test/
           retention-days: 7
-  
+
   # Generate combined summary
   generate_summary:
     name: Generate Combined Summary
     needs: test_japanese
     if: always()
     runs-on: ubuntu-latest
-    
+
     steps:
       - uses: actions/checkout@v6
-      
+
       - name: Setup Python
         uses: actions/setup-python@v6
         with:
           python-version: '3.11'
-      
+
       - name: Download all test results
         uses: actions/download-artifact@v8
         with:
           pattern: japanese-tts-test-results-*
           path: all-results
-      
+
       - name: Combine results and generate summary
         run: |
           echo "Combining test results from all platforms..."
-          
+
           # Create combined results directory
           mkdir -p combined-results/performance
-          
+
           # Find and combine all performance JSON files
           find all-results -name "performance_summary.json" -o -name "*_metrics_*.json" | while read file; do
             # Extract platform from path
@@ -215,10 +215,10 @@ jobs:
               cp "$file" "combined-results/performance/"
             fi
           done
-          
+
           # Generate combined summary
           python scripts/generate_job_summary.py --results-dir combined-results
-      
+
       - name: Upload combined summary
         if: always()
         uses: actions/upload-artifact@v7

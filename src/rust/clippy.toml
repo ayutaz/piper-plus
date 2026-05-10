@@ -1,0 +1,19 @@
+# Clippy thresholds for the piper-plus workspace.
+#
+# Defaults are conservative; we relax a few thresholds because piper-core
+# has a number of long-but-readable functions (audio pipeline, ONNX glue)
+# that fall foul of the stricter pedantic/nursery suites we enabled in
+# [workspace.lints.clippy] in Cargo.toml.
+
+# clippy::cognitive_complexity (default 25) — lift slightly so the
+# gradual pedantic/nursery rollout doesn't drown us in noise.
+cognitive-complexity-threshold = 30
+
+# clippy::too_many_arguments (default 7) — VITS / ONNX inference entry
+# points genuinely take many tensors/scales; allow up to 10 before
+# warning.
+too-many-arguments-threshold = 10
+
+# clippy::type_complexity (default 250) — small bump for ONNX session +
+# tokenizer return types.
+type-complexity-threshold = 300

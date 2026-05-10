@@ -75,7 +75,7 @@ There are two independent WebUI implementations:
 
 **Docker version** (`docker/webui/app.py`) -- a standalone Gradio app that uses `piper_train.infer_onnx` and `piper_train.ort_utils` directly for ONNX inference. Inference only, no training tab. Includes session caching and warmup via `create_session_with_cache`.
 
-```
+```text
 src/python_run/piper/
 ├── webui.py              # Local WebUI (inference + training)
 ├── training_manager.py   # Training management backend

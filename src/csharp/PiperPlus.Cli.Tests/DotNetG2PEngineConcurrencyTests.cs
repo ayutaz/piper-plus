@@ -60,9 +60,10 @@ public class DotNetG2PEngineConcurrencyTests
                 for (int i = 0; i < iterationsPerWorker; i++)
                 {
                     var text = sentences[(w + i) % sentences.Length];
-                    var result = engine.Convert(text);
+                    G2PResult result = engine.Convert(text);
                     Assert.NotNull(result.Phonemes);
-                    Assert.True(result.Phonemes.Length > 0,
+                    Assert.True(
+                        result.Phonemes.Length > 0,
                         $"empty phonemes for '{text}' on worker {w} iter {i}");
                 }
             }
@@ -86,7 +87,7 @@ public class DotNetG2PEngineConcurrencyTests
     public void DotNetG2PEngine_ConcurrentJa_DeterministicResult()
     {
         using var engine = new DotNetG2PEngine();
-        var baseline = engine.Convert(Ja2);
+        G2PResult baseline = engine.Convert(Ja2);
 
         const int workers = 12;
         const int iterations = 32;
@@ -101,7 +102,7 @@ public class DotNetG2PEngineConcurrencyTests
         });
 
         Assert.Equal(workers * iterations, observed.Count);
-        foreach (var r in observed)
+        foreach (G2PResult r in observed)
         {
             Assert.Equal(baseline.Phonemes, r.Phonemes);
             Assert.Equal(baseline.A1, r.A1);
@@ -132,12 +133,12 @@ public class DotNetG2PEngineConcurrencyTests
         {
             Environment.SetEnvironmentVariable(
                 SentenceParallelEncoder.ParallelismEnvVar, "1");
-            var serial = SentenceParallelEncoder.EncodeAll(
+            List<string>[] serial = SentenceParallelEncoder.EncodeAll(
                 sentences, phonemizer.Phonemize);
 
             Environment.SetEnvironmentVariable(
                 SentenceParallelEncoder.ParallelismEnvVar, null);
-            var parallel = SentenceParallelEncoder.EncodeAll(
+            List<string>[] parallel = SentenceParallelEncoder.EncodeAll(
                 sentences, phonemizer.Phonemize);
 
             Assert.Equal(sentences.Length, serial.Length);
@@ -190,7 +191,7 @@ public class DotNetG2PEngineConcurrencyTests
         {
             try
             {
-                var results = SentenceParallelEncoder.EncodeAll(
+                List<string>[] results = SentenceParallelEncoder.EncodeAll(
                     sentences, multilingual.Phonemize, parallelismOverride: 4);
                 Assert.Equal(sentences.Length, results.Length);
                 Assert.All(results, tokens =>

@@ -16,7 +16,7 @@
  * See: https://onnx.ai/onnx/api/mapping.html
  * INT64 = 7, UINT64 = 13
  */
-const WEBGPU_UNSUPPORTED_DTYPES = new Set(['int64', 'uint64']);
+const WEBGPU_UNSUPPORTED_DTYPES = new Set(["int64", "uint64"]);
 
 export class WebGPUSessionManager {
   /**
@@ -41,42 +41,42 @@ export class WebGPUSessionManager {
    * @returns {Promise<Object>} InferenceSession
    */
   async createSession(modelPath) {
-    const providers = this._gpu
-      ? ['webgpu', 'wasm']
-      : ['wasm'];
+    const providers = this._gpu ? ["webgpu", "wasm"] : ["wasm"];
 
     const errors = [];
     for (const provider of providers) {
       try {
         const options = {
           executionProviders: [provider],
-          graphOptimizationLevel: 'extended',
+          graphOptimizationLevel: "extended",
           enableMemPattern: true,
         };
         const session = await this._ort.InferenceSession.create(modelPath, options);
 
         // Check for int64 inputs that WebGPU cannot handle
-        if (provider === 'webgpu' && this._hasUnsupportedDtypes(session)) {
+        if (provider === "webgpu" && this._hasUnsupportedDtypes(session)) {
           console.warn(
-            '[piper-plus] Model uses int64 tensors unsupported by WebGPU (WGSL has no i64). '
-            + 'Falling back to WASM execution provider.'
+            "[piper-plus] Model uses int64 tensors unsupported by WebGPU (WGSL has no i64). " +
+              "Falling back to WASM execution provider."
           );
           // Release the WebGPU session before retrying
-          if (typeof session.release === 'function') {
+          if (typeof session.release === "function") {
             await session.release();
           }
-          errors.push('webgpu: model uses int64 tensors (unsupported by WGSL)');
+          errors.push("webgpu: model uses int64 tensors (unsupported by WGSL)");
           continue;
         }
 
         this.currentProvider = provider;
         return session;
       } catch (e) {
-        errors.push(`${typeof provider === 'string' ? provider : provider.name}: ${e?.message ?? String(e)}`);
+        errors.push(
+          `${typeof provider === "string" ? provider : provider.name}: ${e?.message ?? String(e)}`
+        );
       }
     }
 
-    throw new Error(`All execution providers failed: ${errors.join('; ')}`);
+    throw new Error(`All execution providers failed: ${errors.join("; ")}`);
   }
 
   /**
@@ -90,7 +90,9 @@ export class WebGPUSessionManager {
       // session.inputNames + session.inputMetadata (ort-web >= 1.17)
       // or iterate session handler's inputTypes
       const names = session.inputNames;
-      if (!names) return false;
+      if (!names) {
+        return false;
+      }
       for (const name of names) {
         const meta = session.inputMetadata?.[name];
         if (meta && WEBGPU_UNSUPPORTED_DTYPES.has(meta.dataType)) {
@@ -123,11 +125,15 @@ export class WebGPUSessionManager {
     }
 
     const adapter = await this._gpu.requestAdapter();
-    if (!adapter) return false;
+    if (!adapter) {
+      return false;
+    }
     const device = await adapter.requestDevice();
     try {
-      return device.limits.maxBufferSize >= modelSizeBytes
-          && device.limits.maxStorageBufferBindingSize >= modelSizeBytes;
+      return (
+        device.limits.maxBufferSize >= modelSizeBytes &&
+        device.limits.maxStorageBufferBindingSize >= modelSizeBytes
+      );
     } finally {
       device.destroy();
     }

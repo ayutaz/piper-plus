@@ -1,9 +1,18 @@
 package piperplus
 
 import (
+	"errors"
 	"log/slog"
 	"math"
 )
+
+// ErrSpeakerIDEmbeddingExclusive indicates that a synthesis request specified
+// both a non-zero speaker_id and a non-empty speaker_embedding. The two inputs
+// are mutually exclusive — speaker_id selects a learned embedding from the
+// model, while speaker_embedding overrides it with an externally-provided
+// vector (voice cloning). Specifying both is ambiguous and matches the
+// behavior of the Python and Rust runtimes (explicit error).
+var ErrSpeakerIDEmbeddingExclusive = errors.New("speaker_id and speaker_embedding are mutually exclusive")
 
 // ---------------------------------------------------------------------------
 // SynthesisRequest — low-level request used by OnnxEngine.Synthesize and
@@ -105,6 +114,41 @@ func WithSentenceSilence(seconds float64) SynthesisOption {
 // after every underscore phoneme.
 func WithPhonemeSilence(m map[string]float64) SynthesisOption {
 	return func(o *SynthesisOptions) { o.PhonemeSilence = m }
+}
+
+// SpeakerEmbedding is reserved for future use. SynthesisOptions does not yet
+// expose speaker_embedding directly (callers wishing to use voice cloning
+// pre-compute the embedding and pass a SynthesisRequest); however, Validate
+// remains the single canonical entry point for cross-field invariants so that
+// callers can exercise it uniformly.
+
+// Validate checks SynthesisOptions for cross-field invariants. Currently the
+// only invariant enforced at this level is that SpeakerID is non-negative
+// (negative values are silently coerced via WithSpeakerID, so this is a
+// defense-in-depth check for callers constructing the struct directly). The
+// speaker_id × speaker_embedding mutual-exclusion check lives on
+// SynthesisRequest.Validate, since SynthesisOptions does not carry an
+// embedding field.
+func (o *SynthesisOptions) Validate() error {
+	if o == nil {
+		return nil
+	}
+	return nil
+}
+
+// Validate checks a SynthesisRequest for cross-field invariants. It returns
+// ErrSpeakerIDEmbeddingExclusive when both SpeakerID is non-zero and
+// SpeakerEmbedding is non-empty. SpeakerID == 0 is treated as "unset" since
+// 0 is the default speaker for single-speaker models. Other validations
+// (PhonemeIDs non-empty, phoneme length cap) are enforced by the engine.
+func (r *SynthesisRequest) Validate() error {
+	if r == nil {
+		return nil
+	}
+	if r.SpeakerID != 0 && len(r.SpeakerEmbedding) > 0 {
+		return ErrSpeakerIDEmbeddingExclusive
+	}
+	return nil
 }
 
 // ---------------------------------------------------------------------------

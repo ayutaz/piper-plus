@@ -6,7 +6,7 @@ Piper Plus の音素体系と ID マッピングのリファレンス。
 
 音素変換は **Phonemizer ABC + 言語レジストリ** で管理される。
 
-```
+```text
 テキスト → registry.get_phonemizer(language) → phonemize() → phoneme_ids → モデル
 ```
 

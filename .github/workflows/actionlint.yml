@@ -1,0 +1,47 @@
+name: actionlint
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/**'
+      - '.github/actions/**'
+  push:
+    branches: [dev, main]
+    paths:
+      - '.github/workflows/**'
+      - '.github/actions/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  actionlint:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Download actionlint
+        id: get_actionlint
+        run: |
+          bash <(curl -sSL https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)
+          echo "executable=$(pwd)/actionlint" >> "$GITHUB_OUTPUT"
+        shell: bash
+
+      - name: Check workflow files
+        # Workflows are validated for:
+        #   - YAML syntax
+        #   - Action input/output types
+        #   - Shell script (bash/sh/pwsh) via shellcheck integration
+        #   - Workflow trigger types
+        #   - Job dependencies
+        # Initial pass: continue-on-error so existing 56 workflows can be
+        # incrementally cleaned up. Once baseline is clean, remove this flag.
+        run: |
+          ${{ steps.get_actionlint.outputs.executable }} -color
+        shell: bash
+        continue-on-error: true

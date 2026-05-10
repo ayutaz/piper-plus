@@ -1,0 +1,513 @@
+{
+  "schema_version": 1,
+  "language": "pt",
+  "description": "Brazilian Portuguese G2P golden phoneme matrix (pins current implementation output).",
+  "metadata": {
+    "source": "Python piper_plus_g2p — pinned by scripts/regenerate_g2p_golden_fixtures.py. The expected values capture the *current* implementation output. Drift in any rule will fail src/python/g2p/tests/test_golden_fixtures.py.",
+    "py_runtime": "src/python/g2p/piper_plus_g2p/portuguese.py",
+    "version": 1
+  },
+  "cases": [
+    {
+      "text": "oi",
+      "expected_phonemes": [
+        "o",
+        "i"
+      ],
+      "notes": "basic"
+    },
+    {
+      "text": "bom",
+      "expected_phonemes": [
+        "b",
+        "õ"
+      ],
+      "notes": "nasal om"
+    },
+    {
+      "text": "obrigado",
+      "expected_phonemes": [
+        "o",
+        "b",
+        "ʁ",
+        "i",
+        "ɡ",
+        "a",
+        "d",
+        "u"
+      ],
+      "notes": "stress on -ga-"
+    },
+    {
+      "text": "brasil",
+      "expected_phonemes": [
+        "b",
+        "ʁ",
+        "a",
+        "z",
+        "i",
+        "w"
+      ],
+      "notes": "coda l vocalisation"
+    },
+    {
+      "text": "irmã",
+      "expected_phonemes": [
+        "i",
+        "ʁ",
+        "m",
+        "ã"
+      ],
+      "notes": "ã nasal"
+    },
+    {
+      "text": "entender",
+      "expected_phonemes": [
+        "ẽ",
+        "t",
+        "ẽ",
+        "d",
+        "e",
+        "ʁ"
+      ],
+      "notes": "en nasal"
+    },
+    {
+      "text": "sim",
+      "expected_phonemes": [
+        "s",
+        "ĩ"
+      ],
+      "notes": "im → ĩ"
+    },
+    {
+      "text": "limão",
+      "expected_phonemes": [
+        "l",
+        "i",
+        "m",
+        "ã",
+        "u"
+      ],
+      "notes": "ão diphthong"
+    },
+    {
+      "text": "um",
+      "expected_phonemes": [
+        "ũ"
+      ],
+      "notes": "um nasal"
+    },
+    {
+      "text": "manhã",
+      "expected_phonemes": [
+        "m",
+        "a",
+        "ɲ",
+        "ã"
+      ],
+      "notes": "nh + ã"
+    },
+    {
+      "text": "maçã",
+      "expected_phonemes": [
+        "m",
+        "a",
+        "s",
+        "ã"
+      ],
+      "notes": "ç + ã"
+    },
+    {
+      "text": "melhor",
+      "expected_phonemes": [
+        "m",
+        "e",
+        "ʎ",
+        "o",
+        "ʁ"
+      ],
+      "notes": "lh"
+    },
+    {
+      "text": "filho",
+      "expected_phonemes": [
+        "f",
+        "i",
+        "ʎ",
+        "u"
+      ],
+      "notes": "lh"
+    },
+    {
+      "text": "chão",
+      "expected_phonemes": [
+        "ʃ",
+        "ã",
+        "u"
+      ],
+      "notes": "ch + ão"
+    },
+    {
+      "text": "chave",
+      "expected_phonemes": [
+        "ʃ",
+        "a",
+        "v",
+        "i"
+      ],
+      "notes": "ch initial"
+    },
+    {
+      "text": "cidade",
+      "expected_phonemes": [
+        "s",
+        "i",
+        "d",
+        "a",
+        "dʒ",
+        "i"
+      ],
+      "notes": "final e → i, palatalisation"
+    },
+    {
+      "text": "novo",
+      "expected_phonemes": [
+        "n",
+        "o",
+        "v",
+        "u"
+      ],
+      "notes": "final o → u"
+    },
+    {
+      "text": "amigo",
+      "expected_phonemes": [
+        "a",
+        "m",
+        "i",
+        "ɡ",
+        "u"
+      ],
+      "notes": "final o → u"
+    },
+    {
+      "text": "verde",
+      "expected_phonemes": [
+        "v",
+        "e",
+        "ʁ",
+        "dʒ",
+        "i"
+      ],
+      "notes": "final e → i"
+    },
+    {
+      "text": "animal",
+      "expected_phonemes": [
+        "a",
+        "n",
+        "i",
+        "m",
+        "a",
+        "w"
+      ],
+      "notes": "coda l → w"
+    },
+    {
+      "text": "papel",
+      "expected_phonemes": [
+        "p",
+        "a",
+        "p",
+        "e",
+        "w"
+      ],
+      "notes": "coda l → w"
+    },
+    {
+      "text": "mesa",
+      "expected_phonemes": [
+        "m",
+        "e",
+        "z",
+        "a"
+      ],
+      "notes": "s → z intervocalic"
+    },
+    {
+      "text": "casa",
+      "expected_phonemes": [
+        "k",
+        "a",
+        "z",
+        "a"
+      ],
+      "notes": "s → z intervocalic"
+    },
+    {
+      "text": "tia",
+      "expected_phonemes": [
+        "tʃ",
+        "i",
+        "a"
+      ],
+      "notes": "ti → tʃi"
+    },
+    {
+      "text": "dia",
+      "expected_phonemes": [
+        "dʒ",
+        "i",
+        "a"
+      ],
+      "notes": "di → dʒi"
+    },
+    {
+      "text": "verdade",
+      "expected_phonemes": [
+        "v",
+        "e",
+        "ʁ",
+        "d",
+        "a",
+        "dʒ",
+        "i"
+      ],
+      "notes": "stress + final e palatalisation"
+    },
+    {
+      "text": "tio",
+      "expected_phonemes": [
+        "tʃ",
+        "i",
+        "u"
+      ],
+      "notes": "ti palatalisation"
+    },
+    {
+      "text": "aço",
+      "expected_phonemes": [
+        "a",
+        "s",
+        "u"
+      ],
+      "notes": "ç → s"
+    },
+    {
+      "text": "carro",
+      "expected_phonemes": [
+        "k",
+        "a",
+        "ʁ",
+        "u"
+      ],
+      "notes": "rr"
+    },
+    {
+      "text": "rato",
+      "expected_phonemes": [
+        "ʁ",
+        "a",
+        "t",
+        "u"
+      ],
+      "notes": "initial r → ʁ"
+    },
+    {
+      "text": "para",
+      "expected_phonemes": [
+        "p",
+        "a",
+        "ɾ",
+        "a"
+      ],
+      "notes": "intervocalic single r → ɾ"
+    },
+    {
+      "text": "café",
+      "expected_phonemes": [
+        "k",
+        "a",
+        "f",
+        "ɛ"
+      ],
+      "notes": "final é stress"
+    },
+    {
+      "text": "você",
+      "expected_phonemes": [
+        "v",
+        "o",
+        "s",
+        "e"
+      ],
+      "notes": "final ê stress"
+    },
+    {
+      "text": "também",
+      "expected_phonemes": [
+        "t",
+        "ã",
+        "b",
+        "ẽ"
+      ],
+      "notes": "final em nasal"
+    },
+    {
+      "text": "história",
+      "expected_phonemes": [
+        "i",
+        "s",
+        "t",
+        "ɔ",
+        "ɾ",
+        "i",
+        "a"
+      ],
+      "notes": "antepenult stress + ia"
+    },
+    {
+      "text": "de",
+      "expected_phonemes": [
+        "d",
+        "e"
+      ],
+      "notes": "function word"
+    },
+    {
+      "text": "o",
+      "expected_phonemes": [
+        "o"
+      ],
+      "notes": "function word"
+    },
+    {
+      "text": "a",
+      "expected_phonemes": [
+        "a"
+      ],
+      "notes": "function word"
+    },
+    {
+      "text": "e",
+      "expected_phonemes": [
+        "e"
+      ],
+      "notes": "function word"
+    },
+    {
+      "text": "que",
+      "expected_phonemes": [
+        "k",
+        "e"
+      ],
+      "notes": "function word"
+    },
+    {
+      "text": "falar",
+      "expected_phonemes": [
+        "f",
+        "a",
+        "l",
+        "a",
+        "ʁ"
+      ],
+      "notes": "ar verb"
+    },
+    {
+      "text": "comer",
+      "expected_phonemes": [
+        "k",
+        "o",
+        "m",
+        "e",
+        "ʁ"
+      ],
+      "notes": "er verb"
+    },
+    {
+      "text": "partir",
+      "expected_phonemes": [
+        "p",
+        "a",
+        "ʁ",
+        "tʃ",
+        "i",
+        "ʁ"
+      ],
+      "notes": "ir verb"
+    },
+    {
+      "text": "muito",
+      "expected_phonemes": [
+        "m",
+        "u",
+        "i",
+        "t",
+        "u"
+      ],
+      "notes": "ui diphthong"
+    },
+    {
+      "text": "não",
+      "expected_phonemes": [
+        "n",
+        "ã",
+        "u"
+      ],
+      "notes": "ão diphthong"
+    },
+    {
+      "text": "ontem",
+      "expected_phonemes": [
+        "õ",
+        "t",
+        "ẽ"
+      ],
+      "notes": "stress + em nasal"
+    },
+    {
+      "text": "texto",
+      "expected_phonemes": [
+        "t",
+        "e",
+        "ʃ",
+        "t",
+        "u"
+      ],
+      "notes": "x → s/ks heuristic"
+    },
+    {
+      "text": "exemplo",
+      "expected_phonemes": [
+        "e",
+        "z",
+        "ẽ",
+        "p",
+        "l",
+        "u"
+      ],
+      "notes": "intervocalic x"
+    },
+    {
+      "text": "pão",
+      "expected_phonemes": [
+        "p",
+        "ã",
+        "u"
+      ],
+      "notes": "ão"
+    },
+    {
+      "text": "amor",
+      "expected_phonemes": [
+        "a",
+        "m",
+        "o",
+        "ʁ"
+      ],
+      "notes": "final r"
+    }
+  ]
+}

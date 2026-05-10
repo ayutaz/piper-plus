@@ -1,0 +1,116 @@
+# Portuguese Dialect Contract
+#
+# Canonical contract for how the Portuguese phonemizer accepts language
+# codes and how Brazilian (pt-BR) vs European (pt-PT) phonology is
+# realised. Cross-referenced from
+# `src/python/g2p/piper_plus_g2p/registry.py`
+# (`_LANGUAGE_ALIASES` / `_LANGUAGE_TABLE`) and from
+# `src/python/g2p/piper_plus_g2p/portuguese.py` (header docstring +
+# `Dialect` enum).
+#
+# Update this file together with all language code locations and the
+# corresponding 7 runtime mirrors whenever the accepted-codes set,
+# dialect logic, or phoneme inventory changes.
+
+[meta]
+spec_version = 2
+issue = "PR #401 — pt alias for pt-BR + EU (pt-PT) full implementation across 8 runtimes"
+
+[language_codes]
+# Codes accepted by every runtime. Both `pt` and `pt-BR` resolve to the
+# Brazilian dialect (backward-compat); `pt-PT` selects the European
+# dialect.
+pt = "pt-BR"           # backward-compat alias (default = BR)
+"pt-BR" = "pt-BR"      # canonical Brazilian Portuguese
+"pt-br" = "pt-BR"      # case-insensitive region subtag
+"pt-PT" = "pt-PT"      # canonical European Portuguese
+"pt-pt" = "pt-PT"      # case-insensitive region subtag
+
+[fallback]
+# All accepted dialect codes are routed; no silent error fallback.
+# Unknown PT region subtags (e.g. "pt-AO") still hit the composite-code
+# path and produce a clear "Missing language" error from the registry.
+
+[implementation]
+# The BR and EU phonemizers share a single class
+# (`PortuguesePhonemizer`) parameterised by a `Dialect` enum, NOT
+# duplicated as separate files. The shared `_convert_word` performs
+# grapheme-to-IPA conversion identically for both dialects; only the
+# post-processing differs (5 phenomena listed below).
+canonical = "src/python/g2p/piper_plus_g2p/portuguese.py"
+class_name = "PortuguesePhonemizer"
+dialect_enum = "piper_plus_g2p.portuguese.Dialect"
+references = [
+  "Cruz-Ferreira (1995) European Portuguese — Journal of the IPA, 25(2):90-94",
+  "Mateus & d'Andrade (2000) The Phonology of Portuguese — Oxford University Press",
+]
+
+# 5 BR↔EU differences captured in this release. Each row is pinned by
+# at least one fixture-driven test in EVERY runtime.
+[[implementation.differences]]
+phenomenon = "t/d palatalisation before unstressed final /e/"
+br = "tʃi / dʒi (e.g. 'noite' /nojtʃi/)"
+eu = "tɨ / dɨ (no palatalisation; e.g. 'noite' /nojtɨ/)"
+mechanism = "EU SKIPS BR's t/d→tʃ/dʒ before final unstressed e"
+
+[[implementation.differences]]
+phenomenon = "Final unstressed -e"
+br = "i (general reduction, 'cidade' /sidadʒi/)"
+eu = "ɨ (centralised; 'cidade' /sidadɨ/)"
+mechanism = "EU postprocessing maps unstressed final e → ɨ instead of BR's e → i"
+
+[[implementation.differences]]
+phenomenon = "Final -s / -z and pre-consonantal -s"
+br = "/s,z/ alveolar (e.g. 'mais' /majs/)"
+eu = "/ʃ,ʒ/ postalveolar (e.g. 'mais' /majʃ/)"
+mechanism = "EU postprocessing rewrites word-final s→ʃ. Voiced sandhi (pre-vowel /z/→/ʒ/ across word boundary) is captured for adjacent intra-utterance tokens."
+
+[[implementation.differences]]
+phenomenon = "Coda /l/"
+br = "[w] vocalisation (e.g. 'Brasil' /bɾaziw/)"
+eu = "[ɫ] velarised lateral (e.g. 'Brasil' /bɾaziɫ/)"
+mechanism = "EU postprocessing rewrites coda l→ɫ instead of BR's l→w"
+
+[[implementation.differences]]
+phenomenon = "Strong /r/ and word-final r"
+br = "[ʁ ~ h] regional variation"
+eu = "[ʁ] uvular fricative"
+mechanism = "EU postprocessing canonicalises h → ʁ (BR's debuccalised /r/) so EU output is uniformly uvular"
+
+[implementation.phoneme_inventory]
+# IPA characters that EU output may produce but BR does not.
+# These get a PUA codepoint via `data/pua.json` so they round-trip
+# through the model phoneme map.
+new_phonemes = ["ɨ", "ɫ"]
+pua_contract = "docs/spec/pua-contract.toml"
+
+[runtimes]
+# All 8 runtimes ship the BR + EU dialect split byte-for-byte.
+# Sync gate: `scripts/check_loanword_consistency.py` does NOT cover
+# this file (PT phonemes are word-level, not table-based); each
+# runtime's test suite is the contract enforcer.
+python_canonical = "src/python/g2p/piper_plus_g2p/portuguese.py"
+python_runtime_mirror = "src/python_run/piper/phonemize/portuguese.py"
+rust_core = "src/rust/piper-core/src/phonemize/portuguese.rs"
+rust_g2p = "src/rust/piper-plus-g2p/src/portuguese.rs"
+go = "src/go/piperplus/phonemize/portuguese.go"
+csharp = "src/csharp/PiperPlus.Core/Phonemize/PortugueseG2P.cs"
+wasm_js = "src/wasm/g2p/portuguese.js"
+cpp = "src/cpp/portuguese_phonemizer.{h,cpp}"
+
+[backward_compat]
+# Bare `pt` continues to resolve to the BR dialect — no behaviour change
+# for callers who do not explicitly pass `pt-PT`. Switching the default
+# to a "must specify dialect" mode is intentionally NOT done in this
+# release because every existing consumer expects BR.
+default_dialect = "pt-BR"
+opt_in_eu = "Pass 'pt-PT' explicitly via language code or PortuguesePhonemizer(dialect=Dialect.EU)."
+
+[limitations]
+# Known gaps in this draft, intentionally deferred to a follow-up issue.
+deferred = [
+  "Pretonic mid-vowel raising (e/o → ɨ/u in unstressed pretonic syllables, EU only)",
+  "Vowel deletion in tightly-clustered consonant environments (e.g. 'pequeno' [pkenu], EU only)",
+  "EU-specific orthographic differences (post-1990 Acordo Ortográfico variants)",
+  "Acoustic model: 6lang model is trained on CML-TTS (BR-dominated). EU phonemizer output is correct, but synthesised audio inherits BR prosody until an EU-corpus-trained model ships.",
+]

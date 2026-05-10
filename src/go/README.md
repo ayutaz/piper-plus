@@ -9,6 +9,7 @@ with ONNX Runtime inference via [yalue/onnxruntime_go](https://github.com/yalue/
 **Supported languages (対応言語):** Japanese (JA), English (EN), Chinese (ZH), Korean (KO), Spanish (ES), French (FR), Portuguese (PT), Swedish (SV)
 
 **Key features:**
+
 - Text-to-speech with automatic phonemization for 8 languages
 - Streaming synthesis with sentence-level chunking
 - GPU acceleration: CUDA, CoreML, DirectML, TensorRT (with automatic fallback to CPU)
@@ -466,7 +467,7 @@ docker run -p 8080:8080 -v /path/to/models:/models \
 
 ## Project Structure / プロジェクト構造
 
-```
+```text
 src/go/
   go.mod                          # Module: github.com/ayutaz/piper-plus/src/go
   go.sum

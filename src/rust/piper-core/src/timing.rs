@@ -39,13 +39,21 @@ impl TimingResult {
         serde_json::to_string(self).map_err(PiperError::from)
     }
 
-    /// Serialize to TSV string (tab-separated: start_ms, end_ms, duration_ms, phoneme)
+    /// Serialize to TSV string (tab-separated: start_ms, end_ms, duration_ms, phoneme).
+    ///
+    /// spec [output_formats.tsv].escape_tab_in_phoneme = "\\t" / escape_newline_in_phoneme = "\\n"
+    /// (docs/spec/phoneme-timing-contract.toml). Phoneme tokens that themselves
+    /// contain a tab or newline must be escaped to literal "\t" / "\n" (2-char
+    /// sequences) so the TSV column count remains 4. Cross-runtime parity with
+    /// Python (timing.py:167), C# (TimingWriter.cs EscapeForTsv), Go (timing.go),
+    /// and WASM/JS (timing.js).
     pub fn to_tsv(&self) -> String {
         let mut buf = String::from("start_ms\tend_ms\tduration_ms\tphoneme\n");
         for p in &self.phonemes {
+            let escaped = p.phoneme.replace('\t', "\\t").replace('\n', "\\n");
             buf.push_str(&format!(
                 "{:.3}\t{:.3}\t{:.3}\t{}\n",
-                p.start_ms, p.end_ms, p.duration_ms, p.phoneme
+                p.start_ms, p.end_ms, p.duration_ms, escaped
             ));
         }
         buf
@@ -578,9 +586,10 @@ mod tests {
 
     #[test]
     fn test_tsv_phoneme_with_tab() {
-        // A phoneme token that contains a literal tab character.
-        // The current TSV writer does not escape it, so the tab will
-        // appear as an extra column, producing 5 fields instead of 4.
+        // spec [output_formats.tsv].escape_tab_in_phoneme = "\\t":
+        // a phoneme token containing a literal tab character must be
+        // escaped to the 2-char sequence `\t` so the TSV column count
+        // remains 4 (cross-runtime parity with Python/C#/Go/WASM).
         let durations = vec![5.0];
         let toks = vec!["a\tb".to_string()];
         let result = durations_to_timing(&durations, &toks, 1000, 1).unwrap();
@@ -589,12 +598,51 @@ mod tests {
         let data_line = tsv.lines().nth(1).expect("expected a data line");
         let fields: Vec<&str> = data_line.split('\t').collect();
 
-        // Tab inside the phoneme name splits the field, yielding 5 columns.
+        // Spec-conforming behavior: 4 fields, phoneme column contains
+        // the escaped 4-char sequence `a\tb` (a, backslash, t, b).
         assert_eq!(
             fields.len(),
-            5,
-            "tab inside phoneme name produces an extra TSV column"
+            4,
+            "tab inside phoneme name must be escaped (spec compliance)"
         );
+        assert_eq!(fields[3], "a\\tb");
+    }
+
+    // ---------------------------------------------------------------
+    // 22b. Phoneme name containing newline in TSV output
+    // ---------------------------------------------------------------
+
+    #[test]
+    fn test_tsv_phoneme_with_newline() {
+        // spec [output_formats.tsv].escape_newline_in_phoneme = "\\n":
+        // a phoneme token containing an embedded newline must be
+        // escaped so the TSV row count is preserved.
+        let durations = vec![5.0];
+        let toks = vec!["x\ny".to_string()];
+        let result = durations_to_timing(&durations, &toks, 1000, 1).unwrap();
+
+        let tsv = result.to_tsv();
+        // Header + 1 data row + trailing newline (no third row).
+        let lines: Vec<&str> = tsv.lines().collect();
+        assert_eq!(lines.len(), 2, "newline in phoneme must not split the row");
+
+        let fields: Vec<&str> = lines[1].split('\t').collect();
+        assert_eq!(fields.len(), 4);
+        assert_eq!(fields[3], "x\\ny");
+    }
+
+    #[test]
+    fn test_tsv_phoneme_with_tab_and_newline_mixed() {
+        // Both escapes applied in a single token.
+        let durations = vec![5.0];
+        let toks = vec!["a\tb\nc".to_string()];
+        let result = durations_to_timing(&durations, &toks, 1000, 1).unwrap();
+
+        let tsv = result.to_tsv();
+        let data_line = tsv.lines().nth(1).unwrap();
+        let fields: Vec<&str> = data_line.split('\t').collect();
+        assert_eq!(fields.len(), 4);
+        assert_eq!(fields[3], "a\\tb\\nc");
     }
 
     // ---------------------------------------------------------------

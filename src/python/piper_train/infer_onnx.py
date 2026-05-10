@@ -21,6 +21,32 @@ _LOGGER = logging.getLogger("piper_train.infer_onnx")
 # See docs/spec/short-text-contract.toml and issue #356 for rationale (was 40,
 # empirically tuned to 15 to avoid Strategy A firing on already-stable inputs).
 MIN_PHONEME_IDS = 15
+
+# Strategy B: noise floor multipliers for short sequences. Named constants
+# so scripts/check_short_text_contract.py can drift-check against
+# [scales] in docs/spec/short-text-contract.toml.
+NOISE_SCALE_MIN_RATIO = 0.5
+NOISE_W_MIN_RATIO = 0.4
+
+
+def parse_jsonl_stream(stream) -> list[dict]:
+    """Parse a JSONL stream into a list of utterance dicts.
+
+    Canonical implementation of the JSONL stdin input path used by
+    ``piper_train.infer_onnx``. Empty lines (including pure whitespace)
+    are skipped; remaining lines are parsed via ``json.loads``. Errors
+    are propagated to the caller. Exposed at module scope so unit tests
+    in ``test_infer_onnx_jsonl.py`` can exercise the canonical loop
+    without copying it.
+    """
+    utterances: list[dict] = []
+    for line in stream:
+        line = line.strip()
+        if line:
+            utterances.append(json.loads(line))
+    return utterances
+
+
 # Minimum body length (excluding BOS/EOS) for Strategy A to apply.
 # Bodies smaller than this would have padding ratio so high that pad-token
 # audio dominates over actual content; raw VITS output is preferable.
@@ -253,8 +279,8 @@ def _adjust_scales_for_short_input(
         return noise_scale, length_scale, noise_scale_w
 
     ratio = max(0.0, min(n / MIN_PHONEME_IDS, 1.0))
-    adj_noise = noise_scale * max(0.5, ratio)
-    adj_noise_w = noise_scale_w * max(0.4, ratio)
+    adj_noise = noise_scale * max(NOISE_SCALE_MIN_RATIO, ratio)
+    adj_noise_w = noise_scale_w * max(NOISE_W_MIN_RATIO, ratio)
 
     _LOGGER.debug(
         "Strategy B: ratio=%.3f  noise_scale %.3f->%.3f  noise_w %.3f->%.3f",
@@ -764,11 +790,7 @@ def main():
         ]
     else:
         # Read from stdin (JSONL mode)
-        utterances = []
-        for line in sys.stdin:
-            line = line.strip()
-            if line:
-                utterances.append(json.loads(line))
+        utterances = parse_jsonl_stream(sys.stdin)
 
     for i, utt in enumerate(utterances):
         utt_id = str(i)

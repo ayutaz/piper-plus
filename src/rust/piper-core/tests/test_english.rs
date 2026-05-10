@@ -403,9 +403,22 @@ fn test_whitespace_only_input() {
 #[test]
 fn test_unknown_word_does_not_error() {
     let p = require_phonemizer!();
-    // "xyzzyplugh" is not in any dictionary — should not panic or error
-    let result = p.phonemize_with_prosody("xyzzyplugh");
-    assert!(result.is_ok());
+    // "xyzzyplugh" is not in any dictionary — should not panic or error.
+    // OOV words are skipped (see test_oov_word_skipped) so we expect an
+    // empty token list, not just an Ok(_).
+    let (tokens, prosody) = p
+        .phonemize_with_prosody("xyzzyplugh")
+        .expect("OOV input must not error");
+    assert!(
+        tokens.is_empty(),
+        "OOV word must produce no tokens, got {:?}",
+        tokens
+    );
+    assert_eq!(
+        tokens.len(),
+        prosody.len(),
+        "tokens and prosody must stay aligned even for OOV input"
+    );
 }
 
 #[test]

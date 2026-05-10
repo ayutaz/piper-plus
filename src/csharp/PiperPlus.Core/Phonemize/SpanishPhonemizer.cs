@@ -35,6 +35,7 @@ public sealed class SpanishPhonemizer : IPhonemizer
         [".", ",", ";", ":", "!", "?", "\u00bf", "\u00a1"]; // ¿ = U+00BF, ¡ = U+00A1
 
     /// <summary>
+    /// Initializes a new instance of the <see cref="SpanishPhonemizer"/> class.
     /// Create a new <see cref="SpanishPhonemizer"/> backed by the given G2P engine.
     /// </summary>
     /// <param name="engine">
@@ -48,7 +49,7 @@ public sealed class SpanishPhonemizer : IPhonemizer
     /// <inheritdoc />
     public List<string> Phonemize(string text)
     {
-        var (tokens, _) = PhonemizeCore(text);
+        (List<string>? tokens, List<ProsodyInfo?> _) = PhonemizeCore(text);
         return tokens;
     }
 
@@ -132,7 +133,7 @@ public sealed class SpanishPhonemizer : IPhonemizer
         FlushWord(currentWord, tokens, prosody);
 
         // Step 3: Map multi-character tokens (rr, tʃ, etc.) to PUA codepoints.
-        var mapped = PiperPhonemeConverter.MapSequence(tokens);
+        IReadOnlyList<string> mapped = PiperPhonemeConverter.MapSequence(tokens);
 
         var result = new List<string>(mapped.Count);
         for (int i = 0; i < mapped.Count; i++)
@@ -159,14 +160,18 @@ public sealed class SpanishPhonemizer : IPhonemizer
         List<ProsodyInfo?> outProsody)
     {
         if (wordTokens.Count == 0)
+        {
             return;
+        }
 
         // A3 = phoneme count excluding the stress marker "ˈ".
         int phonemeCount = 0;
         for (int i = 0; i < wordTokens.Count; i++)
         {
             if (wordTokens[i] != "\u02c8")
+            {
                 phonemeCount++;
+            }
         }
 
         for (int i = 0; i < wordTokens.Count; i++)

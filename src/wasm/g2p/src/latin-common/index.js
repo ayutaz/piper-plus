@@ -22,14 +22,19 @@
  * @type {Set<string>}
  */
 export const PUNCTUATION = new Set([
-    ',', '.', ';', ':', '!', '?',
-    '\u00A1',  // inverted exclamation
-    '\u00BF',  // inverted question
-    '\u2014',  // em dash
-    '\u2013',  // en dash
-    '\u2026',  // horizontal ellipsis
-    '\u00AB',  // left guillemet
-    '\u00BB',  // right guillemet
+  ",",
+  ".",
+  ";",
+  ":",
+  "!",
+  "?",
+  "\u00A1", // inverted exclamation
+  "\u00BF", // inverted question
+  "\u2014", // em dash
+  "\u2013", // en dash
+  "\u2026", // horizontal ellipsis
+  "\u00AB", // left guillemet
+  "\u00BB", // right guillemet
 ]);
 
 /**
@@ -38,7 +43,7 @@ export const PUNCTUATION = new Set([
  * @returns {boolean}
  */
 export function isPunctuation(ch) {
-    return PUNCTUATION.has(ch);
+  return PUNCTUATION.has(ch);
 }
 
 // ---------------------------------------------------------------------------
@@ -59,63 +64,63 @@ const NFC_TABLE = new Map();
 
 // Helper to populate table entries.
 function addNfc(combining, base, composed) {
-    if (!NFC_TABLE.has(combining)) {
-        NFC_TABLE.set(combining, new Map());
-    }
-    NFC_TABLE.get(combining).set(base, composed);
+  if (!NFC_TABLE.has(combining)) {
+    NFC_TABLE.set(combining, new Map());
+  }
+  NFC_TABLE.get(combining).set(base, composed);
 }
 
 // U+0300 COMBINING GRAVE ACCENT
-addNfc('\u0300', 'A', '\u00C0');
-addNfc('\u0300', 'a', '\u00E0');
-addNfc('\u0300', 'E', '\u00C8');
-addNfc('\u0300', 'e', '\u00E8');
-addNfc('\u0300', 'U', '\u00D9');
-addNfc('\u0300', 'u', '\u00F9');
+addNfc("\u0300", "A", "\u00C0");
+addNfc("\u0300", "a", "\u00E0");
+addNfc("\u0300", "E", "\u00C8");
+addNfc("\u0300", "e", "\u00E8");
+addNfc("\u0300", "U", "\u00D9");
+addNfc("\u0300", "u", "\u00F9");
 
 // U+0301 COMBINING ACUTE ACCENT
-addNfc('\u0301', 'A', '\u00C1');
-addNfc('\u0301', 'a', '\u00E1');
-addNfc('\u0301', 'E', '\u00C9');
-addNfc('\u0301', 'e', '\u00E9');
-addNfc('\u0301', 'I', '\u00CD');
-addNfc('\u0301', 'i', '\u00ED');
-addNfc('\u0301', 'O', '\u00D3');
-addNfc('\u0301', 'o', '\u00F3');
-addNfc('\u0301', 'U', '\u00DA');
-addNfc('\u0301', 'u', '\u00FA');
+addNfc("\u0301", "A", "\u00C1");
+addNfc("\u0301", "a", "\u00E1");
+addNfc("\u0301", "E", "\u00C9");
+addNfc("\u0301", "e", "\u00E9");
+addNfc("\u0301", "I", "\u00CD");
+addNfc("\u0301", "i", "\u00ED");
+addNfc("\u0301", "O", "\u00D3");
+addNfc("\u0301", "o", "\u00F3");
+addNfc("\u0301", "U", "\u00DA");
+addNfc("\u0301", "u", "\u00FA");
 
 // U+0302 COMBINING CIRCUMFLEX ACCENT
-addNfc('\u0302', 'A', '\u00C2');
-addNfc('\u0302', 'a', '\u00E2');
-addNfc('\u0302', 'E', '\u00CA');
-addNfc('\u0302', 'e', '\u00EA');
-addNfc('\u0302', 'I', '\u00CE');
-addNfc('\u0302', 'i', '\u00EE');
-addNfc('\u0302', 'O', '\u00D4');
-addNfc('\u0302', 'o', '\u00F4');
-addNfc('\u0302', 'U', '\u00DB');
-addNfc('\u0302', 'u', '\u00FB');
+addNfc("\u0302", "A", "\u00C2");
+addNfc("\u0302", "a", "\u00E2");
+addNfc("\u0302", "E", "\u00CA");
+addNfc("\u0302", "e", "\u00EA");
+addNfc("\u0302", "I", "\u00CE");
+addNfc("\u0302", "i", "\u00EE");
+addNfc("\u0302", "O", "\u00D4");
+addNfc("\u0302", "o", "\u00F4");
+addNfc("\u0302", "U", "\u00DB");
+addNfc("\u0302", "u", "\u00FB");
 
 // U+0303 COMBINING TILDE
-addNfc('\u0303', 'A', '\u00C3');
-addNfc('\u0303', 'a', '\u00E3');
-addNfc('\u0303', 'N', '\u00D1');
-addNfc('\u0303', 'n', '\u00F1');
-addNfc('\u0303', 'O', '\u00D5');
-addNfc('\u0303', 'o', '\u00F5');
+addNfc("\u0303", "A", "\u00C3");
+addNfc("\u0303", "a", "\u00E3");
+addNfc("\u0303", "N", "\u00D1");
+addNfc("\u0303", "n", "\u00F1");
+addNfc("\u0303", "O", "\u00D5");
+addNfc("\u0303", "o", "\u00F5");
 
 // U+0308 COMBINING DIAERESIS
-addNfc('\u0308', 'E', '\u00CB');
-addNfc('\u0308', 'e', '\u00EB');
-addNfc('\u0308', 'I', '\u00CF');
-addNfc('\u0308', 'i', '\u00EF');
-addNfc('\u0308', 'U', '\u00DC');
-addNfc('\u0308', 'u', '\u00FC');
+addNfc("\u0308", "E", "\u00CB");
+addNfc("\u0308", "e", "\u00EB");
+addNfc("\u0308", "I", "\u00CF");
+addNfc("\u0308", "i", "\u00EF");
+addNfc("\u0308", "U", "\u00DC");
+addNfc("\u0308", "u", "\u00FC");
 
 // U+0327 COMBINING CEDILLA
-addNfc('\u0327', 'C', '\u00C7');
-addNfc('\u0327', 'c', '\u00E7');
+addNfc("\u0327", "C", "\u00C7");
+addNfc("\u0327", "c", "\u00E7");
 
 /**
  * Collapse NFD combining accent sequences into precomposed NFC codepoints.
@@ -127,32 +132,34 @@ addNfc('\u0327', 'c', '\u00E7');
  * @returns {string[]} Array with combining sequences replaced by NFC precomposed characters.
  */
 export function collapseNfdAccents(cps) {
-    if (cps.length < 2) return cps.slice();
+  if (cps.length < 2) {
+    return cps.slice();
+  }
 
-    const out = [];
-    let i = 0;
-    const n = cps.length;
+  const out = [];
+  let i = 0;
+  const n = cps.length;
 
-    while (i < n) {
-        if (i + 1 < n) {
-            const base = cps[i];
-            const comb = cps[i + 1];
-            const combMap = NFC_TABLE.get(comb);
-            if (combMap) {
-                const composed = combMap.get(base);
-                if (composed !== undefined) {
-                    out.push(composed);
-                    i += 2;
-                    continue;
-                }
-            }
+  while (i < n) {
+    if (i + 1 < n) {
+      const base = cps[i];
+      const comb = cps[i + 1];
+      const combMap = NFC_TABLE.get(comb);
+      if (combMap) {
+        const composed = combMap.get(base);
+        if (composed !== undefined) {
+          out.push(composed);
+          i += 2;
+          continue;
         }
-
-        out.push(cps[i]);
-        i += 1;
+      }
     }
 
-    return out;
+    out.push(cps[i]);
+    i += 1;
+  }
+
+  return out;
 }
 
 // ---------------------------------------------------------------------------
@@ -167,27 +174,27 @@ export function collapseNfdAccents(cps) {
  * @returns {string[]} Whitespace-normalized character array.
  */
 export function normalizeWhitespace(chars) {
-    const out = [];
-    let prevSpace = true; // trim leading
+  const out = [];
+  let prevSpace = true; // trim leading
 
-    for (const ch of chars) {
-        if (ch === ' ' || ch === '\t' || ch === '\n' || ch === '\r') {
-            if (!prevSpace) {
-                out.push(' ');
-            }
-            prevSpace = true;
-        } else {
-            out.push(ch);
-            prevSpace = false;
-        }
+  for (const ch of chars) {
+    if (ch === " " || ch === "\t" || ch === "\n" || ch === "\r") {
+      if (!prevSpace) {
+        out.push(" ");
+      }
+      prevSpace = true;
+    } else {
+      out.push(ch);
+      prevSpace = false;
     }
+  }
 
-    // trim trailing
-    if (out.length > 0 && out[out.length - 1] === ' ') {
-        out.pop();
-    }
+  // trim trailing
+  if (out.length > 0 && out[out.length - 1] === " ") {
+    out.pop();
+  }
 
-    return out;
+  return out;
 }
 
 // ---------------------------------------------------------------------------
@@ -207,28 +214,28 @@ export function normalizeWhitespace(chars) {
  * @returns {{ chars: string[], isPunct: boolean }[]} Array of tokens.
  */
 export function tokenize(chars, isWordCharFn) {
-    const tokens = [];
-    const n = chars.length;
-    let i = 0;
+  const tokens = [];
+  const n = chars.length;
+  let i = 0;
 
-    while (i < n) {
-        const ch = chars[i];
+  while (i < n) {
+    const ch = chars[i];
 
-        if (isWordCharFn(ch)) {
-            const wordChars = [];
-            while (i < n && isWordCharFn(chars[i])) {
-                wordChars.push(chars[i]);
-                i += 1;
-            }
-            tokens.push({ chars: wordChars, isPunct: false });
-        } else if (isPunctuation(ch)) {
-            tokens.push({ chars: [ch], isPunct: true });
-            i += 1;
-        } else {
-            // whitespace, digits, unknown: skip
-            i += 1;
-        }
+    if (isWordCharFn(ch)) {
+      const wordChars = [];
+      while (i < n && isWordCharFn(chars[i])) {
+        wordChars.push(chars[i]);
+        i += 1;
+      }
+      tokens.push({ chars: wordChars, isPunct: false });
+    } else if (isPunctuation(ch)) {
+      tokens.push({ chars: [ch], isPunct: true });
+      i += 1;
+    } else {
+      // whitespace, digits, unknown: skip
+      i += 1;
     }
+  }
 
-    return tokens;
+  return tokens;
 }

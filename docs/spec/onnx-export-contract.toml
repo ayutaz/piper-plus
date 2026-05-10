@@ -1,0 +1,262 @@
+# ONNX Export Contract
+# =====================
+# This file defines the canonical export pipeline that every piper-plus
+# checkpoint -> ONNX conversion path MUST follow. Two conversion paths exist
+# today (main TTS model, speaker encoder), and both share the same skeleton
+# of (1) torch.onnx.export -> (2) checker -> (3) shape_inference ->
+# (4) optional simplification -> (5) optional FP16 conversion.
+#
+# Drift between the two paths is intentional only where called out below
+# (notably: opset version mismatch). All other steps must remain in sync.
+#
+# This file serves as a design-time cross-language contract. Implementations
+# and tests are expected to be kept in sync with these values manually unless
+# and until automated contract-verification tests are added.
+#
+# Implementations:
+#   Main TTS model:   src/python/piper_train/export_onnx.py
+#   Speaker encoder:  src/python/piper_train/speaker_encoder/export_encoder.py
+#   Runtime loaders:  src/python_run/piper/voice.py (config + ONNX session)
+#                     src/rust/piper-core/src/engine.rs
+#                     src/csharp/PiperPlus.Core/Inference/SessionFactory.cs
+#                     src/cpp/piper.cpp
+#                     src/go/piperplus/engine.go
+#                     src/wasm/openjtalk-web/src/index.js
+
+[meta]
+spec_version = "1.0"
+last_updated = "2026-05-09"
+applies_to = ["python-export", "all-runtime-loaders"]
+canonical_source = "src/python/piper_train/export_onnx.py"
+
+# ============================================================================
+# Required export pipeline
+# ============================================================================
+# The five steps below MUST run in order for both export paths. Optional
+# steps (4, 5) may be disabled via CLI flag but the surrounding ordering
+# must not change. Each step's failure is fatal except where marked
+# "warn-only" — in which case the export continues with the unmodified
+# input from the previous step.
+
+[[required_steps]]
+order = 1
+name = "torch.onnx.export"
+description = """
+Export the EMA-applied torch.nn.Module to ONNX bytes via torch.onnx.export().
+opset_version is read from this contract's [opset] table — different export
+paths may legitimately use different opsets (see [opset] table for the
+mismatch justification).
+"""
+fatal = true
+caller = "torch.onnx.export(model, inputs, output_path, opset_version=...)"
+
+[[required_steps]]
+order = 2
+name = "onnx.checker.check_model"
+description = """
+Detect ONNX serialization corruption immediately after export. Use
+full_check=False because full_check would re-run shape_inference (step 3)
+and double-fail on the same shape mismatches we want to surface separately.
+"""
+fatal = true
+caller = "onnx.checker.check_model(model, full_check=False)"
+purpose = "corruption detection"
+
+[[required_steps]]
+order = 3
+name = "onnx.shape_inference.infer_shapes"
+description = """
+Propagate shape annotations through the graph. Catches downstream shape
+mismatches that ORT would otherwise hit at session creation time
+(less informative error). Skipping this step is forbidden because
+several runtime providers (CoreML, TensorRT) depend on annotated shapes.
+"""
+fatal = true
+caller = "onnx.shape_inference.infer_shapes(model)"
+purpose = "downstream shape mismatch detection"
+
+[[required_steps]]
+order = 4
+name = "onnxsim simplification"
+description = """
+Optional graph simplification via onnxsim.simplify(). When applied, the
+output MUST be numerically equivalent to the input within
+[verification.simplify] tolerance. If verification fails the simplified
+graph is discarded and the un-simplified graph is shipped instead.
+"""
+fatal = false
+optional = true
+cli_flag = "--simplify"
+caller = "onnxsim.simplify(model)"
+verify = "max abs diff <= 1e-5 across all output tensors on warmup-style inputs"
+
+[[required_steps]]
+order = 5
+name = "FP16 conversion"
+description = """
+Optional weight-only FP16 conversion via onnxconverter_common.float16. Reduces
+on-disk model size by ~50%. Inference is still performed in mixed precision
+on the CPU EP; CoreML/TRT may upcast internally. Disabled with --no-fp16.
+"""
+fatal = false
+optional = true
+default = "enabled"
+cli_flag = "--no-fp16"
+caller = "onnxconverter_common.float16.convert_float_to_float16(model, keep_io_types=True)"
+purpose = "model size reduction"
+
+# ============================================================================
+# Opset version pinning
+# ============================================================================
+# The two export paths use different ONNX opset versions; the divergence is
+# intentional and must NOT be silently aligned. Loader-side constraints in
+# every runtime accept opset >= the lower of the two values.
+#
+# Bumping either opset is a coordinated change: Python export -> regenerate
+# every official ONNX -> verify all 7 runtimes load without warnings ->
+# update [opset] table -> publish.
+
+[opset]
+main_tts_model = 15
+main_tts_source = "src/python/piper_train/export_onnx.py:31"
+speaker_encoder = 17
+speaker_encoder_source = "src/python/piper_train/speaker_encoder/export_encoder.py:35"
+
+[opset.divergence_justification]
+# The mismatch is required, not accidental.
+reason = """
+The speaker encoder is an ECAPA-TDNN architecture with an STFT operator on
+the input audio path. The ONNX `STFT` op was introduced in opset 17, so the
+speaker encoder cannot legally export below 17. The main TTS model contains
+no STFT op (MB-iSTFT is implemented as Conv1d kernels, not as the ONNX STFT
+op) and is pinned at 15 to maximize compatibility with older ORT releases
+embedded in mobile / edge runtimes.
+"""
+
+[opset.runtime_min_required]
+# Lower bound that every runtime loader must accept without warnings.
+# Higher opsets (e.g. when re-exporting at 17) MUST also load.
+minimum = 15
+
+# ============================================================================
+# Tensor naming convention
+# ============================================================================
+# Input/output tensor names are part of the ABI surface — every runtime's
+# session feeds/fetches by name, not by index. Renames break runtimes
+# silently (binding lookup yields None / null) and must be coordinated.
+
+[tensor_names.inputs]
+# All inputs are present on the main TTS model (sid/lang are conditional).
+# The names below are the canonical strings; loaders MUST not transform
+# (e.g. lowercase, snake-case) before binding.
+input          = "phoneme IDs (int64, shape=[1, T])"
+input_lengths  = "per-batch phoneme length (int64, shape=[1])"
+scales         = "[noise_scale, length_scale, noise_w] (float32, shape=[3])"
+sid            = "speaker ID (int64, shape=[1]) — multi-speaker models only"
+lang           = "language ID (int64, shape=[1]) — multilingual models only"
+prosody_features = "prosody A1/A2/A3 features (float32, shape=[1, T, prosody_dim]) — when present"
+speaker_embedding = "ECAPA-TDNN embedding (float32, shape=[1, 256]) — voice cloning path"
+
+[tensor_names.outputs]
+output         = "audio waveform (float32, shape=[1, 1, T_samples])"
+durations      = "per-phoneme frame counts (int64, shape=[1, T]) — phoneme timing path"
+
+[tensor_names.exclusivity]
+# `sid` and `speaker_embedding` are mutually exclusive at *call time* (not
+# at graph time). The graph may declare both inputs but a given inference
+# request feeds exactly one; the unused input is fed a sentinel value.
+sid_xor_speaker_embedding = true
+
+# ============================================================================
+# Graph node naming convention
+# ============================================================================
+# torch.onnx.export auto-generates node names. We do NOT post-rename nodes
+# because (a) this is brittle across torch versions and (b) the node names
+# are not part of the ABI. Node names ARE preserved verbatim through
+# simplification (step 4) and FP16 conversion (step 5) for debuggability.
+
+[graph_node_naming]
+strategy = "torch.onnx.export auto-generated"
+post_rename = false
+preserve_through_simplify = true
+preserve_through_fp16 = true
+
+# ============================================================================
+# CI validation steps (post-export)
+# ============================================================================
+# Steps that run automatically in CI after every export. These verify the
+# resulting ONNX is loadable and produces matching audio for a fixed set
+# of warmup-style inputs.
+
+[ci_validation]
+# Each entry is a logical step; the CI workflow may bundle them into one job.
+
+[[ci_validation.checks]]
+name = "onnx.load roundtrip"
+description = "Load the exported ONNX with onnx.load() and re-run check_model(full_check=True)."
+fatal = true
+
+[[ci_validation.checks]]
+name = "ORT session creation"
+description = """
+Create an ORT InferenceSession with the [session] settings from
+ort-session-contract.toml. Failure here means the runtime cannot load the
+model at all.
+"""
+fatal = true
+
+[[ci_validation.checks]]
+name = "warmup inference"
+description = """
+Run the warmup phoneme sequence from ort-session-contract.toml ([warmup]
+section) and verify the output tensor is non-empty and free of NaN/Inf.
+"""
+fatal = true
+
+[[ci_validation.checks]]
+name = "FP16 numerical parity (when --fp16 was used)"
+description = """
+Generate audio from FP32 + FP16 builds of the same checkpoint. Verify
+max abs diff <= [verification.fp16] tolerance. FP16 path is allowed
+larger error than simplification.
+"""
+fatal = false
+note = "Currently warn-only; will be promoted to fatal once tolerance baseline is captured."
+
+# ============================================================================
+# Numerical verification tolerances
+# ============================================================================
+
+[verification.simplify]
+max_abs_diff = 1e-5
+applies_to = "all output tensors on warmup-style inputs"
+on_fail = "discard simplified graph, ship un-simplified"
+
+[verification.fp16]
+max_abs_diff = 1e-2
+applies_to = "audio output tensor only"
+note = """
+FP16 weights have meaningfully larger numerical drift than simplify, so the
+tolerance is relaxed by 3 orders of magnitude. Audio that drifts beyond this
+typically also fails listening A/B; treat large excursions as a sign of
+arithmetic-overflow in attention or duration prediction layers.
+"""
+
+# ============================================================================
+# Implementation status
+# ============================================================================
+
+[implementation_status]
+# Which steps each export path implements. ✓ = required and present,
+# - = step intentionally skipped, N/A = not applicable to that path.
+#
+#                                Main TTS    Speaker encoder
+# 1. torch.onnx.export          ✓           ✓
+# 2. onnx.checker.check_model   ✓           ✓
+# 3. onnx.shape_inference       ✓           ✓
+# 4. onnxsim simplification     ✓ (--simplify)  -
+# 5. FP16 conversion            ✓ (default) -
+# CI validation: roundtrip      ✓           ✓
+# CI validation: ORT creation   ✓           ✓
+# CI validation: warmup         ✓           ✓
+# CI validation: FP16 parity    ✓           N/A

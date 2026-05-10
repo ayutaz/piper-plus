@@ -71,6 +71,7 @@ If you cannot use SPM (e.g., your project ships its own bundled xcframework fold
 ### Step 1-3: Acquire and Embed (same as the cross-runtime guide)
 
 See [`docs/guides/ios-integration.md`](../../docs/guides/ios-integration.md):
+
 - Step 1: download `libpiper_plus-ios-v${VERSION}.xcframework.zip`
 - Step 2: download `onnxruntime.xcframework` via CocoaPods / SPM / CDN
 - Step 3: in Xcode, **link `piper_plus.xcframework` (Do Not Embed) and Embed & Sign `onnxruntime.xcframework`**
@@ -100,7 +101,7 @@ piper_plus_free_audio(outputBuffer)
 
 ## Project Structure (when using SPM)
 
-```
+```text
 MyApp/
 ├── Package.swift                    # depends on ayutaz/piper-plus + onnxruntime-spm
 ├── Package.resolved                 # locks piper-plus + ORT versions
@@ -111,7 +112,7 @@ MyApp/
 
 ## Project Structure (when using manual drag-and-drop)
 
-```
+```text
 MyApp/
 ├── Frameworks/
 │   ├── piper_plus.xcframework/      # device + simulator slices, modulemap, PrivacyInfo

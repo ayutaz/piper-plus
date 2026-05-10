@@ -42,30 +42,37 @@ allowed-tools: Agent Bash(git diff *) Bash(git log *) Bash(git status *) Read Gl
 以下の 6 エージェントを **1 メッセージで並列起動** します:
 
 ### Agent 1: CLAUDE.md 監査
+
 **subagent_type**: `Explore`
 **task**: CLAUDE.md の「実装済み機能」「重要なファイルパス」「OpenAI 互換 API」セクションを確認し、実装変更に対する追加・修正が必要か判定。新規モジュール/クラス/HTTP エンドポイント/テストファイルが未記載なら、具体的な diff を提案。
 
 ### Agent 2: ルート README 監査
+
 **subagent_type**: `Explore`
 **task**: `README.md`, `README_EN.md`, `README.*.md` (他言語) の Features / Interfaces / Feature Support Matrix を確認。新機能が各ランタイムで利用可能になった場合、対応 runtime 行を更新。
 
 ### Agent 3: ランタイム別 README 監査
+
 **subagent_type**: `Explore`
 **task**: `src/python_run/README.md`, `src/python_run/README_http.md`, `src/wasm/openjtalk-web/README.md`, `src/wasm/openjtalk-web/README.npm.md`, `src/rust/piper-cli/README.md`, `src/go/README.md` を確認。API 例・CLI フラグ・HTTP エンドポイントが最新か判定。
 
 ### Agent 4: CHANGELOG 監査
+
 **subagent_type**: `Explore`
 **task**: `CHANGELOG.md` と `src/wasm/openjtalk-web/CHANGELOG.md` の `[Unreleased]` セクションが、コード変更 (新機能/バグ修正/破壊的変更) を反映しているか確認。未反映なら具体的な markdown を提案。
 
 ### Agent 5: docs/features・docs/spec 監査
+
 **subagent_type**: `Explore`
 **task**: `docs/features/*.md` と `docs/spec/*.toml` / `*.md` を確認。新機能の専用ドキュメントが必要か、既存の仕様ファイル (ort-session-contract.toml, short-text-contract.toml, phoneme-timing-contract.toml など) の更新が必要か判定。
 
 ### Agent 6: docstring / JSDoc 整合性監査
+
 **subagent_type**: `Explore`
 **task**: 変更された公開 API (関数・クラス・メソッド) に docstring / JSDoc / TypeScript 型定義があるか確認。新規 public API に docstring がない、または既存の docstring が実装と齟齬している箇所を検出。
 
 各エージェントには以下を渡します:
+
 - 変更ファイル一覧 (フェーズ 1 の出力)
 - 対象ディレクトリ
 - 「読み取りのみ、変更提案は markdown diff 形式で報告」という指示
@@ -74,7 +81,7 @@ allowed-tools: Agent Bash(git diff *) Bash(git log *) Bash(git status *) Read Gl
 
 6 エージェントの結果を収集し、以下の形式で **統合レポート** を作成:
 
-```
+```text
 ## ドキュメント監査結果
 
 ### 🔴 更新必須 (機能との不整合)
@@ -102,6 +109,7 @@ allowed-tools: Agent Bash(git diff *) Bash(git log *) Bash(git status *) Read Gl
 ## フェーズ 5: コミット準備
 
 適用が完了したら、以下を表示:
+
 - 更新されたファイルのリスト
 - `/commit` skill を呼び出してコミットするよう促す
 - または、ドキュメント更新を別コミットに分ける提案
@@ -116,7 +124,7 @@ allowed-tools: Agent Bash(git diff *) Bash(git log *) Bash(git status *) Read Gl
 
 ## 実行例
 
-```
+```text
 /sync-docs
 → フェーズ 1-3 を実行し、監査レポートを提示
 → ユーザー承認後、フェーズ 4-5 を実行

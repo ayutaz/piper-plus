@@ -1,0 +1,264 @@
+name: Version Consistency Meta-check
+
+# Detects unintentional version drift across the polyglot package
+# manifests. Each runtime ships on its own cadence, but the expected
+# major.minor prefix is pinned in `docs/spec/release-versions.toml`; this
+# workflow extracts the live versions from each manifest and compares them
+# to the pinned prefix.
+#
+# Initial-introduction policy: `mode = "warn"` in the toml means failures
+# emit `::warning::` only and exit 0. Flip to `mode = "fail"` once the
+# table is trusted (post-merge, after one or two release cycles).
+#
+# This workflow is intentionally separate from `dev-create-release.yml`'s
+# inline version-consistency check (which only verifies the root VERSION /
+# pyproject.toml pair). This one covers all 7 manifests across all
+# runtimes.
+
+on:
+  push:
+    branches: [dev, main]
+    paths:
+      - 'VERSION'
+      - 'pyproject.toml'
+      - 'src/rust/Cargo.toml'
+      - 'src/rust/**/Cargo.toml'
+      - 'src/csharp/**/*.csproj'
+      - 'src/wasm/**/package.json'
+      - 'Package.swift'
+      - 'android/gradle.properties'
+      - 'android/**/build.gradle.kts'
+      - 'docs/spec/release-versions.toml'
+      - '.github/workflows/version-consistency.yml'
+  pull_request:
+    branches: [dev, main]
+    paths:
+      - 'VERSION'
+      - 'pyproject.toml'
+      - 'src/rust/Cargo.toml'
+      - 'src/rust/**/Cargo.toml'
+      - 'src/csharp/**/*.csproj'
+      - 'src/wasm/**/package.json'
+      - 'Package.swift'
+      - 'android/gradle.properties'
+      - 'android/**/build.gradle.kts'
+      - 'docs/spec/release-versions.toml'
+      - '.github/workflows/version-consistency.yml'
+  workflow_dispatch:
+    inputs:
+      mode_override:
+        description: 'Override `mode` (warn|fail) — empty to use toml setting'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check-versions:
+    name: Check pinned versions vs manifests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+
+      - name: Run version-consistency meta-check
+        env:
+          MODE_OVERRIDE: ${{ github.event.inputs.mode_override }}
+        run: |
+          python3 - <<'PY'
+          """
+          Reads docs/spec/release-versions.toml and compares each pinned
+          `expected_prefix` against the actual version extracted from the
+          named manifest. Honours `mode = "warn" | "fail"` from the toml,
+          with `MODE_OVERRIDE` env var taking precedence (used by
+          workflow_dispatch).
+          """
+          from __future__ import annotations
+          import json
+          import os
+          import re
+          import sys
+          import tomllib
+          from pathlib import Path
+
+          ROOT = Path(".").resolve()
+          SPEC = ROOT / "docs/spec/release-versions.toml"
+
+          if not SPEC.exists():
+              print(f"::error::Missing spec file: {SPEC}")
+              sys.exit(1)
+
+          with SPEC.open("rb") as fh:
+              spec = tomllib.load(fh)
+
+          mode = (os.environ.get("MODE_OVERRIDE") or spec.get("meta", {}).get("mode") or "warn").strip()
+          if mode not in ("warn", "fail"):
+              print(f"::warning::Unknown mode '{mode}' — defaulting to 'warn'")
+              mode = "warn"
+          print(f"Running in mode: {mode}")
+
+          # ---------- Manifest extractors ----------------------------------------
+          def read_text(rel: str) -> str:
+              p = ROOT / rel
+              if not p.exists():
+                  raise FileNotFoundError(rel)
+              return p.read_text(encoding="utf-8")
+
+          def extract_version_file(rel: str) -> str:
+              return read_text(rel).strip()
+
+          def extract_csproj(rel: str) -> str:
+              text = read_text(rel)
+              m = re.search(r"<Version>([^<]+)</Version>", text)
+              if not m:
+                  raise ValueError(f"<Version> not found in {rel}")
+              return m.group(1).strip()
+
+          def extract_cargo_workspace(rel: str) -> str:
+              text = read_text(rel)
+              # Workspace-level version: first `^version = "..."` after
+              # `[workspace.package]` (or the top-level `[package]` for
+              # non-workspace crates).
+              for line in text.splitlines():
+                  m = re.match(r'^\s*version\s*=\s*"([^"]+)"\s*$', line)
+                  if m:
+                      return m.group(1)
+              raise ValueError(f"version line not found in {rel}")
+
+          def extract_package_json(rel: str) -> str:
+              data = json.loads(read_text(rel))
+              return str(data["version"])
+
+          def extract_swift_let(rel: str, field: str) -> str:
+              text = read_text(rel)
+              # Match: `let version = "1.13.0"` (allows leading whitespace).
+              pat = rf'^\s*let\s+{re.escape(field)}\s*=\s*"([^"]+)"'
+              m = re.search(pat, text, flags=re.MULTILINE)
+              if not m:
+                  raise ValueError(f"`let {field}` not found in {rel}")
+              return m.group(1)
+
+          def extract_gradle_property(rel: str, field: str) -> str:
+              text = read_text(rel)
+              # Match: `VERSION_NAME=1.0.0` (no quotes, ignore spaces).
+              pat = rf'^\s*{re.escape(field)}\s*=\s*([^\s#]+)'
+              m = re.search(pat, text, flags=re.MULTILINE)
+              if not m:
+                  raise ValueError(f"property `{field}` not found in {rel}")
+              return m.group(1).strip()
+
+          def detect_pyproject_dynamic(rel: str) -> bool:
+              text = read_text(rel)
+              return bool(re.search(r'dynamic\s*=\s*\[\s*"version"\s*\]', text))
+
+          # ---------- Per-section dispatch ---------------------------------------
+          # Each section knows how to map a spec entry to (label, actual_version
+          # or sentinel "DYNAMIC"). The spec keys are arbitrary — we walk all
+          # tables except [meta] and dispatch by manifest extension / fields.
+          failures: list[str] = []
+          warnings: list[str] = []
+
+          def emit(label: str, manifest: str, expected: str, actual: str):
+              ok = actual.startswith(expected)
+              symbol = "OK   " if ok else "MISS "
+              print(f"{symbol} {label:30s}  manifest={manifest}  expected_prefix={expected}  actual={actual}")
+              if not ok:
+                  msg = (
+                      f"{label}: manifest `{manifest}` reports version "
+                      f"`{actual}` but expected_prefix is `{expected}` "
+                      f"(see docs/spec/release-versions.toml)."
+                  )
+                  if mode == "fail":
+                      failures.append(msg)
+                  else:
+                      warnings.append(msg)
+
+          for section_name, body in spec.items():
+              if section_name == "meta" or not isinstance(body, dict):
+                  continue
+              # A section may have its own `manifest` key AND nested children
+              # (e.g. `[python]` carries the VERSION file, while `[python.pyproject]`
+              # carries pyproject.toml). Collect both.
+              entries = []
+              if "manifest" in body:
+                  entries.append((section_name, body))
+              for sub_name, sub_body in body.items():
+                  if isinstance(sub_body, dict) and "manifest" in sub_body:
+                      entries.append((f"{section_name}.{sub_name}", sub_body))
+
+              for label, entry in entries:
+                  manifest = entry["manifest"]
+                  expected = entry.get("expected_prefix")
+                  field = entry.get("field")
+                  dynamic = entry.get("dynamic", False)
+
+                  try:
+                      if dynamic and manifest.endswith("pyproject.toml"):
+                          if detect_pyproject_dynamic(manifest):
+                              print(f"OK    {label:30s}  manifest={manifest}  (dynamic version)")
+                          else:
+                              msg = f"{label}: pyproject.toml expected `dynamic = ['version']`."
+                              (failures if mode == "fail" else warnings).append(msg)
+                          continue
+
+                      if manifest == "VERSION":
+                          actual = extract_version_file(manifest)
+                      elif manifest.endswith(".csproj"):
+                          actual = extract_csproj(manifest)
+                      elif manifest.endswith("Cargo.toml"):
+                          actual = extract_cargo_workspace(manifest)
+                      elif manifest.endswith("package.json"):
+                          actual = extract_package_json(manifest)
+                      elif manifest.endswith("Package.swift"):
+                          if not field:
+                              raise ValueError(f"{label}: Package.swift entry needs `field` (version|g2pVersion)")
+                          actual = extract_swift_let(manifest, field)
+                      elif manifest.endswith("gradle.properties"):
+                          if not field:
+                              raise ValueError(f"{label}: gradle.properties entry needs `field`")
+                          actual = extract_gradle_property(manifest, field)
+                      else:
+                          raise ValueError(f"{label}: unsupported manifest type: {manifest}")
+
+                      if expected is None:
+                          # No prefix means "ignore version, just verify file exists".
+                          print(f"INFO  {label:30s}  manifest={manifest}  actual={actual}  (no expected_prefix)")
+                      else:
+                          emit(label, manifest, expected, actual)
+                  except FileNotFoundError as e:
+                      msg = f"{label}: manifest not found: {e}"
+                      (failures if mode == "fail" else warnings).append(msg)
+                  except Exception as e:
+                      msg = f"{label}: extraction error: {e}"
+                      (failures if mode == "fail" else warnings).append(msg)
+
+          # ---------- Reporting --------------------------------------------------
+          if warnings:
+              print()
+              print("---- Warnings (drift detected, mode=warn) ----")
+              for w in warnings:
+                  print(f"::warning::{w}")
+          if failures:
+              print()
+              print("---- Failures (drift detected, mode=fail) ----")
+              for f in failures:
+                  print(f"::error::{f}")
+              sys.exit(1)
+
+          if not warnings and not failures:
+              print()
+              print("All pinned versions match their manifests.")
+          else:
+              print()
+              print(f"Detected {len(warnings)} warning(s) — exiting 0 because mode=warn.")
+          PY

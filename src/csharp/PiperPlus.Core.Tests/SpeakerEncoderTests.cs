@@ -25,21 +25,24 @@ public class SpeakerEncoderTests
     // Internal reimplementation for unit testing (mirrors SpeakerEncoder
     // private methods; identical algorithm)
     // ------------------------------------------------------------------
+    private static float HzToMel(float hz) => 2595f * MathF.Log10(1f + (hz / 700f));
 
-    private static float HzToMel(float hz) => 2595f * MathF.Log10(1f + hz / 700f);
     private static float MelToHz(float mel) => 700f * (MathF.Pow(10f, mel / 2595f) - 1f);
 
     private static float[] HannWindow(int length)
     {
         float[] w = new float[length];
         for (int n = 0; n < length; n++)
+        {
             w[n] = 0.5f * (1f - MathF.Cos(2f * MathF.PI * n / length));
+        }
+
         return w;
     }
 
     private static float[] CreateMelFilterbank()
     {
-        int fftBins = NFFT / 2 + 1;
+        int fftBins = (NFFT / 2) + 1;
         float[] filterbank = new float[NMels * fftBins];
 
         float melFmin = HzToMel(Fmin);
@@ -47,11 +50,15 @@ public class SpeakerEncoderTests
 
         float[] melPoints = new float[NMels + 2];
         for (int i = 0; i < melPoints.Length; i++)
-            melPoints[i] = melFmin + (melFmax - melFmin) * i / (NMels + 1);
+        {
+            melPoints[i] = melFmin + ((melFmax - melFmin) * i / (NMels + 1));
+        }
 
         float[] binPoints = new float[melPoints.Length];
         for (int i = 0; i < melPoints.Length; i++)
+        {
             binPoints[i] = MelToHz(melPoints[i]) * NFFT / SR;
+        }
 
         for (int m = 0; m < NMels; m++)
         {
@@ -68,6 +75,7 @@ public class SpeakerEncoderTests
             {
                 center = Math.Min(center + 1, fftBins - 1);
             }
+
             if (center == right)
             {
                 right = Math.Min(right + 1, fftBins - 1);
@@ -76,15 +84,23 @@ public class SpeakerEncoderTests
             for (int k = left; k < center; k++)
             {
                 if (center > left)
-                    filterbank[m * fftBins + k] = (float)(k - left) / (center - left);
+                {
+                    filterbank[(m * fftBins) + k] = (float)(k - left) / (center - left);
+                }
             }
+
             for (int k = center; k < right; k++)
             {
                 if (right > center)
-                    filterbank[m * fftBins + k] = (float)(right - k) / (right - center);
+                {
+                    filterbank[(m * fftBins) + k] = (float)(right - k) / (right - center);
+                }
             }
+
             if (center < fftBins)
-                filterbank[m * fftBins + center] = MathF.Max(filterbank[m * fftBins + center], 1.0f);
+            {
+                filterbank[(m * fftBins) + center] = MathF.Max(filterbank[(m * fftBins) + center], 1.0f);
+            }
         }
 
         return filterbank;
@@ -96,10 +112,10 @@ public class SpeakerEncoderTests
         float[] window = HannWindow(NFFT);
 
         int nFrames = samples.Length >= NFFT
-            ? (samples.Length - NFFT) / HopLength + 1
+            ? ((samples.Length - NFFT) / HopLength) + 1
             : 0;
 
-        int fftBins = NFFT / 2 + 1;
+        int fftBins = (NFFT / 2) + 1;
         float[] melSpec = new float[NMels * nFrames];
 
         for (int frameIdx = 0; frameIdx < nFrames; frameIdx++)
@@ -120,16 +136,19 @@ public class SpeakerEncoderTests
                     real += sample * MathF.Cos(angle);
                     imag += sample * MathF.Sin(angle);
                 }
-                powerSpec[k] = real * real + imag * imag;
+
+                powerSpec[k] = (real * real) + (imag * imag);
             }
 
             for (int melIdx = 0; melIdx < NMels; melIdx++)
             {
                 float energy = 0;
                 for (int k = 0; k < fftBins; k++)
-                    energy += melFilters[melIdx * fftBins + k] * powerSpec[k];
+                {
+                    energy += melFilters[(melIdx * fftBins) + k] * powerSpec[k];
+                }
 
-                melSpec[melIdx * nFrames + frameIdx] = MathF.Log(MathF.Max(energy, 1e-10f));
+                melSpec[(melIdx * nFrames) + frameIdx] = MathF.Log(MathF.Max(energy, 1e-10f));
             }
         }
 
@@ -149,9 +168,13 @@ public class SpeakerEncoderTests
             float frac = (float)(srcPos - idx);
 
             if (idx + 1 < samples.Length)
-                output[i] = samples[idx] * (1f - frac) + samples[idx + 1] * frac;
+            {
+                output[i] = (samples[idx] * (1f - frac)) + (samples[idx + 1] * frac);
+            }
             else if (idx < samples.Length)
+            {
                 output[i] = samples[idx];
+            }
         }
 
         return output;
@@ -160,13 +183,15 @@ public class SpeakerEncoderTests
     // ------------------------------------------------------------------
     // Signal generators
     // ------------------------------------------------------------------
-
     private static float[] GenerateSine(float freqHz, float durationS, int sr)
     {
         int n = (int)(durationS * sr);
         float[] samples = new float[n];
         for (int i = 0; i < n; i++)
+        {
             samples[i] = MathF.Sin(2f * MathF.PI * freqHz * i / sr);
+        }
+
         return samples;
     }
 
@@ -177,21 +202,26 @@ public class SpeakerEncoderTests
         foreach (float f in freqs)
         {
             for (int i = 0; i < n; i++)
+            {
                 samples[i] += MathF.Sin(2f * MathF.PI * f * i / sr);
+            }
         }
+
         float peak = samples.Max(MathF.Abs);
         if (peak > 0f)
         {
             for (int i = 0; i < n; i++)
+            {
                 samples[i] /= peak;
+            }
         }
+
         return samples;
     }
 
     // ------------------------------------------------------------------
     // Golden file loading
     // ------------------------------------------------------------------
-
     private static string FindGoldenPath()
     {
         // Walk up from the test binary directory to find the project root
@@ -199,7 +229,11 @@ public class SpeakerEncoderTests
         for (int i = 0; i < 10; i++)
         {
             string candidate = Path.Combine(dir, "test", "fixtures", "speaker_encoder_golden.json");
-            if (File.Exists(candidate)) return candidate;
+            if (File.Exists(candidate))
+            {
+                return candidate;
+            }
+
             dir = Path.GetDirectoryName(dir) ?? dir;
         }
 
@@ -208,7 +242,11 @@ public class SpeakerEncoderTests
         for (int i = 0; i < 10; i++)
         {
             string candidate = Path.Combine(solutionDir, "test", "fixtures", "speaker_encoder_golden.json");
-            if (File.Exists(candidate)) return candidate;
+            if (File.Exists(candidate))
+            {
+                return candidate;
+            }
+
             solutionDir = Path.GetDirectoryName(solutionDir) ?? solutionDir;
         }
 
@@ -226,15 +264,21 @@ public class SpeakerEncoderTests
     {
         foreach (JsonElement tc in golden.GetProperty("test_cases").EnumerateArray())
         {
-            if (tc.GetProperty("id").GetString() == id) return tc;
+            if (tc.GetProperty("id").GetString() == id)
+            {
+                return tc;
+            }
         }
+
         throw new KeyNotFoundException($"Test case '{id}' not found in golden data");
     }
 
     private static double RelativeL2(float[] actual, double[] expected)
     {
         if (actual.Length != expected.Length)
+        {
             throw new ArgumentException($"Length mismatch: {actual.Length} vs {expected.Length}");
+        }
 
         double diffSq = 0, refSq = 0;
         for (int i = 0; i < actual.Length; i++)
@@ -243,13 +287,13 @@ public class SpeakerEncoderTests
             diffSq += d * d;
             refSq += expected[i] * expected[i];
         }
+
         return refSq < 1e-20 ? Math.Sqrt(diffSq) : Math.Sqrt(diffSq / refSq);
     }
 
     // ------------------------------------------------------------------
     // Tests: Parameter validation
     // ------------------------------------------------------------------
-
     [Fact]
     public void GoldenMelParams_Match()
     {
@@ -267,7 +311,6 @@ public class SpeakerEncoderTests
     // ------------------------------------------------------------------
     // Tests: Hann window
     // ------------------------------------------------------------------
-
     [Fact]
     public void GoldenHannWindow_First5()
     {
@@ -280,8 +323,11 @@ public class SpeakerEncoderTests
             .Select(e => e.GetDouble()).ToArray();
 
         for (int i = 0; i < expected.Length; i++)
-            Assert.True(Math.Abs(window[i] - expected[i]) < 1e-5,
+        {
+            Assert.True(
+                Math.Abs(window[i] - expected[i]) < 1e-5,
                 $"hann_window[{i}]: expected {expected[i]}, got {window[i]}");
+        }
     }
 
     [Fact]
@@ -298,7 +344,8 @@ public class SpeakerEncoderTests
         for (int i = 0; i < expected.Length; i++)
         {
             int idx = length - 5 + i;
-            Assert.True(Math.Abs(window[idx] - expected[i]) < 1e-5,
+            Assert.True(
+                Math.Abs(window[idx] - expected[i]) < 1e-5,
                 $"hann_window[{idx}]: expected {expected[i]}, got {window[idx]}");
         }
     }
@@ -312,19 +359,19 @@ public class SpeakerEncoderTests
         double expectedMid = hw.GetProperty("mid_value").GetDouble();
 
         float[] window = HannWindow(length);
-        Assert.True(Math.Abs(window[length / 2] - expectedMid) < 1e-5,
+        Assert.True(
+            Math.Abs(window[length / 2] - expectedMid) < 1e-5,
             $"hann_window mid: expected {expectedMid}, got {window[length / 2]}");
     }
 
     // ------------------------------------------------------------------
     // Tests: Mel filterbank
     // ------------------------------------------------------------------
-
     [Fact]
     public void GoldenFilterbank_Shape()
     {
         JsonElement g = LoadGolden();
-        int fftBins = NFFT / 2 + 1;
+        int fftBins = (NFFT / 2) + 1;
         int[] expectedShape = g.GetProperty("mel_filterbank").GetProperty("shape")
             .EnumerateArray().Select(e => e.GetInt32()).ToArray();
 
@@ -343,19 +390,22 @@ public class SpeakerEncoderTests
             .EnumerateArray().Select(e => e.GetDouble()).ToArray();
 
         float[] fb = CreateMelFilterbank();
-        int fftBins = NFFT / 2 + 1;
+        int fftBins = (NFFT / 2) + 1;
 
         for (int m = 0; m < NMels; m++)
         {
             float bandSum = 0;
             for (int k = 0; k < fftBins; k++)
-                bandSum += fb[m * fftBins + k];
+            {
+                bandSum += fb[(m * fftBins) + k];
+            }
 
             double relErr = Math.Abs(expectedSums[m]) > 1e-10
                 ? Math.Abs((bandSum - expectedSums[m]) / expectedSums[m])
                 : Math.Abs(bandSum - expectedSums[m]);
 
-            Assert.True(relErr < 0.02,
+            Assert.True(
+                relErr < 0.02,
                 $"filterbank band[{m}] sum: expected {expectedSums[m]}, got {bandSum} (rel err {relErr:F6})");
         }
     }
@@ -370,14 +420,14 @@ public class SpeakerEncoderTests
         double total = fb.Sum(x => (double)x);
 
         double relErr = Math.Abs((total - expectedTotal) / expectedTotal);
-        Assert.True(relErr < 0.02,
+        Assert.True(
+            relErr < 0.02,
             $"filterbank total: expected {expectedTotal}, got {total} (rel err {relErr:F6})");
     }
 
     // ------------------------------------------------------------------
     // Tests: Mel spectrogram — 440Hz sine
     // ------------------------------------------------------------------
-
     [Fact]
     public void GoldenSine440Hz_MelShape()
     {
@@ -410,7 +460,7 @@ public class SpeakerEncoderTests
         AssertCornerValue("top_left", mel[0], corners.GetProperty("top_left").GetDouble());
         AssertCornerValue("top_right", mel[nFrames - 1], corners.GetProperty("top_right").GetDouble());
         AssertCornerValue("bottom_left", mel[(NMels - 1) * nFrames], corners.GetProperty("bottom_left").GetDouble());
-        AssertCornerValue("bottom_right", mel[NMels * nFrames - 1], corners.GetProperty("bottom_right").GetDouble());
+        AssertCornerValue("bottom_right", mel[(NMels * nFrames) - 1], corners.GetProperty("bottom_right").GetDouble());
     }
 
     [Fact]
@@ -433,7 +483,6 @@ public class SpeakerEncoderTests
     // ------------------------------------------------------------------
     // Tests: Mel spectrogram — 1000Hz sine
     // ------------------------------------------------------------------
-
     [Fact]
     public void GoldenSine1000Hz_MelCorners()
     {
@@ -448,7 +497,7 @@ public class SpeakerEncoderTests
         AssertCornerValue("top_left", mel[0], corners.GetProperty("top_left").GetDouble());
         AssertCornerValue("top_right", mel[nFrames - 1], corners.GetProperty("top_right").GetDouble());
         AssertCornerValue("bottom_left", mel[(NMels - 1) * nFrames], corners.GetProperty("bottom_left").GetDouble());
-        AssertCornerValue("bottom_right", mel[NMels * nFrames - 1], corners.GetProperty("bottom_right").GetDouble());
+        AssertCornerValue("bottom_right", mel[(NMels * nFrames) - 1], corners.GetProperty("bottom_right").GetDouble());
     }
 
     [Fact]
@@ -471,7 +520,6 @@ public class SpeakerEncoderTests
     // ------------------------------------------------------------------
     // Tests: Mel spectrogram — multitone
     // ------------------------------------------------------------------
-
     [Fact]
     public void GoldenMultitone_MelCorners()
     {
@@ -486,7 +534,7 @@ public class SpeakerEncoderTests
         AssertCornerValue("top_left", mel[0], corners.GetProperty("top_left").GetDouble());
         AssertCornerValue("top_right", mel[nFrames - 1], corners.GetProperty("top_right").GetDouble());
         AssertCornerValue("bottom_left", mel[(NMels - 1) * nFrames], corners.GetProperty("bottom_left").GetDouble());
-        AssertCornerValue("bottom_right", mel[NMels * nFrames - 1], corners.GetProperty("bottom_right").GetDouble());
+        AssertCornerValue("bottom_right", mel[(NMels * nFrames) - 1], corners.GetProperty("bottom_right").GetDouble());
     }
 
     [Fact]
@@ -509,7 +557,6 @@ public class SpeakerEncoderTests
     // ------------------------------------------------------------------
     // Tests: Resampling
     // ------------------------------------------------------------------
-
     [Fact]
     public void GoldenResample_48kTo16k_OutputLength()
     {
@@ -535,8 +582,11 @@ public class SpeakerEncoderTests
         double[] expectedFirst = tc.GetProperty("output_first_10")
             .EnumerateArray().Select(e => e.GetDouble()).ToArray();
         for (int i = 0; i < expectedFirst.Length; i++)
-            Assert.True(Math.Abs(resampled[i] - expectedFirst[i]) < 1e-4,
+        {
+            Assert.True(
+                Math.Abs(resampled[i] - expectedFirst[i]) < 1e-4,
                 $"resample first[{i}]: expected {expectedFirst[i]}, got {resampled[i]}");
+        }
 
         double[] expectedLast = tc.GetProperty("output_last_10")
             .EnumerateArray().Select(e => e.GetDouble()).ToArray();
@@ -544,7 +594,8 @@ public class SpeakerEncoderTests
         for (int i = 0; i < expectedLast.Length; i++)
         {
             int idx = n - 10 + i;
-            Assert.True(Math.Abs(resampled[idx] - expectedLast[i]) < 1e-4,
+            Assert.True(
+                Math.Abs(resampled[idx] - expectedLast[i]) < 1e-4,
                 $"resample last[{i}]: expected {expectedLast[i]}, got {resampled[idx]}");
         }
     }
@@ -552,7 +603,6 @@ public class SpeakerEncoderTests
     // ------------------------------------------------------------------
     // Tests: Edge cases
     // ------------------------------------------------------------------
-
     [Fact]
     public void SilentAudio_ProducesFiniteMel()
     {
@@ -592,7 +642,8 @@ public class SpeakerEncoderTests
         float hz = 1000f;
         float mel = HzToMel(hz);
         float hzBack = MelToHz(mel);
-        Assert.True(MathF.Abs(hz - hzBack) < 0.01f,
+        Assert.True(
+            MathF.Abs(hz - hzBack) < 0.01f,
             $"Hz roundtrip: {hz} -> {mel} -> {hzBack}");
     }
 
@@ -600,7 +651,7 @@ public class SpeakerEncoderTests
     public void FilterbankShape_Correct()
     {
         float[] fb = CreateMelFilterbank();
-        int fftBins = NFFT / 2 + 1;
+        int fftBins = (NFFT / 2) + 1;
         Assert.Equal(NMels * fftBins, fb.Length);
     }
 
@@ -608,12 +659,15 @@ public class SpeakerEncoderTests
     public void FilterbankBands_AllNonZero()
     {
         float[] fb = CreateMelFilterbank();
-        int fftBins = NFFT / 2 + 1;
+        int fftBins = (NFFT / 2) + 1;
         for (int m = 0; m < NMels; m++)
         {
             float bandSum = 0;
             for (int k = 0; k < fftBins; k++)
-                bandSum += fb[m * fftBins + k];
+            {
+                bandSum += fb[(m * fftBins) + k];
+            }
+
             Assert.True(bandSum > 0, $"Mel band {m} has zero total weight");
         }
     }
@@ -621,13 +675,13 @@ public class SpeakerEncoderTests
     // ------------------------------------------------------------------
     // Helper
     // ------------------------------------------------------------------
-
     private static void AssertCornerValue(string name, float actual, double expected)
     {
         double relErr = Math.Abs(expected) > 1e-10
             ? Math.Abs((actual - expected) / expected)
             : Math.Abs(actual - expected);
-        Assert.True(relErr < 0.02,
+        Assert.True(
+            relErr < 0.02,
             $"{name}: expected {expected}, got {actual} (rel err {relErr:F6})");
     }
 }

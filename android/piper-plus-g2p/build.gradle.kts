@@ -16,6 +16,101 @@ plugins {
     id("org.jetbrains.kotlin.android")
     id("com.vanniktech.maven.publish")
     id("org.jetbrains.dokka")
+
+    // Quality gates (Wave 1) — keep parity with the .NET / Rust / Go / Python
+    // toolchains so Android contributions get caught locally instead of
+    // surfacing late on CI. Versions are pinned (and synced with the Wave 2
+    // CI workflow) to avoid drift on tooling auto-bumps.
+    //
+    // Spotless intentionally skipped — ktlint already covers Kotlin format +
+    // lint, and adding Spotless on top duplicates the gradle task graph for
+    // no extra coverage. Re-introduce only if we add Java sources.
+    id("org.jlleitschuh.gradle.ktlint") version "12.1.1"
+    id("io.gitlab.arturbosch.detekt") version "1.23.7"
+    id("org.owasp.dependencycheck") version "10.0.4"
+    jacoco
+}
+
+ktlint {
+    // ktlint engine version is decoupled from the gradle plugin version
+    // (12.1.1 is the gradle plugin; 1.3.1 is the engine ruleset).
+    version.set("1.3.1")
+    android.set(true)
+    outputColorName.set("RED")
+    // CI-fail by default — local devs see the violations and can run
+    // `./gradlew ktlintFormat` to auto-fix.
+    ignoreFailures.set(false)
+    reporters {
+        reporter(org.jlleitschuh.gradle.ktlint.reporter.ReporterType.PLAIN)
+        reporter(org.jlleitschuh.gradle.ktlint.reporter.ReporterType.CHECKSTYLE)
+    }
+    filter {
+        exclude("**/generated/**", "**/build/**")
+    }
+}
+
+detekt {
+    toolVersion = "1.23.7"
+    config.setFrom(files("$rootDir/detekt.yml"))
+    // buildUponDefaultConfig=true → detekt.yml only needs to override what
+    // we want to differ from upstream defaults, so the file stays small.
+    buildUponDefaultConfig = true
+    autoCorrect = false
+}
+
+jacoco {
+    toolVersion = "0.8.12"
+}
+
+// Wire jacoco onto the unit test task (the AGP `test` task is registered
+// lazily once the android variants resolve, so use `matching` instead of
+// `named` to avoid configure-time NPE if AGP order changes).
+tasks.matching { it.name == "test" }.configureEach {
+    finalizedBy(tasks.named("jacocoTestReport"))
+}
+
+tasks.register<JacocoReport>("jacocoTestReport") {
+    dependsOn(tasks.matching { it.name == "test" })
+    reports {
+        xml.required.set(true)
+        html.required.set(true)
+        csv.required.set(false)
+    }
+    classDirectories.setFrom(
+        files(
+            classDirectories.files.map { dir ->
+                fileTree(dir) { exclude("**/generated/**") }
+            },
+        ),
+    )
+}
+
+tasks.register<JacocoCoverageVerification>("jacocoCoverageVerification") {
+    violationRules {
+        rule {
+            limit {
+                // 60% line coverage floor — matches the dev/Rust/Python
+                // baselines. Bump this once the L3 instrumented tests are
+                // wired into JVM coverage too.
+                minimum = "0.60".toBigDecimal()
+            }
+        }
+    }
+}
+
+tasks.matching { it.name == "check" }.configureEach {
+    dependsOn(tasks.named("jacocoCoverageVerification"))
+}
+
+dependencyCheck {
+    // CVSS 7.0 = "High" — fail the build on High/Critical vulnerabilities,
+    // mirroring the OWASP guidance. Lower scores are reported but don't
+    // block. Suppressions live in `dependency-check-suppressions.xml` at
+    // the android root (created on demand when the first false-positive
+    // shows up).
+    failBuildOnCVSS = 7.0f
+    suppressionFile = "$rootDir/dependency-check-suppressions.xml"
+    formats = listOf("HTML", "JSON")
 }
 
 android {
@@ -112,6 +207,11 @@ dependencies {
     androidTestImplementation("androidx.test:runner:1.6.2")
     androidTestImplementation("org.json:json:20240303")
     androidTestImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
+
+    // detekt-formatting bundles the ktlint ruleset into detekt so the
+    // `formatting` section in detekt.yml has rules to operate on. The
+    // version must match `detekt { toolVersion = ... }` above.
+    detektPlugins("io.gitlab.arturbosch.detekt:detekt-formatting:1.23.7")
 }
 
 // Copy the cross-runtime G2P fixture into androidTest assets so the L4 parity

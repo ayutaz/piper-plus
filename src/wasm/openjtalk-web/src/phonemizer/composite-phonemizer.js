@@ -58,7 +58,7 @@ export class CompositePhonemizer {
     if (this._fallback) {
       return this._fallback.detectLanguage(text);
     }
-    throw new Error('No phonemizers registered');
+    throw new Error("No phonemizers registered");
   }
 
   /** @returns {string[]} */
@@ -77,7 +77,9 @@ export class CompositePhonemizer {
 
   /** Release all phonemizer resources. Safe to call multiple times. */
   dispose() {
-    if (this._disposed) return;
+    if (this._disposed) {
+      return;
+    }
     this._disposed = true;
 
     const disposed = new Set();

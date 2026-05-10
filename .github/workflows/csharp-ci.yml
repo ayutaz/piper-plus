@@ -7,6 +7,10 @@ on:
       - 'src/csharp/**'
       - 'src/python/g2p/piper_plus_g2p/data/zh_en_loanword.json'
       - 'tests/fixtures/g2p/zh_en_loanword_matrix.json'
+      - 'tests/fixtures/phoneme_timing/**'
+      - 'tests/fixtures/short_text/**'
+      - 'tests/fixtures/ort_session/**'
+      - 'test/fixtures/speaker_encoder_golden.json'
       - '.github/workflows/csharp-ci.yml'
   push:
     branches: [dev]
@@ -14,6 +18,10 @@ on:
       - 'src/csharp/**'
       - 'src/python/g2p/piper_plus_g2p/data/zh_en_loanword.json'
       - 'tests/fixtures/g2p/zh_en_loanword_matrix.json'
+      - 'tests/fixtures/phoneme_timing/**'
+      - 'tests/fixtures/short_text/**'
+      - 'tests/fixtures/ort_session/**'
+      - 'test/fixtures/speaker_encoder_golden.json'
       - '.github/workflows/csharp-ci.yml'
 
 concurrency:
@@ -42,6 +50,7 @@ jobs:
 
       - name: Cache NuGet packages
         uses: actions/cache@v5
+        continue-on-error: true
         with:
           path: ~/.nuget/packages
           key: ${{ runner.os }}-nuget-${{ hashFiles('src/csharp/**/*.csproj') }}
@@ -58,13 +67,66 @@ jobs:
         run: dotnet format src/csharp/PiperPlus.sln --verify-no-changes --no-restore
         continue-on-error: false
 
-      - name: Test
+      - name: Check for vulnerable NuGet packages
+        if: matrix.os == 'ubuntu-24.04'  # 1 OS で十分
+        run: |
+          dotnet list src/csharp/PiperPlus.sln package --vulnerable --include-transitive 2>&1 | tee vuln-report.txt
+          if grep -E "(Critical|High)" vuln-report.txt; then
+            echo "::error::Found Critical or High severity vulnerable packages"
+            exit 1
+          fi
+          echo "No High/Critical vulnerabilities found"
+        shell: bash
+
+      - name: Run C# tests
         shell: bash
         run: |
           dotnet test src/csharp/PiperPlus.sln -c Release --no-build \
+            --blame-hang-timeout 30s \
             --logger "trx;LogFileName=test-results.xml" \
             --collect:"XPlat Code Coverage" \
             --settings src/csharp/PiperPlus.runsettings
+
+      - name: Generate coverage report
+        if: matrix.os == 'ubuntu-24.04'
+        run: |
+          dotnet tool install -g dotnet-reportgenerator-globaltool || true
+          reportgenerator \
+            -reports:"**/coverage.cobertura.xml" \
+            -targetdir:"coverage-report" \
+            -reporttypes:"Html;Cobertura;TextSummary" \
+            -classfilters:"-*.Tests.*"
+          cat coverage-report/Summary.txt
+
+      - name: Verify coverage threshold (Ubuntu)
+        if: matrix.os == 'ubuntu-24.04'
+        # Baseline as of 2026-05-10: line coverage 78.5%, branch 72.2%, method
+        # 80.7% (run 25627587120). 70% line is the contractual floor — drop
+        # below this and CI fails. Raise the threshold incrementally as
+        # coverage grows so regressions are caught early.
+        run: |
+          LINE_COV=$(grep -oP 'Line coverage:\s+\K[\d.]+' coverage-report/Summary.txt | head -1)
+          echo "Line coverage: $LINE_COV%"
+          THRESHOLD=70
+          awk -v cov="$LINE_COV" -v thr="$THRESHOLD" 'BEGIN { if (cov+0 < thr+0) { print "::error::Coverage " cov "% below threshold " thr "%"; exit 1 } }'
+        shell: bash
+
+      - name: Upload coverage to Codecov
+        if: matrix.os == 'ubuntu-24.04'
+        uses: codecov/codecov-action@v5
+        with:
+          files: ./**/coverage.cobertura.xml
+          flags: csharp
+          fail_ci_if_error: false
+        continue-on-error: true
+
+      - name: Upload coverage report HTML
+        if: matrix.os == 'ubuntu-24.04'
+        uses: actions/upload-artifact@v7
+        with:
+          name: csharp-coverage-report
+          path: coverage-report/
+          retention-days: 14
 
       - name: Upload test results
         uses: actions/upload-artifact@v7

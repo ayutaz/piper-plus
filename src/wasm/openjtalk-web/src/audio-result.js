@@ -20,15 +20,15 @@ function getAudioContext() {
   if (!sharedAudioContext) {
     const AudioCtx = globalThis.AudioContext || globalThis.webkitAudioContext;
     if (!AudioCtx) {
-      throw new Error('AudioContext is not available in this environment');
+      throw new Error("AudioContext is not available in this environment");
     }
     sharedAudioContext = new AudioCtx();
   }
   // Resume if the context was suspended (auto-play policy).
-  if (sharedAudioContext.state === 'suspended') {
+  if (sharedAudioContext.state === "suspended") {
     void sharedAudioContext.resume().catch((err) => {
-      if (typeof console !== 'undefined' && console.warn) {
-        console.warn('[piper-plus] AudioContext.resume() failed:', err);
+      if (typeof console !== "undefined" && console.warn) {
+        console.warn("[piper-plus] AudioContext.resume() failed:", err);
       }
     });
   }
@@ -54,29 +54,29 @@ function encodeWav(samples, sampleRate) {
   const view = new DataView(buffer);
 
   // --- RIFF header ---
-  writeString(view, 0, 'RIFF');
+  writeString(view, 0, "RIFF");
   view.setUint32(4, 36 + dataByteLength, true); // file size - 8
-  writeString(view, 8, 'WAVE');
+  writeString(view, 8, "WAVE");
 
   // --- fmt sub-chunk ---
-  writeString(view, 12, 'fmt ');
-  view.setUint32(16, 16, true);                              // sub-chunk size (PCM = 16)
-  view.setUint16(20, 1, true);                               // audio format (1 = PCM)
-  view.setUint16(22, numChannels, true);                     // number of channels
-  view.setUint32(24, sampleRate, true);                      // sample rate
+  writeString(view, 12, "fmt ");
+  view.setUint32(16, 16, true); // sub-chunk size (PCM = 16)
+  view.setUint16(20, 1, true); // audio format (1 = PCM)
+  view.setUint16(22, numChannels, true); // number of channels
+  view.setUint32(24, sampleRate, true); // sample rate
   view.setUint32(28, sampleRate * numChannels * bytesPerSample, true); // byte rate
-  view.setUint16(32, numChannels * bytesPerSample, true);    // block align
-  view.setUint16(34, bitsPerSample, true);                   // bits per sample
+  view.setUint16(32, numChannels * bytesPerSample, true); // block align
+  view.setUint16(34, bitsPerSample, true); // bits per sample
 
   // --- data sub-chunk ---
-  writeString(view, 36, 'data');
+  writeString(view, 36, "data");
   view.setUint32(40, dataByteLength, true);
 
   // Convert float32 [-1, 1] -> int16 [-32768, 32767]
   const offset = headerByteLength;
   for (let i = 0; i < samples.length; i++) {
     const clamped = Math.max(-1, Math.min(1, samples[i]));
-    const int16 = clamped < 0 ? clamped * 0x8000 : clamped * 0x7FFF;
+    const int16 = clamped < 0 ? clamped * 0x8000 : clamped * 0x7fff;
     view.setInt16(offset + i * bytesPerSample, int16, true);
   }
 
@@ -128,10 +128,10 @@ export class AudioResult {
    */
   constructor(samples, sampleRate = 22050, timing = null) {
     if (!(samples instanceof Float32Array)) {
-      throw new TypeError('samples must be a Float32Array');
+      throw new TypeError("samples must be a Float32Array");
     }
-    if (typeof sampleRate !== 'number' || sampleRate <= 0) {
-      throw new TypeError('sampleRate must be a positive number');
+    if (typeof sampleRate !== "number" || sampleRate <= 0) {
+      throw new TypeError("sampleRate must be a positive number");
     }
     this.#samples = samples;
     this.#sampleRate = sampleRate;
@@ -200,7 +200,7 @@ export class AudioResult {
    */
   toBlob() {
     const wavBuffer = this.toWav();
-    return new Blob([wavBuffer], { type: 'audio/wav' });
+    return new Blob([wavBuffer], { type: "audio/wav" });
   }
 
   /**
@@ -216,13 +216,13 @@ export class AudioResult {
    * Trigger a file download of the audio as a WAV file.
    * @param {string} [filename='output.wav']
    */
-  download(filename = 'output.wav') {
+  download(filename = "output.wav") {
     const blob = this.toBlob();
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
+    const a = document.createElement("a");
     a.href = url;
     a.download = filename;
-    a.style.display = 'none';
+    a.style.display = "none";
     document.body.appendChild(a);
     a.click();
     // Clean up after a short delay so the browser has time to start the download.

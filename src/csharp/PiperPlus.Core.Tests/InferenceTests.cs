@@ -11,7 +11,6 @@ public class InferenceTests
     // ----------------------------------------------------------------
     // ConvertToInt16 tests
     // ----------------------------------------------------------------
-
     [Fact]
     public void ConvertToInt16_ZeroArray_ReturnsAllZeros()
     {
@@ -46,14 +45,16 @@ public class InferenceTests
         // Peak = 0.001, scale = 32767 / 0.01 = 3276700 (minimum peak 0.01 applies).
         // 0.001 * 3276700 = 3276.7 -> (short)3276 after Clamp truncation.
         // -0.001 * 3276700 = -3276.7 -> (short)-3276.
+        //
+        // Golden values are hard-coded so the test fails if production drifts
+        // (recomputing the formula in-test matches drift in either direction).
         float[] audio = [0.001f, -0.001f];
 
         short[] result = PiperSession.ConvertToInt16(audio);
 
         Assert.Equal(2, result.Length);
-        // Math.Clamp returns float, cast to short truncates toward zero.
-        Assert.Equal((short)(0.001f * (32767.0f / 0.01f)), result[0]);
-        Assert.Equal((short)(-0.001f * (32767.0f / 0.01f)), result[1]);
+        Assert.Equal((short)3276, result[0]);
+        Assert.Equal((short)-3276, result[1]);
     }
 
     [Fact]
@@ -104,9 +105,8 @@ public class InferenceTests
         short[] result = PiperSession.ConvertToInt16(audio);
 
         Assert.Equal(2, result.Length);
-        float scale = 32767.0f / 0.5f;
-        Assert.Equal((short)(0.1f * scale), result[0]);
-        Assert.Equal(-32767, result[1]);
+        Assert.Equal((short)6553, result[0]);
+        Assert.Equal((short)-32767, result[1]);
     }
 
     [Fact]
@@ -120,6 +120,7 @@ public class InferenceTests
         short[] result = PiperSession.ConvertToInt16(audio);
 
         Assert.Equal(3, result.Length);
+
         // Values are so small that even with the minimum-peak scale they round to 0.
         Assert.All(result, sample => Assert.Equal(0, sample));
     }
@@ -127,7 +128,6 @@ public class InferenceTests
     // ----------------------------------------------------------------
     // ConvertToInt16 boundary value tests
     // ----------------------------------------------------------------
-
     [Fact]
     public void ConvertToInt16_PeakExactlyAtMinimum_0_01()
     {
@@ -139,8 +139,7 @@ public class InferenceTests
         short[] result = PiperSession.ConvertToInt16(audio);
 
         Assert.Single(result);
-        float scale = 32767.0f / 0.01f;
-        Assert.Equal((short)Math.Clamp(0.01f * scale, -32767f, 32767f), result[0]);
+        Assert.Equal((short)32767, result[0]);
     }
 
     [Fact]
@@ -154,8 +153,7 @@ public class InferenceTests
         short[] result = PiperSession.ConvertToInt16(audio);
 
         Assert.Single(result);
-        float scale = 32767.0f / 0.01f; // minimum peak applies
-        Assert.Equal((short)Math.Clamp(0.005f * scale, -32767f, 32767f), result[0]);
+        Assert.Equal((short)16383, result[0]);
     }
 
     [Fact]
@@ -169,8 +167,7 @@ public class InferenceTests
         short[] result = PiperSession.ConvertToInt16(audio);
 
         Assert.Single(result);
-        float scale = 32767.0f / 0.02f; // actual peak used
-        Assert.Equal((short)Math.Clamp(0.02f * scale, -32767f, 32767f), result[0]);
+        Assert.Equal((short)32767, result[0]);
     }
 
     [Fact]
@@ -178,15 +175,17 @@ public class InferenceTests
     {
         // Peak = max(|-0.5|, |-1.0|, |-0.3|) = 1.0.
         // scale = 32767 / 1.0 = 32767.
+        // -0.5 * 32767 = -16383.5 -> (short)-16383
+        // -1.0 * 32767 = -32767 -> (short)-32767
+        // -0.3 * 32767 = -9830.1 -> (short)-9830
         float[] audio = [-0.5f, -1.0f, -0.3f];
 
         short[] result = PiperSession.ConvertToInt16(audio);
 
         Assert.Equal(3, result.Length);
-        float scale = 32767.0f / 1.0f;
-        Assert.Equal((short)Math.Clamp(-0.5f * scale, -32767f, 32767f), result[0]);
-        Assert.Equal((short)Math.Clamp(-1.0f * scale, -32767f, 32767f), result[1]);
-        Assert.Equal((short)Math.Clamp(-0.3f * scale, -32767f, 32767f), result[2]);
+        Assert.Equal((short)-16383, result[0]);
+        Assert.Equal((short)-32767, result[1]);
+        Assert.Equal((short)-9830, result[2]);
     }
 
     [Fact]
@@ -201,10 +200,9 @@ public class InferenceTests
         short[] result = PiperSession.ConvertToInt16(audio);
 
         Assert.Equal(3, result.Length);
-        float scale = 32767.0f / 1.0f;
-        Assert.Equal((short)(0.001f * scale), result[0]);
-        Assert.Equal(32767, result[1]);
-        Assert.Equal((short)(0.001f * scale), result[2]);
+        Assert.Equal((short)32, result[0]);
+        Assert.Equal((short)32767, result[1]);
+        Assert.Equal((short)32, result[2]);
     }
 
     [Fact]
@@ -221,7 +219,8 @@ public class InferenceTests
         // Peak = 1.5, scale = 32767 / 1.5 = 21844.666...
         // -1.5 * 21844.666 = -32767 (exactly at clamp boundary).
         // Verify clamped to -32767, not -32768.
-        Assert.True(result[1] >= -32767,
+        Assert.True(
+            result[1] >= -32767,
             $"Expected >= -32767 but got {result[1]}; symmetric clamp must not produce -32768");
     }
 
@@ -235,7 +234,8 @@ public class InferenceTests
 
         short[] result = PiperSession.ConvertToInt16(audio);
 
-        Assert.True(result[0] <= 32767,
+        Assert.True(
+            result[0] <= 32767,
             $"Expected <= 32767 but got {result[0]}; positive clamp must be 32767");
         Assert.Equal(32767, result[0]);
     }
@@ -273,12 +273,13 @@ public class InferenceTests
         var rng = new Random(42);
         for (int i = 0; i < count; i++)
         {
-            audio[i] = (float)(rng.NextDouble() * 2.0 - 1.0); // range [-1, 1]
+            audio[i] = (float)((rng.NextDouble() * 2.0) - 1.0); // range [-1, 1]
         }
 
         short[] result = PiperSession.ConvertToInt16(audio);
 
         Assert.Equal(count, result.Length);
+
         // All values must be within the symmetric int16 range.
         Assert.All(result, s => Assert.InRange(s, (short)-32767, (short)32767));
     }
@@ -286,7 +287,6 @@ public class InferenceTests
     // ----------------------------------------------------------------
     // SynthesisInput record tests
     // ----------------------------------------------------------------
-
     [Fact]
     public void SynthesisInput_WithCustomScales_ValuesPreserved()
     {
@@ -295,8 +295,7 @@ public class InferenceTests
             SpeakerId: 5,
             NoiseScale: 0.33f,
             LengthScale: 1.5f,
-            NoiseW: 0.4f
-        );
+            NoiseW: 0.4f);
 
         Assert.Equal(0.33f, input.NoiseScale);
         Assert.Equal(1.5f, input.LengthScale);
@@ -308,13 +307,13 @@ public class InferenceTests
     public void SynthesisInput_WithProsodyFeatures_Preserved()
     {
         long[] phonemes = [1, 2, 3];
+
         // 3 phonemes * 3 features = 9 values: [a1_0, a2_0, a3_0, a1_1, ...]
         long[] prosody = [1, 2, 5, -1, 3, 4, 0, 1, 3];
 
         var input = new SynthesisInput(
             PhonemeIds: phonemes,
-            ProsodyFeatures: prosody
-        );
+            ProsodyFeatures: prosody);
 
         Assert.NotNull(input.ProsodyFeatures);
         Assert.Equal(9, input.ProsodyFeatures.Length);
@@ -338,5 +337,85 @@ public class InferenceTests
 
         Assert.Equal(0, input.SpeakerId);
         Assert.Null(input.ProsodyFeatures);
+    }
+
+    // ----------------------------------------------------------------
+    // SpeakerId × SpeakerEmbedding mutual-exclusion validation
+    //
+    // PiperSession routes every Synthesize* entry point through
+    // SynthesisInput.Validate(), which enforces that callers cannot
+    // simultaneously condition the model on a discrete sid and a
+    // continuous embedding. The four facts below pin every corner of
+    // the (sid, embedding) truth table so the contract regresses
+    // loudly if either branch is ever loosened.
+    // ----------------------------------------------------------------
+    [Fact]
+    public void Synthesize_SpeakerIdOnly_DoesNotThrow()
+    {
+        // SpeakerId set, SpeakerEmbedding unset -> the classic multi-speaker
+        // path. Validate() must succeed so callers can keep using sid-only
+        // inputs without breaking.
+        var input = new SynthesisInput(
+            PhonemeIds: [1, 2, 3],
+            SpeakerId: 5);
+
+        Assert.Null(input.SpeakerEmbedding);
+        Exception? ex = Record.Exception(() => input.Validate());
+        Assert.Null(ex);
+    }
+
+    [Fact]
+    public void Synthesize_SpeakerEmbeddingOnly_DoesNotThrow()
+    {
+        // SpeakerEmbedding set, SpeakerId left at the default (0). The
+        // record cannot distinguish "user picked sid 0" from "user did not
+        // set sid", so the embedding-only path is permitted whenever sid
+        // equals the default.
+        float[] embedding = new float[256];
+        for (int i = 0; i < embedding.Length; i++)
+        {
+            embedding[i] = 0.01f * i;
+        }
+
+        var input = new SynthesisInput(
+            PhonemeIds: [1, 2, 3],
+            SpeakerEmbedding: embedding);
+
+        Assert.Equal(0, input.SpeakerId);
+        Assert.NotNull(input.SpeakerEmbedding);
+        Exception? ex = Record.Exception(() => input.Validate());
+        Assert.Null(ex);
+    }
+
+    [Fact]
+    public void Synthesize_BothSet_ThrowsArgumentException()
+    {
+        // Non-default SpeakerId AND non-empty SpeakerEmbedding -> the
+        // mutex contract fires. The message is asserted to keep the
+        // diagnostic stable across runtimes (Python / Rust / Go raise
+        // the same wording).
+        float[] embedding = new float[256];
+        embedding[0] = 0.5f;
+
+        var input = new SynthesisInput(
+            PhonemeIds: [1, 2, 3],
+            SpeakerId: 5,
+            SpeakerEmbedding: embedding);
+
+        ArgumentException ex = Assert.Throws<ArgumentException>(() => input.Validate());
+        Assert.Contains("mutually exclusive", ex.Message);
+    }
+
+    [Fact]
+    public void Synthesize_NeitherSet_DoesNotThrow()
+    {
+        // Default sid (0) and no embedding -> single-speaker / non-cloning
+        // case. Must remain a no-op so basic invocations do not regress.
+        var input = new SynthesisInput(PhonemeIds: [1, 2, 3]);
+
+        Assert.Equal(0, input.SpeakerId);
+        Assert.Null(input.SpeakerEmbedding);
+        Exception? ex = Record.Exception(() => input.Validate());
+        Assert.Null(ex);
     }
 }

@@ -6,6 +6,10 @@
     <RootNamespace>PiperPlus.Core.Tests</RootNamespace>
     <IsPackable>false</IsPackable>
     <IsTrimmable>false</IsTrimmable>
+    <!-- Test assembly never goes through trimming/AOT, so reflection-based
+         JSON deserialization is safe and matches developer expectations.
+         Overrides Directory.Build.props which disables it for production. -->
+    <JsonSerializerIsReflectionEnabledByDefault>true</JsonSerializerIsReflectionEnabledByDefault>
   </PropertyGroup>
 
   <ItemGroup>
@@ -18,6 +22,18 @@
 
   <ItemGroup>
     <ProjectReference Include="..\PiperPlus.Core\PiperPlus.Core.csproj" />
+  </ItemGroup>
+
+  <!-- Cross-runtime test fixtures (copied to test output, read by Tests). -->
+  <ItemGroup>
+    <Content Include="..\..\..\tests\fixtures\short_text\contract.json">
+      <Link>TestData\short_text_contract.json</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\..\..\tests\fixtures\text_splitter\contract.json">
+      <Link>TestData\text_splitter_contract.json</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 
 </Project>

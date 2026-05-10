@@ -30,6 +30,20 @@ _LOGGER = logging.getLogger(__name__)
 # Latin-script language priority for default_latin_language detection
 _LATIN_PRIORITY = ("en", "es", "pt", "fr")
 
+# BCP-47 dialect aliases. Resolved transparently by `PhonemizerRegistry.get`.
+# Keep entries case-insensitive by registering both upper- and lower-case
+# region subtag forms. For policy / supported codes see
+# `docs/spec/pt-dialect-contract.toml`.
+_LANGUAGE_ALIASES: dict[str, str] = {
+    "pt-BR": "pt",  # BR is the default; bare `pt` resolves to BR
+    "pt-br": "pt",
+    "pt-pt": "pt-PT",  # case-insensitive EU alias
+}
+
+# Dialects that are intentionally NOT supported. Empty in this release —
+# pt-PT moved to `_LANGUAGE_TABLE` once EU phonemizer shipped.
+_UNSUPPORTED_DIALECTS: dict[str, str] = {}
+
 # Table of built-in language phonemizers: (code, module, class_name)
 _LANGUAGE_TABLE = [
     ("ja", ".japanese", "JapanesePhonemizer"),
@@ -39,6 +53,7 @@ _LANGUAGE_TABLE = [
     ("es", ".spanish", "SpanishPhonemizer"),
     ("fr", ".french", "FrenchPhonemizer"),
     ("pt", ".portuguese", "PortuguesePhonemizer"),
+    ("pt-PT", ".portuguese", "EuropeanPortuguesePhonemizer"),
     ("sv", ".swedish", "SwedishPhonemizer"),
 ]
 
@@ -123,6 +138,22 @@ class PhonemizerRegistry:
             If the language code (or any component of a composite code)
             is not registered.
         """
+        # Reject explicitly unsupported dialects with a helpful message
+        # before falling into composite-code resolution.
+        if language in _UNSUPPORTED_DIALECTS:
+            raise ValueError(_UNSUPPORTED_DIALECTS[language])
+
+        # Resolve BCP-47 dialect aliases (e.g. "pt-BR" -> "pt") before
+        # both direct lookup and composite-code splitting. Without this
+        # step, "pt-BR" would be split into ["pt", "BR"] and fail with a
+        # "Missing language ['BR']" error for callers using the BCP-47
+        # form. Cache the alias so future lookups are O(1).
+        if language in _LANGUAGE_ALIASES:
+            canonical = _LANGUAGE_ALIASES[language]
+            if canonical in self._registry:
+                self._registry[language] = self._registry[canonical]
+                return self._registry[canonical]
+
         if language in self._registry:
             return self._registry[language]
 

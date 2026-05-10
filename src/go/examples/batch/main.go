@@ -56,7 +56,7 @@ func main() {
 	}
 	defer f.Close()
 
-	os.MkdirAll(*outDir, 0755)
+	os.MkdirAll(*outDir, 0o755)
 
 	scanner := bufio.NewScanner(f)
 	lineNum := 0

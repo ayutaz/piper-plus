@@ -115,6 +115,110 @@ pub unsafe extern "C" fn piper_plus_g2p_available_languages(
     }
 }
 
+/// Default languages for `piper_plus_g2p_create(NULL)`.
+///
+/// Always includes rule-based languages (`es`, `fr`, `pt`, `sv`).
+/// `en` is included whenever the `english` feature is on (file lookup
+/// without `bundled-dicts`, embedded JSON with it).
+/// `ko` (rule-based) is included when `korean` is on.
+/// `zh` is included only when both `chinese` and `bundled-dicts` are on,
+/// because path-based init would otherwise fail at runtime on iOS.
+/// `ja` requires either `naist-jdic` (bundled NAIST-JDIC) or
+/// `japanese` + `bundled-dicts`.
+#[allow(unused_mut, clippy::vec_init_then_push)]
+fn default_languages() -> Vec<&'static str> {
+    let mut langs: Vec<&'static str> = Vec::new();
+    #[cfg(feature = "english")]
+    langs.push("en");
+    #[cfg(feature = "spanish")]
+    langs.push("es");
+    #[cfg(feature = "french")]
+    langs.push("fr");
+    #[cfg(feature = "portuguese")]
+    langs.push("pt");
+    #[cfg(feature = "swedish")]
+    langs.push("sv");
+    #[cfg(feature = "korean")]
+    langs.push("ko");
+    #[cfg(all(feature = "chinese", feature = "bundled-dicts"))]
+    langs.push("zh");
+    #[cfg(any(
+        feature = "naist-jdic",
+        all(feature = "japanese", feature = "bundled-dicts")
+    ))]
+    langs.push("ja");
+    langs
+}
+
+fn register_one(registry: &mut PhonemizerRegistry, lang: &str) -> Result<(), crate::G2pError> {
+    match lang {
+        #[cfg(all(feature = "english", feature = "bundled-dicts"))]
+        "en" => {
+            registry.register(
+                "en",
+                Box::new(crate::english::EnglishPhonemizer::new_bundled()?),
+            );
+        }
+        #[cfg(all(feature = "english", not(feature = "bundled-dicts")))]
+        "en" => {
+            registry.register("en", Box::new(crate::english::EnglishPhonemizer::new()?));
+        }
+        #[cfg(all(feature = "chinese", feature = "bundled-dicts"))]
+        "zh" => {
+            registry.register(
+                "zh",
+                Box::new(crate::chinese::ChinesePhonemizer::new_bundled()?),
+            );
+        }
+        #[cfg(all(feature = "chinese", not(feature = "bundled-dicts")))]
+        "zh" => {
+            return Err(crate::G2pError::Phonemize(
+                "Chinese requires bundled-dicts feature or use from_dicts() directly".into(),
+            ));
+        }
+        #[cfg(feature = "korean")]
+        "ko" => {
+            registry.register("ko", Box::new(crate::korean::KoreanPhonemizer::new()));
+        }
+        #[cfg(feature = "spanish")]
+        "es" => {
+            registry.register("es", Box::new(crate::spanish::SpanishPhonemizer::new()));
+        }
+        #[cfg(feature = "french")]
+        "fr" => {
+            registry.register("fr", Box::new(crate::french::FrenchPhonemizer::new()));
+        }
+        #[cfg(feature = "portuguese")]
+        "pt" => {
+            registry.register(
+                "pt",
+                Box::new(crate::portuguese::PortuguesePhonemizer::new()),
+            );
+        }
+        #[cfg(feature = "swedish")]
+        "sv" => {
+            registry.register("sv", Box::new(crate::swedish::SwedishPhonemizer::new()));
+        }
+        #[cfg(feature = "naist-jdic")]
+        "ja" => {
+            registry.register(
+                "ja",
+                Box::new(crate::japanese::JapanesePhonemizer::new_bundled()?),
+            );
+        }
+        #[cfg(all(feature = "japanese", not(feature = "naist-jdic")))]
+        "ja" => {
+            registry.register("ja", Box::new(crate::japanese::JapanesePhonemizer::new()?));
+        }
+        _ => {
+            return Err(crate::G2pError::UnsupportedLanguage {
+                code: lang.to_string(),
+            });
+        }
+    }
+    Ok(())
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -746,108 +850,4 @@ mod tests {
             piper_plus_g2p_free(handle);
         }
     }
-}
-
-/// Default languages for `piper_plus_g2p_create(NULL)`.
-///
-/// Always includes rule-based languages (`es`, `fr`, `pt`, `sv`).
-/// `en` is included whenever the `english` feature is on (file lookup
-/// without `bundled-dicts`, embedded JSON with it).
-/// `ko` (rule-based) is included when `korean` is on.
-/// `zh` is included only when both `chinese` and `bundled-dicts` are on,
-/// because path-based init would otherwise fail at runtime on iOS.
-/// `ja` requires either `naist-jdic` (bundled NAIST-JDIC) or
-/// `japanese` + `bundled-dicts`.
-#[allow(unused_mut, clippy::vec_init_then_push)]
-fn default_languages() -> Vec<&'static str> {
-    let mut langs: Vec<&'static str> = Vec::new();
-    #[cfg(feature = "english")]
-    langs.push("en");
-    #[cfg(feature = "spanish")]
-    langs.push("es");
-    #[cfg(feature = "french")]
-    langs.push("fr");
-    #[cfg(feature = "portuguese")]
-    langs.push("pt");
-    #[cfg(feature = "swedish")]
-    langs.push("sv");
-    #[cfg(feature = "korean")]
-    langs.push("ko");
-    #[cfg(all(feature = "chinese", feature = "bundled-dicts"))]
-    langs.push("zh");
-    #[cfg(any(
-        feature = "naist-jdic",
-        all(feature = "japanese", feature = "bundled-dicts")
-    ))]
-    langs.push("ja");
-    langs
-}
-
-fn register_one(registry: &mut PhonemizerRegistry, lang: &str) -> Result<(), crate::G2pError> {
-    match lang {
-        #[cfg(all(feature = "english", feature = "bundled-dicts"))]
-        "en" => {
-            registry.register(
-                "en",
-                Box::new(crate::english::EnglishPhonemizer::new_bundled()?),
-            );
-        }
-        #[cfg(all(feature = "english", not(feature = "bundled-dicts")))]
-        "en" => {
-            registry.register("en", Box::new(crate::english::EnglishPhonemizer::new()?));
-        }
-        #[cfg(all(feature = "chinese", feature = "bundled-dicts"))]
-        "zh" => {
-            registry.register(
-                "zh",
-                Box::new(crate::chinese::ChinesePhonemizer::new_bundled()?),
-            );
-        }
-        #[cfg(all(feature = "chinese", not(feature = "bundled-dicts")))]
-        "zh" => {
-            return Err(crate::G2pError::Phonemize(
-                "Chinese requires bundled-dicts feature or use from_dicts() directly".into(),
-            ));
-        }
-        #[cfg(feature = "korean")]
-        "ko" => {
-            registry.register("ko", Box::new(crate::korean::KoreanPhonemizer::new()));
-        }
-        #[cfg(feature = "spanish")]
-        "es" => {
-            registry.register("es", Box::new(crate::spanish::SpanishPhonemizer::new()));
-        }
-        #[cfg(feature = "french")]
-        "fr" => {
-            registry.register("fr", Box::new(crate::french::FrenchPhonemizer::new()));
-        }
-        #[cfg(feature = "portuguese")]
-        "pt" => {
-            registry.register(
-                "pt",
-                Box::new(crate::portuguese::PortuguesePhonemizer::new()),
-            );
-        }
-        #[cfg(feature = "swedish")]
-        "sv" => {
-            registry.register("sv", Box::new(crate::swedish::SwedishPhonemizer::new()));
-        }
-        #[cfg(feature = "naist-jdic")]
-        "ja" => {
-            registry.register(
-                "ja",
-                Box::new(crate::japanese::JapanesePhonemizer::new_bundled()?),
-            );
-        }
-        #[cfg(all(feature = "japanese", not(feature = "naist-jdic")))]
-        "ja" => {
-            registry.register("ja", Box::new(crate::japanese::JapanesePhonemizer::new()?));
-        }
-        _ => {
-            return Err(crate::G2pError::UnsupportedLanguage {
-                code: lang.to_string(),
-            });
-        }
-    }
-    Ok(())
 }

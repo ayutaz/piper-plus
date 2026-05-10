@@ -259,7 +259,74 @@ pub fn crossfade(prev_tail: &[i16], next_head: &[i16], overlap_samples: usize) -
 ///
 /// Consecutive whitespace between sentences is trimmed.
 /// Empty text returns an empty Vec.
+///
+/// SSML envelopes (`<speak>...</speak>`) are preserved as single units per the
+/// canonical `text-splitter-contract.toml` spec. If the text begins with
+/// `<speak` (after leading whitespace) and contains a matching `</speak>` close
+/// tag, the entire envelope is yielded as one unit and only any trailing text
+/// after `</speak>` is split using the normal sentence-splitting logic. If the
+/// `<speak>` tag is unclosed, the function falls back to normal splitting.
 pub fn split_sentences(text: &str) -> Vec<String> {
+    if text.is_empty() {
+        return Vec::new();
+    }
+
+    // SSML envelope detection: if the text starts with `<speak` (after
+    // leading whitespace), preserve the entire envelope as a single unit.
+    let trimmed_start = text.trim_start();
+    if trimmed_start.starts_with("<speak")
+        && let Some(close_offset) = find_speak_close(trimmed_start)
+    {
+        let envelope_end = close_offset + "</speak>".len();
+        let envelope = trimmed_start[..envelope_end].trim().to_string();
+        let mut result = Vec::new();
+        if !envelope.is_empty() {
+            result.push(envelope);
+        }
+        // Any trailing text after </speak> is split normally.
+        let tail = trimmed_start[envelope_end..].trim();
+        if !tail.is_empty() {
+            result.extend(split_sentences_plain(tail));
+        }
+        return result;
+    }
+
+    split_sentences_plain(text)
+}
+
+/// Find the byte offset of the closing `</speak>` tag (case-insensitive on the
+/// tag name, matching Python's `re.IGNORECASE`). Returns `None` if no closing
+/// tag is found.
+fn find_speak_close(text: &str) -> Option<usize> {
+    let bytes = text.as_bytes();
+    let needle = b"</speak>";
+    let needle_upper = b"</SPEAK>";
+    if bytes.len() < needle.len() {
+        return None;
+    }
+    for i in 0..=bytes.len() - needle.len() {
+        let window = &bytes[i..i + needle.len()];
+        let mut matches = true;
+        for j in 0..needle.len() {
+            let expected_lower = needle[j];
+            let expected_upper = needle_upper[j];
+            let actual = window[j];
+            if actual != expected_lower && actual != expected_upper {
+                matches = false;
+                break;
+            }
+        }
+        if matches {
+            return Some(i);
+        }
+    }
+    None
+}
+
+/// Plain sentence splitter (no SSML awareness). Used internally by
+/// `split_sentences` after stripping the SSML envelope (or when no envelope is
+/// present).
+fn split_sentences_plain(text: &str) -> Vec<String> {
     if text.is_empty() {
         return Vec::new();
     }
@@ -831,6 +898,74 @@ mod tests {
         assert_eq!(result.len(), 2);
         assert_eq!(result[0], "Hello.");
         assert_eq!(result[1], "World.");
+    }
+
+    // ===================================================================
+    // SSML envelope preservation (text-splitter-contract.toml)
+    // ===================================================================
+
+    #[test]
+    fn test_split_sentences_preserves_speak_envelope() {
+        // `<speak>A. B.</speak>` must be yielded as a single unit; the inner
+        // periods MUST NOT trigger a split that would corrupt the XML.
+        let text = "<speak>A. B.</speak>";
+        let result = split_sentences(text);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0], "<speak>A. B.</speak>");
+    }
+
+    #[test]
+    fn test_split_sentences_speak_with_inner_periods_kept() {
+        // Many consecutive inner periods (acronym-style) must remain intact.
+        let text = "<speak>A.B.C.</speak>";
+        let result = split_sentences(text);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0], "<speak>A.B.C.</speak>");
+    }
+
+    #[test]
+    fn test_split_sentences_speak_with_attributes() {
+        // The opening tag may have attributes; envelope detection must still
+        // succeed (we match on the `<speak` prefix, not `<speak>`).
+        let text = "<speak version=\"1.0\">A. B.</speak>";
+        let result = split_sentences(text);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0], "<speak version=\"1.0\">A. B.</speak>");
+    }
+
+    #[test]
+    fn test_split_sentences_text_after_speak_close_continues_normal_split() {
+        // Text that follows `</speak>` is treated as plain text and split
+        // normally. The envelope itself counts as 1 unit.
+        let text = "<speak>A.</speak> Plain. Text.";
+        let result = split_sentences(text);
+        assert_eq!(result.len(), 3);
+        assert_eq!(result[0], "<speak>A.</speak>");
+        assert_eq!(result[1], "Plain.");
+        assert_eq!(result[2], "Text.");
+    }
+
+    #[test]
+    fn test_split_sentences_unclosed_speak_falls_back_to_normal_split() {
+        // An unclosed `<speak>` tag is treated as plain text and split
+        // normally on sentence terminators (this is degenerate input but we
+        // must not hang / panic / drop content).
+        let text = "<speak>A. B.";
+        let result = split_sentences(text);
+        // "<speak>A." is the first sentence (terminator '.'), then "B."
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0], "<speak>A.");
+        assert_eq!(result[1], "B.");
+    }
+
+    #[test]
+    fn test_split_sentences_speak_with_leading_whitespace() {
+        // Leading whitespace before `<speak>` should not defeat envelope
+        // detection; the envelope is yielded trimmed.
+        let text = "   <speak>A. B.</speak>";
+        let result = split_sentences(text);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0], "<speak>A. B.</speak>");
     }
 
     // ===================================================================

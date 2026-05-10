@@ -144,7 +144,18 @@ let package = Package(
             dependencies: [
                 .target(name: "PiperPlusG2PBinary"),
             ],
-            path: "Sources/PiperPlusG2P"
+            path: "Sources/PiperPlusG2P",
+            // ZH-EN code-switching loanword dictionary (Issue #384). The
+            // bundled Rust crate already embeds this JSON via `include_str!`,
+            // so the Swift runtime does not strictly need its own copy at
+            // load time. We still ship it here so the byte-for-byte sync
+            // gate (`scripts/check_loanword_consistency.py`) can directly
+            // enforce drift on the Swift side rather than relying solely
+            // on the transitive Rust mirror. Consumers can read it via
+            // `Bundle.module.url(forResource: "zh_en_loanword", withExtension: "json")`.
+            resources: [
+                .process("Resources/zh_en_loanword.json"),
+            ]
         ),
         // The artifact filename uses `-apple-` (not `-ios-`) since v1.14.0
         // because the xcframework now bundles iOS device + iOS simulator +
@@ -160,6 +171,18 @@ let package = Package(
             name: "PiperPlusG2PTests",
             dependencies: ["PiperPlusG2P"],
             path: "tests/PiperPlusG2PTests"
+        ),
+        // Synthesis-engine smoke tests. Like PiperPlusG2PTests, these
+        // cannot be exercised from the release manifest until the
+        // matching xcframework asset is published (placeholder checksum
+        // above prevents `swift package resolve` pre-tag). See
+        // tests/PiperPlusTests/PiperPlusSmokeTests.swift header for the
+        // CI-swap path required to run these on PRs (needs a macOS
+        // slice in libpiper_plus, not yet built — Issue tracking TBD).
+        .testTarget(
+            name: "PiperPlusTests",
+            dependencies: ["PiperPlus"],
+            path: "tests/PiperPlusTests"
         ),
     ]
 )

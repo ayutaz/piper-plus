@@ -104,14 +104,14 @@ void CustomDictionary::loadDefaultDictionaries() {
         "additional_tech_dict.json",  // 最新トレンドの技術用語
         "user_custom_dict.json"        // ユーザーカスタム辞書（日本語発音修正用）
     };
-    
+
     for (const auto& dictName : defaultDicts) {
         auto dictPath = defaultDictDir_ / dictName;
         if (std::filesystem::exists(dictPath)) {
             try {
                 loadDictionary(dictPath.string());
             } catch (const std::exception& e) {
-                std::cerr << "Warning: Failed to load default dictionary " 
+                std::cerr << "Warning: Failed to load default dictionary "
                           << dictPath << ": " << e.what() << std::endl;
             }
         }
@@ -179,7 +179,7 @@ void CustomDictionary::addEntry(const std::string& word, const DictionaryEntry& 
     } else {
         // 全て大文字または小文字の場合は正規化
         std::string normalizedWord = toLowerCase(word);
-        
+
         // 既存エントリとの優先度比較
         auto it = entries_.find(normalizedWord);
         if (it != entries_.end()) {
@@ -187,37 +187,37 @@ void CustomDictionary::addEntry(const std::string& word, const DictionaryEntry& 
                 return; // 既存の方が優先度が高い
             }
         }
-        
+
         entries_[normalizedWord] = entry;
     }
 }
 
 std::string CustomDictionary::applyToText(const std::string& text) const {
     std::string result = text;
-    
+
     // エントリを長さでソート（長い単語から処理）
     std::vector<std::pair<std::string, DictionaryEntry>> sortedCaseSensitive(
         caseSensitiveEntries_.begin(), caseSensitiveEntries_.end());
     std::sort(sortedCaseSensitive.begin(), sortedCaseSensitive.end(),
               [](const auto& a, const auto& b) { return a.first.length() > b.first.length(); });
-    
+
     std::vector<std::pair<std::string, DictionaryEntry>> sortedEntries(
         entries_.begin(), entries_.end());
     std::sort(sortedEntries.begin(), sortedEntries.end(),
               [](const auto& a, const auto& b) { return a.first.length() > b.first.length(); });
-    
+
     // 大文字小文字を区別するエントリを処理
     for (const auto& [word, entry] : sortedCaseSensitive) {
         std::regex pattern = getWordPattern(word, true);
         result = std::regex_replace(result, pattern, entry.pronunciation);
     }
-    
+
     // 大文字小文字を区別しないエントリを処理
     for (const auto& [word, entry] : sortedEntries) {
         std::regex pattern = getWordPattern(word, false);
         result = std::regex_replace(result, pattern, entry.pronunciation);
     }
-    
+
     return result;
 }
 
@@ -228,20 +228,20 @@ void CustomDictionary::addWord(const std::string& word, const std::string& pronu
 
 bool CustomDictionary::removeWord(const std::string& word) {
     bool removed = false;
-    
+
     if (caseSensitiveEntries_.erase(word) > 0) {
         removed = true;
     }
-    
+
     std::string normalizedWord = toLowerCase(word);
     if (entries_.erase(normalizedWord) > 0) {
         removed = true;
     }
-    
+
     if (removed) {
         patternCache_.clear();
     }
-    
+
     return removed;
 }
 
@@ -251,14 +251,14 @@ std::optional<std::string> CustomDictionary::getPronunciation(const std::string&
     if (it != caseSensitiveEntries_.end()) {
         return it->second.pronunciation;
     }
-    
+
     // 正規化してチェック
     std::string normalizedWord = toLowerCase(word);
     auto it2 = entries_.find(normalizedWord);
     if (it2 != entries_.end()) {
         return it2->second.pronunciation;
     }
-    
+
     return std::nullopt;
 }
 
@@ -318,24 +318,24 @@ std::string CustomDictionary::toLowerCase(const std::string& str) const {
 bool CustomDictionary::isMixedCase(const std::string& str) const {
     bool hasUpper = false;
     bool hasLower = false;
-    
+
     for (char c : str) {
         if (std::isupper(c)) hasUpper = true;
         if (std::islower(c)) hasLower = true;
         if (hasUpper && hasLower) return true;
     }
-    
+
     return false;
 }
 
 std::regex CustomDictionary::getWordPattern(const std::string& word, bool caseSensitive) const {
     std::string cacheKey = word + "_" + (caseSensitive ? "1" : "0");
-    
+
     auto it = patternCache_.find(cacheKey);
     if (it != patternCache_.end()) {
         return it->second;
     }
-    
+
     // エスケープ処理
     std::string escapedWord;
     for (char c : word) {
@@ -344,7 +344,7 @@ std::regex CustomDictionary::getWordPattern(const std::string& word, bool caseSe
         }
         escapedWord += c;
     }
-    
+
     // 単語境界を考慮したパターン
     // 日本語等のマルチバイトUTF-8文字では \b が正しく動作しないため、
     // 先頭バイトが非ASCIIの場合はワードバウンダリを付けない
@@ -354,15 +354,15 @@ std::regex CustomDictionary::getWordPattern(const std::string& word, bool caseSe
     } else {
         patternStr = "\\b" + escapedWord + "\\b";  // ASCII: 従来通り
     }
-    
+
     auto flags = std::regex::ECMAScript;
     if (!caseSensitive) {
         flags |= std::regex::icase;
     }
-    
+
     std::regex pattern(patternStr, flags);
     patternCache_[cacheKey] = pattern;
-    
+
     return pattern;
 }
 
@@ -371,7 +371,7 @@ std::unique_ptr<CustomDictionary> createDefaultDictionary() {
     return std::make_unique<CustomDictionary>();
 }
 
-std::string applyCustomDictionary(const std::string& text, 
+std::string applyCustomDictionary(const std::string& text,
                                  const std::vector<std::string>& dictPaths) {
     CustomDictionary dict(dictPaths);
     return dict.applyToText(text);

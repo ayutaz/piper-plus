@@ -1,6 +1,6 @@
 using System.Collections.Generic;
-using PiperPlus.Core.Phonemize;
 using DotNetG2P.Chinese;
+using PiperPlus.Core.Phonemize;
 
 namespace PiperPlus.Cli;
 
@@ -20,7 +20,7 @@ internal sealed class DotNetChineseG2PEngine : IChineseG2PEngine
     /// <summary>Tone number (1–5) to PUA character for tone markers.</summary>
     private static readonly string[] TonePuaStrings =
     [
-        "",           // index 0 — unused
+        string.Empty,           // index 0 — unused
         "\uE046",     // tone1 — 阴平
         "\uE047",     // tone2 — 阳平
         "\uE048",     // tone3 — 上声
@@ -37,7 +37,7 @@ internal sealed class DotNetChineseG2PEngine : IChineseG2PEngine
         string[] puaPhonemes = _engine.ToPuaPhonemes(text);
 
         // ToIpaWithProsody returns per-syllable prosody (A1=tone, A2=position, A3=word length).
-        var prosodyResult = _engine.ToIpaWithProsody(text);
+        ChineseProsodyResult prosodyResult = _engine.ToIpaWithProsody(text);
         int totalSyllables = prosodyResult.Prosody.Count;
 
         // Edge case: no syllables (empty text or all non-Chinese)
@@ -72,7 +72,7 @@ internal sealed class DotNetChineseG2PEngine : IChineseG2PEngine
 
             for (int syl = 0; syl < totalSyllables; syl++)
             {
-                var p = prosodyResult.Prosody[syl];
+                ChineseProsodyInfo p = prosodyResult.Prosody[syl];
                 if (p.A1 >= 1 && p.A1 <= 5)
                 {
                     fallback.Add(TonePuaStrings[p.A1]);
@@ -99,7 +99,7 @@ internal sealed class DotNetChineseG2PEngine : IChineseG2PEngine
         for (int syl = 0; syl < totalSyllables; syl++)
         {
             int count = phonemesPerSyllable + (syl < remainder ? 1 : 0);
-            var p = prosodyResult.Prosody[syl];
+            ChineseProsodyInfo p = prosodyResult.Prosody[syl];
 
             // Add initial + final PUA phonemes for this syllable
             for (int j = 0; j < count && puaIdx < puaPhonemes.Length; j++, puaIdx++)

@@ -266,3 +266,88 @@ func TestTimingResult_ToJSON(t *testing.T) {
 		t.Error("compact JSON should not contain newlines")
 	}
 }
+
+// ----------------------------------------------------------------------
+// SRT format tests — spec [output_formats.srt]. Cross-runtime parity
+// with Rust (test_srt_format / test_srt_large_timestamps in timing.rs)
+// and Python (_format_srt_timestamp in timing.py).
+// ----------------------------------------------------------------------
+
+func TestFormatSRTTimestamp_ZeroIsAllZeros(t *testing.T) {
+	got := formatSRTTimestamp(0)
+	want := "00:00:00,000"
+	if got != want {
+		t.Errorf("formatSRTTimestamp(0) = %q; want %q", got, want)
+	}
+}
+
+func TestFormatSRTTimestamp_VariousMagnitudes(t *testing.T) {
+	cases := []struct {
+		ms   float64
+		want string
+	}{
+		{1.0, "00:00:00,001"},
+		{999.0, "00:00:00,999"},
+		{1000.0, "00:00:01,000"},
+		{61_500.0, "00:01:01,500"},
+		{3_600_000.0, "01:00:00,000"},
+		{3_661_123.0, "01:01:01,123"},
+	}
+	for _, tc := range cases {
+		if got := formatSRTTimestamp(tc.ms); got != tc.want {
+			t.Errorf("formatSRTTimestamp(%v) = %q; want %q", tc.ms, got, tc.want)
+		}
+	}
+}
+
+func TestFormatSRTTimestamp_NegativeClampsToZero(t *testing.T) {
+	got := formatSRTTimestamp(-100)
+	want := "00:00:00,000"
+	if got != want {
+		t.Errorf("formatSRTTimestamp(-100) = %q; want %q (negative must clamp)", got, want)
+	}
+}
+
+func TestToSRT_SingleCueShape(t *testing.T) {
+	// hop=1 / sample_rate=1000 → 1 frame == 1 ms (Rust fixture style).
+	durations := []float32{500}
+	tokens := []string{"a"}
+	result, err := DurationsToTiming(durations, tokens, 1000, 1)
+	if err != nil {
+		t.Fatalf("DurationsToTiming error: %v", err)
+	}
+
+	got := result.ToSRT()
+	want := "1\n00:00:00,000 --> 00:00:00,500\na\n\n"
+	if got != want {
+		t.Errorf("ToSRT mismatch\n got: %q\nwant: %q", got, want)
+	}
+}
+
+func TestToSRT_ThreePhonemesUseSequentialOneBasedIndex(t *testing.T) {
+	durations := []float32{100, 200, 50}
+	tokens := []string{"a", "b", "c"}
+	result, err := DurationsToTiming(durations, tokens, 1000, 1)
+	if err != nil {
+		t.Fatalf("DurationsToTiming error: %v", err)
+	}
+
+	got := result.ToSRT()
+	expected := "" +
+		"1\n00:00:00,000 --> 00:00:00,100\na\n\n" +
+		"2\n00:00:00,100 --> 00:00:00,300\nb\n\n" +
+		"3\n00:00:00,300 --> 00:00:00,350\nc\n\n"
+	if got != expected {
+		t.Errorf("ToSRT mismatch\n got: %q\nwant: %q", got, expected)
+	}
+}
+
+func TestToSRT_EmptyTimingProducesEmptyString(t *testing.T) {
+	result, err := DurationsToTiming([]float32{}, []string{}, 22050, 256)
+	if err != nil {
+		t.Fatalf("DurationsToTiming error: %v", err)
+	}
+	if got := result.ToSRT(); got != "" {
+		t.Errorf("ToSRT() on empty timing = %q; want empty string", got)
+	}
+}

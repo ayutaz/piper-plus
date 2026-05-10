@@ -1086,7 +1086,7 @@ class SynthesizerTrn(nn.Module):
         assert self.n_speakers > 1, "n_speakers have to be larger than 1."
         g_src = self._get_global_conditioning(sid_src, lid)
         g_tgt = self._get_global_conditioning(sid_tgt, lid)
-        z, m_q, logs_q, y_mask = self.enc_q(y, y_lengths, g=g_src)
+        z, _m_q, _logs_q, y_mask = self.enc_q(y, y_lengths, g=g_src)
         z_p = self.flow(z, y_mask, g=g_src)
         z_hat = self.flow(z_p, y_mask, g=g_tgt, reverse=True)
         o_hat, _ = self.dec(z_hat * y_mask, g=g_tgt)

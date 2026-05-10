@@ -60,16 +60,21 @@ public sealed partial class EnglishPhonemizer : IPhonemizer
     private static partial Regex SourceWordRegex();
 
     // Cache single-char strings for IPA characters (covers ASCII + IPA Extensions)
-    private static readonly string[] s_charStrings = InitCharStrings();
+    private static readonly string[] S_charStrings = InitCharStrings();
+
     private static string[] InitCharStrings()
     {
         var arr = new string[0x0300];
         for (int i = 0; i < arr.Length; i++)
+        {
             arr[i] = ((char)i).ToString();
+        }
+
         return arr;
     }
 
     /// <summary>
+    /// Initializes a new instance of the <see cref="EnglishPhonemizer"/> class.
     /// Create a new <see cref="EnglishPhonemizer"/> backed by the given G2P engine.
     /// </summary>
     /// <param name="engine">
@@ -83,7 +88,7 @@ public sealed partial class EnglishPhonemizer : IPhonemizer
     /// <inheritdoc />
     public List<string> Phonemize(string text)
     {
-        var (tokens, _) = PhonemizeCore(text);
+        (List<string>? tokens, List<ProsodyInfo?> _) = PhonemizeCore(text);
         return tokens;
     }
 
@@ -161,6 +166,7 @@ public sealed partial class EnglishPhonemizer : IPhonemizer
                     isFunc = ArpabetToIPAConverter.IsFunctionWord(sourceWords[srcIdx]);
                     srcIdx++;
                 }
+
                 wordIsFunction[w] = isFunc;
             }
         }
@@ -170,7 +176,7 @@ public sealed partial class EnglishPhonemizer : IPhonemizer
 
         for (int wordIdx = 0; wordIdx < words.Count; wordIdx++)
         {
-            var wordTokens = words[wordIdx];
+            List<string> wordTokens = words[wordIdx];
             bool isPunct = IsPunctuationWord(wordTokens);
             bool isFunc = wordIsFunction[wordIdx];
 
@@ -190,7 +196,7 @@ public sealed partial class EnglishPhonemizer : IPhonemizer
             {
                 for (int i = 0; i < wordIpas.Count; i++)
                 {
-                    var (ipa, stress) = wordIpas[i];
+                    (string? ipa, int stress) = wordIpas[i];
                     if (stress >= 1)
                     {
                         wordIpas[i] = (ipa, 0);
@@ -208,16 +214,22 @@ public sealed partial class EnglishPhonemizer : IPhonemizer
             // Emit phoneme tokens with prosody.
             for (int i = 0; i < wordIpas.Count; i++)
             {
-                var (ipa, stress) = wordIpas[i];
+                (string? ipa, int stress) = wordIpas[i];
 
                 // stress → A2: primary(1)→2, secondary(2)→1, none(0)→0, consonant(-1)→0
                 int a2;
                 if (stress == 1)
+                {
                     a2 = 2;
+                }
                 else if (stress == 2)
+                {
                     a2 = 1;
+                }
                 else
+                {
                     a2 = 0;
+                }
 
                 // Insert stress marker before stressed vowels (espeak-ng compatible).
                 if (stress == 1)
@@ -234,7 +246,7 @@ public sealed partial class EnglishPhonemizer : IPhonemizer
                 // Each IPA character becomes a separate phoneme token.
                 foreach (char ch in ipa)
                 {
-                    phonemes.Add(ch < s_charStrings.Length ? s_charStrings[ch] : ch.ToString());
+                    phonemes.Add(ch < S_charStrings.Length ? S_charStrings[ch] : ch.ToString());
                     prosodyList.Add(new ProsodyInfo(A1: 0, A2: a2, A3: wordPhonemeCount));
                 }
             }
@@ -263,6 +275,7 @@ public sealed partial class EnglishPhonemizer : IPhonemizer
                 return false;
             }
         }
+
         return true;
     }
 
@@ -274,12 +287,13 @@ public sealed partial class EnglishPhonemizer : IPhonemizer
     /// </summary>
     private static List<string> GetSourceWords(string text)
     {
-        var matches = SourceWordRegex().Matches(text.ToLowerInvariant());
+        MatchCollection matches = SourceWordRegex().Matches(text.ToLowerInvariant());
         var result = new List<string>(matches.Count);
         foreach (Match m in matches)
         {
             result.Add(m.Value);
         }
+
         return result;
     }
 }

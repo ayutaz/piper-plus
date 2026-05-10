@@ -3,7 +3,7 @@
  * @module piper-plus/phonemizer/js-g2p-adapter
  */
 
-import { G2P } from '@piper-plus/g2p';
+import { G2P } from "@piper-plus/g2p";
 
 export class JsG2pAdapter {
   /**
@@ -71,7 +71,9 @@ export class JsG2pAdapter {
 
   /** Release G2P resources. Safe to call multiple times. */
   dispose() {
-    if (this._disposed) return;
+    if (this._disposed) {
+      return;
+    }
     this._disposed = true;
     this._g2p.dispose();
   }

@@ -11,7 +11,7 @@ import threading
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict, dataclass
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 
 import numpy as np
@@ -25,7 +25,7 @@ _DIR = Path(__file__).parent
 _PUNCTUATION = re.compile(".。,，?¿？؟!！;；:：-—")
 
 
-class ExcludeReason(str, Enum):
+class ExcludeReason(StrEnum):
     MISSING = "file_missing"
     EMPTY = "file_empty"
     LOW = "rate_low"

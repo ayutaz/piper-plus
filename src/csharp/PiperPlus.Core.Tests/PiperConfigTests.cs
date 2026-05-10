@@ -43,7 +43,6 @@ public sealed class PiperConfigTests : IDisposable
     // ================================================================
     // Deserialization tests
     // ================================================================
-
     [Fact]
     public void BasicConfig_Deserializes()
     {
@@ -184,7 +183,7 @@ public sealed class PiperConfigTests : IDisposable
         """;
 
         var path = WriteTempConfig(json, "missing_audio.json");
-        var ex = Assert.Throws<InvalidOperationException>(() => PiperConfig.LoadFromFile(path));
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() => PiperConfig.LoadFromFile(path));
         Assert.Contains("audio", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -200,7 +199,7 @@ public sealed class PiperConfigTests : IDisposable
         """;
 
         var path = WriteTempConfig(json, "missing_phoneme_id_map.json");
-        var ex = Assert.Throws<InvalidOperationException>(() => PiperConfig.LoadFromFile(path));
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() => PiperConfig.LoadFromFile(path));
         Assert.Contains("phoneme_id_map", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -287,7 +286,6 @@ public sealed class PiperConfigTests : IDisposable
     // ================================================================
     // FindConfigPath tests
     // ================================================================
-
     [Fact]
     public void FindConfigPath_ExplicitPath_ReturnsIt()
     {
@@ -356,7 +354,6 @@ public sealed class PiperConfigTests : IDisposable
     // ================================================================
     // Environment variable tests
     // ================================================================
-
     [Fact]
     public void FindConfigPath_EnvironmentVariable_ReturnsIt()
     {
@@ -427,7 +424,6 @@ public sealed class PiperConfigTests : IDisposable
     // ================================================================
     // Malformed JSON tests
     // ================================================================
-
     [Fact]
     public void LoadFromFile_MalformedJson_ThrowsException()
     {
@@ -439,7 +435,7 @@ public sealed class PiperConfigTests : IDisposable
     [Fact]
     public void LoadFromFile_EmptyFile_ThrowsException()
     {
-        var path = WriteTempConfig("", "empty.json");
+        var path = WriteTempConfig(string.Empty, "empty.json");
 
         Assert.ThrowsAny<JsonException>(() => PiperConfig.LoadFromFile(path));
     }
@@ -455,7 +451,6 @@ public sealed class PiperConfigTests : IDisposable
     // ================================================================
     // Default value tests
     // ================================================================
-
     [Fact]
     public void Audio_SampleRate_DefaultValue_22050()
     {
@@ -499,7 +494,6 @@ public sealed class PiperConfigTests : IDisposable
     // ================================================================
     // Edge cases
     // ================================================================
-
     [Fact]
     public void LoadFromFile_EmptyPhonemeIdMap_ThrowsException()
     {
@@ -513,7 +507,7 @@ public sealed class PiperConfigTests : IDisposable
         """;
 
         var path = WriteTempConfig(json, "empty_phoneme_map.json");
-        var ex = Assert.Throws<InvalidOperationException>(() => PiperConfig.LoadFromFile(path));
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() => PiperConfig.LoadFromFile(path));
         Assert.Contains("phoneme_id_map", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -559,7 +553,7 @@ public sealed class PiperConfigTests : IDisposable
         """;
 
         var path = WriteTempConfig(json, "missing_inference.json");
-        var ex = Assert.Throws<InvalidOperationException>(() => PiperConfig.LoadFromFile(path));
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() => PiperConfig.LoadFromFile(path));
         Assert.Contains("inference", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 

@@ -1,0 +1,201 @@
+# SSML (Speech Synthesis Markup Language) Subset Contract
+# ========================================================
+# This file defines the canonical constants that ALL implementations of the
+# SSML subset parser MUST agree on byte-for-byte. The W3C SSML spec is large,
+# but piper-plus only supports a small, deterministic subset:
+#
+#   <speak>                        — root element; required for SSML detection
+#   <break time="500ms"/>          — explicit silence by duration
+#   <break time="1s"/>             — explicit silence by duration (seconds)
+#   <break strength="medium"/>     — silence by W3C strength name
+#   <prosody rate="slow">..</...>  — speech rate via length_scale multiplier
+#   <prosody rate="120%">..</...>  — speech rate via percentage
+#
+# Unknown tags degrade gracefully (text content is preserved). XML parse
+# errors fall back to a stripped-tags plain-text segment.
+#
+# Implementations:
+#   Python (g2p): src/python/g2p/piper_plus_g2p/ssml.py            SSMLParser
+#   Rust:         src/rust/piper-core/src/ssml.rs                  SsmlParser
+#   Go:           src/go/piperplus/ssml/parser.go                  Parse
+#   C#:           src/csharp/PiperPlus.Core/Ssml/SsmlParser.cs     SsmlParser
+#
+# Drift gate: scripts/check_ssml_contract.py + scripts/regenerate_ssml_fixture.py
+# enforce that the Python canonical constants, this toml, and
+# tests/fixtures/ssml/contract.json all agree byte-for-byte.
+
+[meta]
+spec_version = "1.0"
+last_updated = "2026-05-08"
+applies_to = ["python", "rust", "go", "csharp"]
+
+# ---------------------------------------------------------------------------
+# <break strength="..."> — predefined silence durations
+# ---------------------------------------------------------------------------
+# Mapping is per W3C SSML 1.0 §3.2.3 (break element). All 4 runtimes share
+# the same name -> milliseconds table. Lookup is case-insensitive (the
+# attribute value is lowercased before lookup, which matches W3C).
+#
+# Default behaviour for `<break>` with no attributes OR with an unknown
+# strength value is `medium` (400ms). This is enforced by all runtimes.
+
+[break_strength]
+case_insensitive = true
+default_strength = "medium"
+default_ms = 400
+unknown_strength_fallback_ms = 400  # equivalent to default_strength=medium
+
+[break_strength.map]
+none     = 0
+"x-weak" = 100
+weak     = 200
+medium   = 400
+strong   = 700
+"x-strong" = 1000
+
+# ---------------------------------------------------------------------------
+# <prosody rate="..."> — named rate -> length_scale multiplier
+# ---------------------------------------------------------------------------
+# The returned value is a *length_scale* multiplier:
+#   value > 1.0  =>  audio is longer (= slower speech)
+#   value < 1.0  =>  audio is shorter (= faster speech)
+#   value = 1.0  =>  default (no rate change)
+#
+# Lookup is case-insensitive in Python (lower()-ed before lookup). Rust/Go
+# are case-sensitive on the named lookup but Python is canonical.
+#
+# Percentage form ("120%") and bare floats are parsed at runtime; they are
+# NOT part of this constant table. See [prosody_rate.parsing] below.
+
+[prosody_rate]
+default_rate = 1.0
+case_insensitive_named = true  # Python lowercases before lookup
+
+[prosody_rate.named_map]
+"x-slow" = 1.5
+slow     = 1.25
+medium   = 1.0
+fast     = 0.8
+"x-fast" = 0.6
+
+[prosody_rate.parsing]
+# Acceptable rate value forms beyond the named map:
+#   1. Named (table above)
+#   2. Percentage: "<float>%"   ->  length_scale = 100.0 / pct
+#                                   pct must be > 0; otherwise default_rate
+#   3. Bare float: "<float>"    ->  treat as direct length_scale multiplier
+#                                   value must be > 0; otherwise default_rate
+# Unparseable / invalid values fall back to default_rate (1.0).
+percent_formula = "length_scale = 100.0 / percent"
+percent_min_exclusive = 0.0
+bare_float_min_exclusive = 0.0
+fallback_rate = 1.0
+
+# ---------------------------------------------------------------------------
+# <break time="..."> — explicit duration parsing
+# ---------------------------------------------------------------------------
+# `<break time>` is parsed by the runtime, not by lookup. Suffixes are case
+# insensitive. Unparseable values yield 0ms (but log a warning).
+
+[break_time]
+ms_suffix = "ms"            # "500ms"  -> int(500)
+seconds_suffix = "s"        # "1s"     -> int(1.0 * 1000)
+bare_number_assumes = "ms"  # "500"    -> 500
+case_insensitive_suffix = true
+unparseable_fallback_ms = 0
+
+# ---------------------------------------------------------------------------
+# SSML detection
+# ---------------------------------------------------------------------------
+# A string is treated as SSML iff this regex matches at the beginning. The
+# regex is identical (modulo per-language flag syntax) across all 4 runtimes.
+#
+#   Python: re.compile(r"^\s*<speak[\s>]", re.DOTALL)
+#   Rust:   Regex::new(r"(?s)^\s*<speak[\s>]")
+#   Go:     regexp.MustCompile(`(?s)^\s*<speak[\s>]`)
+#   C#:     [GeneratedRegex(@"^\s*<speak[\s>]", RegexOptions.Singleline)]
+#
+# The trailing `[\s>]` ensures `<speakers>` is not falsely matched.
+
+[detection]
+regex = '^\s*<speak[\s>]'
+flags = "DOTALL"   # a.k.a. Singleline / `(?s)` — matches newlines with `.`
+matches_at = "start_of_string"
+case_sensitive = true   # `<SPEAK>` is NOT detected as SSML
+
+# ---------------------------------------------------------------------------
+# Tag stripping (XML parse error fallback)
+# ---------------------------------------------------------------------------
+# When XML parsing fails, the parser strips all tags via this regex and
+# returns the result as a single plain-text segment, preserving as much
+# audible content as possible.
+
+[fallback]
+strip_regex = '<[^>]*>'
+strip_then_trim = true
+empty_strip_yields_original_text = true
+
+# ---------------------------------------------------------------------------
+# Input size limit (Python only)
+# ---------------------------------------------------------------------------
+# Python enforces a 100 KB input ceiling to mitigate XML-parsing DoS
+# (e.g. billion-laughs entity expansion). The other runtimes rely on
+# their underlying XML libraries' own protections. This limit is part
+# of the contract for the Python implementation only and the fixture
+# tracks it as `python_only = true`.
+
+[size_limit]
+python_max_ssml_bytes = 100000
+python_only = true
+on_exceed = "raise ValueError"
+
+# ---------------------------------------------------------------------------
+# Segment defaults
+# ---------------------------------------------------------------------------
+# Default values for an SSMLSegment / SsmlSegment / Segment when constructed
+# from a fragment that does not specify break/rate. These defaults must match
+# across all 4 runtimes.
+
+[segment_defaults]
+text = ""
+break_ms = 0
+rate = 1.0
+
+# ---------------------------------------------------------------------------
+# Walk semantics
+# ---------------------------------------------------------------------------
+# Element walk semantics that all runtimes must implement. These are not
+# arithmetic constants but they are part of the cross-runtime contract.
+
+[walk_semantics]
+# Tail text inherits the parent's rate, NOT the (preceding) child's rate.
+tail_inherits_parent_rate = true
+
+# Empty-text segments with break_ms > 0 are KEPT (silence-only segments).
+# Empty-text segments with break_ms == 0 are dropped during merge.
+merge_drops_empty_zero_break = true
+
+# When all segments are dropped, parsers return a single empty segment
+# (text="", break_ms=0, rate=1.0) so callers always get a non-empty list.
+empty_result_replacement = "single empty segment"
+
+# Local-name (namespace-stripped) tag matching: `<speak xmlns="..."> handled
+# the same as `<speak>`. Python implements via _local_tag(); other runtimes
+# follow suit via their XML library's namespace handling.
+strip_xml_namespace_for_tag_match = true
+
+# ---------------------------------------------------------------------------
+# Implementation status
+# ---------------------------------------------------------------------------
+# Which runtimes implement the SSML subset.
+#                            Python  Rust  Go  C#  C++  WASM
+# <speak> root              ✓       ✓     ✓   ✓   -    -
+# <break time>              ✓       ✓     ✓   ✓   -    -
+# <break strength>          ✓       ✓     ✓   ✓   -    -
+# <prosody rate=named>      ✓       ✓     ✓   ✓   -    -
+# <prosody rate=%>          ✓       ✓     ✓   ✓   -    -
+# 100KB size limit          ✓       -     -   -   -    -
+# graceful tag stripping    ✓       ✓     ✓   ✓   -    -
+#
+# C++ and WASM/JS do not implement SSML at this time; they are out of scope
+# for this contract.

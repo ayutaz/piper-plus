@@ -23,8 +23,7 @@ public static partial class ArpabetToIPAConverter
     // ---------------------------------------------------------------
     // ARPAbet-to-IPA mapping (33 entries + AH-unstressed special case)
     // ---------------------------------------------------------------
-
-    private static readonly Dictionary<string, string> s_arpabetToIpa = new(StringComparer.Ordinal)
+    private static readonly Dictionary<string, string> S_arpabetToIpa = new(StringComparer.Ordinal)
     {
         ["AA"] = "\u0251",      // ɑ
         ["AE"] = "\u00e6",      // æ
@@ -72,7 +71,7 @@ public static partial class ArpabetToIPAConverter
     /// Keys are uppercase ARPAbet bases without stress digits.
     /// </summary>
     public static IReadOnlyDictionary<string, string> ArpabetToIpa { get; } =
-        new ReadOnlyDictionary<string, string>(s_arpabetToIpa);
+        new ReadOnlyDictionary<string, string>(S_arpabetToIpa);
 
     // Unstressed AH maps to schwa (ə) instead of ʌ.
     private const string AhUnstressedIpa = "\u0259"; // ə
@@ -84,26 +83,26 @@ public static partial class ArpabetToIPAConverter
     // ---------------------------------------------------------------
     // Punctuation
     // ---------------------------------------------------------------
-
-    private static readonly HashSet<char> s_punctuationChars = new() { ',', '.', ';', ':', '!', '?' };
+    private static readonly HashSet<char> S_punctuationChars = new() { ',', '.', ';', ':', '!', '?' };
 
     /// <summary>
     /// Returns <c>true</c> when <paramref name="token"/> is a single
     /// punctuation character (one of <c>,.;:!?</c>).
     /// </summary>
+    /// <returns></returns>
     public static bool IsPunctuation(string token)
     {
-        return token is { Length: 1 } && s_punctuationChars.Contains(token[0]);
+        return token is { Length: 1 } && S_punctuationChars.Contains(token[0]);
     }
 
     // ---------------------------------------------------------------
     // Function words (~110 entries, case-insensitive)
     // ---------------------------------------------------------------
-
-    private static readonly HashSet<string> s_functionWords = new(StringComparer.OrdinalIgnoreCase)
+    private static readonly HashSet<string> S_functionWords = new(StringComparer.OrdinalIgnoreCase)
     {
         // articles / determiners
         "a", "an", "the",
+
         // pronouns
         "i", "me", "my", "mine", "myself",
         "you", "your", "yours", "yourself",
@@ -112,19 +111,24 @@ public static partial class ArpabetToIPAConverter
         "it", "its", "itself",
         "we", "us", "our", "ours", "ourselves",
         "they", "them", "their", "theirs", "themselves",
+
         // be-verbs
         "am", "is", "are", "was", "were", "be", "been", "being",
+
         // auxiliaries
         "have", "has", "had", "having",
         "do", "does", "did",
         "will", "would", "shall", "should",
         "can", "could", "may", "might", "must",
+
         // prepositions
         "at", "by", "for", "from", "in", "of", "on", "to", "with",
         "about", "after", "before", "between", "into", "through", "under",
+
         // conjunctions
         "and", "but", "or", "nor", "so", "yet", "if",
         "that", "than", "when", "while", "as", "because", "since",
+
         // others
         "not", "no",
     };
@@ -133,9 +137,10 @@ public static partial class ArpabetToIPAConverter
     /// Returns <c>true</c> when <paramref name="word"/> is an English
     /// function word (case-insensitive comparison).
     /// </summary>
+    /// <returns></returns>
     public static bool IsFunctionWord(string word)
     {
-        return s_functionWords.Contains(word);
+        return S_functionWords.Contains(word);
     }
 
     // ---------------------------------------------------------------
@@ -156,7 +161,7 @@ public static partial class ArpabetToIPAConverter
     /// </returns>
     public static (string Ipa, int Stress) ConvertToken(string arpabetToken)
     {
-        var m = ArpabetPattern().Match(arpabetToken);
+        Match m = ArpabetPattern().Match(arpabetToken);
         if (!m.Success)
         {
             // Punctuation or unknown token — return as-is.
@@ -172,7 +177,7 @@ public static partial class ArpabetToIPAConverter
             return (AhUnstressedIpa, stress);
         }
 
-        if (s_arpabetToIpa.TryGetValue(basePart, out string? ipa))
+        if (S_arpabetToIpa.TryGetValue(basePart, out string? ipa))
         {
             return (ipa, stress);
         }
@@ -207,7 +212,7 @@ public static partial class ArpabetToIPAConverter
         while (i < tokens.Count)
         {
             string token = tokens[i];
-            var m = ArpabetPattern().Match(token);
+            Match m = ArpabetPattern().Match(token);
 
             if (m.Success)
             {
@@ -231,7 +236,7 @@ public static partial class ArpabetToIPAConverter
                 }
             }
 
-            var (ipa, s) = ConvertToken(token);
+            (string? ipa, int s) = ConvertToken(token);
             result.Add((ipa, s));
             i += 1;
         }

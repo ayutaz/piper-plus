@@ -20,6 +20,7 @@ public static class IpaTokenizer
     /// Optional set of two-character sequences that should be emitted as single tokens.
     /// Pass <c>null</c> when no digraph handling is needed.
     /// </param>
+    /// <returns></returns>
     public static List<string> Tokenize(string ipa, IReadOnlySet<string>? knownDigraphs = null)
     {
         var tokens = new List<string>(Math.Max(4, ipa.Length / 2));

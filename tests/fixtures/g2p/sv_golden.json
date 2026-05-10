@@ -1,0 +1,534 @@
+{
+  "schema_version": 1,
+  "language": "sv",
+  "description": "Swedish G2P golden phoneme matrix (pins current implementation output).",
+  "metadata": {
+    "source": "Python piper_plus_g2p — pinned by scripts/regenerate_g2p_golden_fixtures.py. The expected values capture the *current* implementation output. Drift in any rule will fail src/python/g2p/tests/test_golden_fixtures.py.",
+    "py_runtime": "src/python/g2p/piper_plus_g2p/swedish.py",
+    "version": 1
+  },
+  "cases": [
+    {
+      "text": "hej",
+      "expected_phonemes": [
+        "ˈ",
+        "h",
+        "eː",
+        "j"
+      ],
+      "notes": "basic greeting"
+    },
+    {
+      "text": "ja",
+      "expected_phonemes": [
+        "ˈ",
+        "j",
+        "ɑː"
+      ],
+      "notes": "basic"
+    },
+    {
+      "text": "nej",
+      "expected_phonemes": [
+        "ˈ",
+        "n",
+        "eː",
+        "j"
+      ],
+      "notes": "basic"
+    },
+    {
+      "text": "god",
+      "expected_phonemes": [
+        "ˈ",
+        "ɡ",
+        "oː",
+        "d"
+      ],
+      "notes": "g + back → ɡ"
+    },
+    {
+      "text": "sjö",
+      "expected_phonemes": [
+        "ˈ",
+        "ɧ",
+        "øː"
+      ],
+      "notes": "sj → ɧ"
+    },
+    {
+      "text": "skön",
+      "expected_phonemes": [
+        "ˈ",
+        "ɧ",
+        "øː",
+        "n"
+      ],
+      "notes": "sk + front vowel → ɧ"
+    },
+    {
+      "text": "station",
+      "expected_phonemes": [
+        "s",
+        "t",
+        "a",
+        "ˈ",
+        "ɧ",
+        "uː",
+        "n"
+      ],
+      "notes": "tion suffix"
+    },
+    {
+      "text": "religion",
+      "expected_phonemes": [
+        "ˈ",
+        "r",
+        "eː",
+        "l",
+        "ɪ",
+        "j",
+        "ɪ",
+        "ɔ",
+        "n"
+      ],
+      "notes": "tion-like suffix"
+    },
+    {
+      "text": "tjugo",
+      "expected_phonemes": [
+        "ˈ",
+        "ɕ",
+        "ʉː",
+        "ɡ",
+        "ɔ"
+      ],
+      "notes": "tj → ɕ"
+    },
+    {
+      "text": "kjol",
+      "expected_phonemes": [
+        "ˈ",
+        "ɕ",
+        "uː",
+        "l"
+      ],
+      "notes": "kj → ɕ"
+    },
+    {
+      "text": "kär",
+      "expected_phonemes": [
+        "ˈ",
+        "ɕ",
+        "ɛː",
+        "r"
+      ],
+      "notes": "k + front → ɕ"
+    },
+    {
+      "text": "kort",
+      "expected_phonemes": [
+        "ˈ",
+        "k",
+        "ɔ",
+        "ʈ"
+      ],
+      "notes": "rt → retroflex"
+    },
+    {
+      "text": "hjärta",
+      "expected_phonemes": [
+        "ˈ",
+        "j",
+        "ɛː",
+        "ʈ",
+        "a"
+      ],
+      "notes": "rt retroflex inside"
+    },
+    {
+      "text": "mars",
+      "expected_phonemes": [
+        "ˈ",
+        "m",
+        "ɑː",
+        "ʂ"
+      ],
+      "notes": "rs retroflex"
+    },
+    {
+      "text": "svart",
+      "expected_phonemes": [
+        "ˈ",
+        "s",
+        "v",
+        "ɑː",
+        "ʈ"
+      ],
+      "notes": "rt retroflex"
+    },
+    {
+      "text": "katt",
+      "expected_phonemes": [
+        "ˈ",
+        "k",
+        "a",
+        "t",
+        "t"
+      ],
+      "notes": "k + back → k"
+    },
+    {
+      "text": "kö",
+      "expected_phonemes": [
+        "ˈ",
+        "ɕ",
+        "øː"
+      ],
+      "notes": "k + front → ɕ"
+    },
+    {
+      "text": "kall",
+      "expected_phonemes": [
+        "ˈ",
+        "k",
+        "a",
+        "l",
+        "l"
+      ],
+      "notes": "k + back → k"
+    },
+    {
+      "text": "köpa",
+      "expected_phonemes": [
+        "ˈ",
+        "ɕ",
+        "øː",
+        "p",
+        "a"
+      ],
+      "notes": "k + front → ɕ"
+    },
+    {
+      "text": "gärna",
+      "expected_phonemes": [
+        "ˈ",
+        "j",
+        "ɛː",
+        "ɳ",
+        "a"
+      ],
+      "notes": "g + front → j"
+    },
+    {
+      "text": "gata",
+      "expected_phonemes": [
+        "ˈ",
+        "ɡ",
+        "ɑː",
+        "t",
+        "a"
+      ],
+      "notes": "g + back → ɡ"
+    },
+    {
+      "text": "ge",
+      "expected_phonemes": [
+        "ˈ",
+        "ɡ",
+        "eː"
+      ],
+      "notes": "g + front → j"
+    },
+    {
+      "text": "gick",
+      "expected_phonemes": [
+        "ˈ",
+        "j",
+        "ɪ",
+        "k"
+      ],
+      "notes": "g + i + ck"
+    },
+    {
+      "text": "matt",
+      "expected_phonemes": [
+        "ˈ",
+        "m",
+        "a",
+        "t",
+        "t"
+      ],
+      "notes": "short a + double tt"
+    },
+    {
+      "text": "mat",
+      "expected_phonemes": [
+        "ˈ",
+        "m",
+        "ɑː",
+        "t"
+      ],
+      "notes": "long a"
+    },
+    {
+      "text": "vill",
+      "expected_phonemes": [
+        "v",
+        "ɪ",
+        "l",
+        "l"
+      ],
+      "notes": "short i"
+    },
+    {
+      "text": "vi",
+      "expected_phonemes": [
+        "v",
+        "ɪ"
+      ],
+      "notes": "long i"
+    },
+    {
+      "text": "nation",
+      "expected_phonemes": [
+        "n",
+        "a",
+        "ˈ",
+        "ɧ",
+        "uː",
+        "n"
+      ],
+      "notes": "tion suffix"
+    },
+    {
+      "text": "pension",
+      "expected_phonemes": [
+        "p",
+        "ɛ",
+        "ˈ",
+        "n",
+        "ɧ",
+        "uː",
+        "n"
+      ],
+      "notes": "sion suffix"
+    },
+    {
+      "text": "garage",
+      "expected_phonemes": [
+        "ˈ",
+        "ɡ",
+        "ɑː",
+        "r",
+        "ɑː",
+        "ɧ"
+      ],
+      "notes": "age suffix"
+    },
+    {
+      "text": "tack",
+      "expected_phonemes": [
+        "ˈ",
+        "t",
+        "a",
+        "k"
+      ],
+      "notes": "ck digraph"
+    },
+    {
+      "text": "fika",
+      "expected_phonemes": [
+        "ˈ",
+        "f",
+        "iː",
+        "k",
+        "a"
+      ],
+      "notes": "f + i"
+    },
+    {
+      "text": "flicka",
+      "expected_phonemes": [
+        "ˈ",
+        "f",
+        "l",
+        "ɪ",
+        "k",
+        "a"
+      ],
+      "notes": "ck"
+    },
+    {
+      "text": "pojke",
+      "expected_phonemes": [
+        "ˈ",
+        "p",
+        "ɔ",
+        "j",
+        "k",
+        "ɛ"
+      ],
+      "notes": "j after consonant"
+    },
+    {
+      "text": "svenska",
+      "expected_phonemes": [
+        "ˈ",
+        "s",
+        "v",
+        "ɛ",
+        "n",
+        "s",
+        "k",
+        "a"
+      ],
+      "notes": "sv cluster"
+    },
+    {
+      "text": "Sverige",
+      "expected_phonemes": [
+        "ˈ",
+        "s",
+        "v",
+        "eː",
+        "r",
+        "ɪ",
+        "j",
+        "ɛ"
+      ],
+      "notes": "country name"
+    },
+    {
+      "text": "ung",
+      "expected_phonemes": [
+        "ˈ",
+        "ɵ",
+        "ŋ"
+      ],
+      "notes": "ng → ŋ"
+    },
+    {
+      "text": "lång",
+      "expected_phonemes": [
+        "ˈ",
+        "l",
+        "ɔ",
+        "ŋ"
+      ],
+      "notes": "å + ng"
+    },
+    {
+      "text": "säng",
+      "expected_phonemes": [
+        "ˈ",
+        "s",
+        "ɛ",
+        "ŋ"
+      ],
+      "notes": "ng → ŋ"
+    },
+    {
+      "text": "hus",
+      "expected_phonemes": [
+        "ˈ",
+        "h",
+        "ʉː",
+        "s"
+      ],
+      "notes": "u long"
+    },
+    {
+      "text": "hund",
+      "expected_phonemes": [
+        "ˈ",
+        "h",
+        "ɵ",
+        "n",
+        "d"
+      ],
+      "notes": "u + nd"
+    },
+    {
+      "text": "öl",
+      "expected_phonemes": [
+        "ˈ",
+        "øː",
+        "l"
+      ],
+      "notes": "ö → ø"
+    },
+    {
+      "text": "åka",
+      "expected_phonemes": [
+        "ˈ",
+        "oː",
+        "k",
+        "a"
+      ],
+      "notes": "å → o"
+    },
+    {
+      "text": "är",
+      "expected_phonemes": [
+        "ɛ",
+        "r"
+      ],
+      "notes": "ä → ɛ"
+    },
+    {
+      "text": "att",
+      "expected_phonemes": [
+        "a",
+        "t",
+        "t"
+      ],
+      "notes": "function-y"
+    },
+    {
+      "text": "och",
+      "expected_phonemes": [
+        "ɔ",
+        "k"
+      ],
+      "notes": "och irregular"
+    },
+    {
+      "text": "jag",
+      "expected_phonemes": [
+        "j",
+        "a",
+        "ɡ"
+      ],
+      "notes": "1sg pronoun"
+    },
+    {
+      "text": "du",
+      "expected_phonemes": [
+        "d",
+        "ɵ"
+      ],
+      "notes": "2sg pronoun"
+    },
+    {
+      "text": "schack",
+      "expected_phonemes": [
+        "ˈ",
+        "ɧ",
+        "a",
+        "k"
+      ],
+      "notes": "sch → ɧ"
+    },
+    {
+      "text": "dusch",
+      "expected_phonemes": [
+        "ˈ",
+        "d",
+        "ɵ",
+        "ɧ"
+      ],
+      "notes": "sch final"
+    }
+  ]
+}

@@ -125,6 +125,7 @@ jobs:
 
       - name: Cache NuGet packages
         uses: actions/cache@v5
+        continue-on-error: true
         with:
           path: ~/.nuget/packages
           key: ${{ runner.os }}-nuget-${{ hashFiles('src/csharp/**/*.csproj') }}
@@ -192,10 +193,12 @@ jobs:
 
       - name: Cache NuGet packages
         uses: actions/cache@v5
+        continue-on-error: true
         with:
           path: ~/.nuget/packages
-          key: ${{ runner.os }}-nuget-${{ hashFiles('src/csharp/**/*.csproj') }}
+          key: ${{ runner.os }}-nuget-${{ matrix.rid }}-${{ hashFiles('src/csharp/**/*.csproj') }}
           restore-keys: |
+            ${{ runner.os }}-nuget-${{ matrix.rid }}-
             ${{ runner.os }}-nuget-
 
       - name: Publish self-contained binary
@@ -230,32 +233,32 @@ jobs:
       matrix:
         os: [ubuntu-24.04]
         python-version: ['3.11']
-        
+
     steps:
       - uses: actions/checkout@v6
-      
+
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
-      
+
       - name: Install system dependencies (Ubuntu)
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y libsndfile1-dev build-essential cmake
-      
+
       - name: Install system dependencies (macOS)
         if: runner.os == 'macOS'
         run: |
           brew install libsndfile cmake
-      
+
       - name: Install system dependencies (Windows)
         if: runner.os == 'Windows'
         run: |
           choco install cmake --installargs 'ADD_CMAKE_TO_PATH=System' -y
           refreshenv
-      
+
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip setuptools wheel
@@ -265,7 +268,7 @@ jobs:
           uv pip install --system -e ".[test,inference]"
           # For pyopenjtalk-plus dependencies (optional)
           uv pip install --system sudachipy sudachidict_core || echo "Japanese dependencies optional"
-      
+
       - name: Build C++ executable (Windows)
         if: runner.os == 'Windows'
         run: |
@@ -274,7 +277,7 @@ jobs:
           cmake .. -G "Visual Studio 17 2022" -A x64
           cmake --build . --config Release
         shell: cmd
-      
+
       - name: Build C++ executable (Unix)
         if: runner.os != 'Windows'
         run: |
@@ -282,23 +285,25 @@ jobs:
           cd build
           cmake ..
           make -j$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 2)
-      
+
       - name: Download OpenJTalk dictionary
         if: runner.os != 'Windows'
         run: |
           cd build
           ../scripts/download_openjtalk_dict.sh || true
-      
+
       - name: Run Python tests
         run: |
           # Run tests properly
           cd src/python
+          # `--no-cov` で coverage 計測を無効化 (subset 実行で 70% 閾値を満たさず誤検知)。
+          # 完全な coverage は python-tests.yml の "Run unit tests" で計測。
           if [ "${{ runner.os }}" == "Windows" ]; then
-            python -m pytest tests/ -v --tb=short -m "unit and not phonemize and not training" -k "not test_phonemize and not test_japanese"
+            python -m pytest tests/ -v --tb=short -m "unit and not phonemize and not training" -k "not test_phonemize and not test_japanese" --no-cov
           else
             # Exclude inference tests - they require PyTorch and are covered by python-tests.yml
             # Use --ignore to prevent collection (import) of files that require torch
-            python -m pytest tests/ -v --tb=short -m "unit and not training and not benchmark and not inference" \
+            python -m pytest tests/ -v --tb=short -m "unit and not training and not benchmark and not inference" --no-cov \
               --ignore=tests/test_pytorch_onnx_parity.py \
               --ignore=tests/test_export_onnx.py \
               --ignore=tests/test_export_onnx_mb_istft.py \
@@ -307,7 +312,7 @@ jobs:
               --ignore=tests/test_vits.py \
               --ignore=tests/test_wavlm_discriminator.py
           fi
-      
+
       - name: Upload coverage reports
         uses: codecov/codecov-action@v5
         if: matrix.python-version == '3.11' && runner.os == 'Linux'
@@ -421,21 +426,21 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
-      
+
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
           python-version: '3.11'
-      
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install --no-cache-dir uv
           uv pip install --system ruff==0.12.5 mypy
-      
+
       - name: Run ruff check
         run: ruff check .
-      
+
       - name: Run ruff format check
         run: ruff format --check
 

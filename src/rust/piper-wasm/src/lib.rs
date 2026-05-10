@@ -88,6 +88,61 @@ pub fn get_api_version() -> String {
     env!("CARGO_PKG_VERSION").to_string()
 }
 
+// ---------------------------------------------------------------------------
+// SSML support (parity with Python / Rust / C# / Go runtimes)
+// ---------------------------------------------------------------------------
+// piper-core's `SsmlParser` is feature-gate-free so it remains accessible
+// even with `default-features = false`. Exposing it here closes the SSML
+// gap between WASM and the other runtimes — TTS bundles iterate the
+// returned segments to insert silence (`break_ms`) and adjust
+// `length_scale` (`rate`).
+
+use piper_plus::ssml::SsmlParser as CoreSsmlParser;
+
+/// Detect whether `text` is an SSML document (begins with `<speak`).
+///
+/// Mirrors `piper_plus_g2p.ssml.is_ssml` (Python),
+/// `piper_plus::ssml::SsmlParser::is_ssml` (Rust),
+/// `SsmlParser.IsSsml` (C#), and `ssml.IsSSML` (Go).
+#[wasm_bindgen(js_name = isSsml)]
+pub fn is_ssml(text: &str) -> bool {
+    CoreSsmlParser::is_ssml(text)
+}
+
+/// Parse SSML text into a JSON-encoded array of segments.
+///
+/// Each segment is an object with fields `{text, breakMs, rate}`:
+///   - `text`: text to phonemize (may be empty for silence-only break segments)
+///   - `breakMs`: trailing silence in milliseconds (0 = none)
+///   - `rate`: length_scale multiplier from `<prosody rate="...">` (1.0 = unchanged,
+///             > 1.0 = slower, < 1.0 = faster)
+///
+/// Returns plain text wrapped as a single segment when the input is not SSML
+/// or fails to parse — same fallback semantics as the other 4 runtimes.
+///
+/// ```js
+/// const json = parseSsml('<speak>hi<break time="500ms"/>there</speak>');
+/// const segments = JSON.parse(json);
+/// // [{text: "hi", breakMs: 500, rate: 1.0},
+/// //  {text: "there", breakMs: 0, rate: 1.0}]
+/// ```
+#[wasm_bindgen(js_name = parseSsml)]
+pub fn parse_ssml(text: &str) -> Result<String, JsValue> {
+    let segments = CoreSsmlParser::parse(text);
+    let json_segments: Vec<serde_json::Value> = segments
+        .into_iter()
+        .map(|s| {
+            serde_json::json!({
+                "text": s.text,
+                "breakMs": s.break_ms,
+                "rate": s.rate,
+            })
+        })
+        .collect();
+    serde_json::to_string(&json_segments)
+        .map_err(|e| create_wasm_error(ERROR_INTERNAL, &format!("SSML JSON encode failed: {e}")))
+}
+
 use piper_plus::config::VoiceConfig;
 #[cfg(any(feature = "zh", feature = "zh-external"))]
 use piper_plus_g2p::chinese::ChinesePhonemizer;
@@ -1150,9 +1205,11 @@ mod wasm_tests {
     use super::*;
     use wasm_bindgen_test::*;
 
-    // NOTE: run_in_browser is NOT set — these tests run in Node.js via
-    // `wasm-pack test --node`, which avoids WebDriver/chromedriver issues.
-    // None of these tests use browser-specific APIs (DOM, fetch, etc.).
+    // Run in Node.js via `wasm-pack test --node`. Node is the default runner
+    // for wasm-bindgen-test 0.3, so we deliberately do NOT call
+    // `wasm_bindgen_test_configure!(run_in_browser)` — that arm is the only
+    // one the macro accepts and would force WebDriver/chromedriver. None of
+    // these tests use browser-specific APIs (DOM, fetch, etc.).
 
     // -------------------------------------------------------------------
     // Constructor tests
@@ -1480,5 +1537,109 @@ mod wasm_tests {
         let mut p = WasmPhonemizer::new(&config).unwrap();
         let result = p.set_japanese_dictionary(&[]);
         assert!(result.is_err(), "empty dict data should return error");
+    }
+
+    // -------------------------------------------------------------------
+    // SSML parser tests (parity with Python / Rust / C# / Go runtimes)
+    //
+    // The parser is feature-gate-free, so these tests run unconditionally.
+    // Each segment in the JSON output mirrors the `SsmlSegment` shape from
+    // piper_plus::ssml so JS callers can iterate without re-parsing XML.
+    // -------------------------------------------------------------------
+
+    #[wasm_bindgen_test]
+    fn test_wasm_is_ssml_detection() {
+        assert!(is_ssml("<speak>hello</speak>"));
+        assert!(is_ssml("  <speak>leading whitespace</speak>"));
+        assert!(is_ssml("<speak xml:lang=\"en\">attrs ok</speak>"));
+        assert!(!is_ssml("plain text"));
+        assert!(!is_ssml(""));
+        assert!(!is_ssml("<other>not ssml</other>"));
+    }
+
+    #[wasm_bindgen_test]
+    fn test_wasm_parse_ssml_plain_text_passthrough() {
+        // Non-SSML input is returned as a single segment (graceful fallback).
+        let json = parse_ssml("just plain text").unwrap();
+        let v: serde_json::Value = serde_json::from_str(&json).unwrap();
+        let arr = v.as_array().unwrap();
+        assert_eq!(arr.len(), 1);
+        assert_eq!(arr[0]["text"].as_str().unwrap(), "just plain text");
+        assert_eq!(arr[0]["breakMs"].as_u64().unwrap(), 0);
+        assert!((arr[0]["rate"].as_f64().unwrap() - 1.0).abs() < 1e-6);
+    }
+
+    #[wasm_bindgen_test]
+    fn test_wasm_parse_ssml_break_inserts_silence() {
+        // <break time="500ms"/> attaches to the preceding text segment.
+        let json = parse_ssml(r#"<speak>before<break time="500ms"/>after</speak>"#).unwrap();
+        let v: serde_json::Value = serde_json::from_str(&json).unwrap();
+        let arr = v.as_array().unwrap();
+        // Two text-bearing segments; break_ms attaches to the first.
+        let total_break: u64 = arr.iter().map(|s| s["breakMs"].as_u64().unwrap_or(0)).sum();
+        assert_eq!(
+            total_break, 500,
+            "break time=500ms must surface as breakMs=500 across segments",
+        );
+        let joined: String = arr
+            .iter()
+            .map(|s| s["text"].as_str().unwrap_or("").to_string())
+            .collect::<Vec<_>>()
+            .join("");
+        assert_eq!(joined, "beforeafter");
+    }
+
+    #[wasm_bindgen_test]
+    fn test_wasm_parse_ssml_prosody_rate_applies() {
+        // <prosody rate="slow"> maps to length_scale=1.25 per W3C named rates.
+        let json =
+            parse_ssml(r#"<speak><prosody rate="slow">slow text</prosody></speak>"#).unwrap();
+        let v: serde_json::Value = serde_json::from_str(&json).unwrap();
+        let arr = v.as_array().unwrap();
+        let any_slow = arr.iter().any(|s| {
+            s["text"].as_str().unwrap_or("").contains("slow")
+                && s["rate"].as_f64().unwrap_or(1.0) > 1.0
+        });
+        assert!(any_slow, "rate=slow must produce a segment with rate > 1.0");
+    }
+
+    #[wasm_bindgen_test]
+    fn test_wasm_parse_ssml_attack_unknown_tags() {
+        // Mirrors `tests/test_ssml_attacks.rs` — unknown tags must NOT
+        // break parsing; their text content is preserved (graceful degrade).
+        let json = parse_ssml(r#"<speak><script>alert(1)</script>after</speak>"#).unwrap();
+        let v: serde_json::Value = serde_json::from_str(&json).unwrap();
+        let arr = v.as_array().unwrap();
+        // Either text content from <script> is included as plain text, or
+        // ignored — the important contract is "no panic, valid JSON output".
+        assert!(!arr.is_empty(), "attack vector must yield ≥ 1 segment");
+    }
+
+    #[wasm_bindgen_test]
+    fn test_wasm_parse_ssml_malformed_xml_falls_back() {
+        // Unclosed tag — falls back to plain text without panic.
+        let json = parse_ssml("<speak>oops").unwrap();
+        let v: serde_json::Value = serde_json::from_str(&json).unwrap();
+        let arr = v.as_array().unwrap();
+        assert!(!arr.is_empty(), "malformed SSML must still yield a segment");
+    }
+
+    #[wasm_bindgen_test]
+    fn test_wasm_parse_ssml_returns_valid_json() {
+        // The returned string must always be valid JSON, even on failure paths.
+        for input in &[
+            "",
+            "<speak></speak>",
+            "<speak>only text</speak>",
+            r#"<speak>a<break time="1s"/>b<prosody rate="fast">c</prosody></speak>"#,
+        ] {
+            let json = parse_ssml(input).expect("parse_ssml should not error");
+            let v: Result<serde_json::Value, _> = serde_json::from_str(&json);
+            assert!(
+                v.is_ok(),
+                "parseSsml output must be valid JSON for input: {input:?}",
+            );
+            assert!(v.unwrap().is_array(), "output must be a JSON array");
+        }
     }
 }

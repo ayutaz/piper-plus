@@ -72,7 +72,8 @@ public static class PhonemeSilenceProcessor
         var result = new Dictionary<string, float>();
 
         // Split on comma for multi-phoneme specifications.
-        string[] entries = specification.Split(',',
+        string[] entries = specification.Split(
+            ',',
             StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
         foreach (string entry in entries)
@@ -168,7 +169,7 @@ public static class PhonemeSilenceProcessor
         // Build reverse map: phoneme-ID → (phoneme string, silence seconds).
         // A single phoneme string can map to multiple IDs (e.g. "a" → [5, 6]),
         // but each individual ID uniquely identifies at most one silence entry.
-        var silenceById = BuildSilenceIdMap(phonemeSilence, phonemeIdMap);
+        Dictionary<long, float> silenceById = BuildSilenceIdMap(phonemeSilence, phonemeIdMap);
 
         bool hasProsody = prosodyFlat is not null
                           && prosodyFlat.Length == phonemeIds.Length * 3;
@@ -231,7 +232,7 @@ public static class PhonemeSilenceProcessor
     {
         var map = new Dictionary<long, float>();
 
-        foreach (var (phoneme, seconds) in phonemeSilence)
+        foreach ((string? phoneme, float seconds) in phonemeSilence)
         {
             if (!phonemeIdMap.TryGetValue(phoneme, out int[]? ids))
             {

@@ -199,7 +199,7 @@ def main() -> None:
         from .download import download_model
 
         try:
-            onnx_path, config_path = download_model(
+            onnx_path, _config_path = download_model(
                 args.download_model,
                 args.download_dir,
             )

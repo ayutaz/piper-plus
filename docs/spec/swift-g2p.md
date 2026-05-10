@@ -56,7 +56,7 @@
 
 ### 2.1 アーキテクチャ
 
-```
+```text
 ┌────────────────────────────────────────────────┐
 │ Swift consumer (iOS / macOS app)               │
 │   import PiperPlusG2P                          │
@@ -166,7 +166,7 @@ API/JSON envelope/ABI の規範は [`docs/spec/swift-g2p-contract.toml`](./swift
 
 ### 3.6 module.modulemap (xcframework 内)
 
-```
+```text
 module PiperPlusG2PBinary {
   umbrella header "piper_plus_g2p.h"
   export *
@@ -218,18 +218,23 @@ module PiperPlusG2PBinary {
 ## 6. 拡張可能性
 
 ### 6.1 visionOS / Mac Catalyst slice
+
 `Package.swift` の `platforms:` と CI matrix に追加するのみ。Rust の `aarch64-apple-visionos*` / `*-apple-ios-macabi` target で同じビルド経路。
 
 ### 6.2 Android 配布
+
 同じ Rust ソースから `aarch64-linux-android` 等の target で `.so` を生成し AAR 化 (Issue #388 で別途対応済み)。
 
 ### 6.3 SSML サポート
+
 Rust 側の `piper_plus_g2p::ssml` モジュール (既存) を ffi.rs に export 追加 → Swift wrapper でも `phonemizeSSML(_:)` を提供。本リリースでは見送り (G2P コアに集中)。
 
 ### 6.4 Lite slice (JA 除外) / 言語選択ビルド
+
 バイナリサイズに敏感な consumer 向けに `libpiper_plus_g2p_lite-apple.xcframework.zip` (`--no-default-features --features english,spanish,french,portuguese`) を追加配布する選択肢。本リリースでは見送り、需要が出たら §3.1 のテーブルに lite slice を追加。
 
 ### 6.5 Phoneme ID encoding を Swift 側に開く
+
 現在 Rust の `encode::tokens_to_ids()` は ffi.rs 未 export。将来 SwiftUI のリアルタイムプレビュー等で需要が出たら `piper_plus_g2p_encode()` を追加。
 
 ---

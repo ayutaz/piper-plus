@@ -1,0 +1,25 @@
+# Workspace-wide rustfmt configuration.
+# Stable rustfmt only; nightly-only options are listed at the bottom as
+# commented-out reminders so they can be enabled if/when we adopt nightly
+# rustfmt in CI.
+
+# Match the workspace [workspace.package] edition so rustfmt parses sources
+# with the correct edition-specific syntax (e.g. let-else, async fn in trait).
+# NOTE: workspace uses edition = "2024" — rustfmt edition must match for
+# correct parsing (the original ticket said "2021" but the actual workspace
+# is on 2024).
+edition = "2024"
+
+# Width / wrapping
+max_width = 100
+
+# Reordering (stable)
+reorder_modules = true
+reorder_imports = true
+
+# Style nits (stable)
+use_field_init_shorthand = true
+
+# --- nightly-only (uncomment when running rustfmt nightly) ---
+# imports_granularity = "Crate"
+# group_imports = "StdExternalCrate"

@@ -59,7 +59,8 @@ func main() {
 
 	// Stream synthesis sentence by sentence
 	fmt.Fprintf(os.Stderr, "Streaming synthesis: %q\n", *text)
-	err = voice.SynthesizeStream(ctx, *text, sink,
+	err = voice.SynthesizeStream(
+		ctx, *text, sink,
 		piperplus.WithLanguage(*language),
 		piperplus.WithSentenceSilence(0.3),
 	)

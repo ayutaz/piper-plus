@@ -3,6 +3,7 @@
 Cross-runtime guide for integrating piper-plus into iOS projects (Dart / Flutter / Godot / Swift).
 
 > **Quick links:**
+>
 > - [Dart / Flutter quick reference](../../examples/dart/README.md#ios-integration)
 > - [Godot iOS notes](../../examples/godot/README.md#ios-v1130)
 > - [Swift example (manual drag-and-drop, SPM via Package.swift)](../../examples/swift/README.md)
@@ -44,7 +45,7 @@ unzip libpiper_plus-ios-*.xcframework.zip
 
 Result:
 
-```
+```text
 piper_plus.xcframework/
 ├── Info.plist
 ├── PrivacyInfo.xcprivacy            ← empty (no tracking, no Required Reason API)

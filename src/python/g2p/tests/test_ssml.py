@@ -190,6 +190,69 @@ class TestParseBreak:
 
 
 # =====================================================================
+# parse() — tail double-emit regression
+# =====================================================================
+
+
+class TestTailNoDoubleEmit:
+    """Regression tests: tail text after a self-closing element must
+    appear exactly once.
+
+    Previously, the ``<break>`` branch in ``_walk`` appended
+    ``element.tail`` itself, while the parent loop *also* appended
+    ``child.tail`` after the recursive call returned. This produced
+    duplicate text segments, which at synthesis time caused the same
+    audio to be generated twice (echo / repeated speech).
+    """
+
+    def test_break_tail_emitted_once(self):
+        """Bug repro: B was previously emitted twice after <break/>."""
+        ssml = '<speak>A<break time="500ms"/>B</speak>'
+        segments = SSMLParser.parse(ssml)
+        # Expected: exactly 3 segments — 'A', break(500), 'B'
+        assert len(segments) == 3
+        assert segments[0].text == "A"
+        assert segments[0].break_ms == 0
+        assert segments[1].text == ""
+        assert segments[1].break_ms == 500
+        assert segments[2].text == "B"
+        assert segments[2].break_ms == 0
+        # Defensive: 'B' must appear exactly once across all segments.
+        b_count = sum(1 for s in segments if s.text == "B")
+        assert b_count == 1, f"'B' emitted {b_count} times, expected 1"
+
+    def test_multiple_breaks_tails_emitted_once_each(self):
+        """Two <break/> elements: each tail appears exactly once."""
+        ssml = "<speak>X<break/>Y<break/>Z</speak>"
+        segments = SSMLParser.parse(ssml)
+        # Expected: 5 segments — 'X', break, 'Y', break, 'Z'
+        assert len(segments) == 5
+        texts = [s.text for s in segments]
+        assert texts == ["X", "", "Y", "", "Z"]
+        # Each text must appear exactly once.
+        assert texts.count("X") == 1
+        assert texts.count("Y") == 1
+        assert texts.count("Z") == 1
+        # Both breaks resolved to the default 'medium' (400ms).
+        breaks = [s.break_ms for s in segments if s.break_ms > 0]
+        assert breaks == [400, 400]
+
+    def test_prosody_tail_emitted_once(self):
+        """Tail after a closing prosody tag must not duplicate either."""
+        ssml = '<speak><prosody rate="0.5">L</prosody>M</speak>'
+        segments = SSMLParser.parse(ssml)
+        # Expected: 2 segments — 'L' (rate from prosody), 'M' (parent rate)
+        assert len(segments) == 2
+        assert segments[0].text == "L"
+        assert segments[0].rate == 0.5
+        assert segments[1].text == "M"
+        assert segments[1].rate == 1.0
+        # Defensive: 'M' must appear exactly once.
+        m_count = sum(1 for s in segments if s.text == "M")
+        assert m_count == 1, f"'M' emitted {m_count} times, expected 1"
+
+
+# =====================================================================
 # parse() — prosody rate
 # =====================================================================
 

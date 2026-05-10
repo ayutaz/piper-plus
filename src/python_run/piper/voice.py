@@ -66,6 +66,13 @@ TRIM_MIN_SAMPLES = 2205  # 22050 Hz * 0.1 s
 # for users who hit a thread-safety issue in a third-party G2P backend.
 _G2P_AUTO_PARALLELISM_CAP = 4
 
+# Strategy B: noise floor multipliers for short sequences. The contract gate
+# (scripts/check_short_text_contract.py) requires named constants so the
+# values can be drift-checked against [scales] in
+# docs/spec/short-text-contract.toml; do not inline.
+NOISE_SCALE_MIN_RATIO = 0.5
+NOISE_W_MIN_RATIO = 0.4
+
 
 def _resolve_g2p_parallelism(n_sentences: int) -> int:
     """Resolve effective G2P parallelism for phonemize().
@@ -75,10 +82,10 @@ def _resolve_g2p_parallelism(n_sentences: int) -> int:
     given worker count.
 
     Resolution order:
-      * ``PIPER_G2P_PARALLELISM=1``: force serial.
-      * ``PIPER_G2P_PARALLELISM=N`` (N >= 2): force N workers (capped at
+        * ``PIPER_G2P_PARALLELISM=1``: force serial.
+        * ``PIPER_G2P_PARALLELISM=N`` (N >= 2): force N workers (capped at
         ``n_sentences``).
-      * Otherwise (auto): ``min(n_sentences, max(2, cores // 2),
+        * Otherwise (auto): ``min(n_sentences, max(2, cores // 2),
         _G2P_AUTO_PARALLELISM_CAP)``. Falls back to 1 when ``n_sentences <= 1``.
     """
     raw = os.environ.get("PIPER_G2P_PARALLELISM", "").strip()
@@ -122,6 +129,22 @@ def _map_sentences(
 
     with ThreadPoolExecutor(max_workers=parallelism) as pool:
         return list(pool.map(fn, sentences))
+
+
+def is_short_text(text: str) -> bool:
+    """Return True iff ``text`` qualifies for Strategy C silence padding.
+
+    Mirror of the inline check in :py:meth:`PiperVoice.synthesize_stream_raw`.
+    Exposed at module scope so tests can exercise the canonical decision
+    without re-implementing the rule (see test_short_text_mitigation.py:
+    ``TestShortTextDetection``). SSML payloads always bypass Strategy C.
+    """
+    stripped = text.lstrip()
+    is_ssml = stripped.startswith(("<speak>", "<speak "))
+    if is_ssml:
+        return False
+    non_space = sum(1 for c in stripped if not c.isspace())
+    return non_space <= SHORT_TEXT_CHARS
 
 
 # Optional: use shared ORT utilities when piper_train is available
@@ -257,7 +280,11 @@ def _load_session_inline(
         "yes",
     )
 
-    model_p = Path(model_path)
+    # resolve(strict=True) canonicalises the user-provided model_path and
+    # rejects '..' traversal payloads early — also acts as a CodeQL
+    # py/path-injection sanitiser barrier so downstream cache_path operations
+    # are not flagged. Keep in sync with piper_train.ort_utils._build_cache_paths.
+    model_p = Path(model_path).resolve(strict=True)
     device_label = "cuda0" if use_cuda else "cpu"
     cache_path = model_p.with_suffix(f".{device_label}.opt.onnx")
     sentinel_path = Path(str(cache_path) + ".ok")
@@ -377,13 +404,13 @@ def _trim_padding_by_durations(
     Trimming policy (issue #356):
 
     * **BOS + front padding**: stripped completely. VITS produces an
-      audible "あ" at the start under the padded context.
+        audible "あ" at the start under the padded context.
     * **Back padding**: stripped completely.
     * **EOS**: keep only the first ``eos_max_frames`` frames (default
-      ``TRIM_EOS_MAX_FRAMES`` = 0, i.e. drop the entire EOS region).
-      0 was chosen empirically because even modest clamping (6 frames)
-      left an audible "だぁ"-like tail under the padded context. Callers
-      can pass a larger value to preserve a natural utterance tail.
+        ``TRIM_EOS_MAX_FRAMES`` = 0, i.e. drop the entire EOS region).
+        0 was chosen empirically because even modest clamping (6 frames)
+        left an audible "だぁ"-like tail under the padded context. Callers
+        can pass a larger value to preserve a natural utterance tail.
 
     Returns ``audio`` unchanged when inputs are inconsistent.
     """
@@ -555,8 +582,15 @@ class PiperVoice:
 
                     def _multi_one_debug(sentence: str) -> list[str]:
                         result = mp.phonemize(sentence)
+                        # Strip CR/LF from user-supplied input so it cannot
+                        # forge or split log lines (CodeQL py/log-injection).
+                        # The sanitised value is only used for logging — the
+                        # original `sentence` is still passed to phonemize.
+                        safe_sentence = sentence.replace("\n", "\\n").replace(
+                            "\r", "\\r"
+                        )
                         _LOGGER.debug(
-                            "MultilingualPhonemizer: '%s' -> %s", sentence, result
+                            "MultilingualPhonemizer: '%s' -> %s", safe_sentence, result
                         )
                         return result
 
@@ -689,10 +723,7 @@ class PiperVoice:
         Strategy C silence padding around every chunk.
         """
         # Strategy C: auto-inject silence padding for very short plain text
-        is_short_text = (
-            not text.lstrip().startswith(("<speak>", "<speak "))
-            and sum(1 for c in text if not c.isspace()) <= SHORT_TEXT_CHARS
-        )
+        is_short = is_short_text(text)
 
         # Phase 2 (issue #383): G2P-ORT pipeline. Submit every sentence's G2P
         # to a thread pool up-front so that while the ORT inference of
@@ -713,7 +744,7 @@ class PiperVoice:
         silence_bytes = bytes(num_silence_samples * 2)
 
         # Pre-compute break silence for Strategy C
-        if is_short_text:
+        if is_short:
             break_samples = int(self.config.sample_rate * SILENCE_PAD_MS / 1000)
             break_bytes = bytes(break_samples * 2)
         else:
@@ -837,7 +868,7 @@ class PiperVoice:
         Internal method that runs the full synthesis pipeline:
 
         1. Applies short-text mitigation (Strategy A padding + Strategy B
-           noise scale adjustment) for inputs shorter than ``MIN_PHONEME_IDS``.
+            noise scale adjustment) for inputs shorter than ``MIN_PHONEME_IDS``.
         2. Runs ONNX inference with the configured parameters.
         3. Trims silence introduced by padding (when applicable).
 
@@ -856,11 +887,11 @@ class PiperVoice:
 
             - ``audio_bytes`` : PCM 16-bit mono audio (silence trimmed if padded).
             - ``durations`` : 1-D float32 array of frame counts per phoneme,
-              or ``None`` if the model has no ``durations`` output.
-              Length matches the *padded* phoneme sequence; callers should
-              align with ``original_phoneme_ids`` length when computing timing.
+                or ``None`` if the model has no ``durations`` output.
+                Length matches the *padded* phoneme sequence; callers should
+                align with ``original_phoneme_ids`` length when computing timing.
             - ``original_phoneme_ids`` : The input ``phoneme_ids`` list,
-              preserved before any padding mutation.
+                preserved before any padding mutation.
 
         Notes
         -----
@@ -884,8 +915,8 @@ class PiperVoice:
         original_len = len(phoneme_ids)
         if original_len < MIN_PHONEME_IDS:
             ratio = max(0.0, min(original_len / MIN_PHONEME_IDS, 1.0))
-            noise_scale *= max(0.5, ratio)
-            noise_w *= max(0.4, ratio)
+            noise_scale *= max(NOISE_SCALE_MIN_RATIO, ratio)
+            noise_w *= max(NOISE_W_MIN_RATIO, ratio)
 
         # Strategy A: pad short sequences with silence tokens
         pad_id = 0
@@ -1076,8 +1107,8 @@ class PiperVoice:
 
             - ``wav_bytes`` : Complete WAV file content (RIFF header + PCM).
             - ``timing_result`` : :class:`piper.timing.TimingResult` with
-              per-phoneme entries, or ``None`` if the model does not output
-              a ``durations`` tensor (check ``self.has_duration_output``).
+                per-phoneme entries, or ``None`` if the model does not output
+                a ``durations`` tensor (check ``self.has_duration_output``).
 
         Notes
         -----

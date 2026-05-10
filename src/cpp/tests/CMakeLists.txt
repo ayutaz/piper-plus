@@ -63,6 +63,7 @@ set(TEST_SOURCES
     test_split_sentences.cpp
     test_zh_en_loanword.cpp
     test_g2p_parallelism.cpp
+    test_speaker_encoder_golden.cpp
 )
 
 # Add Unix-only tests (require open_jtalk binary or Unix APIs)
@@ -76,6 +77,10 @@ endif()
 # Add prosody inference test only when ONNX Runtime headers are available
 if(EXISTS "${ORT_INCLUDE_DIR}/onnxruntime_cxx_api.h" OR EXISTS "${CMAKE_BINARY_DIR}/pi/include/onnxruntime_cxx_api.h")
     list(APPEND TEST_SOURCES test_prosody_inference.cpp)
+    # Speaker Encoder E2E gate also requires ONNX Runtime (skips at runtime
+    # when PIPER_SPEAKER_ENCODER_ONNX_PATH is unset, but compilation needs
+    # the C++ API headers).
+    list(APPEND TEST_SOURCES test_speaker_encoder_e2e.cpp)
 endif()
 
 # Create test executables
@@ -122,7 +127,7 @@ foreach(test_source ${TEST_SOURCES})
             endforeach()
         endif()
     endif()
-    
+
     # Add spdlog/fmt dependencies for all tests
     if(TARGET spdlog_external)
         add_dependencies(${test_name} spdlog_external)
@@ -130,17 +135,18 @@ foreach(test_source ${TEST_SOURCES})
     if(TARGET fmt_external)
         add_dependencies(${test_name} fmt_external)
     endif()
-    
+
     # Add include directories for spdlog/fmt
     target_include_directories(${test_name} PRIVATE
         ${CMAKE_BINARY_DIR}/si/include
         ${CMAKE_BINARY_DIR}/fi/include
     )
-    
+
     # Link additional dependencies for dictionary manager test
     if(${test_name} STREQUAL "test_dictionary_manager" AND NOT WIN32 AND NOT MSVC)
         target_sources(${test_name} PRIVATE
             ../openjtalk_dictionary_manager.c
+            ../piper_proc_exec.c
         )
         target_include_directories(${test_name} PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/..
@@ -149,7 +155,7 @@ foreach(test_source ${TEST_SOURCES})
             OPENJTALK_DIC_PATH="../share/open_jtalk/dic"
         )
     endif()
-    
+
     # Link utf8_utils.hpp include path for split sentences test
     if(${test_name} STREQUAL "test_split_sentences")
         target_include_directories(${test_name} PRIVATE
@@ -210,6 +216,9 @@ foreach(test_source ${TEST_SOURCES})
         target_sources(${test_name} PRIVATE
             ../model_manager.cpp
             ../library_path.c
+            # piper_proc_exec.c provides piper_run_argv used by model_manager.cpp
+            # after the argv-based exec refactor (CodeQL fix).
+            ../piper_proc_exec.c
         )
         target_include_directories(${test_name} PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/..
@@ -241,6 +250,7 @@ foreach(test_source ${TEST_SOURCES})
             ../openjtalk_wrapper.c
             ../openjtalk_dictionary_manager.c
             ../openjtalk_error.c
+            ../piper_proc_exec.c
             ../openjtalk_security.c
             ../openjtalk_api.c
         )
@@ -260,6 +270,7 @@ foreach(test_source ${TEST_SOURCES})
             ../openjtalk_wrapper.c
             ../openjtalk_dictionary_manager.c
             ../openjtalk_error.c
+            ../piper_proc_exec.c
             ../openjtalk_security.c
             ../openjtalk_api.c
         )
@@ -279,6 +290,7 @@ foreach(test_source ${TEST_SOURCES})
             ../openjtalk_wrapper.c
             ../openjtalk_dictionary_manager.c
             ../openjtalk_error.c
+            ../piper_proc_exec.c
             ../openjtalk_security.c
             ../openjtalk_optimized.c
             ../openjtalk_api.c
@@ -315,6 +327,7 @@ foreach(test_source ${TEST_SOURCES})
             ../openjtalk_wrapper.c
             ../openjtalk_dictionary_manager.c
             ../openjtalk_error.c
+            ../piper_proc_exec.c
             ../openjtalk_security.c
             ../openjtalk_optimized.c
             ../openjtalk_api.c
@@ -398,6 +411,7 @@ foreach(test_source ${TEST_SOURCES})
             ../openjtalk_wrapper.c
             ../openjtalk_dictionary_manager.c
             ../openjtalk_error.c
+            ../piper_proc_exec.c
             ../openjtalk_security.c
             ../openjtalk_optimized.c
             ../openjtalk_api.c
@@ -497,6 +511,37 @@ foreach(test_source ${TEST_SOURCES})
         endif()
     endif()
 
+    # Link additional dependencies for speaker encoder E2E test (Layer 2).
+    # Same shape as test_prosody_inference: pure unit test that #includes
+    # <onnxruntime_cxx_api.h> directly, so it needs ${ORT_INCLUDE_DIR} on the
+    # include path and onnxruntime on the link line.
+    if(${test_name} STREQUAL "test_speaker_encoder_e2e")
+        target_include_directories(${test_name} PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/..
+            ${CMAKE_BINARY_DIR}/fi/include
+            ${CMAKE_BINARY_DIR}/si/include
+            ${ORT_INCLUDE_DIR}
+        )
+        target_link_directories(${test_name} PRIVATE
+            ${CMAKE_BINARY_DIR}/fi/lib
+            ${CMAKE_BINARY_DIR}/si/lib
+            ${ORT_LIB_DIR}
+        )
+        if(WIN32)
+            target_link_libraries(${test_name}
+                ${ORT_LIB_DIR}/onnxruntime.lib
+            )
+        else()
+            target_link_libraries(${test_name}
+                onnxruntime
+            )
+        endif()
+        if(UNIX)
+            find_package(Threads REQUIRED)
+            target_link_libraries(${test_name} Threads::Threads)
+        endif()
+    endif()
+
     # Link additional dependencies for streaming raw phonemes test
     if(${test_name} STREQUAL "test_streaming_raw_phonemes")
         target_sources(${test_name} PRIVATE
@@ -519,6 +564,7 @@ foreach(test_source ${TEST_SOURCES})
             ../openjtalk_wrapper.c
             ../openjtalk_dictionary_manager.c
             ../openjtalk_error.c
+            ../piper_proc_exec.c
             ../openjtalk_security.c
             ../openjtalk_optimized.c
             ../openjtalk_api.c
@@ -679,6 +725,25 @@ foreach(test_source ${TEST_SOURCES})
     )
 endforeach()
 
+# Direct unit tests for piper_proc_exec.c (argv-based process spawn helpers).
+# Self-contained: compiles piper_proc_exec.c directly + links gtest. No other
+# piper-library symbols required. PR #401 introduced these helpers to remove
+# shell-based system()/popen() and clear CodeQL command-line-injection
+# alerts; this test file gives them direct coverage that previously only
+# existed indirectly through model_manager / dictionary_manager.
+add_executable(test_piper_proc_exec
+    test_piper_proc_exec.cpp
+    ../piper_proc_exec.c
+)
+target_include_directories(test_piper_proc_exec PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../
+)
+target_link_libraries(test_piper_proc_exec gtest_main)
+add_test(NAME test_piper_proc_exec COMMAND test_piper_proc_exec)
+set_tests_properties(test_piper_proc_exec PROPERTIES
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+
 # Add test_phoneme_timing - only uses gtest and json.hpp (no spdlog/fmt)
 add_executable(test_phoneme_timing test_phoneme_timing.cpp)
 target_include_directories(test_phoneme_timing PRIVATE
@@ -690,6 +755,82 @@ target_link_libraries(test_phoneme_timing
 )
 
 add_test(NAME test_phoneme_timing COMMAND test_phoneme_timing)
+
+# Cross-runtime phoneme timing parity test.
+# Reads tests/fixtures/phoneme_timing/golden_matrix.json (generated from the
+# Python canonical timing.py) and asserts the spec cursor-walk algorithm in
+# C++ produces matching output. Self-contained: only links gtest + json.hpp,
+# no piper-library dependency.
+add_executable(test_phoneme_timing_parity test_phoneme_timing_parity.cpp)
+target_include_directories(test_phoneme_timing_parity PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../
+)
+target_link_libraries(test_phoneme_timing_parity
+    gtest_main
+)
+add_test(NAME test_phoneme_timing_parity COMMAND test_phoneme_timing_parity)
+set_tests_properties(test_phoneme_timing_parity PROPERTIES
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+
+# Cross-runtime speaker encoder mel parity test.
+# Reads test/fixtures/speaker_encoder_golden.json (generated from the Python
+# torchaudio reference) and asserts the spec mel pipeline (Hann + slaney mel
+# filterbank + STFT magnitude → log-mel) in C++ produces matching output.
+# Self-contained: only links gtest + json.hpp, no piper-library dependency.
+# (The C API speaker_encoder symbols are EXPERIMENTAL/unimplemented; this
+# test re-implements the spec independently as a forward-compat gate.)
+add_executable(test_speaker_encoder_parity test_speaker_encoder_parity.cpp)
+target_include_directories(test_speaker_encoder_parity PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../
+)
+target_link_libraries(test_speaker_encoder_parity
+    gtest_main
+)
+add_test(NAME test_speaker_encoder_parity COMMAND test_speaker_encoder_parity)
+set_tests_properties(test_speaker_encoder_parity PROPERTIES
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+
+# Cross-runtime short-text mitigation contract test.
+# Reads tests/fixtures/short_text/contract.json (generated from
+# docs/spec/short-text-contract.toml) and asserts the C++ constants in
+# piper.cpp match the canonical values. Self-contained: only links gtest
+# + json.hpp, no piper-library dependency.
+add_executable(test_short_text_contract test_short_text_contract.cpp)
+target_include_directories(test_short_text_contract PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../
+)
+target_link_libraries(test_short_text_contract
+    gtest_main
+)
+add_test(NAME test_short_text_contract COMMAND test_short_text_contract)
+set_tests_properties(test_short_text_contract PROPERTIES
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+
+# Cross-runtime ORT session contract test.
+# Reads tests/fixtures/ort_session/contract.json (generated from
+# docs/spec/ort-session-contract.toml) and asserts the C++ session/warmup
+# constants in piper.cpp match the canonical values that Python/Rust/Go/C#
+# also assert. Self-contained: only links gtest + json.hpp, no piper-library
+# dependency. Cache + env_var rows are pinned to the fixture for
+# forward-compat drift detection (C++ does not implement those features).
+add_executable(test_ort_session_contract test_ort_session_contract.cpp)
+target_include_directories(test_ort_session_contract PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../
+)
+target_link_libraries(test_ort_session_contract
+    gtest_main
+)
+add_test(NAME test_ort_session_contract COMMAND test_ort_session_contract)
+set_tests_properties(test_ort_session_contract PROPERTIES
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
 
 # ---- test_library_path: library_path.c unit tests ----
 add_executable(test_library_path
@@ -799,6 +940,20 @@ endif()
 
 add_test(NAME test_c_api COMMAND test_c_api)
 set_tests_properties(test_c_api PROPERTIES TIMEOUT 60)
+
+# Stage zh_en_loanword.json next to the test_c_api binary so the bundled
+# loanword default-data path (resolved via piper_plus_get_exe_dir() +
+# "/data/zh_en_loanword.json") is populated for the new CApiLoanword
+# round-trip tests. Without this, those tests skip (gracefully) — staging
+# upgrades them from skip to pass.
+add_custom_command(TARGET test_c_api POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory
+        $<TARGET_FILE_DIR:test_c_api>/data
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${CMAKE_SOURCE_DIR}/src/cpp/data/zh_en_loanword.json
+        $<TARGET_FILE_DIR:test_c_api>/data/zh_en_loanword.json
+    COMMENT "Staging zh_en_loanword.json next to test_c_api"
+)
 
 # ---- test_c_api_integration: C API integration tests (model required) ----
 # Links against the piper_plus shared library (or static lib for embedded build).

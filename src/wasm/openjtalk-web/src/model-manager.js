@@ -5,23 +5,23 @@
  * shortcut aliases, progress tracking during download, and IndexedDB caching.
  */
 
-const DB_NAME = 'piper-plus-models';
-const STORE_NAME = 'models';
-const DICT_STORE = 'dictionaries';
+const DB_NAME = "piper-plus-models";
+const STORE_NAME = "models";
+const DICT_STORE = "dictionaries";
 const DB_VERSION = 2;
 
-const HUGGINGFACE_API_BASE = 'https://huggingface.co/api/models';
-const HUGGINGFACE_RESOLVE_BASE = 'https://huggingface.co';
+const HUGGINGFACE_API_BASE = "https://huggingface.co/api/models";
+const HUGGINGFACE_RESOLVE_BASE = "https://huggingface.co";
 
 /**
  * Shortcut names that resolve to full HuggingFace repository identifiers.
  */
 const MODEL_REGISTRY = {
-  'tsukuyomi': 'ayousanz/piper-plus-tsukuyomi-chan',
-  'tsukuyomi-chan': 'ayousanz/piper-plus-tsukuyomi-chan',
-  'css10': 'ayousanz/piper-plus-css10-ja-6lang',
-  'css10-ja': 'ayousanz/piper-plus-css10-ja-6lang',
-  'base': 'ayousanz/piper-plus-base',
+  tsukuyomi: "ayousanz/piper-plus-tsukuyomi-chan",
+  "tsukuyomi-chan": "ayousanz/piper-plus-tsukuyomi-chan",
+  css10: "ayousanz/piper-plus-css10-ja-6lang",
+  "css10-ja": "ayousanz/piper-plus-css10-ja-6lang",
+  base: "ayousanz/piper-plus-base",
 };
 
 /**
@@ -77,7 +77,7 @@ async function fetchWithProgress(url, onProgress) {
     return response.arrayBuffer();
   }
 
-  const contentLength = response.headers.get('Content-Length');
+  const contentLength = response.headers.get("Content-Length");
   const total = contentLength ? parseInt(contentLength, 10) : 0;
 
   const reader = response.body.getReader();
@@ -86,7 +86,9 @@ async function fetchWithProgress(url, onProgress) {
 
   while (true) {
     const { done, value } = await reader.read();
-    if (done) break;
+    if (done) {
+      break;
+    }
 
     chunks.push(value);
     loaded += value.byteLength;
@@ -129,14 +131,14 @@ async function resolveModelFiles(repoName) {
   const metadata = await response.json();
   const siblings = metadata.siblings || [];
   const filenames = siblings.map((s) => s.rfilename);
-  const onnxFiles = filenames.filter((name) => name.endsWith('.onnx'));
+  const onnxFiles = filenames.filter((name) => name.endsWith(".onnx"));
 
   if (onnxFiles.length === 0) {
     throw new Error(`No .onnx file found in repository "${repoName}"`);
   }
 
   // If multiple ONNX files exist, prefer one with "fp16" in the name.
-  const fp16File = onnxFiles.find((name) => name.includes('fp16'));
+  const fp16File = onnxFiles.find((name) => name.includes("fp16"));
   const onnxFilename = fp16File || onnxFiles[0];
 
   // Resolve config: prefer sidecar {onnx}.json, fall back to config.json.
@@ -144,8 +146,8 @@ async function resolveModelFiles(repoName) {
   let configFilename;
   if (filenames.includes(sidecarConfig)) {
     configFilename = sidecarConfig;
-  } else if (filenames.includes('config.json')) {
-    configFilename = 'config.json';
+  } else if (filenames.includes("config.json")) {
+    configFilename = "config.json";
   } else {
     throw new Error(
       `No config file found in repository "${repoName}"; expected "${sidecarConfig}" or "config.json"`
@@ -190,15 +192,19 @@ export class ModelManager {
    * @returns {Promise<string|null>} - Lowercase hex string, or null
    */
   async _computeSha256(arrayBuffer) {
-    if (typeof globalThis.crypto === 'undefined' ||
-        !globalThis.crypto.subtle ||
-        typeof globalThis.crypto.subtle.digest !== 'function') {
+    if (
+      typeof globalThis.crypto === "undefined" ||
+      !globalThis.crypto.subtle ||
+      typeof globalThis.crypto.subtle.digest !== "function"
+    ) {
       return null;
     }
     try {
-      const hashBuffer = await globalThis.crypto.subtle.digest('SHA-256', arrayBuffer);
+      const hashBuffer = await globalThis.crypto.subtle.digest("SHA-256", arrayBuffer);
       const hashArray = new Uint8Array(hashBuffer);
-      return Array.from(hashArray).map(b => b.toString(16).padStart(2, '0')).join('');
+      return Array.from(hashArray)
+        .map((b) => b.toString(16).padStart(2, "0"))
+        .join("");
     } catch {
       return null;
     }
@@ -220,12 +226,11 @@ export class ModelManager {
     // Direct URL.
     if (/^https?:\/\//i.test(modelNameOrUrl)) {
       const modelUrl = modelNameOrUrl;
-      const configUrl = modelUrl + '.json';
+      const configUrl = modelUrl + ".json";
       // Fallback: config.json in the same directory as the model.
-      const lastSlash = modelUrl.lastIndexOf('/');
-      const configFallbackUrl = lastSlash >= 0
-        ? modelUrl.substring(0, lastSlash + 1) + 'config.json'
-        : null;
+      const lastSlash = modelUrl.lastIndexOf("/");
+      const configFallbackUrl =
+        lastSlash >= 0 ? modelUrl.substring(0, lastSlash + 1) + "config.json" : null;
       return { modelUrl, configUrl, configFallbackUrl, cacheKey: modelUrl };
     }
 
@@ -263,7 +268,8 @@ export class ModelManager {
    */
   async loadModel(modelNameOrUrl, options = {}) {
     const { onProgress } = options;
-    const { modelUrl, configUrl, configFallbackUrl, cacheKey } = await this._resolveUrls(modelNameOrUrl);
+    const { modelUrl, configUrl, configFallbackUrl, cacheKey } =
+      await this._resolveUrls(modelNameOrUrl);
 
     // Try the cache first.
     const cached = await this.getFromCache(cacheKey);
@@ -277,9 +283,7 @@ export class ModelManager {
       configResponse = await fetch(configFallbackUrl);
     }
     if (!configResponse.ok) {
-      const tried = configFallbackUrl
-        ? `${configUrl} and ${configFallbackUrl}`
-        : configUrl;
+      const tried = configFallbackUrl ? `${configUrl} and ${configFallbackUrl}` : configUrl;
       throw new Error(
         `Failed to fetch model config from ${tried}: ${configResponse.status} ${configResponse.statusText}`
       );
@@ -293,7 +297,9 @@ export class ModelManager {
     const sha256 = await this._computeSha256(modelData);
 
     if (sha256 === null) {
-      console.warn('[piper-plus] crypto.subtle unavailable — skipping SHA-256 integrity verification. Serve over HTTPS for full integrity checks.');
+      console.warn(
+        "[piper-plus] crypto.subtle unavailable — skipping SHA-256 integrity verification. Serve over HTTPS for full integrity checks."
+      );
     } else if (config.sha256) {
       // Verify against the expected hash in the model config.
       if (sha256 !== config.sha256) {
@@ -305,14 +311,9 @@ export class ModelManager {
 
     // Store in cache (include hash for later verification).
     const db = await this._getDb();
-    const tx = db.transaction(STORE_NAME, 'readwrite');
+    const tx = db.transaction(STORE_NAME, "readwrite");
     const store = tx.objectStore(STORE_NAME);
-    await wrapRequest(
-      store.put(
-        { modelData, config, timestamp: Date.now(), sha256 },
-        cacheKey,
-      )
-    );
+    await wrapRequest(store.put({ modelData, config, timestamp: Date.now(), sha256 }, cacheKey));
 
     return { modelData, config };
   }
@@ -329,7 +330,7 @@ export class ModelManager {
    */
   async getFromCache(key) {
     const db = await this._getDb();
-    const tx = db.transaction(STORE_NAME, 'readonly');
+    const tx = db.transaction(STORE_NAME, "readonly");
     const store = tx.objectStore(STORE_NAME);
     const entry = await wrapRequest(store.get(key));
     if (!entry) {
@@ -362,7 +363,7 @@ export class ModelManager {
    */
   async getDictionaryFromCache(key) {
     const db = await this._getDb();
-    const tx = db.transaction(DICT_STORE, 'readonly');
+    const tx = db.transaction(DICT_STORE, "readonly");
     const store = tx.objectStore(DICT_STORE);
     const entry = await wrapRequest(store.get(key));
     if (!entry) {
@@ -380,14 +381,9 @@ export class ModelManager {
    */
   async cacheDictionary(key, data) {
     const db = await this._getDb();
-    const tx = db.transaction(DICT_STORE, 'readwrite');
+    const tx = db.transaction(DICT_STORE, "readwrite");
     const store = tx.objectStore(DICT_STORE);
-    await wrapRequest(
-      store.put(
-        { data, timestamp: Date.now() },
-        key,
-      )
-    );
+    await wrapRequest(store.put({ data, timestamp: Date.now() }, key));
   }
 
   /**
@@ -423,7 +419,7 @@ export class ModelManager {
    */
   async clearCache() {
     const db = await this._getDb();
-    const tx = db.transaction([STORE_NAME, DICT_STORE], 'readwrite');
+    const tx = db.transaction([STORE_NAME, DICT_STORE], "readwrite");
     await wrapRequest(tx.objectStore(STORE_NAME).clear());
     await wrapRequest(tx.objectStore(DICT_STORE).clear());
   }

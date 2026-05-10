@@ -1,0 +1,36 @@
+name: dependency-review
+
+on:
+  pull_request:
+    branches: [dev, main]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dependency-review:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Dependency Review
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
+          comment-summary-in-pr: on-failure
+          # ライセンス互換性チェック (allow-licenses と deny-licenses は同時指定不可)
+          # allow-licenses にあるものだけ通過、それ以外は暗黙拒否。
+          # GPL/AGPL/LGPL は当然 list にないので拒否される。
+          allow-licenses: >-
+            MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC,
+            Unicode-DFS-2016, Unicode-3.0, CC0-1.0, MPL-2.0,
+            Zlib, OpenSSL, BSL-1.0, 0BSD, Apache-2.0 WITH LLVM-exception
+          # 自動 fail にせず、PR comment で報告
+          warn-only: false
+          # vulnerability scope
+          vulnerability-check: true

@@ -18,12 +18,12 @@
 class PushAudioWorkletProcessor extends AudioWorkletProcessor {
   constructor() {
     super();
-    this._buffer = [];  // queue of Float32Array chunks
-    this._offset = 0;   // current read position in first chunk
+    this._buffer = []; // queue of Float32Array chunks
+    this._offset = 0; // current read position in first chunk
     this.port.onmessage = (e) => {
-      if (e.data.type === 'audio') {
+      if (e.data.type === "audio") {
         this._buffer.push(e.data.samples); // Float32Array
-      } else if (e.data.type === 'stop') {
+      } else if (e.data.type === "stop") {
         this._buffer = [];
         this._offset = 0;
       }
@@ -61,4 +61,4 @@ class PushAudioWorkletProcessor extends AudioWorkletProcessor {
   }
 }
 
-registerProcessor('push-audio-worklet-processor', PushAudioWorkletProcessor);
+registerProcessor("push-audio-worklet-processor", PushAudioWorkletProcessor);

@@ -1,0 +1,506 @@
+{
+  "schema_version": 1,
+  "language": "fr",
+  "description": "French G2P golden phoneme matrix (pins current implementation output).",
+  "metadata": {
+    "source": "Python piper_plus_g2p — pinned by scripts/regenerate_g2p_golden_fixtures.py. The expected values capture the *current* implementation output. Drift in any rule will fail src/python/g2p/tests/test_golden_fixtures.py.",
+    "py_runtime": "src/python/g2p/piper_plus_g2p/french.py",
+    "version": 1
+  },
+  "cases": [
+    {
+      "text": "oui",
+      "expected_phonemes": [
+        "u",
+        "i"
+      ],
+      "notes": "basic ui"
+    },
+    {
+      "text": "non",
+      "expected_phonemes": [
+        "n",
+        "ɔ̃"
+      ],
+      "notes": "nasal on"
+    },
+    {
+      "text": "merci",
+      "expected_phonemes": [
+        "m",
+        "ɛ",
+        "ʁ",
+        "s",
+        "i"
+      ],
+      "notes": "basic"
+    },
+    {
+      "text": "bonjour",
+      "expected_phonemes": [
+        "b",
+        "ɔ̃",
+        "ʒ",
+        "u",
+        "ʁ"
+      ],
+      "notes": "on nasal + jour"
+    },
+    {
+      "text": "bon",
+      "expected_phonemes": [
+        "b",
+        "ɔ̃"
+      ],
+      "notes": "on nasal"
+    },
+    {
+      "text": "vin",
+      "expected_phonemes": [
+        "v",
+        "ɛ̃"
+      ],
+      "notes": "in nasal"
+    },
+    {
+      "text": "fin",
+      "expected_phonemes": [
+        "f",
+        "ɛ̃"
+      ],
+      "notes": "in nasal"
+    },
+    {
+      "text": "un",
+      "expected_phonemes": [
+        "ɛ̃"
+      ],
+      "notes": "un nasal"
+    },
+    {
+      "text": "blanc",
+      "expected_phonemes": [
+        "b",
+        "l",
+        "ɑ̃",
+        "k"
+      ],
+      "notes": "an nasal + silent c"
+    },
+    {
+      "text": "temps",
+      "expected_phonemes": [
+        "t",
+        "ɑ̃"
+      ],
+      "notes": "em nasal + silent ps"
+    },
+    {
+      "text": "petit",
+      "expected_phonemes": [
+        "p",
+        "ə",
+        "t",
+        "i"
+      ],
+      "notes": "silent t"
+    },
+    {
+      "text": "grand",
+      "expected_phonemes": [
+        "ɡ",
+        "ʁ",
+        "ɑ̃"
+      ],
+      "notes": "silent d"
+    },
+    {
+      "text": "parle",
+      "expected_phonemes": [
+        "p",
+        "a",
+        "ʁ",
+        "l"
+      ],
+      "notes": "silent e"
+    },
+    {
+      "text": "nez",
+      "expected_phonemes": [
+        "n",
+        "ə"
+      ],
+      "notes": "silent z"
+    },
+    {
+      "text": "trop",
+      "expected_phonemes": [
+        "t",
+        "ʁ",
+        "o"
+      ],
+      "notes": "silent p"
+    },
+    {
+      "text": "les amis",
+      "expected_phonemes": [
+        "l",
+        "ə",
+        "z",
+        " ",
+        "a",
+        "m",
+        "i"
+      ],
+      "notes": "z-liaison"
+    },
+    {
+      "text": "mes amis",
+      "expected_phonemes": [
+        "m",
+        "ə",
+        "z",
+        " ",
+        "a",
+        "m",
+        "i"
+      ],
+      "notes": "z-liaison"
+    },
+    {
+      "text": "un ami",
+      "expected_phonemes": [
+        "ɛ̃",
+        "n",
+        " ",
+        "a",
+        "m",
+        "i"
+      ],
+      "notes": "n-liaison"
+    },
+    {
+      "text": "très important",
+      "expected_phonemes": [
+        "t",
+        "ʁ",
+        "ɛ",
+        "z",
+        " ",
+        "ɛ̃",
+        "p",
+        "o",
+        "ʁ",
+        "t",
+        "ɑ̃"
+      ],
+      "notes": "z-liaison"
+    },
+    {
+      "text": "l'eau",
+      "expected_phonemes": [
+        "l",
+        "o"
+      ],
+      "notes": "l-elision"
+    },
+    {
+      "text": "j'ai",
+      "expected_phonemes": [
+        "ʒ",
+        "ɛ"
+      ],
+      "notes": "j-elision"
+    },
+    {
+      "text": "c'est",
+      "expected_phonemes": [
+        "s",
+        "ɛ",
+        "s"
+      ],
+      "notes": "c-elision"
+    },
+    {
+      "text": "n'a",
+      "expected_phonemes": [
+        "n",
+        "a"
+      ],
+      "notes": "n-elision"
+    },
+    {
+      "text": "qu'est",
+      "expected_phonemes": [
+        "k",
+        "ɛ",
+        "s"
+      ],
+      "notes": "qu-elision"
+    },
+    {
+      "text": "famille",
+      "expected_phonemes": [
+        "f",
+        "a",
+        "m",
+        "i",
+        "j"
+      ],
+      "notes": "ille → ij"
+    },
+    {
+      "text": "soleil",
+      "expected_phonemes": [
+        "s",
+        "o",
+        "l",
+        "ɛ",
+        "j"
+      ],
+      "notes": "eil → ɛj"
+    },
+    {
+      "text": "oreille",
+      "expected_phonemes": [
+        "o",
+        "ʁ",
+        "ɛ",
+        "j"
+      ],
+      "notes": "eille → ɛj"
+    },
+    {
+      "text": "ville",
+      "expected_phonemes": [
+        "v",
+        "i",
+        "l"
+      ],
+      "notes": "exception ille → il"
+    },
+    {
+      "text": "mille",
+      "expected_phonemes": [
+        "m",
+        "i",
+        "l"
+      ],
+      "notes": "exception ille → il"
+    },
+    {
+      "text": "été",
+      "expected_phonemes": [
+        "e",
+        "t",
+        "e"
+      ],
+      "notes": "é → e"
+    },
+    {
+      "text": "où",
+      "expected_phonemes": [
+        "o",
+        "y_vowel"
+      ],
+      "notes": "où → u"
+    },
+    {
+      "text": "à",
+      "expected_phonemes": [
+        "a"
+      ],
+      "notes": "à → a"
+    },
+    {
+      "text": "ça",
+      "expected_phonemes": [
+        "s",
+        "a"
+      ],
+      "notes": "ç → s"
+    },
+    {
+      "text": "être",
+      "expected_phonemes": [
+        "ɛ",
+        "t",
+        "ʁ"
+      ],
+      "notes": "ê → ɛ"
+    },
+    {
+      "text": "hier",
+      "expected_phonemes": [
+        "j",
+        "e"
+      ],
+      "notes": "exception er → jɛʁ"
+    },
+    {
+      "text": "fier",
+      "expected_phonemes": [
+        "f",
+        "j",
+        "e"
+      ],
+      "notes": "exception er → fjɛʁ"
+    },
+    {
+      "text": "cher",
+      "expected_phonemes": [
+        "ʃ",
+        "ɛ",
+        "ʁ"
+      ],
+      "notes": "exception er → ʃɛʁ"
+    },
+    {
+      "text": "eau",
+      "expected_phonemes": [
+        "o"
+      ],
+      "notes": "eau → o"
+    },
+    {
+      "text": "au",
+      "expected_phonemes": [
+        "o"
+      ],
+      "notes": "au → o"
+    },
+    {
+      "text": "ou",
+      "expected_phonemes": [
+        "u"
+      ],
+      "notes": "ou → u"
+    },
+    {
+      "text": "oi",
+      "expected_phonemes": [
+        "w",
+        "a"
+      ],
+      "notes": "oi → wa"
+    },
+    {
+      "text": "ai",
+      "expected_phonemes": [
+        "ɛ"
+      ],
+      "notes": "ai → ɛ"
+    },
+    {
+      "text": "maison",
+      "expected_phonemes": [
+        "m",
+        "ɛ",
+        "z",
+        "ɔ̃"
+      ],
+      "notes": "ai + nasal on"
+    },
+    {
+      "text": "matin",
+      "expected_phonemes": [
+        "m",
+        "a",
+        "t",
+        "ɛ̃"
+      ],
+      "notes": "in nasal"
+    },
+    {
+      "text": "femme",
+      "expected_phonemes": [
+        "f",
+        "ɛ",
+        "m"
+      ],
+      "notes": "irregular e → a"
+    },
+    {
+      "text": "monsieur",
+      "expected_phonemes": [
+        "m",
+        "ɔ̃",
+        "s",
+        "j",
+        "œ",
+        "ʁ"
+      ],
+      "notes": "irregular pronunciation"
+    },
+    {
+      "text": "aujourd'hui",
+      "expected_phonemes": [
+        "o",
+        "ʒ",
+        "u",
+        "ʁ",
+        " ",
+        "ɥ",
+        "i"
+      ],
+      "notes": "elision + ui"
+    },
+    {
+      "text": "chat",
+      "expected_phonemes": [
+        "ʃ",
+        "a"
+      ],
+      "notes": "ch → ʃ"
+    },
+    {
+      "text": "agneau",
+      "expected_phonemes": [
+        "a",
+        "ɲ",
+        "o"
+      ],
+      "notes": "gn → ɲ"
+    },
+    {
+      "text": "photo",
+      "expected_phonemes": [
+        "f",
+        "o",
+        "t",
+        "o"
+      ],
+      "notes": "ph → f"
+    },
+    {
+      "text": "manger",
+      "expected_phonemes": [
+        "m",
+        "ɑ̃",
+        "ʒ",
+        "e"
+      ],
+      "notes": "-er verb"
+    },
+    {
+      "text": "aller",
+      "expected_phonemes": [
+        "a",
+        "l",
+        "e"
+      ],
+      "notes": "-er irregular"
+    },
+    {
+      "text": "avoir",
+      "expected_phonemes": [
+        "a",
+        "v",
+        "w",
+        "a",
+        "ʁ"
+      ],
+      "notes": "common irreg verb"
+    }
+  ]
+}

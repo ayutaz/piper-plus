@@ -157,7 +157,9 @@ internal sealed class DotNetKoreanG2PEngine : IKoreanG2PEngine
         {
             // Skip empty strings from split
             if (part.Length == 0)
+            {
                 continue;
+            }
 
             // Whitespace between words -> mark that next word needs a space
             if (IsWhitespace(part))
@@ -206,6 +208,7 @@ internal sealed class DotNetKoreanG2PEngine : IKoreanG2PEngine
                     a2.Add(0);
                     a3.Add(wordA3);
                 }
+
                 // Digits and other characters are skipped
             }
 
@@ -216,7 +219,9 @@ internal sealed class DotNetKoreanG2PEngine : IKoreanG2PEngine
         IReadOnlyList<string> mapped = OpenJTalkToPiperMapping.MapSequence(phonemes);
         var mappedList = new List<string>(mapped.Count);
         for (int i = 0; i < mapped.Count; i++)
+        {
             mappedList.Add(mapped[i]);
+        }
 
         return new KoreanG2PResult(
             Phonemes: mappedList,
@@ -255,7 +260,7 @@ internal sealed class DotNetKoreanG2PEngine : IKoreanG2PEngine
     /// </summary>
     private static string[] SyllableToIpa(char ch)
     {
-        var (initial, medial, final_) = DecomposeSyllable(ch);
+        (int initial, int medial, int final_) = DecomposeSyllable(ch);
 
         // Collect all tokens
         var result = new List<string>(6);
@@ -274,8 +279,11 @@ internal sealed class DotNetKoreanG2PEngine : IKoreanG2PEngine
         foreach (char ch in word)
         {
             if (IsHangulSyllable(ch))
+            {
                 count++;
+            }
         }
+
         return count;
     }
 
@@ -287,8 +295,11 @@ internal sealed class DotNetKoreanG2PEngine : IKoreanG2PEngine
         foreach (char ch in s)
         {
             if (!char.IsWhiteSpace(ch))
+            {
                 return false;
+            }
         }
+
         return true;
     }
 }

@@ -263,31 +263,37 @@ pip install piper-plus
 ### Instalacion desde paquetes
 
 **Python (PyPI):**
+
 ```bash
 pip install piper-plus
 ```
 
 **npm (WASM para navegador):**
+
 ```bash
 npm install piper-plus onnxruntime-web
 ```
 
 **CLI C# (.NET Global Tool):**
+
 ```bash
 dotnet tool install -g PiperPlus.Cli
 ```
 
 **CLI Rust (crates.io):**
+
 ```bash
 cargo install piper-plus-cli
 ```
 
 **Biblioteca C# (NuGet):**
+
 ```bash
 dotnet add package PiperPlus.Core
 ```
 
 **Biblioteca Rust (crates.io):**
+
 ```toml
 [dependencies]
 piper-plus = "0.4"
@@ -320,7 +326,7 @@ dotnet test src/csharp/PiperPlus.Core.Tests/
 
 Requisitos previos: .NET 10 SDK o superior
 
-#### Ejemplos de uso del CLI C#
+#### Ejemplos de uso del CLI C\#
 
 ```bash
 # Inferencia por nombre de modelo (descarga automatica, sin --output-file genera output.wav)

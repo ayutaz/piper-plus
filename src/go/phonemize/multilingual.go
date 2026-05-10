@@ -34,7 +34,7 @@ var eosOnlyTokens = map[string]bool{
 // All transient mutable state (EOSToken tracking, per-call dispatch
 // computation) is passed through return values or local variables; the only
 // configuration field that can change after construction is
-// ``enableZhEnDispatch``, which is stored as ``atomic.Bool`` so concurrent
+// “enableZhEnDispatch“, which is stored as “atomic.Bool“ so concurrent
 // SetZhEnDispatch / IsZhEnDispatchEnabled / PhonemizeWithProsody calls do not
 // race. The underlying per-language phonemizers must also be safe for
 // concurrent use.
@@ -164,7 +164,8 @@ func (m *MultilingualPhonemizer) PhonemizeWithProsody(text string) (*PhonemizeRe
 			// dispatch attempts simply fall through to the standard
 			// English phonemizer with no further log noise.
 			m.loanwordWarnOnce.Do(func() {
-				slog.Warn("ZH-EN dispatch disabled: failed to load bundled loanword data",
+				slog.Warn(
+					"ZH-EN dispatch disabled: failed to load bundled loanword data",
 					"error", err,
 				)
 			})
@@ -196,7 +197,8 @@ func (m *MultilingualPhonemizer) PhonemizeWithProsody(text string) (*PhonemizeRe
 
 		phonemizer, ok := m.phonemizers[seg.Language]
 		if !ok {
-			slog.Warn("no phonemizer registered for language, skipping segment",
+			slog.Warn(
+				"no phonemizer registered for language, skipping segment",
 				"language", seg.Language,
 				"text", seg.Text,
 			)
@@ -212,7 +214,8 @@ func (m *MultilingualPhonemizer) PhonemizeWithProsody(text string) (*PhonemizeRe
 		// phonemizer call. BOS/EOS tokens always have nil prosody at matching
 		// indices, so filtering them out keeps tokens and prosody aligned.
 		if len(result.Tokens) != len(result.Prosody) {
-			slog.Warn("tokens/prosody length mismatch from phonemizer",
+			slog.Warn(
+				"tokens/prosody length mismatch from phonemizer",
 				"language", seg.Language,
 				"tokens_len", len(result.Tokens),
 				"prosody_len", len(result.Prosody),

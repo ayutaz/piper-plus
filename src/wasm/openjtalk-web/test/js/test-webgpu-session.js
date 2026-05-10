@@ -5,35 +5,43 @@
  * テスト対象: src/wasm/openjtalk-web/src/webgpu-session-manager.js (未実装)
  */
 
-import { strict as assert } from 'assert';
-import { describe, it, beforeEach } from 'node:test';
+import { strict as assert } from "assert";
+import { describe, it, beforeEach } from "node:test";
 
 // --- モック定義 ---
 
-function createMockOrt({ supportedProviders = ['wasm'] } = {}) {
+function createMockOrt({ supportedProviders = ["wasm"] } = {}) {
   return {
     InferenceSession: {
       create: async (path, options) => {
-        const provider = (options.executionProviders || ['wasm'])[0];
-        const providerName = typeof provider === 'string' ? provider : provider.name;
+        const provider = (options.executionProviders || ["wasm"])[0];
+        const providerName = typeof provider === "string" ? provider : provider.name;
         if (!supportedProviders.includes(providerName)) {
           throw new Error(`EP ${providerName} not available`);
         }
         return {
-          inputNames: ['input', 'input_lengths', 'scales'],
-          outputNames: ['output'],
+          inputNames: ["input", "input_lengths", "scales"],
+          outputNames: ["output"],
           currentProvider: providerName,
           run: async () => ({ output: { data: new Float32Array(100), dims: [1, 100] } }),
           release: () => {},
         };
       },
     },
-    Tensor: class { constructor(t, d, s) { this.type = t; this.data = d; this.dims = s; } },
+    Tensor: class {
+      constructor(t, d, s) {
+        this.type = t;
+        this.data = d;
+        this.dims = s;
+      }
+    },
   };
 }
 
 function createMockGPU(available = true) {
-  if (!available) return undefined;
+  if (!available) {
+    return undefined;
+  }
   return {
     requestAdapter: async () => ({
       requestDevice: async () => ({
@@ -49,7 +57,7 @@ function createMockGPU(available = true) {
 
 let WebGPUSessionManager;
 try {
-  const mod = await import('../../src/webgpu-session-manager.js');
+  const mod = await import("../../src/webgpu-session-manager.js");
   WebGPUSessionManager = mod.WebGPUSessionManager || mod.default;
 } catch {
   WebGPUSessionManager = null;
@@ -57,60 +65,61 @@ try {
 
 const skip = WebGPUSessionManager === null;
 
-describe('WebGPUSessionManager', { skip }, () => {
-  describe('フォールバック順序', () => {
-    it('WebGPU対応環境ではwebgpuプロバイダーを選択する', async () => {
+describe("WebGPUSessionManager", { skip }, () => {
+  describe("フォールバック順序", () => {
+    it("WebGPU対応環境ではwebgpuプロバイダーを選択する", async () => {
       const mgr = new WebGPUSessionManager({
-        ort: createMockOrt({ supportedProviders: ['webgpu', 'wasm'] }),
+        ort: createMockOrt({ supportedProviders: ["webgpu", "wasm"] }),
         gpu: createMockGPU(true),
       });
-      const session = await mgr.createSession('model.onnx');
-      assert.equal(mgr.currentProvider, 'webgpu');
+      const session = await mgr.createSession("model.onnx");
+      assert.equal(mgr.currentProvider, "webgpu");
     });
 
-    it('WebGPU非対応時はwasmにフォールバックする', async () => {
+    it("WebGPU非対応時はwasmにフォールバックする", async () => {
       const mgr = new WebGPUSessionManager({
-        ort: createMockOrt({ supportedProviders: ['wasm'] }),
+        ort: createMockOrt({ supportedProviders: ["wasm"] }),
         gpu: createMockGPU(false),
       });
-      const session = await mgr.createSession('model.onnx');
-      assert.equal(mgr.currentProvider, 'wasm');
+      const session = await mgr.createSession("model.onnx");
+      assert.equal(mgr.currentProvider, "wasm");
     });
 
-    it('全プロバイダー失敗時はエラーをスローする', async () => {
+    it("全プロバイダー失敗時はエラーをスローする", async () => {
       const mgr = new WebGPUSessionManager({
         ort: createMockOrt({ supportedProviders: [] }),
         gpu: createMockGPU(false),
       });
-      await assert.rejects(
-        () => mgr.createSession('model.onnx'),
-        { message: /All execution providers failed/ }
-      );
+      await assert.rejects(() => mgr.createSession("model.onnx"), {
+        message: /All execution providers failed/,
+      });
     });
 
-    it('フォールバック順序は webgpu → wasm (WebGL含まない)', async () => {
+    it("フォールバック順序は webgpu → wasm (WebGL含まない)", async () => {
       const tried = [];
       const mgr = new WebGPUSessionManager({
         ort: {
           InferenceSession: {
             create: async (path, opts) => {
               const p = opts.executionProviders[0];
-              const name = typeof p === 'string' ? p : p.name;
+              const name = typeof p === "string" ? p : p.name;
               tried.push(name);
-              throw new Error('fail');
+              throw new Error("fail");
             },
           },
         },
         gpu: createMockGPU(true),
       });
-      try { await mgr.createSession('model.onnx'); } catch {}
-      assert.ok(!tried.includes('webgl'), 'WebGL should not be in fallback chain');
-      assert.deepEqual(tried, ['webgpu', 'wasm']);
+      try {
+        await mgr.createSession("model.onnx");
+      } catch {}
+      assert.ok(!tried.includes("webgl"), "WebGL should not be in fallback chain");
+      assert.deepEqual(tried, ["webgpu", "wasm"]);
     });
   });
 
-  describe('GPU容量チェック', () => {
-    it('モデルサイズがGPU容量内ならtrueを返す', async () => {
+  describe("GPU容量チェック", () => {
+    it("モデルサイズがGPU容量内ならtrueを返す", async () => {
       const mgr = new WebGPUSessionManager({
         ort: createMockOrt(),
         gpu: createMockGPU(true), // maxBufferSize=256MB
@@ -119,13 +128,16 @@ describe('WebGPUSessionManager', { skip }, () => {
       assert.equal(ok, true);
     });
 
-    it('モデルサイズがGPU容量を超えるとfalseを返す', async () => {
+    it("モデルサイズがGPU容量を超えるとfalseを返す", async () => {
       const mgr = new WebGPUSessionManager({
         ort: createMockOrt(),
         gpu: {
           requestAdapter: async () => ({
             requestDevice: async () => ({
-              limits: { maxBufferSize: 50 * 1024 * 1024, maxStorageBufferBindingSize: 50 * 1024 * 1024 },
+              limits: {
+                maxBufferSize: 50 * 1024 * 1024,
+                maxStorageBufferBindingSize: 50 * 1024 * 1024,
+              },
               destroy: () => {},
             }),
           }),
@@ -136,14 +148,14 @@ describe('WebGPUSessionManager', { skip }, () => {
       assert.equal(ok, false);
     });
 
-    it('maxStorageBufferBindingSizeが不足するとfalseを返す', async () => {
+    it("maxStorageBufferBindingSizeが不足するとfalseを返す", async () => {
       const mgr = new WebGPUSessionManager({
         ort: createMockOrt(),
         gpu: {
           requestAdapter: async () => ({
             requestDevice: async () => ({
               limits: {
-                maxBufferSize: 256 * 1024 * 1024,           // 256MB — enough
+                maxBufferSize: 256 * 1024 * 1024, // 256MB — enough
                 maxStorageBufferBindingSize: 50 * 1024 * 1024, // 50MB — too small
               },
               destroy: () => {},
@@ -155,7 +167,7 @@ describe('WebGPUSessionManager', { skip }, () => {
       assert.equal(ok, false);
     });
 
-    it('GPU非対応時はfalseを返す', async () => {
+    it("GPU非対応時はfalseを返す", async () => {
       const mgr = new WebGPUSessionManager({
         ort: createMockOrt(),
         gpu: undefined,
@@ -164,7 +176,7 @@ describe('WebGPUSessionManager', { skip }, () => {
       assert.equal(ok, false);
     });
 
-    it('requestAdapterがnullを返した場合はfalseを返す', async () => {
+    it("requestAdapterがnullを返した場合はfalseを返す", async () => {
       const mgr = new WebGPUSessionManager({
         ort: createMockOrt(),
         gpu: { requestAdapter: async () => null },
@@ -174,21 +186,21 @@ describe('WebGPUSessionManager', { skip }, () => {
     });
   });
 
-  describe('int64 フォールバック', () => {
-    it('int64入力を持つモデルではWebGPUをスキップしWASMにフォールバックする', async () => {
+  describe("int64 フォールバック", () => {
+    it("int64入力を持つモデルではWebGPUをスキップしWASMにフォールバックする", async () => {
       const mgr = new WebGPUSessionManager({
         ort: {
           InferenceSession: {
             create: async (path, opts) => {
-              const provider = (opts.executionProviders || ['wasm'])[0];
+              const provider = (opts.executionProviders || ["wasm"])[0];
               return {
-                inputNames: ['input', 'input_lengths', 'scales', 'lid'],
-                outputNames: ['output'],
+                inputNames: ["input", "input_lengths", "scales", "lid"],
+                outputNames: ["output"],
                 inputMetadata: {
-                  input: { dataType: 'int64' },
-                  input_lengths: { dataType: 'int64' },
-                  scales: { dataType: 'float32' },
-                  lid: { dataType: 'int64' },
+                  input: { dataType: "int64" },
+                  input_lengths: { dataType: "int64" },
+                  scales: { dataType: "float32" },
+                  lid: { dataType: "int64" },
                 },
                 currentProvider: provider,
                 run: async () => ({ output: { data: new Float32Array(100), dims: [1, 100] } }),
@@ -199,23 +211,26 @@ describe('WebGPUSessionManager', { skip }, () => {
         },
         gpu: createMockGPU(true),
       });
-      const session = await mgr.createSession('model.onnx');
-      assert.equal(mgr.currentProvider, 'wasm',
-        'Should fall back to wasm when model uses int64 inputs');
+      const session = await mgr.createSession("model.onnx");
+      assert.equal(
+        mgr.currentProvider,
+        "wasm",
+        "Should fall back to wasm when model uses int64 inputs"
+      );
     });
 
-    it('float32のみのモデルではWebGPUが選択される', async () => {
+    it("float32のみのモデルではWebGPUが選択される", async () => {
       const mgr = new WebGPUSessionManager({
         ort: {
           InferenceSession: {
             create: async (path, opts) => {
-              const provider = (opts.executionProviders || ['wasm'])[0];
+              const provider = (opts.executionProviders || ["wasm"])[0];
               return {
-                inputNames: ['x', 'y'],
-                outputNames: ['output'],
+                inputNames: ["x", "y"],
+                outputNames: ["output"],
                 inputMetadata: {
-                  x: { dataType: 'float32' },
-                  y: { dataType: 'float32' },
+                  x: { dataType: "float32" },
+                  y: { dataType: "float32" },
                 },
                 currentProvider: provider,
                 run: async () => ({ output: { data: new Float32Array(100), dims: [1, 100] } }),
@@ -226,24 +241,30 @@ describe('WebGPUSessionManager', { skip }, () => {
         },
         gpu: createMockGPU(true),
       });
-      const session = await mgr.createSession('model.onnx');
-      assert.equal(mgr.currentProvider, 'webgpu',
-        'Should use webgpu when model has no int64 inputs');
+      const session = await mgr.createSession("model.onnx");
+      assert.equal(
+        mgr.currentProvider,
+        "webgpu",
+        "Should use webgpu when model has no int64 inputs"
+      );
     });
 
-    it('inputMetadata未提供時はWebGPUを許可する (後方互換)', async () => {
+    it("inputMetadata未提供時はWebGPUを許可する (後方互換)", async () => {
       const mgr = new WebGPUSessionManager({
-        ort: createMockOrt({ supportedProviders: ['webgpu', 'wasm'] }),
+        ort: createMockOrt({ supportedProviders: ["webgpu", "wasm"] }),
         gpu: createMockGPU(true),
       });
-      const session = await mgr.createSession('model.onnx');
-      assert.equal(mgr.currentProvider, 'webgpu',
-        'Should allow webgpu when metadata is unavailable');
+      const session = await mgr.createSession("model.onnx");
+      assert.equal(
+        mgr.currentProvider,
+        "webgpu",
+        "Should allow webgpu when metadata is unavailable"
+      );
     });
   });
 
-  describe('セッション設定', () => {
-    it('graphOptimizationLevelがextendedに設定される', async () => {
+  describe("セッション設定", () => {
+    it("graphOptimizationLevelがextendedに設定される", async () => {
       let capturedOptions;
       const mgr = new WebGPUSessionManager({
         ort: {
@@ -256,11 +277,11 @@ describe('WebGPUSessionManager', { skip }, () => {
         },
         gpu: createMockGPU(false),
       });
-      await mgr.createSession('model.onnx');
-      assert.equal(capturedOptions.graphOptimizationLevel, 'extended');
+      await mgr.createSession("model.onnx");
+      assert.equal(capturedOptions.graphOptimizationLevel, "extended");
     });
 
-    it('enableMemPatternがtrueに設定される', async () => {
+    it("enableMemPatternがtrueに設定される", async () => {
       let capturedOptions;
       const mgr = new WebGPUSessionManager({
         ort: {
@@ -273,11 +294,11 @@ describe('WebGPUSessionManager', { skip }, () => {
         },
         gpu: createMockGPU(false),
       });
-      await mgr.createSession('model.onnx');
+      await mgr.createSession("model.onnx");
       assert.equal(capturedOptions.enableMemPattern, true);
     });
 
-    it('intraOpNumThreadsが設定されない (WASM非対応)', async () => {
+    it("intraOpNumThreadsが設定されない (WASM非対応)", async () => {
       let capturedOptions;
       const mgr = new WebGPUSessionManager({
         ort: {
@@ -290,7 +311,7 @@ describe('WebGPUSessionManager', { skip }, () => {
         },
         gpu: createMockGPU(false),
       });
-      await mgr.createSession('model.onnx');
+      await mgr.createSession("model.onnx");
       assert.equal(capturedOptions.intraOpNumThreads, undefined);
     });
   });

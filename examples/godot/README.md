@@ -8,7 +8,7 @@ This example demonstrates how to wrap the piper-plus C API into a `PiperTTS` nod
 
 ## Directory Structure
 
-```
+```text
 examples/godot/
   SConstruct                   # SCons build script (~15 lines)
   src/
@@ -28,21 +28,28 @@ examples/godot/
 
 1. **Godot 4.3+** installed
 2. **piper-plus shared library** installed and discoverable via `pkg-config`:
+
    ```bash
    # Verify installation
    pkg-config --cflags --libs piper_plus
    ```
+
    If not installed, download from [GitHub Releases](https://github.com/ayutaz/piper-plus/releases) and extract:
+
    ```bash
    tar -xzf piper-plus-shared-linux-x64.tar.gz -C /usr/local
    ```
+
 3. **godot-cpp** (Godot C++ bindings):
+
    ```bash
    cd examples/godot
    git clone --depth 1 --branch godot-4.3-stable \
      https://github.com/godotengine/godot-cpp.git
    ```
+
 4. **SCons** build system:
+
    ```bash
    pip install scons
    ```
@@ -147,7 +154,7 @@ On Linux/macOS, set `LD_LIBRARY_PATH` / `DYLD_LIBRARY_PATH` if the shared librar
 
 ### Before (Source Copy)
 
-```
+```text
 godot-piper-plus/
   src/
     piper_tts.h / .cpp         # GDExtension wrapper
@@ -166,7 +173,7 @@ godot-piper-plus/
 
 ### After (C API Shared Library)
 
-```
+```text
 examples/godot/
   src/
     piper_tts_node.h / .cpp    # GDExtension wrapper (~150 lines)

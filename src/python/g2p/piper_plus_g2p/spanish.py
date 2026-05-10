@@ -303,11 +303,8 @@ def _find_syllable_boundaries(
                 else:
                     # Accented weak vowel forces hiatus (diphthong breaking)
                     weak = {"i", "u"}
-                    if (
-                        curr_base in weak
-                        and _has_accent_on_char(curr_grapheme)
-                        or prev_base in weak
-                        and _has_accent_on_char(prev_grapheme)
+                    if (curr_base in weak and _has_accent_on_char(curr_grapheme)) or (
+                        prev_base in weak and _has_accent_on_char(prev_grapheme)
                     ):
                         ns_boundaries.append(i)
             i += 1
@@ -593,7 +590,7 @@ def _g2p_word(
             continue
 
         if base_ch == "r":
-            if _is_word_initial() or i > 0 and base_word[i - 1] in ("l", "n", "s"):
+            if _is_word_initial() or (i > 0 and base_word[i - 1] in ("l", "n", "s")):
                 phonemes.append("rr")
             else:
                 phonemes.append("\u027e")

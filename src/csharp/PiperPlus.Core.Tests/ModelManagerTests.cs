@@ -39,13 +39,13 @@ public sealed class ModelManagerTests : IDisposable
     // ================================================================
     // GetDefaultModelDir
     // ================================================================
-
     [Fact]
     public void GetDefaultModelDir_ReturnsNonEmpty()
     {
         string dir = ModelManager.GetDefaultModelDir();
 
-        Assert.False(string.IsNullOrWhiteSpace(dir),
+        Assert.False(
+            string.IsNullOrWhiteSpace(dir),
             "GetDefaultModelDir() must return a non-empty string");
     }
 
@@ -62,11 +62,10 @@ public sealed class ModelManagerTests : IDisposable
     // ================================================================
     // FindVoice — exact key
     // ================================================================
-
     [Fact]
     public void FindVoice_ByExactKey()
     {
-        var voice = ModelManager.FindVoice("ja_JP-tsukuyomi-chan-medium");
+        VoiceInfo? voice = ModelManager.FindVoice("ja_JP-tsukuyomi-chan-medium");
 
         Assert.NotNull(voice);
         Assert.Equal("ja_JP-tsukuyomi-chan-medium", voice!.Key);
@@ -80,11 +79,10 @@ public sealed class ModelManagerTests : IDisposable
     // ================================================================
     // FindVoice — alias lookups
     // ================================================================
-
     [Fact]
     public void FindVoice_ByAlias_Tsukuyomi()
     {
-        var voice = ModelManager.FindVoice("tsukuyomi");
+        VoiceInfo? voice = ModelManager.FindVoice("tsukuyomi");
 
         Assert.NotNull(voice);
         Assert.Equal("ja_JP-tsukuyomi-chan-medium", voice!.Key);
@@ -94,7 +92,7 @@ public sealed class ModelManagerTests : IDisposable
     [Fact]
     public void FindVoice_ByAlias_Css10()
     {
-        var voice = ModelManager.FindVoice("css10");
+        VoiceInfo? voice = ModelManager.FindVoice("css10");
 
         Assert.NotNull(voice);
         Assert.Equal("ja_JP-css10-6lang-medium", voice!.Key);
@@ -105,11 +103,10 @@ public sealed class ModelManagerTests : IDisposable
     // ================================================================
     // FindVoice — not-found / edge cases
     // ================================================================
-
     [Fact]
     public void FindVoice_NotFound()
     {
-        var voice = ModelManager.FindVoice("nonexistent-model");
+        VoiceInfo? voice = ModelManager.FindVoice("nonexistent-model");
 
         Assert.Null(voice);
     }
@@ -117,7 +114,7 @@ public sealed class ModelManagerTests : IDisposable
     [Fact]
     public void FindVoice_EmptyString()
     {
-        var voice = ModelManager.FindVoice("");
+        VoiceInfo? voice = ModelManager.FindVoice(string.Empty);
 
         Assert.Null(voice);
     }
@@ -126,7 +123,7 @@ public sealed class ModelManagerTests : IDisposable
     public void FindVoice_CaseSensitive()
     {
         // Aliases are case-sensitive (exact match only), matching C++ behavior.
-        var voice = ModelManager.FindVoice("Tsukuyomi");
+        VoiceInfo? voice = ModelManager.FindVoice("Tsukuyomi");
 
         Assert.Null(voice);
     }
@@ -134,11 +131,10 @@ public sealed class ModelManagerTests : IDisposable
     // ================================================================
     // ListModels
     // ================================================================
-
     [Fact]
     public void ListModels_NoFilter_OutputsAllModels()
     {
-        using var sw = CaptureStdErr();
+        using StringWriter sw = CaptureStdErr();
 
         ModelManager.ListModels(null);
 
@@ -153,7 +149,7 @@ public sealed class ModelManagerTests : IDisposable
     [Fact]
     public void ListModels_JapaneseFilter()
     {
-        using var sw = CaptureStdErr();
+        using StringWriter sw = CaptureStdErr();
 
         ModelManager.ListModels("ja");
 
@@ -168,7 +164,7 @@ public sealed class ModelManagerTests : IDisposable
     [Fact]
     public void ListModels_UnknownLanguage()
     {
-        using var sw = CaptureStdErr();
+        using StringWriter sw = CaptureStdErr();
 
         ModelManager.ListModels("xx");
 
@@ -180,7 +176,6 @@ public sealed class ModelManagerTests : IDisposable
     // ================================================================
     // Security validation
     // ================================================================
-
     [Fact]
     public void FindVoice_PathTraversalKey_Rejected()
     {
@@ -188,7 +183,7 @@ public sealed class ModelManagerTests : IDisposable
         // Even if a malicious catalog entry existed, the key validation
         // in downloadModel would reject it. FindVoice itself simply
         // returns null for unknown keys.
-        var voice = ModelManager.FindVoice("../../../etc/passwd");
+        VoiceInfo? voice = ModelManager.FindVoice("../../../etc/passwd");
 
         Assert.Null(voice);
     }
@@ -199,7 +194,7 @@ public sealed class ModelManagerTests : IDisposable
         // Attempting to download a model that does not exist in the catalog
         // should fail gracefully (return false) without making HTTP requests.
         // Capture stderr to suppress the "not found" error message.
-        using var sw = CaptureStdErr();
+        using StringWriter sw = CaptureStdErr();
 
         bool result = await ModelManager.DownloadModelAsync(
             "nonexistent-model-xyz", Path.GetTempPath(), TestContext.Current.CancellationToken);
@@ -210,7 +205,6 @@ public sealed class ModelManagerTests : IDisposable
     // ================================================================
     // GetDefaultModelDir — environment variable overrides
     // ================================================================
-
     [Fact]
     public void GetDefaultModelDir_EnvVarOverride()
     {
@@ -236,7 +230,7 @@ public sealed class ModelManagerTests : IDisposable
         string? original = Environment.GetEnvironmentVariable("PIPER_MODEL_DIR");
         try
         {
-            Environment.SetEnvironmentVariable("PIPER_MODEL_DIR", "");
+            Environment.SetEnvironmentVariable("PIPER_MODEL_DIR", string.Empty);
 
             string dir = ModelManager.GetDefaultModelDir();
 
@@ -255,12 +249,11 @@ public sealed class ModelManagerTests : IDisposable
     // ================================================================
     // FindVoice — null input
     // ================================================================
-
     [Fact]
     public void FindVoice_NullInput_ReturnsNull()
     {
         // Passing null (via null-forgiving operator) should not throw.
-        var voice = ModelManager.FindVoice(null!);
+        VoiceInfo? voice = ModelManager.FindVoice(null!);
 
         Assert.Null(voice);
     }
@@ -268,11 +261,10 @@ public sealed class ModelManagerTests : IDisposable
     // ================================================================
     // ListModels — additional filter scenarios
     // ================================================================
-
     [Fact]
     public void ListModels_LanguageCodeFilter_ja_JP()
     {
-        using var sw = CaptureStdErr();
+        using StringWriter sw = CaptureStdErr();
 
         // Filter by full language code "ja_JP" (not just the family "ja")
         ModelManager.ListModels("ja_JP");
@@ -288,8 +280,8 @@ public sealed class ModelManagerTests : IDisposable
     public void ListModels_EmptyFilter_SameAsNull()
     {
         // An empty string filter should behave the same as null (show all models).
-        using var swEmpty = CaptureStdErr();
-        ModelManager.ListModels("");
+        using StringWriter swEmpty = CaptureStdErr();
+        ModelManager.ListModels(string.Empty);
         string outputEmpty = swEmpty.ToString();
 
         // Restore stderr for the second call
@@ -299,7 +291,7 @@ public sealed class ModelManagerTests : IDisposable
             _originalStdErr = null;
         }
 
-        using var swNull = CaptureStdErr();
+        using StringWriter swNull = CaptureStdErr();
         ModelManager.ListModels(null);
         string outputNull = swNull.ToString();
 
@@ -313,17 +305,16 @@ public sealed class ModelManagerTests : IDisposable
     // ================================================================
     // FindVoice — all aliases resolve correctly
     // ================================================================
-
     [Fact]
     public void FindVoice_AllAliases_ResolveCorrectly()
     {
-        var catalog = VoiceCatalog.LoadMergedCatalog();
+        IReadOnlyList<VoiceInfo> catalog = VoiceCatalog.LoadMergedCatalog();
 
-        foreach (var voice in catalog)
+        foreach (VoiceInfo voice in catalog)
         {
             foreach (var alias in voice.Aliases)
             {
-                var found = ModelManager.FindVoice(alias);
+                VoiceInfo? found = ModelManager.FindVoice(alias);
 
                 Assert.NotNull(found);
                 Assert.Equal(voice.Key, found!.Key);
@@ -334,7 +325,6 @@ public sealed class ModelManagerTests : IDisposable
     // ================================================================
     // ResolveModelPathAsync — file path resolution
     // ================================================================
-
     [Fact]
     public async Task ResolveModelPathAsync_ExistingFile_ReturnsFullPath()
     {
@@ -352,7 +342,14 @@ public sealed class ModelManagerTests : IDisposable
         }
         finally
         {
-            try { File.Delete(tempFile); } catch { /* best-effort */ }
+            try
+            {
+                File.Delete(tempFile);
+            }
+            catch (IOException ex)
+            {
+                Console.Error.WriteLine($"[Test cleanup] {ex.Message}");
+            }
         }
     }
 
@@ -374,7 +371,7 @@ public sealed class ModelManagerTests : IDisposable
         // Empty string is not a file and not a model name.
         await Assert.ThrowsAsync<FileNotFoundException>(
             () => ModelManager.ResolveModelPathAsync(
-                "",
+                string.Empty,
                 null,
                 TestContext.Current.CancellationToken));
     }
@@ -383,10 +380,10 @@ public sealed class ModelManagerTests : IDisposable
     public async Task ResolveModelPathAsync_KnownVoiceName_ChecksCacheDir()
     {
         // Use a known voice and simulate cache hit
-        var voice = ModelManager.FindVoice("tsukuyomi");
+        VoiceInfo? voice = ModelManager.FindVoice("tsukuyomi");
         Assert.NotNull(voice);
 
-        var onnxFile = voice!.Files
+        VoiceFileInfo? onnxFile = voice!.Files
             .FirstOrDefault(f => f.RelativePath.EndsWith(".onnx", StringComparison.OrdinalIgnoreCase));
         Assert.NotNull(onnxFile);
 
@@ -405,7 +402,14 @@ public sealed class ModelManagerTests : IDisposable
         }
         finally
         {
-            try { Directory.Delete(tempDir, true); } catch { }
+            try
+            {
+                Directory.Delete(tempDir, true);
+            }
+            catch (IOException ex)
+            {
+                Console.Error.WriteLine($"[Test cleanup] {ex.Message}");
+            }
         }
     }
 
@@ -413,10 +417,10 @@ public sealed class ModelManagerTests : IDisposable
     public async Task ResolveModelPathAsync_KnownVoiceWithCachedOnnx_ReturnsCachedPath()
     {
         // Simulate a cached ONNX file for a known voice.
-        var voice = ModelManager.FindVoice("tsukuyomi");
+        VoiceInfo? voice = ModelManager.FindVoice("tsukuyomi");
         Assert.NotNull(voice);
 
-        var onnxFile = voice!.Files
+        VoiceFileInfo? onnxFile = voice!.Files
             .FirstOrDefault(f => f.RelativePath.EndsWith(".onnx", StringComparison.OrdinalIgnoreCase));
         Assert.NotNull(onnxFile);
 
@@ -436,7 +440,14 @@ public sealed class ModelManagerTests : IDisposable
         }
         finally
         {
-            try { Directory.Delete(tempDir, true); } catch { /* best-effort */ }
+            try
+            {
+                Directory.Delete(tempDir, true);
+            }
+            catch (IOException ex)
+            {
+                Console.Error.WriteLine($"[Test cleanup] {ex.Message}");
+            }
         }
     }
 
@@ -444,10 +455,10 @@ public sealed class ModelManagerTests : IDisposable
     public async Task ResolveModelPathAsync_AliasResolvesToCachedFile()
     {
         // Resolve using an alias (e.g., "css10") with a cached ONNX file.
-        var voice = ModelManager.FindVoice("css10");
+        VoiceInfo? voice = ModelManager.FindVoice("css10");
         Assert.NotNull(voice);
 
-        var onnxFile = voice!.Files
+        VoiceFileInfo? onnxFile = voice!.Files
             .FirstOrDefault(f => f.RelativePath.EndsWith(".onnx", StringComparison.OrdinalIgnoreCase));
         Assert.NotNull(onnxFile);
 
@@ -466,17 +477,24 @@ public sealed class ModelManagerTests : IDisposable
         }
         finally
         {
-            try { Directory.Delete(tempDir, true); } catch { /* best-effort */ }
+            try
+            {
+                Directory.Delete(tempDir, true);
+            }
+            catch (IOException ex)
+            {
+                Console.Error.WriteLine($"[Test cleanup] {ex.Message}");
+            }
         }
     }
 
     [Fact]
     public async Task ResolveModelPathAsync_NullModelDir_UsesDefault()
     {
-        var voice = ModelManager.FindVoice("css10");
+        VoiceInfo? voice = ModelManager.FindVoice("css10");
         Assert.NotNull(voice);
 
-        var onnxFile = voice!.Files
+        VoiceFileInfo? onnxFile = voice!.Files
             .FirstOrDefault(f => f.RelativePath.EndsWith(".onnx", StringComparison.OrdinalIgnoreCase));
         Assert.NotNull(onnxFile);
 
@@ -499,7 +517,14 @@ public sealed class ModelManagerTests : IDisposable
         finally
         {
             Environment.SetEnvironmentVariable("PIPER_MODEL_DIR", originalEnv);
-            try { Directory.Delete(tempDir, true); } catch { }
+            try
+            {
+                Directory.Delete(tempDir, true);
+            }
+            catch (IOException ex)
+            {
+                Console.Error.WriteLine($"[Test cleanup] {ex.Message}");
+            }
         }
     }
 
@@ -524,7 +549,14 @@ public sealed class ModelManagerTests : IDisposable
         }
         finally
         {
-            try { Directory.Delete(tempDir, true); } catch { /* best-effort */ }
+            try
+            {
+                Directory.Delete(tempDir, true);
+            }
+            catch (IOException ex)
+            {
+                Console.Error.WriteLine($"[Test cleanup] {ex.Message}");
+            }
         }
     }
 }
