@@ -146,6 +146,7 @@ foreach(test_source ${TEST_SOURCES})
     if(${test_name} STREQUAL "test_dictionary_manager" AND NOT WIN32 AND NOT MSVC)
         target_sources(${test_name} PRIVATE
             ../openjtalk_dictionary_manager.c
+            ../piper_proc_exec.c
         )
         target_include_directories(${test_name} PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/..
@@ -215,6 +216,9 @@ foreach(test_source ${TEST_SOURCES})
         target_sources(${test_name} PRIVATE
             ../model_manager.cpp
             ../library_path.c
+            # piper_proc_exec.c provides piper_run_argv used by model_manager.cpp
+            # after the argv-based exec refactor (CodeQL fix).
+            ../piper_proc_exec.c
         )
         target_include_directories(${test_name} PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/..
@@ -246,6 +250,7 @@ foreach(test_source ${TEST_SOURCES})
             ../openjtalk_wrapper.c
             ../openjtalk_dictionary_manager.c
             ../openjtalk_error.c
+            ../piper_proc_exec.c
             ../openjtalk_security.c
             ../openjtalk_api.c
         )
@@ -265,6 +270,7 @@ foreach(test_source ${TEST_SOURCES})
             ../openjtalk_wrapper.c
             ../openjtalk_dictionary_manager.c
             ../openjtalk_error.c
+            ../piper_proc_exec.c
             ../openjtalk_security.c
             ../openjtalk_api.c
         )
@@ -284,6 +290,7 @@ foreach(test_source ${TEST_SOURCES})
             ../openjtalk_wrapper.c
             ../openjtalk_dictionary_manager.c
             ../openjtalk_error.c
+            ../piper_proc_exec.c
             ../openjtalk_security.c
             ../openjtalk_optimized.c
             ../openjtalk_api.c
@@ -320,6 +327,7 @@ foreach(test_source ${TEST_SOURCES})
             ../openjtalk_wrapper.c
             ../openjtalk_dictionary_manager.c
             ../openjtalk_error.c
+            ../piper_proc_exec.c
             ../openjtalk_security.c
             ../openjtalk_optimized.c
             ../openjtalk_api.c
@@ -403,6 +411,7 @@ foreach(test_source ${TEST_SOURCES})
             ../openjtalk_wrapper.c
             ../openjtalk_dictionary_manager.c
             ../openjtalk_error.c
+            ../piper_proc_exec.c
             ../openjtalk_security.c
             ../openjtalk_optimized.c
             ../openjtalk_api.c
@@ -555,6 +564,7 @@ foreach(test_source ${TEST_SOURCES})
             ../openjtalk_wrapper.c
             ../openjtalk_dictionary_manager.c
             ../openjtalk_error.c
+            ../piper_proc_exec.c
             ../openjtalk_security.c
             ../openjtalk_optimized.c
             ../openjtalk_api.c
