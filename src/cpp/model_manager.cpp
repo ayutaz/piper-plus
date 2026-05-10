@@ -19,7 +19,9 @@
 #endif
 
 #include <spdlog/spdlog.h>
-#include <unistd.h>  // access(), X_OK
+#ifndef _WIN32
+#include <unistd.h>  // access(), X_OK — POSIX only; Windows uses PowerShell branch.
+#endif
 #include "json.hpp"
 #include "model_manager.hpp"
 #include "piper_proc_exec.h"
@@ -288,7 +290,10 @@ static bool downloadFile(const std::string& url,
         "/usr/bin/wget", "/usr/local/bin/wget", "/opt/homebrew/bin/wget",
         "/bin/wget", nullptr,
     };
-    auto find_tool = [](const char* const paths[]) -> const char* {
+    // CodeQL cpp/no-raw-arrays-in-interfaces: take a pointer-to-pointer
+    // explicitly rather than letting array-to-pointer decay happen across
+    // the lambda boundary. Behavior is identical (still NULL-terminated).
+    auto find_tool = [](const char* const* paths) -> const char* {
         for (size_t i = 0; paths[i]; ++i) {
             if (access(paths[i], X_OK) == 0) return paths[i];
         }
