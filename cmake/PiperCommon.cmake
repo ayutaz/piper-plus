@@ -66,6 +66,10 @@ else()
     src/cpp/openjtalk_wrapper.c
     src/cpp/openjtalk_optimized.c
     src/cpp/openjtalk_dictionary_manager.c
+    # Argv-based process spawn helper. Replaces shell-based system()/popen()
+    # call sites to eliminate cpp/command-line-injection &
+    # cpp/uncontrolled-process-operation alerts (CodeQL).
+    src/cpp/piper_proc_exec.c
   )
 endif()
 
