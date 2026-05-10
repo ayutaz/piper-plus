@@ -55,10 +55,11 @@ jobs:
           echo "All docker-build.yml actions resolved successfully"
 
       - name: Verify docker-build.yml uses pinned cosign tag
-        # @v4 のような sliding tag を再導入しないように grep gate を追加。
+        # @v4 のような sliding major tag を再導入しないように grep gate を追加。
+        # 末尾が行末・空白・コメント (`# foo`) いずれの場合でも検知する。
         run: |
           set -euo pipefail
-          if grep -E 'sigstore/cosign-installer@v[0-9]+$' \
+          if grep -E 'sigstore/cosign-installer@v[0-9]+([[:space:]]|#|$)' \
               .github/workflows/docker-build.yml; then
             echo "::error::docker-build.yml references sigstore/cosign-installer with a major-only tag (e.g. @v4). sliding major tag does not exist for this action; pin to a concrete version like @v4.1.2."
             exit 1

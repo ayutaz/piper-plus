@@ -64,7 +64,10 @@ regexes = [
     # by name in tests, model catalogs, and CLI examples. Pattern is stable
     # and public (matches ja_JP-css10-6lang-medium, en_US-libritts-r-medium,
     # etc.); high entropy comes from concatenated dataset slugs.
-    '''(ja|en|zh|es|fr|pt|ko|sv)_[A-Z]{2}-[a-z0-9][a-z0-9-]*-[a-z0-9-]+''',
+    # ワード境界 (`\b`) を付けて「単独の identifier として出現したケース
+    # のみ」allow し、 より長い token の部分文字列として偶然 voice key
+    # に一致するケースの false-negative を防ぐ。
+    '''\b(ja|en|zh|es|fr|pt|ko|sv)_[A-Z]{2}-[a-z0-9][a-z0-9-]*-[a-z0-9-]+\b''',
 ]
 
 # Stop words that, when present in a match, mark it as a false-positive.
