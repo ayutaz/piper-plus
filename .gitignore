@@ -127,6 +127,7 @@ check_*.py
 !scripts/check_ort_version_drift.py
 !scripts/check_dictionary_versions.py
 !scripts/check_phoneme_set_version.py
+!scripts/check_loanword_forward_compat.py
 !scripts/verify_model_checksums.py
 create_comprehensive_*.py
 add_missing_*.py
