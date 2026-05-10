@@ -68,9 +68,13 @@ repos:
         # CI-fail mismatch when crates.io / PyPI publish refuses parse.
       - id: check-executables-have-shebangs
         # Files with executable bit but no shebang are typically a mistake.
+        # Exclude Rust source — `#![...]` inner attributes look like shebangs
+        # to the heuristic but are valid Rust attributes (false positive).
+        exclude: '\.rs$'
       - id: check-shebang-scripts-are-executable
         # Inverse of above — shebanged scripts that lack +x silently fail
         # in CI workflows that call them directly.
+        exclude: '\.rs$'
       - id: mixed-line-ending
         # Force LF endings repo-wide. CRLF leaks on Windows checkouts cause
         # noisy diffs and break shell scripts when run via WSL/Git Bash.
