@@ -778,76 +778,51 @@ void openjtalk_get_cache_stats(OpenJTalkCacheStats* stats) {
 }
 
 // Find OpenJTalk binary (reuse from original implementation)
+// Static allow-list of acceptable OpenJTalk binary paths. The ONLY values
+// that find_openjtalk_binary() can return are pointers into this table —
+// no shell-derived `which`/`where` lookup, no env-var override of arbitrary
+// paths. This eliminates cpp/uncontrolled-process-operation by making the
+// path that flows into execlp() a compile-time constant from CodeQL's
+// taint-tracking perspective.
+static const char* const OPENJTALK_BINARY_ALLOWLIST[] = {
+#ifdef _WIN32
+    "open_jtalk_phonemizer.exe",
+    "bin\\open_jtalk_phonemizer.exe",
+    "open_jtalk.exe",
+    "bin\\open_jtalk.exe",
+#else
+    "./open_jtalk_phonemizer",
+    "./bin/open_jtalk_phonemizer",
+    "/usr/bin/open_jtalk_phonemizer",
+    "/usr/local/bin/open_jtalk_phonemizer",
+    "/opt/homebrew/bin/open_jtalk_phonemizer",
+    "./open_jtalk",
+    "./bin/open_jtalk",
+    "/usr/bin/open_jtalk",
+    "/usr/local/bin/open_jtalk",
+    "/opt/homebrew/bin/open_jtalk",
+#endif
+    NULL,
+};
+
 static char* find_openjtalk_binary(void) {
-    // Thread-local cache for binary path
+    // Thread-local pointer to the matched allow-list entry. The cache stores
+    // an index so the returned char* is always a pointer-to-string-literal.
 #ifdef _WIN32
-    __declspec(thread) static char binary_path[1024] = {0};
+    __declspec(thread) static int cached_idx = -1;
 #else
-    static __thread char binary_path[1024] = {0};
+    static __thread int cached_idx = -1;
 #endif
 
-    if (binary_path[0] != '\0') {
-        return binary_path;
+    if (cached_idx >= 0) {
+        return (char*)OPENJTALK_BINARY_ALLOWLIST[cached_idx];
     }
 
-    // Check common locations
-    const char* paths[] = {
-#ifdef _WIN32
-        "open_jtalk_phonemizer.exe",
-        "bin\\open_jtalk_phonemizer.exe",
-        "open_jtalk.exe",
-        "bin\\open_jtalk.exe",
-#else
-        "./open_jtalk_phonemizer",
-        "./bin/open_jtalk_phonemizer",
-        "/usr/bin/open_jtalk_phonemizer",
-        "/usr/local/bin/open_jtalk_phonemizer",
-        "/opt/homebrew/bin/open_jtalk_phonemizer",
-        "./open_jtalk",
-        "./bin/open_jtalk",
-        "/usr/bin/open_jtalk",
-        "/usr/local/bin/open_jtalk",
-        "/opt/homebrew/bin/open_jtalk",
-#endif
-        NULL
-    };
-
-    for (int i = 0; paths[i] != NULL; i++) {
-        if (access(paths[i], F_OK) == 0) {
-            strncpy(binary_path, paths[i], sizeof(binary_path) - 1);
-            binary_path[sizeof(binary_path) - 1] = '\0';
-            return binary_path;
+    for (int i = 0; OPENJTALK_BINARY_ALLOWLIST[i] != NULL; i++) {
+        if (access(OPENJTALK_BINARY_ALLOWLIST[i], X_OK) == 0) {
+            cached_idx = i;
+            return (char*)OPENJTALK_BINARY_ALLOWLIST[i];
         }
     }
-
-    // Try PATH lookup
-#ifdef _WIN32
-    FILE* fp = popen("where open_jtalk_phonemizer.exe 2>NUL", "r");
-    if (!fp || fgets(binary_path, sizeof(binary_path), fp) == NULL) {
-        if (fp) pclose(fp);
-        fp = popen("where open_jtalk.exe 2>NUL", "r");
-    }
-#else
-    FILE* fp = popen("which open_jtalk_phonemizer 2>/dev/null", "r");
-    if (!fp || fgets(binary_path, sizeof(binary_path), fp) == NULL) {
-        if (fp) pclose(fp);
-        fp = popen("which open_jtalk 2>/dev/null", "r");
-    }
-#endif
-
-    if (fp) {
-        if (fgets(binary_path, sizeof(binary_path), fp) != NULL) {
-            // Remove newline
-            size_t len = strlen(binary_path);
-            if (len > 0 && binary_path[len-1] == '\n') {
-                binary_path[len-1] = '\0';
-            }
-            pclose(fp);
-            return binary_path;
-        }
-        pclose(fp);
-    }
-
-    binary_path[0] = '\0';
     return NULL;
 }

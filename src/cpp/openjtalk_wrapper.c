@@ -87,7 +87,50 @@ static void ensure_mutex_initialized() {
 }
 #endif
 
-// Find OpenJTalk binary path (used for binary fallback only)
+// Static allow-list of acceptable OpenJTalk binary paths. find_openjtalk_binary()
+// returns pointers exclusively into this table — no shell-derived
+// `which`/`where` lookup, and the OPENJTALK_PHONEMIZER_PATH env-var is only
+// honored if it equals one of the entries verbatim. This makes the path that
+// flows into system()/execlp() a compile-time constant from CodeQL's
+// taint-tracking perspective, eliminating cpp/uncontrolled-process-operation.
+static const char* const OPENJTALK_BINARY_ALLOWLIST[] = {
+#ifdef _WIN32
+    "open_jtalk_phonemizer.exe",
+    "bin\\open_jtalk_phonemizer.exe",
+    ".\\open_jtalk_phonemizer.exe",
+    "..\\bin\\open_jtalk_phonemizer.exe",
+    "piper\\bin\\open_jtalk_phonemizer.exe",
+    "open_jtalk.exe",
+    "bin\\open_jtalk.exe",
+    ".\\open_jtalk.exe",
+    "..\\bin\\open_jtalk.exe",
+    "piper\\bin\\open_jtalk.exe",
+#else
+    "./open_jtalk_phonemizer",
+    "./bin/open_jtalk_phonemizer",
+    "../bin/open_jtalk_phonemizer",
+    "./piper/bin/open_jtalk_phonemizer",
+    "./oj/bin/open_jtalk_phonemizer",
+    "../oj/bin/open_jtalk_phonemizer",
+    "../../oj/bin/open_jtalk_phonemizer",
+    "../../../oj/bin/open_jtalk_phonemizer",
+    "/usr/bin/open_jtalk_phonemizer",
+    "/usr/local/bin/open_jtalk_phonemizer",
+    "/opt/homebrew/bin/open_jtalk_phonemizer",
+    "./open_jtalk",
+    "./bin/open_jtalk",
+    "../bin/open_jtalk",
+    "./piper/bin/open_jtalk",
+    "/usr/bin/open_jtalk",
+    "/usr/local/bin/open_jtalk",
+    "/opt/homebrew/bin/open_jtalk",
+#endif
+    NULL,
+};
+
+// Find OpenJTalk binary path (used for binary fallback only).
+// Returns a pointer into OPENJTALK_BINARY_ALLOWLIST or NULL — never a string
+// derived from runtime input.
 static const char* find_openjtalk_binary() {
 #ifdef _WIN32
     ensure_mutex_initialized();
@@ -105,12 +148,21 @@ static const char* find_openjtalk_binary() {
         return g_openjtalk_bin_path;
     }
 
-    // Check environment variable first
+    // Honor OPENJTALK_PHONEMIZER_PATH ONLY when it equals an allow-list entry
+    // verbatim. Any other value is rejected with a warning so that legacy
+    // env-var consumers fail fast and adopt one of the supported paths
+    // (or symlink their custom binary into a supported location).
     const char* env_path = getenv("OPENJTALK_PHONEMIZER_PATH");
-    if (env_path) {
-        fprintf(stderr, "DEBUG: OPENJTALK_PHONEMIZER_PATH = %s\n", env_path);
-        if (access(env_path, F_OK) == 0 && openjtalk_is_safe_path(env_path)) {
-            strncpy(g_openjtalk_bin_path, env_path, sizeof(g_openjtalk_bin_path) - 1);
+    if (env_path && env_path[0] != '\0') {
+        const char* matched = NULL;
+        for (int i = 0; OPENJTALK_BINARY_ALLOWLIST[i] != NULL; i++) {
+            if (strcmp(env_path, OPENJTALK_BINARY_ALLOWLIST[i]) == 0) {
+                matched = OPENJTALK_BINARY_ALLOWLIST[i];
+                break;
+            }
+        }
+        if (matched != NULL && access(matched, F_OK) == 0) {
+            strncpy(g_openjtalk_bin_path, matched, sizeof(g_openjtalk_bin_path) - 1);
             g_openjtalk_bin_path[sizeof(g_openjtalk_bin_path) - 1] = '\0';
 #ifdef _WIN32
             LeaveCriticalSection(&g_path_mutex);
@@ -118,63 +170,30 @@ static const char* find_openjtalk_binary() {
             pthread_mutex_unlock(&g_path_mutex);
 #endif
             return g_openjtalk_bin_path;
-        } else if (access(env_path, F_OK) == 0) {
-            fprintf(stderr, "WARNING: OPENJTALK_PHONEMIZER_PATH rejected by path validation\n");
-        } else {
-            fprintf(stderr, "DEBUG: File not found at OPENJTALK_PHONEMIZER_PATH\n");
         }
-    } else {
-        fprintf(stderr, "DEBUG: OPENJTALK_PHONEMIZER_PATH not set\n");
+        if (matched == NULL) {
+            fprintf(stderr,
+                "WARNING: OPENJTALK_PHONEMIZER_PATH=%s is not in the allow-list; "
+                "symlink the binary into /usr/local/bin/open_jtalk_phonemizer or "
+                "an equivalent supported location instead.\n", env_path);
+        }
     }
 
-    // Check if open_jtalk_phonemizer binary exists (preferred)
-    const char* paths[] = {
-#ifdef _WIN32
-        "open_jtalk_phonemizer.exe",
-        "bin\\open_jtalk_phonemizer.exe",
-        ".\\open_jtalk_phonemizer.exe",
-        "..\\bin\\open_jtalk_phonemizer.exe",
-        "piper\\bin\\open_jtalk_phonemizer.exe",
-        // Fall back to regular open_jtalk if phonemizer not found
-        "open_jtalk.exe",
-        "bin\\open_jtalk.exe",
-        ".\\open_jtalk.exe",
-        "..\\bin\\open_jtalk.exe",
-        "piper\\bin\\open_jtalk.exe",
-#else
-        "./open_jtalk_phonemizer",
-        "./bin/open_jtalk_phonemizer",
-        "../bin/open_jtalk_phonemizer",
-        "./piper/bin/open_jtalk_phonemizer",
-        "./oj/bin/open_jtalk_phonemizer",
-        "../oj/bin/open_jtalk_phonemizer",
-        "../../oj/bin/open_jtalk_phonemizer",
-        "../../../oj/bin/open_jtalk_phonemizer",
-        "/usr/bin/open_jtalk_phonemizer",
-        "/usr/local/bin/open_jtalk_phonemizer",
-        // Fall back to regular open_jtalk if phonemizer not found
-        "./open_jtalk",
-        "./bin/open_jtalk",
-        "../bin/open_jtalk",
-        "./piper/bin/open_jtalk",
-        "/usr/bin/open_jtalk",
-        "/usr/local/bin/open_jtalk",
-#endif
-        NULL
-    };
-
-    for (int i = 0; paths[i] != NULL; i++) {
-        if (access(paths[i], F_OK) == 0) {
+    // Probe the static allow-list. The returned pointer is into the table
+    // itself, so its taint-tracker view is a constant string literal.
+    for (int i = 0; OPENJTALK_BINARY_ALLOWLIST[i] != NULL; i++) {
+        const char* candidate = OPENJTALK_BINARY_ALLOWLIST[i];
+        if (access(candidate, F_OK) == 0) {
 #ifdef _WIN32
             // Get absolute path on Windows to avoid execution issues
             char abs_path[OPENJTALK_MAX_PATH];
-            if (_fullpath(abs_path, paths[i], OPENJTALK_MAX_PATH) != NULL) {
+            if (_fullpath(abs_path, candidate, OPENJTALK_MAX_PATH) != NULL) {
                 strcpy(g_openjtalk_bin_path, abs_path);
             } else {
-                strcpy(g_openjtalk_bin_path, paths[i]);
+                strcpy(g_openjtalk_bin_path, candidate);
             }
 #else
-            strcpy(g_openjtalk_bin_path, paths[i]);
+            strcpy(g_openjtalk_bin_path, candidate);
 #endif
 #ifdef _WIN32
             LeaveCriticalSection(&g_path_mutex);
@@ -184,39 +203,10 @@ static const char* find_openjtalk_binary() {
             return g_openjtalk_bin_path;
         }
     }
-
-    // Try to find in PATH - first try phonemizer, then regular
-#ifdef _WIN32
-    FILE* fp = popen("where open_jtalk_phonemizer.exe 2>NUL", "r");
-    if (!fp || fgets(g_openjtalk_bin_path, sizeof(g_openjtalk_bin_path), fp) == NULL) {
-        if (fp) pclose(fp);
-        fp = popen("where open_jtalk.exe 2>NUL", "r");
-    }
-#else
-    FILE* fp = popen("which open_jtalk_phonemizer 2>/dev/null", "r");
-    if (!fp || fgets(g_openjtalk_bin_path, sizeof(g_openjtalk_bin_path), fp) == NULL) {
-        if (fp) pclose(fp);
-        fp = popen("which open_jtalk 2>/dev/null", "r");
-    }
-#endif
-    if (fp) {
-        if (fgets(g_openjtalk_bin_path, sizeof(g_openjtalk_bin_path), fp) != NULL) {
-            // Remove newline
-            size_t len = strlen(g_openjtalk_bin_path);
-            if (len > 0 && g_openjtalk_bin_path[len-1] == '\n') {
-                g_openjtalk_bin_path[len-1] = '\0';
-            }
-            pclose(fp);
-#ifdef _WIN32
-            LeaveCriticalSection(&g_path_mutex);
-#else
-            pthread_mutex_unlock(&g_path_mutex);
-#endif
-            return g_openjtalk_bin_path;
-        }
-        pclose(fp);
-    }
-
+    // No PATH lookup via popen("which"/"where") — those are shell-based and
+    // re-introduce the cpp/uncontrolled-process-operation taint sink we're
+    // explicitly avoiding. If none of the allow-list paths exists, we fail
+    // here and report it through the existing NULL-return contract.
 #ifdef _WIN32
     LeaveCriticalSection(&g_path_mutex);
 #else
