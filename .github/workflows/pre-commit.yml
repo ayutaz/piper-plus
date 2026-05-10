@@ -97,9 +97,15 @@ jobs:
           #   * markdownlint-cli2         → markdownlint.yml
           #   * codespell                 → codespell.yml
           #   * hadolint                  → hadolint.yml
+          #   * editorconfig-checker      → 全リポジトリで `--all-files` scan 時に
+          #     17,356 件の既存 drift (Python docstring の 3-space indent 等)
+          #     を検出する。 ローカル commit-time の pre-commit は staged file
+          #     のみ作用するので drift を新規導入しない gate として有効。
+          #     CI ゲートとしては別途 changed-files-only workflow が望ましいが、
+          #     現状の `--all-files` 実行では既存コードを修正できない。
           # The corresponding *local* pre-commit hooks still run so
           # contributors catch drift before push.
-          SKIP: cargo-clippy,cargo-fmt,gofmt,go-vet,golangci-lint,mypy-g2p,dotnet-format,markdownlint-cli2,codespell,hadolint
+          SKIP: cargo-clippy,cargo-fmt,gofmt,go-vet,golangci-lint,mypy-g2p,dotnet-format,markdownlint-cli2,codespell,hadolint,editorconfig-checker
         run: |
           # --show-diff-on-failure makes drift trivial to fix locally:
           # contributors see the exact patch the hooks produced.
