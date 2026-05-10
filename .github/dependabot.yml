@@ -7,6 +7,18 @@
 #
 # Reference:
 # https://docs.github.com/en/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
+#
+# ── 既知の失敗パターン: Dependency Graph (GitHub Dependency Submission API) ──
+# GitHub 側で動的生成される `Dependency Graph` チェック (`event: dynamic`、
+# 本ファイルに対応する yaml は無く `github/dependabot-action@main` 内蔵) は、
+# `pyproject.toml` を見つけると uv updater を試行する仕様で、
+# `src/python/`, `src/python_run/` のように pyproject はあるが
+# `uv.lock` が無い subdirectory では `update-uv-graph` ジョブが
+#   "ERROR No uv.lock or pyproject.toml present."
+# で fail する (sha 1595f630 で観測)。
+# このチェックは GitHub の dynamic workflow であり PR では走らないため、
+# dev push 後にしか発覚しない。 構造的解決には該当 directory への
+# `uv.lock` commit が必要 (Issue で別途トラッキング)。
 
 version: 2
 

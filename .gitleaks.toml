@@ -18,26 +18,32 @@ description = "piper-plus baseline allowlist"
 # samples that gitleaks frequently flags as "generic high entropy" / "API key"
 # false-positives. None of them contain real credentials.
 paths = [
-  # Lock files contain hashes that look like high-entropy strings.
-  '''(^|/)package-lock\.json$''',
-  '''(^|/)uv\.lock$''',
-  '''(^|/)Cargo\.lock$''',
-  '''(^|/)go\.sum$''',
-  '''(^|/)gradle\.lockfile$''',
-  # Test fixtures / golden outputs.
-  '''(^|/)tests?/.*\.(json|jsonl|txt|csv|tsv)$''',
-  '''(^|/)test/.*\.(json|jsonl|txt|csv|tsv)$''',
-  '''(^|/)testdata/''',
-  '''(^|/)fixtures?/''',
-  # Model / checkpoint metadata (SHA-256, file digests).
-  '''\.onnx\.json$''',
-  '''\.ckpt\.sha256$''',
-  '''(^|/)model_card\.md$''',
-  # Generated docs / migration notes that may quote sample tokens.
-  '''(^|/)docs/.*\.md$''',
-  # PUA / loanword fixtures (deterministic random-looking tables).
-  '''(^|/)data/zh_en_loanword\.json$''',
-  '''(^|/)data/pua\.json$''',
+    # Lock files contain hashes that look like high-entropy strings.
+    '''(^|/)package-lock\.json$''',
+    '''(^|/)uv\.lock$''',
+    '''(^|/)Cargo\.lock$''',
+    '''(^|/)go\.sum$''',
+    '''(^|/)gradle\.lockfile$''',
+    # Test fixtures / golden outputs.
+    '''(^|/)tests?/.*\.(json|jsonl|txt|csv|tsv)$''',
+    '''(^|/)test/.*\.(json|jsonl|txt|csv|tsv)$''',
+    '''(^|/)testdata/''',
+    '''(^|/)fixtures?/''',
+    # Test source files across runtimes contain HF voice keys / model
+    # filenames whose entropy gitleaks flags as generic-api-key
+    # (e.g. "ja_JP-css10-6lang-medium" in PiperPlus.Core.Tests/VoiceCatalogTests.cs
+    # surfaced after PR #401 squash merge re-introduced the lines as additions).
+    '''(^|/)[^/]*\.?[Tt]ests?\.[^/]+/.*\.(cs|rs|go|py|java|kt|ts|js|swift|cpp|h)$''',
+    '''(^|/)[Tt]ests?/.*\.(cs|rs|go|py|java|kt|ts|js|swift|cpp|h)$''',
+    # Model / checkpoint metadata (SHA-256, file digests).
+    '''\.onnx\.json$''',
+    '''\.ckpt\.sha256$''',
+    '''(^|/)model_card\.md$''',
+    # Generated docs / migration notes that may quote sample tokens.
+    '''(^|/)docs/.*\.md$''',
+    # PUA / loanword fixtures (deterministic random-looking tables).
+    '''(^|/)data/zh_en_loanword\.json$''',
+    '''(^|/)data/pua\.json$''',
 ]
 
 # ---------------------------------------------------------------------------
@@ -46,26 +52,31 @@ paths = [
 # Strings that look like tokens but are documented placeholders or stable
 # public identifiers (HuggingFace model IDs, ONNX runtime version hashes).
 regexes = [
-  # HuggingFace model IDs (org/name).
-  '''ayousanz/piper-plus-[a-z0-9-]+''',
-  # ORT release hashes referenced in docs.
-  '''onnxruntime-(android|osx|linux|win)-[a-z0-9.-]+''',
-  # Sample WandB key placeholder used in docs.
-  '''WANDB_API_KEY=<your[-_]wandb[-_]key>''',
-  # Conventional commit / PR body example tokens.
-  '''ghp_[A-Z]{36}EXAMPLE''',
+    # HuggingFace model IDs (org/name).
+    '''ayousanz/piper-plus-[a-z0-9-]+''',
+    # ORT release hashes referenced in docs.
+    '''onnxruntime-(android|osx|linux|win)-[a-z0-9.-]+''',
+    # Sample WandB key placeholder used in docs.
+    '''WANDB_API_KEY=<your[-_]wandb[-_]key>''',
+    # Conventional commit / PR body example tokens.
+    '''ghp_[A-Z]{36}EXAMPLE''',
+    # Piper voice keys (lang_REGION-dataset-(quality|variant)) referenced
+    # by name in tests, model catalogs, and CLI examples. Pattern is stable
+    # and public (matches ja_JP-css10-6lang-medium, en_US-libritts-r-medium,
+    # etc.); high entropy comes from concatenated dataset slugs.
+    '''(ja|en|zh|es|fr|pt|ko|sv)_[A-Z]{2}-[a-z0-9][a-z0-9-]*-[a-z0-9-]+''',
 ]
 
 # Stop words that, when present in a match, mark it as a false-positive.
 stopwords = [
-  "example",
-  "EXAMPLE",
-  "placeholder",
-  "PLACEHOLDER",
-  "dummy",
-  "DUMMY",
-  "your-",
-  "YOUR-",
-  "<token>",
-  "<secret>",
+    "example",
+    "EXAMPLE",
+    "placeholder",
+    "PLACEHOLDER",
+    "dummy",
+    "DUMMY",
+    "your-",
+    "YOUR-",
+    "<token>",
+    "<secret>",
 ]

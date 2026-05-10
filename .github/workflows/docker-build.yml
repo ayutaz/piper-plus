@@ -92,7 +92,7 @@ jobs:
 
       - name: Install Cosign
         if: startsWith(github.ref, 'refs/tags/v')
-        uses: sigstore/cosign-installer@v4
+        uses: sigstore/cosign-installer@v4.1.2
         with:
           cosign-release: 'v2.4.1'
 
@@ -226,7 +226,7 @@ jobs:
 
       - name: Install Cosign
         if: startsWith(github.ref, 'refs/tags/v')
-        uses: sigstore/cosign-installer@v4
+        uses: sigstore/cosign-installer@v4.1.2
         with:
           cosign-release: 'v2.4.1'
 
@@ -298,7 +298,7 @@ jobs:
 
       - name: Install Cosign
         if: startsWith(github.ref, 'refs/tags/v')
-        uses: sigstore/cosign-installer@v4
+        uses: sigstore/cosign-installer@v4.1.2
         with:
           cosign-release: 'v2.4.1'
 
@@ -371,7 +371,7 @@ jobs:
 
       - name: Install Cosign
         if: startsWith(github.ref, 'refs/tags/v')
-        uses: sigstore/cosign-installer@v4
+        uses: sigstore/cosign-installer@v4.1.2
         with:
           cosign-release: 'v2.4.1'
 
@@ -449,7 +449,7 @@ jobs:
 
       - name: Install Cosign
         if: startsWith(github.ref, 'refs/tags/v')
-        uses: sigstore/cosign-installer@v4
+        uses: sigstore/cosign-installer@v4.1.2
         with:
           cosign-release: 'v2.4.1'
 
@@ -530,7 +530,7 @@ jobs:
 
       - name: Install Cosign
         if: startsWith(github.ref, 'refs/tags/v')
-        uses: sigstore/cosign-installer@v4
+        uses: sigstore/cosign-installer@v4.1.2
         with:
           cosign-release: 'v2.4.1'
 
@@ -653,7 +653,7 @@ jobs:
 
       - name: Install Cosign
         if: startsWith(github.ref, 'refs/tags/v')
-        uses: sigstore/cosign-installer@v4
+        uses: sigstore/cosign-installer@v4.1.2
         with:
           cosign-release: 'v2.4.1'
 
