@@ -127,3 +127,13 @@ padd
 statics
 unparseable
 Unparseable
+
+# Non-English words in webui.py sample_texts (de_DE / fr_FR).  CI workflow
+# already skips webui.py via git ls-files allow-list, but pre-commit's
+# codespell scans whatever git shows as modified.  Listing the foreign words
+# here is more robust than path-based skip (which uses fnmatch and may not
+# match relative paths consistently across CI vs pre-commit).
+# Sie — German "you" (formal)
+Sie
+# informations — French "informations" (plural)
+informations

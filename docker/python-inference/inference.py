@@ -6,8 +6,8 @@ CLI and FastAPI server modes supported.
 Server mode exposes:
 - Native endpoint: ``GET /synthesize`` for direct piper-plus usage
 - OpenAI-compatible endpoints (PR #321): ``POST /v1/audio/speech``,
-  ``GET /v1/models``, ``GET /v1/audio/speech/languages`` so existing OpenAI
-  clients can drop in unchanged
+    ``GET /v1/models``, ``GET /v1/audio/speech/languages`` so existing OpenAI
+    clients can drop in unchanged
 - ``GET /health`` for orchestrator health checks
 
 Note: phoneme-timing JSON/TSV/SRT output is exposed by the separate
@@ -36,6 +36,14 @@ from piper_train.ort_utils import create_session_with_cache, warmup_onnx_session
 
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def _sanitize_for_log(value: str) -> str:
+    # Strip CR/LF/control chars from user-controlled values before logging
+    # to prevent log forging via line-break injection (CWE-117). Used at
+    # HTTP request boundaries (/v1/audio/speech, /tts).
+    return value.replace("\r", "").replace("\n", " ")
+
 
 # FastAPI (optional)
 try:
@@ -356,7 +364,7 @@ def create_app(engine: PiperInferenceEngine, model_path: str):
                 _LOGGER.warning(
                     "Short text input detected (%d chars excl. spaces): %r",
                     len(text.replace(" ", "").replace("\u3000", "").strip()),
-                    text,
+                    _sanitize_for_log(text),
                 )
             return StreamingResponse(buf, media_type="audio/wav", headers=headers)
         except Exception as e:
@@ -394,7 +402,7 @@ def create_app(engine: PiperInferenceEngine, model_path: str):
                 _LOGGER.warning(
                     "Short text input detected (%d chars excl. spaces): %r",
                     len(req.input.replace(" ", "").replace("\u3000", "").strip()),
-                    req.input,
+                    _sanitize_for_log(req.input),
                 )
             return StreamingResponse(buf, media_type="audio/wav", headers=headers)
         except Exception:
