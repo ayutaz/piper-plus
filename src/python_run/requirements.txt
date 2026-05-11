@@ -10,4 +10,4 @@ pyopenjtalk-plus>=0.4
 g2p-en>=2.1.0
 
 # Chinese phonemization
-pypinyin>=0.50
+pypinyin>=0.55.0
