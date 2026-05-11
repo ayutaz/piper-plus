@@ -69,6 +69,14 @@ paths-ignore:
   # Vendored / third-party code (we don't audit upstream).
   - 'src/piper_phonemize_bundled/**'
   - 'src/cpp/openjtalk/**'
+  # nlohmann/json single-header (v3.11.2, MIT) at src/cpp/json.hpp。
+  # Code Scanning alert の上位を占める (cpp/commented-out-code 108 件 /
+  # cpp/unused-local-variable 7 件 / cpp/long-switch 7 件 等)。
+  # 我々は upstream を audit しない。 cpp の compilation DB 経由 include で
+  # paths-ignore がどこまで効くかは extractor 側の都合に依存するが、 新規
+  # PR が `#include "json.hpp"` を増やしたときに analysis 入り口で除外
+  # 候補と見なせるよう、 ここで明示的に列挙しておく。
+  - 'src/cpp/json.hpp'
 
   # Generated/large fixtures.
   - 'tests/fixtures/**'
