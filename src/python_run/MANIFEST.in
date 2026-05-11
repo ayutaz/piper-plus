@@ -1,3 +1,12 @@
+# NOTE: ビルド対象 (publish 用) は wheel のみ (`python -m build --wheel`)。
+# setup.py がリポジトリルートの ../../VERSION を読みに行くが、これは
+# パッケージディレクトリ外なので sdist には**含められない** (setuptools の
+# _assert_local が拒否)。 結果として `python -m build` (sdist + wheel) の
+# sdist→wheel フローでは version が "0.0.0" にフォールバックする。
+# 既存 CI (.github/workflows/dev-build-all.yml) は `--wheel` のみ使用しており
+# source からの直接 build なので影響なし。 sdist が必要になったら別途
+# VERSION を src/python_run/ にコピーする build hook を導入する。
 include requirements.txt
+include README.md
 include piper/voices.json
 include piper/phonemize/data/zh_en_loanword.json

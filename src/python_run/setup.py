@@ -1,26 +1,32 @@
 #!/usr/bin/env python3
+# Issue #418: メタデータの大部分 (name / description / authors / classifiers /
+# entry_points / extras_require / package_data / urls) は pyproject.toml に
+# 移行済み。 setup.py が残している責務は **pyproject の dynamic = ["version",
+# "dependencies"] の実解決のみ**:
+#   - リポジトリルートの VERSION ファイル (パッケージ外、 setuptools の
+#     `_assert_local` で `[tool.setuptools.dynamic]` の file 参照では弾かれる)
+#   - requirements.txt の解釈 (空行 / コメント行のフィルタリング)
 from pathlib import Path
 
-import setuptools
 from setuptools import setup
 
 
 this_dir = Path(__file__).parent
-module_dir = this_dir / "piper"
 
-# VERSIONファイルから動的にバージョンを読み込む
+# VERSION ファイル: リポジトリルート canonical
 version_file = this_dir.parent.parent / "VERSION"
 if version_file.is_file():
     version = version_file.read_text(encoding="utf-8").strip()
 else:
-    # フォールバック: src/python/piper_train/VERSIONから読み込み
+    # フォールバック: src/python/piper_train/VERSION
     version_file_alt = this_dir.parent / "python" / "piper_train" / "VERSION"
     if version_file_alt.is_file():
         version = version_file_alt.read_text(encoding="utf-8").strip()
     else:
-        version = "0.0.0"  # デフォルト値
+        version = "0.0.0"
 
-requirements = []
+# requirements.txt: コメント / 空行を除去して install_requires に流す
+requirements: list[str] = []
 requirements_path = this_dir / "requirements.txt"
 if requirements_path.is_file():
     with open(requirements_path, encoding="utf-8") as requirements_file:
@@ -30,63 +36,7 @@ if requirements_path.is_file():
             if line.strip() and not line.strip().startswith("#")
         ]
 
-# README.md を PyPI 用の長い説明として読み込む
-long_description = ""
-readme_path = this_dir / "README.md"
-if readme_path.is_file():
-    long_description = readme_path.read_text(encoding="utf-8")
-
-data_files = [
-    module_dir / "voices.json",
-    module_dir / "phonemize" / "data" / "zh_en_loanword.json",
-]
-
-# -----------------------------------------------------------------------------
-
 setup(
-    name="piper-plus",
     version=version,
-    description=(
-        "A fast, high-quality neural text-to-speech system supporting "
-        "8 languages (ja/en/zh/ko/es/fr/pt/sv) with VITS architecture."
-    ),
-    url="https://github.com/ayutaz/piper-plus",
-    author="yousan",
-    author_email="rabbitcats77@gmail.com",
-    license="MIT",
-    long_description=long_description,
-    long_description_content_type="text/markdown",
-    packages=setuptools.find_packages(exclude=["tests", "tests.*", "build", "build.*"]),
-    package_data={"piper": [str(p.relative_to(module_dir)) for p in data_files]},
-    entry_points={
-        "console_scripts": [
-            "piper = piper.__main__:main",
-        ]
-    },
     install_requires=requirements,
-    python_requires=">=3.11",
-    extras_require={
-        # Issue #372: floor must be >= C++ canonical (cmake/OnnxRuntime.cmake)
-        "gpu": ["onnxruntime-gpu>=1.20.0,<2"],
-        "http": [
-            "fastapi>=0.110,<1",
-            "uvicorn[standard]>=0.27,<1",
-        ],
-        "test": [
-            "pytest>=7.0",
-            "pytest-cov>=4.0",
-            "pytest-timeout>=2.0",
-            "pytest-asyncio>=0.24",  # NEW: async FastAPI tests
-        ],
-    },
-    classifiers=[
-        "Development Status :: 3 - Alpha",
-        "Intended Audience :: Developers",
-        "Topic :: Text Processing :: Linguistic",
-        "License :: OSI Approved :: MIT License",
-        "Programming Language :: Python :: 3.11",
-        "Programming Language :: Python :: 3.12",
-        "Programming Language :: Python :: 3.13",
-    ],
-    keywords="piper japanese and other languages tts",
 )

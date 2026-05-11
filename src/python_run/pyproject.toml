@@ -1,9 +1,11 @@
 # -----------------------------------------------------------------------------
-# piper-plus runtime: tool configuration
+# piper-plus runtime: canonical PyPI 配布パッケージ
 # -----------------------------------------------------------------------------
-# このファイルは tool 設定 (mypy / ruff / pytest) のみを保持する。
-# パッケージ build はレガシーな `setup.py` が引き続き担当しているため、
-# `[build-system]` / `[project]` テーブルは置かない (setup.py と二重定義しない)。
+# Issue #418 (uv lock 構造修復) で minimal `[project]` + `[build-system]` を追加。
+# setup.py との二重定義を避けるため、version / dependencies は `dynamic` で
+# それぞれ `../../VERSION` / `requirements.txt` から file 参照する。
+# setup.py は entry_points / extras_require / package_data など pyproject で
+# 表現しにくい部分のみを担当 (name / version / install_requires は pyproject 側)。
 #
 # 段階的型付け方針:
 #   - mypy strict は使わず、ignore_missing_imports で onnxruntime 等を許容
@@ -11,6 +13,70 @@
 #     g2p (`src/python/g2p/pyproject.toml`) の設定を概ね mirror する
 #   - `warn_return_any` / `warn_unused_ignores` を入れて漏れを検知
 # -----------------------------------------------------------------------------
+
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "piper-plus"
+description = "A fast, high-quality neural text-to-speech system supporting 8 languages (ja/en/zh/ko/es/fr/pt/sv) with VITS architecture."
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+authors = [
+    {name = "yousan", email = "rabbitcats77@gmail.com"},
+]
+keywords = ["piper", "japanese", "tts", "vits", "multilingual"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Topic :: Text Processing :: Linguistic",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+# version / dependencies は setup.py との二重定義を避けるため dynamic 化:
+#   - version: ../../VERSION (リポジトリルートの canonical VERSION file)
+#   - dependencies: requirements.txt (Issue #372 で ORT floor を C++ canonical に揃え済み)
+dynamic = ["version", "dependencies"]
+
+[project.urls]
+Homepage = "https://github.com/ayutaz/piper-plus"
+Repository = "https://github.com/ayutaz/piper-plus"
+Issues = "https://github.com/ayutaz/piper-plus/issues"
+
+[project.optional-dependencies]
+gpu = ["onnxruntime-gpu>=1.20.0,<2"]
+http = [
+    "fastapi>=0.110,<1",
+    "uvicorn[standard]>=0.27,<1",
+]
+test = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "pytest-timeout>=2.0",
+    "pytest-asyncio>=0.24",
+]
+
+[project.scripts]
+piper = "piper.__main__:main"
+
+# Note: `dynamic = ["version", "dependencies"]` の実解決は setup.py が担当する。
+# `[tool.setuptools.dynamic]` の file 参照は setuptools の `_assert_local` で
+# パッケージ外のパス (`../../VERSION`) を拒否するため使えない。setup.py は
+# Python コードで自由にファイル読みできるため、リポジトリルートの VERSION を
+# 参照できる (現状の挙動を維持)。
+
+[tool.setuptools.packages.find]
+exclude = ["tests*", "build*"]
+
+[tool.setuptools.package-data]
+piper = [
+    "voices.json",
+    "phonemize/data/zh_en_loanword.json",
+]
 
 [tool.mypy]
 python_version = "3.11"
