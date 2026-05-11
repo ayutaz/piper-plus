@@ -28,11 +28,7 @@ jobs:
       - uses: actions/checkout@v6
 
       - uses: codespell-project/actions-codespell@v2
-        with:
-          # Configuration is read from .codespellrc
-          check_filenames: true
-          check_hidden: true
-          # Don't fail on warnings yet — establishing baseline
-          # Once baseline is clean, set --check-hidden and remove this flag
-          ignore_words_file: .codespell-ignore-words.txt
-          skip: '*.lock,*.lockfile,*.min.js,*.min.css,build,dist,target,node_modules,.git,test/models,tools/benchmark/issue-383,README_DE.md,README_ES.md,README_FR.md,README_HI.md,README_KO.md,README_PT.md,README_RU.md,README_SV.md,README_ZH.md'
+        # All configuration (skip, ignore-words, check-filenames, check-hidden)
+        # lives in .codespellrc to keep local `codespell` and CI in lockstep.
+        # Don't add `with: skip / ignore_words_file / ...` here — duplicating
+        # them risks drift (cf. PR #419 review feedback).
