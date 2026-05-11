@@ -25,7 +25,7 @@
 # Run:
 #   docker run --rm -p 8000:8000 -v $PWD/models:/app/models:ro piper-plus-cpu \
 #     python inference.py --server --model /app/models/your-model.onnx --port 8000
-FROM python:3.11-slim-trixie
+FROM python:3.14-slim-trixie
 
 ENV PYTHONUNBUFFERED=1
 ENV DEBIAN_FRONTEND=noninteractive
