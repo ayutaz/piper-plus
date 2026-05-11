@@ -10,7 +10,7 @@
 # ============================================================
 # Stage 1: Builder -- compile C extensions (pyopenjtalk, etc.)
 # ============================================================
-FROM python:3.11-slim-trixie AS builder
+FROM python:3.13-slim-trixie AS builder
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -41,7 +41,7 @@ COPY src/python/ /build/src/python/
 # Building wheels first sidesteps this entirely (archive_info instead of dir_info
 # in dist-info/direct_url.json).
 RUN uv build /build/src/python/g2p --wheel --out-dir /tmp/wheels/ \
- && uv build /build/src/python      --wheel --out-dir /tmp/wheels/
+    && uv build /build/src/python      --wheel --out-dir /tmp/wheels/
 
 # Install piper_plus_g2p (standalone G2P -- all languages)
 RUN uv pip install --system "$(ls /tmp/wheels/piper_plus_g2p-*.whl)[all]"
@@ -70,7 +70,7 @@ nltk.download('cmudict', download_dir='/usr/share/nltk_data')"
 # ============================================================
 # Stage 2: Runtime -- minimal image
 # ============================================================
-FROM python:3.11-slim-trixie
+FROM python:3.13-slim-trixie
 
 ENV PYTHONUNBUFFERED=1
 ENV DEBIAN_FRONTEND=noninteractive
@@ -82,9 +82,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-# Copy installed Python packages from builder
-COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
-COPY --from=builder /usr/local/bin /usr/local/bin
+# Copy installed Python packages from builder.
+# Use `/usr/local` as a whole instead of `/usr/local/lib/python3.X/site-packages`
+# so the Dockerfile stays valid across future Python minor bumps (e.g. 3.13 → 3.14).
+# Same base image in both stages → no /usr/local conflicts.
+COPY --from=builder /usr/local /usr/local
 
 # Copy NLTK data
 COPY --from=builder /usr/share/nltk_data /usr/share/nltk_data
@@ -129,7 +131,7 @@ EXPOSE 10200
 
 # Healthcheck: TCP connection to the Wyoming server
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-  CMD python -c "import socket; s=socket.socket(); s.settimeout(5); s.connect(('localhost', 10200)); s.close()" || exit 1
+    CMD python -c "import socket; s=socket.socket(); s.settimeout(5); s.connect(('localhost', 10200)); s.close()" || exit 1
 
 ENTRYPOINT ["python", "-m", "piper_wyoming"]
 CMD ["--model", "tsukuyomi", "--uri", "tcp://0.0.0.0:10200"]
