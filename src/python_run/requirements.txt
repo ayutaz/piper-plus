@@ -4,7 +4,7 @@ onnxruntime>=1.20.0
 numpy>=1.24.0,<3.0
 
 # Japanese phonemization (cross-platform, no espeak-ng dependency)
-pyopenjtalk-plus>=0.4
+pyopenjtalk-plus>=0.4.1.post8
 
 # English phonemization
 g2p-en>=2.1.0
