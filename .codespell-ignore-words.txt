@@ -76,6 +76,8 @@ Portugues
 # Library / tool names:
 # fmt — fmt library
 fmt
+# astroid — Python AST library (pylint dep); flagged as "asteroid" in uv.lock
+astroid
 ndarray
 onnxruntime
 ortdef
