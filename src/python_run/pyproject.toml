@@ -2,10 +2,17 @@
 # piper-plus runtime: canonical PyPI 配布パッケージ
 # -----------------------------------------------------------------------------
 # Issue #418 (uv lock 構造修復) で minimal `[project]` + `[build-system]` を追加。
-# setup.py との二重定義を避けるため、version / dependencies は `dynamic` で
-# それぞれ `../../VERSION` / `requirements.txt` から file 参照する。
-# setup.py は entry_points / extras_require / package_data など pyproject で
-# 表現しにくい部分のみを担当 (name / version / install_requires は pyproject 側)。
+#
+# メタデータの所在:
+#   - pyproject.toml: name / description / readme / requires-python / license /
+#     authors / keywords / classifiers / urls / scripts (entry_points) /
+#     optional-dependencies (gpu/http/test) / package-data / packages.find
+#   - setup.py: `dynamic = ["version", "dependencies"]` の実解決のみ。
+#     具体的には `../../VERSION` 読み込みと `requirements.txt` パース。
+#     `[tool.setuptools.dynamic]` の file 参照は setuptools の `_assert_local`
+#     がパッケージ外パス (`../../VERSION`) を拒否するため使えず、 setup.py 内
+#     の通常 Python コードで読んで `setup(version=..., install_requires=...)`
+#     に渡す方式を採用 (詳細は後段の Note および setup.py のコメント参照)。
 #
 # 段階的型付け方針:
 #   - mypy strict は使わず、ignore_missing_imports で onnxruntime 等を許容
@@ -37,9 +44,12 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
 ]
-# version / dependencies は setup.py との二重定義を避けるため dynamic 化:
-#   - version: ../../VERSION (リポジトリルートの canonical VERSION file)
-#   - dependencies: requirements.txt (Issue #372 で ORT floor を C++ canonical に揃え済み)
+# version / dependencies は dynamic 化し、 setup.py が実解決を担当する。
+#   - version: ../../VERSION (リポジトリルートの canonical VERSION file) を
+#     setup.py が read してから `setup(version=...)` に渡す。
+#   - dependencies: requirements.txt (Issue #372 で ORT floor を C++ canonical
+#     に揃え済み) を setup.py がパースして `install_requires=...` に渡す。
+# `[tool.setuptools.dynamic]` の file 参照を使わない理由は後段の Note を参照。
 dynamic = ["version", "dependencies"]
 
 [project.urls]
@@ -48,7 +58,10 @@ Repository = "https://github.com/ayutaz/piper-plus"
 Issues = "https://github.com/ayutaz/piper-plus/issues"
 
 [project.optional-dependencies]
-gpu = ["onnxruntime-gpu>=1.20.0,<2"]
+# Issue #372: ORT floor must be >= C++ canonical (cmake/OnnxRuntime.cmake).
+# requirements_gpu.txt (`onnxruntime-gpu>=1.26.0,<2`) と CPU runtime の
+# `onnxruntime>=1.26.0` (requirements.txt) に揃える。
+gpu = ["onnxruntime-gpu>=1.26.0,<2"]
 http = [
     "fastapi>=0.110,<1",
     "uvicorn[standard]>=0.27,<1",
