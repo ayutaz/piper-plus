@@ -1,7 +1,7 @@
 # piper-plus Demo Requirements
-gradio==6.9.0
-numpy>=1.24.0,<2.3
-onnxruntime>=1.16.0
+gradio==6.14.0
+numpy>=2.4.4,<2.5
+onnxruntime>=1.26.0
 pyopenjtalk-plus>=0.4  # Japanese Phonemizer (JapanesePhonemizer), Apache-2.0
 onnx>=1.14.0
 # Note: espeak-phonemizer requires system espeak-ng library

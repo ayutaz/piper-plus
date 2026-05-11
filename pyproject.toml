@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=45", "wheel", "setuptools-scm"]
+requires = ["setuptools>=80.10.2", "wheel", "setuptools-scm"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -9,21 +9,21 @@ description = "Training environment for piper-plus"
 license = {text = "MIT"}
 requires-python = ">=3.11"
 dependencies = [
-    "huggingface-hub>=0.30.0,<1.0",
-    "numpy<2.3",
+    "huggingface-hub>=0.36.2,<1.0",
+    "numpy<2.5",
     "tensorboard>=2.20.0",
     "g2p-en>=2.1.0",
-    "torch>=2.1.0",
+    "torch>=2.11.0",
     "torchaudio>=2.1.0",
     "pytorch-lightning>=2.0",
     "librosa>=0.10",
     "cython>=3.2.4",
     "pyopenjtalk-plus>=0.4",
-    "wandb>=0.19",
+    "wandb>=0.26.1",
     "transformers>=4.30",
     "piper-train[train]",
-    "onnxscript>=0.6.2",
-    "onnxruntime>=1.17",
+    "onnxscript>=0.7.0",
+    "onnxruntime>=1.26.0",
     "ghapi>=1.0.13",
     "onnx>=1.21.0",
 ]
@@ -34,21 +34,21 @@ preprocess = [
 ]
 
 inference = [
-    "onnxruntime>=1.17",
+    "onnxruntime>=1.26.0",
     "soundfile>=0.12",
     "pyopenjtalk-plus",
     "g2p-en>=2.1.0",
-    "fastapi>=0.110",
-    "uvicorn>=0.27",
+    "fastapi>=0.136.1",
+    "uvicorn>=0.46.0",
 ]
 
 inference-gpu = [
-    "onnxruntime-gpu>=1.17",
+    "onnxruntime-gpu>=1.26.0",
     "soundfile>=0.12",
     "pyopenjtalk-plus",
     "g2p-en>=2.1.0",
-    "fastapi>=0.110",
-    "uvicorn>=0.27",
+    "fastapi>=0.136.1",
+    "uvicorn>=0.46.0",
 ]
 
 multilingual = [
@@ -57,60 +57,60 @@ multilingual = [
 ]
 
 train = [
-    "scipy>=1.12",
+    "scipy>=1.17.1",
     "librosa>=0.10",
     "soundfile>=0.12",
     "pytorch-lightning>=2.0",
-    "torchmetrics>=1.0",
+    "torchmetrics>=1.9.0",
     "transformers>=4.38",
     "onnx>=1.21.0",
-    "onnxruntime>=1.17",
+    "onnxruntime>=1.26.0",
     "pyopenjtalk-plus",
     "mecab-python3>=1.0",
     "unidic-lite>=1.0",
     "g2p-en>=2.1.0",
     "tensorboard>=2.16",
-    "wandb>=0.16",
-    "tqdm>=4.66",
+    "wandb>=0.26.1",
+    "tqdm>=4.67.3",
     "einops>=0.7",
     "numba>=0.59",
-    "matplotlib>=3.8",
+    "matplotlib>=3.10.9",
     "seaborn>=0.13",
-    "pyyaml>=6.0",
+    "pyyaml>=6.0.3",
     "onnxsim-prebuilt",
 ]
 
 dev = [
     "black==26.3.1",
     "flake8==6.1.0",
-    "mypy>=1.13",
-    "pylint==3.0.2",
-    "ruff==0.12.5",
+    "mypy>=1.20.2",
+    "pylint==3.3.9",
+    "ruff==0.15.12",
     "pytest>=9.0.3,<10",
     "pytest-cov==4.1.0",
-    "pytest-xdist==3.5.0",
-    "pytest-timeout==2.2.0",
-    "pytest-mock==3.12.0",
+    "pytest-xdist==3.8.0",
+    "pytest-timeout==2.4.0",
+    "pytest-mock==3.15.1",
     "pytest-asyncio>=0.24",  # NEW: async FastAPI tests
     "coverage[toml]>=7.3",
-    "types-requests==2.31.0",
+    "types-requests==2.33.0.20260508",
     "types-PyYAML==6.0.12",
     "sphinx>=4.0.0",
-    "sphinx-rtd-theme>=1.0.0",
-    "pre-commit>=3.0.0",
+    "sphinx-rtd-theme>=3.1.0",
+    "pre-commit>=4.6.0",
 ]
 
 test = [
     "pytest>=9.0.3,<10",
     "pytest-cov==4.1.0",
-    "pytest-xdist==3.5.0",
-    "pytest-timeout==2.2.0",
-    "pytest-mock==3.12.0",
+    "pytest-xdist==3.8.0",
+    "pytest-timeout==2.4.0",
+    "pytest-mock==3.15.1",
     "pytest-asyncio>=0.24",  # NEW: async FastAPI tests
     "coverage[toml]>=7.3",
-    "ruff==0.12.5",
-    "mypy>=1.13",
-    "types-requests==2.31.0",
+    "ruff==0.15.12",
+    "mypy>=1.20.2",
+    "types-requests==2.33.0.20260508",
     "types-PyYAML==6.0.12",
 ]
 
@@ -137,7 +137,7 @@ members = [
 
 [tool.uv]
 dev-dependencies = [
-    "ruff==0.12.5",
+    "ruff==0.15.12",
     "pytest>=9.0.3,<10",
     "pytest-timeout>=2.2.0",
     "black==26.3.1",
