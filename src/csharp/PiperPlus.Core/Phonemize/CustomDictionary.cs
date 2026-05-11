@@ -98,10 +98,14 @@ public sealed class CustomDictionary
     private readonly List<DictionaryEntry> _entries = new();
 
     // Track whether the sorted cache is stale.
-    private bool _dirty;
+    // volatile: ApplyToText の double-checked locking で lock の外側から読むため、
+    // 別スレッドからの書き込み (Add/Remove → _dirty = true) を観測可能にする必要がある。
+    private volatile bool _dirty;
 
     // Sorted snapshot used by ApplyToText (rebuilt lazily when _dirty is true).
-    private List<DictionaryEntry>? _sorted;
+    // volatile: 同じく double-checked locking でフィールドを lock の外から読むため、
+    // 別スレッドが構築した List への参照を確実に観測する必要がある。
+    private volatile List<DictionaryEntry>? _sorted;
 
     private readonly object _sortLock = new();
 
