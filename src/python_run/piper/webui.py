@@ -32,6 +32,15 @@ from .training_manager import training_manager
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+
+def _sanitize_for_log(value: str) -> str:
+    # Strip CR/LF from user-controlled values before logging to prevent
+    # log forging via line-break injection (CWE-117). Gradio dropdown
+    # values are normally controlled but the public Gradio API allows
+    # arbitrary strings via the /api/predict endpoint.
+    return value.replace("\r", "").replace("\n", " ")
+
+
 _voice_cache: dict[str, "PiperVoice"] = {}
 _voice_cache_lock = threading.Lock()
 
@@ -313,7 +322,7 @@ def synthesize_speech(
                     logger.warning(
                         "Language '%s' not found in model's language_id_map; "
                         "falling back to model default",
-                        language_code,
+                        _sanitize_for_log(language_code),
                     )
 
         # Create in-memory WAV file

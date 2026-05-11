@@ -36,6 +36,13 @@ from .timing import timing_to_json, timing_to_tsv
 
 _LOGGER = logging.getLogger(__name__)
 
+
+def _sanitize_for_log(value: str) -> str:
+    # Strip CR/LF from user-controlled values before logging to prevent
+    # log forging via line-break injection (CWE-117).
+    return value.replace("\r", "").replace("\n", " ")
+
+
 # Default channel/bit-depth assumptions match `PiperVoice.synthesize` output.
 _WAV_CHANNELS = 1
 _WAV_BIT_DEPTH = 16
@@ -191,7 +198,7 @@ def create_app(voice: Any, synthesize_args: dict[str, Any]) -> FastAPI:
         is_streaming = _parse_bool_flag(streaming)
         _LOGGER.debug(
             "Synthesizing text: %s (language_id=%s, streaming=%s)",
-            body_text,
+            _sanitize_for_log(body_text),
             resolved_language_id,
             is_streaming,
         )
