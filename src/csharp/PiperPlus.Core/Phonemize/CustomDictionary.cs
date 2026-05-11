@@ -47,6 +47,15 @@ namespace PiperPlus.Core.Phonemize;
 ///         <c>description</c>, <c>metadata</c>) are skipped in JSON.</item>
 ///   <item>Higher priority values win when the same key appears in multiple files.</item>
 /// </list>
+/// <para><b>Thread safety:</b> Loading operations (<see cref="LoadDictionary"/>,
+/// <see cref="LoadDictionaries"/>, <see cref="LoadDefaults"/>) are <i>not</i> safe
+/// to invoke concurrently with each other or with <see cref="ApplyToText"/>.
+/// The intended usage is: load all dictionaries from a single thread at startup,
+/// then call <see cref="ApplyToText"/> concurrently from any thread thereafter.
+/// The <c>volatile</c> on <c>_dirty</c>/<c>_sorted</c> covers the double-checked
+/// locking read in <see cref="ApplyToText"/>; it does <i>not</i> make load-while-read
+/// safe (a write to <c>_dirty</c> from <c>AddEntry</c> can be overwritten by the
+/// reader's <c>_dirty = false</c>, leaving the cache stale).</para>
 /// </remarks>
 public sealed class CustomDictionary
 {
@@ -98,13 +107,16 @@ public sealed class CustomDictionary
     private readonly List<DictionaryEntry> _entries = new();
 
     // Track whether the sorted cache is stale.
-    // volatile: ApplyToText の double-checked locking で lock の外側から読むため、
-    // 別スレッドからの書き込み (Add/Remove → _dirty = true) を観測可能にする必要がある。
+    // volatile: ApplyToText performs a double-checked read of this field outside
+    // _sortLock; the volatile semantics ensure writes from AddEntry (invoked by
+    // LoadDictionary/LoadDictionaries/LoadDefaults) become visible to readers.
+    // See class XML doc for thread-safety scope — this does not make load-while-
+    // read safe; loading must complete before concurrent ApplyToText calls.
     private volatile bool _dirty;
 
     // Sorted snapshot used by ApplyToText (rebuilt lazily when _dirty is true).
-    // volatile: 同じく double-checked locking でフィールドを lock の外から読むため、
-    // 別スレッドが構築した List への参照を確実に観測する必要がある。
+    // volatile: the same double-checked read path needs to observe the reference
+    // published by another thread that rebuilt the list under _sortLock.
     private volatile List<DictionaryEntry>? _sorted;
 
     private readonly object _sortLock = new();
