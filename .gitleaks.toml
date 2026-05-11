@@ -61,13 +61,20 @@ regexes = [
     # Conventional commit / PR body example tokens.
     '''ghp_[A-Z]{36}EXAMPLE''',
     # Piper voice keys (lang_REGION-dataset-(quality|variant)) referenced
-    # by name in tests, model catalogs, and CLI examples. Pattern is stable
-    # and public (matches ja_JP-css10-6lang-medium, en_US-libritts-r-medium,
-    # etc.); high entropy comes from concatenated dataset slugs.
+    # by name in tests, model catalogs (voices.json), and CLI examples.
+    # Pattern is stable and public (matches ja_JP-css10-6lang-medium,
+    # en_US-libritts-r-medium, es_ES-mls_10246-low, etc.); high entropy
+    # comes from concatenated dataset slugs that include digits and
+    # underscores (e.g. `mls_10246`, `mls_9972` from the Multilingual
+    # LibriSpeech dataset).
     # ワード境界 (`\b`) を付けて「単独の identifier として出現したケース
     # のみ」allow し、 より長い token の部分文字列として偶然 voice key
-    # に一致するケースの false-negative を防ぐ。
-    '''\b(ja|en|zh|es|fr|pt|ko|sv)_[A-Z]{2}-[a-z0-9][a-z0-9-]*-[a-z0-9-]+\b''',
+    # に一致するケースの false-negative を防ぐ。dataset slug にアンダー
+    # スコアが含まれるケース (MLS の話者 ID 等) を取りこぼさないよう、
+    # 中央の文字クラスに `_` を含める。
+    # 対応言語コードは voices.json の収録範囲に合わせて拡張。今後 voice
+    # を追加する際は新しい言語コードもここに加えること。
+    '''\b(ca|cs|da|de|el|en|es|fi|fr|hu|is|it|ja|ka|kk|ko|lb|ne|nl|no|pl|pt|ro|ru|sk|sr|sv|sw|tr|uk|vi|zh)_[A-Z]{2}-[a-z0-9][a-z0-9_-]*-[a-z0-9-]+\b''',
 ]
 
 # Stop words that, when present in a match, mark it as a false-positive.
