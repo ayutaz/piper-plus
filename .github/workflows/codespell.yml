@@ -27,8 +27,21 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - uses: codespell-project/actions-codespell@v2
-        # All configuration (skip, ignore-words, check-filenames, check-hidden)
-        # lives in .codespellrc to keep local `codespell` and CI in lockstep.
-        # Don't add `with: skip / ignore_words_file / ...` here — duplicating
-        # them risks drift (cf. PR #419 review feedback).
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Install codespell
+        # Pin version so CI matches the pre-commit hook
+        # (.pre-commit-config.yaml currently uses codespell 2.4.x via codespell-cli).
+        run: pip install 'codespell==2.4.2'
+
+      - name: Run codespell
+        # All configuration (skip / ignore-words / check-filenames / check-hidden)
+        # lives in `.codespellrc`, which `codespell` picks up automatically. This
+        # keeps local `codespell` and CI in lockstep (single source of truth, per
+        # PR #419 review feedback). The previous `codespell-project/actions-codespell@v2`
+        # Docker wrapper was unstable (~50min stuck runs); a direct pip install +
+        # invocation is far more predictable.
+        run: codespell
