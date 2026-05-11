@@ -25,8 +25,8 @@ plugins {
     // Spotless intentionally skipped — ktlint already covers Kotlin format +
     // lint, and adding Spotless on top duplicates the gradle task graph for
     // no extra coverage. Re-introduce only if we add Java sources.
-    id("org.jlleitschuh.gradle.ktlint") version "12.1.1"
-    id("io.gitlab.arturbosch.detekt") version "1.23.7"
+    id("org.jlleitschuh.gradle.ktlint") version "12.3.0"
+    id("io.gitlab.arturbosch.detekt") version "1.23.8"
     id("org.owasp.dependencycheck") version "10.0.4"
     jacoco
 }
@@ -199,19 +199,19 @@ android {
 
 dependencies {
     // DictionaryDownloader uses kotlinx-coroutines for IO dispatch + cancellation.
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
 
     testImplementation("junit:junit:4.13.2")
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation("androidx.test:runner:1.6.2")
     androidTestImplementation("org.json:json:20240303")
-    androidTestImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
+    androidTestImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
 
     // detekt-formatting bundles the ktlint ruleset into detekt so the
     // `formatting` section in detekt.yml has rules to operate on. The
     // version must match `detekt { toolVersion = ... }` above.
-    detektPlugins("io.gitlab.arturbosch.detekt:detekt-formatting:1.23.7")
+    detektPlugins("io.gitlab.arturbosch.detekt:detekt-formatting:1.23.8")
 }
 
 // Copy the cross-runtime G2P fixture into androidTest assets so the L4 parity
