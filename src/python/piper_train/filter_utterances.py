@@ -93,8 +93,6 @@ def main():
 
         text_and_audio.append((filename, text, wav_path, speaker))
 
-    writer = csv.writer(sys.stdout, delimiter="|")
-
     # speaker -> [rate]
     utts_by_speaker = defaultdict(list)
     process_utterance = ProcessUtterance()

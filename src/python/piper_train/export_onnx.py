@@ -61,9 +61,9 @@ def build_infer_forward(
         A forward function with signature::
 
             infer_forward(text, text_lengths, scales,
-                          sid=None, lid=None, prosody_features=None,
-                          speaker_embedding=None,
-                          speaker_embedding_mask=None)
+                sid=None, lid=None, prosody_features=None,
+                speaker_embedding=None,
+                speaker_embedding_mask=None)
             -> (audio: Tensor, durations: Tensor)
     """
     # Configure stochastic/deterministic mode ONCE at build time
@@ -418,7 +418,9 @@ def main() -> None:
             unify_emb_lang_weights(model_g, source=args.unify_emb_lang_source)
         except ValueError as e:
             parser.error(str(e))
-    elif do_unify and num_languages <= 1:
+    elif do_unify:
+        # num_languages <= 1 implied by the if branch above; CodeQL flagged
+        # the redundant `and num_languages <= 1` as always-true (py/redundant-comparison).
         _LOGGER.info(
             "Skipping emb_lang unification: model has only %d language(s)",
             num_languages,
