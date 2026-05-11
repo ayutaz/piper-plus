@@ -7,6 +7,22 @@
 #
 # Reference:
 # https://docs.github.com/en/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
+#
+# ── 既知の失敗パターン: Dependency Graph (GitHub Dependency Submission API) ──
+# GitHub 側で動的生成される `Dependency Graph` チェック (`event: dynamic`、
+# 本ファイルに対応する yaml は無く `github/dependabot-action@main` 内蔵) は、
+# `pyproject.toml` を見つけると uv updater を試行する仕様で、
+# subdirectory に独立 `uv.lock` が無いと `update-uv-graph` ジョブが
+#   "ERROR No uv.lock or pyproject.toml present."
+# で fail する (sha 1595f630 で観測)。 PR では走らないため dev push 後に
+# しか発覚しない。
+#
+# 本ファイルでの対応:
+#   1. uv workspace member (src/python, src/python/g2p) は root の uv
+#      ecosystem 1 本に統合 (root `uv.lock` を canonical 視させる)。
+#   2. src/python_run は setup.py + requirements.txt 管理で `[project]`
+#      テーブルが無いため uv lock 不可、 pip ecosystem のまま残す
+#      (構造的解決は別 issue で minimal `[project]` 追加方針を検討)。
 
 version: 2
 
@@ -34,9 +50,16 @@ updates:
         update-types:
           - "version-update:semver-major"
 
-  # Python: src/python (学習側)
-  - package-ecosystem: "pip"
-    directory: "/src/python"
+  # Python (uv workspace): root が uv workspace の統括点
+  # ([tool.uv.workspace] members = src/python, src/python/g2p)。
+  # root の `uv.lock` に member 全依存を集約しているため、 Dependabot uv
+  # ecosystem を root 1 箇所に登録するだけで両 member を update できる。
+  # GitHub Dependency Submission API ("Dependency Graph" check) も同 lock を
+  # canonical 視するため、 subdirectory pyproject.toml の uv updater 試行
+  # (sha 1595f630 で `update-uv-graph` が `uv.lock` 不在で fail した経緯) を
+  # 抑止できる見込み。
+  - package-ecosystem: "uv"
+    directory: "/"
     schedule:
       interval: "monthly"
     open-pull-requests-limit: 5
@@ -47,7 +70,7 @@ updates:
       - "dependencies"
       - "automated"
     groups:
-      python-train:
+      python-uv-workspace:
         applies-to: version-updates
         update-types:
           - "minor"
@@ -57,7 +80,13 @@ updates:
         update-types:
           - "version-update:semver-major"
 
-  # Python: src/python_run (PyPI piper-plus ランタイム)
+  # Python: src/python_run (PyPI piper-plus ランタイム、 setup.py +
+  # requirements.txt 管理)。
+  # 意図的に `[project]` テーブル無し (setup.py と二重定義しない方針) で
+  # `uv lock` は実行不可。 そのため uv ecosystem へは寄せず pip のままに
+  # するが、 GitHub Dependency Submission API が `pyproject.toml` を見て
+  # uv updater を起動する可能性は残る (構造的解決には minimal `[project]`
+  # 追加 + setup.py 整合性確認が必要、 別 issue でフォロー)。
   - package-ecosystem: "pip"
     directory: "/src/python_run"
     schedule:
@@ -71,29 +100,6 @@ updates:
       - "automated"
     groups:
       python-runtime:
-        applies-to: version-updates
-        update-types:
-          - "minor"
-          - "patch"
-    ignore:
-      - dependency-name: "*"
-        update-types:
-          - "version-update:semver-major"
-
-  # Python: src/python/g2p (独立 G2P)
-  - package-ecosystem: "pip"
-    directory: "/src/python/g2p"
-    schedule:
-      interval: "monthly"
-    open-pull-requests-limit: 5
-    commit-message:
-      prefix: "deps"
-      include: "scope"
-    labels:
-      - "dependencies"
-      - "automated"
-    groups:
-      python-g2p:
         applies-to: version-updates
         update-types:
           - "minor"

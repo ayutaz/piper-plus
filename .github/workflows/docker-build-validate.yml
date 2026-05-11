@@ -1,0 +1,67 @@
+name: Docker Build Validate
+
+# PR 時に docker-build.yml で参照される全 GitHub Actions が「解決可能」か
+# を検証する軽量ワークフロー。
+#
+# 背景:
+#   docker-build.yml は `on: push: dev` のみで PR では走らないため、 PR #401
+#   で sigstore/cosign-installer@v4 (sliding tag が存在しない) を導入した
+#   差分が dev push 後の 7 ジョブ全滅まで気付かれなかった。
+#
+# 検証戦略:
+#   docker-build.yml が参照する action を全部この workflow からも参照する
+#   ことで、 GitHub Actions runner の "Set up job" フェーズで action を
+#   解決させ、不在タグ (e.g. `@v4`) を merge 前に検知する。
+#   実ビルドは行わず、 cosign --help 程度の動作確認のみ。
+#   (実 image build は既存 docker-test.yml が PR で 4 image をカバーする;
+#    本 workflow は残り 3 image の Dockerfile も含めた hadolint との 2 段
+#    で多層防御する。)
+
+on:
+  pull_request:
+    branches: [dev]
+    paths:
+      - '.github/workflows/docker-build.yml'
+      - '.github/workflows/docker-build-validate.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  resolve-actions:
+    name: Resolve docker-build.yml actions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      # 以下の uses: は docker-build.yml と必ず同期させること。
+      # 不一致が起きた場合は CI が落ちて気付ける。
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Resolve sigstore/cosign-installer
+        uses: sigstore/cosign-installer@v4.1.2
+        with:
+          cosign-release: 'v2.4.1'
+
+      - name: Smoke check cosign binary
+        run: |
+          cosign version
+          echo "All docker-build.yml actions resolved successfully"
+
+      - name: Verify docker-build.yml uses pinned cosign tag
+        # @v4 のような sliding major tag を再導入しないように grep gate を追加。
+        # 末尾が行末・空白・コメント (`# foo`) いずれの場合でも検知する。
+        run: |
+          set -euo pipefail
+          if grep -E 'sigstore/cosign-installer@v[0-9]+([[:space:]]|#|$)' \
+              .github/workflows/docker-build.yml; then
+            echo "::error::docker-build.yml references sigstore/cosign-installer with a major-only tag (e.g. @v4). sliding major tag does not exist for this action; pin to a concrete version like @v4.1.2."
+            exit 1
+          fi
+          echo "docker-build.yml cosign refs are pinned to concrete versions."

@@ -18,26 +18,32 @@ description = "piper-plus baseline allowlist"
 # samples that gitleaks frequently flags as "generic high entropy" / "API key"
 # false-positives. None of them contain real credentials.
 paths = [
-  # Lock files contain hashes that look like high-entropy strings.
-  '''(^|/)package-lock\.json$''',
-  '''(^|/)uv\.lock$''',
-  '''(^|/)Cargo\.lock$''',
-  '''(^|/)go\.sum$''',
-  '''(^|/)gradle\.lockfile$''',
-  # Test fixtures / golden outputs.
-  '''(^|/)tests?/.*\.(json|jsonl|txt|csv|tsv)$''',
-  '''(^|/)test/.*\.(json|jsonl|txt|csv|tsv)$''',
-  '''(^|/)testdata/''',
-  '''(^|/)fixtures?/''',
-  # Model / checkpoint metadata (SHA-256, file digests).
-  '''\.onnx\.json$''',
-  '''\.ckpt\.sha256$''',
-  '''(^|/)model_card\.md$''',
-  # Generated docs / migration notes that may quote sample tokens.
-  '''(^|/)docs/.*\.md$''',
-  # PUA / loanword fixtures (deterministic random-looking tables).
-  '''(^|/)data/zh_en_loanword\.json$''',
-  '''(^|/)data/pua\.json$''',
+    # Lock files contain hashes that look like high-entropy strings.
+    '''(^|/)package-lock\.json$''',
+    '''(^|/)uv\.lock$''',
+    '''(^|/)Cargo\.lock$''',
+    '''(^|/)go\.sum$''',
+    '''(^|/)gradle\.lockfile$''',
+    # Test fixtures / golden outputs.
+    '''(^|/)tests?/.*\.(json|jsonl|txt|csv|tsv)$''',
+    '''(^|/)test/.*\.(json|jsonl|txt|csv|tsv)$''',
+    '''(^|/)testdata/''',
+    '''(^|/)fixtures?/''',
+    # Test source files across runtimes contain HF voice keys / model
+    # filenames whose entropy gitleaks flags as generic-api-key
+    # (e.g. "ja_JP-css10-6lang-medium" in PiperPlus.Core.Tests/VoiceCatalogTests.cs
+    # surfaced after PR #401 squash merge re-introduced the lines as additions).
+    '''(^|/)[^/]*\.?[Tt]ests?\.[^/]+/.*\.(cs|rs|go|py|java|kt|ts|js|swift|cpp|h)$''',
+    '''(^|/)[Tt]ests?/.*\.(cs|rs|go|py|java|kt|ts|js|swift|cpp|h)$''',
+    # Model / checkpoint metadata (SHA-256, file digests).
+    '''\.onnx\.json$''',
+    '''\.ckpt\.sha256$''',
+    '''(^|/)model_card\.md$''',
+    # Generated docs / migration notes that may quote sample tokens.
+    '''(^|/)docs/.*\.md$''',
+    # PUA / loanword fixtures (deterministic random-looking tables).
+    '''(^|/)data/zh_en_loanword\.json$''',
+    '''(^|/)data/pua\.json$''',
 ]
 
 # ---------------------------------------------------------------------------
@@ -46,26 +52,41 @@ paths = [
 # Strings that look like tokens but are documented placeholders or stable
 # public identifiers (HuggingFace model IDs, ONNX runtime version hashes).
 regexes = [
-  # HuggingFace model IDs (org/name).
-  '''ayousanz/piper-plus-[a-z0-9-]+''',
-  # ORT release hashes referenced in docs.
-  '''onnxruntime-(android|osx|linux|win)-[a-z0-9.-]+''',
-  # Sample WandB key placeholder used in docs.
-  '''WANDB_API_KEY=<your[-_]wandb[-_]key>''',
-  # Conventional commit / PR body example tokens.
-  '''ghp_[A-Z]{36}EXAMPLE''',
+    # HuggingFace model IDs (org/name).
+    '''ayousanz/piper-plus-[a-z0-9-]+''',
+    # ORT release hashes referenced in docs.
+    '''onnxruntime-(android|osx|linux|win)-[a-z0-9.-]+''',
+    # Sample WandB key placeholder used in docs.
+    '''WANDB_API_KEY=<your[-_]wandb[-_]key>''',
+    # Conventional commit / PR body example tokens.
+    '''ghp_[A-Z]{36}EXAMPLE''',
+    # Piper voice keys (lang_REGION-dataset-(quality|variant)) referenced
+    # by name in tests, model catalogs (voices.json), and CLI examples.
+    # Pattern is stable and public (matches ja_JP-css10-6lang-medium,
+    # en_US-libritts-r-medium, es_ES-mls_10246-low, etc.); high entropy
+    # comes from concatenated dataset slugs that include digits and
+    # underscores (e.g. `mls_10246`, `mls_9972` from the Multilingual
+    # LibriSpeech dataset).
+    # ワード境界 (`\b`) を付けて「単独の identifier として出現したケース
+    # のみ」allow し、 より長い token の部分文字列として偶然 voice key
+    # に一致するケースの false-negative を防ぐ。dataset slug にアンダー
+    # スコアが含まれるケース (MLS の話者 ID 等) を取りこぼさないよう、
+    # 中央の文字クラスに `_` を含める。
+    # 対応言語コードは voices.json の収録範囲に合わせて拡張。今後 voice
+    # を追加する際は新しい言語コードもここに加えること。
+    '''\b(ca|cs|da|de|el|en|es|fi|fr|hu|is|it|ja|ka|kk|ko|lb|ne|nl|no|pl|pt|ro|ru|sk|sr|sv|sw|tr|uk|vi|zh)_[A-Z]{2}-[a-z0-9][a-z0-9_-]*-[a-z0-9-]+\b''',
 ]
 
 # Stop words that, when present in a match, mark it as a false-positive.
 stopwords = [
-  "example",
-  "EXAMPLE",
-  "placeholder",
-  "PLACEHOLDER",
-  "dummy",
-  "DUMMY",
-  "your-",
-  "YOUR-",
-  "<token>",
-  "<secret>",
+    "example",
+    "EXAMPLE",
+    "placeholder",
+    "PLACEHOLDER",
+    "dummy",
+    "DUMMY",
+    "your-",
+    "YOUR-",
+    "<token>",
+    "<secret>",
 ]
