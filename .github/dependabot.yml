@@ -200,6 +200,15 @@ updates:
       - dependency-name: "*"
         update-types:
           - "version-update:semver-major"
+      # onnxruntime_go の minor bump は ORT バージョン整合性に直結するため
+      # 手動で計画的に更新する。Issue #372 (ORT バージョン floor 統一)。
+      # 過去事例: PR #417 で 1.27 → 1.30 (内部で ORT 1.25 へ upgrade) が
+      # 提案されたが、CI の libonnxruntime.so (ORT 1.20 系) と API 不整合で
+      # integration-test fail。Python/Rust/C#/C++ と同時更新する PR で
+      # unignore する想定。
+      - dependency-name: "github.com/yalue/onnxruntime_go"
+        update-types:
+          - "version-update:semver-minor"
 
   # Gradle: android/piper-plus-g2p
   - package-ecosystem: "gradle"
@@ -274,6 +283,12 @@ updates:
       # 過去事例: PR #413 で 3.11 → 3.14 (3 minor jump) が提案されたが、
       # 3.14 が GA から間もない (2025-10) ため stable な 3.13 に手動 bump。
       - dependency-name: "python"
+        update-types:
+          - "version-update:semver-minor"
+      # CUDA image の minor bump (例: 12.4 → 12.9) も同様に production の
+      # GPU driver / cuDNN 互換性判断を要するため手動更新方針。
+      # 過去事例: PR #427 で 12.4.1 → 12.9.1 (5 minor jump) が提案された。
+      - dependency-name: "nvidia/cuda"
         update-types:
           - "version-update:semver-minor"
 
