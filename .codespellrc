@@ -1,14 +1,18 @@
 [codespell]
-# Skip directories and non-English READMEs (codespell only ships an English
-# dictionary, so translated READMEs trigger false positives).
-skip = ./.git,./.build,./node_modules,./build,./dist,./target,./.cache,./test/models,./tools/benchmark/issue-383,./pkg,./.next,./out,./vendor,./third_party,./external,./_deps,./.venv,./venv,./*.lock,./*.min.js,./*.min.css,./*.map,./README_DE.md,./README_ES.md,./README_FR.md,./README_HI.md,./README_KO.md,./README_PT.md,./README_RU.md,./README_SV.md,./README_ZH.md
+# Skip:
+#  1. Build artifacts / vendored / lock files
+#  2. Non-English READMEs (codespell only ships an English dictionary, so
+#     translated READMEs trigger false positives like "Sie", "Modell").
+#  3. Phoneme / pinyin / mecab dictionaries — these are large (1–4 MB) data
+#     files full of non-English fragments that codespell flags as typos and
+#     also dominate the scan runtime.  Triplicated across rust / wasm / test.
+skip = ./.git,./.build,./node_modules,./build,./dist,./target,./.cache,./test/models,./tools/benchmark/issue-383,./pkg,./.next,./out,./vendor,./third_party,./external,./_deps,./.venv,./venv,./*.lock,./*.min.js,./*.min.css,./*.map,./README_DE.md,./README_ES.md,./README_FR.md,./README_HI.md,./README_KO.md,./README_PT.md,./README_RU.md,./README_SV.md,./README_ZH.md,./src/rust/piper-plus-g2p/data/*.json,./src/wasm/openjtalk-web/assets/*.json,./data/dictionaries/*.json
 # Files to skip
 ignore-words = .codespell-ignore-words.txt
 # Don't check these files (typically generated/lockfiles)
 ignore-regex = ^.*(uv\.lock|package-lock\.json|Cargo\.lock|Package\.resolved|gradle\.lockfile|.+\.snap|.+\.golden|.+\.lock|.+\.lockfile)$
 # Check filenames too
 check-filenames =
-check-hidden =
 # Don't be silent on whitespace fixes
 quiet-level = 2
 # Number of context lines around finding
