@@ -26,7 +26,12 @@ dependencies = [
     "pyopenjtalk-plus>=0.4",
     "wandb>=0.19",
     "transformers>=4.30",
+    # workspace member refs: `uv sync` でこれらが自動 install される (root は
+    # `package = false` なのでこの dependencies は実 install でなく resolver
+    # の入力として機能)。Issue #418 で `piper-plus` を新規 member 化したため
+    # 明示。 piper-plus-g2p は piper-train の依存として間接的に install される。
     "piper-train[train]",
+    "piper-plus",
     "onnxscript>=0.6.2",
     "onnxruntime>=1.17",
     "ghapi>=1.0.13",
