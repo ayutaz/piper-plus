@@ -14,6 +14,10 @@ ignored:
             # Rationale: not applicable in our Dockerfiles (we use specific tags)
   - DL3018  # Pin versions in apk add
             # Rationale: only relevant if alpine-based; our images use debian/ubuntu
+  - DL3059  # Multiple consecutive RUN instructions
+            # Rationale: layer separation is intentional in our multi-stage builds
+            # for cache granularity (rebuilding wheels shouldn't bust pip-install
+            # layers). info-level rule, not worth consolidating into one RUN.
 
 trustedRegistries:
   - docker.io

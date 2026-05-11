@@ -1,5 +1,5 @@
 # WebUI Docker image for piper-plus
-FROM python:3.11-slim-trixie
+FROM python:3.13-slim-trixie
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
