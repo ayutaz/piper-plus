@@ -39,9 +39,9 @@ _LOGGER = logging.getLogger(__name__)
 
 
 def _sanitize_for_log(value: str) -> str:
-    # Strip CR/LF/control chars from user-controlled values before logging
-    # to prevent log forging via line-break injection (CWE-117). Used at
-    # HTTP request boundaries (/v1/audio/speech, /tts).
+    # Strip CR/LF from user-controlled values before logging to prevent
+    # log forging via line-break injection (CWE-117). Used at the HTTP
+    # request boundaries `/synthesize` and `/v1/audio/speech`.
     return value.replace("\r", "").replace("\n", " ")
 
 
