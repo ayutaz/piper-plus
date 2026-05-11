@@ -27,12 +27,69 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - uses: codespell-project/actions-codespell@v2
+      - name: Set up Python
+        uses: actions/setup-python@v6
         with:
-          # Configuration is read from .codespellrc
-          check_filenames: true
-          check_hidden: true
-          # Don't fail on warnings yet — establishing baseline
-          # Once baseline is clean, set --check-hidden and remove this flag
-          ignore_words_file: .codespell-ignore-words.txt
-          skip: '*.lock,*.lockfile,*.min.js,*.min.css,build,dist,target,node_modules,.git,test/models,tools/benchmark/issue-383'
+          python-version: '3.12'
+
+      - name: Install codespell
+        # Pin version so CI matches the pre-commit hook
+        # (.pre-commit-config.yaml currently uses codespell 2.4.x via codespell-cli).
+        run: pip install 'codespell==2.4.2'
+
+      - name: Run codespell
+        # We pass an explicit allow-list of source extensions via git ls-files
+        # rather than letting codespell crawl the tree. Rationale:
+        #   * codespell's `skip = ./<path>` syntax in .codespellrc relies on
+        #     basename match against directory entries (fnmatch), so it does
+        #     NOT recursively prune subtrees the way intuition suggests. Path
+        #     globs like `./src/rust/.../data/*.json` are effectively no-ops
+        #     against directory traversal — a free-form `codespell` invocation
+        #     therefore scans massive phoneme dictionaries and minified bundles.
+        #   * Large phoneme dictionaries (`cmudict_data.json` ≈ 3.7MB,
+        #     `pinyin_phrases.json` ≈ 1.9MB) caused 40-50min stuck runs by
+        #     triggering thousands of false positives.
+        #   * Minified JS bundles (`src/wasm/openjtalk-web/...`) emit gibberish
+        #     identifiers that codespell flags relentlessly; native C/C++
+        #     sources also contain reserved short identifiers (`fmt`, `nin`)
+        #     that produce noise. We exclude both extension families until we
+        #     have a baseline scrub for them.
+        # Scope: docs + first-party Python/Rust/Go/C#/Kotlin/Swift source +
+        # config files. JSON / C / C++ / JS / TS are deliberately out of scope.
+        # `.codespellrc` still provides ignore-words / ignore-regex.
+        timeout-minutes: 5
+        run: |
+          codespell --version
+          git ls-files \
+            '*.py' '*.pyi' '*.pyx' \
+            '*.rs' \
+            '*.go' \
+            '*.cs' '*.csproj' '*.sln' \
+            '*.kt' '*.kts' \
+            '*.swift' \
+            '*.md' '*.markdown' '*.mdx' \
+            '*.yaml' '*.yml' \
+            '*.toml' \
+            '*.cfg' '*.ini' \
+            '*.sh' '*.bash' '*.zsh' \
+            '*Dockerfile*' 'Makefile' \
+            '.codespellrc' '.codespell-ignore-words.txt' \
+            '.editorconfig' '.gitignore' '.gitattributes' '.pre-commit-config.yaml' \
+            ':!:README_DE.md' ':!:README_ES.md' ':!:README_FR.md' \
+            ':!:README_HI.md' ':!:README_KO.md' ':!:README_PT.md' \
+            ':!:README_RU.md' ':!:README_SV.md' ':!:README_ZH.md' \
+            ':!:tools/benchmark/**' \
+            ':!:test/models/**' \
+            ':!:**/testdata/**' \
+            ':!:**/phonemize/**' \
+            ':!:**/Phonemize/**' \
+            ':!:src/rust/piper-plus-g2p/**' \
+            ':!:src/python/g2p/**' \
+            ':!:**/test_swedish*' ':!:**/test_chinese*' ':!:**/test_french*' \
+            ':!:**/test_spanish*' ':!:**/test_portuguese*' \
+            ':!:**/SwedishPhonemizerTests.cs' ':!:**/ChinesePhonemizerTests.cs' \
+            ':!:**/FrenchPhonemizerTests.cs' ':!:**/SpanishPhonemizerTests.cs' \
+            ':!:**/PortuguesePhonemizerTests.cs' \
+            ':!:src/python_run/piper/sample_texts.py' \
+            ':!:src/python_run/piper/webui.py' \
+            | xargs --no-run-if-empty codespell

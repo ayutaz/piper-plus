@@ -48,7 +48,7 @@ repos:
       - id: check-json
         # Exclude:
         #   - invalid_json.json: intentionally malformed test fixture for
-        #     parsers that need to handle unparseable input gracefully.
+        #     parsers that need to handle unparsable input gracefully.
         #   - default_common_dict.json: dictionary uses duplicate keys by
         #     design (e.g. "Debug" entry appears twice with different
         #     contexts) — application spec, not a JSON correctness issue.
