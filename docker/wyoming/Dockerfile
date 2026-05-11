@@ -10,7 +10,7 @@
 # ============================================================
 # Stage 1: Builder -- compile C extensions (pyopenjtalk, etc.)
 # ============================================================
-FROM python:3.13-slim-trixie AS builder
+FROM python:3.13.13-slim-trixie AS builder
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -70,7 +70,7 @@ nltk.download('cmudict', download_dir='/usr/share/nltk_data')"
 # ============================================================
 # Stage 2: Runtime -- minimal image
 # ============================================================
-FROM python:3.13-slim-trixie
+FROM python:3.13.13-slim-trixie
 
 ENV PYTHONUNBUFFERED=1
 ENV DEBIAN_FRONTEND=noninteractive
