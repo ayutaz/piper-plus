@@ -81,6 +81,9 @@ if(EXISTS "${ORT_INCLUDE_DIR}/onnxruntime_cxx_api.h" OR EXISTS "${CMAKE_BINARY_D
     # when PIPER_SPEAKER_ENCODER_ONNX_PATH is unset, but compilation needs
     # the C++ API headers).
     list(APPEND TEST_SOURCES test_speaker_encoder_e2e.cpp)
+    # Issue #426: speaker_embedding inference fallback gate. Auto-skips
+    # at runtime when the fixture has not been generated.
+    list(APPEND TEST_SOURCES test_speaker_embedding_inference.cpp)
 endif()
 
 # Create test executables
@@ -306,7 +309,12 @@ foreach(test_source ${TEST_SOURCES})
     endif()
 
     # Link additional dependencies for streaming test
-    if(${test_name} STREQUAL "test_streaming")
+    # Issue #426: speaker_embedding inference fallback integration test.
+    # Reuses the same piper.cpp + dependency set as test_streaming since it
+    # links the full library to call loadVoice / phonemesToAudio against the
+    # in-tree fixture model.
+    if(${test_name} STREQUAL "test_speaker_embedding_inference" OR
+        ${test_name} STREQUAL "test_streaming")
         target_sources(${test_name} PRIVATE
             ../piper.cpp
             ../phoneme_parser.cpp

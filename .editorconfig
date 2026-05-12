@@ -42,3 +42,12 @@ indent_size = unset
 # the formatter, so opt out for this file only.
 [src/rust/piper-core/src/engine.rs]
 indent_size = unset
+
+# Issue #426 integration tests link the legacy piper.cpp / engine.rs
+# runtime code paths and share their rustfmt / clang-format column-
+# alignment style. Same opt-out as the legacy files.
+[src/rust/piper-core/tests/test_speaker_embedding_integration.rs]
+indent_size = unset
+
+[src/cpp/tests/test_speaker_embedding_inference.cpp]
+indent_size = unset

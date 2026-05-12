@@ -186,3 +186,10 @@ android/.gradle/
 # versions for downstream consumers — they resolve their own.
 Package.resolved
 .lycheecache
+
+# Integration test fixtures generated at CI time (build_fixture.py)
+tests/fixtures/mb_istft_speaker_embedding/model.onnx
+tests/fixtures/mb_istft_speaker_embedding/model.onnx.json
+# ort optimized-model cache (sibling to any .onnx the runtime loads)
+*.opt.onnx
+*.opt.onnx.ok

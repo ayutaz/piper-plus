@@ -164,6 +164,15 @@ pub struct ModelCapabilities {
     /// Whether the model accepts `speaker_embedding` (float32) and
     /// `speaker_embedding_mask` (int64) inputs for voice cloning.
     pub has_speaker_embedding: bool,
+
+    /// Embedding dimension declared by the ONNX `speaker_embedding`
+    /// input. Used by the Issue #426 zero-embedding fallback when the
+    /// caller does not supply an explicit embedding.
+    ///
+    /// Falls back to 256 (ECAPA-TDNN canonical) when:
+    /// - the model does NOT declare speaker_embedding, or
+    /// - the dim is a dynamic axis (negative / unset in the shape).
+    pub speaker_embedding_dim: usize,
 }
 
 // ---------------------------------------------------------------------------
@@ -584,12 +593,33 @@ impl OnnxEngine {
         let has_input = |name: &str| input_names.iter().any(|n| n == name);
         let has_output = |name: &str| output_names.iter().any(|n| n == name);
 
+        // Read the declared speaker_embedding dim so the Issue #426 fallback
+        // matches the model's input shape exactly. Mirrors voice.py:200-208
+        // and PiperSession.cs:373-378.
+        let speaker_embedding_dim: usize = if has_input("speaker_embedding") {
+            let inputs = session.inputs();
+            let dim = inputs
+                .iter()
+                .find(|i| i.name() == "speaker_embedding")
+                .and_then(|i| match i.dtype() {
+                    ort::value::ValueType::Tensor { shape, .. } => shape.get(1).copied(),
+                    _ => None,
+                });
+            match dim {
+                Some(d) if d > 0 => d as usize,
+                _ => 256, // dynamic axis or unexpected — use ECAPA-TDNN canonical
+            }
+        } else {
+            256
+        };
+
         let capabilities = ModelCapabilities {
             has_sid: has_input("sid"),
             has_lid: has_input("lid"),
             has_prosody: has_input("prosody_features"),
             has_duration_output: has_output("durations"),
             has_speaker_embedding: has_input("speaker_embedding"),
+            speaker_embedding_dim,
         };
 
         tracing::info!(
@@ -762,12 +792,14 @@ impl OnnxEngine {
         // "Required inputs missing" を返す (Issue #426)。
         // mask=0 のときモデルは emb_g(sid) にフォールバックする
         // (`src/python/piper_train/vits/models.py:1015-1037`)。
-        const FALLBACK_EMB_DIM: usize = 256; // ECAPA-TDNN canonical
+        // emb_dim はモデルの input shape から検出した値を使う
+        // (capabilities.speaker_embedding_dim)。動的軸時は 256 fallback。
         let speaker_emb_tensor = if self.capabilities.has_speaker_embedding {
             let (dim, data) = if let Some(ref emb) = request.speaker_embedding {
                 (emb.len(), emb.to_vec())
             } else {
-                (FALLBACK_EMB_DIM, vec![0.0_f32; FALLBACK_EMB_DIM])
+                let d = self.capabilities.speaker_embedding_dim;
+                (d, vec![0.0_f32; d])
             };
             Some(
                 Tensor::from_array(([1_usize, dim], data.into_boxed_slice()))
@@ -783,14 +815,15 @@ impl OnnxEngine {
             } else {
                 0
             };
-            // shape (1,) — ORT broadcasts to the (1, 1) declared by
-            // export_onnx.py:506 via the mask>=1 comparison in
-            // `vits/models.py:1015-1037`. Keep this shape for backward
-            // compatibility with the pre-Issue #426 behaviour.
+            // shape (1, 1) — matches export_onnx.py:506 and the Python
+            // runtime (`src/python_run/piper/voice.py:208`). The fixture
+            // ONNX requires rank 2; passing rank 1 raises "Invalid rank
+            // for input: speaker_embedding_mask".
             Some(
-                Tensor::from_array(([1_usize], vec![mask_val].into_boxed_slice())).map_err(
-                    |e| PiperError::Inference(format!("speaker_embedding_mask tensor: {e}")),
-                )?,
+                Tensor::from_array(([1_usize, 1_usize], vec![mask_val].into_boxed_slice()))
+                    .map_err(|e| {
+                        PiperError::Inference(format!("speaker_embedding_mask tensor: {e}"))
+                    })?,
             )
         } else {
             None
@@ -1096,6 +1129,7 @@ mod tests {
             has_prosody: true,
             has_duration_output: false,
             has_speaker_embedding: false,
+            speaker_embedding_dim: 256,
         };
         let debug = format!("{:?}", caps);
         assert!(debug.contains("has_sid: true"));
@@ -1144,6 +1178,7 @@ mod tests {
             has_prosody: true,
             has_duration_output: false,
             has_speaker_embedding: true,
+            speaker_embedding_dim: 256,
         };
         let debug = format!("{:?}", caps);
         assert!(debug.contains("has_speaker_embedding: true"));
@@ -1219,6 +1254,7 @@ mod tests {
             has_prosody: true,
             has_duration_output: true,
             has_speaker_embedding: true,
+            speaker_embedding_dim: 256,
         };
         assert!(caps.has_sid);
         assert!(caps.has_lid);
@@ -1235,6 +1271,7 @@ mod tests {
             has_prosody: false,
             has_duration_output: false,
             has_speaker_embedding: false,
+            speaker_embedding_dim: 256,
         };
         assert!(!caps.has_sid);
         assert!(!caps.has_lid);
