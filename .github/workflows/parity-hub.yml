@@ -1,0 +1,145 @@
+# Parity Hub
+# ==========
+# Cross-runtime parity gates consolidated into a single matrix workflow.
+# Each [[parity]] previously lived in its own *-parity.yml; the per-file
+# overhead (setup-python checkout, action-pin baseline, paths block) was
+# duplicated 7 times. This hub deduplicates infra while keeping the
+# matrix job names visible per parity so reviewers still know which
+# contract drifted from a single CI log.
+#
+# Out of scope for this hub (kept as standalone workflows):
+#   - timing-parity.yml         : 2 jobs incl. `pip install -e src/python_run`
+#   - zh-en-loanword-sync.yml   : 3 jobs incl. forward-compat + meta-test
+#
+# Source-of-truth check scripts:
+#   docs/spec/<name>-contract.toml + scripts/check_<name>_contract.py
+#
+# Migration note: branch protection rules referencing the old individual
+# status check names (e.g. "Runtime CLI flag names agree") must be
+# updated to "Parity Hub / parity (<id>)" after merge.
+
+name: Parity Hub
+
+on:
+  pull_request:
+    branches: [dev]
+    paths:
+      # Specs
+      - 'docs/spec/language-id-map-contract.toml'
+      - 'docs/spec/ort-session-contract.toml'
+      - 'docs/spec/short-text-contract.toml'
+      - 'docs/spec/ssml-contract.toml'
+      - 'docs/spec/text-splitter-contract.toml'
+      - 'docs/spec/model-resolution.md'
+      # Canonical / mirror fixtures
+      - 'test/model_resolution_vectors.json'
+      - 'tests/fixtures/language_id_map/**'
+      - 'tests/fixtures/ort_session/**'
+      - 'tests/fixtures/short_text/**'
+      - 'tests/fixtures/ssml/**'
+      - 'tests/fixtures/text_splitter/**'
+      # cli-flag-parity runtime sources
+      - 'src/python_run/piper/__main__.py'
+      - 'src/python/piper_train/infer_onnx.py'
+      - 'src/rust/piper-cli/src/main.rs'
+      - 'src/go/cmd/piper-plus/main.go'
+      - 'src/csharp/PiperPlus.Cli/Program.cs'
+      - 'src/cpp/main.cpp'
+      # language-id-map runtime sources
+      - 'src/python/piper_train/tools/prepare_multilingual_dataset.py'
+      - 'src/python_run/piper/voice.py'
+      - 'src/rust/piper-core/src/config.rs'
+      - 'src/rust/piper-core/src/wasm.rs'
+      - 'src/rust/piper-wasm/src/lib.rs'
+      - 'src/go/piperplus/testdata/valid_multilingual_config.json'
+      - 'src/wasm/openjtalk-web/models/multilingual-test-medium.onnx.json'
+      - 'src/csharp/PiperPlus.Core/Config/PiperConfig.cs'
+      - 'src/cpp/piper.cpp'
+      # ort-session canonical
+      - 'src/python/piper_train/ort_utils.py'
+      # ssml canonical
+      - 'src/python/g2p/piper_plus_g2p/ssml.py'
+      - 'src/wasm/g2p/src/ssml.js'
+      # text-splitter canonical
+      - 'src/python_run/piper/text_splitter.py'
+      # voice-catalog mirrors
+      - 'src/python_run/piper/download.py'
+      - 'src/cpp/piper_plus_voices.json'
+      - 'src/rust/piper-core/src/model_download.rs'
+      - 'src/csharp/PiperPlus.Core/Config/VoiceCatalog.cs'
+      - 'src/go/piperplus/voice_catalog.go'
+      # Scripts
+      - 'scripts/check_cli_flag_parity.py'
+      - 'scripts/check_language_id_map_contract.py'
+      - 'scripts/regenerate_language_id_map_fixture.py'
+      - 'scripts/check_ort_session_contract.py'
+      - 'scripts/regenerate_ort_session_fixture.py'
+      - 'scripts/check_short_text_contract.py'
+      - 'scripts/regenerate_short_text_fixture.py'
+      - 'scripts/check_ssml_contract.py'
+      - 'scripts/regenerate_ssml_fixture.py'
+      - 'scripts/check_text_splitter_contract.py'
+      - 'scripts/regenerate_text_splitter_fixture.py'
+      - 'scripts/check_voice_catalog_parity.py'
+      - '.github/workflows/parity-hub.yml'
+  push:
+    branches: [dev, main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  parity:
+    name: parity (${{ matrix.id }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - id: cli-flag
+            description: Runtime CLI flag names agree
+            scripts: |
+              python scripts/check_cli_flag_parity.py
+          - id: language-id-map
+            description: LANGUAGE_ID_MAP contract drift check
+            scripts: |
+              python scripts/check_language_id_map_contract.py --verbose
+              python scripts/regenerate_language_id_map_fixture.py --check
+          - id: ort-session
+            description: ORT session contract drift check
+            scripts: |
+              python scripts/check_ort_session_contract.py --verbose
+              python scripts/regenerate_ort_session_fixture.py --check
+          - id: short-text
+            description: Short-text contract drift check
+            scripts: |
+              python scripts/check_short_text_contract.py --verbose
+              python scripts/regenerate_short_text_fixture.py --check
+          - id: ssml
+            description: SSML contract drift check
+            scripts: |
+              python scripts/check_ssml_contract.py --verbose
+              python scripts/regenerate_ssml_fixture.py --check
+          - id: text-splitter
+            description: Text-splitter contract drift check
+            scripts: |
+              python scripts/check_text_splitter_contract.py --verbose
+              python scripts/regenerate_text_splitter_fixture.py --check
+          - id: voice-catalog
+            description: 5 runtime catalogs honour canonical vector
+            scripts: |
+              python scripts/check_voice_catalog_parity.py
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+
+      - name: ${{ matrix.description }}
+        run: ${{ matrix.scripts }}

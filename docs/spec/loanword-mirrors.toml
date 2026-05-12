@@ -1,0 +1,61 @@
+# ZH-EN loanword JSON mirror declarations.
+#
+# Source of truth: src/python/g2p/piper_plus_g2p/data/zh_en_loanword.json
+# Consumed by scripts/check_loanword_consistency.py (thin wrapper around
+# scripts/_mirror_check.py).
+#
+# Two groups:
+#   1. Runtime data files (10 mirrors across Python / Rust × 2 crate /
+#      Go / C# / WASM / C++ / Kotlin AAR / Swift SPM)
+#   2. Cross-runtime fixture matrix (8 mirrors for cross-language parity
+#      tests; TICKET-06b deliverable)
+#
+# Schema validation for group 1 is registered in code by the wrapper
+# (`register_schema_validator`) because it inspects JSON structure that
+# can't be declared in TOML. Forward-compat (YELLOW-5): the validator
+# accepts unknown top-level fields and `schema_version: 2` payloads
+# silently to match Python `_load_loanword_data`.
+
+schema_version = 1
+
+[[groups]]
+name = "zh_en_loanword runtime data (10 mirrors)"
+canonical = "src/python/g2p/piper_plus_g2p/data/zh_en_loanword.json"
+mirrors = [
+  "src/python_run/piper/phonemize/data/zh_en_loanword.json",
+  # Rust 2 crate (§8.5: piper-plus-g2p と piper-core の重複維持)
+  "src/rust/piper-plus-g2p/data/zh_en_loanword.json",
+  "src/rust/piper-core/data/zh_en_loanword.json",
+  "src/go/phonemize/data/zh_en_loanword.json",
+  "src/csharp/PiperPlus.Core/Phonemize/Data/zh_en_loanword.json",
+  "src/wasm/g2p/data/zh_en_loanword.json",
+  "src/cpp/data/zh_en_loanword.json",
+  # Kotlin Android G2P AAR — bundled into AAR `assets/` by AGP.
+  "android/piper-plus-g2p/src/main/assets/zh_en_loanword.json",
+  # Swift G2P SPM product — declared as `.process` resource in Package.swift.
+  "Sources/PiperPlusG2P/Resources/zh_en_loanword.json",
+]
+incident_refs = ["PR #397", "Issue #384", "Issue #387", "Issue #388"]
+notes = "Schema validator registered in code (loanword-specific JSON shape)."
+
+[[groups]]
+name = "zh_en_loanword fixture matrix (8 mirrors)"
+canonical = "tests/fixtures/g2p/zh_en_loanword_matrix.json"
+mirrors = [
+  "src/go/phonemize/testdata/zh_en_loanword_matrix.json",
+  "src/csharp/PiperPlus.Core.Tests/Phonemize/TestData/zh_en_loanword_matrix.json",
+  "src/cpp/tests/fixtures/zh_en_loanword_matrix.json",
+  "src/wasm/g2p/test/fixtures/zh_en_loanword_matrix.json",
+  # YELLOW-3: Rust 2 crate symmetric tests
+  "src/rust/piper-plus-g2p/tests/fixtures/zh_en_loanword_matrix.json",
+  "src/rust/piper-core/tests/fixtures/zh_en_loanword_matrix.json",
+  # Kotlin Android G2P androidTest assets (mirror of syncG2pFixture layout)
+  "android/piper-plus-g2p/src/androidTest/assets/g2p_fixtures/zh_en_loanword_matrix.json",
+  # Swift G2P XCTest — loadable via Bundle.module once testTarget gains resources
+  "tests/PiperPlusG2PTests/Fixtures/zh_en_loanword_matrix.json",
+]
+# Allow canonical absence so legacy phases don't fail when the matrix
+# fixture is not yet generated. TICKET-06b introduced this; flag exists
+# to ease bring-up in branches that pre-date the fixture.
+allow_missing_default = false
+notes = "TICKET-06b cross-runtime parity fixture. 2 Rust crates mirrored intentionally."

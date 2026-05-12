@@ -1,0 +1,26 @@
+# Custom dictionary JSON mirror declarations.
+#
+# Source of truth: data/dictionaries/<name>.json
+# Mirror:          src/wasm/openjtalk-web/assets/<name>.json
+#
+# Consumed by scripts/check_dictionary_consistency.py (thin wrapper around
+# scripts/_mirror_check.py). When you add a new dictionary distributed in
+# additional runtimes, append a [[groups]] entry — no Python edit needed.
+
+schema_version = 1
+
+[[groups]]
+name = "default_common dictionary"
+canonical = "data/dictionaries/default_common_dict.json"
+mirrors = ["src/wasm/openjtalk-web/assets/default_common_dict.json"]
+notes = "WASM mirror was 319 lines behind in 2026-05 (PR #447 discovered drift)."
+
+[[groups]]
+name = "default_tech dictionary"
+canonical = "data/dictionaries/default_tech_dict.json"
+mirrors = ["src/wasm/openjtalk-web/assets/default_tech_dict.json"]
+
+[[groups]]
+name = "additional_tech dictionary"
+canonical = "data/dictionaries/additional_tech_dict.json"
+mirrors = ["src/wasm/openjtalk-web/assets/additional_tech_dict.json"]

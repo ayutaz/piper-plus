@@ -11,7 +11,7 @@
 //! 3. The known terminator omitted from rust (U+FF0E fullwidth full stop) is
 //!    NOT recognised as a terminator (current divergence).
 //!
-//! The drift gate (`text-splitter-parity.yml`) ensures the fixture stays in
+//! The drift gate (`parity-hub.yml` text-splitter matrix entry) ensures the fixture stays in
 //! sync with `docs/spec/text-splitter-contract.toml`.
 
 use std::fs;

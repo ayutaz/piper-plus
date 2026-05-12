@@ -22,7 +22,7 @@ namespace PiperPlus.Core.Tests;
 ///   3. The known terminator omitted from C# (U+FF0E fullwidth full stop) is
 ///      NOT recognised today (current divergence — pinned to detect realignment).
 ///
-/// The drift gate (text-splitter-parity.yml) ensures the fixture stays in sync
+/// The drift gate (parity-hub.yml text-splitter matrix entry) ensures the fixture stays in sync
 /// with docs/spec/text-splitter-contract.toml.
 /// </summary>
 public class TextSplitterContractTests

@@ -242,8 +242,9 @@ repos:
         files: ^(cmake/(OnnxRuntime|find_onnxruntime_windows)\.cmake|scripts/check_ort_versions\.py|\.github/workflows/(ort-version-sync|release-shared-lib|android-build|release-kotlin-g2p|kotlin-g2p-ci|build-piper|_build-test-cpp)\.yml|docker/cpp-dev/Dockerfile|src/python/pyproject\.toml|src/python_run/(requirements(_gpu)?\.txt|setup\.py)|src/csharp/.*\.csproj|src/go/go\.mod|src/wasm/openjtalk-web/package\.json)$
         pass_filenames: false
 
-      # Mirror of .github/workflows/voice-catalog-parity.yml. canonical
-      # model_resolution_vectors.json vs 5 runtime mirror catalogs.
+      # Mirror of .github/workflows/parity-hub.yml (voice-catalog matrix
+      # entry). canonical model_resolution_vectors.json vs 5 runtime
+      # mirror catalogs.
       - id: voice-catalog-parity
         name: voice catalog parity (canonical vs 5 runtime mirrors)
         entry: uv run python scripts/check_voice_catalog_parity.py
@@ -263,9 +264,9 @@ repos:
         files: ^(\.github/workflows/.*\.ya?ml|\.github/actions/.*action\.ya?ml|scripts/check_action_pins\.py|scripts/action_pins_baseline\.txt)$
         pass_filenames: false
 
-      # Mirror of .github/workflows/language-id-map-parity.yml. Drift here
-      # is catastrophic (silent multilingual mis-routing), trigger paths
-      # are tightly scoped; cheap to run on every relevant commit.
+      # Mirror of .github/workflows/parity-hub.yml (language-id-map
+      # matrix entry). Drift here is catastrophic (silent multilingual
+      # mis-routing); trigger paths are tightly scoped, cheap to run.
       - id: language-id-map-contract
         name: LANGUAGE_ID_MAP contract (canonical TOML vs 6 runtime sources)
         entry: uv run python scripts/check_language_id_map_contract.py
