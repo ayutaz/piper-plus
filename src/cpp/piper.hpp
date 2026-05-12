@@ -100,6 +100,13 @@ struct ModelSession {
   bool hasProsodyInput = false;    // Whether model accepts prosody_features input
   bool hasMultiSpeaker = false;    // Whether model has sid (speaker ID) input
   bool hasLidInput = false;        // Whether model has lid (language ID) input
+  // PR #320 / Issue #426: MB-iSTFT-VITS2 + Voice Cloning exports declare
+  // speaker_embedding / speaker_embedding_mask unconditionally. Feeding
+  // zero embedding + mask=0 routes the model to emb_g(sid)
+  // (vits/models.py:1015-1037). Without this the session rejects the
+  // call with "Required inputs missing".
+  bool hasSpeakerEmbeddingInput = false;
+  int64_t speakerEmbeddingDim = 256;  // ECAPA-TDNN canonical fallback
 
   ModelSession() : onnx(nullptr){};
 };

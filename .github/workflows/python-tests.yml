@@ -10,6 +10,7 @@ on:
       - 'test/**'
       - 'tools/benchmark/**'
       - 'tests/fixtures/g2p/zh_en_loanword_matrix.json'
+      - 'tests/fixtures/g2p/pt_dialect_parity.json'
       - 'tests/fixtures/phoneme_timing/**'
       - 'tests/fixtures/short_text/**'
       - 'tests/fixtures/ort_session/**'

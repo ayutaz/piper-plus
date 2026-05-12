@@ -1,0 +1,89 @@
+# Extended contract gates
+# =========================
+# Six contract specs that previously lacked an automated drift gate. Each
+# of the [[providers]] / [[runtimes]] / file references in the spec files
+# is now checked at PR time so a silent file rename / table deletion / key
+# mismatch is caught before merge.
+#
+# Why a dedicated workflow?  The existing model-quality-gate.yml is
+# scoped to ONNX-export-side artefacts (model files, phoneme set, ORT
+# versions). The six contracts gated here cover orthogonal axes (audio
+# format, EP matrix, streaming API surface, Swift FFI, Portuguese
+# dialect, speaker encoder). Keeping them in their own workflow makes the
+# matrix readable and lets reviewers identify which contract drifted
+# without reading the whole quality-gate log.
+#
+# Source-of-truth contract: docs/spec/<name>-contract.{toml,md}
+# Check script:             scripts/check_<name>_contract.py
+
+name: Extended contract gates
+
+on:
+  pull_request:
+    branches: [dev]
+    paths:
+      - 'docs/spec/audio-format-contract.toml'
+      - 'docs/spec/ort-provider-contract.toml'
+      - 'docs/spec/streaming-api-contract.toml'
+      - 'docs/spec/swift-g2p-contract.toml'
+      - 'docs/spec/pt-dialect-contract.toml'
+      - 'tests/fixtures/g2p/pt_dialect_parity.json'
+      - 'docs/spec/speaker-encoder-contract.md'
+      - 'docs/spec/pua-contract.toml'  # cross-referenced by swift-g2p
+      - 'src/python/g2p/piper_plus_g2p/data/pua.json'
+      - 'test/fixtures/speaker_encoder_golden.json'
+      - 'scripts/check_audio_format_contract.py'
+      - 'scripts/check_ort_provider_contract.py'
+      - 'scripts/check_streaming_api_contract.py'
+      - 'scripts/check_swift_g2p_contract.py'
+      - 'scripts/check_pt_dialect_contract.py'
+      - 'scripts/check_speaker_encoder_contract.py'
+      - '.github/workflows/contract-gates-extended.yml'
+  push:
+    branches: [dev, main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  contract-checks:
+    name: ${{ matrix.contract }} gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        contract:
+          - audio-format
+          - ort-provider
+          - streaming-api
+          - swift-g2p
+          - pt-dialect
+          - speaker-encoder
+    steps:
+      - uses: actions/checkout@v6
+
+      # tomllib is in the stdlib from Python 3.11; pin to 3.13 to match
+      # the other contract gates (e.g. zh-en-loanword-sync.yml).
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+
+      - name: Run contract drift check
+        run: |
+          # Map the matrix contract id to its check script.
+          case "${{ matrix.contract }}" in
+            audio-format)     script=check_audio_format_contract.py ;;
+            ort-provider)     script=check_ort_provider_contract.py ;;
+            streaming-api)    script=check_streaming_api_contract.py ;;
+            swift-g2p)        script=check_swift_g2p_contract.py ;;
+            pt-dialect)       script=check_pt_dialect_contract.py ;;
+            speaker-encoder)  script=check_speaker_encoder_contract.py ;;
+            *) echo "::error::unknown contract id ${{ matrix.contract }}"; exit 1 ;;
+          esac
+          python "scripts/$script"

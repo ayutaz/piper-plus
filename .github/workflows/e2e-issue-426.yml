@@ -1,0 +1,189 @@
+# End-to-end gate for Issue #426 — MB-iSTFT-VITS2 + speaker_embedding
+# fallback on the docker python-inference server.
+#
+# Reproduces the exact failure mode reported in #426:
+#   docker run ghcr.io/.../python-inference + --server
+#   + MB-iSTFT model with speaker_embedding declared
+#   + curl /v1/audio/speech → 500 "Required inputs missing"
+#
+# If the runtime fix in docker/python-inference/inference.py regresses,
+# this job fails at PR time rather than at user-facing runtime.
+#
+# Fixture: a tiny MB-iSTFT model is built on-the-fly by
+# `tests/fixtures/mb_istft_speaker_embedding/build_fixture.py` so the
+# CI does not need to fetch a large model from HuggingFace.
+
+name: E2E Issue #426 (speaker_embedding)
+
+on:
+  pull_request:
+    branches: [dev]
+    paths:
+      - 'docker/python-inference/**'
+      - 'docker/webui/**'
+      - 'src/python/piper_train/**'
+      - 'src/python_run/**'
+      - 'scripts/check_onnx_inputs.py'
+      - 'tests/fixtures/mb_istft_speaker_embedding/**'
+      - '.github/workflows/e2e-issue-426.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e-docker-server:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost "$AGENT_TOOLSDIRECTORY" /usr/local/lib/android /opt/hostedtoolcache/CodeQL
+          sudo docker image prune --all --force
+          sudo apt-get clean
+
+      - uses: actions/checkout@v6
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Set up Python for fixture build
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Build speaker_embedding fixture
+        run: |
+          uv sync --extra dev
+          CUDA_VISIBLE_DEVICES="" uv run python \
+            tests/fixtures/mb_istft_speaker_embedding/build_fixture.py
+          ls -la tests/fixtures/mb_istft_speaker_embedding/
+
+      - name: Build python-inference image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ./docker/python-inference/Dockerfile
+          push: false
+          tags: piper-python-inference:e2e-426
+          load: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # ----------------------------------------------------------------
+      # Test 1 — CLI mode synthesizes Japanese phonemes successfully
+      # ----------------------------------------------------------------
+      # The CLI path also goes through PiperInferenceEngine.synthesize,
+      # so it exercises the same speaker_embedding feed logic as the
+      # server. Faster than spinning up uvicorn just for one assertion.
+      - name: CLI synth (Issue #426 reproducer)
+        run: |
+          mkdir -p /tmp/output && chmod 777 /tmp/output
+          docker run --rm \
+            -v ${{ github.workspace }}/tests/fixtures/mb_istft_speaker_embedding:/fixture:ro \
+            -v /tmp/output:/output \
+            -e CUDA_VISIBLE_DEVICES="" \
+            -e PIPER_DISABLE_CACHE=1 \
+            -e PIPER_DISABLE_WARMUP=1 \
+            piper-python-inference:e2e-426 \
+            python inference.py \
+              --model /fixture/model.onnx \
+              --config /fixture/model.onnx.json \
+              --output /output/issue426.wav \
+              --text "aaaaa" \
+              --language ja \
+              --device cpu
+
+          FILE_SIZE=$(stat --format=%s /tmp/output/issue426.wav)
+          echo "Output: issue426.wav ($FILE_SIZE bytes)"
+          if [ "$FILE_SIZE" -lt 1000 ]; then
+            echo "ERROR: Output file too small ($FILE_SIZE bytes) — Issue #426 regression?"
+            exit 1
+          fi
+
+          # Confirm RIFF/WAVE header.
+          head -c 12 /tmp/output/issue426.wav | xxd
+          MAGIC=$(head -c 4 /tmp/output/issue426.wav)
+          if [ "$MAGIC" != "RIFF" ]; then
+            echo "ERROR: bad WAV header (magic=$MAGIC)"
+            exit 1
+          fi
+
+      # ----------------------------------------------------------------
+      # Test 2 — Server mode reproduces the original Issue #426 scenario
+      # ----------------------------------------------------------------
+      - name: Start server
+        run: |
+          docker run -d --name piper-e2e \
+            -p 8000:8000 \
+            -v ${{ github.workspace }}/tests/fixtures/mb_istft_speaker_embedding:/fixture:ro \
+            -e CUDA_VISIBLE_DEVICES="" \
+            -e PIPER_DISABLE_CACHE=1 \
+            -e PIPER_DISABLE_WARMUP=1 \
+            piper-python-inference:e2e-426 \
+            python /app/inference.py --server \
+              --model /fixture/model.onnx \
+              --config /fixture/model.onnx.json \
+              --port 8000
+
+          # Wait for server to be ready (up to 30s).
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:8000/health > /dev/null 2>&1; then
+              echo "Server ready after ${i}s"
+              break
+            fi
+            sleep 1
+          done
+
+          # Final check; if still not up, fail loudly.
+          curl -sf http://localhost:8000/health || {
+            echo "Server did not start in 30s. Logs:"
+            docker logs piper-e2e
+            exit 1
+          }
+
+      - name: POST /v1/audio/speech (Issue #426 original repro)
+        run: |
+          # The reported failure: 500 with "Required inputs (...) are missing".
+          # After the fix, this must return 200 with a RIFF/WAVE body.
+          STATUS=$(curl -s -o /tmp/issue426_server.wav -w "%{http_code}" \
+            -X POST http://localhost:8000/v1/audio/speech \
+            -H 'Content-Type: application/json' \
+            -d '{"model":"tts","input":"aaaaaaaaaaaa","voice":"default","language":"ja"}')
+
+          echo "HTTP status: $STATUS"
+          if [ "$STATUS" != "200" ]; then
+            echo "ERROR: Issue #426 regression — server returned $STATUS"
+            echo "Server logs:"
+            docker logs piper-e2e
+            exit 1
+          fi
+
+          FILE_SIZE=$(stat --format=%s /tmp/issue426_server.wav)
+          echo "Body size: $FILE_SIZE bytes"
+          if [ "$FILE_SIZE" -lt 1000 ]; then
+            echo "ERROR: response body too small"
+            exit 1
+          fi
+
+          MAGIC=$(head -c 4 /tmp/issue426_server.wav)
+          if [ "$MAGIC" != "RIFF" ]; then
+            echo "ERROR: response body is not a WAV (magic=$MAGIC)"
+            head -c 256 /tmp/issue426_server.wav
+            exit 1
+          fi
+          echo "Issue #426 E2E PASSED — server returns valid WAV for MB-iSTFT model"
+
+      - name: Show server logs on success
+        if: always()
+        run: |
+          echo "=== piper-e2e server logs ==="
+          docker logs piper-e2e || true
+
+      - name: Stop server
+        if: always()
+        run: docker rm -f piper-e2e || true

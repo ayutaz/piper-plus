@@ -93,10 +93,11 @@ python_canonical = "src/python/g2p/piper_plus_g2p/portuguese.py"
 python_runtime_mirror = "src/python_run/piper/phonemize/portuguese.py"
 rust_core = "src/rust/piper-core/src/phonemize/portuguese.rs"
 rust_g2p = "src/rust/piper-plus-g2p/src/portuguese.rs"
-go = "src/go/piperplus/phonemize/portuguese.go"
-csharp = "src/csharp/PiperPlus.Core/Phonemize/PortugueseG2P.cs"
-wasm_js = "src/wasm/g2p/portuguese.js"
-cpp = "src/cpp/portuguese_phonemizer.{h,cpp}"
+go = "src/go/phonemize/portuguese.go"
+csharp = "src/csharp/PiperPlus.Core/Phonemize/PortuguesePhonemizer.cs"
+wasm_js = "src/wasm/g2p/src/pt/index.js"
+cpp_header = "src/cpp/portuguese_phonemize.hpp"
+cpp_source = "src/cpp/portuguese_phonemize.cpp"
 
 [backward_compat]
 # Bare `pt` continues to resolve to the BR dialect — no behaviour change

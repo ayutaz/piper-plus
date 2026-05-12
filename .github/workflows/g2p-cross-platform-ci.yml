@@ -59,7 +59,11 @@ jobs:
 
       - name: Python cross-platform tests
         working-directory: src/python/g2p
-        run: uv run pytest tests/test_cross_platform.py -v
+        # 全 tests/ を実行する。pyproject.toml の `--cov-fail-under=80` は full-suite
+        # を前提とした閾値 (実測 ~87%) であり、`tests/test_cross_platform.py` 単独
+        # では 66.5% で fail する。PR #401 で threshold を 70 → 80 に引き上げた際の
+        # 設定不整合 (workflow の test scope 未更新) を解消する。
+        run: uv run pytest tests/ -v
 
       - name: Rust build check
         working-directory: src/rust

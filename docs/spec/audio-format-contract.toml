@@ -22,7 +22,7 @@
 #                       src/python_run/piper/http_server.py      (_build_streaming_wav_header — manual RIFF assembly)
 #                       src/python_run/piper/webui.py            (Gradio output)
 #   Rust:               src/rust/piper-core/src/engine.rs        (synth → f32 → i16 → WAV)
-#   Go:                 src/go/piperplus/synth.go                (encoding/binary little-endian writes)
+#   Go:                 src/go/piperplus/synthesize.go           (encoding/binary little-endian writes)
 #   C#:                 src/csharp/PiperPlus.Core/Inference/PiperSession.cs  (BinaryWriter)
 #   C/C++:              src/cpp/piper_plus.cpp                   (manual RIFF assembly)
 #   WASM/JS:            src/wasm/openjtalk-web/src/index.js      (DataView little-endian writes)

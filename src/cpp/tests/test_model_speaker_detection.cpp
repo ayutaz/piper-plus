@@ -15,6 +15,10 @@ struct TestModelSession {
     bool hasDurationOutput = false;
     bool hasProsodyInput = false;
     bool hasMultiSpeaker = false;
+    // Issue #426: MB-iSTFT-VITS2 + Voice Cloning exports declare these
+    // unconditionally; runtimes feed zero+mask=0 to fall back to emb_g(sid).
+    bool hasSpeakerEmbeddingInput = false;
+    int64_t speakerEmbeddingDim = 256;
 };
 
 // Helper function that mirrors the input name building logic from piper.cpp
@@ -29,6 +33,12 @@ std::vector<const char*> buildInputNames(const TestModelSession& session) {
     // Add prosody features if model supports them
     if (session.hasProsodyInput) {
         inputNamesVec.push_back("prosody_features");
+    }
+
+    // Add speaker_embedding / mask when declared (Issue #426).
+    if (session.hasSpeakerEmbeddingInput) {
+        inputNamesVec.push_back("speaker_embedding");
+        inputNamesVec.push_back("speaker_embedding_mask");
     }
 
     return inputNamesVec;
@@ -197,6 +207,66 @@ TEST(ModelSpeakerDetectionTest, BaseInputsAlwaysPresent) {
             << "scales missing for hasMultiSpeaker=" << combo.first
             << ", hasProsodyInput=" << combo.second;
     }
+}
+
+// ============================================================================
+// Issue #426: speaker_embedding / speaker_embedding_mask feed contract
+// ============================================================================
+//
+// PR #320 made MB-iSTFT-VITS2 + Voice Cloning exports declare these inputs
+// unconditionally; without feeding them ORT raises "Required inputs
+// missing". The canonical fallback is zero embedding + mask=0 to route
+// through emb_g(sid) (vits/models.py:1015-1037).
+
+TEST(ModelSpeakerDetectionTest, SpeakerEmbeddingAddedWhenDeclared) {
+    TestModelSession session;
+    session.hasMultiSpeaker = true;
+    session.hasSpeakerEmbeddingInput = true;
+
+    auto inputs = buildInputNames(session);
+    EXPECT_TRUE(containsInput(inputs, "speaker_embedding"));
+    EXPECT_TRUE(containsInput(inputs, "speaker_embedding_mask"));
+}
+
+TEST(ModelSpeakerDetectionTest, SpeakerEmbeddingAbsentByDefault) {
+    TestModelSession session;
+    // hasSpeakerEmbeddingInput defaults to false — legacy non-MB-iSTFT
+    // exports must NOT receive these inputs (ORT would reject them).
+    auto inputs = buildInputNames(session);
+    EXPECT_FALSE(containsInput(inputs, "speaker_embedding"));
+    EXPECT_FALSE(containsInput(inputs, "speaker_embedding_mask"));
+}
+
+TEST(ModelSpeakerDetectionTest, SpeakerEmbeddingOrderAfterProsody) {
+    // ONNX feed order: input, input_lengths, scales, sid, prosody_features,
+    // speaker_embedding, speaker_embedding_mask. The export side
+    // (export_onnx.py:505-515) appends them last; matching the runtime
+    // order keeps debugging output predictable.
+    TestModelSession session;
+    session.hasMultiSpeaker = true;
+    session.hasProsodyInput = true;
+    session.hasSpeakerEmbeddingInput = true;
+
+    auto inputs = buildInputNames(session);
+    int prosodyPos = -1, embPos = -1, maskPos = -1;
+    for (size_t i = 0; i < inputs.size(); i++) {
+        if (std::string(inputs[i]) == "prosody_features") prosodyPos = static_cast<int>(i);
+        if (std::string(inputs[i]) == "speaker_embedding") embPos = static_cast<int>(i);
+        if (std::string(inputs[i]) == "speaker_embedding_mask") maskPos = static_cast<int>(i);
+    }
+    EXPECT_NE(prosodyPos, -1);
+    EXPECT_NE(embPos, -1);
+    EXPECT_NE(maskPos, -1);
+    EXPECT_LT(prosodyPos, embPos);
+    EXPECT_LT(embPos, maskPos);
+}
+
+TEST(ModelSpeakerDetectionTest, SpeakerEmbeddingDefaultDim256) {
+    // ECAPA-TDNN canonical fallback when the ONNX graph uses a dynamic
+    // axis for emb_dim. Mirrors src/python_run/piper/voice.py:200-208 and
+    // docker/python-inference/inference.py.
+    TestModelSession session;
+    EXPECT_EQ(session.speakerEmbeddingDim, 256);
 }
 
 // ----------------------------------------------------------------------------

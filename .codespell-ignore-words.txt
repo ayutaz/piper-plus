@@ -118,6 +118,8 @@ ue
 vai
 vie
 vill
+# longe — Portuguese "far" (PT-BR/EU dialect parity fixture)
+longe
 
 # Pre-existing real typos that the codespell baseline currently surfaces.
 # Slated for follow-up PRs (one per logical area); listed here only so the

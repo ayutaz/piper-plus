@@ -306,6 +306,191 @@ class TestShortTextWarning:
         assert resp.headers.get("x-piper-warning") is None
 
 
+# ---- PiperInferenceEngine input feed (issue #426) ----
+#
+# Verifies that MB-iSTFT-VITS2 + Voice Cloning models — whose ONNX graphs
+# expose `speaker_embedding` / `speaker_embedding_mask` unconditionally
+# (PR #320) — are fed the canonical zero-embedding + mask=0 fallback so
+# ONNX Runtime does not reject the call with "Required inputs missing".
+# The shape/dtype contract mirrors
+# `src/python_run/piper/voice.py` and `src/python/piper_train/export_onnx.py`.
+
+
+class _FakeOnnxInput:
+    def __init__(self, name: str, shape):
+        self.name = name
+        self.shape = shape
+
+
+class _FakeOnnxSession:
+    """Minimal ort.InferenceSession stand-in for input-feed assertions."""
+
+    def __init__(self, input_specs):
+        self._inputs = [_FakeOnnxInput(name, shape) for name, shape in input_specs]
+        self.last_feed: dict | None = None
+
+    def get_inputs(self):
+        return self._inputs
+
+    def get_providers(self):
+        return ["CPUExecutionProvider"]
+
+    def run(self, _output_names, input_feed):
+        self.last_feed = input_feed
+        # Return a tiny 1-channel waveform: shape (1, 1, T) matches the
+        # real model output, which `synthesize` squeezes to 1-D.
+        return [np.zeros((1, 1, 1024), dtype=np.float32)]
+
+
+@pytest.fixture()
+def engine_factory(monkeypatch, tmp_path):
+    """Build a PiperInferenceEngine wired to a fake ONNX session."""
+    import inference as inference_mod
+
+    def _factory(input_specs):
+        session = _FakeOnnxSession(input_specs)
+        monkeypatch.setattr(
+            inference_mod, "create_session_with_cache", lambda *a, **kw: session
+        )
+        monkeypatch.setattr(inference_mod, "warmup_onnx_session", lambda *a, **kw: None)
+
+        config_path = tmp_path / "config.json"
+        config_path.write_text(
+            '{"phoneme_id_map": {"_": [0], "a": [1], "k": [2], "o": [3], "n": [4],'
+            ' "i": [5], "ch": [6], "w": [7], "ha": [8]},'
+            ' "language_id_map": {"ja": 0, "en": 1}}'
+        )
+        engine = inference_mod.PiperInferenceEngine(
+            "/nonexistent/model.onnx", str(config_path)
+        )
+        return engine, session
+
+    return _factory
+
+
+class TestSpeakerEmbeddingFeed:
+    """Issue #426: MB-iSTFT-VITS2 ONNX models must receive
+    speaker_embedding / speaker_embedding_mask or ORT raises
+    "Required inputs missing"."""
+
+    def test_detects_speaker_embedding_input(self, engine_factory):
+        engine, _ = engine_factory(
+            [
+                ("input", ["batch", "seq"]),
+                ("input_lengths", ["batch"]),
+                ("scales", [3]),
+                ("sid", ["batch"]),
+                ("prosody_features", ["batch", "seq", 3]),
+                ("lid", ["batch"]),
+                ("speaker_embedding", ["batch", 256]),
+                ("speaker_embedding_mask", ["batch", 1]),
+            ]
+        )
+        assert engine.has_speaker_embedding is True
+        assert engine.speaker_emb_dim == 256
+
+    def test_absent_when_input_missing(self, engine_factory):
+        engine, _ = engine_factory(
+            [
+                ("input", ["batch", "seq"]),
+                ("input_lengths", ["batch"]),
+                ("scales", [3]),
+                ("sid", ["batch"]),
+            ]
+        )
+        assert engine.has_speaker_embedding is False
+        assert engine.speaker_emb_dim is None
+        # Synthesize must NOT inject speaker_embedding when the model
+        # does not declare it (would raise InvalidArgument).
+        engine.synthesize("a")
+        feed_keys = set(engine.model.last_feed.keys())
+        assert "speaker_embedding" not in feed_keys
+        assert "speaker_embedding_mask" not in feed_keys
+
+    def test_synthesize_feeds_zero_embedding_with_mask_zero(self, engine_factory):
+        """Canonical contract: zero embedding + mask=0 → emb_g(sid) fallback.
+        Mirrors src/python_run/piper/voice.py:200-208."""
+        engine, session = engine_factory(
+            [
+                ("input", ["batch", "seq"]),
+                ("input_lengths", ["batch"]),
+                ("scales", [3]),
+                ("sid", ["batch"]),
+                ("prosody_features", ["batch", "seq", 3]),
+                ("lid", ["batch"]),
+                ("speaker_embedding", ["batch", 256]),
+                ("speaker_embedding_mask", ["batch", 1]),
+            ]
+        )
+        engine.synthesize("a")
+
+        assert session.last_feed is not None
+        assert "speaker_embedding" in session.last_feed
+        assert "speaker_embedding_mask" in session.last_feed
+
+        spk_emb = session.last_feed["speaker_embedding"]
+        assert spk_emb.shape == (1, 256)
+        assert spk_emb.dtype == np.float32
+        assert np.all(spk_emb == 0.0)
+
+        mask = session.last_feed["speaker_embedding_mask"]
+        assert mask.shape == (1, 1)
+        assert mask.dtype == np.int64
+        # mask=0 routes the model to emb_g(sid), not the zero vector.
+        assert mask[0, 0] == 0
+
+    def test_dynamic_dim_falls_back_to_256(self, engine_factory):
+        """If emb_dim is a string (dynamic axis), fall back to the
+        ECAPA-TDNN canonical 256-d default."""
+        engine, session = engine_factory(
+            [
+                ("input", ["batch", "seq"]),
+                ("input_lengths", ["batch"]),
+                ("scales", [3]),
+                ("sid", ["batch"]),
+                ("speaker_embedding", ["batch", "emb_dim"]),
+                ("speaker_embedding_mask", ["batch", 1]),
+            ]
+        )
+        # When emb_dim is non-integer, int() raises — that's a graph we
+        # haven't seen in the wild, but the fallback in synthesize keeps
+        # it from crashing. Force the scenario by clearing the cached dim.
+        engine.speaker_emb_dim = None
+        engine.synthesize("a")
+        assert session.last_feed["speaker_embedding"].shape == (1, 256)
+
+    def test_malformed_export_only_speaker_embedding_raises(self, engine_factory):
+        """PR #320 contract: speaker_embedding and speaker_embedding_mask
+        are declared as a pair. A model that declares only one is a
+        malformed export and must fail loud at load time, not at first
+        request with a cryptic ORT error."""
+        with pytest.raises(RuntimeError, match="Malformed ONNX export"):
+            engine_factory(
+                [
+                    ("input", ["batch", "seq"]),
+                    ("input_lengths", ["batch"]),
+                    ("scales", [3]),
+                    ("sid", ["batch"]),
+                    ("speaker_embedding", ["batch", 256]),
+                    # speaker_embedding_mask intentionally omitted
+                ]
+            )
+
+    def test_malformed_export_only_mask_raises(self, engine_factory):
+        """Inverse of the above — mask declared but embedding missing."""
+        with pytest.raises(RuntimeError, match="Malformed ONNX export"):
+            engine_factory(
+                [
+                    ("input", ["batch", "seq"]),
+                    ("input_lengths", ["batch"]),
+                    ("scales", [3]),
+                    ("sid", ["batch"]),
+                    ("speaker_embedding_mask", ["batch", 1]),
+                    # speaker_embedding intentionally omitted
+                ]
+            )
+
+
 # ---- CORS ----
 
 

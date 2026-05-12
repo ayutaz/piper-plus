@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "description": "Portuguese BR/EU dialect parity fixture. Each example pins the IPA token sequence the canonical Python PortuguesePhonemizer produces for a given word under both Dialect.BR and Dialect.EU. The fixture is consumed by per-runtime tests so a regression in one runtime's BR/EU post-processing fails at PR time rather than at user-facing audio time.",
+  "spec_source": "docs/spec/pt-dialect-contract.toml",
+  "canonical_runtime": "src/python/g2p/piper_plus_g2p/portuguese.py",
+  "test_cases": [
+    {
+      "phenomenon": "t/d palatalisation before unstressed final /e/",
+      "spec_mechanism": "EU SKIPS BR's t/d -> tʃ/dʒ before final unstressed e",
+      "examples": [
+        {"word": "noite",   "br": ["n", "o", "i", "tʃ", "i"], "eu": ["n", "o", "i", "t", "ɨ"]},
+        {"word": "cidade",  "br": ["s", "i", "d", "a", "dʒ", "i"], "eu": ["s", "i", "d", "a", "d", "ɨ"]},
+        {"word": "tarde",   "br": ["t", "a", "ʁ", "dʒ", "i"], "eu": ["t", "a", "ʁ", "d", "ɨ"]},
+        {"word": "verdade", "br": ["v", "e", "ʁ", "d", "a", "dʒ", "i"], "eu": ["v", "e", "ʁ", "d", "a", "d", "ɨ"]}
+      ]
+    },
+    {
+      "phenomenon": "Final unstressed -e",
+      "spec_mechanism": "EU postprocessing maps unstressed final e -> ɨ (BR maps to i)",
+      "examples": [
+        {"word": "pode",  "br": ["p", "o", "dʒ", "i"], "eu": ["p", "o", "d", "ɨ"]},
+        {"word": "longe", "br": ["l", "õ", "ʒ", "i"], "eu": ["l", "õ", "ʒ", "ɨ"]},
+        {"word": "gente", "br": ["ʒ", "ẽ", "tʃ", "i"], "eu": ["ʒ", "ẽ", "t", "ɨ"]}
+      ]
+    },
+    {
+      "phenomenon": "Final -s / -z and pre-consonantal -s",
+      "spec_mechanism": "EU postprocessing rewrites word-final s -> ʃ",
+      "examples": [
+        {"word": "mais", "br": ["m", "a", "i", "s"], "eu": ["m", "a", "i", "ʃ"]},
+        {"word": "mas",  "br": ["m", "a", "s"], "eu": ["m", "a", "ʃ"]},
+        {"word": "tres", "br": ["t", "ʁ", "e", "s"], "eu": ["t", "ʁ", "e", "ʃ"]},
+        {"word": "pais", "br": ["p", "a", "i", "s"], "eu": ["p", "a", "i", "ʃ"]}
+      ]
+    },
+    {
+      "phenomenon": "Coda /l/",
+      "spec_mechanism": "EU postprocessing rewrites coda l -> ɫ (BR uses w vocalisation)",
+      "examples": [
+        {"word": "Brasil", "br": ["b", "ʁ", "a", "z", "i", "w"], "eu": ["b", "ʁ", "a", "z", "i", "ɫ"]},
+        {"word": "mil",    "br": ["m", "i", "w"], "eu": ["m", "i", "ɫ"]},
+        {"word": "sol",    "br": ["s", "o", "w"], "eu": ["s", "o", "ɫ"]},
+        {"word": "mel",    "br": ["m", "e", "w"], "eu": ["m", "e", "ɫ"]}
+      ]
+    },
+    {
+      "phenomenon": "Strong /r/ and word-final r",
+      "spec_mechanism": "EU postprocessing canonicalises h -> ʁ; current BR implementation already produces ʁ for these words, so observable difference is zero. Listed for future regression detection (e.g. if a runtime introduces a 'h' allophone in BR, the fixture must capture both BR and EU outputs separately).",
+      "examples": [
+        {"word": "rato",  "br": ["ʁ", "a", "t", "u"], "eu": ["ʁ", "a", "t", "u"]},
+        {"word": "carro", "br": ["k", "a", "ʁ", "u"], "eu": ["k", "a", "ʁ", "u"]},
+        {"word": "amor",  "br": ["a", "m", "o", "ʁ"], "eu": ["a", "m", "o", "ʁ"]}
+      ]
+    }
+  ]
+}

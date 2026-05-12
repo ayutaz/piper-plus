@@ -124,14 +124,42 @@ class PiperInferenceEngine:
         self.has_prosody = "prosody_features" in input_names
         self.has_sid = "sid" in input_names
         self.has_lid = "lid" in input_names
+        # PR #320 declares speaker_embedding AND speaker_embedding_mask as a
+        # pair. Feeding only one to ORT would either raise "Required inputs
+        # missing" (if mask is undeclared) or "Unexpected input" (if mask is
+        # extra). Require both to be declared together — fail loud at load
+        # time on a malformed export rather than silently at first request.
+        has_speaker_embedding = "speaker_embedding" in input_names
+        has_speaker_embedding_mask = "speaker_embedding_mask" in input_names
+        if has_speaker_embedding != has_speaker_embedding_mask:
+            raise RuntimeError(
+                f"Malformed ONNX export: speaker_embedding="
+                f"{has_speaker_embedding} but speaker_embedding_mask="
+                f"{has_speaker_embedding_mask}. PR #320 contract requires "
+                "both inputs to be declared together."
+            )
+        self.has_speaker_embedding = has_speaker_embedding
+        self.speaker_emb_dim: int | None = None
+        if self.has_speaker_embedding:
+            for inp in self.model.get_inputs():
+                if inp.name == "speaker_embedding":
+                    # Shape: (batch, emb_dim) — emb_dim is the second axis.
+                    # export_onnx.py emits it as a fixed int, but stay
+                    # defensive in case a future model uses a dynamic axis.
+                    try:
+                        self.speaker_emb_dim = int(inp.shape[1])
+                    except (TypeError, ValueError):
+                        self.speaker_emb_dim = None
+                    break
         self.language_id_map = config.get("language_id_map", {})
 
         _LOGGER.info(
-            "Model loaded: %s (prosody=%s, sid=%s, lid=%s)",
+            "Model loaded: %s (prosody=%s, sid=%s, lid=%s, speaker_embedding=%s)",
             model_path,
             self.has_prosody,
             self.has_sid,
             self.has_lid,
+            f"dim={self.speaker_emb_dim}" if self.has_speaker_embedding else False,
         )
 
     def synthesize(
@@ -179,6 +207,17 @@ class PiperInferenceEngine:
         if self.has_lid:
             language_id = self.language_id_map.get(language, 0)
             inputs["lid"] = np.array([language_id], dtype=np.int64)
+
+        if self.has_speaker_embedding:
+            # MB-iSTFT-VITS2 + Voice Cloning support exposes these inputs
+            # unconditionally (PR #320). Feed a zero vector with mask=0 so
+            # the model falls back to emb_g(sid) — see
+            # `src/python/piper_train/vits/models.py` (`use_se = mask >= 1`)
+            # and the matching runtime path in
+            # `src/python_run/piper/voice.py`.
+            emb_dim = self.speaker_emb_dim or 256
+            inputs["speaker_embedding"] = np.zeros((1, emb_dim), dtype=np.float32)
+            inputs["speaker_embedding_mask"] = np.array([[0]], dtype=np.int64)
 
         start = time.perf_counter()
         outputs = self.model.run(None, inputs)

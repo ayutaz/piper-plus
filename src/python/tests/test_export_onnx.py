@@ -485,17 +485,21 @@ class TestSpeakerEmbeddingMaskMixedBatch:
 
         dummy_len = 8
         dummy_batch = 2
-        sequences = torch.randint(
-            0, 50, (dummy_batch, dummy_len), dtype=torch.long
-        )
+        sequences = torch.randint(0, 50, (dummy_batch, dummy_len), dtype=torch.long)
         seq_lengths = torch.LongTensor([dummy_len] * dummy_batch)
         scales = torch.FloatTensor([0.0, 1.0, 0.8])  # noise=0 for determinism
         sid = torch.LongTensor([0, 1])
         spk_emb = torch.zeros(dummy_batch, spk_emb_dim, dtype=torch.float32)
         spk_mask = torch.ones(dummy_batch, 1, dtype=torch.int64)
 
-        def infer_forward(text, text_lengths, scales_t, sid_t,
-                          speaker_embedding, speaker_embedding_mask):
+        def infer_forward(
+            text,
+            text_lengths,
+            scales_t,
+            sid_t,
+            speaker_embedding,
+            speaker_embedding_mask,
+        ):
             length_scale = scales_t[1]
             noise_scale_w = scales_t[2]
 
@@ -506,9 +510,7 @@ class TestSpeakerEmbeddingMaskMixedBatch:
 
             x, m_p, logs_p, x_mask = model.enc_p(text, text_lengths, g=g)
             x_dp = model._prepare_prosody_input(x, x_mask, None)
-            logw = model.dp(
-                x_dp, x_mask, g=g, reverse=True, noise_scale=noise_scale_w
-            )
+            logw = model.dp(x_dp, x_mask, g=g, reverse=True, noise_scale=noise_scale_w)
             w = torch.exp(logw) * x_mask * length_scale
             durations = w.squeeze(1)
             w_ceil = torch.ceil(w)
@@ -541,8 +543,12 @@ class TestSpeakerEmbeddingMaskMixedBatch:
                 str(onnx_path),
                 opset_version=15,
                 input_names=[
-                    "input", "input_lengths", "scales", "sid",
-                    "speaker_embedding", "speaker_embedding_mask",
+                    "input",
+                    "input_lengths",
+                    "scales",
+                    "sid",
+                    "speaker_embedding",
+                    "speaker_embedding_mask",
                 ],
                 output_names=["output", "durations"],
                 dynamic_axes={
@@ -569,21 +575,26 @@ class TestSpeakerEmbeddingMaskMixedBatch:
 
         Returns the audio output (first output of the session).
         """
-        text = np.tile(np.array([1, 8, 5, 10, 20, 30, 15, 2], dtype=np.int64), (batch_size, 1))
+        text = np.tile(
+            np.array([1, 8, 5, 10, 20, 30, 15, 2], dtype=np.int64), (batch_size, 1)
+        )
         text_lengths = np.array([text.shape[1]] * batch_size, dtype=np.int64)
         scales = np.array([0.0, 1.0, 0.8], dtype=np.float32)
         sid = np.array(sid_values, dtype=np.int64)
         np.random.seed(42)
         spk_emb = np.random.randn(batch_size, 256).astype(np.float32)
         mask = np.array(mask_values, dtype=np.int64).reshape(batch_size, 1)
-        outputs = session.run(None, {
-            "input": text,
-            "input_lengths": text_lengths,
-            "scales": scales,
-            "sid": sid,
-            "speaker_embedding": spk_emb,
-            "speaker_embedding_mask": mask,
-        })
+        outputs = session.run(
+            None,
+            {
+                "input": text,
+                "input_lengths": text_lengths,
+                "scales": scales,
+                "sid": sid,
+                "speaker_embedding": spk_emb,
+                "speaker_embedding_mask": mask,
+            },
+        )
         # First output is audio, second is durations
         return outputs[0]
 
@@ -629,17 +640,32 @@ class TestSpeakerEmbeddingMaskMixedBatch:
         np.random.seed(99)
         emb_b = np.random.randn(3, 256).astype(np.float32)
 
-        out_a = session.run(None, {
-            "input": text, "input_lengths": text_lengths, "scales": scales,
-            "sid": sid, "speaker_embedding": emb_a, "speaker_embedding_mask": mask_off,
-        })[0]
-        out_b = session.run(None, {
-            "input": text, "input_lengths": text_lengths, "scales": scales,
-            "sid": sid, "speaker_embedding": emb_b, "speaker_embedding_mask": mask_off,
-        })[0]
+        out_a = session.run(
+            None,
+            {
+                "input": text,
+                "input_lengths": text_lengths,
+                "scales": scales,
+                "sid": sid,
+                "speaker_embedding": emb_a,
+                "speaker_embedding_mask": mask_off,
+            },
+        )[0]
+        out_b = session.run(
+            None,
+            {
+                "input": text,
+                "input_lengths": text_lengths,
+                "scales": scales,
+                "sid": sid,
+                "speaker_embedding": emb_b,
+                "speaker_embedding_mask": mask_off,
+            },
+        )[0]
 
         np.testing.assert_array_equal(
-            out_a, out_b,
+            out_a,
+            out_b,
             err_msg="With mask=[0,0,0], different speaker_embeddings should produce identical output",
         )
 
@@ -659,16 +685,134 @@ class TestSpeakerEmbeddingMaskMixedBatch:
         sid_a = np.array([0, 1, 2], dtype=np.int64)
         sid_b = np.array([3, 0, 1], dtype=np.int64)
 
-        out_a = session.run(None, {
-            "input": text, "input_lengths": text_lengths, "scales": scales,
-            "sid": sid_a, "speaker_embedding": emb, "speaker_embedding_mask": mask_on,
-        })[0]
-        out_b = session.run(None, {
-            "input": text, "input_lengths": text_lengths, "scales": scales,
-            "sid": sid_b, "speaker_embedding": emb, "speaker_embedding_mask": mask_on,
-        })[0]
+        out_a = session.run(
+            None,
+            {
+                "input": text,
+                "input_lengths": text_lengths,
+                "scales": scales,
+                "sid": sid_a,
+                "speaker_embedding": emb,
+                "speaker_embedding_mask": mask_on,
+            },
+        )[0]
+        out_b = session.run(
+            None,
+            {
+                "input": text,
+                "input_lengths": text_lengths,
+                "scales": scales,
+                "sid": sid_b,
+                "speaker_embedding": emb,
+                "speaker_embedding_mask": mask_on,
+            },
+        )[0]
 
         np.testing.assert_array_equal(
-            out_a, out_b,
+            out_a,
+            out_b,
             err_msg="With mask=[1,1,1], different sid values should produce identical output",
         )
+
+
+# ============================================================================
+# Issue #426 — graph.input schema gate
+# ============================================================================
+#
+# Pin the set of ONNX input names produced by export. If a new input is
+# added by export_onnx.py without updating the runtime-side feed logic
+# (docker/python-inference, docker/webui, voice.py, …) or
+# scripts/check_onnx_inputs.py::KNOWN_OPTIONAL_INPUTS, this gate fails so
+# the regression is caught at PR time rather than at user-facing runtime.
+
+
+# The set of inputs that mainline runtimes know how to feed. Mirror of
+# scripts/check_onnx_inputs.py::KNOWN_OPTIONAL_INPUTS — kept inline to
+# avoid scripts/ importlib gymnastics in this file. If this list drifts,
+# also update the script (and vice versa).
+_KNOWN_OPTIONAL_INPUTS = frozenset(
+    {
+        "input",
+        "input_lengths",
+        "scales",
+        "sid",
+        "lid",
+        "prosody_features",
+        "speaker_embedding",
+        "speaker_embedding_mask",
+    }
+)
+
+
+def _graph_input_names(onnx_path) -> set[str]:
+    """Return the set of graph.input names of an ONNX file."""
+    import onnx as onnx_lib
+
+    model = onnx_lib.load(str(onnx_path))
+    return {inp.name for inp in model.graph.input}
+
+
+@pytest.mark.inference
+class TestGraphInputSchema:
+    """Pin the ONNX graph.input set per export configuration (Issue #426)."""
+
+    def test_single_speaker_prosody_inputs(self, temp_onnx_model):
+        """single-speaker + prosody export must expose exactly these inputs."""
+        assert _graph_input_names(temp_onnx_model) == {
+            "input",
+            "input_lengths",
+            "scales",
+            "prosody_features",
+        }
+
+    def test_stochastic_export_same_input_set(self, temp_onnx_model_stochastic):
+        """stochastic export must not change the input names."""
+        assert _graph_input_names(temp_onnx_model_stochastic) == {
+            "input",
+            "input_lengths",
+            "scales",
+            "prosody_features",
+        }
+
+    def test_multilingual_export_input_set(self, temp_onnx_model_unified_emb_lang):
+        """multilingual + lid + prosody export.
+
+        Note: n_speakers=1 in the fixture, so torch.onnx.export prunes the
+        unused `sid` input from the graph even though it appears in the
+        positional args. The fixture therefore exposes lid but not sid.
+        """
+        assert _graph_input_names(temp_onnx_model_unified_emb_lang) == {
+            "input",
+            "input_lengths",
+            "scales",
+            "lid",
+            "prosody_features",
+        }
+
+    def test_all_exports_within_known_optional_inputs(
+        self,
+        temp_onnx_model,
+        temp_onnx_model_stochastic,
+        temp_onnx_model_unified_emb_lang,
+    ):
+        """Every export must only declare inputs known to mainline runtimes.
+
+        If this fails, a new input name was added by export_onnx.py but
+        not propagated to KNOWN_OPTIONAL_INPUTS — extend the set in both
+        scripts/check_onnx_inputs.py and this file, and wire the new
+        input through every runtime feed (Python/Rust/Go/C#/WASM/C++/
+        docker/python-inference/docker/webui).
+        """
+        for onnx_path in [
+            temp_onnx_model,
+            temp_onnx_model_stochastic,
+            temp_onnx_model_unified_emb_lang,
+        ]:
+            inputs = _graph_input_names(onnx_path)
+            unknown = inputs - _KNOWN_OPTIONAL_INPUTS
+            assert not unknown, (
+                f"{onnx_path} declares unknown input(s): {sorted(unknown)}. "
+                "Update _KNOWN_OPTIONAL_INPUTS here and KNOWN_OPTIONAL_INPUTS "
+                "in scripts/check_onnx_inputs.py, then propagate the new "
+                "input through every runtime feed."
+            )

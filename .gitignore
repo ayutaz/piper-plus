@@ -128,6 +128,12 @@ check_*.py
 !scripts/check_dictionary_versions.py
 !scripts/check_phoneme_set_version.py
 !scripts/check_loanword_forward_compat.py
+!scripts/check_audio_format_contract.py
+!scripts/check_ort_provider_contract.py
+!scripts/check_streaming_api_contract.py
+!scripts/check_swift_g2p_contract.py
+!scripts/check_pt_dialect_contract.py
+!scripts/check_speaker_encoder_contract.py
 !scripts/verify_model_checksums.py
 create_comprehensive_*.py
 add_missing_*.py
@@ -186,3 +192,10 @@ android/.gradle/
 # versions for downstream consumers — they resolve their own.
 Package.resolved
 .lycheecache
+
+# Integration test fixtures generated at CI time (build_fixture.py)
+tests/fixtures/mb_istft_speaker_embedding/model.onnx
+tests/fixtures/mb_istft_speaker_embedding/model.onnx.json
+# ort optimized-model cache (sibling to any .onnx the runtime loads)
+*.opt.onnx
+*.opt.onnx.ok

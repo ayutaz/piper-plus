@@ -1,0 +1,210 @@
+# Cross-runtime integration gate for Issue #426 (speaker_embedding).
+#
+# Each runtime (Python infer_onnx, Rust, C++, C#) has a dedicated
+# integration test that loads the in-tree fixture
+# `tests/fixtures/mb_istft_speaker_embedding/model.onnx` and confirms
+# that the zero-embedding + mask=0 fallback works against a real ONNX
+# Runtime session. The fixture is rebuilt on each job so the test
+# matches the current export_onnx.py code path.
+#
+# Why a separate workflow?  The existing per-language workflows do not
+# install Python+torch, and the fixture builder requires both. Keeping
+# this gate distinct avoids slowing down the routine per-runtime CIs.
+
+name: Integration Tests (Issue #426)
+
+on:
+  pull_request:
+    branches: [dev]
+    paths:
+      - 'docker/python-inference/inference.py'
+      - 'docker/webui/app.py'
+      - 'src/python/piper_train/export_onnx.py'
+      - 'src/python/piper_train/infer_onnx.py'
+      - 'src/python_run/piper/voice.py'
+      - 'src/cpp/piper.cpp'
+      - 'src/cpp/piper.hpp'
+      - 'src/rust/piper-core/src/engine.rs'
+      - 'src/csharp/PiperPlus.Core/Inference/PiperSession.cs'
+      - 'tests/fixtures/mb_istft_speaker_embedding/**'
+      - '.github/workflows/integration-tests-issue-426.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+env:
+  FIXTURE_DIR: tests/fixtures/mb_istft_speaker_embedding
+
+jobs:
+  # --------------------------------------------------------------------
+  # Build the shared fixture once and reuse it across every runtime job.
+  # --------------------------------------------------------------------
+  build-fixture:
+    name: Build fixture (Python + torch)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Sync deps
+        run: uv sync --extra dev
+
+      - name: Build fixture
+        run: |
+          CUDA_VISIBLE_DEVICES="" uv run python ${FIXTURE_DIR}/build_fixture.py
+          ls -la ${FIXTURE_DIR}
+
+      # Pin the fixture's ONNX input set so any future export_onnx.py change
+      # that adds/removes/renames a graph input is caught at PR time (Issue
+      # #426 root cause was an export-side input that the runtime didn't
+      # feed). --strict enforces an exact match; --expected lists every
+      # input that runtimes know how to feed today.
+      - name: Validate fixture input contract (check_onnx_inputs.py --strict)
+        run: |
+          uv run python scripts/check_onnx_inputs.py \
+            --strict \
+            --expected input,input_lengths,scales,sid,speaker_embedding,speaker_embedding_mask \
+            ${FIXTURE_DIR}/model.onnx
+
+      - name: Upload fixture
+        uses: actions/upload-artifact@v4
+        with:
+          name: mb-istft-speaker-embedding-fixture
+          path: ${{ env.FIXTURE_DIR }}/model.onnx*
+          retention-days: 1
+
+  # --------------------------------------------------------------------
+  # Python: infer_onnx CLI subprocess test (Phase D-6).
+  # --------------------------------------------------------------------
+  python-integration:
+    name: Python infer_onnx CLI integration
+    runs-on: ubuntu-latest
+    needs: build-fixture
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Sync deps
+        run: uv sync --extra dev
+
+      - uses: actions/download-artifact@v5
+        with:
+          name: mb-istft-speaker-embedding-fixture
+          path: ${{ env.FIXTURE_DIR }}
+
+      - name: Run Python integration test
+        run: |
+          CUDA_VISIBLE_DEVICES="" uv run python -m pytest \
+            src/python/tests/test_infer_onnx_speaker_embedding_integration.py \
+            -v --no-cov
+
+  # --------------------------------------------------------------------
+  # Rust: piper-core integration test (Phase D-2).
+  # --------------------------------------------------------------------
+  rust-integration:
+    name: Rust piper-core integration
+    runs-on: ubuntu-latest
+    needs: build-fixture
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src/rust
+
+      - uses: actions/download-artifact@v5
+        with:
+          name: mb-istft-speaker-embedding-fixture
+          path: ${{ env.FIXTURE_DIR }}
+
+      - name: Run Rust integration test
+        working-directory: src/rust
+        run: |
+          cargo test -p piper-plus --features onnx \
+            --test test_speaker_embedding_integration -- --nocapture
+
+  # --------------------------------------------------------------------
+  # C++: piper.cpp integration test (Phase D-3).
+  # --------------------------------------------------------------------
+  cpp-integration:
+    name: C++ piper integration
+    runs-on: ubuntu-latest
+    needs: build-fixture
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build build-essential
+
+      - uses: actions/download-artifact@v5
+        with:
+          name: mb-istft-speaker-embedding-fixture
+          path: ${{ env.FIXTURE_DIR }}
+
+      - name: Configure
+        # `BUILD_TESTS` is OFF by default (cmake/Testing.cmake:4); without
+        # `-DBUILD_TESTS=ON` the `src/cpp/tests/` subdirectory is skipped and
+        # `test_speaker_embedding_inference` is never declared as a target.
+        run: cmake -S . -B build -G Ninja -DBUILD_TESTS=ON
+
+      - name: Build test
+        run: cmake --build build --target test_speaker_embedding_inference
+
+      - name: Run C++ integration test
+        run: |
+          cd build && ctest -R speaker_embedding_inference --output-on-failure
+
+  # --------------------------------------------------------------------
+  # C#: PiperPlus.Core.Tests integration (Phase D-4).
+  # --------------------------------------------------------------------
+  csharp-integration:
+    name: C# PiperPlus.Core integration
+    runs-on: ubuntu-latest
+    needs: build-fixture
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+
+      - uses: actions/download-artifact@v5
+        with:
+          name: mb-istft-speaker-embedding-fixture
+          path: ${{ env.FIXTURE_DIR }}
+
+      - name: Restore + test
+        run: |
+          cd src/csharp
+          dotnet restore PiperPlus.sln
+          dotnet test PiperPlus.Core.Tests/PiperPlus.Core.Tests.csproj \
+            --no-restore \
+            --filter "FullyQualifiedName~SpeakerEmbeddingInferenceTests|FullyQualifiedName~SynthesisInputSpeakerEmbeddingTests" \
+            --verbosity normal

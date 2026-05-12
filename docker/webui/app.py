@@ -98,6 +98,86 @@ def _is_short_text(text: str, threshold: int = _SHORT_TEXT_THRESHOLD) -> bool:
     return sum(1 for c in text if not c.isspace()) <= threshold
 
 
+def _build_session_inputs(
+    session,
+    phoneme_ids: list[int],
+    prosody_features_data: list,
+    speaker_id: int,
+    language: str,
+    language_id_map: dict,
+    noise_scale: float,
+    length_scale: float,
+    noise_scale_w: float,
+) -> dict:
+    """Build the ONNX input feed for `session.run(None, ...)`.
+
+    Mirrors the dynamic-input-detection contract used by
+    `src/python_run/piper/voice.py:200-208` and
+    `docker/python-inference/inference.py`. MB-iSTFT-VITS2 / Voice-Cloning
+    exports declare `speaker_embedding` + `speaker_embedding_mask`
+    unconditionally (PR #320); feeding zero embedding + mask=0 routes the
+    model to `emb_g(sid)` (`vits/models.py:1015-1037`). Without this,
+    ONNX Runtime rejects the call with "Required inputs missing"
+    (Issue #426).
+    """
+    input_specs = {inp.name: inp for inp in session.get_inputs()}
+    has_prosody = "prosody_features" in input_specs
+    has_sid = "sid" in input_specs
+    has_lid = "lid" in input_specs
+    # PR #320 declares speaker_embedding AND speaker_embedding_mask as a
+    # pair. Feeding only one to ORT would either raise "Required inputs
+    # missing" or "Unexpected input". Require both to be declared together
+    # so a malformed export fails with a clear error here rather than a
+    # cryptic ORT error downstream.
+    has_speaker_embedding = "speaker_embedding" in input_specs
+    has_speaker_embedding_mask = "speaker_embedding_mask" in input_specs
+    if has_speaker_embedding != has_speaker_embedding_mask:
+        raise RuntimeError(
+            f"Malformed ONNX export: speaker_embedding="
+            f"{has_speaker_embedding} but speaker_embedding_mask="
+            f"{has_speaker_embedding_mask}. PR #320 contract requires "
+            "both inputs to be declared together."
+        )
+
+    text_array = np.expand_dims(np.array(phoneme_ids, dtype=np.int64), 0)
+    text_lengths = np.array([text_array.shape[1]], dtype=np.int64)
+    scales = np.array([noise_scale, length_scale, noise_scale_w], dtype=np.float32)
+
+    inputs: dict = {
+        "input": text_array,
+        "input_lengths": text_lengths,
+        "scales": scales,
+    }
+
+    if has_sid:
+        inputs["sid"] = np.array([int(speaker_id)], dtype=np.int64)
+
+    if has_lid:
+        language_id = language_id_map.get(language, 0)
+        inputs["lid"] = np.array([language_id], dtype=np.int64)
+
+    if has_prosody and prosody_features_data:
+        prosody_array = []
+        for pf in prosody_features_data:
+            if pf is None:
+                prosody_array.append([0, 0, 0])
+            else:
+                prosody_array.append([pf["a1"], pf["a2"], pf["a3"]])
+        inputs["prosody_features"] = np.expand_dims(
+            np.array(prosody_array, dtype=np.int64), 0
+        )
+
+    if has_speaker_embedding:
+        try:
+            emb_dim = int(input_specs["speaker_embedding"].shape[1])
+        except (TypeError, ValueError):
+            emb_dim = 256  # ECAPA-TDNN canonical default
+        inputs["speaker_embedding"] = np.zeros((1, emb_dim), dtype=np.float32)
+        inputs["speaker_embedding_mask"] = np.array([[0]], dtype=np.int64)
+
+    return inputs
+
+
 def synthesize(
     text: str,
     model_path: str,
@@ -136,38 +216,17 @@ def synthesize(
     )
 
     session = _get_session(model_path)
-    input_names = [inp.name for inp in session.get_inputs()]
-    has_prosody = "prosody_features" in input_names
-    has_sid = "sid" in input_names
-    has_lid = "lid" in input_names
-
-    text_array = np.expand_dims(np.array(phoneme_ids, dtype=np.int64), 0)
-    text_lengths = np.array([text_array.shape[1]], dtype=np.int64)
-    scales = np.array([noise_scale, length_scale, noise_scale_w], dtype=np.float32)
-
-    inputs = {
-        "input": text_array,
-        "input_lengths": text_lengths,
-        "scales": scales,
-    }
-
-    if has_sid:
-        inputs["sid"] = np.array([int(speaker_id)], dtype=np.int64)
-
-    if has_lid:
-        language_id = language_id_map.get(language, 0)
-        inputs["lid"] = np.array([language_id], dtype=np.int64)
-
-    if has_prosody and prosody_features_data:
-        prosody_array = []
-        for pf in prosody_features_data:
-            if pf is None:
-                prosody_array.append([0, 0, 0])
-            else:
-                prosody_array.append([pf["a1"], pf["a2"], pf["a3"]])
-        inputs["prosody_features"] = np.expand_dims(
-            np.array(prosody_array, dtype=np.int64), 0
-        )
+    inputs = _build_session_inputs(
+        session=session,
+        phoneme_ids=phoneme_ids,
+        prosody_features_data=prosody_features_data,
+        speaker_id=speaker_id,
+        language=language,
+        language_id_map=language_id_map,
+        noise_scale=noise_scale,
+        length_scale=length_scale,
+        noise_scale_w=noise_scale_w,
+    )
 
     outputs = session.run(None, inputs)
     audio = outputs[0].squeeze(0)

@@ -83,6 +83,16 @@ if(EXISTS "${ORT_INCLUDE_DIR}/onnxruntime_cxx_api.h" OR EXISTS "${CMAKE_BINARY_D
     list(APPEND TEST_SOURCES test_speaker_encoder_e2e.cpp)
 endif()
 
+# Issue #426: speaker_embedding inference fallback gate. Uses `piper.hpp` only
+# (no direct ORT headers needed), so we gate on `piper_common` target existence
+# rather than the broken `${ORT_INCLUDE_DIR}` / `pi/include` checks above
+# (which silently evaluate to false → those gated tests are unbuilt on dev too,
+# but that's a pre-existing issue out of scope for this PR). Auto-skips at
+# runtime when the fixture has not been generated.
+if(TARGET piper_common)
+    list(APPEND TEST_SOURCES test_speaker_embedding_inference.cpp)
+endif()
+
 # Create test executables
 foreach(test_source ${TEST_SOURCES})
     get_filename_component(test_name ${test_source} NAME_WE)
@@ -306,7 +316,12 @@ foreach(test_source ${TEST_SOURCES})
     endif()
 
     # Link additional dependencies for streaming test
-    if(${test_name} STREQUAL "test_streaming")
+    # Issue #426: speaker_embedding inference fallback integration test.
+    # Reuses the same piper.cpp + dependency set as test_streaming since it
+    # links the full library to call loadVoice / phonemesToAudio against the
+    # in-tree fixture model.
+    if(${test_name} STREQUAL "test_speaker_embedding_inference" OR
+        ${test_name} STREQUAL "test_streaming")
         target_sources(${test_name} PRIVATE
             ../piper.cpp
             ../phoneme_parser.cpp
@@ -387,6 +402,14 @@ foreach(test_source ${TEST_SOURCES})
             fmt_external
             spdlog_external
         )
+        # piper.cpp は <onnxruntime_cxx_api.h> を直接 include するため
+        # onnxruntime_external にも明示依存させないと並列ビルドで ORT 展開前に
+        # compile が走り `fatal error: onnxruntime_cxx_api.h: No such file` で
+        # 失敗する。Windows 系は ExternalProject ではなく find_onnxruntime_windows.cmake
+        # 経由で download するため target が存在しない (条件分岐で skip)。
+        if(TARGET onnxruntime_external)
+            add_dependencies(${test_name} onnxruntime_external)
+        endif()
     endif()
 
     # Link additional dependencies for streaming test - using same approach as test_piper
