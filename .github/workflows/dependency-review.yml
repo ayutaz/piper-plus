@@ -30,6 +30,16 @@ jobs:
             MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC,
             Unicode-DFS-2016, Unicode-3.0, CC0-1.0, MPL-2.0,
             Zlib, OpenSSL, BSL-1.0, 0BSD, Apache-2.0 WITH LLVM-exception
+          # dev / lint / docs 用 transitive dependency の例外
+          # (配布バイナリには含まれず copyleft 伝播リスクなし)。
+          # ライセンスを広く allow する代わりに、対象パッケージを明示し
+          # carve-out することで scope を最小化する。
+          allow-dependencies-licenses: >-
+            pkg:pypi/astroid,
+            pkg:pypi/matplotlib,
+            pkg:pypi/mypy,
+            pkg:pypi/pylint,
+            pkg:pypi/sphinx-rtd-theme
           # 自動 fail にせず、PR comment で報告
           warn-only: false
           # vulnerability scope
