@@ -28,7 +28,10 @@ public class SpeakerEmbeddingInferenceTests
         string? dir = AppContext.BaseDirectory;
         while (!string.IsNullOrEmpty(dir))
         {
-            string candidate = Path.Combine(
+            // Path.Join (not Path.Combine) — Combine silently drops earlier
+            // arguments if any later one is rooted, which CodeQL flags. Join
+            // concatenates segments unconditionally.
+            string candidate = Path.Join(
                 dir, "tests", "fixtures", "mb_istft_speaker_embedding", "model.onnx");
             if (File.Exists(candidate) && File.Exists(candidate + ".json"))
             {
