@@ -402,6 +402,14 @@ foreach(test_source ${TEST_SOURCES})
             fmt_external
             spdlog_external
         )
+        # piper.cpp は <onnxruntime_cxx_api.h> を直接 include するため
+        # onnxruntime_external にも明示依存させないと並列ビルドで ORT 展開前に
+        # compile が走り `fatal error: onnxruntime_cxx_api.h: No such file` で
+        # 失敗する。Windows 系は ExternalProject ではなく find_onnxruntime_windows.cmake
+        # 経由で download するため target が存在しない (条件分岐で skip)。
+        if(TARGET onnxruntime_external)
+            add_dependencies(${test_name} onnxruntime_external)
+        endif()
     endif()
 
     # Link additional dependencies for streaming test - using same approach as test_piper
