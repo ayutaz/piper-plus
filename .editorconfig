@@ -35,3 +35,10 @@ indent_style = tab
 # default.
 [src/cpp/{piper.cpp,piper.hpp}]
 indent_size = unset
+
+# rustfmt aligns continuation lines inside multi-line string literals to
+# the opening quote column (not a power-of-2 indent). engine.rs uses this
+# pattern liberally in error messages; the indent-multiple check fights
+# the formatter, so opt out for this file only.
+[src/rust/piper-core/src/engine.rs]
+indent_size = unset

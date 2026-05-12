@@ -754,19 +754,25 @@ impl OnnxEngine {
         };
 
         // 7. speaker_embedding: float32 [1, embedding_dim] (条件付き)
-        // 8. speaker_embedding_mask: int64 [1] (条件付き, 1 = embedding active)
+        // 8. speaker_embedding_mask: int64 [1, 1] (条件付き, 1 = embedding active)
+        //
+        // PR #320 以降 MB-iSTFT-VITS2 + Voice Cloning 系の export は
+        // speaker_embedding / mask を **常時 declare** する。提供されない
+        // 場合でも zero embedding + mask=0 を feed しなければ ORT が
+        // "Required inputs missing" を返す (Issue #426)。
+        // mask=0 のときモデルは emb_g(sid) にフォールバックする
+        // (`src/python/piper_train/vits/models.py:1015-1037`)。
+        const FALLBACK_EMB_DIM: usize = 256; // ECAPA-TDNN canonical
         let speaker_emb_tensor = if self.capabilities.has_speaker_embedding {
-            if let Some(ref emb) = request.speaker_embedding {
-                let emb_dim = emb.len();
-                Some(
-                    Tensor::from_array(([1_usize, emb_dim], emb.to_vec().into_boxed_slice()))
-                        .map_err(|e| {
-                            PiperError::Inference(format!("speaker_embedding tensor: {e}"))
-                        })?,
-                )
+            let (dim, data) = if let Some(ref emb) = request.speaker_embedding {
+                (emb.len(), emb.to_vec())
             } else {
-                None
-            }
+                (FALLBACK_EMB_DIM, vec![0.0_f32; FALLBACK_EMB_DIM])
+            };
+            Some(
+                Tensor::from_array(([1_usize, dim], data.into_boxed_slice()))
+                    .map_err(|e| PiperError::Inference(format!("speaker_embedding tensor: {e}")))?,
+            )
         } else {
             None
         };
@@ -777,6 +783,10 @@ impl OnnxEngine {
             } else {
                 0
             };
+            // shape (1,) — ORT broadcasts to the (1, 1) declared by
+            // export_onnx.py:506 via the mask>=1 comparison in
+            // `vits/models.py:1015-1037`. Keep this shape for backward
+            // compatibility with the pre-Issue #426 behaviour.
             Some(
                 Tensor::from_array(([1_usize], vec![mask_val].into_boxed_slice())).map_err(
                     |e| PiperError::Inference(format!("speaker_embedding_mask tensor: {e}")),
@@ -1092,6 +1102,51 @@ mod tests {
         assert!(debug.contains("has_lid: false"));
         assert!(debug.contains("has_prosody: true"));
         assert!(debug.contains("has_duration_output: false"));
+    }
+
+    // -----------------------------------------------------------------------
+    // Issue #426 — speaker_embedding feed contract
+    // -----------------------------------------------------------------------
+    //
+    // MB-iSTFT-VITS2 + Voice Cloning exports declare speaker_embedding /
+    // speaker_embedding_mask unconditionally (PR #320). When a request omits
+    // the embedding, the engine must inject a zero vector + mask=0 so the
+    // model falls back to emb_g(sid). Asserting the request-level contract
+    // here pins the public API surface; the actual tensor feed is covered
+    // by integration tests that load a real ONNX session.
+
+    #[test]
+    fn test_request_without_embedding_validates_when_capability_present() {
+        // Issue #426 / PR #320: a model that declares speaker_embedding
+        // must still accept requests with speaker_embedding=None. The
+        // engine fills in zero+mask=0 internally — see synthesize() in
+        // this file (the const FALLBACK_EMB_DIM block).
+        let req = SynthesisRequest {
+            speaker_id: Some(0),
+            speaker_embedding: None,
+            phoneme_ids: vec![1, 2, 3, 4, 5],
+            ..SynthesisRequest::default()
+        };
+        assert!(
+            req.validate().is_ok(),
+            "Issue #426: speaker_embedding=None must validate so the \
+             engine can inject zero+mask=0 for MB-iSTFT exports."
+        );
+    }
+
+    #[test]
+    fn test_capabilities_has_speaker_embedding_true_in_debug() {
+        // Pin the Debug projection so log lines remain greppable when
+        // diagnosing "Required inputs missing" errors (Issue #426).
+        let caps = ModelCapabilities {
+            has_sid: true,
+            has_lid: true,
+            has_prosody: true,
+            has_duration_output: false,
+            has_speaker_embedding: true,
+        };
+        let debug = format!("{:?}", caps);
+        assert!(debug.contains("has_speaker_embedding: true"));
     }
 
     // -----------------------------------------------------------------------
