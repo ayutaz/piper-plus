@@ -43,6 +43,8 @@ EXPECTED_PHENOMENA = {
 # EU-only IPA characters that round-trip via PUA mapping.
 EXPECTED_NEW_PHONEMES = {"ɨ", "ɫ"}
 
+PARITY_FIXTURE = REPO_ROOT / "tests/fixtures/g2p/pt_dialect_parity.json"
+
 
 def main() -> int:
     if not CONTRACT_PATH.exists():
@@ -116,6 +118,33 @@ def main() -> int:
                 "and the corresponding fixture-driven runtime test)"
             )
 
+    # Cross-check that the parity fixture (consumed by per-runtime tests)
+    # covers exactly the 5 contracted phenomena. Without this gate a
+    # phenomenon could be added to the contract but the fixture would
+    # silently lag behind, producing zero coverage for the new rule.
+    if PARITY_FIXTURE.exists():
+        import json as _json
+
+        try:
+            parity = _json.loads(PARITY_FIXTURE.read_text(encoding="utf-8"))
+        except _json.JSONDecodeError as exc:
+            errors.append(f"parity fixture failed to parse: {exc}")
+        else:
+            fixture_phenomena = {tc.get("phenomenon") for tc in parity.get("test_cases", [])}
+            if fixture_phenomena != EXPECTED_PHENOMENA:
+                errors.append(
+                    f"parity fixture phenomena drift: "
+                    f"missing={sorted(EXPECTED_PHENOMENA - fixture_phenomena)}, "
+                    f"extra={sorted(fixture_phenomena - EXPECTED_PHENOMENA)} "
+                    f"(fixture: {PARITY_FIXTURE.relative_to(REPO_ROOT)})"
+                )
+    else:
+        errors.append(
+            f"parity fixture missing: {PARITY_FIXTURE.relative_to(REPO_ROOT)} "
+            "(required by per-runtime BR/EU tests, e.g. "
+            "src/python_run/tests/test_pt_dialect_parity.py)"
+        )
+
     if errors:
         for msg in errors:
             print(f"FAIL: {msg}", file=sys.stderr)
@@ -123,7 +152,8 @@ def main() -> int:
 
     print(
         f"OK: pt-dialect-contract.toml — "
-        f"{len(EXPECTED_PHENOMENA)} phenomena, {len(runtimes)} runtime mirror(s) validated"
+        f"{len(EXPECTED_PHENOMENA)} phenomena, {len(runtimes)} runtime mirror(s), "
+        f"parity fixture validated"
     )
     return 0
 
