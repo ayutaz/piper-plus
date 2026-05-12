@@ -1,32 +1,35 @@
 #!/usr/bin/env python3
 """Validate the input graph of a Piper-Plus ONNX model before distribution.
 
-This is the gate that would have prevented Issue #385 — the v1.12.0
-tsukuyomi 6lang model was accidentally exported in voice-cloning mode
-(`speaker_embedding` + `speaker_embedding_mask` listed as required inputs),
-so Python CLI inference rejects it with::
-
-    ValueError: Required inputs (['speaker_embedding', 'speaker_embedding_mask'])
-    are missing from input feed (...).
-
-Pipeline runtimes (Python `voice.py`, Rust, Go, ...) do not feed those
-tensors. Any model that requires them is unusable through normal CLI flow.
+History
+-------
+- Issue #385 (v1.12.0 era): the tsukuyomi 6lang model was accidentally
+    exported in voice-cloning mode and CLI runtimes did not yet know how
+    to feed `speaker_embedding` / `speaker_embedding_mask`, so the model
+    failed with `Required inputs missing`. The gate originally rejected
+    those inputs outright.
+- PR #320 / Issue #426: MB-iSTFT-VITS2 + Voice Cloning support makes
+    `speaker_embedding` / `speaker_embedding_mask` *always-declared*
+    inputs. Mainline CLI runtimes (`src/python_run/piper/voice.py`,
+    `docker/python-inference/inference.py`, Rust, Go, C#) now feed zero
+    embedding + mask=0 so the model falls back to `emb_g(sid)`
+    (`src/python/piper_train/vits/models.py`). The two tensors are
+    therefore normal optional inputs, not leakage.
 
 Usage
 -----
     # Validate a single .onnx
     python scripts/check_onnx_inputs.py path/to/model.onnx
 
-    # Allow voice-cloning models explicitly (e.g. Reference-Audio releases)
-    python scripts/check_onnx_inputs.py --allow-voice-cloning path/to/model.onnx
-
-    # Strict mode: require an exact input set
-    python scripts/check_onnx_inputs.py --strict --expected input,input_lengths,scales,lid,prosody_features model.onnx
+    # Strict mode: require an exact input set (e.g. CI gate per release)
+    python scripts/check_onnx_inputs.py --strict \
+        --expected input,input_lengths,scales,lid,prosody_features,speaker_embedding,speaker_embedding_mask \
+        model.onnx
 
 Exit codes
 ----------
     0 — model is fine for distribution
-    1 — model has unexpected input set (e.g. voice-cloning leaked in)
+    1 — model has unexpected / unknown input(s)
     2 — bad invocation / file not found
 """
 
@@ -37,9 +40,12 @@ import sys
 from pathlib import Path
 
 
-# The set of inputs that mainline CLI runtimes *can* feed today. Anything
-# outside this set means the model needs a special caller (and is therefore
-# not safe to drop into a generic distribution slot).
+# The set of inputs that mainline CLI runtimes know how to feed today.
+# Anything outside this set means the model needs a special caller (and
+# is therefore not safe to drop into a generic distribution slot).
+# speaker_embedding / speaker_embedding_mask are listed here because PR #320
+# made them always-declared by `export_onnx.py:505-515`; runtimes feed
+# zero+mask=0 to route through emb_g(sid).
 KNOWN_OPTIONAL_INPUTS = {
     "input",
     "input_lengths",
@@ -47,10 +53,12 @@ KNOWN_OPTIONAL_INPUTS = {
     "sid",  # multispeaker
     "lid",  # multilingual
     "prosody_features",  # OpenJTalk A1/A2/A3 features
+    "speaker_embedding",  # PR #320 — zero+mask=0 fallback via emb_g(sid)
+    "speaker_embedding_mask",
 }
 
-# Inputs that mark voice-cloning-mode export. CLI runtimes cannot feed
-# these; a normal-distribution model must NOT list them as required.
+# Retained for the deprecated --allow-voice-cloning flag so existing CI
+# invocations keep working. The flag is now a no-op (kept as a name only).
 VOICE_CLONING_INPUTS = {
     "speaker_embedding",
     "speaker_embedding_mask",
@@ -96,22 +104,17 @@ def check(
             )
         return True, f"OK (strict): {inputs}"
 
-    leaked_vc = inputs_set & VOICE_CLONING_INPUTS
-    if leaked_vc and not allow_voice_cloning:
-        return False, (
-            f"Voice-cloning input(s) leaked into a distribution model: "
-            f"{sorted(leaked_vc)}. CLI runtimes cannot feed these and will "
-            f"fail with `Required inputs (...) are missing from input feed`. "
-            f"Re-export the model without --speaker-embedding / --reference-audio "
-            f"flags, or pass --allow-voice-cloning if this model is intentionally "
-            f"voice-cloning-only. (Issue #385 / docs/spec/pua-contract.toml)"
-        )
+    # `allow_voice_cloning` is preserved for backward compatibility with CI
+    # scripts that still pass --allow-voice-cloning; after PR #320 the flag
+    # is a no-op because speaker_embedding / speaker_embedding_mask are
+    # ordinary optional inputs.
+    del allow_voice_cloning
 
-    unknown = inputs_set - KNOWN_OPTIONAL_INPUTS - VOICE_CLONING_INPUTS
+    unknown = inputs_set - KNOWN_OPTIONAL_INPUTS
     if unknown:
         return False, (
             f"Unknown input name(s): {sorted(unknown)}. "
-            f"Known: {sorted(KNOWN_OPTIONAL_INPUTS | VOICE_CLONING_INPUTS)}. "
+            f"Known: {sorted(KNOWN_OPTIONAL_INPUTS)}. "
             f"Update KNOWN_OPTIONAL_INPUTS in scripts/check_onnx_inputs.py "
             f"if the export now legitimately produces this input."
         )
@@ -130,8 +133,9 @@ def main() -> int:
     parser.add_argument(
         "--allow-voice-cloning",
         action="store_true",
-        help="Permit speaker_embedding/speaker_embedding_mask as required inputs. "
-        "Use only for intentional voice-cloning-only releases.",
+        help="Deprecated since PR #320: speaker_embedding / speaker_embedding_mask "
+        "are now ordinary optional inputs that mainline runtimes feed as "
+        "zero+mask=0. Kept as a no-op for CI backward compatibility.",
     )
     parser.add_argument(
         "--strict",
