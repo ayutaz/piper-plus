@@ -1,0 +1,53 @@
+name: "Ruff Version Sync Gate"
+
+# Verifies that the ruff version is pinned identically across all 6 sites:
+#   - .pre-commit-config.yaml  (rev:)
+#   - .github/workflows/python-lint.yml  (pip install ruff==)
+#   - .github/workflows/ci.yml  (uv pip install ruff==)
+#   - pyproject.toml  (3 dependency-group entries)
+#
+# Drift = local-clean / CI-fail mismatch (PR #401 was the original incident;
+# Dependabot's uv-workspace PR #442 was the most recent — it bumped pyproject
+# only, requiring PR #445 + #446 follow-ups). This gate fails the offending
+# PR before merge so the cycle of shame stops at one commit, not three.
+
+on:
+  push:
+    branches: [dev, main]
+    paths:
+      - '.pre-commit-config.yaml'
+      - '.github/workflows/python-lint.yml'
+      - '.github/workflows/ci.yml'
+      - 'pyproject.toml'
+      - 'scripts/check_ruff_version_sync.py'
+      - '.github/workflows/ruff-version-sync.yml'
+  pull_request:
+    paths:
+      - '.pre-commit-config.yaml'
+      - '.github/workflows/python-lint.yml'
+      - '.github/workflows/ci.yml'
+      - 'pyproject.toml'
+      - 'scripts/check_ruff_version_sync.py'
+      - '.github/workflows/ruff-version-sync.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  ruff-pin-sync:
+    name: 6 ruff pin sites agree
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Run ruff version sync check
+        run: python scripts/check_ruff_version_sync.py

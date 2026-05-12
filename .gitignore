@@ -134,6 +134,11 @@ check_*.py
 !scripts/check_swift_g2p_contract.py
 !scripts/check_pt_dialect_contract.py
 !scripts/check_speaker_encoder_contract.py
+!scripts/check_dictionary_consistency.py
+!scripts/check_voice_catalog_parity.py
+!scripts/check_ruff_version_sync.py
+!scripts/check_inference_input_contract.py
+!scripts/check_cli_flag_parity.py
 !scripts/verify_model_checksums.py
 create_comprehensive_*.py
 add_missing_*.py

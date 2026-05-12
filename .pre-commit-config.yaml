@@ -197,6 +197,20 @@ repos:
         files: ^(src/python/g2p/piper_plus_g2p/data/pua\.json|tests/fixtures/g2p/phoneme_test_cases\.json)$
         pass_filenames: false
 
+      - id: dictionary-consistency
+        name: Custom dictionaries (data/dictionaries → WASM assets) byte-equal
+        entry: python3 scripts/check_dictionary_consistency.py
+        language: system
+        files: ^(data/dictionaries/(default_common|default_tech|additional_tech)_dict\.json|src/wasm/openjtalk-web/assets/(default_common|default_tech|additional_tech)_dict\.json)$
+        pass_filenames: false
+
+      - id: ruff-version-sync
+        name: ruff version pin synchronization (6 sites across pre-commit/workflows/pyproject)
+        entry: python3 scripts/check_ruff_version_sync.py
+        language: system
+        files: ^(\.pre-commit-config\.yaml|\.github/workflows/(python-lint|ci)\.yml|pyproject\.toml|scripts/check_ruff_version_sync\.py)$
+        pass_filenames: false
+
   # ---------------------------------------------------------------------------
   # Markdown lint — DavidAnson/markdownlint-cli2 has a dedicated pre-commit
   # repo (the GitHub Action variant runs only in CI). Config lives in

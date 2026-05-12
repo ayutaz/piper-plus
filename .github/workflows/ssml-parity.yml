@@ -22,6 +22,7 @@ on:
     paths:
       - 'docs/spec/ssml-contract.toml'
       - 'src/python/g2p/piper_plus_g2p/ssml.py'
+      - 'src/wasm/g2p/src/ssml.js'
       - 'scripts/check_ssml_contract.py'
       - 'scripts/regenerate_ssml_fixture.py'
       - 'tests/fixtures/ssml/**'
@@ -31,6 +32,7 @@ on:
     paths:
       - 'docs/spec/ssml-contract.toml'
       - 'src/python/g2p/piper_plus_g2p/ssml.py'
+      - 'src/wasm/g2p/src/ssml.js'
       - 'scripts/check_ssml_contract.py'
       - 'scripts/regenerate_ssml_fixture.py'
       - 'tests/fixtures/ssml/**'

@@ -54,8 +54,12 @@ drift があれば commit がブロックされます (auto-fix も適用)。手
 
 > **ruff version pin:** `.pre-commit-config.yaml` の `rev: vX` と
 > `.github/workflows/python-lint.yml` / `.github/workflows/ci.yml` の
-> `(uv) pip install ruff==X` (合計 3 箇所) は同期必須。
+> `(uv) pip install ruff==X`、加えて `pyproject.toml` の 3 dependency
+> group エントリ (合計 6 箇所) は同期必須。
 > drift = local-clean / CI-fail mismatch (PR #401 の根本原因の一つ)。
+> `scripts/check_ruff_version_sync.py` + `ruff-version-sync.yml` で
+> 6 箇所一致を CI gate (本 gate がなければ Dependabot uv-workspace PR が
+> pyproject.toml だけ bump → drift → 後追い PR が発生する)。
 
 ---
 
