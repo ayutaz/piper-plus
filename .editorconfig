@@ -51,3 +51,12 @@ indent_size = unset
 
 [src/cpp/tests/test_speaker_embedding_inference.cpp]
 indent_size = unset
+
+# Cross-runtime contract specs in docs/spec/ use column-alignment for
+# inline `# comment` annotations (e.g. `sample_rate = 22050        # Hz`),
+# array entries with inline tables, and field tables with aligned widths
+# (audio-format-contract.toml field_order, ort-provider-contract.toml
+# auto_detect_priority, etc.). The indent-multiple-of-4 check fights the
+# readability of these tables, so the entire spec dir opts out.
+[docs/spec/*.toml]
+indent_size = unset
