@@ -34,17 +34,26 @@ public class SpeakerEmbeddingInferenceTests
             {
                 return (candidate, candidate + ".json");
             }
+
             string? parent = Directory.GetParent(dir)?.FullName;
-            if (parent == dir) break;
+            if (parent == dir)
+            {
+                break;
+            }
+
             dir = parent;
         }
+
         return null;
     }
 
     private static PiperModel? LoadFixtureModel()
     {
         var paths = FindFixture();
-        if (paths is null) return null;
+        if (paths is null)
+        {
+            return null;
+        }
 
         PiperConfig config = PiperConfig.LoadFromFile(paths.Value.ConfigPath);
         var sessionOptions = new SessionOptions();

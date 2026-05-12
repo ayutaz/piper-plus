@@ -58,7 +58,7 @@ jobs:
 
       - name: Build speaker_embedding fixture
         run: |
-          uv sync --group dev
+          uv sync --extra dev
           CUDA_VISIBLE_DEVICES="" uv run python \
             tests/fixtures/mb_istft_speaker_embedding/build_fixture.py
           ls -la tests/fixtures/mb_istft_speaker_embedding/

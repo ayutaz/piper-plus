@@ -58,7 +58,7 @@ jobs:
           echo "$HOME/.local/bin" >> $GITHUB_PATH
 
       - name: Sync deps
-        run: uv sync --group dev
+        run: uv sync --extra dev
 
       - name: Build fixture
         run: |
@@ -105,7 +105,7 @@ jobs:
           echo "$HOME/.local/bin" >> $GITHUB_PATH
 
       - name: Sync deps
-        run: uv sync --group dev
+        run: uv sync --extra dev
 
       - uses: actions/download-artifact@v5
         with:
@@ -170,6 +170,19 @@ jobs:
       - name: Configure
         run: cmake -S . -B build -G Ninja
 
+      # External projects (ONNX Runtime, OpenJTalk, spdlog, fmt) are downloaded
+      # at build time, not configure time, so the conditional in
+      # `src/cpp/tests/CMakeLists.txt:78` (`if(EXISTS ORT headers)`) cannot
+      # enable `test_speaker_embedding_inference` until ORT has been fetched.
+      # Build the `piper` target first to fetch all external deps, then
+      # re-configure so the conditional sees the now-present ORT headers,
+      # then build the test executable.
+      - name: Fetch external deps via piper target
+        run: cmake --build build --target piper
+
+      - name: Re-configure (now that ORT headers exist)
+        run: cmake -S . -B build -G Ninja
+
       - name: Build test
         run: cmake --build build --target test_speaker_embedding_inference
 
@@ -188,7 +201,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - uses: actions/setup-dotnet@v6
+      - uses: actions/setup-dotnet@v5
         with:
           global-json-file: global.json
 
