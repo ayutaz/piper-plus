@@ -53,7 +53,8 @@ drift があれば commit がブロックされます (auto-fix も適用)。手
 > しても PR 時に検出)。
 
 > **ruff version pin:** `.pre-commit-config.yaml` の `rev: vX` と
-> `.github/workflows/python-lint.yml` の `pip install ruff==X` は同期必須。
+> `.github/workflows/python-lint.yml` / `.github/workflows/ci.yml` の
+> `(uv) pip install ruff==X` (合計 3 箇所) は同期必須。
 > drift = local-clean / CI-fail mismatch (PR #401 の根本原因の一つ)。
 
 ---
@@ -68,15 +69,15 @@ drift があれば commit がブロックされます (auto-fix も適用)。手
 export WANDB_API_KEY=$(grep WANDB_API_KEY /data/piper/.env | cut -d= -f2) && \
 NCCL_DEBUG=WARN NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 \
 nohup /data/piper/.venv/bin/python -m piper_train \
-  --dataset-dir <DATASET_DIR> \
-  --prosody-dim 16 \
-  --accelerator gpu --devices 4 --precision 32-true \
-  --max_epochs <EPOCHS> --batch-size 20 --samples-per-speaker 2 \
-  --checkpoint-epochs 5 --quality medium \
-  --base_lr 2e-4 --disable_auto_lr_scaling \
-  --ema-decay 0.9995 --max-phoneme-ids 400 --no-wavlm \
-  --audio-log-epochs 5 \
-  --default_root_dir <OUTPUT_DIR> > training.log 2>&1 &
+    --dataset-dir <DATASET_DIR> \
+    --prosody-dim 16 \
+    --accelerator gpu --devices 4 --precision 32-true \
+    --max_epochs <EPOCHS> --batch-size 20 --samples-per-speaker 2 \
+    --checkpoint-epochs 5 --quality medium \
+    --base_lr 2e-4 --disable_auto_lr_scaling \
+    --ema-decay 0.9995 --max-phoneme-ids 400 --no-wavlm \
+    --audio-log-epochs 5 \
+    --default_root_dir <OUTPUT_DIR> > training.log 2>&1 &
 ```
 
 ### Template B: シングルスピーカー ファインチューニング
@@ -85,16 +86,16 @@ nohup /data/piper/.venv/bin/python -m piper_train \
 export WANDB_API_KEY=$(grep WANDB_API_KEY /data/piper/.env | cut -d= -f2) && \
 NCCL_DEBUG=WARN NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 \
 nohup /data/piper/.venv/bin/python -m piper_train \
-  --dataset-dir <FINETUNE_DATASET> \
-  --prosody-dim 16 \
-  --accelerator gpu --devices 1 --precision 32-true \
-  --max_epochs 500 --batch-size 4 --samples-per-speaker 4 \
-  --checkpoint-epochs 50 --quality medium \
-  --base_lr 2e-5 --disable_auto_lr_scaling \
-  --ema-decay 0.9995 --max-phoneme-ids 400 --no-wavlm \
-  --val-every-n-epochs 50 --audio-log-epochs 50 \
-  --resume-from-multispeaker-checkpoint <BASE_CHECKPOINT> \
-  --default_root_dir <OUTPUT_DIR> > training.log 2>&1 &
+    --dataset-dir <FINETUNE_DATASET> \
+    --prosody-dim 16 \
+    --accelerator gpu --devices 1 --precision 32-true \
+    --max_epochs 500 --batch-size 4 --samples-per-speaker 4 \
+    --checkpoint-epochs 50 --quality medium \
+    --base_lr 2e-5 --disable_auto_lr_scaling \
+    --ema-decay 0.9995 --max-phoneme-ids 400 --no-wavlm \
+    --val-every-n-epochs 50 --audio-log-epochs 50 \
+    --resume-from-multispeaker-checkpoint <BASE_CHECKPOINT> \
+    --default_root_dir <OUTPUT_DIR> > training.log 2>&1 &
 ```
 
 ### A vs B パラメータ差分
@@ -173,8 +174,7 @@ nohup /data/piper/.venv/bin/python -m piper_train \
 
 - **CPU 推論最適化 (Tier 1-2)** — 4 言語実装で ORT セッション設定統一、Warmup 2 回 (100 phonemes、scales=[0.667,1.0,0.8])、`.opt.onnx`+`.ok` キャッシュ、JA 音素化 LRU キャッシュ (Python のみ)。仕様: `docs/spec/ort-session-contract.toml`。CLI: `--no-warmup`。env: `PIPER_DISABLE_WARMUP`, `PIPER_DISABLE_CACHE`, `PIPER_INTRA_THREADS`。
 - **短テキスト合成品質改善 (Strategy A/B/C)** — 全 7 ランタイム並列実装。A: Silence Padding + Post-trim、B: Dynamic Scales、C: SSML `<break>` 自動挿入 (SSML 4 ランタイムのみ)。仕様: `docs/spec/short-text-contract.toml`。
-- **ストリーミング文単位分割** — 終止符 `.`/`!`/`?`/`。`/`！`/`？` で分割し文ごとに音素化・推論・yield。SSML は単一ユニット。Python: `src/python_run/piper/text_splitter.py`、Rust: `piper-core/src/streaming.rs`、他言語: 同等実装。仕様: `docs/spec/text-splitter-contract.toml`。
-  - **Breaking (v1.12.0):** Python `PiperVoice.phonemize()` が単一要素から複数要素へ。詳細: マイグレーションガイド。
+- **ストリーミング文単位分割** — 終止符 `.`/`!`/`?`/`。`/`！`/`？` で分割し文ごとに音素化・推論・yield。SSML は単一ユニット。Python: `src/python_run/piper/text_splitter.py`、Rust: `piper-core/src/streaming.rs`、他言語: 同等実装。仕様: `docs/spec/text-splitter-contract.toml`。**Breaking (v1.12.0):** Python `PiperVoice.phonemize()` が単一要素から複数要素へ (詳細: マイグレーションガイド)。
 - **SSML 基本サポート** (5 ランタイム + WASM 解析 API + G2P-only npm) — `<speak>`, `<break>`, `<prosody rate>` を Python/Rust/C#/Go/JS で実装 (W3C サブセット)。実装: `g2p/piper_plus_g2p/ssml.py`, `piper-plus-g2p/src/ssml.rs` (Rust canonical), `PiperPlus.Core/Ssml/SsmlParser.cs`, `go/piperplus/ssml/parser.go`, `wasm/g2p/src/ssml.js` (npm `@piper-plus/g2p`)。 piper-core は `piper-plus-g2p::ssml` を re-export (API 互換維持)。 piper-wasm は同パーサーを `isSsml` / `parseSsml` で WASM expose (TTS 統合は openjtalk-web の synthesize 側で iterate して silence 挿入 + length_scale 切替)。
 - **Phoneme Timing 出力** — 全 6 ランタイム (Python/JS-WASM 新規 + Rust/Go/C++/C# 既存) で JSON/TSV/SRT 出力。`(hop_length / sample_rate) × 1000` で byte-for-byte 互換。Python: `piper.timing` モジュール、`PiperVoice.synthesize_with_timing()`、HTTP `/api/phoneme-timing`。WASM: `AudioResult.timing` (deep frozen)。仕様: `docs/spec/phoneme-timing-contract.toml`。
 
@@ -258,7 +258,7 @@ nohup /data/piper/.venv/bin/python -m piper_train \
 ```bash
 # 推奨 (EMA + stochastic + FP16 + emb_lang 自動統一)
 CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
-  /path/to/checkpoint.ckpt /path/to/output.onnx
+    /path/to/checkpoint.ckpt /path/to/output.onnx
 ```
 
 | オプション | 既定 | 説明 |
@@ -275,15 +275,15 @@ CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
 ```bash
 # テキスト直接 (6lang multilingual)
 CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.infer_onnx \
-  --model <model.onnx> --config <config.json> --output-dir <out> \
-  --text "こんにちは" --language ja-en-zh-es-fr-pt --speaker-id 0 --noise-scale 0.667
+    --model <model.onnx> --config <config.json> --output-dir <out> \
+    --text "こんにちは" --language ja-en-zh-es-fr-pt --speaker-id 0 --noise-scale 0.667
 
 # Voice Cloning (参照音声から)
 CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.infer_onnx \
-  --model <model.onnx> --config <config.json> --output-dir <out> \
-  --text "こんにちは" \
-  --reference-audio <ref.wav> --speaker-encoder-model <encoder.onnx> \
-  --language ja-en-zh-es-fr-pt
+    --model <model.onnx> --config <config.json> --output-dir <out> \
+    --text "こんにちは" \
+    --reference-audio <ref.wav> --speaker-encoder-model <encoder.onnx> \
+    --language ja-en-zh-es-fr-pt
 ```
 
 `--language` の言語コード順は任意 (内部で canonical key に正規化)。
