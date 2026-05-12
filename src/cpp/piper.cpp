@@ -557,6 +557,20 @@ void loadModel(std::string modelPath, ModelSession &session,
     } else if (name == "lid") {
       session.hasLidInput = true;
       spdlog::debug("Model supports language ID (lid input)");
+    } else if (name == "speaker_embedding") {
+      session.hasSpeakerEmbeddingInput = true;
+      // Shape: (batch, emb_dim). When emb_dim is a dynamic axis (negative
+      // value), fall back to the ECAPA-TDNN canonical 256 to keep the
+      // session usable.
+      auto type_info = session.onnx.GetInputTypeInfo(i);
+      auto tensor_info = type_info.GetTensorTypeAndShapeInfo();
+      auto shape = tensor_info.GetShape();
+      if (shape.size() >= 2 && shape[1] > 0) {
+        session.speakerEmbeddingDim = shape[1];
+      }
+      spdlog::debug(
+          "Model supports speaker_embedding input (emb_dim={})",
+          session.speakerEmbeddingDim);
     }
   }
 }
@@ -1060,7 +1074,9 @@ buildInputTensors(
     std::vector<float>   &scalesBuf,
     std::vector<int64_t> &sidBuf,
     std::vector<int64_t> &lidBuf,
-    std::vector<int64_t> &prosodyBuf) {
+    std::vector<int64_t> &prosodyBuf,
+    std::vector<float>   &speakerEmbeddingBuf,
+    std::vector<int64_t> &speakerEmbeddingMaskBuf) {
 
   // ---- phoneme ids ----
   phonemeIdsBuf = inputs.phonemeIds;  // copy
@@ -1130,6 +1146,27 @@ buildInputTensors(
         prosodyShape.data(), prosodyShape.size()));
   }
 
+  // speaker_embedding + speaker_embedding_mask (Issue #426).
+  // MB-iSTFT-VITS2 + Voice Cloning exports declare these unconditionally.
+  // Feed zero embedding + mask=0 so the model falls back to emb_g(sid).
+  if (session.hasSpeakerEmbeddingInput) {
+    const int64_t embDim = session.speakerEmbeddingDim;
+    speakerEmbeddingBuf.assign(static_cast<size_t>(embDim), 0.0f);
+    std::vector<int64_t> embShape{1, embDim};
+    names.push_back("speaker_embedding");
+    tensors.push_back(Ort::Value::CreateTensor<float>(
+        memoryInfo, speakerEmbeddingBuf.data(), speakerEmbeddingBuf.size(),
+        embShape.data(), embShape.size()));
+
+    speakerEmbeddingMaskBuf = {0};
+    std::vector<int64_t> maskShape{1, 1};
+    names.push_back("speaker_embedding_mask");
+    tensors.push_back(Ort::Value::CreateTensor<int64_t>(
+        memoryInfo, speakerEmbeddingMaskBuf.data(),
+        speakerEmbeddingMaskBuf.size(),
+        maskShape.data(), maskShape.size()));
+  }
+
   return {std::move(tensors), std::move(names)};
 }
 
@@ -1189,12 +1226,14 @@ void synthesize(std::vector<PhonemeId> &phonemeIds,
 
   // Buffers must outlive the Run() call
   std::vector<int64_t> phonemeIdsBuf, phonemeIdLengthsBuf, sidBuf, lidBuf, prosodyBuf;
-  std::vector<float> scalesBuf;
+  std::vector<float> scalesBuf, speakerEmbeddingBuf;
+  std::vector<int64_t> speakerEmbeddingMaskBuf;
 
   auto [inputTensors, inputNamesVec] = buildInputTensors(
       inputs, session, memoryInfo,
       phonemeIdsBuf, phonemeIdLengthsBuf, scalesBuf,
-      sidBuf, lidBuf, prosodyBuf);
+      sidBuf, lidBuf, prosodyBuf,
+      speakerEmbeddingBuf, speakerEmbeddingMaskBuf);
 
   // Output names
   std::vector<const char *> outputNamesVec;
@@ -1396,12 +1435,14 @@ void synthesizeFloat(std::vector<PhonemeId> &phonemeIds,
 
   // Buffers must outlive the Run() call
   std::vector<int64_t> phonemeIdsBuf, phonemeIdLengthsBuf, sidBuf, lidBuf, prosodyBuf;
-  std::vector<float> scalesBuf;
+  std::vector<float> scalesBuf, speakerEmbeddingBuf;
+  std::vector<int64_t> speakerEmbeddingMaskBuf;
 
   auto [inputTensors, inputNamesVec] = buildInputTensors(
       inputs, session, memoryInfo,
       phonemeIdsBuf, phonemeIdLengthsBuf, scalesBuf,
-      sidBuf, lidBuf, prosodyBuf);
+      sidBuf, lidBuf, prosodyBuf,
+      speakerEmbeddingBuf, speakerEmbeddingMaskBuf);
 
   // Output names
   std::vector<const char *> outputNamesVec;
@@ -3260,12 +3301,14 @@ void warmupModel(ModelSession &session, int runs) {
 
         // Buffers kept alive across all warmup runs
         std::vector<int64_t> phonemeIdsBuf, phonemeIdLengthsBuf, sidBuf, lidBuf, prosodyBuf;
-        std::vector<float> scalesBuf;
+        std::vector<float> scalesBuf, speakerEmbeddingBuf;
+        std::vector<int64_t> speakerEmbeddingMaskBuf;
 
         auto [inputTensors, inputNames] = buildInputTensors(
             dummy, session, memoryInfo,
             phonemeIdsBuf, phonemeIdLengthsBuf, scalesBuf,
-            sidBuf, lidBuf, prosodyBuf);
+            sidBuf, lidBuf, prosodyBuf,
+            speakerEmbeddingBuf, speakerEmbeddingMaskBuf);
 
         // Output names
         std::vector<const char*> outputNames;
