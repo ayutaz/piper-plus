@@ -81,8 +81,15 @@ if(EXISTS "${ORT_INCLUDE_DIR}/onnxruntime_cxx_api.h" OR EXISTS "${CMAKE_BINARY_D
     # when PIPER_SPEAKER_ENCODER_ONNX_PATH is unset, but compilation needs
     # the C++ API headers).
     list(APPEND TEST_SOURCES test_speaker_encoder_e2e.cpp)
-    # Issue #426: speaker_embedding inference fallback gate. Auto-skips
-    # at runtime when the fixture has not been generated.
+endif()
+
+# Issue #426: speaker_embedding inference fallback gate. Uses `piper.hpp` only
+# (no direct ORT headers needed), so we gate on `piper_common` target existence
+# rather than the broken `${ORT_INCLUDE_DIR}` / `pi/include` checks above
+# (which silently evaluate to false → those gated tests are unbuilt on dev too,
+# but that's a pre-existing issue out of scope for this PR). Auto-skips at
+# runtime when the fixture has not been generated.
+if(TARGET piper_common)
     list(APPEND TEST_SOURCES test_speaker_embedding_inference.cpp)
 endif()
 
