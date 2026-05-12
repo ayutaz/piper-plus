@@ -168,7 +168,10 @@ jobs:
           path: ${{ env.FIXTURE_DIR }}
 
       - name: Configure
-        run: cmake -S . -B build -G Ninja
+        # `BUILD_TESTS` is OFF by default (cmake/Testing.cmake:4); without
+        # `-DBUILD_TESTS=ON` the `src/cpp/tests/` subdirectory is skipped and
+        # `test_speaker_embedding_inference` is never declared as a target.
+        run: cmake -S . -B build -G Ninja -DBUILD_TESTS=ON
 
       - name: Build test
         run: cmake --build build --target test_speaker_embedding_inference
