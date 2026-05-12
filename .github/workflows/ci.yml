@@ -436,7 +436,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install --no-cache-dir uv
-          uv pip install --system ruff==0.12.5 mypy
+          uv pip install --system ruff==0.15.12 mypy
 
       - name: Run ruff check
         run: ruff check .
