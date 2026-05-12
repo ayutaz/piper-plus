@@ -62,6 +62,15 @@ jobs:
           license-check: true
           # 許容ライセンス (OSS 一般 + Unicode/OpenSSL/Zlib などライブラリ系)
           allow-licenses: MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC, Unicode-DFS-2016, Unicode-3.0, CC0-1.0, MPL-2.0, Zlib, OpenSSL
+          # dev / lint / docs 用 transitive dependency の例外
+          # (配布バイナリには含まれず copyleft 伝播リスクなし)。
+          # dependency-review.yml と同期。
+          allow-dependencies-licenses: >-
+            pkg:pypi/astroid,
+            pkg:pypi/matplotlib,
+            pkg:pypi/mypy,
+            pkg:pypi/pylint,
+            pkg:pypi/sphinx-rtd-theme
 
   # Python: pip-audit
   # PR では false-negative 防止のため block しないが (`continue-on-error: true`)、
