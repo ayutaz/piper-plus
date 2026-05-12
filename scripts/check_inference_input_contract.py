@@ -48,12 +48,24 @@ ECAPA = REPO_ROOT / "src/python/piper_train/speaker_encoder/ecapa_tdnn.py"
 
 
 def _eval_simple_int(expr: str) -> int | None:
-    """Evaluate a literal-only integer expression like '1 * 1024 * 1024'."""
+    """Evaluate a literal-only integer expression like '1 * 1024 * 1024'.
+
+    The whitelist below permits digits, whitespace, ``+ - * / ( )`` only,
+    but two consecutive ``*`` reads as the Python power operator — which
+    a hostile PR could weaponise (``10**10000000`` exhausts memory on
+    the CI runner). Reject any ``**`` substring explicitly so the
+    operator is never reachable.
+    """
     if not re.match(r"^[\d\s*+\-/()]+$", expr):
+        return None
+    if "**" in expr:
         return None
     try:
         return int(eval(expr, {"__builtins__": {}}, {}))  # noqa: S307 — sandboxed
     except Exception:
+        # Non-numeric RHS (e.g. a string literal slipped through the
+        # whitelist via parens) — caller treats this as "no constant
+        # found" and reports a contract miss.
         return None
 
 

@@ -86,14 +86,33 @@ SKIPS: set[tuple[str, str]] = {
 
 
 def contains_flag(path: Path, flag_basename: str) -> bool:
-    """Substring search for the hyphen-form base name (e.g. ``sentence-silence``).
-    Hyphens never appear in identifiers, so a bare substring match avoids
-    false positives from variable names while catching every declaration
-    idiom across runtimes.
+    """Search for the hyphen-form base name **or** its snake_case twin.
+
+    Most runtimes carry the literal hyphen-form (``sentence-silence``):
+
+      - Python argparse:    ``add_argument("--sentence-silence", ...)``
+      - Go pflag:           ``f.Float64Var(..., "sentence-silence", ...)``
+      - C# System.CommandLine: ``new Option<float>("--sentence-silence", ...)``
+      - C++ manual:         ``arg == "--sentence-silence"``
+
+    Rust clap-derive is the exception: with ``rename-all = "kebab-case"``
+    the source carries the snake_case field name (``sentence_silence``)
+    and the hyphen form only appears in comments. A naive substring
+    check on the hyphen form would pass even if the field were deleted
+    (the comment alone would satisfy it). Accept either form so the
+    gate detects field removal even when stale comments linger.
+
+    False-positive risk: a documentation comment like
+    ``// TODO: add sentence_silence later`` would also pass. That is
+    accepted as a trade-off — code review still catches it, and the
+    main failure mode the gate guards against (silent runtime
+    omission across the matrix) is covered.
     """
     if not path.exists():
         return False
-    return flag_basename in path.read_text(encoding="utf-8")
+    text = path.read_text(encoding="utf-8")
+    underscore_form = flag_basename.replace("-", "_")
+    return flag_basename in text or underscore_form in text
 
 
 def main(argv: list[str] | None = None) -> int:

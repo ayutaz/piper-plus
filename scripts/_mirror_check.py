@@ -171,6 +171,11 @@ def run_check(
             sys.stdout.reconfigure(encoding="utf-8", errors="replace")
             sys.stderr.reconfigure(encoding="utf-8", errors="replace")
         except Exception:
+            # Best-effort UTF-8 reconfig for Windows cp932 consoles where
+            # mirror paths or schema-error messages contain non-ASCII.
+            # If reconfigure fails (e.g. stream already detached, or wrapped
+            # by a test harness), keep going — the failure is purely a
+            # display concern, not a correctness one.
             pass
 
     failed: list[str] = []
