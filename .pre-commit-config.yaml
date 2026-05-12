@@ -184,7 +184,7 @@ repos:
     hooks:
       - id: pua-cross-runtime-consistency
         name: PUA cross-runtime consistency (6 runtime tables vs pua.json)
-        entry: python scripts/check_pua_consistency.py --check-version
+        entry: uv run python scripts/check_pua_consistency.py --check-version
         language: system
         # Mirror of paths in .github/workflows/pua-consistency.yml
         files: ^(src/python/g2p/piper_plus_g2p/data/pua\.json|src/python/g2p/piper_plus_g2p/encode/.+|src/python_run/piper/phonemize/token_mapper\.py|src/rust/piper-plus-g2p/src/token_map\.rs|src/go/phonemize/pua\.go|src/go/phonemize/pua_test\.go|src/wasm/g2p/src/pua-map\.js|src/csharp/PiperPlus\.Core/Mapping/OpenJTalkToPiperMapping\.cs|src/cpp/phoneme_parser\.cpp)$
@@ -192,23 +192,85 @@ repos:
 
       - id: pua-fixture-drift
         name: Test fixture in sync with pua.json
-        entry: python scripts/regenerate_test_fixture.py --check
+        entry: uv run python scripts/regenerate_test_fixture.py --check
         language: system
         files: ^(src/python/g2p/piper_plus_g2p/data/pua\.json|tests/fixtures/g2p/phoneme_test_cases\.json)$
         pass_filenames: false
 
       - id: dictionary-consistency
         name: Custom dictionaries (data/dictionaries → WASM assets) byte-equal
-        entry: python3 scripts/check_dictionary_consistency.py
+        entry: uv run python scripts/check_dictionary_consistency.py
         language: system
         files: ^(data/dictionaries/(default_common|default_tech|additional_tech)_dict\.json|src/wasm/openjtalk-web/assets/(default_common|default_tech|additional_tech)_dict\.json)$
         pass_filenames: false
 
       - id: ruff-version-sync
         name: ruff version pin synchronization (6 sites across pre-commit/workflows/pyproject)
-        entry: python3 scripts/check_ruff_version_sync.py
+        entry: uv run python scripts/check_ruff_version_sync.py
         language: system
         files: ^(\.pre-commit-config\.yaml|\.github/workflows/(python-lint|ci)\.yml|pyproject\.toml|scripts/check_ruff_version_sync\.py)$
+        pass_filenames: false
+
+      # Mirror of .github/workflows/zh-en-loanword-sync.yml. Filename
+      # `zh_en_loanword.json` is unique enough to anchor on without per-path
+      # enumeration; same pattern as PUA gate above.
+      - id: loanword-consistency
+        name: zh_en_loanword.json byte-equal across 10 mirrors + 8 fixtures
+        entry: uv run python scripts/check_loanword_consistency.py
+        language: system
+        files: (zh_en_loanword(_matrix)?\.json|scripts/check_loanword_(consistency|forward_compat)\.py|tests/fixtures/g2p/zh_en_loanword_forward_compat\.json|cmake/(EmbedJson|PiperCommon)\.cmake)$
+        pass_filenames: false
+
+      - id: loanword-forward-compat
+        name: zh_en_loanword.json forward-compat (schema_version v2 future-field acceptance)
+        # Needs piper_plus_g2p in import path — the g2p package is its own
+        # uv workspace, so we cd into it before invoking uv run. From the
+        # repo-root venv, the script fails with ModuleNotFoundError because
+        # piper_plus_g2p isn't installed there.
+        entry: bash -c 'cd src/python/g2p && uv run python ../../../scripts/check_loanword_forward_compat.py'
+        language: system
+        files: (zh_en_loanword(_matrix)?\.json|scripts/check_loanword_forward_compat\.py|tests/fixtures/g2p/zh_en_loanword_forward_compat\.json)$
+        pass_filenames: false
+
+      # Mirror of .github/workflows/ort-version-sync.yml. Same Dependabot
+      # drift pattern as ruff (cmake source-of-truth + 7 workflow + 5
+      # workspace consumers). `check_ort_versions.py` is pure Python / IO.
+      - id: ort-version-sync
+        name: ONNX Runtime version pin synchronization (cmake + workflows + workspace)
+        entry: uv run python scripts/check_ort_versions.py
+        language: system
+        files: ^(cmake/(OnnxRuntime|find_onnxruntime_windows)\.cmake|scripts/check_ort_versions\.py|\.github/workflows/(ort-version-sync|release-shared-lib|android-build|release-kotlin-g2p|kotlin-g2p-ci|build-piper|_build-test-cpp)\.yml|docker/cpp-dev/Dockerfile|src/python/pyproject\.toml|src/python_run/(requirements(_gpu)?\.txt|setup\.py)|src/csharp/.*\.csproj|src/go/go\.mod|src/wasm/openjtalk-web/package\.json)$
+        pass_filenames: false
+
+      # Mirror of .github/workflows/voice-catalog-parity.yml. canonical
+      # model_resolution_vectors.json vs 5 runtime mirror catalogs.
+      - id: voice-catalog-parity
+        name: voice catalog parity (canonical vs 5 runtime mirrors)
+        entry: uv run python scripts/check_voice_catalog_parity.py
+        language: system
+        files: ^(test/model_resolution_vectors\.json|src/python_run/piper/download\.py|src/cpp/piper_plus_voices\.json|src/rust/piper-core/src/model_download\.rs|src/csharp/PiperPlus\.Core/Config/VoiceCatalog\.cs|src/go/piperplus/voice_catalog\.go|scripts/check_voice_catalog_parity\.py)$
+        pass_filenames: false
+
+      # Mirror of .github/workflows/action-pin-gate.yml. Codespell-baseline
+      # pattern: snapshot current sliding-tag set in
+      # scripts/action_pins_baseline.txt; fail only on *new* sliding-tag
+      # references not in baseline. Prevents recurrence of PR #414
+      # (cosign-installer@v4 deleted upstream → 7 jobs failed).
+      - id: action-pin-gate
+        name: GitHub Actions pin safety (no new sliding-major-tag refs)
+        entry: uv run python scripts/check_action_pins.py
+        language: system
+        files: ^(\.github/workflows/.*\.ya?ml|\.github/actions/.*action\.ya?ml|scripts/check_action_pins\.py|scripts/action_pins_baseline\.txt)$
+        pass_filenames: false
+
+      # Mirror of .github/workflows/language-id-map-parity.yml. Drift here
+      # is catastrophic (silent multilingual mis-routing), trigger paths
+      # are tightly scoped; cheap to run on every relevant commit.
+      - id: language-id-map-contract
+        name: LANGUAGE_ID_MAP contract (canonical TOML vs 6 runtime sources)
+        entry: uv run python scripts/check_language_id_map_contract.py
+        language: system
+        files: ^(docs/spec/language-id-map-contract\.toml|src/python/piper_train/tools/prepare_multilingual_dataset\.py|src/python_run/piper/voice\.py|src/rust/piper-core/src/(config|wasm)\.rs|src/rust/piper-wasm/src/lib\.rs|src/go/piperplus/testdata/valid_multilingual_config\.json|src/wasm/openjtalk-web/models/multilingual-test-medium\.onnx\.json|src/csharp/PiperPlus\.Core/Config/PiperConfig\.cs|src/cpp/piper\.cpp|scripts/check_language_id_map_contract\.py|scripts/regenerate_language_id_map_fixture\.py|tests/fixtures/language_id_map/.*)$
         pass_filenames: false
 
   # ---------------------------------------------------------------------------
