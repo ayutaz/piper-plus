@@ -459,6 +459,37 @@ class TestSpeakerEmbeddingFeed:
         engine.synthesize("a")
         assert session.last_feed["speaker_embedding"].shape == (1, 256)
 
+    def test_malformed_export_only_speaker_embedding_raises(self, engine_factory):
+        """PR #320 contract: speaker_embedding and speaker_embedding_mask
+        are declared as a pair. A model that declares only one is a
+        malformed export and must fail loud at load time, not at first
+        request with a cryptic ORT error."""
+        with pytest.raises(RuntimeError, match="Malformed ONNX export"):
+            engine_factory(
+                [
+                    ("input", ["batch", "seq"]),
+                    ("input_lengths", ["batch"]),
+                    ("scales", [3]),
+                    ("sid", ["batch"]),
+                    ("speaker_embedding", ["batch", 256]),
+                    # speaker_embedding_mask intentionally omitted
+                ]
+            )
+
+    def test_malformed_export_only_mask_raises(self, engine_factory):
+        """Inverse of the above — mask declared but embedding missing."""
+        with pytest.raises(RuntimeError, match="Malformed ONNX export"):
+            engine_factory(
+                [
+                    ("input", ["batch", "seq"]),
+                    ("input_lengths", ["batch"]),
+                    ("scales", [3]),
+                    ("sid", ["batch"]),
+                    ("speaker_embedding_mask", ["batch", 1]),
+                    # speaker_embedding intentionally omitted
+                ]
+            )
+
 
 # ---- CORS ----
 

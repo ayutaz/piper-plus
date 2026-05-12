@@ -32,10 +32,12 @@ public class SynthesisInputSpeakerEmbeddingTests
     [Fact]
     public void Validate_AllowsSpeakerEmbeddingWithoutSpeakerId()
     {
-        // Voice cloning request: SpeakerEmbedding provided, SpeakerId default.
+        // Voice cloning request: SpeakerEmbedding provided, SpeakerId omitted
+        // (defaults to 0 — the multispeaker-default sentinel). The Validate()
+        // contract permits this because mutual-exclusivity is enforced only
+        // when SpeakerId > 0 (see PiperSession.cs:SynthesisInput.Validate).
         var input = new SynthesisInput(
             PhonemeIds: [1, 10, 5, 2],
-            SpeakerId: 0,
             SpeakerEmbedding: new float[256]);
 
         input.Validate();

@@ -124,7 +124,21 @@ class PiperInferenceEngine:
         self.has_prosody = "prosody_features" in input_names
         self.has_sid = "sid" in input_names
         self.has_lid = "lid" in input_names
-        self.has_speaker_embedding = "speaker_embedding" in input_names
+        # PR #320 declares speaker_embedding AND speaker_embedding_mask as a
+        # pair. Feeding only one to ORT would either raise "Required inputs
+        # missing" (if mask is undeclared) or "Unexpected input" (if mask is
+        # extra). Require both to be declared together — fail loud at load
+        # time on a malformed export rather than silently at first request.
+        has_speaker_embedding = "speaker_embedding" in input_names
+        has_speaker_embedding_mask = "speaker_embedding_mask" in input_names
+        if has_speaker_embedding != has_speaker_embedding_mask:
+            raise RuntimeError(
+                f"Malformed ONNX export: speaker_embedding="
+                f"{has_speaker_embedding} but speaker_embedding_mask="
+                f"{has_speaker_embedding_mask}. PR #320 contract requires "
+                "both inputs to be declared together."
+            )
+        self.has_speaker_embedding = has_speaker_embedding
         self.speaker_emb_dim: int | None = None
         if self.has_speaker_embedding:
             for inp in self.model.get_inputs():

@@ -11,6 +11,7 @@ import textwrap
 from pathlib import Path
 
 import numpy as np
+import pytest
 
 
 # ---------------------------------------------------------------------------
@@ -292,3 +293,53 @@ class TestBuildSessionInputs:
         # First entry preserved, None becomes [0, 0, 0].
         assert inputs["prosody_features"][0, 0].tolist() == [1, 2, 3]
         assert inputs["prosody_features"][0, 1].tolist() == [0, 0, 0]
+
+    def test_malformed_export_only_speaker_embedding_raises(self):
+        """PR #320 declares speaker_embedding + speaker_embedding_mask as a
+        pair. A model with only one declared is a malformed export — fail
+        loud here, not with a cryptic ORT error downstream."""
+        session = _FakeOnnxSession(
+            [
+                ("input", ["batch", "seq"]),
+                ("input_lengths", ["batch"]),
+                ("scales", [3]),
+                ("speaker_embedding", ["batch", 256]),
+                # speaker_embedding_mask intentionally omitted
+            ]
+        )
+        with pytest.raises(RuntimeError, match="Malformed ONNX export"):
+            _build_session_inputs(
+                session=session,
+                phoneme_ids=self._phoneme_ids(),
+                prosody_features_data=[],
+                speaker_id=0,
+                language="ja",
+                language_id_map={"ja": 0},
+                noise_scale=0.667,
+                length_scale=1.0,
+                noise_scale_w=0.8,
+            )
+
+    def test_malformed_export_only_mask_raises(self):
+        """Inverse — mask declared but embedding missing."""
+        session = _FakeOnnxSession(
+            [
+                ("input", ["batch", "seq"]),
+                ("input_lengths", ["batch"]),
+                ("scales", [3]),
+                ("speaker_embedding_mask", ["batch", 1]),
+                # speaker_embedding intentionally omitted
+            ]
+        )
+        with pytest.raises(RuntimeError, match="Malformed ONNX export"):
+            _build_session_inputs(
+                session=session,
+                phoneme_ids=self._phoneme_ids(),
+                prosody_features_data=[],
+                speaker_id=0,
+                language="ja",
+                language_id_map={"ja": 0},
+                noise_scale=0.667,
+                length_scale=1.0,
+                noise_scale_w=0.8,
+            )
