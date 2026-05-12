@@ -18,6 +18,8 @@ on:
       - '**/zh_en_loanword.json'
       - '**/zh_en_loanword_matrix.json'
       - 'scripts/check_loanword_consistency.py'
+      - 'scripts/check_loanword_forward_compat.py'
+      - 'tests/fixtures/g2p/zh_en_loanword_forward_compat.json'
       - 'cmake/EmbedJson.cmake'
       - 'cmake/PiperCommon.cmake'
       - '.github/workflows/zh-en-loanword-sync.yml'
@@ -26,6 +28,8 @@ on:
       - '**/zh_en_loanword.json'
       - '**/zh_en_loanword_matrix.json'
       - 'scripts/check_loanword_consistency.py'
+      - 'scripts/check_loanword_forward_compat.py'
+      - 'tests/fixtures/g2p/zh_en_loanword_forward_compat.json'
       - 'cmake/EmbedJson.cmake'
       - 'cmake/PiperCommon.cmake'
       - '.github/workflows/zh-en-loanword-sync.yml'
@@ -54,6 +58,28 @@ jobs:
 
       - name: Byte-for-byte hash check (Phase 6b — full gate, 9 copies + 8 fixture mirrors)
         run: python scripts/check_loanword_consistency.py
+
+  forward-compat:
+    name: Schema v2 forward-compat (Python loader accepts future fields)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      # The Python loader is the canonical reference for the "v1 loaders
+      # must silently accept future fields" contract (rollout doc §
+      # forward-compatibility). Without this gate, a refactor that
+      # accidentally tightens schema validation (rejecting an unknown
+      # top-level key, bumped schema_version, or per-entry extension)
+      # would only fail at downstream-runtime sync time, not at PR time.
+      - name: Install piper_plus_g2p from source
+        run: pip install -e src/python/g2p
+
+      - name: Run forward-compat fixture against Python loader
+        run: python scripts/check_loanword_forward_compat.py
 
   helper-self-check:
     name: check_loanword_consistency.py self-check

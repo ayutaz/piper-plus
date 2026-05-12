@@ -65,6 +65,18 @@ jobs:
           CUDA_VISIBLE_DEVICES="" uv run python ${FIXTURE_DIR}/build_fixture.py
           ls -la ${FIXTURE_DIR}
 
+      # Pin the fixture's ONNX input set so any future export_onnx.py change
+      # that adds/removes/renames a graph input is caught at PR time (Issue
+      # #426 root cause was an export-side input that the runtime didn't
+      # feed). --strict enforces an exact match; --expected lists every
+      # input that runtimes know how to feed today.
+      - name: Validate fixture input contract (check_onnx_inputs.py --strict)
+        run: |
+          uv run python scripts/check_onnx_inputs.py \
+            --strict \
+            --expected input,input_lengths,scales,sid,speaker_embedding,speaker_embedding_mask \
+            ${FIXTURE_DIR}/model.onnx
+
       - name: Upload fixture
         uses: actions/upload-artifact@v4
         with:
