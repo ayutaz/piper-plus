@@ -1,9 +1,18 @@
 # -----------------------------------------------------------------------------
-# piper-plus runtime: tool configuration
+# piper-plus runtime: canonical PyPI 配布パッケージ
 # -----------------------------------------------------------------------------
-# このファイルは tool 設定 (mypy / ruff / pytest) のみを保持する。
-# パッケージ build はレガシーな `setup.py` が引き続き担当しているため、
-# `[build-system]` / `[project]` テーブルは置かない (setup.py と二重定義しない)。
+# Issue #418 (uv lock 構造修復) で minimal `[project]` + `[build-system]` を追加。
+#
+# メタデータの所在:
+#   - pyproject.toml: name / description / readme / requires-python / license /
+#     authors / keywords / classifiers / urls / scripts (entry_points) /
+#     optional-dependencies (gpu/http/test) / package-data / packages.find
+#   - setup.py: `dynamic = ["version", "dependencies"]` の実解決のみ。
+#     具体的には `../../VERSION` 読み込みと `requirements.txt` パース。
+#     `[tool.setuptools.dynamic]` の file 参照は setuptools の `_assert_local`
+#     がパッケージ外パス (`../../VERSION`) を拒否するため使えず、 setup.py 内
+#     の通常 Python コードで読んで `setup(version=..., install_requires=...)`
+#     に渡す方式を採用 (詳細は後段の Note および setup.py のコメント参照)。
 #
 # 段階的型付け方針:
 #   - mypy strict は使わず、ignore_missing_imports で onnxruntime 等を許容
@@ -11,6 +20,76 @@
 #     g2p (`src/python/g2p/pyproject.toml`) の設定を概ね mirror する
 #   - `warn_return_any` / `warn_unused_ignores` を入れて漏れを検知
 # -----------------------------------------------------------------------------
+
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "piper-plus"
+description = "A fast, high-quality neural text-to-speech system supporting 8 languages (ja/en/zh/ko/es/fr/pt/sv) with VITS architecture."
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+authors = [
+    {name = "yousan", email = "rabbitcats77@gmail.com"},
+]
+keywords = ["piper", "japanese", "tts", "vits", "multilingual"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Topic :: Text Processing :: Linguistic",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+# version / dependencies は dynamic 化し、 setup.py が実解決を担当する。
+#   - version: ../../VERSION (リポジトリルートの canonical VERSION file) を
+#     setup.py が read してから `setup(version=...)` に渡す。
+#   - dependencies: requirements.txt (Issue #372 で ORT floor を C++ canonical
+#     に揃え済み) を setup.py がパースして `install_requires=...` に渡す。
+# `[tool.setuptools.dynamic]` の file 参照を使わない理由は後段の Note を参照。
+dynamic = ["version", "dependencies"]
+
+[project.urls]
+Homepage = "https://github.com/ayutaz/piper-plus"
+Repository = "https://github.com/ayutaz/piper-plus"
+Issues = "https://github.com/ayutaz/piper-plus/issues"
+
+[project.optional-dependencies]
+# Issue #372: ORT floor must be >= C++ canonical (cmake/OnnxRuntime.cmake).
+# requirements_gpu.txt (`onnxruntime-gpu>=1.26.0,<2`) と CPU runtime の
+# `onnxruntime>=1.26.0` (requirements.txt) に揃える。
+gpu = ["onnxruntime-gpu>=1.26.0,<2"]
+http = [
+    "fastapi>=0.110,<1",
+    "uvicorn[standard]>=0.27,<1",
+]
+test = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "pytest-timeout>=2.0",
+    "pytest-asyncio>=0.24",
+]
+
+[project.scripts]
+piper = "piper.__main__:main"
+
+# Note: `dynamic = ["version", "dependencies"]` の実解決は setup.py が担当する。
+# `[tool.setuptools.dynamic]` の file 参照は setuptools の `_assert_local` で
+# パッケージ外のパス (`../../VERSION`) を拒否するため使えない。setup.py は
+# Python コードで自由にファイル読みできるため、リポジトリルートの VERSION を
+# 参照できる (現状の挙動を維持)。
+
+[tool.setuptools.packages.find]
+exclude = ["tests*", "build*"]
+
+[tool.setuptools.package-data]
+piper = [
+    "voices.json",
+    "phonemize/data/zh_en_loanword.json",
+]
 
 [tool.mypy]
 python_version = "3.11"

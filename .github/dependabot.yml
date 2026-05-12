@@ -18,11 +18,12 @@
 # しか発覚しない。
 #
 # 本ファイルでの対応:
-#   1. uv workspace member (src/python, src/python/g2p) は root の uv
-#      ecosystem 1 本に統合 (root `uv.lock` を canonical 視させる)。
-#   2. src/python_run は setup.py + requirements.txt 管理で `[project]`
-#      テーブルが無いため uv lock 不可、 pip ecosystem のまま残す
-#      (構造的解決は別 issue で minimal `[project]` 追加方針を検討)。
+#   uv workspace member (src/python, src/python/g2p, src/python_run) は
+#   root の uv ecosystem 1 本に統合し、 root `uv.lock` を canonical 視させる。
+#   GitHub Dependency Submission API も同 lock を読みに行くため、
+#   subdirectory の `pyproject.toml` を見つけても uv updater は root lock で
+#   解決可能 (Issue #418 で src/python_run に [project] テーブル追加 +
+#   workspace member 化が完了済)。
 
 version: 2
 
@@ -51,13 +52,13 @@ updates:
           - "version-update:semver-major"
 
   # Python (uv workspace): root が uv workspace の統括点
-  # ([tool.uv.workspace] members = src/python, src/python/g2p)。
-  # root の `uv.lock` に member 全依存を集約しているため、 Dependabot uv
-  # ecosystem を root 1 箇所に登録するだけで両 member を update できる。
+  # ([tool.uv.workspace] members = src/python, src/python/g2p, src/python_run)。
+  # root の `uv.lock` に 3 member 全依存を集約しているため、 Dependabot uv
+  # ecosystem を root 1 箇所に登録するだけで全 member を update できる。
   # GitHub Dependency Submission API ("Dependency Graph" check) も同 lock を
   # canonical 視するため、 subdirectory pyproject.toml の uv updater 試行
   # (sha 1595f630 で `update-uv-graph` が `uv.lock` 不在で fail した経緯) を
-  # 抑止できる見込み。
+  # 抑止できる (Issue #418 で src/python_run も workspace 統合した)。
   - package-ecosystem: "uv"
     directory: "/"
     schedule:
@@ -71,35 +72,6 @@ updates:
       - "automated"
     groups:
       python-uv-workspace:
-        applies-to: version-updates
-        update-types:
-          - "minor"
-          - "patch"
-    ignore:
-      - dependency-name: "*"
-        update-types:
-          - "version-update:semver-major"
-
-  # Python: src/python_run (PyPI piper-plus ランタイム、 setup.py +
-  # requirements.txt 管理)。
-  # 意図的に `[project]` テーブル無し (setup.py と二重定義しない方針) で
-  # `uv lock` は実行不可。 そのため uv ecosystem へは寄せず pip のままに
-  # するが、 GitHub Dependency Submission API が `pyproject.toml` を見て
-  # uv updater を起動する可能性は残る (構造的解決には minimal `[project]`
-  # 追加 + setup.py 整合性確認が必要、 別 issue でフォロー)。
-  - package-ecosystem: "pip"
-    directory: "/src/python_run"
-    schedule:
-      interval: "monthly"
-    open-pull-requests-limit: 5
-    commit-message:
-      prefix: "deps"
-      include: "scope"
-    labels:
-      - "dependencies"
-      - "automated"
-    groups:
-      python-runtime:
         applies-to: version-updates
         update-types:
           - "minor"

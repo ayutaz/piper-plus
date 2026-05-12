@@ -3,9 +3,14 @@ requires = ["setuptools>=45", "wheel", "setuptools-scm"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "piper-plus"
+# NOTE: この root project は uv workspace の管理用 meta package。
+# PyPI へは publish せず (`[tool.uv] package = false` 参照)、
+# canonical な `piper-plus` パッケージは `src/python_run/` から build される。
+# Issue #418: src/python_run を workspace member 化する際の name 衝突を回避するため
+# root を `piper-plus-workspace` に rename した。
+name = "piper-plus-workspace"
 dynamic = ["version"]
-description = "Training environment for piper-plus"
+description = "Development workspace for piper-plus (not published; canonical piper-plus is built from src/python_run)"
 license = {text = "MIT"}
 requires-python = ">=3.11"
 dependencies = [
@@ -21,7 +26,12 @@ dependencies = [
     "pyopenjtalk-plus>=0.4",
     "wandb>=0.19",
     "transformers>=4.30",
+    # workspace member refs: `uv sync` でこれらが自動 install される (root は
+    # `package = false` なのでこの dependencies は実 install でなく resolver
+    # の入力として機能)。Issue #418 で `piper-plus` を新規 member 化したため
+    # 明示。 piper-plus-g2p は piper-train の依存として間接的に install される。
     "piper-train[train]",
+    "piper-plus",
     "onnxscript>=0.6.2",
     "onnxruntime>=1.17",
     "ghapi>=1.0.13",
@@ -128,14 +138,20 @@ torchaudio = [
 ]
 piper-train = { workspace = true, editable = true }
 piper-plus-g2p = { workspace = true, editable = true }
+piper-plus = { workspace = true, editable = true }
 
 [tool.uv.workspace]
 members = [
     "src/python",
     "src/python/g2p",
+    "src/python_run",
 ]
 
 [tool.uv]
+# root は workspace 管理用 meta package。`package = false` で root 自体を
+# install/build 対象から外す (Issue #418、 src/python_run と name が衝突しない
+# よう root を `piper-plus-workspace` にした上で非 install 化)。
+package = false
 dev-dependencies = [
     "ruff==0.12.5",
     "pytest>=9.0.3,<10",
