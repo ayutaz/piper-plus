@@ -52,15 +52,15 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.0.2
         with: { submodules: true }
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v4.8.0
         with: { distribution: temurin, java-version: 17 }
 
       - name: Setup Android NDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v3.2.2
         with: { cmdline-tools-version: 11076708 }
 
       - name: Install NDK
@@ -70,7 +70,7 @@ jobs:
 
       - name: Cache ONNX Runtime Android
         id: cache-ort-android
-        uses: actions/cache@v5
+        uses: actions/cache@v5.0.5
         with:
           path: ort-android/
           key: ort-android-${{ env.ONNXRUNTIME_VERSION }}-${{ matrix.abi }}
@@ -114,7 +114,7 @@ jobs:
           cp ort-android/lib/libonnxruntime.so staging/${{ matrix.abi }}/
 
       - name: Upload native libs
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: piper-plus-g2p-native-${{ matrix.abi }}
           path: staging/${{ matrix.abi }}/
@@ -129,15 +129,15 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.0.2
         with: { submodules: true }
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v4.8.0
         with: { distribution: temurin, java-version: 17 }
 
       - name: Download native libs
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@v8.0.1
         with:
           pattern: piper-plus-g2p-native-*
           path: native/
@@ -155,7 +155,7 @@ jobs:
       # prebuilt jniLibs are already staged. That requires the NDK to be
       # installed at the path declared by `android.ndkVersion`.
       - name: Setup Android SDK + NDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v3.2.2
         with: { cmdline-tools-version: 11076708 }
       - name: Install NDK
         run: |
@@ -163,7 +163,7 @@ jobs:
           echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/${{ env.ANDROID_NDK_VERSION }}" >> $GITHUB_ENV
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v4.4.4
         with:
           gradle-version: "8.11.1"
 
@@ -173,7 +173,7 @@ jobs:
 
       - name: Upload unit test reports
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: kotlin-g2p-l1-reports
           path: android/piper-plus-g2p/build/reports/tests/
@@ -187,15 +187,15 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.0.2
         with: { submodules: true }
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v4.8.0
         with: { distribution: temurin, java-version: 17 }
 
       - name: Download native libs
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@v8.0.1
         with:
           pattern: piper-plus-g2p-native-*
           path: native/
@@ -210,7 +210,7 @@ jobs:
           done
 
       - name: Setup Android SDK + NDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v3.2.2
         with: { cmdline-tools-version: 11076708 }
       - name: Install NDK
         run: |
@@ -218,7 +218,7 @@ jobs:
           echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/${{ env.ANDROID_NDK_VERSION }}" >> $GITHUB_ENV
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v4.4.4
         with:
           gradle-version: "8.11.1"
 
@@ -274,7 +274,7 @@ jobs:
           done
 
       - name: Upload AAR
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: piper-plus-g2p-aar
           path: android/piper-plus-g2p/build/outputs/aar/*.aar
@@ -289,11 +289,11 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.0.2
         with: { submodules: true }
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v4.8.0
         with: { distribution: temurin, java-version: 17 }
 
       - name: Enable KVM
@@ -304,7 +304,7 @@ jobs:
           sudo udevadm trigger --name-match=kvm
 
       - name: Download native libs
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@v8.0.1
         with:
           pattern: piper-plus-g2p-native-*
           path: native/
@@ -319,7 +319,7 @@ jobs:
           done
 
       - name: Setup Android SDK + NDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v3.2.2
         with: { cmdline-tools-version: 11076708 }
       - name: Install NDK
         run: |
@@ -327,7 +327,7 @@ jobs:
           echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/${{ env.ANDROID_NDK_VERSION }}" >> $GITHUB_ENV
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v4.4.4
         with:
           gradle-version: "8.11.1"
 
@@ -339,7 +339,7 @@ jobs:
 
       - name: Upload instrumented test reports
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: kotlin-g2p-l3-reports
           path: android/piper-plus-g2p/build/reports/androidTests/managedDevice/
@@ -356,10 +356,10 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.0.2
         with: { submodules: true }
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v4.8.0
         with: { distribution: temurin, java-version: 17 }
 
       - name: Install build deps
@@ -370,7 +370,7 @@ jobs:
 
       - name: Cache ONNX Runtime Linux
         id: cache-ort-linux
-        uses: actions/cache@v5
+        uses: actions/cache@v5.0.5
         with:
           path: ort-linux/
           key: ort-linux-${{ env.ONNXRUNTIME_VERSION }}-x64
@@ -510,7 +510,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.0.2
         with: { submodules: true }
 
       - name: Install build deps
@@ -521,7 +521,7 @@ jobs:
 
       - name: Cache ONNX Runtime Linux
         id: cache-ort-asan
-        uses: actions/cache@v5
+        uses: actions/cache@v5.0.5
         with:
           path: ort-linux/
           key: ort-linux-${{ env.ONNXRUNTIME_VERSION }}-x64
@@ -575,11 +575,11 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.0.2
         with: { submodules: true }
 
       - name: Set up Python 3.12
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v5.6.0
         with: { python-version: "3.12" }
 
       - name: Install uv
@@ -612,7 +612,7 @@ jobs:
 
       - name: Upload regenerated golden (debug)
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: phoneme_test_cases_golden.regen
           path: tests/fixtures/g2p/phoneme_test_cases_golden.regen.json
@@ -628,14 +628,14 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.0.2
         with: { submodules: true }
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v4.8.0
         with: { distribution: temurin, java-version: 17 }
 
       - name: Setup Android SDK + NDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v3.2.2
         with: { cmdline-tools-version: 11076708 }
       - name: Install NDK
         run: |
@@ -643,11 +643,11 @@ jobs:
           echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/${{ env.ANDROID_NDK_VERSION }}" >> $GITHUB_ENV
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v4.4.4
         with: { gradle-version: "8.11.1" }
 
       - name: Download native libs
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@v8.0.1
         with:
           pattern: piper-plus-g2p-native-*
           path: native/
@@ -666,7 +666,7 @@ jobs:
         run: gradle :app:assembleDebug --no-daemon --stacktrace
 
       - name: Upload sample APK
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: piper-plus-g2p-sample-debug
           path: examples/android-g2p-sample/app/build/outputs/apk/debug/*.apk

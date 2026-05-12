@@ -35,10 +35,10 @@ jobs:
         python-version: ["3.11"]
 
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v6.0.2
 
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v6
+      uses: actions/setup-python@v6.2.0
       with:
         python-version: ${{ matrix.python-version }}
 
@@ -141,7 +141,7 @@ jobs:
 
     - name: Upload coverage to Codecov (runtime + g2p)
       if: runner.os == 'Linux'
-      uses: codecov/codecov-action@v5
+      uses: codecov/codecov-action@v5.5.4
       with:
         files: src/python_run/coverage.xml,src/python/g2p/coverage.xml,src/python/coverage.xml
         flags: python
@@ -203,7 +203,7 @@ jobs:
 
     - name: Upload test results
       if: always()
-      uses: actions/upload-artifact@v7
+      uses: actions/upload-artifact@v7.0.1
       with:
         name: test-results-${{ matrix.os }}-${{ matrix.python-version }}
         path: |

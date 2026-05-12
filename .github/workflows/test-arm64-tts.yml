@@ -19,12 +19,12 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v6.0.2
         with:
           submodules: recursive
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v4
+        uses: docker/setup-qemu-action@v4.0.0
         with:
           platforms: arm64
           image: tonistiigi/binfmt:latest
@@ -87,7 +87,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v6.0.2
         with:
           submodules: recursive
 
@@ -145,7 +145,7 @@ jobs:
           ls -la /tmp/piper_arm64.tar.gz
 
       - name: Upload ARM64 artifacts
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: piper-arm64-binary
           path: |

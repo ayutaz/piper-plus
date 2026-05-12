@@ -29,7 +29,7 @@ jobs:
         python: ["3.11", "3.12"]  # Start with 3.11 and 3.12
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.0.2
         with:
           submodules: recursive
           fetch-depth: 0
@@ -57,7 +57,7 @@ jobs:
 
       # Python setup
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v6.2.0
         with:
           python-version: ${{ matrix.python }}
 
@@ -93,7 +93,7 @@ jobs:
           Get-ChildItem wheelhouse/*.whl
 
       # Upload artifacts
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@v7.0.1
         with:
           name: wheels-windows-${{ matrix.python }}
           path: src/piper_phonemize_bundled/wheelhouse/*.whl
@@ -109,15 +109,15 @@ jobs:
         python-version: ['3.11', '3.12']
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.0.2
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v6.2.0
         with:
           python-version: ${{ matrix.python-version }}
 
       - name: Download Windows wheels
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@v8.0.1
         with:
           pattern: wheels-windows-*
           path: dist/
@@ -178,10 +178,10 @@ jobs:
         python-version: ['3.11']  # Use Python 3.11 which has better wheel support
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.0.2
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v6.2.0
         with:
           python-version: ${{ matrix.python-version }}
 
@@ -224,7 +224,7 @@ jobs:
 
     steps:
       - name: Download all wheels
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@v8.0.1
         with:
           pattern: wheels-*
           path: dist/
@@ -237,7 +237,7 @@ jobs:
 
       - name: Generate build provenance attestation
         # SLSA provenance for all wheels before they are uploaded to PyPI.
-        uses: actions/attest-build-provenance@v3
+        uses: actions/attest-build-provenance@v3.2.0
         with:
           subject-path: 'dist/*.whl'
 
@@ -250,7 +250,7 @@ jobs:
 
       - name: Create GitHub Release
         if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v2.6.2
         with:
           files: dist/*.whl
           generate_release_notes: true

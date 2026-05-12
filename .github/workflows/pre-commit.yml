@@ -56,13 +56,13 @@ jobs:
     # したため 35 分に延長 + 専用 workflow のある hook を更に SKIP に追加。
     timeout-minutes: 35
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.0.2
         with:
           # `pre-commit run --all-files` works against the worktree, not
           # diff-vs-base, so a shallow clone is fine.
           fetch-depth: 1
 
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v6.2.0
         with:
           python-version: '3.11'
 
@@ -87,7 +87,7 @@ jobs:
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: Cache pre-commit hook environments
-        uses: actions/cache@v4
+        uses: actions/cache@v4.3.0
         with:
           path: ~/.cache/pre-commit
           key: pre-commit-${{ runner.os }}-py3.11-${{ hashFiles('.pre-commit-config.yaml') }}

@@ -13,16 +13,16 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.0.2
 
       - name: Setup Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v6.2.0
         with:
           python-version: '3.11'
 
       # Download artifacts from both workflows
       - name: Download Japanese TTS results
-        uses: dawidd6/action-download-artifact@v19
+        uses: dawidd6/action-download-artifact@8a338493df3d275e4a7a63bcff3b8fe97e51a927  # v19
         with:
           workflow: test-japanese-tts.yml
           run_id: ${{ github.event.workflow_run.id }}
@@ -31,7 +31,7 @@ jobs:
         continue-on-error: true
 
       - name: Download Multilingual TTS results
-        uses: dawidd6/action-download-artifact@v19
+        uses: dawidd6/action-download-artifact@8a338493df3d275e4a7a63bcff3b8fe97e51a927  # v19
         with:
           workflow: test-multilingual-tts.yml
           run_id: ${{ github.event.workflow_run.id }}
@@ -74,7 +74,7 @@ jobs:
 
       - name: Upload final combined report
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: combined-performance-report-${{ github.run_id }}
           path: |

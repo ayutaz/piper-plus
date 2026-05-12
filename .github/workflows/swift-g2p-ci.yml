@@ -55,7 +55,7 @@ jobs:
     runs-on: macos-15
     timeout-minutes: 25
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.0.2
 
       - name: Toolchain versions
         run: |
@@ -68,7 +68,7 @@ jobs:
           targets: aarch64-apple-darwin,x86_64-apple-darwin
 
       - name: Cache cargo registry + target
-        uses: actions/cache@v4
+        uses: actions/cache@v4.3.0
         with:
           path: |
             ~/.cargo/registry
@@ -79,7 +79,7 @@ jobs:
             swift-g2p-mac-
 
       - name: Cache cbindgen
-        uses: actions/cache@v4
+        uses: actions/cache@v4.3.0
         id: cbindgen-cache
         with:
           path: ~/.cargo/bin/cbindgen
@@ -190,7 +190,7 @@ jobs:
       # xcodebuild dance. Workflow-scoped artifact, retained 1 day —
       # this is intermediate build output, not a release artifact.
       - name: Upload xcframework + staticlib for downstream jobs
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: piper-plus-g2p-mac-xcframework
           path: |
@@ -268,7 +268,7 @@ jobs:
     needs: swift-test
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.0.2
 
       - name: Toolchain versions
         run: |
@@ -276,7 +276,7 @@ jobs:
           xcodebuild -version
 
       - name: Download xcframework artifact from swift-test
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v4.3.0
         with:
           name: piper-plus-g2p-mac-xcframework
           # `actions/upload-artifact@v4` strips the common ancestor of the

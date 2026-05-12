@@ -52,7 +52,7 @@ jobs:
     # 25-min budget leaves room for transient network slowness.
     timeout-minutes: 25
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.0.2
 
       - name: Free disk space
         run: |
@@ -61,7 +61,7 @@ jobs:
             /opt/hostedtoolcache/CodeQL || true
           sudo docker image prune --all --force || true
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5.6.0
         with:
           python-version: "3.11"
 

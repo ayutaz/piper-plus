@@ -86,7 +86,7 @@ jobs:
             echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.0.2
         if: steps.skip_check.outputs.skip != 'true'
         with:
           submodules: true
@@ -176,7 +176,7 @@ jobs:
       - name: Upload artifact
         # PR では smoke build のみで artifact は捨てる (release 用ではない)。
         if: steps.skip_check.outputs.skip != 'true' && github.event_name != 'pull_request'
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: ${{ matrix.artifact }}
           path: ${{ github.workspace }}/${{ matrix.artifact }}.${{ matrix.archive_ext }}
@@ -198,7 +198,7 @@ jobs:
             osx_archs: "arm64;x86_64"
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.0.2
         with:
           submodules: true
 
@@ -419,7 +419,7 @@ jobs:
           fi
 
       - name: Upload slice artifact (for xcframework assembly)
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: piper-plus-slice-${{ matrix.slice }}
           path: slice-out
@@ -446,7 +446,7 @@ jobs:
 
       - name: Upload M1-compat artifact (device slice only)
         if: matrix.slice == 'ios-arm64'
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: libpiper_plus-ios-arm64
           path: libpiper_plus-ios-arm64.tar.gz
@@ -459,7 +459,7 @@ jobs:
     timeout-minutes: 15
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.0.2
 
       - name: Show toolchain
         run: |
@@ -467,13 +467,13 @@ jobs:
           sw_vers
 
       - name: Download device slice
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@v8.0.1
         with:
           name: piper-plus-slice-ios-arm64
           path: slices/ios-arm64
 
       - name: Download simulator slice
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@v8.0.1
         with:
           name: piper-plus-slice-ios-arm64_x86_64-simulator
           path: slices/ios-arm64_x86_64-simulator
@@ -542,7 +542,7 @@ jobs:
           shasum -a 256 libpiper_plus-ios.xcframework.zip
 
       - name: Upload xcframework artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: libpiper_plus-ios-xcframework
           path: libpiper_plus-ios.xcframework.zip
@@ -577,7 +577,7 @@ jobs:
             rust_targets: "aarch64-apple-darwin,x86_64-apple-darwin"
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.0.2
 
       - name: Validate version tag
         if: startsWith(github.ref, 'refs/tags/')
@@ -596,7 +596,7 @@ jobs:
           targets: aarch64-apple-ios,aarch64-apple-ios-sim,x86_64-apple-ios,aarch64-apple-darwin,x86_64-apple-darwin
 
       - name: Cache cargo registry
-        uses: actions/cache@v4
+        uses: actions/cache@v4.3.0
         with:
           path: |
             ~/.cargo/registry
@@ -607,7 +607,7 @@ jobs:
             g2p-apple-${{ matrix.slice }}-
 
       - name: Cache cbindgen
-        uses: actions/cache@v4
+        uses: actions/cache@v4.3.0
         id: cbindgen-cache
         with:
           path: ~/.cargo/bin/cbindgen
@@ -712,7 +712,7 @@ jobs:
           ls -la g2p-slice-out/lib g2p-slice-out/include
 
       - name: Upload G2P slice artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: piper-plus-g2p-slice-${{ matrix.slice }}
           path: src/rust/g2p-slice-out/
@@ -724,7 +724,7 @@ jobs:
     timeout-minutes: 10
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.0.2
 
       - name: Show toolchain
         run: |
@@ -732,19 +732,19 @@ jobs:
           sw_vers
 
       - name: Download iOS device slice
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@v8.0.1
         with:
           name: piper-plus-g2p-slice-ios-arm64
           path: g2p-slices/ios-arm64
 
       - name: Download iOS simulator slice
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@v8.0.1
         with:
           name: piper-plus-g2p-slice-ios-arm64_x86_64-simulator
           path: g2p-slices/ios-arm64_x86_64-simulator
 
       - name: Download macOS slice
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@v8.0.1
         with:
           name: piper-plus-g2p-slice-macos-arm64_x86_64
           path: g2p-slices/macos-arm64_x86_64
@@ -812,7 +812,7 @@ jobs:
           shasum -a 256 libpiper_plus_g2p-apple.xcframework.zip
 
       - name: Upload xcframework artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: libpiper_plus_g2p-apple-xcframework
           path: libpiper_plus_g2p-apple.xcframework.zip
@@ -834,7 +834,7 @@ jobs:
         abi: [arm64-v8a, armeabi-v7a, x86_64]
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.0.2
         with:
           submodules: true
 
@@ -852,7 +852,7 @@ jobs:
           echo "Version: $TAG"
 
       - name: Setup Android NDK
-        uses: nttld/setup-ndk@v1
+        uses: nttld/setup-ndk@v1.6.0
         id: setup-ndk
         with:
           ndk-version: r26c
@@ -966,7 +966,7 @@ jobs:
           tar -czf "${{ github.workspace }}/libpiper_plus-android-${{ matrix.abi }}.tar.gz" .
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: libpiper_plus-android-${{ matrix.abi }}
           path: libpiper_plus-android-${{ matrix.abi }}.tar.gz
@@ -979,14 +979,14 @@ jobs:
     # GitHub Release creation requires `contents: write`. Scoped to this job
     # only so build / assemble jobs run with workflow-default `contents: read`.
     # `id-token: write` + `attestations: write` enable SLSA provenance via
-    # actions/attest-build-provenance@v3 (issued on tag push only).
+    # actions/attest-build-provenance@v3.2.0 (issued on tag push only).
     permissions:
       contents: write
       id-token: write
       attestations: write
     steps:
       - name: Checkout tag commit (for Package.swift checksum verification)
-        uses: actions/checkout@v6
+        uses: actions/checkout@v6.0.2
         with:
           # Sparse checkout — we only need Package.swift to verify the SPM
           # checksum was updated before tagging.
@@ -1031,7 +1031,7 @@ jobs:
           done
 
       - name: Download artifacts
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@v8.0.1
         with:
           path: artifacts/
 
@@ -1125,14 +1125,14 @@ jobs:
         # AAR / iOS .tar.gz). Tag-push only — workflow_dispatch and PR don't
         # produce attestations because this job is gated on
         # startsWith(github.ref, 'refs/tags/').
-        uses: actions/attest-build-provenance@v3
+        uses: actions/attest-build-provenance@v3.2.0
         with:
           subject-path: |
             artifacts/**/*.tar.gz
             artifacts/**/*.zip
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v2.6.2
         with:
           files: |
             artifacts/**/*.tar.gz

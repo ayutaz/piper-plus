@@ -54,8 +54,8 @@ jobs:
       contents: read
       pull-requests: write
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/dependency-review-action@v4
+      - uses: actions/checkout@v6.0.2
+      - uses: actions/dependency-review-action@v4.9.0
         with:
           fail-on-severity: high
           comment-summary-in-pr: on-failure
@@ -82,8 +82,8 @@ jobs:
     name: pip-audit (Python)
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@v6.0.2
+      - uses: actions/setup-python@v6.2.0
         with:
           python-version: "3.11"
       - name: Install pip-audit
@@ -107,7 +107,7 @@ jobs:
     name: cargo-audit (Rust)
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.0.2
       - uses: dtolnay/rust-toolchain@stable
       - name: Install cargo-audit
         run: cargo install --locked cargo-audit
@@ -129,8 +129,8 @@ jobs:
       matrix:
         package: [src/wasm/openjtalk-web, src/wasm/g2p]
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-node@v6
+      - uses: actions/checkout@v6.0.2
+      - uses: actions/setup-node@v6.4.0
         with:
           node-version: "24"
           # cache は package-lock.json が repo にコミットされている
@@ -163,8 +163,8 @@ jobs:
     name: govulncheck (Go)
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v6.0.2
+      - uses: actions/setup-go@v5.6.0
         with:
           go-version: "1.26"
           cache-dependency-path: src/go/go.sum
@@ -213,8 +213,8 @@ jobs:
     name: nuget-audit (.NET)
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-dotnet@v5
+      - uses: actions/checkout@v6.0.2
+      - uses: actions/setup-dotnet@v5.2.0
         with:
           dotnet-version: 10.0.x
       - name: Restore packages
@@ -257,7 +257,7 @@ jobs:
       matrix:
         image: [python-inference, wyoming, webui]
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.0.2
       - name: Trivy config scan (Dockerfile)
         # Dockerfile の misconfiguration (USER root のまま終わる、HEALTHCHECK
         # 未設定など) を build なしで検出。CRITICAL/HIGH のみ fail。
@@ -269,7 +269,7 @@ jobs:
           severity: "CRITICAL,HIGH"
           ignore-unfixed: true
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v3.12.0
       - name: Build image (no push)
         # image scan のため、push せず local に build。失敗しても次の step
         # で skip 判定するために `continue-on-error: true`。

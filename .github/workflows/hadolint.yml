@@ -39,7 +39,7 @@ jobs:
           - docker/webui/Dockerfile
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.0.2
 
       - name: Install hadolint
         # hadolint/hadolint-action@v3 は存在しないため (最新は v3.1.0 stable

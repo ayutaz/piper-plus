@@ -8,12 +8,14 @@ fail simultaneously. Memory entry ``feedback_pin_actions_sha.md`` records
 the rule: pin actions by full SemVer (``@v1.2.3``) or 40-hex SHA, never by
 sliding ``@v<major>`` alone.
 
-The current repo has ~39 sliding-tag references in 79 workflows. A strict
-gate that fails on all of them would either block every PR or force a
-single mega-migration. Instead, this script uses the **codespell-baseline
-pattern**: snapshot the current sliding-tag set in
-``scripts/action_pins_baseline.txt``, fail only when a *new* sliding tag
-appears that isn't in the baseline.
+The original migration (Phase 3) moved all 39 grandfathered sliding-tag
+references to SemVer pins (37 entries) or SHA pins (2 entries —
+``dawidd6/action-download-artifact`` and ``mymindstorm/setup-emsdk`` had
+no SemVer releases). ``scripts/action_pins_baseline.txt`` is now empty
+(header only). New entries should only be added with a justification
+comment when an action *exclusively* publishes ``@v<major>``-style tags
+and SHA pinning is impractical — the codespell-baseline pattern is
+preserved so a future regression doesn't require a mega-migration again.
 
 Allowed pin forms (per `uses:` line):
   - 40-hex SHA:               ``actions/checkout@abcd1234...abcd1234``

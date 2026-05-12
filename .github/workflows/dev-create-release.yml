@@ -35,7 +35,7 @@ jobs:
       release_name: ${{ steps.get_release_name.outputs.name }}
       tag_name: ${{ steps.get_release_name.outputs.tag_name }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.0.2
         with:
           fetch-depth: 0
 
@@ -241,17 +241,17 @@ jobs:
       id-token: write       # OIDC for PyPI Trusted Publishing
       attestations: write   # SLSA build provenance attestation
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.0.2
 
       - name: Download all wheels
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@v8.0.1
         with:
           pattern: wheels-*
           path: dist/
           merge-multiple: true
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v6.2.0
         with:
           python-version: '3.11'
 
@@ -272,7 +272,7 @@ jobs:
         # attestation lands in the repo's GitHub attestation store and
         # can later be verified with `gh attestation verify`.
         if: hashFiles('dist/*.whl') != ''
-        uses: actions/attest-build-provenance@v3
+        uses: actions/attest-build-provenance@v3.2.0
         with:
           subject-path: 'dist/*.whl'
 
@@ -304,10 +304,10 @@ jobs:
       id-token: write
       attestations: write
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.0.2
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v6.2.0
         with:
           python-version: '3.11'
 
@@ -325,7 +325,7 @@ jobs:
         run: python -m build
 
       - name: Generate SLSA build provenance attestation (stub)
-        uses: actions/attest-build-provenance@v3
+        uses: actions/attest-build-provenance@v3.2.0
         with:
           subject-path: 'src/python_stub/dist/*'
 
@@ -370,10 +370,10 @@ jobs:
             archive_ext: tar.gz
             cross: false
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.0.2
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v5
+        uses: actions/setup-dotnet@v5.2.0
         with:
           dotnet-version: 10.0.x
 
@@ -425,10 +425,10 @@ jobs:
       id-token: write       # required by attest-build-provenance
       attestations: write
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.0.2
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v5
+        uses: actions/setup-dotnet@v5.2.0
         with:
           dotnet-version: 10.0.x
 
@@ -474,7 +474,7 @@ jobs:
         # `gh attestation verify` against the published package downloads
         # the .nupkg and matches it against this attestation.
         if: hashFiles('nupkgs/*.nupkg') != ''
-        uses: actions/attest-build-provenance@v3
+        uses: actions/attest-build-provenance@v3.2.0
         with:
           subject-path: 'nupkgs/*.nupkg'
 
@@ -503,7 +503,7 @@ jobs:
       id-token: write       # required by attest-build-provenance
       attestations: write
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.0.2
 
       - name: Validate crate version
         working-directory: src/rust
@@ -534,7 +534,7 @@ jobs:
 
       - name: Generate SLSA build provenance attestation (crates)
         if: hashFiles('src/rust/target/package/*.crate') != ''
-        uses: actions/attest-build-provenance@v3
+        uses: actions/attest-build-provenance@v3.2.0
         with:
           subject-path: 'src/rust/target/package/*.crate'
 
@@ -637,7 +637,7 @@ jobs:
             archive_ext: zip
             cross: false
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.0.2
 
       - uses: dtolnay/rust-toolchain@stable
         with:

@@ -66,11 +66,11 @@ jobs:
           - pt-dialect
           - speaker-encoder
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.0.2
 
       # tomllib is in the stdlib from Python 3.11; pin to 3.13 to match
       # the other contract gates (e.g. zh-en-loanword-sync.yml).
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v6.2.0
         with:
           python-version: '3.13'
 
