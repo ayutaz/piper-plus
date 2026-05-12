@@ -2,7 +2,11 @@ name: coverage-aggregation
 
 on:
   workflow_run:
-    workflows: [python-tests, rust-tests, go-ci, csharp-ci, cpp-tests]
+    # C++ coverage now uploads from `CI / cpp-tests` (ci.yml) since
+    # the duplicate `cpp-tests` job in cpp-tests.yml was removed.
+    # `cpp-tests` workflow is retained (sanitizers / c-api-examples /
+    # ios-toolchain-smoke) but it no longer produces coverage artefacts.
+    workflows: [python-tests, rust-tests, go-ci, csharp-ci, cpp-tests, CI]
     types:
       - completed
   workflow_dispatch:

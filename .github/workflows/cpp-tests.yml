@@ -1,19 +1,30 @@
 name: C++ Tests
 
+# NOTE: The standard cpp-tests build/test job was removed because it
+# duplicated `CI / cpp-tests` (ci.yml) which runs the same reusable
+# workflow on a strict superset of the matrix (3 OS × Release+Debug vs
+# this file's previous 2 OS × Release only). This workflow now retains
+# only the unique C++ checks that ci.yml does not cover:
+#
+#   * cpp-tests-asan / cpp-tests-ubsan (workflow_dispatch only)
+#   * c-api-examples-compile  (public header breaking-change gate)
+#   * ios-toolchain-smoke     (cmake/PrivacyInfo + iOS toolchain syntax)
+#
+# Path filters are tightened to match each surviving job's scope so this
+# workflow doesn't fire on every C++ change that ci.yml already handles.
+
 on:
   pull_request:
     branches: [ dev ]
     paths:
-      - 'src/cpp/**'
-      - 'CMakeLists.txt'
-      - 'cmake/**'
+      # c-api-examples-compile
       - 'examples/c-api/**'
-      - 'src/python/g2p/piper_plus_g2p/data/zh_en_loanword.json'
-      - 'tests/fixtures/g2p/zh_en_loanword_matrix.json'
-      - 'tests/fixtures/phoneme_timing/**'
-      - 'tests/fixtures/short_text/**'
-      - 'tests/fixtures/ort_session/**'
-      - 'test/fixtures/speaker_encoder_golden.json'
+      - 'src/cpp/piper_plus.h'
+      # ios-toolchain-smoke
+      - 'cmake/PrivacyInfo.xcprivacy'
+      - 'cmake/ios.toolchain.cmake'
+      - 'src/cpp/openjtalk_ios_stub.c'
+      # the workflow file itself
       - '.github/workflows/cpp-tests.yml'
       - '.github/workflows/_build-test-cpp.yml'
   workflow_dispatch:
@@ -26,16 +37,10 @@ permissions:
   contents: read
 
 jobs:
-  cpp-tests:
-    uses: ./.github/workflows/_build-test-cpp.yml
-    with:
-      run-integration-tests: true
-      os-matrix: '["ubuntu-latest", "macos-latest"]'
-      build-type-matrix: '["Release"]'
-
-  # Sanitizer runs gated behind the main suite to avoid burning CI on red PRs.
-  # Debug + asan/ubsan on Ubuntu only (clang on macOS asan path differs and
-  # we get the most signal from Linux for the C API surface).
+  # Sanitizer runs (Debug + asan/ubsan on Ubuntu only). Previously gated
+  # behind a local `cpp-tests` job that has been removed (now covered by
+  # `CI / cpp-tests`); `needs:` dropped because both are dispatch-only,
+  # so no PR/push flow is affected.
   #
   # NOTE: ASan/UBSan は既存テスト (test_piper / test_streaming /
   # test_dictionary_manager / test_c_api 等) で memory leak / use-after-free /
@@ -43,7 +48,6 @@ jobs:
   # workflow_dispatch 専用に限定して PR / push を block しないようにする。
   # Wave 後段で実バグ修正後に通常 PR フローに戻す。
   cpp-tests-asan:
-    needs: [cpp-tests]
     if: ${{ github.event_name == 'workflow_dispatch' }}
     uses: ./.github/workflows/_build-test-cpp.yml
     with:
@@ -54,7 +58,6 @@ jobs:
       timeout-minutes: 30
 
   cpp-tests-ubsan:
-    needs: [cpp-tests]
     if: ${{ github.event_name == 'workflow_dispatch' }}
     uses: ./.github/workflows/_build-test-cpp.yml
     with:
