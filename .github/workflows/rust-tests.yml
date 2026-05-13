@@ -185,21 +185,28 @@ jobs:
       with:
         tool: cargo-llvm-cov
     - name: Generate coverage (workspace, lcov)
-      # piper-plus-cli の coverage は build job のみで取れるため、cli を除外。
-      # piper-wasm は wasm32 target で別 job (wasm-test) でカバレッジ取得不可。
-      # それ以外の workspace member (piper-core / piper-plus-g2p / piper-python)
-      # の coverage を lcov 形式で出力。
+      # piper-wasm は wasm32 target で別 job (wasm-test) からのみテスト
+      # 可能なため llvm-cov の native target から除外。
+      # piper-plus-cli は build job 側でビルド検証されており、
+      # llvm-cov に含めると thin な CLI wrapper の coverage が他クレートの
+      # 数値を希釈するため除外する。
+      # 計測対象: piper-core / piper-plus-g2p / piper-python。
       run: |
         cargo llvm-cov clean --workspace
-        cargo llvm-cov --workspace --exclude piper-wasm --all-features \
+        cargo llvm-cov --workspace \
+          --exclude piper-wasm --exclude piper-plus-cli \
+          --all-features \
           --lcov --output-path lcov.info
     - name: Upload coverage to Codecov
+      # continue-on-error は GitHub Actions エンジンレベル、
+      # fail_ci_if_error は codecov-action 内部の挙動制御で、層が違う
+      # ため両指定は二重防御として有効。明確性のため continue-on-error
+      # に統一する (review #456 重複指摘への対応)。
       uses: codecov/codecov-action@v5.5.4
       with:
         files: src/rust/lcov.info
         flags: rust
         name: rust-coverage
-        fail_ci_if_error: false
       continue-on-error: true
 
   python-bindings:
