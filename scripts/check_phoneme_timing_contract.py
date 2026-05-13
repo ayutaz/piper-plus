@@ -72,13 +72,19 @@ HOP_TOKENS = (
 )
 SR_TOKENS = ("sample_rate", "sampleRate", "SampleRate")
 
-# Anchors that pin the check to the formula site (not unrelated comments).
-# Either a multiplier of 1000 OR a frame_time variable name is acceptable.
-FORMULA_ANCHOR_TOKENS = (
-    "1000",  # ms conversion (e.g. `* 1000`, `1000.0f`, `1000.0`)
+# Two separate AND-gated checks:
+#   (a) MS_MULTIPLIER_TOKEN — the literal `1000` (the seconds→ms conversion).
+#       This catches the "forgot the * 1000" drift that the contract is
+#       primarily designed to prevent.
+#   (b) FORMULA_SITE_TOKENS — anchor on the actual formula call-site so the
+#       `1000` match isn't satisfied by an unrelated constant elsewhere
+#       (e.g. an LRU cache size).
+MS_MULTIPLIER_TOKEN = "1000"
+FORMULA_SITE_TOKENS = (
     "frame_time",
     "frameTime",
     "frameLength",
+    "(hop",  # `(hop_length / sample_rate)` parens form
 )
 
 
@@ -105,10 +111,15 @@ def _runtime_ok(runtime: str, file_path: Path) -> list[str]:
             f"  FAIL [{runtime}] {file_path.relative_to(REPO_ROOT)}: "
             f"no sample_rate/sampleRate spelling found"
         )
-    if not any(tok in text for tok in FORMULA_ANCHOR_TOKENS):
+    if MS_MULTIPLIER_TOKEN not in text:
         failures.append(
             f"  FAIL [{runtime}] {file_path.relative_to(REPO_ROOT)}: "
-            f"no 1000 multiplier or frame_time anchor — drift suspected"
+            f"no `1000` ms multiplier — `(hop/sr) * 1000` formula likely broken"
+        )
+    if not any(tok in text for tok in FORMULA_SITE_TOKENS):
+        failures.append(
+            f"  FAIL [{runtime}] {file_path.relative_to(REPO_ROOT)}: "
+            f"no frame_time/(hop formula-site anchor — drift suspected"
         )
     return failures
 

@@ -180,7 +180,7 @@ def main(argv: list[str] | None = None) -> int:
         "--allow",
         action="append",
         default=[],
-        help="Flag to ignore in both directions (repeatable). E.g. --allow --help.",
+        help="Flag to ignore in both directions (repeatable). Must use equals form: --allow=--help (without `=`, argparse mis-parses the leading `--`).",
     )
     parser.add_argument(
         "--allow-file",

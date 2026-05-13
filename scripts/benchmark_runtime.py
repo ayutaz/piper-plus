@@ -74,33 +74,41 @@ RUNTIME_PROFILES: dict[str, dict] = {
     "python": {
         "stdin_text": True,
         "output_flag": "--output_file",
+        "config_flag": "--config",
         "extra_args": ["--quiet"],
     },
     "rust": {
         "stdin_text": True,
         "output_flag": "--output-file",
+        "config_flag": "--config",
         "extra_args": ["--quiet"],
     },
     "go": {
         "stdin_text": True,
         "output_flag": "--output-file",
+        "config_flag": "--config",
         "extra_args": ["--quiet"],
     },
     "csharp": {
         "stdin_text": True,
         "output_flag": "--output_file",
+        "config_flag": "--config",
         "extra_args": ["--quiet"],
     },
     "cpp": {
         "stdin_text": True,
         "output_flag": "--output_file",
+        "config_flag": "--config",
         "extra_args": ["--quiet"],
     },
     "wasm": {
         # Node entrypoint doesn't read stdin by default — pass text inline.
+        # No `--config` flag on the WASM bin: the config is bundled with the
+        # model in JS-land, so the harness drops it for this runtime.
         "stdin_text": False,
         "text_arg": "--text",
         "output_flag": "--output-file",
+        "config_flag": None,
         "extra_args": [],
     },
 }
@@ -146,7 +154,13 @@ def _wav_duration_seconds(wav_path: Path) -> float:
                     data_size = chunk_size
                     break
                 else:
-                    f.seek(chunk_size, 1)
+                    # RIFF chunks are word-aligned: an odd chunk_size requires
+                    # a 1-byte pad before the next chunk header. Without this,
+                    # an odd-sized auxiliary chunk (e.g. LIST/INFO inserted by
+                    # some encoders) desynchronizes the cursor and we'd read
+                    # garbage where `fmt ` / `data` should be → duration=0.0
+                    # → flaky benchmark failures.
+                    f.seek(chunk_size + (chunk_size & 1), 1)
 
             if not sample_rate or not num_channels or not bits_per_sample:
                 return 0.0
@@ -175,11 +189,14 @@ def _build_cmd(
     argv = list(cli_cmd)
     argv.extend(["--model", model])
     if config:
-        # Most runtimes auto-discover ``<model>.json`` next to ``<model>``;
-        # only pass --config when explicitly provided so the harness doesn't
-        # accidentally trip flag-name mismatches on runtimes that don't
-        # accept --config (e.g. some WASM builds).
-        argv.extend(["--config", config])
+        # Per-runtime config flag spelling lives in RUNTIME_PROFILES. A
+        # runtime that doesn't accept any --config flag (e.g. the WASM Node
+        # entrypoint, which bundles config in JS-land) sets config_flag=None
+        # so we silently skip injection rather than tripping a flag-mismatch
+        # error.
+        config_flag = profile.get("config_flag", "--config")
+        if config_flag:
+            argv.extend([config_flag, config])
     argv.extend([profile["output_flag"], str(output_path)])
     argv.extend(profile.get("extra_args", []))
 
