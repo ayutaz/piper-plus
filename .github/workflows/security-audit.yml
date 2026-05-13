@@ -95,9 +95,15 @@ jobs:
           pip-audit --requirement <(uv pip compile pyproject.toml 2>/dev/null) --strict --vulnerability-service osv || \
           pip-audit --strict --vulnerability-service osv
       - name: Audit src/python_run
+        # 引数なし `pip-audit --strict` は working-directory に依存せず runner の
+        # グローバル Python 環境を audit してしまい、プリインストール pip 自体の
+        # CVE で fail する (PR #447 後の push run で CVE-2026-3219 / CVE-2026-6357
+        # により発覚)。`--requirement requirements.txt` で配布対象の production
+        # 依存だけを対象にする。dev / gpu / webui は optional extras で
+        # 配布 wheel には含まれないため audit 対象外。
         continue-on-error: ${{ github.event_name == 'pull_request' }}
         working-directory: src/python_run
-        run: pip-audit --strict --vulnerability-service osv
+        run: pip-audit --strict --vulnerability-service osv --requirement requirements.txt
 
   # Rust: cargo-audit
   # fail-on-severity 統一 (High 以上): cargo-audit はデフォルトで vulnerability
