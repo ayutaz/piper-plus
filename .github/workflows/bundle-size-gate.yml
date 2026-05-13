@@ -99,12 +99,20 @@ jobs:
         run: ./gradlew :piper-plus-g2p:assembleRelease
 
       # -- gate ----------------------------------------------------------
+      # Currently warn-only: bundle-size baselines are placeholders until
+      # the first dev push seeds them, and we want the report in the PR
+      # comment even if every entry is SKIP. Pass `--warn-only` explicitly
+      # to both invocations so the gate's policy is encoded at the call
+      # site (not relying on a `|| echo $?` swallow). Flip to strict by
+      # dropping `--warn-only` from the first invocation once baselines
+      # have ~2-3 weeks of variance data.
       - name: Compare against baseline
         id: gate
         run: |
           uv run python scripts/check_bundle_size.py \
-              --format markdown --output bundle-size-report.md || echo "exit_code=$?" >> "$GITHUB_OUTPUT"
-          uv run python scripts/check_bundle_size.py --format json --warn-only > bundle-size-report.json
+              --format markdown --warn-only --output bundle-size-report.md
+          uv run python scripts/check_bundle_size.py \
+              --format json --warn-only > bundle-size-report.json
           cat bundle-size-report.md
 
       - name: Upload size report

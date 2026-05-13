@@ -270,11 +270,11 @@ jobs:
           lines.append("")
           lines.append(
               "| Runtime | Text | RTF | P50 (ms) | P95 (ms) | "
-              "Baseline RTF | Delta |"
+              "Baseline RTF | RTF Δ | Baseline P95 | P95 Δ |"
           )
           lines.append(
               "|---------|------|-----|----------|----------|"
-              "--------------|-------|"
+              "--------------|-------|--------------|-------|"
           )
 
           any_regression = False
@@ -287,40 +287,54 @@ jobs:
                       .get(tk, {})
                   )
                   base_rtf = base.get("rtf")
+                  base_p95 = base.get("latency_p95_ms")
                   if obs is None:
                       lines.append(
                           f"| {rt} | {tk} | (missing) | - | - | "
-                          f"{base_rtf if base_rtf is not None else 'n/a'} | "
-                          f"- |"
+                          f"{base_rtf if base_rtf is not None else 'n/a'} | - | "
+                          f"{base_p95 if base_p95 is not None else 'n/a'} | - |"
                       )
                       continue
                   rtf = obs.get("rtf")
                   p50 = obs.get("latency_p50_ms")
                   p95 = obs.get("latency_p95_ms")
-                  delta = "n/a"
-                  flag = ""
+                  rtf_delta = "n/a"
+                  rtf_flag = ""
                   if base_rtf is not None and rtf is not None and base_rtf > 0:
                       ratio = (rtf - base_rtf) / base_rtf
-                      delta = f"{ratio * 100:+.1f}%"
+                      rtf_delta = f"{ratio * 100:+.1f}%"
                       if ratio > rtf_pct:
-                          flag = " :warning:"
+                          rtf_flag = " :warning:"
+                          any_regression = True
+                  p95_delta = "n/a"
+                  p95_flag = ""
+                  if base_p95 is not None and p95 is not None and base_p95 > 0:
+                      ratio_p95 = (p95 - base_p95) / base_p95
+                      p95_delta = f"{ratio_p95 * 100:+.1f}%"
+                      if ratio_p95 > p95_pct:
+                          p95_flag = " :warning:"
                           any_regression = True
                   lines.append(
                       f"| {rt} | {tk} | {rtf} | {p50} | {p95} | "
                       f"{base_rtf if base_rtf is not None else 'null'} | "
-                      f"{delta}{flag} |"
+                      f"{rtf_delta}{rtf_flag} | "
+                      f"{base_p95 if base_p95 is not None else 'null'} | "
+                      f"{p95_delta}{p95_flag} |"
                   )
 
           lines.append("")
           if any_regression:
               lines.append(
                   "> :warning: One or more cells regressed beyond the "
-                  "RTF threshold. **Warn-only** while the baseline is "
-                  "being calibrated; this will become a hard gate once "
+                  "RTF or P95 threshold. **Warn-only** while the baseline "
+                  "is being calibrated; this will become a hard gate once "
                   "we have ~2-3 weeks of variance data."
               )
           else:
-              lines.append("> All cells within threshold (or baseline=null).")
+              lines.append(
+                  "> All cells within RTF and P95 threshold "
+                  "(or baseline=null)."
+              )
 
           out = "multi-runtime-rtf-report.md"
           pathlib.Path(out).write_text("\n".join(lines) + "\n")

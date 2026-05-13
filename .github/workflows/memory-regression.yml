@@ -126,7 +126,7 @@ jobs:
           rows.append("")
           rows.append(f"Summary: {warn} warn / {skip} skip / {6 - warn - skip} ok.")
           rows.append("")
-          rows.append("_SKIP means the baseline entry is a placeholder (size_bytes: null). "
+          rows.append("_SKIP means the baseline entry is a placeholder (peak_memory_mb: null). "
                       "The first dev push after this workflow lands is expected to seed the baseline._")
           pathlib.Path("memory-report.md").write_text("\n".join(rows) + "\n")
           print("\n".join(rows))

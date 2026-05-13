@@ -29,8 +29,12 @@ paths_to_mutate = [
 # ローカル全実行は時間がかかるため manual。
 runner = "uv run pytest src/python/g2p/tests src/python_run/tests -x -q --no-cov"
 
-# テスト時間制限 (秒)。1 mutant あたりこれを超えたら timeout 扱い。
-# G2P ユニットテストは通常 1 秒未満、5 倍の安全マージン。
+# pytest が test を探索するディレクトリ (space-separated)。`runner` の
+# 末尾 positional args と冗長だが、mutmut 1.x は `tests_dir` を独自に参照
+# するシナリオがあるため明示。
+# NOTE: mutmut 自体は per-mutant timeout 設定を toml で持たない (`--timeout`
+# 相当の CLI オプションも存在しない)。タイムアウト相当の挙動は pytest 側で
+# `-x` (first failure で early-exit) を runner に含めることで実現している。
 tests_dir = "src/python/g2p/tests src/python_run/tests"
 
 # 除外: 純粋データ / 型定義 / NotImplementedError のみの ABC など。
