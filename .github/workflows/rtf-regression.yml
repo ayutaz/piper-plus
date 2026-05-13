@@ -1,0 +1,132 @@
+name: RTF Regression
+
+# Continuous performance regression gate.
+#
+# Runs ``scripts/benchmark.py`` against the bundled
+# ``test/models/multilingual-test-medium.onnx`` checkpoint on Ubuntu and
+# feeds the result to ``benchmark-action/github-action-benchmark``. The
+# action stores a rolling baseline on ``gh-pages`` (push to dev only) and
+# alerts on regressions when a PR exceeds the threshold.
+#
+# Why this exists:
+#   - ``tools/benchmark/issue-383/`` captured the MB-iSTFT baseline as a
+#     one-shot artefact, but RTF / latency drift after subsequent PRs is
+#     currently only caught by manual re-runs. The Top 10 review surfaced
+#     this as the largest gap in §9.5 "performance regression detection".
+#   - benchmark-action publishes a chart at
+#     ``https://ayutaz.github.io/piper-plus/dev/bench/`` after the first
+#     push to dev, giving humans something to scan during PR review.
+#
+# Initial policy (warn-only): ``fail-on-alert: false`` so the gate is
+# advisory while we calibrate the noise floor. Tighten to fail later once
+# we observe a few weeks of variance and pick a defensible threshold.
+
+on:
+  pull_request:
+    branches: [dev]
+    paths:
+      - 'src/python/piper_train/**'
+      - 'src/python_run/piper/**'
+      - 'scripts/benchmark.py'
+      - 'scripts/benchmark_to_action_bench.py'
+      - 'test/models/multilingual-test-medium.onnx*'
+      - '.github/workflows/rtf-regression.yml'
+  push:
+    branches: [dev]
+    paths:
+      - 'src/python/piper_train/**'
+      - 'src/python_run/piper/**'
+      - 'scripts/benchmark.py'
+      - 'scripts/benchmark_to_action_bench.py'
+      # Review #458: ベンチマーク対象モデルが更新された場合も baseline
+      # 再計測対象。pull_request 側にも同 glob があるため対称性を担保。
+      - 'test/models/multilingual-test-medium.onnx*'
+      - '.github/workflows/rtf-regression.yml'
+  workflow_dispatch:
+
+concurrency:
+  # Don't cancel push-to-dev runs (they own the baseline). Cancel PRs.
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  benchmark:
+    name: RTF benchmark (Ubuntu)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    # Fork PR では GITHUB_TOKEN に contents:write / pull-requests:write が
+    # 付与されないため job 自体をスキップ。同 repo の PR / push に
+    # 限って実行する (review #458 fork-PR 指摘への対応)。
+    if: github.event.pull_request.head.repo.full_name == github.repository || github.event_name != 'pull_request'
+    permissions:
+      contents: write  # benchmark-action pushes to gh-pages (push only)
+      pull-requests: write  # benchmark-action comments on PR alerts
+    steps:
+      - uses: actions/checkout@v6.0.2
+
+      # v6.10.0 は存在しないため CI が "Unable to resolve action" で失敗。
+      # v6 系の最新 patch (v6.8.0) に修正。
+      - uses: astral-sh/setup-uv@v6.8.0
+        with:
+          python-version: '3.12'
+
+      - name: Install inference dependencies
+        # ``inference`` は pyproject.toml の [project.optional-dependencies]
+        # (PEP 621 extras) に定義されている。``--group`` (PEP 735) ではなく
+        # ``--extra`` を使う必要がある。
+        run: uv sync --extra inference
+
+      - name: Run benchmark (English, multilingual-test-medium)
+        run: |
+          uv run python scripts/benchmark.py \
+              --model test/models/multilingual-test-medium.onnx \
+              --config test/models/multilingual-test-medium.onnx.json \
+              --language en \
+              --n-warmup 5 --n-runs 30 \
+              --format json \
+              --output benchmark_results.json
+
+      - name: Convert to action-benchmark schema
+        run: |
+          uv run python scripts/benchmark_to_action_bench.py \
+              benchmark_results.json \
+              --output benchmark_action.json
+          cat benchmark_action.json
+
+      # benchmark-action は内部で gh-pages ブランチを fetch するため、
+      # 初回 push to dev 実行で gh-pages が自動作成されるまでは PR で
+      # 実行すると 'couldn't find remote ref gh-pages' で fail する。
+      # 当面 PR では benchmark JSON を artifact にだけ残し、push to dev
+      # でのみ benchmark-action を起動して baseline 保存/更新を行う。
+      # (gh-pages が安定運用に乗ったら PR 比較も再導入する)。
+      - name: Upload benchmark JSON (PR / dev push 共通)
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: rtf-benchmark-${{ github.event_name }}-${{ github.run_attempt }}
+          path: |
+            benchmark_results.json
+            benchmark_action.json
+          retention-days: 30
+
+      - name: Store + compare against baseline
+        # PR ではスキップ。push to dev でのみ実行し、初回で gh-pages を
+        # 自動初期化する (auto-push:true なら branch 不在時に benchmark-action
+        # が新規作成する)。
+        if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
+        uses: benchmark-action/github-action-benchmark@v1.20.4
+        with:
+          name: Python inference benchmark
+          tool: customSmallerIsBetter
+          output-file-path: benchmark_action.json
+          github-token: ${{ github.token }}
+          auto-push: true
+          # 15% regression alert. Warn-only while we calibrate (see
+          # workflow header). Flip ``fail-on-alert: true`` once the
+          # noise floor on hosted runners is understood.
+          alert-threshold: '115%'
+          comment-on-alert: true
+          fail-on-alert: false
+          alert-comment-cc-users: '@ayutaz'
