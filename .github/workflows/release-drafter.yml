@@ -1,0 +1,60 @@
+name: Release Drafter
+
+# Merge ごとに GitHub Releases のドラフトを upsert する。PR ラベル
+# (autolabeler が PR タイトル先頭の Conventional Commits prefix から
+# 自動付与する) を元に Features / Bug Fixes / Documentation などの
+# セクション別 release note を生成する。
+#
+# Config: .github/release-drafter.yml
+#
+# 連携:
+#   - quality-assurance.md §10 改善 Top 10 #3 (GitHub Releases 自動化)
+#     と #10 (release-drafter) の橋渡し。
+#   - tag push 時の実際の Release 作成は release-shared-lib.yml が
+#     担っており、本 workflow はドラフト管理のみ。手動 tag push 前に
+#     ドラフトを確認 → そのまま publish する運用を想定。
+#
+# Permissions:
+#   - workflow 全体: contents: read (デフォルト最小)
+#   - update_release_draft job: contents: write (Releases 編集) +
+#     pull-requests: write (autolabeler が PR にラベル付与)
+
+on:
+  push:
+    branches: [dev]
+  workflow_dispatch:
+
+# Note: pull_request トリガーは意図的に省略。release-drafter は config
+# (.github/release-drafter.yml) が *default branch* に存在することを
+# 要求するため、本 workflow を最初に導入する PR では必ず "config
+# unfound" で fail する (chicken-and-egg)。merge 後の push トリガー
+# から安定して動作する。autolabeler を PR 時にも動かしたい場合は、
+# merge 後に pull_request_target を別 PR で追加する。
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  update_release_draft:
+    name: Update release draft
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: release-drafter/release-drafter@v6.1.0
+        with:
+          config-name: release-drafter.yml
+          # disable-autolabeler: PR title から自動ラベル付与しない場合
+          # に true。autolabeler は config 側で定義済みなのでデフォルト
+          # の false (有効) のまま。
+        env:
+          # Review #460: ${{ github.token }} の方が GitHub Actions
+          # 慣習として idiomatic (secrets.GITHUB_TOKEN と同一の値を
+          # 指すが、明示的にトークンであることが文脈で読みやすい)。
+          GITHUB_TOKEN: ${{ github.token }}
