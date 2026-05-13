@@ -106,7 +106,14 @@ def main(argv: list[str] | None = None) -> int:
     if isinstance(raw, dict):
         # benchmark.py with a single --model returns a 1-element list
         # wrapped in an object by format_json. Tolerate either shape.
-        records = raw.get("results") or [raw]
+        # Review #458: ``raw.get("results") or [raw]`` was misclassifying
+        # ``{"results": []}`` (empty list is falsy → wrapper treated as a
+        # single record). Explicit key check distinguishes "no results"
+        # from "single record".
+        if "results" in raw and isinstance(raw["results"], list):
+            records = raw["results"]
+        else:
+            records = [raw]
     else:
         records = list(raw)
 

@@ -38,6 +38,10 @@ on:
       - 'src/python_run/piper/**'
       - 'scripts/benchmark.py'
       - 'scripts/benchmark_to_action_bench.py'
+      # Review #458: ベンチマーク対象モデルが更新された場合も baseline
+      # 再計測対象。pull_request 側にも同 glob があるため対称性を担保。
+      - 'test/models/multilingual-test-medium.onnx*'
+      - '.github/workflows/rtf-regression.yml'
   workflow_dispatch:
 
 concurrency:
@@ -53,13 +57,19 @@ jobs:
     name: RTF benchmark (Ubuntu)
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+    # Fork PR では GITHUB_TOKEN に contents:write / pull-requests:write が
+    # 付与されないため job 自体をスキップ。同 repo の PR / push に
+    # 限って実行する (review #458 fork-PR 指摘への対応)。
+    if: github.event.pull_request.head.repo.full_name == github.repository || github.event_name != 'pull_request'
     permissions:
       contents: write  # benchmark-action pushes to gh-pages (push only)
       pull-requests: write  # benchmark-action comments on PR alerts
     steps:
       - uses: actions/checkout@v6.0.2
 
-      - uses: astral-sh/setup-uv@v6.10.0
+      # v6.10.0 は存在しないため CI が "Unable to resolve action" で失敗。
+      # v6 系の最新 patch (v6.8.0) に修正。
+      - uses: astral-sh/setup-uv@v6.8.0
         with:
           python-version: '3.12'
 
