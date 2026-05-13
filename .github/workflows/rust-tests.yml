@@ -157,6 +157,51 @@ jobs:
         workspaces: src/rust -> target
     - run: cargo clippy --workspace --all-features -- -D warnings
 
+  coverage:
+    name: coverage (cargo-llvm-cov, Ubuntu)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: src/rust
+    steps:
+    - uses: actions/checkout@v6.0.2
+    - uses: actions/setup-python@v6.2.0
+      with:
+        python-version: '3.12'
+    - name: Install ALSA dev (for rodio/playback feature)
+      run: sudo apt-get update && sudo apt-get install -y libasound2-dev
+    - uses: dtolnay/rust-toolchain@stable
+      with:
+        components: llvm-tools-preview
+    - uses: Swatinem/rust-cache@v2
+      with:
+        workspaces: src/rust -> target
+        key: coverage
+    - name: Install cargo-llvm-cov
+      uses: taiki-e/install-action@v2.62.20
+      with:
+        tool: cargo-llvm-cov
+    - name: Generate coverage (workspace, lcov)
+      # piper-plus-cli の coverage は build job のみで取れるため、cli を除外。
+      # piper-wasm は wasm32 target で別 job (wasm-test) でカバレッジ取得不可。
+      # それ以外の workspace member (piper-core / piper-plus-g2p / piper-python)
+      # の coverage を lcov 形式で出力。
+      run: |
+        cargo llvm-cov clean --workspace
+        cargo llvm-cov --workspace --exclude piper-wasm --all-features \
+          --lcov --output-path lcov.info
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v5.5.4
+      with:
+        files: src/rust/lcov.info
+        flags: rust
+        name: rust-coverage
+        fail_ci_if_error: false
+      continue-on-error: true
+
   python-bindings:
     name: piper-plus-python build
     runs-on: ubuntu-24.04

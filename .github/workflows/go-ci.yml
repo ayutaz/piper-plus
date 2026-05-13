@@ -60,7 +60,24 @@ jobs:
           go-version: '1.26'
           cache-dependency-path: src/go/go.sum
       - run: go vet ./... ./phonemize/...
-      - run: go test -v -race -count=1 ./... ./phonemize/...
+      # Ubuntu のみカバレッジを併用取得。race と coverprofile は併用可能で、
+      # macOS/Windows でも同じテストが回るが coverage upload は重複排除のため
+      # Ubuntu に集約 (csharp-ci.yml と同パターン)。
+      - if: runner.os == 'Linux'
+        name: Run tests (coverage)
+        run: go test -v -race -count=1 -coverprofile=coverage.out -covermode=atomic ./... ./phonemize/...
+      - if: runner.os != 'Linux'
+        name: Run tests
+        run: go test -v -race -count=1 ./... ./phonemize/...
+      - if: runner.os == 'Linux'
+        name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5.5.4
+        with:
+          files: src/go/coverage.out
+          flags: go
+          name: go-coverage
+          fail_ci_if_error: false
+        continue-on-error: true
 
   integration-test:
     runs-on: ubuntu-24.04
