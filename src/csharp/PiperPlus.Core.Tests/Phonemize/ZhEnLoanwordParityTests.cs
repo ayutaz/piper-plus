@@ -188,6 +188,7 @@ public sealed class ZhEnLoanwordParityTests
             throw new InvalidOperationException(
                 $"Fixture case '{caseName}' not found in zh_en_loanword_matrix.json");
         }
+
         return match;
     }
 

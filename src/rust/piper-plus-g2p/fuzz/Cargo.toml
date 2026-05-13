@@ -24,7 +24,12 @@ cargo-fuzz = true
 [dependencies]
 libfuzzer-sys = "0.4"
 piper-plus-g2p = { path = ".." }
-piper-core = { path = "../../piper-core", default-features = false }
+# NOTE: the crate at src/rust/piper-core is published as `piper-plus`, not
+# `piper-core`. The directory name is historical; the package name is the
+# canonical identifier for `cargo` dependency resolution. Aliasing back to
+# `piper_core` in the rustc namespace so fuzz_targets/*.rs can keep their
+# existing `use piper_core::...` paths.
+piper_core = { package = "piper-plus", path = "../../piper-core", default-features = false }
 
 [[bin]]
 name = "fuzz_ssml"
