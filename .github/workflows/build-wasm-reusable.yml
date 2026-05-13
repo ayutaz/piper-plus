@@ -1,25 +1,42 @@
 name: Build WASM (Reusable)
 
+# 3 variant (multilingual / ja-only / ja-lite) を matrix 並列ビルドする
+# reusable workflow。以前は単一 job 内で 3 variant を順次ビルドしていたため、
+# wasm-pack の cargo build (~5 分/variant) が直列に蓄積し合計 ~15 分掛かって
+# いた。matrix 化により 3 runner で同時実行され、最遅 variant の時間 (~5 分)
+# が実質的な所要時間になる。
+#
+# Caller (wasm-build.yml / npm-publish.yml) は変更不要 — `uses:
+# ./.github/workflows/build-wasm-reusable.yml` だけ呼んでおり、artifact
+# 名 (piper-plus-wasm / piper-plus-wasm-ja / piper-plus-wasm-ja-lite) も
+# 変えていない。以前あった ``outputs.wasm-size*`` は参照箇所が存在しな
+# かったため matrix 化に合わせて削除した (matrix job の output は仕様上
+# 1 値しか返せず、3 variant の集約に手間がかかる割に未使用)。
+
 on:
   workflow_call:
-    outputs:
-      wasm-size:
-        description: "WASM binary size in bytes (multilingual)"
-        value: ${{ jobs.build.outputs.wasm-size }}
-      wasm-size-ja:
-        description: "WASM binary size in bytes (ja-only)"
-        value: ${{ jobs.build.outputs.wasm-size-ja }}
-      wasm-size-ja-lite:
-        description: "WASM binary size in bytes (ja-lite, no bundled dict)"
-        value: ${{ jobs.build.outputs.wasm-size-ja-lite }}
 
 jobs:
   build:
+    name: build (${{ matrix.name }})
     runs-on: ubuntu-latest
-    outputs:
-      wasm-size: ${{ steps.size.outputs.size }}
-      wasm-size-ja: ${{ steps.size-ja.outputs.size }}
-      wasm-size-ja-lite: ${{ steps.size-ja-lite.outputs.size }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: multilingual
+            features: '--features multilingual'
+            dist_subdir: rust-wasm
+            artifact: piper-plus-wasm
+          - name: ja-only
+            features: '--features ja'
+            dist_subdir: rust-wasm-ja
+            artifact: piper-plus-wasm-ja
+          - name: ja-lite
+            features: '--no-default-features --features ja-external'
+            dist_subdir: rust-wasm-ja-lite
+            artifact: piper-plus-wasm-ja-lite
     steps:
       - uses: actions/checkout@v6.0.2
 
@@ -30,75 +47,36 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src/rust -> target
+          # variant 別に cache を分けることで feature combination の
+          # incremental build が cross-pollination で壊れるのを防ぐ
+          # (以前の単一 job では順次ビルドで cargo target が共有され
+          # た副作用で再ビルドが発生していた)。
+          key: wasm-${{ matrix.name }}
 
       - name: Install wasm-pack
-        run: cargo install wasm-pack --locked
+        # prebuilt binary を取得 (cargo install wasm-pack --locked は
+        # ~5 分かかる)。wasm-build.yml の wasm-test job と同じ pin。
+        uses: jetli/wasm-pack-action@v0.4.0
+        with:
+          version: 'latest'
 
-      - name: Build WASM (multilingual)
+      - name: Build WASM (${{ matrix.name }})
         working-directory: src/rust/piper-wasm
         run: |
-          wasm-pack build --target web --release --features multilingual
-          rm -rf ../../wasm/openjtalk-web/dist/rust-wasm
-          mv pkg ../../wasm/openjtalk-web/dist/rust-wasm
+          wasm-pack build --target web --release ${{ matrix.features }}
+          rm -rf ../../wasm/openjtalk-web/dist/${{ matrix.dist_subdir }}
+          mv pkg ../../wasm/openjtalk-web/dist/${{ matrix.dist_subdir }}
 
-      - name: Verify output (multilingual)
-        run: test -f src/wasm/openjtalk-web/dist/rust-wasm/piper_plus_wasm_bg.wasm
+      - name: Verify output
+        run: test -f src/wasm/openjtalk-web/dist/${{ matrix.dist_subdir }}/piper_plus_wasm_bg.wasm
 
-      - name: Report size (multilingual)
-        id: size
+      - name: Report size
         run: |
-          SIZE=$(stat -c%s src/wasm/openjtalk-web/dist/rust-wasm/piper_plus_wasm_bg.wasm)
-          echo "size=$SIZE" >> "$GITHUB_OUTPUT"
-          echo "WASM multilingual size: $SIZE bytes ($(( SIZE / 1048576 )) MB)"
-
-      - name: Build WASM (ja-only)
-        working-directory: src/rust/piper-wasm
-        run: |
-          wasm-pack build --target web --release --features ja
-          rm -rf ../../wasm/openjtalk-web/dist/rust-wasm-ja
-          mv pkg ../../wasm/openjtalk-web/dist/rust-wasm-ja
-
-      - name: Verify output (ja-only)
-        run: test -f src/wasm/openjtalk-web/dist/rust-wasm-ja/piper_plus_wasm_bg.wasm
-
-      - name: Report size (ja-only)
-        id: size-ja
-        run: |
-          SIZE=$(stat -c%s src/wasm/openjtalk-web/dist/rust-wasm-ja/piper_plus_wasm_bg.wasm)
-          echo "size=$SIZE" >> "$GITHUB_OUTPUT"
-          echo "WASM ja-only size: $SIZE bytes ($(( SIZE / 1048576 )) MB)"
-
-      - name: Build WASM (ja-lite)
-        working-directory: src/rust/piper-wasm
-        run: |
-          wasm-pack build --target web --release --no-default-features --features ja-external
-          rm -rf ../../wasm/openjtalk-web/dist/rust-wasm-ja-lite
-          mv pkg ../../wasm/openjtalk-web/dist/rust-wasm-ja-lite
-
-      - name: Verify output (ja-lite)
-        run: test -f src/wasm/openjtalk-web/dist/rust-wasm-ja-lite/piper_plus_wasm_bg.wasm
-
-      - name: Report size (ja-lite)
-        id: size-ja-lite
-        run: |
-          SIZE=$(stat -c%s src/wasm/openjtalk-web/dist/rust-wasm-ja-lite/piper_plus_wasm_bg.wasm)
-          echo "size=$SIZE" >> "$GITHUB_OUTPUT"
-          echo "WASM ja-lite size: $SIZE bytes ($(( SIZE / 1048576 )) MB)"
+          SIZE=$(stat -c%s src/wasm/openjtalk-web/dist/${{ matrix.dist_subdir }}/piper_plus_wasm_bg.wasm)
+          echo "WASM ${{ matrix.name }} size: $SIZE bytes ($(( SIZE / 1048576 )) MB)"
 
       - uses: actions/upload-artifact@v7.0.1
         with:
-          name: piper-plus-wasm
-          path: src/wasm/openjtalk-web/dist/rust-wasm/
-          retention-days: 7
-
-      - uses: actions/upload-artifact@v7.0.1
-        with:
-          name: piper-plus-wasm-ja
-          path: src/wasm/openjtalk-web/dist/rust-wasm-ja/
-          retention-days: 7
-
-      - uses: actions/upload-artifact@v7.0.1
-        with:
-          name: piper-plus-wasm-ja-lite
-          path: src/wasm/openjtalk-web/dist/rust-wasm-ja-lite/
+          name: ${{ matrix.artifact }}
+          path: src/wasm/openjtalk-web/dist/${{ matrix.dist_subdir }}/
           retention-days: 7
