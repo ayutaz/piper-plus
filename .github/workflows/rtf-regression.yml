@@ -117,9 +117,12 @@ jobs:
         # remote ref gh-pages` で fail する (header コメントの auto-push 期待
         # と実挙動が異なる)。
         #
-        # PR (same-repo): read-only check で不在なら fail → dev push 限定の
-        # 回帰を PR 段階で surface できる (gh-pages branch が誰かに削除された
-        # / repo を fresh-clone した直後 etc.)。
+        # PR (same-repo): read-only check で不在なら `::warning::` で flag。
+        # step 自体は success させて PR を merge 可能に保つ (chicken-and-egg
+        # 回避: 初回 dev push 前は不在状態が normal で、 ここで fail させると
+        # merge できなくなる)。 通常運用 (gh-pages 存在後) では silent pass、
+        # 万一 gh-pages が削除された場合は warning が出るが merge 自体は可能、
+        # 直後の dev push で自動再生成される。
         # push to dev: 不在なら空 orphan commit で自動作成 (idempotent)。
         # fork PR は上位 job の if: gate で既に skip 済み。
         if: github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/dev')
@@ -131,8 +134,7 @@ jobs:
           if gh api "repos/${{ github.repository }}/branches/gh-pages" --silent 2>/dev/null; then
             echo "gh-pages branch exists"
           elif [ "$EVENT_NAME" = "pull_request" ]; then
-            echo "::error::gh-pages branch is missing — benchmark-action@v1 will fail on the next push to dev. push-to-dev would auto-create it, but flagging in PR to detect dev-only regression early."
-            exit 1
+            echo "::warning::gh-pages branch is missing — benchmark-action@v1 will auto-create it on the next push to dev. Not failing the PR (chicken-and-egg before first dev push). If you see this after dev runs have created the branch, someone may have deleted it."
           else
             echo "gh-pages branch missing — creating empty placeholder"
             git config user.name "github-actions[bot]"
