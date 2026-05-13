@@ -179,17 +179,16 @@ public sealed class ZhEnLoanwordParityTests
 
     private static JsonElement FindCase(string caseName)
     {
-        IEnumerable<JsonElement> matches = FixtureRoot.Value
+        JsonElement match = FixtureRoot.Value
             .GetProperty("cases")
             .EnumerateArray()
-            .Where(c => c.GetProperty("name").GetString() == caseName);
-        foreach (JsonElement c in matches)
+            .FirstOrDefault(c => c.GetProperty("name").GetString() == caseName);
+        if (match.ValueKind == JsonValueKind.Undefined)
         {
-            return c;
+            throw new InvalidOperationException(
+                $"Fixture case '{caseName}' not found in zh_en_loanword_matrix.json");
         }
-
-        throw new InvalidOperationException(
-            $"Fixture case '{caseName}' not found in zh_en_loanword_matrix.json");
+        return match;
     }
 
     private static JsonElement LoadFixtureRoot()
