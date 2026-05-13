@@ -71,12 +71,14 @@ jobs:
         run: go test -v -race -count=1 ./... ./phonemize/...
       - if: runner.os == 'Linux'
         name: Upload coverage to Codecov
+        # rust-tests.yml の coverage job と方針を揃え、
+        # continue-on-error: true のみで Codecov 障害を許容する
+        # (review #456 fail_ci_if_error/continue-on-error 重複指摘への対応)。
         uses: codecov/codecov-action@v5.5.4
         with:
           files: src/go/coverage.out
           flags: go
           name: go-coverage
-          fail_ci_if_error: false
         continue-on-error: true
 
   integration-test:
