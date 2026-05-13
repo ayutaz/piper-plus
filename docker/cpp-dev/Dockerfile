@@ -42,7 +42,11 @@ RUN apt-get update && apt-get install -y \
 # Install ONNX Runtime (CPU, Linux x64)
 # Issue #372: must match canonical (cmake/OnnxRuntime.cmake) — enforced by
 # scripts/check_ort_versions.py. Bump alongside the C++ pipeline canonical.
-RUN wget -q https://github.com/microsoft/onnxruntime/releases/download/v1.20.0/onnxruntime-linux-x64-1.20.0.tgz && \
+# Use curl with retries: `wget -q` was silently failing on transient
+# github.com release-asset redirects in `Docker Build and Push` runs on dev.
+RUN curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors \
+        -o onnxruntime-linux-x64-1.20.0.tgz \
+        https://github.com/microsoft/onnxruntime/releases/download/v1.20.0/onnxruntime-linux-x64-1.20.0.tgz && \
     tar -xzf onnxruntime-linux-x64-1.20.0.tgz && \
     cp onnxruntime-linux-x64-1.20.0/lib/* /usr/local/lib/ && \
     cp -r onnxruntime-linux-x64-1.20.0/include/* /usr/local/include/ && \

@@ -111,10 +111,33 @@ jobs:
             benchmark_action.json
           retention-days: 30
 
+      - name: Ensure gh-pages branch exists
+        # benchmark-action@v1.20.4 は内部で `git fetch ... gh-pages:gh-pages`
+        # を行うため branch が repo に存在しないと `fatal: couldn't find
+        # remote ref gh-pages` で fail する (header コメントの auto-push 期待
+        # と実挙動が異なる)。 初回 dev push でも安全に動くよう、 不在時のみ
+        # 空 orphan commit で初期化する。 idempotent。
+        if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if gh api "repos/${{ github.repository }}/branches/gh-pages" --silent 2>/dev/null; then
+            echo "gh-pages branch already exists — skip init"
+          else
+            echo "gh-pages branch missing — creating empty placeholder"
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git switch --orphan gh-pages
+            : > .nojekyll
+            git add .nojekyll
+            git commit -m "init gh-pages for RTF benchmark baseline"
+            git push origin gh-pages
+            git switch -
+          fi
+
       - name: Store + compare against baseline
-        # PR ではスキップ。push to dev でのみ実行し、初回で gh-pages を
-        # 自動初期化する (auto-push:true なら branch 不在時に benchmark-action
-        # が新規作成する)。
+        # PR ではスキップ。push to dev でのみ実行。
         if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
         uses: benchmark-action/github-action-benchmark@v1.20.4
         with:

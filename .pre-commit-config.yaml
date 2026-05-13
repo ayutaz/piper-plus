@@ -374,12 +374,19 @@ repos:
   # Dockerfile lint — hadolint catches common Dockerfile mistakes (apt-get
   # without --no-install-recommends, missing pinned versions, etc.). Scoped
   # to docker/ so we don't accidentally lint embedded fixtures.
+  #
+  # `--failure-threshold=error` mirrors `.github/workflows/hadolint.yml` so
+  # local pre-commit and PR CI agree on what counts as a hard failure
+  # (only `.hadolint.yaml::override.error` rules block; warning/info report
+  # but don't exit non-zero). Without this, info-level rules unrelated to
+  # the current edit (e.g. existing DL3015 / DL4001 in unchanged lines) would
+  # silently block a Dockerfile commit locally while passing CI.
   # ---------------------------------------------------------------------------
   - repo: https://github.com/hadolint/hadolint
     rev: v2.12.0
     hooks:
       - id: hadolint
-        args: [--config=.hadolint.yaml]
+        args: [--config=.hadolint.yaml, --failure-threshold=error]
         files: ^docker/.*Dockerfile.*$
 
   # ---------------------------------------------------------------------------
