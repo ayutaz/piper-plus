@@ -74,10 +74,12 @@ change-title-escapes: '\<*_&'
 
 # PR タイトル先頭の Conventional Commits prefix から自動ラベル付与。
 # 既に対応ラベルが付いている場合は noop。
+# Review #460: 各 prefix は (scope) を許容する `(\(.*\))?` を含める
+# (例: `feat(api)!:` や `chore(deps):` などの scoped 形式に対応)。
 autolabeler:
   - label: 'breaking'
     title:
-      - '/^(feat|fix|refactor|chore|docs|ci|build|perf|test)!:/'
+      - '/^(feat|fix|refactor|chore|docs|ci|build|perf|test)(\(.*\))?!:/'
       - '/BREAKING CHANGE:/'
   - label: 'enhancement'
     title:
@@ -94,6 +96,16 @@ autolabeler:
   - label: 'chore'
     title:
       - '/^(chore|refactor|style|test|perf)(\(.*\))?:/'
+  # Review #460: Dependencies カテゴリは label 付与の規則を持たず空に
+  # なる懸念があった。Dependabot の典型タイトル (`chore(deps): ...` /
+  # `deps: ...` / `build(deps): ...`) と scope に deps を含むものを
+  # マップする。chore(deps) は上の chore ルールと併発するが、
+  # release-drafter の category は labels の AND/OR を最初に
+  # マッチしたカテゴリに割り振るため Dependencies が優先される。
+  - label: 'dependencies'
+    title:
+      - '/^(chore|build|fix|deps)\(deps(-dev)?\):/'
+      - '/^deps(\(.*\))?:/'
 
 exclude-labels:
   - 'skip-changelog'
