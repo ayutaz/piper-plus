@@ -58,9 +58,18 @@ FILE_PAREN_RE = re.compile(r"\s*\([^)]*\)\s*$")
 
 # Acceptable spellings of the canonical parameter names. Each runtime uses
 # either snake_case (Python/Rust/Go/C++ comments) or camelCase (JS/C#/C++
-# C++ vars). The substring check is generous on purpose — we only want to
-# fail when *neither* spelling appears.
-HOP_TOKENS = ("hop_length", "hopLength", "HopLength", "hopSize", "hop_size")
+# C++ vars), and some C++ sites use UpperCamelCase (e.g. `HopSize`,
+# `SampleRate`) when surfacing the parameter as a public field/getter.
+# The substring check is generous on purpose — we only want to fail when
+# *neither* spelling appears.
+HOP_TOKENS = (
+    "hop_length",
+    "hopLength",
+    "HopLength",
+    "hop_size",
+    "hopSize",
+    "HopSize",
+)
 SR_TOKENS = ("sample_rate", "sampleRate", "SampleRate")
 
 # Anchors that pin the check to the formula site (not unrelated comments).
@@ -112,12 +121,18 @@ def main() -> int:
         contract = tomllib.load(f)
 
     calc = contract.get("calculation", {})
-    formula = calc.get("formula")
+    formula_raw = calc.get("formula")
+    # Normalise: strip surrounding whitespace so a trailing newline / stray
+    # indent in the TOML doesn't produce a spurious drift failure. The
+    # canonical comparison is on the meaningful payload, not the verbatim
+    # bytes.
+    formula = formula_raw.strip() if isinstance(formula_raw, str) else formula_raw
     print(f"Canonical formula: {formula}")
-    if formula != "frame_time_ms = (hop_length / sample_rate) * 1000":
+    expected = "frame_time_ms = (hop_length / sample_rate) * 1000"
+    if formula != expected:
         print(
             f"::error::canonical formula drift: {formula!r} "
-            f"(expected 'frame_time_ms = (hop_length / sample_rate) * 1000')",
+            f"(expected {expected!r})",
             file=sys.stderr,
         )
         return 1

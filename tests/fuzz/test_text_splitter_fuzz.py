@@ -49,6 +49,10 @@ def _structured_text() -> st.SearchStrategy[str]:
 def test_split_sentences_never_panics(text: str) -> None:
     out = split_sentences(text)
     assert isinstance(out, list)
+    # Stronger invariant: no chunk in the returned list may be empty. (An
+    # empty list overall is still valid for whitespace-only input — that
+    # case is exercised by the `_text_strategy` minimum bound of 0.)
+    assert all(len(chunk) > 0 for chunk in out)
 
 
 @given(text=_text_strategy)

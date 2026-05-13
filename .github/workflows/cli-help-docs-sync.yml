@@ -44,7 +44,7 @@ permissions:
 jobs:
   python-cli-help-drift:
     name: python -m piper --help vs docs/guides/cli-usage.md
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6.0.2

@@ -40,7 +40,7 @@ concurrency:
 jobs:
   doctest:
     name: pytest --doctest-modules
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
 
     steps:

@@ -222,5 +222,5 @@ tests/fixtures/mb_istft_speaker_embedding/model.onnx.json
 .mutmut-cache/
 mutants.out/
 mutants.out.old/
-StrykerOutput/
+# Stryker.NET reports (any depth)
 **/StrykerOutput/

@@ -390,7 +390,18 @@ repos:
         # alone (the indent-multiple-of-N check still fires). Skip those
         # specific files at the hook level until editorconfig-checker is
         # upgraded to a version that honors `unset` for this check.
-        exclude: ^(node_modules|build|dist|target|\.git|test/models|tools/benchmark/issue-383|src/wasm/openjtalk-web/(build|demo|models|voices|patches)|tests/fuzz)/|^src/csharp/.*\.csproj$|^cmake/.*\.cmake$|^src/python/g2p/piper_plus_g2p/registry\.py$|^\.github/workflows/android-build\.yml$|^scripts/check_(bundle_size|cli_help_drift|migration_changelog_parity|phoneme_timing_contract)\.py$|^docs/spec/mutation-testing\.md$
+        # Note: leading `(?x)` enables re.VERBOSE so newlines/indentation are
+        # ignored — keep each alternative on its own line for diff hygiene.
+        exclude: |-
+          (?x)
+          ^(node_modules|build|dist|target|\.git|test/models|tools/benchmark/issue-383|src/wasm/openjtalk-web/(build|demo|models|voices|patches)|tests/fuzz)/|
+          ^src/csharp/.*\.csproj$|
+          ^cmake/.*\.cmake$|
+          ^src/python/g2p/piper_plus_g2p/registry\.py$|
+          ^\.github/workflows/android-build\.yml$|
+          ^scripts/check_(bundle_size|cli_help_drift|migration_changelog_parity|phoneme_timing_contract)\.py$|
+          ^scripts/benchmark_runtime\.py$|
+          ^docs/spec/mutation-testing\.md$
 
   # ---------------------------------------------------------------------------
   # pyproject.toml schema validation (PEP 621 + PEP 518). Catches typos in

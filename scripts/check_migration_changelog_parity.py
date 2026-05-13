@@ -75,8 +75,16 @@ SUBSECTION_HEADER_RE = re.compile(r"^####\s+(.+?)\s*$")
 BULLET_RE = re.compile(r"^-\s+(.+?)\s*$")
 
 # Tokens worth using as migration-doc lookup keys.
+# BACKTICK_RE: the `{2,}` (length >= 2) intentionally excludes single-char
+# phoneme placeholders like `a` / `n` / `ɨ` that show up inside G2P prose
+# but are useless as cross-doc lookup keys (they would match anywhere).
+# Keep the lower bound at 2 so `--x` / `Co` / `JP` style short tokens are
+# still picked up.
 BACKTICK_RE = re.compile(r"`([^`]{2,})`")
-FLAG_RE = re.compile(r"(--[a-z][a-z0-9_-]+)")
+# FLAG_RE: CLI flag tokens may legitimately use UpperCamelCase / PascalCase
+# (e.g. ``--EnableFoo`` on the C# CLI) — use IGNORECASE so we don't silently
+# drop those when extracting keywords from a CHANGELOG bullet.
+FLAG_RE = re.compile(r"--[A-Za-z][A-Za-z0-9_-]+", re.IGNORECASE)
 PATH_RE = re.compile(r"([A-Za-z_][\w./-]*\.(?:py|rs|cs|go|js|ts|toml|md|json|yml|yaml|cpp|h|kt))")
 ISSUE_RE = re.compile(r"#(\d+)")
 
@@ -133,7 +141,9 @@ def extract_keywords(raw: str) -> list[str]:
         if token:
             keywords.append(token)
     for m in FLAG_RE.finditer(raw):
-        keywords.append(m.group(1))
+        # FLAG_RE has no capture group (the whole match IS the flag) —
+        # use group(0) so we still get the ``--foo-bar`` substring.
+        keywords.append(m.group(0))
     for m in PATH_RE.finditer(raw):
         keywords.append(m.group(1))
 

@@ -5,10 +5,12 @@
   ],
   "exclude": [
     "dist/**",
+    "dist/**/*.wasm",
     "node_modules/**",
     "test/**",
     "types/**",
-    "coverage/**"
+    "coverage/**",
+    "**/*.wasm"
   ],
   "reporter": [
     "lcov",

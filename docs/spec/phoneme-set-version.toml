@@ -71,6 +71,12 @@ applies_to = [
 # old models continue to load successfully.
 
 [inventory]
+# num_symbols=173 is pinned by scripts/check_phoneme_set_version.py
+# (PINNED_NUM_SYMBOLS constant). Future changes require updating
+# both this toml and the script's constant in lockstep; the CI gate
+# will fail otherwise. Treat this field as IMMUTABLE without an
+# explicit symbol_set_version major bump (1.x → 2.x).
+_strict = true
 num_symbols = 173
 symbol_set_version = "1.0"
 embedding_dim = 192    # vits.text_encoder.emb.weight.shape = [173, 192]

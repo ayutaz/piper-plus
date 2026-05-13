@@ -73,8 +73,14 @@ def test_parse_never_panics_on_arbitrary_text(text: str) -> None:
         return
     segments = SSMLParser.parse(text)
     assert isinstance(segments, list)
+    # Stronger invariant: every element is the dataclass we expect, and the
+    # `rate` field stays within the clamp window enforced by `parse_rate`
+    # (`0.5x` slowest .. `10.0x` fastest after percentage conversion).
+    assert all(isinstance(seg, SSMLSegment) for seg in segments)
+    assert all(
+        0.5 <= seg.rate <= 10.0 for seg in segments if hasattr(seg, "rate")
+    )
     for seg in segments:
-        assert isinstance(seg, SSMLSegment)
         assert math.isfinite(seg.rate) and seg.rate > 0.0, seg
         assert seg.break_ms >= 0, seg
 

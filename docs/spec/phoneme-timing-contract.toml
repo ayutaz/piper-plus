@@ -9,7 +9,7 @@
 
 [meta]
 spec_version = "1.0"
-last_updated = "2026-04-14"
+last_updated = "2026-05-13"
 applies_to = ["python", "rust", "go", "cpp", "csharp", "wasm-js"]
 
 # ============================================================================

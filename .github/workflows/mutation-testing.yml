@@ -89,10 +89,14 @@ jobs:
             --paths-to-mutate src/python_run/piper/timing.py \
             || echo "mutmut exit code $? (warn-only)"
 
-      - name: Run mutmut (g2p ssml + multilingual)
+      - name: Run mutmut (g2p ssml + multilingual + base)
+        # base.py は ABC + PhonemizationResult を提供する G2P 共通基盤
+        # (.mutmut.toml の paths_to_mutate に追記済み)。 ssml / multilingual と
+        # 同じ step で実行することで言語非依存の核心ロジックを mutation 対象に
+        # 含める。
         run: |
           uvx mutmut run \
-            --paths-to-mutate src/python/g2p/piper_plus_g2p/ssml.py,src/python/g2p/piper_plus_g2p/multilingual.py \
+            --paths-to-mutate src/python/g2p/piper_plus_g2p/ssml.py,src/python/g2p/piper_plus_g2p/multilingual.py,src/python/g2p/piper_plus_g2p/base.py \
             || echo "mutmut exit code $? (warn-only)"
 
       - name: Show results

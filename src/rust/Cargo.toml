@@ -1,5 +1,11 @@
 [workspace]
 members = ["piper-plus-g2p", "piper-core", "piper-cli", "piper-python", "piper-wasm"]
+# `piper-plus-g2p/fuzz` is a cargo-fuzz crate that depends on libfuzzer-sys
+# (requires nightly + libFuzzer runtime) and is not buildable on stable.
+# Keeping it out of the workspace prevents `cargo build --workspace` /
+# `cargo metadata` from pulling it in for routine CI lanes; it is still
+# built explicitly by the fuzz workflow via `cargo +nightly fuzz`.
+exclude = ["piper-plus-g2p/fuzz"]
 resolver = "2"
 
 # Workspace-wide lint policy (Rust 1.74+ via [workspace.lints]).

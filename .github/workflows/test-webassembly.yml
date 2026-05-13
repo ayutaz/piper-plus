@@ -143,7 +143,6 @@ jobs:
         files: src/wasm/openjtalk-web/coverage/lcov.info
         flags: wasm
         fail_ci_if_error: false
-      continue-on-error: true
 
     - name: Run @piper-plus/g2p tests (with coverage)
       working-directory: src/wasm/g2p
@@ -158,7 +157,6 @@ jobs:
         files: src/wasm/g2p/coverage/lcov.info
         flags: g2p-wasm
         fail_ci_if_error: false
-      continue-on-error: true
 
     - name: Run optimization and advanced tests
       working-directory: src/wasm/openjtalk-web

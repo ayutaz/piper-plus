@@ -5,6 +5,7 @@
   ],
   "exclude": [
     "dist/**",
+    "dist/**/*.wasm",
     "node_modules/**",
     "test/**",
     "scripts/**",
@@ -13,6 +14,7 @@
     "demo/**",
     "coverage/**",
     "**/*.cpp",
+    "**/*.wasm",
     "src/audio-worklet-processor.js"
   ],
   "reporter": [

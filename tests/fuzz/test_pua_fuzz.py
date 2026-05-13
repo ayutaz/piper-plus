@@ -56,7 +56,14 @@ def test_known_token_maps_to_pua_char(token: str) -> None:
 def test_unknown_strict_raises(token: str) -> None:
     """`strict=True` on unknown multi-codepoint tokens raises only the
     documented exception type."""
+    # Filter intent: we only want tokens that the fixed table does NOT
+    # know about, otherwise `map_token(strict=True)` would succeed and
+    # the `pytest.raises` block below would fail.
     assume(token not in FIXED_PUA_MAPPING)
+    # Filter intent: re-assert multi-codepoint after the previous filter —
+    # the `_multi_codepoint` strategy already guarantees min_size=2, but
+    # we keep this check explicit so Hypothesis can shrink to the smallest
+    # multi-codepoint counterexample if an invariant ever regresses.
     assume(len(token) > 1)
     with pytest.raises(UnmappedMultiCodepointTokenError):
         map_token(token, strict=True)
@@ -66,7 +73,12 @@ def test_unknown_strict_raises(token: str) -> None:
 def test_unknown_nonstrict_passes_through(token: str) -> None:
     """`strict=False` on unknown multi-codepoint tokens returns the input
     unchanged and emits at most a warning."""
+    # Filter intent: exclude tokens present in the fixed PUA table so we
+    # exercise the *unknown* path (known tokens would be remapped to a
+    # PUA codepoint and the `result == token` assertion would fail).
     assume(token not in FIXED_PUA_MAPPING)
+    # Filter intent: defensive re-check that the token is multi-codepoint
+    # so this test does not silently overlap with `test_single_char_passthrough`.
     assume(len(token) > 1)
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")

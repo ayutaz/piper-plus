@@ -45,14 +45,20 @@ jobs:
     # checker are Linux-only (perl + elfutils) and a single OS is sufficient
     # — ABI compatibility is determined by the ELF format, not the runner.
     runs-on: ubuntu-24.04
-    timeout-minutes: 35
+    # 40 min: head + base の 2 回 build を行うため、base build delay の margin
+    # を含めて広めに取る。ccache hit 時は実測 15-20 min、cold cache で 30 min 前後。
+    timeout-minutes: 40
 
     steps:
       # ── Tooling ───────────────────────────────────────────────────────
+      # abi-dumper / abi-compliance-checker は ubuntu-24.04 リポジトリの最新版
+      # (apt 既定) を利用する。過剰な version pin は upstream の package not found
+      # で fail するため、runner OS の noble main に追従する方針。
+      # --no-install-recommends で perl/elfutils の transitive を最小限に抑える。
       - name: Install abi-dumper, abi-compliance-checker, build deps
         run: |
           sudo apt-get update
-          sudo apt-get install -y \
+          sudo apt-get install -y --no-install-recommends \
             build-essential cmake ccache wget \
             abi-dumper abi-compliance-checker \
             elfutils libdw-dev
@@ -98,6 +104,10 @@ jobs:
       - name: Checkout PR head
         uses: actions/checkout@v6.0.2
         with:
+          # fetch-depth: 0 を明示。shallow clone でも abi-dumper / cmake は
+          # 動作するが、サブモジュール解決や base SHA との比較で履歴が必要に
+          # なるケースがあるため、安全側に倒して全履歴を取得する。
+          fetch-depth: 0
           submodules: recursive
           path: head
 
@@ -126,7 +136,11 @@ jobs:
       - name: Checkout PR base
         uses: actions/checkout@v6.0.2
         with:
-          ref: ${{ github.event.pull_request.base.sha }}
+          # workflow_dispatch では pull_request.base.sha が null になるため、
+          # default_branch (= dev) にフォールバックして base としてビルドする。
+          # PR 経由なら従来通り PR の base SHA を使用する。
+          ref: ${{ github.event.pull_request.base.sha || github.event.repository.default_branch }}
+          fetch-depth: 0
           submodules: recursive
           path: base
 

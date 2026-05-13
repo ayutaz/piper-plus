@@ -20,10 +20,10 @@
 # startup; logic is unchanged from the pre-toml version.
 
 [meta]
-spec_version = "1.0.0"
+spec_version = "1.0"
 last_updated = "2026-05-13"
 canonical_source = "scripts/check_cli_flag_parity.py"
-status = "active"
+applies_to = ["python_runtime", "python_train", "rust", "go", "csharp", "cpp"]
 
 # ---------------------------------------------------------------------------
 # Runtime CLI declarations

@@ -91,42 +91,56 @@ CARGO_TOL = 0.05
 MAVEN_TOL = 0.05
 
 
+# Glob patterns intentionally anchor the version suffix with ``[0-9]*`` so
+# that a sibling package whose name contains the base name as a prefix
+# (e.g. ``piper-plus-dev-1.0.0.tgz`` vs ``piper-plus-1.0.0.tgz``) is not
+# accidentally matched. The first character after the leading hyphen must
+# be a digit, which is true for every semver ``MAJOR.MINOR.PATCH`` we ship
+# but false for sibling ``-dev``/``-rc`` package names.
 ARTIFACTS: tuple[Artifact, ...] = (
     # npm — built by ``npm pack`` in the package directory.
     Artifact(
         package="piper-plus",
         ecosystem="npm",
         tolerance=NPM_TOL,
-        glob="src/wasm/openjtalk-web/piper-plus-*.tgz",
+        # Anchor: ``piper-plus-<digit>...`` excludes hypothetical
+        # ``piper-plus-dev-*.tgz`` from accidental matches.
+        glob="src/wasm/openjtalk-web/piper-plus-[0-9]*.tgz",
     ),
     Artifact(
         package="@piper-plus/g2p",
         ecosystem="npm",
         tolerance=NPM_TOL,
         # npm pack rewrites ``@scope/name`` to ``scope-name``.
-        glob="src/wasm/g2p/piper-plus-g2p-*.tgz",
+        # Anchor: ``piper-plus-g2p-<digit>...`` excludes
+        # ``piper-plus-g2p-dev-*.tgz`` / ``piper-plus-g2p-beta-*.tgz``.
+        glob="src/wasm/g2p/piper-plus-g2p-[0-9]*.tgz",
     ),
     # NuGet — produced by ``dotnet pack -c Release``.
     Artifact(
         package="PiperPlus.Core",
         ecosystem="nuget",
         tolerance=NUGET_TOL,
-        glob="src/csharp/PiperPlus.Core/bin/Release/PiperPlus.Core.*.nupkg",
+        # Anchor: ``PiperPlus.Core.<digit>...`` skips e.g. symbol packages
+        # named ``PiperPlus.Core.snupkg`` or a sibling ``.Tests.*.nupkg``.
+        glob="src/csharp/PiperPlus.Core/bin/Release/PiperPlus.Core.[0-9]*.nupkg",
     ),
     Artifact(
         package="PiperPlus.Cli",
         ecosystem="nuget",
         tolerance=NUGET_TOL,
-        glob="src/csharp/PiperPlus.Cli/bin/Release/PiperPlus.Cli.*.nupkg",
+        glob="src/csharp/PiperPlus.Cli/bin/Release/PiperPlus.Cli.[0-9]*.nupkg",
     ),
     # crates.io — produced by ``cargo package`` (``.crate`` tarball).
     Artifact(
         package="piper-plus",
         ecosystem="cargo",
         tolerance=CARGO_TOL,
-        glob="src/rust/target/package/piper-plus-*.crate",
+        # Anchor: ``piper-plus-<digit>...`` excludes ``piper-plus-cli-*``,
+        # ``piper-plus-g2p-*``, etc. which live in the same target dir.
+        glob="src/rust/target/package/piper-plus-[0-9]*.crate",
     ),
-    # Maven Central — Android AAR.
+    # Maven Central — Android AAR (fixed filename, no version in glob).
     Artifact(
         package="piper-plus-g2p-android",
         ecosystem="maven",
@@ -156,12 +170,36 @@ def _resolve_size_bytes(art: Artifact) -> Optional[int]:
 # Baseline I/O
 # ---------------------------------------------------------------------------
 
+# Baseline JSON schema version. The script reads any baseline that declares
+# this exact value with no warning, accepts a missing field (legacy snapshot
+# from before the field existed) with a one-line stderr notice, and accepts
+# any unknown version with a warn-only message — we never fail on the
+# version field alone, since that would prevent CI from running while a
+# follow-up PR migrates the baseline.
+BASELINE_SCHEMA_VERSION = "1.0"
+
 
 def _load_baseline(path: Path) -> dict:
     if not path.exists():
-        return {"version": 1, "artifacts": {}}
+        return {"schema_version": BASELINE_SCHEMA_VERSION, "version": 1, "artifacts": {}}
     with path.open(encoding="utf-8") as fh:
-        return json.load(fh)
+        data = json.load(fh)
+    declared = data.get("schema_version")
+    if declared is None:
+        print(
+            f"WARN: {path.name} has no 'schema_version' field "
+            f"(assuming {BASELINE_SCHEMA_VERSION!r}); re-run with "
+            f"--update-baseline to upgrade.",
+            file=sys.stderr,
+        )
+    elif declared != BASELINE_SCHEMA_VERSION:
+        print(
+            f"WARN: {path.name} declares schema_version={declared!r} but this "
+            f"script understands {BASELINE_SCHEMA_VERSION!r}; proceeding "
+            f"anyway (unknown future fields are ignored).",
+            file=sys.stderr,
+        )
+    return data
 
 
 def _save_baseline(path: Path, data: dict) -> None:
@@ -182,7 +220,11 @@ def _current_snapshot() -> dict:
             "tolerance": art.tolerance,
             "size_bytes": size,
         }
-    return {"version": 1, "artifacts": artifacts}
+    return {
+        "schema_version": BASELINE_SCHEMA_VERSION,
+        "version": 1,
+        "artifacts": artifacts,
+    }
 
 
 # ---------------------------------------------------------------------------

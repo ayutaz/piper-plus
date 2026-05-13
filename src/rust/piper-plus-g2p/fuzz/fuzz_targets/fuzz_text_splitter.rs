@@ -46,6 +46,11 @@ fuzz_target!(|data: &[u8]| {
     );
 
     // Also exercise `split_chunks` with default config — separate code path.
+    // Invariant: every returned chunk is non-empty (empty list overall is OK
+    // for empty/whitespace-only input).
     let cfg = SplitConfig::default();
-    let _ = split_chunks(text, &cfg);
+    let chunks = split_chunks(text, &cfg);
+    for c in &chunks {
+        assert!(!c.is_empty(), "split_chunks returned empty chunk");
+    }
 });

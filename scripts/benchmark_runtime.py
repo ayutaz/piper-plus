@@ -6,6 +6,13 @@ launching it as a subprocess once per measurement run, measures wall-clock
 synthesis time, decodes the resulting WAV header to recover audio duration,
 and reports RTF, P50, P95 as JSON.
 
+Wall-clock semantics: timing brackets the *entire subprocess lifetime*, so
+the reported numbers include process startup, dynamic linker resolution,
+CLI argument parsing, and ONNX session creation in addition to the actual
+synthesis. This is **user-perceived latency** rather than **pure synthesis
+time**; see ``_run_once`` for details. Use ``scripts/benchmark.py`` for an
+in-process Python-only measurement that isolates ``session.run()``.
+
 Why a separate script (vs ``scripts/benchmark.py``):
     ``scripts/benchmark.py`` is Python-only: it imports ``onnxruntime`` in
     process and times ``session.run()`` directly. Cross-runtime comparison
@@ -194,6 +201,23 @@ def _run_once(
     timeout_s: float,
 ) -> tuple[float, float]:
     """Run the CLI once, return (wall_clock_seconds, audio_duration_seconds).
+
+    Wall-clock scope: ``time.perf_counter()`` brackets the entire
+    ``subprocess.run(...)`` call, which means the measurement *includes*
+    process startup (Python interpreter / .NET runtime / Go binary load),
+    dynamic linker resolution, CLI argument parsing, ONNX session creation,
+    model file I/O, warm-up of any per-process caches, the actual synthesis,
+    WAV header + sample writing, and process teardown.
+
+    In other words: this is **user-perceived latency**, not **pure synthesis
+    time**. Two consequences for callers comparing numbers:
+
+    * Fast runtimes with heavy startup costs (e.g. .NET cold start, Python
+      import time) will look slower than they actually are at steady state.
+      That is intentional — RTF reported by this harness is what an end
+      user shelling out to the CLI will feel.
+    * For a pure ``session.run()`` measurement use
+      ``scripts/benchmark.py`` instead (Python-only, in-process).
 
     Raises ``RuntimeError`` if the subprocess returns non-zero, times out, or
     produces a WAV with zero audio duration.

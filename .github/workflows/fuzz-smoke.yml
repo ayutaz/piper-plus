@@ -34,9 +34,14 @@ on:
   workflow_dispatch:
     inputs:
       duration_seconds:
-        description: "Per-target fuzz duration in seconds (default 60)"
+        description: "Per-target fuzz duration in seconds (60-3600)"
         required: false
         default: "60"
+        # GitHub Actions supports type: number for workflow_dispatch inputs
+        # (alongside string/boolean/choice/environment). The runtime value is
+        # still surfaced as a string in ${{ ... }}, so shell-side clamp below
+        # provides a defence in depth against out-of-range inputs.
+        type: number
 
 # Cancel superseded runs to avoid wasting fuzz minutes on stale commits.
 concurrency:
@@ -52,7 +57,7 @@ jobs:
   # ---------------------------------------------------------------------------
   rust-fuzz:
     name: Rust cargo-fuzz (${{ matrix.target }})
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     strategy:
       fail-fast: false
@@ -83,8 +88,21 @@ jobs:
       - name: Run fuzz smoke (60s default)
         working-directory: src/rust/piper-plus-g2p
         env:
-          DURATION: ${{ github.event.inputs.duration_seconds || '60' }}
+          DURATION_RAW: ${{ github.event.inputs.duration_seconds || '60' }}
         run: |
+          # Clamp DURATION to [60, 3600] regardless of input validity. Non-
+          # numeric inputs degrade to the default 60s. This guards against
+          # accidental long-running campaigns from workflow_dispatch.
+          if ! [[ "${DURATION_RAW}" =~ ^[0-9]+$ ]]; then
+            DURATION=60
+          elif [ "${DURATION_RAW}" -lt 60 ]; then
+            DURATION=60
+          elif [ "${DURATION_RAW}" -gt 3600 ]; then
+            DURATION=3600
+          else
+            DURATION="${DURATION_RAW}"
+          fi
+          echo "Effective fuzz duration: ${DURATION}s (raw=${DURATION_RAW})"
           cargo +nightly fuzz run "${{ matrix.target }}" \
             -- -max_total_time="${DURATION}" -timeout=25
 
@@ -104,7 +122,7 @@ jobs:
   # ---------------------------------------------------------------------------
   python-hypothesis:
     name: Python hypothesis
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6.0.2

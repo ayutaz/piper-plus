@@ -2,12 +2,13 @@
   "$schema": "https://raw.githubusercontent.com/stryker-mutator/stryker-net/master/docs/stryker-config.schema.json",
   "stryker-config": {
     "_comment": "Stryker.NET mutation testing config — see docs/spec/mutation-testing.md for rationale.",
+    "_comment_paths": "本 config 内の全 path (project / solution / test-projects / mutate) は src/csharp/ を working directory として解決される。CI workflow と手元の両方で `cd src/csharp` した上で `dotnet stryker -c stryker-config.json` を実行すること。`.github/workflows/mutation-testing.yml` の csharp job は `working-directory: src/csharp` を明示済み。",
     "project": "PiperPlus.Core/PiperPlus.Core.csproj",
     "solution": "PiperPlus.sln",
     "test-projects": [
       "PiperPlus.Core.Tests/PiperPlus.Core.Tests.csproj"
     ],
-    "_mutate_comment": "High-impact G2P / SSML core logic に絞る。ONNX 推論や I/O ヘルパーは対象外 (mutation の意味が薄い)。",
+    "_mutate_comment": "High-impact G2P / SSML core logic に絞る。ONNX 推論や I/O ヘルパーは対象外 (mutation の意味が薄い)。Path は src/csharp/PiperPlus.Core/ 起点 (project field と同じ root)。",
     "mutate": [
       "Phonemize/MultilingualPhonemizer.cs",
       "Phonemize/InlinePhonemeParser.cs",
