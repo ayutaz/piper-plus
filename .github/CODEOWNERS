@@ -60,7 +60,6 @@
 # ----- CI & repository config --------------------------------------------
 
 /.github/                                               @ayutaz
-/.github/CODEOWNERS                                     @ayutaz
 /.pre-commit-config.yaml                                @ayutaz
 /.gitleaks.toml                                         @ayutaz
 /.editorconfig                                          @ayutaz
