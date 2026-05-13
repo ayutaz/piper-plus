@@ -23,15 +23,19 @@ def _wait_until(
     """Poll predicate() until True or timeout.
 
     Replaces ``time.sleep(0.2)`` / ``time.sleep(0.3)`` race-prone waits.
-    Returns False if the deadline passed without the predicate going true,
-    so callers can produce a meaningful assertion message.
+    Returns False if the deadline expired without predicate ever returning
+    True, so callers can produce a meaningful assertion message.
     """
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         if predicate():
             return True
         time.sleep(interval)
-    return predicate()
+    # Review #455: 以前は ``return predicate()`` としていたが、
+    # deadline 超過後の最後の評価で True が返り得るため "within Ns"
+    # の保証を破っていた (docstring とも不整合)。タイムアウト時は
+    # 必ず False を返すよう修正。
+    return False
 
 
 @pytest.mark.integration
@@ -131,15 +135,18 @@ class TestTrainingIntegration:
 
             assert success
 
-            # Wait for the monitor thread to mark training as running.
-            # Polling avoids the prior race where ``time.sleep(0.3)`` was
-            # sometimes shorter than the thread's first iteration on a
-            # loaded CI runner.
-            assert _wait_until(lambda: manager.status.is_running, timeout=3.0), (
-                "monitor thread did not mark training as running within 3s"
-            )
+            # Review #455: TrainingManager.start_training() は status.is_running
+            # を *同期的に* True にしてから monitor thread を起動するため、
+            # ``_wait_until(is_running)`` は monitor thread が回ったかの確認に
+            # ならない。同期 assert で十分。monitor thread が実際に lines を
+            # 処理したかは最終的な ``final_status.best_loss == 0.3`` などで
+            # 間接的に確認する。
+            assert manager.status.is_running
 
             # Release the monitor thread to see EOF and finish.
+            # こちらは monitor thread が EOF を観測して is_running=False に
+            # するまでを待つ正当な polling (gate.set() 後の thread 状態遷移
+            # は非同期に発生)。
             gate.set()
             assert _wait_until(lambda: not manager.status.is_running, timeout=5.0), (
                 "monitor thread did not finish after gate.set() within 5s"
