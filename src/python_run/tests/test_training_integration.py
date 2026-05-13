@@ -4,6 +4,7 @@
 import importlib.util
 import sys
 import time
+from collections.abc import Callable
 from pathlib import Path
 from unittest.mock import Mock, patch
 
@@ -12,6 +13,29 @@ import pytest
 
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
+
+
+def _wait_until(
+    predicate: Callable[[], bool],
+    timeout: float = 5.0,
+    interval: float = 0.02,
+) -> bool:
+    """Poll predicate() until True or timeout.
+
+    Replaces ``time.sleep(0.2)`` / ``time.sleep(0.3)`` race-prone waits.
+    Returns False if the deadline expired without predicate ever returning
+    True, so callers can produce a meaningful assertion message.
+    """
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if predicate():
+            return True
+        time.sleep(interval)
+    # Review #455: 以前は ``return predicate()`` としていたが、
+    # deadline 超過後の最後の評価で True が返り得るため "within Ns"
+    # の保証を破っていた (docstring とも不整合)。タイムアウト時は
+    # 必ず False を返すよう修正。
+    return False
 
 
 @pytest.mark.integration
@@ -65,16 +89,18 @@ class TestTrainingIntegration:
             """Return training lines, then block until gate is set before EOF."""
             return _readline_side_effect._next()
 
-        lines = iter([
-            "Initializing training...\n",
-            "Epoch 1/3\n",
-            "train_loss: 1.5, val_loss: 1.6\n",
-            "Epoch 2/3\n",
-            "train_loss: 0.8, val_loss: 0.9\n",
-            "Epoch 3/3\n",
-            "train_loss: 0.3, val_loss: 0.4\n",
-            "Training completed!\n",
-        ])
+        lines = iter(
+            [
+                "Initializing training...\n",
+                "Epoch 1/3\n",
+                "train_loss: 1.5, val_loss: 1.6\n",
+                "Epoch 2/3\n",
+                "train_loss: 0.8, val_loss: 0.9\n",
+                "Epoch 3/3\n",
+                "train_loss: 0.3, val_loss: 0.4\n",
+                "Training completed!\n",
+            ]
+        )
 
         def _next():
             try:
@@ -109,13 +135,22 @@ class TestTrainingIntegration:
 
             assert success
 
-            # Allow monitor thread to process the data lines
-            time.sleep(0.3)
+            # Review #455: TrainingManager.start_training() は status.is_running
+            # を *同期的に* True にしてから monitor thread を起動するため、
+            # ``_wait_until(is_running)`` は monitor thread が回ったかの確認に
+            # ならない。同期 assert で十分。monitor thread が実際に lines を
+            # 処理したかは最終的な ``final_status.best_loss == 0.3`` などで
+            # 間接的に確認する。
             assert manager.status.is_running
 
-            # Release the monitor thread to see EOF and finish
+            # Release the monitor thread to see EOF and finish.
+            # こちらは monitor thread が EOF を観測して is_running=False に
+            # するまでを待つ正当な polling (gate.set() 後の thread 状態遷移
+            # は非同期に発生)。
             gate.set()
-            time.sleep(0.3)
+            assert _wait_until(lambda: not manager.status.is_running, timeout=5.0), (
+                "monitor thread did not finish after gate.set() within 5s"
+            )
 
             # Check final status
             final_status = manager.get_status()
@@ -162,8 +197,10 @@ class TestTrainingIntegration:
 
             assert success  # Start succeeds even if process fails later
 
-            # Wait for monitoring to detect failure
-            time.sleep(0.2)
+            # Wait for the monitor thread to detect the failed process.
+            assert _wait_until(
+                lambda: not manager.get_status().is_running, timeout=3.0
+            ), "monitor thread did not detect process failure within 3s"
 
             status = manager.get_status()
             assert not status.is_running
