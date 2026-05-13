@@ -50,6 +50,7 @@ Piper Plus documentation. Guides and references for using and developing with Pi
 ## Development
 
 - [Contributing](/CONTRIBUTING.md) - Contribution guidelines
+- [Quality Assurance](quality-assurance.md) — pre-commit / CI / テスト / contract gate の全体像 (7 層 gate) + 10 観点の深掘り + 統合改善 Top 10
 - [Changelog](/CHANGELOG.md) - Version history
 - [License](/LICENSE.md) - Project license (MIT)
 
