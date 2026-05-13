@@ -46,9 +46,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.0.2
 
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v6.2.0
         with:
           python-version: '3.13'
 
@@ -78,7 +78,7 @@ jobs:
             ${FIXTURE_DIR}/model.onnx
 
       - name: Upload fixture
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: mb-istft-speaker-embedding-fixture
           path: ${{ env.FIXTURE_DIR }}/model.onnx*
@@ -93,9 +93,9 @@ jobs:
     needs: build-fixture
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.0.2
 
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v6.2.0
         with:
           python-version: '3.13'
 
@@ -127,7 +127,7 @@ jobs:
     needs: build-fixture
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.0.2
 
       - uses: dtolnay/rust-toolchain@stable
 
@@ -155,7 +155,7 @@ jobs:
     needs: build-fixture
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.0.2
 
       - name: Install build tools
         run: |
@@ -189,9 +189,9 @@ jobs:
     needs: build-fixture
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.0.2
 
-      - uses: actions/setup-dotnet@v5
+      - uses: actions/setup-dotnet@v5.2.0
         with:
           global-json-file: global.json
 

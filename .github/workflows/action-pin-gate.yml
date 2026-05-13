@@ -1,0 +1,50 @@
+name: "Action Pin Safety Gate"
+
+# Verifies that no new sliding-major-tag references (e.g. `@v3`, `@v4`)
+# appear in .github/workflows/*.yml outside of the grandfathered baseline.
+#
+# Rationale: PR #414 had cosign-installer@v4 deleted upstream, crashing
+# 7 CI jobs. Memory entry `feedback_pin_actions_sha.md` records the rule:
+# pin actions by full SemVer (@v1.2.3) or 40-hex SHA, never by sliding
+# `@v<major>` alone. The codebase has ~39 grandfathered uses; this gate
+# uses a baseline file (scripts/action_pins_baseline.txt) to allow them
+# while blocking any *new* sliding-tag reference.
+
+on:
+  push:
+    branches: [dev, main]
+    paths:
+      - '.github/workflows/**.yml'
+      - '.github/workflows/**.yaml'
+      - '.github/actions/**'
+      - 'scripts/check_action_pins.py'
+      - 'scripts/action_pins_baseline.txt'
+  pull_request:
+    paths:
+      - '.github/workflows/**.yml'
+      - '.github/workflows/**.yaml'
+      - '.github/actions/**'
+      - 'scripts/check_action_pins.py'
+      - 'scripts/action_pins_baseline.txt'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  action-pin-safety:
+    name: No new sliding-major-tag refs
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6.0.2
+      - uses: actions/setup-python@v5.6.0
+        with:
+          python-version: '3.13'
+
+      - name: Run action pin gate
+        run: python scripts/check_action_pins.py

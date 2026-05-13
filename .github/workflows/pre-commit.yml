@@ -56,13 +56,13 @@ jobs:
     # したため 35 分に延長 + 専用 workflow のある hook を更に SKIP に追加。
     timeout-minutes: 35
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.0.2
         with:
           # `pre-commit run --all-files` works against the worktree, not
           # diff-vs-base, so a shallow clone is fine.
           fetch-depth: 1
 
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v6.2.0
         with:
           python-version: '3.11'
 
@@ -73,8 +73,21 @@ jobs:
           # installs and this CI gate.
           pip install pre-commit==4.0.1
 
+      - name: Install uv
+        # Several sync-gate hooks (loanword-consistency, ort-version-sync,
+        # voice-catalog-parity, language-id-map-contract, action-pin-gate,
+        # dictionary-consistency, ruff-version-sync, loanword-forward-compat,
+        # pua-cross-runtime-consistency, pua-fixture-drift) invoke
+        # `uv run python scripts/check_*.py` per the project convention
+        # (feedback_use_uv.md). Without uv on PATH they fail with
+        # `uv: command not found`. The local pre-commit relies on the
+        # contributor's uv install; CI must materialise it explicitly.
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
       - name: Cache pre-commit hook environments
-        uses: actions/cache@v4
+        uses: actions/cache@v4.3.0
         with:
           path: ~/.cache/pre-commit
           key: pre-commit-${{ runner.os }}-py3.11-${{ hashFiles('.pre-commit-config.yaml') }}

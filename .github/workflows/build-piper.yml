@@ -44,7 +44,7 @@ jobs:
       build-path: ${{ steps.set-build-path.outputs.path }}
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.0.2
 
       - name: Set artifact name
         id: set-artifact-name
@@ -65,7 +65,7 @@ jobs:
       # Cache for Linux dependencies
       - name: Cache Linux dependencies
         if: runner.os == 'Linux'
-        uses: actions/cache@v5
+        uses: actions/cache@v5.0.5
         with:
           path: |
             /usr/local/lib/libonnxruntime*
@@ -75,7 +75,7 @@ jobs:
       # Cache for macOS dependencies
       - name: Cache macOS dependencies
         if: runner.os == 'macOS'
-        uses: actions/cache@v5
+        uses: actions/cache@v5.0.5
         with:
           path: |
             /usr/local/lib/libonnxruntime*
@@ -129,7 +129,7 @@ jobs:
 
       - name: Setup MSVC (Windows)
         if: runner.os == 'Windows'
-        uses: ilammy/msvc-dev-cmd@v1
+        uses: ilammy/msvc-dev-cmd@v1.13.0
 
       # Build Piper
       - name: Build piper (Unix)
@@ -481,7 +481,7 @@ jobs:
 
       # Upload artifacts
       - name: Upload build artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: ${{ steps.set-artifact-name.outputs.name }}
           path: |
@@ -493,7 +493,7 @@ jobs:
       # Upload build logs on failure
       - name: Upload build logs on failure
         if: failure()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: build-logs-${{ runner.os }}-${{ github.sha }}
           path: |

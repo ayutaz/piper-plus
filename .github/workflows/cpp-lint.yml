@@ -12,7 +12,7 @@ jobs:
   clang-format:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.0.2
       - name: Check formatting
         run: |
           find src/cpp -name '*.cpp' -o -name '*.h' -o -name '*.c' | \

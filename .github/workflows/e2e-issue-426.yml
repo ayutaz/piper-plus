@@ -43,11 +43,11 @@ jobs:
           sudo docker image prune --all --force
           sudo apt-get clean
 
-      - uses: actions/checkout@v6
-      - uses: docker/setup-buildx-action@v4
+      - uses: actions/checkout@v6.0.2
+      - uses: docker/setup-buildx-action@v4.0.0
 
       - name: Set up Python for fixture build
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v6.2.0
         with:
           python-version: '3.13'
 
@@ -64,7 +64,7 @@ jobs:
           ls -la tests/fixtures/mb_istft_speaker_embedding/
 
       - name: Build python-inference image
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@v7.1.0
         with:
           context: .
           file: ./docker/python-inference/Dockerfile

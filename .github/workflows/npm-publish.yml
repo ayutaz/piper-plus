@@ -24,10 +24,10 @@ jobs:
         working-directory: src/wasm/openjtalk-web
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.0.2
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v6.4.0
         with:
           node-version: ${{ env.NODE_VERSION }}
 
@@ -83,16 +83,16 @@ jobs:
         working-directory: src/wasm/openjtalk-web
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.0.2
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v6.4.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           registry-url: https://registry.npmjs.org
 
       - name: Download WASM artifact
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@v8.0.1
         with:
           name: piper-plus-wasm
           path: src/wasm/openjtalk-web/dist/rust-wasm/
@@ -108,7 +108,7 @@ jobs:
         run: npm pack
 
       - name: Generate build provenance attestation
-        uses: actions/attest-build-provenance@v3
+        uses: actions/attest-build-provenance@v3.2.0
         with:
           subject-path: 'src/wasm/openjtalk-web/*.tgz'
 

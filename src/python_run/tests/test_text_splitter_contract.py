@@ -6,7 +6,7 @@ Python canonical implementation's ``_CLOSING_PUNCTUATION`` and
 the toml-generated fixture.
 
 Sibling tests for Rust/Go/C# live in their own runtime CIs and use the same
-fixture. The toml drift gate (`text-splitter-parity.yml`) ensures the fixture
+fixture. The toml drift gate (`parity-hub.yml` text-splitter matrix entry) ensures the fixture
 stays in sync with the contract.
 """
 
@@ -16,6 +16,7 @@ import json
 from pathlib import Path
 
 import pytest
+
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 FIXTURE_PATH = REPO_ROOT / "tests/fixtures/text_splitter/contract.json"
@@ -35,13 +36,17 @@ class TestTextSplitterContract:
     def test_python_closing_punctuation_matches_fixture(self, contract):
         from piper.text_splitter import _CLOSING_PUNCTUATION
 
-        expected = {chr(cp) for cp in contract["runtimes"]["python"]["closing_punctuation"]}
+        expected = {
+            chr(cp) for cp in contract["runtimes"]["python"]["closing_punctuation"]
+        }
         assert set(_CLOSING_PUNCTUATION) == expected
 
     def test_python_sentence_terminators_match_fixture(self, contract):
         from piper.text_splitter import _SENTENCE_TERMINATORS
 
-        expected = {chr(cp) for cp in contract["runtimes"]["python"]["sentence_terminators"]}
+        expected = {
+            chr(cp) for cp in contract["runtimes"]["python"]["sentence_terminators"]
+        }
         assert set(_SENTENCE_TERMINATORS) == expected
 
     def test_python_strategy_is_post_consume(self, contract):

@@ -39,8 +39,8 @@ jobs:
       run:
         working-directory: src/rust
     steps:
-    - uses: actions/checkout@v6
-    - uses: actions/setup-python@v6
+    - uses: actions/checkout@v6.0.2
+    - uses: actions/setup-python@v6.2.0
       with:
         python-version: '3.12'
     - name: Install ALSA dev (for rodio/playback feature)
@@ -62,7 +62,7 @@ jobs:
       run:
         working-directory: src/rust
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v6.0.2
     - uses: dtolnay/rust-toolchain@stable
     - uses: Swatinem/rust-cache@v2
       with:
@@ -102,14 +102,14 @@ jobs:
       run:
         working-directory: src/rust/piper-wasm
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v6.0.2
     - uses: dtolnay/rust-toolchain@stable
       with:
         targets: wasm32-unknown-unknown
     - uses: Swatinem/rust-cache@v2
       with:
         workspaces: src/rust -> target
-    - uses: actions/setup-node@v6
+    - uses: actions/setup-node@v6.4.0
       with:
         node-version: '24'
     - name: Install wasm-pack
@@ -130,7 +130,7 @@ jobs:
       run:
         working-directory: src/rust
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v6.0.2
     - uses: dtolnay/rust-toolchain@stable
       with:
         components: rustfmt
@@ -143,8 +143,8 @@ jobs:
       run:
         working-directory: src/rust
     steps:
-    - uses: actions/checkout@v6
-    - uses: actions/setup-python@v6
+    - uses: actions/checkout@v6.0.2
+    - uses: actions/setup-python@v6.2.0
       with:
         python-version: '3.12'
     - name: Install ALSA dev (for rodio/playback feature)
@@ -164,12 +164,12 @@ jobs:
       run:
         working-directory: src/rust/piper-python
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v6.0.2
     - uses: dtolnay/rust-toolchain@stable
     - uses: Swatinem/rust-cache@v2
       with:
         workspaces: src/rust -> target
-    - uses: actions/setup-python@v6
+    - uses: actions/setup-python@v6.2.0
       with:
         python-version: '3.12'
     - run: pip install maturin
@@ -199,7 +199,7 @@ jobs:
       run:
         working-directory: src/rust
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v6.0.2
     - uses: dtolnay/rust-toolchain@stable
       with:
         targets: ${{ matrix.target }}
@@ -226,7 +226,7 @@ jobs:
         Compress-Archive -Path staging/* -DestinationPath ${{ matrix.artifact }}.zip
 
     - name: Upload artifact
-      uses: actions/upload-artifact@v7
+      uses: actions/upload-artifact@v7.0.1
       with:
         name: ${{ matrix.artifact }}
         path: src/rust/${{ matrix.artifact }}.${{ matrix.archive_ext }}

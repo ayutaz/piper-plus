@@ -15,7 +15,7 @@ package piperplus
 //      runtimes.go.closing_punctuation are NOT recognized by isCloseBracket
 //      (current divergence — Go's isCloseBracket is an 8/14 subset).
 //
-// The drift gate (text-splitter-parity.yml) ensures the fixture stays in sync
+// The drift gate (parity-hub.yml text-splitter matrix entry) ensures the fixture stays in sync
 // with docs/spec/text-splitter-contract.toml.
 
 import (

@@ -28,11 +28,11 @@ jobs:
           sudo docker image prune --all --force
           sudo apt-get clean
 
-      - uses: actions/checkout@v6
-      - uses: docker/setup-buildx-action@v4
+      - uses: actions/checkout@v6.0.2
+      - uses: docker/setup-buildx-action@v4.0.0
 
       - name: Build Python inference image
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@v7.1.0
         with:
           context: .
           file: ./docker/python-inference/Dockerfile
@@ -223,11 +223,11 @@ jobs:
           sudo docker image prune --all --force
           sudo apt-get clean
 
-      - uses: actions/checkout@v6
-      - uses: docker/setup-buildx-action@v4
+      - uses: actions/checkout@v6.0.2
+      - uses: docker/setup-buildx-action@v4.0.0
 
       - name: Build C++ inference image
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@v7.1.0
         with:
           context: .
           file: ./docker/cpp-inference/Dockerfile
@@ -375,11 +375,11 @@ jobs:
             echo "::warning::Low disk space (${avail_gb}G). Build may fail on small runners."
           fi
 
-      - uses: actions/checkout@v6
-      - uses: docker/setup-buildx-action@v4
+      - uses: actions/checkout@v6.0.2
+      - uses: docker/setup-buildx-action@v4.0.0
 
       - name: Build Python train image
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@v7.1.0
         with:
           context: .
           file: ./docker/python-train/Dockerfile
@@ -430,11 +430,11 @@ jobs:
           sudo docker image prune --all --force
           sudo apt-get clean
 
-      - uses: actions/checkout@v6
-      - uses: docker/setup-buildx-action@v4
+      - uses: actions/checkout@v6.0.2
+      - uses: docker/setup-buildx-action@v4.0.0
 
       - name: Build C++ test image
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@v7.1.0
         with:
           context: .
           file: ./docker/cpp-inference/Dockerfile.test

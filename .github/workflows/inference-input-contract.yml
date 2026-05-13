@@ -1,0 +1,47 @@
+name: "Inference Input Contract Gate"
+
+# Verifies that constants documented in docs/spec/inference-input-contract.toml
+# match the canonical Python implementation (http_server.MAX_TEXT_BYTES,
+# infer_onnx CLI defaults, ecapa_tdnn emb_dim). The contract had no gate;
+# either side could drift silently.
+
+on:
+  push:
+    branches: [dev, main]
+    paths:
+      - 'docs/spec/inference-input-contract.toml'
+      - 'src/python_run/piper/http_server.py'
+      - 'src/python/piper_train/infer_onnx.py'
+      - 'src/python/piper_train/speaker_encoder/ecapa_tdnn.py'
+      - 'scripts/check_inference_input_contract.py'
+      - '.github/workflows/inference-input-contract.yml'
+  pull_request:
+    paths:
+      - 'docs/spec/inference-input-contract.toml'
+      - 'src/python_run/piper/http_server.py'
+      - 'src/python/piper_train/infer_onnx.py'
+      - 'src/python/piper_train/speaker_encoder/ecapa_tdnn.py'
+      - 'scripts/check_inference_input_contract.py'
+      - '.github/workflows/inference-input-contract.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  contract-vs-implementation:
+    name: Contract numeric constants match canonical Python implementation
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6.0.2
+      - uses: actions/setup-python@v5.6.0
+        with:
+          python-version: '3.13'
+
+      - name: Run inference-input contract check
+        run: python scripts/check_inference_input_contract.py

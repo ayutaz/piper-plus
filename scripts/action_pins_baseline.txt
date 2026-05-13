@@ -1,0 +1,4 @@
+# Grandfathered sliding-major-tag references for check_action_pins.py.
+# DO NOT add new entries to this file — pin new actions by SemVer or SHA.
+# Removing a line here: action is migrated to SemVer/SHA pin (good).
+# Adding a line here: undermines the gate (bad). Discuss in PR review first.

@@ -1,0 +1,57 @@
+name: "Dictionary Consistency Gate"
+
+# Verifies data/dictionaries/*.json (canonical) matches the bundled mirrors in
+# src/wasm/openjtalk-web/assets/. Without this gate, default_common_dict.json
+# drifts silently (canonical 443 lines vs WASM mirror 124 lines was observed
+# in May 2026 before this gate landed) — only browser consumers see stale
+# pronunciations.
+
+on:
+  push:
+    branches: [dev, main]
+    paths:
+      - 'data/dictionaries/**.json'
+      - 'src/wasm/openjtalk-web/assets/default_common_dict.json'
+      - 'src/wasm/openjtalk-web/assets/default_tech_dict.json'
+      - 'src/wasm/openjtalk-web/assets/additional_tech_dict.json'
+      - 'scripts/check_dictionary_consistency.py'
+      - '.github/workflows/dictionary-consistency.yml'
+  pull_request:
+    paths:
+      - 'data/dictionaries/**.json'
+      - 'src/wasm/openjtalk-web/assets/default_common_dict.json'
+      - 'src/wasm/openjtalk-web/assets/default_tech_dict.json'
+      - 'src/wasm/openjtalk-web/assets/additional_tech_dict.json'
+      - 'scripts/check_dictionary_consistency.py'
+      - '.github/workflows/dictionary-consistency.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  dict-sync:
+    name: data/dictionaries → WASM assets byte-equal
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6.0.2
+      - uses: actions/setup-python@v5.6.0
+        with:
+          python-version: '3.13'
+
+      - name: Byte-for-byte hash check
+        run: python scripts/check_dictionary_consistency.py
+
+      - name: --fix is idempotent on clean tree
+        run: |
+          python scripts/check_dictionary_consistency.py --fix
+          if ! git diff --quiet; then
+            echo "ERROR: --fix changed working tree on a clean repo:"
+            git --no-pager diff
+            exit 1
+          fi

@@ -26,7 +26,7 @@ jobs:
       run:
         working-directory: src/rust
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.0.2
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
@@ -45,7 +45,7 @@ jobs:
       run:
         working-directory: src/rust
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.0.2
       - uses: dtolnay/rust-toolchain@stable
       - name: Verify version matches tag
         working-directory: src/rust
@@ -69,7 +69,7 @@ jobs:
         # stable on-disk path for attest-build-provenance.
         run: cargo package -p piper-plus-g2p --allow-dirty
       - name: Generate build provenance attestation
-        uses: actions/attest-build-provenance@v3
+        uses: actions/attest-build-provenance@v3.2.0
         with:
           subject-path: 'src/rust/target/package/*.crate'
       - name: Publish piper-plus-g2p

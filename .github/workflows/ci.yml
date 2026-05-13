@@ -37,8 +37,8 @@ jobs:
       zh-en-data: ${{ steps.filter.outputs.zh-en-data }}
       docs: ${{ steps.filter.outputs.docs }}
     steps:
-      - uses: actions/checkout@v6
-      - uses: dorny/paths-filter@v3
+      - uses: actions/checkout@v6.0.2
+      - uses: dorny/paths-filter@v3.0.3
         id: filter
         with:
           filters: |
@@ -116,15 +116,15 @@ jobs:
       matrix:
         os: [ubuntu-24.04, macos-latest, windows-latest]
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.0.2
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v5
+        uses: actions/setup-dotnet@v5.2.0
         with:
           dotnet-version: 10.0.x
 
       - name: Cache NuGet packages
-        uses: actions/cache@v5
+        uses: actions/cache@v5.0.5
         continue-on-error: true
         with:
           path: ~/.nuget/packages
@@ -147,7 +147,7 @@ jobs:
             --settings src/csharp/PiperPlus.runsettings
 
       - name: Upload test results
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v7.0.1
         if: always()
         with:
           name: csharp-test-results-${{ matrix.os }}
@@ -184,15 +184,15 @@ jobs:
             rid: win-arm64
             cross: true
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.0.2
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v5
+        uses: actions/setup-dotnet@v5.2.0
         with:
           dotnet-version: 10.0.x
 
       - name: Cache NuGet packages
-        uses: actions/cache@v5
+        uses: actions/cache@v5.0.5
         continue-on-error: true
         with:
           path: ~/.nuget/packages
@@ -218,7 +218,7 @@ jobs:
         shell: bash
 
       - name: Upload build artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: piper-plus-cli-${{ matrix.rid }}
           path: publish/
@@ -235,10 +235,10 @@ jobs:
         python-version: ['3.11']
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.0.2
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v6.2.0
         with:
           python-version: ${{ matrix.python-version }}
 
@@ -314,7 +314,7 @@ jobs:
           fi
 
       - name: Upload coverage reports
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v5.5.4
         if: matrix.python-version == '3.11' && runner.os == 'Linux'
         with:
           files: ./coverage.xml
@@ -333,7 +333,7 @@ jobs:
       run:
         working-directory: src/rust
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.0.2
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy, rustfmt
@@ -360,7 +360,7 @@ jobs:
         # multilingual.rs (test_zh_en_dispatch_via_phonemizer_trait etc).
         run: cargo test -p piper-plus-g2p --no-fail-fast
 
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v6.2.0
         with:
           python-version: '3.12'
 
@@ -377,10 +377,10 @@ jobs:
         working-directory: src/wasm/openjtalk-web
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.0.2
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v6.4.0
         with:
           node-version: ${{ env.NODE_VERSION }}
 
@@ -390,7 +390,7 @@ jobs:
           targets: wasm32-unknown-unknown
 
       - name: Cache cargo
-        uses: actions/cache@v5
+        uses: actions/cache@v5.0.5
         with:
           path: |
             ~/.cargo/registry
@@ -425,10 +425,10 @@ jobs:
     runs-on: ubuntu-24.04
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.0.2
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v6.2.0
         with:
           python-version: '3.11'
 

@@ -27,12 +27,12 @@ jobs:
       run:
         working-directory: src/go
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.0.2
         with:
           sparse-checkout: |
             src/go
             tests/fixtures/g2p
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v5.6.0
         with:
           go-version: '1.26'
           cache-dependency-path: src/go/go.sum
@@ -43,8 +43,8 @@ jobs:
     name: golangci-lint (phonemize)
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v6.0.2
+      - uses: actions/setup-go@v5.6.0
         with:
           go-version: '1.26'
       - uses: golangci/golangci-lint-action@v7
@@ -56,7 +56,7 @@ jobs:
     needs: [test, lint]
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.0.2
         with:
           fetch-depth: 0
 

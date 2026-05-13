@@ -23,7 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v6.0.2
         with:
           fetch-depth: 0
 
@@ -100,7 +100,7 @@ jobs:
           tree -h hf-space-deploy 2>/dev/null || ls -lah hf-space-deploy/ 2>/dev/null || echo "Directory not found"
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v6.2.0
         with:
           python-version: '3.11'
 
