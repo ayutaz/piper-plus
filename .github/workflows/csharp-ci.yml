@@ -40,6 +40,14 @@ jobs:
       matrix:
         os: [ubuntu-24.04, windows-latest, macos-14]
 
+    permissions:
+      contents: read
+      # dorny/test-reporter は GitHub Checks API に annotation を書く
+      # ため checks: write が必須。デフォルトの GITHUB_TOKEN が
+      # workflow_run 起点だと無効化されるが、本 workflow は PR /
+      # push トリガーなので問題ない。
+      checks: write
+
     steps:
       - uses: actions/checkout@v6.0.2
 
@@ -84,8 +92,24 @@ jobs:
           dotnet test src/csharp/PiperPlus.sln -c Release --no-build \
             --blame-hang-timeout 30s \
             --logger "trx;LogFileName=test-results.xml" \
+            --results-directory TestResults \
             --collect:"XPlat Code Coverage" \
             --settings src/csharp/PiperPlus.runsettings
+
+      - name: Publish test results to GitHub Checks tab
+        # 失敗時にも結果を表示するため if: always()。dotnet test が non-zero
+        # で抜けても、TRX を読んで Checks UI に変換する。
+        if: always()
+        uses: dorny/test-reporter@v2.1.1
+        with:
+          name: csharp-tests (${{ matrix.os }})
+          path: '**/TestResults/test-results*.xml'
+          reporter: dotnet-trx
+          # CI ジョブ自体は dotnet test の exit code で fail させる
+          # (既存挙動)。reporter が二重に fail させると signal が
+          # 重複するので、test-reporter は表示のみで終了 0。
+          fail-on-error: false
+        continue-on-error: true
 
       - name: Generate coverage report
         if: matrix.os == 'ubuntu-24.04'
