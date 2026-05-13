@@ -190,12 +190,18 @@ jobs:
       # piper-plus-cli は build job 側でビルド検証されており、
       # llvm-cov に含めると thin な CLI wrapper の coverage が他クレートの
       # 数値を希釈するため除外する。
+      #
+      # --all-features は使わない: playback feature (rodio) のテストは
+      # 実 audio device を要求するため CI runner で panic する
+      # (play_audio_empty_samples_ok 等 3 件)。test job 側も --features
+      # naist-jdic / onnx しか有効化していないので、coverage 計測も
+      # 同じ feature 集合に揃える (drift 回避)。
       # 計測対象: piper-core / piper-plus-g2p / piper-python。
       run: |
         cargo llvm-cov clean --workspace
         cargo llvm-cov --workspace \
           --exclude piper-wasm --exclude piper-plus-cli \
-          --all-features \
+          --features naist-jdic,onnx \
           --lcov --output-path lcov.info
     - name: Upload coverage to Codecov
       # continue-on-error は GitHub Actions エンジンレベル、
