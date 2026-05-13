@@ -108,6 +108,10 @@ dev = [
     "sphinx>=4.0.0",
     "sphinx-rtd-theme>=3.1.0",
     "pre-commit>=4.6.0",
+    # Mutation testing (manual / weekly CI 専用、push 毎には走らせない)。
+    # 設定: .mutmut.toml / docs/spec/mutation-testing.md。
+    # 通常は `uvx mutmut run` で十分だが、dev 環境の declarative source として pin。
+    "mutmut>=2.4,<3",
 ]
 
 test = [

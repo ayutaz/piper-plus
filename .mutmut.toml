@@ -1,0 +1,44 @@
+# -----------------------------------------------------------------------------
+# mutmut configuration (Python mutation testing)
+# -----------------------------------------------------------------------------
+# Target: G2P core logic + runtime text utilities. これらは pure-Python の
+# 振る舞いロジックで分岐が多く、unit test の「強度」を mutation testing で
+# 測る価値が最も高い。重い分岐 (ONNX/torch 経由) は対象外。
+#
+# 運用:
+#   - manual: `uvx mutmut run` で実行 (週次 CI が canonical)
+#   - 結果確認: `uvx mutmut results` / `uvx mutmut html`
+#   - 閾値: 初期は warn-only (baseline 確立後に kill-rate >= 60% を fail 条件化)
+#
+# 詳細仕様: docs/spec/mutation-testing.md
+# -----------------------------------------------------------------------------
+
+[mutmut]
+# 6 modules — G2P (3) + runtime (3)。
+# 重い ONNX 推論や I/O は対象外: 振る舞いを unit test で網羅できる pure logic に絞る。
+paths_to_mutate = [
+    "src/python/g2p/piper_plus_g2p/multilingual.py",
+    "src/python/g2p/piper_plus_g2p/ssml.py",
+    "src/python/g2p/piper_plus_g2p/base.py",
+    "src/python_run/piper/text_splitter.py",
+    "src/python_run/piper/timing.py",
+]
+
+# Test runner: g2p と python_run の両方を走らせる。
+# CI では各 sub-package を独立に test (matrix で分割) する想定。
+# ローカル全実行は時間がかかるため manual。
+runner = "uv run pytest src/python/g2p/tests src/python_run/tests -x -q --no-cov"
+
+# テスト時間制限 (秒)。1 mutant あたりこれを超えたら timeout 扱い。
+# G2P ユニットテストは通常 1 秒未満、5 倍の安全マージン。
+tests_dir = "src/python/g2p/tests src/python_run/tests"
+
+# 除外: 純粋データ / 型定義 / NotImplementedError のみの ABC など。
+# (paths_to_mutate で既に絞っているが念のため明示)
+do_not_mutate = [
+    "*/tests/*",
+    "*/data/*",
+    "*/__init__.py",
+]
+
+# Cache: mutmut は .mutmut-cache を生成 (.gitignore 済み)。

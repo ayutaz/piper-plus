@@ -1,0 +1,19 @@
+{
+  "_comment": "Shared benchmark input texts consumed by scripts/benchmark_runtime.py and .github/workflows/multi-runtime-rtf.yml. Each entry maps a label (short/medium/long) to an English string sized to roughly hit the documented phoneme target after MultilingualPhonemizer expansion. Counts are approximate (en G2P expands ~1 phoneme per letter on average); the workflow uses these labels as a matrix axis. Texts are deliberately English-only so every runtime can phonemize them without language-specific dictionaries (en G2P is the lowest-common-denominator: pyopenjtalk + g2p-en + pypinyin + ... are not all bundled in every runtime build).",
+  "version": 1,
+  "language": "en",
+  "texts": {
+    "short": {
+      "phoneme_target": 25,
+      "text": "Hello, how are you doing today?"
+    },
+    "medium": {
+      "phoneme_target": 100,
+      "text": "The quick brown fox jumps over the lazy dog. Pack my box with five dozen liquor jugs. How vexingly quick daft zebras jump."
+    },
+    "long": {
+      "phoneme_target": 500,
+      "text": "In a hole in the ground there lived a hobbit. Not a nasty, dirty, wet hole, filled with the ends of worms and an oozy smell, nor yet a dry, bare, sandy hole with nothing in it to sit down on or to eat: it was a hobbit-hole, and that means comfort. It had a perfectly round door like a porthole, painted green, with a shiny yellow brass knob in the exact middle. The door opened on to a tube-shaped hall like a tunnel: a very comfortable tunnel without smoke, with panelled walls, and floors tiled and carpeted, provided with polished chairs, and lots and lots of pegs for hats and coats. The tunnel wound on and on, going fairly but not quite straight into the side of the hill, and many little round doors opened out of it, first on one side and then on another."
+    }
+  }
+}

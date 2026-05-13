@@ -210,3 +210,17 @@ tests/fixtures/mb_istft_speaker_embedding/model.onnx.json
 # ort optimized-model cache (sibling to any .onnx the runtime loads)
 *.opt.onnx
 *.opt.onnx.ok
+
+# -----------------------------------------------------------------------------
+# Mutation testing artifacts (manual / weekly CI でのみ生成、commit しない)
+# -----------------------------------------------------------------------------
+# Python  : mutmut が生成する on-disk cache / report
+# Rust    : cargo-mutants が `mutants.out/` 配下に diff + log を吐く
+# C# (.NET): Stryker.NET の HTML/JSON report と内部 sandbox。
+# 詳細: docs/spec/mutation-testing.md
+.mutmut-cache
+.mutmut-cache/
+mutants.out/
+mutants.out.old/
+StrykerOutput/
+**/StrykerOutput/

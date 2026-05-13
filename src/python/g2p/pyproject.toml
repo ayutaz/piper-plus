@@ -48,6 +48,10 @@ dev = [
     "pytest-asyncio>=0.24",  # NEW: async FastAPI tests
     "ruff>=0.8.0",
     "mypy>=1.13",
+    # hypothesis: property-based fuzz tests under repo-root tests/fuzz/.
+    # Required by tests/fuzz/{test_ssml_fuzz,test_text_splitter_fuzz,test_pua_fuzz}.py
+    # CI gate: .github/workflows/fuzz-smoke.yml
+    "hypothesis>=6.0",
 ]
 
 [project.urls]

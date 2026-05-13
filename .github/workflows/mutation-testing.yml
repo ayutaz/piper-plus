@@ -1,0 +1,217 @@
+name: mutation-testing
+
+# -----------------------------------------------------------------------------
+# Mutation testing (manual + weekly cron 専用)
+# -----------------------------------------------------------------------------
+# - 重い (30 分 - 数時間) ため push 毎には走らせない
+# - 結果は artifact (HTML/JSON report) として 30 日保持
+# - 初期は warn-only (continue-on-error: true) — baseline 確立後に閾値で fail させる
+# - 仕様詳細: docs/spec/mutation-testing.md
+# -----------------------------------------------------------------------------
+
+on:
+  # Manual trigger (PR 検証や ad-hoc 実験で利用)
+  workflow_dispatch:
+    inputs:
+      runtime:
+        description: "対象 runtime ('all' でフル実行)"
+        required: false
+        default: "all"
+        type: choice
+        options:
+          - all
+          - python
+          - rust
+          - csharp
+  # Weekly: 毎週日曜 00:00 UTC (= 月曜 09:00 JST)
+  schedule:
+    - cron: "0 0 * * 0"
+
+concurrency:
+  # Manual / schedule どちらでも 1 並列に絞る (ランナー時間節約)
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  python:
+    name: Python (mutmut)
+    if: github.event_name == 'schedule' || github.event.inputs.runtime == 'all' || github.event.inputs.runtime == 'python'
+    runs-on: ubuntu-24.04
+    # 60 min 上限 (実測 30-60 分想定)。ハングした際の安全網
+    timeout-minutes: 90
+    # 初期 baseline 確立まで warn-only (mutmut の exit code を fail にしない)
+    continue-on-error: true
+
+    steps:
+      - uses: actions/checkout@v6.0.2
+
+      - name: Set up Python
+        uses: actions/setup-python@v6.2.0
+        with:
+          python-version: "3.12"
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libsndfile1 sox build-essential
+
+      - name: Install uv
+        run: |
+          python -m pip install --upgrade pip
+          pip install --no-cache-dir uv
+
+      - name: Install project + mutmut
+        run: |
+          cd src/python
+          uv pip install --system -e "g2p[all]" -e ".[test]"
+          uv pip install --system 'mutmut>=2.4,<3'
+
+      - name: Build Cython extensions
+        run: |
+          cd src/python
+          uv pip install --system cython
+          python piper_train/vits/monotonic_align/setup.py build_ext --inplace
+
+      - name: Run mutmut (text_splitter)
+        # 個別 file 実行: workflow が長すぎる場合に file 単位で並列化する余地
+        # を残す。初回は text_splitter から。
+        run: |
+          uvx mutmut run \
+            --paths-to-mutate src/python_run/piper/text_splitter.py \
+            || echo "mutmut exit code $? (warn-only: baseline 未確定)"
+
+      - name: Run mutmut (timing)
+        run: |
+          uvx mutmut run \
+            --paths-to-mutate src/python_run/piper/timing.py \
+            || echo "mutmut exit code $? (warn-only)"
+
+      - name: Run mutmut (g2p ssml + multilingual)
+        run: |
+          uvx mutmut run \
+            --paths-to-mutate src/python/g2p/piper_plus_g2p/ssml.py,src/python/g2p/piper_plus_g2p/multilingual.py \
+            || echo "mutmut exit code $? (warn-only)"
+
+      - name: Show results
+        if: always()
+        run: |
+          uvx mutmut results || true
+          uvx mutmut html || true
+          ls -la html/ 2>/dev/null || echo "(no html report)"
+
+      - name: Upload mutmut report
+        if: always()
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: mutation-report-python
+          path: |
+            html/
+            .mutmut-cache
+          retention-days: 30
+          if-no-files-found: warn
+
+  rust:
+    name: Rust (cargo-mutants)
+    if: github.event_name == 'schedule' || github.event.inputs.runtime == 'all' || github.event.inputs.runtime == 'rust'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    continue-on-error: true
+
+    steps:
+      - uses: actions/checkout@v6.0.2
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src/rust -> target
+
+      - name: Install ALSA dev (rodio feature 用)
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev
+
+      - name: Install cargo-mutants
+        run: cargo install --locked cargo-mutants
+
+      - name: Run cargo-mutants (piper-plus-g2p ssml)
+        working-directory: src/rust
+        run: |
+          cargo mutants \
+            -p piper-plus-g2p \
+            --file src/ssml.rs \
+            --no-shuffle \
+            || echo "cargo-mutants exit code $? (warn-only: baseline 未確定)"
+
+      - name: Run cargo-mutants (piper-core text_splitter)
+        working-directory: src/rust
+        run: |
+          cargo mutants \
+            -p piper-plus \
+            --file src/text_splitter.rs \
+            --no-shuffle \
+            || echo "cargo-mutants exit code $? (warn-only)"
+
+      - name: Upload cargo-mutants report
+        if: always()
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: mutation-report-rust
+          path: |
+            src/rust/mutants.out/
+            src/rust/mutants.out.old/
+          retention-days: 30
+          if-no-files-found: warn
+
+  csharp:
+    name: C# (Stryker.NET)
+    if: github.event_name == 'schedule' || github.event.inputs.runtime == 'all' || github.event.inputs.runtime == 'csharp'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    continue-on-error: true
+
+    steps:
+      - uses: actions/checkout@v6.0.2
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5.2.0
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v5.0.5
+        continue-on-error: true
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-stryker-${{ hashFiles('src/csharp/**/*.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-stryker-
+            ${{ runner.os }}-nuget-
+
+      - name: Restore + build (warm up project graph)
+        run: |
+          dotnet restore src/csharp/PiperPlus.sln
+          dotnet build src/csharp/PiperPlus.sln -c Release --no-restore
+
+      - name: Install Stryker.NET global tool
+        run: dotnet tool install --global dotnet-stryker
+
+      - name: Ensure dotnet tools on PATH
+        run: echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
+
+      - name: Run Stryker.NET
+        working-directory: src/csharp
+        run: |
+          dotnet stryker -c stryker-config.json \
+            || echo "Stryker exit code $? (warn-only: baseline 未確定)"
+
+      - name: Upload Stryker report
+        if: always()
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: mutation-report-csharp
+          path: |
+            src/csharp/StrykerOutput/
+          retention-days: 30
+          if-no-files-found: warn

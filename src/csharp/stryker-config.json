@@ -1,0 +1,41 @@
+{
+  "$schema": "https://raw.githubusercontent.com/stryker-mutator/stryker-net/master/docs/stryker-config.schema.json",
+  "stryker-config": {
+    "_comment": "Stryker.NET mutation testing config — see docs/spec/mutation-testing.md for rationale.",
+    "project": "PiperPlus.Core/PiperPlus.Core.csproj",
+    "solution": "PiperPlus.sln",
+    "test-projects": [
+      "PiperPlus.Core.Tests/PiperPlus.Core.Tests.csproj"
+    ],
+    "_mutate_comment": "High-impact G2P / SSML core logic に絞る。ONNX 推論や I/O ヘルパーは対象外 (mutation の意味が薄い)。",
+    "mutate": [
+      "Phonemize/MultilingualPhonemizer.cs",
+      "Phonemize/InlinePhonemeParser.cs",
+      "Phonemize/IpaTokenizer.cs",
+      "Phonemize/ArpabetToIPAConverter.cs",
+      "Ssml/SsmlParser.cs"
+    ],
+    "_thresholds_comment": "high=80 / low=60 / break=50。初期は break=0 で warn-only 運用 (baseline 未確定)。週次 CI で値を観測し、安定後に break=50 へ昇格。",
+    "thresholds": {
+      "high": 80,
+      "low": 60,
+      "break": 0
+    },
+    "reporters": [
+      "html",
+      "json",
+      "progress",
+      "cleartext"
+    ],
+    "_concurrency_comment": "GitHub-hosted runner (4 vCPU 想定) で安全な並列度。ローカルは override 可。",
+    "concurrency": 4,
+    "_disable-mixed-mutations_comment": "Mixed mode は意味のある mutation だけに絞れるので有効化推奨だが、初期 baseline では false で網羅。",
+    "disable-mix-mutants": false,
+    "language-version": "Latest",
+    "since": {
+      "_comment": "since-target は CI 側 (workflow_dispatch input) で必要時に上書き。デフォルトは無効 (フル走査)。",
+      "enabled": false,
+      "target": "dev"
+    }
+  }
+}

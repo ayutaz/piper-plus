@@ -1,0 +1,45 @@
+[package]
+name = "piper-plus-g2p-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+# Fuzz harness for piper-plus-g2p.
+#
+# Targets:
+#   - fuzz_ssml         : SsmlParser::parse / is_ssml — XML parser, regex fallback
+#   - fuzz_text_splitter: piper_core::text_splitter::split_sentences — char-boundary edge cases
+#
+# Usage (requires nightly):
+#   rustup toolchain install nightly
+#   cargo +nightly fuzz run fuzz_ssml -- -max_total_time=60
+#   cargo +nightly fuzz run fuzz_text_splitter -- -max_total_time=60
+#
+# CI (.github/workflows/fuzz-smoke.yml) runs a 60-second smoke per target on PRs
+# touching the SSML / text_splitter sources. Crashes uploaded as artifacts.
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+piper-plus-g2p = { path = ".." }
+piper-core = { path = "../../piper-core", default-features = false }
+
+[[bin]]
+name = "fuzz_ssml"
+path = "fuzz_targets/fuzz_ssml.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "fuzz_text_splitter"
+path = "fuzz_targets/fuzz_text_splitter.rs"
+test = false
+doc = false
+bench = false
+
+# cargo-fuzz needs its own workspace root so it does NOT inherit the
+# parent `[workspace]` (which would conflict with `members` discovery).
+[workspace]
