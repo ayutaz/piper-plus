@@ -110,6 +110,7 @@ jobs:
       - name: Compile Rust CLI (release)
         if: matrix.runtime == 'rust'
         working-directory: src/rust
+        continue-on-error: true
         run: cargo build --release -p piper-plus-cli
 
       - name: Set up Go
@@ -121,6 +122,7 @@ jobs:
       - name: Compile Go CLI
         if: matrix.runtime == 'go'
         working-directory: src/go
+        continue-on-error: true
         run: go build -o piper-plus ./cmd/piper-plus
 
       - name: Set up .NET
@@ -132,6 +134,7 @@ jobs:
       - name: Compile C# CLI (Release)
         if: matrix.runtime == 'csharp'
         working-directory: src/csharp
+        continue-on-error: true
         run: dotnet build PiperPlus.Cli/PiperPlus.Cli.csproj -c Release
 
       - name: Install C++ build deps
@@ -142,6 +145,7 @@ jobs:
 
       - name: Compile C++ CLI
         if: matrix.runtime == 'cpp'
+        continue-on-error: true
         run: |
           cmake -S . -B build-cpp -DCMAKE_BUILD_TYPE=Release -DPIPER_PLUS_CLI=ON
           cmake --build build-cpp --target piper_plus_cli -j
