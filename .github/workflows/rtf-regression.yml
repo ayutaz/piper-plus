@@ -115,15 +115,24 @@ jobs:
         # benchmark-action@v1.20.4 は内部で `git fetch ... gh-pages:gh-pages`
         # を行うため branch が repo に存在しないと `fatal: couldn't find
         # remote ref gh-pages` で fail する (header コメントの auto-push 期待
-        # と実挙動が異なる)。 初回 dev push でも安全に動くよう、 不在時のみ
-        # 空 orphan commit で初期化する。 idempotent。
-        if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
+        # と実挙動が異なる)。
+        #
+        # PR (same-repo): read-only check で不在なら fail → dev push 限定の
+        # 回帰を PR 段階で surface できる (gh-pages branch が誰かに削除された
+        # / repo を fresh-clone した直後 etc.)。
+        # push to dev: 不在なら空 orphan commit で自動作成 (idempotent)。
+        # fork PR は上位 job の if: gate で既に skip 済み。
+        if: github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/dev')
         env:
           GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
         run: |
           set -euo pipefail
           if gh api "repos/${{ github.repository }}/branches/gh-pages" --silent 2>/dev/null; then
-            echo "gh-pages branch already exists — skip init"
+            echo "gh-pages branch exists"
+          elif [ "$EVENT_NAME" = "pull_request" ]; then
+            echo "::error::gh-pages branch is missing — benchmark-action@v1 will fail on the next push to dev. push-to-dev would auto-create it, but flagging in PR to detect dev-only regression early."
+            exit 1
           else
             echo "gh-pages branch missing — creating empty placeholder"
             git config user.name "github-actions[bot]"
