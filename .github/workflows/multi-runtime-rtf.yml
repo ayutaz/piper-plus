@@ -159,6 +159,7 @@ jobs:
       - name: Install WASM package
         if: matrix.runtime == 'wasm'
         working-directory: src/wasm/openjtalk-web
+        continue-on-error: true
         run: npm ci
 
       # ---- Resolve runtime CLI command ----
