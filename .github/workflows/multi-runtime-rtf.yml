@@ -185,8 +185,27 @@ jobs:
           esac
 
       # ---- Run benchmark ----
+      # Step-level `continue-on-error: true` keeps the job conclusion as
+      # success even when the actual benchmark fails. This is intentional
+      # during the warn-only baseline calibration period: a single
+      # runtime/CLI not being ready (model file missing, CLI flag drift,
+      # WASM dictionary download flake, etc.) should NOT show up as a
+      # FAILURE check on the PR. The aggregate job runs with
+      # `if: always()` and surfaces the failed cells as "(missing)" rows
+      # in the sticky PR comment, which is the canonical report channel.
+      # Drop this flag once baselines have stabilised (~2-3 weeks).
       - name: Run benchmark
         run: |
+          # `|| true` forces a zero exit so the job conclusion stays SUCCESS
+          # even when the benchmark fails (model file missing, CLI flag
+          # drift, WASM dictionary flake, etc.). The aggregate job reads the
+          # uploaded JSON (or treats it as missing) and surfaces failures in
+          # the sticky PR comment — the canonical report channel during the
+          # warn-only baseline calibration period. Note: `continue-on-error:
+          # true` at job level alone is NOT sufficient — GitHub still
+          # reports the per-cell FAILURE in the PR check rollup, which
+          # confuses reviewers. Removing this `|| true` once baselines have
+          # ~2-3 weeks of variance data converts the gate to strict.
           uv run python scripts/benchmark_runtime.py \
               --runtime "${{ matrix.runtime }}" \
               --cli-cmd "${{ steps.cli.outputs.cmd }}" \
@@ -195,7 +214,8 @@ jobs:
               --text-file tests/fixtures/benchmark-texts.json \
               --text-key "${{ matrix.text }}" \
               --runs 30 --warmup 5 \
-              --output "bench-${{ matrix.runtime }}-${{ matrix.text }}.json"
+              --output "bench-${{ matrix.runtime }}-${{ matrix.text }}.json" \
+              || echo "::warning::benchmark cell failed (warn-only): runtime=${{ matrix.runtime }} text=${{ matrix.text }}"
 
       - name: Upload benchmark JSON
         uses: actions/upload-artifact@v7.0.1
