@@ -1,0 +1,83 @@
+# CODEOWNERS — piper-plus
+#
+# GitHub uses the LAST matching pattern, so order matters: place generic
+# patterns first, specific paths later. Patterns reuse `.gitignore` syntax.
+#
+# Current state: this is a single-maintainer project. Every path defaults
+# to @ayutaz; the per-runtime sections below exist so that future
+# co-maintainers can be added incrementally (just append a second handle
+# to the relevant line) without restructuring the whole file.
+#
+# Reference: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-security/customizing-your-repository/about-code-owners
+
+# Default — every path requires @ayutaz review unless overridden below.
+*                                                       @ayutaz
+
+# ----- Runtimes -----------------------------------------------------------
+
+# Python (training side + G2P canonical source)
+/src/python/                                            @ayutaz
+
+# Python (inference runtime + HTTP server + text splitter + timing)
+/src/python_run/                                        @ayutaz
+
+# C# (.NET 10) — Core + CLI + tests
+/src/csharp/                                            @ayutaz
+
+# Rust — piper-core / piper-cli / piper-python / piper-wasm / piper-plus-g2p
+/src/rust/                                              @ayutaz
+
+# Go — piperplus library, phonemize package, cmd/piper-plus CLI
+/src/go/                                                @ayutaz
+
+# WASM / npm — openjtalk-web bundler + @piper-plus/g2p
+/src/wasm/                                              @ayutaz
+
+# C / C++ — libpiper_plus shared library, C API, ASAN/UBSAN tests
+/src/cpp/                                               @ayutaz
+
+# Kotlin / Android — piper-plus-g2p AAR (Maven Central)
+/android/                                               @ayutaz
+
+# Swift / Apple — Sources + Tests + Package.swift + xcframework toolchain
+/Sources/                                               @ayutaz
+/tests/PiperPlusTests/                                  @ayutaz
+/tests/PiperPlusG2PTests/                               @ayutaz
+/Package.swift                                          @ayutaz
+/examples/swift-g2p/                                    @ayutaz
+
+# ----- Cross-runtime contracts & sync gates ------------------------------
+
+# Declarative contract specifications (loanword / PUA / ORT / SSML 等)
+/docs/spec/                                             @ayutaz
+
+# Verification scripts (check_*.py, check_action_pins.py, etc.)
+/scripts/                                               @ayutaz
+
+# Shared golden fixtures consumed by all runtimes
+/tests/fixtures/                                        @ayutaz
+
+# ----- CI & repository config --------------------------------------------
+
+/.github/                                               @ayutaz
+/.pre-commit-config.yaml                                @ayutaz
+/.gitleaks.toml                                         @ayutaz
+/.editorconfig                                          @ayutaz
+/.markdownlint.yaml                                     @ayutaz
+
+# ----- Documentation ------------------------------------------------------
+
+/docs/                                                  @ayutaz
+/README.md                                              @ayutaz
+/CLAUDE.md                                              @ayutaz
+/CHANGELOG.md                                           @ayutaz
+/CONTRIBUTING.md                                        @ayutaz
+/CONTRIBUTING_MODELS.md                                 @ayutaz
+
+# ----- Packaging manifests (version-sync sensitive) ----------------------
+# Bumping any of these requires extra care — see docs/quality-assurance.md
+# §9.4 (Dependabot drift risk) and CLAUDE.md "ruff version pin" note.
+
+/pyproject.toml                                         @ayutaz
+/uv.lock                                                @ayutaz
+/Cargo.lock                                             @ayutaz
