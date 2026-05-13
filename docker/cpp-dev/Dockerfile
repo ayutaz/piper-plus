@@ -42,13 +42,21 @@ RUN apt-get update && apt-get install -y \
 # Install ONNX Runtime (CPU, Linux x64)
 # Issue #372: must match canonical (cmake/OnnxRuntime.cmake) — enforced by
 # scripts/check_ort_versions.py. Bump alongside the C++ pipeline canonical.
-# Use curl with retries: `wget -q` was silently failing on transient
-# github.com release-asset redirects in `Docker Build and Push` runs on dev.
+#
+# Why curl + cp -r:
+#   - `wget -q` was silently failing the previous dev runs (exit 1 with no
+#     stderr surfaced via `-q`); curl with `-fsSL --retry 5
+#     --retry-all-errors` makes transient redirect failures retry and lets
+#     the actual cp error below surface in the build log.
+#   - ONNX Runtime v1.20.0 ships `lib/cmake/` and `lib/pkgconfig/` as
+#     subdirectories under lib/, so a plain `cp lib/* …` fails with
+#     "omitting directory" + exit 1 (this was the real root cause of the
+#     9+ consecutive dev failures, masked by `wget -q`). Use `cp -r`.
 RUN curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors \
         -o onnxruntime-linux-x64-1.20.0.tgz \
         https://github.com/microsoft/onnxruntime/releases/download/v1.20.0/onnxruntime-linux-x64-1.20.0.tgz && \
     tar -xzf onnxruntime-linux-x64-1.20.0.tgz && \
-    cp onnxruntime-linux-x64-1.20.0/lib/* /usr/local/lib/ && \
+    cp -r onnxruntime-linux-x64-1.20.0/lib/* /usr/local/lib/ && \
     cp -r onnxruntime-linux-x64-1.20.0/include/* /usr/local/include/ && \
     ldconfig && \
     rm -rf onnxruntime-linux-x64-1.20.0*
