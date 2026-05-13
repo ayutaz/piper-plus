@@ -3,12 +3,18 @@
 [English](README_EN.md) | 日本語 | [中文](README_ZH.md) | [Français](README_FR.md) | [한국어](README_KO.md) | [Español](README_ES.md) | [Português](README_PT.md) | [Deutsch](README_DE.md) | [Русский](README_RU.md) | [Svenska](README_SV.md) | [हिन्दी](README_HI.md)
 
 [![CI](https://github.com/ayutaz/piper-plus/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/ayutaz/piper-plus/actions/workflows/ci.yml)
-[![PyPI](https://img.shields.io/pypi/v/piper-plus)](https://pypi.org/project/piper-plus/)
-[![Python](https://img.shields.io/pypi/pyversions/piper-plus)](https://pypi.org/project/piper-plus/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python](https://img.shields.io/pypi/pyversions/piper-plus)](https://pypi.org/project/piper-plus/)
 [![Hugging Face Demo](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Demo-blue)](https://huggingface.co/spaces/ayousanz/piper-plus-demo)
 [![Hugging Face Model](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Model-orange)](https://huggingface.co/ayousanz/piper-plus-base)
 [![Try in Browser](https://img.shields.io/badge/Try%20in%20Browser-WebAssembly-blueviolet)](https://ayutaz.github.io/piper-plus/)
+
+**パッケージ:**
+[![PyPI](https://img.shields.io/pypi/v/piper-plus?label=PyPI%3A%20piper-plus&color=blue)](https://pypi.org/project/piper-plus/)
+[![NuGet](https://img.shields.io/nuget/v/PiperPlus.Core?label=NuGet%3A%20PiperPlus.Core&color=blue)](https://www.nuget.org/packages/PiperPlus.Core/)
+[![crates.io](https://img.shields.io/crates/v/piper-plus-g2p?label=crates.io%3A%20piper-plus-g2p&color=orange)](https://crates.io/crates/piper-plus-g2p)
+[![npm](https://img.shields.io/npm/v/piper-plus?label=npm%3A%20piper-plus&color=cb3837)](https://www.npmjs.com/package/piper-plus)
+[![Maven Central](https://img.shields.io/maven-central/v/io.github.ayutaz/piper-plus-g2p-android?label=Maven%20Central%3A%20piper-plus-g2p-android&color=blue)](https://central.sonatype.com/artifact/io.github.ayutaz/piper-plus-g2p-android)
 
 > **🔑 唯一の MIT ライセンス Piper フォーク** — オリジナルの [rhasspy/piper](https://github.com/rhasspy/piper) は 2025年10月にアーカイブ済み。[OHF-Voice/piper1-gpl](https://github.com/OHF-Voice/piper1-gpl) は GPL-3.0 に移行。piper-plus は espeak-ng に依存しない唯一の MIT 互換フォークです。独自実装の G2P で8言語 (JA/EN/ZH/KO/ES/FR/PT/SV) に対応し、商用利用・組込み利用に適しています。
 
@@ -171,18 +177,18 @@ uv pip install ".[inference]"
 
 # 日本語推論
 uv run python -m piper_train.infer_onnx \
-  --model /path/to/model.onnx \
-  --config /path/to/config.json \
-  --output-dir ./output \
-  --text "こんにちは、今日は良い天気ですね。"
+    --model /path/to/model.onnx \
+    --config /path/to/config.json \
+    --output-dir ./output \
+    --text "こんにちは、今日は良い天気ですね。"
 
 # 英語推論
 uv run python -m piper_train.infer_onnx \
-  --model /path/to/en_model.onnx \
-  --config /path/to/en_model.onnx.json \
-  --output-dir ./output \
-  --text "Hello, how are you today?" \
-  --language en
+    --model /path/to/en_model.onnx \
+    --config /path/to/en_model.onnx.json \
+    --output-dir ./output \
+    --text "Hello, how are you today?" \
+    --language en
 ```
 
 主なオプション: `--speaker-id`(話者ID)、`--device auto|cpu|gpu`、`--noise-scale`(音声バリエーション)、`--length-scale`(話速)、`--noise-scale-w`(音素長バリエーション、デフォルト: 0.8)
@@ -223,19 +229,19 @@ docker run -p 7860:7860 -v ./models:/models:ro piper-webui
 # Python推論 (CPU)
 docker build -t piper-inference -f docker/python-inference/Dockerfile .
 docker run --rm \
-  -v ./models:/app/models:ro -v ./output:/app/output \
-  piper-inference \
-  python -m piper_train.infer_onnx \
-    --model /app/models/model.onnx --config /app/models/config.json \
-    --output-dir /app/output --text "こんにちは" --device cpu
+    -v ./models:/app/models:ro -v ./output:/app/output \
+    piper-inference \
+    python -m piper_train.infer_onnx \
+        --model /app/models/model.onnx --config /app/models/config.json \
+        --output-dir /app/output --text "こんにちは" --device cpu
 
 # GPU推論 (--gpus all を追加)
 docker run --rm --gpus all \
-  -v ./models:/app/models:ro -v ./output:/app/output \
-  piper-inference \
-  python -m piper_train.infer_onnx \
-    --model /app/models/model.onnx --config /app/models/config.json \
-    --output-dir /app/output --text "こんにちは" --device gpu
+    -v ./models:/app/models:ro -v ./output:/app/output \
+    piper-inference \
+    python -m piper_train.infer_onnx \
+        --model /app/models/model.onnx --config /app/models/config.json \
+        --output-dir /app/output --text "こんにちは" --device gpu
 ```
 
 CI/CD ビルド済みイメージ:
