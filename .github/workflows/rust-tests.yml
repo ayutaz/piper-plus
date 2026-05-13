@@ -157,6 +157,64 @@ jobs:
         workspaces: src/rust -> target
     - run: cargo clippy --workspace --all-features -- -D warnings
 
+  coverage:
+    name: coverage (cargo-llvm-cov, Ubuntu)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: src/rust
+    steps:
+    - uses: actions/checkout@v6.0.2
+    - uses: actions/setup-python@v6.2.0
+      with:
+        python-version: '3.12'
+    - name: Install ALSA dev (for rodio/playback feature)
+      run: sudo apt-get update && sudo apt-get install -y libasound2-dev
+    - uses: dtolnay/rust-toolchain@stable
+      with:
+        components: llvm-tools-preview
+    - uses: Swatinem/rust-cache@v2
+      with:
+        workspaces: src/rust -> target
+        key: coverage
+    - name: Install cargo-llvm-cov
+      uses: taiki-e/install-action@v2.62.20
+      with:
+        tool: cargo-llvm-cov
+    - name: Generate coverage (workspace, lcov)
+      # piper-wasm は wasm32 target で別 job (wasm-test) からのみテスト
+      # 可能なため llvm-cov の native target から除外。
+      # piper-plus-cli は build job 側でビルド検証されており、
+      # llvm-cov に含めると thin な CLI wrapper の coverage が他クレートの
+      # 数値を希釈するため除外する。
+      #
+      # --all-features は使わない: playback feature (rodio) のテストは
+      # 実 audio device を要求するため CI runner で panic する
+      # (play_audio_empty_samples_ok 等 3 件)。test job 側も --features
+      # naist-jdic / onnx しか有効化していないので、coverage 計測も
+      # 同じ feature 集合に揃える (drift 回避)。
+      # 計測対象: piper-core / piper-plus-g2p / piper-python。
+      run: |
+        cargo llvm-cov clean --workspace
+        cargo llvm-cov --workspace \
+          --exclude piper-wasm --exclude piper-plus-cli \
+          --features naist-jdic,onnx \
+          --lcov --output-path lcov.info
+    - name: Upload coverage to Codecov
+      # continue-on-error は GitHub Actions エンジンレベル、
+      # fail_ci_if_error は codecov-action 内部の挙動制御で、層が違う
+      # ため両指定は二重防御として有効。明確性のため continue-on-error
+      # に統一する (review #456 重複指摘への対応)。
+      uses: codecov/codecov-action@v5.5.4
+      with:
+        files: src/rust/lcov.info
+        flags: rust
+        name: rust-coverage
+      continue-on-error: true
+
   python-bindings:
     name: piper-plus-python build
     runs-on: ubuntu-24.04
