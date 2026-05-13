@@ -186,9 +186,17 @@ pub fn split_sentences(text: &str) -> Vec<String> {
 
             // Check if this is an abbreviation (only for periods)
             if c == '.' {
-                // Use byte offset directly from char_indices
+                // `byte_pos` is the START byte of the i-th character. We want a
+                // slice that *includes* the entire character, so we add its UTF-8
+                // length. Using `&text[..=byte_pos]` (inclusive of the start
+                // byte only) panics when `text[byte_pos]` is the leading byte of
+                // a multi-byte char and the slice ends mid-character — e.g. a
+                // string ending in `”` (U+201D, 3 bytes) just before a `.`.
+                // Fuzz target: tests/fuzz/test_text_splitter_fuzz.py +
+                // src/rust/piper-plus-g2p/fuzz/fuzz_targets/fuzz_text_splitter.rs
                 let byte_pos = indexed[i].0;
-                if ends_with_abbreviation(&text[..=byte_pos], byte_pos) {
+                let end_exclusive = byte_pos + c.len_utf8();
+                if ends_with_abbreviation(&text[..end_exclusive], byte_pos) {
                     // Don't split at abbreviations
                     i += 1;
                     continue;
