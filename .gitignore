@@ -142,6 +142,10 @@ check_*.py
 !scripts/check_action_pins.py
 !scripts/action_pins_baseline.txt
 !scripts/verify_model_checksums.py
+!scripts/check_phoneme_timing_contract.py
+!scripts/check_cli_help_drift.py
+!scripts/check_bundle_size.py
+!scripts/check_migration_changelog_parity.py
 create_comprehensive_*.py
 add_missing_*.py
 retrain_*.py
@@ -206,3 +210,17 @@ tests/fixtures/mb_istft_speaker_embedding/model.onnx.json
 # ort optimized-model cache (sibling to any .onnx the runtime loads)
 *.opt.onnx
 *.opt.onnx.ok
+
+# -----------------------------------------------------------------------------
+# Mutation testing artifacts (manual / weekly CI でのみ生成、commit しない)
+# -----------------------------------------------------------------------------
+# Python  : mutmut が生成する on-disk cache / report
+# Rust    : cargo-mutants が `mutants.out/` 配下に diff + log を吐く
+# C# (.NET): Stryker.NET の HTML/JSON report と内部 sandbox。
+# 詳細: docs/spec/mutation-testing.md
+.mutmut-cache
+.mutmut-cache/
+mutants.out/
+mutants.out.old/
+# Stryker.NET reports (any depth)
+**/StrykerOutput/

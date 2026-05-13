@@ -1,0 +1,27 @@
+{
+  "all": true,
+  "include": [
+    "src/**/*.js"
+  ],
+  "exclude": [
+    "dist/**",
+    "dist/**/*.wasm",
+    "node_modules/**",
+    "test/**",
+    "scripts/**",
+    "types/**",
+    "build/**",
+    "demo/**",
+    "coverage/**",
+    "**/*.cpp",
+    "**/*.wasm",
+    "src/audio-worklet-processor.js"
+  ],
+  "reporter": [
+    "lcov",
+    "text"
+  ],
+  "report-dir": "coverage",
+  "check-coverage": false,
+  "skip-full": false
+}

@@ -1,0 +1,95 @@
+name: Python Doctest
+
+# Runs `pytest --doctest-modules` against a hand-picked allow-list of files
+# whose docstrings contain executable ``>>> `` blocks. Keeps the gate narrow
+# so that adding doctest coverage to one module never accidentally
+# regresses unrelated code paths.
+#
+# Notes:
+#   * pyproject.toml の `[tool.pytest.ini_options]` には doctest 設定を
+#     入れない方針 (既存テストへの副作用を避ける)。本 workflow が唯一の
+#     doctest 実行経路。
+#   * `--override-ini="addopts="` で各パッケージの pyproject.toml に
+#     書かれている `--cov` / `--cov-fail-under=*` を無効化する
+#     (doctest だけのためにカバレッジ閾値に縛られないようにする)。
+
+on:
+  pull_request:
+    branches: [ dev ]
+    paths:
+      - 'src/python_run/piper/voice.py'
+      - 'src/python_run/piper/text_splitter.py'
+      - 'src/python_run/piper/timing.py'
+      - 'src/python/g2p/piper_plus_g2p/registry.py'
+      - 'src/python/g2p/piper_plus_g2p/japanese.py'
+      - '.github/workflows/python-doctest.yml'
+  push:
+    branches: [ dev ]
+    paths:
+      - 'src/python_run/piper/voice.py'
+      - 'src/python_run/piper/text_splitter.py'
+      - 'src/python_run/piper/timing.py'
+      - 'src/python/g2p/piper_plus_g2p/registry.py'
+      - 'src/python/g2p/piper_plus_g2p/japanese.py'
+      - '.github/workflows/python-doctest.yml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  doctest:
+    name: pytest --doctest-modules
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v6.0.2
+
+      - uses: actions/setup-python@v6.0.0
+        with:
+          python-version: "3.11"
+
+      - uses: astral-sh/setup-uv@v6.8.0
+        with:
+          python-version: "3.11"
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libsndfile1
+
+      - name: Install runtime + g2p packages
+        # 同期: python-tests.yml と同じ依存セット。ただし doctest は
+        # 5 ファイルしか触らないので train/test extras までは入れない。
+        # pyopenjtalk-plus は japanese.py の import 解決に必要 (doctest
+        # 自体は SKIP だが、collection 時にモジュール import が走る)。
+        run: |
+          cd src/python
+          uv pip install --system -e "g2p[all]" -e ".[test]"
+          # runtime package (piper-plus) — voice.py / text_splitter.py /
+          # timing.py が属する src/python_run を editable install。
+          # phonemize subpackage が pyopenjtalk を要求するので必須。
+          cd ../python_run
+          uv pip install --system -e .
+          # FastAPI 系は voice.py の collection には不要 — skip。
+          # nltk corpora は g2p_en (english phonemizer) の import で要求
+          # されるので事前ダウンロード。
+          python -c "import nltk; nltk.download('averaged_perceptron_tagger_eng', quiet=True); nltk.download('cmudict', quiet=True)"
+
+      - name: Run doctests
+        # --override-ini="addopts=" で pyproject.toml の --cov-fail-under=*
+        # を bypass (本 gate の目的は doctest 実行成否のみ)。
+        # --no-cov は addopts override では消えない pytest-cov plugin の
+        # auto-load を抑止する念のための保険。
+        # 失敗時は doctest assertion がそのまま CI を fail させる。
+        run: |
+          uv run --no-project --with pytest --with pytest-cov python -m pytest \
+            --doctest-modules \
+            --no-cov \
+            --override-ini="addopts=" \
+            src/python_run/piper/voice.py \
+            src/python_run/piper/text_splitter.py \
+            src/python_run/piper/timing.py \
+            src/python/g2p/piper_plus_g2p/registry.py \
+            src/python/g2p/piper_plus_g2p/japanese.py

@@ -1,0 +1,59 @@
+name: "Migration <-> CHANGELOG Parity Gate"
+
+# Triangulates three sources of truth that document a release:
+#   1. CHANGELOG.md           -- bullet-level Breaking changes
+#   2. docs/migration/v*.md   -- per-version migration guide
+#   3. VERSION / pyproject.toml -- shipped version string
+#
+# Every released `## [X.Y.Z]` section's Breaking items must be referenced
+# somewhere in `docs/migration/v<prev>-to-v<X.Y>.md`. VERSION and the latest
+# CHANGELOG entry must agree (VERSION may be ahead during release prep but
+# never behind). pyproject.toml's version (or `version = {file = "VERSION"}`)
+# must agree with VERSION.
+#
+# This gate exists because Breaking changes documented in CHANGELOG without
+# a corresponding migration section are a known source of post-release user
+# pain: users see the warning in CHANGELOG and have nowhere actionable to
+# go. By failing the PR we force the author to either add a migration
+# paragraph or downgrade the item from `Breaking` to `Changed`.
+
+on:
+  push:
+    branches: [dev, main]
+    paths:
+      - 'CHANGELOG.md'
+      - 'docs/migration/**'
+      - 'VERSION'
+      - 'pyproject.toml'
+      - 'scripts/check_migration_changelog_parity.py'
+      - '.github/workflows/migration-changelog-parity.yml'
+  pull_request:
+    paths:
+      - 'CHANGELOG.md'
+      - 'docs/migration/**'
+      - 'VERSION'
+      - 'pyproject.toml'
+      - 'scripts/check_migration_changelog_parity.py'
+      - '.github/workflows/migration-changelog-parity.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  parity:
+    name: CHANGELOG breaking items have migration coverage
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6.0.2
+      - uses: actions/setup-python@v5.6.0
+        with:
+          python-version: '3.13'
+
+      - name: Run migration <-> CHANGELOG parity check
+        run: python scripts/check_migration_changelog_parity.py --verbose

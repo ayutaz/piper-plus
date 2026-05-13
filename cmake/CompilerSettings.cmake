@@ -62,6 +62,37 @@ if(PIPER_TREAT_WARNINGS_AS_ERRORS)
   message(STATUS "PIPER_TREAT_WARNINGS_AS_ERRORS=ON: warnings will fail the build")
 endif()
 
+# ---- Code coverage (lcov / gcov) -----------------------------------------
+#
+# ENABLE_COVERAGE=ON injects -fprofile-arcs -ftest-coverage into both compile
+# and link flags so GCC/Clang emit .gcno/.gcda files that lcov can consume.
+# We deliberately gate this on GCC/Clang only (MSVC has a separate /coverage
+# story that we don't ship) and skip Apple-embedded targets (iOS/tvOS/
+# watchOS/visionOS) — the App Sandbox build flow uses xcrun libtool -static
+# which silently drops gcov runtime objects, and we never run tests on
+# device anyway. CI wires this on for the Linux Debug job only; release
+# builds, Windows, macOS-desktop and all cross-compile slices stay at zero
+# overhead.
+option(ENABLE_COVERAGE "Build with --coverage (-fprofile-arcs -ftest-coverage) for lcov/gcov" OFF)
+
+if(ENABLE_COVERAGE)
+  if(MSVC)
+    message(WARNING "ENABLE_COVERAGE=ON ignored on MSVC (gcov-style coverage not supported)")
+  elseif(PIPER_APPLE_EMBEDDED)
+    # iOS / tvOS / watchOS / visionOS: libtool -static drops the gcov runtime
+    # objects, and we can't run tests on device from CI. Silently skip rather
+    # than fail so a top-level -DENABLE_COVERAGE=ON doesn't break xcframework
+    # assembly.
+    message(STATUS "ENABLE_COVERAGE=ON ignored on Apple-embedded target (${CMAKE_SYSTEM_NAME})")
+  elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
+    message(STATUS "ENABLE_COVERAGE=ON: instrumenting C/C++ with --coverage (gcov)")
+    add_compile_options(--coverage -O0 -g)
+    add_link_options(--coverage)
+  else()
+    message(WARNING "ENABLE_COVERAGE=ON requested but compiler ${CMAKE_CXX_COMPILER_ID} is not GCC/Clang — skipping")
+  endif()
+endif()
+
 # ---- Android cross-compilation support ----
 if(ANDROID)
   message(STATUS "Android cross-compilation: ABI=${ANDROID_ABI}, Platform=${ANDROID_PLATFORM}")

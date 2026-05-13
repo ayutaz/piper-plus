@@ -37,6 +37,10 @@ on:
         default: 'basic'
         type: string
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
 env:
   # HuggingFace model repository
   MODEL_REPO: "rhasspy/piper-voices"

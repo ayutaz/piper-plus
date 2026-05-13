@@ -95,7 +95,7 @@ pub fn split_sentences(text: &str) -> Vec<String> {
     let mut i = 0;
 
     while i < len {
-        let (_byte_off, c) = indexed[i];
+        let (byte_off, c) = indexed[i];
 
         // Track quote state
         if c == '"' || c == '\u{201C}' || c == '\u{201D}' {
@@ -186,9 +186,17 @@ pub fn split_sentences(text: &str) -> Vec<String> {
 
             // Check if this is an abbreviation (only for periods)
             if c == '.' {
-                // Use byte offset directly from char_indices
-                let byte_pos = indexed[i].0;
-                if ends_with_abbreviation(&text[..=byte_pos], byte_pos) {
+                // `byte_off` was saved at the start of the iteration before the
+                // multi-punctuation and closing-quote consume loops advanced
+                // `i`, so it still points to the '.' itself. We slice up to
+                // `byte_off + 1` (period is ASCII, 1 byte) — using `indexed[i].0`
+                // here would point to a later quote/punctuation char, and a `..=`
+                // slice could land mid-multi-byte char (e.g. `”` U+201D, 3 bytes)
+                // causing a panic.
+                // Fuzz target: tests/fuzz/test_text_splitter_fuzz.py +
+                // src/rust/piper-plus-g2p/fuzz/fuzz_targets/fuzz_text_splitter.rs
+                let end_exclusive = byte_off + c.len_utf8();
+                if ends_with_abbreviation(&text[..end_exclusive], byte_off) {
                     // Don't split at abbreviations
                     i += 1;
                     continue;
@@ -886,6 +894,22 @@ mod tests {
             result
         );
         assert_eq!(result[0], text);
+    }
+
+    // -----------------------------------------------------------------------
+    // Regression: period followed by closing multi-byte quote (`."”`-style)
+    // must not panic on char-boundary indexing. Found by fuzz_text_splitter.
+    // -----------------------------------------------------------------------
+    #[test]
+    fn test_period_then_closing_curly_quote_no_panic() {
+        // Plain `.` then U+201D (3-byte closing double quote).
+        let _ = split_sentences(".\u{201D}");
+        // Word + `.` + closing curly quote + trailing text.
+        let _ = split_sentences("He said \"hello.\u{201D} Then left.");
+        // Closing single quote variant.
+        let _ = split_sentences("a.'b");
+        // Abbreviation-shaped input ending in closing quote.
+        let _ = split_sentences("Mr.\u{201D} Jones");
     }
 
     // -----------------------------------------------------------------------

@@ -128,7 +128,7 @@ repos:
       - id: mypy-g2p
         name: mypy --ignore-missing-imports (g2p, Python)
         # Mirror of .github/workflows/g2p-python-ci.yml step.
-        entry: bash -c 'cd src/python/g2p && uv run mypy --ignore-missing-imports piper_plus_g2p/'
+        entry: bash -c 'cd src/python/g2p && uv run --frozen mypy --ignore-missing-imports piper_plus_g2p/'
         language: system
         files: ^src/python/g2p/piper_plus_g2p/.*\.py$
         pass_filenames: false
@@ -227,7 +227,13 @@ repos:
         # uv workspace, so we cd into it before invoking uv run. From the
         # repo-root venv, the script fails with ModuleNotFoundError because
         # piper_plus_g2p isn't installed there.
-        entry: bash -c 'cd src/python/g2p && uv run python ../../../scripts/check_loanword_forward_compat.py'
+        # `--frozen` prevents uv from rewriting the lock file as a side
+        # effect of resolving the g2p workspace's dependencies. Without
+        # this flag, a stale uv.lock entry (e.g. when this branch adds a
+        # new dev dep like hypothesis) triggers a resolver pass during
+        # the hook and pre-commit treats the lock update as "files
+        # modified by this hook" → forward-compat gate spuriously fails.
+        entry: bash -c 'cd src/python/g2p && uv run --frozen python ../../../scripts/check_loanword_forward_compat.py'
         language: system
         files: (zh_en_loanword(_matrix)?\.json|scripts/check_loanword_forward_compat\.py|tests/fixtures/g2p/zh_en_loanword_forward_compat\.json)$
         pass_filenames: false
@@ -264,6 +270,37 @@ repos:
         files: ^(\.github/workflows/.*\.ya?ml|\.github/actions/.*action\.ya?ml|scripts/check_action_pins\.py|scripts/action_pins_baseline\.txt)$
         pass_filenames: false
 
+      # Pinned canonical phoneme-set size (num_symbols=173, embedding_dim=192).
+      # Drift here is a model-breaking change for every released ckpt — gate
+      # at commit time so the toml + pua.json review is forced before push.
+      - id: phoneme-set-version
+        name: phoneme set version contract (num_symbols=173 strict)
+        entry: uv run python scripts/check_phoneme_set_version.py
+        language: system
+        files: ^(docs/spec/phoneme-set-version\.toml|src/python/g2p/piper_plus_g2p/data/pua\.json|scripts/check_phoneme_set_version\.py)$
+        pass_filenames: false
+
+      # Cross-runtime phoneme-timing formula anchor check. Guards the
+      # `(hop_length / sample_rate) * 1000` invariant across 6 runtime
+      # canonical timing files. Cheap textual check; byte-for-byte parity
+      # is owned by each runtime's golden fixture test.
+      - id: phoneme-timing-contract
+        name: phoneme-timing formula anchors (6 runtimes vs contract toml)
+        entry: uv run python scripts/check_phoneme_timing_contract.py
+        language: system
+        files: ^(docs/spec/phoneme-timing-contract\.toml|src/python_run/piper/timing\.py|src/rust/piper-core/src/timing\.rs|src/go/piperplus/timing\.go|src/cpp/piper\.cpp|src/csharp/PiperPlus\.Core/Inference/TimingWriter\.cs|src/wasm/openjtalk-web/src/timing\.js|scripts/check_phoneme_timing_contract\.py)$
+        pass_filenames: false
+
+      # CLI flag hyphen-form parity across 5 runtime CLIs. Contract data
+      # (flag matrix, runtime paths, skip allowlist) lives in
+      # docs/spec/cli-flag-contract.toml — the script is pure verifier.
+      - id: cli-flag-parity
+        name: CLI flag hyphen-form parity (5 runtimes vs contract toml)
+        entry: uv run python scripts/check_cli_flag_parity.py
+        language: system
+        files: ^(docs/spec/cli-flag-contract\.toml|src/python_run/piper/__main__\.py|src/python/piper_train/infer_onnx\.py|src/rust/piper-cli/src/main\.rs|src/go/cmd/piper-plus/main\.go|src/csharp/PiperPlus\.Cli/Program\.cs|src/cpp/main\.cpp|scripts/check_cli_flag_parity\.py)$
+        pass_filenames: false
+
       # Mirror of .github/workflows/parity-hub.yml (language-id-map
       # matrix entry). Drift here is catastrophic (silent multilingual
       # mis-routing); trigger paths are tightly scoped, cheap to run.
@@ -272,6 +309,31 @@ repos:
         entry: uv run python scripts/check_language_id_map_contract.py
         language: system
         files: ^(docs/spec/language-id-map-contract\.toml|src/python/piper_train/tools/prepare_multilingual_dataset\.py|src/python_run/piper/voice\.py|src/rust/piper-core/src/(config|wasm)\.rs|src/rust/piper-wasm/src/lib\.rs|src/go/piperplus/testdata/valid_multilingual_config\.json|src/wasm/openjtalk-web/models/multilingual-test-medium\.onnx\.json|src/csharp/PiperPlus\.Core/Config/PiperConfig\.cs|src/cpp/piper\.cpp|scripts/check_language_id_map_contract\.py|scripts/regenerate_language_id_map_fixture\.py|tests/fixtures/language_id_map/.*)$
+        pass_filenames: false
+
+      # Mirror of .github/workflows/cli-help-docs-sync.yml. Catches v1.12.0-
+      # style breaking changes (e.g. `--mb-istft` removed when HiFi-GAN was
+      # deleted) where the user-facing CLI doc would otherwise carry a flag
+      # `python -m piper --help` no longer accepts.
+      #
+      # Capturing --help requires the piper-plus runtime to be importable
+      # (onnxruntime + pyopenjtalk-plus). On a fresh clone these may be
+      # absent — we skip with a warning rather than block the commit. CI
+      # is the authoritative gate.
+      #
+      # Mode: stale-only — only doc rows that disappeared from --help fail.
+      # The inverse direction (new --help flag missing from docs) is
+      # info-only because the canonical doc today is C++-CLI-flavoured.
+      #
+      # --allow baseline: docs/guides/cli-usage.md documents the C++ CLI
+      # surface (--use-cuda, --text, --streaming, …) which the Python CLI
+      # never exposed. Allowlist them so the gate fires only on *new*
+      # drift. Keep this list in sync with the workflow.
+      - id: cli-help-docs-drift
+        name: CLI --help vs docs/guides/cli-usage.md (Python runtime CLI)
+        entry: bash -c 'if ! python -c "import piper" 2>/dev/null; then echo "[skip] piper-plus runtime not importable"; exit 0; fi; tmp=$(mktemp); python -m piper --help > "$tmp" 2>&1 || { echo "[skip] --help failed"; rm -f "$tmp"; exit 0; }; python scripts/check_cli_help_drift.py --help-file "$tmp" --docs docs/guides/cli-usage.md --mode stale-only --allow=--custom-dict --allow=--gpu-device-id --allow=--json-input --allow=--language --allow=--model-dir --allow=--output-timing --allow=--phoneme-silence --allow=--quiet --allow=--raw-phonemes --allow=--streaming --allow=--test-mode --allow=--text --allow=--timing-format --allow=--use-cuda; rc=$?; rm -f "$tmp"; exit $rc'
+        language: system
+        files: ^(src/python_run/piper/.*\.py|docs/guides/cli-usage\.md|scripts/check_cli_help_drift\.py)$
         pass_filenames: false
 
   # ---------------------------------------------------------------------------
@@ -328,7 +390,24 @@ repos:
     rev: 3.0.3
     hooks:
       - id: editorconfig-checker
-        exclude: ^(node_modules|build|dist|target|\.git|test/models|tools/benchmark/issue-383|src/wasm/openjtalk-web/(build|demo|models|voices|patches))/
+        # csproj/cmake/.github yml continuation-indents and registry.py
+        # ReST docstring blocks use alignment-style indentation that
+        # editorconfig-checker 3.0.3 cannot opt-out via `indent_size = unset`
+        # alone (the indent-multiple-of-N check still fires). Skip those
+        # specific files at the hook level until editorconfig-checker is
+        # upgraded to a version that honors `unset` for this check.
+        # Note: leading `(?x)` enables re.VERBOSE so newlines/indentation are
+        # ignored — keep each alternative on its own line for diff hygiene.
+        exclude: |-
+          (?x)
+          ^(node_modules|build|dist|target|\.git|test/models|tools/benchmark/issue-383|src/wasm/openjtalk-web/(build|demo|models|voices|patches)|tests/fuzz)/|
+          ^src/csharp/.*\.csproj$|
+          ^cmake/.*\.cmake$|
+          ^src/python/g2p/piper_plus_g2p/registry\.py$|
+          ^\.github/workflows/android-build\.yml$|
+          ^scripts/check_(bundle_size|cli_help_drift|migration_changelog_parity|phoneme_timing_contract)\.py$|
+          ^scripts/benchmark_runtime\.py$|
+          ^docs/spec/mutation-testing\.md$
 
   # ---------------------------------------------------------------------------
   # pyproject.toml schema validation (PEP 621 + PEP 518). Catches typos in

@@ -116,10 +116,11 @@ jobs:
         node --test test/js/test-piper-plus-g2p-init.js
         node --test test/js/test-piper-plus-wasm-g2p.js
 
-    - name: Run openjtalk-web unit tests
+    - name: Run openjtalk-web unit tests (with coverage)
       working-directory: src/wasm/openjtalk-web
       run: |
-        node --test \
+        npx c8 --reporter=lcov --reporter=text \
+          node --test \
           test/js/test-piper-plus.js \
           test/js/test-piper-plus-init-success.js \
           test/js/test-piper-plus-boundary.js \
@@ -134,6 +135,28 @@ jobs:
           test/js/test-model-manager-cache.js \
           test/js/test-dictionary-cache.js \
           test/js/test-g2p-golden.js
+
+    - name: Upload coverage to Codecov (wasm)
+      uses: codecov/codecov-action@v5.5.4
+      if: always()
+      with:
+        files: src/wasm/openjtalk-web/coverage/lcov.info
+        flags: wasm
+        fail_ci_if_error: false
+
+    - name: Run @piper-plus/g2p tests (with coverage)
+      working-directory: src/wasm/g2p
+      run: |
+        npm install
+        npm run test:coverage
+
+    - name: Upload coverage to Codecov (g2p-wasm)
+      uses: codecov/codecov-action@v5.5.4
+      if: always()
+      with:
+        files: src/wasm/g2p/coverage/lcov.info
+        flags: g2p-wasm
+        fail_ci_if_error: false
 
     - name: Run optimization and advanced tests
       working-directory: src/wasm/openjtalk-web

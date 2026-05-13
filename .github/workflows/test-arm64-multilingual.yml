@@ -11,6 +11,10 @@ on:
       - '.github/workflows/test-arm64-multilingual.yml'
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test-multilingual-arm64:
     name: Test Multilingual TTS on ARM64

@@ -1,0 +1,48 @@
+{
+  "_comment": "Cross-runtime RTF / latency baseline consumed by .github/workflows/multi-runtime-rtf.yml. Each leaf is the value observed by scripts/benchmark_runtime.py on the bundled test/models/multilingual-test-medium.onnx model when invoking that runtime's CLI on the matching tests/fixtures/benchmark-texts.json entry. null = placeholder; the first warn-only CI run uploads observed values as workflow artifacts and a follow-up PR commits them here. thresholds.rtf_pct / latency_p95_pct are the +regression tolerances vs baseline; current policy is warn-only (workflow does not fail).",
+  "version": 1,
+  "model": "test/models/multilingual-test-medium.onnx",
+  "texts_fixture": "tests/fixtures/benchmark-texts.json",
+  "thresholds": {
+    "rtf_pct": 0.10,
+    "latency_p50_pct": 0.10,
+    "latency_p95_pct": 0.15
+  },
+  "policy": "warn-only",
+  "benchmark_params": {
+    "n_warmup": 5,
+    "n_runs": 30
+  },
+  "runtimes": {
+    "python": {
+      "short":  { "rtf": null, "latency_p50_ms": null, "latency_p95_ms": null },
+      "medium": { "rtf": null, "latency_p50_ms": null, "latency_p95_ms": null },
+      "long":   { "rtf": null, "latency_p50_ms": null, "latency_p95_ms": null }
+    },
+    "rust": {
+      "short":  { "rtf": null, "latency_p50_ms": null, "latency_p95_ms": null },
+      "medium": { "rtf": null, "latency_p50_ms": null, "latency_p95_ms": null },
+      "long":   { "rtf": null, "latency_p50_ms": null, "latency_p95_ms": null }
+    },
+    "go": {
+      "short":  { "rtf": null, "latency_p50_ms": null, "latency_p95_ms": null },
+      "medium": { "rtf": null, "latency_p50_ms": null, "latency_p95_ms": null },
+      "long":   { "rtf": null, "latency_p50_ms": null, "latency_p95_ms": null }
+    },
+    "csharp": {
+      "short":  { "rtf": null, "latency_p50_ms": null, "latency_p95_ms": null },
+      "medium": { "rtf": null, "latency_p50_ms": null, "latency_p95_ms": null },
+      "long":   { "rtf": null, "latency_p50_ms": null, "latency_p95_ms": null }
+    },
+    "cpp": {
+      "short":  { "rtf": null, "latency_p50_ms": null, "latency_p95_ms": null },
+      "medium": { "rtf": null, "latency_p50_ms": null, "latency_p95_ms": null },
+      "long":   { "rtf": null, "latency_p50_ms": null, "latency_p95_ms": null }
+    },
+    "wasm": {
+      "short":  { "rtf": null, "latency_p50_ms": null, "latency_p95_ms": null },
+      "medium": { "rtf": null, "latency_p50_ms": null, "latency_p95_ms": null },
+      "long":   { "rtf": null, "latency_p50_ms": null, "latency_p95_ms": null }
+    }
+  }
+}

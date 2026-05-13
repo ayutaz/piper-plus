@@ -1,0 +1,158 @@
+name: "CLI Help / Docs Drift Gate"
+
+# Verifies that every flag listed in the user-facing CLI reference doc
+# (docs/guides/cli-usage.md) is still advertised by `python -m piper --help`.
+# Without this gate, v1.12.0-style breaking changes (e.g. removal of
+# `--mb-istft` when HiFi-GAN was deleted) can leave stale flag-table rows
+# in the markdown: users then copy a command that the CLI no longer accepts
+# and the failure mode is "unrecognized arguments" with no migration hint.
+#
+# Today the canonical reference doc is C++-CLI-flavoured, so the Python
+# Runtime gate uses `--mode stale-only`: it only blocks PRs that *remove*
+# (or rename) a flag from `--help` while the markdown row survives. The
+# inverse direction (new `--help` flag missing from docs) is reported as
+# info but does not fail, because the C++ reference doc covers a different
+# CLI surface. When a dedicated Python CLI reference doc lands, flip to
+# `--mode strict` for stricter bidirectional gating.
+
+on:
+  push:
+    branches: [dev, main]
+    paths:
+      - 'src/python_run/piper/**/*.py'
+      - 'docs/guides/cli-usage.md'
+      - 'docs/**/*.md'
+      - 'scripts/check_cli_help_drift.py'
+      - '.github/workflows/cli-help-docs-sync.yml'
+  pull_request:
+    paths:
+      - 'src/python_run/piper/**/*.py'
+      - 'docs/guides/cli-usage.md'
+      - 'docs/**/*.md'
+      - 'scripts/check_cli_help_drift.py'
+      - '.github/workflows/cli-help-docs-sync.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write  # required to comment a drift report back on the PR
+
+jobs:
+  python-cli-help-drift:
+    name: python -m piper --help vs docs/guides/cli-usage.md
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6.0.2
+
+      - uses: actions/setup-python@v5.6.0
+        with:
+          python-version: '3.13'
+
+      - name: Install uv
+        # Mirrors the project's preferred Python invoker — see CLAUDE.md
+        # "Pythonの実行にはuvを使う". Pin to a release SHA per repo policy.
+        run: pip install --no-cache-dir uv
+
+      - name: Install piper-plus (python_run) for --help capture
+        # Minimal editable install of the runtime package: argparse parsing
+        # in `python -m piper --help` only needs the package to be importable,
+        # which transitively pulls in onnxruntime / pyopenjtalk-plus. The
+        # `[all]` extra is intentionally avoided to keep the job under 2
+        # minutes; the drift check never invokes inference.
+        run: |
+          uv pip install --system -e "src/python/g2p"
+          uv pip install --system -e "src/python_run"
+
+      - name: Capture `python -m piper --help`
+        id: capture
+        # Redirect both streams: argparse writes usage to stdout, but uv may
+        # emit deprecation warnings on stderr. The drift script filters
+        # non-option text via its option-line regex, so capturing both is
+        # safe and yields a single source-of-truth artifact.
+        run: |
+          python -m piper --help > piper_help.txt 2>&1 || true
+          echo '--- captured help ---'
+          cat piper_help.txt
+
+      - name: Run CLI help / docs drift gate
+        id: drift
+        # `--mode stale-only` because the canonical reference doc today is
+        # C++-CLI-flavoured: it documents flags (`--use-cuda`, `--text`,
+        # `--streaming`, …) that the C++ binary accepts but `python -m
+        # piper --help` does not. Those rows are documented and intentional,
+        # so we allow-list them here as the *baseline* — meaning the gate
+        # passes today and only fails when a *new* drift appears (e.g. a
+        # row that *was* shared with the Python CLI suddenly disappears
+        # from --help, exactly the v1.12.0 `--mb-istft` scenario).
+        #
+        # When a dedicated Python CLI reference doc lands, drop most of
+        # these --allow entries and flip `--mode strict`.
+        # Exit code 1 = drift; the `tee` keeps the report for the PR
+        # comment step below without losing the script's exit status.
+        run: |
+          set -o pipefail
+          # NOTE: --allow=--xxx (equals form) is required so argparse does
+          # not mis-interpret the flag value as another option.
+          python scripts/check_cli_help_drift.py \
+            --help-file piper_help.txt \
+            --docs docs/guides/cli-usage.md \
+            --mode stale-only \
+            --allow=--custom-dict \
+            --allow=--gpu-device-id \
+            --allow=--json-input \
+            --allow=--language \
+            --allow=--model-dir \
+            --allow=--output-timing \
+            --allow=--phoneme-silence \
+            --allow=--quiet \
+            --allow=--raw-phonemes \
+            --allow=--streaming \
+            --allow=--test-mode \
+            --allow=--text \
+            --allow=--timing-format \
+            --allow=--use-cuda \
+            2>&1 | tee drift_report.txt
+
+      - name: Upload drift report
+        if: always()
+        uses: actions/upload-artifact@v4.4.3
+        with:
+          name: cli-help-drift-report
+          path: |
+            piper_help.txt
+            drift_report.txt
+          retention-days: 14
+
+      - name: Comment drift report on PR
+        # Only post a comment on PR events where the gate failed; otherwise
+        # we'd spam the PR with green-status noise on every push.
+        if: failure() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7.0.1
+        with:
+          script: |
+            const fs = require('fs');
+            let body = '## CLI Help / Docs Drift detected\n\n';
+            body += 'The user-facing CLI doc references flags that `python -m piper --help` ';
+            body += 'no longer exposes. This usually means a flag was removed or renamed ';
+            body += '(see v1.12.0 `--mb-istft` removal as a precedent) but the markdown ';
+            body += 'flag-table row was not updated.\n\n';
+            body += '<details><summary>Drift report</summary>\n\n```\n';
+            try {
+              body += fs.readFileSync('drift_report.txt', 'utf8');
+            } catch (e) {
+              body += '(drift report not captured)';
+            }
+            body += '\n```\n\n</details>\n\n';
+            body += 'Fix: update `docs/guides/cli-usage.md` to remove or rename the ';
+            body += 'stale row, or pass `--allow <flag>` in the workflow if intentional.';
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body
+            });

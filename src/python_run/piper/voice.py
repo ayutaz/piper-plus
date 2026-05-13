@@ -679,6 +679,17 @@ class PiperVoice:
         :meth:`synthesize_stream_raw`. The chunks are concatenated into a
         single WAV file. SSML markup (``<speak>...``) is treated as a
         single unit.
+
+        Examples
+        --------
+        Loading a real ONNX model has heavyweight side effects (file I/O,
+        ORT session creation), so the doctest is SKIP-marked to document
+        the canonical call shape without exercising it:
+
+        >>> import wave  # doctest: +SKIP
+        >>> voice = PiperVoice.load("model.onnx")  # doctest: +SKIP
+        >>> with wave.open("out.wav", "wb") as wav:  # doctest: +SKIP
+        ...     voice.synthesize("Hello world.", wav)
         """
         wav_file.setframerate(self.config.sample_rate)
         wav_file.setsampwidth(2)  # 16-bit
@@ -1120,9 +1131,9 @@ class PiperVoice:
 
         Examples
         --------
-        >>> voice = PiperVoice.load('model.onnx', config_path='config.json')
-        >>> wav_bytes, timing = voice.synthesize_with_timing('Hello world')
-        >>> if timing is not None:
+        >>> voice = PiperVoice.load('model.onnx', config_path='config.json')  # doctest: +SKIP
+        >>> wav_bytes, timing = voice.synthesize_with_timing('Hello world')  # doctest: +SKIP
+        >>> if timing is not None:  # doctest: +SKIP
         ...     for p in timing.phonemes:
         ...         print(f'{p.phoneme}: {p.start_ms:.1f}-{p.end_ms:.1f} ms')
         """

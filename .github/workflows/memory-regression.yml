@@ -1,0 +1,169 @@
+name: Memory regression (per-language)
+
+# Per-language peak RSS regression gate.
+#
+# Sister workflow to ``rtf-regression.yml``: that one tracks throughput
+# on English text, this one tracks the memory footprint of inference
+# across all six languages the 6lang base model supports
+# (ja / en / zh / es / fr / pt).
+#
+# Why a separate workflow?
+#   - The existing RTF job uses ``benchmark-action/github-action-benchmark``
+#     which expects a single time-series datapoint per run. The per-
+#     language memory matrix would need a custom adapter and would
+#     dilute the throughput chart on gh-pages.
+#   - Memory regressions are noisier than throughput regressions on
+#     hosted runners (page-cache, BSS layout), so we keep this gate
+#     ``warn-only`` for the foreseeable future to avoid alert fatigue.
+#
+# Policy:
+#   - Threshold ``+15 %`` vs ``tests/fixtures/memory-baseline.json``.
+#   - Warn-only: the job always exits 0 and posts a sticky PR comment.
+#     Tighten to fail once we have a few weeks of variance data.
+
+on:
+  pull_request:
+    branches: [dev]
+    paths:
+      - 'src/python/piper_train/**'
+      - 'src/python_run/piper/**'
+      - 'scripts/benchmark.py'
+      - 'tests/fixtures/memory-baseline.json'
+      - 'test/models/multilingual-test-medium.onnx*'
+      - '.github/workflows/memory-regression.yml'
+  push:
+    branches: [dev]
+    paths:
+      - 'src/python/piper_train/**'
+      - 'src/python_run/piper/**'
+      - 'scripts/benchmark.py'
+      - 'tests/fixtures/memory-baseline.json'
+      - 'test/models/multilingual-test-medium.onnx*'
+      - '.github/workflows/memory-regression.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  memory:
+    name: Peak RSS per language (Ubuntu)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    # Fork PRs cannot post comments; matches rtf-regression.yml.
+    if: github.event.pull_request.head.repo.full_name == github.repository || github.event_name != 'pull_request'
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v6.0.2
+
+      - uses: astral-sh/setup-uv@v6.8.0
+        with:
+          python-version: '3.12'
+
+      - name: Install inference dependencies
+        run: uv sync --extra inference
+
+      # One ``benchmark.py`` invocation per language. We launch them
+      # sequentially (not in matrix) so a single artifact captures the
+      # whole table — keeps the sticky PR comment trivial to assemble.
+      - name: Benchmark all 6 languages
+        run: |
+          set -euo pipefail
+          mkdir -p memory-results
+          for lang in ja en zh es fr pt; do
+            echo "::group::benchmark ${lang}"
+            uv run python scripts/benchmark.py \
+                --model  test/models/multilingual-test-medium.onnx \
+                --config test/models/multilingual-test-medium.onnx.json \
+                --language "${lang}" \
+                --n-warmup 2 --n-runs 10 \
+                --format json \
+                --output "memory-results/${lang}.json"
+            echo "::endgroup::"
+          done
+
+      # Compare against the baseline. Inline Python so we do not need
+      # another script; the logic is short and self-contained.
+      - name: Compare against baseline (warn-only)
+        id: compare
+        run: |
+          uv run python - <<'PY'
+          import json, pathlib, sys, os
+          base = json.loads(pathlib.Path("tests/fixtures/memory-baseline.json").read_text())
+          threshold = float(base.get("threshold_pct", 0.15))
+          rows = ["## Memory regression (per-language)",
+                  "",
+                  f"Threshold: +{threshold*100:.0f}% peak RSS vs baseline (warn-only).",
+                  "",
+                  "| Status | Lang | Baseline (MB) | Observed (MB) | Delta |",
+                  "|--------|------|---------------|---------------|-------|"]
+          warn = 0
+          skip = 0
+          for lang in ("ja", "en", "zh", "es", "fr", "pt"):
+              cfg = base["languages"].get(lang, {})
+              base_mb = cfg.get("peak_memory_mb")
+              try:
+                  data = json.loads(pathlib.Path(f"memory-results/{lang}.json").read_text())
+                  obs_mb = data[0]["peak_memory_mb"] if isinstance(data, list) else data.get("peak_memory_mb")
+              except Exception as e:
+                  obs_mb = None
+                  print(f"WARN: could not read memory-results/{lang}.json: {e}", file=sys.stderr)
+              if base_mb is None or obs_mb is None:
+                  rows.append(f"| SKIP | {lang} | {base_mb if base_mb is not None else 'n/a'} | {obs_mb if obs_mb is not None else 'n/a'} | n/a |")
+                  skip += 1
+                  continue
+              delta = (obs_mb - base_mb) / base_mb
+              status = "WARN" if delta > threshold else "OK"
+              if status == "WARN":
+                  warn += 1
+              rows.append(f"| {status} | {lang} | {base_mb:.1f} | {obs_mb:.1f} | {delta*100:+.2f}% |")
+          rows.append("")
+          rows.append(f"Summary: {warn} warn / {skip} skip / {6 - warn - skip} ok.")
+          rows.append("")
+          rows.append("_SKIP means the baseline entry is a placeholder (peak_memory_mb: null). "
+                      "The first dev push after this workflow lands is expected to seed the baseline._")
+          pathlib.Path("memory-report.md").write_text("\n".join(rows) + "\n")
+          print("\n".join(rows))
+          # Warn-only — never fail the job.
+          PY
+
+      - name: Upload memory results
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: memory-regression-${{ github.event_name }}-${{ github.run_attempt }}
+          path: |
+            memory-results/
+            memory-report.md
+          retention-days: 30
+
+      - name: Upsert sticky PR comment
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7.0.1
+        with:
+          script: |
+            const fs = require('fs');
+            const body = fs.readFileSync('memory-report.md', 'utf8');
+            const marker = '<!-- piper-plus:memory-regression -->';
+            const payload = `${marker}\n${body}`;
+
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+            const { data: comments } = await github.rest.issues.listComments({
+              owner, repo, issue_number, per_page: 100,
+            });
+            const existing = comments.find(c => c.body && c.body.startsWith(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner, repo, comment_id: existing.id, body: payload,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner, repo, issue_number, body: payload,
+              });
+            }

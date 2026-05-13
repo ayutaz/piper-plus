@@ -1,0 +1,22 @@
+{
+  "all": true,
+  "include": [
+    "src/**/*.js"
+  ],
+  "exclude": [
+    "dist/**",
+    "dist/**/*.wasm",
+    "node_modules/**",
+    "test/**",
+    "types/**",
+    "coverage/**",
+    "**/*.wasm"
+  ],
+  "reporter": [
+    "lcov",
+    "text"
+  ],
+  "report-dir": "coverage",
+  "check-coverage": false,
+  "skip-full": false
+}

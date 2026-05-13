@@ -194,7 +194,14 @@ class PhonemizerRegistry:
     # ------------------------------------------------------------------
 
     def available(self) -> list[str]:
-        """Return a list of all registered language codes."""
+        """Return a list of all registered language codes.
+
+        Examples
+        --------
+        >>> reg = PhonemizerRegistry()
+        >>> reg.available()
+        []
+        """
         return list(self._registry.keys())
 
 
@@ -207,6 +214,17 @@ def _detect_default_latin(parts: list[str]) -> str:
 
     Priority order: en > es > pt > fr.  Falls back to the first language
     in the list if no Latin-script language is present.
+
+    Examples
+    --------
+    >>> _detect_default_latin(["ja", "en", "zh"])
+    'en'
+    >>> _detect_default_latin(["fr", "es"])
+    'es'
+    >>> _detect_default_latin(["pt", "fr"])
+    'pt'
+    >>> _detect_default_latin(["ja", "ko"])
+    'ja'
     """
     for lang in _LATIN_PRIORITY:
         if lang in parts:
@@ -245,6 +263,17 @@ def get_phonemizer(language: str) -> Phonemizer:
 
     Supports composite language codes (e.g. ``"ja-en-zh"``) -- see
     :meth:`PhonemizerRegistry.get` for details.
+
+    Examples
+    --------
+    Heavyweight phonemizers may need optional dependencies
+    (``pyopenjtalk``, ``g2p_en``, ``pypinyin``, ``g2pk2``) so this doctest
+    is intentionally a SKIP placeholder -- it documents the canonical call
+    shape without actually instantiating a model:
+
+    >>> phonemizer = get_phonemizer("ja")  # doctest: +SKIP
+    >>> phonemizer.phonemize("こんにちは")  # doctest: +SKIP
+    ['k', 'o', 'N_n', 'n', 'i', 'ch', 'i', 'w', 'a']
     """
     return _default_registry.get(language)
 

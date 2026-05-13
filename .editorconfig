@@ -60,3 +60,38 @@ indent_size = unset
 # readability of these tables, so the entire spec dir opts out.
 [docs/spec/*.toml]
 indent_size = unset
+
+# CMake files in this repo are written with 2-space indentation (matching
+# the legacy piper.cpp/.hpp style imported from the upstream piper project).
+# MSBuild project files (.csproj) also use 2-space indentation per
+# Visual Studio defaults. Opt these in explicitly so the
+# indent-multiple-of-4 check from [*] does not fire.
+[*.cmake]
+indent_size = 2
+
+[CMakeLists.txt]
+indent_size = 2
+
+[*.csproj]
+indent_size = unset
+
+# registry.py's module-level docstring uses 3-space ReST literal-block
+# indentation under numbered list items (PEP 257 / Sphinx convention),
+# which is incompatible with the indent-multiple-of-4 check. The actual
+# Python code in this file follows 4-space indentation.
+[src/python/g2p/piper_plus_g2p/registry.py]
+indent_size = unset
+
+# Contract-gate scripts use ReST bullet/numbered-list continuation
+# indentation (2-space follow-on) inside module-level docstrings, which
+# fights the indent-multiple-of-4 check. The actual Python code in these
+# scripts follows 4-space indentation.
+[scripts/check_*.py]
+indent_size = unset
+
+# android-build.yml uses shell line-continuation column alignment (15-space
+# indent for `\`-continued bash arguments) inside `run:` blocks. yamllint
+# is fine with this since YAML treats the block-literal contents as opaque
+# text, but the indent-multiple-of-2 check fights the continuation style.
+[.github/workflows/android-build.yml]
+indent_size = unset
