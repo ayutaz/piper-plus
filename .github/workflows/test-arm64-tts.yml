@@ -11,6 +11,10 @@ on:
       - '.github/workflows/test-arm64-tts.yml'
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test-linux-arm64-emulated:
     name: Test Linux ARM64 TTS (Emulated)

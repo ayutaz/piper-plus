@@ -41,6 +41,7 @@
   ],
   "scripts": {
     "test": "node --test test/js/test-piper-plus.js test/js/test-npm-package.js",
+    "test:coverage": "c8 --reporter=lcov --reporter=text npm test",
     "test:optimization": "node --test test/js/test-benchmark-runner.js test/js/test-memory-pool.js test/js/test-resampler.js test/js/test-webgpu-session.js test/js/test-streaming-pipeline.js test/js/test-cache-manager.js test/js/test-audio-backend.js test/js/test-phase2-integration.js",
     "test:optimization:phase1": "node --test test/js/test-benchmark-runner.js test/js/test-cache-manager.js",
     "test:optimization:phase2": "node --test test/js/test-resampler.js test/js/test-webgpu-session.js test/js/test-audio-backend.js",
@@ -62,7 +63,7 @@
     "build": "npm run build:production",
     "serve": "python3 -m http.server 8081",
     "clean": "rm -rf dist build/build-*",
-    "prepublishOnly": "echo 'Ready to publish'",
+    "prepublishOnly": "npm run check:types && npm test",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --check .",
@@ -74,6 +75,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.10.0",
+    "c8": "^13.0.0",
     "eslint": "^9.10.0",
     "prettier": "^3.3.0",
     "typescript": "^5.5.0"

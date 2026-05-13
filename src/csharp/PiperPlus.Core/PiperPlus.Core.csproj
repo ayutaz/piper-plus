@@ -29,6 +29,23 @@
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.3" />
   </ItemGroup>
 
+  <!-- Banned API analyzer: enforces Path.Join over Path.Combine (CodeQL
+       cs/path-combine, feedback memory feedback_csharp_path_join.md).
+       BannedSymbols.txt lives under src/csharp/ alongside Directory.Build.props
+       and is referenced from production projects only (test code is exempt
+       because cleaning ~50 occurrences would be out of scope and tests do not
+       ship to NuGet consumers). -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.BannedApiAnalyzers" Version="3.3.4">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
+    <AdditionalFiles Include="$(MSBuildThisFileDirectory)../BannedSymbols.txt"
+                     Visible="false" />
+  </ItemGroup>
+
   <!-- ZH-EN code-switching loanword dictionary (TICKET-03 C2). Byte-for-byte
        identical to src/python/g2p/piper_plus_g2p/data/zh_en_loanword.json
        (CI gate: scripts/check_loanword_consistency.py). -->

@@ -121,7 +121,7 @@ nohup /data/piper/.venv/bin/python -m piper_train \
 
 ### Decoder & 生成
 
-- **MB-iSTFT-VITS2 Decoder** (`vits/mb_istft.py`, `vits/stft_onnx.py`) — HiFi-GAN を完全置換、CPU 推論 **2.21x 高速化** (76.2ms / 100 phoneme p50)。`upsample_rates=(4,4)` + iSTFT(4x) + PQMF(4x) = 256x。出力形状 `[B, 1, T]` 維持で C#/Rust/Go/WASM/C++ ランタイム変更不要。CLI: `--c-sub-stft`, `--sub-stft-{fft,hop,win}-sizes`。Issue #268, PR #320。
+- **MB-iSTFT-VITS2 Decoder** (`vits/mb_istft.py`, `vits/stft_onnx.py`) — HiFi-GAN を完全置換、CPU Decoder 単体で **2.21x 高速化** (HiFi-GAN 168.2ms → MB-iSTFT 76.2ms / 100 phoneme p50、PR #320 内部 A/B microbench)。End-to-end の Latency P50 は README.md の Benchmark 表 (Xeon E5-2650 v4 / 25 phoneme 英文 / warmup 5 + 30 runs で **27ms**) を canonical 値とする (測定環境・テスト長が異なるため別値)。`upsample_rates=(4,4)` + iSTFT(4x) + PQMF(4x) = 256x。出力形状 `[B, 1, T]` 維持で C#/Rust/Go/WASM/C++ ランタイム変更不要。CLI: `--c-sub-stft`, `--sub-stft-{fft,hop,win}-sizes`。Issue #268, PR #320。
 - **WavLM Discriminator** (`vits/models.py:WavLMDiscriminator`) — 学習時のみ知覚品質判別。GPU +1-2GB。CLI: `--no-wavlm`, `--wavlm-every-n-steps`, `--c-wavlm`。V100 では `--no-wavlm` 推奨。
 - **prosody_features (A1/A2/A3)** (`vits/models.py`) — OpenJTalk 由来の韻律情報を DP 入力に活用。CLI: `--prosody-dim 16` (デフォルト)。
 - **EMA + stochastic** — ONNX エクスポート時に EMA 自動適用 (チェックポイントに state あれば)。`--no-stochastic` で deterministic。

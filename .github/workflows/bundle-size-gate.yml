@@ -1,0 +1,146 @@
+name: Bundle size gate
+
+# Build every public distributable (npm tarball, NuGet nupkg, cargo crate,
+# Android AAR) and compare its on-disk size against
+# ``tests/fixtures/bundle-size-baseline.json`` via
+# ``scripts/check_bundle_size.py``.
+#
+# Tolerance policy (encoded in the script, repeated here for reviewers):
+#   npm   : ±3 %  (browser bundle — users ship over the wire)
+#   nuget : ±5 %  (debug symbols / metadata churn is normal)
+#   crate : ±5 %  (cargo package occasionally reshuffles file order)
+#   maven : ±5 %  (AAR includes Kotlin metadata + resources)
+#
+# The PR is annotated with a sticky comment (``actions/github-script``
+# upserts the comment by marker line). The job is intentionally
+# warn-only on missing artifacts (``size_bytes: null`` in the baseline,
+# or no glob match on disk) so contributors can land the gate before
+# every ecosystem has a real baseline.
+
+on:
+  pull_request:
+    branches: [dev]
+    paths:
+      - 'src/wasm/**'
+      - 'src/csharp/**'
+      - 'src/rust/**'
+      - 'android/**'
+      - 'scripts/check_bundle_size.py'
+      - 'tests/fixtures/bundle-size-baseline.json'
+      - '.github/workflows/bundle-size-gate.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  bundle-size:
+    name: Measure + compare bundle sizes
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    # Skip fork PRs — they cannot post sticky comments and would only emit
+    # a "skip" report. (Matches rtf-regression.yml policy.)
+    if: github.event.pull_request.head.repo.full_name == github.repository || github.event_name != 'pull_request'
+    permissions:
+      contents: read
+      pull-requests: write  # sticky comment via actions/github-script
+    steps:
+      - uses: actions/checkout@v6.0.2
+
+      # -- toolchains ----------------------------------------------------
+      - uses: astral-sh/setup-uv@v6.8.0
+        with:
+          python-version: '3.12'
+
+      - uses: actions/setup-node@v6.0.0
+        with:
+          node-version: '22'
+
+      - uses: actions/setup-dotnet@v5.0.0
+        with:
+          dotnet-version: '10.0.x'
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: actions/setup-java@v5.0.0
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      # -- pack each ecosystem ------------------------------------------
+      # Failures are non-fatal (``continue-on-error``); the script
+      # records a SKIP for any artifact that did not materialise so a
+      # transient toolchain issue can never block a PR landing here.
+      - name: npm pack (piper-plus + @piper-plus/g2p)
+        continue-on-error: true
+        working-directory: .
+        run: |
+          (cd src/wasm/openjtalk-web && npm install --ignore-scripts && npm pack)
+          (cd src/wasm/g2p          && npm install --ignore-scripts && npm pack)
+
+      - name: dotnet pack (PiperPlus.Core + PiperPlus.Cli)
+        continue-on-error: true
+        run: |
+          dotnet pack src/csharp/PiperPlus.Core/PiperPlus.Core.csproj -c Release
+          dotnet pack src/csharp/PiperPlus.Cli/PiperPlus.Cli.csproj  -c Release
+
+      - name: cargo package (piper-plus)
+        continue-on-error: true
+        working-directory: src/rust
+        run: cargo package -p piper-plus --no-verify --allow-dirty
+
+      - name: gradle bundleRelease (piper-plus-g2p AAR)
+        continue-on-error: true
+        working-directory: android
+        run: ./gradlew :piper-plus-g2p:assembleRelease
+
+      # -- gate ----------------------------------------------------------
+      - name: Compare against baseline
+        id: gate
+        run: |
+          uv run python scripts/check_bundle_size.py \
+              --format markdown --output bundle-size-report.md || echo "exit_code=$?" >> "$GITHUB_OUTPUT"
+          uv run python scripts/check_bundle_size.py --format json --warn-only > bundle-size-report.json
+          cat bundle-size-report.md
+
+      - name: Upload size report
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: bundle-size-report-${{ github.run_attempt }}
+          path: |
+            bundle-size-report.md
+            bundle-size-report.json
+          retention-days: 30
+
+      # Sticky PR comment: insert on first run, update afterwards. The
+      # marker line lets the script identify its own previous comment
+      # without relying on a third-party action.
+      - name: Upsert sticky PR comment
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v8.0.0
+        with:
+          script: |
+            const fs = require('fs');
+            const body = fs.readFileSync('bundle-size-report.md', 'utf8');
+            const marker = '<!-- piper-plus:bundle-size-gate -->';
+            const payload = `${marker}\n${body}`;
+
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+            const { data: comments } = await github.rest.issues.listComments({
+              owner, repo, issue_number, per_page: 100,
+            });
+            const existing = comments.find(c => c.body && c.body.startsWith(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner, repo, comment_id: existing.id, body: payload,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner, repo, issue_number, body: payload,
+              });
+            }

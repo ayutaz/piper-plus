@@ -52,6 +52,19 @@ def split_sentences(text: str) -> list[str]:
 
     Consecutive whitespace between sentences is trimmed. Empty input or
     whitespace-only input returns an empty list.
+
+    Examples
+    --------
+    >>> split_sentences("Hello. World!")
+    ['Hello.', 'World!']
+    >>> split_sentences("こんにちは。さようなら。")
+    ['こんにちは。', 'さようなら。']
+    >>> split_sentences("")
+    []
+    >>> split_sentences("   ")
+    []
+    >>> split_sentences("Hi.")
+    ['Hi.']
     """
     if not text:
         return []

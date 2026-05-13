@@ -1,0 +1,39 @@
+{
+  "_comment": "Per-language peak RSS baseline consumed by .github/workflows/memory-regression.yml via scripts/benchmark.py. Each entry is the peak_memory_mb value reported by a single-language benchmark run on the bundled test/models/multilingual-test-medium.onnx model. peak_memory_mb: null is a placeholder; the first CI run uploads the observed values as a workflow artifact and a follow-up PR commits them here. threshold_pct is the +regression tolerance vs baseline; current policy is warn-only (workflow does not fail).",
+  "version": 1,
+  "model": "test/models/multilingual-test-medium.onnx",
+  "threshold_pct": 0.15,
+  "policy": "warn-only",
+  "languages": {
+    "en": {
+      "peak_memory_mb": null,
+      "n_warmup": 2,
+      "n_runs": 10
+    },
+    "es": {
+      "peak_memory_mb": null,
+      "n_warmup": 2,
+      "n_runs": 10
+    },
+    "fr": {
+      "peak_memory_mb": null,
+      "n_warmup": 2,
+      "n_runs": 10
+    },
+    "ja": {
+      "peak_memory_mb": null,
+      "n_warmup": 2,
+      "n_runs": 10
+    },
+    "pt": {
+      "peak_memory_mb": null,
+      "n_warmup": 2,
+      "n_runs": 10
+    },
+    "zh": {
+      "peak_memory_mb": null,
+      "n_warmup": 2,
+      "n_runs": 10
+    }
+  }
+}

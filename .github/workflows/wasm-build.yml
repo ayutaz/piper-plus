@@ -14,6 +14,10 @@ on:
       - 'src/rust/piper-wasm/**'
       - 'src/rust/Cargo.toml'
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   wasm-build:
     uses: ./.github/workflows/build-wasm-reusable.yml

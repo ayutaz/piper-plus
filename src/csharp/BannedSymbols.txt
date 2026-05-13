@@ -1,0 +1,14 @@
+; Banned APIs for PiperPlus C# codebase (Microsoft.CodeAnalysis.BannedApiAnalyzers RS0030).
+;
+; Path.Combine is banned because it silently drops earlier path fragments if a
+; later fragment looks rooted (starts with '/' or 'C:\'). Example:
+;   Path.Combine("/usr/local/data", "/etc/passwd") -> "/etc/passwd"
+; This is the CodeQL `cs/path-combine` smell and was the root cause of PR #401
+; (63 occurrences) and PR #443. Use Path.Join instead — it never drops
+; arguments and is purely a string-concatenation primitive.
+;
+; Feedback memory: feedback_csharp_path_join.md
+M:System.IO.Path.Combine(System.String,System.String);Use Path.Join instead — Path.Combine silently drops earlier arguments if a later one is rooted (CodeQL cs/path-combine).
+M:System.IO.Path.Combine(System.String,System.String,System.String);Use Path.Join instead — Path.Combine silently drops earlier arguments if a later one is rooted (CodeQL cs/path-combine).
+M:System.IO.Path.Combine(System.String,System.String,System.String,System.String);Use Path.Join instead — Path.Combine silently drops earlier arguments if a later one is rooted (CodeQL cs/path-combine).
+M:System.IO.Path.Combine(System.String[]);Use Path.Join instead — Path.Combine silently drops earlier arguments if a later one is rooted (CodeQL cs/path-combine).

@@ -95,6 +95,23 @@ def durations_to_timing(
     ------
     ValueError
         If inputs are invalid (length mismatch, non-positive rate/hop).
+
+    Examples
+    --------
+    Using a contrived ``hop_length`` / ``sample_rate`` pair that produces a
+    clean 10 ms per frame (240 / 24000 * 1000 = 10.0) keeps the doctest
+    free of floating-point noise:
+
+    >>> result = durations_to_timing([2.0, 3.0], ["a", "b"], 24000, 240)
+    >>> result.total_duration_ms
+    50.0
+    >>> result.phonemes[0].start_ms, result.phonemes[0].end_ms
+    (0.0, 20.0)
+    >>> result.phonemes[1].duration_ms
+    30.0
+    >>> empty = durations_to_timing([], [], 24000, 240)
+    >>> empty.total_duration_ms
+    0.0
     """
     if len(durations) != len(phoneme_tokens):
         raise ValueError(
@@ -185,7 +202,17 @@ def timing_to_srt(result: TimingResult) -> str:
 
 
 def _format_srt_timestamp(ms: float) -> str:
-    """Format milliseconds as SRT timestamp: ``HH:MM:SS,mmm``."""
+    """Format milliseconds as SRT timestamp: ``HH:MM:SS,mmm``.
+
+    Examples
+    --------
+    >>> _format_srt_timestamp(0)
+    '00:00:00,000'
+    >>> _format_srt_timestamp(1234.5)
+    '00:00:01,234'
+    >>> _format_srt_timestamp(3_661_500)
+    '01:01:01,500'
+    """
     total_ms = round(ms)
     millis = total_ms % 1000
     total_secs = total_ms // 1000
@@ -218,6 +245,15 @@ def build_phoneme_id_reverse_map(
         Mapping from phoneme ID to display name.  PUA characters
         (U+E000..U+F8FF) without an explicit mapping are rendered as
         ``U+XXXX``.
+
+    Examples
+    --------
+    >>> build_phoneme_id_reverse_map({"a": [5], "b": [6, 7]})
+    {5: 'a', 6: 'b', 7: 'b'}
+    >>> build_phoneme_id_reverse_map({"\\ue019": [42]})
+    {42: 'U+E019'}
+    >>> build_phoneme_id_reverse_map({"\\ue019": [42]}, {"\\ue019": "N_m"})
+    {42: 'N_m'}
     """
     if pua_to_multi_char is None:
         pua_to_multi_char = {}

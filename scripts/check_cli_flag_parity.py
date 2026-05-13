@@ -9,6 +9,12 @@ historically accepted both ``--sentence_silence`` (underscore) and
 hyphen form, leaving users who learned the underscore form from the
 C++ help text confused on Rust / Go.
 
+The flag matrix, runtime paths, and skip allowlist live in
+``docs/spec/cli-flag-contract.toml`` so the data is reviewable in
+isolation from the verifier logic. This script is the *enforcer* —
+edits to the contract are the right place to register new flags or
+add/remove a runtime.
+
 Source of truth: hyphen-separated flag names (Unix convention). The
 script searches for the hyphen-form *base name* (without the leading
 ``--``) because each runtime uses a different declaration idiom:
@@ -20,17 +26,6 @@ script searches for the hyphen-form *base name* (without the leading
   - C++ manual:         ``arg == "--sentence-silence"``
 
 A simple substring match for the hyphen-form base name catches all five.
-
-Some flags are intentionally not implemented in every runtime:
-
-  - ``phoneme-silence`` is voice-runtime-only (Rust / Go / C++) — Python
-    runtime CLI and the C# CLI do not expose it.
-  - Voice-cloning flags (``reference-audio`` / ``speaker-embedding`` /
-    ``speaker-encoder-model``) are not implemented in the C++ CLI yet.
-
-The allowlist below records the *current* feature matrix. Removing an
-entry from `SKIPS` here is the right action when a runtime implements
-a flag for the first time.
 
 Usage:
     python scripts/check_cli_flag_parity.py
@@ -45,44 +40,14 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+try:
+    import tomllib  # Python 3.11+
+except ImportError:
+    import tomli as tomllib  # type: ignore[no-redef]
+
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-
-# (label, path)
-PYTHON_RUNTIME = (
-    "Python runtime CLI",
-    REPO_ROOT / "src/python_run/piper/__main__.py",
-)
-PYTHON_TRAIN = (
-    "Python infer_onnx CLI",
-    REPO_ROOT / "src/python/piper_train/infer_onnx.py",
-)
-RUST = ("Rust piper-cli", REPO_ROOT / "src/rust/piper-cli/src/main.rs")
-GO = ("Go piper-plus CLI", REPO_ROOT / "src/go/cmd/piper-plus/main.go")
-CSHARP = ("C# PiperPlus.Cli", REPO_ROOT / "src/csharp/PiperPlus.Cli/Program.cs")
-CPP = ("C++ piper_plus main", REPO_ROOT / "src/cpp/main.cpp")
-
-COMMON_RUNTIMES = [PYTHON_RUNTIME, RUST, GO, CSHARP, CPP]
-VOICE_CLONING_RUNTIMES = [PYTHON_TRAIN, RUST, GO, CSHARP, CPP]
-
-# (hyphen-form-base-name, runtimes-that-should-have-it)
-CHECKS: list[tuple[str, list[tuple[str, Path]]]] = [
-    ("sentence-silence", COMMON_RUNTIMES),
-    ("phoneme-silence", COMMON_RUNTIMES),
-    ("reference-audio", VOICE_CLONING_RUNTIMES),
-    ("speaker-embedding", VOICE_CLONING_RUNTIMES),
-    ("speaker-encoder-model", VOICE_CLONING_RUNTIMES),
-]
-
-# Known not-implemented pairs (label of the runtime, flag base name).
-# Remove an entry once the runtime adds the flag.
-SKIPS: set[tuple[str, str]] = {
-    ("Python runtime CLI", "phoneme-silence"),
-    ("C# PiperPlus.Cli", "phoneme-silence"),
-    ("C++ piper_plus main", "reference-audio"),
-    ("C++ piper_plus main", "speaker-embedding"),
-    ("C++ piper_plus main", "speaker-encoder-model"),
-}
+CONTRACT = REPO_ROOT / "docs" / "spec" / "cli-flag-contract.toml"
 
 
 def contains_flag(path: Path, flag_basename: str) -> bool:
@@ -115,13 +80,54 @@ def contains_flag(path: Path, flag_basename: str) -> bool:
     return flag_basename in text or underscore_form in text
 
 
+def _load_contract() -> dict:
+    if not CONTRACT.exists():
+        print(f"::error::contract missing: {CONTRACT}", file=sys.stderr)
+        sys.exit(1)
+    with CONTRACT.open("rb") as f:
+        return tomllib.load(f)
+
+
 def main(argv: list[str] | None = None) -> int:
+    contract = _load_contract()
+
+    # Build runtime registry: key -> (label, path)
+    runtimes_by_key: dict[str, tuple[str, Path]] = {}
+    for r in contract.get("runtimes", []):
+        runtimes_by_key[r["key"]] = (r["label"], REPO_ROOT / r["path"])
+
+    groups: dict[str, list[str]] = contract.get("groups", {})
+
+    # Skip allowlist: set of (label, flag) pairs.
+    skips: set[tuple[str, str]] = set()
+    for s in contract.get("skips", []):
+        runtime_key = s["runtime"]
+        if runtime_key not in runtimes_by_key:
+            print(
+                f"::error::skips entry references unknown runtime key "
+                f"{runtime_key!r}",
+                file=sys.stderr,
+            )
+            return 1
+        label, _ = runtimes_by_key[runtime_key]
+        skips.add((label, s["flag"]))
+
     failures: list[str] = []
     skipped = 0
-    for flag, runtimes in CHECKS:
+    for entry in contract.get("flags", []):
+        flag = entry["flag"]
+        group_key = entry["runtimes"]
+        if group_key not in groups:
+            print(f"::error::unknown group {group_key!r} in [[flags]]", file=sys.stderr)
+            return 1
+        runtime_keys = groups[group_key]
         print(f"== --{flag} ==")
-        for label, path in runtimes:
-            if (label, flag) in SKIPS:
+        for key in runtime_keys:
+            if key not in runtimes_by_key:
+                print(f"::error::group {group_key!r} references unknown runtime {key!r}", file=sys.stderr)
+                return 1
+            label, path = runtimes_by_key[key]
+            if (label, flag) in skips:
                 print(f"  SKIP {label} (allowlisted as not-implemented)")
                 skipped += 1
                 continue
@@ -137,8 +143,7 @@ def main(argv: list[str] | None = None) -> int:
                     f"  FAIL [{label}] does not declare hyphen-form '{flag}'. "
                     f"Either add the flag in {path.relative_to(REPO_ROOT)} "
                     f"or, if this runtime intentionally lacks the feature, "
-                    f"allowlist the pair in SKIPS at "
-                    f"scripts/check_cli_flag_parity.py."
+                    f"add a [[skips]] entry in docs/spec/cli-flag-contract.toml."
                 )
                 failures.append(msg)
                 print(msg, file=sys.stderr)

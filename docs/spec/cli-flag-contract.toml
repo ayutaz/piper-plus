@@ -1,0 +1,128 @@
+# CLI Flag Parity Contract
+# ========================
+# Source of truth for which hyphen-form CLI flags must be recognised by
+# which runtime CLIs. Drift example caught by this gate: C++
+# `main.cpp:865` historically accepted both `--sentence_silence`
+# (underscore) and `--sentence-silence` (hyphen) while Rust / Go accepted
+# only the hyphen form, leaving users who learned the underscore form
+# from the C++ help text confused on Rust / Go.
+#
+# Hyphen-separated flag names follow Unix convention. Each runtime
+# spells the declaration differently (argparse hyphen / clap kebab-case
+# / pflag hyphen / System.CommandLine hyphen / manual string match) so
+# the verifier scripts/check_cli_flag_parity.py searches the source
+# files for the hyphen-form base name *or* its snake_case twin.
+#
+# Adding a runtime that implements a flag: drop the corresponding pair
+# from `skips`. Removing the implementation: re-add the pair.
+#
+# Implementations: scripts/check_cli_flag_parity.py loads this file at
+# startup; logic is unchanged from the pre-toml version.
+
+[meta]
+spec_version = "1.0.0"
+last_updated = "2026-05-13"
+canonical_source = "scripts/check_cli_flag_parity.py"
+status = "active"
+
+# ---------------------------------------------------------------------------
+# Runtime CLI declarations
+# ---------------------------------------------------------------------------
+# `label` is the human-readable name printed by the checker.
+# `path` is repo-relative; verifier resolves vs REPO_ROOT.
+
+[[runtimes]]
+key = "python_runtime"
+label = "Python runtime CLI"
+path = "src/python_run/piper/__main__.py"
+
+[[runtimes]]
+key = "python_train"
+label = "Python infer_onnx CLI"
+path = "src/python/piper_train/infer_onnx.py"
+
+[[runtimes]]
+key = "rust"
+label = "Rust piper-cli"
+path = "src/rust/piper-cli/src/main.rs"
+
+[[runtimes]]
+key = "go"
+label = "Go piper-plus CLI"
+path = "src/go/cmd/piper-plus/main.go"
+
+[[runtimes]]
+key = "csharp"
+label = "C# PiperPlus.Cli"
+path = "src/csharp/PiperPlus.Cli/Program.cs"
+
+[[runtimes]]
+key = "cpp"
+label = "C++ piper_plus main"
+path = "src/cpp/main.cpp"
+
+# ---------------------------------------------------------------------------
+# Runtime groups
+# ---------------------------------------------------------------------------
+# Convenience aliases so per-flag declarations stay short.
+
+[groups]
+common = ["python_runtime", "rust", "go", "csharp", "cpp"]
+voice_cloning = ["python_train", "rust", "go", "csharp", "cpp"]
+
+# ---------------------------------------------------------------------------
+# Flag matrix
+# ---------------------------------------------------------------------------
+# `flag` is the hyphen-form base name without the leading `--`.
+# `runtimes` is a group key from [groups] above.
+
+[[flags]]
+flag = "sentence-silence"
+runtimes = "common"
+
+[[flags]]
+flag = "phoneme-silence"
+runtimes = "common"
+
+[[flags]]
+flag = "reference-audio"
+runtimes = "voice_cloning"
+
+[[flags]]
+flag = "speaker-embedding"
+runtimes = "voice_cloning"
+
+[[flags]]
+flag = "speaker-encoder-model"
+runtimes = "voice_cloning"
+
+# ---------------------------------------------------------------------------
+# Known not-implemented pairs (allowlist)
+# ---------------------------------------------------------------------------
+# Each entry pins a runtime that intentionally lacks a flag. Removing an
+# entry is the right action when a runtime adds support for the flag.
+
+[[skips]]
+runtime = "python_runtime"
+flag = "phoneme-silence"
+reason = "voice-runtime-only — Python runtime CLI does not expose it"
+
+[[skips]]
+runtime = "csharp"
+flag = "phoneme-silence"
+reason = "voice-runtime-only — C# CLI does not expose it"
+
+[[skips]]
+runtime = "cpp"
+flag = "reference-audio"
+reason = "Voice cloning not yet wired into C++ CLI"
+
+[[skips]]
+runtime = "cpp"
+flag = "speaker-embedding"
+reason = "Voice cloning not yet wired into C++ CLI"
+
+[[skips]]
+runtime = "cpp"
+flag = "speaker-encoder-model"
+reason = "Voice cloning not yet wired into C++ CLI"

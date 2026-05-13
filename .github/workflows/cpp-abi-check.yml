@@ -1,0 +1,241 @@
+name: C++ ABI Compliance Check
+
+# ABI compliance gate for libpiper_plus.so.
+#
+# Builds the shared library on the PR head and on the PR base
+# (github.event.pull_request.base.sha), runs `abi-dumper` against each .so to
+# produce a per-build symbol/type dump, then diff's them with
+# `abi-compliance-checker`. The job fails when ABCC reports a **binary
+# incompatibility** (function removal, signature change, struct layout
+# change, etc.) and passes when the diff only contains additions or no
+# changes at all.
+#
+# This gate complements the existing "Verify C API symbols" smoke test in
+# _build-test-cpp.yml — that one only checks that a hand-maintained list of
+# entry points still exists, while ABCC catches the full transitive surface
+# (callbacks, struct sizes, opaque vs. defined types, etc.).
+#
+# Trigger scope (paths) is intentionally narrow: only PRs that touch the C
+# implementation or its build system can change the public ABI in practice.
+# The CMakeLists / cmake/ tree controls compile flags + visibility, and
+# src/cpp/** is the implementation surface. PRs that don't touch either
+# of these never hit this job.
+
+on:
+  pull_request:
+    branches: [ dev ]
+    paths:
+      - 'src/cpp/**'
+      - 'cmake/**'
+      - 'CMakeLists.txt'
+      - '.github/workflows/cpp-abi-check.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  abi-check:
+    name: ABI diff (libpiper_plus.so head vs base)
+    # ubuntu-24.04 is the only supported target: abi-dumper/abi-compliance-
+    # checker are Linux-only (perl + elfutils) and a single OS is sufficient
+    # — ABI compatibility is determined by the ELF format, not the runner.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+
+    steps:
+      # ── Tooling ───────────────────────────────────────────────────────
+      - name: Install abi-dumper, abi-compliance-checker, build deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential cmake ccache wget \
+            abi-dumper abi-compliance-checker \
+            elfutils libdw-dev
+          abi-dumper -version || true
+          abi-compliance-checker -version || true
+
+      # ── ONNX Runtime (shared) ─────────────────────────────────────────
+      # Both the head and base builds need ORT headers + libs. Cache the
+      # tarball-extracted tree so we don't re-download on every PR push.
+      - name: Cache ONNX Runtime
+        id: cache-ort
+        uses: actions/cache@v5.0.5
+        with:
+          path: |
+            /usr/local/lib/libonnxruntime*
+            /usr/local/include/onnxruntime
+          key: ort-linux-x64-1.20.0
+
+      - name: Install ONNX Runtime
+        if: steps.cache-ort.outputs.cache-hit != 'true'
+        run: |
+          wget -q https://github.com/microsoft/onnxruntime/releases/download/v1.20.0/onnxruntime-linux-x64-1.20.0.tgz
+          tar -xzf onnxruntime-linux-x64-1.20.0.tgz
+          sudo cp -r onnxruntime-linux-x64-1.20.0/lib/* /usr/local/lib/
+          sudo cp -r onnxruntime-linux-x64-1.20.0/include/* /usr/local/include/
+          sudo ldconfig
+          rm -rf onnxruntime-linux-x64-1.20.0*
+
+      - name: Refresh dynamic linker cache
+        run: sudo ldconfig
+
+      # ── ccache (separate caches for head vs base to avoid eviction) ──
+      - name: Setup ccache (head)
+        uses: actions/cache@v5.0.5
+        with:
+          path: ~/.cache/ccache
+          key: abi-check-ccache-head-${{ github.sha }}
+          restore-keys: |
+            abi-check-ccache-head-
+            abi-check-ccache-
+
+      # ── Head checkout & build ─────────────────────────────────────────
+      - name: Checkout PR head
+        uses: actions/checkout@v6.0.2
+        with:
+          submodules: recursive
+          path: head
+
+      - name: Build libpiper_plus.so (head, RelWithDebInfo for DWARF)
+        shell: bash
+        run: |
+          export PATH="/usr/lib/ccache:$PATH"
+          # RelWithDebInfo gives us DWARF debug info that abi-dumper requires
+          # while keeping optimizations representative of what ships.
+          cmake -B head/build -S head \
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+            -DPIPER_PLUS_BUILD_SHARED=ON \
+            -DBUILD_TESTS=OFF \
+            -DUSE_CUDA=OFF
+          cmake --build head/build -j"$(nproc)" --target piper_plus
+
+          HEAD_LIB=$(find head/build -name 'libpiper_plus.so*' -type f | head -1)
+          if [ -z "$HEAD_LIB" ]; then
+            echo "FAIL: head libpiper_plus.so not found"
+            exit 1
+          fi
+          echo "HEAD_LIB=$HEAD_LIB" >> "$GITHUB_ENV"
+          file "$HEAD_LIB"
+
+      # ── Base checkout & build (PR target) ─────────────────────────────
+      - name: Checkout PR base
+        uses: actions/checkout@v6.0.2
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          submodules: recursive
+          path: base
+
+      - name: Build libpiper_plus.so (base, RelWithDebInfo)
+        shell: bash
+        run: |
+          export PATH="/usr/lib/ccache:$PATH"
+          # If the base branch predates this workflow / ENABLE_COVERAGE option,
+          # we still build fine — both flags are independent. Tolerate base
+          # build failures by surfacing them clearly: an ABI gate that can't
+          # produce a baseline is a soft skip, not a false positive.
+          if ! cmake -B base/build -S base \
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+            -DPIPER_PLUS_BUILD_SHARED=ON \
+            -DBUILD_TESTS=OFF \
+            -DUSE_CUDA=OFF; then
+            echo "::warning::Base configure failed — skipping ABI diff"
+            echo "ABI_SKIP=1" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          if ! cmake --build base/build -j"$(nproc)" --target piper_plus; then
+            echo "::warning::Base build failed — skipping ABI diff"
+            echo "ABI_SKIP=1" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          BASE_LIB=$(find base/build -name 'libpiper_plus.so*' -type f | head -1)
+          if [ -z "$BASE_LIB" ]; then
+            echo "::warning::Base libpiper_plus.so not found — skipping ABI diff"
+            echo "ABI_SKIP=1" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          echo "BASE_LIB=$BASE_LIB" >> "$GITHUB_ENV"
+          file "$BASE_LIB"
+
+      # ── ABI dump (head + base) ────────────────────────────────────────
+      - name: Dump ABI (head)
+        if: env.ABI_SKIP != '1'
+        run: |
+          mkdir -p abi
+          abi-dumper "$HEAD_LIB" \
+            -o abi/head.dump \
+            -lver "PR-${{ github.event.pull_request.number || 'dispatch' }}" \
+            -public-headers head/src/cpp/piper_plus.h
+
+      - name: Dump ABI (base)
+        if: env.ABI_SKIP != '1'
+        run: |
+          abi-dumper "$BASE_LIB" \
+            -o abi/base.dump \
+            -lver "base-${{ github.event.pull_request.base.sha }}" \
+            -public-headers base/src/cpp/piper_plus.h
+
+      # ── ABI compliance diff ───────────────────────────────────────────
+      - name: Run abi-compliance-checker
+        if: env.ABI_SKIP != '1'
+        id: abicc
+        shell: bash
+        run: |
+          set +e
+          abi-compliance-checker \
+            -l piper_plus \
+            -old abi/base.dump \
+            -new abi/head.dump \
+            -report-path abi/compat_report.html
+          rc=$?
+          # abi-compliance-checker exit codes:
+          #   0 = fully compatible (no changes / additions only)
+          #   1 = incompatible (breaking change detected)
+          #   anything else = tooling error
+          echo "abicc_rc=$rc" >> "$GITHUB_OUTPUT"
+          if [ $rc -eq 1 ]; then
+            echo "::error::ABI breaking change detected — see uploaded compat_report.html"
+          elif [ $rc -ne 0 ]; then
+            echo "::warning::abi-compliance-checker tooling error rc=$rc"
+          fi
+          exit 0
+
+      - name: Upload ABI report
+        if: always() && env.ABI_SKIP != '1'
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: abi-compat-report
+          path: |
+            abi/compat_report.html
+            abi/base.dump
+            abi/head.dump
+          retention-days: 14
+
+      - name: Fail job on ABI break
+        if: env.ABI_SKIP != '1' && steps.abicc.outputs.abicc_rc == '1'
+        run: |
+          echo "ABI breaking change detected (function removal / signature change / layout change)."
+          echo "Download the abi-compat-report artifact for the full HTML diff."
+          exit 1
+
+      - name: ABI check summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## C++ ABI Compliance Check"
+            echo ""
+            if [ "${ABI_SKIP:-0}" = "1" ]; then
+              echo "Base build unavailable — diff skipped (soft pass)."
+            else
+              case "${{ steps.abicc.outputs.abicc_rc }}" in
+                0) echo "PASS — no binary-incompatible changes." ;;
+                1) echo "FAIL — breaking ABI change detected." ;;
+                *) echo "WARN — tooling error rc=${{ steps.abicc.outputs.abicc_rc }}." ;;
+              esac
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

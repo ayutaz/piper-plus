@@ -20,6 +20,10 @@ on:
       - 'src/python/piper_train/ort_utils.py'
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test-hf-space:
     runs-on: ubuntu-latest

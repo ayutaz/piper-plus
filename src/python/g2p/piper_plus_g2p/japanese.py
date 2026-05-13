@@ -249,6 +249,22 @@ class JapanesePhonemizer(Phonemizer):
         return text
 
     def phonemize(self, text: str) -> list[str]:
+        """Phonemize Japanese text into a list of IPA-style tokens.
+
+        The token list is BOS/EOS-free; question markers (``"?"`` etc.)
+        are appended only when the input ends with a question mark.
+
+        Examples
+        --------
+        Real OpenJTalk output is environment-sensitive (dictionary version,
+        custom dict, etc.), so the doctest is SKIP-marked to document the
+        canonical call shape without binding to a specific tokenization:
+
+        >>> JapanesePhonemizer().phonemize("こんにちは")  # doctest: +SKIP
+        ['k', 'o', 'N_n', 'n', 'i', 'ch', 'i', 'w', 'a']
+        >>> JapanesePhonemizer().phonemize("")  # doctest: +SKIP
+        []
+        """
         text = self._apply_custom_dict(text)
         text = self._sanitize_input(text)
         if not text:
