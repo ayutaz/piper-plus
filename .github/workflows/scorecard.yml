@@ -30,7 +30,10 @@ on:
     branches: [dev]
   workflow_dispatch:
 
-permissions: read-all
+# Workflow-level permissions: explicit empty default。後続で job が追加
+# されても read を含む暗黙の継承が起きないよう {} を明示。必要な権限
+# は jobs.<job>.permissions で都度宣言する (least-privilege)。
+permissions: {}
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
