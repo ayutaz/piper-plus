@@ -96,17 +96,33 @@ jobs:
               --output benchmark_action.json
           cat benchmark_action.json
 
+      # benchmark-action は内部で gh-pages ブランチを fetch するため、
+      # 初回 push to dev 実行で gh-pages が自動作成されるまでは PR で
+      # 実行すると 'couldn't find remote ref gh-pages' で fail する。
+      # 当面 PR では benchmark JSON を artifact にだけ残し、push to dev
+      # でのみ benchmark-action を起動して baseline 保存/更新を行う。
+      # (gh-pages が安定運用に乗ったら PR 比較も再導入する)。
+      - name: Upload benchmark JSON (PR / dev push 共通)
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: rtf-benchmark-${{ github.event_name }}-${{ github.run_attempt }}
+          path: |
+            benchmark_results.json
+            benchmark_action.json
+          retention-days: 30
+
       - name: Store + compare against baseline
+        # PR ではスキップ。push to dev でのみ実行し、初回で gh-pages を
+        # 自動初期化する (auto-push:true なら branch 不在時に benchmark-action
+        # が新規作成する)。
+        if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
         uses: benchmark-action/github-action-benchmark@v1.20.4
         with:
           name: Python inference benchmark
           tool: customSmallerIsBetter
           output-file-path: benchmark_action.json
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          # Mutate the baseline only on push to dev — PR runs compare
-          # against the existing baseline without auto-pushing, so a
-          # regressing PR cannot accidentally raise the bar for itself.
-          auto-push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/dev' }}
+          github-token: ${{ github.token }}
+          auto-push: true
           # 15% regression alert. Warn-only while we calibrate (see
           # workflow header). Flip ``fail-on-alert: true`` once the
           # noise floor on hosted runners is understood.
