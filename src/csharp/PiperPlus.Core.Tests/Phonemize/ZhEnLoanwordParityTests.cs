@@ -179,12 +179,13 @@ public sealed class ZhEnLoanwordParityTests
 
     private static JsonElement FindCase(string caseName)
     {
-        foreach (JsonElement c in FixtureRoot.Value.GetProperty("cases").EnumerateArray())
+        IEnumerable<JsonElement> matches = FixtureRoot.Value
+            .GetProperty("cases")
+            .EnumerateArray()
+            .Where(c => c.GetProperty("name").GetString() == caseName);
+        foreach (JsonElement c in matches)
         {
-            if (c.GetProperty("name").GetString() == caseName)
-            {
-                return c;
-            }
+            return c;
         }
 
         throw new InvalidOperationException(

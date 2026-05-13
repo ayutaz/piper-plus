@@ -195,7 +195,6 @@ def collect_breaking_items(text: str) -> list[BreakingItem]:
         i = start + 1
         in_breaking_section = False   # inside `### Changed (Breaking)` heading
         bullets_active = False        # current bullet group is breaking
-        last_subheading: str | None = None
 
         while i < end:
             line = lines[i]
@@ -211,7 +210,6 @@ def collect_breaking_items(text: str) -> list[BreakingItem]:
             if is_breaking_heading:
                 in_breaking_section = True
                 bullets_active = True
-                last_subheading = None
                 i += 1
                 continue
 
@@ -219,7 +217,6 @@ def collect_breaking_items(text: str) -> list[BreakingItem]:
             if ANY_LEVEL3_RE.match(line):
                 in_breaking_section = False
                 bullets_active = False
-                last_subheading = None
                 i += 1
                 continue
 
@@ -241,7 +238,6 @@ def collect_breaking_items(text: str) -> list[BreakingItem]:
                     line_no=i + 1,
                     keywords=extract_keywords(raw),
                 ))
-                last_subheading = raw
                 bullets_active = True
                 i += 1
                 continue

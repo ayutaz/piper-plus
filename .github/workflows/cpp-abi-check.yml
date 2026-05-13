@@ -56,14 +56,22 @@ jobs:
       # で fail するため、runner OS の noble main に追従する方針。
       # --no-install-recommends で perl/elfutils の transitive を最小限に抑える。
       - name: Install abi-dumper, abi-compliance-checker, build deps
+        # abi-dumper depends on `ctags` (universal-ctags / exuberant-ctags)
+        # to extract public symbols from the parsed headers; without it the
+        # tool exits with code 3 and the diff step blows up. Ubuntu 24.04's
+        # `abi-dumper` package does not pull ctags as a hard dep, so install
+        # it explicitly here. `universal-ctags` (provides /usr/bin/ctags
+        # alternative) is the modern fork shipped on noble.
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             build-essential cmake ccache wget \
             abi-dumper abi-compliance-checker \
+            universal-ctags \
             elfutils libdw-dev
           abi-dumper -version || true
           abi-compliance-checker -version || true
+          ctags --version | head -1
 
       # ── ONNX Runtime (shared) ─────────────────────────────────────────
       # Both the head and base builds need ORT headers + libs. Cache the

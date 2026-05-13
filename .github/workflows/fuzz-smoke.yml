@@ -83,7 +83,14 @@ jobs:
             fuzz-${{ runner.os }}-
 
       - name: Install cargo-fuzz
-        run: cargo +nightly install cargo-fuzz --locked
+        # `--locked` was pinning cargo-fuzz 0.13.1's transitive `rustix 0.36.5`,
+        # which uses unstable `#[rustc_attrs]` attributes that the current
+        # nightly compiler rejects (since rust-lang/rust#136923 the attribute
+        # macro is feature-gated). Drop `--locked` so dependency resolution
+        # picks a newer `rustix` that compiles on nightly. cargo-fuzz itself
+        # is install-pinned to its on-crates-io latest, so reproducibility is
+        # preserved at the binary level.
+        run: cargo +nightly install cargo-fuzz
 
       - name: Run fuzz smoke (60s default)
         working-directory: src/rust/piper-plus-g2p

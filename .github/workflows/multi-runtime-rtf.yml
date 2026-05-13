@@ -78,7 +78,13 @@ jobs:
     # rtf-regression.yml's policy).
     if: github.event.pull_request.head.repo.full_name == github.repository || github.event_name != 'pull_request'
     timeout-minutes: 30
-    continue-on-error: ${{ matrix.runtime == 'wasm' }}
+    # During the warn-only baseline calibration period (policy=warn-only in
+    # tests/fixtures/multi-runtime-rtf-baseline.json), individual runtime
+    # cells are allowed to fail without blocking the PR. The aggregate job
+    # still runs with `if: always()` and reports `(missing)` for failed
+    # cells. Flip to strict (drop continue-on-error) once baselines have
+    # ~2-3 weeks of variance data and each runtime cell is stable.
+    continue-on-error: true
     strategy:
       fail-fast: false
       matrix:

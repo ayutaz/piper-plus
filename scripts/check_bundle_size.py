@@ -329,13 +329,16 @@ def _render_markdown(results: list[Comparison]) -> str:
         )
     skips = sum(1 for r in results if r.status == "skip")
     fails = sum(1 for r in results if r.status == "fail")
+    skip_note = (
+        "_SKIP means the artifact was not built in this job, or the "
+        "baseline is a placeholder. The gate never fails on SKIP._"
+    )
     lines.extend(
         [
             "",
             f"Summary: {fails} fail / {skips} skip / {len(results) - fails - skips} ok",
             "",
-            "_SKIP means the artifact was not built in this job, or the "
-            "baseline is a placeholder. The gate never fails on SKIP._",
+            skip_note,
         ]
     )
     return "\n".join(lines)
