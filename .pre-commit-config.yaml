@@ -128,7 +128,7 @@ repos:
       - id: mypy-g2p
         name: mypy --ignore-missing-imports (g2p, Python)
         # Mirror of .github/workflows/g2p-python-ci.yml step.
-        entry: bash -c 'cd src/python/g2p && uv run mypy --ignore-missing-imports piper_plus_g2p/'
+        entry: bash -c 'cd src/python/g2p && uv run --frozen mypy --ignore-missing-imports piper_plus_g2p/'
         language: system
         files: ^src/python/g2p/piper_plus_g2p/.*\.py$
         pass_filenames: false
@@ -227,7 +227,13 @@ repos:
         # uv workspace, so we cd into it before invoking uv run. From the
         # repo-root venv, the script fails with ModuleNotFoundError because
         # piper_plus_g2p isn't installed there.
-        entry: bash -c 'cd src/python/g2p && uv run python ../../../scripts/check_loanword_forward_compat.py'
+        # `--frozen` prevents uv from rewriting the lock file as a side
+        # effect of resolving the g2p workspace's dependencies. Without
+        # this flag, a stale uv.lock entry (e.g. when this branch adds a
+        # new dev dep like hypothesis) triggers a resolver pass during
+        # the hook and pre-commit treats the lock update as "files
+        # modified by this hook" → forward-compat gate spuriously fails.
+        entry: bash -c 'cd src/python/g2p && uv run --frozen python ../../../scripts/check_loanword_forward_compat.py'
         language: system
         files: (zh_en_loanword(_matrix)?\.json|scripts/check_loanword_forward_compat\.py|tests/fixtures/g2p/zh_en_loanword_forward_compat\.json)$
         pass_filenames: false
