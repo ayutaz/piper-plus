@@ -74,7 +74,10 @@ jobs:
           python-version: '3.12'
 
       - name: Install inference dependencies
-        run: uv sync --group inference
+        # ``inference`` は pyproject.toml の [project.optional-dependencies]
+        # (PEP 621 extras) に定義されている。``--group`` (PEP 735) ではなく
+        # ``--extra`` を使う必要がある。
+        run: uv sync --extra inference
 
       - name: Run benchmark (English, multilingual-test-medium)
         run: |
