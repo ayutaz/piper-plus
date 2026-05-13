@@ -54,4 +54,7 @@ jobs:
           # に true。autolabeler は config 側で定義済みなのでデフォルト
           # の false (有効) のまま。
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Review #460: ${{ github.token }} の方が GitHub Actions
+          # 慣習として idiomatic (secrets.GITHUB_TOKEN と同一の値を
+          # 指すが、明示的にトークンであることが文脈で読みやすい)。
+          GITHUB_TOKEN: ${{ github.token }}
