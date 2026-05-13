@@ -42,9 +42,27 @@ RUN apt-get update && apt-get install -y \
 # Install ONNX Runtime (CPU, Linux x64)
 # Issue #372: must match canonical (cmake/OnnxRuntime.cmake) — enforced by
 # scripts/check_ort_versions.py. Bump alongside the C++ pipeline canonical.
-RUN wget -q https://github.com/microsoft/onnxruntime/releases/download/v1.20.0/onnxruntime-linux-x64-1.20.0.tgz && \
+#
+# Why curl + cp -r:
+#   - `cp lib/* /usr/local/lib/` was the actual root cause of 9+ consecutive
+#     dev failures: ONNX Runtime v1.20.0 ships `lib/cmake/` and
+#     `lib/pkgconfig/` as subdirectories under lib/, so a plain `cp` fails
+#     with "omitting directory" + exit 1. The error appeared attributed to
+#     the preceding `wget -q` because the failing `cp` was the last command
+#     in the `&&` chain. Use `cp -r` so subdirectories are copied recursively
+#     (symmetric with `cp -r include/*`).
+#   - curl with `-fsSL --retry 5 --retry-all-errors` replaces `wget -q`: the
+#     `-s` (silent) suppresses the progress bar to keep build logs tidy,
+#     while `-S` (paired with -s via `-fsSL`) and `-f` (fail on HTTP errors)
+#     ensure curl's *errors* are still printed. `--retry-all-errors` makes
+#     transient redirect/network failures retry instead of failing on first
+#     attempt. Net effect: identical download behavior, but if it ever fails
+#     again the stderr / exit code will be diagnostic rather than silent.
+RUN curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors \
+        -o onnxruntime-linux-x64-1.20.0.tgz \
+        https://github.com/microsoft/onnxruntime/releases/download/v1.20.0/onnxruntime-linux-x64-1.20.0.tgz && \
     tar -xzf onnxruntime-linux-x64-1.20.0.tgz && \
-    cp onnxruntime-linux-x64-1.20.0/lib/* /usr/local/lib/ && \
+    cp -r onnxruntime-linux-x64-1.20.0/lib/* /usr/local/lib/ && \
     cp -r onnxruntime-linux-x64-1.20.0/include/* /usr/local/include/ && \
     ldconfig && \
     rm -rf onnxruntime-linux-x64-1.20.0*

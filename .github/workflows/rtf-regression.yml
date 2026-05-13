@@ -111,10 +111,53 @@ jobs:
             benchmark_action.json
           retention-days: 30
 
+      - name: Ensure gh-pages branch exists
+        # benchmark-action@v1.20.4 は内部で `git fetch ... gh-pages:gh-pages`
+        # を行うため branch が repo に存在しないと `fatal: couldn't find
+        # remote ref gh-pages` で fail する (header コメントの auto-push 期待
+        # と実挙動が異なる)。
+        #
+        # PR (same-repo): read-only check で不在なら `::warning::` で flag。
+        # step 自体は success させて PR を merge 可能に保つ (chicken-and-egg
+        # 回避: 初回 dev push 前は不在状態が normal で、 ここで fail させると
+        # merge できなくなる)。 通常運用 (gh-pages 存在後) では silent pass、
+        # 万一 gh-pages が削除された場合は warning が出るが merge 自体は可能、
+        # 直後の dev push で自動再生成される。
+        # push to dev: 不在なら空 orphan commit で自動作成 (idempotent)。
+        # fork PR は上位 job の if: gate で既に skip 済み。
+        if: github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/dev')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          if gh api "repos/${{ github.repository }}/branches/gh-pages" --silent 2>/dev/null; then
+            echo "gh-pages branch exists"
+          elif [ "$EVENT_NAME" = "pull_request" ]; then
+            echo "::warning::gh-pages branch is missing — benchmark-action@v1 will auto-create it on the next push to dev. Not failing the PR (chicken-and-egg before first dev push). If you see this after dev runs have created the branch, someone may have deleted it."
+          else
+            echo "gh-pages branch missing — creating empty placeholder"
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            # Isolated worktree avoids any risk of leaking dev tree into the
+            # orphan commit and avoids checkout-back conflicts. Git 2.27+'s
+            # `git switch --orphan` also clears the working tree, but using
+            # a dedicated worktree is unambiguous regardless of git version
+            # and leaves the original checkout untouched.
+            tmp_worktree="$(mktemp -d)"
+            git worktree add --orphan -b gh-pages "$tmp_worktree"
+            (
+              cd "$tmp_worktree"
+              : > .nojekyll
+              git add .nojekyll
+              git commit -m "init gh-pages for RTF benchmark baseline"
+              git push origin gh-pages
+            )
+            git worktree remove --force "$tmp_worktree"
+          fi
+
       - name: Store + compare against baseline
-        # PR ではスキップ。push to dev でのみ実行し、初回で gh-pages を
-        # 自動初期化する (auto-push:true なら branch 不在時に benchmark-action
-        # が新規作成する)。
+        # PR ではスキップ。push to dev でのみ実行。
         if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
         uses: benchmark-action/github-action-benchmark@v1.20.4
         with:
