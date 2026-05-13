@@ -22,10 +22,14 @@ name: Release Drafter
 on:
   push:
     branches: [dev]
-  pull_request:
-    types: [opened, reopened, synchronize, edited]
-    branches: [dev]
   workflow_dispatch:
+
+# Note: pull_request トリガーは意図的に省略。release-drafter は config
+# (.github/release-drafter.yml) が *default branch* に存在することを
+# 要求するため、本 workflow を最初に導入する PR では必ず "config
+# unfound" で fail する (chicken-and-egg)。merge 後の push トリガー
+# から安定して動作する。autolabeler を PR 時にも動かしたい場合は、
+# merge 後に pull_request_target を別 PR で追加する。
 
 permissions:
   contents: read
