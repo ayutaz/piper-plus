@@ -43,9 +43,10 @@ jobs:
     permissions:
       contents: read
       # dorny/test-reporter は GitHub Checks API に annotation を書く
-      # ため checks: write が必須。デフォルトの GITHUB_TOKEN が
-      # workflow_run 起点だと無効化されるが、本 workflow は PR /
-      # push トリガーなので問題ない。
+      # ため checks: write が必須。fork からの pull_request など
+      # GITHUB_TOKEN が read-only に縮退されるトリガーでは Check 生成
+      # に失敗するが、本 workflow は同 repo の PR / push トリガーから
+      # 起動するため通常は問題ない。
       checks: write
 
     steps:
@@ -103,7 +104,12 @@ jobs:
         uses: dorny/test-reporter@v2.1.1
         with:
           name: csharp-tests (${{ matrix.os }})
-          path: '**/TestResults/test-results*.xml'
+          # vstest は LogFileName の通りに直接 TRX を書く場合もあれば、
+          # ``TestResults/<run-id>/test-results.xml`` のように nested
+          # サブディレクトリに書く場合もある (project 構成依存)。
+          # 両ケースを拾うため `**` を中間にも入れる
+          # (review #459 line 97 / 106 への対応)。
+          path: '**/TestResults/**/test-results*.xml'
           reporter: dotnet-trx
           # CI ジョブ自体は dotnet test の exit code で fail させる
           # (既存挙動)。reporter が二重に fail させると signal が
