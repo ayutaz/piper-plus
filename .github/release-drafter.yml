@@ -1,0 +1,111 @@
+# release-drafter configuration — PR ラベルからドラフトリリースノートを
+# 自動生成する。merge された PR ごとにドラフト release が更新され、tag
+# push 時に既存ドラフトを公開する運用を想定。
+#
+# How to use:
+#   1. PR に適切なラベル (bug / enhancement / breaking / docs / ci /
+#      dependencies など) を付与する。
+#   2. dev ブランチに merge される。
+#   3. .github/workflows/release-drafter.yml が GitHub Releases の
+#      "Draft" を upsert する (https://github.com/ayutaz/piper-plus/releases)。
+#   4. release-shared-lib.yml が tag push で実 release を作成する際、
+#      この本文を踏襲する (将来 #3 GitHub Releases 自動化と統合)。
+#
+# Conventional Commits との関係: PR タイトルから自動でラベル付与する
+# ロジックは ``autolabeler`` セクションで定義 (feat: → enhancement,
+# fix: → bug, など)。ラベル運用が定着するまでは手動付与でも動く。
+
+name-template: 'v$RESOLVED_VERSION'
+tag-template: 'v$RESOLVED_VERSION'
+
+# semver bump rules — labels から RESOLVED_VERSION を決定する。
+version-resolver:
+  major:
+    labels:
+      - 'major'
+      - 'breaking'
+      - 'breaking-change'
+  minor:
+    labels:
+      - 'minor'
+      - 'feature'
+      - 'enhancement'
+  patch:
+    labels:
+      - 'patch'
+      - 'bug'
+      - 'fix'
+      - 'docs'
+      - 'ci'
+      - 'chore'
+      - 'dependencies'
+      - 'automated'
+  default: patch
+
+categories:
+  - title: 'Breaking Changes'
+    labels:
+      - 'breaking'
+      - 'breaking-change'
+  - title: 'Features'
+    labels:
+      - 'feature'
+      - 'enhancement'
+  - title: 'Bug Fixes'
+    labels:
+      - 'bug'
+      - 'fix'
+  - title: 'Documentation'
+    labels:
+      - 'docs'
+      - 'documentation'
+  - title: 'CI / Infrastructure'
+    labels:
+      - 'ci'
+      - 'infrastructure'
+  - title: 'Dependencies'
+    labels:
+      - 'dependencies'
+      - 'automated'
+  - title: 'Other Changes'
+
+change-template: '- $TITLE @$AUTHOR (#$NUMBER)'
+change-title-escapes: '\<*_&'
+
+# PR タイトル先頭の Conventional Commits prefix から自動ラベル付与。
+# 既に対応ラベルが付いている場合は noop。
+autolabeler:
+  - label: 'breaking'
+    title:
+      - '/^(feat|fix|refactor|chore|docs|ci|build|perf|test)!:/'
+      - '/BREAKING CHANGE:/'
+  - label: 'enhancement'
+    title:
+      - '/^feat(\(.*\))?:/'
+  - label: 'bug'
+    title:
+      - '/^fix(\(.*\))?:/'
+  - label: 'docs'
+    title:
+      - '/^docs(\(.*\))?:/'
+  - label: 'ci'
+    title:
+      - '/^(ci|build)(\(.*\))?:/'
+  - label: 'chore'
+    title:
+      - '/^(chore|refactor|style|test|perf)(\(.*\))?:/'
+
+exclude-labels:
+  - 'skip-changelog'
+  - 'no-release'
+
+template: |
+  ## What's Changed
+
+  $CHANGES
+
+  ## Contributors
+
+  $CONTRIBUTORS
+
+  **Full Changelog**: https://github.com/$OWNER/$REPOSITORY/compare/$PREVIOUS_TAG...v$RESOLVED_VERSION
