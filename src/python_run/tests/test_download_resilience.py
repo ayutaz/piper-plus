@@ -64,12 +64,17 @@ class TestDownloadTimeout:
         voice_info = _make_voice_info()
         voices = {"test-voice": voice_info}
 
+        # socket.timeout was unified with TimeoutError in Python 3.10; older
+        # Python versions and some urllib code paths may surface either type.
+        # We raise socket.timeout from the patch to match real urlopen behavior
+        # (urllib lets socket.timeout propagate without wrapping it in URLError),
+        # and accept both types on the assertion side for cross-version safety.
         with tempfile.TemporaryDirectory() as tmpdir:
             with patch(
                 "piper.download.urlopen",
                 side_effect=TimeoutError("connection timed out"),
             ):
-                with pytest.raises(socket.timeout):
+                with pytest.raises((socket.timeout, TimeoutError)):
                     ensure_voice_exists("test-voice", [tmpdir], tmpdir, voices)
 
     def test_urlerror_propagates(self):

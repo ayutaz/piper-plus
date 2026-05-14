@@ -17,6 +17,10 @@ import (
 // FindConfigPath is called first; with a non-existent model path and no
 // sidecar/dir-config, it returns *ConfigError before any ONNX work.
 func TestLoadVoice_MissingModelPath(t *testing.T) {
+	// Hermetic: clear PIPER_DEFAULT_CONFIG so the host environment cannot
+	// redirect FindConfigPath to a real config file and mask the missing model.
+	t.Setenv("PIPER_DEFAULT_CONFIG", "")
+
 	ctx := context.Background()
 
 	tmpDir := t.TempDir()
@@ -131,14 +135,20 @@ func TestLoadVoice_ContextCancelled(t *testing.T) {
 // Voice.Close() idempotency
 // ---------------------------------------------------------------------------
 
-// TestVoiceClose_IdempotentNoPanic exercises Close() repeatedly on a Voice
-// struct in the closed state. The first Close swaps the atomic flag and
-// would call engine.Close(); subsequent Closes must early-return nil
-// WITHOUT panicking and WITHOUT touching the (nil) engine.
+// TestVoiceClose_IdempotentNoPanic verifies that Close() is safe to call
+// repeatedly on a Voice that is ALREADY in the closed state.
 //
-// We start with closed=true so the first Close() also takes the early-return
-// path. This keeps the test free of ONNX runtime dependencies while still
-// validating the documented contract: "It is safe to call multiple times;
+// We pre-set closed=true, so EVERY Close() call here (including the first
+// one in the loop) observes the flag as already-set and takes the
+// early-return branch — CompareAndSwap(false, true) returns false and
+// engine.Close() is NOT invoked. This is the "already-closed idempotency"
+// path: it exercises only the early-return guard and deliberately avoids
+// the first-close cleanup path (which would require a real engine).
+//
+// The complementary first-close CAS transition (false → true) is covered
+// by TestVoiceClose_FlagCompareAndSwap below.
+//
+// Documented contract under test: "It is safe to call multiple times;
 // only the first call performs cleanup."
 func TestVoiceClose_IdempotentNoPanic(t *testing.T) {
 	v := &Voice{}
