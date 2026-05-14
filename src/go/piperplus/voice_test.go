@@ -113,9 +113,9 @@ func TestLoadVoice_ConfigValidationFailure(t *testing.T) {
 	}
 }
 
-// TestLoadVoice_ContextCancelled: a pre-cancelled context must short-circuit
+// TestLoadVoice_ContextCanceled: a pre-canceled context must short-circuit
 // before any filesystem or ONNX I/O.
-func TestLoadVoice_ContextCancelled(t *testing.T) {
+func TestLoadVoice_ContextCanceled(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // cancel before invocation
 
@@ -124,7 +124,7 @@ func TestLoadVoice_ContextCancelled(t *testing.T) {
 
 	_, err := LoadVoice(ctx, dummyModel)
 	if err == nil {
-		t.Fatal("LoadVoice should fail for a cancelled context")
+		t.Fatal("LoadVoice should fail for a canceled context")
 	}
 	if !errors.Is(err, context.Canceled) {
 		t.Errorf("err = %v, want context.Canceled", err)
