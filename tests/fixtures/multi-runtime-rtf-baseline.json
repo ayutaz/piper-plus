@@ -16,87 +16,87 @@
   "runtimes": {
     "python": {
       "short": {
-        "rtf": null,
-        "latency_p50_ms": null,
-        "latency_p95_ms": null
+        "rtf": 4.4317,
+        "latency_p50_ms": 6324.8,
+        "latency_p95_ms": 6757.1
       },
       "medium": {
-        "rtf": null,
-        "latency_p50_ms": null,
-        "latency_p95_ms": null
+        "rtf": 1.0438,
+        "latency_p50_ms": 5882.0,
+        "latency_p95_ms": 6208.1
       },
       "long": {
-        "rtf": null,
-        "latency_p50_ms": null,
-        "latency_p95_ms": null
+        "rtf": 0.2251,
+        "latency_p50_ms": 7755.6,
+        "latency_p95_ms": 8124.9
       }
     },
     "rust": {
       "short": {
-        "rtf": null,
-        "latency_p50_ms": null,
-        "latency_p95_ms": null
+        "rtf": 0.8309,
+        "latency_p50_ms": 1310.9,
+        "latency_p95_ms": 1359.6
       },
       "medium": {
-        "rtf": null,
-        "latency_p50_ms": null,
-        "latency_p95_ms": null
+        "rtf": 0.2501,
+        "latency_p50_ms": 1614.3,
+        "latency_p95_ms": 1636.8
       },
       "long": {
-        "rtf": null,
-        "latency_p50_ms": null,
-        "latency_p95_ms": null
+        "rtf": 0.1039,
+        "latency_p50_ms": 3673.8,
+        "latency_p95_ms": 3697.7
       }
     },
     "go": {
       "short": {
-        "rtf": null,
-        "latency_p50_ms": null,
-        "latency_p95_ms": null
+        "rtf": 2.3051,
+        "latency_p50_ms": 3125.1,
+        "latency_p95_ms": 3216.7
       },
       "medium": {
-        "rtf": null,
-        "latency_p50_ms": null,
-        "latency_p95_ms": null
+        "rtf": 0.5123,
+        "latency_p50_ms": 3158.6,
+        "latency_p95_ms": 3358.1
       },
       "long": {
-        "rtf": null,
-        "latency_p50_ms": null,
-        "latency_p95_ms": null
+        "rtf": 0.1464,
+        "latency_p50_ms": 5374.6,
+        "latency_p95_ms": 5467.3
       }
     },
     "csharp": {
       "short": {
-        "rtf": null,
-        "latency_p50_ms": null,
-        "latency_p95_ms": null
+        "rtf": 2.8462,
+        "latency_p50_ms": 1542.0,
+        "latency_p95_ms": 1627.3
       },
       "medium": {
-        "rtf": null,
-        "latency_p50_ms": null,
-        "latency_p95_ms": null
+        "rtf": 0.8929,
+        "latency_p50_ms": 1608.6,
+        "latency_p95_ms": 1811.7
       },
       "long": {
-        "rtf": null,
-        "latency_p50_ms": null,
-        "latency_p95_ms": null
+        "rtf": 0.1413,
+        "latency_p50_ms": 1813.8,
+        "latency_p95_ms": 1913.0
       }
     },
     "cpp": {
       "short": {
-        "rtf": null,
-        "latency_p50_ms": null,
-        "latency_p95_ms": null
+        "rtf": 0.8694,
+        "latency_p50_ms": 1402.4,
+        "latency_p95_ms": 1431.6
       },
       "medium": {
-        "rtf": null,
-        "latency_p50_ms": null,
-        "latency_p95_ms": null
+        "rtf": 0.2529,
+        "latency_p50_ms": 1686.2,
+        "latency_p95_ms": 1724.0
       },
       "long": {
-        "rtf": null,
-        "latency_p50_ms": null,
-        "latency_p95_ms": null
+        "rtf": 0.0988,
+        "latency_p50_ms": 3573.3,
+        "latency_p95_ms": 3641.5
       }
     },
     "wasm": {
