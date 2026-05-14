@@ -478,3 +478,353 @@ class TestMultilingualProsodyPunctuation:
         tokens, prosody = p.phonemize_with_prosody(text)
         assert len(tokens) > 0
         assert len(tokens) == len(prosody)
+
+
+class TestFullwidthDetection:
+    """Regression / behavior-pinning tests for fullwidth (U+FF00-FFEF) chars.
+
+    The current implementation routes U+FF21-FF3A and U+FF41-FF5A
+    (fullwidth ASCII letters) to ``default_latin_language``, but routes
+    fullwidth digits (U+FF10-FF19) and fullwidth ASCII punctuation
+    (U+FF00-FF20, U+FF3B-FF40, U+FF5B-FFEF) to "ja" when JA is present
+    (otherwise None). These tests pin that behavior so an accidental
+    routing change is caught by CI.
+
+    See ``UnicodeLanguageDetector.detect_char`` in
+    ``piper_plus_g2p/multilingual.py``. Some of these assertions encode
+    behavior that arguably should be revisited (e.g. fullwidth digits
+    routed to JA inside a JA-EN-ZH detector) — those cases are flagged
+    via ``xfail(strict=False)`` and listed under "Future Work" in the
+    accompanying PR description so the next contributor can decide
+    whether to keep, tighten, or relax the contract.
+    """
+
+    def test_fullwidth_uppercase_letters_map_to_default_latin(self):
+        """U+FF21-FF3A (ＡＢＣ...) routes to default_latin_language."""
+        from piper_plus_g2p.multilingual import UnicodeLanguageDetector
+
+        detector = UnicodeLanguageDetector(["ja", "en"], default_latin_language="en")
+        # Boundaries (FF21=Ａ, FF3A=Ｚ) and a representative middle (FF23=Ｃ).
+        assert detector.detect_char("Ａ") == "en"
+        assert detector.detect_char("Ｃ") == "en"
+        assert detector.detect_char("Ｚ") == "en"
+
+    def test_fullwidth_lowercase_letters_map_to_default_latin(self):
+        """U+FF41-FF5A (ａｂｃ...) routes to default_latin_language."""
+        from piper_plus_g2p.multilingual import UnicodeLanguageDetector
+
+        detector = UnicodeLanguageDetector(["ja", "en"], default_latin_language="en")
+        assert detector.detect_char("ａ") == "en"
+        assert detector.detect_char("ｃ") == "en"
+        assert detector.detect_char("ｚ") == "en"
+
+    def test_fullwidth_letters_respect_default_latin_when_not_en(self):
+        """When default_latin_language='es', fullwidth letters route to 'es'."""
+        from piper_plus_g2p.multilingual import UnicodeLanguageDetector
+
+        detector = UnicodeLanguageDetector(["ja", "es"], default_latin_language="es")
+        assert detector.detect_char("Ａ") == "es"
+        assert detector.detect_char("ｚ") == "es"
+
+    def test_fullwidth_letters_none_when_no_supported_latin(self):
+        """Fullwidth letters return None when no Latin language is supported."""
+        from piper_plus_g2p.multilingual import UnicodeLanguageDetector
+
+        # default_latin_language defaults to 'en'; with only ['ja'] supported
+        # the pre-computed _default_latin is None.
+        detector = UnicodeLanguageDetector(["ja"], default_latin_language="en")
+        assert detector.detect_char("Ａ") is None
+        assert detector.detect_char("ａ") is None
+
+    @pytest.mark.xfail(
+        strict=False,
+        reason=(
+            "Fullwidth digits (U+FF10-FF19) currently route to 'ja' when JA is "
+            "present, but they are language-neutral semantically (just like "
+            "ASCII digits which return None). Future Work: consider returning "
+            "None to be consistent with ASCII digit handling."
+        ),
+    )
+    def test_fullwidth_digits_should_be_neutral(self):
+        """Future Work: fullwidth digits ideally return None like ASCII digits."""
+        from piper_plus_g2p.multilingual import UnicodeLanguageDetector
+
+        detector = UnicodeLanguageDetector(["ja", "en"], default_latin_language="en")
+        # Currently returns "ja". Marked xfail so when the implementation is
+        # tightened this flips to xpass and the contract update lands.
+        assert detector.detect_char("０") is None  # １
+        assert detector.detect_char("５") is None  # ５
+        assert detector.detect_char("９") is None  # ９
+
+    def test_fullwidth_digits_current_behavior(self):
+        """Pin the *current* fullwidth digit behavior (route to JA when JA in set)."""
+        from piper_plus_g2p.multilingual import UnicodeLanguageDetector
+
+        detector_ja = UnicodeLanguageDetector(["ja", "en"], default_latin_language="en")
+        # With JA in language set: fullwidth digits route to 'ja'.
+        assert detector_ja.detect_char("０") == "ja"
+        assert detector_ja.detect_char("９") == "ja"
+
+        # Without JA in language set: fullwidth digits return None.
+        detector_no_ja = UnicodeLanguageDetector(
+            ["en", "zh"], default_latin_language="en"
+        )
+        assert detector_no_ja.detect_char("０") is None
+        assert detector_no_ja.detect_char("９") is None
+
+    def test_fullwidth_punctuation_routes_to_ja(self):
+        """U+FF01 (！), U+FF3B ([)、U+FF5E (~) route to 'ja' when JA supported."""
+        from piper_plus_g2p.multilingual import UnicodeLanguageDetector
+
+        detector = UnicodeLanguageDetector(["ja", "en"], default_latin_language="en")
+        # Fullwidth ! (FF01), [ (FF3B), ~ (FF5E) all map to 'ja'.
+        assert detector.detect_char("！") == "ja"
+        assert detector.detect_char("［") == "ja"
+        assert detector.detect_char("～") == "ja"
+
+    def test_fullwidth_mixed_segment_with_jp_context(self):
+        """Fullwidth ＡＢＣ inside JA text is segmented into a 'en' chunk."""
+        from piper_plus_g2p.multilingual import MultilingualPhonemizer
+
+        p = MultilingualPhonemizer(["ja", "en"], default_latin_language="en")
+        # こんにちはＡＢＣさん -> [ja, en, ja]
+        segments = p.segment_text("こんにちはＡＢＣさん")
+        languages = [s["language"] for s in segments]
+        assert "en" in languages, f"Expected an 'en' segment, got {languages}"
+        assert "ja" in languages, f"Expected a 'ja' segment, got {languages}"
+
+    def test_fullwidth_only_text_segments_cleanly(self):
+        """Pure fullwidth letter input segments to a single Latin chunk."""
+        from piper_plus_g2p.multilingual import MultilingualPhonemizer
+
+        p = MultilingualPhonemizer(["ja", "en"], default_latin_language="en")
+        segments = p.segment_text("ＡＢＣａｂｃ")
+        assert len(segments) == 1
+        assert segments[0]["language"] == "en"
+
+
+class TestSurrogateAndEmojiHandling:
+    """Behavior pinning for emoji / non-BMP characters.
+
+    Single-character emoji (U+1F600, etc.) and BMP variation selectors
+    (U+FE0F, ZWJ, skin-tone modifiers) all return None from detect_char
+    because they fall outside the explicit Unicode ranges in
+    ``detect_char``. The phonemizer must not crash when emoji appear in
+    input — they should be silently absorbed into the surrounding
+    segment (neutral-char absorption rule).
+    """
+
+    def test_detect_char_emoji_returns_none(self):
+        """Single emoji codepoints are neutral (return None)."""
+        from piper_plus_g2p.multilingual import UnicodeLanguageDetector
+
+        detector = UnicodeLanguageDetector(["ja", "en"], default_latin_language="en")
+        assert detector.detect_char("\U0001f600") is None  # 😀
+        assert detector.detect_char("\U0001f602") is None  # 😂
+        assert detector.detect_char("\U0001f680") is None  # 🚀
+
+    def test_detect_char_emoji_modifiers_return_none(self):
+        """Variation selectors, ZWJ, skin-tone modifiers are neutral."""
+        from piper_plus_g2p.multilingual import UnicodeLanguageDetector
+
+        detector = UnicodeLanguageDetector(["ja", "en"], default_latin_language="en")
+        assert detector.detect_char("️") is None  # VS-16
+        assert detector.detect_char("‍") is None  # ZWJ
+        assert detector.detect_char("\U0001f3fb") is None  # skin tone 1
+
+    def test_emoji_only_text_does_not_crash(self):
+        """Pure emoji input must not raise; produces empty or default segment."""
+        from piper_plus_g2p.multilingual import MultilingualPhonemizer
+
+        # ES is rule-based -> no external phonemizer dependency required.
+        p = MultilingualPhonemizer(["es", "pt"], default_latin_language="es")
+        # No exception, and segment_text falls back to default language.
+        segments = p.segment_text("\U0001f600\U0001f602\U0001f680")
+        assert isinstance(segments, list)
+        # Emoji-only phonemize: tokens may be empty, but must not raise.
+        tokens = p.phonemize("\U0001f600\U0001f602\U0001f680")
+        assert isinstance(tokens, list)
+
+    def test_emoji_mixed_with_latin_text(self):
+        """Emoji absorbed into surrounding Latin segment without crash."""
+        from piper_plus_g2p.multilingual import MultilingualPhonemizer
+
+        p = MultilingualPhonemizer(["es", "pt"], default_latin_language="es")
+        # Latin + emoji + Latin should still produce phonemes.
+        tokens = p.phonemize("Hola \U0001f600 mundo")
+        assert isinstance(tokens, list)
+        assert len(tokens) > 0
+
+    @requires_ja
+    def test_emoji_mixed_with_japanese_text(self):
+        """Emoji in JA text: no crash, JA portion still phonemized."""
+        from piper_plus_g2p.multilingual import MultilingualPhonemizer
+
+        p = MultilingualPhonemizer(["ja", "en"], default_latin_language="en")
+        tokens = p.phonemize("こんにちは\U0001f600世界")
+        assert isinstance(tokens, list)
+        assert len(tokens) > 0
+
+    def test_utf16_surrogate_pair_safe(self):
+        """UTF-16 surrogate codepoints (when input as a 2-char string) do not crash.
+
+        Python 3 strings are stored as code points (not UTF-16 code units),
+        but it is possible to construct a string containing lone surrogates
+        via ``chr(0xD83D)``. detect_char must accept these without raising.
+        """
+        from piper_plus_g2p.multilingual import UnicodeLanguageDetector
+
+        detector = UnicodeLanguageDetector(["ja", "en"], default_latin_language="en")
+        # Lone high/low surrogates are neutral (return None).
+        assert detector.detect_char("\ud83d") is None
+        assert detector.detect_char("\ude00") is None
+
+
+class TestLongMultilineText:
+    """Behavior pinning for ~1000-char multi-line / mixed-language input.
+
+    The language splitter should:
+    1. Not crash on newlines / tabs / large inputs.
+    2. Detect multiple language segments consistently across the text.
+    3. Treat whitespace (including \\n, \\t) as neutral and absorb into
+        the surrounding segment per the existing contract.
+    """
+
+    def _build_long_text(self) -> str:
+        """Build ~1000-char text with newlines, tabs, JA, EN, ZH."""
+        unit = "こんにちは\nHello world\tTesting.\n你好。"
+        # 30 repetitions * ~30 chars = ~900 chars
+        return unit * 30
+
+    def test_long_text_does_not_crash(self):
+        """Detector and segmenter handle ~1000-char multi-line input."""
+        from piper_plus_g2p.multilingual import MultilingualPhonemizer
+
+        p = MultilingualPhonemizer(["ja", "en", "zh"], default_latin_language="en")
+        text = self._build_long_text()
+        assert len(text) >= 800
+        segments = p.segment_text(text)
+        assert isinstance(segments, list)
+        assert len(segments) > 1, (
+            "Expected multiple segments in a long multilingual text; "
+            f"got {len(segments)}"
+        )
+
+    def test_long_text_segments_contain_multiple_languages(self):
+        """Segmenter detects at least two distinct languages in long mixed text."""
+        from piper_plus_g2p.multilingual import MultilingualPhonemizer
+
+        p = MultilingualPhonemizer(["ja", "en", "zh"], default_latin_language="en")
+        text = self._build_long_text()
+        segments = p.segment_text(text)
+        languages = {s["language"] for s in segments}
+        # JA kana definitely present; EN Latin definitely present.
+        # ZH ideographs may be re-routed to JA under kana context (current
+        # CJK disambiguation rule). At minimum 2 languages must appear.
+        assert len(languages) >= 2, f"Expected >=2 languages, got {languages}"
+        assert "ja" in languages
+        assert "en" in languages
+
+    def test_long_text_preserves_input_characters(self):
+        """Concatenating all segment text reproduces the input verbatim."""
+        from piper_plus_g2p.multilingual import MultilingualPhonemizer
+
+        p = MultilingualPhonemizer(["ja", "en", "zh"], default_latin_language="en")
+        text = self._build_long_text()
+        segments = p.segment_text(text)
+        joined = "".join(s["text"] for s in segments)
+        assert joined == text, (
+            "Segment concatenation must be byte-for-byte identical to input "
+            "(newlines, tabs, and punctuation must be preserved)"
+        )
+
+    @requires_ja
+    @requires_en
+    def test_long_text_phonemize_does_not_crash(self):
+        """phonemize() on long multi-line JA-EN text completes and returns tokens."""
+        from piper_plus_g2p.multilingual import MultilingualPhonemizer
+
+        p = MultilingualPhonemizer(["ja", "en"], default_latin_language="en")
+        unit = "こんにちは\nHello world\tTesting.\n"
+        text = unit * 30
+        tokens = p.phonemize(text)
+        assert isinstance(tokens, list)
+        assert len(tokens) > 0
+
+    def test_pure_whitespace_long_text_returns_empty(self):
+        """A long whitespace-only input returns an empty token list."""
+        from piper_plus_g2p.multilingual import MultilingualPhonemizer
+
+        p = MultilingualPhonemizer(["es", "pt"], default_latin_language="es")
+        text = " \n\t" * 400  # ~1200 chars of whitespace
+        tokens = p.phonemize(text)
+        assert tokens == []
+
+
+class TestKoreanG2pk2Unavailable:
+    """Behavior when ``g2pk2`` is not importable (fallback contract).
+
+    The current implementation raises ``ImportError`` when ``g2pk2`` is
+    missing and Korean phonemization is attempted. These tests pin that
+    behavior. A graceful fallback (e.g. raw Hangul → IPA via syllable
+    decomposition without g2pk2 phonological rules) would arguably be
+    nicer; that is marked as "Future Work" via ``xfail(strict=False)``.
+    """
+
+    def _block_g2pk2(self, monkeypatch):
+        """Force ``import g2pk2`` to raise ImportError, and reset cache."""
+        import builtins
+
+        from piper_plus_g2p import korean
+
+        orig_import = builtins.__import__
+
+        def fake_import(name, *args, **kwargs):
+            if name == "g2pk2":
+                raise ImportError("simulated: g2pk2 not installed")
+            return orig_import(name, *args, **kwargs)
+
+        monkeypatch.setattr(builtins, "__import__", fake_import)
+        # Reset module-level cache so the patched import is reached.
+        monkeypatch.setattr(korean, "_g2p_instance", None, raising=False)
+        monkeypatch.setattr(korean, "_g2p_unavailable", False, raising=False)
+
+    def test_korean_phonemizer_raises_when_g2pk2_missing(self, monkeypatch):
+        """Pure-Hangul input through KoreanPhonemizer raises ImportError."""
+        self._block_g2pk2(monkeypatch)
+        from piper_plus_g2p.korean import KoreanPhonemizer
+
+        ph = KoreanPhonemizer()
+        with pytest.raises(ImportError, match="g2pk2"):
+            ph.phonemize("안녕하세요")  # 안녕하세요
+
+    def test_multilingual_ko_segment_raises_when_g2pk2_missing(self, monkeypatch):
+        """Mixed KO+Latin via MultilingualPhonemizer also raises ImportError."""
+        self._block_g2pk2(monkeypatch)
+        from piper_plus_g2p.multilingual import MultilingualPhonemizer
+
+        p = MultilingualPhonemizer(["ko", "en"], default_latin_language="en")
+        with pytest.raises(ImportError, match="g2pk2"):
+            p.phonemize("Hello 안녕")  # Hello 안녕
+
+    @pytest.mark.xfail(
+        strict=False,
+        reason=(
+            "Future Work: when g2pk2 is unavailable, KoreanPhonemizer ideally "
+            "falls back to raw Hangul syllable decomposition (skipping g2pk2 "
+            "phonological rules) so that mixed-script text does not entirely "
+            "fail at runtime. Today it raises ImportError, which propagates "
+            "out of MultilingualPhonemizer."
+        ),
+    )
+    def test_korean_graceful_fallback_future_work(self, monkeypatch):
+        """Future Work: graceful fallback when g2pk2 missing (currently raises)."""
+        self._block_g2pk2(monkeypatch)
+        from piper_plus_g2p.korean import KoreanPhonemizer
+
+        ph = KoreanPhonemizer()
+        # Desired future contract: returns *something* (raw IPA from jamo
+        # decomposition) instead of raising.
+        tokens = ph.phonemize("안녕")  # 안녕
+        assert isinstance(tokens, list)
+        assert len(tokens) > 0
