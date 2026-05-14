@@ -41,6 +41,11 @@ on:
       - 'test/models/multilingual-test-medium.onnx*'
       - '.github/workflows/memory-regression.yml'
   workflow_dispatch:
+    inputs:
+      initialize_baseline:
+        description: 'Observed values を baseline として commit する (初回初期化用)'
+        type: boolean
+        default: false
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
@@ -57,7 +62,7 @@ jobs:
     # Fork PRs cannot post comments; matches rtf-regression.yml.
     if: github.event.pull_request.head.repo.full_name == github.repository || github.event_name != 'pull_request'
     permissions:
-      contents: read
+      contents: write  # read normally; write needed for initialize_baseline commit
       pull-requests: write
     steps:
       - uses: actions/checkout@v6.0.2
@@ -167,3 +172,38 @@ jobs:
                 owner, repo, issue_number, body: payload,
               });
             }
+
+      - name: Initialize baseline (workflow_dispatch only)
+        if: github.event_name == 'workflow_dispatch' && inputs.initialize_baseline == true
+        run: |
+          uv run python - <<'EOF'
+          import json, pathlib
+
+          baseline_path = pathlib.Path("tests/fixtures/memory-baseline.json")
+          baseline = json.loads(baseline_path.read_text())
+
+          for lang in ("ja", "en", "zh", "es", "fr", "pt"):
+              result_path = pathlib.Path(f"memory-results/{lang}.json")
+              if not result_path.exists():
+                  continue
+              try:
+                  data = json.loads(result_path.read_text())
+                  obs_mb = data[0]["peak_memory_mb"] if isinstance(data, list) else data.get("peak_memory_mb")
+              except Exception as e:
+                  print(f"WARN: could not read memory-results/{lang}.json: {e}")
+                  continue
+              if obs_mb is not None:
+                  baseline["languages"].setdefault(lang, {})["peak_memory_mb"] = round(obs_mb, 1)
+                  print(f"  {lang}: {obs_mb:.1f} MB")
+
+          baseline_path.write_text(json.dumps(baseline, indent=2, ensure_ascii=False) + "\n")
+          print("memory baseline updated")
+          EOF
+        shell: bash
+
+      - name: Commit initialized baseline
+        if: github.event_name == 'workflow_dispatch' && inputs.initialize_baseline == true
+        uses: stefanzweifel/git-auto-commit-action@v5.2.0
+        with:
+          commit_message: "chore(bench): initialize memory baseline from first run"
+          file_pattern: tests/fixtures/memory-baseline.json
