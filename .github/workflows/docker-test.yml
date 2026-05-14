@@ -358,16 +358,48 @@ jobs:
   test-python-train:
     runs-on: ubuntu-latest
     steps:
-      - name: Free disk space
+      - name: Free disk space (aggressive)
+        # CUDA 12.1 devel + cuDNN8 + PyTorch CUDA wheels の組み合わせは ~25-30GB を消費し、
+        # ubuntu-latest の 84GB のうち pre-installed toolchain (Android SDK, .NET, Haskell,
+        # Swift, miniconda, etc.) が ~50GB を専有しているため、 build 中に "no space left
+        # on device" で fail することがある (PR #474, run 25851898518)。
+        # 既知の hostedtoolcache + apt の hard-to-find slot を全部 nuke して 40GB+ を確保する。
         run: |
-          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost \
-            "$AGENT_TOOLSDIRECTORY" /usr/local/lib/android /opt/hostedtoolcache/CodeQL \
-            /usr/local/graalvm /usr/local/.ghcup /usr/local/share/powershell \
+          set -eux
+          # === Hosted tool caches (>20GB) ===
+          sudo rm -rf \
+            /usr/share/dotnet \
+            /usr/local/lib/android \
+            /opt/ghc \
             /opt/hostedtoolcache \
-            /usr/share/swift /usr/share/miniconda /usr/share/az_* \
-            /usr/local/julia* /opt/microsoft /opt/pipx
-          sudo docker image prune --all --force
+            /opt/microsoft \
+            /opt/pipx \
+            "$AGENT_TOOLSDIRECTORY" \
+            /usr/local/share/boost \
+            /usr/local/share/powershell \
+            /usr/local/graalvm \
+            /usr/local/.ghcup \
+            /usr/local/julia* \
+            /usr/share/swift \
+            /usr/share/miniconda \
+            /usr/share/az_* \
+            /usr/share/kotlinc \
+            /usr/share/gradle* \
+            /home/linuxbrew \
+            /home/runneradmin/.rustup
+          # === Heavy apt packages (Azure CLI, gcloud, Firefox, Chromium, ...) ===
+          sudo apt-get purge -y --auto-remove \
+            'aspnetcore-*' 'dotnet-*' 'llvm-*' 'php*' \
+            azure-cli google-cloud-cli google-chrome-stable firefox \
+            powershell mono-devel 2>/dev/null || true
+          sudo apt-get autoremove -y 2>/dev/null || true
           sudo apt-get clean
+          # === Docker dangling images + buildx prune ===
+          sudo docker image prune --all --force
+          sudo docker builder prune --all --force 2>/dev/null || true
+          # === Swap is unused for buildx; release 4GB ===
+          sudo swapoff -a 2>/dev/null || true
+          sudo rm -f /mnt/swapfile /swapfile 2>/dev/null || true
           echo "--- Disk space after cleanup ---"
           df -h /
           avail_gb=$(df / --output=avail -BG | tail -1 | tr -d ' G')
@@ -387,7 +419,11 @@ jobs:
           tags: piper-python-train:test
           load: true
           cache-from: type=gha
-          cache-to: type=gha,mode=max
+          # mode=min: 最終 stage の layer だけ export。 mode=max は全 intermediate stage
+          # (CUDA devel + cuDNN8 builder stage = ~15GB) を local cache として一旦書き出して
+          # から upload するため、 build container の ephemeral disk 圧を倍増させ "no space
+          # left on device" を起こしていた (PR #474)。 hit rate は cache-from 側で確保される。
+          cache-to: type=gha,mode=min
 
       - name: Smoke test
         run: |
