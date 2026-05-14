@@ -64,6 +64,7 @@ set(TEST_SOURCES
     test_zh_en_loanword.cpp
     test_g2p_parallelism.cpp
     test_speaker_encoder_golden.cpp
+    test_voice_cloning_cli.cpp
 )
 
 # Add Unix-only tests (require open_jtalk binary or Unix APIs)

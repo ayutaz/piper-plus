@@ -1148,17 +1148,32 @@ buildInputTensors(
 
   // speaker_embedding + speaker_embedding_mask (Issue #426).
   // MB-iSTFT-VITS2 + Voice Cloning exports declare these unconditionally.
-  // Feed zero embedding + mask=0 so the model falls back to emb_g(sid).
+  // When `inputs.speakerEmbedding` is non-empty (and matches the expected dim),
+  // it is fed with mask=1 → voice cloning path active.
+  // Otherwise feed zero embedding + mask=0 → model falls back to emb_g(sid).
   if (session.hasSpeakerEmbeddingInput) {
     const int64_t embDim = session.speakerEmbeddingDim;
-    speakerEmbeddingBuf.assign(static_cast<size_t>(embDim), 0.0f);
+    const bool haveProvidedEmb =
+        !inputs.speakerEmbedding.empty() &&
+        static_cast<int64_t>(inputs.speakerEmbedding.size()) == embDim;
+    if (!inputs.speakerEmbedding.empty() && !haveProvidedEmb) {
+      spdlog::warn(
+          "Provided speaker_embedding has {} dims but model expects {}; "
+          "falling back to zero embedding (mask=0).",
+          inputs.speakerEmbedding.size(), embDim);
+    }
+    if (haveProvidedEmb) {
+      speakerEmbeddingBuf = inputs.speakerEmbedding;  // copy
+    } else {
+      speakerEmbeddingBuf.assign(static_cast<size_t>(embDim), 0.0f);
+    }
     std::vector<int64_t> embShape{1, embDim};
     names.push_back("speaker_embedding");
     tensors.push_back(Ort::Value::CreateTensor<float>(
         memoryInfo, speakerEmbeddingBuf.data(), speakerEmbeddingBuf.size(),
         embShape.data(), embShape.size()));
 
-    speakerEmbeddingMaskBuf = {0};
+    speakerEmbeddingMaskBuf = {haveProvidedEmb ? int64_t{1} : int64_t{0}};
     std::vector<int64_t> maskShape{1, 1};
     names.push_back("speaker_embedding_mask");
     tensors.push_back(Ort::Value::CreateTensor<int64_t>(
@@ -1223,6 +1238,9 @@ void synthesize(std::vector<PhonemeId> &phonemeIds,
   if (prosodyFeatures) {
     inputs.prosodyFeatures = *prosodyFeatures;
   }
+  // Voice cloning: forward provided speaker embedding (if any) to the
+  // tensor builder, which will switch the mask to 1.
+  inputs.speakerEmbedding = synthesisConfig.speakerEmbedding;
 
   // Buffers must outlive the Run() call
   std::vector<int64_t> phonemeIdsBuf, phonemeIdLengthsBuf, sidBuf, lidBuf, prosodyBuf;
@@ -1432,6 +1450,8 @@ void synthesizeFloat(std::vector<PhonemeId> &phonemeIds,
   if (prosodyFeatures) {
     inputs.prosodyFeatures = *prosodyFeatures;
   }
+  // Voice cloning: forward provided speaker embedding (if any).
+  inputs.speakerEmbedding = synthesisConfig.speakerEmbedding;
 
   // Buffers must outlive the Run() call
   std::vector<int64_t> phonemeIdsBuf, phonemeIdLengthsBuf, sidBuf, lidBuf, prosodyBuf;
