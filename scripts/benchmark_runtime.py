@@ -75,7 +75,9 @@ RUNTIME_PROFILES: dict[str, dict] = {
         "stdin_text": True,
         "output_flag": "--output_file",
         "config_flag": "--config",
-        "extra_args": ["--quiet"],
+        # python -m piper has no --quiet flag (only --debug); omit to avoid
+        # "unrecognized argument" error that silently fails every cell.
+        "extra_args": [],
     },
     "rust": {
         "stdin_text": True,
