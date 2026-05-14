@@ -35,8 +35,18 @@ def mock_engine():
 
 
 @pytest.fixture()
-def client(mock_engine):
-    """Create a FastAPI TestClient backed by the mocked engine."""
+def client(mock_engine, monkeypatch):
+    """Create a FastAPI TestClient backed by the mocked engine.
+
+    Rate limiting is disabled here so the existing test suite — which
+    repeatedly hits /v1/audio/speech — does not start failing once
+    slowapi is wired in. Dedicated rate-limit tests build their own
+    app with PIPER_RATE_LIMIT_ENABLED=true.
+    """
+    # Ensure no stray PIPER_API_KEYS leaks in from the host env (would
+    # require Authorization on every request and break legacy tests).
+    monkeypatch.delenv("PIPER_API_KEYS", raising=False)
+    monkeypatch.setenv("PIPER_RATE_LIMIT_ENABLED", "false")
     # Use this test file as a stand-in for stat().st_mtime
     app = create_app(mock_engine, __file__)
     return TestClient(app)
@@ -489,6 +499,232 @@ class TestSpeakerEmbeddingFeed:
                     # speaker_embedding intentionally omitted
                 ]
             )
+
+
+# ---- Auth (Bearer token) ----
+#
+# PIPER_API_KEYS unset → auth disabled (backward compatible).
+# PIPER_API_KEYS set    → Authorization: Bearer <key> required, else 401.
+# /health is always exempt so load balancer probes don't get 401.
+#
+# Auth/rate-limit settings are resolved inside create_app(), so each test
+# builds a fresh app via monkeypatched env vars. Limiter state is per-app
+# so default-disabled rate-limit tests don't interact with these.
+
+
+@pytest.fixture()
+def make_client(mock_engine, monkeypatch):
+    """Factory that builds a TestClient with env-var-driven config."""
+
+    def _make(**env):
+        for key, val in env.items():
+            if val is None:
+                monkeypatch.delenv(key, raising=False)
+            else:
+                monkeypatch.setenv(key, val)
+        # Disable rate limiting by default for non-rate-limit tests so the
+        # 30/minute speech limit doesn't bleed across cases.
+        if "PIPER_RATE_LIMIT_ENABLED" not in env:
+            monkeypatch.setenv("PIPER_RATE_LIMIT_ENABLED", "false")
+        app = create_app(mock_engine, __file__)
+        return TestClient(app)
+
+    return _make
+
+
+class TestAuthDisabledByDefault:
+    """Backward compat: PIPER_API_KEYS unset → no auth required."""
+
+    def test_speech_no_auth_header_succeeds(self, make_client):
+        client = make_client(PIPER_API_KEYS=None)
+        resp = client.post("/v1/audio/speech", json={"input": "hello"})
+        assert resp.status_code == 200
+
+    def test_models_no_auth_header_succeeds(self, make_client):
+        client = make_client(PIPER_API_KEYS=None)
+        resp = client.get("/v1/models")
+        assert resp.status_code == 200
+
+    def test_empty_string_treated_as_unset(self, make_client):
+        """PIPER_API_KEYS='' (empty) must NOT enable auth."""
+        client = make_client(PIPER_API_KEYS="")
+        resp = client.post("/v1/audio/speech", json={"input": "hello"})
+        assert resp.status_code == 200
+
+
+class TestAuthEnabled:
+    """PIPER_API_KEYS set → Bearer required on protected endpoints."""
+
+    # Fixture token used in env vars + Authorization headers below.
+    # Intentionally NOT shaped like `sk-...` to avoid generic-api-key
+    # heuristics (gitleaks, GitHub secret scanning) misfiring on test data.
+    KEY = "piper-unit-test-token-00"  # gitleaks:allow
+
+    def test_speech_missing_auth_returns_401(self, make_client):
+        client = make_client(PIPER_API_KEYS=self.KEY)
+        resp = client.post("/v1/audio/speech", json={"input": "hello"})
+        assert resp.status_code == 401
+        assert resp.headers.get("www-authenticate") == "Bearer"
+
+    def test_speech_valid_bearer_returns_200(self, make_client):
+        client = make_client(PIPER_API_KEYS=self.KEY)
+        resp = client.post(
+            "/v1/audio/speech",
+            json={"input": "hello"},
+            headers={"Authorization": f"Bearer {self.KEY}"},
+        )
+        assert resp.status_code == 200
+
+    def test_speech_wrong_key_returns_401(self, make_client):
+        client = make_client(PIPER_API_KEYS=self.KEY)
+        resp = client.post(
+            "/v1/audio/speech",
+            json={"input": "hello"},
+            headers={"Authorization": "Bearer wrong-key"},
+        )
+        assert resp.status_code == 401
+
+    def test_speech_malformed_header_returns_401(self, make_client):
+        client = make_client(PIPER_API_KEYS=self.KEY)
+        # No "Bearer " prefix
+        resp = client.post(
+            "/v1/audio/speech",
+            json={"input": "hello"},
+            headers={"Authorization": self.KEY},
+        )
+        assert resp.status_code == 401
+
+    def test_speech_basic_scheme_rejected(self, make_client):
+        client = make_client(PIPER_API_KEYS=self.KEY)
+        resp = client.post(
+            "/v1/audio/speech",
+            json={"input": "hello"},
+            headers={"Authorization": f"Basic {self.KEY}"},
+        )
+        assert resp.status_code == 401
+
+    def test_bearer_scheme_case_insensitive(self, make_client):
+        """Authorization scheme matches case-insensitively (RFC 7235)."""
+        client = make_client(PIPER_API_KEYS=self.KEY)
+        resp = client.post(
+            "/v1/audio/speech",
+            json={"input": "hello"},
+            headers={"Authorization": f"bearer {self.KEY}"},
+        )
+        assert resp.status_code == 200
+
+    def test_multiple_keys_any_valid(self, make_client):
+        """Comma-separated keys: any one of them authorizes."""
+        client = make_client(PIPER_API_KEYS=f"key-one,{self.KEY},key-three")
+        resp = client.post(
+            "/v1/audio/speech",
+            json={"input": "hello"},
+            headers={"Authorization": "Bearer key-three"},
+        )
+        assert resp.status_code == 200
+
+    def test_health_skips_auth(self, make_client):
+        """/health must remain open for load balancer probes."""
+        client = make_client(PIPER_API_KEYS=self.KEY)
+        resp = client.get("/health")
+        assert resp.status_code == 200
+        assert resp.json() == {"status": "healthy"}
+
+    def test_models_requires_auth(self, make_client):
+        client = make_client(PIPER_API_KEYS=self.KEY)
+        resp = client.get("/v1/models")
+        assert resp.status_code == 401
+
+    def test_models_with_auth_succeeds(self, make_client):
+        client = make_client(PIPER_API_KEYS=self.KEY)
+        resp = client.get(
+            "/v1/models",
+            headers={"Authorization": f"Bearer {self.KEY}"},
+        )
+        assert resp.status_code == 200
+
+    def test_languages_requires_auth(self, make_client):
+        client = make_client(PIPER_API_KEYS=self.KEY)
+        resp = client.get("/v1/audio/speech/languages")
+        assert resp.status_code == 401
+
+    def test_synthesize_requires_auth(self, make_client):
+        client = make_client(PIPER_API_KEYS=self.KEY)
+        resp = client.get("/synthesize", params={"text": "hi"})
+        assert resp.status_code == 401
+
+
+# ---- Rate limiting (slowapi, per-IP) ----
+
+
+class TestRateLimitDisabled:
+    """PIPER_RATE_LIMIT_ENABLED=false → no 429 regardless of request volume."""
+
+    def test_speech_no_429_when_disabled(self, make_client):
+        client = make_client(
+            PIPER_RATE_LIMIT_ENABLED="false",
+            PIPER_RATE_LIMIT_SPEECH="2/minute",
+        )
+        for _ in range(5):
+            resp = client.post("/v1/audio/speech", json={"input": "hi"})
+            assert resp.status_code == 200
+
+
+class TestRateLimitEnabled:
+    """PIPER_RATE_LIMIT_ENABLED=true (default) → 429 after limit exceeded."""
+
+    def test_speech_429_after_limit(self, make_client):
+        # 2/minute keeps the test fast and deterministic without sleeping.
+        client = make_client(
+            PIPER_RATE_LIMIT_ENABLED="true",
+            PIPER_RATE_LIMIT_SPEECH="2/minute",
+        )
+        # First two should pass, third should be 429.
+        assert client.post("/v1/audio/speech", json={"input": "a"}).status_code == 200
+        assert client.post("/v1/audio/speech", json={"input": "b"}).status_code == 200
+        resp = client.post("/v1/audio/speech", json={"input": "c"})
+        assert resp.status_code == 429
+        assert resp.headers.get("retry-after") is not None
+        # Retry-After should parse as a non-negative integer (seconds).
+        assert int(resp.headers["retry-after"]) >= 0
+
+    def test_health_never_rate_limited(self, make_client):
+        """/health must never be rate-limited (LB probes hit it every few s)."""
+        client = make_client(
+            PIPER_RATE_LIMIT_ENABLED="true",
+            PIPER_RATE_LIMIT_SPEECH="1/minute",
+            PIPER_RATE_LIMIT_LIGHT="1/minute",
+        )
+        # Hit /health well beyond any plausible limit.
+        for _ in range(20):
+            resp = client.get("/health")
+            assert resp.status_code == 200
+
+    def test_synthesize_get_shares_speech_limit(self, make_client):
+        """GET /synthesize uses the same heavy limit as POST /v1/audio/speech."""
+        client = make_client(
+            PIPER_RATE_LIMIT_ENABLED="true",
+            PIPER_RATE_LIMIT_SPEECH="1/minute",
+        )
+        assert client.get("/synthesize", params={"text": "a"}).status_code == 200
+        resp = client.get("/synthesize", params={"text": "b"})
+        assert resp.status_code == 429
+
+    def test_light_endpoint_has_separate_limit(self, make_client):
+        """/v1/models uses the light limit, independent of speech limit."""
+        client = make_client(
+            PIPER_RATE_LIMIT_ENABLED="true",
+            PIPER_RATE_LIMIT_SPEECH="1/minute",
+            PIPER_RATE_LIMIT_LIGHT="3/minute",
+        )
+        # Exhaust speech limit — should not affect /v1/models.
+        client.post("/v1/audio/speech", json={"input": "a"})
+        client.post("/v1/audio/speech", json={"input": "b"})  # 429 expected
+        # /v1/models still has its own bucket.
+        for _ in range(3):
+            assert client.get("/v1/models").status_code == 200
+        # Fourth /v1/models hit exhausts the light limit.
+        assert client.get("/v1/models").status_code == 429
 
 
 # ---- CORS ----

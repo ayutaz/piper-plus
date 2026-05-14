@@ -330,12 +330,61 @@ def main():
         print(f"Audio saved to: {args.output}")
 
 
+def _parse_api_keys(raw: str | None) -> set[str]:
+    """Parse PIPER_API_KEYS env var (comma-separated).
+
+    Empty / unset → empty set (auth disabled). Whitespace and empty entries
+    are stripped so trailing commas don't accidentally allow blank tokens.
+    """
+    if not raw:
+        return set()
+    return {k.strip() for k in raw.split(",") if k.strip()}
+
+
+def _env_flag(name: str, default: bool) -> bool:
+    """Parse a boolean env var. Accepts 1/true/yes/on (case-insensitive)."""
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in ("1", "true", "yes", "on")
+
+
 def create_app(engine: PiperInferenceEngine, model_path: str):
-    """Create the FastAPI application with all endpoints."""
-    from fastapi import FastAPI, HTTPException, Query  # noqa: PLC0415
+    """Create the FastAPI application with all endpoints.
+
+    Auth (optional bearer token):
+        Set ``PIPER_API_KEYS`` to a comma-separated list of accepted tokens.
+        If unset/empty, auth is disabled and all requests pass (backward
+        compatible). ``/health`` is always exempt for load-balancer probes.
+
+    Rate limiting (slowapi, per-IP):
+        ``PIPER_RATE_LIMIT_ENABLED`` (default ``true``) — master switch.
+        ``PIPER_RATE_LIMIT_SPEECH`` (default ``30/minute``) — heavy synth
+        endpoints.
+        ``PIPER_RATE_LIMIT_LIGHT`` (default ``600/minute``) — metadata
+        endpoints (``/v1/models``, ``/v1/audio/speech/languages``).
+        ``/health`` is never rate-limited.
+
+    Note: CORS is intentionally untouched in this PR; tightening allow-origins
+    is tracked separately so we don't accidentally break embedded browser
+    clients that depend on ``*``.
+    """
+    from fastapi import (  # noqa: PLC0415
+        Depends,
+        FastAPI,
+        Header,
+        HTTPException,
+        Query,
+        Request,
+        status,
+    )
     from fastapi.middleware.cors import CORSMiddleware  # noqa: PLC0415
     from fastapi.responses import StreamingResponse  # noqa: PLC0415
     from pydantic import BaseModel, Field  # noqa: PLC0415
+    from slowapi import Limiter  # noqa: PLC0415
+    from slowapi.errors import RateLimitExceeded  # noqa: PLC0415
+    from slowapi.util import get_remote_address  # noqa: PLC0415
+    from starlette.responses import JSONResponse  # noqa: PLC0415
 
     class SpeechRequest(BaseModel):
         """OpenAI-compatible TTS request schema."""
@@ -351,7 +400,83 @@ def create_app(engine: PiperInferenceEngine, model_path: str):
         noise_scale: float = 0.667
         noise_w: float = 0.8
 
+    # --- Auth / rate-limit configuration (resolved at app-build time) ---
+    api_keys: set[str] = _parse_api_keys(os.environ.get("PIPER_API_KEYS"))
+    auth_enabled: bool = bool(api_keys)
+    rate_limit_enabled: bool = _env_flag("PIPER_RATE_LIMIT_ENABLED", default=True)
+    speech_limit: str = os.environ.get("PIPER_RATE_LIMIT_SPEECH", "30/minute")
+    light_limit: str = os.environ.get("PIPER_RATE_LIMIT_LIGHT", "600/minute")
+
+    if auth_enabled:
+        _LOGGER.info("Bearer auth enabled (%d key(s) configured)", len(api_keys))
+    else:
+        _LOGGER.info(
+            "Bearer auth disabled (PIPER_API_KEYS unset). Set the env var to "
+            "enable per-key authentication."
+        )
+
+    # slowapi: when rate_limit_enabled=False we still construct the Limiter
+    # but pass `enabled=False` so the decorators become no-ops. This keeps a
+    # single code path and lets tests flip the switch via env vars.
+    limiter = Limiter(key_func=get_remote_address, enabled=rate_limit_enabled)
+    if rate_limit_enabled:
+        _LOGGER.info(
+            "Rate limit enabled (speech=%s, light=%s, per-IP via slowapi)",
+            speech_limit,
+            light_limit,
+        )
+    else:
+        _LOGGER.info("Rate limit disabled (PIPER_RATE_LIMIT_ENABLED=false)")
+
+    def verify_api_key(
+        authorization: str | None = Header(default=None),
+    ) -> None:
+        """FastAPI dependency: enforce Bearer auth when PIPER_API_KEYS is set.
+
+        - No keys configured: no-op (backward compatible).
+        - Keys configured: require ``Authorization: Bearer <key>``;
+            401 on missing / malformed header or unknown key.
+        """
+        if not auth_enabled:
+            return
+        if not authorization:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Missing Authorization header",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        scheme, _, token = authorization.partition(" ")
+        if scheme.lower() != "bearer" or not token:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid Authorization header (expected 'Bearer <key>')",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        if token not in api_keys:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid API key",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
     app = FastAPI(title="piper-plus API")
+    app.state.limiter = limiter
+
+    def _rate_limit_handler(request: Request, exc: RateLimitExceeded):
+        # slowapi's default handler returns plain text; emit JSON with a
+        # Retry-After header so OpenAI-compatible clients can back off
+        # automatically.
+        retry_after = getattr(exc, "retry_after", None) or 60
+        headers = {"Retry-After": str(int(retry_after))}
+        return JSONResponse(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            content={
+                "detail": f"Rate limit exceeded: {exc.detail}",
+            },
+            headers=headers,
+        )
+
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_handler)
 
     app.add_middleware(
         CORSMiddleware,
@@ -366,6 +491,9 @@ def create_app(engine: PiperInferenceEngine, model_path: str):
     except OSError:
         model_created = int(time.time())
 
+    # /health is intentionally outside auth + rate limit so external load
+    # balancers and k8s liveness probes never get 401/429 (would mark the
+    # container unhealthy and trigger a restart loop).
     @app.get("/health")
     def health_check():
         return {"status": "healthy"}
@@ -376,8 +504,10 @@ def create_app(engine: PiperInferenceEngine, model_path: str):
             return False
         return sum(1 for c in text if not c.isspace()) <= threshold
 
-    @app.get("/synthesize")
+    @app.get("/synthesize", dependencies=[Depends(verify_api_key)])
+    @limiter.limit(speech_limit)
     def synthesize(
+        request: Request,
         text: str = Query(...),
         speaker_id: int = Query(0),
         language: str = Query("ja"),
@@ -411,8 +541,9 @@ def create_app(engine: PiperInferenceEngine, model_path: str):
 
     # --- OpenAI-compatible endpoints ---
 
-    @app.post("/v1/audio/speech")
-    def openai_speech(req: SpeechRequest):
+    @app.post("/v1/audio/speech", dependencies=[Depends(verify_api_key)])
+    @limiter.limit(speech_limit)
+    def openai_speech(request: Request, req: SpeechRequest):
         if not req.input or not req.input.strip():
             raise HTTPException(status_code=400, detail="input is required")
         if req.response_format != "wav":
@@ -448,8 +579,9 @@ def create_app(engine: PiperInferenceEngine, model_path: str):
             _LOGGER.exception("Synthesis failed for /v1/audio/speech")
             raise HTTPException(status_code=500, detail="Synthesis failed") from None
 
-    @app.get("/v1/models")
-    def openai_models():
+    @app.get("/v1/models", dependencies=[Depends(verify_api_key)])
+    @limiter.limit(light_limit)
+    def openai_models(request: Request):
         return {
             "object": "list",
             "data": [
@@ -462,8 +594,9 @@ def create_app(engine: PiperInferenceEngine, model_path: str):
             ],
         }
 
-    @app.get("/v1/audio/speech/languages")
-    def speech_languages():
+    @app.get("/v1/audio/speech/languages", dependencies=[Depends(verify_api_key)])
+    @limiter.limit(light_limit)
+    def speech_languages(request: Request):
         languages = (
             sorted(engine.language_id_map.keys()) if engine.language_id_map else []
         )
