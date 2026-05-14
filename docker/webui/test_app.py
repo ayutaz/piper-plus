@@ -23,11 +23,18 @@ _source = _APP_PY.read_text(encoding="utf-8")
 # Parse the constant
 _tree = ast.parse(_source)
 _SHORT_TEXT_THRESHOLD: int = 10  # fallback
+_SAMPLE_TEXTS_KEYS: list[str] = []
 for _node in ast.walk(_tree):
     if isinstance(_node, ast.Assign):
         for _target in _node.targets:
             if isinstance(_target, ast.Name) and _target.id == "_SHORT_TEXT_THRESHOLD":
                 _SHORT_TEXT_THRESHOLD = ast.literal_eval(_node.value)
+            elif (
+                isinstance(_target, ast.Name)
+                and _target.id == "SAMPLE_TEXTS"
+                and isinstance(_node.value, ast.Dict)
+            ):
+                _SAMPLE_TEXTS_KEYS = [ast.literal_eval(k) for k in _node.value.keys]
 
 
 def _extract_function(name: str) -> str:
@@ -80,6 +87,34 @@ class _FakeOnnxSession:
 # ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
+class TestSupportedLanguages:
+    """Pin the WebUI's exposed language list to the 6-lang multilingual
+    checkpoints we actually ship (CLAUDE.md: ja=0, en=1, zh=2, es=3, fr=4,
+    pt=5). G2P supports 8 languages (adds ko + sv), but the trained
+    checkpoints have no language embedding for ko/sv, so selecting them
+    in the UI would silently fall back to `lid=0` (Japanese) and drop
+    unique phonemes. Hide them rather than ship a footgun — these tests
+    will fail loudly if anyone re-adds ko/sv without also publishing a
+    checkpoint that supports them."""
+
+    EXPECTED_LANGUAGES = {"ja", "en", "zh", "es", "fr", "pt"}
+
+    def test_sample_texts_keys_match_supported_set(self):
+        assert set(_SAMPLE_TEXTS_KEYS) == self.EXPECTED_LANGUAGES, (
+            f"SAMPLE_TEXTS keys {set(_SAMPLE_TEXTS_KEYS)} drifted from the "
+            f"shipped-checkpoint set {self.EXPECTED_LANGUAGES}"
+        )
+
+    def test_sv_not_in_sample_texts(self):
+        """Regression guard: sv was removed because the 6lang model has no
+        sv language embedding (PR alignment with FastAPI server)."""
+        assert "sv" not in _SAMPLE_TEXTS_KEYS
+
+    def test_ko_not_in_sample_texts(self):
+        """Regression guard: ko is also G2P-supported but checkpoint-less."""
+        assert "ko" not in _SAMPLE_TEXTS_KEYS
+
+
 class TestIsShortText:
     """Boundary-value tests for _is_short_text()."""
 

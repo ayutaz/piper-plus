@@ -186,6 +186,55 @@ class TestLanguages:
         languages = resp.json()["languages"]
         assert languages == sorted(languages)
 
+    def test_languages_endpoint_matches_supported_languages(self, client):
+        """`/v1/audio/speech/languages` must return exactly the canonical
+        `SUPPORTED_LANGUAGES` set when the model exposes a 6-lang
+        `language_id_map`. Mock fixture's map mirrors the shipped
+        checkpoints (ja/en/zh/es/fr/pt — CLAUDE.md)."""
+        from inference import SUPPORTED_LANGUAGES  # noqa: PLC0415
+
+        resp = client.get("/v1/audio/speech/languages")
+        assert resp.status_code == 200
+        returned = set(resp.json()["languages"])
+        assert returned == set(SUPPORTED_LANGUAGES), (
+            f"endpoint returned {returned}, expected {set(SUPPORTED_LANGUAGES)}"
+        )
+
+    def test_supported_languages_matches_webui_sample_texts(self):
+        """CLI `SUPPORTED_LANGUAGES` and WebUI `SAMPLE_TEXTS` keys must
+        match exactly so the two server entry points expose the same set
+        of languages. The WebUI extraction goes via `ast` rather than
+        importing `docker/webui/app.py`, which depends on gradio (not in
+        the test virtualenv — same trick the WebUI's own test_app.py
+        uses)."""
+        import ast  # noqa: PLC0415
+
+        from inference import SUPPORTED_LANGUAGES  # noqa: PLC0415
+
+        webui_path = Path(__file__).resolve().parent.parent / "webui" / "app.py"
+        tree = ast.parse(webui_path.read_text(encoding="utf-8"))
+        sample_texts_keys: list[str] | None = None
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Assign):
+                for target in node.targets:
+                    if (
+                        isinstance(target, ast.Name)
+                        and target.id == "SAMPLE_TEXTS"
+                        and isinstance(node.value, ast.Dict)
+                    ):
+                        sample_texts_keys = [
+                            ast.literal_eval(k) for k in node.value.keys
+                        ]
+                        break
+                if sample_texts_keys is not None:
+                    break
+
+        assert sample_texts_keys is not None, "SAMPLE_TEXTS not found in webui/app.py"
+        assert set(sample_texts_keys) == set(SUPPORTED_LANGUAGES), (
+            f"WebUI SAMPLE_TEXTS keys {set(sample_texts_keys)} do not match "
+            f"CLI SUPPORTED_LANGUAGES {set(SUPPORTED_LANGUAGES)}"
+        )
+
 
 # ---- existing endpoints still work ----
 
