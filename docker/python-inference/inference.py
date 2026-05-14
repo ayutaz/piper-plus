@@ -8,11 +8,18 @@ Server mode exposes:
 - OpenAI-compatible endpoints (PR #321): ``POST /v1/audio/speech``,
     ``GET /v1/models``, ``GET /v1/audio/speech/languages`` so existing OpenAI
     clients can drop in unchanged
+- ``POST /api/phoneme-timing`` — phoneme timing JSON output (parity with
+    ``piper.http_server``; available when the ONNX model exposes a
+    ``durations`` output tensor)
 - ``GET /health`` for orchestrator health checks
 
-Note: phoneme-timing JSON/TSV/SRT output is exposed by the separate
-``piper.http_server`` (in ``src/python_run/``) under
-``POST/GET /api/phoneme-timing``, not by this script.
+Streaming
+---------
+``POST /v1/audio/speech`` accepts ``stream=true`` (request body) to receive a
+chunked WAV response: a streaming-WAV header (placeholder ``0xFFFFFFFF`` for
+RIFF/data sizes) followed by per-sentence PCM frames. ``stream=false`` (the
+default) preserves the original behaviour of buffering the full WAV in a
+single response — keeps existing OpenAI SDK clients working unchanged.
 
 Uses ``piper_plus_g2p.registry`` for text-to-phoneme conversion (8 languages:
 JA/EN/ZH/KO/ES/FR/PT/SV) and ONNX Runtime for inference (CPU, no PyTorch
@@ -24,8 +31,10 @@ import io
 import json
 import logging
 import os
+import struct
 import sys
 import time
+from collections.abc import Iterator
 from pathlib import Path
 
 import numpy as np
@@ -38,37 +47,97 @@ from piper_train.ort_utils import create_session_with_cache, warmup_onnx_session
 _LOGGER = logging.getLogger(__name__)
 
 
-# Languages accepted by the `--language` CLI flag.
-#
-# Kept in sync with `docker/webui/app.py:SAMPLE_TEXTS` and the canonical
-# 6-lang multilingual training set documented in CLAUDE.md (ja=0, en=1,
-# zh=2, es=3, fr=4, pt=5).
-#
-# Why this list is 6 and not 8 (G2P-supported languages):
-#   piper_plus_g2p ships phonemizers for 8 languages (adds ko + sv), but
-#   the trained checkpoints we ship have no language embedding for ko/sv.
-#   Accepting those codes would phonemize with the correct G2P, then
-#   silently fall back to `lid = language_id_map.get(language, 0)` = 0
-#   (Japanese) inside `PiperInferenceEngine.synthesize`, and drop any
-#   unique-to-that-language phonemes that are not in the model's
-#   phoneme_id_map as "Unknown phoneme" log warnings. The audio that
-#   comes out is neither Swedish nor Japanese — just confusing. Re-add
-#   `ko` / `sv` here once a checkpoint with those language ids is
-#   published.
-#
-# Note: the runtime `/v1/audio/speech/languages` endpoint reports the
-# *loaded model*'s `language_id_map.keys()` rather than this static list,
-# so a future model with sv/ko will surface them without needing this
-# constant to change. This constant exists only for the CLI `choices=`
-# validator and as documentation for the WebUI parity.
-SUPPORTED_LANGUAGES: tuple[str, ...] = ("ja", "en", "zh", "es", "fr", "pt")
-
-
 def _sanitize_for_log(value: str) -> str:
     # Strip CR/LF from user-controlled values before logging to prevent
     # log forging via line-break injection (CWE-117). Used at the HTTP
     # request boundaries `/synthesize` and `/v1/audio/speech`.
     return value.replace("\r", "").replace("\n", " ")
+
+
+# Sentence terminators / closers mirror
+# ``src/python_run/piper/text_splitter.py`` and the spec at
+# ``docs/spec/text-splitter-contract.toml``. Kept inline here because the
+# docker image installs ``piper_train`` + ``piper_plus_g2p`` only — not the
+# ``piper`` runtime package — so we can't import ``piper.text_splitter``.
+_SENTENCE_TERMINATORS: frozenset[str] = frozenset(
+    {".", "!", "?", "。", "！", "？", "．"}
+)
+_CLOSING_PUNCTUATION: frozenset[str] = frozenset(
+    {")", "]", "}", '"', "'", "」", "』", "）", "］", "】", "｣", "”", "’", "»"}
+)
+
+
+def _split_sentences(text: str) -> list[str]:
+    """Sentence-level split for streaming synthesis.
+
+    Mirrors ``piper.text_splitter.split_sentences``. SSML (``<speak>...``) is
+    treated as a single unit — the SSML parser is invoked downstream by the
+    phonemizer and must not be torn across chunk boundaries.
+    """
+    if not text:
+        return []
+    stripped = text.lstrip()
+    if stripped.startswith(("<speak>", "<speak ")):
+        return [text.strip()]
+
+    sentences: list[str] = []
+    current: list[str] = []
+    chars = list(text)
+    n = len(chars)
+    i = 0
+    while i < n:
+        ch = chars[i]
+        current.append(ch)
+        i += 1
+        if ch in _SENTENCE_TERMINATORS:
+            while i < n and chars[i] in _CLOSING_PUNCTUATION:
+                current.append(chars[i])
+                i += 1
+            trimmed = "".join(current).strip()
+            if trimmed:
+                sentences.append(trimmed)
+            current.clear()
+            while i < n and chars[i].isspace():
+                i += 1
+    trimmed = "".join(current).strip()
+    if trimmed:
+        sentences.append(trimmed)
+    return sentences
+
+
+# Streaming WAV constants (mirrors piper.http_server).
+_WAV_CHANNELS = 1
+_WAV_BIT_DEPTH = 16
+
+
+def _build_streaming_wav_header(
+    sample_rate: int,
+    channels: int = _WAV_CHANNELS,
+    bit_depth: int = _WAV_BIT_DEPTH,
+) -> bytes:
+    """Build a WAV header with placeholder sizes (``0xFFFFFFFF``).
+
+    Browsers, ``ffmpeg``, and ``soundfile`` accept ``0xFFFFFFFF`` as the
+    conventional "unknown length" sentinel for chunked WAV streams.
+    Mirrors ``piper.http_server._build_streaming_wav_header``.
+    """
+    byte_rate = sample_rate * channels * bit_depth // 8
+    block_align = channels * bit_depth // 8
+    return (
+        b"RIFF"
+        + struct.pack("<I", 0xFFFFFFFF)
+        + b"WAVE"
+        + b"fmt "
+        + struct.pack("<I", 16)
+        + struct.pack("<H", 1)
+        + struct.pack("<H", channels)
+        + struct.pack("<I", sample_rate)
+        + struct.pack("<I", byte_rate)
+        + struct.pack("<H", block_align)
+        + struct.pack("<H", bit_depth)
+        + b"data"
+        + struct.pack("<I", 0xFFFFFFFF)
+    )
 
 
 # FastAPI (optional)
@@ -179,36 +248,45 @@ class PiperInferenceEngine:
                     break
         self.language_id_map = config.get("language_id_map", {})
 
+        # Detect whether the ONNX graph exposes a ``durations`` output tensor.
+        # MB-iSTFT-VITS2 exports emit it by default (PR #320); older HiFi-GAN
+        # exports do not. Required for /api/phoneme-timing — when absent the
+        # endpoint returns 400 instead of synthesizing pointlessly.
+        output_names = [o.name for o in self.model.get_outputs()]
+        self.has_durations: bool = "durations" in output_names
+        # hop_length used to convert durations → milliseconds. Matches the
+        # canonical 256 used across all 7 runtimes (see
+        # ``docs/spec/phoneme-timing-contract.toml``). Config may override.
+        self.hop_length: int = int(config.get("audio", {}).get("hop_length", 256))
+
         _LOGGER.info(
-            "Model loaded: %s (prosody=%s, sid=%s, lid=%s, speaker_embedding=%s)",
+            "Model loaded: %s (prosody=%s, sid=%s, lid=%s, speaker_embedding=%s, durations=%s)",
             model_path,
             self.has_prosody,
             self.has_sid,
             self.has_lid,
             f"dim={self.speaker_emb_dim}" if self.has_speaker_embedding else False,
+            self.has_durations,
         )
 
-    def synthesize(
+    def _build_inputs(
         self,
-        text: str,
-        language: str = "ja",
-        speaker_id: int = 0,
-        noise_scale: float = 0.667,
-        length_scale: float = 1.0,
-        noise_scale_w: float = 0.8,
-    ) -> np.ndarray:
-        """Synthesize text to int16 audio array."""
-        phoneme_ids, prosody_features_data = text_to_phoneme_ids_and_prosody(
-            text,
-            self.phoneme_id_map,
-            language=language,
-        )
-
+        phoneme_ids: list[int],
+        prosody_features_data: list[dict | None],
+        language: str,
+        speaker_id: int,
+        noise_scale: float,
+        length_scale: float,
+        noise_scale_w: float,
+    ) -> dict[str, np.ndarray]:
+        """Pack ORT input feed dict. Extracted so both ``synthesize`` and the
+        timing path share the exact same input contract (single source of truth
+        for the PR #320 ``speaker_embedding`` fallback rules)."""
         text_input = np.expand_dims(np.array(phoneme_ids, dtype=np.int64), 0)
         text_lengths = np.array([text_input.shape[1]], dtype=np.int64)
         scales = np.array([noise_scale, length_scale, noise_scale_w], dtype=np.float32)
 
-        inputs = {
+        inputs: dict[str, np.ndarray] = {
             "input": text_input,
             "input_lengths": text_lengths,
             "scales": scales,
@@ -245,6 +323,34 @@ class PiperInferenceEngine:
             inputs["speaker_embedding"] = np.zeros((1, emb_dim), dtype=np.float32)
             inputs["speaker_embedding_mask"] = np.array([[0]], dtype=np.int64)
 
+        return inputs
+
+    def synthesize(
+        self,
+        text: str,
+        language: str = "ja",
+        speaker_id: int = 0,
+        noise_scale: float = 0.667,
+        length_scale: float = 1.0,
+        noise_scale_w: float = 0.8,
+    ) -> np.ndarray:
+        """Synthesize text to int16 audio array."""
+        phoneme_ids, prosody_features_data = text_to_phoneme_ids_and_prosody(
+            text,
+            self.phoneme_id_map,
+            language=language,
+        )
+
+        inputs = self._build_inputs(
+            phoneme_ids,
+            prosody_features_data,
+            language,
+            speaker_id,
+            noise_scale,
+            length_scale,
+            noise_scale_w,
+        )
+
         start = time.perf_counter()
         outputs = self.model.run(None, inputs)
         audio = outputs[0].squeeze(0)
@@ -258,6 +364,135 @@ class PiperInferenceEngine:
         )
 
         return audio
+
+    def synthesize_with_timing(
+        self,
+        text: str,
+        language: str = "ja",
+        speaker_id: int = 0,
+        noise_scale: float = 0.667,
+        length_scale: float = 1.0,
+        noise_scale_w: float = 0.8,
+    ) -> dict | None:
+        """Synthesize and return phoneme timing metadata.
+
+        Returns ``None`` when the model has no ``durations`` output (so the
+        caller can map that to HTTP 400). The returned dict matches the
+        cross-runtime ``TimingResult`` shape: ``{phonemes, total_duration_ms,
+        sample_rate}`` with millisecond timestamps computed from
+        ``hop_length / sample_rate * 1000``. Byte-for-byte compatible with
+        the Rust/Go/C++/C#/Python piper.timing implementations
+        (see ``docs/spec/phoneme-timing-contract.toml``).
+        """
+        if not self.has_durations:
+            return None
+
+        phonemizer = get_phonemizer(language)
+        phonemes, prosody_info_list = phonemizer.phonemize_with_prosody(text)
+
+        # Build phoneme_ids while remembering the source token for each ID so
+        # we can attach human-readable names to the timing entries.
+        phoneme_ids: list[int] = []
+        prosody_features: list[dict | None] = []
+        token_for_id: list[str] = []
+        for phoneme, prosody_info in zip(phonemes, prosody_info_list, strict=True):
+            if phoneme in self.phoneme_id_map:
+                ids = self.phoneme_id_map[phoneme]
+                phoneme_ids.extend(ids)
+                token_for_id.extend([phoneme] * len(ids))
+                for _ in ids:
+                    if prosody_info is not None:
+                        prosody_features.append(
+                            {
+                                "a1": prosody_info.a1,
+                                "a2": prosody_info.a2,
+                                "a3": prosody_info.a3,
+                            }
+                        )
+                    else:
+                        prosody_features.append(None)
+            else:
+                _LOGGER.warning("Unknown phoneme: %s", phoneme)
+
+        inputs = self._build_inputs(
+            phoneme_ids,
+            prosody_features,
+            language,
+            speaker_id,
+            noise_scale,
+            length_scale,
+            noise_scale_w,
+        )
+        output_names = [o.name for o in self.model.get_outputs()]
+        outputs = self.model.run(output_names, inputs)
+
+        if "durations" not in output_names:
+            return None
+        durations = np.asarray(outputs[output_names.index("durations")]).reshape(-1)
+
+        # If durations length disagrees with phoneme_ids (unusual but possible
+        # with non-conventional exports), fall back to the shorter length.
+        n = min(len(durations), len(token_for_id))
+        frame_time_ms = (self.hop_length / self.sample_rate) * 1000.0
+
+        phonemes_out: list[dict] = []
+        cursor_ms = 0.0
+        for i in range(n):
+            dur_frames = max(float(durations[i]), 0.0)
+            duration_ms = dur_frames * frame_time_ms
+            start_ms = cursor_ms
+            end_ms = cursor_ms + duration_ms
+            phonemes_out.append(
+                {
+                    "phoneme": token_for_id[i],
+                    "start_ms": start_ms,
+                    "end_ms": end_ms,
+                    "duration_ms": duration_ms,
+                }
+            )
+            cursor_ms = end_ms
+
+        return {
+            "phonemes": phonemes_out,
+            "total_duration_ms": cursor_ms,
+            "sample_rate": self.sample_rate,
+        }
+
+    def synthesize_stream_pcm(
+        self,
+        text: str,
+        language: str = "ja",
+        speaker_id: int = 0,
+        noise_scale: float = 0.667,
+        length_scale: float = 1.0,
+        noise_scale_w: float = 0.8,
+    ) -> Iterator[bytes]:
+        """Yield raw PCM (int16, little-endian) per sentence.
+
+        Splits *text* via ``_split_sentences`` and runs one ONNX inference per
+        sentence, emitting PCM bytes immediately. The caller prepends a WAV
+        header so the wire format is ``header + concat(pcm_chunks)``.
+
+        SSML is treated as a single chunk (the phonemizer parses it
+        end-to-end), so callers that pass ``<speak>...</speak>`` still get a
+        valid response, just not a low-latency one.
+        """
+        sentences = _split_sentences(text)
+        if not sentences:
+            return
+        for sentence in sentences:
+            audio = self.synthesize(
+                sentence,
+                language=language,
+                speaker_id=speaker_id,
+                noise_scale=noise_scale,
+                length_scale=length_scale,
+                noise_scale_w=noise_scale_w,
+            )
+            # int16 little-endian — matches WAV PCM format declared by the
+            # header. ``.tobytes()`` is contiguous in C order, which is LE on
+            # all platforms we ship to (x86_64 / arm64).
+            yield audio.astype("<i2", copy=False).tobytes()
 
 
 def main():
@@ -273,7 +508,7 @@ def main():
     parser.add_argument(
         "--language",
         default="ja",
-        choices=SUPPORTED_LANGUAGES,
+        choices=["ja", "en", "zh", "es", "fr", "pt"],
         help="Language",
     )
     parser.add_argument("--noise-scale", type=float, default=0.667)
@@ -424,6 +659,27 @@ def create_app(engine: PiperInferenceEngine, model_path: str):
         speaker_id: int = 0
         language: str = "ja"
         noise_scale: float = 0.667
+        noise_w: float = 0.8
+        # ``stream=true`` (piper-plus extension) → chunked WAV response: a
+        # streaming WAV header followed by per-sentence PCM frames. Defaults
+        # to ``false`` so the response is a buffered WAV (original behaviour),
+        # which keeps existing OpenAI SDK clients working unchanged.
+        stream: bool = False
+
+    class PhonemeTimingRequest(BaseModel):
+        """Phoneme-timing request schema (parity with ``piper.http_server``).
+
+        ``voice`` is accepted for OpenAI-style symmetry but currently ignored:
+        the server is bound to a single model at startup, so cross-voice
+        timing is out of scope until multi-model wiring lands.
+        """
+
+        text: str
+        language: str = "ja"
+        voice: str = "default"
+        speaker_id: int = 0
+        noise_scale: float = 0.667
+        length_scale: float = 1.0
         noise_w: float = 0.8
 
     # --- Auth / rate-limit configuration (resolved at app-build time) ---
@@ -580,6 +836,43 @@ def create_app(engine: PiperInferenceEngine, model_path: str):
 
         length_scale = 1.0 / req.speed
 
+        headers: dict[str, str] = {}
+        if _is_short_text(req.input):
+            headers["X-Piper-Warning"] = "short-text-input"
+            _LOGGER.warning(
+                "Short text input detected (%d chars excl. spaces): %r",
+                len(req.input.replace(" ", "").replace("\u3000", "").strip()),
+                _sanitize_for_log(req.input),
+            )
+
+        if req.stream:
+            # True streaming: emit a streaming-WAV header (placeholder sizes)
+            # followed by per-sentence PCM frames. Clients that concatenate
+            # the chunks get a valid WAV with ``0xFFFFFFFF`` size fields,
+            # accepted by browsers / ffmpeg / soundfile.
+            sample_rate = engine.sample_rate
+
+            def _iter_chunks() -> Iterator[bytes]:
+                try:
+                    yield _build_streaming_wav_header(sample_rate)
+                    yield from engine.synthesize_stream_pcm(
+                        req.input,
+                        language=req.language,
+                        speaker_id=req.speaker_id,
+                        noise_scale=req.noise_scale,
+                        length_scale=length_scale,
+                        noise_scale_w=req.noise_w,
+                    )
+                except Exception:
+                    # Headers have already been sent \u2014 we can no longer return
+                    # 500. Log so operators can diagnose client truncation.
+                    _LOGGER.exception("Streaming synthesis failed for /v1/audio/speech")
+                    raise
+
+            return StreamingResponse(
+                _iter_chunks(), media_type="audio/wav", headers=headers
+            )
+
         try:
             audio = engine.synthesize(
                 req.input,
@@ -592,14 +885,6 @@ def create_app(engine: PiperInferenceEngine, model_path: str):
             buf = io.BytesIO()
             sf.write(buf, audio, engine.sample_rate, format="WAV")
             buf.seek(0)
-            headers = {}
-            if _is_short_text(req.input):
-                headers["X-Piper-Warning"] = "short-text-input"
-                _LOGGER.warning(
-                    "Short text input detected (%d chars excl. spaces): %r",
-                    len(req.input.replace(" ", "").replace("\u3000", "").strip()),
-                    _sanitize_for_log(req.input),
-                )
             return StreamingResponse(buf, media_type="audio/wav", headers=headers)
         except Exception:
             _LOGGER.exception("Synthesis failed for /v1/audio/speech")
@@ -627,6 +912,44 @@ def create_app(engine: PiperInferenceEngine, model_path: str):
             sorted(engine.language_id_map.keys()) if engine.language_id_map else []
         )
         return {"languages": languages}
+
+    # --- Phoneme timing endpoint ---
+    #
+    # Parity with the ``piper.http_server`` endpoint of the same name (see
+    # ``src/python_run/piper/http_server.py``). Returns the
+    # cross-runtime-canonical TimingResult shape (matches Rust / Go / C++ /
+    # C# byte-for-byte: ``(hop_length / sample_rate) * 1000`` ms per frame).
+    # Falls back to 400 when the model has no ``durations`` output — older
+    # HiFi-GAN exports — so callers don't silently get zeros.
+
+    @app.post("/api/phoneme-timing")
+    def phoneme_timing(req: PhonemeTimingRequest):
+        if not req.text or not req.text.strip():
+            raise HTTPException(status_code=400, detail="text is required")
+
+        try:
+            result = engine.synthesize_with_timing(
+                req.text,
+                language=req.language,
+                speaker_id=req.speaker_id,
+                noise_scale=req.noise_scale,
+                length_scale=req.length_scale,
+                noise_scale_w=req.noise_w,
+            )
+        except Exception:
+            _LOGGER.exception("Phoneme timing failed for /api/phoneme-timing")
+            raise HTTPException(
+                status_code=500, detail="Phoneme timing failed"
+            ) from None
+
+        if result is None:
+            # 400 (not 500) — the model is just missing the optional
+            # ``durations`` output. The endpoint contract documents this.
+            raise HTTPException(
+                status_code=400,
+                detail="Model does not support duration output",
+            )
+        return result
 
     return app
 
