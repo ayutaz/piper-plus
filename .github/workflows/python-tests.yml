@@ -32,7 +32,9 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-24.04, windows-latest, macos-latest]
-        # `requires-python = ">=3.11"` を 5 pyproject.toml で宣言済みで、
+        # `requires-python = ">=3.11"` をリポジトリ内 7 pyproject.toml
+        # (root / src/python / src/python/g2p / src/python_run / src/python_stub /
+        #  src/piper_phonemize_bundled / src/rust/piper-python) で宣言済みで、
         # `Programming Language :: Python :: 3.{11,12,13}` も classifiers に
         # 列挙済み (src/python_run/pyproject.toml / src/python/g2p/pyproject.toml)。
         # 既に g2p-python-ci.yml は 3.11/3.12/3.13 を回している。
@@ -67,7 +69,12 @@ jobs:
         python -m pip install --upgrade pip setuptools wheel
         pip install --no-cache-dir uv
         cd src/python
-        uv pip install --system -e "g2p[all]" -e ".[test,train]"
+        # Windows では training / inference テストを実行しない (下記 "Run unit tests (Windows)"
+        # で `-m "unit and not training and not benchmark and not inference"` で除外済み) ため、
+        # train extras (PyTorch + Lightning 等) はインストール不要。
+        # 加えて Python 3.13 では PyTorch 等の wheel 可用性が wheel cache に依存しがちで、
+        # Windows × 3.13 で source build に落ちると失敗しやすい。 [test] のみに絞る。
+        uv pip install --system -e "g2p[all]" -e ".[test]"
 
     - name: Install Python dependencies (Unix)
       if: runner.os != 'Windows'
