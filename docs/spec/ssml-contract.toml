@@ -22,15 +22,16 @@
 #   WASM/JS:      src/wasm/g2p/src/ssml.js                         SsmlParser
 #                 (re-exported from `piper-plus` npm; TTS-side iteration is
 #                  in src/wasm/openjtalk-web/src/index.js:synthesizeSsml)
+#   C++:          src/cpp/ssml.{hpp,cpp}                            piper::ssml::parse
 #
 # Drift gate: scripts/check_ssml_contract.py + scripts/regenerate_ssml_fixture.py
 # enforce that the Python canonical constants, this toml, and
 # tests/fixtures/ssml/contract.json all agree byte-for-byte.
 
 [meta]
-spec_version = "1.0"
-last_updated = "2026-05-08"
-applies_to = ["python", "rust", "go", "csharp", "wasm"]
+spec_version = "1.2"
+last_updated = "2026-05-14"
+applies_to = ["python", "rust", "go", "csharp", "wasm", "cpp"]
 
 # ---------------------------------------------------------------------------
 # <break strength="..."> — predefined silence durations
@@ -192,15 +193,16 @@ strip_xml_namespace_for_tag_match = true
 # ---------------------------------------------------------------------------
 # Which runtimes implement the SSML subset.
 #                            Python  Rust  Go  C#  C++  WASM
-# <speak> root              ✓       ✓     ✓   ✓   -    ✓
-# <break time>              ✓       ✓     ✓   ✓   -    ✓
-# <break strength>          ✓       ✓     ✓   ✓   -    ✓
-# <prosody rate=named>      ✓       ✓     ✓   ✓   -    ✓
-# <prosody rate=%>          ✓       ✓     ✓   ✓   -    ✓
+# <speak> root              ✓       ✓     ✓   ✓   ✓    ✓
+# <break time>              ✓       ✓     ✓   ✓   ✓    ✓
+# <break strength>          ✓       ✓     ✓   ✓   ✓    ✓
+# <prosody rate=named>      ✓       ✓     ✓   ✓   ✓    ✓
+# <prosody rate=%>          ✓       ✓     ✓   ✓   ✓    ✓
 # 100KB size limit          ✓       -     -   -   -    ✓
-# graceful tag stripping    ✓       ✓     ✓   ✓   -    ✓
+# graceful tag stripping    ✓       ✓     ✓   ✓   ✓    ✓
 #
-# C++ does not implement SSML yet (tracking: PR #477). WASM/JS implements
-# the parser in `@piper-plus/g2p` (canonical mirror, byte-for-byte parity
-# enforced by scripts/check_ssml_contract.py) and synthesis-side iteration
-# in `piper-plus` npm via `synthesizeSsml`.
+# C++ implements the parser + minimal CLI integration via the `--ssml` flag
+# (synthesis loops over segments and applies length_scale + silence per
+# segment). WASM/JS implements the parser in `@piper-plus/g2p` (canonical
+# mirror, byte-for-byte parity enforced by scripts/check_ssml_contract.py)
+# and synthesis-side iteration in `piper-plus` npm via `synthesizeSsml`.
