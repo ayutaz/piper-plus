@@ -768,6 +768,26 @@ set_tests_properties(test_piper_proc_exec PROPERTIES
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
 )
 
+# Add test_ssml - self-contained SSML parser unit tests + contract fixture parity.
+# Compiles ../ssml.cpp directly + links gtest + json.hpp (header-only). No
+# spdlog/fmt/ORT/OpenJTalk dependency needed (the parser is pure stdlib).
+add_executable(test_ssml
+    test_ssml.cpp
+    ../ssml.cpp
+)
+target_include_directories(test_ssml PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../
+)
+target_link_libraries(test_ssml
+    gtest_main
+)
+add_test(NAME test_ssml COMMAND test_ssml)
+# Run from repo root so the fixture-parity test can locate
+# tests/fixtures/ssml/contract.json via the in-tree search.
+set_tests_properties(test_ssml PROPERTIES
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+
 # Add test_phoneme_timing - only uses gtest and json.hpp (no spdlog/fmt)
 add_executable(test_phoneme_timing test_phoneme_timing.cpp)
 target_include_directories(test_phoneme_timing PRIVATE

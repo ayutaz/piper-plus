@@ -38,6 +38,7 @@
 #include "custom_dictionary.hpp"
 #include "model_manager.hpp"
 #include "safe_path.hpp"
+#include "ssml.hpp"
 
 using namespace std;
 using json = nlohmann::json;
@@ -103,6 +104,13 @@ struct RunConfig {
 
   // true to interpret input as raw phonemes instead of text
   bool rawPhonemes = false;
+
+  // true to interpret input as SSML markup (parsed into segments with
+  // per-segment rate / silence, then synthesized in order).
+  // Auto-detected when input starts with `<speak`; --ssml forces SSML mode
+  // even for inputs that fail the auto-detection regex (e.g. lone snippets
+  // that begin with leading commentary). See docs/spec/ssml-contract.toml.
+  bool ssmlMode = false;
 
   // true to use streaming mode for reduced latency
   bool streamingMode = false;
@@ -540,6 +548,103 @@ void rawOutputProc(vector<int16_t> &sharedAudioBuffer, mutex &mutAudio,
 
 // ----------------------------------------------------------------------------
 
+// Synthesize an SSML document into a contiguous int16 audio buffer.
+//
+// Iterates over segments produced by piper::ssml::parse(), synthesizes each
+// non-empty text segment with per-segment length_scale, and inserts silence
+// for `<break>` segments. The original length_scale is restored before
+// returning. Used by `--ssml` mode for the standard WAV output paths.
+static void synthesizeSsmlToBuffer(const string &ssmlText,
+                                   piper::PiperConfig &piperConfig,
+                                   piper::Voice &voice,
+                                   piper::SynthesisResult &result,
+                                   vector<int16_t> &audioBuffer) {
+  auto segments = piper::ssml::parse(ssmlText);
+  spdlog::info("SSML: parsed {} segment(s)", segments.size());
+
+  const float originalLengthScale = voice.synthesisConfig.lengthScale;
+  const int sampleRate = voice.synthesisConfig.sampleRate;
+
+  for (size_t segIdx = 0; segIdx < segments.size(); ++segIdx) {
+    const auto &seg = segments[segIdx];
+
+    if (!seg.text.empty()) {
+      voice.synthesisConfig.lengthScale = originalLengthScale * seg.rate;
+      vector<int16_t> segAudio;
+      piper::SynthesisResult segResult;
+      try {
+        piper::textToAudio(piperConfig, voice, seg.text, segAudio, segResult,
+                           []() {}, nullptr);
+      } catch (const exception &e) {
+        spdlog::warn("SSML segment {} synthesis failed: {}", segIdx, e.what());
+        voice.synthesisConfig.lengthScale = originalLengthScale;
+        continue;
+      }
+      audioBuffer.insert(audioBuffer.end(), segAudio.begin(), segAudio.end());
+      result.inferSeconds += segResult.inferSeconds;
+      result.audioSeconds += segResult.audioSeconds;
+    }
+
+    if (seg.breakMs > 0) {
+      const size_t silenceSamples =
+          static_cast<size_t>((static_cast<double>(seg.breakMs) / 1000.0) *
+                              static_cast<double>(sampleRate));
+      audioBuffer.insert(audioBuffer.end(), silenceSamples, int16_t{0});
+      result.audioSeconds +=
+          static_cast<double>(seg.breakMs) / 1000.0;
+    }
+  }
+
+  voice.synthesisConfig.lengthScale = originalLengthScale;
+  result.realTimeFactor = (result.audioSeconds > 0.0)
+                              ? (result.inferSeconds / result.audioSeconds)
+                              : 0.0;
+}
+
+// Write a minimal RIFF/WAVE header followed by 16-bit mono PCM samples.
+// We re-implement this locally rather than #include "wavfile.hpp" because
+// that header defines `writeWavHeader` with external linkage at namespace
+// scope, and piper_common.a already exports it — including it in main.cpp
+// causes a duplicate-symbol linker error.
+static void writeWavFromBuffer(const vector<int16_t> &audioBuffer,
+                               int sampleRate, std::ostream &out) {
+  const uint32_t numSamples = static_cast<uint32_t>(audioBuffer.size());
+  const uint16_t numChannels = 1;
+  const uint16_t bitsPerSample = 16;
+  const uint16_t blockAlign = numChannels * (bitsPerSample / 8);
+  const uint32_t byteRate = static_cast<uint32_t>(sampleRate) * blockAlign;
+  const uint32_t dataSize = numSamples * blockAlign;
+  const uint32_t chunkSize = dataSize + 36;
+
+  auto wU32 = [&](uint32_t v) {
+    char b[4] = {static_cast<char>(v & 0xFF), static_cast<char>((v >> 8) & 0xFF),
+                 static_cast<char>((v >> 16) & 0xFF),
+                 static_cast<char>((v >> 24) & 0xFF)};
+    out.write(b, 4);
+  };
+  auto wU16 = [&](uint16_t v) {
+    char b[2] = {static_cast<char>(v & 0xFF),
+                 static_cast<char>((v >> 8) & 0xFF)};
+    out.write(b, 2);
+  };
+
+  out.write("RIFF", 4);
+  wU32(chunkSize);
+  out.write("WAVE", 4);
+  out.write("fmt ", 4);
+  wU32(16);              // fmt chunk size
+  wU16(1);               // PCM format
+  wU16(numChannels);
+  wU32(static_cast<uint32_t>(sampleRate));
+  wU32(byteRate);
+  wU16(blockAlign);
+  wU16(bitsPerSample);
+  out.write("data", 4);
+  wU32(dataSize);
+  out.write(reinterpret_cast<const char *>(audioBuffer.data()),
+            sizeof(int16_t) * audioBuffer.size());
+}
+
 void processLine(string line, RunConfig &runConfig, piper::PiperConfig &piperConfig,
                  piper::Voice &voice, piper::SynthesisResult &result,
                  bool jsonInput, std::unique_ptr<piper::CustomDictionary> &customDict) {
@@ -626,6 +731,14 @@ void processLine(string line, RunConfig &runConfig, piper::PiperConfig &piperCon
       chrono::duration_cast<chrono::nanoseconds>(now.time_since_epoch())
           .count();
 
+  // SSML mode is enabled either explicitly (--ssml) or by auto-detection.
+  // Disabled for json_input and raw-phonemes modes (mutually exclusive
+  // input formats). When enabled, the input is parsed into segments which
+  // are synthesized in order with per-segment length_scale + silence; the
+  // resulting buffer is then written as a single WAV.
+  const bool ssmlActive = !runConfig.rawPhonemes && !jsonInput &&
+                          (runConfig.ssmlMode || piper::ssml::isSsml(line));
+
   if (outputType == OUTPUT_DIRECTORY) {
     // In --text mode, use "output.wav" instead of timestamp
     stringstream outputName;
@@ -644,6 +757,10 @@ void processLine(string line, RunConfig &runConfig, piper::PiperConfig &piperCon
       auto phonemeType = static_cast<piper::PhonemeTypeInt>(voice.phonemizeConfig.phonemeType);
       auto phonemes = piper::parsePhonemeString(line, phonemeType);
       piper::phonemesToWavFile(piperConfig, voice, phonemes, audioFile, result);
+    } else if (ssmlActive) {
+      vector<int16_t> audioBuffer;
+      synthesizeSsmlToBuffer(line, piperConfig, voice, result, audioBuffer);
+      writeWavFromBuffer(audioBuffer, voice.synthesisConfig.sampleRate, audioFile);
     } else {
       piper::textToWavFile(piperConfig, voice, line, audioFile, result, externalProsodyPtr);
     }
@@ -674,6 +791,10 @@ void processLine(string line, RunConfig &runConfig, piper::PiperConfig &piperCon
       auto phonemeType = static_cast<piper::PhonemeTypeInt>(voice.phonemizeConfig.phonemeType);
       auto phonemes = piper::parsePhonemeString(line, phonemeType);
       piper::phonemesToWavFile(piperConfig, voice, phonemes, audioFile, result);
+    } else if (ssmlActive) {
+      vector<int16_t> audioBuffer;
+      synthesizeSsmlToBuffer(line, piperConfig, voice, result, audioBuffer);
+      writeWavFromBuffer(audioBuffer, voice.synthesisConfig.sampleRate, audioFile);
     } else {
       piper::textToWavFile(piperConfig, voice, line, audioFile, result, externalProsodyPtr);
     }
@@ -685,6 +806,10 @@ void processLine(string line, RunConfig &runConfig, piper::PiperConfig &piperCon
       auto phonemeType = static_cast<piper::PhonemeTypeInt>(voice.phonemizeConfig.phonemeType);
       auto phonemes = piper::parsePhonemeString(line, phonemeType);
       piper::phonemesToWavFile(piperConfig, voice, phonemes, cout, result);
+    } else if (ssmlActive) {
+      vector<int16_t> audioBuffer;
+      synthesizeSsmlToBuffer(line, piperConfig, voice, result, audioBuffer);
+      writeWavFromBuffer(audioBuffer, voice.synthesisConfig.sampleRate, cout);
     } else {
       piper::textToWavFile(piperConfig, voice, line, cout, result, externalProsodyPtr);
     }
@@ -855,6 +980,9 @@ void printUsage(char *argv[]) {
        << endl;
   cerr << "   --raw-phonemes                interpret input as raw phonemes (space-separated)"
        << endl;
+  cerr << "   --ssml                        interpret input as SSML markup "
+          "(<speak> / <break> / <prosody rate>)"
+       << endl;
   cerr << "   --streaming                   use streaming mode for reduced latency"
        << endl;
   cerr << "   --output-timing         FILE  output phoneme timing to FILE"
@@ -1002,6 +1130,8 @@ void parseArgs(int argc, char *argv[], RunConfig &runConfig) {
       runConfig.gpuDeviceId = stoi(argv[++i]);
     } else if (arg == "--raw-phonemes" || arg == "--raw_phonemes") {
       runConfig.rawPhonemes = true;
+    } else if (arg == "--ssml") {
+      runConfig.ssmlMode = true;
     } else if (arg == "--streaming") {
       runConfig.streamingMode = true;
     } else if (arg == "--output-timing" || arg == "--output_timing") {
@@ -1066,7 +1196,7 @@ void parseArgs(int argc, char *argv[], RunConfig &runConfig) {
         "--phoneme-silence", "--phoneme_silence",
         "--json-input", "--json_input", "--use-cuda", "--use_cuda",
         "--gpu-device-id", "--gpu_device_id",
-        "--raw-phonemes", "--raw_phonemes", "--streaming",
+        "--raw-phonemes", "--raw_phonemes", "--ssml", "--streaming",
         "--output-timing", "--output_timing",
         "--timing-format", "--timing_format",
         "--custom-dict", "--custom_dict", "--text",
