@@ -16,19 +16,19 @@
   "runtimes": {
     "python": {
       "short": {
-        "rtf": null,
-        "latency_p50_ms": null,
-        "latency_p95_ms": null
+        "rtf": 3.1636,
+        "latency_p50_ms": 4524.4,
+        "latency_p95_ms": 4617.8
       },
       "medium": {
-        "rtf": null,
-        "latency_p50_ms": null,
-        "latency_p95_ms": null
+        "rtf": 1.0963,
+        "latency_p50_ms": 6236.7,
+        "latency_p95_ms": 6401.8
       },
       "long": {
-        "rtf": null,
-        "latency_p50_ms": null,
-        "latency_p95_ms": null
+        "rtf": 0.2218,
+        "latency_p50_ms": 7634.7,
+        "latency_p95_ms": 8162.5
       }
     },
     "rust": {
