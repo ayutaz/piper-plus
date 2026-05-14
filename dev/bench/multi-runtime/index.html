@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Piper-Plus Multi-Runtime RTF Benchmark</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; padding: 16px 24px; background: #fff; color: #24292f; }
+  h1   { font-size: 1.4rem; margin-bottom: 4px; }
+  p.meta { font-size: 0.85rem; color: #57606a; margin-top: 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.9rem; }
+  th, td { padding: 8px 12px; text-align: right; border: 1px solid #d0d7de; }
+  th { background: #f6f8fa; text-align: center; }
+  td:first-child, td:nth-child(2) { text-align: left; }
+  tr:nth-child(even) { background: #f6f8fa; }
+  .note { font-size: 0.8rem; color: #57606a; margin-top: 12px; }
+  a { color: #0969da; text-decoration: none; }
+</style>
+</head>
+<body>
+<h1>Piper-Plus Multi-Runtime RTF Benchmark</h1>
+<p class="meta">
+  Updated: 2026-05-14 17:31 UTC &nbsp;|&nbsp;
+  Commit: <a href="https://github.com/ayutaz/piper-plus/commit/4367e9584b7c2db63adc02beb41df3288f6fe668">4367e95</a> &nbsp;|&nbsp;
+  <a href="https://github.com/ayutaz/piper-plus/actions/runs/25874758774">CI run</a>
+</p>
+<p class="meta">Model: <code>multilingual-test-medium.onnx</code> &nbsp;|&nbsp; warmup=5, runs=30 &nbsp;|&nbsp; ubuntu-24.04</p>
+<table>
+<thead>
+<tr>
+  <th>Runtime</th><th>Text</th>
+  <th>RTF</th><th>P50 (ms)</th><th>P95 (ms)</th>
+</tr>
+</thead>
+<tbody>
+<tr><td><code>python</code></td><td>short</td><td>3.4858</td><td>4980.0</td><td>5115.8</td></tr>
+<tr><td><code>python</code></td><td>medium</td><td>1.0903</td><td>6198.8</td><td>6368.6</td></tr>
+<tr><td><code>python</code></td><td>long</td><td>0.2337</td><td>8088.1</td><td>8650.7</td></tr>
+<tr><td><code>rust</code></td><td>short</td><td>0.8446</td><td>1313.8</td><td>1425.0</td></tr>
+<tr><td><code>rust</code></td><td>medium</td><td>0.2568</td><td>1658.3</td><td>1694.5</td></tr>
+<tr><td><code>rust</code></td><td>long</td><td>0.1073</td><td>3793.0</td><td>3854.2</td></tr>
+<tr><td><code>go</code></td><td>short</td><td>2.2488</td><td>3044.8</td><td>3112.8</td></tr>
+<tr><td><code>go</code></td><td>medium</td><td>0.5497</td><td>3412.9</td><td>3552.3</td></tr>
+<tr><td><code>go</code></td><td>long</td><td>0.1197</td><td>4415.1</td><td>4570.0</td></tr>
+<tr><td><code>csharp</code></td><td>short</td><td>2.7574</td><td>1499.7</td><td>1572.3</td></tr>
+<tr><td><code>csharp</code></td><td>medium</td><td>0.8744</td><td>1582.3</td><td>1659.1</td></tr>
+<tr><td><code>csharp</code></td><td>long</td><td>0.1785</td><td>2274.7</td><td>2383.4</td></tr>
+<tr><td><code>cpp</code></td><td>short</td><td>0.8483</td><td>1372.2</td><td>1402.7</td></tr>
+<tr><td><code>cpp</code></td><td>medium</td><td>0.2847</td><td>1909.4</td><td>1986.6</td></tr>
+<tr><td><code>cpp</code></td><td>long</td><td>0.1101</td><td>3983.9</td><td>4063.7</td></tr>
+<tr><td><code>wasm</code></td><td>short</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td><code>wasm</code></td><td>medium</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td><code>wasm</code></td><td>long</td><td>—</td><td>—</td><td>—</td></tr>
+</tbody>
+</table>
+<p class="note">
+  RTF &lt; 1.0 = リアルタイムより速い合成。— = ビルド失敗 or best-effort スキップ (C++/WASM)。<br>
+  Python/Rust/Go/C# が missing の場合は CI ゲートが失敗します。
+</p>
+</body>
+</html>
