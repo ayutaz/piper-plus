@@ -132,6 +132,16 @@ jobs:
           cosign sign --yes ${images}
 
       # --- Docker Hub publish (tag push or workflow_dispatch only) ---
+      #
+      # Fail-fast on missing credentials when the trigger explicitly asks for
+      # a Docker Hub publish (tag push or manual dispatch). Previously the
+      # step emitted `::notice::` and continued green, which made silent
+      # publish skips invisible (same failure pattern as the PR #419 baseline
+      # collapse — see feedback_ci_cancelled_baseline.md). For tag pushes
+      # the publish is mandatory; for workflow_dispatch we also require
+      # credentials because the only reason to manually dispatch is to
+      # publish. Non-tag / non-dispatch triggers never enter this branch
+      # (the outer `if:` gates it) so dev pushes / PRs remain unaffected.
       - name: Check Docker Hub credentials
         if: startsWith(github.ref, 'refs/tags/docker-v') || startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
         id: dockerhub-check
@@ -139,8 +149,8 @@ jobs:
           if [ -n "$DOCKERHUB_USERNAME" ] && [ -n "$DOCKERHUB_TOKEN" ]; then
             echo "available=true" >> "$GITHUB_OUTPUT"
           else
-            echo "available=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::Docker Hub secrets not configured — skipping Docker Hub publish"
+            echo "::error::DOCKERHUB_USERNAME / DOCKERHUB_TOKEN not configured but tag push / workflow_dispatch requires Docker Hub publish. Configure repository secrets to unblock release."
+            exit 1
           fi
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -585,6 +595,8 @@ jobs:
           cosign sign --yes ${images}
 
       # --- Docker Hub publish (tag push or workflow_dispatch only) ---
+      # Fail-fast on missing credentials — see python-inference job above
+      # for full rationale (silent-skip = baseline collapse a la PR #419).
       - name: Check Docker Hub credentials
         if: startsWith(github.ref, 'refs/tags/docker-v') || startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
         id: dockerhub-check
@@ -592,8 +604,8 @@ jobs:
           if [ -n "$DOCKERHUB_USERNAME" ] && [ -n "$DOCKERHUB_TOKEN" ]; then
             echo "available=true" >> "$GITHUB_OUTPUT"
           else
-            echo "available=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::Docker Hub secrets not configured -- skipping Docker Hub publish"
+            echo "::error::DOCKERHUB_USERNAME / DOCKERHUB_TOKEN not configured but tag push / workflow_dispatch requires Docker Hub publish. Configure repository secrets to unblock release."
+            exit 1
           fi
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -711,6 +723,8 @@ jobs:
           cosign sign --yes ${images}
 
       # --- Docker Hub publish (tag push or workflow_dispatch only) ---
+      # Fail-fast on missing credentials — see python-inference job above
+      # for full rationale (silent-skip = baseline collapse a la PR #419).
       - name: Check Docker Hub credentials
         if: startsWith(github.ref, 'refs/tags/docker-v') || startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
         id: dockerhub-check
@@ -718,8 +732,8 @@ jobs:
           if [ -n "$DOCKERHUB_USERNAME" ] && [ -n "$DOCKERHUB_TOKEN" ]; then
             echo "available=true" >> "$GITHUB_OUTPUT"
           else
-            echo "available=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::Docker Hub secrets not configured -- skipping Docker Hub publish"
+            echo "::error::DOCKERHUB_USERNAME / DOCKERHUB_TOKEN not configured but tag push / workflow_dispatch requires Docker Hub publish. Configure repository secrets to unblock release."
+            exit 1
           fi
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}

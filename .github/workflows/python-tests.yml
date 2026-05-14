@@ -32,7 +32,17 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-24.04, windows-latest, macos-latest]
-        python-version: ["3.11"]
+        # `requires-python = ">=3.11"` をリポジトリ内 7 pyproject.toml
+        # (root / src/python / src/python/g2p / src/python_run / src/python_stub /
+        #  src/piper_phonemize_bundled / src/rust/piper-python) で宣言済みで、
+        # `Programming Language :: Python :: 3.{11,12,13}` も classifiers に
+        # 列挙済み (src/python_run/pyproject.toml / src/python/g2p/pyproject.toml)。
+        # 既に g2p-python-ci.yml は 3.11/3.12/3.13 を回している。
+        # 一方で本 workflow は 3.11 のみだったため、 3.12/3.13 で起きる
+        # 退行 (typing / std lib 変更 / deprecation) が PyPI release 直前まで
+        # 見えなかった。 OSS public で CI minute 無制限のため
+        # (memory: feedback_ci_matrix_no_reduction.md) 全 3 系列を回す。
+        python-version: ["3.11", "3.12", "3.13"]
 
     steps:
     - uses: actions/checkout@v6.0.2
@@ -59,7 +69,17 @@ jobs:
         python -m pip install --upgrade pip setuptools wheel
         pip install --no-cache-dir uv
         cd src/python
-        uv pip install --system -e "g2p[all]" -e ".[test,train]"
+        # Windows では training / inference テストを実行しない (下記 "Run unit tests (Windows)"
+        # で `-m "unit and not training and not benchmark and not inference"` で除外済み) ため、
+        # train extras (PyTorch + Lightning 等) はインストール不要。
+        # 加えて Python 3.13 では PyTorch 等の wheel 可用性が wheel cache に依存しがちで、
+        # Windows × 3.13 で source build に落ちると失敗しやすい。 [test,inference] に絞る:
+        # - test: pytest / coverage / mypy 等の test 基盤
+        # - inference: onnxruntime + soundfile (piper_plus.engine が `import onnxruntime`
+        #   を最上位で行うため、 unit テストでも collection 時に必要。 PyTorch は含まない)
+        # それでも torch を直接 import するテストファイルは下記 "Run unit tests (Windows)"
+        # の `--ignore` で collection 自体をスキップする。
+        uv pip install --system -e "g2p[all]" -e ".[test,inference]"
 
     - name: Install Python dependencies (Unix)
       if: runner.os != 'Windows'
@@ -80,8 +100,20 @@ jobs:
       if: runner.os == 'Windows'
       run: |
         cd src/python
-        # Run unit tests excluding inference tests (which require torch)
-        pytest tests/ -v --tb=short -m "unit and not training and not benchmark and not inference"
+        # Windows では PyTorch を入れない (上記 "Install Python dependencies (Windows)" 参照)。
+        # 下記テストファイルは module top-level で `import torch` するため、
+        # マーカーで除外する前の pytest collection 段階で ImportError を起こす。
+        # collection 時点で `--ignore` してスキップする (実質的に
+        # `-m "not training and not inference"` と同じ集合を除外)。
+        pytest tests/ -v --tb=short -m "unit and not training and not benchmark and not inference" `
+          --no-cov `
+          --ignore=tests/test_export_onnx.py `
+          --ignore=tests/test_export_onnx_mb_istft.py `
+          --ignore=tests/test_pytorch_onnx_parity.py `
+          --ignore=tests/test_wavlm_discriminator.py `
+          --ignore=tests/test_ema_callback.py `
+          --ignore=tests/test_monotonic_align.py `
+          --ignore=tests/test_vits.py
 
     - name: Run unit tests (Unix)
       if: runner.os != 'Windows'
@@ -172,6 +204,8 @@ jobs:
       run: |
         cd src/python
         pytest ../../test/ -v --tb=short --override-ini="addopts="
+      # test_speaker_encoder.py imports torch at collection time; Windows では torch 未インストールのためスキップ
+      if: runner.os != 'Windows'
       env:
         PYTHONUTF8: '1'
 
