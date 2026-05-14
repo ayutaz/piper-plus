@@ -9,12 +9,12 @@ MODEL_PATH="path/to/your/japanese_model.onnx"
 
 # 基本的な使用例
 echo "=== 基本的な使用例 ==="
-echo "こんにちは、Piperです。" | $PIPER_BIN --model "$MODEL_PATH" --output_file hello.wav
+echo "こんにちは、Piperです。" | $PIPER_BIN --model "$MODEL_PATH" --output-file hello.wav
 echo "hello.wav を生成しました"
 
 # 長いテキストの例
 echo "=== 長いテキストの例 ==="
-cat << EOF | $PIPER_BIN --model "$MODEL_PATH" --output_file long_text.wav
+cat << EOF | $PIPER_BIN --model "$MODEL_PATH" --output-file long_text.wav
 本日は晴天なり。
 日本語の音声合成システムPiperを使用して、
 様々なテキストを自然な音声に変換することができます。
@@ -33,13 +33,13 @@ texts=(
 )
 
 for i in "${!texts[@]}"; do
-    echo "${texts[$i]}" | $PIPER_BIN --model "$MODEL_PATH" --output_file "greeting_$i.wav"
+    echo "${texts[$i]}" | $PIPER_BIN --model "$MODEL_PATH" --output-file "greeting_$i.wav"
     echo "greeting_$i.wav を生成しました"
 done
 
 # デバッグ情報を表示する例
 echo "=== デバッグ情報の表示 ==="
-echo "テスト" | $PIPER_BIN --model "$MODEL_PATH" --output_file test.wav --debug
+echo "テスト" | $PIPER_BIN --model "$MODEL_PATH" --output-file test.wav --debug
 
 echo "=== 完了 ==="
 echo "生成された音声ファイル:"
