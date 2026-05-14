@@ -106,6 +106,7 @@ jobs:
         # collection 時点で `--ignore` してスキップする (実質的に
         # `-m "not training and not inference"` と同じ集合を除外)。
         pytest tests/ -v --tb=short -m "unit and not training and not benchmark and not inference" `
+          --no-cov `
           --ignore=tests/test_export_onnx.py `
           --ignore=tests/test_export_onnx_mb_istft.py `
           --ignore=tests/test_pytorch_onnx_parity.py `
