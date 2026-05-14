@@ -19,6 +19,7 @@
       "import": "./src/phonemizer-compat.js"
     },
     "./streaming": {
+      "types": "./types/index.d.ts",
       "import": "./src/streaming-pipeline.js"
     },
     "./wasm/multilingual": {
