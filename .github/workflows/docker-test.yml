@@ -265,6 +265,13 @@ jobs:
 
       - name: Smoke test (arm64)
         run: |
+          # NOTE: the canonical Dockerfile.cpu installs piper_train (from
+          # src/python/) and piper-plus-g2p (from src/python/g2p/), but NOT
+          # the standalone `piper` runtime package (src/python_run/piper/).
+          # The image's runtime entrypoint is docker/python-inference/inference.py
+          # which depends only on piper_train + piper_plus_g2p. Mirror the
+          # amd64 smoke test surface (lines 45-53) — adding `import piper`
+          # here would assert a package the image never shipped.
           docker run --rm piper-python-inference-cpu:test-arm64 python -c "
           import platform
           assert platform.machine() == 'aarch64', f'expected aarch64, got {platform.machine()}'
@@ -275,7 +282,7 @@ jobs:
           assert 'CPUExecutionProvider' in providers, f'CPUExecutionProvider not found in {providers}'
           print(f'Available providers: {providers}')
           import soundfile; print('soundfile OK')
-          import piper; print('piper runtime OK')
+          import piper_plus_g2p; print('piper_plus_g2p OK')
           print('All arm64 smoke tests passed')
           "
 
