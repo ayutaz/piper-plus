@@ -290,10 +290,11 @@ jobs:
         run: |
           # Verify the OpenAI-compatible API entrypoint imports cleanly on
           # arm64. Heavy ONNX inference is covered by the amd64 job.
+          # Note: inference.py exposes create_app() factory, not a module-level app.
           docker run --rm piper-python-inference-cpu:test-arm64 python -c "
           import inference
-          assert hasattr(inference, 'app'), 'FastAPI app not exposed'
-          print('inference.app importable OK')
+          assert callable(getattr(inference, 'create_app', None)), 'create_app not found in inference'
+          print('inference.create_app importable OK')
           "
 
   test-cpp-inference:
