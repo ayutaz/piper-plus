@@ -9,45 +9,67 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### SSML 合成統合 (synthesize 側)
+
+`@piper-plus/g2p` の SSML パーサーを高位 API に統合。Python/Rust/Go/C# と同等の synthesize-side iteration を WASM/JS でも提供。
+
+**新規 API:**
+
+- `PiperPlus.synthesizeSsml(ssmlText, options)` — SSML 入力をセグメント単位で iterate、`<prosody rate>` を `length_scale` に適用、`<break>` で silence 挿入、全 chunk を連結して `AudioResult` を返す
+- `PiperPlus.synthesize(text)` が `<speak` で始まる入力を自動検知して `synthesizeSsml` に dispatch (opt-out: `{ ssml: false }`)
+- 高位エクスポート: `isSsml`, `parseSsml`, `SsmlParser` (`@piper-plus/g2p` からの re-export)
+
+**仕様:** `docs/spec/ssml-contract.toml` (`applies_to` に `"wasm"` を追加、status table を ✓ に更新)。`tests/fixtures/ssml/contract.json` と byte-for-byte 互換。
+
+**テスト:** `test/js/test-piper-plus-ssml.js` (23 件): re-export 確認 / `synthesize()` 自動 dispatch / segment iteration / `length_scale` 適用 / silence 挿入 / fixture parity。
+
 #### Phoneme Timing 機能 (新規モジュール)
 
 ブラウザ上で完全動作する phoneme timing 出力機能を追加。VITS Duration Predictor から音素ごとの timing を抽出し、リップシンク・字幕生成・カラオケアプリケーションで使用可能。
 
 **新規モジュール:**
+
 - `src/timing.js` — `durationsToTiming`, `timingToJson`, `timingToJsonCompact`, `timingToTsv`, `timingToSrt`, `buildPhonemeIdToTokenMap`, `DEFAULT_HOP_LENGTH`
 - メインエクスポート + `./timing` サブパスエクスポート両対応
 
 **AudioResult 拡張:**
+
 - `timing` プロパティ (TimingResult | null、deep frozen で immutable)
 - `hasTimingInfo` プロパティ (boolean)
 - 後方互換: 2 引数コンストラクタ `new AudioResult(samples, sampleRate)` も動作
 
 **PiperPlus 拡張:**
+
 - `_infer()` の戻り値型を `Float32Array` → `{ audio: Float32Array, durations: Float32Array | null }` に変更
 - `synthesize()` / `synthesizeWithVoiceCloning()` で AudioResult に timing を伝搬
 - `synthesizeStreaming()` は引き続き Float32Array チャンクを返す (timing は streaming パスでは捨てられる - intentional)
 - `_createTiming()`, `_getPhonemeIdToTokenMap()` 内部 helper 追加 (phoneme_id_map 逆引き、PUA 対応、length alignment)
 
 **バリデーション:**
+
 - `sampleRate` / `hopLength` の `NaN` / `Infinity` チェック → `TypeError`
 - `phonemeTokens` 長さ不一致 → `RangeError`
 - 負の duration は警告ログ付きで 0 にクランプ
 
 **TypeScript 型定義:**
+
 - `PhonemeTimingInfo`, `TimingResult` インターフェース
 - `AudioResult` の `timing` / `hasTimingInfo` プロパティ
 - 全 timing 関数の JSDoc + `@example` + `@throws` 完備
 
 **互換性:**
+
 - Rust/Go/C++/C#/Python と byte-for-byte 互換 (`(hop_length / sample_rate) * 1000` 計算式統一)
 - 既存 `AudioResult` / `synthesize()` API は完全な後方互換
 
 **テスト追加 (+90 件以上):**
+
 - `test/js/test-phoneme-timing.js` (66 テスト): 計算精度、エッジケース、SRT、buildPhonemeIdToTokenMap、validation、performance
 - `test/js/test-audio-result-timing.js` (18 テスト): timing プロパティ、deep freeze immutability
 - `test/js/test-piper-plus-timing.js` (22 テスト): E2E 統合、length alignment、cache、streaming/voice cloning パス
 
 **README.npm.md:**
+
 - "Phoneme Timing for Lip-Sync & Subtitles" セクション追加
 - Viseme マッピング例
 - Output format リファレンス
@@ -161,7 +183,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Streaming synthesis pipeline
 - TypeScript type definitions
 
-[0.1.0]: https://github.com/ayutaz/piper-plus/releases/tag/npm-v0.1.0
 [0.1.1]: https://github.com/ayutaz/piper-plus/releases/tag/npm-v0.1.1
 [0.3.0]: https://github.com/ayutaz/piper-plus/releases/tag/npm-v0.3.0
 [0.3.1]: https://github.com/ayutaz/piper-plus/releases/tag/npm-v0.3.1
