@@ -1,0 +1,95 @@
+name: Runtime Parity Issue
+description: Report a feature inconsistency between the 7 piper-plus runtimes
+title: "[parity] "
+labels: ["parity", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this template to report when a feature is implemented in some runtimes but missing or inconsistent in others.
+        piper-plus targets 7 runtimes: Python / Rust / C# / Go / WASM (npm) / C++ / Kotlin (Android).
+        Python is typically the canonical reference implementation.
+
+  - type: input
+    id: feature
+    attributes:
+      label: Feature name
+      description: Short name of the feature with parity drift.
+      placeholder: e.g. SSML <prosody pitch>, phoneme timing TSV output, ZH-EN loanword schema_v2
+    validations:
+      required: true
+
+  - type: dropdown
+    id: canonical
+    attributes:
+      label: Canonical implementation
+      description: Which runtime is treated as the reference for this feature?
+      options:
+        - Python (piper_train / piper-plus-g2p)
+        - Rust (piper-plus / piper-plus-g2p)
+        - "C# (PiperPlus.Core)"
+        - Go (piperplus / phonemize)
+        - npm / WASM (piper-plus / @piper-plus/g2p)
+        - C++ (libpiper_plus)
+        - Kotlin/Android (piper-plus-g2p-android)
+        - Spec file only (docs/spec/*.toml)
+        - Unsure
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: missing_runtimes
+    attributes:
+      label: Runtimes missing or inconsistent
+      description: Check every runtime where the feature is absent, incomplete, or behaves differently from the canonical one.
+      options:
+        - label: Python
+        - label: Rust
+        - label: "C#"
+        - label: Go
+        - label: npm / WASM
+        - label: "C++"
+        - label: Kotlin/Android
+    validations:
+      required: true
+
+  - type: textarea
+    id: impact
+    attributes:
+      label: Impact
+      description: Who is affected and how? Mention user-visible symptoms, broken integrations, or downstream package effects.
+      placeholder: |
+        - Users on runtime X cannot ...
+        - Output differs by ... ms / ... bytes vs Python.
+        - Breaks parity test ...
+    validations:
+      required: true
+
+  - type: input
+    id: spec
+    attributes:
+      label: Related spec file (optional)
+      description: Path to the relevant contract under `docs/spec/`, if any.
+      placeholder: e.g. docs/spec/short-text-contract.toml
+    validations:
+      required: false
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Reproduction steps
+      description: Minimal steps to observe the parity gap. Include inputs, commands, and the diff between canonical vs missing runtime outputs.
+      placeholder: |
+        1. Install ... on Python and on runtime X.
+        2. Run ... with input ...
+        3. Compare outputs: Python returns ..., runtime X returns ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Additional notes
+      description: Links to related issues, PRs, or upstream discussions.
+    validations:
+      required: false
