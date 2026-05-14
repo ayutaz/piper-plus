@@ -106,6 +106,9 @@ jobs:
       - name: Install harness deps (inference + onnxruntime)
         run: uv sync --extra inference
 
+      - name: Download NLTK data
+        run: uv run python -c "import nltk; nltk.download('averaged_perceptron_tagger_eng', quiet=True); nltk.download('cmudict', quiet=True)"
+
       # ---- Runtime-specific build ----
 
       - name: Build Rust CLI
