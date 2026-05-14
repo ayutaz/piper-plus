@@ -260,6 +260,7 @@ def _run_once(
             proc = subprocess.run(
                 argv,
                 input=stdin_payload,
+                stdin=None if stdin_payload is not None else subprocess.DEVNULL,
                 capture_output=True,
                 text=True,
                 timeout=timeout_s,
