@@ -196,6 +196,75 @@ class TestLanguages:
         languages = resp.json()["languages"]
         assert languages == sorted(languages)
 
+    def test_languages_endpoint_matches_supported_languages(self, client):
+        """`/v1/audio/speech/languages` must return exactly the canonical
+        `SUPPORTED_LANGUAGES` set when the model exposes a 6-lang
+        `language_id_map`. Mock fixture's map mirrors the shipped
+        checkpoints (ja/en/zh/es/fr/pt — CLAUDE.md)."""
+        from inference import SUPPORTED_LANGUAGES  # noqa: PLC0415
+
+        resp = client.get("/v1/audio/speech/languages")
+        assert resp.status_code == 200
+        returned = set(resp.json()["languages"])
+        assert returned == set(SUPPORTED_LANGUAGES), (
+            f"endpoint returned {returned}, expected {set(SUPPORTED_LANGUAGES)}"
+        )
+
+    def test_supported_languages_matches_webui_sample_texts(self):
+        """CLI `SUPPORTED_LANGUAGES` and WebUI `SAMPLE_TEXTS` keys must
+        match exactly so the two server entry points expose the same set
+        of languages. The WebUI extraction goes via `ast` rather than
+        importing `docker/webui/app.py`, which depends on gradio (not in
+        the test virtualenv — same trick the WebUI's own test_app.py
+        uses).
+
+        Two layouts are supported because this same test runs in two
+        environments. (1) Repo checkout (pytest from a worktree): the
+        file lives at ``docker/webui/app.py`` relative to this test.
+        (2) Docker image (``docker-test.yml`` mounts only this test
+        into ``/app/test_openai_api.py``): the WebUI source is
+        flattened to ``/app/webui.py`` by the Dockerfile (``COPY
+        docker/webui/app.py /app/webui.py``). Skip cleanly if neither
+        file is present so this test does not regress to a hard-coded
+        ``/webui/app.py`` lookup again."""
+        import ast  # noqa: PLC0415
+
+        from inference import SUPPORTED_LANGUAGES  # noqa: PLC0415
+
+        here = Path(__file__).resolve().parent
+        candidate_paths = [
+            here.parent / "webui" / "app.py",  # repo layout
+            here / "webui.py",  # docker image (flattened)
+        ]
+        webui_path = next((p for p in candidate_paths if p.is_file()), None)
+        if webui_path is None:
+            pytest.skip(
+                "WebUI source not found; checked: "
+                + ", ".join(str(p) for p in candidate_paths)
+            )
+        tree = ast.parse(webui_path.read_text(encoding="utf-8"))
+        sample_texts_keys: list[str] | None = None
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Assign):
+                for target in node.targets:
+                    if (
+                        isinstance(target, ast.Name)
+                        and target.id == "SAMPLE_TEXTS"
+                        and isinstance(node.value, ast.Dict)
+                    ):
+                        sample_texts_keys = [
+                            ast.literal_eval(k) for k in node.value.keys
+                        ]
+                        break
+                if sample_texts_keys is not None:
+                    break
+
+        assert sample_texts_keys is not None, "SAMPLE_TEXTS not found in webui/app.py"
+        assert set(sample_texts_keys) == set(SUPPORTED_LANGUAGES), (
+            f"WebUI SAMPLE_TEXTS keys {set(sample_texts_keys)} do not match "
+            f"CLI SUPPORTED_LANGUAGES {set(SUPPORTED_LANGUAGES)}"
+        )
+
 
 # ---- existing endpoints still work ----
 

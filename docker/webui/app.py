@@ -14,6 +14,23 @@ from piper_train.infer_onnx import text_to_phoneme_ids_and_prosody
 from piper_train.ort_utils import create_session_with_cache, warmup_onnx_session
 
 
+# Languages exposed in the WebUI dropdown.
+#
+# Kept in sync with `docker/python-inference/inference.py:SUPPORTED_LANGUAGES`
+# and the canonical 6-lang multilingual training set documented in CLAUDE.md
+# (ja=0, en=1, zh=2, es=3, fr=4, pt=5).
+#
+# Why this list is 6 and not 8 (G2P-supported languages):
+#   piper_plus_g2p ships phonemizers for 8 languages (adds ko + sv), but the
+#   only trained checkpoints we ship — 6lang base / Tsukuyomi-chan FT / CSS10
+#   JA — have no language embedding for ko/sv. Selecting an unsupported
+#   language in the UI would (a) phonemize with the correct G2P, then (b)
+#   silently fall back to `lid=0` (Japanese) in `synthesize()` and (c) drop
+#   any unique-to-that-language phonemes that are not in the model's
+#   phoneme_id_map as "Unknown phoneme" warnings. The audio that comes out
+#   is neither Swedish nor Japanese — just confusing. We hide these
+#   languages from the UI rather than ship that footgun. Re-add `ko` / `sv`
+#   here once a checkpoint with those language ids is published.
 SAMPLE_TEXTS = {
     "ja": "こんにちは、今日はとても良い天気ですね。散歩に出かけましょう。",
     "en": "Hello, how are you today? The weather is beautiful, let's go for a walk.",
@@ -21,7 +38,6 @@ SAMPLE_TEXTS = {
     "es": "Hola, ¿cómo estás hoy? El clima es hermoso, vamos a dar un paseo.",
     "fr": "Bonjour, comment allez-vous aujourd'hui? Il fait beau, allons nous promener.",
     "pt": "Olá, como você está hoje? O tempo está lindo, vamos dar um passeio.",
-    "sv": "Hej, hur mår du idag?",
 }
 
 
@@ -261,8 +277,10 @@ def create_ui(model_dir: str, output_dir: str):
                     label="Model",
                     value=model_choices[0] if models else None,
                 )
+                # Choices must stay in sync with `SAMPLE_TEXTS` above and
+                # `docker/python-inference/inference.py:SUPPORTED_LANGUAGES`.
                 language = gr.Radio(
-                    choices=["ja", "en", "zh", "es", "fr", "pt", "sv"],
+                    choices=list(SAMPLE_TEXTS.keys()),
                     label="Language",
                     value="ja",
                 )

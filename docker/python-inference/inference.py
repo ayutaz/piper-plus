@@ -38,6 +38,32 @@ from piper_train.ort_utils import create_session_with_cache, warmup_onnx_session
 _LOGGER = logging.getLogger(__name__)
 
 
+# Languages accepted by the `--language` CLI flag.
+#
+# Kept in sync with `docker/webui/app.py:SAMPLE_TEXTS` and the canonical
+# 6-lang multilingual training set documented in CLAUDE.md (ja=0, en=1,
+# zh=2, es=3, fr=4, pt=5).
+#
+# Why this list is 6 and not 8 (G2P-supported languages):
+#   piper_plus_g2p ships phonemizers for 8 languages (adds ko + sv), but
+#   the trained checkpoints we ship have no language embedding for ko/sv.
+#   Accepting those codes would phonemize with the correct G2P, then
+#   silently fall back to `lid = language_id_map.get(language, 0)` = 0
+#   (Japanese) inside `PiperInferenceEngine.synthesize`, and drop any
+#   unique-to-that-language phonemes that are not in the model's
+#   phoneme_id_map as "Unknown phoneme" log warnings. The audio that
+#   comes out is neither Swedish nor Japanese — just confusing. Re-add
+#   `ko` / `sv` here once a checkpoint with those language ids is
+#   published.
+#
+# Note: the runtime `/v1/audio/speech/languages` endpoint reports the
+# *loaded model*'s `language_id_map.keys()` rather than this static list,
+# so a future model with sv/ko will surface them without needing this
+# constant to change. This constant exists only for the CLI `choices=`
+# validator and as documentation for the WebUI parity.
+SUPPORTED_LANGUAGES: tuple[str, ...] = ("ja", "en", "zh", "es", "fr", "pt")
+
+
 def _sanitize_for_log(value: str) -> str:
     # Strip CR/LF from user-controlled values before logging to prevent
     # log forging via line-break injection (CWE-117). Used at the HTTP
@@ -247,7 +273,7 @@ def main():
     parser.add_argument(
         "--language",
         default="ja",
-        choices=["ja", "en", "zh", "es", "fr", "pt"],
+        choices=SUPPORTED_LANGUAGES,
         help="Language",
     )
     parser.add_argument("--noise-scale", type=float, default=0.667)
