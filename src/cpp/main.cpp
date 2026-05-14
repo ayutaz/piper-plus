@@ -128,6 +128,22 @@ struct RunConfig {
   optional<string> listModelsLanguage;
   optional<string> downloadModelName;
   optional<filesystem::path> modelDir;
+
+  // Voice cloning (mirrors Python/Rust/Go/C#/WASM CLI surface).
+  // Reference audio WAV path; requires --speaker-encoder-model.
+  // NOTE: Speaker Encoder inference is not implemented in the C++ runtime
+  //       yet (the C API stub returns "not yet implemented"). Specifying
+  //       --reference-audio currently exits with a clear error directing
+  //       users to pre-compute the embedding via the Python/Rust runtime
+  //       and pass it through --speaker-embedding.
+  optional<filesystem::path> referenceAudioPath;
+  // Pre-computed 256-dim speaker embedding (raw float32 little-endian,
+  // matches the Rust CLI on-disk format produced by other runtimes).
+  optional<filesystem::path> speakerEmbeddingPath;
+  // Speaker encoder ONNX model path (ECAPA-TDNN). Required by
+  // --reference-audio. Accepted on the CLI for forward compatibility but
+  // currently unused (see note on referenceAudioPath above).
+  optional<filesystem::path> speakerEncoderModelPath;
 };
 
 // Define static constants
@@ -141,6 +157,37 @@ void rawOutputProc(vector<int16_t> &sharedAudioBuffer, mutex &mutAudio,
 void processLine(string line, RunConfig &runConfig, piper::PiperConfig &piperConfig,
                  piper::Voice &voice, piper::SynthesisResult &result,
                  bool jsonInput, std::unique_ptr<piper::CustomDictionary> &customDict);
+
+// Load a speaker embedding from a raw float32 little-endian binary file.
+// Format matches the Rust CLI's `--speaker-embedding` (src/rust/piper-cli/
+// src/main.rs:load_speaker_embedding), allowing cross-runtime portability.
+static std::vector<float> loadSpeakerEmbeddingBin(const filesystem::path &path) {
+  ifstream f(path, ios::binary | ios::ate);
+  if (!f.good()) {
+    throw runtime_error("Failed to open speaker embedding file: " +
+                        path.string());
+  }
+  auto bytes = static_cast<std::streamsize>(f.tellg());
+  if (bytes < 0) {
+    throw runtime_error("Failed to stat speaker embedding file: " +
+                        path.string());
+  }
+  if (bytes % 4 != 0) {
+    throw runtime_error(
+        "Speaker embedding file size (" + std::to_string(bytes) +
+        " bytes) is not a multiple of 4 (float32)");
+  }
+  f.seekg(0, ios::beg);
+  std::vector<float> floats(static_cast<size_t>(bytes) / sizeof(float));
+  if (!floats.empty()) {
+    f.read(reinterpret_cast<char *>(floats.data()), bytes);
+    if (!f) {
+      throw runtime_error("Failed to read speaker embedding file: " +
+                          path.string());
+    }
+  }
+  return floats;
+}
 
 // ----------------------------------------------------------------------------
 
@@ -374,6 +421,50 @@ int main(int argc, char *argv[]) {
     }
 
   } // if phonemeSilenceSeconds
+
+  // Voice cloning: resolve speaker embedding.
+  // --speaker-embedding: load from raw float32 LE binary (cross-runtime format).
+  // --reference-audio:   currently unsupported in the C++ runtime; emit a
+  //                      clear error rather than silently ignore the user's
+  //                      intent. Use the Python/Rust runtime to pre-compute
+  //                      the embedding and pass it via --speaker-embedding.
+  if (runConfig.referenceAudioPath) {
+    spdlog::error(
+        "--reference-audio is not yet implemented in the C++ runtime. "
+        "Speaker Encoder (ECAPA-TDNN) inference is not wired up yet "
+        "(see src/cpp/piper_plus_c_api.cpp speaker_encoder stub). "
+        "Workaround: pre-compute the embedding with the Python or Rust "
+        "runtime, save it as raw float32 little-endian, and pass it via "
+        "--speaker-embedding <path>.");
+    return EXIT_FAILURE;
+  }
+  if (runConfig.speakerEmbeddingPath) {
+    try {
+      auto emb = loadSpeakerEmbeddingBin(*runConfig.speakerEmbeddingPath);
+      spdlog::info("Loaded speaker embedding: {} dimensions from {}",
+                   emb.size(),
+                   runConfig.speakerEmbeddingPath->string());
+      if (voice.session.hasSpeakerEmbeddingInput) {
+        auto expected =
+            static_cast<size_t>(voice.session.speakerEmbeddingDim);
+        if (emb.size() != expected) {
+          spdlog::error(
+              "Speaker embedding dimension mismatch: file has {} dims, "
+              "model expects {}.",
+              emb.size(), expected);
+          return EXIT_FAILURE;
+        }
+      } else {
+        spdlog::warn(
+            "Model has no speaker_embedding input; --speaker-embedding "
+            "will be ignored.");
+      }
+      voice.synthesisConfig.speakerEmbedding = std::move(emb);
+    } catch (const std::exception &e) {
+      spdlog::error("Failed to load --speaker-embedding: {}", e.what());
+      return EXIT_FAILURE;
+    }
+  }
 
   // カスタム辞書の初期化
   std::unique_ptr<piper::CustomDictionary> customDict;
@@ -741,6 +832,17 @@ void printUsage(char *argv[]) {
           "comma-separated"
        << endl;
   cerr << endl;
+  cerr << "   Voice cloning:" << endl;
+  cerr << "   --reference-audio          FILE  reference WAV for voice cloning "
+          "(requires --speaker-encoder-model; not yet implemented in C++ runtime)"
+       << endl;
+  cerr << "   --speaker-embedding        FILE  pre-computed speaker embedding "
+          "(raw float32 little-endian; mutually exclusive with --reference-audio)"
+       << endl;
+  cerr << "   --speaker-encoder-model    FILE  ECAPA-TDNN speaker encoder ONNX "
+          "(required when using --reference-audio)"
+       << endl;
+  cerr << endl;
   cerr << "   Phoneme input: Use [[ phonemes ]] notation to specify exact pronunciation" << endl;
   cerr << "                  Example: echo \"Hello [[ h ə l oʊ ]] world\" | piper ..." << endl;
   cerr << endl;
@@ -882,6 +984,15 @@ void parseArgs(int argc, char *argv[], RunConfig &runConfig) {
 
       auto phoneme = piper::getCodepoint(phonemeStr);
       (*runConfig.phonemeSilenceSeconds)[phoneme] = stof(argv[++i]);
+    } else if (arg == "--reference-audio" || arg == "--reference_audio") {
+      ensureArg(argc, argv, i);
+      runConfig.referenceAudioPath = filesystem::path(argv[++i]);
+    } else if (arg == "--speaker-embedding" || arg == "--speaker_embedding") {
+      ensureArg(argc, argv, i);
+      runConfig.speakerEmbeddingPath = filesystem::path(argv[++i]);
+    } else if (arg == "--speaker-encoder-model" || arg == "--speaker_encoder_model") {
+      ensureArg(argc, argv, i);
+      runConfig.speakerEncoderModelPath = filesystem::path(argv[++i]);
     } else if (arg == "--json_input" || arg == "--json-input") {
       runConfig.jsonInput = true;
     } else if (arg == "--use_cuda" || arg == "--use-cuda") {
@@ -939,7 +1050,7 @@ void parseArgs(int argc, char *argv[], RunConfig &runConfig) {
       // Set DEBUG logging
       spdlog::set_level(spdlog::level::debug);
     } else if (arg == "-q" || arg == "--quiet") {
-      // diable logging
+      // disable logging
       spdlog::set_level(spdlog::level::off);
     } else if (arg == "-h" || arg == "--help") {
       printUsage(argv);
@@ -962,6 +1073,9 @@ void parseArgs(int argc, char *argv[], RunConfig &runConfig) {
         "--list-models", "--download-model", "--model-dir", "--model_dir",
         "--version", "--test-mode", "--debug", "--quiet", "--help",
         "--no-stochastic", "--no-warmup", "--no_warmup",
+        "--reference-audio", "--reference_audio",
+        "--speaker-embedding", "--speaker_embedding",
+        "--speaker-encoder-model", "--speaker_encoder_model",
       };
       // Find best match by edit distance (simple Levenshtein)
       string bestMatch;
@@ -991,6 +1105,18 @@ void parseArgs(int argc, char *argv[], RunConfig &runConfig) {
   // Validate --text and --json-input are mutually exclusive
   if (runConfig.textInput && runConfig.jsonInput) {
     throw runtime_error("--text and --json-input are mutually exclusive");
+  }
+
+  // Voice cloning argument validation (parity with Python/Rust/Go/C#/WASM).
+  // - --reference-audio and --speaker-embedding are mutually exclusive
+  // - --reference-audio requires --speaker-encoder-model
+  if (runConfig.referenceAudioPath && runConfig.speakerEmbeddingPath) {
+    throw runtime_error(
+        "--reference-audio and --speaker-embedding are mutually exclusive");
+  }
+  if (runConfig.referenceAudioPath && !runConfig.speakerEncoderModelPath) {
+    throw runtime_error(
+        "--speaker-encoder-model is required when using --reference-audio");
   }
 
   // --list-models and --download-model don't require a model file

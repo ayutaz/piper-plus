@@ -123,6 +123,10 @@ struct InferenceInputs {
   std::optional<int64_t> languageId;
   // Flat [a1,a2,a3, a1,a2,a3, ...] per phoneme. Empty = no prosody.
   std::vector<int64_t> prosodyFeatures;
+  // Voice cloning: when non-empty, fed as `speaker_embedding` input with
+  // mask=1 (overriding the default zero/mask=0 fallback). Size must match
+  // ModelSession::speakerEmbeddingDim.
+  std::vector<float> speakerEmbedding;
 };
 
 struct PhonemeInfo {
