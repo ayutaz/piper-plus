@@ -267,7 +267,7 @@ jobs:
       - name: Trivy config scan (Dockerfile)
         # Dockerfile の misconfiguration (USER root のまま終わる、HEALTHCHECK
         # 未設定など) を build なしで検出。CRITICAL/HIGH のみ fail。
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: config
           scan-ref: docker/${{ matrix.image }}
@@ -287,7 +287,7 @@ jobs:
             -f docker/${{ matrix.image }}/Dockerfile docker/${{ matrix.image }}
       - name: Trivy image scan
         if: steps.build.outcome == 'success'
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: image
           image-ref: piper-plus-${{ matrix.image }}:scan
