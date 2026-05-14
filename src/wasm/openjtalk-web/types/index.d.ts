@@ -87,6 +87,32 @@ export interface SynthesizeOptions {
   lengthScale?: number;
   /** Controls phoneme duration variation. Default: 0.8. */
   noiseW?: number;
+  /**
+   * Optional speaker embedding for voice cloning (typically 256-dim,
+   * L2-normalized). When present, the VITS `speaker_embedding` and
+   * `speaker_embedding_mask` tensors are wired into the inference feed.
+   * Mirrors the `--speaker-embedding` flag in Python / Rust / Go / C# /
+   * C++ runtimes.
+   */
+  speakerEmbedding?: Float32Array;
+}
+
+/** Parameters for PiperPlus.synthesizeFromReferenceAudio(). */
+export interface SynthesizeFromReferenceAudioParams {
+  /** Text to synthesize. */
+  text: string;
+  /**
+   * Reference audio that the SpeakerEncoder encodes into a speaker
+   * embedding. AudioBuffer auto-resamples to 16 kHz; Float32Array is
+   * assumed mono at `sampleRate` (default 16000).
+   */
+  referenceWav: AudioBuffer | Float32Array;
+  /** Initialised SpeakerEncoder (reuse across requests). */
+  encoder: SpeakerEncoder;
+  /** Sample rate when `referenceWav` is a Float32Array. */
+  sampleRate?: number;
+  /** Forwarded to synthesize(); speakerEmbedding is set automatically. */
+  options?: SynthesizeOptions;
 }
 
 /** Options for PiperPlus.synthesizeStreaming(). */
@@ -186,8 +212,19 @@ export class PiperPlus {
    * @param text - Text to synthesize.
    * @param speakerEmbedding - Speaker embedding from SpeakerEncoder.encode().
    * @param options - Synthesis options (same as synthesize).
+   * @deprecated Use `synthesize(text, { ..., speakerEmbedding })` instead.
+   *   Kept for backward compatibility; will be removed in a future
+   *   major release.
    */
   synthesizeWithVoiceCloning(text: string, speakerEmbedding: Float32Array, options?: SynthesizeOptions): Promise<AudioResult>;
+
+  /**
+   * High-level voice-cloning helper: encodes the reference audio with the
+   * provided SpeakerEncoder, then synthesises text with the resulting
+   * speaker embedding. Mirrors `--reference-audio` /
+   * `--speaker-encoder-model` in Python / Rust / Go / C# / C++.
+   */
+  synthesizeFromReferenceAudio(params: SynthesizeFromReferenceAudioParams): Promise<AudioResult>;
 
   /** Streaming synthesis -- splits text into sentences and invokes onChunk for each chunk. */
   synthesizeStreaming(text: string, options?: StreamingSynthesizeOptions): Promise<void>;
