@@ -31,6 +31,40 @@ def mock_engine():
     # synthesize returns 0.5s of silence as int16
     samples = int(engine.sample_rate * 0.5)
     engine.synthesize.return_value = np.zeros(samples, dtype=np.int16)
+
+    # synthesize_stream_pcm: yield one PCM chunk per "sentence" (raw int16
+    # little-endian, matching the real engine's output). Default fixture
+    # emits 3 chunks of 100 ms each so streaming tests can verify multi-chunk
+    # receipt without needing a real ONNX model.
+    chunk_samples = int(engine.sample_rate * 0.1)
+
+    def _stream(*_args, **_kwargs):
+        for _ in range(3):
+            yield np.zeros(chunk_samples, dtype=np.int16).astype("<i2").tobytes()
+
+    engine.synthesize_stream_pcm.side_effect = _stream
+
+    # synthesize_with_timing: deterministic 3-phoneme timing result. Tests
+    # that exercise the missing-durations path override this with None.
+    engine.synthesize_with_timing.return_value = {
+        "phonemes": [
+            {"phoneme": "a", "start_ms": 0.0, "end_ms": 100.0, "duration_ms": 100.0},
+            {
+                "phoneme": "b",
+                "start_ms": 100.0,
+                "end_ms": 200.0,
+                "duration_ms": 100.0,
+            },
+            {
+                "phoneme": "c",
+                "start_ms": 200.0,
+                "end_ms": 300.0,
+                "duration_ms": 100.0,
+            },
+        ],
+        "total_duration_ms": 300.0,
+        "sample_rate": engine.sample_rate,
+    }
     return engine
 
 
@@ -162,6 +196,165 @@ class TestOpenAISpeech:
             json={"input": "test", "model": "tts-1", "voice": "alloy"},
         )
         assert resp.status_code == 200
+
+    def test_default_stream_false_uses_full_synthesize(self, client, mock_engine):
+        """Without ``stream=true`` the original buffered synthesize path is
+        used — keeps existing OpenAI SDK clients (which never pass ``stream``)
+        on the byte-for-byte WAV they already rely on."""
+        resp = client.post(
+            "/v1/audio/speech",
+            json={"input": "hello"},
+        )
+        assert resp.status_code == 200
+        # Buffered path = full WAV (RIFF header AT byte 0). The streaming
+        # path uses 0xFFFFFFFF placeholder sizes; the buffered path uses
+        # the soundfile-computed real sizes, but both start with "RIFF".
+        assert resp.content[:4] == b"RIFF"
+        # Buffered path calls synthesize once, stream path does not.
+        mock_engine.synthesize.assert_called_once()
+        mock_engine.synthesize_stream_pcm.assert_not_called()
+
+
+# ---- /v1/audio/speech stream=true (true chunked WAV) ----
+
+
+class TestOpenAISpeechStreaming:
+    """``stream=true`` (piper-plus extension): real chunked WAV.
+
+    Default behaviour (``stream=false``) is covered by ``TestOpenAISpeech``
+    above. The streaming path must:
+
+    - Route to ``engine.synthesize_stream_pcm`` (not the full ``synthesize``)
+    - Emit a streaming WAV header with ``0xFFFFFFFF`` placeholder sizes
+    - Produce more than one TCP chunk so latency-sensitive consumers benefit
+    - Preserve all request-body semantics (speed, speaker_id, language, ...)
+    """
+
+    def _read_chunks(self, response) -> list[bytes]:
+        return list(response.iter_bytes(chunk_size=None))
+
+    def test_stream_true_routes_to_stream_engine(self, client, mock_engine):
+        with client.stream(
+            "POST",
+            "/v1/audio/speech",
+            json={"input": "Hello. World.", "stream": True},
+        ) as resp:
+            assert resp.status_code == 200
+            assert resp.headers["content-type"] == "audio/wav"
+            chunks = self._read_chunks(resp)
+        # synthesize() must not be touched on the streaming path.
+        mock_engine.synthesize.assert_not_called()
+        mock_engine.synthesize_stream_pcm.assert_called_once()
+        body = b"".join(chunks)
+        assert body[:4] == b"RIFF"
+        assert body[8:12] == b"WAVE"
+
+    def test_stream_true_placeholder_sizes(self, client):
+        """Streaming WAV header MUST use 0xFFFFFFFF for RIFF/data sizes —
+        the conventional 'unknown length' sentinel browsers and ffmpeg
+        accept. A real (non-placeholder) size in a chunked response would
+        misrepresent the body length and break seekable players."""
+        with client.stream(
+            "POST",
+            "/v1/audio/speech",
+            json={"input": "Hello.", "stream": True},
+        ) as resp:
+            body = b"".join(self._read_chunks(resp))
+        # RIFF size at bytes [4:8], data size at bytes [40:44].
+        assert body[4:8] == b"\xff\xff\xff\xff"
+        assert body[40:44] == b"\xff\xff\xff\xff"
+
+    def test_stream_true_multi_chunk_receipt(self, client, mock_engine):
+        """The engine must surface more than one yielded chunk for the
+        latency benefit to be real. ASGI / TestClient batch chunks
+        opportunistically, so we assert at the engine-generator level
+        rather than the wire-level: the streaming path drives
+        ``synthesize_stream_pcm`` to completion (3 chunks per the mock),
+        whereas the non-streaming path never calls it at all. This is the
+        regression we care about — if a future refactor collapses the
+        per-sentence iteration back into a single ``synthesize`` call,
+        this test fails."""
+        # Spy on the generator to count yielded chunks.
+        chunk_count = 0
+
+        original = mock_engine.synthesize_stream_pcm.side_effect
+
+        def _counting_stream(*args, **kwargs):
+            nonlocal chunk_count
+            for piece in original(*args, **kwargs):
+                chunk_count += 1
+                yield piece
+
+        mock_engine.synthesize_stream_pcm.side_effect = _counting_stream
+
+        with client.stream(
+            "POST",
+            "/v1/audio/speech",
+            json={"input": "One. Two. Three.", "stream": True},
+        ) as resp:
+            body = b"".join(self._read_chunks(resp))
+
+        # Mock yields 3 PCM frames (one per "sentence"). If the body had
+        # been buffered into a single response (the bug), the generator
+        # would still be drained — so we also assert the body starts with
+        # the streaming WAV header to prove the chunked path was used.
+        assert chunk_count == 3
+        assert body[:4] == b"RIFF"
+        assert body[4:8] == b"\xff\xff\xff\xff"
+
+    def test_stream_true_speed_propagates(self, client, mock_engine):
+        """speed=2.0 → length_scale=0.5 must propagate on the streaming
+        path too (regression guard: the non-streaming path is covered by
+        TestOpenAISpeech, the streaming path lives in a different branch
+        of openai_speech and was bypassing it pre-PR)."""
+        with client.stream(
+            "POST",
+            "/v1/audio/speech",
+            json={"input": "test", "speed": 2.0, "stream": True},
+        ) as resp:
+            list(self._read_chunks(resp))
+        kwargs = mock_engine.synthesize_stream_pcm.call_args.kwargs
+        assert kwargs["length_scale"] == pytest.approx(0.5)
+
+    def test_stream_true_language_and_speaker(self, client, mock_engine):
+        with client.stream(
+            "POST",
+            "/v1/audio/speech",
+            json={
+                "input": "hi",
+                "stream": True,
+                "language": "en",
+                "speaker_id": 7,
+            },
+        ) as resp:
+            list(self._read_chunks(resp))
+        kwargs = mock_engine.synthesize_stream_pcm.call_args.kwargs
+        assert kwargs["language"] == "en"
+        assert kwargs["speaker_id"] == 7
+
+    def test_stream_true_short_text_warning_still_emitted(self, client):
+        """The X-Piper-Warning header must be set BEFORE the body starts
+        streaming — once the first chunk goes on the wire we can't amend
+        headers. This regression guard ensures the short-text warning
+        propagates on the streaming path too."""
+        with client.stream(
+            "POST",
+            "/v1/audio/speech",
+            json={"input": "hi", "stream": True},
+        ) as resp:
+            assert resp.status_code == 200
+            assert resp.headers.get("x-piper-warning") == "short-text-input"
+            list(self._read_chunks(resp))
+
+    def test_stream_true_unsupported_format_returns_400(self, client):
+        """response_format validation must happen before the streaming
+        branch is taken — otherwise we'd send a chunked WAV header for
+        an unsupported format."""
+        resp = client.post(
+            "/v1/audio/speech",
+            json={"input": "test", "stream": True, "response_format": "mp3"},
+        )
+        assert resp.status_code == 400
 
 
 # ---- /v1/models ----
@@ -332,15 +525,27 @@ class _FakeOnnxInput:
         self.shape = shape
 
 
+class _FakeOnnxOutput:
+    def __init__(self, name: str):
+        self.name = name
+
+
 class _FakeOnnxSession:
     """Minimal ort.InferenceSession stand-in for input-feed assertions."""
 
-    def __init__(self, input_specs):
+    def __init__(self, input_specs, output_names=("output",)):
         self._inputs = [_FakeOnnxInput(name, shape) for name, shape in input_specs]
+        self._outputs = [_FakeOnnxOutput(name) for name in output_names]
         self.last_feed: dict | None = None
 
     def get_inputs(self):
         return self._inputs
+
+    def get_outputs(self):
+        # PiperInferenceEngine probes ``get_outputs()`` to detect whether the
+        # graph exposes a ``durations`` tensor (needed for the new
+        # /api/phoneme-timing endpoint). Older fakes only had get_inputs().
+        return self._outputs
 
     def get_providers(self):
         return ["CPUExecutionProvider"]
@@ -725,6 +930,99 @@ class TestRateLimitEnabled:
             assert client.get("/v1/models").status_code == 200
         # Fourth /v1/models hit exhausts the light limit.
         assert client.get("/v1/models").status_code == 429
+
+
+# ---- /api/phoneme-timing ----
+#
+# Parity with the endpoint exposed by ``piper.http_server`` (in
+# ``src/python_run/``). Required for downstream consumers (Wyoming, Home
+# Assistant, browser captions) that need phoneme-level timestamps for
+# subtitle alignment and karaoke. The /v1/audio/speech path is OpenAI-shaped
+# and intentionally does not emit timing; this endpoint is the canonical
+# place to fetch it without re-synthesizing through OpenAI clients.
+
+
+class TestPhonemeTimingEndpoint:
+    """``POST /api/phoneme-timing`` — JSON timing array, voice from cache."""
+
+    def test_basic_timing_response(self, client, mock_engine):
+        resp = client.post(
+            "/api/phoneme-timing",
+            json={"text": "abc", "language": "ja"},
+        )
+        assert resp.status_code == 200
+        # Cross-runtime canonical shape (matches Rust / Go / C++ / C#
+        # TimingResult). Drift here = wire-format break for downstream
+        # consumers that share the timing-contract spec.
+        data = resp.json()
+        assert "phonemes" in data
+        assert "total_duration_ms" in data
+        assert "sample_rate" in data
+        assert isinstance(data["phonemes"], list)
+        assert len(data["phonemes"]) == 3
+        first = data["phonemes"][0]
+        for key in ("phoneme", "start_ms", "end_ms", "duration_ms"):
+            assert key in first
+
+    def test_timing_uses_engine_cache(self, client, mock_engine):
+        """The voice load must come from the cached engine — synthesize_with_timing
+        is the dependency injected via create_app, never reloaded per request."""
+        client.post("/api/phoneme-timing", json={"text": "hello"})
+        client.post("/api/phoneme-timing", json={"text": "world"})
+        # Two calls to the endpoint = two calls to the cached engine method,
+        # never a fresh PiperInferenceEngine() construction.
+        assert mock_engine.synthesize_with_timing.call_count == 2
+
+    def test_timing_propagates_language(self, client, mock_engine):
+        client.post(
+            "/api/phoneme-timing",
+            json={"text": "hello", "language": "en"},
+        )
+        kwargs = mock_engine.synthesize_with_timing.call_args.kwargs
+        assert kwargs["language"] == "en"
+
+    def test_timing_propagates_speaker_and_scales(self, client, mock_engine):
+        client.post(
+            "/api/phoneme-timing",
+            json={
+                "text": "a",
+                "speaker_id": 3,
+                "length_scale": 1.25,
+                "noise_scale": 0.5,
+                "noise_w": 0.6,
+            },
+        )
+        kwargs = mock_engine.synthesize_with_timing.call_args.kwargs
+        assert kwargs["speaker_id"] == 3
+        assert kwargs["length_scale"] == pytest.approx(1.25)
+        assert kwargs["noise_scale"] == pytest.approx(0.5)
+        assert kwargs["noise_scale_w"] == pytest.approx(0.6)
+
+    def test_timing_empty_text_returns_400(self, client):
+        resp = client.post("/api/phoneme-timing", json={"text": ""})
+        assert resp.status_code == 400
+
+    def test_timing_whitespace_only_returns_400(self, client):
+        resp = client.post("/api/phoneme-timing", json={"text": "   "})
+        assert resp.status_code == 400
+
+    def test_timing_missing_durations_returns_400(self, client, mock_engine):
+        """Older HiFi-GAN exports lack the ``durations`` output tensor.
+        The endpoint must return 400 (model-doesn't-support) rather than
+        500 (server error) so callers can fall back gracefully."""
+        mock_engine.synthesize_with_timing.return_value = None
+        resp = client.post("/api/phoneme-timing", json={"text": "abc"})
+        assert resp.status_code == 400
+        assert "duration" in resp.json()["detail"].lower()
+
+    def test_timing_engine_error_returns_500(self, client, mock_engine):
+        mock_engine.synthesize_with_timing.side_effect = RuntimeError("boom")
+        resp = client.post("/api/phoneme-timing", json={"text": "abc"})
+        assert resp.status_code == 500
+
+    def test_timing_returns_application_json(self, client):
+        resp = client.post("/api/phoneme-timing", json={"text": "abc"})
+        assert resp.headers["content-type"].startswith("application/json")
 
 
 # ---- CORS ----
