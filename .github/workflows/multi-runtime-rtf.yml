@@ -62,6 +62,11 @@ on:
       - 'test/models/multilingual-test-medium.onnx*'
       - '.github/workflows/multi-runtime-rtf.yml'
   workflow_dispatch:
+    inputs:
+      initialize_baseline:
+        description: 'Observed values を baseline として commit する (初回初期化用)'
+        type: boolean
+        default: false
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
@@ -235,7 +240,7 @@ jobs:
     runs-on: ubuntu-24.04
     if: always() && (github.event.pull_request.head.repo.full_name == github.repository || github.event_name != 'pull_request')
     permissions:
-      contents: read
+      contents: write  # read normally; write needed for initialize_baseline commit
       pull-requests: write  # sticky comment via actions/github-script
     steps:
       - uses: actions/checkout@v6.0.2
@@ -266,6 +271,7 @@ jobs:
           )
           thresholds = baseline.get("thresholds", {})
           rtf_pct = thresholds.get("rtf_pct", 0.10)
+          p50_pct = thresholds.get("latency_p50_pct", 0.10)
           p95_pct = thresholds.get("latency_p95_pct", 0.15)
           policy = baseline.get("policy", "warn-only")
 
@@ -291,6 +297,7 @@ jobs:
           lines.append(
               f"Policy: **{policy}** "
               f"(thresholds: RTF +/-{rtf_pct * 100:.0f}%, "
+              f"P50 +/-{p50_pct * 100:.0f}%, "
               f"P95 +/-{p95_pct * 100:.0f}%)"
           )
           lines.append("")
@@ -301,11 +308,11 @@ jobs:
           lines.append("")
           lines.append(
               "| Runtime | Text | RTF | P50 (ms) | P95 (ms) | "
-              "Baseline RTF | RTF Δ | Baseline P95 | P95 Δ |"
+              "Baseline RTF | RTF Δ | Baseline P50 | P50 Δ | Baseline P95 | P95 Δ |"
           )
           lines.append(
               "|---------|------|-----|----------|----------|"
-              "--------------|-------|--------------|-------|"
+              "--------------|-------|--------------|-------|--------------|-------|"
           )
 
           any_regression = False
@@ -318,11 +325,13 @@ jobs:
                       .get(tk, {})
                   )
                   base_rtf = base.get("rtf")
+                  base_p50 = base.get("latency_p50_ms")
                   base_p95 = base.get("latency_p95_ms")
                   if obs is None:
                       lines.append(
                           f"| {rt} | {tk} | (missing) | - | - | "
                           f"{base_rtf if base_rtf is not None else 'n/a'} | - | "
+                          f"{base_p50 if base_p50 is not None else 'n/a'} | - | "
                           f"{base_p95 if base_p95 is not None else 'n/a'} | - |"
                       )
                       continue
@@ -337,6 +346,14 @@ jobs:
                       if ratio > rtf_pct:
                           rtf_flag = " :warning:"
                           any_regression = True
+                  p50_delta = "n/a"
+                  p50_flag = ""
+                  if base_p50 is not None and p50 is not None and base_p50 > 0:
+                      ratio_p50 = (p50 - base_p50) / base_p50
+                      p50_delta = f"{ratio_p50 * 100:+.1f}%"
+                      if ratio_p50 > p50_pct:
+                          p50_flag = " :warning:"
+                          any_regression = True
                   p95_delta = "n/a"
                   p95_flag = ""
                   if base_p95 is not None and p95 is not None and base_p95 > 0:
@@ -349,6 +366,8 @@ jobs:
                       f"| {rt} | {tk} | {rtf} | {p50} | {p95} | "
                       f"{base_rtf if base_rtf is not None else 'null'} | "
                       f"{rtf_delta}{rtf_flag} | "
+                      f"{base_p50 if base_p50 is not None else 'null'} | "
+                      f"{p50_delta}{p50_flag} | "
                       f"{base_p95 if base_p95 is not None else 'null'} | "
                       f"{p95_delta}{p95_flag} |"
                   )
@@ -357,13 +376,13 @@ jobs:
           if any_regression:
               lines.append(
                   "> :warning: One or more cells regressed beyond the "
-                  "RTF or P95 threshold. **Warn-only** while the baseline "
+                  "RTF, P50, or P95 threshold. **Warn-only** while the baseline "
                   "is being calibrated; this will become a hard gate once "
                   "we have ~2-3 weeks of variance data."
               )
           else:
               lines.append(
-                  "> All cells within RTF and P95 threshold "
+                  "> All cells within RTF, P50, and P95 threshold "
                   "(or baseline=null)."
               )
 
@@ -407,3 +426,38 @@ jobs:
                 owner, repo, issue_number, body: payload,
               });
             }
+
+      - name: Initialize baseline (workflow_dispatch only)
+        if: github.event_name == 'workflow_dispatch' && inputs.initialize_baseline == true
+        run: |
+          uv run python - <<'EOF'
+          import json, pathlib, glob
+
+          artifacts_dir = pathlib.Path("bench-artifacts")
+          baseline_path = pathlib.Path("tests/fixtures/multi-runtime-rtf-baseline.json")
+          baseline = json.loads(baseline_path.read_text())
+
+          for result_file in sorted(artifacts_dir.glob("bench-*.json")):
+              data = json.loads(result_file.read_text())
+              rt = data.get("runtime")
+              tk = data.get("text_key")
+              if rt and tk and rt in baseline["runtimes"] and tk in baseline["runtimes"][rt]:
+                  cell = baseline["runtimes"][rt][tk]
+                  if data.get("rtf") is not None:
+                      cell["rtf"] = round(data["rtf"], 4)
+                  if data.get("latency_p50_ms") is not None:
+                      cell["latency_p50_ms"] = round(data["latency_p50_ms"], 1)
+                  if data.get("latency_p95_ms") is not None:
+                      cell["latency_p95_ms"] = round(data["latency_p95_ms"], 1)
+
+          baseline_path.write_text(json.dumps(baseline, indent=2, ensure_ascii=False) + "\n")
+          print("baseline updated")
+          EOF
+        shell: bash
+
+      - name: Commit initialized baseline
+        if: github.event_name == 'workflow_dispatch' && inputs.initialize_baseline == true
+        uses: stefanzweifel/git-auto-commit-action@v5.2.0
+        with:
+          commit_message: "chore(bench): initialize multi-runtime RTF baseline from first run"
+          file_pattern: tests/fixtures/multi-runtime-rtf-baseline.json
