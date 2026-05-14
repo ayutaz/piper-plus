@@ -41,11 +41,7 @@ import { WebGPUSessionManager } from "./webgpu-session-manager.js";
 import { StreamingTTSPipeline } from "./streaming-pipeline.js";
 import { ModelManager } from "./model-manager.js";
 import { AudioResult } from "./audio-result.js";
-import {
-  DEFAULT_HOP_LENGTH,
-  buildPhonemeIdToTokenMap,
-  durationsToTiming,
-} from "./timing.js";
+import { DEFAULT_HOP_LENGTH, buildPhonemeIdToTokenMap, durationsToTiming } from "./timing.js";
 import { RustWasmAdapter } from "./phonemizer/rust-wasm-adapter.js";
 import { JsG2pAdapter } from "./phonemizer/js-g2p-adapter.js";
 import { CompositePhonemizer } from "./phonemizer/composite-phonemizer.js";
@@ -408,6 +404,12 @@ export class PiperPlus {
    * @param {number} [options.noiseScale]
    * @param {number} [options.lengthScale]
    * @param {number} [options.noiseW]
+   * @param {Float32Array} [options.speakerEmbedding] - Optional speaker
+   *   embedding (typically 256-dim, L2-normalized) for voice cloning. When
+   *   present, the `speaker_embedding` / `speaker_embedding_mask` tensors are
+   *   wired into the VITS ONNX feed alongside the standard inputs. This is the
+   *   unified entry point — backward compatible with the older
+   *   `synthesizeWithVoiceCloning()` method.
    * @returns {Promise<AudioResult>}
    */
   async synthesize(text, options = {}) {
@@ -418,6 +420,13 @@ export class PiperPlus {
     }
     if (!text) {
       throw new Error("text is required");
+    }
+    if (
+      options.speakerEmbedding !== undefined &&
+      options.speakerEmbedding !== null &&
+      !(options.speakerEmbedding instanceof Float32Array)
+    ) {
+      throw new TypeError("options.speakerEmbedding must be a Float32Array");
     }
 
     const language = options.language || this._detectLanguage(text);
@@ -452,6 +461,7 @@ export class PiperPlus {
       lengthScale,
       noiseW,
       language,
+      speakerEmbedding: options.speakerEmbedding,
     });
     let audioData = inferResult.audio;
     const durations = inferResult.durations;
@@ -530,6 +540,45 @@ export class PiperPlus {
     const sampleRate = this._config.audio?.sample_rate ?? DEFAULT_SAMPLE_RATE;
     const timing = this._createTiming(durations, phonemeIds);
     return new AudioResult(audioData, sampleRate, timing);
+  }
+
+  /**
+   * High-level voice-cloning helper that takes a reference audio + speaker
+   * encoder, computes the embedding once, then synthesises text with it.
+   *
+   * This mirrors the `--reference-audio` / `--speaker-encoder-model` CLI in
+   * Python / Rust / Go / C# / C++. The reference audio is fed to the
+   * provided `SpeakerEncoder` (which must already be initialised with an
+   * ECAPA-TDNN ONNX model), and the resulting 256-dim L2-normalised
+   * embedding is passed through to `synthesize()` as `speakerEmbedding`.
+   *
+   * @param {Object} params
+   * @param {string} params.text - Text to synthesise.
+   * @param {AudioBuffer|Float32Array} params.referenceWav - Reference audio.
+   *   AudioBuffer auto-resamples to 16 kHz; Float32Array is assumed mono at
+   *   `params.sampleRate` (default 16000).
+   * @param {SpeakerEncoder} params.encoder - Initialised SpeakerEncoder
+   *   instance (call `SpeakerEncoder.initialize({ modelUrl })` once and
+   *   reuse across requests to avoid reloading the encoder ONNX).
+   * @param {number} [params.sampleRate] - Sample rate when `referenceWav` is
+   *   a Float32Array. Ignored for AudioBuffer.
+   * @param {Object} [params.options] - Forwarded to `synthesize()`
+   *   (`language`, `noiseScale`, `lengthScale`, `noiseW`). Any
+   *   `speakerEmbedding` in `options` is overridden by the encoded one.
+   * @returns {Promise<AudioResult>}
+   */
+  async synthesizeFromReferenceAudio({ text, referenceWav, encoder, sampleRate, options = {} }) {
+    if (!text) {
+      throw new Error("text is required");
+    }
+    if (!referenceWav) {
+      throw new Error("referenceWav is required");
+    }
+    if (!encoder || typeof encoder.encode !== "function") {
+      throw new TypeError("encoder must be an initialized SpeakerEncoder instance");
+    }
+    const speakerEmbedding = await encoder.encode(referenceWav, sampleRate);
+    return this.synthesize(text, { ...options, speakerEmbedding });
   }
 
   /**
