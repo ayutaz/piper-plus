@@ -80,25 +80,33 @@ RUNTIME_PROFILES: dict[str, dict] = {
         "extra_args": [],
     },
     "rust": {
-        "stdin_text": True,
+        # Rust CLI defaults to JSONL stdin; use --text for plain-text synthesis.
+        "stdin_text": False,
+        "text_arg": "--text",
         "output_flag": "--output-file",
         "config_flag": "--config",
         "extra_args": ["--quiet"],
     },
     "go": {
-        "stdin_text": True,
+        # Go CLI defaults to JSONL stdin; use --text for plain-text synthesis.
+        "stdin_text": False,
+        "text_arg": "--text",
         "output_flag": "--output-file",
         "config_flag": "--config",
         "extra_args": ["--quiet"],
     },
     "csharp": {
-        "stdin_text": True,
+        # C# CLI defaults to JSONL stdin; use --text for plain-text synthesis.
+        "stdin_text": False,
+        "text_arg": "--text",
         "output_flag": "--output_file",
         "config_flag": "--config",
         "extra_args": ["--quiet"],
     },
     "cpp": {
-        "stdin_text": True,
+        # C++ CLI defaults to JSONL stdin; use --text for plain-text synthesis.
+        "stdin_text": False,
+        "text_arg": "--text",
         "output_flag": "--output_file",
         "config_flag": "--config",
         "extra_args": ["--quiet"],

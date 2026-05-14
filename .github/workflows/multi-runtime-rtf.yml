@@ -125,13 +125,24 @@ jobs:
         if: matrix.runtime == 'go'
         uses: actions/setup-go@v5.6.0
         with:
-          go-version: '1.22'
+          go-version: '1.26'
 
       - name: Compile Go CLI
         if: matrix.runtime == 'go'
         working-directory: src/go
         continue-on-error: true
         run: go build -o piper-plus ./cmd/piper-plus
+
+      - name: Download ONNX Runtime for Go
+        if: matrix.runtime == 'go'
+        run: |
+          ORT_VERSION=1.24.4
+          wget -q "https://github.com/microsoft/onnxruntime/releases/download/v${ORT_VERSION}/onnxruntime-linux-x64-${ORT_VERSION}.tgz"
+          tar xzf "onnxruntime-linux-x64-${ORT_VERSION}.tgz"
+          mkdir -p onnxruntime/lib
+          cp "onnxruntime-linux-x64-${ORT_VERSION}/lib/libonnxruntime.so" onnxruntime/lib/
+          rm -rf "onnxruntime-linux-x64-${ORT_VERSION}" "onnxruntime-linux-x64-${ORT_VERSION}.tgz"
+          echo "ONNX_RUNTIME_SHARED_LIBRARY_PATH=${{ github.workspace }}/onnxruntime/lib/libonnxruntime.so" >> "$GITHUB_ENV"
 
       - name: Set up .NET
         if: matrix.runtime == 'csharp'
@@ -151,12 +162,26 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y cmake build-essential
 
+      - name: Download ONNX Runtime for C++
+        if: matrix.runtime == 'cpp'
+        run: |
+          ORT_VERSION=1.20.0
+          wget -q "https://github.com/microsoft/onnxruntime/releases/download/v${ORT_VERSION}/onnxruntime-linux-x64-${ORT_VERSION}.tgz"
+          tar xzf "onnxruntime-linux-x64-${ORT_VERSION}.tgz"
+          mkdir -p /tmp/ort/lib /tmp/ort/include
+          cp -r "onnxruntime-linux-x64-${ORT_VERSION}/lib/." /tmp/ort/lib/
+          cp -r "onnxruntime-linux-x64-${ORT_VERSION}/include/." /tmp/ort/include/
+          rm -rf "onnxruntime-linux-x64-${ORT_VERSION}" "onnxruntime-linux-x64-${ORT_VERSION}.tgz"
+          echo "LD_LIBRARY_PATH=/tmp/ort/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" >> "$GITHUB_ENV"
+
       - name: Compile C++ CLI
         if: matrix.runtime == 'cpp'
         continue-on-error: true
         run: |
-          cmake -S . -B build-cpp -DCMAKE_BUILD_TYPE=Release -DPIPER_PLUS_CLI=ON
-          cmake --build build-cpp --target piper_plus_cli -j
+          cmake -S . -B build-cpp \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DONNXRUNTIME_DIR=/tmp/ort
+          cmake --build build-cpp --target piper -j
 
       - name: Set up Node
         if: matrix.runtime == 'wasm'
@@ -188,7 +213,7 @@ jobs:
               echo "cmd=dotnet src/csharp/PiperPlus.Cli/bin/Release/net10.0/PiperPlus.Cli.dll" >> "$GITHUB_OUTPUT"
               ;;
             cpp)
-              echo "cmd=build-cpp/piper_plus_cli" >> "$GITHUB_OUTPUT"
+              echo "cmd=build-cpp/piper" >> "$GITHUB_OUTPUT"
               ;;
             wasm)
               # Node entrypoint shipped by the npm package. If this path does
@@ -395,6 +420,38 @@ jobs:
 
           with open(os.environ["GITHUB_OUTPUT"], "a") as f:
               f.write(f"any_regression={'true' if any_regression else 'false'}\n")
+          PY
+
+      - name: Check required runtime measurements
+        run: |
+          uv run python - <<'PY'
+          import json, pathlib, sys
+
+          # Python / Rust / Go / C# are required to have at least one measurement.
+          # C++ and WASM are best-effort (complex build dependencies).
+          REQUIRED = ["python", "rust", "go", "csharp"]
+          texts = ["short", "medium", "long"]
+
+          art_dir = pathlib.Path("bench-artifacts")
+          missing = []
+          for rt in REQUIRED:
+              found = any(
+                  (art_dir / f"bench-{rt}-{tk}.json").exists()
+                  and json.loads((art_dir / f"bench-{rt}-{tk}.json").read_text()).get("rtf") is not None
+                  for tk in texts
+                  if (art_dir / f"bench-{rt}-{tk}.json").exists()
+              )
+              if not found:
+                  missing.append(rt)
+
+          if missing:
+              print(
+                  f"FAIL: required runtime(s) produced no measurements: {missing}\n"
+                  f"Fix the benchmark harness before merging.",
+                  file=sys.stderr,
+              )
+              sys.exit(1)
+          print(f"OK: all required runtimes ({REQUIRED}) have at least one measurement.")
           PY
 
       - name: Upload aggregated report
