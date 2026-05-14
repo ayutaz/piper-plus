@@ -19,6 +19,14 @@ export { ModelManager } from "./model-manager.js";
 export { AudioResult } from "./audio-result.js";
 export { SpeakerEncoder } from "./speaker-encoder.js";
 
+// Re-export the SSML parser from `@piper-plus/g2p` at the top-level so that
+// `piper-plus` consumers do not need a second package dependency to detect /
+// parse SSML before feeding it to `synthesize()`. The actual TTS-side
+// segment iteration + silence concatenation lives in `synthesizeSsml`
+// (see below) — these helpers are exposed for callers who want to inspect
+// the parsed segment list directly.
+export { isSsml, parseSsml, SsmlParser } from "@piper-plus/g2p";
+
 // Re-export timing utilities from the main package entry so that users can
 // bring them in alongside the high-level PiperPlus and AudioResult APIs
 // without needing a separate subpath import.
@@ -36,7 +44,7 @@ export {
 // Imports used by PiperPlus
 // ---------------------------------------------------------------------------
 
-import { checkPuaCompat } from "@piper-plus/g2p";
+import { checkPuaCompat, isSsml, parseSsml } from "@piper-plus/g2p";
 import { WebGPUSessionManager } from "./webgpu-session-manager.js";
 import { StreamingTTSPipeline } from "./streaming-pipeline.js";
 import { ModelManager } from "./model-manager.js";
@@ -429,6 +437,14 @@ export class PiperPlus {
       throw new TypeError("options.speakerEmbedding must be a Float32Array");
     }
 
+    // SSML auto-detect: if the input is an SSML document (starts with
+    // `<speak`), dispatch to the SSML segment iterator. This mirrors the
+    // synthesis-side behaviour pinned by other runtimes (Python/Rust/Go/C#).
+    // Callers that want to opt-out can pass `options.ssml = false`.
+    if (options.ssml !== false && isSsml(text)) {
+      return this.synthesizeSsml(text, options);
+    }
+
     const language = options.language || this._detectLanguage(text);
     let noiseScale =
       options.noiseScale ?? this._config.inference?.noise_scale ?? DEFAULT_NOISE_SCALE;
@@ -488,6 +504,95 @@ export class PiperPlus {
     const sampleRate = this._config.audio?.sample_rate ?? DEFAULT_SAMPLE_RATE;
     const timing = this._createTiming(durations, originalPhonemeIds);
     return new AudioResult(audioData, sampleRate, timing);
+  }
+
+  /**
+   * Synthesize speech from an SSML document.
+   *
+   * Parses the SSML via `@piper-plus/g2p`'s `parseSsml`, iterates the
+   * resulting segments, runs `_infer` for each text segment with the
+   * segment's `length_scale` (from `<prosody rate>`), and concatenates
+   * the audio with silence between segments (from `<break>`).
+   *
+   * This mirrors the synthesis-side SSML behaviour of the Python / Rust /
+   * Go / C# runtimes. Non-SSML input is treated as a single text segment
+   * (matching `parseSsml`'s plain-text fallback).
+   *
+   * @param {string} ssmlText - SSML document (or plain text).
+   * @param {Object} [options]
+   * @param {string} [options.language] - Override language detection.
+   * @param {number} [options.noiseScale]
+   * @param {number} [options.lengthScale] - Base length scale; multiplied
+   *   by each segment's `<prosody rate>` value.
+   * @param {number} [options.noiseW]
+   * @returns {Promise<AudioResult>} Audio with sample rate from config.
+   *   The returned `AudioResult` has no `timing` (multi-segment timing
+   *   would require time-shifting which is out of scope here).
+   */
+  async synthesizeSsml(ssmlText, options = {}) {
+    this._assertReady();
+    if (this._warmupPromise) {
+      await this._warmupPromise;
+      this._warmupPromise = null;
+    }
+    if (typeof ssmlText !== "string" || ssmlText.length === 0) {
+      throw new Error("ssmlText is required");
+    }
+
+    const segments = parseSsml(ssmlText);
+    const sampleRate = this._config.audio?.sample_rate ?? DEFAULT_SAMPLE_RATE;
+    const baseNoiseScale =
+      options.noiseScale ?? this._config.inference?.noise_scale ?? DEFAULT_NOISE_SCALE;
+    const baseLengthScale =
+      options.lengthScale ?? this._config.inference?.length_scale ?? DEFAULT_LENGTH_SCALE;
+    const baseNoiseW = options.noiseW ?? this._config.inference?.noise_w ?? DEFAULT_NOISE_W;
+
+    /** @type {Float32Array[]} */
+    const chunks = [];
+
+    for (const seg of segments) {
+      // 1. Emit the text body of this segment (if any), at the segment's
+      //    rate (multiplied into the base length_scale).
+      if (seg.text && seg.text.length > 0) {
+        const language = options.language || this._detectLanguage(seg.text);
+        const { phonemeIds, prosodyFeatures } = await this._textToPhonemeIds(seg.text, language);
+        // Skip degenerate segments with no phonemizable content.
+        if (phonemeIds.length === 0) {
+          // fall through to break handling
+        } else {
+          const inferResult = await this._infer(phonemeIds, prosodyFeatures, {
+            noiseScale: baseNoiseScale,
+            lengthScale: baseLengthScale * (seg.rate ?? 1.0),
+            noiseW: baseNoiseW,
+            language,
+          });
+          chunks.push(inferResult.audio);
+        }
+      }
+
+      // 2. Append silence after the segment if requested.
+      if (seg.breakMs && seg.breakMs > 0) {
+        const nSilence = Math.max(0, Math.floor((seg.breakMs / 1000) * sampleRate));
+        if (nSilence > 0) {
+          chunks.push(new Float32Array(nSilence));
+        }
+      }
+    }
+
+    // Concatenate all chunks. An entirely empty SSML document (e.g.
+    // `<speak></speak>`) yields a zero-length AudioResult, which is the
+    // documented behaviour across the Python/Rust/Go/C# runtimes.
+    let total = 0;
+    for (const c of chunks) {
+      total += c.length;
+    }
+    const out = new Float32Array(total);
+    let offset = 0;
+    for (const c of chunks) {
+      out.set(c, offset);
+      offset += c.length;
+    }
+    return new AudioResult(out, sampleRate, null);
   }
 
   /**

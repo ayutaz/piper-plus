@@ -95,6 +95,12 @@ export interface SynthesizeOptions {
    * C++ runtimes.
    */
   speakerEmbedding?: Float32Array;
+  /**
+   * Disable SSML auto-detection (treat `<speak>` input as plain text).
+   * Default: `true` — strings starting with `<speak` are auto-dispatched
+   * to {@link PiperPlus.synthesizeSsml}.
+   */
+  ssml?: boolean;
 }
 
 /** Parameters for PiperPlus.synthesizeFromReferenceAudio(). */
@@ -204,8 +210,27 @@ export class PiperPlus {
    */
   static initialize(options: PiperPlusOptions): Promise<PiperPlus>;
 
-  /** Synthesize speech from text. */
+  /**
+   * Synthesize speech from text. When the input starts with `<speak`
+   * (and `options.ssml !== false`), automatically dispatches to
+   * {@link PiperPlus.synthesizeSsml}.
+   */
   synthesize(text: string, options?: SynthesizeOptions): Promise<AudioResult>;
+
+  /**
+   * Synthesize speech from an SSML document.
+   *
+   * Parses the input via `parseSsml`, iterates segments, runs inference
+   * once per text segment with the segment-local `length_scale` (from
+   * `<prosody rate>`), and concatenates the audio with silence between
+   * segments (from `<break>`).
+   *
+   * Plain-text input is treated as a single text segment.
+   *
+   * @returns AudioResult whose `timing` is always `null` (multi-segment
+   *   timing is intentionally out of scope).
+   */
+  synthesizeSsml(ssmlText: string, options?: SynthesizeOptions): Promise<AudioResult>;
 
   /**
    * Synthesize speech with voice cloning from a speaker embedding.
@@ -779,6 +804,44 @@ export class TypedArrayPool {
 
   /** Return pool statistics. */
   getStats(): TypedArrayPoolStats;
+}
+
+// ---------------------------------------------------------------------------
+// SSML (re-exported from `@piper-plus/g2p`)
+// ---------------------------------------------------------------------------
+
+/**
+ * A single segment produced by SSML parsing. Mirrors `SsmlSegment` in the
+ * Python/Rust/Go/C# runtimes (text + post-segment silence + length_scale).
+ */
+export interface SsmlSegment {
+  /** Text to phonemize; empty for silence-only segments. */
+  text: string;
+  /** Silence duration (ms) to insert AFTER this segment. */
+  breakMs: number;
+  /** `length_scale` multiplier (`>1.0` = slower, `<1.0` = faster). */
+  rate: number;
+}
+
+/**
+ * Whether `text` looks like an SSML document (i.e. starts with `<speak`).
+ * Mirrors the cross-runtime contract: case-sensitive, leading whitespace OK.
+ */
+export function isSsml(text: string): boolean;
+
+/**
+ * Parse an SSML string into a list of {@link SsmlSegment}.
+ *
+ * For non-SSML input, returns a single segment containing the input text.
+ * On XML parse error, falls back to tag-stripped plain text so the caller
+ * always receives audible content (never silence).
+ */
+export function parseSsml(ssmlText: string): SsmlSegment[];
+
+/** Convenience static class wrapping `isSsml` and `parseSsml`. */
+export class SsmlParser {
+  static isSsml(text: string): boolean;
+  static parse(text: string): SsmlSegment[];
 }
 
 // ===========================================================================

@@ -19,6 +19,9 @@
 #   Rust:         src/rust/piper-core/src/ssml.rs                  SsmlParser
 #   Go:           src/go/piperplus/ssml/parser.go                  Parse
 #   C#:           src/csharp/PiperPlus.Core/Ssml/SsmlParser.cs     SsmlParser
+#   WASM/JS:      src/wasm/g2p/src/ssml.js                         SsmlParser
+#                 (re-exported from `piper-plus` npm; TTS-side iteration is
+#                  in src/wasm/openjtalk-web/src/index.js:synthesizeSsml)
 #
 # Drift gate: scripts/check_ssml_contract.py + scripts/regenerate_ssml_fixture.py
 # enforce that the Python canonical constants, this toml, and
@@ -27,7 +30,7 @@
 [meta]
 spec_version = "1.0"
 last_updated = "2026-05-08"
-applies_to = ["python", "rust", "go", "csharp"]
+applies_to = ["python", "rust", "go", "csharp", "wasm"]
 
 # ---------------------------------------------------------------------------
 # <break strength="..."> — predefined silence durations
@@ -189,13 +192,15 @@ strip_xml_namespace_for_tag_match = true
 # ---------------------------------------------------------------------------
 # Which runtimes implement the SSML subset.
 #                            Python  Rust  Go  C#  C++  WASM
-# <speak> root              ✓       ✓     ✓   ✓   -    -
-# <break time>              ✓       ✓     ✓   ✓   -    -
-# <break strength>          ✓       ✓     ✓   ✓   -    -
-# <prosody rate=named>      ✓       ✓     ✓   ✓   -    -
-# <prosody rate=%>          ✓       ✓     ✓   ✓   -    -
-# 100KB size limit          ✓       -     -   -   -    -
-# graceful tag stripping    ✓       ✓     ✓   ✓   -    -
+# <speak> root              ✓       ✓     ✓   ✓   -    ✓
+# <break time>              ✓       ✓     ✓   ✓   -    ✓
+# <break strength>          ✓       ✓     ✓   ✓   -    ✓
+# <prosody rate=named>      ✓       ✓     ✓   ✓   -    ✓
+# <prosody rate=%>          ✓       ✓     ✓   ✓   -    ✓
+# 100KB size limit          ✓       -     -   -   -    ✓
+# graceful tag stripping    ✓       ✓     ✓   ✓   -    ✓
 #
-# C++ and WASM/JS do not implement SSML at this time; they are out of scope
-# for this contract.
+# C++ does not implement SSML yet (tracking: PR #477). WASM/JS implements
+# the parser in `@piper-plus/g2p` (canonical mirror, byte-for-byte parity
+# enforced by scripts/check_ssml_contract.py) and synthesis-side iteration
+# in `piper-plus` npm via `synthesizeSsml`.
