@@ -84,12 +84,21 @@ optional_fields = [
 # "学習済みモデル (6言語マルチリンガル)" table for ease of cross-reference.
 
 # ---------------------------------------------------------------------------
-# 6lang base (HiFi-GAN, 75 epoch)
+# [Archived] 6lang base (HiFi-GAN, 75 epoch) — v1.11 系 / 非推奨
+# ---------------------------------------------------------------------------
+# このエントリは v1.11 系の HiFi-GAN Decoder で学習されたモデルです。
+# v1.12.0 で HiFi-GAN Decoder は削除され MB-iSTFT に統一されたため、
+# 新規利用は非推奨。互換のためマニフェストには残置していますが、
+# 現行モデルとしては下記 `multilingual-6lang-mb-istft` を使用してください。
+# 詳細: docs/migration/v1.11-to-v1.12.md
 # ---------------------------------------------------------------------------
 [[models]]
 name = "multilingual-6lang-base"
-description = "6lang base model trained for 75 epochs on the v1.11 HiFi-GAN pipeline"
+description = "[Archived/v1.11] 6lang base model trained for 75 epochs on the v1.11 HiFi-GAN pipeline (deprecated in v1.12.0)"
 training_basis = "75 epoch (v1.11 HiFi-GAN)"
+deprecated = true
+deprecated_since = "1.12.0"
+deprecated_reason = "HiFi-GAN Decoder removed in v1.12.0; superseded by multilingual-6lang-mb-istft"
 trained_languages = ["ja", "en", "zh", "es", "fr", "pt"]
 local_origin = "/data/piper/output-multilingual-6lang/"
 hf_mirror_repo = "ayousanz/piper-plus-base"
@@ -107,11 +116,15 @@ sha256 = "<computed-on-publish>"
 bytes = 0  # <computed-on-publish>
 
 # ---------------------------------------------------------------------------
-# 6lang MB-iSTFT (75 epoch, scratch)
+# 6lang MB-iSTFT (75 epoch, scratch) — 現行 / v1.12.0 推奨
+# ---------------------------------------------------------------------------
+# v1.12.0 以降の canonical な 6lang base モデル。MB-iSTFT Decoder で学習され、
+# CPU Decoder 単体で約 2.21x の高速化を達成 (HiFi-GAN 168.2ms → MB-iSTFT
+# 76.2ms / 100 phoneme p50)。新規 FT は本モデルを base にしてください。
 # ---------------------------------------------------------------------------
 [[models]]
 name = "multilingual-6lang-mb-istft"
-description = "6lang base model trained for 75 epochs from scratch with MB-iSTFT decoder"
+description = "6lang base model trained for 75 epochs from scratch with MB-iSTFT decoder (canonical for v1.12.0+)"
 training_basis = "75 epoch scratch (MB-iSTFT)"
 trained_languages = ["ja", "en", "zh", "es", "fr", "pt"]
 local_origin = "/data/piper/output-multilingual-6lang-mb-istft/multilingual-6lang-mb-istft-scratch-75epoch.onnx"
@@ -130,12 +143,18 @@ sha256 = "<computed-on-publish>"
 bytes = 0  # <computed-on-publish>
 
 # ---------------------------------------------------------------------------
-# Tsukuyomi 6lang-v2 (FT 500 epoch from HiFi-GAN base)
+# [Archived] Tsukuyomi 6lang-v2 (FT 500 epoch from HiFi-GAN base) — v1.11 系 / 非推奨
+# ---------------------------------------------------------------------------
+# v1.11 系 HiFi-GAN base から派生したつくよみちゃん FT モデル。
+# v1.12.0 では下記 `tsukuyomi-mb-istft` が現行モデル。本エントリは互換のため残置。
 # ---------------------------------------------------------------------------
 [[models]]
 name = "tsukuyomi-6lang-v2"
-description = "Single-speaker fine-tune of the 6lang HiFi-GAN base (500 epochs)"
+description = "[Archived/v1.11] Single-speaker fine-tune of the 6lang HiFi-GAN base (500 epochs) (deprecated in v1.12.0)"
 training_basis = "FT 500 epoch (HiFi-GAN base)"
+deprecated = true
+deprecated_since = "1.12.0"
+deprecated_reason = "Derived from HiFi-GAN base; superseded by tsukuyomi-mb-istft"
 trained_languages = ["ja", "en", "zh", "es", "fr", "pt"]
 local_origin = "/data/piper/output-tsukuyomi-finetune-6lang-v2/tsukuyomi-6lang-v2-fixed.onnx"
 hf_mirror_repo = "ayousanz/piper-plus-tsukuyomi-chan"
@@ -153,11 +172,14 @@ sha256 = "<computed-on-publish>"
 bytes = 0  # <computed-on-publish>
 
 # ---------------------------------------------------------------------------
-# Tsukuyomi MB-iSTFT (FT 500 epoch from MB-iSTFT base)
+# Tsukuyomi MB-iSTFT (FT 500 epoch from MB-iSTFT base) — 現行 / v1.12.0 推奨
+# ---------------------------------------------------------------------------
+# v1.12.0 以降の canonical なつくよみちゃんモデル。
+# 上の `tsukuyomi-6lang-v2` の MB-iSTFT 後継。
 # ---------------------------------------------------------------------------
 [[models]]
 name = "tsukuyomi-mb-istft"
-description = "Single-speaker fine-tune of the 6lang MB-iSTFT base (500 epochs)"
+description = "Single-speaker fine-tune of the 6lang MB-iSTFT base (500 epochs) (canonical for v1.12.0+)"
 training_basis = "FT 500 epoch (MB-iSTFT base)"
 trained_languages = ["ja", "en", "zh", "es", "fr", "pt"]
 local_origin = "/data/piper/output-tsukuyomi-mb-istft-finetune/tsukuyomi-mb-istft-500epoch.onnx"
