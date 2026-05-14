@@ -206,12 +206,32 @@ class TestLanguages:
         of languages. The WebUI extraction goes via `ast` rather than
         importing `docker/webui/app.py`, which depends on gradio (not in
         the test virtualenv — same trick the WebUI's own test_app.py
-        uses)."""
+        uses).
+
+        Two layouts are supported because this same test runs in two
+        environments. (1) Repo checkout (pytest from a worktree): the
+        file lives at ``docker/webui/app.py`` relative to this test.
+        (2) Docker image (``docker-test.yml`` mounts only this test
+        into ``/app/test_openai_api.py``): the WebUI source is
+        flattened to ``/app/webui.py`` by the Dockerfile (``COPY
+        docker/webui/app.py /app/webui.py``). Skip cleanly if neither
+        file is present so this test does not regress to a hard-coded
+        ``/webui/app.py`` lookup again."""
         import ast  # noqa: PLC0415
 
         from inference import SUPPORTED_LANGUAGES  # noqa: PLC0415
 
-        webui_path = Path(__file__).resolve().parent.parent / "webui" / "app.py"
+        here = Path(__file__).resolve().parent
+        candidate_paths = [
+            here.parent / "webui" / "app.py",  # repo layout
+            here / "webui.py",  # docker image (flattened)
+        ]
+        webui_path = next((p for p in candidate_paths if p.is_file()), None)
+        if webui_path is None:
+            pytest.skip(
+                "WebUI source not found; checked: "
+                + ", ".join(str(p) for p in candidate_paths)
+            )
         tree = ast.parse(webui_path.read_text(encoding="utf-8"))
         sample_texts_keys: list[str] | None = None
         for node in ast.walk(tree):
