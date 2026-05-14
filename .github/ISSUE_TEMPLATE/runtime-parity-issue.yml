@@ -41,7 +41,7 @@ body:
     id: missing_runtimes
     attributes:
       label: Runtimes missing or inconsistent
-      description: Check every runtime where the feature is absent, incomplete, or behaves differently from the canonical one.
+      description: Check every runtime where the feature is absent, incomplete, or behaves differently from the canonical one. Please select at least one.
       options:
         - label: Python
         - label: Rust
@@ -50,8 +50,6 @@ body:
         - label: npm / WASM
         - label: "C++"
         - label: Kotlin/Android
-    validations:
-      required: true
 
   - type: textarea
     id: impact
