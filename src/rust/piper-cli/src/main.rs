@@ -363,7 +363,12 @@ fn main() -> Result<()> {
 
     // --phoneme-silence パース
     let _phoneme_silence_map = parse_phoneme_silence(&cli.phoneme_silence)?;
-    // TODO: phoneme_silence_map を音素境界で適用する (現在はパース・保持のみ)
+    // TODO: Apply phoneme_silence_map at phoneme boundaries (currently parsed/held
+    // but not applied to silence generation). Other runtimes (Python/C#/Go) already
+    // implement boundary insertion — see src/csharp/PiperPlus.Cli/Program.cs:1051 and
+    // src/go/cmd/piper-plus/main.go:197 for reference. Rust parity is pending;
+    // requires splitting phoneme stream on matched phonemes and inserting zero-padded
+    // audio between adjacent inference calls (similar to --sentence-silence).
     if !_phoneme_silence_map.is_empty() {
         tracing::info!(
             "Phoneme silence: {:?} (parsed but not yet applied to audio)",

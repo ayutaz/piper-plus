@@ -132,16 +132,23 @@ protected:
     const char* original_offline = nullptr;
 };
 
-// Test dictionary path resolution
-// TODO: Implement openjtalk_get_default_dict_path function
-// TEST_F(DictionaryManagerTest, GetDefaultDictPath) {
-//     char buffer[1024];
+// Test dictionary path resolution (disabled — unimplemented C API)
 //
-//     // Test default path (should use HOME)
-//     EXPECT_EQ(openjtalk_get_default_dict_path(buffer, sizeof(buffer)), 0);
-//     EXPECT_TRUE(strstr(buffer, test_dir) != nullptr);
-//     EXPECT_TRUE(strstr(buffer, ".piper/dictionaries/openjtalk") != nullptr);
-// }
+// The C function `openjtalk_get_default_dict_path()` is not implemented in
+// openjtalk_dictionary_manager.{h,c}. The current public surface exposes
+// `ensure_openjtalk_dictionary()` / `force_openjtalk_dictionary_path()` /
+// `reset_openjtalk_dictionary_cache()` only. Keep this as a DISABLED_ test so
+// the intent is preserved and the test will be auto-picked up once the
+// function is added.
+TEST_F(DictionaryManagerTest, DISABLED_GetDefaultDictPath) {
+    GTEST_SKIP() << "TODO: openjtalk_get_default_dict_path() not yet implemented in C API";
+    // char buffer[1024];
+    //
+    // // Test default path (should use HOME)
+    // EXPECT_EQ(openjtalk_get_default_dict_path(buffer, sizeof(buffer)), 0);
+    // EXPECT_TRUE(strstr(buffer, test_dir) != nullptr);
+    // EXPECT_TRUE(strstr(buffer, ".piper/dictionaries/openjtalk") != nullptr);
+}
 
 // Test custom dictionary path via environment variable
 TEST_F(DictionaryManagerTest, CustomDictPath) {
@@ -159,7 +166,9 @@ TEST_F(DictionaryManagerTest, CustomDictPath) {
     fp = fopen("/tmp/custom_dict_test/unk.dic", "w");
     if (fp) fclose(fp);
 
-    // TODO: Implement openjtalk_get_default_dict_path function
+    // TODO: openjtalk_get_default_dict_path() not yet implemented in C API.
+    // Once added, re-enable the assertions below to verify that
+    // OPENJTALK_DICTIONARY_PATH overrides the default $HOME-based path.
     // char buffer[1024];
     // EXPECT_EQ(openjtalk_get_default_dict_path(buffer, sizeof(buffer)), 0);
     // EXPECT_STREQ(buffer, "/tmp/custom_dict_test");
@@ -170,33 +179,39 @@ TEST_F(DictionaryManagerTest, CustomDictPath) {
     rmdir("/tmp/custom_dict_test");
 }
 
-// Test dictionary existence check
-// TODO: Implement openjtalk_check_dictionary function
-// TEST_F(DictionaryManagerTest, CheckDictionary) {
-//     // Non-existent path
-//     EXPECT_EQ(openjtalk_check_dictionary("/nonexistent/path"), 0);
+// Test dictionary existence check (disabled — unimplemented C API)
 //
-//     // Create a test directory with dictionary files
-//     char test_dict_path[256];
-//     snprintf(test_dict_path, sizeof(test_dict_path), "%s/test_dict", test_dir);
-//     mkdir(test_dict_path, 0755);
-//
-//     // Without dictionary files
-//     EXPECT_EQ(openjtalk_check_dictionary(test_dict_path), 0);
-//
-//     // Create dictionary files
-//     char sys_dic[256], unk_dic[256];
-//     snprintf(sys_dic, sizeof(sys_dic), "%s/sys.dic", test_dict_path);
-//     snprintf(unk_dic, sizeof(unk_dic), "%s/unk.dic", test_dict_path);
-//
-//     FILE* fp = fopen(sys_dic, "w");
-//     if (fp) fclose(fp);
-//     fp = fopen(unk_dic, "w");
-//     if (fp) fclose(fp);
-//
-//     // With dictionary files
-//     EXPECT_EQ(openjtalk_check_dictionary(test_dict_path), 1);
-// }
+// The C function `openjtalk_check_dictionary()` is not implemented in
+// openjtalk_dictionary_manager.{h,c}. Existence is currently inferred via the
+// internal cache populated by `ensure_openjtalk_dictionary()`. Keep this as a
+// DISABLED_ test so the intent is preserved and the test will be auto-picked
+// up once the function is added.
+TEST_F(DictionaryManagerTest, DISABLED_CheckDictionary) {
+    GTEST_SKIP() << "TODO: openjtalk_check_dictionary() not yet implemented in C API";
+    // // Non-existent path
+    // EXPECT_EQ(openjtalk_check_dictionary("/nonexistent/path"), 0);
+    //
+    // // Create a test directory with dictionary files
+    // char test_dict_path[256];
+    // snprintf(test_dict_path, sizeof(test_dict_path), "%s/test_dict", test_dir);
+    // mkdir(test_dict_path, 0755);
+    //
+    // // Without dictionary files
+    // EXPECT_EQ(openjtalk_check_dictionary(test_dict_path), 0);
+    //
+    // // Create dictionary files
+    // char sys_dic[256], unk_dic[256];
+    // snprintf(sys_dic, sizeof(sys_dic), "%s/sys.dic", test_dict_path);
+    // snprintf(unk_dic, sizeof(unk_dic), "%s/unk.dic", test_dict_path);
+    //
+    // FILE* fp = fopen(sys_dic, "w");
+    // if (fp) fclose(fp);
+    // fp = fopen(unk_dic, "w");
+    // if (fp) fclose(fp);
+    //
+    // // With dictionary files
+    // EXPECT_EQ(openjtalk_check_dictionary(test_dict_path), 1);
+}
 
 // Test offline mode
 TEST_F(DictionaryManagerTest, OfflineMode) {
