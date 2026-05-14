@@ -214,6 +214,89 @@ jobs:
           fi
           echo "Python config not found error test passed"
 
+  # arm64 native build of the CPU Python inference image.
+  #
+  # 背景: docker/python-inference/Dockerfile (CUDA) は amd64 only。
+  # arm64 (Apple Silicon / Raspberry Pi / AWS Graviton / Home Assistant)
+  # 用には docker/python-inference/Dockerfile.cpu が canonical で、
+  # docker-build.yml の build-python-inference-cpu job が同イメージを
+  # multi-arch publish している。ただし PR 時の実 build/test は
+  # ubuntu-latest (amd64) のみで行われていたため、 arm64 でのみ顕在化する
+  # Dockerfile 起因の breakage (pyopenjtalk の C++ extension build 失敗、
+  # apt パッケージの arm64 manifest 欠落、 onnxruntime aarch64 wheel
+  # mismatch 等) が dev push 後の docker-build.yml で初めて検知される
+  # 状態だった。
+  #
+  # 方針: GitHub-hosted ubuntu-24.04-arm runner (OSS public は無料) で
+  # native arm64 build + smoke test を sibling job として追加し、
+  # PR 時点で arm64 breakage を fail-fast させる。 emulated QEMU build より
+  # 3-5x 高速なので CI minute を浪費しない。 heavy ONNX inference test は
+  # amd64 側 (test-python-inference) でカバー済みなので、 arm64 側は
+  # build + import sanity + ORT providers 確認に留める。
+  test-python-inference-arm64:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost "$AGENT_TOOLSDIRECTORY" /usr/local/lib/android /opt/hostedtoolcache/CodeQL
+          sudo docker image prune --all --force
+          sudo apt-get clean
+
+      - uses: actions/checkout@v6.0.2
+      - uses: docker/setup-buildx-action@v4.0.0
+
+      - name: Build Python inference image (arm64 native, CPU Dockerfile)
+        uses: docker/build-push-action@v7.1.0
+        with:
+          context: .
+          # Dockerfile.cpu is the canonical arm64-capable image (CUDA
+          # variant has no arm64 manifest upstream). docker-build.yml's
+          # build-python-inference-cpu job publishes the same Dockerfile.
+          file: ./docker/python-inference/Dockerfile.cpu
+          platforms: linux/arm64
+          push: false
+          tags: piper-python-inference-cpu:test-arm64
+          load: true
+          # Separate cache scope from amd64 to avoid cross-arch layer hits
+          # (cache-from a different arch can silently produce broken
+          # multi-arch images on push).
+          cache-from: type=gha,scope=python-inference-cpu-arm64
+          cache-to: type=gha,mode=max,scope=python-inference-cpu-arm64
+
+      - name: Smoke test (arm64)
+        run: |
+          # NOTE: the canonical Dockerfile.cpu installs piper_train (from
+          # src/python/) and piper-plus-g2p (from src/python/g2p/), but NOT
+          # the standalone `piper` runtime package (src/python_run/piper/).
+          # The image's runtime entrypoint is docker/python-inference/inference.py
+          # which depends only on piper_train + piper_plus_g2p. Mirror the
+          # amd64 smoke test surface (lines 45-53) — adding `import piper`
+          # here would assert a package the image never shipped.
+          docker run --rm piper-python-inference-cpu:test-arm64 python -c "
+          import platform
+          assert platform.machine() == 'aarch64', f'expected aarch64, got {platform.machine()}'
+          print(f'arch: {platform.machine()} OK')
+          import piper_train; print('piper_train OK')
+          import onnxruntime as ort; print(f'onnxruntime {ort.__version__} OK')
+          providers = ort.get_available_providers()
+          assert 'CPUExecutionProvider' in providers, f'CPUExecutionProvider not found in {providers}'
+          print(f'Available providers: {providers}')
+          import soundfile; print('soundfile OK')
+          import piper_plus_g2p; print('piper_plus_g2p OK')
+          print('All arm64 smoke tests passed')
+          "
+
+      - name: FastAPI app import test (arm64)
+        run: |
+          # Verify the OpenAI-compatible API entrypoint imports cleanly on
+          # arm64. Heavy ONNX inference is covered by the amd64 job.
+          # Note: inference.py exposes create_app() factory, not a module-level app.
+          docker run --rm piper-python-inference-cpu:test-arm64 python -c "
+          import inference
+          assert callable(getattr(inference, 'create_app', None)), 'create_app not found in inference'
+          print('inference.create_app importable OK')
+          "
+
   test-cpp-inference:
     runs-on: ubuntu-latest
     steps:
