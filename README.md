@@ -419,7 +419,7 @@ piper-plus 専用モデル: [piper-plus-base](https://huggingface.co/ayousanz/pi
 
 ## Contributing
 
-[CONTRIBUTING.md](CONTRIBUTING.md) を参照。
+[CONTRIBUTING.md](CONTRIBUTING.md) を参照。質問やバグ報告は [Issues](https://github.com/ayutaz/piper-plus/issues) へどうぞ。行動規範は [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) を参照してください。
 
 ## Changelog
 
