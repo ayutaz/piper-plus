@@ -32,7 +32,15 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-24.04, windows-latest, macos-latest]
-        python-version: ["3.11"]
+        # `requires-python = ">=3.11"` を 5 pyproject.toml で宣言済みで、
+        # `Programming Language :: Python :: 3.{11,12,13}` も classifiers に
+        # 列挙済み (src/python_run/pyproject.toml / src/python/g2p/pyproject.toml)。
+        # 既に g2p-python-ci.yml は 3.11/3.12/3.13 を回している。
+        # 一方で本 workflow は 3.11 のみだったため、 3.12/3.13 で起きる
+        # 退行 (typing / std lib 変更 / deprecation) が PyPI release 直前まで
+        # 見えなかった。 OSS public で CI minute 無制限のため
+        # (memory: feedback_ci_matrix_no_reduction.md) 全 3 系列を回す。
+        python-version: ["3.11", "3.12", "3.13"]
 
     steps:
     - uses: actions/checkout@v6.0.2
