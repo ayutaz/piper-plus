@@ -2,9 +2,7 @@
 
 VITS ベースの高品質ニューラル TTS。**6言語マルチリンガルモデル**を学習済み、**8言語の G2P コード**を全7ランタイム (Python/C#/Rust/Go/JS-WASM/C++/CLI) に実装済み。
 
-**ブランチ**: `dev` (v1.12.0 リリース済み、`release/v1.12.0` ブランチはタグ化後に削除済み)
-
-> **v1.12.0 Breaking changes (2026-05):** HiFi-GAN Decoder 削除 (MB-iSTFT 統一、`--mb-istft` フラグ廃止) / Flask → FastAPI HTTP サーバー / HTS-voice 依存削除 (Python ランタイムのみ) / Unity UPM 別 repo (`ayutaz/uPiper`) / .NET 全プロジェクト `net10.0` LTS。詳細: [docs/migration/v1.11-to-v1.12.md](docs/migration/v1.11-to-v1.12.md)
+**ブランチ**: `dev` (v1.12.0 リリース済み)。v1.12.0 Breaking changes: [docs/migration/v1.11-to-v1.12.md](docs/migration/v1.11-to-v1.12.md)。
 
 ---
 
@@ -102,18 +100,9 @@ nohup /data/piper/.venv/bin/python -m piper_train \
     --default_root_dir <OUTPUT_DIR> > training.log 2>&1 &
 ```
 
-### A vs B パラメータ差分
+### A vs B 主要差分
 
-| パラメータ | A (事前学習) | B (FT) | 理由 |
-|-----------|-------------|--------|------|
-| `--devices` | 4 | 1 | 小データで DDP オーバーヘッド過多 |
-| `--base_lr` | 2e-4 | 2e-5 | catastrophic forgetting 防止 (1/10) |
-| `--batch-size` | 20 | 4 | 100 発話 / 4 = 25 batches/epoch |
-| `--max_epochs` | データ量に応じて | 500 | 25×500 = 12,500 gradient steps |
-| `--freeze-dp` | なし | 自動有効 | DP catastrophic forgetting 防止 |
-| `--audio-log-epochs` | 5 | 50 | Validation 頻度に合わせる |
-
-> **HiFi-GAN ckpt 不可:** v1.12.0 で旧 HiFi-GAN ckpt からの resume/FT は明示エラー。MB-iSTFT base から再 FT 必要。
+B (FT) は A から `--devices 1`、`--base_lr 2e-5` (1/10 で catastrophic forgetting 防止)、`--batch-size 4`、`--max_epochs 500`、`--freeze-dp` 自動有効、`--audio-log-epochs 50` (Validation 頻度に合わせ) を変更。HiFi-GAN ckpt からの resume/FT は v1.12.0 で明示エラー (MB-iSTFT base から再 FT)。
 
 ---
 
@@ -325,39 +314,6 @@ cat test.jsonl | uv run python -m piper_train.infer_onnx --model <model.onnx> --
 
 ---
 
-## アーカイブ: バイリンガル版の履歴
+## アーカイブ: バイリンガル版 (v2/v3/v4) の履歴
 
-> v2/v3/v4 は 6lang に置き換え済み。詳細は git 履歴または旧 CHANGELOG を参照。
-
-### バージョン比較
-
-| 指標 | v2 | v3 | v4 | **6lang (現行)** |
-|------|-----|-----|-----|-----------------|
-| 言語数 | 2 | 2 | 2 | **6** |
-| 総発話数 | 63,325 | 115,795 | 135,060 | **508,187** |
-| 話者数 | 40 | 848 | 330 | **571** |
-| シンボル | 97 | 97 | 97 | **173** |
-| epochs / 学習時間 | 200ep / 4h19m | 350ep / ~3 日 | 150ep / ~46h | **75ep / ~92h** |
-| gradient steps | ~110K | ~202K | ~270K | **~282K** |
-
-### つくよみちゃん FT 履歴 (v3 → 6lang-v2)
-
-v3 → v4 → v4-freeze-dp → v4-emb-lang-fix → 6lang-v2 と段階的改善。
-
-**Key learnings:**
-
-- `emb_lang[0]` → `emb_lang[1:N]` コピーで声質統一 (ONNX エクスポート前の後処理)
-- `--freeze-dp` で DP catastrophic forgetting 防止
-- `--resume-from-multispeaker-checkpoint` で自動変換 (emb_g 除去 + emb_lang 補正 + freeze-dp)
-
-### 旧データセット / モデルパス
-
-| 種類 | パス |
-|------|------|
-| v4 データセット | `/data/piper/dataset-bilingual-ja-en-v4/` |
-| v3 データセット | `/data/piper/dataset-bilingual-ja-en-v3/` |
-| v2 データセット | `/data/piper/dataset-bilingual-ja-en-v2/` |
-| v4 ONNX (EMA 適用済) | `/data/piper/output-bilingual-ja-en-v4/bilingual-ja-en-v4-150epoch.onnx` |
-| v3 ONNX | `/data/piper/output-bilingual-ja-en-v3/bilingual-ja-en-v3-350epoch.onnx` |
-| 20 話者 JA-only | `/data/piper/output-moe-speech-20speakers-v2/moe-speech-20speakers-v2.onnx` |
-| LibriTTS-R ソース | `/data/piper/libritts-r/libritts-ljspeech-v4/` |
+v2/v3/v4 は 6lang に置き換え済み。詳細・旧データセットパス・つくよみちゃん FT 履歴 (v3→v4→6lang-v2 の段階的改善、`emb_lang` コピーや `--freeze-dp` の learnings) は git 履歴 (`git log --grep="bilingual\\|v[234]"`) または `CHANGELOG-archive.md` を参照。
