@@ -12,6 +12,8 @@ English | [日本語](README.md) | [中文](README_ZH.md) | [Français](README_F
 
 > **🔑 The only MIT-licensed Piper fork** — The original [rhasspy/piper](https://github.com/rhasspy/piper) was archived in October 2025. [OHF-Voice/piper1-gpl](https://github.com/OHF-Voice/piper1-gpl) has moved to GPL-3.0. piper-plus is the only MIT-compatible fork with no espeak-ng dependency. Custom G2P covers 8 languages (JA/EN/ZH/KO/ES/FR/PT/SV), suitable for commercial and embedded use.
 
+> **📢 v1.12.0 Breaking changes (2026-05):** HiFi-GAN Decoder removed (unified to MB-iSTFT, `--mb-istft` flag retired) / Flask → FastAPI HTTP server / HTS-voice dependency removed (Python runtime only) / Unity UPM moved to a separate repo (`ayutaz/uPiper`) / all .NET projects upgraded to `net10.0` LTS. Details: [docs/migration/v1.11-to-v1.12.md](docs/migration/v1.11-to-v1.12.md)
+
 A fast, high-quality neural text-to-speech (TTS) system. Built on the [VITS](https://github.com/jaywalnut310/vits/) architecture with multi-speaker support for 8 languages (Japanese, English, Mandarin Chinese, Korean, Spanish, French, Portuguese, Swedish). A fork of [Piper](https://github.com/rhasspy/piper) with significantly enhanced Japanese support, improved voice quality, and advanced training features.
 
 **[Hugging Face Demo](https://huggingface.co/spaces/ayousanz/piper-plus-demo)** | **[WebAssembly Demo](https://ayutaz.github.io/piper-plus/)** (runs in browser, no server needed)

@@ -18,6 +18,8 @@
 
 > **🔑 唯一の MIT ライセンス Piper フォーク** — オリジナルの [rhasspy/piper](https://github.com/rhasspy/piper) は 2025年10月にアーカイブ済み。[OHF-Voice/piper1-gpl](https://github.com/OHF-Voice/piper1-gpl) は GPL-3.0 に移行。piper-plus は espeak-ng に依存しない唯一の MIT 互換フォークです。独自実装の G2P で8言語 (JA/EN/ZH/KO/ES/FR/PT/SV) に対応し、商用利用・組込み利用に適しています。
 
+> **📢 v1.12.0 Breaking changes (2026-05):** HiFi-GAN Decoder 削除 (MB-iSTFT 統一、`--mb-istft` フラグ廃止) / Flask → FastAPI HTTP サーバー / HTS-voice 依存削除 (Python ランタイムのみ) / Unity UPM 別 repo (`ayutaz/uPiper`) / .NET 全プロジェクト `net10.0` LTS。詳細: [docs/migration/v1.11-to-v1.12.md](docs/migration/v1.11-to-v1.12.md)
+
 高速・高品質なニューラルテキスト音声合成 (TTS) システム。[VITS](https://github.com/jaywalnut310/vits/) アーキテクチャを採用し、日本語・英語・中国語・韓国語・スペイン語・フランス語・ポルトガル語・スウェーデン語の8言語マルチスピーカー音声合成に対応。[Piper](https://github.com/rhasspy/piper) のフォークで、日本語対応・音質向上・学習機能を大幅に強化しています。
 
 **[Hugging Face デモ](https://huggingface.co/spaces/ayousanz/piper-plus-demo)** | **[WebAssembly デモ](https://ayutaz.github.io/piper-plus/)** (ブラウザで動作、サーバー不要)
@@ -107,12 +109,12 @@ Python / Rust / Go / C# / C++ / WASM の 6 ランタイムを `multilingual-test
 - **Rust CLI** — piper-plus/piper-plus-cli、ストリーミング、CUDA/CoreML/DirectML対応、**音素タイミング出力 (JSON/TSV/SRT)**、辞書自動ダウンロード
 - **[Go CLI](src/go/README.md)** — HTTP APIサーバー、セッションプーリング、Docker対応、シングルバイナリ、**音素タイミング出力 (JSON/TSV/SRT)**
 - **Voice Cloning (Speaker Encoder + speaker_embedding)** — 全 6 ランタイム (Python/Rust/C#/Go/WASM/C++) 対応。C++ は CLI バイナリと `libpiper_plus` C API ライブラリの両形式で利用可。ECAPA-TDNN による参照音声からの話者 embedding 抽出 (`--reference-audio`)
-- **SSML サポート** — `<speak>`, `<break>`, `<prosody rate="...">` を Python/Rust/C#/Go の 4 ランタイムで実装
+- **SSML サポート** — `<speak>`, `<break>`, `<prosody rate="...">` を Python/Rust/C#/Go/WASM/C++ の 6 ランタイムで実装 (C++ は CLI `--ssml` 経由)
 - **短文品質改善 (Strategy A/B/C)** — Silence Padding、Dynamic Scales、SSML `<break>` 自動注入を全 6 ランタイムで対応 (`docs/spec/short-text-contract.toml`)
 
 ### ランタイム別機能サポート
 
-6 ランタイム (Python/Rust/C#/Go/JS-WASM/C++) で同等の8言語マルチリンガル合成を実現。音素タイミング・ストリーミング (文単位分割含む)・Voice Cloning・カスタム辞書は全ランタイム対応。SSML は Python/Rust/C#/Go の4ランタイム対応、HTTP API は Python/Go の2ランタイム対応。
+6 ランタイム (Python/Rust/C#/Go/JS-WASM/C++) で同等の8言語マルチリンガル合成を実現。音素タイミング・ストリーミング (文単位分割含む)・Voice Cloning・カスタム辞書は全ランタイム対応。SSML は全 6 ランタイム対応 (C++ は CLI `--ssml` 経由、C API 非エクスポート)、HTTP API は Python/Go の 2 ランタイム対応。
 
 ---
 

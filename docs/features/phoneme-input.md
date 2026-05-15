@@ -218,6 +218,13 @@ echo "[[ v ɛ̃ b l ɑ̃ ]]" | piper --model multilingual-test-medium.onnx -f vi
 - Coda-l vocalization: l in syllable coda -> w (e.g. Brasil -> [bɾaziw])
 - Unstressed final vowel reduction: -e -> i, -o -> u
 
+> **European Portuguese (`pt-PT` / `pt-pt`)** is supported by the same
+> `PortuguesePhonemizer` class via `Dialect.EU`. Five EU-specific
+> post-processing rules differentiate from BR (palatalisation suppression,
+> final-e reduction, final-s shibilation, coda-l velarisation, r-realization)
+> and introduce two IPA-only codepoints: `ɨ` (close central unrounded vowel)
+> and `ɫ` (velarised lateral). Spec: `docs/spec/pt-dialect-contract.toml`.
+
 **Consonant phonemes:**
 
 | Phoneme | Description                                | Example              |

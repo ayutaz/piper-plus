@@ -66,8 +66,25 @@ piper-plus-g2p = { version = "0.4", default-features = false, features = ["engli
 | Korean | `ko` | `korean` | Rule-based |
 | Spanish | `es` | `spanish` | Rule-based |
 | French | `fr` | `french` | Rule-based |
-| Portuguese | `pt` | `portuguese` | Rule-based |
+| Portuguese (BR) | `pt` / `pt-BR` | `portuguese` | Rule-based |
+| Portuguese (EU) | `pt-PT` / `pt-pt` | `portuguese` | Rule-based + EU post-processing (palatalisation, final-e, final-s, coda-l, r-realization) |
 | Swedish    | `sv` | `swedish`    | Rule-based |
+
+### Brazilian vs European Portuguese
+
+`PortuguesePhonemizer::new(Dialect::BR)` and `PortuguesePhonemizer::new(Dialect::EU)`
+share the same class but differ in five post-processing transformations
+(see `docs/spec/pt-dialect-contract.toml`). EU also introduces the central
+vowel `ɨ` and the velarised lateral `ɫ` (registered in the PUA contract).
+
+## SSML Basic Profile
+
+`piper-plus-g2p` is the **Rust canonical** SSML parser for the entire
+project. The `ssml` module exposes `is_ssml(text)` / `parse(text)` /
+`Segment` types covering `<speak>`, `<break time="..." strength="...">`,
+and `<prosody rate="...">` (W3C SSML subset). `piper-core` re-exports
+`piper_plus_g2p::ssml`, and `piper-plus-wasm` exposes the same API as
+`isSsml` / `parseSsml` to JavaScript.
 
 ## Piper Model Compatibility
 
@@ -122,9 +139,12 @@ Also available as:
 - **Python**: `piper-plus-g2p` on PyPI
 - **npm**: `@piper-plus/g2p` for browser/WASM
 - **Go**: `go get github.com/ayutaz/piper-plus/src/go/phonemize`
+- **Kotlin (Android)**: `io.github.ayutaz:piper-plus-g2p-android` on Maven Central
+- **Swift (iOS / macOS)**: `PiperPlusG2P` product in [Package.swift](../../../Package.swift) (SPM)
 
-All implementations share the same PUA mapping and are validated
-against a common test fixture.
+All implementations share the same PUA mapping, the same `zh_en_loanword.json`
+canonical dictionary (10-mirror sync, CI gated), and are validated against a
+common test fixture.
 
 ## Minimum Supported Rust Version
 

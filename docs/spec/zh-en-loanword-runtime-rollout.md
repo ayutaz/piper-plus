@@ -13,7 +13,7 @@
 PR #397 で **Python (学習側 + ランタイム側)** の ZH-EN code-switching が実装された:
 
 - 中国語コンテキスト中の英単語 (acronym/loanword) を Mandarin pinyin で発音
-- 辞書: `acronyms` 65, `loanwords` 40, `letter_fallback` 26 (A-Z)
+- 辞書: `acronyms` 66, `loanwords` 40, `letter_fallback` 26 (A-Z)
 - `MultilingualPhonemizer` が `[zh,en,zh] / [zh,en] / [en,zh]` パターンを検出して dispatch
 - 学習側 + Python ランタイム両方で同等動作
 
@@ -1167,7 +1167,7 @@ public class ChinesePhonemizer {
 
 ```text
 LoanwordData (default):
-  acronyms (65)        ~3 KB
+  acronyms (66)        ~3 KB
   loanwords (40)       ~2 KB
   letter_fallback (26) ~1 KB
   ───────────────────────

@@ -6,6 +6,8 @@
 [![PyPI](https://img.shields.io/pypi/v/piper-plus)](https://pypi.org/project/piper-plus/)
 [![Python](https://img.shields.io/pypi/pyversions/piper-plus)](https://pypi.org/project/piper-plus/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+> **📢 v1.12.0 Breaking Changes (2026-05):** HiFi-GAN-Decoder entfernt (auf MB-iSTFT vereinheitlicht, `--mb-istft`-Flag eingestellt) / Flask → FastAPI HTTP-Server / HTS-voice-Abhaengigkeit entfernt (nur Python-Runtime) / Unity UPM in separates Repository ausgelagert (`ayutaz/uPiper`) / alle .NET-Projekte auf `net10.0` LTS aktualisiert. Details: [docs/migration/v1.11-to-v1.12.md](docs/migration/v1.11-to-v1.12.md)
 [![Hugging Face Demo](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Demo-blue)](https://huggingface.co/spaces/ayousanz/piper-plus-demo)
 [![Hugging Face Model](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Model-orange)](https://huggingface.co/ayousanz/piper-plus-base)
 

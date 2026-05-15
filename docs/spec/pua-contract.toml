@@ -14,7 +14,8 @@
 [meta]
 spec_version = "2.0"
 last_updated = "2026-05-05"
-applies_to = ["python", "rust", "go", "cpp", "csharp", "wasm-js"]
+applies_to = ["python", "rust", "go", "cpp", "csharp", "wasm-js", "swift"]
+# kotlin-android is delegated via JNI to the Rust PUA map (no separate constants)
 canonical_source = "src/python/g2p/piper_plus_g2p/data/pua.json"
 pua_compat_version = 2
 
@@ -95,6 +96,7 @@ runtime_constants = [
     "src/python/g2p/piper_plus_g2p/encode/pua.py:PUA_COMPAT_VERSION",
     "src/wasm/g2p/src/pua-map.js:PUA_COMPAT_VERSION",
     "src/rust/piper-plus-g2p/src/token_map.rs:PUA_COMPAT_VERSION",
+    "Sources/PiperPlusG2P/PUAMap.swift:PUA_COMPAT_VERSION",
 ]
 rule = "All listed values must equal pua.json's version field"
 

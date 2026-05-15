@@ -2,7 +2,7 @@
 
 VITS ベースの高品質ニューラル TTS。**6言語マルチリンガルモデル**を学習済み、**8言語の G2P コード**を全7ランタイム (Python/C#/Rust/Go/JS-WASM/C++/CLI) に実装済み。
 
-**ブランチ**: `dev` (リリース作業中: `release/v1.12.0`)
+**ブランチ**: `dev` (v1.12.0 リリース済み、`release/v1.12.0` ブランチはタグ化後に削除済み)
 
 > **v1.12.0 Breaking changes (2026-05):** HiFi-GAN Decoder 削除 (MB-iSTFT 統一、`--mb-istft` フラグ廃止) / Flask → FastAPI HTTP サーバー / HTS-voice 依存削除 (Python ランタイムのみ) / Unity UPM 別 repo (`ayutaz/uPiper`) / .NET 全プロジェクト `net10.0` LTS。詳細: [docs/migration/v1.11-to-v1.12.md](docs/migration/v1.11-to-v1.12.md)
 
@@ -121,14 +121,14 @@ nohup /data/piper/.venv/bin/python -m piper_train \
 
 ### Decoder & 生成
 
-- **MB-iSTFT-VITS2 Decoder** (`vits/mb_istft.py`, `vits/stft_onnx.py`) — HiFi-GAN を完全置換、CPU Decoder 単体で **2.21x 高速化** (HiFi-GAN 168.2ms → MB-iSTFT 76.2ms / 100 phoneme p50、PR #320 内部 A/B microbench)。End-to-end の Latency P50 は README.md の Benchmark 表 (Xeon E5-2650 v4 / 25 phoneme 英文 / warmup 5 + 30 runs で **27ms**) を canonical 値とする (測定環境・テスト長が異なるため別値)。`upsample_rates=(4,4)` + iSTFT(4x) + PQMF(4x) = 256x。出力形状 `[B, 1, T]` 維持で C#/Rust/Go/WASM/C++ ランタイム変更不要。CLI: `--c-sub-stft`, `--sub-stft-{fft,hop,win}-sizes`。Issue #268, PR #320。
+- **MB-iSTFT-VITS2 Decoder** (`vits/mb_istft.py`, `vits/stft_onnx.py`) — HiFi-GAN を完全置換、CPU Decoder 単体で **2.21x 高速化** (HiFi-GAN 168.2ms → MB-iSTFT 76.2ms / 100 phoneme p50、PR #320 内部 A/B microbench)。End-to-end の Latency P50 は README.md の Benchmark 表 (Xeon E5-2650 v4 / 25 phoneme 英文 / warmup 5 + 30 runs で **27ms**) を canonical 値とする (測定環境・テスト長が異なるため別値)。`upsample_rates=(4,4)` + iSTFT(4x) + PQMF(4x) = 256x。出力形状 `[B, 1, T]` 維持で C#/Rust/Go/WASM/C++ ランタイム変更不要。CLI: `--c-sub-stft` (sub-band STFT loss 係数; hparams `sub_stft_{fft,hop,win}_sizes` は config-only)。Issue #268, PR #320。
 - **WavLM Discriminator** (`vits/models.py:WavLMDiscriminator`) — 学習時のみ知覚品質判別。GPU +1-2GB。CLI: `--no-wavlm`, `--wavlm-every-n-steps`, `--c-wavlm`。V100 では `--no-wavlm` 推奨。
 - **prosody_features (A1/A2/A3)** (`vits/models.py`) — OpenJTalk 由来の韻律情報を DP 入力に活用。CLI: `--prosody-dim 16` (デフォルト)。
 - **EMA + stochastic** — ONNX エクスポート時に EMA 自動適用 (チェックポイントに state あれば)。`--no-stochastic` で deterministic。
 
 ### 学習補助
 
-- **Duration Predictor 凍結** (`vits/lightning.py:configure_optimizers`) — CLI `--freeze-dp` で DP 凍結。`--resume-from-multispeaker-checkpoint` 使用時は自動有効。テスト: `tests/test_freeze_dp.py`。
+- **Duration Predictor 凍結** (`vits/lightning.py:configure_optimizers`) — CLI `--freeze-dp` で DP 凍結。`--resume-from-multispeaker-checkpoint` 使用時は自動有効。テスト: `src/python/tests/test_freeze_dp.py`。
 - **転移学習** (`__main__.py:load_multispeaker_checkpoint`) — CLI `--resume-from-multispeaker-checkpoint` で emb_g 除去 + emb_lang 補正 + freeze-dp を一括実行。HiFi-GAN ckpt は明示エラー。
 - **言語グループ均等サンプリング** (`vits/dataset.py:SpeakerBalancedBatchSampler`) — 話者比 ≥ 3:1 で自動有効化。CLI: `--language-balanced-sampling`。
 - **学習高速化** — Validation 頻度削減、DataLoader 最適化 (num_workers=2, pin_memory)、DDP `find_unused_parameters=True`。CLI: `--val-every-n-epochs`, `--limit-val-batches`, `--num-workers`, `--no-pin-memory`。
@@ -138,13 +138,13 @@ nohup /data/piper/.venv/bin/python -m piper_train \
 ### ONNX エクスポート
 
 - **FP16 デフォルト** (`export_onnx.py`) — モデルサイズ ~50% 削減。CLI: `--no-fp16` で無効化。
-- **emb_lang 自動統一** (`export_onnx.py:should_unify_emb_lang`) — シングルスピーカー多言語モデルで自動有効化、声質統一。CLI: `--unify-emb-lang` / `--no-unify-emb-lang` (auto), `--unify-emb-lang-source N`。テスト: `tests/test_export_onnx.py`。
-- **Speaker Embedding 入力パス** (`vits/models.py:infer`, `export_onnx.py`) — `speaker_embedding` テンソルで声質指定、speaker_id と排他。CLI: `--speaker-embedding`, `--reference-audio`, `--speaker-encoder-model`。テスト: `tests/test_speaker_embedding.py`。
+- **emb_lang 自動統一** (`export_onnx.py:should_unify_emb_lang`) — シングルスピーカー多言語モデルで自動有効化、声質統一。CLI: `--unify-emb-lang` / `--no-unify-emb-lang` (auto), `--unify-emb-lang-source N`。テスト: `src/python/tests/test_export_onnx.py`。
+- **Speaker Embedding 入力パス** (`vits/models.py:infer`, `export_onnx.py`) — `speaker_embedding` テンソルで声質指定、speaker_id と排他。CLI: `--speaker-embedding`, `--reference-audio`, `--speaker-encoder-model`。テスト: `src/python/tests/test_speaker_embedding.py`。
 
 ### Voice Cloning
 
-- **Speaker Encoder (ECAPA-TDNN)** (`src/python/piper_train/speaker_encoder/`) — 256 次元 L2 正規化 embedding。テスト: `test/test_speaker_encoder.py`。
-- **全ランタイム統合** — Rust/C#/Go/WASM/C++ に Speaker Encoder + speaker_embedding 統合。CLI: `--reference-audio`, `--speaker-embedding`, `--speaker-encoder-model`。
+- **Speaker Encoder (ECAPA-TDNN)** (`src/python/piper_train/speaker_encoder/`) — 256 次元 L2 正規化 embedding。テスト: `test/test_speaker_encoder.py` (legacy 位置、その他は `src/python/tests/` 配下)。
+- **全ランタイム統合** — Rust/C#/Go/WASM/C++ に Speaker Encoder + speaker_embedding 統合。CLI: `--reference-audio`, `--speaker-embedding`, `--speaker-encoder-model`。C API は `speaker_embedding` テンソル経路のみ動作 (ECAPA-TDNN 推論 API はスタブ、CLI 経路では動作)。
 
 ### G2P (8言語)
 
@@ -172,14 +172,14 @@ nohup /data/piper/.venv/bin/python -m piper_train \
 
 ### G2P 詳細機能 (中国語)
 
-- **ZH-EN 混在ピンイン化** (`chinese.py:phonemize_embedded_english`) — 中国語に隣接する英単語 (acronym/loanword) を米国英語ではなく Mandarin pinyin で発音。`MultilingualPhonemizer` が `[zh,en,zh]`/`[zh,en]`/`[en,zh]` パターンを自動検出してディスパッチ。辞書 (canonical source): `src/python/g2p/piper_plus_g2p/data/zh_en_loanword.json` (acronyms 66 / loanwords 40 / letter_fallback 26 (A-Z))。カスタム上書きは `ChinesePhonemizer(zh_en_loanword_dict_paths=...)`。**全 7 ランタイム同期** (Python + Rust 2 crate / Go / C# / WASM / C++)。CI gate `ZH-EN Loanword Sync Gate / json-sync` が 7 mirror + 6 fixture の byte-for-byte 一致を強制 (`scripts/check_loanword_consistency.py`、`/check-loanword` skill)。Forward-compat loader: 全ランタイムで `schema_version: 2` の未来フィールド受理を pinning。Issue #384, [docs/spec/zh-en-loanword-runtime-rollout.md](docs/spec/zh-en-loanword-runtime-rollout.md)。
+- **ZH-EN 混在ピンイン化** (`chinese.py:phonemize_embedded_english`) — 中国語に隣接する英単語 (acronym/loanword) を米国英語ではなく Mandarin pinyin で発音。`MultilingualPhonemizer` が `[zh,en,zh]`/`[zh,en]`/`[en,zh]` パターンを自動検出してディスパッチ。辞書 (canonical source): `src/python/g2p/piper_plus_g2p/data/zh_en_loanword.json` (acronyms 66 / loanwords 40 / letter_fallback 26 (A-Z))。カスタム上書きは `ChinesePhonemizer(zh_en_loanword_dict_paths=...)`。**全 10 mirror 同期** (Python canonical + Rust 2 crate / Go / C# / WASM / C++ / Kotlin Android / Swift G2P)。CI gate `ZH-EN Loanword Sync Gate / json-sync` が mirror + fixture の byte-for-byte 一致を強制 (`scripts/check_loanword_consistency.py`、`/check-loanword` skill)。Forward-compat loader: 全ランタイムで `schema_version: 2` の未来フィールド受理を pinning。Issue #384, [docs/spec/zh-en-loanword-runtime-rollout.md](docs/spec/zh-en-loanword-runtime-rollout.md)。
 
 ### ランタイム共通機能
 
 - **CPU 推論最適化 (Tier 1-2)** — 4 言語実装で ORT セッション設定統一、Warmup 2 回 (100 phonemes、scales=[0.667,1.0,0.8])、`.opt.onnx`+`.ok` キャッシュ、JA 音素化 LRU キャッシュ (Python のみ)。仕様: `docs/spec/ort-session-contract.toml`。CLI: `--no-warmup`。env: `PIPER_DISABLE_WARMUP`, `PIPER_DISABLE_CACHE`, `PIPER_INTRA_THREADS`。
-- **短テキスト合成品質改善 (Strategy A/B/C)** — 全 7 ランタイム並列実装。A: Silence Padding + Post-trim、B: Dynamic Scales、C: SSML `<break>` 自動挿入 (SSML 4 ランタイムのみ)。仕様: `docs/spec/short-text-contract.toml`。
-- **ストリーミング文単位分割** — 終止符 `.`/`!`/`?`/`。`/`！`/`？` で分割し文ごとに音素化・推論・yield。SSML は単一ユニット。Python: `src/python_run/piper/text_splitter.py`、Rust: `piper-core/src/streaming.rs`、他言語: 同等実装。仕様: `docs/spec/text-splitter-contract.toml`。**Breaking (v1.12.0):** Python `PiperVoice.phonemize()` が単一要素から複数要素へ (詳細: マイグレーションガイド)。
-- **SSML 基本サポート** (5 ランタイム + WASM 解析 API + G2P-only npm) — `<speak>`, `<break>`, `<prosody rate>` を Python/Rust/C#/Go/JS で実装 (W3C サブセット)。実装: `g2p/piper_plus_g2p/ssml.py`, `piper-plus-g2p/src/ssml.rs` (Rust canonical), `PiperPlus.Core/Ssml/SsmlParser.cs`, `go/piperplus/ssml/parser.go`, `wasm/g2p/src/ssml.js` (npm `@piper-plus/g2p`)。 piper-core は `piper-plus-g2p::ssml` を re-export (API 互換維持)。 piper-wasm は同パーサーを `isSsml` / `parseSsml` で WASM expose (TTS 統合は openjtalk-web の synthesize 側で iterate して silence 挿入 + length_scale 切替)。
+- **短テキスト合成品質改善 (Strategy A/B/C)** — 全 7 ランタイム並列実装。A: Silence Padding + Post-trim、B: Dynamic Scales、C: SSML `<break>` 自動挿入 (SSML 実装ランタイムでのみ)。仕様: `docs/spec/short-text-contract.toml`。
+- **ストリーミング文単位分割** — 終止符 `.`/`!`/`?`/`。`/`！`/`？`/`．` で分割し文ごとに音素化・推論・yield。SSML は単一ユニット。Python: `src/python_run/piper/text_splitter.py`、Rust: `piper-core/src/streaming.rs`、他言語: 同等実装。仕様: `docs/spec/text-splitter-contract.toml`。**Breaking (v1.12.0):** Python `PiperVoice.phonemize()` が単一要素から複数要素へ (詳細: マイグレーションガイド)。
+- **SSML 基本サポート** (Python/Rust/C#/Go/WASM/C++ の 6 ランタイム + G2P-only npm 解析 API) — `<speak>`, `<break>`, `<prosody rate>` を W3C サブセットで実装。実装: `g2p/piper_plus_g2p/ssml.py`, `piper-plus-g2p/src/ssml.rs` (Rust canonical), `PiperPlus.Core/Ssml/SsmlParser.cs`, `go/piperplus/ssml/parser.go`, `wasm/g2p/src/ssml.js` (npm `@piper-plus/g2p`), `src/cpp/ssml.{hpp,cpp}` (CLI `--ssml` 経由、C API 非エクスポート)。 piper-core は `piper-plus-g2p::ssml` を re-export (API 互換維持)。 piper-wasm は同パーサーを `isSsml` / `parseSsml` で WASM expose (TTS 統合は openjtalk-web の `synthesizeSsml` 側で iterate して silence 挿入 + length_scale 切替)。
 - **Phoneme Timing 出力** — 全 6 ランタイム (Python/JS-WASM 新規 + Rust/Go/C++/C# 既存) で JSON/TSV/SRT 出力。`(hop_length / sample_rate) × 1000` で byte-for-byte 互換。Python: `piper.timing` モジュール、`PiperVoice.synthesize_with_timing()`、HTTP `/api/phoneme-timing`。WASM: `AudioResult.timing` (deep frozen)。仕様: `docs/spec/phoneme-timing-contract.toml`。
 
 ### ランタイム別パッケージ

@@ -352,7 +352,9 @@ def text_to_phoneme_ids_and_prosody(
     Args:
         text: Input text
         phoneme_id_map: Mapping from phoneme symbols to IDs
-        language: "ja" for Japanese (OpenJTalk), "en" for English (g2p-en)
+        language: Language code dispatched via piper_plus_g2p.get_phonemizer().
+            Supported: ja/en/zh/ko/es/pt (BR)/pt-PT (EU)/fr/sv. Multi-language
+            inputs (e.g. "ja-en-zh-es-fr-pt") auto-promote to MultilingualPhonemizer.
         language_id_map: Language-to-ID mapping from config. When provided
             and the model supports multiple languages, a single language
             code (e.g. "ja") is auto-promoted to a multilingual phonemizer

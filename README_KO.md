@@ -6,6 +6,8 @@
 [![PyPI](https://img.shields.io/pypi/v/piper-plus)](https://pypi.org/project/piper-plus/)
 [![Python](https://img.shields.io/pypi/pyversions/piper-plus)](https://pypi.org/project/piper-plus/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+> **📢 v1.12.0 주요 변경사항 (2026-05):** HiFi-GAN 디코더 제거 (MB-iSTFT로 통합, `--mb-istft` 플래그 폐지) / Flask → FastAPI HTTP 서버 / HTS-voice 의존성 제거 (Python 런타임만 해당) / Unity UPM 별도 저장소로 이동 (`ayutaz/uPiper`) / 모든 .NET 프로젝트 `net10.0` LTS로 업그레이드. 자세히: [docs/migration/v1.11-to-v1.12.md](docs/migration/v1.11-to-v1.12.md)
 [![Hugging Face Demo](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Demo-blue)](https://huggingface.co/spaces/ayousanz/piper-plus-demo)
 [![Hugging Face Model](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Model-orange)](https://huggingface.co/ayousanz/piper-plus-base)
 

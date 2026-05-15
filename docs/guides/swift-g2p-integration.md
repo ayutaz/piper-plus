@@ -86,7 +86,7 @@ let package = Package(
 )
 ```
 
-> SwiftPM が `binaryTarget(url:, checksum:)` から `libpiper_plus_g2p-ios-v${VERSION}.xcframework.zip` を取得する。初回 resolve 時にダウンロード ~3-5 MB。
+> SwiftPM が `binaryTarget(url:, checksum:)` から `libpiper_plus_g2p-apple-v${VERSION}.xcframework.zip` を取得する。初回 resolve 時にダウンロード ~3-5 MB。
 
 ### Xcode プロジェクトの場合 (Package.swift を使わない)
 

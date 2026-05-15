@@ -360,6 +360,11 @@ repos:
     hooks:
       - id: codespell
         additional_dependencies: [tomli]
+        # `.codespellrc` の `skip` は CLI 引数として渡された個別ファイルに対しては
+        # 無視されるため、pre-commit の filename routing 側でも除外する必要がある。
+        # 多言語 README は codespell の英語辞書で大量の false positive を生むので
+        # ここで明示的に除外 (ja README.md は英語混在で false positive 少なめ)。
+        exclude: ^(README_(DE|ES|FR|HI|KO|PT|RU|SV|ZH)\.md|src/python_run/piper/(sample_texts|webui)\.py|.*/zh_en_loanword\.json)$
 
   # ---------------------------------------------------------------------------
   # Secret detection — gitleaks scans for credentials, API keys, and tokens

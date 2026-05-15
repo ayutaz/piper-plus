@@ -6,6 +6,8 @@
 [![PyPI](https://img.shields.io/pypi/v/piper-plus)](https://pypi.org/project/piper-plus/)
 [![Python](https://img.shields.io/pypi/pyversions/piper-plus)](https://pypi.org/project/piper-plus/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+> **📢 v1.12.0 Brytande andringar (2026-05):** HiFi-GAN-avkodare borttagen (enhetlig MB-iSTFT, flaggan `--mb-istft` borttagen) / Flask → FastAPI HTTP-server / HTS-voice-beroende borttaget (endast Python-runtime) / Unity UPM flyttat till separat repo (`ayutaz/uPiper`) / alla .NET-projekt uppgraderade till `net10.0` LTS. Detaljer: [docs/migration/v1.11-to-v1.12.md](docs/migration/v1.11-to-v1.12.md)
 [![Hugging Face Demo](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Demo-blue)](https://huggingface.co/spaces/ayousanz/piper-plus-demo)
 [![Hugging Face Model](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Model-orange)](https://huggingface.co/ayousanz/piper-plus-base)
 
