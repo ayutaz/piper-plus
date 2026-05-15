@@ -13,6 +13,14 @@ ENV PYTHONUNBUFFERED=1
 ENV CUDA_HOME=/usr/local/cuda
 ENV PATH=$CUDA_HOME/bin:$PATH
 ENV LD_LIBRARY_PATH=$CUDA_HOME/lib64:$LD_LIBRARY_PATH
+# Disable uv wheel cache to prevent layer bloat. Builder stage installs
+# torch+CUDA (~3GB) and scipy/numpy/librosa via uv pip — without this,
+# uv keeps a full archive of every wheel under /root/.cache/uv (~3-5GB
+# extra layer), exhausting the runner's ephemeral disk during multi-stage
+# COPY of /opt/venv. Wheels are re-downloaded on rebuild, but that's
+# absorbed by docker/build-push-action's GitHub-Actions cache (cache-from:
+# type=gha) — we only pay this cost on cache miss. Issue #495.
+ENV UV_NO_CACHE=1
 
 # Install build dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
