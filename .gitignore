@@ -146,6 +146,7 @@ check_*.py
 !scripts/check_cli_help_drift.py
 !scripts/check_bundle_size.py
 !scripts/check_migration_changelog_parity.py
+!scripts/check_language_parity.py
 create_comprehensive_*.py
 add_missing_*.py
 retrain_*.py

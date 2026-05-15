@@ -311,6 +311,18 @@ repos:
         files: ^(docs/spec/language-id-map-contract\.toml|src/python/piper_train/tools/prepare_multilingual_dataset\.py|src/python_run/piper/voice\.py|src/rust/piper-core/src/(config|wasm)\.rs|src/rust/piper-wasm/src/lib\.rs|src/go/piperplus/testdata/valid_multilingual_config\.json|src/wasm/openjtalk-web/models/multilingual-test-medium\.onnx\.json|src/csharp/PiperPlus\.Core/Config/PiperConfig\.cs|src/cpp/piper\.cpp|scripts/check_language_id_map_contract\.py|scripts/regenerate_language_id_map_fixture\.py|tests/fixtures/language_id_map/.*)$
         pass_filenames: false
 
+      # Language list 3-way parity (WebUI / CLI / FastAPI test fixture).
+      # Catches drift like PR #2f4efaf9 where the WebUI SAMPLE_TEXTS listed
+      # a language ("sv") that the CLI --language choices and the
+      # /v1/audio/speech/languages endpoint assertion didn't have. Pure
+      # AST-based check, no runtime imports required.
+      - id: language-parity
+        name: language list parity (WebUI SAMPLE_TEXTS / CLI --language / FastAPI test)
+        entry: uv run python scripts/check_language_parity.py
+        language: system
+        files: ^(docker/webui/app\.py|docker/python-inference/(inference|test_openai_api)\.py|scripts/check_language_parity\.py)$
+        pass_filenames: false
+
       # Mirror of .github/workflows/cli-help-docs-sync.yml. Catches v1.12.0-
       # style breaking changes (e.g. `--mb-istft` removed when HiFi-GAN was
       # deleted) where the user-facing CLI doc would otherwise carry a flag

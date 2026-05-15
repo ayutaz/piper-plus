@@ -1,9 +1,9 @@
 ---
 name: reply-review
-description: PR レビューコメント (GitHub / Copilot) に対して対応内容を返信し、review thread を resolve します。修正コミット後に呼び出してください。
-argument-hint: "<pr-number> [commit-hash]"
+description: PR レビューコメント (GitHub / Copilot) に対して対応内容を返信し、review thread を resolve します。修正コミット後に呼び出してください。`--stale-check` で「コメント以降に該当ファイルが更新済」のコメントを自動 flag、`--dry-run` で計画のみ表示。
+argument-hint: "<pr-number> [commit-hash] [--stale-check] [--dry-run]"
 disable-model-invocation: true
-allowed-tools: Bash(gh api *) Bash(gh pr view *) Bash(gh pr checks *) Bash(git log *) Bash(git show *) Bash(git rev-parse *) Read Grep
+allowed-tools: Bash(gh api *) Bash(gh pr view *) Bash(gh pr checks *) Bash(git log *) Bash(git show *) Bash(git rev-parse *) Bash(git diff *) Read Grep
 ---
 
 # PR レビューコメント自動返信 + Resolve
@@ -14,6 +14,8 @@ allowed-tools: Bash(gh api *) Bash(gh pr view *) Bash(gh pr checks *) Bash(git l
 
 - `$1` (必須): PR 番号 (例: `349`)
 - `$2` (任意): 返信に記載するコミットハッシュ。省略時は `git rev-parse HEAD` の短縮 hash を使用。
+- `--stale-check` (任意): 各コメントの `originalCommit.oid` と HEAD を比較し、該当ファイルが以降に更新済の場合 stale flag を立てる (フェーズ 2 で表示)
+- `--dry-run` (任意): 投稿・resolve を実行せず計画のみ表示
 
 ## 実行前の確認
 
@@ -44,6 +46,8 @@ query($pr: Int!) {
               line
               body
               author { login }
+              originalCommit { oid }
+              commit { oid }
             }
           }
         }
@@ -59,6 +63,40 @@ query($pr: Int!) {
 - `comment.databaseId`: REST API で reply するための ID
 - `comment.path` + `comment.line`: どのファイルのどの行のコメントか
 - `comment.body`: レビュー本文 (対応内容を判定する材料)
+- `comment.originalCommit.oid`: コメントが付けられた commit SHA (stale check に使用)
+- `comment.commit.oid`: コメントが現在指している commit SHA (rebase 後の最新位置)
+
+### フェーズ 1.5: Stale Check (オプション、`--stale-check` 指定時のみ)
+
+`$ARGUMENTS` に `--stale-check` が含まれる場合、各コメントについて該当ファイルがコメント作成以降に更新済かを判定する。
+
+各コメントごとに以下を実行:
+
+```bash
+git log --oneline <originalCommit.oid>..HEAD -- <comment.path> 2>/dev/null
+```
+
+- **出力が空**: コメント作成以降にそのファイルへの変更なし → 「未対応」または「対応漏れ」の可能性
+- **出力に commit がある**: 該当ファイルがその後 N コミットで更新されている → **stale 候補** (既に修正済の可能性)
+
+stale 候補のテーブルを表示:
+
+```text
+## Stale Check 結果
+
+| # | path:line | author | original_commit | since | 推定 |
+|---|-----------|--------|-----------------|-------|------|
+| 1 | src/foo.py:42 | Copilot | a7f8abb | 3 commits | 🔶 stale (既に修正済の可能性) |
+| 2 | docs/bar.md:10 | reviewer | b2c3d4e | 0 commits | ⏳ 未対応 |
+```
+
+stale 候補について、ユーザーに以下を確認:
+
+- **A**: そのまま「修正済 (commit `<new>`)」と返信して resolve
+- **B**: 内容を再確認してから個別に判定
+- **C**: スキップ (フェーズ 3 以降に進まない)
+
+> **注意**: stale 判定は heuristic。ファイルが更新されていても該当箇所が修正されているとは限らない (例: 別関数の追加)。最終判断はユーザーに委ねる。CLAUDE.md memory `feedback_copilot_stale_review` で Copilot の古いコメント参照癖が記録されており、本 check はこれを補助する目的。
 
 ### フェーズ 2: 各コメントと修正の対応付け
 
@@ -147,6 +185,12 @@ mutation ResolveThread($id: ID!) {
 
 # Dry-run で計画のみ表示
 /reply-review 349 --dry-run
+
+# Stale check 付き: コメント以降のファイル変更を解析して既修正候補を flag
+/reply-review 349 --stale-check
+
+# Stale check + dry-run の組み合わせ (検出のみ、投稿しない)
+/reply-review 349 --stale-check --dry-run
 ```
 
 ## 期待効果
@@ -154,3 +198,4 @@ mutation ResolveThread($id: ID!) {
 - レビュー対応ループ (修正 → push → 手動返信 → 手動 resolve) を 1 コマンドに集約
 - 返信漏れ・resolve 漏れを防止
 - コミットハッシュの記載を自動化し、後から trace しやすくする
+- `--stale-check` により Copilot の stale review (古い commit を参照したコメント、CLAUDE.md memory `feedback_copilot_stale_review` 記録) を事前検出し、二重対応を防止
