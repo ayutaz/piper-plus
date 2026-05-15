@@ -64,6 +64,12 @@
 >
 > **†** がついた行は本 PR では再計測していません (`piper1-gpl` は piper 本家と同一アーキテクチャ・ONNX 形式のため Piper 本家行とほぼ同等になる見込み。`Kokoro-82M` は別アーキテクチャ、`eSpeak-NG` は非ニューラル CLI のため `scripts/benchmark.py` のテンソル契約に乗らず、別ハーネスが必要)。これらの値は前回計測時 (Apple M2 Max) のもの。
 
+### マルチランタイム RTF ベンチマーク (最新値)
+
+Python / Rust / Go / C# / C++ / WASM の 6 ランタイムを `multilingual-test-medium.onnx` で横断測定した最新の RTF・レイテンシ結果を公開しています。dev ブランチへのマージのたびに自動更新されます。
+
+👉 **[Multi-Runtime RTF Benchmark](https://ayutaz.github.io/piper-plus/bench/multi-runtime/)**
+
 ---
 
 ## 主要機能
