@@ -575,7 +575,7 @@ JSON v1.0 / v2.0 schema は既存 (`docs/spec/custom-dictionary-schema.toml` 等
 - [android/piper-plus/](../../android/) — 既存 TTS フル AAR 草案
 - [.github/workflows/android-build.yml](../../.github/workflows/android-build.yml) — Android NDK ビルド CI
 - [docs/reference/ios-shared-lib.md](ios-shared-lib.md) — iOS shared lib 設計 (xcframework パターン参考)
-- [docs/reference/zh-en-loanword-runtime-rollout.md](zh-en-loanword-runtime-rollout.md) — クロスランタイム同期パターン
+- [docs/reference/zh-en-loanword/README.md](zh-en-loanword/README.md) — クロスランタイム同期パターン
 - [docs/spec/pua-contract.toml](pua-contract.toml) — PUA codepoint 仕様
 - [Issue #388](https://github.com/ayutaz/piper-plus/issues/388) — 親 Issue
 

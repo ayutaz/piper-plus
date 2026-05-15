@@ -695,7 +695,7 @@ class TestDispatchDefaultBehavior:
         assert not hasattr(MultilingualPhonemizer, "set_zh_en_dispatch"), (
             "Python is source-of-truth; dispatch is always-on by design. If "
             "you are adding this method, also extend the parity contract in "
-            "docs/spec/zh-en-loanword-runtime-rollout.md and update this test."
+            "docs/reference/zh-en-loanword/README.md and update this test."
         )
         assert not hasattr(MultilingualPhonemizer, "is_zh_en_dispatch_enabled"), (
             "Python is source-of-truth; dispatch is always-on by design."
