@@ -232,7 +232,7 @@ Step 4. ユニットテスト + CI 同期ガード
 - 元 Issue: [#384](https://github.com/ayutaz/piper-plus/issues/384)
 - PUA 仕様: `docs/spec/pua-contract.toml`
 - Phoneme Timing 仕様: `docs/spec/phoneme-timing-contract.toml`
-- iOS shared lib 仕様: `docs/spec/ios-shared-lib.md`
+- iOS shared lib 仕様: `docs/reference/ios-shared-lib.md`
 
 ---
 

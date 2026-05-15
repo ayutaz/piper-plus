@@ -89,7 +89,7 @@ https://download.onnxruntime.ai/pod-archive-onnxruntime-c-${ONNXRUNTIME_VERSION}
 > - 旧来の `.a` を CMake で static link する CI ロジックは流用不可、`.framework`
 >   ベースに書き直す必要がある
 > - iOS では dylib 単体配布は App Store が拒否するため、消費者側で
->   `Embed & Sign Frameworks` への追加が必須 (`docs/guides/ios-integration.md` で明記)
+>   `Embed & Sign Frameworks` への追加が必須 (`docs/guides/platform/ios-integration.md` で明記)
 > - 純粋 static archive が必要な場合は ORT ソースビルドに切替 (将来検討)
 
 ### 2.2 piper-plus 配布形式
@@ -181,7 +181,7 @@ unzip libpiper_plus-ios-*.xcframework.zip
 # ios/Runner.xcodeproj に piper_plus.xcframework を追加
 ```
 
-### 3.5 `docs/spec/ort-versions.md`
+### 3.5 `docs/reference/ort-versions.md`
 
 iOS 行を更新:
 
@@ -244,4 +244,4 @@ Plan A の xcframework ビルドロジック (`xcodebuild -create-xcframework`) 
 
 1. **ORT バージョンを上げる場合:** `release-shared-lib.yml` の `env.ONNXRUNTIME_VERSION` と本書 §2.1 の検証日を更新。
 2. **xcframework slice を追加する場合** (例: visionOS): §2.2 のテーブルと `release-shared-lib.yml` の matrix に追加。
-3. **取得経路を変更する場合:** §2.1 と §5 を更新し、 `docs/spec/ort-versions.md` も同期。
+3. **取得経路を変更する場合:** §2.1 と §5 を更新し、 `docs/reference/ort-versions.md` も同期。

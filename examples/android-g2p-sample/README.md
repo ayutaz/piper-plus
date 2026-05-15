@@ -35,5 +35,5 @@ which is intentionally not bundled. For a working JA demo bundle the
 dictionary under `app/src/main/assets/open_jtalk_dic/` and update
 `MainActivity.kt` to pass an `OpenJTalkDictionary.fromAssets(context)`
 to `PiperPlusG2p.create(context, dictionary)`. See
-[`docs/guides/android-g2p-dictionary.md`](../../docs/guides/android-g2p-dictionary.md)
+[`docs/guides/platform/android-g2p-dictionary.md`](../../docs/guides/platform/android-g2p-dictionary.md)
 for the full walkthrough.

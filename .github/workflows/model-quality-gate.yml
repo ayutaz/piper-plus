@@ -15,7 +15,7 @@ on:
       - 'docs/spec/model-sha256-manifest.toml'
       - 'docs/spec/dictionary-versions.toml'
       - 'docs/spec/phoneme-set-version.toml'
-      - 'docs/spec/ort-versions.md'
+      - 'docs/reference/ort-versions.md'
       - 'scripts/check_*.py'
       - 'scripts/verify_*.py'
       - '.github/workflows/model-quality-gate.yml'

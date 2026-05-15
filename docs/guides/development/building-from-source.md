@@ -1,6 +1,6 @@
 # Building from Source
 
-If pre-built binaries (see [README](../../README_EN.md)) don't fit your platform or you need to modify piper-plus, build from source. This guide covers C++, C#, and Rust runtimes.
+If pre-built binaries (see [README](../../../README_EN.md)) don't fit your platform or you need to modify piper-plus, build from source. This guide covers C++, C#, and Rust runtimes.
 
 ## Development environment setup (one-time)
 
@@ -34,7 +34,7 @@ cmake --build . --config Release
 Prerequisites: C++17 compiler, CMake 3.15+
 
 - **Linux**: Dependencies (ONNX Runtime, OpenJTalk, etc.) are downloaded automatically by CMake
-- **Windows**: See [Windows Setup Guide](../getting-started/windows-setup.md)
+- **Windows**: See [Windows Setup Guide](../../getting-started/windows-setup.md)
 - **macOS**: Dependencies are downloaded automatically
 
 ## Building C# CLI (PiperPlus)
@@ -122,4 +122,4 @@ Prerequisites: Rust 1.88+, cargo
 
 ---
 
-→ Back to [README](../../README_EN.md)
+→ Back to [README](../../../README_EN.md)

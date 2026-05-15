@@ -30,7 +30,7 @@ on:
       - 'docs/spec/short-text-contract.toml'
       - 'docs/spec/ssml-contract.toml'
       - 'docs/spec/text-splitter-contract.toml'
-      - 'docs/spec/model-resolution.md'
+      - 'docs/reference/model-resolution.md'
       # Canonical / mirror fixtures
       - 'test/model_resolution_vectors.json'
       - 'tests/fixtures/language_id_map/**'

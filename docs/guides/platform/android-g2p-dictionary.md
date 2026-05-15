@@ -6,9 +6,9 @@
 日本語のみが OpenJTalk の辞書を必要とするため、利用するアプリ側で 3 つの
 配布パターンから選んでください。
 
-> 関連: [要件定義書 §6.4](../spec/kotlin-g2p-requirements.md)、
-> [`OpenJTalkDictionary`](../../android/piper-plus-g2p/src/main/java/com/piperplus/g2p/OpenJTalkDictionary.kt)、
-> [`DictionaryDownloader`](../../android/piper-plus-g2p/src/main/java/com/piperplus/g2p/DictionaryDownloader.kt)
+> 関連: [要件定義書 §6.4](../../reference/kotlin-g2p-requirements.md)、
+> [`OpenJTalkDictionary`](../../../android/piper-plus-g2p/src/main/java/com/piperplus/g2p/OpenJTalkDictionary.kt)、
+> [`DictionaryDownloader`](../../../android/piper-plus-g2p/src/main/java/com/piperplus/g2p/DictionaryDownloader.kt)
 
 ---
 
@@ -130,7 +130,7 @@ HF Hub repo に配置するファイル名:
 | `open_jtalk_dic.tar` | naist-jdic を tar アーカイブ化したもの (~102MB) |
 | `open_jtalk_dic.tar.sha256` | 1 行の sha256sum 出力形式 (`<sha>  open_jtalk_dic.tar`) |
 
-リリース時は [`tools/build-openjtalk-dict-archive.sh`](../../tools/build-openjtalk-dict-archive.sh)
+リリース時は [`tools/build-openjtalk-dict-archive.sh`](../../../tools/build-openjtalk-dict-archive.sh)
 で両ファイルを生成し、HF Hub の repo にアップロードします。
 
 ```bash
@@ -144,7 +144,7 @@ ls dist/open_jtalk_dic/
 
 ## 7. 関連ドキュメント
 
-- [要件定義書 §6.4 (FR-DICT-*)](../spec/kotlin-g2p-requirements.md)
-- [既存 TTS フル AAR の辞書展開ロジック (`PiperPlus.kt:80-146`)](../../android/piper-plus/src/main/java/com/piperplus/PiperPlus.kt)
-- [`OpenJTalkDictionary` Kotlin source](../../android/piper-plus-g2p/src/main/java/com/piperplus/g2p/OpenJTalkDictionary.kt)
-- [`DictionaryDownloader` Kotlin source](../../android/piper-plus-g2p/src/main/java/com/piperplus/g2p/DictionaryDownloader.kt)
+- [要件定義書 §6.4 (FR-DICT-*)](../../reference/kotlin-g2p-requirements.md)
+- [既存 TTS フル AAR の辞書展開ロジック (`PiperPlus.kt:80-146`)](../../../android/piper-plus/src/main/java/com/piperplus/PiperPlus.kt)
+- [`OpenJTalkDictionary` Kotlin source](../../../android/piper-plus-g2p/src/main/java/com/piperplus/g2p/OpenJTalkDictionary.kt)
+- [`DictionaryDownloader` Kotlin source](../../../android/piper-plus-g2p/src/main/java/com/piperplus/g2p/DictionaryDownloader.kt)

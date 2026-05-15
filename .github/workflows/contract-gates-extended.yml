@@ -28,7 +28,7 @@ on:
       - 'docs/spec/swift-g2p-contract.toml'
       - 'docs/spec/pt-dialect-contract.toml'
       - 'tests/fixtures/g2p/pt_dialect_parity.json'
-      - 'docs/spec/speaker-encoder-contract.md'
+      - 'docs/reference/speaker-encoder-contract.md'
       - 'docs/spec/pua-contract.toml'  # cross-referenced by swift-g2p
       - 'src/python/g2p/piper_plus_g2p/data/pua.json'
       - 'test/fixtures/speaker_encoder_golden.json'

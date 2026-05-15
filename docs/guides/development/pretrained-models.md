@@ -64,8 +64,8 @@ High-quality Japanese speech synthesis with OpenJTalk integration. The dictionar
 | `PIPER_AUTO_DOWNLOAD_DICT` | Set to `0` to disable auto-download |
 | `PIPER_OFFLINE_MODE` | Set to `1` for offline mode |
 
-See the Japanese Usage Guide and [Phoneme Mapping Reference](../api-reference/phoneme-mapping.md).
+See the Japanese Usage Guide and [Phoneme Mapping Reference](../../api-reference/phoneme-mapping.md).
 
 ---
 
-→ Back to [README](../../README_EN.md)
+→ Back to [README](../../../README_EN.md)

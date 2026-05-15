@@ -1,9 +1,9 @@
 # Swift G2P Integration Guide
 
 > **Status:** Implemented — Swift wrapper, FFI, CI, and Apple xcframework pipeline merged on `dev`. Awaiting v1.14.0 tag for SPM URL resolution.
-> **Spec:** [docs/spec/swift-g2p.md](../spec/swift-g2p.md)
+> **Spec:** [docs/reference/swift-g2p.md](../../reference/swift-g2p.md)
 > **対象バージョン:** v1.14.0+
-> **動作確認サンプル:** [`examples/swift-g2p/HelloG2P/`](../../examples/swift-g2p/HelloG2P/) (CLI demo, macOS)
+> **動作確認サンプル:** [`examples/swift-g2p/HelloG2P/`](../../../examples/swift-g2p/HelloG2P/) (CLI demo, macOS)
 
 iOS / Swift プロジェクトから piper-plus の **G2P (Grapheme-to-Phoneme) を単独で利用する**ための統合ガイド。
 合成エンジン (`PiperPlus`) と独立した Swift Package product `PiperPlusG2P` を提供する。
@@ -57,7 +57,7 @@ iOS / Swift プロジェクトから piper-plus の **G2P (Grapheme-to-Phoneme) 
 > - **未 strip staticlib (CI 中間成果物)**: ~84 MB — リリース時に xcodebuild 側で symbol strip され体感サイズが縮む
 
 > 配布される xcframework はデフォルトで **全 8 言語有効**。consumer 側で言語の選択無効化はできない (Cargo features がビルド時に固定化されるため)。
-> **学習済み TTS モデルは現状 6 言語 (ja/en/zh/es/fr/pt) のみ** — Swift G2P で `ko` / `sv` の音素列を取得しても、それを ONNX 合成エンジンに食わせるための学習済みモデルが piper-plus 配布物に存在しない点に注意 (`docs/migration/v1.11-to-v1.12.md` の言語表参照)。サイズ制約のあるアプリ向け lite slice の提供は将来検討中 ([spec §7.4](../spec/swift-g2p.md#74-lite-slice-ja-除外--言語選択ビルド))。
+> **学習済み TTS モデルは現状 6 言語 (ja/en/zh/es/fr/pt) のみ** — Swift G2P で `ko` / `sv` の音素列を取得しても、それを ONNX 合成エンジンに食わせるための学習済みモデルが piper-plus 配布物に存在しない点に注意 (`docs/migration/v1.11-to-v1.12.md` の言語表参照)。サイズ制約のあるアプリ向け lite slice の提供は将来検討中 ([spec §7.4](../../reference/swift-g2p.md#74-lite-slice-ja-除外--言語選択ビルド))。
 
 ---
 
@@ -170,7 +170,7 @@ do {
 > - `invalidUTF8`
 > - `decodeFailed(String)`
 >
-> 詳細は [`Sources/PiperPlusG2P/G2PError.swift`](../../Sources/PiperPlusG2P/G2PError.swift)。
+> 詳細は [`Sources/PiperPlusG2P/G2PError.swift`](../../../Sources/PiperPlusG2P/G2PError.swift)。
 
 ### SwiftUI から
 
@@ -247,7 +247,7 @@ struct PhonemeView: View {
 | iOS device + simulator | ✓ | `ios-arm64` + `ios-arm64_x86_64-simulator` |
 | **macOS (arm64 + x86_64)** | **✓ (v1.14.0+)** | `macos-arm64_x86_64` slice 同梱。`swift run` / macOS CLI からの利用を想定 |
 | Swift `import PiperPlusG2P` | ✓ | `module.modulemap` 同梱、iOS / macOS 共通 |
-| visionOS / Mac Catalyst | ✗ | 別 slice として将来追加予定 ([spec §7.1](../spec/swift-g2p.md#71-macos--visionos-slice-追加)) |
+| visionOS / Mac Catalyst | ✗ | 別 slice として将来追加予定 ([spec §7.1](../../reference/swift-g2p.md#71-macos--visionos-slice-追加)) |
 | App Extension / App Clip | ⚠ | サイズ次第で可能 (5 言語規則ベースのみなら ~2 MB)、JA/ZH 含めると 10MB を超え App Clip 不可 |
 | Privacy Manifest | ✓ (informational) | xcframework root に空の `PrivacyInfo.xcprivacy` を同梱 (Required Reason API 利用なし) |
 | iOS 14 以下 / macOS 12 以下 | ✗ | iOS 15+ / macOS 13+ のみ (`Package.swift` の platforms 制約) |
@@ -267,7 +267,7 @@ struct PhonemeView: View {
 | 英語 | CMU Pronouncing Dictionary v0.7b | BSD-style ([CMU](http://www.speech.cs.cmu.edu/cgi-bin/cmudict)) | バイナリ埋込 |
 | 他 | (規則ベースのみ、辞書なし) | — | — |
 
-詳細とライセンス全文: [src/rust/piper-plus-g2p/THIRD_PARTY_LICENSES.md](../../src/rust/piper-plus-g2p/THIRD_PARTY_LICENSES.md)
+詳細とライセンス全文: [src/rust/piper-plus-g2p/THIRD_PARTY_LICENSES.md](../../../src/rust/piper-plus-g2p/THIRD_PARTY_LICENSES.md)
 
 > **App Store 配布時の注意**: アプリの License/About 画面に上記ライセンス表記を含めること推奨。CMU dict は再配布時に "This product includes data from the Carnegie Mellon Pronouncing Dictionary" 旨の acknowledgment が必要 (BSD-style 5 条件目)。pypinyin と NAIST-JDIC は Permissive ライセンスで attribution のみ要求。**copyleft / share-alike なライセンスは含まれない**ため、アプリ全体のライセンス選択への伝播はない。
 
@@ -275,8 +275,8 @@ struct PhonemeView: View {
 
 ## Further Reading
 
-- [HelloG2P CLI sample](../../examples/swift-g2p/HelloG2P/) — `swift run HelloG2P` で 8 言語の動作確認ができる最小プロジェクト
-- [Swift G2P Specification](../spec/swift-g2p.md) — design rationale, alternatives, risks
+- [HelloG2P CLI sample](../../../examples/swift-g2p/HelloG2P/) — `swift run HelloG2P` で 8 言語の動作確認ができる最小プロジェクト
+- [Swift G2P Specification](../../reference/swift-g2p.md) — design rationale, alternatives, risks
 - [iOS Integration Guide (合成エンジン)](./ios-integration.md) — フル TTS が必要な場合
-- [piper-plus-g2p crate (Rust)](../../src/rust/piper-plus-g2p/) — 同じロジックの Rust API ドキュメント
+- [piper-plus-g2p crate (Rust)](../../../src/rust/piper-plus-g2p/) — 同じロジックの Rust API ドキュメント
 - [Issue #387](https://github.com/ayutaz/piper-plus/issues/387) — 機能リクエスト tracker

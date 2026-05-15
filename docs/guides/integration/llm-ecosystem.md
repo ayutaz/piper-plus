@@ -221,7 +221,7 @@ print("音声を response.wav に保存しました")
 
 ### Docker Compose での一括起動
 
-Ollama と piper-plus を Docker Compose で一括管理する構成は [`docker/ollama-stack/`](../../docker/ollama-stack/) を参照してください。`docker-compose.yml` と `example.py` が含まれています。
+Ollama と piper-plus を Docker Compose で一括管理する構成は [`docker/ollama-stack/`](../../../docker/ollama-stack/) を参照してください。`docker-compose.yml` と `example.py` が含まれています。
 
 ---
 

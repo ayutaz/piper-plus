@@ -161,7 +161,7 @@ B (FT) は A から `--devices 1`、`--base_lr 2e-5` (1/10 で catastrophic forg
 
 ### G2P 詳細機能 (中国語)
 
-- **ZH-EN 混在ピンイン化** (`chinese.py:phonemize_embedded_english`) — 中国語に隣接する英単語 (acronym/loanword) を米国英語ではなく Mandarin pinyin で発音。`MultilingualPhonemizer` が `[zh,en,zh]`/`[zh,en]`/`[en,zh]` パターンを自動検出してディスパッチ。辞書 (canonical source): `src/python/g2p/piper_plus_g2p/data/zh_en_loanword.json` (acronyms 66 / loanwords 40 / letter_fallback 26 (A-Z))。カスタム上書きは `ChinesePhonemizer(zh_en_loanword_dict_paths=...)`。**全 10 mirror 同期** (Python canonical + Rust 2 crate / Go / C# / WASM / C++ / Kotlin Android / Swift G2P)。CI gate `ZH-EN Loanword Sync Gate / json-sync` が mirror + fixture の byte-for-byte 一致を強制 (`scripts/check_loanword_consistency.py`、`/check-loanword` skill)。Forward-compat loader: 全ランタイムで `schema_version: 2` の未来フィールド受理を pinning。Issue #384, [docs/spec/zh-en-loanword-runtime-rollout.md](docs/spec/zh-en-loanword-runtime-rollout.md)。
+- **ZH-EN 混在ピンイン化** (`chinese.py:phonemize_embedded_english`) — 中国語に隣接する英単語 (acronym/loanword) を米国英語ではなく Mandarin pinyin で発音。`MultilingualPhonemizer` が `[zh,en,zh]`/`[zh,en]`/`[en,zh]` パターンを自動検出してディスパッチ。辞書 (canonical source): `src/python/g2p/piper_plus_g2p/data/zh_en_loanword.json` (acronyms 66 / loanwords 40 / letter_fallback 26 (A-Z))。カスタム上書きは `ChinesePhonemizer(zh_en_loanword_dict_paths=...)`。**全 10 mirror 同期** (Python canonical + Rust 2 crate / Go / C# / WASM / C++ / Kotlin Android / Swift G2P)。CI gate `ZH-EN Loanword Sync Gate / json-sync` が mirror + fixture の byte-for-byte 一致を強制 (`scripts/check_loanword_consistency.py`、`/check-loanword` skill)。Forward-compat loader: 全ランタイムで `schema_version: 2` の未来フィールド受理を pinning。Issue #384, [docs/reference/zh-en-loanword-runtime-rollout.md](docs/reference/zh-en-loanword-runtime-rollout.md)。
 
 ### ランタイム共通機能
 
@@ -194,7 +194,7 @@ B (FT) は A から `--devices 1`、`--base_lr 2e-5` (1/10 で catastrophic forg
 - **WebUI (Gradio)** (`docker/webui/app.py`) — 6lang モデル対応。CI: `webui-test.yml`。ドキュメント: `docs/features/webui.md`。
 - **Wyoming Docker + HA 統合** (`docker/wyoming/`) — Home Assistant 連携。ガイド: `docs/guides/home-assistant.md`。
 - **MOS ベンチマーク** (`tools/benchmark/`) — サンプル生成、PESQ/STOI 計算、調査フォーム生成。ドキュメント: `docs/benchmark-mos.md`。
-- **iOS/Android ビルド CI** (`release-shared-lib.yml`, `cmake/ios.toolchain.cmake`) — libpiper_plus を iOS arm64 / Android (arm64-v8a/armeabi-v7a/x86_64) でクロスコンパイル。iOS は xcframework (device + simulator universal) として配信、`Package.swift` 経由で SPM 利用可能。Apple-embedded プラットフォーム検出は `PIPER_APPLE_EMBEDDED` 変数で集約 (CMakeLists.txt)、OpenJTalk 関数は `src/cpp/openjtalk_ios_stub.c` で stub 化。詳細: `docs/guides/ios-integration.md`、`docs/spec/ios-shared-lib.md`。
+- **iOS/Android ビルド CI** (`release-shared-lib.yml`, `cmake/ios.toolchain.cmake`) — libpiper_plus を iOS arm64 / Android (arm64-v8a/armeabi-v7a/x86_64) でクロスコンパイル。iOS は xcframework (device + simulator universal) として配信、`Package.swift` 経由で SPM 利用可能。Apple-embedded プラットフォーム検出は `PIPER_APPLE_EMBEDDED` 変数で集約 (CMakeLists.txt)、OpenJTalk 関数は `src/cpp/openjtalk_ios_stub.c` で stub 化。詳細: `docs/guides/platform/ios-integration.md`、`docs/reference/ios-shared-lib.md`。
 - **モデル投稿ガイド** — `CONTRIBUTING_MODELS.md` + GitHub Issue テンプレート (`.github/ISSUE_TEMPLATE/model-{request,submission}.yml`)。
 
 ---
@@ -229,7 +229,7 @@ B (FT) は A から `--devices 1`、`--base_lr 2e-5` (1/10 で catastrophic forg
 | 短テキスト戦略仕様 | `docs/spec/short-text-contract.toml` |
 | テキスト分割仕様 | `docs/spec/text-splitter-contract.toml` |
 | Phoneme Timing 仕様 | `docs/spec/phoneme-timing-contract.toml` |
-| ORT バージョン表 | `docs/spec/ort-versions.md` |
+| ORT バージョン表 | `docs/reference/ort-versions.md` |
 | マイグレーションガイド | `docs/migration/v1.11-to-v1.12.md` |
 
 ### 各言語ランタイム

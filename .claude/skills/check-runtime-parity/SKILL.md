@@ -113,5 +113,5 @@ silent regression を残さない。
 ## 関連ドキュメント
 
 - [inference-input-contract.toml](docs/spec/inference-input-contract.toml)
-- [model-resolution.md](docs/spec/model-resolution.md)
+- [model-resolution.md](docs/reference/model-resolution.md)
 - [PR #391 / #443 の経緯] — silent regression の参考事例

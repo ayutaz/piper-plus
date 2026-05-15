@@ -522,8 +522,8 @@ JSON v1.0 / v2.0 schema は既存 (`docs/spec/custom-dictionary-schema.toml` 等
 | ID | 要件 |
 |----|------|
 | **FR-DOCS-1** | `android/piper-plus-g2p/README.md`: クイックスタート、API リファレンス、辞書配布 3 パターン |
-| **FR-DOCS-2** | `docs/guides/android-g2p-integration.md`: 詳細統合ガイド |
-| **FR-DOCS-3** | `docs/guides/android-g2p-dictionary.md`: 辞書配布ガイド (assets / PAD / HF Hub DL の使い分け、F-Droid 制約) |
+| **FR-DOCS-2** | `docs/guides/platform/android-g2p-integration.md`: 詳細統合ガイド |
+| **FR-DOCS-3** | `docs/guides/platform/android-g2p-dictionary.md`: 辞書配布ガイド (assets / PAD / HF Hub DL の使い分け、F-Droid 制約) |
 | **FR-DOCS-4** | dokka で javadoc 自動生成し Maven Central に同梱 |
 | **FR-DOCS-5** | ルート `README.md` の「ランタイム別パッケージ」表に Kotlin/Android 行追加 |
 | **FR-DOCS-6** | `CLAUDE.md` の「ランタイム別パッケージ」表に Kotlin/Android 行追加 |
@@ -574,8 +574,8 @@ JSON v1.0 / v2.0 schema は既存 (`docs/spec/custom-dictionary-schema.toml` 等
 - [src/cpp/piper_plus_c_api.cpp](../../src/cpp/piper_plus_c_api.cpp) — C API 実装
 - [android/piper-plus/](../../android/) — 既存 TTS フル AAR 草案
 - [.github/workflows/android-build.yml](../../.github/workflows/android-build.yml) — Android NDK ビルド CI
-- [docs/spec/ios-shared-lib.md](ios-shared-lib.md) — iOS shared lib 設計 (xcframework パターン参考)
-- [docs/spec/zh-en-loanword-runtime-rollout.md](zh-en-loanword-runtime-rollout.md) — クロスランタイム同期パターン
+- [docs/reference/ios-shared-lib.md](ios-shared-lib.md) — iOS shared lib 設計 (xcframework パターン参考)
+- [docs/reference/zh-en-loanword-runtime-rollout.md](zh-en-loanword-runtime-rollout.md) — クロスランタイム同期パターン
 - [docs/spec/pua-contract.toml](pua-contract.toml) — PUA codepoint 仕様
 - [Issue #388](https://github.com/ayutaz/piper-plus/issues/388) — 親 Issue
 

@@ -19,7 +19,7 @@ swift run HelloG2P
 swift run HelloG2P "ja:今日はいい天気です" "fr:bonjour" "ko:안녕하세요"
 ```
 
-Full setup, error handling, App Store checklist: [`docs/guides/swift-g2p-integration.md`](../../docs/guides/swift-g2p-integration.md).
+Full setup, error handling, App Store checklist: [`docs/guides/platform/swift-g2p-integration.md`](../../docs/guides/platform/swift-g2p-integration.md).
 
 ## Local Development (before v1.14.0 is tagged)
 
@@ -65,7 +65,7 @@ Splitting the examples mirrors that split: this directory is the on-ramp for cal
 
 ## Further Reading
 
-- [Swift G2P Integration Guide](../../docs/guides/swift-g2p-integration.md) — full usage, troubleshooting, App Store checklist.
-- [Swift G2P Specification](../../docs/spec/swift-g2p.md) — design rationale.
+- [Swift G2P Integration Guide](../../docs/guides/platform/swift-g2p-integration.md) — full usage, troubleshooting, App Store checklist.
+- [Swift G2P Specification](../../docs/reference/swift-g2p.md) — design rationale.
 - [piper-plus repo root Package.swift](../../Package.swift) — the canonical SPM manifest.
 - [Issue #387](https://github.com/ayutaz/piper-plus/issues/387) — feature tracker.

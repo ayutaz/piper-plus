@@ -146,4 +146,4 @@ scripts\speak.bat "こんにちは、今日は良い天気ですね。"
 scripts\speak.bat --model models\tsukuyomi.onnx "テスト"
 ```
 
-→ Back to [README](../../README_EN.md)
+→ Back to [README](../../../README_EN.md)

@@ -57,7 +57,7 @@ PiperPlusG2p.create(context, dict).use { g2p ->
 val dict = DictionaryDownloader.downloadFromHuggingFace(context)
 ```
 
-> See [Dictionary distribution guide](../../docs/guides/android-g2p-dictionary.md)
+> See [Dictionary distribution guide](../../docs/guides/platform/android-g2p-dictionary.md)
 > for the full walkthrough.
 
 ---
@@ -158,7 +158,7 @@ distributed separately is Modified BSD (naist-jdic).
 
 ## Related docs
 
-- [Requirements](../../docs/spec/kotlin-g2p-requirements.md)
-- [Design](../../docs/spec/kotlin-g2p-design.md)
-- [Dictionary distribution guide](../../docs/guides/android-g2p-dictionary.md)
+- [Requirements](../../docs/reference/kotlin-g2p-requirements.md)
+- [Design](../../docs/reference/kotlin-g2p-design.md)
+- [Dictionary distribution guide](../../docs/guides/platform/android-g2p-dictionary.md)
 - [Issue #388](https://github.com/ayutaz/piper-plus/issues/388)

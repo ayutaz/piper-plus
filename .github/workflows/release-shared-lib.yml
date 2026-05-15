@@ -40,7 +40,7 @@ concurrency:
 
 env:
   # Issue #383 follow-up: ORT 1.17.0 → 1.20.0
-  # C++ source build / Android PR CI / Kotlin G2P CI と整合 (docs/spec/ort-versions.md)
+  # C++ source build / Android PR CI / Kotlin G2P CI と整合 (docs/reference/ort-versions.md)
   ONNXRUNTIME_VERSION: "1.20.0"
 
 jobs:
@@ -221,7 +221,7 @@ jobs:
           # Source: https://download.onnxruntime.ai/pod-archive-onnxruntime-c-1.20.0.zip
           # Note: This zip is shared with CocoaPods/SPM — Microsoft breaking it
           # would also break those channels, providing a strong invariant.
-          # See docs/spec/ios-shared-lib.md §2.1 for details.
+          # See docs/reference/ios-shared-lib.md §2.1 for details.
           ORT_IOS_SHA256: "50891a8aadd17d4811acb05ed151ba6c394129bb3ab14e843b0fc83a48d450ff"
         run: |
           set -euo pipefail
@@ -243,7 +243,7 @@ jobs:
           # The CDN zip provides ios-arm64/onnxruntime.framework/onnxruntime
           # as a Mach-O dynamic library. Static .a is NOT included
           # (incompatible with the legacy GitHub Releases zip, see
-          # docs/spec/ios-shared-lib.md §2.1 ⚠️).
+          # docs/reference/ios-shared-lib.md §2.1 ⚠️).
           ORT_FW_ROOT=$(find onnxruntime-ios -name "onnxruntime.xcframework" -type d | head -1)
           if [ -z "${ORT_FW_ROOT}" ]; then
             echo "::error::onnxruntime.xcframework not found in CDN zip"
@@ -555,7 +555,7 @@ jobs:
   # target, then `lipo` merges multi-arch slices into a universal archive,
   # and `xcodebuild -create-xcframework` produces the final xcframework.
   # Consumed by Package.swift via `PiperPlusG2P` product.
-  # See docs/spec/swift-g2p.md §4.4 — §4.5.
+  # See docs/reference/swift-g2p.md §4.4 — §4.5.
   #
   # The macOS slice (added 2026-05) lets `swift run` consumers and macOS
   # CLI tooling depend on PiperPlusG2P without iOS-only build flags. The

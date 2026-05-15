@@ -13,7 +13,7 @@ piper-plus ドキュメント。利用ガイド・各ランタイム連携・仕
 ### 開発者・カスタマイズしたい方
 
 - [Windows セットアップ](getting-started/windows-setup.md) — ソースからビルド
-- [Building from source](guides/building-from-source.md) — C++/C#/Rust CLI ビルド
+- [Building from source](guides/development/building-from-source.md) — C++/C#/Rust CLI ビルド
 - [学習ガイド](guides/training/training-guide.md) — 独自モデルの学習
 
 ### トラブルシューティング
@@ -44,24 +44,24 @@ piper-plus ドキュメント。利用ガイド・各ランタイム連携・仕
 
 ### 推論・ビルド
 
-- [CLI usage](guides/cli-usage.md) — C++ CLI オプション
-- [Building from source](guides/building-from-source.md) — C++/C#/Rust CLI ビルド
-- [Pretrained models](guides/pretrained-models.md) — HF モデル一覧
+- [CLI usage](guides/development/cli-usage.md) — C++ CLI オプション
+- [Building from source](guides/development/building-from-source.md) — C++/C#/Rust CLI ビルド
+- [Pretrained models](guides/development/pretrained-models.md) — HF モデル一覧
 
 ### ランタイム統合
 
-- [iOS integration](guides/ios-integration.md) — xcframework / Swift / Dart / Godot
-- [Swift G2P (G2P-only)](guides/swift-g2p-integration.md) — ORT 非依存 G2P SPM
-- [Android G2P dictionary](guides/android-g2p-dictionary.md) — 辞書配布 3 パターン
-- [Android G2P integration](guides/android-g2p-integration.md) — AAR API 利用
-- [Home Assistant](guides/home-assistant.md) — Wyoming Protocol 統合
-- [Open WebUI](guides/open-webui-integration.md) — OpenAI 互換 TTS 接続
-- [LLM ecosystem](guides/llm-ecosystem.md) — LangChain / Ollama 等
-- [WASM bundler](guides/wasm-bundler-guide.md) — Vite / webpack 設定
+- [iOS integration](guides/platform/ios-integration.md) — xcframework / Swift / Dart / Godot
+- [Swift G2P (G2P-only)](guides/platform/swift-g2p-integration.md) — ORT 非依存 G2P SPM
+- [Android G2P dictionary](guides/platform/android-g2p-dictionary.md) — 辞書配布 3 パターン
+- [Android G2P integration](guides/platform/android-g2p-integration.md) — AAR API 利用
+- [Home Assistant](guides/integration/home-assistant.md) — Wyoming Protocol 統合
+- [Open WebUI](guides/integration/open-webui-integration.md) — OpenAI 互換 TTS 接続
+- [LLM ecosystem](guides/integration/llm-ecosystem.md) — LangChain / Ollama 等
+- [WASM bundler](guides/integration/wasm-bundler-guide.md) — Vite / webpack 設定
 
 ### G2P カスタマイズ
 
-- [Adding PUA codepoint](guides/adding-pua-codepoint.md) — 新音素の PUA 登録
+- [Adding PUA codepoint](guides/development/adding-pua-codepoint.md) — 新音素の PUA 登録
 
 ### Testing
 
@@ -71,11 +71,10 @@ piper-plus ドキュメント。利用ガイド・各ランタイム連携・仕
 
 - [Phoneme mapping](api-reference/phoneme-mapping.md) — 全言語の音素 ID 参照
 
-## Specification
+## Specification & Reference
 
-- [Spec INDEX](spec/README.md) — 30+ 個の契約 / 設計書の目次
-- 主要契約: `pua-contract.toml` / `phoneme-timing-contract.toml` / `ssml-contract.toml` 等
-- 設計書: `kotlin-g2p-*.md` / `swift-g2p.md` / `ios-shared-lib.md` 等
+- [Spec INDEX](spec/README.md) — `.toml` 契約 (PUA / phoneme-timing / SSML / 推論入力など、CI gate 対応)
+- [Reference INDEX](reference/README.md) — `.md` 設計書 (Kotlin/Swift G2P / iOS shared-lib / ZH-EN ランタイム展開 / Model 解決 等)
 
 ## Migration
 
@@ -85,11 +84,6 @@ piper-plus ドキュメント。利用ガイド・各ランタイム連携・仕
 
 - [MOS benchmark](benchmark-mos.md) — PESQ / STOI / 主観評価フォーム
 - [Multi-runtime RTF (公開)](https://ayutaz.github.io/piper-plus/bench/multi-runtime/)
-
-## Archive (歴史的記録)
-
-- [csharp-cli-exit-code-rootcause](archive/csharp-cli-exit-code-rootcause.md) — PR #401 root cause
-- [fix-multi-codepoint-config](archive/fix-multi-codepoint-config.md) — v1.12.0 修正済み
 
 ## Development
 

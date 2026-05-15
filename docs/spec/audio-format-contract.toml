@@ -163,7 +163,7 @@ codes = [
 #
 #   - 16000 Hz: Lower-bandwidth voices; reduced model size; some embedded /
 #     telephony targets prefer this. The speaker_encoder pipeline already
-#     uses 16000 Hz internally (see docs/spec/speaker-encoder-contract.md).
+#     uses 16000 Hz internally (see docs/reference/speaker-encoder-contract.md).
 #     A 16000 Hz synthesis model would require a new "low" quality preset
 #     in piper_train (mel hop/win parameters tuned to fs=16000).
 #   - 44100 Hz: CD-quality voices; larger model; longer inference time.

@@ -486,8 +486,8 @@ GitHub Actions の Ubuntu runner は KVM をサポートするため、ヘッド
 
 ## 8. 関連ドキュメント
 
-- [docs/spec/ios-shared-lib.md](ios-shared-lib.md) — iOS shared lib 設計 (xcframework パターン参考)
-- [docs/spec/zh-en-loanword-runtime-rollout.md](zh-en-loanword-runtime-rollout.md) — クロスランタイム同期パターン
+- [docs/reference/ios-shared-lib.md](ios-shared-lib.md) — iOS shared lib 設計 (xcframework パターン参考)
+- [docs/reference/zh-en-loanword-runtime-rollout.md](zh-en-loanword-runtime-rollout.md) — クロスランタイム同期パターン
 - [docs/spec/pua-contract.toml](pua-contract.toml) — PUA codepoint 仕様
 - [android/README.md](../../android/README.md) — 既存 TTS フル AAR 草案
 - [src/cpp/piper_plus.h](../../src/cpp/piper_plus.h) — C API ヘッダ

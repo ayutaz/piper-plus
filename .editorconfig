@@ -104,9 +104,13 @@ indent_size = unset
 [scripts/check_*.py]
 indent_size = unset
 
-# android-build.yml uses shell line-continuation column alignment (15-space
-# indent for `\`-continued bash arguments) inside `run:` blocks. yamllint
-# is fine with this since YAML treats the block-literal contents as opaque
-# text, but the indent-multiple-of-2 check fights the continuation style.
+# android-build.yml and swift-g2p-ci.yml use shell line-continuation column
+# alignment (15-/17-space indent for `\`-continued bash arguments and case
+# branch continuations) inside `run:` blocks. yamllint is fine with this
+# since YAML treats the block-literal contents as opaque text, but the
+# indent-multiple-of-2 check fights the continuation style.
 [.github/workflows/android-build.yml]
+indent_size = unset
+
+[.github/workflows/swift-g2p-ci.yml]
 indent_size = unset

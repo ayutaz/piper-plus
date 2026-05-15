@@ -130,7 +130,7 @@ into the binary. Use `EnglishPhonemizer::new_bundled()` and
 
 The Swift wrapper is distributed separately as the `PiperPlusG2P`
 SPM product (xcframework). See
-[docs/guides/swift-g2p-integration.md](../../../docs/guides/swift-g2p-integration.md).
+[docs/guides/platform/swift-g2p-integration.md](../../../docs/guides/platform/swift-g2p-integration.md).
 
 ## Cross-Platform Consistency
 
