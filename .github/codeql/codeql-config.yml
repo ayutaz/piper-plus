@@ -123,3 +123,15 @@ query-filters:
   # taint flow は設計上の意図と一致しない。
   - exclude:
       id: py/command-line-injection
+  # cpp/loop-variable-changed: note-level の style query で、 C/C++ argv parser
+  # の `argv[++i]` イディオムや phonemizer の grapheme state machine など
+  # 意図的なイテレータ前進で大量に false-positive を出す。 PR #434 で 87 件
+  # (src/cpp/main.cpp の parseArgs + src/cpp/phonemize-*.cpp の grapheme loop)
+  # を "won't fix / argument parser idiom / intentional iterator state
+  # manipulation" として bulk dismiss 済み。 PR #476 (voice cloning CLI flags)
+  # / PR #477 (SSML parser) で同じ parseArgs パターンに 4 件再発したため、
+  # 個別 dismiss を続ける代わりにルール全体を suppress する。 security severity
+  # は付かない note-level なので security risk なし。 真の loop-counter bug を
+  # 失う代償は code review (CODEOWNERS + ultrareview) で補う。
+  - exclude:
+      id: cpp/loop-variable-changed
