@@ -278,7 +278,9 @@ ID は学習済 6lang モデルと一致させる (ja=0, en=1, zh=2, es=3, fr=4,
 | `fun phonemize(text: String, language: String? = null): PhonemeResult` | G2P 実行 |
 | `fun availableLanguages(): List<String>` | 利用可能言語 |
 | `fun loadCustomDict(path: String)` | カスタム辞書ロード |
-| `data class PhonemeResult(phonemes: String, phonemeList: List<String>, language: String)` | G2P 結果 |
+| `data class PhonemeResult(phonemes: String, phonemeList: List<String>, numPhonemes: Int, language: String)` | G2P 結果 (`numPhonemes` は C API `out_result->phoneme_count` をそのまま反映) |
+| `fun setZhEnDispatchEnabled(enabled: Boolean)` / `fun isZhEnDispatchEnabled(): Boolean` | ZH-EN code-switching dispatch の runtime toggle (default-on) |
+| `fun version(): String` | バインディングが解決した libpiper_plus 共有ライブラリのバージョン文字列 |
 | `class PiperPlusG2pException : Exception` | エラー型 |
 | `class OpenJTalkDictionary` (companion: `fromAssets`, `fromPath`) | 日本語辞書ハンドル |
 
@@ -334,7 +336,7 @@ PiperPlusG2p.create(context).use { g2p ->
 #### FR-LANG-3: ZH-EN code-switching
 
 - 中国語コンテキストで隣接する英単語 (acronym/loanword) を Mandarin pinyin で発音する `MultilingualPhonemizer` の `[zh, en, zh]`/`[zh, en]`/`[en, zh]` パターン自動検出を Kotlin AAR でも有効にすること。
-- 設定 toggle: `setZhEnDispatch(enabled: Boolean)` / `isZhEnDispatchEnabled(): Boolean`
+- 設定 toggle: `setZhEnDispatchEnabled(enabled: Boolean)` / `isZhEnDispatchEnabled(): Boolean` (実装メソッド名)
 - デフォルトは有効 (Issue #384 と整合)
 - 内蔵 `zh_en_loanword.json` を `.so` に embed (`PIPER_PLUS_EMBEDDED_LOANWORD` flag、既存パターン)
 
@@ -520,8 +522,8 @@ JSON v1.0 / v2.0 schema は既存 (`docs/spec/custom-dictionary-schema.toml` 等
 | ID | 要件 |
 |----|------|
 | **FR-DOCS-1** | `android/piper-plus-g2p/README.md`: クイックスタート、API リファレンス、辞書配布 3 パターン |
-| **FR-DOCS-2** | `docs/guides/android-g2p-integration.md`: 詳細統合ガイド |
-| **FR-DOCS-3** | `docs/guides/android-g2p-dictionary.md`: 辞書配布ガイド (assets / PAD / HF Hub DL の使い分け、F-Droid 制約) |
+| **FR-DOCS-2** | `docs/guides/platform/android-g2p-integration.md`: 詳細統合ガイド |
+| **FR-DOCS-3** | `docs/guides/platform/android-g2p-dictionary.md`: 辞書配布ガイド (assets / PAD / HF Hub DL の使い分け、F-Droid 制約) |
 | **FR-DOCS-4** | dokka で javadoc 自動生成し Maven Central に同梱 |
 | **FR-DOCS-5** | ルート `README.md` の「ランタイム別パッケージ」表に Kotlin/Android 行追加 |
 | **FR-DOCS-6** | `CLAUDE.md` の「ランタイム別パッケージ」表に Kotlin/Android 行追加 |
@@ -572,9 +574,9 @@ JSON v1.0 / v2.0 schema は既存 (`docs/spec/custom-dictionary-schema.toml` 等
 - [src/cpp/piper_plus_c_api.cpp](../../src/cpp/piper_plus_c_api.cpp) — C API 実装
 - [android/piper-plus/](../../android/) — 既存 TTS フル AAR 草案
 - [.github/workflows/android-build.yml](../../.github/workflows/android-build.yml) — Android NDK ビルド CI
-- [docs/spec/ios-shared-lib.md](ios-shared-lib.md) — iOS shared lib 設計 (xcframework パターン参考)
-- [docs/spec/zh-en-loanword-runtime-rollout.md](zh-en-loanword-runtime-rollout.md) — クロスランタイム同期パターン
-- [docs/spec/pua-contract.toml](pua-contract.toml) — PUA codepoint 仕様
+- [docs/reference/ios-shared-lib.md](ios-shared-lib.md) — iOS shared lib 設計 (xcframework パターン参考)
+- [docs/reference/zh-en-loanword/README.md](zh-en-loanword/README.md) — クロスランタイム同期パターン
+- [docs/spec/pua-contract.toml](../spec/pua-contract.toml) — PUA codepoint 仕様
 - [Issue #388](https://github.com/ayutaz/piper-plus/issues/388) — 親 Issue
 
 ---

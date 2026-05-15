@@ -10,12 +10,17 @@ with ONNX Runtime inference via [yalue/onnxruntime_go](https://github.com/yalue/
 
 **Key features:**
 
-- Text-to-speech with automatic phonemization for 8 languages
-- Streaming synthesis with sentence-level chunking
+- Text-to-speech with automatic phonemization for 8 languages (ja, en, zh, ko, es, fr, pt-BR / pt-PT, sv)
+- Streaming synthesis with sentence-level chunking (terminator-based splitter shared with Python / Rust runtimes)
 - GPU acceleration: CUDA, CoreML, DirectML, TensorRT (with automatic fallback to CPU)
 - Built-in HTTP API server
 - Session pooling for concurrent synthesis (`VoicePool`)
-- Phoneme timing extraction (JSON/TSV)
+- Phoneme timing extraction (JSON / TSV / SRT)
+- **SSML basic profile** — `<speak>`, `<break>`, `<prosody rate>` via `piperplus/ssml` (W3C SSML subset, shared canonical with the Rust `piper-plus-g2p::ssml` mirror)
+- **Voice cloning** — `--reference-audio` + `--speaker-encoder-model` flags extract a 256-dim ECAPA-TDNN `speaker_embedding` and inject it into the ONNX `speaker_embedding` input (matches the Python / Rust / C# / WASM / C++ runtimes)
+- Short-text strategies A/B/C (silence padding, dynamic scales, SSML `<break>` auto-injection)
+- Warmup + `.opt.onnx` session cache for faster cold start (shared `docs/spec/ort-session-contract.toml`)
+- ZH-EN code-switching loanword dispatch (byte-for-byte in sync with the canonical Python `zh_en_loanword.json` and the 9 other runtime mirrors)
 - Model management with automatic download and caching
 - Direct phoneme ID input via JSONL
 - WAV output with peak normalization
@@ -146,7 +151,7 @@ piper-plus -m model.onnx -t "Hello" --streaming | aplay -r 22050 -f S16_LE
 | `-m, --model` | `$PIPER_DEFAULT_MODEL` | Path to ONNX model file |
 | `-c, --config` | auto-detected | Path to config.json |
 | `-t, --text` | | Text to synthesize (single utterance) |
-| `--language` | | Language code (ja, en, zh, es, fr, pt, sv) |
+| `--language` | | Language code (ja, en, zh, ko, es, fr, pt, pt-PT, sv) |
 | `-s, --speaker` | `0` | Speaker ID for multi-speaker models |
 | `-f, --output-file` | | Output WAV path (`-` for stdout) |
 | `-d, --output-dir` | `.` | Output directory for generated files |
@@ -154,11 +159,22 @@ piper-plus -m model.onnx -t "Hello" --streaming | aplay -r 22050 -f S16_LE
 | `--length-scale` | `1.0` | Speech rate (length scale) |
 | `--noise-w` | `0.8` | Duration predictor noise scale |
 | `--sentence-silence` | `0.2` | Silence between sentences (seconds) |
+| `--phoneme-silence` | | Per-phoneme silence override (`p:0.1,t:0.05` syntax) |
 | `--device` | `cpu` | Inference device (cpu, cuda, coreml, directml) |
 | `--streaming` | `false` | Write raw PCM int16 to stdout |
+| `--output-raw` | `false` | Same as `--streaming` (legacy alias) |
 | `--batch` | | Batch file with one text line per utterance |
+| `--json-input` | | Read JSONL `{phoneme_ids, speaker_id?, ...}` from path / stdin |
 | `--output-timing` | | Write phoneme timing to file |
-| `--timing-format` | `json` | Timing output format (json or tsv) |
+| `--timing-format` | `json` | Timing output format (json / tsv / srt) |
+| `--reference-audio` | | Voice cloning: extract `speaker_embedding` from this WAV |
+| `--speaker-embedding` | | Voice cloning: load a pre-computed 256-dim embedding (.bin / .npy) |
+| `--speaker-encoder-model` | | Voice cloning: ECAPA-TDNN ONNX model used with `--reference-audio` |
+| `--model-dir` | `${PIPER_MODEL_DIR}` | Model cache directory (defaults to `~/.cache/piper-plus`) |
+| `--list-models` | | List available pre-trained models (optionally filtered by language) |
+| `--download-model` | | Download a model by alias (e.g. `tsukuyomi`) and exit |
+| `--version` | | Print version (resolved from build ldflags) and exit |
+| `--quiet` | `false` | Suppress informational output |
 | `--debug` | `false` | Enable debug logging |
 
 ## API Reference / APIリファレンス

@@ -4,7 +4,7 @@
 that broke C++ inference for Windows users in v1.12.0 (issue: `ɔɪ`/`œ̃`/`ɐ̃` left as
 multi-codepoint keys in the distributed `tsukuyomi` config).
 
-**Contract source:** [`docs/spec/pua-contract.toml`](pua-contract.toml)
+**Contract source:** [`docs/spec/pua-contract.toml`](../spec/pua-contract.toml)
 
 **CI workflows:**
 

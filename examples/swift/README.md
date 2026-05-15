@@ -70,7 +70,7 @@ If you cannot use SPM (e.g., your project ships its own bundled xcframework fold
 
 ### Step 1-3: Acquire and Embed (same as the cross-runtime guide)
 
-See [`docs/guides/ios-integration.md`](../../docs/guides/ios-integration.md):
+See [`docs/guides/platform/ios-integration.md`](../../docs/guides/platform/ios-integration.md):
 
 - Step 1: download `libpiper_plus-ios-v${VERSION}.xcframework.zip`
 - Step 2: download `onnxruntime.xcframework` via CocoaPods / SPM / CDN
@@ -134,11 +134,11 @@ MyApp/
 
 ## Troubleshooting
 
-See [`docs/guides/ios-integration.md` § Troubleshooting](../../docs/guides/ios-integration.md#troubleshooting).
+See [`docs/guides/platform/ios-integration.md` § Troubleshooting](../../docs/guides/platform/ios-integration.md#troubleshooting).
 
 ## Further Reading
 
-- [Cross-runtime iOS Integration Guide](../../docs/guides/ios-integration.md) — Dart / Flutter / Godot / Swift
-- [iOS Specification](../../docs/spec/ios-shared-lib.md) — design rationale
+- [Cross-runtime iOS Integration Guide](../../docs/guides/platform/ios-integration.md) — Dart / Flutter / Godot / Swift
+- [iOS Specification](../../docs/reference/ios-shared-lib.md) — design rationale
 - [piper-plus Package.swift](../../Package.swift) — the SwiftPM manifest at the repo root
 - [ORT SwiftPM Package](https://github.com/microsoft/onnxruntime-swift-package-manager) — Microsoft official ORT for Swift

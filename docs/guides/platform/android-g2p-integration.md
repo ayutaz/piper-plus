@@ -138,7 +138,7 @@ objects and assign one per worker.
 ## 7. Sample app
 
 A complete Compose-based sample app lives at
-[`examples/android-g2p-sample/`](../../examples/android-g2p-sample/).
+[`examples/android-g2p-sample/`](../../../examples/android-g2p-sample/).
 It demonstrates language tabs, custom-dictionary loading, and lifecycle
 management. Clone the repo and run:
 

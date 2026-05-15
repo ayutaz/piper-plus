@@ -44,7 +44,7 @@ Discrepancy summary (calibrated 2026-05-08):
 | Multitone: dominant-band sanity             | structural          |
 | Resample 48k->16k (scipy path)              | atol < 1e-3         |
 
-Spec: ``docs/spec/speaker-encoder-contract.md`` (if present).
+Spec: ``docs/reference/speaker-encoder-contract.md`` (if present).
 Mirrors: see ``test_speaker_encoder_parity.cpp`` and friends.
 """
 
@@ -91,9 +91,7 @@ def _generate_sine(freq_hz: float, duration_s: float, sr: int) -> np.ndarray:
     )
 
 
-def _generate_multitone(
-    freqs: list[float], duration_s: float, sr: int
-) -> np.ndarray:
+def _generate_multitone(freqs: list[float], duration_s: float, sr: int) -> np.ndarray:
     """Replicate the generator's deterministic multitone in float32."""
     n = int(duration_s * sr)
     samples = np.zeros(n, dtype=np.float32)
@@ -428,8 +426,7 @@ class TestSpeakerEncoderGoldenFixture:
         # in the low-frequency mel bins (band 15 in our 20-7600 Hz / 80
         # scale).  Hard pin: dominant band index should be in [10, 25].
         assert 10 <= py_dominant <= 25, (
-            f"440 Hz sine: dominant mel band should be near bin 15, "
-            f"got {py_dominant}"
+            f"440 Hz sine: dominant mel band should be near bin 15, got {py_dominant}"
         )
 
     def test_1000hz_sine_test_case(self, golden):

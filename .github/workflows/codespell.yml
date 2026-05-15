@@ -76,8 +76,7 @@ jobs:
             '.codespellrc' '.codespell-ignore-words.txt' \
             '.editorconfig' '.gitignore' '.gitattributes' '.pre-commit-config.yaml' \
             ':!:README_DE.md' ':!:README_ES.md' ':!:README_FR.md' \
-            ':!:README_HI.md' ':!:README_KO.md' ':!:README_PT.md' \
-            ':!:README_RU.md' ':!:README_SV.md' ':!:README_ZH.md' \
+            ':!:README_KO.md' ':!:README_PT.md' ':!:README_ZH.md' \
             ':!:tools/benchmark/**' \
             ':!:test/models/**' \
             ':!:**/testdata/**' \

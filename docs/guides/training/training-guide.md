@@ -235,7 +235,7 @@ The following features are enabled by default and do not need explicit flags:
 
 - **Prosody features** (`--prosody-dim 16`): A1/A2/A3 accent features from OpenJTalk are fed into the Duration Predictor.
 - **EMA weights** (`--ema-decay 0.9995`): Exponential Moving Average is applied to the decoder for smoother convergence.
-- **WavLM Discriminator**: A perceptual quality discriminator that improves MOS by +0.15-0.25. It is used during training only (no impact on inference speed). Adds ~1-2 GB GPU memory; reduce `--batch-size` if needed. Control its weight with `--c-wavlm` (default 0.5).
+- **WavLM Discriminator**: A perceptual quality discriminator that improves MOS by +0.15-0.25. It is used during training only (no impact on inference speed). Adds ~1-2 GB GPU memory; reduce `--batch-size` if needed. Control its weight with `--c-wavlm` (default 0.5). **V100 では速度低下を避けるため `--no-wavlm` を推奨** (CLAUDE.md の canonical training template に整合)。
 
 追加対応機能を踏まえて学習をする場合は、以下のようになります。学習を再開する際には `--resume_from_checkpoint "${LATEST_CHECKPOINT_PATH}"` をつけて実行します
 
@@ -255,7 +255,7 @@ uv run python -m piper_train \
   --save-top-k -1 \
 ```
 
-> **⚠️ 注意:** V100 GPU では `--precision 16-mixed` は backward pass が極端に遅くなる問題があります。V100 では `--precision 32-true` を推奨します。A100 以降の GPU では `16-mixed` が利用可能です。
+> **⚠️ 注意:** V100 GPU では `--precision 16-mixed` は backward pass が極端に遅くなる問題があり、`--precision 32-true` が canonical です (CLAUDE.md Template A/B 参照)。A100 以降の GPU でも本リポジトリの実績設定は `32-true` を使用しています。`16-mixed` を試す場合は backward pass time を計測してから採用してください。
 
 Use `--quality high` to train a [larger voice model](https://github.com/rhasspy/piper/blob/master/src/python/piper_train/vits/config.py#L45) (sounds better, but is much slower).
 
@@ -279,7 +279,7 @@ uv run python -m piper_train \
   --resume_from_checkpoint /path/to/checkpoint.ckpt  # Resume training
 ```
 
-> **⚠️ 注意:** V100 GPU では `--precision 16-mixed` は backward pass が極端に遅くなる問題があります。V100 では `--precision 32-true` を推奨します。A100 以降の GPU では `16-mixed` が利用可能です。
+> **⚠️ 注意:** V100 GPU では `--precision 16-mixed` は backward pass が極端に遅くなる問題があり、`--precision 32-true` が canonical です (CLAUDE.md Template A/B 参照)。A100 以降の GPU でも本リポジトリの実績設定は `32-true` を使用しています。`16-mixed` を試す場合は backward pass time を計測してから採用してください。
 
 
 ### Multi-Speaker Fine-Tuning

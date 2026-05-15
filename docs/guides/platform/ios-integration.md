@@ -4,11 +4,11 @@ Cross-runtime guide for integrating piper-plus into iOS projects (Dart / Flutter
 
 > **Quick links:**
 >
-> - [Dart / Flutter quick reference](../../examples/dart/README.md#ios-integration)
-> - [Godot iOS notes](../../examples/godot/README.md#ios-v1130)
-> - [Swift example (manual drag-and-drop, SPM via Package.swift)](../../examples/swift/README.md)
+> - [Dart / Flutter quick reference](../../../examples/dart/README.md#ios-integration)
+> - [Godot iOS notes](../../../examples/godot/README.md#ios-v1130)
+> - [Swift example (manual drag-and-drop, SPM via Package.swift)](../../../examples/swift/README.md)
 > - [**Swift G2P-only integration** (no synthesis engine)](swift-g2p-integration.md) — Issue #387
-> - [Specification](../spec/ios-shared-lib.md) (design rationale)
+> - [Specification](../../reference/ios-shared-lib.md) (design rationale)
 
 > **Need only G2P, not synthesis?** → See [swift-g2p-integration.md](swift-g2p-integration.md). The `PiperPlusG2P` SPM product does not depend on ONNX Runtime and is significantly smaller (~6 MB vs ~31 MB).
 
@@ -88,7 +88,7 @@ dependencies: [
 ]
 ```
 
-> **Version compatibility**: piper-plus is currently link-tested against ORT 1.20.0 (issue #383 follow-up: 1.17.0 から昇格、Windows DLL search order の問題で C++ 側が test model を読めない問題と並行して修正)。See [`docs/spec/ort-versions.md`](../spec/ort-versions.md) for the full per-runtime ORT matrix. `from:` allows minor/patch bumps within the 1.x line; if a future ORT release introduces a breaking ABI change, downgrade with `exact:` until piper-plus is recompiled. Consumers using the SPM `piper-plus` package don't need to declare ORT themselves — it's pulled transitively (v1.13.0+).
+> **Version compatibility**: piper-plus is currently link-tested against ORT 1.20.0 (issue #383 follow-up: 1.17.0 から昇格、Windows DLL search order の問題で C++ 側が test model を読めない問題と並行して修正)。See [`docs/reference/ort-versions.md`](../../reference/ort-versions.md) for the full per-runtime ORT matrix. `from:` allows minor/patch bumps within the 1.x line; if a future ORT release introduces a breaking ABI change, downgrade with `exact:` until piper-plus is recompiled. Consumers using the SPM `piper-plus` package don't need to declare ORT themselves — it's pulled transitively (v1.13.0+).
 
 ### Option C: Microsoft CDN (manual)
 
@@ -113,7 +113,7 @@ In Xcode for your iOS app target:
 
 > **The most common iOS integration failure is leaving the ORT framework as "Do Not Embed"** — that triggers `dyld: Library not loaded: @rpath/onnxruntime.framework/onnxruntime` at app launch. Always Embed & Sign the ORT framework.
 
-> **Godot users**: Step 3 is automated by `ios.dependencies` in your `.gdextension` — no manual Embed & Sign required. See [`examples/godot/README.md` § iOS](../../examples/godot/README.md#ios-v1130).
+> **Godot users**: Step 3 is automated by `ios.dependencies` in your `.gdextension` — no manual Embed & Sign required. See [`examples/godot/README.md` § iOS](../../../examples/godot/README.md#ios-v1130).
 
 ## Step 4 (Japanese TTS only): Bundle the OpenJTalk Dictionary
 
@@ -185,7 +185,7 @@ import PiperPlus  // resolves via module.modulemap inside xcframework
 let synthesizer = piper_plus_create_synthesizer(...)
 ```
 
-> Requires the `module.modulemap` shipped in M2. For the SPM-based workflow (avoids manual drag-and-drop), see [Package.swift integration](../../examples/swift/README.md).
+> Requires the `module.modulemap` shipped in M2. For the SPM-based workflow (avoids manual drag-and-drop), see [Package.swift integration](../../../examples/swift/README.md).
 
 ### Godot (GDScript)
 
@@ -333,6 +333,6 @@ If you were using `libpiper_plus-ios-arm64-${VERSION}.tar.gz` (v1.12.0 or earlie
 
 ## Further Reading
 
-- [iOS Specification](../spec/ios-shared-lib.md) — design rationale and Plan A details
-- [ORT Version Matrix](../spec/ort-versions.md) — concrete ORT versions per runtime
-- [CHANGELOG](../../CHANGELOG.md) — release history
+- [iOS Specification](../../reference/ios-shared-lib.md) — design rationale and Plan A details
+- [ORT Version Matrix](../../reference/ort-versions.md) — concrete ORT versions per runtime
+- [CHANGELOG](../../../CHANGELOG.md) — release history

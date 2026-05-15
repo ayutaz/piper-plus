@@ -325,13 +325,13 @@ repos:
       # The inverse direction (new --help flag missing from docs) is
       # info-only because the canonical doc today is C++-CLI-flavoured.
       #
-      # --allow baseline: docs/guides/cli-usage.md documents the C++ CLI
+      # --allow baseline: docs/guides/development/cli-usage.md documents the C++ CLI
       # surface (--use-cuda, --text, --streaming, …) which the Python CLI
       # never exposed. Allowlist them so the gate fires only on *new*
       # drift. Keep this list in sync with the workflow.
       - id: cli-help-docs-drift
-        name: CLI --help vs docs/guides/cli-usage.md (Python runtime CLI)
-        entry: bash -c 'if ! python -c "import piper" 2>/dev/null; then echo "[skip] piper-plus runtime not importable"; exit 0; fi; tmp=$(mktemp); python -m piper --help > "$tmp" 2>&1 || { echo "[skip] --help failed"; rm -f "$tmp"; exit 0; }; python scripts/check_cli_help_drift.py --help-file "$tmp" --docs docs/guides/cli-usage.md --mode stale-only --allow=--custom-dict --allow=--gpu-device-id --allow=--json-input --allow=--language --allow=--model-dir --allow=--output-timing --allow=--phoneme-silence --allow=--quiet --allow=--raw-phonemes --allow=--streaming --allow=--test-mode --allow=--text --allow=--timing-format --allow=--use-cuda; rc=$?; rm -f "$tmp"; exit $rc'
+        name: CLI --help vs docs/guides/development/cli-usage.md (Python runtime CLI)
+        entry: bash -c 'if ! python -c "import piper" 2>/dev/null; then echo "[skip] piper-plus runtime not importable"; exit 0; fi; tmp=$(mktemp); python -m piper --help > "$tmp" 2>&1 || { echo "[skip] --help failed"; rm -f "$tmp"; exit 0; }; python scripts/check_cli_help_drift.py --help-file "$tmp" --docs docs/guides/development/cli-usage.md --mode stale-only --allow=--custom-dict --allow=--gpu-device-id --allow=--json-input --allow=--language --allow=--model-dir --allow=--output-timing --allow=--phoneme-silence --allow=--quiet --allow=--raw-phonemes --allow=--streaming --allow=--test-mode --allow=--text --allow=--timing-format --allow=--use-cuda; rc=$?; rm -f "$tmp"; exit $rc'
         language: system
         files: ^(src/python_run/piper/.*\.py|docs/guides/cli-usage\.md|scripts/check_cli_help_drift\.py)$
         pass_filenames: false
@@ -360,6 +360,11 @@ repos:
     hooks:
       - id: codespell
         additional_dependencies: [tomli]
+        # `.codespellrc` の `skip` は CLI 引数として渡された個別ファイルに対しては
+        # 無視されるため、pre-commit の filename routing 側でも除外する必要がある。
+        # 多言語 README は codespell の英語辞書で大量の false positive を生むので
+        # ここで明示的に除外 (ja README.md は英語混在で false positive 少なめ)。
+        exclude: ^(README_(DE|ES|FR|KO|PT|ZH)\.md|src/python_run/piper/(sample_texts|webui)\.py|src/python/g2p/piper_plus_g2p/data/zh_en_loanword\.json)$
 
   # ---------------------------------------------------------------------------
   # Secret detection — gitleaks scans for credentials, API keys, and tokens

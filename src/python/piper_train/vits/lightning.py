@@ -205,8 +205,10 @@ class VitsModel(pl.LightningModule):
     def _load_test_dataset(self, test_utterances_path: Path):
         """Load fixed test dataset for WandB audio logging.
 
-        Ensures Japanese, English, and mixed sentences are all covered.
-        Mixed sentences (language_id == -1) are automatically phonemized with ja-en.
+        Ensures Japanese, English, and cross-lingual ja-en sentences are
+        covered. Mixed sentences (language_id == -1) are auto-phonemized with
+        the bilingual ``ja-en`` phonemizer (see ``get_phonemizer("ja-en")``
+        below); extending to 6lang mixed phonemization is a TODO.
         """
         import json
 

@@ -1,13 +1,14 @@
 ![Piper logo](etc/logo.png)
 
-[English](README_EN.md) | [日本語](README.md) | [中文](README_ZH.md) | [Français](README_FR.md) | [한국어](README_KO.md) | Español | [Português](README_PT.md) | [Deutsch](README_DE.md) | [Русский](README_RU.md) | [Svenska](README_SV.md) | [हिन्दी](README_HI.md)
-
+[English](README_EN.md) | [日本語](README.md) | [中文](README_ZH.md) | [Français](README_FR.md) | [한국어](README_KO.md) | Español | [Português](README_PT.md) | [Deutsch](README_DE.md)
 [![CI](https://github.com/ayutaz/piper-plus/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/ayutaz/piper-plus/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/piper-plus)](https://pypi.org/project/piper-plus/)
 [![Python](https://img.shields.io/pypi/pyversions/piper-plus)](https://pypi.org/project/piper-plus/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Hugging Face Demo](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Demo-blue)](https://huggingface.co/spaces/ayousanz/piper-plus-demo)
 [![Hugging Face Model](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Model-orange)](https://huggingface.co/ayousanz/piper-plus-base)
+
+> **📢 v1.12.0 Cambios incompatibles (2026-05):** Decodificador HiFi-GAN eliminado (unificado a MB-iSTFT, opcion `--mb-istft` descontinuada) / Flask → servidor HTTP FastAPI / Dependencia HTS-voice eliminada (solo runtime de Python) / Unity UPM trasladado a repositorio separado (`ayutaz/uPiper`) / todos los proyectos .NET actualizados a `net10.0` LTS. Detalles: [docs/migration/v1.11-to-v1.12.md](docs/migration/v1.11-to-v1.12.md)
 
 Sistema de texto a voz (TTS) neuronal, rapido y de alta calidad. Basado en la arquitectura [VITS](https://github.com/jaywalnut310/vits/), soporta sintesis de voz multilingue y multihablante en 8 idiomas: japones, ingles, chino, coreano, espanol, frances, portugues y sueco. Es un fork de [Piper](https://github.com/rhasspy/piper) con mejoras significativas en soporte para japones, calidad de audio y funcionalidades de entrenamiento.
 

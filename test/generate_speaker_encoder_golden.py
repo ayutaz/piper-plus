@@ -20,7 +20,7 @@ Usage:
         --hf-repo ayousanz/piper-plus-speaker-encoder \\
         --hf-revision v1.0.0
 
-See docs/spec/speaker-encoder-contract.md for the contract this fixture
+See docs/reference/speaker-encoder-contract.md for the contract this fixture
 realizes.
 """
 

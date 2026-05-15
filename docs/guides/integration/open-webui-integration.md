@@ -339,4 +339,4 @@ docker run -d --gpus all \
 ## 関連ガイド
 
 - [LLM エコシステム統合ガイド](llm-ecosystem.md) — AnythingLLM, LangChain, Ollama との統合
-- [Ollama + piper-plus Stack](../../docker/ollama-stack/) — Docker Compose で一括起動
+- [Ollama + piper-plus Stack](../../../docker/ollama-stack/) — Docker Compose で一括起動

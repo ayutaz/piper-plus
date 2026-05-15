@@ -267,7 +267,7 @@ codes = [
 # and falls back to speaker_id / lid conditioning.
 #
 # Embedding is L2-normalized and produced by the ECAPA-TDNN speaker
-# encoder (see docs/spec/speaker-encoder-contract.md).
+# encoder (see docs/reference/speaker-encoder-contract.md).
 
 [speaker_embedding]
 dtype = "float32"

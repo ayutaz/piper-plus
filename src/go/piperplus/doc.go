@@ -200,6 +200,24 @@
 // HTTP:
 //   - [Server]: HTTP TTS server with /synthesize, /health, /info endpoints.
 //
+// SSML (W3C subset):
+//   - The `ssml` subpackage (github.com/ayutaz/piper-plus/src/go/piperplus/ssml)
+//     provides `IsSSML(text)` and `Parse(text)` for `<speak>`, `<break>`, and
+//     `<prosody rate>`. Synthesizers iterate the parsed segments and apply
+//     length_scale / silence overrides, matching the Python / Rust / C# canonical
+//     mirrors. See `docs/spec/ssml-contract.toml` for the contract.
+//
+// Voice cloning:
+//   - [WithSpeakerEmbedding]: inject a 256-dim ECAPA-TDNN embedding into the
+//     ONNX `speaker_embedding` input.
+//   - [LoadSpeakerEncoder], [SpeakerEncoder.EmbedWAV]: extract an embedding
+//     from a reference WAV (matches Python / Rust / C# behavior).
+//
+// Short-text strategies:
+//   - Silence padding + post-trim (Strategy A), dynamic scales (Strategy B),
+//     and SSML `<break>` auto-injection (Strategy C) are applied automatically
+//     when the input is short. See `docs/spec/short-text-contract.toml`.
+//
 // Configuration:
 //   - [VoiceConfig], [AudioConfig], [InferenceConfig]: model config.json.
 //   - [LoadConfig], [FindConfigPath]: config loading and discovery.

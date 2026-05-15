@@ -6,8 +6,9 @@ from torch import nn
 class ExponentialMovingAverage:
     """Exponential Moving Average for model parameters.
 
-    Improves training stability and quality, especially for HiFi-GAN generator.
-    This is particularly effective for preventing quality degradation during fine-tuning.
+    Improves training stability and quality for the neural vocoder generator
+    (MB-iSTFT-VITS2 decoder in v1.12.0+; HiFi-GAN generator in legacy v1.11 ckpts).
+    Particularly effective for preventing quality degradation during fine-tuning.
     """
 
     def __init__(
@@ -114,9 +115,9 @@ class EMACallback(Callback):
 
     def on_fit_start(self, trainer, model):
         """Initialize EMA for generator and discriminator."""
-        # Only apply EMA to generator (HiFi-GAN)
+        # Only apply EMA to generator (MB-iSTFT-VITS2 decoder)
         self.ema_generator = ExponentialMovingAverage(
-            model.model_g.dec,  # HiFi-GAN decoder
+            model.model_g.dec,  # MB-iSTFT decoder
             decay=self.decay,
         )
 

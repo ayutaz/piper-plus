@@ -10,7 +10,7 @@
 #   - 結果確認: `uvx mutmut results` / `uvx mutmut html`
 #   - 閾値: 初期は warn-only (baseline 確立後に kill-rate >= 60% を fail 条件化)
 #
-# 詳細仕様: docs/spec/mutation-testing.md
+# 詳細仕様: docs/reference/mutation-testing.md
 # -----------------------------------------------------------------------------
 
 [mutmut]

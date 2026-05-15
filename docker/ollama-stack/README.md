@@ -65,6 +65,6 @@ docker compose down -v
 
 ## 関連
 
-- [LLM エコシステム統合ガイド](../../docs/guides/llm-ecosystem.md)
-- [Open WebUI 統合ガイド](../../docs/guides/open-webui-integration.md)
-- [piper-plus API 仕様](../../docs/guides/open-webui-integration.md#api-仕様)
+- [LLM エコシステム統合ガイド](../../docs/guides/integration/llm-ecosystem.md)
+- [Open WebUI 統合ガイド](../../docs/guides/integration/open-webui-integration.md)
+- [piper-plus API 仕様](../../docs/guides/integration/open-webui-integration.md#api-仕様)

@@ -681,7 +681,8 @@ class SynthesizerTrn(nn.Module):
     prosody_dim : int, optional
         Dimension for prosody feature projection. If > 0, enables prosody-aware
         duration prediction using A1/A2/A3 values from OpenJTalk labels.
-        Default is 0 (disabled for backward compatibility).
+        Default is 16 (prosody-aware enabled; pass 0 to disable for legacy
+        backward compatibility).
     """
 
     def __init__(

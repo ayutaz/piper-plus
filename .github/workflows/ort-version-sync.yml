@@ -13,7 +13,7 @@ name: "ORT Version Sync Gate"
 # 検査範囲:
 #   - exact-match group: cmake / GitHub Actions workflow / docker/cpp-dev/Dockerfile
 #   - floor-check group: 各ランタイムの dep ファイル (Cargo.toml は対象外、
-#     ort crate stable 未公開のため。docs/spec/ort-versions.md で別途記録)
+#     ort crate stable 未公開のため。docs/reference/ort-versions.md で別途記録)
 
 on:
   push:

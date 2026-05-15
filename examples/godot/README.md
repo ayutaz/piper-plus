@@ -263,7 +263,7 @@ curl -LO https://download.onnxruntime.ai/pod-archive-onnxruntime-c-1.17.0.zip
 unzip pod-archive-onnxruntime-c-1.17.0.zip -d addons/piper-plus/ios/
 ```
 
-For the cross-runtime guide (Dart / Godot / Swift) see [`docs/guides/ios-integration.md`](../../docs/guides/ios-integration.md).
+For the cross-runtime guide (Dart / Godot / Swift) see [`docs/guides/platform/ios-integration.md`](../../docs/guides/platform/ios-integration.md).
 
 #### Note: App Extension / App Clip not supported
 

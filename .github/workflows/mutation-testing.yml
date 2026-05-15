@@ -6,7 +6,7 @@ name: mutation-testing
 # - 重い (30 分 - 数時間) ため push 毎には走らせない
 # - 結果は artifact (HTML/JSON report) として 30 日保持
 # - 初期は warn-only (continue-on-error: true) — baseline 確立後に閾値で fail させる
-# - 仕様詳細: docs/spec/mutation-testing.md
+# - 仕様詳細: docs/reference/mutation-testing.md
 # -----------------------------------------------------------------------------
 
 on:

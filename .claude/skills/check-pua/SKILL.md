@@ -89,6 +89,6 @@ cd src/wasm/g2p && node --test test/test-pua-map.js
 ## 関連リソース
 
 - ルール定義: `docs/spec/pua-contract.toml`
-- 新音素追加手順: `docs/guides/adding-pua-codepoint.md`
+- 新音素追加手順: `docs/guides/development/adding-pua-codepoint.md`
 - CI gate: `.github/workflows/pua-consistency.yml`
 - 配布前検証: `scripts/upload_model_to_hf.py` (config) / `scripts/check_onnx_inputs.py` (onnx)

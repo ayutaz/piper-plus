@@ -227,7 +227,7 @@ mirrors_phrases = [
 #
 # Schema and 7 mirror byte-for-byte equality is enforced by the CI gate
 # `ZH-EN Loanword Sync Gate / json-sync` (scripts/check_loanword_consistency.py).
-# See docs/spec/zh-en-loanword-runtime-rollout.md for details.
+# See docs/reference/zh-en-loanword/README.md for details.
 
 [chinese_english.zh_en_loanword]
 canonical_source = "src/python/g2p/piper_plus_g2p/data/zh_en_loanword.json"

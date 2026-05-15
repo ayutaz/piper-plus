@@ -1,7 +1,6 @@
 ![Piper logo](etc/logo.png)
 
-English | [日本語](README.md) | [中文](README_ZH.md) | [Français](README_FR.md) | [한국어](README_KO.md) | [Español](README_ES.md) | [Português](README_PT.md) | [Deutsch](README_DE.md) | [Русский](README_RU.md) | [Svenska](README_SV.md) | [हिन्दी](README_HI.md)
-
+English | [日本語](README.md) | [中文](README_ZH.md) | [Français](README_FR.md) | [한국어](README_KO.md) | [Español](README_ES.md) | [Português](README_PT.md) | [Deutsch](README_DE.md)
 [![CI](https://github.com/ayutaz/piper-plus/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/ayutaz/piper-plus/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/piper-plus)](https://pypi.org/project/piper-plus/)
 [![Python](https://img.shields.io/pypi/pyversions/piper-plus)](https://pypi.org/project/piper-plus/)
@@ -11,6 +10,8 @@ English | [日本語](README.md) | [中文](README_ZH.md) | [Français](README_F
 [![Try in Browser](https://img.shields.io/badge/Try%20in%20Browser-WebAssembly-blueviolet)](https://ayutaz.github.io/piper-plus/)
 
 > **🔑 The only MIT-licensed Piper fork** — The original [rhasspy/piper](https://github.com/rhasspy/piper) was archived in October 2025. [OHF-Voice/piper1-gpl](https://github.com/OHF-Voice/piper1-gpl) has moved to GPL-3.0. piper-plus is the only MIT-compatible fork with no espeak-ng dependency. Custom G2P covers 8 languages (JA/EN/ZH/KO/ES/FR/PT/SV), suitable for commercial and embedded use.
+
+> **📢 v1.12.0 Breaking changes (2026-05):** HiFi-GAN Decoder removed (unified to MB-iSTFT, `--mb-istft` flag retired) / Flask → FastAPI HTTP server / HTS-voice dependency removed (Python runtime only) / Unity UPM moved to a separate repo (`ayutaz/uPiper`) / all .NET projects upgraded to `net10.0` LTS. Details: [docs/migration/v1.11-to-v1.12.md](docs/migration/v1.11-to-v1.12.md)
 
 A fast, high-quality neural text-to-speech (TTS) system. Built on the [VITS](https://github.com/jaywalnut310/vits/) architecture with multi-speaker support for 8 languages (Japanese, English, Mandarin Chinese, Korean, Spanish, French, Portuguese, Swedish). A fork of [Piper](https://github.com/rhasspy/piper) with significantly enhanced Japanese support, improved voice quality, and advanced training features.
 
@@ -86,8 +87,8 @@ A fast, high-quality neural text-to-speech (TTS) system. Built on the [VITS](htt
 - **[WebUI (Gradio)](docs/features/webui.md)** — Inference and training, Docker-ready
 - **C++ CLI** — Streaming, CUDA inference, **phoneme timing output (JSON/TSV/SRT)**, custom dictionary
 - **[C API Shared Library](examples/c-api/README.md)** — `libpiper_plus.so/.dylib/.dll`, FFI-ready (Flutter/Godot/Swift etc.), streaming API
-- **[iOS xcframework + SPM](docs/guides/ios-integration.md)** — `PiperPlus` Swift Package, synthesis engine shipped as iOS arm64 device + simulator universal xcframework
-- **[iOS Swift G2P (SPM)](docs/guides/swift-g2p-integration.md)** — `PiperPlusG2P` standalone Swift Package: 8-language G2P on iOS without ONNX Runtime (Issue #387)
+- **[iOS xcframework + SPM](docs/guides/platform/ios-integration.md)** — `PiperPlus` Swift Package, synthesis engine shipped as iOS arm64 device + simulator universal xcframework
+- **[iOS Swift G2P (SPM)](docs/guides/platform/swift-g2p-integration.md)** — `PiperPlusG2P` standalone Swift Package: 8-language G2P on iOS without ONNX Runtime (Issue #387)
 - **[WebAssembly](src/wasm/openjtalk-web/README.npm.md)** — Fully runs in browser, **phoneme timing output (JSON/TSV/SRT)**, no server
 - **[Docker](docker/README.md)** — 5 images for inference, training, WebUI, and C++
 - **PyPI (`pip install piper-plus`)** — Easy install, multilingual, **phoneme timing output (JSON/TSV/SRT)**, streaming, HTTP API
@@ -316,13 +317,13 @@ piper-plus = "0.4"
 
 ### Building from Source
 
-If pre-built binaries aren't available for your platform or you need to modify piper-plus, build from source. See **[Building from Source Guide](docs/guides/building-from-source.md)** for C++, C#, and Rust runtime build instructions.
+If pre-built binaries aren't available for your platform or you need to modify piper-plus, build from source. See **[Building from Source Guide](docs/guides/development/building-from-source.md)** for C++, C#, and Rust runtime build instructions.
 
 ---
 
 ## Usage
 
-For detailed C++ CLI command-line options, JSON input format, model management, environment variables, and Windows helper scripts, see **[CLI Usage Guide](docs/guides/cli-usage.md)**.
+For detailed C++ CLI command-line options, JSON input format, model management, environment variables, and Windows helper scripts, see **[CLI Usage Guide](docs/guides/development/cli-usage.md)**.
 
 Simple example:
 
@@ -342,7 +343,7 @@ Production-grade pretraining and fine-tuning command templates (6-language pretr
 
 ## Pre-trained Models
 
-For the list of available piper-plus models, download instructions, 6-language base model details, and Japanese TTS specifics, see **[Pre-trained Models Guide](docs/guides/pretrained-models.md)**.
+For the list of available piper-plus models, download instructions, 6-language base model details, and Japanese TTS specifics, see **[Pre-trained Models Guide](docs/guides/development/pretrained-models.md)**.
 
 Main models: `tsukuyomi` (Japanese), `multilingual-6lang` (8-language base), `bilingual-ja-en-v4` (Japanese-English) — see HuggingFace [ayousanz/piper-plus-base](https://huggingface.co/ayousanz/piper-plus-base) and [ayousanz/piper-plus-tsukuyomi-chan](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan).
 

@@ -132,7 +132,7 @@ tts.dispose();
 
 ## iOS Integration
 
-> **For the full cross-runtime guide (Dart / Godot / Swift), see [`docs/guides/ios-integration.md`](../../docs/guides/ios-integration.md).** This section is the Dart-specific quick reference.
+> **For the full cross-runtime guide (Dart / Godot / Swift), see [`docs/guides/platform/ios-integration.md`](../../docs/guides/platform/ios-integration.md).** This section is the Dart-specific quick reference.
 
 ### Prerequisites
 
@@ -184,7 +184,7 @@ cd ios && pod install
 #### Option B: Swift Package Manager (recommended for pure SPM projects)
 
 ```swift
-// Package.swift — semver range, see docs/spec/ort-versions.md for the matrix
+// Package.swift — semver range, see docs/reference/ort-versions.md for the matrix
 .package(url: "https://github.com/microsoft/onnxruntime-swift-package-manager", from: "1.17.0")
 ```
 

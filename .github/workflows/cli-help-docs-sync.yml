@@ -1,7 +1,7 @@
 name: "CLI Help / Docs Drift Gate"
 
 # Verifies that every flag listed in the user-facing CLI reference doc
-# (docs/guides/cli-usage.md) is still advertised by `python -m piper --help`.
+# (docs/guides/development/cli-usage.md) is still advertised by `python -m piper --help`.
 # Without this gate, v1.12.0-style breaking changes (e.g. removal of
 # `--mb-istft` when HiFi-GAN was deleted) can leave stale flag-table rows
 # in the markdown: users then copy a command that the CLI no longer accepts
@@ -20,14 +20,14 @@ on:
     branches: [dev, main]
     paths:
       - 'src/python_run/piper/**/*.py'
-      - 'docs/guides/cli-usage.md'
+      - 'docs/guides/development/cli-usage.md'
       - 'docs/**/*.md'
       - 'scripts/check_cli_help_drift.py'
       - '.github/workflows/cli-help-docs-sync.yml'
   pull_request:
     paths:
       - 'src/python_run/piper/**/*.py'
-      - 'docs/guides/cli-usage.md'
+      - 'docs/guides/development/cli-usage.md'
       - 'docs/**/*.md'
       - 'scripts/check_cli_help_drift.py'
       - '.github/workflows/cli-help-docs-sync.yml'
@@ -43,7 +43,7 @@ permissions:
 
 jobs:
   python-cli-help-drift:
-    name: python -m piper --help vs docs/guides/cli-usage.md
+    name: python -m piper --help vs docs/guides/development/cli-usage.md
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
@@ -100,7 +100,7 @@ jobs:
           # not mis-interpret the flag value as another option.
           python scripts/check_cli_help_drift.py \
             --help-file piper_help.txt \
-            --docs docs/guides/cli-usage.md \
+            --docs docs/guides/development/cli-usage.md \
             --mode stale-only \
             --allow=--custom-dict \
             --allow=--gpu-device-id \
@@ -148,7 +148,7 @@ jobs:
               body += '(drift report not captured)';
             }
             body += '\n```\n\n</details>\n\n';
-            body += 'Fix: update `docs/guides/cli-usage.md` to remove or rename the ';
+            body += 'Fix: update `docs/guides/development/cli-usage.md` to remove or rename the ';
             body += 'stale row, or pass `--allow <flag>` in the workflow if intentional.';
             await github.rest.issues.createComment({
               owner: context.repo.owner,

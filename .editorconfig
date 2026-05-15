@@ -15,7 +15,13 @@ indent_size = 2
 indent_size = 4
 
 [*.py]
-indent_size = 4
+# multi-line function-call の continuation indent (opening-paren alignment)
+# は ruff format が canonical で 4 の倍数にならないケースがある (例:
+# `def f(\n    a,\n     b,)` のような visual alignment)。editorconfig-checker
+# の "indent must be multiple of N" 検査は ruff format と衝突するので Python に
+# 関しては `indent_size = unset` で off にし、format strictness は ruff に委ねる
+# (CI / pre-commit が canonical formatter)。
+indent_size = unset
 
 [*.go]
 indent_style = tab
@@ -23,6 +29,11 @@ indent_size = 4
 
 [*.{md,markdown}]
 trim_trailing_whitespace = false
+# Markdown は仕様上 2-space indent の continuation を多用する (CommonMark `### List`
+# の継続段落、blockquote 内の lists 等)。global 4-space ルールを適用すると 11 言語
+# README + CHANGELOG / docs/spec で広範な既存 drift が検出されるため、markdown
+# のみ indent multiple check を免除する。実際の lint は markdownlint-cli2 が担当。
+indent_size = unset
 
 [Makefile]
 indent_style = tab
@@ -93,9 +104,13 @@ indent_size = unset
 [scripts/check_*.py]
 indent_size = unset
 
-# android-build.yml uses shell line-continuation column alignment (15-space
-# indent for `\`-continued bash arguments) inside `run:` blocks. yamllint
-# is fine with this since YAML treats the block-literal contents as opaque
-# text, but the indent-multiple-of-2 check fights the continuation style.
+# android-build.yml and swift-g2p-ci.yml use shell line-continuation column
+# alignment (15-/17-space indent for `\`-continued bash arguments and case
+# branch continuations) inside `run:` blocks. yamllint is fine with this
+# since YAML treats the block-literal contents as opaque text, but the
+# indent-multiple-of-2 check fights the continuation style.
 [.github/workflows/android-build.yml]
+indent_size = unset
+
+[.github/workflows/swift-g2p-ci.yml]
 indent_size = unset

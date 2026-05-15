@@ -11,7 +11,7 @@ ZH-EN code-switching (Issue #384) で使う loanword 辞書 (`zh_en_loanword.jso
 
 ## 何をチェックするか
 
-`docs/spec/zh-en-loanword-runtime-rollout.md` の不変条件:
+`docs/reference/zh-en-loanword/README.md` の不変条件:
 
 1. **7 mirror byte-for-byte sync** — Python source と以下の 6 mirror が SHA256 一致:
    - Python runtime (`src/python_run/piper/phonemize/data/zh_en_loanword.json`)
@@ -103,7 +103,7 @@ gh workflow view "ZH-EN Loanword Sync Gate" --branch <branch>
 
 ## 関連ドキュメント
 
-- [ZH-EN runtime rollout 設計書](docs/spec/zh-en-loanword-runtime-rollout.md)
+- [ZH-EN runtime rollout 設計書](docs/reference/zh-en-loanword/README.md)
 - [Cross-runtime fixture matrix](tests/fixtures/g2p/zh_en_loanword_matrix.json)
 - [Workflow](.github/workflows/zh-en-loanword-sync.yml)
 - [PUA sync skill (template)](.claude/skills/check-pua/SKILL.md)

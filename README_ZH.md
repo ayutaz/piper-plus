@@ -1,13 +1,14 @@
 ![Piper logo](etc/logo.png)
 
-[English](README_EN.md) | [日本語](README.md) | 中文 | [Français](README_FR.md) | [한국어](README_KO.md) | [Español](README_ES.md) | [Português](README_PT.md) | [Deutsch](README_DE.md) | [Русский](README_RU.md) | [Svenska](README_SV.md) | [हिन्दी](README_HI.md)
-
+[English](README_EN.md) | [日本語](README.md) | 中文 | [Français](README_FR.md) | [한국어](README_KO.md) | [Español](README_ES.md) | [Português](README_PT.md) | [Deutsch](README_DE.md)
 [![CI](https://github.com/ayutaz/piper-plus/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/ayutaz/piper-plus/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/piper-plus)](https://pypi.org/project/piper-plus/)
 [![Python](https://img.shields.io/pypi/pyversions/piper-plus)](https://pypi.org/project/piper-plus/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Hugging Face Demo](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Demo-blue)](https://huggingface.co/spaces/ayousanz/piper-plus-demo)
 [![Hugging Face Model](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Model-orange)](https://huggingface.co/ayousanz/piper-plus-base)
+
+> **📢 v1.12.0 重大变更 (2026-05):** 移除 HiFi-GAN 解码器（统一为 MB-iSTFT，`--mb-istft` 标志废弃）/ Flask → FastAPI HTTP 服务器 / 移除 HTS-voice 依赖（仅限 Python 运行时）/ Unity UPM 移至独立仓库（`ayutaz/uPiper`）/ 所有 .NET 项目升级至 `net10.0` LTS。详情：[docs/migration/v1.11-to-v1.12.md](docs/migration/v1.11-to-v1.12.md)
 
 > **MIT 许可证 / 不依赖 espeak-ng** -- piper-plus 不依赖 espeak-ng。通过自研 G2P 支持8种语言 (JA/EN/ZH/KO/ES/FR/PT/SV)，项目许可政策排除 copyleft 依赖，适合商用和嵌入式场景。
 > 原版 [rhasspy/piper](https://github.com/rhasspy/piper) 已于2025年10月归档；[OHF-Voice/piper1-gpl](https://github.com/OHF-Voice/piper1-gpl) 已转为 GPL-3.0 许可。

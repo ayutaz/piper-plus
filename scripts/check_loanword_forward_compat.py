@@ -2,7 +2,7 @@
 """ZH-EN loanword forward-compatibility check.
 
 The canonical schema is `version: 1`. The loader contract (documented in
-docs/spec/zh-en-loanword-runtime-rollout.md) requires every runtime to
+docs/reference/zh-en-loanword/README.md) requires every runtime to
 silently accept future fields that v1 loaders did not know about — both
 top-level keys, per-section unknowns, and a bumped `schema_version`.
 

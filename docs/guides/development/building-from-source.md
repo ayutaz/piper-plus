@@ -1,6 +1,25 @@
 # Building from Source
 
-If pre-built binaries (see [README](../../README_EN.md)) don't fit your platform or you need to modify piper-plus, build from source. This guide covers C++, C#, and Rust runtimes.
+If pre-built binaries (see [README](../../../README_EN.md)) don't fit your platform or you need to modify piper-plus, build from source. This guide covers C++, C#, and Rust runtimes.
+
+## Development environment setup (one-time)
+
+After cloning the repository, install the `pre-commit` hook once so that ruff
+(check + format) and PUA consistency are auto-applied on every local commit:
+
+```bash
+pip install pre-commit   # or: uvx pre-commit
+pre-commit install       # generates .git/hooks/pre-commit
+```
+
+This catches lint / format drift before pushing (mirrors `.github/workflows/pre-commit.yml`).
+Run `pre-commit run --all-files` for a one-shot full sweep.
+
+> **v1.12.0 notes:** Python runtime now uses FastAPI (not Flask) for the HTTP server,
+> and the HTS-voice dependency has been removed from the Python runtime
+> (C++/Go/Rust/WASM continue to use OpenJTalk + HTS-voice). HiFi-GAN decoder ckpts
+> are no longer supported — use the MB-iSTFT base model `piper-plus-base` for
+> resume / fine-tuning. See `docs/migration/v1.11-to-v1.12.md`.
 
 ## Building C++ CLI
 
@@ -15,7 +34,7 @@ cmake --build . --config Release
 Prerequisites: C++17 compiler, CMake 3.15+
 
 - **Linux**: Dependencies (ONNX Runtime, OpenJTalk, etc.) are downloaded automatically by CMake
-- **Windows**: See [Windows Setup Guide](../getting-started/windows-setup.md)
+- **Windows**: See [Windows Setup Guide](../../getting-started/windows-setup.md)
 - **macOS**: Dependencies are downloaded automatically
 
 ## Building C# CLI (PiperPlus)
@@ -103,4 +122,4 @@ Prerequisites: Rust 1.88+, cargo
 
 ---
 
-→ Back to [README](../../README_EN.md)
+→ Back to [README](../../../README_EN.md)

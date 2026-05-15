@@ -454,4 +454,4 @@ uv run python -m piper_wyoming --help
 
 - [Open WebUI 統合](open-webui-integration.md) -- OpenAI 互換 API 経由の統合
 - [LLM エコシステム統合](llm-ecosystem.md) -- AnythingLLM, LangChain, Ollama との統合
-- [Docker Wyoming README](../../docker/wyoming/README.md) -- Docker イメージの詳細
+- [Docker Wyoming README](../../../docker/wyoming/README.md) -- Docker イメージの詳細

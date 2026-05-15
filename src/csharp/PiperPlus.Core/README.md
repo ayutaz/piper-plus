@@ -72,14 +72,15 @@ Capabilities like multi-speaker (`HasSpeakerId`), multilingual (`HasLanguageId`)
 
 ## Features
 
-- **8 languages** — Japanese, English, Chinese, Korean, Spanish, French, Portuguese, Swedish; combined codes auto-route to per-segment phonemizers via `MultilingualPhonemizer`.
+- **8 languages** — Japanese, English, Chinese, Korean, Spanish, French, Portuguese (Brazilian via `PortuguesePhonemizer` / European via `EuropeanPortuguesePhonemizer`), Swedish; combined codes auto-route to per-segment phonemizers via `MultilingualPhonemizer`.
 - **Voice cloning** — `SpeakerEncoder` extracts a 256-dim L2-normalized embedding from a reference WAV and feeds it through the ONNX `speaker_embedding` input.
 - **SSML basic profile** — `SsmlParser` covers `<speak>`, `<break time="...">`, `<prosody rate="...">`; matches the Python / Rust / Go runtimes.
 - **Phoneme timing** — when the model exposes a `durations` output, `PiperSession.Synthesize` returns timing data that `TimingWriter` can serialize as JSON / TSV / SRT.
 - **Custom dictionaries** — JSON v1.0/v2.0 (C++/Rust互換) and TSV formats supported via `CustomDictionary.LoadDictionaries`; default dictionaries auto-loaded by `LoadDefaults`.
 - **Inline phoneme notation** — `[[ k o N n i ch i w a ]]` segments parsed by `InlinePhonemeParser` and concatenated with proper BOS/EOS handling.
 - **Streaming sentence splitter** — `TextSplitter.SplitSentences` reproduces the Rust `text_splitter` contract (single source of truth: `docs/spec/text-splitter-contract.toml`).
-- **Short-text quality strategies** — Strategy A (silence padding + post-trim) and Strategy B (dynamic scales) are implemented in `ShortTextProcessor`.
+- **Short-text quality strategies** — Strategy A (silence padding + post-trim), Strategy B (dynamic scales), and Strategy C (SSML `<break>` auto-injection) are implemented in `ShortTextProcessor`.
+- **ZH-EN code-switching** — Chinese text containing embedded English (acronyms / loanwords / per-letter fallback) is rerouted to Mandarin pinyin via `ChinesePhonemizer.PhonemizeEmbeddedEnglish`; the canonical dictionary `zh_en_loanword.json` is shipped as an embedded resource and kept byte-for-byte in sync with the other 9 runtime mirrors (Python + Rust ×2 / Go / WASM / C++ / Kotlin Android / Swift G2P).
 - **OpenJTalk dictionary auto-download** — `DictionaryManager` mirrors the C++ `openjtalk_dictionary_manager.c` behavior so Japanese G2P "just works" out of the box.
 - **Optimized ORT sessions** — `SessionFactory.Create` applies the unified Tier-1/Tier-2 settings (graph optimization, intra-op thread tuning, optimized model cache) defined in `docs/spec/ort-session-contract.toml`. Call `SessionFactory.Warmup` once after creation to eliminate JIT delay.
 

@@ -46,7 +46,7 @@ npm install piper-plus onnxruntime-web
 <script type="importmap">
 {
   "imports": {
-    "piper-plus": "https://cdn.jsdelivr.net/npm/piper-plus@0.5.0/src/index.js",
+    "piper-plus": "https://cdn.jsdelivr.net/npm/piper-plus@0.6.0/src/index.js",
     "onnxruntime-web": "https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.mjs"
   }
 }
@@ -393,14 +393,43 @@ The config file is expected at `<model-url>.json` (e.g. `model.onnx.json`).
 |----------|------|---------------------|-------|
 | Japanese | `ja` | jpreprocess (Rust WASM) | Full phoneme analysis with prosody features (A1/A2/A3); NAIST-JDIC dictionary bundled |
 | English | `en` | Rule-based (JS) | SimpleEnglishPhonemizer |
-| Chinese | `zh` | Character-based mapping | Maps characters through the model's phoneme_id_map |
-| Spanish | `es` | Character-based mapping | Maps characters through the model's phoneme_id_map |
-| French | `fr` | Character-based mapping | Maps characters through the model's phoneme_id_map |
-| Portuguese | `pt` | Character-based mapping | Maps characters through the model's phoneme_id_map |
-| Korean | `ko` | Hangul decomposition + mapping | Decomposes Hangul syllables to Jamo, then maps via the model's phoneme_id_map |
-| Swedish | `sv` | Character-based mapping | Maps characters through the model's phoneme_id_map |
+| Chinese | `zh` | Rule-based G2P (`@piper-plus/g2p`) | Pinyin → IPA with ZH-EN code-switching loanword dispatch |
+| Spanish | `es` | Rule-based G2P (`@piper-plus/g2p`) | IPA via rule-based phonemizer |
+| French | `fr` | Rule-based G2P (`@piper-plus/g2p`) | IPA via rule-based phonemizer |
+| Portuguese | `pt` / `pt-BR` / `pt-PT` | Rule-based G2P (`@piper-plus/g2p`) | Brazilian (default) and European dialects supported; `pt-PT` uses 5 post-processing rules + extra PUA codepoints `ɨ` / `ɫ` |
+| Korean | `ko` | Hangul decomposition + mapping (`@piper-plus/g2p`) | Decomposes Hangul syllables and applies rule-based G2P |
+| Swedish | `sv` | Rule-based G2P (`@piper-plus/g2p`) | IPA via rule-based phonemizer |
 
 Language auto-detection works reliably for Japanese (Kana characters), Chinese (CJK without Kana), and Korean (Hangul characters). For Spanish, French, Portuguese, and Swedish, specify the language explicitly since their Latin-script characters cannot be distinguished from English.
+
+### SSML and Voice Cloning
+
+The runtime exposes both features as first-class API surfaces:
+
+```javascript
+// SSML — pass a <speak>...</speak> string directly or via the explicit method.
+const audio = await piper.synthesize('<speak>Hello <break time="400ms"/>world.</speak>')
+// isSsml() / parseSsml() are also re-exported for inspection.
+
+// Voice Cloning — extract a 256-dim ECAPA-TDNN speaker_embedding from a
+// reference WAV and inject it into synthesize(). `synthesizeFromReferenceAudio`
+// is an instance method on PiperPlus.
+import { SpeakerEncoder } from 'piper-plus'
+const encoder = await SpeakerEncoder.initialize({
+    modelUrl: 'https://huggingface.co/.../speaker_encoder.onnx',
+})
+const cloned = await piper.synthesizeFromReferenceAudio({
+    text: 'こんにちは。',
+    referenceWav: refWavFloat32Array, // or AudioBuffer
+    encoder,
+    sampleRate: 22050, // only required when referenceWav is a Float32Array
+    options: { language: 'ja' },
+})
+```
+
+`synthesizeSsml`, `synthesizeFromReferenceAudio`, and the `speakerEmbedding`
+option on `synthesize()` are available from `piper-plus 0.6.0` onwards (PR #478,
+PR #479). The W3C SSML subset matches the Python / Rust / C# / Go runtimes.
 
 ## Browser Compatibility
 
