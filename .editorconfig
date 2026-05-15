@@ -15,12 +15,12 @@ indent_size = 2
 indent_size = 4
 
 [*.py]
-indent_size = 4
 # multi-line function-call の continuation indent (opening-paren alignment)
 # は ruff format が canonical で 4 の倍数にならないケースがある (例:
 # `def f(\n    a,\n     b,)` のような visual alignment)。editorconfig-checker
 # の "indent must be multiple of N" 検査は ruff format と衝突するので Python に
-# 関しては `indent_size = unset` で off にし、format strictness は ruff に委ねる。
+# 関しては `indent_size = unset` で off にし、format strictness は ruff に委ねる
+# (CI / pre-commit が canonical formatter)。
 indent_size = unset
 
 [*.go]

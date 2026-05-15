@@ -54,7 +54,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Forward-compatible loader (YELLOW-5)**: 全 7 ランタイム (Python + Rust × 2 / Go / C# / WASM / C++) で `schema_version: 2` の未来フィールドを silent ignore する挙動を pinning test で固定
 - **Two-layer model**: コンパイル時 (Cargo feature `chinese` / csproj `<EmbeddedResource>` / Go `//go:embed` / C++ CMake) + ランタイム (default-on opt-out) の二層管理 (TICKET-01 §7 懸念 5)
 - **ランタイム test カバレッジ**: Rust × 2 / Go / C# / WASM / C++ + Python の各 ZH-EN test スイートで `phonemize_embedded_english` の lookup priority / forward-compat / dispatch / opt-out / per-token prosody (a1=tone, a2=a3=1) を検証
-- **Issue #384 例**: `请打开 GPS` / `我喜欢用 Python 写代码` / `让我用 ChatGPT 写代码` を Python リファレンス test がカバー。各ランタイムの `phonemize_embedded_english` は同 JSON (byte-for-byte 同期) と同 lookup ロジックで動くため Python と等価な IPA 列を返す。設計と運用契約: [`docs/reference/zh-en-loanword-runtime-rollout.md`](docs/reference/zh-en-loanword-runtime-rollout.md)。
+- **Issue #384 例**: `请打开 GPS` / `我喜欢用 Python 写代码` / `让我用 ChatGPT 写代码` を Python リファレンス test がカバー。各ランタイムの `phonemize_embedded_english` は同 JSON (byte-for-byte 同期) と同 lookup ロジックで動くため Python と等価な IPA 列を返す。設計と運用契約: [`docs/reference/zh-en-loanword/README.md`](docs/reference/zh-en-loanword/README.md)。
 
 ##### 既知の制約 / 別 PR フォローアップ予定
 
@@ -161,7 +161,7 @@ v1.12.0 で 5 ランタイム (Python/Rust/C#/Go/WASM) に展開した SSML / Vo
 #### サーバー機能拡張
 
 - **真のストリーミングチャンク + Phoneme Timing 配線** — `?streaming=true` で文単位の真のチャンク配信 + 各チャンクに phoneme-timing メタデータを同梱 (Python/Go ランタイム)。`/api/phoneme-timing` で streaming にも対応。PR #481
-- **Bearer Token 認証 + Rate Limit** — `piper.http_server` に `PIPER_AUTH_TOKEN` 環境変数による bearer auth と `slowapi` ベースの rate limit を追加。OpenAI 互換 API でも有効。PR #475
+- **Bearer Token 認証 + Rate Limit** — `docker/python-inference/inference.py` (OpenAI 互換 Docker サーバー) に `PIPER_API_KEYS` 環境変数 (カンマ区切りリスト) による bearer auth と `slowapi` ベースの rate limit を追加。PR #475
 
 #### Post-v1.12.0 fixes
 

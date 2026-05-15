@@ -13,7 +13,7 @@ with ONNX Runtime inference via [yalue/onnxruntime_go](https://github.com/yalue/
 - Text-to-speech with automatic phonemization for 8 languages (ja, en, zh, ko, es, fr, pt-BR / pt-PT, sv)
 - Streaming synthesis with sentence-level chunking (terminator-based splitter shared with Python / Rust runtimes)
 - GPU acceleration: CUDA, CoreML, DirectML, TensorRT (with automatic fallback to CPU)
-- Built-in HTTP API server with bearer-token authentication option (`PIPER_AUTH_TOKEN`)
+- Built-in HTTP API server
 - Session pooling for concurrent synthesis (`VoicePool`)
 - Phoneme timing extraction (JSON / TSV / SRT)
 - **SSML basic profile** — `<speak>`, `<break>`, `<prosody rate>` via `piperplus/ssml` (W3C SSML subset, shared canonical with the Rust `piper-plus-g2p::ssml` mirror)

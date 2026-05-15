@@ -5,10 +5,10 @@
 [![PyPI](https://img.shields.io/pypi/v/piper-plus)](https://pypi.org/project/piper-plus/)
 [![Python](https://img.shields.io/pypi/pyversions/piper-plus)](https://pypi.org/project/piper-plus/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-
-> **📢 v1.12.0 Mudanças incompatíveis (2026-05):** Decodificador HiFi-GAN removido (unificado para MB-iSTFT, flag `--mb-istft` descontinuada) / Flask → servidor HTTP FastAPI / Dependência HTS-voice removida (apenas runtime Python) / Unity UPM movido para repositório separado (`ayutaz/uPiper`) / todos os projetos .NET atualizados para `net10.0` LTS. Detalhes: [docs/migration/v1.11-to-v1.12.md](docs/migration/v1.11-to-v1.12.md)
 [![Hugging Face Demo](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Demo-blue)](https://huggingface.co/spaces/ayousanz/piper-plus-demo)
 [![Hugging Face Model](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Model-orange)](https://huggingface.co/ayousanz/piper-plus-base)
+
+> **📢 v1.12.0 Mudanças incompatíveis (2026-05):** Decodificador HiFi-GAN removido (unificado para MB-iSTFT, flag `--mb-istft` descontinuada) / Flask → servidor HTTP FastAPI / Dependência HTS-voice removida (apenas runtime Python) / Unity UPM movido para repositório separado (`ayutaz/uPiper`) / todos os projetos .NET atualizados para `net10.0` LTS. Detalhes: [docs/migration/v1.11-to-v1.12.md](docs/migration/v1.11-to-v1.12.md)
 
 Sistema neural de texto para fala (TTS) de alta velocidade e alta qualidade. Utiliza a arquitetura [VITS](https://github.com/jaywalnut310/vits/) e suporta 8 idiomas com multi-falantes: japonês, inglês, chinês, coreano, espanhol, francês, português e sueco. Fork do [Piper](https://github.com/rhasspy/piper), com melhorias significativas no suporte ao japonês, qualidade de voz e funcionalidades de treinamento.
 

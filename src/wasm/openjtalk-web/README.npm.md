@@ -412,13 +412,18 @@ const audio = await piper.synthesize('<speak>Hello <break time="400ms"/>world.</
 // isSsml() / parseSsml() are also re-exported for inspection.
 
 // Voice Cloning — extract a 256-dim ECAPA-TDNN speaker_embedding from a
-// reference WAV and inject it into synthesize().
-import { synthesizeFromReferenceAudio } from 'piper-plus'
-const cloned = await synthesizeFromReferenceAudio({
+// reference WAV and inject it into synthesize(). `synthesizeFromReferenceAudio`
+// is an instance method on PiperPlus.
+import { SpeakerEncoder } from 'piper-plus'
+const encoder = await SpeakerEncoder.initialize({
+    modelUrl: 'https://huggingface.co/.../speaker_encoder.onnx',
+})
+const cloned = await piper.synthesizeFromReferenceAudio({
     text: 'こんにちは。',
-    referenceAudio: refWavArrayBuffer,
-    speakerEncoderModel: 'https://huggingface.co/.../speaker_encoder.onnx',
-    model: voice,
+    referenceWav: refWavFloat32Array, // or AudioBuffer
+    encoder,
+    sampleRate: 22050, // only required when referenceWav is a Float32Array
+    options: { language: 'ja' },
 })
 ```
 
