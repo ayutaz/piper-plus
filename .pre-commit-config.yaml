@@ -311,6 +311,20 @@ repos:
         files: ^(docs/spec/language-id-map-contract\.toml|src/python/piper_train/tools/prepare_multilingual_dataset\.py|src/python_run/piper/voice\.py|src/rust/piper-core/src/(config|wasm)\.rs|src/rust/piper-wasm/src/lib\.rs|src/go/piperplus/testdata/valid_multilingual_config\.json|src/wasm/openjtalk-web/models/multilingual-test-medium\.onnx\.json|src/csharp/PiperPlus\.Core/Config/PiperConfig\.cs|src/cpp/piper\.cpp|scripts/check_language_id_map_contract\.py|scripts/regenerate_language_id_map_fixture\.py|tests/fixtures/language_id_map/.*)$
         pass_filenames: false
 
+      # CHANGELOG [Unreleased] section cleanup gate. After a release tag is
+      # cut, the workflow expects sub-headings under [Unreleased] to be moved
+      # to a sibling ## [X.Y.Z] section. This catches the case where a
+      # release-style ### [vX.Y.Z] heading is left under [Unreleased] when
+      # the version's major.minor is already in release-versions.toml's
+      # expected_prefix. Conservative: only flags structural sub-headings,
+      # not prose cross-references.
+      - id: changelog-unreleased-cleanup
+        name: CHANGELOG [Unreleased] stray release-heading detection
+        entry: uv run python scripts/check_changelog_unreleased.py
+        language: system
+        files: ^(CHANGELOG\.md|docs/spec/release-versions\.toml|scripts/check_changelog_unreleased\.py)$
+        pass_filenames: false
+
       # Language list 3-way parity (WebUI / CLI / FastAPI test fixture).
       # Catches drift like PR #2f4efaf9 where the WebUI SAMPLE_TEXTS listed
       # a language ("sv") that the CLI --language choices and the
@@ -347,6 +361,38 @@ repos:
         language: system
         files: ^(src/python_run/piper/.*\.py|docs/guides/cli-usage\.md|scripts/check_cli_help_drift\.py)$
         pass_filenames: false
+
+  # ---------------------------------------------------------------------------
+  # Pre-push pre-flight (opt-in). These hooks run only on `git push` if
+  # installed via `pre-commit install --hook-type pre-push`. NOT installed
+  # by default because they add ~20-30s latency to every push. Recommended
+  # for contributors who have been bitten by silent contract drift
+  # (PR #401 / #419 patterns) — runs full-repo contract gates that are
+  # normally only triggered by specific file changes, so even when
+  # SKIP=... was used during commits, drift is caught before it reaches
+  # CI.
+  #
+  # Opt-in:
+  #   pre-commit install --hook-type pre-push
+  #
+  # Bypass once:
+  #   git push --no-verify
+  # ---------------------------------------------------------------------------
+  - repo: local
+    hooks:
+      - id: pre-push-contract-gates
+        name: full-repo contract gates (pre-push pre-flight, opt-in)
+        stages: [pre-push]
+        entry: bash -c 'set -e;
+          echo "==> Running contract gates pre-flight (4 scripts)...";
+          uv run python scripts/check_loanword_consistency.py;
+          uv run python scripts/check_pua_consistency.py --check-version;
+          uv run python scripts/check_language_parity.py;
+          uv run python scripts/check_changelog_unreleased.py;
+          echo "==> All contract gates passed."'
+        language: system
+        pass_filenames: false
+        always_run: true
 
   # ---------------------------------------------------------------------------
   # Markdown lint — DavidAnson/markdownlint-cli2 has a dedicated pre-commit

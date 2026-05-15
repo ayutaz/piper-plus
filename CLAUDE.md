@@ -44,6 +44,17 @@ pre-commit install      # .git/hooks/pre-commit を生成
 drift があれば commit がブロックされます (auto-fix も適用)。手動全件確認は
 `pre-commit run --all-files`。
 
+**Pre-push 段階 (opt-in、推奨):**
+
+```bash
+pre-commit install --hook-type pre-push   # .git/hooks/pre-push を追加生成
+```
+
+`git push` 直前に 4 つの contract gate (loanword / PUA / language parity /
+CHANGELOG unreleased) を full-repo で実行 (~20-30 秒)。`SKIP=...` で commit
+時に gate を bypass した場合でも push 前に drift を検出できる。bypass は
+`git push --no-verify`。
+
 > **Why:** PR #401 で ruff format 漏れが 2 度起きた (commits 5d9c60e6 / 8dc19e3b)。
 > CI 検出 (~12 秒) → 修正 → commit → push の cycle of shame を断つため、
 > ローカル commit 時点で format drift を fail-fast。CI 側にも
