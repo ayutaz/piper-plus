@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Drift check for docs/spec/speaker-encoder-contract.md.
+"""Drift check for docs/reference/speaker-encoder-contract.md.
 
 The contract is markdown (not TOML) so this gate verifies what can be
 checked without parsing prose: that the canonical fixture exists and
@@ -30,7 +30,7 @@ import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-CONTRACT_PATH = REPO_ROOT / "docs/spec/speaker-encoder-contract.md"
+CONTRACT_PATH = REPO_ROOT / "docs/reference/speaker-encoder-contract.md"
 LAYER1_FIXTURE = REPO_ROOT / "test/fixtures/speaker_encoder_golden.json"
 
 LAYER1_TESTS = [

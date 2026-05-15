@@ -1,6 +1,6 @@
 """Layer-2 E2E cosine gate for the speaker encoder.
 
-See ``docs/spec/speaker-encoder-contract.md``. This test is **opt-in** and
+See ``docs/reference/speaker-encoder-contract.md``. This test is **opt-in** and
 skips by default — it activates only when:
 
 1. The fixture ``test/fixtures/speaker_encoder_golden.json`` contains an
