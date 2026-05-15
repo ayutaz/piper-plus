@@ -362,6 +362,71 @@ repos:
         files: ^(src/python_run/piper/.*\.py|docs/guides/cli-usage\.md|scripts/check_cli_help_drift\.py)$
         pass_filenames: false
 
+      # Host-specific secret-path leak detection. CLAUDE.md documents the
+      # maintainer's training-machine secret env file path; if that pattern
+      # leaks into executable code (sources, workflows, configs),
+      # downstream contributors get confusing "file not found" errors
+      # because the path doesn't exist on their machines. Documentation
+      # references (CLAUDE.md / README* / docs/) are exempt; only
+      # executable artifacts are checked. ALLOWLIST inside the script
+      # documents the legitimate pre-existing references. See
+      # scripts/check_secret_path_reference.py for the canonical pattern
+      # list (kept there to avoid this config file being a self-match).
+      - id: secret-path-reference
+        name: host-specific secret-path leak detection
+        entry: uv run python scripts/check_secret_path_reference.py
+        language: system
+        files: \.(py|sh|bash|zsh|yml|yaml|toml|json|rs|go|cs|cpp|c|h|hpp|js|ts|mjs|cjs|kt|kts|swift|gradle|cmake)$|^(CMakeLists\.txt|Dockerfile|Makefile)$
+        pass_filenames: true
+
+      # OpenJTalk version consistency: cmake/ExternalDeps.cmake pins the
+      # pyopenjtalk-plus tarball URL with a hardcoded version (currently
+      # 0.4.1.post7). The Python runtime separately depends on
+      # pyopenjtalk-plus via pyproject.toml. If those drift apart, training
+      # (Python) and inference (C++) see different OpenJTalk dict /
+      # behaviour. The script is conservative: bare names (no version
+      # constraint) are noted but don't fail; only `==` / `~=` pins that
+      # disagree with the cmake URL are flagged as errors.
+      - id: openjtalk-version-sync
+        name: OpenJTalk pin parity (cmake URL vs pyproject.toml)
+        entry: uv run python scripts/check_openjtalk_version_sync.py
+        language: system
+        files: ^(cmake/ExternalDeps\.cmake|.*pyproject\.toml|scripts/check_openjtalk_version_sync\.py)$
+        pass_filenames: false
+
+      # Pytest skip-reason discipline. Skips without `reason=` accumulate as
+      # silent technical debt — reviewers can't tell whether they're
+      # permanent (missing optional dep), temporary (waiting on a fix), or
+      # accidental. The AST-based check accepts any non-empty positional
+      # message, f-string, expression, or `reason=` kwarg. Only literally
+      # empty (`pytest.skip()` / `@pytest.mark.skip()`) is rejected.
+      - id: pytest-skip-reason
+        name: pytest skip / skipif must have a non-empty reason
+        entry: uv run python scripts/check_test_skip_reason.py
+        language: system
+        files: ^src/(python|python_run)/.*tests?/.*\.py$|^scripts/check_test_skip_reason\.py$
+        pass_filenames: true
+
+      # gofmt drift catch. Go's tooling already enforces this in CI, but
+      # catching it at commit time prevents the cycle-of-shame
+      # local-clean / CI-fail pattern (PR #401 ruff parallel). `gofmt -l`
+      # prints offending file names; empty output = clean. Wrap in bash so
+      # we can convert that into a proper exit code with a readable error.
+      - id: gofmt
+        name: gofmt (Go source format drift)
+        entry: scripts/run_gofmt_check.sh
+        language: system
+        files: \.go$
+        exclude: ^(vendor/|.*\.pb\.go$)
+        pass_filenames: true
+
+      # rustfmt deferred: existing Rust sources contain pre-existing format
+      # drift (multi-line argument expansions, expected_assert spacing).
+      # Adding `rustfmt --check` as a commit-time gate would require a
+      # separate cargo-fmt cleanup PR. Track separately to keep this
+      # Phase 2 conservative. CI's clippy / cargo check still gate
+      # functional drift; format drift is tolerated until cleanup lands.
+
   # ---------------------------------------------------------------------------
   # Pre-push pre-flight (opt-in). These hooks run only on `git push` if
   # installed via `pre-commit install --hook-type pre-push`. NOT installed
