@@ -14,6 +14,12 @@ on:
         description: 'Deployment message'
         required: false
         default: 'Manual deployment'
+  # RTF ベンチマーク完了後に Pages を再デプロイして bench 表を含める。
+  # bench データは gh-pages ブランチに保存されており、build ステップで取得する。
+  workflow_run:
+    workflows: ["Multi-Runtime RTF Benchmark"]
+    types: [completed]
+    branches: [dev]
 
 permissions:
   contents: read
@@ -26,6 +32,11 @@ concurrency:
 
 jobs:
   build:
+    # workflow_run からの起動時は bench が成功した場合のみ Pages を更新する。
+    # push / workflow_dispatch 起動は常に実行。
+    if: >
+      github.event_name != 'workflow_run' ||
+      github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -215,6 +226,21 @@ jobs:
           if [ -d "src/wasm/g2p/src" ]; then
             mkdir -p deploy/g2p/src
             cp -r src/wasm/g2p/src/* deploy/g2p/src/
+          fi
+
+          # RTF multi-runtime bench 表を /bench/multi-runtime/ に含める。
+          # データは gh-pages ブランチの dev/bench/multi-runtime/index.html に保存済み。
+          # ファイルが存在しない場合はスキップ（初回デプロイ時など）。
+          git fetch origin gh-pages 2>/dev/null || true
+          mkdir -p deploy/bench/multi-runtime
+          BENCH_SRC="origin/gh-pages:dev/bench/multi-runtime/index.html"
+          if git show "$BENCH_SRC" > deploy/bench/multi-runtime/index.html 2>/dev/null; then
+            echo "RTF benchmark page included at /bench/multi-runtime/"
+          else
+            echo "No RTF benchmark page in gh-pages yet — skipping"
+            rm -f deploy/bench/multi-runtime/index.html
+            rmdir deploy/bench/multi-runtime 2>/dev/null || true
+            rmdir deploy/bench 2>/dev/null || true
           fi
 
           # Create 404 page
