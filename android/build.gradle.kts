@@ -10,15 +10,24 @@ plugins {
 }
 
 // Gradle dependency locking (Wave 3 — feedback_data_asset_distribution の
-// reproducibility 強化)。 transitive deps を gradle.lockfile に固定し、 CI
-// hosts と dev workstations の build 再現性を担保。 lockfile 更新は
+// reproducibility 強化)。 transitive deps を gradle.lockfile に固定する
+// 仕組み。 ただし STRICT mode は lockfile 必須 (`MissingLockStateException`)
+// なので、 lockfile が generated されるまでは DEFAULT mode で運用。
+//
+// Phase 1 (現状): DEFAULT mode + lockAllConfigurations。 lockfile が
+//   存在しなくても build 成功、 存在すれば検証。
+// Phase 2 (別 PR): release-kotlin-g2p workflow に `./gradlew :piper-plus-g2p:
+//   dependencies --write-locks` step を追加して gradle.lockfile を生成・
+//   commit。 lockfile が repo に landed したら本 file の lockMode を STRICT
+//   に切り替える。
+//
+// lockfile 更新方法:
 //   ./gradlew :piper-plus-g2p:dependencies --write-locks
 //   ./gradlew :piper-plus:dependencies --write-locks
-// で実行。 CI 側は `--write-locks` を付けないため transitive bump があれば
-// strict mode で fail-fast する。
 subprojects {
     dependencyLocking {
         lockAllConfigurations()
-        lockMode.set(LockMode.STRICT)
+        // STRICT mode は lockfile が必須 — generate されるまでは DEFAULT。
+        // lockMode.set(LockMode.STRICT)
     }
 }
