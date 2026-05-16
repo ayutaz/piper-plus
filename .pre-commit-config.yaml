@@ -701,8 +701,10 @@ repos:
         # SC2222 系の warning が多数あり、 全て修正するのは別 PR の範囲。
         # まずは error (syntax / quoting bug) のみ block して新規追加スクリプトの
         # ガード強化を狙う。 warning level 修正は段階的に。
+        # files: 末尾 anchor `$` のみだと `foo.bash.sample` のような中途 suffix も
+        # 拾うので、 拡張子 alternation 全体を grouping して `(\.(sh|bash))$` に。
         args: [--severity=error, --shell=bash]
-        files: \.(sh|bash)$
+        files: (\.(sh|bash))$
         exclude: ^(\.build/|build/|build-full/|build-test/|node_modules/|target/|src/wasm/openjtalk-web/(build|demo|models|voices|patches)/)
 
   # ---------------------------------------------------------------------------

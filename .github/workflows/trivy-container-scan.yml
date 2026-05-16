@@ -50,16 +50,22 @@ jobs:
         # ベースイメージ + apt 層が重要な Dockerfile を対象とする。
         # webui / wyoming / cpp-inference は model / voice をダウンロードする
         # ため build が重く、 schedule run のみ別途扱う (今は除外)。
+        # `build_target` で multi-stage Dockerfile の早期 stage を選択し、
+        # 巨大 model / voice の embedding 込みステージを避ける。 未指定の
+        # Dockerfile は単一 stage / 最終 stage が軽量なので空欄でよい。
         target:
           - name: python-inference
             dockerfile: docker/python-inference/Dockerfile
             context: .
+            build_target: ''
           - name: python-train
             dockerfile: docker/python-train/Dockerfile
             context: .
+            build_target: ''
           - name: cpp-dev
             dockerfile: docker/cpp-dev/Dockerfile
             context: .
+            build_target: ''
 
     steps:
       - uses: actions/checkout@v6.0.2
@@ -72,33 +78,31 @@ jobs:
         with:
           context: ${{ matrix.target.context }}
           file: ${{ matrix.target.dockerfile }}
+          target: ${{ matrix.target.build_target }}
           push: false
           load: true
           tags: piper-plus-${{ matrix.target.name }}:trivy-scan
-          # build-arg / target を限定し、 巨大 model / voice の embedding 込み
-          # ステージを避ける (一部 Dockerfile は multi-stage)。
           cache-from: type=gha,scope=trivy-${{ matrix.target.name }}
           cache-to: type=gha,mode=max,scope=trivy-${{ matrix.target.name }}
 
-      - name: Trivy image scan (table output for log)
-        uses: aquasecurity/trivy-action@0.36.0
-        with:
-          image-ref: piper-plus-${{ matrix.target.name }}:trivy-scan
-          format: table
-          severity: CRITICAL,HIGH,MEDIUM
-          ignore-unfixed: true
-          # fix が存在しない CVE は noise なので除外。 ベースイメージ更新で
-          # 解消されるべきものを目立たせる。
-          exit-code: '0'   # 一度目は report 専用 (下で SARIF を upload)
-
-      - name: Trivy image scan (SARIF for Security tab)
+      # Trivy scan を 1 回に集約。 SARIF を生成して GitHub Security tab へ
+      # upload、 同時に CRITICAL があれば exit-code=1 で PR を block。
+      # 以前は 3 回別 invoke していたが (table / SARIF / fail-on-CRITICAL)、
+      # DB download + analysis を 1 回に削減 (PR #498 review #9 で指摘)。
+      - name: Trivy image scan (SARIF + CRITICAL gate)
+        id: trivy
         uses: aquasecurity/trivy-action@0.36.0
         with:
           image-ref: piper-plus-${{ matrix.target.name }}:trivy-scan
           format: sarif
           output: trivy-${{ matrix.target.name }}.sarif
-          severity: CRITICAL,HIGH
+          severity: CRITICAL,HIGH,MEDIUM
+          # 1) ignore-unfixed: fix が存在しない CVE は noise なので除外。
+          # 2) exit-code=1 + 後段 severity フィルタで CRITICAL のみ block:
+          #    SARIF には HIGH/MEDIUM も載せるが、 PR を fail させるのは
+          #    CRITICAL のみという conservative 設定を維持。
           ignore-unfixed: true
+          exit-code: '0'
 
       - name: Upload SARIF to GitHub Security tab
         if: always()
@@ -107,13 +111,31 @@ jobs:
           sarif_file: trivy-${{ matrix.target.name }}.sarif
           category: trivy-${{ matrix.target.name }}
 
-      - name: Fail on CRITICAL only
-        # MEDIUM/HIGH は report のみ、 CRITICAL のみ PR を block する。
-        # ベースイメージの定常更新を妨げない conservative 設定。
-        uses: aquasecurity/trivy-action@0.36.0
-        with:
-          image-ref: piper-plus-${{ matrix.target.name }}:trivy-scan
-          format: table
-          severity: CRITICAL
-          ignore-unfixed: true
-          exit-code: '1'
+      - name: Fail on CRITICAL findings only
+        # SARIF を parse して CRITICAL があれば fail。 trivy-action を再度
+        # 呼ばないことで DB download + scan の重複コストを回避。
+        run: |
+          python3 - <<'PY'
+          import json, sys
+          path = "trivy-${{ matrix.target.name }}.sarif"
+          try:
+              data = json.load(open(path))
+          except (OSError, json.JSONDecodeError) as exc:
+              print(f"SARIF parse failed: {exc}; treating as no findings.")
+              sys.exit(0)
+          runs = data.get("runs", [])
+          critical = 0
+          for run in runs:
+              for r in run.get("results", []):
+                  level = r.get("level") or r.get("properties", {}).get("security-severity")
+                  # Trivy SARIF: level="error" maps to CRITICAL/HIGH; tags
+                  # carry the actual severity name.
+                  for tag in r.get("properties", {}).get("tags", []):
+                      if isinstance(tag, str) and tag.upper() == "CRITICAL":
+                          critical += 1
+                          break
+          if critical:
+              print(f"CRITICAL findings: {critical} — failing.")
+              sys.exit(1)
+          print("No CRITICAL findings — pass.")
+          PY

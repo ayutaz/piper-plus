@@ -97,9 +97,15 @@ def parse_hooks(config_text: str) -> list[tuple[str, str, int]]:
         if m_files and current_id is not None:
             value = m_files.group(1).strip()
             if value in ("|", ">", "|-", ">-"):
-                # block scalar — collect until indentation drops
+                # block scalar — collect until indentation drops back to
+                # the `files:` key's column (or shallower). Determine the
+                # actual inner indent from the FIRST non-empty continuation
+                # line rather than hard-coding `base_indent + 2` (4-space
+                # styles, deeply nested hooks, or tab indentation made the
+                # hard-coded slice produce mis-stripped fragments).
                 base_indent = len(line) - len(line.lstrip())
                 block: list[str] = []
+                inner_indent: int | None = None
                 i += 1
                 while i < len(lines):
                     next_line = lines[i]
@@ -110,7 +116,12 @@ def parse_hooks(config_text: str) -> list[tuple[str, str, int]]:
                     indent = len(next_line) - len(next_line.lstrip())
                     if indent <= base_indent:
                         break
-                    block.append(next_line[base_indent + 2 :])
+                    if inner_indent is None:
+                        inner_indent = indent
+                    # Strip the detected inner indent (or whichever is smaller
+                    # in case YAML mixes deeper nesting inside the block).
+                    strip_n = min(inner_indent, indent)
+                    block.append(next_line[strip_n:])
                     i += 1
                 regex = "\n".join(line for line in block if line.strip()).strip()
                 hooks.append((current_id, regex, current_id_line))

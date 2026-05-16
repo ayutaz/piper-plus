@@ -67,13 +67,21 @@ LANG_TO_SOURCES: dict[str, list[str]] = {
 ALLOWLIST: set[str] = {
     "print", "main", "println", "console", "log", "info", "warn", "error",
     "len", "range", "list", "dict", "str", "int", "float", "bool",
-    "true", "false", "null", "None", "undefined", "Some", "None",
+    "true", "false", "null", "None", "undefined", "Some",
     "Ok", "Err", "Result", "Option", "Vec", "String", "HashMap",
     "Box", "Arc", "Rc", "Default", "Debug", "Clone",
-    "fmt", "fs", "io", "os", "path", "regex", "json", "tomllib",
+    "fmt", "fs", "io", "os", "path", "regex", "json", "tomllib", "pathlib",
     "Path", "open", "read", "write", "close",
     "fn", "let", "var", "const", "func", "def", "class", "struct", "enum",
     "import", "from", "use", "package", "namespace", "using",
+    # Common stdlib / typing helpers that show up in cross-runtime examples.
+    "Optional", "Union", "Any", "Iterator", "Iterable", "Sequence", "Mapping",
+    "List", "Dict", "Tuple", "Set", "Type", "TypeVar", "Generic",
+    "dataclass", "field", "subprocess", "asyncio", "logging", "argparse",
+    "Callable", "Awaitable", "NoReturn", "Final",
+    # JS / TS / Rust frequently seen names.
+    "Promise", "async", "await", "yield", "return", "throw", "catch",
+    "Self", "Box", "Future", "Stream", "Send", "Sync",
 }
 
 # Document tree roots to scan.
@@ -133,8 +141,11 @@ def grep_sources(ident: str, source_dirs: list[str]) -> bool:
         if not full.exists():
             continue
         try:
+            # `-F` fixed-string mode: identifier に regex metachar (e.g. `$`,
+            # `.`, `*`) が含まれても literal で grep。 `-w` word boundary で
+            # `synthesize` が `synthesizeFrom...` に余計に match するのを防ぐ。
             result = subprocess.run(
-                ["git", "grep", "-l", "--", ident, "--", str(src)],
+                ["git", "grep", "-l", "-F", "-w", "--", ident, "--", str(src)],
                 cwd=REPO_ROOT,
                 capture_output=True,
                 text=True,

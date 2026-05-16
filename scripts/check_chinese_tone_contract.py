@@ -47,8 +47,41 @@ def load_contract() -> dict:
         return tomllib.load(fh)
 
 
+def _normalize_codepoint(cp: object) -> str | None:
+    """Normalize a codepoint value of any common shape into canonical "U+XXXX".
+
+    Accepted inputs: int (e.g. 0xE046), hex string with `0x` prefix
+    (`"0xE046"`), `U+`-prefixed string (`"U+E046"`), or a bare hex string
+    (`"E046"`). Returns None when the value cannot be coerced — keeps the
+    caller's drift report explicit rather than silently passing through.
+    """
+    if cp is None:
+        return None
+    if isinstance(cp, int):
+        return f"U+{cp:04X}"
+    if isinstance(cp, str):
+        s = cp.strip()
+        if s.lower().startswith("u+"):
+            try:
+                return f"U+{int(s[2:], 16):04X}"
+            except ValueError:
+                return None
+        if s.lower().startswith("0x"):
+            try:
+                return f"U+{int(s, 16):04X}"
+            except ValueError:
+                return None
+        # Bare hex — interpret as base-16.
+        if all(c in "0123456789abcdefABCDEF" for c in s) and s:
+            try:
+                return f"U+{int(s, 16):04X}"
+            except ValueError:
+                return None
+    return None
+
+
 def load_pua_codepoints() -> dict[str, str]:
-    """Return mapping token -> "U+XXXX" string for entries in pua.json."""
+    """Return mapping token -> canonical "U+XXXX" string for pua.json entries."""
     with PUA_JSON.open(encoding="utf-8") as fh:
         data = json.load(fh)
     out: dict[str, str] = {}
@@ -58,13 +91,12 @@ def load_pua_codepoints() -> dict[str, str]:
     for entry in entries:
         token = entry.get("token") or entry.get("name")
         cp = entry.get("codepoint") or entry.get("pua_codepoint") or entry.get("codepoint_hex")
-        if token is None or cp is None:
+        if token is None:
             continue
-        if isinstance(cp, int):
-            cp = f"U+{cp:04X}"
-        elif isinstance(cp, str) and cp.startswith("0x"):
-            cp = f"U+{int(cp, 16):04X}"
-        out[token] = cp
+        normalized = _normalize_codepoint(cp)
+        if normalized is None:
+            continue
+        out[token] = normalized
     return out
 
 

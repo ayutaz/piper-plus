@@ -46,20 +46,102 @@ def load_contract() -> dict:
 def extract_python_trigger_phonemes(py_src: str) -> dict[str, list[str]]:
     """Parse `_apply_n_phoneme_rules` and return variant -> trigger list mapping.
 
-    Looks for the Python source's literal tuples after each ``elif next_phoneme in``
-    line. Conservative regex; if the Python source is refactored this needs
-    updating, which is intentional — refactors should land with a contract bump.
+    Strategy: locate the body of `_apply_n_phoneme_rules`, then scan it for
+    any line that assigns a phoneme variant (``result[i] = "N_x"``) and walk
+    *upwards* a few lines to find the nearest ``in (...)``/``in [...]`` /
+    ``in {...}`` literal collection plus the contents of any tuple/list/set
+    assigned to a module-level constant referenced by the condition. This is
+    robust to refactors such as:
+
+      - tuple → list → set literal swaps
+      - hoisting trigger collections to module-level constants
+      - splitting the ``in (...)`` literal onto multiple lines
+      - single-quoted vs double-quoted strings
+      - ``match/case`` rewrites (case heads carry the literal)
+
+    If the body cannot be located we return ``{}`` and let the contract check
+    flag the missing variant — better an explicit failure than silently
+    accepting drift.
     """
     triggers: dict[str, list[str]] = {}
-    pattern = re.compile(
-        r'elif next_phoneme in \(([^)]+)\):\s*\n\s*result\[i\]\s*=\s*"(N_[a-z]+)"',
+
+    # 1. Locate the function body. Capture up to the next top-level `def`.
+    body_re = re.compile(
+        r"def\s+_apply_n_phoneme_rules\b.*?(?=\ndef |\nclass |\Z)",
+        re.DOTALL,
+    )
+    body_match = body_re.search(py_src)
+    if not body_match:
+        return triggers
+    body = body_match.group(0)
+    body_lines = body.splitlines()
+
+    # 2. Module-level constant references: collect mapping name -> [items].
+    const_re = re.compile(
+        r"^\s*(?P<name>[A-Z_][A-Z0-9_]*)\s*=\s*[\(\[\{](?P<items>[^)\]\}]+)[\)\]\}]",
         re.MULTILINE,
     )
-    for m in pattern.finditer(py_src):
-        items_raw = m.group(1)
-        variant = m.group(2)
-        items = re.findall(r'"([^"]+)"', items_raw)
-        triggers[variant] = items
+    const_lookup: dict[str, list[str]] = {}
+    for m in const_re.finditer(py_src):
+        const_name = m.group("name")
+        items_raw = m.group("items")
+        items = re.findall(r"['\"]([^'\"]+)['\"]", items_raw)
+        if items:
+            const_lookup[const_name] = items
+
+    # 3. For each assignment to result[i] = "N_*", walk back ≤8 lines to find
+    #    the controlling `if/elif/case` literal (parenthesised list / set
+    #    / tuple) or a constant reference. Tolerate multi-line ``in (...)``
+    #    by accumulating until the brackets balance.
+    bracket_pairs = {"(": ")", "[": "]", "{": "}"}
+    assign_re = re.compile(r'result\[i\]\s*=\s*[\'"](N_[a-z]+)[\'"]')
+    in_literal_start_re = re.compile(r"in\s*([\(\[\{])(?P<rest>.*)$")
+    in_constant_re = re.compile(r"in\s+([A-Z_][A-Z0-9_]*)\b")
+    case_literal_re = re.compile(r"case\s*[\(\[\{](?P<body>[^)\]\}]*)[\)\]\}]")
+    case_constant_re = re.compile(r"case\s+([A-Z_][A-Z0-9_]*)\b")
+
+    for idx, line in enumerate(body_lines):
+        am = assign_re.search(line)
+        if not am:
+            continue
+        variant = am.group(1)
+        triggers.setdefault(variant, [])
+        # Walk back to find the controlling literal/constant.
+        for look_back in range(idx - 1, max(idx - 9, -1), -1):
+            up = body_lines[look_back]
+            # Match `in CONST_NAME`
+            cm = in_constant_re.search(up)
+            if cm:
+                triggers[variant] = list(const_lookup.get(cm.group(1), []))
+                break
+            # Match `case CONST_NAME`
+            ccm = case_constant_re.search(up)
+            if ccm:
+                triggers[variant] = list(const_lookup.get(ccm.group(1), []))
+                break
+            # Match `case (...)` / `case [...]` / `case {...}`
+            cl = case_literal_re.search(up)
+            if cl:
+                triggers[variant] = re.findall(
+                    r"['\"]([^'\"]+)['\"]", cl.group("body")
+                )
+                break
+            # Match `in (...)` possibly multi-line; accumulate until balanced.
+            ilm = in_literal_start_re.search(up)
+            if ilm:
+                open_bracket = ilm.group(1)
+                close_bracket = bracket_pairs[open_bracket]
+                accum = ilm.group("rest")
+                depth = accum.count(open_bracket) + 1 - accum.count(close_bracket)
+                j = look_back + 1
+                while depth > 0 and j < len(body_lines):
+                    accum += "\n" + body_lines[j]
+                    depth += body_lines[j].count(open_bracket)
+                    depth -= body_lines[j].count(close_bracket)
+                    j += 1
+                inner = accum.rsplit(close_bracket, 1)[0]
+                triggers[variant] = re.findall(r"['\"]([^'\"]+)['\"]", inner)
+                break
     return triggers
 
 

@@ -39,7 +39,13 @@ HOOKS_DIR = REPO_ROOT / ".claude/hooks"
 
 FRONTMATTER_RE = re.compile(r"^---\n(.+?)\n---", re.DOTALL)
 SCRIPT_REF_RE = re.compile(r"scripts/([a-zA-Z0-9_./-]+\.(?:py|sh))")
-TRIGGER_FRAGMENT_RE = re.compile(r"「([^」]{6,30})」|`/[a-z-]+`")
+# 2 named groups so re.findall always returns predictable tuples (jp_quoted,
+# slash_cmd). Empty strings are filtered downstream — avoids the mixed
+# capturing / non-capturing alternation surprise where findall returns a
+# flat string list when only one group exists.
+TRIGGER_FRAGMENT_RE = re.compile(
+    r"「(?P<quoted>[^」]{6,30})」|(?P<slash>/[a-z][a-z0-9-]+)"
+)
 
 
 def parse_frontmatter(text: str) -> dict[str, str] | None:
@@ -78,10 +84,18 @@ def list_hooks() -> list[Path]:
 
 
 def extract_trigger_fragments(description: str) -> list[str]:
-    """Extract 「...」 quoted phrases + /skill-name references."""
-    return [m for m in TRIGGER_FRAGMENT_RE.findall(description) if isinstance(m, str)] or [
-        m[0] or m[1] for m in TRIGGER_FRAGMENT_RE.findall(description)
-    ]
+    """Extract 「...」 quoted phrases + /skill-name references.
+
+    With two named groups in TRIGGER_FRAGMENT_RE, ``findall`` returns a list
+    of (quoted, slash) tuples — exactly one element of each tuple is non-empty
+    per match. Pick whichever fired.
+    """
+    fragments: list[str] = []
+    for quoted, slash in TRIGGER_FRAGMENT_RE.findall(description):
+        chosen = quoted or slash
+        if chosen:
+            fragments.append(chosen)
+    return fragments
 
 
 def check_skill(skill_dir: Path) -> list[str]:

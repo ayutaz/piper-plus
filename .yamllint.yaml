@@ -41,4 +41,8 @@ ignore: |
   build-test/
   target/
   test/models/
-  src/wasm/openjtalk-web/(build|demo|models|voices|patches)/
+  src/wasm/openjtalk-web/build/
+  src/wasm/openjtalk-web/demo/
+  src/wasm/openjtalk-web/models/
+  src/wasm/openjtalk-web/voices/
+  src/wasm/openjtalk-web/patches/

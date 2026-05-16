@@ -101,13 +101,31 @@ def scan_file(path: Path) -> list[tuple[int, str, str]]:
     except (OSError, UnicodeDecodeError):
         return []
 
+    # Build keyword regexes once with word boundaries to avoid false positives:
+    # plain "flask" in laboratory text, unrelated "HTS" acronyms, "--mb-istft"
+    # inside a code block discussing v1.11 history, etc. Each keyword becomes
+    # a regex that requires non-alphanumeric / start-of-line context on both
+    # sides. CLI flags like `--mb-istft` keep their leading `--` and must not
+    # be followed by additional flag chars.
+    keyword_patterns: list[tuple[str, re.Pattern[str]]] = []
+    for kw, _ver, _desc in DEPRECATED_ITEMS:
+        # Escape any regex special and surround with strict boundaries.
+        # Avoid `\b` for `--mb-istft` (leading `-` is non-word) — instead
+        # require leading non-alnum and trailing non-alnum/`-`.
+        escaped = re.escape(kw)
+        pat = re.compile(
+            rf"(?:^|[^A-Za-z0-9_-]){escaped}(?:$|[^A-Za-z0-9_])",
+            re.IGNORECASE,
+        )
+        keyword_patterns.append((kw, pat))
+
     hits: list[tuple[int, str, str]] = []
     for idx, line in enumerate(lines, start=1):
         # Breaking banner 行は内容問わず archive 文脈と判定 (multi-lingual)
         if BANNER_LINE_RE.match(line.strip()):
             continue
-        for keyword, _version, _desc in DEPRECATED_ITEMS:
-            if keyword.lower() not in line.lower():
+        for keyword, pat in keyword_patterns:
+            if not pat.search(line):
                 continue
             # 前後 2 行を文脈として archive marker を検査
             ctx_start = max(0, idx - 3)

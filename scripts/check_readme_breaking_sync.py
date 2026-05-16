@@ -51,10 +51,28 @@ TRANSLATIONS = [
 ]
 
 # `> **📢 v1.12.0 Breaking changes ...` のような行を catch する。
-# 開発を縛り過ぎないように、`📢` または `Breaking changes` の語を含む blockquote
-# 1 行内に `v<version>` が現れていれば banner として扱う。
+# 多言語 README に対応するため、 `📢` または 各言語の "breaking" 相当語を
+# 含む blockquote 1 行内に `v<version>` が現れていれば banner として扱う。
+# 既存翻訳の例:
+#   ZH: 重大变更
+#   FR: Changements incompatibles
+#   PT: Mudanças incompatíveis
+#   ES: Cambios incompatibles
+#   DE: Wichtige Änderungen
+#   KO: 주요 변경사항
+#   JA: 破壊的変更
+BREAKING_KEYWORDS = (
+    r"Breaking|"
+    r"重大变更|破壊的変更|"
+    r"Changements\s+incompatibles|"
+    r"Mudan(?:ç|c)as\s+incompat\w*|"
+    r"Cambios\s+incompatibles|"
+    r"Wichtige\s+Änderungen|"
+    r"주요\s*변경사항"
+)
 BANNER_RE = re.compile(
-    r"^>\s*\*?\*?(?:📢\s*)?v(?P<version>\d+\.\d+\.\d+)\s+Breaking", re.MULTILINE
+    rf"^>\s*\*?\*?\s*(?:📢\s*)?v(?P<version>\d+\.\d+\.\d+)\s+(?:{BREAKING_KEYWORDS})",
+    re.MULTILINE | re.IGNORECASE,
 )
 
 
