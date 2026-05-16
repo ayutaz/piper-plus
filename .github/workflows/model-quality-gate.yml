@@ -33,6 +33,9 @@ concurrency:
 jobs:
   contracts:
     runs-on: ubuntu-24.04
+    # Wave 6-1.1: contract gate は通常 3-5 min だが、 大量の check_*.py が
+    # serial に走るため hung script が cost 暴走する risk あり。 15 min fail-fast。
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v6.0.2
 

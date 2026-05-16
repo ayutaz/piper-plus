@@ -1,0 +1,88 @@
+name: Security Issue Routing
+
+# Wave 6-8.4 — security label が付いた issue に自動で needs-triage + roadmap
+# label を併付して priority routing する。
+#
+# Why: SECURITY.md の private report flow とは別軸で、 public な
+# `security` label 付き issue が triage 漏れする risk が観測されている (Wave 6
+# Domain 8 調査結果)。 stale.yml は `security` label を exempt しているが、
+# 「stale 化させない」 だけで「優先 review に回す」 までは自動化されていなかった。
+#
+# 動作:
+#   * trigger: issue.opened + issue.labeled
+#   * `security` label を持つ issue に `needs-triage` + `roadmap` label を追加
+#   * 既に label が付いている場合は noop (idempotent)
+#   * conservative: 既存 label は削除しない、 close もしない (notification only)
+#
+# memory feedback_conservative_changes に従い、 自動 close / 自動 assign は
+# 行わない。 label 付与のみ (= 既存 sort filter で priority surface に上がる)。
+#
+# pre-conditions:
+#   * `security` / `needs-triage` / `roadmap` label が repo に存在すること
+#     (stale.yml の exempt-issue-labels で security はすでに使用中)。
+#   * GITHUB_TOKEN に issues: write 権限 (top-level permissions で付与)。
+
+on:
+  issues:
+    types: [opened, labeled]
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: security-routing-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  route-security-issue:
+    # security label が付いている、 かつ event が opened OR labeled。
+    # labeled の場合は label.name が 'security' か確認 (他 label 付与で
+    # 連鎖発火しないよう絞り込み)。
+    if: |
+      contains(github.event.issue.labels.*.name, 'security') &&
+      (github.event.action == 'opened' ||
+        (github.event.action == 'labeled' && github.event.label.name == 'security'))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Add needs-triage + roadmap labels
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          REPO: ${{ github.repository }}
+        # gh CLI は既存 label との重複付与でエラーにならない (idempotent)。
+        # API rate limit (5000 req/hr) を考慮し、 1 issue あたり 1-2 call
+        # に抑制 (security label trigger は希少なので問題ない)。
+        run: |
+          set -euo pipefail
+          echo "Routing security issue #${ISSUE_NUMBER}"
+          gh issue edit "${ISSUE_NUMBER}" --repo "${REPO}" \
+            --add-label "needs-triage,roadmap"
+          echo "::notice::Issue #${ISSUE_NUMBER} に needs-triage + roadmap label を付与しました (security routing)"
+
+      - name: Post triage comment (first-time only)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          REPO: ${{ github.repository }}
+        # issue 内に bot comment が既に存在するか確認、 無ければ 1 度だけ comment
+        # する (連鎖 trigger で重複しないため)。
+        # action == 'opened' のみで投稿、 labeled の場合は既に open 後の処理なので skip。
+        if: github.event.action == 'opened'
+        run: |
+          set -euo pipefail
+          BODY=$(cat <<'EOF'
+          security label を検知しました。 本 issue は priority triage 対象です。
+
+          - 公開可能な脆弱性報告: 本 issue で議論可
+          - **embargo 期間が必要 / 未公開 CVE / exploitable**: 即座に SECURITY.md
+            の private report flow に切り替えてください
+          - 本 issue は `roadmap` + `needs-triage` label が自動付与され、
+            stale.yml の auto-close 対象外になります (`security` label が exempt
+            に登録済み)
+
+          maintainer の review 後に label を整理します。
+          EOF
+          )
+          gh issue comment "${ISSUE_NUMBER}" --repo "${REPO}" --body "${BODY}"

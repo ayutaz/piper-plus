@@ -9,11 +9,11 @@
 
 [meta]
 spec_version = 1
-last_updated = "2026-05-16"
+last_updated = "2026-05-17"
 applies_to = ["python", "rust", "go", "csharp", "wasm", "cpp", "kotlin", "swift"]
 forward_compat_policy = "strict"
-status = "deferred-from-wave3"
-canonical_reference = "Wave 3 agent調査 (75 提案)"
+status = "deferred-from-wave3-5-6"
+canonical_reference = "Wave 3 agent (75 提案) + Wave 5 (28 提案 T20-T23) + Wave 6 (~80 提案 T24-T28)"
 
 # =============================================================================
 # T14: Cross-Runtime Parity 拡大
@@ -1171,8 +1171,9 @@ implementation = """
 [[invariants]]
 name = "individual-pr-per-task"
 description = """
-T14 / T15 / T16 / T17 / T18 / T19 / T20 / T21 / T22 / T23 は個別 PR で進める。
-Wave 5 PR にまとめて入れない (PR レビュー困難 + revert 影響範囲が大きい)。
+T14 / T15 / T16 / T17 / T18 / T19 / T20 / T21 / T22 / T23 / T24 / T25 / T26 /
+T27 / T28 は個別 PR で進める。 Wave 5/6 PR にまとめて入れない (PR レビュー困難
++ revert 影響範囲が大きい)。
 """
 
 [[invariants]]
@@ -1188,4 +1189,1270 @@ description = """
 cross-runtime parity 拡大は「canonical (Python) で fixture 生成」 を先に
 行い、 そこから各 runtime test を追加する。 fixture が canonical を確定
 した後に runtime test の golden 化が可能。
+"""
+
+# =============================================================================
+# T24: CI / Workflow / Cache 最適化 (Wave 6 Domain 1 + 2 + 12 由来)
+# =============================================================================
+#
+# Wave 6 で 15 並列 agent が 119 提案を出したうち、 Tier B/C (cross-runtime
+# 同期 or spec 設計が必要な中-大規模 task) を本 file に集約。 Tier A
+# (timeout-minutes / permissions / pre-commit cache / license-check /
+# security-routing) は PR #498 に直接反映済。
+
+[t24_csharp_serialization_relax]
+priority = "MEDIUM"
+effort = "S (~半日)"
+status = "proposal"
+description = """
+ci.yml:165 で csharp-build が needs:[csharp-tests] と strict serialization。
+両者の NuGet cache は RID 独立のため並列実行可能。
+"""
+implementation = """
+  1. csharp-build の needs から csharp-tests を削除 (needs:[changes] のみ)
+  2. 3 OS test と 6 RID build を並列化 → total CI -2-3 min
+"""
+
+[t24_python_cpp_rebuild_redundancy]
+priority = "MEDIUM"
+effort = "M (~3-5日)"
+status = "proposal"
+description = """
+ci.yml:295 で python-tests が毎回 cmake && make で C++ rebuild。 cpp-tests
+と重複。
+"""
+implementation = """
+  1. _build-cpp-artifact.yml (reusable) を作成
+  2. cpp-tests と python-tests が artifact 共有
+"""
+
+[t24_docker_layer_scope_unify]
+priority = "MEDIUM"
+effort = "XS"
+status = "proposal"
+description = """
+docker-build.yml で cache-from: type=gha (scope なし) と scope=X が混在。
+scope なしは全 job が同 cache 名前空間に書き込み collide。
+"""
+implementation = """
+  1. 各 job に一意 scope (python-inference / python-train / cpp-dev) を振る
+  2. cache hit rate +5-7%
+"""
+
+[t24_cache_key_granularity]
+priority = "MEDIUM"
+effort = "S (~半日)"
+status = "proposal"
+description = """
+ci.yml:254 で Python cache が 3 ファイル hashFiles。 1 つ変更で全 cache
+miss。 csproj glob も粗い (30+ 件)。
+"""
+implementation = """
+  1. Python cache: uv.lock のみ
+  2. C# cache: main solution file 限定
+"""
+
+[t24_dev_build_all_dag]
+priority = "LOW"
+effort = "L (~1 週間)"
+status = "proposal"
+description = """
+dev-build-all.yml の summary job が 8 build 直列依存。 intermediate
+aggregator で DAG 化。
+"""
+implementation = """
+  1. Linux/macOS/Windows ごとに aggregator job
+  2. final summary が aggregator 待ち
+"""
+
+[t24_setup_python_composite]
+priority = "MEDIUM"
+effort = "S (~半日)"
+status = "proposal"
+description = """
+setup-python@v5.6.0 (14回) と v6.2.0 (32回) 混在。 composite action 化
+で version drift を吸収。
+"""
+implementation = """
+  1. .github/actions/setup-python-with-uv/action.yml 作成
+  2. python-version / cache-deps input
+"""
+
+[t24_uv_env_wrapper]
+priority = "MEDIUM"
+effort = "XS"
+status = "proposal"
+description = """
+uv sync --extra all --extra dev 等 が 4-5 workflow で重複。
+"""
+implementation = """
+  1. .github/actions/setup-uv-environment/action.yml
+  2. extras input + uv version pin
+"""
+
+[t24_shared_env_yml]
+priority = "MEDIUM"
+effort = "XS"
+status = "proposal"
+description = """
+PYTHON_VERSION / NODE_VERSION / ORT_VERSION / RUST_VERSION 等の version
+hardcode が 40+ workflow に分散。
+"""
+implementation = """
+  1. .github/env-vars.sh または共通 action で集約
+  2. workflow → source or include で参照
+"""
+
+[t24_cache_strategy_unify]
+priority = "LOW"
+effort = "M (~1 週間)"
+status = "proposal"
+description = """
+actions/cache@v5.0.5 が 20+ invocation。 言語ごとに composite action で統一。
+"""
+implementation = """
+  1. cache-rust / cache-python / cache-node / cache-dotnet composite
+"""
+
+[t24_test_matrix_reusable]
+priority = "LOW"
+effort = "L (~1 週間)"
+status = "proposal"
+description = """
+python-tests / rust-tests / csharp-ci / go-ci で matrix:{os:[ubuntu/win/macos]}
+重複。
+"""
+implementation = """
+  1. _test-matrix-template.yml (workflow_call) で os-matrix output 生成
+"""
+
+[t24_ubuntu_pin]
+priority = "MEDIUM"
+effort = "S (~半日)"
+status = "proposal"
+description = """
+ubuntu-latest が 97 workflow で使用。 GH rollover で cache miss。
+ubuntu-24.04 に固定化。
+"""
+implementation = """
+  1. 全 workflow で ubuntu-latest → ubuntu-24.04
+"""
+
+[t24_macos_separate]
+priority = "MEDIUM"
+effort = "S (~半日)"
+status = "proposal"
+description = """
+macos-latest が Rosetta emulation で遅延。 macos-14 (x64) / macos-13
+(arm64) に分離。
+"""
+implementation = """
+  1. matrix に明示的 os 指定
+  2. rust-cache が runner.arch 対応済
+"""
+
+[t24_cargo_workspace_hash]
+priority = "MEDIUM"
+effort = "XS"
+status = "proposal"
+description = """
+複数 rust job が同 Cargo.lock に対して parallel に target cache を fetch、
+serialization point が発生。
+"""
+implementation = """
+  1. 全 job で cache key の workspaces prefix を統一 'cargo-rust-'
+"""
+
+[t24_nuget_rid_separate]
+priority = "LOW"
+effort = "S (~半日)"
+status = "proposal"
+description = """
+ci.yml の RID matrix (6 RID) が同一 NuGet cache fallback bucket に collide。
+restore-keys で RID prefix を優先。
+"""
+implementation = """
+  1. restore-keys に '${{ runner.os }}-nuget-${{ matrix.rid }}-' 追加
+"""
+
+[t24_docker_buildx_min_mode]
+priority = "LOW"
+effort = "XS"
+status = "proposal"
+description = """
+build-python-train (CUDA 12.1 base) は 5GB+ layer、 mode=max での GHA
+cache write が 5-10 min。 mode=min で metadata のみ cache。
+"""
+implementation = """
+  1. cache-to: type=gha,mode=min に変更 (build-python-train のみ)
+"""
+
+[t24_npm_pnpm_unify]
+priority = "LOW"
+effort = "XS"
+status = "proposal"
+description = """
+g2p-wasm-ci.yml の 4 step で 'cache: npm'。 pnpm-lock.yaml に移行で
+npm install -3 min。
+"""
+implementation = """
+  1. package-lock.json → pnpm-lock.yaml migration
+"""
+
+# =============================================================================
+# T25: Release / Dependabot / PR Templates (Wave 6 Domain 3 + 4 + 7 由来)
+# =============================================================================
+
+[t25_release_orchestrator]
+priority = "HIGH"
+effort = "L (~1 週間)"
+status = "proposal"
+description = """
+tag push 時に release-shared-lib / npm-publish / g2p-rust-publish /
+release-kotlin-g2p を直列実行 (1 失敗で全停止)。 multi-registry sync 化。
+"""
+implementation = """
+  1. .github/workflows/release-orchestrator.yml (新規)
+  2. 各 publish workflow を workflow_dispatch only に変更
+"""
+
+[t25_prerelease_tag_skip]
+priority = "HIGH"
+effort = "M (~3-5日)"
+status = "proposal"
+description = """
+v1.0.0-rc1 / v1.0.0-beta SemVer 2.0.0 §10 pre-release tag を auto-skip。
+GitHub Release は Draft、 registry publish は skip。
+"""
+implementation = """
+  1. tag parsing regex + is_prerelease output
+  2. 全 release workflow に if: is_prerelease != true
+"""
+
+[t25_registry_polling_skill]
+priority = "MEDIUM"
+effort = "M (~3-5日)"
+status = "proposal"
+description = """
+PyPI / npm / crates.io / NuGet / Maven の latest version を API fetch、
+publish lag detection (30min warn / 2h error / 24h fail)。
+"""
+implementation = """
+  1. /check-registry-versions skill
+  2. release-verify.yml 拡張で post-publish drift detection
+"""
+
+[t25_release_notes_template]
+priority = "MEDIUM"
+effort = "S (~半日)"
+status = "proposal"
+description = """
+CHANGELOG [Unreleased] の runtime subsection (#### Python / #### Rust 等)
+を extract、 markdown render して GitHub Release body に embed。
+"""
+implementation = """
+  1. .github/release-notes-template.md (mustache style)
+  2. /prepare-release-notes skill 拡張
+"""
+
+[t25_swift_checksum_hook]
+priority = "HIGH"
+effort = "S (~半日)"
+status = "proposal"
+description = """
+Package.swift の xcframework checksum を tag push 前に auto-compute。
+placeholder のままで tag push すると SwiftPM consumer に integrity 失敗。
+"""
+implementation = """
+  1. .claude/hooks/pre-push-tag.sh で swift package compute-checksum
+  2. release-shared-lib.yml L1077-1121 の verify step を削除
+"""
+
+[t25_rust_csharp_tag_publish]
+priority = "MEDIUM"
+effort = "M (~3-5日)"
+status = "proposal"
+description = """
+v-rust-X.Y.Z / v-dotnet-X.Y.Z tag で crates.io / NuGet publish を自動化
+(現状 manual)。
+"""
+implementation = """
+  1. rust-publish.yml + dotnet-publish.yml (新規)
+  2. release-orchestrator から chain 呼び出し
+"""
+
+[t25_release_verify_autodetect]
+priority = "LOW"
+effort = "S (~半日)"
+status = "proposal"
+description = """
+release-verify.yml の version input を workflow_run trigger で auto-detect
+(現状 manual input)。
+"""
+implementation = """
+  1. workflow_run + github.event.workflow_run.head_sha から VERSION 抽出
+"""
+
+[t25_asset_naming_spec]
+priority = "LOW"
+effort = "S (~半日)"
+status = "proposal"
+description = """
+iOS .tar.gz (deprecated M1-compat) と .xcframework.zip 混在。 naming
+convention spec で統一。
+"""
+implementation = """
+  1. docs/spec/release-assets.toml で命名規則 canonical
+  2. checksums-sha256.toml に TOML 化
+"""
+
+[t25_hf_model_release_chain]
+priority = "MEDIUM"
+effort = "M (~3-5日)"
+status = "proposal"
+description = """
+model-config-v* tag push で HF Hub upload を auto-trigger。
+"""
+implementation = """
+  1. release-model-config.yml に publish-to-huggingface job 追加
+  2. CHANGELOG subsection から model metadata extract
+"""
+
+[t25_check_release_config_skill]
+priority = "LOW"
+effort = "XS"
+status = "proposal"
+description = """
+release workflow + version spec の lint + dry-run validation。
+"""
+implementation = """
+  1. /check-release-config skill
+  2. release-config-lint.yml で pre-merge gate
+"""
+
+[t25_dependabot_nuget_added]
+priority = "HIGH"
+effort = "M (~3-5日)"
+status = "proposal"
+description = """
+src/csharp/Directory.Build.props で RestorePackagesWithLockFile=true 済。
+dependabot.yml に nuget ecosystem 追加。
+"""
+implementation = """
+  1. dependabot.yml に nuget entry (directory: /src/csharp)
+  2. groups: nuget で minor/patch 集約
+"""
+
+[t25_dependabot_gradle_lockfile]
+priority = "MEDIUM"
+effort = "M (~3-5日)"
+status = "proposal"
+description = """
+gradle.lockfile が未 commit。 Dependabot gradle ecosystem が lockfile を
+更新できない。
+"""
+implementation = """
+  1. ./gradlew dependencies --write-locks を root + /android/piper-plus-g2p で初回実行
+  2. gradle.lockfile を commit、 Dependabot 対象化
+"""
+
+[t25_dependabot_pr_auto_close]
+priority = "LOW"
+effort = "S (~半日)"
+status = "proposal"
+description = """
+open-pull-requests-limit:5 超過時に stale Dependabot PR を auto-close。
+"""
+implementation = """
+  1. stale-close.yml で author:app/dependabot AND created:<14 days を close
+"""
+
+[t25_dependabot_ignore_docs]
+priority = "LOW"
+effort = "XS"
+status = "proposal"
+description = """
+ignore 理由 (ORT 1.30 / Python 3.14 / CUDA 12.9 / onnxruntime_go minor) を
+docs/ops/dependabot-strategy.md に集約。
+"""
+implementation = """
+  1. dependabot-strategy.md 新規作成
+"""
+
+[t25_dependabot_security_group]
+priority = "MEDIUM"
+effort = "S (~半日)"
+status = "proposal"
+description = """
+groups: applies-to:security-updates を分離、 SLA 短縮 label を付与。
+"""
+implementation = """
+  1. dependabot.yml に groups:security 追加
+"""
+
+[t25_discussion_template]
+priority = "MEDIUM"
+effort = "M (~3-5日)"
+status = "proposal"
+description = """
+DISCUSSION_TEMPLATE/ で Q&A / Ideas / Announcements を分離。 issue の Q&A
+混在を削減。
+"""
+implementation = """
+  1. .github/DISCUSSION_TEMPLATE/{QUESTION,IDEAS}.yml
+"""
+
+[t25_security_issue_template]
+priority = "MEDIUM"
+effort = "S (~半日)"
+status = "proposal"
+description = """
+public security issue template (CVE reference + CVSS + dropdown)。
+SECURITY.md は private flow、 public report 用の template を追加。
+"""
+implementation = """
+  1. .github/ISSUE_TEMPLATE/security.yml
+  2. auto-label [security] (Wave 6-8.4 routing と連動)
+"""
+
+[t25_new_language_template]
+priority = "HIGH"
+effort = "S (~半日)"
+status = "proposal"
+description = """
+言語拡張 issue 用 template (phoneme coverage / PUA / dialect)。 /add-language
+skill との連携。
+"""
+implementation = """
+  1. .github/ISSUE_TEMPLATE/new-language.yml
+"""
+
+[t25_contract_drift_template]
+priority = "MEDIUM"
+effort = "S (~半日)"
+status = "proposal"
+description = """
+spec ファイルと runtime implementation の parity ズレを報告する template。
+"""
+implementation = """
+  1. .github/ISSUE_TEMPLATE/spec-drift.yml
+  2. /check-pua / /check-loanword auto-trigger logic
+"""
+
+[t25_pr_template_checkbox_label]
+priority = "MEDIUM"
+effort = "M (~3-5日)"
+status = "proposal"
+description = """
+PR template checkbox を auto-label に変換 (reviewer triage 削減)。
+"""
+implementation = """
+  1. .github/workflows/auto-label-from-pr.yml
+  2. regex で Type/Risk Level/Affected Components → label map
+"""
+
+[t25_create_pr_template_alignment]
+priority = "LOW"
+effort = "XS"
+status = "proposal"
+description = """
+/create-pr skill body と PR template の 2 重定義を CONTRIBUTING.md で
+clarify。
+"""
+implementation = """
+  1. CONTRIBUTING.md "PR creation flow" 追加
+"""
+
+# =============================================================================
+# T26: SAST / License / Branch Protection (Wave 6 Domain 5 + 9 + 13 由来)
+# =============================================================================
+
+[t26_dev_branch_protection]
+priority = "HIGH"
+effort = "S (~半日, admin UI)"
+status = "proposal"
+description = """
+dev branch に branch protection (required status checks + 1 reviewer +
+linear history + force push 禁止)。 user-only (admin 権限)。
+"""
+implementation = """
+  1. GitHub UI > Settings > Branches で rule 追加
+  2. ci-required (aggregate check) + CodeQL 等 を required に
+  3. release-please bot は bypass 設定
+"""
+
+[t26_required_checks_contract]
+priority = "MEDIUM"
+effort = "S (~半日)"
+status = "proposal"
+description = """
+docs/spec/ci-required-checks-contract.toml で critical check の canonical 化。
+"""
+implementation = """
+  1. spec TOML 新規 (forward_compat_policy = append-only)
+  2. scripts/check_required_checks.py で 120+ check を audit
+"""
+
+[t26_merge_queue_eval]
+priority = "LOW"
+effort = "M (~3-5日, evaluation)"
+status = "proposal"
+description = """
+GitHub merge queue 導入の trade-off 評価。 release-please manual merge との
+両立判断必要。
+"""
+implementation = """
+  1. trade-off doc 作成
+  2. opt-in 試験運用
+"""
+
+[t26_pr_contract_audit]
+priority = "LOW"
+effort = "M (~3-5日)"
+status = "proposal"
+description = """
+pr-title-check + pr-body-validate 既存実装の整合性 audit。 二重定義 review。
+"""
+implementation = """
+  1. workflow 2 file の rule を docs/spec 化
+  2. CLAUDE.md PR Creation セクション更新
+"""
+
+[t26_codeowners_codegen]
+priority = "LOW"
+effort = "L (~1 週間)"
+status = "proposal"
+description = """
+docs/spec/*.toml の per-runtime contract から CODEOWNERS を auto-generate
+(逆方向の drift 防止)。
+"""
+implementation = """
+  1. scripts/codegen_codeowners.py
+  2. check_codeowners_spec_parity.py pre-commit gate
+"""
+
+[t26_rust_semgrep]
+priority = "MEDIUM"
+effort = "M (~3-5日)"
+status = "proposal"
+description = """
+Rust 向け Semgrep rule (async race / unsafe pattern)。 CodeQL Rust 未対応、
+cargo audit は CVE のみ。
+"""
+implementation = """
+  1. rust-semgrep.yml + p/rust-best-practices config
+  2. SARIF upload (GitHub Security tab)
+"""
+
+[t26_python_bandit_stage2]
+priority = "MEDIUM"
+effort = "S (~半日)"
+status = "proposal"
+description = """
+ruff S102-S111 を src/python/piper_train + src/python_run で strict、
+test 系で許容。
+"""
+implementation = """
+  1. pyproject.toml で per-path ruff override
+"""
+
+[t26_go_gosec_sarif]
+priority = "MEDIUM"
+effort = "S (~半日)"
+status = "proposal"
+description = """
+gosec を golangci-lint 内から独立 job に昇格、 SARIF upload で Security
+tab 可視化。
+"""
+implementation = """
+  1. security-audit.yml に gosec job 追加
+  2. github/codeql-action/upload-sarif
+"""
+
+[t26_shellcheck_standalone]
+priority = "LOW"
+effort = "XS"
+status = "proposal"
+description = """
+scripts/*.sh + .github/workflows/*.yml に shellcheck standalone CI。
+actionlint は -shellcheck= disabled (Wave 5)。
+"""
+implementation = """
+  1. shellcheck.yml で find + shellcheck-docker
+"""
+
+[t26_csharp_roslynator]
+priority = "MEDIUM"
+effort = "M (~3-5日)"
+status = "proposal"
+description = """
+EnableNETAnalyzers / Roslynator で null-ref / async deadlock 検出。 CodeQL
+で検出不可。
+"""
+implementation = """
+  1. Directory.Build.props に EnableNETAnalyzers + AnalysisLevel
+"""
+
+[t26_kotlin_detekt_security]
+priority = "LOW"
+effort = "S (~半日)"
+status = "proposal"
+description = """
+android/detekt.yml に security rules (HardcodedPassword / HardcodedUrl) 追加。
+"""
+implementation = """
+  1. detekt.yml security: section 有効化
+"""
+
+[t26_codeql_baseline_generator]
+priority = "LOW"
+effort = "M (~3-5日)"
+status = "proposal"
+description = """
+CodeQL query-filters baseline を auto-generate、 stale suppress 検出。
+"""
+implementation = """
+  1. codeql.yml に Export CodeQL baseline step
+  2. diff を PR comment に post
+"""
+
+[t26_license_forbidden_mode]
+priority = "MEDIUM"
+effort = "S (~半日)"
+status = "proposal"
+description = """
+license-check.yml (Wave 6 Tier A) の go-licenses を warn-only → forbidden
+mode に移行 (GPL/AGPL 検出時 fail)。
+"""
+implementation = """
+  1. go-licenses check --allowed_licenses=MIT,Apache-2.0,...
+  2. exception list で transitive 既存 GPL を allowlist
+"""
+
+[t26_gitleaks_baseline_audit]
+priority = "LOW"
+effort = "XS"
+status = "proposal"
+description = """
+.gitleaks.toml allowlist の rule decay 検出 (6ヶ月ごとの 0-hit rule 除去)。
+"""
+implementation = """
+  1. scripts/audit_gitleaks_baseline.py
+  2. monthly cron hook
+"""
+
+[t26_job_permissions_audit]
+priority = "MEDIUM"
+effort = "M (~3-5日)"
+status = "proposal"
+description = """
+job-level permissions の 7 scope (contents / packages / pull-requests /
+security-events / id-token / attestations / actions) を audit。
+"""
+implementation = """
+  1. scripts/audit_workflow_perms.py
+  2. 必要最小権限を推定、 actual との gap report
+"""
+
+[t26_secrets_clarity_audit]
+priority = "LOW"
+effort = "M (~3-5日)"
+status = "proposal"
+description = """
+secrets.* と set -x / echo / print の組み合わせを検出 (token leak surface
+削減)。
+"""
+implementation = """
+  1. audit script で grep 検出
+"""
+
+[t26_persist_credentials_baseline]
+priority = "LOW"
+effort = "XS"
+status = "proposal"
+description = """
+fork PR で persist-credentials: false override を強制 (token expose 防止)。
+"""
+implementation = """
+  1. fork PR trigger condition + job-level override
+"""
+
+[t26_allowed_actions_whitelist]
+priority = "LOW"
+effort = "S (~半日, admin)"
+status = "proposal"
+description = """
+GitHub repo settings の allowed-actions whitelist。 community actions
+(Swatinem/rust-cache / dtolnay/rust-toolchain / Release-Drafter) を明示。
+"""
+implementation = """
+  1. Settings > Actions > Allowed actions
+"""
+
+[t26_reusable_workflow_perms]
+priority = "LOW"
+effort = "M (~3-5日)"
+status = "proposal"
+description = """
+reusable workflow (build-wasm-reusable / _build-test-cpp) の permissions
+継承 audit。 caller-side 明示化。
+"""
+implementation = """
+  1. job-level defaults を明示
+"""
+
+# =============================================================================
+# T27: Triage / Labels / Nightly / Flaky (Wave 6 Domain 6 + 8 + 10 + 11 由来)
+# =============================================================================
+
+[t27_pr_creation_labeler]
+priority = "MEDIUM"
+effort = "S (~半日)"
+status = "proposal"
+description = """
+release-drafter autolabeler を merge 後 → PR 生成時にも動作させる。 pull_request
+trigger で別 workflow。
+"""
+implementation = """
+  1. pr-auto-labeler.yml で release-drafter@v6 を pull_request trigger
+"""
+
+[t27_create_pr_label_sync]
+priority = "MEDIUM"
+effort = "M (~3-5日)"
+status = "proposal"
+description = """
+/create-pr が書く PR body Risk Level / Affected Components / Type を
+GitHub label に同期。
+"""
+implementation = """
+  1. create-pr SKILL.md に Phase 6 (gh pr edit --add-label) 追加
+  2. body 解析 → label mapping
+"""
+
+[t27_multi_runtime_label]
+priority = "MEDIUM"
+effort = "S (~半日)"
+status = "proposal"
+description = """
+Affected Components で 2+ runtime checked → multi-runtime label auto-add。
+release note 分類用。
+"""
+implementation = """
+  1. t27_create_pr_label_sync の subset
+"""
+
+[t27_size_based_labeling]
+priority = "LOW"
+effort = "S (~半日)"
+status = "proposal"
+description = """
+lines changed → size:S/M/L/XL label。 reviewer の workload visibility。
+"""
+implementation = """
+  1. .github/labeler-size.yml + size-labeler action
+"""
+
+[t27_triage_labeling]
+priority = "LOW"
+effort = "M (~3-5日)"
+status = "proposal"
+description = """
+needs-triage / good-first-issue の auto-add。
+"""
+implementation = """
+  1. issue.opened trigger
+  2. body parsing で domain 推定
+"""
+
+[t27_breaking_change_detect]
+priority = "MEDIUM"
+effort = "S (~半日)"
+status = "proposal"
+description = """
+CHANGELOG-unreleased の Breaking Changes section 存在で
+breaking-change label auto-add。
+"""
+implementation = """
+  1. PR body 検出 + CHANGELOG-unreleased.md scan
+  2. gh pr edit --add-label
+"""
+
+[t27_runtime_specific_labels]
+priority = "MEDIUM"
+effort = "M (~3-5日)"
+status = "proposal"
+description = """
+path-based labeling (src/python/** → area:python 等)。
+"""
+implementation = """
+  1. .github/labeler.yml (path → label map)
+  2. actions/labeler workflow
+"""
+
+[t27_release_drafter_pr_target]
+priority = "LOW"
+effort = "XS"
+status = "proposal"
+description = """
+release-drafter autolabeler を pull_request_target trigger で PR 作成時にも
+動作 (chicken-and-egg risk あり)。
+"""
+implementation = """
+  1. risk evaluation + config-unfound guard
+"""
+
+[t27_label_release_sync]
+priority = "LOW"
+effort = "M (~3-5日)"
+status = "proposal"
+description = """
+label ↔ release-drafter category の双方向 sync。 false positive 削減。
+"""
+implementation = """
+  1. release-drafter.yml category と label allowlist の sync gate
+"""
+
+[t27_issue_auto_labeler]
+priority = "MEDIUM"
+effort = "M (~3-5日)"
+status = "proposal"
+description = """
+issue.opened で body 解析 → bug/question/feature 自動分類。 author 手動
+付与済なら respects (conservative)。
+"""
+implementation = """
+  1. issue-auto-label.yml
+  2. template selection から label 推定
+"""
+
+[t27_model_submission_tracker]
+priority = "MEDIUM"
+effort = "S (~半日)"
+status = "proposal"
+description = """
+model-submission issue の status (submitted/reviewing/approved/rejected) を
+comment trigger で label 更新。
+"""
+implementation = """
+  1. /publish-model skill 拡張 or 新 skill model-submission-status
+"""
+
+[t27_old_issue_digest]
+priority = "LOW"
+effort = "S (~半日)"
+status = "proposal"
+description = """
+60-80d open issue を monthly digest として Discussion post (近期 stale 警告)。
+"""
+implementation = """
+  1. old-issue-digest.yml cron
+"""
+
+[t27_good_first_issue_digest]
+priority = "LOW"
+effort = "S (~半日)"
+status = "proposal"
+description = """
+help-wanted + lines<5 issue を月次 digest で community に surface。
+"""
+implementation = """
+  1. good-first-issue-digest.yml
+"""
+
+[t27_close_open_rate_dashboard]
+priority = "LOW"
+effort = "M (~3-5日)"
+status = "proposal"
+description = """
+issue churn (open/close rate / avg lifetime) を monthly CSV export。
+"""
+implementation = """
+  1. /skill close-open-rate
+"""
+
+[t27_nightly_smoke_test]
+priority = "HIGH"
+effort = "M (~3-5日)"
+status = "proposal"
+description = """
+6 lang multilingual model × 6 lang inference smoke test を daily 定期化。
+upstream ORT / openjtalk 破壊検知。
+"""
+implementation = """
+  1. nightly-multimodel-smoke.yml cron 02:17 UTC
+  2. baseline hash 照合
+"""
+
+[t27_python_canary]
+priority = "HIGH"
+effort = "M (~3-5日)"
+status = "proposal"
+description = """
+Python 3.13/3.14-dev での test を weekly canary、 future version 互換性
+early warning。
+"""
+implementation = """
+  1. nightly-python-canary.yml cron Wed
+"""
+
+[t27_prerelease_dep_canary]
+priority = "MEDIUM"
+effort = "L (~1 週間)"
+status = "proposal"
+description = """
+ORT 1.21.0-rc / torch nightly / openjtalk main を weekly canary。
+"""
+implementation = """
+  1. nightly-prerelease-canary.yml
+"""
+
+[t27_cron_distribute]
+priority = "LOW"
+effort = "XS"
+status = "proposal"
+description = """
+schedule cron が 03:00 UTC に集中、 GH runner queue 衝突。 17 min ずつ
+ズラす。
+"""
+implementation = """
+  1. release-verify 03:00 → 04:17、 secret-scan 03:30 → 03:45
+"""
+
+[t27_rtf_variance_tracking]
+priority = "MEDIUM"
+effort = "M (~3-5日)"
+status = "proposal"
+description = """
+multi-runtime-rtf-baseline.json に samples / p10 / p90 / cv (variance) を
+記録、 calibration 期間中の精度向上。
+"""
+implementation = """
+  1. baseline JSON schema 拡張
+  2. multi-runtime-rtf.yml で variance 計算
+"""
+
+[t27_upstream_registry_health]
+priority = "MEDIUM"
+effort = "M (~3-5日)"
+status = "proposal"
+description = """
+PyPI / npm / crates.io / NuGet / Maven Central / HF Hub の API health check
+daily。
+"""
+implementation = """
+  1. nightly-upstream-health.yml
+  2. failure → issue auto-create
+"""
+
+[t27_lockfile_unlock_canary]
+priority = "LOW"
+effort = "L (~1 週間)"
+status = "proposal"
+description = """
+Cargo.lock / go.sum / packages.lock.json を削除して rebuild、 transitive
+upgrade 互換性 test。
+"""
+implementation = """
+  1. nightly-unlock-canary.yml weekly
+"""
+
+[t27_nightly_aggregate_notify]
+priority = "LOW"
+effort = "S (~半日)"
+status = "proposal"
+description = """
+nightly workflow failure を 1 aggregate issue + Slack 通知。
+"""
+implementation = """
+  1. open-issue-on-failure aggregate job
+"""
+
+[t27_pytest_rerunfailures_rollout]
+priority = "MEDIUM"
+effort = "M (~3-5日)"
+status = "proposal"
+description = """
+python-tests.yml の全 pytest invocation で --reruns 1。 Phase-2 で
+@pytest.mark.flaky に絞り --reruns-only flaky に。
+"""
+implementation = """
+  1. python-tests.yml に --reruns 1 --reruns-delay 1 統一
+"""
+
+[t27_cargo_nextest]
+priority = "MEDIUM"
+effort = "L (~1 週間)"
+status = "proposal"
+description = """
+cargo test → cargo nextest --retries 2 に migration。 JUnit XML + flake
+分類自動化。
+"""
+implementation = """
+  1. rust-tests.yml で cargo-nextest 導入
+"""
+
+[t27_gotestsum]
+priority = "MEDIUM"
+effort = "M (~3-5日)"
+status = "proposal"
+description = """
+go test → gotestsum --rerun-fails=2 に migration。
+"""
+implementation = """
+  1. go-ci.yml で gotestsum
+"""
+
+[t27_pytest_flaky_marker]
+priority = "MEDIUM"
+effort = "S (~半日)"
+status = "proposal"
+description = """
+@pytest.mark.flaky decorator を permanent flake にのみ付与、 --reruns-only
+flaky で明示。 hide-bug 防止。
+"""
+implementation = """
+  1. flaky test を src/python/tests/ で marker 化
+"""
+
+[t27_flake_detection_analytics]
+priority = "LOW"
+effort = "M (~3-5日)"
+status = "proposal"
+description = """
+gh run list --limit 100 → conclusion=FAILURE の rerun-pass を集計、 chronic
+flake を可視化。
+"""
+implementation = """
+  1. /watch-ci-patterns skill 拡張
+"""
+
+[t27_csharp_retry_attribute]
+priority = "LOW"
+effort = "S (~半日)"
+status = "proposal"
+description = """
+xUnit [Retry(2)] を IO-bound / timing-sensitive test に明示。
+"""
+implementation = """
+  1. test method 単位で [Retry(2)] 付与
+"""
+
+[t27_wasm_network_timeout]
+priority = "LOW"
+effort = "XS"
+status = "proposal"
+description = """
+test-webassembly.yml の npm test timeout 60s → 120s (HTTP dict download)。
+"""
+implementation = """
+  1. timeout 引数調整
+"""
+
+[t27_flaky_quarantine_doc]
+priority = "MEDIUM"
+effort = "XS"
+status = "proposal"
+description = """
+docs/guides/development/flaky-test-quarantine.md に既知 flaky test 一覧 +
+rootcause + rotation schedule。 hide-bug visibility 確保。
+"""
+implementation = """
+  1. markdown doc 新規 (quarterly review)
+"""
+
+[t27_ci_only_retry_contract]
+priority = "MEDIUM"
+effort = "S (~半日)"
+status = "proposal"
+description = """
+test-flake-retry-contract.toml Phase-2 を workflow に落とし込み。 local
+default = 0、 CI override 明示。
+"""
+implementation = """
+  1. pytest.ini / Cargo.toml / go.mod の retry config 整理
+"""
+
+# =============================================================================
+# T28: Version Sync / PR Convention / Misc (Wave 6 Domain 14 + 15 由来)
+# =============================================================================
+
+[t28_ort_rust_crate_floor]
+priority = "MEDIUM"
+effort = "L (~1 週間)"
+status = "proposal"
+description = """
+scripts/check_ort_versions.py の docstring で Rust ort crate を明示的に
+out-of-scope (RC 系 2.0.0-rc.X は upstream ORT と 1:1 対応せず、 stable
+版未公開)。 別 gate で ort crate ↔ upstream ORT mapping table 管理。
+"""
+implementation = """
+  1. docs/spec/ort-versions.md に ort crate ↔ upstream ORT mapping
+  2. 別 script (e.g., check_rust_ort_floor.py) で mapping を gate
+"""
+
+[t28_api_capability_matrix]
+priority = "MEDIUM"
+effort = "M (~3-5日)"
+status = "proposal"
+description = """
+docs/spec/api-capability-matrix.toml で 7 runtime × method signature を
+canonical 化。 Python 新メソッド追加で他 runtime 追随を検知。
+"""
+implementation = """
+  1. capability matrix spec 新規
+  2. PR-time gate
+"""
+
+[t28_ssml_per_runtime_contract]
+priority = "LOW"
+effort = "S (~半日)"
+status = "proposal"
+description = """
+ssml-contract.toml に [swift.ssml] / [kotlin.ssml] section で per-runtime
+parity gate。
+"""
+implementation = """
+  1. spec section 追加
+  2. CI で各 runtime SSML 機能を assert
+"""
+
+[t28_streaming_api_contract_version]
+priority = "MEDIUM"
+effort = "S (~半日)"
+status = "proposal"
+description = """
+streaming-api-contract.toml に contract_version = N、 schema 変更時に bump。
+version-consistency.yml で gate。
+"""
+implementation = """
+  1. spec に contract_version
+  2. gate 拡張
+"""
+
+[t28_model_schema_version_pin]
+priority = "HIGH"
+effort = "S (~半日)"
+status = "proposal"
+description = """
+release-versions.toml に [model_schema] section、 sample_rate / hop_length /
+num_speakers の expected_prefix を明示。
+"""
+implementation = """
+  1. spec section 追加
+  2. load test で verify
+"""
+
+[t28_ios_android_capability_lag]
+priority = "LOW"
+effort = "M (~3-5日)"
+status = "proposal"
+description = """
+Swift v1.13.0 / Kotlin v1.0.0 が Python 1.12.0 feature set 追随しているか
+の capability lag check。
+"""
+implementation = """
+  1. capability lag issue template
+  2. PR で Python 新 feature に対応 SPM/Kotlin 未追随を flag
+"""
+
+[t28_version_bump_checklist]
+priority = "LOW"
+effort = "S (~半日)"
+status = "proposal"
+description = """
+scripts/version_bump_checklist.py で 7 manifest の bump shell snippet を
+生成 (atomically 全 manifest 更新)。
+"""
+implementation = """
+  1. script 新規
+  2. /release-prep skill から呼び出し
+"""
+
+[t28_branch_naming_gate]
+priority = "MEDIUM"
+effort = "M (~3-5日)"
+status = "proposal"
+description = """
+push event で branch name = ^(feat|fix|chore|docs|test|ci|...)/[a-z0-9-]+$
+を gate。
+"""
+implementation = """
+  1. branch-naming-check.yml
+  2. error → push reject
+"""
+
+[t28_pr_title_commits_consistency]
+priority = "MEDIUM"
+effort = "M (~3-5日)"
+status = "proposal"
+description = """
+squash merge 想定で PR title type と PR 内 commits type の一致を verify。
+"""
+implementation = """
+  1. pr-title-commits-consistency.yml
+  2. squash predicted message vs PR title diff
+"""
+
+[t28_references_empty_strict]
+priority = "MEDIUM"
+effort = "XS"
+status = "proposal"
+description = """
+.commitlintrc.json で references-empty を 1 (warn) → 2 (error) に強制化。
+但し本 PR の既存 commit (0a797777 / 7e5b519e 等) を retroactively fail
+させるため、 commitlint workflow を新規 commit のみ verify に変更が必要。
+"""
+implementation = """
+  1. commitlint.yml で gitlog 範囲を「最新 commit のみ」 に絞る
+  2. references-empty を 2 に bump
+  3. 既存 PR の merge 後に適用
+"""
+
+[t28_dco_signoff_audit]
+priority = "LOW"
+effort = "S (~半日)"
+status = "proposal"
+description = """
+DCO sign-off audit (read-only)。 contributor agreement tracking 準備。
+"""
+implementation = """
+  1. scripts/audit-dco-signoff.sh
+  2. enforcement は別 PR で議論
+"""
+
+[t28_wip_draft_prevention]
+priority = "LOW"
+effort = "S (~半日)"
+status = "proposal"
+description = """
+WIP / Draft branch name → guard-bash.sh で warn。 PR title で WIP も check。
+"""
+implementation = """
+  1. .claude/hooks/guard-wip.sh
+  2. guard-bash.sh に統合
+"""
+
+[t28_multi_commit_dedup]
+priority = "LOW"
+effort = "L (~1 週間)"
+status = "proposal"
+description = """
+fixup! / squash! / revert: chains を warning-only で検出。 squash merge
+回避時の cleanup 不足を informational に。
+"""
+implementation = """
+  1. commit-dedup-detector.yml
+"""
+
+[t28_risk_commit_alignment]
+priority = "MEDIUM"
+effort = "M (~3-5日)"
+status = "proposal"
+description = """
+PR body Risk Level (patch/minor/major) と commits type (feat/fix/chore) の
+alignment を verify。 major → feat or breaking(!) 必須、 minor → chore NG 等。
+"""
+implementation = """
+  1. pr-risk-commit-alignment.yml
 """

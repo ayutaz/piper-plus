@@ -19,10 +19,17 @@ on:
 env:
   CIBW_BUILD_VERBOSITY: 1
 
+permissions:
+  contents: read
+
 jobs:
   build_wheels:
     name: Build Windows wheels for Python ${{ matrix.python }}
     runs-on: windows-latest
+    # Wave 6-1.1: cibuildwheel + MSVC + espeak-ng build は 30-45 min。
+    # windows-latest の MSVC link が hang した場合 GitHub の default 6h まで
+    # 待たせる行動に陥るため 60 min で fail-fast。
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
@@ -103,6 +110,9 @@ jobs:
     name: Test Windows wheels on Python ${{ matrix.python-version }}
     needs: build_wheels
     runs-on: windows-latest
+    # Wave 6-1.1: wheel test は ~10 min、 pip install + Python import smoke。
+    # 20 min fail-fast (pip install network flake 吸収)。
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:

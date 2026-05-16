@@ -35,6 +35,9 @@ on:
         description: 'Path to the build directory'
         value: ${{ jobs.build.outputs.build-path }}
 
+permissions:
+  contents: read
+
 jobs:
   build:
     name: Build on ${{ inputs.os }}
