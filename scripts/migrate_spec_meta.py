@@ -89,7 +89,6 @@ def insert_forward_compat(text: str) -> tuple[str, str]:
     start, end = section
     lines = text.splitlines(keepends=True)
     # 既存 [meta] の最終 valid line (空行ではない) 直後に挿入。
-    insert_at = start + 1
     last_field_line = start + 1
     for k in range(start + 1, end):
         s = lines[k].strip()
