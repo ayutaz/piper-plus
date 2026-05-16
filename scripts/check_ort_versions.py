@@ -22,6 +22,7 @@ Issue #383 follow-up で ORT 1.17.0 → 1.20.0 に上げた際、6 ファイル 
     * ``.github/workflows/kotlin-g2p-ci.yml`` (Kotlin G2P PR CI)
     * ``.github/workflows/build-piper.yml`` (Linux/macOS source build)
     * ``.github/workflows/_build-test-cpp.yml`` (Linux/macOS arm64/x86_64/Windows pre-built)
+    * ``.github/workflows/bundle-size-gate.yml`` (Android shared lib build for AAR size measure)
     * ``docker/cpp-dev/Dockerfile`` (CPU-only dev image; Issue #372)
 
 2. **Floor-check group** — canonical より低い floor pin は禁止 (Issue
@@ -75,6 +76,7 @@ TARGETS: list[Path] = [
     Path(".github/workflows/kotlin-g2p-ci.yml"),
     Path(".github/workflows/build-piper.yml"),
     Path(".github/workflows/_build-test-cpp.yml"),
+    Path(".github/workflows/bundle-size-gate.yml"),
     Path("docker/cpp-dev/Dockerfile"),
 ]
 
