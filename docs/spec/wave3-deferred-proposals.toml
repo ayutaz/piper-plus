@@ -645,14 +645,534 @@ implementation = """
 """
 
 # =============================================================================
+# Wave 5 deferred (T20-T23) — 15 並列 agent 第 3 弾調査の M/L 工数 + 中-高 risk
+# 100+ 件を集約。 Wave 5 Tier A 13 件は本 PR で実装済 (.pre-commit-config.yaml
+# + scripts/check_* + docs/spec/*-baseline.toml)。 T20-T23 は個別 PR で着手。
+# =============================================================================
+
+# ---------------------------------------------------------------------------
+# T20 — G2P cross-runtime contract 拡張 (Wave 5-7 系)
+# ---------------------------------------------------------------------------
+
+[t20_phonemize_api_shape]
+priority = "HIGH"
+effort = "M (~3-5日)"
+status = "proposal"
+description = """
+全 8 ランタイムの phonemize() 戻り値 shape (List[(str, Option<ProsodyInfo>)] 等)
+を canonical spec 化、 docs/spec/phonemize-api-contract.toml で pin。 fixture
+は tests/fixtures/phonemize_api/contract.json に生成し、 各 runtime で shape
+assertion を追加 (Python は List[str] + List[Option<ProsodyInfo>]、 他は
+unspecified の現状を統一)。
+"""
+implementation = """
+  1. spec TOML + canonical Python で fixture 生成
+  2. 7 runtime に shape assertion test 追加 (Rust/Go/C#/WASM/C++/Kotlin/Swift)
+  3. CI parity-hub.yml に統合
+"""
+
+[t20_unknown_phoneme_policy]
+priority = "MEDIUM"
+effort = "S (~半日)"
+status = "proposal"
+description = """
+unknown phoneme の挙動 (silently-skip / error / passthrough) を language ×
+runtime 行列で TOML 化、 各 runtime の processor で assert。 現状: Python
+Spanish/Swedish は silently-skip、 他 runtime は未確認 → drift catch。
+"""
+implementation = """
+  1. docs/spec/unknown-phoneme-fallback-contract.toml
+  2. scripts/check_unknown_phoneme_policy.py (pre-commit hook)
+"""
+
+[t20_ssml_parse_golden]
+priority = "MEDIUM"
+effort = "M (~3-5日)"
+status = "proposal"
+description = """
+tests/fixtures/ssml/parse_golden.json を新規作成 (100+ SSML snippet × expected
+AST)。 Rust/Go/C#/WASM が same JSON を deserialize して AST を再構築し
+byte-for-byte 比較。 現 fixture は定数 map のみ (break_strength / prosody_rate
+named map)、 実 SSML parse 結果は未 gate。
+"""
+implementation = """
+  1. fixture 生成 (Python canonical)
+  2. 5 runtime parser golden test 追加
+  3. scripts/check_ssml_parse_parity.py
+"""
+
+[t20_japanese_chinese_variant_fixture_mirror]
+priority = "MEDIUM"
+effort = "M (~3-5日)"
+status = "proposal"
+description = """
+Japanese N-variant / Chinese tone の fixture を 8 ランタイム 全網羅型に展開
+(N: 清音/濁音/促音 × accent position 30+、 tone: 4 tone × loanword prefix ×
+3 context 36 組み合わせ)。 現 spec は contract TOML のみ、 fixture が薄い。
+"""
+implementation = """
+  1. tests/fixtures/japanese_n_variant_golden.json (30+ cases)
+  2. tests/fixtures/chinese_tone_golden.json (36+ cases)
+  3. 7 runtime assertion + scripts/regenerate_variant_golden.py --check
+"""
+
+[t20_phoneme_timing_fixture_mirror]
+priority = "LOW"
+effort = "M (~3-5日)"
+status = "proposal"
+description = """
+phoneme-timing-contract.toml は formula のみ。 実 timing fixture (text ×
+expected duration array) を 6 runtime で sync する。 voice quality regression
+(PR #426 事例) を防ぐ。 timing drift threshold 5%。
+"""
+implementation = """
+  1. tests/fixtures/phoneme_timing/golden.json (100+ texts)
+  2. 6 runtime timing assertion (Python/Rust/Go/C#/WASM/C++)
+  3. timing-parity.yml 拡張
+"""
+
+[t20_dialect_context_detection]
+priority = "LOW"
+effort = "S-M (~1-2日)"
+status = "proposal"
+description = """
+pt vs pt-PT の context-based fallback policy (code=pt だが EU marker > 50%
+で EU 昇格 等) を TOML 化、 8 runtime で same dialect を選出することを assert。
+現 pt-dialect-contract は code aliasing のみカバー。
+"""
+implementation = """
+  1. docs/spec/dialect-context-detection-contract.toml
+  2. 8 runtime detection assertion
+"""
+
+# ---------------------------------------------------------------------------
+# T21 — モデル ライフサイクル拡張 (Wave 5-8 系)
+# ---------------------------------------------------------------------------
+
+[t21_embedding_dim_validator]
+priority = "HIGH"
+effort = "S (~半日)"
+status = "proposal"
+description = """
+ONNX export 後、 emb_lang/emb_g dimension が config.json の gin_channels と
+一致するか post-export validation。 古い epoch ckpt での silent mismatch を
+catch。 既存 check_onnx_export_contract.py の流用パターン。
+"""
+implementation = """
+  1. scripts/check_config_embedding_dims.py (pre-commit gate)
+"""
+
+[t21_naming_convention_validator]
+priority = "HIGH"
+effort = "S (~半日)"
+status = "proposal"
+description = """
+models_manifest.json / model-sha256-manifest.toml の filename entry と
+実 .onnx file 名の完全一致を gate。 命名 drift の早期 catch。
+"""
+implementation = """
+  1. scripts/validate_model_naming.py (pre-commit gate)
+"""
+
+[t21_emb_lang_unify_validator]
+priority = "MEDIUM"
+effort = "S (~半日)"
+status = "proposal"
+description = """
+ONNX export 後、 --unify-emb-lang flag の効果が実際に ONNX graph に反映
+されているか確認 (single-lang annotation を metadata に追加)。 config.json
+の「multilingual」記載と ONNX graph 内 dim の整合性 verify。
+"""
+implementation = """
+  1. check_onnx_export_contract.py 拡張 (post-export emb_lang validator)
+"""
+
+[t21_config_roundtrip_test]
+priority = "MEDIUM"
+effort = "S (~半日)"
+status = "proposal"
+description = """
+Export config.json → ort.InferenceSession 経由で ONNX load → session の
+get_inputs() / get_outputs() shape が config 記載値と一致するか assert。
+FP16 conversion / opset version mismatch を catch。
+"""
+implementation = """
+  1. scripts/check_onnx_config_roundtrip.py (post-export gate)
+"""
+
+[t21_checkpoint_archive_policy]
+priority = "MEDIUM"
+effort = "M (~1-2日)"
+status = "proposal"
+description = """
+/data/piper/output-* 配下の checkpoint を最新 N epoch のみ保持、 古い ckpt
+は _archived/ に移動 (or 圧縮)。 disk cost 削減。 dry-run mode 必須。
+"""
+implementation = """
+  1. scripts/archive_old_checkpoints.sh + cron job (manual trigger only)
+"""
+
+[t21_hf_sync_validator]
+priority = "MEDIUM"
+effort = "M (~2-3日)"
+status = "proposal"
+description = """
+HF Hub repo の actual file list と manifest 内 entry の一致を確認。 404 /
+size mismatch を warn。 HF API rate limit + retry logic 必要。
+"""
+implementation = """
+  1. scripts/check_hf_manifest_sync.py + scheduled workflow
+"""
+
+[t21_submission_manifest_validator]
+priority = "LOW"
+effort = "M (~2-3日)"
+status = "proposal"
+description = """
+Issue close trigger で「model submission」 issue body から hf_url / model_name
+を抽出、 model-sha256-manifest.toml に entry が存在するか verify。 orphan
+entry 蓄積防止。
+"""
+implementation = """
+  1. .github/workflows/issue-close-manifest-check.yml + scripts
+"""
+
+[t21_dataset_license_matrix]
+priority = "MEDIUM"
+effort = "M (~1-2日)"
+status = "proposal"
+description = """
+CONTRIBUTING_MODELS.md に dataset license matrix (CML-TTS=CC-BY-NC、 LibriTTS=
+CC-BY-4.0 等) を定義、 model submission template の checklist で「最も制限的
+license に従う」 mapping を強制。
+"""
+implementation = """
+  1. CONTRIBUTING_MODELS.md license matrix table
+  2. .github/ISSUE_TEMPLATE/model-submission.yml に dataset license dropdown
+"""
+
+# ---------------------------------------------------------------------------
+# T22 — Error observability + 静的解析拡張 (Wave 5-9 + 5-12 系)
+# ---------------------------------------------------------------------------
+
+[t22_exit_code_contract]
+priority = "MEDIUM"
+effort = "M (~2-3日)"
+status = "proposal"
+description = """
+CLI exit code を 0=OK / 1=arg error / 2=model not found / 3=ORT error 等
+の enum で cross-runtime 統一。 docs/spec/cli-exit-code-contract.toml と
+Go/C# CLI 実装 + per-runtime test。
+"""
+implementation = """
+  1. docs/spec/cli-exit-code-contract.toml
+  2. Rust/Go/C#/Python CLI exit code enum 実装
+  3. cross-runtime exit test fixtures
+"""
+
+[t22_http_status_policy]
+priority = "LOW"
+effort = "M (~1-2日)"
+status = "proposal"
+description = """
+FastAPI server の HTTP status code policy 統一 (4xx 契約違反 / 5xx 内部
+エラー)、 error_code + error_details JSON 標準化。 OpenAI 互換性強化。
+"""
+implementation = """
+  1. docker/python-inference/inference.py error response refactor
+  2. scripts/check_http_status_policy.py (schema linter)
+"""
+
+[t22_log_level_parity]
+priority = "LOW"
+effort = "M (~2-3日)"
+status = "proposal"
+description = """
+Python logging / Go slog / Rust tracing / C# ILogger の TRACE/DEBUG/INFO/
+WARN/ERROR 一貫性 + C# 構造化 logging 導入。 APM (Sentry / Datadog) 統合の
+前提整備。
+"""
+implementation = """
+  1. docs/spec/log-level-contract.toml
+  2. scripts/check_log_level_parity.py + 4 runtime regex assert
+"""
+
+[t22_ruf_lints_enable]
+priority = "MEDIUM"
+effort = "S (~半日)"
+status = "proposal"
+description = """
+Ruff RUF008 (mutable-class-attribute-default) / RUF009 (pydantic-validation) /
+TCH (type-checking imports) を enable。 dataclass 多用環境での循環参照 risk
+を低減。
+"""
+implementation = """
+  1. pyproject.toml [tool.ruff] select 拡張
+"""
+
+[t22_errorlint_enable]
+priority = "MEDIUM"
+effort = "M (~1-2日)"
+status = "proposal"
+description = """
+golangci-lint errorlint を enable (現在 disabled)。 fmt.Errorf %w / errors.Is
+が必要な箇所を catch。 既存 test code refactor 後に有効化。
+"""
+implementation = """
+  1. .golangci.yml errorlint section 追加
+  2. test code の error wrap refactor
+"""
+
+[t22_clang_tidy_bugprone]
+priority = "MEDIUM"
+effort = "M (~1-2日)"
+status = "proposal"
+description = """
+clang-tidy bugprone-narrowing-conversions / bugprone-infinite-loop を enable。
+C++ inference path (piper.cpp / engine.rs link) の type safety 向上。
+"""
+implementation = """
+  1. .clang-tidy Checks 拡張
+  2. per-rule suppression triage
+"""
+
+[t22_csharp_naming_warnings]
+priority = "LOW"
+effort = "S (~半日)"
+status = "proposal"
+description = """
+C# SA1407 (logical not before binary) / CA1711 (naming convention) を warning
+level で enable。 既存 code 影響なし (naming check only)。
+"""
+implementation = """
+  1. .editorconfig dotnet_diagnostic.SA1407.severity = warning
+"""
+
+[t22_short_text_warning_parity]
+priority = "LOW"
+effort = "S (~半日)"
+status = "proposal"
+description = """
+Short-text warning (< 10 chars) を Go/C#/Rust CLI にも実装、 stderr 構造化
+warning (JSON) で aggregation 可能に。 Python FastAPI 専用だった機能を
+cross-runtime 同期。
+"""
+implementation = """
+  1. short-text-contract.toml threshold 定数同期
+  2. 4 runtime warning マクロ
+"""
+
+[t22_phonemizer_fallback_logging]
+priority = "LOW"
+effort = "M (~2-3日)"
+status = "proposal"
+description = """
+"Unknown phoneme" warning を structured log ({session_id, unknown_phonemes,
+fallback_used, language}) で統一形式に。 各 runtime で同 JSON shape。
+"""
+implementation = """
+  1. docs/spec/phonemizer-fallback-log-contract.toml
+  2. scripts/check_phonemizer_error_parity.py
+"""
+
+[t22_root_pyproject_floor_expansion]
+priority = "LOW"
+effort = "S (~半日)"
+status = "proposal"
+description = """
+既存 check_ort_versions は src/python/pyproject.toml + src/python_run/*
++ C# csproj + go.mod + npm package.json の floor をカバーするが、 root
+pyproject.toml は対象外。 root の onnxruntime>=1.17 が src/python の >=1.20
+と drift している。 root も canonical floor に揃える gate を追加。
+"""
+implementation = """
+  1. check_ort_versions.py の floor-check group に root pyproject.toml 追加
+"""
+
+# ---------------------------------------------------------------------------
+# T23 — meta-workflow + 学習パイプ品質 (Wave 5-14 + 5-15 系)
+# ---------------------------------------------------------------------------
+
+[t23_skill_meta_toml]
+priority = "MEDIUM"
+effort = "M (~3-5日)"
+status = "proposal"
+description = """
+.claude/skills/*/meta.toml で skill 引数 / hook / chain 関係を正式化
+(arguments / depends_on / auto_chain_after / incompatible_with)。 schema
+validator + pre-commit gate。
+"""
+implementation = """
+  1. .claude/skills/*/meta.toml (各 skill)
+  2. scripts/check_skill_meta_schema.py
+"""
+
+[t23_cross_runtime_sync_framework]
+priority = "MEDIUM"
+effort = "M (~3-5日)"
+status = "proposal"
+description = """
+check-pua / check-loanword 等の「Python canonical → 6 mirror byte-for-byte
+同期」 pattern を framework 化 (cross_runtime_sync_framework.py)。 SyncChecker
+base class + plugin。 新 data asset 追加時の boilerplate 削減。
+"""
+implementation = """
+  1. scripts/cross_runtime_sync_framework.py (base class)
+  2. 既存 checker を adapter pattern に refactor
+"""
+
+[t23_hook_profile_reporter]
+priority = "LOW"
+effort = "S (~半日)"
+status = "proposal"
+description = """
+.claude/hooks/_profiler.sh wrapper で各 hook の実行時間を measure、 週次 skill
+で集計 (median / p95)。 hook ボトルネック特定。
+"""
+implementation = """
+  1. .claude/hooks/_profiler.sh
+  2. /watch-hook-perf skill
+"""
+
+[t23_local_ci_act_equivalence]
+priority = "MEDIUM"
+effort = "M (~3-5日)"
+status = "proposal"
+description = """
+local hook (.claude/hooks/ + .pre-commit-config.yaml) と CI workflow の
+等価性検証 (act ベース)。 PR #401 (ruff format drift local-clean / CI-fail)
+の再発防止。 /sync-hook-ci skill で hook 抽出 + CI 照合 + act simulation。
+"""
+implementation = """
+  1. /sync-hook-ci skill
+  2. scripts/check_hook_ci_parity.py
+"""
+
+[t23_edit_skill_dryrun_enforce]
+priority = "LOW"
+effort = "S (~半日)"
+status = "proposal"
+description = """
+skill frontmatter に edit-operations: require-dry-run flag を追加、 Edit/Write
+を呼ぶ skill が --dry-run / --check / --diff 引数を持つことを gate。 誤編集
+防止。
+"""
+implementation = """
+  1. .claude/skills/*/SKILL.md frontmatter 拡張
+  2. scripts/check_skill_dryrun_safety.py
+"""
+
+[t23_doc_link_drift_detection]
+priority = "LOW"
+effort = "S (~半日)"
+status = "proposal"
+description = """
+CLAUDE.md と .claude/README.md の双方向 link consistency を gate。 skill
+directory list と README の skill 列挙の照合、 最終更新日 30日差で warn。
+"""
+implementation = """
+  1. scripts/check_doc_link_consistency.py (pre-commit gate)
+"""
+
+[t23_memory_cleanup_automation]
+priority = "LOW"
+effort = "M (~2-3日)"
+status = "proposal"
+description = """
+.claude/projects/-*/memory/*.md の semantic 重複 / 90+ 日 idle entry の
+cleanup skill。 memory file lint + auto-deprecate proposal。
+"""
+implementation = """
+  1. /memory-lint skill (read-only initially)
+"""
+
+[t23_training_log_structured]
+priority = "MEDIUM"
+effort = "M (~2-3日)"
+status = "proposal"
+description = """
+VitsModel.on_train_epoch_end() で構造化 log JSON を training.log に emit
+(epoch / loss_g / loss_d / val_loss / timestamp)。 NaN loss / validation
+skip の早期検出。 既存 WandB と並行 logging。
+"""
+implementation = """
+  1. lightning.py logging hook
+  2. scripts/parse_training_log.py --check-nan --check-validation-freq
+"""
+
+[t23_seed_everything_enforce]
+priority = "MEDIUM"
+effort = "S (~半日)"
+status = "proposal"
+description = """
+pl.seed_everything(args.seed) を __main__.py に追加、 cuDNN deterministic
+flag を CLI flag (--deterministic) で制御。 reproducibility 保証。
+"""
+implementation = """
+  1. src/python/piper_train/__main__.py に pl.seed_everything 追加
+  2. pre-commit gate で grep check
+"""
+
+[t23_checkpoint_resume_determinism_test]
+priority = "MEDIUM"
+effort = "M (~3-5日)"
+status = "proposal"
+description = """
+1 epoch run → save → resume → 1 epoch run で loss 一致 (delta < 1e-5) を
+GPU CI で assert。 deterministic resume capability の pinning。
+"""
+implementation = """
+  1. src/python/tests/test_checkpoint_resume_determinism.py (requires_gpu)
+"""
+
+[t23_onnx_export_sanity_test]
+priority = "MEDIUM"
+effort = "M (~1-2日)"
+status = "proposal"
+description = """
+ckpt → ONNX export → infer_onnx で 1 文 synthesize → output.wav 存在 +
+length > 0 の end-to-end sanity test。 broken ONNX export を catch。
+"""
+implementation = """
+  1. src/python/tests/test_export_onnx_sanity.py (integration test)
+"""
+
+[t23_dataset_balance_report]
+priority = "LOW"
+effort = "M (~1-2日)"
+status = "proposal"
+description = """
+VitsModel.setup() で各 split の言語/話者分布を histogram 計算、 training
+開始時 INFO log + WandB 記録。 言語比 ≥ 3:1 で --language-balanced-sampling
+推奨を auto 提案。
+"""
+implementation = """
+  1. lightning.py setup() histogram + warning
+  2. /check-dataset-balance skill
+"""
+
+[t23_val_audio_log_relation_check]
+priority = "LOW"
+effort = "S (~半日)"
+status = "proposal"
+description = """
+__main__.py で audio_log_epochs % val_every_n_epochs != 0 を warn、
+audio_log_epochs > val_every_n_epochs を error として gate。 audio log が
+emit されない edge case の防止。
+"""
+implementation = """
+  1. _build_trainer() に assertion 追加
+"""
+
+# =============================================================================
 # 不変条件
 # =============================================================================
 
 [[invariants]]
 name = "individual-pr-per-task"
 description = """
-T14 / T15 / T16 / T17 / T18 / T19 は個別 PR で進める。 Wave 3 PR にまとめて
-入れない (PR レビュー困難 + revert 影響範囲が大きい)。
+T14 / T15 / T16 / T17 / T18 / T19 / T20 / T21 / T22 / T23 は個別 PR で進める。
+Wave 5 PR にまとめて入れない (PR レビュー困難 + revert 影響範囲が大きい)。
 """
 
 [[invariants]]

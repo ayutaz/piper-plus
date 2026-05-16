@@ -1,0 +1,49 @@
+# Wave 5-4 — Lockfile size baseline.
+#
+# Why: transitive dep 爆発 (e.g. 1 packaged が 30 sub-dep を pull する)
+#   は build performance / CI cache size / supply-chain attack surface
+#   を悪化させる。 lockfile の byte size 急増 (例: +50% in 1 PR) は
+#   transitive bloat の早期 signal。 既存 lockfile-consistency gate は
+#   「9 runtime の lockfile が存在するか」 を見ているだけで、 size delta
+#   は監視していない。
+#
+# How to apply: scripts/check_lockfile_size.py が各 lockfile の現在 size を
+#   measure し、 ここに記載された baseline と比較。 +20% で warning、
+#   +50% で fail。 dep 大型更新 (e.g. PyTorch upgrade) で意図的に bloat
+#   する場合は本 file の `bytes` 値を更新して PR で justification 必須。
+
+[meta]
+last_audit_date = "2026-05-17"
+last_audit_pr = "PR #498 (Wave 5)"
+warn_pct = 20
+fail_pct = 50
+forward_compat_policy = "strict"
+
+# 各 lockfile の byte size (現在の sha256 と byte 数の snapshot)。
+# `bytes` を Real_Size と比較、 (Real - Base) / Base * 100 > fail_pct で fail。
+
+[lockfiles."uv.lock"]
+bytes = 1023798
+description = "Root workspace (piper-train / inference / dev tooling)"
+
+[lockfiles."src/rust/Cargo.lock"]
+bytes = 100219
+description = "Rust workspace (piper-core, piper-cli, piper-python, piper-wasm)"
+
+[lockfiles."src/wasm/openjtalk-web/package-lock.json"]
+bytes = 7551
+description = "WASM npm package (openjtalk-web)"
+
+[lockfiles."src/wasm/g2p/package-lock.json"]
+bytes = 0   # baseline不明 (initial state まちまち) — 初回 reset
+description = "WASM npm package (@piper-plus/g2p) — baseline未設定、 初回更新後 fill"
+optional = true
+
+[lockfiles."src/go/go.sum"]
+bytes = 1238
+description = "Go module (piperplus root)"
+
+[lockfiles."src/python/g2p/uv.lock"]
+bytes = 0   # workspace member の lock、 monitor 対象は root uv.lock
+description = "Python G2P workspace member — root uv.lock がカバーするため monitor 対象外"
+optional = true
