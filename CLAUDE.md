@@ -325,6 +325,29 @@ cat test.jsonl | uv run python -m piper_train.infer_onnx --model <model.onnx> --
 
 ---
 
+## Automation (skill / hook / pre-commit)
+
+開発作業の繰り返しを skill / pre-commit / pre-push gate に落とし込んでいる。 詳細仕様は [.claude/README.md](.claude/README.md)。 主要 skill 一覧:
+
+| skill | 用途 |
+|-------|------|
+| `/create-pr` | push 済 branch から構造化 PR 本文を作成 (auto chain で `/watch-pr` / `/check-review-backlog` 発動) |
+| `/watch-pr <PR>` / `/watch-ci-patterns` | CI 監視、 failure を flake/drift/env/test bug に分類 |
+| `/reply-review <PR>` | unresolved review thread への返信 + resolve |
+| `/check-review-backlog` | open PR の review backlog 集計 |
+| `/precheck` / `/check-pr-ready` / `/run-tests` | scope 自動判定で local CI equivalent を実行 |
+| `/commit` / `/sync-docs` | コミット前 ドキュメント整合性 + 構造化メッセージ |
+| `/check-loanword` / `/check-pua` / `/check-runtime-parity` / `/check-cross-runtime` / `/check-new-runtime-asset` | cross-runtime 同期検査 |
+| `/add-language <code>` / `/review-language <code>` | 新言語追加と 10 エージェント並列レビュー |
+| `/release-prep` / `/prepare-release` | リリース確認 (read-mostly) と bump 適用案 |
+| `/publish-model` | 学習 ckpt → export + sanity + bench + HF upload chain |
+| `/bump-deps` | ORT/openjtalk/ruff の cross-runtime canonical sync 更新 |
+| `/skill-health` | skill / hook 自身の health check (frontmatter / script 参照 / trigger 衝突) |
+
+pre-commit / pre-push gate は `.pre-commit-config.yaml` に集約 (50+ hook、 contract gate 18+、 cross-language formatter 6 言語)。 各 hook の trigger 条件と既知パターンは [.claude/README.md](.claude/README.md) を参照。
+
+---
+
 ## アーカイブ: バイリンガル版 (v2/v3/v4) の履歴
 
 v2/v3/v4 は 6lang に置き換え済み。詳細・旧データセットパス・つくよみちゃん FT 履歴 (v3→v4→6lang-v2 の段階的改善、`emb_lang` コピーや `--freeze-dp` の learnings) は git 履歴 (`git log --grep="bilingual\\|v[234]"`) または `CHANGELOG-archive.md` を参照。
