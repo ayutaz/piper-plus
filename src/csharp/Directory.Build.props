@@ -26,7 +26,7 @@
     <!-- NuGet packages.lock.json (transitive deps の reproducible build / CVE
          監査向上)。 Dependabot は .NET ecosystem を直接サポートしないが、
          security-audit.yml の nuget-audit と組み合わせて CVE detection の
-         baseline を確立する。 CI では `--locked-mode` で lock 違反を fail。 -->
+         baseline を確立する。 CI では locked-mode で lock 違反を fail。 -->
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
 
     <!-- XML doc generation: 既存コードの doc-comment 不備が build を fail させるため OFF。

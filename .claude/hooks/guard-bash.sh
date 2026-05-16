@@ -106,4 +106,15 @@ case "$CMD" in
     deny "npm publish は手動で行わず、release ワークフロー経由で実行してください。" ;;
 esac
 
+# --- PR 作成は /create-pr skill 経由を強制 -------------------------------
+# `gh pr create` を直接実行すると /create-pr skill のフェーズ 6.2 で発動する
+# `/watch-pr` auto-chain が走らず、 CI 監視が起動しない (PR #498 で発覚)。
+# memory: feedback_pr_create_skill_only.md
+# command 先頭 / `&& ` / `; ` 直後の場合のみ block (commit message 等の
+# 引用内文字列は誤発動を避けるため除外)。
+case "$CMD" in
+  "gh pr create"|"gh pr create "*|*"&& gh pr create"*|*"; gh pr create"*|*"&&gh pr create"*|*";gh pr create"*)
+    deny "gh pr create の直接実行は禁止です。/create-pr skill を使うと watch-pr の auto-chain が発動し、 PR 構造化本文 + CI 監視が一括で起動します。" ;;
+esac
+
 exit 0

@@ -697,7 +697,11 @@ repos:
     rev: v0.10.0.1
     hooks:
       - id: shellcheck
-        args: [--severity=warning, --shell=bash]
+        # severity=error: 既存 shell スクリプト群に SC2034/SC2046/SC2010/SC2221/
+        # SC2222 系の warning が多数あり、 全て修正するのは別 PR の範囲。
+        # まずは error (syntax / quoting bug) のみ block して新規追加スクリプトの
+        # ガード強化を狙う。 warning level 修正は段階的に。
+        args: [--severity=error, --shell=bash]
         files: \.(sh|bash)$
         exclude: ^(\.build/|build/|build-full/|build-test/|node_modules/|target/|src/wasm/openjtalk-web/(build|demo|models|voices|patches)/)
 
@@ -766,6 +770,7 @@ repos:
           ^(node_modules|build|dist|target|\.git|test/models|tools/benchmark/issue-383|src/wasm/openjtalk-web/(build|demo|models|voices|patches)|tests/fuzz)/|
           ^src/csharp/.*\.csproj$|
           ^src/csharp/.*\.props$|
+          ^\.claude/hooks/.*\.sh$|
           ^cmake/.*\.cmake$|
           ^src/python/g2p/piper_plus_g2p/registry\.py$|
           ^\.github/workflows/android-build\.yml$|

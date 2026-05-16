@@ -81,7 +81,7 @@ jobs:
           cache-to: type=gha,mode=max,scope=trivy-${{ matrix.target.name }}
 
       - name: Trivy image scan (table output for log)
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@0.36.0
         with:
           image-ref: piper-plus-${{ matrix.target.name }}:trivy-scan
           format: table
@@ -92,7 +92,7 @@ jobs:
           exit-code: '0'   # 一度目は report 専用 (下で SARIF を upload)
 
       - name: Trivy image scan (SARIF for Security tab)
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@0.36.0
         with:
           image-ref: piper-plus-${{ matrix.target.name }}:trivy-scan
           format: sarif
@@ -110,7 +110,7 @@ jobs:
       - name: Fail on CRITICAL only
         # MEDIUM/HIGH は report のみ、 CRITICAL のみ PR を block する。
         # ベースイメージの定常更新を妨げない conservative 設定。
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@0.36.0
         with:
           image-ref: piper-plus-${{ matrix.target.name }}:trivy-scan
           format: table
