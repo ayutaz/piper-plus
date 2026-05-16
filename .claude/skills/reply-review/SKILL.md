@@ -1,8 +1,8 @@
 ---
 name: reply-review
-description: PR レビューコメント (GitHub / Copilot) に対して対応内容を返信し、review thread を resolve します。修正コミット後に呼び出してください。`--stale-check` で「コメント以降に該当ファイルが更新済」のコメントを自動 flag、`--skip-copilot-style` で Copilot の定型ノイズを除外、`--dry-run` で計画のみ表示。
+description: PR レビューコメントへの対応 / review thread の resolve / Copilot や human reviewer のコメントに返信 する文脈で発動。修正コミット後に呼ぶと、各 unresolved thread に対して返信本文を生成し thread を resolve する。`--stale-check` で「コメント以降に該当ファイルが更新済」を自動 flag、`--skip-copilot-style` で Copilot 定型ノイズ regex 除外、`--dry-run` で計画のみ表示。
 argument-hint: "<pr-number> [commit-hash] [--stale-check] [--skip-copilot-style] [--dry-run]"
-disable-model-invocation: true
+disable-model-invocation: false
 allowed-tools: Bash(gh api *) Bash(gh pr view *) Bash(gh pr checks *) Bash(git log *) Bash(git show *) Bash(git rev-parse *) Bash(git diff *) Read Grep
 ---
 

@@ -1,8 +1,8 @@
 ---
 name: watch-pr
-description: PR の CI checks を一度ポーリングし、green/red/pending を集計する。`/loop` と組み合わせて 5 分間隔の継続監視に使う (例 `/loop /watch-pr 489`)。red になったら失敗 job のログを fetch し、原因を「format drift / test fail / flake」に分類して修正案を提案する。
+description: PR push 直後 / CI 監視 / merge 前確認 の文脈で発動。`gh pr checks` を一度 polling し green / red / pending を集計、red なら失敗 job のログを fetch して「format drift / test fail / build error / flake / contract drift」に分類し修正案を提案する。`/loop /watch-pr <PR>` で 5 分間隔の継続監視に使える。
 argument-hint: "[pr-number]"
-disable-model-invocation: true
+disable-model-invocation: false
 allowed-tools: Bash(gh pr checks *) Bash(gh pr view *) Bash(gh run view *) Bash(gh api *) Bash(git rev-parse *) Bash(git branch *) Read Grep
 ---
 
