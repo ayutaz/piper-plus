@@ -1,5 +1,9 @@
 name: Go CI
 
+# 最小権限: go test / vet / golangci-lint のみ。
+permissions:
+  contents: read
+
 on:
   pull_request:
     branches: [dev]
@@ -172,7 +176,9 @@ jobs:
       - uses: actions/setup-go@v5.6.0
         with:
           go-version: '1.26'
-      - uses: golangci/golangci-lint-action@v7
+      # major-only sliding ref `@v7` を semver pin (`@v7.0.1`) に変更。
+      # security audit Top 1 (v8/v9 で Go 1.20 サポート drop の可能性あり)。
+      - uses: golangci/golangci-lint-action@v7.0.1
         with:
           working-directory: src/go
 

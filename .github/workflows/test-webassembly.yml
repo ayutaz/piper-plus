@@ -1,5 +1,9 @@
 name: Test WebAssembly
 
+# 最小権限 (least privilege): test / report のみ、 書込不要。
+permissions:
+  contents: read
+
 on:
   push:
     branches: [ dev ]

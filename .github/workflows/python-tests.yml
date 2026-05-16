@@ -1,5 +1,9 @@
 name: python-tests
 
+# 最小権限: テスト実行のみ、 PR / issue への書き込み不要。
+permissions:
+  contents: read
+
 on:
   workflow_call:
   pull_request:

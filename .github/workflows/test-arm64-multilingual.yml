@@ -1,5 +1,9 @@
 name: Test ARM64 Multilingual TTS
 
+# 最小権限 (least privilege): test / report のみ、 書込不要。
+permissions:
+  contents: read
+
 on:
   pull_request:
     branches: [dev]

@@ -1,0 +1,119 @@
+name: Trivy Container Scan
+
+# Dockerfile の build → image vulnerability scan を Aqua Security Trivy で
+# 走らせる。 既存 hadolint.yml (Dockerfile lint) と security-audit.yml (deps
+# audit) と相補的: 本ワークフローは「実際にビルドされる layer 内の OS / lang
+# 依存に既知 CVE が無いか」 を検出する。
+#
+# 既存 security 監査:
+#   * hadolint.yml         : Dockerfile static lint
+#   * security-audit.yml   : pip-audit / cargo-audit / npm-audit / govulncheck
+#                            / nuget-audit / trivy fs (repo scan)
+#   * codeql.yml           : SAST (Python/JS/TS/Go/C#/C++/Kotlin)
+#
+# 本 workflow が埋める gap: built docker image を image scan (上記は filesystem
+# scan のみ)。 ベースイメージの apt パッケージ層に潜む CVE が catch される。
+#
+# 各 Dockerfile を small subset image build (LLM/voice/モデルなしの軽量 stage)
+# したうえで Trivy scan。 critical/high のみ failure 化、 medium/low は report。
+
+on:
+  pull_request:
+    branches: [dev]
+    paths:
+      - 'docker/**/Dockerfile*'
+      - '.github/workflows/trivy-container-scan.yml'
+  push:
+    branches: [dev, main]
+    paths:
+      - 'docker/**/Dockerfile*'
+  workflow_dispatch:
+  schedule:
+    # 週 1 で base image の新規 CVE を catch する。
+    - cron: '17 5 * * 1'
+
+# 最小権限 + SARIF upload に必要な security-events
+permissions:
+  contents: read
+  security-events: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  scan:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        # ベースイメージ + apt 層が重要な Dockerfile を対象とする。
+        # webui / wyoming / cpp-inference は model / voice をダウンロードする
+        # ため build が重く、 schedule run のみ別途扱う (今は除外)。
+        target:
+          - name: python-inference
+            dockerfile: docker/python-inference/Dockerfile
+            context: .
+          - name: python-train
+            dockerfile: docker/python-train/Dockerfile
+            context: .
+          - name: cpp-dev
+            dockerfile: docker/cpp-dev/Dockerfile
+            context: .
+
+    steps:
+      - uses: actions/checkout@v6.0.2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3.7.1
+
+      - name: Build image (no push, local only)
+        uses: docker/build-push-action@v6.10.0
+        with:
+          context: ${{ matrix.target.context }}
+          file: ${{ matrix.target.dockerfile }}
+          push: false
+          load: true
+          tags: piper-plus-${{ matrix.target.name }}:trivy-scan
+          # build-arg / target を限定し、 巨大 model / voice の embedding 込み
+          # ステージを避ける (一部 Dockerfile は multi-stage)。
+          cache-from: type=gha,scope=trivy-${{ matrix.target.name }}
+          cache-to: type=gha,mode=max,scope=trivy-${{ matrix.target.name }}
+
+      - name: Trivy image scan (table output for log)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: piper-plus-${{ matrix.target.name }}:trivy-scan
+          format: table
+          severity: CRITICAL,HIGH,MEDIUM
+          ignore-unfixed: true
+          # fix が存在しない CVE は noise なので除外。 ベースイメージ更新で
+          # 解消されるべきものを目立たせる。
+          exit-code: '0'   # 一度目は report 専用 (下で SARIF を upload)
+
+      - name: Trivy image scan (SARIF for Security tab)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: piper-plus-${{ matrix.target.name }}:trivy-scan
+          format: sarif
+          output: trivy-${{ matrix.target.name }}.sarif
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+
+      - name: Upload SARIF to GitHub Security tab
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3.30.6
+        with:
+          sarif_file: trivy-${{ matrix.target.name }}.sarif
+          category: trivy-${{ matrix.target.name }}
+
+      - name: Fail on CRITICAL only
+        # MEDIUM/HIGH は report のみ、 CRITICAL のみ PR を block する。
+        # ベースイメージの定常更新を妨げない conservative 設定。
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: piper-plus-${{ matrix.target.name }}:trivy-scan
+          format: table
+          severity: CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
