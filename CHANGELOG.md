@@ -209,6 +209,9 @@ v1.12.0 で 5 ランタイム (Python/Rust/C#/Go/WASM) に展開した SSML / Vo
 
 - iOS / Linux / Windows / macOS / Android shared-lib リリースパイプラインを復旧 (Issue #377、v1.11.0 以降の停止)
   - `release` ジョブの `needs:` が `build-ios` 失敗で全 OS artifact のアップロードを止めていた
+- Bundle size gate: Android AAR ビルドが prebuilt `libpiper_plus.so` 欠如で永久 SKIP となっていた問題を修正 (Issue #494)
+  - `bundle-size-gate.yml` に `build-android-shared-libs` matrix job (arm64-v8a / armeabi-v7a / x86_64) を追加し、`release-shared-lib.yml` と同じ NDK r26c + ORT 1.20.0 + 16 KB page-align で `libpiper_plus.so` をビルド。bundle-size ジョブが artifact を `android/piper-plus-g2p/src/main/jniLibs/<ABI>/` に配置してから `assembleRelease` を実行することで `maven::piper-plus-g2p-android` の Observed サイズが取得可能に
+  - `scripts/check_ort_versions.py` の `TARGETS` に `bundle-size-gate.yml` を追加し、ORT バージョン drift gate の対象に統合 (Copilot review fix)
 
 ### Security
 

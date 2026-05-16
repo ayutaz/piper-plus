@@ -37,9 +37,123 @@ concurrency:
 permissions:
   contents: read
 
+env:
+  # Must stay aligned with release-shared-lib.yml's ONNXRUNTIME_VERSION and
+  # docs/reference/ort-versions.md — the prebuilt libpiper_plus.so depends on
+  # the same ORT major/minor that the runtime AAR will eventually ship with.
+  ONNXRUNTIME_VERSION: "1.20.0"
+
 jobs:
+  # Issue #494: the piper-plus-g2p AAR's JNI wrapper (libpiper_plus_g2p_jni.so)
+  # has libpiper_plus.so as an IMPORTED dependency under
+  # `android/piper-plus-g2p/src/main/jniLibs/<ABI>/`. Without this job, the
+  # gradle step below fails with "ninja: error: ... libpiper_plus.so missing"
+  # and the maven::piper-plus-g2p-android baseline is forever SKIP. We mirror
+  # release-shared-lib.yml's build-android job (3-ABI matrix, NDK r26c, 16 KB
+  # page-size alignment for 64-bit ABIs) so the AAR produced here matches the
+  # one Maven Central will ship.
+  build-android-shared-libs:
+    name: Build libpiper_plus.so (${{ matrix.abi }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    if: github.event.pull_request.head.repo.full_name == github.repository || github.event_name != 'pull_request'
+    strategy:
+      fail-fast: false
+      matrix:
+        abi: [arm64-v8a, armeabi-v7a, x86_64]
+
+    steps:
+      - uses: actions/checkout@v6.0.2
+        with:
+          submodules: true
+
+      - name: Setup Android NDK
+        uses: nttld/setup-ndk@v1.6.0
+        id: setup-ndk
+        with:
+          ndk-version: r26c
+
+      - name: Download ONNX Runtime Android
+        run: |
+          curl -L -o onnxruntime-android.aar \
+            "https://repo1.maven.org/maven2/com/microsoft/onnxruntime/onnxruntime-android/${ONNXRUNTIME_VERSION}/onnxruntime-android-${ONNXRUNTIME_VERSION}.aar"
+          unzip -q onnxruntime-android.aar -d onnxruntime-android
+          mkdir -p ort-android/lib ort-android/include
+          cp "onnxruntime-android/jni/${{ matrix.abi }}/libonnxruntime.so" ort-android/lib/
+          HEADER_DIR=$(find onnxruntime-android -name "onnxruntime_cxx_api.h" -exec dirname {} \; | head -1)
+          if [ -n "${HEADER_DIR}" ]; then
+            cp -R "${HEADER_DIR}/"* ort-android/include/
+          else
+            HEADER_DIR2=$(find onnxruntime-android -type d -name "headers" | head -1)
+            if [ -n "${HEADER_DIR2}" ]; then
+              cp -R "${HEADER_DIR2}/"* ort-android/include/
+            fi
+          fi
+          echo "ORT_ANDROID_DIR=${{ github.workspace }}/ort-android" >> "$GITHUB_ENV"
+          echo "ORT_ANDROID_LIB=${{ github.workspace }}/ort-android/lib/libonnxruntime.so" >> "$GITHUB_ENV"
+
+      - name: Configure CMake (Android)
+        env:
+          ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
+        run: |
+          # 16 KB page-size alignment for 64-bit ABIs (Pixel 8a / Android 15+).
+          # armeabi-v7a 32-bit kernels still use 4 KB pages — keep parity with
+          # release-shared-lib.yml / kotlin-g2p-ci.yml convention.
+          PAGE_ALIGN_FLAGS=""
+          if [ "${{ matrix.abi }}" != "armeabi-v7a" ]; then
+            PAGE_ALIGN_FLAGS="-Wl,-z,max-page-size=16384"
+          fi
+          CMAKE_EXTRA_FLAGS=""
+          if [ "${{ matrix.abi }}" = "armeabi-v7a" ]; then
+            CMAKE_EXTRA_FLAGS="-DANDROID_ARM_NEON=ON"
+          fi
+          cmake -B build-android \
+            -DCMAKE_TOOLCHAIN_FILE="${ANDROID_NDK_HOME}/build/cmake/android.toolchain.cmake" \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DANDROID_ABI=${{ matrix.abi }} \
+            -DANDROID_PLATFORM=android-24 \
+            -DPIPER_PLUS_BUILD_SHARED=ON \
+            -DCMAKE_SHARED_LINKER_FLAGS="${PAGE_ALIGN_FLAGS}" \
+            -DCMAKE_EXE_LINKER_FLAGS="${PAGE_ALIGN_FLAGS}" \
+            -DONNXRUNTIME_DIR="${ORT_ANDROID_DIR}" \
+            -DONNXRUNTIME_LIB="${ORT_ANDROID_LIB}" \
+            -DONNXRUNTIME_INCLUDE_DIR="${ORT_ANDROID_DIR}/include" \
+            $CMAKE_EXTRA_FLAGS
+
+      - name: Build (Android)
+        run: cmake --build build-android --config Release -j$(nproc)
+
+      - name: Locate libpiper_plus.so
+        id: locate-so
+        run: |
+          set -euo pipefail
+          if [ -f build-android/libpiper_plus.so ]; then
+            SO_PATH="build-android/libpiper_plus.so"
+          elif [ -f build-android/lib/libpiper_plus.so ]; then
+            SO_PATH="build-android/lib/libpiper_plus.so"
+          else
+            echo "::error::libpiper_plus.so not found under build-android/"
+            find build-android -name "libpiper_plus.so" -print || true
+            exit 1
+          fi
+          echo "so-path=${SO_PATH}" >> "$GITHUB_OUTPUT"
+          echo "Resolved: ${SO_PATH}"
+
+      - name: Stage shared lib for downstream consumer
+        run: |
+          mkdir -p so-out
+          cp "${{ steps.locate-so.outputs.so-path }}" so-out/libpiper_plus.so
+
+      - name: Upload libpiper_plus.so artifact
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: bundle-gate-libpiper_plus-${{ matrix.abi }}
+          path: so-out/libpiper_plus.so
+          retention-days: 1
+
   bundle-size:
     name: Measure + compare bundle sizes
+    needs: build-android-shared-libs
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     # Skip fork PRs — they cannot post sticky comments and would only emit
@@ -92,6 +206,34 @@ jobs:
         continue-on-error: true
         working-directory: src/rust
         run: cargo package -p piper-plus --no-verify --allow-dirty
+
+      # Issue #494: stage the prebuilt libpiper_plus.so produced by the
+      # build-android-shared-libs matrix into jniLibs/<ABI>/ so the JNI
+      # wrapper's CMakeLists.txt (IMPORTED target pointing at
+      # src/main/jniLibs/${ANDROID_ABI}/libpiper_plus.so) can link. All 3
+      # ABIs declared in android/piper-plus-g2p/build.gradle.kts
+      # (`abiFilters`) must be present or AGP's externalNativeBuild fails
+      # the first ABI to configure.
+      - name: Download Android shared libs (3 ABIs)
+        uses: actions/download-artifact@v8.0.1
+        with:
+          pattern: bundle-gate-libpiper_plus-*
+          path: android-shared-libs/
+
+      - name: Place libpiper_plus.so into jniLibs
+        run: |
+          set -euo pipefail
+          for abi in arm64-v8a armeabi-v7a x86_64; do
+            SRC="android-shared-libs/bundle-gate-libpiper_plus-${abi}/libpiper_plus.so"
+            DST_DIR="android/piper-plus-g2p/src/main/jniLibs/${abi}"
+            if [ ! -f "${SRC}" ]; then
+              echo "::error::expected artifact missing: ${SRC}"
+              exit 1
+            fi
+            mkdir -p "${DST_DIR}"
+            cp "${SRC}" "${DST_DIR}/libpiper_plus.so"
+            echo "staged ${DST_DIR}/libpiper_plus.so ($(stat -c%s "${DST_DIR}/libpiper_plus.so") bytes)"
+          done
 
       - name: gradle bundleRelease (piper-plus-g2p AAR)
         continue-on-error: true
