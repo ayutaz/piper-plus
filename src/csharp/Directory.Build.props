@@ -23,6 +23,17 @@
     <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
     <Deterministic>true</Deterministic>
 
+    <!-- NuGet packages.lock.json (transitive deps の reproducible build / CVE
+         監査向上)。 Dependabot は .NET ecosystem を直接サポートしないが、
+         security-audit.yml の nuget-audit と組み合わせて CVE detection の
+         baseline を確立する。
+         初回有効化時は packages.lock.json が存在しないため、 CI 側は最初の
+         dotnet restore で auto-generate させ、 以降の run で locked-mode を
+         検査する 2 段階 rollout (csharp-ci.yml で実施)。 PR レビュー指摘
+         (PR #498) を反映して repo-wide enable は維持しつつ、 CI workflow 側
+         で初回 restore を許容する形に運用する。 -->
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+
     <!-- XML doc generation: 既存コードの doc-comment 不備が build を fail させるため OFF。
          Wave 後段で各 public API に doc-comment 追加 → ON 化。 -->
     <GenerateDocumentationFile>false</GenerateDocumentationFile>

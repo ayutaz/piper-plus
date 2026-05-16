@@ -1,0 +1,96 @@
+# Japanese N-variant assimilation contract.
+# =========================================
+# 「ん」(/N/) は後続音素により 4 つの allophone に分岐し、 学習済みモデルの
+# 音素テーブルでも別 ID として扱われる。 cross-runtime で drift すると
+# 「さんぽ」 → 別 phoneme ID → 異なる音響特徴 → 全く違う音声出力となる。
+#
+# 本契約は Python (canonical) / Rust / C++ / Go / C# / WASM / Swift / Kotlin
+# の 8 G2P ランタイムで以下 4 ルールが同一であることを保証する。
+#
+# Drift gate: scripts/check_japanese_n_variant_contract.py
+# Canonical:  src/python/g2p/piper_plus_g2p/japanese.py:_apply_n_phoneme_rules
+#
+# 影響: drift = silent acoustic regression on Japanese audio (catastrophic).
+
+[meta]
+spec_version = "1.0"
+last_updated = "2026-05-16"
+applies_to = ["python", "rust", "go", "csharp", "wasm", "cpp", "swift", "kotlin"]
+canonical_source = "src/python/g2p/piper_plus_g2p/japanese.py"
+canonical_function = "_apply_n_phoneme_rules"
+forward_compat_policy = "strict"
+
+# ---------------------------------------------------------------------------
+# 4 N-variant phonemes (in canonical phoneme inventory order)
+# ---------------------------------------------------------------------------
+# 全 variant は PUA U+E019..U+E01C に mapping され、 pua.json と
+# id_maps.py の inventory に登録済 (check_pua_consistency.py が gate)。
+
+[variants]
+all = ["N_m", "N_n", "N_ng", "N_uvular"]
+description = "後続音素により 4 つの allophone に分岐"
+
+# ---------------------------------------------------------------------------
+# Bilabial assimilation: N → N_m
+# ---------------------------------------------------------------------------
+# 後続が両唇音 (m / b / p) およびその拗音バリエーション (my / by / py) の
+# とき、 「さんぽ」 / 「あんま」 / 「ぜんぶ」 のような同化を表現。
+[rules.N_m]
+description = "Bilabial assimilation: N before m/b/p"
+trigger_phonemes = ["m", "my", "b", "by", "p", "py"]
+example_jp = "さんぽ"
+example_phonemes = ["s", "a", "N_m", "p", "o"]
+
+# ---------------------------------------------------------------------------
+# Alveolar assimilation: N → N_n
+# ---------------------------------------------------------------------------
+# 後続が歯茎音 (n / t / d / ts / ch) およびその拗音バリエーション (ny / ty /
+# dy) のとき、 「あんない」 / 「ほんとう」 / 「うんてん」 のような同化。
+[rules.N_n]
+description = "Alveolar assimilation: N before n/t/d/ts/ch"
+trigger_phonemes = ["n", "ny", "t", "ty", "d", "dy", "ts", "ch"]
+example_jp = "あんない"
+example_phonemes = ["a", "N_n", "n", "a", "i"]
+
+# ---------------------------------------------------------------------------
+# Velar assimilation: N → N_ng
+# ---------------------------------------------------------------------------
+# 後続が軟口蓋音 (k / g) およびその拗音 + 合拗音 (ky / kw / gy / gw) の
+# とき、 「ぎんこう」 / 「あんぐり」 のような同化。
+[rules.N_ng]
+description = "Velar assimilation: N before k/g"
+trigger_phonemes = ["k", "ky", "kw", "g", "gy", "gw"]
+example_jp = "ぎんこう"
+example_phonemes = ["g", "i", "N_ng", "k", "o", "u"]
+
+# ---------------------------------------------------------------------------
+# Default / phrase-final: N → N_uvular
+# ---------------------------------------------------------------------------
+# trigger_phonemes に含まれない母音 / 子音 / 句末では uvular nasal となる。
+# 「ほん」 (phrase-final) / 「あんい」 (vowel-followed) などが該当。
+[rules.N_uvular]
+description = "Default: phrase-final or before vowels/other consonants"
+trigger_phonemes = []  # 空 = それ以外すべて
+example_jp = "ほん"
+example_phonemes = ["h", "o", "N_uvular"]
+
+# ---------------------------------------------------------------------------
+# Implementation pointers — drift gate が走査する canonical fields
+# ---------------------------------------------------------------------------
+# 検証 script は次の各 file 内で 4 つの phoneme symbol (N_m / N_n /
+# N_ng / N_uvular) が string literal として出現することを確認する。
+# 完全 byte-for-byte は要求しない (Rust の HashSet vs Python の tuple
+# など実装差は許容)。
+
+[runtime_sources]
+python = "src/python/g2p/piper_plus_g2p/japanese.py"
+rust = "src/rust/piper-plus-g2p/src/japanese.rs"
+# G2P-only ランタイム (WASM / Swift / Kotlin) と inference-only ランタイム
+# (Go / C# / C++) は本契約の対象だが、 token map 経由 (token_map.rs /
+# pua-map.js / OpenJTalkToPiperMapping.cs / pua.go / phoneme_parser.cpp) で
+# N_* シンボルを参照していれば parity OK。
+rust_token_map = "src/rust/piper-plus-g2p/src/token_map.rs"
+wasm_pua_map = "src/wasm/g2p/src/pua-map.js"
+go_pua = "src/go/phonemize/pua.go"
+csharp_mapping = "src/csharp/PiperPlus.Core/Mapping/OpenJTalkToPiperMapping.cs"
+cpp_parser = "src/cpp/phoneme_parser.cpp"

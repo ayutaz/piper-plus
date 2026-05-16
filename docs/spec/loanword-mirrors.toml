@@ -16,6 +16,9 @@
 # accepts unknown top-level fields and `schema_version: 2` payloads
 # silently to match Python `_load_loanword_data`.
 
+[meta]
+forward_compat_policy = "strict"
+
 schema_version = 1
 
 [[groups]]

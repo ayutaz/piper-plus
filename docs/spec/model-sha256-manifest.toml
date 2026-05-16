@@ -43,6 +43,7 @@ Hash and CHANGELOG.md MUST be updated in the same commit. Re-uploading a
 model file under an existing entry without updating both is a release
 process violation.
 """
+forward_compat_policy = "strict"
 
 # ============================================================================
 # Required config.json fields

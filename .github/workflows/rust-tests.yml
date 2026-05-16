@@ -1,5 +1,9 @@
 name: rust-tests
 
+# 最小権限: cargo test / clippy のみ。
+permissions:
+  contents: read
+
 on:
   workflow_call:
   pull_request:

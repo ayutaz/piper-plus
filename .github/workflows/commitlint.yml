@@ -1,0 +1,46 @@
+name: Commitlint
+
+# PR の commits を Conventional Commits 規約で検査 (Wave 3)。
+# pr-title-check.yml は PR title のみを検査するが、 squash merge を使わない
+# ケース (merge commit / rebase merge) では各 commit message も merged log
+# に残るため、 PR 範囲全 commits も同 format に従っている必要がある。
+#
+# `.commitlintrc.json` で許容 type を制御:
+#   feat / fix / chore / docs / test / ci / refactor / perf / build / style / revert
+#
+# 既存 commits 200+ 件で 100% 遵守確認済 (Wave 3 agent 4 調査)。
+
+on:
+  pull_request:
+    branches:
+      - dev
+      - main
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6.0.2
+        with:
+          # PR 範囲の commits 全て見るため、 base まで fetch 深さを広げる。
+          # wagoid/commitlint-github-action は内部で git log を使うため、
+          # shallow checkout だと PR 内 commits を見落とす。
+          fetch-depth: 0
+
+      - name: Validate commit messages
+        # @v6.2.1 (2025-09 release) — fail-on-warnings は OFF 維持 (header
+        # 100 文字 over 等は warn のみ、 既存 commits との互換性確保)。
+        uses: wagoid/commitlint-github-action@v6.2.1
+        with:
+          configFile: .commitlintrc.json
+          failOnWarnings: false
+          failOnErrors: true
+          helpURL: https://www.conventionalcommits.org/en/v1.0.0/

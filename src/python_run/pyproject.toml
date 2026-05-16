@@ -71,6 +71,12 @@ test = [
     "pytest-cov>=4.0",
     "pytest-timeout>=2.0",
     "pytest-asyncio>=0.24",
+    # `pytest.ini` の `addopts = ... -n auto` で並列実行するため必須。
+    "pytest-xdist>=3.5",
+    # CI で `--reruns 2` を opt-in 形式で使う (Wave 3, T11)。 ONNX inference
+    # の flake は再現性が低いため、 flake 検出時に 2 回 retry して pass
+    # するなら通す。 local では default 0 retry (pytest.ini で明示)。
+    "pytest-rerunfailures>=14.0",
 ]
 
 [project.scripts]

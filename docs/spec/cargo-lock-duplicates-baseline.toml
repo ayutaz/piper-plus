@@ -1,0 +1,47 @@
+# Wave 5-4 — Cargo.lock duplicate crate baseline.
+#
+# Why: workspace 5 member + feature gate の組み合わせで同一 crate の異なる
+#   version が Cargo.lock に複数登録されることがある。 binary size 増 +
+#   ABI mismatch (e.g. ort 1.x vs 2.x の併存) の risk。 既存併存は
+#   transitive dep 起因なので allowlist 化、 新規 duplicate のみ fail させる
+#   regression-only ゲート。
+#
+# How to apply: scripts/check_cargo_lock_duplicates.py が src/rust/Cargo.lock
+#   を parse し、 duplicate を集計。 ここに記載された entry の `count` を
+#   上限値 (≤) として扱う。 新しい duplicate が出現 / count が増加した場合は
+#   gate fail。 transitive dep update で count が増えた場合は本 file の
+#   `count` を更新して PR で説明する。
+
+[meta]
+canonical_lockfile = "src/rust/Cargo.lock"
+last_audit_date = "2026-05-17"
+last_audit_pr = "PR #498 (Wave 5)"
+total_unique_crates = 407
+forward_compat_policy = "strict"
+
+# 各 entry の count は「Cargo.lock 内に同名 crate が何 version 並存しているか」
+# 既存 22 crate を allowlist 化。 新規 entry を加えるには PR で justification 必須。
+
+[allowlist]
+"bitflags" = 2
+"getrandom" = 3
+"hashbrown" = 2
+"jni-sys" = 2
+"ndarray" = 2
+"r-efi" = 2
+"rand" = 2
+"rand_core" = 2
+"thiserror" = 2
+"thiserror-impl" = 2
+"ureq" = 2
+"webpki-roots" = 2
+"windows-sys" = 4
+"windows-targets" = 3
+"windows_aarch64_gnullvm" = 3
+"windows_aarch64_msvc" = 3
+"windows_i686_gnu" = 3
+"windows_i686_gnullvm" = 2
+"windows_i686_msvc" = 3
+"windows_x86_64_gnu" = 3
+"windows_x86_64_gnullvm" = 3
+"windows_x86_64_msvc" = 3

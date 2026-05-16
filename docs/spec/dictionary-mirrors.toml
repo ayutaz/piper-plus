@@ -7,6 +7,9 @@
 # scripts/_mirror_check.py). When you add a new dictionary distributed in
 # additional runtimes, append a [[groups]] entry — no Python edit needed.
 
+[meta]
+forward_compat_policy = "strict"
+
 schema_version = 1
 
 [[groups]]

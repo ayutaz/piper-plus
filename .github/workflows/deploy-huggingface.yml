@@ -18,9 +18,16 @@ on:
         default: ''
         type: string
 
+permissions:
+  contents: read
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    # Wave 6-1.1: HF Space deploy は通常 5-10 min だが、 HF Hub API rate
+    # limit hit / large model copy 失敗時に hang する可能性あり (huggingface_hub
+    # の retry が 5 min 単位で繰り返される)。 30 min で fail-fast。
+    timeout-minutes: 30
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6.0.2

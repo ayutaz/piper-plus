@@ -28,6 +28,9 @@ on:
         type: string
         default: 'none'
 
+permissions:
+  contents: read
+
 jobs:
   build-and-test:
     name: C++ ${{ matrix.build-type }} on ${{ matrix.os }}

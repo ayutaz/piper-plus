@@ -29,6 +29,7 @@ spec_version = "1.0"
 last_updated = "2026-05-09"
 applies_to = ["python", "rust", "csharp", "cpp", "go", "wasm-js"]
 companion_contract = "docs/spec/ort-session-contract.toml"
+forward_compat_policy = "strict"
 
 # ============================================================================
 # Supported provider matrix

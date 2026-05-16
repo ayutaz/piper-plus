@@ -47,6 +47,9 @@
 # hasTerminator is true. This prevents closing brackets from leaking
 # into the next sentence chunk.
 
+[meta]
+forward_compat_policy = "strict"
+
 [[closing_punctuation]]
 char = ")"
 codepoint = "U+0029"

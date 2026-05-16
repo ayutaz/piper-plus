@@ -1,7 +1,7 @@
 ---
 name: reply-review
-description: PR レビューコメントへの対応 / review thread の resolve / Copilot や human reviewer のコメントに返信 する文脈で発動。修正コミット後に呼ぶと、各 unresolved thread に対して返信本文を生成し thread を resolve する。`--stale-check` で「コメント以降に該当ファイルが更新済」を自動 flag、`--skip-copilot-style` で Copilot 定型ノイズ regex 除外、`--dry-run` で計画のみ表示。
-argument-hint: "<pr-number> [commit-hash] [--stale-check] [--skip-copilot-style] [--dry-run]"
+description: PR レビューコメントへの対応 / review thread の resolve / Copilot や human reviewer のコメントに返信 する文脈で発動。修正コミット後に呼ぶと、各 unresolved thread に対して返信本文を生成し thread を resolve する。`--stale-check` で「コメント以降に該当ファイルが更新済」を自動 flag、`--skip-copilot-style` で Copilot 定型ノイズ regex 除外、`--dry-run` で計画のみ表示、`--auto-safe` で stale + Copilot ノイズ category のみ自動 reply + resolve (人間 reviewer / 非 stale はユーザ判断)。
+argument-hint: "<pr-number> [commit-hash] [--stale-check] [--skip-copilot-style] [--auto-safe] [--dry-run]"
 disable-model-invocation: false
 allowed-tools: Bash(gh api *) Bash(gh pr view *) Bash(gh pr checks *) Bash(git log *) Bash(git show *) Bash(git rev-parse *) Bash(git diff *) Read Grep
 ---
@@ -16,6 +16,7 @@ allowed-tools: Bash(gh api *) Bash(gh pr view *) Bash(gh pr checks *) Bash(git l
 - `$2` (任意): 返信に記載するコミットハッシュ。省略時は `git rev-parse HEAD` の短縮 hash を使用。
 - `--stale-check` (任意): 各コメントの `originalCommit.oid` と HEAD を比較し、該当ファイルが以降に更新済の場合 stale flag を立てる (フェーズ 1.5 で表示)
 - `--skip-copilot-style` (任意): Copilot の定型ノイズコメント (style/lint 系の "Consider using" "Consider renaming" 等) を一覧から除外 (フェーズ 1.7 で適用)
+- `--auto-safe` (任意): 安全カテゴリ ((a) stale 判定済 + (b) Copilot 定型ノイズ + (c) Copilot stale-on-style 重複) のみ **自動** reply + resolve。 非 stale な human reviewer / blocker 候補は dry-run と同様にユーザに提示するのみ。 `--stale-check` と `--skip-copilot-style` を内部で自動有効化。 `/loop /watch-pr` から chain 起動される想定。 memory feedback_pr_body_over_comments / feedback_merge_caution と整合 (review thread への reply ≠ PR body 改変 ≠ merge)。
 - `--dry-run` (任意): 投稿・resolve を実行せず計画のみ表示
 
 ## 実行前の確認
@@ -139,6 +140,40 @@ COPILOT_STYLE_NOISE_PATTERNS = [
 
 > **注意**: 過去 PR (#489, #493) で観測された Copilot コメントの 40-50% がこの pattern に該当 (調査エージェント報告)。誤検出を避けるため、author が Copilot bot **でない** 場合は除外しない (人間レビュアーが意図的に "Consider..." と書いた可能性を尊重)。
 
+### フェーズ 1.9: 自動分類 (`--auto-safe` 指定時のみ)
+
+`$ARGUMENTS` に `--auto-safe` が含まれる場合、 内部で `--stale-check` と
+`--skip-copilot-style` を自動有効化し、 各 thread を 4 つのカテゴリに分類:
+
+| カテゴリ | 条件 | 自動処理 |
+|---------|------|---------|
+| **SAFE-stale** | stale check が `🔶 stale (既に修正済の可能性)` | 「修正済 (commit `<hash>`)。 該当 file は `<N>` commits 後に更新済」 で reply → resolve |
+| **SAFE-copilot-style** | Copilot bot + style noise regex に match + (stale OR PR diff に該当 line 含まない) | 「style 提案は本 PR の scope 外 / 既に対応済」 で reply → resolve |
+| **REVIEW-human** | author が `*[bot]` 以外 (人間 reviewer) | 自動処理しない、 user に提示 |
+| **REVIEW-copilot-blocker** | Copilot bot + style noise regex に **match しない** (logic / security / API 系の指摘) | 自動処理しない、 user に提示 |
+
+判定後、 SAFE 系のみフェーズ 3-4 を自動実行 (`--dry-run` がない限り)、
+REVIEW 系は別表で user に提示し「個別に judge してください」 と促す。
+
+```text
+## Auto-safe 自動処理対象 (<N> 件)
+
+| # | path:line | author | category | reply 本文 (40 文字 preview) |
+|---|-----------|--------|----------|----------------------------|
+| 1 | src/foo.py:42 | Copilot | SAFE-stale | 修正済 (commit a7f8abb)。 該当 file は |
+| 2 | docs/bar.md:10 | Copilot | SAFE-copilot-style | style 提案は本 PR の scope 外。 主旨は |
+
+## ユーザ判断必要 (<M> 件)
+
+| # | path:line | author | category | body (60 文字) |
+|---|-----------|--------|----------|----------------|
+| 1 | src/baz.rs:88 | yousan | REVIEW-human | "logic 順序が逆では?" |
+| 2 | src/qux.go:12 | Copilot | REVIEW-copilot-blocker | "TOCTOU race の可能性..." |
+```
+
+**SAFE 0 件のみ かつ REVIEW ≥ 1 件**: 自動処理対象なし、 user 提示のみ。
+**SAFE ≥ 1 件**: フェーズ 3-4 を SAFE 集合に対して実行。 REVIEW 集合は提示のみ。
+
 ### フェーズ 2: 各コメントと修正の対応付け
 
 1. 未解決 thread をリストで表示 (path:line、author、body の要約)
@@ -238,6 +273,13 @@ mutation ResolveThread($id: ID!) {
 
 # 全フィルタを有効化 (stale 検出 + Copilot ノイズ除外 + dry-run)
 /reply-review 349 --stale-check --skip-copilot-style --dry-run
+
+# 自動安全モード: stale + Copilot ノイズだけ自動 reply + resolve、
+# 人間 / blocker は user 提示のみ。 watch-pr から chain 起動される。
+/reply-review 349 --auto-safe
+
+# 自動安全モード + dry-run: 計画のみ (実際の reply / resolve は走らない)
+/reply-review 349 --auto-safe --dry-run
 ```
 
 ## 期待効果

@@ -1,0 +1,73 @@
+name: PR Title Check
+
+# PR title が Conventional Commits 形式に従っているか検査 (Wave 3)。
+# squash merge 時の commit message = PR title となるため、 CHANGELOG 自動
+# 生成 / release-please 連携の前提として title format を強制する。
+#
+# 既存 /create-pr skill (.claude/skills/create-pr/) も title 形式を強制
+# しているが、 GitHub UI から直接 PR 作成された場合の安全網として CI 側
+# でも検査する。
+#
+# 既存 commit log 200+ 件で 100% 遵守確認済 (Wave 3 agent 4 調査)。
+
+on:
+  pull_request:
+    types:
+      - opened
+      - edited
+      - synchronize
+      - reopened
+    branches:
+      - dev
+      - main
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Validate PR title (Conventional Commits)
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          # 許容形式:
+          #   feat(scope): summary
+          #   fix(scope): summary
+          #   chore(scope): summary  または  chore: summary
+          #   feat(scope)!: breaking summary
+          #
+          # type allow-list:
+          #   feat / fix / chore / docs / test / ci / refactor / perf / build / style / revert
+          # scope は optional (chore: docs: 等は scope なしで OK)
+          # scope は kebab-case ASCII or 言語コード (python, rust, cpp, cs, go,
+          # wasm, ssml, g2p, deps 等)。 multi-scope は kebab,kebab で許容。
+          #
+          # PR #498 wave2 で導入。
+          pattern='^(feat|fix|chore|docs|test|ci|refactor|perf|build|style|revert)(\([a-z0-9][a-z0-9\-]*([,/][a-z0-9][a-z0-9\-]*)*\))?!?: .+'
+
+          echo "PR title: $TITLE"
+          if echo "$TITLE" | grep -qE "$pattern"; then
+            echo "OK: PR title matches Conventional Commits format"
+          else
+            echo "ERROR: PR title does NOT match Conventional Commits format" >&2
+            echo "" >&2
+            echo "Expected: <type>(<scope>): <summary>" >&2
+            echo "  type:  feat | fix | chore | docs | test | ci | refactor | perf | build | style | revert" >&2
+            echo "  scope: optional kebab-case (e.g. python, rust, cpp, cs, go, wasm, deps)" >&2
+            echo "  !:     append after scope for breaking changes" >&2
+            echo "" >&2
+            echo "Examples:" >&2
+            echo "  feat(python): add streaming TTS support" >&2
+            echo "  fix(rust): correct phoneme ID overflow" >&2
+            echo "  chore(deps): bump onnxruntime to 1.20.0" >&2
+            echo "  feat(g2p)!: change PhonemizeOutput schema" >&2
+            echo "  docs: update README installation guide" >&2
+            exit 1
+          fi

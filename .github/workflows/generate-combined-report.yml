@@ -1,5 +1,9 @@
 name: Generate Combined Performance Report
 
+# 最小権限 (least privilege): test / report のみ、 書込不要。
+permissions:
+  contents: read
+
 on:
   workflow_run:
     workflows: ["Test Japanese TTS", "Test Multilingual TTS"]

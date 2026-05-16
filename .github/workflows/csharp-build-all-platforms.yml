@@ -15,6 +15,9 @@ on:
         required: false
         default: '0.0.0-dev'
 
+permissions:
+  contents: read
+
 jobs:
   build:
     name: Build ${{ matrix.rid }}

@@ -1,0 +1,49 @@
+# Wave 5-9 — Rust panic/unwrap density budget.
+#
+# Why: piper-core / piper-cli / piper-python / piper-wasm / piper-plus-g2p の
+#   各 crate に対し、 `.unwrap()` / `.expect()` / `panic!(...)` の出現密度
+#   を crate 単位で track。 production 経路 (piper-core / piper-cli /
+#   piper-python) は低密度を維持し、 WASM (panic は wasm_bindgen + console.log
+#   で trap される) は relaxed。
+#
+# How to apply: scripts/check_unwrap_density.py が `find src/rust/<crate>/src
+#   -name "*.rs"` で source line を集計、 unwrap/expect/panic を grep + count、
+#   `count / total_lines * 100` を pct として算出。 各 crate の `max_pct`
+#   を超えたら fail。 budget 緩和 (新規 unwrap 追加) には justification PR で
+#   本 file を更新する必要がある。
+
+[meta]
+last_audit_date = "2026-05-17"
+last_audit_pr = "PR #498 (Wave 5)"
+forward_compat_policy = "strict"
+description = """
+Production crates の unwrap density を抑えることで、 panic-on-unexpected-input
+の risk を下げる。 expect() で fail-fast したい invariant 違反は文字列を
+明示すれば許容するが、 production 経路では Result + ? operator で error 伝播
+させる方が望ましい。
+"""
+
+[crates.piper-core]
+current_pct = 1.71
+max_pct = 2.5
+description = "Library core — error は Result で伝播するべき"
+
+[crates.piper-cli]
+current_pct = 0.13
+max_pct = 1.0
+description = "CLI 経路 — argparse 失敗以外は panic を避ける"
+
+[crates.piper-python]
+current_pct = 0.12
+max_pct = 1.0
+description = "PyO3 binding — Python 側に Result/PyErr で伝播するべき"
+
+[crates.piper-wasm]
+current_pct = 7.54
+max_pct = 10.0
+description = "WASM binding — wasm_bindgen の constraint で panic relaxed"
+
+[crates.piper-plus-g2p]
+current_pct = 1.10
+max_pct = 2.0
+description = "G2P engine — token map / fixture parse の invariant check に expect 多用"

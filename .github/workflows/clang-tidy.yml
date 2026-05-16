@@ -88,5 +88,5 @@ jobs:
         with:
           name: clang-tidy-report
           path: tidy-output.txt
-          retention-days: 14
+          retention-days: 7
         continue-on-error: true

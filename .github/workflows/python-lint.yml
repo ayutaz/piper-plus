@@ -1,5 +1,9 @@
 name: Python Linting
 
+# 最小権限: lint / format check のみ、 PR commit / issue 操作不要。
+permissions:
+  contents: read
+
 on:
   pull_request:
     branches: [ dev ]

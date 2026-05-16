@@ -1,0 +1,110 @@
+name: pr-body-validate
+
+# Wave 4 — PR body section validation。
+# `.github/pull_request_template.md` の必須 section が空のまま merge されるのを
+# 防止。 特に ## Test Plan が空だと reviewer が何を verify すれば良いか判断できず、
+# CI が緑でも production regression につながる。
+#
+# Why: PR #401 (ruff format drift) は test plan が薄く、 CI gate もなかったため
+#   ruff のローカル / CI mismatch を未検出のまま merge された。 同じパターンを
+#   防ぐため、 ## Test Plan の existence + 内容を validate。
+#
+# How to apply: bot (dependabot / renovate / release-please) の PR は skip。
+#   人間が立てる PR には全 section 完備を強制。
+
+permissions:
+  contents: read
+  pull-requests: read
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+    branches: [dev, main]
+
+concurrency:
+  group: pr-body-validate-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: validate-pr-body
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    # bot PR は skip (template に従わなくて良い: dependabot / renovate / release-please)。
+    if: |
+      github.event.pull_request.user.login != 'dependabot[bot]' &&
+      github.event.pull_request.user.login != 'renovate[bot]' &&
+      github.event.pull_request.user.login != 'github-actions[bot]' &&
+      !contains(github.event.pull_request.labels.*.name, 'skip-pr-body-validate')
+
+    steps:
+      - name: Validate PR body sections
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_NUM: ${{ github.event.pull_request.number }}
+        run: |
+          set -e
+          if [ -z "${PR_BODY}" ]; then
+            echo "::error::PR body is empty. Please follow .github/pull_request_template.md"
+            exit 1
+          fi
+
+          ERRORS=0
+          NOTES=()
+
+          # ----- ## Test Plan: section が存在し、 placeholder コメントだけでない -----
+          if ! echo "${PR_BODY}" | grep -q "^## Test Plan"; then
+            echo "::error::Missing required section: ## Test Plan"
+            NOTES+=("Add a ## Test Plan section explaining how this change was tested.")
+            ERRORS=$((ERRORS + 1))
+          else
+            # Test Plan section の内容 (次の ## 行までの間) を抽出し、
+            # placeholder コメント `<!-- ... -->` を除いて空でないか check。
+            TEST_PLAN_BODY=$(echo "${PR_BODY}" | awk '/^## Test Plan/{flag=1; next} /^## /{flag=0} flag' | sed -E 's/<!--.*-->//g' | tr -d '[:space:]')
+            if [ -z "${TEST_PLAN_BODY}" ]; then
+              echo "::error::## Test Plan section is empty (only placeholder comments). Describe how this change was tested."
+              NOTES+=("## Test Plan must include at least 1 line of actual test description.")
+              ERRORS=$((ERRORS + 1))
+            fi
+          fi
+
+          # ----- ## Risk Level: ちょうど 1 つ check -----
+          RISK_COUNT=$(echo "${PR_BODY}" | awk '/^## Risk Level/{flag=1; next} /^## /{flag=0} flag' | grep -cE '^\- \[x\] ' || true)
+          if [ "${RISK_COUNT}" -ne 1 ]; then
+            echo "::error::## Risk Level must have exactly 1 box checked (found ${RISK_COUNT})"
+            NOTES+=("Pick exactly one of: patch / minor / major in ## Risk Level.")
+            ERRORS=$((ERRORS + 1))
+          fi
+
+          # ----- ## Affected Components: 最低 1 つ check -----
+          AFFECTED_COUNT=$(echo "${PR_BODY}" | awk '/^## Affected Components/{flag=1; next} /^## /{flag=0} flag' | grep -cE '^\- \[x\] ' || true)
+          if [ "${AFFECTED_COUNT}" -lt 1 ]; then
+            echo "::error::## Affected Components must have at least 1 box checked (found ${AFFECTED_COUNT})"
+            NOTES+=("Check at least one component in ## Affected Components.")
+            ERRORS=$((ERRORS + 1))
+          fi
+
+          # ----- ## Type: 最低 1 つ check -----
+          TYPE_COUNT=$(echo "${PR_BODY}" | awk '/^## Type/{flag=1; next} /^## /{flag=0} flag' | grep -cE '^\- \[x\] ' || true)
+          if [ "${TYPE_COUNT}" -lt 1 ]; then
+            echo "::error::## Type must have at least 1 box checked (found ${TYPE_COUNT})"
+            NOTES+=("Check at least one type in ## Type.")
+            ERRORS=$((ERRORS + 1))
+          fi
+
+          # ----- summary -----
+          if [ "${ERRORS}" -gt 0 ]; then
+            echo ""
+            echo "::error::PR #${PR_NUM} body validation failed: ${ERRORS} issue(s)"
+            echo ""
+            echo "To fix:"
+            for note in "${NOTES[@]}"; do
+              echo "  - ${note}"
+            done
+            echo ""
+            echo "Edit the PR body in the GitHub UI (not via a new comment, per CONTRIBUTING.md)."
+            echo "Or add the 'skip-pr-body-validate' label to bypass for trivial PRs."
+            exit 1
+          fi
+
+          echo "PR body validation OK (Test Plan filled, Risk=${RISK_COUNT}, Affected=${AFFECTED_COUNT}, Type=${TYPE_COUNT})"

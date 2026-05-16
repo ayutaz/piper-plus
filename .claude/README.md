@@ -21,11 +21,20 @@
 │   ├── commit/SKILL.md             # /commit — CLAUDE.md 準拠コミット
 │   ├── run-tests/SKILL.md          # /run-tests — 各言語ランタイムテスト
 │   ├── sync-docs/SKILL.md          # /sync-docs — エージェントチームによる全ドキュメント監査・更新
-│   └── reply-review/SKILL.md       # /reply-review — レビューコメントに返信 + thread resolve
+│   ├── reply-review/SKILL.md       # /reply-review — レビューコメントに返信 + thread resolve
+│   ├── release-prep/SKILL.md       # /release-prep — リリース前 version 状況確認 (read-mostly)
+│   ├── prepare-release/SKILL.md    # /prepare-release — 9 manifest bump 案 + Swift checksum + tag 順序
+│   ├── publish-model/SKILL.md      # /publish-model — 学習 ckpt → export + sanity + bench + HF upload
+│   ├── bump-deps/SKILL.md          # /bump-deps — ORT/openjtalk/ruff の canonical sync 更新
+│   ├── watch-ci-patterns/SKILL.md  # /watch-ci-patterns — CI failure を flake/drift/env/test bug 分類
+│   ├── skill-health/SKILL.md       # /skill-health — skill / hook の health check (meta)
+│   └── ... (他 cross-runtime gate skill)
 └── commands/                       # 既存の slash commands (skills と併存可)
     ├── add-language.md             # 新言語追加ガイド
     └── review-language.md          # 10 エージェント並列レビュー
 ```
+
+> 設計の全体像は repo root の [CLAUDE.md](../CLAUDE.md) `Automation` セクションを参照。 同セクションは本 README から逆方向リンクされている。
 
 ## Hooks (自動実行)
 

@@ -24,6 +24,7 @@ spec_version = "1.0"
 last_updated = "2026-05-13"
 canonical_source = "scripts/check_cli_flag_parity.py"
 applies_to = ["python_runtime", "python_train", "rust", "go", "csharp", "cpp"]
+forward_compat_policy = "strict"
 
 # ---------------------------------------------------------------------------
 # Runtime CLI declarations

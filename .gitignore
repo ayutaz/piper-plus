@@ -151,6 +151,29 @@ check_*.py
 !scripts/check_secret_path_reference.py
 !scripts/check_openjtalk_version_sync.py
 !scripts/check_test_skip_reason.py
+# Workflow-automation wave2 で追加した check スクリプト群
+!scripts/check_precommit_file_regex.py
+!scripts/check_readme_code_examples.py
+!scripts/check_japanese_n_variant_contract.py
+!scripts/check_chinese_tone_contract.py
+!scripts/check_skill_health.py
+!scripts/check_readme_breaking_sync.py
+!scripts/check_deprecated_api_lingering.py
+!scripts/check_lockfile_consistency.py
+!scripts/check_benchmark_json.py
+!scripts/check_readme_h2_parity.py
+!scripts/check_spec_meta.py
+!scripts/check_version_manifest_sync.py
+# Wave 5 — workflow automation 第 3 波 で追加した check スクリプト群
+!scripts/check_test_parametrize.py
+!scripts/check_cargo_lock_duplicates.py
+!scripts/check_lockfile_size.py
+!scripts/check_readme_latency_freshness.py
+!scripts/check_asymmetric_latency.py
+!scripts/check_unwrap_density.py
+!scripts/check_todo_age.py
+!scripts/check_workspace_python_parity.py
+!scripts/check_training_defaults.py
 create_comprehensive_*.py
 add_missing_*.py
 retrain_*.py

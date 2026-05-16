@@ -39,6 +39,9 @@
 # Strategy A — Silence Padding + Post-Trim
 # ---------------------------------------------------------------------------
 
+[meta]
+forward_compat_policy = "strict"
+
 [padding]
 # Minimum phoneme ID count for stable VITS inference.
 # Sequences shorter than this are padded with pause tokens.

@@ -15,6 +15,9 @@ concurrency:
 env:
   NODE_VERSION: '24.x'
 
+permissions:
+  contents: read
+
 jobs:
   validate:
     runs-on: ubuntu-latest

@@ -55,6 +55,7 @@ applies_to = [
     "io.github.ayutaz:piper-plus-g2p-android (Maven Central)",
     "PiperPlusG2P (Swift Package)",
 ]
+forward_compat_policy = "strict"
 
 # ---------------------------------------------------------------------------
 # Symbol Inventory

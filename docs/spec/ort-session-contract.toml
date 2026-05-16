@@ -14,6 +14,9 @@
 #   C++:    src/cpp/piper.cpp
 #   Python: src/python/piper_train/ort_utils.py
 
+[meta]
+forward_compat_policy = "strict"
+
 [session]
 graph_optimization_level = "ORT_ENABLE_ALL"
 execution_mode = "SEQUENTIAL"

@@ -16,6 +16,9 @@ name: Build WASM (Reusable)
 on:
   workflow_call:
 
+permissions:
+  contents: read
+
 jobs:
   build:
     name: build (${{ matrix.name }})

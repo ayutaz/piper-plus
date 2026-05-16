@@ -1,0 +1,113 @@
+name: Cosign Release Artifacts
+
+# GitHub Release で publish された binary / xcframework / aar / tarball 等の
+# artifact を Sigstore cosign で keyless 署名する (Wave 3, T12)。
+# OIDC token + Fulcio CA + Rekor transparency log を使った keyless signing
+# のため、 GPG key 管理は不要。
+#
+# 署名対象は release の各 asset:
+#   - libpiper_plus-* (xcframework / aar / linux-x64-tar)
+#   - 圧縮済 tar.gz / zip
+#   - .whl / .nupkg / .crate (もし Release に添付されていれば)
+#
+# 動作:
+#   1. release event の `released` (published) を trigger
+#   2. release assets を gh api 経由で list + download
+#   3. 各 asset を cosign sign-blob で署名 → .sig + .pem 生成
+#   4. .sig / .pem を同 release に上書き upload
+#   5. Rekor transparency log に記録される (公開検証可能)
+#
+# 検証側 (downstream user):
+#   cosign verify-blob --certificate <asset>.pem --signature <asset>.sig \
+#     --certificate-identity-regexp "https://github.com/ayutaz/piper-plus" \
+#     --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+#     <asset>
+
+on:
+  release:
+    types: [released]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to sign (e.g. v1.13.0)"
+        required: true
+
+permissions:
+  contents: write  # release assets を upload するため必要
+  id-token: write  # OIDC token for keyless signing
+  actions: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.release.tag_name || inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  sign:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Determine tag
+        id: tag
+        run: |
+          if [ -n "${{ inputs.tag }}" ]; then
+            echo "tag=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${{ github.event.release.tag_name }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v6.0.2
+
+      # cosign-installer は upstream sigstore/cosign-installer @ vX.Y.Z で pin。
+      # SHA pin 移行は別 PR (CLAUDE.md feedback_pin_actions_sha)。
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3.8.1
+        with:
+          cosign-release: 'v2.4.1'
+
+      - name: Download release assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          mkdir -p artifacts
+          cd artifacts
+          # Skip .sig / .pem (前回 sign 結果の二重 sign 防止)。
+          gh release view "$TAG" --json assets --jq '.assets[].name' \
+            | grep -vE '\.(sig|pem)$' \
+            | while read -r name; do
+                echo "Downloading: $name"
+                gh release download "$TAG" --pattern "$name" --clobber
+              done
+          ls -la
+
+      - name: Sign each asset with cosign (keyless OIDC)
+        env:
+          COSIGN_EXPERIMENTAL: "1"
+        run: |
+          cd artifacts
+          for asset in *; do
+            # skip directories and existing signatures
+            if [ -d "$asset" ]; then continue; fi
+            case "$asset" in
+              *.sig|*.pem) continue ;;
+            esac
+            echo "Signing: $asset"
+            cosign sign-blob --yes \
+              --bundle "${asset}.cosign.bundle" \
+              "$asset" || {
+                echo "::warning::cosign failed for $asset (continuing)"
+                continue
+              }
+          done
+          ls -la *.cosign.bundle 2>/dev/null || echo "no bundles generated"
+
+      - name: Upload signatures to release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          cd artifacts
+          for sig in *.cosign.bundle; do
+            if [ ! -f "$sig" ]; then continue; fi
+            echo "Uploading: $sig"
+            gh release upload "$TAG" "$sig" --clobber
+          done

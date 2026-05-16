@@ -36,6 +36,7 @@ contract_version = 1
 status = "stable"
 applies_to = ["python", "rust", "go", "csharp", "cpp", "wasm-js", "swift"]
 canonical_source = "src/python_run/piper/http_server.py:_build_streaming_wav_header"
+forward_compat_policy = "strict"
 
 # ===========================================================================
 # Sample format — locked by the trained model

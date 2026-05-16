@@ -1,0 +1,50 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "release-type": "simple",
+  "include-component-in-tag": false,
+  "include-v-in-tag": true,
+  "bootstrap-sha": "098f8bdf",
+  "bump-minor-pre-major": true,
+  "bump-patch-for-minor-pre-major": false,
+  "draft": false,
+  "draft-pull-request": false,
+  "changelog-path": "CHANGELOG.md",
+  "changelog-sections": [
+    {"type": "feat", "section": "Added"},
+    {"type": "fix", "section": "Fixed"},
+    {"type": "refactor", "section": "Changed"},
+    {"type": "perf", "section": "Changed"},
+    {"type": "revert", "section": "Changed"},
+    {"type": "build", "section": "Changed", "hidden": true},
+    {"type": "ci", "section": "Changed", "hidden": true},
+    {"type": "chore", "section": "Changed", "hidden": true},
+    {"type": "docs", "section": "Documentation", "hidden": true},
+    {"type": "style", "section": "Changed", "hidden": true},
+    {"type": "test", "section": "Changed", "hidden": true}
+  ],
+  "packages": {
+    ".": {
+      "package-name": "piper-plus",
+      "release-type": "simple",
+      "extra-files": [
+        "VERSION",
+        "src/python/piper_train/VERSION",
+        {
+          "type": "toml",
+          "path": "pyproject.toml",
+          "jsonpath": "$.project.version"
+        }
+      ]
+    }
+  },
+  "plugins": [],
+  "_comment_design_notes": [
+    "release-type=simple — single canonical Python package (piper-plus).",
+    "Rust / C# / npm / Swift / Kotlin は per-package 独自 version cadence",
+    "なので release-please の extra-files に含めない (drift gate は",
+    "version-consistency workflow + check_version_manifest_sync.py が担当)。",
+    "bootstrap-sha は v1.12.0 リリース commit (098f8bdf) を base に。",
+    "CHANGELOG hidden sections は Keep a Changelog の Added/Fixed/Changed/",
+    "Documentation の 4 section に集約 (既存 CHANGELOG.md と整合)。"
+  ]
+}

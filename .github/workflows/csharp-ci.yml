@@ -1,5 +1,9 @@
 name: "C# CI"
 
+# 最小権限: dotnet build / test のみ。
+permissions:
+  contents: read
+
 on:
   pull_request:
     branches: [dev]
@@ -27,9 +31,6 @@ on:
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
   cancel-in-progress: true
-
-permissions:
-  contents: read
 
 jobs:
   build-and-test:
@@ -156,7 +157,7 @@ jobs:
         with:
           name: csharp-coverage-report
           path: coverage-report/
-          retention-days: 14
+          retention-days: 7
 
       - name: Upload test results
         uses: actions/upload-artifact@v7.0.1

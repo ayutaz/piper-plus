@@ -11,6 +11,7 @@ spec_version = "1.0"
 last_updated = "2026-05-07"
 issue = 387
 applies_to = ["rust-ffi", "swift-package", "release-shared-lib-yml"]
+forward_compat_policy = "strict"
 
 # ============================================================================
 # Compatibility versioning

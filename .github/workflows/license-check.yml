@@ -1,0 +1,116 @@
+name: License Compliance Check
+
+# Wave 6-9.8 — OSS license compliance audit (cargo-deny + go-licenses).
+#
+# Why: dependency-review-action (security-audit.yml の job 1) は PR 時の
+# 「新規追加 dep の license」 を GitHub native の SPDX DB と allow-licenses
+# 一覧で gate しているが、 transitive cascade (depA→depB→depC で C の GPL
+# が後から導入される) や Go module の license は SPDX 不整合で false-positive
+# が発生する。 本 workflow は (a) `cargo deny --manifest-path src/rust/Cargo.toml
+# check licenses` で Rust workspace 全体を `src/rust/deny.toml` allowlist と
+# 照合、 (b) `go-licenses report` で Go module の transitive license を report
+# する。 schedule (週次) + workflow_dispatch のみで PR は noise を避ける。
+#
+# 既存 dependency-review-action との関係:
+#   * dependency-review-action: PR 時、 GitHub native SPDX、 allow-licenses
+#     一覧で gate (fail-on-severity high)。 reactive、 真新規の license 違反
+#     を最初に catch する。
+#   * 本 workflow: schedule 週次、 cargo-deny は workspace 全体の license
+#     cascade を検査、 go-licenses は Go の license を report。 proactive、
+#     既存 dep tree の累積を audit。
+#
+# 失敗時の対応:
+#   1. 違反 dep を確認 (output に crate/module 名と license が出る)
+#   2. (a) その dep を削除 / 別 crate に置換、 (b) deny.toml の allow に
+#      追加して justification PR を出す、 (c) `exceptions = [{ name = ...,
+#      version = ... }]` で個別許可、 の何れかを user 判断で選択
+#   3. memory feedback_merge_caution に従い merge は user 確認
+
+on:
+  schedule:
+    # 毎週月曜 04:00 UTC (= 13:00 JST)。 security-audit.yml が 03:00 UTC
+    # に走るので 1 hour 後にズラして GH runner queue 集中を避ける。
+    - cron: "0 4 * * 1"
+  workflow_dispatch:
+  pull_request:
+    branches: [dev, main]
+    paths:
+      - "src/rust/Cargo.lock"
+      - "src/rust/Cargo.toml"
+      - "src/rust/deny.toml"
+      - "src/go/go.mod"
+      - "src/go/go.sum"
+      - ".github/workflows/license-check.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  cargo-deny-licenses:
+    name: cargo-deny check licenses (Rust)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6.0.2
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install cargo-deny
+        run: cargo install --locked cargo-deny
+      - name: Run cargo-deny check licenses
+        working-directory: src/rust
+        # `check licenses` だけを実行 (advisories / bans / sources は
+        # security-audit.yml の cargo-audit と機能重複するため skip)。
+        # deny.toml の `[licenses] allow = [...]` allowlist を強制し、
+        # 既存 allowlist 外 license を新規導入したら exit 1。
+        run: cargo deny --manifest-path Cargo.toml check licenses
+
+  go-licenses-report:
+    name: go-licenses report (Go)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6.0.2
+      - uses: actions/setup-go@v5.6.0
+        with:
+          go-version: "1.26"
+          cache-dependency-path: src/go/go.sum
+      - name: Install go-licenses
+        run: go install github.com/google/go-licenses@latest
+      - name: Run go-licenses (report mode, warn-only)
+        working-directory: src/go
+        # report mode は report-only。 GPL/AGPL 検出時は fail させる別 step
+        # を用意 (Wave 6-9.8 Tier A scope では report のみで、 警告 surface
+        # を上げる優先)。
+        # `forbidden` mode 移行は wave3-deferred-proposals.toml T26 で deferred。
+        continue-on-error: true
+        run: |
+          go-licenses report ./... 2>&1 | tee /tmp/go-licenses-report.txt
+          echo "::notice::go-licenses report 完了 (warn-only)。 GPL/AGPL 検出時は wave3-deferred-proposals.toml T26 (forbidden mode 化) を参照"
+      - name: Check for GPL/AGPL contamination (warn-only)
+        # report 内に GPL / AGPL があれば warning surface。 fail させない (Wave 6
+        # Tier A scope: surface のみ、 真の forbidden gate は T26 deferred)。
+        run: |
+          if grep -iE "GPL-[23](\.0)?|AGPL" /tmp/go-licenses-report.txt 2>/dev/null; then
+            echo "::warning::Potential GPL/AGPL license detected in Go transitive deps. Review wave3-deferred-proposals.toml T26."
+          else
+            echo "::notice::No GPL/AGPL contamination detected in Go deps."
+          fi
+
+  license-summary:
+    name: License Check Summary
+    if: always()
+    needs: [cargo-deny-licenses, go-licenses-report]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Summary
+        run: |
+          echo "## License Compliance Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- cargo-deny (Rust): ${{ needs.cargo-deny-licenses.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- go-licenses (Go): ${{ needs.go-licenses-report.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Python/JS/.NET license は dependency-review-action (security-audit.yml) で PR 時に gate。" >> $GITHUB_STEP_SUMMARY
+          echo "本 workflow は cargo-deny + go-licenses の補完 (週次 + transitive cascade 検出)。" >> $GITHUB_STEP_SUMMARY
