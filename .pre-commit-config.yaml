@@ -211,6 +211,196 @@ repos:
         files: ^(\.pre-commit-config\.yaml|\.github/workflows/(python-lint|ci)\.yml|pyproject\.toml|scripts/check_ruff_version_sync\.py)$
         pass_filenames: false
 
+      # PR #496 (file-path regex over-matching) で再発したパターンを抑止する
+      # メタ gate。 `.pre-commit-config.yaml` 自身の `files:` regex を全 hook
+      # スキャンし、 (1) `^(name1|name2)$` 形式で root-only に anchor された
+      # basename alternation、 (2) 0 ファイルしか match しない dead regex、
+      # (3) compile error を検出する。 `.pre-commit-config.yaml` 編集時のみ走る。
+      - id: precommit-file-regex
+        name: "pre-commit files regex coverage (meta gate)"
+        entry: uv run python scripts/check_precommit_file_regex.py
+        language: system
+        files: ^(\.pre-commit-config\.yaml|scripts/check_precommit_file_regex\.py)$
+        pass_filenames: false
+
+      # SSML subset 仕様 byte-for-byte 三方向 drift gate。
+      # toml ↔ Python canonical ↔ JSON fixture が乖離していないか。
+      # 既存 CI workflow を pre-commit 化、 PR 時点ではなく commit 時点で
+      # drift を catch する。
+      - id: ssml-contract
+        name: SSML subset contract (toml ↔ python ↔ fixture)
+        entry: uv run python scripts/check_ssml_contract.py
+        language: system
+        files: ^(docs/spec/ssml-contract\.toml|src/python/g2p/piper_plus_g2p/ssml\.py|tests/fixtures/ssml/contract\.json|scripts/check_ssml_contract\.py|scripts/regenerate_ssml_fixture\.py)$
+        pass_filenames: false
+
+      # Streaming API 表面 (function 名 / return 型 / sentence boundary) の
+      # cross-runtime drift gate。 7 runtime のうち何れかが streaming サポート
+      # を silent に drop しないように。
+      - id: streaming-api-contract
+        name: Streaming API contract (toml meta gate)
+        entry: uv run python scripts/check_streaming_api_contract.py
+        language: system
+        files: ^(docs/spec/streaming-api-contract\.toml|scripts/check_streaming_api_contract\.py|src/python_run/piper/text_splitter\.py|src/rust/piper-core/src/streaming\.rs|src/go/piperplus/streaming\.go)$
+        pass_filenames: false
+
+      # Swift G2P xcframework ABI / JSON envelope / default-language の
+      # contract gate。 PUA compat version の double-check + ABI 完全性確認。
+      - id: swift-g2p-contract
+        name: Swift G2P xcframework ABI contract
+        entry: uv run python scripts/check_swift_g2p_contract.py
+        language: system
+        files: ^(docs/spec/swift-g2p-contract\.toml|Sources/PiperPlusG2P/|scripts/check_swift_g2p_contract\.py)
+        pass_filenames: false
+
+      # Release 時に CHANGELOG.md の `### Breaking changes` と
+      # `docs/migration/v*.md` の三方向 triangulation 検査。 release tag を
+      # cut する前に breaking change の migration 記載漏れを catch する。
+      - id: migration-changelog-parity
+        name: CHANGELOG breaking ↔ docs/migration/ triangulation
+        entry: uv run python scripts/check_migration_changelog_parity.py
+        language: system
+        files: ^(CHANGELOG\.md|docs/migration/.*\.md|scripts/check_migration_changelog_parity\.py)$
+        pass_filenames: false
+
+      # Short-text 戦略 (Silence Padding / Dynamic Scales / SSML break 自動
+      # 挿入) の cross-runtime drift gate。 既存 CI のみだったものを
+      # pre-commit 化。 6 runtime 並列実装の整合維持。
+      - id: short-text-contract
+        name: Short-text strategy contract (6 runtimes vs toml)
+        entry: uv run python scripts/check_short_text_contract.py
+        language: system
+        files: ^(docs/spec/short-text-contract\.toml|scripts/check_short_text_contract\.py|src/python_run/piper/voice\.py|src/rust/piper-core/src/short_text\.rs|src/go/piperplus/.*\.go)$
+        pass_filenames: false
+
+      # Text splitter (.!?。！？．) 終止符による文単位分割の cross-runtime
+      # 整合性 gate。 v1.12.0 の breaking change (Python phonemize() の戻り値)
+      # 周辺の regression を防ぐ。
+      - id: text-splitter-contract
+        name: Text splitter contract (sentence-boundary parity)
+        entry: uv run python scripts/check_text_splitter_contract.py
+        language: system
+        files: ^(docs/spec/text-splitter-contract\.toml|scripts/check_text_splitter_contract\.py|src/python_run/piper/text_splitter\.py|src/rust/piper-core/src/streaming\.rs)$
+        pass_filenames: false
+
+      # ONNX export の opset / checker / shape_inference / FP16 / EMA contract
+      # gate。 export_onnx.py 編集時 (model export 仕様変更) に gate する。
+      - id: onnx-export-contract
+        name: ONNX export contract (opset / checker / FP16 / EMA)
+        entry: uv run python scripts/check_onnx_export_contract.py
+        language: system
+        files: ^(docs/spec/onnx-export-contract\.toml|scripts/check_onnx_export_contract\.py|src/python/piper_train/export_onnx\.py)$
+        pass_filenames: false
+
+      # 推論 input 仕様 (phoneme_ids / scales / speaker_id / speaker_embedding /
+      # prosody_features) の cross-runtime contract gate。 全 runtime infer 入力
+      # を一致させる。
+      - id: inference-input-contract
+        name: Inference input contract (cross-runtime parity)
+        entry: uv run python scripts/check_inference_input_contract.py
+        language: system
+        files: ^(docs/spec/inference-input-contract\.toml|scripts/check_inference_input_contract\.py|src/python_run/piper/voice\.py|src/rust/piper-core/src/(engine|inference)\.rs|src/go/piperplus/synthesize\.go|src/csharp/PiperPlus\.Core/Inference/PiperSession\.cs|src/cpp/piper_plus\.cpp)$
+        pass_filenames: false
+
+      # Audio output format (sample_rate=22050 / 16-bit / mono / LE) の
+      # cross-runtime gate。 既存 CI のみだったもの。 sample_rate mismatch は
+      # silent pitch shift を引き起こすため drift 検出が critical。
+      - id: audio-format-contract
+        name: Audio output format contract (WAV header parity)
+        entry: uv run python scripts/check_audio_format_contract.py
+        language: system
+        files: ^(docs/spec/audio-format-contract\.toml|scripts/check_audio_format_contract\.py|src/python_run/piper/(voice|http_server|webui)\.py|src/rust/piper-core/src/engine\.rs|src/go/piperplus/synthesize\.go|src/csharp/PiperPlus\.Core/Inference/PiperSession\.cs|src/cpp/piper_plus\.cpp|src/wasm/openjtalk-web/src/index\.js)$
+        pass_filenames: false
+
+      # ORT session warmup / threading / opt_path contract gate。 全 runtime の
+      # ORT session 初期化挙動を pin。 warmup 回数 / thread pool size /
+      # `.opt.onnx`+`.ok` キャッシュ仕様が drift しないか。
+      - id: ort-session-contract
+        name: ORT session initialization contract
+        entry: uv run python scripts/check_ort_session_contract.py
+        language: system
+        files: ^(docs/spec/ort-session-contract\.toml|scripts/check_ort_session_contract\.py|src/python/piper_train/ort_utils\.py|src/python_run/piper/voice\.py|src/rust/piper-core/src/session\.rs|src/go/piperplus/.*\.go)$
+        pass_filenames: false
+
+      # ORT provider (CPU/CUDA/CoreML) parity contract gate。
+      - id: ort-provider-contract
+        name: ORT execution provider contract (CPU/CUDA/CoreML)
+        entry: uv run python scripts/check_ort_provider_contract.py
+        language: system
+        files: ^(docs/spec/ort-provider-contract\.toml|scripts/check_ort_provider_contract\.py)$
+        pass_filenames: false
+
+      # Speaker encoder (ECAPA-TDNN) inference の cross-runtime contract gate。
+      # 256 次元 / L2 正規化 / FP16 受容仕様を pin。
+      - id: speaker-encoder-contract
+        name: Speaker encoder (ECAPA-TDNN) contract
+        entry: uv run python scripts/check_speaker_encoder_contract.py
+        language: system
+        files: ^(docs/spec/.*speaker.*\.toml|scripts/check_speaker_encoder_contract\.py|src/python/piper_train/speaker_encoder/.*\.py)$
+        pass_filenames: false
+
+      # PT BR/EU dialect (5 phenomena post-processing) contract gate。
+      # 既存 CI のみだったもの。 dialect rule drift 検出に。
+      - id: pt-dialect-contract
+        name: Portuguese BR/EU dialect rule contract
+        entry: uv run python scripts/check_pt_dialect_contract.py
+        language: system
+        files: ^(docs/spec/pt-dialect-contract\.toml|scripts/check_pt_dialect_contract\.py|src/python/g2p/piper_plus_g2p/portuguese\.py)$
+        pass_filenames: false
+
+      # 「ん」 4 つの allophone (N_m / N_n / N_ng / N_uvular) の同化規則
+      # cross-runtime drift gate。 canonical Python の trigger 集合と各 runtime
+      # source の variant symbol 存在を pin。 drift = silent acoustic regression。
+      - id: japanese-n-variant-contract
+        name: Japanese N-variant assimilation contract (8 G2P runtimes)
+        entry: uv run python scripts/check_japanese_n_variant_contract.py
+        language: system
+        files: ^(docs/spec/japanese-n-variant-contract\.toml|scripts/check_japanese_n_variant_contract\.py|src/python/g2p/piper_plus_g2p/japanese\.py|src/rust/piper-plus-g2p/src/japanese\.rs|src/rust/piper-plus-g2p/src/token_map\.rs|src/wasm/g2p/src/pua-map\.js|src/go/phonemize/pua\.go|src/csharp/PiperPlus\.Core/Mapping/OpenJTalkToPiperMapping\.cs|src/cpp/phoneme_parser\.cpp)$
+        pass_filenames: false
+
+      # Mandarin tone 5 symbol (tone1-tone5) の cross-runtime contract gate。
+      # canonical Python の f"tone{tone}" 生成パターンと、 各 runtime での
+      # symbol literal OR PUA codepoint hex の存在を確認。 PUA codepoint は
+      # pua.json と double-check (drift = silent embedding ID shift)。
+      - id: chinese-tone-contract
+        name: Chinese tone symbol contract (6 G2P runtimes)
+        entry: uv run python scripts/check_chinese_tone_contract.py
+        language: system
+        files: ^(docs/spec/chinese-tone-contract\.toml|scripts/check_chinese_tone_contract\.py|src/python/g2p/piper_plus_g2p/(chinese|data/pua)\.(py|json)|src/rust/piper-plus-g2p/src/(chinese|token_map)\.rs|src/wasm/g2p/src/pua-map\.js|src/go/phonemize/pua\.go|src/csharp/PiperPlus\.Core/Mapping/OpenJTalkToPiperMapping\.cs|src/cpp/chinese_phonemize\.cpp)$
+        pass_filenames: false
+
+      # README / docs 内の fenced code block で参照される API シンボル名が
+      # source tree で git grep ヒットするか warning モードで検証。 PR #493
+      # で WASM `synthesizeFromReferenceAudio` の引数が wrong だった事例の
+      # ような drift を早期発見する。 false positive 多めなため warning のみ。
+      - id: readme-code-examples
+        name: README/docs code-example symbol resolution (warning)
+        entry: uv run python scripts/check_readme_code_examples.py
+        language: system
+        files: ^(README.*\.md|src/.*/README\.md|docs/(features|guides)/.*\.md|scripts/check_readme_code_examples\.py)$
+        pass_filenames: false
+
+      # 多言語 README (8 言語) breaking banner sync gate。 canonical README.md
+      # の `> **📢 v<X.Y.Z> Breaking changes ...` banner が他 7 言語に同 version
+      # で出現するか warning モードで検証。 翻訳遅延に対応するため non-strict、
+      # PR #493 ea994a2c で発覚した v1.12.0 多言語 drift パターンを早期検出。
+      - id: readme-breaking-sync
+        name: multilingual README breaking banner sync (warning)
+        entry: uv run python scripts/check_readme_breaking_sync.py
+        language: system
+        files: ^(README(_(DE|EN|ES|FR|KO|PT|ZH))?\.md|scripts/check_readme_breaking_sync\.py)$
+        pass_filenames: false
+
+      # 廃止 API (HiFi-GAN / Flask / HTS-voice / --mb-istft / Unity UPM) が
+      # docs/ や README で archived 注釈なしに使い方として残存していないか
+      # を warning モードで検出。 v1.12.0 migration 後の doc drift を catch。
+      - id: deprecated-api-lingering
+        name: deprecated API lingering doc references (warning)
+        entry: uv run python scripts/check_deprecated_api_lingering.py
+        language: system
+        files: ^(README.*\.md|docs/(features|guides|reference)/.*\.md|src/.*/README\.md|scripts/check_deprecated_api_lingering\.py)$
+        pass_filenames: false
+
       # Mirror of .github/workflows/zh-en-loanword-sync.yml. Filename
       # `zh_en_loanword.json` is unique enough to anchor on without per-path
       # enumeration; same pattern as PUA gate above.
@@ -481,6 +671,32 @@ repos:
         args: [--config=.markdownlint.yaml]
         files: \.(md|markdown)$
         exclude: ^(node_modules|build|dist|target|test/models)/
+
+  # ---------------------------------------------------------------------------
+  # yamllint — `.github/workflows/` と docker-compose 系 YAML の syntax / 重複
+  # key 検出。 hadolint が Dockerfile を担当するのに対し、 yamllint は
+  # workflow YAML の構造的ドリフトを catch する。 config は repo root の
+  # `.yamllint.yaml` で relaxed プロファイル + duplicate-keys = error。
+  # ---------------------------------------------------------------------------
+  - repo: https://github.com/adrienverge/yamllint
+    rev: v1.35.1
+    hooks:
+      - id: yamllint
+        args: [--config-file=.yamllint.yaml, --strict]
+        files: ^(\.github/(workflows|actions)/.*\.ya?ml|docker/.*compose.*\.ya?ml|\.yamllint\.yaml)$
+
+  # ---------------------------------------------------------------------------
+  # shellcheck — `.claude/hooks/*.sh` と repo 内 shell スクリプトの syntax /
+  # lint 検証。 メタワークフロー監査で「hook script rot が最高リスク」と判明
+  # したため pre-commit に追加。 vendored / build artifacts は除外する。
+  # ---------------------------------------------------------------------------
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.10.0.1
+    hooks:
+      - id: shellcheck
+        args: [--severity=warning, --shell=bash]
+        files: \.(sh|bash)$
+        exclude: ^(\.build/|build/|build-full/|build-test/|node_modules/|target/|src/wasm/openjtalk-web/(build|demo|models|voices|patches)/)
 
   # ---------------------------------------------------------------------------
   # Spell-checker — codespell honors .codespellrc / pyproject.toml `[tool.codespell]`

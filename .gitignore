@@ -151,6 +151,14 @@ check_*.py
 !scripts/check_secret_path_reference.py
 !scripts/check_openjtalk_version_sync.py
 !scripts/check_test_skip_reason.py
+# Workflow-automation wave2 で追加した check スクリプト群
+!scripts/check_precommit_file_regex.py
+!scripts/check_readme_code_examples.py
+!scripts/check_japanese_n_variant_contract.py
+!scripts/check_chinese_tone_contract.py
+!scripts/check_skill_health.py
+!scripts/check_readme_breaking_sync.py
+!scripts/check_deprecated_api_lingering.py
 create_comprehensive_*.py
 add_missing_*.py
 retrain_*.py

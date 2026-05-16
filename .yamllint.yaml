@@ -1,0 +1,44 @@
+# yamllint config — pre-commit gate for .github/workflows と docker-compose 系。
+# hadolint が Dockerfile を担当するのに対し、yamllint は workflow YAML の
+# syntax-only ドリフト (重複 key / インデント崩れ / truthy 強制) を catch する。
+#
+# 既存の workflow には `!reference` のような GitHub Actions 固有の YAML 拡張
+# を使う箇所があるため、 yamllint の default ルールでは false positive が
+# 多すぎる。 そこで relaxed プロファイルをベースに、 syntax と重複検出だけ
+# 強制する保守的セットアップとする。
+
+extends: relaxed
+
+rules:
+  # 行長は workflow / docker-compose で長くなりがちなため明示的に無効化
+  line-length: disable
+  # コメント前の空白を強制しない
+  comments: disable
+  comments-indentation: disable
+  # truthy: on/off/yes/no を許容 (GitHub Actions の on: は警告対象になる)
+  truthy: disable
+  # ドキュメント開始マーカ ( --- ) は CI workflow では任意
+  document-start: disable
+  # インデント揺れは GitHub Actions YAML で頻出 (block sequence indent)
+  indentation:
+    indent-sequences: consistent
+    check-multi-line-strings: false
+  # 重複 key は warning ではなく error にする (silent override の温床)
+  key-duplicates: enable
+  # 末尾空白
+  trailing-spaces: enable
+  # 改行末尾は LF
+  new-line-at-end-of-file: enable
+  # bracket / brace のスペーシングは relaxed
+  brackets: disable
+  braces: disable
+
+ignore: |
+  node_modules/
+  .build/
+  build/
+  build-full/
+  build-test/
+  target/
+  test/models/
+  src/wasm/openjtalk-web/(build|demo|models|voices|patches)/
