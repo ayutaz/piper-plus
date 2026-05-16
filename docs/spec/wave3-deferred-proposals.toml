@@ -1,0 +1,268 @@
+# Wave 3 Deferred Proposals — Cross-Runtime Parity / Benchmark / Governance
+#
+# Wave 3 (workflow automation enhancement) で 15 並列 agent が 75 提案を
+# 出したうち、 PR 規模 (45 件規模) を考慮して個別 PR に分割した方が良い
+# 大規模 task を本 spec に集約。 各 proposal の優先度 / 実装計画を
+# canonical 化する。
+#
+# 順序: 個別 PR の作成は T14 → T15 → T16 で進める想定。
+
+[meta]
+spec_version = 1
+last_updated = "2026-05-16"
+applies_to = ["python", "rust", "go", "csharp", "wasm", "cpp", "kotlin", "swift"]
+forward_compat_policy = "strict"
+status = "deferred-from-wave3"
+canonical_reference = "Wave 3 agent調査 (75 提案)"
+
+# =============================================================================
+# T14: Cross-Runtime Parity 拡大
+# =============================================================================
+
+[t14_speaker_embedding_e2e]
+priority = "HIGH"
+effort = "M (~1 週間)"
+status = "scaffold-only"
+description = """
+Speaker Encoder (ECAPA-TDNN) の E2E cross-runtime parity gate を 6 runtime
+拡張する。 現状は Mel parity Layer 1 のみ検証済 (contract-gates-extended.yml
+の speaker-encoder)。 E2E cosine gate (Layer 2) は scaffold 化されているが
+encoder ONNX が release されていない。
+"""
+implementation = """
+  1. ECAPA-TDNN ONNX を release (HF にアップロード + sha256-manifest 追加)
+  2. e2e-issue-426.yml の job を 6 runtime に拡張 (Python/Rust/Go/C#/C++/WASM)
+  3. 各 runtime で encoder.onnx 推論時の embedding feeding パス一致を assert
+  4. fixture: tests/fixtures/speaker-encoder/golden_embeddings.json
+"""
+
+[t14_custom_dict_v2_lookup]
+priority = "HIGH"
+effort = "M (~1 週間)"
+status = "proposal"
+description = """
+カスタム辞書 JSON v2 → phoneme ID mapping の 7 runtime parity gate。
+特に Kotlin Android / Swift G2P-only での辞書 lookup パス、 JSON schema
+version 差を検証。
+"""
+implementation = """
+  1. tests/fixtures/dictionary/v2_lookup_matrix.json を作成 (ja/en/pt の
+     custom dict + test case matrix)
+  2. 各 runtime の dict.load() + lookup() 結果が canonical (Python) と
+     一致するか assert
+  3. Kotlin/Swift test scaffold を追加 (Swift FFI + Kotlin JNI bridge)
+  4. CI gate: dictionary-lookup-parity.yml
+"""
+
+[t14_pt_dialect_audio]
+priority = "MEDIUM"
+effort = "L (~2 週間)"
+status = "proposal"
+description = """
+PT BR / EU dialect の audio cosine assert。 現状 phoneme-id level までは
+parity 済 (pt-dialect-contract.toml + pt_dialect_parity.json)、 audio
+合成 (mel synthesis + duration) は未検証。
+"""
+implementation = """
+  1. fixture: tests/fixtures/pt_dialect/golden_audio_matrix.json (BR 3 ref +
+     EU 3 variant)
+  2. canonical Python TTS で合成 → reference WAV 生成
+  3. 各 runtime (Rust/Go/C#/C++/WASM) で同合成 → cosine-sim 閾値で assert
+  4. CI gate: pt-dialect-audio-parity.yml (重い、 schedule weekly)
+"""
+
+[t14_ssml_audio_byte_for_byte]
+priority = "LOW"
+effort = "L (~2 週間)"
+status = "proposal"
+description = """
+SSML <prosody rate> / <break time> の WAV output byte-for-byte parity。
+現状 SSML→phoneme stream の parity (G2P-only) のみ。 audio output 差
+(length_scale 適用 / silence 挿入 / duration scaling) は未検証。
+"""
+implementation = """
+  1. fixture: tests/fixtures/ssml/golden_audio_matrix.json
+  2. canonical Python SSML 合成 → wav dump
+  3. 各 runtime での md5 / PCM byte 一致検証
+  4. skill: check-ssml-audio-contract.py
+"""
+
+[t14_list_models_filter]
+priority = "LOW"
+effort = "S (~半日)"
+status = "proposal"
+description = """
+--list-models --language <lang> filter の cross-runtime parity。 現状は
+CLI flag syntax の parity のみ (cli-flag-parity)、 filter 結果の検証なし。
+"""
+implementation = """
+  1. fixture: tests/fixtures/cli_flag/list_models_filter_matrix.json
+  2. 各 runtime の CLI 出力を JSON 化、 canonical と比較
+  3. pre-commit script (軽い): scripts/check_list_models_filter.py
+"""
+
+# =============================================================================
+# T15: Benchmark Regression 強化
+# =============================================================================
+
+[t15_dynamic_threshold]
+priority = "HIGH"
+effort = "M (~1 週間)"
+status = "proposal"
+description = """
+multi-runtime-rtf.yml の固定 threshold (rtf 10%, latency p95 15%) を
+stddev × 2 動的計算に置換し、 runner variance に適応。
+"""
+implementation = """
+  1. scripts/calibrate_bench_stddev.py: gh-pages の過去 5-10 回の bench
+     を集約し、 ランタイム × text-length 別 stddev を算出
+  2. multi-runtime-rtf-baseline.json に _stddev_baseline.json を追加
+  3. multi-runtime-rtf.yml の aggregator step で動的 threshold 判定
+"""
+
+[t15_unified_schema]
+priority = "MEDIUM"
+effort = "M (~1 週間)"
+status = "proposal"
+description = """
+benchmark.py (in-process) と benchmark_runtime.py (subprocess) の出力
+schema を統一 TOML contract で定義し、 iOS / Android bench も同 schema
+で互換に。
+"""
+implementation = """
+  1. docs/spec/benchmark-contract.toml: 統一 JSON schema (metric / unit /
+     comparison method)
+  2. benchmark.py / benchmark_runtime.py 両者がこの schema 準拠で出力
+  3. pre-commit hook: check_benchmark_contract.py
+"""
+
+[t15_mobile_harness]
+priority = "LOW"
+effort = "L (~2 週間)"
+status = "proposal"
+description = """
+iOS Simulator + Android Emulator で bench を走らせる harness。
+"""
+implementation = """
+  1. benchmark_mobile.py: xcrun simctl (iOS) + adb (Android emu) wrapper
+  2. CI workflow: mobile-bench.yml (scheduled weekly / manual dispatch)
+  3. 結果は multi-runtime-rtf-baseline.json に ios_simulator /
+     android_emulator cell として格納
+"""
+
+# =============================================================================
+# T16: Supply Chain / Governance 完成形
+# =============================================================================
+
+[t16_slsa_l3]
+priority = "HIGH"
+effort = "L (~2 週間)"
+status = "proposal"
+description = """
+slsa-framework/slsa-github-generator@v2 で release-shared-lib.yml /
+npm-publish.yml / cargo-publish.yml に full SLSA Level 3 provenance を
+追加。 attest-build-provenance より厳格な supply chain integrity 保証。
+"""
+implementation = """
+  1. .github/workflows/_slsa-generator.yml (reusable workflow)
+  2. release-shared-lib.yml / npm-publish.yml / g2p-rust-publish.yml の
+     publish step 前に SLSA provenance generate を呼び出し
+  3. provenance.in-toto.jsonl を release asset に attach
+"""
+
+[t16_nuget_oidc]
+priority = "MEDIUM"
+effort = "S (~半日)"
+status = "proposal"
+description = """
+NuGet Trusted Publishing (OIDC) で API key を廃止。 dotnet 6.17+ の
+--interactive-oidc flag を使用。
+"""
+implementation = """
+  1. dev-create-release.yml の NuGet publish step に oidc-provider: github
+  2. NUGET_API_KEY secret を廃止 (削除 PR)
+"""
+
+[t16_reproducibility_audit]
+priority = "MEDIUM"
+effort = "L (~2 週間)"
+status = "proposal"
+description = """
+monthly schedule で 4 runtime (Rust/Go/C#/npm) を rebuild し、 binary hash
+が前回 build と一致するか検証。 supply chain integrity の SLSA L2 step。
+"""
+implementation = """
+  1. .github/workflows/reproducibility-audit.yml (monthly cron)
+  2. docs/spec/reproducibility.md (検証手順)
+"""
+
+[t16_flake_db]
+priority = "LOW"
+effort = "L (~2 週間)"
+status = "proposal"
+description = """
+CI failure log から flake suspected test を自動検出し、 GitHub Issue
+([flake-suspect] label) で auto-open / update する。
+"""
+implementation = """
+  1. watch-ci-patterns skill 拡張で「2 回 fail → pass」 pattern 検出
+  2. .github/workflows/ci-flake-db.yml
+  3. Issue template + graphql for issue auto-create
+"""
+
+[t16_mirror_sync_framework]
+priority = "MEDIUM"
+effort = "L (~1.5 週間)"
+status = "proposal"
+description = """
+loanword-mirrors / dictionary-mirrors / pua-contract の mirror sync ロジック
+を一般化し、 新規 spec TOML の [[mirrors]] 宣言だけで gate が自動有効化される
+framework に。 _mirror_check.py:general_mirror_validator() を拡張。
+"""
+implementation = """
+  1. _mirror_check.py:general_mirror_validator() の API 拡張
+  2. 既存 check_loanword_consistency / check_dictionary_consistency を
+     thin wrapper 化
+  3. 新規 spec TOML が [[mirrors]] を持てば自動的に gate に組み込み
+"""
+
+[t16_registry_cap]
+priority = "LOW"
+effort = "L (~2-3 週間)"
+status = "proposal"
+description = """
+PyPI / crates.io / NuGet publish chain の CAP theorem 対応。 transaction-
+like な 4 層 publish (sandbox → polling → final → mirror polling) と
+失敗時 rollback script。
+"""
+implementation = """
+  1. tools/release-rollback.sh
+  2. dev-create-release.yml に sandbox publish step
+  3. publish 失敗時の Release asset 削除 + tag revert
+"""
+
+# =============================================================================
+# 不変条件
+# =============================================================================
+
+[[invariants]]
+name = "individual-pr-per-task"
+description = """
+T14 / T15 / T16 は個別 PR で進める。 Wave 3 PR にまとめて入れない
+(PR レビュー困難 + revert 影響範囲が大きい)。
+"""
+
+[[invariants]]
+name = "test-coverage-first"
+description = """
+各 task は実装前に「現状の検証深度」 を spec に明記する。
+"phoneme-id level only" / "audio sample" / "byte-for-byte" の区別を明確化。
+"""
+
+[[invariants]]
+name = "fixture-first-then-runtime"
+description = """
+cross-runtime parity 拡大は「canonical (Python) で fixture 生成」 を先に
+行い、 そこから各 runtime test を追加する。 fixture が canonical を確定
+した後に runtime test の golden 化が可能。
+"""

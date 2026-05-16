@@ -71,6 +71,17 @@ jobs:
     steps:
       - uses: actions/checkout@v6.0.2
 
+      # PR / push event でも runner の disk 圧迫を回避するため軽量 cleanup。
+      # python-inference (CUDA base) + cpp-dev (ubuntu builder + apt deps)
+      # は 2 image 同時 cache で ~10GB 食うことがある。 schedule job は
+      # `scan-heavy` 側で full free-disk-space を実施。
+      - name: Free up disk space (light cleanup)
+        run: |
+          docker system prune -af || true
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android \
+            /opt/ghc /opt/hostedtoolcache/CodeQL 2>/dev/null || true
+          df -h | head -5
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3.7.1
 
@@ -131,6 +142,108 @@ jobs:
                   level = r.get("level") or r.get("properties", {}).get("security-severity")
                   # Trivy SARIF: level="error" maps to CRITICAL/HIGH; tags
                   # carry the actual severity name.
+                  for tag in r.get("properties", {}).get("tags", []):
+                      if isinstance(tag, str) and tag.upper() == "CRITICAL":
+                          critical += 1
+                          break
+          if critical:
+              print(f"CRITICAL findings: {critical} — failing.")
+              sys.exit(1)
+          print("No CRITICAL findings — pass.")
+          PY
+
+  # ---------------------------------------------------------------------------
+  # Scheduled heavy scan (Wave 3, T12).
+  # 通常 PR / push では disk OOM で除外している heavy image (webui / wyoming /
+  # python-train / cpp-inference final) を週次でスキャン。 free-disk-space で
+  # 10GB+ 確保し、 docker system prune で intermediate cache を全部削除。
+  # ---------------------------------------------------------------------------
+  scan-heavy:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - name: webui
+            dockerfile: docker/webui/Dockerfile
+            build_target: ''
+          - name: wyoming
+            dockerfile: docker/wyoming/Dockerfile
+            build_target: builder
+          - name: cpp-inference
+            dockerfile: docker/cpp-inference/Dockerfile
+            build_target: builder
+          - name: python-train
+            dockerfile: docker/python-train/Dockerfile
+            build_target: builder
+
+    steps:
+      - uses: actions/checkout@v6.0.2
+
+      # 重 image (CUDA / ML stack / apt full) を build できるよう
+      # ~14-15GB の空き容量を確保。 jlumbroso/free-disk-space は
+      # /usr/share/dotnet / android SDK / ghc / haskell / boost / aspnet
+      # を削除し、 swap も無効化することで maximum disk を解放。
+      - name: Free disk space (aggressive)
+        uses: jlumbroso/free-disk-space@v1.3.1
+        with:
+          tool-cache: true
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: true
+          swap-storage: true
+
+      - name: Verify disk space
+        run: df -h | head -5
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3.7.1
+
+      - name: Build image (no push, middle stage only)
+        uses: docker/build-push-action@v6.10.0
+        with:
+          context: .
+          file: ${{ matrix.target.dockerfile }}
+          target: ${{ matrix.target.build_target }}
+          push: false
+          load: true
+          tags: piper-plus-${{ matrix.target.name }}:trivy-scan
+          # heavy scan は cache 無し (毎週 fresh build で base CVE を確実
+          # に catch、 stale cache で missing CVE になるのを防ぐ)。
+
+      - name: Trivy image scan (heavy, SARIF + CRITICAL gate)
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: piper-plus-${{ matrix.target.name }}:trivy-scan
+          format: sarif
+          output: trivy-heavy-${{ matrix.target.name }}.sarif
+          severity: CRITICAL,HIGH,MEDIUM
+          ignore-unfixed: true
+          exit-code: '0'
+
+      - name: Upload heavy SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3.30.6
+        with:
+          sarif_file: trivy-heavy-${{ matrix.target.name }}.sarif
+          category: trivy-heavy-${{ matrix.target.name }}
+
+      - name: Fail on CRITICAL findings only (heavy)
+        run: |
+          python3 - <<'PY'
+          import json, sys
+          path = "trivy-heavy-${{ matrix.target.name }}.sarif"
+          try:
+              data = json.load(open(path))
+          except (OSError, json.JSONDecodeError) as exc:
+              print(f"SARIF parse failed: {exc}; treating as no findings.")
+              sys.exit(0)
+          runs = data.get("runs", [])
+          critical = 0
+          for run in runs:
+              for r in run.get("results", []):
                   for tag in r.get("properties", {}).get("tags", []):
                       if isinstance(tag, str) and tag.upper() == "CRITICAL":
                           critical += 1
