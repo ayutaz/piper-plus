@@ -28,6 +28,7 @@ spec_version = "1.0"
 last_updated = "2026-05-09"
 applies_to = ["python-export", "all-runtime-loaders"]
 canonical_source = "src/python/piper_train/export_onnx.py"
+forward_compat_policy = "strict"
 
 # ============================================================================
 # Required export pipeline

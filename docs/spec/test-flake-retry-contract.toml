@@ -1,0 +1,102 @@
+# Test Flake Retry Contract (Wave 3, T11).
+#
+# 多 runtime CI で「flake な test が一過性 fail → PR red → 手動で retry」
+# サイクルを削減する。 retry 機構は CI cost と「flake で本物 bug を隠す」
+# trade-off があるため、 各 runtime に対し以下方針を明示する。
+#
+# 原則:
+#   - retry 回数は最大 2 (3 回試行)。 3 回で pass しなければ本物の fail
+#   - retry-delay は 1 秒 (network flake 想定)
+#   - retry は CI のみ。 local では default 0 (本物の fail を即時検知)
+#   - retry 結果は log に明示 (どの test が何回 retry した記録)
+
+[meta]
+spec_version = 1
+last_updated = "2026-05-16"
+applies_to = ["python", "rust", "go", "csharp"]
+forward_compat_policy = "strict"
+
+# -----------------------------------------------------------------------------
+# Python (pytest)
+# -----------------------------------------------------------------------------
+[python]
+status = "phase-1"  # dependency 追加済、 workflow 適用は phase 2 で実施
+package = "pytest-rerunfailures"
+pyproject_dep = "src/python_run/pyproject.toml [project.optional-dependencies] test"
+ci_flag = "--reruns 1 --reruns-delay 1 --reruns-only flaky"
+local_default = 0
+implementation_phase_2 = """
+  .github/workflows/python-tests.yml の各 `pytest` step に
+  `--reruns 1 --reruns-delay 1` を追加し、 `@pytest.mark.flaky` で quarantine
+  対象 test を明示する。 ad-hoc な test 全体 retry は付けない (本物 bug 隠蔽
+  リスク)。
+"""
+
+# -----------------------------------------------------------------------------
+# Rust (cargo test → cargo nextest)
+# -----------------------------------------------------------------------------
+[rust]
+status = "proposed"  # nextest 未導入、 phase 2 で migration
+package = "cargo-nextest"
+ci_install = "cargo install cargo-nextest --locked"
+ci_flag = "cargo nextest run --retries 2"
+local_default = "cargo test (no retry; nextest opt-in via Justfile)"
+implementation_phase_2 = """
+  .github/workflows/rust-tests.yml で `cargo test --no-fail-fast` を
+  `cargo nextest run --retries 2` に置換。 nextest は test 単位の細粒度
+  reporting + 自動 retry を提供。 既存 workflow との互換性確認後 rollout。
+"""
+
+# -----------------------------------------------------------------------------
+# Go (go test → gotestsum)
+# -----------------------------------------------------------------------------
+[go]
+status = "proposed"
+package = "github.com/gotesttools/gotestsum"
+ci_install = "go install gotest.tools/gotestsum@latest"
+ci_flag = "gotestsum --rerun-fails=2 --packages=./..."
+local_default = "go test ./... (no retry)"
+implementation_phase_2 = """
+  .github/workflows/go-ci.yml で `go test -race -count=1` を gotestsum
+  に置換。 fail した test のみ re-run できる + JUnit XML 出力で flake
+  自動分類が可能になる。
+"""
+
+# -----------------------------------------------------------------------------
+# C# (.NET) (xunit Retry attribute)
+# -----------------------------------------------------------------------------
+[csharp]
+status = "proposed"
+package = "Xunit.RetryAttribute"
+ci_flag = "[Retry(2)]"  # test method 単位の attribute
+local_default = "no retry"
+implementation_phase_2 = """
+  flaky な test method に明示的に `[Retry(2)]` 属性を付与する pattern。
+  全 test retry は採らない (本物 bug 隠蔽防止)。 PiperPlus.runsettings の
+  TestSessionTimeout を 6 min に拡張済 (既存設定)。
+"""
+
+# -----------------------------------------------------------------------------
+# 不変条件
+# -----------------------------------------------------------------------------
+
+[[invariants]]
+name = "no-blanket-retry"
+description = """
+全 test を無条件に retry させない。 flake 候補のみ明示 (mark / attribute)。
+無条件 retry は CI cost 増 + 本物の bug 隠蔽のリスク。
+"""
+
+[[invariants]]
+name = "retry-count-max-2"
+description = """
+retry 回数は最大 2 (合計 3 回試行)。 3 回 fail で本物の bug。
+無制限 retry はループ防止のため禁止。
+"""
+
+[[invariants]]
+name = "ci-only-retry"
+description = """
+retry は CI のみ。 local では default 0 で本物 fail を即時検知。
+local 開発で flake を発見しやすくする。
+"""

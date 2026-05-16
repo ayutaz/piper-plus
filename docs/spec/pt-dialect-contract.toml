@@ -15,6 +15,7 @@
 [meta]
 spec_version = 2
 issue = "PR #401 — pt alias for pt-BR + EU (pt-PT) full implementation across 8 runtimes"
+forward_compat_policy = "strict"
 
 [language_codes]
 # Codes accepted by every runtime. Both `pt` and `pt-BR` resolve to the

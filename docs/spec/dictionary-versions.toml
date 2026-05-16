@@ -51,6 +51,7 @@ Bumping any pinned version below requires:
   4. Bumping last_updated and (if the upstream source itself is
      versioned) bumping contract_version.
 """
+forward_compat_policy = "strict"
 
 # ===========================================================================
 # Japanese — OpenJTalk + NAIST-JDIC

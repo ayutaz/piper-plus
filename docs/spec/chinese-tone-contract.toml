@@ -22,6 +22,7 @@ last_updated = "2026-05-16"
 applies_to = ["python", "rust", "go", "csharp", "wasm", "cpp"]
 canonical_source = "src/python/g2p/piper_plus_g2p/chinese.py"
 canonical_function = "_pinyin_to_ipa"
+forward_compat_policy = "strict"
 
 # ---------------------------------------------------------------------------
 # 5 tone symbols (in canonical pinyin numbering order)

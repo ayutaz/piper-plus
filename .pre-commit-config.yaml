@@ -552,6 +552,31 @@ repos:
         files: ^README(_[A-Z]{2})?\.md|scripts/check_readme_h2_parity\.py$
         pass_filenames: false
 
+      # spec [meta] schema gate (Wave 3).
+      # 24 spec TOML が [meta] section + forward_compat_policy を持つことを
+      # 検証。 Wave 3 で migrate_spec_meta.py により既存 spec は統一済み、
+      # 本 gate は新規 spec TOML 追加時の付与忘れを catch する。
+      - id: spec-meta-schema
+        name: spec TOML [meta] schema (24 specs)
+        entry: uv run python scripts/check_spec_meta.py
+        language: system
+        files: ^(docs/spec/.*\.toml|scripts/check_spec_meta\.py)$
+        pass_filenames: false
+
+      # Version manifest sync gate (Wave 3, S-4 Release 自動化).
+      # release-versions.toml の expected_prefix と各 manifest の実 version
+      # を比較し、 9 polyglot manifest の drift を検出。 既存 CI workflow
+      # `.github/workflows/version-consistency.yml` の local 版として、
+      # commit 時に該当 file 変更があれば走る。 mode は release-versions.toml
+      # の meta.mode (warn / fail) を尊重し、 本 hook は --strict なしで
+      # warn-only 動作。 tag push 時の hard gate は pre-push hook 側で行う。
+      - id: version-manifest-sync
+        name: version manifest sync (10 polyglot manifests)
+        entry: uv run python scripts/check_version_manifest_sync.py
+        language: system
+        files: ^(VERSION|src/python/piper_train/VERSION|pyproject\.toml|src/python(_run)?/pyproject\.toml|src/rust/Cargo\.toml|src/csharp/PiperPlus\.(Core|Cli)/PiperPlus\.(Core|Cli)\.csproj|src/wasm/(g2p|openjtalk-web)/package\.json|Package\.swift|android/gradle\.properties|docs/spec/release-versions\.toml|scripts/check_version_manifest_sync\.py)$
+        pass_filenames: false
+
       # Language list 3-way parity (WebUI / CLI / FastAPI test fixture).
       # Catches drift like PR #2f4efaf9 where the WebUI SAMPLE_TEXTS listed
       # a language ("sv") that the CLI --language choices and the

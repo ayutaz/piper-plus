@@ -9,6 +9,7 @@ spec_version = 1
 last_updated = "2026-05-16"
 applies_to = ["github-actions"]
 canonical_reference = ".github/workflows/*.yml"
+forward_compat_policy = "strict"
 
 # -----------------------------------------------------------------------------
 # Retention category 定義

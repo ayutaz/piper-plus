@@ -32,6 +32,7 @@
 spec_version = "1.2"
 last_updated = "2026-05-14"
 applies_to = ["python", "rust", "go", "csharp", "wasm", "cpp"]
+forward_compat_policy = "strict"
 
 # ---------------------------------------------------------------------------
 # <break strength="..."> — predefined silence durations

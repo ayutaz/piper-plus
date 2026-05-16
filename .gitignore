@@ -162,6 +162,8 @@ check_*.py
 !scripts/check_lockfile_consistency.py
 !scripts/check_benchmark_json.py
 !scripts/check_readme_h2_parity.py
+!scripts/check_spec_meta.py
+!scripts/check_version_manifest_sync.py
 create_comprehensive_*.py
 add_missing_*.py
 retrain_*.py

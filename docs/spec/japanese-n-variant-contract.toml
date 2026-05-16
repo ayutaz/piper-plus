@@ -18,6 +18,7 @@ last_updated = "2026-05-16"
 applies_to = ["python", "rust", "go", "csharp", "wasm", "cpp", "swift", "kotlin"]
 canonical_source = "src/python/g2p/piper_plus_g2p/japanese.py"
 canonical_function = "_apply_n_phoneme_rules"
+forward_compat_policy = "strict"
 
 # ---------------------------------------------------------------------------
 # 4 N-variant phonemes (in canonical phoneme inventory order)

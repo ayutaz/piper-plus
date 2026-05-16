@@ -48,6 +48,7 @@ contract_version = 1
 status = "stable"
 applies_to = ["python", "rust", "go", "csharp", "cpp", "wasm-js", "swift"]
 canonical_source = "src/python_run/piper/voice.py:PiperVoice.synthesize"
+forward_compat_policy = "strict"
 
 # ===========================================================================
 # Text input

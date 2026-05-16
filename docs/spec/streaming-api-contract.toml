@@ -32,6 +32,7 @@ spec_version = "1.0"
 last_updated = "2026-05-09"
 applies_to = ["python", "rust", "csharp", "go", "wasm-js", "c-api"]
 sentence_boundary_source = "docs/spec/text-splitter-contract.toml"
+forward_compat_policy = "strict"
 
 # ============================================================================
 # Per-language API signature

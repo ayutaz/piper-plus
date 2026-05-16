@@ -18,6 +18,7 @@ applies_to = ["python", "rust", "go", "cpp", "csharp", "wasm-js", "swift"]
 # kotlin-android is delegated via JNI to the Rust PUA map (no separate constants)
 canonical_source = "src/python/g2p/piper_plus_g2p/data/pua.json"
 pua_compat_version = 2
+forward_compat_policy = "strict"
 
 # ============================================================================
 # Invariant 1 — Single canonical source

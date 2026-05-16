@@ -1,0 +1,112 @@
+name: G2P Language Issue
+description: Report a language-specific G2P bug or missing language support
+title: "[g2p][LANG] "
+labels: ["g2p", "language-support", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this template for language-specific phoneme conversion issues:
+        - phoneme mismatch (e.g. zh `bei3jing1` produced wrong phoneme set)
+        - missing language support (e.g. Vietnamese G2P request)
+        - dialect handling (e.g. pt-BR vs pt-PT discrepancy)
+
+        piper-plus G2P supports 8 languages today: **ja / en / zh / ko / es / fr / pt / sv**.
+        Two PT dialects (pt-BR canonical, pt-PT) are handled by `PortuguesePhonemizer(dialect=...)`.
+
+  - type: dropdown
+    id: language
+    attributes:
+      label: Language
+      description: Which language is affected?
+      options:
+        - "ja (Japanese)"
+        - "en (English)"
+        - "zh (Mandarin Chinese)"
+        - "ko (Korean)"
+        - "es (Spanish)"
+        - "fr (French)"
+        - "pt / pt-BR (Brazilian Portuguese)"
+        - "pt-PT (European Portuguese)"
+        - "sv (Swedish)"
+        - "new language (not yet supported)"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      description: How blocking is this?
+      options:
+        - "blocker (wrong phoneme produced — audio sounds wrong)"
+        - "major (degenerate edge case — rare but reproducible)"
+        - "minor (cosmetic / edge case — workaround exists)"
+        - "feature request (language not supported yet)"
+    validations:
+      required: true
+
+  - type: textarea
+    id: input_text
+    attributes:
+      label: Input text
+      description: The exact text that triggers the issue. Include codepoints if it involves special characters.
+      placeholder: |
+        e.g.  「北京」 should produce `pei3ching1` (pinyin: bei3jing1)
+        or:   "São Paulo" should treat tilde correctly in pt-BR
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected phonemes
+      description: What phoneme sequence (in IPA, pinyin, or runtime-internal symbols) you expected.
+      placeholder: |
+        pinyin: bei3 jing1
+        IPA:    peɪ³⁵ tɕiŋ⁵⁵
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual phonemes
+      description: What the runtime actually produced. Paste the raw phoneme list / ID array if possible.
+      placeholder: |
+        ChinesePhonemizer().phonemize_text("北京") returned [...]
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: runtimes
+    attributes:
+      label: Affected runtimes
+      description: Which runtimes did you observe the issue in? Leave unchecked if you only tested one.
+      options:
+        - label: "Python (piper-plus / piper-plus-g2p)"
+        - label: "Rust (piper-plus / piper-plus-g2p)"
+        - label: "C# (PiperPlus.Core / DotNetG2P)"
+        - label: "Go (src/go/phonemize)"
+        - label: "npm / WASM (@piper-plus/g2p)"
+        - label: "C++ (libpiper_plus)"
+        - label: "Kotlin/Android (piper-plus-g2p-android)"
+        - label: "Swift G2P (PiperPlusG2P SPM)"
+
+  - type: textarea
+    id: dictionary
+    attributes:
+      label: Custom dictionary used?
+      description: If you loaded a custom dictionary (`--dictionary` / `--zh-en-dispatch`), paste the relevant entry. Leave blank for default behavior.
+
+  - type: textarea
+    id: env
+    attributes:
+      label: Environment
+      description: piper-plus version, runtime version (Python 3.13 etc.), OS
+      placeholder: |
+        piper-plus: 1.12.0
+        Python:     3.13.1
+        OS:         macOS 15.2 / Linux ubuntu-24.04 / Windows 11 23H2
+    validations:
+      required: true

@@ -49,6 +49,7 @@ schema_version = 1
 #   - "warn"  → emit ::warning:: but exit 0 (initial-introduction safe).
 #   - "fail"  → emit ::error:: and exit 1 (post-hardening).
 mode = "warn"
+forward_compat_policy = "strict"
 
 # ---------------------------------------------------------------------------
 # Python — PyPI piper-plus (main project)
