@@ -242,14 +242,417 @@ implementation = """
 """
 
 # =============================================================================
+# T17: Test / Coverage / Golden Fixture 強化 (Wave 4 調査由来)
+# =============================================================================
+
+[t17_cli_help_snapshot]
+priority = "HIGH"
+effort = "M (~1 週間)"
+status = "proposal"
+description = """
+6 runtime CLI (Python/Rust/Go/C#/C++/WASM) の `--help` 出力を golden snapshot
+化し、 regression を gate。 現状 `cli-help-drift.py` は Python のみ + flag
+表 only、 全 runtime の help body は監視されていない。
+"""
+implementation = """
+  1. scripts/snapshot_cli_help.py: 各 runtime の help を capture
+  2. docs/spec/golden/{python,rust,go,csharp,cpp,wasm}_help.txt として保存
+  3. CI gate: `--check` mode で diff があれば fail (line-based, allow markdown
+     formatting drift)
+  4. pre-commit hook: src/{python_run,rust,go,csharp,cpp,wasm}/.../cli 変更時に
+     `--capture` 自動実行 (warning mode で開始)
+"""
+
+[t17_cli_exit_code_contract]
+priority = "MEDIUM"
+effort = "S (~半日)"
+status = "proposal"
+description = """
+6 runtime CLI の exit code を統一 contract で定義。 現状 Python sys.exit(2)
+(argparse), C# Environment.ExitCode=1, Go os.Exit(1), Rust anyhow 1, C++
+EXIT_FAILURE/raw exit(1) が混在。 0=ok, 1=user error, 2=internal error 等の
+規約を docs/spec/cli-exit-code-contract.toml に集約し、 runtime ごとに grep
+で literal を検証。
+"""
+implementation = """
+  1. docs/spec/cli-exit-code-contract.toml (canonical)
+  2. scripts/check_cli_exit_codes.py で各 runtime CLI から exit code literals
+     を抽出 + contract と照合
+  3. pre-commit hook (cli source 変更時のみ)
+"""
+
+[t17_cli_behavioral_parity]
+priority = "MEDIUM"
+effort = "M (~1 週間)"
+status = "proposal"
+description = """
+CLI flag syntax だけでなく、 stderr format / --version 出力 format / error
+message 構造 (action + cause + hint) の cross-runtime parity を gate。
+現状 cli-flag-parity gate は flag syntax のみ。
+"""
+implementation = """
+  1. docs/spec/cli-behavioral-contract.toml (stderr prefix / version regex
+     / error format)
+  2. scripts/check_cli_behavioral_parity.py
+  3. CI workflow: cli-behavioral-verification.yml で 6 runtime を build +
+     `--version` / missing-model error / `--help` 比較
+"""
+
+[t17_coverage_threshold_promotion]
+priority = "HIGH"
+effort = "S (~半日)"
+status = "proposal"
+description = """
+codecov.yml の `informational: true` を `false` に段階昇格し、 patch >= 80%
+/ project >= 70% を required check 化。 現状は表示のみで merge block されない。
+"""
+implementation = """
+  1. codecov.yml: informational: false (段階的に flag ごとに切り替え)
+  2. flag 別 threshold 設定 (python_runtime 70%, g2p 80% など既存の数値を
+     強制)
+  3. ロールアウト計画: 最初は 1 flag (g2p) のみ enforce、 4 週間 stable
+     なら全 flag に展開
+"""
+
+[t17_untested_public_api]
+priority = "MEDIUM"
+effort = "M (~1 週間)"
+status = "proposal"
+description = """
+各 runtime の public API (`__all__` / `pub` / `Exported`) に対して coverage
+path graph を walk し、 一度も呼ばれない API を検出する skill。 coverage
+盲点 (CLI entrypoint / feature flag 等) を排除。
+"""
+implementation = """
+  1. scripts/check_untested_public_api.py (Python: inspect.getmembers,
+     Rust: cargo public-api, Go: ast walk)
+  2. lcov / coverage.xml と cross-reference して 0-call API を report
+  3. ranking: HIGH (public class methods) / MEDIUM (public func) / LOW
+     (private helpers)
+"""
+
+[t17_audio_wave_golden]
+priority = "HIGH"
+effort = "L (~2 週間)"
+status = "proposal"
+description = """
+Wave 3 で phoneme-timing は 7 runtime golden parity 化済。 audio WAV 出力
+(synthesize() の最終結果波形) の golden が未確立。 各 runtime が異なる ORT
+provider で同 ONNX を infer した時の output wave parity を gate。
+"""
+implementation = """
+  1. canonical Python TTS で 3 ref text を合成 → WAV RIFF header + 最初の
+     4410 samples (0.1 秒) の checksum 化
+  2. tests/fixtures/audio/golden_checksums.json
+  3. 各 runtime test に load + checksum 比較を追加 (Mel cosine + zero-cross
+     位置 tolerance)
+"""
+
+[t17_speaker_encoder_xruntime]
+priority = "MEDIUM"
+effort = "S (~半日)"
+status = "proposal"
+description = """
+test/fixtures/speaker_encoder_golden.json の 7 runtime load 検証 gate を
+追加。 現状 canonical Python が生成側、 他 runtime の load 検証が pre-commit
+に組み込まれていない。
+"""
+implementation = """
+  1. .pre-commit-config.yaml の speaker-encoder-contract hook を拡張
+  2. scripts/check_speaker_encoder_golden_consistency.py (7 runtime parse
+     + sha256 + version check)
+"""
+
+[t17_flake_catalog_skill]
+priority = "MEDIUM"
+effort = "M (~1 週間)"
+status = "proposal"
+description = """
+T16 t16_flake_db を更に深化させた flake catalog skill。 `gh run list
+--status failure --limit 100` で過去 14 日の failure log を parse し、
+同一 test name が N≥2 回 fail → auto Issue [flake-suspect] label +
+docs/reference/flake-history.md TOML table 自動更新。
+"""
+implementation = """
+  1. scripts/watch_ci_patterns.py の拡張 (catalog mode)
+  2. .github/workflows/ci-flake-monitor.yml (weekly schedule)
+  3. docs/reference/flake-history.md (canonical flake DB)
+"""
+
+# =============================================================================
+# T18: Developer Experience / Onboarding 改善 (Wave 4 調査由来)
+# =============================================================================
+
+[t18_devcontainer]
+priority = "MEDIUM"
+effort = "S (~半日)"
+status = "proposal"
+description = """
+.devcontainer/devcontainer.json で新規 contributor がボタン 1 つで full
+toolchain (Python 3.11 + uv / Rust 1.88 / Node 24 / Go 1.26 / .NET 10) を
+立ち上げられる環境を提供。 現状 README に分散した setup 手順を 1 file に
+集約。
+"""
+implementation = """
+  1. .devcontainer/devcontainer.json (Debian trixie base、 features で
+     各 tool install)
+  2. README に "Open in Codespaces" badge 追加
+  3. 初回コマンド: `uv sync && npm install && cargo build --workspace`
+"""
+
+[t18_dev_env_sync_check]
+priority = "MEDIUM"
+effort = "S (~半日)"
+status = "proposal"
+description = """
+scripts/check_dev_env_sync.py で各 manifest (pyproject.toml / Cargo.toml /
+go.mod / package.json / *.csproj) の tool version pin と CI workflow の
+hardcoded version (ci.yml の NODE_VERSION 等) が一致するか pre-commit で
+check。 ruff-version-sync の汎用化。
+"""
+implementation = """
+  1. scripts/check_dev_env_sync.py: canonical = manifest、 CI workflow が
+     mirror する形 (drift で fail)
+  2. pre-commit hook (CI workflow / manifest 変更時)
+  3. 段階的展開: Python / Node / .NET 先行、 Rust / Go は loose pin のため
+     warning mode
+"""
+
+[t18_codeowners_from_spec]
+priority = "LOW"
+effort = "S (~半日)"
+status = "proposal"
+description = """
+docs/spec/_implementation-map.auto.toml (88 paths) から CODEOWNERS を自動
+生成する skill。 現状全て @ayutaz だが、 contributor 増加時の path-based
+owner 自動割当 framework を準備。
+"""
+implementation = """
+  1. scripts/build_codeowners_from_spec.py (spec maintainer field を読む)
+  2. spec TOML に [maintainers] section を追加 (canonical: @ayutaz)
+  3. .github/CODEOWNERS を auto-generate (manual edit 禁止)
+"""
+
+[t18_stale_codeowners_path]
+priority = "LOW"
+effort = "S (~半日)"
+status = "proposal"
+description = """
+.github/CODEOWNERS の各 path glob が実ファイルにマッチしているか pre-commit
+で check (= stale entry 検出)。 ファイル移動で空 glob が残る問題を防ぐ。
+"""
+implementation = """
+  1. scripts/check_codeowners_paths.py
+  2. pre-commit hook: .github/CODEOWNERS 変更時 + 月次 cron
+"""
+
+[t18_path_based_auto_label]
+priority = "MEDIUM"
+effort = "S (~半日)"
+status = "proposal"
+description = """
+actions/labeler@v5 で path-based PR auto-label。 src/python/** → python、
+src/rust/** → rust、 docs/spec/** → contract、 .github/workflows/** → ci
+等。 release-drafter の category mapping が堅牢化する。
+"""
+implementation = """
+  1. .github/labeler.yml (config)
+  2. .github/workflows/labeler.yml (workflow)
+"""
+
+# =============================================================================
+# T19: Supply Chain / Security / Cache / API Surface (Wave 4 調査由来)
+# =============================================================================
+
+[t19_spdx_header_check]
+priority = "MEDIUM"
+effort = "M (~1 週間)"
+status = "proposal"
+description = """
+全 source file (*.py / *.rs / *.go / *.ts / *.js / *.cs / *.cpp / *.h /
+*.kt / *.swift) に `SPDX-License-Identifier: MIT` header を追加し、
+pre-commit で existence を check。 現状 0 file が header 持ち。
+新規 file には hard-fail、 既存 file には soft-warn で段階展開。
+"""
+implementation = """
+  1. scripts/check_spdx_headers.py (warning mode で start)
+  2. scripts/add_spdx_headers.py (一括 backfill tool、 manual review 必須)
+  3. pre-commit hook (新規 file のみ hard-fail)
+"""
+
+[t19_license_gate_ci]
+priority = "MEDIUM"
+effort = "S (~半日)"
+status = "proposal"
+description = """
+cargo deny check licenses (deny.toml は既存) を CI workflow で実行し、
+Rust deps に GPL/AGPL/LGPL が混入したら fail。 Go は google/go-licenses
+で同等 gate を追加。
+"""
+implementation = """
+  1. .github/workflows/license-check.yml: cargo deny + go-licenses 統合
+  2. dependency-review-action@v4 (npm/pypi 用) を re-enable
+"""
+
+[t19_notices_md_autogen]
+priority = "LOW"
+effort = "M (~1 週間)"
+status = "proposal"
+description = """
+9 lockfile (uv.lock / Cargo.lock / go.sum × 2 / package-lock.json × 2 /
+gradle.lockfile × 2 + Package.resolved) から third-party license を集約
+して NOTICES.md を自動生成。 distribution 時の attribution 義務に対応。
+"""
+implementation = """
+  1. scripts/generate_third_party_notices.py
+  2. pre-commit hook (lockfile 変更時に regen 必須)
+  3. NOTICES.md を repo root に commit (auto-generated header 付き)
+"""
+
+[t19_secret_rotation_audit]
+priority = "MEDIUM"
+effort = "S (~半日)"
+status = "proposal"
+description = """
+weekly cron で `gh api repos/{owner}/{repo}/actions/secrets` を query し、
+updated_at が 90 日超の secret を private security issue で report。
+9 production secret (PYPI_TOKEN / NPM_TOKEN / CARGO_TOKEN / NUGET_API_KEY
+/ MAVEN_CENTRAL_* / HF_TOKEN / DOCKERHUB_* / WANDB_API_KEY) の rotation
+discipline を強制。
+"""
+implementation = """
+  1. .github/workflows/secret-rotation-audit.yml (weekly cron)
+  2. scripts/audit_secret_rotation.py
+  3. 90 日超で private repo の Issue auto-open (label: security)
+"""
+
+[t19_env_scoped_secrets]
+priority = "MEDIUM"
+effort = "S (~半日)"
+status = "proposal"
+description = """
+GitHub Environments (cargo-registry / dockerhub-api / maven-central /
+nuget / huggingface) を作成し、 各 publish job を environment scope に
+移動。 secret leak の blast radius を 1 publisher に縮小。
+"""
+implementation = """
+  1. dev-create-release.yml / g2p-rust-publish.yml / npm-publish.yml /
+     release-kotlin-g2p.yml / deploy-huggingface.yml に environment: 追加
+  2. docs/CODE_SIGNING.md に scoping 記載
+"""
+
+[t19_cache_key_drift]
+priority = "LOW"
+effort = "S (~半日)"
+status = "proposal"
+description = """
+pre-commit hook で各 workflow の cache key (hashFiles 等) が lockfile と
+同期しているか check。 lockfile 変更 = cache key 変更 = cache miss を
+予測可能化。
+"""
+implementation = """
+  1. scripts/check_cache_key_stability.py
+  2. pre-commit hook (.github/workflows/**.yml + lockfile 変更時)
+"""
+
+[t19_ccache_for_cpp]
+priority = "LOW"
+effort = "M (~1 週間)"
+status = "proposal"
+description = """
+release-shared-lib.yml + cpp-tests.yml で ccache を導入し、 C++ build を
+キャッシュ化。 iOS xcframework / Android AAR / Linux .so の repeated
+build 時間を 50%+ 削減見込み。 既存の _build-test-cpp.yml:107-115 の
+ccache cache 戦略を release-shared-lib.yml に水平展開。
+"""
+implementation = """
+  1. release-shared-lib.yml の各 build job に ccache install + cache
+  2. CMakeLists.txt: CMAKE_CXX_COMPILER_LAUNCHER=ccache
+"""
+
+[t19_public_api_surface_dump]
+priority = "HIGH"
+effort = "L (~2 週間)"
+status = "proposal"
+description = """
+7 runtime の public API を JSON dump し、 cross-runtime drift を detect。
+現状 Rust (cargo public-api) / Go (gorelease) / C# (PublicApiAnalyzer)
+のみ track、 Python / WASM / C / Kotlin / Swift は全くの blind。
+"""
+implementation = """
+  1. scripts/dump_api_surface.py (Python inspect / WASM jsdoc / C clang-ast
+     / Kotlin reflection / Swift dump-package)
+  2. target/api-surface-{runtime}.json
+  3. docs/spec/public-api-surface-contract.toml (canonical param set per
+     method)
+  4. CI gate: PR で API surface drift があれば flag + semver bump 要求
+"""
+
+[t19_release_smoke_test]
+priority = "HIGH"
+effort = "L (~2 週間)"
+status = "proposal"
+description = """
+release publish 後 5-10 分の delay loop で 7 runtime install + import +
+minimal synth を実行する smoke test workflow。 release-please の release
+tag trigger で起動、 失敗時に [release-smoke-failure] label で auto-Issue。
+registry CDN 地域伝搬の lag 検出も兼ねる。
+"""
+implementation = """
+  1. .github/workflows/release-smoke-test.yml (workflow_run on release-please)
+  2. 7 runtime × {install from registry, import, minimal synth, sha256 verify}
+  3. 失敗時の auto-rollback skill (HF draft revert + Release asset 削除)
+"""
+
+[t19_hf_model_verify]
+priority = "MEDIUM"
+effort = "M (~1 週間)"
+status = "proposal"
+description = """
+HuggingFace model upload 後の verification post-hook。 huggingface_hub
+で fetch + sha256 verify + ONNX load + minimal "hello" 合成 smoke。
+"""
+implementation = """
+  1. .github/workflows/hf-model-verify.yml (deploy-huggingface workflow_run)
+  2. scripts/verify_hf_model.py
+"""
+
+[t19_code_block_lang_lint]
+priority = "LOW"
+effort = "S (~半日)"
+status = "proposal"
+description = """
+docs/**.md / README*.md の fenced code block の言語 tag を lint。 missing
+tag / canonical でない tag (python3 → python、 sh → bash 等) を warning。
+"""
+implementation = """
+  1. scripts/check_code_block_language_tags.py
+  2. pre-commit hook (warning mode)
+"""
+
+[t19_readme_hardcoded_freshness]
+priority = "LOW"
+effort = "S (~半日)"
+status = "proposal"
+description = """
+README の hardcoded 値 (学習済みモデル日付 2026-0X-XX 等) と CLAUDE.md の
+canonical 値の drift を warning。 ORT version 表 (docs/reference/ort-
+versions.md) と manifest の sync も check。
+"""
+implementation = """
+  1. scripts/check_readme_hardcoded_values.py
+  2. pre-commit hook (warning mode)
+"""
+
+# =============================================================================
 # 不変条件
 # =============================================================================
 
 [[invariants]]
 name = "individual-pr-per-task"
 description = """
-T14 / T15 / T16 は個別 PR で進める。 Wave 3 PR にまとめて入れない
-(PR レビュー困難 + revert 影響範囲が大きい)。
+T14 / T15 / T16 / T17 / T18 / T19 は個別 PR で進める。 Wave 3 PR にまとめて
+入れない (PR レビュー困難 + revert 影響範囲が大きい)。
 """
 
 [[invariants]]

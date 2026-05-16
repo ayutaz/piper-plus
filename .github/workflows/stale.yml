@@ -1,0 +1,64 @@
+name: stale-issue-pr
+
+# Wave 4 — Issue / PR stale auto-close。
+# 90 日 idle で stale label、 +7 日 (= 97 日) で auto-close。
+# pinned / blocked / wip / security label は exempt (人為的に保留中の signal)。
+#
+# Why: model-request / model-submission / runtime-parity-issue のような
+#   提案系 Issue が backlog として蓄積。 不要な open issue が `gh issue list`
+#   の見通しを悪化させ、 stale-Copilot-review 系の問題 (memory
+#   feedback_copilot_stale_review) と同じく noise を増やす。
+#
+# How to apply: 引き続き active な議論には `pinned` または `wip` label を
+#   付与してもらう運用。 stale-marked された Issue が「実は対応中」 だった
+#   場合は label を外す or コメント 1 つで stale clear。
+
+permissions:
+  issues: write
+  pull-requests: write
+
+on:
+  schedule:
+    # 毎日 04:17 UTC (= JST 13:17)。 平日昼間で監視しやすい時間帯。
+    - cron: '17 4 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: stale-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  stale:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/stale@v9.1.0
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          days-before-stale: 90
+          days-before-close: 7
+          stale-issue-label: stale
+          close-issue-label: auto-closed
+          stale-pr-label: stale
+          close-pr-label: auto-closed
+          exempt-issue-labels: 'pinned,blocked,wip,security,roadmap,help-wanted'
+          exempt-pr-labels: 'pinned,blocked,wip,security,dependencies'
+          stale-issue-message: |
+            この Issue は 90 日間 activity がないため `stale` label を付与しました。
+            7 日以内に進展がなければ自動 close されます。
+            引き続き対応が必要な場合は コメント 1 つ、 または `pinned` / `wip`
+            label の付与で stale clear してください。
+          close-issue-message: |
+            90+7 日間 activity なしのため自動 close します。
+            再開が必要な場合は Issue を reopen するか、 新規 Issue を立ててください。
+          stale-pr-message: |
+            この PR は 90 日間 activity がないため `stale` label を付与しました。
+            7 日以内に進展がなければ自動 close されます。 rebase / push / コメント
+            のいずれかで stale clear。
+          close-pr-message: |
+            90+7 日間 activity なしのため自動 close します。
+            再開が必要な場合は PR を reopen、 もしくは新規 PR を立ててください。
+          operations-per-run: 100
+          ascending: true
+          remove-stale-when-updated: true
+          enable-statistics: true

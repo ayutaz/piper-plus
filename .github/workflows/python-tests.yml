@@ -157,6 +157,11 @@ jobs:
         # HTTP サーバー (FastAPI) のテストに必要な依存。バージョン制約は src/python_run/setup.py の [http] extras で一元管理。
         pip install fastapi 'uvicorn[standard]' httpx
         pip install pytest-asyncio  # NEW: 既存の test_http_* tests で asyncio_mode=auto を使う
+        # Wave 4: 一過性 flake (network / ONNX load timing / nltk download race) を
+        # 1 回 retry で吸収。 src/python_run/pyproject.toml [test] extras と同期。
+        # 永続的な flake は @pytest.mark.flaky で個別 quarantine、 本 install は
+        # CI 全体の safety net 。 docs/spec/test-flake-retry-contract.toml (Phase-1)。
+        pip install 'pytest-rerunfailures>=14.0'
         python -c "import nltk; nltk.download('averaged_perceptron_tagger_eng', quiet=True); nltk.download('cmudict', quiet=True)"
       env:
         PYTHONUTF8: '1'
@@ -164,14 +169,16 @@ jobs:
     - name: Run runtime phonemization tests
       run: |
         cd src/python_run
-        pytest tests/test_japanese_phonemization.py tests/test_multilingual_integration.py -v --tb=short --override-ini="addopts="
+        # Wave 4: --reruns 1 で network / nltk-download / pyopenjtalk warmup race を retry。
+        pytest tests/test_japanese_phonemization.py tests/test_multilingual_integration.py -v --tb=short --override-ini="addopts=" --reruns 1 --reruns-delay 1
       env:
         PYTHONUTF8: '1'
 
     - name: Run runtime full tests (config, training manager, CLI, timing, streaming, short-text, zh-en, g2p-parallel, webui, http_server, text_splitter contract)
       run: |
         cd src/python_run
-        pytest tests/test_config_fallback.py tests/test_english_phonemization.py tests/test_runtime.py tests/test_util_impl.py tests/test_cli_models.py tests/test_training_manager.py tests/test_training_integration.py tests/test_phoneme_timing.py tests/test_voice_timing.py tests/test_http_timing.py tests/test_http_server_root.py tests/test_voice_streaming.py tests/test_text_splitter.py tests/test_text_splitter_contract.py tests/test_voice_g2p_parallel.py tests/test_short_text_mitigation.py tests/test_zh_en_loanword_runtime.py tests/test_webui.py -v --tb=short --override-ini="addopts="
+        # Wave 4: --reruns 1 で HTTP server bind race / ONNX warmup / threading-related flake を retry。
+        pytest tests/test_config_fallback.py tests/test_english_phonemization.py tests/test_runtime.py tests/test_util_impl.py tests/test_cli_models.py tests/test_training_manager.py tests/test_training_integration.py tests/test_phoneme_timing.py tests/test_voice_timing.py tests/test_http_timing.py tests/test_http_server_root.py tests/test_voice_streaming.py tests/test_text_splitter.py tests/test_text_splitter_contract.py tests/test_voice_g2p_parallel.py tests/test_short_text_mitigation.py tests/test_zh_en_loanword_runtime.py tests/test_webui.py -v --tb=short --override-ini="addopts=" --reruns 1 --reruns-delay 1
       env:
         PYTHONUTF8: '1'
 
@@ -197,7 +204,9 @@ jobs:
     - name: Run G2P package tests (multilingual phonemizers, ssml, snapshots, zh-en loanword)
       run: |
         cd src/python/g2p
-        pytest tests/ -v --tb=short --override-ini="addopts="
+        # Wave 4: --reruns 1 で g2p-en/g2pk2 lazy load の最初の attempt が cold cache で
+        # fail する flake を retry (2 回目は cache 効くため安定)。
+        pytest tests/ -v --tb=short --override-ini="addopts=" --reruns 1 --reruns-delay 1
       env:
         PYTHONUTF8: '1'
 
