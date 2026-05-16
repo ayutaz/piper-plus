@@ -3093,6 +3093,7 @@ test = [
     { name = "pytest-asyncio" },
     { name = "pytest-cov" },
     { name = "pytest-timeout" },
+    { name = "pytest-xdist" },
 ]
 
 [package.metadata]
@@ -3108,6 +3109,7 @@ requires-dist = [
     { name = "pytest-asyncio", marker = "extra == 'test'", specifier = ">=0.24" },
     { name = "pytest-cov", marker = "extra == 'test'", specifier = ">=4.0" },
     { name = "pytest-timeout", marker = "extra == 'test'", specifier = ">=2.0" },
+    { name = "pytest-xdist", marker = "extra == 'test'", specifier = ">=3.5" },
     { name = "uvicorn", extras = ["standard"], marker = "extra == 'http'", specifier = ">=0.27,<1" },
 ]
 provides-extras = ["gpu", "http", "test"]

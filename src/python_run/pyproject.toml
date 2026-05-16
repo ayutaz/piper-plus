@@ -71,6 +71,8 @@ test = [
     "pytest-cov>=4.0",
     "pytest-timeout>=2.0",
     "pytest-asyncio>=0.24",
+    # `pytest.ini` の `addopts = ... -n auto` で並列実行するため必須。
+    "pytest-xdist>=3.5",
 ]
 
 [project.scripts]

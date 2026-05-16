@@ -765,6 +765,7 @@ repos:
           (?x)
           ^(node_modules|build|dist|target|\.git|test/models|tools/benchmark/issue-383|src/wasm/openjtalk-web/(build|demo|models|voices|patches)|tests/fuzz)/|
           ^src/csharp/.*\.csproj$|
+          ^src/csharp/.*\.props$|
           ^cmake/.*\.cmake$|
           ^src/python/g2p/piper_plus_g2p/registry\.py$|
           ^\.github/workflows/android-build\.yml$|
