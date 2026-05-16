@@ -516,16 +516,17 @@ repos:
         pass_filenames: false
 
       # Lockfile consistency gate (Wave 3).
-      # 10 runtime の lockfile (uv.lock / Cargo.lock / go.sum / package-lock.json / packages.lock.json / gradle.lockfile)
-      # が committed されているか検査。 C# / Android lockfile は初回 build まで absent
-      # なので soft-required (warning) として扱い、 残りは hard-required (fail) で
-      # block する。 transitive deps の reproducible build 保証 (PR #498 wave2 で
-      # 議論された supply chain hardening の続編)。
+      # 9 runtime の lockfile (uv.lock / Cargo.lock / go.sum / package-lock.json /
+      # packages.lock.json / gradle.lockfile) が committed されているか検査。
+      # C# / Android lockfile は初回 build まで absent なので soft-required
+      # (warning) として扱い、 残りは hard-required (fail) で block する。
+      # src/wasm/g2p の package-lock.json は意図的に gitignore 方針のため
+      # スコープ外 (openjtalk-web のみ hard-required)。
       - id: lockfile-consistency
-        name: Lockfile consistency (10 runtimes)
+        name: Lockfile consistency (9 runtimes)
         entry: uv run python scripts/check_lockfile_consistency.py
         language: system
-        files: ^(uv\.lock|src/rust/Cargo\.lock|src/go/(go\.sum|phonemize/go\.sum)|src/wasm/(g2p|openjtalk-web)/package-lock\.json|src/csharp/PiperPlus\.(Core|Cli)/packages\.lock\.json|android/(piper-plus|piper-plus-g2p)/gradle\.lockfile|scripts/check_lockfile_consistency\.py)$
+        files: ^(uv\.lock|src/rust/Cargo\.lock|src/go/(go\.sum|phonemize/go\.sum)|src/wasm/openjtalk-web/package-lock\.json|src/csharp/PiperPlus\.(Core|Cli)/packages\.lock\.json|android/(piper-plus|piper-plus-g2p)/gradle\.lockfile|scripts/check_lockfile_consistency\.py)$
         pass_filenames: false
 
       # Benchmark JSON sanity gate (Wave 3).
