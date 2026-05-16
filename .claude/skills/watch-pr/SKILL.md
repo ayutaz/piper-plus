@@ -1,9 +1,9 @@
 ---
 name: watch-pr
-description: PR push 直後 / PR 作成後の auto chain (`/create-pr` のフェーズ 6.2 から発動) / CI 監視 / レビュー対応 / merge 前確認 の文脈で発動。`gh pr checks` を一度 polling し green / red / pending を集計、 red なら失敗 job のログを fetch して「format drift / test fail / build error / flake / contract drift」に分類。 同時に unresolved review thread (人間 / Copilot) も集計し、 stale check 付きで提示。 `/loop /watch-pr <PR>` で継続監視に使える。
+description: PR push 直後 / PR 作成後の auto chain (`/create-pr` のフェーズ 6.2 から発動) / CI 監視 / レビュー対応 / merge 前確認 の文脈で発動。`gh pr checks` を一度 polling し green / red / pending を集計、 red なら失敗 job のログを fetch して「format drift / test fail / build error / flake / contract drift」に分類。 同時に unresolved review thread (人間 / Copilot) も集計し、 安全カテゴリ (stale / Copilot style ノイズ) は `/reply-review --auto-safe` を auto chain で起動して reply + resolve まで自動完了。 人間 reviewer / blocker 候補は user 判断のため提示のみ。 `/loop /watch-pr <PR>` で継続監視に使える。
 argument-hint: "[pr-number]"
 disable-model-invocation: false
-allowed-tools: Bash(gh pr checks *) Bash(gh pr view *) Bash(gh run view *) Bash(gh api *) Bash(git rev-parse *) Bash(git branch *) Read Grep
+allowed-tools: Bash(gh pr checks *) Bash(gh pr view *) Bash(gh run view *) Bash(gh api *) Bash(git rev-parse *) Bash(git branch *) Read Grep Skill
 ---
 
 # PR CI Status Watcher
@@ -135,18 +135,42 @@ query($owner: String!, $name: String!, $number: Int!) {
     | 2 | yousan   | src/bar.rs:88 | new | 修正 → `/reply-review <PR>` |
     ```
 
+### フェーズ 5.5: 安全カテゴリの自動 reply + resolve (auto-chain)
+
+Unresolved review thread が 1 件以上ある場合、 **必ず**`/reply-review <PR> --auto-safe`
+を Skill tool で chain 起動する。 これにより以下が自動処理される (フェーズ 1.9
+参照、 SAFE-stale / SAFE-copilot-style の 2 カテゴリ):
+
+- **SAFE-stale**: コメント以降に該当 file が更新済 → 「修正済 (commit `<hash>`)」 reply + resolve
+- **SAFE-copilot-style**: Copilot bot の style noise (`^Consider (using|renaming)\b` 等) → 「style 提案は本 PR の scope 外」 reply + resolve
+
+`--auto-safe` は SAFE 系のみ実行、 **REVIEW-human / REVIEW-copilot-blocker** は
+内部で dry-run 扱いとなり提示のみ。 これにより:
+
+- ユーザの介入なく Copilot のノイズコメントと stale 指摘を片付ける
+- 人間 reviewer の本質的な指摘と Copilot の logic / security 指摘は user 判断に残す
+- memory `feedback_pr_body_over_comments` (PR body 改変ルール) は review thread reply には適用外、 `feedback_merge_caution` (merge 前確認) も merge ≠ resolve のため抵触しない
+
+skill 呼び出し:
+
+```text
+Skill({skill: "reply-review", args: "<PR_NUM> --auto-safe"})
+```
+
+戻り値の reply / resolve カウントを次フェーズの判定材料にする。
+
 ### フェーズ 6: 次のアクション提案
 
 | 状態 | 推奨アクション |
 |------|-------------|
-| All green + Unresolved 0 | `/check-pr-ready` で最終確認、 user 確認後に merge (`gh pr merge --auto` 禁止) |
-| All green + Unresolved ≥ 1 | review 対応必要。 修正コミット後 `/reply-review <PR>` を提案 |
+| All green + Unresolved 0 (自動 resolve 後含む) | `/check-pr-ready` で最終確認、 user 確認後に merge (`gh pr merge --auto` 禁止) |
+| All green + REVIEW 残 ≥ 1 (自動処理外) | user に judge を促し、 修正コミット後再度 `/loop /watch-pr <PR>` |
 | Red (format drift) | `pre-commit run --all-files` をローカル実行、修正後 `/commit` |
 | Red (test fail) | 該当テストファイル名を提示、`/run-tests <scope>` で再現 |
 | Red (build error) | エラーログを示してユーザーに方針確認 |
 | Red (flake) | `gh run rerun <run-id> --failed` を提示 (ユーザー確認後実行) |
 | Red (contract drift) | `/check-pua` `/check-loanword` 等の該当 skill を提示 |
-| Pending | `/loop /watch-pr <PR>` で継続監視を推奨 |
+| Pending | `/loop /watch-pr <PR>` で継続監視 (auto-safe は次回 iteration でも走る) |
 
 ## 継続監視モード
 
@@ -162,12 +186,15 @@ CI + review thread を両方確認。 終了条件:
 | iteration の結果 | アクション |
 |------------------|-----------|
 | All green + Unresolved 0 | ユーザーに完了通知して `/loop` を終了 |
-| All green + Unresolved ≥ 1 | review backlog を表示、 `/reply-review <PR>` を提案して `/loop` を終了 (人間判断必須) |
+| All green + Unresolved ≥ 1 | フェーズ 5.5 で `/reply-review --auto-safe` を chain 起動。 SAFE 系は自動 reply + resolve、 残った REVIEW 系を user に提示して `/loop` を終了 |
 | Red (本物) | 失敗分析を表示して `/loop` を終了 (人間判断が必要) |
 | Red (flake のみ) | `gh run rerun --failed` を提案 (確認後実行)、 ループは継続 |
-| Pending | 次の polling 間隔まで sleep (自動 pace は CI 状況で 4-20 分、 cache TTL の都合で IN_PROGRESS 多い時は `delaySeconds=270`、 落ち着いた状態なら `1200`+) |
+| Pending | 次の polling 間隔まで sleep (自動 pace は CI 状況で 4-20 分、 cache TTL の都合で IN_PROGRESS 多い時は `delaySeconds=270`、 落ち着いた状態なら `1200`+)。 各 iteration でも review thread の auto-safe chain は走る |
 
-review thread 自動 reply は行わない (memory `feedback_merge_caution` / `feedback_pr_body_over_comments` 遵守)。 reply 自動化が必要な場合はユーザーが明示的に `/reply-review <PR>` を起動。
+SAFE 系 review thread の自動 reply + resolve は本 skill のフェーズ 5.5 で行う。
+REVIEW-human / REVIEW-copilot-blocker は memory `feedback_pr_body_over_comments` /
+`feedback_merge_caution` 遵守のため user 判断に委ね、 修正後にユーザが明示的に
+`/reply-review <PR>` を起動する形。
 
 ## 注意事項
 
@@ -176,8 +203,9 @@ review thread 自動 reply は行わない (memory `feedback_merge_caution` / `f
 - **silent skip**: cancelled+skipped が連続 3 以上は path filter による意図的 skip かもしれないが、 PR #419 事例のように baseline が silent に skip されることがあるので警告
 - **失敗ログ取得失敗時**: `gh run view` が 404 を返す場合 (job がまだ完了していない等) はスキップ
 - **merge は user-only**: 本 skill から `gh pr merge` を実行することは禁止 (memory `feedback_merge_caution` に従う)
-- **review reply は提案のみ**: フェーズ 5 で集計するが、 自動 reply / resolve は行わない。 `/reply-review <PR>` をユーザーが明示起動する形でのみ実行 (memory `feedback_pr_body_over_comments` 遵守、 各 thread に reviewer 意図を読み解いた返信本文が必要)
-- **Copilot stale 検出**: review コメント以降に同 file が更新済なら `stale` フラグ付き提示 (memory `feedback_copilot_stale_review`)。 stale な Copilot 指摘は dismiss / 簡潔な「修正済」 reply が候補
+- **review reply は SAFE 系のみ自動**: フェーズ 5.5 で `/reply-review --auto-safe` を chain 起動。 SAFE-stale / SAFE-copilot-style だけ自動 reply + resolve。 REVIEW-human / REVIEW-copilot-blocker は user 判断のため `/reply-review <PR>` 明示起動を待つ
+- **自動コード修正は行わない**: review 指摘で「コードを直す」 必要があるものは user 判断。 stale (既に修正済) / Copilot ノイズ (style 提案) のみ自動 reply で完結
+- **Copilot stale 検出**: review コメント以降に同 file が更新済なら `stale` フラグ付き提示 (memory `feedback_copilot_stale_review`)。 自動 reply の core ロジック
 
 ## 使用例
 
