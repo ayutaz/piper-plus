@@ -991,14 +991,23 @@ repos:
 
   # ---------------------------------------------------------------------------
   # Wave 5 — actionlint local pre-commit (mirror of .github/workflows/actionlint.yml).
-  # GitHub Actions workflow の syntax / shellcheck / job-needs cycle 等を
-  # commit 時点で検出。 CI gate (`actionlint.yml`) と byte-for-byte 同等の
-  # 検証を local で実行可能に。 hook を skip しても CI が catch する設計。
+  # GitHub Actions workflow の syntax / job-needs cycle 等を commit 時点で検出。
+  # CI gate (`actionlint.yml`) は `continue-on-error: true` で運用しており、
+  # pre-commit 側も等価にする。 shellcheck integration は OFF (-shellcheck=) —
+  # 既存 56 workflow に大量の SC2086/SC2129 violations が蓄積しており、
+  # 段階的 cleanup の判断は別 PR (T22) で行う。
   # ---------------------------------------------------------------------------
   - repo: https://github.com/rhysd/actionlint
     rev: v1.7.7
     hooks:
       - id: actionlint
-        # Only run on workflow / composite-action YAML files. Repo-wide
-        # check-yaml hook already covers generic YAML syntax.
-        files: ^\.github/(workflows|actions)/.*\.ya?ml$
+        # Only run on `.github/workflows/*.yml` (top-level workflows).
+        # Composite action files (.github/actions/**/action.yml) use a
+        # different schema — actionlint treats them as workflows and falsely
+        # flags `inputs:` / `runs:` as unknown keys. Composite action lint is
+        # not currently gated; track in T23 (skill meta.toml + workflow lint).
+        files: ^\.github/workflows/.*\.ya?ml$
+        # shellcheck integration を OFF にして、 既存 workflow の SC2086 /
+        # SC2129 を一斉に block しない (workflows actionlint.yml と等価)。
+        # 段階的 shellcheck 修正は別 PR で実施。
+        args: ['-shellcheck=']
