@@ -376,7 +376,12 @@ repos:
         name: host-specific secret-path leak detection
         entry: uv run python scripts/check_secret_path_reference.py
         language: system
-        files: \.(py|sh|bash|zsh|yml|yaml|toml|json|rs|go|cs|cpp|c|h|hpp|js|ts|mjs|cjs|kt|kts|swift|gradle|cmake)$|^(CMakeLists\.txt|Dockerfile|Makefile)$
+        # The `(^|/)` prefix is mandatory for the basename-style alternatives
+        # — pre-commit matches files filter against the repo-relative path,
+        # so `^(CMakeLists\.txt|Dockerfile|Makefile)$` only catches root-level
+        # files. Adding `(^|/)` lets it fire on sub-directory CMakeLists.txt
+        # / Dockerfile / Makefile as well (e.g., src/cpp/CMakeLists.txt).
+        files: \.(py|sh|bash|zsh|yml|yaml|toml|json|rs|go|cs|cpp|c|h|hpp|js|ts|mjs|cjs|kt|kts|swift|gradle|cmake)$|(^|/)(CMakeLists\.txt|Dockerfile|Makefile)$
         pass_filenames: true
 
       # OpenJTalk version consistency: cmake/ExternalDeps.cmake pins the
@@ -388,10 +393,14 @@ repos:
       # constraint) are noted but don't fail; only `==` / `~=` pins that
       # disagree with the cmake URL are flagged as errors.
       - id: openjtalk-version-sync
-        name: OpenJTalk pin parity (cmake URL vs pyproject.toml)
+        name: OpenJTalk pin parity (cmake URL vs pyproject.toml / requirements.txt)
         entry: uv run python scripts/check_openjtalk_version_sync.py
         language: system
-        files: ^(cmake/ExternalDeps\.cmake|.*pyproject\.toml|scripts/check_openjtalk_version_sync\.py)$
+        # Include requirements*.txt — src/python_run uses dynamic deps
+        # resolved from requirements.txt, not the static
+        # `[project.dependencies]` array, so a pin change there must
+        # re-fire the gate.
+        files: ^(cmake/ExternalDeps\.cmake|.*pyproject\.toml|.*requirements.*\.txt|scripts/check_openjtalk_version_sync\.py)$
         pass_filenames: false
 
       # Pytest skip-reason discipline. Skips without `reason=` accumulate as
