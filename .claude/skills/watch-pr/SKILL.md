@@ -1,6 +1,6 @@
 ---
 name: watch-pr
-description: PR push 直後 / CI 監視 / merge 前確認 の文脈で発動。`gh pr checks` を一度 polling し green / red / pending を集計、red なら失敗 job のログを fetch して「format drift / test fail / build error / flake / contract drift」に分類し修正案を提案する。`/loop /watch-pr <PR>` で 5 分間隔の継続監視に使える。
+description: PR push 直後 / PR 作成後の auto chain (`/create-pr` のフェーズ 6.2 から発動) / CI 監視 / merge 前確認 の文脈で発動。`gh pr checks` を一度 polling し green / red / pending を集計、red なら失敗 job のログを fetch して「format drift / test fail / build error / flake / contract drift」に分類し修正案を提案する。`/loop /watch-pr <PR>` で 5 分間隔の継続監視に使える。
 argument-hint: "[pr-number]"
 disable-model-invocation: false
 allowed-tools: Bash(gh pr checks *) Bash(gh pr view *) Bash(gh run view *) Bash(gh api *) Bash(git rev-parse *) Bash(git branch *) Read Grep

@@ -146,12 +146,49 @@ gh pr edit <PR#> --body-file /tmp/pr-body-<branch-slug>.md
 
 `gh pr list --head <branch>` で既存 PR 有無を判定。
 
-### フェーズ 6: 自動 follow-up 提案
+### フェーズ 6: PR 作成直後の auto follow-up chain (自動実行)
 
-PR URL を表示し、 以下を提案 (実行はユーザー指示後):
+PR 作成 / 更新が成功した直後に、 以下の chain を **明示確認なしで** 連続実行する。 過去 (PR #496) で「PR 作成後に review チェックを発動しなかった結果、 5 件の未対応 review に気づくのが遅れた」事例があり、 これを再発防止するための自動化。
 
-- `/watch-pr <PR#>` で CI 監視 (新 skill との chain)
-- `/reply-review <PR#>` で review 対応 (review 来た後)
+#### Step 6.1: 既存 review の即時チェック
+
+`/check-review-backlog --pr <作成した PR#>` を Skill tool で発動 (= 既存 review コメントがあれば即時表示)。 PR 更新 (`gh pr edit`) の場合は特に重要 — bot レビューが PR 作成から数秒以内に付くため、 直後の check で 5-10 件溜まっていることがある。
+
+```text
+Skill(check-review-backlog, "--pr <PR#>")
+```
+
+#### Step 6.2: CI 状態の確認 (5 秒待機後)
+
+CI workflow trigger が確実に登録されるまで 5 秒待ち、 `/watch-pr <PR#>` を Skill tool で発動。 CI が pending / failure ならその場で分類された情報がユーザに表示される。
+
+```text
+Skill(watch-pr, "<PR#>")
+```
+
+#### Step 6.3: 結果の集約報告
+
+PR URL + Step 6.1 / 6.2 の結果を 1 メッセージにまとめてユーザに提示:
+
+```text
+PR #<N> 作成完了: https://github.com/.../pull/<N>
+
+レビュー状態: <N> 件 unresolved (Step 6.1 の結果)
+CI 状態: <green/red/pending> (Step 6.2 の結果)
+
+次のアクション提案:
+- <unresolved があれば> /reply-review <PR#> で対応
+- <CI red なら> 失敗 job のログ確認
+- <両方 OK なら> merge 判断はユーザに委ねる
+```
+
+#### 6.x: chain skip 条件
+
+以下の場合は Step 6.1 / 6.2 を skip:
+
+- ユーザが明示的に「PR 作成だけして」 / 「chain は不要」と指示
+- PR base branch が `dev` / `main` 以外 (feature → feature の PR では auto chain は noise)
+- dry-run 系オプション (実 push しない場合)
 
 ## guard hook 回避
 
