@@ -159,6 +159,9 @@ check_*.py
 !scripts/check_skill_health.py
 !scripts/check_readme_breaking_sync.py
 !scripts/check_deprecated_api_lingering.py
+!scripts/check_lockfile_consistency.py
+!scripts/check_benchmark_json.py
+!scripts/check_readme_h2_parity.py
 create_comprehensive_*.py
 add_missing_*.py
 retrain_*.py

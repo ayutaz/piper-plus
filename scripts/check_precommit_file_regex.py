@@ -175,6 +175,91 @@ def test_regex(regex: str, tracked: list[str]) -> int:
     return sum(1 for path in tracked if compiled.search(path))
 
 
+def parse_exclude_blocks(config_text: str) -> list[tuple[str, str, int]]:
+    r"""Yield (scope, regex, line_no) for each ``exclude:`` directive.
+
+    scope is ``global`` if encountered at column 0 (top-level), otherwise
+    the closest preceding ``- id: ...`` hook id. Both single-line and
+    block-scalar (``exclude: |``) forms are handled.
+
+    The aim is to catch:
+        1. ``exclude:`` regex that fails ``re.compile`` (silently disables
+           the hook on the entire repo when pre-commit treats the bad regex
+           as "no exclusion").
+        2. ``exclude:`` patterns with broken escaping (``\\.`` written as
+           ``\.`` outside of a regex character class is fine, but typos like
+           ``(?P<name>``)`` produce silent failures).
+    """
+    blocks: list[tuple[str, str, int]] = []
+    lines = config_text.splitlines()
+    i = 0
+    current_id: str | None = None
+    while i < len(lines):
+        line = lines[i]
+        stripped = line.strip()
+        m_id = re.match(r"-\s+id:\s+([\w-]+)", stripped)
+        if m_id:
+            current_id = m_id.group(1)
+            i += 1
+            continue
+        m_excl = re.match(r"exclude:\s*(.*)", stripped)
+        if m_excl:
+            indent = len(line) - len(line.lstrip())
+            scope = current_id if indent > 0 else "global"
+            value = m_excl.group(1).strip()
+            if value in ("|", ">", "|-", ">-"):
+                base_indent = indent
+                block: list[str] = []
+                inner_indent: int | None = None
+                i += 1
+                while i < len(lines):
+                    next_line = lines[i]
+                    if not next_line.strip():
+                        block.append("")
+                        i += 1
+                        continue
+                    next_indent = len(next_line) - len(next_line.lstrip())
+                    if next_indent <= base_indent:
+                        break
+                    if inner_indent is None:
+                        inner_indent = next_indent
+                    strip_n = min(inner_indent, next_indent)
+                    block.append(next_line[strip_n:])
+                    i += 1
+                regex = "\n".join(ln for ln in block if ln.strip()).strip()
+                if regex:
+                    blocks.append((scope or "global", regex, i))
+                continue
+            value = re.sub(r"\s+#.*$", "", value)
+            if value.startswith(("'", '"')) and value.endswith(value[0]):
+                value = value[1:-1]
+            if value:
+                blocks.append((scope or "global", value, i + 1))
+        i += 1
+    return blocks
+
+
+def check_exclude_compiles(
+    blocks: list[tuple[str, str, int]],
+) -> list[str]:
+    """Compile each exclude regex; return failure messages."""
+    failures: list[str] = []
+    for scope, regex, line_no in blocks:
+        flags = 0
+        pattern = regex.strip()
+        if pattern.startswith("(?x)"):
+            flags |= re.VERBOSE
+            pattern = pattern[len("(?x)") :]
+        try:
+            re.compile(pattern, flags)
+        except re.error as exc:
+            failures.append(
+                f"  [exclude:{scope}] (line {line_no}): regex failed to compile: {exc}\n"
+                f"    regex: {regex[:120]}{'...' if len(regex) > 120 else ''}"
+            )
+    return failures
+
+
 def main() -> int:
     if not CONFIG_PATH.exists():
         print(f"error: {CONFIG_PATH} not found", file=sys.stderr)
@@ -182,10 +267,16 @@ def main() -> int:
 
     config_text = CONFIG_PATH.read_text(encoding="utf-8")
     hooks = parse_hooks(config_text)
+    excludes = parse_exclude_blocks(config_text)
     tracked = list_tracked_files()
 
     failures: list[str] = []
     warnings_: list[str] = []
+
+    # exclude regex の compile 検証 (Wave 3)。 broken な exclude regex は
+    # pre-commit が「no exclusion」 と扱い hook を repo 全体に適用する
+    # 危険 silent failure を起こすため、 compile error を hard-fail にする。
+    failures.extend(check_exclude_compiles(excludes))
 
     for hook_id, regex, line_no in hooks:
         if not regex:

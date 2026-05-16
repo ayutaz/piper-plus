@@ -1,0 +1,81 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    ":dependencyDashboard",
+    ":semanticCommits"
+  ],
+  "description": "Renovate config (Wave 3) — regex-manager 専用。 ruff / ORT のように 1 version が 6+ ファイルに散らばる cross-runtime sync を 1 PR に集約する。 通常の dependency 管理 (PyPI / Cargo / npm / Go / Gradle / NuGet / Docker) は .github/dependabot.yml 側に委譲し、 Renovate は regex-manager の用途に限定する。 Renovate を有効化するには Renovate GitHub App (https://github.com/apps/renovate) を repo に install する必要がある。 install しない限り本 file は no-op。",
+  "labels": ["dependencies", "automated", "renovate"],
+  "schedule": ["before 10am on monday"],
+  "timezone": "Asia/Tokyo",
+  "prHourlyLimit": 4,
+  "prConcurrentLimit": 6,
+  "semanticCommitType": "deps",
+  "semanticCommitScope": "renovate",
+  "commitMessagePrefix": "deps(renovate):",
+  "enabledManagers": ["regex"],
+  "packageRules": [
+    {
+      "description": "ruff 6 箇所 (pyproject.toml × 3 dependency group + .pre-commit-config.yaml + python-lint.yml + ci.yml) を 1 PR に集約。 PR #401 の format drift 再発防止。",
+      "matchPackageNames": ["ruff"],
+      "groupName": "ruff (cross-runtime sync)",
+      "groupSlug": "ruff-cross-sync"
+    },
+    {
+      "description": "ORT cross-runtime (Python/Rust/Go/C#/WASM/C++) を 1 PR に集約。 Issue #372 (ORT floor 統一) で multi-runtime ORT bump の手動 sync が問題視されていた。",
+      "matchPackageNames": [
+        "onnxruntime",
+        "onnxruntime-gpu",
+        "ort",
+        "github.com/yalue/onnxruntime_go",
+        "Microsoft.ML.OnnxRuntime",
+        "Microsoft.ML.OnnxRuntime.Managed",
+        "onnxruntime-web"
+      ],
+      "groupName": "onnxruntime (cross-runtime sync)",
+      "groupSlug": "ort-cross-sync",
+      "minimumReleaseAge": "14 days"
+    },
+    {
+      "description": "OpenJTalk dictionary version は Python pyproject.toml + CMakeLists.txt + Rust Cargo.toml で同期必須。",
+      "matchPackageNames": [
+        "pyopenjtalk-plus",
+        "openjtalk"
+      ],
+      "groupName": "openjtalk (cross-runtime sync)",
+      "groupSlug": "openjtalk-cross-sync"
+    }
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "ruff version pin in non-package files (.pre-commit-config.yaml の rev / workflow file の pip install ruff==X)。 pyproject.toml の `ruff==X` は dependabot uv-ecosystem が更新するが、 これら 3 箇所は uv ecosystem の scan 範囲外なので Renovate regex-manager で補完。",
+      "fileMatch": [
+        "^\\.pre-commit-config\\.yaml$",
+        "^\\.github/workflows/python-lint\\.yml$",
+        "^\\.github/workflows/ci\\.yml$"
+      ],
+      "matchStrings": [
+        "ruff-pre-commit\\s*\\n\\s*rev:\\s*v(?<currentValue>[0-9]+\\.[0-9]+\\.[0-9]+)",
+        "pip install\\s+ruff==(?<currentValue>[0-9]+\\.[0-9]+\\.[0-9]+)",
+        "ruff==(?<currentValue>[0-9]+\\.[0-9]+\\.[0-9]+)"
+      ],
+      "depNameTemplate": "ruff",
+      "datasourceTemplate": "pypi"
+    },
+    {
+      "customType": "regex",
+      "description": "Trivy / cosign / SLSA generator のような security tooling version pin in workflow files。 Dependabot github-actions は uses: 行のみ scan し、 step run: 内の version pin は更新しない。",
+      "fileMatch": [
+        "^\\.github/workflows/.*\\.ya?ml$"
+      ],
+      "matchStrings": [
+        "aquasecurity/trivy-action@v(?<currentValue>[0-9]+\\.[0-9]+\\.[0-9]+)",
+        "sigstore/cosign-installer@v(?<currentValue>[0-9]+\\.[0-9]+\\.[0-9]+)"
+      ],
+      "depNameTemplate": "aquasecurity/trivy-action",
+      "datasourceTemplate": "github-releases"
+    }
+  ]
+}

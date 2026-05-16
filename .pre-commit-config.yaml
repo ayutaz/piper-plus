@@ -515,6 +515,43 @@ repos:
         files: ^(CHANGELOG\.md|docs/spec/release-versions\.toml|scripts/check_changelog_unreleased\.py)$
         pass_filenames: false
 
+      # Lockfile consistency gate (Wave 3).
+      # 10 runtime の lockfile (uv.lock / Cargo.lock / go.sum / package-lock.json / packages.lock.json / gradle.lockfile)
+      # が committed されているか検査。 C# / Android lockfile は初回 build まで absent
+      # なので soft-required (warning) として扱い、 残りは hard-required (fail) で
+      # block する。 transitive deps の reproducible build 保証 (PR #498 wave2 で
+      # 議論された supply chain hardening の続編)。
+      - id: lockfile-consistency
+        name: Lockfile consistency (10 runtimes)
+        entry: uv run python scripts/check_lockfile_consistency.py
+        language: system
+        files: ^(uv\.lock|src/rust/Cargo\.lock|src/go/(go\.sum|phonemize/go\.sum)|src/wasm/(g2p|openjtalk-web)/package-lock\.json|src/csharp/PiperPlus\.(Core|Cli)/packages\.lock\.json|android/(piper-plus|piper-plus-g2p)/gradle\.lockfile|scripts/check_lockfile_consistency\.py)$
+        pass_filenames: false
+
+      # Benchmark JSON sanity gate (Wave 3).
+      # corrupt baseline JSON (NaN / Inf / 負値 / 異常値) が gh-pages に
+      # stash されると以後の PR 全てに false alert が伝播する。 corrupt な
+      # JSON が commit される前に block。
+      - id: benchmark-json-sanity
+        name: Benchmark JSON sanity (NaN / Inf / out-of-bounds)
+        entry: uv run python scripts/check_benchmark_json.py
+        language: system
+        files: ^(tools/benchmark/.*\.json|tests/fixtures/benchmark-.*\.json|docs/spec/.*-baseline\.json|scripts/check_benchmark_json\.py)$
+        pass_filenames: false
+
+      # README H2 parity gate (Wave 3, warn-only).
+      # 8 言語 README (JP canonical + 7 翻訳) の H2 個数を比較し、 ±20%
+      # tolerance 超過で warning。 PR #498 wave2 調査で「翻訳 drift は
+      # H1/H3 の細分化 (1.5-2x) で頻発、 H2 個数は安定 (13 一致)」 と
+      # 観測されたため H2 個数を invariant に。 strict ではなく warning
+      # only で翻訳遅延を許容。
+      - id: readme-h2-parity
+        name: README H2 section parity (8 languages)
+        entry: uv run python scripts/check_readme_h2_parity.py
+        language: system
+        files: ^README(_[A-Z]{2})?\.md|scripts/check_readme_h2_parity\.py$
+        pass_filenames: false
+
       # Language list 3-way parity (WebUI / CLI / FastAPI test fixture).
       # Catches drift like PR #2f4efaf9 where the WebUI SAMPLE_TEXTS listed
       # a language ("sv") that the CLI --language choices and the

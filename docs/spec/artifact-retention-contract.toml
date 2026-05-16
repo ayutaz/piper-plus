@@ -1,0 +1,116 @@
+# Artifact Retention Contract (Wave 3).
+#
+# GitHub Actions の `retention-days` をカテゴリ別に整理し、 storage cost と
+# 後追い debug の利便性のバランスを取る。 新規 workflow で artifact upload を
+# 追加する場合は本 contract のいずれかのカテゴリに該当させる。
+
+[meta]
+spec_version = 1
+last_updated = "2026-05-16"
+applies_to = ["github-actions"]
+canonical_reference = ".github/workflows/*.yml"
+
+# -----------------------------------------------------------------------------
+# Retention category 定義
+# -----------------------------------------------------------------------------
+
+[[categories]]
+name = "ephemeral"
+retention_days = 1
+description = """
+PR / push debug 用に短期間だけ保管する artifact。 build 失敗時の log や
+intermediate binary を「直近 1 日だけ参照できれば良い」 ケース。 storage
+コスト最小化を優先。
+"""
+examples = [
+    "build-piper.yml: piper-build-debug",
+    "integration-tests-issue-426.yml: integration-output",
+    "swift-g2p-ci.yml: swift-test-output",
+    "bundle-size-gate.yml: bundle-size-pr-debug",
+]
+
+[[categories]]
+name = "pr-debug"
+retention_days = 7
+description = """
+PR レビュー期間中 (通常 1-7 日) に参照できる必要がある artifact。 PR が
+merge / close される頃には不要になる category。 14 日は中途半端 (PR が
+1 週間以上 open のままになる頻度は稀) なので 7 日に統一。
+"""
+examples = [
+    "build-piper.yml: piper-artifact",
+    "build-wasm-reusable.yml: wasm-build-output",
+    "test-multilingual-tts.yml: tts-test-results",
+    "python-tests.yml: pytest-coverage",
+    "rust-tests.yml: rust-test-output",
+    "test-japanese-tts.yml: jp-tts-output",
+    "test-webassembly.yml: wasm-test-output",
+    "_build-test-cpp.yml: cpp-test-output",
+    "cli-help-docs-sync.yml: cli-help-drift-report",
+    "csharp-ci.yml: csharp-coverage-report",
+    "go-ci.yml: go-binary",
+    "clang-tidy.yml: clang-tidy-report",
+]
+
+[[categories]]
+name = "regression-baseline"
+retention_days = 30
+description = """
+回帰検出のため、 過去 1 ヶ月分の baseline と比較する必要がある artifact。
+benchmark / mutation testing / memory profiling 等。 30 日 = 「直近の主要
+release から少なくとも 1 cycle 後」 の保管期間。
+"""
+examples = [
+    "multi-runtime-rtf.yml: rtf-benchmark-results",
+    "mutation-testing.yml: stryker-report",
+    "memory-regression.yml: memory-profile",
+    "generate-combined-report.yml: combined-report",
+    "bundle-size-gate.yml: bundle-size-baseline",
+    "csharp-ci.yml: test-results-${matrix.os}",
+    "csharp-build-all-platforms.yml: platform-binaries",
+]
+
+[[categories]]
+name = "release-publish"
+retention_days = 90
+description = """
+GitHub Release で publish する binary / xcframework / aar 等。 一度 publish
+した artifact は基本的に Release 経由で永続化されるため、 actions/upload-artifact
+側は 90 日で十分 (緊急 re-upload が必要なケースに備えるため即削除しない)。
+本 retention は actions/upload-artifact デフォルト相当。
+"""
+examples = [
+    "release-shared-lib.yml: libpiper_plus-* (xcframework / aar / linux-x64-tar)",
+    "g2p-rust-publish.yml: piper-plus-g2p crate",
+    "g2p-go-publish.yml: piper-plus-go-tarball",
+]
+
+# -----------------------------------------------------------------------------
+# 不変条件
+# -----------------------------------------------------------------------------
+
+[[invariants]]
+name = "no-implicit-retention"
+description = """
+upload-artifact step は必ず `retention-days:` を明示。 GitHub Action の
+デフォルト (90 日) は storage cost が高く、 PR debug 用途には過剰。
+"""
+enforced_by = "scripts/check_artifact_retention.py (future)"
+
+[[invariants]]
+name = "no-14-day-retention"
+description = """
+14 日は本 contract のカテゴリに該当しない中途半端な値。 PR が 14 日
+open のままになるケースは稀で、 必要なら regression-baseline (30 日) に
+寄せる。 既存 14 日 artifact は 7 日に統一済 (Wave 3)。
+"""
+enforced_by = "manual review (PR template の retention check 項目)"
+
+[[invariants]]
+name = "release-artifact-not-pr-retention"
+description = """
+release-shared-lib.yml 等の release workflow で release-publish カテゴリ
+ではない短期 retention を指定するのは禁止。 release 失敗時の re-upload に
+必要な余裕を残す。
+"""
+enforced_by = "manual review"

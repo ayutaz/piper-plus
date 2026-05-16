@@ -126,7 +126,7 @@ jobs:
           path: |
             piper_help.txt
             drift_report.txt
-          retention-days: 14
+          retention-days: 7
 
       - name: Comment drift report on PR
         # Only post a comment on PR events where the gate failed; otherwise
