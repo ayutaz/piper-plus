@@ -50,16 +50,17 @@ jobs:
         # ベースイメージ + apt 層が重要な Dockerfile を対象とする。
         # webui / wyoming / cpp-inference は model / voice をダウンロードする
         # ため build が重く、 schedule run のみ別途扱う (今は除外)。
+        # python-train は ML training stack (torch + cuDNN + ML libs) で
+        # image が ~10GB+、 GitHub-hosted runner で `no space left on device`
+        # OOM するため除外 (本番 deploy されない image でもあり、 scan 優先度
+        # は低い)。 専用 scheduled job で free-disk-space cleanup 経由で
+        # scan する形で別途扱う TODO。
         # `build_target` で multi-stage Dockerfile の早期 stage を選択し、
         # 巨大 model / voice の embedding 込みステージを避ける。 未指定の
         # Dockerfile は単一 stage / 最終 stage が軽量なので空欄でよい。
         target:
           - name: python-inference
             dockerfile: docker/python-inference/Dockerfile
-            context: .
-            build_target: ''
-          - name: python-train
-            dockerfile: docker/python-train/Dockerfile
             context: .
             build_target: ''
           - name: cpp-dev
