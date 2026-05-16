@@ -1,0 +1,101 @@
+# Chinese (Mandarin) tone symbol contract.
+# ========================================
+# 現代標準中国語ピンイン → 音素変換において、 5 つの tone marker
+# (tone1 / tone2 / tone3 / tone4 / tone5) を「独立した音素 token」 として
+# phoneme 列に挿入することで、 model に音高情報を渡している。
+#
+# 全 G2P ランタイム間で:
+#   - symbol 表記 (literal "tone1" 〜 "tone5") が完全一致
+#   - PUA mapping (U+E046 〜 U+E04A) が完全一致 (pua.json が canonical)
+#   - tone 数値 (1-5) と表記の対応が完全一致
+# でなければ silent embedding ID shift → model に異なる pitch contour が
+# 入力 → 違う発音 / 違う声調になる。
+#
+# Drift gate: scripts/check_chinese_tone_contract.py
+# Canonical:  src/python/g2p/piper_plus_g2p/chinese.py (`_pinyin_to_ipa`)
+#
+# 影響度: drift = silent Mandarin pronunciation error (catastrophic)。
+
+[meta]
+spec_version = "1.0"
+last_updated = "2026-05-16"
+applies_to = ["python", "rust", "go", "csharp", "wasm", "cpp"]
+canonical_source = "src/python/g2p/piper_plus_g2p/chinese.py"
+canonical_function = "_pinyin_to_ipa"
+
+# ---------------------------------------------------------------------------
+# 5 tone symbols (in canonical pinyin numbering order)
+# ---------------------------------------------------------------------------
+# tone5 は neutral tone (軽声) で、 pypinyin の `neutral_tone_with_five=True`
+# 設定により tone1-4 と同じ symbol family で扱う。 5 が「中性」 / 「無声調」
+# を意味するのは中国語声調学の慣習。
+
+[tones]
+all = ["tone1", "tone2", "tone3", "tone4", "tone5"]
+description = "Mandarin tones — high level / rising / dipping / falling / neutral"
+
+# ---------------------------------------------------------------------------
+# Numeric tone ↔ symbol mapping
+# ---------------------------------------------------------------------------
+# canonical Python: chinese.py 内で `f"tone{tone}"` として生成。
+# 全 runtime はこの規則に従わなければならない。
+# Pypinyin の TONE3 style: 1=high level / 2=rising / 3=dipping /
+# 4=falling / 5=neutral (軽声)。
+
+[[tone_definitions]]
+number = 1
+symbol = "tone1"
+description = "high level (陰平)"
+example_pinyin = "ma1"
+example_phonemes = ["m", "a", "tone1"]
+pua_codepoint = "U+E046"
+
+[[tone_definitions]]
+number = 2
+symbol = "tone2"
+description = "rising (陽平)"
+example_pinyin = "ma2"
+example_phonemes = ["m", "a", "tone2"]
+pua_codepoint = "U+E047"
+
+[[tone_definitions]]
+number = 3
+symbol = "tone3"
+description = "dipping (上聲)"
+example_pinyin = "ma3"
+example_phonemes = ["m", "a", "tone3"]
+pua_codepoint = "U+E048"
+
+[[tone_definitions]]
+number = 4
+symbol = "tone4"
+description = "falling (去聲)"
+example_pinyin = "ma4"
+example_phonemes = ["m", "a", "tone4"]
+pua_codepoint = "U+E049"
+
+[[tone_definitions]]
+number = 5
+symbol = "tone5"
+description = "neutral / unstressed (輕聲)"
+example_pinyin = "ma5"
+example_phonemes = ["m", "a", "tone5"]
+pua_codepoint = "U+E04A"
+
+# ---------------------------------------------------------------------------
+# Implementation pointers — drift gate が走査する canonical fields
+# ---------------------------------------------------------------------------
+# 各 runtime source が tone1-5 symbol を string literal として参照していれば
+# parity OK。 PUA codepoint の同期は別 gate (pua-contract.toml) が担当する。
+
+[runtime_sources]
+python = "src/python/g2p/piper_plus_g2p/chinese.py"
+rust = "src/rust/piper-plus-g2p/src/chinese.rs"
+rust_token_map = "src/rust/piper-plus-g2p/src/token_map.rs"
+wasm_pua_map = "src/wasm/g2p/src/pua-map.js"
+go_pua = "src/go/phonemize/pua.go"
+csharp_mapping = "src/csharp/PiperPlus.Core/Mapping/OpenJTalkToPiperMapping.cs"
+# C++ では tone1-5 を string literal ではなく PUA codepoint (0xE046-0xE04A) で
+# 直接扱う。 chinese_phonemize.cpp が canonical source、 piper.cpp は
+# inference 時の tone-id range 検査に同 codepoint を使う。
+cpp_chinese_phonemize = "src/cpp/chinese_phonemize.cpp"
