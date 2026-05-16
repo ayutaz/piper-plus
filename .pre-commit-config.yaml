@@ -311,6 +311,32 @@ repos:
         files: ^(docs/spec/language-id-map-contract\.toml|src/python/piper_train/tools/prepare_multilingual_dataset\.py|src/python_run/piper/voice\.py|src/rust/piper-core/src/(config|wasm)\.rs|src/rust/piper-wasm/src/lib\.rs|src/go/piperplus/testdata/valid_multilingual_config\.json|src/wasm/openjtalk-web/models/multilingual-test-medium\.onnx\.json|src/csharp/PiperPlus\.Core/Config/PiperConfig\.cs|src/cpp/piper\.cpp|scripts/check_language_id_map_contract\.py|scripts/regenerate_language_id_map_fixture\.py|tests/fixtures/language_id_map/.*)$
         pass_filenames: false
 
+      # CHANGELOG [Unreleased] section cleanup gate. After a release tag is
+      # cut, the workflow expects sub-headings under [Unreleased] to be moved
+      # to a sibling ## [X.Y.Z] section. This catches the case where a
+      # release-style ### [vX.Y.Z] heading is left under [Unreleased] when
+      # the version's major.minor is already in release-versions.toml's
+      # expected_prefix. Conservative: only flags structural sub-headings,
+      # not prose cross-references.
+      - id: changelog-unreleased-cleanup
+        name: CHANGELOG [Unreleased] stray release-heading detection
+        entry: uv run python scripts/check_changelog_unreleased.py
+        language: system
+        files: ^(CHANGELOG\.md|docs/spec/release-versions\.toml|scripts/check_changelog_unreleased\.py)$
+        pass_filenames: false
+
+      # Language list 3-way parity (WebUI / CLI / FastAPI test fixture).
+      # Catches drift like PR #2f4efaf9 where the WebUI SAMPLE_TEXTS listed
+      # a language ("sv") that the CLI --language choices and the
+      # /v1/audio/speech/languages endpoint assertion didn't have. Pure
+      # AST-based check, no runtime imports required.
+      - id: language-parity
+        name: language list parity (WebUI SAMPLE_TEXTS / CLI --language / FastAPI test)
+        entry: uv run python scripts/check_language_parity.py
+        language: system
+        files: ^(docker/webui/app\.py|docker/python-inference/(inference|test_openai_api)\.py|scripts/check_language_parity\.py)$
+        pass_filenames: false
+
       # Mirror of .github/workflows/cli-help-docs-sync.yml. Catches v1.12.0-
       # style breaking changes (e.g. `--mb-istft` removed when HiFi-GAN was
       # deleted) where the user-facing CLI doc would otherwise carry a flag
@@ -335,6 +361,112 @@ repos:
         language: system
         files: ^(src/python_run/piper/.*\.py|docs/guides/cli-usage\.md|scripts/check_cli_help_drift\.py)$
         pass_filenames: false
+
+      # Host-specific secret-path leak detection. CLAUDE.md documents the
+      # maintainer's training-machine secret env file path; if that pattern
+      # leaks into executable code (sources, workflows, configs),
+      # downstream contributors get confusing "file not found" errors
+      # because the path doesn't exist on their machines. Documentation
+      # references (CLAUDE.md / README* / docs/) are exempt; only
+      # executable artifacts are checked. ALLOWLIST inside the script
+      # documents the legitimate pre-existing references. See
+      # scripts/check_secret_path_reference.py for the canonical pattern
+      # list (kept there to avoid this config file being a self-match).
+      - id: secret-path-reference
+        name: host-specific secret-path leak detection
+        entry: uv run python scripts/check_secret_path_reference.py
+        language: system
+        # The `(^|/)` prefix is mandatory for the basename-style alternatives
+        # — pre-commit matches files filter against the repo-relative path,
+        # so `^(CMakeLists\.txt|Dockerfile|Makefile)$` only catches root-level
+        # files. Adding `(^|/)` lets it fire on sub-directory CMakeLists.txt
+        # / Dockerfile / Makefile as well (e.g., src/cpp/CMakeLists.txt).
+        files: \.(py|sh|bash|zsh|yml|yaml|toml|json|rs|go|cs|cpp|c|h|hpp|js|ts|mjs|cjs|kt|kts|swift|gradle|cmake)$|(^|/)(CMakeLists\.txt|Dockerfile|Makefile)$
+        pass_filenames: true
+
+      # OpenJTalk version consistency: cmake/ExternalDeps.cmake pins the
+      # pyopenjtalk-plus tarball URL with a hardcoded version (currently
+      # 0.4.1.post7). The Python runtime separately depends on
+      # pyopenjtalk-plus via pyproject.toml. If those drift apart, training
+      # (Python) and inference (C++) see different OpenJTalk dict /
+      # behaviour. The script is conservative: bare names (no version
+      # constraint) are noted but don't fail; only `==` / `~=` pins that
+      # disagree with the cmake URL are flagged as errors.
+      - id: openjtalk-version-sync
+        name: OpenJTalk pin parity (cmake URL vs pyproject.toml / requirements.txt)
+        entry: uv run python scripts/check_openjtalk_version_sync.py
+        language: system
+        # Include requirements*.txt — src/python_run uses dynamic deps
+        # resolved from requirements.txt, not the static
+        # `[project.dependencies]` array, so a pin change there must
+        # re-fire the gate.
+        files: ^(cmake/ExternalDeps\.cmake|.*pyproject\.toml|.*requirements.*\.txt|scripts/check_openjtalk_version_sync\.py)$
+        pass_filenames: false
+
+      # Pytest skip-reason discipline. Skips without `reason=` accumulate as
+      # silent technical debt — reviewers can't tell whether they're
+      # permanent (missing optional dep), temporary (waiting on a fix), or
+      # accidental. The AST-based check accepts any non-empty positional
+      # message, f-string, expression, or `reason=` kwarg. Only literally
+      # empty (`pytest.skip()` / `@pytest.mark.skip()`) is rejected.
+      - id: pytest-skip-reason
+        name: pytest skip / skipif must have a non-empty reason
+        entry: uv run python scripts/check_test_skip_reason.py
+        language: system
+        files: ^src/(python|python_run)/.*tests?/.*\.py$|^scripts/check_test_skip_reason\.py$
+        pass_filenames: true
+
+      # gofmt drift catch. Go's tooling already enforces this in CI, but
+      # catching it at commit time prevents the cycle-of-shame
+      # local-clean / CI-fail pattern (PR #401 ruff parallel). `gofmt -l`
+      # prints offending file names; empty output = clean. Wrap in bash so
+      # we can convert that into a proper exit code with a readable error.
+      - id: gofmt
+        name: gofmt (Go source format drift)
+        entry: scripts/run_gofmt_check.sh
+        language: system
+        files: \.go$
+        exclude: ^(vendor/|.*\.pb\.go$)
+        pass_filenames: true
+
+      # rustfmt deferred: existing Rust sources contain pre-existing format
+      # drift (multi-line argument expansions, expected_assert spacing).
+      # Adding `rustfmt --check` as a commit-time gate would require a
+      # separate cargo-fmt cleanup PR. Track separately to keep this
+      # Phase 2 conservative. CI's clippy / cargo check still gate
+      # functional drift; format drift is tolerated until cleanup lands.
+
+  # ---------------------------------------------------------------------------
+  # Pre-push pre-flight (opt-in). These hooks run only on `git push` if
+  # installed via `pre-commit install --hook-type pre-push`. NOT installed
+  # by default because they add ~20-30s latency to every push. Recommended
+  # for contributors who have been bitten by silent contract drift
+  # (PR #401 / #419 patterns) — runs full-repo contract gates that are
+  # normally only triggered by specific file changes, so even when
+  # SKIP=... was used during commits, drift is caught before it reaches
+  # CI.
+  #
+  # Opt-in:
+  #   pre-commit install --hook-type pre-push
+  #
+  # Bypass once:
+  #   git push --no-verify
+  # ---------------------------------------------------------------------------
+  - repo: local
+    hooks:
+      - id: pre-push-contract-gates
+        name: full-repo contract gates (pre-push pre-flight, opt-in)
+        stages: [pre-push]
+        entry: bash -c 'set -e;
+          echo "==> Running contract gates pre-flight (4 scripts)...";
+          uv run python scripts/check_loanword_consistency.py;
+          uv run python scripts/check_pua_consistency.py --check-version;
+          uv run python scripts/check_language_parity.py;
+          uv run python scripts/check_changelog_unreleased.py;
+          echo "==> All contract gates passed."'
+        language: system
+        pass_filenames: false
+        always_run: true
 
   # ---------------------------------------------------------------------------
   # Markdown lint — DavidAnson/markdownlint-cli2 has a dedicated pre-commit

@@ -39,7 +39,7 @@ allowed-tools: Agent Bash(git diff *) Bash(git log *) Bash(git status *) Read Gl
 
 ## フェーズ 2: 並列ドキュメント監査 (エージェントチーム)
 
-以下の 6 エージェントを **1 メッセージで並列起動** します:
+以下の 7 エージェントを **1 メッセージで並列起動** します:
 
 ### Agent 1: CLAUDE.md 監査
 
@@ -70,6 +70,23 @@ allowed-tools: Agent Bash(git diff *) Bash(git log *) Bash(git status *) Read Gl
 
 **subagent_type**: `Explore`
 **task**: 変更された公開 API (関数・クラス・メソッド) に docstring / JSDoc / TypeScript 型定義があるか確認。新規 public API に docstring がない、または既存の docstring が実装と齟齬している箇所を検出。
+
+### Agent 7: Version Drift 監査 (release-versions.toml canonical)
+
+**subagent_type**: `Explore`
+**task**: 以下の 3 段階で version-drift を検出する。
+
+1. **Canonical 抽出**: `docs/spec/release-versions.toml` を読み、各ランタイム (`python`, `rust`, `dotnet.core`, `dotnet.cli`, `npm.synthesis`, `npm.g2p`, `swift.synthesis`, `swift.g2p`, `kotlin.android_g2p`) の `expected_prefix` を取得 (例: `"1.12."`, `"0.4."`)。これを canonical truth とする。
+
+2. **CLAUDE.md ランタイム別パッケージ表との照合**: CLAUDE.md の「ランタイム別パッケージ」表 (現在 L177-186 付近、 `| ランタイム | パッケージ | バージョン |` を含む table) を grep で抽出し、各ランタイムの記載バージョンが `expected_prefix` で始まるかを確認。不一致なら drift 報告。
+
+3. **`docs/spec/*.toml` 内 version comment 監査**: 全 `docs/spec/*.toml` を grep で `# v1\.|# v0\.` 等の version reference comment を抽出し、`release-versions.toml` の expected_prefix とずれていないか確認 (例: `audio-format-contract.toml` の `# v1.12.0 で HiFi-GAN は削除` が canonical と矛盾していないか)。
+
+4. **CHANGELOG.md unreleased 重複検査**: `CHANGELOG.md` の `[Unreleased]` セクションに、既に release tag が付いた version (`release-versions.toml::expected_prefix` で始まる version) への reference が残っていないか確認。残っていれば「release 後の cleanup 漏れ」として報告。
+
+5. **README ランタイム matrix 整合性**: `README.md` および `README_EN.md` の Feature Support Matrix / ランタイム表に書かれたバージョン番号が canonical と一致するか確認。
+
+報告形式は他の Agent と同じく markdown diff。 drift が見つからなければ「全 N ランタイム version 整合」と報告。
 
 各エージェントには以下を渡します:
 
@@ -138,4 +155,13 @@ allowed-tools: Agent Bash(git diff *) Bash(git log *) Bash(git status *) Read Gl
 
 ## 期待効果
 
-PR #349 で発生した「ドキュメント更新を一括で後付けする」パターンを、**コミット単位で小さく防止** します。エージェントチームを並列で動かすことで、6 観点の監査を短時間で完了できます。
+PR #349 で発生した「ドキュメント更新を一括で後付けする」パターンを、**コミット単位で小さく防止** します。エージェントチームを並列で動かすことで、7 観点の監査を短時間で完了できます。
+
+Agent 7 (Version Drift 監査) により、`release-versions.toml` を canonical とした以下の drift を一括検出:
+
+- CLAUDE.md ランタイム別パッケージ表のバージョン番号
+- `docs/spec/*.toml` 内に埋め込まれた version comment (`# v1.12.0 で削除` 等)
+- CHANGELOG.md `[Unreleased]` の release 済み version reference 残留
+- README Feature Support Matrix のランタイム version
+
+memory `feedback_data_asset_distribution.md` で記録された「新規データファイル追加時 7 箇所の package metadata 更新」を補強する観点。

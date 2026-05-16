@@ -146,6 +146,11 @@ check_*.py
 !scripts/check_cli_help_drift.py
 !scripts/check_bundle_size.py
 !scripts/check_migration_changelog_parity.py
+!scripts/check_language_parity.py
+!scripts/check_changelog_unreleased.py
+!scripts/check_secret_path_reference.py
+!scripts/check_openjtalk_version_sync.py
+!scripts/check_test_skip_reason.py
 create_comprehensive_*.py
 add_missing_*.py
 retrain_*.py

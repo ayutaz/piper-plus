@@ -139,7 +139,7 @@ endif()
 # This fork has improved NJD accent phrase rules (Rules 19-22) and accent type fixes
 # that produce identical fullcontext labels to the Python training pipeline.
 # Both the library and dictionary come from the same pyopenjtalk-plus source.
-set(PYOPENJTALK_PLUS_URL "https://files.pythonhosted.org/packages/82/4e/1e2c165b04dd250dbcb1c270df8517681eed5c20b755c72bec2b42853851/pyopenjtalk_plus-0.4.1.post7.tar.gz")
+set(PYOPENJTALK_PLUS_URL "https://files.pythonhosted.org/packages/8f/de/004b053d6e5a319dd5072a74aa2bd68e71a8ba5f3acdf6e78381aed94898/pyopenjtalk_plus-0.4.1.post8.tar.gz")
 
 if(NOT DEFINED OPENJTALK_DIR)
     set(OPENJTALK_DIR "${CMAKE_CURRENT_BINARY_DIR}/oj")
@@ -176,7 +176,7 @@ if(NOT DEFINED OPENJTALK_DIR)
       openjtalk_external
       PREFIX "${CMAKE_CURRENT_BINARY_DIR}/o"
       URL ${PYOPENJTALK_PLUS_URL}
-      URL_HASH SHA256=555fdf86310d6d72f4a37e92beb251cdc2114aafc133d4c77b136a07a4b17119
+      URL_HASH SHA256=f4dfbfbe9021d33c708f04ca5a27008c4f72a9fed097718ca3234d318a7a45e1
       DOWNLOAD_NO_PROGRESS TRUE
       TIMEOUT 600
       TLS_VERIFY ON
@@ -201,7 +201,7 @@ if(NOT DEFINED OPENJTALK_DIR)
       PREFIX "${CMAKE_CURRENT_BINARY_DIR}/od"
       DEPENDS openjtalk_external
       URL ${PYOPENJTALK_PLUS_URL}
-      URL_HASH SHA256=555fdf86310d6d72f4a37e92beb251cdc2114aafc133d4c77b136a07a4b17119
+      URL_HASH SHA256=f4dfbfbe9021d33c708f04ca5a27008c4f72a9fed097718ca3234d318a7a45e1
       DOWNLOAD_NO_PROGRESS TRUE
       TIMEOUT 600
       TLS_VERIFY ON
