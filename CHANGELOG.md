@@ -5,6 +5,67 @@ All notable changes to piper-plus will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0](https://github.com/ayutaz/piper-plus/compare/v1.12.0...v2.0.0) (2026-05-16)
+
+
+### ⚠ BREAKING CHANGES
+
+* PiperPlus.Core の wire format を docs/spec/phoneme-timing -contract.toml v1.0 に合わせる。NuGet PiperPlus.Core ≤ 0.3.0 を利用する コードは新版で API/JSON/TSV キーが変わるため更新が必要。
+
+### test/ci
+
+* 全領域監査の Gap を解消 (parity gates / CLI smoke / Dependabot / CodeQL / attestation) ([#401](https://github.com/ayutaz/piper-plus/issues/401)) ([692cb3f](https://github.com/ayutaz/piper-plus/commit/692cb3f608e1ffb228073edbed0b24ab43d1770e))
+
+
+### Added
+
+* **ci:** クロスランタイム sync gate 拡充 + parity workflow を matrix hub に集約 ([#447](https://github.com/ayutaz/piper-plus/issues/447)) ([605093c](https://github.com/ayutaz/piper-plus/commit/605093c032dee699478efcf09b4b9fe93c364866))
+* **cpp:** SSML parser 実装 (W3C subset: speak/break/prosody) ([#477](https://github.com/ayutaz/piper-plus/issues/477)) ([6b96679](https://github.com/ayutaz/piper-plus/commit/6b9667975aca05808abd49df2e04aec0d261e326))
+* **cpp:** voice cloning CLI flags (--reference-audio, --speaker-embedding, --speaker-encoder-model) ([#476](https://github.com/ayutaz/piper-plus/issues/476)) ([5a09d8d](https://github.com/ayutaz/piper-plus/commit/5a09d8d85fd69eeefa0a2ec194b4fe92d0cb86ae))
+* G2P を文単位で並列化し Python は ORT 推論ともオーバーラップ (Python/Rust/C#/Go/C++、Issue [#383](https://github.com/ayutaz/piper-plus/issues/383)) ([#403](https://github.com/ayutaz/piper-plus/issues/403)) ([d65e4a9](https://github.com/ayutaz/piper-plus/commit/d65e4a9beab138b8bbebcac5ad2fd6f5571da393))
+* **g2p/zh:** 中英混在テキストで英単語を中国語コンテキスト用にピンイン化 ([#384](https://github.com/ayutaz/piper-plus/issues/384)) ([#397](https://github.com/ayutaz/piper-plus/issues/397)) ([dd5878a](https://github.com/ayutaz/piper-plus/commit/dd5878ad51a0cc7dd7fb5ec969ed58d802b30c48))
+* **kotlin-g2p:** Issue [#388](https://github.com/ayutaz/piper-plus/issues/388) — Kotlin/Android G2P AAR (Maven Central) ([#400](https://github.com/ayutaz/piper-plus/issues/400)) ([9929702](https://github.com/ayutaz/piper-plus/commit/9929702a22ee05d71407176653c8cbf4158f87de))
+* **pages:** publish multi-runtime RTF benchmark to GitHub Pages on every dev push ([4367e95](https://github.com/ayutaz/piper-plus/commit/4367e9584b7c2db63adc02beb41df3288f6fe668))
+* **release:** HF Hub モデル config 配布パイプライン (A) ([#393](https://github.com/ayutaz/piper-plus/issues/393)) ([6172171](https://github.com/ayutaz/piper-plus/commit/617217115d960a139acbc974d1ba23692f9d36cb))
+* **release:** ONNX 入力グラフ検証 + Issue [#385](https://github.com/ayutaz/piper-plus/issues/385) 対策 (E) ([#395](https://github.com/ayutaz/piper-plus/issues/395)) ([bfb38e7](https://github.com/ayutaz/piper-plus/commit/bfb38e7f3bfd63afea493c6d463a8b75fa3389a4))
+* **server:** bearer auth + rate limit (slowapi) を追加 (backward-compat) ([#475](https://github.com/ayutaz/piper-plus/issues/475)) ([5082fe8](https://github.com/ayutaz/piper-plus/commit/5082fe85802022cf8307377947a3bc5ef6dd1016))
+* **server:** true streaming chunks + phoneme-timing endpoint 配線 ([#481](https://github.com/ayutaz/piper-plus/issues/481)) ([d778f0c](https://github.com/ayutaz/piper-plus/commit/d778f0c61ba8b4af8d59564f0236a065017195f8))
+* **swift-g2p:** iOS Swift G2P 対応 + SPM product 配布 ([#387](https://github.com/ayutaz/piper-plus/issues/387)) ([#398](https://github.com/ayutaz/piper-plus/issues/398)) ([ff6f34c](https://github.com/ayutaz/piper-plus/commit/ff6f34c5c46bb3e8faea351eef7229658f7aeedb))
+* **wasm:** speaker encoder synthesize 統合 (speakerEmbedding API) ([#478](https://github.com/ayutaz/piper-plus/issues/478)) ([bd6adc5](https://github.com/ayutaz/piper-plus/commit/bd6adc5a521279936478ef0f90cf1a000593da43))
+* **wasm:** SSML parser 統合 + synthesize 側 segment iterate ([#479](https://github.com/ayutaz/piper-plus/issues/479)) ([446f568](https://github.com/ayutaz/piper-plus/commit/446f568f05927a6eec8cdfb0bf3d40da30d9d0d9))
+* **workflow:** 5 波調査による workflow 自動化 — Tier A 60+ 件 + T14-T28 deferred ~155 件 ([#498](https://github.com/ayutaz/piper-plus/issues/498)) ([a1c3b6c](https://github.com/ayutaz/piper-plus/commit/a1c3b6c08bcee52fb0f4c1026d0fceb72765ebc4))
+* **workflow:** ワークフロー自動化 13 件 — skill 4 + pre-commit hook 6 + pre-push gate ([#496](https://github.com/ayutaz/piper-plus/issues/496)) ([1163a60](https://github.com/ayutaz/piper-plus/commit/1163a60f4d4f30a2bf7097b61e03fac42b51210b))
+* **zh-en:** Issue [#384](https://github.com/ayutaz/piper-plus/issues/384) — ZH-EN code-switching を全 7 ランタイムに展開 + テスト/CI 強化 ([#399](https://github.com/ayutaz/piper-plus/issues/399)) ([c6db62e](https://github.com/ayutaz/piper-plus/commit/c6db62e0e15ef2d2389e51512f1d850c059873ad))
+
+
+### Fixed
+
+* **bench:** NLTK データ不足で Python ベンチ全 cell 失敗を修正 ([#485](https://github.com/ayutaz/piper-plus/issues/485)) ([ce501f0](https://github.com/ayutaz/piper-plus/commit/ce501f0b5ed405b37c2df0c8625125267de43009))
+* **bench:** RTF baseline 自動初期化 + P50 threshold チェック追加 ([#480](https://github.com/ayutaz/piper-plus/issues/480)) ([26d4696](https://github.com/ayutaz/piper-plus/commit/26d46966dd7efdfdb38e72bb581786698f4ef9f8))
+* **bench:** RTF ベンチ全 cell missing 修正 (--quiet 除去 + baseline PR 作成) ([#483](https://github.com/ayutaz/piper-plus/issues/483)) ([b55a84f](https://github.com/ayutaz/piper-plus/commit/b55a84fba32f02f944d4d6f7edd5c76e1a96f92c))
+* **bench:** Rust/Go/C#/C++ RTF harness — stdin→--text, ORT libs, stdin=DEVNULL, CI gate ([ac13c35](https://github.com/ayutaz/piper-plus/commit/ac13c353c8fc60ee5c601f187a85298c49e254ed))
+* **ci:** bundle-size-gate に Android 3 ABI shared lib build を追加 ([#494](https://github.com/ayutaz/piper-plus/issues/494)) ([#497](https://github.com/ayutaz/piper-plus/issues/497)) ([098f8bd](https://github.com/ayutaz/piper-plus/commit/098f8bdf152e65aeb6855615f31fdf635b86d58a))
+* **ci:** codespell baseline を整備 (format + 非英語 README skip + typo) ([#419](https://github.com/ayutaz/piper-plus/issues/419)) ([5c7f4e2](https://github.com/ayutaz/piper-plus/commit/5c7f4e26727546bfdf07ca5a56ca236452659b3a))
+* **ci:** dev push 限定の RTF Regression / Docker Build 失敗を修正 + PR 検知拡張 ([#463](https://github.com/ayutaz/piper-plus/issues/463)) ([7f0da7e](https://github.com/ayutaz/piper-plus/commit/7f0da7eaaca78529318d8d1626d1f1b04bdd203f))
+* **ci:** dev 連続失敗修正 (cosign / gitleaks) + PR 時検知ゲート追加 ([#414](https://github.com/ayutaz/piper-plus/issues/414)) ([d83cdf3](https://github.com/ayutaz/piper-plus/commit/d83cdf3082e2d968d98d343180507712e6391b0d))
+* **ci:** sliding [@master](https://github.com/master) tag を固定 version に置換 (actions/checkout 等) ([2e5c5d9](https://github.com/ayutaz/piper-plus/commit/2e5c5d96926ccdf90712a2fb921bdbd9ade41aab))
+* **dependabot:** production-impacting な依存を minor bump ignore に追加 ([#430](https://github.com/ayutaz/piper-plus/issues/430)) ([b56b9d2](https://github.com/ayutaz/piper-plus/commit/b56b9d23abd3bb3dc7dc9647c52cdbd6f04e1a4a))
+* **deps:** bump gitpython 3.1.49 → 3.1.50 (GHSA-mv93-w799-cj2w) ([#437](https://github.com/ayutaz/piper-plus/issues/437)) ([d8551a6](https://github.com/ayutaz/piper-plus/commit/d8551a66c6057be49c15662a43f842e409f555e1))
+* **deps:** Dependabot security alerts (urllib3 high, @protobufjs/utf8 medium) ([#450](https://github.com/ayutaz/piper-plus/issues/450)) ([2c9a57c](https://github.com/ayutaz/piper-plus/commit/2c9a57cd3b490f0634fa2f9078946d111bb34470))
+* **deps:** src/python_run を uv workspace 統合し Dependency Graph 構造修復 ([#418](https://github.com/ayutaz/piper-plus/issues/418)) ([#438](https://github.com/ayutaz/piper-plus/issues/438)) ([71bcbc3](https://github.com/ayutaz/piper-plus/commit/71bcbc317799d2c400b27b43c7097179523a0b99))
+* **docker:** cpp-dev Dockerfile を python3.12 に切り替え ([#380](https://github.com/ayutaz/piper-plus/issues/380)) ([f2c9ebc](https://github.com/ayutaz/piper-plus/commit/f2c9ebc58128f1ee643c5c33540bfe530f2553d3))
+* **docker:** Python base image を手動で 3.11 → 3.13 に bump ([#420](https://github.com/ayutaz/piper-plus/issues/420)) ([9dd663a](https://github.com/ayutaz/piper-plus/commit/9dd663a02addcb7ff221a8339e36f8a170665ced))
+* **inference:** MB-iSTFT モデルの speaker_embedding 未対応を全ランタイムで解消 ([#426](https://github.com/ayutaz/piper-plus/issues/426)) ([#443](https://github.com/ayutaz/piper-plus/issues/443)) ([4122722](https://github.com/ayutaz/piper-plus/commit/41227229b54cf5e7513f8262732e7e4cf1b513da))
+* **iOS:** release-shared-lib パイプライン復旧 + xcframework 配布開始 ([#377](https://github.com/ayutaz/piper-plus/issues/377)) ([#381](https://github.com/ayutaz/piper-plus/issues/381)) ([97cac19](https://github.com/ayutaz/piper-plus/commit/97cac199cb0de55a0cbfff13be6e51250e59d236))
+* **npm:** subpath exports に types フィールドを追加 ([#465](https://github.com/ayutaz/piper-plus/issues/465)) ([ec4c5b7](https://github.com/ayutaz/piper-plus/commit/ec4c5b7da27659c8ca86973bf83c7f358743bb8f))
+* **pages:** include RTF benchmark page in WebAssembly Pages deployment ([f08cd41](https://github.com/ayutaz/piper-plus/commit/f08cd41778e962c838eeeae22d2d8a4cd6768bc7))
+* **pua:** 多コードポイント音素レグレッションの完全修正と再発防止CI ([#389](https://github.com/ayutaz/piper-plus/issues/389)) ([6268d21](https://github.com/ayutaz/piper-plus/commit/6268d21ed6dd2f1cd50ec638be7ae720a1f5af3c))
+* **python:** voice-cloning モデルの speaker_embedding 入力欠落を補填 ([#385](https://github.com/ayutaz/piper-plus/issues/385)) ([#391](https://github.com/ayutaz/piper-plus/issues/391)) ([a210268](https://github.com/ayutaz/piper-plus/commit/a210268e2e512a5dc9610e659a4abf8c3f7de26d))
+* **quality:** CodeQL py 品質指摘 3 件を fix (Phase 2) ([#436](https://github.com/ayutaz/piper-plus/issues/436)) ([05e5757](https://github.com/ayutaz/piper-plus/commit/05e575717a785fc1a026676707b302e02c03f84d))
+* **security:** CodeQL noise 削減 + cs/unsafe-double-checked-lock 修正 ([#434](https://github.com/ayutaz/piper-plus/issues/434)) ([7838bfc](https://github.com/ayutaz/piper-plus/commit/7838bfcb7798331d98d465491f77f046da404c90))
+* **security:** HTTP server の log-injection 対策 (CodeQL py/log-injection) ([#435](https://github.com/ayutaz/piper-plus/issues/435)) ([e50232f](https://github.com/ayutaz/piper-plus/commit/e50232f5556dbe21754041f3c41b857c812e577c))
+* **server:** WebUI と FastAPI CLI で言語リスト整合 (sv 取扱を統一) ([2f4efaf](https://github.com/ayutaz/piper-plus/commit/2f4efaf9254889d5b8345c5295ab40b7d92295a9))
+
 ## [Unreleased]
 
 ### Added
