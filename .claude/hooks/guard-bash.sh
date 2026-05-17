@@ -112,8 +112,32 @@ esac
 # memory: feedback_pr_create_skill_only.md
 # command 先頭 / `&& ` / `; ` 直後の場合のみ block (commit message 等の
 # 引用内文字列は誤発動を避けるため除外)。
+#
+# Skill 経由の判定: transcript_path の直近メッセージで
+# `"attributionSkill":"create-pr"` または `"name":"Skill","input":{"skill":"create-pr"`
+# が見つかれば skill 内呼び出しとして許可。 これがないと skill 自身が
+# `gh pr create` を呼べず (skill フェーズ 5 が deny される)、 PR 作成フロー全体が止まる。
+is_in_skill() {
+  local skill_name="$1"
+  local tpath
+  tpath=$(extract_field "transcript_path")
+  [ -n "$tpath" ] && [ -r "$tpath" ] || return 1
+  # 直近 80 行 (= 約 80 メッセージ) で最後の attributionSkill を取得。
+  # Skill tool 呼び出し直後の assistant message は attributionSkill が一旦消えるため、
+  # Skill tool 呼び出し自体もマッチ対象に含める (skill 起動直後の Bash も許可)。
+  local last_attr
+  last_attr=$(tail -n 80 "$tpath" 2>/dev/null \
+    | grep -oE '"attributionSkill":"[^"]+"|"name":"Skill","input":\{"skill":"[^"]+' \
+    | tail -n 1 \
+    | sed -nE 's/.*"(attributionSkill|skill)":"([^"]+).*/\2/p')
+  [ "$last_attr" = "$skill_name" ]
+}
+
 case "$CMD" in
   "gh pr create"|"gh pr create "*|*"&& gh pr create"*|*"; gh pr create"*|*"&&gh pr create"*|*";gh pr create"*)
+    if is_in_skill create-pr; then
+      exit 0
+    fi
     deny "gh pr create の直接実行は禁止です。/create-pr skill を使うと watch-pr の auto-chain が発動し、 PR 構造化本文 + CI 監視が一括で起動します。" ;;
 esac
 
