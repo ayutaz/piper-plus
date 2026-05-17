@@ -257,21 +257,9 @@ jobs:
             ${{ runner.os }}-uv-
 
       - name: Install system dependencies (Ubuntu)
-        if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y libsndfile1-dev build-essential cmake
-
-      - name: Install system dependencies (macOS)
-        if: runner.os == 'macOS'
-        run: |
-          brew install libsndfile cmake
-
-      - name: Install system dependencies (Windows)
-        if: runner.os == 'Windows'
-        run: |
-          choco install cmake --installargs 'ADD_CMAKE_TO_PATH=System' -y
-          refreshenv
 
       - name: Install Python dependencies
         run: |
@@ -283,17 +271,7 @@ jobs:
           # For pyopenjtalk-plus dependencies (optional)
           uv pip install --system sudachipy sudachidict_core || echo "Japanese dependencies optional"
 
-      - name: Build C++ executable (Windows)
-        if: runner.os == 'Windows'
-        run: |
-          mkdir build
-          cd build
-          cmake .. -G "Visual Studio 17 2022" -A x64
-          cmake --build . --config Release
-        shell: cmd
-
-      - name: Build C++ executable (Unix)
-        if: runner.os != 'Windows'
+      - name: Build C++ executable
         run: |
           mkdir -p build
           cd build
@@ -301,35 +279,29 @@ jobs:
           make -j$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 2)
 
       - name: Download OpenJTalk dictionary
-        if: runner.os != 'Windows'
         run: |
           cd build
           ../scripts/download_openjtalk_dict.sh || true
 
       - name: Run Python tests
         run: |
-          # Run tests properly
           cd src/python
           # `--no-cov` で coverage 計測を無効化 (subset 実行で 70% 閾値を満たさず誤検知)。
           # 完全な coverage は python-tests.yml の "Run unit tests" で計測。
-          if [ "${{ runner.os }}" == "Windows" ]; then
-            python -m pytest tests/ -v --tb=short -m "unit and not phonemize and not training" -k "not test_phonemize and not test_japanese" --no-cov
-          else
-            # Exclude inference tests - they require PyTorch and are covered by python-tests.yml
-            # Use --ignore to prevent collection (import) of files that require torch
-            python -m pytest tests/ -v --tb=short -m "unit and not training and not benchmark and not inference" --no-cov \
-              --ignore=tests/test_pytorch_onnx_parity.py \
-              --ignore=tests/test_export_onnx.py \
-              --ignore=tests/test_export_onnx_mb_istft.py \
-              --ignore=tests/test_infer_onnx.py \
-              --ignore=tests/test_english_phonemizer.py \
-              --ignore=tests/test_vits.py \
-              --ignore=tests/test_wavlm_discriminator.py
-          fi
+          # Exclude inference tests - they require PyTorch and are covered by python-tests.yml.
+          # Use --ignore to prevent collection (import) of files that require torch.
+          python -m pytest tests/ -v --tb=short -m "unit and not training and not benchmark and not inference" --no-cov \
+            --ignore=tests/test_pytorch_onnx_parity.py \
+            --ignore=tests/test_export_onnx.py \
+            --ignore=tests/test_export_onnx_mb_istft.py \
+            --ignore=tests/test_infer_onnx.py \
+            --ignore=tests/test_english_phonemizer.py \
+            --ignore=tests/test_vits.py \
+            --ignore=tests/test_wavlm_discriminator.py
 
       - name: Upload coverage reports
         uses: codecov/codecov-action@v5.5.4
-        if: matrix.python-version == '3.11' && runner.os == 'Linux'
+        if: matrix.python-version == '3.11'
         with:
           files: ./coverage.xml
           flags: python
