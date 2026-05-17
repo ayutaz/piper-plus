@@ -39,8 +39,13 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# piper-phonemize 1.1.0 only publishes a macOS x86_64 wheel (no sdist, no
+# Linux/Windows wheel), so installing it elsewhere fails hard. The marker
+# keeps `uv sync --all-extras` working off macOS by skipping the dependency
+# there (QA finding F5). Dataset preprocessing via piper-phonemize is
+# therefore macOS-x86_64 only; piper-plus' own G2P does not need it.
 preprocess = [
-    "piper-phonemize>=1.1.0",
+    "piper-phonemize>=1.1.0; sys_platform == 'darwin'",
 ]
 
 inference = [
