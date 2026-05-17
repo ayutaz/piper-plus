@@ -245,18 +245,6 @@ func isCloseBracket(r rune) bool {
 	return isClosingPunctuation(r)
 }
 
-// isOpenBracket reports whether r is an opening bracket / quote / paren.
-// Retained for callers that need symmetric matching (e.g. SSML parsing) but
-// no longer used by splitSentencesPlain.
-func isOpenBracket(r rune) bool {
-	switch r {
-	case '(', '[', '{', '「', '『', '【',
-		'“', '（':
-		return true
-	}
-	return false
-}
-
 // isPunctuation reports whether a rune is a sentence-ending or clause-ending punctuation.
 func isPunctuation(r rune) bool {
 	switch r {
