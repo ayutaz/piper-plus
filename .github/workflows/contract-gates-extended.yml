@@ -52,12 +52,16 @@ permissions:
 
 jobs:
   contract-checks:
-    name: ${{ matrix.contract }} gate
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
+    name: ${{ matrix.contract }} (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix:
+        # Run on all three OSes. Contract-gate scripts had Windows-only
+        # failures (non-UTF-8 console encoding, path separators) that an
+        # ubuntu-only matrix never caught — see the QA CI-coverage gap.
+        os: [ubuntu-latest, macos-latest, windows-latest]
         contract:
           - audio-format
           - ort-provider
@@ -75,6 +79,9 @@ jobs:
           python-version: '3.13'
 
       - name: Run contract drift check
+        # bash on all three OSes (windows-latest ships Git Bash) so the
+        # case statement below stays portable.
+        shell: bash
         run: |
           # Map the matrix contract id to its check script.
           case "${{ matrix.contract }}" in
