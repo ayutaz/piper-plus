@@ -37,6 +37,7 @@ Override:
 
 from __future__ import annotations
 
+import subprocess
 import sys
 from pathlib import Path
 
@@ -146,22 +147,42 @@ def main(argv: list[str]) -> int:
         paths = [Path(p) for p in argv]
     else:
         # Manual full-repo scan fallback. pre-commit always passes paths,
-        # so this branch is only hit when developer runs the script directly.
-        paths = []
-        for ext in EXECUTABLE_EXTENSIONS:
-            if ext.startswith("."):
-                paths.extend(REPO_ROOT.rglob(f"*{ext}"))
-            else:
-                paths.extend(REPO_ROOT.rglob(ext))
+        # so this branch is only hit when a developer runs the script
+        # directly. Scan TRACKED files via `git ls-files` — a raw rglob would
+        # also walk gitignored build artifacts (build/, .venv/, node_modules/,
+        # target/, dist/) and report false positives (QA finding F7).
+        try:
+            tracked = subprocess.run(
+                ["git", "-C", str(REPO_ROOT), "ls-files", "-z"],
+                capture_output=True,
+                check=True,
+            ).stdout.decode("utf-8", errors="replace")
+            paths = [REPO_ROOT / p for p in tracked.split("\0") if p]
+        except (OSError, subprocess.CalledProcessError):
+            # Not a git checkout — fall back to rglob, explicitly skipping
+            # build / cache directories.
+            _IGNORE_DIRS = {
+                "build", ".venv", "venv", "node_modules", "target",
+                "dist", ".git", "__pycache__", ".mypy_cache",
+            }
+            paths = [
+                p
+                for p in REPO_ROOT.rglob("*")
+                if p.is_file()
+                and not _IGNORE_DIRS.intersection(p.relative_to(REPO_ROOT).parts)
+            ]
 
     failures: list[tuple[str, int, str, str]] = []
     for path in paths:
         if not path.is_file():
             continue
         try:
-            rel = str(path.resolve().relative_to(REPO_ROOT))
+            # as_posix() — forward slashes on every OS so the ALLOWLIST and
+            # DOC_PATH_PREFIXES entries (which use "/") match on Windows too,
+            # where relative_to() would otherwise yield backslash paths (F7).
+            rel = path.resolve().relative_to(REPO_ROOT).as_posix()
         except ValueError:
-            rel = str(path)
+            rel = path.as_posix()
         if rel in ALLOWLIST:
             continue
         if _is_doc_file(rel):
