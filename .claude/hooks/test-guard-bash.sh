@@ -71,6 +71,21 @@ run "transcript なし (拒否)" \
   "$(input_no_tx 'gh pr create --base dev')" \
   0 "permissionDecision.*deny"
 
+run "marker 後に tool_result のみ (許可)" \
+  $'<command-name>/create-pr</command-name>\n{"type":"user","content":[{"tool_use_id":"toolu_01","type":"tool_result"}]}' \
+  "$(input_for 'gh pr create --base dev')" \
+  0 ""
+
+run "marker 後に user new prompt (拒否、 historical match 防止)" \
+  $'<command-name>/create-pr</command-name>\n{"type":"user","content":"new question after skill done"}' \
+  "$(input_for 'gh pr create --base dev')" \
+  0 "permissionDecision.*deny"
+
+run "marker 後に tool_result + user prompt 両方 (拒否)" \
+  $'<command-name>/create-pr</command-name>\n{"type":"user","content":[{"tool_use_id":"toolu_01","type":"tool_result"}]}\n{"type":"user","content":"another task"}' \
+  "$(input_for 'gh pr create --base dev')" \
+  0 "permissionDecision.*deny"
+
 echo ""
 echo "== 既存挙動の維持 =="
 run "echo bypass" \
