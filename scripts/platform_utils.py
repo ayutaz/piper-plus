@@ -41,4 +41,7 @@ def force_utf8_output() -> None:
         try:
             reconfigure(encoding="utf-8")
         except (OSError, ValueError):
+            # Stream is already UTF-8, detached, or backed by a console that
+            # rejects reconfiguration — keeping the original encoding is the
+            # safe fallback, so the failure is intentionally swallowed.
             pass

@@ -3234,7 +3234,7 @@ multilingual = [
     { name = "pypinyin" },
 ]
 preprocess = [
-    { name = "piper-phonemize", marker = "sys_platform == 'darwin'" },
+    { name = "piper-phonemize", marker = "platform_machine == 'x86_64' and sys_platform == 'darwin'" },
 ]
 test = [
     { name = "coverage", extra = ["toml"] },
@@ -3318,7 +3318,7 @@ requires-dist = [
     { name = "onnxruntime-gpu", marker = "extra == 'inference-gpu'", specifier = ">=1.17" },
     { name = "onnxscript", specifier = ">=0.7.0" },
     { name = "onnxsim-prebuilt", marker = "extra == 'train'" },
-    { name = "piper-phonemize", marker = "sys_platform == 'darwin' and extra == 'preprocess'", specifier = ">=1.1.0" },
+    { name = "piper-phonemize", marker = "platform_machine == 'x86_64' and sys_platform == 'darwin' and extra == 'preprocess'", specifier = ">=1.1.0" },
     { name = "piper-plus", editable = "src/python_run" },
     { name = "piper-train", extras = ["train"], editable = "src/python" },
     { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=4.6.0" },
