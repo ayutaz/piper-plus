@@ -112,8 +112,53 @@ esac
 # memory: feedback_pr_create_skill_only.md
 # command 先頭 / `&& ` / `; ` 直後の場合のみ block (commit message 等の
 # 引用内文字列は誤発動を避けるため除外)。
+#
+# Skill 経由の判定: transcript_path から「最新の skill activation marker」を取得し、
+# **その marker 以降に user の new prompt がなく**、 marker が指定 skill 名と
+# 一致すれば許可。 marker 後に新 prompt があれば skill flow を抜けたとみなし deny。
+#
+# 検出する 2 種類のマーカー:
+#   1. <command-name>/<name></command-name> — ユーザーが slash command を入力
+#   2. "name":"Skill","input":{"skill":"<name>" — Claude が Skill tool を呼び出し
+# close tag を含めて bash コマンド内の `<command-name>` リテラル文字列を排除する。
+#
+# User new prompt の検出: transcript の `"type":"user"` line から、 tool_result
+# (= `"tool_use_id"` field を持つ) を除外したもの。 marker line 以降にこの種類の
+# line があれば「skill flow から抜けた」と判定して deny。
+#
+# これにより historical match (過去の /create-pr 起動から user が新 prompt を
+# 入れて遷移したケース) を弾けるため、 Copilot review (#502) の「reliable
+# active-skill/recency signal」 要求を満たす。
+is_in_skill() {
+  local skill_name="$1"
+  local tpath
+  tpath=$(extract_field "transcript_path")
+  [ -n "$tpath" ] && [ -r "$tpath" ] || return 1
+  # 最後の skill activation marker の line 番号
+  local marker_line
+  marker_line=$(grep -nE '<command-name>/[a-z-]+</command-name>|"name":"Skill","input":\{"skill":"[^"]+"' "$tpath" 2>/dev/null \
+    | tail -n 1 \
+    | cut -d: -f1)
+  [ -n "$marker_line" ] || return 1
+  # marker line の中身から skill 名を抽出
+  local marker_skill
+  marker_skill=$(awk -v ln="$marker_line" 'NR == ln' "$tpath" \
+    | grep -oE '<command-name>/[a-z-]+</command-name>|"name":"Skill","input":\{"skill":"[^"]+"' \
+    | tail -n 1 \
+    | sed -nE 's|.*<command-name>/([a-z-]+)</command-name>.*|\1|p; s|.*"skill":"([^"]+)".*|\1|p')
+  [ "$marker_skill" = "$skill_name" ] || return 1
+  # marker 以降に user の new prompt があれば skill flow から抜けた → deny
+  local new_prompt_after
+  new_prompt_after=$(awk -v start="$marker_line" 'NR > start && /"type":"user"/ && !/"tool_use_id"/' "$tpath" \
+    | wc -l)
+  [ "$new_prompt_after" -eq 0 ]
+}
+
 case "$CMD" in
   "gh pr create"|"gh pr create "*|*"&& gh pr create"*|*"; gh pr create"*|*"&&gh pr create"*|*";gh pr create"*)
+    if is_in_skill create-pr; then
+      exit 0
+    fi
     deny "gh pr create の直接実行は禁止です。/create-pr skill を使うと watch-pr の auto-chain が発動し、 PR 構造化本文 + CI 監視が一括で起動します。" ;;
 esac
 
