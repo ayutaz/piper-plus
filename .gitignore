@@ -64,6 +64,8 @@ test_windows_build/
 test_results/
 test_ci_binaries/
 build_log.zip
+# CMake/CTest auto-generated (do not commit)
+/Testing/
 # Root test files (should be in src/cpp/tests or src/python/tests)
 /test_*.cpp
 /test_*.c
