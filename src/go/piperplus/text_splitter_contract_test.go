@@ -65,8 +65,8 @@ func loadTextSplitterContract(t *testing.T) textSplitterContract {
 
 func TestTextSplitterContract_FixtureLoadsWithGoSection(t *testing.T) {
 	c := loadTextSplitterContract(t)
-	if c.Runtimes["go"].Strategy != "depth-tracking" {
-		t.Fatalf("Go strategy mismatch: got %q", c.Runtimes["go"].Strategy)
+	if c.Runtimes["go"].Strategy != "post-consume" {
+		t.Fatalf("Go strategy mismatch: got %q (post-consume aligns with Python/Rust canonical)", c.Runtimes["go"].Strategy)
 	}
 }
 
@@ -111,10 +111,9 @@ func TestTextSplitterContract_GoSentenceTerminatorsMatchFixture(t *testing.T) {
 	}
 }
 
-func TestTextSplitterContract_GoDepthTrackingKeepsParensTogether(t *testing.T) {
-	// Behavioral pin: depth-tracking strategy means a sentence terminator
-	// inside parens does NOT trigger a split. (post-consume in Rust/C#/Py
-	// would behave identically here because parens don't open a new chunk.)
+func TestTextSplitterContract_GoPostConsumeBracket(t *testing.T) {
+	// Behavioral pin: post-consume strategy consumes the trailing ')' with the
+	// preceding chunk because it immediately follows '.'. Matches Rust/C#/Py.
 	chunks := SplitSentences("She said (Hello.) Then left.")
 	if len(chunks) != 2 {
 		t.Fatalf("expected 2 chunks, got %d: %#v", len(chunks), chunks)

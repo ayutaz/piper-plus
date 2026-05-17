@@ -7,35 +7,25 @@ import (
 )
 
 // SplitSentences splits text into individual sentences for streaming synthesis.
-// It handles multiple languages: Japanese (。！？), Chinese (。！？), and
+// It handles multiple languages: Japanese (。！？．), Chinese (。！？), and
 // Western (.!?). Punctuation is kept attached to the preceding sentence.
-// Splits inside quotes or parentheses are suppressed.
+// Trailing closing punctuation (e.g. 」 ） ”) is consumed greedily as part
+// of the same sentence so that 「こんにちは。」 stays in one chunk.
 //
-// Limitations:
-//   - Unmatched brackets: If the input contains unclosed brackets or
-//     parentheses, the nesting depth never returns to zero and the
-//     remaining text is emitted as a single unsplit sentence.
-//   - ASCII double-quote ('"'): Handled via a simple toggle, so nested or
-//     unbalanced ASCII double-quotes will desynchronise the in-quote state.
-//     Use Unicode quotes (\u201c/\u201d) for reliable nesting via the
-//     bracket depth mechanism.
+// Mirrors Python/Rust/C++ canonical implementations — see
+// docs/spec/text-splitter-contract.toml for the shared character set spec.
 //
-// SSML envelopes (`<speak>...</speak>`) are preserved as single units per the
-// canonical `text-splitter-contract.toml` spec. If the text begins with
-// `<speak` (after leading whitespace) and contains a matching `</speak>` close
-// tag, the entire envelope is yielded as one unit and only any trailing text
-// after `</speak>` is split using the normal sentence-splitting logic. If the
-// `<speak>` tag is unclosed, the function falls back to normal splitting.
+// SSML envelopes (`<speak>...</speak>`) are preserved as single units. If the
+// text begins with `<speak` (after leading whitespace) and contains a matching
+// `</speak>` close tag, the entire envelope is yielded as one unit and only
+// any trailing text after `</speak>` is split using the normal sentence-
+// splitting logic. If the `<speak>` tag is unclosed, the function falls back
+// to normal splitting.
 func SplitSentences(text string) []string {
 	if len(text) == 0 {
 		return nil
 	}
 
-	// SSML envelope detection: if the text starts with `<speak` (after
-	// leading whitespace) and we find a matching `</speak>` close tag,
-	// preserve the entire envelope as a single unit. Any trailing text
-	// after `</speak>` is split using the normal logic. If the tag is
-	// unclosed, fall back to normal splitting.
 	if envelope, tail, ok := extractSpeakEnvelope(text); ok {
 		var result []string
 		if envelope != "" {
@@ -50,9 +40,11 @@ func SplitSentences(text string) []string {
 	return splitSentencesPlain(text)
 }
 
-// splitSentencesPlain is the SSML-unaware sentence splitter. It is invoked by
+// splitSentencesPlain is the SSML-unaware sentence splitter. Invoked by
 // SplitSentences after stripping any SSML envelope (or directly when no
-// envelope is present).
+// envelope is present). Mirrors the canonical Python implementation in
+// src/python_run/piper/text_splitter.py::split_sentences and the Rust
+// implementation in piper-core/src/streaming.rs::split_sentences_plain.
 func splitSentencesPlain(text string) []string {
 	if len(text) == 0 {
 		return nil
@@ -60,79 +52,36 @@ func splitSentencesPlain(text string) []string {
 
 	var sentences []string
 	var current strings.Builder
-	depth := 0       // nesting depth for brackets/parentheses
-	inQuote := false // toggle for ambiguous ASCII double-quote
 
 	runes := []rune(text)
-	for i := 0; i < len(runes); i++ {
+	n := len(runes)
+	i := 0
+	for i < n {
 		r := runes[i]
-
-		// Track nesting depth.
-		justClosed := false
-		switch {
-		case r == '"':
-			// ASCII double-quote is ambiguous; use toggle.
-			if inQuote {
-				justClosed = true
-			}
-			inQuote = !inQuote
-		case isOpenBracket(r):
-			depth++
-		case isCloseBracket(r) && depth > 0:
-			depth--
-			justClosed = true
-		}
-
 		current.WriteRune(r)
+		i++
 
-		// Only split at top-level (not inside quotes/parens).
-		if depth > 0 || inQuote {
+		if !isSentenceTerminator(r) {
 			continue
 		}
 
-		// Check if closing bracket/quote follows a sentence-ending punct.
-		// e.g., `Hello."` or `元気です。」` — treat closing mark as sentence end.
-		splitHere := isSentenceEnd(r)
-		if !splitHere && justClosed && i > 0 {
-			prev := runes[i-1]
-			splitHere = isSentenceEnd(prev)
+		// Greedily consume trailing closing punctuation (e.g. 」 ） ”) so
+		// that 「こんにちは。」 stays in one chunk. Issue #346.
+		for i < n && isClosingPunctuation(runes[i]) {
+			current.WriteRune(runes[i])
+			i++
 		}
 
-		if !splitHere {
-			continue
+		if s := strings.TrimSpace(current.String()); s != "" {
+			sentences = append(sentences, s)
 		}
+		current.Reset()
 
-		// For CJK sentence-enders, split immediately (no trailing space needed).
-		// Only the actual CJK punctuation triggers an immediate split, not a
-		// closing bracket that happens to follow one (e.g., 「…。」と…).
-		if isCJKSentenceEnd(r) {
-			if s := strings.TrimSpace(current.String()); s != "" {
-				sentences = append(sentences, s)
-			}
-			current.Reset()
-			continue
-		}
-
-		// For Western punctuation (.!?), require whitespace or end-of-string.
-		if i == len(runes)-1 {
-			// End of string.
-			if s := strings.TrimSpace(current.String()); s != "" {
-				sentences = append(sentences, s)
-			}
-			current.Reset()
-			continue
-		}
-
-		next := runes[i+1]
-		if unicode.IsSpace(next) {
-			if s := strings.TrimSpace(current.String()); s != "" {
-				sentences = append(sentences, s)
-			}
-			current.Reset()
+		for i < n && unicode.IsSpace(runes[i]) {
+			i++
 		}
 	}
 
-	// Flush remaining text.
 	if s := strings.TrimSpace(current.String()); s != "" {
 		sentences = append(sentences, s)
 	}
@@ -157,14 +106,12 @@ func SplitTextChunks(text string, maxChars int) []string {
 		curLen := utf8.RuneCountInString(current.String())
 
 		if curLen == 0 {
-			// Start a new chunk.
 			current.WriteString(s)
 			continue
 		}
 
 		// +1 for the joining space.
 		if curLen+1+sLen > maxChars {
-			// Flush current chunk.
 			chunks = append(chunks, current.String())
 			current.Reset()
 			current.WriteString(s)
@@ -174,7 +121,6 @@ func SplitTextChunks(text string, maxChars int) []string {
 		}
 	}
 
-	// Flush remaining.
 	if current.Len() > 0 {
 		chunks = append(chunks, current.String())
 	}
@@ -200,12 +146,9 @@ func extractSpeakEnvelope(text string) (envelope, tail string, ok bool) {
 	if !strings.HasPrefix(trimmed, prefix) {
 		return "", "", false
 	}
-	// Ensure the prefix is followed by `>`, whitespace, or end-of-string so
-	// that e.g. `<speaker>` does not falsely match.
 	if len(trimmed) > len(prefix) {
 		switch trimmed[len(prefix)] {
 		case '>', ' ', '\t', '\n', '\r':
-			// ok — valid `<speak>` or `<speak ...>`.
 		default:
 			return "", "", false
 		}
@@ -229,7 +172,6 @@ func findSpeakClose(text string) int {
 	if len(text) < needleLen {
 		return -1
 	}
-	// Lower-case + upper-case mask for ASCII case-insensitive byte compare.
 	lower := []byte("</speak>")
 	upper := []byte("</SPEAK>")
 	for i := 0; i+needleLen <= len(text); i++ {
@@ -248,50 +190,68 @@ func findSpeakClose(text string) int {
 	return -1
 }
 
-// isSentenceEnd returns true if r is a sentence-ending punctuation mark.
-func isSentenceEnd(r rune) bool {
+// isSentenceEnd is retained for backward compatibility (was used by depth-
+// tracking implementation). Equivalent to isSentenceTerminator.
+//
+// Deprecated: use isSentenceTerminator.
+func isSentenceEnd(r rune) bool { return isSentenceTerminator(r) }
+
+// isSentenceTerminator reports whether r is a sentence-ending terminator.
+// Mirrors docs/spec/text-splitter-contract.toml (7 codepoints).
+func isSentenceTerminator(r rune) bool {
 	switch r {
 	case '.', '!', '?': // Western
 		return true
-	case '\u3002': // 。 CJK fullstop
+	case '。': // 。 CJK fullstop
 		return true
-	case '\uff01': // ！ fullwidth exclamation
+	case '！': // ！ fullwidth exclamation
 		return true
-	case '\uff1f': // ？ fullwidth question
+	case '？': // ？ fullwidth question
 		return true
-	case '\uff0e': // ．fullwidth full stop
+	case '．': // ．fullwidth full stop
 		return true
 	}
 	return false
 }
 
-// isCJKSentenceEnd returns true if r is a CJK sentence-ending punctuation
-// mark that doesn't require trailing whitespace to trigger a split.
-func isCJKSentenceEnd(r rune) bool {
+// isClosingPunctuation reports whether r is a closing punctuation mark that
+// should be consumed greedily after a sentence terminator.
+// Mirrors docs/spec/text-splitter-contract.toml (14 codepoints) and matches
+// Python's _CLOSING_PUNCTUATION / Rust's is_closing_punctuation.
+func isClosingPunctuation(r rune) bool {
 	switch r {
-	case '\u3002', '\uff01', '\uff1f', '\uff0e':
+	case ')', ']', '}', '"', '\'':
+		return true
+	case '」', // 」 Right Corner Bracket
+		'』', // 』 Right White Corner Bracket
+		'）', // ） Fullwidth Right Parenthesis
+		'］', // ］ Fullwidth Right Square Bracket
+		'】', // 】 Right Black Lenticular Bracket
+		'｣', // ｣ Halfwidth Right Corner Bracket
+		'”', // ” Right Double Quotation Mark
+		'’', // ’ Right Single Quotation Mark
+		'»': // » Right-Pointing Double Angle Quotation Mark
 		return true
 	}
 	return false
 }
 
-// isOpenBracket returns true if r is an opening bracket, quote, or paren.
+// isCloseBracket is retained for backward compatibility with external callers
+// (e.g. existing parity helpers). Equivalent to isClosingPunctuation.
+//
+// Deprecated: use isClosingPunctuation, which carries the contract-aligned
+// name. The two are kept in sync.
+func isCloseBracket(r rune) bool {
+	return isClosingPunctuation(r)
+}
+
+// isOpenBracket reports whether r is an opening bracket / quote / paren.
+// Retained for callers that need symmetric matching (e.g. SSML parsing) but
+// no longer used by splitSentencesPlain.
 func isOpenBracket(r rune) bool {
 	switch r {
-	case '(', '[', '{', '\u300c', '\u300e', '\u3010',
-		'\u201c', '\uff08':
-		// ( [ { 「 『 【 \u201c （
-		return true
-	}
-	return false
-}
-
-// isCloseBracket returns true if r is a closing bracket, quote, or paren.
-func isCloseBracket(r rune) bool {
-	switch r {
-	case ')', ']', '}', '\u300d', '\u300f', '\u3011',
-		'\u201d', '\uff09':
-		// ) ] } 」 』 】 \u201d ）
+	case '(', '[', '{', '「', '『', '【',
+		'“', '（':
 		return true
 	}
 	return false
