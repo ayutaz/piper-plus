@@ -70,6 +70,27 @@ export default [
     },
   },
   {
+    // Legacy CommonJS test runners (test/*.js — direct children only; the
+    // modern ESM suite lives under test/js/). They use require()/__dirname,
+    // so they need the CommonJS source type and Node globals (QA finding F2).
+    files: ["test/*.js"],
+    languageOptions: {
+      sourceType: "commonjs",
+      globals: {
+        require: "readonly",
+        module: "readonly",
+        exports: "writable",
+        __dirname: "readonly",
+        __filename: "readonly",
+        process: "readonly",
+        Buffer: "readonly",
+        console: "readonly",
+        setTimeout: "readonly",
+        clearTimeout: "readonly",
+      },
+    },
+  },
+  {
     ignores: [
       "dist/**",
       "node_modules/**",
