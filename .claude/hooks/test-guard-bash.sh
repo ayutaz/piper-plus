@@ -46,8 +46,8 @@ input_no_tx() {
 }
 
 echo "== gh pr create skill-aware guard =="
-run "skill 内 (attributionSkill)" \
-  'random{"attributionSkill":"create-pr"}' \
+run "skill 内 (slash command marker)" \
+  'random<command-name>/create-pr</command-name>more' \
   "$(input_for 'gh pr create --base dev')" \
   0 ""
 
@@ -56,8 +56,13 @@ run "skill 内 (Skill tool record)" \
   "$(input_for 'gh pr create --base dev')" \
   0 ""
 
-run "別 skill (拒否)" \
-  '{"attributionSkill":"watch-pr"}' \
+run "別 skill が最新 (拒否)" \
+  '<command-name>/create-pr</command-name>{"name":"Skill","input":{"skill":"watch-pr"}}' \
+  "$(input_for 'gh pr create --base dev')" \
+  0 "permissionDecision.*deny"
+
+run "bash command 内の <command-name> リテラルは無視 (拒否)" \
+  'echo "<command-name>/create-pr"' \
   "$(input_for 'gh pr create --base dev')" \
   0 "permissionDecision.*deny"
 
