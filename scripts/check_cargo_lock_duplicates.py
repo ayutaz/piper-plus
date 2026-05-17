@@ -18,6 +18,10 @@ import sys
 import tomllib
 from pathlib import Path
 
+from platform_utils import force_utf8_output
+
+force_utf8_output()
+
 ROOT = Path(__file__).resolve().parent.parent
 LOCKFILE = ROOT / "src" / "rust" / "Cargo.lock"
 BASELINE = ROOT / "docs" / "spec" / "cargo-lock-duplicates-baseline.toml"

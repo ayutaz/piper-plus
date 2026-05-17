@@ -31,6 +31,9 @@ import tomllib
 from pathlib import Path
 from typing import Any
 
+from platform_utils import force_utf8_output
+
+force_utf8_output()
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 CONTRACT_PATH = REPO_ROOT / "docs/spec/ssml-contract.toml"

@@ -19,6 +19,10 @@ import subprocess
 import sys
 from pathlib import Path
 
+from platform_utils import force_utf8_output
+
+force_utf8_output()
+
 ROOT = Path(__file__).resolve().parent.parent
 README = ROOT / "README.md"
 FRESHNESS_DAYS = 90

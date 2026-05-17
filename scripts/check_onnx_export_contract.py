@@ -15,6 +15,10 @@ import re
 import sys
 from pathlib import Path
 
+from platform_utils import force_utf8_output
+
+force_utf8_output()
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 EXPORT_ONNX = REPO_ROOT / "src" / "python" / "piper_train" / "export_onnx.py"
 EXPORT_ENCODER = REPO_ROOT / "src" / "python" / "piper_train" / "speaker_encoder" / "export_encoder.py"
