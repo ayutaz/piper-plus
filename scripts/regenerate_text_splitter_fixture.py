@@ -49,7 +49,7 @@ RUNTIME_CLOSING_OMITS: dict[str, list[int]] = {
     "rust": [],  # 14/14 after Issue #346
     "csharp": [],  # 14/14 after Issue #346
     "cpp": [],  # 14/14 after Issue #346
-    "go": [0x0022, 0x0027, 0xFF3D, 0xFF63, 0x2019, 0x00BB],  # 8/14
+    "go": [],  # 14/14 after Issue #346 Go fix
 }
 
 # Codepoints that each runtime currently OMITS from the canonical terminator set.
@@ -67,7 +67,7 @@ RUNTIME_STRATEGY: dict[str, str] = {
     "rust": "post-consume",
     "csharp": "post-consume",
     "cpp": "post-consume",
-    "go": "depth-tracking",
+    "go": "post-consume",
 }
 
 
