@@ -1,3 +1,9 @@
+# Default: treat every file as text with LF line endings unless overridden
+# below. A catch-all is required because per-extension enumeration silently
+# missed *.go / *.rs / *.kt etc., letting Windows check them out as CRLF —
+# which breaks gofmt and the byte-for-byte sync gates (QA finding F1).
+* text=auto eol=lf
+
 # Ensure shell scripts always use LF line endings (required for Docker/Linux)
 *.sh text eol=lf
 

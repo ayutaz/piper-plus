@@ -35,9 +35,22 @@ permissions:
 
 jobs:
   dict-sync:
-    name: data/dictionaries → WASM assets byte-equal
-    runs-on: ubuntu-latest
+    name: data/dictionaries → WASM assets byte-equal (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        # Run on all three OSes. The byte-for-byte sha256 mirror check is
+        # the same class as zh-en-loanword-sync / pua-consistency: a CRLF
+        # checkout on Windows can mask or surface drift an ubuntu-only
+        # matrix never sees. Closes the QA CI-coverage gap.
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    defaults:
+      run:
+        # windows-latest ships Git Bash; the --fix idempotency step uses
+        # `if ! git diff --quiet`, which is bash-only.
+        shell: bash
     steps:
       - uses: actions/checkout@v6.0.2
       - uses: actions/setup-python@v5.6.0

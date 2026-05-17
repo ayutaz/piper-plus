@@ -19,6 +19,10 @@ import re
 import sys
 from pathlib import Path
 
+from platform_utils import force_utf8_output
+
+force_utf8_output()
+
 ROOT = Path(__file__).resolve().parent.parent
 # argparse args が登録される source file。 VitsModel.add_model_specific_args 経由で
 # `--batch-size` 等が追加されるため、 __main__.py と lightning.py の両方を scan する。

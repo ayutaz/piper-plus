@@ -16,6 +16,10 @@ import sys
 import tomllib
 from pathlib import Path
 
+from platform_utils import force_utf8_output
+
+force_utf8_output()
+
 ROOT = Path(__file__).resolve().parent.parent
 
 # 監視対象 pyproject.toml (uv workspace member + 主要 sub-project)。

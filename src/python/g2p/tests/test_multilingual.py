@@ -799,13 +799,19 @@ class TestKoreanG2pk2Unavailable:
             ph.phonemize("안녕하세요")  # 안녕하세요
 
     def test_multilingual_ko_segment_raises_when_g2pk2_missing(self, monkeypatch):
-        """Mixed KO+Latin via MultilingualPhonemizer also raises ImportError."""
+        """Mixed KO+Latin via MultilingualPhonemizer also raises ImportError.
+
+        The Latin segment uses Spanish (rule-based, no optional dependency)
+        rather than English: g2p-en is an *optional* dependency, so when it
+        is also absent the English segment raises its own ImportError first
+        and masks the g2pk2 error this test targets (QA finding F3).
+        """
         self._block_g2pk2(monkeypatch)
         from piper_plus_g2p.multilingual import MultilingualPhonemizer
 
-        p = MultilingualPhonemizer(["ko", "en"], default_latin_language="en")
+        p = MultilingualPhonemizer(["ko", "es"], default_latin_language="es")
         with pytest.raises(ImportError, match="g2pk2"):
-            p.phonemize("Hello 안녕")  # Hello 안녕
+            p.phonemize("hola 안녕")  # hola 안녕
 
     @pytest.mark.xfail(
         strict=False,

@@ -29,6 +29,10 @@ import json
 import sys
 from pathlib import Path
 
+from platform_utils import force_utf8_output
+
+force_utf8_output()
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 CONTRACT_PATH = REPO_ROOT / "docs/reference/speaker-encoder-contract.md"
 LAYER1_FIXTURE = REPO_ROOT / "test/fixtures/speaker_encoder_golden.json"

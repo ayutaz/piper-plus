@@ -17,6 +17,10 @@ import ast
 import sys
 from pathlib import Path
 
+from platform_utils import force_utf8_output
+
+force_utf8_output()
+
 ROOT = Path(__file__).resolve().parent.parent
 
 # Test root candidates — pytest collects from these.

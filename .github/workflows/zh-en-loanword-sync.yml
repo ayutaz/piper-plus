@@ -44,9 +44,16 @@ permissions:
 
 jobs:
   json-sync:
-    name: 9 zh_en_loanword.json copies match Python source
-    runs-on: ubuntu-latest
+    name: zh_en_loanword.json copies match Python source (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        # The byte-for-byte hash check is line-ending sensitive. Run it on
+        # Windows / macOS too so a CRLF-checkout regression (e.g. a missing
+        # .gitattributes rule) is caught at PR time, not only in local QA.
+        os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
       - uses: actions/checkout@v6.0.2
       - uses: actions/setup-python@v5.6.0

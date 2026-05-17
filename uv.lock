@@ -3064,8 +3064,6 @@ source = { registry = "https://pypi.org/simple" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/38/23/64a9fae86b5aedd3a3b0aab942f41237aebe74e2d28e3364880d1bfa7e47/piper_phonemize-1.1.0-cp311-cp311-macosx_10_14_x86_64.whl", hash = "sha256:d4b9265213ab53275d52318c18226c30c1cde5ab6d829f73c6ae6b8deb49e612", size = 16031645, upload-time = "2024-03-11T20:39:26.736Z" },
     { url = "https://files.pythonhosted.org/packages/d2/d0/04c99158daa29bad5f6e7f981cdc423556b77d2194f744b319094142651b/piper_phonemize-1.1.0-cp311-cp311-macosx_13_0_x86_64.whl", hash = "sha256:a021b6e49e26e14246579d01264353880f261be66c03ab7cb353d28ed49a59a2", size = 16062184, upload-time = "2024-03-11T20:39:30.167Z" },
-    { url = "https://files.pythonhosted.org/packages/6f/eb/02440084802648a3e074c0db9a72dfbbce35f4110ed3db085129d5dca7bc/piper_phonemize-1.1.0-cp311-cp311-manylinux_2_28_aarch64.whl", hash = "sha256:793077437584cf314a6d49c9c6d9d655b4c373391da5384e832208aa80402949", size = 24508707, upload-time = "2023-07-31T21:23:46.463Z" },
-    { url = "https://files.pythonhosted.org/packages/b8/b7/a8fc2584d509ca36d5713693d675a88f80e4c3725e16a8c7ff1451f0ba99/piper_phonemize-1.1.0-cp311-cp311-manylinux_2_28_x86_64.whl", hash = "sha256:c1062e00c94835e9115df7ce1d7b3b5c40c6d845cd70b2c121954faf5b8d23c7", size = 24955361, upload-time = "2023-07-31T21:23:25.311Z" },
     { url = "https://files.pythonhosted.org/packages/6e/8b/df9da36b29664db0883beb0d2c36b7b4bf6e683fef16dea2195742525b99/piper_phonemize-1.1.0-cp312-cp312-macosx_13_0_x86_64.whl", hash = "sha256:9c5401dc49ca868f988d88d48e592ec39a10e3fedde994c884854a6c0f44f634", size = 16061014, upload-time = "2024-03-11T20:39:33.494Z" },
 ]
 
@@ -3236,7 +3234,7 @@ multilingual = [
     { name = "pypinyin" },
 ]
 preprocess = [
-    { name = "piper-phonemize" },
+    { name = "piper-phonemize", marker = "python_full_version < '3.13' and platform_machine == 'x86_64' and sys_platform == 'darwin'" },
 ]
 test = [
     { name = "coverage", extra = ["toml"] },
@@ -3320,7 +3318,7 @@ requires-dist = [
     { name = "onnxruntime-gpu", marker = "extra == 'inference-gpu'", specifier = ">=1.17" },
     { name = "onnxscript", specifier = ">=0.7.0" },
     { name = "onnxsim-prebuilt", marker = "extra == 'train'" },
-    { name = "piper-phonemize", marker = "extra == 'preprocess'", specifier = ">=1.1.0" },
+    { name = "piper-phonemize", marker = "python_full_version < '3.13' and platform_machine == 'x86_64' and sys_platform == 'darwin' and extra == 'preprocess'", specifier = ">=1.1.0" },
     { name = "piper-plus", editable = "src/python_run" },
     { name = "piper-train", extras = ["train"], editable = "src/python" },
     { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=4.6.0" },

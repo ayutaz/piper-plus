@@ -17,6 +17,10 @@ import subprocess
 import sys
 from pathlib import Path
 
+from platform_utils import force_utf8_output
+
+force_utf8_output()
+
 ROOT = Path(__file__).resolve().parent.parent
 WARN_DAYS = 180  # 6 months
 
@@ -49,7 +53,15 @@ def _list_tracked_files() -> list[Path]:
     """git ls-files で tracked file のみ列挙 (untracked / gitignored を排除)。"""
     try:
         out = subprocess.check_output(
-            ["git", "ls-files"], cwd=ROOT, text=True, stderr=subprocess.DEVNULL
+            ["git", "ls-files"],
+            cwd=ROOT,
+            text=True,
+            # Decode git output as UTF-8 explicitly: text=True alone uses the
+            # locale codec (cp932 on Japanese Windows) and crashes on non-ASCII
+            # paths / blame metadata (QA finding F6).
+            encoding="utf-8",
+            errors="replace",
+            stderr=subprocess.DEVNULL,
         )
     except (subprocess.CalledProcessError, FileNotFoundError):
         return []
@@ -79,6 +91,11 @@ def _blame_date(path: Path, lineno: int) -> dt.date | None:
             cwd=ROOT,
             stderr=subprocess.DEVNULL,
             text=True,
+            # git blame --porcelain carries author names / commit summaries
+            # that are UTF-8; decode explicitly so non-ASCII does not crash
+            # under a cp932/cp1252 locale (QA finding F6).
+            encoding="utf-8",
+            errors="replace",
         )
     except (subprocess.CalledProcessError, FileNotFoundError):
         return None

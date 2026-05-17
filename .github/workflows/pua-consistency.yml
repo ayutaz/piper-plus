@@ -53,9 +53,15 @@ permissions:
 
 jobs:
   cross-runtime-table-consistency:
-    name: All 7 runtime PUA tables match pua.json
-    runs-on: ubuntu-latest
+    name: All 7 runtime PUA tables match pua.json (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        # PUA byte-sync is line-ending sensitive — run on Windows / macOS
+        # too so a CRLF-checkout regression is caught at PR time.
+        os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
       - uses: actions/checkout@v6.0.2
       - uses: actions/setup-python@v5.6.0
@@ -69,6 +75,9 @@ jobs:
       # exits non-zero with --check-version. Catches regressions in the
       # version-comparison regex / parser without needing a separate harness.
       - name: Meta-test (gate fails on intentional version drift)
+        # bash on all three OSes (windows-latest ships Git Bash) for the
+        # `if ! git diff` guard below.
+        shell: bash
         run: |
           python scripts/test_sync_gates_meta.py
           # Restore must have run; assert tree is clean for the next jobs.

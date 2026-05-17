@@ -39,8 +39,16 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# piper-phonemize 1.1.0 only publishes macOS x86_64 wheels for CPython
+# 3.11 / 3.12 (no sdist, no Linux/Windows wheel, no Apple Silicon wheel,
+# no cp313 wheel), so every other interpreter/platform fails hard. The
+# marker restricts the dependency to exactly that matrix — sys_platform
+# AND platform_machine AND python_version — so it is never even attempted
+# elsewhere and `uv sync --all-extras` succeeds by skipping it (QA finding
+# F5). Dataset preprocessing via piper-phonemize is therefore macOS-x86_64
+# + Python 3.11/3.12 only; piper-plus' own G2P does not need it.
 preprocess = [
-    "piper-phonemize>=1.1.0",
+    "piper-phonemize>=1.1.0; sys_platform == 'darwin' and platform_machine == 'x86_64' and python_version < '3.13'",
 ]
 
 inference = [

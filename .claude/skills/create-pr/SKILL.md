@@ -1,229 +1,238 @@
 ---
 name: create-pr
-description: 「PR を作って」「pull request を出して」要求で発動。 push 済みブランチに対し、 機能カテゴリ別の表 + 設計判断 + Test plan を含む構造化 PR 本文を作成。 マイルストーン非付与、 auto-merge 非使用、 後から見て分かる機能ベース構造 (フェーズ表現排除) を強制。
-argument-hint: "[base-branch] [--title <title>]"
+description: 「PR を作って」「pull request を出して」要求で発動。 push → 構造化 PR 本文 (pull_request_template.md 準拠) で PR 作成 → CI 監視ループ → review thread 返信+resolve まで 1 skill で完結。 skill 間 handoff を排除し工程の取りこぼしを防ぐ。 マイルストーン非付与、 auto-merge 非使用。
+argument-hint: "[base-branch] [--title <title>] [--no-watch]"
 disable-model-invocation: false
-allowed-tools: Bash(git log *) Bash(git diff *) Bash(git status *) Bash(git push *) Bash(git rev-parse *) Bash(git remote *) Bash(gh pr create *) Bash(gh pr view *) Bash(gh pr edit *) Bash(cat *) Read Write
+allowed-tools: Bash(git *) Bash(gh *) Bash(sleep *) Bash(python *) Bash(cat *) Read Write ScheduleWakeup TaskList TaskStop
 ---
 
-# PR Creation Helper
+# PR 作成 + CI 監視 + レビュー対応 (end-to-end)
 
-PR 作成の **標準フォーマット** を強制し、 過去のレビュー指摘で繰り返し出てきた構造問題 (時系列フェーズ表記、 機能の不明瞭、 Test plan 欠落、 マイルストーン誤付与) を予防する skill。
+`/create-pr` 1 コマンドで PR ライフサイクル全体を完結する skill:
+
+**push → PR 作成 → CI 監視ループ → review thread 返信 + resolve → 報告**
+
+過去 `/create-pr` → `/watch-pr` → `/reply-review` を別々の skill 呼び出しで連鎖していたが、 「次の skill を Skill ツールで呼べ」 という散文 handoff は LLM が実行を飛ばすと工程が抜ける (PR #496 / #505 で発生)。 本 skill は全工程を **inline フェーズ** として持ち、 skill 間 handoff をゼロにする。
+
+> 単体利用: CI 監視のみ → `/watch-pr <PR#>`、 review 対応のみ → `/reply-review <PR#>`、 backlog 集計 → `/check-review-backlog`。 これらは本 skill のフェーズ 5 / 6 と同一手順の standalone 版。
 
 ## 自動発動条件
 
-以下の文脈で LLM が自動判断で本 skill を呼ぶことを想定:
+- 「PR を作って / 出して」「pull request を作って」「この変更で PR にして」「branch を push して PR にして」
 
-- 「PR を作って / 出して」
-- 「pull request を作って」
-- 「この変更で PR にして」
-- 「branch を push して PR にして」
-
-明示呼び出し: `/create-pr` または `/create-pr <base-branch>`
+明示呼び出し: `/create-pr` / `/create-pr <base-branch>` / `/create-pr --no-watch` (PR 作成のみ、 監視ループに入らない)
 
 ## 引数
 
-- `$ARGUMENTS` 空: base = `dev` (memory `feedback_merge_caution`: 通常 dev を base にする)
+- `$ARGUMENTS` 空: base = `dev` (memory `feedback_merge_caution`: 通常 dev を base)
 - `<base-branch>`: 明示指定 (例: `main`)
 - `--title <title>`: title 上書き (デフォルトは最新コミット message から抽出)
+- `--no-watch`: フェーズ 5/6 (CI 監視・review 対応) を skip し PR 作成で終了
 
 ## 制約 (memory 参照)
 
-- **マイルストーン非付与** (memory `feedback_pr_no_milestones`): `--milestone` を一切付けない。 PR body にも「M1」「M2」等の表記を入れない
-- **auto-merge 禁止** (memory `feedback_merge_caution`): `gh pr merge --auto` 等を絶対に使わない。 PR 作成のみで完了、 マージはユーザー判断
-- **本文書き換え禁止** (memory `feedback_pr_body_over_comments`): 既存 PR の更新は `gh pr edit --body-file` で本文置換。 新規コメントで追記しない
-- **--no-verify 禁止** (CLAUDE.md): hook bypass 系オプションを使わない
+- **マイルストーン非付与** (`feedback_pr_no_milestones`): `--milestone` を付けない。 本文に「M1」等も書かない
+- **auto-merge 禁止** (`feedback_merge_caution`): `gh pr merge --auto` 等を使わない。 マージはユーザー判断
+- **本文書き換えは body-file** (`feedback_pr_body_over_comments`): 既存 PR 更新は `gh pr edit --body-file`。 新規コメント追記しない。 review thread への reply はこの制約の対象外
+- **--no-verify 禁止** (CLAUDE.md): hook bypass 系を使わない
+- **review thread の自動 reply は SAFE 系のみ**: stale / Copilot style noise のみ自動 reply+resolve。 人間 reviewer・logic/security 指摘は user 判断 (フェーズ 6)
 
-## フォーマット規定
+## PR 本文フォーマット (重要 — テンプレート準拠必須)
 
-PR title は **70 文字以内** で機能サマリ。 type(scope) prefix (例: `feat(workflow):`, `fix(g2p):`, `docs(spec):`)。
+**PR 本文は `.github/pull_request_template.md` の必須セクションをすべて含むこと。** `validate-pr-body` CI ゲートが以下を検査し、 欠けると PR が必ず red になる (PR #505 で発生した既知バグ — 旧フォーマットはこのゲートを通らなかった):
 
-PR body は以下の **6 セクション** を必ず含める (後から読んで分かる、 機能ベース構造):
+- `## Test Plan` セクションが存在し非空 (**大文字 P**。 `## Test plan` は grep `^## Test Plan` に不一致で fail)
+- `## Risk Level` セクションでチェックボックスがちょうど **1 個** `- [x]`
+- `## Affected Components` セクションでチェックボックス最低 1 個 `- [x]`
 
-### 1. Summary (3 bullet 以内)
+PR title は **70 文字以内**、 `type(scope):` prefix (例 `fix(g2p):` `ci:` `feat(workflow):`)。
 
-- 解決する問題 / 動機 (1-2 行)
-- 変更の規模 (コミット数 / ファイル数 / 行数)
-- design 上の主要トレードオフ (1 行、 必要なら)
+PR 本文は以下を **この順** で含める (1-8 は template 準拠の必須セクション、 9-10 は create-pr 独自の value-add):
 
-時系列表現 (`Phase 1` / `Phase 2` / `S 級` / `A 級` 等) は使わない。 後から読む人にとって意味がない。
+1. `## Summary` — 解決する問題 / 動機 (1-3 文)。 時系列表現 (Phase 1/2) は使わない
+2. `## Affected Components` — 該当を `- [x]`: Python / Rust / C# / C++ / Go / WASM-npm / Docker / CI-CD / Documentation
+3. `## Type` — Bug fix / New feature / Refactoring / Documentation / CI/CD / Dependencies
+4. `## Risk Level` — patch / minor / major の **ちょうど 1 個**を `- [x]` (patch=bugfix/内部, minor=新機能/非破壊, major=破壊的変更)
+5. `## Contract Impact` — `docs/spec/*.toml` 影響。 無ければ `- [x] None`
+6. `## 変更内容` — 機能カテゴリ別の表 `機能名 / 動作 / これがないと起こること` の 3 列
+7. `## 設計判断` — 意思決定の根拠 bullet (conservative/aggressive 判断・誤検出回避・bypass 経路・既存整合)
+8. `## Test Plan` — `- [ ]` で reviewer がそのまま使える具体的手順 (抽象表現禁止)
+9. `## Checklist` — Tests pass locally / No GPL-LGPL deps / Documentation updated
+10. `## Related Issues` — `Closes #N` 等、 無ければ「なし」
 
-### 2. 新規 / 拡張機能 (機能カテゴリ別の表)
-
-カテゴリの例 (PR の性質に応じて選択):
-
-- **PR レビュー支援** (skill / hook)
-- **リリース・ドキュメント整合性** (skill / hook)
-- **Commit 時の drift gate** (pre-commit hook)
-- **Push 前の最終確認** (opt-in pre-push stage)
-- **CI / build 自動化** (workflow)
-- **API / runtime 機能追加** (機能種別: synthesis / G2P / SSML / etc.)
-- **バグ修正 / 性能改善** (修正内容)
-- **ドキュメント / 仕様更新** (spec / migration / reference)
-
-各カテゴリ内は **表形式** で `機能名 / 動作 / 解決する問題 (or インパクト)` の 3 列。 動作は「何がどう動くか」、 解決する問題は「これがないと何が起こるか」。
-
-### 3. 設計判断 / トレードオフ
-
-bullet で意思決定の根拠を残す:
-
-- conservative / aggressive 判断と理由
-- 誤検出回避 / false-positive control の設計
-- bypass 経路 (緊急時の回避策)
-- 既存システムとの整合性 (CI mirror / hook chain 等)
-
-### 4. Test plan (`- [ ]` チェックボックス)
-
-reviewer がそのまま動作確認に使える具体的な手順。 抽象表現 (「動作確認する」) でなく具体的なコマンド or 操作。
-
-### 5. 参考
-
-- canonical truth / spec ファイルへの参照
-- 関連 memory file
-- 関連 PR / issue 番号
-
-### 6. 何を含めないか
-
-- 時系列 (Phase / 開発過程 / 履歴)
-- マイルストーン番号
-- 「LLM が generate した」「Claude Code で作成」等の co-authored note
-- 確認済み bug の説明 (fix した後の説明は冗長)
+禁止: 時系列 (Phase/開発過程)、 マイルストーン番号、 「LLM が生成」 等の co-authored note。
 
 ## 実行手順
 
-### フェーズ 1: ブランチ状態確認 (並列)
+### フェーズ 1: ブランチ状態確認
 
 ```bash
 git status --short
 git log --oneline <base>..HEAD
 git diff --stat <base>..HEAD
 git rev-parse --abbrev-ref HEAD
-git remote -v | head -2
+git rev-parse --abbrev-ref @{u} 2>/dev/null || echo "no-upstream"
 ```
 
-確認項目:
-
-- working tree clean か
-- commit が 1 つ以上 ahead か
-- upstream 設定済みか (新規ブランチは `-u` 必要)
-- remote が SSH か HTTPS か
+確認: working tree、 commit が 1 つ以上 ahead か、 upstream 設定済みか。 ブランチが `dev`/`main` なら停止 (feature ブランチ必須)。
 
 ### フェーズ 2: PR 本文 draft 作成
 
-`git log <base>..HEAD --pretty=format:"%h %s%n%b"` で全 commit のメッセージを読み、 以下を抽出:
+`git log <base>..HEAD --pretty=format:"%h %s%n%b"` で全 commit を読み、 機能カテゴリ・規模・トレードオフを抽出。 上記 10 セクションを埋めて `/tmp/pr-body-<branch-slug>.md` に書き出す。
 
-- 機能カテゴリの自動分類 (commit message の type(scope) と diff の path から)
-- 行数 / ファイル数 (`git diff --stat` の最後の行)
-- 主要トレードオフ (commit body の「why」「設計判断」コメント)
+### フェーズ 2.5: PR 本文 self-check (validate-pr-body 先取り)
 
-draft を `/tmp/pr-body-<branch-slug>.md` に書き出す。 6 セクション構造を埋める。
-
-### フェーズ 3: ユーザー確認 (任意、 conservative)
-
-ユーザーが「確認なしで進める」と指示している場合は省略。 そうでない場合は draft を表示して承認を取る。
-
-### フェーズ 4: push (必要なら)
+push 前に必須セクションを検証する。 1 つでも欠けたら修正してからフェーズ 3 へ:
 
 ```bash
-git push -u origin <branch-name>
+B=/tmp/pr-body-<branch-slug>.md
+for s in "## Summary" "## Affected Components" "## Type" "## Risk Level" "## Contract Impact" "## Test Plan" "## Checklist" "## Related Issues"; do
+  grep -qF "$s" "$B" || echo "MISSING: $s"
+done
+# Risk Level は [x] ちょうど 1 個であること (出力が 1 でなければ fail)
+awk '/^## Risk Level/{f=1;next}/^## /{f=0}f' "$B" | grep -cE '^- \[x\] '
+# Affected Components は [x] 1 個以上
+awk '/^## Affected Components/{f=1;next}/^## /{f=0}f' "$B" | grep -cE '^- \[x\] '
 ```
 
-既に push 済みなら skip。 `git rev-parse @{u}` で upstream の有無を確認。
-
-### フェーズ 5: PR 作成 (or 既存 PR 更新)
-
-新規:
+### フェーズ 3: push
 
 ```bash
+git push -u origin <branch-name>   # upstream 未設定時。 設定済みなら git push
+```
+
+### フェーズ 4: PR 作成 / 既存 PR 更新
+
+`gh pr list --head <branch> --json number` で既存 PR を判定:
+
+```bash
+# 新規
 gh pr create --base <base> --title "<title>" --body-file /tmp/pr-body-<branch-slug>.md
-```
-
-既存 PR (本ブランチに対する PR が既存) の本文書き換え:
-
-```bash
+# 既存 (本ブランチに PR があれば本文置換)
 gh pr edit <PR#> --body-file /tmp/pr-body-<branch-slug>.md
 ```
 
-`gh pr list --head <branch>` で既存 PR 有無を判定。
+`--milestone` は付けない。 PR URL / 番号を控える。
 
-### フェーズ 6: PR 作成直後の auto follow-up chain (自動実行)
+`--no-watch` 指定時はここで終了 (PR URL を報告)。 それ以外はフェーズ 5 へ自動継続 (確認を挟まない)。
 
-PR 作成 / 更新が成功した直後に、 以下の chain を **明示確認なしで** 連続実行する。 過去 (PR #496) で「PR 作成後に review チェックを発動しなかった結果、 5 件の未対応 review に気づくのが遅れた」事例があり、 これを再発防止するための自動化。
+### フェーズ 5: CI 監視ループ (inline — skill handoff なし)
 
-#### Step 6.1: 既存 review の即時チェック
+PR 作成後、 CI を完了まで監視する。 **`/watch-pr` skill は呼ばず以下を本 skill 内で実行する。**
 
-`/check-review-backlog --pr <作成した PR#>` を Skill tool で発動 (= 既存 review コメントがあれば即時表示)。 PR 更新 (`gh pr edit`) の場合は特に重要 — bot レビューが PR 作成から数秒以内に付くため、 直後の check で 5-10 件溜まっていることがある。
+**5.1 ポーリング** — `gh pr checks <PR> --json name,bucket` を取得し bucket (pass/fail/pending/skipping/cancel) を集計。
 
-```text
-Skill(check-review-backlog, "--pr <PR#>")
+**5.2 判定**:
+
+- **pending ≥ 1** → 5.3 (継続監視)
+- **fail = 0 かつ pending = 0** → all green。 フェーズ 6 を実行し all-resolved ならフェーズ 7 で完了報告
+- **fail ≥ 1** → 5.4 (失敗分析) を実行後、 フェーズ 6 → フェーズ 7
+
+**5.3 継続監視 (self-pace)**:
+
+- background watcher が未 arm なら arm する (`Bash` を `run_in_background: true` で):
+  `gh pr checks <PR> --json name,bucket` を ~120s 間隔でポーリングし、 pending=0 になったら集計行を出力して exit するループ。 完了通知でループに再入する。
+- fallback として `ScheduleWakeup(delaySeconds=1800, prompt="/create-pr ...<元の引数>")` を設定。
+- watcher 完了通知 か wakeup で 5.1 に再入。 各再入でフェーズ 6 (review) も実行する。
+- 4 時間以上 pending が続く場合はループを終了し user に報告。
+
+**5.4 失敗分析** — 失敗 job のログを `gh run view <run-id> --log-failed` で fetch し分類:
+
+| 分類 | signature | 推奨アクション |
+|------|-----------|---------------|
+| format drift | `ruff` `cargo fmt` `gofmt` `clippy` 系 | `pre-commit run --all-files` で修復 |
+| test fail | `FAILED` `assert` `panicked` | テスト名を抽出して提示 |
+| build error | `error[E` `cannot find` | ログ提示、 user 方針確認 |
+| flake | `timeout` `network` `rate limit` | `gh run rerun <id> --failed` 提案 |
+| contract drift | `MISMATCH` `OUT OF SYNC` | 該当 `/check-*` skill 案内 |
+| validate-pr-body | `Missing required section` | フェーズ 2 に戻り本文修正 → `gh pr edit --body-file` |
+
+分類結果と推奨アクションを user に提示。 format drift / validate-pr-body は本 skill で修正→push まで実施してよい。 test/build error は user 判断。
+
+### フェーズ 6: review thread 返信 + resolve (inline — skill handoff なし)
+
+CI 監視の各 iteration および all-green 時に **必ず実行する。** `/reply-review` skill は呼ばず以下を実行:
+
+**6.1 未解決 thread 取得**:
+
+```bash
+gh api graphql -f query='
+query($pr: Int!) {
+  repository(owner: "ayutaz", name: "piper-plus") {
+    pullRequest(number: $pr) {
+      reviewThreads(first: 50) { nodes {
+        id isResolved
+        comments(first: 1) { nodes {
+          databaseId path body author { login } originalCommit { oid }
+        } }
+      } }
+    }
+  }
+}' -F pr=<PR> --jq '.data.repository.pullRequest.reviewThreads.nodes[] | select(.isResolved==false)'
 ```
 
-#### Step 6.2: CI 状態の確認 (5 秒待機後)
+**6.2 各 thread を分類**:
 
-CI workflow trigger が確実に登録されるまで 5 秒待ち、 `/watch-pr <PR#>` を Skill tool で発動。 CI が pending / failure ならその場で分類された情報がユーザに表示される。
+- **SAFE-stale**: コメント以降に該当ファイル更新済 (`git log <originalCommit.oid>..HEAD -- <path>` が非空)
+- **SAFE-copilot-style**: Copilot bot (`author.login` = `copilot-pull-request-reviewer` or `*[bot]`) + style noise (`^Consider (using|renaming)\b` `^Optional:` `\bnit:` 等)
+- **REVIEW-human**: author が人間 reviewer
+- **REVIEW-blocker**: Copilot/CodeQL の logic / security / API 指摘 (style noise でない)
 
-```text
-Skill(watch-pr, "<PR#>")
+**6.3 SAFE 系の自動対応** — 各 SAFE thread に REST API で reply → GraphQL で resolve:
+
+```bash
+# reply (in_reply_to は REST の comment databaseId)
+gh api repos/ayutaz/piper-plus/pulls/<PR>/comments --method POST \
+  -F in_reply_to=<databaseId> -f body="対応しました (commit <hash>)。<要約>"
+# resolve (threadId は GraphQL node ID)
+gh api graphql -f query='mutation($id:ID!){resolveReviewThread(input:{threadId:$id}){thread{isResolved}}}' -f id=<threadId>
 ```
 
-#### Step 6.3: 結果の集約報告
+**6.4 REVIEW 系** — 自動 reply / resolve せず、 表形式で user に提示し判断を促す。 user が修正を指示したら: 修正 → commit → push → 該当 thread に reply (commit hash 付き) → resolve。 修正コミット後の reply+resolve を忘れないこと (PR #505 で抜けた工程)。
 
-PR URL + Step 6.1 / 6.2 の結果を 1 メッセージにまとめてユーザに提示:
+> 詳細な分類 regex と API の注意点 (node ID と databaseId の取り違え等) は `reply-review/SKILL.md` を参照。 手順自体は上記で完結している。
+
+### フェーズ 7: 最終報告
 
 ```text
-PR #<N> 作成完了: https://github.com/.../pull/<N>
+PR #<N>: https://github.com/ayutaz/piper-plus/pull/<N>
 
-レビュー状態: <N> 件 unresolved (Step 6.1 の結果)
-CI 状態: <green/red/pending> (Step 6.2 の結果)
+CI: <all green / red N 件 / pending N 件>
+Review: <resolved N 件 / 自動対応 N 件 / user 判断待ち N 件>
 
-次のアクション提案:
-- <unresolved があれば> /reply-review <PR#> で対応
-- <CI red なら> 失敗 job のログ確認
-- <両方 OK なら> merge 判断はユーザに委ねる
+次のアクション:
+- <red なら> 失敗分類と推奨アクション
+- <REVIEW 残あれば> user 判断が必要な thread
+- <all green + resolved 全部> merge 判断は user に委ねる (auto-merge 禁止)
 ```
-
-#### 6.x: chain skip 条件
-
-以下の場合は Step 6.1 / 6.2 を skip:
-
-- ユーザが明示的に「PR 作成だけして」 / 「chain は不要」と指示
-- PR base branch が `dev` / `main` 以外 (feature → feature の PR では auto chain は noise)
-- dry-run 系オプション (実 push しない場合)
 
 ## guard hook 回避
 
-memory: pre-commit / GitHub hook が PR body 内の `--no-verify` 等の禁止文字列で誤検出することがある。 対策:
+PR body 内に `--no-verify` 等の禁止文字列があると pre-commit / GitHub hook が誤検出することがある:
 
-- PR body には実行コマンドの **抽象表記** を使う (「auto-merge」「hook bypass フラグ」等)
-- どうしても禁止文字列を含めたい場合は `--body-file` 経由で渡す (引数として渡さない)
+- 実行コマンドは抽象表記にする (「auto-merge」「hook bypass フラグ」等)
+- 禁止文字列を含めたい場合は `--body-file` 経由で渡す (引数で渡さない)
 
 ## 使用例
 
 ```text
-# dev base に PR 作成 (自動発動でも明示でも同じ)
-/create-pr
-
-# main base 指定
-/create-pr main
-
-# title 上書き
-/create-pr --title "fix(g2p): 中国語 loanword の正規化漏れ修正"
-
-# 既存 PR の本文更新 (gh pr list で自動判定)
-/create-pr
+/create-pr                          # dev base に PR 作成 → CI 監視 → review 対応まで自動
+/create-pr main                     # main base
+/create-pr --title "fix(g2p): ..."  # title 上書き
+/create-pr --no-watch               # PR 作成のみ (監視ループに入らない)
 ```
 
 ## 関連 skill
 
-- `/watch-pr <PR#>`: PR 作成直後の CI 監視
-- `/reply-review <PR#>`: review 対応
-- `/sync-docs`: PR 作成前のドキュメント整合性監査 (推奨フロー: `/sync-docs` → `/create-pr` → `/watch-pr`)
-- `/release-prep`: リリース PR 専用の情報収集
+- `/watch-pr <PR#>`: 本 skill フェーズ 5 の standalone 版 (既存 PR の CI 監視のみ)
+- `/reply-review <PR#>`: 本 skill フェーズ 6 の standalone 版 (既存 PR の review 対応のみ)
+- `/check-review-backlog`: 全 open PR の未解決 review 集計
+- `/loop /watch-pr <PR#>`: CI を長時間継続監視 (本 skill フェーズ 5 を loop 化)
+- `/sync-docs`: PR 作成前のドキュメント整合性監査 (推奨フロー: `/sync-docs` → `/create-pr`)
 
 ## 期待効果
 
-- PR body の構造を標準化、 reviewer が読みやすい
-- 「フェーズ」「マイルストーン」表記の自動排除
-- Test plan / 設計判断の missing を予防
-- 過去 PR の振り返り時に機能ベースで grep できる (時系列でなく)
-- 「PR 作って」要求で自動発動、 ユーザーが skill 名を覚えなくて良い
+- **skill 間 handoff ゼロ** — push / PR 作成 / CI 監視 / review 対応が 1 skill の連続フェーズ。 「次の skill を呼び忘れて工程が抜ける」 (PR #496 / #505) を構造的に防止
+- PR 本文が `pull_request_template.md` 準拠で `validate-pr-body` を必ず通る
+- PR body の構造標準化、 フェーズ/マイルストーン表記の排除
+- review thread の reply+resolve 漏れ防止
