@@ -331,7 +331,7 @@ cat test.jsonl | uv run python -m piper_train.infer_onnx --model <model.onnx> --
 
 | skill | 用途 |
 |-------|------|
-| `/create-pr` | push 済 branch から構造化 PR 本文を作成 (auto chain で `/watch-pr` / `/check-review-backlog` 発動)。 **`gh pr create` 直接実行は禁止** — watch-pr の auto-chain が走らないため (PR #498 事例)。 hook `.claude/hooks/guard-bash.sh` で block 済み |
+| `/create-pr` | push → 構造化 PR 本文 (pull_request_template.md 準拠) → CI 監視ループ → review thread 返信+resolve まで 1 skill で完結 (skill 間 handoff なし、 工程の取りこぼし防止)。 **`gh pr create` 直接実行は禁止** — 構造化フローを通すため。 hook `.claude/hooks/guard-bash.sh` で block 済み |
 | `/watch-pr <PR>` / `/watch-ci-patterns` | CI 監視、 failure を flake/drift/env/test bug に分類 |
 | `/reply-review <PR>` | unresolved review thread への返信 + resolve |
 | `/check-review-backlog` | open PR の review backlog 集計 |
