@@ -83,10 +83,13 @@ func TestSplitSentences_KeepPunctuation(t *testing.T) {
 	}
 }
 
-func TestSplitSentences_QuotesNotSplit(t *testing.T) {
-	// Periods inside quotes should not cause a split.
+func TestSplitSentences_QuotesGreedyConsume(t *testing.T) {
+	// Canonical behavior: each terminator splits; trailing closing
+	// punctuation (including ASCII '"') is consumed with the preceding chunk.
+	// Mirrors Python/Rust/C++ implementations — see docs/spec/text-splitter-
+	// contract.toml.
 	got := SplitSentences(`He said "Hello. Goodbye." Then left.`)
-	want := []string{`He said "Hello. Goodbye."`, "Then left."}
+	want := []string{`He said "Hello.`, `Goodbye."`, "Then left."}
 
 	if len(got) != len(want) {
 		t.Fatalf("expected %d sentences, got %d: %v", len(want), len(got), got)
@@ -98,9 +101,11 @@ func TestSplitSentences_QuotesNotSplit(t *testing.T) {
 	}
 }
 
-func TestSplitSentences_ParensNotSplit(t *testing.T) {
+func TestSplitSentences_ParensGreedyConsume(t *testing.T) {
+	// Canonical behavior: each '.' triggers a split; trailing ')' is consumed
+	// with the preceding chunk if it immediately follows a terminator.
 	got := SplitSentences("Check (see fig. 1) for details. Done.")
-	want := []string{"Check (see fig. 1) for details.", "Done."}
+	want := []string{"Check (see fig.", "1) for details.", "Done."}
 
 	if len(got) != len(want) {
 		t.Fatalf("expected %d sentences, got %d: %v", len(want), len(got), got)
@@ -114,8 +119,10 @@ func TestSplitSentences_ParensNotSplit(t *testing.T) {
 
 func TestSplitSentences_JapaneseQuotes(t *testing.T) {
 	got := SplitSentences("彼は「元気です。」と言った。終わり。")
-	// The 。 inside 「」 should not split.
-	want := []string{"彼は「元気です。」と言った。", "終わり。"}
+	// Issue #346: closing bracket after CJK terminator triggers split.
+	// Mirrors Python/Rust/C++ canonical behavior — see
+	// docs/spec/text-splitter-contract.toml.
+	want := []string{"彼は「元気です。」", "と言った。", "終わり。"}
 
 	if len(got) != len(want) {
 		t.Fatalf("expected %d sentences, got %d: %v", len(want), len(got), got)
@@ -124,6 +131,64 @@ func TestSplitSentences_JapaneseQuotes(t *testing.T) {
 		if got[i] != want[i] {
 			t.Errorf("sentence[%d]: expected %q, got %q", i, want[i], got[i])
 		}
+	}
+}
+
+func TestSplitSentences_Issue346_CJKClosingBracket(t *testing.T) {
+	// Issue #346 regression: closing bracket after CJK terminator must trigger
+	// an immediate split. Without the fix, the entire input collapses into a
+	// single sentence because the closing bracket prevents the CJK split path
+	// from firing. Mirrors C++ SplitSentencesTest.CJKClosingBracket_* tests.
+	tests := []struct {
+		name  string
+		input string
+		want  []string
+	}{
+		{
+			name:  "basic kakko",
+			input: "「こんにちは。」次の文。",
+			want:  []string{"「こんにちは。」", "次の文。"},
+		},
+		{
+			name:  "double corner bracket",
+			input: "『素晴らしい！』感動した。",
+			want:  []string{"『素晴らしい！』", "感動した。"},
+		},
+		{
+			name:  "fullwidth paren",
+			input: "結果は（成功です。）次へ。",
+			want:  []string{"結果は（成功です。）", "次へ。"},
+		},
+		{
+			name:  "sumitsuki",
+			input: "【テスト。】次。",
+			want:  []string{"【テスト。】", "次。"},
+		},
+		{
+			name:  "consecutive bracketed sentences",
+			input: "「あ。」「い。」う。",
+			want:  []string{"「あ。」", "「い。」", "う。"},
+		},
+		{
+			name:  "fullwidth question mark inside bracket",
+			input: "「本当？」と聞いた。",
+			want:  []string{"「本当？」", "と聞いた。"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := SplitSentences(tt.input)
+			if len(got) != len(tt.want) {
+				t.Fatalf("input %q: expected %d sentences, got %d: %v",
+					tt.input, len(tt.want), len(got), got)
+			}
+			for i := range tt.want {
+				if got[i] != tt.want[i] {
+					t.Errorf("input %q: sentence[%d]: expected %q, got %q",
+						tt.input, i, tt.want[i], got[i])
+				}
+			}
+		})
 	}
 }
 

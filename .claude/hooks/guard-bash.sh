@@ -147,9 +147,12 @@ is_in_skill() {
     | tail -n 1 \
     | sed -nE 's|.*<command-name>/([a-z-]+)</command-name>.*|\1|p; s|.*"skill":"([^"]+)".*|\1|p')
   [ "$marker_skill" = "$skill_name" ] || return 1
-  # marker 以降に user の new prompt があれば skill flow から抜けた → deny
+  # marker 以降に user の new prompt があれば skill flow から抜けた → deny。
+  # Skill tool が invoke 直後に配信する skill body 本文 (`Base directory for
+  # this skill` を含む user-type メッセージ) は tool_result ではないため
+  # tool_use_id を持たないが、 user 入力でもないので除外する。
   local new_prompt_after
-  new_prompt_after=$(awk -v start="$marker_line" 'NR > start && /"type":"user"/ && !/"tool_use_id"/' "$tpath" \
+  new_prompt_after=$(awk -v start="$marker_line" 'NR > start && /"type":"user"/ && !/"tool_use_id"/ && !/Base directory for this skill/' "$tpath" \
     | wc -l)
   [ "$new_prompt_after" -eq 0 ]
 }

@@ -142,14 +142,20 @@
     },
     "go": {
       "closing_punctuation": [
+        34,
+        39,
         41,
         93,
         125,
+        187,
+        8217,
         8221,
         12301,
         12303,
         12305,
-        65289
+        65289,
+        65341,
+        65379
       ],
       "sentence_terminators": [
         33,
@@ -160,7 +166,7 @@
         65294,
         65311
       ],
-      "strategy": "depth-tracking"
+      "strategy": "post-consume"
     }
   }
 }

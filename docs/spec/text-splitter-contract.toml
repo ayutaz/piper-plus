@@ -16,7 +16,7 @@
 #   C++:    src/cpp/piper.cpp                              isClosingPunctuation()
 #   Rust:   src/rust/piper-core/src/streaming.rs           is_closing_punctuation()
 #   C#:     src/csharp/PiperPlus.Core/Phonemize/TextSplitter.cs  IsClosingPunctuation()
-#   Go:     src/go/piperplus/text_splitter.go              isCloseBracket()
+#   Go:     src/go/piperplus/text_splitter.go              isClosingPunctuation()
 #   Python: src/python_run/piper/text_splitter.py          _CLOSING_PUNCTUATION
 #   WASM:   (uses Rust via piper-wasm)
 #
@@ -24,21 +24,21 @@
 #   Issue: https://github.com/ayutaz/piper-plus/issues/346
 #   Spec:  docs/spec/text-splitter-contract.toml (this file)
 #
-# Closing punctuation divergence (as of 2026-05-03):
+# Closing punctuation divergence (as of 2026-05-17):
 #   C++:    14/14 chars (fully conformant after Issue #346)
 #   Rust:   14/14 chars (fully conformant after Issue #346)
 #   C#:     14/14 chars (fully conformant after Issue #346)
 #   Python: 14/14 chars (mirrors Rust streaming.rs)
-#   Go:      8/14 chars (missing U+0022, U+0027, U+FF3D, U+FF63, U+2019, U+00BB)
+#   Go:     14/14 chars (post-consume aligned with canonical)
 #
-# Sentence terminator divergence (as of 2026-05-03):
+# Sentence terminator divergence (as of 2026-05-17):
 #   C++:    7/7 terminators (fully conformant after Issue #346)
 #   Rust:   6/7 terminators (missing U+FF0E)
 #   C#:     6/7 terminators (missing U+FF0E)
 #   Python: 7/7 terminators (fully conformant per spec)
 #   Go:     7/7 terminators (fully conformant)
 #
-# Future work: align all runtimes to the canonical character sets.
+# Future work: align Rust/C# sentence terminators (add U+FF0E).
 
 # ---------------------------------------------------------------------------
 # Closing Punctuation Character Set (14 characters)
@@ -202,16 +202,9 @@ note = "In C++ and Go. Not in Rust/C#. Covers CJK fullwidth period usage."
 # How closing punctuation is handled after sentence terminators.
 # "post-consume": After detecting a sentence terminator, greedily consume
 #                 any following closing punctuation into the same chunk.
-#                 Used by C++, Rust (streaming.rs), C#.
-# "depth-tracking": Track bracket nesting depth; suppress sentence splitting
-#                   while depth > 0. Used by Go.
+#                 Used by all runtimes (C++, Rust, C#, Go, Python).
 #
-# The two approaches produce different results for nested quotes:
+# Example (post-consume canonical):
 #   Input: 彼は「元気です。」と言った。終わり。
-#   post-consume:  ["彼は「元気です。」", "と言った。", "終わり。"]  (3 chunks)
-#   depth-tracking: ["彼は「元気です。」と言った。", "終わり。"]     (2 chunks)
-#
-# This divergence is documented and accepted. Unifying to one approach
-# is a separate initiative.
+#   Output: ["彼は「元気です。」", "と言った。", "終わり。"]  (3 chunks)
 strategy = "post-consume"
-note = "Go uses depth-tracking. This is a known divergence."

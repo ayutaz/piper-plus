@@ -4,19 +4,17 @@ package piperplus
 //
 // Loads tests/fixtures/text_splitter/contract.json and asserts that the Go
 // streaming module's behavior matches the runtimes.go.* projection of the
-// toml-generated fixture. Go uses a depth-tracking strategy (vs post-consume
-// in Python/Rust/C#/C++), so the assertions differ:
+// toml-generated fixture. After Issue #346 Go fix, Go uses post-consume
+// (matching Python/Rust/C#/C++ canonical) with full 14/14 closing-punctuation
+// coverage:
 //
-//   1. Each closing-bracket codepoint listed in runtimes.go.closing_punctuation
-//      keeps the prior sentence atomic when paired with its open bracket.
+//   1. Each closing-punctuation codepoint listed in runtimes.go.closing_punctuation
+//      is greedily consumed after a sentence terminator.
 //   2. Each sentence-terminator codepoint listed in runtimes.go.sentence_terminators
-//      triggers a split.
-//   3. Codepoints listed in canonical.closing_punctuation but ABSENT from
-//      runtimes.go.closing_punctuation are NOT recognized by isCloseBracket
-//      (current divergence — Go's isCloseBracket is an 8/14 subset).
+//      triggers a split (followed by greedy closing-punctuation consume).
 //
-// The drift gate (parity-hub.yml text-splitter matrix entry) ensures the fixture stays in sync
-// with docs/spec/text-splitter-contract.toml.
+// The drift gate (parity-hub.yml text-splitter matrix entry) ensures the
+// fixture stays in sync with docs/spec/text-splitter-contract.toml.
 
 import (
 	"encoding/json"
@@ -65,8 +63,8 @@ func loadTextSplitterContract(t *testing.T) textSplitterContract {
 
 func TestTextSplitterContract_FixtureLoadsWithGoSection(t *testing.T) {
 	c := loadTextSplitterContract(t)
-	if c.Runtimes["go"].Strategy != "depth-tracking" {
-		t.Fatalf("Go strategy mismatch: got %q", c.Runtimes["go"].Strategy)
+	if c.Runtimes["go"].Strategy != "post-consume" {
+		t.Fatalf("Go strategy mismatch: got %q (post-consume aligns with Python/Rust canonical)", c.Runtimes["go"].Strategy)
 	}
 }
 
@@ -111,10 +109,9 @@ func TestTextSplitterContract_GoSentenceTerminatorsMatchFixture(t *testing.T) {
 	}
 }
 
-func TestTextSplitterContract_GoDepthTrackingKeepsParensTogether(t *testing.T) {
-	// Behavioral pin: depth-tracking strategy means a sentence terminator
-	// inside parens does NOT trigger a split. (post-consume in Rust/C#/Py
-	// would behave identically here because parens don't open a new chunk.)
+func TestTextSplitterContract_GoPostConsumeBracket(t *testing.T) {
+	// Behavioral pin: post-consume strategy consumes the trailing ')' with the
+	// preceding chunk because it immediately follows '.'. Matches Rust/C#/Py.
 	chunks := SplitSentences("She said (Hello.) Then left.")
 	if len(chunks) != 2 {
 		t.Fatalf("expected 2 chunks, got %d: %#v", len(chunks), chunks)
