@@ -7,14 +7,16 @@ import torch
 from torch import nn
 
 
-def _onnx_inference(onnx_path, phoneme_ids, prosody_features, noise_scale=0.667):
+def _onnx_inference(
+    onnx_path, phoneme_ids, prosody_features, noise_scale=0.667, noise_scale_w=0.8
+):
     """Run ONNX inference and return audio output."""
     import onnxruntime
 
     session = onnxruntime.InferenceSession(str(onnx_path))
     text = np.expand_dims(np.array(phoneme_ids, dtype=np.int64), 0)
     text_lengths = np.array([text.shape[1]], dtype=np.int64)
-    scales = np.array([noise_scale, 1.0, 0.8], dtype=np.float32)
+    scales = np.array([noise_scale, 1.0, noise_scale_w], dtype=np.float32)
 
     inputs = {
         "input": text,
@@ -75,25 +77,28 @@ class TestStochasticExport:
         sample_phoneme_ids,
         sample_prosody_features,
     ):
-        """Stochastic モードで noise_scale=0 なら deterministic と同等の出力"""
+        """noise_scale=0 + noise_scale_w=0 で stochastic export は deterministic と一致"""
+        # noise_scale_w=0 → SDP の z=randn*0=0、deterministic export の zeros と一致
         audio_det = _onnx_inference(
             temp_onnx_model,
             sample_phoneme_ids,
             sample_prosody_features,
             noise_scale=0.0,
+            noise_scale_w=0.0,
         )
         audio_stoch = _onnx_inference(
             temp_onnx_model_stochastic,
             sample_phoneme_ids,
             sample_prosody_features,
             noise_scale=0.0,
+            noise_scale_w=0.0,
         )
 
         np.testing.assert_allclose(
             audio_det,
             audio_stoch,
             atol=1e-4,
-            err_msg="Stochastic with noise_scale=0 should match deterministic output",
+            err_msg="Zero noise scales: stochastic export must equal deterministic",
         )
 
     def test_stochastic_produces_valid_audio(
@@ -292,7 +297,7 @@ class TestUnifyEmbLang:
 
         model_g = _make_mock_model_g(n_speakers=1, n_languages=6)
 
-        with pytest.raises(ValueError, match="must be 0..5"):
+        with pytest.raises(ValueError, match=r"must be 0..5"):
             unify_emb_lang_weights(model_g, source=10)
 
 
