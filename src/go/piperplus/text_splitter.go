@@ -42,9 +42,13 @@ func SplitSentences(text string) []string {
 
 // splitSentencesPlain is the SSML-unaware sentence splitter. Invoked by
 // SplitSentences after stripping any SSML envelope (or directly when no
-// envelope is present). Mirrors the canonical Python implementation in
-// src/python_run/piper/text_splitter.py::split_sentences and the Rust
-// implementation in piper-core/src/streaming.rs::split_sentences_plain.
+// envelope is present). Implements the post-consume strategy defined by
+// docs/spec/text-splitter-contract.toml — see the canonical Python
+// implementation in src/python_run/piper/text_splitter.py::split_sentences.
+//
+// Note: Go currently recognizes all 7 sentence terminators including
+// U+FF0E (．), whereas Rust/C# omit U+FF0E (tracked as a separate parity
+// follow-up in the contract spec).
 func splitSentencesPlain(text string) []string {
 	if len(text) == 0 {
 		return nil
