@@ -263,6 +263,17 @@ repos:
         files: ^(CHANGELOG\.md|docs/migration/.*\.md|scripts/check_migration_changelog_parity\.py)$
         pass_filenames: false
 
+      # CHANGELOG `[Unreleased] > ### Breaking` entry の anchor link が
+      # 実際に docs/migration/v*.md の見出しに解決するかまで検査する。
+      # v1.12 で migration doc が breaking commit 後追いで作成された問題を
+      # 構造的に塞ぐ (`docs/tickets/M1-2-migration-guide-lint.md`)。
+      - id: migration-guide-lint
+        name: CHANGELOG breaking entries have resolvable migration cross-ref
+        entry: uv run python scripts/check_migration_xref.py
+        language: system
+        files: ^(CHANGELOG\.md|docs/migration/.*\.md|scripts/check_migration_xref\.py)$
+        pass_filenames: false
+
       # Short-text 戦略 (Silence Padding / Dynamic Scales / SSML break 自動
       # 挿入) の cross-runtime drift gate。 既存 CI のみだったものを
       # pre-commit 化。 6 runtime 並列実装の整合維持。

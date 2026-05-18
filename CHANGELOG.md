@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+<!--
+  Breaking changes must be listed under `### Breaking` and each entry must
+  include at least one `[label](docs/migration/v<X>-to-v<Y>.md#anchor)`
+  link. See `docs/migration/README.md` for the anchor slug rules.
+  `scripts/check_migration_xref.py` (workflow `Migration Guide Lint`)
+  enforces this automatically.
+-->
+
 ### Added
 
 #### Kotlin/Android G2P AAR を Maven Central に公開 (Issue #388)
