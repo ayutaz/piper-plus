@@ -1077,7 +1077,7 @@ TEST_F(TrimPaddingByDurationsTest, TruncationMatchesIntCast) {
 // Tier 1 (Issue #499): trimEosRegion — drop EOS region for ALL inputs
 // ======================================================================
 // Mirrors src/python_run/tests/test_short_text_mitigation.py::TestTrimEosRegion
-// so every runtime gets identical behavioural coverage
+// so every runtime gets identical behavioral coverage
 // (cross-runtime contract — Issue #499).
 
 class TrimEosRegionTest : public ::testing::Test {};

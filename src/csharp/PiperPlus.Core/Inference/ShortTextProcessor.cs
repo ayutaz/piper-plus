@@ -349,6 +349,7 @@ public static class ShortTextProcessor
         {
             return audio;
         }
+
         float eosFrames = durations[^1];
         int eosCeil = (int)Math.Ceiling(eosFrames);
         int eosExcess = eosCeil - eosMaxFrames;
@@ -356,11 +357,13 @@ public static class ShortTextProcessor
         {
             return audio;
         }
+
         int trimSamples = eosExcess * hopSize;
         if (trimSamples >= audio.Length)
         {
             return audio;
         }
+
         int newLength = audio.Length - trimSamples;
         var trimmed = new float[newLength];
         Array.Copy(audio, 0, trimmed, 0, newLength);
