@@ -192,6 +192,7 @@ v1.12.0 で 5 ランタイム (Python/Rust/C#/Go/WASM) に展開した SSML / Vo
 - Docker: GitHub Actions runner の disk 枯渇対策 (build artifact prune + buildx cache strategy)。PR #482 (22c78236)
 - CodeQL: `cpp/loop-variable-changed` をルール全体で suppress (false positive 多数のため)。PR #492 (cd6a9d8a)
 - CI: `deploy-huggingface.yml` / `release-shared-lib.yml` に `scripts/generate_model_card.py` 駆動の `MODEL_CARD.md` + `LICENSE_ATTRIBUTIONS.md` 生成 step を注入。 HF Space deploy / GitHub Release artifact に attribution が確実に同梱され、 dataset attribution の脱落を構造的に防止 (M3.2 / PR #511 実装完了)
+- CI: OpenSSF Scorecard を週次 + dev push で実行する `scorecard.yml` を追加 (`docs/proposals/ci-expansion-2026-05.md` §3.6 Week 1 由来、 Top 10 外の supply-chain hardening)。 SARIF を code scanning に upload + `scorecard.dev` に publish、 PR を block しない informational tier
 
 ### Limitations (v1.13.0 iOS xcframework)
 
