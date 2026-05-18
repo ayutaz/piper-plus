@@ -135,5 +135,5 @@ Hypothesis の `@given` で `max_examples=1000` は default の `max_examples=10
 - [親調査: ci-expansion-2026-05.md §3.3](../proposals/ci-expansion-2026-05.md) (Property-based & Fuzzing 拡張)
 - [親調査: ci-expansion-2026-05.md §4](../proposals/ci-expansion-2026-05.md) (批判的観点 — signal-to-noise)
 - [M1 overview](./M1-overview.md) (informational tier と gateway workflow の関係)
-- [feedback memory: feedback_data_asset_distribution.md](../../.claude/memory/) (M4.1 の延長元)
+- feedback memory `feedback_data_asset_distribution.md` (M4.1 の延長元、 ユーザー固有 path)
 - [docs/spec/phoneme-timing-contract.toml](../spec/phoneme-timing-contract.toml) (M4.2 の検査対象 spec)

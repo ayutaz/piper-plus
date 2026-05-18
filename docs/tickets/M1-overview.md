@@ -72,6 +72,6 @@ CI 検出で塞ぐのは事後対応であり、 根本的には **branch protec
 
 - [親マイルストーン: ci-expansion-milestones.md §M1](../proposals/ci-expansion-milestones.md#m1-defensive-foundations)
 - [親調査: ci-expansion-2026-05.md](../proposals/ci-expansion-2026-05.md)
-- [feedback memory: feedback_ci_cancelled_baseline.md](../../.claude/memory/) (PR #419 教訓)
-- [feedback memory: feedback_pr_body_validate_sections.md](../../.claude/memory/) (PR body 構造)
+- feedback memory `feedback_ci_cancelled_baseline.md` (PR #419 教訓、 ユーザー固有 path)
+- feedback memory `feedback_pr_body_validate_sections.md` (PR body 構造、 ユーザー固有 path)
 - [CONTRIBUTING.md](../../CONTRIBUTING.md) (M1.3 で更新予定)
