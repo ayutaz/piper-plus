@@ -76,10 +76,6 @@ piper-plus ドキュメント。利用ガイド・各ランタイム連携・仕
 - [Spec INDEX](spec/README.md) — `.toml` 契約 (PUA / phoneme-timing / SSML / 推論入力など、CI gate 対応)
 - [Reference INDEX](reference/README.md) — `.md` 設計書 (Kotlin/Swift G2P / iOS shared-lib / ZH-EN ランタイム展開 / Model 解決 等)
 
-## Proposals (ロードマップ / 議論起点)
-
-- [CI/CD 拡張 — M-Stretch 詳細実装方針](proposals/ci-expansion-deferred-items.md) — M-Stretch 8 項目を Claude Code 前提で再評価、 Tier 1/2/3 推奨 (親調査 `ci-expansion-2026-05.md` / マイルストーン詳細 `ci-expansion-milestones.md` は PR #511 で実装完了し 2026-05-18 に削除、 履歴は `git log --diff-filter=D -- docs/proposals/`)
-
 ## Migration
 
 - [v1.11 → v1.12](migration/v1.11-to-v1.12.md) — HiFi-GAN/Flask/HTS-voice 削除など
