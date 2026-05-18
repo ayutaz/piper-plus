@@ -1,0 +1,129 @@
+# Typosquatting watch (M3.3)
+# ==========================
+# PyPI / npm / crates.io / NuGet / Maven Central を週次 polling し、
+# `piper-plus` の類似名 (Levenshtein distance ≤ 2 / homograph) package を
+# 検出した場合に GitHub Issue を auto-create する supply-chain 監視 workflow。
+#
+# 本 workflow は schedule (毎週月曜 09:00 UTC) で走り、 PR では走らない。
+# 検出 logic は `scripts/check_typosquatting.py` に集約されており、 PR は
+# 同 script に対する pytest によって test される。
+
+name: Typosquatting Watch
+
+on:
+  schedule:
+    - cron: '0 9 * * 1'  # Mondays 09:00 UTC
+  workflow_dispatch:
+    inputs:
+      max_distance:
+        description: 'Levenshtein max distance (default 2)'
+        required: false
+        default: '2'
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  scan:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6.0.2
+      - uses: actions/setup-python@v6.2.0
+        with:
+          python-version: "3.13"
+
+      - name: Build candidate list
+        # The polling layer is intentionally inline here so it can be
+        # tweaked per-registry without changing the contract that
+        # check_typosquatting.py expects.
+        run: |
+          python - <<'PY'
+          import json, urllib.request, urllib.parse, sys
+          out = {"entries": []}
+
+          def fetch_json(url):
+              req = urllib.request.Request(url, headers={"Accept": "application/json", "User-Agent": "piper-plus-typosquatting-watch/1.0"})
+              with urllib.request.urlopen(req, timeout=20) as resp:
+                  return json.loads(resp.read())
+
+          # PyPI XML-RPC is being deprecated; use the JSON simple index via search shim.
+          try:
+              pypi = fetch_json("https://pypi.org/search/?q=piper&format=json")
+              for hit in pypi.get("results", []) or []:
+                  out["entries"].append({"registry": "pypi", "name": hit.get("name", "")})
+          except Exception as exc:
+              print(f"pypi lookup failed: {exc}", file=sys.stderr)
+
+          try:
+              npm = fetch_json("https://registry.npmjs.org/-/v1/search?text=piper&size=50")
+              for obj in npm.get("objects", []):
+                  out["entries"].append({"registry": "npm", "name": obj.get("package", {}).get("name", "")})
+          except Exception as exc:
+              print(f"npm lookup failed: {exc}", file=sys.stderr)
+
+          try:
+              crates = fetch_json("https://crates.io/api/v1/crates?q=piper&per_page=50")
+              for c in crates.get("crates", []):
+                  out["entries"].append({"registry": "crates", "name": c.get("name", "")})
+          except Exception as exc:
+              print(f"crates lookup failed: {exc}", file=sys.stderr)
+
+          try:
+              nuget = fetch_json("https://azuresearch-usnc.nuget.org/query?q=piper&take=50")
+              for d in nuget.get("data", []):
+                  out["entries"].append({"registry": "nuget", "name": d.get("id", "")})
+          except Exception as exc:
+              print(f"nuget lookup failed: {exc}", file=sys.stderr)
+
+          try:
+              mvn = fetch_json("https://search.maven.org/solrsearch/select?q=piper&rows=50&wt=json")
+              for d in mvn.get("response", {}).get("docs", []):
+                  out["entries"].append({"registry": "maven", "name": d.get("a", "")})
+          except Exception as exc:
+              print(f"maven lookup failed: {exc}", file=sys.stderr)
+
+          with open("/tmp/registry-candidates.json", "w") as fh:
+              json.dump(out, fh, indent=2)
+          print(f"collected {len(out['entries'])} candidate names")
+          PY
+
+      - name: Classify suspects
+        id: classify
+        run: |
+          python scripts/check_typosquatting.py scan \
+            --registry-fixture /tmp/registry-candidates.json \
+            --max-distance "${{ inputs.max_distance || '2' }}" \
+            --output /tmp/typosquatting-report.md
+          if grep -q "suspects: \*\*0\*\*" /tmp/typosquatting-report.md; then
+            echo "has_suspects=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_suspects=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Open / update GitHub Issue on detection
+        if: steps.classify.outputs.has_suspects == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          body_file=/tmp/typosquatting-report.md
+          # Look for an existing open issue with our title prefix so we update instead of spamming.
+          existing=$(gh issue list --search "typosquatting watch in:title state:open" --json number --jq '.[0].number' 2>/dev/null || true)
+          if [ -n "${existing:-}" ]; then
+            gh issue edit "$existing" --body-file "$body_file"
+          else
+            gh issue create \
+              --title "Typosquatting watch: suspicious package(s) detected" \
+              --label "security:typosquatting" \
+              --body-file "$body_file"
+          fi
+
+      - name: Upload report
+        uses: actions/upload-artifact@v4.6.0
+        if: always()
+        with:
+          name: typosquatting-${{ github.run_id }}
+          path: /tmp/typosquatting-report.md
+          retention-days: 365

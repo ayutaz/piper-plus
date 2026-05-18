@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "_comment": "Known false-positive package names. Listed here so the weekly scan does not file repeated GitHub issues for unrelated packages whose name happens to be Levenshtein-close to ours.",
+  "allowed": [
+    "piper",
+    "piper_phonemize",
+    "piper-phonemize",
+    "piper-text-utils",
+    "piperjs"
+  ]
+}

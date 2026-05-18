@@ -191,6 +191,8 @@ check_*.py
 !scripts/diff_public_abi.py
 # Model card / license attribution generator (data-sources.yml driven)
 !scripts/generate_model_card.py
+# Typosquatting watch (registry Levenshtein + homograph scan)
+!scripts/check_typosquatting.py
 create_comprehensive_*.py
 add_missing_*.py
 retrain_*.py
