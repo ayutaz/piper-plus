@@ -1,0 +1,79 @@
+# Rust miri nightly (informational)
+# ==================================
+# `docs/proposals/ci-expansion-2026-05.md` §3.1 Sanitizer 拡張 #8 由来。
+# Top 10 外の sanitizer 軸で、 piper-plus-g2p crate に含まれる 27 箇所の
+# unsafe ブロック (FFI 系を除く Rust internals) に対する Undefined Behavior /
+# stacked borrow / aliasing 違反を nightly miri で検出する。
+#
+# scope:
+#   - piper-plus-g2p crate の non-FFI test のみを対象 (`--skip ffi` で extern
+#     "C" 経由の test を除外、 miri は FFI 不サポート)
+#   - schedule weekly nightly、 PR を block しない informational tier
+#   - failure 時は artifact (miri 出力) を upload、 maintainer が trend 観測
+#
+# 関連: docs/proposals/ci-expansion-2026-05.md §3.1 (Sanitizer 拡張)、
+# 親調査 Top 10 外の §3 横断テーマ。 既存 ASan/UBSan/clang-tidy gate と
+# 重複せず、 Rust 側の memory safety を補完する。
+
+name: Rust miri nightly
+
+on:
+  schedule:
+    - cron: '0 3 * * 0'  # 毎週日曜 UTC 03:00 (週末オフピーク)
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  miri:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60  # miri は通常 cargo test の 10-50x 遅い
+    steps:
+      - uses: actions/checkout@v6.0.2
+
+      - name: Install nightly toolchain with miri
+        run: |
+          rustup toolchain install nightly --component miri --no-self-update
+          rustup +nightly component add rust-src
+          cargo +nightly miri --version
+
+      - name: Cache cargo build
+        uses: actions/cache@v4.2.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            src/rust/target
+          key: ${{ runner.os }}-miri-${{ hashFiles('src/rust/**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-miri-
+
+      - name: cargo +nightly miri test (piper-plus-g2p, non-FFI)
+        working-directory: src/rust
+        env:
+          MIRIFLAGS: "-Zmiri-disable-isolation"
+        # informational tier: failure を artifact 経由で確認、 PR を block しない
+        # `continue-on-error: true` は steps 単位 (set-output で記録可能だが
+        # 本 workflow は単独 job なので job 全体を fail にしない形にする)。
+        continue-on-error: true
+        id: miri_run
+        run: |
+          set -o pipefail
+          cargo +nightly miri test \
+            --package piper-plus-g2p \
+            --lib \
+            -- --skip ffi \
+            2>&1 | tee miri-output.log
+
+      - name: Upload miri output
+        if: always()
+        uses: actions/upload-artifact@v4.6.0
+        with:
+          name: miri-output
+          path: src/rust/miri-output.log
+          retention-days: 30
