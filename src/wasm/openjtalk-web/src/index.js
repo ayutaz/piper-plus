@@ -292,7 +292,12 @@ export function trimEosRegion(
   if (eosExcess <= 0) {
     return audio;
   }
-  const trimSamples = eosExcess * hopSize;
+  // Math.trunc() makes the frame→sample conversion explicit so the truncation
+  // contract holds even when `hopSize` (or any intermediate product) ends up
+  // non-integer — matches Python `int(...)` and Rust `as i64`. Without this
+  // the implementation would rely on TypedArray.subarray()'s implicit index
+  // coercion, which diverges around boundary float values.
+  const trimSamples = Math.trunc(eosExcess * hopSize);
   if (trimSamples >= audio.length) {
     return audio;
   }

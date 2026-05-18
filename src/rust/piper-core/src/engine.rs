@@ -975,7 +975,23 @@ impl OnnxEngine {
             // like the final syllable was repeated. Strategy A above
             // already handles this for padded inputs; this branch applies
             // the same EOS-region drop to long-text outputs.
-            trim_eos_region(&audio_i16_raw, durs, self.hop_size, TRIM_EOS_MAX_FRAMES)
+            //
+            // Implemented in-place (truncate, no allocation/copy) instead of
+            // calling `trim_eos_region` — that helper has to return a fresh
+            // `Vec<i16>` to mirror the Python signature for cross-runtime
+            // byte-equality, but here we already own the buffer and just
+            // want to drop the tail. Keeps the long-text path at O(1)
+            // tail-trim rather than O(n) full-buffer copy.
+            let mut buf = audio_i16_raw;
+            if !durs.is_empty() && self.hop_size > 0 {
+                let eos_ceil = durs[durs.len() - 1].ceil() as i64;
+                let eos_excess = (eos_ceil - TRIM_EOS_MAX_FRAMES as i64).max(0);
+                let trim = (eos_excess * self.hop_size as i64) as usize;
+                if trim > 0 && trim < buf.len() {
+                    buf.truncate(buf.len() - trim);
+                }
+            }
+            buf
         } else {
             audio_i16_raw
         };
