@@ -1,0 +1,70 @@
+# CI Observability Snapshot
+# =========================
+# `docs/proposals/ci-expansion-2026-05.md` §3.9 #1 由来。 Top 10 外の CI
+# observability 拡張で、 M1.1 cancelled baseline alarm (PR 単位の silent skip
+# gate) を補完する trend 観測層。 過去 7 日の workflow run を集計して
+# cancellation_rate / failure_rate / success_rate を JSON artifact に書き出し、
+# threshold 越え (cancel rate > 10%) の workflow を flake watch 候補として
+# 明示する。
+#
+# 関連:
+#   - feedback memory `feedback_ci_cancelled_baseline.md` (PR #419 教訓)
+#   - M1.1 `scripts/check_required_gate.py` / `required_status_check_gate.yml`
+#   - `/watch-ci-patterns` skill (本 snapshot は同 skill の data layer 候補)
+#
+# 設計判断:
+#   - schedule weekly (毎週月曜 08:00 UTC)、 PR トリガーなし (PR は M1.1 が
+#     カバー、 本 workflow は trend のみ)
+#   - artifact 保持 90 日、 dashboard UI は別 PR / 後続作業に分離 (yagni)
+#   - informational tier (PR を block しない、 trend 観測のみ)
+
+name: CI Observability Snapshot
+
+on:
+  schedule:
+    - cron: '0 8 * * 1'  # 月曜 UTC 08:00 (typosquatting=09:00 / first-pr-health=月曜帯と隣接、 1 時間ずらして並走負荷を分散)
+  workflow_dispatch:
+    inputs:
+      days:
+        description: 'Window size in days (default 7)'
+        required: false
+        default: '7'
+      cancel_threshold:
+        description: 'Flake watch cancellation_rate threshold (default 0.10)'
+        required: false
+        default: '0.10'
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6.0.2
+
+      - uses: actions/setup-python@v6.2.0
+        with:
+          python-version: "3.13"
+
+      - name: Run snapshot
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python scripts/ci_observability_snapshot.py \
+            --days "${{ github.event.inputs.days || '7' }}" \
+            --cancel-threshold "${{ github.event.inputs.cancel_threshold || '0.10' }}" \
+            --output ci-observability.json
+
+      - name: Upload snapshot artifact
+        uses: actions/upload-artifact@v4.6.0
+        with:
+          name: ci-observability-snapshot
+          path: ci-observability.json
+          retention-days: 90
