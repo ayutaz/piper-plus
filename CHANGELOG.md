@@ -193,6 +193,7 @@ v1.12.0 で 5 ランタイム (Python/Rust/C#/Go/WASM) に展開した SSML / Vo
 - CodeQL: `cpp/loop-variable-changed` をルール全体で suppress (false positive 多数のため)。PR #492 (cd6a9d8a)
 - CI: `deploy-huggingface.yml` / `release-shared-lib.yml` に `scripts/generate_model_card.py` 駆動の `MODEL_CARD.md` + `LICENSE_ATTRIBUTIONS.md` 生成 step を注入。 HF Space deploy / GitHub Release artifact に attribution が確実に同梱され、 dataset attribution の脱落を構造的に防止 (M3.2 / PR #511 実装完了)
 - CI: OpenSSF Scorecard を週次 + dev push で実行する `scorecard.yml` を追加 (`docs/proposals/ci-expansion-2026-05.md` §3.6 Week 1 由来、 Top 10 外の supply-chain hardening)。 SARIF を code scanning に upload + `scorecard.dev` に publish、 PR を block しない informational tier
+- CI: `scripts/check_changelog_format.py` + `changelog-format.yml` + pre-commit hook (`changelog-format`) で keep-a-changelog 形式 validator を追加 (`docs/proposals/ci-expansion-2026-05.md` §3.7 Tier S #1 由来)。 H1 / Unreleased / バージョン header date format / 降順を error tier、 セクション名 / 重複を warning tier として検査。 既存 historic な絵文字付きセクションは bootstrap baseline として allowlist 化
 
 ### Limitations (v1.13.0 iOS xcframework)
 

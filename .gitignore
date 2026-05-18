@@ -197,6 +197,8 @@ check_*.py
 !scripts/fuzz_forward_compat.py
 # Phoneme timing monotonicity property test
 !scripts/check_timing_monotonicity.py
+# CHANGELOG keep-a-changelog format validator (proposals §3.7 Tier S #1)
+!scripts/check_changelog_format.py
 create_comprehensive_*.py
 add_missing_*.py
 retrain_*.py

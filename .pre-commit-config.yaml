@@ -274,6 +274,17 @@ repos:
         files: ^(CHANGELOG\.md|docs/migration/.*\.md|scripts/check_migration_xref\.py)$
         pass_filenames: false
 
+      # CHANGELOG.md が keep-a-changelog 形式に従っているかを検査
+      # (H1 / Unreleased / バージョン header date format / 降順)。
+      # M1.2 (anchor link 強制) と相補的に「CHANGELOG.md 自体の format drift」
+      # を防ぐ。 `docs/proposals/ci-expansion-2026-05.md` §3.7 Tier S #1 由来。
+      - id: changelog-format
+        name: CHANGELOG.md keep-a-changelog format check
+        entry: uv run python scripts/check_changelog_format.py
+        language: system
+        files: ^CHANGELOG\.md$
+        pass_filenames: true
+
       # Short-text 戦略 (Silence Padding / Dynamic Scales / SSML break 自動
       # 挿入) の cross-runtime drift gate。 既存 CI のみだったものを
       # pre-commit 化。 6 runtime 並列実装の整合維持。

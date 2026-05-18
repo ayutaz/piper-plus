@@ -1,0 +1,42 @@
+# CHANGELOG Format
+# ================
+# `docs/proposals/ci-expansion-2026-05.md` §3.7 Tier S #1 由来。 Top 10 外の
+# docs / i18n / CHANGELOG 拡張で、 M1.2 migration-guide-lint (anchor link 強制)
+# と相補的に「CHANGELOG.md 自体の keep-a-changelog 形式 drift」 を error tier
+# (H1 / Unreleased / バージョン header date / 降順) と warning tier (セクション
+# 名 / 重複) に分けて検査する。
+#
+# 関連: docs/proposals/ci-expansion-2026-05.md §3.7 (Docs / i18n / CHANGELOG)。
+
+name: CHANGELOG Format
+
+on:
+  pull_request:
+    branches: [dev, main]
+    paths:
+      - 'CHANGELOG.md'
+      - 'scripts/check_changelog_format.py'
+      - '.github/workflows/changelog-format.yml'
+      - 'tests/scripts/test_check_changelog_format.py'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6.0.2
+
+      - uses: actions/setup-python@v6.2.0
+        with:
+          python-version: "3.13"
+
+      - name: Validate CHANGELOG.md format
+        run: python scripts/check_changelog_format.py CHANGELOG.md
