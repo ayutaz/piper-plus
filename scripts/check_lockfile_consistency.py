@@ -32,6 +32,11 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+from platform_utils import force_utf8_output
+
+
+force_utf8_output()
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 # (relative_path, runtime_label, hard_required)
@@ -77,8 +82,10 @@ def check() -> int:
         for entry in empty:
             print(f"  empty (required):   {entry}", file=sys.stderr)
         if missing_soft:
-            print("  (soft-required lockfiles also missing — see warnings below)",
-                  file=sys.stderr)
+            print(
+                "  (soft-required lockfiles also missing — see warnings below)",
+                file=sys.stderr,
+            )
             for entry in missing_soft:
                 print(f"    soft-missing: {entry}", file=sys.stderr)
         return 1
@@ -87,11 +94,15 @@ def check() -> int:
         print("warning: optional lockfiles not yet committed:")
         for entry in missing_soft:
             print(f"  soft-missing: {entry}")
-        print("  Run `dotnet restore` / `./gradlew :<module>:dependencies "
-              "--write-locks` and commit the generated lockfile.")
+        print(
+            "  Run `dotnet restore` / `./gradlew :<module>:dependencies "
+            "--write-locks` and commit the generated lockfile."
+        )
 
-    print(f"OK: {len(LOCKFILES) - len(missing_soft)} lockfile(s) present, "
-          f"{len(missing_soft)} soft-missing.")
+    print(
+        f"OK: {len(LOCKFILES) - len(missing_soft)} lockfile(s) present, "
+        f"{len(missing_soft)} soft-missing."
+    )
     return 0
 
 

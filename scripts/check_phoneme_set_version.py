@@ -21,15 +21,22 @@ Exit code:
   0 = compliant
   1 = mismatch found
 """
+
 import json
 import re
 import sys
 from pathlib import Path
 
+
 try:
     import tomllib  # Python 3.11+
 except ImportError:
     import tomli as tomllib  # type: ignore[no-redef]
+
+from platform_utils import force_utf8_output
+
+
+force_utf8_output()
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SPEC = REPO_ROOT / "docs" / "spec" / "phoneme-set-version.toml"
@@ -116,7 +123,9 @@ def main() -> int:
         actual_count = len(pua["entries"])
     else:
         # Fallback: count any single-codepoint values in the top-level dict
-        actual_count = sum(1 for v in pua.values() if isinstance(v, str) and len(v) == 1)
+        actual_count = sum(
+            1 for v in pua.values() if isinstance(v, str) and len(v) == 1
+        )
 
     print(f"\npua.json: {actual_count} entries discovered")
 

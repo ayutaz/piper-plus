@@ -30,6 +30,11 @@ import sys
 import tomllib
 from pathlib import Path
 
+from platform_utils import force_utf8_output
+
+
+force_utf8_output()
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 CONTRACT_PATH = REPO_ROOT / "docs/spec/language-id-map-contract.toml"
 
@@ -94,9 +99,7 @@ def _extract_inline_python_list(path: Path, expected: list[str]) -> bool:
     return rendered_double in text or rendered_single in text
 
 
-def _extract_inline_substring_map(
-    path: Path, expected_map: dict[str, int]
-) -> bool:
+def _extract_inline_substring_map(path: Path, expected_map: dict[str, int]) -> bool:
     """Check that an inline JSON-shaped literal exists in the source file.
 
     Used for Rust source files where `language_id_map` appears as an embedded
@@ -112,9 +115,7 @@ def _extract_inline_substring_map(
         return True
     # Variant 2: comma + no-space form (`"k":v`).
     body2 = ", ".join(f'"{k}":{v}' for k, v in expected_map.items())
-    if body2 in text:
-        return True
-    return False
+    return body2 in text
 
 
 def _extract_json_field(path: Path, field: str) -> object:
@@ -132,7 +133,9 @@ def main() -> int:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    parser.add_argument("--verbose", action="store_true", help="Print all checked values")
+    parser.add_argument(
+        "--verbose", action="store_true", help="Print all checked values"
+    )
     args = parser.parse_args()
 
     contract = tomllib.loads(CONTRACT_PATH.read_text(encoding="utf-8"))
@@ -166,7 +169,9 @@ def main() -> int:
         values = list(mapping.values())
         if invariants["keys_lowercase"] and any(k != k.lower() for k in keys):
             errors.append(f"  {name}: keys_lowercase invariant violated ({keys!r})")
-        if invariants["values_consecutive_from_zero"] and sorted(values) != list(range(len(values))):
+        if invariants["values_consecutive_from_zero"] and sorted(values) != list(
+            range(len(values))
+        ):
             errors.append(
                 f"  {name}: values_consecutive_from_zero invariant violated "
                 f"(values={values!r})"
@@ -174,9 +179,13 @@ def main() -> int:
         if invariants["values_unique"] and len(set(values)) != len(values):
             errors.append(f"  {name}: values_unique invariant violated ({values!r})")
         if invariants["ja_is_zero"] and mapping.get("ja") != 0:
-            errors.append(f"  {name}: ja_is_zero invariant violated (ja={mapping.get('ja')!r})")
+            errors.append(
+                f"  {name}: ja_is_zero invariant violated (ja={mapping.get('ja')!r})"
+            )
         if invariants["en_is_one"] and mapping.get("en") != 1:
-            errors.append(f"  {name}: en_is_one invariant violated (en={mapping.get('en')!r})")
+            errors.append(
+                f"  {name}: en_is_one invariant violated (en={mapping.get('en')!r})"
+            )
     if invariants["values_consecutive_from_zero"]:
         # Cross-form: every shared key must agree across the 6/7/8-lang forms.
         # (Adding sv or ko must NEVER renumber an existing language.)
@@ -296,19 +305,48 @@ def main() -> int:
     }
     # Source-code-ish extensions only — skip binaries, generated files, models.
     sweep_extensions = {
-        ".py", ".rs", ".go", ".cs", ".cpp", ".cc", ".c", ".h", ".hpp",
-        ".js", ".ts", ".mjs", ".cjs", ".json", ".toml", ".yaml", ".yml",
-        ".kt", ".swift",
+        ".py",
+        ".rs",
+        ".go",
+        ".cs",
+        ".cpp",
+        ".cc",
+        ".c",
+        ".h",
+        ".hpp",
+        ".js",
+        ".ts",
+        ".mjs",
+        ".cjs",
+        ".json",
+        ".toml",
+        ".yaml",
+        ".yml",
+        ".kt",
+        ".swift",
     }
     # Directory names to prune entirely (anywhere in path).
     skip_dirs = {
-        "node_modules", "target", "build", "dist", "bin", "obj",
-        "__pycache__", ".pytest_cache", ".venv", "venv", "vendor",
+        "node_modules",
+        "target",
+        "build",
+        "dist",
+        "bin",
+        "obj",
+        "__pycache__",
+        ".pytest_cache",
+        ".venv",
+        "venv",
+        "vendor",
         "pkg",  # Go module cache
         # Tests legitimately exercise edge cases including non-canonical
         # language_id_map literals (e.g. http_server fallback paths). The
         # contract verifies SOURCE drift, not test fixture diversity.
-        "tests", "test", "testdata", "TestData", "fixtures",
+        "tests",
+        "test",
+        "testdata",
+        "TestData",
+        "fixtures",
     }
     forbidden = contract["expected_not_found"]["forbidden_outside_sources"]
     sweep_root = REPO_ROOT / "src"

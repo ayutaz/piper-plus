@@ -63,7 +63,11 @@ import os
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
+
+from platform_utils import force_utf8_output
+
+
+force_utf8_output()
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_BASELINE = REPO_ROOT / "tests" / "fixtures" / "bundle-size-baseline.json"
@@ -78,10 +82,10 @@ DEFAULT_BASELINE = REPO_ROOT / "tests" / "fixtures" / "bundle-size-baseline.json
 class Artifact:
     """One distributable unit on a public registry."""
 
-    package: str       # registry-facing name (e.g. ``piper-plus``)
-    ecosystem: str     # one of ``npm`` / ``nuget`` / ``cargo`` / ``maven``
-    tolerance: float   # fractional, e.g. ``0.03`` for ±3 %
-    glob: str          # POSIX glob relative to REPO_ROOT
+    package: str  # registry-facing name (e.g. ``piper-plus``)
+    ecosystem: str  # one of ``npm`` / ``nuget`` / ``cargo`` / ``maven``
+    tolerance: float  # fractional, e.g. ``0.03`` for ±3 %
+    glob: str  # POSIX glob relative to REPO_ROOT
 
 
 # Per-ecosystem tolerances (kept here to make the policy obvious in review).
@@ -155,14 +159,14 @@ def _baseline_key(art: Artifact) -> str:
     return f"{art.ecosystem}::{art.package}"
 
 
-def _resolve_size_bytes(art: Artifact) -> Optional[int]:
+def _resolve_size_bytes(art: Artifact) -> int | None:
     """Return the on-disk size of the matching artifact, or None."""
     matches = sorted(glob.glob(str(REPO_ROOT / art.glob)))
     if not matches:
         return None
     # If multiple matches (e.g. several versions in target/package), take
     # the newest by mtime so reruns within one CI job stay deterministic.
-    matches.sort(key=lambda p: os.path.getmtime(p))
+    matches.sort(key=os.path.getmtime)
     return os.path.getsize(matches[-1])
 
 
@@ -181,7 +185,11 @@ BASELINE_SCHEMA_VERSION = "1.0"
 
 def _load_baseline(path: Path) -> dict:
     if not path.exists():
-        return {"schema_version": BASELINE_SCHEMA_VERSION, "version": 1, "artifacts": {}}
+        return {
+            "schema_version": BASELINE_SCHEMA_VERSION,
+            "version": 1,
+            "artifacts": {},
+        }
     with path.open(encoding="utf-8") as fh:
         data = json.load(fh)
     declared = data.get("schema_version")
@@ -237,17 +245,17 @@ class Comparison:
     package: str
     ecosystem: str
     tolerance: float
-    baseline: Optional[int]
-    observed: Optional[int]
+    baseline: int | None
+    observed: int | None
 
     @property
-    def delta_bytes(self) -> Optional[int]:
+    def delta_bytes(self) -> int | None:
         if self.baseline is None or self.observed is None:
             return None
         return self.observed - self.baseline
 
     @property
-    def delta_pct(self) -> Optional[float]:
+    def delta_pct(self) -> float | None:
         if self.baseline is None or not self.baseline or self.observed is None:
             return None
         return (self.observed - self.baseline) / self.baseline
@@ -287,7 +295,7 @@ def _compare(baseline: dict, observed: dict) -> list[Comparison]:
 # ---------------------------------------------------------------------------
 
 
-def _fmt_bytes(n: Optional[int]) -> str:
+def _fmt_bytes(n: int | None) -> str:
     if n is None:
         return "n/a"
     if n < 1024:
@@ -297,7 +305,7 @@ def _fmt_bytes(n: Optional[int]) -> str:
     return f"{n / (1024 * 1024):.2f} MiB"
 
 
-def _fmt_pct(p: Optional[float]) -> str:
+def _fmt_pct(p: float | None) -> str:
     if p is None:
         return "n/a"
     return f"{p * 100:+.2f}%"
@@ -317,15 +325,7 @@ def _render_markdown(results: list[Comparison]) -> str:
     ]
     for r in results:
         lines.append(
-            "| {status} | {eco} | `{pkg}` | {base} | {obs} | {delta} | ±{tol:.0%} |".format(
-                status=_emoji(r.status),
-                eco=r.ecosystem,
-                pkg=r.package,
-                base=_fmt_bytes(r.baseline),
-                obs=_fmt_bytes(r.observed),
-                delta=_fmt_pct(r.delta_pct),
-                tol=r.tolerance,
-            )
+            f"| {_emoji(r.status)} | {r.ecosystem} | `{r.package}` | {_fmt_bytes(r.baseline)} | {_fmt_bytes(r.observed)} | {_fmt_pct(r.delta_pct)} | ±{r.tolerance:.0%} |"
         )
     skips = sum(1 for r in results if r.status == "skip")
     fails = sum(1 for r in results if r.status == "fail")

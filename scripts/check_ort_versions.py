@@ -61,6 +61,10 @@ import argparse
 import re
 from pathlib import Path
 
+from platform_utils import force_utf8_output
+
+
+force_utf8_output()
 
 CMAKE_FILE = Path("cmake/OnnxRuntime.cmake")
 

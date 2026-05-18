@@ -50,6 +50,11 @@ import sys
 import tomllib
 from pathlib import Path
 
+from platform_utils import force_utf8_output
+
+
+force_utf8_output()
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 CMAKE_FILE = REPO_ROOT / "cmake" / "ExternalDeps.cmake"
 
@@ -87,9 +92,7 @@ def _find_requirements() -> list[Path]:
     return out
 
 
-_CMAKE_URL_RE = re.compile(
-    r"pyopenjtalk_plus-(\d+\.\d+\.\d+(?:\.post\d+)?)\.tar\.gz"
-)
+_CMAKE_URL_RE = re.compile(r"pyopenjtalk_plus-(\d+\.\d+\.\d+(?:\.post\d+)?)\.tar\.gz")
 
 
 def _extract_cmake_version(path: Path) -> str | None:
@@ -163,7 +166,9 @@ def _extract_pyproject_specs(pyproject: Path) -> list[tuple[str, str]]:
         if isinstance(deps, dict):
             for name, val in deps.items():
                 if "pyopenjtalk" in name.lower():
-                    specs.append((f"{name}{val!s}", f"tool.{tooltable_key}.dependencies"))
+                    specs.append(
+                        (f"{name}{val!s}", f"tool.{tooltable_key}.dependencies")
+                    )
 
     return specs
 
@@ -215,8 +220,14 @@ def _classify_drift(spec: str, cmake_version: str) -> tuple[str, str]:
             major, minor = int(m_compat.group(1)), int(m_compat.group(2))
             cm_parts = cmake_version.split(".post", 1)[0].split(".")
             if int(cm_parts[0]) != major or int(cm_parts[1]) != minor:
-                return ("error", f"~= mismatch ({m_compat.group(0)} vs cmake {cmake_version})")
-        return ("warn", f"packaging library unavailable; only == / ~= checked for {constraint!r}")
+                return (
+                    "error",
+                    f"~= mismatch ({m_compat.group(0)} vs cmake {cmake_version})",
+                )
+        return (
+            "warn",
+            f"packaging library unavailable; only == / ~= checked for {constraint!r}",
+        )
 
     try:
         spec_set = SpecifierSet(constraint)
@@ -231,7 +242,10 @@ def _classify_drift(spec: str, cmake_version: str) -> tuple[str, str]:
     has_strict = any(s.operator in ("==", "~=") for s in spec_set)
     if has_strict:
         return ("error", f"cmake {cmake_version} violates strict pin {constraint!r}")
-    return ("warn", f"cmake {cmake_version} does not satisfy range constraint {constraint!r}")
+    return (
+        "warn",
+        f"cmake {cmake_version} does not satisfy range constraint {constraint!r}",
+    )
 
 
 def main() -> int:

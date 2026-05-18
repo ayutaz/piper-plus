@@ -34,6 +34,11 @@ import sys
 import tomllib
 from pathlib import Path
 
+from platform_utils import force_utf8_output
+
+
+force_utf8_output()
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 CONTRACT = REPO_ROOT / "docs/spec/japanese-n-variant-contract.toml"
 
@@ -122,9 +127,7 @@ def extract_python_trigger_phonemes(py_src: str) -> dict[str, list[str]]:
             # Match `case (...)` / `case [...]` / `case {...}`
             cl = case_literal_re.search(up)
             if cl:
-                triggers[variant] = re.findall(
-                    r"['\"]([^'\"]+)['\"]", cl.group("body")
-                )
+                triggers[variant] = re.findall(r"['\"]([^'\"]+)['\"]", cl.group("body"))
                 break
             # Match `in (...)` possibly multi-line; accumulate until balanced.
             ilm = in_literal_start_re.search(up)

@@ -33,6 +33,11 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 
+from platform_utils import force_utf8_output
+
+
+force_utf8_output()
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SKILLS_DIR = REPO_ROOT / ".claude/skills"
 HOOKS_DIR = REPO_ROOT / ".claude/hooks"
@@ -208,9 +213,7 @@ def main() -> int:
 
     if errors:
         return 1
-    print(
-        f"OK skill-health: {len(skills)} skill(s), {len(hooks)} hook(s) inspected"
-    )
+    print(f"OK skill-health: {len(skills)} skill(s), {len(hooks)} hook(s) inspected")
     return 0
 
 
