@@ -14,9 +14,11 @@ from piper.voice import (
     MIN_PHONEME_IDS,
     SHORT_TEXT_CHARS,
     SILENCE_PAD_MS,
+    TRIM_EOS_MAX_FRAMES,
     TRIM_MIN_SAMPLES,
     TRIM_THRESHOLD_RMS,
     _pad_phoneme_ids,
+    _trim_eos_region,
     _trim_padding_by_durations,
     _trim_silence,
     is_short_text,
@@ -253,6 +255,102 @@ class TestTrimPaddingByDurations:
             audio, durations, front_pad=5, back_pad=5, hop_size=256
         )
         assert np.array_equal(result, audio)
+
+
+# ---------------------------------------------------------------
+# Tier 1 (Issue #499): _trim_eos_region — drop EOS region for ALL inputs
+# ---------------------------------------------------------------
+class TestTrimEosRegion:
+    """EOS-region trim applied to every inference path (long-text included).
+
+    Background: ``VitsModel.infer()`` expands attention with ``ceil(w)`` but
+    exposes the raw float ``w`` as the ``durations`` output. The EOS
+    frame(s) generated under the ``ceil`` expansion carry decoder leakage
+    that sounds like the final syllable was repeated (Issue #499 —
+    ``piper-plus-tsukuyomi-chan`` doubled-tail bug). ``_trim_padding_by_durations``
+    drops the EOS region only when Strategy A short-text padding was
+    applied; ``_trim_eos_region`` applies the same drop to **every** input.
+    """
+
+    @pytest.mark.unit
+    def test_default_strips_full_eos_region(self):
+        """Default eos_max_frames=0 drops ``ceil(durations[-1])`` frames."""
+        # EOS = 2.0 frames → ceil = 2 → 200 samples (hop=100)
+        durations = np.array([1.0, 2.0, 3.0, 2.0], dtype=np.float32)
+        hop = 100
+        total_samples = int(durations.sum() * hop)  # 800
+        audio = np.arange(total_samples, dtype=np.int16)
+        result = _trim_eos_region(audio, durations, hop_size=hop)
+        assert len(result) == total_samples - 200
+        assert np.array_equal(result, audio[:600])
+
+    @pytest.mark.unit
+    def test_default_uses_module_constant(self):
+        """``TRIM_EOS_MAX_FRAMES`` must default to 0 (cross-runtime contract)."""
+        assert TRIM_EOS_MAX_FRAMES == 0
+
+    @pytest.mark.unit
+    def test_applies_ceil_to_fractional_duration(self):
+        """``durations[-1]=1.99`` must trim ``ceil(1.99)=2`` frames, not 1."""
+        # Raw float 1.99 frames; ceil rounds UP to 2 to match the attention
+        # path's ``ceil(w)`` expansion (root cause of Issue #499).
+        durations = np.array([1.0, 1.0, 1.0, 1.99], dtype=np.float32)
+        hop = 256
+        # Use an audio buffer wide enough for the trim to be observable.
+        audio = np.arange(2048, dtype=np.int16)
+        result = _trim_eos_region(audio, durations, hop_size=hop)
+        # ceil(1.99) * 256 = 512 samples dropped
+        assert len(result) == 2048 - 512
+
+    @pytest.mark.unit
+    def test_eos_max_frames_override_keeps_head_of_eos(self):
+        # EOS=10 raw, eos_max_frames=6 → excess = ceil(10) - 6 = 4 frames
+        durations = np.array([2.0, 3.0, 3.0, 10.0], dtype=np.float32)
+        hop = 100
+        audio = np.arange(2000, dtype=np.int16)
+        result = _trim_eos_region(audio, durations, hop_size=hop, eos_max_frames=6)
+        assert len(result) == 2000 - 400
+
+    @pytest.mark.unit
+    def test_no_op_when_eos_below_max(self):
+        # ceil(1.99)=2 ≤ eos_max_frames=4 → no trim
+        durations = np.array([1.0, 1.0, 1.99], dtype=np.float32)
+        hop = 256
+        audio = np.arange(1024, dtype=np.int16)
+        result = _trim_eos_region(audio, durations, hop_size=hop, eos_max_frames=4)
+        assert np.array_equal(result, audio)
+
+    @pytest.mark.unit
+    def test_returns_input_when_durations_empty(self):
+        audio = np.arange(1000, dtype=np.int16)
+        durations = np.array([], dtype=np.float32)
+        result = _trim_eos_region(audio, durations, hop_size=256)
+        assert np.array_equal(result, audio)
+
+    @pytest.mark.unit
+    def test_returns_input_when_hop_size_zero(self):
+        audio = np.arange(1000, dtype=np.int16)
+        durations = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+        result = _trim_eos_region(audio, durations, hop_size=0)
+        assert np.array_equal(result, audio)
+
+    @pytest.mark.unit
+    def test_returns_input_when_trim_exceeds_audio(self):
+        """Safety: if the trim length would consume the buffer, keep audio."""
+        # EOS=5 frames * 100 hop = 500 samples, audio has 200 samples
+        durations = np.array([1.0, 5.0], dtype=np.float32)
+        audio = np.arange(200, dtype=np.int16)
+        result = _trim_eos_region(audio, durations, hop_size=100)
+        assert np.array_equal(result, audio)
+
+    @pytest.mark.unit
+    def test_integer_duration_unaffected_by_ceil(self):
+        """``ceil(2.0) == 2`` — integer-valued durations must trim ``int(d)`` frames."""
+        durations = np.array([1.0, 1.0, 2.0], dtype=np.float32)
+        hop = 100
+        audio = np.arange(400, dtype=np.int16)
+        result = _trim_eos_region(audio, durations, hop_size=hop)
+        assert len(result) == 400 - 200
 
 
 # ---------------------------------------------------------------
@@ -590,7 +688,7 @@ class TestConstants:
 
     @pytest.mark.unit
     def test_trim_threshold_rms(self):
-        assert TRIM_THRESHOLD_RMS == pytest.approx(0.01)
+        assert pytest.approx(0.01) == TRIM_THRESHOLD_RMS
 
     @pytest.mark.unit
     def test_trim_min_samples(self):

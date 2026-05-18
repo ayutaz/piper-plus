@@ -444,6 +444,48 @@ def _trim_padding_by_durations(
     return audio[start:end]
 
 
+def _trim_eos_region(
+    audio: np.ndarray,
+    durations: np.ndarray,
+    hop_size: int,
+    eos_max_frames: int = TRIM_EOS_MAX_FRAMES,
+) -> np.ndarray:
+    """Trim the EOS region from the tail of an audio buffer (Issue #499).
+
+    Why: ``VitsModel.infer()`` expands attention using ``ceil(w)`` but
+    exposes the raw float ``w`` as the ``durations`` output. The EOS
+    frame(s) generated under the ``ceil`` expansion carry decoder leakage
+    that sounds like the final syllable was repeated — clearly audible on
+    fine-tuned models such as ``piper-plus-tsukuyomi-chan`` (Issue #499).
+
+    ``_trim_padding_by_durations`` already drops the EOS region when
+    Strategy A short-text padding was applied. This helper applies the
+    same drop to **every** inference path so long-text outputs are not
+    left with the audible doubled tail.
+
+    How to apply: trims ``max(0, ceil(durations[-1]) - eos_max_frames)
+    * hop_size`` samples from the end of ``audio``. With the default
+    ``TRIM_EOS_MAX_FRAMES = 0`` the entire EOS region is dropped.
+
+    Returns ``audio`` unchanged when inputs are inconsistent (empty
+    durations, non-positive ``hop_size``, or the trim would consume the
+    whole buffer).
+    """
+    if hop_size <= 0:
+        return audio
+    durations_1d = np.asarray(durations).reshape(-1)
+    if durations_1d.size == 0:
+        return audio
+    eos_ceil = int(np.ceil(float(durations_1d[-1])))
+    eos_excess = max(0, eos_ceil - int(eos_max_frames))
+    if eos_excess <= 0:
+        return audio
+    trim_samples = eos_excess * hop_size
+    if trim_samples >= len(audio):
+        return audio
+    return audio[:-trim_samples]
+
+
 def _trim_silence(
     audio: np.ndarray,
     threshold_rms: float = TRIM_THRESHOLD_RMS,
@@ -1025,6 +1067,19 @@ class PiperVoice:
                 )
             else:
                 audio = _trim_silence(audio)
+        elif durations is not None:
+            # Tier 1 workaround for Issue #499: VITS expands attention with
+            # ceil(w) but exposes raw w as durations, so the EOS frame(s)
+            # carry decoder leakage that sounds like the final syllable was
+            # repeated. Strategy A above already drops the EOS region for
+            # padded short text; this branch applies the same drop to every
+            # other input so long-text outputs are not left with the
+            # audible doubled tail.
+            audio = _trim_eos_region(
+                audio,
+                durations,
+                self.config.hop_size,
+            )
 
         return audio.tobytes(), durations, original_phoneme_ids
 
