@@ -313,17 +313,21 @@ jobs:
       - name: Run audio_parity.py compare
         run: |
           mkdir -p /tmp/parity
+          # 注: argparse の `nargs="*"` は同名 flag が複数回現れると
+          # 最後の値で上書きする (Phase 2 のサイレントバグ 原因)。
+          # 6 runtime を「単一 --inputs に複数 RUNTIME=PATH」で渡す。
           declare -a INPUTS=()
           for r in python rust go csharp cpp wasm; do
             wav="/tmp/parity-artifacts/parity-wav-${r}/${r}.wav"
             if [ -f "$wav" ]; then
-              INPUTS+=("--inputs" "${r}=${wav}")
+              INPUTS+=("${r}=${wav}")
             else
               echo "WARN: $wav missing — runtime ${r} will be reported as skipped."
             fi
           done
+          echo "Collected inputs (${#INPUTS[@]} runtimes): ${INPUTS[*]}"
           python scripts/audio_parity.py compare \
-            "${INPUTS[@]}" \
+            --inputs "${INPUTS[@]}" \
             --output /tmp/parity/parity-diff.md
           cat /tmp/parity/parity-diff.md
 
