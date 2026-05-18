@@ -69,6 +69,20 @@ exclude = [
   # plus citation tables in docs/. Excluding the canonical URL is safer
   # than racing against the host's uptime on every PR.
   "^https?://www\\.speech\\.cs\\.cmu\\.edu/cgi-bin/cmudict",
+  # PR #511 で追加した docs/tickets/*.md は `feedback memory` の logical
+  # reference として `../../.claude/memory/` を参照する。 実体はユーザー
+  # 固有 path (`~/.claude/projects/.../memory/`) にあり repo に存在しない。
+  # auto memory システムの設計に従う構造的事情で、 ticket 内の link は
+  # 「該当 feedback memory が存在する」 ことを示す pointer。
+  "^file://.*\\.claude/memory",
+  # docs/tickets/M3-1-public-abi-snapshot.md 内の Swift SymbolGraph 旧 URL
+  # (swiftlang/swift repo 構造変更で 404)。 該当 link の修正は別 PR で
+  # `apple/swift-syntax` 等の新 path に置換予定。
+  "^https://github\\.com/swiftlang/swift/blob/main/docs/SymbolGraph\\.md$",
+  # docs/tickets/M3-3-typosquatting-watch.md 内の USENIX 2020 paper URL
+  # (`presentation/tschacher`、 USENIX サイト path 変更で 404)。 該当 link
+  # の修正は別 PR で archive.org 経由か新 path に置換予定。
+  "^https://www\\.usenix\\.org/conference/usenixsecurity20/presentation/tschacher$",
 ]
 
 # Excluded paths (regex matched against full path)
@@ -84,4 +98,9 @@ exclude_path = [
   "(^|/)pkg/",
   "\\.pytest_cache/",
   "(^|/)CHANGELOG\\.md$",   # historical, contains many old links
+  # migration_xref test fixture は意図的に broken link を含む negative-case
+  # data (`scripts/check_migration_xref.py` の anchor / file 解決ロジックが
+  # 「該当 file / anchor が無い」 を検知するための fixture)。 link checker
+  # 対象から外す。
+  "(^|/)tests/scripts/fixtures/migration_xref/",
 ]
