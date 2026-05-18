@@ -6,6 +6,8 @@
 **調査体制**: 30 エージェント並列調査 (現状監査 10 + 領域別ギャップ分析 10 + 前向き提案 10)
 
 > このドキュメントは「ロードマップ提案」であり、 実装決定ではない。 各項目は採用判断の議論起点として扱う。
+>
+> **実装ステータス (2026-05-18 更新)**: §5 の Top 10 と §3 横断テーマのうち **軽量 5 件** ((1) §3.6 OpenSSF Scorecard 週次 CI 化 / (2) §3.7 Tier S README-ja heading tree parity / (3) §3.7 Tier S CHANGELOG keep-a-changelog validator / (4) §3.9 CI observability snapshot / (5) §3.1 #8 Rust miri nightly) は **PR #511 で実装完了**。 M-Stretch 8 項目の詳細実装方針は [`ci-expansion-deferred-items.md`](./ci-expansion-deferred-items.md) で Claude Code 前提の障壁を再評価済み。
 
 ---
 
@@ -310,6 +312,8 @@ MOS gate は最初 4 週間 informational で false positive 率を測り、 安
 
 ## 関連ドキュメント
 
+- [`ci-expansion-milestones.md`](./ci-expansion-milestones.md) — Top 10 を M1-M3 + M4 + M-Stretch に分解した実装ロードマップ詳細
+- [`ci-expansion-deferred-items.md`](./ci-expansion-deferred-items.md) — M-Stretch 8 項目の Claude Code 前提での障壁再評価 + Tier 1/2/3 推奨
 - [`docs/spec/README.md`](../spec/README.md) — 既存 contract spec の一覧 (19 toml)
 - [`docs/reference/README.md`](../reference/README.md) — 既存設計書の一覧
 - [`docs/migration/v1.11-to-v1.12.md`](../migration/v1.11-to-v1.12.md) — breaking change 事例

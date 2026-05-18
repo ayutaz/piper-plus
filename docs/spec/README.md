@@ -14,6 +14,7 @@ piper-plus の **ランタイム横断 byte-for-byte 整合契約** の目次。
 | Phoneme Set バージョン | [`phoneme-set-version.toml`](phoneme-set-version.toml) | 173 シンボル / PUA v2 |
 | 音素タイミング | [`phoneme-timing-contract.toml`](phoneme-timing-contract.toml) | 全ランタイム JSON/TSV/SRT 出力 |
 | Audio Format | [`audio-format-contract.toml`](audio-format-contract.toml) | WAV 出力 |
+| Audio Parity | [`audio-parity-contract.toml`](audio-parity-contract.toml) | 全ランタイム WAV 階層化等価性 (peak RMS / chromaprint / mel-spec) |
 | Streaming API | [`streaming-api-contract.toml`](streaming-api-contract.toml) | 文単位 yield |
 | Text Splitter | [`text-splitter-contract.toml`](text-splitter-contract.toml) | 句読点ベース文分割 |
 | Short-text 戦略 | [`short-text-contract.toml`](short-text-contract.toml) | Strategy A/B/C |

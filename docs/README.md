@@ -78,8 +78,9 @@ piper-plus ドキュメント。利用ガイド・各ランタイム連携・仕
 
 ## Proposals (ロードマップ / 議論起点)
 
-- [CI/CD 拡張プラン (2026-05)](proposals/ci-expansion-2026-05.md) — Unlimited CI 前提の網羅調査 + 真に追加する価値があるトップ 10 + 3 ヶ月ロードマップ
+- [CI/CD 拡張プラン (2026-05)](proposals/ci-expansion-2026-05.md) — Unlimited CI 前提の網羅調査 + 真に追加する価値があるトップ 10 + 3 ヶ月ロードマップ (Top 10 + §3 軽量 5 件は PR #511 で実装完了)
 - [CI/CD 拡張プラン — マイルストーン詳細](proposals/ci-expansion-milestones.md) — Top 10 を M1-M3 + M4 + M-Stretch に分解、 各 M に目的 / 成功基準 / タスク / 依存 / リスク / 工数を明記 (Top 10 + §3 軽量 5 件は PR #511 で実装完了)
+- [CI/CD 拡張 — M-Stretch 詳細実装方針](proposals/ci-expansion-deferred-items.md) — M-Stretch 8 項目を Claude Code 前提で再評価、 Tier 1/2/3 推奨
 
 ## Migration
 
