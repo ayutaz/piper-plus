@@ -52,5 +52,4 @@ CI は anchor なしを fail にはしません。 ただし strict CI で `--st
 ## 関連 doc
 
 - [CHANGELOG.md](../../CHANGELOG.md) — release notes
-- [docs/proposals/ci-expansion-2026-05.md](../proposals/ci-expansion-2026-05.md#5-真に追加する価値があるトップ-10) — Top 10 #3 親調査 (M1.2 / PR #511 で実装完了)
 - [docs/spec/release-versions.toml](../spec/release-versions.toml) — release version pin
