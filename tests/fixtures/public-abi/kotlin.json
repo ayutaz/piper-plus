@@ -1,0 +1,7 @@
+{
+  "schema_version": 1,
+  "artifact": "io.github.ayutaz:piper-plus-g2p-android",
+  "version_tag": null,
+  "_comment": "Populated by binary-compatibility-validator (api/*.api). Empty until the first green snapshot lands.",
+  "declarations": []
+}

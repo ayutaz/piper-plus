@@ -187,6 +187,8 @@ check_*.py
 !scripts/audio_quality_metrics.py
 # Cross-runtime audio byte parity (SHA256 / RMS / SNR tiers)
 !scripts/audio_parity.py
+# Public ABI snapshot diff (C / Swift / Kotlin)
+!scripts/diff_public_abi.py
 create_comprehensive_*.py
 add_missing_*.py
 retrain_*.py
