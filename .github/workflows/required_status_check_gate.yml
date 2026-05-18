@@ -1,0 +1,95 @@
+# Required Status Check Gate (M1.1)
+# ==================================
+# GitHub branch protection treats `cancelled` and `skipped` workflow runs as
+# a pass (fail-open). PR #419 (memory `feedback_ci_cancelled_baseline`) showed
+# how that lets a baseline collapse merge silently. This workflow is the hub
+# of a hub-and-spoke gateway: it asks the REST API for the latest run of
+# every monitored spoke at `head_sha` and fails if any spoke is missing,
+# cancelled, skipped, failed, or timed out.
+#
+# Why a separate workflow rather than touching the spokes:
+#   - The 18+ contract gates have well-isolated responsibilities; we don't
+#     want to add fail-open guards into each of them.
+#   - Spoke renames / consolidations don't touch branch protection — only
+#     the `MONITORED_WORKFLOWS` env below changes.
+#
+# Add a workflow to MONITORED_WORKFLOWS after it has been green on dev for
+# at least one week (informational tiers from M2/M4 stay off this list).
+
+name: Required Status Check Gate
+
+on:
+  pull_request:
+    branches: [dev]
+    types: [opened, synchronize, reopened]
+  workflow_run:
+    workflows:
+      - Multi-Runtime RTF Benchmark
+      - Memory regression (per-language)
+      - CodeQL
+      - Parity Hub
+      - PUA Consistency Gate
+    types: [completed]
+
+# Avoid self-cancellation when several spokes complete in quick succession;
+# letting the gate be cancelled is exactly the fail-open path we are closing.
+concurrency:
+  group: required-gate-${{ github.event.pull_request.head.sha || github.event.workflow_run.head_sha }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  pull-requests: write
+  actions: read
+
+jobs:
+  gate:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    env:
+      MONITORED_WORKFLOWS: >-
+        Multi-Runtime RTF Benchmark,Memory regression (per-language),CodeQL,Parity Hub,PUA Consistency Gate
+    steps:
+      - uses: actions/checkout@v6.0.2
+
+      - uses: actions/setup-python@v6.2.0
+        with:
+          python-version: "3.13"
+
+      - name: Resolve head_sha and PR number
+        id: ctx
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "sha=${{ github.event.pull_request.head.sha }}" >> "$GITHUB_OUTPUT"
+            echo "pr=${{ github.event.pull_request.number }}" >> "$GITHUB_OUTPUT"
+            echo "base_branch=${{ github.event.pull_request.base.ref }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "sha=${{ github.event.workflow_run.head_sha }}" >> "$GITHUB_OUTPUT"
+            # `workflow_run` doesn't carry the PR number directly; surface the
+            # head branch so the next step can look it up if needed.
+            echo "pr=" >> "$GITHUB_OUTPUT"
+            echo "base_branch=${{ github.event.workflow_run.head_branch }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Aggregate spoke conclusions
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HEAD_SHA: ${{ steps.ctx.outputs.sha }}
+          PR_NUMBER: ${{ steps.ctx.outputs.pr }}
+          BASE_BRANCH: ${{ steps.ctx.outputs.base_branch }}
+        run: |
+          set -euo pipefail
+          extra_args=()
+          if [ -n "${PR_NUMBER}" ]; then
+            extra_args+=("--post-pr-comment" "${PR_NUMBER}")
+          fi
+          if [ -n "${BASE_BRANCH}" ]; then
+            extra_args+=("--branch-for-supersede" "${BASE_BRANCH}")
+          fi
+          python scripts/check_required_gate.py \
+            --head-sha "${HEAD_SHA}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --monitored "${MONITORED_WORKFLOWS}" \
+            --on-cancelled fail \
+            --on-skipped fail \
+            "${extra_args[@]}"

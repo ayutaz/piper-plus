@@ -1,0 +1,23 @@
+{
+  "total_count": 2,
+  "workflow_runs": [
+    {
+      "id": 600001,
+      "name": "Multi-Runtime RTF Benchmark",
+      "head_sha": "0000000000000000000000000000000000000000",
+      "status": "completed",
+      "conclusion": "success",
+      "run_number": 1,
+      "html_url": "https://github.com/owner/repo/actions/runs/600001"
+    },
+    {
+      "id": 600002,
+      "name": "CodeQL",
+      "head_sha": "deadbeef0000000000000000000000000000beef",
+      "status": "completed",
+      "conclusion": "success",
+      "run_number": 1,
+      "html_url": "https://github.com/owner/repo/actions/runs/600002"
+    }
+  ]
+}
