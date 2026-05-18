@@ -657,12 +657,26 @@ void processLine(string line, RunConfig &runConfig, piper::PiperConfig &piperCon
   std::vector<piper::ProsodyFeature> externalProsody;
   const std::vector<piper::ProsodyFeature> *externalProsodyPtr = nullptr;
 
+  // External phoneme IDs (from JSON input). When non-empty, bypasses G2P
+  // entirely and feeds the IDs straight into piper::synthesize. Mirrors
+  // the Rust / Go / C# / Python `phoneme_ids` JSONL contract.
+  std::vector<piper::PhonemeId> externalPhonemeIds;
+
   if (jsonInput) {
     // Each line is a JSON object
     json lineRoot = json::parse(line);
 
-    // Text is required
-    line = lineRoot["text"].get<std::string>();
+    if (lineRoot.contains("phoneme_ids")) {
+      // Direct phoneme IDs path (G2P bypass)
+      for (const auto &id : lineRoot["phoneme_ids"]) {
+        externalPhonemeIds.push_back(id.get<piper::PhonemeId>());
+      }
+      // text becomes optional when phoneme_ids is present
+      line = lineRoot.value("text", std::string{});
+    } else {
+      // Text is required when phoneme_ids is absent
+      line = lineRoot["text"].get<std::string>();
+    }
 
     if (lineRoot.contains("output_file")) {
       // Override output WAV file path
@@ -752,7 +766,13 @@ void processLine(string line, RunConfig &runConfig, piper::PiperConfig &piperCon
 
     // Output audio to automatically-named WAV file in a directory
     ofstream audioFile(outputPath.string(), ios::binary);
-    if (runConfig.rawPhonemes) {
+    if (!externalPhonemeIds.empty()) {
+      // Direct phoneme_ids path (JSONL --json-input bypass G2P)
+      vector<int16_t> audioBuffer;
+      piper::synthesize(externalPhonemeIds, voice.synthesisConfig, voice.session,
+                        audioBuffer, result, &voice);
+      writeWavFromBuffer(audioBuffer, voice.synthesisConfig.sampleRate, audioFile);
+    } else if (runConfig.rawPhonemes) {
       // Parse raw phonemes from input
       auto phonemeType = static_cast<piper::PhonemeTypeInt>(voice.phonemizeConfig.phonemeType);
       auto phonemes = piper::parsePhonemeString(line, phonemeType);
@@ -786,7 +806,13 @@ void processLine(string line, RunConfig &runConfig, piper::PiperConfig &piperCon
 
     // Output audio to WAV file
     ofstream audioFile(outputPath.string(), ios::binary);
-    if (runConfig.rawPhonemes) {
+    if (!externalPhonemeIds.empty()) {
+      // Direct phoneme_ids path (JSONL --json-input bypass G2P)
+      vector<int16_t> audioBuffer;
+      piper::synthesize(externalPhonemeIds, voice.synthesisConfig, voice.session,
+                        audioBuffer, result, &voice);
+      writeWavFromBuffer(audioBuffer, voice.synthesisConfig.sampleRate, audioFile);
+    } else if (runConfig.rawPhonemes) {
       // Parse raw phonemes from input
       auto phonemeType = static_cast<piper::PhonemeTypeInt>(voice.phonemizeConfig.phonemeType);
       auto phonemes = piper::parsePhonemeString(line, phonemeType);
@@ -801,7 +827,13 @@ void processLine(string line, RunConfig &runConfig, piper::PiperConfig &piperCon
     cout << outputPath.string() << endl;
   } else if (outputType == OUTPUT_STDOUT) {
     // Output WAV to stdout
-    if (runConfig.rawPhonemes) {
+    if (!externalPhonemeIds.empty()) {
+      // Direct phoneme_ids path (JSONL --json-input bypass G2P)
+      vector<int16_t> audioBuffer;
+      piper::synthesize(externalPhonemeIds, voice.synthesisConfig, voice.session,
+                        audioBuffer, result, &voice);
+      writeWavFromBuffer(audioBuffer, voice.synthesisConfig.sampleRate, cout);
+    } else if (runConfig.rawPhonemes) {
       // Parse raw phonemes from input
       auto phonemeType = static_cast<piper::PhonemeTypeInt>(voice.phonemizeConfig.phonemeType);
       auto phonemes = piper::parsePhonemeString(line, phonemeType);
