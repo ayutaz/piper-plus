@@ -24,10 +24,10 @@ M4 の対象は Top 10 のうち **#6 forward-compat fuzz** と **#9 timing mono
 
 ## 含まれるチケット
 
-| ID | タイトル | Top 10 # | 想定工数 | 優先度 |
-|----|---------|----------|---------|--------|
-| [M4.1](./M4-1-loanword-pua-forward-compat.md) | Loanword / PUA forward-compat fuzz | #6 | 1-2 PR (~10h) | 中 |
-| [M4.2](./M4-2-timing-monotonicity-property.md) | Phoneme timing monotonicity property test | #9 | 1 PR (~8h) | 中 |
+| ID | タイトル | Top 10 # | 想定工数 | 優先度 | ステータス |
+|----|---------|----------|---------|--------|-----------|
+| M4.1 | Loanword / PUA forward-compat fuzz | #6 | 1-2 PR (~10h) | 中 | 実装完了 (PR #511, Python fuzz informational) |
+| M4.2 | Phoneme timing monotonicity property test | #9 | 1 PR (~8h) | 中 | 実装完了 (PR #511, Python fuzz informational) |
 
 合計想定工数: 2-3 PR / ~18h (M3 と並走しても 1 maintainer 容量に収まる)。
 
@@ -130,8 +130,6 @@ Hypothesis の `@given` で `max_examples=1000` は default の `max_examples=10
 
 ## 関連リンク
 
-- [M4.1: Loanword / PUA forward-compat fuzz](./M4-1-loanword-pua-forward-compat.md)
-- [M4.2: Phoneme timing monotonicity property test](./M4-2-timing-monotonicity-property.md)
 - [M-Stretch overview](./M-Stretch-overview.md)
 - [親マイルストーン: ci-expansion-milestones.md §M4](../proposals/ci-expansion-milestones.md#m4-informational-tier-任意-m3-と並走可)
 - [親調査: ci-expansion-2026-05.md §3.3](../proposals/ci-expansion-2026-05.md) (Property-based & Fuzzing 拡張)

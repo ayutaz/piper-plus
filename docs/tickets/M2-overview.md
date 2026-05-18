@@ -3,7 +3,7 @@
 **親マイルストーン**: [ci-expansion-milestones.md §M2](../proposals/ci-expansion-milestones.md#m2-audio-quality-moat)
 **親調査**: [ci-expansion-2026-05.md](../proposals/ci-expansion-2026-05.md)
 **期間**: Month 2 (4 週)
-**前提**: [M1.1 cancelled baseline alarm](./M1-1-cancelled-baseline-alarm.md) が稼働済
+**前提**: M1.1 cancelled baseline alarm が稼働済 (PR #511 で実装)
 **作成日**: 2026-05-18
 
 ---
@@ -25,10 +25,10 @@ M2 はこの **piper-plus 最大の盲点** を 2 軸で塞ぐフェーズであ
 
 ## 含まれるチケット
 
-| ID | タイトル | Top 10 # | 想定工数 | 優先度 |
-|----|---------|---------|---------|--------|
-| [M2.1](./M2-1-audio-mos-proxy.md) | Audio MOS proxy gate (PESQ / STOI / UTMOS / WER) | #1 | 3-4 PR (~30h) | 高 |
-| [M2.2](./M2-2-cross-runtime-audio-parity.md) | Cross-runtime audio byte parity (7 runtime × 3 model) | #2 | 4-5 PR (~40h) | 高 |
+| ID | タイトル | Top 10 # | 想定工数 | 優先度 | ステータス |
+|----|---------|---------|---------|--------|-----------|
+| M2.1 | Audio MOS proxy gate (PESQ / STOI / UTMOS / WER) | #1 | 3-4 PR (~30h) | 高 | 実装完了 (PR #511, informational bootstrap) |
+| M2.2 | Cross-runtime audio byte parity (7 runtime × 3 model) | #2 | 4-5 PR (~40h) | 高 | 実装完了 (PR #511, informational bootstrap) |
 
 合計 7-9 PR / ~70h。 4 週で 1 maintainer が消化可能な上限近く、 並走には audio quality engineer 1 名 + runtime integration 各 1 名のチーム編成を要する。
 
@@ -152,20 +152,11 @@ M2 開始から 4 週後 (= M3 開始時) に maintainer が以下を実施。
 
 ## 関連リンク
 
-### チケット
-
-- [M2.1 Audio MOS proxy gate](./M2-1-audio-mos-proxy.md)
-- [M2.2 Cross-runtime audio byte parity](./M2-2-cross-runtime-audio-parity.md)
-
 ### 親ドキュメント
 
 - [ci-expansion-milestones.md §M2](../proposals/ci-expansion-milestones.md#m2-audio-quality-moat)
 - [ci-expansion-2026-05.md §2.2 音声品質](../proposals/ci-expansion-2026-05.md)
 - [ci-expansion-2026-05.md §3.2 Cross-runtime differential testing](../proposals/ci-expansion-2026-05.md)
-
-### 前提チケット
-
-- [M1.1 Cancelled baseline alarm](./M1-1-cancelled-baseline-alarm.md)
 
 ### 既存資産
 

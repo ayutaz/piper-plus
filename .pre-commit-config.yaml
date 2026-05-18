@@ -266,7 +266,7 @@ repos:
       # CHANGELOG `[Unreleased] > ### Breaking` entry の anchor link が
       # 実際に docs/migration/v*.md の見出しに解決するかまで検査する。
       # v1.12 で migration doc が breaking commit 後追いで作成された問題を
-      # 構造的に塞ぐ (`docs/tickets/M1-2-migration-guide-lint.md`)。
+      # 構造的に塞ぐ (M1.2 / PR #511 実装完了)。
       - id: migration-guide-lint
         name: CHANGELOG breaking entries have resolvable migration cross-ref
         entry: uv run python scripts/check_migration_xref.py

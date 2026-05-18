@@ -13,7 +13,7 @@
 #   - cancelled / skipped baseline gateway (M1.1) も blocker 維持
 #   - main branch protection への適用 (dev で 1 ヶ月安定後に検討)
 #
-# 関連: docs/tickets/M1-3-first-pr-fast-lane.md、 親調査 Top 10 #5。
+# 関連: docs/proposals/ci-expansion-2026-05.md Top 10 #5 (M1.3 / PR #511 実装完了)。
 
 name: First-PR Fast Lane
 

@@ -12,8 +12,7 @@
 #
 # patch / minor PR は paths filter で skip される。
 #
-# 関連: docs/tickets/M1-2-migration-guide-lint.md / parent
-# docs/proposals/ci-expansion-2026-05.md Top 10 #3。
+# 関連: docs/proposals/ci-expansion-2026-05.md Top 10 #3 (M1.2 / PR #511 実装完了)。
 
 name: Migration Guide Lint
 

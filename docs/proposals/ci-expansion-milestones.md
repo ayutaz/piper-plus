@@ -30,7 +30,7 @@
 
 ### M1.1 — Cancelled / skipped baseline alarm (Top 10 #10)
 
-**実装チケット**: [M1-1-cancelled-baseline-alarm.md](../tickets/M1-1-cancelled-baseline-alarm.md)
+**実装ステータス**: 実装完了 (PR #511)
 
 | 項目 | 内容 |
 |------|------|
@@ -45,7 +45,7 @@
 
 ### M1.2 — Migration guide lint (Top 10 #3)
 
-**実装チケット**: [M1-2-migration-guide-lint.md](../tickets/M1-2-migration-guide-lint.md)
+**実装ステータス**: 実装完了 (PR #511)
 
 | 項目 | 内容 |
 |------|------|
@@ -60,7 +60,7 @@
 
 ### M1.3 — First-PR fast lane (Top 10 #5)
 
-**実装チケット**: [M1-3-first-pr-fast-lane.md](../tickets/M1-3-first-pr-fast-lane.md)
+**実装ステータス**: 実装完了 (PR #511)
 
 | 項目 | 内容 |
 |------|------|
@@ -85,7 +85,7 @@
 
 ### M2.1 — Audio MOS proxy gate (Top 10 #1)
 
-**実装チケット**: [M2-1-audio-mos-proxy.md](../tickets/M2-1-audio-mos-proxy.md)
+**実装ステータス**: 実装完了 (PR #511)
 
 | 項目 | 内容 |
 |------|------|
@@ -100,7 +100,7 @@
 
 ### M2.2 — Cross-runtime audio byte parity (Top 10 #2)
 
-**実装チケット**: [M2-2-cross-runtime-audio-parity.md](../tickets/M2-2-cross-runtime-audio-parity.md)
+**実装ステータス**: 実装完了 (PR #511)
 
 | 項目 | 内容 |
 |------|------|
@@ -124,7 +124,7 @@
 
 ### M3.1 — Public ABI snapshot (Top 10 #4)
 
-**実装チケット**: [M3-1-public-abi-snapshot.md](../tickets/M3-1-public-abi-snapshot.md)
+**実装ステータス**: 実装完了 (PR #511)
 
 | 項目 | 内容 |
 |------|------|
@@ -139,7 +139,7 @@
 
 ### M3.2 — Model card / license auto-injection (Top 10 #7)
 
-**実装チケット**: [M3-2-license-auto-injection.md](../tickets/M3-2-license-auto-injection.md)
+**実装ステータス**: 実装完了 (PR #511)
 
 | 項目 | 内容 |
 |------|------|
@@ -154,7 +154,7 @@
 
 ### M3.3 — Typosquatting weekly scan (Top 10 #8)
 
-**実装チケット**: [M3-3-typosquatting-watch.md](../tickets/M3-3-typosquatting-watch.md)
+**実装ステータス**: 実装完了 (PR #511)
 
 | 項目 | 内容 |
 |------|------|
@@ -177,7 +177,7 @@
 
 ### M4.1 — Loanword / PUA forward-compat fuzz (Top 10 #6)
 
-**実装チケット**: [M4-1-loanword-pua-forward-compat.md](../tickets/M4-1-loanword-pua-forward-compat.md)
+**実装ステータス**: 実装完了 (PR #511)
 
 `schema_version: 99` のランダム未来フィールドを 7 ランタイムに食わせ、 panic / exception しないことを保証。 `feedback_data_asset_distribution.md` の延長で `forward-compat` を CI 化。
 
@@ -187,7 +187,7 @@
 
 ### M4.2 — Phoneme timing monotonicity property test (Top 10 #9)
 
-**実装チケット**: [M4-2-timing-monotonicity-property.md](../tickets/M4-2-timing-monotonicity-property.md)
+**実装ステータス**: 実装完了 (PR #511)
 
 任意入力で `start ≤ end` かつ累積単調なことを Hypothesis で 1000 ケース。 **PR ブロックせず informational** に留める。
 

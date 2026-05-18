@@ -21,7 +21,7 @@
 コマンドの実行時に遅延 import する。 import 失敗時は ``--allow-missing-deps``
 で skip 可能にし、 baseline 値を NaN として記録する (informational tier 専用)。
 
-設計の根拠: ``docs/tickets/M2-1-audio-mos-proxy.md`` §2-§4。
+設計の根拠: ``docs/proposals/ci-expansion-2026-05.md`` Top 10 #1 (M2.1 / PR #511 実装完了)。
 """
 
 from __future__ import annotations

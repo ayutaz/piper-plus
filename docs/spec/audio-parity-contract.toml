@@ -14,7 +14,7 @@
 #           SNR が `snr_min_db` dB 以上
 #
 # 4 週間 informational tier 運用後、 maintainer が閾値を見直し blocker
-# 昇格する (`docs/tickets/M2-2-cross-runtime-audio-parity.md` §1 DoD)。
+# 昇格する (M2.2 / PR #511 実装完了 informational bootstrap DoD)。
 
 [meta]
 schema_version = 1

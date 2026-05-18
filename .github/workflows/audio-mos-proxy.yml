@@ -12,7 +12,7 @@
 #   2. /tmp/metrics.json を tests/fixtures/audio-mos-baseline.json にコピー
 #   3. samples / generated_at / model.sha256 を埋めてコミット
 #
-# 関連 ticket: docs/tickets/M2-1-audio-mos-proxy.md。
+# 関連: docs/proposals/ci-expansion-2026-05.md Top 10 #1 (M2.1 / PR #511 実装完了)。
 
 name: Audio MOS Proxy
 

@@ -5,7 +5,7 @@
 # pass に分類する gate。 baseline が空の bootstrap 段階では常に pass し、
 # `update-abi-baseline` label 付きの PR で意図的更新を許容する。
 #
-# 関連: docs/tickets/M3-1-public-abi-snapshot.md。
+# 関連: docs/proposals/ci-expansion-2026-05.md Top 10 #4 (M3.1 / PR #511 実装完了, bootstrap baseline)。
 
 name: Public ABI Snapshot
 
