@@ -406,6 +406,106 @@ public class ShortTextProcessorTests
     }
 
     // ==================================================================
+    // Tier 1 (Issue #499): TrimEosRegion — drop EOS region for ALL inputs
+    // ==================================================================
+    // Mirrors src/python_run/tests/test_short_text_mitigation.py::TestTrimEosRegion
+    // so every runtime gets identical behavioural coverage
+    // (cross-runtime contract — Issue #499).
+
+    [Fact]
+    public void TrimEosRegion_DefaultStripsFullEosRegion()
+    {
+        // EOS = 2.0 frames → ceil = 2 → 200 samples (hop=100)
+        var durations = new[] { 1f, 2f, 3f, 2f };
+        const int hop = 100;
+        const int total = 800;
+        var audio = new float[total];
+        for (int i = 0; i < total; i++) audio[i] = i;
+        var result = ShortTextProcessor.TrimEosRegion(audio, durations, hop);
+        Assert.Equal(total - 200, result.Length);
+        for (int i = 0; i < 600; i++) Assert.Equal(audio[i], result[i]);
+    }
+
+    [Fact]
+    public void TrimEosRegion_AppliesCeilToFractionalDuration()
+    {
+        // durations[-1]=1.99 must trim ceil(1.99)=2 frames, not 1.
+        var durations = new[] { 1f, 1f, 1f, 1.99f };
+        const int hop = 256;
+        var audio = new float[2048];
+        var result = ShortTextProcessor.TrimEosRegion(audio, durations, hop);
+        Assert.Equal(2048 - 512, result.Length);
+    }
+
+    [Fact]
+    public void TrimEosRegion_EosMaxFramesOverrideKeepsHeadOfEos()
+    {
+        // EOS=10 raw, eosMaxFrames=6 → excess = ceil(10) - 6 = 4 frames
+        var durations = new[] { 2f, 3f, 3f, 10f };
+        const int hop = 100;
+        var audio = new float[2000];
+        var result = ShortTextProcessor.TrimEosRegion(audio, durations, hop, eosMaxFrames: 6);
+        Assert.Equal(2000 - 400, result.Length);
+    }
+
+    [Fact]
+    public void TrimEosRegion_NoOpWhenEosBelowMax()
+    {
+        // ceil(1.99)=2 ≤ eosMaxFrames=4 → no trim
+        var durations = new[] { 1f, 1f, 1.99f };
+        const int hop = 256;
+        var audio = new float[1024];
+        var result = ShortTextProcessor.TrimEosRegion(audio, durations, hop, eosMaxFrames: 4);
+        Assert.Equal(audio.Length, result.Length);
+    }
+
+    [Fact]
+    public void TrimEosRegion_ReturnsInputWhenDurationsEmpty()
+    {
+        var audio = new float[1000];
+        var result = ShortTextProcessor.TrimEosRegion(audio, Array.Empty<float>(), hopSize: 256);
+        Assert.Equal(audio.Length, result.Length);
+    }
+
+    [Fact]
+    public void TrimEosRegion_ReturnsInputWhenDurationsNull()
+    {
+        var audio = new float[1000];
+        var result = ShortTextProcessor.TrimEosRegion(audio, null, hopSize: 256);
+        Assert.Equal(audio.Length, result.Length);
+    }
+
+    [Fact]
+    public void TrimEosRegion_ReturnsInputWhenHopSizeZero()
+    {
+        var audio = new float[1000];
+        var durations = new[] { 1f, 2f, 3f };
+        var result = ShortTextProcessor.TrimEosRegion(audio, durations, hopSize: 0);
+        Assert.Equal(audio.Length, result.Length);
+    }
+
+    [Fact]
+    public void TrimEosRegion_ReturnsInputWhenTrimExceedsAudio()
+    {
+        // EOS=5 frames * 100 hop = 500 samples, audio has 200 samples
+        var durations = new[] { 1f, 5f };
+        var audio = new float[200];
+        var result = ShortTextProcessor.TrimEosRegion(audio, durations, hopSize: 100);
+        Assert.Equal(audio.Length, result.Length);
+    }
+
+    [Fact]
+    public void TrimEosRegion_IntegerDurationUnaffectedByCeil()
+    {
+        // ceil(2.0) == 2 — integer-valued durations trim int(d) frames.
+        var durations = new[] { 1f, 1f, 2f };
+        const int hop = 100;
+        var audio = new float[400];
+        var result = ShortTextProcessor.TrimEosRegion(audio, durations, hop);
+        Assert.Equal(400 - 200, result.Length);
+    }
+
+    // ==================================================================
     // Strategy A: TrimSilence
     // ==================================================================
     [Fact]
@@ -981,7 +1081,7 @@ public class ShortTextProcessorTests
         string wrapped = ShortTextProcessor.WrapShortTextWithBreaks(shortText);
 
         bool isShort = !ReferenceEquals(wrapped, shortText)
-                       && !string.Equals(wrapped, shortText, StringComparison.Ordinal);
+            && !string.Equals(wrapped, shortText, StringComparison.Ordinal);
         Assert.True(isShort);
     }
 
@@ -993,7 +1093,7 @@ public class ShortTextProcessorTests
 
         // For long text, WrapShortTextWithBreaks returns the same string
         bool isShort = !ReferenceEquals(wrapped, longText)
-                       && !string.Equals(wrapped, longText, StringComparison.Ordinal);
+            && !string.Equals(wrapped, longText, StringComparison.Ordinal);
         Assert.False(isShort);
     }
 }

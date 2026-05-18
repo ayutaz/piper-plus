@@ -419,6 +419,13 @@ func (e *OnnxEngine) Synthesize(ctx context.Context, req *SynthesisRequest) (*Sy
 		} else {
 			audio = trimSilence(audio)
 		}
+	} else if paddedDurations != nil {
+		// Tier 1 workaround for Issue #499: even without short-text
+		// padding, the EOS region carries decoder leakage that sounds
+		// like the final syllable was repeated. Strategy A above already
+		// handles this for padded inputs; this branch applies the same
+		// EOS-region drop to long-text outputs.
+		audio = trimEosRegion(audio, paddedDurations, e.hopSize, trimEosMaxFrames)
 	}
 
 	// Calculate audio duration using integer arithmetic for precision.

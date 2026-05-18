@@ -435,6 +435,16 @@ public sealed class PiperSession
                     audio = ShortTextProcessor.TrimSilence(audio);
                 }
             }
+            else if (paddedDurations is not null)
+            {
+                // Tier 1 workaround for Issue #499: even without short-text
+                // padding, the EOS region carries decoder leakage that
+                // sounds like the final syllable was repeated. Strategy A
+                // above already handles this for padded inputs; this branch
+                // applies the same EOS-region drop to long-text outputs.
+                audio = ShortTextProcessor.TrimEosRegion(
+                    audio, paddedDurations, _model.HopSize);
+            }
 
             // Truncate durations back to the original phoneme length for
             // timing consumers (they treat the padded extras as out-of-band).

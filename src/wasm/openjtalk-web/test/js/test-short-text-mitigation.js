@@ -21,7 +21,7 @@ import assert from "node:assert/strict";
 // ---------------------------------------------------------------------------
 
 let PiperPlus, AudioResult, padPhonemeIds, trimSilence, adjustScalesForShortInput;
-let trimPaddingByDurations;
+let trimPaddingByDurations, trimEosRegion;
 let MIN_PHONEME_IDS, MIN_BODY_FOR_STRATEGY_A, TRIM_EOS_MAX_FRAMES, DEFAULT_HOP_SIZE;
 let importError = null;
 
@@ -32,6 +32,7 @@ try {
   padPhonemeIds = mod.padPhonemeIds;
   trimSilence = mod.trimSilence;
   trimPaddingByDurations = mod.trimPaddingByDurations;
+  trimEosRegion = mod.trimEosRegion;
   adjustScalesForShortInput = mod.adjustScalesForShortInput;
   MIN_PHONEME_IDS = mod.MIN_PHONEME_IDS;
   MIN_BODY_FOR_STRATEGY_A = mod.MIN_BODY_FOR_STRATEGY_A;
@@ -466,6 +467,87 @@ describe("trimPaddingByDurations (Strategy A - precise post-trim)", { skip }, ()
     const result = trimPaddingByDurations(audio, durations, 1, 1, hop, 0);
     // BOS(2) + frontPad(2) = 400, backPad(2) + EOS(50) = 5200
     assert.equal(result.length, total - 400 - 5200);
+  });
+});
+
+// ===========================================================================
+// trimEosRegion — Tier 1 (Issue #499): drop EOS region for ALL inputs
+// ===========================================================================
+// Mirrors src/python_run/tests/test_short_text_mitigation.py::TestTrimEosRegion
+// so every runtime gets identical behavioural coverage
+// (cross-runtime contract — Issue #499).
+
+describe("trimEosRegion (Tier 1 - drop EOS region for ALL inputs)", { skip }, () => {
+  it("default strips full EOS region (ceil(durations[-1]) frames)", () => {
+    // EOS = 2.0 frames → ceil = 2 → 200 samples (hop=100)
+    const durations = new Float32Array([1, 2, 3, 2]);
+    const hop = 100;
+    const total = 800;
+    const audio = new Float32Array(total);
+    for (let i = 0; i < total; i++) audio[i] = i;
+    const result = trimEosRegion(audio, durations, hop);
+    assert.equal(result.length, total - 200);
+    for (let i = 0; i < 600; i++) assert.equal(result[i], audio[i]);
+  });
+
+  it("applies ceil to fractional duration (1.99 → 2 frames)", () => {
+    const durations = new Float32Array([1, 1, 1, 1.99]);
+    const hop = 256;
+    const audio = new Float32Array(2048);
+    const result = trimEosRegion(audio, durations, hop);
+    assert.equal(result.length, 2048 - 512);
+  });
+
+  it("eosMaxFrames override keeps head of EOS", () => {
+    // EOS=10 raw, eosMaxFrames=6 → excess = ceil(10) - 6 = 4 frames
+    const durations = new Float32Array([2, 3, 3, 10]);
+    const hop = 100;
+    const audio = new Float32Array(2000);
+    const result = trimEosRegion(audio, durations, hop, 6);
+    assert.equal(result.length, 2000 - 400);
+  });
+
+  it("no-op when ceil(EOS) <= eosMaxFrames", () => {
+    const durations = new Float32Array([1, 1, 1.99]);
+    const hop = 256;
+    const audio = new Float32Array(1024);
+    const result = trimEosRegion(audio, durations, hop, 4);
+    assert.equal(result.length, audio.length);
+  });
+
+  it("returns input when durations is empty", () => {
+    const audio = new Float32Array(1000);
+    const result = trimEosRegion(audio, new Float32Array(0), 256);
+    assert.equal(result.length, audio.length);
+  });
+
+  it("returns input when durations is null", () => {
+    const audio = new Float32Array(1000);
+    const result = trimEosRegion(audio, null, 256);
+    assert.equal(result.length, audio.length);
+  });
+
+  it("returns input when hopSize is zero", () => {
+    const audio = new Float32Array(1000);
+    const durations = new Float32Array([1, 2, 3]);
+    const result = trimEosRegion(audio, durations, 0);
+    assert.equal(result.length, audio.length);
+  });
+
+  it("returns input when trim would consume the buffer", () => {
+    // EOS=5 frames * 100 hop = 500 samples, audio has 200 samples
+    const durations = new Float32Array([1, 5]);
+    const audio = new Float32Array(200);
+    const result = trimEosRegion(audio, durations, 100);
+    assert.equal(result.length, audio.length);
+  });
+
+  it("integer duration unaffected by ceil", () => {
+    const durations = new Float32Array([1, 1, 2]);
+    const hop = 100;
+    const audio = new Float32Array(400);
+    const result = trimEosRegion(audio, durations, hop);
+    assert.equal(result.length, 400 - 200);
   });
 });
 

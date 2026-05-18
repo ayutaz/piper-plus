@@ -169,6 +169,43 @@ func trimPaddingByDurations(audio []int16, durations []float32, frontPad, backPa
 	return audio[frontSamples:end]
 }
 
+// trimEosRegion is the Tier 1 workaround for Issue #499: it trims the EOS
+// region from the tail for every inference path (long-text included).
+//
+// VITS's infer() expands attention with ceil(w) but exposes the raw float w
+// as the durations output. The EOS frame(s) generated under ceil carry
+// decoder leakage that sounds like the final syllable was repeated —
+// clearly audible on fine-tuned models such as piper-plus-tsukuyomi-chan.
+// trimPaddingByDurations already drops the EOS region only when Strategy A
+// short-text padding was applied; this helper applies the same drop to every
+// other inference path so long-text outputs do not retain the audible
+// doubled tail.
+//
+// Mirrors src/python_run/piper/voice.py _trim_eos_region so all runtimes
+// produce byte-equal output for the same (audio, durations[-1], hopSize,
+// eosMaxFrames) tuple. The sample-count conversion uses int(...) truncation
+// to match the Python reference — cross-runtime contract (Issue #499).
+//
+// Returns audio unchanged when arguments are inconsistent (nil/empty
+// durations, non-positive hopSize, ceil(durations[-1]) <= eosMaxFrames, or
+// the computed trim would consume the whole buffer).
+func trimEosRegion(audio []int16, durations []float32, hopSize, eosMaxFrames int) []int16 {
+	if hopSize <= 0 || len(durations) == 0 {
+		return audio
+	}
+	eosFrames := durations[len(durations)-1]
+	eosCeil := int(math.Ceil(float64(eosFrames)))
+	eosExcess := eosCeil - eosMaxFrames
+	if eosExcess <= 0 {
+		return audio
+	}
+	trimSamples := eosExcess * hopSize
+	if trimSamples >= len(audio) {
+		return audio
+	}
+	return audio[:len(audio)-trimSamples]
+}
+
 // padProsodyFeatures extends prosody features to match the new padded phoneme
 // length. Inserted positions are zero-filled.
 func padProsodyFeatures(original [][3]int64, originalLen, paddedLen int) [][3]int64 {

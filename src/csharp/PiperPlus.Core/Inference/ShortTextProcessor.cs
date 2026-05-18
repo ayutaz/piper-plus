@@ -311,6 +311,62 @@ public static class ShortTextProcessor
         return trimmed;
     }
 
+    /// <summary>
+    /// Tier 1 workaround for Issue #499: trims the EOS region from the tail
+    /// for <em>every</em> inference path (long-text included).
+    /// <para>
+    /// <c>VitsModel.infer()</c> expands attention with <c>ceil(w)</c> but
+    /// exposes the raw float <c>w</c> as the <c>durations</c> output. The
+    /// EOS frame(s) generated under <c>ceil</c> carry decoder leakage that
+    /// sounds like the final syllable was repeated — clearly audible on
+    /// fine-tuned models such as <c>piper-plus-tsukuyomi-chan</c>.
+    /// <see cref="TrimPaddingByDurations"/> drops the EOS region only when
+    /// Strategy A short-text padding was applied; this helper applies the
+    /// same drop to every other inference path so long-text outputs do not
+    /// retain the audible doubled tail.
+    /// </para>
+    /// <para>
+    /// Mirrors the Python reference
+    /// (<c>src/python_run/piper/voice.py::_trim_eos_region</c>) so every
+    /// runtime produces byte-equal output for the same
+    /// (audio, durations[-1], hopSize, eosMaxFrames) tuple. The
+    /// sample-count conversion uses <c>(int)</c> truncation to match Python.
+    /// </para>
+    /// </summary>
+    /// <returns>
+    /// The trimmed audio, or the input unchanged when arguments are
+    /// inconsistent (null/empty durations, non-positive hop,
+    /// <c>ceil(durations[-1]) &lt;= eosMaxFrames</c>, or the trim would
+    /// consume the whole buffer).
+    /// </returns>
+    internal static float[] TrimEosRegion(
+        float[] audio,
+        float[]? durations,
+        int hopSize,
+        int eosMaxFrames = TrimEosMaxFrames)
+    {
+        if (hopSize <= 0 || durations is null || durations.Length == 0)
+        {
+            return audio;
+        }
+        float eosFrames = durations[^1];
+        int eosCeil = (int)Math.Ceiling(eosFrames);
+        int eosExcess = eosCeil - eosMaxFrames;
+        if (eosExcess <= 0)
+        {
+            return audio;
+        }
+        int trimSamples = eosExcess * hopSize;
+        if (trimSamples >= audio.Length)
+        {
+            return audio;
+        }
+        int newLength = audio.Length - trimSamples;
+        var trimmed = new float[newLength];
+        Array.Copy(audio, 0, trimmed, 0, newLength);
+        return trimmed;
+    }
+
     // ------------------------------------------------------------------
     // Strategy A: Post-inference silence trimming
     // ------------------------------------------------------------------

@@ -901,6 +901,56 @@ static void trimPaddingByDurationsFloat(std::vector<float> &audioBuffer,
   }
 }
 
+// Tier 1 workaround for Issue #499: trim the EOS region from the tail for
+// every inference path (long-text included).
+//
+// VITS's infer() expands attention with ceil(w) but exposes the raw float w
+// as the durations output. The EOS frame(s) generated under ceil carry
+// decoder leakage that sounds like the final syllable was repeated —
+// clearly audible on fine-tuned models such as piper-plus-tsukuyomi-chan.
+// trimPaddingByDurations already drops the EOS region only when Strategy A
+// short-text padding was applied; this helper applies the same drop to
+// every other inference path so long-text outputs do not retain the
+// audible doubled tail.
+//
+// Mirrors src/python_run/piper/voice.py _trim_eos_region so every runtime
+// produces byte-equal output for the same (audio, durations.back(),
+// hopSize, eosMaxFrames) tuple. The sample-count conversion uses
+// static_cast<int>(...) truncation to match Python's int(...) semantics.
+//
+// Falls through unchanged when arguments are inconsistent.
+static void trimEosRegion(std::vector<int16_t> &audioBuffer,
+                          const std::vector<float> &durations,
+                          int hopSize,
+                          int eosMaxFrames = TRIM_EOS_MAX_FRAMES) {
+  if (hopSize <= 0 || durations.empty()) return;
+  const float eosFrames = durations.back();
+  const int eosCeil = static_cast<int>(std::ceil(eosFrames));
+  const int eosExcess = std::max(0, eosCeil - eosMaxFrames);
+  if (eosExcess <= 0) return;
+  const int trimSamples = eosExcess * hopSize;
+  const int totalSamples = static_cast<int>(audioBuffer.size());
+  if (trimSamples >= totalSamples) return;
+  audioBuffer.resize(totalSamples - trimSamples);
+}
+
+// Float32 variant of trimEosRegion. Identical sample-count logic; only the
+// buffer element type differs.
+static void trimEosRegionFloat(std::vector<float> &audioBuffer,
+                               const std::vector<float> &durations,
+                               int hopSize,
+                               int eosMaxFrames = TRIM_EOS_MAX_FRAMES) {
+  if (hopSize <= 0 || durations.empty()) return;
+  const float eosFrames = durations.back();
+  const int eosCeil = static_cast<int>(std::ceil(eosFrames));
+  const int eosExcess = std::max(0, eosCeil - eosMaxFrames);
+  if (eosExcess <= 0) return;
+  const int trimSamples = eosExcess * hopSize;
+  const int totalSamples = static_cast<int>(audioBuffer.size());
+  if (trimSamples >= totalSamples) return;
+  audioBuffer.resize(totalSamples - trimSamples);
+}
+
 // Trim leading/trailing silence from int16 audio using windowed RMS.
 // Preserves at least TRIM_MIN_SAMPLES samples.
 static void trimSilenceInt16(std::vector<int16_t> &audioBuffer) {
@@ -1363,6 +1413,19 @@ void synthesize(std::vector<PhonemeId> &phonemeIds,
     if (result.audioSeconds > 0) {
       result.realTimeFactor = result.inferSeconds / result.audioSeconds;
     }
+  } else if (haveDurations) {
+    // Tier 1 workaround for Issue #499: even without short-text padding,
+    // the EOS region carries decoder leakage that sounds like the final
+    // syllable was repeated. Strategy A above already handles this for
+    // padded inputs; this branch applies the same EOS-region drop to
+    // long-text outputs.
+    trimEosRegion(audioBuffer, paddedDurations, hopSize, TRIM_EOS_MAX_FRAMES);
+    result.audioSeconds =
+        static_cast<double>(audioBuffer.size()) /
+        static_cast<double>(synthesisConfig.sampleRate);
+    if (result.audioSeconds > 0) {
+      result.realTimeFactor = result.inferSeconds / result.audioSeconds;
+    }
   }
 
   // Extract phoneme timing information using the original (pre-padding)
@@ -1546,6 +1609,16 @@ void synthesizeFloat(std::vector<PhonemeId> &phonemeIds,
     } else {
       trimSilenceFloat(audioBuffer);
     }
+    result.audioSeconds =
+        static_cast<double>(audioBuffer.size()) /
+        static_cast<double>(synthesisConfig.sampleRate);
+    if (result.audioSeconds > 0) {
+      result.realTimeFactor = result.inferSeconds / result.audioSeconds;
+    }
+  } else if (haveDurations) {
+    // Tier 1 workaround for Issue #499 — see int16 path above.
+    trimEosRegionFloat(audioBuffer, paddedDurations, hopSize,
+                       TRIM_EOS_MAX_FRAMES);
     result.audioSeconds =
         static_cast<double>(audioBuffer.size()) /
         static_cast<double>(synthesisConfig.sampleRate);

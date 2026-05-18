@@ -175,6 +175,29 @@ export function trimPaddingByDurations(
 ): Float32Array;
 
 /**
+ * Tier 1 workaround for Issue #499: trim the EOS region from the tail for
+ * **every** inference path (long-text included).
+ *
+ * `VitsModel.infer()` expands attention with `ceil(w)` but exposes the raw
+ * float `w` as the `durations` output. The EOS frame(s) generated under
+ * `ceil` carry decoder leakage that sounds like the final syllable was
+ * repeated. {@link trimPaddingByDurations} drops the EOS region only when
+ * Strategy A short-text padding was applied; this helper applies the same
+ * drop to every other inference path so long-text outputs do not retain
+ * the audible doubled tail.
+ *
+ * Returns input unchanged when arguments are inconsistent (null/empty
+ * `durations`, non-positive `hopSize`, `ceil(durations[-1]) <= eosMaxFrames`,
+ * or the computed trim would consume the whole buffer).
+ */
+export function trimEosRegion(
+  audio: Float32Array,
+  durations: ArrayLike<number> | null,
+  hopSize: number,
+  eosMaxFrames?: number,
+): Float32Array;
+
+/**
  * Strategy A (post-step): Trim leading and trailing silence from audio
  * using a sliding RMS window. Used as a fallback when the model does
  * not expose a `durations` output.

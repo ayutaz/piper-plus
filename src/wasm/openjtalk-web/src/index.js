@@ -254,6 +254,53 @@ export function trimPaddingByDurations(
 }
 
 /**
+ * Tier 1 workaround for Issue #499: trim the EOS region from the tail for
+ * **every** inference path (long-text included).
+ *
+ * `VitsModel.infer()` expands attention with `ceil(w)` but exposes the raw
+ * float `w` as the `durations` output. The EOS frame(s) generated under
+ * `ceil` carry decoder leakage that sounds like the final syllable was
+ * repeated — clearly audible on fine-tuned models such as
+ * `piper-plus-tsukuyomi-chan`. {@link trimPaddingByDurations} already drops
+ * the EOS region only when Strategy A short-text padding was applied; this
+ * helper applies the same drop to every other inference path so long-text
+ * outputs do not retain the audible doubled tail.
+ *
+ * Mirrors `src/python_run/piper/voice.py::_trim_eos_region` so all runtimes
+ * produce byte-equal output for the same `(audio, durations[-1], hopSize,
+ * eosMaxFrames)` tuple. The sample-count conversion uses `Math.trunc()` to
+ * match Python's `int(...)` semantics — cross-runtime contract (Issue #499).
+ *
+ * @param {Float32Array} audio  Audio samples in the range -1.0 to 1.0
+ * @param {number[]|Float32Array|null} durations  Per-phoneme frame counts
+ * @param {number} hopSize  VITS hop length (samples per frame)
+ * @param {number} [eosMaxFrames=TRIM_EOS_MAX_FRAMES]
+ * @returns {Float32Array} Trimmed audio (or the original if inputs are inconsistent)
+ */
+export function trimEosRegion(
+  audio,
+  durations,
+  hopSize,
+  eosMaxFrames = TRIM_EOS_MAX_FRAMES
+) {
+  if (hopSize <= 0 || durations == null || durations.length === 0) {
+    return audio;
+  }
+  const eosFrames = durations[durations.length - 1];
+  const eosCeil = Math.ceil(eosFrames);
+  const eosExcess = Math.max(0, eosCeil - eosMaxFrames);
+  if (eosExcess <= 0) {
+    return audio;
+  }
+  const trimSamples = eosExcess * hopSize;
+  if (trimSamples >= audio.length) {
+    return audio;
+  }
+  // subarray() avoids a copy; subscribers that mutate must already clone.
+  return audio.subarray(0, audio.length - trimSamples);
+}
+
+/**
  * Strategy A (post-step): Trim leading and trailing silence from Float32Array
  * audio using a sliding RMS window.
  *
@@ -498,6 +545,18 @@ export class PiperPlus {
       } else {
         audioData = trimSilence(audioData);
       }
+    } else if (durations != null) {
+      // Tier 1 workaround for Issue #499: even without short-text
+      // padding, the EOS region carries decoder leakage that sounds like
+      // the final syllable was repeated. Strategy A above already handles
+      // this for padded inputs; this branch applies the same EOS-region
+      // drop to long-text outputs.
+      const hopSize = this._config.audio?.hop_size ?? DEFAULT_HOP_SIZE;
+      audioData = trimEosRegion(
+        audioData,
+        durations,
+        hopSize > 0 ? hopSize : DEFAULT_HOP_SIZE
+      );
     }
 
     // 3. Wrap result — include phoneme timing when the model supports it
