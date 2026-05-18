@@ -692,3 +692,88 @@ def test_snapshot_records_sha256_even_when_pcm_unavailable(ap, tmp_path):
     snap = ap.snapshot("python", a)
     assert snap.sha256
     assert len(snap.sha256) == 64
+
+
+# ---------- Phase 2 follow-up: CLI argument edge cases ----------
+
+
+def test_cli_compare_zero_inputs_with_empty_contract_exits_2(
+    ap, tmp_path, capsys
+):
+    """`--inputs` 空 + 空 contract で exit code 2 と stderr メッセージ.
+
+    cmd_compare:346-350 の guard を pin する。 contract に runtimes が
+    無く inputs も無い完全に degenerate な状態で silently 0 で抜けないこと。
+    本番 contract には 6 runtime 登録済みのため、 本 guard は ad-hoc
+    contract でのみ trigger される (production では「6 skip 行 / 0 pair」
+    が返るため別経路)。
+    """
+    empty = tmp_path / "empty-contract.toml"
+    empty.write_text(
+        "[thresholds]\n"
+        "peak_rms_max_diff = 0.005\n"
+        "chromaprint_max_hamming = 32\n"
+        "mel_spec_max_mse = 0.001\n"
+        "snr_min_db = 60.0\n"
+    )
+    args = ap.build_parser().parse_args(
+        ["compare", "--contract", str(empty)]
+    )
+    rc = args.func(args)
+    assert rc == 2
+    err = capsys.readouterr().err
+    assert "at least one" in err
+
+
+def test_parse_inputs_duplicate_runtime_last_wins(ap, tmp_path):
+    """同じ runtime 名を 2 回与えると後勝ち (dict 上書き).
+
+    parse_inputs:287-294 は明示的な duplicate detection を持たないので、
+    behavior contract として last-wins を pin。 これが変わると CI script
+    側の `--inputs python=... python=...` (誤って 2 度足された場合) の
+    挙動が silently 変わってしまう。
+    """
+    a = tmp_path / "first.wav"
+    b = tmp_path / "second.wav"
+    a.write_bytes(b"first")
+    b.write_bytes(b"second")
+    parsed = ap.parse_inputs([f"python={a}", f"python={b}"])
+    assert set(parsed.keys()) == {"python"}
+    assert parsed["python"] == b
+
+
+def test_snapshot_rejects_corrupt_wave_header(ap, tmp_path):
+    """Corrupt RIFF/WAVE header should raise (NOT silently produce a
+    degraded snapshot). wave.open() must surface the error so the
+    workflow's `ls -lh` step catches the missing artifact rather than
+    proceeding into tier comparison with a zero-byte audio."""
+    bad = tmp_path / "corrupt.wav"
+    bad.write_bytes(b"NOT_A_RIFF_HEADER_AT_ALL" * 4)
+    with pytest.raises(Exception):  # wave.Error / EOFError / ValueError
+        ap.snapshot("python", bad)
+
+
+def test_cli_compare_all_runtimes_disabled_produces_zero_pair_table(
+    ap, tmp_path, capsys
+):
+    """全 6 runtime が supports_dump_wav=false の極端な contract でも
+    cmd_compare が crash せず exit code 0 を返し、 skip table に 6 行
+    並ぶこと (pair table は 0 行 / 該当 markdown が描画される)。"""
+    contract = _write_ad_hoc_contract(tmp_path, disabled=set(ALL_RUNTIMES))
+    a = tmp_path / "a.wav"
+    _write_sine(a)
+    args = ap.build_parser().parse_args(
+        [
+            "compare",
+            "--inputs",
+            f"python={a}",  # supports=false だが provide してみる
+            "--contract",
+            str(contract),
+        ]
+    )
+    rc = args.func(args)
+    assert rc == 0  # informational tier — fail-on-mismatch 無しなら 0
+    out = capsys.readouterr().out
+    # 6 runtime 全て skip 行で報告される
+    for name in ALL_RUNTIMES:
+        assert name in out
