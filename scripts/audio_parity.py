@@ -74,9 +74,16 @@ class PairwiseResult:
 
 
 @dataclass
+class SkipEntry:
+    runtime: str
+    reason: str
+
+
+@dataclass
 class ComparisonReport:
     snapshots: dict[str, WavSnapshot] = field(default_factory=dict)
     pairs: list[PairwiseResult] = field(default_factory=list)
+    skipped: list[SkipEntry] = field(default_factory=list)
 
     @property
     def failures(self) -> list[PairwiseResult]:
@@ -233,22 +240,41 @@ def render_markdown(report: ComparisonReport) -> str:
         "## Runtime Parity Deep — audio (informational tier)",
         "",
         f"Pairs compared: **{len(report.pairs)}**, "
-        f"failing: **{len(report.failures)}**.",
+        f"failing: **{len(report.failures)}**, "
+        f"runtimes skipped: **{len(report.skipped)}**.",
         "",
-        "| A | B | Tier | Result | Detail |",
-        "|---|---|------|--------|--------|",
     ]
-    for pair in report.pairs:
-        for tier in pair.tiers:
-            flag = "✅" if tier.passed else "⚠️"
-            lines.append(
-                f"| `{pair.a}` | `{pair.b}` | {tier.name} | {flag} | {tier.detail} |"
-            )
+    if report.pairs:
+        lines.extend(
+            [
+                "| A | B | Tier | Result | Detail |",
+                "|---|---|------|--------|--------|",
+            ]
+        )
+        for pair in report.pairs:
+            for tier in pair.tiers:
+                flag = "✅" if tier.passed else "⚠️"
+                lines.append(
+                    f"| `{pair.a}` | `{pair.b}` | {tier.name} | {flag} | "
+                    f"{tier.detail} |"
+                )
+    if report.skipped:
+        lines.append("")
+        lines.append("### Skipped runtimes")
+        lines.append("")
+        lines.append("| Runtime | Reason |")
+        lines.append("|---------|--------|")
+        for entry in report.skipped:
+            lines.append(f"| `{entry.runtime}` | {entry.reason} |")
     return "\n".join(lines).rstrip() + "\n"
 
 
-def gather_pairs(snapshots: dict[str, WavSnapshot], contract: dict) -> ComparisonReport:
-    report = ComparisonReport(snapshots=snapshots)
+def gather_pairs(
+    snapshots: dict[str, WavSnapshot],
+    contract: dict,
+    skipped: list[SkipEntry] | None = None,
+) -> ComparisonReport:
+    report = ComparisonReport(snapshots=snapshots, skipped=skipped or [])
     names = sorted(snapshots)
     for i in range(len(names)):
         for j in range(i + 1, len(names)):
@@ -268,6 +294,47 @@ def parse_inputs(values: list[str]) -> dict[str, Path]:
     return result
 
 
+def collect_skips(
+    inputs: dict[str, Path], contract: dict
+) -> tuple[dict[str, Path], list[SkipEntry]]:
+    """Filter ``inputs`` against ``contract[runtimes]`` and report skips.
+
+    A runtime is skipped when:
+
+    1. It is declared in ``contract[runtimes]`` with
+       ``supports_dump_wav = false`` — typically a runtime that has not yet
+       implemented the JSONL phoneme_ids dump path (e.g. C++ / WASM during
+       Phase 1).
+    2. It is declared in ``contract[runtimes]`` but its path is missing from
+       ``inputs`` — typically a build job that failed to upload its
+       artifact.
+
+    Inputs whose key is not present in ``contract[runtimes]`` at all are
+    kept verbatim (allows ad-hoc experimentation).
+    """
+    runtimes = contract.get("runtimes", {})
+    skipped: list[SkipEntry] = []
+    kept: dict[str, Path] = {}
+    for name, spec in runtimes.items():
+        supports = (
+            spec.get("supports_dump_wav", True) if isinstance(spec, dict) else True
+        )
+        path = inputs.get(name)
+        if not supports:
+            skipped.append(
+                SkipEntry(name, "supports_dump_wav = false (Phase 2 follow-up)")
+            )
+            continue
+        if path is None:
+            skipped.append(SkipEntry(name, "no --inputs entry provided"))
+            continue
+        kept[name] = path
+    for name, path in inputs.items():
+        if name not in runtimes:
+            kept[name] = path
+    return kept, skipped
+
+
 def cmd_compare(args: argparse.Namespace) -> int:
     contract = load_contract(args.contract)
     if args.inputs_json:
@@ -275,13 +342,14 @@ def cmd_compare(args: argparse.Namespace) -> int:
         inputs = {k: Path(v) for k, v in raw.items()}
     else:
         inputs = parse_inputs(args.inputs)
-    if not inputs:
+    kept, skipped = collect_skips(inputs, contract)
+    if not kept and not skipped:
         print(
             "at least one --inputs / --inputs-json entry is required", file=sys.stderr
         )
         return 2
-    snapshots = {name: snapshot(name, path) for name, path in inputs.items()}
-    report = gather_pairs(snapshots, contract)
+    snapshots = {name: snapshot(name, path) for name, path in kept.items()}
+    report = gather_pairs(snapshots, contract, skipped=skipped)
     md = render_markdown(report)
     print(md)
     if args.output:

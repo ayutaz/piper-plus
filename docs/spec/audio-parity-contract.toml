@@ -38,12 +38,17 @@ sample_rate = 22050            # piper-plus uses 22.05 kHz mono throughout
 
 [runtimes]
 # `id` keys must match the matrix entries in runtime-parity-deep.yml.
+# Phase 1 (PR #511): Python / Rust / Go / C# expose JSONL phoneme_ids stdin
+# input + WAV output and are gated for cross-parity. Phase 2 will flip
+# `supports_dump_wav = true` for cpp / wasm once their CLIs gain the same
+# `--json-input` contract (cpp needs phoneme_ids extraction in processLine,
+# wasm needs a Node CLI bin entry).
 python  = { id = "python",  cli = "uv run python -m piper", supports_dump_wav = true }
 rust    = { id = "rust",    cli = "piper-plus",             supports_dump_wav = true }
 csharp  = { id = "csharp",  cli = "piper-plus-cli",         supports_dump_wav = true }
 go      = { id = "go",      cli = "piper-plus",             supports_dump_wav = true }
-wasm    = { id = "wasm",    cli = "node cli-dump.js",       supports_dump_wav = true }
-cpp     = { id = "cpp",     cli = "piper_plus_cli",         supports_dump_wav = true }
+wasm    = { id = "wasm",    cli = "node cli-dump.js",       supports_dump_wav = false }
+cpp     = { id = "cpp",     cli = "piper_plus_cli",         supports_dump_wav = false }
 # iOS Swift / Android Kotlin G2P bindings are excluded; they do not load
 # the ONNX decoder so cross-runtime WAV parity does not apply.
 

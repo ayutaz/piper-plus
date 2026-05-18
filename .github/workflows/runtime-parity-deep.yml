@@ -1,13 +1,20 @@
 # Runtime Parity Deep — audio output equivalence (informational tier)
 # =====================================================================
 # 同一 model + 同一 phoneme IDs から各 runtime が出力する WAV が階層化
-# 判定で「同じ音」と認められるかを検証する。 階層は SHA256 / peak-RMS /
+# 判定で「同じ音」 と認められるかを検証する。 階層は SHA256 / peak-RMS /
 # SNR の順で評価され、 informational tier (continue-on-error: true) で
-# 4 週間運用後に blocker 昇格を maintainer が判定する。
+# 4 週間運用後 blocker 昇格を maintainer が判定する。
 #
-# 本 workflow は **bootstrap 段階で 1 runtime のみで起動** する。 残りの
-# runtime CLI に `--dump-wav` flag を順次追加した上で matrix を拡張する
-# 設計 — ticket M2-2 §2 参照。
+# Phase 1 (PR #511 系列): Python / Rust / Go / C# の 4 runtime で稼働。
+# Phase 2: C++ / WASM CLI に phoneme_ids JSONL 入力契約を追加し 6 runtime
+# 化 — supports_dump_wav = false の runtime は scripts/audio_parity.py
+# 側で skip 行として報告される。
+#
+# 各 runtime は同一の fixture を入力:
+#   - model:       test/models/multilingual-test-medium.onnx (~38 MB, git)
+#   - phoneme IDs: tests/fixtures/audio-corpus/parity/phoneme_ids.jsonl
+# 各 build job が WAV 1 個を artifact upload → 最後の compare job が
+# scripts/audio_parity.py で 6 pair (C(4,2)) の tier 判定を出力する。
 
 name: Runtime Parity Deep
 
@@ -32,10 +39,150 @@ permissions:
   contents: read
   pull-requests: write
 
+env:
+  MODEL_PATH: test/models/multilingual-test-medium.onnx
+  CONFIG_PATH: test/models/multilingual-test-medium.onnx.json
+  FIXTURE: tests/fixtures/audio-corpus/parity/phoneme_ids.jsonl
+
 jobs:
-  parity-audio:
+  dump-python:
     runs-on: ubuntu-22.04
-    timeout-minutes: 40
+    timeout-minutes: 20
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v6.0.2
+      - uses: actions/setup-python@v6.2.0
+        with:
+          python-version: "3.11"
+
+      - name: Install piper-plus (inference only)
+        run: |
+          python -m pip install --upgrade pip
+          pip install --no-cache-dir uv
+          uv pip install --system -e src/python_run
+
+      - name: Synthesize via --json-input
+        run: |
+          mkdir -p /tmp/parity
+          # piper-plus is the installed entry point name; use the module path
+          # to avoid bin shadowing if multiple wheels are present.
+          python -m piper \
+            --model "$MODEL_PATH" \
+            --config "$CONFIG_PATH" \
+            --json-input \
+            --output-file /tmp/parity/python.wav \
+            < "$FIXTURE"
+          ls -lh /tmp/parity/python.wav
+
+      - uses: actions/upload-artifact@v4.6.0
+        with:
+          name: parity-wav-python
+          path: /tmp/parity/python.wav
+          retention-days: 7
+
+  dump-rust:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 25
+    continue-on-error: true
+    defaults:
+      run:
+        working-directory: src/rust
+    steps:
+      - uses: actions/checkout@v6.0.2
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src/rust -> target
+
+      - name: Build piper-plus-cli (release)
+        run: cargo build --release -p piper-plus-cli
+
+      - name: Synthesize via JSONL stdin
+        working-directory: ${{ github.workspace }}
+        run: |
+          mkdir -p /tmp/parity
+          # Rust CLI auto-detects JSONL when --text is absent and stdin is
+          # piped; --output-file overrides per-line output_file when missing.
+          ./src/rust/target/release/piper-plus \
+            --model "$MODEL_PATH" \
+            --config "$CONFIG_PATH" \
+            --output-file /tmp/parity/rust.wav \
+            --no-warmup \
+            < "$FIXTURE"
+          ls -lh /tmp/parity/rust.wav
+
+      - uses: actions/upload-artifact@v4.6.0
+        with:
+          name: parity-wav-rust
+          path: /tmp/parity/rust.wav
+          retention-days: 7
+
+  dump-go:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v6.0.2
+      - uses: actions/setup-go@v5.0.2
+        with:
+          go-version: "1.23"
+
+      - name: Build piper-plus (Go CLI)
+        working-directory: src/go
+        run: go build -o /tmp/piper-plus-go ./cmd/piper-plus
+
+      - name: Synthesize via --json-input
+        run: |
+          mkdir -p /tmp/parity
+          /tmp/piper-plus-go \
+            --model "$MODEL_PATH" \
+            --config "$CONFIG_PATH" \
+            --json-input \
+            --output-file /tmp/parity/go.wav \
+            < "$FIXTURE"
+          ls -lh /tmp/parity/go.wav
+
+      - uses: actions/upload-artifact@v4.6.0
+        with:
+          name: parity-wav-go
+          path: /tmp/parity/go.wav
+          retention-days: 7
+
+  dump-csharp:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 25
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v6.0.2
+      - uses: actions/setup-dotnet@v5.2.0
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Build PiperPlus.Cli (release)
+        run: dotnet build src/csharp/PiperPlus.Cli/PiperPlus.Cli.csproj -c Release
+
+      - name: Synthesize via --json-input
+        run: |
+          mkdir -p /tmp/parity
+          dotnet run --project src/csharp/PiperPlus.Cli/PiperPlus.Cli.csproj -c Release --no-build -- \
+            --model "$MODEL_PATH" \
+            --config "$CONFIG_PATH" \
+            --json-input \
+            --output-file /tmp/parity/csharp.wav \
+            < "$FIXTURE"
+          ls -lh /tmp/parity/csharp.wav
+
+      - uses: actions/upload-artifact@v4.6.0
+        with:
+          name: parity-wav-csharp
+          path: /tmp/parity/csharp.wav
+          retention-days: 7
+
+  compare:
+    needs: [dump-python, dump-rust, dump-go, dump-csharp]
+    if: always()
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
     continue-on-error: true
     steps:
       - uses: actions/checkout@v6.0.2
@@ -49,40 +196,43 @@ jobs:
         # touched.
         run: python scripts/audio_parity.py compare --help >/dev/null
 
-      - name: Bootstrap (synthesise a single-runtime self-comparison)
-        # Until at least two runtimes ship --dump-wav, the matrix runs as a
-        # smoke test: read the example WAV bundled with the test fixtures (or
-        # write a 1-second sine if none exists) and compare it against itself
-        # to exercise the script's load + tier-1 path. The actual cross-
-        # runtime matrix replaces this step once every CLI exposes --dump-wav.
+      - name: Download per-runtime wav artifacts
+        uses: actions/download-artifact@v4.3.0
+        with:
+          path: /tmp/parity-artifacts
+          pattern: parity-wav-*
+          merge-multiple: false
+
+      - name: Run audio_parity.py compare
         run: |
-          python - <<'PY'
-          import math, struct, wave
-          out = "/tmp/bootstrap.wav"
-          with wave.open(out, "wb") as w:
-              w.setnchannels(1); w.setsampwidth(2); w.setframerate(22050)
-              w.writeframes(b"".join(
-                  struct.pack("<h", int(0.1 * 32767 * math.sin(2*math.pi*440*i/22050)))
-                  for i in range(22050)
-              ))
-          PY
+          mkdir -p /tmp/parity
+          declare -a INPUTS=()
+          for r in python rust go csharp; do
+            wav="/tmp/parity-artifacts/parity-wav-${r}/${r}.wav"
+            if [ -f "$wav" ]; then
+              INPUTS+=("--inputs" "${r}=${wav}")
+            else
+              echo "WARN: $wav missing — runtime ${r} will be reported as skipped."
+            fi
+          done
           python scripts/audio_parity.py compare \
-            --inputs python=/tmp/bootstrap.wav python2=/tmp/bootstrap.wav \
-            --output /tmp/parity-diff.md
+            "${INPUTS[@]}" \
+            --output /tmp/parity/parity-diff.md
+          cat /tmp/parity/parity-diff.md
 
       - name: Post sticky comment
         if: github.event_name == 'pull_request'
         uses: marocchino/sticky-pull-request-comment@v2.9.4
         with:
           header: runtime-parity-deep
-          path: /tmp/parity-diff.md
+          path: /tmp/parity/parity-diff.md
 
-      - name: Upload artifacts
+      - name: Upload diff + wavs
         uses: actions/upload-artifact@v4.6.0
         if: always()
         with:
           name: runtime-parity-deep-${{ github.run_id }}
           path: |
-            /tmp/parity-diff.md
-            /tmp/*.wav
+            /tmp/parity/parity-diff.md
+            /tmp/parity-artifacts/**/*.wav
           retention-days: 30

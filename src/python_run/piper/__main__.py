@@ -145,6 +145,17 @@ def main() -> None:
         help="Text file(s) to read (can be used multiple times)",
     )
     parser.add_argument(
+        "--json-input",
+        "--json_input",
+        action="store_true",
+        help=(
+            "Read stdin as JSONL with one utterance per line. Each line must "
+            "contain a 'phoneme_ids' (list[int]) field; optional fields: "
+            "speaker_id, language_id, output_file. Used by cross-runtime "
+            "parity tests; phonemization is bypassed."
+        ),
+    )
+    parser.add_argument(
         "--debug", action="store_true", help="Print DEBUG messages to console"
     )
     parser.add_argument(
@@ -245,6 +256,65 @@ def main() -> None:
         )
 
     synthesize_args = config.to_synthesize_args()
+
+    # JSONL phoneme_ids stdin path (cross-runtime parity contract).
+    # Bypasses G2P so the input matches Rust / Go / C# `--json-input` exactly.
+    if getattr(args, "json_input", False):
+        import json
+
+        sample_rate = voice.config.sample_rate
+        output_dir = Path(config.output_dir) if config.output_dir else None
+        if output_dir is not None:
+            output_dir.mkdir(parents=True, exist_ok=True)
+        single_output = (
+            Path(config.output_file)
+            if config.output_file and config.output_file != "-"
+            else None
+        )
+
+        wrote_any = False
+        for line in sys.stdin:
+            line = line.strip()
+            if not line:
+                continue
+            entry = json.loads(line)
+            phoneme_ids = entry["phoneme_ids"]
+            raw_audio = voice.synthesize_ids_to_raw(
+                phoneme_ids,
+                speaker_id=entry.get("speaker_id", config.speaker_id),
+                language_id=entry.get("language_id"),
+                length_scale=config.length_scale,
+                noise_scale=config.noise_scale,
+                noise_w=config.noise_w,
+                volume=config.volume,
+            )
+
+            line_output = entry.get("output_file")
+            if line_output:
+                wav_path: Path | None = Path(line_output)
+            elif output_dir is not None:
+                wav_path = output_dir / f"{time.monotonic_ns()}.wav"
+            elif single_output is not None and not wrote_any:
+                wav_path = single_output
+            else:
+                wav_path = None  # write to stdout
+
+            if wav_path is None:
+                with wave.open(sys.stdout.buffer, "wb") as wav_file:
+                    wav_file.setnchannels(1)
+                    wav_file.setsampwidth(2)
+                    wav_file.setframerate(sample_rate)
+                    wav_file.writeframes(raw_audio)
+            else:
+                wav_path.parent.mkdir(parents=True, exist_ok=True)
+                with wave.open(str(wav_path), "wb") as wav_file:
+                    wav_file.setnchannels(1)
+                    wav_file.setsampwidth(2)
+                    wav_file.setframerate(sample_rate)
+                    wav_file.writeframes(raw_audio)
+                _LOGGER.info("Wrote %s", wav_path)
+            wrote_any = True
+        return
 
     # Determine input source
     def read_input_lines():
