@@ -199,6 +199,8 @@ check_*.py
 !scripts/check_timing_monotonicity.py
 # CHANGELOG keep-a-changelog format validator (proposals §3.7 Tier S #1)
 !scripts/check_changelog_format.py
+# README heading tree parity (proposals §3.7 Tier S #2, informational)
+!scripts/check_readme_heading_tree.py
 create_comprehensive_*.py
 add_missing_*.py
 retrain_*.py
