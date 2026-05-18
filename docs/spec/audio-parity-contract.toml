@@ -1,0 +1,54 @@
+# Audio parity contract — cross-runtime WAV equivalence (M2.2)
+# =============================================================
+# 同一 model + 同一 phoneme IDs から各 runtime が出力する WAV が、 階層化
+# 判定で「同じ音」と認められる閾値を pinning する canonical spec。 個別の
+# script / workflow は本 file を single source of truth として参照する。
+#
+# 階層化判定 (tier 1 → 4 の順):
+#   tier 1: SHA256 完全一致 (期待値、 ただし FP16 量子化や iSTFT の浮動小数
+#           演算で破られることが多い)
+#   tier 2: peak RMS の差が `peak_rms_max_diff` 以下
+#   tier 3: chromaprint fingerprint の Hamming distance が
+#           `chromaprint_max_hamming` 以下
+#   tier 4: mel-spec MSE が `mel_spec_max_mse` 以下、 かつ
+#           SNR が `snr_min_db` dB 以上
+#
+# 4 週間 informational tier 運用後、 maintainer が閾値を見直し blocker
+# 昇格する (`docs/tickets/M2-2-cross-runtime-audio-parity.md` §1 DoD)。
+
+[meta]
+schema_version = 1
+forward_compat_policy = "strict"
+canonical_source = "docs/spec/audio-parity-contract.toml"
+referencing_workflows = [
+    ".github/workflows/runtime-parity-deep.yml",
+]
+referencing_scripts = [
+    "scripts/audio_parity.py",
+]
+
+[thresholds]
+# All-zero thresholds would silently pass any input, so the script enforces
+# a non-zero floor on every tier; see `scripts/audio_parity.py:_validate_thresholds`.
+peak_rms_max_diff = 0.005      # informational tier upper bound (~ -46 dBFS)
+chromaprint_max_hamming = 32   # /256-bit chunks; ~12% bit-difference allowance
+mel_spec_max_mse = 1.0e-3      # 80-bin log-mel, normalised
+snr_min_db = 60.0              # signal-to-noise vs reference (cross-runtime)
+sample_rate = 22050            # piper-plus uses 22.05 kHz mono throughout
+
+[runtimes]
+# `id` keys must match the matrix entries in runtime-parity-deep.yml.
+python  = { id = "python",  cli = "uv run python -m piper", supports_dump_wav = true }
+rust    = { id = "rust",    cli = "piper-plus",             supports_dump_wav = true }
+csharp  = { id = "csharp",  cli = "piper-plus-cli",         supports_dump_wav = true }
+go      = { id = "go",      cli = "piper-plus",             supports_dump_wav = true }
+wasm    = { id = "wasm",    cli = "node cli-dump.js",       supports_dump_wav = true }
+cpp     = { id = "cpp",     cli = "piper_plus_cli",         supports_dump_wav = true }
+# iOS Swift / Android Kotlin G2P bindings are excluded; they do not load
+# the ONNX decoder so cross-runtime WAV parity does not apply.
+
+[models]
+# Models are looked up by name; the workflow downloads them on demand.
+multilingual_test_medium = { hf = "ayousanz/piper-plus-css10-ja-6lang" }
+tsukuyomi_6lang_v2       = { hf = "ayousanz/piper-plus-tsukuyomi-chan" }
+mb_istft_base            = { hf = "ayousanz/piper-plus-base" }

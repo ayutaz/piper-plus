@@ -3,7 +3,7 @@
 **親マイルストーン**: [M2 Audio Quality Moat](./M2-overview.md)
 **親調査**: [ci-expansion-2026-05.md §Top 10 #2](../proposals/ci-expansion-2026-05.md)
 **Top 10 内番号**: #2
-**ステータス**: 未着手
+**ステータス**: 着手中 (PR draft, informational tier bootstrap)
 **前提チケット**: [M1.1 Cancelled baseline alarm](./M1-1-cancelled-baseline-alarm.md) / [M2.1 Audio MOS proxy gate](./M2-1-audio-mos-proxy.md)
 **想定工数**: 4-5 PR (~40h)
 **優先度**: 高

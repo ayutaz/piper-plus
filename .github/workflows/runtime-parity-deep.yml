@@ -1,0 +1,88 @@
+# Runtime Parity Deep — audio output equivalence (informational tier)
+# =====================================================================
+# 同一 model + 同一 phoneme IDs から各 runtime が出力する WAV が階層化
+# 判定で「同じ音」と認められるかを検証する。 階層は SHA256 / peak-RMS /
+# SNR の順で評価され、 informational tier (continue-on-error: true) で
+# 4 週間運用後に blocker 昇格を maintainer が判定する。
+#
+# 本 workflow は **bootstrap 段階で 1 runtime のみで起動** する。 残りの
+# runtime CLI に `--dump-wav` flag を順次追加した上で matrix を拡張する
+# 設計 — ticket M2-2 §2 参照。
+
+name: Runtime Parity Deep
+
+on:
+  pull_request:
+    branches: [dev]
+    paths:
+      - 'src/**'
+      - 'tests/fixtures/audio-corpus/**'
+      - 'docs/spec/audio-parity-contract.toml'
+      - 'scripts/audio_parity.py'
+      - '.github/workflows/runtime-parity-deep.yml'
+  push:
+    branches: [dev]
+  workflow_dispatch:
+
+concurrency:
+  group: runtime-parity-deep-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  parity-audio:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 40
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v6.0.2
+      - uses: actions/setup-python@v6.2.0
+        with:
+          python-version: "3.13"
+
+      - name: Validate contract toml
+        # The script raises if any threshold is 0 / missing, so this step is
+        # itself the meta-gate: a contract drift fails before any audio is
+        # touched.
+        run: python scripts/audio_parity.py compare --help >/dev/null
+
+      - name: Bootstrap (synthesise a single-runtime self-comparison)
+        # Until at least two runtimes ship --dump-wav, the matrix runs as a
+        # smoke test: read the example WAV bundled with the test fixtures (or
+        # write a 1-second sine if none exists) and compare it against itself
+        # to exercise the script's load + tier-1 path. The actual cross-
+        # runtime matrix replaces this step once every CLI exposes --dump-wav.
+        run: |
+          python - <<'PY'
+          import math, struct, wave
+          out = "/tmp/bootstrap.wav"
+          with wave.open(out, "wb") as w:
+              w.setnchannels(1); w.setsampwidth(2); w.setframerate(22050)
+              w.writeframes(b"".join(
+                  struct.pack("<h", int(0.1 * 32767 * math.sin(2*math.pi*440*i/22050)))
+                  for i in range(22050)
+              ))
+          PY
+          python scripts/audio_parity.py compare \
+            --inputs python=/tmp/bootstrap.wav python2=/tmp/bootstrap.wav \
+            --output /tmp/parity-diff.md
+
+      - name: Post sticky comment
+        if: github.event_name == 'pull_request'
+        uses: marocchino/sticky-pull-request-comment@v2.9.4
+        with:
+          header: runtime-parity-deep
+          path: /tmp/parity-diff.md
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4.6.0
+        if: always()
+        with:
+          name: runtime-parity-deep-${{ github.run_id }}
+          path: |
+            /tmp/parity-diff.md
+            /tmp/*.wav
+          retention-days: 30

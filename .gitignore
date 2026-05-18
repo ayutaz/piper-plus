@@ -185,6 +185,8 @@ check_*.py
 !scripts/first_pr_health.py
 # Audio MOS proxy metrics (PESQ / STOI / UTMOS / Whisper WER)
 !scripts/audio_quality_metrics.py
+# Cross-runtime audio byte parity (SHA256 / RMS / SNR tiers)
+!scripts/audio_parity.py
 create_comprehensive_*.py
 add_missing_*.py
 retrain_*.py
