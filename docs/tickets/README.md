@@ -14,7 +14,7 @@
 | Phase | Overview | 個別チケット | Top 10 # | 想定工数 | 優先度 | ステータス |
 |-------|----------|-------------|---------|----------|--------|-----------|
 | **M1** Defensive Foundations | [M1-overview.md](./M1-overview.md) | [M1.1 Cancelled baseline alarm](./M1-1-cancelled-baseline-alarm.md) | #10 | 1-2 PR (~8h) | 高 | 未着手 |
-| | | [M1.2 Migration guide lint](./M1-2-migration-guide-lint.md) | #3 | 1 PR (~6h) | 高 | 未着手 |
+| | | [M1.2 Migration guide lint](./M1-2-migration-guide-lint.md) | #3 | 1 PR (~6h) | 高 | 着手中 (PR draft) |
 | | | [M1.3 First-PR fast lane](./M1-3-first-pr-fast-lane.md) | #5 | 2 PR (~12h) | 高 | 未着手 |
 | **M2** Audio Quality Moat | [M2-overview.md](./M2-overview.md) | [M2.1 Audio MOS proxy gate](./M2-1-audio-mos-proxy.md) | #1 | 3-4 PR (~30h) | 高 | 未着手 |
 | | | [M2.2 Cross-runtime audio byte parity](./M2-2-cross-runtime-audio-parity.md) | #2 | 4-5 PR (~40h) | 高 | 未着手 |

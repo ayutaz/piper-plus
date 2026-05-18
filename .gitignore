@@ -176,6 +176,8 @@ check_*.py
 !scripts/check_todo_age.py
 !scripts/check_workspace_python_parity.py
 !scripts/check_training_defaults.py
+# M1.2 — migration guide cross-ref lint
+!scripts/check_migration_xref.py
 create_comprehensive_*.py
 add_missing_*.py
 retrain_*.py

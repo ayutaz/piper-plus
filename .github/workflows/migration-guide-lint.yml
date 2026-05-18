@@ -1,0 +1,77 @@
+# Migration Guide Lint (M1.2)
+# ===========================
+# `CHANGELOG.md` の `[Unreleased] > ### Breaking` 節と
+# `docs/migration/v<X>-to-v<Y>.md` の cross-ref を構造的に強制する。
+# 既存 `migration-changelog-parity.yml` は CHANGELOG と migration doc の
+# 存在対応のみ検査するが、 こちらは entry 内の anchor link が実際に
+# 解決するかまで確認する。
+#
+# Enforce 条件 (false-positive 最小化):
+#   - `breaking` label が付与されている、 または
+#   - PR diff で CHANGELOG.md の `### Breaking` 節に新規 entry が追加されている
+#
+# patch / minor PR は paths filter で skip される。
+#
+# 関連: docs/tickets/M1-2-migration-guide-lint.md / parent
+# docs/proposals/ci-expansion-2026-05.md Top 10 #3。
+
+name: Migration Guide Lint
+
+on:
+  pull_request:
+    branches: [dev, main]
+    paths:
+      - 'CHANGELOG.md'
+      - 'docs/migration/**'
+      - 'scripts/check_migration_xref.py'
+      - '.github/workflows/migration-guide-lint.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6.0.2
+
+      - uses: actions/setup-python@v6.2.0
+        with:
+          python-version: "3.13"
+
+      - name: Detect breaking-change signal
+        id: signal
+        run: |
+          set -euo pipefail
+          has_label=false
+          has_diff=false
+          if [ -n "${{ join(github.event.pull_request.labels.*.name, ',') }}" ]; then
+            if echo "${{ join(github.event.pull_request.labels.*.name, ',') }}" | tr ',' '\n' | grep -qx breaking; then
+              has_label=true
+            fi
+          fi
+          base_sha="${{ github.event.pull_request.base.sha }}"
+          if [ -n "$base_sha" ]; then
+            git fetch --no-tags --depth=1 origin "$base_sha" 2>/dev/null || true
+            if git diff "$base_sha"...HEAD -- CHANGELOG.md 2>/dev/null | grep -E "^\+### Breaking" >/dev/null; then
+              has_diff=true
+            fi
+          fi
+          echo "has_label=$has_label" >> "$GITHUB_OUTPUT"
+          echo "has_diff=$has_diff" >> "$GITHUB_OUTPUT"
+          echo "Signal: label=$has_label diff=$has_diff"
+
+      - name: Run migration cross-ref lint
+        if: steps.signal.outputs.has_label == 'true' || steps.signal.outputs.has_diff == 'true' || github.event_name == 'workflow_dispatch'
+        run: python scripts/check_migration_xref.py
+
+      - name: Skipped (no breaking signal)
+        if: steps.signal.outputs.has_label != 'true' && steps.signal.outputs.has_diff != 'true' && github.event_name != 'workflow_dispatch'
+        run: echo "No breaking label and no ### Breaking diff; skipping migration cross-ref lint."
