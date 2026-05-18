@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1778862367197,
+  "lastUpdate": 1779070688264,
   "repoUrl": "https://github.com/ayutaz/piper-plus",
   "entries": {
     "Python inference benchmark": [
@@ -97,6 +97,60 @@ window.BENCHMARK_DATA = {
           {
             "name": "Cold Start (en)",
             "value": 1335.6,
+            "unit": "ms"
+          },
+          {
+            "name": "Peak Memory (en)",
+            "value": 209.3,
+            "unit": "MB"
+          },
+          {
+            "name": "Model Size (en)",
+            "value": 37.6,
+            "unit": "MB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "41669061+ayutaz@users.noreply.github.com",
+            "name": "yousan",
+            "username": "ayutaz"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "6fe8c9c6af2a3a6f9ba299ce3eb77a0a6e2b3156",
+          "message": "fix(runtime): trim EOS region for all inputs (Issue #499 Tier 1) (#506)\n\nVitsModel.infer() expands attention with ceil(w) but exposes raw float\nw as the durations output. The EOS frame(s) generated under ceil\nexpansion carry decoder leakage that sounds like the final syllable was\nrepeated — audible on fine-tuned models such as\npiper-plus-tsukuyomi-chan (Issue #499 / HF samples ja/en/zh/fr/pt).\n\n_trim_padding_by_durations already drops the EOS region but only when\nStrategy A short-text padding was applied. This adds _trim_eos_region\nwhich applies the same drop to every inference path so long-text\noutputs are no longer left with the audible doubled tail.\n\nChanges:\n- src/python_run/piper/voice.py: add _trim_eos_region; apply in\n  _synthesize_ids_core when was_padded=False.\n- src/python/piper_train/infer_onnx.py: mirror the helper and apply\n  in main()'s inference path.\n- TestTrimEosRegion (9 cases) added to both\n  src/python_run/tests/test_short_text_mitigation.py (CI: \"Run runtime\n  full tests\") and src/python/tests/test_infer_onnx.py (cross-runtime\n  contract mirror).\n\nMeasured on tsukuyomi-chan-6lang-fp16.onnx with text\n\"こんにちは、つくよみちゃんです。\" (ls=1.0, nw=0, deterministic):\nceil(durations[-1])=2 frames (512 samples, ~23 ms) trimmed; trailing\n\"doubled syllable\" 2nd-peak amplitude drops by ~30 % (15535 → 10997).\nRemaining structural decoder leakage upstream of EOS requires Tier 2\n(durations = w_ceil at export) or model re-training to remove.",
+          "timestamp": "2026-05-18T11:17:04+09:00",
+          "tree_id": "331ee698ca5404d3f97d87d095b767d03d67a52a",
+          "url": "https://github.com/ayutaz/piper-plus/commit/6fe8c9c6af2a3a6f9ba299ce3eb77a0a6e2b3156"
+        },
+        "date": 1779070686420,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "RTF (en)",
+            "value": 0.1036,
+            "unit": "ratio"
+          },
+          {
+            "name": "Latency P50 (en)",
+            "value": 24.8,
+            "unit": "ms"
+          },
+          {
+            "name": "Latency P95 (en)",
+            "value": 36,
+            "unit": "ms"
+          },
+          {
+            "name": "Cold Start (en)",
+            "value": 1353.9,
             "unit": "ms"
           },
           {
