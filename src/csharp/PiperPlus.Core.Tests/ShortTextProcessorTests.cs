@@ -411,7 +411,6 @@ public class ShortTextProcessorTests
     // Mirrors src/python_run/tests/test_short_text_mitigation.py::TestTrimEosRegion
     // so every runtime gets identical behavioral coverage
     // (cross-runtime contract — Issue #499).
-
     [Fact]
     public void TrimEosRegion_DefaultStripsFullEosRegion()
     {
@@ -420,10 +419,17 @@ public class ShortTextProcessorTests
         const int hop = 100;
         const int total = 800;
         var audio = new float[total];
-        for (int i = 0; i < total; i++) audio[i] = i;
+        for (int i = 0; i < total; i++)
+        {
+            audio[i] = i;
+        }
+
         var result = ShortTextProcessor.TrimEosRegion(audio, durations, hop);
         Assert.Equal(total - 200, result.Length);
-        for (int i = 0; i < 600; i++) Assert.Equal(audio[i], result[i]);
+        for (int i = 0; i < 600; i++)
+        {
+            Assert.Equal(audio[i], result[i]);
+        }
     }
 
     [Fact]
