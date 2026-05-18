@@ -191,6 +191,7 @@ v1.12.0 で 5 ランタイム (Python/Rust/C#/Go/WASM) に展開した SSML / Vo
 - Docker: arm64 build/test matrix を CI に追加 (`docker-build-test.yml`)。PR #473 (16fa5091)
 - Docker: GitHub Actions runner の disk 枯渇対策 (build artifact prune + buildx cache strategy)。PR #482 (22c78236)
 - CodeQL: `cpp/loop-variable-changed` をルール全体で suppress (false positive 多数のため)。PR #492 (cd6a9d8a)
+- CI: `deploy-huggingface.yml` / `release-shared-lib.yml` に `scripts/generate_model_card.py` 駆動の `MODEL_CARD.md` + `LICENSE_ATTRIBUTIONS.md` 生成 step を注入。 HF Space deploy / GitHub Release artifact に attribution が確実に同梱され、 dataset attribution の脱落を構造的に防止 (`docs/tickets/M3-2-license-auto-injection.md`)
 
 ### Limitations (v1.13.0 iOS xcframework)
 

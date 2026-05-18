@@ -3,7 +3,7 @@
 **親マイルストーン**: [M3 ABI & Ecosystem Hardening](./M3-overview.md)
 **親調査**: [ci-expansion-2026-05.md §Top 10 #7](../proposals/ci-expansion-2026-05.md)
 **Top 10 内番号**: #7
-**ステータス**: 着手中 (PR draft, validate + generate ready)
+**ステータス**: 着手中 (PR draft, validate + generate + workflow hook 注入完了)
 **想定工数**: 2 PR (~15h)
 **優先度**: 中
 **作成日**: 2026-05-18

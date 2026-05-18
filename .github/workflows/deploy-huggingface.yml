@@ -111,6 +111,25 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: Generate MODEL_CARD.md + LICENSE_ATTRIBUTIONS.md (M3.2)
+        # data-sources.yml を canonical source として model card + license
+        # attribution を deterministic に生成し、 HF Space deploy bundle に
+        # 同梱する。 generate_model_card.py validate で schema を先に検証
+        # することで yml typo 由来の崩れを deploy 前に止める。
+        # filter `--model multilingual-test-medium` により tsukuyomi-chan-corpus
+        # (used_only_in が tsukuyomi 系) は HF Space 同梱物から除外される。
+        run: |
+          pip install --quiet pyyaml
+          python3 scripts/generate_model_card.py validate
+          python3 scripts/generate_model_card.py generate \
+            --model multilingual-test-medium \
+            --model-card hf-space-deploy/MODEL_CARD.md \
+            --attributions hf-space-deploy/LICENSE_ATTRIBUTIONS.md
+          echo "=== MODEL_CARD.md (head) ==="
+          head -20 hf-space-deploy/MODEL_CARD.md
+          echo "=== LICENSE_ATTRIBUTIONS.md (head) ==="
+          head -20 hf-space-deploy/LICENSE_ATTRIBUTIONS.md
+
       - name: Validate Python imports before deployment
         working-directory: hf-space-deploy
         run: |
