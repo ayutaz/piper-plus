@@ -3,7 +3,7 @@
 **親マイルストーン**: [M1 Defensive Foundations](./M1-overview.md)
 **親調査**: [ci-expansion-2026-05.md §Top 10 #10](../proposals/ci-expansion-2026-05.md#5-真に追加する価値があるトップ-10)
 **Top 10 内番号**: #10
-**ステータス**: 未着手
+**ステータス**: 着手中 (PR draft)
 **想定工数**: 1-2 PR (~8h)
 **優先度**: 高
 **作成日**: 2026-05-18
