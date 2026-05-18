@@ -79,12 +79,7 @@ piper-plus ドキュメント。利用ガイド・各ランタイム連携・仕
 ## Proposals (ロードマップ / 議論起点)
 
 - [CI/CD 拡張プラン (2026-05)](proposals/ci-expansion-2026-05.md) — Unlimited CI 前提の網羅調査 + 真に追加する価値があるトップ 10 + 3 ヶ月ロードマップ
-- [CI/CD 拡張プラン — マイルストーン詳細](proposals/ci-expansion-milestones.md) — Top 10 を M1-M3 + M4 + M-Stretch に分解、 各 M に目的 / 成功基準 / タスク / 依存 / リスク / 工数を明記
-
-## Tickets (実装単位の個別チケット)
-
-- [Tickets INDEX](tickets/README.md) — CI/CD 拡張プラン マイルストーンを実装者が一人で着手できるレベルまで分解した 10 チケット + 5 phase overview (M1-M4 + M-Stretch) / マイルストーン↔チケット相互マップ / 依存グラフ
-- Phase overview: [M1 Defensive Foundations](tickets/M1-overview.md) / [M2 Audio Quality Moat](tickets/M2-overview.md) / [M3 ABI & Ecosystem Hardening](tickets/M3-overview.md) / [M4 Informational Tier](tickets/M4-overview.md) / [M-Stretch Strategic Bets](tickets/M-Stretch-overview.md)
+- [CI/CD 拡張プラン — マイルストーン詳細](proposals/ci-expansion-milestones.md) — Top 10 を M1-M3 + M4 + M-Stretch に分解、 各 M に目的 / 成功基準 / タスク / 依存 / リスク / 工数を明記 (Top 10 + §3 軽量 5 件は PR #511 で実装完了)
 
 ## Migration
 
