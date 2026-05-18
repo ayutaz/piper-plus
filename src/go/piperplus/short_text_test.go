@@ -297,6 +297,104 @@ func TestTrimPaddingByDurations_TruncationMatchesIntCast(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
+// Tier 1 (Issue #499): trimEosRegion — drop EOS region for ALL inputs
+// ---------------------------------------------------------------------------
+// Mirrors src/python_run/tests/test_short_text_mitigation.py::TestTrimEosRegion
+// so every runtime gets identical behavioral coverage
+// (cross-runtime contract — Issue #499).
+
+func TestTrimEosRegion_DefaultStripsFullEosRegion(t *testing.T) {
+	// EOS = 2.0 frames → ceil = 2 → 200 samples (hop=100)
+	durations := []float32{1.0, 2.0, 3.0, 2.0}
+	const hop = 100
+	total := 800
+	audio := make([]int16, total)
+	for i := range audio {
+		audio[i] = int16(i)
+	}
+	result := trimEosRegion(audio, durations, hop, trimEosMaxFrames)
+	if len(result) != total-200 {
+		t.Errorf("expected length %d, got %d", total-200, len(result))
+	}
+	for i := 0; i < 600; i++ {
+		if result[i] != audio[i] {
+			t.Errorf("sample %d: expected %d, got %d", i, audio[i], result[i])
+		}
+	}
+}
+
+func TestTrimEosRegion_AppliesCeilToFractionalDuration(t *testing.T) {
+	// durations[-1]=1.99 must trim ceil(1.99)=2 frames, not 1.
+	durations := []float32{1.0, 1.0, 1.0, 1.99}
+	const hop = 256
+	audio := make([]int16, 2048)
+	result := trimEosRegion(audio, durations, hop, trimEosMaxFrames)
+	if len(result) != 2048-512 {
+		t.Errorf("expected length %d, got %d", 2048-512, len(result))
+	}
+}
+
+func TestTrimEosRegion_EosMaxFramesOverrideKeepsHeadOfEos(t *testing.T) {
+	// EOS=10 raw, eosMaxFrames=6 → excess = ceil(10) - 6 = 4 frames
+	durations := []float32{2.0, 3.0, 3.0, 10.0}
+	const hop = 100
+	audio := make([]int16, 2000)
+	result := trimEosRegion(audio, durations, hop, 6)
+	if len(result) != 2000-400 {
+		t.Errorf("expected length %d, got %d", 2000-400, len(result))
+	}
+}
+
+func TestTrimEosRegion_NoOpWhenEosBelowMax(t *testing.T) {
+	// ceil(1.99)=2 ≤ eosMaxFrames=4 → no trim
+	durations := []float32{1.0, 1.0, 1.99}
+	const hop = 256
+	audio := make([]int16, 1024)
+	result := trimEosRegion(audio, durations, hop, 4)
+	if len(result) != len(audio) {
+		t.Errorf("expected unchanged length %d, got %d", len(audio), len(result))
+	}
+}
+
+func TestTrimEosRegion_ReturnsInputWhenDurationsEmpty(t *testing.T) {
+	audio := make([]int16, 1000)
+	result := trimEosRegion(audio, []float32{}, 256, trimEosMaxFrames)
+	if len(result) != len(audio) {
+		t.Errorf("expected unchanged length %d, got %d", len(audio), len(result))
+	}
+}
+
+func TestTrimEosRegion_ReturnsInputWhenHopSizeZero(t *testing.T) {
+	audio := make([]int16, 1000)
+	durations := []float32{1.0, 2.0, 3.0}
+	result := trimEosRegion(audio, durations, 0, trimEosMaxFrames)
+	if len(result) != len(audio) {
+		t.Errorf("expected unchanged length %d, got %d", len(audio), len(result))
+	}
+}
+
+func TestTrimEosRegion_ReturnsInputWhenTrimExceedsAudio(t *testing.T) {
+	// EOS=5 frames * 100 hop = 500 samples, audio has 200 samples
+	durations := []float32{1.0, 5.0}
+	audio := make([]int16, 200)
+	result := trimEosRegion(audio, durations, 100, trimEosMaxFrames)
+	if len(result) != len(audio) {
+		t.Errorf("expected unchanged length %d, got %d", len(audio), len(result))
+	}
+}
+
+func TestTrimEosRegion_IntegerDurationUnaffectedByCeil(t *testing.T) {
+	// ceil(2.0) == 2 — integer-valued durations trim int(d) frames.
+	durations := []float32{1.0, 1.0, 2.0}
+	const hop = 100
+	audio := make([]int16, 400)
+	result := trimEosRegion(audio, durations, hop, trimEosMaxFrames)
+	if len(result) != 400-200 {
+		t.Errorf("expected length %d, got %d", 400-200, len(result))
+	}
+}
+
+// ---------------------------------------------------------------------------
 // Strategy A: trimSilence
 // ---------------------------------------------------------------------------
 

@@ -322,6 +322,50 @@ pub fn trim_padding_by_durations(
     audio[start as usize..end as usize].to_vec()
 }
 
+/// Tier 1 workaround for Issue #499: trim the EOS region from the tail for
+/// **every** inference path (long-text included).
+///
+/// `VitsModel.infer()` expands attention with `ceil(w)` but exposes the raw
+/// float `w` as the `durations` output. The EOS frame(s) generated under
+/// `ceil` carry decoder leakage that sounds like the final syllable was
+/// repeated — clearly audible on fine-tuned models such as
+/// `piper-plus-tsukuyomi-chan`. `trim_padding_by_durations` already drops
+/// the EOS region only when Strategy A short-text padding was applied; this
+/// helper applies the same drop to every other inference path so long-text
+/// outputs do not retain the audible doubled tail.
+///
+/// Mirrors `piper.voice._trim_eos_region` so all runtimes produce
+/// byte-equal output for the same `(audio, durations[-1], hop_size,
+/// eos_max_frames)` tuple. The sample-count conversion uses `as i64`
+/// truncation to match Python's `int(...)` semantics — cross-runtime
+/// contract (Issue #499).
+///
+/// 返り値は入力をそのまま返す: `audio.is_empty()`, `durations.is_empty()`,
+/// `hop_size == 0`, `ceil(durations[-1]) <= eos_max_frames`, または
+/// `trim_samples >= audio.len()` のとき。
+pub fn trim_eos_region(
+    audio: &[i16],
+    durations: &[f32],
+    hop_size: u32,
+    eos_max_frames: usize,
+) -> Vec<i16> {
+    if hop_size == 0 || durations.is_empty() {
+        return audio.to_vec();
+    }
+    let eos_frames = durations[durations.len() - 1];
+    let eos_ceil = eos_frames.ceil() as i64;
+    let eos_excess = (eos_ceil - eos_max_frames as i64).max(0);
+    if eos_excess <= 0 {
+        return audio.to_vec();
+    }
+    let trim_samples = eos_excess * hop_size as i64;
+    let total = audio.len() as i64;
+    if trim_samples >= total {
+        return audio.to_vec();
+    }
+    audio[..(total - trim_samples) as usize].to_vec()
+}
+
 /// Strategy A (post-trim): RMS ベースで先頭・末尾の無音をトリムする。
 ///
 /// 窓幅 `TRIM_WINDOW_SIZE` の RMS が `TRIM_THRESHOLD_RMS` を超える
@@ -925,6 +969,29 @@ impl OnnxEngine {
                 trimmed.len()
             );
             trimmed
+        } else if let Some(durs) = padded_durations.as_deref() {
+            // Tier 1 workaround for Issue #499: even without short-text
+            // padding, the EOS region carries decoder leakage that sounds
+            // like the final syllable was repeated. Strategy A above
+            // already handles this for padded inputs; this branch applies
+            // the same EOS-region drop to long-text outputs.
+            //
+            // Implemented in-place (truncate, no allocation/copy) instead of
+            // calling `trim_eos_region` — that helper has to return a fresh
+            // `Vec<i16>` to mirror the Python signature for cross-runtime
+            // byte-equality, but here we already own the buffer and just
+            // want to drop the tail. Keeps the long-text path at O(1)
+            // tail-trim rather than O(n) full-buffer copy.
+            let mut buf = audio_i16_raw;
+            if !durs.is_empty() && self.hop_size > 0 {
+                let eos_ceil = durs[durs.len() - 1].ceil() as i64;
+                let eos_excess = (eos_ceil - TRIM_EOS_MAX_FRAMES as i64).max(0);
+                let trim = (eos_excess * self.hop_size as i64) as usize;
+                if trim > 0 && trim < buf.len() {
+                    buf.truncate(buf.len() - trim);
+                }
+            }
+            buf
         } else {
             audio_i16_raw
         };
@@ -1803,5 +1870,89 @@ mod tests {
         let audio = vec![0i16; total];
         let result = trim_padding_by_durations(&audio, &durations, 1, 1, hop, TRIM_EOS_MAX_FRAMES);
         assert_eq!(result.len(), total - 140 - 140);
+    }
+
+    // ---------------------------------------------------------------
+    // Tier 1 (Issue #499): trim_eos_region — drop EOS region for ALL inputs
+    // ---------------------------------------------------------------
+    // Mirrors src/python_run/tests/test_short_text_mitigation.py::TestTrimEosRegion
+    // so every runtime gets identical behavioral coverage
+    // (cross-runtime contract — Issue #499).
+
+    #[test]
+    fn test_trim_eos_region_default_strips_full_eos_region() {
+        // EOS = 2.0 frames → ceil = 2 → 200 samples (hop=100)
+        let durations: Vec<f32> = vec![1.0, 2.0, 3.0, 2.0];
+        let hop = 100u32;
+        let total = 800usize;
+        let audio: Vec<i16> = (0..total as i16).collect();
+        let result = trim_eos_region(&audio, &durations, hop, TRIM_EOS_MAX_FRAMES);
+        assert_eq!(result.len(), total - 200);
+        assert_eq!(result, audio[..600]);
+    }
+
+    #[test]
+    fn test_trim_eos_region_applies_ceil_to_fractional_duration() {
+        // durations[-1]=1.99 must trim ceil(1.99)=2 frames, not 1.
+        let durations: Vec<f32> = vec![1.0, 1.0, 1.0, 1.99];
+        let hop = 256u32;
+        let audio = vec![0i16; 2048];
+        let result = trim_eos_region(&audio, &durations, hop, TRIM_EOS_MAX_FRAMES);
+        assert_eq!(result.len(), 2048 - 512);
+    }
+
+    #[test]
+    fn test_trim_eos_region_eos_max_frames_override_keeps_head_of_eos() {
+        // EOS=10 raw, eos_max_frames=6 → excess = ceil(10) - 6 = 4 frames
+        let durations: Vec<f32> = vec![2.0, 3.0, 3.0, 10.0];
+        let hop = 100u32;
+        let audio = vec![0i16; 2000];
+        let result = trim_eos_region(&audio, &durations, hop, 6);
+        assert_eq!(result.len(), 2000 - 400);
+    }
+
+    #[test]
+    fn test_trim_eos_region_no_op_when_eos_below_max() {
+        // ceil(1.99)=2 ≤ eos_max_frames=4 → no trim
+        let durations: Vec<f32> = vec![1.0, 1.0, 1.99];
+        let hop = 256u32;
+        let audio = vec![0i16; 1024];
+        let result = trim_eos_region(&audio, &durations, hop, 4);
+        assert_eq!(result.len(), audio.len());
+    }
+
+    #[test]
+    fn test_trim_eos_region_returns_input_when_durations_empty() {
+        let audio = vec![0i16; 1000];
+        let durations: Vec<f32> = vec![];
+        let result = trim_eos_region(&audio, &durations, 256, TRIM_EOS_MAX_FRAMES);
+        assert_eq!(result.len(), audio.len());
+    }
+
+    #[test]
+    fn test_trim_eos_region_returns_input_when_hop_size_zero() {
+        let audio = vec![0i16; 1000];
+        let durations: Vec<f32> = vec![1.0, 2.0, 3.0];
+        let result = trim_eos_region(&audio, &durations, 0, TRIM_EOS_MAX_FRAMES);
+        assert_eq!(result.len(), audio.len());
+    }
+
+    #[test]
+    fn test_trim_eos_region_returns_input_when_trim_exceeds_audio() {
+        // EOS=5 frames * 100 hop = 500 samples, audio has 200 samples
+        let durations: Vec<f32> = vec![1.0, 5.0];
+        let audio = vec![0i16; 200];
+        let result = trim_eos_region(&audio, &durations, 100, TRIM_EOS_MAX_FRAMES);
+        assert_eq!(result.len(), audio.len());
+    }
+
+    #[test]
+    fn test_trim_eos_region_integer_duration_unaffected_by_ceil() {
+        // ceil(2.0) == 2 — integer-valued durations trim int(d) frames.
+        let durations: Vec<f32> = vec![1.0, 1.0, 2.0];
+        let hop = 100u32;
+        let audio = vec![0i16; 400];
+        let result = trim_eos_region(&audio, &durations, hop, TRIM_EOS_MAX_FRAMES);
+        assert_eq!(result.len(), 400 - 200);
     }
 }

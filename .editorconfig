@@ -67,6 +67,13 @@ indent_size = unset
 [src/cpp/tests/test_ssml.cpp]
 indent_size = unset
 
+# Short-text mitigation tests follow the legacy src/cpp 2-space indent style
+# to match piper.cpp (whose own opt-out is grouped with piper.cpp above). The
+# test file replicates piper.cpp's trim helpers verbatim so the indentation
+# style must match.
+[src/cpp/tests/test_short_text_mitigation.cpp]
+indent_size = unset
+
 # Cross-runtime contract specs in docs/spec/ use column-alignment for
 # inline `# comment` annotations (e.g. `sample_rate = 22050        # Hz`),
 # array entries with inline tables, and field tables with aligned widths

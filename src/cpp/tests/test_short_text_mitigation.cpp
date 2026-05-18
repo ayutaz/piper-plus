@@ -14,7 +14,7 @@
 #include <vector>
 
 // ---------------------------------------------------------------------------
-// Re-declare the constants and helpers identically to piper.cpp so the tests
+// Redeclare the constants and helpers identically to piper.cpp so the tests
 // are self-contained (no piper.cpp linkage required).
 // ---------------------------------------------------------------------------
 
@@ -116,6 +116,23 @@ static void trimPaddingByDurations(std::vector<int16_t> &audioBuffer,
                                  audioBuffer.begin() + end);
     audioBuffer = std::move(trimmed);
   }
+}
+
+// Replica of trimEosRegion from piper.cpp (int16 variant). Tier 1 (Issue
+// #499): drop ceil(durations[-1]) frames from the tail for ALL inputs.
+static void trimEosRegion(std::vector<int16_t> &audioBuffer,
+                          const std::vector<float> &durations,
+                          int hopSize,
+                          int eosMaxFrames = TRIM_EOS_MAX_FRAMES) {
+  if (hopSize <= 0 || durations.empty()) return;
+  const float eosFrames = durations.back();
+  const int eosCeil = static_cast<int>(std::ceil(eosFrames));
+  const int eosExcess = std::max(0, eosCeil - eosMaxFrames);
+  if (eosExcess <= 0) return;
+  const int trimSamples = eosExcess * hopSize;
+  const int totalSamples = static_cast<int>(audioBuffer.size());
+  if (trimSamples >= totalSamples) return;
+  audioBuffer.resize(totalSamples - trimSamples);
 }
 
 // Replica of trimSilenceInt16 from piper.cpp
@@ -1054,6 +1071,101 @@ TEST_F(TrimPaddingByDurationsTest, TruncationMatchesIntCast) {
                          hop, TRIM_EOS_MAX_FRAMES);
 
   EXPECT_EQ(static_cast<int>(audio.size()), total - 140 - 140);
+}
+
+// ======================================================================
+// Tier 1 (Issue #499): trimEosRegion — drop EOS region for ALL inputs
+// ======================================================================
+// Mirrors src/python_run/tests/test_short_text_mitigation.py::TestTrimEosRegion
+// so every runtime gets identical behavioral coverage
+// (cross-runtime contract — Issue #499).
+
+class TrimEosRegionTest : public ::testing::Test {};
+
+TEST_F(TrimEosRegionTest, DefaultStripsFullEosRegion) {
+  // EOS = 2.0 frames → ceil = 2 → 200 samples (hop=100)
+  std::vector<float> durations = {1.0f, 2.0f, 3.0f, 2.0f};
+  const int hop = 100;
+  const int total = 800;
+  std::vector<int16_t> audio(total);
+  for (int i = 0; i < total; i++) audio[i] = static_cast<int16_t>(i);
+
+  trimEosRegion(audio, durations, hop, TRIM_EOS_MAX_FRAMES);
+
+  EXPECT_EQ(static_cast<int>(audio.size()), total - 200);
+  for (int i = 0; i < 600; i++) EXPECT_EQ(audio[i], static_cast<int16_t>(i));
+}
+
+TEST_F(TrimEosRegionTest, AppliesCeilToFractionalDuration) {
+  // durations[-1]=1.99 must trim ceil(1.99)=2 frames, not 1.
+  std::vector<float> durations = {1.0f, 1.0f, 1.0f, 1.99f};
+  const int hop = 256;
+  std::vector<int16_t> audio(2048);
+
+  trimEosRegion(audio, durations, hop, TRIM_EOS_MAX_FRAMES);
+
+  EXPECT_EQ(static_cast<int>(audio.size()), 2048 - 512);
+}
+
+TEST_F(TrimEosRegionTest, EosMaxFramesOverrideKeepsHeadOfEos) {
+  // EOS=10 raw, eosMaxFrames=6 → excess = ceil(10) - 6 = 4 frames
+  std::vector<float> durations = {2.0f, 3.0f, 3.0f, 10.0f};
+  const int hop = 100;
+  std::vector<int16_t> audio(2000);
+
+  trimEosRegion(audio, durations, hop, /*eosMaxFrames=*/6);
+
+  EXPECT_EQ(static_cast<int>(audio.size()), 2000 - 400);
+}
+
+TEST_F(TrimEosRegionTest, NoOpWhenEosBelowMax) {
+  // ceil(1.99)=2 ≤ eosMaxFrames=4 → no trim
+  std::vector<float> durations = {1.0f, 1.0f, 1.99f};
+  const int hop = 256;
+  std::vector<int16_t> audio(1024);
+
+  trimEosRegion(audio, durations, hop, /*eosMaxFrames=*/4);
+
+  EXPECT_EQ(static_cast<int>(audio.size()), 1024);
+}
+
+TEST_F(TrimEosRegionTest, ReturnsInputWhenDurationsEmpty) {
+  std::vector<int16_t> audio(1000);
+  std::vector<float> durations;
+
+  trimEosRegion(audio, durations, /*hopSize=*/256, TRIM_EOS_MAX_FRAMES);
+
+  EXPECT_EQ(static_cast<int>(audio.size()), 1000);
+}
+
+TEST_F(TrimEosRegionTest, ReturnsInputWhenHopSizeZero) {
+  std::vector<int16_t> audio(1000);
+  std::vector<float> durations = {1.0f, 2.0f, 3.0f};
+
+  trimEosRegion(audio, durations, /*hopSize=*/0, TRIM_EOS_MAX_FRAMES);
+
+  EXPECT_EQ(static_cast<int>(audio.size()), 1000);
+}
+
+TEST_F(TrimEosRegionTest, ReturnsInputWhenTrimExceedsAudio) {
+  // EOS=5 frames * 100 hop = 500 samples, audio has 200 samples
+  std::vector<float> durations = {1.0f, 5.0f};
+  std::vector<int16_t> audio(200);
+
+  trimEosRegion(audio, durations, /*hopSize=*/100, TRIM_EOS_MAX_FRAMES);
+
+  EXPECT_EQ(static_cast<int>(audio.size()), 200);
+}
+
+TEST_F(TrimEosRegionTest, IntegerDurationUnaffectedByCeil) {
+  // ceil(2.0) == 2 — integer-valued durations trim int(d) frames.
+  std::vector<float> durations = {1.0f, 1.0f, 2.0f};
+  const int hop = 100;
+  std::vector<int16_t> audio(400);
+
+  trimEosRegion(audio, durations, hop, TRIM_EOS_MAX_FRAMES);
+
+  EXPECT_EQ(static_cast<int>(audio.size()), 400 - 200);
 }
 
 int main(int argc, char **argv) {
