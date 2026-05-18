@@ -1,0 +1,66 @@
+# Forward-compat fuzz (M4.1, informational tier)
+# ===============================================
+# `zh_en_loanword.json` / `pua.json` の forward-compat (schema_version > 2 /
+# 未定義 future field) を 1000+ random ケースで Python loader に投げて
+# panic / exception しないことを確認する gate。 続いて他 runtime も
+# subprocess で叩く設計だが、 本 commit では Python のみ。 失敗履歴は
+# `docs/ci-dashboard/data/forward-compat-fuzz.jsonl` に append される。
+
+name: Forward-compat Fuzz
+
+on:
+  pull_request:
+    branches: [dev]
+    paths:
+      - 'src/python/g2p/**'
+      - 'src/python_run/piper/phonemize/**'
+      - 'scripts/fuzz_forward_compat.py'
+      - '.github/workflows/forward-compat-fuzz.yml'
+  push:
+    branches: [dev]
+  workflow_dispatch:
+    inputs:
+      seed:
+        description: 'Random seed (optional)'
+        required: false
+        default: ''
+
+concurrency:
+  group: forward-compat-fuzz-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  fuzz:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v6.0.2
+      - uses: actions/setup-python@v6.2.0
+        with:
+          python-version: "3.13"
+      - name: Run fuzz (Python loader contract)
+        run: |
+          seed="${{ inputs.seed }}"
+          if [ -n "$seed" ]; then
+            python scripts/fuzz_forward_compat.py fuzz \
+              --iterations 1000 --seed "$seed" --output /tmp/fuzz.json
+          else
+            python scripts/fuzz_forward_compat.py fuzz \
+              --iterations 1000 --output /tmp/fuzz.json
+          fi
+      - name: Record dashboard entry
+        run: |
+          python scripts/fuzz_forward_compat.py record --input /tmp/fuzz.json
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4.6.0
+        if: always()
+        with:
+          name: forward-compat-fuzz-${{ github.run_id }}
+          path: |
+            /tmp/fuzz.json
+            docs/ci-dashboard/data/forward-compat-fuzz.jsonl
+          retention-days: 90

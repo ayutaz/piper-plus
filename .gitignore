@@ -193,6 +193,10 @@ check_*.py
 !scripts/generate_model_card.py
 # Typosquatting watch (registry Levenshtein + homograph scan)
 !scripts/check_typosquatting.py
+# Forward-compat fuzz for loanword / PUA JSON schema
+!scripts/fuzz_forward_compat.py
+# Phoneme timing monotonicity property test
+!scripts/check_timing_monotonicity.py
 create_comprehensive_*.py
 add_missing_*.py
 retrain_*.py

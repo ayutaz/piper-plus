@@ -3,7 +3,7 @@
 **親マイルストーン**: [ci-expansion-milestones.md §M4.1](../proposals/ci-expansion-milestones.md#m41--loanword--pua-forward-compat-fuzz-top-10-6)
 **フェーズ**: [M4: Informational Tier](./M4-overview.md)
 **Top 10 #**: 6
-**ステータス**: 未着手
+**ステータス**: 着手中 (PR draft, Python loader fuzz informational)
 **優先度**: 中
 **想定工数**: 1-2 PR (~10h)
 **作成日**: 2026-05-18

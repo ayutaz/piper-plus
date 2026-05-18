@@ -3,7 +3,7 @@
 **親マイルストーン**: [ci-expansion-milestones.md §M4.2](../proposals/ci-expansion-milestones.md#m42--phoneme-timing-monotonicity-property-test-top-10-9)
 **フェーズ**: [M4: Informational Tier](./M4-overview.md)
 **Top 10 #**: 9
-**ステータス**: 未着手
+**ステータス**: 着手中 (PR draft, Python invariant fuzz informational)
 **優先度**: 中
 **想定工数**: 1 PR (~8h)
 **作成日**: 2026-05-18
