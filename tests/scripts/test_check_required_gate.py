@@ -122,6 +122,29 @@ def test_diagnostic_contains_sticky_marker(gate, capsys):
     assert gate.STICKY_MARKER in captured.out
 
 
+def test_neutral_conclusion_treated_as_success(gate, tmp_path):
+    """The first-PR fast lane (M1.3) downgrades contract gates to ``neutral``;
+    the gateway must not flag those as fail-open."""
+    payload = {
+        "workflow_runs": [
+            {
+                "id": 7001, "name": "Parity Hub", "head_sha": HEAD_SHA,
+                "status": "completed", "conclusion": "neutral", "run_number": 1,
+                "html_url": "https://example/7001",
+            },
+        ]
+    }
+    runs_file = tmp_path / "runs.json"
+    runs_file.write_text(json.dumps(payload))
+    args = gate.build_parser().parse_args([
+        "--head-sha", HEAD_SHA,
+        "--monitored", "Parity Hub",
+        "--runs-json", str(runs_file),
+    ])
+    rc = gate.run(args)
+    assert rc == 0
+
+
 def test_picks_most_recent_run_per_workflow(gate, tmp_path):
     payload = {
         "workflow_runs": [

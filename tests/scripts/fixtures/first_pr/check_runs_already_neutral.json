@@ -1,0 +1,8 @@
+{
+  "total_count": 3,
+  "check_runs": [
+    {"id": 10, "name": "Parity Hub", "status": "completed", "conclusion": "neutral"},
+    {"id": 11, "name": "PUA Consistency Gate", "status": "completed", "conclusion": "neutral"},
+    {"id": 12, "name": "ZH-EN Loanword Sync Gate", "status": "completed", "conclusion": "success"}
+  ]
+}

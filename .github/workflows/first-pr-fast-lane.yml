@@ -1,0 +1,91 @@
+# First-PR Fast Lane (M1.3)
+# =========================
+# piper-plus は 18+ contract gate を持つため、 初回 contributor は事実上
+# PR を merge できない状態になっている (親調査 §4 「CI as a moat 誤謬」)。
+# 本 workflow は初回 PR (author_association ∈ {FIRST_TIME_CONTRIBUTOR,
+# FIRST_TIMER, NONE}) で `run-full-gate` label が付いていないとき、
+# 監視対象 contract gate の check-run conclusion を `neutral` に書き換える。
+# branch protection は neutral を pass 扱いするため、 contract gate は
+# warning として残るが merge は可能となる。
+#
+# Out of scope:
+#   - core lint (ruff / cargo fmt / gofmt / dotnet-format) は blocker 維持
+#   - cancelled / skipped baseline gateway (M1.1) も blocker 維持
+#   - main branch protection への適用 (dev で 1 ヶ月安定後に検討)
+#
+# 関連: docs/tickets/M1-3-first-pr-fast-lane.md、 親調査 Top 10 #5。
+
+name: First-PR Fast Lane
+
+on:
+  pull_request:
+    branches: [dev]
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+concurrency:
+  group: first-pr-fast-lane-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  pull-requests: write
+  checks: write
+
+jobs:
+  evaluate:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 3
+    outputs:
+      fast_lane: ${{ steps.eval.outputs.fast_lane }}
+      reason: ${{ steps.eval.outputs.reason }}
+    steps:
+      - uses: actions/checkout@v6.0.2
+      - uses: actions/setup-python@v6.2.0
+        with:
+          python-version: "3.13"
+      - id: eval
+        env:
+          AUTHOR_ASSOC: ${{ github.event.pull_request.author_association }}
+          LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+        run: |
+          python scripts/first_pr_fast_lane.py evaluate \
+            --author-association "${AUTHOR_ASSOC}" \
+            --labels "${LABELS}"
+
+  neutralize:
+    needs: evaluate
+    if: needs.evaluate.outputs.fast_lane == 'true'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    env:
+      # Contract gate names that count as "warnings" on a first-PR.
+      # Adding a gate here is the *only* coupling between a contract spec
+      # and the fast lane — individual workflow files stay untouched.
+      CONTRACT_GATES: >-
+        Parity Hub,PUA Consistency Gate,ZH-EN Loanword Sync Gate,Migration Guide Lint,Migration <-> CHANGELOG Parity Gate,ORT Version Sync,ruff version pin synchronization,CHANGELOG breaking entries have resolvable migration cross-ref
+    steps:
+      - uses: actions/checkout@v6.0.2
+      - uses: actions/setup-python@v6.2.0
+        with:
+          python-version: "3.13"
+      - name: Neutralize contract-gate check-runs
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          python scripts/first_pr_fast_lane.py neutralize \
+            --repo "${GITHUB_REPOSITORY}" \
+            --head-sha "${HEAD_SHA}" \
+            --gates "${CONTRACT_GATES}" \
+            --post-pr-comment "${PR_NUMBER}" \
+            --apply
+
+  notify-skip:
+    needs: evaluate
+    if: needs.evaluate.outputs.fast_lane != 'true'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 3
+    steps:
+      - run: |
+          echo "Skipping neutralize step: ${{ needs.evaluate.outputs.reason }}"

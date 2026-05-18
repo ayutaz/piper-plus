@@ -296,3 +296,19 @@ git push origin npm-v0.6.0
 ```
 
 Skipping step 1 will cause `npm install piper-plus@0.6.0` to fail with `notarget No matching version found for @piper-plus/g2p@^0.4.0`.
+
+## First-PR fast lane (新規 contributor 向け)
+
+piper-plus は 18+ contract gate (PUA / loanword / ORT 等) を持ちますが、 **初回 PR ではこれらを `neutral` (warning) に降格** します。 GitHub の `author_association` が `FIRST_TIME_CONTRIBUTOR` / `FIRST_TIMER` / `NONE` のいずれかなら、 以下を満たすだけで merge を依頼できます:
+
+- ruff format / cargo fmt / gofmt / dotnet-format / clang-tidy 等の **コア lint pass**
+- `Required Status Check Gate` (cancelled / skipped baseline run の検出) pass
+- maintainer の review 通過
+
+contract gate の知識 (PUA fixture / loanword JSON / ruff 6 箇所同期 等) は初回 PR では学習対象外で、 warning として記録されます。 詳細: `.github/workflows/first-pr-fast-lane.yml` / `scripts/first_pr_fast_lane.py`。
+
+### Maintainer 向け: `run-full-gate` label
+
+初回 PR を merge する **直前に** `run-full-gate` label を付与してください。 label が付くと fast lane が無効化され、 全 contract gate が blocker に昇格して再評価されます。 label 付与 → CI green → ユーザー確認 → merge の順で進めます (`gh pr merge --auto` は使わない、 `feedback_merge_caution` に従う)。
+
+`run-full-gate` を付け忘れると contract gate が warning のまま merge され、 PUA / loanword fixture が壊れたまま dev に入る可能性があります。 `scripts/first_pr_health.py` が週次で「first-PR merge 数」「follow-up 修正 PR 数」を計測し、 follow-up 率が 5% を超える場合は fast lane 設計を見直します。

@@ -158,6 +158,11 @@ def classify(
         conclusion = run.conclusion or "missing"
         if conclusion == "success":
             continue
+        # `neutral` is what the first-PR fast lane (M1.3) writes when it
+        # downgrades a contract gate to a warning. We honour that here so
+        # the cancelled-baseline gateway doesn't undo the fast lane.
+        if conclusion == "neutral":
+            continue
         if conclusion == "cancelled" and on_cancelled != "fail":
             continue
         if conclusion == "skipped" and on_skipped != "fail":

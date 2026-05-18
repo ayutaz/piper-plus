@@ -178,6 +178,9 @@ check_*.py
 !scripts/check_training_defaults.py
 # M1.1 — cancelled / skipped baseline alarm gateway
 !scripts/check_required_gate.py
+# M1.3 — first-PR fast lane (gate neutralizer + weekly health)
+!scripts/first_pr_fast_lane.py
+!scripts/first_pr_health.py
 create_comprehensive_*.py
 add_missing_*.py
 retrain_*.py
