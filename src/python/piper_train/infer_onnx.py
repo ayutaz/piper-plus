@@ -187,6 +187,41 @@ def _trim_padding_by_durations(
     return audio[start:end]
 
 
+def _trim_eos_region(
+    audio: np.ndarray,
+    durations: np.ndarray,
+    hop_size: int,
+    eos_max_frames: int = TRIM_EOS_MAX_FRAMES,
+) -> np.ndarray:
+    """Trim the EOS region from the tail of an audio buffer (Issue #499).
+
+    Mirrors :func:`piper.voice._trim_eos_region` so the runtime and
+    training paths share the same EOS-region trimming behaviour. See
+    that function for the rationale; in short: ``VitsModel.infer()``
+    expands attention with ``ceil(w)`` but exposes raw float ``w`` as
+    ``durations``, so the EOS frame(s) under ``ceil`` carry decoder
+    leakage that sounds like the final syllable was repeated. Strategy
+    A drops EOS only when short-text padding was applied; this helper
+    applies the same drop to every other inference path so long-text
+    outputs do not retain the audible doubled tail.
+
+    Returns ``audio`` unchanged when inputs are inconsistent.
+    """
+    if hop_size <= 0:
+        return audio
+    durations_1d = np.asarray(durations).reshape(-1)
+    if durations_1d.size == 0:
+        return audio
+    eos_ceil = int(np.ceil(float(durations_1d[-1])))
+    eos_excess = max(0, eos_ceil - int(eos_max_frames))
+    if eos_excess <= 0:
+        return audio
+    trim_samples = eos_excess * hop_size
+    if trim_samples >= len(audio):
+        return audio
+    return audio[:-trim_samples]
+
+
 def _trim_silence(
     audio: np.ndarray,
     sample_rate: int = 22050,
@@ -906,6 +941,15 @@ def main():
                 )
             else:
                 audio = _trim_silence(audio, sample_rate=args.sample_rate)
+        elif durations is not None:
+            # Tier 1 workaround for Issue #499: VITS expands attention with
+            # ceil(w) but exposes raw w as durations, so the EOS frame(s)
+            # carry decoder leakage that sounds like the final syllable was
+            # repeated. The Strategy A branch above already handles this for
+            # short-text padding; this branch applies the same EOS-region
+            # drop to long-text outputs.
+            durations_1d = np.asarray(durations).reshape(-1)
+            audio = _trim_eos_region(audio, durations_1d, args.hop_size)
 
         end_time = time.perf_counter()
 

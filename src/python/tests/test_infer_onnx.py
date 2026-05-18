@@ -2,21 +2,20 @@
 
 import numpy as np
 import pytest
+from piper_plus_g2p.encode.id_maps import get_phoneme_id_map
 
 from piper_train.infer_onnx import (
-    DEFAULT_HOP_SIZE,
     MIN_BODY_FOR_STRATEGY_A,
     MIN_PHONEME_IDS,
     TRIM_EOS_MAX_FRAMES,
     TRIM_MIN_SAMPLES,
-    TRIM_THRESHOLD_RMS,
     _adjust_scales_for_short_input,
     _pad_phoneme_ids,
+    _trim_eos_region,
     _trim_padding_by_durations,
     _trim_silence,
     text_to_phoneme_ids_and_prosody,
 )
-from piper_plus_g2p.encode.id_maps import get_phoneme_id_map
 
 
 class TestTextToPhonemeIdsAndProsody:
@@ -306,9 +305,7 @@ class TestTrimPaddingByDurations:
     def test_default_strips_eos_completely(self):
         """Default eos_max_frames=0 drops the entire EOS region (#356)."""
         # body × 2, pads × 2, EOS=8
-        durations = np.array(
-            [2.0, 5.0, 5.0, 4.0, 4.0, 5.0, 5.0, 8.0], dtype=np.float32
-        )
+        durations = np.array([2.0, 5.0, 5.0, 4.0, 4.0, 5.0, 5.0, 8.0], dtype=np.float32)
         hop = 100
         total = int(durations.sum() * hop)  # 3800
         audio = np.arange(total, dtype=np.int16)
@@ -373,6 +370,87 @@ class TestTrimPaddingByDurations:
         #            = 70 + 70 = 140 (each truncated independently)
         # If a runtime mistakenly used round() it would yield 141 + 70 = 141.
         assert len(result) == total_samples - 140 - 140
+
+
+class TestTrimEosRegion:
+    """Tier 1 EOS-region trim (Issue #499).
+
+    Mirrors src/python_run/tests/test_short_text_mitigation.py::TestTrimEosRegion
+    to keep the training (infer_onnx) and runtime (piper.voice) implementations
+    behaviourally identical (cross-runtime contract — Issue #499).
+
+    Background: ``VitsModel.infer()`` expands attention with ``ceil(w)`` but
+    exposes the raw float ``w`` as the ``durations`` output. The EOS frame(s)
+    generated under the ``ceil`` expansion carry decoder leakage that sounds
+    like the final syllable was repeated. ``_trim_padding_by_durations``
+    drops the EOS region only when Strategy A short-text padding was applied;
+    ``_trim_eos_region`` applies the same drop to **every** input.
+    """
+
+    def test_default_strips_full_eos_region(self):
+        # EOS = 2.0 frames → ceil = 2 → 200 samples (hop=100)
+        durations = np.array([1.0, 2.0, 3.0, 2.0], dtype=np.float32)
+        hop = 100
+        total_samples = int(durations.sum() * hop)  # 800
+        audio = np.arange(total_samples, dtype=np.int16)
+        result = _trim_eos_region(audio, durations, hop_size=hop)
+        assert len(result) == total_samples - 200
+        assert np.array_equal(result, audio[:600])
+
+    def test_default_uses_module_constant(self):
+        """``TRIM_EOS_MAX_FRAMES`` must default to 0 (cross-runtime contract)."""
+        assert TRIM_EOS_MAX_FRAMES == 0
+
+    def test_applies_ceil_to_fractional_duration(self):
+        """``durations[-1]=1.99`` must trim ``ceil(1.99)=2`` frames, not 1."""
+        durations = np.array([1.0, 1.0, 1.0, 1.99], dtype=np.float32)
+        hop = 256
+        audio = np.arange(2048, dtype=np.int16)
+        result = _trim_eos_region(audio, durations, hop_size=hop)
+        assert len(result) == 2048 - 512
+
+    def test_eos_max_frames_override_keeps_head_of_eos(self):
+        # EOS=10 raw, eos_max_frames=6 → excess = ceil(10) - 6 = 4 frames
+        durations = np.array([2.0, 3.0, 3.0, 10.0], dtype=np.float32)
+        hop = 100
+        audio = np.arange(2000, dtype=np.int16)
+        result = _trim_eos_region(audio, durations, hop_size=hop, eos_max_frames=6)
+        assert len(result) == 2000 - 400
+
+    def test_no_op_when_eos_below_max(self):
+        # ceil(1.99)=2 ≤ eos_max_frames=4 → no trim
+        durations = np.array([1.0, 1.0, 1.99], dtype=np.float32)
+        hop = 256
+        audio = np.arange(1024, dtype=np.int16)
+        result = _trim_eos_region(audio, durations, hop_size=hop, eos_max_frames=4)
+        assert np.array_equal(result, audio)
+
+    def test_returns_input_when_durations_empty(self):
+        audio = np.arange(1000, dtype=np.int16)
+        durations = np.array([], dtype=np.float32)
+        result = _trim_eos_region(audio, durations, hop_size=256)
+        assert np.array_equal(result, audio)
+
+    def test_returns_input_when_hop_size_zero(self):
+        audio = np.arange(1000, dtype=np.int16)
+        durations = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+        result = _trim_eos_region(audio, durations, hop_size=0)
+        assert np.array_equal(result, audio)
+
+    def test_returns_input_when_trim_exceeds_audio(self):
+        # EOS=5 frames * 100 hop = 500 samples, audio has 200 samples
+        durations = np.array([1.0, 5.0], dtype=np.float32)
+        audio = np.arange(200, dtype=np.int16)
+        result = _trim_eos_region(audio, durations, hop_size=100)
+        assert np.array_equal(result, audio)
+
+    def test_integer_duration_unaffected_by_ceil(self):
+        """``ceil(2.0) == 2`` — integer-valued durations must trim ``int(d)`` frames."""
+        durations = np.array([1.0, 1.0, 2.0], dtype=np.float32)
+        hop = 100
+        audio = np.arange(400, dtype=np.int16)
+        result = _trim_eos_region(audio, durations, hop_size=hop)
+        assert len(result) == 400 - 200
 
 
 class TestTrimSilence:
@@ -487,12 +565,8 @@ class TestAdjustScalesForShortInput:
         ids_high = list(range(high))
         ids_low = list(range(low))
 
-        ns_high, _, nw_high = _adjust_scales_for_short_input(
-            ids_high, 0.667, 0.8, 1.0
-        )
-        ns_low, _, nw_low = _adjust_scales_for_short_input(
-            ids_low, 0.667, 0.8, 1.0
-        )
+        ns_high, _, nw_high = _adjust_scales_for_short_input(ids_high, 0.667, 0.8, 1.0)
+        ns_low, _, nw_low = _adjust_scales_for_short_input(ids_low, 0.667, 0.8, 1.0)
 
         # Longer input should have less reduction than shorter input.
         assert ns_high > ns_low
@@ -575,7 +649,7 @@ class TestStrategyBUsesPrePaddingLength:
         # so it does NOT adjust (this was the bug)
         ns, ls, nw = _adjust_scales_for_short_input(padded_ids, 0.667, 0.8, 1.0)
         assert ns == pytest.approx(0.667)  # no reduction -- the old bug
-        assert nw == pytest.approx(0.8)    # no reduction -- the old bug
+        assert nw == pytest.approx(0.8)  # no reduction -- the old bug
 
     def test_combined_strategy_a_b_varying_lengths(self):
         """Shorter original inputs should get more aggressive scale reduction."""
