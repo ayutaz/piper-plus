@@ -76,6 +76,16 @@ piper-plus ドキュメント。利用ガイド・各ランタイム連携・仕
 - [Spec INDEX](spec/README.md) — `.toml` 契約 (PUA / phoneme-timing / SSML / 推論入力など、CI gate 対応)
 - [Reference INDEX](reference/README.md) — `.md` 設計書 (Kotlin/Swift G2P / iOS shared-lib / ZH-EN ランタイム展開 / Model 解決 等)
 
+## Proposals (ロードマップ / 議論起点)
+
+- [CI/CD 拡張プラン (2026-05)](proposals/ci-expansion-2026-05.md) — Unlimited CI 前提の網羅調査 + 真に追加する価値があるトップ 10 + 3 ヶ月ロードマップ
+- [CI/CD 拡張プラン — マイルストーン詳細](proposals/ci-expansion-milestones.md) — Top 10 を M1-M3 + M4 + M-Stretch に分解、 各 M に目的 / 成功基準 / タスク / 依存 / リスク / 工数を明記
+
+## Tickets (実装単位の個別チケット)
+
+- [Tickets INDEX](tickets/README.md) — CI/CD 拡張プラン マイルストーンを実装者が一人で着手できるレベルまで分解した 10 チケット + 5 phase overview (M1-M4 + M-Stretch) / マイルストーン↔チケット相互マップ / 依存グラフ
+- Phase overview: [M1 Defensive Foundations](tickets/M1-overview.md) / [M2 Audio Quality Moat](tickets/M2-overview.md) / [M3 ABI & Ecosystem Hardening](tickets/M3-overview.md) / [M4 Informational Tier](tickets/M4-overview.md) / [M-Stretch Strategic Bets](tickets/M-Stretch-overview.md)
+
 ## Migration
 
 - [v1.11 → v1.12](migration/v1.11-to-v1.12.md) — HiFi-GAN/Flask/HTS-voice 削除など
