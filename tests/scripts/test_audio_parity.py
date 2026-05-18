@@ -477,3 +477,218 @@ def test_cli_compare_phase2_fail_on_mismatch_across_runtimes(ap, tmp_path):
     assert rc == 1
     text = out.read_text()
     assert "Pairs compared: **1**" in text
+
+
+# ---------- garbage tolerance / contract edge cases ----------
+
+
+def test_cli_compare_all_inputs_unsupported_runtime(ap, tmp_path):
+    """All --inputs entries map to supports_dump_wav=false runtimes →
+    0 pair + N skip rows + exit 0. Confirms informational tier does not
+    crash on a fully-skipped corpus."""
+    a = tmp_path / "a.wav"
+    _write_sine(a)
+    out = tmp_path / "diff.md"
+    ad_hoc = _write_ad_hoc_contract(tmp_path, {"wasm", "cpp"})
+    args = ap.build_parser().parse_args(
+        [
+            "compare",
+            "--inputs",
+            f"wasm={a}",
+            f"cpp={a}",
+            "--output",
+            str(out),
+            "--contract",
+            str(ad_hoc),
+        ]
+    )
+    rc = args.func(args)
+    assert rc == 0
+    text = out.read_text()
+    assert "Pairs compared: **0**" in text
+    # Both unsupported entries appear in the skip table; other 4 runtimes
+    # are also listed as missing --inputs (declared in ad-hoc contract).
+    for name in ("wasm", "cpp"):
+        assert f"`{name}`" in text
+    # supports_dump_wav reason wins over missing for wasm/cpp
+    assert text.count("supports_dump_wav") >= 2
+
+
+def test_contract_with_empty_runtimes_section_keeps_inputs_verbatim(ap, tmp_path):
+    """A contract with no [runtimes] entries should accept any --inputs key
+    without skipping. Edge case for diagnostic / ad-hoc parity runs."""
+    bad = tmp_path / "no-runtimes.toml"
+    bad.write_text(
+        "[thresholds]\n"
+        "peak_rms_max_diff = 0.005\n"
+        "chromaprint_max_hamming = 32\n"
+        "mel_spec_max_mse = 0.001\n"
+        "snr_min_db = 60\n"
+    )
+    contract = ap.load_contract(bad)
+    a = tmp_path / "a.wav"
+    _write_sine(a)
+    kept, skipped = ap.collect_skips({"foo": a, "bar": a}, contract)
+    assert kept == {"foo": a, "bar": a}
+    assert skipped == []
+
+
+def test_contract_spec_missing_supports_dump_wav_defaults_to_true(
+    ap,
+    tmp_path,
+):
+    """A runtime entry without the supports_dump_wav field should be treated
+    as enabled (default True). Forward-compat for older contract dialects."""
+    bad = tmp_path / "default-true.toml"
+    bad.write_text(
+        "[thresholds]\n"
+        "peak_rms_max_diff = 0.005\n"
+        "chromaprint_max_hamming = 32\n"
+        "mel_spec_max_mse = 0.001\n"
+        "snr_min_db = 60\n"
+        "\n"
+        "[runtimes]\n"
+        'python = { id = "python" }\n'  # no supports_dump_wav
+        'rust   = { id = "rust", supports_dump_wav = true }\n'
+    )
+    contract = ap.load_contract(bad)
+    a = tmp_path / "a.wav"
+    _write_sine(a)
+    kept, skipped = ap.collect_skips({"python": a, "rust": a}, contract)
+    assert set(kept) == {"python", "rust"}
+    # Neither is skipped — defaults to enabled
+    assert skipped == []
+
+
+def test_contract_spec_non_dict_runtime_entry_treated_as_enabled(
+    ap,
+    tmp_path,
+):
+    """If a runtime entry is malformed (not a dict — TOML scalar / array),
+    collect_skips should not crash. It treats the entry as enabled
+    (default True). This is the garbage-tolerance contract for
+    misconfigured ad-hoc TOML files."""
+    bad = tmp_path / "scalar-runtime.toml"
+    bad.write_text(
+        "[thresholds]\n"
+        "peak_rms_max_diff = 0.005\n"
+        "chromaprint_max_hamming = 32\n"
+        "mel_spec_max_mse = 0.001\n"
+        "snr_min_db = 60\n"
+        "\n"
+        "[runtimes]\n"
+        'python = "deadbeef"\n'  # malformed: scalar instead of inline table
+    )
+    contract = ap.load_contract(bad)
+    a = tmp_path / "a.wav"
+    _write_sine(a)
+    # Should not raise; python is kept (default True path handles non-dict)
+    kept, _ = ap.collect_skips({"python": a}, contract)
+    assert "python" in kept
+
+
+# ---------- parity fixture validation ----------
+
+
+def test_parity_fixture_phoneme_ids_jsonl_is_valid(ap):
+    """The canonical phoneme_ids.jsonl fixture (Phase 1) must remain a
+    valid single-line JSONL with the contract fields. A drift in this
+    fixture would silently change what every runtime parity job
+    synthesizes, so we pin it here."""
+    import json
+
+    fixture = (
+        REPO_ROOT
+        / "tests"
+        / "fixtures"
+        / "audio-corpus"
+        / "parity"
+        / "phoneme_ids.jsonl"
+    )
+    assert fixture.exists(), "phoneme_ids.jsonl fixture is missing"
+    lines = [line for line in fixture.read_text().splitlines() if line.strip()]
+    assert len(lines) >= 1, "fixture must contain at least one utterance"
+    for line in lines:
+        entry = json.loads(line)
+        ids = entry["phoneme_ids"]
+        assert isinstance(ids, list)
+        assert len(ids) >= 3, "needs BOS / body / EOS at minimum"
+        assert all(isinstance(i, int) for i in ids)
+        # piper-plus contract: ID 1 = BOS, ID 2 = EOS, ID 0 = PAD
+        assert ids[0] == 1, "first ID should be BOS (=1)"
+        assert ids[-1] == 2, "last ID should be EOS (=2)"
+
+
+def test_parity_fixture_first_utterance_matches_expected_layout():
+    """The first fixture utterance is `あいうえお` interspersed with PAD.
+    Pinning the exact ID layout (`^ a _ i _ u _ e _ o _ $`) makes any
+    accidental edit to the fixture (and therefore the parity baseline)
+    show up as a test failure rather than silent audio drift."""
+    import json
+
+    fixture = (
+        REPO_ROOT
+        / "tests"
+        / "fixtures"
+        / "audio-corpus"
+        / "parity"
+        / "phoneme_ids.jsonl"
+    )
+    first_line = next(line for line in fixture.read_text().splitlines() if line.strip())
+    entry = json.loads(first_line)
+    assert entry["phoneme_ids"] == [1, 10, 0, 11, 0, 12, 0, 13, 0, 14, 0, 2]
+    assert entry.get("language_id") == 0  # ja
+
+
+# ---------- snapshot edge cases ----------
+
+
+def test_snapshot_handles_8bit_pcm_wav(ap, tmp_path):
+    """A non-16-bit WAV should still load without raising — only the
+    sample_width is recorded, samples_f32 / rms stay None so tier 2/3
+    cleanly report as 'unavailable'."""
+    a = tmp_path / "8bit.wav"
+    with wave.open(str(a), "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(1)  # 8-bit
+        w.setframerate(22050)
+        w.writeframes(b"\x80" * 100)
+    snap = ap.snapshot("python", a)
+    assert snap.sample_width == 1
+    assert snap.samples_f32 is None
+    assert snap.rms is None
+
+
+def test_snapshot_handles_stereo_wav(ap, tmp_path):
+    """Stereo (2-channel) PCM 16-bit input gets averaged to mono so
+    downstream tier 2/3 comparisons stay valid (cross-runtime contract
+    is mono 22050 Hz). Pin the averaging behaviour."""
+    a = tmp_path / "stereo.wav"
+    with wave.open(str(a), "wb") as w:
+        w.setnchannels(2)
+        w.setsampwidth(2)
+        w.setframerate(22050)
+        # L=+0.5, R=-0.5 → avg = 0
+        frames = []
+        for _ in range(100):
+            frames.append(struct.pack("<hh", 16384, -16384))
+        w.writeframes(b"".join(frames))
+    snap = ap.snapshot("python", a)
+    assert snap.num_channels == 2
+    assert snap.samples_f32 is not None
+    assert all(abs(s) < 1e-6 for s in snap.samples_f32)
+
+
+def test_snapshot_records_sha256_even_when_pcm_unavailable(ap, tmp_path):
+    """SHA256 is the tier 1 anchor; it must work regardless of sample
+    format (24-bit / 32-bit-float / 8-bit) so the workflow can still
+    detect byte-identical outputs."""
+    a = tmp_path / "24bit.wav"
+    with wave.open(str(a), "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(3)  # 24-bit
+        w.setframerate(22050)
+        w.writeframes(b"\x00\x00\x00" * 100)
+    snap = ap.snapshot("python", a)
+    assert snap.sha256
+    assert len(snap.sha256) == 64

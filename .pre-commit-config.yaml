@@ -959,7 +959,8 @@ repos:
           ^\.github/workflows/android-build\.yml$|
           ^scripts/check_(bundle_size|cli_help_drift|migration_changelog_parity|phoneme_timing_contract)\.py$|
           ^scripts/benchmark_runtime\.py$|
-          ^docs/spec/mutation-testing\.md$
+          ^docs/spec/mutation-testing\.md$|
+          ^src/cpp/tests/test_streaming_raw_phonemes\.cpp$
 
   # ---------------------------------------------------------------------------
   # pyproject.toml schema validation (PEP 621 + PEP 518). Catches typos in
