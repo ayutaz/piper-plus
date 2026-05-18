@@ -105,7 +105,9 @@ jobs:
           mkdir -p /tmp/parity
           # Rust CLI auto-detects JSONL when --text is absent and stdin is
           # piped; --output-file overrides per-line output_file when missing.
-          ./src/rust/target/release/piper-plus \
+          # Binary name is `piper-plus-cli` (Cargo.toml package name; no
+          # [[bin]] override).
+          ./src/rust/target/release/piper-plus-cli \
             --model "$MODEL_PATH" \
             --config "$CONFIG_PATH" \
             --output-file /tmp/parity/rust.wav \
@@ -157,12 +159,16 @@ jobs:
           ONNX_RUNTIME_SHARED_LIBRARY_PATH: ${{ github.workspace }}/onnxruntime/lib/libonnxruntime.so
         run: |
           mkdir -p /tmp/parity
+          # Go CLI の JSONL mode は --output-file を無視し --output-dir に
+          # line_001.wav (連番) を書く設計 (src/go/cmd/piper-plus/main.go:425)。
+          # parity gate のために rename して go.wav に揃える。
           /tmp/piper-plus-go \
             --model "$MODEL_PATH" \
             --config "$CONFIG_PATH" \
             --json-input \
-            --output-file /tmp/parity/go.wav \
+            --output-dir /tmp/parity/go-out \
             < "$FIXTURE"
+          mv /tmp/parity/go-out/line_001.wav /tmp/parity/go.wav
           ls -lh /tmp/parity/go.wav
 
       - uses: actions/upload-artifact@v4.6.0
