@@ -768,10 +768,8 @@ void processLine(string line, RunConfig &runConfig, piper::PiperConfig &piperCon
     ofstream audioFile(outputPath.string(), ios::binary);
     if (!externalPhonemeIds.empty()) {
       // Direct phoneme_ids path (JSONL --json-input bypass G2P)
-      vector<int16_t> audioBuffer;
-      piper::synthesize(externalPhonemeIds, voice.synthesisConfig, voice.session,
-                        audioBuffer, result, &voice);
-      writeWavFromBuffer(audioBuffer, voice.synthesisConfig.sampleRate, audioFile);
+      piper::phonemeIdsToWavFile(piperConfig, voice, externalPhonemeIds,
+                                 audioFile, result);
     } else if (runConfig.rawPhonemes) {
       // Parse raw phonemes from input
       auto phonemeType = static_cast<piper::PhonemeTypeInt>(voice.phonemizeConfig.phonemeType);
@@ -808,10 +806,8 @@ void processLine(string line, RunConfig &runConfig, piper::PiperConfig &piperCon
     ofstream audioFile(outputPath.string(), ios::binary);
     if (!externalPhonemeIds.empty()) {
       // Direct phoneme_ids path (JSONL --json-input bypass G2P)
-      vector<int16_t> audioBuffer;
-      piper::synthesize(externalPhonemeIds, voice.synthesisConfig, voice.session,
-                        audioBuffer, result, &voice);
-      writeWavFromBuffer(audioBuffer, voice.synthesisConfig.sampleRate, audioFile);
+      piper::phonemeIdsToWavFile(piperConfig, voice, externalPhonemeIds,
+                                 audioFile, result);
     } else if (runConfig.rawPhonemes) {
       // Parse raw phonemes from input
       auto phonemeType = static_cast<piper::PhonemeTypeInt>(voice.phonemizeConfig.phonemeType);
@@ -829,10 +825,8 @@ void processLine(string line, RunConfig &runConfig, piper::PiperConfig &piperCon
     // Output WAV to stdout
     if (!externalPhonemeIds.empty()) {
       // Direct phoneme_ids path (JSONL --json-input bypass G2P)
-      vector<int16_t> audioBuffer;
-      piper::synthesize(externalPhonemeIds, voice.synthesisConfig, voice.session,
-                        audioBuffer, result, &voice);
-      writeWavFromBuffer(audioBuffer, voice.synthesisConfig.sampleRate, cout);
+      piper::phonemeIdsToWavFile(piperConfig, voice, externalPhonemeIds,
+                                 cout, result);
     } else if (runConfig.rawPhonemes) {
       // Parse raw phonemes from input
       auto phonemeType = static_cast<piper::PhonemeTypeInt>(voice.phonemizeConfig.phonemeType);

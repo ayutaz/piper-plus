@@ -202,17 +202,41 @@ def test_parse_inputs_requires_runtime_prefix(ap):
         ap.parse_inputs(["a.wav"])
 
 
-# ---------- skip logic (Phase 1: cpp / wasm not yet implemented) ----------
+# ---------- skip logic (Phase 2: all 6 runtimes enabled) ----------
+
+
+ALL_RUNTIMES = ("python", "rust", "csharp", "go", "cpp", "wasm")
+
+
+def _write_ad_hoc_contract(tmp_path: Path, disabled: set[str]) -> Path:
+    """Generate a contract toml where ``disabled`` runtimes have
+    supports_dump_wav=false. Used by tests that need to assert the skip
+    behaviour without depending on the production contract toml (which
+    has all 6 runtimes enabled in Phase 2)."""
+    lines = [
+        "[thresholds]",
+        "peak_rms_max_diff = 0.005",
+        "chromaprint_max_hamming = 32",
+        "mel_spec_max_mse = 0.001",
+        "snr_min_db = 60.0",
+        "",
+        "[runtimes]",
+    ]
+    for name in ALL_RUNTIMES:
+        supports = "false" if name in disabled else "true"
+        lines.append(f'{name} = {{ id = "{name}", supports_dump_wav = {supports} }}')
+    path = tmp_path / "ad-hoc-contract.toml"
+    path.write_text("\n".join(lines) + "\n")
+    return path
 
 
 def test_collect_skips_drops_supports_dump_wav_false(ap, tmp_path):
     """A runtime declared with supports_dump_wav=false is skipped even when an
-    --inputs entry is provided. This lets the workflow upload an artifact for
-    a not-yet-supported runtime (e.g. for diagnostic purposes) without
-    accidentally enforcing parity against it."""
+    --inputs entry is provided. Verified via an ad-hoc fixture toml so the
+    regression test stays valid after Phase 2 enabled all runtimes."""
     a = tmp_path / "a.wav"
     _write_sine(a)
-    contract = ap.load_contract(CONTRACT)
+    contract = ap.load_contract(_write_ad_hoc_contract(tmp_path, {"wasm"}))
     kept, skipped = ap.collect_skips({"wasm": a, "python": a}, contract)
     assert "python" in kept and "wasm" not in kept
     reasons = {entry.runtime: entry.reason for entry in skipped}
@@ -226,14 +250,14 @@ def test_collect_skips_drops_missing_runtimes(ap, tmp_path):
     uploads its wav."""
     a = tmp_path / "a.wav"
     _write_sine(a)
-    contract = ap.load_contract(CONTRACT)
+    contract = ap.load_contract(CONTRACT)  # production contract: 6 enabled
     kept, skipped = ap.collect_skips({"python": a, "rust": a}, contract)
     skipped_names = {entry.runtime for entry in skipped}
-    # supports_dump_wav=false: cpp / wasm
-    assert "cpp" in skipped_names and "wasm" in skipped_names
-    # missing --inputs: csharp / go
-    assert "csharp" in skipped_names and "go" in skipped_names
+    # All 4 remaining runtimes (csharp/go/cpp/wasm) are missing --inputs
+    assert skipped_names == {"csharp", "go", "cpp", "wasm"}
     assert kept == {"python": a, "rust": a}
+    for entry in skipped:
+        assert "no --inputs entry" in entry.reason
 
 
 def test_render_markdown_includes_skipped_table(ap, tmp_path):
@@ -252,9 +276,10 @@ def test_render_markdown_includes_skipped_table(ap, tmp_path):
     assert "supports_dump_wav" in md
 
 
-def test_cli_compare_reports_skips_for_phase1_runtimes(ap, tmp_path):
-    """End-to-end CLI run: only python + rust inputs given → 1 pair compared,
-    4 runtimes skipped (csharp/go missing inputs + cpp/wasm unsupported)."""
+def test_cli_compare_reports_skips_for_partial_inputs(ap, tmp_path):
+    """End-to-end CLI run: only python + rust inputs given (out of 6 enabled
+    runtimes) → 1 pair compared, 4 runtimes skipped (csharp/go/cpp/wasm
+    missing inputs)."""
     a = tmp_path / "a.wav"
     b = tmp_path / "b.wav"
     out = tmp_path / "diff.md"
@@ -275,18 +300,20 @@ def test_cli_compare_reports_skips_for_phase1_runtimes(ap, tmp_path):
     text = out.read_text()
     assert "Pairs compared: **1**" in text
     assert "runtimes skipped: **4**" in text
-    # ordering inside the table is contract-driven (declaration order)
-    for name in ("csharp", "go", "wasm", "cpp"):
+    # all 4 missing runtimes show up in the skip table
+    for name in ("csharp", "go", "cpp", "wasm"):
         assert f"`{name}`" in text
 
 
-def test_cli_compare_accepts_only_skipped_runtime(ap, tmp_path):
+def test_cli_compare_accepts_only_unsupported_runtime(ap, tmp_path):
     """If only an unsupported runtime is provided we still produce a report
     (no pairs, only skips) and exit success — informational tier should not
-    crash on a degenerate input set."""
+    crash on a degenerate input set. Verified via ad-hoc fixture toml
+    (production contract now has all 6 supported)."""
     a = tmp_path / "a.wav"
     _write_sine(a)
     out = tmp_path / "diff.md"
+    ad_hoc = _write_ad_hoc_contract(tmp_path, {"wasm"})
     args = ap.build_parser().parse_args(
         [
             "compare",
@@ -294,6 +321,8 @@ def test_cli_compare_accepts_only_skipped_runtime(ap, tmp_path):
             f"wasm={a}",
             "--output",
             str(out),
+            "--contract",
+            str(ad_hoc),
         ]
     )
     rc = args.func(args)
@@ -301,3 +330,150 @@ def test_cli_compare_accepts_only_skipped_runtime(ap, tmp_path):
     text = out.read_text()
     assert "Pairs compared: **0**" in text
     assert "`wasm`" in text
+
+
+# ---------- Phase 2 coverage (all 6 runtimes enabled) ----------
+
+
+def test_load_contract_runtimes_section_has_six_runtimes(ap):
+    """Phase 2 production contract enables all 6 inference runtimes."""
+    contract = ap.load_contract(CONTRACT)
+    runtimes = contract.get("runtimes", {})
+    assert set(runtimes) == set(ALL_RUNTIMES)
+    for name, spec in runtimes.items():
+        assert spec.get("supports_dump_wav") is True, f"{name} should be enabled"
+
+
+def test_collect_skips_all_runtimes_enabled_full_inputs(ap, tmp_path):
+    """When inputs are provided for every runtime in the contract, every
+    runtime is kept and no skip rows are emitted."""
+    a = tmp_path / "a.wav"
+    _write_sine(a)
+    contract = ap.load_contract(CONTRACT)
+    inputs = dict.fromkeys(ALL_RUNTIMES, a)
+    kept, skipped = ap.collect_skips(inputs, contract)
+    assert set(kept) == set(ALL_RUNTIMES)
+    assert skipped == []
+
+
+def test_collect_skips_unknown_runtime_is_kept_verbatim(ap, tmp_path):
+    """An --inputs entry whose runtime key is not in the contract is kept
+    verbatim. This lets contributors add ad-hoc runtimes for one-off
+    diagnostics without editing the production contract toml."""
+    a = tmp_path / "a.wav"
+    _write_sine(a)
+    contract = ap.load_contract(CONTRACT)
+    inputs = {"python": a, "myrust": a}
+    kept, _ = ap.collect_skips(inputs, contract)
+    assert "myrust" in kept
+    assert "python" in kept
+
+
+def test_collect_skips_priority_dump_wav_over_missing(ap, tmp_path):
+    """When a runtime is both disabled (supports_dump_wav=false) AND missing
+    --inputs, the unsupported reason wins. This pin keeps the skip table
+    free of redundant entries."""
+    a = tmp_path / "a.wav"
+    _write_sine(a)
+    contract = ap.load_contract(_write_ad_hoc_contract(tmp_path, {"wasm", "cpp"}))
+    # Provide python only; wasm/cpp are both unsupported AND missing
+    kept, skipped = ap.collect_skips({"python": a}, contract)
+    reasons = {entry.runtime: entry.reason for entry in skipped}
+    assert "supports_dump_wav" in reasons["wasm"]
+    assert "supports_dump_wav" in reasons["cpp"]
+    # Other runtimes (rust/csharp/go) are missing inputs only
+    for name in ("rust", "csharp", "go"):
+        assert "no --inputs entry" in reasons[name]
+    assert kept == {"python": a}
+
+
+def test_render_markdown_full_six_runtime_pair_count(ap, tmp_path):
+    """When all 6 runtimes are compared, render_markdown shows C(6,2)=15
+    pairs — pin the form so a future refactor can't silently drop pairs."""
+    a = tmp_path / "a.wav"
+    _write_sine(a)
+    snaps = {name: ap.snapshot(name, a) for name in ALL_RUNTIMES}
+    contract = ap.load_contract(CONTRACT)
+    report = ap.gather_pairs(snaps, contract)
+    assert len(report.pairs) == 15
+    md = ap.render_markdown(report)
+    assert "Pairs compared: **15**" in md
+    for name in ALL_RUNTIMES:
+        assert f"`{name}`" in md
+
+
+def test_cli_compare_phase2_full_six_runtimes(ap, tmp_path):
+    """End-to-end CLI run with all 6 runtime inputs (byte-identical wavs):
+    15 pairs all pass tier 1, 0 skip rows, exit 0."""
+    a = tmp_path / "a.wav"
+    _write_sine(a)
+    out = tmp_path / "diff.md"
+    # --inputs uses nargs="*", so pass all values in a single flag invocation
+    args = ap.build_parser().parse_args(
+        [
+            "compare",
+            "--inputs",
+            *(f"{name}={a}" for name in ALL_RUNTIMES),
+            "--output",
+            str(out),
+        ]
+    )
+    rc = args.func(args)
+    assert rc == 0
+    text = out.read_text()
+    assert "Pairs compared: **15**" in text
+    assert "runtimes skipped: **0**" in text
+    assert "Skipped runtimes" not in text  # no skip section when empty
+
+
+def test_cli_compare_phase2_partial_three_inputs(ap, tmp_path):
+    """3 inputs out of 6 → C(3,2)=3 pairs + 3 missing-input skip rows."""
+    a = tmp_path / "a.wav"
+    _write_sine(a)
+    out = tmp_path / "diff.md"
+    args = ap.build_parser().parse_args(
+        [
+            "compare",
+            "--inputs",
+            f"python={a}",
+            f"rust={a}",
+            f"cpp={a}",
+            "--output",
+            str(out),
+        ]
+    )
+    rc = args.func(args)
+    assert rc == 0
+    text = out.read_text()
+    assert "Pairs compared: **3**" in text
+    assert "runtimes skipped: **3**" in text
+    for missing in ("csharp", "go", "wasm"):
+        assert f"`{missing}`" in text
+
+
+def test_cli_compare_phase2_fail_on_mismatch_across_runtimes(ap, tmp_path):
+    """--fail-on-mismatch propagates a non-zero exit when any pair fails
+    even in a Phase 2 full-runtime comparison. Reused regression coverage
+    for the rc==1 path applied to the new 6-runtime topology."""
+    a = tmp_path / "loud.wav"
+    b = tmp_path / "silent.wav"
+    out = tmp_path / "diff.md"
+    _write_sine(a, amp=0.5)
+    _write_silence(b)
+    # Use 2 mismatched inputs; the rest will be skipped (missing) so the
+    # fail-on-mismatch is anchored on a real pair.
+    args = ap.build_parser().parse_args(
+        [
+            "compare",
+            "--inputs",
+            f"python={a}",
+            f"rust={b}",
+            "--output",
+            str(out),
+            "--fail-on-mismatch",
+        ]
+    )
+    rc = args.func(args)
+    assert rc == 1
+    text = out.read_text()
+    assert "Pairs compared: **1**" in text

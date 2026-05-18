@@ -5,10 +5,9 @@
 # SNR の順で評価され、 informational tier (continue-on-error: true) で
 # 4 週間運用後 blocker 昇格を maintainer が判定する。
 #
-# Phase 1 (PR #511 系列): Python / Rust / Go / C# の 4 runtime で稼働。
-# Phase 2: C++ / WASM CLI に phoneme_ids JSONL 入力契約を追加し 6 runtime
-# 化 — supports_dump_wav = false の runtime は scripts/audio_parity.py
-# 側で skip 行として報告される。
+# Phase 2 (PR #511 系列): 6 runtime (Python / Rust / Go / C# / C++ / WASM)
+# 全てで稼働。 contract toml の supports_dump_wav=false な runtime は
+# scripts/audio_parity.py 側で skip 行として報告される (現状ゼロ)。
 #
 # 各 runtime は同一の fixture を入力:
 #   - model:       test/models/multilingual-test-medium.onnx (~38 MB, git)
@@ -178,8 +177,80 @@ jobs:
           path: /tmp/parity/csharp.wav
           retention-days: 7
 
+  dump-cpp:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v6.0.2
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake
+
+      - name: cmake configure + build piper
+        run: |
+          mkdir -p build
+          cd build
+          cmake -DCMAKE_BUILD_TYPE=Release ..
+          make -j$(nproc) piper
+
+      - name: Synthesize via --json-input
+        run: |
+          mkdir -p /tmp/parity
+          ./build/piper \
+            --model "$MODEL_PATH" \
+            --json-input \
+            --output_file /tmp/parity/cpp.wav \
+            < "$FIXTURE"
+          ls -lh /tmp/parity/cpp.wav
+
+      - uses: actions/upload-artifact@v4.6.0
+        with:
+          name: parity-wav-cpp
+          path: /tmp/parity/cpp.wav
+          retention-days: 7
+
+  dump-wasm:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    continue-on-error: true
+    defaults:
+      run:
+        working-directory: src/wasm/openjtalk-web
+    steps:
+      - uses: actions/checkout@v6.0.2
+      - uses: actions/setup-node@v6.4.0
+        with:
+          node-version: "24"
+
+      - name: Install onnxruntime-node (no full npm install)
+        # The full `npm install` triggers WASM build dependencies that are
+        # unrelated to the parity gate. We only need onnxruntime-node for
+        # bin/piper-cli.js to load the model.
+        run: npm install --no-save --no-package-lock onnxruntime-node
+
+      - name: Synthesize via bin/piper-cli.js
+        working-directory: ${{ github.workspace }}
+        run: |
+          mkdir -p /tmp/parity
+          node src/wasm/openjtalk-web/bin/piper-cli.js \
+            --model "$MODEL_PATH" \
+            --config "$CONFIG_PATH" \
+            --json-input \
+            --output-file /tmp/parity/wasm.wav \
+            < "$FIXTURE"
+          ls -lh /tmp/parity/wasm.wav
+
+      - uses: actions/upload-artifact@v4.6.0
+        with:
+          name: parity-wav-wasm
+          path: /tmp/parity/wasm.wav
+          retention-days: 7
+
   compare:
-    needs: [dump-python, dump-rust, dump-go, dump-csharp]
+    needs: [dump-python, dump-rust, dump-go, dump-csharp, dump-cpp, dump-wasm]
     if: always()
     runs-on: ubuntu-22.04
     timeout-minutes: 10
@@ -207,7 +278,7 @@ jobs:
         run: |
           mkdir -p /tmp/parity
           declare -a INPUTS=()
-          for r in python rust go csharp; do
+          for r in python rust go csharp cpp wasm; do
             wav="/tmp/parity-artifacts/parity-wav-${r}/${r}.wav"
             if [ -f "$wav" ]; then
               INPUTS+=("--inputs" "${r}=${wav}")
