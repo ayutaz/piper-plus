@@ -1,0 +1,138 @@
+# Canonical metadata for datasets used to train the 6-language multilingual
+# base model + downstream fine-tunes. Consumed by
+# `scripts/generate_model_card.py` to populate MODEL_CARD.md and
+# LICENSE_ATTRIBUTIONS.md on HF Hub release.
+#
+# A `verified: false` entry means the license was inferred from upstream
+# README / dataset card but has not been confirmed by a maintainer. Such
+# entries are emitted in MODEL_CARD with a visible warning; once a human
+# checks them, flip `verified` to `true`.
+#
+# Schema is forward-compatible: extra keys on a dataset are passed through
+# but new top-level keys are ignored until the script learns about them.
+
+schema_version: 1
+last_reviewed: "2026-05-18"
+review_period_months: 3
+
+datasets:
+  - id: moe-speech-20speakers
+    languages: [ja]
+    title: "MOE-Speech (20 speakers, LJSpeech format)"
+    speakers: 20
+    utterances: 60148
+    license:
+      spdx: "CC-BY-SA-4.0"
+      verified: false
+      url: "https://creativecommons.org/licenses/by-sa/4.0/"
+    source:
+      url: "https://huggingface.co/datasets/ayousanz/moe-speech-20speakers-ljspeech"
+      commit_or_version: "HF Hub revision @ 2026-03-16"
+    attribution_required: true
+    attribution_text: |
+      MOE-Speech 20 speakers corpus, distributed under CC BY-SA 4.0 by ayousanz.
+
+  - id: libritts-r
+    languages: [en]
+    title: "LibriTTS-R"
+    speakers: 310
+    utterances: 74912
+    license:
+      spdx: "CC-BY-4.0"
+      verified: true
+      url: "https://creativecommons.org/licenses/by/4.0/"
+    source:
+      url: "https://www.openslr.org/141/"
+      commit_or_version: "v1.0"
+    attribution_required: true
+    attribution_text: |
+      LibriTTS-R: A Restored Multi-Speaker Text-to-Speech Corpus,
+      Koizumi et al., 2023. Distributed under CC BY 4.0.
+
+  - id: aishell-3
+    languages: [zh]
+    title: "AISHELL-3"
+    speakers: 142
+    utterances: 63223
+    license:
+      spdx: "Apache-2.0"
+      verified: true
+      url: "https://www.apache.org/licenses/LICENSE-2.0"
+    source:
+      url: "https://www.aishelltech.com/aishell_3"
+      commit_or_version: "v1.0"
+    attribution_required: true
+    attribution_text: |
+      AISHELL-3 multi-speaker Mandarin TTS corpus,
+      Shi et al., 2020. Licensed under Apache-2.0.
+
+  - id: cml-tts-es
+    languages: [es]
+    title: "CML-TTS (es subset)"
+    speakers: 63
+    utterances: 168374
+    license:
+      spdx: "CC-BY-4.0"
+      verified: true
+      url: "https://creativecommons.org/licenses/by/4.0/"
+    source:
+      url: "https://github.com/freds0/CML-TTS-Dataset"
+      commit_or_version: "v1.0"
+    attribution_required: true
+    attribution_text: |
+      CML-TTS: A Multilingual Speech Corpus, freds0 et al.
+      Distributed under CC BY 4.0.
+
+  - id: cml-tts-fr
+    languages: [fr]
+    title: "CML-TTS (fr subset)"
+    speakers: 28
+    utterances: 107464
+    license:
+      spdx: "CC-BY-4.0"
+      verified: true
+      url: "https://creativecommons.org/licenses/by/4.0/"
+    source:
+      url: "https://github.com/freds0/CML-TTS-Dataset"
+      commit_or_version: "v1.0"
+    attribution_required: true
+    attribution_text: |
+      CML-TTS: A Multilingual Speech Corpus, freds0 et al.
+      Distributed under CC BY 4.0.
+
+  - id: cml-tts-pt
+    languages: [pt]
+    title: "CML-TTS (pt subset)"
+    speakers: 8
+    utterances: 34066
+    license:
+      spdx: "CC-BY-4.0"
+      verified: true
+      url: "https://creativecommons.org/licenses/by/4.0/"
+    source:
+      url: "https://github.com/freds0/CML-TTS-Dataset"
+      commit_or_version: "v1.0"
+    attribution_required: true
+    attribution_text: |
+      CML-TTS: A Multilingual Speech Corpus, freds0 et al.
+      Distributed under CC BY 4.0.
+
+  - id: tsukuyomi-chan-corpus
+    languages: [ja]
+    title: "つくよみちゃんコーパス"
+    speakers: 1
+    utterances: 100
+    license:
+      spdx: "CC-BY-4.0"
+      verified: false
+      url: "https://tyc.rei-yumesaki.net/material/corpus/"
+    source:
+      url: "https://tyc.rei-yumesaki.net/material/corpus/"
+      commit_or_version: "v1.0"
+    attribution_required: true
+    attribution_text: |
+      Tsukuyomi-chan Corpus, distributed by 夢前黎.
+      See https://tyc.rei-yumesaki.net/about/terms/ for terms.
+    used_only_in:
+      - "tsukuyomi-6lang-v2"
+      - "tsukuyomi-mb-istft"

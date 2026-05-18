@@ -19,7 +19,7 @@
 | **M2** Audio Quality Moat | [M2-overview.md](./M2-overview.md) | [M2.1 Audio MOS proxy gate](./M2-1-audio-mos-proxy.md) | #1 | 3-4 PR (~30h) | 高 | 着手中 (informational bootstrap) |
 | | | [M2.2 Cross-runtime audio byte parity](./M2-2-cross-runtime-audio-parity.md) | #2 | 4-5 PR (~40h) | 高 | 着手中 (informational bootstrap) |
 | **M3** ABI & Ecosystem Hardening | [M3-overview.md](./M3-overview.md) | [M3.1 Public ABI snapshot](./M3-1-public-abi-snapshot.md) | #4 | 3 PR (~25h) | 高 | 着手中 (bootstrap baseline) |
-| | | [M3.2 Model card / license auto-injection](./M3-2-license-auto-injection.md) | #7 | 2 PR (~15h) | 中 | 未着手 |
+| | | [M3.2 Model card / license auto-injection](./M3-2-license-auto-injection.md) | #7 | 2 PR (~15h) | 中 | 着手中 (validate + generate ready) |
 | | | [M3.3 Typosquatting weekly scan](./M3-3-typosquatting-watch.md) | #8 | 2 PR (~12h) | 中 | 未着手 |
 | **M4** Informational Tier | [M4-overview.md](./M4-overview.md) | [M4.1 Loanword/PUA forward-compat fuzz](./M4-1-loanword-pua-forward-compat.md) | #6 | 1-2 PR (~10h) | 低 | 未着手 |
 | | | [M4.2 Phoneme timing monotonicity](./M4-2-timing-monotonicity-property.md) | #9 | 1 PR (~8h) | 低 | 未着手 |

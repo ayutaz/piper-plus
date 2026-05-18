@@ -189,6 +189,8 @@ check_*.py
 !scripts/audio_parity.py
 # Public ABI snapshot diff (C / Swift / Kotlin)
 !scripts/diff_public_abi.py
+# Model card / license attribution generator (data-sources.yml driven)
+!scripts/generate_model_card.py
 create_comprehensive_*.py
 add_missing_*.py
 retrain_*.py
