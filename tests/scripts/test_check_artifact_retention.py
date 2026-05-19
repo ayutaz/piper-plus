@@ -250,14 +250,18 @@ def test_invalid_mode_returns_two(mod, tmp_path: Path, capsys):
 
 
 def test_real_workflows_baseline_runs(mod, capsys: pytest.CaptureFixture):
-    """The committed spec + real workflows execute without crashing.
+    """The committed spec + real workflows must be aligned (mode=fail).
 
-    Today's baseline contains 6 pre-existing violations (4× 14d, 1× 5d,
-    1× 365d) that were captured before this gate existed. The spec sits
-    at mode=warn so this MUST exit 0 even with those violations; the
-    flip to mode=fail happens in a follow-up sweep PR.
+    The M2 T-006 sweep migrated the 6 pre-existing violations
+    (4× 14d → 30d/7d, 1× 5d → 7d, 1× 365d → 90d) into the four
+    canonical categories and flipped [meta].mode to "fail". A
+    regression here means a new upload step slipped in with a
+    retention-days value outside {1, 7, 30, 90}.
     """
     rc = mod.main([])
-    assert rc == 0, "warn mode must not fail; flip to mode=fail in a future PR"
+    assert rc == 0, (
+        "fail mode + drift; either bring the new retention-days into "
+        "{1, 7, 30, 90} or extend the spec categories."
+    )
     captured = capsys.readouterr()
     assert "Collected upload steps" in captured.err

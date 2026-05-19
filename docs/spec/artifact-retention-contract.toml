@@ -18,10 +18,11 @@ direction = "pre-impl"
 # `mode` controls the gate behaviour:
 #   - "warn" → emit ::warning:: but exit 0 (initial introduction safe).
 #   - "fail" → emit ::error:: and exit 1 (post-hardening).
-# Initial baseline has 6 pre-existing violations (4× 14d, 1× 5d, 1× 365d)
-# from before this gate existed. Flip to "fail" only after a sweep PR
-# brings every retention-days value into one of the categories below.
-mode = "warn"
+# Flipped to "fail" in the M2 T-006 sweep: 6 pre-existing violations
+# (4× 14d → 30d|7d, 1× 5d → 7d, 1× 365d → 90d) were migrated into the
+# four canonical categories below, so any new retention-days outside
+# {1, 7, 30, 90} is now a hard CI failure.
+mode = "fail"
 
 # -----------------------------------------------------------------------------
 # Retention category 定義
