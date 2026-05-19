@@ -208,6 +208,8 @@ check_*.py
 !scripts/check_model_sha256_manifest.py
 !scripts/check_artifact_retention.py
 !scripts/check_test_flake_retry.py
+# Doc examples audit (T-009)
+!scripts/check_doc_examples.py
 create_comprehensive_*.py
 add_missing_*.py
 retrain_*.py

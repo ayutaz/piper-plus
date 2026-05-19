@@ -1,0 +1,164 @@
+# Doc Examples Contract — audit / execution policy for fenced code blocks
+#
+# This file pins how `scripts/check_doc_examples.py` classifies fenced
+# code blocks under `docs/` (and what later phases — execution gate,
+# blocker promote — are allowed to assume).
+#
+# Three categories partition the fenced-block universe:
+#   - `executable`        → block has no placeholders / no skip directive
+#                           / no environment dependency; the execution
+#                           gate is allowed to run it in a sandbox.
+#   - `needs_placeholder` → block contains placeholder tokens (e.g.
+#                           `<HA_TOKEN>`, `<your-pi-ip>`) — running it
+#                           verbatim would fail or worse, leak host
+#                           state. The execution gate must skip until
+#                           the placeholder convention is finalised.
+#   - `skip_warranted`    → block contains an explicit skip directive,
+#                           an absolute machine-specific path, or a
+#                           dependency the sandbox cannot provide (ONNX
+#                           model file, GPU, secret, network beyond
+#                           localhost).
+#
+# Companion gate: scripts/check_readme_code_examples.py (symbol grep on
+# README public APIs). The two gates do NOT overlap — that one verifies
+# names exist; this contract verifies execution policy. See CON-7.1 in
+# the deferred-items requirements doc.
+
+[meta]
+spec_version = 1
+last_updated = "2026-05-19"
+applies_to = ["docs"]
+canonical_reference = "scripts/check_doc_examples.py"
+forward_compat_policy = "strict"
+# `direction = pre-impl`: this TOML pins the audit / execution policy;
+# the script reads it and mirrors what it declares (placeholder regexes,
+# skip directives, env_dependency patterns).
+direction = "pre-impl"
+
+# ---------------------------------------------------------------------
+# Glob and exclusion rules for the audit input
+# ---------------------------------------------------------------------
+
+[audit_scope]
+include_glob = ["docs/**/*.md"]
+exclude_dirs = [
+    ".claude",                # skill instructions — not user-facing docs
+    "node_modules",
+    "build",
+    "target",
+    "docs/proposals",         # draft / variable example content; revisit if needed
+]
+# Inline HTML <pre><code> blocks are OUT OF SCOPE; only GFM fenced
+# blocks (triple backticks) are considered. This caps the audit at the
+# canonical markdown surface and avoids HTML edge cases.
+fenced_only = true
+
+# ---------------------------------------------------------------------
+# Recognised languages and aliases (info string normalisation)
+# ---------------------------------------------------------------------
+
+[languages]
+# Map alias → canonical. Anything not listed here is classified as
+# `skip_warranted` with reason `unknown_language` so the audit doesn't
+# silently misroute exotic blocks.
+canonical = ["bash", "python", "rust", "csharp", "go", "wasm"]
+
+[languages.aliases]
+sh = "bash"
+shell = "bash"
+zsh = "bash"
+py = "python"
+py3 = "python"
+rs = "rust"
+cs = "csharp"
+"c#" = "csharp"
+golang = "go"
+js = "wasm"          # the wasm runtime exposes JS bindings
+javascript = "wasm"
+ts = "wasm"
+typescript = "wasm"
+
+# ---------------------------------------------------------------------
+# Placeholder detection — regex patterns that flip a block to
+# `needs_placeholder`
+# ---------------------------------------------------------------------
+
+[placeholders]
+# Convention proposed for v1: angle-bracket tokens like `<HA_TOKEN>` or
+# `<your-pi-ip>`. Existing docs use a mix of these and ALL_CAPS shouts;
+# both are detected so the audit reflects the as-is corpus.
+patterns = [
+    "<[A-Z][A-Z0-9_-]+>",                   # <HA_TOKEN>, <YOUR_PATH>
+    "<your-[a-z0-9_-]+>",                   # <your-pi-ip>, <your-path>
+    "<[a-z][a-z0-9_-]*>",                   # <model.onnx>, <output-dir>
+    "<\\{[a-zA-Z_][a-zA-Z0-9_]*\\}>",       # <{var}> proposed convention
+    "YOUR_[A-Z_]+",                         # YOUR_API_KEY (legacy convention)
+    "\\$\\{[A-Z][A-Z0-9_]+\\}",             # ${API_KEY} when paired with comment
+]
+
+# ---------------------------------------------------------------------
+# Skip directives — explicit opt-out written in the block
+# ---------------------------------------------------------------------
+
+[skip_directives]
+# A block becomes `skip_warranted` if its FIRST non-blank line matches
+# any of these patterns. Each directive must appear at the very top so
+# tools can scan once.
+patterns = [
+    "^# doctest:skip(\\s|$)",
+    "^# noexec(\\s|$)",
+    "^// noexec(\\s|$)",
+    "^# skip:.+",                           # `# skip: needs GPU`
+]
+
+# ---------------------------------------------------------------------
+# Environment dependency patterns — substrings/regex that force
+# `skip_warranted` because the sandbox cannot satisfy them
+# ---------------------------------------------------------------------
+
+[env_dependencies]
+# Conservative bias: anything matching these stays out of the executable
+# bucket. The T-010 execution gate will surface false-negative reports
+# back here so we can extend the list.
+patterns = [
+    "/data/piper/",                         # author-local training paths
+    "~/.cache/huggingface/",
+    "nvidia-smi",
+    "wandb login",
+    "CUDA_VISIBLE_DEVICES",                 # explicit GPU directive
+    "huggingface-cli login",
+    "gcloud auth",
+    "aws sts",
+    "/dev/snd",                             # ALSA / audio device
+    "/dev/nvidia",
+]
+
+# ---------------------------------------------------------------------
+# Output schema reference
+# ---------------------------------------------------------------------
+
+[output]
+# Audit emits JSON conforming to the in-repo schema below. Bumping
+# `schema_version` requires updating both the schema and any T-010
+# consumer.
+audit_json_path = "tests/fixtures/doc_examples_audit/audit.json"
+schema_path = "tests/fixtures/doc_examples_audit/audit.schema.json"
+schema_version = 1
+# `hash_sha1` of the raw block body is the primary key the execution
+# gate uses to detect "audit went stale". Line numbers shift as docs
+# get edited; the hash does not.
+block_primary_key = "hash_sha1"
+
+# ---------------------------------------------------------------------
+# Silent-zero defence — the "Collected blocks (N): ..." stderr echo
+# ---------------------------------------------------------------------
+
+[silent_zero]
+# A zero-total scan probably means the glob filter is broken, not that
+# docs/ has no examples. The audit script MUST echo a "Collected blocks"
+# line to stderr unconditionally and emit `::warning::` when total or
+# any language bucket comes back at 0.
+defensive_log_required = true
+log_template = "Collected blocks (total={total}): bash={bash} python={python} rust={rust} csharp={csharp} go={go} wasm={wasm}"
+warn_when_total_zero = true
+warn_when_language_zero = true

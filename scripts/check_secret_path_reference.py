@@ -77,6 +77,14 @@ ALLOWLIST: frozenset[str] = frozenset({
     # behaviour. Pre-existing as of the hook's introduction.
     "src/python/piper_train/tools/prepare_multilingual_dataset.py",
     "src/python/piper_train/tools/prepare_bilingual_dataset.py",
+    # Doc examples audit (T-009): the env_dependency pattern list intentionally
+    # contains the `/data/piper/` literal so the classifier can flag any
+    # fenced block that references it. The test exercises that flagging
+    # behaviour; the JSON snapshot records which fenced blocks did flag.
+    # These are pattern definitions and records, not actual host-specific
+    # references to disk.
+    "tests/scripts/test_check_doc_examples_audit.py",
+    "tests/fixtures/doc_examples_audit/audit.json",
 })
 
 # File extensions / globs of *executable* artifacts. References here are
