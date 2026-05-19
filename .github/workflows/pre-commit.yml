@@ -58,9 +58,10 @@ jobs:
     steps:
       - uses: actions/checkout@v6.0.2
         with:
-          # `pre-commit run --all-files` works against the worktree, not
-          # diff-vs-base, so a shallow clone is fine.
-          fetch-depth: 1
+          # Tier 2-F: changed-files mode requires both base and head SHAs in
+          # local history so `git diff <base>..<head>` resolves. `fetch-depth: 0`
+          # gets the full history (still fast: shallow PR clones are ~MB).
+          fetch-depth: 0
 
       - uses: actions/setup-python@v6.2.0
         with:
@@ -103,32 +104,34 @@ jobs:
             pre-commit-${{ runner.os }}-py3.11-${{ hashFiles('.pre-commit-config.yaml') }}-
             pre-commit-${{ runner.os }}-py3.11-
 
-      - name: Run all hooks
+      - name: Run hooks (changed files mode)
         env:
-          # Skip the heavy cross-language lint hooks here. Each is already
-          # gated by a dedicated CI workflow with the right toolchain
-          # installed (cargo + libasound2-dev for clippy, .NET 10 for
-          # dotnet format, Go + golangci-lint for go vet / golangci-lint,
-          # uv for mypy). Running them here would require installing four
-          # SDKs in this otherwise-fast Python-only gate, and would
-          # double-bill minutes for drift that is already detected upstream:
-          #   * cargo-clippy / cargo-fmt   → rust-tests.yml
-          #   * gofmt / go-vet / golangci-lint → go-ci.yml
-          #   * dotnet-format             → csharp-ci.yml + ci.yml
-          #   * mypy-g2p                  → g2p-python-ci.yml
-          #   * markdownlint-cli2         → markdownlint.yml
-          #   * codespell                 → codespell.yml
-          #   * hadolint                  → hadolint.yml
-          #   * editorconfig-checker      → 全リポジトリで `--all-files` scan 時に
-          #     17,356 件の既存 drift (Python docstring の 3-space indent 等)
-          #     を検出する。 ローカル commit-time の pre-commit は staged file
-          #     のみ作用するので drift を新規導入しない gate として有効。
-          #     CI ゲートとしては別途 changed-files-only workflow が望ましいが、
-          #     現状の `--all-files` 実行では既存コードを修正できない。
-          # The corresponding *local* pre-commit hooks still run so
-          # contributors catch drift before push.
+          # Skip heavy cross-language lint hooks (each gated by a dedicated
+          # CI workflow with the right toolchain installed). Entries are
+          # idempotent with .pre-commit-config.yaml `stages: [pre-push]`
+          # markers (commit-stage filter already excludes those hooks).
+          #   * cargo-clippy / cargo-fmt          → rust-tests.yml
+          #   * gofmt / go-vet / golangci-lint    → go-ci.yml
+          #   * dotnet-format                     → csharp-ci.yml + ci.yml
+          #   * mypy-g2p                          → g2p-python-ci.yml
+          #   * markdownlint-cli2                 → markdownlint.yml
+          #   * codespell                         → codespell.yml
+          #   * hadolint                          → hadolint.yml
+          #   * editorconfig-checker              → full-repo scan has 17k
+          #     latent drift; new drift caught locally via
+          #     `pre-commit install --hook-type pre-push`.
           SKIP: cargo-clippy,cargo-fmt,gofmt,go-vet,golangci-lint,mypy-g2p,dotnet-format,markdownlint-cli2,codespell,hadolint,editorconfig-checker
         run: |
-          # --show-diff-on-failure makes drift trivial to fix locally:
-          # contributors see the exact patch the hooks produced.
-          pre-commit run --all-files --show-diff-on-failure
+          # Tier 2-F: --from-ref/--to-ref runs hooks only on files changed
+          # in this PR/push (~5x faster than --all-files for typical PRs
+          # which touch <1% of repo). Latent drift in unchanged files is
+          # NOT caught here — for full-repo check, run
+          # `pre-commit run --all-files --hook-stage push` locally before
+          # release tags. A periodic cron (weekly) could add a full-repo
+          # gate as follow-up.
+          # --show-diff-on-failure makes drift trivial to fix locally
+          # (contributors see the exact patch the hooks produced).
+          pre-commit run \
+            --from-ref ${{ github.event.pull_request.base.sha || github.event.before }} \
+            --to-ref HEAD \
+            --show-diff-on-failure
