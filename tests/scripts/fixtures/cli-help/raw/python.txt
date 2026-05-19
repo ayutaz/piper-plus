@@ -1,0 +1,13 @@
+usage: __main__.py [-h] [--model MODEL] [--version]
+
+piper-plus 1.12.0
+
+A neural text-to-speech CLI.
+
+Generated at 2026-05-19T10:30:45Z on /home/runner/work/piper-plus/piper-plus
+\x1b[31mError color\x1b[0m
+
+options:
+  -h, --help            show this help message and exit
+  --model MODEL         Path to model
+  --version             Show version

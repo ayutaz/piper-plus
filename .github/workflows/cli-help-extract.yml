@@ -1,0 +1,320 @@
+name: CLI Help Extract
+
+# T-003 full 6 runtime matrix. cli-flag-contract.toml gates flag
+# *existence*; this workflow gates flag *wording / ordering* by committing
+# a sanitized canonical help.txt per runtime and diffing against the live
+# output.
+#
+# Runtimes: python, rust, csharp, go, wasm, cpp.
+# Initial canonical txt for csharp / cpp may be a PLACEHOLDER (when the
+# dev env that landed the PR lacked the SDK / toolchain). The drift-check
+# job skips any canonical that contains a "# PLACEHOLDER:" marker line —
+# run workflow_dispatch on a runner with the full toolchain and commit
+# the regenerated body in a follow-up PR to flip the runtime to a real
+# baseline.
+#
+# Existing cli-help-docs-sync.yml (Python-only, stale-only mode) is
+# preserved unchanged — both run in parallel (AC-4.2). Consolidation is
+# a phase B decision.
+
+on:
+  schedule:
+    - cron: '0 5 * * 1'  # Monday 05:00 UTC, 1h after T-002 action-sha-drift.
+  pull_request:
+    paths:
+      - 'src/python_run/piper/**/*.py'
+      - 'src/rust/piper-cli/**'
+      - 'src/csharp/PiperPlus.Cli/**'
+      - 'src/go/cmd/piper-plus/**'
+      - 'src/wasm/openjtalk-web/bin/**'
+      - 'src/cpp/main.cpp'
+      - 'docs/reference/cli-help/**'
+      - 'scripts/sanitize_cli_help.py'
+      - 'scripts/sanitize_cli_help_rules.toml'
+      - '.github/workflows/cli-help-extract.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: cli-help-extract-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+env:
+  NO_COLOR: "1"          # Suppress ANSI escapes at the source where possible.
+  PYTHONIOENCODING: utf-8
+
+jobs:
+  extract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        runtime: [python, rust, csharp, go, wasm, cpp]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6.0.2
+
+      - name: Setup Python
+        uses: actions/setup-python@v5.6.0
+        with:
+          python-version: '3.13'
+
+      # ----- Per-runtime build + capture -----
+
+      - name: Install piper (python)
+        if: matrix.runtime == 'python'
+        run: pip install -e src/python_run
+        shell: bash
+
+      - name: Capture python --help
+        if: matrix.runtime == 'python'
+        run: |
+          mkdir -p /tmp/cli-help
+          python -m piper --help > /tmp/cli-help/python-raw.txt 2>&1
+        shell: bash
+
+      - name: Setup Rust
+        if: matrix.runtime == 'rust'
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Cargo target
+        if: matrix.runtime == 'rust'
+        uses: actions/cache@v4.3.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            src/rust/target
+          key: cargo-cli-help-${{ runner.os }}-${{ hashFiles('src/rust/Cargo.lock') }}
+
+      - name: Build Rust + capture --help
+        if: matrix.runtime == 'rust'
+        run: |
+          mkdir -p /tmp/cli-help
+          cargo build --release -p piper-plus-cli --manifest-path src/rust/Cargo.toml
+          src/rust/target/release/piper-plus-cli --help > /tmp/cli-help/rust-raw.txt 2>&1
+        shell: bash
+
+      - name: Setup .NET 10
+        if: matrix.runtime == 'csharp'
+        uses: actions/setup-dotnet@v5.0.0
+        with:
+          dotnet-version: '10.0.x'
+        continue-on-error: true
+
+      - name: Build C# + capture --help
+        if: matrix.runtime == 'csharp'
+        continue-on-error: true
+        run: |
+          mkdir -p /tmp/cli-help
+          dotnet build src/csharp/PiperPlus.Cli/PiperPlus.Cli.csproj -c Release --nologo
+          dotnet src/csharp/PiperPlus.Cli/bin/Release/net10.0/PiperPlus.Cli.dll --help \
+            > /tmp/cli-help/csharp-raw.txt 2>&1
+        shell: bash
+
+      - name: Setup Go
+        if: matrix.runtime == 'go'
+        uses: actions/setup-go@v6.0.0
+        with:
+          go-version: 'stable'
+          cache: true
+          cache-dependency-path: src/go/go.sum
+
+      - name: Build Go + capture --help
+        if: matrix.runtime == 'go'
+        run: |
+          mkdir -p /tmp/cli-help
+          cd src/go
+          go build -o /tmp/piper-plus ./cmd/piper-plus
+          /tmp/piper-plus --help > /tmp/cli-help/go-raw.txt 2>&1
+        shell: bash
+
+      - name: Setup Node
+        if: matrix.runtime == 'wasm'
+        uses: actions/setup-node@v6.0.0
+        with:
+          node-version: 'lts/*'
+
+      - name: Capture WASM CLI --help
+        if: matrix.runtime == 'wasm'
+        run: |
+          mkdir -p /tmp/cli-help
+          node src/wasm/openjtalk-web/bin/piper-cli.js --help > /tmp/cli-help/wasm-raw.txt 2>&1
+        shell: bash
+
+      - name: Build C++ + capture --help
+        if: matrix.runtime == 'cpp'
+        continue-on-error: true
+        run: |
+          mkdir -p /tmp/cli-help
+          # C++ build is out-of-scope for the initial PR; this step is
+          # expected to leave /tmp/cli-help/cpp-raw.txt absent. The drift
+          # check honours the PLACEHOLDER marker in the committed canonical
+          # to keep the workflow green until the toolchain step lands.
+          echo "::warning::C++ build step not yet implemented; using PLACEHOLDER canonical."
+          : > /tmp/cli-help/cpp-raw.txt
+        shell: bash
+
+      # ----- Sanitize (skipped when raw is empty / build failed) -----
+
+      - name: Sanitize
+        id: sanitize
+        continue-on-error: true
+        run: |
+          rt='${{ matrix.runtime }}'
+          raw=/tmp/cli-help/${rt}-raw.txt
+          out=/tmp/cli-help/${rt}.txt
+          if [ ! -s "$raw" ]; then
+            echo "::warning::raw --help is empty for ${rt}; skipping sanitize."
+            echo "skipped=1" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          case "$rt" in
+            python) src='python -m piper --help' ;;
+            rust)   src='piper-plus-cli --help' ;;
+            csharp) src='dotnet PiperPlus.Cli/bin/Release/net10.0/PiperPlus.Cli.dll --help' ;;
+            go)     src='piper-plus --help' ;;
+            wasm)   src='node piper-cli.js --help' ;;
+            cpp)    src='./build/piper_plus --help' ;;
+            *)      echo "::error::No source mapped for ${rt}"; exit 1 ;;
+          esac
+          python scripts/sanitize_cli_help.py \
+            --runtime "$rt" \
+            --source "$src" \
+            --version '<VERSION>' \
+            --timestamp '<TIMESTAMP>' \
+            --in "$raw" \
+            --out "$out"
+          echo "skipped=0" >> "$GITHUB_OUTPUT"
+        shell: bash
+
+      - name: Upload artifact
+        if: steps.sanitize.outputs.skipped != '1'
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: cli-help-${{ matrix.runtime }}-${{ github.run_id }}
+          path: /tmp/cli-help/${{ matrix.runtime }}.txt
+          retention-days: 30
+          if-no-files-found: warn
+
+  drift-check:
+    runs-on: ubuntu-24.04
+    needs: extract
+    timeout-minutes: 5
+    # Copilot review on PR #513: weekly schedule run was previously skipped
+    # by the original if-clause, so drift never produced a signal. Now run
+    # on PR / workflow_dispatch / schedule; sticky-comment / issue steps
+    # branch on event_name below.
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6.0.2
+
+      - name: Setup Python
+        uses: actions/setup-python@v5.6.0
+        with:
+          python-version: '3.13'
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v6.0.0
+        with:
+          pattern: cli-help-*
+          path: /tmp/cli-help-downloads
+          merge-multiple: true
+
+      - name: Defensive log + diff vs canonical
+        id: diff
+        continue-on-error: true
+        # Walk the full 6-runtime set (matrix may have lost some at extract
+        # time). Capture vs. canonical produces 4 outcomes per runtime:
+        #   - canonical missing                → NO_CANONICAL (drift)
+        #   - canonical has # PLACEHOLDER:     → SKIPPED (not drift)
+        #   - artifact missing (build failed)  → CAPTURE_FAILED (drift)
+        #   - diff non-zero                    → DRIFT (drift)
+        #   - diff zero                        → OK
+        # The report is always written (even for the 0-artifact case) so
+        # the sticky-comment and Issue steps never reference a missing file.
+        run: |
+          shopt -s nullglob
+          all_runtimes=("python" "go" "rust" "wasm" "csharp" "cpp")
+          captured=()
+          for f in /tmp/cli-help-downloads/*.txt; do
+            [ -f "$f" ] && captured+=("$(basename "$f" .txt)")
+          done
+          summary="${captured[*]:-(none)}"
+          echo "Collected helps (${#captured[@]} captured of ${#all_runtimes[@]} runtimes): ${summary}" >&2
+
+          diff_count=0
+          {
+            echo "## CLI help drift report"
+            echo
+            echo "Captured artifacts: ${#captured[@]} / ${#all_runtimes[@]} runtimes."
+            echo
+            echo "| Runtime | Status | Note |"
+            echo "|---------|--------|------|"
+            for rt in "${all_runtimes[@]}"; do
+              canonical="docs/reference/cli-help/${rt}.txt"
+              actual="/tmp/cli-help-downloads/${rt}.txt"
+              if [ ! -f "$canonical" ]; then
+                echo "| \`$rt\` | **NO_CANONICAL** | commit \`$canonical\` first |"
+                diff_count=$((diff_count + 1))
+                continue
+              fi
+              if grep -q '^# PLACEHOLDER:' "$canonical"; then
+                echo "| \`$rt\` | SKIPPED | canonical contains \`# PLACEHOLDER:\` — regenerate via workflow_dispatch |"
+                continue
+              fi
+              if [ ! -f "$actual" ]; then
+                echo "| \`$rt\` | **CAPTURE_FAILED** | build / capture step produced no artifact |"
+                diff_count=$((diff_count + 1))
+                continue
+              fi
+              if diff -u "$canonical" "$actual" > /tmp/diff-"$rt".txt; then
+                echo "| \`$rt\` | OK | |"
+              else
+                echo "| \`$rt\` | **DRIFT** | see diff section below |"
+                diff_count=$((diff_count + 1))
+              fi
+            done
+            for rt in "${all_runtimes[@]}"; do
+              if [ -s /tmp/diff-"$rt".txt ]; then
+                echo
+                echo "### Diff for \`$rt\`"
+                echo '```diff'
+                cat /tmp/diff-"$rt".txt
+                echo '```'
+              fi
+            done
+            echo
+            echo "Summary: total=${#all_runtimes[@]}, captured=${#captured[@]}, drift=$diff_count"
+          } > /tmp/cli-help-drift-report.md
+          cat /tmp/cli-help-drift-report.md >> "$GITHUB_STEP_SUMMARY"
+          echo "diff_count=$diff_count" >> "$GITHUB_OUTPUT"
+          if [ "$diff_count" -gt 0 ]; then exit 1; fi
+        shell: bash
+
+      - name: Post sticky comment (PR only)
+        # Report file is now guaranteed to exist (see diff step), so this
+        # step is safe even when diff exited 2 / 1.
+        if: github.event_name == 'pull_request'
+        uses: marocchino/sticky-pull-request-comment@v2.9.4
+        with:
+          header: cli-help-extract
+          path: /tmp/cli-help-drift-report.md
+
+      - name: Open issue on drift (scheduled only)
+        if: github.event_name == 'schedule' && steps.diff.outputs.diff_count != '0'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          DATE=$(date -u +%Y-%m-%d)
+          gh issue create \
+            --label cli-help-drift \
+            --title "[cli-help-drift] CLI help drift detected (${DATE})" \
+            --body-file /tmp/cli-help-drift-report.md
+        shell: bash

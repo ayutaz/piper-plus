@@ -1,0 +1,13 @@
+{
+  "releases": [
+    {
+      "tag": "v1.13.0",
+      "assets": [
+        {"name": "libpiper_plus-linux-x64.tar.gz", "expected_verify": "pass"},
+        {"name": "libpiper_plus-linux-x64.tar.gz.cosign.bundle"},
+        {"name": "libpiper_plus-macos-arm64.tar.gz", "expected_verify": "pass"},
+        {"name": "libpiper_plus-macos-arm64.tar.gz.cosign.bundle"}
+      ]
+    }
+  ]
+}

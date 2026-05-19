@@ -1,0 +1,287 @@
+"""Unit tests for scripts/sanitize_cli_help.py (T-003)."""
+
+from __future__ import annotations
+
+import importlib.util
+import sys
+from pathlib import Path
+
+import pytest
+
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+SCRIPT_PATH = REPO_ROOT / "scripts" / "sanitize_cli_help.py"
+RULES_PATH = REPO_ROOT / "scripts" / "sanitize_cli_help_rules.toml"
+FIXTURES = Path(__file__).resolve().parent / "fixtures" / "cli-help"
+
+
+def _load_module():
+    sys.path.insert(0, str(REPO_ROOT / "scripts"))
+    spec = importlib.util.spec_from_file_location(
+        "sanitize_cli_help",
+        SCRIPT_PATH,
+    )
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+@pytest.fixture(scope="module")
+def sanitize():
+    return _load_module()
+
+
+@pytest.fixture(scope="module")
+def rules(sanitize):
+    return sanitize.load_rules(RULES_PATH)
+
+
+def test_load_rules_requires_required_keys(sanitize, tmp_path: Path):
+    bad = tmp_path / "bad.toml"
+    bad.write_text('[[rules]]\nruntime = "python"\n')
+    with pytest.raises(ValueError, match="missing required key"):
+        sanitize.load_rules(bad)
+
+
+def test_load_rules_rejects_empty_file(sanitize, tmp_path: Path):
+    empty = tmp_path / "empty.toml"
+    empty.write_text("")
+    with pytest.raises(ValueError, match="no \\[\\[rules\\]\\] entries"):
+        sanitize.load_rules(empty)
+
+
+def test_apply_rules_strips_timestamp(sanitize, rules):
+    text = "Generated at 2026-05-19T10:30:45Z on a server."
+    out = sanitize.apply_rules(text, runtime="python", rules=rules)
+    assert "2026-05-19T10:30:45Z" not in out
+    assert "<TIMESTAMP>" in out
+
+
+def test_apply_rules_strips_linux_runner_path(sanitize, rules):
+    text = "checkout at /home/runner/work/piper-plus/piper-plus"
+    out = sanitize.apply_rules(text, runtime="python", rules=rules)
+    assert "<RUNNER_PATH>" in out
+    assert "/home/runner" not in out
+
+
+def test_apply_rules_strips_macos_runner_path(sanitize, rules):
+    text = "checkout at /Users/runner/work/piper-plus/piper-plus"
+    out = sanitize.apply_rules(text, runtime="python", rules=rules)
+    assert "<RUNNER_PATH>" in out
+
+
+def test_apply_rules_normalizes_python_prog(sanitize, rules):
+    text = "usage: __main__.py [-h] [--model MODEL]"
+    out = sanitize.apply_rules(text, runtime="python", rules=rules)
+    assert out.startswith("usage: python -m piper ")
+
+
+def test_apply_rules_normalizes_python_version(sanitize, rules):
+    text = "piper-plus 1.12.0 is great"
+    out = sanitize.apply_rules(text, runtime="python", rules=rules)
+    assert "piper-plus <VERSION>" in out
+
+
+def test_apply_rules_strips_ansi_escapes(sanitize, rules):
+    text = "\x1b[31mred text\x1b[0m"
+    out = sanitize.apply_rules(text, runtime="python", rules=rules)
+    assert "\x1b" not in out
+    assert "red text" in out
+
+
+def test_apply_rules_strips_onnxruntime_pci_warning(sanitize, rules):
+    """Linux GitHub runner-only noise observed on PR #513 first run.
+
+    `python -m piper --help 2>&1` captures onnxruntime's PCI bus scan
+    warning into the raw output. Local macOS dev env does not emit it
+    (no ACPI device path), so the rule must strip it from the runner
+    output to keep the canonical reproducible across platforms.
+    """
+    text = (
+        "2026-05-19 03:57:25.827861094 [W:onnxruntime:Default, "
+        "device_discovery.cc:133 GetPciBusId] Skipping pci_bus_id ...\n"
+        "usage: python -m piper [-h]\n"
+    )
+    out = sanitize.apply_rules(text, runtime="python", rules=rules)
+    assert "W:onnxruntime" not in out, (
+        "onnxruntime warning lines must be stripped — caused python DRIFT "
+        "on PR #513 first run."
+    )
+    assert "usage: python -m piper" in out
+
+
+def test_apply_rules_strips_onnxruntime_warning_without_timestamp(
+    sanitize, rules,
+):
+    """Fallback rule: ORT warning lacking the leading timestamp prefix."""
+    text = (
+        "[W:onnxruntime:CPU, init.cc:99 Something] partial warning line\n"
+        "usage: python -m piper [-h]\n"
+    )
+    out = sanitize.apply_rules(text, runtime="python", rules=rules)
+    assert "W:onnxruntime" not in out
+    assert "usage: python -m piper" in out
+
+
+def test_apply_rules_strips_ansi_prefixed_onnxruntime_warning(sanitize, rules):
+    """Regression for PR #513 debug commit: GitHub Linux runner emits the
+    onnxruntime warning prefixed with \\x1b[0;93m, which makes ^\\d{4} fail
+    to match (line starts with ESC, not a digit). The ANSI rule must run
+    BEFORE the onnxruntime rule so the leading escape is stripped first."""
+    text = (
+        "\x1b[0;93m2026-05-19 04:32:05.859518882 [W:onnxruntime:Default, "
+        "device_discovery.cc:133 GetPciBusId] Skipping pci_bus_id ...\x1b[m\n"
+        "usage: python -m piper [-h]\n"
+    )
+    out = sanitize.apply_rules(text, runtime="python", rules=rules)
+    assert "W:onnxruntime" not in out, (
+        "ANSI prefix must be stripped before the ^-anchored onnxruntime "
+        "rule fires. If this fails, the rule order in TOML drifted back "
+        "to placing the ANSI rule after onnxruntime."
+    )
+    assert "\x1b" not in out
+    assert "usage: python -m piper" in out
+
+
+def test_apply_rules_runtime_filter_isolates_python_rule(sanitize, rules):
+    """Python's __main__.py prog rule must not affect non-Python output."""
+    text = "usage: __main__.py [-h]"
+    out_rust = sanitize.apply_rules(text, runtime="rust", rules=rules)
+    assert "usage: __main__.py" in out_rust  # untouched
+    out_py = sanitize.apply_rules(text, runtime="python", rules=rules)
+    assert "usage: python -m piper" in out_py
+
+
+def test_build_header_has_four_lines(sanitize):
+    h = sanitize.build_header(
+        runtime="python",
+        source="python -m piper --help",
+        version="<VERSION>",
+        timestamp="<TIMESTAMP>",
+    )
+    lines = h.splitlines()
+    assert len(lines) == 4
+    assert lines[0].startswith("# Auto-generated by")
+    assert lines[1] == "# Source: python -m piper --help"
+    assert lines[2] == "# Runtime: python"
+    assert lines[3] == "# Version: <VERSION>"
+
+
+def test_sanitize_rejects_unsupported_runtime(sanitize, rules):
+    with pytest.raises(ValueError, match="Unsupported runtime"):
+        sanitize.sanitize(
+            raw="",
+            runtime="erlang",
+            source="x",
+            version="y",
+            rules=rules,
+        )
+
+
+def test_sanitize_round_trip_against_fixture(sanitize, rules):
+    raw = (FIXTURES / "raw" / "python.txt").read_text(encoding="utf-8")
+    expected = (FIXTURES / "expected" / "python.txt").read_text(encoding="utf-8")
+    actual = sanitize.sanitize(
+        raw=raw,
+        runtime="python",
+        source="python -m piper --help",
+        version="<VERSION>",
+        rules=rules,
+        timestamp="<TIMESTAMP>",
+    )
+    assert actual == expected, (
+        f"sanitize fixture round-trip failed:\n"
+        f"--- expected ---\n{expected!r}\n--- actual ---\n{actual!r}"
+    )
+
+
+@pytest.mark.parametrize(
+    "runtime", ["python", "go", "rust", "wasm", "csharp", "cpp"],
+)
+def test_canonical_runtime_txt_has_4_line_header(sanitize, runtime: str):
+    """Every committed canonical file must use the 4-line header."""
+    canonical = REPO_ROOT / "docs" / "reference" / "cli-help" / f"{runtime}.txt"
+    assert canonical.exists(), (
+        f"docs/reference/cli-help/{runtime}.txt is missing. T-003 ships "
+        f"canonicals (real or PLACEHOLDER) for all 6 runtimes."
+    )
+    text = canonical.read_text(encoding="utf-8")
+    lines = text.splitlines()
+    assert lines[0].startswith("# Auto-generated by"), (
+        f"{runtime}.txt line 1 must be the auto-generated marker."
+    )
+    assert "<TIMESTAMP>" in lines[0], (
+        f"{runtime}.txt header must keep <TIMESTAMP> placeholder so CI runs "
+        f"do not produce header drift on every run."
+    )
+    assert lines[1].startswith("# Source: "), (
+        f"{runtime}.txt line 2 must declare the canonical source command."
+    )
+    assert lines[2] == f"# Runtime: {runtime}", (
+        f"{runtime}.txt line 3 must declare its runtime identity."
+    )
+    assert lines[3].startswith("# Version: "), (
+        f"{runtime}.txt line 4 must declare the version slot."
+    )
+    assert "<VERSION>" in lines[3], (
+        f"{runtime}.txt Version field must use <VERSION> placeholder so a "
+        f"release bump does not require touching the committed help file."
+    )
+
+
+@pytest.mark.parametrize("runtime", ["csharp", "cpp"])
+def test_placeholder_runtimes_have_placeholder_marker(runtime: str):
+    """csharp / cpp ship a PLACEHOLDER canonical until their toolchain lands
+    in CI. The drift-check workflow MUST keep skipping these — assert the
+    marker line is present so workflow logic stays in sync with reality."""
+    canonical = REPO_ROOT / "docs" / "reference" / "cli-help" / f"{runtime}.txt"
+    text = canonical.read_text(encoding="utf-8")
+    assert "# PLACEHOLDER:" in text, (
+        f"{runtime}.txt should be a PLACEHOLDER canonical (its toolchain is "
+        f"not yet wired up in CI). If the toolchain has landed, delete this "
+        f"assertion and replace the canonical with a real --help capture."
+    )
+
+
+@pytest.mark.parametrize("runtime", ["python", "go", "rust", "wasm"])
+def test_real_canonical_runtimes_lack_placeholder_marker(runtime: str):
+    """python / go / rust / wasm ship a real --help canonical. If a future
+    edit accidentally drops the body and leaves a PLACEHOLDER, this gate
+    catches it."""
+    canonical = REPO_ROOT / "docs" / "reference" / "cli-help" / f"{runtime}.txt"
+    text = canonical.read_text(encoding="utf-8")
+    assert "# PLACEHOLDER:" not in text, (
+        f"{runtime}.txt should hold a real --help capture, not a PLACEHOLDER. "
+        f"Re-run the cli-help-extract workflow to regenerate the body."
+    )
+
+
+def test_main_writes_output_file(sanitize, tmp_path: Path):
+    inp = tmp_path / "raw.txt"
+    inp.write_text("usage: __main__.py [-h]\n", encoding="utf-8")
+    out = tmp_path / "out.txt"
+    rc = sanitize.main(
+        [
+            "--runtime",
+            "python",
+            "--source",
+            "python -m piper --help",
+            "--version",
+            "<VERSION>",
+            "--timestamp",
+            "<TIMESTAMP>",
+            "--in",
+            str(inp),
+            "--out",
+            str(out),
+            "--rules",
+            str(RULES_PATH),
+        ]
+    )
+    assert rc == 0
+    assert out.exists()
+    body = out.read_text(encoding="utf-8")
+    assert "usage: python -m piper" in body
+    assert body.startswith("# Auto-generated")

@@ -1,0 +1,11 @@
+{
+  "releases": [
+    {
+      "tag": "v1.4.0",
+      "assets": [
+        {"name": "libpiper_plus-linux-x64.tar.gz"},
+        {"name": "libpiper_plus-macos-arm64.tar.gz"}
+      ]
+    }
+  ]
+}

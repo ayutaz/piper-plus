@@ -1,0 +1,113 @@
+# Sanitization rules for CLI --help output (T-003).
+#
+# Each [[rules]] entry strips a piece of build-/run-time noise (version
+# strings, machine paths, timestamps, ANSI escapes) so the resulting
+# `docs/reference/cli-help/<runtime>.txt` is reproducible across CI
+# runners and local machines. ``runtime = "*"`` applies to every runtime;
+# a specific runtime name (``python``, ``rust``, …) scopes the rule.
+#
+# Rule order matters. ANSI escape stripping MUST run before line-anchored
+# rules (those starting with ``^``); on PR #513 a Linux GitHub runner
+# emitted onnxruntime warnings prefixed with ``\x1b[0;93m``, which made
+# ``^\d{4}-...`` fail to match (the line started with ESC, not a digit).
+# The earlier rule order had ANSI last and consequently left the warning
+# in the canonical output. See PR #513 debug commit / sticky for the
+# original symptom.
+
+# Generic: ANSI color escapes (must come first — leading ESC bytes break
+# downstream ``^anchor`` rules like the onnxruntime warning strip below).
+[[rules]]
+runtime = "*"
+pattern = "\\x1b\\[[0-9;]*[A-Za-z]"
+replace_with = ""
+note = "ANSI CSI sequences (color / cursor). MUST run before ^-anchored rules."
+
+# Generic: timestamps anywhere in the output (ISO8601 with T separator).
+[[rules]]
+runtime = "*"
+pattern = "\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})?"
+replace_with = "<TIMESTAMP>"
+note = "ISO8601 timestamps (UTC or offset)."
+
+# Generic: onnxruntime device_discovery warnings (stderr-only, Linux runner).
+# Caught on PR #513 first CI run: `python -m piper --help` re-routes stderr
+# into stdout (2>&1), so onnxruntime's PCI bus scan warnings appear in the
+# raw capture on GitHub-hosted Linux runners (where ACPI device paths exist)
+# but not on macOS / local dev machines. Strip the whole line.
+[[rules]]
+runtime = "*"
+pattern = "^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}\\.\\d+ \\[W:onnxruntime:.*\\n"
+replace_with = ""
+note = "onnxruntime stderr warnings (PCI / device discovery) — Linux runner only."
+
+# Generic: ORT init warnings without leading timestamp (rare but observed).
+[[rules]]
+runtime = "*"
+pattern = "^\\[W:onnxruntime:.*\\n"
+replace_with = ""
+note = "onnxruntime warnings missing the timestamp prefix (fallback)."
+
+# Generic: GitHub runner workspace paths.
+[[rules]]
+runtime = "*"
+pattern = "/home/runner/work/[^\\s]*"
+replace_with = "<RUNNER_PATH>"
+note = "GitHub Actions runner workspace paths."
+
+# Generic: macOS GitHub runner paths.
+[[rules]]
+runtime = "*"
+pattern = "/Users/runner/work/[^\\s]*"
+replace_with = "<RUNNER_PATH>"
+note = "macOS GitHub Actions runner workspace paths."
+
+# Generic: Windows GitHub runner paths.
+[[rules]]
+runtime = "*"
+pattern = "D:\\\\a\\\\[^\\s]*"
+replace_with = "<RUNNER_PATH>"
+note = "Windows GitHub Actions runner workspace paths."
+
+# Python: argparse prog name is the entrypoint file (__main__.py).
+[[rules]]
+runtime = "python"
+pattern = "^usage: __main__\\.py "
+replace_with = "usage: python -m piper "
+note = "Normalize argparse prog from __main__.py to invocation form."
+
+# Python: package version string.
+[[rules]]
+runtime = "python"
+pattern = "piper-plus[ \\-]\\d+\\.\\d+\\.\\d+(?:[\\-+][A-Za-z0-9.]+)?"
+replace_with = "piper-plus <VERSION>"
+note = "Avoid version-only drift surfacing on every release."
+
+# Rust: cargo binary version.
+[[rules]]
+runtime = "rust"
+pattern = "piper-cli \\d+\\.\\d+\\.\\d+(?:[\\-+][A-Za-z0-9.]+)?"
+replace_with = "piper-cli <VERSION>"
+
+# C#: assembly version banner.
+[[rules]]
+runtime = "csharp"
+pattern = "PiperPlus\\.Cli, Version=\\d+\\.\\d+\\.\\d+\\.\\d+, Culture=neutral, PublicKeyToken=null"
+replace_with = "PiperPlus.Cli, Version=<VERSION>"
+
+# Go: standard `version vX.Y.Z` suffix.
+[[rules]]
+runtime = "go"
+pattern = "version v?\\d+\\.\\d+\\.\\d+(?:[\\-+][A-Za-z0-9.]+)?"
+replace_with = "version <VERSION>"
+
+# WASM (Node CLI): node --version pinned in usage.
+[[rules]]
+runtime = "wasm"
+pattern = "node v?\\d+\\.\\d+\\.\\d+"
+replace_with = "node <VERSION>"
+
+# C++: CMake build timestamp embedded in --version banner.
+[[rules]]
+runtime = "cpp"
+pattern = "build \\d{4}-\\d{2}-\\d{2}"
+replace_with = "build <BUILD_DATE>"
