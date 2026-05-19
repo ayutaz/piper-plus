@@ -137,11 +137,9 @@ jobs:
           # `pre-commit run --all-files --hook-stage push` locally before
           # release tags. A periodic cron (weekly) could add a full-repo
           # gate as follow-up.
-          # --jobs 4: pre-commit native hook parallelism.
           # --show-diff-on-failure makes drift trivial to fix locally
           # (contributors see the exact patch the hooks produced).
           pre-commit run \
             --from-ref ${{ github.event.pull_request.base.sha || github.event.before }} \
             --to-ref HEAD \
-            --jobs 4 \
             --show-diff-on-failure
