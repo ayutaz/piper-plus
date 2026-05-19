@@ -108,7 +108,7 @@ description = """
 upload-artifact step は必ず `retention-days:` を明示。 GitHub Action の
 デフォルト (90 日) は storage cost が高く、 PR debug 用途には過剰。
 """
-enforced_by = "scripts/check_artifact_retention.py (future)"
+enforced_by = "scripts/check_artifact_retention.py via .github/workflows/contract-gates-extended.yml (matrix entry: artifact-retention) + .pre-commit-config.yaml hook"
 
 [[invariants]]
 name = "no-14-day-retention"

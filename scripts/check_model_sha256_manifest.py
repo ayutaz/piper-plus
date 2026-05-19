@@ -5,7 +5,10 @@ The companion `scripts/verify_model_checksums.py` is a release-time tool
 that computes an actual file's SHA256 and looks it up here. This script
 runs in CI / pre-commit and gates the *structure* of the manifest itself:
 that every entry is well-formed, that the placeholder sentinel is uniform,
-and that the model inventory matches CLAUDE.md's "学習済みモデル" table.
+and that the model inventory matches the EXPECTED_MODELS set below — which
+is a *hand-curated mirror* of CLAUDE.md's "学習済みモデル" table. The set
+is hardcoded (not parsed from CLAUDE.md), so when models are added or
+removed both this script and CLAUDE.md MUST be updated in the same PR.
 
 Why split it out:
   * Most entries today carry `sha256 = "<computed-on-publish>"` placeholders
@@ -50,10 +53,11 @@ EXPECTED_MODELS = {
     "speaker-encoder-ecapa-tdnn",  # voice cloning
 }
 
-# Forward-compat: the loader MUST accept schema_version values up to and
-# including this number without crashing. Bump in lockstep with the
-# manifest. The mirror check (`schema_version > MAX_KNOWN`) lets a future
-# bump appear without immediately failing this gate.
+# Forward-compat boundary: schema_version values up to and including this
+# number are accepted; a higher major fails the gate. The rationale is
+# fail-fast — a future schema bump may add required keys this script does
+# not yet validate, so we force the schema introduction PR to also bump
+# MAX_KNOWN_SCHEMA_VERSION (and extend the validators) in the same change.
 MAX_KNOWN_SCHEMA_VERSION = 2
 
 REQUIRED_META_KEYS = (

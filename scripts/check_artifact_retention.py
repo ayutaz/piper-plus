@@ -14,8 +14,8 @@ Exit policy:
 
 Exit codes:
   0 -- aligned, OR mode=warn with drift (drift surfaced as ::warning::)
-  1 -- mode=fail (or --strict) with drift, OR spec missing / malformed
-  2 -- structural error (e.g. spec / workflow dir unreadable)
+  1 -- mode=fail (or --strict) with drift
+  2 -- spec missing / malformed / invalid mode
 """
 
 from __future__ import annotations
