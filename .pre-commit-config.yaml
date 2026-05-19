@@ -127,6 +127,7 @@ repos:
     hooks:
       - id: mypy-g2p
         name: mypy --ignore-missing-imports (g2p, Python)
+        stages: [pre-push]
         # Mirror of .github/workflows/g2p-python-ci.yml step.
         entry: bash -c 'cd src/python/g2p && uv run --frozen mypy --ignore-missing-imports piper_plus_g2p/'
         language: system
@@ -135,6 +136,7 @@ repos:
 
       - id: cargo-clippy
         name: cargo clippy --workspace --all-features --all-targets -- -D warnings (Rust)
+        stages: [pre-push]
         # Mirror of .github/workflows/rust-tests.yml step. Catches issues
         # like needless_range_loop / collapsible_if / items_after_test_module
         # / absurd_extreme_comparisons before they hit CI (PR #401 needed
@@ -155,6 +157,7 @@ repos:
 
       - id: dotnet-format
         name: dotnet format --verify-no-changes (C#)
+        stages: [pre-push]
         # Mirror of .github/workflows/csharp-ci.yml + ci.yml. Heavy on a cold
         # cache (~60s) but seconds once the SDK has materialized the analyzer
         # cache. Use SKIP=dotnet-format on tiny non-C# commits if needed.
@@ -170,6 +173,7 @@ repos:
 
       - id: golangci-lint
         name: golangci-lint run (Go)
+        stages: [pre-push]
         # Mirror of .github/workflows/go-ci.yml + g2p-go-publish.yml. Skips
         # with a warning when the binary is absent — CI still gates. Install
         # via `brew install golangci-lint` to enable locally.
@@ -849,6 +853,7 @@ repos:
     rev: v0.14.0
     hooks:
       - id: markdownlint-cli2
+        stages: [pre-push]
         args: [--config=.markdownlint.yaml]
         files: \.(md|markdown)$
         exclude: ^(node_modules|build|dist|target|test/models)/
@@ -897,6 +902,7 @@ repos:
     rev: v2.3.0
     hooks:
       - id: codespell
+        stages: [pre-push]
         additional_dependencies: [tomli]
         # `.codespellrc` の `skip` は CLI 引数として渡された個別ファイルに対しては
         # 無視されるため、pre-commit の filename routing 側でも除外する必要がある。
@@ -912,6 +918,7 @@ repos:
     rev: v8.21.2
     hooks:
       - id: gitleaks
+        stages: [pre-push]
 
   # ---------------------------------------------------------------------------
   # Dockerfile lint — hadolint catches common Dockerfile mistakes (apt-get
@@ -929,6 +936,7 @@ repos:
     rev: v2.12.0
     hooks:
       - id: hadolint
+        stages: [pre-push]
         args: [--config=.hadolint.yaml, --failure-threshold=error]
         files: ^docker/.*Dockerfile.*$
 
@@ -940,6 +948,7 @@ repos:
     rev: 3.0.3
     hooks:
       - id: editorconfig-checker
+        stages: [pre-push]
         # csproj/cmake/.github yml continuation-indents and registry.py
         # ReST docstring blocks use alignment-style indentation that
         # editorconfig-checker 3.0.3 cannot opt-out via `indent_size = unset`

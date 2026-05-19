@@ -131,4 +131,4 @@ jobs:
         run: |
           # --show-diff-on-failure makes drift trivial to fix locally:
           # contributors see the exact patch the hooks produced.
-          pre-commit run --all-files --show-diff-on-failure
+          pre-commit run --all-files --jobs 4 --show-diff-on-failure
