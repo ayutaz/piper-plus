@@ -4,8 +4,8 @@
 **Milestone**: [M2 Spec & Docs Gates](../milestones/M2-spec-and-docs.md)
 **Proposal 項目**: `#5-5` (`test-flake-retry-contract.toml`)
 **Tier**: Tier 2 (blocker、 pre-impl direction)
-**Status**: 完了 (4 runtime scope = python/rust/go/csharp。 WASM/C++/Kotlin/Swift 拡張は別 spec で別 PR に委譲)
-**PR**: #517 (merge: 2026-05-19、 commit f3ef12cd)
+**Status**: 完了 (8 runtime scope = python/rust/go/csharp + wasm/cpp/kotlin/swift)
+**PR**: #517 (merge: 2026-05-19、 commit f3ef12cd、 4 runtime 初期実装) + 後続 PR (commit TBD、 4 runtime 拡張で full scope に)
 
 > **Note (PR #517 merge 後の scope 補足)**
 >
@@ -21,6 +21,17 @@
 > **未実装分 = 4 runtime 拡張 (WASM jest / C++ ctest / Kotlin gradle test retry / Swift XCTest XCTRetries)** は spec の `applies_to` を拡張する別 PR で追加する。 各 runtime の retry mechanism は調査 spike が必要なため別 ticket / 別 spec として扱う。
 >
 > 以下の §1〜§7 は ticket 作成時点の original 提案であり、 historical record として保持。 「8 runtime」 「Java / Swift / etc.」 記述は実装に反映されていない点に注意 (実装 → spec [`docs/spec/test-flake-retry-contract.toml`] の `applies_to` が正)。
+
+> **Update (PR #517 後続、 4 runtime 拡張で full scope 化)**
+>
+> `applies_to` を 4 → 8 runtime に拡張し、 元 ticket の original 提案 scope (8 runtime) と整合化済み。 追加した 4 runtime はいずれも `status = "proposed"` で、 既存 gate (`scripts/check_test_flake_retry.py`) の `check_proposed_runtime` が shape (status / package / ci_flag) を検証する流れに乗る:
+>
+> - WASM (`jest`): `--testRetries 1` 経由、 `jest.config.js` の `testEnvironmentOptions.retries` 又は CLI flag 両対応
+> - C++ (`ctest --repeat until-pass:2`): CMake 3.17+ built-in、 同 test を最大 3 回試行、 一度 pass で green
+> - Kotlin (`org.gradle.test-retry` plugin 1.5.10): `maxRetries=2 / maxFailures=0`、 CI=true env で gating
+> - Swift (`swift test ... -- --test-iterations 3 --rerun-failed-tests`): XCTest 標準引数、 fail のみ rerun mode
+>
+> 実 CI workflow 適用は phase 2 で各 runtime の implementation_phase_2 通り。 本 PR は spec の applies_to 拡張と shape validation 整備のみ (runtime test 実行への影響なし)。
 **担当 (予定)**: Claude Code (agent team) + maintainer review
 **着手前提**: なし (M2 内他 ticket と並列可)
 

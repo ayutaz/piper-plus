@@ -13,10 +13,10 @@
 [meta]
 spec_version = 1
 last_updated = "2026-05-19"
-applies_to = ["python", "rust", "go", "csharp"]
+applies_to = ["python", "rust", "go", "csharp", "wasm", "cpp", "kotlin", "swift"]
 forward_compat_policy = "strict"
 # `direction` (added per M2 T-008):
-#   - "pre-impl": this TOML is canonical for retry policy across the 4
+#   - "pre-impl": this TOML is canonical for retry policy across the 8
 #     applies_to runtimes. The gate verifies that runtimes whose
 #     `status` is "phase-1" or "phase-2" carry the required dependency
 #     and CLI flag, and that no observed retry value exceeds 2 (per
@@ -86,6 +86,67 @@ implementation_phase_2 = """
   flaky な test method に明示的に `[Retry(2)]` 属性を付与する pattern。
   全 test retry は採らない (本物 bug 隠蔽防止)。 PiperPlus.runsettings の
   TestSessionTimeout を 6 min に拡張済 (既存設定)。
+"""
+
+# -----------------------------------------------------------------------------
+# WASM (jest)
+# -----------------------------------------------------------------------------
+[wasm]
+status = "proposed"  # jest.config.js に retry 設定なし、 phase 2 で追加
+package = "jest"
+ci_flag = "--testRetries 1"
+local_default = "no retry (default jest behaviour)"
+implementation_phase_2 = """
+  src/wasm/openjtalk-web/jest.config.js に `testEnvironmentOptions.retries`
+  を 1 で設定するか、 `.github/workflows/test-webassembly.yml` で
+  `--testRetries 1` を渡す。 jest は flaky test に対し test 単位の retry
+  を提供 (testRetries option)。 ad-hoc な全 test retry は採らない。
+"""
+
+# -----------------------------------------------------------------------------
+# C++ (ctest)
+# -----------------------------------------------------------------------------
+[cpp]
+status = "proposed"  # ctest --repeat 未導入、 phase 2 で追加
+package = "ctest (CMake built-in)"
+ci_flag = "ctest --repeat until-pass:2"
+local_default = "ctest (no retry)"
+implementation_phase_2 = """
+  .github/workflows/_build-test-cpp.yml の `ctest` step に
+  `--repeat until-pass:2` を追加。 ctest 標準機構で test 単位の retry を
+  提供 (CMake 3.17+)。 同 test を最大 3 回試行 (= retries=2)、 一度でも
+  pass すれば green とする until-pass mode を採用。
+"""
+
+# -----------------------------------------------------------------------------
+# Kotlin / Android (Gradle test retry plugin)
+# -----------------------------------------------------------------------------
+[kotlin]
+status = "proposed"  # org.gradle.test-retry 未導入、 phase 2 で追加
+package = "org.gradle.test-retry"
+ci_install = "Gradle plugin: id(\"org.gradle.test-retry\") version \"1.5.10\""
+ci_flag = "test { retry { maxRetries.set(2); maxFailures.set(0) } }"
+local_default = "no retry (test-retry plugin は CI only に設定)"
+implementation_phase_2 = """
+  android/piper-plus-g2p/build.gradle.kts に test-retry plugin を追加し、
+  CI 環境変数 (例: CI=true) で maxRetries=2 を有効化する。 local 実行では
+  default 0 で本物 fail を即検知。
+"""
+
+# -----------------------------------------------------------------------------
+# Swift (XCTest)
+# -----------------------------------------------------------------------------
+[swift]
+status = "proposed"  # XCTest 標準 retry なし、 -test-iterations 経由
+package = "XCTest (Foundation 標準)"
+via = "swift test option"
+ci_flag = "swift test --num-workers 1 -- --test-iterations 3 --rerun-failed-tests"
+local_default = "no retry (swift test default)"
+implementation_phase_2 = """
+  .github/workflows/swift-g2p-ci.yml の `swift test` step に
+  `-- --test-iterations 3 --rerun-failed-tests` を追加。 XCTest は
+  test method の iteration 回数を引数で制御可能、 fail した case のみ
+  rerun する mode と組み合わせて retry に相当する挙動を実現。
 """
 
 # -----------------------------------------------------------------------------
