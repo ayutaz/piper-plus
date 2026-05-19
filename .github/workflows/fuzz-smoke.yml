@@ -122,7 +122,7 @@ jobs:
             src/rust/piper-plus-g2p/fuzz/artifacts/**
             src/rust/piper-plus-g2p/fuzz/corpus/${{ matrix.target }}/crash-*
           if-no-files-found: ignore
-          retention-days: 14
+          retention-days: 30
 
   # ---------------------------------------------------------------------------
   # Python hypothesis
@@ -170,4 +170,4 @@ jobs:
           path: |
             .hypothesis/**
           if-no-files-found: ignore
-          retention-days: 14
+          retention-days: 30

@@ -126,4 +126,4 @@ jobs:
         with:
           name: typosquatting-${{ github.run_id }}
           path: /tmp/typosquatting-report.md
-          retention-days: 365
+          retention-days: 90

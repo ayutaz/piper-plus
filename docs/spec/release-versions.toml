@@ -50,6 +50,12 @@ schema_version = 1
 #   - "fail"  → emit ::error:: and exit 1 (post-hardening).
 mode = "warn"
 forward_compat_policy = "strict"
+# `direction` (added per M2 T-004 closeout):
+#   - "post-hoc": the manifest files are canonical, this TOML is a
+#     snapshot. The gate enforces that the snapshot stays in sync with
+#     whatever the manifests claim — i.e. `expected_prefix` MUST be
+#     bumped whenever a manifest is bumped.
+direction = "post-hoc"
 
 # ---------------------------------------------------------------------------
 # Python — PyPI piper-plus (main project)

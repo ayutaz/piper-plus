@@ -253,6 +253,35 @@ repos:
         files: ^(docs/spec/swift-g2p-contract\.toml|Sources/PiperPlusG2P/|scripts/check_swift_g2p_contract\.py)
         pass_filenames: false
 
+      # M2 T-005: docs/spec/model-sha256-manifest.toml の構造健全性 gate。
+      # 6 model entry の存在 + placeholder sentinel + forward-compat schema。
+      # 実 SHA256 突合は publish パイプライン (verify_model_checksums.py) 側。
+      - id: model-sha256-manifest
+        name: model-sha256-manifest.toml structural gate
+        entry: uv run python scripts/check_model_sha256_manifest.py
+        language: system
+        files: ^(docs/spec/model-sha256-manifest\.toml|scripts/check_model_sha256_manifest\.py)$
+        pass_filenames: false
+
+      # M2 T-006: docs/spec/artifact-retention-contract.toml gate。
+      # 全 workflow YAML の retention-days を category 許容値域と突合。
+      # 現在 mode=warn (baseline 違反 6 件あり、 fail 化は別 PR)。
+      - id: artifact-retention
+        name: artifact-retention-contract.toml gate
+        entry: uv run python scripts/check_artifact_retention.py
+        language: system
+        files: ^(docs/spec/artifact-retention-contract\.toml|\.github/workflows/.*\.ya?ml|scripts/check_artifact_retention\.py)$
+        pass_filenames: false
+
+      # M2 T-008: docs/spec/test-flake-retry-contract.toml gate。
+      # phase-1/2 runtime の dependency/CI flag 同期 + retry-count-max-2 invariant。
+      - id: test-flake-retry
+        name: test-flake-retry-contract.toml gate
+        entry: uv run python scripts/check_test_flake_retry.py
+        language: system
+        files: ^(docs/spec/test-flake-retry-contract\.toml|src/python_run/pyproject\.toml|\.github/workflows/python-tests\.yml|scripts/check_test_flake_retry\.py)$
+        pass_filenames: false
+
       # Release 時に CHANGELOG.md の `### Breaking changes` と
       # `docs/migration/v*.md` の三方向 triangulation 検査。 release tag を
       # cut する前に breaking change の migration 記載漏れを catch する。

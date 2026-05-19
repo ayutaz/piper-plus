@@ -17,6 +17,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### Spec contract gates: model-sha256-manifest / artifact-retention / test-flake-retry (T-005/T-006/T-008)
+
+5 件の spec sync gate 穴のうち未実装だった 3 件を新規 gate 化、 既存実装 (T-004/T-007) は `[meta].direction` 明文化のみで closeout。 各 gate に silent-zero defensive log を inline 実装し M1 で確立した pattern を踏襲。
+
+- **T-005 model-sha256-manifest gate** (`scripts/check_model_sha256_manifest.py`): `docs/spec/model-sha256-manifest.toml` の 6 model entry が CLAUDE.md 「学習済みモデル」 表と一致するか、 `<computed-on-publish>` placeholder か 64-char lowercase hex SHA256 のいずれかか、 `[meta]` 必須 key (spec_version / canonical_source / hash_algorithm / hash_encoding / update_policy / forward_compat_policy) が揃っているかを検証。 `MAX_KNOWN_SCHEMA_VERSION = 2` で forward-compat (loanword sync gate と同型) を pin
+- **T-006 artifact-retention gate** (`scripts/check_artifact_retention.py`): 全 `.github/workflows/*.y*ml` (40 workflow / 63 upload step) の `retention-days:` を抽出し、 `[[categories]]` 許容値 [1, 7, 30, 90] と突合。 同 PR 内で初期 baseline 違反 6 件を sweep (cpp-abi-check/fuzz-smoke 4 件: 14d→30d / cppcheck: 14d→7d / scorecard: 5d→7d / typosquatting-watch: 365d→90d) し `[meta].mode = "fail"` で導入完了
+- **T-008 test-flake-retry gate** (`scripts/check_test_flake_retry.py`): 4 runtime (python / rust / go / csharp) のうち `status = "phase-1"`/`"phase-2"` の runtime に pyproject 依存 + `--reruns N` flag が wire-up されているか、 全 runtime の retry 値が `retry_count_max = 2` 不変条件を満たすか、 `[[invariants]]` 3 件 (no-blanket-retry / retry-count-max-2 / ci-only-retry) が削除されていないかを検証
+- **direction 明文化 (closeout)**: `release-versions.toml` (post-hoc) と `swift-g2p-contract.toml` (pre-impl) の `[meta].direction` を追加。 これら 2 件は既存 `scripts/check_version_manifest_sync.py` / `scripts/check_swift_g2p_contract.py` が gate 化済み
+- **CI 統合**: `.github/workflows/contract-gates-extended.yml` の matrix に 3 contract id (model-sha256-manifest / artifact-retention / test-flake-retry) を追加、 既存 `.pre-commit-config.yaml` に 3 hook 追加 (path filter で fast-path)
+- **Unit tests**: 41 件追加 (`tests/scripts/test_check_{model_sha256_manifest,artifact_retention,test_flake_retry}.py`)
+- **M1 status 反映**: PR #513 merge を受けて `docs/tickets/{README.md,milestones/M1-foundations.md,tickets/T-00{1,2,3}-*.md}` の Status を 「完了」 + PR #513 を記録
+
 #### Kotlin/Android G2P AAR を Maven Central に公開 (Issue #388)
 
 8 言語マルチリンガル G2P を Android アプリから利用するための **engine-less Kotlin AAR** を新設。Maven coordinates `io.github.ayutaz:piper-plus-g2p-android`。`implementation("io.github.ayutaz:piper-plus-g2p-android:1.0.0")` 1 行で導入できる。

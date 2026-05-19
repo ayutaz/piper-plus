@@ -4,8 +4,8 @@
 **Milestone**: [M2 Spec & Docs Gates](../milestones/M2-spec-and-docs.md)
 **Proposal 項目**: `#5-1` (`release-versions.toml`)
 **Tier**: Tier 2 (blocker、 ただし direction 判定で post-hoc snapshot に倒れる場合は informational 起点)
-**Status**: 計画中
-**PR**: (未作成)
+**Status**: 完了 (既存実装、 本 PR で direction 明文化のみ)
+**PR**: 既存実装 = `scripts/check_version_manifest_sync.py` + `.github/workflows/version-consistency.yml` + `.pre-commit-config.yaml` hook (PR #401 で導入)。 本 ticket は `[meta].direction = "post-hoc"` の明文化と ticket closeout のみ実施
 **担当 (予定)**: Claude Code (agent team) + maintainer review
 **着手前提**: なし (M1 完了が望ましいが、 並列着手可)
 

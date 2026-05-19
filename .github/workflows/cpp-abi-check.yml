@@ -235,7 +235,7 @@ jobs:
             abi/compat_report.html
             abi/base.dump
             abi/head.dump
-          retention-days: 14
+          retention-days: 30
 
       - name: Fail job on ABI break
         if: env.ABI_SKIP != '1' && steps.abicc.outputs.abicc_rc == '1'

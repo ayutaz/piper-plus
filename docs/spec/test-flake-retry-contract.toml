@@ -12,9 +12,21 @@
 
 [meta]
 spec_version = 1
-last_updated = "2026-05-16"
+last_updated = "2026-05-19"
 applies_to = ["python", "rust", "go", "csharp"]
 forward_compat_policy = "strict"
+# `direction` (added per M2 T-008):
+#   - "pre-impl": this TOML is canonical for retry policy across the 4
+#     applies_to runtimes. The gate verifies that runtimes whose
+#     `status` is "phase-1" or "phase-2" carry the required dependency
+#     and CLI flag, and that no observed retry value exceeds 2 (per
+#     [[invariants]].retry-count-max-2). Runtimes still in "proposed"
+#     are scanned informationally only.
+direction = "pre-impl"
+# `retry_count_max` is referenced by the gate to enforce the
+# `retry-count-max-2` invariant uniformly. Bump in lockstep with the
+# invariant if the policy ever changes.
+retry_count_max = 2
 
 # -----------------------------------------------------------------------------
 # Python (pytest)

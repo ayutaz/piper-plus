@@ -56,5 +56,5 @@ jobs:
           path: |
             cppcheck-report.xml
             cppcheck-output.txt
-          retention-days: 14
+          retention-days: 7
         continue-on-error: true

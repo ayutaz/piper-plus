@@ -4,8 +4,8 @@
 **Milestone**: [M2 Spec & Docs Gates](../milestones/M2-spec-and-docs.md)
 **Proposal 項目**: `#5-4` (`swift-g2p-contract.toml`)
 **Tier**: Tier 2 (blocker、 pre-impl direction)
-**Status**: 計画中
-**PR**: (未作成)
+**Status**: 完了 (既存実装、 本 PR で direction 明文化のみ)
+**PR**: 既存実装 = `scripts/check_swift_g2p_contract.py` + `.github/workflows/contract-gates-extended.yml` (swift-g2p job) + `.pre-commit-config.yaml` hook。 本 ticket は `[meta].direction = "pre-impl"` の明文化と ticket closeout のみ実施
 **担当 (予定)**: Claude Code (agent team) + maintainer review
 **着手前提**: なし (M2 内他 ticket と並列可)
 

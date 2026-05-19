@@ -6,10 +6,23 @@
 
 [meta]
 spec_version = 1
-last_updated = "2026-05-16"
+last_updated = "2026-05-19"
 applies_to = ["github-actions"]
 canonical_reference = ".github/workflows/*.yml"
 forward_compat_policy = "strict"
+# `direction` (added per M2 T-006):
+#   - "pre-impl": this TOML pins the allowed retention values; workflow
+#     YAMLs mirror the policy. Drift is enforced by
+#     scripts/check_artifact_retention.py + artifact-retention-gate.yml.
+direction = "pre-impl"
+# `mode` controls the gate behaviour:
+#   - "warn" → emit ::warning:: but exit 0 (initial introduction safe).
+#   - "fail" → emit ::error:: and exit 1 (post-hardening).
+# Flipped to "fail" in the M2 T-006 sweep: 6 pre-existing violations
+# (4× 14d → 30d|7d, 1× 5d → 7d, 1× 365d → 90d) were migrated into the
+# four canonical categories below, so any new retention-days outside
+# {1, 7, 30, 90} is now a hard CI failure.
+mode = "fail"
 
 # -----------------------------------------------------------------------------
 # Retention category 定義
@@ -96,7 +109,7 @@ description = """
 upload-artifact step は必ず `retention-days:` を明示。 GitHub Action の
 デフォルト (90 日) は storage cost が高く、 PR debug 用途には過剰。
 """
-enforced_by = "scripts/check_artifact_retention.py (future)"
+enforced_by = "scripts/check_artifact_retention.py via .github/workflows/contract-gates-extended.yml (matrix entry: artifact-retention) + .pre-commit-config.yaml hook"
 
 [[invariants]]
 name = "no-14-day-retention"
