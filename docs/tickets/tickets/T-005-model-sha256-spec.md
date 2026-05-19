@@ -9,6 +9,21 @@
 **担当 (予定)**: Claude Code (agent team) + maintainer review
 **着手前提**: T-004 完了 (推奨。 `scripts/_lib/` の共通化を流用するため。 ただし並列着手も可)
 
+> **Note (PR #517 merge 後の scope 補足)**
+>
+> 本 ticket の original Done definition (§1.2 以下) には「8 runtime loader の hardcoded SHA256 抽出 + spec との byte-for-byte 突合」 が含まれていたが、 現状 spec の各 artifact `sha256` field が `<computed-on-publish>` placeholder のままで、 突合対象 (実 SHA256) が物理的に存在しない (publish パイプラインで初回 release 時に埋め込まれる前提)。
+>
+> このため PR #517 で実装した scope は **「manifest の構造的健全性」 に絞った**:
+>
+> - 6 model entry の inventory が CLAUDE.md「学習済みモデル」 表と一致 (`EXPECTED_MODELS` set との突合)
+> - 各 artifact の `sha256` が placeholder sentinel `<computed-on-publish>` か 64-char lowercase hex のいずれか
+> - `[meta]` 必須 key (`spec_version` / `canonical_source` / `hash_algorithm` / `hash_encoding` / `update_policy` / `forward_compat_policy`) の存在
+> - `MAX_KNOWN_SCHEMA_VERSION = 2` の forward-compat boundary
+>
+> 未実施分 = **実 SHA256 ↔ 8 runtime loader 突合** は別 PR で追加実装する。 前提条件は publish パイプラインで実 SHA256 が spec に埋め込まれること。 詳細は §7.1 (後続作業) を参照。
+>
+> 以下の §1〜§7 は ticket 作成時点の original 提案であり、 historical record として保持。 「実装内容の詳細」 「Done definition」 等の記述は scope 縮小前の提案ベースである点に注意。
+
 ---
 
 ## 1. タスク目的とゴール

@@ -6,6 +6,21 @@
 **Tier**: Tier 2 (blocker、 pre-impl direction)
 **Status**: 完了 (4 runtime scope = python/rust/go/csharp。 WASM/C++/Kotlin/Swift 拡張は別 spec で別 PR に委譲)
 **PR**: #517 (merge: 2026-05-19、 commit f3ef12cd)
+
+> **Note (PR #517 merge 後の scope 補足)**
+>
+> 本 ticket の original 提案では 8 runtime (python / rust / go / csharp / **wasm / cpp / kotlin / swift**) の test retry policy を対象としていたが、 PR #517 で実装した scope は **spec の `applies_to = ["python", "rust", "go", "csharp"]` に揃えた 4 runtime のみ**:
+>
+> - Python (`pytest-rerunfailures`) — `status = "phase-1"` で実 config と sync 必須
+> - Rust (`cargo-nextest`) — `status = "proposed"` (config 抽出を skip)
+> - Go (`gotestsum`) — `status = "proposed"` (同上)
+> - C# (`Xunit.RetryAttribute`) — `status = "proposed"` (同上)
+>
+> gate (`scripts/check_test_flake_retry.py`) は phase status と config の同期 + `retry_count_max = 2` 不変条件 + 3 invariants (no-blanket-retry / retry-count-max-2 / ci-only-retry) を検証。
+>
+> **未実装分 = 4 runtime 拡張 (WASM jest / C++ ctest / Kotlin gradle test retry / Swift XCTest XCTRetries)** は spec の `applies_to` を拡張する別 PR で追加する。 各 runtime の retry mechanism は調査 spike が必要なため別 ticket / 別 spec として扱う。
+>
+> 以下の §1〜§7 は ticket 作成時点の original 提案であり、 historical record として保持。 「8 runtime」 「Java / Swift / etc.」 記述は実装に反映されていない点に注意 (実装 → spec [`docs/spec/test-flake-retry-contract.toml`] の `applies_to` が正)。
 **担当 (予定)**: Claude Code (agent team) + maintainer review
 **着手前提**: なし (M2 内他 ticket と並列可)
 
