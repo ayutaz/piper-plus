@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-05-19T00:00:00Z",
+  "expected_total_pins": 3,
+  "allowlist": [
+    {
+      "action": "dawidd6/action-download-artifact",
+      "sha": "8a338493df3d275e4a7a63bcff3b8fe97e51a927",
+      "resolved_tag": "v19",
+      "verified_at": "2026-05-19T00:00:00Z",
+      "note": "Initial baseline (T-002). SHA pin because dawidd6 ships only sliding @v<major> tags. Verified via gh api repos/dawidd6/action-download-artifact/commits/<sha>."
+    },
+    {
+      "action": "mymindstorm/setup-emsdk",
+      "sha": "6ab9eb1bda2574c4ddb79809fc9247783eaf9021",
+      "resolved_tag": "v14",
+      "verified_at": "2026-05-19T00:00:00Z",
+      "note": "Initial baseline (T-002). SHA pin because setup-emsdk ships only sliding @v<major> tags. Verified via gh api."
+    }
+  ],
+  "ignore_actions": []
+}

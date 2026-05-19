@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-01-01T00:00:00Z",
+  "expected_total_pins": 10,
+  "allowlist": [
+    {
+      "action": "foo/bar",
+      "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "resolved_tag": "v1.0.0",
+      "verified_at": "2026-01-01T00:00:00Z"
+    }
+  ],
+  "ignore_actions": []
+}

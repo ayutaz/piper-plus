@@ -1,0 +1,109 @@
+name: Action SHA Drift Detector
+
+# T-002 (informational tier): complements action-pin-gate.yml.
+# action-pin-gate.yml enforces the SHA pin **shape** (40-hex or full SemVer,
+# never sliding @v<major>). This workflow verifies that each 40-hex SHA pin is
+# still **alive** on GitHub (commit exists, not force-pushed). Run weekly +
+# on PRs that touch workflow YAMLs / the gate script / the baseline.
+#
+# Tier: informational (PR run does NOT fail CI on drift — sticky comment only).
+# Promotion to blocker is gated on 4 consecutive green weekly runs (CON-3.1).
+
+on:
+  schedule:
+    - cron: '0 4 * * 1'  # Monday 04:00 UTC, 1h after T-001 rekor-verify (queue spread).
+  pull_request:
+    paths:
+      - '.github/workflows/**.yml'
+      - 'scripts/check_action_sha_drift.py'
+      - 'scripts/action_sha_baseline.json'
+      - 'scripts/platform_utils.py'
+  workflow_dispatch:
+    inputs:
+      update_baseline:
+        description: "Re-scan + rewrite scripts/action_sha_baseline.json (commit manually after)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: action-sha-drift-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  drift-check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6.0.2
+
+      - name: Setup Python
+        uses: actions/setup-python@v5.6.0
+        with:
+          python-version: '3.13'
+
+      - name: Run drift detector
+        id: detect
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
+        run: |
+          python scripts/check_action_sha_drift.py \
+            --report /tmp/action-sha-drift-report.md
+          echo "exit_code=$?" >> "$GITHUB_OUTPUT"
+        shell: bash
+
+      - name: Compute drift flag
+        id: flag
+        run: |
+          if grep -E '^\| .*\| \*\*(DANGLING|FORCE-PUSHED)\*\* \|' /tmp/action-sha-drift-report.md >/dev/null 2>&1; then
+            echo "drift=1" >> "$GITHUB_OUTPUT"
+          else
+            echo "drift=0" >> "$GITHUB_OUTPUT"
+          fi
+        shell: bash
+
+      - name: Append to step summary
+        run: cat /tmp/action-sha-drift-report.md >> "$GITHUB_STEP_SUMMARY"
+        shell: bash
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: action-sha-drift-report-${{ github.run_id }}
+          path: /tmp/action-sha-drift-report.md
+          retention-days: 30
+
+      - name: Post sticky comment (PR only)
+        if: github.event_name == 'pull_request'
+        uses: marocchino/sticky-pull-request-comment@v2.9.4
+        with:
+          header: action-sha-drift
+          path: /tmp/action-sha-drift-report.md
+
+      - name: Open issue on drift (scheduled only)
+        if: steps.flag.outputs.drift == '1' && github.event_name == 'schedule'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          DATE=$(date -u +%Y-%m-%d)
+          gh issue create \
+            --label action-sha-drift \
+            --title "[action-sha-drift] Drift detected (${DATE})" \
+            --body-file /tmp/action-sha-drift-report.md
+        shell: bash
+
+      - name: Update baseline (workflow_dispatch only)
+        if: github.event_name == 'workflow_dispatch' && inputs.update_baseline == true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python scripts/check_action_sha_drift.py --update-baseline
+          echo '::notice::Baseline rewritten. Inspect the diff and commit manually via PR.'
+          git --no-pager diff scripts/action_sha_baseline.json | head -200
+        shell: bash
