@@ -46,6 +46,8 @@ pinyin
 pinyins
 loanword
 loanwords
+# intoto — in-toto attestation framework (SLSA L3 provenance file extension)
+intoto
 
 # Common false positives:
 # nd — 2nd, 3rd in ordinals
