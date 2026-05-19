@@ -58,10 +58,23 @@ jobs:
     steps:
       - uses: actions/checkout@v6.0.2
         with:
-          # Tier 2-F: changed-files mode requires both base and head SHAs in
-          # local history so `git diff <base>..<head>` resolves. `fetch-depth: 0`
-          # gets the full history (still fast: shallow PR clones are ~MB).
-          fetch-depth: 0
+          # fetch-depth: 1 (HEAD only) — the base SHA needed for
+          # `pre-commit run --from-ref` is fetched explicitly in the next
+          # step. Avoids the full-history clone (saves ~10-20s on large
+          # repos vs `fetch-depth: 0`).
+          fetch-depth: 1
+
+      - name: Fetch base SHA for diff
+        # `git fetch --depth=1 <sha>` pulls just the base commit's tree
+        # (no intermediate history). Sufficient for `git diff base..HEAD`
+        # which is what `pre-commit run --from-ref` uses internally.
+        # Skipped when BASE_SHA is empty (e.g. workflow_dispatch event).
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          if [ -n "${BASE_SHA:-}" ] && ! git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
+            git fetch --no-tags --depth=1 origin "${BASE_SHA}"
+          fi
 
       - uses: actions/setup-python@v6.2.0
         with:
@@ -75,24 +88,37 @@ jobs:
           pip install pre-commit==4.0.1
 
       - name: Install uv
-        # Several sync-gate hooks (loanword-consistency, ort-version-sync,
-        # voice-catalog-parity, language-id-map-contract, action-pin-gate,
-        # dictionary-consistency, ruff-version-sync, loanword-forward-compat,
-        # pua-cross-runtime-consistency, pua-fixture-drift) invoke
-        # `uv run python scripts/check_*.py` per the project convention
-        # (feedback_use_uv.md). Without uv on PATH they fail with
-        # `uv: command not found`. The local pre-commit relies on the
-        # contributor's uv install; CI must materialise it explicitly.
-        run: |
-          curl -LsSf https://astral.sh/uv/install.sh | sh
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+        # Official astral-sh/setup-uv action — faster than `curl | sh`
+        # (downloads pre-built binary from action's CDN, no shell exec).
+        # `enable-cache: true` caches `~/.cache/uv` (package download
+        # cache) keyed on `uv.lock` by default → restored on subsequent
+        # runs so `uv sync` doesn't re-fetch wheels.
+        #
+        # Several sync-gate hooks (loanword-consistency, ort-version-sync, etc.)
+        # invoke `uv run --no-sync python scripts/check_*.py` and need uv on
+        # PATH (feedback_use_uv.md). setup-uv handles PATH automatically.
+        uses: astral-sh/setup-uv@v8.1.0
+        with:
+          enable-cache: true
+
+      - name: Cache uv venv
+        # Cache `.venv/` so `uv sync --frozen` is near-no-op on warm cache.
+        # Key on (uv.lock, pyproject.toml) → invalidates if either changes.
+        # setup-uv's `~/.cache/uv` (pkg download cache) is separate; this
+        # caches the materialised venv (resolved + linked packages).
+        uses: actions/cache@v4.3.0
+        with:
+          path: .venv
+          key: uv-venv-${{ runner.os }}-py3.11-${{ hashFiles('uv.lock', 'pyproject.toml') }}
+          restore-keys: |
+            uv-venv-${{ runner.os }}-py3.11-
 
       - name: Sync uv environment
         # Tier 1-B: pre-commit hooks use `uv run --no-sync python ...` to skip
         # env-validation overhead per hook (saves ~1-2s × 30+ hooks). This step
         # materialises `.venv/` once up-front so `--no-sync` doesn't hit a
-        # missing-venv error. `--frozen` keeps uv.lock pinned (no resolution
-        # side-effect).
+        # missing-venv error. `--frozen` keeps uv.lock pinned. Near-no-op when
+        # the `.venv/` cache above hits.
         run: uv sync --frozen
 
       - name: Cache pre-commit hook environments
