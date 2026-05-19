@@ -1,7 +1,7 @@
 # T-XXX: チケット タイトル (placeholder)
 
 **チケット ID**: `T-XXX`
-**Milestone**: [M? name](../milestones/M%3F-slug.md)
+**Milestone**: `[M? name](../milestones/M?-slug.md)` (example — replace with the real link)
 **Proposal 項目**: `#?` (`項目名`)
 **Tier**: Tier ? (informational / blocker)
 **Status**: 計画中 / 着手 / レビュー中 / 完了
@@ -174,8 +174,12 @@
 
 ## 8. 参照
 
-- 要求定義: [`docs/proposals/ci-expansion-deferred-items-requirements.md`](../../proposals/ci-expansion-deferred-items-requirements.md) §<該当節>
-- 要件定義書: [`docs/proposals/ci-expansion-deferred-items-system-requirements.md`](../../proposals/ci-expansion-deferred-items-system-requirements.md) §<該当節>
+<!-- Example link forms (replace with the real path when filling in a ticket).
+     These are intentionally rendered as inline code so the link checker does
+     not try to resolve placeholders against the template's own directory. -->
+
+- 要求定義: `[docs/proposals/ci-expansion-deferred-items-requirements.md](../../proposals/ci-expansion-deferred-items-requirements.md) §<該当節>` (example)
+- 要件定義書: `[docs/proposals/ci-expansion-deferred-items-system-requirements.md](../../proposals/ci-expansion-deferred-items-system-requirements.md) §<該当節>` (example)
 - 関連 spec: `docs/spec/<spec>.toml`
 - 関連 workflow: `.github/workflows/<name>.yml`
 
