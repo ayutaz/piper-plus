@@ -1,0 +1,94 @@
+name: doc-examples-gate
+
+# T-010 informational tier — `scripts/check_doc_examples.py execute` runs
+# every block the audit JSON classified as `executable` through bash -n /
+# python -m py_compile (syntax-validation only). Real subprocess execution
+# (`--actually-run`) is intentionally NOT enabled here: fenced docs blocks
+# are not vetted for destructive side effects (`rm`, `curl`, etc.).
+#
+# Outcomes:
+# * sticky comment on the PR with pass/fail/timeout counts and a fail table
+# * stale-audit warnings echoed to the run log
+# * exit 0 always (informational); promotion to blocker requires updating
+#   this workflow to add `--strict` and dropping the `continue-on-error`.
+
+on:
+  pull_request:
+    branches: [dev]
+    paths:
+      - 'docs/**/*.md'
+      - 'tests/fixtures/doc_examples_audit/**'
+      - 'scripts/check_doc_examples.py'
+      - 'scripts/doc_examples/**'
+      - 'docs/spec/doc-examples-contract.toml'
+      - '.github/workflows/doc-examples-gate.yml'
+  schedule:
+    # Tuesday 06:00 UTC — gives the doc-examples cadence room to react to
+    # whatever lands on dev between weekly snapshots.
+    - cron: '0 6 * * 2'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  syntax-validate:
+    name: Syntax-validate executable docs blocks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6.0.2
+
+      - uses: actions/setup-python@v6.2.0
+        with:
+          python-version: '3.13'
+
+      - name: Install runtime
+        run: pip install markdown-it-py==4.0.0
+
+      - name: Run audit drift check
+        run: |
+          python scripts/check_doc_examples.py audit \
+            --check-snapshot tests/fixtures/doc_examples_audit/audit.json \
+            --generated-at 2026-05-19T00:00:00Z
+
+      - name: Execute (syntax-only)
+        id: execute
+        continue-on-error: true
+        run: |
+          # Pre-seed both files so a script crash before they're written
+          # doesn't turn the sticky-comment / upload-artifact steps into
+          # hard failures (the gate is informational tier — sticky must
+          # always exist).
+          mkdir -p /tmp
+          printf '%s\n' \
+            "## doc-examples-gate report (informational)" \
+            "" \
+            "_The execute script did not complete successfully; this is a placeholder._" \
+            > /tmp/doc-examples-sticky.md
+          printf '%s\n' '{"results": [], "observed_total": 0, "expected_total": 0, "runner_languages": []}' \
+            > /tmp/doc-examples-report.json
+          python scripts/check_doc_examples.py execute \
+            --report /tmp/doc-examples-report.json \
+            --sticky-comment /tmp/doc-examples-sticky.md
+
+      - name: Post sticky comment (PR only)
+        if: github.event_name == 'pull_request' && hashFiles('/tmp/doc-examples-sticky.md') != ''
+        uses: marocchino/sticky-pull-request-comment@v2.9.4
+        with:
+          header: doc-examples-gate
+          path: /tmp/doc-examples-sticky.md
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: doc-examples-report-${{ github.run_id }}
+          path: /tmp/doc-examples-report.json
+          retention-days: 30
+          if-no-files-found: warn

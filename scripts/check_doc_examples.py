@@ -1,20 +1,28 @@
 #!/usr/bin/env python3
-"""docs/ fenced code blocks の audit / execution gate (T-009 + 後続).
+"""docs/ fenced code blocks の audit / execution gate.
 
-現在は ``--audit`` サブモード (T-009) のみ実装:
+Sub-commands:
 
-- ``docs/`` 配下の Markdown を walk
-- GFM fenced code blocks を抽出
-- 3 カテゴリ (executable / needs_placeholder / skip_warranted) に分類
-- 結果を JSON で出力 (`--output`)
-- silent-zero 防御: ``Collected blocks ...`` を stderr に必ず echo
+- ``audit``: walk markdown, classify fenced blocks, emit JSON snapshot.
+- ``execute``: load the audit JSON, run each ``executable`` block in a
+  sandboxed subprocess (bash + python runners in v1), report per-block
+  outcomes.
 
-``--audit`` のみで T-010 (execute mode) は別 PR で追加する。
+The ``execute`` sub-command runs in informational tier — every PR pass
+is intended to surface drift without breaking the merge gate. Promote
+to blocker only after a quiet-period (e.g. 4 weeks of zero false
+positives) confirms the runners are stable.
 
-Exit codes:
-  0 — audit 成功 (drift なし、 または audit JSON snapshot に一致)
-  1 — silent-zero 検出 (block 数 0)、 または snapshot との drift
-  2 — spec / fixture 不在、 入力エラー
+Exit codes (audit):
+  0 — drift なし or snapshot match
+  1 — silent-zero (0 blocks) or snapshot drift
+  2 — spec/fixture missing or input error
+
+Exit codes (execute):
+  0 — informational tier always exit 0 (sticky comment carries signal);
+      promoted to non-zero only when ``--strict`` is set
+  1 — ``--strict`` + at least one block failed / timed-out
+  2 — audit JSON missing or malformed
 """
 
 from __future__ import annotations
@@ -36,7 +44,16 @@ from doc_examples.classifier import (
     load_config,
     normalize_language,
 )
-from doc_examples.extractor import FencedBlock, walk_docs
+from doc_examples.executor import (
+    EXEC_FAIL,
+    EXEC_PASS,
+    EXEC_RUNNER_MISSING,
+    EXEC_RUNNER_UNSUPPORTED,
+    EXEC_TIMEOUT,
+    RUNNERS,
+    execute_block,
+)
+from doc_examples.extractor import FencedBlock, extract_from_file, walk_docs
 from platform_utils import force_utf8_output
 
 
@@ -222,6 +239,267 @@ def run_audit(args: argparse.Namespace) -> int:
     return 0
 
 
+def _silent_zero_execute_log(
+    *,
+    observed_total: int,
+    observed_per_language: Counter[str],
+    expected_total: int,
+) -> None:
+    """Echo the contract-required execution Collected line + drift warnings."""
+    line = (
+        f"Collected executable blocks (N={observed_total}): "
+        f"bash={observed_per_language.get('bash', 0)} "
+        f"python={observed_per_language.get('python', 0)} "
+        f"rust={observed_per_language.get('rust', 0)} "
+        f"csharp={observed_per_language.get('csharp', 0)} "
+        f"go={observed_per_language.get('go', 0)} "
+        f"wasm={observed_per_language.get('wasm', 0)}"
+    )
+    print(line, file=sys.stderr)
+    print(
+        f"Expected from audit.totals.executable={expected_total}, "
+        f"observed={observed_total}",
+        file=sys.stderr,
+    )
+    if observed_total == 0 and expected_total > 0:
+        # Only warn when the audit actually claimed executable blocks — an
+        # empty audit (e.g. fixture / first-PR run with no executable
+        # content yet) legitimately observes 0 and is not a regression.
+        print(
+            "::warning::audit JSON had executable blocks but execute mode "
+            "saw 0 — runner dispatch broken or audit input mismatched?",
+            file=sys.stderr,
+        )
+    elif observed_total > 0 and observed_total < (expected_total / 2):
+        print(
+            f"::warning::execute saw {observed_total} of expected "
+            f"{expected_total} executable blocks (< 50%) — possible "
+            "regression in classifier dispatch.",
+            file=sys.stderr,
+        )
+
+
+def _execute_one(record: dict, args: argparse.Namespace) -> dict:
+    """Wrap executor.execute_block with stale-audit detection."""
+    file = record["file"]
+    abs_path = args.repo_root / file
+    stale = False
+    if abs_path.exists():
+        blocks = extract_from_file(abs_path, repo_root=args.repo_root)
+        current_hash = next(
+            (b.hash_sha1 for b in blocks if b.line_start == record["line_start"]),
+            None,
+        )
+        if current_hash and current_hash != record["hash_sha1"]:
+            stale = True
+            print(
+                f"::warning::Audit JSON stale: {file}:{record['line_start']} "
+                f"(audit hash={record['hash_sha1'][:8]} current="
+                f"{current_hash[:8]}). Re-run "
+                f"`python scripts/check_doc_examples.py audit` and commit "
+                f"the updated snapshot.",
+                file=sys.stderr,
+            )
+
+    # Re-extract block body from the source file at the same hash to
+    # avoid relying on audit JSON containing the full text (it doesn't).
+    body = None
+    if abs_path.exists():
+        for blk in extract_from_file(abs_path, repo_root=args.repo_root):
+            if blk.hash_sha1 == record["hash_sha1"]:
+                body = blk.body
+                break
+    if body is None:
+        return {
+            "file": file,
+            "line_start": record["line_start"],
+            "language": record["language"],
+            "hash_sha1": record["hash_sha1"],
+            "status": "source_missing",
+            "exit_code": None,
+            "duration_sec": 0.0,
+            "stale_audit": stale,
+        }
+
+    result = execute_block(
+        block_hash=record["hash_sha1"],
+        file=file,
+        line_start=record["line_start"],
+        language=record["language"],
+        body=body,
+        timeout_sec=args.timeout_sec,
+        mode="real" if args.actually_run else "syntax",
+    )
+    return {
+        "file": result.file,
+        "line_start": result.line_start,
+        "language": result.language,
+        "hash_sha1": result.block_hash,
+        "status": result.status,
+        "exit_code": result.exit_code,
+        "duration_sec": result.duration_sec,
+        "stdout_tail": result.stdout_tail,
+        "stderr_tail": result.stderr_tail,
+        "stale_audit": stale,
+    }
+
+
+def _render_sticky_comment(
+    summary: dict,
+    results: list[dict],
+    *,
+    expected_total: int,
+) -> str:
+    """Format a markdown sticky-comment body for the gate result."""
+    by_lang: Counter[str] = Counter()
+    by_status: Counter[str] = Counter()
+    for r in results:
+        by_lang[r["language"]] += 1
+        by_status[r["status"]] += 1
+
+    fail_rows: list[str] = []
+    stale_rows: list[str] = []
+    for r in results:
+        if r["status"] in (EXEC_FAIL, EXEC_TIMEOUT):
+            fail_rows.append(
+                f"| `{r['file']}:{r['line_start']}` | {r['language']} | "
+                f"{r['status']} | exit={r.get('exit_code')} | "
+                f"{r.get('duration_sec', 0):.2f}s |"
+            )
+        if r.get("stale_audit"):
+            stale_rows.append(
+                f"- `{r['file']}:{r['line_start']}` — audit hash="
+                f"`{r['hash_sha1'][:8]}` (re-audit needed)"
+            )
+
+    lines = [
+        "## doc-examples-gate report (informational)",
+        "",
+        f"Expected from audit.totals.executable: **{expected_total}**, "
+        f"observed: **{len(results)}**.",
+        "",
+        "| Outcome | Count |",
+        "|---|---|",
+        f"| pass | {by_status.get(EXEC_PASS, 0)} |",
+        f"| fail | {by_status.get(EXEC_FAIL, 0)} |",
+        f"| timeout | {by_status.get(EXEC_TIMEOUT, 0)} |",
+        f"| runner_unsupported | {by_status.get(EXEC_RUNNER_UNSUPPORTED, 0)} |",
+        f"| runner_missing | {by_status.get(EXEC_RUNNER_MISSING, 0)} |",
+        f"| source_missing | {by_status.get('source_missing', 0)} |",
+        "",
+        "Per language: "
+        + ", ".join(f"`{lang}`={cnt}" for lang, cnt in sorted(by_lang.items())),
+        "",
+    ]
+    if fail_rows:
+        lines.extend(
+            [
+                "### Failures / timeouts",
+                "",
+                "| Location | Language | Status | Exit | Duration |",
+                "|---|---|---|---|---|",
+                *fail_rows,
+                "",
+            ]
+        )
+    if stale_rows:
+        stale_blurb = (
+            "Re-run `python scripts/check_doc_examples.py audit` and commit "
+            "the updated `tests/fixtures/doc_examples_audit/audit.json` to "
+            "clear these warnings:"
+        )
+        lines.extend(
+            [
+                "### Stale audit blocks",
+                "",
+                stale_blurb,
+                "",
+                *stale_rows,
+                "",
+            ]
+        )
+    return "\n".join(lines)
+
+
+def run_execute(args: argparse.Namespace) -> int:
+    audit_path = args.audit_input
+    if not audit_path.exists():
+        print(f"ERROR: audit JSON missing: {audit_path}", file=sys.stderr)
+        return 2
+    try:
+        audit = json.loads(audit_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError) as exc:
+        print(f"ERROR: audit JSON malformed: {exc}", file=sys.stderr)
+        return 2
+
+    expected_total = int(audit.get("totals", {}).get("executable", 0))
+    executable_records = [
+        rec
+        for rec in audit.get("blocks", [])
+        if rec.get("category") == CATEGORY_EXECUTABLE
+    ]
+
+    # Filter by --languages if provided (default: dispatch every executable
+    # record). Languages we don't ship a runner for surface as
+    # `runner_unsupported` so the sticky comment accounts for the full
+    # audit total instead of silently dropping records.
+    runner_languages = set(args.languages) if args.languages else None
+    if runner_languages is not None:
+        target = [r for r in executable_records if r["language"] in runner_languages]
+        reported_runners = sorted(runner_languages)
+    else:
+        target = executable_records
+        # Report the union of runner registry + observed languages so the
+        # report makes it clear which languages flowed through.
+        reported_runners = sorted(set(RUNNERS.keys()) | {r["language"] for r in target})
+
+    observed_per_language: Counter[str] = Counter()
+    results: list[dict] = []
+    for rec in target:
+        observed_per_language[rec["language"]] += 1
+        results.append(_execute_one(rec, args))
+
+    _silent_zero_execute_log(
+        observed_total=len(results),
+        observed_per_language=observed_per_language,
+        expected_total=expected_total,
+    )
+
+    if args.report:
+        args.report.parent.mkdir(parents=True, exist_ok=True)
+        args.report.write_text(
+            json.dumps(
+                {
+                    "expected_total": expected_total,
+                    "observed_total": len(results),
+                    "runner_languages": reported_runners,
+                    "results": results,
+                },
+                indent=2,
+                ensure_ascii=False,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+
+    if args.sticky_comment:
+        args.sticky_comment.parent.mkdir(parents=True, exist_ok=True)
+        args.sticky_comment.write_text(
+            _render_sticky_comment(
+                summary=audit.get("totals", {}),
+                results=results,
+                expected_total=expected_total,
+            ),
+            encoding="utf-8",
+        )
+
+    if args.strict:
+        any_fail = any(r["status"] in (EXEC_FAIL, EXEC_TIMEOUT) for r in results)
+        return 1 if any_fail else 0
+    # Informational tier: always exit 0; signal is in the sticky comment.
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="mode", required=True)
@@ -256,6 +534,54 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Pin generated_at field (UTC ISO8601) for reproducible runs.",
     )
+
+    execute = sub.add_parser(
+        "execute",
+        help="Run each executable block from the audit JSON in a sandbox.",
+    )
+    execute.add_argument(
+        "--audit-input",
+        type=Path,
+        default=DEFAULT_OUTPUT,
+        help=f"Audit JSON to consume (default: {DEFAULT_OUTPUT.relative_to(REPO_ROOT)})",
+    )
+    execute.add_argument("--repo-root", type=Path, default=REPO_ROOT)
+    execute.add_argument(
+        "--languages",
+        nargs="+",
+        default=None,
+        help="Restrict runners to these languages (default: bash + python).",
+    )
+    execute.add_argument(
+        "--timeout-sec",
+        type=int,
+        default=60,
+        help="Per-block subprocess timeout (default: 60s).",
+    )
+    execute.add_argument(
+        "--report",
+        type=Path,
+        default=None,
+        help="Write a JSON report of per-block results to this path.",
+    )
+    execute.add_argument(
+        "--sticky-comment",
+        type=Path,
+        default=None,
+        help="Render a markdown sticky-comment body to this path.",
+    )
+    execute.add_argument(
+        "--actually-run",
+        action="store_true",
+        help="Actually execute each block (default: syntax-validation only "
+        "via `bash -n` / `python -m py_compile`). Real execution can be "
+        "destructive — fenced docs blocks may call `rm`, `curl`, etc.",
+    )
+    execute.add_argument(
+        "--strict",
+        action="store_true",
+        help="Exit non-zero on any fail/timeout (default: informational, exit 0).",
+    )
     return parser
 
 
@@ -264,6 +590,8 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.mode == "audit":
         return run_audit(args)
+    if args.mode == "execute":
+        return run_execute(args)
     parser.print_help()
     return 2
 

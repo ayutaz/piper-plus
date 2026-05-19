@@ -83,7 +83,9 @@ def test_real_spec_aligned(mod, capsys: pytest.CaptureFixture):
     rc = mod.main([])
     captured = capsys.readouterr()
     assert rc == 0, f"Real repo failed unexpectedly:\n{captured.err}"
-    assert "Collected retry policies (runtimes=4" in captured.err
+    # 8 runtimes after the WASM/C++/Kotlin/Swift extension; python is the
+    # only `phase-1` entry so enforced=1.
+    assert "Collected retry policies (runtimes=8" in captured.err
 
 
 def test_check_python_proposed_phase_skips_impl_check(

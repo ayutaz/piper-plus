@@ -6021,8 +6021,8 @@
     },
     {
       "file": "docs/tickets/tickets/T-008-test-flake-retry-spec.md",
-      "line_start": 67,
-      "line_end": 83,
+      "line_start": 78,
+      "line_end": 94,
       "language_raw": "text",
       "language": "unknown",
       "category": "skip_warranted",

@@ -17,6 +17,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### docs/ fenced code blocks の execution gate (`scripts/check_doc_examples.py execute`)
+
+audit gate (`scripts/check_doc_examples.py audit`) で生成した canonical snapshot を入力に、 `executable` category の block を **syntax-validation default** で sandbox 実行する informational tier gate を追加。 加えて `test-flake-retry-contract.toml` の `applies_to` を 4 → 8 runtime に拡張し full scope 化。
+
+- **execute サブモード** (`scripts/doc_examples/executor.py`): bash + python の 2 runner を v1 で実装 (executable scope の 95%+ を担保)。 default は **syntax 検証のみ** (`bash -n` / `python -m py_compile`) で destructive 操作 (`rm` / `curl` 等) を呼ばない。 `--actually-run` 明示時のみ subprocess で実行、 bash は `set -euo pipefail` 注入。 残 4 言語 (rust / csharp / go / wasm) は runner 未登録、 `runner_unsupported` で集計のみ
+- **stale audit 検知**: audit JSON の `hash_sha1` と現在の block hash を再計算で比較、 不一致なら `::warning::Audit JSON stale: <file>:<line>` を出力 (block の実行自体は継続)
+- **sticky comment 生成**: 「期待値 (audit.totals.executable) vs 実測値」 / outcome 内訳 (pass / fail / timeout / runner_unsupported / runner_missing) / fail 一覧テーブル / stale audit 一覧 を markdown で書き出し (`--sticky-comment`)
+- **新規 workflow** (`.github/workflows/doc-examples-gate.yml`): PR base + Tuesday 06:00 UTC schedule + workflow_dispatch、 informational tier (`continue-on-error: true`)、 sticky-pull-request-comment で PR に投稿
+- **silent-zero defensive log**: `Collected executable blocks (N=...): bash=A python=B ...` + `Expected from audit.totals.executable=N` を必ず stderr 出力。 N=0 で `::warning::`、 N < expected/2 で `::warning::`
+- **8 runtime test flake retry**: `test-flake-retry-contract.toml` の `applies_to` を `[python, rust, go, csharp, wasm, cpp, kotlin, swift]` に拡張、 4 新規 runtime (WASM jest / C++ ctest --repeat / Kotlin gradle test-retry / Swift `swift test -- --test-iterations`) を spec に追加 (status=proposed、 既存 gate の `check_proposed_runtime` で shape validation)
+- **Unit tests 26 件追加** (`test_check_doc_examples_execute.py` 13 件 + `test_check_test_flake_retry.py` 既存テスト 8 runtime 対応)
+- **実 docs での効果**: syntax-only run で 185 block を validate (165 bash + 20 python)、 既存 docs から **5 件の bash 構文エラー** を検出 (mutation-testing.md / M3-supply-chain.md / T-019/T-020/T-021 SLSA ticket)。 これらは informational tier として sticky comment に記録され、 後続 PR で個別修正候補
+
 #### docs/ fenced code blocks の audit gate (`scripts/check_doc_examples.py audit`)
 
 `docs/` 配下 (~150 markdown) の GFM fenced code blocks を全件抽出し、 3 カテゴリ (executable / needs_placeholder / skip_warranted) に分類する audit 機能を新規実装。 後続の execution gate / blocker 化判定の前提となる canonical 入力 (`tests/fixtures/doc_examples_audit/audit.json`) を生成する。
