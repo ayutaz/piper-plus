@@ -70,8 +70,17 @@ jobs:
 
       - name: Compute fail flag
         id: flag
+        # Copilot review on PR #513: grep-based detection misclassified
+        # "report missing / script aborted early" as success. Use the
+        # script's exit code (captured into steps.verify.outputs.exit_code)
+        # as the authoritative signal, and explicitly fail when either the
+        # exit code is unset or the report file does not exist.
         run: |
-          if grep -E '^\| .*\| \*\*FAIL\*\* \|' /tmp/rekor-verify/report.md >/dev/null 2>&1; then
+          rc='${{ steps.verify.outputs.exit_code }}'
+          if [ ! -f /tmp/rekor-verify/report.md ]; then
+            echo '::warning::report.md missing — verify script aborted early'
+            echo "fail=1" >> "$GITHUB_OUTPUT"
+          elif [ -z "$rc" ] || [ "$rc" != "0" ]; then
             echo "fail=1" >> "$GITHUB_OUTPUT"
           else
             echo "fail=0" >> "$GITHUB_OUTPUT"

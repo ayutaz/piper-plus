@@ -82,10 +82,15 @@ def resolve_sha_via_api(
 
     Returns a dict with ``status`` in ``{"ok", "force-pushed", "error"}``.
 
-    ``dangling`` (commit exists but unreachable from any tag/branch) is
-    classified by the caller via ``classify_dangling`` against a separate
-    refs-listing call — we keep this function single-purpose so the unit
-    tests can monkeypatch a small surface.
+    Note: in live (API) mode the only failure signal exposed by this
+    endpoint is 404 → ``force-pushed`` / SHA missing. Distinguishing
+    a *dangling* commit (200 OK but no reachable tag/branch) requires
+    a second call to ``/repos/.../git/matching-refs/...`` and is left
+    as a future expansion. The ``dangling`` status is therefore only
+    produced today by the ``--offline`` mode against a baseline that
+    does not allowlist the (action, sha) tuple — useful for unit tests
+    and for catching pins that fall out of the allowlist after the
+    weekly --update-baseline run.
     """
     owner_repo = "/".join(action.split("/")[:2])
     url = f"https://api.github.com/repos/{owner_repo}/commits/{sha}"

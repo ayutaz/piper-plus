@@ -206,7 +206,11 @@ jobs:
     runs-on: ubuntu-24.04
     needs: extract
     timeout-minutes: 5
-    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    # Copilot review on PR #513: weekly schedule run was previously skipped
+    # by the original if-clause, so drift never produced a signal. Now run
+    # on PR / workflow_dispatch / schedule; sticky-comment / issue steps
+    # branch on event_name below.
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
     steps:
       - name: Checkout
         uses: actions/checkout@v6.0.2
@@ -226,54 +230,77 @@ jobs:
       - name: Defensive log + diff vs canonical
         id: diff
         continue-on-error: true
+        # Walk the full 6-runtime set (matrix may have lost some at extract
+        # time). Capture vs. canonical produces 4 outcomes per runtime:
+        #   - canonical missing                → NO_CANONICAL (drift)
+        #   - canonical has # PLACEHOLDER:     → SKIPPED (not drift)
+        #   - artifact missing (build failed)  → CAPTURE_FAILED (drift)
+        #   - diff non-zero                    → DRIFT (drift)
+        #   - diff zero                        → OK
+        # The report is always written (even for the 0-artifact case) so
+        # the sticky-comment and Issue steps never reference a missing file.
         run: |
           shopt -s nullglob
-          runtimes=()
+          all_runtimes=("python" "go" "rust" "wasm" "csharp" "cpp")
+          captured=()
           for f in /tmp/cli-help-downloads/*.txt; do
-            runtimes+=("$(basename "$f" .txt)")
+            [ -f "$f" ] && captured+=("$(basename "$f" .txt)")
           done
-          echo "Collected helps (${#runtimes[@]} runtimes): ${runtimes[*]}" >&2
-
-          if [ "${#runtimes[@]}" -eq 0 ]; then
-            echo "::warning::Collected helps (0): drift-check has nothing to compare." >&2
-            exit 2
-          fi
+          summary="${captured[*]:-(none)}"
+          echo "Collected helps (${#captured[@]} captured of ${#all_runtimes[@]} runtimes): ${summary}" >&2
 
           diff_count=0
           {
             echo "## CLI help drift report"
             echo
-            for rt in "${runtimes[@]}"; do
-              actual="/tmp/cli-help-downloads/${rt}.txt"
+            echo "Captured artifacts: ${#captured[@]} / ${#all_runtimes[@]} runtimes."
+            echo
+            echo "| Runtime | Status | Note |"
+            echo "|---------|--------|------|"
+            for rt in "${all_runtimes[@]}"; do
               canonical="docs/reference/cli-help/${rt}.txt"
+              actual="/tmp/cli-help-downloads/${rt}.txt"
               if [ ! -f "$canonical" ]; then
-                echo "- \`$rt\`: **NO_CANONICAL** (commit \`$canonical\` first)"
+                echo "| \`$rt\` | **NO_CANONICAL** | commit \`$canonical\` first |"
                 diff_count=$((diff_count + 1))
                 continue
               fi
               if grep -q '^# PLACEHOLDER:' "$canonical"; then
-                echo "- \`$rt\`: SKIPPED (canonical contains \`# PLACEHOLDER:\` — regenerate via workflow_dispatch on a runner with the toolchain, then commit)"
+                echo "| \`$rt\` | SKIPPED | canonical contains \`# PLACEHOLDER:\` — regenerate via workflow_dispatch |"
+                continue
+              fi
+              if [ ! -f "$actual" ]; then
+                echo "| \`$rt\` | **CAPTURE_FAILED** | build / capture step produced no artifact |"
+                diff_count=$((diff_count + 1))
                 continue
               fi
               if diff -u "$canonical" "$actual" > /tmp/diff-"$rt".txt; then
-                echo "- \`$rt\`: OK"
+                echo "| \`$rt\` | OK | |"
               else
-                echo "- \`$rt\`: **DRIFT**"
+                echo "| \`$rt\` | **DRIFT** | see diff section below |"
                 diff_count=$((diff_count + 1))
+              fi
+            done
+            for rt in "${all_runtimes[@]}"; do
+              if [ -s /tmp/diff-"$rt".txt ]; then
                 echo
+                echo "### Diff for \`$rt\`"
                 echo '```diff'
                 cat /tmp/diff-"$rt".txt
                 echo '```'
               fi
             done
             echo
-            echo "Summary: total=${#runtimes[@]}, drift=$diff_count"
+            echo "Summary: total=${#all_runtimes[@]}, captured=${#captured[@]}, drift=$diff_count"
           } > /tmp/cli-help-drift-report.md
           cat /tmp/cli-help-drift-report.md >> "$GITHUB_STEP_SUMMARY"
+          echo "diff_count=$diff_count" >> "$GITHUB_OUTPUT"
           if [ "$diff_count" -gt 0 ]; then exit 1; fi
         shell: bash
 
       - name: Post sticky comment (PR only)
+        # Report file is now guaranteed to exist (see diff step), so this
+        # step is safe even when diff exited 2 / 1.
         if: github.event_name == 'pull_request'
         uses: marocchino/sticky-pull-request-comment@v2.9.4
         with:
@@ -281,7 +308,7 @@ jobs:
           path: /tmp/cli-help-drift-report.md
 
       - name: Open issue on drift (scheduled only)
-        if: steps.diff.outputs.exit_code != '0' && github.event_name == 'schedule'
+        if: github.event_name == 'schedule' && steps.diff.outputs.diff_count != '0'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |

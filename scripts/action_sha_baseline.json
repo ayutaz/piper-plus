@@ -1,6 +1,7 @@
 {
   "schema_version": 1,
   "generated_at": "2026-05-19T00:00:00Z",
+  "_note": "expected_total_pins counts pin USE-SITES across all workflows (matches len(collect_sha_pins(...))). allowlist contains UNIQUE (action, sha) tuples — dawidd6/action-download-artifact is pinned at 2 use-sites with the same SHA, hence 3 use-sites / 2 allowlist entries. Offline lookup is by (action, sha) tuple so duplicate use-sites all map to the same allowlist row.",
   "expected_total_pins": 3,
   "allowlist": [
     {
@@ -8,7 +9,7 @@
       "sha": "8a338493df3d275e4a7a63bcff3b8fe97e51a927",
       "resolved_tag": "v19",
       "verified_at": "2026-05-19T00:00:00Z",
-      "note": "Initial baseline (T-002). SHA pin because dawidd6 ships only sliding @v<major> tags. Verified via gh api repos/dawidd6/action-download-artifact/commits/<sha>."
+      "note": "Initial baseline (T-002). SHA pin because dawidd6 ships only sliding @v<major> tags. Verified via gh api repos/dawidd6/action-download-artifact/commits/<sha>. Pinned at 2 use-sites."
     },
     {
       "action": "mymindstorm/setup-emsdk",

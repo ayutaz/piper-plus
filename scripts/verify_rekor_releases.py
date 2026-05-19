@@ -85,28 +85,33 @@ def _default_gh_runner(argv: list[str]) -> str:
 def find_assets_for_release(
     release: dict[str, Any],
 ) -> list[dict[str, Any]]:
-    """Pair every artifact with its ``.sig`` / ``.pem`` siblings.
+    """Pair every artifact with its ``.cosign.bundle`` sibling.
 
-    Releases predating PR #511 do not have ``.sig`` / ``.pem`` — those
-    artifacts return ``status='skipped'`` from :func:`classify_asset`.
-    Per-asset metadata (``expected_verify`` etc.) is preserved so fixture
-    mode can drive deterministic test outcomes.
+    PR #511's ``cosign-release-artifacts.yml`` produces a single
+    ``<asset>.cosign.bundle`` per artifact (cosign ``--bundle`` flag),
+    not the legacy ``.sig`` / ``.pem`` two-file form. Releases predating
+    PR #511 do not have a bundle — those artifacts return
+    ``status='skipped'`` from :func:`classify_asset`. Per-asset metadata
+    (``expected_verify`` etc.) is preserved so fixture mode can drive
+    deterministic test outcomes.
     """
     raw_assets = release.get("assets", []) or []
     names = [a["name"] for a in raw_assets]
     by_name = {a["name"]: a for a in raw_assets}
-    sigs = {n.removesuffix(".sig"): n for n in names if n.endswith(".sig")}
-    pems = {n.removesuffix(".pem"): n for n in names if n.endswith(".pem")}
+    bundles = {
+        n.removesuffix(".cosign.bundle"): n
+        for n in names
+        if n.endswith(".cosign.bundle")
+    }
     artifacts: list[dict[str, Any]] = []
     for n in names:
-        if n.endswith((".sig", ".pem")):
+        if n.endswith((".sig", ".pem", ".cosign.bundle")):
             continue
         artifact_meta = by_name.get(n, {})
         artifacts.append(
             {
                 "name": n,
-                "sig": sigs.get(n, ""),
-                "pem": pems.get(n, ""),
+                "bundle": bundles.get(n, ""),
                 "expected_verify": artifact_meta.get("expected_verify", "pass"),
             }
         )
@@ -115,19 +120,25 @@ def find_assets_for_release(
 
 def classify_asset(asset: dict[str, Any]) -> str:
     """Return one of: ``ready``, ``skipped``."""
-    if asset["sig"] and asset["pem"]:
+    if asset.get("bundle"):
         return "ready"
     return "skipped"
 
 
 def verify_blob(
     artifact_path: Path,
-    sig_path: Path,
-    pem_path: Path,
+    bundle_path: Path,
     cosign_cmd: str = "cosign",
     runner: Callable[[list[str]], int] | None = None,
 ) -> dict[str, Any]:
-    """Run ``cosign verify-blob`` and return a result dict."""
+    """Run ``cosign verify-blob`` against a ``--bundle`` and return a result.
+
+    PR #511 signs blobs with ``cosign sign-blob --bundle <name>.cosign.bundle``,
+    embedding both the signature and the Fulcio-issued certificate in a
+    single file. The verify side must use ``--bundle`` (not the legacy
+    ``--signature`` + ``--certificate`` pair) or every verify call fails
+    with "could not verify" even though the upstream signature is valid.
+    """
     argv = [
         cosign_cmd,
         "verify-blob",
@@ -137,10 +148,8 @@ def verify_blob(
         CERTIFICATE_IDENTITY_REGEXP,
         "--certificate-oidc-issuer",
         CERTIFICATE_OIDC_ISSUER,
-        "--signature",
-        str(sig_path),
-        "--certificate",
-        str(pem_path),
+        "--bundle",
+        str(bundle_path),
         str(artifact_path),
     ]
     invoke = runner or _default_subprocess_runner
@@ -211,6 +220,7 @@ def run_verify(
     releases: list[dict[str, Any]],
     download_dir: Path,
     *,
+    cosign_cmd: str = "cosign",
     cosign_runner: Callable[[list[str]], int] | None = None,
     download_fn: Callable[[str, str, Path], Path] | None = None,
 ) -> list[dict[str, Any]]:
@@ -228,7 +238,7 @@ def run_verify(
                         "tag": tag,
                         "artifact": asset["name"],
                         "status": "skipped",
-                        "note": "no .sig/.pem (pre-cosign release)",
+                        "note": "no .cosign.bundle (pre-cosign release)",
                     }
                 )
                 continue
@@ -246,12 +256,11 @@ def run_verify(
                 )
                 continue
             artifact_path = download_fn(tag, asset["name"], download_dir)
-            sig_path = download_fn(tag, asset["sig"], download_dir)
-            pem_path = download_fn(tag, asset["pem"], download_dir)
+            bundle_path = download_fn(tag, asset["bundle"], download_dir)
             verify_result = verify_blob(
                 artifact_path,
-                sig_path,
-                pem_path,
+                bundle_path,
+                cosign_cmd=cosign_cmd,
                 runner=cosign_runner,
             )
             results.append(
@@ -370,6 +379,7 @@ def main(argv: list[str] | None = None) -> int:
     results = run_verify(
         releases,
         args.workdir,
+        cosign_cmd=args.cosign_cmd,
         download_fn=_download_via_gh if args.fixture is None else None,
     )
 
@@ -379,7 +389,11 @@ def main(argv: list[str] | None = None) -> int:
         args.report.write_text(report, encoding="utf-8")
     print(report)
 
-    fail_count = sum(1 for r in results if r["status"] == "fail")
+    # Treat both ``fail`` (verify-blob exit != 0) and ``error`` (cosign
+    # missing / runner exception) as failure — Copilot review on PR #513
+    # flagged that an ``error``-only outcome was silently green and could
+    # mask a "verify never ran" condition.
+    fail_count = sum(1 for r in results if r["status"] in ("fail", "error"))
     return 1 if fail_count > 0 else 0
 
 
