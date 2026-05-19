@@ -4,8 +4,23 @@
 **Milestone**: [M2 Spec & Docs Gates](../milestones/M2-spec-and-docs.md)
 **Proposal 項目**: `#5-3` (`artifact-retention-contract.toml`)
 **Tier**: Tier 2 (blocker、 pre-impl direction)
-**Status**: 計画中
-**PR**: (未作成)
+**Status**: 完了 (sweep 6 件 + mode=fail flip まで同 PR 内で完了)
+**PR**: #517 (merge: 2026-05-19、 commit f3ef12cd)
+
+> **Note (PR #517 merge 後の scope 補足)**
+>
+> 本 ticket の original 提案では retention 許容値域を「7 / 30 / 90 / 365」 等として例示していたが、 PR #517 で実装した実 spec の category 許容値域は **`[1, 7, 30, 90]` の 4 category のみ**:
+>
+> - `ephemeral` = 1 日
+> - `pr-debug` = 7 日
+> - `regression-baseline` = 30 日
+> - `release-publish` = 90 日
+>
+> **365 日は spec に含めない** 設計を採用。 既存 baseline にあった 1 件 (`typosquatting-watch.yml` の 365 日) は本 PR 内で **90 日 (release-publish category) に migrate 済み** (Issue が actionable signal、 artifact は forensics backup のため 90 日で十分という判断)。
+>
+> その他の baseline 違反も同 PR で sweep 完了 (cpp-abi-check / cppcheck / fuzz-smoke × 2 / scorecard / typosquatting-watch の 6 件)、 spec `[meta].mode` を `warn` → `fail` に flip。 これ以降 retention drift は CI hard block。
+>
+> 以下の §1〜§7 は ticket 作成時点の original 提案であり、 historical record として保持。 「7 / 30 / 90 / 365」 等の旧記述は実装に反映されていない点に注意 (実装 → spec [`docs/spec/artifact-retention-contract.toml`] が正)。
 **担当 (予定)**: Claude Code (agent team) + maintainer review
 **着手前提**: なし (T-004 / T-005 と並列可)
 

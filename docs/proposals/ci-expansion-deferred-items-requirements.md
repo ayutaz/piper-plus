@@ -1,10 +1,10 @@
 # CI/CD 拡張 Deferred 8 項目 — 要求定義 (Requirements Specification)
 
-**バージョン**: 0.1 (initial draft)
-**作成日**: 2026-05-19
-**基準ブランチ / HEAD**: `docs/ci-expansion-deferred-items-organize` / `4f2ff86c`
+**バージョン**: 0.2 (PR #513 / #517 merge 反映)
+**作成日**: 2026-05-19 (最終更新: 2026-05-19)
+**基準ブランチ / HEAD**: dev / `eee9d5fb` (PR #513 / #514-516 / #517 merge 後)
 **前提ドキュメント**: [`ci-expansion-deferred-items.md`](ci-expansion-deferred-items.md) (proposal)
-**ステータス**: draft (本 doc は 8 項目を実装可能 PR scope に落とすための要求定義)
+**ステータス**: 部分実施 — 8 項目のうち 3 件 (#3 / #4 / #5) が完了 (PR #513 と #517 経由)、 残り 5 件は draft (未着手)
 
 本ドキュメントは proposal (`ci-expansion-deferred-items.md`) を実装可能な要件に変換したもの。 各項目について **FR (機能要件) / NFR (非機能要件) / AC (受け入れ基準) / CON (制約) / DEP (依存)** を ID 付きで列挙する。 ID 体系は **`<type>-<項目番号>.<連番>`** (例: `FR-3.1` = #3 の機能要件 1 番)。
 
@@ -133,6 +133,8 @@ slsa-verifier verify-artifact <asset> \
 
 ### 4.3 #3 Sigstore Rekor + Action SHA drift 監視
 
+> **実装完了 (PR #513、 2026-05-19 merge / commit `c29a87ec`)** — FR-3.1 〜 FR-3.5 すべて充足。 informational tier で稼働中、 4 週間 false-positive 0 確認後に blocker 昇格を user 判断に委ねる運用に入っている。
+
 **FR-3.1**: Rekor verify workflow `.github/workflows/rekor-verify.yml` を新設 (**informational tier**、 weekly schedule `0 3 * * 1`)。 直近 N=10 release の cosign 署名を Rekor transparency log 経由で再検証する。
 
 **FR-3.2**: Action SHA drift detector `scripts/check_action_sha_drift.py` (~100 行) を新設。 全 `.github/workflows/*.yml` から `uses: <action>@<sha>` を抽出し、 GitHub API (`/repos/{owner}/{repo}/commits/{sha}`) で resolve、 dangling / force-pushed を検出する。
@@ -168,6 +170,8 @@ slsa-verifier verify-artifact <asset> \
 
 ### 4.4 #4 7 runtime CLI help auto-extract
 
+> **実装完了 (PR #513、 2026-05-19 merge / commit `c29a87ec`)** — 6 runtime matrix (python / rust / go / wasm = 実 canonical、 csharp / cpp = `# PLACEHOLDER:` marker、 toolchain 完備後に workflow_dispatch で本番化) で実装。 G2P-py の 7 runtime 目への拡張は別 PR 候補。 FR-4.1〜FR-4.4 充足。
+
 **FR-4.1**: 残 6 runtime (Rust / C# / Go / WASM / C++ / G2P-py) の `--help` 出力を `docs/reference/cli-help/<runtime>.txt` に自動抽出する。 Python は既存 `cli-help-docs-sync.yml` を **統合または並存** で扱う。
 
 **FR-4.2**: `.github/workflows/cli-help-extract.yml` (weekly + manual + PR base trigger) で全 runtime を build → `--help` 出力 → `git diff --exit-code` で drift 検出。
@@ -193,6 +197,8 @@ slsa-verifier verify-artifact <asset> \
 ---
 
 ### 4.5 #5 spec contract toml ↔ impl 同期 gate
+
+> **実装完了 (PR #517、 2026-05-19 merge / commit `f3ef12cd`)** — 5 spec すべて drift gate 整備済み。 release-versions / swift-g2p は既存実装活用 + `[meta].direction` 明文化のみで closeout、 残り 3 件 (model-sha256-manifest / artifact-retention / test-flake-retry) は新規 gate + 41 unit tests + `contract-gates-extended.yml` matrix 統合。 artifact-retention は同 PR 内で baseline 違反 6 件 sweep + `mode = "fail"` flip まで完了。 FR-5.1〜FR-5.x 充足。
 
 **FR-5.1**: 残カバレッジ穴 5 spec について個別 gate を実装する。 **1 spec / 1 PR** の cadence:
 
@@ -399,20 +405,20 @@ Skip 条件に該当しないブロックを実 subprocess で実行する。
 
 ## 6. 優先度マトリクス (実装順)
 
-| Tier | 項目 | 推奨実装順 | 単独 PR 可否 | user 判断 |
-|------|------|---------|-----------|----------|
-| Tier 1 | `#3` Rekor + SHA drift | 1 | ✅ | informational tier 固定 |
-| Tier 1 | `#4` CLI help auto-extract | 2 | ✅ | CI minute 影響確認 |
-| Tier 2 | `#5` (a) `release-versions.toml` | 3 | ✅ | spec rewrite 必要可 |
-| Tier 2 | `#5` (b) `model-sha256-manifest.toml` | 4 | ✅ | — |
-| Tier 2 | `#7` (a) audit phase (PR-A) | 5 | ✅ | placeholder 規約決定 |
-| Tier 2 | `#5` (c-e) 残 3 spec | 6-8 | ✅ | 優先順位 |
-| Tier 2 | `#7` (b) doctest informational (PR-B) | 9 | ✅ | — |
-| Tier 2 | `#7` (c) blocker 昇格 (PR-C) | 10 | ✅ | 昇格判定 |
-| Tier 3 | `#1` Distroless (1 image/PR × 5) | 11-15 | ✅ | image 戦略 + HF/HA 検証 |
-| Tier 3 | `#2` SLSA L3 (1 registry/PR × 5-7) | 16-22 | ✅ | release path 選定 |
-| Tier 3 | `#6` mkdocs | 別 milestone | (proposal phase) | 公開範囲 / i18n / 配信先 |
-| Tier 3 | `#8` Test aggregation | `#6` と coupling | ✅ (#6 後) | aggregator vs skill 住み分け |
+| Tier | 項目 | 推奨実装順 | 単独 PR 可否 | user 判断 | Status |
+|------|------|---------|-----------|----------|--------|
+| Tier 1 | `#3` Rekor + SHA drift | 1 | ✅ | informational tier 固定 | **完了 (PR #513)** |
+| Tier 1 | `#4` CLI help auto-extract | 2 | ✅ | CI minute 影響確認 | **完了 (PR #513)** |
+| Tier 2 | `#5` (a) `release-versions.toml` | 3 | ✅ | spec rewrite 必要可 | **完了 (PR #517、 既存実装で closeout)** |
+| Tier 2 | `#5` (b) `model-sha256-manifest.toml` | 4 | ✅ | — | **完了 (PR #517、 構造健全性 scope)** |
+| Tier 2 | `#7` (a) audit phase (PR-A) | 5 | ✅ | placeholder 規約決定 | 未着手 |
+| Tier 2 | `#5` (c-e) 残 3 spec | 6-8 | ✅ | 優先順位 | **完了 (PR #517、 swift-g2p closeout / artifact-retention / test-flake-retry)** |
+| Tier 2 | `#7` (b) doctest informational (PR-B) | 9 | ✅ | — | 未着手 |
+| Tier 2 | `#7` (c) blocker 昇格 (PR-C) | 10 | ✅ | 昇格判定 | 未着手 |
+| Tier 3 | `#1` Distroless (1 image/PR × 5) | 11-15 | ✅ | image 戦略 + HF/HA 検証 | 未着手 |
+| Tier 3 | `#2` SLSA L3 (1 registry/PR × 5-7) | 16-22 | ✅ | release path 選定 | 未着手 |
+| Tier 3 | `#6` mkdocs | 別 milestone | (proposal phase) | 公開範囲 / i18n / 配信先 | 未着手 |
+| Tier 3 | `#8` Test aggregation | `#6` と coupling | ✅ (#6 後) | aggregator vs skill 住み分け | 部分着手 (audio parity が同型 pattern を canonical 化済み、 PR #511) |
 
 ---
 
@@ -475,9 +481,9 @@ Skip 条件に該当しないブロックを実 subprocess で実行する。
 ## 9. 用語と参照
 
 - **親 proposal**: [`ci-expansion-deferred-items.md`](ci-expansion-deferred-items.md)
-- **既存 spec contract**: `docs/spec/*.toml` (31 件)
-- **既存 check script**: `scripts/check_*.py` (62 件)
-- **既存 workflow**: `.github/workflows/*.yml` (108 件)
+- **既存 spec contract**: `docs/spec/*.{toml,md}` (32 件)
+- **既存 check script**: `scripts/check_*.py` (66 件)
+- **既存 workflow**: `.github/workflows/*.yml` (111 件)
 - **skill / hook 仕様**: [`.claude/README.md`](../../.claude/README.md)
 - **Wave 3 deferred 別線**: [`docs/spec/wave3-deferred-proposals.toml`](../spec/wave3-deferred-proposals.toml)
 - **PR #511 (Defensive Foundations)**: 本要求定義の前提となる 10 CI gate + 軽量 5 件の実装 PR
@@ -502,3 +508,4 @@ Skip 条件に該当しないブロックを実 subprocess で実行する。
 |------|------|------|
 | 2026-05-19 | 初版 (v0.1 draft) — ブランチ `docs/ci-expansion-deferred-items-organize` で proposal から要求定義を抽出。 8 項目 × FR/NFR/AC/CON/DEP の ID 付き要件、 優先度マトリクス、 リスク 7 件、 受け入れ基準サマリーを定義。 | Claude Code |
 | 2026-05-19 | §10 下流チケット link を追記 (要件定義書とチケット index への双方向参照確立)。 | Claude Code |
+| 2026-05-19 | v0.2 — PR #513 (項目 #3 / #4) と PR #517 (項目 #5) の merge を反映。 各 4.3 / 4.4 / 4.5 section 冒頭に「実装完了 (PR #N、 commit)」 marker を追加。 §6 優先度マトリクスに Status 列を追加 (完了 5 件 / 部分着手 1 件 / 未着手 6 件)。 全体カウントを最新化 (spec 31→32、 check 62→66、 workflow 108→111)。 基準ブランチ / HEAD を `docs/ci-expansion-deferred-items-organize` / `4f2ff86c` → `dev` / `eee9d5fb` に更新。 | Claude Code |
