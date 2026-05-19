@@ -2,10 +2,10 @@
   "schema_version": 1,
   "generated_at": "2026-05-19T00:00:00Z",
   "totals": {
-    "executable": 215,
+    "executable": 214,
     "needs_placeholder": 2,
-    "skip_warranted": 247,
-    "total": 464
+    "skip_warranted": 230,
+    "total": 446
   },
   "by_language": {
     "bash": {
@@ -24,7 +24,7 @@
       "skip_warranted": 0
     },
     "python": {
-      "executable": 20,
+      "executable": 19,
       "needs_placeholder": 0,
       "skip_warranted": 0
     },
@@ -36,7 +36,7 @@
     "unknown": {
       "executable": 0,
       "needs_placeholder": 0,
-      "skip_warranted": 223
+      "skip_warranted": 206
     },
     "wasm": {
       "executable": 10,
@@ -5768,8 +5768,8 @@
     },
     {
       "file": "docs/tickets/README.md",
-      "line_start": 56,
-      "line_end": 64,
+      "line_start": 57,
+      "line_end": 65,
       "language_raw": "text",
       "language": "unknown",
       "category": "skip_warranted",
@@ -5798,8 +5798,8 @@
     },
     {
       "file": "docs/tickets/milestones/M2-spec-and-docs.md",
-      "line_start": 62,
-      "line_end": 72,
+      "line_start": 63,
+      "line_end": 73,
       "language_raw": "toml",
       "language": "unknown",
       "category": "skip_warranted",
@@ -5813,8 +5813,8 @@
     },
     {
       "file": "docs/tickets/milestones/M2-spec-and-docs.md",
-      "line_start": 98,
-      "line_end": 103,
+      "line_start": 99,
+      "line_end": 104,
       "language_raw": "yaml",
       "language": "unknown",
       "category": "skip_warranted",
@@ -5828,8 +5828,8 @@
     },
     {
       "file": "docs/tickets/milestones/M2-spec-and-docs.md",
-      "line_start": 127,
-      "line_end": 132,
+      "line_start": 128,
+      "line_end": 133,
       "language_raw": "toml",
       "language": "unknown",
       "category": "skip_warranted",
@@ -5853,274 +5853,6 @@
       "directives_detected": [],
       "env_dependencies": [],
       "hash_sha1": "100f787b55407af89b319400ff7728e02da9d6ad"
-    },
-    {
-      "file": "docs/tickets/tickets/T-001-rekor-verify.md",
-      "line_start": 48,
-      "line_end": 68,
-      "language_raw": "text",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "d07b2de9be765c67644b092132325508f319a278"
-    },
-    {
-      "file": "docs/tickets/tickets/T-002-action-sha-drift.md",
-      "line_start": 61,
-      "line_end": 72,
-      "language_raw": "markdown",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "743263ec3dfa10a4cd855d143fadeb64194f19f0"
-    },
-    {
-      "file": "docs/tickets/tickets/T-002-action-sha-drift.md",
-      "line_start": 82,
-      "line_end": 100,
-      "language_raw": "json",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "5e9490cd99e02d0e35ff1f429838ea660f41cd2b"
-    },
-    {
-      "file": "docs/tickets/tickets/T-002-action-sha-drift.md",
-      "line_start": 119,
-      "line_end": 137,
-      "language_raw": "text",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "b3d0b95698402a8bae8a9ec5c6d2f6240b63653b"
-    },
-    {
-      "file": "docs/tickets/tickets/T-003-cli-help-extract.md",
-      "line_start": 72,
-      "line_end": 77,
-      "language_raw": "text",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "303b5dcf0f994fff3e019f29d66abd6b9ea97fb2"
-    },
-    {
-      "file": "docs/tickets/tickets/T-003-cli-help-extract.md",
-      "line_start": 92,
-      "line_end": 112,
-      "language_raw": "toml",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "22696ff2c1657691179089251fd20343483e5b47"
-    },
-    {
-      "file": "docs/tickets/tickets/T-003-cli-help-extract.md",
-      "line_start": 126,
-      "line_end": 146,
-      "language_raw": "text",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "fc2c0509da0cc9ec6f27cc291183364fa29cd200"
-    },
-    {
-      "file": "docs/tickets/tickets/T-004-release-versions-spec.md",
-      "line_start": 48,
-      "line_end": 58,
-      "language_raw": "text",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "ddd002402292fa8f5dec36a29927b056b8afdc82"
-    },
-    {
-      "file": "docs/tickets/tickets/T-005-model-sha256-spec.md",
-      "line_start": 65,
-      "line_end": 80,
-      "language_raw": "text",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "a8b25ce64dcfb228efcb1cfe528ece3895f9d84c"
-    },
-    {
-      "file": "docs/tickets/tickets/T-006-artifact-retention-spec.md",
-      "line_start": 67,
-      "line_end": 78,
-      "language_raw": "text",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "d8546a7cb654e28040a3b429d4beb1640e15ce96"
-    },
-    {
-      "file": "docs/tickets/tickets/T-007-swift-g2p-spec.md",
-      "line_start": 50,
-      "line_end": 66,
-      "language_raw": "text",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "1de7acc84d1781e374318e14671410ac10f0f313"
-    },
-    {
-      "file": "docs/tickets/tickets/T-008-test-flake-retry-spec.md",
-      "line_start": 78,
-      "line_end": 94,
-      "language_raw": "text",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "22bfa6ec64e7af43a35b83572331a7711e182c0b"
-    },
-    {
-      "file": "docs/tickets/tickets/T-009-doc-examples-audit.md",
-      "line_start": 52,
-      "line_end": 65,
-      "language_raw": "text",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "3e2636cbbafde611af05272a2b3be1d8438536b8"
-    },
-    {
-      "file": "docs/tickets/tickets/T-009-doc-examples-audit.md",
-      "line_start": 71,
-      "line_end": 100,
-      "language_raw": "json",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "923ef087495f5ecdcd7a9c3d171245aeb4aacd54"
-    },
-    {
-      "file": "docs/tickets/tickets/T-010-doc-examples-gate.md",
-      "line_start": 58,
-      "line_end": 77,
-      "language_raw": "text",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "c19f7999e4c745d4b088e29e4779a3411983b11d"
-    },
-    {
-      "file": "docs/tickets/tickets/T-010-doc-examples-gate.md",
-      "line_start": 83,
-      "line_end": 89,
-      "language_raw": "python",
-      "language": "python",
-      "category": "executable",
-      "suggested_action": "execution_gate_candidate",
-      "placeholders_detected": [],
-      "directives_detected": [],
-      "env_dependencies": [],
-      "hash_sha1": "fa5367a8529f1515b7c3046a1e1c788ad7be7a9e"
-    },
-    {
-      "file": "docs/tickets/tickets/T-010-doc-examples-gate.md",
-      "line_start": 93,
-      "line_end": 117,
-      "language_raw": "toml",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "53bac0c6b4fa09b8889bb262a60c7d1c07925b17"
-    },
-    {
-      "file": "docs/tickets/tickets/T-010-doc-examples-gate.md",
-      "line_start": 123,
-      "line_end": 130,
-      "language_raw": "yaml",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "e519801644fb68ad243b075a742832d4f13a94a8"
     },
     {
       "file": "docs/tickets/tickets/T-011-doc-examples-blocker.md",

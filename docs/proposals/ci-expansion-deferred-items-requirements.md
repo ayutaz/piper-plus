@@ -495,7 +495,7 @@ Skip 条件に該当しないブロックを実 subprocess で実行する。
 
 本要求定義は [`docs/tickets/`](../tickets/README.md) で 4 milestone × 23 ticket に分解済み:
 
-- [M1 Foundations](../tickets/milestones/M1-foundations.md) — Tier 1 (T-001〜T-003)
+- ~~M1 Foundations~~ — Tier 1 (旧 T-001〜T-003)。 **完了 (PR #513 merged、 2026-05-19)**。 milestone 文書および配下 ticket file は完了 closeout で削除済み、 履歴は merged PR と git log を canonical reference として参照
 - [M2 Spec & Docs Gates](../tickets/milestones/M2-spec-and-docs.md) — Tier 2 (T-004〜T-011)
 - [M3 Supply Chain](../tickets/milestones/M3-supply-chain.md) — Tier 3 (T-012〜T-021)
 - [M4 Docs Infra](../tickets/milestones/M4-docs-infra.md) — Tier 3 別 milestone (T-022, T-023)
