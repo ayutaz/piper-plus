@@ -24,7 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **新規 spec**: `docs/spec/doc-examples-contract.toml` で audit 対象 glob / 言語 alias / placeholder 正規表現 / skip directive / 環境依存パターン / silent-zero 防御方針を pin
 - **新規モジュール**: `scripts/doc_examples/{extractor,classifier}.py` (markdown-it-py の `commonmark` preset で GFM 三連バッククォート fenced block を抽出、 6 canonical 言語 + 多数の alias を正規化、 placeholder/skip directive/env-dep を deterministic に分類)
 - **新規 CLI**: `scripts/check_doc_examples.py audit` (`--config` / `--output` / `--check-snapshot` / `--generated-at` をサポート)。 silent-zero 防御 `Collected blocks (total=N): bash=A python=B ...` を必ず stderr 出力、 total=0 で `::warning::`
-- **canonical snapshot**: 現状の audit 結果を `tests/fixtures/doc_examples_audit/audit.json` に commit (464 block: executable 209 / needs_placeholder 8 / skip_warranted 247、 言語別内訳付き)。 docs 編集で snapshot が drift したら `--check-snapshot` が exit 1
+- **canonical snapshot**: 現状の audit 結果を `tests/fixtures/doc_examples_audit/audit.json` に commit (464 block: executable 215 / needs_placeholder 2 / skip_warranted 247、 言語別内訳付き、 非 canonical 言語は `unknown` bucket に集約)。 docs 編集で snapshot が drift したら `--check-snapshot` が exit 1
 - **既存 `scripts/check_readme_code_examples.py` (シンボル grep) は維持** — 「シンボル存在 vs 実行可否」 の役割分担を spec contract に明記、 重複なし
 - **Unit tests 11 件追加** (extractor / classifier 各カテゴリ / 言語 alias 正規化 / silent-zero / snapshot drift / 実 docs snapshot 一致)
 
@@ -32,13 +32,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 | 言語 | executable | needs_placeholder | skip_warranted |
 |------|-----------|------------------|----------------|
-| bash | 159 | 8 | 24 |
+| bash | 165 | 2 | 24 |
 | python | 20 | 0 | 0 |
 | rust | 11 | 0 | 0 |
 | csharp | 5 | 0 | 0 |
 | go | 4 | 0 | 0 |
 | wasm | 10 | 0 | 0 |
-| 非 canonical (json/yaml/text/dockerfile/etc) | 0 | 0 | 213 (unknown_language → skip) |
+| `unknown` (非 canonical: json/yaml/text/dockerfile/kotlin/etc) | 0 | 0 | 213 |
 
 #### Spec contract gates: model-sha256-manifest / artifact-retention / test-flake-retry (T-005/T-006/T-008)
 

@@ -87,13 +87,18 @@ typescript = "wasm"
 # Convention proposed for v1: angle-bracket tokens like `<HA_TOKEN>` or
 # `<your-pi-ip>`. Existing docs use a mix of these and ALL_CAPS shouts;
 # both are detected so the audit reflects the as-is corpus.
+#
+# The lowercase angle-bracket variant deliberately REQUIRES a hyphen or
+# underscore inside the token. A bare `<div>` / `<br>` (HTML) or
+# `<u8>` / `<value>` (Rust / C# generics) must NOT count as a
+# placeholder — those are valid code samples in fenced blocks.
 patterns = [
-    "<[A-Z][A-Z0-9_-]+>",                   # <HA_TOKEN>, <YOUR_PATH>
-    "<your-[a-z0-9_-]+>",                   # <your-pi-ip>, <your-path>
-    "<[a-z][a-z0-9_-]*>",                   # <model.onnx>, <output-dir>
-    "<\\{[a-zA-Z_][a-zA-Z0-9_]*\\}>",       # <{var}> proposed convention
-    "YOUR_[A-Z_]+",                         # YOUR_API_KEY (legacy convention)
-    "\\$\\{[A-Z][A-Z0-9_]+\\}",             # ${API_KEY} when paired with comment
+    "<[A-Z][A-Z0-9_-]+>",                       # <HA_TOKEN>, <YOUR_PATH>
+    "<your-[a-z0-9_-]+>",                       # <your-pi-ip>, <your-path>
+    "<[a-z][a-z0-9_]*[-_][a-z0-9_-]*>",         # <output-dir>, <model_name>
+    "<\\{[a-zA-Z_][a-zA-Z0-9_]*\\}>",           # <{var}> proposed convention
+    "YOUR_[A-Z_]+",                             # YOUR_API_KEY (legacy convention)
+    "\\$\\{[A-Z][A-Z0-9_]+\\}",                 # ${API_KEY} when paired with comment
 ]
 
 # ---------------------------------------------------------------------
@@ -102,8 +107,13 @@ patterns = [
 
 [skip_directives]
 # A block becomes `skip_warranted` if its FIRST non-blank line matches
-# any of these patterns. Each directive must appear at the very top so
-# tools can scan once.
+# any of these patterns. Each directive MUST appear as the very first
+# non-blank line — shebangs (`#!/usr/bin/env ...`) and decorative
+# comment headers BEFORE the directive will hide it from the
+# classifier. This is intentional: scanning further leaves the
+# detection ambiguous (`# noexec` deeper in the block may apply to a
+# subsection, not the whole block). Authors who need to mix a shebang
+# with a skip directive should move the directive above the shebang.
 patterns = [
     "^# doctest:skip(\\s|$)",
     "^# noexec(\\s|$)",
@@ -156,9 +166,15 @@ block_primary_key = "hash_sha1"
 [silent_zero]
 # A zero-total scan probably means the glob filter is broken, not that
 # docs/ has no examples. The audit script MUST echo a "Collected blocks"
-# line to stderr unconditionally and emit `::warning::` when total or
-# any language bucket comes back at 0.
+# line to stderr unconditionally and emit `::warning::` when the total
+# is 0.
+#
+# Per-language zero is NOT warned. Plenty of fixture / smoke runs land
+# with bash != 0 but the four other canonical languages at 0, and
+# emitting a warning per empty bucket would be too noisy to signal a
+# real bug. The total-only warning catches the actually-bad case
+# (broken include_glob → nothing extracted) without false positives.
 defensive_log_required = true
 log_template = "Collected blocks (total={total}): bash={bash} python={python} rust={rust} csharp={csharp} go={go} wasm={wasm}"
 warn_when_total_zero = true
-warn_when_language_zero = true
+warn_when_language_zero = false

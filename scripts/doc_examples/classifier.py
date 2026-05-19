@@ -101,6 +101,13 @@ def normalize_language(raw: str, config: ClassifierConfig) -> str:
 
 
 def _first_nonblank_line(body: str) -> str:
+    """Return the first line that has any non-whitespace content.
+
+    Only this line is consulted by ``_detect_directives``. Shebangs or
+    decorative comment headers placed BEFORE the directive will hide
+    it — the contract pins this behaviour explicitly so authors know
+    the directive must lead the block.
+    """
     for line in body.splitlines():
         if line.strip():
             return line

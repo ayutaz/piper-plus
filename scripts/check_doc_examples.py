@@ -75,10 +75,21 @@ def _audit_scope(config_data: dict) -> tuple[list[str], list[str]]:
     )
 
 
+UNKNOWN_LANGUAGE_BUCKET = "unknown"
+
+
 def _classify_all(blocks: list[FencedBlock], config: ClassifierConfig) -> list[dict]:
+    """Build per-block records.
+
+    Unknown languages collapse to a single ``UNKNOWN_LANGUAGE_BUCKET``
+    so a new exotic info string (``erlang``, ``zig`` …) doesn't churn
+    ``by_language`` in the canonical snapshot. The raw info string is
+    preserved in ``language_raw`` for traceability.
+    """
     out: list[dict] = []
     for blk in blocks:
         canon_lang = normalize_language(blk.language, config)
+        bucket = canon_lang or UNKNOWN_LANGUAGE_BUCKET
         classification = classify(
             language=blk.language,
             body=blk.body,
@@ -90,7 +101,7 @@ def _classify_all(blocks: list[FencedBlock], config: ClassifierConfig) -> list[d
                 "line_start": blk.line_start,
                 "line_end": blk.line_end,
                 "language_raw": blk.language,
-                "language": canon_lang or blk.language,
+                "language": bucket,
                 "category": classification.category,
                 "suggested_action": classification.suggested_action,
                 "placeholders_detected": classification.placeholders_detected,
@@ -107,7 +118,7 @@ def _summarise(records: list[dict]) -> dict:
     by_language: dict[str, Counter[str]] = {}
     for rec in records:
         cat = rec["category"]
-        lang = rec["language"] or "unknown"
+        lang = rec["language"] or UNKNOWN_LANGUAGE_BUCKET
         totals[cat] += 1
         by_language.setdefault(lang, Counter())[cat] += 1
 
@@ -165,7 +176,9 @@ def run_audit(args: argparse.Namespace) -> int:
 
     per_language: Counter[str] = Counter()
     for blk in blocks:
-        per_language[normalize_language(blk.language, config) or "unknown"] += 1
+        per_language[
+            normalize_language(blk.language, config) or UNKNOWN_LANGUAGE_BUCKET
+        ] += 1
     _silent_zero_log(per_language, total=len(blocks))
 
     payload = build_audit_payload(
@@ -228,8 +241,9 @@ def build_parser() -> argparse.ArgumentParser:
         "--output",
         type=Path,
         default=None,
-        help=f"Where to write audit JSON (default: stdout only). "
-        f"Canonical: {DEFAULT_OUTPUT.relative_to(REPO_ROOT)}",
+        help=f"Where to write the audit JSON. Default: no file written; "
+        f"only the stderr 'Collected blocks' summary is emitted. "
+        f"Canonical snapshot path: {DEFAULT_OUTPUT.relative_to(REPO_ROOT)}",
     )
     audit.add_argument(
         "--check-snapshot",
