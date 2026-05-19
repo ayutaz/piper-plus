@@ -1,0 +1,108 @@
+name: Rekor Verify
+
+# T-001 (informational tier): verify side of PR #511's cosign-release-artifacts.yml.
+# PR #511 introduced the *signing* side (release event → cosign sign-blob).
+# This workflow is the *verifying* side: weekly, it walks the N most recent
+# releases and runs `cosign verify-blob` against the Rekor transparency log
+# to confirm signatures are still valid.
+#
+# Tier: informational. CI stays green even if cosign verify-blob exits != 0
+# (continue-on-error: true on the verify step). Promotion to blocker is gated
+# on 4 consecutive green weekly runs with no false-positive issues (CON-3.1).
+#
+# certificate-identity-regexp / certificate-oidc-issuer MUST mirror PR #511
+# byte-for-byte (M1-R3). The script `scripts/verify_rekor_releases.py` keeps
+# the literal strings as module constants and a unit test asserts they appear
+# in cosign-release-artifacts.yml.
+
+on:
+  schedule:
+    - cron: '0 3 * * 1'  # Monday 03:00 UTC, 1h before T-002 action-sha-drift.
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: "Number of recent releases to verify"
+        required: false
+        default: "10"
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: rekor-verify-${{ github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6.0.2
+
+      - name: Setup Python
+        uses: actions/setup-python@v5.6.0
+        with:
+          python-version: '3.13'
+
+      # cosign-installer version MUST match PR #511's signing workflow
+      # (sigstore/cosign-installer@v3.8.1 / cosign-release: v2.4.1).
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3.8.1
+        with:
+          cosign-release: 'v2.4.1'
+
+      - name: Verify recent releases
+        id: verify
+        continue-on-error: true
+        env:
+          LIMIT: ${{ inputs.limit || '10' }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p /tmp/rekor-verify
+          python scripts/verify_rekor_releases.py \
+            --limit "${LIMIT:-10}" \
+            --workdir /tmp/rekor-verify \
+            --report /tmp/rekor-verify/report.md
+          echo "exit_code=$?" >> "$GITHUB_OUTPUT"
+        shell: bash
+
+      - name: Compute fail flag
+        id: flag
+        run: |
+          if grep -E '^\| .*\| \*\*FAIL\*\* \|' /tmp/rekor-verify/report.md >/dev/null 2>&1; then
+            echo "fail=1" >> "$GITHUB_OUTPUT"
+          else
+            echo "fail=0" >> "$GITHUB_OUTPUT"
+          fi
+        shell: bash
+
+      - name: Append to step summary
+        if: always()
+        run: |
+          if [ -f /tmp/rekor-verify/report.md ]; then
+            cat /tmp/rekor-verify/report.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+        shell: bash
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: rekor-verify-report-${{ github.run_id }}
+          path: /tmp/rekor-verify/report.md
+          retention-days: 30
+          if-no-files-found: warn
+
+      - name: Open issue on verify failure
+        if: steps.flag.outputs.fail == '1' && github.event_name == 'schedule'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          DATE=$(date -u +%Y-%m-%d)
+          gh issue create \
+            --label rekor-verify-failure \
+            --title "[rekor-verify] verify failed (${DATE})" \
+            --body-file /tmp/rekor-verify/report.md
+        shell: bash

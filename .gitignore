@@ -146,6 +146,7 @@ check_*.py
 !scripts/check_action_sha_drift.py
 !scripts/action_sha_baseline.json
 !scripts/verify_model_checksums.py
+!scripts/verify_rekor_releases.py
 !scripts/check_phoneme_timing_contract.py
 !scripts/check_cli_help_drift.py
 !scripts/check_bundle_size.py
