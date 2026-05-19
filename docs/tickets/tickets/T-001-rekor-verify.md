@@ -4,8 +4,8 @@
 **Milestone**: [M1 Foundations](../milestones/M1-foundations.md)
 **Proposal 項目**: `#3a` (Sigstore Rekor transparency log 検証)
 **Tier**: Tier 1 (informational tier)
-**Status**: 計画中
-**PR**: (未作成)
+**Status**: レビュー待ち
+**PR**: (branch ready: `feat/t-001-rekor-verify`, commit `571a7a8e` — `/create-pr` skill で起票予定)
 **担当 (予定)**: Claude Code (agent team) + maintainer review
 **着手前提**: なし (PR #511 で `cosign-release-artifacts.yml` が発行側として merged 済み)
 
@@ -267,3 +267,4 @@ informational tier で 4 週間運用後、 false positive が 0 件であれば
 | 日付 | 変更 | 担当 |
 |------|------|------|
 | 2026-05-19 | 初版 | Claude Code |
+| 2026-05-19 | 実装完了 (commit `571a7a8e` on `feat/t-001-rekor-verify`)。 PR #511 mirror assert 込み 15 unit test pass。 PR 起票は `/create-pr` skill 実行待ち。 | Claude Code |

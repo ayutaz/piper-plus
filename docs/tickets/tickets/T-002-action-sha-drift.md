@@ -4,8 +4,8 @@
 **Milestone**: [M1 Foundations](../milestones/M1-foundations.md)
 **Proposal 項目**: `#3b` (Action SHA pin の生存検証)
 **Tier**: Tier 1 (informational tier)
-**Status**: 計画中
-**PR**: (未作成)
+**Status**: レビュー待ち
+**PR**: (branch ready: `feat/t-002-action-sha-drift`, commit `1004f4f3` — `/create-pr` skill で起票予定)
 **担当 (予定)**: Claude Code (agent team) + maintainer review
 **着手前提**: なし (T-001 とは独立、 並列実装可能)
 
@@ -330,3 +330,4 @@ field 定義 (要件定義書 §7.1):
 | 日付 | 変更 | 担当 |
 |------|------|------|
 | 2026-05-19 | 初版 | Claude Code |
+| 2026-05-19 | 実装完了 (commit `1004f4f3` on `feat/t-002-action-sha-drift`)。 14 unit test pass。 実 repo は SHA pin **3 use / 2 種類** (dawidd6 + mymindstorm)、 初期 baseline は gh api で 2 entry を生存確認済み。 expected_total_pins=3 で silent-zero defence 動作確認済み。 | Claude Code |
