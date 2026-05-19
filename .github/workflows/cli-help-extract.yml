@@ -1,0 +1,182 @@
+name: CLI Help Extract
+
+# T-003 phase A: 1 runtime (python) active, 5 runtime scaffold pending.
+#
+# Why phase A only: extracting --help from rust/csharp/go/wasm/cpp requires
+# a full release build per matrix job (5-15 min each). Landing all 6 at
+# once would extend wall clock past the NFR-1.4 budget (10 min) and make
+# the initial baseline commit very hard to review. Phase B (separate PR)
+# enables the remaining runtimes one at a time as each toolchain's build
+# is proven stable.
+#
+# Existing cli-help-docs-sync.yml (Python-only, flag stale-only mode) is
+# preserved unchanged — this workflow runs in parallel during phase A
+# (AC-4.2). Integration / consolidation is a phase B decision.
+
+on:
+  schedule:
+    - cron: '0 5 * * 1'  # Monday 05:00 UTC, 1h after T-002 action-sha-drift.
+  pull_request:
+    paths:
+      - 'src/python_run/piper/**/*.py'
+      - 'docs/reference/cli-help/**'
+      - 'scripts/sanitize_cli_help.py'
+      - 'scripts/sanitize_cli_help_rules.toml'
+      - '.github/workflows/cli-help-extract.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: cli-help-extract-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+env:
+  NO_COLOR: "1"          # Suppress ANSI escapes at the source where possible.
+  PYTHONIOENCODING: utf-8
+
+jobs:
+  extract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        runtime: [python]
+        # TODO phase B: add 'rust', 'csharp', 'go', 'wasm', 'cpp'.
+        # Each entry requires a corresponding build step + invocation
+        # below, plus a canonical docs/reference/cli-help/<runtime>.txt.
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6.0.2
+
+      - name: Setup Python
+        if: matrix.runtime == 'python'
+        uses: actions/setup-python@v5.6.0
+        with:
+          python-version: '3.13'
+
+      - name: Install piper (editable)
+        if: matrix.runtime == 'python'
+        run: |
+          pip install -e src/python_run
+        shell: bash
+
+      - name: Capture --help (python)
+        if: matrix.runtime == 'python'
+        run: |
+          mkdir -p /tmp/cli-help
+          python -m piper --help > /tmp/cli-help/${{ matrix.runtime }}-raw.txt 2>&1
+        shell: bash
+
+      - name: Sanitize
+        run: |
+          source=""
+          case "${{ matrix.runtime }}" in
+            python) source="python -m piper --help" ;;
+            *) echo "::error::No source command mapped for runtime ${{ matrix.runtime }}"; exit 1 ;;
+          esac
+          python scripts/sanitize_cli_help.py \
+            --runtime "${{ matrix.runtime }}" \
+            --source "$source" \
+            --version '<VERSION>' \
+            --timestamp '<TIMESTAMP>' \
+            --in /tmp/cli-help/${{ matrix.runtime }}-raw.txt \
+            --out /tmp/cli-help/${{ matrix.runtime }}.txt
+        shell: bash
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: cli-help-${{ matrix.runtime }}-${{ github.run_id }}
+          path: /tmp/cli-help/${{ matrix.runtime }}.txt
+          retention-days: 30
+
+  drift-check:
+    runs-on: ubuntu-24.04
+    needs: extract
+    timeout-minutes: 5
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6.0.2
+
+      - name: Setup Python
+        uses: actions/setup-python@v5.6.0
+        with:
+          python-version: '3.13'
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v6.0.0
+        with:
+          pattern: cli-help-*
+          path: /tmp/cli-help-downloads
+          merge-multiple: true
+
+      - name: Defensive log + diff vs canonical
+        id: diff
+        continue-on-error: true
+        run: |
+          shopt -s nullglob
+          runtimes=()
+          for f in /tmp/cli-help-downloads/*.txt; do
+            runtimes+=("$(basename "$f" .txt)")
+          done
+          echo "Collected helps (${#runtimes[@]} runtimes): ${runtimes[*]}" >&2
+
+          if [ "${#runtimes[@]}" -eq 0 ]; then
+            echo "::warning::Collected helps (0): drift-check has nothing to compare." >&2
+            exit 2
+          fi
+
+          diff_count=0
+          {
+            echo "## CLI help drift report"
+            echo
+            for rt in "${runtimes[@]}"; do
+              actual="/tmp/cli-help-downloads/${rt}.txt"
+              canonical="docs/reference/cli-help/${rt}.txt"
+              if [ ! -f "$canonical" ]; then
+                echo "- \`$rt\`: **NO_CANONICAL** (commit \`$canonical\` first)"
+                diff_count=$((diff_count + 1))
+                continue
+              fi
+              if diff -u "$canonical" "$actual" > /tmp/diff-"$rt".txt; then
+                echo "- \`$rt\`: OK"
+              else
+                echo "- \`$rt\`: **DRIFT**"
+                diff_count=$((diff_count + 1))
+                echo
+                echo '```diff'
+                cat /tmp/diff-"$rt".txt
+                echo '```'
+              fi
+            done
+            echo
+            echo "Summary: total=${#runtimes[@]}, drift=$diff_count"
+          } > /tmp/cli-help-drift-report.md
+          cat /tmp/cli-help-drift-report.md >> "$GITHUB_STEP_SUMMARY"
+          if [ "$diff_count" -gt 0 ]; then exit 1; fi
+        shell: bash
+
+      - name: Post sticky comment (PR only)
+        if: github.event_name == 'pull_request'
+        uses: marocchino/sticky-pull-request-comment@v2.9.4
+        with:
+          header: cli-help-extract
+          path: /tmp/cli-help-drift-report.md
+
+      - name: Open issue on drift (scheduled only)
+        if: steps.diff.outputs.exit_code != '0' && github.event_name == 'schedule'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          DATE=$(date -u +%Y-%m-%d)
+          gh issue create \
+            --label cli-help-drift \
+            --title "[cli-help-drift] CLI help drift detected (${DATE})" \
+            --body-file /tmp/cli-help-drift-report.md
+        shell: bash

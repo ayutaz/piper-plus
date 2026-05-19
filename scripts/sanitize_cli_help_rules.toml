@@ -1,0 +1,86 @@
+# Sanitization rules for CLI --help output (T-003).
+#
+# Each [[rules]] entry strips a piece of build-/run-time noise (version
+# strings, machine paths, timestamps, ANSI escapes) so the resulting
+# `docs/reference/cli-help/<runtime>.txt` is reproducible across CI
+# runners and local machines. ``runtime = "*"`` applies to every runtime;
+# a specific runtime name (``python``, ``rust``, …) scopes the rule.
+
+# Generic: timestamps anywhere in the output.
+[[rules]]
+runtime = "*"
+pattern = "\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})?"
+replace_with = "<TIMESTAMP>"
+note = "ISO8601 timestamps (UTC or offset)."
+
+# Generic: ANSI color escapes (some CLI frameworks emit them even with NO_COLOR).
+[[rules]]
+runtime = "*"
+pattern = "\\x1b\\[[0-9;]*[A-Za-z]"
+replace_with = ""
+note = "ANSI CSI sequences (color / cursor)."
+
+# Generic: GitHub runner workspace paths.
+[[rules]]
+runtime = "*"
+pattern = "/home/runner/work/[^\\s]*"
+replace_with = "<RUNNER_PATH>"
+note = "GitHub Actions runner workspace paths."
+
+# Generic: macOS GitHub runner paths.
+[[rules]]
+runtime = "*"
+pattern = "/Users/runner/work/[^\\s]*"
+replace_with = "<RUNNER_PATH>"
+note = "macOS GitHub Actions runner workspace paths."
+
+# Generic: Windows GitHub runner paths.
+[[rules]]
+runtime = "*"
+pattern = "D:\\\\a\\\\[^\\s]*"
+replace_with = "<RUNNER_PATH>"
+note = "Windows GitHub Actions runner workspace paths."
+
+# Python: argparse prog name is the entrypoint file (__main__.py).
+[[rules]]
+runtime = "python"
+pattern = "^usage: __main__\\.py "
+replace_with = "usage: python -m piper "
+note = "Normalize argparse prog from __main__.py to invocation form."
+
+# Python: package version string.
+[[rules]]
+runtime = "python"
+pattern = "piper-plus[ \\-]\\d+\\.\\d+\\.\\d+(?:[\\-+][A-Za-z0-9.]+)?"
+replace_with = "piper-plus <VERSION>"
+note = "Avoid version-only drift surfacing on every release."
+
+# Rust: cargo binary version.
+[[rules]]
+runtime = "rust"
+pattern = "piper-cli \\d+\\.\\d+\\.\\d+(?:[\\-+][A-Za-z0-9.]+)?"
+replace_with = "piper-cli <VERSION>"
+
+# C#: assembly version banner.
+[[rules]]
+runtime = "csharp"
+pattern = "PiperPlus\\.Cli, Version=\\d+\\.\\d+\\.\\d+\\.\\d+, Culture=neutral, PublicKeyToken=null"
+replace_with = "PiperPlus.Cli, Version=<VERSION>"
+
+# Go: standard `version vX.Y.Z` suffix.
+[[rules]]
+runtime = "go"
+pattern = "version v?\\d+\\.\\d+\\.\\d+(?:[\\-+][A-Za-z0-9.]+)?"
+replace_with = "version <VERSION>"
+
+# WASM (Node CLI): node --version pinned in usage.
+[[rules]]
+runtime = "wasm"
+pattern = "node v?\\d+\\.\\d+\\.\\d+"
+replace_with = "node <VERSION>"
+
+# C++: CMake build timestamp embedded in --version banner.
+[[rules]]
+runtime = "cpp"
+pattern = "build \\d{4}-\\d{2}-\\d{2}"
+replace_with = "build <BUILD_DATE>"
