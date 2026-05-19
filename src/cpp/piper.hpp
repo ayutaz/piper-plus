@@ -242,6 +242,16 @@ void phonemesToWavFile(PiperConfig &config, Voice &voice,
                        const std::vector<Phoneme> &phonemes,
                        std::ostream &audioFile, SynthesisResult &result);
 
+// Synthesize audio directly from phoneme IDs to WAV file.
+// Bypasses phonemization entirely (used by the JSONL --json-input
+// `phoneme_ids` cross-runtime parity contract — see
+// docs/spec/audio-parity-contract.toml). IDs must already include any
+// BOS / EOS / padding the model expects (callers are responsible for
+// matching the model's `phoneme_id_map`).
+void phonemeIdsToWavFile(PiperConfig &config, Voice &voice,
+                         std::vector<PhonemeId> &phonemeIds,
+                         std::ostream &audioFile, SynthesisResult &result);
+
 // Streaming text-to-audio synthesis with reduced latency
 void textToAudioStreaming(PiperConfig &config, Voice &voice, std::string text,
                           std::vector<int16_t> &audioBuffer, SynthesisResult &result,

@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "description": "Golden corpus for the Audio MOS Proxy workflow. Each entry is one synthesis target; categories are intentionally chosen to surface regressions in EOS trim / streaming parity / SSML break insertion / ZH-EN dispatch / PUA codepoint handling.",
+  "languages": ["ja", "en", "zh", "es", "fr", "pt"],
+  "categories": ["short", "long", "ssml", "code_switch", "pua"],
+  "samples": [
+    {"id": "ja-short-001", "language": "ja", "category": "short", "text": "こんにちは"},
+    {"id": "ja-long-001",  "language": "ja", "category": "long",  "text": "桜の咲く季節になりました。今日は天気もよく、散歩日和です。"},
+    {"id": "ja-ssml-001",  "language": "ja", "category": "ssml",  "text": "<speak>こんにちは<break time=\"500ms\"/>世界</speak>"},
+    {"id": "ja-code-001",  "language": "ja", "category": "code_switch", "text": "数字は 1、 2、 3、 4、 5 です。"},
+    {"id": "ja-pua-001",   "language": "ja", "category": "pua",   "text": "彼女は冗談を言うのが上手だ。"},
+
+    {"id": "en-short-001", "language": "en", "category": "short", "text": "Hello world."},
+    {"id": "en-long-001",  "language": "en", "category": "long",  "text": "The quick brown fox jumps over the lazy dog. Pack my box with five dozen liquor jugs."},
+    {"id": "en-ssml-001",  "language": "en", "category": "ssml",  "text": "<speak>Hello<break time=\"500ms\"/>world.</speak>"},
+    {"id": "en-code-001",  "language": "en", "category": "code_switch", "text": "The numbers are 1, 2, 3, 4, and 5."},
+    {"id": "en-pua-001",   "language": "en", "category": "pua",   "text": "She thought about the boil and the joy."},
+
+    {"id": "zh-short-001", "language": "zh", "category": "short", "text": "你好"},
+    {"id": "zh-long-001",  "language": "zh", "category": "long",  "text": "春天来了，樱花盛开，公园里非常热闹。"},
+    {"id": "zh-ssml-001",  "language": "zh", "category": "ssml",  "text": "<speak>你好<break time=\"500ms\"/>世界</speak>"},
+    {"id": "zh-code-001",  "language": "zh", "category": "code_switch", "text": "我用 USB 充电。"},
+    {"id": "zh-pua-001",   "language": "zh", "category": "pua",   "text": "春节快乐！"},
+
+    {"id": "es-short-001", "language": "es", "category": "short", "text": "Hola mundo."},
+    {"id": "es-long-001",  "language": "es", "category": "long",  "text": "La primavera ha llegado y las flores están floreciendo en el jardín."},
+    {"id": "es-ssml-001",  "language": "es", "category": "ssml",  "text": "<speak>Hola<break time=\"500ms\"/>mundo.</speak>"},
+    {"id": "es-code-001",  "language": "es", "category": "code_switch", "text": "Los números son 1, 2, 3, 4, 5."},
+    {"id": "es-pua-001",   "language": "es", "category": "pua",   "text": "El niño pequeño es muy señorial."},
+
+    {"id": "fr-short-001", "language": "fr", "category": "short", "text": "Bonjour le monde."},
+    {"id": "fr-long-001",  "language": "fr", "category": "long",  "text": "Le printemps est arrivé et les fleurs s'épanouissent dans le jardin."},
+    {"id": "fr-ssml-001",  "language": "fr", "category": "ssml",  "text": "<speak>Bonjour<break time=\"500ms\"/>le monde.</speak>"},
+    {"id": "fr-code-001",  "language": "fr", "category": "code_switch", "text": "Les numéros sont 1, 2, 3, 4, 5."},
+    {"id": "fr-pua-001",   "language": "fr", "category": "pua",   "text": "Un bon vin blanc."},
+
+    {"id": "pt-short-001", "language": "pt", "category": "short", "text": "Olá mundo."},
+    {"id": "pt-long-001",  "language": "pt", "category": "long",  "text": "A primavera chegou e as flores estão a desabrochar no jardim."},
+    {"id": "pt-ssml-001",  "language": "pt", "category": "ssml",  "text": "<speak>Olá<break time=\"500ms\"/>mundo.</speak>"},
+    {"id": "pt-code-001",  "language": "pt", "category": "code_switch", "text": "Os números são 1, 2, 3, 4, 5."},
+    {"id": "pt-pua-001",   "language": "pt", "category": "pua",   "text": "Não, são pães bons."}
+  ]
+}

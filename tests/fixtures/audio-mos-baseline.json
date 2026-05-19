@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "_comment": "Populated by the first green run of audio-mos-proxy.yml on dev. Until then the workflow runs informationally with continue-on-error and reports the deltas vs. a synthesised reference instead of this baseline.",
+  "generated_at": null,
+  "model": {
+    "name": null,
+    "sha256": null,
+    "config_sha256": null
+  },
+  "reference_corpus": {
+    "manifest": "tests/fixtures/audio-corpus/manifest.json",
+    "manifest_sha256": null
+  },
+  "thresholds": {
+    "pesq_wb_min_drop": 0.15,
+    "stoi_min_drop": 0.02,
+    "utmos22_min_drop": 0.10,
+    "wer_max_increase": 0.05
+  },
+  "samples": []
+}

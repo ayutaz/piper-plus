@@ -83,6 +83,13 @@ indent_size = unset
 [docs/spec/*.toml]
 indent_size = unset
 
+# `.lychee.toml` uses 2-space indentation throughout (matching the upstream
+# lychee project example config). The global `[*.{rs,toml}]` 4-space rule
+# would force rewriting every existing entry just to add a new exclude
+# pattern, so opt out at the file level instead.
+[.lychee.toml]
+indent_size = unset
+
 # CMake files in this repo are written with 2-space indentation (matching
 # the legacy piper.cpp/.hpp style imported from the upstream piper project).
 # MSBuild project files (.csproj) also use 2-space indentation per

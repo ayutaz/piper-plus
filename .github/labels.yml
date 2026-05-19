@@ -1,0 +1,18 @@
+# Repository label catalogue (Issue / PR triage).
+#
+# Apply with: `gh label sync -f .github/labels.yml`
+# or with the `actions/labeler` family. We do **not** auto-sync from CI to
+# avoid clobbering labels that maintainers set manually; this file is the
+# source-of-truth that humans update when adding a label.
+
+- name: run-full-gate
+  color: "B60205"
+  description: >-
+    Promote all contract gates back to blocker for a first-PR fast lane PR.
+    Attach before merge so PUA / loanword / ORT / migration parity is enforced.
+
+- name: breaking
+  color: "D93F0B"
+  description: >-
+    PR introduces a user-visible breaking change. Triggers Migration Guide Lint
+    enforcement on top of paths-based detection.

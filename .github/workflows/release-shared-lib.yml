@@ -988,10 +988,15 @@ jobs:
       - name: Checkout tag commit (for Package.swift checksum verification)
         uses: actions/checkout@v6.0.2
         with:
-          # Sparse checkout — we only need Package.swift to verify the SPM
-          # checksum was updated before tagging.
+          # Sparse checkout — Package.swift for the SPM checksum verification,
+          # plus generate_model_card.py / data-sources.yml for M3.2 license
+          # attribution generation (see `Generate LICENSE_ATTRIBUTIONS.md` step
+          # below). All three files are tiny so this stays much lighter than
+          # a full checkout.
           sparse-checkout: |
             Package.swift
+            scripts/generate_model_card.py
+            data-sources.yml
           sparse-checkout-cone-mode: false
 
       - name: Verify Package.swift checksums are non-placeholder
@@ -1067,6 +1072,22 @@ jobs:
             fi
           done
 
+      - name: Generate LICENSE_ATTRIBUTIONS.md + MODEL_CARD.md (M3.2)
+        # data-sources.yml を canonical source として attribution / model card
+        # を deterministic に生成し、 GitHub Release artifact に同梱する。
+        # binary distribution (libpiper_plus shared lib / xcframework / AAR)
+        # 利用時に再配布対象の dataset attribution を辿れるようにするのが
+        # 目的。 model フィルタは付けない (release artifact は any model 用)。
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m pip install --quiet pyyaml
+          python3 scripts/generate_model_card.py validate
+          python3 scripts/generate_model_card.py generate \
+            --model-card MODEL_CARD.md \
+            --attributions LICENSE_ATTRIBUTIONS.md
+          ls -la MODEL_CARD.md LICENSE_ATTRIBUTIONS.md
+
       - name: Generate checksums
         shell: bash
         run: |
@@ -1138,6 +1159,8 @@ jobs:
             artifacts/**/*.tar.gz
             artifacts/**/*.zip
             artifacts/checksums-sha256.txt
+            MODEL_CARD.md
+            LICENSE_ATTRIBUTIONS.md
           generate_release_notes: true
 
       # NOTE: Package.swift checksum is NOT updated by this workflow.

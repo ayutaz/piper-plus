@@ -263,6 +263,28 @@ repos:
         files: ^(CHANGELOG\.md|docs/migration/.*\.md|scripts/check_migration_changelog_parity\.py)$
         pass_filenames: false
 
+      # CHANGELOG `[Unreleased] > ### Breaking` entry の anchor link が
+      # 実際に docs/migration/v*.md の見出しに解決するかまで検査する。
+      # v1.12 で migration doc が breaking commit 後追いで作成された問題を
+      # 構造的に塞ぐ (M1.2 / PR #511 実装完了)。
+      - id: migration-guide-lint
+        name: CHANGELOG breaking entries have resolvable migration cross-ref
+        entry: uv run python scripts/check_migration_xref.py
+        language: system
+        files: ^(CHANGELOG\.md|docs/migration/.*\.md|scripts/check_migration_xref\.py)$
+        pass_filenames: false
+
+      # CHANGELOG.md が keep-a-changelog 形式に従っているかを検査
+      # (H1 / Unreleased / バージョン header date format / 降順)。
+      # M1.2 (anchor link 強制) と相補的に「CHANGELOG.md 自体の format drift」
+      # を防ぐ。 `docs/proposals/ci-expansion-2026-05.md` §3.7 Tier S #1 由来。
+      - id: changelog-format
+        name: CHANGELOG.md keep-a-changelog format check
+        entry: uv run python scripts/check_changelog_format.py
+        language: system
+        files: ^CHANGELOG\.md$
+        pass_filenames: true
+
       # Short-text 戦略 (Silence Padding / Dynamic Scales / SSML break 自動
       # 挿入) の cross-runtime drift gate。 既存 CI のみだったものを
       # pre-commit 化。 6 runtime 並列実装の整合維持。
@@ -937,7 +959,9 @@ repos:
           ^\.github/workflows/android-build\.yml$|
           ^scripts/check_(bundle_size|cli_help_drift|migration_changelog_parity|phoneme_timing_contract)\.py$|
           ^scripts/benchmark_runtime\.py$|
-          ^docs/spec/mutation-testing\.md$
+          ^docs/spec/mutation-testing\.md$|
+          ^src/cpp/tests/test_streaming_raw_phonemes\.cpp$|
+          ^src/rust/Cargo\.lock$
 
   # ---------------------------------------------------------------------------
   # pyproject.toml schema validation (PEP 621 + PEP 518). Catches typos in

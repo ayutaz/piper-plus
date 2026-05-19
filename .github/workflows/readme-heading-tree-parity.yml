@@ -1,0 +1,53 @@
+# README Heading Tree Parity (informational)
+# ===========================================
+# `docs/proposals/ci-expansion-2026-05.md` §3.7 Tier S #2 由来。 Top 10 外の
+# docs / i18n / CHANGELOG 拡張で、 既存 `multilingual README breaking banner
+# sync` (warning tier) + `README H2 section parity` (±20% tolerance) を補強
+# する形で「heading tree AST 比較」 を informational tier で追加する。
+#
+# 検査内容:
+#   - canonical (README.md JP) の H2/H3/H4 tree pattern と 7 言語翻訳 README
+#     との structural diff
+#   - H2 count, H3 count per H2 section (±5 tolerance, bootstrap baseline)
+#   - 既存 drift は default tolerance で吸収、 新規の drift 拡大のみ検出
+#
+# informational tier (PR を block しない、 4 週間観測後に blocker 化判定):
+#   `--strict` を付けないため warning は exit 0 で扱う。
+#
+# 関連: docs/proposals/ci-expansion-2026-05.md §3.7 (Docs / i18n / CHANGELOG)。
+
+name: README Heading Tree Parity
+
+on:
+  pull_request:
+    branches: [dev, main]
+    paths:
+      - 'README.md'
+      - 'README_*.md'
+      - 'scripts/check_readme_heading_tree.py'
+      - '.github/workflows/readme-heading-tree-parity.yml'
+      - 'tests/scripts/test_check_readme_heading_tree.py'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6.0.2
+
+      - uses: actions/setup-python@v6.2.0
+        with:
+          python-version: "3.13"
+
+      - name: README heading tree parity (informational)
+        # informational tier: 警告は exit 0、 PR を block しない。
+        # 4 週間観測後 false positive 率を見て blocker 昇格を判定する。
+        run: python scripts/check_readme_heading_tree.py

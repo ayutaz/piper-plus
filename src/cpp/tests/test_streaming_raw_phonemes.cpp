@@ -5,6 +5,7 @@
 #include <chrono>
 #include <filesystem>
 #include <optional>
+#include <sstream>
 
 #include "piper.hpp"
 #include "phoneme_parser.hpp"
@@ -181,6 +182,135 @@ TEST_F(StreamingRawPhonemesTest, PerformanceTest) {
   // Verify streaming provides lower latency to first audio
   EXPECT_LT(timeToFirstChunk, totalTime / 2)
       << "First chunk should arrive before half the total processing time";
+}
+
+// ============================================================================
+// phonemeIdsToWavFile (Phase 2: cross-runtime audio byte parity)
+// ============================================================================
+//
+// PR #511 で追加した piper::phonemeIdsToWavFile API の単体テスト。 G2P を
+// バイパスして phoneme IDs を直接渡す経路で、 Rust / Go / C# / Python /
+// WASM と同一の入力契約 (docs/spec/audio-parity-contract.toml) を満たす
+// ことを保証する。 fixture (tests/fixtures/audio-corpus/parity/
+// phoneme_ids.jsonl) は `^ a _ i _ u _ e _ o _ $` = `[1,10,0,11,0,12,0,
+// 13,0,14,0,2]` で固定されており、 ここでも同じ ID 列を直接 vector
+// として組み立て canonical 入力として扱う。
+
+namespace {
+
+// Read a 32-bit little-endian unsigned int from a WAV byte buffer at offset.
+uint32_t readU32LE(const std::string &buf, size_t offset) {
+  return static_cast<uint32_t>(static_cast<unsigned char>(buf[offset])) |
+         (static_cast<uint32_t>(static_cast<unsigned char>(buf[offset + 1])) << 8) |
+         (static_cast<uint32_t>(static_cast<unsigned char>(buf[offset + 2])) << 16) |
+         (static_cast<uint32_t>(static_cast<unsigned char>(buf[offset + 3])) << 24);
+}
+
+// Read a 16-bit little-endian unsigned int from a WAV byte buffer at offset.
+uint16_t readU16LE(const std::string &buf, size_t offset) {
+  return static_cast<uint16_t>(static_cast<unsigned char>(buf[offset])) |
+         (static_cast<uint16_t>(static_cast<unsigned char>(buf[offset + 1])) << 8);
+}
+
+} // namespace
+
+TEST_F(StreamingRawPhonemesTest, PhonemeIdsToWavBasicHeader) {
+  // Canonical fixture phoneme IDs ("あいうえお" with PAD intersperse)
+  std::vector<piper::PhonemeId> ids = {1, 10, 0, 11, 0, 12, 0, 13, 0, 14, 0, 2};
+
+  std::ostringstream wavStream(std::ios::binary);
+  piper::SynthesisResult result;
+
+  piper::phonemeIdsToWavFile(config, voice, ids, wavStream, result);
+
+  const std::string wav = wavStream.str();
+  ASSERT_GT(wav.size(), 44u) << "WAV must contain RIFF header + at least some PCM";
+
+  // RIFF / WAVE / fmt / data magic bytes
+  EXPECT_EQ(wav.substr(0, 4), "RIFF");
+  EXPECT_EQ(wav.substr(8, 4), "WAVE");
+  EXPECT_EQ(wav.substr(12, 4), "fmt ");
+  EXPECT_EQ(wav.substr(36, 4), "data");
+
+  // fmt chunk: PCM=1, mono=1, sample_rate=22050, bits=16
+  EXPECT_EQ(readU16LE(wav, 20), 1) << "PCM format";
+  EXPECT_EQ(readU16LE(wav, 22), 1) << "mono channel count";
+  EXPECT_EQ(readU32LE(wav, 24), voice.synthesisConfig.sampleRate);
+  EXPECT_EQ(readU16LE(wav, 34), voice.synthesisConfig.sampleWidth * 8u)
+      << "bits per sample matches voice config";
+
+  // data chunk size matches the actual sample bytes
+  const uint32_t dataSize = readU32LE(wav, 40);
+  EXPECT_EQ(dataSize, wav.size() - 44) << "data chunk size matches payload";
+}
+
+TEST_F(StreamingRawPhonemesTest, PhonemeIdsToWavSameLengthOnRepeat) {
+  // VITS のサンプリングは stochastic (noise_scale > 0) なので、 同じ
+  // phoneme IDs でも 2 回呼ぶと byte-identical な WAV にはならない。 これは
+  // cross-runtime parity gate が tier 1 (SHA256) ではなく tier 2 (peak RMS)
+  // / tier 3 (SNR) で吸収する設計の前提 (docs/spec/audio-parity-contract.toml
+  // を参照)。 ここではより弱い不変条件 — 「同じ ID 列を渡せばフレーム数
+  // (= audio 長さ) は同一」 — を assert することで Strategy A の padding 量と
+  // EOS 切り捨ての挙動を pin する。
+  std::vector<piper::PhonemeId> ids = {1, 10, 0, 11, 0, 12, 0, 13, 0, 14, 0, 2};
+
+  std::ostringstream firstStream(std::ios::binary);
+  piper::SynthesisResult firstResult;
+  piper::phonemeIdsToWavFile(config, voice, ids, firstStream, firstResult);
+
+  std::ostringstream secondStream(std::ios::binary);
+  piper::SynthesisResult secondResult;
+  std::vector<piper::PhonemeId> ids2 = {1, 10, 0, 11, 0, 12, 0, 13, 0, 14, 0, 2};
+  piper::phonemeIdsToWavFile(config, voice, ids2, secondStream, secondResult);
+
+  const std::string a = firstStream.str();
+  const std::string b = secondStream.str();
+  EXPECT_EQ(a.size(), b.size())
+      << "same phoneme IDs must yield same number of audio samples";
+  // Headers (44 bytes) and data chunk size declared in the header should
+  // match byte-for-byte even when the PCM body diverges due to noise.
+  EXPECT_EQ(a.substr(0, 44), b.substr(0, 44))
+      << "WAV header layout must be deterministic for identical inputs";
+}
+
+TEST_F(StreamingRawPhonemesTest, PhonemeIdsToWavShortInputProducesAudio) {
+  // Minimum viable input: BOS + single phoneme + EOS. Strategy A short-text
+  // padding is applied inside synthesize() so the output is non-empty even
+  // for a 3-ID input.
+  std::vector<piper::PhonemeId> ids = {1, 10, 2};
+
+  std::ostringstream wavStream(std::ios::binary);
+  piper::SynthesisResult result;
+
+  piper::phonemeIdsToWavFile(config, voice, ids, wavStream, result);
+
+  const std::string wav = wavStream.str();
+  EXPECT_GT(wav.size(), 44u) << "header + body";
+  EXPECT_GT(readU32LE(wav, 40), 0u) << "non-empty data chunk";
+}
+
+TEST_F(StreamingRawPhonemesTest, PhonemeIdsToWavDifferentInputsDifferentOutputs) {
+  // Two distinct phoneme ID sequences should produce distinct WAV payloads.
+  // This guards against a regression where synthesize() inadvertently caches
+  // / reuses output across calls (which would silently pass the parity gate).
+  std::vector<piper::PhonemeId> idsA = {1, 10, 0, 11, 0, 12, 0, 13, 0, 14, 0, 2};
+  std::vector<piper::PhonemeId> idsB = {1, 14, 0, 13, 0, 12, 0, 11, 0, 10, 0, 2}; // reversed body
+
+  std::ostringstream streamA(std::ios::binary);
+  std::ostringstream streamB(std::ios::binary);
+  piper::SynthesisResult resultA, resultB;
+
+  piper::phonemeIdsToWavFile(config, voice, idsA, streamA, resultA);
+  piper::phonemeIdsToWavFile(config, voice, idsB, streamB, resultB);
+
+  const std::string wavA = streamA.str();
+  const std::string wavB = streamB.str();
+  EXPECT_GT(wavA.size(), 44u);
+  EXPECT_GT(wavB.size(), 44u);
+  // Headers can be identical (same length / sample rate) but the data
+  // payload (offset 44 onward) must differ for different inputs.
+  EXPECT_NE(wavA.substr(44), wavB.substr(44))
+      << "different phoneme IDs must produce different audio data";
 }
 
 } // namespace piper

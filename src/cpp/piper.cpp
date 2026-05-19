@@ -2325,6 +2325,29 @@ void textToWavFile(PiperConfig &config, Voice &voice, std::string text,
 
 } /* textToWavFile */
 
+// Synthesize audio directly from phoneme IDs to a WAV file. Mirrors the
+// textToWavFile shape so callers can swap text→WAV for ids→WAV without
+// touching the WAV header / write logic. The cross-runtime parity gate
+// (docs/spec/audio-parity-contract.toml) relies on this entry point to
+// match Rust / Go / C# / Python which all already accept phoneme_ids
+// JSONL stdin directly.
+void phonemeIdsToWavFile(PiperConfig &config, Voice &voice,
+                         std::vector<PhonemeId> &phonemeIds,
+                         std::ostream &audioFile,
+                         SynthesisResult &result) {
+  std::vector<int16_t> audioBuffer;
+  synthesize(phonemeIds, voice.synthesisConfig, voice.session, audioBuffer,
+             result, &voice);
+
+  auto synthesisConfig = voice.synthesisConfig;
+  writeWavHeader(synthesisConfig.sampleRate, synthesisConfig.sampleWidth,
+                 synthesisConfig.channels, (int32_t)audioBuffer.size(),
+                 audioFile);
+
+  audioFile.write((const char *)audioBuffer.data(),
+                  sizeof(int16_t) * audioBuffer.size());
+} /* phonemeIdsToWavFile */
+
 // Synthesize audio directly from phonemes
 void phonemesToAudio(PiperConfig &config, Voice &voice,
                      const std::vector<Phoneme> &phonemes,

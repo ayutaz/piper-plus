@@ -176,6 +176,31 @@ check_*.py
 !scripts/check_todo_age.py
 !scripts/check_workspace_python_parity.py
 !scripts/check_training_defaults.py
+# M1.1 — cancelled / skipped baseline alarm gateway
+!scripts/check_required_gate.py
+# M1.2 — migration guide cross-ref lint
+!scripts/check_migration_xref.py
+# M1.3 — first-PR fast lane (gate neutralizer + weekly health)
+!scripts/first_pr_fast_lane.py
+!scripts/first_pr_health.py
+# Audio MOS proxy metrics (PESQ / STOI / UTMOS / Whisper WER)
+!scripts/audio_quality_metrics.py
+# Cross-runtime audio byte parity (SHA256 / RMS / SNR tiers)
+!scripts/audio_parity.py
+# Public ABI snapshot diff (C / Swift / Kotlin)
+!scripts/diff_public_abi.py
+# Model card / license attribution generator (data-sources.yml driven)
+!scripts/generate_model_card.py
+# Typosquatting watch (registry Levenshtein + homograph scan)
+!scripts/check_typosquatting.py
+# Forward-compat fuzz for loanword / PUA JSON schema
+!scripts/fuzz_forward_compat.py
+# Phoneme timing monotonicity property test
+!scripts/check_timing_monotonicity.py
+# CHANGELOG keep-a-changelog format validator (proposals §3.7 Tier S #1)
+!scripts/check_changelog_format.py
+# README heading tree parity (proposals §3.7 Tier S #2, informational)
+!scripts/check_readme_heading_tree.py
 create_comprehensive_*.py
 add_missing_*.py
 retrain_*.py

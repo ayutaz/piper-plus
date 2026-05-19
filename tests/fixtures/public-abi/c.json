@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "platform": "linux-x86_64",
+  "library": "libpiper_plus.so",
+  "version_tag": null,
+  "_comment": "Populated by the first green run of public-abi-snapshot.yml. Until then this baseline is intentionally empty so the diff path reports `bootstrap mode` rather than failing.",
+  "symbols": [],
+  "structs": [],
+  "enums": [],
+  "constants": []
+}

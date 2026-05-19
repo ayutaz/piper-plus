@@ -1,0 +1,61 @@
+# Model Card / License Attributions Generation (M3.2)
+# ====================================================
+# `data-sources.yml` を canonical source として MODEL_CARD.md +
+# LICENSE_ATTRIBUTIONS.md を deterministic に生成し、 PR で diff があれば
+# artifact として upload。 release-shared-lib.yml / deploy-huggingface.yml
+# は将来 `python scripts/generate_model_card.py generate` を publish 直前
+# step として呼び込み、 attribution を ONNX 同梱物に必ず注入する。
+#
+# 本 workflow 自体は validate を毎 PR 実行し、 license.verified=false の
+# dataset がある場合は警告を残すだけ (informational tier ではない、 schema
+# 違反は blocker)。
+
+name: Model Card Generation
+
+on:
+  pull_request:
+    branches: [dev]
+    paths:
+      - 'data-sources.yml'
+      - 'scripts/generate_model_card.py'
+      - '.github/workflows/model-card-generation.yml'
+  push:
+    branches: [dev]
+  workflow_dispatch:
+
+concurrency:
+  group: model-card-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  validate-and-generate:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6.0.2
+      - uses: actions/setup-python@v6.2.0
+        with:
+          python-version: "3.13"
+
+      - name: Install pyyaml
+        run: pip install "pyyaml>=6.0.3"
+
+      - name: Validate data-sources.yml schema
+        run: python scripts/generate_model_card.py validate
+
+      - name: Generate MODEL_CARD.md + LICENSE_ATTRIBUTIONS.md
+        run: |
+          mkdir -p /tmp/model-card
+          python scripts/generate_model_card.py generate \
+            --model-card /tmp/model-card/MODEL_CARD.md \
+            --attributions /tmp/model-card/LICENSE_ATTRIBUTIONS.md
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4.6.0
+        with:
+          name: model-card-${{ github.run_id }}
+          path: /tmp/model-card/
+          retention-days: 90

@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "product": "PiperPlus",
+  "module": "PiperPlus",
+  "version_tag": null,
+  "_comment": "Populated by swift symbolgraph-extract output (normalised). Empty until the first green snapshot lands.",
+  "declarations": []
+}

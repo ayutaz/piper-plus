@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+<!--
+  Breaking changes must be listed under `### Breaking` and each entry must
+  include at least one `[label](docs/migration/v<X>-to-v<Y>.md#anchor)`
+  link. See `docs/migration/README.md` for the anchor slug rules.
+  `scripts/check_migration_xref.py` (workflow `Migration Guide Lint`)
+  enforces this automatically.
+-->
+
 ### Added
 
 #### Kotlin/Android G2P AAR を Maven Central に公開 (Issue #388)
@@ -183,6 +191,12 @@ v1.12.0 で 5 ランタイム (Python/Rust/C#/Go/WASM) に展開した SSML / Vo
 - Docker: arm64 build/test matrix を CI に追加 (`docker-build-test.yml`)。PR #473 (16fa5091)
 - Docker: GitHub Actions runner の disk 枯渇対策 (build artifact prune + buildx cache strategy)。PR #482 (22c78236)
 - CodeQL: `cpp/loop-variable-changed` をルール全体で suppress (false positive 多数のため)。PR #492 (cd6a9d8a)
+- CI: `deploy-huggingface.yml` / `release-shared-lib.yml` に `scripts/generate_model_card.py` 駆動の `MODEL_CARD.md` + `LICENSE_ATTRIBUTIONS.md` 生成 step を注入。 HF Space deploy / GitHub Release artifact に attribution が確実に同梱され、 dataset attribution の脱落を構造的に防止 (M3.2 / PR #511 実装完了)
+- CI: OpenSSF Scorecard を週次 + dev push で実行する `scorecard.yml` を追加 (`docs/proposals/ci-expansion-2026-05.md` §3.6 Week 1 由来、 Top 10 外の supply-chain hardening)。 SARIF を code scanning に upload + `scorecard.dev` に publish、 PR を block しない informational tier
+- CI: `scripts/check_changelog_format.py` + `changelog-format.yml` + pre-commit hook (`changelog-format`) で keep-a-changelog 形式 validator を追加 (`docs/proposals/ci-expansion-2026-05.md` §3.7 Tier S #1 由来)。 H1 / Unreleased / バージョン header date format / 降順を error tier、 セクション名 / 重複を warning tier として検査。 既存 historic な絵文字付きセクションは bootstrap baseline として allowlist 化
+- CI: `scripts/check_readme_heading_tree.py` + `readme-heading-tree-parity.yml` で multilingual README の heading tree parity を informational tier で追加 (`docs/proposals/ci-expansion-2026-05.md` §3.7 Tier S #2 由来)。 既存 `check_readme_h2_parity.py` (H2 個数のみ) を補強し、 H2/H3/H4 の structure と H2 section 内の H3 count を比較。 default tolerance ±5 で既存翻訳 drift を bootstrap baseline 吸収、 新規 drift 拡大のみ警告。 PR を block しない
+- CI: `scripts/ci_observability_snapshot.py` + `ci-observability-snapshot.yml` で 週次の CI flake / cancel / skip trend snapshot を追加 (`docs/proposals/ci-expansion-2026-05.md` §3.9 #1 由来、 Top 10 外の CI observability)。 過去 7 日の `gh run list` を workflow 単位に集計し、 cancellation_rate > 10% の workflow を "flake watch" 候補として artifact 出力。 M1.1 cancelled baseline alarm (PR 単位の silent skip gate) の trend 観測層
+- CI: `.github/workflows/rust-miri-nightly.yml` で nightly Rust miri を週次実行 (`docs/proposals/ci-expansion-2026-05.md` §3.1 Sanitizer 拡張 #8 由来、 Top 10 外)。 piper-plus-g2p crate の 27 箇所の unsafe ブロック (FFI 系を除く Rust internals) に対する Undefined Behavior / stacked borrow / aliasing 違反を `cargo +nightly miri test --skip ffi` で informational 検出。 timeout 60 min、 PR を block しない
 
 ### Limitations (v1.13.0 iOS xcframework)
 

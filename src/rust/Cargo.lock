@@ -1985,6 +1985,7 @@ dependencies = [
  "piper-plus",
  "predicates",
  "serde_json",
+ "tempfile",
  "tracing",
  "tracing-subscriber",
 ]

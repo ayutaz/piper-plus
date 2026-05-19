@@ -84,4 +84,9 @@ exclude_path = [
   "(^|/)pkg/",
   "\\.pytest_cache/",
   "(^|/)CHANGELOG\\.md$",   # historical, contains many old links
+  # migration_xref test fixture は意図的に broken link を含む negative-case
+  # data (`scripts/check_migration_xref.py` の anchor / file 解決ロジックが
+  # 「該当 file / anchor が無い」 を検知するための fixture)。 link checker
+  # 対象から外す。
+  "(^|/)tests/scripts/fixtures/migration_xref/",
 ]

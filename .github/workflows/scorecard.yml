@@ -1,0 +1,71 @@
+# OpenSSF Scorecard
+# =================
+# `docs/proposals/ci-expansion-2026-05.md` §3.6 Week 1 由来。 Top 10 外の
+# supply-chain hardening 追加項目で、 OpenSSF Scorecard を週次 + push to
+# dev で実行する。 結果は SARIF として code scanning に upload + 公開
+# scorecard.dev に publish (informational tier、 PR を block しない)。
+#
+# 期待値:
+#   - branch-protection / fuzzing / pinned-deps / token-permissions など
+#     17 check で項目別スコア取得
+#   - 既存 cosign / SBOM / Trivy / dependency-review / action-pin gate と
+#     重複しないため net flat policy 違反なし (Scorecard は外部公開メタ)
+#
+# 関連: docs/proposals/ci-expansion-2026-05.md §3.6 (Supply-chain
+# hardening recommended roadmap)、 親調査 Top 10 外の §3 横断テーマ。
+# 本 workflow は PR を block せず、 trend 監視と OpenSSF Score badge の
+# data source として使う。
+
+name: OpenSSF Scorecard
+
+on:
+  branch_protection_rule:
+  schedule:
+    - cron: '30 1 * * 6'  # 毎週土曜 01:30 UTC (既存 schedule 集中時間帯を回避)
+  push:
+    branches: [dev, main]
+  workflow_dispatch:
+
+permissions: read-all
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analysis:
+    name: Scorecard analysis
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    permissions:
+      security-events: write
+      id-token: write
+      contents: read
+      actions: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Run analysis
+        uses: ossf/scorecard-action@v2.4.2
+        with:
+          results_file: results.sarif
+          results_format: sarif
+          # public_repo なので Scorecard API への publish を有効化
+          # (https://scorecard.dev/viewer/?uri=github.com/ayutaz/piper-plus)。
+          publish_results: true
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4.6.0
+        with:
+          name: SARIF file
+          path: results.sarif
+          retention-days: 5
+
+      - name: Upload to code scanning
+        uses: github/codeql-action/upload-sarif@v3.35.4
+        with:
+          sarif_file: results.sarif

@@ -240,7 +240,9 @@ B (FT) は A から `--devices 1`、`--base_lr 2e-5` (1/10 で catastrophic forg
 | 短テキスト戦略仕様 | `docs/spec/short-text-contract.toml` |
 | テキスト分割仕様 | `docs/spec/text-splitter-contract.toml` |
 | Phoneme Timing 仕様 | `docs/spec/phoneme-timing-contract.toml` |
+| Audio Parity 仕様 | `docs/spec/audio-parity-contract.toml` |
 | ORT バージョン表 | `docs/reference/ort-versions.md` |
+| Branch protection 履歴 | `docs/reference/branch-protection-history.md` |
 | マイグレーションガイド | `docs/migration/v1.11-to-v1.12.md` |
 
 ### 各言語ランタイム

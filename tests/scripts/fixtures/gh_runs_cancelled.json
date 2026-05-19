@@ -1,0 +1,50 @@
+{
+  "total_count": 5,
+  "workflow_runs": [
+    {
+      "id": 200001,
+      "name": "Multi-Runtime RTF Benchmark",
+      "head_sha": "deadbeef0000000000000000000000000000beef",
+      "status": "completed",
+      "conclusion": "cancelled",
+      "run_number": 1,
+      "html_url": "https://github.com/owner/repo/actions/runs/200001"
+    },
+    {
+      "id": 200002,
+      "name": "Memory regression (per-language)",
+      "head_sha": "deadbeef0000000000000000000000000000beef",
+      "status": "completed",
+      "conclusion": "success",
+      "run_number": 1,
+      "html_url": "https://github.com/owner/repo/actions/runs/200002"
+    },
+    {
+      "id": 200003,
+      "name": "CodeQL",
+      "head_sha": "deadbeef0000000000000000000000000000beef",
+      "status": "completed",
+      "conclusion": "success",
+      "run_number": 1,
+      "html_url": "https://github.com/owner/repo/actions/runs/200003"
+    },
+    {
+      "id": 200004,
+      "name": "Parity Hub",
+      "head_sha": "deadbeef0000000000000000000000000000beef",
+      "status": "completed",
+      "conclusion": "success",
+      "run_number": 1,
+      "html_url": "https://github.com/owner/repo/actions/runs/200004"
+    },
+    {
+      "id": 200005,
+      "name": "PUA Consistency Gate",
+      "head_sha": "deadbeef0000000000000000000000000000beef",
+      "status": "completed",
+      "conclusion": "success",
+      "run_number": 1,
+      "html_url": "https://github.com/owner/repo/actions/runs/200005"
+    }
+  ]
+}

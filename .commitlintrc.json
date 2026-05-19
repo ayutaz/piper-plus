@@ -26,6 +26,7 @@
     "scope-case": [0],
     "header-max-length": [1, "always", 100],
     "body-max-line-length": [0],
+    "footer-max-line-length": [0],
     "references-empty": [1, "never"]
   }
 }

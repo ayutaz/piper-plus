@@ -1,0 +1,11 @@
+{
+  "total_count": 6,
+  "check_runs": [
+    {"id": 1, "name": "Parity Hub", "status": "completed", "conclusion": "failure"},
+    {"id": 2, "name": "PUA Consistency Gate", "status": "completed", "conclusion": "failure"},
+    {"id": 3, "name": "ZH-EN Loanword Sync Gate", "status": "completed", "conclusion": "success"},
+    {"id": 4, "name": "Migration Guide Lint", "status": "in_progress", "conclusion": null},
+    {"id": 5, "name": "ruff format", "status": "completed", "conclusion": "failure"},
+    {"id": 6, "name": "Parity Hub", "status": "completed", "conclusion": "neutral"}
+  ]
+}

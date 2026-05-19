@@ -1,0 +1,50 @@
+# Phoneme timing monotonicity property test (M4.2, informational tier)
+# ======================================================================
+# `docs/spec/phoneme-timing-contract.toml` の 4 不変条件を任意入力で検査
+# する gate。 既存 `timing-parity.yml` は固定 fixture の byte 一致のみ検査
+# しているため、 任意入力で不変条件が崩れる timing 計算 bug は本 gate で
+# 検出する。 浮動小数累積誤差 / SSML break boundary 演算誤差で false
+# positive が出やすいため informational tier (continue-on-error: true)。
+
+name: Timing Monotonicity
+
+on:
+  pull_request:
+    branches: [dev]
+    paths:
+      - 'src/python_run/piper/timing.py'
+      - 'docs/spec/phoneme-timing-contract.toml'
+      - 'scripts/check_timing_monotonicity.py'
+      - '.github/workflows/timing-monotonicity.yml'
+  push:
+    branches: [dev]
+  workflow_dispatch:
+
+concurrency:
+  group: timing-monotonicity-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  property:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v6.0.2
+      - uses: actions/setup-python@v6.2.0
+        with:
+          python-version: "3.13"
+      - name: Run monotonicity fuzz
+        run: |
+          python scripts/check_timing_monotonicity.py fuzz \
+            --iterations 1000 --output /tmp/timing-fuzz.json
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4.6.0
+        if: always()
+        with:
+          name: timing-monotonicity-${{ github.run_id }}
+          path: /tmp/timing-fuzz.json
+          retention-days: 90

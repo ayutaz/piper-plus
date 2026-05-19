@@ -6,6 +6,9 @@
   "main": "src/index.js",
   "module": "src/index.js",
   "types": "types/index.d.ts",
+  "bin": {
+    "piper-plus": "./bin/piper-cli.js"
+  },
   "exports": {
     ".": {
       "types": "./types/index.d.ts",
@@ -34,6 +37,7 @@
   },
   "files": [
     "src/**/*.js",
+    "bin/**/*.js",
     "dist/rust-wasm/**",
     "types/",
     "THIRD-PARTY-LICENSES.md",
@@ -80,6 +84,7 @@
     "@types/node": "^25.0.0",
     "c8": "^11.0.0",
     "eslint": "^9.10.0",
+    "onnxruntime-node": "^1.21.0",
     "prettier": "^3.3.0",
     "typescript": "^5.5.0"
   },

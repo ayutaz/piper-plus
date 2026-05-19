@@ -1,0 +1,80 @@
+# Public ABI Snapshot (C / Swift / Kotlin)
+# =========================================
+# C API / Swift Package / Kotlin AAR の public signature を JSON snapshot に
+# 落とし、 baseline と diff して **削除 / 型変更** は fail、 **追加のみ** は
+# pass に分類する gate。 baseline が空の bootstrap 段階では常に pass し、
+# `update-abi-baseline` label 付きの PR で意図的更新を許容する。
+#
+# 関連: docs/proposals/ci-expansion-2026-05.md Top 10 #4 (M3.1 / PR #511 実装完了, bootstrap baseline)。
+
+name: Public ABI Snapshot
+
+on:
+  pull_request:
+    branches: [dev]
+    paths:
+      - 'src/cpp/**'
+      - 'src/csharp/**'
+      - 'Sources/**'
+      - 'android/piper-plus-g2p/**'
+      - 'tests/fixtures/public-abi/**'
+      - 'scripts/diff_public_abi.py'
+      - '.github/workflows/public-abi-snapshot.yml'
+  push:
+    branches: [dev]
+  workflow_dispatch:
+
+concurrency:
+  group: public-abi-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  diff-bootstrap:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6.0.2
+      - uses: actions/setup-python@v6.2.0
+        with:
+          python-version: "3.13"
+      - name: C ABI diff (bootstrap, current = baseline)
+        run: |
+          python scripts/diff_public_abi.py diff \
+            --surface c \
+            --baseline tests/fixtures/public-abi/c.json \
+            --current  tests/fixtures/public-abi/c.json \
+            --output /tmp/c-abi-diff.md
+      - name: Swift ABI diff (bootstrap)
+        run: |
+          python scripts/diff_public_abi.py diff \
+            --surface swift \
+            --baseline tests/fixtures/public-abi/swift.json \
+            --current  tests/fixtures/public-abi/swift.json \
+            --output /tmp/swift-abi-diff.md
+      - name: Kotlin ABI diff (bootstrap)
+        run: |
+          python scripts/diff_public_abi.py diff \
+            --surface kotlin \
+            --baseline tests/fixtures/public-abi/kotlin.json \
+            --current  tests/fixtures/public-abi/kotlin.json \
+            --output /tmp/kotlin-abi-diff.md
+      - name: Post sticky comment
+        if: github.event_name == 'pull_request'
+        uses: marocchino/sticky-pull-request-comment@v2.9.4
+        with:
+          header: public-abi-snapshot
+          path: /tmp/c-abi-diff.md
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4.6.0
+        if: always()
+        with:
+          name: public-abi-${{ github.run_id }}
+          path: |
+            /tmp/c-abi-diff.md
+            /tmp/swift-abi-diff.md
+            /tmp/kotlin-abi-diff.md
+          retention-days: 90

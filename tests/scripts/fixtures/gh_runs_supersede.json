@@ -1,0 +1,14 @@
+{
+  "total_count": 1,
+  "workflow_runs": [
+    {
+      "id": 500001,
+      "name": "Multi-Runtime RTF Benchmark",
+      "head_sha": "deadbeef0000000000000000000000000000beef",
+      "status": "completed",
+      "conclusion": "cancelled",
+      "run_number": 1,
+      "html_url": "https://github.com/owner/repo/actions/runs/500001"
+    }
+  ]
+}

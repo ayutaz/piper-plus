@@ -1,0 +1,89 @@
+# Audio MOS Proxy (informational tier)
+# =====================================
+# PESQ-WB / STOI / UTMOS22 / Whisper WER の 4 指標を PR ごとに計算し、
+# baseline JSON との diff を sticky comment で投稿する gate。 最初の 4 週間
+# は informational (continue-on-error: true) で稼働し、 false positive 率
+# が < 5% で安定したら blocker 昇格を maintainer が判定する。
+#
+# 本 workflow は **意図的に bootstrap 段階で空 baseline / stub metrics** を
+# 許容する。 初回 dev push が green を確立した後、 maintainer が手動で
+# tests/fixtures/audio-mos-baseline.json を populate する手順:
+#   1. dev で `synthesize` + `compute` を手動実行
+#   2. /tmp/metrics.json を tests/fixtures/audio-mos-baseline.json にコピー
+#   3. samples / generated_at / model.sha256 を埋めてコミット
+#
+# 関連: docs/proposals/ci-expansion-2026-05.md Top 10 #1 (M2.1 / PR #511 実装完了)。
+
+name: Audio MOS Proxy
+
+on:
+  pull_request:
+    branches: [dev]
+    paths:
+      - 'src/python_run/**'
+      - 'src/python/piper_train/**'
+      - 'tests/fixtures/audio-corpus/**'
+      - 'tests/fixtures/audio-mos-baseline.json'
+      - 'scripts/audio_quality_metrics.py'
+      - '.github/workflows/audio-mos-proxy.yml'
+  push:
+    branches: [dev]
+  workflow_dispatch:
+
+concurrency:
+  group: audio-mos-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  mos-proxy:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 25
+    # informational tier: failures are reported in the sticky comment but do
+    # not fail the PR. Promotion to blocker is a maintainer-gated change to
+    # this line plus an entry in branch-protection-history.md.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v6.0.2
+      - uses: actions/setup-python@v6.2.0
+        with:
+          python-version: "3.13"
+
+      - name: Stub metrics (bootstrap path)
+        # While tests/fixtures/audio-mos-baseline.json has empty `samples`,
+        # we skip the heavy synth/inference path and emit zero-filled metrics
+        # so the diff renders a "first measurement" table. Once the baseline
+        # has been populated by a maintainer, replace this step with the
+        # synthesize → compute pair documented in the ticket.
+        run: |
+          python scripts/audio_quality_metrics.py synthesize-stubs \
+            --output /tmp/metrics.json \
+            --bencher-json /tmp/bencher.json
+
+      - name: Diff vs baseline
+        run: |
+          python scripts/audio_quality_metrics.py diff \
+            --metrics /tmp/metrics.json \
+            --baseline tests/fixtures/audio-mos-baseline.json \
+            --output /tmp/diff.md
+
+      - name: Post sticky comment
+        if: github.event_name == 'pull_request'
+        uses: marocchino/sticky-pull-request-comment@v2.9.4
+        with:
+          header: audio-mos-proxy
+          path: /tmp/diff.md
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4.6.0
+        if: always()
+        with:
+          name: audio-mos-${{ github.run_id }}
+          path: |
+            /tmp/metrics.json
+            /tmp/bencher.json
+            /tmp/diff.md
+          retention-days: 90
