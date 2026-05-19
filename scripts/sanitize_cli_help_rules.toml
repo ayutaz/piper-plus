@@ -13,6 +13,24 @@ pattern = "\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:
 replace_with = "<TIMESTAMP>"
 note = "ISO8601 timestamps (UTC or offset)."
 
+# Generic: onnxruntime device_discovery warnings (stderr-only, Linux runner).
+# Caught on PR #513 first CI run: `python -m piper --help` re-routes stderr
+# into stdout (2>&1), so onnxruntime's PCI bus scan warnings appear in the
+# raw capture on GitHub-hosted Linux runners (where ACPI device paths exist)
+# but not on macOS / local dev machines. Strip the whole line.
+[[rules]]
+runtime = "*"
+pattern = "^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}\\.\\d+ \\[W:onnxruntime:.*\\n"
+replace_with = ""
+note = "onnxruntime stderr warnings (PCI / device discovery) — Linux runner only."
+
+# Generic: ORT init warnings without leading timestamp (rare but observed).
+[[rules]]
+runtime = "*"
+pattern = "^\\[W:onnxruntime:.*\\n"
+replace_with = ""
+note = "onnxruntime warnings missing the timestamp prefix (fallback)."
+
 # Generic: ANSI color escapes (some CLI frameworks emit them even with NO_COLOR).
 [[rules]]
 runtime = "*"

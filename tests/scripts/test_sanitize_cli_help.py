@@ -91,6 +91,40 @@ def test_apply_rules_strips_ansi_escapes(sanitize, rules):
     assert "red text" in out
 
 
+def test_apply_rules_strips_onnxruntime_pci_warning(sanitize, rules):
+    """Linux GitHub runner-only noise observed on PR #513 first run.
+
+    `python -m piper --help 2>&1` captures onnxruntime's PCI bus scan
+    warning into the raw output. Local macOS dev env does not emit it
+    (no ACPI device path), so the rule must strip it from the runner
+    output to keep the canonical reproducible across platforms.
+    """
+    text = (
+        "2026-05-19 03:57:25.827861094 [W:onnxruntime:Default, "
+        "device_discovery.cc:133 GetPciBusId] Skipping pci_bus_id ...\n"
+        "usage: python -m piper [-h]\n"
+    )
+    out = sanitize.apply_rules(text, runtime="python", rules=rules)
+    assert "W:onnxruntime" not in out, (
+        "onnxruntime warning lines must be stripped — caused python DRIFT "
+        "on PR #513 first run."
+    )
+    assert "usage: python -m piper" in out
+
+
+def test_apply_rules_strips_onnxruntime_warning_without_timestamp(
+    sanitize, rules,
+):
+    """Fallback rule: ORT warning lacking the leading timestamp prefix."""
+    text = (
+        "[W:onnxruntime:CPU, init.cc:99 Something] partial warning line\n"
+        "usage: python -m piper [-h]\n"
+    )
+    out = sanitize.apply_rules(text, runtime="python", rules=rules)
+    assert "W:onnxruntime" not in out
+    assert "usage: python -m piper" in out
+
+
 def test_apply_rules_runtime_filter_isolates_python_rule(sanitize, rules):
     """Python's __main__.py prog rule must not affect non-Python output."""
     text = "usage: __main__.py [-h]"
