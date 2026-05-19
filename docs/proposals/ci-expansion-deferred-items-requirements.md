@@ -485,8 +485,20 @@ Skip 条件に該当しないブロックを実 subprocess で実行する。
 
 ---
 
-## 10. 変更履歴
+## 10. 下流ドキュメント (チケット)
+
+本要求定義は [`docs/tickets/`](../tickets/README.md) で 4 milestone × 23 ticket に分解済み:
+
+- [M1 Foundations](../tickets/milestones/M1-foundations.md) — Tier 1 (T-001〜T-003)
+- [M2 Spec & Docs Gates](../tickets/milestones/M2-spec-and-docs.md) — Tier 2 (T-004〜T-011)
+- [M3 Supply Chain](../tickets/milestones/M3-supply-chain.md) — Tier 3 (T-012〜T-021)
+- [M4 Docs Infra](../tickets/milestones/M4-docs-infra.md) — Tier 3 別 milestone (T-022, T-023)
+
+---
+
+## 11. 変更履歴
 
 | 日付 | 変更 | 担当 |
 |------|------|------|
 | 2026-05-19 | 初版 (v0.1 draft) — ブランチ `docs/ci-expansion-deferred-items-organize` で proposal から要求定義を抽出。 8 項目 × FR/NFR/AC/CON/DEP の ID 付き要件、 優先度マトリクス、 リスク 7 件、 受け入れ基準サマリーを定義。 | Claude Code |
+| 2026-05-19 | §10 下流チケット link を追記 (要件定義書とチケット index への双方向参照確立)。 | Claude Code |

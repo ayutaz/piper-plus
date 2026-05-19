@@ -714,6 +714,16 @@ Kotlin:  gradle test (JUnit XML 自動出力)             # 既出
 
 ---
 
+## 下流ドキュメント
+
+本 proposal は 3 段階で実装着手可能なレベルまで詳細化済み:
+
+1. [**要求定義 v0.1**](ci-expansion-deferred-items-requirements.md) — FR / NFR / AC / CON / DEP の ID 付き列挙
+2. [**要件定義書 v0.1**](ci-expansion-deferred-items-system-requirements.md) — Tier 1 を I/O 仕様・データ構造・処理シーケンスまで詳細化
+3. [**チケット集約**](../tickets/README.md) — 4 milestone (M1〜M4) × 23 ticket (T-001〜T-023) に分解
+
+---
+
 ## 変更履歴
 
 | 日付 | 変更 | 担当 |
@@ -721,3 +731,4 @@ Kotlin:  gradle test (JUnit XML 自動出力)             # 既出
 | 2026-05-18 | 初版 — PR #511 (defensive foundations) で defer した 8 項目を Claude Code 実装前提で再評価 | Claude Code |
 | 2026-05-19 | PR #511 最終確定状況セクション追加 (Tier1+2 Review 結果 / argparse bug 発見 / 最終 CI 状態 / 15-pair sticky)。 #3 に informational tier の silent-failure 落とし穴 (PR #511 learnings) を追記。 #8 に audio parity gate の partial aggregation 前例を追記。 | Claude Code |
 | 2026-05-19 | 「現状コードベース調査 (本ブランチ HEAD `4f2ff86c` 時点)」 セクション新設。 全体カウントを更新 (workflow 93→108、 spec 25→31、 docker 5→6、 check script 62)。 8 項目に「現状 (本ブランチ HEAD 時点)」 サブセクションを追加し、 既着手部分と未着手部分の境界を明示: #3 (action-pin-gate 形式のみ強制 / Rekor verify 不在)、 #4 (cli-help-docs-sync が Python のみ / stale-only mode / 13 flag allow-list)、 #5 (穴 12→5)、 #7 (check_readme_code_examples は grep のみで実行は別)、 #8 (coverage-aggregation は coverage のみで test 統計は別)。 #2 SLSA L3 で対象 release workflow が想定の 5 つと不一致 (PyPI/NuGet 不在) を明示。 #1 Distroless で対象 docker を 5→6 (cpp-dev 追加) に修正。 過去コミット履歴の主要マイルストーン表 + 本 doc が PR #511 から意図的に外された経緯 (`0d690dca`) を追記。 | Claude Code (ブランチ `docs/ci-expansion-deferred-items-organize`) |
+| 2026-05-19 | 下流ドキュメント セクション追加 — 要求定義 / 要件定義書 / チケット集約への双方向 link 確立 (4 milestone × 23 ticket)。 | Claude Code |

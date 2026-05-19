@@ -731,8 +731,20 @@ Body:
 
 ---
 
-## 13. 変更履歴
+## 13. 下流ドキュメント (チケット)
+
+本要件定義書は [`docs/tickets/`](../tickets/README.md) で 4 milestone × 23 ticket に分解済み。 Tier 1 (T-001〜T-003) は本書 §3 の I/O 仕様・データ構造を直接参照、 Tier 2 / Tier 3 は本書 §4 の overview を元に各 ticket §2 で詳細化:
+
+- [M1 Foundations](../tickets/milestones/M1-foundations.md) — T-001 / T-002 / T-003
+- [M2 Spec & Docs Gates](../tickets/milestones/M2-spec-and-docs.md) — T-004〜T-011
+- [M3 Supply Chain](../tickets/milestones/M3-supply-chain.md) — T-012〜T-021
+- [M4 Docs Infra](../tickets/milestones/M4-docs-infra.md) — T-022 / T-023
+
+---
+
+## 14. 変更履歴
 
 | 日付 | バージョン | 変更内容 | 担当 |
 |------|---------|--------|------|
 | 2026-05-19 | 0.1 (draft) | 初版。 上流 proposal / 要求定義 v0.1 を受けて、 Tier 1 (`#3` Rekor + SHA drift / `#4` CLI help) を I/O 仕様・データ構造・処理シーケンス・トリガー条件・エラーケース・既存資産との接続まで詳細化。 Tier 2 / Tier 3 は overview レベル (後続要件定義 PR で詳細化)。 NFR を 6 カテゴリ (性能 / セキュリティ / 信頼性 / 保守性 / 互換性 / 観測性) に再整理し、 検証可能な数値・手法を明示。 sticky comment / Issue auto-create / baseline JSON / CLI help txt の汎用 interface format を §6 で集約。 silent-zero 対策 (PR #511 phase 2 教訓) を NFR-6.3 / AC-3.3 / fixture test で 3 重に構造化。 | Claude Code (ブランチ `docs/ci-expansion-deferred-items-organize`) |
+| 2026-05-19 | 0.1 (draft) | §13 下流チケット link を追記 (4 milestone × 23 ticket への双方向参照確立)。 | Claude Code |
