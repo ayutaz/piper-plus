@@ -35,4 +35,4 @@ qa-push:
 # Auto-apply fixes (ruff --fix, trailing-whitespace, end-of-file-fixer, etc.).
 # Runs commit-stage hooks only; re-run `git add` + `make qa-commit` to verify.
 qa-fix:
-	pre-commit run --all-files --jobs 4
+	pre-commit run --all-files
