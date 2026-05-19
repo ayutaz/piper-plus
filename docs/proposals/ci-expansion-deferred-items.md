@@ -7,7 +7,24 @@
 
 ---
 
-## PR #511 最終確定状況 (2026-05-19 時点)
+## 進捗状況 (2026-05-19 時点、 PR #517 merge 後)
+
+### 8 項目の現在 status
+
+| # | 項目 | Status | merge PR |
+|---|------|--------|----------|
+| 1 | Distroless | 未着手 | — |
+| 2 | SLSA L3 provenance | 未着手 | — |
+| 3 | Sigstore Rekor verify + Action SHA drift | **完了** (informational tier、 4 週間観測期間入り) | #513 |
+| 4 | 6 runtime CLI help auto-extract | **完了** (python/go/rust/wasm 実 canonical、 csharp/cpp PLACEHOLDER) | #513 |
+| 5 | spec sync gate × 5 (release-versions / model-sha256 / artifact-retention / swift-g2p / test-flake-retry) | **完了** (release-versions / swift-g2p は既存実装で direction 明文化、 残り 3 件は新規 gate + 41 unit tests) | #517 |
+| 6 | mkdocs-material | 未着手 | — |
+| 7 | doc examples × 3 phase (audit → informational → blocker) | 未着手 | — |
+| 8 | test result aggregation | 部分着手 (audio parity pattern が canonical 化) | #511 (audio) |
+
+完了 3 件 / 部分着手 1 件 / 未着手 4 件。 完了済み 3 項目の詳細は各 §で「実装完了 (PR #N)」 として記録。
+
+### PR #511 最終確定状況 (2026-05-19 時点)
 
 PR #511 自体は **本 8 項目を含まない範囲** で確定。 5 agent 並列 review で網羅穴を再点検し、 識別された Tier1+2 を本 PR 内で塞いだ:
 
@@ -27,23 +44,23 @@ PR #511 自体は **本 8 項目を含まない範囲** で確定。 5 agent 並
 - sticky comment: **Pairs compared: 15 / failing: 15 (informational) / skipped: 0**
 - 6 runtime 間 frame count: cpp=go=python=3129 / wasm=3328 / csharp=6615 / rust=7539 — VITS stochastic flow による cross-runtime divergence が baseline として可視化
 
-**8 項目は依然未着手** であり、 本ドキュメントの優先度マトリクスはそのまま有効。
+**PR #511 merge 時点では 8 項目は依然未着手** であった。 その後 PR #513 (項目 #3 / #4) と PR #517 (項目 #5) が merge され、 現在は 3 項目完了 / 5 項目未着手 (上表参照)。 本ドキュメントの優先度マトリクスは未着手 5 項目に対して引き続き有効。
 
 ---
 
-## 現状コードベース調査 (2026-05-19、 本ブランチ整理時点)
+## 現状コードベース調査 (2026-05-19、 PR #517 merge 後時点)
 
-本セクションは PR #511 マージ後の dev branch (HEAD: `4f2ff86c`) を実コードと突き合わせて、 8 項目の **「未着手 / 部分着手 / 補完あり」** を再点検した結果。 親調査時点 (2026-05-18) の数値が PR #511 / #498 マージで既に古くなっているため数値も更新する。
+本セクションは PR #511 / #513 / #517 マージ後の dev branch (HEAD: `eee9d5fb`) を実コードと突き合わせて、 8 項目の **「未着手 / 部分着手 / 補完あり」** を再点検した結果。 親調査時点 (2026-05-18) の数値が直近 4 PR (#511 / #513 / #514-516 perf / #517) マージで既に古くなっているため数値も更新する。
 
 ### 全体カウント更新
 
-| 指標 | 親調査 (2026-05-18) | 本ブランチ (HEAD `4f2ff86c`) | 差分 |
-|------|--------------------|---------------------------|------|
-| `.github/workflows/*.yml` | 93 本 | **108 本** | +15 (PR #511 で約 10 / 後続 PR で 5) |
-| `docs/spec/*.toml` | 25 spec (13 gate + 12 穴) | **31 spec** | +6 (PR #498 / #511 で追加、 末尾節で再算定) |
-| `scripts/check_*.py` | (未集計) | **62 script** | — (gate ロジックの canonical 集約) |
-| `docker/*/Dockerfile` | 5 image | **6 image** | +1 (`docker/cpp-dev/Dockerfile` 追加) |
-| `docs/proposals/*.md` | 親調査 + milestones の 2 doc | **本 doc 1 件のみ** (untracked) | 前身 2 doc は 2026-05-18 に削除済 |
+| 指標 | 親調査 (2026-05-18) | PR #517 merge 後 (HEAD `eee9d5fb`) | 差分 |
+|------|--------------------|------------------------------------|------|
+| `.github/workflows/*.yml` | 93 本 | **111 本** | +18 (PR #511 で約 10 / #513 で 3 (Rekor / SHA drift / CLI help) / #517 で 0 (既存 gate 拡張) / 後続 perf PR で 5) |
+| `docs/spec/*.{toml,md}` | 25 spec (13 gate + 12 穴) | **32 spec** | +7 (PR #498 / #511 / #517 で追加) |
+| `scripts/check_*.py` | (未集計) | **66 script** | +4 (#513 で 2: rekor verify / action sha drift、 #517 で 3 新規 + 1 既存統合) |
+| `docker/*/Dockerfile` | 5 image | **6+ image** (python-inference / python-train / cpp-dev / cpp-inference / webui / wyoming + ollama-stack) | +2 (`cpp-inference` / `ollama-stack` 追加) |
+| `docs/proposals/*.md` | 親調査 + milestones の 2 doc | **本 doc 1 件 + 要求定義 + 要件定義書 の 3 doc** | 前身 2 doc は 2026-05-18 に削除済、 後続で要求 / 要件 2 doc を追加 |
 
 ### 8 項目の既存実装 / 補完関係
 
@@ -265,6 +282,9 @@ SLSA Build L3 個別 milestone。 **1 registry / 1 PR** の cadence で、 各 P
 
 ## #3 Sigstore Rekor + Action SHA drift 監視
 
+> **実装完了 (PR #513、 2026-05-19 merge / commit `c29a87ec`)**
+> Rekor verify (`scripts/verify_rekor_releases.py` + `.github/workflows/rekor-verify.yml`、 weekly schedule + workflow_dispatch、 直近 10 release の `.cosign.bundle` を再検証) と Action SHA drift detector (`scripts/check_action_sha_drift.py` + `.github/workflows/action-sha-drift.yml`、 weekly + PR base、 40-hex pin の dangling / force-pushed を GitHub API で検出) の 2 機能を informational tier で導入。 silent-zero defensive log + sticky comment + drift 時 Issue auto-create を含む。 4 週間 false-positive 0 で blocker 昇格を user 判断に委ねる運用。
+
 ### 目的 / 期待効果 (メリット)
 
 - **release artifact の改竄検出**: ユーザーが PyPI / NuGet 等から download した package を、 piper-plus の sign 経路 (`cosign-release-artifacts.yml`) で signed されたものと **Rekor transparency log 経由で再検証** 可能。 release 後に PyPI account compromise されて malicious package が同一 version で reupload された場合の検出経路を確立。
@@ -341,6 +361,9 @@ schedule: ['0 4 * * 1']  # 月曜 04:00 UTC
 
 ## #4 7 runtime CLI help auto-extract
 
+> **実装完了 (PR #513、 2026-05-19 merge / commit `c29a87ec`)**
+> 6 runtime matrix で実装 (python / rust / go / wasm = 実 build から sanitize 済み canonical、 csharp / cpp = `# PLACEHOLDER:` marker 付き)。 `.github/workflows/cli-help-extract.yml` で抽出 → `scripts/sanitize_cli_help.py` + `scripts/sanitize_cli_help_rules.toml` で正規化 → `docs/reference/cli-help/<runtime>.txt` と diff。 PR base trigger + workflow_dispatch + weekly schedule、 drift-check job が 4 状態 (OK / SKIPPED / CAPTURE_FAILED / DRIFT) を sticky comment に分類報告。 csharp / cpp の本番 canonical 化は dev env に toolchain が揃った後に workflow_dispatch で実施する設計。 Java / Kotlin / Swift G2P の同型 7 runtime 拡張は別 PR で検討。
+
 ### 目的 / 期待効果 (メリット)
 
 - **docs ↔ CLI の drift 検出**: 既存 `cli-flag-contract.toml` は **flag 存在** を強制するが、 `--help` 出力の **wording / description / example** までは検出していない。 README / 個別 runtime docs に書かれた CLI 説明と実装の drift を構造的に検出可能。
@@ -398,6 +421,9 @@ docs/reference/cli-help/g2p-python.txt  # uv run python -m piper_plus_g2p --help
 ---
 
 ## #5 spec contract toml ↔ impl 同期 gate
+
+> **実装完了 (PR #517、 2026-05-19 merge / commit `f3ef12cd`)**
+> 5 spec すべてに drift gate 整備。 release-versions / swift-g2p は既存実装 (`scripts/check_version_manifest_sync.py` / `scripts/check_swift_g2p_contract.py` + 既存 workflow / pre-commit hook) を活かして `[meta].direction` (`post-hoc` / `pre-impl`) 明文化のみで closeout。 残り 3 件は新規実装: `scripts/check_model_sha256_manifest.py` (構造健全性 scope、 実 SHA256 突合は publish パイプライン整備後の別 PR) / `scripts/check_artifact_retention.py` (40 workflow / 63 upload step を walk、 同 PR 内で baseline 違反 6 件 sweep + `mode = "fail"` flip まで完了) / `scripts/check_test_flake_retry.py` (4 runtime scope = python/rust/go/csharp、 phase status と config の同期 + `retry_count_max = 2` 不変条件)。 全 3 件に silent-zero defensive log + 41 unit tests + `contract-gates-extended.yml` matrix 統合。 WASM / C++ / Kotlin / Swift の retry policy 拡張は別 spec で検討。
 
 ### 目的 / 期待効果 (メリット)
 
@@ -732,3 +758,4 @@ Kotlin:  gradle test (JUnit XML 自動出力)             # 既出
 | 2026-05-19 | PR #511 最終確定状況セクション追加 (Tier1+2 Review 結果 / argparse bug 発見 / 最終 CI 状態 / 15-pair sticky)。 #3 に informational tier の silent-failure 落とし穴 (PR #511 learnings) を追記。 #8 に audio parity gate の partial aggregation 前例を追記。 | Claude Code |
 | 2026-05-19 | 「現状コードベース調査 (本ブランチ HEAD `4f2ff86c` 時点)」 セクション新設。 全体カウントを更新 (workflow 93→108、 spec 25→31、 docker 5→6、 check script 62)。 8 項目に「現状 (本ブランチ HEAD 時点)」 サブセクションを追加し、 既着手部分と未着手部分の境界を明示: #3 (action-pin-gate 形式のみ強制 / Rekor verify 不在)、 #4 (cli-help-docs-sync が Python のみ / stale-only mode / 13 flag allow-list)、 #5 (穴 12→5)、 #7 (check_readme_code_examples は grep のみで実行は別)、 #8 (coverage-aggregation は coverage のみで test 統計は別)。 #2 SLSA L3 で対象 release workflow が想定の 5 つと不一致 (PyPI/NuGet 不在) を明示。 #1 Distroless で対象 docker を 5→6 (cpp-dev 追加) に修正。 過去コミット履歴の主要マイルストーン表 + 本 doc が PR #511 から意図的に外された経緯 (`0d690dca`) を追記。 | Claude Code (ブランチ `docs/ci-expansion-deferred-items-organize`) |
 | 2026-05-19 | 下流ドキュメント セクション追加 — 要求定義 / 要件定義書 / チケット集約への双方向 link 確立 (4 milestone × 23 ticket)。 | Claude Code |
+| 2026-05-19 | PR #513 / #517 merge を反映。 進捗状況セクション新設 (8 項目の status table: 完了 3 件 / 部分着手 1 件 / 未着手 4 件)。 全体カウント再算定 (workflow 108→111、 spec 31→32、 check script 62→66、 docker 6→6+ で新規 2 image)。 #3 / #4 / #5 各 section 冒頭に「実装完了 (PR #N、 merge commit)」 marker と完了 scope の要約を追記 (csharp/cpp PLACEHOLDER の運用、 release-versions/swift-g2p の closeout、 artifact-retention の baseline sweep + mode=fail まで)。 基準点を dev HEAD `4f2ff86c` → `eee9d5fb` (PR #513 / #514-516 / #517 merge 後) に更新。 | Claude Code |
