@@ -4606,7 +4606,7 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "3e033f5b1dee17f56b49d8ee3dc6862f478caf74"
+      "hash_sha1": "29d2d62b6c79f6e1c458449834fcceae80228980"
     },
     {
       "file": "docs/reference/mutation-testing.md",
@@ -5852,7 +5852,7 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "b3823fb322f666158101f667be32b2e511eea0eb"
+      "hash_sha1": "100f787b55407af89b319400ff7728e02da9d6ad"
     },
     {
       "file": "docs/tickets/tickets/T-001-rekor-verify.md",
@@ -6412,7 +6412,7 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "f1d5f5e2c64862c8ae1887e333212c442937f077"
+      "hash_sha1": "55e2fdc5cc5f2c141c9be9f1b3c3a1de892e66c1"
     },
     {
       "file": "docs/tickets/tickets/T-019-slsa-rust-g2p.md",
@@ -6440,7 +6440,7 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "938619a49e04c7b8d414917306c6da86d6af0a8f"
+      "hash_sha1": "7169b535f671a30bb5972a2ffb5521a699cace94"
     },
     {
       "file": "docs/tickets/tickets/T-020-slsa-go-g2p.md",
@@ -6468,7 +6468,7 @@
       "placeholders_detected": [],
       "directives_detected": [],
       "env_dependencies": [],
-      "hash_sha1": "c4d2c431d3b3626b4c747eca84e74d79dd978704"
+      "hash_sha1": "8f581daa273541f9bad44cadaa08177da5965889"
     },
     {
       "file": "docs/tickets/tickets/T-021-slsa-npm.md",

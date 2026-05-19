@@ -32,10 +32,10 @@ PR #511 後の現状:
 - [ ] **AC-2.1**: 以下コマンドが exit 0 を返す:
 
   ```bash
-  slsa-verifier verify-artifact piper-plus-g2p-<version>.crate \
-    --provenance-path piper-plus-g2p-<version>.crate.intoto.jsonl \
+  slsa-verifier verify-artifact piper-plus-g2p-'<version>'.crate \
+    --provenance-path piper-plus-g2p-'<version>'.crate.intoto.jsonl \
     --source-uri github.com/ayutaz/piper-plus \
-    --source-tag rust-g2p-v<version>
+    --source-tag rust-g2p-v'<version>'
   ```
 
 - [ ] **AC-2.2**: OpenSSF Scorecard の `Token-Permissions` / `SAST` 以外の項目で score 低下なし (baseline = PR #511 マージ後の Scorecard 値)。
