@@ -5,8 +5,24 @@
 # `docs/reference/cli-help/<runtime>.txt` is reproducible across CI
 # runners and local machines. ``runtime = "*"`` applies to every runtime;
 # a specific runtime name (``python``, ``rust``, …) scopes the rule.
+#
+# Rule order matters. ANSI escape stripping MUST run before line-anchored
+# rules (those starting with ``^``); on PR #513 a Linux GitHub runner
+# emitted onnxruntime warnings prefixed with ``\x1b[0;93m``, which made
+# ``^\d{4}-...`` fail to match (the line started with ESC, not a digit).
+# The earlier rule order had ANSI last and consequently left the warning
+# in the canonical output. See PR #513 debug commit / sticky for the
+# original symptom.
 
-# Generic: timestamps anywhere in the output.
+# Generic: ANSI color escapes (must come first — leading ESC bytes break
+# downstream ``^anchor`` rules like the onnxruntime warning strip below).
+[[rules]]
+runtime = "*"
+pattern = "\\x1b\\[[0-9;]*[A-Za-z]"
+replace_with = ""
+note = "ANSI CSI sequences (color / cursor). MUST run before ^-anchored rules."
+
+# Generic: timestamps anywhere in the output (ISO8601 with T separator).
 [[rules]]
 runtime = "*"
 pattern = "\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})?"
@@ -30,13 +46,6 @@ runtime = "*"
 pattern = "^\\[W:onnxruntime:.*\\n"
 replace_with = ""
 note = "onnxruntime warnings missing the timestamp prefix (fallback)."
-
-# Generic: ANSI color escapes (some CLI frameworks emit them even with NO_COLOR).
-[[rules]]
-runtime = "*"
-pattern = "\\x1b\\[[0-9;]*[A-Za-z]"
-replace_with = ""
-note = "ANSI CSI sequences (color / cursor)."
 
 # Generic: GitHub runner workspace paths.
 [[rules]]

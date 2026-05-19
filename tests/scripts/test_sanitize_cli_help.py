@@ -125,6 +125,26 @@ def test_apply_rules_strips_onnxruntime_warning_without_timestamp(
     assert "usage: python -m piper" in out
 
 
+def test_apply_rules_strips_ansi_prefixed_onnxruntime_warning(sanitize, rules):
+    """Regression for PR #513 debug commit: GitHub Linux runner emits the
+    onnxruntime warning prefixed with \\x1b[0;93m, which makes ^\\d{4} fail
+    to match (line starts with ESC, not a digit). The ANSI rule must run
+    BEFORE the onnxruntime rule so the leading escape is stripped first."""
+    text = (
+        "\x1b[0;93m2026-05-19 04:32:05.859518882 [W:onnxruntime:Default, "
+        "device_discovery.cc:133 GetPciBusId] Skipping pci_bus_id ...\x1b[m\n"
+        "usage: python -m piper [-h]\n"
+    )
+    out = sanitize.apply_rules(text, runtime="python", rules=rules)
+    assert "W:onnxruntime" not in out, (
+        "ANSI prefix must be stripped before the ^-anchored onnxruntime "
+        "rule fires. If this fails, the rule order in TOML drifted back "
+        "to placing the ANSI rule after onnxruntime."
+    )
+    assert "\x1b" not in out
+    assert "usage: python -m piper" in out
+
+
 def test_apply_rules_runtime_filter_isolates_python_rule(sanitize, rules):
     """Python's __main__.py prog rule must not affect non-Python output."""
     text = "usage: __main__.py [-h]"
