@@ -27,6 +27,9 @@ on:
       - 'docs/spec/streaming-api-contract.toml'
       - 'docs/spec/swift-g2p-contract.toml'
       - 'docs/spec/pt-dialect-contract.toml'
+      - 'docs/spec/model-sha256-manifest.toml'
+      - 'docs/spec/artifact-retention-contract.toml'
+      - 'docs/spec/test-flake-retry-contract.toml'
       - 'tests/fixtures/g2p/pt_dialect_parity.json'
       - 'docs/reference/speaker-encoder-contract.md'
       - 'docs/spec/pua-contract.toml'  # cross-referenced by swift-g2p
@@ -38,6 +41,12 @@ on:
       - 'scripts/check_swift_g2p_contract.py'
       - 'scripts/check_pt_dialect_contract.py'
       - 'scripts/check_speaker_encoder_contract.py'
+      - 'scripts/check_model_sha256_manifest.py'
+      - 'scripts/check_artifact_retention.py'
+      - 'scripts/check_test_flake_retry.py'
+      - '.github/workflows/*.yml'  # artifact-retention scans every workflow
+      - 'src/python_run/pyproject.toml'  # test-flake-retry: pytest-rerunfailures dep
+      - '.github/workflows/python-tests.yml'  # test-flake-retry: --reruns flag
       - '.github/workflows/contract-gates-extended.yml'
   push:
     branches: [dev, main]
@@ -69,6 +78,9 @@ jobs:
           - swift-g2p
           - pt-dialect
           - speaker-encoder
+          - model-sha256-manifest
+          - artifact-retention
+          - test-flake-retry
     steps:
       - uses: actions/checkout@v6.0.2
 
@@ -85,12 +97,15 @@ jobs:
         run: |
           # Map the matrix contract id to its check script.
           case "${{ matrix.contract }}" in
-            audio-format)     script=check_audio_format_contract.py ;;
-            ort-provider)     script=check_ort_provider_contract.py ;;
-            streaming-api)    script=check_streaming_api_contract.py ;;
-            swift-g2p)        script=check_swift_g2p_contract.py ;;
-            pt-dialect)       script=check_pt_dialect_contract.py ;;
-            speaker-encoder)  script=check_speaker_encoder_contract.py ;;
+            audio-format)            script=check_audio_format_contract.py ;;
+            ort-provider)            script=check_ort_provider_contract.py ;;
+            streaming-api)           script=check_streaming_api_contract.py ;;
+            swift-g2p)               script=check_swift_g2p_contract.py ;;
+            pt-dialect)              script=check_pt_dialect_contract.py ;;
+            speaker-encoder)         script=check_speaker_encoder_contract.py ;;
+            model-sha256-manifest)   script=check_model_sha256_manifest.py ;;
+            artifact-retention)      script=check_artifact_retention.py ;;
+            test-flake-retry)        script=check_test_flake_retry.py ;;
             *) echo "::error::unknown contract id ${{ matrix.contract }}"; exit 1 ;;
           esac
           python "scripts/$script"

@@ -12,6 +12,12 @@ last_updated = "2026-05-07"
 issue = 387
 applies_to = ["rust-ffi", "swift-package", "release-shared-lib-yml"]
 forward_compat_policy = "strict"
+# `direction` (added per M2 T-007 closeout):
+#   - "pre-impl": this TOML is canonical; Package.swift, Rust FFI, and
+#     Sources/PiperPlusG2P/ MUST mirror what this file declares. Drift
+#     between the contract and any of the 3 mirrors fails CI via
+#     scripts/check_swift_g2p_contract.py + contract-gates-extended.yml.
+direction = "pre-impl"
 
 # ============================================================================
 # Compatibility versioning

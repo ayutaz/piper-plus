@@ -204,6 +204,10 @@ check_*.py
 !scripts/check_changelog_format.py
 # README heading tree parity (proposals §3.7 Tier S #2, informational)
 !scripts/check_readme_heading_tree.py
+# M2 spec sync gates (T-005 / T-006 / T-008)
+!scripts/check_model_sha256_manifest.py
+!scripts/check_artifact_retention.py
+!scripts/check_test_flake_retry.py
 create_comprehensive_*.py
 add_missing_*.py
 retrain_*.py

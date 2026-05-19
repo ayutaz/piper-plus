@@ -4,8 +4,8 @@
 **Milestone**: [M1 Foundations](../milestones/M1-foundations.md)
 **Proposal 項目**: `#4` (7 runtime CLI help auto-extract)
 **Tier**: Tier 1 (PR=blocker / weekly=informational の hybrid)
-**Status**: レビュー待ち (6 runtime full、 csharp/cpp は PLACEHOLDER canonical で初版、 workflow_dispatch で本番化)
-**PR**: (T-001/T-002/T-003 + ticket Status を統合した 1 branch、 `/create-pr` skill で起票予定)
+**Status**: 完了 (6 runtime full、 csharp/cpp は PLACEHOLDER canonical で初版、 workflow_dispatch で本番化予定)
+**PR**: #513 (merge: 2026-05-19、 commit c29a87ec)
 **担当 (予定)**: Claude Code (agent team) + maintainer review
 **着手前提**: なし (T-001 / T-002 と独立、 並列実装可能)
 

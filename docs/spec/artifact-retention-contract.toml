@@ -6,10 +6,22 @@
 
 [meta]
 spec_version = 1
-last_updated = "2026-05-16"
+last_updated = "2026-05-19"
 applies_to = ["github-actions"]
 canonical_reference = ".github/workflows/*.yml"
 forward_compat_policy = "strict"
+# `direction` (added per M2 T-006):
+#   - "pre-impl": this TOML pins the allowed retention values; workflow
+#     YAMLs mirror the policy. Drift is enforced by
+#     scripts/check_artifact_retention.py + artifact-retention-gate.yml.
+direction = "pre-impl"
+# `mode` controls the gate behaviour:
+#   - "warn" → emit ::warning:: but exit 0 (initial introduction safe).
+#   - "fail" → emit ::error:: and exit 1 (post-hardening).
+# Initial baseline has 6 pre-existing violations (4× 14d, 1× 5d, 1× 365d)
+# from before this gate existed. Flip to "fail" only after a sweep PR
+# brings every retention-days value into one of the categories below.
+mode = "warn"
 
 # -----------------------------------------------------------------------------
 # Retention category 定義
