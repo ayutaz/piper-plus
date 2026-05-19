@@ -5,7 +5,7 @@
 **Proposal 項目**: `#7-B` (Code example execution test — informational gate phase)
 **Tier**: Tier 2 (informational)
 **Status**: レビュー待ち (syntax-validation default scope。 `--actually-run` opt-in で real subprocess 実行可、 ただし CI default は syntax のみ。 残 4 runtime (rust/csharp/go/wasm) は runner 未登録 = runner_unsupported)
-**PR**: feat/t008-extend-and-doc-examples-gate (/create-pr skill で起票予定)
+**PR**: #521
 **担当 (予定)**: Claude Code (agent team) + maintainer review
 **着手前提**: **T-009 (doc examples audit, PR-A) merge 済み**。 audit JSON (`tests/fixtures/doc_examples_audit/audit.json`) と placeholder 規約 (FR-7.3、 user 決定済み) が前提。 audit 未完で本 PR に着手すると skip directive 設計が空回りする
 

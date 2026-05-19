@@ -109,13 +109,18 @@ def _run_subprocess(
 
 
 def _bash_body_with_safety(body: str) -> str:
-    """Prepend ``set -euo pipefail`` unless the block already sets it.
+    """Prepend ``set -euo pipefail`` unless the block leads with ``set -...``.
 
-    The author may already opt-out of pipefail (e.g. ``set +e`` for an
-    intentionally fallible script). Detecting this would require parsing
-    the block; for v1 we only inject when no ``set -`` line is present
-    in the first 10 lines, which catches the common case without
-    overriding explicit author choice.
+    The heuristic is intentionally narrow: only an explicit ``set -``
+    flag combination in the first 10 lines skips the injection. The
+    author's ``set +e`` does NOT skip injection — it gets prepended after
+    our ``set -euo pipefail`` and ends up disabling ``-e`` only (``-u``
+    and ``pipefail`` stay active). That matches the v1 contract: we
+    surface mid-pipe failures unless the author has already enabled
+    pipefail themselves.
+
+    A future "opt out fully" knob would need a richer parser (e.g.
+    recognise ``# noinject`` directive); not in v1.
     """
     head = "\n".join(body.splitlines()[:10])
     if "set -" in head:

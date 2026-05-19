@@ -22,7 +22,7 @@ Exit codes (execute):
   0 — informational tier always exit 0 (sticky comment carries signal);
       promoted to non-zero only when ``--strict`` is set
   1 — ``--strict`` + at least one block failed / timed-out
-  2 — audit JSON missing/malformed, or runner missing entirely
+  2 — audit JSON missing or malformed
 """
 
 from __future__ import annotations
@@ -261,13 +261,16 @@ def _silent_zero_execute_log(
         f"observed={observed_total}",
         file=sys.stderr,
     )
-    if observed_total == 0:
+    if observed_total == 0 and expected_total > 0:
+        # Only warn when the audit actually claimed executable blocks — an
+        # empty audit (e.g. fixture / first-PR run with no executable
+        # content yet) legitimately observes 0 and is not a regression.
         print(
             "::warning::audit JSON had executable blocks but execute mode "
             "saw 0 — runner dispatch broken or audit input mismatched?",
             file=sys.stderr,
         )
-    elif observed_total < (expected_total / 2):
+    elif observed_total > 0 and observed_total < (expected_total / 2):
         print(
             f"::warning::execute saw {observed_total} of expected "
             f"{expected_total} executable blocks (< 50%) — possible "
@@ -292,8 +295,9 @@ def _execute_one(record: dict, args: argparse.Namespace) -> dict:
             print(
                 f"::warning::Audit JSON stale: {file}:{record['line_start']} "
                 f"(audit hash={record['hash_sha1'][:8]} current="
-                f"{current_hash[:8]}). Re-run `check_doc_examples.py audit` "
-                f"and commit the updated snapshot.",
+                f"{current_hash[:8]}). Re-run "
+                f"`python scripts/check_doc_examples.py audit` and commit "
+                f"the updated snapshot.",
                 file=sys.stderr,
             )
 
@@ -381,6 +385,7 @@ def _render_sticky_comment(
         f"| timeout | {by_status.get(EXEC_TIMEOUT, 0)} |",
         f"| runner_unsupported | {by_status.get(EXEC_RUNNER_UNSUPPORTED, 0)} |",
         f"| runner_missing | {by_status.get(EXEC_RUNNER_MISSING, 0)} |",
+        f"| source_missing | {by_status.get('source_missing', 0)} |",
         "",
         "Per language: "
         + ", ".join(f"`{lang}`={cnt}" for lang, cnt in sorted(by_lang.items())),
@@ -398,13 +403,16 @@ def _render_sticky_comment(
             ]
         )
     if stale_rows:
+        stale_blurb = (
+            "Re-run `python scripts/check_doc_examples.py audit` and commit "
+            "the updated `tests/fixtures/doc_examples_audit/audit.json` to "
+            "clear these warnings:"
+        )
         lines.extend(
             [
                 "### Stale audit blocks",
                 "",
-                "Re-run `scripts/check_doc_examples.py audit` and commit the "
-                "updated `tests/fixtures/doc_examples_audit/audit.json` to "
-                "clear these warnings:",
+                stale_blurb,
                 "",
                 *stale_rows,
                 "",
@@ -431,9 +439,19 @@ def run_execute(args: argparse.Namespace) -> int:
         if rec.get("category") == CATEGORY_EXECUTABLE
     ]
 
-    # Filter by --languages if provided (default: only the runners we ship).
-    runner_languages = set(args.languages) if args.languages else set(RUNNERS.keys())
-    target = [r for r in executable_records if r["language"] in runner_languages]
+    # Filter by --languages if provided (default: dispatch every executable
+    # record). Languages we don't ship a runner for surface as
+    # `runner_unsupported` so the sticky comment accounts for the full
+    # audit total instead of silently dropping records.
+    runner_languages = set(args.languages) if args.languages else None
+    if runner_languages is not None:
+        target = [r for r in executable_records if r["language"] in runner_languages]
+        reported_runners = sorted(runner_languages)
+    else:
+        target = executable_records
+        # Report the union of runner registry + observed languages so the
+        # report makes it clear which languages flowed through.
+        reported_runners = sorted(set(RUNNERS.keys()) | {r["language"] for r in target})
 
     observed_per_language: Counter[str] = Counter()
     results: list[dict] = []
@@ -454,7 +472,7 @@ def run_execute(args: argparse.Namespace) -> int:
                 {
                     "expected_total": expected_total,
                     "observed_total": len(results),
-                    "runner_languages": sorted(runner_languages),
+                    "runner_languages": reported_runners,
                     "results": results,
                 },
                 indent=2,

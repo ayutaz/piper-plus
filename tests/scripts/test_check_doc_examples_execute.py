@@ -132,8 +132,14 @@ def test_executor_injects_pipefail_in_real_bash(executor_mod):
     assert result.exit_code != 0
 
 
-def test_executor_honours_author_pipefail_optout(executor_mod):
-    """Author-supplied ``set +e`` opts out of the injection (head heuristic)."""
+def test_executor_set_plus_e_disables_injected_errexit(executor_mod):
+    """``set +e`` in the body disables our injected ``-e`` (does NOT opt out).
+
+    The heuristic only skips injection on ``set -...``; ``set +e`` falls
+    through, so ``set -euo pipefail`` is prepended first and ``set +e``
+    follows, disabling ``-e`` only. The end-of-script exit code is the
+    last command (``echo ok``) = 0.
+    """
     result = executor_mod.execute_block(
         block_hash="h",
         file="x.md",
@@ -143,8 +149,25 @@ def test_executor_honours_author_pipefail_optout(executor_mod):
         timeout_sec=10,
         mode="real",
     )
-    # With set +e, the script returns the last command's status (0).
     assert result.status == executor_mod.EXEC_PASS
+
+
+def test_executor_set_minus_e_skips_injection(executor_mod):
+    """``set -e`` already on the first line skips the injection entirely.
+
+    The author has declared their own flag combination; we don't
+    override it. ``false`` then triggers ``-e`` exit, producing a fail.
+    """
+    result = executor_mod.execute_block(
+        block_hash="h",
+        file="x.md",
+        line_start=1,
+        language="bash",
+        body="set -e\nfalse\necho ok\n",
+        timeout_sec=10,
+        mode="real",
+    )
+    assert result.status == executor_mod.EXEC_FAIL
 
 
 # ----- execute CLI integration -----
