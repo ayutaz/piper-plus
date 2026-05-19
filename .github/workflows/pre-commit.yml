@@ -87,6 +87,14 @@ jobs:
           curl -LsSf https://astral.sh/uv/install.sh | sh
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
+      - name: Sync uv environment
+        # Tier 1-B: pre-commit hooks use `uv run --no-sync python ...` to skip
+        # env-validation overhead per hook (saves ~1-2s × 30+ hooks). This step
+        # materialises `.venv/` once up-front so `--no-sync` doesn't hit a
+        # missing-venv error. `--frozen` keeps uv.lock pinned (no resolution
+        # side-effect).
+        run: uv sync --frozen
+
       - name: Cache pre-commit hook environments
         uses: actions/cache@v4.3.0
         with:

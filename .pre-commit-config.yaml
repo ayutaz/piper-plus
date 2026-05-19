@@ -184,7 +184,7 @@ repos:
     hooks:
       - id: pua-cross-runtime-consistency
         name: PUA cross-runtime consistency (6 runtime tables vs pua.json)
-        entry: uv run python scripts/check_pua_consistency.py --check-version
+        entry: uv run --no-sync python scripts/check_pua_consistency.py --check-version
         language: system
         # Mirror of paths in .github/workflows/pua-consistency.yml
         files: ^(src/python/g2p/piper_plus_g2p/data/pua\.json|src/python/g2p/piper_plus_g2p/encode/.+|src/python_run/piper/phonemize/token_mapper\.py|src/rust/piper-plus-g2p/src/token_map\.rs|src/go/phonemize/pua\.go|src/go/phonemize/pua_test\.go|src/wasm/g2p/src/pua-map\.js|src/csharp/PiperPlus\.Core/Mapping/OpenJTalkToPiperMapping\.cs|src/cpp/phoneme_parser\.cpp)$
@@ -192,21 +192,21 @@ repos:
 
       - id: pua-fixture-drift
         name: Test fixture in sync with pua.json
-        entry: uv run python scripts/regenerate_test_fixture.py --check
+        entry: uv run --no-sync python scripts/regenerate_test_fixture.py --check
         language: system
         files: ^(src/python/g2p/piper_plus_g2p/data/pua\.json|tests/fixtures/g2p/phoneme_test_cases\.json)$
         pass_filenames: false
 
       - id: dictionary-consistency
         name: Custom dictionaries (data/dictionaries → WASM assets) byte-equal
-        entry: uv run python scripts/check_dictionary_consistency.py
+        entry: uv run --no-sync python scripts/check_dictionary_consistency.py
         language: system
         files: ^(data/dictionaries/(default_common|default_tech|additional_tech)_dict\.json|src/wasm/openjtalk-web/assets/(default_common|default_tech|additional_tech)_dict\.json)$
         pass_filenames: false
 
       - id: ruff-version-sync
         name: ruff version pin synchronization (6 sites across pre-commit/workflows/pyproject)
-        entry: uv run python scripts/check_ruff_version_sync.py
+        entry: uv run --no-sync python scripts/check_ruff_version_sync.py
         language: system
         files: ^(\.pre-commit-config\.yaml|\.github/workflows/(python-lint|ci)\.yml|pyproject\.toml|scripts/check_ruff_version_sync\.py)$
         pass_filenames: false
@@ -218,7 +218,7 @@ repos:
       # (3) compile error を検出する。 `.pre-commit-config.yaml` 編集時のみ走る。
       - id: precommit-file-regex
         name: "pre-commit files regex coverage (meta gate)"
-        entry: uv run python scripts/check_precommit_file_regex.py
+        entry: uv run --no-sync python scripts/check_precommit_file_regex.py
         language: system
         files: ^(\.pre-commit-config\.yaml|scripts/check_precommit_file_regex\.py)$
         pass_filenames: false
@@ -229,7 +229,7 @@ repos:
       # drift を catch する。
       - id: ssml-contract
         name: SSML subset contract (toml ↔ python ↔ fixture)
-        entry: uv run python scripts/check_ssml_contract.py
+        entry: uv run --no-sync python scripts/check_ssml_contract.py
         language: system
         files: ^(docs/spec/ssml-contract\.toml|src/python/g2p/piper_plus_g2p/ssml\.py|tests/fixtures/ssml/contract\.json|scripts/check_ssml_contract\.py|scripts/regenerate_ssml_fixture\.py)$
         pass_filenames: false
@@ -239,7 +239,7 @@ repos:
       # を silent に drop しないように。
       - id: streaming-api-contract
         name: Streaming API contract (toml meta gate)
-        entry: uv run python scripts/check_streaming_api_contract.py
+        entry: uv run --no-sync python scripts/check_streaming_api_contract.py
         language: system
         files: ^(docs/spec/streaming-api-contract\.toml|scripts/check_streaming_api_contract\.py|src/python_run/piper/text_splitter\.py|src/rust/piper-core/src/streaming\.rs|src/go/piperplus/streaming\.go)$
         pass_filenames: false
@@ -248,7 +248,7 @@ repos:
       # contract gate。 PUA compat version の double-check + ABI 完全性確認。
       - id: swift-g2p-contract
         name: Swift G2P xcframework ABI contract
-        entry: uv run python scripts/check_swift_g2p_contract.py
+        entry: uv run --no-sync python scripts/check_swift_g2p_contract.py
         language: system
         files: ^(docs/spec/swift-g2p-contract\.toml|Sources/PiperPlusG2P/|scripts/check_swift_g2p_contract\.py)
         pass_filenames: false
@@ -258,7 +258,7 @@ repos:
       # cut する前に breaking change の migration 記載漏れを catch する。
       - id: migration-changelog-parity
         name: CHANGELOG breaking ↔ docs/migration/ triangulation
-        entry: uv run python scripts/check_migration_changelog_parity.py
+        entry: uv run --no-sync python scripts/check_migration_changelog_parity.py
         language: system
         files: ^(CHANGELOG\.md|docs/migration/.*\.md|scripts/check_migration_changelog_parity\.py)$
         pass_filenames: false
@@ -269,7 +269,7 @@ repos:
       # 構造的に塞ぐ (M1.2 / PR #511 実装完了)。
       - id: migration-guide-lint
         name: CHANGELOG breaking entries have resolvable migration cross-ref
-        entry: uv run python scripts/check_migration_xref.py
+        entry: uv run --no-sync python scripts/check_migration_xref.py
         language: system
         files: ^(CHANGELOG\.md|docs/migration/.*\.md|scripts/check_migration_xref\.py)$
         pass_filenames: false
@@ -280,7 +280,7 @@ repos:
       # を防ぐ。 `docs/proposals/ci-expansion-2026-05.md` §3.7 Tier S #1 由来。
       - id: changelog-format
         name: CHANGELOG.md keep-a-changelog format check
-        entry: uv run python scripts/check_changelog_format.py
+        entry: uv run --no-sync python scripts/check_changelog_format.py
         language: system
         files: ^CHANGELOG\.md$
         pass_filenames: true
@@ -290,7 +290,7 @@ repos:
       # pre-commit 化。 6 runtime 並列実装の整合維持。
       - id: short-text-contract
         name: Short-text strategy contract (6 runtimes vs toml)
-        entry: uv run python scripts/check_short_text_contract.py
+        entry: uv run --no-sync python scripts/check_short_text_contract.py
         language: system
         files: ^(docs/spec/short-text-contract\.toml|scripts/check_short_text_contract\.py|src/python_run/piper/voice\.py|src/rust/piper-core/src/short_text\.rs|src/go/piperplus/.*\.go)$
         pass_filenames: false
@@ -300,7 +300,7 @@ repos:
       # 周辺の regression を防ぐ。
       - id: text-splitter-contract
         name: Text splitter contract (sentence-boundary parity)
-        entry: uv run python scripts/check_text_splitter_contract.py
+        entry: uv run --no-sync python scripts/check_text_splitter_contract.py
         language: system
         files: ^(docs/spec/text-splitter-contract\.toml|scripts/check_text_splitter_contract\.py|src/python_run/piper/text_splitter\.py|src/rust/piper-core/src/streaming\.rs)$
         pass_filenames: false
@@ -309,7 +309,7 @@ repos:
       # gate。 export_onnx.py 編集時 (model export 仕様変更) に gate する。
       - id: onnx-export-contract
         name: ONNX export contract (opset / checker / FP16 / EMA)
-        entry: uv run python scripts/check_onnx_export_contract.py
+        entry: uv run --no-sync python scripts/check_onnx_export_contract.py
         language: system
         files: ^(docs/spec/onnx-export-contract\.toml|scripts/check_onnx_export_contract\.py|src/python/piper_train/export_onnx\.py)$
         pass_filenames: false
@@ -319,7 +319,7 @@ repos:
       # を一致させる。
       - id: inference-input-contract
         name: Inference input contract (cross-runtime parity)
-        entry: uv run python scripts/check_inference_input_contract.py
+        entry: uv run --no-sync python scripts/check_inference_input_contract.py
         language: system
         files: ^(docs/spec/inference-input-contract\.toml|scripts/check_inference_input_contract\.py|src/python_run/piper/voice\.py|src/rust/piper-core/src/(engine|inference)\.rs|src/go/piperplus/synthesize\.go|src/csharp/PiperPlus\.Core/Inference/PiperSession\.cs|src/cpp/piper_plus\.cpp)$
         pass_filenames: false
@@ -329,7 +329,7 @@ repos:
       # silent pitch shift を引き起こすため drift 検出が critical。
       - id: audio-format-contract
         name: Audio output format contract (WAV header parity)
-        entry: uv run python scripts/check_audio_format_contract.py
+        entry: uv run --no-sync python scripts/check_audio_format_contract.py
         language: system
         files: ^(docs/spec/audio-format-contract\.toml|scripts/check_audio_format_contract\.py|src/python_run/piper/(voice|http_server|webui)\.py|src/rust/piper-core/src/engine\.rs|src/go/piperplus/synthesize\.go|src/csharp/PiperPlus\.Core/Inference/PiperSession\.cs|src/cpp/piper_plus\.cpp|src/wasm/openjtalk-web/src/index\.js)$
         pass_filenames: false
@@ -339,7 +339,7 @@ repos:
       # `.opt.onnx`+`.ok` キャッシュ仕様が drift しないか。
       - id: ort-session-contract
         name: ORT session initialization contract
-        entry: uv run python scripts/check_ort_session_contract.py
+        entry: uv run --no-sync python scripts/check_ort_session_contract.py
         language: system
         files: ^(docs/spec/ort-session-contract\.toml|scripts/check_ort_session_contract\.py|src/python/piper_train/ort_utils\.py|src/python_run/piper/voice\.py|src/rust/piper-core/src/session\.rs|src/go/piperplus/.*\.go)$
         pass_filenames: false
@@ -347,7 +347,7 @@ repos:
       # ORT provider (CPU/CUDA/CoreML) parity contract gate。
       - id: ort-provider-contract
         name: ORT execution provider contract (CPU/CUDA/CoreML)
-        entry: uv run python scripts/check_ort_provider_contract.py
+        entry: uv run --no-sync python scripts/check_ort_provider_contract.py
         language: system
         files: ^(docs/spec/ort-provider-contract\.toml|scripts/check_ort_provider_contract\.py)$
         pass_filenames: false
@@ -356,7 +356,7 @@ repos:
       # 256 次元 / L2 正規化 / FP16 受容仕様を pin。
       - id: speaker-encoder-contract
         name: Speaker encoder (ECAPA-TDNN) contract
-        entry: uv run python scripts/check_speaker_encoder_contract.py
+        entry: uv run --no-sync python scripts/check_speaker_encoder_contract.py
         language: system
         files: ^(docs/spec/.*speaker.*\.toml|scripts/check_speaker_encoder_contract\.py|src/python/piper_train/speaker_encoder/.*\.py)$
         pass_filenames: false
@@ -365,7 +365,7 @@ repos:
       # 既存 CI のみだったもの。 dialect rule drift 検出に。
       - id: pt-dialect-contract
         name: Portuguese BR/EU dialect rule contract
-        entry: uv run python scripts/check_pt_dialect_contract.py
+        entry: uv run --no-sync python scripts/check_pt_dialect_contract.py
         language: system
         files: ^(docs/spec/pt-dialect-contract\.toml|scripts/check_pt_dialect_contract\.py|src/python/g2p/piper_plus_g2p/portuguese\.py)$
         pass_filenames: false
@@ -375,7 +375,7 @@ repos:
       # source の variant symbol 存在を pin。 drift = silent acoustic regression。
       - id: japanese-n-variant-contract
         name: Japanese N-variant assimilation contract (8 G2P runtimes)
-        entry: uv run python scripts/check_japanese_n_variant_contract.py
+        entry: uv run --no-sync python scripts/check_japanese_n_variant_contract.py
         language: system
         files: ^(docs/spec/japanese-n-variant-contract\.toml|scripts/check_japanese_n_variant_contract\.py|src/python/g2p/piper_plus_g2p/japanese\.py|src/rust/piper-plus-g2p/src/japanese\.rs|src/rust/piper-plus-g2p/src/token_map\.rs|src/wasm/g2p/src/pua-map\.js|src/go/phonemize/pua\.go|src/csharp/PiperPlus\.Core/Mapping/OpenJTalkToPiperMapping\.cs|src/cpp/phoneme_parser\.cpp)$
         pass_filenames: false
@@ -386,7 +386,7 @@ repos:
       # pua.json と double-check (drift = silent embedding ID shift)。
       - id: chinese-tone-contract
         name: Chinese tone symbol contract (6 G2P runtimes)
-        entry: uv run python scripts/check_chinese_tone_contract.py
+        entry: uv run --no-sync python scripts/check_chinese_tone_contract.py
         language: system
         files: ^(docs/spec/chinese-tone-contract\.toml|scripts/check_chinese_tone_contract\.py|src/python/g2p/piper_plus_g2p/(chinese|data/pua)\.(py|json)|src/rust/piper-plus-g2p/src/(chinese|token_map)\.rs|src/wasm/g2p/src/pua-map\.js|src/go/phonemize/pua\.go|src/csharp/PiperPlus\.Core/Mapping/OpenJTalkToPiperMapping\.cs|src/cpp/chinese_phonemize\.cpp)$
         pass_filenames: false
@@ -397,7 +397,7 @@ repos:
       # ような drift を早期発見する。 false positive 多めなため warning のみ。
       - id: readme-code-examples
         name: README/docs code-example symbol resolution (warning)
-        entry: uv run python scripts/check_readme_code_examples.py
+        entry: uv run --no-sync python scripts/check_readme_code_examples.py
         language: system
         files: ^(README.*\.md|src/.*/README\.md|docs/(features|guides)/.*\.md|scripts/check_readme_code_examples\.py)$
         pass_filenames: false
@@ -408,7 +408,7 @@ repos:
       # PR #493 ea994a2c で発覚した v1.12.0 多言語 drift パターンを早期検出。
       - id: readme-breaking-sync
         name: multilingual README breaking banner sync (warning)
-        entry: uv run python scripts/check_readme_breaking_sync.py
+        entry: uv run --no-sync python scripts/check_readme_breaking_sync.py
         language: system
         files: ^(README(_(DE|EN|ES|FR|KO|PT|ZH))?\.md|scripts/check_readme_breaking_sync\.py)$
         pass_filenames: false
@@ -418,7 +418,7 @@ repos:
       # を warning モードで検出。 v1.12.0 migration 後の doc drift を catch。
       - id: deprecated-api-lingering
         name: deprecated API lingering doc references (warning)
-        entry: uv run python scripts/check_deprecated_api_lingering.py
+        entry: uv run --no-sync python scripts/check_deprecated_api_lingering.py
         language: system
         files: ^(README.*\.md|docs/(features|guides|reference)/.*\.md|src/.*/README\.md|scripts/check_deprecated_api_lingering\.py)$
         pass_filenames: false
@@ -428,7 +428,7 @@ repos:
       # parametrize 利用 test は skip (false positive 回避)。 block しない。
       - id: test-parametrize-hint
         name: pytest for-loop parametrize hint (warning)
-        entry: uv run python scripts/check_test_parametrize.py
+        entry: uv run --no-sync python scripts/check_test_parametrize.py
         language: system
         files: ^(src/python(_run)?/tests/.*\.py|tests/.*\.py|scripts/check_test_parametrize\.py)$
         pass_filenames: false
@@ -439,7 +439,7 @@ repos:
       # binary size 増加 + ABI 併存 risk を catch。
       - id: cargo-lock-duplicates
         name: Cargo.lock duplicate crate gate (regression-only)
-        entry: uv run python scripts/check_cargo_lock_duplicates.py
+        entry: uv run --no-sync python scripts/check_cargo_lock_duplicates.py
         language: system
         files: ^(src/rust/Cargo\.lock|docs/spec/cargo-lock-duplicates-baseline\.toml|scripts/check_cargo_lock_duplicates\.py)$
         pass_filenames: false
@@ -450,7 +450,7 @@ repos:
       # 等の major upgrade で baseline 更新が必要な場合は PR で justification。
       - id: lockfile-size-regression
         name: Lockfile size regression gate (warn +20% / fail +50%)
-        entry: uv run python scripts/check_lockfile_size.py
+        entry: uv run --no-sync python scripts/check_lockfile_size.py
         language: system
         files: ^(uv\.lock|src/rust/Cargo\.lock|src/wasm/openjtalk-web/package-lock\.json|src/wasm/g2p/package-lock\.json|src/go/go\.sum|src/python/g2p/uv\.lock|docs/spec/lockfile-size-baseline\.toml|scripts/check_lockfile_size\.py)$
         pass_filenames: false
@@ -460,7 +460,7 @@ repos:
       # の rotting signal)。 値そのものの正しさは check しない。
       - id: readme-latency-freshness
         name: README latency table freshness (warning, >90d touchdate)
-        entry: uv run python scripts/check_readme_latency_freshness.py
+        entry: uv run --no-sync python scripts/check_readme_latency_freshness.py
         language: system
         files: ^(README\.md|scripts/check_readme_latency_freshness\.py)$
         pass_filenames: false
@@ -471,7 +471,7 @@ repos:
       # の早期 signal)。
       - id: asymmetric-latency-gate
         name: Asymmetric latency (short vs medium P50 ratio)
-        entry: uv run python scripts/check_asymmetric_latency.py
+        entry: uv run --no-sync python scripts/check_asymmetric_latency.py
         language: system
         files: ^(tests/fixtures/multi-runtime-rtf-baseline\.json|scripts/check_asymmetric_latency\.py)$
         pass_filenames: false
@@ -482,7 +482,7 @@ repos:
       # WASM は relaxed。 budget 緩和には PR で TOML 更新 + justification。
       - id: rust-unwrap-density
         name: Rust unwrap/expect/panic density budget
-        entry: uv run python scripts/check_unwrap_density.py
+        entry: uv run --no-sync python scripts/check_unwrap_density.py
         language: system
         files: ^(src/rust/(piper-core|piper-cli|piper-python|piper-wasm|piper-plus-g2p)/src/.*\.rs|docs/spec/unwrap-density-budget\.toml|scripts/check_unwrap_density\.py)$
         pass_filenames: false
@@ -492,7 +492,7 @@ repos:
       # TODO の早期 issue 化 / 削除を促す signal。
       - id: todo-age-check
         name: TODO/FIXME age check (warning, >180d via git blame)
-        entry: uv run python scripts/check_todo_age.py
+        entry: uv run --no-sync python scripts/check_todo_age.py
         language: system
         # Note: full-repo scan は git blame で時間がかかる (~30s)。
         # 該当 file が変わったときだけ実行するため scope を絞る。
@@ -504,7 +504,7 @@ repos:
       # silent type error / import failure の防止。
       - id: workspace-python-parity
         name: uv workspace requires-python parity (6 pyproject.toml)
-        entry: uv run python scripts/check_workspace_python_parity.py
+        entry: uv run --no-sync python scripts/check_workspace_python_parity.py
         language: system
         files: ^(pyproject\.toml|src/python(_run|_stub)?/pyproject\.toml|src/python/g2p/pyproject\.toml|src/rust/piper-python/pyproject\.toml|scripts/check_workspace_python_parity\.py)$
         pass_filenames: false
@@ -514,7 +514,7 @@ repos:
       # が argparse に存在することを pin。 silent template rot を防止。
       - id: training-template-drift
         name: Training CLI Template (CLAUDE.md) vs argparse drift
-        entry: uv run python scripts/check_training_defaults.py
+        entry: uv run --no-sync python scripts/check_training_defaults.py
         language: system
         files: ^(CLAUDE\.md|src/python/piper_train/(__main__|vits/lightning)\.py|scripts/check_training_defaults\.py)$
         pass_filenames: false
@@ -524,7 +524,7 @@ repos:
       # enumeration; same pattern as PUA gate above.
       - id: loanword-consistency
         name: zh_en_loanword.json byte-equal across 10 mirrors + 8 fixtures
-        entry: uv run python scripts/check_loanword_consistency.py
+        entry: uv run --no-sync python scripts/check_loanword_consistency.py
         language: system
         files: (zh_en_loanword(_matrix)?\.json|scripts/check_loanword_(consistency|forward_compat)\.py|tests/fixtures/g2p/zh_en_loanword_forward_compat\.json|cmake/(EmbedJson|PiperCommon)\.cmake)$
         pass_filenames: false
@@ -551,7 +551,7 @@ repos:
       # workspace consumers). `check_ort_versions.py` is pure Python / IO.
       - id: ort-version-sync
         name: ONNX Runtime version pin synchronization (cmake + workflows + workspace)
-        entry: uv run python scripts/check_ort_versions.py
+        entry: uv run --no-sync python scripts/check_ort_versions.py
         language: system
         files: ^(cmake/(OnnxRuntime|find_onnxruntime_windows)\.cmake|scripts/check_ort_versions\.py|\.github/workflows/(ort-version-sync|release-shared-lib|android-build|release-kotlin-g2p|kotlin-g2p-ci|build-piper|_build-test-cpp)\.yml|docker/cpp-dev/Dockerfile|src/python/pyproject\.toml|src/python_run/(requirements(_gpu)?\.txt|setup\.py)|src/csharp/.*\.csproj|src/go/go\.mod|src/wasm/openjtalk-web/package\.json)$
         pass_filenames: false
@@ -561,7 +561,7 @@ repos:
       # mirror catalogs.
       - id: voice-catalog-parity
         name: voice catalog parity (canonical vs 5 runtime mirrors)
-        entry: uv run python scripts/check_voice_catalog_parity.py
+        entry: uv run --no-sync python scripts/check_voice_catalog_parity.py
         language: system
         files: ^(test/model_resolution_vectors\.json|src/python_run/piper/download\.py|src/cpp/piper_plus_voices\.json|src/rust/piper-core/src/model_download\.rs|src/csharp/PiperPlus\.Core/Config/VoiceCatalog\.cs|src/go/piperplus/voice_catalog\.go|scripts/check_voice_catalog_parity\.py)$
         pass_filenames: false
@@ -573,7 +573,7 @@ repos:
       # (cosign-installer@v4 deleted upstream → 7 jobs failed).
       - id: action-pin-gate
         name: GitHub Actions pin safety (no new sliding-major-tag refs)
-        entry: uv run python scripts/check_action_pins.py
+        entry: uv run --no-sync python scripts/check_action_pins.py
         language: system
         files: ^(\.github/workflows/.*\.ya?ml|\.github/actions/.*action\.ya?ml|scripts/check_action_pins\.py|scripts/action_pins_baseline\.txt)$
         pass_filenames: false
@@ -583,7 +583,7 @@ repos:
       # at commit time so the toml + pua.json review is forced before push.
       - id: phoneme-set-version
         name: phoneme set version contract (num_symbols=173 strict)
-        entry: uv run python scripts/check_phoneme_set_version.py
+        entry: uv run --no-sync python scripts/check_phoneme_set_version.py
         language: system
         files: ^(docs/spec/phoneme-set-version\.toml|src/python/g2p/piper_plus_g2p/data/pua\.json|scripts/check_phoneme_set_version\.py)$
         pass_filenames: false
@@ -594,7 +594,7 @@ repos:
       # is owned by each runtime's golden fixture test.
       - id: phoneme-timing-contract
         name: phoneme-timing formula anchors (6 runtimes vs contract toml)
-        entry: uv run python scripts/check_phoneme_timing_contract.py
+        entry: uv run --no-sync python scripts/check_phoneme_timing_contract.py
         language: system
         files: ^(docs/spec/phoneme-timing-contract\.toml|src/python_run/piper/timing\.py|src/rust/piper-core/src/timing\.rs|src/go/piperplus/timing\.go|src/cpp/piper\.cpp|src/csharp/PiperPlus\.Core/Inference/TimingWriter\.cs|src/wasm/openjtalk-web/src/timing\.js|scripts/check_phoneme_timing_contract\.py)$
         pass_filenames: false
@@ -604,7 +604,7 @@ repos:
       # docs/spec/cli-flag-contract.toml — the script is pure verifier.
       - id: cli-flag-parity
         name: CLI flag hyphen-form parity (5 runtimes vs contract toml)
-        entry: uv run python scripts/check_cli_flag_parity.py
+        entry: uv run --no-sync python scripts/check_cli_flag_parity.py
         language: system
         files: ^(docs/spec/cli-flag-contract\.toml|src/python_run/piper/__main__\.py|src/python/piper_train/infer_onnx\.py|src/rust/piper-cli/src/main\.rs|src/go/cmd/piper-plus/main\.go|src/csharp/PiperPlus\.Cli/Program\.cs|src/cpp/main\.cpp|scripts/check_cli_flag_parity\.py)$
         pass_filenames: false
@@ -614,7 +614,7 @@ repos:
       # mis-routing); trigger paths are tightly scoped, cheap to run.
       - id: language-id-map-contract
         name: LANGUAGE_ID_MAP contract (canonical TOML vs 6 runtime sources)
-        entry: uv run python scripts/check_language_id_map_contract.py
+        entry: uv run --no-sync python scripts/check_language_id_map_contract.py
         language: system
         files: ^(docs/spec/language-id-map-contract\.toml|src/python/piper_train/tools/prepare_multilingual_dataset\.py|src/python_run/piper/voice\.py|src/rust/piper-core/src/(config|wasm)\.rs|src/rust/piper-wasm/src/lib\.rs|src/go/piperplus/testdata/valid_multilingual_config\.json|src/wasm/openjtalk-web/models/multilingual-test-medium\.onnx\.json|src/csharp/PiperPlus\.Core/Config/PiperConfig\.cs|src/cpp/piper\.cpp|scripts/check_language_id_map_contract\.py|scripts/regenerate_language_id_map_fixture\.py|tests/fixtures/language_id_map/.*)$
         pass_filenames: false
@@ -628,7 +628,7 @@ repos:
       # not prose cross-references.
       - id: changelog-unreleased-cleanup
         name: CHANGELOG [Unreleased] stray release-heading detection
-        entry: uv run python scripts/check_changelog_unreleased.py
+        entry: uv run --no-sync python scripts/check_changelog_unreleased.py
         language: system
         files: ^(CHANGELOG\.md|docs/spec/release-versions\.toml|scripts/check_changelog_unreleased\.py)$
         pass_filenames: false
@@ -642,7 +642,7 @@ repos:
       # スコープ外 (openjtalk-web のみ hard-required)。
       - id: lockfile-consistency
         name: Lockfile consistency (9 runtimes)
-        entry: uv run python scripts/check_lockfile_consistency.py
+        entry: uv run --no-sync python scripts/check_lockfile_consistency.py
         language: system
         files: ^(uv\.lock|src/rust/Cargo\.lock|src/go/(go\.sum|phonemize/go\.sum)|src/wasm/openjtalk-web/package-lock\.json|src/csharp/PiperPlus\.(Core|Cli)/packages\.lock\.json|android/(piper-plus|piper-plus-g2p)/gradle\.lockfile|scripts/check_lockfile_consistency\.py)$
         pass_filenames: false
@@ -653,7 +653,7 @@ repos:
       # JSON が commit される前に block。
       - id: benchmark-json-sanity
         name: Benchmark JSON sanity (NaN / Inf / out-of-bounds)
-        entry: uv run python scripts/check_benchmark_json.py
+        entry: uv run --no-sync python scripts/check_benchmark_json.py
         language: system
         files: ^(tools/benchmark/.*\.json|tests/fixtures/benchmark-.*\.json|docs/spec/.*-baseline\.json|scripts/check_benchmark_json\.py)$
         pass_filenames: false
@@ -666,7 +666,7 @@ repos:
       # only で翻訳遅延を許容。
       - id: readme-h2-parity
         name: README H2 section parity (8 languages)
-        entry: uv run python scripts/check_readme_h2_parity.py
+        entry: uv run --no-sync python scripts/check_readme_h2_parity.py
         language: system
         files: ^README(_[A-Z]{2})?\.md|scripts/check_readme_h2_parity\.py$
         pass_filenames: false
@@ -677,7 +677,7 @@ repos:
       # 本 gate は新規 spec TOML 追加時の付与忘れを catch する。
       - id: spec-meta-schema
         name: spec TOML [meta] schema (24 specs)
-        entry: uv run python scripts/check_spec_meta.py
+        entry: uv run --no-sync python scripts/check_spec_meta.py
         language: system
         files: ^(docs/spec/.*\.toml|scripts/check_spec_meta\.py)$
         pass_filenames: false
@@ -691,7 +691,7 @@ repos:
       # warn-only 動作。 tag push 時の hard gate は pre-push hook 側で行う。
       - id: version-manifest-sync
         name: version manifest sync (10 polyglot manifests)
-        entry: uv run python scripts/check_version_manifest_sync.py
+        entry: uv run --no-sync python scripts/check_version_manifest_sync.py
         language: system
         files: ^(VERSION|src/python/piper_train/VERSION|pyproject\.toml|src/python(_run)?/pyproject\.toml|src/rust/Cargo\.toml|src/csharp/PiperPlus\.(Core|Cli)/PiperPlus\.(Core|Cli)\.csproj|src/wasm/(g2p|openjtalk-web)/package\.json|Package\.swift|android/gradle\.properties|docs/spec/release-versions\.toml|scripts/check_version_manifest_sync\.py)$
         pass_filenames: false
@@ -703,7 +703,7 @@ repos:
       # AST-based check, no runtime imports required.
       - id: language-parity
         name: language list parity (WebUI SAMPLE_TEXTS / CLI --language / FastAPI test)
-        entry: uv run python scripts/check_language_parity.py
+        entry: uv run --no-sync python scripts/check_language_parity.py
         language: system
         files: ^(docker/webui/app\.py|docker/python-inference/(inference|test_openai_api)\.py|scripts/check_language_parity\.py)$
         pass_filenames: false
@@ -745,7 +745,7 @@ repos:
       # list (kept there to avoid this config file being a self-match).
       - id: secret-path-reference
         name: host-specific secret-path leak detection
-        entry: uv run python scripts/check_secret_path_reference.py
+        entry: uv run --no-sync python scripts/check_secret_path_reference.py
         language: system
         # The `(^|/)` prefix is mandatory for the basename-style alternatives
         # — pre-commit matches files filter against the repo-relative path,
@@ -765,7 +765,7 @@ repos:
       # disagree with the cmake URL are flagged as errors.
       - id: openjtalk-version-sync
         name: OpenJTalk pin parity (cmake URL vs pyproject.toml / requirements.txt)
-        entry: uv run python scripts/check_openjtalk_version_sync.py
+        entry: uv run --no-sync python scripts/check_openjtalk_version_sync.py
         language: system
         # Include requirements*.txt — src/python_run uses dynamic deps
         # resolved from requirements.txt, not the static
@@ -782,7 +782,7 @@ repos:
       # empty (`pytest.skip()` / `@pytest.mark.skip()`) is rejected.
       - id: pytest-skip-reason
         name: pytest skip / skipif must have a non-empty reason
-        entry: uv run python scripts/check_test_skip_reason.py
+        entry: uv run --no-sync python scripts/check_test_skip_reason.py
         language: system
         files: ^src/(python|python_run)/.*tests?/.*\.py$|^scripts/check_test_skip_reason\.py$
         pass_filenames: true
