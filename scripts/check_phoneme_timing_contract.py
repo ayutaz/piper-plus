@@ -42,11 +42,16 @@ import re
 import sys
 from pathlib import Path
 
+
 try:
     import tomllib  # Python 3.11+
 except ImportError:
     import tomli as tomllib  # type: ignore[no-redef]
 
+from platform_utils import force_utf8_output
+
+
+force_utf8_output()
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 CONTRACT = REPO_ROOT / "docs" / "spec" / "phoneme-timing-contract.toml"
@@ -142,8 +147,7 @@ def main() -> int:
     expected = "frame_time_ms = (hop_length / sample_rate) * 1000"
     if formula != expected:
         print(
-            f"::error::canonical formula drift: {formula!r} "
-            f"(expected {expected!r})",
+            f"::error::canonical formula drift: {formula!r} (expected {expected!r})",
             file=sys.stderr,
         )
         return 1

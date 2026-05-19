@@ -41,6 +41,11 @@ import subprocess
 import sys
 from pathlib import Path
 
+from platform_utils import force_utf8_output
+
+
+force_utf8_output()
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 CONFIG_PATH = REPO_ROOT / ".pre-commit-config.yaml"
 

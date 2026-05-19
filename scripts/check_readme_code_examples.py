@@ -46,6 +46,11 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 
+from platform_utils import force_utf8_output
+
+
+force_utf8_output()
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 LANG_TO_SOURCES: dict[str, list[str]] = {
@@ -65,23 +70,108 @@ LANG_TO_SOURCES: dict[str, list[str]] = {
 # Symbols that show up in examples but are intentionally documented before
 # being implemented, or which live in third-party packages.
 ALLOWLIST: set[str] = {
-    "print", "main", "println", "console", "log", "info", "warn", "error",
-    "len", "range", "list", "dict", "str", "int", "float", "bool",
-    "true", "false", "null", "None", "undefined", "Some",
-    "Ok", "Err", "Result", "Option", "Vec", "String", "HashMap",
-    "Box", "Arc", "Rc", "Default", "Debug", "Clone",
-    "fmt", "fs", "io", "os", "path", "regex", "json", "tomllib", "pathlib",
-    "Path", "open", "read", "write", "close",
-    "fn", "let", "var", "const", "func", "def", "class", "struct", "enum",
-    "import", "from", "use", "package", "namespace", "using",
+    "print",
+    "main",
+    "println",
+    "console",
+    "log",
+    "info",
+    "warn",
+    "error",
+    "len",
+    "range",
+    "list",
+    "dict",
+    "str",
+    "int",
+    "float",
+    "bool",
+    "true",
+    "false",
+    "null",
+    "None",
+    "undefined",
+    "Some",
+    "Ok",
+    "Err",
+    "Result",
+    "Option",
+    "Vec",
+    "String",
+    "HashMap",
+    "Box",
+    "Arc",
+    "Rc",
+    "Default",
+    "Debug",
+    "Clone",
+    "fmt",
+    "fs",
+    "io",
+    "os",
+    "path",
+    "regex",
+    "json",
+    "tomllib",
+    "pathlib",
+    "Path",
+    "open",
+    "read",
+    "write",
+    "close",
+    "fn",
+    "let",
+    "var",
+    "const",
+    "func",
+    "def",
+    "class",
+    "struct",
+    "enum",
+    "import",
+    "from",
+    "use",
+    "package",
+    "namespace",
+    "using",
     # Common stdlib / typing helpers that show up in cross-runtime examples.
-    "Optional", "Union", "Any", "Iterator", "Iterable", "Sequence", "Mapping",
-    "List", "Dict", "Tuple", "Set", "Type", "TypeVar", "Generic",
-    "dataclass", "field", "subprocess", "asyncio", "logging", "argparse",
-    "Callable", "Awaitable", "NoReturn", "Final",
+    "Optional",
+    "Union",
+    "Any",
+    "Iterator",
+    "Iterable",
+    "Sequence",
+    "Mapping",
+    "List",
+    "Dict",
+    "Tuple",
+    "Set",
+    "Type",
+    "TypeVar",
+    "Generic",
+    "dataclass",
+    "field",
+    "subprocess",
+    "asyncio",
+    "logging",
+    "argparse",
+    "Callable",
+    "Awaitable",
+    "NoReturn",
+    "Final",
     # JS / TS / Rust frequently seen names.
-    "Promise", "async", "await", "yield", "return", "throw", "catch",
-    "Self", "Box", "Future", "Stream", "Send", "Sync",
+    "Promise",
+    "async",
+    "await",
+    "yield",
+    "return",
+    "throw",
+    "catch",
+    "Self",
+    "Future",
+    "Stream",
+    "Send",
+    "Sync",
 }
 
 # Document tree roots to scan.
@@ -150,6 +240,7 @@ def grep_sources(ident: str, source_dirs: list[str]) -> bool:
                 capture_output=True,
                 text=True,
                 timeout=30,
+                check=False,
             )
             if result.returncode == 0 and result.stdout.strip():
                 return True
@@ -221,7 +312,10 @@ def main() -> int:
         )
         if args.strict:
             return 1
-        print("\n(non-strict mode: warning only — re-run with --strict to fail)", file=sys.stderr)
+        print(
+            "\n(non-strict mode: warning only — re-run with --strict to fail)",
+            file=sys.stderr,
+        )
         return 0
 
     if args.verbose:

@@ -30,6 +30,11 @@ import json
 import sys
 from pathlib import Path
 
+from platform_utils import force_utf8_output
+
+
+force_utf8_output()
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 FIXTURE = REPO_ROOT / "tests/fixtures/g2p/zh_en_loanword_forward_compat.json"
 

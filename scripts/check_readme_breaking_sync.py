@@ -37,6 +37,11 @@ import re
 import sys
 from pathlib import Path
 
+from platform_utils import force_utf8_output
+
+
+force_utf8_output()
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 CANONICAL = REPO_ROOT / "README.md"
 
@@ -112,7 +117,9 @@ def main() -> int:
                     f"  {name}: stale breaking banner v{v} (canonical has none)"
                 )
         if warnings:
-            print("README breaking sync: stale banner(s) in translations", file=sys.stderr)
+            print(
+                "README breaking sync: stale banner(s) in translations", file=sys.stderr
+            )
             for w in warnings:
                 print(w, file=sys.stderr)
             return 1 if args.strict else 0

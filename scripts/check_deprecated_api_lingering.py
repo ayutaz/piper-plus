@@ -37,6 +37,11 @@ import re
 import sys
 from pathlib import Path
 
+from platform_utils import force_utf8_output
+
+
+force_utf8_output()
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 # 検査対象パス (`docs/`, `README*.md`)、 example / archive は除外。
@@ -48,7 +53,7 @@ EXCLUDE_PREFIXES = (
     "docs/archive/",
     "CHANGELOG-archive.md",
     "CHANGELOG.md",  # 歴史的記述 OK
-    "docs/spec/",    # contract spec は archived 注釈フォーマットが別
+    "docs/spec/",  # contract spec は archived 注釈フォーマットが別
 )
 
 # (キーワード, 廃止 version, 説明) の組
@@ -157,7 +162,9 @@ def main() -> int:
             findings.append((doc, ln, kw, line))
 
     if args.verbose:
-        print(f"scanned {len(docs)} doc files for {len(DEPRECATED_ITEMS)} deprecated keywords")
+        print(
+            f"scanned {len(docs)} doc files for {len(DEPRECATED_ITEMS)} deprecated keywords"
+        )
 
     if findings:
         print(

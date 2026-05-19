@@ -37,6 +37,11 @@ import sys
 import tomllib
 from pathlib import Path
 
+from platform_utils import force_utf8_output
+
+
+force_utf8_output()
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 CONTRACT = REPO_ROOT / "docs/spec/chinese-tone-contract.toml"
 PUA_JSON = REPO_ROOT / "src/python/g2p/piper_plus_g2p/data/pua.json"
@@ -87,10 +92,17 @@ def load_pua_codepoints() -> dict[str, str]:
     out: dict[str, str] = {}
     entries = data.get("entries") or data.get("mappings") or []
     if isinstance(entries, dict):
-        entries = [{"token": k, **(v if isinstance(v, dict) else {"codepoint": v})} for k, v in entries.items()]
+        entries = [
+            {"token": k, **(v if isinstance(v, dict) else {"codepoint": v})}
+            for k, v in entries.items()
+        ]
     for entry in entries:
         token = entry.get("token") or entry.get("name")
-        cp = entry.get("codepoint") or entry.get("pua_codepoint") or entry.get("codepoint_hex")
+        cp = (
+            entry.get("codepoint")
+            or entry.get("pua_codepoint")
+            or entry.get("codepoint_hex")
+        )
         if token is None:
             continue
         normalized = _normalize_codepoint(cp)
@@ -168,7 +180,7 @@ def main() -> int:
         if 'f"tone{' not in fn_body and "f'tone{" not in fn_body:
             errors.append(
                 f"  canonical function {canonical_function} does not use "
-                f"`f\"tone{{tone}}\"` formatting — drift risk."
+                f'`f"tone{{tone}}"` formatting — drift risk.'
             )
 
     # 4. symbol literals in each runtime source

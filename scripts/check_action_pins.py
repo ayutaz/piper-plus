@@ -52,6 +52,10 @@ import re
 import sys
 from pathlib import Path
 
+from platform_utils import force_utf8_output
+
+
+force_utf8_output()
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 WORKFLOW_DIR = REPO_ROOT / ".github/workflows"
@@ -144,7 +148,9 @@ def main(argv: list[str] | None = None) -> int:
     stale_baseline = sorted(baseline - sliding_refs)
 
     if other_refs:
-        print(f"WARN: {len(other_refs)} 'other' ref(s) (branch/release-name pin); review:")
+        print(
+            f"WARN: {len(other_refs)} 'other' ref(s) (branch/release-name pin); review:"
+        )
         for wf, lineno, ref in other_refs:
             print(f"  {wf.relative_to(REPO_ROOT)}:{lineno}  {ref}")
         print()

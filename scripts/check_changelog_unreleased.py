@@ -38,6 +38,11 @@ import sys
 import tomllib
 from pathlib import Path
 
+from platform_utils import force_utf8_output
+
+
+force_utf8_output()
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 CHANGELOG_PATH = REPO_ROOT / "CHANGELOG.md"
 RELEASE_VERSIONS_PATH = REPO_ROOT / "docs" / "spec" / "release-versions.toml"
@@ -112,7 +117,9 @@ def _detect_drift(
 
 def main() -> int:
     if not CHANGELOG_PATH.exists():
-        print(f"ERROR: {CHANGELOG_PATH.relative_to(REPO_ROOT)} not found", file=sys.stderr)
+        print(
+            f"ERROR: {CHANGELOG_PATH.relative_to(REPO_ROOT)} not found", file=sys.stderr
+        )
         return 1
     if not RELEASE_VERSIONS_PATH.exists():
         print(

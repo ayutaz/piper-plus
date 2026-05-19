@@ -42,6 +42,11 @@ import re
 import sys
 from pathlib import Path
 
+from platform_utils import force_utf8_output
+
+
+force_utf8_output()
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CANONICAL = REPO_ROOT / "README.md"
 TRANSLATIONS = [
@@ -72,12 +77,20 @@ def count_h2(path: Path) -> tuple[int, list[str]]:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="README H2 parity gate")
-    parser.add_argument("--strict", action="store_true",
-                        help="exit 1 on tolerance exceeded (default: warn only)")
-    parser.add_argument("--verbose", "-v", action="store_true",
-                        help="print full H2 lists per file")
-    parser.add_argument("--tolerance", type=float, default=DEFAULT_TOLERANCE,
-                        help=f"max relative diff (default {DEFAULT_TOLERANCE})")
+    parser.add_argument(
+        "--strict",
+        action="store_true",
+        help="exit 1 on tolerance exceeded (default: warn only)",
+    )
+    parser.add_argument(
+        "--verbose", "-v", action="store_true", help="print full H2 lists per file"
+    )
+    parser.add_argument(
+        "--tolerance",
+        type=float,
+        default=DEFAULT_TOLERANCE,
+        help=f"max relative diff (default {DEFAULT_TOLERANCE})",
+    )
     args = parser.parse_args()
 
     if not CANONICAL.exists():
@@ -86,8 +99,11 @@ def main() -> int:
 
     canon_count, canon_headings = count_h2(CANONICAL)
     if canon_count == 0:
-        print(f"warning: canonical {CANONICAL.name} has 0 H2 sections — "
-              "skipping comparison", file=sys.stderr)
+        print(
+            f"warning: canonical {CANONICAL.name} has 0 H2 sections — "
+            "skipping comparison",
+            file=sys.stderr,
+        )
         return 0
 
     print(f"canonical {CANONICAL.name}: {canon_count} H2 sections")
