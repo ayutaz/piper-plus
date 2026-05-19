@@ -4,8 +4,8 @@
 **Milestone**: [M2 Spec & Docs Gates](../milestones/M2-spec-and-docs.md)
 **Proposal 項目**: `#7-A` (Code example execution test — audit phase)
 **Tier**: (audit only、 gate 化は T-010 / T-011)
-**Status**: 計画中
-**PR**: (未作成)
+**Status**: レビュー待ち (audit + 3 カテゴリ分類 + 実 docs snapshot 464 block を本 PR で commit。 Issue auto-create は別途 user 判断後に実行する設計)
+**PR**: feat/doc-examples-audit (/create-pr skill で起票予定)
 **担当 (予定)**: Claude Code (agent team) + maintainer review
 **着手前提**: なし (M2 内で T-004〜T-008 と並列着手可)
 
