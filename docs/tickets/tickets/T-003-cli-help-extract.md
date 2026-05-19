@@ -4,8 +4,8 @@
 **Milestone**: [M1 Foundations](../milestones/M1-foundations.md)
 **Proposal 項目**: `#4` (7 runtime CLI help auto-extract)
 **Tier**: Tier 1 (PR=blocker / weekly=informational の hybrid)
-**Status**: レビュー待ち (phase A のみ、 phase B は別 PR 予定)
-**PR**: (branch ready: `feat/t-003-cli-help-extract`, commit `5cb3fa78` — `/create-pr` skill で起票予定。 phase A: python runtime のみ active、 rust/csharp/go/wasm/cpp は TODO scaffold)
+**Status**: レビュー待ち (6 runtime full、 csharp/cpp は PLACEHOLDER canonical で初版、 workflow_dispatch で本番化)
+**PR**: (T-001/T-002/T-003 + ticket Status を統合した 1 branch、 `/create-pr` skill で起票予定)
 **担当 (予定)**: Claude Code (agent team) + maintainer review
 **着手前提**: なし (T-001 / T-002 と独立、 並列実装可能)
 
@@ -361,3 +361,4 @@ concurrency: `cli-help-extract-${{ github.head_ref \|\| github.ref }}`
 |------|------|------|
 | 2026-05-19 | 初版 | Claude Code |
 | 2026-05-19 | 実装完了 (phase A、 commit `5cb3fa78` on `feat/t-003-cli-help-extract`)。 14 unit test pass。 sanitize 機能 + 11 rule + python canonical txt + matrix scaffold。 g2p-py は `__main__.py` 不在のため supported runtime 表からは外さず scaffold のみ。 rust/csharp/go/wasm/cpp は phase B (別 PR) で段階追加。 | Claude Code |
+| 2026-05-19 | 6 runtime full に拡張。 python/go/rust/wasm は実 build で canonical txt 生成 + commit (Rust binary 名は `piper-plus-cli`)、 csharp は dotnet SDK 10 不在 / cpp は CMake setup 不在のため PLACEHOLDER canonical で commit (workflow drift-check は `# PLACEHOLDER:` marker を skip する logic を追加)。 25 unit test pass (parametrize で 6 runtime × header + placeholder marker)。 ticket は user 要求 (「全部同じブランチで対応」) を受け T-001/T-002/T-003 を 1 branch に統合。 | Claude Code |

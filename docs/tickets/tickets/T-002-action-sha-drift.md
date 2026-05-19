@@ -5,7 +5,7 @@
 **Proposal 項目**: `#3b` (Action SHA pin の生存検証)
 **Tier**: Tier 1 (informational tier)
 **Status**: レビュー待ち
-**PR**: (branch ready: `feat/t-002-action-sha-drift`, commit `1004f4f3` — `/create-pr` skill で起票予定)
+**PR**: (T-001/T-002/T-003 + ticket Status を統合した 1 branch、 `/create-pr` skill で起票予定)
 **担当 (予定)**: Claude Code (agent team) + maintainer review
 **着手前提**: なし (T-001 とは独立、 並列実装可能)
 

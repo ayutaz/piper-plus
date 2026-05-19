@@ -5,7 +5,7 @@
 **Proposal 項目**: `#3a` (Sigstore Rekor transparency log 検証)
 **Tier**: Tier 1 (informational tier)
 **Status**: レビュー待ち
-**PR**: (branch ready: `feat/t-001-rekor-verify`, commit `571a7a8e` — `/create-pr` skill で起票予定)
+**PR**: (T-001/T-002/T-003 + ticket Status を統合した 1 branch、 `/create-pr` skill で起票予定)
 **担当 (予定)**: Claude Code (agent team) + maintainer review
 **着手前提**: なし (PR #511 で `cosign-release-artifacts.yml` が発行側として merged 済み)
 
