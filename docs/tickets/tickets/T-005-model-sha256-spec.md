@@ -4,8 +4,8 @@
 **Milestone**: [M2 Spec & Docs Gates](../milestones/M2-spec-and-docs.md)
 **Proposal 項目**: `#5-2` (`model-sha256-manifest.toml`)
 **Tier**: Tier 2 (blocker、 pre-impl direction)
-**Status**: 計画中
-**PR**: (未作成)
+**Status**: 完了 (構造健全性 scope。 実 SHA256 ↔ 8 runtime loader 突合は publish パイプライン整備後の別 PR に委譲)
+**PR**: #517 (merge: 2026-05-19、 commit f3ef12cd)
 **担当 (予定)**: Claude Code (agent team) + maintainer review
 **着手前提**: T-004 完了 (推奨。 `scripts/_lib/` の共通化を流用するため。 ただし並列着手も可)
 

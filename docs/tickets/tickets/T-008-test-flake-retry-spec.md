@@ -4,8 +4,8 @@
 **Milestone**: [M2 Spec & Docs Gates](../milestones/M2-spec-and-docs.md)
 **Proposal 項目**: `#5-5` (`test-flake-retry-contract.toml`)
 **Tier**: Tier 2 (blocker、 pre-impl direction)
-**Status**: 計画中
-**PR**: (未作成)
+**Status**: 完了 (4 runtime scope = python/rust/go/csharp。 WASM/C++/Kotlin/Swift 拡張は別 spec で別 PR に委譲)
+**PR**: #517 (merge: 2026-05-19、 commit f3ef12cd)
 **担当 (予定)**: Claude Code (agent team) + maintainer review
 **着手前提**: なし (M2 内他 ticket と並列可)
 

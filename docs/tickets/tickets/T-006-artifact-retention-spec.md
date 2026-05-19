@@ -4,8 +4,8 @@
 **Milestone**: [M2 Spec & Docs Gates](../milestones/M2-spec-and-docs.md)
 **Proposal 項目**: `#5-3` (`artifact-retention-contract.toml`)
 **Tier**: Tier 2 (blocker、 pre-impl direction)
-**Status**: 計画中
-**PR**: (未作成)
+**Status**: 完了 (sweep 6 件 + mode=fail flip まで同 PR 内で完了)
+**PR**: #517 (merge: 2026-05-19、 commit f3ef12cd)
 **担当 (予定)**: Claude Code (agent team) + maintainer review
 **着手前提**: なし (T-004 / T-005 と並列可)
 
