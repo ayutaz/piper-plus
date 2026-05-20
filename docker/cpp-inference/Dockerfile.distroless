@@ -126,6 +126,33 @@ COPY --from=builder /opt/runtime-libs/ /usr/lib/
 # bind-mount their models/output/config the same way.
 WORKDIR /app
 
+# Environment carried over from canonical docker/cpp-inference/
+# entrypoint.sh. Distroless cannot run that Bash wrapper, so we set
+# what it sets directly in the image:
+#
+#   * LD_LIBRARY_PATH=/usr/local/lib — the canonical entrypoint sets
+#     this so the piper binary can dlopen libonnxruntime.so* /
+#     libgomp.so* / OpenJTalk dict bundles that we COPY into
+#     /usr/local/lib above. Distroless's default loader still consults
+#     this var, so ENV is sufficient.
+#
+# What canonical entrypoint.sh ALSO did that we DO NOT replicate here:
+#   * $MODEL_PATH -> $PIPER_MODEL_PATH var remap. This was historical
+#     compatibility for users who set MODEL_PATH; the canonical
+#     `piper` binary itself takes `--model <path>` (no env var lookup).
+#     Existing users who relied on MODEL_PATH must switch to passing
+#     `--model "$MODEL_PATH"` in their docker-compose / run command,
+#     or set PIPER_MODEL_PATH directly. The breakage is documented in
+#     the promotion PR's Test Plan as a known migration step.
+#   * The `if [ "${1#-}" != "$1" ]` heuristic that prepended `piper`
+#     when the first arg started with `-`. Distroless ENTRYPOINT IS
+#     /usr/local/bin/piper now, so `docker run <image> --version`
+#     already routes to `piper --version`. The shell heuristic was a
+#     workaround for the canonical image's `CMD ["/bin/bash"]`
+#     default; we replace that here with `CMD ["--version"]` so the
+#     argument-prepend logic is unnecessary.
+ENV LD_LIBRARY_PATH=/usr/local/lib
+
 # distroless has no shell. CMD form is exec-form, ENTRYPOINT is the
 # piper binary directly — any flags after `docker run <image>` flow
 # to piper.

@@ -48,8 +48,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libsndfile1-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Pin uv to the same range the canonical Dockerfile uses to keep
-# workspace-editable handling consistent (uv version-sensitive).
+# Pin uv. The canonical docker/webui/Dockerfile currently does an
+# unpinned `pip install uv`; pinning here is intentional drift to
+# protect the trial build against a future breaking uv release.
+# Promotion PR will reconcile the canonical to match this pin.
 RUN pip install --no-cache-dir "uv>=0.9,<1"
 
 WORKDIR /build
@@ -106,13 +108,18 @@ ENV PYTHONUNBUFFERED=1
 ENV GRADIO_SERVER_NAME=0.0.0.0
 ENV GRADIO_SERVER_PORT=7860
 
-# Bring in the WebUI entrypoint. The canonical Dockerfile ships an
-# entrypoint.sh shell wrapper; distroless has no shell, so the final
-# stage uses ENTRYPOINT [/usr/bin/python3, /app/app.py] directly. Any
-# logic in entrypoint.sh would need to be ported to Python (the only
-# behaviour today is `cd /app && exec python app.py "$@"`, which the
-# ENTRYPOINT below already does).
+# Bring in the WebUI entrypoint and the Python port of the Bash
+# wrapper. The canonical docker/webui/entrypoint.sh has real logic:
+#   * resolves $PIPER_MODEL_DIR (default /models)
+#   * if $PIPER_MODEL is set, downloads the model via
+#     piper_train.model_manager.download_model
+#   * exec's `python /app/app.py --model-dir <dir> --output-dir <out> $@`
+# Distroless has no shell, so we port that to entrypoint_distroless.py
+# (kept beside app.py in the repo) and ENTRYPOINT into the Python
+# interpreter directly. Behavioural parity for $PIPER_MODEL /
+# $PIPER_MODEL_DIR / $PIPER_OUTPUT_DIR is preserved.
 COPY docker/webui/app.py /app/app.py
+COPY docker/webui/entrypoint_distroless.py /app/entrypoint_distroless.py
 
 WORKDIR /app
 
@@ -132,4 +139,4 @@ EXPOSE 7860
 HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
     CMD ["/usr/bin/python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:7860/')"]
 
-ENTRYPOINT ["/usr/bin/python3", "/app/app.py"]
+ENTRYPOINT ["/usr/bin/python3", "/app/entrypoint_distroless.py"]
