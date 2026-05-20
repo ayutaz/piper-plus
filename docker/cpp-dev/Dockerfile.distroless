@@ -94,6 +94,12 @@ RUN set -eux; \
       aarch64) ort_arch=aarch64 ;; \
       *)       echo "unsupported arch: $arch" >&2; exit 1 ;; \
     esac; \
+    # Wolfi minimal does not pre-create /usr/local/{lib,include}. The
+    # canonical Ubuntu image inherits these from base; here we mkdir
+    # explicitly so the cp targets exist. Without this, cp fails with
+    # "can't create directory '/usr/local/include/core': No such
+    # file or directory".
+    mkdir -p /usr/local/lib /usr/local/include; \
     wget -qO /tmp/onnxruntime.tgz \
       "https://github.com/microsoft/onnxruntime/releases/download/v1.20.0/onnxruntime-linux-${ort_arch}-1.20.0.tgz"; \
     mkdir -p /tmp/ort; \
