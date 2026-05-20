@@ -6036,8 +6036,8 @@
     },
     {
       "file": "docs/tickets/tickets/T-016-distroless-cpp-dev.md",
-      "line_start": 91,
-      "line_end": 130,
+      "line_start": 107,
+      "line_end": 146,
       "language_raw": "dockerfile",
       "language": "unknown",
       "category": "skip_warranted",
@@ -6051,8 +6051,8 @@
     },
     {
       "file": "docs/tickets/tickets/T-016-distroless-cpp-dev.md",
-      "line_start": 136,
-      "line_end": 148,
+      "line_start": 152,
+      "line_end": 164,
       "language_raw": "markdown",
       "language": "unknown",
       "category": "skip_warranted",

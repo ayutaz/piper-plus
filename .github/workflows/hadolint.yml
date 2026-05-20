@@ -30,7 +30,6 @@ jobs:
       matrix:
         dockerfile:
           - docker/cpp-dev/Dockerfile
-          - docker/cpp-dev/Dockerfile.distroless
           - docker/cpp-inference/Dockerfile
           - docker/cpp-inference/Dockerfile.distroless
           - docker/cpp-inference/Dockerfile.test

@@ -299,9 +299,6 @@ jobs:
           - name: python-inference-cpu
             dockerfile: docker/python-inference/Dockerfile.cpu.distroless
             cache_scope: python-inference-cpu-distroless
-          - name: cpp-dev
-            dockerfile: docker/cpp-dev/Dockerfile.distroless
-            cache_scope: cpp-dev-distroless
           - name: cpp-inference
             dockerfile: docker/cpp-inference/Dockerfile.distroless
             cache_scope: cpp-inference-distroless

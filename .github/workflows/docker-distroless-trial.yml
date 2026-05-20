@@ -1,25 +1,28 @@
 name: docker-distroless-trial
 
-# Trial CI for the second wave of distroless variants (cpp-dev / webui
-# / cpp-inference). Mirrors python-inference-distroless-trial.yml from
-# PR #523 with a matrix over the three new images: amd64 single-arch
+# Trial CI for the second wave of distroless variants (webui +
+# cpp-inference). Mirrors python-inference-distroless-trial.yml from
+# PR #523 with a matrix over the two new images: amd64 single-arch
 # build (multi-arch is handled by docker-build.yml's
 # build-distroless-trials job), canonical image size measured as the
 # A/B baseline, and a smoke step appropriate to the image's role.
 #
+# cpp-dev distroless was investigated in this PR but deferred: the
+# canonical image depends on OpenJTalk / mecab tooling that only ships
+# as Debian apt packages, and chasing the long tail of missing Wolfi
+# equivalents (iconv, libtool, gettext, ...) defeats the supply-chain
+# benefit of the move. T-016 ticket needs a fresh design (likely
+# debian:12-slim baseline rather than chainguard/wolfi-base) and is
+# handled in a separate PR.
+#
 # Promotion to canonical (replacing the original Dockerfile) is a
 # follow-up PR per image, after the trial confirms the runtime works
-# in the expected environment (HF Space for python-inference is the
-# only image with that deployment risk in this batch).
+# in the expected environment.
 
 on:
   pull_request:
     branches: [dev]
     paths:
-      - 'docker/cpp-dev/Dockerfile'
-      - 'docker/cpp-dev/Dockerfile.distroless'
-      - 'docker/cpp-dev/build.sh'
-      - 'docker/cpp-dev/test.sh'
       - 'docker/webui/Dockerfile'
       - 'docker/webui/Dockerfile.distroless'
       - 'docker/webui/app.py'
@@ -53,14 +56,6 @@ jobs:
       fail-fast: false
       matrix:
         image:
-          - name: cpp-dev
-            canonical_dockerfile: docker/cpp-dev/Dockerfile
-            trial_dockerfile: docker/cpp-dev/Dockerfile.distroless
-            smoke_entrypoint: /bin/sh
-            # cpp-dev's smoke checks that the dev toolchain is reachable
-            # inside the image — that's what a developer pulling the
-            # image would touch first.
-            smoke_args: '-c "cmake --version && clang --version && python3 --version"'
           - name: webui
             canonical_dockerfile: docker/webui/Dockerfile
             trial_dockerfile: docker/webui/Dockerfile.distroless
@@ -188,9 +183,11 @@ jobs:
         run: |
           mkdir -p /tmp/sticky
           {
-            echo "## Distroless trial: cpp-dev / webui / cpp-inference"
+            echo "## Distroless trial: webui / cpp-inference"
             echo
             echo "Each canonical Dockerfile is UNCHANGED; the trial Dockerfile sits beside it as \`Dockerfile.distroless\` so docker-compose and existing CI matrices keep using the proven image."
+            echo
+            echo "(\`cpp-dev\` distroless was deferred — chainguard/wolfi-base does not ship the OpenJTalk / mecab build toolchain the canonical image depends on. T-016 needs a fresh design and ships in a separate PR.)"
             echo
             for f in /tmp/reports/*.md; do
               [ -f "$f" ] && cat "$f" && echo
@@ -202,12 +199,11 @@ jobs:
             echo "- CVE Trivy diff lives in \`trivy-container-scan.yml\` (per-image SARIF upload)."
             echo "- For \`webui\`: full Gradio cold-start under distroless (a real \`docker run -p 7860:7860\` from \`webui-test.yml\`) is the promotion gate."
             echo "- For \`cpp-inference\`: end-to-end \`piper --model ... --output_file ...\` with a real model fixture is the promotion gate."
-            echo "- For \`cpp-dev\`: \`docker exec -it ... /bin/sh\` interactive workflow check is user manual."
           } > /tmp/sticky/combined.md
           cat /tmp/sticky/combined.md
 
       - name: Post sticky comment
         uses: marocchino/sticky-pull-request-comment@v2.9.4
         with:
-          header: docker-distroless-trial-cpp-dev-webui-cpp-inference
+          header: docker-distroless-trial-webui-cpp-inference
           path: /tmp/sticky/combined.md
