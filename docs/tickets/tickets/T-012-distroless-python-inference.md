@@ -364,7 +364,7 @@ format (FR-1.4): T-013 と同 format に HF Space cold start latency 比較を�
 - Milestone: [`docs/tickets/milestones/M3-supply-chain.md`](../milestones/M3-supply-chain.md), M3-R2 / M3-R3 リスク
 - 実 Dockerfile: [`docker/python-inference/Dockerfile`](../../../docker/python-inference/Dockerfile), [`docker/python-inference/Dockerfile.cpu`](../../../docker/python-inference/Dockerfile.cpu)
 - 関連: `docker/python-inference/inference.py`, `docker/python-inference/test.py`, `docker/python-inference/docker-compose.yml`, `.github/workflows/deploy-huggingface.yml`
-- 先行チケット: [T-016](T-016-distroless-cpp-dev.md), [T-015](T-015-distroless-cpp-inference.md), [T-013](T-013-distroless-webui.md)
+- 先行チケット: [T-015](T-015-distroless-cpp-inference.md), [T-013](T-013-distroless-webui.md) (旧 T-016 は 2026-05-20 scope-out、 ticket file 削除済、 経緯は PR #524 / #526)
 - 外部: HuggingFace Spaces docs <https://huggingface.co/docs/hub/spaces-sdks-docker>
 
 ---

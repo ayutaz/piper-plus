@@ -332,7 +332,7 @@ format (FR-1.4): T-016 と同 format に Gradio 起動 sample 結果を追加:
 - Milestone: [`docs/tickets/milestones/M3-supply-chain.md`](../milestones/M3-supply-chain.md)
 - 実 Dockerfile: [`docker/webui/Dockerfile`](../../../docker/webui/Dockerfile)
 - 関連: `docker/webui/app.py`, `docker/webui/entrypoint.sh`, `src/python_run/requirements_webui.txt`, `.github/workflows/webui-test.yml`
-- 先行チケット: [T-016](T-016-distroless-cpp-dev.md), [T-015](T-015-distroless-cpp-inference.md)
+- 先行チケット: [T-015](T-015-distroless-cpp-inference.md) (旧 T-016 は 2026-05-20 scope-out、 ticket file 削除済、 経緯は PR #524 / #526)
 - 外部: Chainguard python <https://images.chainguard.dev/directory/image/python>
 
 ---

@@ -27,11 +27,12 @@
 
 | ID | タイトル | 提案項目 | 影響範囲 | Status | PR |
 |----|--------|---------|--------|--------|----|
-| [T-012](../tickets/T-012-distroless-python-inference.md) | `python-inference` distroless 化 | `#1-1` | HF Space deploy | 計画中 | — |
-| [T-013](../tickets/T-013-distroless-webui.md) | `webui` distroless 化 | `#1-2` | Gradio demo | 計画中 | — |
+| [T-012](../tickets/T-012-distroless-python-inference.md) | `python-inference` distroless 化 | `#1-1` | HF Space deploy | 着手中 (trial merged 2026-05-20、 promotion 観測中) | #523 |
+| [T-013](../tickets/T-013-distroless-webui.md) | `webui` distroless 化 | `#1-2` | Gradio demo | 着手中 (trial merged 2026-05-20、 promotion 観測中) | #524 |
 | [T-014](../tickets/T-014-distroless-wyoming.md) | `wyoming` distroless 化 | `#1-3` | Home Assistant addon | 計画中 | — |
-| [T-015](../tickets/T-015-distroless-cpp-inference.md) | `cpp-inference` distroless 化 | `#1-4` | C++ runtime image | 計画中 | — |
-| ~~[T-016](../tickets/T-016-distroless-cpp-dev.md)~~ | ~~`cpp-dev` distroless 化~~ | ~~`#1-5`~~ | C++ dev image | **除外確定 (2026-05-20)** | PR #524 (spike 結果) |
+| [T-015](../tickets/T-015-distroless-cpp-inference.md) | `cpp-inference` distroless 化 | `#1-4` | C++ runtime image | 着手中 (trial merged 2026-05-20、 promotion 観測中) | #524 |
+
+> `cpp-dev` (旧 T-016) は 2026-05-20 scope-out 確定 (PR #526)。 spike 目的が PR #524 で達成済 + dev image 構造的不整合のため除外。 ticket file は削除済み、 経緯は git history (PR #524 / #526) を参照。
 
 ### SLSA L3 × 5 registry (PyPI / NuGet は新設要否を user 判断)
 

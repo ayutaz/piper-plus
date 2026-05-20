@@ -4,8 +4,8 @@
   "totals": {
     "executable": 214,
     "needs_placeholder": 2,
-    "skip_warranted": 230,
-    "total": 446
+    "skip_warranted": 228,
+    "total": 444
   },
   "by_language": {
     "bash": {
@@ -36,7 +36,7 @@
     "unknown": {
       "executable": 0,
       "needs_placeholder": 0,
-      "skip_warranted": 206
+      "skip_warranted": 204
     },
     "wasm": {
       "executable": 10,
@@ -5843,8 +5843,8 @@
     },
     {
       "file": "docs/tickets/milestones/M3-supply-chain.md",
-      "line_start": 131,
-      "line_end": 135,
+      "line_start": 132,
+      "line_end": 136,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -6033,36 +6033,6 @@
       ],
       "env_dependencies": [],
       "hash_sha1": "7fe62015de5e474f4a87c10af8d9d59227a60d62"
-    },
-    {
-      "file": "docs/tickets/tickets/T-016-distroless-cpp-dev.md",
-      "line_start": 125,
-      "line_end": 164,
-      "language_raw": "dockerfile",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "16d1f6ed549a0c92789e06be8c0d8d15a6f5ab6f"
-    },
-    {
-      "file": "docs/tickets/tickets/T-016-distroless-cpp-dev.md",
-      "line_start": 170,
-      "line_end": 182,
-      "language_raw": "markdown",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "96859b8c06d0fb81c3fab024bedf7db04d3bad66"
     },
     {
       "file": "docs/tickets/tickets/T-017-slsa-shared-lib.md",

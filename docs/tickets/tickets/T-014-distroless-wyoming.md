@@ -363,7 +363,7 @@ format (FR-1.4): T-012 と同 format に HA addon deploy 結果 (user 手動測�
 - Milestone: [`docs/tickets/milestones/M3-supply-chain.md`](../milestones/M3-supply-chain.md), M3-R2 リスク (HA addon supervisor 互換性)
 - 実 Dockerfile: [`docker/wyoming/Dockerfile`](../../../docker/wyoming/Dockerfile)
 - 関連: `docker/wyoming/README.md`, `docker/wyoming/docker-compose.yml`, `docker/wyoming/test_integration.py`, `src/python/piper_wyoming/`
-- 先行チケット: [T-016](T-016-distroless-cpp-dev.md), [T-015](T-015-distroless-cpp-inference.md), [T-013](T-013-distroless-webui.md), [T-012](T-012-distroless-python-inference.md)
+- 先行チケット: [T-015](T-015-distroless-cpp-inference.md), [T-013](T-013-distroless-webui.md), [T-012](T-012-distroless-python-inference.md) (旧 T-016 は 2026-05-20 scope-out、 ticket file 削除済、 経緯は PR #524 / #526)
 - 外部: Wyoming protocol <https://github.com/rhasspy/wyoming>, HA addon docs <https://developers.home-assistant.io/docs/add-ons>
 
 ---
