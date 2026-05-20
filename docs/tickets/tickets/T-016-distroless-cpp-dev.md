@@ -5,9 +5,9 @@
 **Proposal 項目**: `#1-5` (Distroless / Chainguard 移行 — `cpp-dev` image)
 **Tier**: Tier 3 (blast radius 小、 学習用 spike)
 **Status**: 除外確定 (M3 distroless scope-out 2026-05-20)
-**PR**: PR #524 (wolfi-base trial 実施 → scope 矛盾実証 → cpp-dev は除外確定)
-**担当 (予定)**: ―
-**着手前提**: ―
+**PR**: #524 (wolfi-base trial 実施 → scope 矛盾実証 → cpp-dev は除外確定)
+**担当 (予定)**: なし
+**着手前提**: なし
 
 > **Note (2026-05-20 scope-out 確定)**
 >
@@ -20,7 +20,7 @@
 >
 > 採用しない選択肢 (履歴記録):
 >
-> - **A. debian:12-slim 切替**: 「distroless 化」 ではないため M3 §1 FR-1.2 (cgr.dev/chainguard or gcr.io/distroless 二択) と不整合。 size 局所最適化として価値はあるが、 別 ticket (`docs/tickets/proposals/cpp-dev-base-optimization.md` 等) として再立案するのが integrity 上 clean
+> - **A. debian:12-slim 切替**: 「distroless 化」 ではないため M3 §1 FR-1.2 (cgr.dev/chainguard or gcr.io/distroless 二択) と不整合。 size 局所最適化として価値はあるが、 別 proposal doc として独立 ticket で再立案するのが integrity 上 clean
 > - **C. wolfi 継続**: 下記旧 Note の apk infinite chain により目的達成不能、 試行 cost 不明
 >
 > 大目的 (supply chain 防御) は残 4 image (T-012 python-inference / T-013 webui / T-014 wyoming / T-015 cpp-inference) で完結する。 M3 milestone は **distroless × 4 image** に scope 縮小。
