@@ -43,10 +43,11 @@ jobs:
 
       - name: Measure canonical image size (Dockerfile.cpu) for baseline
         id: baseline
-        continue-on-error: true
+        # NOT continue-on-error: the canonical Dockerfile.cpu is what
+        # HF Space pulls today. If its build is broken on this PR's tree,
+        # the size diff loses meaning AND the canonical deploy path is
+        # silently red. Required-by-default protects both.
         run: |
-          # The canonical CPU image is what HF Space pulls today; size
-          # diff vs. this is the headline number we report.
           docker build \
             -f docker/python-inference/Dockerfile.cpu \
             -t piper-plus-inference:cpu-canonical \
@@ -74,12 +75,17 @@ jobs:
 
       - name: Smoke test — full import chain
         run: |
-          # distroless has no shell. Run python directly. All imports
-          # MUST pass — that is the trial's primary success criterion.
-          # builder (python:3.11-slim-trixie) and final
+          # distroless/python3-debian12 ships /usr/bin/python3 only —
+          # no `python` alias on PATH. Use the absolute interpreter
+          # path so the smoke step never depends on Debian's
+          # `python-is-python3` symlink (which the distroless layer
+          # does not include).
+          #
+          # All imports MUST pass — that is the trial's primary success
+          # criterion. builder (python:3.11-slim-trixie) and final
           # (gcr.io/distroless/python3-debian12) share Debian-glibc ABI,
           # so onnxruntime's pre-built C extension resolves cleanly.
-          docker run --rm --entrypoint python \
+          docker run --rm --entrypoint /usr/bin/python3 \
             piper-plus-inference:cpu-distroless-trial \
             -c "import platform, sys; \
                 print(f'final arch: {platform.machine()}'); \

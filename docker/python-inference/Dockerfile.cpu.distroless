@@ -140,11 +140,18 @@ FROM gcr.io/distroless/python3-debian12
 # AND /usr/lib directly).
 COPY --from=builder /opt/runtime-libs/ /usr/lib/
 
-# Python site-packages and CLI entry-points. distroless/python3-debian12
-# tracks Python 3.11, matching the builder's debian python:3.11-slim.
-# Paths align: /usr/local/lib/python3.11/site-packages.
+# Python site-packages. distroless/python3-debian12 tracks Python 3.11,
+# matching the builder's debian python:3.11-slim. Paths align:
+# /usr/local/lib/python3.11/site-packages.
+#
+# Note: we deliberately do NOT copy /usr/local/bin/uvicorn. pip-generated
+# console scripts carry a `#!/usr/local/bin/python` shebang that points
+# at the builder's interpreter, which doesn't exist in the final stage
+# (/usr/bin/python3 is the only interpreter here). inference.py imports
+# and calls uvicorn programmatically, so the console-script shebang is
+# never exercised; copying it would only invite future "run uvicorn
+# directly" patterns that would fail at runtime.
 COPY --from=builder /usr/local/lib/python3.11 /usr/local/lib/python3.11
-COPY --from=builder /usr/local/bin/uvicorn /usr/local/bin/uvicorn
 COPY --from=builder /usr/share/nltk_data /usr/share/nltk_data
 
 # distroless/python3-debian12's default python3 is /usr/bin/python3.11
@@ -169,11 +176,15 @@ EXPOSE 8000 7860
 # No `USER` directive needed; documenting the assumption for reviewers.
 
 # distroless has no shell — HEALTHCHECK must be exec-form, and inline
-# python. Using urllib (stdlib) keeps the check binary-free.
+# python. distroless/python3-debian12 ships /usr/bin/python3 (Debian
+# layout); there is no /usr/bin/python alias. Always use the absolute
+# path so `python` resolution via PATH never enters the picture.
 HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
-    CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+    CMD ["/usr/bin/python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
 
 # Default entrypoint matches Dockerfile.cpu — OpenAI-compat FastAPI
 # server bound to 8000. Override at `docker run` for CLI / WebUI modes.
-ENTRYPOINT ["python", "/app/inference.py"]
+# `/usr/bin/python3` (absolute) because distroless does not provide a
+# bare `python` alias.
+ENTRYPOINT ["/usr/bin/python3", "/app/inference.py"]
 CMD ["--server", "--model", "/app/models/model.onnx", "--port", "8000"]
