@@ -1,0 +1,190 @@
+# CPU-only Python Inference image (distroless trial).
+#
+# Trial variant of docker/python-inference/Dockerfile.cpu that swaps the
+# final stage for `gcr.io/distroless/python3-debian12`. The existing
+# `Dockerfile.cpu` (debian-slim, full shell) is intentionally left
+# UNCHANGED so the trial does not break the docker-compose flow, the
+# HF Space deploy pipeline, or the multi-arch buildx matrix already
+# proven on it.
+#
+# Why this base image:
+#   * Python wheels for `onnxruntime`, `pyopenjtalk-plus`, and `soundfile`
+#     are built against Debian-glibc. distroless/python3-debian12 inherits
+#     debian12-slim's glibc, so the C extensions copied from a debian-slim
+#     builder load with byte-for-byte ABI match.
+#   * Earlier trial attempt used `cgr.dev/chainguard/python:latest`
+#     (Wolfi-based). That failed at import time because Wolfi's glibc /
+#     Python build is a separate ABI from debian-slim's, even when minor
+#     versions look the same. The pybind11_state .so couldn't resolve
+#     symbols → `ModuleNotFoundError: onnxruntime.capi.onnxruntime_pybind11_state`.
+#   * distroless/python3-debian12 pins Python 3.11, which matches the
+#     canonical `Dockerfile.cpu`. No Python version drift in this PR.
+#
+# Why a separate file:
+#   * Side-by-side image build lets us A/B compare size + CVE counts.
+#   * Promotion to the canonical image is a follow-up PR after staging
+#     verification (HF Space cold start, ARM64 deploy).
+#   * Roll-back is `git revert` of the trial PR — no compose/CD changes.
+#
+# Build (multi-arch, from repo root):
+#   docker buildx build \
+#     --platform linux/amd64,linux/arm64 \
+#     -f docker/python-inference/Dockerfile.cpu.distroless \
+#     -t piper-plus-inference:cpu-distroless-trial \
+#     .
+#
+# Smoke (single-arch local):
+#   docker build \
+#     -f docker/python-inference/Dockerfile.cpu.distroless \
+#     -t piper-plus-inference:cpu-distroless-trial \
+#     .
+
+# ----------------------------------------------------------------------
+# Stage 1: builder (Debian-based, has apt/pip/build-essential).
+# Mirrors Dockerfile.cpu's base so the resulting site-packages and
+# shared libraries link against the same libc / libstdc++ that the
+# distroless/python3-debian12 final stage ships.
+# ----------------------------------------------------------------------
+FROM python:3.11-slim-trixie AS builder
+
+ENV PYTHONUNBUFFERED=1
+ENV DEBIAN_FRONTEND=noninteractive
+
+# build-essential / cmake / g++ are required because pyopenjtalk-plus
+# (a transitive dep of piper-plus-g2p via the [all] extra) builds C
+# extensions from source on arm64. libsndfile1-dev provides the .so /
+# headers that soundfile needs at install AND runtime.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    cmake \
+    g++ \
+    libsndfile1 \
+    libsndfile1-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Pin uv to the same major version range used by the canonical
+# Dockerfile.cpu — workspace-editable handling is uv-version sensitive.
+RUN pip install --no-cache-dir "uv>=0.9,<1"
+
+WORKDIR /build
+
+# Copy source for piper_plus_g2p + piper_train install. setup.py reads
+# ../../VERSION relative to src/python/, so VERSION must be at
+# /build/VERSION.
+COPY VERSION /build/VERSION
+COPY pyproject.toml /build/pyproject.toml
+COPY src/python/ /build/src/python/
+COPY src/python_run/requirements_webui.txt /build/requirements_webui.txt
+
+# Install into the system Python so the layout under
+# /usr/local/lib/python3.11/site-packages is self-contained and copy-able
+# into the final stage.
+RUN uv pip install --system "/build/src/python/g2p[all]"
+RUN uv pip install --system "/build/src/python[inference]"
+RUN uv pip install --system -r /build/requirements_webui.txt
+
+# Pre-download NLTK data for g2p-en. The download dir is shared so the
+# distroless final stage can read it post-USER-switch.
+ENV NLTK_DATA=/usr/share/nltk_data
+RUN python -c "import nltk; \
+nltk.download('averaged_perceptron_tagger', download_dir='/usr/share/nltk_data'); \
+nltk.download('averaged_perceptron_tagger_eng', download_dir='/usr/share/nltk_data'); \
+nltk.download('cmudict', download_dir='/usr/share/nltk_data')"
+
+# Builder-side smoke test. If onnxruntime / piper_train / gradio fail to
+# import here, the final stage won't be runnable either — fail fast.
+RUN python --version && \
+    python -c "import platform; print(f'builder arch: {platform.machine()}')" && \
+    python -c "import onnxruntime as ort; print(f'ONNX Runtime: {ort.__version__}'); print(f'Providers: {ort.get_available_providers()}')" && \
+    python -c "import piper_train; print('piper_train OK')" && \
+    python -c "import gradio; print(f'Gradio: {gradio.__version__}')" && \
+    python -c "import fastapi, uvicorn; print(f'FastAPI: {fastapi.__version__}, uvicorn: {uvicorn.__version__}')" && \
+    python -c "import soundfile; print(f'soundfile: {soundfile.__version__}')"
+
+# Stage the runtime shared libs into an arch-neutral location. Debian's
+# multiarch layout puts libs under /usr/lib/<triplet>-linux-gnu/ where
+# <triplet> is x86_64 / aarch64 / armv7l / etc. Hardcoding x86_64 in the
+# final-stage COPY breaks linux/arm64 builds (the triplet directory does
+# not exist). Letting bash resolve the wildcard once during the builder
+# stage hands the final stage a single deterministic path to COPY from.
+RUN set -eux; \
+    mkdir -p /opt/runtime-libs; \
+    for lib in libsndfile libgomp libFLAC libvorbis libvorbisenc libogg libopus libmpg123; do \
+      cp -a /usr/lib/*-linux-gnu/${lib}.so* /opt/runtime-libs/ 2>/dev/null || true; \
+    done; \
+    ls -la /opt/runtime-libs/
+
+# ----------------------------------------------------------------------
+# Stage 2: distroless final.
+# gcr.io/distroless/python3-debian12 is Debian 12 (bookworm) baseline +
+# CPython 3.11. No shell, no package manager, no docs / man / locale.
+# Maintained by Google; pin-by-digest is recommended for reproducibility
+# but the trial uses the floating tag while we measure.
+#
+# Why not chainguard/python: see header comment. Wolfi's Python build is
+# a different ABI surface from debian-slim's; the C extensions in
+# onnxruntime's wheels won't resolve.
+# ----------------------------------------------------------------------
+FROM gcr.io/distroless/python3-debian12
+
+# Bring in the runtime shared libs the wheels dlopen() at import time.
+# Debian's multiarch layout puts libs under /usr/lib/<triplet>-linux-gnu/;
+# the builder stages them into /opt/runtime-libs/ so we can COPY from a
+# single arch-neutral path here. This makes the final stage work
+# unchanged on linux/amd64 (x86_64-linux-gnu) and linux/arm64
+# (aarch64-linux-gnu).
+#
+# Landing them in /usr/lib/ keeps them on the dynamic loader's default
+# search path (distroless/python3-debian12 inherits Debian's ld.so
+# config, which includes /usr/lib/<triplet>-linux-gnu via /etc/ld.so.cache
+# AND /usr/lib directly).
+COPY --from=builder /opt/runtime-libs/ /usr/lib/
+
+# Python site-packages. distroless/python3-debian12 tracks Python 3.11,
+# matching the builder's debian python:3.11-slim. Paths align:
+# /usr/local/lib/python3.11/site-packages.
+#
+# Note: we deliberately do NOT copy /usr/local/bin/uvicorn. pip-generated
+# console scripts carry a `#!/usr/local/bin/python` shebang that points
+# at the builder's interpreter, which doesn't exist in the final stage
+# (/usr/bin/python3 is the only interpreter here). inference.py imports
+# and calls uvicorn programmatically, so the console-script shebang is
+# never exercised; copying it would only invite future "run uvicorn
+# directly" patterns that would fail at runtime.
+COPY --from=builder /usr/local/lib/python3.11 /usr/local/lib/python3.11
+COPY --from=builder /usr/share/nltk_data /usr/share/nltk_data
+
+# distroless/python3-debian12's default python3 is /usr/bin/python3.11
+# (debian layout). PYTHONPATH points at the site-packages we copied;
+# the interpreter itself comes from the base image.
+ENV PYTHONPATH=/usr/local/lib/python3.11/site-packages
+ENV NLTK_DATA=/usr/share/nltk_data
+ENV PYTHONUNBUFFERED=1
+ENV GRADIO_SERVER_NAME=0.0.0.0
+ENV GRADIO_SERVER_PORT=7860
+
+# Inference + WebUI scripts.
+COPY docker/python-inference/inference.py /app/inference.py
+COPY docker/python-inference/test.py /app/test.py
+COPY docker/webui/app.py /app/webui.py
+
+WORKDIR /app
+
+EXPOSE 8000 7860
+
+# distroless/python3-debian12 defaults to UID 65532 (nonroot user).
+# No `USER` directive needed; documenting the assumption for reviewers.
+
+# distroless has no shell — HEALTHCHECK must be exec-form, and inline
+# python. distroless/python3-debian12 ships /usr/bin/python3 (Debian
+# layout); there is no /usr/bin/python alias. Always use the absolute
+# path so `python` resolution via PATH never enters the picture.
+HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
+    CMD ["/usr/bin/python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+
+# Default entrypoint matches Dockerfile.cpu — OpenAI-compat FastAPI
+# server bound to 8000. Override at `docker run` for CLI / WebUI modes.
+# `/usr/bin/python3` (absolute) because distroless does not provide a
+# bare `python` alias.
+ENTRYPOINT ["/usr/bin/python3", "/app/inference.py"]
+CMD ["--server", "--model", "/app/models/model.onnx", "--port", "8000"]

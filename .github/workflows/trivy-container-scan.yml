@@ -63,6 +63,10 @@ jobs:
             dockerfile: docker/python-inference/Dockerfile
             context: .
             build_target: ''
+          - name: python-inference-cpu-distroless
+            dockerfile: docker/python-inference/Dockerfile.cpu.distroless
+            context: .
+            build_target: ''
           - name: cpp-dev
             dockerfile: docker/cpp-dev/Dockerfile
             context: .

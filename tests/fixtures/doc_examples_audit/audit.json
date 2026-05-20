@@ -5901,8 +5901,8 @@
     },
     {
       "file": "docs/tickets/tickets/T-012-distroless-python-inference.md",
-      "line_start": 96,
-      "line_end": 165,
+      "line_start": 106,
+      "line_end": 175,
       "language_raw": "dockerfile",
       "language": "unknown",
       "category": "skip_warranted",
@@ -5916,8 +5916,8 @@
     },
     {
       "file": "docs/tickets/tickets/T-012-distroless-python-inference.md",
-      "line_start": 171,
-      "line_end": 182,
+      "line_start": 181,
+      "line_end": 192,
       "language_raw": "markdown",
       "language": "unknown",
       "category": "skip_warranted",
@@ -5931,8 +5931,8 @@
     },
     {
       "file": "docs/tickets/tickets/T-012-distroless-python-inference.md",
-      "line_start": 188,
-      "line_end": 197,
+      "line_start": 198,
+      "line_end": 207,
       "language_raw": "markdown",
       "language": "unknown",
       "category": "skip_warranted",

@@ -34,6 +34,7 @@ jobs:
           - docker/cpp-inference/Dockerfile.test
           - docker/python-inference/Dockerfile
           - docker/python-inference/Dockerfile.cpu
+          - docker/python-inference/Dockerfile.cpu.distroless
           - docker/python-train/Dockerfile
           - docker/wyoming/Dockerfile
           - docker/webui/Dockerfile

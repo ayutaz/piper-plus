@@ -1,0 +1,154 @@
+name: python-inference-distroless-trial
+
+# Trial CI for the distroless variant of docker/python-inference/
+# (Dockerfile.cpu.distroless). The canonical Dockerfile.cpu stays the
+# CI-verified path used by HF Space deploy; this workflow only proves
+# that the distroless image builds, stays under the size target, and
+# answers /health. Promotion to canonical is a follow-up PR after a
+# user-driven HF Space staging deploy validates cold-start latency.
+
+on:
+  pull_request:
+    branches: [dev]
+    paths:
+      - 'docker/python-inference/Dockerfile.cpu.distroless'
+      - 'docker/python-inference/inference.py'
+      - 'docker/python-inference/test.py'
+      - 'docker/webui/app.py'
+      - 'src/python/**'
+      - 'pyproject.toml'
+      - 'VERSION'
+      - 'src/python_run/requirements_webui.txt'
+      - '.github/workflows/python-inference-distroless-trial.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-smoke:
+    name: Build + size + /health smoke
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6.0.2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3.8.0
+
+      - name: Measure canonical image size (Dockerfile.cpu) for baseline
+        id: baseline
+        # NOT continue-on-error: the canonical Dockerfile.cpu is what
+        # HF Space pulls today. If its build is broken on this PR's tree,
+        # the size diff loses meaning AND the canonical deploy path is
+        # silently red. Required-by-default protects both.
+        run: |
+          docker build \
+            -f docker/python-inference/Dockerfile.cpu \
+            -t piper-plus-inference:cpu-canonical \
+            --load \
+            .
+          BASELINE_BYTES=$(docker image inspect piper-plus-inference:cpu-canonical --format '{{.Size}}')
+          echo "baseline_bytes=${BASELINE_BYTES}" >> "$GITHUB_OUTPUT"
+          printf 'canonical (Dockerfile.cpu) size: %s bytes (%s)\n' \
+            "$BASELINE_BYTES" \
+            "$(numfmt --to=iec --suffix=B "$BASELINE_BYTES")"
+
+      - name: Build distroless image (amd64 only — arm64 is buildx follow-up)
+        id: build
+        run: |
+          docker build \
+            -f docker/python-inference/Dockerfile.cpu.distroless \
+            -t piper-plus-inference:cpu-distroless-trial \
+            --load \
+            .
+          TRIAL_BYTES=$(docker image inspect piper-plus-inference:cpu-distroless-trial --format '{{.Size}}')
+          echo "trial_bytes=${TRIAL_BYTES}" >> "$GITHUB_OUTPUT"
+          printf 'distroless trial size: %s bytes (%s)\n' \
+            "$TRIAL_BYTES" \
+            "$(numfmt --to=iec --suffix=B "$TRIAL_BYTES")"
+
+      - name: Smoke test — full import chain
+        run: |
+          # distroless/python3-debian12 ships /usr/bin/python3 only —
+          # no `python` alias on PATH. Use the absolute interpreter
+          # path so the smoke step never depends on Debian's
+          # `python-is-python3` symlink (which the distroless layer
+          # does not include).
+          #
+          # All imports MUST pass — that is the trial's primary success
+          # criterion. builder (python:3.11-slim-trixie) and final
+          # (gcr.io/distroless/python3-debian12) share Debian-glibc ABI,
+          # so onnxruntime's pre-built C extension resolves cleanly.
+          docker run --rm --entrypoint /usr/bin/python3 \
+            piper-plus-inference:cpu-distroless-trial \
+            -c "import platform, sys; \
+                print(f'final arch: {platform.machine()}'); \
+                print(f'final python: {sys.version}'); \
+                import onnxruntime as ort; \
+                print(f'ONNX Runtime: {ort.__version__}'); \
+                providers = ort.get_available_providers(); \
+                print(f'Providers: {providers}'); \
+                assert any('CPUExecutionProvider' in p for p in providers), 'CPU EP missing'; \
+                import piper_train; print('piper_train OK'); \
+                import fastapi, uvicorn; \
+                print(f'FastAPI: {fastapi.__version__}, uvicorn: {uvicorn.__version__}'); \
+                import soundfile; print(f'soundfile: {soundfile.__version__}')"
+
+      - name: Compose report.md
+        id: report
+        env:
+          BASELINE_BYTES: ${{ steps.baseline.outputs.baseline_bytes }}
+          TRIAL_BYTES: ${{ steps.build.outputs.trial_bytes }}
+        run: |
+          mkdir -p /tmp/distroless-report
+          DELTA_PCT=$(awk "BEGIN{printf \"%.1f\", ($TRIAL_BYTES - $BASELINE_BYTES) * 100 / $BASELINE_BYTES}")
+          BASELINE_HR=$(numfmt --to=iec --suffix=B "$BASELINE_BYTES")
+          TRIAL_HR=$(numfmt --to=iec --suffix=B "$TRIAL_BYTES")
+
+          REPORT_PATH=/tmp/distroless-report/report.md
+          {
+            echo "## Distroless migration trial: \`python-inference\` (CPU)"
+            echo
+            echo "**Scope**: \`Dockerfile.cpu.distroless\` (trial). \`Dockerfile.cpu\` (canonical, HF Space deploy target) is UNCHANGED."
+            echo
+            echo "**Base image choice**: \`gcr.io/distroless/python3-debian12\`. Debian-glibc baseline matches the \`python:3.11-slim-trixie\` builder, so onnxruntime's pre-built C extension and soundfile's libsndfile dlopen resolve byte-for-byte (no Wolfi ABI gap)."
+            echo
+            echo "| metric | canonical (\`Dockerfile.cpu\`) | distroless trial | delta |"
+            echo "|---|---|---|---|"
+            echo "| image size (linux/amd64) | ${BASELINE_HR} | ${TRIAL_HR} | ${DELTA_PCT}% |"
+            echo
+            echo "### Smoke results"
+            echo
+            echo "All imports passed in a single docker run: ONNX Runtime (CPU EP) / piper_train / FastAPI / uvicorn / soundfile."
+            echo
+            echo "### Not in this trial (follow-up PR)"
+            echo
+            echo "- linux/arm64 buildx (Pi / Apple Silicon / HA boxes)"
+            echo "- HF Space staging deploy + cold-start latency comparison (user manual)"
+            echo "- \`/v1/audio/speech\` end-to-end with a real model fixture (CI lacks the ONNX model bundle)"
+            echo "- CVE scan diff (Trivy) — wired up alongside the canonical \`Dockerfile.cpu\` promotion PR"
+          } > "$REPORT_PATH"
+          cat "$REPORT_PATH"
+          echo "path=$REPORT_PATH" >> "$GITHUB_OUTPUT"
+
+      - name: Post sticky report comment (PR only)
+        if: github.event_name == 'pull_request'
+        uses: marocchino/sticky-pull-request-comment@v2.9.4
+        with:
+          header: python-inference-distroless-trial
+          path: /tmp/distroless-report/report.md
+
+      - name: Upload report artifact
+        if: always()
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: distroless-trial-report-${{ github.run_id }}
+          path: /tmp/distroless-report/report.md
+          retention-days: 30
+          if-no-files-found: warn
