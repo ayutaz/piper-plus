@@ -4,10 +4,26 @@
 **Milestone**: [M3 Supply Chain](../milestones/M3-supply-chain.md)
 **Proposal 項目**: `#1-5` (Distroless / Chainguard 移行 — `cpp-dev` image)
 **Tier**: Tier 3 (blast radius 小、 学習用 spike)
-**Status**: 計画中
-**PR**: (未作成)
+**Status**: 計画中 (base image 戦略の見直しが必要)
+**PR**: (未作成、 PR #524 で wolfi-base trial を試行したが scope 矛盾を発見、 ticket 再設計が前提)
 **担当 (予定)**: Claude Code (agent team) + maintainer review
 **着手前提**: なし (M3 内 distroless 5 件の **最初に着手** することを推奨。 影響範囲最小、 spike 効果最大)
+
+> **Note (PR #524 wolfi-base trial 結果)**
+>
+> PR [#524](https://github.com/ayutaz/piper-plus/pull/524) で本 ticket §2.2 推奨の `cgr.dev/chainguard/wolfi-base` を試行したが、 以下の構造的問題で **wolfi-base + apk add のみで canonical 機能 parity を取れない** ことが判明:
+>
+> 1. wolfi-base に **prebuilt package がない依存**: OpenJTalk / HTS Engine / mecab / libmecab-dev は Wolfi 公式 apk repository に未提供 (Debian apt 専用)
+> 2. **source build に必要な tooling も連鎖的に不足**: `iconv` (OpenJTalk Makefile が使う) / libtool / gettext / autoconf-archive 等が apk add で順次必要、 1 build cycle ごとに次の missing が判明する infinite chain
+> 3. **結果として「Wolfi minimal の CVE/size 削減」 という trial の目的が達成困難**: Debian package 群を Wolfi で source build で full reconstruction することになり、 base image 切替の supply-chain benefit が失われる
+>
+> **ticket 再設計の選択肢** (本 ticket は計画中に差し戻し、 別 PR で着手):
+>
+> - **A. base を `debian:12-slim` に変更**: ticket §2.2 の wolfi 推奨を撤回、 ubuntu:24.04 から debian:12-slim への切替で apt package を維持しつつ size 削減 (Wolfi ほどではないが Ubuntu からは小さい)。 distroless カテゴリではないが minimal 化の利益はある
+> - **B. cpp-dev を distroless 化スコープから除外**: dev image は shell + apt 必須 / production deploy なし / image size の優先度が低いため、 distroless 化のメリットが薄い。 M3 milestone から cpp-dev を外して 4 image (python-inference / webui / cpp-inference / wyoming) に縮小
+> - **C. Wolfi で apk add を継続的に拡張**: missing package を順次追加。 試行 cost が予測不能、 推奨しない
+>
+> 推奨は A または B。 user 判断後に別 PR で実施。
 
 > **M3 内推奨実装順**: **T-016 (本チケット)** → T-015 → T-013 → T-012 → T-014。
 > 本チケットは「distroless 移行の社内学習教材」 を兼ねる。 cpp-dev は dev 用 image であり、 ship 先 (HF Space / HA addon) が無いため、 移行失敗時の blast radius が repo 内に限定される。

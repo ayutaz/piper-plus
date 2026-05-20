@@ -34,6 +34,13 @@ trustedRegistries:
   # because distroless is the canonical "minimal supply chain" choice
   # for container images that ship just CPython + a single workload.
   - gcr.io
+  # cgr.dev/chainguard: Chainguard's Wolfi-based minimal images. Used
+  # by docker/cpp-dev/Dockerfile.distroless (wolfi-base + apk add for
+  # dev tooling). Wolfi is to-the-bone minimal (BusyBox shell + glibc),
+  # rebuilt continuously upstream, with substantially smaller CVE
+  # exposure than ubuntu:24.04. Trusted on the same footing as gcr.io
+  # for the same supply-chain reason.
+  - cgr.dev
 
 # Failure threshold: error (DL3xxx warnings won't fail, DL3xxx errors will)
 # Use --failure-threshold error to make hadolint exit non-zero only on errors.

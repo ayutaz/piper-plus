@@ -281,15 +281,30 @@ jobs:
           done
           cosign sign --yes ${images}
 
-  # Trial distroless variant of the CPU image. Build-only (never pushed
-  # to ghcr.io) until a promotion PR validates HF Space cold start. This
-  # job catches multi-arch buildx breakage that the trial workflow
-  # (python-inference-distroless-trial.yml) doesn't exercise — the trial
-  # workflow runs amd64 only because it has to A/B compare image sizes.
-  build-python-inference-cpu-distroless-trial:
+  # Trial distroless variants. Build-only (never pushed to ghcr.io)
+  # until a promotion PR validates each image's runtime behaviour
+  # (HF Space cold start for python-inference, webui-test.yml smoke
+  # for webui, container test for cpp-inference, dev-experience for
+  # cpp-dev). Each job catches multi-arch buildx breakage the
+  # per-image trial workflow doesn't exercise (those run amd64 only
+  # for A/B size comparisons).
+  build-distroless-trials:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - name: python-inference-cpu
+            dockerfile: docker/python-inference/Dockerfile.cpu.distroless
+            cache_scope: python-inference-cpu-distroless
+          - name: cpp-inference
+            dockerfile: docker/cpp-inference/Dockerfile.distroless
+            cache_scope: cpp-inference-distroless
+          - name: webui
+            dockerfile: docker/webui/Dockerfile.distroless
+            cache_scope: webui-distroless
     steps:
       - name: Free disk space
         run: |
@@ -305,17 +320,15 @@ jobs:
         uses: docker/build-push-action@v7.1.0
         with:
           context: .
-          file: ./docker/python-inference/Dockerfile.cpu.distroless
+          file: ${{ matrix.target.dockerfile }}
           # Same arch coverage as the canonical CPU image — proves the
-          # builder (debian:slim) + final (distroless/python3-debian12)
-          # combo works for arm64 too, which the trial workflow's
-          # amd64-only A/B run can't cover.
+          # multi-stage builder + final combo works for arm64 too.
           platforms: linux/arm64,linux/amd64
           push: false
           load: false
-          tags: piper-plus-inference:cpu-distroless-trial
-          cache-from: type=gha,scope=python-inference-cpu-distroless
-          cache-to: type=gha,mode=max,scope=python-inference-cpu-distroless
+          tags: piper-plus-${{ matrix.target.name }}:distroless-trial
+          cache-from: type=gha,scope=${{ matrix.target.cache_scope }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.target.cache_scope }}
 
   build-python-train:
     runs-on: ubuntu-latest

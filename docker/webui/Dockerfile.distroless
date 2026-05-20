@@ -1,0 +1,142 @@
+# WebUI image (distroless trial, multi-stage).
+#
+# Trial variant of docker/webui/Dockerfile that swaps the
+# python:3.13.13-slim-trixie single-stage build for:
+#   builder = python:3.11-slim-trixie (matches docker/python-inference/
+#             Dockerfile.cpu.distroless so wheels + shared libs are the
+#             same Debian-glibc ABI across both images)
+#   final   = gcr.io/distroless/python3-debian12
+#
+# The canonical docker/webui/Dockerfile stays UNCHANGED so docker-compose
+# and webui-test.yml continue to operate against the proven image.
+# Promotion to canonical is a follow-up PR after the trial verifies
+# Gradio cold-start works under distroless.
+#
+# Why this layout matches T-012 (python-inference):
+#   * Same Python 3.11 minor (no version drift between the two images
+#     that consumers run side by side).
+#   * Same Debian-glibc ABI between builder and final — the
+#     onnxruntime / soundfile C extensions copied from the builder
+#     resolve cleanly inside the distroless final stage.
+#   * Same /usr/bin/python3 absolute-path invocation everywhere
+#     (distroless does NOT provide a `python` alias on PATH).
+#
+# Build (from project root):
+#   docker buildx build \
+#     --platform linux/amd64,linux/arm64 \
+#     -f docker/webui/Dockerfile.distroless \
+#     -t piper-plus-webui:distroless-trial \
+#     .
+
+# ----------------------------------------------------------------------
+# Stage 1: builder (Debian-based, has apt/pip).
+# ----------------------------------------------------------------------
+FROM python:3.11-slim-trixie AS builder
+
+ENV PYTHONUNBUFFERED=1
+ENV DEBIAN_FRONTEND=noninteractive
+
+# libsndfile1 + libsndfile1-dev provide the .so + headers the soundfile
+# Python wheel links against at install AND import time. build-essential
+# / cmake are needed because pyopenjtalk-plus (a transitive dep through
+# piper-plus-g2p[all] on arm64) builds C extensions from source.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    cmake \
+    g++ \
+    libsndfile1 \
+    libsndfile1-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Pin uv. The canonical docker/webui/Dockerfile currently does an
+# unpinned `pip install uv`; pinning here is intentional drift to
+# protect the trial build against a future breaking uv release.
+# Promotion PR will reconcile the canonical to match this pin.
+RUN pip install --no-cache-dir "uv>=0.9,<1"
+
+WORKDIR /build
+
+COPY VERSION /build/VERSION
+COPY pyproject.toml /build/pyproject.toml
+COPY src/python /build/src/python
+COPY src/python_run/requirements_webui.txt /build/requirements_webui.txt
+
+# Install into system Python so /usr/local/lib/python3.11/site-packages
+# becomes a self-contained tree we can COPY into the distroless final.
+RUN uv pip install --system "/build/src/python[inference]"
+RUN uv pip install --system -r /build/requirements_webui.txt
+
+ENV NLTK_DATA=/usr/share/nltk_data
+RUN python -c "import nltk; \
+nltk.download('averaged_perceptron_tagger', download_dir='/usr/share/nltk_data'); \
+nltk.download('averaged_perceptron_tagger_eng', download_dir='/usr/share/nltk_data'); \
+nltk.download('cmudict', download_dir='/usr/share/nltk_data')"
+
+# Builder-side smoke. Fail fast here if the wheel install / Gradio /
+# soundfile / onnxruntime can't even import in the build environment.
+RUN python --version && \
+    python -c "import platform; print(f'builder arch: {platform.machine()}')" && \
+    python -c "import onnxruntime as ort; print(f'ONNX Runtime: {ort.__version__}'); print(f'Providers: {ort.get_available_providers()}')" && \
+    python -c "import piper_train; print('piper_train OK')" && \
+    python -c "import gradio; print(f'Gradio: {gradio.__version__}')" && \
+    python -c "import soundfile; print(f'soundfile: {soundfile.__version__}')"
+
+# Stage the arch-dependent shared libs into an arch-neutral location.
+# Same trick as python-inference: hardcoding /usr/lib/x86_64-linux-gnu/
+# breaks the linux/arm64 build (the directory is aarch64-linux-gnu there).
+# Resolving the wildcard once during the builder hands the final stage
+# a single deterministic path to COPY from.
+RUN set -eux; \
+    mkdir -p /opt/runtime-libs; \
+    for lib in libsndfile libgomp libFLAC libvorbis libvorbisenc libogg libopus libmpg123; do \
+      cp -a /usr/lib/*-linux-gnu/${lib}.so* /opt/runtime-libs/ 2>/dev/null || true; \
+    done; \
+    ls -la /opt/runtime-libs/
+
+# ----------------------------------------------------------------------
+# Stage 2: distroless final.
+# ----------------------------------------------------------------------
+FROM gcr.io/distroless/python3-debian12
+
+COPY --from=builder /opt/runtime-libs/ /usr/lib/
+COPY --from=builder /usr/local/lib/python3.11 /usr/local/lib/python3.11
+COPY --from=builder /usr/share/nltk_data /usr/share/nltk_data
+
+ENV PYTHONPATH=/usr/local/lib/python3.11/site-packages
+ENV NLTK_DATA=/usr/share/nltk_data
+ENV PYTHONUNBUFFERED=1
+ENV GRADIO_SERVER_NAME=0.0.0.0
+ENV GRADIO_SERVER_PORT=7860
+
+# Bring in the WebUI entrypoint and the Python port of the Bash
+# wrapper. The canonical docker/webui/entrypoint.sh has real logic:
+#   * resolves $PIPER_MODEL_DIR (default /models)
+#   * if $PIPER_MODEL is set, downloads the model via
+#     piper_train.model_manager.download_model
+#   * exec's `python /app/app.py --model-dir <dir> --output-dir <out> $@`
+# Distroless has no shell, so we port that to entrypoint_distroless.py
+# (kept beside app.py in the repo) and ENTRYPOINT into the Python
+# interpreter directly. Behavioural parity for $PIPER_MODEL /
+# $PIPER_MODEL_DIR / $PIPER_OUTPUT_DIR is preserved.
+COPY docker/webui/app.py /app/app.py
+COPY docker/webui/entrypoint_distroless.py /app/entrypoint_distroless.py
+
+WORKDIR /app
+
+# Explicit USER declaration. gcr.io/distroless/python3-debian12 already
+# defaults to UID 65532 (nonroot), but Trivy's static Dockerfile linter
+# (DS-0002) requires an explicit `USER` directive, not a base-image
+# default, so the policy is auditable from the Dockerfile alone.
+USER 65532
+
+EXPOSE 7860
+
+# distroless/python3-debian12 ships /usr/bin/python3 only (no `python`
+# alias on PATH). Use the absolute interpreter path so the HEALTHCHECK
+# never depends on PATH resolution. Gradio's default health endpoint
+# lives at /, so we hit that — the canonical webui image had no
+# HEALTHCHECK at all; this trial adds one.
+HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
+    CMD ["/usr/bin/python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:7860/')"]
+
+ENTRYPOINT ["/usr/bin/python3", "/app/entrypoint_distroless.py"]

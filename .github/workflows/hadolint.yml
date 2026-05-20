@@ -31,6 +31,7 @@ jobs:
         dockerfile:
           - docker/cpp-dev/Dockerfile
           - docker/cpp-inference/Dockerfile
+          - docker/cpp-inference/Dockerfile.distroless
           - docker/cpp-inference/Dockerfile.test
           - docker/python-inference/Dockerfile
           - docker/python-inference/Dockerfile.cpu
@@ -38,6 +39,7 @@ jobs:
           - docker/python-train/Dockerfile
           - docker/wyoming/Dockerfile
           - docker/webui/Dockerfile
+          - docker/webui/Dockerfile.distroless
 
     steps:
       - uses: actions/checkout@v6.0.2

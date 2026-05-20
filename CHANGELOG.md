@@ -17,6 +17,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### 2 image distroless trial Dockerfiles + CI (webui / cpp-inference)
+
+PR #523 (python-inference) で確立した distroless trial pattern を、 deploy 検証要件のない 2 image に bundle 適用。 既存 `Dockerfile` / `docker-compose` / 関連 CI は **不変更で残し**、 並行 `Dockerfile.distroless` を 2 枚追加して build / size A/B / smoke test を CI で実証する scope。 promotion (canonical 置換) は image 別に別 PR。
+
+- **`docker/webui/Dockerfile.distroless`** (Python + Gradio): multi-stage、 builder = `python:3.11-slim-trixie`、 final = `gcr.io/distroless/python3-debian12`。 PR #523 と同型 Debian-glibc ABI 統一、 `/usr/bin/python3` 絶対パス起動、 arch-neutral lib staging。 site-packages + NLTK data を builder から COPY、 ENTRYPOINT は `python3 /app/app.py` (canonical の `entrypoint.sh` は shell なしのため使えず、 実体は同等の単一行 exec)、 明示的 `USER 65532` を Trivy DS-0002 対応
+- **`docker/cpp-inference/Dockerfile.distroless`** (C++ runtime): builder = `debian:12-slim` (canonical の ubuntu:24.04 から変更、 distroless/cc-debian12 = Debian 12 glibc 2.36 との ABI 一致のため)、 final = `gcr.io/distroless/cc-debian12`。 piper binary + ONNX Runtime / libgomp shared lib + OpenJTalk 辞書を COPY。 libgomp は arch-neutral staging で bring-over。 canonical の `entrypoint.sh` (shell) → ENTRYPOINT に直接 `/usr/local/bin/piper` 化
+- **新規 CI workflow** (`.github/workflows/docker-distroless-trial.yml`): PR base + workflow_dispatch、 2 image matrix で build (canonical baseline + distroless trial) → size 比較 → smoke (webui: Gradio import / cpp-inference: piper --version) → aggregate sticky comment 投稿
+- **既存 workflow chain 統合**: `hadolint.yml` matrix に 2 Dockerfile 追加、 `trivy-container-scan.yml` matrix に 2 target 追加、 `docker-build.yml` の `build-distroless-trials` matrix job (multi-arch linux/arm64 + linux/amd64) に統合 (PR #523 で導入した python-inference distroless と合わせて 3 image trial が 1 job matrix で並走)
+- **hadolint config 拡張**: `.hadolint.yaml` の `trustedRegistries` に `cgr.dev` を allow-list 追加 (将来の Wolfi 採用に備えた forward-compat、 本 PR では未使用)
+- **promotion path**: 各 trial で build + size 効果が確認できた後、 image 別に canonical 置換 PR を作成 (webui は webui-test.yml smoke、 cpp-inference は container test gate での実モデル E2E が前提)
+- **T-016 cpp-dev は本 PR から除外**: ticket §2.2 で推奨されていた `cgr.dev/chainguard/wolfi-base` で trial したところ、 canonical Dockerfile が依存する OpenJTalk / mecab tooling chain が Debian apt package 前提で組まれており、 Wolfi で source build を full chain で組むには iconv / libtool / gettext 等の missing package を順次追加していく形となり、 trial の目的 (Wolfi minimal の CVE/size 削減効果) を達成する前に Debian package 群を full reconstruction することになると判明。 T-016 ticket 自体の base image 戦略見直し (debian:12-slim 等への切替) を別 PR で扱う
+
 #### `python-inference` distroless trial Dockerfile + CI (`Dockerfile.cpu.distroless`)
 
 `docker/python-inference/` の distroless 化を derisk する **trial PR**。 既存 `Dockerfile.cpu` と `docker-compose.yml` / `.github/workflows/deploy-huggingface.yml` (HF Space deploy 経路) は **不変更で残し**、 並行 `Dockerfile.cpu.distroless` を新設して build / size / smoke test を CI で実証する scope。
