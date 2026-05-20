@@ -4,8 +4,8 @@
 **Milestone**: [M3 Supply Chain](../milestones/M3-supply-chain.md)
 **Proposal 項目**: `#1-2` (Distroless / Chainguard 移行 — `webui` image)
 **Tier**: Tier 3 (Gradio demo、 中影響)
-**Status**: 着手中 (trial PR scope: 並行 Dockerfile.distroless 新設、 既存 Dockerfile / docker-compose / webui-test.yml は不変更)
-**PR**: #524 (T-015 と同 PR で 2 image bundle。 T-016 は wolfi 試行で scope 矛盾発覚し別 PR に分離)
+**Status**: 着手中 (trial 投入済 — PR #524 merged 2026-05-20。 `docker/webui/Dockerfile.distroless` 新設、 既存 Dockerfile / docker-compose / webui-test.yml は不変更。 canonical 置換は promotion PR で別途、 観測期間後に着手)
+**PR**: #524 (merged 2026-05-20、 T-015 と同 PR で 2 image bundle。 T-016 は wolfi 試行で scope 矛盾発覚し別 PR に分離)
 **担当 (予定)**: Claude Code (agent team) + maintainer review
 **着手前提**: T-015 完了推奨 (`pyopenjtalk` C 拡張の multi-stage knowledge を流用)
 
@@ -342,3 +342,4 @@ format (FR-1.4): T-016 と同 format に Gradio 起動 sample 結果を追加:
 | 日付 | 変更 | 担当 |
 |------|------|------|
 | 2026-05-19 | 初版 | Claude Code |
+| 2026-05-20 | trial PR #524 merged。 `docker/webui/Dockerfile.distroless` + `entrypoint_distroless.py` 投入、 canonical Dockerfile / entrypoint.sh は不変更。 image size 918MB → 756MB (-17.7%)。 promotion (canonical 置換 + Gradio 実 cold-start 検証 + webui-test.yml 統合) は別 PR で観測期間後に実施。 | Claude Code |
