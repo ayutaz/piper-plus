@@ -281,6 +281,42 @@ jobs:
           done
           cosign sign --yes ${images}
 
+  # Trial distroless variant of the CPU image. Build-only (never pushed
+  # to ghcr.io) until a promotion PR validates HF Space cold start. This
+  # job catches multi-arch buildx breakage that the trial workflow
+  # (python-inference-distroless-trial.yml) doesn't exercise — the trial
+  # workflow runs amd64 only because it has to A/B compare image sizes.
+  build-python-inference-cpu-distroless-trial:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost "$AGENT_TOOLSDIRECTORY" /usr/local/lib/android /opt/hostedtoolcache/CodeQL
+          sudo docker image prune --all --force
+          sudo apt-get clean
+
+      - uses: actions/checkout@v6.0.2
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v4.0.0
+
+      - name: Build distroless trial image (multi-arch, no push)
+        uses: docker/build-push-action@v7.1.0
+        with:
+          context: .
+          file: ./docker/python-inference/Dockerfile.cpu.distroless
+          # Same arch coverage as the canonical CPU image — proves the
+          # builder (debian:slim) + final (distroless/python3-debian12)
+          # combo works for arm64 too, which the trial workflow's
+          # amd64-only A/B run can't cover.
+          platforms: linux/arm64,linux/amd64
+          push: false
+          load: false
+          tags: piper-plus-inference:cpu-distroless-trial
+          cache-from: type=gha,scope=python-inference-cpu-distroless
+          cache-to: type=gha,mode=max,scope=python-inference-cpu-distroless
+
   build-python-train:
     runs-on: ubuntu-latest
     permissions:
