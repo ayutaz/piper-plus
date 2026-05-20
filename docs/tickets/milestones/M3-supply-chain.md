@@ -128,7 +128,7 @@ SLSA L3 は **builder identity + isolation + non-falsifiable provenance** を要
 
 ```bash
 in-toto-attestation create --predicate-type https://slsa.dev/provenance/v1 \
-  --subject <asset> --predicate <generated-predicate.json> > attestation.intoto.jsonl
+  --subject '<asset>' --predicate '<generated-predicate.json>' > attestation.intoto.jsonl
 cosign sign-blob --keyless ... attestation.intoto.jsonl > attestation.sig
 ```
 

@@ -288,9 +288,9 @@ jobs:
 - 既存資産: [`scripts/check_readme_code_examples.py`](../../../scripts/check_readme_code_examples.py) (シンボル grep gate、 本 PR で置換しない、 並存維持)
 - 関連 spec: `docs/spec/doc-examples-contract.toml` (T-009 で新規、 T-010 で `[execute]` 追加、 本 PR で tier 昇格)
 - 関連 workflow: `.github/workflows/doc-examples-gate.yml` (T-010 で新規、 本 PR で `continue-on-error: true` 削除)
-- 前提: [`T-009-doc-examples-audit.md`](T-009-doc-examples-audit.md), [`T-010-doc-examples-gate.md`](T-010-doc-examples-gate.md) (両方 merge 必須 + T-010 merge 後 1 ヶ月観測完了)
+- 前提 PR: PR #520 (doc examples audit、 旧 T-009) + PR #521 (doc examples informational gate、 旧 T-010)。 両方 merge 後 + gate の 1 ヶ月観測完了が本チケット着手の前提。 旧 ticket file は完了 closeout で削除済み、 履歴は merged PR と git log を canonical reference として参照
 - 親 milestone: [`../milestones/M2-spec-and-docs.md`](../milestones/M2-spec-and-docs.md)
-- 類似 chain (informational → blocker 昇格 pattern): `#3` Rekor + SHA drift (T-001 / T-002)、 CON-3.1 に同型 informational tier 固定 → 4 週連続 fp 0 で user 判断
+- 類似 chain (informational → blocker 昇格 pattern): `#3` Rekor + SHA drift (旧 T-001 / T-002 = PR #513 で完了)、 CON-3.1 に同型 informational tier 固定 → 4 週連続 fp 0 で user 判断
 
 ---
 

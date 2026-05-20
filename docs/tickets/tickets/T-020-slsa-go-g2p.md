@@ -35,7 +35,7 @@ PR #511 後の現状:
   slsa-verifier verify-artifact source.tar.gz \
     --provenance-path source.tar.gz.intoto.jsonl \
     --source-uri github.com/ayutaz/piper-plus \
-    --source-tag go-g2p-v<version>
+    --source-tag go-g2p-v'<version>'
   ```
 
   Go module の場合 subject は **`git archive` で生成した source tarball** (`source.tar.gz`) を canonical とする。 binary asset がないため。

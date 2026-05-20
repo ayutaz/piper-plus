@@ -52,7 +52,7 @@ uvx mutmut run --paths-to-mutate src/python_run/piper/text_splitter.py
 # 結果確認
 uvx mutmut results        # survived/killed の summary
 uvx mutmut html           # html/index.html を生成 (CI artifact 化)
-uvx mutmut show <id>      # 個別 mutant の diff
+uvx mutmut show '<id>'    # 個別 mutant の diff (id を実値に置換)
 ```
 
 ### Rust (`cargo-mutants`)

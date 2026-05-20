@@ -33,10 +33,10 @@ PR #511 後の現状:
 - [ ] **AC-2.1**: 以下コマンドが exit 0 を返す:
 
   ```bash
-  slsa-verifier verify-artifact piper-plus-<version>.tgz \
-    --provenance-path piper-plus-<version>.tgz.intoto.jsonl \
+  slsa-verifier verify-artifact piper-plus-'<version>'.tgz \
+    --provenance-path piper-plus-'<version>'.tgz.intoto.jsonl \
     --source-uri github.com/ayutaz/piper-plus \
-    --source-tag npm-v<version>
+    --source-tag npm-v'<version>'
   ```
 
   subject は `npm pack` で生成された `.tgz` tarball (既存 attestation pattern と同一)。

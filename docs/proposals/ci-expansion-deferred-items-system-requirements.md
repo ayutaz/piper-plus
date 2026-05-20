@@ -740,7 +740,7 @@ Body:
 
 本要件定義書は [`docs/tickets/`](../tickets/README.md) で 4 milestone × 23 ticket に分解済み。 Tier 1 (T-001〜T-003) は本書 §3 の I/O 仕様・データ構造を直接参照、 Tier 2 / Tier 3 は本書 §4 の overview を元に各 ticket §2 で詳細化:
 
-- [M1 Foundations](../tickets/milestones/M1-foundations.md) — T-001 / T-002 / T-003
+- ~~M1 Foundations~~ — 旧 T-001 / T-002 / T-003。 **完了 (PR #513 merged、 2026-05-19)**。 milestone 文書および配下 ticket file は完了 closeout で削除済み、 履歴は merged PR と git log を canonical reference として参照
 - [M2 Spec & Docs Gates](../tickets/milestones/M2-spec-and-docs.md) — T-004〜T-011
 - [M3 Supply Chain](../tickets/milestones/M3-supply-chain.md) — T-012〜T-021
 - [M4 Docs Infra](../tickets/milestones/M4-docs-infra.md) — T-022 / T-023

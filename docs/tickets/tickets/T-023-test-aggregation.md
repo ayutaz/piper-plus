@@ -365,7 +365,7 @@ retry_count > 0 は **silent flake 警告**: sticky comment で `retry: N` を�
 - Milestone: [`M4 Docs Infra`](../milestones/M4-docs-infra.md) §3 (AC) / §4 (Phase rethink: SaaS / 分離)
 - 既存 workflow (流用): `.github/workflows/coverage-aggregation.yml` (DEP-8.1)、 `.github/workflows/runtime-parity-deep.yml` (DEP-8.3、 sticky comment pattern)
 - 既存 skill (住み分け): `.claude/skills/check-cross-runtime/SKILL.md` (FR-8.4)
-- 前提 ticket: [T-001 Rekor](T-001-rekor-verify.md) / [T-002 Action SHA drift](T-002-action-sha-drift.md) / [T-003 CLI help](T-003-cli-help-extract.md) (M1 sticky pattern 確立)
+- 前提 PR: PR #513 (Rekor verify + Action SHA drift + 6 runtime CLI help canonical、 sticky pattern 確立)。 旧 ticket file (T-001 / T-002 / T-003) は完了 closeout で削除済み、 履歴は merged PR と git log を canonical reference として参照
 - 関連 ticket: [T-022](T-022-mkdocs-material.md) (FR-6.6 dashboard 統合判断)
 - PR #511 phase 2 argparse `nargs="*"` last-wins bug (silent-zero 教訓の源流)
 - 親 index: [`../README.md`](../README.md)
