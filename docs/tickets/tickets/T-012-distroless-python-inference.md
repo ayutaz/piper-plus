@@ -4,10 +4,20 @@
 **Milestone**: [M3 Supply Chain](../milestones/M3-supply-chain.md)
 **Proposal 項目**: `#1-1` (Distroless / Chainguard 移行 — `python-inference` image)
 **Tier**: Tier 3 (HF Space deploy 対象、 **影響最大**)
-**Status**: 計画中
-**PR**: (未作成)
+**Status**: 着手中 (trial PR scope: 並行 Dockerfile.cpu.distroless 新設、 既存 Dockerfile.cpu と docker-compose / HF Space deploy path は不変更)
+**PR**: feat/python-inference-distroless-trial (/create-pr skill で起票予定)
 **担当 (予定)**: Claude Code (agent team) + maintainer review
 **着手前提**: T-013 完了必須 (Gradio + pyopenjtalk distroless multi-stage 知見を確立してから着手)
+
+> **Trial PR scope note (PR #TBD)**
+>
+> M3 distroless 化を順序を変更して **T-012 自体を trial PR として derisk** する方針に変更。 ticket original の「T-016 → T-015 → T-013 → T-012 → T-014」 順序より先に T-012 着手する理由:
+>
+> - 既存 `Dockerfile.cpu` を **不変更で残し** 並行 `Dockerfile.cpu.distroless` を新設、 既存 deployment path への影響ゼロ
+> - HF Space deploy 検証は user 手動 step (AC-1.2)、 trial 期間中は staging slot のみ使用、 promotion (canonical 置換) は別 PR
+> - linux/amd64 single-arch build のみ CI で実行、 multi-arch (arm64) build は次 PR
+>
+> trial PR で「distroless build が成立し size 削減効果がある」 ことを実証してから T-013/T-014/T-015/T-016 + canonical 置換 PR に進む 5+ PR cadence。
 
 > **M3 内推奨実装順**: T-016 → T-015 → T-013 → **T-012 (本チケット)** → T-014。
 > 本 image は HuggingFace Space (`ayousanz/piper-plus`) の deploy 対象であり、 cold start 失敗が user-facing 影響を直接発生させる (R-4)。 T-013 (webui) 完了で Python distroless multi-stage を spike 済みの状態で着手する。

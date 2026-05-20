@@ -17,6 +17,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### `python-inference` distroless trial Dockerfile + CI (`Dockerfile.cpu.distroless`)
+
+`docker/python-inference/` の distroless 化を derisk する **trial PR**。 既存 `Dockerfile.cpu` と `docker-compose.yml` / `.github/workflows/deploy-huggingface.yml` (HF Space deploy 経路) は **不変更で残し**、 並行 `Dockerfile.cpu.distroless` を新設して build / size / smoke test を CI で実証する scope。
+
+- **新規 Dockerfile** (`docker/python-inference/Dockerfile.cpu.distroless`): multi-stage build (builder = `python:3.13-slim-trixie`、 final = `cgr.dev/chainguard/python:latest`)。 builder で `piper_plus_g2p[all]` + `piper_train[inference]` + Gradio WebUI requirements + NLTK data を install、 final へ Python site-packages + `/usr/local/bin/uvicorn` + 必要な shared libs (libsndfile / libgomp / libFLAC / libvorbis / libogg / libopus / libmpg123) を COPY
+- **新規 CI workflow** (`.github/workflows/python-inference-distroless-trial.yml`): PR base + workflow_dispatch、 canonical `Dockerfile.cpu` を baseline として build、 distroless trial を build、 image size を比較、 import smoke test 2 種 (ONNX Runtime / piper_train / FastAPI / soundfile import 確認) を実行、 PR コメントに distroless trial report を sticky 投稿
+- **scope 限定**: linux/amd64 single-arch CI build のみ (multi-arch は別 PR で buildx)、 `/v1/audio/speech` E2E は CI に ONNX model fixture 配置が前提のため別 PR、 CVE 比較 (Trivy) も canonical 置換 PR 側で実施。 HF Space staging deploy 検証は user 手動 step (Claude Code は実行不可)
+- **promotion path**: trial PR で「build 成立 + size 削減効果」 が確認できた後、 別 PR で `Dockerfile.cpu` 自体を置換 (HF Space staging で cold start 検証後)
+
 #### docs/ fenced code blocks の execution gate (`scripts/check_doc_examples.py execute`)
 
 audit gate (`scripts/check_doc_examples.py audit`) で生成した canonical snapshot を入力に、 `executable` category の block を **syntax-validation default** で sandbox 実行する informational tier gate を追加。 加えて `test-flake-retry-contract.toml` の `applies_to` を 4 → 8 runtime に拡張し full scope 化。
