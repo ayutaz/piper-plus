@@ -164,10 +164,15 @@ RUN chmod +x /workspace/build.sh /workspace/test.sh && \
 # Verify the dev toolchain on image build. If any of these fail, the
 # image is non-functional and we want to know during CI rather than
 # the first developer pull.
+#
+# `gdb --version` is intentionally NOT piped through `head -n1` to keep
+# this RUN free of `|` — hadolint's DL4006 is enforced even when the
+# Dockerfile-level SHELL directive sets pipefail, so the safest answer
+# is to remove pipes from verification steps.
 RUN set -eux; \
     cmake --version; \
     clang --version; \
-    gdb --version | head -n1; \
+    gdb --version; \
     python3 --version; \
     test -f /usr/local/lib/libonnxruntime.so; \
     test -d /usr/local/share/open_jtalk || test -f /usr/local/bin/open_jtalk
