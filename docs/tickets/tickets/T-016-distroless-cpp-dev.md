@@ -4,12 +4,30 @@
 **Milestone**: [M3 Supply Chain](../milestones/M3-supply-chain.md)
 **Proposal 項目**: `#1-5` (Distroless / Chainguard 移行 — `cpp-dev` image)
 **Tier**: Tier 3 (blast radius 小、 学習用 spike)
-**Status**: 計画中 (base image 戦略の見直しが必要)
-**PR**: (未作成、 PR #524 で wolfi-base trial を試行したが scope 矛盾を発見、 ticket 再設計が前提)
-**担当 (予定)**: Claude Code (agent team) + maintainer review
-**着手前提**: なし (M3 内 distroless 5 件の **最初に着手** することを推奨。 影響範囲最小、 spike 効果最大)
+**Status**: 除外確定 (M3 distroless scope-out 2026-05-20)
+**PR**: PR #524 (wolfi-base trial 実施 → scope 矛盾実証 → cpp-dev は除外確定)
+**担当 (予定)**: ―
+**着手前提**: ―
 
-> **Note (PR #524 wolfi-base trial 結果)**
+> **Note (2026-05-20 scope-out 確定)**
+>
+> 本 ticket は M3 distroless 移行 scope から **除外確定**。 大目的「production image の CVE 80%+ 削減 / size 50%+ 削減」 に対する寄与が限定的、 かつ ticket §1 の本来目的 (「学習用 spike」) は PR #524 で webui + cpp-inference の trial bundle により達成済。
+>
+> 除外根拠 (2 点):
+>
+> 1. **spike 目的が達成済**: ticket §1 で取得目的とされた multi-stage build pattern (Python C 拡張 / shared lib path / ABI 整合 / entrypoint 移植) は、 PR #524 の webui (Python + soundfile + NLTK + Gradio) と cpp-inference (C++ + ldconfig + glibc ABI 整合) で全て実証済。 cpp-dev で同等の spike を再実施する追加価値なし
+> 2. **dev image は distroless 哲学と本質的に不整合**: cmake / clang / gdb / valgrind を final stage に同居させないと dev experience が成立せず、 builder = final が事実上強制される。 PR #524 wolfi-base 試行で apk packaging 不足 (OpenJTalk / mecab / HTS Engine / iconv chain) も判明、 minimal 化の利益が消える構造。 加えて cpp-dev は GHCR で公開されているが **production 推論経路ではない dev image** (推論 user の attack surface ではない) ため、 supply chain 大目的への寄与も薄い
+>
+> 採用しない選択肢 (履歴記録):
+>
+> - **A. debian:12-slim 切替**: 「distroless 化」 ではないため M3 §1 FR-1.2 (cgr.dev/chainguard or gcr.io/distroless 二択) と不整合。 size 局所最適化として価値はあるが、 別 ticket (`docs/tickets/proposals/cpp-dev-base-optimization.md` 等) として再立案するのが integrity 上 clean
+> - **C. wolfi 継続**: 下記旧 Note の apk infinite chain により目的達成不能、 試行 cost 不明
+>
+> 大目的 (supply chain 防御) は残 4 image (T-012 python-inference / T-013 webui / T-014 wyoming / T-015 cpp-inference) で完結する。 M3 milestone は **distroless × 4 image** に scope 縮小。
+
+---
+
+> **旧 Note (PR #524 wolfi-base trial 結果、 履歴記録)**
 >
 > PR [#524](https://github.com/ayutaz/piper-plus/pull/524) で本 ticket §2.2 推奨の `cgr.dev/chainguard/wolfi-base` を試行したが、 以下の構造的問題で **wolfi-base + apk add のみで canonical 機能 parity を取れない** ことが判明:
 >
@@ -318,3 +336,4 @@ Comparison run at: <ISO-8601 timestamp>
 | 日付 | 変更 | 担当 |
 |------|------|------|
 | 2026-05-19 | 初版 | Claude Code |
+| 2026-05-20 | M3 distroless scope から除外確定。 PR #524 で webui + cpp-inference trial が成功し spike 目的 (multi-stage pattern / ABI 整合 / entrypoint 移植) は達成済。 cpp-dev は dev image (production 推論経路なし) で distroless 哲学と構造的不整合のため、 大目的 (supply chain 防御) への寄与が限定的と判断。 ticket は履歴 / 再着手時の参照用として保持、 M3 は 4 image (T-012 / T-013 / T-014 / T-015) に scope 縮小。 | Claude Code |

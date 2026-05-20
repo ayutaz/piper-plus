@@ -17,11 +17,13 @@
 
 両者とも **1 PR で 1 image / 1 registry** の cadence。 一括移行禁止 (R-2 / R-4 緩和)。
 
+> **2026-05-20 scope 変更**: Distroless は **5 image → 4 image** に縮小。 cpp-dev (T-016) は scope-out 確定。 理由は PR #524 で spike 目的 (multi-stage pattern / ABI 整合 / entrypoint 移植) が webui + cpp-inference の trial bundle により達成済、 加えて dev image は distroless 哲学と本質的に不整合 (cmake/gdb 等を final stage に残さざるを得ない) で大目的への寄与が限定的なため。 詳細は [T-016 §Note](../tickets/T-016-distroless-cpp-dev.md) 参照。
+
 ---
 
 ## 2. 配下チケット
 
-### Distroless × 5 image (`python-train` は GPU CUDA toolkit 依存で対象外)
+### Distroless × 4 image (`python-train` は GPU CUDA toolkit 依存で対象外、 `cpp-dev` は 2026-05-20 scope-out)
 
 | ID | タイトル | 提案項目 | 影響範囲 | Status | PR |
 |----|--------|---------|--------|--------|----|
@@ -29,7 +31,7 @@
 | [T-013](../tickets/T-013-distroless-webui.md) | `webui` distroless 化 | `#1-2` | Gradio demo | 計画中 | — |
 | [T-014](../tickets/T-014-distroless-wyoming.md) | `wyoming` distroless 化 | `#1-3` | Home Assistant addon | 計画中 | — |
 | [T-015](../tickets/T-015-distroless-cpp-inference.md) | `cpp-inference` distroless 化 | `#1-4` | C++ runtime image | 計画中 | — |
-| [T-016](../tickets/T-016-distroless-cpp-dev.md) | `cpp-dev` distroless 化 | `#1-5` | C++ dev image | 計画中 | — |
+| ~~[T-016](../tickets/T-016-distroless-cpp-dev.md)~~ | ~~`cpp-dev` distroless 化~~ | ~~`#1-5`~~ | C++ dev image | **除外確定 (2026-05-20)** | PR #524 (spike 結果) |
 
 ### SLSA L3 × 5 registry (PyPI / NuGet は新設要否を user 判断)
 
@@ -43,7 +45,7 @@
 
 ### 依存関係
 
-- Distroless 5 件は互いに独立、 並列実装可 (推奨実装順: 最も影響範囲が広い `python-inference` を最後にして、 学習を `cpp-dev` などから取る)
+- Distroless 4 件は互いに独立、 並列実装可 (cpp-dev による spike は PR #524 で webui + cpp-inference の trial bundle に置換され達成済、 残 T-012 / T-014 は trial 観測期間後の promotion + canonical 置換が主タスク)
 - SLSA L3 5 件も互いに独立だが、 **最初の 1 件 (推奨: T-019 crates.io、 GPG 署名共存制約なし)** を merged して運用知見を取ってから残 4 件に着手 (R-2 緩和)
 - Distroless と SLSA L3 は independence (異なる workflow を扱う)
 
@@ -197,3 +199,4 @@ cosign sign-blob --keyless ... attestation.intoto.jsonl > attestation.sig
 | 日付 | 変更 | 担当 |
 |------|------|------|
 | 2026-05-19 | 初版 | Claude Code |
+| 2026-05-20 | Distroless scope を 5 image → 4 image に縮小 (cpp-dev / T-016 scope-out 確定)。 PR #524 で webui (T-013) + cpp-inference (T-015) の trial bundle merged により spike 目的達成、 cpp-dev は production 経路なし & distroless 不整合で除外。 個別 ticket Status の merged 反映 (T-012 PR #523 / T-013 + T-015 PR #524) は別 PR で扱う。 | Claude Code |
