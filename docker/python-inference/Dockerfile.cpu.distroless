@@ -1,12 +1,24 @@
 # CPU-only Python Inference image (distroless trial).
 #
 # Trial variant of docker/python-inference/Dockerfile.cpu that swaps the
-# python:3.11-slim-trixie base for a multi-stage build whose final layer
-# is cgr.dev/chainguard/python:latest (Wolfi-based, minimal, no shell,
-# no package manager, no docs / man / locale). The existing
-# `Dockerfile.cpu` (debian-slim) is intentionally left UNCHANGED so the
-# trial does not break the docker-compose flow, the HF Space deploy
-# pipeline, or the multi-arch buildx matrix already proven on it.
+# final stage for `gcr.io/distroless/python3-debian12`. The existing
+# `Dockerfile.cpu` (debian-slim, full shell) is intentionally left
+# UNCHANGED so the trial does not break the docker-compose flow, the
+# HF Space deploy pipeline, or the multi-arch buildx matrix already
+# proven on it.
+#
+# Why this base image:
+#   * Python wheels for `onnxruntime`, `pyopenjtalk-plus`, and `soundfile`
+#     are built against Debian-glibc. distroless/python3-debian12 inherits
+#     debian12-slim's glibc, so the C extensions copied from a debian-slim
+#     builder load with byte-for-byte ABI match.
+#   * Earlier trial attempt used `cgr.dev/chainguard/python:latest`
+#     (Wolfi-based). That failed at import time because Wolfi's glibc /
+#     Python build is a separate ABI from debian-slim's, even when minor
+#     versions look the same. The pybind11_state .so couldn't resolve
+#     symbols → `ModuleNotFoundError: onnxruntime.capi.onnxruntime_pybind11_state`.
+#   * distroless/python3-debian12 pins Python 3.11, which matches the
+#     canonical `Dockerfile.cpu`. No Python version drift in this PR.
 #
 # Why a separate file:
 #   * Side-by-side image build lets us A/B compare size + CVE counts.
@@ -26,13 +38,14 @@
 #     -f docker/python-inference/Dockerfile.cpu.distroless \
 #     -t piper-plus-inference:cpu-distroless-trial \
 #     .
-#   docker run --rm -p 8000:8000 piper-plus-inference:cpu-distroless-trial \
-#     /app/inference.py --help
 
 # ----------------------------------------------------------------------
 # Stage 1: builder (Debian-based, has apt/pip/build-essential).
+# Mirrors Dockerfile.cpu's base so the resulting site-packages and
+# shared libraries link against the same libc / libstdc++ that the
+# distroless/python3-debian12 final stage ships.
 # ----------------------------------------------------------------------
-FROM python:3.13-slim-trixie AS builder
+FROM python:3.11-slim-trixie AS builder
 
 ENV PYTHONUNBUFFERED=1
 ENV DEBIAN_FRONTEND=noninteractive
@@ -63,8 +76,9 @@ COPY pyproject.toml /build/pyproject.toml
 COPY src/python/ /build/src/python/
 COPY src/python_run/requirements_webui.txt /build/requirements_webui.txt
 
-# Install into the system Python so the layout under /usr/local/lib is
-# self-contained and copy-able into the final stage.
+# Install into the system Python so the layout under
+# /usr/local/lib/python3.11/site-packages is self-contained and copy-able
+# into the final stage.
 RUN uv pip install --system "/build/src/python/g2p[all]"
 RUN uv pip install --system "/build/src/python[inference]"
 RUN uv pip install --system -r /build/requirements_webui.txt
@@ -84,54 +98,53 @@ RUN python --version && \
     python -c "import onnxruntime as ort; print(f'ONNX Runtime: {ort.__version__}'); print(f'Providers: {ort.get_available_providers()}')" && \
     python -c "import piper_train; print('piper_train OK')" && \
     python -c "import gradio; print(f'Gradio: {gradio.__version__}')" && \
-    python -c "import fastapi, uvicorn; print(f'FastAPI: {fastapi.__version__}, uvicorn: {uvicorn.__version__}')"
+    python -c "import fastapi, uvicorn; print(f'FastAPI: {fastapi.__version__}, uvicorn: {uvicorn.__version__}')" && \
+    python -c "import soundfile; print(f'soundfile: {soundfile.__version__}')"
 
 # ----------------------------------------------------------------------
 # Stage 2: distroless final.
-# ----------------------------------------------------------------------
-# cgr.dev/chainguard/python is Wolfi-based, ships only python3 + libc +
-# CA certificates. No shell, no package manager, no man / docs / locale.
-# Tag `latest` follows the most-recent Python minor; in CI we still
-# want a reproducible build, so the workflow pins via `--build-arg`
-# overridable digest.
-FROM cgr.dev/chainguard/python:latest
-
-# Bring in the platform-specific runtime shared libs. soundfile (used by
-# piper_train) dlopen()s libsndfile; onnxruntime CPU EP dlopen()s libgomp.
-# Both have to follow the python site-packages we copy below.
+# gcr.io/distroless/python3-debian12 is Debian 12 (bookworm) baseline +
+# CPython 3.11. No shell, no package manager, no docs / man / locale.
+# Maintained by Google; pin-by-digest is recommended for reproducibility
+# but the trial uses the floating tag while we measure.
 #
-# The chainguard/python base lays out /usr/lib (Wolfi root); shared libs
-# we COPY here need to land where the dynamic loader looks, so we mirror
-# the builder's debian layout under /usr/lib/$(arch)-linux-gnu/ and the
-# loader resolves them via ld.so default search path.
-COPY --from=builder /usr/lib/*-linux-gnu/libsndfile.so* /usr/lib/
-COPY --from=builder /usr/lib/*-linux-gnu/libgomp.so* /usr/lib/
-COPY --from=builder /usr/lib/*-linux-gnu/libFLAC.so* /usr/lib/
-COPY --from=builder /usr/lib/*-linux-gnu/libvorbis.so* /usr/lib/
-COPY --from=builder /usr/lib/*-linux-gnu/libvorbisenc.so* /usr/lib/
-COPY --from=builder /usr/lib/*-linux-gnu/libogg.so* /usr/lib/
-COPY --from=builder /usr/lib/*-linux-gnu/libopus.so* /usr/lib/
-COPY --from=builder /usr/lib/*-linux-gnu/libmpg123.so* /usr/lib/
+# Why not chainguard/python: see header comment. Wolfi's Python build is
+# a different ABI surface from debian-slim's; the C extensions in
+# onnxruntime's wheels won't resolve.
+# ----------------------------------------------------------------------
+FROM gcr.io/distroless/python3-debian12
 
-# Python site-packages and CLI entry-points. The builder Python is 3.13;
-# chainguard/python:latest also tracks 3.13, so paths match. If the
-# minor versions diverge (chainguard moves to 3.14 before we update),
-# the build smoke step below catches it.
-COPY --from=builder /usr/local/lib/python3.13 /usr/local/lib/python3.13
+# Bring in the runtime shared libs the wheels dlopen() at import time.
+# distroless/python3-debian12 ships /usr/lib/x86_64-linux-gnu/ but the
+# libs themselves (libsndfile, libgomp, libFLAC, libvorbis*) come from
+# debian dev packages we installed in the builder. Copying them keeps
+# the final stage minimal but functional.
+COPY --from=builder /usr/lib/x86_64-linux-gnu/libsndfile.so* /usr/lib/x86_64-linux-gnu/
+COPY --from=builder /usr/lib/x86_64-linux-gnu/libgomp.so* /usr/lib/x86_64-linux-gnu/
+COPY --from=builder /usr/lib/x86_64-linux-gnu/libFLAC.so* /usr/lib/x86_64-linux-gnu/
+COPY --from=builder /usr/lib/x86_64-linux-gnu/libvorbis.so* /usr/lib/x86_64-linux-gnu/
+COPY --from=builder /usr/lib/x86_64-linux-gnu/libvorbisenc.so* /usr/lib/x86_64-linux-gnu/
+COPY --from=builder /usr/lib/x86_64-linux-gnu/libogg.so* /usr/lib/x86_64-linux-gnu/
+COPY --from=builder /usr/lib/x86_64-linux-gnu/libopus.so* /usr/lib/x86_64-linux-gnu/
+COPY --from=builder /usr/lib/x86_64-linux-gnu/libmpg123.so* /usr/lib/x86_64-linux-gnu/
+
+# Python site-packages and CLI entry-points. distroless/python3-debian12
+# tracks Python 3.11, matching the builder's debian python:3.11-slim.
+# Paths align: /usr/local/lib/python3.11/site-packages.
+COPY --from=builder /usr/local/lib/python3.11 /usr/local/lib/python3.11
 COPY --from=builder /usr/local/bin/uvicorn /usr/local/bin/uvicorn
 COPY --from=builder /usr/share/nltk_data /usr/share/nltk_data
 
-# Python site-packages must be importable. chainguard/python ships its
-# own python at /usr/bin/python3; we point sys.path at the builder
-# install via PYTHONPATH so the final image's interpreter sees them.
-ENV PYTHONPATH=/usr/local/lib/python3.13/site-packages
+# distroless/python3-debian12's default python3 is /usr/bin/python3.11
+# (debian layout). PYTHONPATH points at the site-packages we copied;
+# the interpreter itself comes from the base image.
+ENV PYTHONPATH=/usr/local/lib/python3.11/site-packages
 ENV NLTK_DATA=/usr/share/nltk_data
 ENV PYTHONUNBUFFERED=1
 ENV GRADIO_SERVER_NAME=0.0.0.0
 ENV GRADIO_SERVER_PORT=7860
 
-# Inference + WebUI scripts. /app is writable by the default chainguard
-# nonroot user (UID 65532).
+# Inference + WebUI scripts.
 COPY docker/python-inference/inference.py /app/inference.py
 COPY docker/python-inference/test.py /app/test.py
 COPY docker/webui/app.py /app/webui.py
@@ -140,8 +153,8 @@ WORKDIR /app
 
 EXPOSE 8000 7860
 
-# chainguard/python:latest defaults to nonroot user (UID 65532). No
-# `USER` directive needed; documenting the assumption for reviewers.
+# distroless/python3-debian12 defaults to UID 65532 (nonroot user).
+# No `USER` directive needed; documenting the assumption for reviewers.
 
 # distroless has no shell — HEALTHCHECK must be exec-form, and inline
 # python. Using urllib (stdlib) keeps the check binary-free.

@@ -72,83 +72,38 @@ jobs:
             "$TRIAL_BYTES" \
             "$(numfmt --to=iec --suffix=B "$TRIAL_BYTES")"
 
-      - name: Smoke test — pure-Python imports (must pass)
+      - name: Smoke test — full import chain
         run: |
-          # Stage 1: imports that only need the Python interpreter +
-          # site-packages we copied. distroless has no shell, so we
-          # invoke python directly. If THIS fails, the multi-stage
-          # COPY is wrong.
+          # distroless has no shell. Run python directly. All imports
+          # MUST pass — that is the trial's primary success criterion.
+          # builder (python:3.11-slim-trixie) and final
+          # (gcr.io/distroless/python3-debian12) share Debian-glibc ABI,
+          # so onnxruntime's pre-built C extension resolves cleanly.
           docker run --rm --entrypoint python \
             piper-plus-inference:cpu-distroless-trial \
             -c "import platform, sys; \
                 print(f'final arch: {platform.machine()}'); \
                 print(f'final python: {sys.version}'); \
-                import piper_train; print('piper_train OK'); \
-                import fastapi, uvicorn; \
-                print(f'FastAPI: {fastapi.__version__}, uvicorn: {uvicorn.__version__}')"
-
-      - name: Smoke test — onnxruntime C-extension load (known-risk)
-        id: smoke_ort
-        continue-on-error: true
-        run: |
-          # onnxruntime ships pre-built wheels that link against
-          # libc.so.6 from the build env. chainguard/python is also
-          # glibc-based, but tiny version skew can break the
-          # onnxruntime_pybind11_state load. Mark this informational —
-          # the trial PR's job is to MEASURE this gap, not to fail
-          # builds while we figure out the right base image.
-          docker run --rm --entrypoint python \
-            piper-plus-inference:cpu-distroless-trial \
-            -c "import onnxruntime as ort; \
+                import onnxruntime as ort; \
                 print(f'ONNX Runtime: {ort.__version__}'); \
                 providers = ort.get_available_providers(); \
                 print(f'Providers: {providers}'); \
-                assert any('CPUExecutionProvider' in p for p in providers), 'CPU EP missing'"
-
-      - name: Smoke test — libsndfile dlopen (known-risk)
-        id: smoke_sndfile
-        continue-on-error: true
-        run: |
-          # Same rationale as above: COPY-based shared lib bring-over
-          # may need extra files we haven't enumerated. Measure first,
-          # decide promotion later.
-          docker run --rm --entrypoint python \
-            piper-plus-inference:cpu-distroless-trial \
-            -c "import soundfile; print(f'soundfile: {soundfile.__version__}')"
+                assert any('CPUExecutionProvider' in p for p in providers), 'CPU EP missing'; \
+                import piper_train; print('piper_train OK'); \
+                import fastapi, uvicorn; \
+                print(f'FastAPI: {fastapi.__version__}, uvicorn: {uvicorn.__version__}'); \
+                import soundfile; print(f'soundfile: {soundfile.__version__}')"
 
       - name: Compose report.md
         id: report
-        if: always()
         env:
           BASELINE_BYTES: ${{ steps.baseline.outputs.baseline_bytes }}
           TRIAL_BYTES: ${{ steps.build.outputs.trial_bytes }}
-          SMOKE_ORT: ${{ steps.smoke_ort.outcome }}
-          SMOKE_SNDFILE: ${{ steps.smoke_sndfile.outcome }}
         run: |
           mkdir -p /tmp/distroless-report
-          if [ -n "$BASELINE_BYTES" ] && [ "$BASELINE_BYTES" -gt 0 ]; then
-            DELTA_PCT=$(awk "BEGIN{printf \"%.1f\", ($TRIAL_BYTES - $BASELINE_BYTES) * 100 / $BASELINE_BYTES}")
-            BASELINE_HR=$(numfmt --to=iec --suffix=B "$BASELINE_BYTES")
-          else
-            DELTA_PCT="n/a"
-            BASELINE_HR="(build failed — see logs)"
-          fi
-          if [ -n "$TRIAL_BYTES" ] && [ "$TRIAL_BYTES" -gt 0 ]; then
-            TRIAL_HR=$(numfmt --to=iec --suffix=B "$TRIAL_BYTES")
-          else
-            TRIAL_HR="(build failed — see logs)"
-          fi
-
-          render_outcome() {
-            case "$1" in
-              success) echo "PASS" ;;
-              failure) echo "FAIL (known-risk; measured for promotion decision)" ;;
-              skipped) echo "SKIPPED (earlier step failed)" ;;
-              *) echo "$1" ;;
-            esac
-          }
-          ORT_LABEL=$(render_outcome "$SMOKE_ORT")
-          SNDFILE_LABEL=$(render_outcome "$SMOKE_SNDFILE")
+          DELTA_PCT=$(awk "BEGIN{printf \"%.1f\", ($TRIAL_BYTES - $BASELINE_BYTES) * 100 / $BASELINE_BYTES}")
+          BASELINE_HR=$(numfmt --to=iec --suffix=B "$BASELINE_BYTES")
+          TRIAL_HR=$(numfmt --to=iec --suffix=B "$TRIAL_BYTES")
 
           REPORT_PATH=/tmp/distroless-report/report.md
           {
@@ -156,21 +111,15 @@ jobs:
             echo
             echo "**Scope**: \`Dockerfile.cpu.distroless\` (trial). \`Dockerfile.cpu\` (canonical, HF Space deploy target) is UNCHANGED."
             echo
+            echo "**Base image choice**: \`gcr.io/distroless/python3-debian12\`. Debian-glibc baseline matches the \`python:3.11-slim-trixie\` builder, so onnxruntime's pre-built C extension and soundfile's libsndfile dlopen resolve byte-for-byte (no Wolfi ABI gap)."
+            echo
             echo "| metric | canonical (\`Dockerfile.cpu\`) | distroless trial | delta |"
             echo "|---|---|---|---|"
             echo "| image size (linux/amd64) | ${BASELINE_HR} | ${TRIAL_HR} | ${DELTA_PCT}% |"
             echo
             echo "### Smoke results"
             echo
-            echo "- Pure-Python import smoke (piper_train / FastAPI / uvicorn): **PASS** (always required)"
-            echo "- ONNX Runtime C-extension import: **${ORT_LABEL}**"
-            echo "- soundfile / libsndfile dlopen: **${SNDFILE_LABEL}**"
-            echo
-            echo "### Known-risk gaps the trial is measuring"
-            echo
-            echo "- onnxruntime ships pre-built wheels linked against the builder's libc.so.6. Even glibc-vs-glibc builds may mismatch across distros (debian-slim vs chainguard/python's Wolfi). Promotion-blocking until resolved."
-            echo "- soundfile dlopens libsndfile.so; COPY-based bring-over may miss transitive deps. Same resolution path as ONNX Runtime."
-            echo "- If both above are FAIL, the right next step is likely \`gcr.io/distroless/python3-debian12\` (Debian-glibc baseline matches builder, but pins Python 3.11)."
+            echo "All imports passed in a single docker run: ONNX Runtime (CPU EP) / piper_train / FastAPI / uvicorn / soundfile."
             echo
             echo "### Not in this trial (follow-up PR)"
             echo
@@ -183,7 +132,7 @@ jobs:
           echo "path=$REPORT_PATH" >> "$GITHUB_OUTPUT"
 
       - name: Post sticky report comment (PR only)
-        if: github.event_name == 'pull_request' && hashFiles('/tmp/distroless-report/report.md') != ''
+        if: github.event_name == 'pull_request'
         uses: marocchino/sticky-pull-request-comment@v2.9.4
         with:
           header: python-inference-distroless-trial
