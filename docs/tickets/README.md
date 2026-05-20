@@ -32,7 +32,7 @@ docs/tickets/                                   (本ディレクトリ)
 | Milestone | 範囲 | 着手 tier | チケット | 状態 |
 |-----------|------|----------|---------|------|
 | [M2 Spec & Docs Gates](milestones/M2-spec-and-docs.md) | doc examples 3 phase の残作業 | Tier 2 | [T-011](tickets/T-011-doc-examples-blocker.md) | 計画中 (informational 1 ヶ月観測後の blocker promote 判断、 PR #521 merge 後の cadence) |
-| [M3 Supply Chain](milestones/M3-supply-chain.md) | Distroless 5 image + SLSA L3 5 registry | Tier 3 | [T-012](tickets/T-012-distroless-python-inference.md), [T-013](tickets/T-013-distroless-webui.md), [T-014](tickets/T-014-distroless-wyoming.md), [T-015](tickets/T-015-distroless-cpp-inference.md), [T-016](tickets/T-016-distroless-cpp-dev.md), [T-017](tickets/T-017-slsa-shared-lib.md), [T-018](tickets/T-018-slsa-kotlin-g2p.md), [T-019](tickets/T-019-slsa-rust-g2p.md), [T-020](tickets/T-020-slsa-go-g2p.md), [T-021](tickets/T-021-slsa-npm.md) | 計画中 |
+| [M3 Supply Chain](milestones/M3-supply-chain.md) | Distroless 4 image + SLSA L3 5 registry (cpp-dev は 2026-05-20 scope-out) | Tier 3 | [T-012](tickets/T-012-distroless-python-inference.md), [T-013](tickets/T-013-distroless-webui.md), [T-014](tickets/T-014-distroless-wyoming.md), [T-015](tickets/T-015-distroless-cpp-inference.md), [T-017](tickets/T-017-slsa-shared-lib.md), [T-018](tickets/T-018-slsa-kotlin-g2p.md), [T-019](tickets/T-019-slsa-rust-g2p.md), [T-020](tickets/T-020-slsa-go-g2p.md), [T-021](tickets/T-021-slsa-npm.md) | 進行中 (Distroless trial 3/4 image 投入済、 promotion 観測期間中) |
 | [M4 Docs Infra](milestones/M4-docs-infra.md) | mkdocs + test aggregation | Tier 3 (別 milestone) | [T-022](tickets/T-022-mkdocs-material.md), [T-023](tickets/T-023-test-aggregation.md) | 計画中 (user 判断待ち) |
 
 ---
@@ -41,7 +41,7 @@ docs/tickets/                                   (本ディレクトリ)
 
 | Proposal | チケット | Milestone | 状態 |
 |---------|--------|----------|------|
-| `#1` Distroless | T-012〜T-016 (5 image) | M3 | 計画中 |
+| `#1` Distroless | T-012〜T-015 (4 image、 cpp-dev は 2026-05-20 scope-out) | M3 | 進行中 (trial 3/4 投入済、 promotion 観測期間中) |
 | `#2` SLSA L3 | T-017〜T-021 (5 registry) | M3 | 計画中 |
 | `#3` Rekor + SHA drift | (旧 T-001 / T-002) | (旧 M1) | **完了 (PR #513)** |
 | `#4` CLI help auto-extract | (旧 T-003) | (旧 M1) | **完了 (PR #513)** |

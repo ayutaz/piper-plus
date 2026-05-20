@@ -2,7 +2,7 @@
 
 **Milestone ID**: `M3`
 **Tier**: Tier 3
-**Status**: 計画中
+**Status**: 進行中 (Distroless trial 3/4 image 投入済 — PR #523 / #524、 promotion 観測中。 SLSA L3 (T-017〜T-021) は未着手)
 **期間目安**: M2 merge 後 〜 8 週間 (10 チケット × 1 PR / 1 image or registry)
 **前提**: M1 完了 (`cosign verify-blob` 運用定着) + M2 完了 (`model-sha256-manifest.toml` / `release-versions.toml` 整備済み)
 
@@ -17,7 +17,7 @@
 
 両者とも **1 PR で 1 image / 1 registry** の cadence。 一括移行禁止 (R-2 / R-4 緩和)。
 
-> **2026-05-20 scope 変更**: Distroless は **5 image → 4 image** に縮小。 cpp-dev (T-016) は scope-out 確定。 理由は PR #524 で spike 目的 (multi-stage pattern / ABI 整合 / entrypoint 移植) が webui + cpp-inference の trial bundle により達成済、 加えて dev image は distroless 哲学と本質的に不整合 (cmake/gdb 等を final stage に残さざるを得ない) で大目的への寄与が限定的なため。 詳細は [T-016 §Note](../tickets/T-016-distroless-cpp-dev.md) 参照。
+> **2026-05-20 scope 変更**: Distroless は **5 image → 4 image** に縮小。 cpp-dev (T-016) は scope-out 確定。 理由は PR #524 で spike 目的 (multi-stage pattern / ABI 整合 / entrypoint 移植) が webui + cpp-inference の trial bundle により達成済、 加えて dev image は distroless 哲学と本質的に不整合 (cmake/gdb 等を final stage に残さざるを得ない) で大目的への寄与が限定的なため。 詳細は PR #526 (scope-out 確定) を参照。 旧 T-016 ticket file は削除済 (git history で参照可能)。
 
 ---
 
@@ -27,11 +27,12 @@
 
 | ID | タイトル | 提案項目 | 影響範囲 | Status | PR |
 |----|--------|---------|--------|--------|----|
-| [T-012](../tickets/T-012-distroless-python-inference.md) | `python-inference` distroless 化 | `#1-1` | HF Space deploy | 計画中 | — |
-| [T-013](../tickets/T-013-distroless-webui.md) | `webui` distroless 化 | `#1-2` | Gradio demo | 計画中 | — |
+| [T-012](../tickets/T-012-distroless-python-inference.md) | `python-inference` distroless 化 | `#1-1` | HF Space deploy | 着手中 (trial merged 2026-05-20、 promotion 観測中) | #523 |
+| [T-013](../tickets/T-013-distroless-webui.md) | `webui` distroless 化 | `#1-2` | Gradio demo | 着手中 (trial merged 2026-05-20、 promotion 観測中) | #524 |
 | [T-014](../tickets/T-014-distroless-wyoming.md) | `wyoming` distroless 化 | `#1-3` | Home Assistant addon | 計画中 | — |
-| [T-015](../tickets/T-015-distroless-cpp-inference.md) | `cpp-inference` distroless 化 | `#1-4` | C++ runtime image | 計画中 | — |
-| ~~[T-016](../tickets/T-016-distroless-cpp-dev.md)~~ | ~~`cpp-dev` distroless 化~~ | ~~`#1-5`~~ | C++ dev image | **除外確定 (2026-05-20)** | PR #524 (spike 結果) |
+| [T-015](../tickets/T-015-distroless-cpp-inference.md) | `cpp-inference` distroless 化 | `#1-4` | C++ runtime image | 着手中 (trial merged 2026-05-20、 promotion 観測中) | #524 |
+
+> `cpp-dev` (旧 T-016) は 2026-05-20 scope-out 確定 (PR #526)。 spike 目的が PR #524 で達成済 + dev image 構造的不整合のため除外。 ticket file は削除済み、 経緯は git history (PR #524 / #526) を参照。
 
 ### SLSA L3 × 5 registry (PyPI / NuGet は新設要否を user 判断)
 
@@ -180,7 +181,7 @@ cosign sign-blob --keyless ... attestation.intoto.jsonl > attestation.sig
 ### release notes / docs へ
 
 - T-017 〜 T-021 完了で `docs/reference/slsa-verify.md` が完成 (FR-2.5) → 全 release notes に「Verifying artifacts with SLSA」 セクション追加
-- T-012〜T-016 完了で各 Dockerfile の base image が変更 → README の Quick Start docker pull コマンド更新
+- T-012〜T-015 完了で各 Dockerfile の base image が変更 → README の Quick Start docker pull コマンド更新 (cpp-dev は scope-out で対象外)
 
 ---
 
