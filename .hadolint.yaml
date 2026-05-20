@@ -26,6 +26,14 @@ trustedRegistries:
   - registry.hub.docker.com
   - nvcr.io
   - mcr.microsoft.com
+  # gcr.io/distroless: Google-maintained distroless base images
+  # (https://github.com/GoogleContainerTools/distroless). Used by
+  # docker/python-inference/Dockerfile.cpu.distroless final stage.
+  # Debian-glibc baseline, no shell / package manager, UID 65532
+  # nonroot by default. Trusted alongside the other vendor registries
+  # because distroless is the canonical "minimal supply chain" choice
+  # for container images that ship just CPython + a single workload.
+  - gcr.io
 
 # Failure threshold: error (DL3xxx warnings won't fail, DL3xxx errors will)
 # Use --failure-threshold error to make hadolint exit non-zero only on errors.

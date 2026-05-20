@@ -101,6 +101,19 @@ RUN python --version && \
     python -c "import fastapi, uvicorn; print(f'FastAPI: {fastapi.__version__}, uvicorn: {uvicorn.__version__}')" && \
     python -c "import soundfile; print(f'soundfile: {soundfile.__version__}')"
 
+# Stage the runtime shared libs into an arch-neutral location. Debian's
+# multiarch layout puts libs under /usr/lib/<triplet>-linux-gnu/ where
+# <triplet> is x86_64 / aarch64 / armv7l / etc. Hardcoding x86_64 in the
+# final-stage COPY breaks linux/arm64 builds (the triplet directory does
+# not exist). Letting bash resolve the wildcard once during the builder
+# stage hands the final stage a single deterministic path to COPY from.
+RUN set -eux; \
+    mkdir -p /opt/runtime-libs; \
+    for lib in libsndfile libgomp libFLAC libvorbis libvorbisenc libogg libopus libmpg123; do \
+      cp -a /usr/lib/*-linux-gnu/${lib}.so* /opt/runtime-libs/ 2>/dev/null || true; \
+    done; \
+    ls -la /opt/runtime-libs/
+
 # ----------------------------------------------------------------------
 # Stage 2: distroless final.
 # gcr.io/distroless/python3-debian12 is Debian 12 (bookworm) baseline +
@@ -115,18 +128,17 @@ RUN python --version && \
 FROM gcr.io/distroless/python3-debian12
 
 # Bring in the runtime shared libs the wheels dlopen() at import time.
-# distroless/python3-debian12 ships /usr/lib/x86_64-linux-gnu/ but the
-# libs themselves (libsndfile, libgomp, libFLAC, libvorbis*) come from
-# debian dev packages we installed in the builder. Copying them keeps
-# the final stage minimal but functional.
-COPY --from=builder /usr/lib/x86_64-linux-gnu/libsndfile.so* /usr/lib/x86_64-linux-gnu/
-COPY --from=builder /usr/lib/x86_64-linux-gnu/libgomp.so* /usr/lib/x86_64-linux-gnu/
-COPY --from=builder /usr/lib/x86_64-linux-gnu/libFLAC.so* /usr/lib/x86_64-linux-gnu/
-COPY --from=builder /usr/lib/x86_64-linux-gnu/libvorbis.so* /usr/lib/x86_64-linux-gnu/
-COPY --from=builder /usr/lib/x86_64-linux-gnu/libvorbisenc.so* /usr/lib/x86_64-linux-gnu/
-COPY --from=builder /usr/lib/x86_64-linux-gnu/libogg.so* /usr/lib/x86_64-linux-gnu/
-COPY --from=builder /usr/lib/x86_64-linux-gnu/libopus.so* /usr/lib/x86_64-linux-gnu/
-COPY --from=builder /usr/lib/x86_64-linux-gnu/libmpg123.so* /usr/lib/x86_64-linux-gnu/
+# Debian's multiarch layout puts libs under /usr/lib/<triplet>-linux-gnu/;
+# the builder stages them into /opt/runtime-libs/ so we can COPY from a
+# single arch-neutral path here. This makes the final stage work
+# unchanged on linux/amd64 (x86_64-linux-gnu) and linux/arm64
+# (aarch64-linux-gnu).
+#
+# Landing them in /usr/lib/ keeps them on the dynamic loader's default
+# search path (distroless/python3-debian12 inherits Debian's ld.so
+# config, which includes /usr/lib/<triplet>-linux-gnu via /etc/ld.so.cache
+# AND /usr/lib directly).
+COPY --from=builder /opt/runtime-libs/ /usr/lib/
 
 # Python site-packages and CLI entry-points. distroless/python3-debian12
 # tracks Python 3.11, matching the builder's debian python:3.11-slim.
