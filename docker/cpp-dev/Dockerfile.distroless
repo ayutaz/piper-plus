@@ -37,6 +37,12 @@
 
 FROM cgr.dev/chainguard/wolfi-base
 
+# Wolfi's default sh does not preset pipefail. Several RUN steps below
+# pipe `tar -xzf` into directory walks, and hadolint's DL4006 requires
+# pipefail be enabled for any RUN with a pipe. Setting it once at the
+# Dockerfile level applies to every subsequent RUN.
+SHELL ["/bin/sh", "-o", "pipefail", "-c"]
+
 # Wolfi defaults to root for image build; the canonical Dockerfile drops
 # to UID 1000 after install steps. We keep the same end state for parity
 # with build.sh / test.sh which expect /workspace to be owned by piper.
@@ -70,7 +76,8 @@ RUN apk add --no-cache \
         pkgconf \
         python-3.12 \
         spdlog-dev \
-        valgrind
+        valgrind \
+        wget
 
 # ONNX Runtime CPU build, fetched from the canonical upstream release.
 # Pin matches docker/cpp-dev/Dockerfile (canonical) — keep the two

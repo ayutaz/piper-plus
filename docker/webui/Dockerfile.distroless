@@ -116,6 +116,12 @@ COPY docker/webui/app.py /app/app.py
 
 WORKDIR /app
 
+# Explicit USER declaration. gcr.io/distroless/python3-debian12 already
+# defaults to UID 65532 (nonroot), but Trivy's static Dockerfile linter
+# (DS-0002) requires an explicit `USER` directive, not a base-image
+# default, so the policy is auditable from the Dockerfile alone.
+USER 65532
+
 EXPOSE 7860
 
 # distroless/python3-debian12 ships /usr/bin/python3 only (no `python`

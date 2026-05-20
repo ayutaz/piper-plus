@@ -37,10 +37,23 @@
 #     .
 
 # ----------------------------------------------------------------------
-# Stage 1: Builder (identical to canonical Dockerfile — keeps the
-# CMake ExternalProject graph green and avoids a from-scratch redesign).
+# Stage 1: Builder.
+#
+# Why debian:12-slim (not ubuntu:24.04 like the canonical Dockerfile):
+#   * The final stage is gcr.io/distroless/cc-debian12, which ships
+#     Debian 12 glibc 2.36.
+#   * ubuntu:24.04 ships glibc 2.39. Binaries linked against the
+#     ubuntu builder require GLIBC_2.38+ symbols that aren't in the
+#     distroless final stage — the runtime fails with
+#     "libc.so.6: version `GLIBC_2.38' not found" the moment
+#     /usr/local/bin/piper is invoked.
+#   * debian:12-slim shares the same glibc minor as the distroless
+#     final stage, so symbol versions in the linked binary stay
+#     resolvable. This is the same ABI-pinning logic that
+#     docker/python-inference/Dockerfile.cpu.distroless uses
+#     (python:3.11-slim-trixie ↔ distroless/python3-debian12).
 # ----------------------------------------------------------------------
-FROM ubuntu:24.04 AS builder
+FROM debian:12-slim AS builder
 
 ENV DEBIAN_FRONTEND=noninteractive
 
