@@ -1,0 +1,120 @@
+# cpp-inference image (distroless trial).
+#
+# Trial variant of docker/cpp-inference/Dockerfile that keeps the
+# ubuntu:24.04 builder stage but swaps the runtime stage for
+# gcr.io/distroless/cc-debian12.
+#
+# The canonical Dockerfile stays UNCHANGED so docker-compose and the
+# release pipeline keep working. Promotion to canonical is a follow-up
+# PR after the trial confirms the piper binary launches and runs under
+# distroless/cc.
+#
+# Why gcr.io/distroless/cc-debian12:
+#   * Ships glibc, libgcc, libstdc++ — everything a Release-mode C++
+#     binary linked against the system C++ stdlib expects at runtime.
+#   * No shell, no package manager. The C++ binary is the only thing
+#     in PID 1; CVE surface is minimal.
+#   * Debian 12 baseline matches the ubuntu:24.04 builder closely
+#     enough that libgomp / libstdc++ ABI stays compatible (both glibc-
+#     based, both modern enough for the C++17 features piper uses).
+#
+# Why the entrypoint changes vs. canonical:
+#   * Canonical uses /entrypoint.sh + bash for CLI args handling. Under
+#     distroless there is no /bin/sh and no /bin/bash, so we cannot
+#     execute the existing entrypoint.sh.
+#   * Trial substitutes ENTRYPOINT ["/usr/local/bin/piper"] directly,
+#     which is what entrypoint.sh ultimately exec'd. CLI flags from
+#     `docker run ... -- ...` flow through to piper unchanged.
+#   * Anything entrypoint.sh did beyond exec'ing piper (which is
+#     nothing today) would need to be ported into the binary or done
+#     via docker-compose env vars before promotion.
+#
+# Build (from project root):
+#   docker buildx build \
+#     --platform linux/amd64,linux/arm64 \
+#     -f docker/cpp-inference/Dockerfile.distroless \
+#     -t piper-plus-cpp-inference:distroless-trial \
+#     .
+
+# ----------------------------------------------------------------------
+# Stage 1: Builder (identical to canonical Dockerfile — keeps the
+# CMake ExternalProject graph green and avoids a from-scratch redesign).
+# ----------------------------------------------------------------------
+FROM ubuntu:24.04 AS builder
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    cmake \
+    git \
+    wget \
+    ninja-build \
+    pkg-config \
+    ca-certificates \
+    autoconf automake libtool \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /workspace
+
+COPY CMakeLists.txt VERSION ./
+COPY cmake/ cmake/
+COPY src/cpp/ src/cpp/
+COPY src/rust/piper-plus-g2p/data/ src/rust/piper-plus-g2p/data/
+
+RUN mkdir -p build && cd build && \
+    cmake .. \
+        -G Ninja \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_INSTALL_PREFIX=/install \
+        -DBUILD_TESTS=OFF && \
+    ninja -j"$(nproc)" && \
+    ninja install
+
+RUN if [ ! -d /install/share/open_jtalk/dic ]; then \
+      echo "OpenJTalk dictionary not found in install prefix, downloading..." && \
+      mkdir -p /install/share/open_jtalk && \
+      wget -q -O /tmp/open_jtalk_dic.tar.gz \
+        "https://github.com/r9y9/open_jtalk/releases/download/v1.11.1/open_jtalk_dic_utf_8-1.11.tar.gz" && \
+      tar -xzf /tmp/open_jtalk_dic.tar.gz -C /install/share/open_jtalk && \
+      mv /install/share/open_jtalk/open_jtalk_dic_utf_8-1.11 /install/share/open_jtalk/dic && \
+      rm -f /tmp/open_jtalk_dic.tar.gz && \
+      echo "OpenJTalk dictionary installed successfully"; \
+    else \
+      echo "OpenJTalk dictionary already present at /install/share/open_jtalk/dic"; \
+    fi
+
+# Stage the runtime shared libs into an arch-neutral location. The
+# install/lib tree already has piper's own libs (in /install/lib),
+# but we additionally need libgomp from the system because the
+# canonical Dockerfile relies on `apt-get install libgomp1` at the
+# runtime stage. distroless/cc-debian12 ships libgcc / libstdc++ but
+# NOT libgomp (OpenMP runtime), so we copy it explicitly.
+RUN set -eux; \
+    mkdir -p /opt/runtime-libs; \
+    for lib in libgomp libonnxruntime; do \
+      cp -a /usr/lib/*-linux-gnu/${lib}.so* /opt/runtime-libs/ 2>/dev/null || true; \
+      cp -a /install/lib/${lib}.so* /opt/runtime-libs/ 2>/dev/null || true; \
+    done; \
+    ls -la /opt/runtime-libs/
+
+# ----------------------------------------------------------------------
+# Stage 2: distroless runtime.
+# ----------------------------------------------------------------------
+FROM gcr.io/distroless/cc-debian12
+
+# /install/* came from CMake's `ninja install` with prefix=/install.
+# Land it at /usr/local in the final image (matches the canonical
+# runtime's `COPY --from=builder /install/ /usr/local/`).
+COPY --from=builder /install/ /usr/local/
+COPY --from=builder /opt/runtime-libs/ /usr/lib/
+
+# WORKDIR /app keeps parity with the canonical image so users can
+# bind-mount their models/output/config the same way.
+WORKDIR /app
+
+# distroless has no shell. CMD form is exec-form, ENTRYPOINT is the
+# piper binary directly — any flags after `docker run <image>` flow
+# to piper.
+ENTRYPOINT ["/usr/local/bin/piper"]
+CMD ["--version"]

@@ -4,8 +4,8 @@
 **Milestone**: [M3 Supply Chain](../milestones/M3-supply-chain.md)
 **Proposal 項目**: `#1-5` (Distroless / Chainguard 移行 — `cpp-dev` image)
 **Tier**: Tier 3 (blast radius 小、 学習用 spike)
-**Status**: 計画中
-**PR**: (未作成)
+**Status**: 着手中 (trial PR scope: 並行 Dockerfile.distroless 新設、 既存 Dockerfile / docker-compose / build.sh / test.sh は不変更)
+**PR**: feat/distroless-3-images-cpp-dev-webui-cpp-inference (/create-pr skill で起票予定、 T-013 / T-015 と同 PR で 3 image bundle)
 **担当 (予定)**: Claude Code (agent team) + maintainer review
 **着手前提**: なし (M3 内 distroless 5 件の **最初に着手** することを推奨。 影響範囲最小、 spike 効果最大)
 

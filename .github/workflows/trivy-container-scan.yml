@@ -71,6 +71,18 @@ jobs:
             dockerfile: docker/cpp-dev/Dockerfile
             context: .
             build_target: ''
+          - name: cpp-dev-distroless
+            dockerfile: docker/cpp-dev/Dockerfile.distroless
+            context: .
+            build_target: ''
+          - name: cpp-inference-distroless
+            dockerfile: docker/cpp-inference/Dockerfile.distroless
+            context: .
+            build_target: ''
+          - name: webui-distroless
+            dockerfile: docker/webui/Dockerfile.distroless
+            context: .
+            build_target: ''
 
     steps:
       - uses: actions/checkout@v6.0.2

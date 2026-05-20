@@ -4,8 +4,8 @@
 **Milestone**: [M3 Supply Chain](../milestones/M3-supply-chain.md)
 **Proposal 項目**: `#1-4` (Distroless / Chainguard 移行 — `cpp-inference` image)
 **Tier**: Tier 3 (C++ runtime image、 ship 対象だが HF Space / HA addon は無し)
-**Status**: 計画中
-**PR**: (未作成)
+**Status**: 着手中 (trial PR scope: 並行 Dockerfile.distroless 新設、 既存 Dockerfile / entrypoint.sh は不変更)
+**PR**: feat/distroless-3-images-cpp-dev-webui-cpp-inference (/create-pr skill で起票予定、 T-013 / T-016 と同 PR で 3 image bundle)
 **担当 (予定)**: Claude Code (agent team) + maintainer review
 **着手前提**: T-016 完了推奨 (Wolfi multi-stage の知見を流用)
 

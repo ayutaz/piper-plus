@@ -1,0 +1,213 @@
+name: docker-distroless-trial
+
+# Trial CI for the second wave of distroless variants (cpp-dev / webui
+# / cpp-inference). Mirrors python-inference-distroless-trial.yml from
+# PR #523 with a matrix over the three new images: amd64 single-arch
+# build (multi-arch is handled by docker-build.yml's
+# build-distroless-trials job), canonical image size measured as the
+# A/B baseline, and a smoke step appropriate to the image's role.
+#
+# Promotion to canonical (replacing the original Dockerfile) is a
+# follow-up PR per image, after the trial confirms the runtime works
+# in the expected environment (HF Space for python-inference is the
+# only image with that deployment risk in this batch).
+
+on:
+  pull_request:
+    branches: [dev]
+    paths:
+      - 'docker/cpp-dev/Dockerfile'
+      - 'docker/cpp-dev/Dockerfile.distroless'
+      - 'docker/cpp-dev/build.sh'
+      - 'docker/cpp-dev/test.sh'
+      - 'docker/webui/Dockerfile'
+      - 'docker/webui/Dockerfile.distroless'
+      - 'docker/webui/app.py'
+      - 'docker/cpp-inference/Dockerfile'
+      - 'docker/cpp-inference/Dockerfile.distroless'
+      - 'docker/cpp-inference/entrypoint.sh'
+      - 'src/cpp/**'
+      - 'src/python/**'
+      - 'CMakeLists.txt'
+      - 'cmake/**'
+      - 'pyproject.toml'
+      - 'VERSION'
+      - 'src/python_run/requirements_webui.txt'
+      - '.github/workflows/docker-distroless-trial.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-smoke:
+    name: ${{ matrix.image.name }} build + size + smoke
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        image:
+          - name: cpp-dev
+            canonical_dockerfile: docker/cpp-dev/Dockerfile
+            trial_dockerfile: docker/cpp-dev/Dockerfile.distroless
+            smoke_entrypoint: /bin/sh
+            # cpp-dev's smoke checks that the dev toolchain is reachable
+            # inside the image — that's what a developer pulling the
+            # image would touch first.
+            smoke_args: '-c "cmake --version && clang --version && python3 --version"'
+          - name: webui
+            canonical_dockerfile: docker/webui/Dockerfile
+            trial_dockerfile: docker/webui/Dockerfile.distroless
+            smoke_entrypoint: /usr/bin/python3
+            # webui's smoke imports the Gradio app's deps; running
+            # app.py would actually bind 7860 and we'd need to teardown
+            # — import-only is enough to prove site-packages copied.
+            # Single-quoted to keep YAML happy with f-string braces.
+            smoke_args: '-c "import platform, sys; print(''arch:'', platform.machine()); print(''python:'', sys.version); import gradio; print(''Gradio:'', gradio.__version__); import piper_train; print(''piper_train OK''); import soundfile; print(''soundfile:'', soundfile.__version__)"'
+          - name: cpp-inference
+            canonical_dockerfile: docker/cpp-inference/Dockerfile
+            trial_dockerfile: docker/cpp-inference/Dockerfile.distroless
+            smoke_entrypoint: /usr/local/bin/piper
+            # piper --version is the canonical smoke for the runtime
+            # binary; it exercises the libonnxruntime / libstdc++ /
+            # libgomp dlopen path without needing a model.
+            smoke_args: '--version'
+    steps:
+      - uses: actions/checkout@v6.0.2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3.8.0
+
+      - name: Free disk space (cpp images can pull big deps)
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost \
+            "$AGENT_TOOLSDIRECTORY" /usr/local/lib/android \
+            /opt/hostedtoolcache/CodeQL
+          docker system prune -af || true
+          df -h | head -5
+
+      - name: Measure canonical image size (baseline)
+        id: baseline
+        # NOT continue-on-error: a broken canonical Dockerfile loses
+        # both the A/B baseline AND silently misleads reviewers about
+        # which image is the production path. Same policy as PR #523.
+        run: |
+          docker build \
+            -f ${{ matrix.image.canonical_dockerfile }} \
+            -t piper-plus-${{ matrix.image.name }}:canonical \
+            --load \
+            .
+          BASELINE_BYTES=$(docker image inspect piper-plus-${{ matrix.image.name }}:canonical --format '{{.Size}}')
+          echo "baseline_bytes=${BASELINE_BYTES}" >> "$GITHUB_OUTPUT"
+          printf 'canonical (%s) size: %s bytes (%s)\n' \
+            "${{ matrix.image.canonical_dockerfile }}" \
+            "$BASELINE_BYTES" \
+            "$(numfmt --to=iec --suffix=B "$BASELINE_BYTES")"
+
+      - name: Build distroless trial image (amd64 only — multi-arch is in docker-build.yml)
+        id: build
+        run: |
+          docker build \
+            -f ${{ matrix.image.trial_dockerfile }} \
+            -t piper-plus-${{ matrix.image.name }}:distroless-trial \
+            --load \
+            .
+          TRIAL_BYTES=$(docker image inspect piper-plus-${{ matrix.image.name }}:distroless-trial --format '{{.Size}}')
+          echo "trial_bytes=${TRIAL_BYTES}" >> "$GITHUB_OUTPUT"
+          printf 'distroless trial size: %s bytes (%s)\n' \
+            "$TRIAL_BYTES" \
+            "$(numfmt --to=iec --suffix=B "$TRIAL_BYTES")"
+
+      - name: Smoke test
+        run: |
+          docker run --rm \
+            --entrypoint ${{ matrix.image.smoke_entrypoint }} \
+            piper-plus-${{ matrix.image.name }}:distroless-trial \
+            ${{ matrix.image.smoke_args }}
+
+      - name: Compose report.md
+        id: report
+        env:
+          BASELINE_BYTES: ${{ steps.baseline.outputs.baseline_bytes }}
+          TRIAL_BYTES: ${{ steps.build.outputs.trial_bytes }}
+        run: |
+          mkdir -p /tmp/distroless-report
+          DELTA_PCT=$(awk "BEGIN{printf \"%.1f\", ($TRIAL_BYTES - $BASELINE_BYTES) * 100 / $BASELINE_BYTES}")
+          BASELINE_HR=$(numfmt --to=iec --suffix=B "$BASELINE_BYTES")
+          TRIAL_HR=$(numfmt --to=iec --suffix=B "$TRIAL_BYTES")
+
+          REPORT_PATH=/tmp/distroless-report/${{ matrix.image.name }}.md
+          {
+            echo "### \`${{ matrix.image.name }}\`"
+            echo
+            echo "Trial Dockerfile: \`${{ matrix.image.trial_dockerfile }}\`. Canonical \`${{ matrix.image.canonical_dockerfile }}\` is UNCHANGED."
+            echo
+            echo "| metric | canonical | distroless trial | delta |"
+            echo "|---|---|---|---|"
+            echo "| image size (linux/amd64) | ${BASELINE_HR} | ${TRIAL_HR} | ${DELTA_PCT}% |"
+            echo
+            echo "Smoke entrypoint: \`${{ matrix.image.smoke_entrypoint }}\` — passed."
+          } > "$REPORT_PATH"
+          cat "$REPORT_PATH"
+
+      - name: Upload per-image report
+        if: always()
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: docker-distroless-trial-${{ matrix.image.name }}-${{ github.run_id }}
+          path: /tmp/distroless-report/${{ matrix.image.name }}.md
+          retention-days: 30
+          if-no-files-found: warn
+
+  aggregate-sticky:
+    name: Sticky-comment aggregation
+    needs: build-and-smoke
+    if: github.event_name == 'pull_request' && always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v6.0.2
+
+      - name: Download all per-image reports
+        uses: actions/download-artifact@v6.0.0
+        with:
+          pattern: docker-distroless-trial-*-${{ github.run_id }}
+          path: /tmp/reports
+          merge-multiple: true
+
+      - name: Combine into sticky comment
+        run: |
+          mkdir -p /tmp/sticky
+          {
+            echo "## Distroless trial: cpp-dev / webui / cpp-inference"
+            echo
+            echo "Each canonical Dockerfile is UNCHANGED; the trial Dockerfile sits beside it as \`Dockerfile.distroless\` so docker-compose and existing CI matrices keep using the proven image."
+            echo
+            for f in /tmp/reports/*.md; do
+              [ -f "$f" ] && cat "$f" && echo
+            done
+            echo
+            echo "### Not in these trials (follow-up promotion PRs)"
+            echo
+            echo "- linux/arm64 buildx coverage is handled by \`docker-build.yml\` (\`build-distroless-trials\` matrix)."
+            echo "- CVE Trivy diff lives in \`trivy-container-scan.yml\` (per-image SARIF upload)."
+            echo "- For \`webui\`: full Gradio cold-start under distroless (a real \`docker run -p 7860:7860\` from \`webui-test.yml\`) is the promotion gate."
+            echo "- For \`cpp-inference\`: end-to-end \`piper --model ... --output_file ...\` with a real model fixture is the promotion gate."
+            echo "- For \`cpp-dev\`: \`docker exec -it ... /bin/sh\` interactive workflow check is user manual."
+          } > /tmp/sticky/combined.md
+          cat /tmp/sticky/combined.md
+
+      - name: Post sticky comment
+        uses: marocchino/sticky-pull-request-comment@v2.9.4
+        with:
+          header: docker-distroless-trial-cpp-dev-webui-cpp-inference
+          path: /tmp/sticky/combined.md

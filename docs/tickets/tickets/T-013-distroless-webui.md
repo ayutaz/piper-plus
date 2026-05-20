@@ -4,8 +4,8 @@
 **Milestone**: [M3 Supply Chain](../milestones/M3-supply-chain.md)
 **Proposal 項目**: `#1-2` (Distroless / Chainguard 移行 — `webui` image)
 **Tier**: Tier 3 (Gradio demo、 中影響)
-**Status**: 計画中
-**PR**: (未作成)
+**Status**: 着手中 (trial PR scope: 並行 Dockerfile.distroless 新設、 既存 Dockerfile / docker-compose / webui-test.yml は不変更)
+**PR**: feat/distroless-3-images-cpp-dev-webui-cpp-inference (/create-pr skill で起票予定、 T-015 / T-016 と同 PR で 3 image bundle)
 **担当 (予定)**: Claude Code (agent team) + maintainer review
 **着手前提**: T-015 完了推奨 (`pyopenjtalk` C 拡張の multi-stage knowledge を流用)
 

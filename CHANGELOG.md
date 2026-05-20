@@ -17,6 +17,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### 3 image distroless trial Dockerfiles + CI (cpp-dev / webui / cpp-inference)
+
+PR #523 (python-inference) で確立した distroless trial pattern を、 deploy 検証要件のない残 3 image に bundle 適用。 既存 `Dockerfile` / `docker-compose` / 関連 CI は **不変更で残し**、 並行 `Dockerfile.distroless` を 3 枚追加して build / size A/B / smoke test を CI で実証する scope。 promotion (canonical 置換) は image 別に別 PR。
+
+- **`docker/cpp-dev/Dockerfile.distroless`** (Wolfi minimal、 dev image): builder/final 一体型 multi-stage、 base = `cgr.dev/chainguard/wolfi-base`、 `apk add` で cmake / clang / gdb / valgrind / cpplint / cmake-format / gcovr などの dev toolchain を導入。 `apt` lockfile を撤廃、 BusyBox shell + uv venv + ONNX Runtime + HTS Engine + OpenJTalk source build は canonical Dockerfile と機能 parity を維持。 distroless/cc-debian12 (shell なし) は dev 用途と矛盾するため不採用 (ticket T-016 §2.2 の推奨どおり)
+- **`docker/webui/Dockerfile.distroless`** (Python + Gradio): multi-stage、 builder = `python:3.11-slim-trixie`、 final = `gcr.io/distroless/python3-debian12`。 PR #523 と同型 Debian-glibc ABI 統一、 `/usr/bin/python3` 絶対パス起動、 arch-neutral lib staging。 site-packages + NLTK data を builder から COPY、 ENTRYPOINT は `python3 /app/app.py` (canonical の `entrypoint.sh` は shell なしのため使えず、 実体は同等の単一行 exec)
+- **`docker/cpp-inference/Dockerfile.distroless`** (C++ runtime): builder = `ubuntu:24.04` (canonical と同型、 CMake ExternalProject graph 維持)、 final = `gcr.io/distroless/cc-debian12`。 piper binary + ONNX Runtime / libgomp shared lib + OpenJTalk 辞書を COPY。 distroless/cc-debian12 が libstdc++ / libgcc 同梱、 libgomp は arch-neutral staging で bring-over。 canonical の `entrypoint.sh` (shell) → ENTRYPOINT に直接 `/usr/local/bin/piper` 化
+- **新規 CI workflow** (`.github/workflows/docker-distroless-trial.yml`): PR base + workflow_dispatch、 3 image matrix で build (canonical baseline + distroless trial) → size 比較 → smoke (cpp-dev: cmake/clang/python3 起動確認 / webui: Gradio import / cpp-inference: piper --version) → aggregate sticky comment 投稿
+- **既存 workflow chain 統合**: `hadolint.yml` matrix に 3 Dockerfile 追加、 `trivy-container-scan.yml` matrix に 3 target 追加、 `docker-build.yml` の `build-distroless-trials` matrix job (multi-arch linux/arm64 + linux/amd64) に統合 (PR #523 で導入した python-inference distroless と合わせて 4 image trial が 1 job matrix で並走)
+- **hadolint config 拡張**: `.hadolint.yaml` の `trustedRegistries` に `cgr.dev` を追加 (wolfi-base 用、 既存 `gcr.io` は PR #523 で追加済み)
+- **promotion path**: 各 trial で build + size 効果が確認できた後、 image 別に canonical 置換 PR を作成 (cpp-dev は最も低リスク、 webui は webui-test.yml smoke、 cpp-inference は container test gate での実モデル E2E が前提)
+
 #### `python-inference` distroless trial Dockerfile + CI (`Dockerfile.cpu.distroless`)
 
 `docker/python-inference/` の distroless 化を derisk する **trial PR**。 既存 `Dockerfile.cpu` と `docker-compose.yml` / `.github/workflows/deploy-huggingface.yml` (HF Space deploy 経路) は **不変更で残し**、 並行 `Dockerfile.cpu.distroless` を新設して build / size / smoke test を CI で実証する scope。
