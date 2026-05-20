@@ -17,7 +17,7 @@
 
 両者とも **1 PR で 1 image / 1 registry** の cadence。 一括移行禁止 (R-2 / R-4 緩和)。
 
-> **2026-05-20 scope 変更**: Distroless は **5 image → 4 image** に縮小。 cpp-dev (T-016) は scope-out 確定。 理由は PR #524 で spike 目的 (multi-stage pattern / ABI 整合 / entrypoint 移植) が webui + cpp-inference の trial bundle により達成済、 加えて dev image は distroless 哲学と本質的に不整合 (cmake/gdb 等を final stage に残さざるを得ない) で大目的への寄与が限定的なため。 詳細は [T-016 §Note](../tickets/T-016-distroless-cpp-dev.md) 参照。
+> **2026-05-20 scope 変更**: Distroless は **5 image → 4 image** に縮小。 cpp-dev (T-016) は scope-out 確定。 理由は PR #524 で spike 目的 (multi-stage pattern / ABI 整合 / entrypoint 移植) が webui + cpp-inference の trial bundle により達成済、 加えて dev image は distroless 哲学と本質的に不整合 (cmake/gdb 等を final stage に残さざるを得ない) で大目的への寄与が限定的なため。 詳細は PR #526 (scope-out 確定) を参照。 旧 T-016 ticket file は削除済 (git history で参照可能)。
 
 ---
 
