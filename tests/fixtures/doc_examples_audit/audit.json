@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-05-19T00:00:00Z",
+  "generated_at": "2026-05-20T00:00:00Z",
   "totals": {
     "executable": 214,
     "needs_placeholder": 2,
@@ -5843,8 +5843,8 @@
     },
     {
       "file": "docs/tickets/milestones/M3-supply-chain.md",
-      "line_start": 129,
-      "line_end": 133,
+      "line_start": 131,
+      "line_end": 135,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -6036,8 +6036,8 @@
     },
     {
       "file": "docs/tickets/tickets/T-016-distroless-cpp-dev.md",
-      "line_start": 107,
-      "line_end": 146,
+      "line_start": 125,
+      "line_end": 164,
       "language_raw": "dockerfile",
       "language": "unknown",
       "category": "skip_warranted",
@@ -6051,8 +6051,8 @@
     },
     {
       "file": "docs/tickets/tickets/T-016-distroless-cpp-dev.md",
-      "line_start": 152,
-      "line_end": 164,
+      "line_start": 170,
+      "line_end": 182,
       "language_raw": "markdown",
       "language": "unknown",
       "category": "skip_warranted",
