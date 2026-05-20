@@ -2,7 +2,7 @@
 
 **Milestone ID**: `M3`
 **Tier**: Tier 3
-**Status**: 計画中
+**Status**: 進行中 (Distroless trial 3/4 image 投入済 — PR #523 / #524、 promotion 観測中。 SLSA L3 (T-017〜T-021) は未着手)
 **期間目安**: M2 merge 後 〜 8 週間 (10 チケット × 1 PR / 1 image or registry)
 **前提**: M1 完了 (`cosign verify-blob` 運用定着) + M2 完了 (`model-sha256-manifest.toml` / `release-versions.toml` 整備済み)
 
@@ -181,7 +181,7 @@ cosign sign-blob --keyless ... attestation.intoto.jsonl > attestation.sig
 ### release notes / docs へ
 
 - T-017 〜 T-021 完了で `docs/reference/slsa-verify.md` が完成 (FR-2.5) → 全 release notes に「Verifying artifacts with SLSA」 セクション追加
-- T-012〜T-016 完了で各 Dockerfile の base image が変更 → README の Quick Start docker pull コマンド更新
+- T-012〜T-015 完了で各 Dockerfile の base image が変更 → README の Quick Start docker pull コマンド更新 (cpp-dev は scope-out で対象外)
 
 ---
 

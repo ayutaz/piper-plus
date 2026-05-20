@@ -9,8 +9,7 @@
 **担当 (予定)**: Claude Code (agent team) + maintainer review
 **着手前提**: T-015 完了推奨 (`pyopenjtalk` C 拡張の multi-stage knowledge を流用)
 
-> **M3 内推奨実装順**: T-016 → T-015 → **T-013 (本チケット)** → T-012 → T-014。
-> webui は Gradio Web UI で Python + JS hybrid。 静的 asset (Gradio 同梱の JS / CSS) の配置と Python 単体 image (NLTK data / pyopenjtalk C 拡張) の知見が、 後続 T-012 (python-inference) / T-014 (wyoming) の同 base に直接転用できる。
+> **M3 内推奨実装順 (旧計画、 PR #524 trial bundle で実際の cadence は変更済)**: 旧 ticket 設計 (2026-05-19) では cpp-dev → cpp-inference → webui → python-inference → wyoming を推奨していたが、 PR #524 で本 ticket と T-015 (cpp-inference) を bundle merged、 PR #526 で cpp-dev scope-out 確定により再編済。 webui は Gradio Web UI で Python + JS hybrid、 静的 asset と Python 単体 image (NLTK data / pyopenjtalk C 拡張) の知見が後続 T-012 (python-inference、 PR #523 で trial 済) / T-014 (wyoming) の同 base に転用可能。
 
 ---
 
@@ -163,7 +162,7 @@ Gradio は `pip install gradio` で取得した site-packages の `gradio/templa
 
 ### 2.7 PR コメント自動投稿 (`docker/webui/distroless-report.md`)
 
-format (FR-1.4): T-016 と同 format に Gradio 起動 sample 結果を追加:
+format (FR-1.4): distroless-report.md format (旧 T-016 で想定された M3 共通 format、 cpp-dev scope-out で未作成、 本 ticket の promotion PR で別途定義予定) に Gradio 起動 sample 結果を追加:
 
 ```markdown
 ## Distroless migration report: `webui`
