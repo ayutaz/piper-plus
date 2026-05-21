@@ -52,7 +52,7 @@ piper-plus リポジトリで **デフォルト Python interpreter を 3.11 → 
 
 | ID | 要求 | 受入基準 |
 |---|---|---|
-| **NFR-01: 後方互換性** | Python 3.11 サポートを維持 | `requires-python = ">=3.11"` 据置、 `python-tests.yml` matrix で 3.11 が PASS |
+| **NFR-01: 後方互換性** | Python 3.11 サポートを維持 (Python interpreter のみ) | `requires-python = ">=3.11"` 据置、 `python-tests.yml` matrix で 3.11 が PASS。 ハードウェア / driver / 数値再現性などの**その他互換性損失は [9. 互換性影響評価](#9-互換性影響評価-breaking-changes-棚卸し) を参照** |
 | **NFR-02: 学習再現性** | 既存学習 ckpt が新 Docker image で resume 可能 | `--resume-from-multispeaker-checkpoint` で 6lang base ckpt をロード成功、 loss が canonical 範囲 |
 | **NFR-03: セキュリティ** | Trivy CVE クリーン | `docker-build.yml` の Trivy scan で new HIGH/CRITICAL が 0 |
 | **NFR-04: OS 寿命** | Ubuntu EOL を 2 年以上延長 | base image を Ubuntu 22.04 (EOL 2027) → 24.04 (EOL 2029) に bump |
@@ -204,7 +204,112 @@ piper-plus リポジトリで **デフォルト Python interpreter を 3.11 → 
 
 ---
 
-## 9. 用語定義
+## 9. 互換性影響評価 (Breaking Changes 棚卸し)
+
+**NFR-01 (3.11 サポート維持) は約束するが、 それ以外で「最適化と引き換えに失われる互換性」 が複数存在**する。 stakeholder 承認時の判断材料として全件列挙する。
+
+### 9.1 失う互換性 (Breaking)
+
+#### A. ハードウェア互換性
+
+| ID | 失うもの | 影響範囲 | 対象 GPU | 緩和策 |
+|---|---|---|---|---|
+| **B-A1** | **V100 (sm_70) で新機能利用不可** | 学習速度の向上 | V100 | V100 は既に引退方針、 影響なし |
+| **B-A2** | **Pascal P100 / P40 (sm_60/61) は wheel cu128 で deprecation 警告** | 学習・推論 | P100/P40 | 該当ハードなし、 影響なし |
+| **B-A3** | **Maxwell (sm_50/52/53) は CUDA 12.x で完全非対応** | 学習・推論 | M40 等 | 既に CUDA 11.x 時点で deprecated、 影響なし |
+| **B-A4** | **host driver R470 以下は cu128 wheel 起動不可** | 推論サーバー / 学習サーバー | 全 GPU 共通 | A-01 で R570+ を前提化、 サーバー管理者に確認 |
+| **B-A5** | **古い nvidia-container-toolkit (1.10 以下) で `--gpus all` が CUDA 12.8 image を扱えない** | docker run 動作 | Docker host | サーバーの nvidia-container-toolkit を 1.14+ に更新 |
+
+#### B. ソフトウェア互換性
+
+| ID | 失うもの | 影響範囲 | 緩和策 |
+|---|---|---|---|
+| **B-B1** | **Python 3.10 以下は使えない** | 3.10 ユーザ | 既に `>=3.11` で 3.10 は切られている、 追加影響なし |
+| **B-B2** | **Ubuntu 22.04 (Jammy) base image の wheel を再利用しない** | Docker build | Ubuntu 24.04 manylinux_2_28 wheel に揃える、 全 wheel 確認済 |
+| **B-B3** | **glibc 2.35 (Jammy) でビルドした native extension は 2.39 (Noble) で再 build 推奨** | Cython 等 | piper-plus は wheel 経由なので影響なし、 ローカル開発のみ要 rebuild |
+| **B-B4** | **CUDA 11.x driver でホストされた環境では起動不可** | 古い学習サーバー | 該当なし、 新サーバーは driver R570+ |
+| **B-B5** | **deadsnakes PPA 経由 python3.13 は Ubuntu 公式サポート対象外** | Docker maintenance | CPython core dev maintained、 ただし Ubuntu 公式 SLA 範囲外 |
+| **B-B6** | **distroless debian12 image を継続利用するユーザ (3rd party)** | 推論サービス | Issue #527 PR ノートに migration 指示を明記、 image tag は `v1.x.y-debian12` を残すか別途検討 |
+
+#### C. データ・モデル互換性
+
+| ID | 失うもの | 影響範囲 | 緩和策 |
+|---|---|---|---|
+| **B-C1** | **PyTorch 2.2 で生成された optimizer state_dict の forward-compat は保証されない** | 学習 resume | model weights は互換、 optimizer は再構築可能。 既存 ckpt は `--resume-from-multispeaker-checkpoint` で optimizer 破棄して再開可能 (既存仕様) |
+| **B-C2** | **ONNX export の opset_version default が 17 → 20+ に変わる可能性** | 推論ランタイム互換 | 明示的に `--opset 17` 等を export 時に指定して固定、 audio_parity Tier 4 で検証 |
+| **B-C3** | **TF32 enable で生成された state_dict は TF32 OFF 環境で resume 時に loss curve が変わる** | 学習 reproducibility | 既存 ckpt は TF32 ありで再学習推奨、 もしくは TF32 OFF flag を opt-in 化 |
+| **B-C4** | **bf16-mixed で学習した ckpt を FP16-mixed で resume すると数値表現の違いで loss spike の可能性** | 学習 reproducibility | precision は学習ジョブ通して固定、 途中変更しない運用 |
+
+#### D. API 互換性 (PyTorch 2.2 → 2.11)
+
+| ID | 失うもの | 影響範囲 | 緩和策 |
+|---|---|---|---|
+| **B-D1** | **`torch.cuda.amp.autocast` → `torch.amp.autocast('cuda', ...)` への移行** | piper-train code | piper-train は Lightning Trainer の precision 経由なので直接の影響なし |
+| **B-D2** | **`torch.distributed.algorithms.ddp_comm_hooks` の一部 hook 削除** | DDP 学習 | piper-train は標準 DDP のため影響なし |
+| **B-D3** | **`torch.jit.script` の一部仕様変更** | TorchScript export | piper-plus は ONNX export のみ、 TorchScript 経路は legacy |
+| **B-D4** | **`torch.onnx.export` の `dynamic_axes` 等の引数名変更可能性** | ONNX export | `export_onnx.py` の引数を 2.11 docs に揃える、 Phase 4 で要検証 |
+| **B-D5** | **`torch.optim.lr_scheduler.LRScheduler` の一部 method signature 変更** | Lightning Trainer | pytorch-lightning 2.6.1 が absorb、 piper-train 側は影響なし |
+| **B-D6** | **`torch.set_default_tensor_type` deprecated**、 `torch.set_default_dtype` / `torch.set_default_device` への移行 | piper-train code | piper-train code でgrep 確認 (未使用予想)、 使われていれば置換 |
+
+#### E. 数値再現性
+
+| ID | 失うもの | 影響範囲 | 緩和策 |
+|---|---|---|---|
+| **B-E1** | **TF32 enable で matmul mantissa が 23-bit → 10-bit に低下** | 数値精度 | TTS workload では perceptual 影響なし、 ただし `torch.use_deterministic_algorithms(True)` と非互換 |
+| **B-E2** | **bf16-mixed は FP16-mixed と異なる数値表現** | 学習 loss curve | dynamic range は広いが mantissa が短い、 loss scaling 不要だが分布変わる |
+| **B-E3** | **cuDNN 8.9 → 9.5 で convolution algorithm 選択が変わる** | step 単位の数値再現 | cuDNN 内部の autotune 結果が変わる、 wall-clock は速くなるが bit-exact ではない |
+| **B-E4** | **`torch.backends.cudnn.deterministic = True` を設定しても完全な determinism は得られない** | reproducible 学習 | Phase 4 で TF32 ON 時の determinism は諦める方針、 必要なら opt-in flag |
+
+#### F. ドキュメント・サポート互換性
+
+| ID | 失うもの | 影響範囲 | 緩和策 |
+|---|---|---|---|
+| **B-F1** | **V100 想定のトラブルシューティング情報が無効化** | CLAUDE.md / training-guide | Phase 4 で新 GPU 前提に置換 |
+| **B-F2** | **`--precision 32-true` 推奨 (V100 用) が legacy 扱いになる** | training-guide | bf16-mixed を新メイン推奨に格上げ、 32-true は legacy compatibility 用と注記 |
+| **B-F3** | **`--no-wavlm` 推奨 (V100 用) も VRAM 16GB 制約 (T4) 用に意味が変わる** | docs | T4 (16GB) では `--no-wavlm`、 Ada/Blackwell (32-48GB) では WavLM 利用可、 ニュアンス変更を明記 |
+
+### 9.2 失わない互換性 (Maintained)
+
+確認のため明示:
+
+| ID | 維持されるもの | 確認方法 |
+|---|---|---|
+| **K-01** | Python 3.11 サポート (NFR-01) | `requires-python = ">=3.11"` 据置、 `python-tests.yml` matrix で 3.11 PASS |
+| **K-02** | Python 3.12 サポート | 同 matrix で 3.12 PASS |
+| **K-03** | 既存 PyPI `piper-plus` の API 互換 | runtime 関連は変更なし、 推論側のみ |
+| **K-04** | 学習済み ONNX モデルの推論互換 | ランタイム側の onnxruntime は既に 1.26.0 で安定、 audio_parity Tier 4 PASS で検証 |
+| **K-05** | 6lang base ckpt から FT 可能 | Template B FT smoke で確認 |
+| **K-06** | Wyoming Docker (Home Assistant 連携) の動作 | 既に Python 3.13、 Phase 2 で変更なし |
+| **K-07** | C# / Rust / Go / WASM / C++ ランタイム | piper_train の変更は piper runtime に波及しない (model file のみ共有) |
+| **K-08** | Phoneme set / G2P 仕様 | num_symbols=173 strict gate で pin、 言語別 phonemizer も無変更 |
+| **K-09** | OpenAI 互換 TTS API | docker/python-inference の FastAPI 経由、 同じ |
+| **K-10** | カスタム辞書 / `[[ phoneme ]]` インライン記法 | 機能変更なし |
+
+### 9.3 グレーゾーン (要検証)
+
+実装中に「動くかもしれないが要確認」 の項目:
+
+| ID | 項目 | 検証方法 | 検証 Phase |
+|---|---|---|---|
+| **G-01** | onnxsim-prebuilt 0.4.39 (cp312-abi3 wheel) が cp313 で完全動作 | Phase 3 で `python -m onnxsim` smoke test | Phase 3 |
+| **G-02** | `pyopenjtalk-plus` の Cython extension が glibc 2.39 (Noble) wheel で問題なし | Phase 3 で docker build 成功 + 推論 smoke | Phase 3 |
+| **G-03** | `g2pk2` (Korean phonemizer) が Python 3.13 で動作 | `import g2pk2` smoke | Phase 1 |
+| **G-04** | `wandb` 0.26 の web socket / API が cu128 環境で接続 | Phase 4 学習 smoke で WandB ログ確認 | Phase 4 |
+| **G-05** | `pytorch-lightning` 2.6.1 の `precision="bf16-mixed"` が Ada/Blackwell で期待通り動作 | Phase 4 で 100 step bf16 smoke | Phase 4 |
+| **G-06** | `numba` 0.65.1 の JIT compile が Python 3.13 + Ubuntu 24.04 で正常 | Phase 4 norm_audio / VAD 経路の動作 | Phase 4 |
+
+### 9.4 結論
+
+**「ほぼ全ての互換性は維持できる」 が、 以下の 4 つだけは断念**:
+
+1. **V100 / Pascal / Maxwell GPU を新機能と組み合わせる**未来 (これらは既に引退方針なので影響軽微)
+2. **CUDA 11.x driver 環境**でのサポート (推論サービス運用者は driver bump 必要)
+3. **TF32 OFF / TF32 ON のステップ単位 bit-exact 再現性** (perceptual 互換は維持)
+4. **`torch.use_deterministic_algorithms(True)` モード**と TF32 / cuDNN 9.5 autotune の併用
+
+それ以外の API / データ / ランタイム / phoneme / G2P / モデル互換は全て維持される。
+
+## 10. 用語定義
 
 | 用語 | 意味 |
 |---|---|
@@ -218,7 +323,7 @@ piper-plus リポジトリで **デフォルト Python interpreter を 3.11 → 
 
 ---
 
-## 10. 関連ドキュメント
+## 11. 関連ドキュメント
 
 | 文書 | 内容 |
 |---|---|
