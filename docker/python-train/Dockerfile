@@ -3,11 +3,22 @@
 
 # Build stage
 # Base: CUDA 12.6.3 + cuDNN 9 + Ubuntu 22.04
-# Note: image side ships cuDNN 9, but torch==2.2.1+cu121 wheel bundles its
-# own cuDNN 8.9 and uses it dynamically at runtime, so cuDNN version mismatch
-# between image and torch does not affect training. Bumped from 12.1.0 to
-# clear Trivy OS-package CVEs (libssl/glibc/libxml2 etc.) accumulated since
-# the 2023-04 base.
+#
+# Why the CUDA/cuDNN version mismatch with torch==2.2.1+cu121 is safe:
+#   - torch wheel bundles its own CUDA runtime libraries (libcudart, libcublas,
+#     libcufft, libcurand, libcusolver, libcusparse, libcudnn 8.9, libnccl) under
+#     /opt/venv/lib/python*/site-packages/{nvidia,torch/lib} and uses them
+#     dynamically at runtime. The system CUDA 12.6 toolkit installed under
+#     /usr/local/cuda is NOT used by torch — it ships only for non-torch CUDA
+#     consumers (CMake / nvcc invocations from third-party packages).
+#   - NVIDIA CUDA forward compatibility: drivers from newer toolkits (12.6)
+#     fully support binaries built against older toolkits (12.1), so wheel-
+#     bundled cu121 runtime libs load correctly on the 12.6 image's driver.
+#   - cuDNN bundled by torch (8.9) takes precedence at dlopen time because
+#     site-packages/nvidia/cudnn/lib appears earlier in the loader path than
+#     the image's /usr/lib/x86_64-linux-gnu cuDNN 9.
+# Bumped from 12.1.0 to clear Trivy OS-package CVEs (libssl/glibc/libxml2
+# etc.) accumulated since the 2023-04 base.
 FROM nvidia/cuda:12.6.3-cudnn-devel-ubuntu22.04 AS builder
 
 # Free up space in the build environment
@@ -75,6 +86,11 @@ RUN uv pip install "/tmp/src/python[train]"
 
 # Runtime stage
 # Base: CUDA 12.6.3 + cuDNN 9 + Ubuntu 22.04 (matches builder stage)
+# Same CUDA/cuDNN compatibility argument as builder stage: torch 2.2.1+cu121
+# wheel (copied via /opt/venv) bundles its own CUDA 12.1 runtime + cuDNN 8.9
+# under site-packages and loads them via the venv's library path. The image's
+# 12.6 system libraries are used only for non-torch CUDA consumers. NVIDIA
+# driver forward compat ensures cu121 binaries run on 12.6 drivers.
 FROM nvidia/cuda:12.6.3-cudnn-runtime-ubuntu22.04
 
 # Set environment variables
