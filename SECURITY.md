@@ -79,6 +79,33 @@ reporters informed if a particular issue requires more time.
 - Vulnerabilities that require physical access to the user's machine or that
   rely solely on already-compromised host environments.
 
+### Docker Image Scope
+
+The repository ships several Docker images. Trivy container scanning runs on
+a weekly schedule and on changes to `docker/**/Dockerfile*` (and the workflow
+file). Monitoring scope is decided **per image**: production / distributed
+images and contributor-baseline development helpers are monitored, while
+purely-individual local development environments (such as the 4-GPU training
+stack) are excluded because their CVE alerts do not represent an external
+attack surface in their intended deployment. Existing alerts on excluded
+images are dismissed as `won't fix`.
+
+| Image | Distribution | Trivy monitored? | Notes |
+|-------|-------------|-----------------:|-------|
+| `python-inference` (CUDA) | Production (GHCR / DockerHub) | ✅ | OpenAI-compatible TTS API server for GPU clusters |
+| `python-inference-cpu-distroless` | Production | ✅ | Multi-arch CPU inference image |
+| `webui` / `webui-distroless` | Production | ✅ | Gradio demo / WebUI |
+| `wyoming` | Production | ✅ | Home Assistant Wyoming Protocol TTS |
+| `cpp-inference` / `cpp-inference-distroless` | Production | ✅ | Native C++ inference binary |
+| `cpp-dev` | Local development helper | ✅ | Build / debug environment (kept under monitoring as a hygiene baseline) |
+| `python-train` | **Local development only** (4-GPU training stack) | ❌ | Not deployed to clusters; executed on individual researcher machines. CVE alerts on the ML/training apt layer (CUDA + cuDNN + ML toolchain) do not represent an exposed network attack surface for piper-plus |
+
+If you identify a vulnerability in a development-only image that nonetheless
+has a credible attack path (for example, a researcher loading a malicious
+checkpoint in a shared training environment), please still report it via the
+private channels above — the scope policy is about scanner monitoring, not
+about whether we will fix exploitable defects.
+
 ## Security Best Practices for Users
 
 Even within supported versions there are operational pitfalls users should be
