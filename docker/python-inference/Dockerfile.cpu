@@ -13,7 +13,7 @@
 #   - Same NLTK data preload, healthcheck, non-root user
 #
 # Differences:
-#   - Base image: python:3.11-slim-trixie (no CUDA, multi-arch native)
+#   - Base image: python:3.11-slim-bookworm (no CUDA, multi-arch native)
 #   - piper_train installed with [inference] extras (onnxruntime CPU wheels),
 #     not [inference-gpu]. onnxruntime-gpu has no aarch64 wheel on PyPI as
 #     of 1.18.x, so the GPU variant would fail to install on arm64 anyway.
@@ -25,7 +25,14 @@
 # Run:
 #   docker run --rm -p 8000:8000 -v $PWD/models:/app/models:ro piper-plus-cpu \
 #     python inference.py --server --model /app/models/your-model.onnx --port 8000
-FROM python:3.11-slim-trixie
+#
+# Base: python:3.11-slim-bookworm (Debian 12 stable; see
+# https://wiki.debian.org/DebianReleases for the current support window).
+# Bumped from slim-trixie (Debian 13, then still pre-release) to clear Trivy
+# apt-layer CVEs and align with the broader Debian-stable Docker ecosystem.
+# Python 3.11 stays as-is — pyproject.toml allows 3.11+; bumping the
+# interpreter is out of scope for a CVE-cleanup PR.
+FROM python:3.11-slim-bookworm
 
 ENV PYTHONUNBUFFERED=1
 ENV DEBIAN_FRONTEND=noninteractive

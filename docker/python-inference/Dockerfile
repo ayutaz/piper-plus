@@ -1,7 +1,14 @@
 # Python Inference Environment for piper-plus (GPU/CPU)
 # GPU support via onnxruntime-gpu; also works without --gpus (CPU fallback)
 # Includes Gradio WebUI (--webui mode)
-FROM nvidia/cuda:12.4.1-cudnn-runtime-ubuntu22.04
+#
+# Base: CUDA 12.6.3 + cuDNN 9 + Ubuntu 22.04 (bumped from 12.4.1 to clear
+# Trivy apt-layer CVEs in gnutls / openssl / curl accumulated on the 12.4.1
+# base). onnxruntime-gpu 1.18+ wheels are linked against CUDA 12.x and rely
+# on NVIDIA driver forward compatibility, so a 12.6 host driver runs 12.x
+# binaries without recompilation. Same compatibility rationale as the
+# python-train image (see docker/python-train/Dockerfile).
+FROM nvidia/cuda:12.6.3-cudnn-runtime-ubuntu22.04
 
 ENV PYTHONUNBUFFERED=1
 ENV DEBIAN_FRONTEND=noninteractive
