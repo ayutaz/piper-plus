@@ -43,9 +43,11 @@
 # Stage 1: builder (Debian-based, has apt/pip/build-essential).
 # Mirrors Dockerfile.cpu's base so the resulting site-packages and
 # shared libraries link against the same libc / libstdc++ that the
-# distroless/python3-debian12 final stage ships.
+# distroless/python3-debian12 final stage ships. Kept in sync with the
+# main Dockerfile.cpu base (bookworm = Debian 12, matches distroless
+# python3-debian12 final stage).
 # ----------------------------------------------------------------------
-FROM python:3.11-slim-trixie AS builder
+FROM python:3.11-slim-bookworm AS builder
 
 ENV PYTHONUNBUFFERED=1
 ENV DEBIAN_FRONTEND=noninteractive
