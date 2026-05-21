@@ -46,7 +46,6 @@ exclude_dirs = [
     "node_modules",
     "build",
     "target",
-    "docs/proposals",         # draft / variable example content; revisit if needed
 ]
 # Inline HTML <pre><code> blocks are OUT OF SCOPE; only GFM fenced
 # blocks (triple backticks) are considered. This caps the audit at the
