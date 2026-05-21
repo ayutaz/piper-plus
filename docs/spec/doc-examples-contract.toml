@@ -26,7 +26,7 @@
 
 [meta]
 spec_version = 1
-last_updated = "2026-05-19"
+last_updated = "2026-05-21"
 applies_to = ["docs"]
 canonical_reference = "scripts/check_doc_examples.py"
 forward_compat_policy = "strict"
