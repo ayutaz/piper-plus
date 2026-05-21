@@ -1,6 +1,14 @@
-# Default Python 3.11 → 3.13 移行調査
+# Default Python 3.11 → 3.13 移行
 
-Issue [#527](https://github.com/ayutaz/piper-plus/issues/527) 対応の影響範囲調査ノート。
+Issue [#527](https://github.com/ayutaz/piper-plus/issues/527) — デフォルト Python interpreter を 3.11 から 3.13 に揃えるための調査・計画ドキュメント群。
+
+## このフォルダの構成
+
+| 文書 | 内容 |
+|---|---|
+| [`README.md`](README.md) | (本ファイル) 調査結果サマリ + Phase 分割計画 + 全議論 |
+
+> **追加ドキュメント置き場:** 実装着手時に Phase ごとの個別ノート (例: `phase-3-gpu-validation.md` 等) を追加する場合は本フォルダに置く。 追加した際は本表に追記すること。
 
 ## 背景
 
