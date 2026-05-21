@@ -613,6 +613,270 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 `[tool.mypy] python_version` と `[tool.ruff] target-version` を `"3.11"` → `"3.13"` に上げると `match` 文 / `Self` 型 / `PEP 695 generics` が解禁される。 ただし **3.11 サポートを切ることになる**ため、 `requires-python` 据置方針と矛盾するため **見送り推奨**。
 
+## Phase 依存関係
+
+```
+Phase 0 (distutils → setuptools)
+   │  前提: monotonic_align build を 3.13 で fragile shim から解放
+   ▼
+Phase 1 (docs + 軽量 CI + CPU Docker)
+   │  並列実行可: Phase 2 と独立、 ただし PR review 衝突を避けるため Phase 0 → 1 順
+   ▼
+Phase 2 (distroless × 2 を debian13 で統一)
+   │  並列実行可: Phase 3 と独立 (CPU image のみ touch)
+   ▼
+Phase 3 (CUDA Docker base 統一: 12.6 → 12.8 + Ubuntu 24.04 + deadsnakes 3.13)
+   │  必須前提: host driver R570+ 確認 (新 GPU 環境では問題なし)
+   │  並列実行可: Phase 4 と独立 (Docker のみ touch、 piper_train コード変更なし)
+   ▼
+Phase 4 (新 GPU 学習最適化: TF32 + bf16-mixed + docs 更新)
+   │  必須前提: Phase 3 完了 (Phase 3 の Docker image で新 GPU 学習可能)
+   │  実機検証: Ada 6000 / RTX 5090 で 1 epoch smoke
+   ▼
+(任意) Phase 5: mypy/ruff target_version — 見送り推奨
+```
+
+Phase 1 / 2 は並列でも可だが、 PR review 衝突を避けるため順次推奨。 Phase 3 と Phase 4 は touch するファイル群が異なる (Docker vs piper_train code) ため並列実行可能。
+
+## Phase 別 diff サンプル
+
+実装時の参考。 各 Phase の代表的な変更を before / after で示す。
+
+### Phase 0 — distutils → setuptools
+
+```diff
+--- a/src/python/piper_train/vits/monotonic_align/setup.py
++++ b/src/python/piper_train/vits/monotonic_align/setup.py
+@@ -1,4 +1,4 @@
+-from distutils.core import setup
++from setuptools import setup
+ from pathlib import Path
+
+ import numpy
+```
+
+### Phase 1 — CPU Docker (Dockerfile.cpu)
+
+```diff
+--- a/docker/python-inference/Dockerfile.cpu
++++ b/docker/python-inference/Dockerfile.cpu
+@@ -32,7 +32,7 @@
+-# Python 3.11 stays as-is — pyproject.toml allows 3.11+; bumping the
+-# interpreter is out of scope for a CVE-cleanup PR.
+-FROM python:3.11-slim-bookworm
++# Python 3.13 default — see docs/reference/python-313/README.md
++# (Issue #527 Phase 1).
++FROM python:3.13-slim-trixie
+```
+
+### Phase 1 — workflow `python-lint.yml` (代表例)
+
+```diff
+--- a/.github/workflows/python-lint.yml
++++ b/.github/workflows/python-lint.yml
+@@ -19,7 +19,7 @@ jobs:
+     strategy:
+       matrix:
+-        python-version: ['3.11']
++        python-version: ['3.13']
+```
+
+(他 21 個の workflow も同パターン、 一覧は「影響範囲の内訳」 B 節参照)
+
+### Phase 2 — distroless (Dockerfile.cpu.distroless)
+
+```diff
+--- a/docker/python-inference/Dockerfile.cpu.distroless
++++ b/docker/python-inference/Dockerfile.cpu.distroless
+@@ -47,7 +47,7 @@
+-FROM python:3.11-slim-bookworm AS builder
++FROM python:3.13-slim-trixie AS builder
+@@ -134,12 +134,12 @@
+-FROM gcr.io/distroless/python3-debian12
++FROM gcr.io/distroless/python3-debian13
+@@ -160,9 +160,9 @@
+-COPY --from=builder /usr/local/lib/python3.11 /usr/local/lib/python3.11
++COPY --from=builder /usr/local/lib/python3.13 /usr/local/lib/python3.13
+@@ -166,7 +166,7 @@
+-ENV PYTHONPATH=/usr/local/lib/python3.11/site-packages
++ENV PYTHONPATH=/usr/local/lib/python3.13/site-packages
+```
+
+### Phase 3 — CUDA inference Docker (Dockerfile)
+
+```diff
+--- a/docker/python-inference/Dockerfile
++++ b/docker/python-inference/Dockerfile
+@@ -8,9 +8,9 @@
+-FROM nvidia/cuda:12.6.3-cudnn-runtime-ubuntu22.04
++FROM nvidia/cuda:12.8.1-cudnn-runtime-ubuntu24.04
+
+ ENV PYTHONUNBUFFERED=1
+ ENV DEBIAN_FRONTEND=noninteractive
+
+-# Install Python 3.11 and system dependencies
++# Install Python 3.13 via deadsnakes PPA (Ubuntu 24.04 apt default is 3.12)
+ RUN apt-get update && apt-get install -y --no-install-recommends \
++    software-properties-common \
++    && add-apt-repository -y ppa:deadsnakes/ppa \
++    && apt-get update && apt-get install -y --no-install-recommends \
+-    python3.11 \
+-    python3.11-venv \
++    python3.13 \
++    python3.13-venv \
++    python3.13-dev \
+     python3-pip \
+     libsndfile1 \
+-    && ln -sf /usr/bin/python3.11 /usr/bin/python3 \
+-    && ln -sf /usr/bin/python3.11 /usr/bin/python \
++    && update-alternatives --install /usr/bin/python python /usr/bin/python3.13 1 \
++    && update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.13 1 \
+     && rm -rf /var/lib/apt/lists/*
+```
+
+### Phase 3 — 学習 Docker (Dockerfile)
+
+```diff
+--- a/docker/python-train/Dockerfile
++++ b/docker/python-train/Dockerfile
+@@ -19,7 +19,7 @@
+-FROM nvidia/cuda:12.6.3-cudnn-devel-ubuntu22.04 AS builder
++FROM nvidia/cuda:12.8.1-cudnn-devel-ubuntu24.04 AS builder
+@@ -43,11 +43,18 @@
++# Install Python 3.13 via deadsnakes PPA
+ RUN apt-get update && apt-get install -y --no-install-recommends \
++    software-properties-common \
++    && add-apt-repository -y ppa:deadsnakes/ppa \
++    && apt-get update && apt-get install -y --no-install-recommends \
+     build-essential \
+     cmake \
+     git \
+     wget \
+     curl \
+-    python3.11 \
+-    python3.11-dev \
+-    python3.11-venv \
++    python3.13 \
++    python3.13-dev \
++    python3.13-venv \
+@@ -71,5 +78,5 @@
+-# PyTorch (CUDA 12.1)
++# PyTorch (CUDA 12.8, aligned with base image and uv.lock canonical)
+ RUN uv pip install \
+-    --extra-index-url https://download.pytorch.org/whl/cu121 \
+-    "torch==2.2.1+cu121" "torchaudio==2.2.1+cu121" "torchvision==0.17.1+cu121"
++    --extra-index-url https://download.pytorch.org/whl/cu128 \
++    "torch==2.11.0+cu128" "torchaudio==2.11.0+cu128"
+@@ -94,7 +101,7 @@
+-FROM nvidia/cuda:12.6.3-cudnn-runtime-ubuntu22.04
++FROM nvidia/cuda:12.8.1-cudnn-runtime-ubuntu24.04
+```
+
+> **注:** `torchvision==0.17.1+cu121` は piper-train が使っていないので削除可。 削除する場合 commit 内で明示。
+
+### Phase 4 — TF32 enable
+
+```diff
+--- a/src/python/piper_train/__main__.py
++++ b/src/python/piper_train/__main__.py
+@@ -458,7 +458,11 @@ def main():
+     ...
+     torch.backends.cudnn.benchmark = True
++    # TF32 enable for Ampere+ (sm_80+: A100/Ada 6000/RTX 5090). On
++    # sm_75 (T4) and older, this setting is a noop. Speeds up matmul by
++    # ~1.3-1.5x with negligible quality impact for TTS workloads.
++    torch.backends.cuda.matmul.allow_tf32 = True
+```
+
+### Phase 4 — CLAUDE.md (V100 → 新 GPU)
+
+```diff
+--- a/CLAUDE.md
++++ b/CLAUDE.md
+@@ -122,7 +122,7 @@
+-- **WavLM Discriminator** ... V100 では `--no-wavlm` 推奨。
++- **WavLM Discriminator** ... T4 (VRAM 16GB) では `--no-wavlm` 推奨。 Ada 6000 / RTX 5090 では WavLM 利用可。
+@@ -310,7 +310,7 @@
+-| 学習速度が遅い (V100) | `--precision 32-true` (FP16-mixed は backward 29-40s に劣化) / ...
++| 学習速度が遅い (T4) | VRAM 制約 (16GB) を確認、 batch_size を 8-12 に絞る / Ada 6000 / RTX 5090 への移行検討 |
++| 学習速度が遅い (Ada 6000 / RTX 5090) | `--precision bf16-mixed` 推奨 / `--compile` で torch.compile / TF32 enabled 確認 |
+```
+
+## ロールバック手順
+
+各 Phase で問題が発覚した場合の戻し方:
+
+| Phase | ロールバック方法 | データロス可能性 |
+|---|---|---|
+| 0 | `git revert <commit>` のみで完了 (1 commit、 setup.py の 1 行) | なし |
+| 1 | `git revert <commit>` で workflow / Dockerfile.cpu / docs を一括戻し | なし |
+| 2 | `git revert <commit>` で distroless × 2 を debian12 に戻す。 既に push 済 image がある場合は registry の旧 tag を再 promote | image registry の整合性確認のみ |
+| 3 | `git revert <commit>` で CUDA Docker を 12.6 + Python 3.11 に戻す。 学習途中の場合は新 image で生成した ckpt が旧 image で読めるか確認 (基本互換、 ただし PyTorch 2.11 → 2.2 ckpt の forward compat は要検証) | **学習 ckpt の互換性確認必須** |
+| 4 | `git revert <commit>` で `__main__.py` の TF32 行を削除、 CLAUDE.md / training-guide の V100 言及を復元。 既存学習ジョブは TF32 ありで生成された state_dict なので、 ロールバック後の TF32 OFF 学習で resume すると loss curve が変わる可能性 | **学習 reproducibility 影響あり** |
+
+Phase 3 / 4 のロールバック時は:
+1. 新 image で生成した ckpt を別 backup
+2. 旧 image (12.6.3 + Python 3.11) を再 build して resume 確認
+3. validation loss が canonical 範囲内なら継続、 外れたら新 image での再学習決定
+
+## PR テンプレート
+
+各 Phase の PR 作成時に使うベース。 詳細は `pull_request_template.md` の section 構造に従う。
+
+### Phase 0 PR
+
+```
+Title: chore(build): replace distutils.core with setuptools in monotonic_align
+
+## Summary
+- src/python/piper_train/vits/monotonic_align/setup.py の `from distutils.core import setup` を `from setuptools import setup` に書換
+- distutils は Python 3.12 で stdlib から削除済 (PEP 632)、 setuptools shim 経由で偶然動いていた状態を明示化
+- Issue #527 Phase 0 (Python 3.13 移行の前提整理)
+
+## Type
+- [x] chore (build/dep)
+
+## Risk Level
+- [x] Low
+
+## Affected Components
+- [x] Python (training)
+
+## Test Plan
+- [ ] python-tests.yml matrix (3.11/3.12/3.13) で monotonic_align build が green
+- [ ] `python setup.py build_ext --inplace` がローカルで動作
+```
+
+### Phase 3 PR (例)
+
+```
+Title: feat(docker): unify python-train/inference to CUDA 12.8 + Ubuntu 24.04 + Python 3.13
+
+## Summary
+- nvidia/cuda 12.6.3-ubuntu22.04 → 12.8.1-ubuntu24.04 (OS EOL 2027→2029、 fully-aligned 戦略)
+- Python 3.11 (apt) → 3.13 (deadsnakes PPA)
+- torch 2.2.1+cu121 → 2.11.0+cu128 (RTX 5090 sm_120 起動条件)
+- Issue #527 Phase 3 (詳細: docs/reference/python-313/README.md)
+
+## Type
+- [x] feat (infrastructure)
+
+## Risk Level
+- [x] High (CUDA / Ubuntu / Python の triple bump)
+
+## Affected Components
+- [x] Docker (training)
+- [x] Docker (inference)
+
+## Test Plan
+- [ ] docker build (python-train + python-inference) が success
+- [ ] Trivy CVE diff: new HIGH/CRITICAL なし
+- [ ] Ada 6000 実機で `python -c "import torch; torch.cuda.is_available()"` true
+- [ ] RTX 5090 実機で sm_120 起動確認 (`torch.cuda.get_device_capability()` (12, 0))
+- [ ] T4 実機で onnxruntime-gpu CPUExecutionProvider + CUDAExecutionProvider 認識
+- [ ] host driver R570+ を学習サーバー / 推論サーバー全台で確認
+```
+
 ## 非対応事項
 
 - `requires-python = ">=3.11"` の下限引き上げ → Issue #527 のスコープ外
