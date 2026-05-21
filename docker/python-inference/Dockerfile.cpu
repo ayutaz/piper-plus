@@ -26,7 +26,8 @@
 #   docker run --rm -p 8000:8000 -v $PWD/models:/app/models:ro piper-plus-cpu \
 #     python inference.py --server --model /app/models/your-model.onnx --port 8000
 #
-# Base: python:3.11-slim-bookworm (Debian 12, stable LTS until 2026-06).
+# Base: python:3.11-slim-bookworm (Debian 12 stable; see
+# https://wiki.debian.org/DebianReleases for the current support window).
 # Bumped from slim-trixie (Debian 13, then still pre-release) to clear Trivy
 # apt-layer CVEs and align with the broader Debian-stable Docker ecosystem.
 # Python 3.11 stays as-is — pyproject.toml allows 3.11+; bumping the
