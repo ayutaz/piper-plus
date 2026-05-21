@@ -81,12 +81,14 @@ reporters informed if a particular issue requires more time.
 
 ### Docker Image Scope
 
-The repository ships several Docker images. We monitor automated container
-scanners (Trivy on a weekly schedule and on `docker/**` changes) **only against
-images that are distributed for production use**. Images intended solely for
-local development tasks are not actively monitored, and their Trivy alerts are
-dismissed as `won't fix` because they do not represent an external attack
-surface in their intended deployment.
+The repository ships several Docker images. Trivy container scanning runs on
+a weekly schedule and on changes to `docker/**/Dockerfile*` (and the workflow
+file). Monitoring scope is decided **per image**: production / distributed
+images and contributor-baseline development helpers are monitored, while
+purely-individual local development environments (such as the 4-GPU training
+stack) are excluded because their CVE alerts do not represent an external
+attack surface in their intended deployment. Existing alerts on excluded
+images are dismissed as `won't fix`.
 
 | Image | Distribution | Trivy monitored? | Notes |
 |-------|-------------|-----------------:|-------|

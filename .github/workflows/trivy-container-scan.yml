@@ -171,13 +171,15 @@ jobs:
   # docker system prune で intermediate cache を全部削除。
   #
   # Scope policy (SECURITY.md "Docker Image Scope" 参照):
-  #   - 配布 / 本番運用される image のみ Trivy 監視対象とする
-  #   - 開発専用 image (python-train: 4-GPU ML 学習スタック、 個別開発者環境のみ
-  #     で実行され、 production cluster へ配布されない) は scan 対象外
+  #   - 配布 / 本番運用される image と contributor-baseline 開発 helper を
+  #     Trivy 監視対象とする
+  #   - 個別研究者環境のみで実行される開発専用 image (python-train:
+  #     4-GPU ML 学習スタック、 個別開発者環境のみで実行され production
+  #     cluster へ配布されない) は scan 対象外
   #   - 上記方針により python-train を 2026-05 に scan-heavy matrix から除外。
-  #     既存 alert はすべて won't fix で dismiss 済み (Trivy advisory の attack
-  #     surface は ML training stack の内部依存に閉じており exposed network
-  #     経路を持たないため)
+  #     除外と並行して既存 alert は won't fix で個別 dismiss を実施
+  #     (Trivy advisory の attack surface は ML training stack の内部依存に
+  #     閉じており exposed network 経路を持たないため)
   # ---------------------------------------------------------------------------
   scan-heavy:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
