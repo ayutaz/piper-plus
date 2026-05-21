@@ -34,12 +34,19 @@ jobs:
           # (配布バイナリには含まれず copyleft 伝播リスクなし)。
           # ライセンスを広く allow する代わりに、対象パッケージを明示し
           # carve-out することで scope を最小化する。
+          #
+          # pkg:npm/protobufjs: 7.5.8+ で scancode が
+          # `BSD-3-Clause AND LicenseRef-scancode-protobuf` を検出する。
+          # 後者は Google Protocol Buffers のオリジナル license (BSD-3-Clause
+          # 系) で copyleft なし。 SPDX 標準名でないため allow-licenses では
+          # 通せず、 package 単位で carve-out する。
           allow-dependencies-licenses: >-
             pkg:pypi/astroid,
             pkg:pypi/matplotlib,
             pkg:pypi/mypy,
             pkg:pypi/pylint,
-            pkg:pypi/sphinx-rtd-theme
+            pkg:pypi/sphinx-rtd-theme,
+            pkg:npm/protobufjs
           # 自動 fail にせず、PR comment で報告
           warn-only: false
           # vulnerability scope
