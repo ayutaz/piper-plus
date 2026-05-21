@@ -167,8 +167,17 @@ jobs:
   # ---------------------------------------------------------------------------
   # Scheduled heavy scan (Wave 3, T12).
   # 通常 PR / push では disk OOM で除外している heavy image (webui / wyoming /
-  # python-train / cpp-inference final) を週次でスキャン。 free-disk-space で
-  # 10GB+ 確保し、 docker system prune で intermediate cache を全部削除。
+  # cpp-inference final) を週次でスキャン。 free-disk-space で 10GB+ 確保し、
+  # docker system prune で intermediate cache を全部削除。
+  #
+  # Scope policy (SECURITY.md "Docker Image Scope" 参照):
+  #   - 配布 / 本番運用される image のみ Trivy 監視対象とする
+  #   - 開発専用 image (python-train: 4-GPU ML 学習スタック、 個別開発者環境のみ
+  #     で実行され、 production cluster へ配布されない) は scan 対象外
+  #   - 上記方針により python-train を 2026-05 に scan-heavy matrix から除外。
+  #     既存 alert はすべて won't fix で dismiss 済み (Trivy advisory の attack
+  #     surface は ML training stack の内部依存に閉じており exposed network
+  #     経路を持たないため)
   # ---------------------------------------------------------------------------
   scan-heavy:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
@@ -185,9 +194,6 @@ jobs:
             build_target: builder
           - name: cpp-inference
             dockerfile: docker/cpp-inference/Dockerfile
-            build_target: builder
-          - name: python-train
-            dockerfile: docker/python-train/Dockerfile
             build_target: builder
 
     steps:

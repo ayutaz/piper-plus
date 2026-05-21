@@ -79,6 +79,31 @@ reporters informed if a particular issue requires more time.
 - Vulnerabilities that require physical access to the user's machine or that
   rely solely on already-compromised host environments.
 
+### Docker Image Scope
+
+The repository ships several Docker images. We monitor automated container
+scanners (Trivy on a weekly schedule and on `docker/**` changes) **only against
+images that are distributed for production use**. Images intended solely for
+local development tasks are not actively monitored, and their Trivy alerts are
+dismissed as `won't fix` because they do not represent an external attack
+surface in their intended deployment.
+
+| Image | Distribution | Trivy monitored? | Notes |
+|-------|-------------|-----------------:|-------|
+| `python-inference` (CUDA) | Production (GHCR / DockerHub) | ✅ | OpenAI-compatible TTS API server for GPU clusters |
+| `python-inference-cpu-distroless` | Production | ✅ | Multi-arch CPU inference image |
+| `webui` / `webui-distroless` | Production | ✅ | Gradio demo / WebUI |
+| `wyoming` | Production | ✅ | Home Assistant Wyoming Protocol TTS |
+| `cpp-inference` / `cpp-inference-distroless` | Production | ✅ | Native C++ inference binary |
+| `cpp-dev` | Local development helper | ✅ | Build / debug environment (kept under monitoring as a hygiene baseline) |
+| `python-train` | **Local development only** (4-GPU training stack) | ❌ | Not deployed to clusters; executed on individual researcher machines. CVE alerts on the ML/training apt layer (CUDA + cuDNN + ML toolchain) do not represent an exposed network attack surface for piper-plus |
+
+If you identify a vulnerability in a development-only image that nonetheless
+has a credible attack path (for example, a researcher loading a malicious
+checkpoint in a shared training environment), please still report it via the
+private channels above — the scope policy is about scanner monitoring, not
+about whether we will fix exploitable defects.
+
 ## Security Best Practices for Users
 
 Even within supported versions there are operational pitfalls users should be
