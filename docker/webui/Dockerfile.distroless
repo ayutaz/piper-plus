@@ -48,6 +48,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libsndfile1-dev \
     && rm -rf /var/lib/apt/lists/*
 
+# Upgrade pip / setuptools / wheel to clear Trivy supply-chain CVEs. The
+# builder's site-packages (under /usr/local/lib/python3.11) is COPYed
+# verbatim into the distroless final stage, so upgrading here propagates
+# into the published image.
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel
+
 # Pin uv. The canonical docker/webui/Dockerfile currently does an
 # unpinned `pip install uv`; pinning here is intentional drift to
 # protect the trial build against a future breaking uv release.

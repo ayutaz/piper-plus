@@ -23,6 +23,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && ln -sf /usr/bin/python3.11 /usr/bin/python \
     && rm -rf /var/lib/apt/lists/*
 
+# Upgrade pip / setuptools / wheel to clear Trivy supply-chain CVEs that ride
+# on the apt-installed python3-pip (Ubuntu 22.04 ships pip 22.0.2, setuptools
+# 59.6.0, wheel 0.37.x — all on multiple HIGH/MEDIUM advisories). Run before
+# installing uv so the upgraded pip is what bootstraps the rest.
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel
+
 # Install uv (Ubuntu 22.04's pip doesn't support --break-system-packages)
 RUN pip install --no-cache-dir uv
 

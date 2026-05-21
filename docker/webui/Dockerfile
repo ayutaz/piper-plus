@@ -6,6 +6,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libsndfile1 \
     && rm -rf /var/lib/apt/lists/*
 
+# Upgrade pip / setuptools / wheel to clear Trivy supply-chain CVEs that
+# ride on the python:3.13.13-slim-trixie default toolchain.
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel
+
 # Install uv
 RUN pip install --no-cache-dir uv
 
