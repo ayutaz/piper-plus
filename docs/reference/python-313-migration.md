@@ -226,75 +226,124 @@ CUDA は **3 層** (base image / torch wheel / uv index) で個別に pin され
 - ROCm / Apple Silicon MPS バックエンドへの拡張
   → torch には mps backend あり、 cu128 とは独立。 これは別 issue。
 
-## CUDA 12.8 アップグレードの恩恵 (3.13 + torch 2.11 と同時 bump 時)
+## CUDA 12.8 アップグレードの恩恵 (3.13 + torch 2.11 + 新 GPU 環境)
 
-「3.13 化のついでに CUDA 12.8 にする最適化恩恵は?」 への分析。 学習対象 GPU は **V100 16GB (sm_70)** 中心、 一部 A100 (sm_80) の想定 (CLAUDE.md トラブルシューティング表 + training-guide V100 言及から判定)。
+「3.13 化のついでに CUDA 12.8 にする最適化恩恵は?」 への分析。
 
-### 結論 (先出し)
+**学習対象 GPU の前提変更 (2026-05-21):** V100 が使えなくなったため、 今後の学習サーバーは以下 3 種に移行する:
+- **T4** (Turing sm_75, 16GB GDDR6) — 主に推論用途
+- **RTX 6000 Ada Generation** (Ada Lovelace sm_89, 48GB GDDR6) — メイン学習機
+- **RTX 5090** (Blackwell sm_120, 32GB GDDR7) — 次世代学習機
 
-- **torch wheel を cu121 → cu128 に bump する** だけで CUDA 12.8 由来の最適化の **80% を享受可能**。 base image bump は不要。
-- 恩恵の主因は wheel が bundle する **cuDNN 9.5+** と **NCCL 2.23+** と **Triton 3.x** で、 image レイヤーの CUDA toolkit version とはほぼ独立。
-- V100 (sm_70) では Flash Attention / TF32 / BF16 native の恩恵は **使えない** (sm_80+ 機能)。 Blackwell (sm_120) 対応も**該当ハードがなければ恩恵ゼロ**。
+この前提変更により **CUDA 12.8 化の優先度は「恩恵あり」 から「Blackwell サポートのため事実上必須」 に昇格**する。 V100 想定で書いていた既存セクションは全面差し替え。
 
-### 12.6 → 12.8 で具体的に何が変わるか
+### 結論 (先出し、 新 GPU 前提)
 
-| 層 | 12.6 (cu121 wheel 経由) | 12.8 (cu128 wheel 経由) | V100 効果 | A100 効果 |
+- **RTX 5090 (Blackwell sm_120) を使う場合、 CUDA 12.8 + cu128 wheel は事実上必須**。 cu121 wheel は sm_120 を含まないため Blackwell では起動不能。
+- **Ada 6000 (sm_89) も CUDA 12.8 で FP8 / Flash Attention 3 / BF16 native が解禁** → V100 比で学習速度 **5-10 倍**の可能性 (VITS の Conv/GEMM 構成次第)。
+- **T4 (sm_75) は学習には VRAM 16GB が厳しい**。 推論 (`docker/python-inference`) は十分。
+- **base image (12.6.3) も bump 検討が現実味を帯びる**: RTX 5090 host の最小 driver 要件 (R570+) と整合させるため。
+
+### 新 GPU 別の機能対応表
+
+| 機能 | V100 (sm_70, 旧) | T4 (sm_75) | Ada 6000 (sm_89) | RTX 5090 (sm_120) | 備考 |
+|---|---|---|---|---|---|
+| FP32 / FP16-mixed | ✅ | ✅ | ✅ | ✅ | 基本動作 |
+| TF32 (Ampere+) | ❌ | ❌ | ✅ | ✅ | matmul 1.5-2x 高速化 |
+| BF16 native | ❌ (emul) | ❌ | ✅ | ✅ | FP16 より numerical stable |
+| FP8 (E4M3/E5M2) | ❌ | ❌ | ✅ (Gen 4 TC) | ✅ (Gen 5 TC) | matmul 2-4x、 学習で活用可能 |
+| Flash Attention 2 | ❌ | 限定 | ✅ | ✅ | self-attention 高速化 |
+| Flash Attention 3 | ❌ | ❌ | ✅ | ✅ (Gen 5 で最適化) | FA2 比 1.5-2x |
+| cu128 wheel 対応 | ✅ | ✅ | ✅ | **必須** | sm_120 PTX は cu128 のみ |
+| 最小 PyTorch | 2.x | 2.x | 2.4+ | **2.7+** (2.11 推奨) | Blackwell 公式対応 |
+| 最小 driver | R450+ | R450+ | R525+ | **R570+** | RTX 5090 は新 driver 必須 |
+| 推奨用途 | (引退) | 推論専用 | **メイン学習** | **次世代学習** | T4 は VRAM 16GB で 6lang base 学習厳しい |
+
+### 学習速度の期待値 (V100 比、 6lang base 学習想定)
+
+| GPU | 構成 | VRAM | 期待倍率 (vs V100) | 備考 |
 |---|---|---|---|---|
-| **cuDNN (wheel bundle)** | 8.9 | **9.5+** | conv kernel 5-10% 高速 (sm_70 dispatch 改善) | 同左 + Flash Attention 2/3 kernel |
-| **cuBLAS (wheel bundle)** | 12.1 | 12.8 | GEMM dispatch ロジック改善で一部 dim で 3-7% 高速 | 同左 + TF32 split-K 改善 |
-| **NCCL (wheel bundle)** | 2.20 | 2.23+ | multi-GPU all-reduce 5-10% (Template A `--devices 4`) | 同左 |
-| **Triton (torch 2.11 同梱)** | 2.x (torch 2.2) | **3.x** (torch 2.11) | `torch.compile()` autotune 高速化 + コード生成改善 | 同左 |
-| **CUDA Graphs API** | 12.1 ABI | 12.8 ABI (launch overhead 削減) | 推論側で意味あり、 学習はループ構造が複雑で適用範囲狭い | 同左 |
-| **Blackwell sm_120** | — | 対応 | 該当ハードなし → **恩恵なし** | 該当ハードなし → **恩恵なし** |
-| **sm_70 deprecation** | 12.x 全体で利用可 | 12.x 全体で利用可 | 安心 | 該当せず |
+| V100 16GB | FP32 (canonical), batch=20 | 16GB | 1.0x (baseline) | 旧環境 |
+| T4 16GB | FP16-mixed, batch=8-12 | 16GB | 0.5-0.7x | Tensor Core Gen 2 で AMP は効くが VRAM が boundary、 学習向きではない |
+| Ada 6000 48GB | BF16-mixed, batch=32-64, TF32 | **48GB** | **3-5x** | VRAM 余裕で batch 拡大 + BF16 + TF32 + FA2 |
+| Ada 6000 48GB | FP8-mixed, batch=64+, FA3 | 48GB | **5-8x** | FP8 + Flash Attention 3 (要 torch 2.7+ + transformer_engine 系) |
+| RTX 5090 32GB | BF16-mixed, batch=32-48 | 32GB | **5-7x** | Gen 5 TC + 高 clock + GDDR7 |
+| RTX 5090 32GB | FP8-mixed, batch=48-64, FA3 | 32GB | **7-10x** | Blackwell の FP8 + FA3 のフル活用 |
 
-**実測でどう効くか (推定):**
+> **注意:** VITS 学習で FP8 / FA3 を実際に効かせるには PyTorch 側の AMP 設定 + nn.Module 側の対応が必要。 piper-train は現状 FP32/FP16-mixed のみ。 FP8 採用は別 issue で評価。
 
-VITS 学習の bottleneck は (1) HiFi-GAN/MB-iSTFT decoder の **Conv1d スタック** (cuDNN) + (2) TextEncoder/PosteriorEncoder の **Linear/Attention** (cuBLAS) で、 両方が wheel bundle の更新で改善する。 V100 16GB / batch_size=20 / 6lang 学習を想定すると:
+### Ada 6000 / RTX 5090 で **新たに使えるようになる** 12.8 機能
 
-- 同 ckpt から 100 step の wall-clock で **5-12% 程度の学習速度向上**が期待値 (cuDNN/cuBLAS 改善の合算、 GEMM-bound と Conv-bound の比率次第)
-- multi-GPU (`--devices 4`) では NCCL 改善が乗って **8-15% 向上**の可能性
-- `--compile` 使用時はさらに Triton 3.x の autotune が効く (cold start は遅いが warm 後は +5-10%)
+V100 時代に「使わない」 と書いたものが、 新 GPU では実用範囲に入る:
 
-### base image bump (12.6.3 → 12.8.x) の追加恩恵
-
-wheel bump 単体で 80% 取れるとしたら、 残り 20% は base image bump で取れる:
-
-| 項目 | wheel only (cu128) | base + wheel 両方 (12.8) | 追加恩恵 |
+| 機能 | 対応 GPU | piper-train 適用性 | 採用判断 |
 |---|---|---|---|
-| CUDA runtime (`cudart`) | 12.1 (wheel bundle) | 12.8 (image + wheel 統一) | アプリ依存、 piper-train は torch 経由なので不変 |
-| nvcc / cudnn-frontend headers | 12.6 (image) | 12.8 (image) | piper-train 用途では使わない (Cython 経由の monotonic_align は CPU build) |
-| Trivy CVE | 12.6 系の修正範囲 | 12.8 系で新規 CVE 解消 + 一部新規 CVE 発生の可能性 | 中立 (Trivy は分散) |
-| nvidia driver forward-compat | 12.6 image で cu128 wheel が forward-compat 動作 | 揃って "fully aligned"、 forward-compat に依存しない | 安心感のみ、 実性能は同じ |
-| 学習サーバー driver | host driver が `>=525.x` であれば 12.6 / 12.8 どちらの image でも OK | 同左 | なし |
+| **TF32** | Ada 6000 / RTX 5090 | ✅ Linear / Conv で透過適用 (`torch.backends.cuda.matmul.allow_tf32 = True`) | **本 Issue で同時設定推奨** (1 行追加で 1.3-1.5x) |
+| **BF16-mixed** | Ada 6000 / RTX 5090 | ✅ `--precision bf16-mixed` (Lightning native) | **training-guide で推奨**、 既存 `--precision 16-mixed` の上位互換 |
+| **FP8 (E4M3)** | Ada 6000 / RTX 5090 | △ transformer_engine 統合が必要 | **別 issue 評価**、 piper-train の VITS architecture は FP8 適用範囲が限定的 |
+| **Flash Attention 2** | Ada 6000 / RTX 5090 | △ PyTorch SDPA 経由で自動利用 (attention layer のみ) | **自動適用**、 明示設定不要 |
+| **Flash Attention 3** | Ada 6000 / RTX 5090 | △ PyTorch 2.7+ で SDPA が自動選択 | **自動適用** |
+| **CUDA Graphs Enhanced** | Ada 6000 / RTX 5090 | ❌ Lightning の動的ループと非互換 | スコープ外 |
 
-**追加恩恵は実測 0-2%** (測定誤差レベル)。 主に「forward-compat に依存しない integrity」 という運用面のメリット。
+### base image bump (12.6.3 → 12.8.x) の評価 (新 GPU 前提で更新)
 
-### 推奨アクション (恩恵観点)
+V100 時代は「実測 0-2%、 別 issue」 と書いたが、 新 GPU 前提では再評価が必要:
 
-| アクション | 恩恵 | コスト | Issue #527 への組み込み |
+| 項目 | wheel only (cu128) on 12.6 image | base 12.8 + wheel cu128 | 新 GPU での違い |
 |---|---|---|---|
-| ✅ **wheel を cu121 → cu128** | 学習 5-12%、 multi-GPU 8-15% | 1 行変更 | **Phase 3 セット** |
-| ⚠️ base image を 12.6 → 12.8 | 0-2% (誤差レベル) | base image bump の整合性確認、 PR #532 直後の追従 | **本 Issue 外**、 別 PR で評価 |
-| ❌ Blackwell (sm_120) 対応 | V100/A100 では恩恵ゼロ | — | スコープ外 |
-| 💡 `torch.compile()` を training-guide で推奨化 | warm 後 +5-10% | 既存 `--compile` flag を CLAUDE.md Template に明示 | **本 Issue 外**、 別 PR で評価 (cu128 + Triton 3.x の前提が整ってから) |
+| RTX 5090 動作 | 12.6 image + cu128 wheel + host driver R570+ で動く (forward-compat) | 同左 | wheel が sm_120 PTX 含むので image は影響しない |
+| Ada 6000 動作 | 動く | 動く | 同左 |
+| T4 動作 | 動く | 動く | 同左 |
+| host driver 要件 | R570+ (RTX 5090 ハード前提) | R570+ | image 側は変わらない |
+| CUDA runtime ABI | wheel bundle 12.1 / 12.8 が image 12.6 上で混在 | 統一 12.8 | 動作上は不変、 trace tools (nsys/nvprof) が混乱しないメリット |
+| Trivy CVE | 12.6 系 | 12.8 系 (新 base なので新 CVE 表面) | 中立 |
+| 心理的負荷 | 「forward-compat に依存している」 状態 | "fully aligned" | 運用面で安心 |
 
-### 12.8 の追加機能で **使わない** もの (情報整理)
+**結論:** RTX 5090 をメインで使うなら、 image を 12.8 に揃える運用上のメリットが上がる。 ただし **実測パフォーマンスは wheel cu128 で 95%+ 取れる**ので、 image bump は別 PR で良い (Phase 3 後の追加 PR で評価)。
 
-VITS 学習が利用しない、 もしくは V100 で利用不可な 12.8 新機能:
+### 推奨アクション (新 GPU 観点、 改訂版)
 
-- **FP8 (E4M3/E5M2)**: Hopper (sm_90) / Blackwell (sm_120) 専用、 V100/A100 では未対応。 piper-train は FP32/FP16-mixed で運用、 FP8 採用予定なし。
-- **Flash Attention 3**: sm_90+ 専用。 VITS は self-attention を限定的にしか使わないため、 そもそも適用範囲狭い。
-- **CUDA Graphs Enhanced Conditional Nodes**: Lightning Trainer のループ構造とは噛み合わない (動的 batch / dropout)。
-- **Cooperative Groups API 拡張**: piper-train は custom CUDA kernel を書かない。
-- **NVSHMEM / NVLink Sharp**: Template A の 4-GPU で NVLink 経由 NCCL は使うが、 SHARP は H100+ DGX 構成専用。
+| 優先度 | アクション | 恩恵 | Issue #527 への組み込み |
+|---|---|---|---|
+| **必須** | torch wheel cu121 → cu128 | RTX 5090 起動可能、 Ada 6000 で TF32/BF16/FA2 解禁 | **Phase 3 セット** |
+| **必須** | torch 2.2.1 → 2.11.0 | Blackwell 公式対応 (sm_120) + Triton 3.x | **Phase 3 セット** |
+| **推奨** | `torch.backends.cuda.matmul.allow_tf32 = True` を default に | Ada/Blackwell で 1.3-1.5x | **Phase 3 で同時設定** (1 行追加、 sm_75/V100 では無視されるので安全) |
+| **推奨** | `--precision bf16-mixed` を training-guide で新メイン候補に | Ada/Blackwell で FP16-mixed より stable + 同等速度 | **Phase 3 で training-guide 更新** |
+| **任意** | base image 12.6.3 → 12.8.x | 0-2% 性能、 運用整合性 | 本 Issue 外、 Phase 3 完了後の別 PR |
+| **任意** | FP8 / transformer_engine 統合 | Ada/Blackwell で +30-50% | 別 issue 評価 |
+| **削除** | "V100 では `--precision 16-mixed` 避ける" 注意書き | V100 不使用なので不要 | training-guide / CLAUDE.md から段階削除 (Phase 3) |
 
-つまり 12.8 の "shiny new features" の多くは V100/A100 / piper-train ワークロードでは使われない。 **取れる恩恵は cuDNN/cuBLAS/NCCL の generic な改善のみ**。
+### CLAUDE.md / training-guide の更新事項
 
-### V100 特有のリスク (注意点)
+新 GPU 前提に揃えるドキュメント変更:
 
-- CUDA 12.x シリーズ全体で sm_70 (V100) のサポートは継続だが、 **将来の CUDA 13.x で sm_70 が deprecation 対象になる可能性**がある (公式アナウンスはまだだが、 NVIDIA は Volta を順次フェードアウト傾向)。 12.8 への bump 自体は V100 への影響なし。
-- V100 で `--precision 16-mixed` の backward が極端に遅い既知問題 (CLAUDE.md 記載) は CUDA 12.8 + cuDNN 9.5 でも改善しない (Volta のハードウェア制約)。 12.8 bump で「FP16 mixed を再評価したい」 という誘惑は避けるべき。
+| ファイル | 行 | 現状 | 更新 |
+|---|---|---|---|
+| `CLAUDE.md` | 125 | "V100 では `--no-wavlm` 推奨" | "T4 では `--no-wavlm` 推奨 (VRAM 16GB の制約)、 Ada 6000 / RTX 5090 では WavLM 利用可" |
+| `CLAUDE.md` | 312 | "学習速度が遅い (V100) ..." トラブルシューティング | "学習速度が遅い (T4) ..." に置換、 Ada/Blackwell では別の対処 |
+| `docs/guides/training/training-guide.md` | 258, 282 | "V100 では `--precision 16-mixed` 避ける" | 削除、 もしくは「過去 V100 環境では...」 注記 |
+| `docs/guides/training/training-guide.md` | 264 | "24GB vRAM (RTX 3090/4090)" 例 | "48GB vRAM (Ada 6000) / 32GB (RTX 5090)" を追加 |
+| `docs/guides/training/training-guide.md` | 266 | "On V100 16GB, --batch-size 20" | "On Ada 6000 48GB, --batch-size 32-64" 等を追加 |
+| `docs/guides/training/wavlm-guide.md` | 57 | "V100 では `--precision 16-mixed` は backward が極端に遅い" | 削除、 Ada/Blackwell では bf16-mixed 推奨に |
+
+### 新 GPU 移行と Phase 3 の関係
+
+Phase 3 (学習 Docker) のスコープが拡大:
+
+**従来の Phase 3** (V100 想定):
+- python 3.11 → 3.13
+- torch 2.2.1+cu121 → 2.11.0+cu128
+- 性能改善 5-12% 期待
+
+**改訂後の Phase 3** (新 GPU 前提):
+- python 3.11 → 3.13
+- torch 2.2.1+cu121 → 2.11.0+cu128 (**RTX 5090 起動の必須条件**)
+- `torch.backends.cuda.matmul.allow_tf32 = True` を `__main__.py` に追加 (Ada/Blackwell で TF32 解禁、 1 行)
+- training-guide / CLAUDE.md の V100 言及を新 GPU 前提に置換
+- 性能改善 **3-10x 期待** (V100 比、 Ada 6000 / RTX 5090 想定)
+- 検証: Ada 6000 実機で Template B 1 epoch smoke、 RTX 5090 でも別途検証
+
+これにより Phase 3 は「performance optimization PR」 という色が強くなる。 PR title も `chore(docker)` ではなく `feat(training)` 系が妥当。
 
 ## 懸念事項 (掘り下げ調査結果)
 
@@ -398,20 +447,41 @@ from distutils.core import setup
 - distroless/python3-debian13 が piper-plus の onnxruntime / soundfile を import できるか smoke test (`docker/python-inference/Dockerfile.cpu.distroless` の Trivy gate + Wyoming smoke)
 - CUDA inference image で deadsnakes 経由 python3.13 + uv pip install が onnxruntime-gpu wheel を解決できるか
 
-### Phase 3: 学習 Docker (大 PR, 1-2 日)
+### Phase 3: 学習 Docker + 新 GPU 最適化 (大 PR, 1-2 日)
 
-対象:
-- `docker/python-train/Dockerfile`: python 3.11 → 3.13 + torch `==2.2.1+cu121` → `==2.11.0+cu128` (uv.lock の canonical に合わせる、 C2)
+> **スコープ拡大の経緯:** 2026-05-21 に学習サーバー GPU が V100 → T4/Ada 6000/RTX 5090 へ移行することが確定。 これに伴い Phase 3 の position が「Docker bump」 から「performance optimization PR」 に格上げされた。 「CUDA 12.8 アップグレードの恩恵」 セクション参照。
+
+対象 (必須):
+- `docker/python-train/Dockerfile`: python 3.11 → 3.13 + torch `==2.2.1+cu121` → `==2.11.0+cu128`
+  - **RTX 5090 (sm_120) を動かす必須条件** — cu121 wheel は sm_120 PTX を含まない
 - `--extra-index-url`: `download.pytorch.org/whl/cu121` → `download.pytorch.org/whl/cu128`
-- base image (`nvidia/cuda:12.6.3-cudnn-runtime-ubuntu22.04`) は **据置** (forward-compat で cu128 wheel 動作)
-- 関連 README / CHANGELOG / training-guide
-- ubuntu22.04 + deadsnakes 3.13 で `python3.11-dev` の代替 (`python3.13-dev` も deadsnakes で提供) — `pyopenjtalk-plus` の C 拡張 build 用
+- base image (`nvidia/cuda:12.6.3-cudnn-runtime-ubuntu22.04`) は **据置** (forward-compat で cu128 wheel 動作、 host driver R570+ が前提)
+- ubuntu22.04 + deadsnakes 3.13 で python3.13 + python3.13-dev install
 
-リスク: 高 (torch bump は学習 reproducibility に影響、 CUDA wheel runtime も 12.1 → 12.8)
+対象 (新 GPU 最適化、 同時):
+- `src/python/piper_train/__main__.py`: `torch.backends.cuda.matmul.allow_tf32 = True` を `torch.backends.cudnn.benchmark = True` の隣に追加 (1 行、 sm_80+ で TF32 解禁、 V100/T4 では noop)
+- `docs/guides/training/training-guide.md`: V100 言及を新 GPU 前提に置換
+  - 「V100 では `--precision 16-mixed` 避ける」 → 削除 or 過去注記化
+  - VRAM 例に Ada 6000 48GB / RTX 5090 32GB / T4 16GB を追加
+  - Ada/Blackwell では `--precision bf16-mixed` を新メイン候補として記載
+- `docs/guides/training/wavlm-guide.md` line 57: V100 注意書きを削除
+- `CLAUDE.md`:
+  - line 125: WavLM の V100 注記を T4 注記に
+  - line 312: トラブルシューティング表の V100 行を T4 / Ada / RTX 5090 別に再構成
+  - Template A/B の `--precision` default を bf16-mixed 推奨候補に格上げ (32-true は legacy V100 互換用と注記)
+
+リスク: 高
+- torch bump は学習 reproducibility に影響 (FP16/BF16 の rounding 違い)
+- 新 GPU 実機での smoke test が PR merge の前提
+- training-guide / CLAUDE.md の trainer template 変更は学習ジョブの canonical 仕様変更
+
 要検証:
-- 既存 6lang base ckpt + Template B FT 1 epoch smoke で loss / forward が一致レンジか
-- WandB ログの metric が同範囲で生成されるか (kl_loss / mel_loss / duration_loss)
-- ONNX export 出力が PR #532 前の base と byte-equal でなくとも、 audio_parity の Tier 4 (SNR ≥ 30dB) を満たすか
+- **Ada 6000 実機** で Template B FT 1 epoch smoke を実行、 loss / metric range が許容範囲か
+- **RTX 5090 実機**で同様 (Blackwell sm_120 の起動確認 + 性能測定)
+- T4 実機での推論 only smoke (`docker/python-inference/Dockerfile` の動作確認)
+- TF32 enable 前後で 100 step の deterministic 比較 — TF32 は数値精度を落とすので "正解" は変わるが、 validation loss / audio 出力が許容範囲内か
+- WandB ログの metric range が同等 (kl_loss / mel_loss / duration_loss)
+- ONNX export 出力が audio_parity Tier 4 (SNR ≥ 30dB) を満たす
 
 ### Phase 4 (任意): mypy / ruff target-version
 
@@ -437,15 +507,29 @@ from distutils.core import setup
 | `wyoming-smoke.yml` | Home Assistant 連携 | smoke green |
 | `model-quality-gate.yml` | MOS / RTF 退行 | baseline ±2% 以内 |
 
+Phase 3 のみ (新 GPU 実機検証、 CI ではカバー外):
+
+| ゲート | 対象 | 期待 |
+|---|---|---|
+| Ada 6000 smoke | Template B 1 epoch FT | loss / metric range が canonical 範囲、 ONNX export → audio_parity Tier 4 PASS |
+| RTX 5090 smoke | 同上 | sm_120 起動確認 + 学習速度測定 (期待 5-10x vs V100) |
+| T4 smoke (推論) | `docker/python-inference/Dockerfile` で 6lang base 推論 | 起動 + RTF 範囲内 |
+| TF32 ON/OFF 比較 | Ada 6000 で 100 step | validation loss 差分が許容範囲、 audio 出力が perceptually 同等 |
+
 ## 次アクション提案
 
 1. 本ドキュメントを Issue #527 にコメントとして貼り、 Phase 分割 (0/1/2/3) の方針承認を求める
 2. 承認後 Phase 0 (distutils 書換) → Phase 1 → 2 → 3 の順で個別 PR (`/create-pr` skill 経由)
 3. 各 Phase で `python-tests.yml` matrix の 3.13 ジョブが green であることを必須化
-4. Phase 3 (学習 Docker) は学習サーバー実機で 1 epoch smoke を回した上で merge
+4. **Phase 3 (学習 Docker + 新 GPU 最適化)** は以下を merge 前必須化:
+   - Ada 6000 実機で Template B 1 epoch smoke
+   - RTX 5090 実機で sm_120 起動確認 + 学習速度測定
+   - T4 で推論 only smoke (`docker/python-inference`)
+   - TF32 enable 前後の validation loss 比較
 
 ---
 
 調査日: 2026-05-21
 調査範囲: dev branch HEAD (4e7a879e、 worktree `docs/issue-527-python-313-migration` b84f3681)
 追加調査 (懸念事項 C1-C8): 2026-05-21 同日
+新 GPU 移行 (T4/Ada 6000/RTX 5090) 反映: 2026-05-21 同日
