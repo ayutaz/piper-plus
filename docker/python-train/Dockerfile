@@ -2,7 +2,13 @@
 # Multi-stage build to reduce final image size
 
 # Build stage
-FROM nvidia/cuda:12.1.0-cudnn8-devel-ubuntu22.04 AS builder
+# Base: CUDA 12.6.3 + cuDNN 9 + Ubuntu 22.04
+# Note: image side ships cuDNN 9, but torch==2.2.1+cu121 wheel bundles its
+# own cuDNN 8.9 and uses it dynamically at runtime, so cuDNN version mismatch
+# between image and torch does not affect training. Bumped from 12.1.0 to
+# clear Trivy OS-package CVEs (libssl/glibc/libxml2 etc.) accumulated since
+# the 2023-04 base.
+FROM nvidia/cuda:12.6.3-cudnn-devel-ubuntu22.04 AS builder
 
 # Free up space in the build environment
 RUN rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* || true
@@ -68,7 +74,8 @@ RUN uv pip install "/tmp/src/python/g2p"
 RUN uv pip install "/tmp/src/python[train]"
 
 # Runtime stage
-FROM nvidia/cuda:12.1.0-cudnn8-runtime-ubuntu22.04
+# Base: CUDA 12.6.3 + cuDNN 9 + Ubuntu 22.04 (matches builder stage)
+FROM nvidia/cuda:12.6.3-cudnn-runtime-ubuntu22.04
 
 # Set environment variables
 ENV DEBIAN_FRONTEND=noninteractive
