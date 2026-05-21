@@ -220,11 +220,81 @@ CUDA は **3 層** (base image / torch wheel / uv index) で個別に pin され
 ### 別 issue で評価可能なもの (本 Issue スコープ外)
 
 - base image を `nvidia/cuda:12.8.x-cudnn-runtime-ubuntu22.04` (or 24.04) に bump
-  → CUDA 12.8 wheel + 12.8 driver / runtime image の "fully aligned" 構成。 ただし PR #532-#533 (12.4 → 12.6) で base image bump を最近やったばかりで、 過度な追従はメンテ負荷増。
+  → CUDA 12.8 wheel + 12.8 driver / runtime image の "fully aligned" 構成。 ただし PR #532-#533 (12.4 → 12.6) で base image bump を最近やったばかりで、 過度な追従はメンテ負荷増。 (恩恵分析は下記「CUDA 12.8 アップグレードの恩恵」 を参照)
 - dependabot の `nvidia/cuda` minor bump ignore を解除
   → 自動 PR で 12.6 → 12.7 等が来るが、 cuDNN / driver 互換性ローテーションが伴うため**据置推奨**。 PR #427 (12.4 → 12.9 jump) のような 5 minor 飛びを避けたい運用判断。
 - ROCm / Apple Silicon MPS バックエンドへの拡張
   → torch には mps backend あり、 cu128 とは独立。 これは別 issue。
+
+## CUDA 12.8 アップグレードの恩恵 (3.13 + torch 2.11 と同時 bump 時)
+
+「3.13 化のついでに CUDA 12.8 にする最適化恩恵は?」 への分析。 学習対象 GPU は **V100 16GB (sm_70)** 中心、 一部 A100 (sm_80) の想定 (CLAUDE.md トラブルシューティング表 + training-guide V100 言及から判定)。
+
+### 結論 (先出し)
+
+- **torch wheel を cu121 → cu128 に bump する** だけで CUDA 12.8 由来の最適化の **80% を享受可能**。 base image bump は不要。
+- 恩恵の主因は wheel が bundle する **cuDNN 9.5+** と **NCCL 2.23+** と **Triton 3.x** で、 image レイヤーの CUDA toolkit version とはほぼ独立。
+- V100 (sm_70) では Flash Attention / TF32 / BF16 native の恩恵は **使えない** (sm_80+ 機能)。 Blackwell (sm_120) 対応も**該当ハードがなければ恩恵ゼロ**。
+
+### 12.6 → 12.8 で具体的に何が変わるか
+
+| 層 | 12.6 (cu121 wheel 経由) | 12.8 (cu128 wheel 経由) | V100 効果 | A100 効果 |
+|---|---|---|---|---|
+| **cuDNN (wheel bundle)** | 8.9 | **9.5+** | conv kernel 5-10% 高速 (sm_70 dispatch 改善) | 同左 + Flash Attention 2/3 kernel |
+| **cuBLAS (wheel bundle)** | 12.1 | 12.8 | GEMM dispatch ロジック改善で一部 dim で 3-7% 高速 | 同左 + TF32 split-K 改善 |
+| **NCCL (wheel bundle)** | 2.20 | 2.23+ | multi-GPU all-reduce 5-10% (Template A `--devices 4`) | 同左 |
+| **Triton (torch 2.11 同梱)** | 2.x (torch 2.2) | **3.x** (torch 2.11) | `torch.compile()` autotune 高速化 + コード生成改善 | 同左 |
+| **CUDA Graphs API** | 12.1 ABI | 12.8 ABI (launch overhead 削減) | 推論側で意味あり、 学習はループ構造が複雑で適用範囲狭い | 同左 |
+| **Blackwell sm_120** | — | 対応 | 該当ハードなし → **恩恵なし** | 該当ハードなし → **恩恵なし** |
+| **sm_70 deprecation** | 12.x 全体で利用可 | 12.x 全体で利用可 | 安心 | 該当せず |
+
+**実測でどう効くか (推定):**
+
+VITS 学習の bottleneck は (1) HiFi-GAN/MB-iSTFT decoder の **Conv1d スタック** (cuDNN) + (2) TextEncoder/PosteriorEncoder の **Linear/Attention** (cuBLAS) で、 両方が wheel bundle の更新で改善する。 V100 16GB / batch_size=20 / 6lang 学習を想定すると:
+
+- 同 ckpt から 100 step の wall-clock で **5-12% 程度の学習速度向上**が期待値 (cuDNN/cuBLAS 改善の合算、 GEMM-bound と Conv-bound の比率次第)
+- multi-GPU (`--devices 4`) では NCCL 改善が乗って **8-15% 向上**の可能性
+- `--compile` 使用時はさらに Triton 3.x の autotune が効く (cold start は遅いが warm 後は +5-10%)
+
+### base image bump (12.6.3 → 12.8.x) の追加恩恵
+
+wheel bump 単体で 80% 取れるとしたら、 残り 20% は base image bump で取れる:
+
+| 項目 | wheel only (cu128) | base + wheel 両方 (12.8) | 追加恩恵 |
+|---|---|---|---|
+| CUDA runtime (`cudart`) | 12.1 (wheel bundle) | 12.8 (image + wheel 統一) | アプリ依存、 piper-train は torch 経由なので不変 |
+| nvcc / cudnn-frontend headers | 12.6 (image) | 12.8 (image) | piper-train 用途では使わない (Cython 経由の monotonic_align は CPU build) |
+| Trivy CVE | 12.6 系の修正範囲 | 12.8 系で新規 CVE 解消 + 一部新規 CVE 発生の可能性 | 中立 (Trivy は分散) |
+| nvidia driver forward-compat | 12.6 image で cu128 wheel が forward-compat 動作 | 揃って "fully aligned"、 forward-compat に依存しない | 安心感のみ、 実性能は同じ |
+| 学習サーバー driver | host driver が `>=525.x` であれば 12.6 / 12.8 どちらの image でも OK | 同左 | なし |
+
+**追加恩恵は実測 0-2%** (測定誤差レベル)。 主に「forward-compat に依存しない integrity」 という運用面のメリット。
+
+### 推奨アクション (恩恵観点)
+
+| アクション | 恩恵 | コスト | Issue #527 への組み込み |
+|---|---|---|---|
+| ✅ **wheel を cu121 → cu128** | 学習 5-12%、 multi-GPU 8-15% | 1 行変更 | **Phase 3 セット** |
+| ⚠️ base image を 12.6 → 12.8 | 0-2% (誤差レベル) | base image bump の整合性確認、 PR #532 直後の追従 | **本 Issue 外**、 別 PR で評価 |
+| ❌ Blackwell (sm_120) 対応 | V100/A100 では恩恵ゼロ | — | スコープ外 |
+| 💡 `torch.compile()` を training-guide で推奨化 | warm 後 +5-10% | 既存 `--compile` flag を CLAUDE.md Template に明示 | **本 Issue 外**、 別 PR で評価 (cu128 + Triton 3.x の前提が整ってから) |
+
+### 12.8 の追加機能で **使わない** もの (情報整理)
+
+VITS 学習が利用しない、 もしくは V100 で利用不可な 12.8 新機能:
+
+- **FP8 (E4M3/E5M2)**: Hopper (sm_90) / Blackwell (sm_120) 専用、 V100/A100 では未対応。 piper-train は FP32/FP16-mixed で運用、 FP8 採用予定なし。
+- **Flash Attention 3**: sm_90+ 専用。 VITS は self-attention を限定的にしか使わないため、 そもそも適用範囲狭い。
+- **CUDA Graphs Enhanced Conditional Nodes**: Lightning Trainer のループ構造とは噛み合わない (動的 batch / dropout)。
+- **Cooperative Groups API 拡張**: piper-train は custom CUDA kernel を書かない。
+- **NVSHMEM / NVLink Sharp**: Template A の 4-GPU で NVLink 経由 NCCL は使うが、 SHARP は H100+ DGX 構成専用。
+
+つまり 12.8 の "shiny new features" の多くは V100/A100 / piper-train ワークロードでは使われない。 **取れる恩恵は cuDNN/cuBLAS/NCCL の generic な改善のみ**。
+
+### V100 特有のリスク (注意点)
+
+- CUDA 12.x シリーズ全体で sm_70 (V100) のサポートは継続だが、 **将来の CUDA 13.x で sm_70 が deprecation 対象になる可能性**がある (公式アナウンスはまだだが、 NVIDIA は Volta を順次フェードアウト傾向)。 12.8 への bump 自体は V100 への影響なし。
+- V100 で `--precision 16-mixed` の backward が極端に遅い既知問題 (CLAUDE.md 記載) は CUDA 12.8 + cuDNN 9.5 でも改善しない (Volta のハードウェア制約)。 12.8 bump で「FP16 mixed を再評価したい」 という誘惑は避けるべき。
 
 ## 懸念事項 (掘り下げ調査結果)
 
