@@ -49,6 +49,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libsndfile1-dev \
     && rm -rf /var/lib/apt/lists/*
 
+# Upgrade pip / setuptools / wheel to clear Trivy supply-chain CVEs riding on
+# the python:3.11-slim-bookworm default pip (24.x) and bundled
+# setuptools/wheel. Run before uv install so the upgraded toolchain is what
+# bootstraps everything else.
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel
+
 # Pin uv to the same major version range used by docker/wyoming/Dockerfile
 # (workspace-editable handling is uv version-sensitive).
 RUN pip install --no-cache-dir "uv>=0.9,<1"

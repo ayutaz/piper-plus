@@ -22,6 +22,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libsndfile1-dev \
     && rm -rf /var/lib/apt/lists/*
 
+# Upgrade pip / setuptools / wheel to clear Trivy supply-chain CVEs. The
+# builder stage's `/usr/local` is copied verbatim into the runtime stage
+# (see the `COPY --from=builder /usr/local /usr/local` instruction below),
+# so upgrading here propagates into the published image.
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel
+
 # Pin uv to a known-good major version (workspace editable handling is uv version-sensitive)
 RUN pip install --no-cache-dir "uv>=0.9,<1"
 
