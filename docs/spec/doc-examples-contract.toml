@@ -26,7 +26,7 @@
 
 [meta]
 spec_version = 1
-last_updated = "2026-05-19"
+last_updated = "2026-05-21"
 applies_to = ["docs"]
 canonical_reference = "scripts/check_doc_examples.py"
 forward_compat_policy = "strict"
@@ -46,7 +46,6 @@ exclude_dirs = [
     "node_modules",
     "build",
     "target",
-    "docs/proposals",         # draft / variable example content; revisit if needed
 ]
 # Inline HTML <pre><code> blocks are OUT OF SCOPE; only GFM fenced
 # blocks (triple backticks) are considered. This caps the audit at the
