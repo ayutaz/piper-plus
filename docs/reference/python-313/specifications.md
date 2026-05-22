@@ -644,6 +644,145 @@ Phase 順序 (要求定義 Phase 0-4 と一致):
 
 ---
 
+## 10.5 ライブラリ bump 候補 (Library Update Survey)
+
+> 「3.13 化のついでに他に更新したいライブラリは?」 への網羅調査結果。 全 dependency の floor pin と uv.lock actual を全件突合。
+
+### 10.5.1 サマリ — 3 カテゴリで整理
+
+| カテゴリ | 件数 | 推奨対応 | Issue #527 への組み込み |
+|---|---|---|---|
+| **A. Floor drift 解消** (root と member で乖離) | 11 件 | 統一して整合性確保 | **M1 で同時実施** (低コスト、 1 PR で吸収) |
+| **B. Major bump で security/性能改善** (別 PR 推奨) | 3 件 | 別 PR で慎重に評価 | 別 issue |
+| **C. 据置** (上限制約 / exact pin) | 6 件 | 触らない | — |
+
+### 10.5.2 A. Floor drift 解消 (M1 で同時実施推奨)
+
+**問題:** root `pyproject.toml` と member `src/python/pyproject.toml` / `src/python_run/pyproject.toml` で同 library の floor pin が異なる。 これは silent drift で、 ローカル開発で member だけ install すると古い version が解決される可能性がある。 既存の `workspace-python-parity` gate が `requires-python` のみ pin しているのと同パターンで、 主要 library の floor 統一が望まれる。
+
+| Library | root floor | member floor (src/python) | run floor (python_run/requirements.txt) | uv.lock actual | **推奨統一値** |
+|---|---|---|---|---|---|
+| `scipy` | (なし) | `>=1.12` | — | `1.17.1` | `>=1.17.1` |
+| `pytorch-lightning` | `>=2.0` | `>=2.0` | — | `2.6.1` | `>=2.4.0` (configure_model API 安定化点) |
+| `transformers` | `>=4.30` | `>=4.38` | — | `4.57.6` | `>=4.50.0` (3.13 対応版) |
+| `wandb` | `>=0.26.1` | `>=0.16` | — | `0.26.1` | `>=0.26.1` (root 値で統一) |
+| `tensorboard` | `>=2.20.0` | `>=2.16` | — | `2.20.0` | `>=2.20.0` (root 値で統一) |
+| `onnxruntime` | `>=1.17` | `>=1.20.0` | `>=1.26.0` | `1.26.0` | `>=1.26.0` (3 箇所統一、 C++ canonical) |
+| `fastapi` | `>=0.136.1` | `>=0.110` | (run pyproject `>=0.110,<1`) | `0.136.1` | `>=0.136.1` (root 値) |
+| `uvicorn` | `>=0.27` | `>=0.27` | `>=0.27,<1` | `0.46.0` | `>=0.46.0` |
+| `pytest` | `>=9.0.3,<10` | `>=7.4` | `>=7.0` | `9.0.3` | `>=9.0.3,<10` (root 値) |
+| `matplotlib` | `>=3.10.9` | `>=3.8` | — | `3.10.9` | `>=3.10.9` (root 値) |
+| `pypinyin` | `>=0.50` | — | `>=0.55.0` | `0.55.0` | `>=0.55.0` |
+| `librosa` | `>=0.10` | `>=0.10` | — | `0.11.0` | `>=0.11.0` |
+| `numba` | `>=0.59` | `>=0.59` | — | `0.65.1` | `>=0.61.0` (numpy 2.x ABI warning 解消) |
+| `torchmetrics` | `>=1.9.0` | `>=1.0` | — | `1.9.0` | `>=1.9.0` (root 値) |
+| `onnxscript` | `>=0.7.0` | `>=0.6.2` | — | `0.7.0` | `>=0.7.0` (root 値) |
+| `coverage` | `>=7.14.0` | `>=7.6` | — | `7.14.0` | `>=7.14.0` (root 値) |
+| `mypy` | `>=1.20.2` | `>=1.7` | — | `1.20.2` | `>=1.20.2` (root 値) |
+
+**実装方針:**
+- M1 (Phase 1) で `src/python/pyproject.toml` と `src/python_run/pyproject.toml` の floor を root と統一
+- `uv.lock` は規定値が変わらない場合は据置 (resolver は今と同じ wheel を選ぶ)
+- 新 CI gate (任意): `scripts/check_workspace_library_floor.py` を追加して主要 library の floor 統一を pin (`workspace-python-parity` と同パターン)
+
+**期待 PR:** `chore(deps): unify library floor pins across workspace members`
+
+### 10.5.3 B. Major bump で改善余地あり (別 PR 推奨)
+
+本 Issue (3.13 化) と独立した動機を持つ bump。 Issue #527 と混ぜると revert 単位が肥大化するため別出し。
+
+| Library | 現状 floor | uv.lock | 推奨 bump | 動機 | 別 issue 候補 |
+|---|---|---|---|---|---|
+| `psutil` | `>=5.9` | `7.2.2` | `>=7.0` | psutil 6.x → 7.x で major bump、 過去 CVE 修正含む。 lockfile は既に 7.x | `chore(deps): bump psutil floor to 7.x` |
+| `onnxsim-prebuilt` | (pin なし) | `0.4.39.post2` | `>=0.4.39` | floor 未指定で resolver が古い version を引き上げる可能性、 明示化推奨 | `chore(deps): pin onnxsim-prebuilt floor` |
+| `g2p-en` | `>=2.1.0` | `2.1.0` | (現状最新) | upstream で更新あれば追従 | 不要 (現状最新) |
+
+### 10.5.4 C. 据置すべきもの (明示)
+
+| Library | 現状 | 据置理由 |
+|---|---|---|
+| `huggingface-hub` | `>=0.36.2,<1.0` | HF Hub 1.0 は dataset API 全面改訂、 release 動作確認後に外す |
+| `numpy` | `<2.5` | numpy 2.5 で dtype 仕様変更予告、 librosa/scipy upstream 対応待ち |
+| `black` | `==26.3.1` | exact pin (formatter は version 一致必須) |
+| `ruff` | `==0.15.12` | 6 箇所 sync の canonical version (`ruff-version-sync` gate あり) |
+| `piper-phonemize` | `>=1.1.0; python_version < '3.13'` | cp313 wheel 未提供、 marker で制約済 |
+| `pyopenjtalk-plus` | `>=0.4` | floor のままで lockfile は `0.4.1.post8`、 floor 上げる積極理由なし |
+| `g2pk2` | `>=0.0.3` | upstream 開発停滞、 pin 上げる動機なし |
+| `mecab-python3` | `>=1.0` | 安定 library、 lockfile `1.0.12` |
+| `unidic-lite` | `>=1.0` | 同上 |
+
+### 10.5.5 Python 3.13 動作確認が必要なもの (G-XX として既掲)
+
+[`requirements.md`](requirements.md#93-グレーゾーン-要検証) の「グレーゾーン (要検証)」 を再掲:
+
+| Library | uv.lock | 3.13 動作確認 Phase |
+|---|---|---|
+| `onnxsim-prebuilt` | `0.4.39.post2` (cp312-abi3 wheel) | Phase 3 で `python -m onnxsim` smoke (G-01) |
+| `pyopenjtalk-plus` | `0.4.1.post8` (Cython extension) | Phase 3 で docker build + 推論 smoke (G-02) |
+| `g2pk2` | `0.0.3` (pure Python) | Phase 1 で `import g2pk2` smoke (G-03) |
+| `wandb` | `0.26.1` | Phase 4 で WandB ログ確認 (G-04) |
+| `pytorch-lightning` | `2.6.1` | Phase 4 で bf16-mixed smoke (G-05) |
+| `numba` | `0.65.1` | Phase 4 で norm_audio / VAD 経路 (G-06) |
+| `mecab-python3` | `1.0.12` | Phase 1 で `import MeCab` smoke (**新規追加**) |
+| `sudachipy` | `0.6.10` | Phase 1 で `import sudachipy` smoke (**新規追加**) |
+
+### 10.5.6 推奨アクション (まとめ)
+
+| 優先度 | アクション | 組み込み |
+|---|---|---|
+| **必須** (M1) | floor drift 解消 (10.5.2 表の 17 library) | M1 で `chore(deps): unify library floor pins` PR を 1 つ追加 |
+| **推奨** (M1) | `mecab-python3` / `sudachipy` の Python 3.13 import smoke を追加 | Phase 1 の CI smoke step に追加 (1 行) |
+| **任意** (別 issue) | `psutil` floor `>=5.9` → `>=7.0` | `chore(deps): bump psutil floor to 7.x` |
+| **任意** (別 issue) | `onnxsim-prebuilt` floor を `>=0.4.39` で明示 pin | 同上 |
+| **任意** (将来) | `huggingface-hub` `<1.0` 上限を release 後に外す | HF Hub 1.0 release 後の別 issue |
+| **任意** (将来) | `numpy` `<2.5` 上限を librosa/scipy 対応後に外す | dependency upstream 待ち |
+
+### 10.5.7 floor 統一の実装 diff サンプル
+
+`src/python/pyproject.toml` の `[project.optional-dependencies] train`:
+
+```diff
+ train = [
+-    "scipy>=1.12",
+-    "librosa>=0.10",
++    "scipy>=1.17.1",
++    "librosa>=0.11.0",
+     "soundfile>=0.12",
+-    "pytorch-lightning>=2.0",
+-    "torchmetrics>=1.0",
+-    "transformers>=4.38",
++    "pytorch-lightning>=2.4.0",
++    "torchmetrics>=1.9.0",
++    "transformers>=4.50.0",
+     "onnx>=1.21.0",
+     "onnxruntime>=1.26.0",
+     "pyopenjtalk-plus",
+     ...
+-    "tensorboard>=2.16",
+-    "wandb>=0.16",
++    "tensorboard>=2.20.0",
++    "wandb>=0.26.1",
+-    "matplotlib>=3.8",
++    "matplotlib>=3.10.9",
+-    "numba>=0.59",
++    "numba>=0.61.0",
+     ...
+ ]
+```
+
+`src/python_run/requirements.txt`:
+
+```diff
+-onnxruntime>=1.26.0
++onnxruntime>=1.26.0  # 据置 (canonical)
+-pypinyin>=0.55.0
++pypinyin>=0.55.0  # 据置 (canonical)
+```
+
+(requirements.txt 側は既に最新値、 root pyproject の `>=0.50` を `>=0.55.0` に揃える側で対応)
+
+---
+
 ## 11. 既知の前提・調査結果 (Discovered Facts)
 
 実装前の追加調査で確定した事実:

@@ -58,8 +58,10 @@ M5: リリース + clean-up                  (Phase 外)
 | Docker | `docker/python-inference/Dockerfile.cpu` を `python:3.13-slim-trixie` へ | 1 |
 | CI workflow | 軽量 workflow 11 個 (lint / audit / sbom / codeql / pre-commit / 等) を 3.13 へ | 11 |
 | ドキュメント | `CONTRIBUTING.md` / `README*.md` / `docs/**` の Python version 表記更新 | ~12 |
+| Library floor 統一 | `scipy / pytorch-lightning / transformers / wandb / tensorboard / fastapi / uvicorn / pytest / matplotlib / pypinyin / librosa / numba / torchmetrics / onnxscript / coverage / mypy / onnxruntime` の floor を root と member で統一 (詳細は [specifications.md 10.5.2](specifications.md#1052-a-floor-drift-解消-m1-で同時実施推奨)) | 17 library |
+| Python 3.13 動作確認 | `mecab-python3` / `sudachipy` の import smoke 追加 | 2 |
 
-PR 数: 1-2 (Phase 0 と Phase 1 を 1 PR にまとめてもよい)
+PR 数: 1-3 (Phase 0 + Phase 1 + 任意で library floor 統一を別 PR にする選択肢あり)
 
 ### Entry Criteria (開始条件)
 
