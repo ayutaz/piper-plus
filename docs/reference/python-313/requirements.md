@@ -110,6 +110,32 @@ piper-plus リポジトリで **デフォルト Python interpreter を 3.11 → 
 - `docs/features/webui.md` (Python 表記)
 - `docker/README.md` (image base 表記)
 
+#### 4.1.5 ライブラリ依存 (floor drift お掃除)
+
+DR-002 (決定事項) により、 root pyproject と member pyproject の floor pin drift を M1 で同時統一する。
+
+| 対象 library | 統一値 | 配置 |
+|---|---|---|
+| `scipy` | `>=1.17.1` | M1 |
+| `pytorch-lightning` | `>=2.4.0` | M1 |
+| `transformers` | `>=4.50.0` | M1 |
+| `wandb` | `>=0.26.1` | M1 |
+| `tensorboard` | `>=2.20.0` | M1 |
+| `onnxruntime` | `>=1.26.0` | M1 |
+| `fastapi` | `>=0.136.1` | M1 |
+| `uvicorn` | `>=0.46.0` | M1 |
+| `pytest` | `>=9.0.3,<10` | M1 |
+| `matplotlib` | `>=3.10.9` | M1 |
+| `pypinyin` | `>=0.55.0` | M1 |
+| `librosa` | `>=0.11.0` | M1 |
+| `numba` | `>=0.61.0` | M1 |
+| `torchmetrics` | `>=1.9.0` | M1 |
+| `onnxscript` | `>=0.7.0` | M1 |
+| `coverage` | `>=7.14.0` | M1 |
+| `mypy` | `>=1.20.2` | M1 |
+
+詳細は [`specifications.md §10.5`](specifications.md#105-ライブラリ-bump-候補-library-update-survey) 参照。
+
 ### 4.2 対象外 (Out of Scope)
 
 | 項目 | 理由 | 別 issue 化候補 |
@@ -121,7 +147,10 @@ piper-plus リポジトリで **デフォルト Python interpreter を 3.11 → 
 | ROCm / MPS バックエンド対応 | 別ハードウェア | "Issue #XXX: Multi-backend GPU support" |
 | `docker/cpp-inference/Dockerfile.distroless` の debian13 化 | Python 利用なし、 統一性のみ | "Issue #XXX: cpp-inference distroless debian13 bump" |
 | `docker/cpp-dev/Dockerfile` の python3.12 → 3.13 | dev tool 用、 動けば何でも | 不要 (個別判断) |
-| `pytorch-lightning` / `wandb` / `librosa` / `numba` の floor pin 引き上げ | 3.13 化と独立 | "Issue #XXX: chore(deps): raise floor pins" |
+| `psutil` major bump (`>=5.9` → `>=7.0`) | security/major bump、 別 PR で評価 (DR-01 参照) | "Issue #XXX: chore(deps): bump psutil floor to 7.x" |
+| `onnxsim-prebuilt` floor 明示 pin | 明示化のみ、 機能影響なし | "Issue #XXX: chore(deps): pin onnxsim-prebuilt floor" |
+| `huggingface-hub <1.0` 上限解除 | HF Hub 1.0 release 動作確認後 | "Issue #XXX: chore(deps): allow huggingface-hub 1.0+" |
+| `numpy <2.5` 上限解除 | numpy 2.5 dtype 仕様変更、 librosa/scipy upstream 対応待ち | "Issue #XXX: chore(deps): allow numpy 2.5+" |
 | base image の CUDA 13.x bump | 12.8 統一後の next step | 12.8 安定運用後に再評価 |
 | PyPI metadata の email 修正 | Issue #527 と無関係 | 別 chore PR |
 

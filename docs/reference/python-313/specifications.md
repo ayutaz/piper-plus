@@ -783,6 +783,81 @@ Phase 順序 (要求定義 Phase 0-4 と一致):
 
 ---
 
+## 10.6 決定事項記録 (Decision Records)
+
+本 Issue で確定した方針判断を ADR (Architecture Decision Record) 形式で記録する。 将来 「なぜそうしたのか」 を参照できるようにする。
+
+### DR-001: Fully-aligned Docker 戦略の採用
+
+- **状態**: Accepted (2026-05-21)
+- **コンテキスト**: 当初は「base image は 12.6 据置 + wheel cu128 で forward-compat 動作」 戦略を検討していたが、 学習サーバー GPU が V100 → T4/Ada 6000/RTX 5090 へ移行することが確定 (2026-05-21)。 RTX 5090 (Blackwell sm_120) は CUDA 12.8+ 必須。
+- **決定**: Docker 全 image を「CUDA 12.8 + Ubuntu 24.04 + Python 3.13」 で完全統一する fully-aligned 戦略を採用。
+- **理由**:
+  - RTX 5090 の "wheel-only forward-compat" 不確定性が解消
+  - wheel と image の CUDA major が揃うことで forward-compat 依存解消
+  - Trivy CVE 管理が単一 CUDA major で完結
+  - Ubuntu EOL 2027 → 2029 で OS 寿命延長
+- **トレードオフ**:
+  - PR スコープ拡大 (Phase 3 が "Docker bump" → "Fully-aligned migration" に)
+  - Ubuntu 22.04 → 24.04 で glibc 2.35 → 2.39、 wheel ABI 確認必要
+- **代替案**:
+  - **A. wheel-only forward-compat 据置 (棄却)**: シンプルだが forward-compat 依存が残り、 RTX 5090 起動の不確定性
+  - **B. base image のみ 12.8 bump、 Ubuntu 22.04 維持 (棄却)**: Jammy EOL 2027 が近く、 結局 24.04 bump を後で行う必要
+- **影響**: M3 のスコープ + Phase 3 の検証要件 + host driver R570+ 前提
+
+### DR-002: Library Floor Drift Unification を M1 に組み込み
+
+- **状態**: Accepted (2026-05-24)
+- **コンテキスト**: 調査の結果、 root `pyproject.toml` と member (`src/python/pyproject.toml` `src/python_run/pyproject.toml`) で 17 library の floor pin が乖離していることが判明。 例: `pytorch-lightning` root `>=2.0` vs member `>=2.0` だが uv.lock は `2.6.1`、 `transformers` root `>=4.30` vs member `>=4.38`、 `onnxruntime` root `>=1.17` vs member `>=1.20.0` vs requirements.txt `>=1.26.0`。
+- **決定**: 17 library の floor を **M1 (Phase 1) で同時統一**する (本 Issue #527 のスコープ内とする)。 詳細は §10.5.2 表。
+- **理由**:
+  - silent drift で member だけ install すると古い version が解決される可能性
+  - Issue #527 で既に複数 pyproject.toml を touch するため、 同 PR で吸収できればコスト追加 ほぼゼロ
+  - 既存 `workspace-python-parity` gate (`requires-python` 整合) と同パターン、 library 版 gate も任意で追加検討
+  - 別 issue 化すると忘れられる / 後追いコスト発生
+- **トレードオフ**:
+  - M1 PR の review 範囲がやや拡大 (3.11→3.13 と floor 統一の 2 軸変更が 1 PR に混在)
+  - 別 commit にすれば revert 可能性は維持される
+- **代替案**:
+  - **A. 完全に別 issue (棄却)**: メンテナンス頻度低、 忘れられるリスク
+  - **B. 別 PR だが M1 の一部 (折衷案)**: M1 内で `chore(deps): unify floor pins` PR を別に切る選択肢あり (実装者判断)
+- **影響**: M1 Deliverables に 17 library 統一 + 任意で `scripts/check_workspace_library_floor.py` gate 追加
+
+### DR-003: Major Library Bump は別 Issue に切り出し
+
+- **状態**: Accepted (2026-05-24)
+- **コンテキスト**: floor drift 統一の調査中、 単なる整合性確保ではなく **意図的な major bump** が必要なものを発見:
+  - `psutil >=5.9` → `>=7.0` (major bump、 security 修正含む)
+  - `onnxsim-prebuilt` (pin 不在、 floor 明示必要)
+  - `huggingface-hub <1.0` 上限解除 (1.0 release 後)
+  - `numpy <2.5` 上限解除 (upstream 対応後)
+- **決定**: 上記 4 件は **Issue #527 のスコープから明示的に除外**し、 別 issue として切り出す。
+- **理由**:
+  - major bump は学習 reproducibility / API 互換性に影響するため独立検証が必要
+  - Issue #527 と混ぜると revert 単位が肥大化 (3.13 化を戻すと library bump も戻る)
+  - `huggingface-hub 1.0` / `numpy 2.5` は upstream リリースタイミング待ち、 本 Issue の進行を阻害してはいけない
+- **トレードオフ**:
+  - 別 issue メンテナンスのオーバーヘッド (合計 4 issue)
+  - dependabot 自動 PR でも対応可能なものは自動化を期待
+- **代替案**:
+  - **A. M1 で全部やる (棄却)**: PR 肥大化、 失敗時の影響範囲特定が困難
+  - **B. M5 (リリース後) に回す (棄却)**: リリース後のタイミングは bumper 担当が決まりにくい、 上記が独立した PR の方が判断軽い
+- **影響**: requirements.md §4.2 (対象外) に 4 件追加、 別 issue 候補として明記
+
+### DR-004: New GPU Optimization は Phase 4 で分離
+
+- **状態**: Accepted (2026-05-21)
+- **コンテキスト**: Phase 3 (CUDA Docker base 統一) と Phase 4 (TF32 + bf16 推奨) は当初 1 PR にまとめる案もあった。
+- **決定**: Phase 3 (infrastructure) と Phase 4 (training optimization) を分離。
+- **理由**:
+  - Phase 3 は Docker 設定のみ、 piper-train code 変更なし → CI で十分検証可能
+  - Phase 4 は piper-train code (TF32) + docs (V100→新 GPU) → 実機 smoke 必要
+  - 分離すると Phase 3 で問題があっても Phase 4 を巻き戻す必要なし
+  - 学習担当が実機 smoke を Phase 4 だけ集中対応できる
+- **トレードオフ**: PR 数増 (1 → 2)
+- **代替案**: 統合 PR (棄却、 review 負荷増 + revert 影響範囲拡大)
+- **影響**: マイルストーン M3 / M4 を分離 ([`milestones.md`](milestones.md) 参照)
+
 ## 11. 既知の前提・調査結果 (Discovered Facts)
 
 実装前の追加調査で確定した事実:
