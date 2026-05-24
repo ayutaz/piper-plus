@@ -235,7 +235,7 @@ The following features are enabled by default and do not need explicit flags:
 
 - **Prosody features** (`--prosody-dim 16`): A1/A2/A3 accent features from OpenJTalk are fed into the Duration Predictor.
 - **EMA weights** (`--ema-decay 0.9995`): Exponential Moving Average is applied to the decoder for smoother convergence.
-- **WavLM Discriminator**: A perceptual quality discriminator that improves MOS by +0.15-0.25. It is used during training only (no impact on inference speed). Adds ~1-2 GB GPU memory; reduce `--batch-size` if needed. Control its weight with `--c-wavlm` (default 0.5). **V100 では速度低下を避けるため `--no-wavlm` を推奨** (CLAUDE.md の canonical training template に整合)。
+- **WavLM Discriminator**: A perceptual quality discriminator that improves MOS by +0.15-0.25. It is used during training only (no impact on inference speed). Adds ~1-2 GB GPU memory; reduce `--batch-size` if needed. Control its weight with `--c-wavlm` (default 0.5). **T4 (VRAM 16GB) では VRAM 制約のため `--no-wavlm` を推奨**。 Ada 6000 (48GB) / RTX 5090 (32GB) では WavLM 有効が canonical。
 
 追加対応機能を踏まえて学習をする場合は、以下のようになります。学習を再開する際には `--resume_from_checkpoint "${LATEST_CHECKPOINT_PATH}"` をつけて実行します
 
@@ -255,7 +255,7 @@ uv run python -m piper_train \
   --save-top-k -1 \
 ```
 
-> **⚠️ 注意:** V100 GPU では `--precision 16-mixed` は backward pass が極端に遅くなる問題があり、`--precision 32-true` が canonical です (CLAUDE.md Template A/B 参照)。A100 以降の GPU でも本リポジトリの実績設定は `32-true` を使用しています。`16-mixed` を試す場合は backward pass time を計測してから採用してください。
+> **⚠️ 注意 (Issue #527 / DR-008 後):** v1.13 では Template default が `--precision bf16-mixed` (Ada 6000 / RTX 5090 で BF16 native Tensor Core を活用)。 古い GPU (V100 等) は引退済、 `--precision 32-true` は legacy として残存。 新規学習では `bf16-mixed` 推奨、 V100 互換が必要なら `32-true` を明示指定。
 
 Use `--quality high` to train a [larger voice model](https://github.com/rhasspy/piper/blob/master/src/python/piper_train/vits/config.py#L45) (sounds better, but is much slower).
 
@@ -263,7 +263,7 @@ You can adjust the validation split (5% = 0.05) and number of test examples for 
 
 Batch size can be tricky to get right. It depends on the size of your GPU's vRAM, the model's quality/size, and the length of the longest sentence in your dataset. The `--max-phoneme-ids <N>` argument to `piper_train` will drop sentences that have more than `N` phoneme ids. In practice, using `--batch-size 32` and `--max-phoneme-ids 400` will work for 24 GB of vRAM (RTX 3090/4090).
 
-**Note on multilingual models:** The current 6-language model uses 173 symbols (vs 97 for bilingual JA+EN), which increases embedding table size and GPU memory usage. Code supports 8 languages (including Korean and Swedish), which would increase the symbol count further. On V100 16GB, `--batch-size 20` with `--max-phoneme-ids 400` is recommended. For fine-tuning a single speaker from a multilingual base, `--batch-size 4` works well.
+**Note on multilingual models:** The current 6-language model uses 173 symbols (vs 97 for bilingual JA+EN), which increases embedding table size and GPU memory usage. Code supports 8 languages (including Korean and Swedish), which would increase the symbol count further. **新 GPU 環境での VRAM 別推奨 batch_size**: RTX 6000 Ada 48GB → `--batch-size 32-64`、 RTX 5090 32GB → `--batch-size 32-48`、 T4 16GB (推論専用) → 学習非推奨、 旧 V100 16GB (引退済) → `--batch-size 20`。 For fine-tuning a single speaker from a multilingual base, `--batch-size 4-8` works well.
 
 ### Advanced Training Options
 
@@ -279,7 +279,7 @@ uv run python -m piper_train \
   --resume_from_checkpoint /path/to/checkpoint.ckpt  # Resume training
 ```
 
-> **⚠️ 注意:** V100 GPU では `--precision 16-mixed` は backward pass が極端に遅くなる問題があり、`--precision 32-true` が canonical です (CLAUDE.md Template A/B 参照)。A100 以降の GPU でも本リポジトリの実績設定は `32-true` を使用しています。`16-mixed` を試す場合は backward pass time を計測してから採用してください。
+> **⚠️ 注意 (Issue #527 / DR-008 後):** v1.13 では Template default が `--precision bf16-mixed` (Ada 6000 / RTX 5090 で BF16 native Tensor Core を活用)。 古い GPU (V100 等) は引退済、 `--precision 32-true` は legacy として残存。 新規学習では `bf16-mixed` 推奨、 V100 互換が必要なら `32-true` を明示指定。
 
 
 ### Multi-Speaker Fine-Tuning
@@ -315,26 +315,25 @@ NCCL_DEBUG=WARN NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 \
 uv run python -m piper_train \
   --dataset-dir /path/to/multilingual-dataset \
   --prosody-dim 16 \
-  --accelerator gpu --devices 4 --precision 32-true \
-  --max_epochs 75 --batch-size 20 --samples-per-speaker 2 \
+  --accelerator gpu --devices 4 --precision bf16-mixed \
+  --max_epochs 75 --batch-size 32 --samples-per-speaker 2 \
   --checkpoint-epochs 5 --quality medium \
   --base_lr 2e-4 --disable_auto_lr_scaling \
   --ema-decay 0.9995 \
   --max-phoneme-ids 400 \
-  --no-wavlm \
   --audio-log-epochs 5 \
   --default_root_dir /path/to/output-dir
 ```
 
-**Key parameters:**
+**Key parameters (Ada 6000 / RTX 5090 想定):**
 
 | Parameter | Rationale |
 |-----------|-----------|
 | `--max_epochs 75` | 75 epochs with large dataset yields ~282K gradient steps |
-| `--batch-size 20` | Fits on V100 16GB with 173 symbols |
+| `--batch-size 32` | Ada 6000 48GB / RTX 5090 32GB で快適 (V100 16GB では 20 に絞る) |
 | `--samples-per-speaker 2` | Balances speaker representation across languages |
-| `--precision 32-true` | V100 requires FP32 (FP16-mixed causes slow backward pass) |
-| `--no-wavlm` | Recommended on V100 for training speed |
+| `--precision bf16-mixed` | Ada/Blackwell の BF16 Tensor Core 活用 (Issue #527 / DR-008、 旧 V100 互換は `32-true`) |
+| WavLM 有効 | Ada/Blackwell 48GB+ で利用可。 T4 (16GB) は `--no-wavlm` で VRAM 節約 |
 
 **Language-balanced sampling:** When the speaker count ratio between languages exceeds 3:1, `--language-balanced-sampling` is **automatically enabled** to ensure balanced representation across language groups. You can also force it on with `--language-balanced-sampling`.
 
@@ -355,13 +354,12 @@ Transfer a multilingual multi-speaker model to a single-speaker voice using `--r
 uv run python -m piper_train \
   --dataset-dir /path/to/finetune-dataset \
   --prosody-dim 16 \
-  --accelerator gpu --devices 1 --precision 32-true \
-  --max_epochs 500 --batch-size 4 --samples-per-speaker 4 \
+  --accelerator gpu --devices 1 --precision bf16-mixed \
+  --max_epochs 500 --batch-size 8 --samples-per-speaker 4 \
   --checkpoint-epochs 50 --quality medium \
   --base_lr 2e-5 --disable_auto_lr_scaling \
   --ema-decay 0.9995 \
   --max-phoneme-ids 400 \
-  --no-wavlm \
   --val-every-n-epochs 50 \
   --audio-log-epochs 50 \
   --resume-from-multispeaker-checkpoint /path/to/base-model.ckpt \
@@ -395,7 +393,7 @@ WavLM Discriminator is a Microsoft WavLM-based perceptual quality discriminator.
 - WavLM is used **during training only** -- it is not included in the exported ONNX inference graph, so there is no impact on inference speed
 - Adds approximately **1-2 GB GPU memory per GPU**; reduce `--batch-size` if you encounter OOM errors
 - Control the discriminator loss weight with `--c-wavlm` (default: 0.5)
-- To disable WavLM, use `--no-wavlm` (recommended on V100 for training speed)
+- To disable WavLM, use `--no-wavlm` (T4 等 VRAM 16GB GPU で推奨、 Ada/Blackwell では WavLM 有効が canonical)
 - Alternatively, set `--c-wavlm 0` to zero out the WavLM loss while keeping the module loaded
 
 **ONNX export for WavLM-trained models:**
@@ -742,7 +740,7 @@ Summary of key CLI options for `piper_train`:
 | `--freeze-dp` | off (auto-enabled with `--resume-from-multispeaker-checkpoint`) | Freeze Duration Predictor parameters to prevent catastrophic forgetting during fine-tuning. Automatically enabled when using `--resume-from-multispeaker-checkpoint`. |
 | `--resume-from-multispeaker-checkpoint <path>` | - | Transfer learning from a multi-speaker model to single-speaker. Automatically removes `emb_g`, corrects `emb_lang`, and enables `--freeze-dp`. |
 | `--language-balanced-sampling` | auto (enabled when speaker ratio >= 3:1) | Force language-balanced batch sampling. Ensures equal representation across language groups. Automatically enabled when speaker count ratio between languages exceeds 3:1. |
-| `--no-wavlm` | WavLM ON | Disable WavLM discriminator. Recommended on V100 for training speed (~0.03 it/s with WavLM vs faster without). |
+| `--no-wavlm` | WavLM ON | Disable WavLM discriminator. T4 (VRAM 16GB) で推奨 (~1-2GB 節約)、 Ada 6000 / RTX 5090 (32-48GB) では WavLM 有効が canonical。 |
 | `--audio-log-epochs N` | 1 | Interval (in epochs) for logging audio samples to WandB. Set to 0 to disable. For DDP, `5` is recommended. For fine-tuning, match `--val-every-n-epochs`. |
 | `--no-fp16` | FP16 ON (export only) | Disable FP16 conversion during ONNX export. Default exports FP16 models (~50% size reduction). |
 | `--prosody-dim N` | 16 | Dimension for A1/A2/A3 prosody features fed to Duration Predictor. Set to 0 to disable. |

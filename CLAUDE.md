@@ -95,11 +95,11 @@ NCCL_DEBUG=WARN NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 \
 nohup /data/piper/.venv/bin/python -m piper_train \
     --dataset-dir <DATASET_DIR> \
     --prosody-dim 16 \
-    --accelerator gpu --devices 4 --precision 32-true \
+    --accelerator gpu --devices 4 --precision bf16-mixed \
     --max_epochs <EPOCHS> --batch-size 20 --samples-per-speaker 2 \
     --checkpoint-epochs 5 --quality medium \
     --base_lr 2e-4 --disable_auto_lr_scaling \
-    --ema-decay 0.9995 --max-phoneme-ids 400 --no-wavlm \
+    --ema-decay 0.9995 --max-phoneme-ids 400 \
     --audio-log-epochs 5 \
     --default_root_dir <OUTPUT_DIR> > training.log 2>&1 &
 ```
@@ -112,11 +112,11 @@ NCCL_DEBUG=WARN NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 \
 nohup /data/piper/.venv/bin/python -m piper_train \
     --dataset-dir <FINETUNE_DATASET> \
     --prosody-dim 16 \
-    --accelerator gpu --devices 1 --precision 32-true \
+    --accelerator gpu --devices 1 --precision bf16-mixed \
     --max_epochs 500 --batch-size 4 --samples-per-speaker 4 \
     --checkpoint-epochs 50 --quality medium \
     --base_lr 2e-5 --disable_auto_lr_scaling \
-    --ema-decay 0.9995 --max-phoneme-ids 400 --no-wavlm \
+    --ema-decay 0.9995 --max-phoneme-ids 400 \
     --val-every-n-epochs 50 --audio-log-epochs 50 \
     --resume-from-multispeaker-checkpoint <BASE_CHECKPOINT> \
     --default_root_dir <OUTPUT_DIR> > training.log 2>&1 &
@@ -126,6 +126,14 @@ nohup /data/piper/.venv/bin/python -m piper_train \
 
 B (FT) は A から `--devices 1`、`--base_lr 2e-5` (1/10 で catastrophic forgetting 防止)、`--batch-size 4`、`--max_epochs 500`、`--freeze-dp` 自動有効、`--audio-log-epochs 50` (Validation 頻度に合わせ) を変更。HiFi-GAN ckpt からの resume/FT は v1.12.0 で明示エラー (MB-iSTFT base から再 FT)。
 
+### Precision の選び方 (Issue #527 / DR-008 適用後)
+
+- **`--precision bf16-mixed`** (default、 Template A/B canonical) — Ada 6000 / RTX 5090 で BF16 native Tensor Core を活用、 numerical stable (FP16 より loss spike しにくい、 loss scaling 不要)。 TF32 enable (DR-007) と直交、 両方の恩恵を受ける
+- `--precision 16-mixed` (旧 default、 legacy) — T4 等 sm_75 以下で BF16 native 非対応の場合、 ただし VITS 推論用途中心
+- `--precision 32-true` (legacy V100 互換) — 数値再現性最優先 (`torch.use_deterministic_algorithms(True)` 併用時)、 通常学習では非推奨
+
+> **過去 ckpt resume 非サポート (Issue #527 / DR-006):** v1.13 では torch 2.11 + cu128 環境で旧 ckpt (torch 2.2 製) の resume を保証しない。 継続学習が必要なユーザは v1.12 Docker image tag を継続利用 (registry 長期保持)。 新規学習は from scratch、 もしくは torch 2.11 で生成した base からの FT のみ対応。
+
 ---
 
 ## 実装済み機能
@@ -133,7 +141,7 @@ B (FT) は A から `--devices 1`、`--base_lr 2e-5` (1/10 で catastrophic forg
 ### Decoder & 生成
 
 - **MB-iSTFT-VITS2 Decoder** (`vits/mb_istft.py`, `vits/stft_onnx.py`) — HiFi-GAN を完全置換、CPU Decoder 単体で **2.21x 高速化** (HiFi-GAN 168.2ms → MB-iSTFT 76.2ms / 100 phoneme p50、PR #320 内部 A/B microbench)。End-to-end の Latency P50 は README.md の Benchmark 表 (Xeon E5-2650 v4 / 25 phoneme 英文 / warmup 5 + 30 runs で **27ms**) を canonical 値とする (測定環境・テスト長が異なるため別値)。`upsample_rates=(4,4)` + iSTFT(4x) + PQMF(4x) = 256x。出力形状 `[B, 1, T]` 維持で C#/Rust/Go/WASM/C++ ランタイム変更不要。CLI: `--c-sub-stft` (sub-band STFT loss 係数; hparams `sub_stft_{fft,hop,win}_sizes` は config-only)。Issue #268, PR #320。
-- **WavLM Discriminator** (`vits/models.py:WavLMDiscriminator`) — 学習時のみ知覚品質判別。GPU +1-2GB。CLI: `--no-wavlm`, `--wavlm-every-n-steps`, `--c-wavlm`。V100 では `--no-wavlm` 推奨。
+- **WavLM Discriminator** (`vits/models.py:WavLMDiscriminator`) — 学習時のみ知覚品質判別。GPU +1-2GB。CLI: `--no-wavlm`, `--wavlm-every-n-steps`, `--c-wavlm`。**T4 (VRAM 16GB)** では `--no-wavlm` 推奨 (VRAM 制約)。 **Ada 6000 (48GB) / RTX 5090 (32GB)** では WavLM 利用可、 Template default も WavLM 有効。
 - **prosody_features (A1/A2/A3)** (`vits/models.py`) — OpenJTalk 由来の韻律情報を DP 入力に活用。CLI: `--prosody-dim 16` (デフォルト)。
 - **EMA + stochastic** — ONNX エクスポート時に EMA 自動適用 (チェックポイントに state あれば)。`--no-stochastic` で deterministic。
 
@@ -324,7 +332,9 @@ cat test.jsonl | uv run python -m piper_train.infer_onnx --model <model.onnx> --
 |------|------|
 | 推論音声が「ピー」音 | DP 学習失敗。`--samples-per-speaker` を使う / `--disable_auto_lr_scaling` / `--base_lr 1e-4` |
 | GPU OOM | `NCCL_DEBUG=WARN NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1` / batch_size と samples_per_speaker を下げる / 異なる batch size からの resume を避ける |
-| 学習速度が遅い (V100) | `--precision 32-true` (FP16-mixed は backward 29-40s に劣化) / ゾンビ GPU プロセス確認 (`nvidia-smi --query-compute-apps=pid,used_memory --format=csv`) / `--max-phoneme-ids 400` / `--val-every-n-epochs 10` / `--limit-val-batches 20` / `--no-wavlm` |
+| 学習速度が遅い (Ada/Blackwell) | TF32 enabled 確認 (`torch.backends.cuda.matmul.allow_tf32 == True`、 DR-007 で default ON) / `--precision bf16-mixed` 使用 (Template default、 DR-008) / `--compile` 試行 (Triton 3.x autotune、 warm 後 +5-10%) / `nsys profile` で bottleneck 分析 |
+| 学習速度が遅い (T4、 VRAM 16GB) | VRAM 制約を確認、 batch_size 8-12 に絞る / `--no-wavlm` で VRAM 1-2GB 節約 / 6lang base 規模なら Ada 6000 / RTX 5090 移行検討 |
+| ゾンビ GPU プロセス | `nvidia-smi --query-compute-apps=pid,used_memory --format=csv` で残存 PID 確認、 `kill` で解放 |
 | ONNX 変換エラー | `CUDA_VISIBLE_DEVICES=""` で CPU モード |
 | HiFi-GAN ckpt resume 失敗 | v1.12.0 で `Generator` 削除。MB-iSTFT base から再 FT (`piper-plus-base/model.ckpt`)。詳細: マイグレーションガイド |
 
