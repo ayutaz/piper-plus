@@ -297,42 +297,69 @@ SCR-02 と FR-02-04 / FR-02-05 で網羅。 追加で:
 | **Ada 6000** (sm_89) | 同 `(8, 9)` PASS。 Template B 1 epoch FT 完走。 loss curve canonical 範囲。 |
 | **T4** (sm_75) | 推論 image 起動。 6lang base モデル推論で WAV 生成。 RTF < 0.5 (16kHz)。 |
 
-### FR-08: TF32 enable (詳細)
+### FR-08: TF32 enable (詳細、 DR-007 適用)
 
-#### FR-08-01: コード変更
+#### FR-08-01: コード変更 (`__main__.py`)
 
-`src/python/piper_train/__main__.py` line 461 (`torch.backends.cudnn.benchmark = True` の隣) に追加:
+`src/python/piper_train/__main__.py` line 461 (`torch.backends.cudnn.benchmark = True` の隣) に **2 行追加**:
 
 ```python
 torch.backends.cudnn.benchmark = True
 # TF32 enable for Ampere+ (sm_80+: A100/Ada 6000/RTX 5090). On
-# sm_75 (T4) and older, this setting is a noop. Speeds up matmul by
-# ~1.3-1.5x with negligible quality impact for TTS workloads.
+# sm_75 (T4) and older, these settings are no-ops. Speeds up matmul
+# and conv by ~1.3-1.5x with negligible quality impact for TTS
+# workloads. See DR-007 in docs/reference/python-313/specifications.md
+# for rationale.
 torch.backends.cuda.matmul.allow_tf32 = True
+torch.backends.cudnn.allow_tf32 = True
 ```
 
 #### FR-08-02: 受入基準
 
-- 該当行が `__main__.py` の `main()` 関数内、 Trainer 構築前に存在
-- Ada 6000 / RTX 5090 で `torch.backends.cuda.matmul.allow_tf32` が `True`
+- 該当 2 行が `__main__.py` の `main()` 関数内、 Trainer 構築前に存在
+- Ada 6000 / RTX 5090 で `torch.backends.cuda.matmul.allow_tf32` と `torch.backends.cudnn.allow_tf32` の両方が `True`
 - T4 / sm_75 以下では noop (warning 出ない)
-- TF32 enable 状態で Template B 1 epoch smoke 完走
+- TF32 enable 状態で from scratch 1 epoch smoke 完走 (DR-006 で resume smoke は除外)
+- TF32 ON/OFF で 100 step deterministic 比較、 validation loss 差分が許容範囲 (perceptual 同等)
 
-### FR-09: bf16-mixed 推奨 (詳細)
+### FR-09: bf16-mixed Template default 化 (詳細、 DR-008 適用)
 
 #### FR-09-01: ドキュメント変更
 
-`docs/guides/training/training-guide.md` の `--precision` 表で:
+`docs/guides/training/training-guide.md` の `--precision` 表 (canonical):
 
-| 値 | 推奨対象 |
-|---|---|
-| `bf16-mixed` | **Ada 6000 / RTX 5090 (新メイン推奨)** |
-| `16-mixed` (FP16) | 互換性維持、 旧 GPU 用 |
-| `32-true` | legacy V100 互換、 数値安定性最優先時 |
+| 値 | 推奨対象 | 備考 |
+|---|---|---|
+| **`bf16-mixed`** | **Ada 6000 / RTX 5090 (default / canonical)** | BF16 native Tensor Core、 numerical stable |
+| `16-mixed` (FP16) | 旧 GPU 互換用 (legacy) | loss scaling 必要、 V100 で backward 遅い既知問題 |
+| `32-true` | legacy V100 互換、 数値再現性最優先時 | TF32 enabled (DR-007) で実質的に Ampere+ では mixed と同等速度 |
 
-#### FR-09-02: コード変更
+#### FR-09-02: コード変更 (CLAUDE.md Template A/B)
 
-`--precision` の default は **据置** (現状 `16-mixed`)。 ドキュメント側でのみ推奨を変更。 既存 CLAUDE.md Template A/B も `16-mixed` 据置で、 オプションとして `bf16-mixed` を新 GPU 環境で記載。
+`CLAUDE.md` の Template A (multi-speaker pretraining) と Template B (single-speaker FT) で:
+
+```diff
+- --accelerator gpu --devices 4 --precision 32-true \
++ --accelerator gpu --devices 4 --precision bf16-mixed \
+```
+
+```diff
+- --accelerator gpu --devices 1 --precision 32-true \
++ --accelerator gpu --devices 1 --precision bf16-mixed \
+```
+
+#### FR-09-03: pre-commit hook 整合性
+
+`pre-commit-config.yaml` の `training-template-drift` hook (`scripts/check_training_defaults.py`) は argparse default を pin。 Template default が `bf16-mixed` に変わるため、 hook の期待値も更新が必要 (script 側の更新 commit を Phase 4 に含める)。
+
+#### FR-09-04: 受入基準
+
+- `CLAUDE.md` Template A/B の `--precision` が `bf16-mixed`
+- `training-guide.md` の表で bf16-mixed が default 列に位置
+- `wavlm-guide.md` の V100 注記が削除済 (DR-008 影響)
+- `training-template-drift` pre-commit hook が PASS
+- Ada 6000 で `--precision bf16-mixed` 1 epoch smoke 完走
+- audio_parity Tier 4 PASS (SNR ≥ 30dB)
 
 ### FR-10: distroless Python 3.13 統一 (詳細)
 
@@ -913,6 +940,56 @@ Phase 順序 (要求定義 Phase 0-4 と一致):
   - **CHANGELOG breaking note** に「resume 非対応」 を明記
   - **Migration guide** で「v1.12 までで学習した ckpt を v1.13 で resume する場合は v1.12 で継続学習、 v1.13 では新規学習のみ」 を案内
   - 旧 v1.12 Docker image tag を保持 (OQ-14 を「残す」 で確定する根拠が強化)
+
+### DR-007: TF32 を default ON 化
+
+- **状態**: Accepted (2026-05-25)
+- **コンテキスト**: 学習サーバー GPU の主流が Ada 6000 (sm_89) と RTX 5090 (sm_120) に移行 (DR-001)。 両 GPU で TF32 Tensor Core を活用すると matmul / conv で 1.3-1.5x 高速化。 TF32 は数値精度を 23-bit mantissa → 10-bit mantissa に低下させるが、 TTS workload では perceptual 影響なし。 一方、 `torch.use_deterministic_algorithms(True)` モードとは併用不可。
+- **決定**: `src/python/piper_train/__main__.py` で **default ON** にする (opt-in flag や opt-out flag は追加しない)。
+  ```python
+  torch.backends.cudnn.benchmark = True  # 既存
+  # NEW (DR-007):
+  torch.backends.cuda.matmul.allow_tf32 = True
+  torch.backends.cudnn.allow_tf32 = True
+  ```
+- **理由**:
+  - Ada / Blackwell で透過的に Tensor Core 活用、 全学習ジョブが恩恵
+  - sm_75 (T4) 以下では noop (warning 出ない)、 既存 GPU 環境を壊さない
+  - TTS で perceptual 影響なしという既存知見 (`docs/spec/audio-parity-contract.toml` Tier 4 で確認)
+  - opt-in flag を追加すると discovery cost (誰も気づかない可能性) があり、 default ON の恩恵が逃げる
+- **トレードオフ**:
+  - `torch.use_deterministic_algorithms(True)` と併用不可 — TF32 OFF が必要な研究用途には別 issue で `--disable-tf32` flag 追加検討
+  - 旧 ckpt 由来の loss curve とは bit-exact 一致しない (perceptual には同等)
+- **代替案**:
+  - **B. opt-in (`--enable-tf32`) (棄却)**: discovery cost、 学習ユーザが気づかず V100 想定の遅さで学習する
+  - **C. opt-out (`--disable-tf32`) (棄却)**: default ON と同じだが flag 名で精度を担保したい research 用途向け、 必要なら別 issue
+- **影響**:
+  - `src/python/piper_train/__main__.py` の 2 行追加 (Phase 4 / M4 で実施)
+  - `docs/guides/training/training-guide.md` で TF32 default ON を明記
+  - `CLAUDE.md` トラブルシューティング表に「学習速度が遅い」 時の TF32 確認項目追加
+
+### DR-008: bf16-mixed を Template default に格上げ
+
+- **状態**: Accepted (2026-05-25)
+- **コンテキスト**: 当初は「Template default は `16-mixed` 据置、 docs で bf16 推奨を併記」 (FR-09-02 草案) としていたが、 V100 が引退済で新 GPU (Ada 6000 / RTX 5090) が canonical 学習環境となった (DR-001, DR-006)。 V100 互換 (`--precision 32-true`) を default として残す動機は実質消滅。
+- **決定**: CLAUDE.md Template A/B の `--precision` を **`32-true` → `bf16-mixed`** に書換。 `32-true` は legacy V100 互換用と注記して残す (削除はしない、 リファレンスとして)。
+- **理由**:
+  - 新 GPU (Ada/Blackwell) で BF16 native Tensor Core 活用、 FP16-mixed より numerical stable (loss spike しにくい)
+  - BF16 dynamic range = FP32 同等、 loss scaling 不要
+  - V100 引退済のため `32-true` を canonical で残す意味なし
+  - `16-mixed` は V100 で backward が遅い問題 (`docs/guides/training/wavlm-guide.md:57`) があり、 新 GPU でも `bf16-mixed` の方が安定
+- **トレードオフ**:
+  - 既存学習 (V100 + `--precision 32-true`) との loss curve bit-exact 一致しない (perceptual には同等、 audio_parity Tier 4 PASS で検証)
+  - 3rd party 学習ユーザが古い GPU (V100 等) で学習する場合は明示的に `--precision 32-true` を指定する必要 (legacy 注記で案内)
+- **代替案**:
+  - **A. default 据置 + 注記** (旧推奨、 棄却): 新 GPU 利用者が opt-in しないと恩恵を逃す、 discovery cost
+  - **C. GPU 自動検出 (棄却)**: Lightning に該当機能なし、 自前実装はメンテコスト
+- **影響**:
+  - `CLAUDE.md` Template A/B (line 50-77 想定) の `--precision 32-true` → `--precision bf16-mixed`
+  - `docs/guides/training/training-guide.md` の precision 表で bf16-mixed を canonical 推奨、 32-true を legacy 注記
+  - `docs/guides/training/wavlm-guide.md` line 57 の V100 注記削除 (新 GPU 前提で再構成)
+  - `pre-commit` hook `training-template-drift` (`scripts/check_training_defaults.py`) との整合確認、 必要なら hook 更新
+  - 検証: Phase 4 で bf16-mixed 100 step smoke + audio_parity Tier 4 確認
 
 ## 11. 既知の前提・調査結果 (Discovered Facts)
 

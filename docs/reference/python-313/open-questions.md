@@ -24,8 +24,8 @@
 | **OQ-09** | スコープ判断 | `docker/cpp-inference/Dockerfile.distroless` の debian12 → debian13 統一を今やるか | 低 | M2 着手前 | 別 issue 推奨 |
 | **OQ-10** | dependabot | CUDA 12.8 統一後の dependabot ignore policy 更新 | 低 | M5 後 | 未決 |
 | **OQ-11** | CHANGELOG | breaking change 文言の正式版確定 | 中 | M5 着手前 | 草案あり |
-| **OQ-12** | 検証 | TF32 enable を opt-in flag にするか default ON にするか | 中 | Phase 4 着手前 | 推奨案あり (default ON) |
-| **OQ-13** | 検証 | bf16-mixed を CLAUDE.md Template の default にするか optional 推奨にとどめるか | 中 | Phase 4 着手前 | 推奨案あり (optional 推奨) |
+| **OQ-12** | 検証 | TF32 enable を opt-in flag にするか default ON にするか | 中 | Phase 4 着手前 | ✅ **決定済 (2026-05-25): default ON** (Ada/Blackwell 最適化、 sm_75 以下 noop) |
+| **OQ-13** | 検証 | bf16-mixed を CLAUDE.md Template の default にするか optional 推奨にとどめるか | 中 | Phase 4 着手前 | ✅ **決定済 (2026-05-25): Template default 化 (`--precision bf16-mixed`)** |
 | **OQ-14** | リリース | v1.12 系の旧 Docker image tag を registry に残すか削除するか | 中 (DR-006 で昇格) | M5 着手前 | ✅ **決定済 (2026-05-25): 残す** (DR-006 で旧 ckpt 継続学習者の唯一の選択肢) |
 
 合計: **14 件** (高 4 / 中 7 / 低 3)
@@ -245,6 +245,8 @@
 
 **決定すべき人:** リポジトリオーナー + 学習担当
 
+**✅ 決定 (2026-05-25): A. default ON** — `src/python/piper_train/__main__.py` に `torch.backends.cuda.matmul.allow_tf32 = True` + `torch.backends.cudnn.allow_tf32 = True` を追加。 学習サーバー新 GPU (Ada/Blackwell) で TF32 Tensor Core を活用、 sm_75 以下 (T4 / 旧 GPU) では noop。 deterministic 用途の opt-out flag は別 issue で必要に応じて追加。 詳細は [`specifications.md DR-007`](specifications.md#dr-007-tf32-を-default-on-化) 参照。
+
 ---
 
 ### OQ-13: bf16-mixed を CLAUDE.md Template の default にするか
@@ -263,6 +265,8 @@
 **推奨:** A (Template 変更は慎重、 ユーザが明示的に bf16 を選ぶ形)
 
 **決定すべき人:** リポジトリオーナー + 学習担当
+
+**✅ 決定 (2026-05-25): B. default を bf16-mixed に変更** — CLAUDE.md Template A/B の `--precision 32-true` を **`--precision bf16-mixed`** に書換、 32-true は legacy V100 互換用と注記。 新 GPU (Ada 6000 / RTX 5090) を canonical 環境とする方針確定 (V100 引退済)。 詳細は [`specifications.md DR-008`](specifications.md#dr-008-bf16-mixed-を-template-default-に格上げ) 参照。
 
 ---
 

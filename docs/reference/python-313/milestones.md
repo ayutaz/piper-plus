@@ -266,7 +266,9 @@ PR 数: 1
 - [ ] TF32 ON/OFF deterministic 100 step 比較で validation loss 差分が許容範囲
 - [ ] ONNX export 出力が `audio_parity` Tier 4 (SNR ≥ 30dB) PASS
 - [ ] `CLAUDE.md` line 125 / 312 の V100 言及が新 GPU 前提に置換済
-- [ ] `training-guide.md` で `bf16-mixed` が Ada/Blackwell の新メイン推奨として記載
+- [ ] `training-guide.md` で `bf16-mixed` が Ada/Blackwell の **default 推奨**として記載 (DR-008)
+- [ ] `CLAUDE.md` Template A/B の `--precision` が **`bf16-mixed`** に書換 (DR-008、 `32-true` は legacy 注記)
+- [ ] `training-template-drift` pre-commit hook が新 default で PASS
 - [ ] `training-guide.md` / `CLAUDE.md` に「v1.13 では過去 ckpt の resume 非サポート」 を明記
 - [ ] `model-quality-gate.yml` で MOS / RTF が baseline ±2% 以内 (既存 ONNX 推論経路で評価)
 
