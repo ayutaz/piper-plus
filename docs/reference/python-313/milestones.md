@@ -253,25 +253,27 @@ PR 数: 1
 
 - [ ] M3 完了 (新 GPU で Docker image が動く)
 - [ ] Ada 6000 実機への定常アクセス権 (学習担当)
-- [ ] 6lang base ckpt が `/data/piper/output-multilingual-6lang/` で利用可能 (既存環境)
+- [ ] 新規学習用 dataset (`dataset-multilingual-6lang-filtered` 等) が利用可能
+- [ ] ~~6lang base ckpt が利用可能~~ (DR-006 で resume 非サポートのため不要)
 
 ### Exit Criteria
 
 - [ ] `__main__.py` の TF32 enable 行が main() 内、 Trainer 構築前に存在
 - [ ] Ada 6000 で `torch.backends.cuda.matmul.allow_tf32 == True` 確認
 - [ ] T4 / sm_75 以下で noop 動作 (warning 出ない)
-- [ ] **Ada 6000 実機**で Template B 1 epoch FT 完走 (loss / metric range canonical ±10% 以内)
-- [ ] **RTX 5090 実機**で同 smoke 完走
+- [ ] **Ada 6000 実機**で **from scratch 1 epoch smoke** 完走 (loss が発散せず NaN なし、 DR-006 適用)
+- [ ] **RTX 5090 実機**で同 smoke 完走 (sm_120 起動 + 学習進行確認)
 - [ ] TF32 ON/OFF deterministic 100 step 比較で validation loss 差分が許容範囲
 - [ ] ONNX export 出力が `audio_parity` Tier 4 (SNR ≥ 30dB) PASS
 - [ ] `CLAUDE.md` line 125 / 312 の V100 言及が新 GPU 前提に置換済
 - [ ] `training-guide.md` で `bf16-mixed` が Ada/Blackwell の新メイン推奨として記載
-- [ ] `model-quality-gate.yml` で MOS / RTF が baseline ±2% 以内
+- [ ] `training-guide.md` / `CLAUDE.md` に「v1.13 では過去 ckpt の resume 非サポート」 を明記
+- [ ] `model-quality-gate.yml` で MOS / RTF が baseline ±2% 以内 (既存 ONNX 推論経路で評価)
 
 ### 依存
 
 - M3 完了 (新 GPU Docker image が動く)
-- 6lang base ckpt + dataset へのアクセス
+- 新規学習用 dataset へのアクセス (旧 ckpt は不要、 DR-006)
 
 ### リスクゲート (重要)
 

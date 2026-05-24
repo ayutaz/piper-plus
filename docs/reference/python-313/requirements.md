@@ -216,7 +216,7 @@ DR-002 (決定事項) により、 root pyproject と member pyproject の floor
 
 | ID | リスク | 影響度 | 発生確率 | 緩和策 |
 |---|---|---|---|---|
-| **R-01** | torch 2.2 → 2.11 bump で学習結果が変わる | 高 | 中 | Phase 4 で実機 1 epoch smoke、 loss curve diff 確認 |
+| **R-01** | torch 2.2 → 2.11 bump で学習結果が変わる | 中 (DR-006 で resume 非サポート確定後に降格) | 中 | Phase 4 で from scratch 1 epoch smoke、 loss 発散がないことを確認。 過去 ckpt resume の検証は非対象 (DR-006) |
 | **R-02** | Ubuntu 22.04 → 24.04 で wheel ABI 非互換 (glibc 2.35 → 2.39) | 高 | 低 | Phase 3 で docker build 失敗を早期検出、 manylinux_2_28 wheel 確認 |
 | **R-03** | deadsnakes PPA の供給停止 / 信頼性 | 中 | 極低 | CPython core dev maintained で信頼性高、 代替案は multi-stage で `python:3.13-slim` 流用 |
 | **R-04** | distroless debian12 → debian13 で onnxruntime ABI 不一致 | 高 | 低 | Phase 2 で builder/final 両方 trixie 揃え (PR #523 と同型対応) |
@@ -264,7 +264,7 @@ DR-002 (決定事項) により、 root pyproject と member pyproject の floor
 
 | ID | 失うもの | 影響範囲 | 緩和策 |
 |---|---|---|---|
-| **B-C1** | **PyTorch 2.2 で生成された optimizer state_dict の forward-compat は保証されない** | 学習 resume | model weights は互換、 optimizer は再構築可能。 既存 ckpt は `--resume-from-multispeaker-checkpoint` で optimizer 破棄して再開可能 (既存仕様) |
+| **B-C1** | **PyTorch 2.2 ckpt の resume を非サポート化 (model weights も含む)** | 学習 resume | DR-006 により v1.13 では過去 ckpt の resume 自体を保証しない。 v1.12 image で継続学習が必要なユーザは旧 image tag を使用 |
 | **B-C2** | **ONNX export の opset_version default が 17 → 20+ に変わる可能性** | 推論ランタイム互換 | 明示的に `--opset 17` 等を export 時に指定して固定、 audio_parity Tier 4 で検証 |
 | **B-C3** | **TF32 enable で生成された state_dict は TF32 OFF 環境で resume 時に loss curve が変わる** | 学習 reproducibility | 既存 ckpt は TF32 ありで再学習推奨、 もしくは TF32 OFF flag を opt-in 化 |
 | **B-C4** | **bf16-mixed で学習した ckpt を FP16-mixed で resume すると数値表現の違いで loss spike の可能性** | 学習 reproducibility | precision は学習ジョブ通して固定、 途中変更しない運用 |

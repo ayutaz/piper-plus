@@ -359,13 +359,19 @@ FR-02-02 / FR-02-03 で網羅。 追加で:
 | `g2p-python-ci.yml` matrix Python 3.11 ジョブ | 全 PASS | 同 |
 | `requires-python` 値 (7 file) | 全て `>=3.11` | `check_workspace_python_parity.py` |
 
-### NFR-02: 学習再現性
+### NFR-02: 学習再現性 (DR-006 適用後)
+
+過去 ckpt resume は **非サポート** (DR-006)。 新規学習のみ動作確認:
 
 | 指標 | 閾値 | 測定方法 |
 |---|---|---|
-| 6lang base ckpt から FT 1 epoch | 完走 | Ada 6000 実機 |
-| validation loss (1 epoch 後) | canonical ±10% 以内 | wandb / tensorboard 比較 |
+| **新規学習 from scratch 1 epoch** | 完走 (loss が発散しない) | Ada 6000 実機、 Template A から短縮した smoke 構成 |
+| validation loss (1 epoch 後) | canonical 範囲 (発散・NaN なし) | wandb / tensorboard 確認 |
 | ONNX export 出力 | audio_parity Tier 4 PASS (SNR ≥ 30dB) | `runtime-parity-deep.yml` |
+
+**削除した指標** (DR-006 により非サポート):
+- ~~6lang base ckpt resume が成功する~~
+- ~~validation loss が canonical の ±10% 以内 (resume 後)~~
 
 ### NFR-03: セキュリティ (Trivy)
 
@@ -429,14 +435,18 @@ FR-02-02 / FR-02-03 で網羅。 追加で:
 
 ## 5. データ要件 (Data Requirements)
 
-### DR-01: モデルチェックポイント
+### DR-01: モデルチェックポイント (DR-006 適用後)
+
+過去 ckpt の resume は **非サポート** (DR-006 で確定)。 v1.13.0 移行時の扱い:
 
 | 項目 | 要件 |
 |---|---|
-| 既存 6lang base ckpt | 新 Docker image (torch 2.11) で **lazy load 可能** (`--resume-from-multispeaker-checkpoint`) |
+| 既存 6lang base ckpt の resume | **非サポート** — torch 2.11 環境で load 不可でも修正しない |
+| 既存学習済 ONNX (`piper-plus-base` 等 HF 配布物) | **据置で推論可能** — ONNX レベルの forward 互換は ONNX Runtime 1.26+ で成立 |
+| 新規学習 ckpt | torch 2.11 環境で from scratch、 もしくは torch 2.11 で生成した base からの FT |
 | optimizer state_dict | 破棄して再構築 (既存仕様、 影響なし) |
-| EMA state | wheel cu128 で保持される (KEY 変更なし) |
-| WavLM weights | 保持 |
+| EMA state | 新規学習で生成、 旧 ckpt から継承しない |
+| 旧 ckpt 継続学習が必要なユーザ | **v1.12 Docker image を使用** (旧 image tag は registry に保持、 OQ-14 で確定) |
 
 ### DR-02: ONNX エクスポート
 
@@ -857,6 +867,52 @@ Phase 順序 (要求定義 Phase 0-4 と一致):
 - **トレードオフ**: PR 数増 (1 → 2)
 - **代替案**: 統合 PR (棄却、 review 負荷増 + revert 影響範囲拡大)
 - **影響**: マイルストーン M3 / M4 を分離 ([`milestones.md`](milestones.md) 参照)
+
+### DR-005: リリースバージョンは v1.13.0 (minor bump)
+
+- **状態**: Accepted (2026-05-25)
+- **コンテキスト**: Issue #527 の変更は Docker base image / Python interpreter / torch / CUDA すべて変更でユーザ環境への影響大。 一方 PyPI `piper-plus` ランタイム API は無変更 (NFR-01 で 3.11 サポート維持)。 SemVer 解釈に裁量の余地あり。
+- **決定**: **v1.13.0 (minor bump)** として release する。 patch (v1.12.x) は採用しない。
+- **理由**:
+  - Docker 利用者にとって breaking 級 (host driver R570+ 要件、 base image 大幅変更)
+  - 前回 v1.11 → v1.12 の breaking も同様に minor bump で対応 (`docs/migration/v1.11-to-v1.12.md`)
+  - Migration guide を伴う変更は minor 以上の SemVer 慣習に合致
+  - PyPI API 互換だけで patch にすると Docker 利用者の breaking が release note に埋もれるリスク
+- **トレードオフ**:
+  - v1.12.x patch 系列で hotfix が必要になった場合の分岐コスト
+  - 学習用 model_manager 等の "v1.13" minor リリース対応工数
+- **代替案**:
+  - **B. v1.12.1 patch (棄却)**: Docker 利用者の breaking が patch 表記に隠れ、 周知不足のリスク
+  - **C. v2.0.0 major (棄却)**: API 互換維持しているのに major bump は過剰、 SemVer 違反気味
+- **影響**:
+  - `VERSION` ファイルを `1.13.0` に bump (M5 で実施)
+  - `docs/migration/v1.12-to-v1.13.md` を新規作成
+  - PyPI / Docker Hub / GHCR の tag を `1.13.0` で publish
+  - CHANGELOG `[Unreleased]` → `[1.13.0] - YYYY-MM-DD`
+
+### DR-006: 過去 ckpt resume 非対応を許容
+
+- **状態**: Accepted (2026-05-25)
+- **コンテキスト**: Issue #527 で torch 2.2.1+cu121 → 2.11.0+cu128 に bump する。 PyTorch upstream の互換ポリシーは「model weights は forward 互換、 optimizer state_dict は保証なし」 で、 piper-train は `--resume-from-multispeaker-checkpoint` で optimizer 破棄して再開する仕組みを持つが、 model state_dict の load 自体が失敗するケース (内部 key 変更、 量子化 op 削除等) もありうる。 当初は「smoke で失敗したら再学習 vs 旧 image 維持」 のフォールバック判断が必要 (OQ-03) としていた。
+- **決定**: **過去 ckpt の resume は対応しない (非サポート)。** torch 2.11 環境で旧 ckpt (torch 2.2 系で生成) を load することは保証しない。
+- **理由**:
+  - 既存 ONNX (生成済) はランタイム側で推論継続可能 (forward 互換は ONNX opset で成立)
+  - 新規学習は torch 2.11 環境で from scratch または torch 2.11 で新規生成した base ckpt からの FT のみ対応
+  - 「resume 保証」 は実機 smoke + 数値 reproducibility 検証コストが大きい、 切ることで Phase 4 の検証スコープを縮小可能
+  - 学習サーバー GPU 移行 (V100 → 新 GPU) のタイミングなので、 どのみち再 base 学習が必要になる流れ
+- **トレードオフ**:
+  - 既存 6lang base ckpt の継続学習が不可、 base 再生成コスト (75 epoch 規模、 1-2 週間)
+  - 利用ユーザ (3rd party) の中で旧 ckpt 継続学習者がいた場合、 v1.12 で運用継続を強制 (旧 Docker image tag は保持される、 DR-007 案で別決定)
+- **代替案**:
+  - **A. resume 完全保証 (棄却)**: PyTorch upstream が保証しない部分まで本リポジトリで担保する技術コストが高い
+  - **B. 失敗時のみ fallback (open-questions.md 旧推奨案、 棄却)**: 結局判断を smoke 時に持ち越すだけ、 先に「非対応」 と決めた方が明確
+- **影響**:
+  - **NFR-02 (学習再現性) の更新**: 「6lang base ckpt resume」 → 「from scratch 1 epoch 完走」 に変更
+  - **DR-01 (モデルチェックポイント) の更新**: 既存 ckpt の lazy load 要件削除
+  - **M4 Entry Criteria** から resume smoke 削除、 新規学習 smoke に置換
+  - **CHANGELOG breaking note** に「resume 非対応」 を明記
+  - **Migration guide** で「v1.12 までで学習した ckpt を v1.13 で resume する場合は v1.12 で継続学習、 v1.13 では新規学習のみ」 を案内
+  - 旧 v1.12 Docker image tag を保持 (OQ-14 を「残す」 で確定する根拠が強化)
 
 ## 11. 既知の前提・調査結果 (Discovered Facts)
 

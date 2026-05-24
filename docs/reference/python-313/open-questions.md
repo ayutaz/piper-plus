@@ -15,8 +15,8 @@
 |---|---|---|---|---|---|
 | **OQ-01** | 運用前提 | 学習・推論サーバーの host driver R570+ アップグレードは誰が・いつやるか | **高** | M3 着手前 | 未決 |
 | **OQ-02** | 運用前提 | nvidia-container-toolkit 1.14+ への bump は誰が確認するか | **高** | M3 着手前 | 未決 |
-| **OQ-03** | 学習方針 | torch 2.2 → 2.11 で 6lang base ckpt が resume 不可だった場合のフォールバック (再学習 vs 維持) | **高** | M4 着手前 (smoke 失敗時) | 未決 |
-| **OQ-04** | バージョニング | 本変更は v1.13.0 (minor) か v1.12.x (patch) か | **高** | M5 着手前 | 未決 |
+| **OQ-03** | 学習方針 | torch 2.2 → 2.11 で 6lang base ckpt が resume 不可だった場合のフォールバック (再学習 vs 維持) | **高** | M4 着手前 (smoke 失敗時) | ✅ **決定済 (2026-05-25): resume 非対応 (新規学習のみ対応)** |
+| **OQ-04** | バージョニング | 本変更は v1.13.0 (minor) か v1.12.x (patch) か | **高** | M5 着手前 | ✅ **決定済 (2026-05-25): v1.13.0** |
 | **OQ-05** | PR 分割 | M1 内で floor drift 統一を別 PR にするか 1 PR に混ぜるか | 中 | M1 着手前 | 未決 |
 | **OQ-06** | PR 分割 | M3 と M4 を統合 PR にするか分離 PR にするか (DR-004 では分離が推奨) | 中 | M3 着手前 | 推奨案あり (分離) |
 | **OQ-07** | CUDA patch | `nvidia/cuda:12.8.0` か `12.8.1` (or 最新 patch) | 中 | M3 着手前 | 推奨案あり (12.8.1) |
@@ -26,7 +26,7 @@
 | **OQ-11** | CHANGELOG | breaking change 文言の正式版確定 | 中 | M5 着手前 | 草案あり |
 | **OQ-12** | 検証 | TF32 enable を opt-in flag にするか default ON にするか | 中 | Phase 4 着手前 | 推奨案あり (default ON) |
 | **OQ-13** | 検証 | bf16-mixed を CLAUDE.md Template の default にするか optional 推奨にとどめるか | 中 | Phase 4 着手前 | 推奨案あり (optional 推奨) |
-| **OQ-14** | リリース | v1.12 系の旧 Docker image tag を registry に残すか削除するか | 低 | M5 着手前 | 残す方針 (草案) |
+| **OQ-14** | リリース | v1.12 系の旧 Docker image tag を registry に残すか削除するか | 中 (DR-006 で昇格) | M5 着手前 | ✅ **決定済 (2026-05-25): 残す** (DR-006 で旧 ckpt 継続学習者の唯一の選択肢) |
 
 合計: **14 件** (高 4 / 中 7 / 低 3)
 
@@ -92,6 +92,14 @@
 
 **決定すべき人:** 学習担当 + リポジトリオーナー
 
+**✅ 決定 (2026-05-25): 過去 ckpt の resume は対応しない (B より大胆な選択)**
+
+- torch 2.11 環境で旧 ckpt (torch 2.2 で生成) の resume は **保証しない・サポート対象外**
+- 既存 ONNX (生成済) はランタイム側で推論継続 (forward 互換は ONNX レベルで成立)
+- 新規学習は torch 2.11 環境で**スクラッチ or 新 ckpt 経由のみ**
+- M4 の Entry Criteria から「6lang base ckpt の resume smoke」 を削除、 代わりに「新規学習 1 epoch smoke (Ada 6000 で from scratch、 もしくは torch 2.11 で新規生成した base からの FT)」 に置換
+- 詳細は [`specifications.md DR-006`](specifications.md#dr-006-過去-ckpt-resume-非対応を許容) 参照
+
 ---
 
 ### OQ-04: バージョン番号 (v1.13.0 vs v1.12.x)
@@ -110,6 +118,8 @@
 **推奨:** A (Docker 利用者にとって breaking 級の変更、 v1.13.0 にして Migration guide を添付)
 
 **決定すべき人:** リポジトリオーナー
+
+**✅ 決定 (2026-05-25):** **A. v1.13.0 (minor bump)** を採用。 Migration guide `docs/migration/v1.12-to-v1.13.md` を M5 で作成。 詳細は [`specifications.md DR-005`](specifications.md#dr-005-リリースバージョンは-v1130-minor-bump) 参照。
 
 ---
 
@@ -313,6 +323,8 @@
 **推奨:** A (草案)
 
 **決定すべき人:** リポジトリオーナー
+
+**✅ 決定 (2026-05-25): A. 残す** — DR-006 により過去 ckpt 継続学習が v1.12 image に依存するため、 旧 image tag の保持は必須事項に格上げ。 削除予定は設定しない (長期保持)。
 
 ---
 
