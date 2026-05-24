@@ -250,7 +250,7 @@ Weitere Details unter [docker/README.md](docker/README.md).
 
 ### Python
 
-Erfordert Python 3.11+. [uv](https://docs.astral.sh/uv/) wird als Paketmanager empfohlen.
+Python 3.13+ empfohlen (3.11+ unterstutzt). [uv](https://docs.astral.sh/uv/) wird als Paketmanager empfohlen.
 
 ```bash
 # CPU-Inferenz

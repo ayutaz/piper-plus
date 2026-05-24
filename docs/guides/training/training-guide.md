@@ -28,7 +28,7 @@ For Windows, see [ssamjh's guide using WSL](https://ssamjh.nz/create-custom-pipe
 
 ## env
 
-- python 3.11
+- python 3.13 (推奨、 3.11+ サポート)
 - [uv](https://docs.astral.sh/uv/) (recommended package manager)
 - Single or Multi-GPU support (PyTorch Lightning 2.x)
 

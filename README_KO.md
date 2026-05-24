@@ -250,7 +250,7 @@ docker pull ghcr.io/ayutaz/piper-plus/cpp-dev:dev
 
 ### Python
 
-Python 3.11 이상 필요. 의존성 관리에는 [uv](https://docs.astral.sh/uv/)를 권장합니다.
+Python 3.13+ 권장 (3.11+ 지원). 의존성 관리에는 [uv](https://docs.astral.sh/uv/)를 권장합니다.
 
 ```bash
 # CPU 추론

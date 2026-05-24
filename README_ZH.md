@@ -259,7 +259,7 @@ docker pull ghcr.io/ayutaz/piper-plus/cpp-dev:dev
 
 ### Python
 
-需要 Python 3.11+。推荐使用 [uv](https://docs.astral.sh/uv/) 管理依赖。
+推荐 Python 3.13+ (支持 3.11+)。推荐使用 [uv](https://docs.astral.sh/uv/) 管理依赖。
 
 ```bash
 # CPU 推理

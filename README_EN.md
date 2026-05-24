@@ -262,7 +262,7 @@ See [docker/README.md](docker/README.md) for details.
 
 ### Python
 
-Requires Python 3.11+. [uv](https://docs.astral.sh/uv/) is recommended for dependency management.
+Requires Python 3.13+ (recommended; 3.11+ supported). [uv](https://docs.astral.sh/uv/) is recommended for dependency management.
 
 ```bash
 # CPU inference
