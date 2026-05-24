@@ -51,7 +51,7 @@
 #     final stage, so symbol versions in the linked binary stay
 #     resolvable. This is the same ABI-pinning logic that
 #     docker/python-inference/Dockerfile.cpu.distroless uses
-#     (python:3.11-slim-trixie ↔ distroless/python3-debian12).
+#     (python:3.13-slim-trixie ↔ distroless/python3-debian13、 Issue #527 後)。
 # ----------------------------------------------------------------------
 FROM debian:12-slim AS builder
 

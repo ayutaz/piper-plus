@@ -2,10 +2,10 @@
 #
 # Trial variant of docker/webui/Dockerfile that swaps the
 # python:3.13.13-slim-trixie single-stage build for:
-#   builder = python:3.11-slim-trixie (matches docker/python-inference/
+#   builder = python:3.13-slim-trixie (matches docker/python-inference/
 #             Dockerfile.cpu.distroless so wheels + shared libs are the
 #             same Debian-glibc ABI across both images)
-#   final   = gcr.io/distroless/python3-debian12
+#   final   = gcr.io/distroless/python3-debian13
 #
 # The canonical docker/webui/Dockerfile stays UNCHANGED so docker-compose
 # and webui-test.yml continue to operate against the proven image.
@@ -13,8 +13,8 @@
 # Gradio cold-start works under distroless.
 #
 # Why this layout matches T-012 (python-inference):
-#   * Same Python 3.11 minor (no version drift between the two images
-#     that consumers run side by side).
+#   * Same Python 3.13 minor (no version drift between the two images
+#     that consumers run side by side). Issue #527 bumped from 3.11.
 #   * Same Debian-glibc ABI between builder and final — the
 #     onnxruntime / soundfile C extensions copied from the builder
 #     resolve cleanly inside the distroless final stage.
@@ -31,7 +31,7 @@
 # ----------------------------------------------------------------------
 # Stage 1: builder (Debian-based, has apt/pip).
 # ----------------------------------------------------------------------
-FROM python:3.11-slim-trixie AS builder
+FROM python:3.13-slim-trixie AS builder
 
 ENV PYTHONUNBUFFERED=1
 ENV DEBIAN_FRONTEND=noninteractive
@@ -49,7 +49,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Upgrade pip / setuptools / wheel to clear Trivy supply-chain CVEs. The
-# builder's site-packages (under /usr/local/lib/python3.11) is copied
+# builder's site-packages (under /usr/local/lib/python3.13) is copied
 # verbatim into the distroless final stage, so upgrading here propagates
 # into the published image.
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel
@@ -67,7 +67,7 @@ COPY pyproject.toml /build/pyproject.toml
 COPY src/python /build/src/python
 COPY src/python_run/requirements_webui.txt /build/requirements_webui.txt
 
-# Install into system Python so /usr/local/lib/python3.11/site-packages
+# Install into system Python so /usr/local/lib/python3.13/site-packages
 # becomes a self-contained tree we can COPY into the distroless final.
 RUN uv pip install --system "/build/src/python[inference]"
 RUN uv pip install --system -r /build/requirements_webui.txt
@@ -102,13 +102,13 @@ RUN set -eux; \
 # ----------------------------------------------------------------------
 # Stage 2: distroless final.
 # ----------------------------------------------------------------------
-FROM gcr.io/distroless/python3-debian12
+FROM gcr.io/distroless/python3-debian13
 
 COPY --from=builder /opt/runtime-libs/ /usr/lib/
-COPY --from=builder /usr/local/lib/python3.11 /usr/local/lib/python3.11
+COPY --from=builder /usr/local/lib/python3.13 /usr/local/lib/python3.13
 COPY --from=builder /usr/share/nltk_data /usr/share/nltk_data
 
-ENV PYTHONPATH=/usr/local/lib/python3.11/site-packages
+ENV PYTHONPATH=/usr/local/lib/python3.13/site-packages
 ENV NLTK_DATA=/usr/share/nltk_data
 ENV PYTHONUNBUFFERED=1
 ENV GRADIO_SERVER_NAME=0.0.0.0
@@ -129,7 +129,7 @@ COPY docker/webui/entrypoint_distroless.py /app/entrypoint_distroless.py
 
 WORKDIR /app
 
-# Explicit USER declaration. gcr.io/distroless/python3-debian12 already
+# Explicit USER declaration. gcr.io/distroless/python3-debian13 already
 # defaults to UID 65532 (nonroot), but Trivy's static Dockerfile linter
 # (DS-0002) requires an explicit `USER` directive, not a base-image
 # default, so the policy is auditable from the Dockerfile alone.
@@ -137,7 +137,7 @@ USER 65532
 
 EXPOSE 7860
 
-# distroless/python3-debian12 ships /usr/bin/python3 only (no `python`
+# distroless/python3-debian13 ships /usr/bin/python3 only (no `python`
 # alias on PATH). Use the absolute interpreter path so the HEALTHCHECK
 # never depends on PATH resolution. Gradio's default health endpoint
 # lives at /, so we hit that — the canonical webui image had no
