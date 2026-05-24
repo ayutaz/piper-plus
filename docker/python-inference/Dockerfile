@@ -90,7 +90,10 @@ RUN python --version && \
     python -c "import gradio; print(f'Gradio: {gradio.__version__}')"
 
 # Run as non-root user for security
-RUN useradd -m -u 1000 piper && \
+# Ubuntu 24.04 (Noble) は既存 ubuntu user (UID 1000) を提供しているため
+# 削除してから piper を 1000 で作成 (Issue #527 / Ubuntu 24.04 移行の副作用)。
+RUN userdel -r ubuntu 2>/dev/null || true && \
+    useradd -m -u 1000 piper && \
     chown -R piper:piper /app/models /app/output
 USER piper
 

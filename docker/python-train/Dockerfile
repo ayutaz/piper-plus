@@ -155,8 +155,13 @@ RUN echo "=== Running build-time tests ===" && \
     cd /opt/piper/src/python && python -c "import piper_train; print('piper_train accessible')" && \
     echo "=== Build-time tests passed ==="
 
-# Create non-root user and transfer ownership of working directories
-RUN useradd -m -u 1000 piper && \
+# Create non-root user and transfer ownership of working directories.
+# Ubuntu 24.04 (Noble) は既存 ubuntu user (UID 1000) を提供しているため
+# 削除してから piper を 1000 で作成 (Issue #527 / Ubuntu 22.04 → 24.04 bump
+# の副作用、 既存 piper UID 1000 仕様を維持して dataset volume permission
+# 互換性を保つ)。 22.04 以前で ubuntu user が無い場合は `|| true` で吸収。
+RUN userdel -r ubuntu 2>/dev/null || true && \
+    useradd -m -u 1000 piper && \
     chown -R piper:piper /workspace /opt/venv /opt/piper
 USER piper
 
