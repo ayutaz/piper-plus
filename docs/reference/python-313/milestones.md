@@ -11,7 +11,7 @@
 
 ## マイルストーンと Phase の対応
 
-```
+```text
 M1: 基盤整備 + 軽量切替                  Phase 0 + Phase 1
    ▼
 M2: 非 GPU Docker 統一                   Phase 2
@@ -382,7 +382,7 @@ PR 数: 1 (release prep PR)
 
 ## マイルストーン依存図 (DR-009 適用後)
 
-```
+```text
               ┌─────────────────┐
               │   Issue #527    │  (実装着手中)
               └────────┬────────┘
@@ -482,7 +482,8 @@ PR 数: 1 (release prep PR)
 ### M-RULE-01: PR と Milestone の対応
 
 各 PR は明示的に対応 Milestone を記載する:
-```
+
+```markdown
 ## Milestone
 M3: GPU Docker 統一 (CUDA 12.8 + Ubuntu 24.04 + Python 3.13)
 詳細: docs/reference/python-313/milestones.md#m3-gpu-docker-統一-cuda-128--ubuntu-2404--python-313
@@ -495,6 +496,7 @@ M3: GPU Docker 統一 (CUDA 12.8 + Ubuntu 24.04 + Python 3.13)
 ### M-RULE-03: リスクゲート発動時の処理
 
 リスクゲートが発動した場合 (例: M3 で RTX 5090 起動失敗):
+
 1. PR を draft に戻す
 2. 該当 Milestone セクションの **リスクゲート対応**を実施
 3. 解決後、 PR を ready for review に戻す

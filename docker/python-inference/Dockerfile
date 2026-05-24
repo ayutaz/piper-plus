@@ -31,7 +31,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Upgrade pip / setuptools / wheel to clear Trivy supply-chain CVEs.
 # Run before installing uv so the upgraded pip is what bootstraps the rest.
-RUN pip install --no-cache-dir --upgrade --break-system-packages pip setuptools wheel
+# --ignore-installed は Ubuntu 24.04 の apt-installed pip 24.0 で
+# 「Cannot uninstall pip 24.0, RECORD file not found」 を回避するため必須
+# (debian package が pip metadata を持たないことに起因する既知問題)。
+RUN pip install --no-cache-dir --upgrade --break-system-packages --ignore-installed pip setuptools wheel
 
 # Install uv. --break-system-packages は Ubuntu 24.04 + Python 3.13 環境で
 # PEP 668 protections を bypass するため。 venv を使わず system Python に

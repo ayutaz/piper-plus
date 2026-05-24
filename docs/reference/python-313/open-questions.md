@@ -39,11 +39,13 @@
 **質問:** 学習サーバー (Ada 6000 + RTX 5090) / 推論サーバー (T4) の host NVIDIA driver を R570+ に bump する作業は **誰が、 いつ**やるか。
 
 **コンテキスト:**
+
 - RTX 5090 (Blackwell sm_120) は CUDA 12.8 wheel と driver R570+ が必須
 - M3 (CUDA Docker 統一) の Entry Criteria に「host driver R570+ 確認済」 がある
 - 現状の host driver version は把握できていない
 
 **選択肢:**
+
 - A. M1 着手と並行してサーバー管理者に依頼 (M3 開始時には完了想定)
 - B. 学習担当が自分で bump (権限ある場合)
 - C. M3 着手時にトリガーで bump (M3 が driver 待ちで blocked)
@@ -68,11 +70,13 @@
 **質問:** Docker host の `nvidia-container-toolkit` を 1.14+ に上げる作業は OQ-01 と同タイミングで対応可能か。
 
 **コンテキスト:**
+
 - CUDA 12.8 image を `--gpus all` で実行するには nvidia-container-toolkit 1.14+ が必要
 - 1.10 以下では device mount で失敗するケースあり
 - 通常 driver bump とセットで実施されるので OQ-01 と同タイミングで吸収可能
 
 **選択肢:**
+
 - A. OQ-01 と同時に対応 (推奨)
 - B. 別タイミングで対応 (二度手間)
 
@@ -89,12 +93,14 @@
 **質問:** Phase 4 で 6lang base ckpt (`/data/piper/output-multilingual-6lang/`) を torch 2.11 環境で resume したときに失敗した場合、 どう対応するか。
 
 **コンテキスト:**
+
 - DR-001 (Fully-aligned 戦略) の前提として「torch 2.11 で既存 ckpt が lazy load できる」 を想定
 - PyTorch upstream の互換ポリシーは「model weights は forward 互換、 optimizer state_dict は保証なし」
 - 既存 piper-train は `--resume-from-multispeaker-checkpoint` で optimizer 破棄して再開する仕様 (CLAUDE.md Template B)
 - それでも load 不可な場合の fallback が未定
 
 **選択肢:**
+
 - A. 6lang base を torch 2.11 環境で再学習 (75 epoch 規模、 1-2 週間)
 - B. 旧 image (torch 2.2) で生成した ONNX のみ運用継続、 新 ckpt は torch 2.11 から作る (M3 完了後)
 - C. torch 2.5 等の中間 version でブリッジ (複雑、 非推奨)
@@ -118,11 +124,13 @@
 **質問:** 本変更は SemVer 上 minor bump (v1.12.0 → v1.13.0) か patch bump (v1.12.0 → v1.12.1) か。
 
 **コンテキスト:**
+
 - Docker base image / Python interpreter / torch version 全て変更 → ユーザ環境への影響大
 - ただし PyPI `piper-plus` ランタイム API は無変更 (NFR-01 で 3.11 サポート維持)
 - v1.11 → v1.12 の前回 breaking は Migration guide を伴った minor bump (`docs/migration/v1.11-to-v1.12.md`)
 
 **選択肢:**
+
 - A. **v1.13.0 (minor bump)** — Docker 利用者向け breaking として明示、 Migration guide 添付
 - B. v1.12.1 (patch) — PyPI API 互換なので patch、 Docker 利用者は release note で周知
 
@@ -141,11 +149,13 @@
 **質問:** M1 (Phase 0 + 1) の 17 library floor 統一を、 同じ PR にするか分離するか。
 
 **コンテキスト:**
+
 - DR-002 で「M1 内で `chore(deps): unify floor pins` PR を別に切る選択肢あり (実装者判断)」 と記載
 - 同じ PR にまとめると review 範囲が拡大 (3.11→3.13 と floor 統一の 2 軸)
 - 別 PR にすると revert 可能性が独立
 
 **選択肢:**
+
 - A. 1 PR にまとめる (M1 全体を 1 commit chain で)
 - B. 2 PR に分離 (`chore(deps): unify floor pins` を先に merge → 3.11→3.13 PR)
 
@@ -160,10 +170,12 @@
 **質問:** M3 (CUDA Docker 統一) と M4 (新 GPU 学習最適化) を 1 PR にまとめるか分離するか。
 
 **コンテキスト:**
+
 - DR-004 で「分離推奨」 と決定済 (Phase 3 = infra、 Phase 4 = code + docs)
 - ただし「実装者判断で統合 PR も可」 と余地を残している
 
 **選択肢:**
+
 - A. 分離 (M3 = infra PR、 M4 = optimization PR) — DR-004 推奨
 - B. 統合 (1 つの大型 PR で M3 + M4)
 
@@ -180,10 +192,12 @@
 **質問:** `nvidia/cuda:12.8.x-cudnn-runtime-ubuntu24.04` の `x` をどれにするか。
 
 **コンテキスト:**
+
 - 12.8.0 (初期) / 12.8.1 (bugfix) / より新しい minor patch が存在する可能性
 - specifications.md FR-02-04 で「12.8.1 を選択」 と記載済 (草案)
 
 **選択肢:**
+
 - A. **12.8.1** (specifications.md 草案) — より bugfix が含まれる
 - B. 12.8.0 — 最も保守的、 ただし bugfix なし
 - C. 実装時の最新 12.8.x patch を選ぶ
@@ -199,6 +213,7 @@
 **質問:** CHANGELOG.md の `[1.13.0]` セクションに記載する breaking 表記の正式文言。
 
 **コンテキスト:**
+
 - M5 deliverable に「BREAKING: Docker now uses CUDA 12.8 + Ubuntu 24.04, requires host driver R570+」 と草案
 - ユーザ migration 周知のため正確性が重要
 
@@ -248,6 +263,7 @@
 ```
 
 **選択肢:**
+
 - A. 上記草案をそのまま採用
 - B. 修正 (具体的に指摘箇所)
 
@@ -264,11 +280,13 @@
 **質問:** `torch.backends.cuda.matmul.allow_tf32 = True` を全 GPU で default ON にするか、 CLI flag (`--enable-tf32`) で opt-in にするか。
 
 **コンテキスト:**
+
 - specifications.md FR-08 では default ON で記載 (sm_75 以下は noop)
 - TF32 は数値精度に影響 (matmul mantissa 23-bit → 10-bit)、 bit-exact reproducibility 喪失
 - TTS workload では perceptual 影響なし (要 deterministic 用途では opt-out 必要)
 
 **選択肢:**
+
 - A. **default ON** (specifications.md 草案) — シンプル、 全ユーザに恩恵
 - B. opt-in (`--enable-tf32` flag) — 既存挙動維持、 慎重派向け
 - C. opt-out (`--disable-tf32` flag) — default ON だがフラグで OFF 可能
@@ -286,10 +304,12 @@
 **質問:** CLAUDE.md Template A/B の `--precision` default を bf16-mixed に格上げするか、 16-mixed 据置で「Ada/Blackwell では bf16 推奨」 と注記のみとするか。
 
 **コンテキスト:**
+
 - specifications.md FR-09 では「default は据置 (16-mixed)、 docs で bf16 を新メイン推奨候補と記載」 と草案
 - Template default 変更はサンプル学習ジョブの canonical 仕様変更に該当
 
 **選択肢:**
+
 - A. **default 据置 + 注記** (specifications.md 草案) — 既存学習との一貫性、 新 GPU 利用者が opt-in
 - B. default を bf16-mixed に変更 — 新 GPU が主流になる前提、 古い GPU 利用者は opt-out
 - C. GPU 自動検出 (Lightning の `precision="bf16-mixed-if-supported"` 等) — 複雑
@@ -333,10 +353,12 @@
 **質問:** `.github/dependabot.yml` で `nvidia/cuda` minor bump を ignore しているが、 12.8 統一後はどうするか。
 
 **コンテキスト:**
+
 - 現状 `version-update:semver-minor` を ignore (line 263-265)
 - 12.8 → 12.9 / 13.0 が出たときに自動 PR を出すか手動 bump 方針継続か
 
 **選択肢:**
+
 - A. 据置 (手動 bump 方針継続)
 - B. ignore 解除 (12.x patch のみ自動 PR、 minor は手動)
 - C. major のみ ignore (12.x → 13.x は手動、 12.8 → 12.9 は自動)
@@ -354,10 +376,12 @@
 **質問:** Registry に push 済の v1.12.x Docker image tag を v1.13.0 release 後も保持するか。
 
 **コンテキスト:**
+
 - v1.12.x tag は CUDA 12.6 + Python 3.11、 一部の 3rd party ユーザが利用継続する可能性
 - Registry storage コスト vs ユーザ移行ペース のバランス
 
 **選択肢:**
+
 - A. **残す** (推奨) — ユーザが任意のタイミングで移行、 storage コスト許容
 - B. v1.13.0 release 後 N ヶ月で削除予告
 - C. 即削除 (推奨しない、 ユーザ環境を壊す)
@@ -408,6 +432,7 @@
 ## 決定の記録方法
 
 各 OQ-XX が決定したら:
+
 1. 本ドキュメントの「状態」 列を `未決` → `決定済 (YYYY-MM-DD)` に更新
 2. 大きな判断 (OQ-01〜04 等) は新規 ADR (DR-005, DR-006...) として [`specifications.md §10.6`](specifications.md#106-決定事項記録-decision-records) に追加
 3. 関連する Phase / Milestone の Entry Criteria に決定を反映

@@ -116,11 +116,13 @@
 | `webui-test.yml` | `['3.11', '3.12']` matrix + `'3.11'` single | matrix `['3.13']` single | 削減 |
 
 **維持する matrix** (FR-01 では更新しない):
+
 - `python-tests.yml`: `["3.11", "3.12", "3.13"]` 据置 (C-02)
 - `g2p-python-ci.yml`: `['3.11', '3.12', '3.13']` 据置 (同上)
 - `build-phonemize-wheels.yml`: `["3.11", "3.12"]` 据置 (C-03、 piper-phonemize cp313 未提供)
 
 **受入基準:**
+
 - `grep -rE "python-version.{0,10}3\.11" .github/workflows/*.yml` の結果が **5 件以下** (matrix 内のみ残る)
 - 各更新 workflow の next 実行で `Set up Python 3.13` が success
 
@@ -397,6 +399,7 @@ FR-02-02 / FR-02-03 で網羅。 追加で:
 | ONNX export 出力 | audio_parity Tier 4 PASS (SNR ≥ 30dB) | `runtime-parity-deep.yml` |
 
 **削除した指標** (DR-006 により非サポート):
+
 - ~~6lang base ckpt resume が成功する~~
 - ~~validation loss が canonical の ±10% 以内 (resume 後)~~
 
@@ -601,6 +604,7 @@ Phase 順序 (要求定義 Phase 0-4 と一致):
 ### MR-02: rollback 計画
 
 各 Phase で `git revert` 可能性を保証:
+
 - Phase 0/1: 完全 revert 可能
 - Phase 2: image registry の旧 tag 再 promote 必要
 - Phase 3/4: 学習 ckpt の互換性検証必須 (DR-01)
@@ -718,6 +722,7 @@ Phase 順序 (要求定義 Phase 0-4 と一致):
 | `mypy` | `>=1.20.2` | `>=1.7` | — | `1.20.2` | `>=1.20.2` (root 値) |
 
 **実装方針:**
+
 - M1 (Phase 1) で `src/python/pyproject.toml` と `src/python_run/pyproject.toml` の floor を root と統一
 - `uv.lock` は規定値が変わらない場合は据置 (resolver は今と同じ wheel を選ぶ)
 - 新 CI gate (任意): `scripts/check_workspace_library_floor.py` を追加して主要 library の floor 統一を pin (`workspace-python-parity` と同パターン)
@@ -946,12 +951,14 @@ Phase 順序 (要求定義 Phase 0-4 と一致):
 - **状態**: Accepted (2026-05-25)
 - **コンテキスト**: 学習サーバー GPU の主流が Ada 6000 (sm_89) と RTX 5090 (sm_120) に移行 (DR-001)。 両 GPU で TF32 Tensor Core を活用すると matmul / conv で 1.3-1.5x 高速化。 TF32 は数値精度を 23-bit mantissa → 10-bit mantissa に低下させるが、 TTS workload では perceptual 影響なし。 一方、 `torch.use_deterministic_algorithms(True)` モードとは併用不可。
 - **決定**: `src/python/piper_train/__main__.py` で **default ON** にする (opt-in flag や opt-out flag は追加しない)。
+
   ```python
   torch.backends.cudnn.benchmark = True  # 既存
   # NEW (DR-007):
   torch.backends.cuda.matmul.allow_tf32 = True
   torch.backends.cudnn.allow_tf32 = True
   ```
+
 - **理由**:
   - Ada / Blackwell で透過的に Tensor Core 活用、 全学習ジョブが恩恵
   - sm_75 (T4) 以下では noop (warning 出ない)、 既存 GPU 環境を壊さない
