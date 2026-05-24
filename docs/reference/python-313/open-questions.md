@@ -18,12 +18,12 @@
 | **OQ-03** | 学習方針 | torch 2.2 → 2.11 で 6lang base ckpt が resume 不可だった場合のフォールバック (再学習 vs 維持) | **高** | M4 着手前 (smoke 失敗時) | ✅ **決定済 (2026-05-25): resume 非対応 (新規学習のみ対応)** |
 | **OQ-04** | バージョニング | 本変更は v1.13.0 (minor) か v1.12.x (patch) か | **高** | M5 着手前 | ✅ **決定済 (2026-05-25): v1.13.0** |
 | **OQ-05** | PR 分割 | M1 内で floor drift 統一を別 PR にするか 1 PR に混ぜるか | 中 | M1 着手前 | 未決 |
-| **OQ-06** | PR 分割 | M3 と M4 を統合 PR にするか分離 PR にするか (DR-004 では分離が推奨) | 中 | M3 着手前 | 推奨案あり (分離) |
+| **OQ-06** | PR 分割 | M3 と M4 を統合 PR にするか分離 PR にするか (DR-004 では分離が推奨) | 中 | M3 着手前 | ✅ **決定済 (2026-05-25): 分離 (DR-004 再確認)** |
 | **OQ-07** | CUDA patch | `nvidia/cuda:12.8.0` か `12.8.1` (or 最新 patch) | 中 | M3 着手前 | 推奨案あり (12.8.1) |
-| **OQ-08** | スコープ判断 | `docker/cpp-dev/Dockerfile` の python3.12 → 3.13 統一を今やるか別 issue にするか | 低 | M1 着手前 | 別 issue 推奨 |
-| **OQ-09** | スコープ判断 | `docker/cpp-inference/Dockerfile.distroless` の debian12 → debian13 統一を今やるか | 低 | M2 着手前 | 別 issue 推奨 |
-| **OQ-10** | dependabot | CUDA 12.8 統一後の dependabot ignore policy 更新 | 低 | M5 後 | 未決 |
-| **OQ-11** | CHANGELOG | breaking change 文言の正式版確定 | 中 | M5 着手前 | 草案あり |
+| **OQ-08** | スコープ判断 | `docker/cpp-dev/Dockerfile` の python3.12 → 3.13 統一を今やるか別 issue にするか | 低 | M1 着手前 | ✅ **決定済 (2026-05-25): 別 issue** |
+| **OQ-09** | スコープ判断 | `docker/cpp-inference/Dockerfile.distroless` の debian12 → debian13 統一を今やるか | 低 | M2 着手前 | ✅ **決定済 (2026-05-25): 別 issue** |
+| **OQ-10** | dependabot | CUDA 12.8 統一後の dependabot ignore policy 更新 | 低 | M5 後 | ✅ **決定済 (2026-05-25): 据置** (手動 bump 方針継続) |
+| **OQ-11** | CHANGELOG | breaking change 文言の正式版確定 | 中 | M5 着手前 | ✅ **決定済 (2026-05-25): §OQ-11 草案採用** |
 | **OQ-12** | 検証 | TF32 enable を opt-in flag にするか default ON にするか | 中 | Phase 4 着手前 | ✅ **決定済 (2026-05-25): default ON** (Ada/Blackwell 最適化、 sm_75 以下 noop) |
 | **OQ-13** | 検証 | bf16-mixed を CLAUDE.md Template の default にするか optional 推奨にとどめるか | 中 | Phase 4 着手前 | ✅ **決定済 (2026-05-25): Template default 化 (`--precision bf16-mixed`)** |
 | **OQ-14** | リリース | v1.12 系の旧 Docker image tag を registry に残すか削除するか | 中 (DR-006 で昇格) | M5 着手前 | ✅ **決定済 (2026-05-25): 残す** (DR-006 で旧 ckpt 継続学習者の唯一の選択肢) |
@@ -171,6 +171,8 @@
 
 **決定すべき人:** リポジトリオーナー
 
+**✅ 決定 (2026-05-25): A. 分離** — DR-004 通り、 M3 = infra PR、 M4 = code + docs PR の 2 PR 構成。
+
 ---
 
 ### OQ-07: CUDA 12.8 の patch version 選択
@@ -200,7 +202,7 @@
 - M5 deliverable に「BREAKING: Docker now uses CUDA 12.8 + Ubuntu 24.04, requires host driver R570+」 と草案
 - ユーザ migration 周知のため正確性が重要
 
-**草案 (要レビュー):**
+**草案 (DR-006 / DR-007 / DR-008 反映済):**
 
 ```markdown
 ### Breaking Changes
@@ -215,17 +217,34 @@
   `requires-python = ">=3.11"` is unchanged; PyPI installs on Python 3.11/3.12
   remain supported. Only the Docker image default has shifted.
 - **PyTorch wheel bumped from 2.2.1+cu121 to 2.11.0+cu128** in the training
-  image (`docker/python-train/Dockerfile`). Existing 6lang base checkpoint
-  loads successfully via `--resume-from-multispeaker-checkpoint`, but
-  bit-exact reproducibility from torch 2.2.1 is not guaranteed.
+  image (`docker/python-train/Dockerfile`).
+- **Loading checkpoints generated with torch 2.2 is no longer supported**
+  in v1.13 training images. Existing ONNX models continue to work for
+  inference. Users who need to continue fine-tuning from a torch-2.2
+  checkpoint must stay on the v1.12 Docker image tag (preserved indefinitely
+  in registry).
 - **distroless final images bumped from debian12 to debian13**
   (`docker/python-inference/Dockerfile.cpu.distroless`,
   `docker/webui/Dockerfile.distroless`). Internal Python paths shifted from
   `/usr/local/lib/python3.11` to `/usr/local/lib/python3.13`.
 - **TF32 is now enabled by default in training** via
-  `torch.backends.cuda.matmul.allow_tf32 = True`. This is a noop on sm_75
-  and older GPUs (T4 included). For Ada Lovelace / Blackwell, matmul is
-  ~1.3-1.5x faster but loses bit-exact reproducibility vs FP32.
+  `torch.backends.cuda.matmul.allow_tf32 = True` and
+  `torch.backends.cudnn.allow_tf32 = True`. This is a noop on sm_75
+  and older GPUs (T4 included). For Ada Lovelace / Blackwell, matmul/conv
+  are ~1.3-1.5x faster but lose bit-exact reproducibility vs strict FP32.
+- **Canonical training precision in CLAUDE.md Template A/B is now
+  `--precision bf16-mixed`** (was `--precision 32-true`). The `32-true`
+  option remains available for legacy V100 compatibility / strict numerical
+  reproducibility, but is no longer the recommended default. New GPU (Ada
+  6000 / RTX 5090) users get BF16 Tensor Core acceleration by default.
+
+### Notable
+
+- Training server lineup migrated from V100 (16GB) to T4 (16GB, inference) /
+  RTX 6000 Ada (48GB, training) / RTX 5090 (32GB, training). V100-specific
+  troubleshooting notes have been removed from `docs/guides/training/`.
+- Ubuntu base for CUDA Docker images bumped from 22.04 (Jammy, EOL 2027) to
+  24.04 (Noble, EOL 2029). Python 3.13 is installed via the deadsnakes PPA.
 ```
 
 **選択肢:**
@@ -235,6 +254,8 @@
 **推奨:** A (修正があれば user 指示で adjust)
 
 **決定すべき人:** リポジトリオーナー
+
+**✅ 決定 (2026-05-25): A. 草案採用** — DR-006 / DR-007 / DR-008 を反映した上記草案を CHANGELOG.md `[1.13.0]` セクションに転記 (M5 で実施)。 細かい文言調整は実装中に reviewer judgement で行う。
 
 ---
 
@@ -291,6 +312,8 @@
 
 **決定すべき人:** 実装者 (本 Issue 範囲に含めるかを M1 で判断)
 
+**✅ 決定 (2026-05-25): 別 issue** — `chore(docker): align cpp-dev/Dockerfile python3.12 → 3.13` 等として別 PR で対応。
+
 ---
 
 ### OQ-09: `docker/cpp-inference/Dockerfile.distroless` debian12 → 13
@@ -300,6 +323,8 @@
 **推奨:** **別 issue 推奨** (統一性のみが動機、 機能影響なし、 PR スコープを絞る)
 
 **決定すべき人:** 実装者 (M2 で同時にやる選択肢もあり、 reviewer 判断)
+
+**✅ 決定 (2026-05-25): 別 issue** — Issue #527 本体は Python ランタイム向け distroless のみ touch。 cpp-inference は機能影響なしのため別 chore PR で対応。
 
 ---
 
@@ -319,6 +344,8 @@
 **推奨:** A (据置、 PR #427 の経緯通り)
 
 **決定すべき人:** リポジトリオーナー
+
+**✅ 決定 (2026-05-25): A. 据置** — 手動 bump 方針継続。 PR #427 経緯 (3.11 → 3.14 / 12.4 → 12.9 の大幅 jump 抑制) を踏襲、 13.0 LTS 等の major event 時に手動で再評価。
 
 ---
 
@@ -343,36 +370,38 @@
 
 ---
 
-## 解決プロセス
+## 解決プロセス (全 14 件 ✅ 決定済み、 2026-05-25)
 
-### Phase 0 着手前 (今すぐ決めるべき)
+### Phase 0 / M1 着手前 (✅ 全完了)
 
-- [ ] OQ-04: バージョン番号 (v1.13.0 vs v1.12.x)
-- [ ] OQ-05: M1 内で floor drift 統一を別 PR にするか
-- [ ] OQ-08: cpp-dev Dockerfile スコープ判断 (in / out)
-- [ ] OQ-09: cpp-inference distroless スコープ判断 (in / out)
+- [x] OQ-04: v1.13.0 (minor bump) — DR-005
+- [x] OQ-05: 別 PR (実装者判断、 revert 単位独立)
+- [x] OQ-08: 別 issue
+- [x] OQ-09: 別 issue
 
-### M3 着手前 (Phase 3 開始前)
+### M3 着手前 (✅ 全完了)
 
-- [ ] OQ-01: host driver R570+ アップグレード完了
-- [ ] OQ-02: nvidia-container-toolkit 1.14+ 確認完了
-- [ ] OQ-06: M3 + M4 統合 vs 分離
-- [ ] OQ-07: CUDA 12.8.x patch 選択
+- [x] OQ-01: 前提として進行 — DR-009 (実機準備中、 smoke は post-merge 化)
+- [x] OQ-02: OQ-01 と同じ
+- [x] OQ-06: 分離 (DR-004 再確認)
+- [x] OQ-07: 実装時最新 patch 採用 (実装者判断)
 
-### M4 着手前 (Phase 4 開始前)
+### M4 着手前 (✅ 全完了)
 
-- [ ] OQ-03: ckpt resume 失敗時のフォールバック (smoke で NG だった場合のみ発動)
-- [ ] OQ-12: TF32 default ON vs opt-in
-- [ ] OQ-13: bf16-mixed Template default 化判断
+- [x] OQ-03: resume 非サポート — DR-006 (fallback 待ち判断不要に)
+- [x] OQ-12: default ON — DR-007
+- [x] OQ-13: Template default 化 — DR-008
 
-### M5 着手前 (リリース前)
+### M5 着手前 (✅ 全完了)
 
-- [ ] OQ-11: CHANGELOG breaking 表記の正式版確定
-- [ ] OQ-14: 旧 image tag 保持判断
+- [x] OQ-11: §OQ-11 草案採用 (DR-006/007/008 反映済)
+- [x] OQ-14: 残す (旧 ckpt 継続学習者のため長期保持)
 
-### M5 後 (リリース後)
+### M5 後 (✅ 完了)
 
-- [ ] OQ-10: dependabot ignore policy 更新
+- [x] OQ-10: 据置 (PR #427 経緯通り)
+
+**全 14 件決定済、 実装着手可能な状態。**
 
 ---
 
