@@ -63,7 +63,7 @@ jobs:
 
       - uses: actions/setup-python@v5.6.0
         with:
-          python-version: "3.11"
+          python-version: "3.13"
 
       # `wyoming-cli` is not a separate PyPI distribution; the `wyoming`
       # package itself ships the protocol client classes we use below

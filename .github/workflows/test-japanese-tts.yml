@@ -104,7 +104,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v6.2.0
         with:
-          python-version: '3.11'
+          python-version: '3.13'
 
       - name: Install test dependencies
         run: |
@@ -197,7 +197,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v6.2.0
         with:
-          python-version: '3.11'
+          python-version: '3.13'
 
       - name: Download all test results
         uses: actions/download-artifact@v8.0.1
