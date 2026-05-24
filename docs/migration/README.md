@@ -49,6 +49,11 @@ H2 anchor slug の算出:
 
 CI は anchor なしを fail にはしません。 ただし strict CI で `--strict-anchor` flag を指定するとき (release branch 等で運用予定) は anchor 必須になります。
 
+## 利用可能な migration guide
+
+- [v1.11 → v1.12](v1.11-to-v1.12.md) — HiFi-GAN `Generator` 削除 + `phonemize()` 戻り値変更 + streaming/SSML 関連
+- [v1.12 → v1.13](v1.12-to-v1.13.md) — Issue #527 Python 3.13 + CUDA 12.8 + Ubuntu 24.04 統一 + 新 GPU 最適化 (TF32 / bf16-mixed default)
+
 ## 関連 doc
 
 - [CHANGELOG.md](../../CHANGELOG.md) — release notes
