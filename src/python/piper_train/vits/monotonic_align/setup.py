@@ -1,8 +1,8 @@
-from distutils.core import setup
 from pathlib import Path
 
 import numpy
 from Cython.Build import cythonize
+from setuptools import setup
 
 
 _DIR = Path(__file__).parent
