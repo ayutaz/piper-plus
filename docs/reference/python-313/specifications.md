@@ -991,6 +991,38 @@ Phase 順序 (要求定義 Phase 0-4 と一致):
   - `pre-commit` hook `training-template-drift` (`scripts/check_training_defaults.py`) との整合確認、 必要なら hook 更新
   - 検証: Phase 4 で bf16-mixed 100 step smoke + audio_parity Tier 4 確認
 
+### DR-009: 実機検証を post-merge に切り出し
+
+- **状態**: Accepted (2026-05-25)
+- **コンテキスト**: 新 GPU 環境 (Ada 6000 + RTX 5090 + T4) は **本 Issue 着手時点ではまだ未準備**。 host driver R570+ + nvidia-container-toolkit 1.14+ のアップグレードは別途進行中。 当初の M3 / M4 Exit Criteria では実機 smoke を merge 前必須としていた (Ada 6000 で Template B 1 epoch 完走、 RTX 5090 で sm_120 起動確認、 T4 で推論 smoke) が、 環境準備を待つと Issue #527 全体が blocker になる。
+- **決定**:
+  - M3 / M4 の **コード / Docker 変更 PR は merge 可能** (CI で完結する範囲)
+  - M3 / M4 Exit Criteria の「実機 smoke」 項目は **「post-merge verification」 に格下げ** (環境準備完了後に実施)
+  - **M5 (リリース) は実機 smoke 完了を merge 前必須に維持** — release 品質を担保
+- **理由**:
+  - リポジトリオーナーから「ブランチは host 環境が整っている前提で進めて良い」 と明示承認
+  - 実機がないと検証できない項目以外 (docker build / Trivy CVE / CI smoke / コード変更等) は merge 可能
+  - M5 で release tag を打つ前に必ず実機 smoke を通すことで品質ゲートを保つ
+  - 環境準備中に実装を進めることで、 実機到着時に即時検証→修正サイクルが可能
+- **トレードオフ**:
+  - merge 後に実機 smoke で問題発覚した場合の hotfix が必要 (`v1.13.0-rc1` 等の pre-release で吸収する選択肢あり)
+  - dev branch の green 状態と実機での動作確認が時間的に乖離
+  - 実機 smoke 失敗時の rollback 範囲が拡大 (M3/M4 ともに巻き戻す可能性)
+- **緩和策**:
+  - M5 release を実機 smoke 完了まで打たない
+  - 必要なら release candidate (`v1.13.0rc1`) で 3rd party / 学習担当に early access、 fix を取り込んだ後に GA
+  - 実機 smoke が失敗するリスク評価のため、 Phase 3 / Phase 4 の docker build + CI レベルの検証を徹底
+- **代替案**:
+  - **A. 環境準備完了まで M3 着手も待つ (棄却)**: Issue 全体が blocker、 ドキュメント整備の momentum 消失
+  - **B. 全 phase を merge 前実機 smoke 必須 (棄却)**: 上記と同じ理由
+  - **D. release を v1.12.x patch にして実機 smoke 不要 (棄却)**: DR-005 で v1.13.0 minor 確定、 そもそも実機検証は releaser の責務
+- **影響**:
+  - M3 Exit Criteria: Ada 6000 / RTX 5090 / T4 実機 smoke → post-merge verification 化
+  - M4 Exit Criteria: 同上 (from scratch smoke + TF32 比較 + bf16 切替)
+  - M5 Entry Criteria に「全実機 smoke が完了済」 を追加
+  - `milestones.md` の M3/M4 リスクゲートで「実機 smoke 失敗時の対応」 を新規追加
+  - 関連: OQ-01 / OQ-02 の決定根拠 (前提として進行)
+
 ## 11. 既知の前提・調査結果 (Discovered Facts)
 
 実装前の追加調査で確定した事実:
