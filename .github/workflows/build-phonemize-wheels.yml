@@ -185,7 +185,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest]  # Only Ubuntu for now, macOS has compatibility issues
-        python-version: ['3.11', '3.12', '3.13']  # Test PyPI install on all supported Python versions (Issue #527)
+        python-version: ['3.11', '3.12']  # piper-phonemize は python<3.13 (root pyproject の条件依存と整合)、 PyPI に 3.13 配布が無いため除外 (Issue #527)
 
     steps:
       - uses: actions/checkout@v6.0.3
