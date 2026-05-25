@@ -46,7 +46,7 @@ jobs:
     - uses: actions/checkout@v6.0.3
     - uses: actions/setup-python@v6.2.0
       with:
-        python-version: '3.12'
+        python-version: '3.13'
     - name: Install ALSA dev (for rodio/playback feature)
       run: sudo apt-get update && sudo apt-get install -y libasound2-dev
     - uses: dtolnay/rust-toolchain@stable
@@ -150,7 +150,7 @@ jobs:
     - uses: actions/checkout@v6.0.3
     - uses: actions/setup-python@v6.2.0
       with:
-        python-version: '3.12'
+        python-version: '3.13'
     - name: Install ALSA dev (for rodio/playback feature)
       run: sudo apt-get update && sudo apt-get install -y libasound2-dev
     - uses: dtolnay/rust-toolchain@stable
@@ -174,7 +174,7 @@ jobs:
     - uses: actions/checkout@v6.0.3
     - uses: actions/setup-python@v6.2.0
       with:
-        python-version: '3.12'
+        python-version: '3.13'
     - name: Install ALSA dev (for rodio/playback feature)
       run: sudo apt-get update && sudo apt-get install -y libasound2-dev
     - uses: dtolnay/rust-toolchain@stable
@@ -233,7 +233,7 @@ jobs:
         workspaces: src/rust -> target
     - uses: actions/setup-python@v6.2.0
       with:
-        python-version: '3.12'
+        python-version: '3.13'
     - run: pip install maturin
     - run: maturin build --release
 

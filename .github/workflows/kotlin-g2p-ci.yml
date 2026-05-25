@@ -578,9 +578,9 @@ jobs:
       - uses: actions/checkout@v6.0.3
         with: { submodules: true }
 
-      - name: Set up Python 3.12
+      - name: Set up Python 3.13
         uses: actions/setup-python@v5.6.0
-        with: { python-version: "3.12" }
+        with: { python-version: "3.13" }
 
       - name: Install uv
         run: pipx install uv || pip install --user uv
