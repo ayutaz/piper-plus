@@ -54,7 +54,7 @@ uv run python -m piper_train \
   --default_root_dir /path/to/output
 ```
 
-> **⚠️ 注意 (Issue #527 / DR-008 後):** v1.13 では Template default が `--precision bf16-mixed` (Ada 6000 / RTX 5090 で BF16 native Tensor Core を活用)。 古い GPU 互換用に `--precision 16-mixed` も残るが、 新規学習では `bf16-mixed` 推奨。 V100 (sm_70) は引退済 (新 GPU lineup へ移行)、 V100 互換が必要な場合は `--precision 32-true` (legacy)。
+> **⚠️ 注意 (Issue #527 / DR-008 後):** v2.0 では Template default が `--precision bf16-mixed` (Ada 6000 / RTX 5090 で BF16 native Tensor Core を活用)。 古い GPU 互換用に `--precision 16-mixed` も残るが、 新規学習では `bf16-mixed` 推奨。 V100 (sm_70) は引退済 (新 GPU lineup へ移行)、 V100 互換が必要な場合は `--precision 32-true` (legacy)。
 
 WavLM が有効な場合、GPUメモリが約1-2GB増加するため、`--batch-size` を従来より下げる必要がある場合があります（例: 20 → 12）。
 

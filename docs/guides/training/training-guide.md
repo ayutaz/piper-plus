@@ -255,7 +255,7 @@ uv run python -m piper_train \
   --save-top-k -1 \
 ```
 
-> **⚠️ 注意 (Issue #527 / DR-008 後):** v1.13 では Template default が `--precision bf16-mixed` (Ada 6000 / RTX 5090 で BF16 native Tensor Core を活用)。 古い GPU (V100 等) は引退済、 `--precision 32-true` は legacy として残存。 新規学習では `bf16-mixed` 推奨、 V100 互換が必要なら `32-true` を明示指定。
+> **⚠️ 注意 (Issue #527 / DR-008 後):** v2.0 では Template default が `--precision bf16-mixed` (Ada 6000 / RTX 5090 で BF16 native Tensor Core を活用)。 古い GPU (V100 等) は引退済、 `--precision 32-true` は legacy として残存。 新規学習では `bf16-mixed` 推奨、 V100 互換が必要なら `32-true` を明示指定。
 
 Use `--quality high` to train a [larger voice model](https://github.com/rhasspy/piper/blob/master/src/python/piper_train/vits/config.py#L45) (sounds better, but is much slower).
 
@@ -279,7 +279,7 @@ uv run python -m piper_train \
   --resume_from_checkpoint /path/to/checkpoint.ckpt  # Resume training
 ```
 
-> **⚠️ 注意 (Issue #527 / DR-008 後):** v1.13 では Template default が `--precision bf16-mixed` (Ada 6000 / RTX 5090 で BF16 native Tensor Core を活用)。 古い GPU (V100 等) は引退済、 `--precision 32-true` は legacy として残存。 新規学習では `bf16-mixed` 推奨、 V100 互換が必要なら `32-true` を明示指定。
+> **⚠️ 注意 (Issue #527 / DR-008 後):** v2.0 では Template default が `--precision bf16-mixed` (Ada 6000 / RTX 5090 で BF16 native Tensor Core を活用)。 古い GPU (V100 等) は引退済、 `--precision 32-true` は legacy として残存。 新規学習では `bf16-mixed` 推奨、 V100 互換が必要なら `32-true` を明示指定。
 
 
 ### Multi-Speaker Fine-Tuning

@@ -264,7 +264,7 @@ DR-002 (決定事項) により、 root pyproject と member pyproject の floor
 
 | ID | 失うもの | 影響範囲 | 緩和策 |
 |---|---|---|---|
-| **B-C1** | **PyTorch 2.2 ckpt の resume を非サポート化 (model weights も含む)** | 学習 resume | DR-006 により v1.13 では過去 ckpt の resume 自体を保証しない。 v1.12 image で継続学習が必要なユーザは旧 image tag を使用 |
+| **B-C1** | **PyTorch 2.2 ckpt の resume を非サポート化 (model weights も含む)** | 学習 resume | DR-006 により v2.0 では過去 ckpt の resume 自体を保証しない。 v1.12 image で継続学習が必要なユーザは旧 image tag を使用 |
 | **B-C2** | **ONNX export の opset_version default が 17 → 20+ に変わる可能性** | 推論ランタイム互換 | 明示的に `--opset 17` 等を export 時に指定して固定、 audio_parity Tier 4 で検証 |
 | **B-C3** | **TF32 enable で生成された state_dict は TF32 OFF 環境で resume 時に loss curve が変わる** | 学習 reproducibility | 既存 ckpt は TF32 ありで再学習推奨、 もしくは TF32 OFF flag を opt-in 化 |
 | **B-C4** | **bf16-mixed で学習した ckpt を FP16-mixed で resume すると数値表現の違いで loss spike の可能性** | 学習 reproducibility | precision は学習ジョブ通して固定、 途中変更しない運用 |

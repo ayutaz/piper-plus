@@ -63,8 +63,8 @@ direction = "post-hoc"
 [python]
 manifest = "VERSION"
 # expected_prefix is matched as a literal string prefix against the version
-# field. "1.13." matches 1.13.0, 1.13.1, 1.13.0.dev1 etc.
-expected_prefix = "1.13."
+# field. "2.0." matches 2.0.0, 2.0.1, 2.0.0.dev1 etc.
+expected_prefix = "2.0."
 
 [python.pyproject]
 manifest = "pyproject.toml"

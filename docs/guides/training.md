@@ -20,7 +20,7 @@ uv run python -m piper_train \
     --ema-decay 0.9995
 ```
 
-> **Precision (v1.13.0 / DR-008):** `--precision bf16-mixed` が Template default です (Ada 6000 / RTX 5090 の BF16 native Tensor Core を活用、 FP16 より数値的に安定し loss scaling 不要)。 T4 等 BF16 非対応 GPU では `--precision 16-mixed`、 V100 互換の数値再現性最優先時は `--precision 32-true` を使用してください。
+> **Precision (v2.0.0 / DR-008):** `--precision bf16-mixed` が Template default です (Ada 6000 / RTX 5090 の BF16 native Tensor Core を活用、 FP16 より数値的に安定し loss scaling 不要)。 T4 等 BF16 非対応 GPU では `--precision 16-mixed`、 V100 互換の数値再現性最優先時は `--precision 32-true` を使用してください。
 
 ## Multi-speaker / Multi-GPU
 

@@ -36,15 +36,15 @@ H2 anchor slug の算出:
 ```markdown
 ### Breaking
 
-- Docker base image を CUDA 12.8.1 + Ubuntu 24.04 にアップグレードしました。 host driver R570+ が必要です。 ([移行ガイド](docs/migration/v1.12-to-v1.13.md#docker-base-image-upgrade))
-- TF32 が default で有効化されました。 ([移行ガイド](docs/migration/v1.12-to-v1.13.md#tf32-default-on))
+- Docker base image を CUDA 12.8.1 + Ubuntu 24.04 にアップグレードしました。 host driver R570+ が必要です。 ([移行ガイド](docs/migration/v1.12-to-v2.0.md#docker-base-image-upgrade))
+- TF32 が default で有効化されました。 ([移行ガイド](docs/migration/v1.12-to-v2.0.md#tf32-default-on))
 ```
 
 `### Breaking` という見出しテキストは厳密に一致する必要があります。 `### Changed (Breaking)` のような変則は検査対象外になるため、 ユーザー向け migration 情報は **必ず `### Breaking` 節に集約**してください。
 
 ## anchor を省略してよい場合
 
-- migration guide の全体概要 link (`[v1.13 migration overview](docs/migration/v1.12-to-v1.13.md)`)
+- migration guide の全体概要 link (`[v2.0 migration overview](docs/migration/v1.12-to-v2.0.md)`)
 - 同じ breaking change を別 entry が anchor 付きで参照済みで、 こちらは context link
 
 CI は anchor なしを fail にはしません。 ただし strict CI で `--strict-anchor` flag を指定するとき (release branch 等で運用予定) は anchor 必須になります。
@@ -52,7 +52,7 @@ CI は anchor なしを fail にはしません。 ただし strict CI で `--st
 ## 利用可能な migration guide
 
 - [v1.11 → v1.12](v1.11-to-v1.12.md) — HiFi-GAN `Generator` 削除 + `phonemize()` 戻り値変更 + streaming/SSML 関連
-- [v1.12 → v1.13](v1.12-to-v1.13.md) — Issue #527 Python 3.13 + CUDA 12.8 + Ubuntu 24.04 統一 + 新 GPU 最適化 (TF32 / bf16-mixed default)
+- [v1.12 → v2.0](v1.12-to-v2.0.md) — Issue #527 Python 3.13 + CUDA 12.8 + Ubuntu 24.04 統一 + 新 GPU 最適化 (TF32 / bf16-mixed default)
 
 ## 関連 doc
 

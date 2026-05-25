@@ -184,7 +184,7 @@ uv run python -m piper_train \
   --default_root_dir /path/to/output
 ```
 
-> **legacy GPU 用 fallback (V100 等 sm_70):** v1.13 では V100 を公式サポートしないが、 動かす場合は `--precision 32-true --no-wavlm` を併用 (V100 で FP16 mixed は backward pass が遅延、 WavLM は VRAM 制約のため無効化推奨)。 旧 ckpt (torch 2.2 製) からの resume は v1.12 Docker image で実施。
+> **legacy GPU 用 fallback (V100 等 sm_70):** v2.0 では V100 を公式サポートしないが、 動かす場合は `--precision 32-true --no-wavlm` を併用 (V100 で FP16 mixed は backward pass が遅延、 WavLM は VRAM 制約のため無効化推奨)。 旧 ckpt (torch 2.2 製) からの resume は v1.12 Docker image で実施。
 
 ### パラメータガイド
 

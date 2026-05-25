@@ -467,7 +467,7 @@ FR-02-02 / FR-02-03 で網羅。 追加で:
 
 ### DR-01: モデルチェックポイント (DR-006 適用後)
 
-過去 ckpt の resume は **非サポート** (DR-006 で確定)。 v1.13.0 移行時の扱い:
+過去 ckpt の resume は **非サポート** (DR-006 で確定)。 v2.0.0 移行時の扱い:
 
 | 項目 | 要件 |
 |---|---|
@@ -519,7 +519,7 @@ FR-02-02 / FR-02-03 で網羅。 追加で:
 
 | image | tag 戦略 |
 |---|---|
-| `piper-plus-cpu` | next release tag (例 `v1.13.0`) で Python 3.13 base に切替 |
+| `piper-plus-cpu` | next release tag (例 `v2.0.0`) で Python 3.13 base に切替 |
 | `piper-plus-gpu` (train + inference) | 同 |
 | `piper-plus-distroless` | 同 |
 | 旧 v1.12.x tag | **削除しない** (rollback 用に保持) |
@@ -900,27 +900,27 @@ Phase 順序 (要求定義 Phase 0-4 と一致):
 - **代替案**: 統合 PR (棄却、 review 負荷増 + revert 影響範囲拡大)
 - **影響**: マイルストーン M3 / M4 を分離 ([`milestones.md`](milestones.md) 参照)
 
-### DR-005: リリースバージョンは v1.13.0 (minor bump)
+### DR-005: リリースバージョンは v2.0.0 (major bump)
 
-- **状態**: Accepted (2026-05-25)
-- **コンテキスト**: Issue #527 の変更は Docker base image / Python interpreter / torch / CUDA すべて変更でユーザ環境への影響大。 一方 PyPI `piper-plus` ランタイム API は無変更 (NFR-01 で 3.11 サポート維持)。 SemVer 解釈に裁量の余地あり。
-- **決定**: **v1.13.0 (minor bump)** として release する。 patch (v1.12.x) は採用しない。
+- **状態**: Accepted (2026-05-25、 当初 v1.13.0 minor → PR #222 統合により v2.0.0 major へ改訂)
+- **コンテキスト**: Issue #527 の変更は Docker base image / Python interpreter / torch / CUDA すべて変更でユーザ環境への影響大。 一方 PyPI `piper-plus` ランタイム API は無変更 (NFR-01 で 3.11 サポート維持) のため、 Issue #527 単体では minor 相当。 ただし本リリースは Zero-Shot TTS ([PR #222](https://github.com/ayutaz/piper-plus/pull/222)) と統合した major リリースとして publish する。
+- **決定**: **v2.0.0 (major bump)** として release する。 patch (v1.12.x) / minor (v1.13.0) は採用しない。
 - **理由**:
-  - Docker 利用者にとって breaking 級 (host driver R570+ 要件、 base image 大幅変更)
-  - 前回 v1.11 → v1.12 の breaking も同様に minor bump で対応 (`docs/migration/v1.11-to-v1.12.md`)
-  - Migration guide を伴う変更は minor 以上の SemVer 慣習に合致
+  - Zero-Shot TTS (PR #222) との統合で機能セットが大幅拡張、 メジャーリリースの節目として位置付け
+  - Docker 利用者にとって breaking 級 (host driver R570+ 要件、 base image 大幅変更) であり、 major bump で breaking を明確化
+  - Migration guide を伴う変更であり、 breaking を release note に埋もれさせない
   - PyPI API 互換だけで patch にすると Docker 利用者の breaking が release note に埋もれるリスク
 - **トレードオフ**:
   - v1.12.x patch 系列で hotfix が必要になった場合の分岐コスト
-  - 学習用 model_manager 等の "v1.13" minor リリース対応工数
+  - 学習用 model_manager 等の major リリース対応工数
 - **代替案**:
   - **B. v1.12.1 patch (棄却)**: Docker 利用者の breaking が patch 表記に隠れ、 周知不足のリスク
-  - **C. v2.0.0 major (棄却)**: API 互換維持しているのに major bump は過剰、 SemVer 違反気味
+  - **C. v1.13.0 minor (棄却)**: Issue #527 単体なら妥当だが、 PR #222 統合リリースとしては機能拡張規模が大きく major が適切
 - **影響**:
-  - `VERSION` ファイルを `1.13.0` に bump (M5 で実施)
-  - `docs/migration/v1.12-to-v1.13.md` を新規作成
-  - PyPI / Docker Hub / GHCR の tag を `1.13.0` で publish
-  - CHANGELOG `[Unreleased]` → `[1.13.0] - YYYY-MM-DD`
+  - `VERSION` ファイルを `2.0.0` に bump (M5 で実施)
+  - `docs/migration/v1.12-to-v2.0.md` を新規作成
+  - PyPI / Docker Hub / GHCR の tag を `2.0.0` で publish
+  - CHANGELOG `[Unreleased]` → `[2.0.0] - YYYY-MM-DD`
 
 ### DR-006: 過去 ckpt resume 非対応を許容
 
@@ -943,7 +943,7 @@ Phase 順序 (要求定義 Phase 0-4 と一致):
   - **DR-01 (モデルチェックポイント) の更新**: 既存 ckpt の lazy load 要件削除
   - **M4 Entry Criteria** から resume smoke 削除、 新規学習 smoke に置換
   - **CHANGELOG breaking note** に「resume 非対応」 を明記
-  - **Migration guide** で「v1.12 までで学習した ckpt を v1.13 で resume する場合は v1.12 で継続学習、 v1.13 では新規学習のみ」 を案内
+  - **Migration guide** で「v1.12 までで学習した ckpt を v2.0 で resume する場合は v1.12 で継続学習、 v2.0 では新規学習のみ」 を案内
   - 旧 v1.12 Docker image tag を保持 (OQ-14 を「残す」 で確定する根拠が強化)
 
 ### DR-007: TF32 を default ON 化
@@ -1012,17 +1012,17 @@ Phase 順序 (要求定義 Phase 0-4 と一致):
   - M5 で release tag を打つ前に必ず実機 smoke を通すことで品質ゲートを保つ
   - 環境準備中に実装を進めることで、 実機到着時に即時検証→修正サイクルが可能
 - **トレードオフ**:
-  - merge 後に実機 smoke で問題発覚した場合の hotfix が必要 (`v1.13.0-rc1` 等の pre-release で吸収する選択肢あり)
+  - merge 後に実機 smoke で問題発覚した場合の hotfix が必要 (`v2.0.0-rc1` 等の pre-release で吸収する選択肢あり)
   - dev branch の green 状態と実機での動作確認が時間的に乖離
   - 実機 smoke 失敗時の rollback 範囲が拡大 (M3/M4 ともに巻き戻す可能性)
 - **緩和策**:
   - M5 release を実機 smoke 完了まで打たない
-  - 必要なら release candidate (`v1.13.0rc1`) で 3rd party / 学習担当に early access、 fix を取り込んだ後に GA
+  - 必要なら release candidate (`v2.0.0rc1`) で 3rd party / 学習担当に early access、 fix を取り込んだ後に GA
   - 実機 smoke が失敗するリスク評価のため、 Phase 3 / Phase 4 の docker build + CI レベルの検証を徹底
 - **代替案**:
   - **A. 環境準備完了まで M3 着手も待つ (棄却)**: Issue 全体が blocker、 ドキュメント整備の momentum 消失
   - **B. 全 phase を merge 前実機 smoke 必須 (棄却)**: 上記と同じ理由
-  - **D. release を v1.12.x patch にして実機 smoke 不要 (棄却)**: DR-005 で v1.13.0 minor 確定、 そもそも実機検証は releaser の責務
+  - **D. release を v1.12.x patch にして実機 smoke 不要 (棄却)**: DR-005 で v2.0.0 major 確定、 そもそも実機検証は releaser の責務
 - **影響**:
   - M3 Exit Criteria: Ada 6000 / RTX 5090 / T4 実機 smoke → post-merge verification 化
   - M4 Exit Criteria: 同上 (from scratch smoke + TF32 比較 + bf16 切替)

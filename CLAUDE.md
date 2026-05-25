@@ -132,7 +132,7 @@ B (FT) は A から `--devices 1`、`--base_lr 2e-5` (1/10 で catastrophic forg
 - `--precision 16-mixed` (旧 default、 legacy) — T4 等 sm_75 以下で BF16 native 非対応の場合、 ただし VITS 推論用途中心
 - `--precision 32-true` (legacy V100 互換) — 数値再現性最優先 (`torch.use_deterministic_algorithms(True)` 併用時)、 通常学習では非推奨
 
-> **過去 ckpt resume 非サポート (Issue #527 / DR-006):** v1.13 では torch 2.11 + cu128 環境で旧 ckpt (torch 2.2 製) の resume を保証しない。 継続学習が必要なユーザは v1.12 Docker image tag を継続利用 (registry 長期保持)。 新規学習は from scratch、 もしくは torch 2.11 で生成した base からの FT のみ対応。
+> **過去 ckpt resume 非サポート (Issue #527 / DR-006):** v2.0 では torch 2.11 + cu128 環境で旧 ckpt (torch 2.2 製) の resume を保証しない。 継続学習が必要なユーザは v1.12 Docker image tag を継続利用 (registry 長期保持)。 新規学習は from scratch、 もしくは torch 2.11 で生成した base からの FT のみ対応。
 
 ---
 

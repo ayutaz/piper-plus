@@ -16,7 +16,7 @@
 | **OQ-01** | 運用前提 | 学習・推論サーバーの host driver R570+ アップグレードは誰が・いつやるか | **高** | M3 実機 smoke 前 | ✅ **決定済 (2026-05-25): 前提として進行 (実機環境は別途準備中)** |
 | **OQ-02** | 運用前提 | nvidia-container-toolkit 1.14+ への bump は誰が確認するか | **高** | M3 実機 smoke 前 | ✅ **決定済 (2026-05-25): 前提として進行 (OQ-01 と同じ)** |
 | **OQ-03** | 学習方針 | torch 2.2 → 2.11 で 6lang base ckpt が resume 不可だった場合のフォールバック (再学習 vs 維持) | **高** | M4 着手前 (smoke 失敗時) | ✅ **決定済 (2026-05-25): resume 非対応 (新規学習のみ対応)** |
-| **OQ-04** | バージョニング | 本変更は v1.13.0 (minor) か v1.12.x (patch) か | **高** | M5 着手前 | ✅ **決定済 (2026-05-25): v1.13.0** |
+| **OQ-04** | バージョニング | 本変更は v2.0.0 (major) か v1.13.0 (minor) か v1.12.x (patch) か | **高** | M5 着手前 | ✅ **決定済 (2026-05-25): v2.0.0** |
 | **OQ-05** | PR 分割 | M1 内で floor drift 統一を別 PR にするか 1 PR に混ぜるか | 中 | M1 着手前 | 未決 |
 | **OQ-06** | PR 分割 | M3 と M4 を統合 PR にするか分離 PR にするか (DR-004 では分離が推奨) | 中 | M3 着手前 | ✅ **決定済 (2026-05-25): 分離 (DR-004 再確認)** |
 | **OQ-07** | CUDA patch | `nvidia/cuda:12.8.0` か `12.8.1` (or 最新 patch) | 中 | M3 着手前 | 推奨案あり (12.8.1) |
@@ -119,26 +119,28 @@
 
 ---
 
-### OQ-04: バージョン番号 (v1.13.0 vs v1.12.x)
+### OQ-04: バージョン番号 (v2.0.0 vs v1.13.0 vs v1.12.x)
 
-**質問:** 本変更は SemVer 上 minor bump (v1.12.0 → v1.13.0) か patch bump (v1.12.0 → v1.12.1) か。
+**質問:** 本変更は SemVer 上 minor bump (v1.12.0 → v1.13.0) か patch bump (v1.12.0 → v1.12.1) か、 あるいは Zero-Shot TTS 統合を含めた major bump (v2.0.0) か。
 
 **コンテキスト:**
 
 - Docker base image / Python interpreter / torch version 全て変更 → ユーザ環境への影響大
-- ただし PyPI `piper-plus` ランタイム API は無変更 (NFR-01 で 3.11 サポート維持)
+- ただし PyPI `piper-plus` ランタイム API は無変更 (NFR-01 で 3.11 サポート維持) のため Issue #527 単体では minor 相当
 - v1.11 → v1.12 の前回 breaking は Migration guide を伴った minor bump (`docs/migration/v1.11-to-v1.12.md`)
+- 本リリースは Zero-Shot TTS (PR #222) と統合する方針
 
 **選択肢:**
 
-- A. **v1.13.0 (minor bump)** — Docker 利用者向け breaking として明示、 Migration guide 添付
-- B. v1.12.1 (patch) — PyPI API 互換なので patch、 Docker 利用者は release note で周知
+- A. **v2.0.0 (major bump)** — Zero-Shot TTS (PR #222) 統合リリース、 Docker 利用者向け breaking を major で明示、 Migration guide 添付
+- B. v1.13.0 (minor bump) — Issue #527 単体なら妥当
+- C. v1.12.1 (patch) — PyPI API 互換なので patch、 Docker 利用者は release note で周知
 
-**推奨:** A (Docker 利用者にとって breaking 級の変更、 v1.13.0 にして Migration guide を添付)
+**推奨:** A (PR #222 統合で機能拡張規模が大きく、 Docker breaking もあるため major が適切)
 
 **決定すべき人:** リポジトリオーナー
 
-**✅ 決定 (2026-05-25):** **A. v1.13.0 (minor bump)** を採用。 Migration guide `docs/migration/v1.12-to-v1.13.md` を M5 で作成。 詳細は [`specifications.md DR-005`](specifications.md#dr-005-リリースバージョンは-v1130-minor-bump) 参照。
+**✅ 決定 (2026-05-25):** **A. v2.0.0 (major bump)** を採用。 Migration guide `docs/migration/v1.12-to-v2.0.md` を M5 で作成。 詳細は [`specifications.md DR-005`](specifications.md#dr-005-リリースバージョンは-v200-major-bump) 参照。
 
 ---
 
@@ -210,7 +212,7 @@
 
 ### OQ-11: CHANGELOG breaking 表記の文言
 
-**質問:** CHANGELOG.md の `[1.13.0]` セクションに記載する breaking 表記の正式文言。
+**質問:** CHANGELOG.md の `[2.0.0]` セクションに記載する breaking 表記の正式文言。
 
 **コンテキスト:**
 
@@ -227,14 +229,14 @@
   Base image bumped from `nvidia/cuda:12.6.3-...-ubuntu22.04` to
   `nvidia/cuda:12.8.x-...-ubuntu24.04`. Hosts running NVIDIA driver R525 (12.6)
   or older will fail to start the new images. See
-  [docs/migration/v1.12-to-v1.13.md](../../migration/v1.12-to-v1.13.md).
+  [docs/migration/v1.12-to-v2.0.md](../../migration/v1.12-to-v2.0.md).
 - **Default Python interpreter inside Docker images is 3.13** (was 3.11).
   `requires-python = ">=3.11"` is unchanged; PyPI installs on Python 3.11/3.12
   remain supported. Only the Docker image default has shifted.
 - **PyTorch wheel bumped from 2.2.1+cu121 to 2.11.0+cu128** in the training
   image (`docker/python-train/Dockerfile`).
 - **Loading checkpoints generated with torch 2.2 is no longer supported**
-  in v1.13 training images. Existing ONNX models continue to work for
+  in v2.0 training images. Existing ONNX models continue to work for
   inference. Users who need to continue fine-tuning from a torch-2.2
   checkpoint must stay on the v1.12 Docker image tag (preserved indefinitely
   in registry).
@@ -271,7 +273,7 @@
 
 **決定すべき人:** リポジトリオーナー
 
-**✅ 決定 (2026-05-25): A. 草案採用** — DR-006 / DR-007 / DR-008 を反映した上記草案を CHANGELOG.md `[1.13.0]` セクションに転記 (M5 で実施)。 細かい文言調整は実装中に reviewer judgement で行う。
+**✅ 決定 (2026-05-25): A. 草案採用** — DR-006 / DR-007 / DR-008 を反映した上記草案を CHANGELOG.md `[2.0.0]` セクションに転記 (M5 で実施)。 細かい文言調整は実装中に reviewer judgement で行う。
 
 ---
 
@@ -373,7 +375,7 @@
 
 ### OQ-14: v1.12 系の旧 Docker image tag を残すか削除するか
 
-**質問:** Registry に push 済の v1.12.x Docker image tag を v1.13.0 release 後も保持するか。
+**質問:** Registry に push 済の v1.12.x Docker image tag を v2.0.0 release 後も保持するか。
 
 **コンテキスト:**
 
@@ -383,7 +385,7 @@
 **選択肢:**
 
 - A. **残す** (推奨) — ユーザが任意のタイミングで移行、 storage コスト許容
-- B. v1.13.0 release 後 N ヶ月で削除予告
+- B. v2.0.0 release 後 N ヶ月で削除予告
 - C. 即削除 (推奨しない、 ユーザ環境を壊す)
 
 **推奨:** A (草案)
@@ -398,7 +400,7 @@
 
 ### Phase 0 / M1 着手前 (✅ 全完了)
 
-- [x] OQ-04: v1.13.0 (minor bump) — DR-005
+- [x] OQ-04: v2.0.0 (major bump) — DR-005
 - [x] OQ-05: 別 PR (実装者判断、 revert 単位独立)
 - [x] OQ-08: 別 issue
 - [x] OQ-09: 別 issue
