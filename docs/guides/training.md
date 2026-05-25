@@ -13,12 +13,14 @@ uv pip install ".[train]"
 
 uv run python -m piper_train \
     --dataset-dir /path/to/dataset \
-    --accelerator gpu --devices 1 --precision 16-mixed \
+    --accelerator gpu --devices 1 --precision bf16-mixed \
     --max_epochs 200 --batch-size 16 \
     --quality medium \
     --prosody-dim 16 \
     --ema-decay 0.9995
 ```
+
+> **Precision (v1.13.0 / DR-008):** `--precision bf16-mixed` が Template default です (Ada 6000 / RTX 5090 の BF16 native Tensor Core を活用、 FP16 より数値的に安定し loss scaling 不要)。 T4 等 BF16 非対応 GPU では `--precision 16-mixed`、 V100 互換の数値再現性最優先時は `--precision 32-true` を使用してください。
 
 ## Multi-speaker / Multi-GPU
 
@@ -27,7 +29,7 @@ NCCL_DEBUG=WARN NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 \
 uv run python -m piper_train \
     --dataset-dir /path/to/dataset \
     --prosody-dim 16 \
-    --accelerator gpu --devices 4 --precision 16-mixed \
+    --accelerator gpu --devices 4 --precision bf16-mixed \
     --max_epochs 200 --batch-size 12 --samples-per-speaker 2 \
     --checkpoint-epochs 1 --quality medium \
     --base_lr 2e-4 --disable_auto_lr_scaling \
