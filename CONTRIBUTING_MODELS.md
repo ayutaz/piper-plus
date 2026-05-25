@@ -172,18 +172,19 @@ uv run python -m piper_train.tools.prepare_multilingual_dataset \
 uv run python -m piper_train \
   --dataset-dir /path/to/dataset \
   --prosody-dim 16 \
-  --accelerator gpu --devices 1 --precision 32-true \
+  --accelerator gpu --devices 1 --precision bf16-mixed \
   --max_epochs 500 --batch-size 4 --samples-per-speaker 4 \
   --checkpoint-epochs 50 --quality medium \
   --base_lr 2e-5 --disable_auto_lr_scaling \
   --ema-decay 0.9995 \
   --max-phoneme-ids 400 \
-  --no-wavlm \
   --val-every-n-epochs 50 \
   --audio-log-epochs 50 \
   --resume-from-multispeaker-checkpoint /path/to/base-model-checkpoint.ckpt \
   --default_root_dir /path/to/output
 ```
+
+> **legacy GPU 用 fallback (V100 等 sm_70):** v1.13 では V100 を公式サポートしないが、 動かす場合は `--precision 32-true --no-wavlm` を併用 (V100 で FP16 mixed は backward pass が遅延、 WavLM は VRAM 制約のため無効化推奨)。 旧 ckpt (torch 2.2 製) からの resume は v1.12 Docker image で実施。
 
 ### パラメータガイド
 
@@ -193,8 +194,8 @@ uv run python -m piper_train \
 | `--max_epochs` | 500 | 100 発話なら 500 epoch で ~12,500 gradient steps |
 | `--batch-size` | 4 | 小データセット向け |
 | `--resume-from-multispeaker-checkpoint` | (必須) | emb_g 除去 + emb_lang 補正 + freeze-dp を自動実行 |
-| `--no-wavlm` | (推奨) | V100 では学習速度優先 |
-| `--precision 32-true` | (推奨) | V100 では FP16 mixed は backward pass が遅くなる |
+| `--precision bf16-mixed` | (推奨、 Ada 6000 / RTX 5090) | BF16 native Tensor Core を活用、 numerical stable |
+| `--no-wavlm` | (T4 のみ) | T4 (VRAM 16GB) で VRAM 節約のため WavLM 無効化 |
 
 ### 3. 学習の確認
 

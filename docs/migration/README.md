@@ -36,8 +36,8 @@ H2 anchor slug の算出:
 ```markdown
 ### Breaking
 
-- `Generator` クラスを削除。 MB-iSTFT base からの fine-tune に移行してください。 ([移行ガイド](docs/migration/v1.12-to-v1.13.md#generator-class-removal))
-- `phonemize()` 戻り値が単一要素から複数要素へ変更。 ([移行ガイド](docs/migration/v1.12-to-v1.13.md#phonemize-return-shape))
+- Docker base image を CUDA 12.8.1 + Ubuntu 24.04 にアップグレードしました。 host driver R570+ が必要です。 ([移行ガイド](docs/migration/v1.12-to-v1.13.md#docker-base-image-upgrade))
+- TF32 が default で有効化されました。 ([移行ガイド](docs/migration/v1.12-to-v1.13.md#tf32-default-on))
 ```
 
 `### Breaking` という見出しテキストは厳密に一致する必要があります。 `### Changed (Breaking)` のような変則は検査対象外になるため、 ユーザー向け migration 情報は **必ず `### Breaking` 節に集約**してください。

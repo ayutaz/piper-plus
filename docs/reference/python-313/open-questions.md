@@ -227,7 +227,7 @@
   Base image bumped from `nvidia/cuda:12.6.3-...-ubuntu22.04` to
   `nvidia/cuda:12.8.x-...-ubuntu24.04`. Hosts running NVIDIA driver R525 (12.6)
   or older will fail to start the new images. See
-  [docs/migration/v1.12-to-v1.13.md](docs/migration/v1.12-to-v1.13.md).
+  [docs/migration/v1.12-to-v1.13.md](../../migration/v1.12-to-v1.13.md).
 - **Default Python interpreter inside Docker images is 3.13** (was 3.11).
   `requires-python = ">=3.11"` is unchanged; PyPI installs on Python 3.11/3.12
   remain supported. Only the Docker image default has shifted.

@@ -79,6 +79,7 @@ piper-plus ドキュメント。利用ガイド・各ランタイム連携・仕
 ## Migration
 
 - [v1.11 → v1.12](migration/v1.11-to-v1.12.md) — HiFi-GAN/Flask/HTS-voice 削除など
+- [v1.12 → v1.13](migration/v1.12-to-v1.13.md) — Python 3.13 + CUDA 12.8 + Ubuntu 24.04 統一、 TF32 / bf16-mixed Template default、 旧 ckpt resume 非サポート
 
 ## Benchmarks
 

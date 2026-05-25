@@ -389,7 +389,7 @@ effort = "S (~半日)"
 status = "proposal"
 description = """
 .devcontainer/devcontainer.json で新規 contributor がボタン 1 つで full
-toolchain (Python 3.11 + uv / Rust 1.88 / Node 24 / Go 1.26 / .NET 10) を
+toolchain (Python 3.13 + uv / Rust 1.88 / Node 24 / Go 1.26 / .NET 10) を
 立ち上げられる環境を提供。 現状 README に分散した setup 手順を 1 file に
 集約。
 """
