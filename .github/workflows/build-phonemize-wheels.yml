@@ -185,7 +185,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest]  # Only Ubuntu for now, macOS has compatibility issues
-        python-version: ['3.11']  # Use Python 3.11 which has better wheel support
+        python-version: ['3.11', '3.12', '3.13']  # Test PyPI install on all supported Python versions (Issue #527)
 
     steps:
       - uses: actions/checkout@v6.0.3

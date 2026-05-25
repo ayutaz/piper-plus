@@ -33,7 +33,7 @@ permissions:
 
 jobs:
   evaluate:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 3
     outputs:
       fast_lane: ${{ steps.eval.outputs.fast_lane }}
@@ -55,7 +55,7 @@ jobs:
   neutralize:
     needs: evaluate
     if: needs.evaluate.outputs.fast_lane == 'true'
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     env:
       # Contract gate names that count as "warnings" on a first-PR.
@@ -84,7 +84,7 @@ jobs:
   notify-skip:
     needs: evaluate
     if: needs.evaluate.outputs.fast_lane != 'true'
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 3
     steps:
       - run: |

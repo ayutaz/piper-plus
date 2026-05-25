@@ -1380,7 +1380,7 @@ priority = "LOW"
 effort = "XS"
 status = "proposal"
 description = """
-build-python-train (CUDA 12.1 base) は 5GB+ layer、 mode=max での GHA
+build-python-train (CUDA 12.8 base) は 5GB+ layer、 mode=max での GHA
 cache write が 5-10 min。 mode=min で metadata のみ cache。
 """
 implementation = """
