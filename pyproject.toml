@@ -170,7 +170,8 @@ dev-dependencies = [
     "pytest>=9.0.3,<10",
     "pytest-timeout>=2.2.0",
     "black==26.5.1",
-    "fastapi>=0.135.1",
+    # Issue #527 / DR-002: inference extras の統一 floor (>=0.136.1) と揃える。
+    "fastapi>=0.136.1",
     "httpx>=0.28.1",
     # OpenAI SDK for end-to-end tests against /v1/audio/speech via
     # docker/python-inference/test_openai_api.py::TestOpenAISDKEndToEnd. Tests

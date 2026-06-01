@@ -50,7 +50,7 @@ inference = [
     "piper-plus-g2p[all]",
     # Issue #527 / DR-002: root pyproject (>=0.136.1) と統一
     "fastapi>=0.136.1",
-    "uvicorn>=0.27",
+    "uvicorn>=0.46.0",
     # Per-IP rate limiting for the FastAPI inference server (docker/python-inference).
     # 0.1.9 is the first release on starlette ≥ 0.27 (matches fastapi>=0.110).
     "slowapi>=0.1.9",
@@ -63,7 +63,7 @@ inference-gpu = [
     "piper-plus-g2p[all]",
     # Issue #527 / DR-002: root pyproject (>=0.136.1) と統一
     "fastapi>=0.136.1",
-    "uvicorn>=0.27",
+    "uvicorn>=0.46.0",
     "slowapi>=0.1.9",
 ]
 
