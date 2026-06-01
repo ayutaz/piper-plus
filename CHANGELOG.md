@@ -74,8 +74,9 @@ Issue #527: Docker 全 image + CI workflow + ドキュメントを **Python 3.13
 ### Changed
 
 - **CI workflow**: 20 個の workflow で `python-version` を `'3.11'` から
-  `'3.13'` に bump (matrix workflow `python-tests` / `g2p-python-ci` /
-  `build-phonemize-wheels` は 3.11/3.12/3.13 網羅で据置)。
+  `'3.13'` に bump (matrix workflow `python-tests` / `g2p-python-ci` は
+  3.11/3.12/3.13 網羅で据置。 `build-phonemize-wheels` は piper-phonemize が
+  `python<3.13` のため 3.11/3.12 のみ網羅、 Issue #527)。
 - **Library floor pins**: 17 library の floor drift を root と member で統一
   (`scipy>=1.17.1` / `pytorch-lightning>=2.4.0` / `transformers>=4.50.0`
   / `onnxruntime>=1.26.0` / `numba>=0.61.0` 等、 DR-002)。

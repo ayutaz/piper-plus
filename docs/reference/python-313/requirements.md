@@ -53,7 +53,7 @@ piper-plus リポジトリで **デフォルト Python interpreter を 3.11 → 
 | ID | 要求 | 受入基準 |
 |---|---|---|
 | **NFR-01: 後方互換性** | Python 3.11 サポートを維持 (Python interpreter のみ) | `requires-python = ">=3.11"` 据置、 `python-tests.yml` matrix で 3.11 が PASS。 ハードウェア / driver / 数値再現性などの**その他互換性損失は [9. 互換性影響評価](#9-互換性影響評価-breaking-changes-棚卸し) を参照** |
-| **NFR-02: 学習再現性** | 既存学習 ckpt が新 Docker image で resume 可能 | `--resume-from-multispeaker-checkpoint` で 6lang base ckpt をロード成功、 loss が canonical 範囲 |
+| **NFR-02: 学習再現性 (DR-006 適用後)** | 新規学習および torch 2.11 製 base ckpt からの FT が正常動作 (旧 torch 2.2 製 ckpt の resume は **非サポート**、 [B-C1](#91-失う互換性-breaking) 参照) | from scratch 1 epoch smoke で loss 発散なし / torch 2.11 製 6lang base からの FT smoke 成立。 旧 ckpt resume は検証対象外 ([specifications.md NFR-02](specifications.md#nfr-02-学習再現性-dr-006-適用後) / DR-006) |
 | **NFR-03: セキュリティ** | Trivy CVE クリーン | `docker-build.yml` の Trivy scan で new HIGH/CRITICAL が 0 |
 | **NFR-04: OS 寿命** | Ubuntu EOL を 2 年以上延長 | base image を Ubuntu 22.04 (EOL 2027) → 24.04 (EOL 2029) に bump |
 | **NFR-05: 観測性** | observability tool (nsys/nvprof) が version mismatch なく動作 | wheel cu128 + image CUDA 12.8 で同 major 揃え |
@@ -307,7 +307,7 @@ DR-002 (決定事項) により、 root pyproject と member pyproject の floor
 | **K-02** | Python 3.12 サポート | 同 matrix で 3.12 PASS |
 | **K-03** | 既存 PyPI `piper-plus` の API 互換 | runtime 関連は変更なし、 推論側のみ |
 | **K-04** | 学習済み ONNX モデルの推論互換 | ランタイム側の onnxruntime は既に 1.26.0 で安定、 audio_parity Tier 4 PASS で検証 |
-| **K-05** | 6lang base ckpt から FT 可能 | Template B FT smoke で確認 |
+| **K-05** | torch 2.11 製 6lang base ckpt から FT 可能 (旧 torch 2.2 製 ckpt は対象外、 DR-006) | torch 2.11 製 base での Template B FT smoke で確認 |
 | **K-06** | Wyoming Docker (Home Assistant 連携) の動作 | 既に Python 3.13、 Phase 2 で変更なし |
 | **K-07** | C# / Rust / Go / WASM / C++ ランタイム | piper_train の変更は piper runtime に波及しない (model file のみ共有) |
 | **K-08** | Phoneme set / G2P 仕様 | num_symbols=173 strict gate で pin、 言語別 phonemizer も無変更 |
