@@ -109,9 +109,13 @@ jobs:
         uses: actions/cache@v4.3.0
         with:
           path: .venv
-          key: uv-venv-${{ runner.os }}-py3.11-${{ hashFiles('uv.lock', 'pyproject.toml') }}
+          # py3.13: setup-python (上記) の interpreter に揃える。 namespace が
+          # py3.11 のままだと、 過去に 3.11 で materialise した .venv が 3.13 job に
+          # restore され、 `uv run --no-sync` 系 hook が旧 interpreter で走り得る
+          # (requires-python = ">=3.11" のため uv が venv を作り直さない)。
+          key: uv-venv-${{ runner.os }}-py3.13-${{ hashFiles('uv.lock', 'pyproject.toml') }}
           restore-keys: |
-            uv-venv-${{ runner.os }}-py3.11-
+            uv-venv-${{ runner.os }}-py3.13-
 
       - name: Sync uv environment
         # Tier 1-B: pre-commit hooks use `uv run --no-sync python ...` to skip
@@ -133,10 +137,10 @@ jobs:
           # build に切り替わる。 restore-keys は引き続き .pre-commit-config.yaml
           # 単独 hash で fallback (uv.lock のみ変わった時は uv install が走るが
           # pre-commit env 自体は再利用できる)。
-          key: pre-commit-${{ runner.os }}-py3.11-${{ hashFiles('.pre-commit-config.yaml', 'uv.lock') }}
+          key: pre-commit-${{ runner.os }}-py3.13-${{ hashFiles('.pre-commit-config.yaml', 'uv.lock') }}
           restore-keys: |
-            pre-commit-${{ runner.os }}-py3.11-${{ hashFiles('.pre-commit-config.yaml') }}-
-            pre-commit-${{ runner.os }}-py3.11-
+            pre-commit-${{ runner.os }}-py3.13-${{ hashFiles('.pre-commit-config.yaml') }}-
+            pre-commit-${{ runner.os }}-py3.13-
 
       - name: Run hooks (changed files mode)
         env:
