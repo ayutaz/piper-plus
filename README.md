@@ -19,7 +19,7 @@
 
 > **🔑 唯一の MIT ライセンス Piper フォーク** — オリジナルの [rhasspy/piper](https://github.com/rhasspy/piper) は 2025年10月にアーカイブ済み。[OHF-Voice/piper1-gpl](https://github.com/OHF-Voice/piper1-gpl) は GPL-3.0 に移行。piper-plus は espeak-ng に依存しない唯一の MIT 互換フォークです。独自実装の G2P で8言語 (JA/EN/ZH/KO/ES/FR/PT/SV) に対応し、商用利用・組込み利用に適しています。
 
-> **📢 v1.12.0 Breaking changes (2026-05):** HiFi-GAN Decoder 削除 (MB-iSTFT 統一、`--mb-istft` フラグ廃止) / Flask → FastAPI HTTP サーバー / HTS-voice 依存削除 (Python ランタイムのみ) / Unity UPM 別 repo (`ayutaz/uPiper`) / .NET 全プロジェクト `net10.0` LTS。詳細: [docs/migration/v1.11-to-v1.12.md](docs/migration/v1.11-to-v1.12.md)
+> **📢 v2.0.0 Breaking changes (2026-05):** Docker 既定イメージが CUDA 12.8 + Ubuntu 24.04 + Python 3.13 に統一 (host NVIDIA driver **R570+** 必須、 旧 driver では新イメージが起動不可) / 学習 torch 2.11+cu128 へ更新 (torch 2.2 製 checkpoint の resume 非対応) / TF32 + bf16-mixed が学習デフォルト。詳細: [docs/migration/v1.12-to-v2.0.md](docs/migration/v1.12-to-v2.0.md)
 
 高速・高品質なニューラルテキスト音声合成 (TTS) システム。[VITS](https://github.com/jaywalnut310/vits/) アーキテクチャを採用し、日本語・英語・中国語・韓国語・スペイン語・フランス語・ポルトガル語・スウェーデン語の8言語マルチスピーカー音声合成に対応。[Piper](https://github.com/rhasspy/piper) のフォークで、日本語対応・音質向上・学習機能を大幅に強化しています。
 

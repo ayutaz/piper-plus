@@ -9,6 +9,8 @@
 [![Hugging Face Model](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Model-orange)](https://huggingface.co/ayousanz/piper-plus-base)
 [![Try in Browser](https://img.shields.io/badge/Try%20in%20Browser-WebAssembly-blueviolet)](https://ayutaz.github.io/piper-plus/)
 
+> **📢 v2.0.0 Cambios incompatibles (2026-05):** Imágenes Docker predeterminadas unificadas a CUDA 12.8 + Ubuntu 24.04 + Python 3.13 (driver NVIDIA del host **R570+** requerido; los drivers antiguos no pueden iniciar las nuevas imágenes) / entrenamiento actualizado a torch 2.11+cu128 (los checkpoints creados con torch 2.2 ya no se pueden reanudar) / TF32 + bf16-mixed son los nuevos valores predeterminados de entrenamiento. Detalles: [docs/migration/v1.12-to-v2.0.md](docs/migration/v1.12-to-v2.0.md)
+
 **Paquetes:**
 
 [![PyPI](https://img.shields.io/pypi/v/piper-plus?label=PyPI%3A%20piper-plus&color=blue)](https://pypi.org/project/piper-plus/)

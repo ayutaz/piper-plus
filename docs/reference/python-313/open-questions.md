@@ -17,9 +17,9 @@
 | **OQ-02** | 運用前提 | nvidia-container-toolkit 1.14+ への bump は誰が確認するか | **高** | M3 実機 smoke 前 | ✅ **決定済 (2026-05-25): 前提として進行 (OQ-01 と同じ)** |
 | **OQ-03** | 学習方針 | torch 2.2 → 2.11 で 6lang base ckpt が resume 不可だった場合のフォールバック (再学習 vs 維持) | **高** | M4 着手前 (smoke 失敗時) | ✅ **決定済 (2026-05-25): resume 非対応 (新規学習のみ対応)** |
 | **OQ-04** | バージョニング | 本変更は v2.0.0 (major) か v1.13.0 (minor) か v1.12.x (patch) か | **高** | M5 着手前 | ✅ **決定済 (2026-05-25): v2.0.0** |
-| **OQ-05** | PR 分割 | M1 内で floor drift 統一を別 PR にするか 1 PR に混ぜるか | 中 | M1 着手前 | 未決 |
+| **OQ-05** | PR 分割 | M1 内で floor drift 統一を別 PR にするか 1 PR に混ぜるか | 中 | M1 着手前 | ✅ **決定済 (2026-05-25): 実装者判断 — 独立 commit (`chore(deps): unify library floor pins`) に分離、 本 PR (#537) 同梱** |
 | **OQ-06** | PR 分割 | M3 と M4 を統合 PR にするか分離 PR にするか (DR-004 では分離が推奨) | 中 | M3 着手前 | ✅ **決定済 (2026-05-25): 分離 (DR-004 再確認)** |
-| **OQ-07** | CUDA patch | `nvidia/cuda:12.8.0` か `12.8.1` (or 最新 patch) | 中 | M3 着手前 | 推奨案あり (12.8.1) |
+| **OQ-07** | CUDA patch | `nvidia/cuda:12.8.0` か `12.8.1` (or 最新 patch) | 中 | M3 着手前 | ✅ **決定済 (2026-05-25): 12.8.1 (実装時最新安定 patch)** |
 | **OQ-08** | スコープ判断 | `docker/cpp-dev/Dockerfile` の python3.12 → 3.13 統一を今やるか別 issue にするか | 低 | M1 着手前 | ✅ **決定済 (2026-05-25): 別 issue** |
 | **OQ-09** | スコープ判断 | `docker/cpp-inference/Dockerfile.distroless` の debian12 → debian13 統一を今やるか | 低 | M2 着手前 | ✅ **決定済 (2026-05-25): 別 issue** |
 | **OQ-10** | dependabot | CUDA 12.8 統一後の dependabot ignore policy 更新 | 低 | M5 後 | ✅ **決定済 (2026-05-25): 据置** (手動 bump 方針継続) |
@@ -165,6 +165,8 @@
 
 **決定すべき人:** リポジトリオーナー (PR review style preference)
 
+**✅ 決定 (2026-05-25): 実装者判断** — floor 統一を独立 commit (`chore(deps): unify library floor pins`) として分離し、 本 migration PR (#537) に同梱。 revert 単位の独立性は commit 粒度で確保 (別 PR には切らず)。
+
 ---
 
 ### OQ-06: M3 と M4 を統合 PR にするか分離 PR にするか
@@ -207,6 +209,8 @@
 **推奨:** C → A (実装時の最新を確認、 fallback で 12.8.1)
 
 **決定すべき人:** 実装者 (大きな判断ではない、 M3 実装時に確定)
+
+**✅ 決定 (2026-05-25): A. 12.8.1** — 実装時の最新安定 patch を確認し 12.8.1 を採用 (specifications.md FR-02-04 と一致)。
 
 ---
 
@@ -401,7 +405,7 @@
 ### Phase 0 / M1 着手前 (✅ 全完了)
 
 - [x] OQ-04: v2.0.0 (major bump) — DR-005
-- [x] OQ-05: 別 PR (実装者判断、 revert 単位独立)
+- [x] OQ-05: 実装者判断 — 独立 commit に分離 (別 PR には切らず本 PR #537 同梱)
 - [x] OQ-08: 別 issue
 - [x] OQ-09: 別 issue
 

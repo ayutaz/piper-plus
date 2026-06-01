@@ -19,7 +19,7 @@
 
 > **🔑 O único fork do Piper sob licença MIT** — O projeto original [rhasspy/piper](https://github.com/rhasspy/piper) foi arquivado em outubro de 2025 e o [OHF-Voice/piper1-gpl](https://github.com/OHF-Voice/piper1-gpl) migrou para a licença GPL-3.0. O piper-plus é o único fork compatível com MIT sem dependência do espeak-ng. Seu G2P próprio oferece suporte a 8 idiomas (JA/EN/ZH/KO/ES/FR/PT/SV), tornando-o adequado para uso comercial e embarcado.
 
-> **📢 v1.12.0 Mudanças incompatíveis (2026-05):** Decodificador HiFi-GAN removido (unificado para MB-iSTFT, flag `--mb-istft` descontinuada) / Flask → servidor HTTP FastAPI / Dependência HTS-voice removida (apenas runtime Python) / Unity UPM movido para repositório separado (`ayutaz/uPiper`) / todos os projetos .NET atualizados para `net10.0` LTS. Detalhes: [docs/migration/v1.11-to-v1.12.md](docs/migration/v1.11-to-v1.12.md)
+> **📢 v2.0.0 Mudanças incompatíveis (2026-05):** Imagens Docker padrão unificadas para CUDA 12.8 + Ubuntu 24.04 + Python 3.13 (driver NVIDIA do host **R570+** obrigatório; drivers mais antigos não conseguem iniciar as novas imagens) / treinamento atualizado para torch 2.11+cu128 (checkpoints criados com torch 2.2 não podem mais ser retomados) / TF32 + bf16-mixed são os novos padrões de treinamento. Detalhes: [docs/migration/v1.12-to-v2.0.md](docs/migration/v1.12-to-v2.0.md)
 
 Sistema neural de texto para fala (TTS) de alta velocidade e alta qualidade. Utiliza a arquitetura [VITS](https://github.com/jaywalnut310/vits/) e suporta 8 idiomas com multi-falantes: japonês, inglês, chinês, coreano, espanhol, francês, português e sueco. Fork do [Piper](https://github.com/rhasspy/piper), com melhorias significativas no suporte ao japonês, qualidade de voz e funcionalidades de treinamento.
 
