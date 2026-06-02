@@ -9,5 +9,16 @@ pyopenjtalk-plus>=0.4.1.post8
 # English phonemization
 g2p-en>=2.1.0
 
+# g2p-en transitive dependency security floors (chain: g2p-en -> nltk -> joblib).
+# Keep these above the OSV/PyPA advisory affected ranges so a fresh dependency
+# resolution can never regress into a genuinely-vulnerable version. See
+# docs/getting-started/troubleshooting.md ("Security Audit CI Issues").
+#   nltk>=3.9.4   : above PYSEC-2026-97 / CVE-2026-0846 (filestring() arbitrary
+#                   file read, last_affected 3.9.2); 3.9.4 also fixes nltk DoS/XSS.
+#   joblib>=1.5.0 : above PYSEC-2024-277 / CVE-2024-34997 (NumpyArrayWrapper
+#                   pickle, vendor-DISPUTED false positive, last_affected 1.4.2).
+nltk>=3.9.4
+joblib>=1.5.0
+
 # Chinese phonemization
 pypinyin>=0.55.0

@@ -3,14 +3,14 @@
   "generated_at": "2026-05-21T12:06:10Z",
   "totals": {
     "executable": 207,
-    "needs_placeholder": 2,
+    "needs_placeholder": 4,
     "skip_warranted": 199,
-    "total": 408
+    "total": 410
   },
   "by_language": {
     "bash": {
       "executable": 158,
-      "needs_placeholder": 2,
+      "needs_placeholder": 4,
       "skip_warranted": 24
     },
     "csharp": {
@@ -860,8 +860,8 @@
     },
     {
       "file": "docs/getting-started/troubleshooting.md",
-      "line_start": 21,
-      "line_end": 23,
+      "line_start": 22,
+      "line_end": 24,
       "language_raw": "text",
       "language": "unknown",
       "category": "skip_warranted",
@@ -875,8 +875,8 @@
     },
     {
       "file": "docs/getting-started/troubleshooting.md",
-      "line_start": 36,
-      "line_end": 38,
+      "line_start": 37,
+      "line_end": 39,
       "language_raw": "text",
       "language": "unknown",
       "category": "skip_warranted",
@@ -890,8 +890,8 @@
     },
     {
       "file": "docs/getting-started/troubleshooting.md",
-      "line_start": 54,
-      "line_end": 56,
+      "line_start": 55,
+      "line_end": 57,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -903,8 +903,8 @@
     },
     {
       "file": "docs/getting-started/troubleshooting.md",
-      "line_start": 60,
-      "line_end": 62,
+      "line_start": 61,
+      "line_end": 63,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -916,8 +916,8 @@
     },
     {
       "file": "docs/getting-started/troubleshooting.md",
-      "line_start": 81,
-      "line_end": 83,
+      "line_start": 82,
+      "line_end": 84,
       "language_raw": "text",
       "language": "unknown",
       "category": "skip_warranted",
@@ -931,8 +931,8 @@
     },
     {
       "file": "docs/getting-started/troubleshooting.md",
-      "line_start": 89,
-      "line_end": 95,
+      "line_start": 90,
+      "line_end": 96,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -944,8 +944,8 @@
     },
     {
       "file": "docs/getting-started/troubleshooting.md",
-      "line_start": 107,
-      "line_end": 110,
+      "line_start": 108,
+      "line_end": 111,
       "language_raw": "text",
       "language": "unknown",
       "category": "skip_warranted",
@@ -959,8 +959,8 @@
     },
     {
       "file": "docs/getting-started/troubleshooting.md",
-      "line_start": 116,
-      "line_end": 119,
+      "line_start": 117,
+      "line_end": 120,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -972,8 +972,8 @@
     },
     {
       "file": "docs/getting-started/troubleshooting.md",
-      "line_start": 123,
-      "line_end": 131,
+      "line_start": 124,
+      "line_end": 132,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -985,8 +985,8 @@
     },
     {
       "file": "docs/getting-started/troubleshooting.md",
-      "line_start": 142,
-      "line_end": 144,
+      "line_start": 143,
+      "line_end": 145,
       "language_raw": "text",
       "language": "unknown",
       "category": "skip_warranted",
@@ -1000,8 +1000,8 @@
     },
     {
       "file": "docs/getting-started/troubleshooting.md",
-      "line_start": 161,
-      "line_end": 167,
+      "line_start": 162,
+      "line_end": 168,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -1013,8 +1013,8 @@
     },
     {
       "file": "docs/getting-started/troubleshooting.md",
-      "line_start": 181,
-      "line_end": 187,
+      "line_start": 182,
+      "line_end": 188,
       "language_raw": "cmd",
       "language": "unknown",
       "category": "skip_warranted",
@@ -1028,8 +1028,8 @@
     },
     {
       "file": "docs/getting-started/troubleshooting.md",
-      "line_start": 199,
-      "line_end": 202,
+      "line_start": 200,
+      "line_end": 203,
       "language_raw": "cmd",
       "language": "unknown",
       "category": "skip_warranted",
@@ -1043,8 +1043,8 @@
     },
     {
       "file": "docs/getting-started/troubleshooting.md",
-      "line_start": 206,
-      "line_end": 212,
+      "line_start": 207,
+      "line_end": 213,
       "language_raw": "cmd",
       "language": "unknown",
       "category": "skip_warranted",
@@ -1058,8 +1058,8 @@
     },
     {
       "file": "docs/getting-started/troubleshooting.md",
-      "line_start": 228,
-      "line_end": 231,
+      "line_start": 229,
+      "line_end": 232,
       "language_raw": "powershell",
       "language": "unknown",
       "category": "skip_warranted",
@@ -1073,8 +1073,8 @@
     },
     {
       "file": "docs/getting-started/troubleshooting.md",
-      "line_start": 239,
-      "line_end": 242,
+      "line_start": 240,
+      "line_end": 243,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -1086,8 +1086,8 @@
     },
     {
       "file": "docs/getting-started/troubleshooting.md",
-      "line_start": 250,
-      "line_end": 256,
+      "line_start": 251,
+      "line_end": 257,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -1099,8 +1099,8 @@
     },
     {
       "file": "docs/getting-started/troubleshooting.md",
-      "line_start": 264,
-      "line_end": 267,
+      "line_start": 265,
+      "line_end": 268,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -1112,8 +1112,8 @@
     },
     {
       "file": "docs/getting-started/troubleshooting.md",
-      "line_start": 275,
-      "line_end": 277,
+      "line_start": 276,
+      "line_end": 278,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -1125,8 +1125,8 @@
     },
     {
       "file": "docs/getting-started/troubleshooting.md",
-      "line_start": 281,
-      "line_end": 290,
+      "line_start": 282,
+      "line_end": 291,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -1138,8 +1138,8 @@
     },
     {
       "file": "docs/getting-started/troubleshooting.md",
-      "line_start": 324,
-      "line_end": 326,
+      "line_start": 325,
+      "line_end": 327,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -1151,8 +1151,38 @@
     },
     {
       "file": "docs/getting-started/troubleshooting.md",
-      "line_start": 358,
-      "line_end": 360,
+      "line_start": 379,
+      "line_end": 382,
+      "language_raw": "bash",
+      "language": "bash",
+      "category": "needs_placeholder",
+      "suggested_action": "wrap_with_doctest_skip_until_t011",
+      "placeholders_detected": [
+        "<PYSEC-ID>"
+      ],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "13bbd7405ae8337cf56168e444627af1429be951"
+    },
+    {
+      "file": "docs/getting-started/troubleshooting.md",
+      "line_start": 388,
+      "line_end": 390,
+      "language_raw": "bash",
+      "language": "bash",
+      "category": "needs_placeholder",
+      "suggested_action": "wrap_with_doctest_skip_until_t011",
+      "placeholders_detected": [
+        "<PYSEC-ID>"
+      ],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "4490bd9ff4478b5a1ba96832edc65a8d3bd93cd5"
+    },
+    {
+      "file": "docs/getting-started/troubleshooting.md",
+      "line_start": 413,
+      "line_end": 415,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -1164,8 +1194,8 @@
     },
     {
       "file": "docs/getting-started/troubleshooting.md",
-      "line_start": 364,
-      "line_end": 366,
+      "line_start": 419,
+      "line_end": 421,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -1177,8 +1207,8 @@
     },
     {
       "file": "docs/getting-started/troubleshooting.md",
-      "line_start": 370,
-      "line_end": 372,
+      "line_start": 425,
+      "line_end": 427,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -1190,8 +1220,8 @@
     },
     {
       "file": "docs/getting-started/troubleshooting.md",
-      "line_start": 382,
-      "line_end": 386,
+      "line_start": 437,
+      "line_end": 441,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -1203,8 +1233,8 @@
     },
     {
       "file": "docs/getting-started/troubleshooting.md",
-      "line_start": 390,
-      "line_end": 392,
+      "line_start": 445,
+      "line_end": 447,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -1216,8 +1246,8 @@
     },
     {
       "file": "docs/getting-started/troubleshooting.md",
-      "line_start": 404,
-      "line_end": 407,
+      "line_start": 459,
+      "line_end": 462,
       "language_raw": "bash",
       "language": "bash",
       "category": "skip_warranted",
@@ -1231,8 +1261,8 @@
     },
     {
       "file": "docs/getting-started/troubleshooting.md",
-      "line_start": 411,
-      "line_end": 414,
+      "line_start": 466,
+      "line_end": 469,
       "language_raw": "bash",
       "language": "bash",
       "category": "skip_warranted",
@@ -1246,8 +1276,8 @@
     },
     {
       "file": "docs/getting-started/troubleshooting.md",
-      "line_start": 432,
-      "line_end": 434,
+      "line_start": 487,
+      "line_end": 489,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",

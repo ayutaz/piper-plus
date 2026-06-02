@@ -300,6 +300,10 @@ v1.12.0 で 5 ランタイム (Python/Rust/C#/Go/WASM) に展開した SSML / Vo
 
 - `release-shared-lib.yml` の workflow-level permissions を `contents: read` に縮小、`release` ジョブのみ `contents: write` を opt-in
 - tag validator の regex を `^[0-9]+\.[0-9]+\.[0-9]+([-+][A-Za-z0-9.-]+)?$` に anchored 化 (例: `1.0.0-malicious$(rm)` 形のタグ injection を拒否)
+- `src/python_run/requirements.txt`: `g2p-en` 経由 transitive 依存 (`g2p-en` → `nltk` → `joblib`) にセキュリティ下限を明示 (`nltk>=3.9.4` / `joblib>=1.5.0`)。診断手順を `docs/getting-started/troubleshooting.md` ("Security Audit CI Issues") に追加
+  - 2026-05 の `Security Audit / pip-audit (Python)` dev push 失敗は **上流 advisory データ欠陥** が原因で piper-plus 側のコード/依存問題ではない: `nltk` `PYSEC-2026-97` (CVE-2026-0846) と `joblib` `PYSEC-2024-277` (CVE-2024-34997) が 2026-05-20 に `last_affected` 欠落で生成され、安全な `nltk 3.9.4` / `joblib 1.5.3` を含む全バージョンが flag された (同一 commit が後の schedule run では pass)。`pypa/advisory-database` PR #289 ("Update records generated incorrectly", 2026-05-21) で修正済み
+  - 下限ピンは将来の dependency resolution が真に脆弱なバージョンへ退行するのを防ぐ regression insurance
+- `.github/workflows/security-audit.yml`: pull_request `paths` に `src/python_run/requirements.txt` を追加。従来 `setup.py` のみが対象で、実際の依存定義 source (setup.py がパースする requirements.txt) の変更が PR の pip-audit gate を通らなかった漏れを修正
 
 ## [1.12.0] - 2026-05-04
 

@@ -9,6 +9,7 @@ This guide helps resolve common issues when using Piper, especially with Japanes
 - [Platform-Specific Issues](#platform-specific-issues)
 - [Build Issues](#build-issues)
 - [Performance Issues](#performance-issues)
+- [Security Audit CI Issues](#security-audit-ci-issues)
 - [Training Troubleshooting](#training-troubleshooting)
 - [C# CLI (PiperPlus) のトラブルシューティング](#c-cli-piperplus-のトラブルシューティング)
 
@@ -344,6 +345,60 @@ If issues persist:
 | "Unknown multi-character phoneme" | Wrong phoneme format | Update to latest version |
 | "Checksum verification failed" | Corrupt download | Re-download files |
 | "UnicodeEncodeError" (Windows) | Console encoding | Use chcp 65001 |
+
+## Security Audit CI Issues
+
+### `Security Audit / pip-audit` fails on a transitive dependency CVE
+
+**Symptoms**: The `Security Audit / pip-audit (Python)` job fails on a `push` to
+`dev` / `main` (it is `continue-on-error` on pull requests, so PRs only warn),
+reporting a CVE / PYSEC advisory against a package that is **not** listed
+directly in `requirements.txt` — e.g. a `g2p-en` → `nltk` → `joblib` transitive
+dependency. The *same commit* may pass in a later `schedule` run.
+
+**Most common root cause**: a transient **upstream advisory-data defect**, not a
+real regression in this repo. OSV / PyPA advisories are sometimes auto-generated
+with a missing `last_affected` / `fixed` field, which OSV interprets as "all
+versions affected" — so even an already-patched version gets flagged. Once the
+advisory is corrected upstream, the finding disappears with no code change.
+
+> Real example (2026-05): `nltk` `PYSEC-2026-97` and `joblib` `PYSEC-2024-277`
+> were generated on 2026-05-20 with `introduced: 0` and no `last_affected`, so
+> the safe versions `nltk 3.9.4` / `joblib 1.5.3` were flagged. The
+> `pypa/advisory-database` PR #289 ("Update records generated incorrectly",
+> 2026-05-21) added `last_affected: 3.9.2` / `1.4.2`, after which the same
+> commit passed.
+
+**Diagnosis**:
+
+1. Open the failed job and note which step failed (`Audit root requirements` vs
+   `Audit src/python_run`) and the exact `Name / Version / ID` rows.
+2. Check whether the flagged version is actually inside the advisory's affected
+   range by inspecting the advisory YAML `ranges` events:
+
+   ```bash
+   gh api repos/pypa/advisory-database/contents/vulns/<pkg>/<PYSEC-ID>.yaml \
+     -H "Accept: application/vnd.github.raw" | grep -E "introduced|last_affected|fixed"
+   ```
+
+3. If the resolved version is **above** `last_affected` (or `last_affected` is
+   missing entirely), suspect an upstream data defect. Inspect the advisory's
+   commit history to see whether the range was recently corrected:
+
+   ```bash
+   gh api "repos/pypa/advisory-database/commits?path=vulns/<pkg>/<PYSEC-ID>.yaml"
+   ```
+
+**Resolution**:
+
+- If upstream already corrected the range, a re-run / re-push clears it — no
+  code change required.
+- To stop a future *resolution* from regressing into a truly-affected version,
+  add a lower-bound floor for the transitive package in
+  `src/python_run/requirements.txt` (e.g. `nltk>=3.9.4`, `joblib>=1.5.0`).
+- Avoid `pip-audit --ignore-vuln <ID>` unless the advisory is a documented,
+  vendor-disputed false positive; if used, add a comment citing the dispute and
+  a removal condition so the suppression cannot hide a future genuine finding.
 
 ## Training Troubleshooting
 

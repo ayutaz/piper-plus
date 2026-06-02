@@ -8,6 +8,7 @@ on:
       - "uv.lock"
       - "src/python/pyproject.toml"
       - "src/python_run/setup.py"
+      - "src/python_run/requirements.txt"
       - "src/rust/**/Cargo.toml"
       - "src/rust/**/Cargo.lock"
       - "src/rust/Cargo.lock"
