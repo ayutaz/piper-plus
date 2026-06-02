@@ -3072,6 +3072,8 @@ name = "piper-plus"
 source = { editable = "src/python_run" }
 dependencies = [
     { name = "g2p-en" },
+    { name = "joblib" },
+    { name = "nltk" },
     { name = "numpy" },
     { name = "onnxruntime" },
     { name = "pyopenjtalk-plus" },
@@ -3099,6 +3101,8 @@ test = [
 requires-dist = [
     { name = "fastapi", marker = "extra == 'http'", specifier = ">=0.110,<1" },
     { name = "g2p-en", specifier = ">=2.1.0" },
+    { name = "joblib", specifier = ">=1.5.0" },
+    { name = "nltk", specifier = ">=3.9.4" },
     { name = "numpy", specifier = ">=1.26.4,<3.0" },
     { name = "onnxruntime", specifier = ">=1.26.0" },
     { name = "onnxruntime-gpu", marker = "extra == 'gpu'", specifier = ">=1.26.0,<2" },
