@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "strong_chars": ["å", "Å"],
+  "function_words": [
+    "och", "att", "jag", "det", "den", "inte", "som", "han", "hon",
+    "var", "har", "kan", "ska", "med", "för", "sig", "sin", "min",
+    "din", "vill", "från", "när", "här", "där", "också", "alla",
+    "denna", "efter", "eller", "under", "utan", "mycket", "mellan",
+    "genom", "bara", "sedan", "redan", "aldrig", "alltid", "igen",
+    "något", "några", "varje", "vilken", "vilket", "är"
+  ]
+}

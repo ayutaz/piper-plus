@@ -10,3 +10,4 @@ include requirements.txt
 include README.md
 include piper/voices.json
 include piper/phonemize/data/zh_en_loanword.json
+include piper/phonemize/data/sv_function_words.json
