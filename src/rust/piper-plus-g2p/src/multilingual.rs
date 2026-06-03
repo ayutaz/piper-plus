@@ -7,11 +7,95 @@
 //! Port of the Python `multilingual.py`.
 
 use std::collections::{HashMap, HashSet};
-use std::sync::{Mutex, OnceLock};
+use std::sync::{LazyLock, Mutex, OnceLock};
 
 use crate::error::G2pError;
 use crate::phonemizer::{PhonemeIdMap, Phonemizer, ProsodyFeature, ProsodyInfo};
 use crate::token_map::token_to_pua;
+
+// ---------------------------------------------------------------------------
+// Swedish per-word LID data (Issue #539)
+// ---------------------------------------------------------------------------
+// The char-level detector maps å/ä/ö to `default_latin_language` (shared with
+// other Latin scripts). A conservative word-level post-pass then re-classifies
+// default-Latin segments to Swedish when a STRONG indicator is present:
+// the å/Å character, or an exact match in the Swedish function-word set.
+// Weak chars ä/ö alone are NOT sufficient (shared with German/Finnish/loanwords).
+//
+// The function-word list + strong-char set are loaded from the bundled JSON
+// data file (byte-for-byte identical to the Python canonical
+// `src/python/g2p/piper_plus_g2p/data/sv_function_words.json`; a CI sync gate
+// enforces this). We do NOT hardcode them — mirroring the ZH-EN loanword
+// pattern (`chinese.rs`).
+
+/// Default Swedish function-word + strong-char data, embedded at compile time.
+///
+/// Byte-for-byte identical to
+/// `src/python/g2p/piper_plus_g2p/data/sv_function_words.json`. `include_str!`
+/// bakes the bytes into the binary at compile time, so there is no runtime
+/// file dependency (and no `include` entry is needed in `Cargo.toml`).
+const SV_FUNCTION_WORDS_JSON: &str = include_str!("../data/sv_function_words.json");
+
+/// Schema for `sv_function_words.json`.
+///
+/// **Forward-compatible**: unknown top-level fields (e.g. a future
+/// `schema_version` bump or added sections) are silently ignored via
+/// `#[serde(default)]` + serde's default behaviour of dropping unrecognised
+/// keys, so a future payload extension does not break this loader.
+#[derive(Debug, Clone, Default, serde::Deserialize)]
+struct SvFunctionWordsData {
+    /// Strong single-char indicators (conservative policy: å/Å only).
+    #[serde(default)]
+    strong_chars: Vec<String>,
+    /// LID-discriminative Swedish function words.
+    #[serde(default)]
+    function_words: Vec<String>,
+}
+
+/// Parsed `(function_words, strong_chars)`, lazily loaded + cached.
+///
+/// * `function_words` are lowercased (callers lowercase each word before
+///   matching).
+/// * `strong_chars` are kept as-is. The uppercase `Å` entry is a *defensive*
+///   convention shared with the C#/Go/C++ runtimes (which store the uppercase
+///   form too). Since callers lowercase each word first, only the lowercase
+///   `å` is strictly needed to match, but the uppercase form is intentionally
+///   retained for cross-runtime parity — do not drop it.
+///
+/// A malformed/empty bundle degrades gracefully to empty sets (the post-pass
+/// becomes a no-op) rather than panicking the whole crate at first use.
+///
+/// Note: `sv_function_words.json` is the LID-discriminative word list (used
+/// only for language detection, and deliberately excludes
+/// cross-language-ambiguous words like i/en/av/de/du). It is intentionally
+/// DISTINCT from `swedish.rs`'s prosody/stress function-word list — do not
+/// try to sync the two.
+static SV_FUNCTION_WORDS: LazyLock<(HashSet<String>, HashSet<char>)> = LazyLock::new(|| {
+    let data: SvFunctionWordsData = match serde_json::from_str(SV_FUNCTION_WORDS_JSON) {
+        Ok(d) => d,
+        Err(e) => {
+            tracing::warn!(
+                "Swedish function-word data is malformed ({e}); \
+                 per-word Swedish LID will be disabled."
+            );
+            SvFunctionWordsData::default()
+        }
+    };
+
+    let function_words: HashSet<String> = data
+        .function_words
+        .iter()
+        .filter(|w| !w.is_empty())
+        .map(|w| w.to_lowercase())
+        .collect();
+
+    // Each strong "char" entry in the JSON is a single Unicode scalar; expand
+    // any (defensively) multi-char string into its chars so the set is a
+    // `HashSet<char>` for O(1) membership.
+    let strong_chars: HashSet<char> = data.strong_chars.iter().flat_map(|s| s.chars()).collect();
+
+    (function_words, strong_chars)
+});
 
 // ---------------------------------------------------------------------------
 // UnicodeLanguageDetector
@@ -27,6 +111,11 @@ pub struct UnicodeLanguageDetector {
     has_ja: bool,
     has_zh: bool,
     has_ko: bool,
+    /// Whether the conservative Swedish per-word post-pass is enabled.
+    /// True when "sv" is in `languages` AND there are >=2 Latin-script
+    /// languages (i.e. a genuine code-switching context, not a Swedish-only
+    /// model). See `refine_latin_segments_for_swedish`.
+    detect_swedish: bool,
 }
 
 impl UnicodeLanguageDetector {
@@ -36,10 +125,20 @@ impl UnicodeLanguageDetector {
     /// characters (A-Z, a-z, accented Latin) are assigned to.
     pub fn new(languages: &[String], default_latin_language: &str) -> Self {
         let lang_set: HashSet<String> = languages.iter().cloned().collect();
+        let has_sv = lang_set.contains("sv");
+        // Latin-script languages in piper-plus.
+        let latin_count = ["en", "es", "pt", "fr", "sv"]
+            .iter()
+            .filter(|l| lang_set.contains(**l))
+            .count();
         Self {
             has_ja: lang_set.contains("ja"),
             has_zh: lang_set.contains("zh"),
             has_ko: lang_set.contains("ko"),
+            // Conservative gate for the Swedish per-word post-pass (Issue
+            // #539): only when Swedish is requested alongside >=2 Latin-script
+            // languages.
+            detect_swedish: has_sv && latin_count >= 2,
             default_latin_language: default_latin_language.to_string(),
             languages: lang_set,
         }
@@ -191,7 +290,83 @@ pub fn segment_text(text: &str, detector: &UnicodeLanguageDetector) -> Vec<(Stri
         segments.push((detector.default_latin_language.clone(), text.to_string()));
     }
 
+    // Conservative Swedish per-word post-pass (Issue #539): re-classify
+    // default-Latin segments containing a strong Swedish indicator to "sv".
+    // Gated on `detect_swedish` (sv present + >=2 Latin-script languages).
+    if detector.detect_swedish {
+        segments = refine_latin_segments_for_swedish(segments, &detector.default_latin_language);
+    }
+
     segments
+}
+
+/// Re-classify default-Latin segments as Swedish (conservative; Issue #539).
+///
+/// For each segment currently assigned to the default Latin language, scan its
+/// words for a STRONG Swedish indicator:
+///
+///   * an exact function-word match (e.g. "och", "jag", "från"), OR
+///   * the å/Å character.
+///
+/// The weak chars ä/ö ALONE are intentionally NOT sufficient — they are shared
+/// with German/Finnish/loanwords, so treating them as strong would over-trigger
+/// (e.g. German "schön" / "Mädchen"). Function words containing ä/ö (för, när,
+/// är, …) still qualify via the exact-match path. If any word is strong, the
+/// WHOLE segment is re-classified to "sv" (avoids over-fragmentation from
+/// word-by-word splitting). Segments NOT in the default Latin language (ja, zh,
+/// ko, …) are left untouched.
+fn refine_latin_segments_for_swedish(
+    segments: Vec<(String, String)>,
+    default_latin: &str,
+) -> Vec<(String, String)> {
+    // If the default Latin language IS Swedish, Latin text already goes to
+    // "sv" directly — no refinement needed.
+    if default_latin == "sv" {
+        return segments;
+    }
+
+    let (func_words, strong_chars) = &*SV_FUNCTION_WORDS;
+
+    segments
+        .into_iter()
+        .map(|(lang, text)| {
+            if lang != default_latin {
+                return (lang, text);
+            }
+
+            let mut strong = false;
+            for word in text.split_whitespace() {
+                // The 5-mark strip set (. , ; : ! ?) is PINNED: all runtimes
+                // (Python/C#/Go/C++) strip exactly these ASCII marks, and
+                // byte-identical tokenization across runtimes is required for
+                // parity. Do not broaden it (no Unicode punctuation, no smart
+                // quotes, etc.).
+                let w = word
+                    .trim_matches(|c: char| matches!(c, '.' | ',' | ';' | ':' | '!' | '?'))
+                    .to_lowercase();
+                if w.is_empty() {
+                    continue;
+                }
+                if func_words.contains(&w) {
+                    strong = true;
+                    break;
+                }
+                // `w` is already lowercased here, so the å/Å strong-char set
+                // only needs the lowercase `å` to match; the uppercase `Å`
+                // entry is kept for cross-runtime parity (see loader docs).
+                if w.chars().any(|c| strong_chars.contains(&c)) {
+                    strong = true;
+                    break;
+                }
+            }
+
+            if strong {
+                ("sv".to_string(), text)
+            } else {
+                (lang, text)
+            }
+        })
+        .collect()
 }
 
 /// A text segment with its detected language.
