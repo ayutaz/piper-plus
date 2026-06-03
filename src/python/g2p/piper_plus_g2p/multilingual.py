@@ -5,7 +5,10 @@ combinations. Detects language segments via Unicode ranges, delegates to
 language-specific phonemizers, and returns unified phoneme tokens.
 """
 
+import functools
+import json
 import logging
+from pathlib import Path
 
 from .base import Phonemizer, ProsodyInfo
 
@@ -13,6 +16,67 @@ _LOGGER = logging.getLogger(__name__)
 
 
 __all__ = ["MultilingualPhonemizer", "UnicodeLanguageDetector"]
+
+# ---------------------------------------------------------------------------
+# Swedish per-word LID support (Issue #539)
+# ---------------------------------------------------------------------------
+# The char-level detector maps å/ä/ö to ``default_latin_language`` (shared with
+# other Latin scripts). A conservative word-level post-pass then re-classifies
+# default-Latin segments to Swedish when a STRONG indicator is present:
+# the å/Å character, or an exact match in the Swedish function-word set.
+# Weak chars ä/ö alone are NOT sufficient (shared with German/Finnish/loanwords).
+_SV_FUNCTION_WORDS_DATA_PATH = Path(__file__).parent / "data" / "sv_function_words.json"
+
+
+@functools.cache
+def _load_sv_function_words() -> tuple[frozenset[str], frozenset[str]]:
+    """Load the bundled Swedish function-word + strong-char data (cached).
+
+    Returns ``(function_words, strong_chars)`` as frozensets: function words
+    are lowercased; strong chars are kept as-is (see below). The loader is
+    forward-compatible: unknown top-level keys (e.g. a future
+    ``schema_version`` bump or added sections) are ignored.
+
+    This is called at module import time. Missing *or* malformed data
+    (FileNotFoundError / other OSError / JSON parse error) degrades
+    gracefully to empty sets — warned via ``_LOGGER`` — so the per-word
+    post-pass simply becomes a no-op rather than bricking the import.
+
+    Case-folding: callers lowercase each word before matching, so the
+    uppercase ``Å`` entry in ``strong_chars`` is a *defensive* convention
+    shared with the C#/Go/C++ runtimes (which store the uppercase form too).
+    It is intentional, not dead data — do not drop it or switch the strong
+    check to case-sensitive.
+
+    Note: ``sv_function_words.json`` is the LID-discriminative word list
+    (used only for language detection, and deliberately excludes
+    cross-language-ambiguous words like i/en/av/de/du). It is intentionally
+    DISTINCT from ``swedish.py:FUNCTION_WORDS`` (the prosody/stress list);
+    do not try to sync the two.
+    """
+    try:
+        with open(_SV_FUNCTION_WORDS_DATA_PATH, encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, json.JSONDecodeError) as exc:
+        # OSError covers FileNotFoundError (missing bundle) and other I/O
+        # failures; json.JSONDecodeError covers a corrupt/truncated file.
+        _LOGGER.warning(
+            "Swedish function-word data unavailable at %s (%s); "
+            "per-word Swedish LID will be disabled.",
+            _SV_FUNCTION_WORDS_DATA_PATH,
+            exc,
+        )
+        return frozenset(), frozenset()
+
+    words_raw = data.get("function_words", []) if isinstance(data, dict) else []
+    chars_raw = data.get("strong_chars", []) if isinstance(data, dict) else []
+
+    function_words = frozenset(w.lower() for w in words_raw if isinstance(w, str) and w)
+    strong_chars = frozenset(c for c in chars_raw if isinstance(c, str) and c)
+    return function_words, strong_chars
+
+
+_SV_FUNCTION_WORDS, _SV_STRONG_CHARS = _load_sv_function_words()
 
 
 class UnicodeLanguageDetector:
@@ -47,9 +111,14 @@ class UnicodeLanguageDetector:
         )
 
         # Latin-script languages available (for disambiguation if needed)
+        self._has_sv = "sv" in self.languages
         self._latin_languages = {
-            lang for lang in languages if lang in ("en", "es", "pt", "fr")
+            lang for lang in languages if lang in ("en", "es", "pt", "fr", "sv")
         }
+        # Conservative gate for the Swedish per-word post-pass (Issue #539):
+        # only when Swedish is requested alongside >=2 Latin-script languages
+        # (i.e. genuine code-switching context, not a Swedish-only model).
+        self._detect_swedish = self._has_sv and len(self._latin_languages) >= 2
 
     def detect_char(self, ch: str, context_has_kana: bool = False) -> str | None:  # noqa: PLR0911
         """Detect language for a single character.
@@ -227,7 +296,52 @@ def _segment_text_multilingual(
         )
         segments = [(default_lang, text)]
 
+    # Conservative Swedish per-word post-pass (Issue #539): re-classify
+    # default-Latin segments containing a strong Swedish indicator to "sv".
+    if detector._detect_swedish:
+        segments = _refine_latin_segments_for_swedish(segments, detector)
+
     return segments
+
+
+def _refine_latin_segments_for_swedish(
+    segments: list[tuple[str, str]],
+    detector: "UnicodeLanguageDetector",
+) -> list[tuple[str, str]]:
+    """Re-classify default-Latin segments as Swedish (conservative).
+
+    Strong indicators (sufficient): å/Å, or an exact function-word match.
+    Weak chars ä/ö are NOT sufficient alone (shared with German etc.).
+    """
+    default = detector.default_latin_language
+    if default == "sv":
+        return segments
+
+    result: list[tuple[str, str]] = []
+    for lang, text in segments:
+        if lang != default:
+            result.append((lang, text))
+            continue
+        strong = False
+        for word in text.split():
+            # The 5-mark strip set (. , ; : !  ?) is PINNED: all runtimes
+            # (C++/C#/Go) strip exactly these ASCII marks, and byte-identical
+            # tokenization across runtimes is required for parity. Do not
+            # broaden it (no Unicode punctuation, no smart quotes, etc.).
+            w = word.strip(".,;:!?").lower()
+            if not w:
+                continue
+            if w in _SV_FUNCTION_WORDS:
+                strong = True
+                break
+            # ``w`` is already lowercased here, so the å/Å strong-char set
+            # only needs the lowercase form to match; the uppercase ``Å``
+            # entry is kept for cross-runtime parity (see loader docstring).
+            if any(c in _SV_STRONG_CHARS for c in w):
+                strong = True
+                break
+        result.append(("sv", text) if strong else (default, text))
+    return result
 
 
 class MultilingualPhonemizer(Phonemizer):
