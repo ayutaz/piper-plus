@@ -1,6 +1,9 @@
 package phonemize
 
 import (
+	_ "embed"
+	"encoding/json"
+	"log"
 	"strings"
 	"unicode/utf8"
 )
@@ -11,30 +14,51 @@ type LangSegment struct {
 	Text     string
 }
 
-// svUniqueChars contains characters uniquely Swedish (not shared with German).
-// å (U+00E5/U+00C5) is distinctive to Swedish among Latin-script languages.
-var svUniqueChars = map[rune]bool{
-	'\u00e5': true, // å
-	'\u00c5': true, // Å
+// svFunctionWordsJSON embeds the canonical sv_function_words.json, which is
+// byte-for-byte identical to
+// src/python/g2p/piper_plus_g2p/data/sv_function_words.json
+// (CI gate: scripts/check_loanword_consistency.py blob-hash check).
+//
+//go:embed data/sv_function_words.json
+var svFunctionWordsJSON []byte
+
+// svFunctionWordsData is the deserialized form of sv_function_words.json.
+// Forward-compatible loader: unknown top-level fields in a future
+// schema_version: 2 are silently ignored by encoding/json (default behaviour).
+type svFunctionWordsData struct {
+	SchemaVersion int      `json:"schema_version"`
+	StrongChars   []string `json:"strong_chars"`
+	FunctionWords []string `json:"function_words"`
 }
 
+// svUniqueChars contains runes that are uniquely Swedish (not shared with
+// German) among Latin-script languages.  Populated at init time from
+// sv_function_words.json strong_chars (å/Å).
+var svUniqueChars map[rune]bool
+
 // svDetectFunctionWords contains highly distinctive Swedish function words
-// that do not appear in EN/ES/PT/FR. Used for word-level language detection
-// disambiguation (distinct from svFunctionWords in swedish.go which is used
-// for G2P vowel length / stress rules).
-var svDetectFunctionWords = map[string]bool{
-	"och":    true, // and
-	"att":    true, // to/that
-	"jag":    true, // I (first person pronoun)
-	"det":    true, // it/that
-	"inte":   true, // not
-	"han":    true, // he
-	"hon":    true, // she
-	"som":    true, // who/which/as
-	"ska":    true, // shall/will
-	"med":    true, // with
-	"aldrig": true, // never
-	"alltid": true, // always
+// used for word-level language detection disambiguation (distinct from
+// svFunctionWords in swedish.go which is used for G2P vowel length / stress
+// rules).  Populated at init time from sv_function_words.json (46 words).
+var svDetectFunctionWords map[string]bool
+
+func init() {
+	var data svFunctionWordsData
+	if err := json.Unmarshal(svFunctionWordsJSON, &data); err != nil {
+		log.Panicf("phonemize: failed to parse sv_function_words.json: %v", err)
+	}
+
+	svUniqueChars = make(map[rune]bool, len(data.StrongChars))
+	for _, s := range data.StrongChars {
+		for _, r := range s {
+			svUniqueChars[r] = true
+		}
+	}
+
+	svDetectFunctionWords = make(map[string]bool, len(data.FunctionWords))
+	for _, w := range data.FunctionWords {
+		svDetectFunctionWords[strings.ToLower(w)] = true
+	}
 }
 
 // UnicodeLanguageDetector detects language from Unicode character ranges.
@@ -250,8 +274,8 @@ func SegmentText(text string, detector *UnicodeLanguageDetector) []LangSegment {
 // are reclassified as "sv" when a strong indicator is found.
 //
 // Strong indicators (sufficient to trigger SV classification):
-//   - å/Å (uniquely Swedish among Latin-script languages)
-//   - Swedish function words (och, att, jag, det, inte, ...)
+//   - å/Å (uniquely Swedish among Latin-script languages; from JSON strong_chars)
+//   - Swedish function words (46-word canonical list from sv_function_words.json)
 //
 // Weak indicators (NOT sufficient alone):
 //   - ä/Ä, ö/Ö (shared with German)
