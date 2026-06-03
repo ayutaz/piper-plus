@@ -4,12 +4,16 @@
 # Consumed by scripts/check_swedish_lid_consistency.py (thin wrapper around
 # scripts/_mirror_check.py).
 #
-# One group: the Swedish function-word / strong-char table that drives
-# per-word Swedish language detection. 7 runtime mirrors must be
-# byte-for-byte equal to the Python g2p canonical (Python runtime / Rust ×
-# 2 crate / Go / C# / WASM / C++).
+# Two groups:
+#   1. The Swedish function-word / strong-char table that drives per-word
+#      Swedish language detection. 7 runtime mirrors must be byte-for-byte
+#      equal to the Python g2p canonical (Python runtime / Rust × 2 crate /
+#      Go / C# / WASM / C++).
+#   2. Cross-runtime parity fixture matrix (6 mirrors): a single shared
+#      fixture that EVERY runtime loads + asserts against, modeled on the
+#      ZH-EN loanword fixture matrix. Python reads the canonical directly.
 #
-# Schema validation for the group is registered in code by the wrapper
+# Schema validation for group 1 is registered in code by the wrapper
 # (`register_schema_validator`) because it inspects JSON structure that
 # can't be declared in TOML. Forward-compat: the validator accepts unknown
 # top-level fields and `schema_version` absence/extra silently so a future
@@ -36,3 +40,19 @@ mirrors = [
 ]
 incident_refs = ["Issue #539", "PR #297 regression via #300"]
 notes = "Conservative per-word Swedish LID policy: strong_chars = å/Å plus the function_words list trigger Swedish; ä/ö are weak (shared with German etc.) and intentionally NOT strong_chars. Schema validator registered in code (sv-specific JSON shape)."
+
+[[groups]]
+name = "swedish_lid fixture matrix (6 mirrors)"
+canonical = "tests/fixtures/g2p/swedish_lid_matrix.json"
+mirrors = [
+  "src/go/phonemize/testdata/swedish_lid_matrix.json",
+  "src/csharp/PiperPlus.Core.Tests/Phonemize/TestData/swedish_lid_matrix.json",
+  "src/cpp/tests/fixtures/swedish_lid_matrix.json",
+  "src/wasm/g2p/test/fixtures/swedish_lid_matrix.json",
+  # Rust 2 crate symmetric tests (piper-plus-g2p owns the LID; piper-core
+  # re-exports it via piper_plus::phonemize::multilingual).
+  "src/rust/piper-plus-g2p/tests/fixtures/swedish_lid_matrix.json",
+  "src/rust/piper-core/tests/fixtures/swedish_lid_matrix.json",
+]
+incident_refs = ["Issue #539"]
+notes = "Cross-runtime Swedish per-word LID parity fixture. Each runtime builds a detector with languages=[en,sv]/default_latin=en, runs segmentation, and asserts ('sv' in segment languages) == expect_contains_sv for every case. Python reads the canonical directly (no separate mirror)."
