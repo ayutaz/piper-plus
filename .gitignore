@@ -210,6 +210,8 @@ check_*.py
 !scripts/check_test_flake_retry.py
 # Doc examples audit (T-009)
 !scripts/check_doc_examples.py
+# Swedish per-word LID sync gate (Issue #539)
+!scripts/check_swedish_lid_consistency.py
 create_comprehensive_*.py
 add_missing_*.py
 retrain_*.py

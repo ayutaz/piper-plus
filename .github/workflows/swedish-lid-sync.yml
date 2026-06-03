@@ -1,0 +1,120 @@
+name: "Swedish LID Sync Gate"
+
+# Phase 7 (Issue #539): byte-for-byte gate across all 8 copies of the Swedish
+# per-word LID function-word table (Python source-of-truth + 7 mirrors across
+# Python runtime / Rust × 2 crate / Go / C# / WASM / C++). Any PR that drifts a
+# copy from the Python source-of-truth is blocked at this gate.
+#
+# The conservative LID policy this table encodes (strong_chars = å/Å plus the
+# function_words list trigger Swedish; ä/ö are weak and shared with German etc.)
+# was the subject of PR #297 and the regression reintroduced via #300 — keeping
+# all 8 copies identical prevents one runtime silently diverging from that
+# policy.
+#
+# Source of truth: src/python/g2p/piper_plus_g2p/data/sv_function_words.json
+# Mirror declarations: docs/spec/swedish-lid-mirrors.toml
+
+on:
+  push:
+    branches: [dev, main]
+    paths:
+      - '**/sv_function_words.json'
+      - 'scripts/check_swedish_lid_consistency.py'
+      - 'docs/spec/swedish-lid-mirrors.toml'
+      - '.github/workflows/swedish-lid-sync.yml'
+  pull_request:
+    paths:
+      - '**/sv_function_words.json'
+      - 'scripts/check_swedish_lid_consistency.py'
+      - 'docs/spec/swedish-lid-mirrors.toml'
+      - '.github/workflows/swedish-lid-sync.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  json-sync:
+    name: sv_function_words.json copies match Python source (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        # The byte-for-byte hash check is line-ending sensitive. Run it on
+        # Windows / macOS too so a CRLF-checkout regression (e.g. a missing
+        # .gitattributes rule) is caught at PR time, not only in local QA.
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v6.0.2
+      - uses: actions/setup-python@v5.6.0
+        with:
+          python-version: '3.13'
+
+      - name: Schema validation (Python source)
+        run: python scripts/check_swedish_lid_consistency.py --schema-only
+
+      - name: Byte-for-byte hash check (full gate, 8 copies)
+        run: python scripts/check_swedish_lid_consistency.py
+
+  helper-self-check:
+    name: check_swedish_lid_consistency.py self-check
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6.0.2
+      - uses: actions/setup-python@v5.6.0
+        with:
+          python-version: '3.13'
+
+      # `--schema-only` and `--diff` should always succeed against a clean
+      # working tree. `--fix` should be idempotent (a no-op when in sync).
+      # Catches drift in the helper itself before the full gate fires.
+      - name: --schema-only succeeds on clean tree
+        run: python scripts/check_swedish_lid_consistency.py --schema-only
+
+      - name: --diff produces no real diff on clean tree
+        run: |
+          # Status lines like "Group <hash>" and "OK ..." are allowed; only
+          # actual unified-diff content (---/+++/@@ lines) signals drift.
+          out=$(python scripts/check_swedish_lid_consistency.py --diff)
+          if echo "$out" | grep -qE '^(---|\+\+\+|@@)'; then
+            echo "ERROR: --diff emitted unified-diff content on a clean tree:"
+            echo "$out"
+            exit 1
+          fi
+
+      - name: --fix is idempotent (no git diff after running)
+        run: |
+          python scripts/check_swedish_lid_consistency.py --fix
+          if ! git diff --quiet; then
+            echo "ERROR: --fix changed working tree on a clean repo:"
+            git --no-pager diff
+            exit 1
+          fi
+
+      # Meta-test: deliberately drift a single mirror, assert the gate exits
+      # non-zero, then assert --fix restores byte-identity. Without this, a
+      # regression in the gate could let drift slip through unnoticed.
+      - name: Meta-test (gate fails on intentional drift, --fix repairs)
+        run: |
+          mirror="src/go/phonemize/data/sv_function_words.json"
+          printf '\n' >> "$mirror"
+          if python scripts/check_swedish_lid_consistency.py; then
+            echo "ERROR: gate passed despite drifted mirror $mirror"
+            git checkout -- "$mirror"
+            exit 1
+          fi
+          python scripts/check_swedish_lid_consistency.py --fix
+          if ! git diff --quiet; then
+            echo "ERROR: --fix failed to restore byte-identity:"
+            git --no-pager diff
+            git checkout -- "$mirror"
+            exit 1
+          fi
+          # Final clean assertion for any following steps.
+          python scripts/check_swedish_lid_consistency.py
