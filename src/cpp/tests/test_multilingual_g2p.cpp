@@ -618,3 +618,124 @@ TEST(DefaultLatinLangTest, EnglishDefault) {
     EXPECT_EQ(segments[0].lang, "en")
         << "Latin text should be classified as 'en' when defaultLatinLang=\"en\"";
 }
+
+// =========================================================================
+// 14. Swedish per-word LID — CONSERVATIVE policy (Issue #539)
+//
+// The char-level detector maps å/ä/ö to the default Latin language; a
+// word-level post-pass then re-classifies a default-Latin segment to "sv"
+// ONLY when a STRONG indicator is present: the å/Å character, or an exact
+// match in the 46-word function-word list (loaded from
+// sv_function_words.json). ä/ö alone are WEAK (shared with German/Finnish/
+// loanwords) and must NOT trigger Swedish.
+//
+// Mirrors the canonical Python cases in
+// tests/.../test_multilingual.py (Issue #539).
+// =========================================================================
+
+// Helper: does any segment of `text` get classified as Swedish?
+static bool containsSwedishSegment(const UnicodeLanguageDetector &det,
+                                   const std::string &text) {
+    for (const auto &seg : det.segmentText(text)) {
+        if (seg.lang == "sv") {
+            return true;
+        }
+    }
+    return false;
+}
+
+class SwedishLidTest : public ::testing::Test {
+protected:
+    // Swedish present alongside English -> per-word post-pass is active.
+    UnicodeLanguageDetector det{{"en", "sv"}, "en"};
+};
+
+// --- Strong char (å/Å) path: already worked under the lenient policy ---
+
+TEST_F(SwedishLidTest, AaCharIsSwedish_Sa) {
+    // "så" — å is a strong char
+    EXPECT_TRUE(containsSwedishSegment(det, "s\xc3\xa5"));
+}
+
+TEST_F(SwedishLidTest, AaCharIsSwedish_Fran) {
+    // "från" — å is a strong char
+    EXPECT_TRUE(containsSwedishSegment(det, "fr\xc3\xa5n"));
+}
+
+// --- Function-word path (no Swedish char) ---
+
+TEST_F(SwedishLidTest, FunctionWordIsSwedish_Och) {
+    EXPECT_TRUE(containsSwedishSegment(det, "och"));
+}
+
+TEST_F(SwedishLidTest, FunctionWordIsSwedish_Jag) {
+    EXPECT_TRUE(containsSwedishSegment(det, "jag"));
+}
+
+TEST_F(SwedishLidTest, FunctionWordIsSwedish_Inte) {
+    EXPECT_TRUE(containsSwedishSegment(det, "inte"));
+}
+
+TEST_F(SwedishLidTest, FunctionWordWithUmlautIsSwedish_For) {
+    // "för" — contains ö (weak) but IS in the function-word list
+    EXPECT_TRUE(containsSwedishSegment(det, "f\xc3\xb6r"));
+}
+
+TEST_F(SwedishLidTest, FunctionWordWithUmlautIsSwedish_Nar) {
+    // "när" — contains ä (weak) but IS in the function-word list
+    EXPECT_TRUE(containsSwedishSegment(det, "n\xc3\xa4r"));
+}
+
+TEST_F(SwedishLidTest, FunctionWordWithUmlautIsSwedish_Ar) {
+    // "är" — the new 46th word; contains ä (weak) but IS in the list.
+    EXPECT_TRUE(containsSwedishSegment(det, "\xc3\xa4r"));
+}
+
+// --- Conservative invariant: bare ä/ö must NOT be Swedish ---
+// (These FAIL under the old lenient policy where ä/ö were strong chars.)
+
+TEST_F(SwedishLidTest, BareUmlautIsNotSwedish_Madchen) {
+    // German "Mädchen" — has ä but is NOT a Swedish function word.
+    EXPECT_FALSE(containsSwedishSegment(det, "M\xc3\xa4""dchen"));
+}
+
+TEST_F(SwedishLidTest, BareUmlautIsNotSwedish_Schon) {
+    // German "schön" — has ö but is NOT a Swedish function word.
+    EXPECT_FALSE(containsSwedishSegment(det, "sch\xc3\xb6n"));
+}
+
+TEST_F(SwedishLidTest, BareUmlautIsNotSwedish_Worter) {
+    // "wörter" — has ö but not a function word.
+    EXPECT_FALSE(containsSwedishSegment(det, "w\xc3\xb6rter"));
+}
+
+TEST_F(SwedishLidTest, BareUmlautIsNotSwedish_Xox) {
+    // "xöx" — bare ö, weak-char invariant.
+    EXPECT_FALSE(containsSwedishSegment(det, "x\xc3\xb6x"));
+}
+
+// --- Sentence-level ---
+
+TEST_F(SwedishLidTest, SentenceWithFunctionWordIsSwedish) {
+    // "jag heter Anna" — "jag" is a function word -> whole segment sv.
+    EXPECT_TRUE(containsSwedishSegment(det, "jag heter Anna"));
+}
+
+// --- Gate: sv must be present (alongside >=2 Latin langs) ---
+
+TEST(SwedishLidGateTest, NoSwedishInLanguageSet) {
+    // {"en","es"} has no sv -> post-pass disabled -> "från" stays non-sv.
+    UnicodeLanguageDetector det{{"en", "es"}, "en"};
+    EXPECT_FALSE(containsSwedishSegment(det, "fr\xc3\xa5n"));
+}
+
+// --- detectDominantLanguage parity (function-word path) ---
+
+TEST_F(SwedishLidTest, DetectDominantArIsSwedish) {
+    // "är" via detectDominantLanguage — note: the char-level dominant counter
+    // classifies ä as the default Latin lang ("en"); the Swedish per-word
+    // post-pass lives in segmentText. This documents that distinction.
+    EXPECT_EQ(detectDominantLanguage("\xc3\xa4r", det), "en");
+    // segmentText (the LID surface that carries the post-pass) IS sv:
+    EXPECT_TRUE(containsSwedishSegment(det, "\xc3\xa4r"));
+}
