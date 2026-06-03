@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using PiperPlus.Core.Phonemize.Data;
 
 namespace PiperPlus.Core.Phonemize;
 
@@ -60,24 +61,20 @@ public sealed class UnicodeLanguageDetector
         (ch >= '\u00D8' && ch <= '\u00F6') ||
         (ch >= '\u00F8' && ch <= '\u00FF');
 
-    // Swedish-specific characters not used by EN/ES/PT/FR.
-    // a-diaeresis (U+00E4), o-diaeresis (U+00F6), a-ring (U+00E5) and uppercase variants.
-    private static readonly HashSet<char> SwedishChars = new()
-    {
-        '\u00E4', '\u00F6', '\u00C4', '\u00D6', '\u00E5', '\u00C5',
-    };
+    // Swedish per-word LID data (Issue #539), loaded from the canonical
+    // sv_function_words.json (single source of truth, shared byte-for-byte with
+    // Python/Rust/Go/C++). CONSERVATIVE policy: the strong-char set holds ONLY
+    // a-ring (U+00E5 / U+00C5) — the weak chars ae-diaeresis (U+00E4) and
+    // o-diaeresis (U+00F6) are NOT strong (they are shared with German).
+    // Reclassification to Swedish requires a strong char OR an exact
+    // function-word match. On JSON load failure BOTH sets are empty, so the
+    // post-pass no-ops (matching every other runtime's degradation behavior);
+    // there is intentionally no hardcoded fallback.
+    private static readonly IReadOnlySet<char> SwedishStrongChars =
+        SwedishFunctionWordDataLoader.Default.StrongChars;
 
-    // Swedish function words for word-level disambiguation.
-    // These are highly distinctive and do not appear in EN/ES/PT/FR.
-    private static readonly HashSet<string> SwedishFunctionWords = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "och", "att", "jag", "det", "den", "inte", "som", "han", "hon",
-        "var", "har", "kan", "ska", "med", "för", "sig", "sin", "min",
-        "din", "vill", "från", "när", "här", "där", "också", "alla",
-        "denna", "efter", "eller", "under", "utan", "mycket", "mellan",
-        "genom", "bara", "sedan", "redan", "aldrig", "alltid", "igen",
-        "något", "några", "varje", "vilken", "vilket",
-    };
+    private static readonly IReadOnlySet<string> SwedishFunctionWords =
+        SwedishFunctionWordDataLoader.Default.FunctionWords;
 
     private readonly HashSet<string> _languages;
     private readonly bool _hasJa;
@@ -300,12 +297,16 @@ public sealed class UnicodeLanguageDetector
     }
 
     /// <summary>
-    /// Re-classify Latin segments as Swedish based on indicator count.
+    /// Re-classify default-Latin segments as Swedish (CONSERVATIVE, Issue #539).
     /// <para>
-    /// For each segment assigned to the default Latin language, count Swedish
-    /// indicators (characters in <see cref="SwedishChars"/> + function words
-    /// in <see cref="SwedishFunctionWords"/>). If at least one indicator is
-    /// found, the entire segment is re-classified as <c>"sv"</c>.
+    /// For each segment assigned to the default Latin language, scan its words
+    /// for a strong Swedish indicator: a character in
+    /// <see cref="SwedishStrongChars"/> (only a-ring / Å) OR an exact match
+    /// against <see cref="SwedishFunctionWords"/>. The weak chars ä/ö are NOT
+    /// strong on their own (shared with German), so words like
+    /// <c>Mädchen</c>/<c>schön</c> are not reclassified. If any strong
+    /// indicator is found, the entire segment is re-classified as <c>"sv"</c>.
+    /// When the JSON failed to load both sets are empty and this is a no-op.
     /// </para>
     /// </summary>
     private List<(string Lang, string Text)> RefineLatinSegmentsForSwedish(
@@ -339,11 +340,11 @@ public sealed class UnicodeLanguageDetector
                     continue;
                 }
 
-                // Swedish-specific characters
+                // Strong Swedish chars (a-ring only; ä/ö are weak).
                 bool hasSwedishChar = false;
                 foreach (char c in word)
                 {
-                    if (SwedishChars.Contains(c))
+                    if (SwedishStrongChars.Contains(c))
                     {
                         hasSwedishChar = true;
                         break;

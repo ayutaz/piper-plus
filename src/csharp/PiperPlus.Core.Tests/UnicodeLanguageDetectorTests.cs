@@ -339,4 +339,120 @@ public sealed class UnicodeLanguageDetectorTests
         Assert.Equal("\u3053\u3093\u306B\u3061\u306F ", segments[1].Text); // こんにちは + space
         Assert.Equal("world", segments[2].Text);
     }
+
+    // ================================================================
+    // Swedish per-word LID — CONSERVATIVE policy (Issue #539)
+    // ================================================================
+
+    /// <summary>
+    /// Build a detector with sv present alongside en so the per-word
+    /// post-pass runs. The detector loads BOTH function_words (46,
+    /// lowercased) AND strong_chars (a-ring U+00E5 / U+00C5) from
+    /// sv_function_words.json. Strong indicators (sufficient): a-ring char
+    /// OR an exact function-word match. Weak chars a-diaeresis (U+00E4) /
+    /// o-diaeresis (U+00F6) are NOT sufficient alone (shared with German).
+    /// </summary>
+    private static UnicodeLanguageDetector MakeSvDetector()
+        => new(new[] { "en", "sv" }, defaultLatinLanguage: "en");
+
+    /// <summary>Does any segment of <paramref name="text"/> classify as Swedish?</summary>
+    private static bool ContainsSwedish(UnicodeLanguageDetector det, string text)
+    {
+        foreach ((string lang, string _) in det.SegmentText(text))
+        {
+            if (lang == "sv")
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>Strong-char (a-ring) path: "så" stays Swedish.</summary>
+    [Fact]
+    public void Swedish_StrongChar_Sa_IsSwedish()
+    {
+        Assert.True(ContainsSwedish(MakeSvDetector(), "så"));
+    }
+
+    /// <summary>Strong-char (a-ring) path: "från" stays Swedish.</summary>
+    [Fact]
+    public void Swedish_StrongChar_Fran_IsSwedish()
+    {
+        Assert.True(ContainsSwedish(MakeSvDetector(), "från"));
+    }
+
+    /// <summary>
+    /// Function-word path: exact matches stay Swedish even when the word
+    /// contains only weak chars (för/när/är) or no special chars (och/jag).
+    /// "är" is the new 46th word added in this change.
+    /// </summary>
+    [Theory]
+    [InlineData("och")]
+    [InlineData("jag")]
+    [InlineData("inte")]
+    [InlineData("för")]
+    [InlineData("när")]
+    [InlineData("är")]
+    public void Swedish_FunctionWord_IsSwedish(string word)
+    {
+        Assert.True(ContainsSwedish(MakeSvDetector(), word));
+    }
+
+    /// <summary>
+    /// CONSERVATIVE FLIP: "Mädchen" (German) — a-diaeresis is weak and not
+    /// a function word, so it must NOT be Swedish. (Was sv under the OLD
+    /// lenient policy where ä/ö counted as strong.)
+    /// </summary>
+    [Fact]
+    public void Swedish_Madchen_IsNotSwedish()
+    {
+        Assert.False(ContainsSwedish(MakeSvDetector(), "Mädchen"));
+    }
+
+    /// <summary>
+    /// CONSERVATIVE FLIP: "schön" (German) — o-diaeresis is weak and not a
+    /// function word -> NOT sv. (Was sv under the OLD lenient policy.)
+    /// </summary>
+    [Fact]
+    public void Swedish_Schon_IsNotSwedish()
+    {
+        Assert.False(ContainsSwedish(MakeSvDetector(), "schön"));
+    }
+
+    /// <summary>Weak-char invariant: "wörter" (o-diaeresis only) is NOT Swedish.</summary>
+    [Fact]
+    public void Swedish_Worter_IsNotSwedish()
+    {
+        Assert.False(ContainsSwedish(MakeSvDetector(), "wörter"));
+    }
+
+    /// <summary>Weak-char invariant: "xöx" (o-diaeresis only) is NOT Swedish.</summary>
+    [Fact]
+    public void Swedish_Xox_IsNotSwedish()
+    {
+        Assert.False(ContainsSwedish(MakeSvDetector(), "xöx"));
+    }
+
+    /// <summary>
+    /// Gate: with languages ["en","es"] (no sv), the post-pass does not run,
+    /// so "från" is NOT reclassified Swedish.
+    /// </summary>
+    [Fact]
+    public void Swedish_NotDetected_WhenSvAbsent()
+    {
+        var det = new UnicodeLanguageDetector(new[] { "en", "es" }, defaultLatinLanguage: "en");
+        Assert.False(ContainsSwedish(det, "från"));
+    }
+
+    /// <summary>
+    /// Multi-word reclassification: "jag heter Anna" — "jag" is a function
+    /// word, so the whole default-Latin segment becomes Swedish.
+    /// </summary>
+    [Fact]
+    public void Swedish_Sentence_IsSwedish()
+    {
+        Assert.True(ContainsSwedish(MakeSvDetector(), "jag heter Anna"));
+    }
 }

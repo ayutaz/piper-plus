@@ -643,8 +643,10 @@ public sealed class SwedishPhonemizerTests
     [Fact]
     public void SwedishDetection_TextWithADiaeresis()
     {
-        // Text containing a-diaeresis (U+00E4) should be detected as Swedish
-        // when sv is in the language set alongside en.
+        // "Det \u00E4r bra" is detected as Swedish via the function words "det" and
+        // "\u00E4r" (CONSERVATIVE policy, Issue #539). NOTE: the a-diaeresis char in
+        // "\u00E4r" is itself a WEAK indicator now; detection here comes from the
+        // exact function-word matches, not from the \u00E4 character.
         var detector = new UnicodeLanguageDetector(
             ["en", "sv"], defaultLatinLanguage: "en");
 
@@ -671,19 +673,24 @@ public sealed class SwedishPhonemizerTests
     }
 
     // ================================================================
-    // 31. SwedishDetection_TextWithODiaeresis
+    // 31. SwedishDetection_TextWithODiaeresisOnly_NotSwedish
     // ================================================================
     [Fact]
-    public void SwedishDetection_TextWithODiaeresis()
+    public void SwedishDetection_TextWithODiaeresisOnly_NotSwedish()
     {
-        // Text containing o-diaeresis (U+00F6) should be detected as Swedish.
+        // CONSERVATIVE policy (Issue #539): o-diaeresis (U+00F6) is a WEAK
+        // indicator (shared with German etc.), so text whose only Swedish
+        // signal is \u00E4/\u00F6 \u2014 with NO function-word match and NO a-ring \u2014 must NOT
+        // be reclassified as Swedish. "H\u00F6r du mig" has no function word here
+        // ("h\u00F6r"/"du"/"mig" are excluded from the LID list), so it stays "en".
+        // (This asserted "sv" under the OLD lenient policy.)
         var detector = new UnicodeLanguageDetector(
             ["en", "sv"], defaultLatinLanguage: "en");
 
         List<(string Lang, string Text)> segments = detector.SegmentText("H\u00F6r du mig");  // "Hor du mig" with o-diaeresis
 
         Assert.Single(segments);
-        Assert.Equal("sv", segments[0].Lang);
+        Assert.Equal("en", segments[0].Lang);
     }
 
     // ================================================================
@@ -770,17 +777,20 @@ public sealed class SwedishPhonemizerTests
     }
 
     // ================================================================
-    // 37. SwedishDetection_UppercaseChars
+    // 37. SwedishDetection_UppercaseStrongChar
     // ================================================================
     [Fact]
-    public void SwedishDetection_UppercaseChars()
+    public void SwedishDetection_UppercaseStrongChar()
     {
-        // Uppercase Swedish characters should also trigger detection.
-        // U+00C4 = A-diaeresis, U+00C5 = A-ring, U+00D6 = O-diaeresis
+        // The uppercase a-ring (U+00C5) is a STRONG indicator (strong_chars in
+        // sv_function_words.json contains both "\u00E5" and "\u00C5"). A word starting
+        // with \u00C5 and no function-word match is still detected as Swedish.
+        // (Weak chars \u00C4/\u00D6 would NOT suffice \u2014 see the conservative-policy
+        // tests in UnicodeLanguageDetectorTests.)
         var detector = new UnicodeLanguageDetector(
             ["en", "sv"], defaultLatinLanguage: "en");
 
-        List<(string Lang, string Text)> segments = detector.SegmentText("\u00C4ven om det regnar");
+        List<(string Lang, string Text)> segments = detector.SegmentText("\u00C5ka snabbt");  // "Aka snabbt" with uppercase a-ring
 
         Assert.Single(segments);
         Assert.Equal("sv", segments[0].Lang);
