@@ -18,6 +18,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   dispatches automatically. Custom overrides via the new
   `zh_en_loanword_dict_paths` constructor argument.
 
+### Fixed
+
+- **Swedish (sv) per-word language detection (Issue #539)**: Swedish words
+  containing `å`/`ä`/`ö` (e.g. `så`, `och`, `för`, `är`) were misdetected
+  as English. Per-word Swedish LID is restored and unified across all
+  runtimes with a **conservative policy**: strong indicators are `å`/`Å`
+  or an exact match in a 46-word function-word list; `ä`/`ö` alone are NOT
+  sufficient (shared with German/Finnish/loanwords). The detector loads the
+  bundled `data/sv_function_words.json`, byte-identical to every runtime
+  mirror and enforced by a new sync gate
+  (`scripts/check_swedish_lid_consistency.py`). Regression history: #297
+  added per-word sv LID to all runtimes; #300's package extraction silently
+  dropped it from Python/Rust.
+
 ## [0.1.0] - 2026-04-01
 
 ### Added
