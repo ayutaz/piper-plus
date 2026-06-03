@@ -249,51 +249,163 @@ describe('UnicodeLanguageDetector Korean detection', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Swedish (å/ä/ö) detection
+// Swedish word-level LID post-pass (Issue #539)
+//
+// Swedish is detected by a CONSERVATIVE word-level post-pass, NOT by the
+// per-character path. At char level, å/ä/ö fall through to the default Latin
+// language (like every other runtime); after segmentation, a post-pass
+// re-classifies a whole default-Latin segment to "sv" iff it contains a strong
+// indicator: an å/Å char, or an exact function-word match (och/jag/för/är/...).
+// Weak chars ä/ö are deliberately NOT strong (shared with German/Finnish).
 // ---------------------------------------------------------------------------
 
-describe('UnicodeLanguageDetector Swedish detection', () => {
+describe('UnicodeLanguageDetector Swedish detection (word-level)', () => {
     const detector = new UnicodeLanguageDetector();
 
-    it('should detect Swedish-specific characters as sv', () => {
-        assert.equal(detector.detectChar('å'), 'sv');
-        assert.equal(detector.detectChar('ä'), 'sv');
-        assert.equal(detector.detectChar('ö'), 'sv');
+    // --- char level must NOT return sv (no fragmentation source) -----------
+
+    it('should NOT classify å/ä/ö as sv at the character level', () => {
+        // The strong char å and the weak chars ä/ö all fall through to the
+        // default Latin language at char level; Swedish is decided per-word.
+        assert.equal(detector.detectChar('å'), 'en');
+        assert.equal(detector.detectChar('ä'), 'en');
+        assert.equal(detector.detectChar('ö'), 'en');
     });
 
-    it('should detect uppercase Swedish characters as sv', () => {
-        assert.equal(detector.detectChar('Å'), 'sv');
-        assert.equal(detector.detectChar('Ä'), 'sv');
-        assert.equal(detector.detectChar('Ö'), 'sv');
+    it('should NOT classify uppercase Å/Ä/Ö as sv at the character level', () => {
+        assert.equal(detector.detectChar('Å'), 'en');
+        assert.equal(detector.detectChar('Ä'), 'en');
+        assert.equal(detector.detectChar('Ö'), 'en');
     });
 
-    it('should detect text with å/ä/ö as Swedish by majority', () => {
-        // 'åäö' -- all 3 chars are Swedish-specific, so sv wins
-        assert.equal(detector.detectLanguage('åäö'), 'sv');
-    });
-
-    it('should detect plain Latin as en even when text has few Swedish chars', () => {
-        // 'räksmörgås': ä, ö, å = 3 sv chars vs r, k, s, m, r, g, s = 7 en chars
-        // English wins by majority -- this is the expected behaviour
-        assert.equal(detector.detectLanguage('räksmörgås'), 'en');
-    });
-
-    it('should detect mixed Swedish/English text by majority', () => {
-        // 4 Swedish-specific chars vs 2 plain Latin -> sv wins
-        assert.equal(detector.detectLanguage('åäöö go'), 'sv');
-    });
-
-    it('should fall back to default Latin when sv is not in languages', () => {
+    it('should fall back to default Latin for å when sv is not in languages', () => {
         const detectorNoSv = new UnicodeLanguageDetector(['ja', 'en', 'zh']);
         assert.equal(detectorNoSv.detectChar('å'), 'en');
     });
 
-    it('should segment Swedish chars + Japanese text', () => {
-        // 'ö' is sv, then 'こんにちは' is ja
-        const segments = detector.segmentText('öこんにちは');
+    // --- strong char words (å) -> single sv segment, no fragmentation ------
+
+    it('should keep "så" as a single sv segment (å strong, not fragmented)', () => {
+        const segments = detector.segmentText('så');
+        assert.equal(segments.length, 1);
+        assert.equal(segments[0].language, 'sv');
+        assert.equal(segments[0].text, 'så');
+    });
+
+    it('should keep "från" as a single sv segment (å strong, not fragmented)', () => {
+        const segments = detector.segmentText('från');
+        assert.equal(segments.length, 1);
+        assert.equal(segments[0].language, 'sv');
+        assert.equal(segments[0].text, 'från');
+    });
+
+    // --- function words with NO special char (impossible under char-level) --
+
+    it('should detect "och" as sv (function word, no special char)', () => {
+        const segments = detector.segmentText('och');
+        assert.equal(segments.length, 1);
+        assert.equal(segments[0].language, 'sv');
+        assert.equal(segments[0].text, 'och');
+    });
+
+    it('should detect "jag" as sv (function word, no special char)', () => {
+        const segments = detector.segmentText('jag');
+        assert.equal(segments.length, 1);
+        assert.equal(segments[0].language, 'sv');
+    });
+
+    it('should detect "inte" as sv (function word, no special char)', () => {
+        const segments = detector.segmentText('inte');
+        assert.equal(segments.length, 1);
+        assert.equal(segments[0].language, 'sv');
+    });
+
+    // --- function words that DO carry a weak/strong char --------------------
+
+    it('should detect "för" as a single sv segment (function word)', () => {
+        const segments = detector.segmentText('för');
+        assert.equal(segments.length, 1);
+        assert.equal(segments[0].language, 'sv');
+        assert.equal(segments[0].text, 'för');
+    });
+
+    it('should detect "när" as a single sv segment (function word)', () => {
+        const segments = detector.segmentText('när');
+        assert.equal(segments.length, 1);
+        assert.equal(segments[0].language, 'sv');
+        assert.equal(segments[0].text, 'när');
+    });
+
+    it('should detect "är" as a single sv segment (function word)', () => {
+        const segments = detector.segmentText('är');
+        assert.equal(segments.length, 1);
+        assert.equal(segments[0].language, 'sv');
+        assert.equal(segments[0].text, 'är');
+    });
+
+    // --- weak-char invariant: ä/ö alone must NOT trigger sv ----------------
+
+    it('should NOT classify "Mädchen" (German, ä) as sv', () => {
+        const segments = detector.segmentText('Mädchen');
+        assert.equal(segments.length, 1);
+        assert.notEqual(segments[0].language, 'sv');
+    });
+
+    it('should NOT classify "schön" (German, ö) as sv', () => {
+        const segments = detector.segmentText('schön');
+        assert.equal(segments.length, 1);
+        assert.notEqual(segments[0].language, 'sv');
+    });
+
+    it('should NOT classify "wörter" (ö only, not a function word) as sv', () => {
+        const segments = detector.segmentText('wörter');
+        assert.equal(segments.length, 1);
+        assert.notEqual(segments[0].language, 'sv');
+    });
+
+    it('should NOT classify "xöx" (ö only, weak-char invariant) as sv', () => {
+        const segments = detector.segmentText('xöx');
+        assert.equal(segments.length, 1);
+        assert.notEqual(segments[0].language, 'sv');
+    });
+
+    // --- conservative gate: needs sv + >=2 Latin langs ---------------------
+
+    it('should NOT classify "från" as sv when sv is not among the languages', () => {
+        const detectorNoSv = new UnicodeLanguageDetector(['en', 'es']);
+        const segments = detectorNoSv.segmentText('från');
+        assert.equal(segments.length, 1);
+        assert.notEqual(segments[0].language, 'sv');
+    });
+
+    // --- sentence-level: one strong word reclassifies the whole segment ----
+
+    it('should classify "jag heter Anna" as sv (function word triggers segment)', () => {
+        const segments = detector.segmentText('jag heter Anna');
+        assert.equal(segments.length, 1);
+        assert.equal(segments[0].language, 'sv');
+        assert.equal(segments[0].text, 'jag heter Anna');
+    });
+
+    // --- detectLanguage stays consistent with the post-pass ----------------
+
+    it('should detect "och jag" as sv via detectLanguage', () => {
+        assert.equal(detector.detectLanguage('och jag'), 'sv');
+    });
+
+    it('should detect "Mädchen" as en via detectLanguage (ä weak)', () => {
+        assert.equal(detector.detectLanguage('Mädchen'), 'en');
+    });
+
+    // --- mixed Swedish + Japanese: no fragmentation of the Swedish word ----
+
+    it('should segment "från こんにちは" as [sv, ja] without fragmenting "från"', () => {
+        // 'från' is a default-Latin segment reclassified to sv by the post-pass;
+        // 'こんにちは' is ja. The Swedish word must stay whole (no f|å|n split).
+        const segments = detector.segmentText('från こんにちは');
         assert.equal(segments.length, 2);
         assert.equal(segments[0].language, 'sv');
-        assert.equal(segments[0].text, 'ö');
+        assert.equal(segments[0].text.trim(), 'från');
         assert.equal(segments[1].language, 'ja');
         assert.equal(segments[1].text, 'こんにちは');
     });

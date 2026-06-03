@@ -41,6 +41,7 @@
   },
   "files": [
     "src/**/*.js",
+    "data/sv_function_words.json",
     "dist/openjtalk.wasm",
     "dist/openjtalk.js",
     "types/",
