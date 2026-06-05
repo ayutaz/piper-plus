@@ -23,7 +23,7 @@ Issue #539 の調査で確定した方針 (ユーザ承認済み):
 
 char レベル `detect_char` は**変更しない** (`å`/`ä`/`ö` は従来通り `default_latin` を返す)。`segment_text` の末尾に post-pass を追加:
 
-```
+```text
 refine_latin_segments_for_swedish(segments):
   if not detect_swedish: return segments        # 呼び出し側でガード
   if default_latin_language == "sv": return segments
@@ -108,6 +108,7 @@ refine_latin_segments_for_swedish(segments):
 ## Phase 0: Canonical データ + Python training canonical (本体バグ修正)
 
 **Files:**
+
 - Create: `src/python/g2p/piper_plus_g2p/data/sv_function_words.json`
 - Modify: `src/python/g2p/piper_plus_g2p/multilingual.py`
 - Test: `src/python/g2p/tests/test_swedish_lid.py` (新規)
@@ -282,6 +283,7 @@ git commit -m "fix(g2p): restore Swedish per-word LID in canonical Python (conse
 ## Phase 1: Python runtime mirror
 
 **Files:**
+
 - Create: `src/python_run/piper/phonemize/data/sv_function_words.json` (Phase 0 の byte-identical コピー)
 - Modify: `src/python_run/piper/phonemize/multilingual.py` (regex スタイル)
 - Test: `src/python/tests/test_swedish_lid_runtime.py` (新規) または既存 runtime テストに追加
@@ -315,6 +317,7 @@ git commit -m "fix(g2p): mirror Swedish per-word LID into Python runtime (#539)"
 ## Phase 2: Rust (piper-plus-g2p + piper-core)
 
 **Files:**
+
 - Create: `src/rust/piper-plus-g2p/data/sv_function_words.json`, `src/rust/piper-core/data/sv_function_words.json`
 - Modify: `src/rust/piper-plus-g2p/src/multilingual.rs` (+ piper-core 経路が独自実装なら同様)
 - Test: `src/rust/piper-plus-g2p/tests/test_swedish_lid.rs` (新規)
@@ -374,6 +377,7 @@ git commit -m "fix(g2p): restore Swedish per-word LID in Rust (conservative, #53
 ## Phase 3: Go (12→46 語に拡張、JSON ロード化)
 
 **Files:**
+
 - Create: `src/go/phonemize/data/sv_function_words.json`
 - Modify: `src/go/phonemize/unicode_detect.go`
 - Test: `src/go/phonemize/unicode_detect_test.go` (既存に追加)
@@ -421,6 +425,7 @@ git commit -m "fix(g2p): expand Go Swedish LID to canonical 46-word list (#539)"
 ## Phase 4: C++ (lenient→conservative + JSON ロード)
 
 **Files:**
+
 - Create: `src/cpp/data/sv_function_words.json`
 - Modify: `src/cpp/language_detector.cpp`, `src/cpp/language_detector.hpp`
 - Test: `src/cpp/tests/test_language_detector*.cpp` (既存に追加、CMakeLists に既存なら不要)
@@ -464,6 +469,7 @@ git commit -m "fix(g2p): make C++ Swedish LID conservative + JSON-load (#539)"
 ## Phase 5: C# (lenient→conservative + JSON ロード)
 
 **Files:**
+
 - Create: `src/csharp/PiperPlus.Core/Phonemize/Data/sv_function_words.json`
 - Modify: `src/csharp/PiperPlus.Core/Phonemize/UnicodeLanguageDetector.cs`
 - Test: `src/csharp/PiperPlus.Core.Tests/UnicodeLanguageDetectorTests.cs` (新規/既存)
@@ -509,6 +515,7 @@ git commit -m "fix(g2p): make C# Swedish LID conservative + JSON-load (#539)"
 ## Phase 6: WASM/npm (char単位→word単位 post-pass)
 
 **Files:**
+
 - Create: `src/wasm/g2p/data/sv_function_words.json`
 - Modify: `src/wasm/g2p/src/detect.js`
 - Test: `src/wasm/g2p/test/test-detect.js` (既存に追加)
@@ -557,6 +564,7 @@ git commit -m "fix(g2p): switch WASM Swedish LID to word-level post-pass (#539)"
 ## Phase 7: Sync gate (byte-identical 強制)
 
 **Files:**
+
 - Create: `docs/spec/swedish-lid-mirrors.toml`, `scripts/check_swedish_lid_consistency.py`, `.github/workflows/swedish-lid-sync.yml`
 - Modify: `.github/workflows/ci.yml` (gate job 追加)
 
@@ -606,6 +614,7 @@ git commit -m "ci(g2p): add Swedish LID sync gate (byte-identical mirrors, #539)
 ## Phase 8: Cross-runtime parity fixture matrix
 
 **Files:**
+
 - Create: `tests/fixtures/g2p/swedish_lid_matrix.json` (canonical) + 各ランタイム fixture ミラー
 - Modify: 各ランタイムの fixture-driven parity テスト (loanword matrix テストと同じ場所)
 
@@ -646,6 +655,7 @@ cd src/csharp && dotnet test --filter SwedishLid
 cd src/wasm/g2p && npm test -- swedish
 # C++: ctest -R swedish_lid
 ```
+
 Expected: 全 PASS、全ランタイムで同一 `expect_contains_sv` 結果
 
 - [ ] **Step 8.5: gate に fixture group を含めて再実行** — `python scripts/check_swedish_lid_consistency.py` → exit 0
@@ -671,6 +681,7 @@ git commit -m "test(g2p): cross-runtime Swedish LID parity fixture matrix (#539)
 pre-commit run --all-files
 python scripts/check_swedish_lid_consistency.py
 ```
+
 Expected: 全 PASS
 
 - [ ] **Step 9.4: docs/research の取り扱い確認** — `docs/README.md` 変更と `docs/research/` は本 PR と分離 (別途コミット or stash)。本ブランチには混ぜない。
@@ -682,6 +693,7 @@ Expected: 全 PASS
 ## Self-Review チェック結果
 
 **Spec coverage (受け入れ条件 4 点):**
+
 1. `å`/`ä`/`ö` 含む語が全ランタイムで sv 一致 → Phase 0-6 (統一アルゴリズム) + Phase 8 (parity fixture) ✓
 2. function word リストが byte-identical (gate) → Phase 7 ✓
 3. cross-runtime parity テスト green → Phase 8 ✓
@@ -690,6 +702,7 @@ Expected: 全 PASS
 **Issue 提案修正 6 点との対応:** (1) Python 復元=Phase 0/1、(2) Rust=Phase 2、(3) WASM 単語化=Phase 6、(4) C++/C#/Go 統一=Phase 3/4/5、(5) spec mirror+gate=Phase 7、(6) parity テスト=Phase 8。全網羅。
 
 **既知の留意点 (executor 向け):**
+
 - 各ランタイムの JSON ロード機構は **既存 loanword ローダーを必ず Read してから**踏襲 (ディレクトリ規約・embed/同梱方式・forward-compat がランタイム毎に違う)。
 - `är` は canonical 46語の一部。テスト・fixture と JSON が常に一致するよう、語の増減は **canonical JSON のみ編集 → `--fix` で伝播**。
 - conservative policy のため `ä`/`ö` のみの未知語 (例 独語 "schön") は **意図的に en**。これは仕様でありバグではない (negative test で固定)。
