@@ -60,7 +60,13 @@ public static class SwedishFunctionWordDataLoader
 
             return Parse(stream);
         }
-        catch (Exception)
+        catch (Exception ex) when (ex is IOException or
+                                   InvalidOperationException or
+                                   System.Security.SecurityException or
+                                   UnauthorizedAccessException or
+                                   NotSupportedException or
+                                   JsonException or
+                                   BadImageFormatException)
         {
             return Empty();
         }
@@ -102,15 +108,13 @@ public static class SwedishFunctionWordDataLoader
             if (root.TryGetProperty("function_words", out JsonElement wordsEl) &&
                 wordsEl.ValueKind == JsonValueKind.Array)
             {
-                foreach (JsonElement item in wordsEl.EnumerateArray())
+                foreach (JsonElement item in wordsEl.EnumerateArray()
+                    .Where(e => e.ValueKind == JsonValueKind.String))
                 {
-                    if (item.ValueKind == JsonValueKind.String)
+                    string? w = item.GetString();
+                    if (!string.IsNullOrEmpty(w))
                     {
-                        string? w = item.GetString();
-                        if (!string.IsNullOrEmpty(w))
-                        {
-                            functionWords.Add(w.ToLowerInvariant());
-                        }
+                        functionWords.Add(w.ToLowerInvariant());
                     }
                 }
             }
@@ -122,17 +126,15 @@ public static class SwedishFunctionWordDataLoader
             if (root.TryGetProperty("strong_chars", out JsonElement charsEl) &&
                 charsEl.ValueKind == JsonValueKind.Array)
             {
-                foreach (JsonElement item in charsEl.EnumerateArray())
+                foreach (JsonElement item in charsEl.EnumerateArray()
+                    .Where(e => e.ValueKind == JsonValueKind.String))
                 {
-                    if (item.ValueKind == JsonValueKind.String)
+                    string? s = item.GetString();
+                    if (!string.IsNullOrEmpty(s))
                     {
-                        string? s = item.GetString();
-                        if (!string.IsNullOrEmpty(s))
+                        foreach (char c in s)
                         {
-                            foreach (char c in s)
-                            {
-                                strongChars.Add(c);
-                            }
+                            strongChars.Add(c);
                         }
                     }
                 }
