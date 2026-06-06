@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1780714529447,
+  "lastUpdate": 1780754746658,
   "repoUrl": "https://github.com/ayutaz/piper-plus",
   "entries": {
     "Python inference benchmark": [
@@ -264,6 +264,60 @@ window.BENCHMARK_DATA = {
           {
             "name": "Peak Memory (en)",
             "value": 210.8,
+            "unit": "MB"
+          },
+          {
+            "name": "Model Size (en)",
+            "value": 37.6,
+            "unit": "MB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "49699333+dependabot[bot]@users.noreply.github.com",
+            "name": "dependabot[bot]",
+            "username": "dependabot[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "5dfcb77ab023b215dd66e1d629abd9261522df15",
+          "message": "chore(deps): bump the gh-actions group across 1 directory with 18 updates (#546)\n\nBumps the gh-actions group with 18 updates in the / directory:\n\n| Package | From | To |\n| --- | --- | --- |\n| [actions/checkout](https://github.com/actions/checkout) | `6.0.2` | `6.0.3` |\n| [actions/cache](https://github.com/actions/cache) | `4.2.0` | `4.3.0` |\n| [actions/upload-artifact](https://github.com/actions/upload-artifact) | `4.4.3` | `4.6.2` |\n| [actions/setup-node](https://github.com/actions/setup-node) | `6.0.0` | `6.4.0` |\n| [actions/setup-dotnet](https://github.com/actions/setup-dotnet) | `5.0.0` | `5.3.0` |\n| [actions/github-script](https://github.com/actions/github-script) | `7.0.1` | `7.1.0` |\n| [actions/setup-go](https://github.com/actions/setup-go) | `5.0.2` | `5.6.0` |\n| [github/codeql-action](https://github.com/github/codeql-action) | `3.30.6` | `3.36.2` |\n| [sigstore/cosign-installer](https://github.com/sigstore/cosign-installer) | `3.8.1` | `3.10.1` |\n| [dorny/test-reporter](https://github.com/dorny/test-reporter) | `2.1.1` | `2.7.0` |\n| [docker/setup-buildx-action](https://github.com/docker/setup-buildx-action) | `3.7.1` | `3.12.0` |\n| [docker/login-action](https://github.com/docker/login-action) | `4.1.0` | `4.2.0` |\n| [docker/metadata-action](https://github.com/docker/metadata-action) | `6.0.0` | `6.1.0` |\n| [docker/build-push-action](https://github.com/docker/build-push-action) | `6.10.0` | `6.19.2` |\n| [release-drafter/release-drafter](https://github.com/release-drafter/release-drafter) | `6.1.0` | `6.4.0` |\n| [benchmark-action/github-action-benchmark](https://github.com/benchmark-action/github-action-benchmark) | `1.20.4` | `1.22.1` |\n| [taiki-e/install-action](https://github.com/taiki-e/install-action) | `2.62.20` | `2.81.6` |\n| [ossf/scorecard-action](https://github.com/ossf/scorecard-action) | `2.4.2` | `2.4.3` |\n\n\n\nUpdates `actions/checkout` from 6.0.2 to 6.0.3\n- [Release notes](https://github.com/actions/checkout/releases)\n- [Changelog](https://github.com/actions/checkout/blob/main/CHANGELOG.md)\n- [Commits](https://github.com/actions/checkout/compare/v6.0.2...v6.0.3)\n\nUpdates `actions/cache` from 4.2.0 to 4.3.0\n- [Release notes](https://github.com/actions/cache/releases)\n- [Changelog](https://github.com/actions/cache/blob/main/RELEASES.md)\n- [Commits](https://github.com/actions/cache/compare/v4.2.0...v4.3.0)\n\nUpdates `actions/upload-artifact` from 4.4.3 to 4.6.2\n- [Release notes](https://github.com/actions/upload-artifact/releases)\n- [Commits](https://github.com/actions/upload-artifact/compare/v4.4.3...v4.6.2)\n\nUpdates `actions/setup-node` from 6.0.0 to 6.4.0\n- [Release notes](https://github.com/actions/setup-node/releases)\n- [Commits](https://github.com/actions/setup-node/compare/v6...v6.4.0)\n\nUpdates `actions/setup-dotnet` from 5.0.0 to 5.3.0\n- [Release notes](https://github.com/actions/setup-dotnet/releases)\n- [Commits](https://github.com/actions/setup-dotnet/compare/v5...v5.3.0)\n\nUpdates `actions/github-script` from 7.0.1 to 7.1.0\n- [Release notes](https://github.com/actions/github-script/releases)\n- [Commits](https://github.com/actions/github-script/compare/v7.0.1...v7.1.0)\n\nUpdates `actions/setup-go` from 5.0.2 to 5.6.0\n- [Release notes](https://github.com/actions/setup-go/releases)\n- [Commits](https://github.com/actions/setup-go/compare/v5.0.2...v5.6.0)\n\nUpdates `github/codeql-action` from 3.30.6 to 3.36.2\n- [Release notes](https://github.com/github/codeql-action/releases)\n- [Changelog](https://github.com/github/codeql-action/blob/v3.36.2/CHANGELOG.md)\n- [Commits](https://github.com/github/codeql-action/compare/v3.30.6...v3.36.2)\n\nUpdates `sigstore/cosign-installer` from 3.8.1 to 3.10.1\n- [Release notes](https://github.com/sigstore/cosign-installer/releases)\n- [Commits](https://github.com/sigstore/cosign-installer/compare/v3.8.1...v3.10.1)\n\nUpdates `dorny/test-reporter` from 2.1.1 to 2.7.0\n- [Release notes](https://github.com/dorny/test-reporter/releases)\n- [Changelog](https://github.com/dorny/test-reporter/blob/main/CHANGELOG.md)\n- [Commits](https://github.com/dorny/test-reporter/compare/v2.1.1...v2.7.0)\n\nUpdates `docker/setup-buildx-action` from 3.7.1 to 3.12.0\n- [Release notes](https://github.com/docker/setup-buildx-action/releases)\n- [Commits](https://github.com/docker/setup-buildx-action/compare/v3.7.1...v3.12.0)\n\nUpdates `docker/login-action` from 4.1.0 to 4.2.0\n- [Release notes](https://github.com/docker/login-action/releases)\n- [Commits](https://github.com/docker/login-action/compare/v4.1.0...v4.2.0)\n\nUpdates `docker/metadata-action` from 6.0.0 to 6.1.0\n- [Release notes](https://github.com/docker/metadata-action/releases)\n- [Commits](https://github.com/docker/metadata-action/compare/v6.0.0...v6.1.0)\n\nUpdates `docker/build-push-action` from 6.10.0 to 6.19.2\n- [Release notes](https://github.com/docker/build-push-action/releases)\n- [Commits](https://github.com/docker/build-push-action/compare/v6.10.0...v6.19.2)\n\nUpdates `release-drafter/release-drafter` from 6.1.0 to 6.4.0\n- [Release notes](https://github.com/release-drafter/release-drafter/releases)\n- [Commits](https://github.com/release-drafter/release-drafter/compare/v6.1.0...v6.4.0)\n\nUpdates `benchmark-action/github-action-benchmark` from 1.20.4 to 1.22.1\n- [Release notes](https://github.com/benchmark-action/github-action-benchmark/releases)\n- [Changelog](https://github.com/benchmark-action/github-action-benchmark/blob/master/CHANGELOG.md)\n- [Commits](https://github.com/benchmark-action/github-action-benchmark/compare/v1.20.4...v1.22.1)\n\nUpdates `taiki-e/install-action` from 2.62.20 to 2.81.6\n- [Release notes](https://github.com/taiki-e/install-action/releases)\n- [Changelog](https://github.com/taiki-e/install-action/blob/main/CHANGELOG.md)\n- [Commits](https://github.com/taiki-e/install-action/compare/v2.62.20...v2.81.6)\n\nUpdates `ossf/scorecard-action` from 2.4.2 to 2.4.3\n- [Release notes](https://github.com/ossf/scorecard-action/releases)\n- [Changelog](https://github.com/ossf/scorecard-action/blob/main/RELEASE.md)\n- [Commits](https://github.com/ossf/scorecard-action/compare/v2.4.2...v2.4.3)\n\n---\nupdated-dependencies:\n- dependency-name: actions/cache\n  dependency-version: 4.3.0\n  dependency-type: direct:production\n  update-type: version-update:semver-minor\n  dependency-group: gh-actions\n- dependency-name: actions/checkout\n  dependency-version: 6.0.3\n  dependency-type: direct:production\n  update-type: version-update:semver-patch\n  dependency-group: gh-actions\n- dependency-name: actions/github-script\n  dependency-version: 7.1.0\n  dependency-type: direct:production\n  update-type: version-update:semver-minor\n  dependency-group: gh-actions\n- dependency-name: actions/setup-dotnet\n  dependency-version: 5.3.0\n  dependency-type: direct:production\n  update-type: version-update:semver-minor\n  dependency-group: gh-actions\n- dependency-name: actions/setup-go\n  dependency-version: 5.6.0\n  dependency-type: direct:production\n  update-type: version-update:semver-minor\n  dependency-group: gh-actions\n- dependency-name: actions/setup-node\n  dependency-version: 6.4.0\n  dependency-type: direct:production\n  update-type: version-update:semver-minor\n  dependency-group: gh-actions\n- dependency-name: actions/upload-artifact\n  dependency-version: 4.6.2\n  dependency-type: direct:production\n  update-type: version-update:semver-minor\n  dependency-group: gh-actions\n- dependency-name: benchmark-action/github-action-benchmark\n  dependency-version: 1.22.1\n  dependency-type: direct:production\n  update-type: version-update:semver-minor\n  dependency-group: gh-actions\n- dependency-name: docker/build-push-action\n  dependency-version: 6.19.2\n  dependency-type: direct:production\n  update-type: version-update:semver-minor\n  dependency-group: gh-actions\n- dependency-name: docker/login-action\n  dependency-version: 4.2.0\n  dependency-type: direct:production\n  update-type: version-update:semver-minor\n  dependency-group: gh-actions\n- dependency-name: docker/metadata-action\n  dependency-version: 6.1.0\n  dependency-type: direct:production\n  update-type: version-update:semver-minor\n  dependency-group: gh-actions\n- dependency-name: docker/setup-buildx-action\n  dependency-version: 3.12.0\n  dependency-type: direct:production\n  update-type: version-update:semver-minor\n  dependency-group: gh-actions\n- dependency-name: dorny/test-reporter\n  dependency-version: 2.7.0\n  dependency-type: direct:production\n  update-type: version-update:semver-minor\n  dependency-group: gh-actions\n- dependency-name: github/codeql-action\n  dependency-version: 3.36.1\n  dependency-type: direct:production\n  update-type: version-update:semver-minor\n  dependency-group: gh-actions\n- dependency-name: ossf/scorecard-action\n  dependency-version: 2.4.3\n  dependency-type: direct:production\n  update-type: version-update:semver-patch\n  dependency-group: gh-actions\n- dependency-name: release-drafter/release-drafter\n  dependency-version: 6.4.0\n  dependency-type: direct:production\n  update-type: version-update:semver-minor\n  dependency-group: gh-actions\n- dependency-name: sigstore/cosign-installer\n  dependency-version: 3.10.1\n  dependency-type: direct:production\n  update-type: version-update:semver-minor\n  dependency-group: gh-actions\n- dependency-name: taiki-e/install-action\n  dependency-version: 2.81.3\n  dependency-type: direct:production\n  update-type: version-update:semver-minor\n  dependency-group: gh-actions\n...\n\nSigned-off-by: dependabot[bot] <support@github.com>\nCo-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>",
+          "timestamp": "2026-06-06T23:04:02+09:00",
+          "tree_id": "98c1b1b8118e7766ebb7c8ee9b3695791f8f3c5c",
+          "url": "https://github.com/ayutaz/piper-plus/commit/5dfcb77ab023b215dd66e1d629abd9261522df15"
+        },
+        "date": 1780754744967,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "RTF (en)",
+            "value": 0.0865,
+            "unit": "ratio"
+          },
+          {
+            "name": "Latency P50 (en)",
+            "value": 21.8,
+            "unit": "ms"
+          },
+          {
+            "name": "Latency P95 (en)",
+            "value": 24.1,
+            "unit": "ms"
+          },
+          {
+            "name": "Cold Start (en)",
+            "value": 1108.6,
+            "unit": "ms"
+          },
+          {
+            "name": "Peak Memory (en)",
+            "value": 207.8,
             "unit": "MB"
           },
           {
