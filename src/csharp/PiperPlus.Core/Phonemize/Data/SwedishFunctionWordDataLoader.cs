@@ -108,14 +108,13 @@ public static class SwedishFunctionWordDataLoader
             if (root.TryGetProperty("function_words", out JsonElement wordsEl) &&
                 wordsEl.ValueKind == JsonValueKind.Array)
             {
-                foreach (string? w in wordsEl.EnumerateArray()
+                foreach (string w in wordsEl.EnumerateArray()
                     .Where(e => e.ValueKind == JsonValueKind.String)
-                    .Select(e => e.GetString()))
+                    .Select(e => e.GetString())
+                    .OfType<string>()
+                    .Where(w => w.Length > 0))
                 {
-                    if (!string.IsNullOrEmpty(w))
-                    {
-                        functionWords.Add(w.ToLowerInvariant());
-                    }
+                    functionWords.Add(w.ToLowerInvariant());
                 }
             }
 
@@ -126,16 +125,15 @@ public static class SwedishFunctionWordDataLoader
             if (root.TryGetProperty("strong_chars", out JsonElement charsEl) &&
                 charsEl.ValueKind == JsonValueKind.Array)
             {
-                foreach (string? s in charsEl.EnumerateArray()
+                foreach (string s in charsEl.EnumerateArray()
                     .Where(e => e.ValueKind == JsonValueKind.String)
-                    .Select(e => e.GetString()))
+                    .Select(e => e.GetString())
+                    .OfType<string>()
+                    .Where(s => s.Length > 0))
                 {
-                    if (!string.IsNullOrEmpty(s))
+                    foreach (char c in s)
                     {
-                        foreach (char c in s)
-                        {
-                            strongChars.Add(c);
-                        }
+                        strongChars.Add(c);
                     }
                 }
             }
