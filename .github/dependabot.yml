@@ -91,6 +91,14 @@ updates:
       - dependency-name: "*"
         update-types:
           - "version-update:semver-major"
+      # ruff は dependabot で更新しない (cross-site pin sync の treadmill を断つ)。
+      # dependabot は pyproject.toml の pin のみ bump し .pre-commit-config.yaml /
+      # python-lint.yml の pin を残すため `6 ruff pin sites agree` ゲート
+      # (scripts/check_ruff_version_sync.py) が必ず fail する。
+      # 事例: #541→#548 で 0.15.15 に sync した数時間後、#549 が 0.15.16 で再 drift。
+      # ruff version は 5 pin site を /bump-deps で一括手動更新する
+      # (CLAUDE.md「ruff version pin」節 参照)。
+      - dependency-name: "ruff"
 
   # Rust: src/rust (Cargo workspace)
   - package-ecosystem: "cargo"
