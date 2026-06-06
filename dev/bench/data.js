@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1779151417723,
+  "lastUpdate": 1780714529447,
   "repoUrl": "https://github.com/ayutaz/piper-plus",
   "entries": {
     "Python inference benchmark": [
@@ -210,6 +210,60 @@ window.BENCHMARK_DATA = {
           {
             "name": "Peak Memory (en)",
             "value": 210.7,
+            "unit": "MB"
+          },
+          {
+            "name": "Model Size (en)",
+            "value": 37.6,
+            "unit": "MB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "41669061+ayutaz@users.noreply.github.com",
+            "name": "yousan",
+            "username": "ayutaz"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "d5226c29034f8906172e80116ea285908eb906f7",
+          "message": "fix(g2p): restore and unify Swedish per-word LID across all runtimes (#545)\n\n* fix(g2p): restore Swedish per-word LID in canonical Python (conservative, #539)\n\n* docs: add Swedish per-word LID parity implementation plan (#539)\n\n* fix(g2p): mirror Swedish per-word LID into Python runtime (conservative, #539)\n\n* fix(g2p): restore Swedish per-word LID in Rust (conservative, #539)\n\n* fix(g2p): expand Go Swedish LID to canonical 46-word list via JSON (#539)\n\nReplace the hardcoded 12-word svDetectFunctionWords map and hardcoded\nsvUniqueChars in unicode_detect.go with values loaded at init time from\n//go:embed data/sv_function_words.json (byte-for-byte mirror of the\ncanonical src/python/g2p/piper_plus_g2p/data/sv_function_words.json,\nblob 080e94a9c8a4236785f5e4b178a5c9c3dac15d93).\n\nThe conservative policy (å/Å strong, ä/ö weak) is unchanged; only the\ndata source and word count change (12 → 46).  Words previously missing\nfrom the hardcoded list (för, när, är) now correctly detect as sv.\n\n* fix(g2p): make C++ Swedish LID conservative + JSON-load 46 words (#539)\n\n* fix(g2p): make C# Swedish LID conservative + JSON-load (strong_chars + 46 words) (#539)\n\n* fix(g2p): switch WASM Swedish LID to word-level post-pass + JSON-load (#539)\n\n* ci(g2p): add Swedish LID sync gate enforcing byte-identical mirrors (#539)\n\n* test(g2p): cross-runtime Swedish LID parity fixture matrix (#539)\n\n* docs(g2p): changelog + docs for Swedish per-word LID parity (#539)\n\n* docs: fix markdownlint violations in implementation plan (#539)\n\n* docs: add research snapshot index (improvement survey 2026-06)\n\n改善調査スナップショット (VITS2/MB-iSTFT 先行研究) と docs/README.md への参照を追加。\n\n* fix(csharp): narrow exception filter and use LINQ Where in SwedishFunctionWordDataLoader\n\nCodeQL 指摘 (Generic catch clause + Missed opportunity to use Where) に対応。\ncatch (Exception) を具体的な例外型に絞り、foreach 内の暗黙フィルタを Where() に整理。\n\n* docs: fix MD032 blanks-around-lists in research survey\n\n* fix(csharp): chain Select() in Swedish LID loader to address CodeQL suggestions\n\n* docs: regenerate doc-examples audit snapshot for Swedish LID parity plan\n\ndocs/superpowers/plans/2026-06-03-swedish-per-word-lid-parity.md の追加で\nコードブロック監査が snapshot から drift していた。CI ジョブ\n\"Syntax-validate executable docs blocks\" の audit drift failure を解消。\n\ntotal=436 blocks (bash=198 python=24 rust=12 csharp=6 go=5 wasm=11)\n\n* fix(csharp): hoist null/empty filters into LINQ Where in Swedish LID loader\n\nCodeQL \"Missed opportunity to use Where\" (line 119/140) は 200e5c1 後も\nforeach 本体に残った if (!string.IsNullOrEmpty(...)) の暗黙的フィルタを\n指摘していた。.OfType<string>().Where(w => w.Length > 0) でチェーンに移し、\nforeach 本体から条件分岐を除去。OfType<string>() で null を除去するため\nnull-forgiving operator 不要、nullable warning も発生しない。\n\n検証: PiperPlus.Core ビルド 0 warning / 0 error、Swedish テスト 160 件 pass。",
+          "timestamp": "2026-06-06T11:53:50+09:00",
+          "tree_id": "8461f9941dd372c322802511097d150f565ded03",
+          "url": "https://github.com/ayutaz/piper-plus/commit/d5226c29034f8906172e80116ea285908eb906f7"
+        },
+        "date": 1780714528326,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "RTF (en)",
+            "value": 0.1,
+            "unit": "ratio"
+          },
+          {
+            "name": "Latency P50 (en)",
+            "value": 25.4,
+            "unit": "ms"
+          },
+          {
+            "name": "Latency P95 (en)",
+            "value": 26.5,
+            "unit": "ms"
+          },
+          {
+            "name": "Cold Start (en)",
+            "value": 1367.5,
+            "unit": "ms"
+          },
+          {
+            "name": "Peak Memory (en)",
+            "value": 210.8,
             "unit": "MB"
           },
           {
