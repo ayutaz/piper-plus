@@ -17,12 +17,12 @@
 # # Version pinning:
 #   ruff version below MUST match the pins in
 #   .github/workflows/python-lint.yml and .github/workflows/ci.yml
-#   (currently 0.15.12). Drift between pre-commit and CI =
+#   (currently 0.15.15). Drift between pre-commit and CI =
 #   local-clean / CI-fail mismatch (PR #401 cause).
 
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.12
+    rev: v0.15.15
     hooks:
       - id: ruff
         args: [--fix]
