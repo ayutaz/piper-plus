@@ -3,7 +3,7 @@
 # 各 ecosystem の依存関係を月次で更新。
 # - minor / patch は groups でまとめて 1 PR
 # - major bump は ignore (手動レビュー)
-# - PR 上限 5、commit prefix "deps"、labels ["dependencies","automated"]
+# - PR 上限 5、commit prefix "chore" (→ "chore(deps): ..." 形式)、labels ["dependencies","automated"]
 #
 # Reference:
 # https://docs.github.com/en/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
@@ -24,6 +24,17 @@
 #   subdirectory の `pyproject.toml` を見つけても uv updater は root lock で
 #   解決可能 (Issue #418 で src/python_run に [project] テーブル追加 +
 #   workspace member 化が完了済)。
+#
+# ── commit-message.prefix は "chore" 固定 (type allow-list 制約) ──
+# `prefix: "deps"` だと title/commit が "deps(deps): ..." になり、 Conventional
+# Commits の type が "deps" 扱いになる。 だが本リポジトリの 2 ゲート
+#   - PR Title Check  (.github/workflows/pr-title-check.yml)
+#   - Commitlint      (.github/workflows/commitlint.yml + .commitlintrc.json)
+# は type allow-list を feat/fix/chore/docs/test/ci/refactor/perf/build/style/
+# revert に限定しており、 "deps" type を reject する (両 gate の help でも
+# "chore(deps): bump ..." を推奨)。 そのため prefix は "chore" に統一し、
+# include: "scope" と併せて "chore(deps): ..." 形式を生成する。 prefix を
+# "deps" に戻すと全 Dependabot PR の lint/validate が fail するので注意。
 
 version: 2
 
@@ -35,7 +46,7 @@ updates:
       interval: "monthly"
     open-pull-requests-limit: 5
     commit-message:
-      prefix: "deps"
+      prefix: "chore"
       include: "scope"
     labels:
       - "dependencies"
@@ -65,7 +76,7 @@ updates:
       interval: "monthly"
     open-pull-requests-limit: 5
     commit-message:
-      prefix: "deps"
+      prefix: "chore"
       include: "scope"
     labels:
       - "dependencies"
@@ -88,7 +99,7 @@ updates:
       interval: "monthly"
     open-pull-requests-limit: 5
     commit-message:
-      prefix: "deps"
+      prefix: "chore"
       include: "scope"
     labels:
       - "dependencies"
@@ -111,7 +122,7 @@ updates:
       interval: "monthly"
     open-pull-requests-limit: 5
     commit-message:
-      prefix: "deps"
+      prefix: "chore"
       include: "scope"
     labels:
       - "dependencies"
@@ -134,7 +145,7 @@ updates:
       interval: "monthly"
     open-pull-requests-limit: 5
     commit-message:
-      prefix: "deps"
+      prefix: "chore"
       include: "scope"
     labels:
       - "dependencies"
@@ -157,7 +168,7 @@ updates:
       interval: "monthly"
     open-pull-requests-limit: 5
     commit-message:
-      prefix: "deps"
+      prefix: "chore"
       include: "scope"
     labels:
       - "dependencies"
@@ -189,7 +200,7 @@ updates:
       interval: "monthly"
     open-pull-requests-limit: 5
     commit-message:
-      prefix: "deps"
+      prefix: "chore"
       include: "scope"
     labels:
       - "dependencies"
@@ -212,7 +223,7 @@ updates:
       interval: "monthly"
     open-pull-requests-limit: 5
     commit-message:
-      prefix: "deps"
+      prefix: "chore"
       include: "scope"
     labels:
       - "dependencies"
@@ -235,7 +246,7 @@ updates:
       interval: "monthly"
     open-pull-requests-limit: 5
     commit-message:
-      prefix: "deps"
+      prefix: "chore"
       include: "scope"
     labels:
       - "dependencies"
@@ -271,7 +282,7 @@ updates:
       interval: "monthly"
     open-pull-requests-limit: 5
     commit-message:
-      prefix: "deps"
+      prefix: "chore"
       include: "scope"
     labels:
       - "dependencies"
@@ -299,7 +310,7 @@ updates:
       interval: "monthly"
     open-pull-requests-limit: 5
     commit-message:
-      prefix: "deps"
+      prefix: "chore"
       include: "scope"
     labels:
       - "dependencies"
