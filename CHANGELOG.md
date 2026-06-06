@@ -295,6 +295,7 @@ v1.12.0 で 5 ランタイム (Python/Rust/C#/Go/WASM) に展開した SSML / Vo
 - Bundle size gate: Android AAR ビルドが prebuilt `libpiper_plus.so` 欠如で永久 SKIP となっていた問題を修正 (Issue #494)
   - `bundle-size-gate.yml` に `build-android-shared-libs` matrix job (arm64-v8a / armeabi-v7a / x86_64) を追加し、`release-shared-lib.yml` と同じ NDK r26c + ORT 1.20.0 + 16 KB page-align で `libpiper_plus.so` をビルド。bundle-size ジョブが artifact を `android/piper-plus-g2p/src/main/jniLibs/<ABI>/` に配置してから `assembleRelease` を実行することで `maven::piper-plus-g2p-android` の Observed サイズが取得可能に
   - `scripts/check_ort_versions.py` の `TARGETS` に `bundle-size-gate.yml` を追加し、ORT バージョン drift gate の対象に統合 (Copilot review fix)
+- スウェーデン語 (sv) の単語単位 言語判定 (per-word LID) を全 7 ランタイムで復旧・統一 (Issue #539)。`å`/`ä`/`ö` を含む語 (例: `så` / `och` / `för` / `är`) が英語と誤判定されていた回帰を修正 (#297 で全ランタイム実装 → #300 の g2p パッケージ抽出で Python/Rust から脱落 → 残存コピーが drift、WASM は char-level の別実装)。**保守的ポリシー** (strong indicator = `å`/`Å` または 46 語の function-word リスト完全一致のみ。`ä`/`ö` 単独は独語/フィンランド語/借用語と共有のため不十分) で再実装。全ランタイムが byte-identical な `sv_function_words.json` をロードし、新規 sync gate (`scripts/check_swedish_lid_consistency.py` + `docs/spec/swedish-lid-mirrors.toml`、ZH-EN loanword gate と同型) が 7 データミラー + 6 fixture ミラーの byte-for-byte 一致を強制。cross-runtime parity fixture matrix で一致を実証。学習済み 6lang モデルは sv 未含有のためデフォルト推論は不変、独立 G2P 用途と将来の sv モデルに影響
 
 ### Security
 

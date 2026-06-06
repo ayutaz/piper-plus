@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "languages": ["en", "sv"],
+  "default_latin": "en",
+  "cases": [
+    {"text": "så", "expect_contains_sv": true},
+    {"text": "från", "expect_contains_sv": true},
+    {"text": "för", "expect_contains_sv": true},
+    {"text": "när", "expect_contains_sv": true},
+    {"text": "är", "expect_contains_sv": true},
+    {"text": "och", "expect_contains_sv": true},
+    {"text": "jag heter Anna", "expect_contains_sv": true},
+    {"text": "schön", "expect_contains_sv": false},
+    {"text": "Mädchen", "expect_contains_sv": false},
+    {"text": "hello world", "expect_contains_sv": false}
+  ]
+}

@@ -649,3 +649,108 @@ func TestSegmentText_GermanNotMisdetectedAsSV_DasIstGut(t *testing.T) {
 			segs[0].Text, segs[0].Language)
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Phase 3 / Issue #539: canonical 46-word list parity tests
+// ---------------------------------------------------------------------------
+// These tests mirror the canonical sv_function_words.json behavioral cases.
+// Words like för/när/är were NOT in the old 12-word hardcoded list and would
+// fail before the JSON-backed 46-word list is in place.
+
+// T14: "så" and "från" — å is a strong char (already works), från is a function word.
+func TestSegmentText_SV_CanonicalStrongChars(t *testing.T) {
+	d := NewUnicodeLanguageDetector([]string{"en", "sv"}, "en")
+	for _, text := range []string{"så", "från"} {
+		segs := SegmentText(text, d)
+		if len(segs) != 1 {
+			t.Fatalf("%q: expected 1 segment, got %d: %+v", text, len(segs), segs)
+		}
+		if segs[0].Language != "sv" {
+			t.Errorf("%q: expected sv, got %q", text, segs[0].Language)
+		}
+	}
+}
+
+// T15: "och", "jag", "inte" — function words present in both the old 12-word
+// list and the canonical 46-word list; must still pass after the refactor.
+func TestSegmentText_SV_CanonicalFunctionWordsOriginal(t *testing.T) {
+	d := NewUnicodeLanguageDetector([]string{"en", "sv"}, "en")
+	for _, text := range []string{"och", "jag", "inte"} {
+		segs := SegmentText(text, d)
+		if len(segs) != 1 {
+			t.Fatalf("%q: expected 1 segment, got %d: %+v", text, len(segs), segs)
+		}
+		if segs[0].Language != "sv" {
+			t.Errorf("%q: expected sv, got %q", text, segs[0].Language)
+		}
+	}
+}
+
+// T16: "för", "när", "är" — words that are in the canonical 46-word list but
+// NOT in the old 12-word hardcoded list.  These MUST detect as sv after the
+// expansion.  This is the primary regression gate for Phase 3.
+func TestSegmentText_SV_CanonicalFunctionWordsExpanded(t *testing.T) {
+	d := NewUnicodeLanguageDetector([]string{"en", "sv"}, "en")
+	for _, text := range []string{"för", "när", "är"} {
+		segs := SegmentText(text, d)
+		if len(segs) != 1 {
+			t.Fatalf("%q: expected 1 segment, got %d: %+v", text, len(segs), segs)
+		}
+		if segs[0].Language != "sv" {
+			t.Errorf("%q: expected sv, got %q (word must be in canonical 46-word list)", text, segs[0].Language)
+		}
+	}
+}
+
+// T17: "Mädchen", "schön" — German text with ä/ö only; conservative policy must
+// NOT classify these as Swedish (ä/ö are weak indicators).
+func TestSegmentText_SV_GermanWeakCharsNotSV(t *testing.T) {
+	d := NewUnicodeLanguageDetector([]string{"en", "sv"}, "en")
+	for _, text := range []string{"Mädchen", "schön"} {
+		segs := SegmentText(text, d)
+		if len(segs) != 1 {
+			t.Fatalf("%q: expected 1 segment, got %d: %+v", text, len(segs), segs)
+		}
+		if segs[0].Language == "sv" {
+			t.Errorf("%q: German text should NOT be detected as sv (ä/ö are weak indicators)", text)
+		}
+	}
+}
+
+// T18: "wörter", "xöx" — weak ö only; conservative policy invariant.
+func TestSegmentText_SV_WeakCharInvariant(t *testing.T) {
+	d := NewUnicodeLanguageDetector([]string{"en", "sv"}, "en")
+	for _, text := range []string{"wörter", "xöx"} {
+		segs := SegmentText(text, d)
+		if len(segs) != 1 {
+			t.Fatalf("%q: expected 1 segment, got %d: %+v", text, len(segs), segs)
+		}
+		if segs[0].Language == "sv" {
+			t.Errorf("%q: weak-ö-only text should NOT be detected as sv", text)
+		}
+	}
+}
+
+// T19: languages ["en","es"] (no sv) — "från" must NOT be detected as sv.
+func TestSegmentText_SV_NoSVInSet_Fran(t *testing.T) {
+	d := NewUnicodeLanguageDetector([]string{"en", "es"}, "en")
+	segs := SegmentText("från", d)
+	if len(segs) != 1 {
+		t.Fatalf("expected 1 segment, got %d: %+v", len(segs), segs)
+	}
+	if segs[0].Language == "sv" {
+		t.Errorf("\"från\" with no sv in language set should NOT be sv, got %q", segs[0].Language)
+	}
+}
+
+// T20: "jag heter Anna" — sentence-level SV detection via function word.
+func TestSegmentText_SV_SentenceLevelFunctionWord(t *testing.T) {
+	d := NewUnicodeLanguageDetector([]string{"en", "sv"}, "en")
+	segs := SegmentText("jag heter Anna", d)
+	if len(segs) != 1 {
+		t.Fatalf("expected 1 segment, got %d: %+v", len(segs), segs)
+	}
+	if segs[0].Language != "sv" {
+		t.Errorf("expected sv (jag is a function word), got %q", segs[0].Language)
+	}
+}

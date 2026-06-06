@@ -704,6 +704,10 @@ foreach(test_source ${TEST_SOURCES})
             ../swedish_phonemize.cpp
             ../korean_phonemize.cpp
             ../phoneme_parser.cpp
+            # language_detector.cpp loads sv_function_words.json via
+            # piper_plus_get_exe_dir() (library_path.c), mirroring the
+            # zh_en_loanword loader (Issue #539).
+            ../library_path.c
         )
         target_include_directories(${test_name} PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/..
@@ -729,8 +733,24 @@ foreach(test_source ${TEST_SOURCES})
                 fmt
             )
         endif()
+        # library_path.c uses dladdr which requires libdl on Linux
+        if(UNIX AND NOT APPLE)
+            target_link_libraries(${test_name} dl)
+        endif()
         # Ensure dependencies are built first
         add_dependencies(${test_name} spdlog_external fmt_external)
+        # Stage sv_function_words.json next to the test binary so the bundled
+        # default-data path (resolved via piper_plus_get_exe_dir() +
+        # "/data/sv_function_words.json") is populated for the Swedish per-word
+        # LID tests (Issue #539). Mirrors the zh_en_loanword staging.
+        add_custom_command(TARGET ${test_name} POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E make_directory
+                $<TARGET_FILE_DIR:${test_name}>/data
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                ${CMAKE_SOURCE_DIR}/src/cpp/data/sv_function_words.json
+                $<TARGET_FILE_DIR:${test_name}>/data/sv_function_words.json
+            COMMENT "Staging sv_function_words.json next to ${test_name}"
+        )
     endif()
 
     # Link additional dependencies for Swedish phonemize test
@@ -785,6 +805,45 @@ add_test(NAME test_ssml COMMAND test_ssml)
 # Run from repo root so the fixture-parity test can locate
 # tests/fixtures/ssml/contract.json via the in-tree search.
 set_tests_properties(test_ssml PROPERTIES
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+
+# Add test_swedish_lid_degradation - Swedish per-word LID degradation path
+# (Issue #539). Self-contained: compiles ../language_detector.cpp +
+# ../library_path.c directly + links gtest (language_detector.cpp pulls in
+# json.hpp / utf8.h header-only — no spdlog/fmt/ORT/OpenJTalk dependency).
+#
+# DELIBERATELY does NOT stage sv_function_words.json next to the binary, and
+# runs from the repo root (where no `data/sv_function_words.json` exists), so
+# the std::call_once loader finds no data and leaves BOTH the function-word and
+# strong-char sets EMPTY. This pins the contract that C++ has NO hardcoded å/Å
+# fallback and degrades identically to Python/Rust/Go (whole post-pass no-ops).
+add_executable(test_swedish_lid_degradation
+    test_swedish_lid_degradation.cpp
+    ../language_detector.cpp
+    ../library_path.c
+)
+target_include_directories(test_swedish_lid_degradation PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../
+)
+target_link_libraries(test_swedish_lid_degradation
+    gtest_main
+)
+# library_path.c uses dladdr which requires libdl on Linux
+if(UNIX AND NOT APPLE)
+    target_link_libraries(test_swedish_lid_degradation dl)
+endif()
+# Place this binary in its OWN output directory so its <exe-dir> never contains
+# a staged data/sv_function_words.json. Sibling targets (e.g.
+# test_multilingual_g2p) stage the JSON into their own <exe-dir>/data/, which
+# is the shared tests/ output dir — putting this one in a dedicated subdir
+# isolates it so the loader genuinely finds no data file. (Belt-and-braces with
+# WORKING_DIRECTORY=repo-root, which also has no `data/sv_function_words.json`.)
+set_target_properties(test_swedish_lid_degradation PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/swedish_lid_degradation_nodata
+)
+add_test(NAME test_swedish_lid_degradation
+    COMMAND test_swedish_lid_degradation
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
 )
 

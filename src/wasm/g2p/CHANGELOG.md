@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **Swedish (sv) per-word language detection (Issue #539)**: Swedish words containing `å`/`ä`/`ö` (e.g. `så`, `och`, `för`, `är`) were misdetected as English. The Swedish LID is reworked from the previous char-level approach to a word-level post-pass with a **conservative policy** (strong indicators: `å`/`Å` or an exact match in a 46-word function-word list; `ä`/`ö` alone are NOT sufficient — shared with German/Finnish/loanwords). `UnicodeLanguageDetector` now loads the bundled `data/sv_function_words.json`, byte-identical to every other runtime mirror and enforced by a new cross-runtime sync gate.
+
 ## [0.3.0] - 2026-04-11
 
 ### Breaking Changes

@@ -212,8 +212,16 @@ describe('C) Language detection with all 7 non-JA languages', () => {
         assert.equal(g2p.detectLanguage('\u00E5\u00E4\u00F6'), 'sv'); // åäö
     });
 
-    it('should detect sv for short Swedish words with diacritics', () => {
-        assert.equal(g2p.detectLanguage('\u00F6l'), 'sv'); // öl
+    it('should detect sv for a function word without any diacritic', () => {
+        // Issue #539: word-level LID detects Swedish function words (e.g.
+        // 'och') that carry no special char — impossible at char level.
+        assert.equal(g2p.detectLanguage('och'), 'sv');
+    });
+
+    it('should NOT detect sv for a short word with only the weak char ö', () => {
+        // Issue #539: ä/ö are WEAK and not sufficient alone; 'öl' is not a
+        // function word and has no strong char, so it stays 'en'.
+        assert.equal(g2p.detectLanguage('\u00F6l'), 'en'); // öl
     });
 
     it('should default to en for plain Latin text', () => {

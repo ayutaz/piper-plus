@@ -1,45 +1,45 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-05-21T12:06:10Z",
+  "generated_at": "2026-05-19T00:00:00Z",
   "totals": {
-    "executable": 207,
+    "executable": 228,
     "needs_placeholder": 4,
-    "skip_warranted": 199,
-    "total": 410
+    "skip_warranted": 204,
+    "total": 436
   },
   "by_language": {
     "bash": {
-      "executable": 158,
+      "executable": 170,
       "needs_placeholder": 4,
       "skip_warranted": 24
     },
     "csharp": {
-      "executable": 5,
+      "executable": 6,
       "needs_placeholder": 0,
       "skip_warranted": 0
     },
     "go": {
-      "executable": 4,
+      "executable": 5,
       "needs_placeholder": 0,
       "skip_warranted": 0
     },
     "python": {
-      "executable": 19,
+      "executable": 24,
       "needs_placeholder": 0,
       "skip_warranted": 0
     },
     "rust": {
-      "executable": 11,
+      "executable": 12,
       "needs_placeholder": 0,
       "skip_warranted": 0
     },
     "unknown": {
       "executable": 0,
       "needs_placeholder": 0,
-      "skip_warranted": 175
+      "skip_warranted": 180
     },
     "wasm": {
-      "executable": 10,
+      "executable": 11,
       "needs_placeholder": 0,
       "skip_warranted": 0
     }
@@ -5780,6 +5780,354 @@
       "directives_detected": [],
       "env_dependencies": [],
       "hash_sha1": "cf080af42f664b5ad38f4716b714e1920e09d3ed"
+    },
+    {
+      "file": "docs/superpowers/plans/2026-06-03-swedish-per-word-lid-parity.md",
+      "line_start": 26,
+      "line_end": 42,
+      "language_raw": "text",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "80c37321a534a295221563f6d4f8abe5a5b89c17"
+    },
+    {
+      "file": "docs/superpowers/plans/2026-06-03-swedish-per-word-lid-parity.md",
+      "line_start": 50,
+      "line_end": 63,
+      "language_raw": "json",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "2cb8ce394d2a0234b2711889f3e1d6eb35fe0ed2"
+    },
+    {
+      "file": "docs/superpowers/plans/2026-06-03-swedish-per-word-lid-parity.md",
+      "line_start": 124,
+      "line_end": 172,
+      "language_raw": "python",
+      "language": "python",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "d8403c4f6878f4e3d3d1042cd78af86cffef6afc"
+    },
+    {
+      "file": "docs/superpowers/plans/2026-06-03-swedish-per-word-lid-parity.md",
+      "line_start": 185,
+      "line_end": 205,
+      "language_raw": "python",
+      "language": "python",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "c05061f647cfbd8eddde3f20e028dae7b75190e9"
+    },
+    {
+      "file": "docs/superpowers/plans/2026-06-03-swedish-per-word-lid-parity.md",
+      "line_start": 209,
+      "line_end": 215,
+      "language_raw": "python",
+      "language": "python",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "1bc2ced9416ad62c7458ebf1af63a20b8e6f0d37"
+    },
+    {
+      "file": "docs/superpowers/plans/2026-06-03-swedish-per-word-lid-parity.md",
+      "line_start": 219,
+      "line_end": 224,
+      "language_raw": "python",
+      "language": "python",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "456cb02c003f856b84388fa4a1e797979482b03d"
+    },
+    {
+      "file": "docs/superpowers/plans/2026-06-03-swedish-per-word-lid-parity.md",
+      "line_start": 228,
+      "line_end": 260,
+      "language_raw": "python",
+      "language": "python",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "484a58608ce27d2cd39ce5f0e1b1461412b8286e"
+    },
+    {
+      "file": "docs/superpowers/plans/2026-06-03-swedish-per-word-lid-parity.md",
+      "line_start": 274,
+      "line_end": 279,
+      "language_raw": "bash",
+      "language": "bash",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "9da9e0854f19b8df61e659f93a9d6231b9f7e15c"
+    },
+    {
+      "file": "docs/superpowers/plans/2026-06-03-swedish-per-word-lid-parity.md",
+      "line_start": 293,
+      "line_end": 296,
+      "language_raw": "bash",
+      "language": "bash",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "30eeef36cf7dd2f8ed76d4a7a524bdd0b4e9e1ec"
+    },
+    {
+      "file": "docs/superpowers/plans/2026-06-03-swedish-per-word-lid-parity.md",
+      "line_start": 308,
+      "line_end": 313,
+      "language_raw": "bash",
+      "language": "bash",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "767ca2a6a590ea49cda2f47f8cca5b3744780f38"
+    },
+    {
+      "file": "docs/superpowers/plans/2026-06-03-swedish-per-word-lid-parity.md",
+      "line_start": 331,
+      "line_end": 350,
+      "language_raw": "rust",
+      "language": "rust",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "0521fdc0c3637e689b50db9ca5877e5a63b2b9d0"
+    },
+    {
+      "file": "docs/superpowers/plans/2026-06-03-swedish-per-word-lid-parity.md",
+      "line_start": 367,
+      "line_end": 373,
+      "language_raw": "bash",
+      "language": "bash",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "b031929b68ed77c6a778518c9e90947b94e5574a"
+    },
+    {
+      "file": "docs/superpowers/plans/2026-06-03-swedish-per-word-lid-parity.md",
+      "line_start": 391,
+      "line_end": 406,
+      "language_raw": "go",
+      "language": "go",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "7b10ef06c465a60c300815421747e70889458055"
+    },
+    {
+      "file": "docs/superpowers/plans/2026-06-03-swedish-per-word-lid-parity.md",
+      "line_start": 418,
+      "line_end": 421,
+      "language_raw": "bash",
+      "language": "bash",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "f509a7c4687ab8b5e960ac5f2144dc65fe876ff7"
+    },
+    {
+      "file": "docs/superpowers/plans/2026-06-03-swedish-per-word-lid-parity.md",
+      "line_start": 439,
+      "line_end": 450,
+      "language_raw": "cpp",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "82abcd3e9e4508b502eab79cf2ccb80fecd34366"
+    },
+    {
+      "file": "docs/superpowers/plans/2026-06-03-swedish-per-word-lid-parity.md",
+      "line_start": 462,
+      "line_end": 465,
+      "language_raw": "bash",
+      "language": "bash",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "770d95f90a25e3d6bb5346836c95b47a3c05b5aa"
+    },
+    {
+      "file": "docs/superpowers/plans/2026-06-03-swedish-per-word-lid-parity.md",
+      "line_start": 483,
+      "line_end": 493,
+      "language_raw": "csharp",
+      "language": "csharp",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "51377990595dcdf0adde5315de71c784cd76795d"
+    },
+    {
+      "file": "docs/superpowers/plans/2026-06-03-swedish-per-word-lid-parity.md",
+      "line_start": 505,
+      "line_end": 511,
+      "language_raw": "bash",
+      "language": "bash",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "6683e7ddf4283e9697ca8cc555129d201c313c6d"
+    },
+    {
+      "file": "docs/superpowers/plans/2026-06-03-swedish-per-word-lid-parity.md",
+      "line_start": 529,
+      "line_end": 544,
+      "language_raw": "js",
+      "language": "wasm",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "84d292b0f0d760ee6aaa371bead8f810d5066da3"
+    },
+    {
+      "file": "docs/superpowers/plans/2026-06-03-swedish-per-word-lid-parity.md",
+      "line_start": 557,
+      "line_end": 560,
+      "language_raw": "bash",
+      "language": "bash",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "e07e9c535a4adcafb1c60c795613b4ee3274fcfd"
+    },
+    {
+      "file": "docs/superpowers/plans/2026-06-03-swedish-per-word-lid-parity.md",
+      "line_start": 575,
+      "line_end": 594,
+      "language_raw": "toml",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "1c076fe228ed6db106fe5ecbf29138c816d8a8ad"
+    },
+    {
+      "file": "docs/superpowers/plans/2026-06-03-swedish-per-word-lid-parity.md",
+      "line_start": 606,
+      "line_end": 610,
+      "language_raw": "bash",
+      "language": "bash",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "8c1d376358635368f3908b92909669a323cca24f"
+    },
+    {
+      "file": "docs/superpowers/plans/2026-06-03-swedish-per-word-lid-parity.md",
+      "line_start": 623,
+      "line_end": 641,
+      "language_raw": "json",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "d93364db9e6f985e179466e1ce1268fb6839a997"
+    },
+    {
+      "file": "docs/superpowers/plans/2026-06-03-swedish-per-word-lid-parity.md",
+      "line_start": 650,
+      "line_end": 657,
+      "language_raw": "bash",
+      "language": "bash",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "8064c1fddc7cb22246720d3b619a418e1600bdf1"
+    },
+    {
+      "file": "docs/superpowers/plans/2026-06-03-swedish-per-word-lid-parity.md",
+      "line_start": 665,
+      "line_end": 668,
+      "language_raw": "bash",
+      "language": "bash",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "5f9f54b365e2045e35976ad4058717502f4302aa"
+    },
+    {
+      "file": "docs/superpowers/plans/2026-06-03-swedish-per-word-lid-parity.md",
+      "line_start": 680,
+      "line_end": 683,
+      "language_raw": "bash",
+      "language": "bash",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "7f6e19f1c1c9f9650dbc885519558a5b5fbeddbe"
     }
   ]
 }

@@ -134,6 +134,17 @@ if(PIPER_APPLE_EMBEDDED OR ANDROID)
     zh_en_loanword_json
   )
   list(APPEND PIPER_COMMON_SOURCES "${PIPER_LOANWORD_HEADER}")
+
+  # Swedish per-word LID function-word list (Issue #539): same dual-mode
+  # bundling as the loanword JSON. On Apple-embedded / Android it is embedded
+  # as a C array header consumed by language_detector.cpp.
+  set(PIPER_SV_FUNCTION_WORDS_HEADER ${CMAKE_CURRENT_BINARY_DIR}/sv_function_words_data.h)
+  piper_embed_json_as_header(
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/cpp/data/sv_function_words.json"
+    "${PIPER_SV_FUNCTION_WORDS_HEADER}"
+    sv_function_words_json
+  )
+  list(APPEND PIPER_COMMON_SOURCES "${PIPER_SV_FUNCTION_WORDS_HEADER}")
 endif()
 
 add_library(piper_common STATIC ${PIPER_COMMON_SOURCES})
@@ -142,10 +153,17 @@ if(PIPER_APPLE_EMBEDDED OR ANDROID)
   # Activate the embedded-data branch in chinese_loanword.cpp +
   # makes the generated header discoverable via #include "zh_en_loanword_data.h".
   target_compile_definitions(piper_common PRIVATE PIPER_PLUS_EMBEDDED_LOANWORD)
+  # Same for the Swedish function-word loader in language_detector.cpp
+  # (#include "sv_function_words_data.h").
+  target_compile_definitions(piper_common PRIVATE PIPER_PLUS_EMBEDDED_SV_FUNCTION_WORDS)
   target_include_directories(piper_common PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
 else()
   # Desktop install: ship the JSON next to the binary so
   # piper_plus_get_exe_dir() can resolve <exe-dir>/data/zh_en_loanword.json.
   install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/src/cpp/data/zh_en_loanword.json"
+          DESTINATION share/piper/dicts)
+  # Same for the Swedish per-word LID function-word list (Issue #539),
+  # resolved at runtime from <exe-dir>/data/sv_function_words.json.
+  install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/src/cpp/data/sv_function_words.json"
           DESTINATION share/piper/dicts)
 endif()

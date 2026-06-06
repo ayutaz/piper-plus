@@ -85,6 +85,11 @@ piper-plus ドキュメント。利用ガイド・各ランタイム連携・仕
 - [MOS benchmark](benchmark-mos.md) — PESQ / STOI / 主観評価フォーム
 - [Multi-runtime RTF (公開)](https://ayutaz.github.io/piper-plus/bench/multi-runtime/)
 
+## Research
+
+- [Research INDEX](research/README.md) — 先行研究・最新論文を用いた改善調査スナップショット
+- [改善調査 2026-06](research/improvement-survey-2026-06.md) — VITS2/MB-iSTFT を超える/取り込める先行研究 (増分改善 vs 大規模刷新)
+
 ## Development
 
 - [Contributing](../CONTRIBUTING.md) — Contribution guidelines

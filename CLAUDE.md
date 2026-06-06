@@ -174,6 +174,10 @@ B (FT) は A から `--devices 1`、`--base_lr 2e-5` (1/10 で catastrophic forg
 
 - **ZH-EN 混在ピンイン化** (`chinese.py:phonemize_embedded_english`) — 中国語に隣接する英単語 (acronym/loanword) を米国英語ではなく Mandarin pinyin で発音。`MultilingualPhonemizer` が `[zh,en,zh]`/`[zh,en]`/`[en,zh]` パターンを自動検出してディスパッチ。辞書 (canonical source): `src/python/g2p/piper_plus_g2p/data/zh_en_loanword.json` (acronyms 66 / loanwords 40 / letter_fallback 26 (A-Z))。カスタム上書きは `ChinesePhonemizer(zh_en_loanword_dict_paths=...)`。**全 10 mirror 同期** (Python canonical + Rust 2 crate / Go / C# / WASM / C++ / Kotlin Android / Swift G2P)。CI gate `ZH-EN Loanword Sync Gate / json-sync` が mirror + fixture の byte-for-byte 一致を強制 (`scripts/check_loanword_consistency.py`、`/check-loanword` skill)。Forward-compat loader: 全ランタイムで `schema_version: 2` の未来フィールド受理を pinning。Issue #384, [docs/reference/zh-en-loanword/README.md](docs/reference/zh-en-loanword/README.md)。
 
+### G2P 詳細機能 (スウェーデン語)
+
+- **単語単位 言語判定 (per-word LID)** (`multilingual.py` / `UnicodeLanguageDetector`) — `å`/`ä`/`ö` を含む sv 語 (例: `så`/`och`/`för`/`är`) の英語誤判定を修正 (Issue #539、#297 で実装 → #300 抽出で Python/Rust から脱落した回帰を復旧)。**保守的ポリシー**: strong indicator = `å`/`Å` (`strong_chars`) または 46 語の function-word リスト完全一致のみ。`ä`/`ö` 単独は独語/フィンランド語/借用語と共有のため weak (NOT strong_chars)。辞書 (canonical source): `src/python/g2p/piper_plus_g2p/data/sv_function_words.json`。**全ランタイム同期** (Python canonical + Python runtime / Rust 2 crate / Go / C# / WASM / C++ = 7 データミラー)。CI gate `Swedish LID Sync Gate / json-sync` が ZH-EN loanword gate と同型で 7 データミラー + 6 fixture matrix ミラーの byte-for-byte 一致を強制 (`scripts/check_swedish_lid_consistency.py` + `docs/spec/swedish-lid-mirrors.toml`)。Forward-compat loader: `schema_version: 2` の未来フィールド受理を pinning。[docs/reference/swedish-lid/README.md](docs/reference/swedish-lid/README.md)。
+
 ### ランタイム共通機能
 
 - **CPU 推論最適化 (Tier 1-2)** — 4 言語実装で ORT セッション設定統一、Warmup 2 回 (100 phonemes、scales=[0.667,1.0,0.8])、`.opt.onnx`+`.ok` キャッシュ、JA 音素化 LRU キャッシュ (Python のみ)。仕様: `docs/spec/ort-session-contract.toml`。CLI: `--no-warmup`。env: `PIPER_DISABLE_WARMUP`, `PIPER_DISABLE_CACHE`, `PIPER_INTRA_THREADS`。

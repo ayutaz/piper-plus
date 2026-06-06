@@ -147,14 +147,24 @@ describe('G2P.detectLanguage (sv)', () => {
         if (g2p) g2p.dispose();
     });
 
-    it('should detect Swedish for text dominated by \u00e5/\u00e4/\u00f6', () => {
-        // å ä ö are Swedish-specific chars; when they outnumber plain Latin chars
-        // the detector returns 'sv'
-        assert.equal(g2p.detectLanguage('\u00e5\u00e4\u00f6'), 'sv'); // åäö
+    it('should detect Swedish for a word containing the strong char å', () => {
+        // Issue #539: Swedish LID is a conservative word-level post-pass. The
+        // å (U+00E5) char is a STRONG indicator on its own, so a word /
+        // segment containing it is reclassified to 'sv'.
+        assert.equal(g2p.detectLanguage('\u00e5\u00e4\u00f6'), 'sv'); // åäö (has å)
     });
 
-    it('should detect Swedish for short word with \u00e5/\u00e4/\u00f6', () => {
-        assert.equal(g2p.detectLanguage('\u00f6l'), 'sv'); // öl
+    it('should detect Swedish for a function word with no special char', () => {
+        // 'och' carries no diacritic but is in the function-word set, which the
+        // old char-level approach could never detect.
+        assert.equal(g2p.detectLanguage('och'), 'sv');
+    });
+
+    it('should NOT detect Swedish for a short word with only the weak char ö', () => {
+        // Issue #539: ä/ö are WEAK (shared with German/Finnish/loanwords)
+        // and are NOT sufficient on their own. 'öl' is not a function word
+        // and has no strong char, so it stays the default Latin language ('en').
+        assert.equal(g2p.detectLanguage('\u00f6l'), 'en'); // öl
     });
 });
 

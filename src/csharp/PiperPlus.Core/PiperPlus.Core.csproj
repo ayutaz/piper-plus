@@ -54,4 +54,13 @@
                       LogicalName="PiperPlus.Core.Phonemize.Data.zh_en_loanword.json" />
   </ItemGroup>
 
+  <!-- Swedish per-word LID data (Issue #539). Byte-for-byte identical to
+       src/python/g2p/piper_plus_g2p/data/sv_function_words.json. Loaded by
+       UnicodeLanguageDetector for conservative Swedish detection (strong_chars
+       å/Å + 46 function words). Must be packaged or the post-pass no-ops. -->
+  <ItemGroup>
+    <EmbeddedResource Include="Phonemize/Data/sv_function_words.json"
+                      LogicalName="PiperPlus.Core.Phonemize.Data.sv_function_words.json" />
+  </ItemGroup>
+
 </Project>
