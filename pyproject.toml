@@ -20,11 +20,11 @@ dependencies = [
     "g2p-en>=2.1.0",
     "torch>=2.11.0",
     "torchaudio>=2.1.0",
-    "pytorch-lightning>=2.0",
+    "pytorch-lightning>=2.6.5",
     "librosa>=0.10",
-    "cython>=3.2.4",
+    "cython>=3.2.5",
     "pyopenjtalk-plus>=0.4",
-    "wandb>=0.26.1",
+    "wandb>=0.27.2",
     "transformers>=4.30",
     # workspace member refs: `uv sync` でこれらが自動 install される (root は
     # `package = false` なのでこの dependencies は実 install でなく resolver
@@ -56,8 +56,8 @@ inference = [
     "soundfile>=0.12",
     "pyopenjtalk-plus",
     "g2p-en>=2.1.0",
-    "fastapi>=0.136.1",
-    "uvicorn>=0.27",
+    "fastapi>=0.136.3",
+    "uvicorn>=0.49.0",
 ]
 
 inference-gpu = [
@@ -65,8 +65,8 @@ inference-gpu = [
     "soundfile>=0.12",
     "pyopenjtalk-plus",
     "g2p-en>=2.1.0",
-    "fastapi>=0.136.1",
-    "uvicorn>=0.27",
+    "fastapi>=0.136.3",
+    "uvicorn>=0.49.0",
 ]
 
 multilingual = [
@@ -78,7 +78,7 @@ train = [
     "scipy>=1.17.1",
     "librosa>=0.10",
     "soundfile>=0.12",
-    "pytorch-lightning>=2.0",
+    "pytorch-lightning>=2.6.5",
     "torchmetrics>=1.9.0",
     "transformers>=4.38",
     "onnx>=1.21.0",
@@ -88,8 +88,8 @@ train = [
     "unidic-lite>=1.0",
     "g2p-en>=2.1.0",
     "tensorboard>=2.16",
-    "wandb>=0.26.1",
-    "tqdm>=4.67.3",
+    "wandb>=0.27.2",
+    "tqdm>=4.68.1",
     "einops>=0.7",
     "numba>=0.59",
     "matplotlib>=3.10.9",
@@ -99,17 +99,17 @@ train = [
 ]
 
 dev = [
-    "black==26.3.1",
+    "black==26.5.1",
     "flake8==6.1.0",
     "mypy>=1.20.2",
     "pylint==3.3.9",
-    "ruff==0.15.15",
+    "ruff==0.15.16",
     "pytest>=9.0.3,<10",
     "pytest-cov==4.1.0",
     "pytest-xdist==3.8.0",
     "pytest-timeout==2.4.0",
     "pytest-mock==3.15.1",
-    "pytest-asyncio>=0.24",  # NEW: async FastAPI tests
+    "pytest-asyncio>=1.4.0",  # NEW: async FastAPI tests
     "coverage[toml]>=7.14.0",
     "types-requests==2.33.0.20260508",
     "types-PyYAML==6.0.12",
@@ -128,9 +128,9 @@ test = [
     "pytest-xdist==3.8.0",
     "pytest-timeout==2.4.0",
     "pytest-mock==3.15.1",
-    "pytest-asyncio>=0.24",  # NEW: async FastAPI tests
+    "pytest-asyncio>=1.4.0",  # NEW: async FastAPI tests
     "coverage[toml]>=7.14.0",
-    "ruff==0.15.15",
+    "ruff==0.15.16",
     "mypy>=1.20.2",
     "types-requests==2.33.0.20260508",
     "types-PyYAML==6.0.12",
@@ -165,10 +165,10 @@ members = [
 # よう root を `piper-plus-workspace` にした上で非 install 化)。
 package = false
 dev-dependencies = [
-    "ruff==0.15.15",
+    "ruff==0.15.16",
     "pytest>=9.0.3,<10",
     "pytest-timeout>=2.2.0",
-    "black==26.3.1",
+    "black==26.5.1",
     "fastapi>=0.135.1",
     "httpx>=0.28.1",
     # OpenAI SDK for end-to-end tests against /v1/audio/speech via
