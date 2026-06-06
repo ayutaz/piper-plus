@@ -52,7 +52,7 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v6.0.3
         with: { submodules: true }
 
       - name: Set up JDK 17
@@ -70,7 +70,7 @@ jobs:
 
       - name: Cache ONNX Runtime Android
         id: cache-ort-android
-        uses: actions/cache@v5.0.5
+        uses: actions/cache@v4.3.0
         with:
           path: ort-android/
           key: ort-android-${{ env.ONNXRUNTIME_VERSION }}-${{ matrix.abi }}
@@ -114,7 +114,7 @@ jobs:
           cp ort-android/lib/libonnxruntime.so staging/${{ matrix.abi }}/
 
       - name: Upload native libs
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: piper-plus-g2p-native-${{ matrix.abi }}
           path: staging/${{ matrix.abi }}/
@@ -129,7 +129,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v6.0.3
         with: { submodules: true }
 
       - name: Set up JDK 17
@@ -173,7 +173,7 @@ jobs:
 
       - name: Upload unit test reports
         if: always()
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: kotlin-g2p-l1-reports
           path: android/piper-plus-g2p/build/reports/tests/
@@ -187,7 +187,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v6.0.3
         with: { submodules: true }
 
       - name: Set up JDK 17
@@ -274,7 +274,7 @@ jobs:
           done
 
       - name: Upload AAR
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: piper-plus-g2p-aar
           path: android/piper-plus-g2p/build/outputs/aar/*.aar
@@ -289,7 +289,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v6.0.3
         with: { submodules: true }
 
       - name: Set up JDK 17
@@ -339,7 +339,7 @@ jobs:
 
       - name: Upload instrumented test reports
         if: always()
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: kotlin-g2p-l3-reports
           path: android/piper-plus-g2p/build/reports/androidTests/managedDevice/
@@ -356,7 +356,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v6.0.3
         with: { submodules: true }
       - name: Set up JDK 17
         uses: actions/setup-java@v4.8.0
@@ -370,7 +370,7 @@ jobs:
 
       - name: Cache ONNX Runtime Linux
         id: cache-ort-linux
-        uses: actions/cache@v5.0.5
+        uses: actions/cache@v4.3.0
         with:
           path: ort-linux/
           key: ort-linux-${{ env.ONNXRUNTIME_VERSION }}-x64
@@ -510,7 +510,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v6.0.3
         with: { submodules: true }
 
       - name: Install build deps
@@ -521,7 +521,7 @@ jobs:
 
       - name: Cache ONNX Runtime Linux
         id: cache-ort-asan
-        uses: actions/cache@v5.0.5
+        uses: actions/cache@v4.3.0
         with:
           path: ort-linux/
           key: ort-linux-${{ env.ONNXRUNTIME_VERSION }}-x64
@@ -575,7 +575,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v6.0.3
         with: { submodules: true }
 
       - name: Set up Python 3.12
@@ -612,7 +612,7 @@ jobs:
 
       - name: Upload regenerated golden (debug)
         if: always()
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: phoneme_test_cases_golden.regen
           path: tests/fixtures/g2p/phoneme_test_cases_golden.regen.json
@@ -628,7 +628,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v6.0.3
         with: { submodules: true }
       - name: Set up JDK 17
         uses: actions/setup-java@v4.8.0
@@ -666,7 +666,7 @@ jobs:
         run: gradle :app:assembleDebug --no-daemon --stacktrace
 
       - name: Upload sample APK
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: piper-plus-g2p-sample-debug
           path: examples/android-g2p-sample/app/build/outputs/apk/debug/*.apk

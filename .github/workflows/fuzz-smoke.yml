@@ -64,7 +64,7 @@ jobs:
       matrix:
         target: [fuzz_ssml, fuzz_text_splitter]
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v6.0.3
 
       - name: Install nightly Rust (cargo-fuzz requires nightly)
         run: |
@@ -115,7 +115,7 @@ jobs:
 
       - name: Upload crash artifacts (on failure)
         if: failure()
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: rust-fuzz-crashes-${{ matrix.target }}
           path: |
@@ -132,7 +132,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v6.0.3
 
       - name: Set up Python
         uses: actions/setup-python@v6.2.0
@@ -164,7 +164,7 @@ jobs:
 
       - name: Upload hypothesis examples DB (on failure)
         if: failure()
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: python-hypothesis-failures
           path: |

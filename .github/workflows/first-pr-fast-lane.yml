@@ -39,7 +39,7 @@ jobs:
       fast_lane: ${{ steps.eval.outputs.fast_lane }}
       reason: ${{ steps.eval.outputs.reason }}
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v6.0.3
       - uses: actions/setup-python@v6.2.0
         with:
           python-version: "3.13"
@@ -64,7 +64,7 @@ jobs:
       CONTRACT_GATES: >-
         Parity Hub,PUA Consistency Gate,ZH-EN Loanword Sync Gate,Migration Guide Lint,Migration <-> CHANGELOG Parity Gate,ORT Version Sync,ruff version pin synchronization,CHANGELOG breaking entries have resolvable migration cross-ref
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v6.0.3
       - uses: actions/setup-python@v6.2.0
         with:
           python-version: "3.13"

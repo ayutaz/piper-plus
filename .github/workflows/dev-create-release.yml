@@ -35,7 +35,7 @@ jobs:
       release_name: ${{ steps.get_release_name.outputs.name }}
       tag_name: ${{ steps.get_release_name.outputs.tag_name }}
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v6.0.3
         with:
           fetch-depth: 0
 
@@ -241,7 +241,7 @@ jobs:
       id-token: write       # OIDC for PyPI Trusted Publishing
       attestations: write   # SLSA build provenance attestation
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v6.0.3
 
       - name: Download all wheels
         uses: actions/download-artifact@v8.0.1
@@ -304,7 +304,7 @@ jobs:
       id-token: write
       attestations: write
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v6.0.3
 
       - name: Set up Python
         uses: actions/setup-python@v6.2.0
@@ -370,10 +370,10 @@ jobs:
             archive_ext: tar.gz
             cross: false
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v6.0.3
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v5.2.0
+        uses: actions/setup-dotnet@v5.3.0
         with:
           dotnet-version: 10.0.x
 
@@ -425,10 +425,10 @@ jobs:
       id-token: write       # required by attest-build-provenance
       attestations: write
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v6.0.3
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v5.2.0
+        uses: actions/setup-dotnet@v5.3.0
         with:
           dotnet-version: 10.0.x
 
@@ -503,7 +503,7 @@ jobs:
       id-token: write       # required by attest-build-provenance
       attestations: write
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v6.0.3
 
       - name: Validate crate version
         working-directory: src/rust
@@ -637,7 +637,7 @@ jobs:
             archive_ext: zip
             cross: false
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v6.0.3
 
       - uses: dtolnay/rust-toolchain@stable
         with:

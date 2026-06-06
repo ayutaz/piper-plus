@@ -47,7 +47,7 @@ jobs:
     # this line plus an entry in branch-protection-history.md.
     continue-on-error: true
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v6.0.3
       - uses: actions/setup-python@v6.2.0
         with:
           python-version: "3.13"
@@ -78,7 +78,7 @@ jobs:
           path: /tmp/diff.md
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4.6.0
+        uses: actions/upload-artifact@v4.6.2
         if: always()
         with:
           name: audio-mos-${{ github.run_id }}

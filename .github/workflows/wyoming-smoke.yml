@@ -52,7 +52,7 @@ jobs:
     # 25-min budget leaves room for transient network slowness.
     timeout-minutes: 25
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v6.0.3
 
       - name: Free disk space
         run: |

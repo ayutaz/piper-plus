@@ -35,7 +35,7 @@ jobs:
   syft-repo:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v6.0.3
         with:
           fetch-depth: 0
 
@@ -61,7 +61,7 @@ jobs:
   cyclonedx-python:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v6.0.3
       - uses: actions/setup-python@v6.2.0
         with:
           python-version: '3.11'
@@ -81,7 +81,7 @@ jobs:
           cyclonedx-py environment -o ../../../sbom-python-g2p.cyclonedx.json
         continue-on-error: true
 
-      - uses: actions/upload-artifact@v7.0.1
+      - uses: actions/upload-artifact@v4.6.2
         with:
           name: sbom-python
           path: |
@@ -95,7 +95,7 @@ jobs:
   cyclonedx-rust:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v6.0.3
       - uses: dtolnay/rust-toolchain@stable
 
       - name: Install cargo-cyclonedx
@@ -109,7 +109,7 @@ jobs:
         working-directory: src/rust
         run: cargo cyclonedx --format json
 
-      - uses: actions/upload-artifact@v7.0.1
+      - uses: actions/upload-artifact@v4.6.2
         with:
           name: sbom-rust
           path: sbom-rust*.json
@@ -121,8 +121,8 @@ jobs:
   cyclonedx-go:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v6.0.2
-      - uses: actions/setup-go@v6
+      - uses: actions/checkout@v6.0.3
+      - uses: actions/setup-go@v5.6.0
         with:
           go-version-file: src/go/go.mod
 
@@ -137,7 +137,7 @@ jobs:
         working-directory: src/go
         run: cyclonedx-gomod mod -json -output ../../sbom-go.cyclonedx.json
 
-      - uses: actions/upload-artifact@v7.0.1
+      - uses: actions/upload-artifact@v4.6.2
         with:
           name: sbom-go
           path: sbom-go.cyclonedx.json
@@ -149,8 +149,8 @@ jobs:
   cyclonedx-dotnet:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v6.0.2
-      - uses: actions/setup-dotnet@v5.2.0
+      - uses: actions/checkout@v6.0.3
+      - uses: actions/setup-dotnet@v5.3.0
         with:
           dotnet-version: 10.0.x
 
@@ -162,7 +162,7 @@ jobs:
           dotnet CycloneDX src/csharp/PiperPlus.sln \
             --json --filename sbom-csharp.cyclonedx.json --output .
 
-      - uses: actions/upload-artifact@v7.0.1
+      - uses: actions/upload-artifact@v4.6.2
         with:
           name: sbom-csharp
           path: sbom-csharp.cyclonedx.json
@@ -174,7 +174,7 @@ jobs:
   cyclonedx-npm:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v6.0.3
       - uses: actions/setup-node@v6.4.0
         with:
           node-version: '24'
@@ -194,7 +194,7 @@ jobs:
           cyclonedx-npm --output-file ../../../sbom-npm-openjtalk.cyclonedx.json
         continue-on-error: true
 
-      - uses: actions/upload-artifact@v7.0.1
+      - uses: actions/upload-artifact@v4.6.2
         with:
           name: sbom-npm
           path: |

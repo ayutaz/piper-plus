@@ -78,7 +78,7 @@ jobs:
       # tarball-extracted tree so we don't re-download on every PR push.
       - name: Cache ONNX Runtime
         id: cache-ort
-        uses: actions/cache@v5.0.5
+        uses: actions/cache@v4.3.0
         with:
           path: |
             /usr/local/lib/libonnxruntime*
@@ -100,7 +100,7 @@ jobs:
 
       # ── ccache (separate caches for head vs base to avoid eviction) ──
       - name: Setup ccache (head)
-        uses: actions/cache@v5.0.5
+        uses: actions/cache@v4.3.0
         with:
           path: ~/.cache/ccache
           key: abi-check-ccache-head-${{ github.sha }}
@@ -110,7 +110,7 @@ jobs:
 
       # ── Head checkout & build ─────────────────────────────────────────
       - name: Checkout PR head
-        uses: actions/checkout@v6.0.2
+        uses: actions/checkout@v6.0.3
         with:
           # fetch-depth: 0 を明示。shallow clone でも abi-dumper / cmake は
           # 動作するが、サブモジュール解決や base SHA との比較で履歴が必要に
@@ -142,7 +142,7 @@ jobs:
 
       # ── Base checkout & build (PR target) ─────────────────────────────
       - name: Checkout PR base
-        uses: actions/checkout@v6.0.2
+        uses: actions/checkout@v6.0.3
         with:
           # workflow_dispatch では pull_request.base.sha が null になるため、
           # default_branch (= dev) にフォールバックして base としてビルドする。
@@ -228,7 +228,7 @@ jobs:
 
       - name: Upload ABI report
         if: always() && env.ABI_SKIP != '1'
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: abi-compat-report
           path: |

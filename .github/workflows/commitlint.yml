@@ -28,7 +28,7 @@ jobs:
   lint:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v6.0.3
         with:
           # PR 範囲の commits 全て見るため、 base まで fetch 深さを広げる。
           # wagoid/commitlint-github-action は内部で git log を使うため、

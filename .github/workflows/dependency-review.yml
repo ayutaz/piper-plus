@@ -16,7 +16,7 @@ jobs:
   dependency-review:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v6.0.3
 
       - name: Dependency Review
         uses: actions/dependency-review-action@v4.9.0

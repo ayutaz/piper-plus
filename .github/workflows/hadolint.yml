@@ -42,7 +42,7 @@ jobs:
           - docker/webui/Dockerfile.distroless
 
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v6.0.3
 
       - name: Install hadolint
         # hadolint/hadolint-action@v3 は存在しないため (最新は v3.1.0 stable

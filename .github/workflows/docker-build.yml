@@ -74,15 +74,15 @@ jobs:
           sudo docker image prune --all --force
           sudo apt-get clean
 
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v6.0.3
       - uses: docker/setup-qemu-action@v3
-      - uses: docker/setup-buildx-action@v4.0.0
+      - uses: docker/setup-buildx-action@v3.12.0
 
       - name: Log in to ghcr.io
         # PR では push しないので ghcr.io login も不要 (token write 権限も
         # 持たない fork PR でここが落ちるのも回避できる)。
         if: github.event_name != 'pull_request'
-        uses: docker/login-action@v4.1.0
+        uses: docker/login-action@v4.2.0
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -90,7 +90,7 @@ jobs:
 
       - name: Extract metadata
         id: meta
-        uses: docker/metadata-action@v6.0.0
+        uses: docker/metadata-action@v6.1.0
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/python-inference
           tags: |
@@ -100,7 +100,7 @@ jobs:
 
       - name: Build and push to ghcr.io
         id: build
-        uses: docker/build-push-action@v7.1.0
+        uses: docker/build-push-action@v6.19.2
         with:
           context: .
           file: ./docker/python-inference/Dockerfile
@@ -118,7 +118,7 @@ jobs:
 
       - name: Install Cosign
         if: startsWith(github.ref, 'refs/tags/v')
-        uses: sigstore/cosign-installer@v4.1.2
+        uses: sigstore/cosign-installer@v3.10.1
         with:
           cosign-release: 'v2.4.1'
 
@@ -163,7 +163,7 @@ jobs:
         if: >-
           steps.dockerhub-check.outputs.available == 'true' &&
           (startsWith(github.ref, 'refs/tags/docker-v') || startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch')
-        uses: docker/login-action@v4.1.0
+        uses: docker/login-action@v4.2.0
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -173,7 +173,7 @@ jobs:
           steps.dockerhub-check.outputs.available == 'true' &&
           (startsWith(github.ref, 'refs/tags/docker-v') || startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch')
         id: meta-dockerhub
-        uses: docker/metadata-action@v6.0.0
+        uses: docker/metadata-action@v6.1.0
         with:
           images: ${{ secrets.DOCKERHUB_USERNAME }}/piper-plus-api
           tags: |
@@ -185,7 +185,7 @@ jobs:
         if: >-
           steps.dockerhub-check.outputs.available == 'true' &&
           (startsWith(github.ref, 'refs/tags/docker-v') || startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch')
-        uses: docker/build-push-action@v7.1.0
+        uses: docker/build-push-action@v6.19.2
         with:
           context: .
           file: ./docker/python-inference/Dockerfile
@@ -216,15 +216,15 @@ jobs:
           sudo docker image prune --all --force
           sudo apt-get clean
 
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v6.0.3
       - uses: docker/setup-qemu-action@v3
-      - uses: docker/setup-buildx-action@v4.0.0
+      - uses: docker/setup-buildx-action@v3.12.0
 
       - name: Log in to ghcr.io
         # PR では push しないので ghcr.io login も不要 (token write 権限も
         # 持たない fork PR でここが落ちるのも回避できる)。
         if: github.event_name != 'pull_request'
-        uses: docker/login-action@v4.1.0
+        uses: docker/login-action@v4.2.0
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -232,7 +232,7 @@ jobs:
 
       - name: Extract metadata
         id: meta
-        uses: docker/metadata-action@v6.0.0
+        uses: docker/metadata-action@v6.1.0
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/python-inference
           # `-cpu` suffix distinguishes from the CUDA-default tags above.
@@ -246,7 +246,7 @@ jobs:
 
       - name: Build and push CPU image (multi-arch)
         id: build
-        uses: docker/build-push-action@v7.1.0
+        uses: docker/build-push-action@v6.19.2
         with:
           context: .
           file: ./docker/python-inference/Dockerfile.cpu
@@ -265,7 +265,7 @@ jobs:
 
       - name: Install Cosign
         if: startsWith(github.ref, 'refs/tags/v')
-        uses: sigstore/cosign-installer@v4.1.2
+        uses: sigstore/cosign-installer@v3.10.1
         with:
           cosign-release: 'v2.4.1'
 
@@ -312,12 +312,12 @@ jobs:
           sudo docker image prune --all --force
           sudo apt-get clean
 
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v6.0.3
       - uses: docker/setup-qemu-action@v3
-      - uses: docker/setup-buildx-action@v4.0.0
+      - uses: docker/setup-buildx-action@v3.12.0
 
       - name: Build distroless trial image (multi-arch, no push)
-        uses: docker/build-push-action@v7.1.0
+        uses: docker/build-push-action@v6.19.2
         with:
           context: .
           file: ${{ matrix.target.dockerfile }}
@@ -344,15 +344,15 @@ jobs:
           sudo docker image prune --all --force
           sudo apt-get clean
 
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v6.0.3
       - uses: docker/setup-qemu-action@v3
-      - uses: docker/setup-buildx-action@v4.0.0
+      - uses: docker/setup-buildx-action@v3.12.0
 
       - name: Log in to ghcr.io
         # PR では push しないので ghcr.io login も不要 (token write 権限も
         # 持たない fork PR でここが落ちるのも回避できる)。
         if: github.event_name != 'pull_request'
-        uses: docker/login-action@v4.1.0
+        uses: docker/login-action@v4.2.0
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -360,7 +360,7 @@ jobs:
 
       - name: Extract metadata
         id: meta
-        uses: docker/metadata-action@v6.0.0
+        uses: docker/metadata-action@v6.1.0
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/python-train
           tags: |
@@ -370,7 +370,7 @@ jobs:
 
       - name: Build and push
         id: build
-        uses: docker/build-push-action@v7.1.0
+        uses: docker/build-push-action@v6.19.2
         with:
           context: .
           file: ./docker/python-train/Dockerfile
@@ -389,7 +389,7 @@ jobs:
 
       - name: Install Cosign
         if: startsWith(github.ref, 'refs/tags/v')
-        uses: sigstore/cosign-installer@v4.1.2
+        uses: sigstore/cosign-installer@v3.10.1
         with:
           cosign-release: 'v2.4.1'
 
@@ -419,15 +419,15 @@ jobs:
           sudo docker image prune --all --force
           sudo apt-get clean
 
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v6.0.3
       - uses: docker/setup-qemu-action@v3
-      - uses: docker/setup-buildx-action@v4.0.0
+      - uses: docker/setup-buildx-action@v3.12.0
 
       - name: Log in to ghcr.io
         # PR では push しないので ghcr.io login も不要 (token write 権限も
         # 持たない fork PR でここが落ちるのも回避できる)。
         if: github.event_name != 'pull_request'
-        uses: docker/login-action@v4.1.0
+        uses: docker/login-action@v4.2.0
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -435,7 +435,7 @@ jobs:
 
       - name: Extract metadata
         id: meta
-        uses: docker/metadata-action@v6.0.0
+        uses: docker/metadata-action@v6.1.0
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/cpp-dev
           tags: |
@@ -445,7 +445,7 @@ jobs:
 
       - name: Build and push
         id: build
-        uses: docker/build-push-action@v7.1.0
+        uses: docker/build-push-action@v6.19.2
         with:
           context: .
           file: ./docker/cpp-dev/Dockerfile
@@ -465,7 +465,7 @@ jobs:
 
       - name: Install Cosign
         if: startsWith(github.ref, 'refs/tags/v')
-        uses: sigstore/cosign-installer@v4.1.2
+        uses: sigstore/cosign-installer@v3.10.1
         with:
           cosign-release: 'v2.4.1'
 
@@ -500,15 +500,15 @@ jobs:
           sudo docker image prune --all --force
           sudo apt-get clean
 
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v6.0.3
       - uses: docker/setup-qemu-action@v3
-      - uses: docker/setup-buildx-action@v4.0.0
+      - uses: docker/setup-buildx-action@v3.12.0
 
       - name: Log in to ghcr.io
         # PR では push しないので ghcr.io login も不要 (token write 権限も
         # 持たない fork PR でここが落ちるのも回避できる)。
         if: github.event_name != 'pull_request'
-        uses: docker/login-action@v4.1.0
+        uses: docker/login-action@v4.2.0
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -516,7 +516,7 @@ jobs:
 
       - name: Extract metadata
         id: meta
-        uses: docker/metadata-action@v6.0.0
+        uses: docker/metadata-action@v6.1.0
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/cpp-inference
           tags: |
@@ -526,7 +526,7 @@ jobs:
 
       - name: Build and push
         id: build
-        uses: docker/build-push-action@v7.1.0
+        uses: docker/build-push-action@v6.19.2
         with:
           context: .
           file: ./docker/cpp-inference/Dockerfile
@@ -546,7 +546,7 @@ jobs:
 
       - name: Install Cosign
         if: startsWith(github.ref, 'refs/tags/v')
-        uses: sigstore/cosign-installer@v4.1.2
+        uses: sigstore/cosign-installer@v3.10.1
         with:
           cosign-release: 'v2.4.1'
 
@@ -584,15 +584,15 @@ jobs:
           sudo docker image prune --all --force
           sudo apt-get clean
 
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v6.0.3
       - uses: docker/setup-qemu-action@v3
-      - uses: docker/setup-buildx-action@v4.0.0
+      - uses: docker/setup-buildx-action@v3.12.0
 
       - name: Log in to ghcr.io
         # PR では push しないので ghcr.io login も不要 (token write 権限も
         # 持たない fork PR でここが落ちるのも回避できる)。
         if: github.event_name != 'pull_request'
-        uses: docker/login-action@v4.1.0
+        uses: docker/login-action@v4.2.0
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -600,7 +600,7 @@ jobs:
 
       - name: Extract metadata
         id: meta
-        uses: docker/metadata-action@v6.0.0
+        uses: docker/metadata-action@v6.1.0
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/wyoming
           tags: |
@@ -610,7 +610,7 @@ jobs:
 
       - name: Build and push to ghcr.io
         id: build
-        uses: docker/build-push-action@v7.1.0
+        uses: docker/build-push-action@v6.19.2
         with:
           context: .
           file: ./docker/wyoming/Dockerfile
@@ -630,7 +630,7 @@ jobs:
 
       - name: Install Cosign
         if: startsWith(github.ref, 'refs/tags/v')
-        uses: sigstore/cosign-installer@v4.1.2
+        uses: sigstore/cosign-installer@v3.10.1
         with:
           cosign-release: 'v2.4.1'
 
@@ -667,7 +667,7 @@ jobs:
         if: >-
           steps.dockerhub-check.outputs.available == 'true' &&
           (startsWith(github.ref, 'refs/tags/docker-v') || startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch')
-        uses: docker/login-action@v4.1.0
+        uses: docker/login-action@v4.2.0
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -677,7 +677,7 @@ jobs:
           steps.dockerhub-check.outputs.available == 'true' &&
           (startsWith(github.ref, 'refs/tags/docker-v') || startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch')
         id: meta-dockerhub
-        uses: docker/metadata-action@v6.0.0
+        uses: docker/metadata-action@v6.1.0
         with:
           images: ${{ secrets.DOCKERHUB_USERNAME }}/wyoming-piper-plus
           tags: |
@@ -689,7 +689,7 @@ jobs:
         if: >-
           steps.dockerhub-check.outputs.available == 'true' &&
           (startsWith(github.ref, 'refs/tags/docker-v') || startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch')
-        uses: docker/build-push-action@v7.1.0
+        uses: docker/build-push-action@v6.19.2
         with:
           context: .
           file: ./docker/wyoming/Dockerfile
@@ -715,15 +715,15 @@ jobs:
           sudo docker image prune --all --force
           sudo apt-get clean
 
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v6.0.3
       - uses: docker/setup-qemu-action@v3
-      - uses: docker/setup-buildx-action@v4.0.0
+      - uses: docker/setup-buildx-action@v3.12.0
 
       - name: Log in to ghcr.io
         # PR では push しないので ghcr.io login も不要 (token write 権限も
         # 持たない fork PR でここが落ちるのも回避できる)。
         if: github.event_name != 'pull_request'
-        uses: docker/login-action@v4.1.0
+        uses: docker/login-action@v4.2.0
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -731,7 +731,7 @@ jobs:
 
       - name: Extract metadata
         id: meta
-        uses: docker/metadata-action@v6.0.0
+        uses: docker/metadata-action@v6.1.0
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/webui
           tags: |
@@ -741,7 +741,7 @@ jobs:
 
       - name: Build and push to ghcr.io
         id: build
-        uses: docker/build-push-action@v7.1.0
+        uses: docker/build-push-action@v6.19.2
         with:
           context: .
           file: ./docker/webui/Dockerfile
@@ -758,7 +758,7 @@ jobs:
 
       - name: Install Cosign
         if: startsWith(github.ref, 'refs/tags/v')
-        uses: sigstore/cosign-installer@v4.1.2
+        uses: sigstore/cosign-installer@v3.10.1
         with:
           cosign-release: 'v2.4.1'
 
@@ -795,7 +795,7 @@ jobs:
         if: >-
           steps.dockerhub-check.outputs.available == 'true' &&
           (startsWith(github.ref, 'refs/tags/docker-v') || startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch')
-        uses: docker/login-action@v4.1.0
+        uses: docker/login-action@v4.2.0
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -805,7 +805,7 @@ jobs:
           steps.dockerhub-check.outputs.available == 'true' &&
           (startsWith(github.ref, 'refs/tags/docker-v') || startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch')
         id: meta-dockerhub
-        uses: docker/metadata-action@v6.0.0
+        uses: docker/metadata-action@v6.1.0
         with:
           images: ${{ secrets.DOCKERHUB_USERNAME }}/piper-plus-webui
           tags: |
@@ -817,7 +817,7 @@ jobs:
         if: >-
           steps.dockerhub-check.outputs.available == 'true' &&
           (startsWith(github.ref, 'refs/tags/docker-v') || startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch')
-        uses: docker/build-push-action@v7.1.0
+        uses: docker/build-push-action@v6.19.2
         with:
           context: .
           file: ./docker/webui/Dockerfile

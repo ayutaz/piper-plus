@@ -27,7 +27,7 @@ jobs:
       run:
         working-directory: src/go
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v6.0.3
         with:
           sparse-checkout: |
             src/go
@@ -43,7 +43,7 @@ jobs:
     name: golangci-lint (phonemize)
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v6.0.3
       - uses: actions/setup-go@v5.6.0
         with:
           go-version: '1.26'
@@ -58,7 +58,7 @@ jobs:
     needs: [test, lint]
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v6.0.3
         with:
           fetch-depth: 0
 

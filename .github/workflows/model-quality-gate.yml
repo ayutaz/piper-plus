@@ -37,7 +37,7 @@ jobs:
     # serial に走るため hung script が cost 暴走する risk あり。 15 min fail-fast。
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v6.0.3
 
       - uses: actions/setup-python@v6.2.0
         with:

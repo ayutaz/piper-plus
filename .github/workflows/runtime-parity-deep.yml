@@ -52,7 +52,7 @@ jobs:
     timeout-minutes: 20
     continue-on-error: true
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v6.0.3
       - uses: actions/setup-python@v6.2.0
         with:
           python-version: "3.11"
@@ -76,7 +76,7 @@ jobs:
             < "$FIXTURE"
           ls -lh /tmp/parity/python.wav
 
-      - uses: actions/upload-artifact@v4.6.0
+      - uses: actions/upload-artifact@v4.6.2
         with:
           name: parity-wav-python
           path: /tmp/parity/python.wav
@@ -90,7 +90,7 @@ jobs:
       run:
         working-directory: src/rust
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v6.0.3
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
@@ -115,7 +115,7 @@ jobs:
             < "$FIXTURE"
           ls -lh /tmp/parity/rust.wav
 
-      - uses: actions/upload-artifact@v4.6.0
+      - uses: actions/upload-artifact@v4.6.2
         with:
           name: parity-wav-rust
           path: /tmp/parity/rust.wav
@@ -126,8 +126,8 @@ jobs:
     timeout-minutes: 20
     continue-on-error: true
     steps:
-      - uses: actions/checkout@v6.0.2
-      - uses: actions/setup-go@v5.0.2
+      - uses: actions/checkout@v6.0.3
+      - uses: actions/setup-go@v5.6.0
         with:
           # Mirror go-ci.yml's pinned go-version so the Go runtime dlopens
           # the same libonnxruntime.so build pipeline the production CI uses.
@@ -135,7 +135,7 @@ jobs:
           go-version: "1.26"
 
       - name: Cache ONNX Runtime
-        uses: actions/cache@v5.0.5
+        uses: actions/cache@v4.3.0
         with:
           path: onnxruntime
           key: onnxruntime-linux-x64-${{ env.ORT_VERSION }}
@@ -174,7 +174,7 @@ jobs:
           mv /tmp/parity/go-out/line_001.wav /tmp/parity/go.wav
           ls -lh /tmp/parity/go.wav
 
-      - uses: actions/upload-artifact@v4.6.0
+      - uses: actions/upload-artifact@v4.6.2
         with:
           name: parity-wav-go
           path: /tmp/parity/go.wav
@@ -185,8 +185,8 @@ jobs:
     timeout-minutes: 25
     continue-on-error: true
     steps:
-      - uses: actions/checkout@v6.0.2
-      - uses: actions/setup-dotnet@v5.2.0
+      - uses: actions/checkout@v6.0.3
+      - uses: actions/setup-dotnet@v5.3.0
         with:
           dotnet-version: 10.0.x
 
@@ -204,7 +204,7 @@ jobs:
             < "$FIXTURE"
           ls -lh /tmp/parity/csharp.wav
 
-      - uses: actions/upload-artifact@v4.6.0
+      - uses: actions/upload-artifact@v4.6.2
         with:
           name: parity-wav-csharp
           path: /tmp/parity/csharp.wav
@@ -215,7 +215,7 @@ jobs:
     timeout-minutes: 30
     continue-on-error: true
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v6.0.3
 
       - name: Install system dependencies
         run: |
@@ -239,7 +239,7 @@ jobs:
             < "$FIXTURE"
           ls -lh /tmp/parity/cpp.wav
 
-      - uses: actions/upload-artifact@v4.6.0
+      - uses: actions/upload-artifact@v4.6.2
         with:
           name: parity-wav-cpp
           path: /tmp/parity/cpp.wav
@@ -253,7 +253,7 @@ jobs:
       run:
         working-directory: src/wasm/openjtalk-web
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v6.0.3
       - uses: actions/setup-node@v6.4.0
         with:
           node-version: "24"
@@ -276,7 +276,7 @@ jobs:
             < "$FIXTURE"
           ls -lh /tmp/parity/wasm.wav
 
-      - uses: actions/upload-artifact@v4.6.0
+      - uses: actions/upload-artifact@v4.6.2
         with:
           name: parity-wav-wasm
           path: /tmp/parity/wasm.wav
@@ -289,7 +289,7 @@ jobs:
     timeout-minutes: 10
     continue-on-error: true
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v6.0.3
       - uses: actions/setup-python@v6.2.0
         with:
           # Match dump-python (3.11) so scripts/audio_parity.py imports the
@@ -339,7 +339,7 @@ jobs:
           path: /tmp/parity/parity-diff.md
 
       - name: Upload diff + wavs
-        uses: actions/upload-artifact@v4.6.0
+        uses: actions/upload-artifact@v4.6.2
         if: always()
         with:
           name: runtime-parity-deep-${{ github.run_id }}
