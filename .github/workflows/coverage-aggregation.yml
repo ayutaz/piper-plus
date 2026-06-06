@@ -21,7 +21,7 @@ jobs:
     runs-on: ubuntu-24.04
     if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v6.0.3
 
       - name: Download coverage artifacts from triggering workflow
         uses: actions/download-artifact@v6.0.0

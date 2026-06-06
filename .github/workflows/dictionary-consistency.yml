@@ -52,7 +52,7 @@ jobs:
         # `if ! git diff --quiet`, which is bash-only.
         shell: bash
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v6.0.3
       - uses: actions/setup-python@v5.6.0
         with:
           python-version: '3.13'

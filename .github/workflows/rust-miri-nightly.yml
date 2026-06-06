@@ -34,7 +34,7 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 60  # miri は通常 cargo test の 10-50x 遅い
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v6.0.3
 
       - name: Install nightly toolchain with miri
         run: |
@@ -43,7 +43,7 @@ jobs:
           cargo +nightly miri --version
 
       - name: Cache cargo build
-        uses: actions/cache@v4.2.0
+        uses: actions/cache@v4.3.0
         with:
           path: |
             ~/.cargo/registry
@@ -72,7 +72,7 @@ jobs:
 
       - name: Upload miri output
         if: always()
-        uses: actions/upload-artifact@v4.6.0
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: miri-output
           path: src/rust/miri-output.log

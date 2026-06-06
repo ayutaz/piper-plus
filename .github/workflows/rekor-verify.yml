@@ -39,7 +39,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout
-        uses: actions/checkout@v6.0.2
+        uses: actions/checkout@v6.0.3
 
       - name: Setup Python
         uses: actions/setup-python@v5.6.0
@@ -47,9 +47,9 @@ jobs:
           python-version: '3.13'
 
       # cosign-installer version MUST match PR #511's signing workflow
-      # (sigstore/cosign-installer@v3.8.1 / cosign-release: v2.4.1).
+      # (sigstore/cosign-installer@v3.10.1 / cosign-release: v2.4.1).
       - name: Install cosign
-        uses: sigstore/cosign-installer@v3.8.1
+        uses: sigstore/cosign-installer@v3.10.1
         with:
           cosign-release: 'v2.4.1'
 
@@ -97,7 +97,7 @@ jobs:
 
       - name: Upload report
         if: always()
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: rekor-verify-report-${{ github.run_id }}
           path: /tmp/rekor-verify/report.md

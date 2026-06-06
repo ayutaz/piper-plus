@@ -38,7 +38,7 @@ jobs:
     timeout-minutes: 10
     continue-on-error: true
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v6.0.3
       - uses: actions/setup-python@v6.2.0
         with:
           python-version: "3.13"
@@ -56,7 +56,7 @@ jobs:
         run: |
           python scripts/fuzz_forward_compat.py record --input /tmp/fuzz.json
       - name: Upload artifact
-        uses: actions/upload-artifact@v4.6.0
+        uses: actions/upload-artifact@v4.6.2
         if: always()
         with:
           name: forward-compat-fuzz-${{ github.run_id }}

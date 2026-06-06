@@ -41,7 +41,7 @@ jobs:
             dist_subdir: rust-wasm-ja-lite
             artifact: piper-plus-wasm-ja-lite
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v6.0.3
 
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -78,7 +78,7 @@ jobs:
           SIZE=$(stat -c%s src/wasm/openjtalk-web/dist/${{ matrix.dist_subdir }}/piper_plus_wasm_bg.wasm)
           echo "WASM ${{ matrix.name }} size: $SIZE bytes ($(( SIZE / 1048576 )) MB)"
 
-      - uses: actions/upload-artifact@v7.0.1
+      - uses: actions/upload-artifact@v4.6.2
         with:
           name: ${{ matrix.artifact }}
           path: src/wasm/openjtalk-web/dist/${{ matrix.dist_subdir }}/

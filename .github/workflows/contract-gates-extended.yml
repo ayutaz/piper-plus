@@ -82,7 +82,7 @@ jobs:
           - artifact-retention
           - test-flake-retry
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v6.0.3
 
       # tomllib is in the stdlib from Python 3.11; pin to 3.13 to match
       # the other contract gates (e.g. zh-en-loanword-sync.yml).

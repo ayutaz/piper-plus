@@ -47,7 +47,7 @@ jobs:
       contents: write
       pull-requests: write
     steps:
-      - uses: release-drafter/release-drafter@v6.1.0
+      - uses: release-drafter/release-drafter@v6.4.0
         with:
           config-name: release-drafter.yml
           # disable-autolabeler: PR title から自動ラベル付与しない場合

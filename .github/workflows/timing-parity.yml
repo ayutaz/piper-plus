@@ -51,7 +51,7 @@ jobs:
     name: Phoneme timing fixture drift check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v6.0.3
 
       - uses: actions/setup-python@v6.2.0
         with:
@@ -70,7 +70,7 @@ jobs:
     name: Verify each runtime ships a parity test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v6.0.3
 
       - name: Assert all 6 per-runtime parity test files exist
         run: |

@@ -101,7 +101,7 @@ jobs:
     name: C-API examples compile check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v6.0.3
       - name: Install toolchain
         run: |
           sudo apt-get update
@@ -123,7 +123,7 @@ jobs:
     name: iOS toolchain & PrivacyInfo smoke
     runs-on: macos-14
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v6.0.3
       - name: PrivacyInfo.xcprivacy plist lint
         run: plutil -lint cmake/PrivacyInfo.xcprivacy
       - name: iOS toolchain syntax check (cmake -P)

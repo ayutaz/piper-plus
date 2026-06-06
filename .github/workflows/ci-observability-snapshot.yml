@@ -47,7 +47,7 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v6.0.3
 
       - uses: actions/setup-python@v6.2.0
         with:
@@ -63,7 +63,7 @@ jobs:
             --output ci-observability.json
 
       - name: Upload snapshot artifact
-        uses: actions/upload-artifact@v4.6.0
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: ci-observability-snapshot
           path: ci-observability.json

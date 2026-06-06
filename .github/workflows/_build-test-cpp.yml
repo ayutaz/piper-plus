@@ -43,7 +43,7 @@ jobs:
         build-type: ${{ fromJson(inputs.build-type-matrix) }}
 
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v6.0.3
         with:
           submodules: recursive
 
@@ -107,7 +107,7 @@ jobs:
       # ── Build cache ───────────────────────────────────────────
       - name: Setup build cache
         if: runner.os != 'Windows'
-        uses: actions/cache@v5.0.5
+        uses: actions/cache@v4.3.0
         with:
           path: |
             ~/.cache/ccache
@@ -229,7 +229,7 @@ jobs:
       - name: Cache test model
         if: ${{ inputs.run-integration-tests }}
         id: cache-test-model
-        uses: actions/cache@v5.0.5
+        uses: actions/cache@v4.3.0
         with:
           path: test/models/
           key: test-model-multilingual-medium-v1
@@ -506,7 +506,7 @@ jobs:
 
       - name: Upload test results on failure
         if: failure()
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: test-results-${{ matrix.os }}-${{ matrix.build-type }}
           path: |

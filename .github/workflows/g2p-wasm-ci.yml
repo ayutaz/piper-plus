@@ -40,7 +40,7 @@ jobs:
       run:
         working-directory: src/wasm/g2p
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v6.0.3
 
       - name: Setup Node.js
         uses: actions/setup-node@v6.4.0
@@ -73,7 +73,7 @@ jobs:
       run:
         working-directory: src/wasm/g2p
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v6.0.3
 
       - name: Setup Node.js
         uses: actions/setup-node@v6.4.0
@@ -100,7 +100,7 @@ jobs:
       run:
         working-directory: src/wasm/g2p
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v6.0.3
 
       - name: Setup Node.js
         uses: actions/setup-node@v6.4.0
@@ -138,7 +138,7 @@ jobs:
       run:
         working-directory: src/wasm/g2p
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v6.0.3
 
       - name: Setup Node.js
         uses: actions/setup-node@v6.4.0

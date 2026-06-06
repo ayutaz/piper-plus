@@ -43,7 +43,7 @@ jobs:
       run:
         working-directory: src/rust
     steps:
-    - uses: actions/checkout@v6.0.2
+    - uses: actions/checkout@v6.0.3
     - uses: actions/setup-python@v6.2.0
       with:
         python-version: '3.12'
@@ -66,7 +66,7 @@ jobs:
       run:
         working-directory: src/rust
     steps:
-    - uses: actions/checkout@v6.0.2
+    - uses: actions/checkout@v6.0.3
     - uses: dtolnay/rust-toolchain@stable
     - uses: Swatinem/rust-cache@v2
       with:
@@ -106,7 +106,7 @@ jobs:
       run:
         working-directory: src/rust/piper-wasm
     steps:
-    - uses: actions/checkout@v6.0.2
+    - uses: actions/checkout@v6.0.3
     - uses: dtolnay/rust-toolchain@stable
       with:
         targets: wasm32-unknown-unknown
@@ -134,7 +134,7 @@ jobs:
       run:
         working-directory: src/rust
     steps:
-    - uses: actions/checkout@v6.0.2
+    - uses: actions/checkout@v6.0.3
     - uses: dtolnay/rust-toolchain@stable
       with:
         components: rustfmt
@@ -147,7 +147,7 @@ jobs:
       run:
         working-directory: src/rust
     steps:
-    - uses: actions/checkout@v6.0.2
+    - uses: actions/checkout@v6.0.3
     - uses: actions/setup-python@v6.2.0
       with:
         python-version: '3.12'
@@ -171,7 +171,7 @@ jobs:
       run:
         working-directory: src/rust
     steps:
-    - uses: actions/checkout@v6.0.2
+    - uses: actions/checkout@v6.0.3
     - uses: actions/setup-python@v6.2.0
       with:
         python-version: '3.12'
@@ -185,7 +185,7 @@ jobs:
         workspaces: src/rust -> target
         key: coverage
     - name: Install cargo-llvm-cov
-      uses: taiki-e/install-action@v2.62.20
+      uses: taiki-e/install-action@v2.81.6
       with:
         tool: cargo-llvm-cov
     - name: Generate coverage (workspace, lcov)
@@ -226,7 +226,7 @@ jobs:
       run:
         working-directory: src/rust/piper-python
     steps:
-    - uses: actions/checkout@v6.0.2
+    - uses: actions/checkout@v6.0.3
     - uses: dtolnay/rust-toolchain@stable
     - uses: Swatinem/rust-cache@v2
       with:
@@ -261,7 +261,7 @@ jobs:
       run:
         working-directory: src/rust
     steps:
-    - uses: actions/checkout@v6.0.2
+    - uses: actions/checkout@v6.0.3
     - uses: dtolnay/rust-toolchain@stable
       with:
         targets: ${{ matrix.target }}
@@ -288,7 +288,7 @@ jobs:
         Compress-Archive -Path staging/* -DestinationPath ${{ matrix.artifact }}.zip
 
     - name: Upload artifact
-      uses: actions/upload-artifact@v7.0.1
+      uses: actions/upload-artifact@v4.6.2
       with:
         name: ${{ matrix.artifact }}
         path: src/rust/${{ matrix.artifact }}.${{ matrix.archive_ext }}

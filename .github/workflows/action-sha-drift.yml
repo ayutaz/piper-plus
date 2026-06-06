@@ -40,7 +40,7 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Checkout
-        uses: actions/checkout@v6.0.2
+        uses: actions/checkout@v6.0.3
 
       - name: Setup Python
         uses: actions/setup-python@v5.6.0
@@ -73,7 +73,7 @@ jobs:
         shell: bash
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: action-sha-drift-report-${{ github.run_id }}
           path: /tmp/action-sha-drift-report.md

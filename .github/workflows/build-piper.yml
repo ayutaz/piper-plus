@@ -47,7 +47,7 @@ jobs:
       build-path: ${{ steps.set-build-path.outputs.path }}
 
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v6.0.3
 
       - name: Set artifact name
         id: set-artifact-name
@@ -68,7 +68,7 @@ jobs:
       # Cache for Linux dependencies
       - name: Cache Linux dependencies
         if: runner.os == 'Linux'
-        uses: actions/cache@v5.0.5
+        uses: actions/cache@v4.3.0
         with:
           path: |
             /usr/local/lib/libonnxruntime*
@@ -78,7 +78,7 @@ jobs:
       # Cache for macOS dependencies
       - name: Cache macOS dependencies
         if: runner.os == 'macOS'
-        uses: actions/cache@v5.0.5
+        uses: actions/cache@v4.3.0
         with:
           path: |
             /usr/local/lib/libonnxruntime*
@@ -484,7 +484,7 @@ jobs:
 
       # Upload artifacts
       - name: Upload build artifact
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: ${{ steps.set-artifact-name.outputs.name }}
           path: |
@@ -496,7 +496,7 @@ jobs:
       # Upload build logs on failure
       - name: Upload build logs on failure
         if: failure()
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: build-logs-${{ runner.os }}-${{ github.sha }}
           path: |

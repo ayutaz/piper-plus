@@ -81,7 +81,7 @@ jobs:
             build_target: ''
 
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v6.0.3
 
       # PR / push event でも runner の disk 圧迫を回避するため軽量 cleanup。
       # python-inference (CUDA base) + cpp-dev (ubuntu builder + apt deps)
@@ -95,10 +95,10 @@ jobs:
           df -h | head -5
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3.7.1
+        uses: docker/setup-buildx-action@v3.12.0
 
       - name: Build image (no push, local only)
-        uses: docker/build-push-action@v6.10.0
+        uses: docker/build-push-action@v6.19.2
         with:
           context: ${{ matrix.target.context }}
           file: ${{ matrix.target.dockerfile }}
@@ -130,7 +130,7 @@ jobs:
 
       - name: Upload SARIF to GitHub Security tab
         if: always()
-        uses: github/codeql-action/upload-sarif@v3.30.6
+        uses: github/codeql-action/upload-sarif@v3.36.2
         with:
           sarif_file: trivy-${{ matrix.target.name }}.sarif
           category: trivy-${{ matrix.target.name }}
@@ -199,7 +199,7 @@ jobs:
             build_target: builder
 
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v6.0.3
 
       # 重 image (CUDA / ML stack / apt full) を build できるよう
       # ~14-15GB の空き容量を確保。 jlumbroso/free-disk-space は
@@ -219,10 +219,10 @@ jobs:
         run: df -h | head -5
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3.7.1
+        uses: docker/setup-buildx-action@v3.12.0
 
       - name: Build image (no push, middle stage only)
-        uses: docker/build-push-action@v6.10.0
+        uses: docker/build-push-action@v6.19.2
         with:
           context: .
           file: ${{ matrix.target.dockerfile }}
@@ -245,7 +245,7 @@ jobs:
 
       - name: Upload heavy SARIF
         if: always()
-        uses: github/codeql-action/upload-sarif@v3.30.6
+        uses: github/codeql-action/upload-sarif@v3.36.2
         with:
           sarif_file: trivy-heavy-${{ matrix.target.name }}.sarif
           category: trivy-heavy-${{ matrix.target.name }}

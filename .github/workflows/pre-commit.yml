@@ -56,7 +56,7 @@ jobs:
     # したため 35 分に延長 + 専用 workflow のある hook を更に SKIP に追加。
     timeout-minutes: 35
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v6.0.3
         with:
           # fetch-depth: 1 (HEAD only) — the base SHA needed for
           # `pre-commit run --from-ref` is fetched explicitly in the next
