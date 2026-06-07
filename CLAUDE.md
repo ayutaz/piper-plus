@@ -70,6 +70,17 @@ CHANGELOG unreleased) を full-repo で実行 (~20-30 秒)。`SKIP=...` で comm
 > 6 箇所一致を CI gate (本 gate がなければ Dependabot uv-workspace PR が
 > pyproject.toml だけ bump → drift → 後追い PR が発生する)。
 
+### ローカルテスト実行 (特に macOS)
+
+各ランタイムを CI と同条件でローカル実行する際の注意点 (macOS で検証済み):
+
+- **Python**: `uv sync --extra dev` で pytest-cov 等を入れてから `uv run --no-sync pytest <dir> --no-cov`。bare `uv sync` は plugin を入れず pytest.ini の `addopts=--cov` で usage error (exit 4) になる。
+- **Rust**: per-crate (`cargo test -p piper-plus` 等) で実行。`cargo test --workspace` は piper-plus-python (pyo3 auto-initialize) を含み、macOS の framework Python (`/usr/bin/python3`) では `@rpath` 解決失敗で SIGABRT。全 crate を回すなら `cargo test --workspace --exclude piper-plus-python --exclude piper-plus-wasm` (python は maturin / wasm は wasm-pack で別途テスト)。
+- **Go**: `src/go` と `src/go/phonemize` は別 go.mod。両方で `go test ./...` する。
+- **npm (openjtalk-web)**: `npm install "@piper-plus/g2p@file:../g2p"` でローカル g2p をリンク (registry 版は古いと isSsml 等の root export を欠く)。生成された file: リンクの lockfile は commit しない (lockfile-size gate)。
+- **C++**: `cmake -B build -DBUILD_TESTS=ON && cmake --build build -j && ctest --test-dir build` (ORT/OpenJTalk は cmake が自動 DL、sudo 不要)。
+- **Swift**: release 用 `Package.swift` は未リリース xcframework を参照するため `swift test` が 404。CI と同じ manifest swap か tag リリース後に実行する。
+
 ---
 
 ## 学習テンプレート
