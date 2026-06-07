@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-06-07
+
+### Added
+
+- **SSML public API root exports (`isSsml` / `parseSsml` / `SsmlParser`)**: these root re-exports already exist in `src/index.js`, but the registry's 0.4.0 predates them, so consumers importing from the main entry (e.g. `openjtalk-web`'s `synthesizeSsml`) hit `does not provide an export named 'isSsml'`. This 0.4.1 release ships those existing root exports to the registry (version bump only — no source / API change).
+
 ### Fixed
 
 - **Swedish (sv) per-word language detection (Issue #539)**: Swedish words containing `å`/`ä`/`ö` (e.g. `så`, `och`, `för`, `är`) were misdetected as English. The Swedish LID is reworked from the previous char-level approach to a word-level post-pass with a **conservative policy** (strong indicators: `å`/`Å` or an exact match in a 46-word function-word list; `ä`/`ö` alone are NOT sufficient — shared with German/Finnish/loanwords). `UnicodeLanguageDetector` now loads the bundled `data/sv_function_words.json`, byte-identical to every other runtime mirror and enforced by a new cross-runtime sync gate.
