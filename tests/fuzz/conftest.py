@@ -18,7 +18,17 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from hypothesis import HealthCheck, Verbosity, settings
+
+try:
+    from hypothesis import HealthCheck, Verbosity, settings
+
+    _HAS_HYPOTHESIS = True
+except ImportError:
+    # hypothesis は fuzz 専用の optional dep (src/python/g2p[dev] / fuzz-smoke.yml で
+    # install)。未インストール時はこのディレクトリの collection をスキップし、
+    # repo-root の `pytest tests` 全体を ModuleNotFoundError で中断させない。
+    _HAS_HYPOTHESIS = False
+    collect_ignore_glob = ["test_*.py"]
 
 
 # Ensure the source modules under test are importable without installing the
@@ -34,21 +44,22 @@ for _p in (
             sys.path.insert(0, _path)
 
 
-settings.register_profile(
-    "dev",
-    max_examples=50,
-    deadline=None,
-    verbosity=Verbosity.normal,
-    suppress_health_check=[HealthCheck.too_slow, HealthCheck.large_base_example],
-)
+if _HAS_HYPOTHESIS:
+    settings.register_profile(
+        "dev",
+        max_examples=50,
+        deadline=None,
+        verbosity=Verbosity.normal,
+        suppress_health_check=[HealthCheck.too_slow, HealthCheck.large_base_example],
+    )
 
-settings.register_profile(
-    "ci",
-    max_examples=500,
-    deadline=None,
-    verbosity=Verbosity.normal,
-    suppress_health_check=[HealthCheck.too_slow, HealthCheck.large_base_example],
-)
+    settings.register_profile(
+        "ci",
+        max_examples=500,
+        deadline=None,
+        verbosity=Verbosity.normal,
+        suppress_health_check=[HealthCheck.too_slow, HealthCheck.large_base_example],
+    )
 
-# Default profile used when running pytest without `--hypothesis-profile`.
-settings.load_profile("dev")
+    # Default profile used when running pytest without `--hypothesis-profile`.
+    settings.load_profile("dev")
