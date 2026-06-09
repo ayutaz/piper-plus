@@ -13,8 +13,8 @@
 #   する場合は本 file の `bytes` 値を更新して PR で justification 必須。
 
 [meta]
-last_audit_date = "2026-05-17"
-last_audit_pr = "PR #498 (Wave 5)"
+last_audit_date = "2026-06-09"
+last_audit_pr = "PR #556 (openjtalk-web @piper-plus/g2p ^0.4.1)"
 warn_pct = 20
 fail_pct = 50
 forward_compat_policy = "strict"
@@ -31,7 +31,7 @@ bytes = 100219
 description = "Rust workspace (piper-core, piper-cli, piper-python, piper-wasm)"
 
 [lockfiles."src/wasm/openjtalk-web/package-lock.json"]
-bytes = 7551
+bytes = 73145
 description = "WASM npm package (openjtalk-web)"
 
 [lockfiles."src/wasm/g2p/package-lock.json"]
