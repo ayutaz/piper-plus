@@ -14,7 +14,7 @@
 
 [meta]
 last_audit_date = "2026-06-09"
-last_audit_pr = "PR #498 (Wave 5) / openjtalk-web updated to @piper-plus/g2p@^0.4.1"
+last_audit_pr = "PR #556 (openjtalk-web @piper-plus/g2p ^0.4.1)"
 warn_pct = 20
 fail_pct = 50
 forward_compat_policy = "strict"
