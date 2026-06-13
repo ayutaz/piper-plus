@@ -43,6 +43,12 @@ on:
       - 'docs/spec/pua-contract.toml'
       - 'scripts/check_pua_consistency.py'
       - '.github/workflows/pua-consistency.yml'
+  schedule:
+    # Weekly: catch a stale *distributed* (HuggingFace) config — e.g. the
+    # v1.12.0 ɔɪ/œ̃/ɐ̃ multi-codepoint leak that broke C++ inference on Windows.
+    # PR-time gates cannot see it because the artifact lives on HF, not the repo.
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
@@ -213,3 +219,69 @@ jobs:
               print(f"OK: $cfg ({len(pid_map)} phoneme_id_map entries, all single-codepoint)")
           EOF
           done
+
+  distributed-config-validator:
+    name: Distributed (HF) config validator
+    # Only on schedule / manual dispatch: avoids HuggingFace egress on every
+    # PR. The in-repo configs are covered by config-key-validator above; this
+    # job catches a stale *distributed* config.json — the failure mode behind
+    # the v1.12.0 ɔɪ/œ̃/ɐ̃ leak that broke C++ inference for Windows users
+    # (the corrected config must be regenerated AND re-pushed to HuggingFace,
+    # which a PR-time gate cannot verify).
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6.0.3
+      - uses: actions/setup-python@v5.6.0
+        with:
+          python-version: '3.13'
+
+      - name: Validate HF-distributed model configs are PUA single-codepoint
+        run: |
+          python - <<'EOF'
+          import importlib.util, json, sys, urllib.request
+
+          # Load MODEL_ALIASES by file path so we don't import the piper_plus
+          # package __init__ (and its heavier optional deps). This dict is the
+          # single source of truth for which models we distribute.
+          spec = importlib.util.spec_from_file_location(
+              "_model_resolver", "src/python/piper_plus/_model_resolver.py")
+          mod = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(mod)
+          aliases = mod.MODEL_ALIASES
+
+          failures = []
+          for name, a in aliases.items():
+              url = (f"https://huggingface.co/{a['repo_id']}"
+                     f"/resolve/main/{a['config_file']}")
+              print(f"Checking '{name}': {url}")
+              try:
+                  with urllib.request.urlopen(url, timeout=30) as r:
+                      data = json.loads(r.read().decode("utf-8"))
+              except Exception as e:  # network/transient — log, do not flake-fail
+                  print(f"  WARN: could not fetch ({e}); skipping this model")
+                  continue
+              pid = data.get("phoneme_id_map", {})
+              bad = [k for k in pid if len(k) > 1]
+              if bad:
+                  hexed = ["+".join(f"U+{ord(c):04X}" for c in k) for k in bad]
+                  print(f"  FAIL: {len(bad)} multi-codepoint key(s): {hexed}")
+                  failures.append((name, hexed))
+              else:
+                  print(f"  OK: {len(pid)} entries, all single-codepoint")
+
+          if failures:
+              print("\nDistributed config validation FAILED:")
+              for name, hexed in failures:
+                  print(f"  {name}: {hexed}")
+              print(
+                  "\nFix: regenerate the config with PUA-encoded keys via "
+                  "`python scripts/regenerate_tsukuyomi_config.py` (or "
+                  "`python -m piper_train.update_model_config <cfg>`) and "
+                  "re-push it to HuggingFace. The C++ runtime rejects "
+                  "multi-codepoint phoneme_id_map keys (see "
+                  "src/cpp/tests/test_phonemize_config.cpp).")
+              sys.exit(1)
+          print("\nAll distributed configs OK.")
+          EOF
