@@ -201,11 +201,11 @@ B (FT) は A から `--devices 1`、`--base_lr 2e-5` (1/10 で catastrophic forg
 
 | ランタイム | パッケージ | バージョン | テスト | パス |
 |-----------|----------|----------|-------|------|
-| Python (PyPI) | `piper-plus` | 1.12.0 | pytest 多数 | `src/python_run/piper/` |
-| C# (NuGet) | `PiperPlus.Core` / `PiperPlus.Cli` | 0.3.0 | ~1000 (xUnit v3) | `src/csharp/PiperPlus.{Core,Cli}/` (TFM `net10.0`) |
-| Rust (crates.io) | `piper-plus` / `piper-plus-cli` | 0.4.0 | 多数 | `src/rust/piper-{core,cli,python,wasm}/` |
+| Python (PyPI) | `piper-plus` | 1.13.0 | pytest 多数 | `src/python_run/piper/` |
+| C# (NuGet) | `PiperPlus.Core` / `PiperPlus.Cli` | 0.4.0 | ~1000 (xUnit v3) | `src/csharp/PiperPlus.{Core,Cli}/` (TFM `net10.0`) |
+| Rust (crates.io) | `piper-plus` / `piper-plus-cli` | 0.5.0 | 多数 | `src/rust/piper-{core,cli,python,wasm}/` |
 | Go (Go module) | `github.com/ayutaz/piper-plus/src/go` | tag-based | 793 | `src/go/piperplus/`, `src/go/cmd/piper-plus/` |
-| JS/WASM (npm) | `piper-plus` | 0.6.0 | ~1200 + 56 (Rust) | `src/wasm/openjtalk-web/`, `src/rust/piper-wasm/` |
+| JS/WASM (npm) | `piper-plus` | 0.7.0 | ~1200 + 56 (Rust) | `src/wasm/openjtalk-web/`, `src/rust/piper-wasm/` |
 | C API | `libpiper_plus` | shared lib | C/Dart/Godot サンプル | `src/cpp/piper_plus.{h,c_api.cpp}`, `cmake/PiperPlusShared.cmake` |
 | iOS xcframework + SPM | `piper-plus` (Swift Package) | 1.13.0+ (M4) | release-shared-lib CI | `Package.swift`, `Sources/PiperPlus/`, `cmake/PrivacyInfo.xcprivacy` |
 | **Kotlin/Android G2P (Maven Central)** | `io.github.ayutaz:piper-plus-g2p-android` | 1.0.0+ | L1〜L5 (kotlin-g2p-ci.yml) | `android/piper-plus-g2p/` |
