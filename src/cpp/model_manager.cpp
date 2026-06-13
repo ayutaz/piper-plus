@@ -267,16 +267,26 @@ static bool downloadFile(const std::string& url,
     spdlog::info("Downloading {} ...", url);
 
 #ifdef _WIN32
-    // Pass URL / OutFile as separate parameters to PowerShell rather than
-    // embedding them in the -Command string — Invoke-WebRequest binds them
-    // to its named parameters without re-parsing.
-    const std::string ps_script =
-        std::string("Invoke-WebRequest -Uri $args[0] -OutFile $args[1]");
+    // PowerShell's -Command does NOT bind trailing positional arguments to
+    // $args (only -File does). The previous "-Uri $args[0] -OutFile $args[1]"
+    // form therefore left both empty, and Invoke-WebRequest failed with
+    // "Cannot validate argument on parameter 'Uri'. The argument is null or
+    // empty." — breaking --download-model on Windows entirely.
+    //
+    // Pass URL / OutFile via environment variables instead: the _spawnvp child
+    // inherits the parent environment, and env values are never re-parsed as
+    // code (injection-safe, so no shell-quoting concerns). The variables are
+    // cleared immediately after the spawn returns.
+    _putenv_s("PIPER_DL_URI", url.c_str());
+    _putenv_s("PIPER_DL_OUT", outStr.c_str());
     const char* argv[] = {
-        "powershell", "-NoProfile", "-Command", ps_script.c_str(),
-        url.c_str(), outStr.c_str(), nullptr,
+        "powershell", "-NoProfile", "-Command",
+        "Invoke-WebRequest -Uri $env:PIPER_DL_URI -OutFile $env:PIPER_DL_OUT",
+        nullptr,
     };
     int rc = piper_run_argv(argv);
+    _putenv_s("PIPER_DL_URI", "");
+    _putenv_s("PIPER_DL_OUT", "");
     return rc == 0;
 #else
     // Prefer curl, fall back to wget. Look up the binary on PATH locations
