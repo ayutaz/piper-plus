@@ -1,0 +1,23 @@
+# cargo-audit configuration for the piper-plus Rust workspace.
+#
+# `ignore` lists RUSTSEC advisories we have consciously accepted as
+# non-actionable for now. Each entry MUST document why it is safe and when it
+# can be removed. The Security Audit CI job (`.github/workflows/security-audit.yml`)
+# runs `cargo audit` from this directory, so this file gates that check.
+
+[advisories]
+ignore = [
+    # pyo3 0.24.2 — out-of-bounds read in PyList/PyTuple iterator nth/nth_back.
+    # pyo3 0.24.2 — missing Sync bound on PyCFunction::new_closure.
+    #
+    # Both are fixed only in pyo3 >= 0.29.0, but the `numpy` crate (rust-numpy)
+    # — including its main branch — still requires pyo3 ^0.28, so bumping pyo3
+    # to 0.29 is impossible without dropping the numpy dependency. Neither
+    # vulnerable API is reached by our binding (src/rust/piper-python): it does
+    # not call nth/nth_back on PyList/PyTuple iterators, nor PyCFunction::new_closure.
+    #
+    # REMOVE these two entries (and bump pyo3 -> 0.29 + numpy -> the matching
+    # release) once rust-numpy ships a pyo3 0.29-compatible version.
+    "RUSTSEC-2026-0176",
+    "RUSTSEC-2026-0177",
+]
