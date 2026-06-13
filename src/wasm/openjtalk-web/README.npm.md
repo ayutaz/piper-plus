@@ -46,7 +46,7 @@ npm install piper-plus onnxruntime-web
 <script type="importmap">
 {
   "imports": {
-    "piper-plus": "https://cdn.jsdelivr.net/npm/piper-plus@0.6.0/src/index.js",
+    "piper-plus": "https://cdn.jsdelivr.net/npm/piper-plus@0.7.0/src/index.js",
     "onnxruntime-web": "https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.mjs"
   }
 }

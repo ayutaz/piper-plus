@@ -19,6 +19,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### G2P 文単位並列化 + ORT 推論オーバーラップ (Issue #383)
+
+G2P (音素化) を文単位で並列化し、全 5 ランタイム (Python/Rust/C#/Go/C++) に展開。Python は ORT 推論との pipeline 化で長文の TTFB を短縮 (代表値: Go N=20 で約 3.96x、Python で約 -19%)。新 env var `PIPER_G2P_PARALLELISM` で並列度を全ランタイム共通制御でき、`PIPER_G2P_PARALLELISM=1` で逐次の旧挙動に戻せる (Breaking なし)。PR #403。
+
 #### 2 image distroless trial Dockerfiles + CI (webui / cpp-inference)
 
 PR #523 (python-inference) で確立した distroless trial pattern を、 deploy 検証要件のない 2 image に bundle 適用。 既存 `Dockerfile` / `docker-compose` / 関連 CI は **不変更で残し**、 並行 `Dockerfile.distroless` を 2 枚追加して build / size A/B / smoke test を CI で実証する scope。 promotion (canonical 置換) は image 別に別 PR。
@@ -302,6 +306,7 @@ v1.12.0 で 5 ランタイム (Python/Rust/C#/Go/WASM) に展開した SSML / Vo
 - 推論の EOS region trim を全 6 ランタイム (Python / Rust / Go / C# / WASM / C++) で全入力に対し適用し、ファインチューニング済みモデル (つくよみちゃん等) で末尾音節が二重に聞こえる問題を修正 (Issue #499、PR #506 / #507)。**挙動変更注記:** 本修正により全モデル・全ランタイムで出力音声の末尾フレーム (`ceil(durations[-1])` 由来の EOS region) が trim され、v1.12.0 比で出力音声長・末尾が変化する。バグ修正だがデフォルト出力が変わるため明示 (破壊的変更ではない)
 - Go の text splitter を Python / Rust の canonical 実装 (post-consume 方式) に統一し、CJK 句読点 + 閉じ括弧パターンが 1 文として誤結合されていた問題を修正 (Issue #346、PR #504)
 - リリース QA で判明した Windows ビルドの諸問題を修正 (PR #505): `.gitattributes` の `eol=lf` catch-all 追加 (CRLF チェックアウトで gofmt / byte-sync gate が破損)、contract gate スクリプトの cp932 / cp1252 コンソール `UnicodeEncodeError` crash、`check_secret_path_reference` の Windows パス処理
+- v1.12.0 の MB-iSTFT-VITS2 ONNX (つくよみちゃん等) を Docker python-inference / webui サーバや Rust / C++ ランタイムで実行すると `Required inputs (speaker_embedding, speaker_embedding_mask) are missing` で 500 エラー / ロード失敗していた問題を修正 (Issue #426、PR #443)。推論側 4 箇所で speaker_embedding 入力の有無を ONNX セッションから動的判定し、未使用時は zero embedding + mask=0 を feed する fallback を追加。実モデルでの回帰を防ぐ integration gate も追加
 
 ### Security
 
