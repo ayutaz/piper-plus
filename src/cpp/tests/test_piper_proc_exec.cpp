@@ -191,6 +191,66 @@ TEST(PiperProcExec, CaptureArgvNonexistentBinaryReturnsError) {
     EXPECT_LE(n, sizeof(buf));
 }
 
+#if defined(_WIN32)
+// Windows-only regression guard for the --download-model PowerShell bug.
+//
+// model_manager.cpp / openjtalk_dictionary_manager.c previously built
+// `powershell -NoProfile -Command "Invoke-WebRequest -Uri $args[0] ..."` and
+// passed the URL / OutFile as trailing positional argv elements. PowerShell's
+// -Command (unlike -File) does NOT bind positional arguments to $args, so
+// $args[0] was empty and Invoke-WebRequest failed with "argument is null or
+// empty", breaking model + dictionary downloads on Windows entirely.
+//
+// The fix passes those values via environment variables referenced as
+// $env:VAR. These two tests pin both halves of that fact so the regression
+// cannot silently return.
+//
+// Both use piper_run_argv (which spawns via _spawnvp directly) and assert on
+// the child *exit code*, NOT captured stdout: piper_capture_argv routes
+// through `cmd.exe /c` with per-arg quoting, whose outer-quote-stripping
+// mangles a multi-arg `powershell` command line. The real download path also
+// uses piper_run_argv, so this matches production.
+
+TEST(PiperProcExec, PowerShellCommandDoesNotBindPositionalArgsToDollarArgs) {
+    if (!piper_proc_exec_supported()) {
+        GTEST_SKIP();
+    }
+    // OLD (broken) pattern: the token is passed positionally. Under -Command
+    // $args[0] is NOT bound, so the comparison fails and the script exits 7.
+    const char* argv[] = {
+        "powershell", "-NoProfile", "-Command",
+        "if ($args[0] -eq 'PIPER_TOK') { exit 0 } else { exit 7 }",
+        "PIPER_TOK", nullptr,
+    };
+    int rc = piper_run_argv(argv);
+    EXPECT_NE(rc, 0)
+        << "PowerShell -Command must NOT bind positional args to $args (root "
+           "cause of the old --download-model failure); the $args[0] match "
+           "unexpectedly succeeded (rc=0).";
+}
+
+TEST(PiperProcExec, PowerShellEnvVarBindingDeliversValue) {
+    if (!piper_proc_exec_supported()) {
+        GTEST_SKIP();
+    }
+    // NEW (fixed) pattern: deliver the value via an environment variable and
+    // reference it as $env:VAR. The _spawnvp child inherits the parent
+    // environment, so the comparison succeeds and the script exits 0.
+    _putenv_s("PIPER_PROC_EXEC_TEST_VAL", "PIPER_TOK");
+    const char* argv[] = {
+        "powershell", "-NoProfile", "-Command",
+        "if ($env:PIPER_PROC_EXEC_TEST_VAL -eq 'PIPER_TOK') "
+        "{ exit 0 } else { exit 7 }",
+        nullptr,
+    };
+    int rc = piper_run_argv(argv);
+    _putenv_s("PIPER_PROC_EXEC_TEST_VAL", "");  // clear
+    EXPECT_EQ(rc, 0)
+        << "PowerShell must resolve $env:VAR from the inherited environment "
+           "(how the fixed download path passes URL/OutFile); rc=" << rc;
+}
+#endif
+
 #if !defined(_WIN32)
 // POSIX-only: shell metacharacters in argv must NOT be interpreted by a
 // shell — the whole point of argv-based exec. Pass a string with `;` and

@@ -40,15 +40,18 @@ static int verify_checksum(const char* file_path, const char* expected_sha256) {
     fprintf(stderr, "Verifying checksum...\n");
 
 #ifdef _WIN32
-    // PowerShell Get-FileHash. -Path is a parameter — the file path is
-    // passed via positional argument, not interpolated into a command
-    // string, so cmd.exe never sees it.
+    // PowerShell -Command does NOT bind trailing positional arguments to
+    // $args (only -File does), so the previous "-Path $args[0]" form left the
+    // path empty. Pass it via an environment variable instead: it is inherited
+    // by the child process and never re-parsed as code (injection-safe).
+    _putenv_s("PIPER_HASH_PATH", file_path);
     const char* const argv[] = {
         "powershell", "-NoProfile", "-Command",
-        "(Get-FileHash -Path $args[0] -Algorithm SHA256).Hash",
-        file_path, NULL,
+        "(Get-FileHash -Path $env:PIPER_HASH_PATH -Algorithm SHA256).Hash",
+        NULL,
     };
     spawn_rc = piper_capture_argv(argv, result, sizeof(result), &bytes_read);
+    _putenv_s("PIPER_HASH_PATH", "");
 #else
     // Probe for sha256sum / shasum at fixed paths (skip `which`, which
     // would re-introduce a shell sink that CodeQL flags).
@@ -360,12 +363,20 @@ static int download_and_extract_dictionary() {
 
 #ifdef _WIN32
     {
+        // PowerShell -Command does not bind positional args to $args; pass the
+        // URL / OutFile via environment variables (inherited by the child, not
+        // re-parsed as code) instead. See model_manager.cpp downloadFile() for
+        // the full rationale.
+        _putenv_s("PIPER_DL_URI", DICTIONARY_URL);
+        _putenv_s("PIPER_DL_OUT", archive_path);
         const char* const argv[] = {
             "powershell", "-NoProfile", "-Command",
-            "Invoke-WebRequest -Uri $args[0] -OutFile $args[1]",
-            DICTIONARY_URL, archive_path, NULL,
+            "Invoke-WebRequest -Uri $env:PIPER_DL_URI -OutFile $env:PIPER_DL_OUT",
+            NULL,
         };
         download_rc = piper_run_argv(argv);
+        _putenv_s("PIPER_DL_URI", "");
+        _putenv_s("PIPER_DL_OUT", "");
     }
 #else
     // Probe for curl / wget at fixed paths (avoids shell-based `which`).

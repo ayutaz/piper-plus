@@ -42,6 +42,9 @@ env:
   # Issue #383 follow-up: ORT 1.17.0 → 1.20.0
   # C++ source build / Android PR CI / Kotlin G2P CI と整合 (docs/reference/ort-versions.md)
   ONNXRUNTIME_VERSION: "1.20.0"
+  # Issue #426 release smoke: the MB-iSTFT speaker_embedding fixture, generated
+  # on Linux and consumed by the Windows binary smoke job below.
+  FIXTURE_DIR: tests/fixtures/mb_istft_speaker_embedding
 
 jobs:
   build-shared:
@@ -180,6 +183,96 @@ jobs:
         with:
           name: ${{ matrix.artifact }}
           path: ${{ github.workspace }}/${{ matrix.artifact }}.${{ matrix.archive_ext }}
+
+  # ---------------------------------------------------------------------
+  # Issue #426 release smoke: confirm the released Windows piper.exe feeds
+  # speaker_embedding / speaker_embedding_mask for MB-iSTFT-VITS2 models.
+  # ---------------------------------------------------------------------
+  # PR #443 fixed the runtime to feed a zero embedding + mask=0 when a model
+  # declares those inputs, but v1.12.0 shipped a Windows binary built BEFORE
+  # that fix, so users hit ORT "Required inputs ... are missing" and a 0-byte
+  # WAV. No release-time gate caught it. These two jobs close that gap: the
+  # fixture is generated on Linux (fast torch wheel) and the actual released
+  # windows-x64 artifact is exercised against it on Windows.
+  build-fixture:
+    name: Build speaker_embedding fixture (Python + torch)
+    # Only when the windows-x64 artifact will exist (build-shared skips Windows
+    # on pull_request), so the downstream smoke job has something to test.
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6.0.3
+      - uses: actions/setup-python@v6.2.0
+        with:
+          python-version: '3.13'
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Sync deps
+        run: uv sync --extra dev
+      - name: Build fixture
+        run: |
+          CUDA_VISIBLE_DEVICES="" uv run python "${FIXTURE_DIR}/build_fixture.py"
+          ls -la "${FIXTURE_DIR}"
+      - name: Upload fixture
+        uses: actions/upload-artifact@v4.6.2
+        with:
+          name: mb-istft-speaker-embedding-fixture
+          path: ${{ env.FIXTURE_DIR }}/model.onnx*
+          retention-days: 1
+
+  smoke-windows-speaker-embedding:
+    name: Smoke test Windows binary (speaker_embedding / Issue #426)
+    needs: [build-shared, build-fixture]
+    if: github.event_name != 'pull_request'
+    runs-on: windows-2022
+    timeout-minutes: 15
+    steps:
+      - name: Download windows-x64 release artifact
+        uses: actions/download-artifact@v8.0.1
+        with:
+          name: piper-plus-shared-windows-x64
+          path: release-artifact
+      - name: Download fixture
+        uses: actions/download-artifact@v8.0.1
+        with:
+          name: mb-istft-speaker-embedding-fixture
+          path: fixture
+      - name: Extract release archive and locate piper.exe
+        shell: pwsh
+        run: |
+          $zip = Get-ChildItem release-artifact -Filter *.zip | Select-Object -First 1
+          if (-not $zip) { Write-Error "windows-x64 .zip artifact not found"; exit 1 }
+          # bsdtar (Windows `tar`) reads the POSIX-path zip the build job produced.
+          tar -xf $zip.FullName -C release-artifact
+          $exe = Get-ChildItem release-artifact -Recurse -Filter piper.exe | Select-Object -First 1
+          if (-not $exe) { Write-Error "piper.exe not found in released artifact"; exit 1 }
+          Write-Output "piper.exe: $($exe.FullName)"
+          "PIPER_EXE=$($exe.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append
+      - name: Smoke synthesize a speaker_embedding model
+        shell: pwsh
+        run: |
+          # The fixture model DECLARES speaker_embedding / speaker_embedding_mask.
+          # A binary missing the Issue #426 fix fails here with ORT "Required
+          # inputs ... are missing" and produces no WAV. The synthesized audio
+          # quality is irrelevant — reaching session.run successfully is the
+          # signal that the runtime fed the inputs.
+          $wav = "smoke.wav"
+          "speaker embedding smoke test" | & "$env:PIPER_EXE" --model fixture/model.onnx --output_file $wav
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "piper.exe exited $LASTEXITCODE — likely missing the speaker_embedding feed (Issue #426 regression)"
+            exit 1
+          }
+          if (-not (Test-Path $wav)) { Write-Error "no WAV produced"; exit 1 }
+          $len = (Get-Item $wav).Length
+          $hdr = [System.Text.Encoding]::ASCII.GetString([System.IO.File]::ReadAllBytes($wav)[0..3])
+          if ($len -lt 100 -or $hdr -ne "RIFF") {
+            Write-Error "WAV invalid (len=$len, header=$hdr)"
+            exit 1
+          }
+          Write-Output "OK: released piper.exe synthesized a $len-byte RIFF WAV from a speaker_embedding model"
 
   build-ios:
     name: Build iOS ${{ matrix.slice }}
@@ -973,7 +1066,7 @@ jobs:
 
   release:
     name: Create Release
-    needs: [build-shared, build-ios, build-android, assemble-xcframework, assemble-g2p-xcframework]
+    needs: [build-shared, build-ios, build-android, assemble-xcframework, assemble-g2p-xcframework, smoke-windows-speaker-embedding]
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-24.04
     # GitHub Release creation requires `contents: write`. Scoped to this job

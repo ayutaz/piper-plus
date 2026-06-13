@@ -92,6 +92,10 @@ endif()
 # runtime when the fixture has not been generated.
 if(TARGET piper_common)
     list(APPEND TEST_SOURCES test_speaker_embedding_inference.cpp)
+    # v1.12.0 multi-codepoint phoneme leak (ɔɪ/œ̃/ɐ̃) regression guard. Uses
+    # `piper.hpp` + exercises parsePhonemizeConfig() / isSingleCodepoint() from
+    # piper.cpp, so it links the full library like test_speaker_embedding_inference.
+    list(APPEND TEST_SOURCES test_phonemize_config.cpp)
 endif()
 
 # Create test executables
@@ -322,6 +326,7 @@ foreach(test_source ${TEST_SOURCES})
     # links the full library to call loadVoice / phonemesToAudio against the
     # in-tree fixture model.
     if(${test_name} STREQUAL "test_speaker_embedding_inference" OR
+        ${test_name} STREQUAL "test_phonemize_config" OR
         ${test_name} STREQUAL "test_streaming")
         target_sources(${test_name} PRIVATE
             ../piper.cpp
