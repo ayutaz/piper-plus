@@ -12,6 +12,9 @@ on:
       - "src/rust/**/Cargo.toml"
       - "src/rust/**/Cargo.lock"
       - "src/rust/Cargo.lock"
+      # cargo-audit の ignore リスト変更を PR 時に再監査する
+      # (.cargo/audit.toml を編集したら cargo-audit ジョブを走らせる)。
+      - "src/rust/**/audit.toml"
       - "src/wasm/**/package.json"
       - "src/wasm/**/package-lock.json"
       - "src/csharp/**/*.csproj"
