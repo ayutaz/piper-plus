@@ -1,0 +1,113 @@
+name: "Windows C++ E2E (real tsukuyomi model)"
+
+# End-to-end gate that exercises the exact path that let bugs ①②③ ship to
+# Windows users: build the C++ piper.exe, `--download-model tsukuyomi` the real
+# distributed 6lang model, and synthesize Japanese text to a WAV. No existing
+# CI runs the *real* distributed model through the C++ runtime on Windows —
+# fixtures and pre-staged models hid all three regressions.
+#
+#   ③ download   : `--download-model` must succeed (PowerShell env-var fix).
+#   ②  config    : the distributed config.json is PUA-normalized in-flight
+#                  (workaround until the corrected config is re-pushed to HF;
+#                   the pua-consistency `distributed-config-validator` job is
+#                   the gate that the HF artifact gets fixed and stays fixed).
+#   ① embedding  : synthesis must feed speaker_embedding / speaker_embedding_mask
+#                  for the MB-iSTFT model and produce a non-empty RIFF WAV.
+#
+# Heavy (full C++ build + ~40 MB HF download), so scheduled weekly + manual
+# dispatch only — never on PR.
+
+on:
+  schedule:
+    - cron: '0 7 * * 1'  # weekly, Monday 07:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows-real-model-e2e:
+    name: tsukuyomi 6lang -> WAV on Windows C++ piper.exe
+    runs-on: windows-2022
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v6.0.3
+        with:
+          submodules: true
+
+      - uses: actions/setup-python@v6.2.0
+        with:
+          python-version: '3.13'
+
+      - name: Configure CMake
+        shell: pwsh
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DUSE_CUDA=OFF -DBUILD_TESTS=OFF
+
+      - name: Build (full build stages the OpenJTalk dictionary under build/share)
+        shell: pwsh
+        run: cmake --build build --config Release -j $env:NUMBER_OF_PROCESSORS
+
+      - name: Locate piper.exe
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem build -Recurse -Filter piper.exe | Select-Object -First 1
+          if (-not $exe) { Write-Error "piper.exe was not built"; exit 1 }
+          Write-Output "piper.exe: $($exe.FullName)"
+          & $exe.FullName --version
+          "PIPER_EXE=$($exe.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Download real model (--download-model exercises the PowerShell fix, ③)
+        shell: pwsh
+        run: |
+          & "$env:PIPER_EXE" --download-model tsukuyomi --model-dir models
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "--download-model failed (PowerShell download regression?)"
+            exit 1
+          }
+          Get-ChildItem models
+
+      - name: Normalize distributed config to PUA (②, until HF is re-pushed)
+        # The HF config still carries raw multi-codepoint keys (ɔɪ/œ̃/ɐ̃) that
+        # the C++ parser rejects. PUA-encode it so the e2e can run; idempotent,
+        # so this is a no-op once the corrected config lands on HF.
+        shell: pwsh
+        run: |
+          $cfg = Get-ChildItem models -Recurse -Filter *.json | ForEach-Object { $_.FullName }
+          python scripts/fix_config_pua.py @cfg
+          if ($LASTEXITCODE -ne 0) { Write-Error "config PUA fix reported an unmappable key"; exit 1 }
+
+      - name: Synthesize Japanese text -> WAV (speaker_embedding feed, ①)
+        shell: pwsh
+        run: |
+          $model = Get-ChildItem models -Recurse -Filter *.onnx |
+            Where-Object { $_.Name -notlike '*.opt.onnx' } | Select-Object -First 1
+          if (-not $model) { Write-Error "downloaded .onnx not found"; exit 1 }
+          [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+          $OutputEncoding = [System.Text.Encoding]::UTF8
+          "こんにちは、これはエンドツーエンドのテストです。" |
+            & "$env:PIPER_EXE" --model $model.FullName --output_file out.wav
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "synthesis failed (speaker_embedding feed regression?)"
+            exit 1
+          }
+          if (-not (Test-Path out.wav)) { Write-Error "no WAV produced"; exit 1 }
+          $len = (Get-Item out.wav).Length
+          $hdr = [System.Text.Encoding]::ASCII.GetString([System.IO.File]::ReadAllBytes('out.wav')[0..3])
+          if ($len -lt 1000 -or $hdr -ne 'RIFF') {
+            Write-Error "invalid WAV (len=$len, header=$hdr)"
+            exit 1
+          }
+          Write-Output "OK: tsukuyomi 6lang -> $len-byte RIFF WAV via Windows C++ piper.exe"
+
+      - name: Upload synthesized WAV (diagnostic)
+        if: always()
+        uses: actions/upload-artifact@v4.6.2
+        with:
+          name: e2e-tsukuyomi-windows-wav
+          path: out.wav
+          if-no-files-found: ignore
+          retention-days: 7
