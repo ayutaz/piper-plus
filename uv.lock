@@ -3506,7 +3506,7 @@ requires-dist = [
     { name = "tqdm", marker = "extra == 'train'", specifier = ">=4.66" },
     { name = "transformers", marker = "extra == 'train'", specifier = ">=4.38" },
     { name = "types-pyyaml", marker = "extra == 'test'", specifier = ">=6.0" },
-    { name = "types-requests", marker = "extra == 'test'", specifier = ">=2.33.0.20260518" },
+    { name = "types-requests", marker = "extra == 'test'", specifier = ">=2.31" },
     { name = "unidic-lite", marker = "extra == 'train'", specifier = ">=1.0" },
     { name = "uvicorn", marker = "extra == 'inference'", specifier = ">=0.27" },
     { name = "uvicorn", marker = "extra == 'inference-gpu'", specifier = ">=0.27" },
