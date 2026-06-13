@@ -297,6 +297,28 @@ git push origin npm-v0.6.0
 
 Skipping step 1 will cause `npm install piper-plus@0.6.0` to fail with `notarget No matching version found for @piper-plus/g2p@^0.4.0`.
 
+### `v<X.Y.Z>` tag push の注意点 (Swift checksum / Docker / GitHub Release)
+
+PyPI / NuGet / crates.io の publish は `dev-create-release.yml` の **workflow_dispatch** (version 入力) が担当し **tag 駆動ではない**。一方 **`v<X.Y.Z>` tag の push は複数 workflow を同時発火**させるため、以下を順守する:
+
+1. **`v<X.Y.Z>` tag は `release-shared-lib.yml` と `docker-build.yml` を同時にトリガする。** 前者は C API shared lib + iOS/Android xcframework を、後者は Docker image を `type=semver` で `<X.Y.Z>` + `latest` として ghcr.io / Docker Hub に publish する (`latest` がこのリリースを指すようになる)。
+
+2. **Swift checksum は tag の「前」に更新する (最頻出 footgun)。** `Package.swift` の `let checksum` (synthesis) / `let g2pChecksum` (PiperPlusG2P) は **tag commit に存在必須** (SwiftPM は tag の git ref の manifest を解決)。placeholder (全ゼロ) や不一致のまま tag を push すると `release-shared-lib.yml` の release job が hard-fail し、**post-tag の後追い PR では救済不能**。手順:
+
+   ```bash
+   # tag push の直前に:
+   gh workflow run release-shared-lib.yml --ref dev          # tag 無しで artifact 生成
+   gh run download <run-id> --name libpiper_plus-ios-xcframework
+   swift package compute-checksum libpiper_plus-ios.xcframework.zip
+   # → Package.swift の `let checksum` を更新 → dev に commit → その commit に v<X.Y.Z> tag
+   ```
+
+   **g2pChecksum の特例:** PiperPlusG2P xcframework は自身の `g2pVersion` tag で debut する。`g2pVersion != tag 版` のとき (例: synthesis `v1.13.0` に対し g2p は `1.14.0` 先行設定)、`release-shared-lib.yml` は g2p checksum 検証を**自動 skip** する (Issue #387)。この場合 `g2pChecksum` は placeholder のままで良い。
+
+3. **GitHub Release は 2 workflow から作られる。** `dev-create-release.yml` が `--draft` + 自動 note を、`release-shared-lib.yml` が同 tag に `generate_release_notes: true` で asset を添付する。**どちらも CHANGELOG `[X.Y.Z]` 本文を使わない**ため、draft の本文を CHANGELOG `[X.Y.Z]` で手動置換してから publish する。
+
+推奨順序: PR merge → (g2p/npm tag) → `dev-create-release.yml` dispatch → Package.swift checksum commit → `v<X.Y.Z>` tag push。既公開の `wasm-g2p-v*` / `kotlin-g2p-v*` は再 tag 不要。
+
 ## First-PR fast lane (新規 contributor 向け)
 
 piper-plus は 18+ contract gate (PUA / loanword / ORT 等) を持ちますが、 **初回 PR ではこれらを `neutral` (warning) に降格** します。 GitHub の `author_association` が `FIRST_TIME_CONTRIBUTOR` / `FIRST_TIMER` / `NONE` のいずれかなら、 以下を満たすだけで merge を依頼できます:
