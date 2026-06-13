@@ -63,8 +63,8 @@ direction = "post-hoc"
 [python]
 manifest = "VERSION"
 # expected_prefix is matched as a literal string prefix against the version
-# field. "1.12." matches 1.12.0, 1.12.1, 1.12.0.dev1 etc.
-expected_prefix = "1.12."
+# field. "1.13." matches 1.13.0, 1.13.1, 1.13.0.dev1 etc.
+expected_prefix = "1.13."
 
 [python.pyproject]
 manifest = "pyproject.toml"
@@ -79,25 +79,25 @@ dynamic = true
 manifest = "src/rust/Cargo.toml"
 # Workspace-level version inherited by piper-plus, piper-plus-cli,
 # piper-plus-g2p, piper-wasm, piper-python via `version.workspace = true`.
-expected_prefix = "0.4."
+expected_prefix = "0.5."
 
 # ---------------------------------------------------------------------------
 # C# / .NET — NuGet PiperPlus.Core / PiperPlus.Cli
 # ---------------------------------------------------------------------------
 [dotnet.core]
 manifest = "src/csharp/PiperPlus.Core/PiperPlus.Core.csproj"
-expected_prefix = "0.3."
+expected_prefix = "0.4."
 
 [dotnet.cli]
 manifest = "src/csharp/PiperPlus.Cli/PiperPlus.Cli.csproj"
-expected_prefix = "0.3."
+expected_prefix = "0.4."
 
 # ---------------------------------------------------------------------------
 # npm — piper-plus (browser WASM synthesis) + @piper-plus/g2p
 # ---------------------------------------------------------------------------
 [npm.synthesis]
 manifest = "src/wasm/openjtalk-web/package.json"
-expected_prefix = "0.6."
+expected_prefix = "0.7."
 
 [npm.g2p]
 manifest = "src/wasm/g2p/package.json"

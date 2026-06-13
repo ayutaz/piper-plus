@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   enforces this automatically.
 -->
 
+## [1.13.0] - 2026-06-13
+
 ### Added
 
 #### 2 image distroless trial Dockerfiles + CI (webui / cpp-inference)
@@ -296,6 +298,10 @@ v1.12.0 で 5 ランタイム (Python/Rust/C#/Go/WASM) に展開した SSML / Vo
   - `bundle-size-gate.yml` に `build-android-shared-libs` matrix job (arm64-v8a / armeabi-v7a / x86_64) を追加し、`release-shared-lib.yml` と同じ NDK r26c + ORT 1.20.0 + 16 KB page-align で `libpiper_plus.so` をビルド。bundle-size ジョブが artifact を `android/piper-plus-g2p/src/main/jniLibs/<ABI>/` に配置してから `assembleRelease` を実行することで `maven::piper-plus-g2p-android` の Observed サイズが取得可能に
   - `scripts/check_ort_versions.py` の `TARGETS` に `bundle-size-gate.yml` を追加し、ORT バージョン drift gate の対象に統合 (Copilot review fix)
 - スウェーデン語 (sv) の単語単位 言語判定 (per-word LID) を全 7 ランタイムで復旧・統一 (Issue #539)。`å`/`ä`/`ö` を含む語 (例: `så` / `och` / `för` / `är`) が英語と誤判定されていた回帰を修正 (#297 で全ランタイム実装 → #300 の g2p パッケージ抽出で Python/Rust から脱落 → 残存コピーが drift、WASM は char-level の別実装)。**保守的ポリシー** (strong indicator = `å`/`Å` または 46 語の function-word リスト完全一致のみ。`ä`/`ö` 単独は独語/フィンランド語/借用語と共有のため不十分) で再実装。全ランタイムが byte-identical な `sv_function_words.json` をロードし、新規 sync gate (`scripts/check_swedish_lid_consistency.py` + `docs/spec/swedish-lid-mirrors.toml`、ZH-EN loanword gate と同型) が 7 データミラー + 6 fixture ミラーの byte-for-byte 一致を強制。cross-runtime parity fixture matrix で一致を実証。学習済み 6lang モデルは sv 未含有のためデフォルト推論は不変、独立 G2P 用途と将来の sv モデルに影響
+- Windows の C++ ランタイム (`piper.exe`) でつくよみちゃん 6lang モデルの `--download-model` が PowerShell `-Command $args` のバグにより URL / 出力先が空になりダウンロードできなかった問題を修正 (PR #557)。あわせて multi-codepoint 音素 (`ɔɪ` / `œ̃` / `ɐ̃` 等) の raw キーが C++ パーサに漏れ、Windows のつくよみ / base config で推論が失敗していた v1.12.0 の回帰をガード (regression CI 追加)
+- 推論の EOS region trim を全 6 ランタイム (Python / Rust / Go / C# / WASM / C++) で全入力に対し適用し、ファインチューニング済みモデル (つくよみちゃん等) で末尾音節が二重に聞こえる問題を修正 (Issue #499、PR #506 / #507)。**挙動変更注記:** 本修正により全モデル・全ランタイムで出力音声の末尾フレーム (`ceil(durations[-1])` 由来の EOS region) が trim され、v1.12.0 比で出力音声長・末尾が変化する。バグ修正だがデフォルト出力が変わるため明示 (破壊的変更ではない)
+- Go の text splitter を Python / Rust の canonical 実装 (post-consume 方式) に統一し、CJK 句読点 + 閉じ括弧パターンが 1 文として誤結合されていた問題を修正 (Issue #346、PR #504)
+- リリース QA で判明した Windows ビルドの諸問題を修正 (PR #505): `.gitattributes` の `eol=lf` catch-all 追加 (CRLF チェックアウトで gofmt / byte-sync gate が破損)、contract gate スクリプトの cp932 / cp1252 コンソール `UnicodeEncodeError` crash、`check_secret_path_reference` の Windows パス処理
 
 ### Security
 
@@ -305,6 +311,9 @@ v1.12.0 で 5 ランタイム (Python/Rust/C#/Go/WASM) に展開した SSML / Vo
   - 2026-05 の `Security Audit / pip-audit (Python)` dev push 失敗は **上流 advisory データ欠陥** が原因で piper-plus 側のコード/依存問題ではない: `nltk` `PYSEC-2026-97` (CVE-2026-0846) と `joblib` `PYSEC-2024-277` (CVE-2024-34997) が 2026-05-20 に `last_affected` 欠落で生成され、安全な `nltk 3.9.4` / `joblib 1.5.3` を含む全バージョンが flag された (同一 commit が後の schedule run では pass)。`pypa/advisory-database` PR #289 ("Update records generated incorrectly", 2026-05-21) で修正済み
   - 下限ピンは将来の dependency resolution が真に脆弱なバージョンへ退行するのを防ぐ regression insurance
 - `.github/workflows/security-audit.yml`: pull_request `paths` に `src/python_run/requirements.txt` を追加。従来 `setup.py` のみが対象で、実際の依存定義 source (setup.py がパースする requirements.txt) の変更が PR の pip-audit gate を通らなかった漏れを修正
+- 依存ライブラリの脆弱性対応: `protobufjs` 7.5.6 → 7.5.8 (CVE-2026-45740、PR #530)、`idna` 3.10 → 3.15 (CVE-2026-45409、PR #531)、`gitpython` 3.1.49 → 3.1.50 (GHSA-mv93-w799-cj2w、PR #437)、Dependabot security alert 対応で `urllib3` (high) / `@protobufjs/utf8` (medium) を更新 (PR #450)
+- HTTP サーバーのログインジェクション対策 (CodeQL `py/log-injection`、PR #435)、および C# の `cs/unsafe-double-checked-lock` 修正 + CodeQL ノイズ削減 (PR #434)
+- Rust の `pyo3` advisory RUSTSEC-2026-0176 / RUSTSEC-2026-0177 を `.cargo/audit.toml` で ignore (rust-numpy が `pyo3` 0.24 系に pin しており上流更新待ち、PR #558 / #559)
 
 ## [1.12.0] - 2026-05-04
 
