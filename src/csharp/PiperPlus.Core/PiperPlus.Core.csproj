@@ -6,7 +6,7 @@
 
     <!-- NuGet Package Metadata -->
     <PackageId>PiperPlus.Core</PackageId>
-    <Version>0.3.0</Version>
+    <Version>0.4.0</Version>
     <Authors>ayousanz</Authors>
     <Description>Piper Plus TTS Core library — ONNX inference, phonemization, config</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>

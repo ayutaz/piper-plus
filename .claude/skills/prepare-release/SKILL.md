@@ -93,23 +93,28 @@ uv lock --upgrade-package piper-plus
 
 ## フェーズ 5: Swift checksum 計算ガイド
 
-Package.swift の checksum を release-shared-lib.yml の artifact から取得する手順:
+Package.swift の `checksum` / `g2pChecksum` は **tag commit に存在していなければならない** (SwiftPM は tag の git ref の manifest を解決し、checksum 不一致なら `artifact has changed checksum` で fail。release-shared-lib.yml の release job も tag push 時に placeholder / 不一致を hard-fail させる)。よって **tag push 前** に実施する (`gh release download` は release がまだ無いので使えない):
 
 ```bash
-# 1. release-shared-lib.yml の release run の zip URL を取得
-gh run list --workflow=release-shared-lib.yml --limit 1 --json databaseId,headBranch
+# 1. release-shared-lib.yml を tag 無しで workflow_dispatch 実行し artifact を生成
+gh workflow run release-shared-lib.yml --ref dev
+# 完了後、run の workflow artifact を取得 (release ではない)
+gh run download <run-id> --name libpiper_plus-ios-xcframework
+# g2pChecksum は g2pVersion が今回 tag と一致する時のみ取得・更新
+gh run download <run-id> --name libpiper_plus_g2p-apple-xcframework
 
-# 2. 各 artifact をダウンロード
-gh release download v<TARGET_VERSION> --pattern "*.xcframework.zip"
+# 2. swift package compute-checksum (workflow artifact のファイル名は version 無し)
+swift package compute-checksum libpiper_plus-ios.xcframework.zip
+swift package compute-checksum libpiper_plus_g2p-apple.xcframework.zip   # g2pVersion == TARGET のみ
 
-# 3. swift package compute-checksum
-swift package compute-checksum piper-plus-<TARGET_VERSION>.xcframework.zip
-swift package compute-checksum piper-plus-g2p-<TARGET_VERSION>-apple.xcframework.zip
+# 3. Package.swift の `let checksum` (synthesis) を更新。
+#    `let g2pChecksum` は g2pVersion が今回 tag と一致する時のみ更新
+#    (異なる場合 release-shared-lib.yml が g2p checksum 検証を自動 skip する)。
 
-# 4. Package.swift の checksum / g2pChecksum 行を更新
+# 4. dev に commit し、その commit に v<TARGET_VERSION> tag を push (フェーズ 7 の順序)
 ```
 
-これは release artifact が出てから行うため、 tag push 後の作業。 dry-run でも手順を出力する。
+workflow_dispatch build と tag build は deterministic なので checksum は一致する。**この手順は tag push の直前** (フェーズ 7)。 dry-run でも手順を出力する。
 
 ## フェーズ 6: CHANGELOG 昇格 markdown diff
 
@@ -135,15 +140,17 @@ awk '/^## \[Unreleased\]/{flag=1; next} /^## /{flag=0} flag' CHANGELOG.md
 
 CONTRIBUTING.md の規約に従い、 tag push 順序を明示:
 
-1. **First**: `wasm-g2p-v<X.Y.Z>` (npm `@piper-plus/g2p`)
+1. **First**: `wasm-g2p-v<X.Y.Z>` (npm `@piper-plus/g2p`) — g2p に変更が無く既公開なら skip
 2. **Second**: `npm-v<X.Y.Z>` (npm `piper-plus`、 g2p に依存)
-3. **Third**: `v<X.Y.Z>` (root)
-   → `dev-create-release.yml` 内部で PyPI / crates.io / NuGet を sleep 30 入りで連鎖
-4. **Fourth**: `kotlin-g2p-v<X.Y.Z>` (Maven Central、 独立)
-5. **Fifth**: `v<X.Y.Z>` の release-shared-lib.yml (libpiper_plus + iOS xcframework)
-6. **Last**: Package.swift の checksum 更新 PR (フェーズ 5 の結果)
+3. **Third**: `dev-create-release.yml` を **workflow_dispatch** (version 入力) で実行
+   → PyPI / crates.io / NuGet を sleep 30 入りで連鎖 publish。 **tag 駆動ではない** (Actions UI から手動実行)
+4. **Fourth**: `kotlin-g2p-v<X.Y.Z>` (Maven Central、 独立) — 既公開なら skip
+5. **Fifth**: **Package.swift の `checksum` を pre-tag 更新** (フェーズ 5 の workflow_dispatch artifact から compute-checksum → dev に commit)
+6. **Last**: その checksum commit に `v<X.Y.Z>` tag を push → release-shared-lib.yml (libpiper_plus + iOS/Android xcframework)
 
-順序逆転による npm install 失敗 (g2p が無いと `piper-plus` install fail) を防ぐ。
+> **重要 (フェーズ 5 参照):** Swift checksum 更新は `v<X.Y.Z>` tag の **前** (ステップ 5)。 placeholder のまま tag を push すると release-shared-lib.yml の release job が hard-fail し、 post-tag の後追い PR では SwiftPM 解決を救済できない (tag の git ref が解決対象のため)。
+>
+> 順序逆転による npm install 失敗 (g2p が無いと `piper-plus` install fail) も防ぐ。 `v<X.Y.Z>` tag は release-shared-lib.yml と **docker-build.yml を同時発火**させ、 Docker image (`<X.Y.Z>` / `latest`) も自動 publish される点に留意。
 
 ## フェーズ 8: 公開後検証コマンド
 

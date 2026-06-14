@@ -15,7 +15,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   enforces this automatically.
 -->
 
+## [1.13.0] - 2026-06-13
+
 ### Added
+
+#### G2P 文単位並列化 + ORT 推論オーバーラップ (Issue #383)
+
+G2P (音素化) を文単位で並列化し、全 5 ランタイム (Python/Rust/C#/Go/C++) に展開。Python は ORT 推論との pipeline 化で長文の TTFB を短縮 (代表値: Go N=20 で約 3.96x、Python で約 -19%)。新 env var `PIPER_G2P_PARALLELISM` で並列度を全ランタイム共通制御でき、`PIPER_G2P_PARALLELISM=1` で逐次の旧挙動に戻せる (Breaking なし)。PR #403。
 
 #### 2 image distroless trial Dockerfiles + CI (webui / cpp-inference)
 
@@ -102,17 +108,17 @@ audit gate (`scripts/check_doc_examples.py audit`) で生成した canonical sna
 - **サンプル Compose アプリ**: `examples/android-g2p-sample/` (8 言語タブ + TextField → phonemize → カード表示)。Gradle composite build で in-repo AAR を直接消費。`.github/workflows/kotlin-g2p-ci.yml` の `sample-app` ジョブで `assembleDebug` を CI gate (AC-10)
 - **設計・要件**: `docs/spec/kotlin-g2p-{design,requirements}.md`
 - **10 並列エージェント自己監査による 22 件の修正** (2026-05-07):
-  - **CI 修正 (🔴 Critical)**: NDK install を 4 つの Gradle ジョブ (unit-tests / build-aar / instrumented-tests / sample-app) と release publish に追加 (externalNativeBuild が常に NDK を要求するため、無いと全失敗していた)。`concurrency` block 追加でブランチ重複実行を防止。L4 専用 `parity-golden` ジョブ追加: Linux で eunjeon インストール後に `tools/generate_g2p_golden.py` を再実行し、`tools/compare_g2p_golden.py` で `expected_phonemes` の drift だけを strict 検査 (KO の skip / failed_cases メタデータは platform 固有なので除外)。
-  - **L4 default_latin_language の golden 修正 (🔴 Critical)**: 既存 golden は `default_latin_language="en"` で全ケース生成していたため PT/ES/FR/SV テキストが英語 G2P 経由で誤った IPA を保持していた (例: `"hola"` → `h ˈ o ʊ l ə` 英語フォニックス)。C API 側 `piper.cpp` は `synthesisConfig.languageId` から `defaultLatin` を選ぶため runtime と divergence。`generate_g2p_golden.py` を per-case `default_latin_language=lang` に修正 + golden を再生成 (`"hola"` → `ˈ o l a` Spanish)。`schema_version: 2` で `failed_cases` / `skipped_ko_cases` を追加。
-  - **VERSION_NAME = 1.0.0 統一 (🔴)**: `android/gradle.properties` が `0.1.0` のままだったためタグ push 時に 0.1.0 が public される状態だった。`build.gradle.kts` のフォールバックも合わせて 1.0.0 に。`GROUP=io.github.ayutaz` も明示。
-  - **AndroidManifest INTERNET permission 追加 (🔴)**: `DictionaryDownloader` が HF Hub 接続するのに必要だが空 manifest のままだった。consumer apps へ manifest merger 経由で伝播。
-  - **DictionaryDownloader セキュリティ強化 (🟡 → 🟢, NFR-SEC-2)**: (a) `host` パラメータを **allowlist** (`huggingface.co` / `hf-mirror.com`) に固定 + `https://` 強制、(b) ustar の `prefix` (155B) field を `name` field と連結、(c) symlink/hardlink/device entry を `IOException` で reject、(d) per-entry 64MB / total 256MB の上限ガード (TAR-bomb 対策)、(e) 中間ディレクトリ → `renameTo` でほぼ atomic な extract (.complete marker)、(f) `withContext(Dispatchers.IO)` + `currentCoroutineContext().ensureActive()` で coroutine cancellation 対応。
-  - **PiperPlusG2pException に `cause` 引数追加 (🟡)**: 設計書要求の `Exception(message, cause)` に整合。`DictionaryDownloader` などの内部 IOException を chain 可能に。
-  - **build.gradle.kts (🟡)**: `ndkVersion = "26.1.10909125"` pin (再現性 NFR-PUB-1)、`targetSdk = 34` 追加 (Play Store 必須)、vanniktech と `android.publishing { singleVariant }` の二重設定を解消、`org.jetbrains.dokka` plugin を適用 (空 javadoc.jar が Sonatype 品質ゲートで弾かれる対策、FR-DOCS-4)、kotlinx-coroutines-android 依存追加。
-  - **Kotlin API 仕様整合 (🟡)**: `OpenJTalkDictionary.path` を `internal val` に降格 (公開 API 表面汚染解消、`absolutePath()` 関数のみ public)、`PhonemeResult.phonemeList` を `Collections.unmodifiableList` でラップ、`version()` に `@Synchronized` 追加 (設計書「全 native 呼び出し同期」充足)、`extractAssetTree` に path traversal 防御 (canonical-path 検査) 追加。
-  - **L1 ユニットテスト 5 → 18 件 (🟡)**: `DictionaryDownloaderTest` (host allowlist) / `OpenJTalkDictionaryTest` (`fromPath` / `exists` / `absolutePath`) / `PiperPlusG2pNativeTest` (JNI shape reflection) / `PhonemeResultTest` (immutability) / `PiperPlusG2pExceptionTest` (cause) を追加。
+  - **CI 修正**: NDK install を 4 つの Gradle ジョブ (unit-tests / build-aar / instrumented-tests / sample-app) と release publish に追加 (externalNativeBuild が常に NDK を要求するため、無いと全失敗していた)。`concurrency` block 追加でブランチ重複実行を防止。L4 専用 `parity-golden` ジョブ追加: Linux で eunjeon インストール後に `tools/generate_g2p_golden.py` を再実行し、`tools/compare_g2p_golden.py` で `expected_phonemes` の drift だけを strict 検査 (KO の skip / failed_cases メタデータは platform 固有なので除外)。
+  - **L4 default_latin_language の golden 修正**: 既存 golden は `default_latin_language="en"` で全ケース生成していたため PT/ES/FR/SV テキストが英語 G2P 経由で誤った IPA を保持していた (例: `"hola"` → `h ˈ o ʊ l ə` 英語フォニックス)。C API 側 `piper.cpp` は `synthesisConfig.languageId` から `defaultLatin` を選ぶため runtime と divergence。`generate_g2p_golden.py` を per-case `default_latin_language=lang` に修正 + golden を再生成 (`"hola"` → `ˈ o l a` Spanish)。`schema_version: 2` で `failed_cases` / `skipped_ko_cases` を追加。
+  - **VERSION_NAME = 1.0.0 統一**: `android/gradle.properties` が `0.1.0` のままだったためタグ push 時に 0.1.0 が public される状態だった。`build.gradle.kts` のフォールバックも合わせて 1.0.0 に。`GROUP=io.github.ayutaz` も明示。
+  - **AndroidManifest INTERNET permission 追加**: `DictionaryDownloader` が HF Hub 接続するのに必要だが空 manifest のままだった。consumer apps へ manifest merger 経由で伝播。
+  - **DictionaryDownloader セキュリティ強化 (NFR-SEC-2)**: (a) `host` パラメータを **allowlist** (`huggingface.co` / `hf-mirror.com`) に固定 + `https://` 強制、(b) ustar の `prefix` (155B) field を `name` field と連結、(c) symlink/hardlink/device entry を `IOException` で reject、(d) per-entry 64MB / total 256MB の上限ガード (TAR-bomb 対策)、(e) 中間ディレクトリ → `renameTo` でほぼ atomic な extract (.complete marker)、(f) `withContext(Dispatchers.IO)` + `currentCoroutineContext().ensureActive()` で coroutine cancellation 対応。
+  - **PiperPlusG2pException に `cause` 引数追加**: 設計書要求の `Exception(message, cause)` に整合。`DictionaryDownloader` などの内部 IOException を chain 可能に。
+  - **build.gradle.kts**: `ndkVersion = "26.1.10909125"` pin (再現性 NFR-PUB-1)、`targetSdk = 34` 追加 (Play Store 必須)、vanniktech と `android.publishing { singleVariant }` の二重設定を解消、`org.jetbrains.dokka` plugin を適用 (空 javadoc.jar が Sonatype 品質ゲートで弾かれる対策、FR-DOCS-4)、kotlinx-coroutines-android 依存追加。
+  - **Kotlin API 仕様整合**: `OpenJTalkDictionary.path` を `internal val` に降格 (公開 API 表面汚染解消、`absolutePath()` 関数のみ public)、`PhonemeResult.phonemeList` を `Collections.unmodifiableList` でラップ、`version()` に `@Synchronized` 追加 (設計書「全 native 呼び出し同期」充足)、`extractAssetTree` に path traversal 防御 (canonical-path 検査) 追加。
+  - **L1 ユニットテスト 5 → 18 件**: `DictionaryDownloaderTest` (host allowlist) / `OpenJTalkDictionaryTest` (`fromPath` / `exists` / `absolutePath`) / `PiperPlusG2pNativeTest` (JNI shape reflection) / `PhonemeResultTest` (immutability) / `PiperPlusG2pExceptionTest` (cause) を追加。
   - **L3 instrumented 拡充**: `OpenJTalkDictionaryInstrumentedTest` で 3 辞書配布パターン (assets / fromPath / Downloader allowlist) と `create(context, dict)` 統合を網羅 (FR-DICT-1 / FR-TEST-4)。`PhonemeFixtureParityTest.byte_for_byte_parity_with_python_golden` を `assumeTrue(false)` silent skip → `AssertionError` に変更し golden 欠落を loud fail に。
-  - **release-kotlin-g2p.yml (🟡)**: SemVer regex を SemVer 2.0.0 §10 準拠 (pre-release **+** build metadata 同時許可)、4 つの publishing secrets の fail-fast 検査追加、workflow_dispatch にも version regex を適用。
+  - **release-kotlin-g2p.yml**: SemVer regex を SemVer 2.0.0 §10 準拠 (pre-release **+** build metadata 同時許可)、4 つの publishing secrets の fail-fast 検査追加、workflow_dispatch にも version regex を適用。
   - **ドキュメント整備**: `docs/guides/platform/android-g2p-integration.md` (FR-DOCS-2、新規)、`tools/build-openjtalk-dict-archive.sh` (M6 で参照されていたが未実装だったビルドスクリプト)、`tools/compare_g2p_golden.py` (CI 用 golden diff)、`CONTRIBUTING.md` に `kotlin-g2p-v*` tag 規約と Maven Central リリース順序追加。`piper_plus.h` の `findG2pDictFile` 経路に関する誤解を招く記述を訂正。
 
 - **残作業全消化** (2026-05-07、ユーザー指示「すべてこのブランチで対応」):
@@ -296,6 +302,12 @@ v1.12.0 で 5 ランタイム (Python/Rust/C#/Go/WASM) に展開した SSML / Vo
   - `bundle-size-gate.yml` に `build-android-shared-libs` matrix job (arm64-v8a / armeabi-v7a / x86_64) を追加し、`release-shared-lib.yml` と同じ NDK r26c + ORT 1.20.0 + 16 KB page-align で `libpiper_plus.so` をビルド。bundle-size ジョブが artifact を `android/piper-plus-g2p/src/main/jniLibs/<ABI>/` に配置してから `assembleRelease` を実行することで `maven::piper-plus-g2p-android` の Observed サイズが取得可能に
   - `scripts/check_ort_versions.py` の `TARGETS` に `bundle-size-gate.yml` を追加し、ORT バージョン drift gate の対象に統合 (Copilot review fix)
 - スウェーデン語 (sv) の単語単位 言語判定 (per-word LID) を全 7 ランタイムで復旧・統一 (Issue #539)。`å`/`ä`/`ö` を含む語 (例: `så` / `och` / `för` / `är`) が英語と誤判定されていた回帰を修正 (#297 で全ランタイム実装 → #300 の g2p パッケージ抽出で Python/Rust から脱落 → 残存コピーが drift、WASM は char-level の別実装)。**保守的ポリシー** (strong indicator = `å`/`Å` または 46 語の function-word リスト完全一致のみ。`ä`/`ö` 単独は独語/フィンランド語/借用語と共有のため不十分) で再実装。全ランタイムが byte-identical な `sv_function_words.json` をロードし、新規 sync gate (`scripts/check_swedish_lid_consistency.py` + `docs/spec/swedish-lid-mirrors.toml`、ZH-EN loanword gate と同型) が 7 データミラー + 6 fixture ミラーの byte-for-byte 一致を強制。cross-runtime parity fixture matrix で一致を実証。学習済み 6lang モデルは sv 未含有のためデフォルト推論は不変、独立 G2P 用途と将来の sv モデルに影響
+- v1.12.0 で配布された config.json (つくよみちゃん / 6lang base) に未 PUA 化の multi-codepoint 音素 (`ɔɪ` / `œ̃` / `ɐ̃`) が混入し、Windows の C++ 推論が `is not a single codepoint` で失敗していた問題を修正 (Issue #385、PR #389)。`pua.json` を v1 → v2 化して該当音素を PUA 割り当て + 全 6 ランタイムの PUA テーブルを同期 + `map_token(strict=True)` で未知トークンを fail-fast 化
+- Windows の C++ ランタイム (`piper.exe`) でつくよみちゃん 6lang モデルの `--download-model` が PowerShell `-Command $args` のバグにより URL / 出力先が空になりダウンロードできなかった問題を修正 (PR #557)。あわせて multi-codepoint 音素 (`ɔɪ` / `œ̃` / `ɐ̃` 等) の raw キーが C++ パーサに漏れ、Windows のつくよみ / base config で推論が失敗していた v1.12.0 の回帰をガードする regression CI を追加 (実 config / `pua.json` データ修正は上記 PR #389、本 PR は再発防止 CI)
+- 推論の EOS region trim を全 6 ランタイム (Python / Rust / Go / C# / WASM / C++) で全入力に対し適用し、ファインチューニング済みモデル (つくよみちゃん等) で末尾音節が二重に聞こえる問題を修正 (Issue #499、PR #506 / #507)。**挙動変更注記:** 本修正により全モデル・全ランタイムで出力音声の末尾フレーム (`ceil(durations[-1])` 由来の EOS region) が trim され、v1.12.0 比で出力音声長・末尾が変化する。バグ修正だがデフォルト出力が変わるため明示 (破壊的変更ではない)
+- Go の text splitter を Python / Rust の canonical 実装 (post-consume 方式) に統一し、CJK 句読点 + 閉じ括弧パターンが 1 文として誤結合されていた問題を修正 (Issue #346、PR #504)
+- リリース QA で判明した Windows ビルドの諸問題を修正 (PR #505): `.gitattributes` の `eol=lf` catch-all 追加 (CRLF チェックアウトで gofmt / byte-sync gate が破損)、contract gate スクリプトの cp932 / cp1252 コンソール `UnicodeEncodeError` crash、`check_secret_path_reference` の Windows パス処理
+- v1.12.0 の MB-iSTFT-VITS2 ONNX (つくよみちゃん等) を Docker python-inference / webui サーバや Rust / C++ ランタイムで実行すると `Required inputs (speaker_embedding, speaker_embedding_mask) are missing` で 500 エラー / ロード失敗していた問題を修正 (Issue #426、PR #443)。推論側 4 箇所で speaker_embedding 入力の有無を ONNX セッションから動的判定し、未使用時は zero embedding + mask=0 を feed する fallback を追加。実モデルでの回帰を防ぐ integration gate も追加
 
 ### Security
 
@@ -305,6 +317,9 @@ v1.12.0 で 5 ランタイム (Python/Rust/C#/Go/WASM) に展開した SSML / Vo
   - 2026-05 の `Security Audit / pip-audit (Python)` dev push 失敗は **上流 advisory データ欠陥** が原因で piper-plus 側のコード/依存問題ではない: `nltk` `PYSEC-2026-97` (CVE-2026-0846) と `joblib` `PYSEC-2024-277` (CVE-2024-34997) が 2026-05-20 に `last_affected` 欠落で生成され、安全な `nltk 3.9.4` / `joblib 1.5.3` を含む全バージョンが flag された (同一 commit が後の schedule run では pass)。`pypa/advisory-database` PR #289 ("Update records generated incorrectly", 2026-05-21) で修正済み
   - 下限ピンは将来の dependency resolution が真に脆弱なバージョンへ退行するのを防ぐ regression insurance
 - `.github/workflows/security-audit.yml`: pull_request `paths` に `src/python_run/requirements.txt` を追加。従来 `setup.py` のみが対象で、実際の依存定義 source (setup.py がパースする requirements.txt) の変更が PR の pip-audit gate を通らなかった漏れを修正
+- 依存ライブラリの脆弱性対応: `protobufjs` 7.5.6 → 7.5.8 (CVE-2026-45740、PR #530)、`idna` 3.10 → 3.15 (CVE-2026-45409、PR #531)、`gitpython` 3.1.49 → 3.1.50 (GHSA-mv93-w799-cj2w、PR #437)、Dependabot security alert 対応で `urllib3` (high) / `@protobufjs/utf8` (medium) を更新 (PR #450)
+- HTTP サーバーのログインジェクション対策 (CodeQL `py/log-injection`、PR #435)、および C# の `cs/unsafe-double-checked-lock` 修正 + CodeQL ノイズ削減 (PR #434)
+- Rust の `pyo3` advisory RUSTSEC-2026-0176 / RUSTSEC-2026-0177 を `.cargo/audit.toml` で ignore (rust-numpy が `pyo3` 0.24 系に pin しており上流更新待ち、PR #558 / #559)
 
 ## [1.12.0] - 2026-05-04
 

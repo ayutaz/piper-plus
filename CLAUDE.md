@@ -191,7 +191,7 @@ B (FT) は A から `--devices 1`、`--base_lr 2e-5` (1/10 で catastrophic forg
 
 ### ランタイム共通機能
 
-- **CPU 推論最適化 (Tier 1-2)** — 4 言語実装で ORT セッション設定統一、Warmup 2 回 (100 phonemes、scales=[0.667,1.0,0.8])、`.opt.onnx`+`.ok` キャッシュ、JA 音素化 LRU キャッシュ (Python のみ)。仕様: `docs/spec/ort-session-contract.toml`。CLI: `--no-warmup`。env: `PIPER_DISABLE_WARMUP`, `PIPER_DISABLE_CACHE`, `PIPER_INTRA_THREADS`。
+- **CPU 推論最適化 (Tier 1-2)** — 4 言語実装で ORT セッション設定統一、Warmup 2 回 (100 phonemes、scales=[0.667,1.0,0.8])、`.opt.onnx`+`.ok` キャッシュ、JA 音素化 LRU キャッシュ (Python のみ)。仕様: `docs/spec/ort-session-contract.toml`。CLI: `--no-warmup`。env: `PIPER_DISABLE_WARMUP`, `PIPER_DISABLE_CACHE`, `PIPER_INTRA_THREADS`, `PIPER_G2P_PARALLELISM` (G2P 文単位並列度、`=1` で逐次の旧挙動。Issue #383 / PR #403)。
 - **短テキスト合成品質改善 (Strategy A/B/C)** — 全 6 ランタイム (Python/Rust/C#/Go/WASM/C++) 並列実装。A: Silence Padding + Post-trim、B: Dynamic Scales、C: SSML `<break>` 自動挿入 (SSML 実装ランタイムでのみ)。仕様: `docs/spec/short-text-contract.toml`。
 - **ストリーミング文単位分割** — 終止符 `.`/`!`/`?`/`。`/`！`/`？`/`．` で分割し文ごとに音素化・推論・yield。SSML は単一ユニット。Python: `src/python_run/piper/text_splitter.py`、Rust: `piper-core/src/streaming.rs`、他言語: 同等実装。仕様: `docs/spec/text-splitter-contract.toml`。**Breaking (v1.12.0):** Python `PiperVoice.phonemize()` が単一要素から複数要素へ (詳細: マイグレーションガイド)。
 - **SSML 基本サポート** (Python/Rust/C#/Go/WASM/C++ の 6 ランタイム + G2P-only npm 解析 API) — `<speak>`, `<break>`, `<prosody rate>` を W3C サブセットで実装。実装: `g2p/piper_plus_g2p/ssml.py`, `piper-plus-g2p/src/ssml.rs` (Rust canonical), `PiperPlus.Core/Ssml/SsmlParser.cs`, `go/piperplus/ssml/parser.go`, `wasm/g2p/src/ssml.js` (npm `@piper-plus/g2p`), `src/cpp/ssml.{hpp,cpp}` (CLI `--ssml` 経由、C API 非エクスポート)。 piper-core は `piper-plus-g2p::ssml` を re-export (API 互換維持)。 piper-wasm は同パーサーを `isSsml` / `parseSsml` で WASM expose (TTS 統合は openjtalk-web の `synthesizeSsml` 側で iterate して silence 挿入 + length_scale 切替)。
@@ -201,11 +201,11 @@ B (FT) は A から `--devices 1`、`--base_lr 2e-5` (1/10 で catastrophic forg
 
 | ランタイム | パッケージ | バージョン | テスト | パス |
 |-----------|----------|----------|-------|------|
-| Python (PyPI) | `piper-plus` | 1.12.0 | pytest 多数 | `src/python_run/piper/` |
-| C# (NuGet) | `PiperPlus.Core` / `PiperPlus.Cli` | 0.3.0 | ~1000 (xUnit v3) | `src/csharp/PiperPlus.{Core,Cli}/` (TFM `net10.0`) |
-| Rust (crates.io) | `piper-plus` / `piper-plus-cli` | 0.4.0 | 多数 | `src/rust/piper-{core,cli,python,wasm}/` |
+| Python (PyPI) | `piper-plus` | 1.13.0 | pytest 多数 | `src/python_run/piper/` |
+| C# (NuGet) | `PiperPlus.Core` / `PiperPlus.Cli` | 0.4.0 | ~1000 (xUnit v3) | `src/csharp/PiperPlus.{Core,Cli}/` (TFM `net10.0`) |
+| Rust (crates.io) | `piper-plus` / `piper-plus-cli` | 0.5.0 | 多数 | `src/rust/piper-{core,cli,python,wasm}/` |
 | Go (Go module) | `github.com/ayutaz/piper-plus/src/go` | tag-based | 793 | `src/go/piperplus/`, `src/go/cmd/piper-plus/` |
-| JS/WASM (npm) | `piper-plus` | 0.6.0 | ~1200 + 56 (Rust) | `src/wasm/openjtalk-web/`, `src/rust/piper-wasm/` |
+| JS/WASM (npm) | `piper-plus` | 0.7.0 | ~1200 + 56 (Rust) | `src/wasm/openjtalk-web/`, `src/rust/piper-wasm/` |
 | C API | `libpiper_plus` | shared lib | C/Dart/Godot サンプル | `src/cpp/piper_plus.{h,c_api.cpp}`, `cmake/PiperPlusShared.cmake` |
 | iOS xcframework + SPM | `piper-plus` (Swift Package) | 1.13.0+ (M4) | release-shared-lib CI | `Package.swift`, `Sources/PiperPlus/`, `cmake/PrivacyInfo.xcprivacy` |
 | **Kotlin/Android G2P (Maven Central)** | `io.github.ayutaz:piper-plus-g2p-android` | 1.0.0+ | L1〜L5 (kotlin-g2p-ci.yml) | `android/piper-plus-g2p/` |

@@ -1,12 +1,23 @@
 ![Piper logo](etc/logo.png)
 
 [English](README_EN.md) | [日本語](README.md) | [中文](README_ZH.md) | [Français](README_FR.md) | [한국어](README_KO.md) | [Español](README_ES.md) | Português | [Deutsch](README_DE.md)
+
 [![CI](https://github.com/ayutaz/piper-plus/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/ayutaz/piper-plus/actions/workflows/ci.yml)
-[![PyPI](https://img.shields.io/pypi/v/piper-plus)](https://pypi.org/project/piper-plus/)
-[![Python](https://img.shields.io/pypi/pyversions/piper-plus)](https://pypi.org/project/piper-plus/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python](https://img.shields.io/pypi/pyversions/piper-plus)](https://pypi.org/project/piper-plus/)
 [![Hugging Face Demo](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Demo-blue)](https://huggingface.co/spaces/ayousanz/piper-plus-demo)
 [![Hugging Face Model](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Model-orange)](https://huggingface.co/ayousanz/piper-plus-base)
+[![Try in Browser](https://img.shields.io/badge/Try%20in%20Browser-WebAssembly-blueviolet)](https://ayutaz.github.io/piper-plus/)
+
+**Pacotes:**
+
+[![PyPI](https://img.shields.io/pypi/v/piper-plus?label=PyPI%3A%20piper-plus&color=blue)](https://pypi.org/project/piper-plus/)
+[![NuGet](https://img.shields.io/nuget/v/PiperPlus.Core?label=NuGet%3A%20PiperPlus.Core&color=blue)](https://www.nuget.org/packages/PiperPlus.Core/)
+[![crates.io](https://img.shields.io/crates/v/piper-plus-g2p?label=crates.io%3A%20piper-plus-g2p&color=orange)](https://crates.io/crates/piper-plus-g2p)
+[![npm](https://img.shields.io/npm/v/piper-plus?label=npm%3A%20piper-plus&color=cb3837)](https://www.npmjs.com/package/piper-plus)
+[![Maven Central](https://img.shields.io/maven-central/v/io.github.ayutaz/piper-plus-g2p-android?label=Maven%20Central%3A%20piper-plus-g2p-android&color=blue)](https://central.sonatype.com/artifact/io.github.ayutaz/piper-plus-g2p-android)
+
+> **🔑 O único fork do Piper sob licença MIT** — O projeto original [rhasspy/piper](https://github.com/rhasspy/piper) foi arquivado em outubro de 2025 e o [OHF-Voice/piper1-gpl](https://github.com/OHF-Voice/piper1-gpl) migrou para a licença GPL-3.0. O piper-plus é o único fork compatível com MIT sem dependência do espeak-ng. Seu G2P próprio oferece suporte a 8 idiomas (JA/EN/ZH/KO/ES/FR/PT/SV), tornando-o adequado para uso comercial e embarcado.
 
 > **📢 v1.12.0 Mudanças incompatíveis (2026-05):** Decodificador HiFi-GAN removido (unificado para MB-iSTFT, flag `--mb-istft` descontinuada) / Flask → servidor HTTP FastAPI / Dependência HTS-voice removida (apenas runtime Python) / Unity UPM movido para repositório separado (`ayutaz/uPiper`) / todos os projetos .NET atualizados para `net10.0` LTS. Detalhes: [docs/migration/v1.11-to-v1.12.md](docs/migration/v1.11-to-v1.12.md)
 
@@ -16,15 +27,15 @@ Sistema neural de texto para fala (TTS) de alta velocidade e alta qualidade. Uti
 
 ---
 
-## Sumario
+## Sumário
 
 - [Funcionalidades Principais](#funcionalidades-principais)
-- [Inicio Rapido](#inicio-rapido)
-- [Modelos Pre-treinados](#modelos-pre-treinados)
-- [Instalacao](#instalacao)
+- [Início Rápido](#início-rápido)
+- [Modelos Pré-treinados](#modelos-pré-treinados)
+- [Instalação](#instalação)
 - [Uso](#uso)
 - [Treinamento](#treinamento)
-- [TTS em Japones](#tts-em-japones)
+- [TTS em Japonês](#tts-em-japonês)
 - [Plataformas](#plataformas)
 - [Links Relacionados](#links-relacionados)
 
@@ -32,7 +43,7 @@ Sistema neural de texto para fala (TTS) de alta velocidade e alta qualidade. Uti
 
 ## Funcionalidades Principais
 
-### Sintese de Voz
+### Síntese de Voz
 
 - **Suporte a 8 idiomas** — Japonês, inglês, chinês, espanhol, francês, português, sueco e coreano (ja=0, en=1, zh=2, es=3, fr=4, pt=5, sv=6, ko=7) *O modelo treinado cobre 6 idiomas (JA/EN/ZH/ES/FR/PT)*
 - **TTS em japonês** — Integração com OpenJTalk, informações prosódicas (A1/A2/A3), marcadores de interrogação (#204), variantes contextuais de "ん" (#207)
@@ -85,7 +96,7 @@ Síntese multilíngue equivalente em 8 idiomas em 6 runtimes (Python/Rust/C#/Go/
 
 ---
 
-## Inicio Rapido
+## Início Rápido
 
 ### Binários pré-compilados (sem necessidade de compilação)
 
@@ -238,7 +249,7 @@ Para mais detalhes, consulte [docker/README.md](docker/README.md).
 
 ---
 
-## Instalacao
+## Instalação
 
 ### Python
 
@@ -621,7 +632,7 @@ CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
 
 ---
 
-## Modelos Pre-treinados
+## Modelos Pré-treinados
 
 Modelos de síntese de voz para inferência estão disponíveis no Hugging Face.
 
@@ -682,7 +693,7 @@ curl -L -o models/config.json https://huggingface.co/ayousanz/piper-plus-tsukuyo
 
 ---
 
-## TTS em Japones
+## TTS em Japonês
 
 Síntese de voz em japonês de alta qualidade com integração OpenJTalk. O dicionário e os arquivos de voz são baixados automaticamente na primeira execução.
 
@@ -764,7 +775,7 @@ Modelos piper-plus: [piper-plus-base](https://huggingface.co/ayousanz/piper-plus
 
 ---
 
-## Documentacao
+## Documentação
 
 | Categoria | Links |
 |---|---|

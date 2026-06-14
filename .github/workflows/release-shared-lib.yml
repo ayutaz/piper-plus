@@ -1106,7 +1106,23 @@ jobs:
             echo "::error::Package.swift not found at tag commit"
             exit 1
           fi
-          for var in checksum g2pChecksum; do
+          # Only enforce a checksum for an xcframework that actually debuts at
+          # THIS tag. The synthesis `checksum` always applies (its asset is
+          # named -v${TAG} and consumers fetch v\(version)). The PiperPlusG2P
+          # xcframework (Issue #387) debuts at its OWN g2pVersion tag; when
+          # g2pVersion != tag (e.g. synthesis v1.13.0 while g2p is pre-staged
+          # at 1.14.0), the g2p asset built here is NOT the one SwiftPM
+          # consumers fetch (they pull -v${g2pVersion}), so its placeholder
+          # checksum must NOT block this release.
+          TAG_VER="${GITHUB_REF#refs/tags/}"; TAG_VER="${TAG_VER#v}"
+          G2P_VER=$(grep -E '^let g2pVersion' Package.swift | sed -E 's/.*"([^"]+)".*/\1/')
+          VARS="checksum"
+          if [ "${G2P_VER}" = "${TAG_VER}" ]; then
+            VARS="checksum g2pChecksum"
+          else
+            echo "::notice::g2pChecksum verification skipped: g2pVersion=${G2P_VER} != tag ${TAG_VER} (PiperPlusG2P xcframework debuts at its own v${G2P_VER} tag, Issue #387)"
+          fi
+          for var in ${VARS}; do
             VAL=$(grep -E "^let ${var}" Package.swift | sed -E 's/.*"([^"]+)".*/\1/')
             if [ -z "${VAL}" ]; then
               echo "::error::Could not extract ${var} from Package.swift"
@@ -1217,22 +1233,31 @@ jobs:
           fi
           echo "✓ PiperPlus checksum matches released xcframework"
 
-          # PiperPlusG2P xcframework (Issue #387, iOS + macOS slices since v1.14.0)
-          G2P_ZIP="artifacts/libpiper_plus_g2p-apple-xcframework/libpiper_plus_g2p-apple-${TAG}.xcframework.zip"
-          if ! [ -f "${G2P_ZIP}" ]; then
-            echo "::error::Released PiperPlusG2P xcframework zip not found at ${G2P_ZIP}"
-            exit 1
+          # PiperPlusG2P xcframework (Issue #387, iOS + macOS slices since v1.14.0).
+          # Only enforce when the g2p xcframework debuts at THIS tag; otherwise
+          # the -v${TAG} g2p asset is not the one consumers fetch (they pull
+          # v\(g2pVersion)), so a placeholder/mismatch must not block the release.
+          TAG_VER="${TAG#v}"
+          G2P_VER=$(grep -E '^let g2pVersion' Package.swift | sed -E 's/.*"([^"]+)".*/\1/')
+          if [ "${G2P_VER}" != "${TAG_VER}" ]; then
+            echo "::notice::PiperPlusG2P checksum match skipped: g2pVersion=${G2P_VER} != tag ${TAG_VER} (debuts at its own v${G2P_VER} tag, Issue #387)"
+          else
+            G2P_ZIP="artifacts/libpiper_plus_g2p-apple-xcframework/libpiper_plus_g2p-apple-${TAG}.xcframework.zip"
+            if ! [ -f "${G2P_ZIP}" ]; then
+              echo "::error::Released PiperPlusG2P xcframework zip not found at ${G2P_ZIP}"
+              exit 1
+            fi
+            G2P_ACTUAL=$(sha256sum "${G2P_ZIP}" | awk '{print $1}')
+            G2P_DECLARED=$(grep -E '^let g2pChecksum' Package.swift | sed -E 's/.*"([^"]+)".*/\1/')
+            echo "PiperPlusG2P xcframework SHA-256: ${G2P_ACTUAL}"
+            echo "Package.swift declared g2p:       ${G2P_DECLARED}"
+            if [ "${G2P_ACTUAL}" != "${G2P_DECLARED}" ]; then
+              echo "::error::PiperPlusG2P checksum mismatch: SwiftPM consumers will fail to resolve."
+              echo "::error::Run 'swift package compute-checksum ${G2P_ZIP}' locally and update Package.swift, then re-tag."
+              exit 1
+            fi
+            echo "✓ PiperPlusG2P checksum matches released xcframework"
           fi
-          G2P_ACTUAL=$(sha256sum "${G2P_ZIP}" | awk '{print $1}')
-          G2P_DECLARED=$(grep -E '^let g2pChecksum' Package.swift | sed -E 's/.*"([^"]+)".*/\1/')
-          echo "PiperPlusG2P xcframework SHA-256: ${G2P_ACTUAL}"
-          echo "Package.swift declared g2p:       ${G2P_DECLARED}"
-          if [ "${G2P_ACTUAL}" != "${G2P_DECLARED}" ]; then
-            echo "::error::PiperPlusG2P checksum mismatch: SwiftPM consumers will fail to resolve."
-            echo "::error::Run 'swift package compute-checksum ${G2P_ZIP}' locally and update Package.swift, then re-tag."
-            exit 1
-          fi
-          echo "✓ PiperPlusG2P checksum matches released xcframework"
 
       - name: Generate build provenance attestation
         # SLSA provenance for all release archives (xcframework / shared libs /
