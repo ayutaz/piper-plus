@@ -524,11 +524,20 @@ jobs:
         # exist on disk for attest-build-provenance. cargo publish below
         # repackages internally but produces byte-identical bundles when
         # the working tree is unchanged.
+        #
+        # --no-verify is REQUIRED here: the default verify build resolves
+        # internal deps against the crates.io index, but on a version bump the
+        # new versions are not published yet (e.g. packaging piper-plus 0.5.0
+        # fails with `failed to select a version for the requirement
+        # piper-plus-g2p = "^0.5.0"` because only 0.4.0/0.2.0 are on the index).
+        # We only need the .crate bundle for attestation here; the real
+        # `cargo publish` steps below verify in dependency order (g2p -> core ->
+        # cli) with index-propagation waits, so they resolve correctly.
         working-directory: src/rust
         run: |
-          cargo package -p piper-plus-g2p --allow-dirty
-          cargo package -p piper-plus --allow-dirty
-          cargo package -p piper-plus-cli --allow-dirty
+          cargo package -p piper-plus-g2p --allow-dirty --no-verify
+          cargo package -p piper-plus --allow-dirty --no-verify
+          cargo package -p piper-plus-cli --allow-dirty --no-verify
           echo "Packaged crates:"
           ls -lh target/package/*.crate
 
