@@ -52,7 +52,7 @@ import PackageDescription
 // v1.13.0 release lands; `swift package resolve` succeeds only against tags
 // where this manifest was updated to match a published release asset.
 let version = "1.13.0"
-let checksum = "0000000000000000000000000000000000000000000000000000000000000000"
+let checksum = "33870ebd45ac24685033901831d0910fdfb1c7f1acb5d1176966ba2239031552"
 
 // G2P-only artifact — produced by the same release workflow but as a
 // separate xcframework that does NOT depend on ONNX Runtime. Consumers
