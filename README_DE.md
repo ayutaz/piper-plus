@@ -1,18 +1,29 @@
 ![Piper logo](etc/logo.png)
 
 [English](README_EN.md) | [日本語](README.md) | [中文](README_ZH.md) | [Français](README_FR.md) | [한국어](README_KO.md) | [Español](README_ES.md) | [Português](README_PT.md) | Deutsch
+
 [![CI](https://github.com/ayutaz/piper-plus/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/ayutaz/piper-plus/actions/workflows/ci.yml)
-[![PyPI](https://img.shields.io/pypi/v/piper-plus)](https://pypi.org/project/piper-plus/)
-[![Python](https://img.shields.io/pypi/pyversions/piper-plus)](https://pypi.org/project/piper-plus/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python](https://img.shields.io/pypi/pyversions/piper-plus)](https://pypi.org/project/piper-plus/)
 [![Hugging Face Demo](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Demo-blue)](https://huggingface.co/spaces/ayousanz/piper-plus-demo)
 [![Hugging Face Model](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Model-orange)](https://huggingface.co/ayousanz/piper-plus-base)
+[![Try in Browser](https://img.shields.io/badge/Try%20in%20Browser-WebAssembly-blueviolet)](https://ayutaz.github.io/piper-plus/)
 
-> **📢 v1.12.0 Breaking Changes (2026-05):** HiFi-GAN-Decoder entfernt (auf MB-iSTFT vereinheitlicht, `--mb-istft`-Flag eingestellt) / Flask → FastAPI HTTP-Server / HTS-voice-Abhaengigkeit entfernt (nur Python-Runtime) / Unity UPM in separates Repository ausgelagert (`ayutaz/uPiper`) / alle .NET-Projekte auf `net10.0` LTS aktualisiert. Details: [docs/migration/v1.11-to-v1.12.md](docs/migration/v1.11-to-v1.12.md)
+**Pakete:**
 
-Ein schnelles und hochwertiges neuronales Text-to-Speech-System (TTS). Basierend auf der [VITS](https://github.com/jaywalnut310/vits/)-Architektur mit Multi-Speaker-Sprachsynthese in 8 Sprachen: Japanisch, Englisch, Chinesisch, Koreanisch, Spanisch, Franzoesisch, Portugiesisch und Schwedisch. Ein Fork von [Piper](https://github.com/rhasspy/piper) mit umfassend erweiterter japanischer Sprachunterstuetzung, verbesserter Audioqualitaet und erweiterten Trainingsfunktionen.
+[![PyPI](https://img.shields.io/pypi/v/piper-plus?label=PyPI%3A%20piper-plus&color=blue)](https://pypi.org/project/piper-plus/)
+[![NuGet](https://img.shields.io/nuget/v/PiperPlus.Core?label=NuGet%3A%20PiperPlus.Core&color=blue)](https://www.nuget.org/packages/PiperPlus.Core/)
+[![crates.io](https://img.shields.io/crates/v/piper-plus-g2p?label=crates.io%3A%20piper-plus-g2p&color=orange)](https://crates.io/crates/piper-plus-g2p)
+[![npm](https://img.shields.io/npm/v/piper-plus?label=npm%3A%20piper-plus&color=cb3837)](https://www.npmjs.com/package/piper-plus)
+[![Maven Central](https://img.shields.io/maven-central/v/io.github.ayutaz/piper-plus-g2p-android?label=Maven%20Central%3A%20piper-plus-g2p-android&color=blue)](https://central.sonatype.com/artifact/io.github.ayutaz/piper-plus-g2p-android)
 
-**[Hugging Face Demo](https://huggingface.co/spaces/ayousanz/piper-plus-demo)** | **[WebAssembly Demo](https://ayutaz.github.io/piper-plus/)** (laeuft im Browser, kein Server erforderlich)
+> **🔑 Der einzige Piper-Fork unter MIT-Lizenz** — Das ursprüngliche [rhasspy/piper](https://github.com/rhasspy/piper) wurde im Oktober 2025 archiviert und [OHF-Voice/piper1-gpl](https://github.com/OHF-Voice/piper1-gpl) ist auf GPL-3.0 umgestiegen. piper-plus ist der einzige MIT-kompatible Fork ohne espeak-ng-Abhängigkeit. Das eigene G2P unterstützt 8 Sprachen (JA/EN/ZH/KO/ES/FR/PT/SV) und eignet sich für den kommerziellen und eingebetteten Einsatz.
+
+> **📢 v1.12.0 Breaking Changes (2026-05):** HiFi-GAN-Decoder entfernt (auf MB-iSTFT vereinheitlicht, `--mb-istft`-Flag eingestellt) / Flask → FastAPI HTTP-Server / HTS-voice-Abhängigkeit entfernt (nur Python-Runtime) / Unity UPM in separates Repository ausgelagert (`ayutaz/uPiper`) / alle .NET-Projekte auf `net10.0` LTS aktualisiert. Details: [docs/migration/v1.11-to-v1.12.md](docs/migration/v1.11-to-v1.12.md)
+
+Ein schnelles und hochwertiges neuronales Text-to-Speech-System (TTS). Basierend auf der [VITS](https://github.com/jaywalnut310/vits/)-Architektur mit Multi-Speaker-Sprachsynthese in 8 Sprachen: Japanisch, Englisch, Chinesisch, Koreanisch, Spanisch, Französisch, Portugiesisch und Schwedisch. Ein Fork von [Piper](https://github.com/rhasspy/piper) mit umfassend erweiterter japanischer Sprachunterstützung, verbesserter Audioqualität und erweiterten Trainingsfunktionen.
+
+**[Hugging Face Demo](https://huggingface.co/spaces/ayousanz/piper-plus-demo)** | **[WebAssembly Demo](https://ayutaz.github.io/piper-plus/)** (läuft im Browser, kein Server erforderlich)
 
 ---
 
@@ -34,49 +45,49 @@ Ein schnelles und hochwertiges neuronales Text-to-Speech-System (TTS). Basierend
 
 ### Sprachsynthese
 
-- **8 Sprachen** — Japanisch, Englisch, Chinesisch, Spanisch, Franzoesisch, Portugiesisch, Schwedisch und Koreanisch (ja=0, en=1, zh=2, es=3, fr=4, pt=5, sv=6, ko=7) *Das trainierte Modell umfasst 6 Sprachen (JA/EN/ZH/ES/FR/PT)*
-- **Japanisches TTS** — OpenJTalk-Integration, Prosodieinformationen (A1/A2/A3), Fragemarkierungen (#204), kontextabhaengige "N"-Varianten (#207)
+- **8 Sprachen** — Japanisch, Englisch, Chinesisch, Spanisch, Französisch, Portugiesisch, Schwedisch und Koreanisch (ja=0, en=1, zh=2, es=3, fr=4, pt=5, sv=6, ko=7) *Das trainierte Modell umfasst 6 Sprachen (JA/EN/ZH/ES/FR/PT)*
+- **Japanisches TTS** — OpenJTalk-Integration, Prosodieinformationen (A1/A2/A3), Fragemarkierungen (#204), kontextabhängige "N"-Varianten (#207)
 - **Englisches TTS** — GPL-freies G2P ([g2p-en](https://github.com/Kyubyong/g2p), Apache-2.0), kein espeak-ng erforderlich
-- **Multi-Speaker** — Unterstuetzung fuer 571 Sprecher (Basis-Trainingsmodell), SpeakerBalancedBatchSampler, ausgewogene Sprachgruppen-Abtastung
-- **Benutzerdefinierte Woerterbuecher** — Integriertes Aussprachwoerterbuch mit ueber 200 Fachbegriffen
-- **Phoneingabe** — Direkte Eingabe ueber `[[ Phoneme ]]`-Notation — [Anleitung](docs/features/phoneme-input.md)
+- **Multi-Speaker** — Unterstützung für 571 Sprecher (Basis-Trainingsmodell), SpeakerBalancedBatchSampler, ausgewogene Sprachgruppen-Abtastung
+- **Benutzerdefinierte Wörterbücher** — Integriertes Aussprachwörterbuch mit über 200 Fachbegriffen
+- **Phoneingabe** — Direkte Eingabe über `[[ Phoneme ]]`-Notation — [Anleitung](docs/features/phoneme-input.md)
 
 ### Training
 
-- **WavLM Discriminator** — MOS-Verbesserung von +0,15-0,25 (standardmaessig aktiviert, nur beim Training verwendet)
+- **WavLM Discriminator** — MOS-Verbesserung von +0,15-0,25 (standardmäßig aktiviert, nur beim Training verwendet)
 - **MB-iSTFT-VITS2 Decoder** — Decoder vereinheitlicht zu MB-iSTFT + PQMF, ~2,21x schnellere CPU-Inferenz. ONNX-kompatibel mit bestehenden Runtimes
-- **FP16 Mixed Precision** — 2-3x schnelleres Training, ca. 50% weniger Speicherbedarf (standardmaessig aktiviert)
-- **EMA** — Exponential Moving Average fuer stabiles Training (standardmaessig aktiviert)
-- **Multi-GPU** — DDP-Unterstuetzung, automatische Lernraten-Skalierung
+- **FP16 Mixed Precision** — 2-3x schnelleres Training, ca. 50% weniger Speicherbedarf (standardmäßig aktiviert)
+- **EMA** — Exponential Moving Average für stabiles Training (standardmäßig aktiviert)
+- **Multi-GPU** — DDP-Unterstützung, automatische Lernraten-Skalierung
 - **Prosody Features** — Einspeisung von Prosodieinformationen in den Duration Predictor (`--prosody-dim 16`)
-- **Wandb-Integration** — Echtzeit-Metrikueberwachung
+- **Wandb-Integration** — Echtzeit-Metriküberwachung
 
 ### Schnittstellen
 
-- **[WebUI (Gradio)](docs/features/webui.md)** — Fuer Inferenz und Training, Docker-kompatibel
-- **C++ CLI** — Streaming, CUDA-Inferenz, **Phoneme-Timing-Ausgabe (JSON/TSV/SRT)**, benutzerdefinierte Woerterbuecher
+- **[WebUI (Gradio)](docs/features/webui.md)** — Für Inferenz und Training, Docker-kompatibel
+- **C++ CLI** — Streaming, CUDA-Inferenz, **Phoneme-Timing-Ausgabe (JSON/TSV/SRT)**, benutzerdefinierte Wörterbücher
 - **[C API Shared Library](examples/c-api/README.md)** — `libpiper_plus.so/.dylib/.dll`, FFI-fähig (Flutter/Godot/Swift etc.), Streaming API
-- **[WebAssembly](src/wasm/openjtalk-web/README.npm.md)** — Laeuft vollstaendig im Browser, **Phoneme-Timing-Ausgabe (JSON/TSV/SRT)**, kein Server erforderlich
-- **[Docker](docker/README.md)** — 5 Images fuer Inferenz, Training, WebUI und C++
+- **[WebAssembly](src/wasm/openjtalk-web/README.npm.md)** — Läuft vollständig im Browser, **Phoneme-Timing-Ausgabe (JSON/TSV/SRT)**, kein Server erforderlich
+- **[Docker](docker/README.md)** — 5 Images für Inferenz, Training, WebUI und C++
 - **PyPI** — `pip install piper-plus`, 8 Sprachen multilingual, **Phoneme-Timing-Ausgabe (JSON/TSV/SRT)**, Streaming, **HTTP API auf FastAPI-Basis**
-- **C# CLI** — .NET 10, plattformuebergreifend, 8 Sprachen, ONNX-Inferenz, **Phoneme-Timing-Ausgabe (JSON/TSV/SRT)**
-- **Rust CLI** — piper-plus/piper-plus-cli, Streaming, CUDA/CoreML/DirectML-Unterstuetzung, **Phoneme-Timing-Ausgabe (JSON/TSV/SRT)**, automatischer Woerterbuch-Download
-- **[Go CLI](src/go/README.md)** — HTTP-API-Server, Session-Pooling, Docker-kompatibel, einzelne Binaerdatei, **Phoneme-Timing-Ausgabe (JSON/TSV/SRT)**
-- **Voice Cloning (Speaker Encoder + speaker_embedding)** — in allen 6 Runtimes (Python/Rust/C#/Go/WASM/C++) verfuegbar
-- **SSML-Unterstuetzung** — `<speak>`, `<break>`, `<prosody rate="...">` in 4 Runtimes (Python/Rust/C#/Go) verfuegbar
-- **Qualitaetsverbesserung fuer Kurztexte (Strategy A/B/C)** — Silence Padding, dynamische Scales und automatisches SSML `<break>` in allen 6 Runtimes
+- **C# CLI** — .NET 10, plattformübergreifend, 8 Sprachen, ONNX-Inferenz, **Phoneme-Timing-Ausgabe (JSON/TSV/SRT)**
+- **Rust CLI** — piper-plus/piper-plus-cli, Streaming, CUDA/CoreML/DirectML-Unterstützung, **Phoneme-Timing-Ausgabe (JSON/TSV/SRT)**, automatischer Wörterbuch-Download
+- **[Go CLI](src/go/README.md)** — HTTP-API-Server, Session-Pooling, Docker-kompatibel, einzelne Binärdatei, **Phoneme-Timing-Ausgabe (JSON/TSV/SRT)**
+- **Voice Cloning (Speaker Encoder + speaker_embedding)** — in allen 6 Runtimes (Python/Rust/C#/Go/WASM/C++) verfügbar
+- **SSML-Unterstützung** — `<speak>`, `<break>`, `<prosody rate="...">` in 4 Runtimes (Python/Rust/C#/Go) verfügbar
+- **Qualitätsverbesserung für Kurztexte (Strategy A/B/C)** — Silence Padding, dynamische Scales und automatisches SSML `<break>` in allen 6 Runtimes
 
-### Funktionsunterstuetzung pro Runtime
+### Funktionsunterstützung pro Runtime
 
-Aequivalente 8-sprachige multilinguale Synthese ueber 6 Runtimes (Python/Rust/C#/Go/JS-WASM/C++). Phoneme Timing, Streaming (inkl. satzweiser Aufteilung), Voice Cloning und benutzerdefinierte Woerterbuecher werden von allen Runtimes unterstuetzt. SSML wird von 4 Runtimes (Python/Rust/C#/Go), die HTTP API von 2 Runtimes (Python/Go) unterstuetzt.
+Äquivalente 8-sprachige multilinguale Synthese über 6 Runtimes (Python/Rust/C#/Go/JS-WASM/C++). Phoneme Timing, Streaming (inkl. satzweiser Aufteilung), Voice Cloning und benutzerdefinierte Wörterbücher werden von allen Runtimes unterstützt. SSML wird von 4 Runtimes (Python/Rust/C#/Go), die HTTP API von 2 Runtimes (Python/Go) unterstützt.
 
 ### Plattformen
 
 | Plattform | Architektur | Hinweise |
 |---|---|---|
-| Linux | x86_64 / ARM64 / ARMv7 | Volle Unterstuetzung |
+| Linux | x86_64 / ARM64 / ARMv7 | Volle Unterstützung |
 | macOS | ARM64 (Apple Silicon) nur | M1/M2/M3+ |
-| Windows | x64 | Volle Unterstuetzung |
+| Windows | x64 | Volle Unterstützung |
 | C API (FFI) | Linux x64/ARM64, macOS ARM64, Windows x64 | Shared Library, Android AAR |
 | Web | WebAssembly | Chrome/Edge/Firefox/Safari |
 | C# (.NET) | x64 / ARM64 | .NET 10, Linux/macOS/Windows |
@@ -93,7 +104,7 @@ Laden Sie vorkompilierte Binaries von [GitHub Releases](https://github.com/ayuta
 
 **1. Binary herunterladen**
 
-Laden Sie die passende Version fuer Ihr Betriebssystem herunter und entpacken Sie diese.
+Laden Sie die passende Version für Ihr Betriebssystem herunter und entpacken Sie diese.
 
 **Windows (PowerShell):**
 
@@ -138,11 +149,11 @@ cd piper
 ./bin/piper --model tsukuyomi --text "こんにちは、今日は良い天気ですね。" --output_file output.wav
 ```
 
-> **Hinweis zur Windows cmd-Codepage:** Die Option `--text` verwendet intern `GetCommandLineW()` (UTF-16) und funktioniert daher unabhaengig von der Codepage. Nur bei Pipe-Eingabe (`echo ... | piper`) muessen Sie vorher mit `chcp 65001` auf UTF-8 umschalten.
+> **Hinweis zur Windows cmd-Codepage:** Die Option `--text` verwendet intern `GetCommandLineW()` (UTF-16) und funktioniert daher unabhängig von der Codepage. Nur bei Pipe-Eingabe (`echo ... | piper`) müssen Sie vorher mit `chcp 65001` auf UTF-8 umschalten.
 >
-> **Ausgabeort von output.wav:** Die Datei wird im aktuellen Verzeichnis erstellt (dort, wo Sie `cd piper` ausgefuehrt haben).
+> **Ausgabeort von output.wav:** Die Datei wird im aktuellen Verzeichnis erstellt (dort, wo Sie `cd piper` ausgeführt haben).
 
-> **Welches Binary soll ich waehlen?** Die Releases enthalten ausserdem `piper-plus-cli-*` (C# .NET) und `piper-plus-rs-cli-*` (Rust) CLIs. Der obige Schnellstart verwendet **C++ CLI (`piper-*`)**, das die breiteste Plattformunterstuetzung bietet und fuer die meisten Nutzer empfohlen wird. Details siehe [Auswahl eines CLI-Binarys](docs/getting-started/binary-selection.md).
+> **Welches Binary soll ich wählen?** Die Releases enthalten außerdem `piper-plus-cli-*` (C# .NET) und `piper-plus-rs-cli-*` (Rust) CLIs. Der obige Schnellstart verwendet **C++ CLI (`piper-*`)**, das die breiteste Plattformunterstützung bietet und für die meisten Nutzer empfohlen wird. Details siehe [Auswahl eines CLI-Binarys](docs/getting-started/binary-selection.md).
 
 ### Python-Inferenz
 
@@ -166,9 +177,9 @@ uv run python -m piper_train.infer_onnx \
   --language en
 ```
 
-Wichtige Optionen: `--speaker-id` (Sprecher-ID), `--device auto|cpu|gpu`, `--noise-scale` (Sprachvariation), `--noise-scale-w` (Phonemlaengenvariation, Standard: 0.8), `--length-scale` (Sprechgeschwindigkeit)
+Wichtige Optionen: `--speaker-id` (Sprecher-ID), `--device auto|cpu|gpu`, `--noise-scale` (Sprachvariation), `--noise-scale-w` (Phonemlängenvariation, Standard: 0.8), `--length-scale` (Sprechgeschwindigkeit)
 
-> **Empfohlene Einstellungen fuer WavLM-Modelle:** Modelle, die mit dem WavLM Discriminator trainiert wurden (z.B. Tsukuyomi-chan), erreichen mit `--noise-scale 0.5` optimale Audioqualitaet (Standard ist 0.667).
+> **Empfohlene Einstellungen für WavLM-Modelle:** Modelle, die mit dem WavLM Discriminator trainiert wurden (z.B. Tsukuyomi-chan), erreichen mit `--noise-scale 0.5` optimale Audioqualität (Standard ist 0.667).
 
 #### Python CLI Modellverwaltung
 
@@ -255,7 +266,7 @@ uv pip install ".[train]"
 uv pip install ".[dev]"
 ```
 
-Alternativ ueber das PyPI-Paket installierbar:
+Alternativ über das PyPI-Paket installierbar:
 
 ```bash
 pip install piper-plus
@@ -312,9 +323,9 @@ cmake --build . --config Release
 
 Voraussetzungen: C++17-kompatibler Compiler, CMake 3.15+
 
-- **Linux**: Abhaengigkeiten (ONNX Runtime, OpenJTalk usw.) werden automatisch von CMake heruntergeladen
+- **Linux**: Abhängigkeiten (ONNX Runtime, OpenJTalk usw.) werden automatisch von CMake heruntergeladen
 - **Windows**: Siehe [Windows-Setup-Anleitung](docs/getting-started/windows-setup.md)
-- **macOS**: Abhaengigkeiten werden automatisch heruntergeladen
+- **macOS**: Abhängigkeiten werden automatisch heruntergeladen
 
 ### Aus Quellcode bauen (C#)
 
@@ -325,7 +336,7 @@ dotnet build src/csharp/PiperPlus.sln -c Release
 dotnet test src/csharp/PiperPlus.Core.Tests/
 ```
 
-Voraussetzungen: .NET 10 SDK oder hoeher
+Voraussetzungen: .NET 10 SDK oder höher
 
 #### C# CLI Verwendungsbeispiele
 
@@ -386,7 +397,7 @@ piper-plus-cli --model model.onnx --text "hello" --language en --quiet
 piper-plus-cli --model model.onnx --text "hello" --language en --output-raw | aplay -r 22050 -f S16_LE
 ```
 
-> **Hinweis:** Die C# CLI ist ueber `dotnet tool install -g PiperPlus.Cli` und die Rust CLI ueber `cargo install piper-plus-cli` installierbar. Beide unterstuetzen 8 Sprachen, benutzerdefinierte Woerterbuecher und Streaming.
+> **Hinweis:** Die C# CLI ist über `dotnet tool install -g PiperPlus.Cli` und die Rust CLI über `cargo install piper-plus-cli` installierbar. Beide unterstützen 8 Sprachen, benutzerdefinierte Wörterbücher und Streaming.
 
 ### Aus Quellcode bauen (Rust)
 
@@ -407,7 +418,7 @@ Voraussetzungen: Rust 1.88+, cargo
 
 #### Direkte Texteingabe (empfohlen)
 
-Mit der Option `--text` koennen Sie Text direkt ohne Pipe eingeben:
+Mit der Option `--text` können Sie Text direkt ohne Pipe eingeben:
 
 ```sh
 # Sprache aus Text generieren
@@ -453,38 +464,38 @@ Wichtige Optionen:
 
 | Option | Beschreibung | Standard |
 |---|---|---|
-| `--model PATH\|NAME` | Pfad zur Modelldatei oder Modellname (heruntergeladene Modelle werden automatisch aufgeloest) | - |
+| `--model PATH\|NAME` | Pfad zur Modelldatei oder Modellname (heruntergeladene Modelle werden automatisch aufgelöst) | - |
 | `--text TEXT` | Direkte Texteingabe (kein Pipe erforderlich) | - |
 | `--streaming` | Chunk-basierter Streaming-Modus | aus |
 | `--use-cuda` | CUDA-GPU-Inferenz aktivieren | aus |
-| `--gpu-device-id NUM` | GPU-Geraete-ID | 0 |
+| `--gpu-device-id NUM` | GPU-Geräte-ID | 0 |
 | `--length-scale VAL` | Sprechgeschwindigkeit (kleiner = schneller) | 1.0 |
 | `--noise-scale VAL` | Steuerung der Sprachvariation | 0.667 |
-| `--noise-w VAL` | Steuerung der Phonemlaengen-Variation | 0.8 |
-| `--sentence-silence SEC` | Pause zwischen Saetzen (Sekunden) | 0.2 |
-| `--speaker NUM` | Sprechernummer fuer Multi-Speaker-Modelle | 0 |
-| `--phoneme-silence PHONEME SEC` | Pausendauer fuer bestimmte Phoneme | - |
+| `--noise-w VAL` | Steuerung der Phonemlängen-Variation | 0.8 |
+| `--sentence-silence SEC` | Pause zwischen Sätzen (Sekunden) | 0.2 |
+| `--speaker NUM` | Sprechernummer für Multi-Speaker-Modelle | 0 |
+| `--phoneme-silence PHONEME SEC` | Pausendauer für bestimmte Phoneme | - |
 | `--raw-phonemes` | Eingabe als Phoneme interpretieren | aus |
 | `--output-timing FILE` | Phonem-Timing-Informationen in Datei ausgeben (JSON/TSV) | - |
-| `--custom-dict FILE` | Benutzerdefiniertes Woerterbuch (mehrere durch Komma getrennt) | - |
+| `--custom-dict FILE` | Benutzerdefiniertes Wörterbuch (mehrere durch Komma getrennt) | - |
 | `--json-input` | JSON-Eingabemodus | aus |
-| `--list-models [LANG]` | Verfuegbare Modelle auflisten | - |
+| `--list-models [LANG]` | Verfügbare Modelle auflisten | - |
 | `--download-model NAME` | Modell herunterladen | - |
-| `--model-dir DIR` | Zielverzeichnis fuer heruntergeladene Modelle | - |
+| `--model-dir DIR` | Zielverzeichnis für heruntergeladene Modelle | - |
 | `--config/-c PATH` | Pfad zur Konfigurationsdatei | - |
 | `--output_file/-f PATH` | Pfad zur WAV-Ausgabedatei | - |
 | `--output_dir/-d DIR` | Ausgabeverzeichnis | - |
 | `--output-raw` | Raw-PCM-Audio auf stdout ausgeben | aus |
 | `--language/-l CODE` | Sprachcode | - |
 | `--timing-format FORMAT` | Timing-Ausgabeformat (json/tsv) | - |
-| `--test-mode` | Testmodus, ONNX-Inferenz ueberspringen | aus |
+| `--test-mode` | Testmodus, ONNX-Inferenz überspringen | aus |
 | `--debug` | Debug-Logging aktivieren | aus |
 | `--quiet/-q` | Logging deaktivieren | aus |
 | `--version` | Version anzeigen | - |
 
 Alle Optionen mit `piper --help` anzeigen.
 
-> **Empfohlene Einstellungen fuer WavLM-Modelle:** Fuer Modelle, die mit dem WavLM Discriminator trainiert wurden, wird `--noise-scale 0.5` empfohlen (Standard ist 0.667).
+> **Empfohlene Einstellungen für WavLM-Modelle:** Für Modelle, die mit dem WavLM Discriminator trainiert wurden, wird `--noise-scale 0.5` empfohlen (Standard ist 0.667).
 >
 > ```sh
 > echo "こんにちは" | ./bin/piper --model tsukuyomi.onnx --config config.json --noise-scale 0.5 -f output.wav
@@ -492,7 +503,7 @@ Alle Optionen mit `piper --help` anzeigen.
 
 ### JSON-Eingabe
 
-Mit dem Flag `--json-input` wird JSON-Eingabe unterstuetzt:
+Mit dem Flag `--json-input` wird JSON-Eingabe unterstützt:
 
 ```json
 { "text": "First speaker.", "speaker_id": 0, "output_file": "/tmp/speaker_0.wav" }
@@ -532,12 +543,12 @@ Mit dem Flag `--json-input` wird JSON-Eingabe unterstuetzt:
 |---|---|---|
 | `PIPER_DEFAULT_MODEL` | Standard-Modellpfad, wenn `--model` nicht angegeben | `/path/to/model.onnx` |
 | `PIPER_DEFAULT_CONFIG` | Standard-Konfigurationsdateipfad, wenn `--config` nicht angegeben | `/path/to/config.json` |
-| `PIPER_MODEL_DIR` | Speicherverzeichnis fuer heruntergeladene Modelle | `~/.local/share/piper/models` |
-| `PIPER_GPU_DEVICE_ID` | CUDA-GPU-Geraete-ID | `0` |
+| `PIPER_MODEL_DIR` | Speicherverzeichnis für heruntergeladene Modelle | `~/.local/share/piper/models` |
+| `PIPER_GPU_DEVICE_ID` | CUDA-GPU-Geräte-ID | `0` |
 
 ### Hilfsskripte (Windows)
 
-Im Verzeichnis `scripts/` stehen Hilfsskripte fuer Windows-Nutzer bereit.
+Im Verzeichnis `scripts/` stehen Hilfsskripte für Windows-Nutzer bereit.
 
 **PowerShell:**
 
@@ -587,11 +598,11 @@ uv run python -m piper_train \
   --ema-decay 0.9995
 ```
 
-Bei Multi-GPU wird DDP (Distributed Data Parallel) automatisch konfiguriert. Die NCCL-Umgebungsvariablen muessen gesetzt werden. Weitere Details im Multi-GPU-Trainingshandbuch.
+Bei Multi-GPU wird DDP (Distributed Data Parallel) automatisch konfiguriert. Die NCCL-Umgebungsvariablen müssen gesetzt werden. Weitere Details im Multi-GPU-Trainingshandbuch.
 
 ### ONNX-Konvertierung
 
-Standardmaessig wird eine FP16-Konvertierung angewendet, die die Modellgroesse um ca. 50% reduziert. Deaktivierbar mit `--no-fp16`. Fuer numerische Stabilitaet bleiben LayerNormalization, Sigmoid und Softmax in FP32.
+Standardmäßig wird eine FP16-Konvertierung angewendet, die die Modellgröße um ca. 50% reduziert. Deaktivierbar mit `--no-fp16`. Für numerische Stabilität bleiben LayerNormalization, Sigmoid und Softmax in FP32.
 
 ```bash
 # Standardmodell (FP16-Ausgabe)
@@ -614,13 +625,13 @@ CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
 
 ### Sprachevaluation
 
-`scripts/evaluation/` enthaelt Evaluierungstexte.
+`scripts/evaluation/` enthält Evaluierungstexte.
 
 ---
 
 ## Vortrainierte Modelle
 
-Vortrainierte Sprachsynthesemodelle stehen auf Hugging Face zur Verfuegung.
+Vortrainierte Sprachsynthesemodelle stehen auf Hugging Face zur Verfügung.
 
 **Inferenzmodelle (sofort einsatzbereit):**
 
@@ -629,11 +640,11 @@ Vortrainierte Sprachsynthesemodelle stehen auf Hugging Face zur Verfuegung.
 | Tsukuyomi-chan 6lang | JA/EN/ZH/ES/FR/PT | 1 | Tsukuyomi-chan Stimme, 6 Sprachen, FP16 | [HuggingFace](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan) |
 | CSS10 Japanisch 6lang | JA/EN/ZH/ES/FR/PT | 1 | CSS10 Japanische Stimme, 6 Sprachen, FP16 | [HuggingFace](https://huggingface.co/ayousanz/piper-plus-css10-ja-6lang) |
 
-**Trainings-Basismodelle (fuer Feinabstimmung):**
+**Trainings-Basismodelle (für Feinabstimmung):**
 
 | Modell | Sprachen | Sprecher | Beschreibung | Download |
 |---|---|---|---|---|
-| 6-Sprachen-Basismodell | JA/EN/ZH/ES/FR/PT | 571 | Multilingual vortrainiert (508.187 Aeusserungen, VITS + Prosodie) | [HuggingFace](https://huggingface.co/ayousanz/piper-plus-base) |
+| 6-Sprachen-Basismodell | JA/EN/ZH/ES/FR/PT | 571 | Multilingual vortrainiert (508.187 Äußerungen, VITS + Prosodie) | [HuggingFace](https://huggingface.co/ayousanz/piper-plus-base) |
 
 ### Modelle herunterladen
 
@@ -655,41 +666,41 @@ curl -L -o models/tsukuyomi.onnx https://huggingface.co/ayousanz/piper-plus-tsuk
 curl -L -o models/config.json https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/config.json
 ```
 
-### Merkmale des 6-Sprachen-Basismodells (fuer Training)
+### Merkmale des 6-Sprachen-Basismodells (für Training)
 
 - Architektur: VITS + Prosody Features
-- Trainingsdaten: 508.187 Aeusserungen (571 Sprecher, 6 Sprachen)
+- Trainingsdaten: 508.187 Äußerungen (571 Sprecher, 6 Sprachen)
 - Abtastrate: 22.050 Hz
 - Symbolanzahl: 173
 - Prosody Features: A1/A2/A3-Prosodieinformationen (Japanisch)
 - Ausgewogene Sprachgruppen-Abtastung: automatisch aktiviert
 
-**Unterstuetzte Sprachen:**
+**Unterstützte Sprachen:**
 
-| Sprache | Code | language_id | Sprecher | Aeusserungen | Quelle |
+| Sprache | Code | language_id | Sprecher | Äußerungen | Quelle |
 |---|---|---|---|---|---|
 | Japanisch | ja | 0 | 20 | 60.148 | MOE-Speech |
 | Englisch | en | 1 | 310 | 74.912 | LibriTTS-R |
 | Chinesisch | zh | 2 | 142 | 63.223 | AISHELL-3 |
 | Spanisch | es | 3 | 63 | 168.374 | CML-TTS |
-| Franzoesisch | fr | 4 | 28 | 107.464 | CML-TTS |
+| Französisch | fr | 4 | 28 | 107.464 | CML-TTS |
 | Portugiesisch | pt | 5 | 8 | 34.066 | CML-TTS |
 
-> **Hinweis:** piper-plus verwendet eigene Architekturerweiterungen (multilinguale Embeddings, Prosodie A1/A2/A3, 173 Symbole) und ist daher nicht kompatibel mit Checkpoints/ONNX-Modellen des upstream Piper. Bitte verwenden Sie ausschliesslich piper-plus-spezifische Modelle.
+> **Hinweis:** piper-plus verwendet eigene Architekturerweiterungen (multilinguale Embeddings, Prosodie A1/A2/A3, 173 Symbole) und ist daher nicht kompatibel mit Checkpoints/ONNX-Modellen des upstream Piper. Bitte verwenden Sie ausschließlich piper-plus-spezifische Modelle.
 
 ---
 
 ## Japanisches TTS
 
-Hochwertige japanische Sprachsynthese durch OpenJTalk-Integration. Woerterbuch und Sprachdateien werden beim ersten Start automatisch heruntergeladen.
+Hochwertige japanische Sprachsynthese durch OpenJTalk-Integration. Wörterbuch und Sprachdateien werden beim ersten Start automatisch heruntergeladen.
 
 **Umgebungsvariablen (optional):**
 
 | Variable | Beschreibung |
 |---|---|
-| `OPENJTALK_DICTIONARY_PATH` | OpenJTalk-Woerterbuchpfad (bei fehlender Angabe automatischer Download) |
+| `OPENJTALK_DICTIONARY_PATH` | OpenJTalk-Wörterbuchpfad (bei fehlender Angabe automatischer Download) |
 | `PIPER_AUTO_DOWNLOAD_DICT` | `0` zum Deaktivieren des automatischen Downloads |
-| `PIPER_OFFLINE_MODE` | `1` fuer den Offline-Modus |
+| `PIPER_OFFLINE_MODE` | `1` für den Offline-Modus |
 
 Weitere Details im Japanischen Sprachsynthesehandbuch und in der [Phonem-Mapping-Referenz](docs/api-reference/phoneme-mapping.md).
 
@@ -699,7 +710,7 @@ Weitere Details im Japanischen Sprachsynthesehandbuch und in der [Phonem-Mapping
 
 ### macOS
 
-**Nur Apple Silicon (M1/M2/M3+) wird unterstuetzt.** Fuer Intel-Macs verwenden Sie bitte Docker oder den Quellcode-Build.
+**Nur Apple Silicon (M1/M2/M3+) wird unterstützt.** Für Intel-Macs verwenden Sie bitte Docker oder den Quellcode-Build.
 
 Sicherheitswarnung beim ersten Start:
 
@@ -717,7 +728,7 @@ piper.exe --model en_US-lessac-medium.onnx -f output.wav
 
 ### WebAssembly
 
-Japanisches TTS direkt im Browser. Kein Server erforderlich, offline-faehig.
+Japanisches TTS direkt im Browser. Kein Server erforderlich, offline-fähig.
 
 - **[Online-Demo](https://ayutaz.github.io/piper-plus/)**
 - **[Technische Details & Integrationsanleitung](src/wasm/openjtalk-web/README.npm.md)**
@@ -726,9 +737,9 @@ Japanisches TTS direkt im Browser. Kein Server erforderlich, offline-faehig.
 
 ## Weitere Links
 
-### piper-plus-g2p (Eigenstaendiges G2P-Paket)
+### piper-plus-g2p (Eigenständiges G2P-Paket)
 
-Mehrsprachiges G2P (Grapheme-to-Phoneme) als eigenstaendige Pakete verfuegbar:
+Mehrsprachiges G2P (Grapheme-to-Phoneme) als eigenständige Pakete verfügbar:
 
 - **Python**: `pip install piper-plus-g2p` — [Quellcode](src/python/g2p/)
 - **Rust**: `cargo add piper-plus-g2p` — [Quellcode](src/rust/piper-plus-g2p/)

@@ -1,12 +1,23 @@
 ![Piper logo](etc/logo.png)
 
 [English](README_EN.md) | [日本語](README.md) | [中文](README_ZH.md) | [Français](README_FR.md) | 한국어 | [Español](README_ES.md) | [Português](README_PT.md) | [Deutsch](README_DE.md)
+
 [![CI](https://github.com/ayutaz/piper-plus/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/ayutaz/piper-plus/actions/workflows/ci.yml)
-[![PyPI](https://img.shields.io/pypi/v/piper-plus)](https://pypi.org/project/piper-plus/)
-[![Python](https://img.shields.io/pypi/pyversions/piper-plus)](https://pypi.org/project/piper-plus/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python](https://img.shields.io/pypi/pyversions/piper-plus)](https://pypi.org/project/piper-plus/)
 [![Hugging Face Demo](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Demo-blue)](https://huggingface.co/spaces/ayousanz/piper-plus-demo)
 [![Hugging Face Model](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Model-orange)](https://huggingface.co/ayousanz/piper-plus-base)
+[![Try in Browser](https://img.shields.io/badge/Try%20in%20Browser-WebAssembly-blueviolet)](https://ayutaz.github.io/piper-plus/)
+
+**패키지:**
+
+[![PyPI](https://img.shields.io/pypi/v/piper-plus?label=PyPI%3A%20piper-plus&color=blue)](https://pypi.org/project/piper-plus/)
+[![NuGet](https://img.shields.io/nuget/v/PiperPlus.Core?label=NuGet%3A%20PiperPlus.Core&color=blue)](https://www.nuget.org/packages/PiperPlus.Core/)
+[![crates.io](https://img.shields.io/crates/v/piper-plus-g2p?label=crates.io%3A%20piper-plus-g2p&color=orange)](https://crates.io/crates/piper-plus-g2p)
+[![npm](https://img.shields.io/npm/v/piper-plus?label=npm%3A%20piper-plus&color=cb3837)](https://www.npmjs.com/package/piper-plus)
+[![Maven Central](https://img.shields.io/maven-central/v/io.github.ayutaz/piper-plus-g2p-android?label=Maven%20Central%3A%20piper-plus-g2p-android&color=blue)](https://central.sonatype.com/artifact/io.github.ayutaz/piper-plus-g2p-android)
+
+> **🔑 유일한 MIT 라이선스 Piper 포크** — 원본 [rhasspy/piper](https://github.com/rhasspy/piper)는 2025년 10월에 아카이브되었으며, [OHF-Voice/piper1-gpl](https://github.com/OHF-Voice/piper1-gpl)은 GPL-3.0으로 전환되었습니다. piper-plus는 espeak-ng에 의존하지 않는 유일한 MIT 호환 포크입니다. 자체 구현 G2P로 8개 언어 (JA/EN/ZH/KO/ES/FR/PT/SV)를 지원하며, 상용 및 임베디드 용도에 적합합니다.
 
 > **📢 v1.12.0 주요 변경사항 (2026-05):** HiFi-GAN 디코더 제거 (MB-iSTFT로 통합, `--mb-istft` 플래그 폐지) / Flask → FastAPI HTTP 서버 / HTS-voice 의존성 제거 (Python 런타임만 해당) / Unity UPM 별도 저장소로 이동 (`ayutaz/uPiper`) / 모든 .NET 프로젝트 `net10.0` LTS로 업그레이드. 자세히: [docs/migration/v1.11-to-v1.12.md](docs/migration/v1.11-to-v1.12.md)
 
