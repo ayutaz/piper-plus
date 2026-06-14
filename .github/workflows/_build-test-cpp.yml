@@ -151,8 +151,9 @@ jobs:
           fi
 
           if [ "${{ runner.os }}" == "Windows" ]; then
+            # Auto-detect the VS generator (windows-latest may ship VS17/VS18/newer);
+            # pinning a generator name breaks project() after a runner VS upgrade.
             cmake -B build \
-              -G "Visual Studio 17 2022" \
               -A x64 \
               ${CMAKE_ARGS} \
               -DONNXRUNTIME_ROOT_PATH="$ONNXRUNTIME_ROOT_PATH"

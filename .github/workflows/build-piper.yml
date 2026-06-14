@@ -193,8 +193,13 @@ jobs:
           New-Item -ItemType Directory -Force -Path build | Out-Null
           cd build
 
-          # Set CMAKE flags
-          $cmakeFlags = @("-G", "Visual Studio 17 2022", "-A", "x64", "-DCMAKE_BUILD_TYPE=${{ inputs.build-type }}")
+          # Set CMAKE flags.
+          # Do NOT hardcode the VS generator: the windows-latest runner image
+          # upgraded its Visual Studio (VS17 -> VS18), which broke a pinned
+          # "Visual Studio 17 2022" generator at project(). Let CMake auto-detect
+          # the installed VS generator; -A x64 still selects the x64 platform and
+          # survives future runner VS bumps.
+          $cmakeFlags = @("-A", "x64", "-DCMAKE_BUILD_TYPE=${{ inputs.build-type }}")
           if ("${{ inputs.include-tests }}" -eq "true") {
             $cmakeFlags += "-DBUILD_TESTS=ON"
           }
