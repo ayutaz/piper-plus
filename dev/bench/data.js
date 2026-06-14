@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1780754746658,
+  "lastUpdate": 1781418195265,
   "repoUrl": "https://github.com/ayutaz/piper-plus",
   "entries": {
     "Python inference benchmark": [
@@ -318,6 +318,60 @@ window.BENCHMARK_DATA = {
           {
             "name": "Peak Memory (en)",
             "value": 207.8,
+            "unit": "MB"
+          },
+          {
+            "name": "Model Size (en)",
+            "value": 37.6,
+            "unit": "MB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "41669061+ayutaz@users.noreply.github.com",
+            "name": "yousan",
+            "username": "ayutaz"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "abf2877a6fbaf1d8bac6c211b47fa567fcee0673",
+          "message": "chore(release): v1.13.0 — version bump + CHANGELOG promotion (#560)\n\n* chore(release): v1.13.0 — version bump + CHANGELOG promotion\n\n- bump 5 manifests (Python/Rust/C#/npm) + release-versions.toml prefixes\n  - Python/root VERSION + piper_train/VERSION + src/python pyproject: 1.12.0 -> 1.13.0\n  - Rust workspace (+ internal cli/core/python/wasm deps): 0.4.0 -> 0.5.0\n  - C# Core/Cli: 0.3.0 -> 0.4.0\n  - npm synthesis (openjtalk-web): 0.6.0 -> 0.7.0\n- regenerate uv.lock / Cargo.lock / package-lock.json\n- promote CHANGELOG [Unreleased] -> [1.13.0] - 2026-06-13\n- add missing Fixed entries (#557 Windows tsukuyomi C++, #506/#507 EOS trim,\n  #504 Go text splitter, #505 Windows release-QA)\n- add missing Security entries (CVE bumps #530/#531/#437/#450,\n  CodeQL #435/#434, pyo3 advisories #558/#559)\n\n* docs(release): v1.13.0 監査で判明した CHANGELOG 漏れ等を追記\n\n- CHANGELOG ### Added: G2P 文単位並列化 + 新 env PIPER_G2P_PARALLELISM (Issue #383, PR #403)\n- CHANGELOG ### Fixed: MB-iSTFT モデルの speaker_embedding 未対応で Docker/Rust/C++ が 500/load 失敗していた問題 (Issue #426, PR #443)\n- CLAUDE.md: env 列挙に PIPER_G2P_PARALLELISM を追記\n- README.npm.md: importmap CDN pin を piper-plus@0.6.0 -> @0.7.0 に更新 (publish 版と同期)\n\n* fix(ci): unblock v1.13.0 tag — g2p checksum gate + pre-tag Swift runbook\n\n監査 (ultracode) で判明したリリース実行 blocker を release ブランチで解消:\n\n- release-shared-lib.yml: g2p xcframework の checksum 検証 (placeholder + asset\n  一致) を「g2pVersion == tag 版」のときのみ強制する条件を追加。g2p は自身の\n  g2pVersion tag で debut するため、synthesis v1.13.0 タグで g2pVersion=1.14.0 の\n  placeholder が release job を hard-fail させていた (Issue #387)。synthesis の\n  checksum は従来どおり常時強制。\n- prepare-release skill: Swift checksum 更新を「tag 後」→「tag 前」の正しい順序に\n  修正 (Phase 5/7)。compute-checksum 対象を実 artifact 名 (libpiper_plus-ios.\n  xcframework.zip 等) に訂正。workflow_dispatch artifact から取得する手順に変更。\n- CONTRIBUTING.md: v<X.Y.Z> tag が release-shared-lib.yml + docker-build.yml を\n  同時発火する点、Swift checksum pre-tag 手順、GitHub Release 二重作成の注意を追記。\n\n* docs(release): v1.13.0 監査で判明した CHANGELOG/CLAUDE.md の漏れを修正\n\n- CLAUDE.md「ランタイム別パッケージ」表の版数を bump 後の値に更新\n  (Python 1.12.0→1.13.0 / C# 0.3.0→0.4.0 / Rust 0.4.0→0.5.0 / npm 0.6.0→0.7.0)。\n  version-consistency gate は CLAUDE.md を読まないため CI 未検出だった\n- CHANGELOG [1.13.0] Fixed に PR #389 を独立記載。v1.12.0 配布 config.json の\n  未 PUA 化 multi-codepoint 音素 (ɔɪ/œ̃/ɐ̃) による Windows C++ 推論失敗の実データ\n  修正 (pua.json v1→v2 + 全6ランタイム同期 + strict fail-fast)。従来は #557 の\n  regression CI ガード文脈でしか言及されておらず、別 PR の実修正が独立記載漏れだった\n\n* docs(changelog): 開発時の重大度マーカー (🔴 Critical 等) を除去\n\n[1.13.0] の Kotlin/Android G2P エントリに混入していた開発時の重大度/優先度\nマーカー (🔴 Critical / 🔴 / 🟡 / 🟡 → 🟢) を全除去。リリース後に changelog を\n読む人にとって緊急度の色分けは無意味なノイズのため、事実記述のみに統一。\nカテゴリ見出しの装飾絵文字 (### 🚀 Major Features 等) と要件 ID (NFR-SEC-2 等)\nは意味が明確なため残置。\n\n* docs(readme): 全8言語のヘッダーを統一・改行整理し FR/ES/PT/DE の正書法を復元\n\n- 言語ナビとバッジ群の間・パッケージラベルとバッジの間に空行を挿入。README は\n  CommonMark で単一改行がスペース化されナビとバッジが密着していたため、論理グループ\n  を空行で分離 (左寄せ・HTML 不使用)\n- 全8言語ヘッダーを日本語版水準に統一: 状態バッジ整列 (重複 PyPI 除去)、パッケージ\n  レジストリバッジ群 (PyPI/NuGet/crates.io/npm/Maven Central)、Try in Browser バッジ、\n  MIT フォーク訴求文 (各言語へ翻訳) を追加\n- FR/ES/PT/DE の本文 diacritics を全面復元 (Systeme→Système、Franzoesisch→Französisch\n  等)。heading slug と TOC アンカーの整合は維持、コードブロック内は ASCII のまま\n  (コピペ互換性のため)\n- 6言語は per-language の edit→adversarial verify で検証 (バッジ URL byte 一致、callout\n  翻訳、TOC アンカー整合、内容非改変)",
+          "timestamp": "2026-06-14T15:19:56+09:00",
+          "tree_id": "360ca3264684d046d57e26ba72199f99b7921407",
+          "url": "https://github.com/ayutaz/piper-plus/commit/abf2877a6fbaf1d8bac6c211b47fa567fcee0673"
+        },
+        "date": 1781418193640,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "RTF (en)",
+            "value": 0.1352,
+            "unit": "ratio"
+          },
+          {
+            "name": "Latency P50 (en)",
+            "value": 26.1,
+            "unit": "ms"
+          },
+          {
+            "name": "Latency P95 (en)",
+            "value": 69.4,
+            "unit": "ms"
+          },
+          {
+            "name": "Cold Start (en)",
+            "value": 1392.5,
+            "unit": "ms"
+          },
+          {
+            "name": "Peak Memory (en)",
+            "value": 208.5,
             "unit": "MB"
           },
           {
