@@ -115,7 +115,14 @@ jobs:
     uses: ./.github/workflows/_build-test-cpp.yml
     with:
       run-integration-tests: true
-      os-matrix: '["ubuntu-24.04", "macos-latest", "windows-latest"]'
+      # Pin Windows to windows-2022 (VS17). The windows-latest image upgraded to
+      # VS18, whose STL dropped stdext::checked_array_iterator, which breaks the
+      # bundled fmt 10.0.0 in Debug builds (cmake/ExternalDeps.cmake) — Release
+      # compiled but Debug failed. The release also builds Windows on
+      # windows-2022, so this keeps C++ CI and the release toolchain in sync.
+      # Revisit (back to windows-latest) once fmt is bumped to a VS18-compatible
+      # release.
+      os-matrix: '["ubuntu-24.04", "macos-latest", "windows-2022"]'
       build-type-matrix: '["Release", "Debug"]'
       timeout-minutes: 25
 
