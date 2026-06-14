@@ -286,55 +286,6 @@ jobs:
           packages-dir: dist/
           skip-existing: true
 
-  # Publish stub package (piper-tts-plus -> piper-plus redirect)
-  publish_pypi_stub:
-    name: Publish PyPI Stub (piper-tts-plus)
-    needs: [publish_pypi]
-    if: |
-      always() &&
-      needs.publish_pypi.result == 'success'
-    runs-on: ubuntu-24.04
-    # Stub package has its own Trusted Publisher entry on PyPI (separate
-    # project name `piper-tts-plus`).
-    environment:
-      name: pypi-stub
-      url: https://pypi.org/p/piper-tts-plus
-    permissions:
-      contents: read
-      id-token: write
-      attestations: write
-    steps:
-      - uses: actions/checkout@v6.0.3
-
-      - name: Set up Python
-        uses: actions/setup-python@v6.2.0
-        with:
-          python-version: '3.11'
-
-      - name: Install build tools
-        run: pip install build twine
-
-      - name: Copy VERSION for stub
-        run: |
-          VERSION="${{ github.event.inputs.version }}"
-          echo "$VERSION" > VERSION
-          cp VERSION src/python_stub/VERSION
-
-      - name: Build stub package
-        working-directory: src/python_stub
-        run: python -m build
-
-      - name: Generate SLSA build provenance attestation (stub)
-        uses: actions/attest-build-provenance@v3.2.0
-        with:
-          subject-path: 'src/python_stub/dist/*'
-
-      - name: Publish stub to PyPI (Trusted Publisher)
-        uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          packages-dir: src/python_stub/dist/
-          skip-existing: true
-
   # C# CLI builds
   csharp-cli:
     name: Build C# CLI (${{ matrix.rid }})
@@ -704,7 +655,7 @@ jobs:
   release_summary:
     name: Release Summary
     runs-on: ubuntu-24.04
-    needs: [create_release, build_all, publish_pypi, publish_pypi_stub, publish_nuget, publish_crates, csharp-cli, rust-cli]
+    needs: [create_release, build_all, publish_pypi, publish_nuget, publish_crates, csharp-cli, rust-cli]
     if: always()
     steps:
       - name: Summary
@@ -718,7 +669,6 @@ jobs:
           echo "- Create Release: ${{ needs.create_release.result }}"
           echo "- Build All: ${{ needs.build_all.result }}"
           echo "- Publish PyPI: ${{ needs.publish_pypi.result }}"
-          echo "- Publish PyPI Stub: ${{ needs.publish_pypi_stub.result }}"
           echo "- Publish NuGet: ${{ needs.publish_nuget.result }}"
           echo "- Publish crates.io: ${{ needs.publish_crates.result }}"
           echo "- C# CLI: ${{ needs.csharp-cli.result }}"
@@ -728,7 +678,6 @@ jobs:
           echo "## Release Summary" >> $GITHUB_STEP_SUMMARY
           echo "- C++/Python Build: ${{ needs.build_all.result }}" >> $GITHUB_STEP_SUMMARY
           echo "- PyPI: ${{ needs.publish_pypi.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "- PyPI Stub: ${{ needs.publish_pypi_stub.result }}" >> $GITHUB_STEP_SUMMARY
           echo "- NuGet: ${{ needs.publish_nuget.result }}" >> $GITHUB_STEP_SUMMARY
           echo "- crates.io: ${{ needs.publish_crates.result }}" >> $GITHUB_STEP_SUMMARY
           echo "- C# CLI: ${{ needs.csharp-cli.result }}" >> $GITHUB_STEP_SUMMARY
