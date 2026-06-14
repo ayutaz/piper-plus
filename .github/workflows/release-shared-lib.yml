@@ -383,6 +383,14 @@ jobs:
             -DONNXRUNTIME_INCLUDE_DIR="${ORT_IOS_DIR}/include"
 
       - name: Build (iOS slice)
+        # ZERO_AR_DATE=1 makes Apple's `xcrun libtool -static` (the PiperPlusShared.cmake
+        # POST_BUILD merge, cmake/PiperPlusShared.cmake) zero the archive member mtimes
+        # and the global symbol-table timestamp, so libpiper_plus.a is byte-reproducible
+        # across runs of the same source. Required so the Package.swift binaryTarget
+        # checksum computed from a workflow_dispatch build still matches the tag-run
+        # rebuild (release job Gate 2 fails on any mismatch).
+        env:
+          ZERO_AR_DATE: "1"
         run: cmake --build build-ios --config Release -j$(sysctl -n hw.ncpu)
 
       - name: Verify slice arch
@@ -627,9 +635,17 @@ jobs:
       - name: Zip xcframework
         run: |
           set -euo pipefail
-          # zip -ry preserves symlinks (Apple frameworks rely on them in some
-          # configurations; harmless overhead for static-archive xcframeworks).
-          zip -ry libpiper_plus-ios.xcframework.zip piper_plus.xcframework
+          # Reproducible zip — the Package.swift binaryTarget checksum must survive the
+          # dispatch-build -> tag-build rebuild (the release job's Gate 2 compares the
+          # declared `let checksum` against a fresh sha256 of this zip and hard-fails on
+          # mismatch). `zip` stores a per-entry modification time, so we (1) normalise
+          # every entry's mtime to a fixed epoch (`touch -h`, not following symlinks),
+          # (2) feed a byte-sorted file list for a stable member order, and (3) pass -X
+          # to drop the platform extra field (uid/gid/hi-res time). -y keeps symlinks as
+          # symlinks (Apple framework layout). Combined with ZERO_AR_DATE on the .a build,
+          # the archive is byte-identical across runs of the same source.
+          find piper_plus.xcframework -exec touch -h -t 202001010000.00 {} +
+          find piper_plus.xcframework -print | LC_ALL=C sort | zip -X -y libpiper_plus-ios.xcframework.zip -@
           ls -la libpiper_plus-ios.xcframework.zip
           echo "sha256:"
           shasum -a 256 libpiper_plus-ios.xcframework.zip
