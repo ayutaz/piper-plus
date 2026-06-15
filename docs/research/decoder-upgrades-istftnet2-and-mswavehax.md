@@ -35,7 +35,7 @@ from torch.nn import Conv1d, ConvTranspose1d, functional as F
 
 **`Conv2d` を import すらしていない。** つまり **1D CNN のみで構成された backbone**。
 
-`MBiSTFTGenerator` クラス (`mb_istft.py:133-216`) の主要設定:
+`MBiSTFTGenerator` クラス (`mb_istft.py:133-296`、 ファイル末尾まで) の主要設定:
 
 | 要素 | 値 | コード行 |
 |------|----|---------|

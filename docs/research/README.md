@@ -13,4 +13,4 @@
 
 ## 深堀りコンパニオン
 
-- [Decoder Upgrade: iSTFTNet2-MB (A-1) と MS-Wavehax (A-2)](decoder-upgrades-istftnet2-and-mswavehax.md) — 統合レポート §A の A-1 / A-2 について、 v1.12.0 で導入済みの **MB-iSTFT-VITS** との差分を**コード位置 (`mb_istft.py:14` import / `:25` PQMF クラス / `:133-216` MBiSTFTGenerator クラス) と数値で明示**。 「置換」ではなく「枠組み流用 + 増築」 (A-1 は backbone 1D→1D-2D 置換、 A-2 は streaming 専用 vocoder 併設) であることを示し、 並走戦略と実装フェーズを提示。 §2.5 に Phase 1〜4 deep-research の段階的更新 (Risk 1 中→低 / Risk 2 中→高 / Risk 3 中→低 に再評価) と companion オープンクエスチョン Q10〜Q20 全 11 件の分類済表を併載。
+- [Decoder Upgrade: iSTFTNet2-MB (A-1) と MS-Wavehax (A-2)](decoder-upgrades-istftnet2-and-mswavehax.md) — 統合レポート §A の A-1 / A-2 について、 v1.12.0 で導入済みの **MB-iSTFT-VITS** との差分を**コード位置 (`mb_istft.py:14` import / `:25` PQMF クラス / `:133-296` MBiSTFTGenerator クラス) と数値で明示**。 「置換」ではなく「枠組み流用 + 増築」 (A-1 は backbone 1D→1D-2D 置換、 A-2 は streaming 専用 vocoder 併設) であることを示し、 並走戦略と実装フェーズを提示。 §2.5 に Phase 1〜4 deep-research の段階的更新 (Risk 1 中→低 / Risk 2 中→高 / Risk 3 中→低 に再評価) と companion オープンクエスチョン Q10〜Q20 全 11 件の分類済表を併載。
