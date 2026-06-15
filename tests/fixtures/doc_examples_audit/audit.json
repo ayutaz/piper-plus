@@ -2,9 +2,9 @@
   "schema_version": 1,
   "generated_at": "2026-05-19T00:00:00Z",
   "totals": {
-    "executable": 229,
+    "executable": 230,
     "needs_placeholder": 4,
-    "skip_warranted": 208,
+    "skip_warranted": 207,
     "total": 441
   },
   "by_language": {
@@ -24,7 +24,7 @@
       "skip_warranted": 0
     },
     "python": {
-      "executable": 25,
+      "executable": 26,
       "needs_placeholder": 0,
       "skip_warranted": 0
     },
@@ -36,7 +36,7 @@
     "unknown": {
       "executable": 0,
       "needs_placeholder": 0,
-      "skip_warranted": 184
+      "skip_warranted": 183
     },
     "wasm": {
       "executable": 11,
@@ -5783,8 +5783,8 @@
     },
     {
       "file": "docs/research/decoder-upgrades-istftnet2-and-mswavehax.md",
-      "line_start": 30,
-      "line_end": 32,
+      "line_start": 32,
+      "line_end": 34,
       "language_raw": "python",
       "language": "python",
       "category": "executable",
@@ -5796,24 +5796,22 @@
     },
     {
       "file": "docs/research/decoder-upgrades-istftnet2-and-mswavehax.md",
-      "line_start": 49,
-      "line_end": 51,
-      "language_raw": "",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
+      "line_start": 51,
+      "line_end": 53,
+      "language_raw": "python",
+      "language": "python",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
       "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
+      "directives_detected": [],
       "env_dependencies": [],
       "hash_sha1": "8feca036be245dcf82b16cc27e3e506d5c95bfd1"
     },
     {
       "file": "docs/research/decoder-upgrades-istftnet2-and-mswavehax.md",
-      "line_start": 422,
-      "line_end": 431,
-      "language_raw": "",
+      "line_start": 428,
+      "line_end": 437,
+      "language_raw": "text",
       "language": "unknown",
       "category": "skip_warranted",
       "suggested_action": "route_via_language_alias_table",
@@ -5826,9 +5824,9 @@
     },
     {
       "file": "docs/research/improvement-survey-2026-06-15.md",
-      "line_start": 488,
-      "line_end": 496,
-      "language_raw": "",
+      "line_start": 489,
+      "line_end": 497,
+      "language_raw": "text",
       "language": "unknown",
       "category": "skip_warranted",
       "suggested_action": "route_via_language_alias_table",
@@ -5841,9 +5839,9 @@
     },
     {
       "file": "docs/research/improvement-survey-2026-06-15.md",
-      "line_start": 500,
-      "line_end": 510,
-      "language_raw": "",
+      "line_start": 501,
+      "line_end": 511,
+      "language_raw": "text",
       "language": "unknown",
       "category": "skip_warranted",
       "suggested_action": "route_via_language_alias_table",
