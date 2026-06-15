@@ -88,7 +88,7 @@ piper-plus ドキュメント。利用ガイド・各ランタイム連携・仕
 ## Research
 
 - [Research INDEX](research/README.md) — 先行研究・最新論文を用いた改善調査スナップショット
-- [改善調査 2026-06](research/improvement-survey-2026-06.md) — VITS2/MB-iSTFT を超える/取り込める先行研究 (増分改善 vs 大規模刷新)
+- [改善調査 統合レポート 2026-06-15](research/improvement-survey-2026-06-15.md) — VITS2/MB-iSTFT を超える/取り込める先行研究の統合スナップショット (5 軸 31 アクション、 deep-dive companion 付き)
 
 ## Development
 

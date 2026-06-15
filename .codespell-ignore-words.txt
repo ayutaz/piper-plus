@@ -143,3 +143,6 @@ Unparseable
 Sie
 # informations — French "informations" (plural)
 informations
+
+# Company name (Appen, referenced in OSS G2P license discussion)
+appen

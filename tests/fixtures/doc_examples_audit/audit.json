@@ -2,10 +2,10 @@
   "schema_version": 1,
   "generated_at": "2026-05-19T00:00:00Z",
   "totals": {
-    "executable": 228,
+    "executable": 229,
     "needs_placeholder": 4,
-    "skip_warranted": 204,
-    "total": 436
+    "skip_warranted": 208,
+    "total": 441
   },
   "by_language": {
     "bash": {
@@ -24,7 +24,7 @@
       "skip_warranted": 0
     },
     "python": {
-      "executable": 24,
+      "executable": 25,
       "needs_placeholder": 0,
       "skip_warranted": 0
     },
@@ -36,7 +36,7 @@
     "unknown": {
       "executable": 0,
       "needs_placeholder": 0,
-      "skip_warranted": 180
+      "skip_warranted": 184
     },
     "wasm": {
       "executable": 11,
@@ -5780,6 +5780,79 @@
       "directives_detected": [],
       "env_dependencies": [],
       "hash_sha1": "cf080af42f664b5ad38f4716b714e1920e09d3ed"
+    },
+    {
+      "file": "docs/research/decoder-upgrades-istftnet2-and-mswavehax.md",
+      "line_start": 30,
+      "line_end": 32,
+      "language_raw": "python",
+      "language": "python",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "062ec94cc31c2c908c4b2400b166083d94f2c62c"
+    },
+    {
+      "file": "docs/research/decoder-upgrades-istftnet2-and-mswavehax.md",
+      "line_start": 49,
+      "line_end": 51,
+      "language_raw": "",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "8feca036be245dcf82b16cc27e3e506d5c95bfd1"
+    },
+    {
+      "file": "docs/research/decoder-upgrades-istftnet2-and-mswavehax.md",
+      "line_start": 422,
+      "line_end": 431,
+      "language_raw": "",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "df9d64a0fb6e2c7c20a68c9d0a48818c77b65dd4"
+    },
+    {
+      "file": "docs/research/improvement-survey-2026-06-15.md",
+      "line_start": 488,
+      "line_end": 496,
+      "language_raw": "",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "0ec6b646f3b5844112b8405006321d7d318a79c4"
+    },
+    {
+      "file": "docs/research/improvement-survey-2026-06-15.md",
+      "line_start": 500,
+      "line_end": 510,
+      "language_raw": "",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "f3f450f7d39e90322eaba777574de6071e983519"
     },
     {
       "file": "docs/superpowers/plans/2026-06-03-swedish-per-word-lid-parity.md",
