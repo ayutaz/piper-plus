@@ -117,6 +117,56 @@ def test_voice_conversion():
 
 
 @pytest.mark.unit
+def test_synthesizer_trn_propagates_decoder_type():
+    """AI-03: ``SynthesizerTrn`` forwards ``decoder_type`` to ``self.dec``.
+
+    Pin for ``models.py`` L717 + L769. The kwarg is wired through three
+    layers (VitsModel -> SynthesizerTrn -> MBiSTFTGenerator); this gate
+    catches a future refactor that silently drops the kwarg between
+    SynthesizerTrn and its inner generator.
+    """
+    # Default propagation: omitting decoder_type keeps the legacy 1D path.
+    model_default = _make_synthesizer()
+    assert model_default.dec.decoder_type == "mb_istft_1d", (
+        "SynthesizerTrn dropped the default decoder_type before reaching "
+        "MBiSTFTGenerator"
+    )
+
+    # Explicit propagation: the new-decoder value reaches the inner generator
+    # AND the 2D state (blocks_2d) is built — guards against a refactor that
+    # stores decoder_type on self but forgets to forward it to self.dec.
+    from piper_train.vits.models import SynthesizerTrn
+
+    model_new = SynthesizerTrn(
+        n_vocab=97,
+        spec_channels=513,
+        segment_size=32,
+        inter_channels=192,
+        hidden_channels=192,
+        filter_channels=768,
+        n_heads=2,
+        n_layers=6,
+        kernel_size=3,
+        p_dropout=0.1,
+        resblock="2",
+        resblock_kernel_sizes=(3, 5, 7),
+        resblock_dilation_sizes=((1, 2), (2, 6), (3, 12)),
+        upsample_rates=(4, 4),
+        upsample_initial_channel=256,
+        upsample_kernel_sizes=(16, 16),
+        n_speakers=1,
+        n_languages=2,
+        gin_channels=512,
+        decoder_type="istftnet2_mb_1d2d",
+    )
+    assert model_new.dec.decoder_type == "istftnet2_mb_1d2d"
+    assert hasattr(model_new.dec, "blocks_2d"), (
+        "decoder_type propagated but blocks_2d was not built — "
+        "constructor wiring is broken"
+    )
+
+
+@pytest.mark.unit
 def test_synthesizer_output_all_fields():
     """All SynthesizerOutput fields have correct types."""
     from piper_train.vits.models import SynthesizerOutput
