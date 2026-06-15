@@ -90,6 +90,10 @@ piper-plus ドキュメント。利用ガイド・各ランタイム連携・仕
 - [Research INDEX](research/README.md) — 先行研究・最新論文を用いた改善調査スナップショット
 - [改善調査 統合レポート 2026-06-15](research/improvement-survey-2026-06-15.md) — VITS2/MB-iSTFT を超える/取り込める先行研究の統合スナップショット (5 軸 31 アクション、 deep-dive companion 付き)
 
+## Tickets
+
+- [チケットシステム INDEX](tickets/README.md) — A-1 / A-2 PoC 実装計画 ([research/implementation-plan-a1-a2-2026-06-16.md](research/implementation-plan-a1-a2-2026-06-16.md)) を実行するための **6 マイルストーン × 18 チケット** 集約 index。 各チケットに目的/実装詳細/エージェントチーム編成/unit+e2e テスト/懸念事項/「一から作り直すとしたら」省察/後続タスクへの連絡事項を含む
+
 ## Development
 
 - [Contributing](../CONTRIBUTING.md) — Contribution guidelines

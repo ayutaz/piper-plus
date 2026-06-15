@@ -18,3 +18,4 @@
 ## 実装計画
 
 - [A-1 / A-2 実装計画 2026-06-16](implementation-plan-a1-a2-2026-06-16.md) — PoC 着手の **18 action items + 6 milestones + 8 risk register + 5 immediate next steps**。 in-flight PR (#222 Zero-shot DRAFT-stale / #537 Python 3.13 CONFLICTING-stale) との衝突マップを 9 ターゲットファイルで分析、 merge 順戦略を確定 (A-1/A-2 先行 → #537 → #222 で 7 ランタイム ABI 同期を 1 回に集約)。 CSS10 JA 単一話者 50 epoch + FLY-TTS 並走保険 + 1 GPU 約 9 週間の PoC 設計。 `feat/decoder-istftnet2-mswavehax-poc` ブランチで実行。
+- [チケットシステム (docs/tickets/)](../tickets/README.md) — 上記実装計画を実行するための **6 マイルストーン × 18 チケット** 集約 index。 各チケットはタスク目的/実装詳細/エージェントチーム編成/unit+e2e テスト項目/懸念事項/「一から作り直すとしたら」省察/後続タスクへの連絡事項を含む。 マイルストーンとチケットを双方向リンクで紐付け進捗追跡を一元化。
