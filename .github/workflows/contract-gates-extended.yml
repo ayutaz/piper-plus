@@ -109,3 +109,58 @@ jobs:
             *) echo "::error::unknown contract id ${{ matrix.contract }}"; exit 1 ;;
           esac
           python "scripts/$script"
+
+  # ---------------------------------------------------------------------------
+  # AI-15 regression-guard for A-1 / A-2 / FLY-TTS decoder variants.
+  # Runs the 5 AI-15 check scripts on ubuntu-latest only — the gates are
+  # AST / JSON / markdown parsing and have no OS-specific surface.
+  # NOTE: This job is gated by `continue-on-error: true` while the AI-15
+  # skeleton lands. Promote to blocking after the script bodies are filled
+  # in (see AI-15 ticket DoD).
+  # ---------------------------------------------------------------------------
+  regression-guard:
+    name: AI-15 regression-guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # TODO(AI-15): remove continue-on-error once the script bodies are
+    # implemented and the contract is enforceable.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v6.0.3
+        with:
+          fetch-depth: 2  # AI-15 isolation check needs HEAD~1 diff.
+
+      - uses: actions/setup-python@v6.2.0
+        with:
+          python-version: '3.13'
+
+      - name: AI-15 audio-parity baseline drift
+        run: python scripts/check_audio_parity_baseline.py
+
+      - name: AI-15 A-1 / A-2 isolation invariants
+        run: python scripts/check_a1_a2_isolation.py
+
+      - name: Download tools/benchmark/metrics.json (from AI-12 artifact)
+        # TODO(AI-15): wire actions/download-artifact once AI-12 publishes
+        # the metrics.json artifact name. For the skeleton the gate runs
+        # against any committed metrics.json present in the tree.
+        run: |
+          if [ ! -f tools/benchmark/metrics.json ]; then
+            echo "::warning::tools/benchmark/metrics.json missing — AI-12 artifact not yet wired"
+          fi
+
+      - name: AI-15 expected_p50_ms tolerance gate
+        run: python scripts/check_expected_p50_ms_gate.py
+
+      - name: AI-15 freeze-dp auto-enable invariant
+        run: python scripts/check_freeze_dp_compat.py
+
+      - name: AI-15 PR #222 / PR #537 isolation reviewer checklist
+        # Only on pull_request events — push events have no PR body.
+        if: ${{ github.event_name == 'pull_request' }}
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          tmpfile=$(mktemp)
+          printf '%s' "$PR_BODY" > "$tmpfile"
+          python scripts/check_pr222_pr537_isolation_checklist.py --pr-body "$tmpfile"

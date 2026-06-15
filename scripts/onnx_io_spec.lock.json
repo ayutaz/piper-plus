@@ -1,0 +1,23 @@
+{
+  "_comment": [
+    "AI-15 regression-guard pin file for the ONNX export I/O surface.",
+    "Mirrors the current contract in src/python/piper_train/export_onnx.py;",
+    "any change to input_names / output_names / dynamic_axes must update this",
+    "file in the same PR and include an 'onnx-io-spec-bump:' trailer on HEAD.",
+    "",
+    "Note on PR #222 (sid -> speaker_embedding migration): the rename is",
+    "deferred to AI-17 by design. Until then this pin keeps `sid` as the",
+    "fourth canonical input so existing C# / Rust / Go / WASM / C++ runtimes",
+    "do not require coordinated cross-runtime updates. TODO(AI-15): re-pin",
+    "opset_version once AI-17 decides on the migration cut-over."
+  ],
+  "input_names": ["input", "input_lengths", "scales", "sid"],
+  "output_names": ["output"],
+  "dynamic_axes": {
+    "input": {"0": "batch_size", "1": "phonemes"},
+    "input_lengths": {"0": "batch_size"},
+    "scales": {"0": "batch_size"},
+    "sid": {"0": "batch_size"},
+    "output": {"0": "batch_size", "1": "channels", "2": "time"}
+  }
+}

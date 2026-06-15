@@ -1,5 +1,16 @@
 # Audio parity contract — cross-runtime WAV equivalence (M2.2)
 # =============================================================
+#
+# AI-15 regression-guard note
+# ---------------------------
+# The [mb_istft_1d] section is baseline-immutable and pinned by
+# `scripts/audio_parity_baseline.lock.json`. New decoder variants
+# ([istftnet2_mb_1d2d] / [mswavehax] / [fly_convnext6] etc.) must be added
+# as separate sections — never by mutating existing [mb_istft_1d] values.
+# Intentional bumps require an `audio-parity-baseline-bump:` trailer on
+# the HEAD commit; the gate is enforced by
+# `scripts/check_audio_parity_baseline.py`.
+#
 # 同一 model + 同一 phoneme IDs から各 runtime が出力する WAV が、 階層化
 # 判定で「同じ音」と認められる閾値を pinning する canonical spec。 個別の
 # script / workflow は本 file を single source of truth として参照する。

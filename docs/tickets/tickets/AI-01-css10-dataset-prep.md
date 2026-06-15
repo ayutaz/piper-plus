@@ -233,3 +233,30 @@ split 設計を再考するなら、 現計画の deterministic seed=42 + train 
 - 6lang base ckpt 配置: `/data/piper/output-multilingual-6lang-mb-istft/` (CLAUDE.md §現在の状態)
 - 影響 PR: [#222 Zero-shot TTS](https://github.com/ayutaz/piper-plus/pull/222) / [#537 Python 3.13 + CUDA 12.8 + Ubuntu 24.04 統一](https://github.com/ayutaz/piper-plus/pull/537)
 - Kyubyong/css10 オリジナル: [github.com/Kyubyong/css10](https://github.com/Kyubyong/css10)
+
+## Worklog
+
+### 2026-06-16 — skeleton-pass landed
+
+スケルトン実装が dev ブランチに着地。 後続の data-prep 実行ステップ (GPU/network/disk 必要分) を未完 TODO として明示記録する。
+
+**landed (skeleton scope):**
+
+- `src/python/piper_train/tools/fetch_css10_ja.py` — argparse + `download_archive` / `extract_archive` / `verify_layout` 関数シグネチャ。 `CSS10_JA_URL` / `CSS10_JA_SHA256` / `EXPECTED_HOURS=14.0` の定数定義。 実 DL は `NotImplementedError` で gate 済み (network 不要)
+- `src/python/piper_train/tools/split_css10_ja_poc.py` — 6200/200/200 deterministic split を pure-Python で完全実装 (skeleton 段階で動作)、 `--seed 42`、 `--stratify-by-title` フラグ (default off)
+- `src/python/tests/test_css10_ja_prep.py` — 6 contract assertions (split ratio / determinism / prosody 16-dim / 6lang phoneme set 互換 / 22050Hz mono / lid==0 & speaker_id==0)。 FS 依存テストは `/data/piper/dataset-css10-ja-poc/processed/` 不在時 skip、 split-logic 2 件は 6,600 件 synthetic fixture で即時実行
+- `BASE_6LANG_CONFIG = "/data/piper/output-multilingual-6lang-mb-istft/config.json"` 定数を test 側に pin
+
+**piper_train core への編集なし** (G-1.2 / G-1.9 / audio-parity-contract 不変条件は自動的に満たす)。
+
+**残 TODO (本スケルトン外、 training host 上で実行):**
+
+- [ ] Kyubyong/css10 Japanese subset の DL + SHA256 確定 (`fetch_css10_ja.py` の URL / SHA pin を実値に置換、 ~8.3 GB compressed)
+- [ ] `prepare_multilingual_dataset.py --single-speaker` で 22050Hz LJSpeech 正規化 + spec cache 生成 (CPU 数十分〜1h)
+- [ ] `add_prosody_features.py` で 16-dim prosody npz 生成 (`pyopenjtalk-plus` バージョンは 6lang base ckpt と一致確認)
+- [ ] `split_css10_ja_poc.py --seed 42` で `splits/{train,val,test}.csv` 出力 (skeleton 実装で即実行可)
+- [ ] 1 epoch sanity 学習 (`uv run python -m piper_train --max_epochs 1 ... --precision 32-true`) で 6lang base ckpt resume dry-run + WandB audio sample 確認
+- [ ] WandB run URL を本 Worklog 末尾に追記
+- [ ] disk occupancy 7.5-9.0 GB 範囲内であることを `du -sh processed/` で確認
+
+**Blockers (parent agent への返し):** network DL / CPU 前処理 / GPU sanity run はすべて GPU 訓練ホスト依存のため、 本セッションでは skeleton 着地までで一旦完。

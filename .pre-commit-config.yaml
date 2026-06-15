@@ -1076,3 +1076,48 @@ repos:
         # SC2129 を一斉に block しない (workflows actionlint.yml と等価)。
         # 段階的 shellcheck 修正は別 PR で実施。
         args: ['-shellcheck=']
+
+  # ---------------------------------------------------------------------------
+  # AI-15 — A-1 / A-2 / FLY-TTS decoder regression-guard gates.
+  # Five lightweight check scripts (AST walks + JSON pin diffs) that protect
+  # the existing [mb_istft_1d] baseline while new decoder variants land.
+  # Skeleton: scripts currently no-op (exit 0); full enforcement TODO(AI-15).
+  # ---------------------------------------------------------------------------
+  - repo: local
+    hooks:
+      - id: check-audio-parity-baseline
+        name: AI-15 audio-parity baseline drift
+        entry: uv run python scripts/check_audio_parity_baseline.py
+        language: system
+        files: ^(docs/spec/audio-parity-contract\.toml|scripts/audio_parity_baseline\.lock\.json)$
+        pass_filenames: false
+
+      - id: check-a1-a2-isolation
+        name: AI-15 A-1 / A-2 isolation invariants
+        entry: uv run python scripts/check_a1_a2_isolation.py
+        language: system
+        files: ^(src/python/piper_train/vits/(mb_istft|models)\.py|src/python/piper_train/export_onnx\.py|src/python_run/piper/text_splitter\.py|scripts/onnx_io_spec\.lock\.json)$
+        pass_filenames: false
+
+      - id: check-expected-p50-ms-gate
+        name: AI-15 expected_p50_ms tolerance gate
+        entry: uv run python scripts/check_expected_p50_ms_gate.py
+        language: system
+        files: ^(tools/benchmark/metrics\.json|docs/spec/audio-parity-contract\.toml)$
+        pass_filenames: false
+
+      - id: check-freeze-dp-compat
+        name: AI-15 freeze-dp auto-enable invariant
+        entry: uv run python scripts/check_freeze_dp_compat.py
+        language: system
+        files: ^src/python/piper_train/__main__\.py$
+        pass_filenames: false
+
+      - id: check-pr222-pr537-isolation-checklist
+        name: AI-15 PR #222 / PR #537 isolation reviewer checklist
+        # Manual stage — needs the PR body markdown which is unavailable
+        # locally. CI gates the same script via contract-gates workflow.
+        stages: [manual]
+        entry: uv run python scripts/check_pr222_pr537_isolation_checklist.py
+        language: system
+        pass_filenames: false
