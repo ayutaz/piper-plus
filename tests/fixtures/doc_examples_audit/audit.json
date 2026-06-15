@@ -2,16 +2,16 @@
   "schema_version": 1,
   "generated_at": "2026-05-19T00:00:00Z",
   "totals": {
-    "executable": 230,
+    "executable": 242,
     "needs_placeholder": 4,
-    "skip_warranted": 207,
-    "total": 441
+    "skip_warranted": 227,
+    "total": 473
   },
   "by_language": {
     "bash": {
       "executable": 170,
       "needs_placeholder": 4,
-      "skip_warranted": 24
+      "skip_warranted": 32
     },
     "csharp": {
       "executable": 6,
@@ -24,19 +24,19 @@
       "skip_warranted": 0
     },
     "python": {
-      "executable": 26,
+      "executable": 37,
       "needs_placeholder": 0,
       "skip_warranted": 0
     },
     "rust": {
-      "executable": 12,
+      "executable": 13,
       "needs_placeholder": 0,
       "skip_warranted": 0
     },
     "unknown": {
       "executable": 0,
       "needs_placeholder": 0,
-      "skip_warranted": 183
+      "skip_warranted": 195
     },
     "wasm": {
       "executable": 11,
@@ -5823,6 +5823,21 @@
       "hash_sha1": "df9d64a0fb6e2c7c20a68c9d0a48818c77b65dd4"
     },
     {
+      "file": "docs/research/implementation-plan-a1-a2-2026-06-16.md",
+      "line_start": 64,
+      "line_end": 68,
+      "language_raw": "text",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "43dad589def969fe2e332d96fa17d5285320edfc"
+    },
+    {
       "file": "docs/research/improvement-survey-2026-06-15.md",
       "line_start": 489,
       "line_end": 497,
@@ -6199,6 +6214,449 @@
       "directives_detected": [],
       "env_dependencies": [],
       "hash_sha1": "7f6e19f1c1c9f9650dbc885519558a5b5fbeddbe"
+    },
+    {
+      "file": "docs/tickets/tickets/AI-01-css10-dataset-prep.md",
+      "line_start": 38,
+      "line_end": 55,
+      "language_raw": "text",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "d327218b4626f08c20a19267d8e86d760ecad0e9"
+    },
+    {
+      "file": "docs/tickets/tickets/AI-01-css10-dataset-prep.md",
+      "line_start": 73,
+      "line_end": 102,
+      "language_raw": "bash",
+      "language": "bash",
+      "category": "skip_warranted",
+      "suggested_action": "sandbox_cannot_satisfy_env_dep",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [
+        "/data/piper/"
+      ],
+      "hash_sha1": "03b66761c50a4ca1ad66279c97c435863cdab051"
+    },
+    {
+      "file": "docs/tickets/tickets/AI-02-baseline-training.md",
+      "line_start": 38,
+      "line_end": 54,
+      "language_raw": "bash",
+      "language": "bash",
+      "category": "skip_warranted",
+      "suggested_action": "sandbox_cannot_satisfy_env_dep",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [
+        "/data/piper/"
+      ],
+      "hash_sha1": "db0a6c826be171a268bc603a72918efac6a5f1fd"
+    },
+    {
+      "file": "docs/tickets/tickets/AI-02-baseline-training.md",
+      "line_start": 66,
+      "line_end": 70,
+      "language_raw": "bash",
+      "language": "bash",
+      "category": "skip_warranted",
+      "suggested_action": "sandbox_cannot_satisfy_env_dep",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [
+        "/data/piper/",
+        "CUDA_VISIBLE_DEVICES"
+      ],
+      "hash_sha1": "1946f67f1efcd54af4f544dcc02e2e4910d700bf"
+    },
+    {
+      "file": "docs/tickets/tickets/AI-03-istftnet2-backbone-impl.md",
+      "line_start": 65,
+      "line_end": 89,
+      "language_raw": "python",
+      "language": "python",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "a99f14cd4c0bc85ccb32e134c42bb04bbe36795b"
+    },
+    {
+      "file": "docs/tickets/tickets/AI-03-istftnet2-backbone-impl.md",
+      "line_start": 240,
+      "line_end": 247,
+      "language_raw": "bash",
+      "language": "bash",
+      "category": "skip_warranted",
+      "suggested_action": "sandbox_cannot_satisfy_env_dep",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [
+        "/data/piper/"
+      ],
+      "hash_sha1": "4aa76d513ea2409711fbc52912ba38af1704c2c3"
+    },
+    {
+      "file": "docs/tickets/tickets/AI-04-istftnet2-unit-tests.md",
+      "line_start": 53,
+      "line_end": 89,
+      "language_raw": "python",
+      "language": "python",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "d963f19f124a95d2968e4f19f6dc84ff470a772d"
+    },
+    {
+      "file": "docs/tickets/tickets/AI-05-istftnet2-training.md",
+      "line_start": 28,
+      "line_end": 44,
+      "language_raw": "bash",
+      "language": "bash",
+      "category": "skip_warranted",
+      "suggested_action": "sandbox_cannot_satisfy_env_dep",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [
+        "/data/piper/"
+      ],
+      "hash_sha1": "595acfdc20a88c9d99b7ed6b70ef1afed0bf1e7d"
+    },
+    {
+      "file": "docs/tickets/tickets/AI-06-fly-decoder-impl.md",
+      "line_start": 59,
+      "line_end": 112,
+      "language_raw": "python",
+      "language": "python",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "b2861078a5b278d12dbddc7130331623ad862307"
+    },
+    {
+      "file": "docs/tickets/tickets/AI-07-fly-training.md",
+      "line_start": 28,
+      "line_end": 44,
+      "language_raw": "bash",
+      "language": "bash",
+      "category": "skip_warranted",
+      "suggested_action": "sandbox_cannot_satisfy_env_dep",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [
+        "/data/piper/"
+      ],
+      "hash_sha1": "0cd4576dfc78e0d0e4a94b0db2e5a942b52c683d"
+    },
+    {
+      "file": "docs/tickets/tickets/AI-08-wavehax-vocoder-impl.md",
+      "line_start": 44,
+      "line_end": 87,
+      "language_raw": "python",
+      "language": "python",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "eb0713fa58c899c498adb2bbd291eb70695bf8cb"
+    },
+    {
+      "file": "docs/tickets/tickets/AI-08-wavehax-vocoder-impl.md",
+      "line_start": 91,
+      "line_end": 103,
+      "language_raw": "python",
+      "language": "python",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "ea5d3c2e5d9ffb78a2b52f00a2e23df4a8fe6832"
+    },
+    {
+      "file": "docs/tickets/tickets/AI-09-configure-optimizers-hook.md",
+      "line_start": 33,
+      "line_end": 77,
+      "language_raw": "python",
+      "language": "python",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "71bcfc65d3db59e4dc9c54fd549ea7e9b78364c9"
+    },
+    {
+      "file": "docs/tickets/tickets/AI-10-wavehax-training.md",
+      "line_start": 69,
+      "line_end": 86,
+      "language_raw": "bash",
+      "language": "bash",
+      "category": "skip_warranted",
+      "suggested_action": "sandbox_cannot_satisfy_env_dep",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [
+        "/data/piper/"
+      ],
+      "hash_sha1": "909e5fa7f09fdac9237bb7e8557579c13cca6474"
+    },
+    {
+      "file": "docs/tickets/tickets/AI-10-wavehax-training.md",
+      "line_start": 90,
+      "line_end": 95,
+      "language_raw": "bash",
+      "language": "bash",
+      "category": "skip_warranted",
+      "suggested_action": "sandbox_cannot_satisfy_env_dep",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [
+        "/data/piper/",
+        "CUDA_VISIBLE_DEVICES"
+      ],
+      "hash_sha1": "108e1a34e3a97f8c040dad50b976e6ee1ece89cb"
+    },
+    {
+      "file": "docs/tickets/tickets/AI-11-voice-streaming-integration.md",
+      "line_start": 60,
+      "line_end": 109,
+      "language_raw": "python",
+      "language": "python",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "c6675580777a5cc82b2fd5f06b99bee28b15141a"
+    },
+    {
+      "file": "docs/tickets/tickets/AI-12-benchmark-3-variants.md",
+      "line_start": 42,
+      "line_end": 72,
+      "language_raw": "yaml",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "5ce0a588c19ef907bca54606a121a406dbb5bea9"
+    },
+    {
+      "file": "docs/tickets/tickets/AI-12-benchmark-3-variants.md",
+      "line_start": 145,
+      "line_end": 151,
+      "language_raw": "",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "ac2704af08f0b23c82c56faa29fa053c288fd692"
+    },
+    {
+      "file": "docs/tickets/tickets/AI-13-runtime-smoke-snr.md",
+      "line_start": 103,
+      "line_end": 128,
+      "language_raw": "rust",
+      "language": "rust",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "8ecad4380be0835dbdde0dd69494504acc6c0b8b"
+    },
+    {
+      "file": "docs/tickets/tickets/AI-14-audio-parity-contract.md",
+      "line_start": 35,
+      "line_end": 58,
+      "language_raw": "toml",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "323c373f2b8ddb6ffd05d711259464bce567a3bd"
+    },
+    {
+      "file": "docs/tickets/tickets/AI-15-regression-guard-ci.md",
+      "line_start": 60,
+      "line_end": 81,
+      "language_raw": "yaml",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "e2ac022ec91678af47a2dbdc6751a87a156bb346"
+    },
+    {
+      "file": "docs/tickets/tickets/AI-15-regression-guard-ci.md",
+      "line_start": 109,
+      "line_end": 125,
+      "language_raw": "python",
+      "language": "python",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "4ec69c145588d672d1e001e01a737c9ae1e3d197"
+    },
+    {
+      "file": "docs/tickets/tickets/AI-15-regression-guard-ci.md",
+      "line_start": 189,
+      "line_end": 193,
+      "language_raw": "",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "57d660dbcad21eec54143548a4262bad3ce26a6d"
+    },
+    {
+      "file": "docs/tickets/tickets/AI-16-pr537-rebase-benchmark.md",
+      "line_start": 82,
+      "line_end": 108,
+      "language_raw": "toml",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "0aa64774c7680dbe471cbe874d285945b48247b9"
+    },
+    {
+      "file": "docs/tickets/tickets/AI-16-pr537-rebase-benchmark.md",
+      "line_start": 165,
+      "line_end": 171,
+      "language_raw": "",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "215757f26ca3d443252dde20b1cc7f2023a10448"
+    },
+    {
+      "file": "docs/tickets/tickets/AI-16-pr537-rebase-benchmark.md",
+      "line_start": 174,
+      "line_end": 176,
+      "language_raw": "",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "dc5cab825e388ed98a36040f0bac543469eed689"
+    },
+    {
+      "file": "docs/tickets/tickets/AI-17-pr222-rebase-integration.md",
+      "line_start": 74,
+      "line_end": 93,
+      "language_raw": "python",
+      "language": "python",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "1da863bfc916b18d09f479b65ac3e4b3471c76f1"
+    },
+    {
+      "file": "docs/tickets/tickets/AI-17-pr222-rebase-integration.md",
+      "line_start": 95,
+      "line_end": 104,
+      "language_raw": "python",
+      "language": "python",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "13df3827c4db46b630bc266194109a9de5b5e203"
+    },
+    {
+      "file": "docs/tickets/tickets/AI-17-pr222-rebase-integration.md",
+      "line_start": 166,
+      "line_end": 172,
+      "language_raw": "",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "b37b197c87d3e418f18bed9f8622f6b802fa322b"
+    },
+    {
+      "file": "docs/tickets/tickets/AI-17-pr222-rebase-integration.md",
+      "line_start": 175,
+      "line_end": 179,
+      "language_raw": "",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "d5debe10b698ec04301b36974c190ae1879d40ca"
+    },
+    {
+      "file": "docs/tickets/tickets/AI-18-adoption-report.md",
+      "line_start": 57,
+      "line_end": 77,
+      "language_raw": "python",
+      "language": "python",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "6ce104b1047367702156d9d950f8a420183e6c73"
     }
   ]
 }

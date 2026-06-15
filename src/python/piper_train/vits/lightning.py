@@ -129,6 +129,8 @@ class VitsModel(pl.LightningModule):
         sub_stft_fft_sizes: tuple[int, ...] = (171, 384, 683),
         sub_stft_hop_sizes: tuple[int, ...] = (10, 30, 60),
         sub_stft_win_sizes: tuple[int, ...] = (60, 150, 300),
+        # AI-03: decoder backbone switch (default preserves bit-exact 1D path)
+        decoder_type: str = "mb_istft_1d",
         **kwargs,
     ):
         super().__init__()
@@ -166,6 +168,7 @@ class VitsModel(pl.LightningModule):
             gin_channels=self.hparams.gin_channels,
             use_sdp=self.hparams.use_sdp,
             prosody_dim=self.hparams.prosody_dim,
+            decoder_type=self.hparams.decoder_type,  # AI-03
         )
         self.model_d = MultiPeriodDiscriminator(
             use_spectral_norm=self.hparams.use_spectral_norm

@@ -33,6 +33,27 @@
 - [ ] **minor** — new feature / additive API / no breaking change
 - [ ] **major** — breaking change (API removal, schema migration, behavior reversal)
 
+## Decoder Regression Guard (AI-15)
+
+<!--
+AI-15 regression-guard reviewer checklist for A-1 / A-2 / FLY-TTS
+decoder variants. Tick each box once you have confirmed the invariant
+locally. Enforced by scripts/check_pr222_pr537_isolation_checklist.py.
+
+NOTE: Lives in its own section so the `validate-pr-body` gate that counts
+`- [x]` inside Risk Level is not contaminated by this checklist.
+-->
+
+- [ ] default decoder_type 不変 (no change to the default config field)
+- [ ] [mb_istft_1d] audio parity 不変 (baseline lock untouched or
+      `audio-parity-baseline-bump:` trailer present)
+- [ ] ONNX I/O 不変 (input_names / output_names / dynamic_axes match
+      `scripts/onnx_io_spec.lock.json`; PR #222 deferred to AI-17)
+- [ ] PR #537 TF32/bf16-mixed impact deferred to AI-16 (no mixed-precision
+      re-baseline in this PR)
+- [ ] freeze-dp 互換 (`--resume-from-multispeaker-checkpoint` still
+      auto-enables `--freeze-dp` in `piper_train/__main__.py`)
+
 ## Contract Impact
 
 <!--

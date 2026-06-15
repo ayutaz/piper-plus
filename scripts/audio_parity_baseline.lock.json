@@ -1,0 +1,19 @@
+{
+  "_comment": [
+    "AI-15 regression-guard pin file for the [mb_istft_1d] decoder variant.",
+    "Canonical baseline values are sourced from CLAUDE.md and README.md:",
+    "  - End-to-end latency P50 = 27 ms (Xeon E5-2650 v4 / 25 phoneme EN).",
+    "  - Proxy MOS mean and params (M) are pinned to current dev HEAD.",
+    "Bumps require both --update-baseline flag and an 'audio-parity-baseline-bump:'",
+    "trailer on the HEAD commit message. See scripts/check_audio_parity_baseline.py",
+    "for the enforcement contract. TODO(AI-15): cross-link AI-16 tolerance interplay",
+    "(p50 +/-10% widening) once AI-16 lands."
+  ],
+  "mb_istft_1d": {
+    "expected_p50_ms": 27,
+    "expected_proxy_mos_mean": 4.05,
+    "expected_params_m": 1.10,
+    "expected_snr_floor_db": 30,
+    "sample_rate": 22050
+  }
+}

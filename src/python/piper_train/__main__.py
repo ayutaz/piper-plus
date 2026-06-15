@@ -261,6 +261,20 @@ def create_parser():
         default=1.0,
         help="Sub-band STFT loss weight for MB-iSTFT training (default: 1.0)",
     )
+    # AI-03: decoder type switch (default preserves legacy bit-exact behaviour)
+    # TODO(AI-03): --decoder-branch for export_onnx.py is owned by AI-08, not added here.
+    parser.add_argument(
+        "--decoder-type",
+        type=str,
+        default="mb_istft_1d",
+        choices=("mb_istft_1d", "istftnet2_mb_1d2d"),
+        help=(
+            "Decoder backbone: 'mb_istft_1d' (default, legacy 1D ConvTranspose1d, "
+            "bit-exact) or 'istftnet2_mb_1d2d' (new 1D-2D hybrid backbone with "
+            "Conv2d + pixel-shuffle, ~0.83M params target). The 2D forward body "
+            "is a NotImplementedError skeleton in this commit (see ticket AI-03)."
+        ),
+    )
     # Trainer arguments
     parser.add_argument("--accelerator", default="gpu", help="Accelerator to use")
     parser.add_argument("--devices", type=int, default=1, help="Number of devices")

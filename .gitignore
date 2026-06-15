@@ -212,6 +212,13 @@ check_*.py
 !scripts/check_doc_examples.py
 # Swedish per-word LID sync gate (Issue #539)
 !scripts/check_swedish_lid_consistency.py
+# A-1/A-2 PoC regression-guard scripts (AI-03 / AI-15)
+!scripts/check_istftnet2_params.py
+!scripts/check_audio_parity_baseline.py
+!scripts/check_a1_a2_isolation.py
+!scripts/check_expected_p50_ms_gate.py
+!scripts/check_freeze_dp_compat.py
+!scripts/check_pr222_pr537_isolation_checklist.py
 create_comprehensive_*.py
 add_missing_*.py
 retrain_*.py

@@ -683,6 +683,11 @@ class SynthesizerTrn(nn.Module):
         duration prediction using A1/A2/A3 values from OpenJTalk labels.
         Default is 16 (prosody-aware enabled; pass 0 to disable for legacy
         backward compatibility).
+    decoder_type : str, optional
+        AI-03 SKELETON: ``"mb_istft_1d"`` (default, legacy bit-exact 1D path)
+        or ``"istftnet2_mb_1d2d"`` (new 1D-2D hybrid backbone with Conv2d +
+        pixel-shuffle, no ConvTranspose2d, ~0.83M params target). The 2D
+        forward body is a NotImplementedError stub in this skeleton commit.
     """
 
     def __init__(
@@ -709,6 +714,7 @@ class SynthesizerTrn(nn.Module):
         use_sdp: bool = True,
         prosody_dim: int = 16,
         prosody_language_ids: "set[int] | None" = None,
+        decoder_type: str = "mb_istft_1d",
     ):
         super().__init__()
         self.n_vocab = n_vocab
@@ -760,6 +766,7 @@ class SynthesizerTrn(nn.Module):
             upsample_initial_channel=upsample_initial_channel,
             upsample_kernel_sizes=upsample_kernel_sizes,
             gin_channels=gin_channels,
+            decoder_type=decoder_type,  # AI-03: legacy default preserves bit-exact behaviour
         )
         self.enc_q = PosteriorEncoder(
             spec_channels,
