@@ -249,7 +249,7 @@ class TestZeroNoiseScale:
 
     @pytest.mark.unit
     def test_zero_noise_scale_not_overridden(self):
-        """--noise-scale 0.0 must not be replaced by the default 0.667."""
+        """--noise-scale 0.0 must not be replaced by the default 0.4."""
         args = SimpleNamespace(
             model="dummy.onnx",
             config=None,
@@ -297,9 +297,9 @@ class TestZeroNoiseScale:
             text=None,
         )
         cfg = InferenceConfig.from_args(args)
-        assert cfg.noise_scale == 0.667
+        assert cfg.noise_scale == 0.4
         assert cfg.length_scale == 1.0
-        assert cfg.noise_w == 0.8
+        assert cfg.noise_w == 0.5
 
 
 # ------------------------------------------------------------------

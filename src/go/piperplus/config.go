@@ -58,7 +58,7 @@ type AudioConfig struct {
 type InferenceConfig struct {
 	NoiseScale  float32 `json:"noise_scale"`
 	LengthScale float32 `json:"length_scale"`
-	NoiseW      float32 `json:"noise_w"`
+	NoiseW      float32 `json:"noise_scale_w"`
 }
 
 // EspeakConfig holds espeak-ng voice configuration.
@@ -86,9 +86,9 @@ func LoadConfig(path string) (*VoiceConfig, error) {
 		NumLanguages: 1,
 		PhonemeType:  PhonemeTypeEspeak,
 		Inference: InferenceConfig{
-			NoiseScale:  0.667,
+			NoiseScale:  0.4,
 			LengthScale: 1.0,
-			NoiseW:      0.8,
+			NoiseW:      0.5,
 		},
 	}
 

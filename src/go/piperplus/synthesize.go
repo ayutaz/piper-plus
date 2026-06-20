@@ -209,13 +209,14 @@ func (v *Voice) prepareSynthesisRequest(text string, so SynthesisOptions) (*Synt
 	_, needsBreakPad := wrapShortTextWithBreaks(text)
 
 	req := &SynthesisRequest{
-		PhonemeIDs:      phonemeIDs,
-		SpeakerID:       so.SpeakerID,
-		LanguageID:      languageID,
-		NoiseScale:      so.NoiseScale,
-		LengthScale:     so.LengthScale,
-		NoiseW:          so.NoiseW,
-		ProsodyFeatures: prosodyFeatures,
+		PhonemeIDs:       phonemeIDs,
+		SpeakerID:        so.SpeakerID,
+		LanguageID:       languageID,
+		NoiseScale:       so.NoiseScale,
+		LengthScale:      so.LengthScale,
+		NoiseW:           so.NoiseW,
+		ProsodyFeatures:  prosodyFeatures,
+		SpeakerEmbedding: so.SpeakerEmbedding,
 	}
 	return req, needsBreakPad, nil
 }

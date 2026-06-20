@@ -239,9 +239,9 @@ void parseSynthesisConfig(json &configRoot, SynthesisConfig &synthesisConfig) {
   //         "sample_rate": 22050
   //     },
   //     "inference": {
-  //         "noise_scale": 0.667,
+  //         "noise_scale": 0.4,
   //         "length_scale": 1,
-  //         "noise_w": 0.8,
+  //         "noise_w": 0.5,
   //         "phoneme_silence": {
   //           "<phoneme>": <seconds of silence>,
   //           ...
@@ -261,7 +261,7 @@ void parseSynthesisConfig(json &configRoot, SynthesisConfig &synthesisConfig) {
     // Overrides default inference settings
     auto inferenceValue = configRoot["inference"];
     if (inferenceValue.contains("noise_scale")) {
-      synthesisConfig.noiseScale = inferenceValue.value("noise_scale", 0.667f);
+      synthesisConfig.noiseScale = inferenceValue.value("noise_scale", 0.4f);
     }
 
     if (inferenceValue.contains("length_scale")) {
@@ -269,7 +269,7 @@ void parseSynthesisConfig(json &configRoot, SynthesisConfig &synthesisConfig) {
     }
 
     if (inferenceValue.contains("noise_w")) {
-      synthesisConfig.noiseW = inferenceValue.value("noise_w", 0.8f);
+      synthesisConfig.noiseW = inferenceValue.value("noise_w", 0.5f);
     }
 
     if (inferenceValue.contains("phoneme_silence")) {
@@ -554,6 +554,9 @@ void loadModel(std::string modelPath, ModelSession &session,
     } else if (name == "sid") {
       session.hasMultiSpeaker = true;
       spdlog::debug("Model supports multi-speaker (sid input)");
+    } else if (name == "speaker_embedding") {
+      session.hasSpeakerEmbedding = true;
+      spdlog::debug("Model supports zero-shot speaker embedding");
     } else if (name == "lid") {
       session.hasLidInput = true;
       spdlog::debug("Model supports language ID (lid input)");
@@ -1126,7 +1129,8 @@ buildInputTensors(
     std::vector<int64_t> &lidBuf,
     std::vector<int64_t> &prosodyBuf,
     std::vector<float>   &speakerEmbeddingBuf,
-    std::vector<int64_t> &speakerEmbeddingMaskBuf) {
+    std::vector<int64_t> &speakerEmbeddingMaskBuf,
+    std::vector<float>   &speakerEmbBuf) {
 
   // ---- phoneme ids ----
   phonemeIdsBuf = inputs.phonemeIds;  // copy
@@ -1178,6 +1182,23 @@ buildInputTensors(
     tensors.push_back(Ort::Value::CreateTensor<int64_t>(
         memoryInfo, lidBuf.data(), lidBuf.size(),
         lidShape.data(), lidShape.size()));
+  }
+
+  // speaker_embedding (zero-shot TTS, CSM path: hasSpeakerEmbedding).
+  // Distinct from the VITS Issue #426 path below (hasSpeakerEmbeddingInput),
+  // which uses session.speakerEmbeddingDim from the model's declared shape.
+  if (session.hasSpeakerEmbedding) {
+    if (inputs.speakerEmbedding.empty()) {
+      std::cerr << "WARNING: Model expects 'speaker_embedding' but none provided; using zero vector" << std::endl;
+      speakerEmbBuf.assign(192, 0.0f);
+    } else {
+      speakerEmbBuf = inputs.speakerEmbedding;  // copy
+    }
+    std::vector<int64_t> speakerEmbShape{1, static_cast<int64_t>(speakerEmbBuf.size())};
+    names.push_back("speaker_embedding");
+    tensors.push_back(Ort::Value::CreateTensor<float>(
+        memoryInfo, speakerEmbBuf.data(), speakerEmbBuf.size(),
+        speakerEmbShape.data(), speakerEmbShape.size()));
   }
 
   // prosody_features
@@ -1280,28 +1301,30 @@ void synthesize(std::vector<PhonemeId> &phonemeIds,
   // Populate InferenceInputs from the existing parameters
   InferenceInputs inputs;
   inputs.phonemeIds.assign(phonemeIds.begin(), phonemeIds.end());
-  inputs.noiseScale  = effectiveNoiseScale;
-  inputs.lengthScale = synthesisConfig.lengthScale;
-  inputs.noiseW      = effectiveNoiseW;
-  inputs.speakerId   = static_cast<int64_t>(synthesisConfig.speakerId.value_or(0));
-  inputs.languageId  = static_cast<int64_t>(lid);
+  inputs.noiseScale       = effectiveNoiseScale;
+  inputs.lengthScale      = synthesisConfig.lengthScale;
+  inputs.noiseW           = effectiveNoiseW;
+  inputs.speakerId        = static_cast<int64_t>(synthesisConfig.speakerId.value_or(0));
+  inputs.languageId       = static_cast<int64_t>(lid);
+  // Voice cloning / zero-shot TTS: forward provided speaker embedding (if any).
+  // Unwrap optional to plain vector; empty vector signals "use mask=0 fallback".
+  if (synthesisConfig.speakerEmbedding.has_value()) {
+    inputs.speakerEmbedding = *synthesisConfig.speakerEmbedding;
+  }
   if (prosodyFeatures) {
     inputs.prosodyFeatures = *prosodyFeatures;
   }
-  // Voice cloning: forward provided speaker embedding (if any) to the
-  // tensor builder, which will switch the mask to 1.
-  inputs.speakerEmbedding = synthesisConfig.speakerEmbedding;
 
   // Buffers must outlive the Run() call
   std::vector<int64_t> phonemeIdsBuf, phonemeIdLengthsBuf, sidBuf, lidBuf, prosodyBuf;
-  std::vector<float> scalesBuf, speakerEmbeddingBuf;
+  std::vector<float> scalesBuf, speakerEmbeddingBuf, speakerEmbBuf;
   std::vector<int64_t> speakerEmbeddingMaskBuf;
 
   auto [inputTensors, inputNamesVec] = buildInputTensors(
       inputs, session, memoryInfo,
       phonemeIdsBuf, phonemeIdLengthsBuf, scalesBuf,
       sidBuf, lidBuf, prosodyBuf,
-      speakerEmbeddingBuf, speakerEmbeddingMaskBuf);
+      speakerEmbeddingBuf, speakerEmbeddingMaskBuf, speakerEmbBuf);
 
   // Output names
   std::vector<const char *> outputNamesVec;
@@ -1505,27 +1528,30 @@ void synthesizeFloat(std::vector<PhonemeId> &phonemeIds,
   // Populate InferenceInputs from the existing parameters
   InferenceInputs inputs;
   inputs.phonemeIds.assign(phonemeIds.begin(), phonemeIds.end());
-  inputs.noiseScale  = effectiveNoiseScale;
-  inputs.lengthScale = synthesisConfig.lengthScale;
-  inputs.noiseW      = effectiveNoiseW;
-  inputs.speakerId   = static_cast<int64_t>(synthesisConfig.speakerId.value_or(0));
-  inputs.languageId  = static_cast<int64_t>(lid);
+  inputs.noiseScale       = effectiveNoiseScale;
+  inputs.lengthScale      = synthesisConfig.lengthScale;
+  inputs.noiseW           = effectiveNoiseW;
+  inputs.speakerId        = static_cast<int64_t>(synthesisConfig.speakerId.value_or(0));
+  inputs.languageId       = static_cast<int64_t>(lid);
+  // Voice cloning / zero-shot TTS: forward provided speaker embedding (if any).
+  // Unwrap optional to plain vector; empty vector signals "use mask=0 fallback".
+  if (synthesisConfig.speakerEmbedding.has_value()) {
+    inputs.speakerEmbedding = *synthesisConfig.speakerEmbedding;
+  }
   if (prosodyFeatures) {
     inputs.prosodyFeatures = *prosodyFeatures;
   }
-  // Voice cloning: forward provided speaker embedding (if any).
-  inputs.speakerEmbedding = synthesisConfig.speakerEmbedding;
 
   // Buffers must outlive the Run() call
   std::vector<int64_t> phonemeIdsBuf, phonemeIdLengthsBuf, sidBuf, lidBuf, prosodyBuf;
-  std::vector<float> scalesBuf, speakerEmbeddingBuf;
+  std::vector<float> scalesBuf, speakerEmbeddingBuf, speakerEmbBuf;
   std::vector<int64_t> speakerEmbeddingMaskBuf;
 
   auto [inputTensors, inputNamesVec] = buildInputTensors(
       inputs, session, memoryInfo,
       phonemeIdsBuf, phonemeIdLengthsBuf, scalesBuf,
       sidBuf, lidBuf, prosodyBuf,
-      speakerEmbeddingBuf, speakerEmbeddingMaskBuf);
+      speakerEmbeddingBuf, speakerEmbeddingMaskBuf, speakerEmbBuf);
 
   // Output names
   std::vector<const char *> outputNamesVec;
@@ -3408,7 +3434,7 @@ void warmupModel(ModelSession &session, int runs) {
         dummy.phonemeIds.assign(phonemeLength, 8);
         dummy.phonemeIds[0] = 1;                       // BOS
         dummy.phonemeIds[phonemeLength - 1] = 2;       // EOS
-        // noiseScale / lengthScale / noiseW use defaults (0.667, 1.0, 0.8)
+        // noiseScale / lengthScale / noiseW use defaults (0.4, 1.0, 0.5)
         if (session.hasMultiSpeaker) dummy.speakerId = 0;
         if (session.hasLidInput)     dummy.languageId = 0;
         if (session.hasProsodyInput) {
@@ -3417,14 +3443,14 @@ void warmupModel(ModelSession &session, int runs) {
 
         // Buffers kept alive across all warmup runs
         std::vector<int64_t> phonemeIdsBuf, phonemeIdLengthsBuf, sidBuf, lidBuf, prosodyBuf;
-        std::vector<float> scalesBuf, speakerEmbeddingBuf;
+        std::vector<float> scalesBuf, speakerEmbeddingBuf, speakerEmbBuf;
         std::vector<int64_t> speakerEmbeddingMaskBuf;
 
         auto [inputTensors, inputNames] = buildInputTensors(
             dummy, session, memoryInfo,
             phonemeIdsBuf, phonemeIdLengthsBuf, scalesBuf,
             sidBuf, lidBuf, prosodyBuf,
-            speakerEmbeddingBuf, speakerEmbeddingMaskBuf);
+            speakerEmbeddingBuf, speakerEmbeddingMaskBuf, speakerEmbBuf);
 
         // Output names
         std::vector<const char*> outputNames;

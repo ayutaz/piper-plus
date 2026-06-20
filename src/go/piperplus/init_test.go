@@ -75,17 +75,22 @@ func TestInit_Reinitialize(t *testing.T) {
 }
 
 func TestShutdown(t *testing.T) {
+	libPath := os.Getenv("ONNX_RUNTIME_SHARED_LIBRARY_PATH")
+	if libPath == "" {
+		t.Skip("ONNX_RUNTIME_SHARED_LIBRARY_PATH not set")
+	}
 	if !initialized {
 		t.Skip("ONNX Runtime not initialized")
 	}
 	if err := Shutdown(); err != nil {
 		t.Fatalf("Shutdown returned error: %v", err)
 	}
-	// Re-init the runtime for subsequent tests in the same `go test` run.
-	// Issue #383 follow-up (PR #403): TestShutdown left the runtime down,
-	// causing later integration tests (alphabetically-after, e.g.
-	// streaming_stress_test.go's TestSynthesizeStream_JaConcurrent) to fail
-	// LoadVoice with "InitializeRuntime() has either not yet been called".
+	// Re-init the runtime for subsequent tests in the same `go test` run
+	// (e.g. TestZeroShot* and streaming_stress_test.go's
+	// TestSynthesizeStream_JaConcurrent). Issue #383 follow-up (PR #403):
+	// TestShutdown left the runtime down, causing later integration tests
+	// (alphabetically-after) to fail LoadVoice with
+	// "InitializeRuntime() has either not yet been called".
 	// t.Cleanup runs after the test body completes, so the next test sees a
 	// ready runtime. TestMain.Shutdown still fires at the end of the run.
 	t.Cleanup(func() {

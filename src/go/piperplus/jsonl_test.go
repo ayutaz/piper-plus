@@ -291,15 +291,73 @@ func TestReadJSONL_ContextCancelledDuringSelectSend(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
+// SpeakerEmbedding in JSONL
+// ---------------------------------------------------------------------------
+
+func TestJSONLSpeakerEmbedding(t *testing.T) {
+	line := []byte(`{"phoneme_ids": [1, 2, 3], "speaker_embedding": [0.1, 0.2, 0.3]}`)
+	input, err := ParseJSONLLine(line)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(input.SpeakerEmbedding) != 3 {
+		t.Fatalf("SpeakerEmbedding length: expected 3, got %d", len(input.SpeakerEmbedding))
+	}
+
+	wantEmb := []float32{0.1, 0.2, 0.3}
+	for i, v := range wantEmb {
+		if input.SpeakerEmbedding[i] != v {
+			t.Errorf("SpeakerEmbedding[%d]: expected %v, got %v", i, v, input.SpeakerEmbedding[i])
+		}
+	}
+
+	defaults := SynthesisOptions{SpeakerID: 0, NoiseScale: 0.4, LengthScale: 1.0, NoiseW: 0.5}
+	req := input.ToSynthesisRequest(defaults)
+	if req == nil {
+		t.Fatal("expected non-nil SynthesisRequest")
+	}
+	if len(req.SpeakerEmbedding) != 3 {
+		t.Fatalf("req.SpeakerEmbedding length: expected 3, got %d", len(req.SpeakerEmbedding))
+	}
+	for i, v := range wantEmb {
+		if req.SpeakerEmbedding[i] != v {
+			t.Errorf("req.SpeakerEmbedding[%d]: expected %v, got %v", i, v, req.SpeakerEmbedding[i])
+		}
+	}
+}
+
+func TestJSONLNoSpeakerEmbedding(t *testing.T) {
+	line := []byte(`{"phoneme_ids": [1, 2, 3], "speaker_id": 1}`)
+	input, err := ParseJSONLLine(line)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(input.SpeakerEmbedding) != 0 {
+		t.Errorf("SpeakerEmbedding: expected nil/empty, got %v", input.SpeakerEmbedding)
+	}
+
+	defaults := SynthesisOptions{SpeakerID: 0, NoiseScale: 0.4, LengthScale: 1.0, NoiseW: 0.5}
+	req := input.ToSynthesisRequest(defaults)
+	if req == nil {
+		t.Fatal("expected non-nil SynthesisRequest")
+	}
+	if len(req.SpeakerEmbedding) != 0 {
+		t.Errorf("req.SpeakerEmbedding: expected nil/empty, got %v", req.SpeakerEmbedding)
+	}
+}
+
+// ---------------------------------------------------------------------------
 // ToSynthesisRequest
 // ---------------------------------------------------------------------------
 
 func TestJSONLInput_ToSynthesisRequest(t *testing.T) {
 	defaults := SynthesisOptions{
 		SpeakerID:   5,
-		NoiseScale:  0.667,
+		NoiseScale:  0.4,
 		LengthScale: 1.0,
-		NoiseW:      0.8,
+		NoiseW:      0.5,
 	}
 
 	t.Run("phoneme_ids with overrides", func(t *testing.T) {
@@ -321,8 +379,8 @@ func TestJSONLInput_ToSynthesisRequest(t *testing.T) {
 		if req.LanguageID != 1 {
 			t.Errorf("LanguageID: expected 1, got %d", req.LanguageID)
 		}
-		if req.NoiseScale != 0.667 {
-			t.Errorf("NoiseScale: expected 0.667, got %f", req.NoiseScale)
+		if req.NoiseScale != 0.4 {
+			t.Errorf("NoiseScale: expected 0.4, got %f", req.NoiseScale)
 		}
 	})
 

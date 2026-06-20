@@ -49,9 +49,9 @@ TEST(CApiDefaultOptions, HasExpectedDefaults) {
     PiperPlusSynthOptions opts = piper_plus_default_options();
     EXPECT_EQ(opts.speaker_id, 0);
     EXPECT_EQ(opts.language_id, -1);
-    EXPECT_FLOAT_EQ(opts.noise_scale, 0.667f);
+    EXPECT_FLOAT_EQ(opts.noise_scale, 0.4f);
     EXPECT_FLOAT_EQ(opts.length_scale, 1.0f);
-    EXPECT_FLOAT_EQ(opts.noise_w, 0.8f);
+    EXPECT_FLOAT_EQ(opts.noise_w, 0.5f);
     EXPECT_FLOAT_EQ(opts.sentence_silence_sec, 0.2f);
 }
 
@@ -273,7 +273,7 @@ TEST(CApiDefaultOptions, ReturnValueIsIndependentCopy) {
     opts1.noise_scale = 0.0f;
     PiperPlusSynthOptions opts2 = piper_plus_default_options();
     EXPECT_EQ(opts2.speaker_id, 0);
-    EXPECT_FLOAT_EQ(opts2.noise_scale, 0.667f);
+    EXPECT_FLOAT_EQ(opts2.noise_scale, 0.4f);
 }
 
 TEST(CApiStatusCodes, SpecificValuesMatchHeader) {
@@ -525,9 +525,9 @@ TEST(CApiZeroInit, DefaultOptionsNotZero) {
     EXPECT_NE(opts.noise_w, 0.0f);
 
     // 具体的なデフォルト値も検証
-    EXPECT_FLOAT_EQ(opts.noise_scale, 0.667f);
+    EXPECT_FLOAT_EQ(opts.noise_scale, 0.4f);
     EXPECT_FLOAT_EQ(opts.length_scale, 1.0f);
-    EXPECT_FLOAT_EQ(opts.noise_w, 0.8f);
+    EXPECT_FLOAT_EQ(opts.noise_w, 0.5f);
 }
 
 // ===== Phase 5: Status enum tests (M5-13) =====

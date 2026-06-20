@@ -304,7 +304,10 @@ def warmup_onnx_session(
                         emb_dim = inp.shape[1]
                     break
             inputs["speaker_embedding"] = np.zeros((1, emb_dim), dtype=np.float32)
-            inputs["speaker_embedding_mask"] = np.array([[0]], dtype=np.int64)
+            # zero-shot exports (e.g. v7 / Tsukuyomi FT) may omit
+            # speaker_embedding_mask — only feed it when the session declares it
+            if "speaker_embedding_mask" in input_names:
+                inputs["speaker_embedding_mask"] = np.array([[0]], dtype=np.int64)
 
         output_names = [o.name for o in session.get_outputs()]
         t0 = time.perf_counter()

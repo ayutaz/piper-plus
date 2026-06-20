@@ -227,7 +227,7 @@ class TextEncoder(nn.Module):
 
         x = self.encoder(x * x_mask, x_mask)
         if g is not None and hasattr(self, "cond_layer"):
-            x = x + self.cond_layer(g)
+            x = (x + self.cond_layer(g)) * x_mask
         stats = self.proj(x) * x_mask
 
         m, logs = torch.split(stats, self.out_channels, dim=1)
@@ -709,6 +709,9 @@ class SynthesizerTrn(nn.Module):
         use_sdp: bool = True,
         prosody_dim: int = 16,
         prosody_language_ids: "set[int] | None" = None,
+        # Accepted for backward compat but unused (spk_proj is always used for n_speakers > 1)
+        use_zero_shot: bool = True,
+        spk_embed_dim: int = 192,
     ):
         super().__init__()
         self.n_vocab = n_vocab
@@ -771,7 +774,7 @@ class SynthesizerTrn(nn.Module):
             gin_channels=gin_channels,
         )
         self.flow = ResidualCouplingBlock(
-            inter_channels, hidden_channels, 5, 1, 4, gin_channels=gin_channels
+            inter_channels, hidden_channels, 5, 2, 4, gin_channels=gin_channels
         )
 
         # Prosody feature projection (A1/A2/A3 → prosody_dim)
@@ -791,38 +794,76 @@ class SynthesizerTrn(nn.Module):
                 dp_in_channels, 256, 3, 0.5, gin_channels=gin_channels
             )
 
+        # Speaker projection MLP for zero-shot speaker conditioning.
+        # Replaces emb_g (nn.Embedding) -- all speaker conditioning now goes
+        # through spk_proj, eliminating the dual-mode mismatch between
+        # emb_g (used for speaker-ID training) and spk_proj (used at inference).
         if n_speakers > 1:
-            self.emb_g = nn.Embedding(n_speakers, gin_channels)
+            self.spk_proj = nn.Sequential(
+                nn.Linear(192, gin_channels),
+                nn.LayerNorm(gin_channels),
+                nn.GELU(),
+                nn.Linear(gin_channels, gin_channels),
+            )
 
         if n_languages > 1:
             self.emb_lang = nn.Embedding(n_languages, gin_channels)
 
-        # Speaker embedding projection (for voice cloning inference)
-        # Maps external speaker_embedding (e.g. 256-d from ECAPA-TDNN) to gin_channels.
-        # When gin_channels == emb_dim, this is an identity-like passthrough.
-        # Lazily initialised on first use if None.
-        self.spk_proj = None
+    def _get_speaker_condition(self, speaker_embeddings=None):
+        """Project speaker embeddings through spk_proj MLP.
 
-    def _get_global_conditioning(self, sid=None, lid=None):
+        Parameters
+        ----------
+        speaker_embeddings : torch.Tensor or None
+            Raw speaker embeddings from CAM++ [batch, 192]
+
+        Returns
+        -------
+        torch.Tensor or None
+            Projected speaker conditioning [batch, gin_channels, 1]
+        """
+        if speaker_embeddings is None:
+            return None
+        if not hasattr(self, "spk_proj"):
+            return None
+        # spk_proj: Linear(192, gin_channels) -> LayerNorm -> GELU -> Linear(gin_channels, gin_channels)
+        g = self.spk_proj(speaker_embeddings)  # [b, gin_channels]
+        return g.unsqueeze(-1)  # [b, gin_channels, 1]
+
+    def _get_global_conditioning(self, sid=None, lid=None, speaker_embeddings=None):
         """Compute global conditioning vector from speaker and language embeddings.
+
+        For multi-speaker models, speaker conditioning is always provided via
+        speaker_embeddings (192-dim CAM++ vectors) projected through spk_proj.
+        The sid argument is accepted for ONNX signature compatibility but is
+        not used internally.
 
         Parameters
         ----------
         sid : torch.LongTensor or None
-            Speaker IDs [batch]
+            Speaker IDs [batch]. Accepted for API/ONNX compatibility but
+            not used -- all speaker conditioning goes through spk_proj.
         lid : torch.LongTensor or None
             Language IDs [batch]
+        speaker_embeddings : torch.Tensor or None
+            Raw speaker embeddings from CAM++ [batch, 192].
+            Required for multi-speaker models.
 
         Returns
         -------
         torch.Tensor or None
             Global conditioning [batch, gin_channels, 1]
         """
-        g = None
-        if self.n_speakers > 1 and sid is not None:
-            g = self.emb_g(sid).unsqueeze(-1)  # [b, h, 1]
+        g = self._get_speaker_condition(speaker_embeddings)
         if self.n_languages > 1 and lid is not None:
-            lang_emb = self.emb_lang(lid).unsqueeze(-1)  # [b, h, 1]
+            # Defend against the lid=-1 mixed-language sentinel used in
+            # lightning.py:358-401. Direct model.forward() callers that
+            # bypass that normalization would otherwise crash inside
+            # nn.Embedding with IndexError. Clamp negative ids to 0 so
+            # the embedding lookup succeeds; downstream callers that need
+            # true "no language" conditioning should pass lid=None.
+            safe_lid = torch.where(lid < 0, torch.zeros_like(lid), lid)
+            lang_emb = self.emb_lang(safe_lid).unsqueeze(-1)  # [b, h, 1]
             g = (g + lang_emb) if g is not None else lang_emb
         return g
 
@@ -891,12 +932,11 @@ class SynthesizerTrn(nn.Module):
         sid=None,
         lid=None,
         prosody_features=None,
-        speaker_embedding=None,
+        speaker_embeddings=None,
     ):
-        # NOTE: speaker_embedding is accepted but intentionally unused during
-        # training (emb_g(sid) is always used).  The parameter is reserved for
-        # future extensions such as joint speaker-encoder fine-tuning.
-        g = self._get_global_conditioning(sid, lid)
+        g = self._get_global_conditioning(
+            sid, lid, speaker_embeddings=speaker_embeddings
+        )
         x, m_p, logs_p, x_mask = self.enc_p(x, x_lengths, g=g)
 
         z, m_q, logs_q, y_mask = self.enc_q(y, y_lengths, g=g)
@@ -959,46 +999,18 @@ class SynthesizerTrn(nn.Module):
             decoder_subbands=o_mb,
         )
 
-    def _ensure_spk_proj(self, emb_dim: int) -> nn.Linear:
-        """Lazily create (or return) the speaker-embedding projection layer.
-
-        When the external speaker_embedding dimension differs from
-        ``gin_channels``, a linear projection is required.  The layer is
-        created on first call and reused afterwards.  It lives on the same
-        device as the encoder embedding table so that mixed-device errors
-        are avoided.
-
-        Parameters
-        ----------
-        emb_dim : int
-            Dimension of the incoming speaker embedding.
-
-        Returns
-        -------
-        nn.Linear
-            Projection ``(emb_dim) -> (gin_channels)``.
-        """
-        if self.spk_proj is not None and self.spk_proj.in_features == emb_dim:
-            return self.spk_proj
-
-        device = next(self.parameters()).device
-        self.spk_proj = nn.Linear(emb_dim, self.gin_channels, bias=False).to(device)
-        nn.init.xavier_uniform_(self.spk_proj.weight)
-        return self.spk_proj
-
     def infer(
         self,
         x,
         x_lengths,
         sid=None,
         lid=None,
-        noise_scale=0.667,
+        noise_scale=0.4,
         length_scale=1,
-        noise_scale_w=0.8,
+        noise_scale_w=0.5,
         max_len=None,
         prosody_features=None,
-        speaker_embedding=None,
-        speaker_embedding_mask=None,
+        speaker_embeddings=None,
     ) -> "InferOutput":
         """Run inference to synthesize audio from phoneme IDs.
 
@@ -1013,36 +1025,18 @@ class SynthesizerTrn(nn.Module):
             callers using ``audio, *_ =`` or ``[0]`` indexing are
             unaffected.
         """
-        # Determine global conditioning: prefer speaker_embedding over emb_g(sid)
-        if speaker_embedding is not None:
-            # speaker_embedding: (batch, emb_dim) -> (batch, gin_channels, 1)
-            if speaker_embedding.dim() == 2:
-                g_se = speaker_embedding.unsqueeze(-1)  # (batch, emb_dim, 1)
-            else:
-                g_se = speaker_embedding
-            # Project to gin_channels if dimensions differ
-            if g_se.size(1) != self.gin_channels:
-                proj = self._ensure_spk_proj(g_se.size(1))
-                # (batch, emb_dim, 1) -> (batch, 1, emb_dim) -> Linear -> (batch, 1, gin) -> transpose
-                g_se = proj(g_se.squeeze(-1)).unsqueeze(-1)
-            # Add language embedding if available
-            if self.n_languages > 1 and lid is not None:
-                lang_emb = self.emb_lang(lid).unsqueeze(-1)
-                g_se = g_se + lang_emb
-
-            # Apply speaker_embedding_mask: when mask is 0, fall back to
-            # sid-based conditioning.  This keeps the logic trace-friendly
-            # for ONNX export (torch.where instead of Python if).
-            if speaker_embedding_mask is not None:
-                g_base = self._get_global_conditioning(sid, lid)
-                use_se = (speaker_embedding_mask >= 1).unsqueeze(-1).float()
-                g = torch.where(use_se >= 1, g_se, g_base)
-            else:
-                g = g_se
-        else:
-            if self.n_speakers > 1:
-                assert sid is not None, "Missing speaker id"
-            g = self._get_global_conditioning(sid, lid)
+        if self.n_speakers > 1:
+            assert speaker_embeddings is not None, (
+                "Missing speaker_embeddings. "
+                "Provide 192-dim CAM++ embeddings for multi-speaker inference."
+            )
+        if speaker_embeddings is not None and speaker_embeddings.shape[-1] != 192:
+            raise ValueError(
+                f"speaker_embeddings dim must be 192, got {speaker_embeddings.shape[-1]}"
+            )
+        g = self._get_global_conditioning(
+            sid, lid, speaker_embeddings=speaker_embeddings
+        )
         x, m_p, logs_p, x_mask = self.enc_p(x, x_lengths, g=g)
 
         # Prepare input for duration predictor with prosody features
@@ -1083,10 +1077,23 @@ class SynthesizerTrn(nn.Module):
 
         return InferOutput(o, attn, y_mask, (z, z_p, m_p, logs_p), durations)
 
-    def voice_conversion(self, y, y_lengths, sid_src, sid_tgt, lid=None):
+    def voice_conversion(
+        self,
+        y,
+        y_lengths,
+        sid_src=None,
+        sid_tgt=None,
+        lid=None,
+        speaker_embeddings_src=None,
+        speaker_embeddings_tgt=None,
+    ):
         assert self.n_speakers > 1, "n_speakers have to be larger than 1."
-        g_src = self._get_global_conditioning(sid_src, lid)
-        g_tgt = self._get_global_conditioning(sid_tgt, lid)
+        g_src = self._get_global_conditioning(
+            sid_src, lid, speaker_embeddings=speaker_embeddings_src
+        )
+        g_tgt = self._get_global_conditioning(
+            sid_tgt, lid, speaker_embeddings=speaker_embeddings_tgt
+        )
         z, _m_q, _logs_q, y_mask = self.enc_q(y, y_lengths, g=g_src)
         z_p = self.flow(z, y_mask, g=g_src)
         z_hat = self.flow(z_p, y_mask, g=g_tgt, reverse=True)

@@ -38,6 +38,12 @@ exclude = [
   "^https?://your-",
   # HuggingFace gated/auth-required model files (return 200 only with token)
   "^https?://huggingface\\.co/.*/resolve/.*\\.onnx",
+  # HuggingFace private repos for zero-shot TTS staging (will be unlisted once made public).
+  # campplus-onnx: speaker encoder pretrained weights (vendor redistribution gating)
+  # piper-plus-zero-shot-multi-6lang-v7: 6lang zero-shot base ckpt (still in training/audit)
+  # piper-plus-zero-shot-tsukuyomi: tsukuyomi-chan zero-shot FT (license review pending)
+  # Referenced from CLAUDE.md and docs/handoff/zero-shot-tts-handoff-2026-06-20.md.
+  "^https?://huggingface\\.co/ayousanz/(campplus-onnx|piper-plus-zero-shot-multi-6lang-v7|piper-plus-zero-shot-tsukuyomi)(/|$)",
   # Slack invites (private workspace)
   "^https?://[a-z]+\\.slack\\.com",
   # Wandb private projects

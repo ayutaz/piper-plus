@@ -3293,6 +3293,7 @@ dev = [
     { name = "pytest" },
     { name = "pytest-timeout" },
     { name = "ruff" },
+    { name = "uvicorn" },
 ]
 
 [package.metadata]
@@ -3394,6 +3395,7 @@ dev = [
     { name = "pytest", specifier = ">=9.0.3,<10" },
     { name = "pytest-timeout", specifier = ">=2.2.0" },
     { name = "ruff", specifier = "==0.15.15" },
+    { name = "uvicorn", specifier = ">=0.49.0" },
 ]
 
 [[package]]

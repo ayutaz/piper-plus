@@ -132,7 +132,7 @@ def test_limit_val_batches_custom():
 
 @pytest.mark.unit
 def test_num_workers_default_is_2():
-    """--num-workers should default to 2 (not 0)."""
+    """--num-workers should default to 2."""
     args = _parse_main_args(["--dataset-dir", "/tmp/test", "--batch-size", "4"])
     assert args.num_workers == 2, (
         f"num_workers default should be 2, got {args.num_workers}"

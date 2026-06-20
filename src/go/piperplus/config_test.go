@@ -36,8 +36,8 @@ func TestLoadConfig_ValidMultilingual(t *testing.T) {
 
 	// Float comparison with epsilon.
 	const eps = 0.001
-	if math.Abs(float64(cfg.Inference.NoiseScale)-0.667) > eps {
-		t.Errorf("Inference.NoiseScale = %f, want ~0.667", cfg.Inference.NoiseScale)
+	if math.Abs(float64(cfg.Inference.NoiseScale)-0.4) > eps {
+		t.Errorf("Inference.NoiseScale = %f, want ~0.4", cfg.Inference.NoiseScale)
 	}
 
 	// PhonemeIDMap spot checks.

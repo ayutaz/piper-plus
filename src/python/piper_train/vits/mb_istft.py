@@ -211,9 +211,39 @@ class MBiSTFTGenerator(nn.Module):
         # --- Weight initialisation (ups only) ---
         self.ups.apply(init_weights)
 
-        # --- Speaker conditioning ---
+        # --- Speaker conditioning (Multi-scale FiLM) ---
+        # ``conv_pre`` 直後の Input-stage FiLM と各 upsample 段ごとの FiLM 層を
+        # 持つことで、speaker 情報を decoder の各解像度に注入する。
+        # 旧 Generator (HiFi-GAN) の Multi-scale FiLM 構造を MB-iSTFT に移植
+        # (zero-shot multi-6lang スクラッチ学習で 32-true 数値安定性向上が目的)。
+        self.gin_channels = gin_channels
         if gin_channels != 0:
-            self.cond = nn.Conv1d(gin_channels, upsample_initial_channel, 1)
+            # Input-stage FiLM: 出力 channel を 2 倍 (scale + shift)
+            self.cond = nn.Conv1d(gin_channels, upsample_initial_channel * 2, 1)
+
+            # Multi-scale FiLM: 各 upsample 段の出力チャネルに対する scale + shift
+            self.cond_layers = nn.ModuleList()
+            for i in range(self.num_upsamples):
+                ch_stage = upsample_initial_channel // (2 ** (i + 1))
+                layer = nn.Conv1d(gin_channels, ch_stage * 2, 1)
+                # Zero-init: scale_raw=0 → sigmoid(0)+0.5=1.0, shift=0
+                # → 学習開始時 FiLM は identity、徐々に speaker 条件付けを獲得
+                nn.init.zeros_(layer.weight)
+                nn.init.zeros_(layer.bias)
+                self.cond_layers.append(layer)
+
+    @staticmethod
+    def _apply_film(x: torch.Tensor, scale_shift: torch.Tensor) -> torch.Tensor:
+        """FiLM (Feature-wise Linear Modulation) を適用する。
+
+        ``scale_shift`` を channel 軸で 2 分割し、前半を scale_raw、後半を shift とする。
+        ``scale = sigmoid(scale_raw) + 0.5`` で [0.5, 1.5] のレンジに制限し、
+        ``x = x * scale + shift`` を計算する。
+        sigmoid 中心 0.5 によりチャネル完全抑制 (=0) を起こさず安定。
+        """
+        scale_raw, shift = scale_shift.split(scale_shift.size(1) // 2, dim=1)
+        scale = torch.sigmoid(scale_raw) + 0.5
+        return x * scale + shift
 
     def forward(
         self, x: torch.Tensor, g: torch.Tensor | None = None
@@ -232,8 +262,9 @@ class MBiSTFTGenerator(nn.Module):
                 ``fullband`` only ``[B, 1, T]``.
         """
         x = self.conv_pre(x)
-        if g is not None:
-            x = x + self.cond(g)
+        if g is not None and self.gin_channels != 0:
+            # Input-stage FiLM (scale + shift) — 旧加算のみから FiLM へ強化
+            x = self._apply_film(x, self.cond(g))
 
         for i, up in enumerate(self.ups):
             x = F.leaky_relu(x, LRELU_SLOPE)
@@ -246,6 +277,9 @@ class MBiSTFTGenerator(nn.Module):
                 elif (index > 0) and (index < self.num_kernels):
                     xs = xs + resblock(x)
             x = xs / self.num_kernels
+            # Multi-scale FiLM: 各 upsample 段の出力に speaker 条件付けを注入
+            if g is not None and self.gin_channels != 0:
+                x = self._apply_film(x, self.cond_layers[i](g))
 
         x = F.leaky_relu(x, LRELU_SLOPE)
         x = self.subband_conv_post(x)  # [B, subbands * (n_fft + 2), T_frames]

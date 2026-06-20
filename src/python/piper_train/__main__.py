@@ -11,6 +11,7 @@ from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import TensorBoardLogger
 from pytorch_lightning.strategies import DDPStrategy
 
+from .vits.commons import remap_weight_norm_keys
 from .vits.ema import EMACallback
 from .vits.lightning import VitsModel
 
@@ -96,6 +97,21 @@ def configure_ddp_strategy(num_gpus, user_strategy=None, no_wavlm=False):
     return None
 
 
+def _resolve_grad_clip(gradient_clip_val: float | None) -> float | None:
+    """CLI --gradient-clip-val を VitsModel.grad_clip にマップする。
+
+    VITS は ``automatic_optimization=False`` で動作するため、Lightning Trainer
+    の自動 ``gradient_clip_val`` は使えない (MisconfigurationException)。代わりに
+    ``training_step`` 内で ``torch.nn.utils.clip_grad_norm_`` を直接呼び出す
+    実装になっており、その値は ``VitsModel.__init__(grad_clip=...)`` 経由で渡る。
+
+    None / 0 以下は clipping 無効化として ``None`` を返す。
+    """
+    if gradient_clip_val is None or gradient_clip_val <= 0:
+        return None
+    return float(gradient_clip_val)
+
+
 def _build_trainer(args, loggers, num_gpus, num_speakers):
     """Build a Trainer instance with callbacks and strategy from args.
 
@@ -139,6 +155,11 @@ def _build_trainer(args, loggers, num_gpus, num_speakers):
         "check_val_every_n_epoch": args.val_every_n_epochs,
         "limit_val_batches": args.limit_val_batches,
     }
+
+    # NOTE: VITS は automatic_optimization=False (manual optimization) のため
+    # Trainer(gradient_clip_val=...) は使えない (Lightning が MisconfigurationException を投げる)。
+    # 代わりに VitsModel.training_step 内で torch.nn.utils.clip_grad_norm_ を呼び出す
+    # (lightning.py:589-604)。値は VitsModel(grad_clip=...) で渡される。
 
     # --limit-train-batches: テスト用に学習バッチ数を制限
     if getattr(args, "limit_train_batches", None) is not None:
@@ -294,9 +315,9 @@ def create_parser():
     )
     parser.add_argument(
         "--precision",
-        default="16-mixed",
+        default="bf16-mixed",
         choices=("32-true", "16-mixed", "bf16-mixed"),
-        help="Floating point precision (default: 16-mixed for faster training with minimal quality impact)",
+        help="Floating point precision (default: bf16-mixed for faster training with minimal quality impact)",
     )
     parser.add_argument(
         "--val-every-n-epochs",
@@ -319,7 +340,10 @@ def create_parser():
         help="Limit training to N batches per epoch (for testing). Default: None (no limit).",
     )
     parser.add_argument(
-        "--max_epochs", type=int, default=1000, help="Maximum number of epochs"
+        "--max_epochs",
+        type=int,
+        default=100,
+        help="Maximum number of epochs (default: 100)",
     )
     parser.add_argument(
         "--default_root_dir", default=None, help="Default path for logs and weights"
@@ -330,10 +354,96 @@ def create_parser():
         help="Path to checkpoint to resume from",
     )
     VitsModel.add_model_specific_args(parser)
+    # Zero-shot speaker conditioning arguments
+    parser.add_argument(
+        "--spk-emb-noise-sigma",
+        type=float,
+        default=0.05,
+        help="Gaussian noise sigma for speaker embedding perturbation during training "
+        "(default: 0.05). Set to 0 to disable.",
+    )
+    parser.add_argument(
+        "--d-update-interval",
+        type=int,
+        default=1,
+        help="Discriminator update interval relative to generator (D:G ratio). "
+        "Default: 1 (update D every G step, i.e. 1:1 ratio).",
+    )
+    # LR scheduler arguments
+    parser.add_argument(
+        "--lr-scheduler",
+        choices=("cosine", "exponential"),
+        default="cosine",
+        help="Learning rate scheduler type (default: cosine). "
+        "'cosine' uses CosineAnnealingLR with warmup; "
+        "'exponential' uses the legacy ExponentialLR (gamma=lr_decay).",
+    )
+    parser.add_argument(
+        "--lr-warmup-epochs",
+        type=int,
+        default=5,
+        help="Number of linear warmup epochs for cosine scheduler (default: 5). "
+        "Ignored when --lr-scheduler=exponential.",
+    )
+    parser.add_argument(
+        "--lr-min",
+        type=float,
+        default=1e-5,
+        help="Minimum learning rate for cosine annealing (default: 1e-5). "
+        "Ignored when --lr-scheduler=exponential.",
+    )
+    # Speaker embedding dropout (deprecated)
+    parser.add_argument(
+        "--spk-emb-dropout",
+        type=float,
+        default=0.0,
+        help="(deprecated, ignored) Speaker embedding dropout rate. "
+        "This argument is kept for backward compatibility but has no effect.",
+    )
+    # Speaker encoder path
+    parser.add_argument(
+        "--speaker-encoder-path",
+        type=str,
+        default=None,
+        help="Path to speaker encoder ONNX for embedding extraction "
+        "(SCL now uses mel-domain loss).",
+    )
+    parser.add_argument(
+        "--c-dino",
+        type=float,
+        default=0.5,
+        help="DINO self-distillation loss weight (default: 0.5)",
+    )
+    parser.add_argument(
+        "--kl-annealing-epochs",
+        type=int,
+        default=10,
+        help="KL annealing epochs: linearly increase KL weight from 0.1 to 1.0 "
+        "over this many epochs (default: 10, 0 to disable)",
+    )
+    parser.add_argument(
+        "--max-spec-length",
+        type=int,
+        default=700,
+        help="Maximum spectrogram length; utterances longer than this are excluded "
+        "(default: 700). Use to prevent OOM on long utterances.",
+    )
     parser.add_argument(
         "--compile",
         action="store_true",
         help="Enable torch.compile() for potential training speedup (requires PyTorch 2.0+)",
+    )
+    parser.add_argument(
+        "--no-compile",
+        action="store_true",
+        default=False,
+        help="Disable torch.compile() (recommended for T4 GPUs where compile overhead is large)",
+    )
+    parser.add_argument(
+        "--gradient-clip-val",
+        type=float,
+        default=1.0,
+        help="Gradient norm clipping value to prevent NaN explosion (default: 1.0). Set 0 to disable.",
     )
     parser.add_argument("--seed", type=int, default=1234)
     return parser
@@ -545,8 +655,35 @@ def main():
 
     dict_args = vars(args)
 
+    # CLI --gradient-clip-val (Trainer 用の名前) → VitsModel(grad_clip=...) にマップ
+    dict_args["grad_clip"] = _resolve_grad_clip(
+        getattr(args, "gradient_clip_val", 1.0)
+    )
+    if dict_args["grad_clip"] is not None:
+        _LOGGER.info(
+            "Gradient clipping enabled in training_step: max_norm=%.2f (manual optimization)",
+            dict_args["grad_clip"],
+        )
+
     if args.no_wavlm:
         dict_args["use_wavlm_discriminator"] = False
+
+    # Warn about deprecated --spk-emb-dropout
+    if getattr(args, "spk_emb_dropout", 0.0) != 0.0:
+        _LOGGER.warning(
+            "--spk-emb-dropout is deprecated and ignored. Value %.2f will have no effect.",
+            args.spk_emb_dropout,
+        )
+
+    # Log new training parameters
+    _LOGGER.info("Speaker embedding noise sigma: %s", args.spk_emb_noise_sigma)
+    _LOGGER.info("D:G update interval: %s", args.d_update_interval)
+    _LOGGER.info(
+        "LR scheduler: %s (warmup=%d epochs, min_lr=%.1e)",
+        args.lr_scheduler,
+        args.lr_warmup_epochs,
+        args.lr_min,
+    )
 
     # Set learning rate (either scaled or base)
     if hasattr(args, "auto_lr_scaling") and args.auto_lr_scaling and num_gpus > 1:
@@ -591,6 +728,8 @@ def main():
         **dict_args,
     )
 
+    if getattr(args, "no_compile", False):
+        args.compile = False
     if args.compile:
         _LOGGER.info(
             "Compiling model sub-modules with torch.compile(mode='reduce-overhead', dynamic=True)"
@@ -637,7 +776,63 @@ def main():
             "--resume-from-multispeaker-checkpoint はシングルスピーカーモデル専用です。"
             "マルチスピーカーへの転移には --resume_from_single_speaker_checkpoint を使用してください。"
         )
-        load_multispeaker_checkpoint(args.resume_from_multispeaker_checkpoint, model)
+        _LOGGER.info(
+            "Resuming from multispeaker checkpoint: %s",
+            args.resume_from_multispeaker_checkpoint,
+        )
+
+        # 1. strict=False でロード（emb_g は自動スキップ）
+        # NOTE: weights_only=False is required to handle PosixPath objects in checkpoints
+        # This poses a security risk - only load trusted checkpoints
+        checkpoint = torch.load(
+            args.resume_from_multispeaker_checkpoint,
+            map_location="cpu",
+            weights_only=False,
+        )
+        remapped_sd = remap_weight_norm_keys(
+            checkpoint["state_dict"], model.state_dict()
+        )
+        missing, unexpected = model.load_state_dict(remapped_sd, strict=False)
+        _LOGGER.info(
+            "Weights loaded (strict=False). Missing keys: %s. Unexpected keys: %s.",
+            missing,
+            unexpected,
+        )
+
+        # 2. emb_g 平均を emb_lang に加算（conditioning 分布補正）
+        #    emb_g は平均ノルム ~0.68 でほぼゼロ中心のため影響は軽微だが、
+        #    conceptual correctness のため実施する。
+        raw_sd = checkpoint["state_dict"]
+        emb_g_weight = raw_sd.get("model_g.emb_g.weight")
+        if emb_g_weight is not None and hasattr(model.model_g, "emb_lang"):
+            emb_g_mean = emb_g_weight.mean(dim=0)  # [gin_channels]
+            _LOGGER.info(
+                "emb_g mean norm: %.4f → adding to all emb_lang rows for conditioning correction",
+                emb_g_mean.norm().item(),
+            )
+            with torch.no_grad():
+                model.model_g.emb_lang.weight.add_(emb_g_mean.unsqueeze(0))
+            _LOGGER.info("emb_g_mean added to emb_lang.")
+        else:
+            _LOGGER.info(
+                "emb_g not found in checkpoint or model has no emb_lang; skipping conditioning correction."
+            )
+
+        # 3. All emb_lang rows are preserved with emb_g_mean correction.
+        #    Previously emb_lang[0] (JA) was copied to emb_lang[1] (EN), but this
+        #    caused the frozen Duration Predictor to lose EN conditioning, breaking
+        #    English duration prediction. Keeping original embeddings + correction
+        #    lets the DP predict correct duration patterns for all languages.
+        if hasattr(model.model_g, "emb_lang") and model.model_g.n_languages > 1:
+            _LOGGER.info(
+                "All emb_lang rows preserved with emb_g_mean correction "
+                "for correct duration prediction across languages."
+            )
+
+        _LOGGER.info(
+            "Multispeaker → single-speaker transfer complete. "
+            "Starting training from epoch 0 (optimizer state reset)."
+        )
 
     # チェックポイントからの再開処理を修正
     if args.resume_from_checkpoint:
@@ -664,7 +859,10 @@ def main():
                         path=str(args.resume_from_checkpoint)
                     )
                 ) from None
-            model.load_state_dict(checkpoint["state_dict"], strict=False)
+            remapped_sd = remap_weight_norm_keys(
+                checkpoint["state_dict"], model.state_dict()
+            )
+            model.load_state_dict(remapped_sd, strict=False)
 
             _LOGGER.info(
                 "Weights loaded successfully with strict=False. Starting training without resuming optimizer state."  # noqa: E501
@@ -687,6 +885,7 @@ def main():
 
 def load_state_dict(model, saved_state_dict):
     state_dict = model.state_dict()
+    saved_state_dict = remap_weight_norm_keys(saved_state_dict, state_dict)
     new_state_dict = {}
 
     for k, v in state_dict.items():

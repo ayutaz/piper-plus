@@ -210,6 +210,11 @@ function createMockedInstance(overrides = {}) {
   // Expose captured feeds for assertion
   instance.__capturedFeeds = capturedFeeds;
 
+  // Set capability flags based on session inputNames (mirrors _init() logic)
+  const inputNames = (overrides.session || instance._session).inputNames || [];
+  instance._hasSpeakerEmbedding = inputNames.includes('speaker_embedding');
+  instance._hasProsodyFeatures = inputNames.includes('prosody_features');
+
   return instance;
 }
 
@@ -395,7 +400,7 @@ describe("language に未知のコードを渡した場合", { skip }, () => {
 // ===========================================================================
 
 describe("config.inference が undefined の場合はデフォルト値が使用される", { skip }, () => {
-  it("inference 未設定時に noiseScale=0.667 がデフォルトになる", async () => {
+  it("inference 未設定時に noiseScale=0.4 がデフォルトになる", async () => {
     // Arrange
     const instance = createMockedInstance({
       config: { inference: undefined },
@@ -404,9 +409,9 @@ describe("config.inference が undefined の場合はデフォルト値が使用
     // Act
     await instance.synthesize("test");
 
-    // Assert — DEFAULT_NOISE_SCALE = 0.667
+    // Assert — DEFAULT_NOISE_SCALE = 0.4
     const scales = Array.from(instance.__capturedFeeds[0].scales.data);
-    assert.ok(Math.abs(scales[0] - 0.667) < 1e-3);
+    assert.ok(Math.abs(scales[0] - 0.4) < 1e-3);
   });
 });
 
