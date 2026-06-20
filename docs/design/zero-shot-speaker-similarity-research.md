@@ -100,8 +100,8 @@ v9再学習のための2件のバグ修正が完了し、v9コマンドが確定
 
 | # | 元の指摘 | 実際 |
 |---|---------|------|
-| ~~DINO softmax dim~~ | dim=-1は**正しい** (DINO標準) |
-| ~~DP g detach除去~~ | **元VITS設計**。除去はDP崩壊リスク |
+| 1 | ~~DINO softmax dim~~ | dim=-1は**正しい** (DINO標準) |
+| 2 | ~~DP g detach除去~~ | **元VITS設計**。除去はDP崩壊リスク |
 
 ---
 
@@ -121,42 +121,48 @@ v9再学習のための2件のバグ修正が完了し、v9コマンドが確定
 ## 修正済みロードマップ
 
 ### Phase 0: v9完了 + ベースライン確立（学習不要）
+
 1. **D1-D5** 推論時テクニック全適用
 2. SECS/MCD評価パイプライン構築
 3. v9 ベースライン測定（v8は話者再現失敗のため廃棄）
 
 ### Phase 1a: バグ修正 + 低リスク改善 (v9a, 2-3変更のみ)
-4. **B4** Embedding perturbation L2再正規化
-5. **B5** Embedding perturbation annealing (0.1→0.02)
-6. **A4** Speaker embedding mixup
+
+1. **B4** Embedding perturbation L2再正規化
+2. **B5** Embedding perturbation annealing (0.1→0.02)
+3. **A4** Speaker embedding mixup
 
 → v9ベースライン比較で効果測定
 
 ### Phase 1b: 追加Loss改善 (v9b, 効果確認後)
-7. **B1** InfoNCE対比学習loss
-8. **B2** R1勾配ペナルティ
-9. **B6** Multi-scale mel SCL
+
+1. **B1** InfoNCE対比学習loss
+2. **B2** R1勾配ペナルティ
+3. **B6** Multi-scale mel SCL
 
 → v9a比較で効果測定
 
 ### Phase 2: データ拡充（最大インパクト）
-10. **A1** JVS/JVNV追加 (20→120話者)
-11. **A3** Speed perturbation
-12. **A2** LibriTTS-R clean-100 (cross-lingual)
-13. **ERes2NetV2** speaker encoder交換 (検証)
+
+1. **A1** JVS/JVNV追加 (20→120話者)
+2. **A3** Speed perturbation
+3. **A2** LibriTTS-R clean-100 (cross-lingual)
+4. **ERes2NetV2** speaker encoder交換 (検証)
 
 → 期待: 最大の改善幅
 
 ### Phase 3: アーキテクチャ進化
-14. **C1** Snake活性化 + **C2** Anti-aliased upsampling
-15. **C3** TextEncoder FiLM化
-16. **C5** TextEncoder CLN (効果次第)
-17. **C6** SC-CNN (実験的)
+
+1. **C1** Snake活性化 + **C2** Anti-aliased upsampling
+2. **C3** TextEncoder FiLM化
+3. **C5** TextEncoder CLN (効果次第)
+4. **C6** SC-CNN (実験的)
 
 ### Phase 4: 大規模データ + 高度テクニック
-18. ReazonSpeech filtered (200-500話者)
-19. CFG (DINO競合解決後)
-20. RL fine-tuning (F5R-TTS式)
+
+1. ReazonSpeech filtered (200-500話者)
+2. CFG (DINO競合解決後)
+3. RL fine-tuning (F5R-TTS式)
 
 ---
 

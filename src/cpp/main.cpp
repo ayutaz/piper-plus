@@ -68,8 +68,8 @@ struct RunConfig {
   // Numerical id of the default speaker (multi-speaker voices)
   optional<piper::SpeakerId> speakerId;
 
-  // Path to speaker embedding binary file (192 float32 values) for zero-shot TTS
-  optional<filesystem::path> speakerEmbeddingPath;
+  // (speakerEmbeddingPath moved to the Voice cloning block below, where it
+  // shares a thorough docstring with referenceAudioPath / speakerEncoderModelPath.)
 
   // Language code or numerical id (multi-language voices)
   optional<string> language;
@@ -1250,9 +1250,6 @@ void parseArgs(int argc, char *argv[], RunConfig &runConfig) {
     } else if (arg == "--reference-audio" || arg == "--reference_audio") {
       ensureArg(argc, argv, i);
       runConfig.referenceAudioPath = filesystem::path(argv[++i]);
-    } else if (arg == "--speaker-embedding" || arg == "--speaker_embedding") {
-      ensureArg(argc, argv, i);
-      runConfig.speakerEmbeddingPath = filesystem::path(argv[++i]);
     } else if (arg == "--speaker-encoder-model" || arg == "--speaker_encoder_model") {
       ensureArg(argc, argv, i);
       runConfig.speakerEncoderModelPath = filesystem::path(argv[++i]);

@@ -14,11 +14,13 @@
 ## 1. 現在の状態
 
 ### ブランチ状態
+
 - `feat/zero-shot-tts` を最新の `origin/dev` にリベース済み
 - CI: push待ち（リベース後未push → `--force-with-lease`でpush済み）
 - バックアップブランチ: 削除済み
 
 ### v8学習結果（話者再現に失敗 — 再学習必須）
+
 - **ONNXモデル**: `/data/piper/output-zero-shot-20speakers-v8/zero-shot-20speakers-v8.onnx` (39MB)
 - **チェックポイント**: 101個 (各848MB, 合計85GB)
 - **問題**: 話者再現精度が極めて低い。未知話者のRMSが既知話者の1/10
@@ -55,6 +57,7 @@ uv run python -m piper_train \
 ```
 
 ### 重要な注意事項
+
 - `--c-dino` はCLI引数として**追加済み**（包括レビュー修正により有効化）。デフォルト0.5
 - `--kl-annealing-epochs` はCLI引数として**追加済み**（包括レビュー修正により有効化）。デフォルト10
 - `--c-spk` はCLI引数として**存在する**（`add_model_specific_args`経由）。デフォルト1.0のため省略可
@@ -79,6 +82,7 @@ uv run python -m piper_train \
 ## 3. 修正済み機能一覧（v8からの差分）
 
 ### 学習コード修正
+
 | 機能 | ファイル | 状態 |
 |------|---------|------|
 | speaker_embeddings in Batch | `vits/dataset.py` | **復元済み** — Batchクラスにフィールド追加、DataLoaderで.npy読み込み |
@@ -92,6 +96,7 @@ uv run python -m piper_train \
 | prosody形式統一 | `vits/dataset.py` | **修正済み** — list[dict\|None]形式 |
 
 ### ネイティブ推論（C++/C#/Rust）
+
 | 言語 | 状態 | 追加ファイル |
 |------|------|-------------|
 | C++ | 完了 | `main.cpp`, `piper.cpp`, `piper.hpp` |
@@ -119,19 +124,23 @@ uv run python -m piper_train \
 ## 5. 学習中の確認ポイント
 
 ### 起動直後に確認
-```
+
+```text
 spk_proj_teacher          │ Sequential    │  362 K │ train  ← DINO teacher存在確認
 ```
+
 - `gin_channels: 512` が `hparams.yaml` にあること
 - `CamPPSpeakerEncoder loaded` のログが出ること
 
 ### 学習中のログで確認
+
 - `loss_spk` が出力されること（SCLが動作している証拠）
 - `loss_dino` が出力されること（DINOが動作している証拠）
 - `kl_weight` が0.1→1.0に増加すること（epoch 0-10）
 - `loss_disc` が6.0固定にならないこと（D:G=1:1の効果）
 
 ### 学習完了後
+
 ```bash
 # ONNX変換（zero-shotモード）
 CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
@@ -179,12 +188,14 @@ CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.infer_onnx \
 最終確認: commit `5bcb54e` (包括レビュー修正適用済み)
 
 直近のCI修正:
+
 - `d5f0cb8`: Python Linting + Rust CI修正（ruff/rustfmt/synthesize_with_params）
 - `bdbdb8c`: 全テストがCIで実行されるようワークフロー修正
 - `b425e31`: CamPP FP16対応 + 消失ツール3本復元
 - `5bcb54e`: `infer_onnx.py` の `--speaker-embedding` 重複引数除去
 
 包括レビュー修正（2026-04-12）:
+
 - `go-ci` を `ci-required` ゲートに追加
 - `test_short_text_mitigation.py` / `.js` をワークフローに追加
 - Rust E2E テストから `#[ignore]` を削除（モデルファイルがリポジトリにトラッキング済み）

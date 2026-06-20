@@ -31,7 +31,7 @@
 
 **最終的に判明した真因**:
 
-```
+```text
 WARNING:vits.lightning:Non-finite loss_g at step=236 → batch skip
 [Rank 3] ALLREDUCE 1800002ms timeout → 全 rank 終了
 ```
@@ -59,6 +59,7 @@ Multi-scale FiLM` クラスが廃止されたが、MBiSTFT 側への移植が未
 L2 再正規化を入れた v6 でも `loss_dino` が step ~1249 で突如 0.00 に貼り付く。
 
 原因の連鎖:
+
 1. CAM++ 出力 (norm=1) に `+ σ × N(0, I)` noise を加えた後、**L2 再正規化していなかった**
 2. 期待 norm が `√(1 + σ² × dim) ≈ 1.22` に増加
 3. spk_proj の入力分布が train/inference で 22% magnitude 不一致
@@ -85,6 +86,7 @@ L2 再正規化を入れた v6 でも `loss_dino` が step ~1249 で突如 0.00 
 | `95e74cb` | **dino_center を NaN 汚染から防御** | spk_proj 稀な NaN で center 永続汚染を防止 |
 
 実装位置:
+
 - `src/python/piper_train/vits/mb_istft.py:212-265, 274-285`: Multi-scale FiLM + `_apply_film`
 - `src/python/piper_train/vits/lightning.py:79-99`: `_ddp_synced_is_finite`
 - `src/python/piper_train/vits/lightning.py:786-797`: noise 加算 + L2 再正規化
@@ -92,6 +94,7 @@ L2 再正規化を入れた v6 でも `loss_dino` が step ~1249 で突如 0.00 
 - `src/python/piper_train/vits/losses.py:84-148`: dino_loss 入力検証 + 警告
 
 テスト:
+
 - `tests/test_mb_istft_film.py`: 15 ケース (FiLM 数値挙動、構造、forward、勾配)
 - `tests/test_ddp_synced_finite.py`: 11 ケース (DDP all_reduce mock)
 - `tests/test_dino_loss_diagnostics.py`: 12 ケース (NaN 入力分類)
@@ -132,6 +135,7 @@ nohup /data/piper/.venv/bin/python -u -m piper_train \
 ```
 
 ポイント:
+
 - `precision=32-true`: V100 で FP16-mixed は backward 27 sec → 32-true で 5.3 sec (5x 高速)
 - `num_workers=2`: cgroup 100GB 制約 (DataLoader worker × devices × 13GB)
 - `gradient-clip-val=0`: 過去成功事例 (v9, 6lang-mb) いずれも grad_clip=null
@@ -142,6 +146,7 @@ nohup /data/piper/.venv/bin/python -u -m piper_train \
 ## 5. 学習結果
 
 ### 速度
+
 - **1 epoch ≈ 8 時間 53 分** (極めて安定)
 - step あたり ≈ 5.3 sec (32-true)
 - GPU 利用率 87-96% (全 4 枚)

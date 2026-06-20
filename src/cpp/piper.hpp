@@ -122,12 +122,13 @@ struct InferenceInputs {
   float noiseW      = 0.5f;
   std::optional<int64_t> speakerId;
   std::optional<int64_t> languageId;
-  std::optional<std::vector<float>> speakerEmbedding;
   // Flat [a1,a2,a3, a1,a2,a3, ...] per phoneme. Empty = no prosody.
   std::vector<int64_t> prosodyFeatures;
-  // Voice cloning: when non-empty, fed as `speaker_embedding` input with
-  // mask=1 (overriding the default zero/mask=0 fallback). Size must match
-  // ModelSession::speakerEmbeddingDim.
+  // Voice cloning / zero-shot TTS: when non-empty, fed as `speaker_embedding`
+  // input with mask=1 (overriding the default zero/mask=0 fallback). Size must
+  // match ModelSession::speakerEmbeddingDim. Empty = use emb_g(speaker_id) fallback.
+  // Canonical post-v2 rebase: plain vector (not optional). Consumers should
+  // check `.empty()` instead of `.has_value()`.
   std::vector<float> speakerEmbedding;
 };
 

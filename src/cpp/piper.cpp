@@ -1184,12 +1184,16 @@ buildInputTensors(
         lidShape.data(), lidShape.size()));
   }
 
-  // speaker_embedding (zero-shot TTS)
+  // speaker_embedding (zero-shot TTS, CSM path: hasSpeakerEmbedding).
+  // Distinct from the VITS Issue #426 path below (hasSpeakerEmbeddingInput),
+  // which uses session.speakerEmbeddingDim from the model's declared shape.
   if (session.hasSpeakerEmbedding) {
-    if (!inputs.speakerEmbedding.has_value()) {
+    if (inputs.speakerEmbedding.empty()) {
       std::cerr << "WARNING: Model expects 'speaker_embedding' but none provided; using zero vector" << std::endl;
+      speakerEmbBuf.assign(192, 0.0f);
+    } else {
+      speakerEmbBuf = inputs.speakerEmbedding;  // copy
     }
-    speakerEmbBuf = inputs.speakerEmbedding.value_or(std::vector<float>(192, 0.0f));
     std::vector<int64_t> speakerEmbShape{1, static_cast<int64_t>(speakerEmbBuf.size())};
     names.push_back("speaker_embedding");
     tensors.push_back(Ort::Value::CreateTensor<float>(
@@ -1302,13 +1306,14 @@ void synthesize(std::vector<PhonemeId> &phonemeIds,
   inputs.noiseW           = effectiveNoiseW;
   inputs.speakerId        = static_cast<int64_t>(synthesisConfig.speakerId.value_or(0));
   inputs.languageId       = static_cast<int64_t>(lid);
-  inputs.speakerEmbedding = synthesisConfig.speakerEmbedding;
+  // Voice cloning / zero-shot TTS: forward provided speaker embedding (if any).
+  // Unwrap optional to plain vector; empty vector signals "use mask=0 fallback".
+  if (synthesisConfig.speakerEmbedding.has_value()) {
+    inputs.speakerEmbedding = *synthesisConfig.speakerEmbedding;
+  }
   if (prosodyFeatures) {
     inputs.prosodyFeatures = *prosodyFeatures;
   }
-  // Voice cloning: forward provided speaker embedding (if any) to the
-  // tensor builder, which will switch the mask to 1.
-  inputs.speakerEmbedding = synthesisConfig.speakerEmbedding;
 
   // Buffers must outlive the Run() call
   std::vector<int64_t> phonemeIdsBuf, phonemeIdLengthsBuf, sidBuf, lidBuf, prosodyBuf;
@@ -1528,12 +1533,14 @@ void synthesizeFloat(std::vector<PhonemeId> &phonemeIds,
   inputs.noiseW           = effectiveNoiseW;
   inputs.speakerId        = static_cast<int64_t>(synthesisConfig.speakerId.value_or(0));
   inputs.languageId       = static_cast<int64_t>(lid);
-  inputs.speakerEmbedding = synthesisConfig.speakerEmbedding;
+  // Voice cloning / zero-shot TTS: forward provided speaker embedding (if any).
+  // Unwrap optional to plain vector; empty vector signals "use mask=0 fallback".
+  if (synthesisConfig.speakerEmbedding.has_value()) {
+    inputs.speakerEmbedding = *synthesisConfig.speakerEmbedding;
+  }
   if (prosodyFeatures) {
     inputs.prosodyFeatures = *prosodyFeatures;
   }
-  // Voice cloning: forward provided speaker embedding (if any).
-  inputs.speakerEmbedding = synthesisConfig.speakerEmbedding;
 
   // Buffers must outlive the Run() call
   std::vector<int64_t> phonemeIdsBuf, phonemeIdLengthsBuf, sidBuf, lidBuf, prosodyBuf;

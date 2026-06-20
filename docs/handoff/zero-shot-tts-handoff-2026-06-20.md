@@ -9,7 +9,7 @@
 
 ## 0. 全体像 (5 分で読む用)
 
-```
+```text
    ┌──────────────────────────────────────────────────────────────────┐
    │ piper-plus zero-shot TTS のサイクル                              │
    │                                                                  │
@@ -113,7 +113,7 @@ uv pip install onnxruntime-gpu>=1.20.0 huggingface_hub torchaudio soundfile pypi
 
 `/data/piper/.env` に下記を設定:
 
-```
+```text
 HF_TOKEN=<your_hf_token>
 WANDB_API_KEY=<optional>
 ```
@@ -144,7 +144,7 @@ export LD_LIBRARY_PATH="$CUDNN:$CUBLAS:$NVRTC:$CURAND:$CUFFT:$LD_LIBRARY_PATH"
 
 ### 3.1 ブランチ状態 (作業の起点)
 
-```
+```text
 リモート: https://github.com/ayutaz/piper-plus.git
 ブランチ: feat/zero-shot-tts
 HEAD:     cb2a095 docs: v7 epoch 32 評価結果と Tsukuyomi zero-shot FT 完走を反映
@@ -241,7 +241,7 @@ hf download ayousanz/campplus-onnx campplus.onnx \
 | 話者 | tsukuyomi (single) |
 | 発話 | 100 |
 | ライセンス | CC BY-ND 4.0 (商用可、改変禁止) |
-| 入手 | https://tyc.rei-yumesaki.net/material/corpus/ |
+| 入手 | <https://tyc.rei-yumesaki.net/material/corpus/> |
 
 ### 5.3 データセットの場所 (旧環境での参考パス)
 
@@ -323,7 +323,7 @@ cd /data/piper-plus-zero-shot
 
 これで以下が生成される:
 
-```
+```text
 /data/piper/dataset-multilingual-6lang-filtered-new/
 ├── config.json                # 173 シンボル / 6 言語 / 571 話者の id_map
 ├── dataset.jsonl              # 全 497,519 発話のメタデータ (text/phonemes/audio_path...)
@@ -578,7 +578,8 @@ CUDA_VISIBLE_DEVICES="" /data/piper/.venv/bin/python -m piper_train.infer_onnx \
 ```
 
 期待出力 (epoch 32 時点):
-```
+
+```text
 === SECS (epoch 32) ===
 既知 ref ↔ 既知 synth      : 0.6619  (epoch20: 0.5943)
 未知 ref ↔ 未知 synth (ZS) : 0.6879  (epoch20: 0.6388)
@@ -621,7 +622,7 @@ CUDA_VISIBLE_DEVICES="" /data/piper/.venv/bin/python -m piper_train.infer_onnx \
 
 `training_step` で各 rank が `_ddp_synced_is_finite` を呼び、**全 rank で skip を整合**させる:
 
-```
+```text
 [各 rank] loss_g 計算 → is_finite check
         → torch.distributed.all_reduce(local_finite, MIN)
         → 1 rank でも non-finite なら 全 rank skip
@@ -830,6 +831,6 @@ if __name__ == "__main__":
 
 ## 16. 連絡先
 
-- リポジトリ: https://github.com/ayutaz/piper-plus
-- HF プロフィール: https://huggingface.co/ayousanz
+- リポジトリ: <https://github.com/ayutaz/piper-plus>
+- HF プロフィール: <https://huggingface.co/ayousanz>
 - Issue は GitHub に

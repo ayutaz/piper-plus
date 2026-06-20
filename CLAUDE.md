@@ -27,6 +27,7 @@ L2 再正規化 / dino_center 汚染防御 を実装。詳細は
 **v7 学習は epoch 32 で停止**。続けて **Tsukuyomi zero-shot FT 500 epoch 完走** (2026-05-21 00:07〜00:58)。再開コマンドは下方「[新 GPU での学習再開](#新-gpu-での学習再開)」参照。
 
 > 📦 **HF リポジトリ (private)** — 2026-06-20 アップロード:
+>
 > - [`ayousanz/piper-plus-zero-shot-multi-6lang-v7`](https://huggingface.co/ayousanz/piper-plus-zero-shot-multi-6lang-v7) — v7 resume ckpt + singlespk ckpt + ONNX (ep32) + 評価再現セット (compute_secs.py + 参照 emb + 合成 wav) + TensorBoard events + 過去 epoch ONNX (ep10/ep20)
 > - [`ayousanz/piper-plus-zero-shot-tsukuyomi`](https://huggingface.co/ayousanz/piper-plus-zero-shot-tsukuyomi) — Tsukuyomi FT ckpt + ONNX + 合成サンプル + 評価再現セット
 > - [`ayousanz/campplus-onnx`](https://huggingface.co/ayousanz/campplus-onnx) — CAM++ Speaker Encoder (Apache-2.0、ModelScope iic ミラー、引き継ぎの簡便化用)

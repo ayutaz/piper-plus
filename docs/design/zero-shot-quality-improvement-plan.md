@@ -61,9 +61,10 @@ loss_kl = kl_loss(z_p, logs_q, m_p, logs_p, z_mask) * kl_weight
 
 #### 1.2 DINO自己蒸留 ✅ FIXED
 
-**場所**: `losses.py` (定義)、`lightning.py` (__init__ + training_step_g)
+**場所**: `losses.py` (定義)、`lightning.py` (**init** + training_step_g)
 
 **復元済み** (2026-04-01):
+
 1. ✅ `VitsModel.__init__` で `spk_proj_teacher` を `spk_proj` のdeep copyとして作成（勾配凍結）
 2. ✅ `dino_center` バッファを登録
 3. ✅ `training_step_g` で teacher出力を計算し `dino_loss()` を呼び出す
@@ -177,6 +178,7 @@ self.flow = ResidualCouplingBlock(inter_channels, hidden_channels, 5, 2, 4, gin_
 ## 4. 評価パイプライン設計
 
 ### 現状
+
 - 体系的な評価パイプラインが**存在しない**
 - WandBで学習lossを監視するのみ、定量的な話者類似度測定なし
 
@@ -230,7 +232,7 @@ A の Multi-scale FiLM は本文書 50 行目「**TestGeneratorFiLMConditioning*
 
 ### Phase 1: 未実装機能の修正
 
-```
+```text
 進捗: 5/7完了 (2026-04-03更新) + 包括レビュー修正 (2026-04-12)
 期待効果: 話者類似度 +15-25% (復元済み分で +10-15%)
 ```
@@ -245,39 +247,39 @@ A の Multi-scale FiLM は本文書 50 行目「**TestGeneratorFiLMConditioning*
 
 **包括レビュー修正 (2026-04-12) — 追加完了:**
 
-8. ✅ C#/Rust/Go SpeakerEncoder mel shape 修正 `[1,80,T]`→`[1,T,80]` — **DONE**
-9. ✅ C#/Rust/Go SpeakerEncoder FFT window 512→400 (Kaldi 25ms@16kHz) — **DONE**
-10. ✅ C#/Rust/Go SpeakerEncoder CMVN 追加（バンド単位平均減算） — **DONE**
-11. ✅ EMA CPU/GPU デバイスミスマッチ修正（チェックポイントリジューム後） — **DONE**
-12. ✅ DINO center dtype ミスマッチ修正（FP16 学習時） — **DONE**
-13. ✅ SCL dtype ミスマッチ修正（CamPP FP32 vs FP16） — **DONE**
-14. ✅ TextEncoder speaker conditioning の `x_mask` 未適用修正 — **DONE**
-15. ✅ `noise_scale` デフォルト全言語更新 0.667/0.8 → 0.4/0.5 — **DONE**
+1. ✅ C#/Rust/Go SpeakerEncoder mel shape 修正 `[1,80,T]`→`[1,T,80]` — **DONE**
+2. ✅ C#/Rust/Go SpeakerEncoder FFT window 512→400 (Kaldi 25ms@16kHz) — **DONE**
+3. ✅ C#/Rust/Go SpeakerEncoder CMVN 追加（バンド単位平均減算） — **DONE**
+4. ✅ EMA CPU/GPU デバイスミスマッチ修正（チェックポイントリジューム後） — **DONE**
+5. ✅ DINO center dtype ミスマッチ修正（FP16 学習時） — **DONE**
+6. ✅ SCL dtype ミスマッチ修正（CamPP FP32 vs FP16） — **DONE**
+7. ✅ TextEncoder speaker conditioning の `x_mask` 未適用修正 — **DONE**
+8. ✅ `noise_scale` デフォルト全言語更新 0.667/0.8 → 0.4/0.5 — **DONE**
 
 ### Phase 2: 学習改善 + 評価基盤
 
-```
+```text
 所要時間: 3-5日
 期待効果: 話者類似度 +5-10% (Phase 1比)
 ```
 
-8. 評価パイプライン構築 (`scripts/evaluation/evaluate_zero_shot.py`)
-9. InfoNCE対比学習loss追加
-10. R1勾配ペナルティ
-11. G/D/spk_proj別学習率
-12. embedding noiseスケジュール
+1. 評価パイプライン構築 (`scripts/evaluation/evaluate_zero_shot.py`)
+2. InfoNCE対比学習loss追加
+3. R1勾配ペナルティ
+4. G/D/spk_proj別学習率
+5. embedding noiseスケジュール
 
 ### Phase 3: データ拡充 + 推論改善
 
-```
+```text
 所要時間: 1-2週間 (データ準備含む)
 期待効果: 話者類似度 +10-20% (Phase 2比)
 ```
 
-13. JVS/JVNV等から話者追加 (目標100+話者)
-14. speed perturbation
-15. 推論時VAD適用
-16. 複数参照音声平均 (`--speaker-audio-dir`)
+1. JVS/JVNV等から話者追加 (目標100+話者)
+2. speed perturbation
+3. 推論時VAD適用
+4. 複数参照音声平均 (`--speaker-audio-dir`)
 
 ### 全Phase合計の期待効果
 
