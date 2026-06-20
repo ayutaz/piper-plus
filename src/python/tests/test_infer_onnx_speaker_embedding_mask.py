@@ -163,14 +163,6 @@ class TestSpeakerEmbeddingMaskDetection:
 class TestSpeakerEmbeddingMaskFeed:
     """Lines 1049-1057: feeds dict construction for zero-shot models."""
 
-    @pytest.mark.xfail(
-        reason=(
-            "Bug: infer_onnx.py:1057 unconditionally feeds speaker_embedding"
-            " but never forwards speaker_embedding_mask. Mirror of voice.py"
-            " commit 5188b088. See production_file in test rationale."
-        ),
-        strict=True,
-    )
     def test_infer_onnx_feeds_mask_when_model_declares_it(
         self, tmp_path: Path, speaker_embedding_npy: Path
     ) -> None:

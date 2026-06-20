@@ -268,6 +268,8 @@ def main() -> None:
     if getattr(args, "json_input", False):
         import json
 
+        import numpy as np
+
         sample_rate = voice.config.sample_rate
         output_dir = Path(config.output_dir) if config.output_dir else None
         if output_dir is not None:
@@ -293,6 +295,11 @@ def main() -> None:
                 noise_scale=config.noise_scale,
                 noise_w=config.noise_w,
                 volume=config.volume,
+                speaker_embedding=(
+                    np.asarray(entry["speaker_embedding"], dtype=np.float32)
+                    if "speaker_embedding" in entry
+                    else None
+                ),
             )
 
             line_output = entry.get("output_file")

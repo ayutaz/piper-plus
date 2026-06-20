@@ -1163,6 +1163,7 @@ class PiperVoice:
         sentence_silence: float = 0.0,
         volume: float = 1.0,
         language_id: int | None = None,
+        speaker_embedding: np.ndarray | None = None,
     ) -> tuple[bytes, TimingResult | None]:
         """Synthesize audio with phoneme timing information.
 
@@ -1249,6 +1250,7 @@ class PiperVoice:
                     noise_w=noise_w,
                     volume=volume,
                     language_id=language_id,
+                    speaker_embedding=speaker_embedding,
                 )
 
                 wf.writeframes(audio_bytes)

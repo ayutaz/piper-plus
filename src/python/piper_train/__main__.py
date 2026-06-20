@@ -315,9 +315,9 @@ def create_parser():
     )
     parser.add_argument(
         "--precision",
-        default="16-mixed",
+        default="bf16-mixed",
         choices=("32-true", "16-mixed", "bf16-mixed"),
-        help="Floating point precision (default: 16-mixed for faster training with minimal quality impact)",
+        help="Floating point precision (default: bf16-mixed for faster training with minimal quality impact)",
     )
     parser.add_argument(
         "--val-every-n-epochs",

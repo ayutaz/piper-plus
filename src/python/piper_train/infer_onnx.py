@@ -879,6 +879,7 @@ def main():
     has_prosody = "prosody_features" in input_names
     has_sid = "sid" in input_names
     has_spk_emb = "speaker_embedding" in input_names
+    has_spk_emb_mask = "speaker_embedding_mask" in input_names
     has_lid = "lid" in input_names
     if has_prosody:
         _LOGGER.info("Model supports prosody features (A1/A2/A3)")
@@ -1055,6 +1056,8 @@ def main():
             else:
                 spk_emb = resolved_spk_emb
             inputs["speaker_embedding"] = np.expand_dims(spk_emb, 0)  # [1, 192]
+            if has_spk_emb_mask:
+                inputs["speaker_embedding_mask"] = np.ones((1,), dtype=np.int64)
         elif has_sid:
             # Legacy sid-based model
             sid = None

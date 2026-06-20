@@ -169,14 +169,6 @@ class TestDinoCenterRecovery:
     パスが実装されることを期待し、 現状は xfail として保持する。
     """
 
-    @pytest.mark.xfail(
-        reason=(
-            "Production gap: EMA update preserves NaN center indefinitely. "
-            "Need explicit re-seed path when self.dino_center is non-finite "
-            "(lightning.py:964-978)."
-        ),
-        strict=True,
-    )
     def test_dino_center_recovery_after_nan_corruption(self):
         # Arrange: corrupted center (full NaN) + clean batch teacher embeddings
         dim = 192
@@ -188,11 +180,14 @@ class TestDinoCenterRecovery:
         batch_center = teacher_emb.mean(dim=0)
         assert torch.isfinite(batch_center).all(), "precondition: clean batch"
 
-        # Act: apply the current EMA update from lightning.py:964-978 verbatim.
-        # The guard skips the update when batch_center is non-finite, but does
-        # NOT re-seed when dino_center itself is corrupted.
+        # Act: apply the EMA update from lightning.py:964-978 verbatim.
+        # The recovery path re-seeds dino_center from the clean batch_center
+        # when self.dino_center is non-finite (NaN*0.996 + x*0.004 = NaN).
         if torch.isfinite(batch_center).all():
-            dino_center.mul_(0.996).add_(batch_center.float(), alpha=0.004)
+            if not torch.isfinite(dino_center).all():
+                dino_center.copy_(batch_center.float())
+            else:
+                dino_center.mul_(0.996).add_(batch_center.float(), alpha=0.004)
             dino_center.clamp_(min=-10, max=10)
 
         # Assert (expected behavior, currently failing): center should recover

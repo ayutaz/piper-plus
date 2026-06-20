@@ -175,17 +175,6 @@ def test_windows_posix_path_patch_applied():
 
 
 @pytest.mark.unit
-@pytest.mark.xfail(
-    reason=(
-        "Bug: src/python/piper_train/__main__.py L318 sets "
-        "--precision default='16-mixed', but DR-008 / Template A & B canonical "
-        "specifies 'bf16-mixed'. CLAUDE.md trouble-shooting section also says "
-        "'A100/RTX/T4 で --precision 32-true は遅い、必ず bf16-mixed に変更' "
-        "and lists bf16-mixed as the new default. Production code lags the "
-        "decision record."
-    ),
-    strict=True,
-)
 def test_argparse_precision_default_is_bf16_mixed():
     """``--precision`` default must be ``bf16-mixed`` per DR-008 / Template A/B canonical.
 

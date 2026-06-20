@@ -889,18 +889,6 @@ class TestDurationPredictorConditioning:
 
     @pytest.mark.unit
     @pytest.mark.training
-    @pytest.mark.xfail(
-        reason="SynthesizerTrn.forward() does not handle the language_id=-1 "
-        "mixed-language sentinel — it reaches nn.Embedding(emb_lang) and "
-        "raises IndexError. lightning.py:358-401 normalizes -1 to a valid "
-        "lid before the model, but any code path that bypasses that "
-        "normalization (e.g., direct model.forward() calls in tests or "
-        "future callers) crashes. Either the model should clamp/handle -1 "
-        "gracefully (preferred: treat as 'no language conditioning') or "
-        "the sentinel value should be removed from the public model API.",
-        strict=True,
-        raises=IndexError,
-    )
     def test_forward_with_mixed_language_id_and_speaker_embeddings(self):
         """forward() with language_id=-1 (mixed-language test path) + speaker_embeddings.
 

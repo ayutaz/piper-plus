@@ -145,6 +145,17 @@ class PiperDataset(Dataset):
             spk_emb = np.load(utt.speaker_embedding_path, allow_pickle=False).astype(
                 np.float32
             )
+            if spk_emb.ndim != 1:
+                raise ValueError(
+                    f"speaker_embedding must be 1-D, got shape {spk_emb.shape} "
+                    f"from {utt.speaker_embedding_path}"
+                )
+            expected_dim = getattr(self, "speaker_embedding_dim", 192)
+            if spk_emb.shape[0] != expected_dim:
+                raise ValueError(
+                    f"speaker_embedding dim must be {expected_dim}, got {spk_emb.shape[0]} "
+                    f"from {utt.speaker_embedding_path}"
+                )
             speaker_embedding_tensor = torch.from_numpy(spk_emb)
 
         return UtteranceTensors(

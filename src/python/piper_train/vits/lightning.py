@@ -963,9 +963,21 @@ class VitsModel(pl.LightningModule):
                         # dino_loss が常に 0 マスクされて DINO が完全停止する)
                         batch_center = teacher_emb.mean(dim=0)
                         if torch.isfinite(batch_center).all():
-                            self.dino_center.mul_(0.996).add_(
-                                batch_center.float(), alpha=0.004
-                            )
+                            if not torch.isfinite(self.dino_center).all():
+                                # Recovery: dino_center 自身が NaN 汚染された
+                                # 場合、 EMA (NaN*0.996 + x*0.004 = NaN) では
+                                # 永続的に回復しない。 clean な batch_center で
+                                # 再シードする。
+                                self.dino_center.copy_(batch_center.float())
+                                _LOGGER.warning(
+                                    "dino_center had non-finite values at "
+                                    "step=%d; re-seeded from clean batch_center.",
+                                    self.global_step,
+                                )
+                            else:
+                                self.dino_center.mul_(0.996).add_(
+                                    batch_center.float(), alpha=0.004
+                                )
                             self.dino_center.clamp_(min=-10, max=10)
                         else:
                             _LOGGER.warning(

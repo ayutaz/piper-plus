@@ -435,12 +435,6 @@ class TestSynthesizeWithTimingSpeakerEmbedding:
             return_value=sentences if sentences is not None else [["a", "k", "o"]]
         )
 
-    @pytest.mark.xfail(
-        reason="Production bug: synthesize_with_timing() does not accept "
-        "speaker_embedding kwarg (parallel to 5188b088 fix for stream_raw). "
-        "Fix in voice.py:1154 — add kwarg + thread to _synthesize_ids_core.",
-        strict=True,
-    )
     def test_speaker_embedding_parameter_accepted(self):
         """Public API: synthesize_with_timing() accepts speaker_embedding kwarg."""
         voice = _make_mock_voice(
@@ -458,11 +452,6 @@ class TestSynthesizeWithTimingSpeakerEmbedding:
         assert isinstance(wav_bytes, bytes)
         assert len(wav_bytes) > 0
 
-    @pytest.mark.xfail(
-        reason="Production bug: synthesize_with_timing() does not thread "
-        "speaker_embedding to _synthesize_ids_core (voice.py:1244).",
-        strict=True,
-    )
     def test_speaker_embedding_threaded_to_core(self):
         """speaker_embedding kwarg reaches _synthesize_ids_core feed."""
         voice = _make_mock_voice(
@@ -489,11 +478,6 @@ class TestSynthesizeWithTimingSpeakerEmbedding:
             kwargs["speaker_embedding"], emb
         )
 
-    @pytest.mark.xfail(
-        reason="Production bug: synthesize_with_timing() does not accept/"
-        "thread speaker_embedding for multi-sentence input.",
-        strict=True,
-    )
     def test_speaker_embedding_threaded_per_sentence(self):
         """speaker_embedding is forwarded on EVERY sentence, not just the first."""
         voice = _make_mock_voice(

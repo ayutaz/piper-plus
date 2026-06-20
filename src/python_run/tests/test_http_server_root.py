@@ -330,14 +330,6 @@ class TestSynthesizeEndpointSpeakerEmbedding:
     i.e. the wrong speaker.
     """
 
-    @pytest.mark.xfail(
-        reason=(
-            "http_server.py does not yet parse JSON POST bodies nor forward "
-            "speaker_embedding to voice.synthesize. Tracked as production bug "
-            "by the parent task; voice.py already accepts the kwarg (l.717)."
-        ),
-        strict=False,
-    )
     def test_root_endpoint_accepts_speaker_embedding_post_field(self):
         import numpy as np
 
@@ -372,15 +364,6 @@ class TestHttpServerStartup:
     overrides (notably ``speaker_embedding`` for zero-shot) must take
     precedence so a single server instance can serve many cloned voices."""
 
-    @pytest.mark.xfail(
-        reason=(
-            "synthesize_args is built once in main() (l.372) without a "
-            "speaker_embedding slot, and the route handler does not splice "
-            "per-request speaker_embedding into the kwargs forwarded to "
-            "voice.synthesize. Same root cause as the POST-field test above."
-        ),
-        strict=False,
-    )
     def test_synthesize_args_includes_speaker_embedding_support(self):
         import numpy as np
 

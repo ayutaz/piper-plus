@@ -856,7 +856,14 @@ class SynthesizerTrn(nn.Module):
         """
         g = self._get_speaker_condition(speaker_embeddings)
         if self.n_languages > 1 and lid is not None:
-            lang_emb = self.emb_lang(lid).unsqueeze(-1)  # [b, h, 1]
+            # Defend against the lid=-1 mixed-language sentinel used in
+            # lightning.py:358-401. Direct model.forward() callers that
+            # bypass that normalization would otherwise crash inside
+            # nn.Embedding with IndexError. Clamp negative ids to 0 so
+            # the embedding lookup succeeds; downstream callers that need
+            # true "no language" conditioning should pass lid=None.
+            safe_lid = torch.where(lid < 0, torch.zeros_like(lid), lid)
+            lang_emb = self.emb_lang(safe_lid).unsqueeze(-1)  # [b, h, 1]
             g = (g + lang_emb) if g is not None else lang_emb
         return g
 
@@ -1022,6 +1029,10 @@ class SynthesizerTrn(nn.Module):
             assert speaker_embeddings is not None, (
                 "Missing speaker_embeddings. "
                 "Provide 192-dim CAM++ embeddings for multi-speaker inference."
+            )
+        if speaker_embeddings is not None and speaker_embeddings.shape[-1] != 192:
+            raise ValueError(
+                f"speaker_embeddings dim must be 192, got {speaker_embeddings.shape[-1]}"
             )
         g = self._get_global_conditioning(
             sid, lid, speaker_embeddings=speaker_embeddings

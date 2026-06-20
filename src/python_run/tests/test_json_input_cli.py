@@ -262,14 +262,6 @@ except Exception:
         recorded = json.loads(kwargs_dump.read_text()) if kwargs_dump.exists() else {}
         return proc, recorded
 
-    @pytest.mark.xfail(
-        reason=(
-            "Production bug: src/python_run/piper/__main__.py:288 does not "
-            "extract entry['speaker_embedding'] from JSONL. To be fixed in "
-            "a separate task; this xfail pins the expected forwarding contract."
-        ),
-        strict=True,
-    )
     def test_speaker_embedding_field_extracted_from_jsonl(self, tmp_path):
         """JSONL entry の `speaker_embedding` (192-dim) が voice 呼び出しに forward される."""
         out = tmp_path / "out.wav"

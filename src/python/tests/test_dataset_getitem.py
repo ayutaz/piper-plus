@@ -245,14 +245,6 @@ def test_dataset_accepts_well_formed_speaker_embedding_npy(tmp_path):
     assert result.speaker_embedding.dtype == torch.float32
 
 
-@pytest.mark.xfail(
-    reason=(
-        "Production bug: _load speaker_embedding has no shape validation; "
-        "malformed [191] .npy propagates silently to UtteranceCollate. "
-        "See dataset.py lines 142-148."
-    ),
-    strict=False,
-)
 @pytest.mark.unit
 def test_dataset_rejects_malformed_speaker_embedding_npy(tmp_path):
     """Malformed speaker embedding .npy (wrong shape) must raise early at __getitem__.

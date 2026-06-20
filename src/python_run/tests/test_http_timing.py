@@ -538,14 +538,6 @@ class TestTimingEndpointSpeakerEmbedding:
         client = TestClient(create_app(voice, synthesize_args={}))
         return client, captured
 
-    @pytest.mark.xfail(
-        reason=(
-            "http_server.py POST handler reads body as raw text only; "
-            "JSON body with speaker_embedding is not yet parsed/forwarded "
-            "to voice.synthesize_with_timing()."
-        ),
-        strict=False,
-    )
     def test_speaker_embedding_from_post_body(self, mock_timing_result):
         import numpy as np
 
@@ -559,13 +551,6 @@ class TestTimingEndpointSpeakerEmbedding:
         assert emb.shape == (192,)
         assert emb.dtype == np.float32
 
-    @pytest.mark.xfail(
-        reason=(
-            "http_server.py does not yet validate speaker_embedding "
-            "dimensions; needs 400 on len != 192."
-        ),
-        strict=False,
-    )
     def test_speaker_embedding_invalid_dimension_400(self, mock_timing_result):
         client, _captured = self._build(mock_timing_result)
         payload = {"text": "hi", "speaker_embedding": [0.0] * 191}
@@ -576,13 +561,6 @@ class TestTimingEndpointSpeakerEmbedding:
         detail = (body.get("error") or body.get("detail") or "").lower()
         assert "192" in detail or "dimension" in detail
 
-    @pytest.mark.xfail(
-        reason=(
-            "Pending JSON-body support in http_server.py POST handler "
-            "(speaker_id passthrough when speaker_embedding omitted)."
-        ),
-        strict=False,
-    )
     def test_speaker_embedding_omitted_falls_back_to_speaker_id(
         self, mock_timing_result
     ):
