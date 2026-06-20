@@ -108,7 +108,9 @@ def build_speaker_embedding_fixture(output_path: Path) -> Path:
         # We touch them in a value-preserving no-op so the tracer keeps
         # them as graph inputs instead of pruning them.
         g = model.spk_proj(speaker_embedding).unsqueeze(-1)  # (batch, gin, 1)
-        _noop = (sid_t.float().sum() * 0.0) + (speaker_embedding_mask.float().sum() * 0.0)
+        _noop = (sid_t.float().sum() * 0.0) + (
+            speaker_embedding_mask.float().sum() * 0.0
+        )
         g = g + _noop
 
         x, m_p, logs_p, x_mask = model.enc_p(text, text_lengths, g=g)

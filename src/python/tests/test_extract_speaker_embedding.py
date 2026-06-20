@@ -9,8 +9,14 @@ from unittest import mock
 
 import pytest
 
+
+# extract_speaker_embedding requires torch + torchaudio + soundfile at import time.
+# Skip the whole module (collection-time) on minimal CI envs that don't install them.
+pytest.importorskip("torchaudio")
+pytest.importorskip("soundfile")
+
 # conftest.py adds src/python to sys.path so this import works
-from piper_train import extract_speaker_embedding as ese
+from piper_train import extract_speaker_embedding as ese  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
@@ -78,8 +84,7 @@ class TestFilterForShard:
         items = ["x", "y"]
         # 5 shards で 2 アイテム → shard 0, 1 が 1 件、それ以外 0 件
         sizes = [
-            len(ese._filter_for_shard(items, shard=s, num_shards=5))
-            for s in range(5)
+            len(ese._filter_for_shard(items, shard=s, num_shards=5)) for s in range(5)
         ]
         assert sizes == [1, 1, 0, 0, 0]
 
@@ -279,5 +284,5 @@ class TestExtractPerUtteranceShortCircuit:
         ds = tmp_path / "empty"
         ds.mkdir()
         fake_session = mock.MagicMock()
-        with pytest.raises(FileNotFoundError, match="dataset.jsonl"):
+        with pytest.raises(FileNotFoundError, match=r"dataset\.jsonl"):
             ese.extract_per_utterance(session=fake_session, dataset_dir=ds)

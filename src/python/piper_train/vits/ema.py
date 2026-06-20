@@ -203,9 +203,7 @@ class EMACallback(Callback):
             if self.ema_spk_proj is not None:
                 self.ema_spk_proj.load_state_dict(checkpoint["ema_spk_proj_state"])
 
-        if (
-            checkpoint.get("ema_discriminator_state")
-        ):
+        if checkpoint.get("ema_discriminator_state"):
             if self.ema_discriminator is None:
                 self.ema_discriminator = ExponentialMovingAverage(
                     model.model_d, decay=self.decay

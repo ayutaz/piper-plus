@@ -106,9 +106,7 @@ class CamPPSpeakerEncoder:
         self.source_sr = source_sr
         self.target_sr = target_sr
         actual = self.session.get_providers()
-        _LOGGER.info(
-            "CamPPSpeakerEncoder loaded: %s (providers=%s)", onnx_path, actual
-        )
+        _LOGGER.info("CamPPSpeakerEncoder loaded: %s (providers=%s)", onnx_path, actual)
 
     @torch.no_grad()
     def __call__(self, audio: torch.Tensor) -> torch.Tensor:
@@ -608,9 +606,7 @@ class VitsModel(pl.LightningModule):
         """
         is_finite = torch.isfinite(loss).to(torch.uint8).reshape(())
         if torch.distributed.is_available() and torch.distributed.is_initialized():
-            torch.distributed.all_reduce(
-                is_finite, op=torch.distributed.ReduceOp.MIN
-            )
+            torch.distributed.all_reduce(is_finite, op=torch.distributed.ReduceOp.MIN)
         return is_finite.item() == 1
 
     def training_step(self, batch: Batch, batch_idx: int):
@@ -993,7 +989,7 @@ class VitsModel(pl.LightningModule):
             if self.model_d_wavlm is not None and (
                 self.global_step % self.hparams.wavlm_every_n_steps == 0
             ):
-                y_d_hat_r_wlm, y_d_hat_g_wlm, fmap_r_wlm, fmap_g_wlm = (
+                _y_d_hat_r_wlm, y_d_hat_g_wlm, fmap_r_wlm, fmap_g_wlm = (
                     self.model_d_wavlm(y, y_hat)
                 )
                 loss_fm_wavlm = feature_loss(fmap_r_wlm, fmap_g_wlm)
