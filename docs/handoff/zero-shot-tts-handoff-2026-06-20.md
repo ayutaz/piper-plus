@@ -201,6 +201,22 @@ hf download ayousanz/campplus-onnx campplus.onnx \
 # (上記 mirror が利用不可な場合の代替: ModelScope iic/speech_campplus_sv_zh-cn_16k-common)
 ```
 
+### 4.2.1 Windows ローカル検証時の注意
+
+Windows PC で HF からモデルを取得して `torch.load` で sanity check する際は **2 つの罠** がある (2026-06-20 検証で確認):
+
+1. **`torch 2.11.0+cpu` が install される** — `pyproject.toml` の cu128 index は Linux only marker。 Windows GPU 学習は手動 `uv pip install --index-url https://download.pytorch.org/whl/cu128 torch==2.11.0+cu128` で上書き
+2. **`PosixPath` エラーで `torch.load` 失敗** — Linux 製 ckpt を Windows で読む際は load 前にモンキーパッチ必須:
+
+   ```python
+   import pathlib
+   pathlib.PosixPath = pathlib.WindowsPath  # Linux→Windows pickle 互換
+   import torch
+   ckpt = torch.load("epoch=32-step=216326.ckpt", map_location="cpu", weights_only=False)
+   ```
+
+詳細: [`docs/migration/v1.12-to-v2.0.md` の "Windows local dev" セクション](../migration/v1.12-to-v2.0.md#windows-local-dev-cross-platform-notes)。 学習自体は Linux 環境で実行する前提のため、 上記 patch は Windows ローカル inspect 専用。
+
 ### 4.3 各 ckpt / ファイルの役割
 
 | ファイル | 用途 |
