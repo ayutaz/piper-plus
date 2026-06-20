@@ -2,35 +2,44 @@
 # GPU support via onnxruntime-gpu; also works without --gpus (CPU fallback)
 # Includes Gradio WebUI (--webui mode)
 #
-# Base: CUDA 12.6.3 + cuDNN 9 + Ubuntu 22.04 (bumped from 12.4.1 to clear
-# Trivy apt-layer CVEs in gnutls / openssl / curl accumulated on the 12.4.1
-# base). onnxruntime-gpu 1.18+ wheels are linked against CUDA 12.x and rely
-# on NVIDIA driver forward compatibility, so a 12.6 host driver runs 12.x
-# binaries without recompilation. Same compatibility rationale as the
-# python-train image (see docker/python-train/Dockerfile).
-FROM nvidia/cuda:12.6.3-cudnn-runtime-ubuntu22.04
+# Base: CUDA 12.8.1 + cuDNN 9 + Ubuntu 24.04 (Issue #527 Fully-aligned 戦略
+# DR-001 で bump、 12.6.3 + Ubuntu 22.04 → 12.8.1 + Ubuntu 24.04)。
+# - CUDA 12.8 で RTX 5090 (Blackwell sm_120) を正式サポート
+# - wheel cu128 と image CUDA toolkit を同 major で揃え、 forward-compat
+#   依存を解消
+# - Ubuntu 24.04 (Noble) は EOL 2029-04 で OS 寿命延長
+# - host driver R570+ が前提 (新 GPU 環境では問題なし、 OQ-01 で確定)
+FROM nvidia/cuda:12.8.1-cudnn-runtime-ubuntu24.04
 
 ENV PYTHONUNBUFFERED=1
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install Python 3.11 and system dependencies
+# Install Python 3.13 via deadsnakes PPA. Ubuntu 24.04 (Noble) の apt
+# 標準は python3.12、 3.13 は deadsnakes PPA (CPython core dev maintained)
+# 経由で取得。 Issue #527 / DR-001 で deadsnakes 採用が確定。
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3.11 \
-    python3.11-venv \
+    software-properties-common \
+    && add-apt-repository -y ppa:deadsnakes/ppa \
+    && apt-get update && apt-get install -y --no-install-recommends \
+    python3.13 \
+    python3.13-venv \
     python3-pip \
     libsndfile1 \
-    && ln -sf /usr/bin/python3.11 /usr/bin/python3 \
-    && ln -sf /usr/bin/python3.11 /usr/bin/python \
+    && update-alternatives --install /usr/bin/python python /usr/bin/python3.13 1 \
+    && update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.13 1 \
     && rm -rf /var/lib/apt/lists/*
 
-# Upgrade pip / setuptools / wheel to clear Trivy supply-chain CVEs that ride
-# on the apt-installed python3-pip (Ubuntu 22.04 ships pip 22.0.2, setuptools
-# 59.6.0, wheel 0.37.x — all on multiple HIGH/MEDIUM advisories). Run before
-# installing uv so the upgraded pip is what bootstraps the rest.
-RUN pip install --no-cache-dir --upgrade pip setuptools wheel
+# Upgrade pip / setuptools / wheel to clear Trivy supply-chain CVEs.
+# Run before installing uv so the upgraded pip is what bootstraps the rest.
+# --ignore-installed は Ubuntu 24.04 の apt-installed pip 24.0 で
+# 「Cannot uninstall pip 24.0, RECORD file not found」 を回避するため必須
+# (debian package が pip metadata を持たないことに起因する既知問題)。
+RUN pip install --no-cache-dir --upgrade --break-system-packages --ignore-installed pip setuptools wheel
 
-# Install uv (Ubuntu 22.04's pip doesn't support --break-system-packages)
-RUN pip install --no-cache-dir uv
+# Install uv. --break-system-packages は Ubuntu 24.04 + Python 3.13 環境で
+# PEP 668 protections を bypass するため。 venv を使わず system Python に
+# 直接 install する Docker 慣習に沿う。
+RUN pip install --no-cache-dir --break-system-packages uv
 
 WORKDIR /app
 
@@ -81,7 +90,10 @@ RUN python --version && \
     python -c "import gradio; print(f'Gradio: {gradio.__version__}')"
 
 # Run as non-root user for security
-RUN useradd -m -u 1000 piper && \
+# Ubuntu 24.04 (Noble) は既存 ubuntu user (UID 1000) を提供しているため
+# 削除してから piper を 1000 で作成 (Issue #527 / Ubuntu 24.04 移行の副作用)。
+RUN userdel -r ubuntu 2>/dev/null || true && \
+    useradd -m -u 1000 piper && \
     chown -R piper:piper /app/models /app/output
 USER piper
 

@@ -31,7 +31,7 @@ permissions:
 
 jobs:
   miri:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 60  # miri は通常 cargo test の 10-50x 遅い
     steps:
       - uses: actions/checkout@v6.0.3

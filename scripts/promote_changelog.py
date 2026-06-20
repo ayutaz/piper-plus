@@ -12,9 +12,9 @@ Release 直前に呼び出して [Unreleased] section の heading を新 version
   3. dry-run option で書き換え前の preview のみ表示
 
 Usage:
-  uv run python scripts/promote_changelog.py --version 1.13.0
-  uv run python scripts/promote_changelog.py --version 1.13.0 --date 2026-06-01
-  uv run python scripts/promote_changelog.py --version 1.13.0 --dry-run
+  uv run python scripts/promote_changelog.py --version 2.0.0
+  uv run python scripts/promote_changelog.py --version 2.0.0 --date 2026-06-01
+  uv run python scripts/promote_changelog.py --version 2.0.0 --dry-run
 
 Exit codes:
   0 -- 昇格成功 (または dry-run 完了)
@@ -48,7 +48,7 @@ NEW_UNRELEASED_BLOCK = """## [Unreleased]
 def main() -> int:
     parser = argparse.ArgumentParser(description="Promote CHANGELOG [Unreleased]")
     parser.add_argument(
-        "--version", required=True, help='target version (e.g. "1.13.0")'
+        "--version", required=True, help='target version (e.g. "2.0.0")'
     )
     parser.add_argument("--date", help="release date YYYY-MM-DD (default: today)")
     parser.add_argument(

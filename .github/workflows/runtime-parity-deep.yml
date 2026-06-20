@@ -55,7 +55,7 @@ jobs:
       - uses: actions/checkout@v6.0.3
       - uses: actions/setup-python@v6.2.0
         with:
-          python-version: "3.11"
+          python-version: "3.13"
 
       - name: Install piper-plus (inference only)
         run: |
@@ -292,10 +292,11 @@ jobs:
       - uses: actions/checkout@v6.0.3
       - uses: actions/setup-python@v6.2.0
         with:
-          # Match dump-python (3.11) so scripts/audio_parity.py imports the
-          # same numpy / scipy ABI as the producer side. Python 3.13 vs 3.11
-          # drift can surface as latent wave / numpy diffs in tier 2/3 comp.
-          python-version: "3.11"
+          # Match dump-python (3.13). Both producer and compare side run on
+          # the same Python interpreter to avoid latent numpy/scipy ABI
+          # drift in tier 2/3 comparison. Issue #527 unified all default
+          # Python to 3.13.
+          python-version: "3.13"
 
       - name: Validate contract toml
         # The script raises if any threshold is 0 / missing, so this step is

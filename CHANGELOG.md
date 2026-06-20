@@ -15,6 +15,82 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   enforces this automatically.
 -->
 
+## [2.0.0] - 2026-05-25
+
+Issue #527: Docker 全 image + CI workflow + ドキュメントを **Python 3.13 + CUDA 12.8 + Ubuntu 24.04** で完全統一する fully-aligned 戦略 migration。 新 GPU (T4 / RTX 6000 Ada / RTX 5090) サポート + TF32 / bf16-mixed default 化。
+
+### Breaking
+
+- **Default Docker images now require CUDA 12.8 + host NVIDIA driver R570+**
+  ([`docker/python-train/Dockerfile`](docker/python-train/Dockerfile),
+  [`docker/python-inference/Dockerfile`](docker/python-inference/Dockerfile)).
+  Base image bumped from `nvidia/cuda:12.6.3-...-ubuntu22.04` to
+  `nvidia/cuda:12.8.1-...-ubuntu24.04`. Hosts running NVIDIA driver R525
+  (12.6) or older will fail to start the new images. See
+  [Docker base image upgrade](docs/migration/v1.12-to-v2.0.md#docker-base-image-upgrade).
+- **Default Python interpreter inside Docker images is 3.13** (was 3.11).
+  `requires-python = ">=3.11"` is unchanged; PyPI installs on Python
+  3.11/3.12 remain supported. Only the Docker image default has shifted.
+  See [Python 3.13 default](docs/migration/v1.12-to-v2.0.md#python-313-default).
+- **PyTorch wheel bumped from 2.2.1+cu121 to 2.11.0+cu128** in the
+  training image. Required for RTX 5090 (Blackwell sm_120) support.
+  See [PyTorch upgrade](docs/migration/v1.12-to-v2.0.md#pytorch-upgrade).
+- **Loading checkpoints generated with torch 2.2 is no longer supported**
+  in v2.0 training images. Existing ONNX models continue to work for
+  inference. Users who need to continue fine-tuning from a torch-2.2
+  checkpoint must stay on the v1.12 Docker image tag (preserved
+  indefinitely in registry).
+  See [Checkpoint resume non-support](docs/migration/v1.12-to-v2.0.md#checkpoint-resume-non-support).
+- **distroless final images bumped from debian12 to debian13**
+  ([`docker/python-inference/Dockerfile.cpu.distroless`](docker/python-inference/Dockerfile.cpu.distroless),
+  [`docker/webui/Dockerfile.distroless`](docker/webui/Dockerfile.distroless)).
+  Internal Python paths shifted from `/usr/local/lib/python3.11` to
+  `/usr/local/lib/python3.13`.
+  See [distroless image upgrade](docs/migration/v1.12-to-v2.0.md#distroless-image-upgrade).
+- **TF32 is now enabled by default in training** via
+  `torch.backends.cuda.matmul.allow_tf32 = True` and
+  `torch.backends.cudnn.allow_tf32 = True`. This is a noop on sm_75 and
+  older GPUs (T4 included). For Ada Lovelace / Blackwell, matmul/conv
+  are ~1.3-1.5x faster but lose bit-exact reproducibility vs strict FP32.
+  See [TF32 default ON](docs/migration/v1.12-to-v2.0.md#tf32-default-on).
+- **Canonical training precision in CLAUDE.md Template A/B is now
+  `--precision bf16-mixed`** (was `--precision 32-true`). The `32-true`
+  option remains available for legacy V100 compatibility / strict
+  numerical reproducibility, but is no longer the recommended default.
+  New GPU (Ada 6000 / RTX 5090) users get BF16 Tensor Core acceleration
+  by default.
+  See [bf16-mixed Template default](docs/migration/v1.12-to-v2.0.md#bf16-mixed-template-default).
+
+### Added
+
+- **`docs/reference/python-313/`**: Issue #527 設計ドキュメント群
+  (`requirements.md` / `specifications.md` / `milestones.md` /
+  `open-questions.md` / `README.md`、 計 5 文書 約 3700 行)。
+- **`docs/migration/v1.12-to-v2.0.md`**: 本マイグレーションガイド。
+- **`torch.backends.cuda.matmul.allow_tf32 = True`** in
+  [`src/python/piper_train/__main__.py`](src/python/piper_train/__main__.py)
+  (DR-007、 Ada/Blackwell で TF32 Tensor Core 透過適用)。
+
+### Changed
+
+- **CI workflow**: 20 個の workflow で `python-version` を `'3.11'` から
+  `'3.13'` に bump (matrix workflow `python-tests` / `g2p-python-ci` は
+  3.11/3.12/3.13 網羅で据置。 `build-phonemize-wheels` は piper-phonemize が
+  `python<3.13` のため 3.11/3.12 のみ網羅、 Issue #527)。
+- **Library floor pins**: 17 library の floor drift を root と member で統一
+  (`scipy>=1.17.1` / `pytorch-lightning>=2.4.0` / `transformers>=4.50.0`
+  / `onnxruntime>=1.26.0` / `numba>=0.61.0` 等、 DR-002)。
+- **CLAUDE.md Template A/B**: `--precision 32-true` → `--precision bf16-mixed`、
+  `--no-wavlm` を削除 (Ada/Blackwell では WavLM 有効が canonical)。
+- **docs/guides/training/**: V100 言及を新 GPU (T4 / Ada 6000 / RTX 5090)
+  前提に置換。
+
+### Fixed
+
+- **`monotonic_align/setup.py`**: `from distutils.core import setup` →
+  `from setuptools import setup`。 distutils は Python 3.12 で stdlib から
+  削除済 (PEP 632)、 setuptools shim 経由で偶然動いていた状態を明示化。
+
 ## [1.13.0] - 2026-06-13
 
 ### Added

@@ -63,11 +63,14 @@ Issues = "https://github.com/ayutaz/piper-plus/issues"
 # `onnxruntime>=1.26.0` (requirements.txt) に揃える。
 gpu = ["onnxruntime-gpu>=1.26.0,<2"]
 http = [
-    "fastapi>=0.110,<1",
-    "uvicorn[standard]>=0.27,<1",
+    # Issue #527 / DR-002: floor を root pyproject と統一 (<1 cap は PyPI 配布の
+    # 保守的上限ポリシーとして維持)。 uv.lock は fastapi 0.136.1 / uvicorn 0.46.0。
+    "fastapi>=0.136.1,<1",
+    "uvicorn[standard]>=0.46.0,<1",
 ]
 test = [
-    "pytest>=7.0",
+    # Issue #527 / DR-002: pytest floor を root / src/python と統一。
+    "pytest>=9.0.3,<10",
     "pytest-cov>=4.0",
     "pytest-timeout>=2.0",
     "pytest-asyncio>=0.24",

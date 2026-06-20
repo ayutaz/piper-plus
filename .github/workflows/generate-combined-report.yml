@@ -22,7 +22,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v6.2.0
         with:
-          python-version: '3.11'
+          python-version: '3.13'
 
       # Download artifacts from both workflows
       - name: Download Japanese TTS results

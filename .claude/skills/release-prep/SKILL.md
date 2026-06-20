@@ -165,8 +165,8 @@ verdict に応じて推奨 next action を表示:
 # Python だけに絞って詳細表示
 /release-prep python
 
-# 1.13.0 リリース予定での CHANGELOG 移行案を生成
-/release-prep --target-version 1.13.0
+# 2.0.0 リリース予定での CHANGELOG 移行案を生成
+/release-prep --target-version 2.0.0
 
 # Rust だけ + target version
 /release-prep rust --target-version 0.5.0

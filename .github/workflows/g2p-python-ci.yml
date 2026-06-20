@@ -28,7 +28,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6.0.3
 
-      - uses: astral-sh/setup-uv@v6
+      - uses: astral-sh/setup-uv@v6.8.0
         with:
           python-version: "3.13"
 
@@ -60,7 +60,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6.0.3
 
-      - uses: astral-sh/setup-uv@v6
+      - uses: astral-sh/setup-uv@v6.8.0
         with:
           python-version: ${{ matrix.python-version }}
 
@@ -109,7 +109,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6.0.3
 
-      - uses: astral-sh/setup-uv@v6
+      - uses: astral-sh/setup-uv@v6.8.0
         with:
           python-version: "3.13"
 
@@ -141,7 +141,7 @@ jobs:
         extra: [ja, en, zh]
     steps:
       - uses: actions/checkout@v6.0.3
-      - uses: astral-sh/setup-uv@v6
+      - uses: astral-sh/setup-uv@v6.8.0
       - run: uv venv .venv-extras
       - run: uv pip install --python .venv-extras "./src/python/g2p[${{ matrix.extra }}]"
       - name: Download NLTK data (EN only)
@@ -162,7 +162,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6.0.3
 
-      - uses: astral-sh/setup-uv@v6
+      - uses: astral-sh/setup-uv@v6.8.0
 
       - name: Verify version matches tag
         run: |
