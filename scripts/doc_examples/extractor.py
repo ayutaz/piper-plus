@@ -117,7 +117,12 @@ def walk_docs(
     out: list[FencedBlock] = []
     seen: set[Path] = set()
     for pattern in include_glob:
-        for path in sorted(repo_root.glob(pattern)):
+        # Sort by POSIX-style relative path string so Windows (case-insensitive
+        # ``Path.__lt__``) and Linux (case-sensitive) yield identical ordering.
+        # Without this normalisation ``README.md`` and ``milestones.md`` swap
+        # positions between platforms, causing the audit JSON to drift.
+        matches = list(repo_root.glob(pattern))
+        for path in sorted(matches, key=lambda p: p.as_posix()):
             if not path.is_file():
                 continue
             if path in seen:

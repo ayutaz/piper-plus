@@ -5,9 +5,12 @@ Spectrograms are computed later on GPU in batched mode.
 Usage
 -----
 uv run python -m piper_train.tools.cache_audio \
-  --dataset /data/piper/dataset-zero-shot-20speakers/dataset.jsonl \
-  --cache-dir /data/piper/dataset-zero-shot-20speakers/cache/22050 \
+  --dataset ${DATASET_DIR}/dataset.jsonl \
+  --cache-dir ${DATASET_DIR}/cache/22050 \
   --sample-rate 22050 --workers 30
+
+(DATASET_DIR is the user's dataset root; see docs/handoff/ for the
+maintainer's actual training layout.)
 """
 
 from __future__ import annotations
