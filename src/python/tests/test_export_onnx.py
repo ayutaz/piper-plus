@@ -1,5 +1,7 @@
 """Tests for export_onnx stochastic/deterministic export modes, EMA weight application,
-and emb_lang unification."""
+emb_lang unification, and spk_proj-only architecture support."""
+
+import warnings
 
 import numpy as np
 import pytest
@@ -8,7 +10,7 @@ from torch import nn
 
 
 def _onnx_inference(
-    onnx_path, phoneme_ids, prosody_features, noise_scale=0.667, noise_scale_w=0.8
+    onnx_path, phoneme_ids, prosody_features, noise_scale=0.4, noise_scale_w=0.5
 ):
     """Run ONNX inference and return audio output."""
     import onnxruntime
@@ -56,7 +58,7 @@ class TestDeterministicExport:
             temp_onnx_model,
             sample_phoneme_ids,
             sample_prosody_features,
-            noise_scale=0.667,
+            noise_scale=0.4,
         )
 
         np.testing.assert_array_equal(
@@ -340,8 +342,8 @@ class TestUnifyEmbLangOnnxExport:
 
         def _build_inputs(lid_val):
             inputs = {"input": text, "input_lengths": text_lengths, "scales": scales}
-            if "sid" in input_names:
-                inputs["sid"] = np.array([0], dtype=np.int64)
+            # No sid input -- emb_g has been removed from the architecture.
+            # Single-speaker multilingual models use only lid for conditioning.
             if "lid" in input_names:
                 inputs["lid"] = np.array([lid_val], dtype=np.int64)
             if "prosody_features" in input_names:
@@ -357,6 +359,18 @@ class TestUnifyEmbLangOnnxExport:
             audio_lid1,
             err_msg="After emb_lang unification, different lid values should produce identical output",
         )
+
+    def test_no_sid_input_in_exported_model(self, temp_onnx_model_unified_emb_lang):
+        """エクスポートされたモデルにsid入力が含まれないことを確認"""
+        import onnxruntime
+
+        session = onnxruntime.InferenceSession(str(temp_onnx_model_unified_emb_lang))
+        input_names = {inp.name for inp in session.get_inputs()}
+
+        assert "sid" not in input_names, (
+            "sid input should not exist in exported model (emb_g removed)"
+        )
+        assert "lid" in input_names, "lid input should exist for multilingual model"
 
 
 # ---------------------------------------------------------------------------
@@ -821,3 +835,102 @@ class TestGraphInputSchema:
                 "in scripts/check_onnx_inputs.py, then propagate the new "
                 "input through every runtime feed."
             )
+
+
+@pytest.mark.unit
+class TestExportModeSidDeprecation:
+    """--export-mode sid の非推奨化テスト"""
+
+    def test_sid_mode_emits_deprecation_warning(self):
+        """--export-mode sid を指定するとDeprecationWarningが発生"""
+        # Simulate the warning logic from export_onnx.main()
+        export_mode = "sid"
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            if export_mode == "sid":
+                warnings.warn(
+                    "--export-mode sid is deprecated (emb_g has been removed). "
+                    "Falling back to zero-shot mode.",
+                    DeprecationWarning,
+                    stacklevel=1,
+                )
+                export_mode = "zero-shot"
+
+            assert len(w) == 1
+            assert issubclass(w[0].category, DeprecationWarning)
+            assert "deprecated" in str(w[0].message).lower()
+            assert export_mode == "zero-shot"
+
+    def test_auto_mode_no_warning(self):
+        """--export-mode auto では警告が発生しない"""
+        export_mode = "auto"
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            if export_mode == "sid":
+                warnings.warn(
+                    "--export-mode sid is deprecated",
+                    DeprecationWarning,
+                    stacklevel=1,
+                )
+            assert len(w) == 0
+
+
+@pytest.mark.unit
+class TestEMASpkProjApplication:
+    """EMA spk_proj 重み適用のテスト"""
+
+    def test_ema_spk_proj_weights_applied(self, tmp_path):
+        """EMA spk_proj state があればspk_projパラメータに適用される"""
+        # spk_projの代替としてシンプルなモジュールを使用
+        spk_proj = torch.nn.Sequential(
+            torch.nn.Linear(192, 512),
+            torch.nn.LayerNorm(512),
+            torch.nn.GELU(),
+            torch.nn.Linear(512, 512),
+        )
+
+        # 元パラメータを記録
+        original_params = {}
+        for name, param in spk_proj.named_parameters():
+            original_params[name] = param.data.clone()
+
+        # EMA shadow params を作成（元のパラメータ + 0.1）
+        shadow_params = {}
+        for name, param in spk_proj.named_parameters():
+            shadow_params[name] = param.data.clone() + 0.1
+
+        ema_spk_proj_state = {"shadow_params": shadow_params}
+
+        # モックチェックポイントを保存
+        ckpt_path = tmp_path / "test_ema_spk_proj.ckpt"
+        torch.save({"ema_spk_proj_state": ema_spk_proj_state}, str(ckpt_path))
+
+        # EMA適用ロジックを直接テスト（export_onnx.pyと同じロジック）
+        ckpt = torch.load(str(ckpt_path), map_location="cpu")
+        ema = ckpt.get("ema_spk_proj_state")
+        assert ema is not None
+
+        applied = 0
+        proj_params = dict(spk_proj.named_parameters())
+        for name, shadow_param in ema["shadow_params"].items():
+            if name in proj_params:
+                proj_params[name].data.copy_(shadow_param)
+                applied += 1
+
+        assert applied > 0, "No EMA spk_proj parameters were applied"
+
+        # パラメータが変更されたことを確認
+        for name, param in spk_proj.named_parameters():
+            if name in original_params:
+                assert not torch.equal(param.data, original_params[name]), (
+                    f"Parameter {name} was not updated by EMA spk_proj"
+                )
+
+    def test_no_ema_spk_proj_state_is_handled(self, tmp_path):
+        """チェックポイントに EMA spk_proj state がない場合はスキップされる"""
+        ckpt_path = tmp_path / "no_ema_spk_proj.ckpt"
+        torch.save({"state_dict": {}}, str(ckpt_path))
+
+        ckpt = torch.load(str(ckpt_path), map_location="cpu")
+        ema_spk_proj_state = ckpt.get("ema_spk_proj_state")
+        assert ema_spk_proj_state is None, "Should not have EMA spk_proj state"

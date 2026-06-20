@@ -22,18 +22,16 @@ class VitsEncoder(nn.Module):
         super().__init__()
         self.gen = gen
 
-    def forward(self, x, x_lengths, scales, sid=None):
+    def forward(self, x, x_lengths, scales, speaker_embeddings=None):
         noise_scale = scales[0]
         length_scale = scales[1]
         noise_scale_w = scales[2]
 
         gen = self.gen
-        x, m_p, logs_p, x_mask = gen.enc_p(x, x_lengths)
-        if gen.n_speakers > 1:
-            assert sid is not None, "Missing speaker id"
-            g = gen.emb_g(sid).unsqueeze(-1)  # [b, h, 1]
-        else:
-            g = None
+        # Use _get_global_conditioning with speaker_embeddings (spk_proj MLP)
+        g = gen._get_global_conditioning(speaker_embeddings=speaker_embeddings)
+
+        x, m_p, logs_p, x_mask = gen.enc_p(x, x_lengths, g=g)
 
         if gen.use_sdp:
             logw = gen.dp(x, x_mask, g=g, reverse=True, noise_scale=noise_scale_w)
@@ -140,13 +138,17 @@ def export_encoder(args, model_g):
     )
     sequence_lengths = torch.LongTensor([sequences.size(1)])
 
-    sid: torch.LongTensor | None = None
+    speaker_embeddings: torch.Tensor | None = None
     if num_speakers > 1:
-        sid = torch.LongTensor([0])
+        speaker_embeddings = torch.zeros(1, 192, dtype=torch.float32)
 
     # noise, noise_w, length
     scales = torch.FloatTensor([0.667, 1.0, 0.8])
-    dummy_input = (sequences, sequence_lengths, scales, sid)
+    dummy_input = (sequences, sequence_lengths, scales, speaker_embeddings)
+
+    input_names = ["input", "input_lengths", "scales"]
+    if num_speakers > 1:
+        input_names.append("speaker_embeddings")
 
     output_names = [
         "z",
@@ -157,6 +159,14 @@ def export_encoder(args, model_g):
 
     onnx_path = os.fspath(args.output_dir.joinpath("encoder.onnx"))
 
+    dynamic_axes = {
+        "input": {0: "batch_size", 1: "phonemes"},
+        "input_lengths": {0: "batch_size"},
+        "output": {0: "batch_size", 2: "time"},
+    }
+    if num_speakers > 1:
+        dynamic_axes["speaker_embeddings"] = {0: "batch_size"}
+
     # Export
     torch.onnx.export(
         model=model,
@@ -164,13 +174,9 @@ def export_encoder(args, model_g):
         f=onnx_path,
         verbose=False,
         opset_version=OPSET_VERSION,
-        input_names=["input", "input_lengths", "scales", "sid"],
+        input_names=input_names,
         output_names=output_names,
-        dynamic_axes={
-            "input": {0: "batch_size", 1: "phonemes"},
-            "input_lengths": {0: "batch_size"},
-            "output": {0: "batch_size", 2: "time"},
-        },
+        dynamic_axes=dynamic_axes,
     )
     _LOGGER.info("Exported encoder to %s", onnx_path)
 

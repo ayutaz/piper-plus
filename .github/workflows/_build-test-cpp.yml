@@ -227,12 +227,17 @@ jobs:
           fi
 
       # ── Test model (integration tests only) ───────────────────
+      # cache 失敗時 (Windows で観測されたフレーキーな即時失敗等) は後段の
+      # Download test model が cache-hit != 'true' で動くので、ジョブはブロックしない。
       - name: Cache test model
         if: ${{ inputs.run-integration-tests }}
         id: cache-test-model
+        continue-on-error: true
         uses: actions/cache@v4.3.0
         with:
-          path: test/models/
+          path: |
+            test/models/multilingual-test-medium.onnx
+            test/models/multilingual-test-medium.onnx.json
           key: test-model-multilingual-medium-v1
 
       - name: Download test model

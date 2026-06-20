@@ -36,7 +36,7 @@ struct Cli {
     speaker: Option<i64>,
 
     /// 生成ノイズスケール
-    #[arg(long, default_value_t = 0.667)]
+    #[arg(long, default_value_t = 0.4)]
     noise_scale: f32,
 
     /// 音素長さスケール
@@ -44,7 +44,7 @@ struct Cli {
     length_scale: f32,
 
     /// 音素幅ノイズ
-    #[arg(long, default_value_t = 0.8)]
+    #[arg(long, default_value_t = 0.5)]
     noise_w: f32,
 
     /// 実行デバイス
@@ -174,28 +174,6 @@ fn build_synthesis_params(cli: &Cli, speaker_emb: Option<Vec<f32>>) -> Synthesis
         noise_w: cli.noise_w,
         speaker_embedding: speaker_emb,
     }
-}
-
-/// Load speaker embedding from a binary file (raw float32 values, little-endian).
-fn load_speaker_embedding(path: &std::path::Path) -> Result<Vec<f32>> {
-    let data = std::fs::read(path)
-        .with_context(|| format!("Failed to read speaker embedding: {}", path.display()))?;
-    if data.len() % 4 != 0 {
-        anyhow::bail!(
-            "Speaker embedding file size ({} bytes) is not a multiple of 4 (float32)",
-            data.len()
-        );
-    }
-    let floats: Vec<f32> = data
-        .chunks_exact(4)
-        .map(|chunk| f32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]))
-        .collect();
-    tracing::info!(
-        "Loaded speaker embedding: {} dimensions from {}",
-        floats.len(),
-        path.display()
-    );
-    Ok(floats)
 }
 
 fn main() -> Result<()> {
@@ -738,9 +716,12 @@ fn main() -> Result<()> {
             // SynthesisRequest 構築 (move semantics — clone を回避)
             let mut request = utterance.to_request(cli.noise_scale, cli.length_scale, cli.noise_w);
 
-            // CLI の speaker_id でオーバーライド
+            // CLI の speaker_id / speaker_embedding でオーバーライド
             if let Some(sid) = cli.speaker {
                 request.speaker_id = Some(sid);
+            }
+            if speaker_emb.is_some() {
+                request.speaker_embedding = speaker_emb.clone();
             }
 
             // 推論実行
@@ -787,4 +768,128 @@ fn main() -> Result<()> {
     }
 
     Ok(())
+}
+
+/// Load speaker embedding from a raw binary file (192 float32 = 768 bytes)
+/// or a NumPy .npy file (header + 192 float32).
+fn load_speaker_embedding(path: &std::path::Path) -> Result<Vec<f32>> {
+    const EXPECTED_DIM: usize = 192;
+
+    let bytes = std::fs::read(path)
+        .with_context(|| format!("Cannot open speaker embedding: {}", path.display()))?;
+
+    let embedding: Vec<f32> = if bytes.len() >= 6 && bytes[0] == 0x93 && bytes[1..6] == *b"NUMPY" {
+        // NumPy .npy format: bytes[6] = major version, bytes[7] = minor version
+        let major = bytes[6];
+        let data_offset = if major == 1 {
+            // v1.0: header_len is u16 at bytes[8..10], data starts at 10 + header_len
+            let header_len = u16::from_le_bytes([bytes[8], bytes[9]]) as usize;
+            10 + header_len
+        } else {
+            // v2.0+: header_len is u32 at bytes[8..12], data starts at 12 + header_len
+            let header_len =
+                u32::from_le_bytes([bytes[8], bytes[9], bytes[10], bytes[11]]) as usize;
+            12 + header_len
+        };
+        let num_floats = (bytes.len() - data_offset) / 4;
+        let mut emb = Vec::with_capacity(num_floats);
+        for i in 0..num_floats {
+            let offset = data_offset + i * 4;
+            let val = f32::from_le_bytes([
+                bytes[offset],
+                bytes[offset + 1],
+                bytes[offset + 2],
+                bytes[offset + 3],
+            ]);
+            emb.push(val);
+        }
+        emb
+    } else {
+        // Raw binary
+        let num_floats = bytes.len() / 4;
+        let mut emb = Vec::with_capacity(num_floats);
+        for i in 0..num_floats {
+            let offset = i * 4;
+            let val = f32::from_le_bytes([
+                bytes[offset],
+                bytes[offset + 1],
+                bytes[offset + 2],
+                bytes[offset + 3],
+            ]);
+            emb.push(val);
+        }
+        emb
+    };
+
+    if embedding.len() != EXPECTED_DIM {
+        tracing::warn!(
+            "Speaker embedding has {} values, expected {}; padding/truncating",
+            embedding.len(),
+            EXPECTED_DIM
+        );
+        let mut padded = vec![0.0f32; EXPECTED_DIM];
+        let copy_len = embedding.len().min(EXPECTED_DIM);
+        padded[..copy_len].copy_from_slice(&embedding[..copy_len]);
+        return Ok(padded);
+    }
+
+    Ok(embedding)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write;
+
+    /// Write `count` float32 values as raw little-endian bytes to a temp file,
+    /// return the file path (tempfile is kept alive via the returned handle).
+    fn write_raw_floats(values: &[f32]) -> (tempfile::NamedTempFile, std::path::PathBuf) {
+        let mut f = tempfile::NamedTempFile::new().expect("tempfile");
+        for &v in values {
+            f.write_all(&v.to_le_bytes()).expect("write");
+        }
+        f.flush().expect("flush");
+        let path = f.path().to_path_buf();
+        (f, path)
+    }
+
+    #[test]
+    fn test_load_speaker_embedding_raw_binary() {
+        let values: Vec<f32> = (0..192).map(|i| i as f32 * 0.01).collect();
+        let (_file, path) = write_raw_floats(&values);
+        let emb = load_speaker_embedding(&path).expect("load_speaker_embedding");
+        assert_eq!(emb.len(), 192);
+        for (i, &v) in emb.iter().enumerate() {
+            assert!(
+                (v - i as f32 * 0.01).abs() < 1e-5,
+                "mismatch at index {}: got {}, expected {}",
+                i,
+                v,
+                i as f32 * 0.01
+            );
+        }
+    }
+
+    #[test]
+    fn test_load_speaker_embedding_wrong_size_pads() {
+        // Write only 100 floats — should be padded/truncated to 192
+        let values: Vec<f32> = (0..100).map(|i| i as f32).collect();
+        let (_file, path) = write_raw_floats(&values);
+        let emb = load_speaker_embedding(&path).expect("load_speaker_embedding");
+        assert_eq!(emb.len(), 192, "result must be padded to 192");
+        // First 100 values should match the input
+        for (i, &v) in emb.iter().take(100).enumerate() {
+            assert!(
+                (v - i as f32).abs() < 1e-5,
+                "value mismatch at index {}: got {}, expected {}",
+                i,
+                v,
+                i as f32
+            );
+        }
+        // Remaining values should be zero-padded
+        for (i, &v) in emb.iter().enumerate().skip(100) {
+            assert_eq!(v, 0.0f32, "expected zero padding at index {}, got {}", i, v);
+        }
+    }
 }

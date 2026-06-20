@@ -48,16 +48,13 @@ def _make_utterance_with_prosody(tmp_path, speaker_id=0):
     torch.save(spectrogram, spec_path)
 
     phoneme_ids = np.array([1, 8, 5, 39, 25], dtype=np.int16)
-    prosody_features = np.array(
-        [
-            [-2, 1, 5],
-            [-1, 2, 5],
-            [0, 3, 5],
-            [1, 4, 5],
-            [2, 5, 5],
-        ],
-        dtype=np.int16,
-    )
+    prosody_features = [
+        {"a1": -2, "a2": 1, "a3": 5},
+        {"a1": -1, "a2": 2, "a3": 5},
+        {"a1": 0, "a2": 3, "a3": 5},
+        {"a1": 1, "a2": 4, "a3": 5},
+        {"a1": 2, "a2": 5, "a3": 5},
+    ]
 
     return Utterance(
         phoneme_ids=phoneme_ids,

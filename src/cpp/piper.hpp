@@ -56,9 +56,9 @@ struct PhonemizeConfig {
 
 struct SynthesisConfig {
   // VITS inference settings
-  float noiseScale = 0.667f;
+  float noiseScale = 0.4f;
   float lengthScale = 1.0f;
-  float noiseW = 0.8f;
+  float noiseW = 0.5f;
 
   // Audio settings
   int sampleRate = 22050;
@@ -68,6 +68,9 @@ struct SynthesisConfig {
   // Speaker id from 0 to numSpeakers - 1
   std::optional<SpeakerId> speakerId;
 
+  // Speaker embedding for zero-shot TTS [192 floats]
+  std::optional<std::vector<float>> speakerEmbedding;
+
   // Language id from 0 to numLanguages - 1
   std::optional<LanguageId> languageId;
 
@@ -75,9 +78,6 @@ struct SynthesisConfig {
   float sentenceSilenceSeconds = 0.2f;
   std::optional<std::map<piper::Phoneme, float>> phonemeSilenceSeconds;
 
-  // Voice cloning: speaker embedding from speaker encoder (M3-04).
-  // When non-empty, passed as the speaker_embedding ONNX input with mask=1.
-  std::vector<float> speakerEmbedding;
 };
 
 struct ModelConfig {
@@ -99,6 +99,7 @@ struct ModelSession {
   bool hasDurationOutput = false;  // Whether model outputs duration information
   bool hasProsodyInput = false;    // Whether model accepts prosody_features input
   bool hasMultiSpeaker = false;    // Whether model has sid (speaker ID) input
+  bool hasSpeakerEmbedding = false; // Whether model has speaker_embedding input (zero-shot)
   bool hasLidInput = false;        // Whether model has lid (language ID) input
   // PR #320 / Issue #426: MB-iSTFT-VITS2 + Voice Cloning exports declare
   // speaker_embedding / speaker_embedding_mask unconditionally. Feeding
@@ -116,11 +117,12 @@ struct ModelSession {
 // duplicating tensor-construction logic.
 struct InferenceInputs {
   std::vector<int64_t> phonemeIds;
-  float noiseScale  = 0.667f;
+  float noiseScale  = 0.4f;
   float lengthScale = 1.0f;
-  float noiseW      = 0.8f;
+  float noiseW      = 0.5f;
   std::optional<int64_t> speakerId;
   std::optional<int64_t> languageId;
+  std::optional<std::vector<float>> speakerEmbedding;
   // Flat [a1,a2,a3, a1,a2,a3, ...] per phoneme. Empty = no prosody.
   std::vector<int64_t> prosodyFeatures;
   // Voice cloning: when non-empty, fed as `speaker_embedding` input with

@@ -3,6 +3,7 @@ package piperplus
 import (
 	"context"
 	"fmt"
+	"log"
 	"log/slog"
 	"math"
 	"time"
@@ -20,7 +21,7 @@ type ModelCapabilities struct {
 	HasLanguageID       bool
 	HasProsody          bool
 	HasDurationOutput   bool
-	HasSpeakerEmbedding bool // model accepts speaker_embedding + speaker_embedding_mask
+	HasSpeakerEmbedding bool // model accepts speaker_embedding input
 }
 
 // OnnxEngine wraps DynamicAdvancedSession for TTS inference.
@@ -84,7 +85,6 @@ func newOnnxEngine(modelPath string, config *VoiceConfig, sessOpts *ort.SessionO
 	}
 	if caps.HasSpeakerEmbedding {
 		inputNames = append(inputNames, "speaker_embedding")
-		inputNames = append(inputNames, "speaker_embedding_mask")
 	}
 
 	// Build output names: always include audio output, conditionally add durations.
@@ -216,8 +216,17 @@ func (e *OnnxEngine) Synthesize(ctx context.Context, req *SynthesisRequest) (*Sy
 	inputs = append(inputs, scalesTensor)
 
 	// "sid": int64 [1] (if HasSpeakerID)
+	// In dual-mode models (HasSpeakerID && HasSpeakerEmbedding both true), sid is
+	// still sent (as 0 or the requested ID) so the tensor count matches the session
+	// registration. The model's ONNX forward ignores sid when speaker_embedding is
+	// non-zero. For pure zero-shot models (HasSpeakerID=false), sid is never sent.
 	if e.capabilities.HasSpeakerID {
-		sidTensor, err := ort.NewTensor(ort.NewShape(1), []int64{req.SpeakerID})
+		sidValue := req.SpeakerID
+		// When using speaker_embedding on a dual-mode model, always use sid=0.
+		if e.capabilities.HasSpeakerEmbedding && len(req.SpeakerEmbedding) > 0 {
+			sidValue = 0
+		}
+		sidTensor, err := ort.NewTensor(ort.NewShape(1), []int64{sidValue})
 		if err != nil {
 			return nil, &InferenceError{Msg: "failed to create sid tensor", Err: err}
 		}
@@ -254,7 +263,7 @@ func (e *OnnxEngine) Synthesize(ctx context.Context, req *SynthesisRequest) (*Sy
 		inputs = append(inputs, prosodyTensor)
 	}
 
-	// "speaker_embedding": float32 [1, embDim] + "speaker_embedding_mask": int64 [1, 1]
+	// "speaker_embedding": float32 [1, embDim] (if HasSpeakerEmbedding)
 	if e.capabilities.HasSpeakerEmbedding {
 		if len(req.SpeakerEmbedding) > 0 {
 			embDim := len(req.SpeakerEmbedding)
@@ -264,28 +273,15 @@ func (e *OnnxEngine) Synthesize(ctx context.Context, req *SynthesisRequest) (*Sy
 			}
 			tensors = append(tensors, embTensor)
 			inputs = append(inputs, embTensor)
-
-			maskTensor, err := ort.NewTensor(ort.NewShape(1, 1), []int64{1})
-			if err != nil {
-				return nil, &InferenceError{Msg: "failed to create speaker_embedding_mask tensor", Err: err}
-			}
-			tensors = append(tensors, maskTensor)
-			inputs = append(inputs, maskTensor)
 		} else {
-			// No embedding provided — send zero-length embedding placeholder and mask=0
-			placeholderTensor, err := ort.NewTensor(ort.NewShape(1, 1), []float32{0})
+			// No embedding provided — warn and send a zero vector of shape [1, 192] as placeholder.
+			log.Println("WARNING: Model expects 'speaker_embedding' but none was provided; using zero vector")
+			placeholderTensor, err := ort.NewTensor(ort.NewShape(1, 192), make([]float32, 192))
 			if err != nil {
 				return nil, &InferenceError{Msg: "failed to create speaker_embedding placeholder", Err: err}
 			}
 			tensors = append(tensors, placeholderTensor)
 			inputs = append(inputs, placeholderTensor)
-
-			maskTensor, err := ort.NewTensor(ort.NewShape(1, 1), []int64{0})
-			if err != nil {
-				return nil, &InferenceError{Msg: "failed to create speaker_embedding_mask tensor", Err: err}
-			}
-			tensors = append(tensors, maskTensor)
-			inputs = append(inputs, maskTensor)
 		}
 	}
 

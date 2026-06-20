@@ -95,6 +95,12 @@ def main() -> None:
     )
     parser.add_argument("-s", "--speaker", type=int, help="Id of speaker (default: 0)")
     parser.add_argument(
+        "--speaker-embedding",
+        "--speaker_embedding",
+        metavar="FILE",
+        help="Path to speaker embedding file (.npy, 192-dim float32) for zero-shot TTS",
+    )
+    parser.add_argument(
         "--length-scale", "--length_scale", type=float, help="Phoneme length"
     )
     parser.add_argument(

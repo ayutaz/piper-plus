@@ -51,7 +51,7 @@
 //	    // Synthesize text to speech.
 //	    result, err := voice.Synthesize(context.Background(), "Hello, world!",
 //	        piperplus.WithLanguage("en"),
-//	        piperplus.WithNoiseScale(0.667),
+//	        piperplus.WithNoiseScale(0.4),
 //	        piperplus.WithLengthScale(1.0),
 //	    )
 //	    if err != nil {
@@ -123,9 +123,9 @@
 //	req := &piperplus.SynthesisRequest{
 //	    PhonemeIDs:  []int64{1, 8, 5, 39, 2},
 //	    SpeakerID:   0,
-//	    NoiseScale:  0.667,
+//	    NoiseScale:  0.4,
 //	    LengthScale: 1.0,
-//	    NoiseW:      0.8,
+//	    NoiseW:      0.5,
 //	}
 //	result, err := voice.SynthesizeFromIDs(ctx, req)
 //

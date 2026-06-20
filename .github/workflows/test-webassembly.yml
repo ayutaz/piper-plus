@@ -138,7 +138,8 @@ jobs:
           test/js/test-model-manager-boundary.js \
           test/js/test-model-manager-cache.js \
           test/js/test-dictionary-cache.js \
-          test/js/test-g2p-golden.js
+          test/js/test-g2p-golden.js \
+          test/js/test-speaker-embedding.js
 
     - name: Upload coverage to Codecov (wasm)
       uses: codecov/codecov-action@v5.5.4
@@ -189,6 +190,7 @@ jobs:
           test/js/test-short-text-contract.js \
           test/js/test-speaker-encoder-parity.js \
           test/js/test-ort-session-contract.js
+
 
     - name: Check file sizes
       working-directory: src/wasm/openjtalk-web

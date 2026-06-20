@@ -199,8 +199,8 @@ piper-plus が提供する OpenAI 互換エンドポイントの一覧です。
 | `speed` | float | `1.0` | 話速 (0.0 < speed <= 4.0) |
 | `language` | string | `"ja"` | 言語コード (piper-plus 拡張) |
 | `speaker_id` | int | `0` | 話者 ID (piper-plus 拡張) |
-| `noise_scale` | float | `0.667` | ノイズスケール (piper-plus 拡張) |
-| `noise_w` | float | `0.8` | ノイズ W (piper-plus 拡張) |
+| `noise_scale` | float | `0.4` | ノイズスケール (piper-plus 拡張) |
+| `noise_w` | float | `0.5` | ノイズ W (piper-plus 拡張) |
 
 **レスポンス:** `audio/wav` (バイナリ)
 

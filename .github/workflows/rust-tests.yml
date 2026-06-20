@@ -96,6 +96,10 @@ jobs:
       # gate so the per-runtime drift assert runs in CI.
       run: cargo test -p piper-plus --features onnx --test test_ort_session_contract --no-fail-fast
 
+    - name: Run zero-shot E2E tests (onnx feature, Linux only)
+      if: runner.os == 'Linux'
+      run: cargo test --test test_zero_shot_e2e --features onnx --no-fail-fast
+
     - name: Run CLI tests
       run: cargo test -p piper-plus-cli --no-fail-fast
 

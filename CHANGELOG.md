@@ -529,6 +529,52 @@ Python ランタイムに完全な phoneme timing 出力機能を追加。VITS D
 - `tests/test_http_timing.py` (14 テスト)
 - `tests/test_config_fallback.py` に hop_size テスト 5 件追加
 
+- 全言語 Zero-Shot TTS 推論対応 — Go・WASM・Python Runtime で `speaker_embedding` テンソル入力を実装し、C++/C#/Rust に続き全 6 実装が zero-shot 推論に対応
+- クロス言語 speaker embedding テスト 92 件 — ユニットテスト 73 件 + E2E テスト 19 件（C++/C#/Rust/Go/WASM/Python 全実装を網羅）
+- Zero-Shot テスト用 ONNX モデル生成スクリプト (`scripts/generate_zero_shot_test_model.py`) — CI 用の最小 zero-shot ONNX モデルを自動生成
+- C++/C#: NumPy v2.0 .npy パーサーサポート追加（ヘッダー長 uint16→uint32）とテストケース追加
+- WASM: `speaker_embedding` 未指定時のゼロベクトルフォールバック追加
+- WASM: embedding 次元バリデーション（192 次元であることを確認）
+- WASM: ONNX モデル入力名のケイパビリティ検出追加
+- C++: JSONL `speaker_embedding` サイズバリデーションと警告ログ追加
+- C++/Go: ゼロベクトル speaker embedding フォールバック時の警告ログ追加
+- C++: `speaker_embedding` 指定時にモデルが対応入力を持たない場合の警告追加
+- Python Training: CLI 引数 `--c-dino`, `--kl-annealing-epochs`, `--max-spec-length`, `--no-compile` を追加
+- Python Training: ExponentialLR スケジューラーサポート追加（`--lr-scheduler exponential`）
+- Python Inference: `warmup_onnx_session` で `speaker_embedding` サポートを追加
+- CI: `go-ci` を `ci-required` ゲートに追加
+- CI: `test_short_text_mitigation.py` / `.js` をワークフローに追加
+
+### Fixed
+- Go `.npy` ファイルパーシング修正 — speaker embedding の NumPy v1/v2 フォーマット読み込みが正常に動作するよう修正
+- Rust JSONL `speaker_embedding` 上書きバグ修正 — JSONL 入力時に speaker_embedding フィールドが意図せず上書きされる問題を解消
+- C++ `piper_plus_c_api` の `std::optional` API 誤用を修正
+- 全言語で stale な `speaker_embedding_mask` テンソル入力を削除
+- C#/Rust/Go: SpeakerEncoder メルスペクトログラム形状を `[1,80,T]` → `[1,T,80]`（CAM++ 互換）に修正
+- C#/Rust/Go: SpeakerEncoder FFT ウィンドウを 512 → 400（Kaldi 25ms@16kHz）に修正
+- C#/Rust/Go: SpeakerEncoder の CMVN（バンド単位平均減算）未適用を修正
+- C#/Rust/Go: SpeakerEncoder のハードコードされた ONNX 入力名を動的ルックアップに修正
+- C++/C#/Rust: NumPy v2.0 .npy パーサーの uint16 → uint32 ヘッダー長修正
+- 全言語: `noise_scale` デフォルトを 0.667/0.8 → 0.4/0.5 に更新（zero-shot 最適化済み値）
+- Go: config キー名の不一致 `noise_w` → `noise_scale_w` を修正
+- Go: `speaker_embedding` 指定時の dual-mode sid 制御を修正
+- C#: embedding 未指定時の dual-mode sid フォールバックを修正
+- C#: `PiperConfig InferenceConfig` の stale なデフォルト値を修正
+- Python Training: チェックポイントリジューム後の EMA CPU/GPU デバイスミスマッチを修正
+- Python Training: シングル GPU リジューム時に EMA state が破棄される問題を修正
+- Python Training: FP16 学習時の DINO center dtype ミスマッチを修正
+- Python Training: SCL dtype ミスマッチ（CamPP FP32 vs FP16）を修正
+- Python Training: `TextEncoder` の speaker conditioning が `x_mask` なしで適用される問題を修正
+- Python Training: `--lr-warmup-epochs`, `--lr-min`, `--spk-emb-noise-sigma` CLI 引数が有効化されるよう修正
+- Python Training: `val_dataloader` のワーカー数を最大 2 にキャップ
+- Python Inference: 廃止された `--reference-audio` コードパスを削除
+- Python Inference: `export_onnx.py` のシングルスピーカー+prosody での positional arg バインディングを修正
+- Python: `speaker_embedding_mask` の残存参照を export/tests から削除
+- C++: `--output-dir` CLI オプションのダブルダッシュ欠落を修正
+- WASM: `prosody_features` のゲーティングを ONNX モデル入力名で条件分岐するよう修正
+- Rust: E2E テストから `#[ignore]` を削除（モデルファイルがリポジトリにトラッキング済み）
+- Golden test フィクスチャを `n_fft=400` で再生成
+
 ### Removed
 
 - 死んだコード `src/python_run/piper/espeak_phonemizer.py` を削除 (piper-plus は推論時に espeak-ng に依存しない)
@@ -539,6 +585,9 @@ Python ランタイムに完全な phoneme timing 出力機能を追加。VITS D
 
 - HTTP server を Flask から **FastAPI に移行**、`?streaming=true` で `StreamingResponse` による真のチャンク配信に対応 (#361)
 - Go Docker — Debian 化 + ORT 修正 + OpenJTalk 日本語 G2P + `serve` サブコマンド対応 (#332, #334)
+- README の「30秒で試す」を OS 別ワンライナー化 + CLI バイナリ選択ガイド追加 (#360)
+- Rust `piper-python` バインディングを非推奨の `synthesize_text()` から `synthesize_with_params()` に移行
+- CI ワークフローを更新し、全 speaker embedding テストを実行するよう変更
 
 ### Fixed
 

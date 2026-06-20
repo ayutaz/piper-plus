@@ -92,10 +92,16 @@ function createMockInstance(overrides = {}) {
         output: { data: outputAudio, dims: [1, outputAudio.length] },
       })),
     release: () => {},
+    inputNames: overrides.inputNames || ['input', 'input_lengths', 'scales'],
   };
 
   instance._ort = globalThis.ort;
   instance._initialized = true;
+
+  // Set capability flags (mirrors _init() logic)
+  const inputNames = instance._session.inputNames || [];
+  instance._hasSpeakerEmbedding = inputNames.includes('speaker_embedding');
+  instance._hasProsodyFeatures = inputNames.includes('prosody_features');
 
   return instance;
 }
@@ -904,6 +910,7 @@ describe("synthesize() short-text mitigation integration", { skip }, () => {
         phoneme_id_map: { _: [0] },
         prosody_id_map: { a1: 0, a2: 1, a3: 2 },
       },
+      inputNames: ['input', 'input_lengths', 'scales', 'prosody_features'],
       encode: () => ({
         phonemeIds: [1, ...new Array(bodySize).fill(4), 2],
         prosodyFeatures: prosody,

@@ -1,28 +1,27 @@
 using System;
 using System.IO;
-using System.Numerics;
 using Microsoft.ML.OnnxRuntime;
 
 namespace PiperPlus.Core.Inference;
 
 /// <summary>
-/// Speaker encoder for voice cloning — loads an ECAPA-TDNN ONNX model
+/// Speaker encoder for voice cloning — loads a CAM++ ONNX model
 /// and extracts speaker embedding vectors from reference audio.
 /// </summary>
 /// <remarks>
 /// <para>
 /// Mel spectrogram parameters are unified across all runtimes:
-/// sr=16000, n_fft=512, hop=160, n_mels=80, fmin=20, fmax=7600.
+/// sr=16000, n_fft=400 (Kaldi 25ms @ 16kHz), hop=160, n_mels=80, fmin=20, fmax=7600.
 /// </para>
 /// <para>
-/// The extracted embedding (typically 256-d float32) can be passed to
+/// The extracted embedding (192-d float32) can be passed to
 /// <see cref="SynthesisInput.SpeakerEmbedding"/> for voice cloning synthesis.
 /// </para>
 /// </remarks>
 public sealed class SpeakerEncoder : IDisposable
 {
     private const int MelSampleRate = 16000;
-    private const int MelNFft = 512;
+    private const int MelNFft = 400; // Kaldi frame_length=25ms at 16kHz = 400 samples
     private const int MelHopLength = 160;
     private const int MelNMels = 80;
     private const float MelFmin = 20f;
@@ -59,7 +58,7 @@ public sealed class SpeakerEncoder : IDisposable
     /// </summary>
     /// <param name="audioSamples">Mono float32 PCM samples.</param>
     /// <param name="sampleRate">Sample rate of the input audio.</param>
-    /// <returns>Speaker embedding vector (typically 256-d float32).</returns>
+    /// <returns>Speaker embedding vector (192-d float32).</returns>
     public float[] Encode(float[] audioSamples, int sampleRate)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -75,7 +74,7 @@ public sealed class SpeakerEncoder : IDisposable
             ? ResampleLinear(audioSamples, sampleRate, MelSampleRate)
             : audioSamples;
 
-        // Compute mel spectrogram
+        // Compute mel spectrogram: frame-major layout [nFrames, nMels]
         float[] mel = ComputeMelSpectrogram(resampled);
         int nFrames = mel.Length / MelNMels;
 
@@ -84,11 +83,13 @@ public sealed class SpeakerEncoder : IDisposable
             throw new ArgumentException("Audio is too short for mel spectrogram computation.", nameof(audioSamples));
         }
 
-        // Create input tensor: [1, n_mels, n_frames]
+        // Create input tensor: [1, n_frames, n_mels] — CAM++ expects frame-major (time, mel)
         using var melTensor = OrtValue.CreateTensorValueFromMemory(
-            mel, [1, MelNMels, nFrames]);
+            mel, [1, nFrames, MelNMels]);
 
-        var inputNames = new List<string> { "input" };
+        // Dynamically read the model's first input name (CAM++ uses "feats", not "input")
+        string firstInputName = _session.InputMetadata.Keys.First();
+        var inputNames = new List<string> { firstInputName };
         var inputValues = new List<OrtValue> { melTensor };
 
         string[] outputNames = _session.OutputMetadata.Keys.ToArray();
@@ -274,7 +275,10 @@ public sealed class SpeakerEncoder : IDisposable
             : 0;
 
         int fftBins = (MelNFft / 2) + 1;
-        float[] melSpec = new float[MelNMels * nFrames];
+
+        // Frame-major layout: melSpec[frameIdx * MelNMels + melIdx]
+        // CAM++ expects input shape [batch, T, 80] (time-first)
+        float[] melSpec = new float[nFrames * MelNMels];
 
         for (int frameIdx = 0; frameIdx < nFrames; frameIdx++)
         {
@@ -299,7 +303,7 @@ public sealed class SpeakerEncoder : IDisposable
                 powerSpec[k] = (real * real) + (imag * imag);
             }
 
-            // Apply mel filterbank
+            // Apply mel filterbank — store in frame-major order
             for (int melIdx = 0; melIdx < MelNMels; melIdx++)
             {
                 float energy = 0;
@@ -308,7 +312,26 @@ public sealed class SpeakerEncoder : IDisposable
                     energy += melFilters[(melIdx * fftBins) + k] * powerSpec[k];
                 }
 
-                melSpec[(melIdx * nFrames) + frameIdx] = MathF.Log(MathF.Max(energy, 1e-10f));
+                melSpec[(frameIdx * MelNMels) + melIdx] = MathF.Log(MathF.Max(energy, 1e-10f));
+            }
+        }
+
+        // CMVN: subtract per-band mean across time (mean normalisation)
+        if (nFrames > 0)
+        {
+            for (int melIdx = 0; melIdx < MelNMels; melIdx++)
+            {
+                float sum = 0f;
+                for (int frameIdx = 0; frameIdx < nFrames; frameIdx++)
+                {
+                    sum += melSpec[(frameIdx * MelNMels) + melIdx];
+                }
+
+                float mean = sum / nFrames;
+                for (int frameIdx = 0; frameIdx < nFrames; frameIdx++)
+                {
+                    melSpec[(frameIdx * MelNMels) + melIdx] -= mean;
+                }
             }
         }
 

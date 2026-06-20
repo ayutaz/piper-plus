@@ -67,6 +67,12 @@ piper-plus ドキュメント。利用ガイド・各ランタイム連携・仕
 
 - [Multilingual testing](guides/testing/multilingual-testing.md) — CI/CD テストカバレッジ
 
+### Integrations
+- [Home Assistant](guides/home-assistant.md) - Home Assistant integration guide
+- [Open WebUI](guides/open-webui-integration.md) - Open WebUI integration
+- [LLM Ecosystem](guides/llm-ecosystem.md) - LLM / Ollama 連携ガイド
+- [WASM Bundler](guides/wasm-bundler-guide.md) - WebAssembly bundling guide
+
 ## API Reference
 
 - [Phoneme mapping](api-reference/phoneme-mapping.md) — 全言語の音素 ID 参照
@@ -90,6 +96,15 @@ piper-plus ドキュメント。利用ガイド・各ランタイム連携・仕
 
 - [Research INDEX](research/README.md) — 先行研究・最新論文を用いた改善調査スナップショット
 - [改善調査 統合レポート 2026-06-15](research/improvement-survey-2026-06-15.md) — VITS2/MB-iSTFT を超える/取り込める先行研究の統合スナップショット (5 軸 31 アクション、 deep-dive companion 付き)
+
+## Spec / Contracts
+- [Model Resolution](spec/model-resolution.md) - Model file resolution rules
+- [ORT Version Matrix](spec/ort-versions.md) - ONNX Runtime version compatibility
+
+## Design Documents
+- [Zero-Shot Quality Improvement Plan](design/zero-shot-quality-improvement-plan.md) - Improvement roadmap for zero-shot speaker similarity
+- [Zero-Shot Speaker Similarity Research](design/zero-shot-speaker-similarity-research.md) - Research report: techniques and findings
+- [v9 Training Handoff](design/v9-training-handoff.md) - v9 re-training context, fixed bugs, and commands
 
 ## Development
 

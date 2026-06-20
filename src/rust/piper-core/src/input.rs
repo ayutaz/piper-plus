@@ -14,6 +14,9 @@ pub struct JsonlUtterance {
     pub speaker_id: Option<i64>,
 
     #[serde(default)]
+    pub speaker_embedding: Option<Vec<f32>>,
+
+    #[serde(default)]
     pub language_id: Option<i64>,
 
     #[serde(default)]
@@ -53,11 +56,11 @@ impl JsonlUtterance {
             phoneme_ids: self.phoneme_ids,
             prosody_features,
             speaker_id: self.speaker_id,
+            speaker_embedding: self.speaker_embedding,
             language_id: self.language_id,
             noise_scale,
             length_scale,
             noise_w,
-            speaker_embedding: None,
         }
     }
 }
@@ -133,6 +136,20 @@ mod tests {
     }
 
     #[test]
+    fn test_speaker_embedding_preserved_in_to_request() {
+        let line = r#"{"phoneme_ids": [1, 2, 3], "speaker_embedding": [0.1, 0.2, 0.3]}"#;
+        let utt = JsonlUtterance::parse(line).unwrap();
+        let req = utt.to_request(0.667, 1.0, 0.8);
+        let emb = req
+            .speaker_embedding
+            .expect("speaker_embedding must not be None");
+        assert_eq!(emb.len(), 3);
+        assert!((emb[0] - 0.1_f32).abs() < 1e-6);
+        assert!((emb[1] - 0.2_f32).abs() < 1e-6);
+        assert!((emb[2] - 0.3_f32).abs() < 1e-6);
+    }
+
+    #[test]
     fn test_jsonl_reader() {
         let input = "{ \"phoneme_ids\": [1] }\n{ \"phoneme_ids\": [2, 3] }\n";
         let reader = JsonlReader::new(input.as_bytes());
@@ -140,5 +157,26 @@ mod tests {
         assert_eq!(results.len(), 2);
         assert_eq!(results[0].as_ref().unwrap().phoneme_ids, vec![1]);
         assert_eq!(results[1].as_ref().unwrap().phoneme_ids, vec![2, 3]);
+    }
+
+    #[test]
+    fn test_jsonl_speaker_embedding_deserialization() {
+        let line =
+            r#"{"text": "hello", "phoneme_ids": [1, 2, 3], "speaker_embedding": [0.1, 0.2, 0.3]}"#;
+        let utt = JsonlUtterance::parse(line).unwrap();
+        let emb = utt
+            .speaker_embedding
+            .expect("speaker_embedding must not be None");
+        assert_eq!(emb.len(), 3);
+        assert!((emb[0] - 0.1_f32).abs() < 1e-6);
+        assert!((emb[1] - 0.2_f32).abs() < 1e-6);
+        assert!((emb[2] - 0.3_f32).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_jsonl_no_speaker_embedding_defaults_to_none() {
+        let line = r#"{"phoneme_ids": [1, 2, 3]}"#;
+        let utt = JsonlUtterance::parse(line).unwrap();
+        assert!(utt.speaker_embedding.is_none());
     }
 }

@@ -400,6 +400,14 @@ class TestSynthesizeWithTimingParameters:
         )
         voice.phonemize = MagicMock(return_value=[["a"]])
 
+        # Add 'sid' to the mock model's input names so the speaker_id path is taken.
+        # Zero-shot multi-speaker models expose 'speaker_embedding' instead of 'sid',
+        # so the runtime now requires the sid input node to exist before forwarding it.
+        sid_mock = MagicMock()
+        sid_mock.name = "sid"
+        existing_inputs = voice.session.get_inputs.return_value
+        voice.session.get_inputs.return_value = [*existing_inputs, sid_mock]
+
         _, _ = voice.synthesize_with_timing("a", speaker_id=2)
 
         call_args = voice.session.run.call_args

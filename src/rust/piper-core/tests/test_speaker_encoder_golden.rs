@@ -20,7 +20,7 @@ use serde::Deserialize;
 // ---------------------------------------------------------------------------
 
 const MEL_SAMPLE_RATE: u32 = 16000;
-const MEL_N_FFT: usize = 512;
+const MEL_N_FFT: usize = 400; // Kaldi frame_length=25ms at 16kHz = 400 samples
 const MEL_HOP_LENGTH: usize = 160;
 const MEL_N_MELS: usize = 80;
 const MEL_FMIN: f32 = 20.0;
@@ -101,7 +101,9 @@ fn compute_mel_spectrogram(samples: &[f32]) -> Vec<f32> {
     };
 
     let fft_bins = MEL_N_FFT / 2 + 1;
-    let mut mel_spec = vec![0.0f32; MEL_N_MELS * n_frames];
+    // Frame-major layout: mel_spec[frame_idx * MEL_N_MELS + mel_idx]
+    // Matches CAM++ expected input [batch, T, 80] and production speaker_encoder.rs
+    let mut mel_spec = vec![0.0f32; n_frames * MEL_N_MELS];
 
     for frame_idx in 0..n_frames {
         let start = frame_idx * MEL_HOP_LENGTH;
@@ -129,7 +131,20 @@ fn compute_mel_spectrogram(samples: &[f32]) -> Vec<f32> {
             for k in 0..fft_bins {
                 energy += mel_filters[mel_idx * fft_bins + k] * power_spec[k];
             }
-            mel_spec[mel_idx * n_frames + frame_idx] = energy.max(1e-10).ln();
+            mel_spec[frame_idx * MEL_N_MELS + mel_idx] = energy.max(1e-10).ln();
+        }
+    }
+
+    // CMVN: subtract per-band mean across all frames
+    if n_frames > 0 {
+        for mel_idx in 0..MEL_N_MELS {
+            let mean: f32 = (0..n_frames)
+                .map(|f| mel_spec[f * MEL_N_MELS + mel_idx])
+                .sum::<f32>()
+                / n_frames as f32;
+            for frame_idx in 0..n_frames {
+                mel_spec[frame_idx * MEL_N_MELS + mel_idx] -= mean;
+            }
         }
     }
 
@@ -444,16 +459,21 @@ fn golden_sine_440hz_mel_corners() {
         );
     };
 
+    // Frame-major layout: mel[frame_idx * MEL_N_MELS + mel_idx]
+    // top_left  = frame 0,     mel 0
+    // top_right = last frame,  mel 0
+    // bottom_left  = frame 0,  last mel
+    // bottom_right = last frame, last mel
     check("top_left", mel[0], corners.top_left);
-    check("top_right", mel[n_frames - 1], corners.top_right);
     check(
-        "bottom_left",
-        mel[(MEL_N_MELS - 1) * n_frames],
-        corners.bottom_left,
+        "top_right",
+        mel[(n_frames - 1) * MEL_N_MELS],
+        corners.top_right,
     );
+    check("bottom_left", mel[MEL_N_MELS - 1], corners.bottom_left);
     check(
         "bottom_right",
-        mel[MEL_N_MELS * n_frames - 1],
+        mel[n_frames * MEL_N_MELS - 1],
         corners.bottom_right,
     );
 }
@@ -494,7 +514,7 @@ fn golden_sine_1000hz_mel_corners() {
     let mel = compute_mel_spectrogram(&audio);
     let n_frames = mel.len() / MEL_N_MELS;
 
-    let tol = 0.02;
+    let tol = 0.03; // 3% tolerance for cross-platform (ARM64 macOS)
     let check = |name: &str, actual: f32, expected: f64| {
         let rel = if expected.abs() > 1e-10 {
             ((actual as f64 - expected) / expected).abs()
@@ -507,16 +527,17 @@ fn golden_sine_1000hz_mel_corners() {
         );
     };
 
+    // Frame-major layout
     check("top_left", mel[0], corners.top_left);
-    check("top_right", mel[n_frames - 1], corners.top_right);
     check(
-        "bottom_left",
-        mel[(MEL_N_MELS - 1) * n_frames],
-        corners.bottom_left,
+        "top_right",
+        mel[(n_frames - 1) * MEL_N_MELS],
+        corners.top_right,
     );
+    check("bottom_left", mel[MEL_N_MELS - 1], corners.bottom_left);
     check(
         "bottom_right",
-        mel[MEL_N_MELS * n_frames - 1],
+        mel[n_frames * MEL_N_MELS - 1],
         corners.bottom_right,
     );
 }
@@ -570,16 +591,17 @@ fn golden_multitone_mel_corners() {
         );
     };
 
+    // Frame-major layout
     check("top_left", mel[0], corners.top_left);
-    check("top_right", mel[n_frames - 1], corners.top_right);
     check(
-        "bottom_left",
-        mel[(MEL_N_MELS - 1) * n_frames],
-        corners.bottom_left,
+        "top_right",
+        mel[(n_frames - 1) * MEL_N_MELS],
+        corners.top_right,
     );
+    check("bottom_left", mel[MEL_N_MELS - 1], corners.bottom_left);
     check(
         "bottom_right",
-        mel[MEL_N_MELS * n_frames - 1],
+        mel[n_frames * MEL_N_MELS - 1],
         corners.bottom_right,
     );
 }

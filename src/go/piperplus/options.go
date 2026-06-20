@@ -25,9 +25,9 @@ type SynthesisRequest struct {
 	PhonemeIDs       []int64            // phoneme ID sequence (required)
 	SpeakerID        int64              // speaker ID (default 0)
 	LanguageID       int64              // language ID (default 0)
-	NoiseScale       float32            // generation noise (default 0.667)
+	NoiseScale       float32            // generation noise (default 0.4)
 	LengthScale      float32            // speech rate (default 1.0)
-	NoiseW           float32            // duration predictor noise (default 0.8)
+	NoiseW           float32            // duration predictor noise (default 0.5)
 	ProsodyFeatures  [][3]int64         // A1/A2/A3 per phoneme (nil = zero-fill)
 	PhonemeSilence   map[string]float64 // phoneme -> seconds of silence to insert after it (nil = disabled)
 	SpeakerEmbedding []float32          // speaker embedding from encoder (nil = use SpeakerID)
@@ -40,13 +40,14 @@ type SynthesisRequest struct {
 
 // SynthesisOptions holds resolved parameters for text-level synthesis.
 type SynthesisOptions struct {
-	Language        string
-	SpeakerID       int64
-	NoiseScale      float32
-	LengthScale     float32
-	NoiseW          float32
-	SentenceSilence float64            // seconds of silence between sentences (default 0.2)
-	PhonemeSilence  map[string]float64 // phoneme -> seconds of silence to insert after it (nil = disabled)
+	Language         string
+	SpeakerID        int64
+	NoiseScale       float32
+	LengthScale      float32
+	NoiseW           float32
+	SentenceSilence  float64            // seconds of silence between sentences (default 0.2)
+	PhonemeSilence   map[string]float64 // phoneme -> seconds of silence to insert after it (nil = disabled)
+	SpeakerEmbedding []float32          // pre-computed speaker embedding (nil = use SpeakerID)
 }
 
 // SynthesisOption is a functional option applied to SynthesisOptions.
@@ -116,19 +117,20 @@ func WithPhonemeSilence(m map[string]float64) SynthesisOption {
 	return func(o *SynthesisOptions) { o.PhonemeSilence = m }
 }
 
-// SpeakerEmbedding is reserved for future use. SynthesisOptions does not yet
-// expose speaker_embedding directly (callers wishing to use voice cloning
-// pre-compute the embedding and pass a SynthesisRequest); however, Validate
-// remains the single canonical entry point for cross-field invariants so that
-// callers can exercise it uniformly.
+// WithSpeakerEmbedding sets a pre-computed speaker embedding for zero-shot
+// voice cloning. When set, it takes priority over SpeakerID.
+func WithSpeakerEmbedding(emb []float32) SynthesisOption {
+	return func(o *SynthesisOptions) { o.SpeakerEmbedding = emb }
+}
 
 // Validate checks SynthesisOptions for cross-field invariants. Currently the
 // only invariant enforced at this level is that SpeakerID is non-negative
 // (negative values are silently coerced via WithSpeakerID, so this is a
 // defense-in-depth check for callers constructing the struct directly). The
 // speaker_id × speaker_embedding mutual-exclusion check lives on
-// SynthesisRequest.Validate, since SynthesisOptions does not carry an
-// embedding field.
+// SynthesisRequest.Validate, since SynthesisOptions also exposes an embedding
+// field but the canonical mutual-exclusion gate is on the engine-facing
+// SynthesisRequest.
 func (o *SynthesisOptions) Validate() error {
 	if o == nil {
 		return nil
@@ -210,9 +212,9 @@ func WithPhonemeSilenceLoad(m map[string]float64) LoadOption {
 // defaultSynthesisOptions returns SynthesisOptions with sensible defaults.
 func defaultSynthesisOptions() SynthesisOptions {
 	return SynthesisOptions{
-		NoiseScale:      0.667,
+		NoiseScale:      0.4,
 		LengthScale:     1.0,
-		NoiseW:          0.8,
+		NoiseW:          0.5,
 		SentenceSilence: 0.2,
 	}
 }
@@ -232,11 +234,12 @@ func applySynthesisOptions(opts []SynthesisOption) SynthesisOptions {
 func NewSynthesisRequest(phonemeIDs []int64, opts ...SynthesisOption) *SynthesisRequest {
 	so := applySynthesisOptions(opts)
 	return &SynthesisRequest{
-		PhonemeIDs:     phonemeIDs,
-		SpeakerID:      so.SpeakerID,
-		NoiseScale:     so.NoiseScale,
-		LengthScale:    so.LengthScale,
-		NoiseW:         so.NoiseW,
-		PhonemeSilence: so.PhonemeSilence,
+		PhonemeIDs:       phonemeIDs,
+		SpeakerID:        so.SpeakerID,
+		NoiseScale:       so.NoiseScale,
+		LengthScale:      so.LengthScale,
+		NoiseW:           so.NoiseW,
+		PhonemeSilence:   so.PhonemeSilence,
+		SpeakerEmbedding: so.SpeakerEmbedding,
 	}
 }

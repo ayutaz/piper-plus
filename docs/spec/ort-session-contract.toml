@@ -32,9 +32,9 @@ bos_token = 1
 eos_token = 2
 dummy_phoneme = 8
 default_runs = 2
-noise_scale = 0.667
+noise_scale = 0.4
 length_scale = 1.0
-noise_w = 0.8
+noise_w = 0.5
 
 [warmup.optional_inputs]
 # These inputs are added only when the model requires them

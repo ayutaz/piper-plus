@@ -65,6 +65,7 @@ set(TEST_SOURCES
     test_g2p_parallelism.cpp
     test_speaker_encoder_golden.cpp
     test_voice_cloning_cli.cpp
+    test_speaker_embedding.cpp
 )
 
 # Add Unix-only tests (require open_jtalk binary or Unix APIs)
@@ -1334,6 +1335,88 @@ add_test(NAME test_c_api_concurrent_ja COMMAND test_c_api_concurrent_ja)
 
 # Concurrent threads + JA G2P + 3 sub-tests can take a while in Debug.
 set_tests_properties(test_c_api_concurrent_ja PROPERTIES
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    TIMEOUT 300
+)
+
+# ---- test_zero_shot_e2e: Zero-Shot TTS end-to-end integration tests ----
+# Requires test/models/zero-shot-test.onnx and test/models/test_speaker.npy.
+# Auto-skips when the test model files are absent.
+# Uses the same link configuration as test_c_api_integration.
+add_executable(test_zero_shot_e2e
+    test_zero_shot_e2e.cpp
+    ../piper_plus_c_api.cpp
+)
+
+target_link_libraries(test_zero_shot_e2e PRIVATE
+    piper_common
+    gtest
+    gtest_main
+)
+
+target_compile_definitions(test_zero_shot_e2e PRIVATE
+    PIPER_PLUS_BUILDING_DLL
+    _PIPER_VERSION=${piper_version}
+)
+
+target_include_directories(test_zero_shot_e2e PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+    ${CMAKE_BINARY_DIR}/fi/include
+    ${CMAKE_BINARY_DIR}/si/include
+    ${ORT_INCLUDE_DIR}
+    ${CMAKE_BINARY_DIR}/oj/include
+    ${CMAKE_BINARY_DIR}/oj/include/openjtalk
+)
+
+target_link_directories(test_zero_shot_e2e PRIVATE
+    ${CMAKE_BINARY_DIR}/fi/lib
+    ${CMAKE_BINARY_DIR}/si/lib
+    ${ORT_LIB_DIR}
+)
+
+if(WIN32)
+    target_link_libraries(test_zero_shot_e2e PRIVATE
+        optimized ${CMAKE_BINARY_DIR}/fi/lib/fmt.lib
+        debug ${CMAKE_BINARY_DIR}/fi/lib/fmtd.lib
+        optimized ${CMAKE_BINARY_DIR}/si/lib/spdlog.lib
+        debug ${CMAKE_BINARY_DIR}/si/lib/spdlogd.lib
+        ${ORT_LIB_DIR}/onnxruntime.lib
+    )
+    target_link_libraries(test_zero_shot_e2e PRIVATE ${CMAKE_BINARY_DIR}/oj/lib/openjtalk.lib)
+else()
+    target_link_libraries(test_zero_shot_e2e PRIVATE
+        fmt
+        spdlog
+        onnxruntime
+    )
+    target_link_libraries(test_zero_shot_e2e PRIVATE ${CMAKE_BINARY_DIR}/oj/lib/libopenjtalk.a)
+endif()
+
+if(TARGET hts_engine_stub)
+    target_link_libraries(test_zero_shot_e2e PRIVATE hts_engine_stub)
+endif()
+
+if(UNIX)
+    find_package(Threads REQUIRED)
+    target_link_libraries(test_zero_shot_e2e PRIVATE Threads::Threads)
+    if(NOT APPLE)
+        target_link_libraries(test_zero_shot_e2e PRIVATE dl)
+    endif()
+endif()
+
+if(TARGET fmt_external)
+    add_dependencies(test_zero_shot_e2e fmt_external)
+endif()
+if(TARGET spdlog_external)
+    add_dependencies(test_zero_shot_e2e spdlog_external)
+endif()
+if(TARGET openjtalk_external)
+    add_dependencies(test_zero_shot_e2e openjtalk_external)
+endif()
+
+add_test(NAME test_zero_shot_e2e COMMAND test_zero_shot_e2e)
+
+set_tests_properties(test_zero_shot_e2e PROPERTIES
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
     TIMEOUT 300
 )

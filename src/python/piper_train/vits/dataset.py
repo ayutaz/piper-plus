@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 import random
 from collections import Counter, defaultdict
 from collections.abc import Iterable, Sequence
@@ -35,9 +36,8 @@ class Utterance:
     speaker_id: int | None = None
     language_id: int | None = None
     text: str | None = None
-    prosody_features: np.ndarray | None = (
-        None  # dtype=int16, shape=(num_phonemes, 3) for A1/A2/A3
-    )
+    prosody_features: list[dict | None] | None = None  # A1/A2/A3 per phoneme
+    speaker_embedding_path: Path | None = None
 
 
 @dataclass
@@ -49,6 +49,7 @@ class UtteranceTensors:
     language_id: LongTensor | None = None
     text: str | None = None
     prosody_features: LongTensor | None = None  # Shape: (num_phonemes, 3) for A1/A2/A3
+    speaker_embedding: FloatTensor | None = None
 
     @property
     def spec_length(self) -> int:
@@ -66,6 +67,7 @@ class Batch:
     speaker_ids: LongTensor | None = None
     language_ids: LongTensor | None = None
     prosody_features: LongTensor | None = None  # Shape: (batch, max_phonemes, 3)
+    speaker_embeddings: FloatTensor | None = None
 
 
 class PiperDataset(Dataset):
@@ -84,6 +86,8 @@ class PiperDataset(Dataset):
         self,
         dataset_paths: list[str | Path],
         max_phoneme_ids: int | None = None,
+        max_spec_length: int | None = None,
+        filter_length: int = 1024,
         validate_cache: bool = False,
     ):
         self.utterances: list[Utterance] = []
@@ -92,7 +96,12 @@ class PiperDataset(Dataset):
             dataset_path = Path(dataset_path)
             _LOGGER.debug("Loading dataset: %s", dataset_path)
             self.utterances.extend(
-                PiperDataset.load_dataset(dataset_path, max_phoneme_ids=max_phoneme_ids)
+                PiperDataset.load_dataset(
+                    dataset_path,
+                    max_phoneme_ids=max_phoneme_ids,
+                    max_spec_length=max_spec_length,
+                    filter_length=filter_length,
+                )
             )
 
         if validate_cache:
@@ -119,6 +128,7 @@ class PiperDataset(Dataset):
         audio_norm = _load_tensor(utt.audio_norm_path)
         if audio_norm.dim() == 1:
             audio_norm = audio_norm.unsqueeze(0)
+
         spectrogram = _load_tensor(utt.audio_spec_path)
         # Convert float16 spec to float32 (new caches are saved as float16 to save disk space)
         if spectrogram.dtype == torch.float16:
@@ -129,8 +139,16 @@ class PiperDataset(Dataset):
         if utt.prosody_features is not None:
             prosody_tensor = self._prosody_features_to_tensor(utt.prosody_features)
 
+        # Load speaker embedding from .npy file if available
+        speaker_embedding_tensor = None
+        if utt.speaker_embedding_path is not None:
+            spk_emb = np.load(utt.speaker_embedding_path, allow_pickle=False).astype(
+                np.float32
+            )
+            speaker_embedding_tensor = torch.from_numpy(spk_emb)
+
         return UtteranceTensors(
-            phoneme_ids=torch.from_numpy(utt.phoneme_ids).long(),
+            phoneme_ids=LongTensor(utt.phoneme_ids),
             audio_norm=audio_norm,
             spectrogram=spectrogram,
             speaker_id=(
@@ -141,6 +159,7 @@ class PiperDataset(Dataset):
             ),
             text=utt.text,
             prosody_features=prosody_tensor,
+            speaker_embedding=speaker_embedding_tensor,
         )
 
     @staticmethod
@@ -156,14 +175,12 @@ class PiperDataset(Dataset):
 
     @staticmethod
     def _prosody_features_to_tensor(
-        prosody_features: np.ndarray,
+        prosody_features: list[dict | None],
     ) -> LongTensor:
-        """Convert prosody features (numpy array) to tensor.
+        """Convert prosody features (list of dicts) to tensor.
 
         Args:
-            prosody_features: numpy int16 array of shape (num_phonemes, 3)
-                where columns are A1, A2, A3 values.
-                Special tokens are encoded as (0, 0, 0).
+            prosody_features: List of {"a1": int, "a2": int, "a3": int} or None
 
         Returns:
             LongTensor of shape (num_phonemes, 3) where:
@@ -172,14 +189,35 @@ class PiperDataset(Dataset):
             - [:, 2] = A3 values (total morae in phrase)
             - Special tokens (None) are encoded as (0, 0, 0)
         """
-        return torch.from_numpy(prosody_features).long()
+        result = []
+        for feat in prosody_features:
+            if feat is not None:
+                result.append([feat["a1"], feat["a2"], feat["a3"]])
+            else:
+                # Special tokens (^, $, ?, _, #, [, ]) have no prosody info
+                result.append([0, 0, 0])
+        return LongTensor(result)
 
     @staticmethod
     def load_dataset(
         dataset_path: Path,
         max_phoneme_ids: int | None = None,
+        max_spec_length: int | None = None,
+        filter_length: int = 1024,
     ) -> Iterable[Utterance]:
-        num_skipped = 0
+        num_skipped_phoneme = 0
+        num_skipped_spec = 0
+
+        # Precompute spec channel count for file-size-based length estimation
+        # spec shape: [filter_length // 2 + 1, T], stored as float32 (4 bytes)
+        spec_channels = filter_length // 2 + 1
+        bytes_per_frame = spec_channels * 4
+        # NumPy .npy files have a small header (~128 bytes).
+        # PyTorch .pt files have a ~2KB header.
+        # Using the smaller value (128) is conservative — it overestimates
+        # spec_length, so borderline-long utterances are correctly filtered out.
+        spec_header_bytes_npy = 128
+        spec_header_bytes_pt = 2048
 
         dataset_dir = dataset_path.parent
 
@@ -191,12 +229,30 @@ class PiperDataset(Dataset):
 
                 try:
                     utt = PiperDataset.load_utterance(line, dataset_dir)
-                    if (max_phoneme_ids is None) or (
-                        len(utt.phoneme_ids) <= max_phoneme_ids
+                    if (max_phoneme_ids is not None) and (
+                        len(utt.phoneme_ids) > max_phoneme_ids
                     ):
-                        yield utt
-                    else:
-                        num_skipped += 1
+                        num_skipped_phoneme += 1
+                        continue
+
+                    # Filter by spectrogram length using file size estimation.
+                    # Uses os.path.getsize() (a single stat syscall) instead of
+                    # loading every spec file at init time.
+                    if max_spec_length is not None:
+                        file_size = os.path.getsize(utt.audio_spec_path)
+                        header_bytes = (
+                            spec_header_bytes_npy
+                            if utt.audio_spec_path.suffix == ".npy"
+                            else spec_header_bytes_pt
+                        )
+                        estimated_spec_length = (
+                            file_size - header_bytes
+                        ) // bytes_per_frame
+                        if estimated_spec_length > max_spec_length:
+                            num_skipped_spec += 1
+                            continue
+
+                    yield utt
                 except Exception:
                     _LOGGER.exception(
                         "Error on line %s of %s: %s",
@@ -205,42 +261,38 @@ class PiperDataset(Dataset):
                         line,
                     )
 
-        if num_skipped > 0:
-            _LOGGER.warning("Skipped %s utterance(s)", num_skipped)
+        if num_skipped_phoneme > 0:
+            _LOGGER.warning(
+                "Skipped %s utterance(s) exceeding max_phoneme_ids", num_skipped_phoneme
+            )
+        if num_skipped_spec > 0:
+            _LOGGER.warning(
+                "Filtered %s utterance(s) exceeding max_spec_length=%s",
+                num_skipped_spec,
+                max_spec_length,
+            )
 
     @staticmethod
     def load_utterance(line: str, dataset_dir: Path | None = None) -> Utterance:
         utt_dict = json.loads(line)
 
-        phoneme_ids = np.array(utt_dict["phoneme_ids"], dtype=np.int16)
+        def _resolve(p: str) -> Path:
+            """Resolve a path: if relative and dataset_dir given, prepend it."""
+            path = Path(p)
+            if not path.is_absolute() and dataset_dir is not None:
+                return dataset_dir / path
+            return path
 
-        prosody_raw = utt_dict.get("prosody_features")
-        prosody_features: np.ndarray | None = None
-        if prosody_raw is not None:
-            prosody_arr = [
-                [f["a1"], f["a2"], f["a3"]] if f is not None else [0, 0, 0]
-                for f in prosody_raw
-            ]
-            prosody_features = np.array(prosody_arr, dtype=np.int16)
-
-        audio_norm_path = Path(utt_dict["audio_norm_path"])
-        audio_spec_path = Path(utt_dict["audio_spec_path"])
-
-        # Resolve relative paths against dataset directory
-        if dataset_dir is not None:
-            if not audio_norm_path.is_absolute():
-                audio_norm_path = dataset_dir / audio_norm_path
-            if not audio_spec_path.is_absolute():
-                audio_spec_path = dataset_dir / audio_spec_path
-
+        spk_emb_path = utt_dict.get("speaker_embedding_path")
         return Utterance(
-            phoneme_ids=phoneme_ids,
-            audio_norm_path=audio_norm_path,
-            audio_spec_path=audio_spec_path,
+            phoneme_ids=utt_dict["phoneme_ids"],
+            audio_norm_path=_resolve(utt_dict["audio_norm_path"]),
+            audio_spec_path=_resolve(utt_dict["audio_spec_path"]),
             speaker_id=utt_dict.get("speaker_id"),
             language_id=utt_dict.get("language_id"),
             text=utt_dict.get("text"),
-            prosody_features=prosody_features,
+            prosody_features=utt_dict.get("prosody_features"),
+            speaker_embedding_path=_resolve(spk_emb_path) if spk_emb_path else None,
         )
 
 
@@ -262,6 +314,7 @@ class UtteranceCollate:
 
         num_mels = 0
         has_prosody = False
+        has_speaker_embedding = False
 
         # Determine lengths
         for _utt_idx, utt in enumerate(utterances):
@@ -282,6 +335,9 @@ class UtteranceCollate:
 
             if utt.prosody_features is not None:
                 has_prosody = True
+
+            if utt.speaker_embedding is not None:
+                has_speaker_embedding = True
 
         # Audio cannot be smaller than segment size (8192)
         max_audio_length = max(max_audio_length, self.segment_size)
@@ -346,6 +402,23 @@ class UtteranceCollate:
                         :prosody_length
                     ]
 
+        # Stack speaker embeddings (固定長のためパディング不要)
+        speaker_embeddings: FloatTensor | None = None
+        if has_speaker_embedding:
+            emb_list = []
+            for utt in sorted_utterances:
+                if utt.speaker_embedding is not None:
+                    emb_list.append(utt.speaker_embedding)
+                else:
+                    # Fallback: zero embedding if some utterances don't have it
+                    emb_dim = next(
+                        u.speaker_embedding.size(-1)
+                        for u in sorted_utterances
+                        if u.speaker_embedding is not None
+                    )
+                    emb_list.append(torch.zeros(emb_dim))
+            speaker_embeddings = torch.stack(emb_list)
+
         return Batch(
             phoneme_ids=phonemes_padded,
             phoneme_lengths=phoneme_lengths,
@@ -356,6 +429,7 @@ class UtteranceCollate:
             speaker_ids=speaker_ids,
             language_ids=language_ids,
             prosody_features=prosody_padded,
+            speaker_embeddings=speaker_embeddings,
         )
 
 
