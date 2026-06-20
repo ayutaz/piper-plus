@@ -8,7 +8,6 @@ Loads the epoch=199 checkpoint, runs flow.reverse, and checks:
   - Final z and audio output quality
 """
 
-import os
 from pathlib import Path
 
 import numpy as np
@@ -22,13 +21,7 @@ except ImportError:
 
 pytestmark = pytest.mark.skipif(torch is None, reason="torch not installed")
 
-# Maintainer-only diagnostic. Override via env var; default path is the
-# maintainer's training-host layout (documented in CLAUDE.md / docs/handoff).
-# The fixture skips when the checkpoint is absent, so this is safe on CI.
-CKPT_PATH = os.environ.get(
-    "PIPER_FLOW_DEBUG_CKPT",
-    str(Path.home() / "piper-flow-debug-epoch199.ckpt"),
-)
+CKPT_PATH = "/data/piper/output-zero-shot-20speakers/lightning_logs/version_2/checkpoints/epoch=199-step=206400.ckpt"
 
 
 def _stats(t, name=""):

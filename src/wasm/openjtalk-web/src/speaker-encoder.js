@@ -5,15 +5,13 @@
  * or Float32Array input, and extracts speaker embeddings for voice cloning.
  *
  * Mel spectrogram parameters (unified across all runtimes):
- *   sr=16000, n_fft=400, hop=160, n_mels=80, fmin=20, fmax=7600
- *   (n_fft=400 matches Kaldi frame_length=25ms at 16kHz; canonical across
- *    Python/Rust/Go/C#/C++ — see test/generate_speaker_encoder_golden.py.)
+ *   sr=16000, n_fft=512, hop=160, n_mels=80, fmin=20, fmax=7600
  *
  * @module speaker-encoder
  */
 
 const MEL_SAMPLE_RATE = 16000;
-const MEL_N_FFT = 400;
+const MEL_N_FFT = 512;
 const MEL_HOP_LENGTH = 160;
 const MEL_N_MELS = 80;
 const MEL_FMIN = 20;
@@ -98,10 +96,9 @@ export class SpeakerEncoder {
       throw new Error("Audio is too short for mel spectrogram computation");
     }
 
-    // Create input tensor: [1, n_frames, n_mels] (frame-major, as expected
-    // by CAM++ — matches Rust/Go/C#/C++ runtimes).
+    // Create input tensor: [1, n_mels, n_frames]
     const ort = this._ort;
-    const melTensor = new ort.Tensor("float32", mel, [1, nFrames, MEL_N_MELS]);
+    const melTensor = new ort.Tensor("float32", mel, [1, MEL_N_MELS, nFrames]);
 
     const results = await this._session.run({ input: melTensor });
     const outputTensor = results.output || results[Object.keys(results)[0]];
@@ -161,10 +158,7 @@ function resampleLinear(samples, fromRate, toRate) {
 /**
  * Compute log mel spectrogram.
  * @param {Float32Array} samples - Mono 16kHz audio.
- * @returns {Float32Array} Flattened [n_frames * n_mels] in frame-major order
- *   (frame 0 mel 0, frame 0 mel 1, ..., frame 1 mel 0, ...). Matches the
- *   CAM++ expected input layout [batch, T, 80] used by Python/Rust/Go/C#/C++.
- *   Per-band mean subtraction (CMVN) is applied after computing the log mel.
+ * @returns {Float32Array} Flattened [n_mels * n_frames] in mel-major order.
  */
 // fr32 forces a value to its nearest float32 representation. Used at every
 // arithmetic step so the JS path matches Python's float32 semantics
@@ -179,40 +173,29 @@ export function computeMelSpectrogram(samples) {
     samples.length >= MEL_N_FFT ? Math.floor((samples.length - MEL_N_FFT) / MEL_HOP_LENGTH) + 1 : 0;
 
   const fftBins = Math.floor(MEL_N_FFT / 2) + 1;
-  // Frame-major layout: melSpec[frameIdx * MEL_N_MELS + melIdx]
-  const melSpec = new Float32Array(nFrames * MEL_N_MELS);
+  const melSpec = new Float32Array(MEL_N_MELS * nFrames);
 
   for (let frameIdx = 0; frameIdx < nFrames; frameIdx++) {
     const start = frameIdx * MEL_HOP_LENGTH;
 
-    // Power spectrum via DFT. Match the Python reference numerics:
-    //   - `sample` (= audio[i] * window[i]) is float32.
-    //   - cos/sin compute in float64 (Math.cos input is auto-promoted),
-    //     so the multiplication `sample * cos(angle)` happens in f64
-    //     (mirrors Python `f32 * np.cos(f32_angle) → f64`).
-    //   - Accumulators `real`/`imag` are clamped back to float32 after each
-    //     add via Math.fround — matches numpy's `F32_scalar += f64_value`
-    //     semantics (the addition uses higher precision, the result is
-    //     truncated to f32 on store).
-    // Casting cos/sin to f32 (the old behavior) produced stationary output
-    // for pure sines, which CMVN then collapsed to zero — see Go runtime's
-    // identical comment for the same trap.
+    // Power spectrum via DFT in float32 (Math.fround at every step
+    // mirrors Python's F32 alias to keep checksums byte-for-byte equal).
     const powerSpec = new Float32Array(fftBins);
     for (let k = 0; k < fftBins; k++) {
       let real = fr32(0),
         imag = fr32(0);
-      const freq = (-2 * Math.PI * k) / MEL_N_FFT;
+      const freq = fr32((fr32(-2 * Math.PI) * fr32(k)) / fr32(MEL_N_FFT));
       for (let n = 0; n < MEL_N_FFT; n++) {
         const winSample =
           start + n < samples.length ? fr32(fr32(samples[start + n]) * fr32(window[n])) : fr32(0);
-        const angle = freq * n;
-        real = fr32(real + winSample * Math.cos(angle));
-        imag = fr32(imag + winSample * Math.sin(angle));
+        const angle = fr32(freq * fr32(n));
+        real = fr32(real + fr32(winSample * fr32(Math.cos(angle))));
+        imag = fr32(imag + fr32(winSample * fr32(Math.sin(angle))));
       }
       powerSpec[k] = fr32(fr32(real * real) + fr32(imag * imag));
     }
 
-    // Apply mel filterbank — float32 arithmetic. Store in frame-major order.
+    // Apply mel filterbank — float32 arithmetic.
     for (let melIdx = 0; melIdx < MEL_N_MELS; melIdx++) {
       let energy = fr32(0);
       for (let k = 0; k < fftBins; k++) {
@@ -221,23 +204,7 @@ export function computeMelSpectrogram(samples) {
       // np.log accepts a Python float (f64); the output is then cast to f32
       // when stored in mel_spec (which is dtype=F32). Match that here:
       // log of f32-clamped energy, then cast result to f32.
-      melSpec[frameIdx * MEL_N_MELS + melIdx] = fr32(Math.log(Math.max(fr32(energy), 1e-10)));
-    }
-  }
-
-  // CMVN: subtract per-band mean across all frames (matches Python/Rust).
-  if (nFrames > 0) {
-    for (let melIdx = 0; melIdx < MEL_N_MELS; melIdx++) {
-      let sum = 0;
-      for (let frameIdx = 0; frameIdx < nFrames; frameIdx++) {
-        sum += melSpec[frameIdx * MEL_N_MELS + melIdx];
-      }
-      const mean = fr32(sum / nFrames);
-      for (let frameIdx = 0; frameIdx < nFrames; frameIdx++) {
-        melSpec[frameIdx * MEL_N_MELS + melIdx] = fr32(
-          melSpec[frameIdx * MEL_N_MELS + melIdx] - mean
-        );
-      }
+      melSpec[melIdx * nFrames + frameIdx] = fr32(Math.log(Math.max(fr32(energy), 1e-10)));
     }
   }
 

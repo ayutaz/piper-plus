@@ -105,9 +105,9 @@ func TestRootCmd_FlagDefaults(t *testing.T) {
 		flag     string
 		expected string
 	}{
-		{"noise-scale", "0.4"},
+		{"noise-scale", "0.667"},
 		{"length-scale", "1"},
-		{"noise-w", "0.5"},
+		{"noise-w", "0.8"},
 		{"sentence-silence", "0.2"},
 		{"timing-format", "json"},
 		{"output-dir", "."},

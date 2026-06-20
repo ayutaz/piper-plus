@@ -129,9 +129,9 @@ class TestWarmupTokens:
         assert contract["warmup"]["dummy_phoneme"] == 8
 
     def test_warmup_scales(self, contract: dict) -> None:
-        assert contract["warmup"]["noise_scale"] == 0.4
+        assert contract["warmup"]["noise_scale"] == 0.667
         assert contract["warmup"]["length_scale"] == 1.0
-        assert contract["warmup"]["noise_w"] == 0.5
+        assert contract["warmup"]["noise_w"] == 0.8
 
 
 @pytest.mark.unit

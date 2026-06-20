@@ -4,11 +4,8 @@ CPU並列版(~40 file/s)に対して、GPUバッチ処理で10倍以上の高速
 
 Usage:
     uv run python -m piper_train.tools.batch_spectrograms \
-      --cache-dir ${DATASET_DIR}/cache/22050 \
+      --cache-dir /data/piper/dataset-zero-shot-20speakers/cache/22050 \
       --workers 30
-
-    (DATASET_DIR is the user's dataset root; see docs/handoff/ for the
-    maintainer's actual training layout.)
 """
 
 from __future__ import annotations

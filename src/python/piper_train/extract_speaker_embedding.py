@@ -12,13 +12,13 @@ Usage:
     # Per-utterance (recommended for zero-shot training)
     uv run python -m piper_train.extract_speaker_embedding \
         --encoder models/campplus.onnx \
-        --dataset-dir ${DATASET_DIR} \
+        --dataset-dir /data/piper/dataset-moe-speech-20speakers \
         --per-utterance --batch-size 64 --num-workers 12
 
     # Per-speaker (for inference reference)
     uv run python -m piper_train.extract_speaker_embedding \
         --encoder models/campplus.onnx \
-        --dataset-dir ${DATASET_DIR} \
+        --dataset-dir /data/piper/dataset-moe-speech-20speakers \
         --output-dir /path/to/embeddings
 """
 

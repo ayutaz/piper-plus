@@ -1966,7 +1966,6 @@ internal static class Program
                 headerLen = BitConverter.ToUInt16(bytes, 8);
                 dataOffset = 10 + headerLen; // magic(6) + ver(2) + headerLen_uint16(2) + header
             }
-
             int numFloats = (bytes.Length - dataOffset) / sizeof(float);
             embedding = new float[numFloats];
             Buffer.BlockCopy(bytes, dataOffset, embedding, 0, numFloats * sizeof(float));
