@@ -71,7 +71,7 @@ jobs:
       # v6 系の最新 patch (v6.8.0) に修正。
       - uses: astral-sh/setup-uv@v6.8.0
         with:
-          python-version: '3.12'
+          python-version: '3.13'
 
       - name: Install inference dependencies
         # ``inference`` は pyproject.toml の [project.optional-dependencies]

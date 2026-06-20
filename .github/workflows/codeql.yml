@@ -165,7 +165,7 @@ jobs:
         if: steps.should-skip.outputs.skip != 'true' && matrix.language == 'python'
         uses: actions/setup-python@v6.2.0
         with:
-          python-version: '3.11'
+          python-version: '3.13'
 
       - name: Setup Node.js
         if: steps.should-skip.outputs.skip != 'true' && matrix.language == 'javascript-typescript'

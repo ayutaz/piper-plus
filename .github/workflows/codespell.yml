@@ -30,7 +30,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v6.2.0
         with:
-          python-version: '3.12'
+          python-version: '3.13'
 
       - name: Install codespell
         # Pin version so CI matches the pre-commit hook

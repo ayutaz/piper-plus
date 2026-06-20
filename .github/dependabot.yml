@@ -276,9 +276,11 @@ updates:
       - dependency-name: "python"
         update-types:
           - "version-update:semver-minor"
-      # CUDA image の minor bump (例: 12.4 → 12.9) も同様に production の
-      # GPU driver / cuDNN 互換性判断を要するため手動更新方針。
+      # CUDA image の minor bump (例: 12.8 → 12.9) も同様に production の
+      # GPU driver / cuDNN 互換性判断を要するため手動更新方針 (OQ-10 で据置確定)。
       # 過去事例: PR #427 で 12.4.1 → 12.9.1 (5 minor jump) が提案された。
+      # Issue #527 で 12.6.3 → 12.8.1 へ手動 bump 済 (RTX 5090 / Blackwell 対応)、
+      # 次の major event (CUDA 13.0 LTS 等) まで minor bump は手動運用。
       - dependency-name: "nvidia/cuda"
         update-types:
           - "version-update:semver-minor"

@@ -19,7 +19,7 @@
 
 > **🔑 유일한 MIT 라이선스 Piper 포크** — 원본 [rhasspy/piper](https://github.com/rhasspy/piper)는 2025년 10월에 아카이브되었으며, [OHF-Voice/piper1-gpl](https://github.com/OHF-Voice/piper1-gpl)은 GPL-3.0으로 전환되었습니다. piper-plus는 espeak-ng에 의존하지 않는 유일한 MIT 호환 포크입니다. 자체 구현 G2P로 8개 언어 (JA/EN/ZH/KO/ES/FR/PT/SV)를 지원하며, 상용 및 임베디드 용도에 적합합니다.
 
-> **📢 v1.12.0 주요 변경사항 (2026-05):** HiFi-GAN 디코더 제거 (MB-iSTFT로 통합, `--mb-istft` 플래그 폐지) / Flask → FastAPI HTTP 서버 / HTS-voice 의존성 제거 (Python 런타임만 해당) / Unity UPM 별도 저장소로 이동 (`ayutaz/uPiper`) / 모든 .NET 프로젝트 `net10.0` LTS로 업그레이드. 자세히: [docs/migration/v1.11-to-v1.12.md](docs/migration/v1.11-to-v1.12.md)
+> **📢 v2.0.0 주요 변경사항 (2026-05):** 기본 Docker 이미지가 CUDA 12.8 + Ubuntu 24.04 + Python 3.13으로 통합 (호스트 NVIDIA 드라이버 **R570+** 필요; 구버전 드라이버에서는 새 이미지를 시작할 수 없음) / 학습이 torch 2.11+cu128로 업데이트 (torch 2.2로 생성한 체크포인트는 더 이상 재개 불가) / TF32 + bf16-mixed가 새로운 학습 기본값. 자세히: [docs/migration/v1.12-to-v2.0.md](docs/migration/v1.12-to-v2.0.md)
 
 빠르고 고품질의 뉴럴 텍스트 음성 합성 (TTS) 시스템. [VITS](https://github.com/jaywalnut310/vits/) 아키텍처를 채택하여 일본어, 영어, 중국어, 한국어, 스페인어, 프랑스어, 포르투갈어, 스웨덴어 등 8개 언어 다중 화자 음성 합성을 지원합니다. [Piper](https://github.com/rhasspy/piper)의 포크로, 일본어 지원, 음질 향상, 학습 기능을 대폭 강화했습니다.
 
@@ -250,7 +250,7 @@ docker pull ghcr.io/ayutaz/piper-plus/cpp-dev:dev
 
 ### Python
 
-Python 3.11 이상 필요. 의존성 관리에는 [uv](https://docs.astral.sh/uv/)를 권장합니다.
+Python 3.13+ 권장 (3.11+ 지원). 의존성 관리에는 [uv](https://docs.astral.sh/uv/)를 권장합니다.
 
 ```bash
 # CPU 추론

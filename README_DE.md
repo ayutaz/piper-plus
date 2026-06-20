@@ -9,6 +9,8 @@
 [![Hugging Face Model](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Model-orange)](https://huggingface.co/ayousanz/piper-plus-base)
 [![Try in Browser](https://img.shields.io/badge/Try%20in%20Browser-WebAssembly-blueviolet)](https://ayutaz.github.io/piper-plus/)
 
+> **📢 v2.0.0 Breaking Changes (2026-05):** Standard-Docker-Images auf CUDA 12.8 + Ubuntu 24.04 + Python 3.13 vereinheitlicht (Host-NVIDIA-Treiber **R570+** erforderlich; ältere Treiber können die neuen Images nicht starten) / Training auf torch 2.11+cu128 aktualisiert (mit torch 2.2 erstellte Checkpoints können nicht fortgesetzt werden) / TF32 + bf16-mixed sind die neuen Trainings-Standards. Details: [docs/migration/v1.12-to-v2.0.md](docs/migration/v1.12-to-v2.0.md)
+
 **Pakete:**
 
 [![PyPI](https://img.shields.io/pypi/v/piper-plus?label=PyPI%3A%20piper-plus&color=blue)](https://pypi.org/project/piper-plus/)
@@ -250,7 +252,7 @@ Weitere Details unter [docker/README.md](docker/README.md).
 
 ### Python
 
-Erfordert Python 3.11+. [uv](https://docs.astral.sh/uv/) wird als Paketmanager empfohlen.
+Python 3.13+ empfohlen (3.11+ unterstutzt). [uv](https://docs.astral.sh/uv/) wird als Paketmanager empfohlen.
 
 ```bash
 # CPU-Inferenz

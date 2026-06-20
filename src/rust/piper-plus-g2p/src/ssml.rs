@@ -303,26 +303,29 @@ impl SsmlParser {
             return rate;
         }
 
-        // Percentage
+        // Percentage. Validate the *final* f32 is finite and positive so that
+        // NaN / Inf / f32-overflow (e.g. "0%" -> 100/0 = inf, tiny pct -> inf)
+        // fall back to 1.0 instead of leaking a non-positive rate downstream.
         if let Some(pct_part) = s.strip_suffix('%') {
             if let Ok(pct) = pct_part.parse::<f64>() {
-                if pct <= 0.0 {
-                    tracing::warn!("Invalid rate percentage: {}", rate_str);
-                    return 1.0;
+                let r = (100.0 / pct) as f32;
+                if r.is_finite() && r > 0.0 {
+                    return r;
                 }
-                return (100.0 / pct) as f32;
             }
             tracing::warn!("Invalid rate percentage: {}", rate_str);
             return 1.0;
         }
 
-        // Bare float
+        // Bare float. `<= 0.0` alone misses NaN (comparisons are always false)
+        // and f32-overflow (e.g. "1e40" -> inf), so check the cast result.
         if let Ok(val) = s.parse::<f64>() {
-            if val <= 0.0 {
-                tracing::warn!("Invalid rate value: {}", rate_str);
-                return 1.0;
+            let r = val as f32;
+            if r.is_finite() && r > 0.0 {
+                return r;
             }
-            return val as f32;
+            tracing::warn!("Invalid rate value: {}", rate_str);
+            return 1.0;
         }
 
         tracing::warn!("Unrecognized rate: {}", rate_str);
@@ -504,6 +507,24 @@ mod tests {
         let ssml = r#"<speak><prosody rate="x-fast">Hello</prosody></speak>"#;
         let segments = SsmlParser::parse(ssml);
         assert!((segments[0].rate - 0.6).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_prosody_rate_rejects_non_finite_and_nonpositive() {
+        // Regression (fuzz_ssml invariant 3): parse_rate must never emit a
+        // NaN / Inf / zero / negative rate. NaN/Inf/f32-overflow inputs
+        // previously slipped past the `<= 0.0` guard. All must fall back to 1.0.
+        for bad in ["nan", "inf", "infinity", "1e40", "0", "-5", "0%", "-50%"] {
+            let ssml = format!(r#"<speak><prosody rate="{}">Hello</prosody></speak>"#, bad);
+            for seg in &SsmlParser::parse(&ssml) {
+                assert!(
+                    seg.rate.is_finite() && seg.rate > 0.0,
+                    "rate={} from rate=\"{}\" violates finite && > 0",
+                    seg.rate,
+                    bad
+                );
+            }
+        }
     }
 
     // ---- Prosody rate (percentage) ----
