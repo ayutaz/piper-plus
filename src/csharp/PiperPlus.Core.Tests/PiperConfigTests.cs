@@ -486,9 +486,9 @@ public sealed class PiperConfigTests : IDisposable
         var path = WriteTempConfig(json, "default_inference.json");
         var config = PiperConfig.LoadFromFile(path);
 
-        Assert.Equal(0.667f, config.Inference.NoiseScale);
+        Assert.Equal(0.4f, config.Inference.NoiseScale);
         Assert.Equal(1.0f, config.Inference.LengthScale);
-        Assert.Equal(0.8f, config.Inference.NoiseW);
+        Assert.Equal(0.5f, config.Inference.NoiseW);
     }
 
     // ================================================================

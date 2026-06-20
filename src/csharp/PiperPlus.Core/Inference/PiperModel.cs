@@ -42,14 +42,12 @@ public sealed class PiperModel : IDisposable
 
         // Detect optional capabilities from tensor names.
         HasSpeakerId = _session.InputMetadata.ContainsKey("sid");
+        HasSpeakerEmbedding = _session.InputMetadata.ContainsKey("speaker_embedding");
         HasLanguageId = _session.InputMetadata.ContainsKey("lid");
         HasProsody = _session.InputMetadata.ContainsKey("prosody_features");
 
         // Detect duration output capability (mirrors C++ piper.cpp:loadModel).
         HasDurationOutput = _session.OutputMetadata.ContainsKey("durations");
-
-        // Detect voice cloning capability (speaker_embedding + speaker_embedding_mask).
-        HasSpeakerEmbedding = _session.InputMetadata.ContainsKey("speaker_embedding");
 
         SampleRate = config.Audio.SampleRate;
 
@@ -71,6 +69,14 @@ public sealed class PiperModel : IDisposable
     public bool HasSpeakerId { get; }
 
     /// <summary>
+    /// <c>true</c> when the model accepts a <c>speaker_embedding</c> tensor
+    /// (<c>[1, 192]</c> float32), indicating a zero-shot speaker conditioning model.
+    /// When both <c>sid</c> and <c>speaker_embedding</c> inputs are present,
+    /// <c>speaker_embedding</c> takes priority.
+    /// </summary>
+    public bool HasSpeakerEmbedding { get; }
+
+    /// <summary>
     /// <c>true</c> when the model accepts a <c>lid</c> (language-id) tensor,
     /// indicating a multilingual model.
     /// </summary>
@@ -88,12 +94,6 @@ public sealed class PiperModel : IDisposable
     /// Mirrors <c>hasDurationOutput</c> in the C++ implementation (<c>piper.cpp</c>).
     /// </summary>
     public bool HasDurationOutput { get; }
-
-    /// <summary>
-    /// <c>true</c> when the model accepts <c>speaker_embedding</c> (float32)
-    /// and <c>speaker_embedding_mask</c> (int64) inputs for voice cloning.
-    /// </summary>
-    public bool HasSpeakerEmbedding { get; }
 
     /// <summary>
     /// Audio sample rate in Hz, sourced from the accompanying config.json.

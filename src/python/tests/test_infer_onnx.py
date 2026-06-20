@@ -1,5 +1,7 @@
 """Tests for infer_onnx module, specifically the --text functionality."""
 
+from pathlib import Path
+
 import numpy as np
 import pytest
 from piper_plus_g2p.encode.id_maps import get_phoneme_id_map
@@ -18,6 +20,7 @@ from piper_train.infer_onnx import (
 )
 
 
+@pytest.mark.unit
 class TestTextToPhonemeIdsAndProsody:
     """Tests for text_to_phoneme_ids_and_prosody function."""
 
@@ -138,6 +141,7 @@ class TestTextToPhonemeIdsAndProsody:
         assert len(phoneme_ids) == len(prosody_features)
 
 
+@pytest.mark.unit
 class TestPhonemeIdMapCompatibility:
     """Tests to ensure phoneme_id_map from config.json works."""
 
@@ -149,7 +153,7 @@ class TestPhonemeIdMapCompatibility:
         assert isinstance(phoneme_id_map, dict)
 
         # Each value should be a list of integers
-        for symbol, ids in phoneme_id_map.items():
+        for _symbol, ids in phoneme_id_map.items():
             assert isinstance(ids, list)
             assert all(isinstance(i, int) for i in ids)
 
@@ -167,6 +171,7 @@ class TestPhonemeIdMapCompatibility:
             assert vowel in phoneme_id_map
 
 
+@pytest.mark.unit
 class TestPadPhonemeIds:
     """Tests for Strategy A: _pad_phoneme_ids."""
 
@@ -453,6 +458,7 @@ class TestTrimEosRegion:
         assert len(result) == 400 - 200
 
 
+@pytest.mark.unit
 class TestTrimSilence:
     """Tests for Strategy A post-trim: _trim_silence."""
 
@@ -512,6 +518,7 @@ class TestTrimSilence:
         assert len(trimmed) >= TRIM_MIN_SAMPLES
 
 
+@pytest.mark.unit
 class TestAdjustScalesForShortInput:
     """Tests for Strategy B: _adjust_scales_for_short_input."""
 
@@ -602,6 +609,7 @@ class TestAdjustScalesForShortInput:
         assert nw == pytest.approx(0.8)
 
 
+@pytest.mark.unit
 class TestStrategyBUsesPrePaddingLength:
     """Integration tests: Strategy B must use the pre-padding length.
 
@@ -692,3 +700,129 @@ class TestStrategyBUsesPrePaddingLength:
         assert ns == pytest.approx(0.667)
         assert ls == pytest.approx(1.0)
         assert nw == pytest.approx(0.8)
+
+
+# ---------------------------------------------------------------------------
+# E2E Zero-Shot ONNX Inference Tests
+# ---------------------------------------------------------------------------
+
+try:
+    import onnxruntime as _ort  # noqa: F401
+
+    _HAS_ORT = True
+except ImportError:
+    _HAS_ORT = False
+
+# Locate test model files relative to the repository root.
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+_MODEL_PATH = _REPO_ROOT / "test" / "models" / "zero-shot-test.onnx"
+_SPEAKER_EMB_PATH = _REPO_ROOT / "test" / "models" / "test_speaker.npy"
+
+# Shared phoneme IDs used by all E2E tests (simple, reproducible token sequence).
+_PHONEME_IDS = [1, 8, 5, 39, 25, 11, 0, 15, 22, 40]
+_SCALES = np.array([0.0, 1.0, 0.0], dtype=np.float32)  # deterministic: noise=0
+
+
+def _build_inputs(
+    phoneme_ids: list[int],
+    speaker_embedding: np.ndarray,
+) -> dict:
+    """Build the ONNX input feed dict for the zero-shot-test model.
+
+    Parameters
+    ----------
+    phoneme_ids:
+        1-D list of int token IDs.
+    speaker_embedding:
+        1-D float32 array of shape (192,).
+    """
+    text = np.expand_dims(np.array(phoneme_ids, dtype=np.int64), 0)  # [1, T]
+    text_lengths = np.array([text.shape[1]], dtype=np.int64)  # [1]
+    prosody_features = np.zeros((1, len(phoneme_ids), 3), dtype=np.int64)
+    spk_emb = speaker_embedding.reshape(1, 192).astype(np.float32)
+    return {
+        "input": text,
+        "input_lengths": text_lengths,
+        "scales": _SCALES,
+        "speaker_embedding": spk_emb,
+        "prosody_features": prosody_features,
+    }
+
+
+@pytest.mark.inference
+@pytest.mark.unit
+@pytest.mark.skipif(not _HAS_ORT, reason="onnxruntime not installed")
+@pytest.mark.skipif(not _MODEL_PATH.exists(), reason="zero-shot-test.onnx not found")
+class TestZeroShotOnnxInference:
+    """E2E tests that run the zero-shot-test ONNX model directly via onnxruntime."""
+
+    @pytest.fixture(scope="class")
+    def session(self):
+        """Shared onnxruntime InferenceSession for all tests in this class."""
+        import onnxruntime as ort
+
+        return ort.InferenceSession(str(_MODEL_PATH))
+
+    @pytest.fixture(scope="class")
+    def reference_embedding(self):
+        """Load the pre-generated test speaker embedding."""
+        return np.load(str(_SPEAKER_EMB_PATH))  # shape (192,)
+
+    def test_zero_shot_inference_produces_audio(self, session, reference_embedding):
+        """Run ONNX inference with the test speaker embedding and verify the output.
+
+        Checks that:
+        - The output array is non-empty (more than 0 samples).
+        - Every sample is a finite float (no NaN or Inf).
+        """
+        inputs = _build_inputs(_PHONEME_IDS, reference_embedding)
+        outputs = session.run(None, inputs)
+
+        audio = outputs[0].squeeze()  # flatten to 1-D
+        assert audio.size > 0, "Inference produced an empty audio array"
+        assert np.isfinite(audio).all(), "Audio output contains NaN or Inf values"
+
+    def test_zero_shot_inference_different_embeddings_differ(
+        self, session, reference_embedding
+    ):
+        """Run inference twice with different speaker embeddings and verify outputs differ.
+
+        This proves that the speaker conditioning path is active: the model
+        conditions on the embedding, so distinct embeddings must produce
+        distinct waveforms.
+        """
+        rng = np.random.default_rng(seed=0)
+        other_embedding = rng.standard_normal(192).astype(np.float32)
+        # L2-normalise so the magnitude difference is not the only cause
+        other_embedding /= np.linalg.norm(other_embedding) + 1e-8
+
+        inputs_ref = _build_inputs(_PHONEME_IDS, reference_embedding)
+        inputs_other = _build_inputs(_PHONEME_IDS, other_embedding)
+
+        audio_ref = session.run(None, inputs_ref)[0].squeeze()
+        audio_other = session.run(None, inputs_other)[0].squeeze()
+
+        # Pad or trim to the same length before comparing
+        min_len = min(audio_ref.size, audio_other.size)
+        assert not np.allclose(audio_ref[:min_len], audio_other[:min_len], atol=1e-5), (
+            "Different speaker embeddings produced identical audio output – "
+            "speaker conditioning appears to have no effect."
+        )
+
+    def test_zero_shot_inference_zero_embedding_works(self, session):
+        """Run inference with a zero embedding and verify it does not crash.
+
+        A zero embedding is the standard fallback when no reference audio is
+        available.  The model must not raise an exception and must produce a
+        finite (though possibly bland) waveform.
+        """
+        zero_embedding = np.zeros(192, dtype=np.float32)
+        inputs = _build_inputs(_PHONEME_IDS, zero_embedding)
+
+        outputs = session.run(None, inputs)
+        audio = outputs[0].squeeze()
+
+        assert audio.size > 0, "Zero-embedding inference produced an empty audio array"
+        assert np.isfinite(audio).all(), (
+            "Zero-embedding audio output contains NaN or Inf values"
+        )

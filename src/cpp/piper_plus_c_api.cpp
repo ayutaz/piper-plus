@@ -185,14 +185,11 @@ static void applySynthOptions(piper::SynthesisConfig &synthConfig,
         effectiveOpts = piper_plus_default_options();
     }
 
-    // Zero-init safety: replace 0.0 with sensible defaults
-    // 注意: ゼロ値置換により意図的な deterministic 推論 (noise_scale=0) が無効化される
-    if (effectiveOpts.noise_scale == 0.0f)
-        effectiveOpts.noise_scale = 0.667f;
+    // Zero-init safety: only replace length_scale=0 (which would silence audio).
+    // noise_scale=0 and noise_w=0 are valid for deterministic inference and
+    // must not be overridden.
     if (effectiveOpts.length_scale == 0.0f)
         effectiveOpts.length_scale = 1.0f;
-    if (effectiveOpts.noise_w == 0.0f)
-        effectiveOpts.noise_w = 0.8f;
 
     if (effectiveOpts.speaker_id >= 0) {
         synthConfig.speakerId = effectiveOpts.speaker_id;
@@ -207,11 +204,11 @@ static void applySynthOptions(piper::SynthesisConfig &synthConfig,
 
     // Voice cloning: speaker embedding
     if (effectiveOpts.speaker_embedding && effectiveOpts.speaker_embedding_dim > 0) {
-        synthConfig.speakerEmbedding.assign(
+        synthConfig.speakerEmbedding = std::vector<float>(
             effectiveOpts.speaker_embedding,
             effectiveOpts.speaker_embedding + effectiveOpts.speaker_embedding_dim);
     } else {
-        synthConfig.speakerEmbedding.clear();
+        synthConfig.speakerEmbedding.reset();
     }
 }
 
@@ -282,9 +279,9 @@ PIPER_PLUS_API PiperPlusSynthOptions piper_plus_default_options(void) {
     std::memset(&opts, 0, sizeof(opts));
     opts.speaker_id = 0;
     opts.language_id = -1;
-    opts.noise_scale = 0.667f;
+    opts.noise_scale = 0.4f;
     opts.length_scale = 1.0f;
-    opts.noise_w = 0.8f;
+    opts.noise_w = 0.5f;
     opts.sentence_silence_sec = 0.2f;
     return opts;
 }

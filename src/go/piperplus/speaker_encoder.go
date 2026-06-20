@@ -10,10 +10,13 @@ import (
 	ort "github.com/yalue/onnxruntime_go"
 )
 
+// speakerEncoderInputName and speakerEncoderOutputName are read dynamically
+// from the ONNX model graph to avoid hard-coded name assumptions.
+
 // Mel spectrogram parameters — unified across all runtimes.
 const (
 	melSampleRate = 16000
-	melNFFT       = 512
+	melNFFT       = 400 // Kaldi frame_length=25ms at 16kHz = 400 samples
 	melHopLength  = 160
 	melNMels      = 80
 	melFmin       = 20.0
@@ -28,9 +31,21 @@ type SpeakerEncoder struct {
 }
 
 // NewSpeakerEncoder creates a speaker encoder from an ONNX model file.
+// Input and output names are read dynamically from the model graph.
 func NewSpeakerEncoder(modelPath string) (*SpeakerEncoder, error) {
-	inputNames := []string{"input"}
-	outputNames := []string{"output"}
+	// Dynamically read input/output names from the model graph.
+	inputs, outputs, err := ort.GetInputOutputInfo(modelPath)
+	if err != nil {
+		return nil, fmt.Errorf("speaker encoder read model info %s: %w", modelPath, err)
+	}
+	if len(inputs) == 0 {
+		return nil, fmt.Errorf("speaker encoder model has no inputs: %s", modelPath)
+	}
+	if len(outputs) == 0 {
+		return nil, fmt.Errorf("speaker encoder model has no outputs: %s", modelPath)
+	}
+	inputNames := []string{inputs[0].Name}
+	outputNames := []string{outputs[0].Name}
 
 	sessOpts, err := ort.NewSessionOptions()
 	if err != nil {
@@ -59,7 +74,7 @@ func (se *SpeakerEncoder) Encode(audio []float32, sampleRate int) ([]float32, er
 		resampled = resampleLinear(audio, sampleRate)
 	}
 
-	// Compute mel spectrogram
+	// Compute mel spectrogram: returned in frame-major order [n_frames * n_mels]
 	mel := computeMelSpectrogram(resampled)
 	nFrames := len(mel) / melNMels
 
@@ -67,8 +82,8 @@ func (se *SpeakerEncoder) Encode(audio []float32, sampleRate int) ([]float32, er
 		return nil, fmt.Errorf("speaker encoder: audio too short for mel spectrogram")
 	}
 
-	// Create input tensor: [1, n_mels, n_frames]
-	melTensor, err := ort.NewTensor(ort.NewShape(1, int64(melNMels), int64(nFrames)), mel)
+	// Create input tensor: [1, n_frames, n_mels] — CAM++ expects time-first (Fbank) layout.
+	melTensor, err := ort.NewTensor(ort.NewShape(1, int64(nFrames), int64(melNMels)), mel)
 	if err != nil {
 		return nil, fmt.Errorf("speaker encoder mel tensor: %w", err)
 	}
@@ -116,20 +131,75 @@ func (se *SpeakerEncoder) Close() {
 	}
 }
 
-// LoadSpeakerEmbeddingFile reads a pre-computed speaker embedding from a
-// raw binary file (little-endian float32 values).
+// LoadSpeakerEmbeddingFile reads a pre-computed speaker embedding from a file.
+// Supports NumPy .npy format (v1.0/v2.0, little-endian float32) and raw binary
+// (little-endian float32 values with no header).
 func LoadSpeakerEmbeddingFile(path string) ([]float32, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("read speaker embedding %s: %w", path, err)
 	}
+
+	// Detect NumPy .npy format by magic bytes: \x93NUMPY
+	if len(data) >= 6 && data[0] == 0x93 && string(data[1:6]) == "NUMPY" {
+		return loadNpyFloat32(data, path)
+	}
+
+	// Raw binary: every 4 bytes is one little-endian float32.
 	if len(data)%4 != 0 {
 		return nil, fmt.Errorf("speaker embedding file size (%d bytes) is not a multiple of 4", len(data))
 	}
-
 	floats := make([]float32, len(data)/4)
 	for i := range floats {
 		bits := binary.LittleEndian.Uint32(data[i*4 : i*4+4])
+		floats[i] = math.Float32frombits(bits)
+	}
+	return floats, nil
+}
+
+// loadNpyFloat32 parses a NumPy v1.0/v2.0 .npy file containing float32 data.
+// It skips the variable-length header and returns the raw float32 values.
+func loadNpyFloat32(data []byte, path string) ([]float32, error) {
+	// Minimum header: magic(6) + major(1) + minor(1) + headerLen(2 or 4) = 10/12 bytes
+	if len(data) < 10 {
+		return nil, fmt.Errorf("npy file too short: %s", path)
+	}
+
+	major := data[6]
+
+	var headerLen int
+	var dataOffset int
+	switch major {
+	case 1:
+		// v1.0: header length stored as little-endian uint16 at offset 8
+		if len(data) < 10 {
+			return nil, fmt.Errorf("npy v1 file too short: %s", path)
+		}
+		headerLen = int(binary.LittleEndian.Uint16(data[8:10]))
+		dataOffset = 10 + headerLen
+	case 2, 3:
+		// v2.0/v3.0: header length stored as little-endian uint32 at offset 8
+		if len(data) < 12 {
+			return nil, fmt.Errorf("npy v2/v3 file too short: %s", path)
+		}
+		headerLen = int(binary.LittleEndian.Uint32(data[8:12]))
+		dataOffset = 12 + headerLen
+	default:
+		return nil, fmt.Errorf("unsupported npy version %d.%d: %s", major, data[7], path)
+	}
+
+	if dataOffset > len(data) {
+		return nil, fmt.Errorf("npy header length %d exceeds file size %d: %s", dataOffset, len(data), path)
+	}
+
+	payload := data[dataOffset:]
+	if len(payload)%4 != 0 {
+		return nil, fmt.Errorf("npy payload size (%d bytes) is not a multiple of 4: %s", len(payload), path)
+	}
+
+	floats := make([]float32, len(payload)/4)
+	for i := range floats {
+		bits := binary.LittleEndian.Uint32(payload[i*4 : i*4+4])
 		floats[i] = math.Float32frombits(bits)
 	}
 	return floats, nil
@@ -265,8 +335,9 @@ func resampleLinear(samples []float32, fromRate int) []float32 {
 	return output
 }
 
-// computeMelSpectrogram computes a log mel spectrogram.
-// Returns a flattened [n_mels * n_frames] array (mel-major order).
+// computeMelSpectrogram computes a log mel spectrogram with CMVN (mean subtraction).
+// Returns a flattened [n_frames * n_mels] array (frame-major / time-first order)
+// matching CAM++'s expected input layout [1, T, 80].
 func computeMelSpectrogram(samples []float32) []float32 {
 	melFilters := createMelFilterbank()
 	window := hannWindow(melNFFT)
@@ -277,12 +348,17 @@ func computeMelSpectrogram(samples []float32) []float32 {
 	}
 
 	fftBins := melNFFT/2 + 1
-	melSpec := make([]float32, melNMels*nFrames)
+	// Store in frame-major order: melSpec[frameIdx*melNMels + melIdx]
+	melSpec := make([]float32, nFrames*melNMels)
 
 	for frameIdx := 0; frameIdx < nFrames; frameIdx++ {
 		start := frameIdx * melHopLength
 
-		// Power spectrum via DFT
+		// Power spectrum via DFT — use float32 angle arithmetic to match
+		// the Python reference implementation (golden test generator).
+		// Using float64 angles produces a more accurate (constant) DFT for pure
+		// sine waves, which CMVN then flattens to zero. float32 angle truncation
+		// introduces the same per-frame variation as the Python reference.
 		powerSpec := make([]float32, fftBins)
 		for k := 0; k < fftBins; k++ {
 			var realPart, imagPart float32
@@ -299,7 +375,7 @@ func computeMelSpectrogram(samples []float32) []float32 {
 			powerSpec[k] = realPart*realPart + imagPart*imagPart
 		}
 
-		// Apply mel filterbank
+		// Apply mel filterbank — store in frame-major layout
 		for melIdx := 0; melIdx < melNMels; melIdx++ {
 			var energy float32
 			for k := 0; k < fftBins; k++ {
@@ -308,7 +384,21 @@ func computeMelSpectrogram(samples []float32) []float32 {
 			if energy < 1e-10 {
 				energy = 1e-10
 			}
-			melSpec[melIdx*nFrames+frameIdx] = float32(math.Log(float64(energy)))
+			melSpec[frameIdx*melNMels+melIdx] = float32(math.Log(float64(energy)))
+		}
+	}
+
+	// CMVN: subtract per-band mean across all frames (global mean normalization)
+	if nFrames > 0 {
+		for melIdx := 0; melIdx < melNMels; melIdx++ {
+			var sum float32
+			for frameIdx := 0; frameIdx < nFrames; frameIdx++ {
+				sum += melSpec[frameIdx*melNMels+melIdx]
+			}
+			mean := sum / float32(nFrames)
+			for frameIdx := 0; frameIdx < nFrames; frameIdx++ {
+				melSpec[frameIdx*melNMels+melIdx] -= mean
+			}
 		}
 	}
 

@@ -100,6 +100,10 @@ jobs:
         uv pip install --system cython
         python piper_train/vits/monotonic_align/setup.py build_ext --inplace
 
+    - name: Download NLTK data (for g2p-en English phonemizer)
+      run: |
+        python -c "import nltk; nltk.download('averaged_perceptron_tagger_eng', quiet=True); nltk.download('cmudict', quiet=True)"
+
     - name: Run unit tests (Windows)
       if: runner.os == 'Windows'
       run: |
@@ -125,6 +129,7 @@ jobs:
         cd src/python
         # Run unit tests excluding inference tests (which require torch)
         pytest tests/ -v --tb=short -m "unit and not training and not benchmark and not inference"
+
 
     - name: Run integration tests (Unix only)
       if: runner.os != 'Windows'
@@ -207,6 +212,20 @@ jobs:
         # Wave 4: --reruns 1 で g2p-en/g2pk2 lazy load の最初の attempt が cold cache で
         # fail する flake を retry (2 回目は cache 効くため安定)。
         pytest tests/ -v --tb=short --override-ini="addopts=" --reruns 1 --reruns-delay 1
+      env:
+        PYTHONUTF8: '1'
+
+    - name: Run runtime speaker embedding tests
+      run: |
+        cd src/python_run
+        pytest tests/test_speaker_embedding.py tests/test_zero_shot_e2e.py -v --tb=short --override-ini="addopts="
+      env:
+        PYTHONUTF8: '1'
+
+    - name: Run runtime short-text mitigation tests
+      run: |
+        cd src/python_run
+        pytest tests/test_short_text_mitigation.py -v --tb=short --override-ini="addopts="
       env:
         PYTHONUTF8: '1'
 

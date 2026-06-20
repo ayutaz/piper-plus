@@ -325,9 +325,9 @@ public class InferenceTests
     {
         var input = new SynthesisInput(PhonemeIds: [1, 2, 3]);
 
-        Assert.Equal(0.667f, input.NoiseScale);
+        Assert.Equal(0.4f, input.NoiseScale);
         Assert.Equal(1.0f, input.LengthScale);
-        Assert.Equal(0.8f, input.NoiseW);
+        Assert.Equal(0.5f, input.NoiseW);
     }
 
     [Fact]

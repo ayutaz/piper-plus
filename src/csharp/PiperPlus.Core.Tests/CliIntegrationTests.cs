@@ -4,64 +4,72 @@ namespace PiperPlus.Core.Tests;
 
 /// <summary>
 /// Subprocess-based CLI integration tests for <c>PiperPlus.Cli</c>.
-/// These tests launch the CLI as a child process via <c>dotnet run</c>
-/// and verify exit codes, stdout, and stderr output.
+/// These tests launch the pre-built CLI assembly as a child process via
+/// <c>dotnet PiperPlus.Cli.dll</c> and verify exit codes, stdout, and stderr.
 /// Marked with <c>[Trait("Category", "CLI")]</c> for selective filtering.
 /// </summary>
 public sealed class CliIntegrationTests
 {
     /// <summary>
     /// Maximum time (ms) to wait for the CLI process to exit.
-    /// Generous to account for <c>dotnet run</c> compilation overhead.
+    /// Includes a margin for first-run JIT and System.CommandLine initialization.
     /// </summary>
     private const int ProcessTimeoutMs = 30_000;
 
     /// <summary>
-    /// Returns the absolute path to the <c>PiperPlus.Cli</c> project directory.
-    /// Resolves relative to the test assembly location, walking up to
-    /// <c>src/csharp/</c> and then into <c>PiperPlus.Cli</c>.
+    /// Returns the absolute path to the pre-built <c>PiperPlus.Cli.dll</c>.
+    /// Resolves relative to the test assembly location: tests live under
+    /// <c>PiperPlus.Core.Tests/bin/&lt;config&gt;/&lt;tfm&gt;/</c>, and the CLI
+    /// builds to <c>PiperPlus.Cli/bin/&lt;config&gt;/&lt;tfm&gt;/PiperPlus.Cli.dll</c>
+    /// (same configuration and target framework as the test assembly).
     /// </summary>
-    private static string GetCliProjectPath()
+    private static string GetCliAssemblyPath()
     {
-        // The test assembly sits under src/csharp/PiperPlus.Core.Tests/bin/...
-        // Walk up to find src/csharp, then resolve PiperPlus.Cli.
+        // The test assembly sits under src/csharp/PiperPlus.Core.Tests/bin/<config>/<tfm>/
         string assemblyDir = Path.GetDirectoryName(
             typeof(CliIntegrationTests).Assembly.Location)!;
 
-        // Walk up until we find PiperPlus.Core.Tests directory
-        var dir = new DirectoryInfo(assemblyDir);
-        while (dir is not null && !dir.Name.Equals("PiperPlus.Core.Tests", StringComparison.Ordinal))
+        var tfmDir = new DirectoryInfo(assemblyDir);            // e.g. net9.0
+        var configDir = tfmDir.Parent;                          // e.g. Release
+        var binDir = configDir?.Parent;                         // bin
+        var testsDir = binDir?.Parent;                          // PiperPlus.Core.Tests
+        var csharpDir = testsDir?.Parent;                       // src/csharp
+
+        if (tfmDir is null || configDir is null || binDir is null
+            || testsDir is null || csharpDir is null)
         {
-            dir = dir.Parent;
+            throw new InvalidOperationException(
+                $"Unable to resolve PiperPlus.Cli.dll path from test assembly location: {assemblyDir}");
         }
 
-        if (dir?.Parent is null)
-        {
-            // Fallback: resolve relative to the working directory
-            return Path.GetFullPath(
-                Path.Combine(
-                    Directory.GetCurrentDirectory(),
-                    "..", "..", "..", "..", "PiperPlus.Cli"));
-        }
+        // Mirror the same configuration (Debug/Release) and TFM as the test assembly.
+        string cliAssemblyPath = Path.GetFullPath(Path.Combine(
+            csharpDir.FullName,
+            "PiperPlus.Cli",
+            "bin",
+            configDir.Name,
+            tfmDir.Name,
+            "PiperPlus.Cli.dll"));
 
-        // dir = PiperPlus.Core.Tests, dir.Parent = src/csharp
-        return Path.GetFullPath(Path.Combine(dir.Parent.FullName, "PiperPlus.Cli"));
+        return cliAssemblyPath;
     }
 
     /// <summary>
-    /// If the CLI subprocess failed due to a build infrastructure issue
-    /// (e.g. .NET SDK version mismatch), skips the test instead of failing it.
-    /// This handles CI environments where a mismatched SDK is pre-installed.
+    /// If the CLI subprocess failed due to an environment issue (missing pre-built
+    /// DLL, .NET SDK/runtime mismatch), skips the test instead of failing it.
     /// </summary>
     private static void SkipIfBuildFailed(int exitCode, string stderr)
     {
         if (exitCode != 0
             && (stderr.Contains("The build failed", StringComparison.Ordinal)
                 || stderr.Contains("error MSB", StringComparison.Ordinal)
-                || stderr.Contains("could not be loaded from assembly", StringComparison.Ordinal)))
+                || stderr.Contains("could not be loaded from assembly", StringComparison.Ordinal)
+                || stderr.Contains("Could not execute because the application was not found", StringComparison.Ordinal)
+                || stderr.Contains("framework was not found", StringComparison.Ordinal)
+                || stderr.Contains("framework 'Microsoft.NETCore.App'", StringComparison.Ordinal)))
         {
             Assert.Skip(
-                "CLI project could not be built in this environment (SDK version mismatch). " +
+                "CLI assembly could not be loaded in this environment. " +
                 $"stderr: {stderr[..Math.Min(stderr.Length, 500)]}");
         }
     }
@@ -109,10 +117,18 @@ public sealed class CliIntegrationTests
     /// <summary>
     /// Launches the CLI as a subprocess and captures exit code, stdout, and stderr.
     /// </summary>
+    /// <remarks>
+    /// We invoke the already-built CLI assembly directly via <c>dotnet PiperPlus.Cli.dll</c>
+    /// rather than <c>dotnet run --project</c>. The latter triggers an implicit MSBuild
+    /// pass on every invocation, which is slow and can fail intermittently on macOS CI
+    /// runners due to NuGet/MSBuild lock contention when many tests run concurrently
+    /// (observed: macos-14 arm64, .NET 9 SDK 9.0.313). The CI workflow builds the CLI
+    /// in Release mode before tests run, so the DLL is guaranteed to exist.
+    /// </remarks>
     private static async Task<(int ExitCode, string StdOut, string StdErr)> RunCliAsync(
         params string[] args)
     {
-        string cliProjectPath = GetCliProjectPath();
+        string cliAssemblyPath = GetCliAssemblyPath();
 
         var psi = new ProcessStartInfo
         {
@@ -123,11 +139,10 @@ public sealed class CliIntegrationTests
             CreateNoWindow = true,
         };
 
-        // Use ArgumentList to avoid quoting/escaping issues with spaces in paths
-        psi.ArgumentList.Add("run");
-        psi.ArgumentList.Add("--project");
-        psi.ArgumentList.Add(cliProjectPath);
-        psi.ArgumentList.Add("--");
+        // Use ArgumentList to avoid quoting/escaping issues with spaces in paths.
+        // Invoke the pre-built DLL directly to skip the implicit MSBuild that
+        // `dotnet run --project` would trigger on every call.
+        psi.ArgumentList.Add(cliAssemblyPath);
         foreach (var arg in args)
         {
             psi.ArgumentList.Add(arg);
@@ -244,8 +259,10 @@ public sealed class CliIntegrationTests
             "--model", "/nonexistent/path/model.onnx", "--text", "test");
         SkipIfBuildFailed(exitCode, stderr);
 
-        // The CLI uses Environment.ExitCode = 1, which dotnet run may not
-        // always propagate. Verify the error message appears on stderr.
+        // The CLI uses Environment.ExitCode = 1; verify the error message
+        // appears on stderr. We assert the message rather than the exit code
+        // because System.CommandLine's invocation contract has historically
+        // not propagated Environment.ExitCode reliably across all paths.
         Assert.Contains("not found", stderr, StringComparison.OrdinalIgnoreCase);
 
         // If the exit code is propagated, it should be non-zero

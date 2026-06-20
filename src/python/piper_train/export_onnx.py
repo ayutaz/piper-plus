@@ -5,12 +5,15 @@ import argparse
 import logging
 import pathlib
 import platform
+import warnings
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 import torch
 
 from .tools.convert_fp16 import convert_fp16
+from .vits import commons
+from .vits.commons import remap_weight_norm_keys
 from .vits.lightning import VitsModel
 
 
@@ -83,7 +86,6 @@ def build_infer_forward(
         lid=None,
         prosody_features=None,
         speaker_embedding=None,
-        speaker_embedding_mask=None,
     ):
         noise_scale = scales[0]
         length_scale = scales[1]
@@ -106,8 +108,7 @@ def build_infer_forward(
             length_scale=length_scale,
             noise_scale_w=noise_scale_w,
             prosody_features=prosody_features,
-            speaker_embedding=speaker_embedding,
-            speaker_embedding_mask=speaker_embedding_mask,
+            speaker_embeddings=speaker_embedding,
         )
 
         return audio, durations
@@ -200,6 +201,34 @@ def apply_ema_weights(
     result = apply_ema_shadow_params(decoder, ema_state["shadow_params"])
     del ckpt
     return result
+
+
+def _strip_orig_mod(state_dict: dict) -> tuple[dict, int]:
+    """Remove ``._orig_mod.`` inserted by ``torch.compile`` from state_dict keys.
+
+    When a checkpoint is saved while ``torch.compile`` is active, parameter keys
+    get an ``_orig_mod`` prefix (e.g. ``model_g.dec._orig_mod.conv_pre.weight``).
+    ``load_from_checkpoint(strict=False)`` silently ignores these mismatched keys,
+    leaving weights uninitialised.  This helper strips the prefix so the weights
+    can be loaded correctly.
+
+    Returns ``(cleaned_dict, n_stripped)``.  The original dict is not mutated.
+    Only keys that actually contain ``._orig_mod.`` are renamed; others are
+    passed through unchanged.
+    """
+    cleaned: dict = {}
+    n_stripped = 0
+    for key, value in state_dict.items():
+        new_key = key.replace("._orig_mod.", ".")
+        if new_key != key:
+            n_stripped += 1
+        cleaned[new_key] = value
+    if n_stripped > 0:
+        _LOGGER.info(
+            "Stripped '_orig_mod' prefix from %d state_dict keys (torch.compile artifact)",
+            n_stripped,
+        )
+    return cleaned, n_stripped
 
 
 def should_unify_emb_lang(
@@ -368,6 +397,15 @@ def main() -> None:
         default=0,
         help="Source language index for emb_lang unification (default: 0).",
     )
+    parser.add_argument(
+        "--export-mode",
+        choices=["auto", "zero-shot", "sid"],
+        default="auto",
+        help="Export mode. 'auto': auto-detect (zero-shot for multi-speaker). "
+        "'zero-shot': speaker embedding input. "
+        "'sid': DEPRECATED, falls back to zero-shot with warning. "
+        "Default: auto.",
+    )
     args = parser.parse_args()
 
     if args.debug:
@@ -376,6 +414,17 @@ def main() -> None:
         logging.basicConfig(level=logging.INFO)
 
     _LOGGER.debug(args)
+
+    # Handle deprecated --export-mode sid
+    if args.export_mode == "sid":
+        warnings.warn(
+            "--export-mode sid is deprecated (emb_g has been removed). "
+            "Falling back to zero-shot mode. Use --export-mode auto or "
+            "--export-mode zero-shot instead.",
+            DeprecationWarning,
+            stacklevel=1,
+        )
+        args.export_mode = "zero-shot"
 
     # -------------------------------------------------------------------------
 
@@ -395,9 +444,32 @@ def main() -> None:
     model = VitsModel.load_from_checkpoint(args.checkpoint, dataset=None, strict=False)
     model_g = model.model_g
 
+    # Load raw checkpoint for _orig_mod stripping, weight_norm remapping, and EMA.
+    # Must happen early: fixes restore weights that load_from_checkpoint silently
+    # missed, and EMA must be applied BEFORE remove_weight_norm().
+    ckpt = torch.load(args.checkpoint, map_location="cpu")
+
+    raw_sd = ckpt.get("state_dict", {})
+
+    # Fix torch.compile artifact: strip _orig_mod prefix from state_dict keys.
+    cleaned_sd, n_stripped = _strip_orig_mod(raw_sd)
+
+    # Fix DDP weight_norm format mismatch (parametrized ↔ legacy).
+    cleaned_sd = remap_weight_norm_keys(cleaned_sd, model.state_dict())
+
+    if n_stripped > 0 or cleaned_sd != raw_sd:
+        missing, unexpected = model.load_state_dict(cleaned_sd, strict=False)
+        if missing:
+            _LOGGER.debug("Keys still missing after fixups: %d", len(missing))
+        if unexpected:
+            _LOGGER.debug("Unexpected keys after fixups: %d", len(unexpected))
+
     num_symbols = model_g.n_vocab
     num_speakers = model_g.n_speakers
     num_languages = getattr(model_g, "n_languages", 1)
+
+    # Determine if model has spk_proj (zero-shot capable)
+    has_spk_proj = hasattr(model_g, "spk_proj")
 
     # Enable ONNX export mode for all compatible modules.
     # This makes the decoder emit fullband-only output and applies other
@@ -426,11 +498,63 @@ def main() -> None:
             num_languages,
         )
 
-    # Apply EMA weights to decoder if available (always applied when present)
+    # Apply EMA weights to decoder and spk_proj if available (always applied when present)
     # IMPORTANT: EMA must be applied BEFORE remove_weight_norm(), because EMA shadow
     # params use weight_g/weight_v keys. remove_weight_norm() fuses them into a single
     # "weight" tensor, making EMA keys unmatchable.
-    apply_ema_weights(model_g.dec, args.checkpoint)
+
+    # --- EMA decoder ---
+    ema_state = ckpt.get("ema_generator_state")
+    if ema_state and "shadow_params" in ema_state:
+        applied = 0
+        skipped = 0
+        dec_params = dict(model_g.dec.named_parameters())
+        # Remap shadow param keys for weight_norm format compatibility
+        shadow = remap_weight_norm_keys(ema_state["shadow_params"], dec_params)
+        for name, shadow_param in shadow.items():
+            if name in dec_params:
+                dec_params[name].data.copy_(shadow_param)
+                applied += 1
+            else:
+                skipped += 1
+        if applied > 0:
+            _LOGGER.info(
+                "Applied EMA weights to decoder: %d parameters (skipped %d)",
+                applied,
+                skipped,
+            )
+        else:
+            _LOGGER.warning("EMA state found but no matching decoder parameters")
+    else:
+        _LOGGER.info("No EMA state found in checkpoint, skipping EMA")
+
+    # --- EMA spk_proj ---
+    ema_spk_proj_state = ckpt.get("ema_spk_proj_state")
+    if ema_spk_proj_state and "shadow_params" in ema_spk_proj_state and has_spk_proj:
+        applied = 0
+        skipped = 0
+        spk_proj_params = dict(model_g.spk_proj.named_parameters())
+        shadow = remap_weight_norm_keys(
+            ema_spk_proj_state["shadow_params"], spk_proj_params
+        )
+        for name, shadow_param in shadow.items():
+            if name in spk_proj_params:
+                spk_proj_params[name].data.copy_(shadow_param)
+                applied += 1
+            else:
+                skipped += 1
+        if applied > 0:
+            _LOGGER.info(
+                "Applied EMA weights to spk_proj: %d parameters (skipped %d)",
+                applied,
+                skipped,
+            )
+        else:
+            _LOGGER.warning("EMA spk_proj state found but no matching parameters")
+    elif has_spk_proj:
+        _LOGGER.info("No EMA spk_proj state found in checkpoint, skipping")
+
+    del ckpt
 
     with torch.no_grad():
         model_g.dec.remove_weight_norm()
@@ -438,7 +562,96 @@ def main() -> None:
     # Check if model uses prosody features
     has_prosody = getattr(model_g, "prosody_dim", 0) > 0
 
-    model_g.forward = build_infer_forward(model_g, stochastic=args.stochastic)
+    # Determine zero-shot mode:
+    # - auto: use zero-shot if multi-speaker AND spk_proj exists
+    # - zero-shot: force zero-shot (requires spk_proj)
+    if args.export_mode == "zero-shot":
+        use_zero_shot = True
+        if not has_spk_proj:
+            _LOGGER.error(
+                "Cannot use --export-mode zero-shot: model does not have spk_proj. "
+                "This model may be an older architecture without speaker embedding support."
+            )
+            return
+    else:
+        # auto mode: zero-shot for multi-speaker models with spk_proj
+        use_zero_shot = num_speakers > 1 and has_spk_proj
+
+    if use_zero_shot:
+        _LOGGER.info(
+            "Zero-shot mode: model will accept speaker_embedding [batch, 192] input"
+        )
+
+    stochastic = args.stochastic
+
+    def infer_forward(
+        text,
+        text_lengths,
+        scales,
+        speaker_embedding=None,
+        lid=None,
+        prosody_features=None,
+    ):
+        """
+        Efficient forward function that returns both audio and duration information.
+        The duration predictor is called once to compute both durations and audio output.
+
+        For multi-speaker models, speaker_embedding (float32 [batch, 192]) is used
+        with spk_proj MLP to compute global conditioning.
+        """
+        # noise_scale = scales[0]  # unused in ONNX export (deterministic mode)
+        length_scale = scales[1]
+        noise_scale_w = scales[2]
+
+        # 1. Global conditioning (must be computed before enc_p)
+        # spk_proj-only: pass speaker_embedding through _get_global_conditioning
+        # which uses spk_proj MLP instead of emb_g
+        g = model_g._get_global_conditioning(
+            sid=None, lid=lid, speaker_embeddings=speaker_embedding
+        )
+
+        # 2. Encoder (with global conditioning for cond_layer)
+        x, m_p, logs_p, x_mask = model_g.enc_p(text, text_lengths, g=g)
+
+        # 3. Duration Predictor (called only once)
+        x_dp = model_g._prepare_prosody_input(x, x_mask, prosody_features, lid=lid)
+        if model_g.use_sdp:
+            logw = model_g.dp(
+                x_dp, x_mask, g=g, reverse=True, noise_scale=noise_scale_w
+            )
+        else:
+            logw = model_g.dp(x_dp, x_mask, g=g)
+
+        w = torch.exp(logw) * x_mask * length_scale
+        durations = w.squeeze(1)  # [batch, phoneme_length]
+
+        # 4. Attention/Alignment
+        w_ceil = torch.ceil(w)
+        y_lengths = torch.clamp_min(torch.sum(w_ceil, [1, 2]), 1).long()
+        y_mask = torch.unsqueeze(
+            commons.sequence_mask(y_lengths, y_lengths.max()), 1
+        ).type_as(x_mask)
+        attn_mask = torch.unsqueeze(x_mask, 2) * torch.unsqueeze(y_mask, -1)
+        attn = commons.generate_path(w_ceil, attn_mask)
+
+        # 5. Expand prior
+        m_p = torch.matmul(attn.squeeze(1), m_p.transpose(1, 2)).transpose(1, 2)
+        logs_p = torch.matmul(attn.squeeze(1), logs_p.transpose(1, 2)).transpose(1, 2)
+
+        # 6. Sample z_p
+        if stochastic:
+            noise_scale = scales[0]
+            z_p = m_p + torch.randn_like(m_p) * torch.exp(logs_p) * noise_scale
+        else:
+            z_p = m_p
+
+        # 7. Flow + Decoder
+        z = model_g.flow(z_p, y_mask, g=g, reverse=True)
+        o = model_g.dec((z * y_mask), g=g)
+
+        return o, durations
+
+    model_g.forward = infer_forward
 
     dummy_input_length = 50
     sequences = torch.randint(
@@ -448,22 +661,20 @@ def main() -> None:
 
     # Determine which optional inputs to include.
     # These flags control BOTH dummy_input and input_names so they stay in sync.
-    include_sid = num_speakers > 1 or num_languages > 1
+    include_speaker_embedding = use_zero_shot
     include_lid = num_languages > 1
 
-    sid: torch.LongTensor | None = None
-    if include_sid:
-        # Multi-speaker: real speaker ID needed.
-        # Single-speaker multilingual: sid=0 placeholder to maintain correct
-        # positional argument order in infer_forward (sid before lid).
-        sid = torch.LongTensor([0])
+    speaker_embedding: torch.Tensor | None = None
+    if include_speaker_embedding:
+        # Zero-shot: 192-dim speaker embedding from CAM++ encoder
+        speaker_embedding = torch.zeros(1, 192, dtype=torch.float32)
 
     lid: torch.LongTensor | None = None
     if include_lid:
         lid = torch.LongTensor([0])
 
-    # noise, noise_w, length
-    scales = torch.FloatTensor([0.667, 1.0, 0.8])
+    # noise_scale, length_scale, noise_scale_w
+    scales = torch.FloatTensor([0.4, 1.0, 0.5])
 
     # Prosody features [batch, phonemes, 3] - A1/A2/A3 values
     # Use int64 (long) so that .float() in models.py creates explicit Cast node in ONNX graph
@@ -481,14 +692,25 @@ def main() -> None:
         "durations": {0: "batch_size", 1: "phonemes"},
     }
 
-    if include_sid:
-        dummy_input_list.append(sid)
-        input_names.append("sid")
-        dynamic_axes["sid"] = {0: "batch_size"}
+    if include_speaker_embedding:
+        dummy_input_list.append(speaker_embedding)
+        input_names.append("speaker_embedding")
+        dynamic_axes["speaker_embedding"] = {0: "batch_size"}
+    elif has_prosody or include_lid:
+        # Placeholder for skipped speaker_embedding so that lid/prosody_features
+        # are not bound to the wrong positional parameter in infer_forward.
+        # torch.onnx.export ignores None entries in the args tuple.
+        dummy_input_list.append(None)
+
     if include_lid:
         dummy_input_list.append(lid)
         input_names.append("lid")
         dynamic_axes["lid"] = {0: "batch_size"}
+    elif has_prosody:
+        # Placeholder for skipped lid so that prosody_features is not bound to
+        # the lid positional parameter in infer_forward.
+        dummy_input_list.append(None)
+
     if has_prosody:
         dummy_input_list.append(prosody_features)
         input_names.append("prosody_features")
@@ -497,27 +719,6 @@ def main() -> None:
             "Exporting model with prosody features support (prosody_dim=%d)",
             model_g.prosody_dim,
         )
-
-    # Speaker embedding inputs (voice cloning support)
-    # Always include these optional inputs so the ONNX graph supports
-    # both sid-based and speaker-embedding-based inference.
-    speaker_emb_dim = 256  # ECAPA-TDNN default output dimension
-    dummy_speaker_embedding = torch.zeros(1, speaker_emb_dim, dtype=torch.float32)
-    dummy_speaker_embedding_mask = torch.ones(1, 1, dtype=torch.int64)
-
-    dummy_input_list.append(dummy_speaker_embedding)
-    input_names.append("speaker_embedding")
-    # axis 1 (emb_dim=256) is fixed at export time by spk_proj weights
-    dynamic_axes["speaker_embedding"] = {0: "batch_size"}
-
-    dummy_input_list.append(dummy_speaker_embedding_mask)
-    input_names.append("speaker_embedding_mask")
-    dynamic_axes["speaker_embedding_mask"] = {0: "batch_size"}
-
-    _LOGGER.info(
-        "Exporting model with speaker_embedding support (emb_dim=%d)",
-        speaker_emb_dim,
-    )
 
     dummy_input = tuple(dummy_input_list)
 
@@ -543,7 +744,10 @@ def main() -> None:
     )
 
     mode = "stochastic" if args.stochastic else "deterministic"
-    _LOGGER.info("Exported model to %s (mode: %s)", args.output, mode)
+    export_type = "zero-shot" if use_zero_shot else "single-speaker"
+    _LOGGER.info(
+        "Exported model to %s (mode: %s, type: %s)", args.output, mode, export_type
+    )
 
     # ONNX validation pipeline (per docs/spec/onnx-export-contract.toml):
     #   1. onnx.checker.check_model() — corruption / opset / type validation

@@ -52,16 +52,20 @@ var (
 	referenceAudio      string // --reference-audio PATH
 	speakerEmbedding    string // --speaker-embedding PATH
 	speakerEncoderModel string // --speaker-encoder-model PATH
+
+	// Resolved speaker embedding, populated during runSynthesize.
+	resolvedSpeakerEmbedding []float32
 )
 
 // jsonlInput represents a single line of JSONL input from stdin or batch file.
 type jsonlInput struct {
-	PhonemeIDs      []int64    `json:"phoneme_ids,omitempty"`
-	Text            string     `json:"text,omitempty"`
-	SpeakerID       *int64     `json:"speaker_id,omitempty"`
-	LanguageID      *int64     `json:"language_id,omitempty"`
-	Language        string     `json:"language,omitempty"`
-	ProsodyFeatures [][3]int64 `json:"prosody_features,omitempty"`
+	PhonemeIDs       []int64    `json:"phoneme_ids,omitempty"`
+	Text             string     `json:"text,omitempty"`
+	SpeakerID        *int64     `json:"speaker_id,omitempty"`
+	LanguageID       *int64     `json:"language_id,omitempty"`
+	Language         string     `json:"language,omitempty"`
+	ProsodyFeatures  [][3]int64 `json:"prosody_features,omitempty"`
+	SpeakerEmbedding []float32  `json:"speaker_embedding,omitempty"`
 }
 
 var rootCmd = &cobra.Command{
@@ -89,9 +93,9 @@ func init() {
 	f.Int64VarP(&speakerID, "speaker", "s", 0, "speaker ID for multi-speaker models")
 	f.StringVarP(&outputFile, "output-file", "f", "", "output WAV path (- for stdout)")
 	f.StringVarP(&outputDir, "output-dir", "d", ".", "output directory for generated files")
-	f.Float32Var(&noiseScale, "noise-scale", 0.667, "generation noise scale")
+	f.Float32Var(&noiseScale, "noise-scale", 0.4, "generation noise scale")
 	f.Float32Var(&lengthScale, "length-scale", 1.0, "speech rate (length scale)")
-	f.Float32Var(&noiseW, "noise-w", 0.8, "duration predictor noise scale")
+	f.Float32Var(&noiseW, "noise-w", 0.5, "duration predictor noise scale")
 	f.Float64Var(&sentenceSilence, "sentence-silence", 0.2, "silence between sentences in seconds")
 	f.BoolVar(&streaming, "streaming", false, "write raw PCM int16 to stdout (no WAV header)")
 	f.StringVar(&batchFile, "batch", "", "batch file with one text line per utterance")
@@ -267,6 +271,33 @@ func runSynthesize(cmd *cobra.Command, args []string) error {
 	}
 	defer voice.Close() //nolint:errcheck
 
+	// Load speaker embedding from flags (--speaker-embedding takes priority over
+	// --reference-audio + --speaker-encoder-model).
+	if speakerEmbedding != "" {
+		emb, err := piperplus.LoadSpeakerEmbeddingFile(speakerEmbedding)
+		if err != nil {
+			return fmt.Errorf("failed to load speaker embedding: %w", err)
+		}
+		resolvedSpeakerEmbedding = emb
+		logger.Info("loaded speaker embedding", "path", speakerEmbedding, "dims", len(emb))
+	} else if referenceAudio != "" {
+		encoderPath := speakerEncoderModel
+		if encoderPath == "" {
+			return fmt.Errorf("--reference-audio requires --speaker-encoder-model")
+		}
+		enc, err := piperplus.NewSpeakerEncoder(encoderPath)
+		if err != nil {
+			return fmt.Errorf("failed to load speaker encoder: %w", err)
+		}
+		defer enc.Close()
+		emb, err := enc.EncodeFile(referenceAudio)
+		if err != nil {
+			return fmt.Errorf("failed to encode reference audio: %w", err)
+		}
+		resolvedSpeakerEmbedding = emb
+		logger.Info("extracted speaker embedding", "audio", referenceAudio, "dims", len(emb))
+	}
+
 	// Dispatch to the appropriate input mode.
 	switch {
 	case hasText:
@@ -291,6 +322,9 @@ func buildSynthOpts() []piperplus.SynthesisOption {
 	opts = append(opts, piperplus.WithLengthScale(lengthScale))
 	opts = append(opts, piperplus.WithNoiseW(noiseW))
 	opts = append(opts, piperplus.WithSentenceSilence(sentenceSilence))
+	if len(resolvedSpeakerEmbedding) > 0 {
+		opts = append(opts, piperplus.WithSpeakerEmbedding(resolvedSpeakerEmbedding))
+	}
 	return opts
 }
 
@@ -323,6 +357,9 @@ func buildSynthOptsFromJSONL(input *jsonlInput) []piperplus.SynthesisOption {
 	}
 	if input.SpeakerID != nil {
 		opts = append(opts, piperplus.WithSpeakerID(*input.SpeakerID))
+	}
+	if len(input.SpeakerEmbedding) > 0 {
+		opts = append(opts, piperplus.WithSpeakerEmbedding(input.SpeakerEmbedding))
 	}
 	return opts
 }
@@ -456,10 +493,11 @@ func synthesizeLine(ctx context.Context, voice *piperplus.Voice, line string) (*
 // Used only for the phoneme-ID path (SynthesizeFromIDs).
 func buildRequest(input *jsonlInput) *piperplus.SynthesisRequest {
 	req := &piperplus.SynthesisRequest{
-		SpeakerID:   speakerID,
-		NoiseScale:  noiseScale,
-		LengthScale: lengthScale,
-		NoiseW:      noiseW,
+		SpeakerID:        speakerID,
+		NoiseScale:       noiseScale,
+		LengthScale:      lengthScale,
+		NoiseW:           noiseW,
+		SpeakerEmbedding: resolvedSpeakerEmbedding,
 	}
 
 	if input != nil {
@@ -478,6 +516,10 @@ func buildRequest(input *jsonlInput) *piperplus.SynthesisRequest {
 		// Set prosody features from JSONL.
 		if input.ProsodyFeatures != nil {
 			req.ProsodyFeatures = input.ProsodyFeatures
+		}
+		// JSONL-level embedding overrides CLI flag embedding.
+		if len(input.SpeakerEmbedding) > 0 {
+			req.SpeakerEmbedding = input.SpeakerEmbedding
 		}
 	}
 

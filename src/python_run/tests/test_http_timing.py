@@ -514,6 +514,65 @@ class TestStreamingLanguageIdPassthrough:
 # ---------------------------------------------------------------------------
 
 
+class TestTimingEndpointSpeakerEmbedding:
+    """POST JSON body may carry a 192-dim speaker_embedding for zero-shot TTS.
+
+    These tests describe the intended contract for the /api/phoneme-timing
+    endpoint when accepting a JSON request body. The current production
+    implementation in ``piper/http_server.py`` only reads the raw body as
+    UTF-8 text, so these tests are marked ``xfail`` until POST-body JSON
+    parsing (with ``speaker_embedding`` forwarding) is added.
+    """
+
+    def _build(self, mock_timing_result):
+        voice = _make_voice(mock_timing_result)
+        captured: dict = {}
+
+        def _synth(text, **kwargs):
+            captured["text"] = text
+            captured["speaker_embedding"] = kwargs.get("speaker_embedding")
+            captured["speaker_id"] = kwargs.get("speaker_id")
+            return (b"fake-wav", mock_timing_result)
+
+        voice.synthesize_with_timing.side_effect = _synth
+        client = TestClient(create_app(voice, synthesize_args={}))
+        return client, captured
+
+    def test_speaker_embedding_from_post_body(self, mock_timing_result):
+        import numpy as np
+
+        client, captured = self._build(mock_timing_result)
+        payload = {"text": "hi", "speaker_embedding": [0.0] * 192}
+        resp = client.post("/api/phoneme-timing", json=payload)
+
+        assert resp.status_code == 200
+        emb = captured["speaker_embedding"]
+        assert isinstance(emb, np.ndarray)
+        assert emb.shape == (192,)
+        assert emb.dtype == np.float32
+
+    def test_speaker_embedding_invalid_dimension_400(self, mock_timing_result):
+        client, _captured = self._build(mock_timing_result)
+        payload = {"text": "hi", "speaker_embedding": [0.0] * 191}
+        resp = client.post("/api/phoneme-timing", json=payload)
+
+        assert resp.status_code == 400
+        body = resp.json()
+        detail = (body.get("error") or body.get("detail") or "").lower()
+        assert "192" in detail or "dimension" in detail
+
+    def test_speaker_embedding_omitted_falls_back_to_speaker_id(
+        self, mock_timing_result
+    ):
+        client, captured = self._build(mock_timing_result)
+        payload = {"text": "hi", "speaker_id": 7}
+        resp = client.post("/api/phoneme-timing", json=payload)
+
+        assert resp.status_code == 200
+        assert captured["speaker_embedding"] is None
+        assert captured["speaker_id"] == 7
+
+
 class TestPublicBindWarning:
     def test_warns_for_wildcard_address(self, caplog):
         import logging

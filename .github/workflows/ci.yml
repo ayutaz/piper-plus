@@ -40,6 +40,7 @@ jobs:
       ci-config-wasm: ${{ steps.filter.outputs.ci-config-wasm }}
       zh-en-data: ${{ steps.filter.outputs.zh-en-data }}
       swedish-lid-data: ${{ steps.filter.outputs.swedish-lid-data }}
+      ci-config-go: ${{ steps.filter.outputs.ci-config-go }}
       docs: ${{ steps.filter.outputs.docs }}
     steps:
       - uses: actions/checkout@v6.0.3
@@ -105,6 +106,9 @@ jobs:
               - 'scripts/check_swedish_lid_consistency.py'
               - 'docs/spec/swedish-lid-mirrors.toml'
               - '.github/workflows/swedish-lid-sync.yml'
+            ci-config-go:
+              - '.github/workflows/ci.yml'
+              - '.github/workflows/go-ci.yml'
             docs:
               - 'docs/**'
               - 'README*'

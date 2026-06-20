@@ -212,13 +212,13 @@ public sealed class AudioConfig
 public sealed class InferenceConfig
 {
     [JsonPropertyName("noise_scale")]
-    public float NoiseScale { get; set; } = 0.667f;
+    public float NoiseScale { get; set; } = 0.4f;
 
     [JsonPropertyName("length_scale")]
     public float LengthScale { get; set; } = 1.0f;
 
     [JsonPropertyName("noise_w")]
-    public float NoiseW { get; set; } = 0.8f;
+    public float NoiseW { get; set; } = 0.5f;
 }
 
 /// <summary>

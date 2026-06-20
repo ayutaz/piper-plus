@@ -17,13 +17,16 @@ browsers, ``ffmpeg`` and most media players.
 from __future__ import annotations
 
 import argparse
+import base64
 import io
+import json
 import logging
 import struct
 import wave
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 import uvicorn
 from fastapi import FastAPI, Query, Request, Response
 from fastapi.concurrency import run_in_threadpool
@@ -152,6 +155,101 @@ class _RequestTooLarge(Exception):
     """Internal sentinel for body-size enforcement."""
 
 
+class _InvalidEmbedding(Exception):
+    """Invalid speaker_embedding (wrong dimension or unparseable)."""
+
+    def __init__(self, message: str):
+        super().__init__(message)
+        self.message = message
+
+
+_EXPECTED_EMBEDDING_DIM = 192
+
+
+def _parse_speaker_embedding(value: Any) -> np.ndarray:
+    """Parse a speaker_embedding payload (list[float] or base64 str) to ndarray.
+
+    Raises ``_InvalidEmbedding`` when dimension is not 192 or value is malformed.
+    """
+    if isinstance(value, str):
+        try:
+            raw = base64.b64decode(value)
+        except Exception as exc:
+            raise _InvalidEmbedding(
+                f"speaker_embedding base64 decode failed: {exc}"
+            ) from exc
+        emb = np.frombuffer(raw, dtype=np.float32).copy()
+    elif isinstance(value, (list, tuple)):
+        emb = np.asarray(value, dtype=np.float32)
+    else:
+        raise _InvalidEmbedding(
+            "speaker_embedding must be a list[float] or base64-encoded string"
+        )
+
+    if emb.ndim != 1 or emb.shape[-1] != _EXPECTED_EMBEDDING_DIM:
+        raise _InvalidEmbedding(
+            f"speaker_embedding has wrong dimension: expected {_EXPECTED_EMBEDDING_DIM}, "
+            f"got {emb.shape}"
+        )
+    return emb
+
+
+async def _parse_json_body(
+    request: Request,
+) -> tuple[str | None, np.ndarray | None, int | None]:
+    """Parse a JSON POST body for ``text``, ``speaker_embedding``, ``speaker_id``.
+
+    Returns ``(None, None, None)`` when the request is not JSON or body is empty.
+    Raises ``_RequestTooLarge`` / ``_InvalidEmbedding`` as appropriate.
+    """
+    if request.method != "POST":
+        return None, None, None
+    ctype = (request.headers.get("content-type") or "").lower()
+    if "application/json" not in ctype:
+        return None, None, None
+
+    cl = request.headers.get("content-length")
+    if cl is not None:
+        try:
+            if int(cl) > MAX_TEXT_BYTES:
+                raise _RequestTooLarge()
+        except ValueError:
+            pass
+    chunks: list[bytes] = []
+    total = 0
+    async for chunk in request.stream():
+        total += len(chunk)
+        if total > MAX_TEXT_BYTES:
+            raise _RequestTooLarge()
+        chunks.append(chunk)
+    raw = b"".join(chunks)
+    if not raw:
+        return None, None, None
+    try:
+        payload = json.loads(raw.decode("utf-8", errors="replace"))
+    except json.JSONDecodeError:
+        return None, None, None
+    if not isinstance(payload, dict):
+        return None, None, None
+
+    text = payload.get("text")
+    if text is not None and not isinstance(text, str):
+        text = str(text)
+
+    emb: np.ndarray | None = None
+    if "speaker_embedding" in payload and payload["speaker_embedding"] is not None:
+        emb = _parse_speaker_embedding(payload["speaker_embedding"])
+
+    sid = payload.get("speaker_id")
+    if sid is not None and not isinstance(sid, int):
+        try:
+            sid = int(sid)
+        except (ValueError, TypeError):
+            sid = None
+
+    return text, emb, sid
+
+
 def _parse_bool_flag(value: str | None) -> bool:
     if value is None:
         return False
@@ -186,16 +284,39 @@ def create_app(voice: Any, synthesize_args: dict[str, Any]) -> FastAPI:
         full WAV is buffered and returned in one response. ``?language=`` /
         ``?language_id=`` route through the loaded voice's language map.
         """
+        request_speaker_embedding: np.ndarray | None = None
+        request_speaker_id: int | None = None
+        body_text: str | None = None
         try:
-            body_text = await _read_text(request, text)
+            json_text, json_emb, json_sid = await _parse_json_body(request)
         except _RequestTooLarge:
             return _error_response(413, f"Request body exceeds {MAX_TEXT_BYTES} bytes")
+        except _InvalidEmbedding as exc:
+            return _error_response(400, exc.message)
+
+        if json_text is not None or json_emb is not None or json_sid is not None:
+            body_text = (json_text or "").strip()
+            request_speaker_embedding = json_emb
+            request_speaker_id = json_sid
+        else:
+            try:
+                body_text = await _read_text(request, text)
+            except _RequestTooLarge:
+                return _error_response(
+                    413, f"Request body exceeds {MAX_TEXT_BYTES} bytes"
+                )
 
         if not body_text:
             return _error_response(400, "No text provided")
 
         resolved_language_id = _resolve_language_id(voice, language_id, language)
         is_streaming = _parse_bool_flag(streaming)
+
+        per_request_kwargs: dict[str, Any] = dict(synthesize_args)
+        if request_speaker_embedding is not None:
+            per_request_kwargs["speaker_embedding"] = request_speaker_embedding
+        if request_speaker_id is not None:
+            per_request_kwargs["speaker_id"] = request_speaker_id
         _LOGGER.debug(
             "Synthesizing text: %s (language_id=%s, streaming=%s)",
             _sanitize_for_log(body_text),
@@ -211,7 +332,7 @@ def create_app(voice: Any, synthesize_args: dict[str, Any]) -> FastAPI:
                     yield _build_streaming_wav_header(sample_rate)
                     yield from voice.synthesize_stream_raw(
                         body_text,
-                        **synthesize_args,
+                        **per_request_kwargs,
                         language_id=resolved_language_id,
                     )
                 except Exception:
@@ -228,7 +349,7 @@ def create_app(voice: Any, synthesize_args: dict[str, Any]) -> FastAPI:
                     voice.synthesize(
                         body_text,
                         wav_file,
-                        **synthesize_args,
+                        **per_request_kwargs,
                         language_id=resolved_language_id,
                     )
                 return wav_io.getvalue()
@@ -251,10 +372,27 @@ def create_app(voice: Any, synthesize_args: dict[str, Any]) -> FastAPI:
         Returns 400 if the model lacks ``durations`` output. Compatible with
         Rust/Go/C++/C# implementations (byte-for-byte timing values).
         """
+        request_speaker_embedding: np.ndarray | None = None
+        request_speaker_id: int | None = None
+        body_text: str | None = None
         try:
-            body_text = await _read_text(request, text)
+            json_text, json_emb, json_sid = await _parse_json_body(request)
         except _RequestTooLarge:
             return _error_response(413, f"Request body exceeds {MAX_TEXT_BYTES} bytes")
+        except _InvalidEmbedding as exc:
+            return _error_response(400, exc.message)
+
+        if json_text is not None or json_emb is not None or json_sid is not None:
+            body_text = (json_text or "").strip()
+            request_speaker_embedding = json_emb
+            request_speaker_id = json_sid
+        else:
+            try:
+                body_text = await _read_text(request, text)
+            except _RequestTooLarge:
+                return _error_response(
+                    413, f"Request body exceeds {MAX_TEXT_BYTES} bytes"
+                )
 
         if not body_text:
             return _error_response(400, "No text provided")
@@ -267,10 +405,16 @@ def create_app(voice: Any, synthesize_args: dict[str, Any]) -> FastAPI:
 
         resolved_language_id = _resolve_language_id(voice, language_id, language)
 
+        per_request_kwargs: dict[str, Any] = dict(synthesize_args)
+        if request_speaker_embedding is not None:
+            per_request_kwargs["speaker_embedding"] = request_speaker_embedding
+        if request_speaker_id is not None:
+            per_request_kwargs["speaker_id"] = request_speaker_id
+
         def _do_timing():
             return voice.synthesize_with_timing(
                 body_text,
-                **synthesize_args,
+                **per_request_kwargs,
                 language_id=resolved_language_id,
             )
 

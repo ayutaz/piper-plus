@@ -5,6 +5,7 @@ import logging
 import os
 import sys
 import time
+import warnings
 from pathlib import Path
 
 import numpy as np
@@ -61,6 +62,9 @@ TRIM_MIN_SAMPLES = 2205
 TRIM_EOS_MAX_FRAMES = 0
 # Default hop length when config.json does not declare audio.hop_size.
 DEFAULT_HOP_SIZE = 256
+
+# Speaker embedding dimension for CAM++ models
+_SPK_EMBED_DIM = 192
 
 
 def _pad_phoneme_ids(
@@ -376,6 +380,151 @@ def _detect_dominant_language(text: str, language_id_map: dict[str, int]) -> int
     return _DominantLanguageDetector.get(language_id_map).detect(text)
 
 
+def _extract_speaker_embedding_from_audio(
+    audio_path: str | Path,
+    encoder_path: str | Path,
+) -> np.ndarray:
+    """Extract speaker embedding from reference audio using CAM++ ONNX encoder.
+
+    Args:
+        audio_path: Path to reference WAV file.
+        encoder_path: Path to CAM++ ONNX model.
+
+    Returns:
+        Speaker embedding, shape [192], float32, L2-normalized.
+    """
+    import onnxruntime  # noqa: PLC0415
+
+    from .extract_speaker_embedding import (  # noqa: PLC0415
+        extract_embedding,
+        preprocess_audio,
+    )
+
+    encoder_session = onnxruntime.InferenceSession(
+        str(encoder_path),
+        providers=["CPUExecutionProvider"],
+    )
+    fbank = preprocess_audio(audio_path)
+    embedding = extract_embedding(encoder_session, fbank)
+    _LOGGER.info(
+        "Extracted speaker embedding from %s (norm=%.4f)",
+        audio_path,
+        np.linalg.norm(embedding),
+    )
+    return embedding
+
+
+def _find_speaker_encoder(model_path: Path) -> Path | None:
+    """Search for campplus.onnx near the model file.
+
+    Search order:
+      1. Same directory as model
+      2. Parent directory
+      3. Parent's 'models' subdirectory
+
+    Returns:
+        Path to campplus.onnx if found, else None.
+    """
+    candidates = [
+        model_path.parent / "campplus.onnx",
+        model_path.parent.parent / "campplus.onnx",
+        model_path.parent.parent / "models" / "campplus.onnx",
+    ]
+    for p in candidates:
+        if p.exists():
+            _LOGGER.info("Auto-detected speaker encoder: %s", p)
+            return p
+    return None
+
+
+def _resolve_speaker_embedding(
+    *,
+    speaker_audio: str | None,
+    speaker_encoder: str | None,
+    speaker_embedding_path: str | None,
+    speaker_id: int | None,
+    model_path: Path,
+    dataset_dir: Path | None,
+) -> np.ndarray | None:
+    """Resolve speaker embedding from the various input sources.
+
+    Priority:
+      1. --speaker-embedding (pre-computed .npy file)
+      2. --speaker-audio + --speaker-encoder (extract at runtime)
+      3. --speaker-id (look up pre-computed per-speaker embedding)
+
+    Returns:
+        np.ndarray of shape [192] or None if no embedding can be resolved.
+    """
+    # 1. Direct .npy file
+    if speaker_embedding_path is not None:
+        emb_path = Path(speaker_embedding_path)
+        if not emb_path.exists():
+            _LOGGER.error("Speaker embedding file not found: %s", emb_path)
+            sys.exit(1)
+        emb = np.load(str(emb_path)).astype(np.float32)
+        if emb.shape != (_SPK_EMBED_DIM,):
+            _LOGGER.error(
+                "Speaker embedding has wrong shape: %s (expected (%d,))",
+                emb.shape,
+                _SPK_EMBED_DIM,
+            )
+            sys.exit(1)
+        _LOGGER.info("Loaded speaker embedding from %s", emb_path)
+        return emb
+
+    # 2. Extract from reference audio
+    if speaker_audio is not None:
+        audio_path = Path(speaker_audio)
+        if not audio_path.exists():
+            _LOGGER.error("Speaker audio file not found: %s", audio_path)
+            sys.exit(1)
+        # Resolve encoder path
+        if speaker_encoder is not None:
+            encoder_path = Path(speaker_encoder)
+        else:
+            encoder_path = _find_speaker_encoder(model_path)
+        if encoder_path is None or not encoder_path.exists():
+            _LOGGER.error(
+                "Speaker encoder (campplus.onnx) not found. "
+                "Specify --speaker-encoder or place campplus.onnx near the model."
+            )
+            sys.exit(1)
+        return _extract_speaker_embedding_from_audio(audio_path, encoder_path)
+
+    # 3. Look up by speaker_id in pre-computed embeddings
+    if speaker_id is not None:
+        # Search locations for per-speaker embeddings
+        search_dirs: list[Path] = []
+        if dataset_dir is not None:
+            search_dirs.append(dataset_dir)
+        search_dirs.append(model_path.parent)
+
+        for search_dir in search_dirs:
+            npy_path = search_dir / f"speaker_{speaker_id}.npy"
+            if npy_path.exists():
+                emb = np.load(str(npy_path)).astype(np.float32)
+                if emb.ndim != 1 or emb.shape[0] != _SPK_EMBED_DIM:
+                    emb = emb.reshape(_SPK_EMBED_DIM)
+                _LOGGER.info(
+                    "Loaded per-speaker embedding for speaker_id=%d from %s",
+                    speaker_id,
+                    npy_path,
+                )
+                return emb
+
+        # speaker_id given but no per-speaker embedding found
+        warnings.warn(
+            f"--speaker-id {speaker_id} specified but no pre-computed embedding "
+            f"(speaker_{speaker_id}.npy) found. For zero-shot models, use "
+            f"--speaker-audio or --speaker-embedding instead.",
+            stacklevel=2,
+        )
+        return None
+
+    return None
+
+
 def text_to_phoneme_ids_and_prosody(
     text: str,
     phoneme_id_map: dict[str, list[int]],
@@ -526,7 +675,7 @@ def resolve_config_path(model: str, config: str | None) -> Path:
 
 def main():
     """Main entry point"""
-    logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig(level=logging.INFO)
     parser = argparse.ArgumentParser(prog="piper_train.infer_onnx")
     parser.add_argument("--model", help="Path to model (.onnx) or model name/alias")
     parser.add_argument("--output-dir", help="Path to write WAV files")
@@ -582,21 +731,39 @@ def main():
     parser.add_argument(
         "--speaker-id",
         type=int,
-        default=0,
-        help="Speaker ID for multi-speaker models (default: 0)",
+        default=None,
+        help="Speaker ID. For legacy sid-based models, passed directly as sid tensor. "
+        "For zero-shot models (speaker_embedding input), used to look up "
+        "pre-computed per-speaker embedding (speaker_{id}.npy).",
+    )
+    parser.add_argument(
+        "--speaker-audio",
+        default=None,
+        help="Path to reference WAV file for zero-shot speaker cloning. "
+        "Speaker embedding is extracted at runtime using CAM++ encoder.",
+    )
+    parser.add_argument(
+        "--speaker-encoder",
+        default=None,
+        help="Path to CAM++ ONNX speaker encoder model. "
+        "If not specified, searches for campplus.onnx near the model file.",
+    )
+    parser.add_argument(
+        "--speaker-embedding",
+        default=None,
+        help="Path to pre-computed speaker embedding .npy file (192-dim float32).",
+    )
+    parser.add_argument(
+        "--dataset-dir",
+        default=None,
+        help="Dataset directory to search for per-speaker embeddings "
+        "(speaker_{id}.npy) when using --speaker-id with zero-shot models.",
     )
     parser.add_argument(
         "--device",
         choices=["auto", "cpu", "gpu"],
         default="auto",
         help="Device to run inference on (default: auto)",
-    )
-    parser.add_argument(
-        "--speaker-embedding",
-        default=None,
-        metavar="PATH",
-        help="Path to a .npy file containing a speaker embedding vector "
-        "(e.g. 256-dim from ECAPA-TDNN). Overrides --speaker-id.",
     )
     parser.add_argument(
         "--reference-audio",
@@ -707,55 +874,60 @@ def main():
     )
     warmup_onnx_session(model)
 
-    # Check if model supports prosody features
+    # Check which optional inputs the ONNX model accepts
     input_names = [inp.name for inp in model.get_inputs()]
     has_prosody = "prosody_features" in input_names
     has_sid = "sid" in input_names
-    has_lid = "lid" in input_names
     has_spk_emb = "speaker_embedding" in input_names
+    has_spk_emb_mask = "speaker_embedding_mask" in input_names
+    has_lid = "lid" in input_names
     if has_prosody:
         _LOGGER.info("Model supports prosody features (A1/A2/A3)")
     if has_sid:
-        _LOGGER.info("Model supports multi-speaker (sid input)")
+        _LOGGER.info("Model supports multi-speaker (sid input, legacy mode)")
+    if has_spk_emb:
+        _LOGGER.info("Model supports speaker embedding (zero-shot mode)")
     if has_lid:
         _LOGGER.info("Model supports multi-language (lid input)")
+
+    # Resolve speaker embedding for zero-shot models
+    # This is done once and reused for all utterances in --text mode
+    model_path = Path(args.model)
+    resolved_spk_emb: np.ndarray | None = None
     if has_spk_emb:
-        _LOGGER.info("Model supports speaker_embedding (voice cloning)")
+        dataset_dir = Path(args.dataset_dir) if args.dataset_dir else None
 
-    # Resolve speaker embedding from --speaker-embedding or --reference-audio
-    spk_emb_array = None
-    if args.speaker_embedding:
-        spk_emb_array = np.load(args.speaker_embedding).astype(np.float32)
-        if spk_emb_array.ndim == 1:
-            spk_emb_array = spk_emb_array.reshape(1, -1)
-        _LOGGER.info(
-            "Loaded speaker embedding from %s (dim=%d)",
-            args.speaker_embedding,
-            spk_emb_array.shape[1],
+        resolved_spk_emb = _resolve_speaker_embedding(
+            speaker_audio=args.speaker_audio,
+            speaker_encoder=args.speaker_encoder,
+            speaker_embedding_path=args.speaker_embedding,
+            speaker_id=args.speaker_id,
+            model_path=model_path,
+            dataset_dir=dataset_dir,
         )
-    elif args.reference_audio:
-        if not args.speaker_encoder_model:
-            print(
-                "Error: --speaker-encoder-model is required with --reference-audio.",
-                file=sys.stderr,
-            )
+        if resolved_spk_emb is None and (
+            args.speaker_audio is not None or args.speaker_embedding is not None
+        ):
+            # Explicit speaker source was given but resolution failed
+            _LOGGER.error("Failed to resolve speaker embedding")
             sys.exit(1)
-        from .speaker_encoder import SpeakerEncoder  # noqa: PLC0415
-
-        se_encoder = SpeakerEncoder.from_onnx(args.speaker_encoder_model)
-        spk_emb_vec = se_encoder.encode(args.reference_audio)
-        spk_emb_array = spk_emb_vec.reshape(1, -1).astype(np.float32)
-        _LOGGER.info(
-            "Encoded speaker embedding from %s (dim=%d)",
-            args.reference_audio,
-            spk_emb_array.shape[1],
-        )
-
-    if spk_emb_array is not None and not has_spk_emb:
+        if resolved_spk_emb is None:
+            _LOGGER.warning(
+                "Zero-shot model but no speaker embedding provided. "
+                "Using zero embedding (output quality will be poor). "
+                "Use --speaker-audio, --speaker-embedding, or --speaker-id."
+            )
+            resolved_spk_emb = np.zeros(_SPK_EMBED_DIM, dtype=np.float32)
+    elif args.speaker_audio is not None or args.speaker_embedding is not None:
         _LOGGER.warning(
-            "speaker_embedding provided but model does not have "
-            "speaker_embedding input; it will be ignored."
+            "Model does not have speaker_embedding input. "
+            "--speaker-audio/--speaker-embedding will be ignored. "
+            "Using sid-based speaker conditioning instead."
         )
+
+    # For legacy sid models, default speaker_id to 0 if not specified
+    if has_sid and args.speaker_id is None:
+        args.speaker_id = 0
 
     # Handle --text mode: convert text to phoneme_ids and prosody_features
     phoneme_id_map = None
@@ -817,14 +989,16 @@ def main():
             )
 
         # Create single utterance
-        utterances = [
-            {
-                "phoneme_ids": phoneme_ids,
-                "speaker_id": args.speaker_id if has_sid else None,
-                "language_id": language_id if has_lid else None,
-                "prosody_features": prosody_features_data,
-            }
-        ]
+        utt_data: dict = {
+            "phoneme_ids": phoneme_ids,
+            "language_id": language_id if has_lid else None,
+            "prosody_features": prosody_features_data,
+        }
+        if has_sid:
+            utt_data["speaker_id"] = (
+                args.speaker_id if args.speaker_id is not None else 0
+            )
+        utterances = [utt_data]
     else:
         # Read from stdin (JSONL mode)
         utterances = parse_jsonl_stream(sys.stdin)
@@ -864,7 +1038,6 @@ def main():
             [adj_noise, adj_length, adj_noise_w],
             dtype=np.float32,
         )
-        sid = resolve_speaker_id(speaker_id, has_sid)
 
         # Build input dictionary
         inputs = {
@@ -873,7 +1046,26 @@ def main():
             "scales": scales,
         }
 
-        if sid is not None:
+        # Handle speaker conditioning: new zero-shot mode vs legacy sid mode
+        if has_spk_emb:
+            # Zero-shot model: always use speaker_embedding tensor
+            # Per-utterance embedding from JSONL overrides the CLI-resolved one
+            utt_spk_emb = utt.get("speaker_embedding")
+            if utt_spk_emb is not None:
+                spk_emb = np.array(utt_spk_emb, dtype=np.float32)
+            else:
+                spk_emb = resolved_spk_emb
+            inputs["speaker_embedding"] = np.expand_dims(spk_emb, 0)  # [1, 192]
+            if has_spk_emb_mask:
+                inputs["speaker_embedding_mask"] = np.ones((1,), dtype=np.int64)
+        elif has_sid:
+            # Legacy sid-based model
+            sid = None
+            if speaker_id is not None:
+                sid = np.array([speaker_id], dtype=np.int64)
+            # Default sid to 0 for models that require it (e.g. single-speaker multilingual)
+            if sid is None:
+                sid = np.array([0], dtype=np.int64)
             inputs["sid"] = sid
 
         # Handle language ID if model supports it
@@ -900,23 +1092,6 @@ def main():
                 # No prosody data provided - use zeros (int64)
                 prosody_features = np.zeros((1, text.shape[1], 3), dtype=np.int64)
             inputs["prosody_features"] = prosody_features
-
-        # Handle speaker embedding if model supports it
-        if has_spk_emb:
-            if spk_emb_array is not None:
-                inputs["speaker_embedding"] = spk_emb_array
-                inputs["speaker_embedding_mask"] = np.array([[1]], dtype=np.int64)
-            else:
-                # No speaker embedding: provide zeros with mask=0
-                # Infer emb_dim from the ONNX input shape (dynamic, fallback to 256)
-                for inp in model.get_inputs():
-                    if inp.name == "speaker_embedding":
-                        emb_dim = inp.shape[1] if isinstance(inp.shape[1], int) else 256
-                        break
-                else:
-                    emb_dim = 256
-                inputs["speaker_embedding"] = np.zeros((1, emb_dim), dtype=np.float32)
-                inputs["speaker_embedding_mask"] = np.array([[0]], dtype=np.int64)
 
         start_time = time.perf_counter()
         outputs = model.run(None, inputs)

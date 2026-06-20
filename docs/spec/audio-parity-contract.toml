@@ -62,3 +62,15 @@ cpp     = { id = "cpp",     cli = "piper",                  supports_dump_wav = 
 multilingual_test_medium = { hf = "ayousanz/piper-plus-css10-ja-6lang" }
 tsukuyomi_6lang_v2       = { hf = "ayousanz/piper-plus-tsukuyomi-chan" }
 mb_istft_base            = { hf = "ayousanz/piper-plus-base" }
+
+# Zero-shot test model entry — pins the `speaker_embedding` input contract
+# so cross-runtime parity for the v7 multi-6lang zero-shot decoder can be
+# verified without depending on speaker_id lookup. `expected_embedding_dim`
+# matches the CAM++ ONNX speaker encoder output (192-dim, L2 normalised);
+# `has_speaker_embedding=true` signals to scripts/audio_parity.py that the
+# corresponding fixture (zero_shot_phoneme_ids.jsonl + test_speaker.npy)
+# must be forwarded as `--speaker-embedding` to every runtime CLI.
+[models.zero_shot_test_model]
+hf = "ayousanz/piper-plus-zero-shot-multi-6lang-v7"
+has_speaker_embedding = true
+expected_embedding_dim = 192

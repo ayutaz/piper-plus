@@ -170,7 +170,7 @@ CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.infer_onnx \
   --config /path/to/config.json \
   --output-dir ./test-output \
   --text "こんにちは、今日は良い天気ですね。" \
-  --language ja-en-zh-es-fr-pt --speaker-id 0 --noise-scale 0.667
+  --language ja-en-zh-es-fr-pt --speaker-id 0 --noise-scale 0.4
 
 # English (speaker_id=20, EN speaker)
 CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.infer_onnx \
@@ -178,7 +178,7 @@ CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.infer_onnx \
   --config /path/to/config.json \
   --output-dir ./test-output \
   --text "Hello, how are you today?" \
-  --language ja-en-zh-es-fr-pt --speaker-id 20 --noise-scale 0.667
+  --language ja-en-zh-es-fr-pt --speaker-id 20 --noise-scale 0.4
 
 # Chinese
 CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.infer_onnx \
@@ -186,7 +186,7 @@ CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.infer_onnx \
   --config /path/to/config.json \
   --output-dir ./test-output \
   --text "你好，今天天气很好。" \
-  --language ja-en-zh-es-fr-pt --speaker-id 162 --noise-scale 0.667
+  --language ja-en-zh-es-fr-pt --speaker-id 162 --noise-scale 0.4
 
 # Spanish
 CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.infer_onnx \
@@ -194,7 +194,7 @@ CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.infer_onnx \
   --config /path/to/config.json \
   --output-dir ./test-output \
   --text "Hola, como estas hoy?" \
-  --language ja-en-zh-es-fr-pt --speaker-id 472 --noise-scale 0.667
+  --language ja-en-zh-es-fr-pt --speaker-id 472 --noise-scale 0.4
 
 # French
 CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.infer_onnx \
@@ -202,7 +202,7 @@ CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.infer_onnx \
   --config /path/to/config.json \
   --output-dir ./test-output \
   --text "Bonjour, comment allez-vous?" \
-  --language ja-en-zh-es-fr-pt --speaker-id 535 --noise-scale 0.667
+  --language ja-en-zh-es-fr-pt --speaker-id 535 --noise-scale 0.4
 
 # Portuguese
 CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.infer_onnx \
@@ -210,7 +210,7 @@ CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.infer_onnx \
   --config /path/to/config.json \
   --output-dir ./test-output \
   --text "Ola, como voce esta hoje?" \
-  --language ja-en-zh-es-fr-pt --speaker-id 563 --noise-scale 0.667
+  --language ja-en-zh-es-fr-pt --speaker-id 563 --noise-scale 0.4
 ```
 
 ### What to Check

@@ -1,12 +1,11 @@
-"""Tests for M3-02: speaker_embedding input path in SynthesizerTrn.
+"""Tests for M3-02: speaker_embeddings input path in SynthesizerTrn.
 
 Verifies:
-- SynthesizerTrn.infer() accepts speaker_embedding and produces valid audio
-- speaker_embedding=None falls back to emb_g(sid) (backward compat)
-- Linear projection when speaker_embedding dim != gin_channels
-- ONNX export includes speaker_embedding / speaker_embedding_mask inputs
-- speaker_embedding_mask=0 causes speaker_embedding to be ignored
-- forward() accepts speaker_embedding kwarg without using it
+- SynthesizerTrn.infer() accepts speaker_embeddings and produces valid audio
+- speaker_embeddings is required for multi-speaker models
+- spk_proj is always a 2-layer MLP Sequential for multi-speaker models
+- ONNX export includes speaker_embedding input
+- forward() accepts speaker_embeddings kwarg
 """
 
 import pytest
@@ -24,18 +23,18 @@ class TestInferSpeakerEmbedding:
 
     @pytest.mark.unit
     def test_infer_with_speaker_embedding_produces_audio(self, make_synthesizer_trn):
-        """Passing a speaker_embedding produces valid (non-zero) audio."""
+        """Passing speaker_embeddings (192-dim CAM++) produces valid (non-zero) audio."""
         gin = 256
         model = make_synthesizer_trn(n_speakers=2, gin_channels=gin)
         model.eval()
 
         x = torch.randint(0, 50, (1, 12))
         x_len = torch.LongTensor([12])
-        spk_emb = torch.randn(1, gin)
+        spk_emb = torch.randn(1, 192)  # CAM++ 192-dim embedding
 
         with torch.no_grad():
             o, attn, y_mask, _, _ = model.infer(
-                x, x_len, speaker_embedding=spk_emb
+                x, x_len, speaker_embeddings=spk_emb
             )
 
         assert o.dim() == 3
@@ -43,25 +42,22 @@ class TestInferSpeakerEmbedding:
         assert o.shape[2] > 0, "Audio length should be > 0"
 
     @pytest.mark.unit
-    def test_infer_none_speaker_embedding_uses_sid(self, make_synthesizer_trn):
-        """speaker_embedding=None falls back to emb_g(sid)."""
+    def test_infer_requires_speaker_embeddings_for_multi_speaker(self, make_synthesizer_trn):
+        """Multi-speaker models require speaker_embeddings; omitting raises AssertionError."""
         gin = 256
         model = make_synthesizer_trn(n_speakers=2, gin_channels=gin)
         model.eval()
 
         x = torch.randint(0, 50, (1, 10))
         x_len = torch.LongTensor([10])
-        sid = torch.LongTensor([0])
 
-        with torch.no_grad():
-            o, attn, y_mask, _, _ = model.infer(x, x_len, sid=sid)
-
-        assert o.dim() == 3
-        assert o.shape[0] == 1
+        with pytest.raises(AssertionError, match="Missing speaker_embeddings"):
+            with torch.no_grad():
+                model.infer(x, x_len)
 
     @pytest.mark.unit
-    def test_infer_speaker_embedding_overrides_sid(self, make_synthesizer_trn):
-        """When both speaker_embedding and sid are provided, speaker_embedding wins."""
+    def test_infer_speaker_embeddings_with_sid_accepted(self, make_synthesizer_trn):
+        """sid is accepted alongside speaker_embeddings (ONNX compat); only spk_emb used."""
         gin = 256
         model = make_synthesizer_trn(n_speakers=2, gin_channels=gin)
         model.eval()
@@ -69,102 +65,112 @@ class TestInferSpeakerEmbedding:
         x = torch.randint(0, 50, (1, 10))
         x_len = torch.LongTensor([10])
         sid = torch.LongTensor([0])
-        spk_emb = torch.randn(1, gin)
+        spk_emb_a = torch.randn(1, 192)
+        spk_emb_b = torch.randn(1, 192)
 
         with torch.no_grad():
-            o_emb, _, _, _, _ = model.infer(
-                x, x_len, sid=sid, speaker_embedding=spk_emb
+            o_a, _, _, _, _ = model.infer(
+                x, x_len, sid=sid, speaker_embeddings=spk_emb_a
             )
-            o_sid, _, _, _, _ = model.infer(x, x_len, sid=sid)
+            o_b, _, _, _, _ = model.infer(
+                x, x_len, sid=sid, speaker_embeddings=spk_emb_b
+            )
 
         # Both should produce valid 3D audio tensors.
-        # Audio lengths may differ (different conditioning -> different durations).
-        assert o_emb.dim() == 3
-        assert o_sid.dim() == 3
-        assert o_emb.shape[0] == 1
-        assert o_sid.shape[0] == 1
+        assert o_a.dim() == 3
+        assert o_b.dim() == 3
+        assert o_a.shape[0] == 1
+        assert o_b.shape[0] == 1
 
     @pytest.mark.unit
-    def test_infer_speaker_embedding_3d(self, make_synthesizer_trn):
-        """speaker_embedding with shape (batch, dim, 1) is accepted."""
+    def test_infer_speaker_embedding_192dim(self, make_synthesizer_trn):
+        """speaker_embeddings with CAM++ standard shape [batch, 192] is accepted."""
         gin = 256
         model = make_synthesizer_trn(n_speakers=2, gin_channels=gin)
         model.eval()
 
         x = torch.randint(0, 50, (1, 10))
         x_len = torch.LongTensor([10])
-        spk_emb = torch.randn(1, gin, 1)  # already has trailing dim
+        spk_emb = torch.randn(1, 192)  # standard CAM++ embedding shape
 
         with torch.no_grad():
-            o, _, _, _, _ = model.infer(x, x_len, speaker_embedding=spk_emb)
+            o, _, _, _, _ = model.infer(x, x_len, speaker_embeddings=spk_emb)
 
         assert o.dim() == 3
 
 
 # ---------------------------------------------------------------------------
-# Tests: Linear projection when dim mismatch
+# Tests: spk_proj MLP for multi-speaker models
 # ---------------------------------------------------------------------------
 
 
 class TestSpeakerEmbeddingProjection:
-    """Linear projection for mismatched speaker_embedding dimensions."""
+    """spk_proj is always a 2-layer MLP Sequential for multi-speaker models."""
 
     @pytest.mark.unit
-    def test_projection_created_on_mismatch(self, make_synthesizer_trn):
-        """spk_proj is lazily created when emb_dim != gin_channels."""
+    def test_spk_proj_exists_for_multi_speaker(self, make_synthesizer_trn):
+        """spk_proj is always a nn.Sequential for n_speakers > 1."""
+        import torch.nn as nn
+
         gin = 512
-        emb_dim = 256
         model = make_synthesizer_trn(n_speakers=2, gin_channels=gin)
-        model.eval()
 
-        assert model.spk_proj is None, "spk_proj should start as None"
-
-        x = torch.randint(0, 50, (1, 10))
-        x_len = torch.LongTensor([10])
-        spk_emb = torch.randn(1, emb_dim)
-
-        with torch.no_grad():
-            o, _, _, _, _ = model.infer(x, x_len, speaker_embedding=spk_emb)
-
-        assert model.spk_proj is not None, "spk_proj should be created"
-        assert model.spk_proj.in_features == emb_dim
-        assert model.spk_proj.out_features == gin
+        assert hasattr(model, "spk_proj"), "spk_proj should exist for multi-speaker"
+        assert isinstance(model.spk_proj, nn.Sequential), (
+            "spk_proj should be an nn.Sequential (2-layer MLP)"
+        )
 
     @pytest.mark.unit
-    def test_no_projection_when_dims_match(self, make_synthesizer_trn):
-        """No projection needed when emb_dim == gin_channels."""
+    def test_spk_proj_input_dim_is_192(self, make_synthesizer_trn):
+        """spk_proj first Linear layer accepts 192-dim CAM++ embeddings."""
+        import torch.nn as nn
+
+        gin = 512
+        model = make_synthesizer_trn(n_speakers=2, gin_channels=gin)
+
+        first_linear = model.spk_proj[0]
+        assert isinstance(first_linear, nn.Linear)
+        assert first_linear.in_features == 192, (
+            f"Expected spk_proj input dim 192, got {first_linear.in_features}"
+        )
+        assert first_linear.out_features == gin, (
+            f"Expected spk_proj output dim {gin}, got {first_linear.out_features}"
+        )
+
+    @pytest.mark.unit
+    def test_spk_proj_not_created_for_single_speaker(self, make_synthesizer_trn):
+        """spk_proj is not created for single-speaker models."""
+        model = make_synthesizer_trn(n_speakers=1, gin_channels=0)
+
+        assert not hasattr(model, "spk_proj"), (
+            "spk_proj should not exist for single-speaker models"
+        )
+
+    @pytest.mark.unit
+    def test_infer_consistent_across_calls(self, make_synthesizer_trn):
+        """Same speaker_embeddings produce same output across repeated calls."""
         gin = 256
         model = make_synthesizer_trn(n_speakers=2, gin_channels=gin)
         model.eval()
+        model.onnx_export_mode = True
+        if hasattr(model, "dp"):
+            model.dp.onnx_export_mode = True
 
         x = torch.randint(0, 50, (1, 10))
         x_len = torch.LongTensor([10])
-        spk_emb = torch.randn(1, gin)
+        spk_emb = torch.randn(1, 192)
 
         with torch.no_grad():
-            model.infer(x, x_len, speaker_embedding=spk_emb)
+            o1, _, _, _, _ = model.infer(
+                x, x_len, noise_scale=0.0, noise_scale_w=0.0,
+                speaker_embeddings=spk_emb,
+            )
+            o2, _, _, _, _ = model.infer(
+                x, x_len, noise_scale=0.0, noise_scale_w=0.0,
+                speaker_embeddings=spk_emb,
+            )
 
-        assert model.spk_proj is None, "spk_proj should remain None when dims match"
-
-    @pytest.mark.unit
-    def test_projection_reused_across_calls(self, make_synthesizer_trn):
-        """spk_proj is created once and reused."""
-        gin = 512
-        emb_dim = 256
-        model = make_synthesizer_trn(n_speakers=2, gin_channels=gin)
-        model.eval()
-
-        x = torch.randint(0, 50, (1, 10))
-        x_len = torch.LongTensor([10])
-        spk_emb = torch.randn(1, emb_dim)
-
-        with torch.no_grad():
-            model.infer(x, x_len, speaker_embedding=spk_emb)
-            proj_first = model.spk_proj
-            model.infer(x, x_len, speaker_embedding=spk_emb)
-            proj_second = model.spk_proj
-
-        assert proj_first is proj_second, "spk_proj should be the same object"
+        torch.testing.assert_close(o1, o2)
 
 
 # ---------------------------------------------------------------------------
@@ -173,11 +179,11 @@ class TestSpeakerEmbeddingProjection:
 
 
 class TestSpeakerEmbeddingWithLanguage:
-    """speaker_embedding + emb_lang (multilingual voice cloning)."""
+    """speaker_embeddings + emb_lang (multilingual voice cloning)."""
 
     @pytest.mark.unit
     def test_infer_with_speaker_embedding_and_lid(self, make_synthesizer_trn):
-        """speaker_embedding combined with language embedding."""
+        """speaker_embeddings combined with language embedding."""
         gin = 256
         model = make_synthesizer_trn(n_speakers=2, n_languages=3, gin_channels=gin)
         model.eval()
@@ -185,11 +191,11 @@ class TestSpeakerEmbeddingWithLanguage:
         x = torch.randint(0, 50, (1, 10))
         x_len = torch.LongTensor([10])
         lid = torch.LongTensor([1])
-        spk_emb = torch.randn(1, gin)
+        spk_emb = torch.randn(1, 192)  # 192-dim CAM++ embedding
 
         with torch.no_grad():
             o, _, _, _, _ = model.infer(
-                x, x_len, lid=lid, speaker_embedding=spk_emb
+                x, x_len, lid=lid, speaker_embeddings=spk_emb
             )
 
         assert o.dim() == 3
@@ -197,16 +203,16 @@ class TestSpeakerEmbeddingWithLanguage:
 
 
 # ---------------------------------------------------------------------------
-# Tests: forward() accepts speaker_embedding without using it
+# Tests: forward() accepts speaker_embeddings
 # ---------------------------------------------------------------------------
 
 
 class TestForwardSpeakerEmbedding:
-    """forward() accepts speaker_embedding kwarg (unused, future-reserved)."""
+    """forward() accepts speaker_embeddings kwarg."""
 
     @pytest.mark.unit
-    def test_forward_accepts_speaker_embedding_kwarg(self, make_synthesizer_trn):
-        """forward() does not raise when speaker_embedding is passed."""
+    def test_forward_accepts_speaker_embeddings_kwarg(self, make_synthesizer_trn):
+        """forward() does not raise when speaker_embeddings is passed to single-speaker model."""
         model = make_synthesizer_trn(n_speakers=1, gin_channels=0)
 
         batch, text_len, spec_len = 1, 10, 50
@@ -219,7 +225,7 @@ class TestForwardSpeakerEmbedding:
         with torch.no_grad():
             result = model(
                 x, x_lengths, spec, spec_lengths,
-                speaker_embedding=spk_emb,
+                speaker_embeddings=spk_emb,
             )
 
         # forward returns 8 elements (including decoder_subbands)
@@ -232,7 +238,7 @@ class TestForwardSpeakerEmbedding:
 
 
 class TestOnnxExportSpeakerEmbedding:
-    """ONNX export includes speaker_embedding and speaker_embedding_mask."""
+    """ONNX export includes speaker_embedding input."""
 
     @pytest.fixture
     def onnx_model_with_spk_emb(self, tmp_path, make_synthesizer_trn):
@@ -261,21 +267,13 @@ class TestOnnxExportSpeakerEmbedding:
         scales = torch.FloatTensor([0.667, 1.0, 0.8])
         sid = torch.LongTensor([0])
         spk_emb = torch.zeros(1, spk_emb_dim, dtype=torch.float32)
-        spk_mask = torch.zeros(1, 1, dtype=torch.int64)
 
         def infer_forward(text, text_lengths, scales_t, sid_t,
-                          speaker_embedding, speaker_embedding_mask):
+                          speaker_embedding):
             length_scale = scales_t[1]
             noise_scale_w = scales_t[2]
 
-            # Standard sid-based conditioning
-            g_base = model.emb_g(sid_t).unsqueeze(-1)  # (batch, gin, 1)
-
-            # Speaker-embedding conditioning (trace-friendly: always evaluate
-            # both paths and select via torch.where)
-            g_se = speaker_embedding.unsqueeze(-1)  # (batch, emb_dim, 1)
-            use_se = (speaker_embedding_mask >= 1).unsqueeze(-1).float()
-            g = torch.where(use_se >= 1, g_se, g_base)
+            g = speaker_embedding.unsqueeze(-1)  # (batch, emb_dim, 1)
 
             x, m_p, logs_p, x_mask = model.enc_p(text, text_lengths, g=g)
             x_dp = model._prepare_prosody_input(x, x_mask, None)
@@ -314,12 +312,12 @@ class TestOnnxExportSpeakerEmbedding:
         try:
             torch.onnx.export(
                 model,
-                (sequences, seq_lengths, scales, sid, spk_emb, spk_mask),
+                (sequences, seq_lengths, scales, sid, spk_emb),
                 str(onnx_path),
                 opset_version=15,
                 input_names=[
                     "input", "input_lengths", "scales", "sid",
-                    "speaker_embedding", "speaker_embedding_mask",
+                    "speaker_embedding",
                 ],
                 output_names=["output", "durations"],
                 dynamic_axes={
@@ -327,7 +325,6 @@ class TestOnnxExportSpeakerEmbedding:
                     "input_lengths": {0: "batch_size"},
                     "sid": {0: "batch_size"},
                     "speaker_embedding": {0: "batch_size", 1: "emb_dim"},
-                    "speaker_embedding_mask": {0: "batch_size"},
                     "output": {0: "batch_size", 2: "time"},
                     "durations": {0: "batch_size", 1: "phonemes"},
                 },
@@ -343,75 +340,10 @@ class TestOnnxExportSpeakerEmbedding:
 
     @pytest.mark.inference
     def test_onnx_has_speaker_embedding_inputs(self, onnx_model_with_spk_emb):
-        """Exported ONNX model has speaker_embedding and mask inputs."""
+        """Exported ONNX model has speaker_embedding input."""
         import onnxruntime
 
         session = onnxruntime.InferenceSession(str(onnx_model_with_spk_emb))
         names = {inp.name for inp in session.get_inputs()}
 
         assert "speaker_embedding" in names
-        assert "speaker_embedding_mask" in names
-
-    @pytest.mark.inference
-    def test_onnx_mask_zero_ignores_embedding(self, onnx_model_with_spk_emb):
-        """mask=0 produces same output regardless of speaker_embedding values."""
-        import numpy as np
-        import onnxruntime
-
-        session = onnxruntime.InferenceSession(str(onnx_model_with_spk_emb))
-
-        text = np.array([[1, 8, 5, 10, 20, 30, 15, 2]], dtype=np.int64)
-        text_lengths = np.array([text.shape[1]], dtype=np.int64)
-        scales = np.array([0.0, 1.0, 0.8], dtype=np.float32)
-        sid = np.array([0], dtype=np.int64)
-        mask_off = np.array([[0]], dtype=np.int64)
-
-        # Two different embeddings but both with mask=0
-        np.random.seed(42)
-        emb_a = np.random.randn(1, 256).astype(np.float32)
-        emb_b = np.random.randn(1, 256).astype(np.float32)
-
-        out_a = session.run(None, {
-            "input": text, "input_lengths": text_lengths,
-            "scales": scales, "sid": sid,
-            "speaker_embedding": emb_a,
-            "speaker_embedding_mask": mask_off,
-        })[0]
-
-        out_b = session.run(None, {
-            "input": text, "input_lengths": text_lengths,
-            "scales": scales, "sid": sid,
-            "speaker_embedding": emb_b,
-            "speaker_embedding_mask": mask_off,
-        })[0]
-
-        np.testing.assert_array_equal(
-            out_a, out_b,
-            err_msg="With mask=0, different speaker_embeddings should produce identical output",
-        )
-
-    @pytest.mark.inference
-    def test_onnx_mask_one_uses_embedding(self, onnx_model_with_spk_emb):
-        """mask=1 produces valid audio output."""
-        import numpy as np
-        import onnxruntime
-
-        session = onnxruntime.InferenceSession(str(onnx_model_with_spk_emb))
-
-        text = np.array([[1, 8, 5, 10, 20, 30, 15, 2]], dtype=np.int64)
-        text_lengths = np.array([text.shape[1]], dtype=np.int64)
-        scales = np.array([0.667, 1.0, 0.8], dtype=np.float32)
-        sid = np.array([0], dtype=np.int64)
-        emb = np.random.randn(1, 256).astype(np.float32)
-        mask_on = np.array([[1]], dtype=np.int64)
-
-        out = session.run(None, {
-            "input": text, "input_lengths": text_lengths,
-            "scales": scales, "sid": sid,
-            "speaker_embedding": emb,
-            "speaker_embedding_mask": mask_on,
-        })[0]
-
-        assert out.ndim >= 2
-        assert out.size > 0
-        assert np.isfinite(out).all(), "Audio contains NaN or Inf"

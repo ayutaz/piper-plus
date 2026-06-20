@@ -364,7 +364,12 @@ def mock_vits_model_multilingual():
 
 @pytest.fixture(scope="module")
 def temp_onnx_model_unified_emb_lang(mock_vits_model_multilingual, tmp_path_factory):
-    """emb_lang統一後にONNXエクスポートしたマルチリンガルモデル"""
+    """emb_lang統一後にONNXエクスポートしたマルチリンガルモデル
+
+    Single-speaker multilingual model (n_speakers=1, n_languages=2).
+    No sid or speaker_embedding input -- only lid for language selection.
+    emb_g has been removed from the architecture.
+    """
     import torch
 
     from piper_train.export_onnx import unify_emb_lang_weights
@@ -384,7 +389,6 @@ def temp_onnx_model_unified_emb_lang(mock_vits_model_multilingual, tmp_path_fact
     sequences = torch.randint(0, 50, (1, dummy_input_length), dtype=torch.long)
     sequence_lengths = torch.LongTensor([dummy_input_length])
     scales = torch.FloatTensor([0.667, 1.0, 0.8])
-    sid = torch.LongTensor([0])
     lid = torch.LongTensor([0])
     prosody_features = torch.zeros(1, dummy_input_length, 3, dtype=torch.long)
 
@@ -401,14 +405,13 @@ def temp_onnx_model_unified_emb_lang(mock_vits_model_multilingual, tmp_path_fact
     try:
         torch.onnx.export(
             model,
-            (sequences, sequence_lengths, scales, sid, lid, prosody_features),
+            (sequences, sequence_lengths, scales, lid, prosody_features),
             str(onnx_path),
             opset_version=15,
             input_names=[
                 "input",
                 "input_lengths",
                 "scales",
-                "sid",
                 "lid",
                 "prosody_features",
             ],
@@ -416,7 +419,6 @@ def temp_onnx_model_unified_emb_lang(mock_vits_model_multilingual, tmp_path_fact
             dynamic_axes={
                 "input": {0: "batch_size", 1: "phonemes"},
                 "input_lengths": {0: "batch_size"},
-                "sid": {0: "batch_size"},
                 "lid": {0: "batch_size"},
                 "prosody_features": {0: "batch_size", 1: "phonemes"},
                 "output": {0: "batch_size", 2: "time"},

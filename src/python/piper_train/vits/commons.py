@@ -8,6 +8,61 @@ from torch.nn import functional as F
 _LOGGER = logging.getLogger("vits.commons")
 
 
+def remap_weight_norm_keys(saved_sd: dict, model_sd: dict) -> dict:
+    """Remap weight_norm keys between old and new PyTorch formats.
+
+    DDP (multi-GPU) training may convert weight_norm to the parametrized format,
+    while single-GPU training retains the legacy format.  This causes key
+    mismatches when loading checkpoints across configurations.
+
+    Old format (legacy ``torch.nn.utils.weight_norm``):
+        ``module.weight_g``, ``module.weight_v``
+
+    New format (``torch.nn.utils.parametrizations.weight_norm``):
+        ``module.parametrizations.weight.original0``,
+        ``module.parametrizations.weight.original1``
+
+    The tensor contents are compatible (g ↔ original0, v ↔ original1).
+    """
+    remapped: dict = {}
+    n_remapped = 0
+
+    for key, value in saved_sd.items():
+        new_key = key
+
+        # Old → New
+        if ".weight_g" in key:
+            candidate = key.replace(".weight_g", ".parametrizations.weight.original0")
+            if candidate in model_sd and key not in model_sd:
+                new_key = candidate
+        elif ".weight_v" in key:
+            candidate = key.replace(".weight_v", ".parametrizations.weight.original1")
+            if candidate in model_sd and key not in model_sd:
+                new_key = candidate
+
+        # New → Old
+        elif ".parametrizations.weight.original0" in key:
+            candidate = key.replace(".parametrizations.weight.original0", ".weight_g")
+            if candidate in model_sd and key not in model_sd:
+                new_key = candidate
+        elif ".parametrizations.weight.original1" in key:
+            candidate = key.replace(".parametrizations.weight.original1", ".weight_v")
+            if candidate in model_sd and key not in model_sd:
+                new_key = candidate
+
+        if new_key != key:
+            n_remapped += 1
+
+        remapped[new_key] = value
+
+    if n_remapped > 0:
+        _LOGGER.info(
+            "Remapped %d weight_norm key(s) for checkpoint compatibility.", n_remapped
+        )
+
+    return remapped
+
+
 def init_weights(m, mean=0.0, std=0.01):
     classname = m.__class__.__name__
     if classname.find("Conv") != -1:
