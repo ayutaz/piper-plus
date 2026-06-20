@@ -356,13 +356,9 @@ def validate_speaker_embedding(path: Path, contract: dict) -> int:
         ) from exc
     arr = np.load(path)
     if arr.ndim != 1:
-        raise ValueError(
-            f"speaker embedding must be 1-D, got shape {arr.shape}"
-        )
+        raise ValueError(f"speaker embedding must be 1-D, got shape {arr.shape}")
     if arr.dtype != np.float32:
-        raise ValueError(
-            f"speaker embedding must be float32, got dtype {arr.dtype}"
-        )
+        raise ValueError(f"speaker embedding must be float32, got dtype {arr.dtype}")
     models = contract.get("models", {})
     expected_dims: set[int] = set()
     for spec in models.values():

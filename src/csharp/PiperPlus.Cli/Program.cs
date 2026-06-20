@@ -118,8 +118,10 @@ internal static class Program
         };
 
         // --speaker-embedding
-        var speakerEmbeddingOption = new Option<FileInfo?>("--speaker-embedding")
-        { Description = "Path to speaker embedding file (192 float32 values, raw binary or .npy) for zero-shot TTS" };
+        var speakerEmbeddingOption = new Option<string?>("--speaker-embedding")
+        {
+            Description = "Path to speaker embedding file (192 float32 values, raw binary or .npy) for zero-shot TTS",
+        };
 
         // --noise_scale / --noise-scale
         var noiseScaleOption = new Option<float>("--noise_scale", "--noise-scale")
