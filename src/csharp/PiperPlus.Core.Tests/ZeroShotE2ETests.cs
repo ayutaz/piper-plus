@@ -26,7 +26,6 @@ public sealed class ZeroShotE2ETests : IDisposable
     // ------------------------------------------------------------------
     // Constants
     // ------------------------------------------------------------------
-
     private const string ModelFileName = "zero-shot-test.onnx";
     private const string SpeakerEmbeddingFileName = "test_speaker.npy";
     private const int EmbeddingDim = 192;
@@ -34,13 +33,11 @@ public sealed class ZeroShotE2ETests : IDisposable
     // ------------------------------------------------------------------
     // State
     // ------------------------------------------------------------------
-
     private readonly string? _modelDir;
 
     // ------------------------------------------------------------------
     // Constructor
     // ------------------------------------------------------------------
-
     public ZeroShotE2ETests()
     {
         _modelDir = ResolveTestModelsDir();
@@ -49,8 +46,9 @@ public sealed class ZeroShotE2ETests : IDisposable
     // ------------------------------------------------------------------
     // IDisposable
     // ------------------------------------------------------------------
-
-    public void Dispose() { /* nothing to dispose */ }
+    public void Dispose()
+    { /* nothing to dispose */
+    }
 
     // ------------------------------------------------------------------
     // Helper: locate test/models directory
@@ -85,7 +83,6 @@ public sealed class ZeroShotE2ETests : IDisposable
     // ------------------------------------------------------------------
     // Helper: skip if the model file is not available
     // ------------------------------------------------------------------
-
     private string RequireModelPath()
     {
         if (_modelDir is null)
@@ -195,7 +192,6 @@ public sealed class ZeroShotE2ETests : IDisposable
     // ------------------------------------------------------------------
     // Test 1: inference produces non-empty audio with finite values
     // ------------------------------------------------------------------
-
     [Fact]
     public void ZeroShot_Inference_ProducesAudio()
     {
@@ -227,14 +223,14 @@ public sealed class ZeroShotE2ETests : IDisposable
 
         // All samples must be finite (no NaN or Inf).
         Assert.All(audio, sample =>
-            Assert.True(float.IsFinite(sample),
+            Assert.True(
+                float.IsFinite(sample),
                 $"Audio sample is not finite: {sample}"));
     }
 
     // ------------------------------------------------------------------
     // Test 2: different embeddings produce different audio
     // ------------------------------------------------------------------
-
     [Fact]
     public void ZeroShot_DifferentEmbeddings_ProduceDifferentAudio()
     {
@@ -281,14 +277,14 @@ public sealed class ZeroShotE2ETests : IDisposable
             }
         }
 
-        Assert.True(anyDifference,
+        Assert.True(
+            anyDifference,
             "Audio produced from different speaker embeddings must differ.");
     }
 
     // ------------------------------------------------------------------
     // Test 3: zero embedding does not throw
     // ------------------------------------------------------------------
-
     [Fact]
     public void ZeroShot_ZeroEmbedding_DoesNotThrow()
     {

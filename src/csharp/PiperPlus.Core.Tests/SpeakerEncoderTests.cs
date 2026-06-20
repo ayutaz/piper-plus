@@ -116,6 +116,7 @@ public class SpeakerEncoderTests
             : 0;
 
         int fftBins = (NFFT / 2) + 1;
+
         // Frame-major layout: melSpec[frameIdx * NMels + melIdx]
         // CAM++ expects input shape [batch, T, 80] (time-first)
         float[] melSpec = new float[nFrames * NMels];

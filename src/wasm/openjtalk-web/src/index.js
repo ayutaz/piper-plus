@@ -1115,7 +1115,12 @@ export class PiperPlus {
       }
     }
 
-    // Attach speaker embedding for voice cloning
+    // Attach speaker embedding for voice cloning.
+    // Guard speaker_embedding_mask behind the session's actual input names:
+    // older ONNX exports omit the mask tensor and ORT rejects unknown feeds
+    // (mirrors Python ort_utils / infer_onnx Bug B fix).
+    const sessionInputNames = new Set(this._session.inputNames || []);
+    const hasSpeakerEmbeddingMask = sessionInputNames.has("speaker_embedding_mask");
     if (this._hasSpeakerEmbedding) {
       // Zero-shot / voice-cloning model: speaker_embedding is a required input.
       if (speakerEmbedding && speakerEmbedding.length > 0) {
@@ -1123,13 +1128,17 @@ export class PiperPlus {
           1,
           speakerEmbedding.length,
         ]);
-        feeds.speaker_embedding_mask = new ort.Tensor("int64", new BigInt64Array([1n]), [1]);
+        if (hasSpeakerEmbeddingMask) {
+          feeds.speaker_embedding_mask = new ort.Tensor("int64", new BigInt64Array([1n]), [1]);
+        }
       } else {
         console.warn(
           "[piper-plus] Model expects 'speaker_embedding' but none provided; using zero vector."
         );
         feeds.speaker_embedding = new ort.Tensor("float32", new Float32Array(192), [1, 192]);
-        feeds.speaker_embedding_mask = new ort.Tensor("int64", new BigInt64Array([0n]), [1]);
+        if (hasSpeakerEmbeddingMask) {
+          feeds.speaker_embedding_mask = new ort.Tensor("int64", new BigInt64Array([0n]), [1]);
+        }
       }
     } else if (speakerEmbedding && speakerEmbedding.length > 0) {
       // Non-zero-shot model: pass embedding only when explicitly provided
@@ -1139,7 +1148,9 @@ export class PiperPlus {
         1,
         speakerEmbedding.length,
       ]);
-      feeds.speaker_embedding_mask = new ort.Tensor("int64", new BigInt64Array([1n]), [1]);
+      if (hasSpeakerEmbeddingMask) {
+        feeds.speaker_embedding_mask = new ort.Tensor("int64", new BigInt64Array([1n]), [1]);
+      }
     }
 
     // Attach prosody features when the model supports them
