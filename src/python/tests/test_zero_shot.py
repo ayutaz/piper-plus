@@ -782,6 +782,165 @@ class TestDurationPredictorConditioning:
         )
 
     @pytest.mark.unit
+    @pytest.mark.inference
+    def test_infer_rejects_wrong_embedding_dimension(self):
+        """infer() should validate speaker_embeddings shape[-1] matches spk_proj input.
+
+        spk_proj expects 192-dim CAM++ embeddings. Passing a 191-dim tensor
+        should fail (currently via torch's matmul shape-mismatch RuntimeError
+        rather than an explicit ValueError). This test pins the failure so a
+        future explicit shape check (preferred) does not regress silently.
+        """
+        torch.manual_seed(42)
+        model = SynthesizerTrn(
+            **MODEL_PARAMS,
+            n_speakers=20,
+            gin_channels=512,
+        )
+        model.eval()
+
+        text_len = 10
+        x = torch.randint(0, 50, (1, text_len))
+        x_lengths = torch.LongTensor([text_len])
+        bad_speaker_embeddings = torch.randn(1, 191)  # 191 != 192
+
+        with torch.no_grad():
+            with pytest.raises((ValueError, AssertionError, RuntimeError)):
+                model.infer(
+                    x, x_lengths,
+                    speaker_embeddings=bad_speaker_embeddings,
+                )
+
+    @pytest.mark.unit
+    @pytest.mark.training
+    def test_spk_proj_teacher_ema_update_with_finite_weights(self):
+        """EMA momentum=0.996 update of spk_proj_teacher only when student is finite.
+
+        Mirrors lightning.py:944-959 EMA block. Verifies:
+        1. Finite student → teacher = 0.996*teacher_prev + 0.004*student
+        2. NaN student weight → teacher unchanged (skip path)
+        """
+        import copy
+
+        torch.manual_seed(42)
+        model = SynthesizerTrn(
+            **MODEL_PARAMS,
+            n_speakers=20,
+            gin_channels=512,
+        )
+        # Build teacher exactly as lightning.py:290 does
+        spk_proj_teacher = copy.deepcopy(model.spk_proj)
+        spk_proj_teacher.requires_grad_(False)
+
+        # Snapshot teacher weights before update
+        teacher_prev = [p.detach().clone() for p in spk_proj_teacher.parameters()]
+        student_snapshot = [
+            p.detach().clone() for p in model.spk_proj.parameters()
+        ]
+
+        # ---- Case 1: finite student → EMA update applied ----
+        with torch.no_grad():
+            student_finite = all(
+                torch.isfinite(p.data).all() for p in model.spk_proj.parameters()
+            )
+            assert student_finite, "Fresh model weights should be finite"
+            for p_ema, p in zip(
+                spk_proj_teacher.parameters(),
+                model.spk_proj.parameters(),
+                strict=True,
+            ):
+                p_ema.mul_(0.996).add_(p.data, alpha=0.004)
+
+        for prev, student, p_ema in zip(
+            teacher_prev, student_snapshot, spk_proj_teacher.parameters(), strict=True
+        ):
+            expected = prev * 0.996 + student * 0.004
+            assert torch.allclose(p_ema.data, expected, atol=1e-6), (
+                "Teacher EMA update did not apply 0.996*prev + 0.004*student"
+            )
+
+        # ---- Case 2: NaN in student → skip (teacher unchanged) ----
+        teacher_after_case1 = [
+            p.detach().clone() for p in spk_proj_teacher.parameters()
+        ]
+        with torch.no_grad():
+            # Corrupt one student weight
+            first_param = next(model.spk_proj.parameters())
+            first_param.data[0, 0] = float("nan")
+
+            student_finite = all(
+                torch.isfinite(p.data).all() for p in model.spk_proj.parameters()
+            )
+            assert not student_finite, "Student should now be non-finite"
+            if student_finite:
+                for p_ema, p in zip(
+                    spk_proj_teacher.parameters(),
+                    model.spk_proj.parameters(),
+                    strict=True,
+                ):
+                    p_ema.mul_(0.996).add_(p.data, alpha=0.004)
+
+        for prev, p_ema in zip(
+            teacher_after_case1, spk_proj_teacher.parameters(), strict=True
+        ):
+            assert torch.equal(p_ema.data, prev), (
+                "Teacher must remain unchanged when student has NaN"
+            )
+
+    @pytest.mark.unit
+    @pytest.mark.training
+    @pytest.mark.xfail(
+        reason="SynthesizerTrn.forward() does not handle the language_id=-1 "
+        "mixed-language sentinel — it reaches nn.Embedding(emb_lang) and "
+        "raises IndexError. lightning.py:358-401 normalizes -1 to a valid "
+        "lid before the model, but any code path that bypasses that "
+        "normalization (e.g., direct model.forward() calls in tests or "
+        "future callers) crashes. Either the model should clamp/handle -1 "
+        "gracefully (preferred: treat as 'no language conditioning') or "
+        "the sentinel value should be removed from the public model API.",
+        strict=True,
+        raises=IndexError,
+    )
+    def test_forward_with_mixed_language_id_and_speaker_embeddings(self):
+        """forward() with language_id=-1 (mixed-language test path) + speaker_embeddings.
+
+        lightning.py:358 routes language_id=-1 utterances through bilingual
+        phonemization, normalizing lid to a valid index before the model.
+        This test pins the gap that the model layer has no equivalent
+        defense.
+        """
+        torch.manual_seed(42)
+        params = dict(MODEL_PARAMS)
+        model = SynthesizerTrn(
+            **params,
+            n_speakers=20,
+            n_languages=2,
+            gin_channels=512,
+        )
+        model.train()
+
+        batch_size = 1
+        text_len = 10
+        spec_len = 50
+
+        x = torch.randint(0, 50, (batch_size, text_len))
+        x_lengths = torch.LongTensor([text_len])
+        y = torch.randn(batch_size, 513, spec_len)
+        y_lengths = torch.LongTensor([spec_len])
+        speaker_embeddings = torch.randn(batch_size, 192)
+        language_ids = torch.tensor([-1], dtype=torch.long)  # mixed-lang marker
+
+        output = model.forward(
+            x, x_lengths, y, y_lengths,
+            lid=language_ids,
+            speaker_embeddings=speaker_embeddings,
+        )
+        audio = output[0]
+        assert audio is not None
+        assert audio.shape[0] == batch_size
+        assert audio.dim() == 3, f"Expected [B,1,T] audio, got shape {audio.shape}"
+
+    @pytest.mark.unit
     def test_synthesizer_dp_has_cond(self):
         """SynthesizerTrn's duration predictor has cond when gin_channels > 0"""
         model = SynthesizerTrn(

@@ -151,6 +151,169 @@ def test_json_input_per_line_output_file_overrides_cli_flag(tmp_path):
     assert meta["frames"] > 0
 
 
+class TestJsonInputSpeakerEmbedding:
+    """`--json-input` JSONL entries の `speaker_embedding` 受理 (zero-shot parity).
+
+    Rust / Go / C# は JSONL の `speaker_embedding` field を抽出して
+    `synthesize_ids_to_raw` に渡す。 Python が同 field を無視すると
+    cross-runtime zero-shot parity matrix から脱落する (Issue: this gap).
+    本テストは subprocess + PiperVoice.load monkeypatch で
+    `__main__.py:288` の forward を pin する。
+    """
+
+    @staticmethod
+    def _write_mock_sitecustomize(tmp_path: Path, kwargs_dump: Path) -> Path:
+        """sitecustomize.py: PiperVoice.load を差し替え、 kwargs を JSON dump する."""
+        site_dir = tmp_path / "sitepkg"
+        site_dir.mkdir()
+        helper = site_dir / "sitecustomize.py"
+        helper.write_text(
+            f"""
+import json
+from pathlib import Path
+
+import piper
+from piper.inference_config import InferenceConfig as _IC
+
+_DUMP = Path(r{str(kwargs_dump)!r})
+
+
+class _FakeConfig:
+    sample_rate = 22050
+    num_symbols = 256
+    num_speakers = 1
+
+
+class _FakeVoice:
+    def __init__(self):
+        self.config = _FakeConfig()
+
+    def synthesize_ids_to_raw(self, phoneme_ids, **kwargs):
+        record = {{
+            "phoneme_ids": list(phoneme_ids),
+            "speaker_id": kwargs.get("speaker_id"),
+            "language_id": kwargs.get("language_id"),
+        }}
+        emb = kwargs.get("speaker_embedding")
+        if emb is None:
+            record["speaker_embedding"] = None
+        else:
+            import numpy as _np
+            arr = _np.asarray(emb)
+            record["speaker_embedding"] = {{
+                "is_ndarray": isinstance(emb, _np.ndarray),
+                "shape": list(arr.shape),
+                "dtype": str(arr.dtype),
+                "first": float(arr.reshape(-1)[0]) if arr.size else None,
+            }}
+        _DUMP.write_text(json.dumps(record))
+        # 16-bit PCM zeros, 100 samples
+        return b"\\x00\\x00" * 100
+
+
+def _fake_load(model_path, config_path=None, use_cuda=False):
+    return _FakeVoice()
+
+
+piper.PiperVoice.load = staticmethod(_fake_load)
+# Re-bind the name imported into piper.__main__ if already imported
+try:
+    import piper.__main__ as _m
+    _m.PiperVoice = piper.PiperVoice
+except Exception:
+    pass
+""",
+            encoding="utf-8",
+        )
+        return site_dir
+
+    def _run_with_mock(
+        self, tmp_path: Path, line: str, out_file: Path
+    ) -> tuple[subprocess.CompletedProcess, dict]:
+        kwargs_dump = tmp_path / "kwargs.json"
+        site_dir = self._write_mock_sitecustomize(tmp_path, kwargs_dump)
+
+        env = {
+            **dict(__import__("os").environ),
+            "PYTHONPATH": str(site_dir)
+            + __import__("os").pathsep
+            + __import__("os").environ.get("PYTHONPATH", ""),
+        }
+        proc = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "piper",
+                "--model",
+                str(MODEL),
+                "--config",
+                str(CONFIG),
+                "--json-input",
+                "--output_file",
+                str(out_file),
+            ],
+            input=line + "\n",
+            capture_output=True,
+            text=True,
+            timeout=120,
+            check=False,
+            env=env,
+        )
+        recorded = json.loads(kwargs_dump.read_text()) if kwargs_dump.exists() else {}
+        return proc, recorded
+
+    @pytest.mark.xfail(
+        reason=(
+            "Production bug: src/python_run/piper/__main__.py:288 does not "
+            "extract entry['speaker_embedding'] from JSONL. To be fixed in "
+            "a separate task; this xfail pins the expected forwarding contract."
+        ),
+        strict=True,
+    )
+    def test_speaker_embedding_field_extracted_from_jsonl(self, tmp_path):
+        """JSONL entry の `speaker_embedding` (192-dim) が voice 呼び出しに forward される."""
+        out = tmp_path / "out.wav"
+        embedding = [0.0] * 192
+        line = json.dumps(
+            {
+                "phoneme_ids": CANONICAL_IDS,
+                "speaker_embedding": embedding,
+            }
+        )
+        proc, recorded = self._run_with_mock(tmp_path, line, out)
+        assert proc.returncode == 0, proc.stderr
+        assert recorded.get("phoneme_ids") == CANONICAL_IDS
+        emb_record = recorded.get("speaker_embedding")
+        assert emb_record is not None, (
+            "speaker_embedding field was not forwarded to voice call; "
+            "JSON input path drops entry['speaker_embedding']"
+        )
+        assert emb_record["is_ndarray"] is True
+        # flatten 後 192 要素であること (shape は (192,) または (1,192) を許容)
+        flat_size = 1
+        for d in emb_record["shape"]:
+            flat_size *= d
+        assert flat_size == 192, (
+            f"expected 192 elements, got shape {emb_record['shape']}"
+        )
+        assert emb_record["first"] == 0.0
+
+    def test_speaker_embedding_missing_field_uses_speaker_id(self, tmp_path):
+        """speaker_embedding 未指定なら speaker_id 経路を維持 (後方互換)."""
+        out = tmp_path / "out.wav"
+        line = json.dumps(
+            {
+                "phoneme_ids": CANONICAL_IDS,
+                "speaker_id": 0,
+                "language_id": 0,
+            }
+        )
+        proc, recorded = self._run_with_mock(tmp_path, line, out)
+        assert proc.returncode == 0, proc.stderr
+        assert recorded.get("speaker_id") == 0
+        assert recorded.get("speaker_embedding") is None
+
+
 def test_json_input_multi_line_directory_mode(tmp_path):
     """`--output_dir` mode で複数行 JSONL を受け、 1 行 1 WAV を書く."""
     out_dir = tmp_path / "out"

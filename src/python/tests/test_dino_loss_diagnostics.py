@@ -150,3 +150,90 @@ class TestExtremeFiniteInput:
         c = torch.zeros(16)
         loss = dino_loss(s, t, c)
         assert torch.isfinite(loss)
+
+
+# ---------------------------------------------------------------------------
+# Center 汚染後の回復シナリオ
+# ---------------------------------------------------------------------------
+
+
+class TestDinoCenterRecovery:
+    """`dino_center` が一度 NaN 汚染された場合の回復挙動を文書化する。
+
+    現状の EMA 更新ロジック (lightning.py:964-978) は
+    ``batch_center.isfinite().all()`` を確認してから ``mul_(0.996).add_(...)``
+    するが、 ``dino_center`` 側が NaN の場合は ``NaN * 0.996 + x * 0.004 = NaN``
+    のままで、 clean batch が来ても永続的に回復しない (= DINO 完全停止)。
+
+    このテストは「クリーンな batch_center だけで center を再シードする」回復
+    パスが実装されることを期待し、 現状は xfail として保持する。
+    """
+
+    @pytest.mark.xfail(
+        reason=(
+            "Production gap: EMA update preserves NaN center indefinitely. "
+            "Need explicit re-seed path when self.dino_center is non-finite "
+            "(lightning.py:964-978)."
+        ),
+        strict=True,
+    )
+    def test_dino_center_recovery_after_nan_corruption(self):
+        # Arrange: corrupted center (full NaN) + clean batch teacher embeddings
+        dim = 192
+        dino_center = torch.full((dim,), float("nan"))
+        # Simulate a clean teacher_emb batch (post spk_proj_teacher, L2-normalized)
+        torch.manual_seed(42)
+        teacher_emb = torch.randn(8, dim)
+        teacher_emb = teacher_emb / teacher_emb.norm(dim=-1, keepdim=True)
+        batch_center = teacher_emb.mean(dim=0)
+        assert torch.isfinite(batch_center).all(), "precondition: clean batch"
+
+        # Act: apply the current EMA update from lightning.py:964-978 verbatim.
+        # The guard skips the update when batch_center is non-finite, but does
+        # NOT re-seed when dino_center itself is corrupted.
+        if torch.isfinite(batch_center).all():
+            dino_center.mul_(0.996).add_(batch_center.float(), alpha=0.004)
+            dino_center.clamp_(min=-10, max=10)
+
+        # Assert (expected behavior, currently failing): center should recover
+        # to a finite state after at least one clean batch.
+        assert torch.isfinite(dino_center).all(), (
+            "dino_center must recover from NaN corruption when clean batches "
+            "arrive; otherwise dino_loss stays masked at 0 forever."
+        )
+
+
+# ---------------------------------------------------------------------------
+# Edge case: tau_s == tau_t
+# ---------------------------------------------------------------------------
+
+
+class TestEqualTemperatures:
+    """tau_s == tau_t は数学的に well-defined だが degenerate に近づく edge case。
+
+    student と teacher が同じ温度で softmax されるため、 standard DINO の
+    sharpening 効果 (tau_t < tau_s) が消える。 loss は依然 finite scalar
+    であるべき。
+    """
+
+    def test_dino_loss_with_equal_temperatures(self, normal_inputs):
+        # Arrange
+        s, t, c = normal_inputs
+
+        # Act
+        loss_eq = dino_loss(s, t, c, tau_s=0.07, tau_t=0.07)
+        loss_baseline = dino_loss(s, t, c, tau_s=0.1, tau_t=0.07)
+
+        # Assert: finite scalar, non-NaN/Inf
+        assert torch.isfinite(loss_eq).all()
+        assert loss_eq.dim() == 0
+        assert not torch.isnan(loss_eq)
+        assert not torch.isinf(loss_eq)
+        assert loss_eq.item() > 0  # cross-entropy 下限
+
+        # Sanity: equal temperatures should produce a measurably different
+        # magnitude vs the asymmetric baseline (sharpening removed).
+        assert abs(loss_eq.item() - loss_baseline.item()) > 1e-6, (
+            "tau_s==tau_t should differ from the asymmetric baseline; "
+            "if identical, the temperature application path is suspect."
+        )

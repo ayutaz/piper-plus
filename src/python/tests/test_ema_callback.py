@@ -219,6 +219,96 @@ class TestEMACallbackLifecycle:
         # After validation: model restored to original
         assert torch.allclose(model.model_g.dec.linear.weight, original)
 
+    def test_ema_restore_on_validation_epoch_end_with_ddp_mock(self):
+        """DDP validation: apply_shadow at start replaces live params with
+        shadow on every rank; restore at end returns live params bit-identical
+        to pre-validation snapshot. Mocked trainer simulates strategy='ddp'
+        with world_size=2 — the callback itself is rank-agnostic, so we
+        assert behavioural symmetry without rank divergence.
+        """
+        callback = EMACallback(decay=0.5)
+        model = _DummyLightningModule()
+        callback.on_fit_start(_DummyTrainer(), model)
+
+        # Synthesize a distinct shadow so apply/restore is observable.
+        with torch.no_grad():
+            callback.ema_generator.shadow_params["linear.weight"].fill_(4.2)
+            callback.ema_generator.shadow_params["linear.bias"].fill_(-1.5)
+
+        # DDP-shaped trainer mock (strategy + world_size attributes that
+        # Lightning exposes). Callback does not branch on these today, so
+        # we pin: behaviour is identical to single-GPU restore.
+        class _DDPTrainer:
+            def __init__(self):
+                self.global_step = 100
+                self.strategy = "ddp"
+                self.world_size = 2
+
+        trainer = _DDPTrainer()
+
+        # Snapshot live params BEFORE validation (bit-exact baseline).
+        weight_snapshot = model.model_g.dec.linear.weight.clone()
+        bias_snapshot = model.model_g.dec.linear.bias.clone()
+
+        # apply_shadow: live params become shadow on this rank.
+        callback.on_validation_epoch_start(trainer, model)
+        assert torch.allclose(
+            model.model_g.dec.linear.weight,
+            torch.full_like(model.model_g.dec.linear.weight, 4.2),
+        )
+        assert torch.allclose(
+            model.model_g.dec.linear.bias,
+            torch.full_like(model.model_g.dec.linear.bias, -1.5),
+        )
+
+        # restore: live params return to pre-validation snapshot bit-identically.
+        callback.on_validation_epoch_end(trainer, model)
+        assert torch.equal(model.model_g.dec.linear.weight, weight_snapshot)
+        assert torch.equal(model.model_g.dec.linear.bias, bias_snapshot)
+        # Backup is cleared (no shadow leak into next training step).
+        assert callback.ema_generator.backup_params == {}
+
+    def test_ema_restore_on_validation_exception(self):
+        """If validation raises mid-epoch, the caller (Lightning) must invoke
+        on_validation_epoch_end via its hook lifecycle (or the user must wrap
+        in try/finally) so EMA shadow does not leak into the next training
+        step. This test pins the contract: calling on_validation_epoch_end in
+        a finally-block after an exception restores params bit-identically.
+        """
+        callback = EMACallback(decay=0.5)
+        model = _DummyLightningModule()
+        callback.on_fit_start(_DummyTrainer(), model)
+
+        with torch.no_grad():
+            callback.ema_generator.shadow_params["linear.weight"].fill_(9.9)
+
+        # Pre-validation snapshot.
+        weight_snapshot = model.model_g.dec.linear.weight.clone()
+        bias_snapshot = model.model_g.dec.linear.bias.clone()
+
+        trainer = _DummyTrainer()
+
+        # Simulate exception mid-validation; finally-block restores.
+        raised = False
+        try:
+            callback.on_validation_epoch_start(trainer, model)
+            # Shadow now active on live params.
+            assert torch.allclose(
+                model.model_g.dec.linear.weight,
+                torch.full_like(model.model_g.dec.linear.weight, 9.9),
+            )
+            raise RuntimeError("simulated validation failure")
+        except RuntimeError:
+            raised = True
+        finally:
+            callback.on_validation_epoch_end(trainer, model)
+
+        assert raised, "RuntimeError should have been raised and caught"
+        # Live params restored bit-identically — no shadow leak.
+        assert torch.equal(model.model_g.dec.linear.weight, weight_snapshot)
+        assert torch.equal(model.model_g.dec.linear.bias, bias_snapshot)
+        assert callback.ema_generator.backup_params == {}
+
     def test_on_save_checkpoint_serializes_ema_state(self):
         callback = EMACallback(decay=0.999)
         model = _DummyLightningModule()

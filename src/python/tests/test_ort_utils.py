@@ -396,6 +396,56 @@ class TestWarmup:
         assert inputs["speaker_embedding_mask"].tolist() == [[0]]
         assert inputs["speaker_embedding_mask"].dtype == np.int64
 
+    def test_warmup_with_speaker_embedding_no_mask(self):
+        """Zero-shot exports omit speaker_embedding_mask — warmup must skip it.
+
+        Regression guard for Issue #527 fix (commit 5188b088): warmup
+        previously fed speaker_embedding_mask unconditionally, which raised
+        InvalidArgument on zero-shot ONNX models (v7 / Tsukuyomi FT) that
+        declare only speaker_embedding as input.
+        """
+        # Build a session that declares speaker_embedding but NOT the mask.
+        session = MagicMock(spec=onnxruntime.InferenceSession)
+        inputs = []
+        for name in ("input", "input_lengths", "scales"):
+            inp = MagicMock()
+            inp.name = name
+            inputs.append(inp)
+        emb_inp = MagicMock()
+        emb_inp.name = "speaker_embedding"
+        emb_inp.shape = ["batch_size", 192]
+        inputs.append(emb_inp)
+        session.get_inputs.return_value = inputs
+        out = MagicMock()
+        out.name = "output"
+        session.get_outputs.return_value = [out]
+
+        warmup_onnx_session(session)
+
+        feeds = session.run.call_args[0][1]
+        assert "speaker_embedding" in feeds
+        assert "speaker_embedding_mask" not in feeds, (
+            "warmup must not feed speaker_embedding_mask when the session "
+            "does not declare it (zero-shot export compatibility, Issue #527)"
+        )
+        assert feeds["speaker_embedding"].shape == (1, 192)
+        assert feeds["speaker_embedding"].dtype == np.float32
+
+    def test_warmup_with_speaker_embedding_and_mask(self):
+        """Backward compat: legacy models declaring both inputs still get both."""
+        session = _make_mock_session(
+            has_speaker_embedding=True, speaker_embedding_dim=256
+        )
+        warmup_onnx_session(session)
+
+        feeds = session.run.call_args[0][1]
+        assert "speaker_embedding" in feeds
+        assert "speaker_embedding_mask" in feeds
+        assert feeds["speaker_embedding"].shape == (1, 256)
+        assert feeds["speaker_embedding"].dtype == np.float32
+        assert feeds["speaker_embedding_mask"].shape == (1, 1)
+        assert feeds["speaker_embedding_mask"].dtype == np.int64
+
     def test_speaker_embedding_symbolic_shape_uses_default_dim(self):
         """ONNX 入力 shape が symbolic の場合、デフォルト 256 次元を使う."""
         session = _make_mock_session(has_speaker_embedding=True)

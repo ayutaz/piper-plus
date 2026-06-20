@@ -418,6 +418,127 @@ class TestSynthesizeWithTimingParameters:
         assert int(feeds["sid"][0][0]) == 2
 
 
+class TestSynthesizeWithTimingSpeakerEmbedding:
+    """Regression coverage: ``synthesize_with_timing()`` must accept and
+    forward a ``speaker_embedding`` kwarg, matching the contract already
+    fixed for ``synthesize_stream_raw`` in commit 5188b088.
+
+    Without this, zero-shot users calling the timing API
+    (``/api/phoneme-timing`` / library) get a ``TypeError`` from the public
+    method, or — once the kwarg is accepted — silently lose the embedding
+    because it is never threaded to ``_synthesize_ids_core``.
+    """
+
+    @staticmethod
+    def _patch_phonemize(voice: PiperVoice, sentences=None) -> None:
+        voice.phonemize = MagicMock(
+            return_value=sentences if sentences is not None else [["a", "k", "o"]]
+        )
+
+    @pytest.mark.xfail(
+        reason="Production bug: synthesize_with_timing() does not accept "
+        "speaker_embedding kwarg (parallel to 5188b088 fix for stream_raw). "
+        "Fix in voice.py:1154 — add kwarg + thread to _synthesize_ids_core.",
+        strict=True,
+    )
+    def test_speaker_embedding_parameter_accepted(self):
+        """Public API: synthesize_with_timing() accepts speaker_embedding kwarg."""
+        voice = _make_mock_voice(
+            has_durations=True,
+            has_speaker_embedding=True,
+            speaker_embedding_dim=192,
+        )
+        self._patch_phonemize(voice)
+
+        emb = np.full(192, 0.5, dtype=np.float32)
+
+        # Should not raise TypeError about unexpected keyword argument
+        wav_bytes, _ = voice.synthesize_with_timing("hello", speaker_embedding=emb)
+
+        assert isinstance(wav_bytes, bytes)
+        assert len(wav_bytes) > 0
+
+    @pytest.mark.xfail(
+        reason="Production bug: synthesize_with_timing() does not thread "
+        "speaker_embedding to _synthesize_ids_core (voice.py:1244).",
+        strict=True,
+    )
+    def test_speaker_embedding_threaded_to_core(self):
+        """speaker_embedding kwarg reaches _synthesize_ids_core feed."""
+        voice = _make_mock_voice(
+            has_durations=True,
+            has_speaker_embedding=True,
+            speaker_embedding_dim=192,
+        )
+        self._patch_phonemize(voice)
+
+        emb = (np.arange(192, dtype=np.float32) / 192.0).astype(np.float32)
+
+        # Wrap the bound method with a MagicMock that delegates to the real
+        # implementation so we capture call args while still producing output.
+        real_core = voice._synthesize_ids_core
+        spy = MagicMock(side_effect=real_core)
+        voice._synthesize_ids_core = spy
+
+        voice.synthesize_with_timing("hello", speaker_embedding=emb)
+
+        assert spy.call_count >= 1
+        kwargs = spy.call_args.kwargs
+        assert "speaker_embedding" in kwargs
+        assert kwargs["speaker_embedding"] is emb or np.array_equal(
+            kwargs["speaker_embedding"], emb
+        )
+
+    @pytest.mark.xfail(
+        reason="Production bug: synthesize_with_timing() does not accept/"
+        "thread speaker_embedding for multi-sentence input.",
+        strict=True,
+    )
+    def test_speaker_embedding_threaded_per_sentence(self):
+        """speaker_embedding is forwarded on EVERY sentence, not just the first."""
+        voice = _make_mock_voice(
+            has_durations=True,
+            has_speaker_embedding=True,
+            speaker_embedding_dim=192,
+            phoneme_ids_len=5,
+        )
+        # Three sentences -> three _synthesize_ids_core calls
+        self._patch_phonemize(voice, sentences=[["a"], ["k"], ["o"]])
+
+        emb = np.full(192, 0.25, dtype=np.float32)
+
+        real_core = voice._synthesize_ids_core
+        spy = MagicMock(side_effect=real_core)
+        voice._synthesize_ids_core = spy
+
+        voice.synthesize_with_timing("A. B. C.", speaker_embedding=emb)
+
+        assert spy.call_count == 3
+        for call in spy.call_args_list:
+            assert "speaker_embedding" in call.kwargs
+            assert np.array_equal(call.kwargs["speaker_embedding"], emb)
+
+    def test_speaker_embedding_none_default_unchanged(self):
+        """Backward compat: omitting speaker_embedding still works (defaults None)."""
+        voice = _make_mock_voice(
+            has_durations=True,
+            has_speaker_embedding=True,
+            speaker_embedding_dim=192,
+        )
+        self._patch_phonemize(voice)
+
+        real_core = voice._synthesize_ids_core
+        spy = MagicMock(side_effect=real_core)
+        voice._synthesize_ids_core = spy
+
+        wav_bytes, _ = voice.synthesize_with_timing("hello")
+
+        assert isinstance(wav_bytes, bytes)
+        assert spy.call_count >= 1
+        # Either kwarg absent, or explicitly None
+        assert spy.call_args.kwargs.get("speaker_embedding", None) is None
+
+
 class TestSynthesizeCoreShortText:
     """Verifies short-text mitigation (Strategy A padding + Strategy B noise) in core."""
 

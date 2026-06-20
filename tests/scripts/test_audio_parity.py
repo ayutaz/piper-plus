@@ -777,3 +777,99 @@ def test_cli_compare_all_runtimes_disabled_produces_zero_pair_table(
     # 6 runtime 全て skip 行で報告される
     for name in ALL_RUNTIMES:
         assert name in out
+
+
+# ---------- zero-shot speaker_embedding parity ----------
+
+
+PARITY_DIR = REPO_ROOT / "tests" / "fixtures" / "audio-corpus" / "parity"
+ZERO_SHOT_JSONL = PARITY_DIR / "zero_shot_phoneme_ids.jsonl"
+TEST_SPEAKER_NPY = PARITY_DIR / "test_speaker.npy"
+
+
+def test_create_zero_shot_phoneme_ids_jsonl_fixture():
+    """JSONL + .npy fixture for zero-shot parity must exist and each row
+    must carry a 192-dim L2-normalised `speaker_embedding` matching the
+    canonical .npy. Pin shape / norm so a future fixture regeneration can't
+    silently desync the runtime drivers."""
+    import json
+
+    np = pytest.importorskip("numpy")
+
+    assert ZERO_SHOT_JSONL.exists(), "zero_shot_phoneme_ids.jsonl missing"
+    assert TEST_SPEAKER_NPY.exists(), "test_speaker.npy missing"
+
+    canonical = np.load(TEST_SPEAKER_NPY)
+    assert canonical.dtype == np.float32
+    assert canonical.shape == (192,)
+    assert abs(float(np.linalg.norm(canonical)) - 1.0) < 1e-5
+
+    lines = [
+        line for line in ZERO_SHOT_JSONL.read_text().splitlines() if line.strip()
+    ]
+    assert len(lines) >= 3, "fixture must contain at least 3 utterances"
+    for line in lines:
+        entry = json.loads(line)
+        ids = entry["phoneme_ids"]
+        assert ids[0] == 1 and ids[-1] == 2  # BOS / EOS
+        assert "language_id" in entry
+        emb = entry["speaker_embedding"]
+        assert isinstance(emb, list)
+        assert len(emb) == 192
+        # Each row mirrors the canonical npy exactly (no per-row jitter)
+        emb_arr = np.array(emb, dtype=np.float32)
+        assert np.allclose(emb_arr, canonical, atol=1e-6)
+
+
+def test_audio_parity_script_accepts_speaker_embedding_flag(ap, tmp_path):
+    """`scripts/audio_parity.py compare --speaker-embedding=test_speaker.npy`
+    must parse the new CLI flag, validate the .npy against the contract's
+    `expected_embedding_dim`, and produce a parity report (exit 0)."""
+    np = pytest.importorskip("numpy")
+
+    a = tmp_path / "python.wav"
+    b = tmp_path / "rust.wav"
+    out = tmp_path / "diff.md"
+    _write_sine(a)
+    b.write_bytes(a.read_bytes())  # byte-identical → tier 1 pass
+
+    # Parser exposes the flag and routes it to args.speaker_embedding
+    args = ap.build_parser().parse_args(
+        [
+            "compare",
+            "--inputs",
+            f"python={a}",
+            f"rust={b}",
+            "--speaker-embedding",
+            str(TEST_SPEAKER_NPY),
+            "--output",
+            str(out),
+        ]
+    )
+    assert args.speaker_embedding == TEST_SPEAKER_NPY
+    rc = args.func(args)
+    assert rc == 0
+    assert out.exists()
+
+    # Validation helper rejects malformed embeddings (wrong dim)
+    bad = tmp_path / "bad.npy"
+    np.save(bad, np.zeros(100, dtype=np.float32))
+    contract = ap.load_contract(CONTRACT)
+    with pytest.raises(ValueError, match="expected_embedding_dim"):
+        ap.validate_speaker_embedding(bad, contract)
+
+
+def test_audio_parity_contract_includes_zero_shot_model_entry(ap):
+    """`docs/spec/audio-parity-contract.toml` must declare
+    `[models.zero_shot_test_model]` with the zero-shot input contract
+    so runtime drivers can discover the embedding requirement
+    declaratively (rather than hard-coding the model name)."""
+    contract = ap.load_contract(CONTRACT)
+    models = contract.get("models", {})
+    assert "zero_shot_test_model" in models, (
+        "contract missing zero_shot_test_model entry"
+    )
+    entry = models["zero_shot_test_model"]
+    assert isinstance(entry, dict)
+    assert entry.get("has_speaker_embedding") is True
+    assert entry.get("expected_embedding_dim") == 192

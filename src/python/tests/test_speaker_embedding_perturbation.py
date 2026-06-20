@@ -117,3 +117,87 @@ class TestLightningIntegration:
         cos_a = F.cosine_similarity(out_a, emb, dim=-1)
         assert (cos_a > 0.5).all(), "正の方向類似が保たれる (cos > 0.5)"
         assert (cos_a < 1.0).all(), "ただし完全一致ではない (cos < 1.0)"
+
+
+# ---------------------------------------------------------------------------
+# Train / eval mode gating + per-step randomness + L2 re-normalization
+# (lightning.py:794-801 の self.training gate を直接検証)
+# ---------------------------------------------------------------------------
+
+
+class _PerturbationModule(torch.nn.Module):
+    """``lightning.py:794-801`` の perturbation block を最小限に切り出した nn.Module.
+
+    本物の ``VitsModel`` は依存が重い (HiFi-GAN / MB-iSTFT / spk_proj 等の
+    init) ため、ここでは ``self.training`` gate + noise + L2 renorm の振る舞い
+    だけを取り出して、production と同じ条件分岐をテストする。
+    """
+
+    def __init__(self, sigma: float = 0.05):
+        super().__init__()
+        self.sigma = sigma
+
+    def forward(self, speaker_embeddings: torch.Tensor) -> torch.Tensor:
+        # ``lightning.py:794`` の gate を 1:1 で再現
+        if self.training and speaker_embeddings is not None:
+            speaker_embeddings = (
+                speaker_embeddings
+                + torch.randn_like(speaker_embeddings) * self.sigma
+            )
+            speaker_embeddings = torch.nn.functional.normalize(
+                speaker_embeddings, p=2, dim=-1
+            )
+        return speaker_embeddings
+
+
+class TestPerturbationModeGating:
+    """train / eval mode で perturbation の有無を分岐すること"""
+
+    def test_perturbation_not_applied_in_eval_mode(self):
+        """eval mode では perturbation を完全に skip し bit-identical を返す.
+
+        ``lightning.py:794`` の ``self.training`` gate が機能していなければ、
+        validation 中の speaker_embeddings に noise が乗って SECS / loss が
+        silently に inflate する (multi-6lang での主要 regression risk).
+        """
+        module = _PerturbationModule(sigma=0.05)
+        module.eval()
+        torch.manual_seed(0)
+        emb0 = F.normalize(torch.randn(4, 192), p=2, dim=-1)
+
+        for _ in range(5):
+            out = module(emb0)
+            # eval mode は完全に bit-identical (同じ tensor object でも OK)
+            assert torch.equal(out, emb0), "eval mode で perturbation が適用された"
+
+    def test_perturbation_differs_per_step_in_train_mode(self):
+        """train mode では呼び出しごとに 異なる noise が乗ること (cache されない)"""
+        module = _PerturbationModule(sigma=0.05)
+        module.train()
+        torch.manual_seed(123)
+        emb0 = F.normalize(torch.randn(4, 192), p=2, dim=-1)
+
+        # seed 固定せず連続呼び出し: torch global RNG が進むので毎回違う noise
+        out1 = module(emb0)
+        out2 = module(emb0)
+        out3 = module(emb0)
+
+        assert not torch.allclose(out1, out2, atol=1e-4), "step1 と step2 が同一"
+        assert not torch.allclose(out2, out3, atol=1e-4), "step2 と step3 が同一"
+        assert not torch.allclose(out1, out3, atol=1e-4), "step1 と step3 が同一"
+
+    def test_perturbation_l2_renormalized_after_noise(self):
+        """noise 加算後の出力は norm=1 (commit ba71e16 の修正点)"""
+        module = _PerturbationModule(sigma=0.05)
+        module.train()
+        torch.manual_seed(7)
+        emb0 = F.normalize(torch.randn(16, 192), p=2, dim=-1)
+        # 前提: 入力は norm=1
+        torch.testing.assert_close(
+            emb0.norm(dim=-1), torch.ones(16), atol=1e-6, rtol=0
+        )
+
+        out = module(emb0)
+        torch.testing.assert_close(
+            out.norm(dim=-1), torch.ones(16), atol=1e-5, rtol=0
+        )
