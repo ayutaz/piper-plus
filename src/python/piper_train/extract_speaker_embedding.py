@@ -437,7 +437,10 @@ def extract_per_utterance(
         items_to_extract = _filter_for_shard(items_to_extract, shard, num_shards)
         _LOGGER.info(
             "Shard %d/%d: filtered %d -> %d items",
-            shard, num_shards, before, len(items_to_extract),
+            shard,
+            num_shards,
+            before,
+            len(items_to_extract),
         )
 
     if not items_to_extract:

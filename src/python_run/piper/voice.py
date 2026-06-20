@@ -1049,15 +1049,11 @@ class PiperVoice:
                 emb = np.array(speaker_embedding, dtype=np.float32).reshape(1, -1)
                 args["speaker_embedding"] = emb
                 if "speaker_embedding_mask" in input_names:
-                    args["speaker_embedding_mask"] = np.array(
-                        [[1]], dtype=np.int64
-                    )
+                    args["speaker_embedding_mask"] = np.array([[1]], dtype=np.int64)
             else:
                 args["speaker_embedding"] = np.zeros((1, emb_dim), dtype=np.float32)
                 if "speaker_embedding_mask" in input_names:
-                    args["speaker_embedding_mask"] = np.array(
-                        [[0]], dtype=np.int64
-                    )
+                    args["speaker_embedding_mask"] = np.array([[0]], dtype=np.int64)
 
         # Synthesize through Onnx
         output_names = [o.name for o in self.session.get_outputs()]

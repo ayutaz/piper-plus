@@ -1,6 +1,11 @@
+import logging
+
 import torch
 from librosa.filters import mel as librosa_mel_fn
 from torch.nn import functional as F
+
+
+_LOGGER = logging.getLogger(__name__)
 
 
 def feature_loss(fmap_r, fmap_g):
@@ -107,8 +112,7 @@ def dino_loss(student_emb, teacher_emb, center, tau_s=0.1, tau_t=0.07):
     # log_softmax → NaN → loss=0 マスクで「DINO が黙って機能停止する」状態に陥る。
     # 既知の現象 (multi-6lang スクラッチで step ~1249 から発生)。
     if not torch.isfinite(student_emb).all():
-        import logging
-        logging.getLogger(__name__).warning(
+        _LOGGER.warning(
             "dino_loss: student_emb has non-finite values "
             "(NaN=%d, Inf=%d, total=%d). Returning 0.",
             int(torch.isnan(student_emb).sum().item()),
@@ -117,8 +121,7 @@ def dino_loss(student_emb, teacher_emb, center, tau_s=0.1, tau_t=0.07):
         )
         return torch.tensor(0.0, device=student_emb.device)
     if not torch.isfinite(teacher_emb).all():
-        import logging
-        logging.getLogger(__name__).warning(
+        _LOGGER.warning(
             "dino_loss: teacher_emb has non-finite values "
             "(NaN=%d, Inf=%d). Returning 0.",
             int(torch.isnan(teacher_emb).sum().item()),
@@ -126,10 +129,7 @@ def dino_loss(student_emb, teacher_emb, center, tau_s=0.1, tau_t=0.07):
         )
         return torch.tensor(0.0, device=student_emb.device)
     if not torch.isfinite(center).all():
-        import logging
-        logging.getLogger(__name__).warning(
-            "dino_loss: dino_center has non-finite values. Returning 0."
-        )
+        _LOGGER.warning("dino_loss: dino_center has non-finite values. Returning 0.")
         return torch.tensor(0.0, device=student_emb.device)
 
     # Clamp softmax inputs to prevent exp overflow (NaN fix #8)
@@ -142,8 +142,7 @@ def dino_loss(student_emb, teacher_emb, center, tau_s=0.1, tau_t=0.07):
     loss = -(teacher_out * student_out).sum(dim=-1).mean()
     # NaN防止: 損失が異常な場合は0を返す (上流チェックで漏れた数値発散の最終ガード)
     if torch.isnan(loss) or torch.isinf(loss):
-        import logging
-        logging.getLogger(__name__).warning(
+        _LOGGER.warning(
             "dino_loss: post-softmax loss is non-finite "
             "(student_emb stats: min=%.3f max=%.3f, teacher_emb: min=%.3f max=%.3f). "
             "Returning 0.",

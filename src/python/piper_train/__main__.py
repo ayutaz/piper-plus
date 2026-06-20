@@ -656,9 +656,7 @@ def main():
     dict_args = vars(args)
 
     # CLI --gradient-clip-val (Trainer 用の名前) → VitsModel(grad_clip=...) にマップ
-    dict_args["grad_clip"] = _resolve_grad_clip(
-        getattr(args, "gradient_clip_val", 1.0)
-    )
+    dict_args["grad_clip"] = _resolve_grad_clip(getattr(args, "gradient_clip_val", 1.0))
     if dict_args["grad_clip"] is not None:
         _LOGGER.info(
             "Gradient clipping enabled in training_step: max_norm=%.2f (manual optimization)",
