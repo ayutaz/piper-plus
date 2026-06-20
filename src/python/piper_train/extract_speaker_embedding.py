@@ -33,7 +33,6 @@ from pathlib import Path
 import numpy as np
 import onnxruntime
 import soundfile as sf
-import soxr
 import torch
 import torchaudio
 
@@ -67,6 +66,8 @@ def preprocess_audio(wav_path: str | Path, target_sr: int = 16000) -> np.ndarray
 
     # Resample to target_sr
     if sr != target_sr:
+        import soxr  # noqa: PLC0415 — lazy import (optional runtime dependency)
+
         audio_data = soxr.resample(audio_data, sr, target_sr, quality="HQ")
 
     waveform = torch.from_numpy(audio_data).unsqueeze(0)

@@ -31,15 +31,19 @@ public sealed class SpeakerEmbeddingTests : IDisposable
     {
         foreach (var path in _tempFiles)
         {
-            try { File.Delete(path); }
-            catch { /* best-effort */ }
+            try
+            {
+                File.Delete(path);
+            }
+            catch
+            { /* best-effort */
+            }
         }
     }
 
     // ------------------------------------------------------------------
     // Inline reimplementation of LoadSpeakerEmbedding (mirrors Program.cs)
     // ------------------------------------------------------------------
-
     private static float[] LoadSpeakerEmbedding(string path)
     {
         const int expectedDim = ExpectedDim;
@@ -69,6 +73,7 @@ public sealed class SpeakerEmbeddingTests : IDisposable
                 headerLen = BitConverter.ToUInt16(bytes, 8);
                 dataOffset = 10 + headerLen; // magic(6) + ver(2) + headerLen_uint16(2) + header
             }
+
             int numFloats = (bytes.Length - dataOffset) / sizeof(float);
             embedding = new float[numFloats];
             Buffer.BlockCopy(bytes, dataOffset, embedding, 0, numFloats * sizeof(float));
@@ -113,8 +118,10 @@ public sealed class SpeakerEmbeddingTests : IDisposable
     {
         // Minimal descriptor string; padded to (header_len) bytes with spaces + '\n'.
         const int headerLen = 64; // must be chosen so preamble (10+headerLen) is divisible by 16? No strict requirement; just must fit.
+
         // Actual NumPy format: "{'descr': '<f4', 'fortran_order': False, 'shape': (N,), }"
         string descriptor = $"{{'descr': '<f4', 'fortran_order': False, 'shape': ({floats.Length},), }}";
+
         // Pad with spaces to headerLen - 1, then '\n' as the last byte.
         string padded = descriptor.PadRight(headerLen - 1) + "\n";
         byte[] headerBytes = System.Text.Encoding.ASCII.GetBytes(padded);
@@ -173,7 +180,6 @@ public sealed class SpeakerEmbeddingTests : IDisposable
     // ================================================================
     // SynthesisInput — SpeakerEmbedding property
     // ================================================================
-
     [Fact]
     public void SynthesisInput_SpeakerEmbedding_DefaultIsNull()
     {
@@ -187,7 +193,9 @@ public sealed class SpeakerEmbeddingTests : IDisposable
     {
         float[] embedding = new float[192];
         for (int i = 0; i < embedding.Length; i++)
+        {
             embedding[i] = i * 0.01f;
+        }
 
         var input = new SynthesisInput(
             PhonemeIds: [1, 2, 3],
@@ -246,14 +254,15 @@ public sealed class SpeakerEmbeddingTests : IDisposable
     // ================================================================
     // LoadSpeakerEmbedding — raw binary format
     // ================================================================
-
     [Fact]
     public void LoadSpeakerEmbedding_RawBinary_Returns192Floats()
     {
         // 192 float32 values = 768 bytes
         float[] expected = new float[192];
         for (int i = 0; i < 192; i++)
+        {
             expected[i] = (float)i;
+        }
 
         byte[] rawBytes = new byte[192 * sizeof(float)];
         Buffer.BlockCopy(expected, 0, rawBytes, 0, rawBytes.Length);
@@ -263,7 +272,9 @@ public sealed class SpeakerEmbeddingTests : IDisposable
 
         Assert.Equal(192, result.Length);
         for (int i = 0; i < 192; i++)
+        {
             Assert.Equal(expected[i], result[i]);
+        }
     }
 
     [Fact]
@@ -299,21 +310,27 @@ public sealed class SpeakerEmbeddingTests : IDisposable
 
         Assert.Equal(192, result.Length);
         for (int i = 0; i < 10; i++)
+        {
             Assert.Equal(partial[i], result[i]);
+        }
+
         for (int i = 10; i < 192; i++)
+        {
             Assert.Equal(0f, result[i]);
+        }
     }
 
     // ================================================================
     // LoadSpeakerEmbedding — NumPy v1.0 .npy format
     // ================================================================
-
     [Fact]
     public void LoadSpeakerEmbedding_NpyV1_ParsesCorrectly()
     {
         float[] expected = new float[192];
         for (int i = 0; i < 192; i++)
+        {
             expected[i] = i * 0.001f;
+        }
 
         byte[] npyBytes = BuildNpyV1(expected);
         string path = WriteTempFile(npyBytes, ".npy");
@@ -322,7 +339,9 @@ public sealed class SpeakerEmbeddingTests : IDisposable
 
         Assert.Equal(192, result.Length);
         for (int i = 0; i < 192; i++)
+        {
             Assert.Equal(expected[i], result[i], precision: 6);
+        }
     }
 
     [Fact]
@@ -365,13 +384,14 @@ public sealed class SpeakerEmbeddingTests : IDisposable
     // ================================================================
     // LoadSpeakerEmbedding — NumPy v2.0 .npy format
     // ================================================================
-
     [Fact]
     public void LoadSpeakerEmbedding_NpyV2_ParsesCorrectly()
     {
         float[] expected = new float[192];
         for (int i = 0; i < 192; i++)
+        {
             expected[i] = i * 0.001f;
+        }
 
         byte[] npyBytes = BuildNpyV2(expected);
         string path = WriteTempFile(npyBytes, ".npy");
@@ -380,7 +400,9 @@ public sealed class SpeakerEmbeddingTests : IDisposable
 
         Assert.Equal(192, result.Length);
         for (int i = 0; i < 192; i++)
+        {
             Assert.Equal(expected[i], result[i], precision: 6);
+        }
     }
 
     [Fact]
@@ -419,7 +441,6 @@ public sealed class SpeakerEmbeddingTests : IDisposable
     // ================================================================
     // SpeakerEmbeddingMask — verify "speaker_embedding_mask" is absent
     // ================================================================
-
     [Fact]
     public void SpeakerEmbeddingMask_NotInInputNames_PiperModelCapabilityKeys()
     {
@@ -455,6 +476,7 @@ public sealed class SpeakerEmbeddingTests : IDisposable
             .ToArray();
 
         Assert.DoesNotContain("SpeakerEmbeddingMask", propNames);
+
         // Also check for any variant spellings that might indicate a mask field.
         Assert.False(
             propNames.Any(name =>
