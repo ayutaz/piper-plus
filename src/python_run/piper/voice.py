@@ -822,6 +822,7 @@ class PiperVoice:
                 noise_w=noise_w,
                 volume=volume,
                 language_id=language_id,
+                speaker_embedding=speaker_embedding,
             )
             return
 
@@ -879,6 +880,7 @@ class PiperVoice:
                 noise_w=noise_w,
                 volume=volume,
                 language_id=language_id,
+                speaker_embedding=speaker_embedding,
             )
         finally:
             pool.shutdown(wait=False, cancel_futures=True)
@@ -895,6 +897,7 @@ class PiperVoice:
         noise_w: float | None,
         volume: float,
         language_id: int | None,
+        speaker_embedding: np.ndarray | None,
     ) -> Iterable[bytes]:
         """Run ORT inference per sentence and yield the wrapped audio chunk."""
         for phonemes in phonemes_iter:
