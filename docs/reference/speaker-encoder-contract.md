@@ -21,16 +21,18 @@ the canonical cross-EP gate used by SpeechBrain and other ECAPA-TDNN consumers.
 
 | Parameter | Value | Locked at |
 |---|---|---|
-| `sample_rate` | 16000 | `test/generate_speaker_encoder_golden.py:27` |
-| `n_fft` | 512 | `:28` |
-| `hop_length` | 160 | `:29` |
-| `n_mels` | 80 | `:30` |
-| `fmin` | 20.0 | `:31` |
-| `fmax` | 7600.0 | `:32` |
+| `sample_rate` | 16000 | `test/generate_speaker_encoder_golden.py` |
+| `n_fft` | 400 (Kaldi 25ms @ 16kHz) | `test/generate_speaker_encoder_golden.py` |
+| `hop_length` | 160 (10ms @ 16kHz) | `test/generate_speaker_encoder_golden.py` |
+| `n_mels` | 80 | `test/generate_speaker_encoder_golden.py` |
+| `fmin` | 20.0 | `test/generate_speaker_encoder_golden.py` |
+| `fmax` | 7600.0 | `test/generate_speaker_encoder_golden.py` |
 | Window | Hann | `hann_window` |
 | Mel scale | HTK 2595·log10 | `hz_to_mel` |
 | Filterbank center | always `≥ 1.0` | `create_mel_filterbank` |
-| FFT semantics | manual DFT, **float32** | `compute_mel_spectrogram` |
+| FFT semantics | manual DFT, **float32** (Python / Rust); f64-angle / f32-cos cast (Go / JS) | `compute_mel_spectrogram` |
+| Tensor layout | **frame-major** `[batch, T, n_mels]` (CAM++ Fbank convention) | `compute_mel_spectrogram` |
+| Post-processing | per-band CMVN (subtract per-band mean across all frames) | `compute_mel_spectrogram` |
 | Resampling | linear interpolation, float32 | `resample_linear` |
 
 Fixture: `test/fixtures/speaker_encoder_golden.json`. Includes:
