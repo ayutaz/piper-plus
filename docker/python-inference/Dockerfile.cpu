@@ -56,7 +56,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # the python:3.13-slim-trixie default pip and bundled setuptools/wheel.
 # Run before uv install so the upgraded toolchain is what bootstraps
 # everything else.
-RUN pip install --no-cache-dir --upgrade pip setuptools wheel
+RUN pip install --no-cache-dir --break-system-packages --ignore-installed --upgrade pip setuptools wheel
 
 # Pin uv to the same major version range used by docker/wyoming/Dockerfile
 # (workspace-editable handling is uv version-sensitive).
