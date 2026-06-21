@@ -543,8 +543,25 @@ void loadModel(std::string modelPath, ModelSession &session,
     }
   }
 
-  // Check model inputs for optional features
+  // Check model inputs for optional features.
+  //
+  // Pass 1: detect each input name (sid / speaker_embedding / mask / etc.)
+  // Pass 2: disambiguate the two "speaker_embedding" code paths based on
+  //   whether speaker_embedding_mask is ALSO declared:
+  //
+  //   - speaker_embedding only          → hasSpeakerEmbedding   (zero-shot
+  //                                       CSM path, no fallback to emb_g)
+  //   - speaker_embedding + ..._mask    → hasSpeakerEmbeddingInput (Issue #426
+  //                                       voice-cloning path with mask-based
+  //                                       fallback to emb_g(sid))
+  //
+  // The previous if/else if chain set both branches on the same name string
+  // making the second branch unreachable and hasSpeakerEmbeddingInput never
+  // set even for dual-input models (regression from PR #320 / Issue #426).
   size_t numInputNodes = session.onnx.GetInputCount();
+  bool hasSpeakerEmbeddingTensor = false;
+  bool hasSpeakerEmbeddingMaskTensor = false;
+  size_t speakerEmbeddingInputIndex = 0;
   for (size_t i = 0; i < numInputNodes; i++) {
     auto inputName = session.onnx.GetInputNameAllocated(i, session.allocator);
     std::string name(inputName.get());
@@ -555,26 +572,33 @@ void loadModel(std::string modelPath, ModelSession &session,
       session.hasMultiSpeaker = true;
       spdlog::debug("Model supports multi-speaker (sid input)");
     } else if (name == "speaker_embedding") {
-      session.hasSpeakerEmbedding = true;
-      spdlog::debug("Model supports zero-shot speaker embedding");
+      hasSpeakerEmbeddingTensor = true;
+      speakerEmbeddingInputIndex = i;
+    } else if (name == "speaker_embedding_mask") {
+      hasSpeakerEmbeddingMaskTensor = true;
     } else if (name == "lid") {
       session.hasLidInput = true;
       spdlog::debug("Model supports language ID (lid input)");
-    } else if (name == "speaker_embedding") {
-      session.hasSpeakerEmbeddingInput = true;
-      // Shape: (batch, emb_dim). When emb_dim is a dynamic axis (negative
-      // value), fall back to the ECAPA-TDNN canonical 256 to keep the
-      // session usable.
-      auto type_info = session.onnx.GetInputTypeInfo(i);
-      auto tensor_info = type_info.GetTensorTypeAndShapeInfo();
-      auto shape = tensor_info.GetShape();
-      if (shape.size() >= 2 && shape[1] > 0) {
-        session.speakerEmbeddingDim = shape[1];
-      }
-      spdlog::debug(
-          "Model supports speaker_embedding input (emb_dim={})",
-          session.speakerEmbeddingDim);
     }
+  }
+
+  if (hasSpeakerEmbeddingTensor && hasSpeakerEmbeddingMaskTensor) {
+    // Issue #426 dual-input path: voice cloning with mask-based emb_g fallback
+    session.hasSpeakerEmbeddingInput = true;
+    auto type_info =
+        session.onnx.GetInputTypeInfo(speakerEmbeddingInputIndex);
+    auto tensor_info = type_info.GetTensorTypeAndShapeInfo();
+    auto shape = tensor_info.GetShape();
+    if (shape.size() >= 2 && shape[1] > 0) {
+      session.speakerEmbeddingDim = shape[1];
+    }
+    spdlog::debug(
+        "Model supports speaker_embedding + mask (Issue #426 path, emb_dim={})",
+        session.speakerEmbeddingDim);
+  } else if (hasSpeakerEmbeddingTensor) {
+    // Zero-shot CSM path (no fallback)
+    session.hasSpeakerEmbedding = true;
+    spdlog::debug("Model supports zero-shot speaker embedding");
   }
 }
 
