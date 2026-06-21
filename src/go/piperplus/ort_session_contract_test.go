@@ -144,14 +144,14 @@ func TestOrtSessionContract_WarmupConstants(t *testing.T) {
 
 func TestOrtSessionContract_WarmupScales(t *testing.T) {
 	c := loadOrtSessionContract(t)
-	if abs(c.Warmup.NoiseScale-0.667) > 1e-9 {
-		t.Errorf("warmup.noise_scale: got %f, want 0.667", c.Warmup.NoiseScale)
+	if abs(c.Warmup.NoiseScale-0.4) > 1e-9 {
+		t.Errorf("warmup.noise_scale: got %f, want 0.4", c.Warmup.NoiseScale)
 	}
 	if abs(c.Warmup.LengthScale-1.0) > 1e-9 {
 		t.Errorf("warmup.length_scale: got %f, want 1.0", c.Warmup.LengthScale)
 	}
-	if abs(c.Warmup.NoiseW-0.8) > 1e-9 {
-		t.Errorf("warmup.noise_w: got %f, want 0.8", c.Warmup.NoiseW)
+	if abs(c.Warmup.NoiseW-0.5) > 1e-9 {
+		t.Errorf("warmup.noise_w: got %f, want 0.5", c.Warmup.NoiseW)
 	}
 }
 
