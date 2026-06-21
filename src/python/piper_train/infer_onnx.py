@@ -709,8 +709,8 @@ def main():
             "Defaults to 256."
         ),
     )
-    parser.add_argument("--noise-scale", type=float, default=0.667)
-    parser.add_argument("--noise-scale-w", type=float, default=0.8)
+    parser.add_argument("--noise-scale", type=float, default=0.4)
+    parser.add_argument("--noise-scale-w", type=float, default=0.5)
     parser.add_argument("--length-scale", type=float, default=1.0)
     # Text input options
     parser.add_argument(
