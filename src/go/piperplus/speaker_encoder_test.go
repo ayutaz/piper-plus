@@ -293,7 +293,22 @@ func TestGolden_Sine440Hz_MelShape(t *testing.T) {
 // TestGolden_Sine440Hz_ActiveBins verifies that a 440Hz sine produces high
 // energy in the expected low-frequency mel bins and low energy in the high-
 // frequency mel bins.
+//
+// Skipped under CMVN: computeMelSpectrogram applies per-band CMVN
+// (see speaker_encoder.go:391) which subtracts the per-band mean across
+// all frames. For a stationary pure tone, every frame has near-identical
+// energy at each band, so CMVN flattens all bands to ~0 with float32
+// noise-floor residual (~2e-5). The "low_bins > high_bins" invariant the
+// test was written to verify holds only on raw log-mel (pre-CMVN);
+// post-CMVN it is inherently false for stationary signals. Cross-runtime
+// canonical (Rust / C++ / WASM) handles this either by skipping the test
+// or by comparing pre-CMVN values. See docs/spec/speaker-encoder-contract.md
+// — adding a non-stationary or transient signal here would restore the
+// invariant but the existing TestGolden_Sine440Hz_MelCornerStructure
+// already covers the structural assertion.
 func TestGolden_Sine440Hz_ActiveBins(t *testing.T) {
+	t.Skip("Stationary sine + CMVN flattens all mel bins to noise floor — see comment above")
+
 	audio := generateSineGo(440, 1.0, melSampleRate)
 	mel := computeMelSpectrogram(audio)
 	nFrames := len(mel) / melNMels
