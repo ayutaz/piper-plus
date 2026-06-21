@@ -293,7 +293,7 @@ public static class SessionFactory
             using var inputLengths = OrtValue.CreateTensorValueFromMemory(
                 lengths, [1]);
 
-            float[] scales = [0.667f, 1.0f, 0.8f];
+            float[] scales = [0.4f, 1.0f, 0.5f];
             using var scalesTensor = OrtValue.CreateTensorValueFromMemory(
                 scales, [3]);
 
