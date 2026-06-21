@@ -8,6 +8,7 @@ Loads the epoch=199 checkpoint, runs flow.reverse, and checks:
   - Final z and audio output quality
 """
 
+import os
 from pathlib import Path
 
 import numpy as np
@@ -21,7 +22,11 @@ except ImportError:
 
 pytestmark = pytest.mark.skipif(torch is None, reason="torch not installed")
 
-CKPT_PATH = "/data/piper/output-zero-shot-20speakers/lightning_logs/version_2/checkpoints/epoch=199-step=206400.ckpt"
+# Path to checkpoint for flow.reverse diagnostic.
+# Set PIPER_FLOW_DEBUG_CKPT env var to point at an actual local checkpoint.
+# Default is intentionally empty so CI / non-maintainer environments skip
+# instead of leaking host-specific paths (pre-commit secret-path detector).
+CKPT_PATH = os.environ.get("PIPER_FLOW_DEBUG_CKPT", "")
 
 
 def _stats(t, name=""):
@@ -54,8 +59,11 @@ def _print_stats(s):
 @pytest.fixture(scope="module")
 def loaded_model():
     """Load checkpoint and build SynthesizerTrn."""
-    if not Path(CKPT_PATH).exists():
-        pytest.skip(f"Checkpoint not found: {CKPT_PATH}")
+    if not CKPT_PATH or not Path(CKPT_PATH).exists():
+        pytest.skip(
+            "Checkpoint not found "
+            "(set PIPER_FLOW_DEBUG_CKPT env var to enable this maintainer-only test)"
+        )
 
     ckpt = torch.load(CKPT_PATH, map_location="cpu", weights_only=False)
     state_dict = ckpt["state_dict"]
