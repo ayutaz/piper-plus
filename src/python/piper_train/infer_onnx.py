@@ -1046,9 +1046,13 @@ def main():
             "scales": scales,
         }
 
-        # Handle speaker conditioning: new zero-shot mode vs legacy sid mode
+        # Handle speaker conditioning: feed each declared input independently.
+        # Modern zero-shot models declare `speaker_embedding`; legacy models
+        # declare `sid`; Issue #426 compat models declare BOTH (sid drives
+        # emb_g fallback when speaker_embedding_mask=0). Mutual exclusion
+        # via if/elif was wrong — caused `Required inputs (['sid']) are
+        # missing` when both inputs were required.
         if has_spk_emb:
-            # Zero-shot model: always use speaker_embedding tensor
             # Per-utterance embedding from JSONL overrides the CLI-resolved one
             utt_spk_emb = utt.get("speaker_embedding")
             if utt_spk_emb is not None:
@@ -1057,9 +1061,10 @@ def main():
                 spk_emb = resolved_spk_emb
             inputs["speaker_embedding"] = np.expand_dims(spk_emb, 0)  # [1, 192]
             if has_spk_emb_mask:
-                inputs["speaker_embedding_mask"] = np.ones((1,), dtype=np.int64)
-        elif has_sid:
-            # Legacy sid-based model
+                # Shape [1, 1] (rank-2) to match the ONNX export contract;
+                # matches voice.py:_warmup_session and python_run feed path.
+                inputs["speaker_embedding_mask"] = np.ones((1, 1), dtype=np.int64)
+        if has_sid:
             sid = None
             if speaker_id is not None:
                 sid = np.array([speaker_id], dtype=np.int64)
