@@ -40,7 +40,7 @@ public record SynthesisInput(
     long[]? ProsodyFeatures = null,
     float NoiseScale = 0.4f,
     float LengthScale = 1.0f,
-    float NoiseW = 0.8f,
+    float NoiseW = 0.5f,
     float[]? SpeakerEmbedding = null)
 {
     /// <summary>
