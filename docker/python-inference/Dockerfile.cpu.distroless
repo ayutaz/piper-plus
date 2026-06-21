@@ -70,7 +70,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # setuptools / pip metadata) are copied verbatim into the final distroless
 # stage, so upgrading here propagates into the published image.
 # Issue #527: bumped from python:3.11-slim-bookworm + distroless debian12.
-RUN pip install --no-cache-dir --upgrade pip setuptools wheel
+RUN pip install --no-cache-dir --break-system-packages --ignore-installed --upgrade pip setuptools wheel
 
 # Pin uv to the same major version range used by the canonical
 # Dockerfile.cpu — workspace-editable handling is uv-version sensitive.

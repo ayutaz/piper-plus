@@ -8,7 +8,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Upgrade pip / setuptools / wheel to clear Trivy supply-chain CVEs that
 # ride on the python:3.13.13-slim-trixie default toolchain.
-RUN pip install --no-cache-dir --upgrade pip setuptools wheel
+RUN pip install --no-cache-dir --break-system-packages --ignore-installed --upgrade pip setuptools wheel
 
 # Install uv
 RUN pip install --no-cache-dir uv
