@@ -279,7 +279,7 @@ def warmup_onnx_session(
         phoneme_ids[0, 0] = 1  # BOS
         phoneme_ids[0, -1] = 2  # EOS
         input_lengths = np.array([phoneme_length], dtype=np.int64)
-        scales = np.array([0.667, 1.0, 0.8], dtype=np.float32)
+        scales = np.array([0.4, 1.0, 0.5], dtype=np.float32)
 
         # Detect optional inputs dynamically
         input_names = {inp.name for inp in session.get_inputs()}
