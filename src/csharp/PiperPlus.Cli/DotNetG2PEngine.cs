@@ -29,6 +29,15 @@ namespace PiperPlus.Cli;
 /// </remarks>
 internal sealed class DotNetG2PEngine : IJapaneseG2PEngine, IDisposable
 {
+    // Serialize MeCabTokenizer construction across threads.
+    // DotNetG2P.MeCab 1.8.x opens sys.dic with an exclusive FileShare during
+    // construction; concurrent ctor calls (e.g. ThreadLocal factory firing
+    // on every parallel worker's first Convert call) race on file-lock
+    // acquisition and throw IOException. Locking only the ctor keeps the
+    // per-thread engine isolation that follows — once each thread has its
+    // own tokenizer instance, Convert() runs in parallel without contention.
+    private static readonly object S_tokenizerCtorLock = new object();
+
     private readonly string _dictPath;
     private readonly ThreadLocal<G2PEngine> _threadLocalEngine;
 
@@ -43,7 +52,14 @@ internal sealed class DotNetG2PEngine : IJapaneseG2PEngine, IDisposable
         Environment.SetEnvironmentVariable("NAIST_JDIC_PATH", _dictPath);
 
         _threadLocalEngine = new ThreadLocal<G2PEngine>(
-            valueFactory: () => new G2PEngine(new MeCabTokenizer(_dictPath)),
+            valueFactory: () =>
+            {
+                // sys.dic file-lock race workaround for DotNetG2P.MeCab 1.8.x
+                lock (S_tokenizerCtorLock)
+                {
+                    return new G2PEngine(new MeCabTokenizer(_dictPath));
+                }
+            },
             trackAllValues: true);
     }
 
