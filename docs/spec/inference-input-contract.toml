@@ -180,9 +180,15 @@ order = ["noise_scale", "length_scale", "noise_w"]
 
 # Default values (match piper_train.infer_onnx CLI defaults and the
 # `inference` block written into config.json by export_onnx.py).
-default_noise_scale = 0.667
+# v1.12.0 で全 runtime CLI を 0.4 / 1.0 / 0.5 に統一済 (CLAUDE.md
+# "Inference defaults"、 PR #222 / commit c644e9e2)。 Note: これは
+# Warmup scales (ORT 内部最適化、 ort-session-contract.toml) と同値だが
+# 意味的には別カテゴリ — Warmup は dummy run 用の "安定な" 値、 推論
+# default は audio quality (低 noise / 短 duration) と graph 安定性の
+# 折衷値として選定された結果、 たまたま同じ値に着地した。
+default_noise_scale = 0.4
 default_length_scale = 1.0
-default_noise_w = 0.8
+default_noise_w = 0.5
 
 # Acceptance ranges. Each runtime SHOULD validate at the API boundary
 # and reject out-of-range inputs with the prefixed error code.
