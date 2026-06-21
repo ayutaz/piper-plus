@@ -40,7 +40,7 @@ namespace fs = std::filesystem;
 using nlohmann::json;
 
 constexpr int    kMelSampleRate = 16000;
-constexpr int    kMelNFft       = 512;
+constexpr int    kMelNFft       = 400;
 constexpr int    kMelHopLength  = 160;
 constexpr int    kMelNMels      = 80;
 constexpr float  kMelFmin       = 20.0f;
