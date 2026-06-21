@@ -19,8 +19,8 @@
 //   - warmup phonemeLength = 100         (piper.cpp:2967)
 //   - warmup BOS = 1, EOS = 2, dummy = 8 (piper.cpp:2970-2972)
 //   - warmup default runs = 2            (piper.cpp:warmupModel(...) sig in piper.h)
-//   - warmup scales: noise=0.667, length=1.0, w=0.8 (piper.cpp:2973 + config defaults
-//     at piper.cpp:262/270 for SynthesisConfig)
+//   - warmup scales: noise=0.4, length=1.0, w=0.5 (piper.cpp:2973 + config defaults
+//     at piper.cpp:264/272 for SynthesisConfig; v1.12.0 で全 runtime 統一)
 //
 // The C++ runtime does NOT implement model-cache (.opt.onnx[.ok]) nor the
 // PIPER_DISABLE_WARMUP / PIPER_DISABLE_CACHE / PIPER_INTRA_THREADS env
@@ -65,10 +65,11 @@ constexpr int WARMUP_DUMMY_PHONEME = 8;
 // main.cpp:294 — `piper::warmupModel(voice.session)` defaults to 2 runs
 // (piper.h: void warmupModel(ModelSession &, int runs = 2);).
 constexpr int WARMUP_DEFAULT_RUNS = 2;
-// piper.cpp:262/270: SynthesisConfig defaults pulled into warmup at line 2973.
-constexpr float WARMUP_NOISE_SCALE = 0.667f;
+// piper.cpp:264/272: SynthesisConfig defaults pulled into warmup at line 2973.
+// v1.12.0 で全 runtime canonical 0.4/1.0/0.5 に統一済 (contract.json と整合)。
+constexpr float WARMUP_NOISE_SCALE = 0.4f;
 constexpr float WARMUP_LENGTH_SCALE = 1.0f;
-constexpr float WARMUP_NOISE_W = 0.8f;
+constexpr float WARMUP_NOISE_W = 0.5f;
 }  // namespace cpp_constants
 
 // ---------------------------------------------------------------------------
