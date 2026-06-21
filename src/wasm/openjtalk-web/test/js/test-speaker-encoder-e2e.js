@@ -169,6 +169,8 @@ describe("Speaker Encoder — E2E cosine gate (layer 2)", () => {
     const samples =
       sampleRate === 16000 ? rawSamples : resampleLinearForTesting(rawSamples, sampleRate, 16000);
 
+    // computeMelSpectrogram returns frame-major (CAM++ canonical):
+    // mel[frameIdx * N_MELS + melIdx], shape [n_frames * n_mels].
     const mel = computeMelSpectrogram(samples);
     const N_MELS = 80;
     const nFrames = mel.length / N_MELS;
@@ -176,23 +178,24 @@ describe("Speaker Encoder — E2E cosine gate (layer 2)", () => {
     const sess = await ort.default.InferenceSession.create(encoderPath);
     const inputName = sess.inputNames[0];
     const inputMeta = sess.inputMetadata?.[inputName];
-    const inputShape = inputMeta?.dimensions ?? [1, N_MELS, nFrames];
+    const inputShape = inputMeta?.dimensions ?? [1, nFrames, N_MELS];
 
     let feed;
-    if (inputShape.length === 3 && Number(inputShape[1]) === N_MELS) {
-      feed = new ort.default.Tensor("float32", mel, [1, N_MELS, nFrames]);
-    } else if (inputShape.length === 3 && Number(inputShape[2]) === N_MELS) {
-      // Transpose from [N_MELS, nFrames] (mel-major) to [nFrames, N_MELS].
+    if (inputShape.length === 3 && Number(inputShape[2]) === N_MELS) {
+      // CAM++ / canonical: [batch, T, 80] — feed our frame-major mel directly.
+      feed = new ort.default.Tensor("float32", mel, [1, nFrames, N_MELS]);
+    } else if (inputShape.length === 3 && Number(inputShape[1]) === N_MELS) {
+      // Legacy / mel-major encoder: transpose from frame-major to [N_MELS, T].
       const t = new Float32Array(N_MELS * nFrames);
-      for (let m = 0; m < N_MELS; m++) {
-        for (let f = 0; f < nFrames; f++) {
-          t[f * N_MELS + m] = mel[m * nFrames + f];
+      for (let f = 0; f < nFrames; f++) {
+        for (let m = 0; m < N_MELS; m++) {
+          t[m * nFrames + f] = mel[f * N_MELS + m];
         }
       }
-      feed = new ort.default.Tensor("float32", t, [1, nFrames, N_MELS]);
+      feed = new ort.default.Tensor("float32", t, [1, N_MELS, nFrames]);
     } else {
-      // Fall back to the [1, N_MELS, T] layout that piper-plus uses.
-      feed = new ort.default.Tensor("float32", mel, [1, N_MELS, nFrames]);
+      // Fall back to the canonical [batch, T, 80] layout.
+      feed = new ort.default.Tensor("float32", mel, [1, nFrames, N_MELS]);
     }
 
     const result = await sess.run({ [inputName]: feed });

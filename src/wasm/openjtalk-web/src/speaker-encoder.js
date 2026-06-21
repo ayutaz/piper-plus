@@ -1,17 +1,26 @@
 /**
- * SpeakerEncoder — Browser-based voice cloning via ECAPA-TDNN ONNX model.
+ * SpeakerEncoder — Browser-based voice cloning via ECAPA-TDNN / CAM++ ONNX models.
  *
  * Loads a speaker encoder model, computes mel spectrograms from AudioBuffer
  * or Float32Array input, and extracts speaker embeddings for voice cloning.
  *
- * Mel spectrogram parameters (unified across all runtimes):
- *   sr=16000, n_fft=512, hop=160, n_mels=80, fmin=20, fmax=7600
+ * Mel spectrogram parameters (unified across all runtimes — see
+ * docs/reference/speaker-encoder-contract.md):
+ *   sr=16000, n_fft=400 (Kaldi 25ms@16kHz), hop=160, n_mels=80,
+ *   fmin=20, fmax=7600. Layout is frame-major (CAM++ expects [batch, T, 80]).
+ *   Per-band CMVN (mean subtraction) is applied after log-mel.
+ *
+ * Mirrors:
+ *   - Python: src/python/piper_train/speaker_encoder/audio_utils.py
+ *   - Rust:   src/rust/piper-core/src/speaker_encoder.rs
+ *   - Go:     src/go/piperplus/speaker_encoder.go
+ *   - C#:     src/csharp/PiperPlus.Core/Inference/SpeakerEncoder.cs
  *
  * @module speaker-encoder
  */
 
 const MEL_SAMPLE_RATE = 16000;
-const MEL_N_FFT = 512;
+const MEL_N_FFT = 400; // Kaldi frame_length=25ms at 16kHz = 400 samples
 const MEL_HOP_LENGTH = 160;
 const MEL_N_MELS = 80;
 const MEL_FMIN = 20;
@@ -59,7 +68,7 @@ export class SpeakerEncoder {
    *   AudioBuffer: uses the first channel; auto-resamples from buffer's sample rate.
    *   Float32Array: assumed to be mono 16kHz PCM.
    * @param {number} [sampleRate] - Sample rate when audio is Float32Array (default: 16000).
-   * @returns {Promise<Float32Array>} Speaker embedding (typically 256 dimensions).
+   * @returns {Promise<Float32Array>} Speaker embedding (typically 192 or 256 dimensions).
    */
   async encode(audio, sampleRate) {
     if (!this._session) {
@@ -88,7 +97,7 @@ export class SpeakerEncoder {
     const resampled =
       rate !== MEL_SAMPLE_RATE ? resampleLinear(samples, rate, MEL_SAMPLE_RATE) : samples;
 
-    // Compute mel spectrogram
+    // Compute mel spectrogram (frame-major layout: [n_frames * n_mels])
     const mel = computeMelSpectrogram(resampled);
     const nFrames = mel.length / MEL_N_MELS;
 
@@ -96,11 +105,16 @@ export class SpeakerEncoder {
       throw new Error("Audio is too short for mel spectrogram computation");
     }
 
-    // Create input tensor: [1, n_mels, n_frames]
+    // Create input tensor: [1, n_frames, n_mels] — CAM++ expects time-first
+    // (Fbank) layout, matching Rust/Go/C# canonical runtimes.
     const ort = this._ort;
-    const melTensor = new ort.Tensor("float32", mel, [1, MEL_N_MELS, nFrames]);
+    const melTensor = new ort.Tensor("float32", mel, [1, nFrames, MEL_N_MELS]);
 
-    const results = await this._session.run({ input: melTensor });
+    // Read first input/output name dynamically (CAM++ uses "feats", not "input")
+    const inputName =
+      (this._session.inputNames && this._session.inputNames[0]) || "feats";
+
+    const results = await this._session.run({ [inputName]: melTensor });
     const outputTensor = results.output || results[Object.keys(results)[0]];
 
     return new Float32Array(outputTensor.data);
@@ -156,13 +170,21 @@ function resampleLinear(samples, fromRate, toRate) {
 }
 
 /**
- * Compute log mel spectrogram.
+ * Compute log mel spectrogram with per-band CMVN (mean subtraction).
+ *
  * @param {Float32Array} samples - Mono 16kHz audio.
- * @returns {Float32Array} Flattened [n_mels * n_frames] in mel-major order.
+ * @returns {Float32Array} Flattened [n_frames * n_mels] in frame-major order.
+ *   Layout matches CAM++'s expected input shape [batch, T, 80].
+ *   Index: mel_spec[frame_idx * MEL_N_MELS + mel_idx].
  */
 // fr32 forces a value to its nearest float32 representation. Used at every
 // arithmetic step so the JS path matches Python's float32 semantics
 // byte-for-byte (see test/generate_speaker_encoder_golden.py — F32 alias).
+// This includes the DFT angle math — Python/Rust canonical both use
+// fully-f32 angles, which CMVN preserves enough variation to give the
+// expected non-zero log-mel values. Switching to f64 angles (as Go does)
+// produces near-zero values for pure sines because the cleaner DFT
+// flattens the per-frame energy that CMVN then subtracts away.
 const fr32 = Math.fround;
 
 export function computeMelSpectrogram(samples) {
@@ -173,17 +195,23 @@ export function computeMelSpectrogram(samples) {
     samples.length >= MEL_N_FFT ? Math.floor((samples.length - MEL_N_FFT) / MEL_HOP_LENGTH) + 1 : 0;
 
   const fftBins = Math.floor(MEL_N_FFT / 2) + 1;
-  const melSpec = new Float32Array(MEL_N_MELS * nFrames);
+  // Frame-major layout: melSpec[frameIdx * MEL_N_MELS + melIdx]
+  const melSpec = new Float32Array(nFrames * MEL_N_MELS);
 
   for (let frameIdx = 0; frameIdx < nFrames; frameIdx++) {
     const start = frameIdx * MEL_HOP_LENGTH;
 
-    // Power spectrum via DFT in float32 (Math.fround at every step
-    // mirrors Python's F32 alias to keep checksums byte-for-byte equal).
+    // Power spectrum via DFT — fully f32 arithmetic (fr32 at every step).
+    // Mirrors Python golden generator (test/generate_speaker_encoder_golden.py)
+    // and Rust canonical (src/rust/piper-core/src/speaker_encoder.rs) which
+    // both use f32 angles. The accumulated f32 truncation introduces the
+    // per-frame variation that CMVN preserves; f64 angles produce a cleaner
+    // DFT that CMVN flattens to zero (Go workaround diverges from layer-1
+    // golden parity by ~2-4 abs log-mel).
     const powerSpec = new Float32Array(fftBins);
     for (let k = 0; k < fftBins; k++) {
-      let real = fr32(0),
-        imag = fr32(0);
+      let real = fr32(0);
+      let imag = fr32(0);
       const freq = fr32((fr32(-2 * Math.PI) * fr32(k)) / fr32(MEL_N_FFT));
       for (let n = 0; n < MEL_N_FFT; n++) {
         const winSample =
@@ -195,16 +223,32 @@ export function computeMelSpectrogram(samples) {
       powerSpec[k] = fr32(fr32(real * real) + fr32(imag * imag));
     }
 
-    // Apply mel filterbank — float32 arithmetic.
+    // Apply mel filterbank — frame-major storage.
     for (let melIdx = 0; melIdx < MEL_N_MELS; melIdx++) {
       let energy = fr32(0);
       for (let k = 0; k < fftBins; k++) {
         energy = fr32(energy + fr32(melFilters[melIdx * fftBins + k] * powerSpec[k]));
       }
       // np.log accepts a Python float (f64); the output is then cast to f32
-      // when stored in mel_spec (which is dtype=F32). Match that here:
-      // log of f32-clamped energy, then cast result to f32.
-      melSpec[melIdx * nFrames + frameIdx] = fr32(Math.log(Math.max(fr32(energy), 1e-10)));
+      // when stored in mel_spec (which is dtype=F32). Match that here.
+      melSpec[frameIdx * MEL_N_MELS + melIdx] = fr32(Math.log(Math.max(fr32(energy), 1e-10)));
+    }
+  }
+
+  // CMVN: subtract per-band mean across all frames (global mean normalisation).
+  // Matches Rust/Go/C# / Python (test/generate_speaker_encoder_golden.py).
+  if (nFrames > 0) {
+    for (let melIdx = 0; melIdx < MEL_N_MELS; melIdx++) {
+      let sum = fr32(0);
+      for (let frameIdx = 0; frameIdx < nFrames; frameIdx++) {
+        sum = fr32(sum + melSpec[frameIdx * MEL_N_MELS + melIdx]);
+      }
+      const mean = fr32(sum / fr32(nFrames));
+      for (let frameIdx = 0; frameIdx < nFrames; frameIdx++) {
+        melSpec[frameIdx * MEL_N_MELS + melIdx] = fr32(
+          melSpec[frameIdx * MEL_N_MELS + melIdx] - mean
+        );
+      }
     }
   }
 
