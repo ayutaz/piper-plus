@@ -14,12 +14,12 @@ Optimizations:
 
 Usage:
     .venv/bin/python prepare_multilingual_dataset.py \
-        --ja-en-dataset /data/piper/dataset-bilingual-ja-en-v4/dataset.jsonl \
-        --zh-aishell3 /data/piper/downloads/aishell3 \
-        --es-cml-tts /data/piper/downloads/cml_tts_dataset_spanish_v0.1 \
-        --fr-cml-tts /data/piper/downloads/cml_tts_dataset_french_v0.1 \
-        --pt-cml-tts /data/piper/downloads/cml_tts_dataset_portuguese_v0.1 \
-        --output-dir /data/piper/dataset-multilingual-6lang \
+        --ja-en-dataset "${JA_EN_DATASET}/dataset.jsonl" \
+        --zh-aishell3 "${DOWNLOADS_DIR}/aishell3" \
+        --es-cml-tts "${DOWNLOADS_DIR}/cml_tts_dataset_spanish_v0.1" \
+        --fr-cml-tts "${DOWNLOADS_DIR}/cml_tts_dataset_french_v0.1" \
+        --pt-cml-tts "${DOWNLOADS_DIR}/cml_tts_dataset_portuguese_v0.1" \
+        --output-dir "${OUTPUT_DIR}" \
         --sample-rate 22050 \
         --workers 30 \
         --gpu-spec-device cuda:0

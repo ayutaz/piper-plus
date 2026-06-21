@@ -3,9 +3,9 @@
 
 Usage:
     uv run python prepare_bilingual_dataset.py \
-        --ja-dataset /data/piper/dataset-moe-speech-20speakers-v2/dataset.jsonl \
-        --en-input-dir /data/piper/ljspeech/LJSpeech-1.1 \
-        --output-dir /data/piper/dataset-bilingual-ja-en \
+        --ja-dataset "${JA_DATASET_DIR}/dataset.jsonl" \
+        --en-input-dir "${EN_LJSPEECH_DIR}" \
+        --output-dir "${OUTPUT_DIR}" \
         --sample-rate 22050 \
         --max-en-utterances 13000 \
         --workers 8
