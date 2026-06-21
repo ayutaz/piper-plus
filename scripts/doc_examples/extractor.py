@@ -117,7 +117,10 @@ def walk_docs(
     out: list[FencedBlock] = []
     seen: set[Path] = set()
     for pattern in include_glob:
-        for path in sorted(repo_root.glob(pattern)):
+        # Sort by POSIX-style string to ensure deterministic, case-sensitive
+        # ordering across platforms (Windows pathlib uses case-insensitive __lt__
+        # by default, which diverges from Linux/CI and causes snapshot drift).
+        for path in sorted(repo_root.glob(pattern), key=lambda p: p.as_posix()):
             if not path.is_file():
                 continue
             if path in seen:
