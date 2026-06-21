@@ -170,9 +170,9 @@ public class OrtSessionContractTests
     {
         JsonElement fixture = LoadFixture();
         JsonElement warmup = fixture.GetProperty("warmup");
-        Assert.Equal(0.667, warmup.GetProperty("noise_scale").GetDouble(), 9);
+        Assert.Equal(0.4, warmup.GetProperty("noise_scale").GetDouble(), 9);
         Assert.Equal(1.0, warmup.GetProperty("length_scale").GetDouble(), 9);
-        Assert.Equal(0.8, warmup.GetProperty("noise_w").GetDouble(), 9);
+        Assert.Equal(0.5, warmup.GetProperty("noise_w").GetDouble(), 9);
     }
 
     [Fact]
