@@ -625,9 +625,12 @@ internal static class Program
                             }
 
                             speakerEmbedding = LoadSpeakerEmbedding(speakerEmbeddingPath);
-                            LogInfo(quiet,
+                            LogInfo(
+                                quiet,
                                 $"Loaded speaker embedding from {speakerEmbeddingPath} ({speakerEmbedding.Length} values)");
-                            LogDebug(debug, quiet,
+                            LogDebug(
+                                debug,
+                                quiet,
                                 $"Loaded speaker embedding: {speakerEmbedding.Length} dims from {speakerEmbeddingPath}");
                         }
                         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
