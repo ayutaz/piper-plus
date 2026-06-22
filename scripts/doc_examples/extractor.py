@@ -117,7 +117,7 @@ def walk_docs(
     out: list[FencedBlock] = []
     seen: set[Path] = set()
     for pattern in include_glob:
-        for path in sorted(repo_root.glob(pattern)):
+        for path in sorted(repo_root.glob(pattern), key=lambda p: p.as_posix()):
             if not path.is_file():
                 continue
             if path in seen:

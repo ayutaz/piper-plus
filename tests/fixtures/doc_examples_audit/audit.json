@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-06-22T02:54:32Z",
+  "generated_at": "2026-06-22T03:04:43Z",
   "totals": {
     "executable": 241,
     "needs_placeholder": 6,
@@ -3380,6 +3380,47 @@
       "hash_sha1": "5c573466ac870b1139a4a94a8349f920ef19bcf6"
     },
     {
+      "file": "docs/guides/training.md",
+      "line_start": 11,
+      "line_end": 21,
+      "language_raw": "bash",
+      "language": "bash",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "e36b82a6207696177a2af37d68e6a0c8ff495608"
+    },
+    {
+      "file": "docs/guides/training.md",
+      "line_start": 27,
+      "line_end": 37,
+      "language_raw": "bash",
+      "language": "bash",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "b8830606b5de24e386400a5a95688a2cf324bd63"
+    },
+    {
+      "file": "docs/guides/training.md",
+      "line_start": 60,
+      "line_end": 68,
+      "language_raw": "bash",
+      "language": "bash",
+      "category": "skip_warranted",
+      "suggested_action": "sandbox_cannot_satisfy_env_dep",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [
+        "CUDA_VISIBLE_DEVICES"
+      ],
+      "hash_sha1": "cc170e10ef490edb72e1f52432136257ab04cd0b"
+    },
+    {
       "file": "docs/guides/training/training-guide.md",
       "line_start": 55,
       "line_end": 57,
@@ -4087,47 +4128,6 @@
       "directives_detected": [],
       "env_dependencies": [],
       "hash_sha1": "d357dcc82db2fb29193042fabfd6401953855240"
-    },
-    {
-      "file": "docs/guides/training.md",
-      "line_start": 11,
-      "line_end": 21,
-      "language_raw": "bash",
-      "language": "bash",
-      "category": "executable",
-      "suggested_action": "execution_gate_candidate",
-      "placeholders_detected": [],
-      "directives_detected": [],
-      "env_dependencies": [],
-      "hash_sha1": "e36b82a6207696177a2af37d68e6a0c8ff495608"
-    },
-    {
-      "file": "docs/guides/training.md",
-      "line_start": 27,
-      "line_end": 37,
-      "language_raw": "bash",
-      "language": "bash",
-      "category": "executable",
-      "suggested_action": "execution_gate_candidate",
-      "placeholders_detected": [],
-      "directives_detected": [],
-      "env_dependencies": [],
-      "hash_sha1": "b8830606b5de24e386400a5a95688a2cf324bd63"
-    },
-    {
-      "file": "docs/guides/training.md",
-      "line_start": 60,
-      "line_end": 68,
-      "language_raw": "bash",
-      "language": "bash",
-      "category": "skip_warranted",
-      "suggested_action": "sandbox_cannot_satisfy_env_dep",
-      "placeholders_detected": [],
-      "directives_detected": [],
-      "env_dependencies": [
-        "CUDA_VISIBLE_DEVICES"
-      ],
-      "hash_sha1": "cc170e10ef490edb72e1f52432136257ab04cd0b"
     },
     {
       "file": "docs/migration/README.md",
@@ -4887,66 +4887,6 @@
       "hash_sha1": "ae040ba29e99f872f94902f34b73828966d93d70"
     },
     {
-      "file": "docs/reference/python-313/milestones.md",
-      "line_start": 14,
-      "line_end": 24,
-      "language_raw": "text",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "14e535aa87cc7a4c4dc343e41722e12a01659854"
-    },
-    {
-      "file": "docs/reference/python-313/milestones.md",
-      "line_start": 385,
-      "line_end": 426,
-      "language_raw": "text",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "a78eb1ab87abf1b9c03966e21dd0660ddafe5909"
-    },
-    {
-      "file": "docs/reference/python-313/milestones.md",
-      "line_start": 486,
-      "line_end": 490,
-      "language_raw": "markdown",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "08e827efeb5ff6ec0588e86b292a98ef7a0ed05c"
-    },
-    {
-      "file": "docs/reference/python-313/open-questions.md",
-      "line_start": 228,
-      "line_end": 269,
-      "language_raw": "markdown",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "17e4906aebec0d8500ea237bd8415bf1c8127806"
-    },
-    {
       "file": "docs/reference/python-313/README.md",
       "line_start": 19,
       "line_end": 31,
@@ -5153,6 +5093,66 @@
       ],
       "env_dependencies": [],
       "hash_sha1": "34a749999f684e3699c7176796c96d12f89d213a"
+    },
+    {
+      "file": "docs/reference/python-313/milestones.md",
+      "line_start": 14,
+      "line_end": 24,
+      "language_raw": "text",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "14e535aa87cc7a4c4dc343e41722e12a01659854"
+    },
+    {
+      "file": "docs/reference/python-313/milestones.md",
+      "line_start": 385,
+      "line_end": 426,
+      "language_raw": "text",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "a78eb1ab87abf1b9c03966e21dd0660ddafe5909"
+    },
+    {
+      "file": "docs/reference/python-313/milestones.md",
+      "line_start": 486,
+      "line_end": 490,
+      "language_raw": "markdown",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "08e827efeb5ff6ec0588e86b292a98ef7a0ed05c"
+    },
+    {
+      "file": "docs/reference/python-313/open-questions.md",
+      "line_start": 228,
+      "line_end": 269,
+      "language_raw": "markdown",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "17e4906aebec0d8500ea237bd8415bf1c8127806"
     },
     {
       "file": "docs/reference/python-313/specifications.md",
@@ -5402,6 +5402,402 @@
       ],
       "env_dependencies": [],
       "hash_sha1": "09edadd78a89f2a1f4aa0dcfc92d0e6ae962a4f1"
+    },
+    {
+      "file": "docs/reference/zh-en-loanword/README.md",
+      "line_start": 45,
+      "line_end": 62,
+      "language_raw": "text",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "cb62216a6815b2c0cb9b24988ec3a0d297c4c6d7"
+    },
+    {
+      "file": "docs/reference/zh-en-loanword/README.md",
+      "line_start": 66,
+      "line_end": 72,
+      "language_raw": "text",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "b8b80e5d5b09a0d31b43bfd4da57c143e35f8cd5"
+    },
+    {
+      "file": "docs/reference/zh-en-loanword/README.md",
+      "line_start": 76,
+      "line_end": 83,
+      "language_raw": "json",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "a14a55cd5353b9060180e07f39e3398947da17f0"
+    },
+    {
+      "file": "docs/reference/zh-en-loanword/README.md",
+      "line_start": 108,
+      "line_end": 145,
+      "language_raw": "text",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "3f609074bd1d7b488757224f19478a58e205fc58"
+    },
+    {
+      "file": "docs/reference/zh-en-loanword/README.md",
+      "line_start": 176,
+      "line_end": 186,
+      "language_raw": "text",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "ce8ea99584c8c14e999ca376da2944569203416c"
+    },
+    {
+      "file": "docs/reference/zh-en-loanword/README.md",
+      "line_start": 203,
+      "line_end": 205,
+      "language_raw": "text",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "4a4ea95370f57824d32dc077ee49a74855ddb972"
+    },
+    {
+      "file": "docs/reference/zh-en-loanword/README.md",
+      "line_start": 230,
+      "line_end": 240,
+      "language_raw": "c",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "d1bfb3f1e8e5683b4bbebb7ffb12970bc71e23e7"
+    },
+    {
+      "file": "docs/reference/zh-en-loanword/README.md",
+      "line_start": 265,
+      "line_end": 284,
+      "language_raw": "json",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "70117d5770c029209a2306d13f7a21688b6ce74b"
+    },
+    {
+      "file": "docs/reference/zh-en-loanword/README.md",
+      "line_start": 288,
+      "line_end": 295,
+      "language_raw": "python",
+      "language": "python",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "d76b0b9e05b1cdf0e4591c1f15fcad2b6bf7f9db"
+    },
+    {
+      "file": "docs/reference/zh-en-loanword/README.md",
+      "line_start": 297,
+      "line_end": 304,
+      "language_raw": "rust",
+      "language": "rust",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "ea827376948c0a971e083ea5352310a2974763f1"
+    },
+    {
+      "file": "docs/reference/zh-en-loanword/README.md",
+      "line_start": 308,
+      "line_end": 317,
+      "language_raw": "yaml",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "4663afa43520fe96f795254acd692455cd25cb1d"
+    },
+    {
+      "file": "docs/reference/zh-en-loanword/README.md",
+      "line_start": 334,
+      "line_end": 342,
+      "language_raw": "text",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "f0a80099ba7a9554b93253a0e6e6218c70f81e8c"
+    },
+    {
+      "file": "docs/reference/zh-en-loanword/README.md",
+      "line_start": 366,
+      "line_end": 379,
+      "language_raw": "yaml",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "b4e863a7dcfe333c0bf4d0b7deeefb0f9fe9e63a"
+    },
+    {
+      "file": "docs/reference/zh-en-loanword/README.md",
+      "line_start": 403,
+      "line_end": 410,
+      "language_raw": "text",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "7cae2666c91792cb3bd9eac7a9530bf3ca560c5b"
+    },
+    {
+      "file": "docs/reference/zh-en-loanword/README.md",
+      "line_start": 430,
+      "line_end": 439,
+      "language_raw": "json",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "7ec33f6657050ae53670655ea53f40d83d8d3b3a"
+    },
+    {
+      "file": "docs/reference/zh-en-loanword/README.md",
+      "line_start": 468,
+      "line_end": 473,
+      "language_raw": "python",
+      "language": "python",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "c22e35514cf3bbe05d5525b16377014b04dbe64b"
+    },
+    {
+      "file": "docs/reference/zh-en-loanword/README.md",
+      "line_start": 488,
+      "line_end": 507,
+      "language_raw": "python",
+      "language": "python",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "42ce5f7b3c064b9f3f72de1b77d4ad3c08a4bcfb"
+    },
+    {
+      "file": "docs/reference/zh-en-loanword/README.md",
+      "line_start": 557,
+      "line_end": 585,
+      "language_raw": "rust",
+      "language": "rust",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "b7d3e85f7268b146426b577a9be70997c3fe0374"
+    },
+    {
+      "file": "docs/reference/zh-en-loanword/README.md",
+      "line_start": 613,
+      "line_end": 616,
+      "language_raw": "python",
+      "language": "python",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "d98636a771481adcfcb866d0a421791964fe54fa"
+    },
+    {
+      "file": "docs/reference/zh-en-loanword/README.md",
+      "line_start": 618,
+      "line_end": 621,
+      "language_raw": "rust",
+      "language": "rust",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "1e84ae41d955987432812df2808cf378ce5ffbb5"
+    },
+    {
+      "file": "docs/reference/zh-en-loanword/README.md",
+      "line_start": 623,
+      "line_end": 626,
+      "language_raw": "go",
+      "language": "go",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "aa9e5d9d7d1bf50458f51531811b84bb99547fde"
+    },
+    {
+      "file": "docs/reference/zh-en-loanword/README.md",
+      "line_start": 628,
+      "line_end": 631,
+      "language_raw": "csharp",
+      "language": "csharp",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "b30b7c606031d02dab1e83fa24d8e6f0d491bf2f"
+    },
+    {
+      "file": "docs/reference/zh-en-loanword/README.md",
+      "line_start": 633,
+      "line_end": 636,
+      "language_raw": "cpp",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "2274a8a7facc5cfd5e6bca55be705f477497b06e"
+    },
+    {
+      "file": "docs/reference/zh-en-loanword/README.md",
+      "line_start": 638,
+      "line_end": 641,
+      "language_raw": "javascript",
+      "language": "wasm",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "1beac827e224f150423751f8a4152884cc6ffd7e"
+    },
+    {
+      "file": "docs/reference/zh-en-loanword/README.md",
+      "line_start": 645,
+      "line_end": 650,
+      "language_raw": "python",
+      "language": "python",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "4484564ae05fe2939930f6a2f2555f39906a4334"
+    },
+    {
+      "file": "docs/reference/zh-en-loanword/README.md",
+      "line_start": 652,
+      "line_end": 655,
+      "language_raw": "rust",
+      "language": "rust",
+      "category": "executable",
+      "suggested_action": "execution_gate_candidate",
+      "placeholders_detected": [],
+      "directives_detected": [],
+      "env_dependencies": [],
+      "hash_sha1": "fea1996dfa85ad408b6956b7041e6fef9360e29a"
+    },
+    {
+      "file": "docs/reference/zh-en-loanword/README.md",
+      "line_start": 677,
+      "line_end": 689,
+      "language_raw": "text",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "9fb9a245c9c8de67ccdbf4fe996af88a7b125f2f"
+    },
+    {
+      "file": "docs/reference/zh-en-loanword/README.md",
+      "line_start": 704,
+      "line_end": 736,
+      "language_raw": "yaml",
+      "language": "unknown",
+      "category": "skip_warranted",
+      "suggested_action": "route_via_language_alias_table",
+      "placeholders_detected": [],
+      "directives_detected": [
+        "unknown_language"
+      ],
+      "env_dependencies": [],
+      "hash_sha1": "dd2368f406409797da7fe8ab4a145118cbaaca80"
     },
     {
       "file": "docs/reference/zh-en-loanword/cpp.md",
@@ -5813,402 +6209,6 @@
       "directives_detected": [],
       "env_dependencies": [],
       "hash_sha1": "06af13f91f1d192296db4e022c82ff83c88d5796"
-    },
-    {
-      "file": "docs/reference/zh-en-loanword/README.md",
-      "line_start": 45,
-      "line_end": 62,
-      "language_raw": "text",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "cb62216a6815b2c0cb9b24988ec3a0d297c4c6d7"
-    },
-    {
-      "file": "docs/reference/zh-en-loanword/README.md",
-      "line_start": 66,
-      "line_end": 72,
-      "language_raw": "text",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "b8b80e5d5b09a0d31b43bfd4da57c143e35f8cd5"
-    },
-    {
-      "file": "docs/reference/zh-en-loanword/README.md",
-      "line_start": 76,
-      "line_end": 83,
-      "language_raw": "json",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "a14a55cd5353b9060180e07f39e3398947da17f0"
-    },
-    {
-      "file": "docs/reference/zh-en-loanword/README.md",
-      "line_start": 108,
-      "line_end": 145,
-      "language_raw": "text",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "3f609074bd1d7b488757224f19478a58e205fc58"
-    },
-    {
-      "file": "docs/reference/zh-en-loanword/README.md",
-      "line_start": 176,
-      "line_end": 186,
-      "language_raw": "text",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "ce8ea99584c8c14e999ca376da2944569203416c"
-    },
-    {
-      "file": "docs/reference/zh-en-loanword/README.md",
-      "line_start": 203,
-      "line_end": 205,
-      "language_raw": "text",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "4a4ea95370f57824d32dc077ee49a74855ddb972"
-    },
-    {
-      "file": "docs/reference/zh-en-loanword/README.md",
-      "line_start": 230,
-      "line_end": 240,
-      "language_raw": "c",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "d1bfb3f1e8e5683b4bbebb7ffb12970bc71e23e7"
-    },
-    {
-      "file": "docs/reference/zh-en-loanword/README.md",
-      "line_start": 265,
-      "line_end": 284,
-      "language_raw": "json",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "70117d5770c029209a2306d13f7a21688b6ce74b"
-    },
-    {
-      "file": "docs/reference/zh-en-loanword/README.md",
-      "line_start": 288,
-      "line_end": 295,
-      "language_raw": "python",
-      "language": "python",
-      "category": "executable",
-      "suggested_action": "execution_gate_candidate",
-      "placeholders_detected": [],
-      "directives_detected": [],
-      "env_dependencies": [],
-      "hash_sha1": "d76b0b9e05b1cdf0e4591c1f15fcad2b6bf7f9db"
-    },
-    {
-      "file": "docs/reference/zh-en-loanword/README.md",
-      "line_start": 297,
-      "line_end": 304,
-      "language_raw": "rust",
-      "language": "rust",
-      "category": "executable",
-      "suggested_action": "execution_gate_candidate",
-      "placeholders_detected": [],
-      "directives_detected": [],
-      "env_dependencies": [],
-      "hash_sha1": "ea827376948c0a971e083ea5352310a2974763f1"
-    },
-    {
-      "file": "docs/reference/zh-en-loanword/README.md",
-      "line_start": 308,
-      "line_end": 317,
-      "language_raw": "yaml",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "4663afa43520fe96f795254acd692455cd25cb1d"
-    },
-    {
-      "file": "docs/reference/zh-en-loanword/README.md",
-      "line_start": 334,
-      "line_end": 342,
-      "language_raw": "text",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "f0a80099ba7a9554b93253a0e6e6218c70f81e8c"
-    },
-    {
-      "file": "docs/reference/zh-en-loanword/README.md",
-      "line_start": 366,
-      "line_end": 379,
-      "language_raw": "yaml",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "b4e863a7dcfe333c0bf4d0b7deeefb0f9fe9e63a"
-    },
-    {
-      "file": "docs/reference/zh-en-loanword/README.md",
-      "line_start": 403,
-      "line_end": 410,
-      "language_raw": "text",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "7cae2666c91792cb3bd9eac7a9530bf3ca560c5b"
-    },
-    {
-      "file": "docs/reference/zh-en-loanword/README.md",
-      "line_start": 430,
-      "line_end": 439,
-      "language_raw": "json",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "7ec33f6657050ae53670655ea53f40d83d8d3b3a"
-    },
-    {
-      "file": "docs/reference/zh-en-loanword/README.md",
-      "line_start": 468,
-      "line_end": 473,
-      "language_raw": "python",
-      "language": "python",
-      "category": "executable",
-      "suggested_action": "execution_gate_candidate",
-      "placeholders_detected": [],
-      "directives_detected": [],
-      "env_dependencies": [],
-      "hash_sha1": "c22e35514cf3bbe05d5525b16377014b04dbe64b"
-    },
-    {
-      "file": "docs/reference/zh-en-loanword/README.md",
-      "line_start": 488,
-      "line_end": 507,
-      "language_raw": "python",
-      "language": "python",
-      "category": "executable",
-      "suggested_action": "execution_gate_candidate",
-      "placeholders_detected": [],
-      "directives_detected": [],
-      "env_dependencies": [],
-      "hash_sha1": "42ce5f7b3c064b9f3f72de1b77d4ad3c08a4bcfb"
-    },
-    {
-      "file": "docs/reference/zh-en-loanword/README.md",
-      "line_start": 557,
-      "line_end": 585,
-      "language_raw": "rust",
-      "language": "rust",
-      "category": "executable",
-      "suggested_action": "execution_gate_candidate",
-      "placeholders_detected": [],
-      "directives_detected": [],
-      "env_dependencies": [],
-      "hash_sha1": "b7d3e85f7268b146426b577a9be70997c3fe0374"
-    },
-    {
-      "file": "docs/reference/zh-en-loanword/README.md",
-      "line_start": 613,
-      "line_end": 616,
-      "language_raw": "python",
-      "language": "python",
-      "category": "executable",
-      "suggested_action": "execution_gate_candidate",
-      "placeholders_detected": [],
-      "directives_detected": [],
-      "env_dependencies": [],
-      "hash_sha1": "d98636a771481adcfcb866d0a421791964fe54fa"
-    },
-    {
-      "file": "docs/reference/zh-en-loanword/README.md",
-      "line_start": 618,
-      "line_end": 621,
-      "language_raw": "rust",
-      "language": "rust",
-      "category": "executable",
-      "suggested_action": "execution_gate_candidate",
-      "placeholders_detected": [],
-      "directives_detected": [],
-      "env_dependencies": [],
-      "hash_sha1": "1e84ae41d955987432812df2808cf378ce5ffbb5"
-    },
-    {
-      "file": "docs/reference/zh-en-loanword/README.md",
-      "line_start": 623,
-      "line_end": 626,
-      "language_raw": "go",
-      "language": "go",
-      "category": "executable",
-      "suggested_action": "execution_gate_candidate",
-      "placeholders_detected": [],
-      "directives_detected": [],
-      "env_dependencies": [],
-      "hash_sha1": "aa9e5d9d7d1bf50458f51531811b84bb99547fde"
-    },
-    {
-      "file": "docs/reference/zh-en-loanword/README.md",
-      "line_start": 628,
-      "line_end": 631,
-      "language_raw": "csharp",
-      "language": "csharp",
-      "category": "executable",
-      "suggested_action": "execution_gate_candidate",
-      "placeholders_detected": [],
-      "directives_detected": [],
-      "env_dependencies": [],
-      "hash_sha1": "b30b7c606031d02dab1e83fa24d8e6f0d491bf2f"
-    },
-    {
-      "file": "docs/reference/zh-en-loanword/README.md",
-      "line_start": 633,
-      "line_end": 636,
-      "language_raw": "cpp",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "2274a8a7facc5cfd5e6bca55be705f477497b06e"
-    },
-    {
-      "file": "docs/reference/zh-en-loanword/README.md",
-      "line_start": 638,
-      "line_end": 641,
-      "language_raw": "javascript",
-      "language": "wasm",
-      "category": "executable",
-      "suggested_action": "execution_gate_candidate",
-      "placeholders_detected": [],
-      "directives_detected": [],
-      "env_dependencies": [],
-      "hash_sha1": "1beac827e224f150423751f8a4152884cc6ffd7e"
-    },
-    {
-      "file": "docs/reference/zh-en-loanword/README.md",
-      "line_start": 645,
-      "line_end": 650,
-      "language_raw": "python",
-      "language": "python",
-      "category": "executable",
-      "suggested_action": "execution_gate_candidate",
-      "placeholders_detected": [],
-      "directives_detected": [],
-      "env_dependencies": [],
-      "hash_sha1": "4484564ae05fe2939930f6a2f2555f39906a4334"
-    },
-    {
-      "file": "docs/reference/zh-en-loanword/README.md",
-      "line_start": 652,
-      "line_end": 655,
-      "language_raw": "rust",
-      "language": "rust",
-      "category": "executable",
-      "suggested_action": "execution_gate_candidate",
-      "placeholders_detected": [],
-      "directives_detected": [],
-      "env_dependencies": [],
-      "hash_sha1": "fea1996dfa85ad408b6956b7041e6fef9360e29a"
-    },
-    {
-      "file": "docs/reference/zh-en-loanword/README.md",
-      "line_start": 677,
-      "line_end": 689,
-      "language_raw": "text",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "9fb9a245c9c8de67ccdbf4fe996af88a7b125f2f"
-    },
-    {
-      "file": "docs/reference/zh-en-loanword/README.md",
-      "line_start": 704,
-      "line_end": 736,
-      "language_raw": "yaml",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "dd2368f406409797da7fe8ab4a145118cbaaca80"
     },
     {
       "file": "docs/reference/zh-en-loanword/rust.md",
