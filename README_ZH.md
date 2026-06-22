@@ -19,7 +19,7 @@
 
 > **🔑 唯一采用 MIT 许可证的 Piper 分支** — 原版 [rhasspy/piper](https://github.com/rhasspy/piper) 已于 2025 年 10 月归档，[OHF-Voice/piper1-gpl](https://github.com/OHF-Voice/piper1-gpl) 已转为 GPL-3.0。piper-plus 是唯一不依赖 espeak-ng 的 MIT 兼容分支。自研 G2P 支持 8 种语言 (JA/EN/ZH/KO/ES/FR/PT/SV)，适合商用和嵌入式场景。
 
-> **📢 v1.12.0 重大变更 (2026-05):** 移除 HiFi-GAN 解码器（统一为 MB-iSTFT，`--mb-istft` 标志废弃）/ Flask → FastAPI HTTP 服务器 / 移除 HTS-voice 依赖（仅限 Python 运行时）/ Unity UPM 移至独立仓库（`ayutaz/uPiper`）/ 所有 .NET 项目升级至 `net10.0` LTS。详情：[docs/migration/v1.11-to-v1.12.md](docs/migration/v1.11-to-v1.12.md)
+> **📢 v2.0.0 重大变更 (2026-05):** 默认 Docker 镜像统一为 CUDA 12.8 + Ubuntu 24.04 + Python 3.13（需要宿主机 NVIDIA 驱动 **R570+**；旧版驱动无法启动新镜像）/ 训练更新至 torch 2.11+cu128（torch 2.2 生成的检查点无法续训）/ TF32 + bf16-mixed 成为新的训练默认值。详情：[docs/migration/v1.12-to-v2.0.md](docs/migration/v1.12-to-v2.0.md)
 
 快速、高质量的神经网络文本转语音 (TTS) 系统。基于 [VITS](https://github.com/jaywalnut310/vits/) 架构，支持8种语言（日语、英语、普通话、韩语、西班牙语、法语、葡萄牙语、瑞典语）的多说话人语音合成。本项目是 [Piper](https://github.com/rhasspy/piper) 的分支，大幅增强了日语支持、音质和训练功能。
 
@@ -259,7 +259,7 @@ docker pull ghcr.io/ayutaz/piper-plus/cpp-dev:dev
 
 ### Python
 
-需要 Python 3.11+。推荐使用 [uv](https://docs.astral.sh/uv/) 管理依赖。
+推荐 Python 3.13+ (支持 3.11+)。推荐使用 [uv](https://docs.astral.sh/uv/) 管理依赖。
 
 ```bash
 # CPU 推理

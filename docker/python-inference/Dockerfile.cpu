@@ -13,7 +13,7 @@
 #   - Same NLTK data preload, healthcheck, non-root user
 #
 # Differences:
-#   - Base image: python:3.11-slim-bookworm (no CUDA, multi-arch native)
+#   - Base image: python:3.13-slim-trixie (no CUDA, multi-arch native)
 #   - piper_train installed with [inference] extras (onnxruntime CPU wheels),
 #     not [inference-gpu]. onnxruntime-gpu has no aarch64 wheel on PyPI as
 #     of 1.18.x, so the GPU variant would fail to install on arm64 anyway.
@@ -26,13 +26,16 @@
 #   docker run --rm -p 8000:8000 -v $PWD/models:/app/models:ro piper-plus-cpu \
 #     python inference.py --server --model /app/models/your-model.onnx --port 8000
 #
-# Base: python:3.11-slim-bookworm (Debian 12 stable; see
+# Base: python:3.13-slim-trixie (Debian 13 stable; see
 # https://wiki.debian.org/DebianReleases for the current support window).
-# Bumped from slim-trixie (Debian 13, then still pre-release) to clear Trivy
-# apt-layer CVEs and align with the broader Debian-stable Docker ecosystem.
-# Python 3.11 stays as-is — pyproject.toml allows 3.11+; bumping the
-# interpreter is out of scope for a CVE-cleanup PR.
-FROM python:3.11-slim-bookworm
+# Bumped from slim-bookworm + python 3.11 as part of Issue #527 Phase 1
+# (default Python 3.11 → 3.13 across the project). Debian 13 (trixie) became
+# stable mid-2025, and python:3.13-slim-trixie ships with Python 3.13.x +
+# the latest debian-stable apt packages, clearing the prior CVE concerns
+# that motivated the bookworm pin.
+# requires-python = ">=3.11" is unchanged; PyPI installs on Python 3.11/3.12
+# remain supported (Docker image default only).
+FROM python:3.13-slim-trixie
 
 ENV PYTHONUNBUFFERED=1
 ENV DEBIAN_FRONTEND=noninteractive
@@ -50,9 +53,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Upgrade pip / setuptools / wheel to clear Trivy supply-chain CVEs riding on
-# the python:3.11-slim-bookworm default pip (24.x) and bundled
-# setuptools/wheel. Run before uv install so the upgraded toolchain is what
-# bootstraps everything else.
+# the python:3.13-slim-trixie default pip and bundled setuptools/wheel.
+# Run before uv install so the upgraded toolchain is what bootstraps
+# everything else.
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel
 
 # Pin uv to the same major version range used by docker/wyoming/Dockerfile

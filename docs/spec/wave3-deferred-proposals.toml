@@ -389,7 +389,7 @@ effort = "S (~半日)"
 status = "proposal"
 description = """
 .devcontainer/devcontainer.json で新規 contributor がボタン 1 つで full
-toolchain (Python 3.11 + uv / Rust 1.88 / Node 24 / Go 1.26 / .NET 10) を
+toolchain (Python 3.13 + uv / Rust 1.88 / Node 24 / Go 1.26 / .NET 10) を
 立ち上げられる環境を提供。 現状 README に分散した setup 手順を 1 file に
 集約。
 """
@@ -1380,7 +1380,7 @@ priority = "LOW"
 effort = "XS"
 status = "proposal"
 description = """
-build-python-train (CUDA 12.1 base) は 5GB+ layer、 mode=max での GHA
+build-python-train (CUDA 12.8 base) は 5GB+ layer、 mode=max での GHA
 cache write が 5-10 min。 mode=min で metadata のみ cache。
 """
 implementation = """

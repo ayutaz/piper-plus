@@ -2,24 +2,19 @@
 # Multi-stage build to reduce final image size
 
 # Build stage
-# Base: CUDA 12.6.3 + cuDNN 9 + Ubuntu 22.04
+# Base: CUDA 12.8.1 + cuDNN 9 + Ubuntu 24.04 (Issue #527 Fully-aligned DR-001)
 #
-# Why the CUDA/cuDNN version mismatch with torch==2.2.1+cu121 is safe:
-#   - torch wheel bundles its own CUDA runtime libraries (libcudart, libcublas,
-#     libcufft, libcurand, libcusolver, libcusparse, libcudnn 8.9, libnccl) under
-#     /opt/venv/lib/python*/site-packages/{nvidia,torch/lib} and uses them
-#     dynamically at runtime. The system CUDA 12.6 toolkit installed under
-#     /usr/local/cuda is NOT used by torch — it ships only for non-torch CUDA
-#     consumers (CMake / nvcc invocations from third-party packages).
-#   - NVIDIA CUDA forward compatibility: drivers from newer toolkits (12.6)
-#     fully support binaries built against older toolkits (12.1), so wheel-
-#     bundled cu121 runtime libs load correctly on the 12.6 image's driver.
-#   - cuDNN bundled by torch (8.9) takes precedence at dlopen time because
-#     site-packages/nvidia/cudnn/lib appears earlier in the loader path than
-#     the image's /usr/lib/x86_64-linux-gnu cuDNN 9.
-# Bumped from 12.1.0 to clear Trivy OS-package CVEs (libssl/glibc/libxml2
-# etc.) accumulated since the 2023-04 base.
-FROM nvidia/cuda:12.6.3-cudnn-devel-ubuntu22.04 AS builder
+# Issue #527 で fully-aligned 戦略を採用:
+#   - CUDA toolkit (image) と torch wheel (cu128) の major を揃え、 forward-
+#     compat 依存を解消
+#   - RTX 5090 (Blackwell sm_120) は CUDA 12.8+ + driver R570+ が必須
+#   - Ubuntu 24.04 (Noble) EOL 2029-04 で OS 寿命延長 (Jammy 22.04 EOL 2027-04)
+#   - Python 3.13 を deadsnakes PPA 経由で取得 (Ubuntu 24.04 apt default は 3.12)
+#
+# 旧版 (12.6.3 + ubuntu22.04 + torch 2.2.1+cu121) では wheel bundle cuDNN 8.9
+# と image cuDNN 9 が共存していたが、 12.8 + torch 2.11.0+cu128 では wheel
+# bundle cuDNN 9.5+ と image cuDNN 9 が同 major で揃う。
+FROM nvidia/cuda:12.8.1-cudnn-devel-ubuntu24.04 AS builder
 
 # Free up space in the build environment
 RUN rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* || true
@@ -39,16 +34,21 @@ ENV LD_LIBRARY_PATH=$CUDA_HOME/lib64:$LD_LIBRARY_PATH
 # type=gha) — we only pay this cost on cache miss. Issue #495.
 ENV UV_NO_CACHE=1
 
-# Install build dependencies
+# Install build dependencies + Python 3.13 via deadsnakes PPA
+# Ubuntu 24.04 (Noble) の apt 標準は python3.12、 3.13 は deadsnakes
+# (CPython core dev maintained) 経由で取得 (Issue #527 / DR-001)。
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    software-properties-common \
+    && add-apt-repository -y ppa:deadsnakes/ppa \
+    && apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     cmake \
     git \
     wget \
     curl \
-    python3.11 \
-    python3.11-dev \
-    python3.11-venv \
+    python3.13 \
+    python3.13-dev \
+    python3.13-venv \
     python3-pip \
     portaudio19-dev \
     libsndfile1-dev \
@@ -57,21 +57,26 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
-# Set Python 3.11 as default
-RUN update-alternatives --install /usr/bin/python python /usr/bin/python3.11 1 && \
-    update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1
+# Set Python 3.13 as default
+RUN update-alternatives --install /usr/bin/python python /usr/bin/python3.13 1 && \
+    update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.13 1
 
-# Install uv
-RUN pip install --no-cache-dir uv
+# Install uv. --break-system-packages: Ubuntu 24.04 + Python 3.13 環境で
+# PEP 668 protections を bypass。 後段で venv を作る用途のため system pip に
+# 直接 install してよい。
+RUN pip install --no-cache-dir --break-system-packages uv
 
 # Create virtual environment
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
-# PyTorch (CUDA 12.1)
+# PyTorch (CUDA 12.8、 Issue #527 / DR-001 で cu121 → cu128 bump)
+# - RTX 5090 (Blackwell sm_120) を起動するために cu128 wheel 必須
+# - uv.lock canonical (root pyproject.toml `[[tool.uv.index]]` cu128) と整合
+# - torchvision は piper-train で未使用のため削除 (FR-02-05)
 RUN uv pip install \
-    --extra-index-url https://download.pytorch.org/whl/cu121 \
-    "torch==2.2.1+cu121" "torchaudio==2.2.1+cu121" "torchvision==0.17.1+cu121"
+    --extra-index-url https://download.pytorch.org/whl/cu128 \
+    "torch==2.11.0+cu128" "torchaudio==2.11.0+cu128"
 
 # Copy source code for piper-train installation
 # setup.py reads ../../VERSION relative to src/python/
@@ -85,13 +90,11 @@ RUN uv pip install "/tmp/src/python/g2p"
 RUN uv pip install "/tmp/src/python[train]"
 
 # Runtime stage
-# Base: CUDA 12.6.3 + cuDNN 9 + Ubuntu 22.04 (matches builder stage)
-# Same CUDA/cuDNN compatibility argument as builder stage: torch 2.2.1+cu121
-# wheel (copied via /opt/venv) bundles its own CUDA 12.1 runtime + cuDNN 8.9
-# under site-packages and loads them via the venv's library path. The image's
-# 12.6 system libraries are used only for non-torch CUDA consumers. NVIDIA
-# driver forward compat ensures cu121 binaries run on 12.6 drivers.
-FROM nvidia/cuda:12.6.3-cudnn-runtime-ubuntu22.04
+# Base: CUDA 12.8.1 + cuDNN 9 + Ubuntu 24.04 (matches builder stage、
+# Issue #527 / DR-001 Fully-aligned 戦略)
+# wheel (copied via /opt/venv) bundles CUDA 12.8 runtime + cuDNN 9.5+
+# under site-packages、 image cuDNN 9 と同 major で揃う。
+FROM nvidia/cuda:12.8.1-cudnn-runtime-ubuntu24.04
 
 # Set environment variables
 ENV DEBIAN_FRONTEND=noninteractive
@@ -100,10 +103,13 @@ ENV CUDA_HOME=/usr/local/cuda
 ENV PATH=$CUDA_HOME/bin:$PATH
 ENV LD_LIBRARY_PATH=$CUDA_HOME/lib64:$LD_LIBRARY_PATH
 
-# Install runtime dependencies only
+# Install runtime dependencies + Python 3.13 via deadsnakes PPA
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3.11 \
-    python3.11-venv \
+    software-properties-common \
+    && add-apt-repository -y ppa:deadsnakes/ppa \
+    && apt-get update && apt-get install -y --no-install-recommends \
+    python3.13 \
+    python3.13-venv \
     libsndfile1 \
     libportaudio2 \
     sox \
@@ -115,9 +121,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
-# Set Python 3.11 as default
-RUN update-alternatives --install /usr/bin/python python /usr/bin/python3.11 1 && \
-    update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1
+# Set Python 3.13 as default
+RUN update-alternatives --install /usr/bin/python python /usr/bin/python3.13 1 && \
+    update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.13 1
 
 # Copy virtual environment from builder
 COPY --from=builder /opt/venv /opt/venv
@@ -149,8 +155,13 @@ RUN echo "=== Running build-time tests ===" && \
     cd /opt/piper/src/python && python -c "import piper_train; print('piper_train accessible')" && \
     echo "=== Build-time tests passed ==="
 
-# Create non-root user and transfer ownership of working directories
-RUN useradd -m -u 1000 piper && \
+# Create non-root user and transfer ownership of working directories.
+# Ubuntu 24.04 (Noble) は既存 ubuntu user (UID 1000) を提供しているため
+# 削除してから piper を 1000 で作成 (Issue #527 / Ubuntu 22.04 → 24.04 bump
+# の副作用、 既存 piper UID 1000 仕様を維持して dataset volume permission
+# 互換性を保つ)。 22.04 以前で ubuntu user が無い場合は `|| true` で吸収。
+RUN userdel -r ubuntu 2>/dev/null || true && \
+    useradd -m -u 1000 piper && \
     chown -R piper:piper /workspace /opt/venv /opt/piper
 USER piper
 

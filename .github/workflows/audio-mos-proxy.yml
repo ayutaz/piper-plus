@@ -40,7 +40,7 @@ permissions:
 
 jobs:
   mos-proxy:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
     # informational tier: failures are reported in the sticky comment but do
     # not fail the PR. Promotion to blocker is a maintainer-gated change to

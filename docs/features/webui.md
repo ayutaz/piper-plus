@@ -8,7 +8,7 @@ There are two separate WebUI implementations: a **local development** version wi
 
 ### Requirements
 
-- Python 3.11+
+- Python 3.13+ recommended (3.11+ supported)
 - piper-plus installed
 - ONNX models downloaded
 

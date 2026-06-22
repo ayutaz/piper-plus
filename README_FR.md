@@ -9,6 +9,8 @@
 [![Hugging Face Model](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Model-orange)](https://huggingface.co/ayousanz/piper-plus-base)
 [![Try in Browser](https://img.shields.io/badge/Try%20in%20Browser-WebAssembly-blueviolet)](https://ayutaz.github.io/piper-plus/)
 
+> **📢 v2.0.0 Changements incompatibles (2026-05):** Images Docker par défaut unifiées vers CUDA 12.8 + Ubuntu 24.04 + Python 3.13 (pilote NVIDIA hôte **R570+** requis ; les pilotes plus anciens ne peuvent pas démarrer les nouvelles images) / entraînement mis à jour vers torch 2.11+cu128 (les checkpoints produits avec torch 2.2 ne peuvent plus être repris) / TF32 + bf16-mixed sont les nouvelles valeurs par défaut de l'entraînement. Détails : [docs/migration/v1.12-to-v2.0.md](docs/migration/v1.12-to-v2.0.md)
+
 **Paquets :**
 
 [![PyPI](https://img.shields.io/pypi/v/piper-plus?label=PyPI%3A%20piper-plus&color=blue)](https://pypi.org/project/piper-plus/)
@@ -250,7 +252,7 @@ Voir [docker/README.md](docker/README.md) pour plus de détails.
 
 ### Python
 
-Python 3.11+ requis. [uv](https://docs.astral.sh/uv/) est recommandé pour la gestion des dépendances.
+Python 3.13+ recommandé (3.11+ supporté). [uv](https://docs.astral.sh/uv/) est recommandé pour la gestion des dépendances.
 
 ```bash
 # Inference CPU

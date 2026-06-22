@@ -1,2 +1,5 @@
 # Issue #372: floor must be >= C++ canonical (cmake/OnnxRuntime.cmake)
-onnxruntime-gpu>=1.26.0,<2
+# Issue #527 follow-up: onnxruntime-gpu 1.26+ requires libcudart.so.13 (CUDA 13)
+# but DR-001 base image is CUDA 12.8.1. Cap to <1.26 until CUDA 13 base bump
+# ships in a dedicated follow-up PR.
+onnxruntime-gpu>=1.20.1,<1.26
