@@ -297,7 +297,12 @@ def warmup_onnx_session(
                 (1, phoneme_length, 3), dtype=np.int64
             )
         if "speaker_embedding" in input_names:
-            emb_dim = 256
+            # PR #222 / DR-008 canonical: CAM++ 192-dim default (fallback for
+            # symbolic / dynamic graphs). Real ONNX models declare emb_dim
+            # explicitly via session.get_inputs()[].shape[1] and will
+            # overwrite this. ECAPA-TDNN 256-dim legacy declares shape[1]=256
+            # in the graph.
+            emb_dim = 192
             for inp in session.get_inputs():
                 if inp.name == "speaker_embedding":
                     if len(inp.shape) >= 2 and isinstance(inp.shape[1], int):

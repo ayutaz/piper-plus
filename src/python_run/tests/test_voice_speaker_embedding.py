@@ -119,9 +119,13 @@ class TestSynthesizeAudioFeedsSpeakerEmbedding:
         # mask=0 → fall back to emb_g(sid) (vits/models.py:1015-1037).
         assert mask[0, 0] == 0
 
-    def test_dynamic_emb_dim_falls_back_to_256(self):
+    def test_dynamic_emb_dim_falls_back_to_192(self):
         """If the ONNX graph uses a dynamic axis for emb_dim, the runtime
-        must fall back to the ECAPA-TDNN canonical 256."""
+        must fall back to the CAM++ canonical 192 (PR #222 / DR-008).
+
+        ECAPA-TDNN 256-dim legacy exports still work because their graphs
+        declare shape[1]=256 explicitly (overrides this fallback).
+        """
         voice, session = _make_voice_with_inputs(
             [
                 ("input", ["batch", "seq"]),
@@ -133,7 +137,7 @@ class TestSynthesizeAudioFeedsSpeakerEmbedding:
         )
         self._run_synth(voice)
         feed = session.run.call_args[0][1]
-        assert feed["speaker_embedding"].shape == (1, 256)
+        assert feed["speaker_embedding"].shape == (1, 192)
 
     def test_speaker_embedding_with_prosody_and_lid(self):
         """All optional inputs coexist without the speaker_embedding feed

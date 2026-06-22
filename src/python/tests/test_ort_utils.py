@@ -447,7 +447,12 @@ class TestWarmup:
         assert feeds["speaker_embedding_mask"].dtype == np.int64
 
     def test_speaker_embedding_symbolic_shape_uses_default_dim(self):
-        """ONNX 入力 shape が symbolic の場合、デフォルト 256 次元を使う."""
+        """ONNX 入力 shape が symbolic の場合、デフォルト 192 次元 (CAM++) を使う.
+
+        PR #222 / DR-008 canonical: zero_shot_cam_plus 192-dim が新規 v2
+        export の canonical。 ECAPA-TDNN 256-dim legacy は graph で shape[1]=256
+        を declare するため fallback には影響しない。
+        """
         session = _make_mock_session(has_speaker_embedding=True)
         for inp in session.get_inputs.return_value:
             if inp.name == "speaker_embedding":
@@ -455,7 +460,7 @@ class TestWarmup:
                 break
         warmup_onnx_session(session)
         inputs = session.run.call_args[0][1]
-        assert inputs["speaker_embedding"].shape == (1, 256)
+        assert inputs["speaker_embedding"].shape == (1, 192)
 
 
 # ---------------------------------------------------------------------------

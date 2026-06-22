@@ -612,7 +612,12 @@ class TestSpeakerEmbeddingDefaults:
         assert feeds["speaker_embedding_mask"].dtype == np.int64
 
     def test_synthesize_falls_back_to_default_dim_when_shape_unknown(self):
-        """When the ONNX input shape is symbolic, default to 256 dims."""
+        """When the ONNX input shape is symbolic, default to 192 dims (CAM++).
+
+        PR #222 / DR-008 canonical: zero_shot_cam_plus is 192-dim. ECAPA-TDNN
+        256-dim legacy exports still work because their ONNX graphs declare
+        shape[1]=256 explicitly (overrides this fallback at runtime).
+        """
         voice = _make_mock_voice(has_speaker_embedding=True)
         # Overwrite the speaker_embedding input to advertise a symbolic dim
         for inp in voice.session.get_inputs.return_value:
@@ -623,7 +628,7 @@ class TestSpeakerEmbeddingDefaults:
         voice._synthesize_ids_core([1, 0, 10, 0, 2])
 
         feeds = voice.session.run.call_args[0][1]
-        assert feeds["speaker_embedding"].shape == (1, 256)
+        assert feeds["speaker_embedding"].shape == (1, 192)
 
     def test_warmup_supplies_speaker_embedding_inputs(self):
         """_warmup_session feeds zero speaker_embedding + mask=0 when required."""
