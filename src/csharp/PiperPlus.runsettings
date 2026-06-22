@@ -1,7 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <RunSettings>
   <RunConfiguration>
-    <MaxCpuCount>0</MaxCpuCount>
+    <!-- MaxCpuCount=1 (was 0 = unlimited) — VSTest spawns separate processes per
+         test assembly when > 1, and processes race on the OpenJTalk sys.dic
+         file lock during MeCabTokenizer ctor. In-process lock in
+         DotNetG2PEngine.cs handles intra-process races; cross-process race
+         on macOS is solved by serializing assemblies via MaxCpuCount=1.
+         (Ubuntu / Windows pass even with 0 because their FileShare semantics
+         tolerate the brief overlap window; macOS does not.) -->
+    <MaxCpuCount>1</MaxCpuCount>
     <ResultsDirectory>./TestResults</ResultsDirectory>
     <!-- Wall-clock cap for the entire test session (5 min). -->
     <TestSessionTimeout>300000</TestSessionTimeout>
