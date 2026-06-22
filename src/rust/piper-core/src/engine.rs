@@ -159,9 +159,12 @@ pub struct ModelCapabilities {
     pub has_lid: bool,
     pub has_prosody: bool,
     pub has_duration_output: bool,
-    /// Whether the model accepts `speaker_embedding` (float32) and
-    /// `speaker_embedding_mask` (int64) inputs for voice cloning.
+    /// Whether the model accepts `speaker_embedding` (float32) input.
     pub has_speaker_embedding: bool,
+    /// Whether the model accepts `speaker_embedding_mask` (int64) input.
+    /// PR #222 zero-shot exports may omit the mask (older format) so this
+    /// must be checked separately from `has_speaker_embedding`.
+    pub has_speaker_embedding_mask: bool,
 
     /// Embedding dimension declared by the ONNX `speaker_embedding`
     /// input. Used by the Issue #426 zero-embedding fallback when the
@@ -662,6 +665,7 @@ impl OnnxEngine {
             has_prosody: has_input("prosody_features"),
             has_duration_output: has_output("durations"),
             has_speaker_embedding: has_input("speaker_embedding"),
+            has_speaker_embedding_mask: has_input("speaker_embedding_mask"),
             speaker_embedding_dim,
         };
 
@@ -876,7 +880,7 @@ impl OnnxEngine {
             None
         };
 
-        let speaker_emb_mask_tensor = if self.capabilities.has_speaker_embedding {
+        let speaker_emb_mask_tensor = if self.capabilities.has_speaker_embedding_mask {
             let mask_val: i64 = if request.speaker_embedding.is_some() {
                 1
             } else {
@@ -1225,6 +1229,7 @@ mod tests {
             has_prosody: true,
             has_duration_output: false,
             has_speaker_embedding: false,
+            has_speaker_embedding_mask: false,
             speaker_embedding_dim: 256,
         };
         let debug = format!("{:?}", caps);
@@ -1275,6 +1280,7 @@ mod tests {
             has_prosody: true,
             has_duration_output: false,
             has_speaker_embedding: true,
+            has_speaker_embedding_mask: true,
             speaker_embedding_dim: 256,
         };
         let debug = format!("{:?}", caps);
@@ -1352,6 +1358,7 @@ mod tests {
             has_prosody: true,
             has_duration_output: true,
             has_speaker_embedding: true,
+            has_speaker_embedding_mask: true,
             speaker_embedding_dim: 256,
         };
         assert!(caps.has_sid);
@@ -1370,6 +1377,7 @@ mod tests {
             has_prosody: false,
             has_duration_output: false,
             has_speaker_embedding: false,
+            has_speaker_embedding_mask: false,
             speaker_embedding_dim: 256,
         };
         assert!(!caps.has_sid);
