@@ -184,7 +184,7 @@ jobs:
 
     - name: Upload coverage to Codecov (runtime + g2p)
       if: runner.os == 'Linux'
-      uses: codecov/codecov-action@v5.5.4
+      uses: codecov/codecov-action@v5.5.5
       with:
         files: src/python_run/coverage.xml,src/python/g2p/coverage.xml,src/python/coverage.xml
         flags: python

@@ -141,7 +141,7 @@ jobs:
           test/js/test-g2p-golden.js
 
     - name: Upload coverage to Codecov (wasm)
-      uses: codecov/codecov-action@v5.5.4
+      uses: codecov/codecov-action@v5.5.5
       if: always()
       with:
         files: src/wasm/openjtalk-web/coverage/lcov.info
@@ -155,7 +155,7 @@ jobs:
         npm run test:coverage
 
     - name: Upload coverage to Codecov (g2p-wasm)
-      uses: codecov/codecov-action@v5.5.4
+      uses: codecov/codecov-action@v5.5.5
       if: always()
       with:
         files: src/wasm/g2p/coverage/lcov.info
