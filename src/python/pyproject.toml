@@ -58,7 +58,10 @@ inference = [
 
 inference-gpu = [
     # Issue #372: floor must be >= C++ canonical (cmake/OnnxRuntime.cmake)
-    "onnxruntime-gpu>=1.26.0",
+    # Issue #527 follow-up: onnxruntime-gpu 1.26+ requires libcudart.so.13 (CUDA 13)
+    # but DR-001 base image is CUDA 12.8.1. Cap to <1.26 until CUDA 13 base bump
+    # ships in a dedicated follow-up PR (tracked separately).
+    "onnxruntime-gpu>=1.20.1,<1.26",
     "soundfile>=0.12",
     "piper-plus-g2p[all]",
     # Issue #527 / DR-002: root pyproject (>=0.136.1) と統一

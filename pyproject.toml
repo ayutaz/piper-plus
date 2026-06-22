@@ -62,7 +62,10 @@ inference = [
 ]
 
 inference-gpu = [
-    "onnxruntime-gpu>=1.26.0",
+    # Issue #527 follow-up: onnxruntime-gpu 1.26+ requires libcudart.so.13 (CUDA 13)
+    # but DR-001 base image is CUDA 12.8.1. Cap to <1.26 until the CUDA 13 base
+    # bump lands in a dedicated follow-up PR.
+    "onnxruntime-gpu>=1.20.1,<1.26",
     "soundfile>=0.14.0",
     "pyopenjtalk-plus",
     "g2p-en>=2.1.0",
