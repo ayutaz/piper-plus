@@ -198,7 +198,12 @@ def _warmup_session(
                 (1, phoneme_length, 3), dtype=np.int64
             )
         if "speaker_embedding" in input_names:
-            emb_dim = 256
+            # PR #222 / DR-008 canonical: CAM++ 192-dim (fallback for tests
+            # / dynamic graphs). Real ONNX models declare emb_dim explicitly
+            # via session.get_inputs()[].shape[1] and will overwrite this
+            # below. ECAPA-TDNN 256-dim legacy exports still work because
+            # they declare shape[1]=256 in the graph.
+            emb_dim = 192
             for inp in session.get_inputs():
                 if inp.name == "speaker_embedding":
                     if len(inp.shape) >= 2 and isinstance(inp.shape[1], int):
@@ -1039,7 +1044,11 @@ class PiperVoice:
         # for zero-shot transfer — spk_proj is lazy-initialised and never
         # sees gradients).
         if "speaker_embedding" in input_names:
-            emb_dim = 256
+            # PR #222 / DR-008 canonical: CAM++ 192-dim default for
+            # tests / dynamic graphs. Real ONNX models overwrite via
+            # session metadata; ECAPA-TDNN 256-dim legacy declares
+            # shape[1]=256 in graph.
+            emb_dim = 192
             for inp in self.session.get_inputs():
                 if inp.name == "speaker_embedding":
                     if len(inp.shape) >= 2 and isinstance(inp.shape[1], int):
@@ -1051,6 +1060,11 @@ class PiperVoice:
                 if "speaker_embedding_mask" in input_names:
                     args["speaker_embedding_mask"] = np.array([[1]], dtype=np.int64)
             else:
+                _LOGGER.warning(
+                    "speaker_embedding input declared but none provided; "
+                    "feeding zero vector with mask=0 (model will fall back "
+                    "to speaker_id / lid conditioning)."
+                )
                 args["speaker_embedding"] = np.zeros((1, emb_dim), dtype=np.float32)
                 if "speaker_embedding_mask" in input_names:
                     args["speaker_embedding_mask"] = np.array([[0]], dtype=np.int64)

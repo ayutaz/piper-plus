@@ -219,16 +219,31 @@ class TestSynthesizeStreamRaw:
 
     @pytest.mark.unit
     def test_speaker_embedding_forwarded_to_ids_to_raw(self):
-        """synthesize_stream_raw passes speaker_embedding down to synthesize_ids_to_raw."""
+        """synthesize_stream_raw passes speaker_embedding down to synthesize_ids_to_raw.
+
+        Note: PR #569 refactored synthesize_stream_raw to a phase 2 G2P-ORT
+        pipeline (_split_sentences + _phonemize_one_factory +
+        _stream_phonemes_to_audio). This test mocks the new internal flow.
+        """
         config = _make_config(num_speakers=1)
         voice = MagicMock(spec=PiperVoice)
         voice.config = config
         voice.session = MagicMock()
-        voice.phonemize = MagicMock(return_value=[["a"] * 5])
-        voice.phonemes_to_ids = MagicMock(return_value=[1] + [10] * 48 + [2])
+        voice._split_sentences = MagicMock(return_value=["hello world test text here"])
+        voice._phonemize_one_factory = MagicMock(return_value=lambda s: ["a"] * 5)
 
         audio_bytes = b"\xab\xcd" * 200
         voice.synthesize_ids_to_raw = MagicMock(return_value=audio_bytes)
+
+        def fake_stream(phonemes_iter, break_bytes, silence_bytes, **kwargs):
+            for _ in phonemes_iter:
+                voice.synthesize_ids_to_raw(
+                    [1] + [10] * 48 + [2],
+                    speaker_embedding=kwargs.get("speaker_embedding"),
+                )
+                yield audio_bytes
+
+        voice._stream_phonemes_to_audio = fake_stream
 
         embedding = np.random.randn(192).astype(np.float32)
         results = list(
@@ -249,11 +264,21 @@ class TestSynthesizeStreamRaw:
         voice = MagicMock(spec=PiperVoice)
         voice.config = config
         voice.session = MagicMock()
-        voice.phonemize = MagicMock(return_value=[["a"] * 5])
-        voice.phonemes_to_ids = MagicMock(return_value=[1] + [10] * 48 + [2])
+        voice._split_sentences = MagicMock(return_value=["hello world test text here"])
+        voice._phonemize_one_factory = MagicMock(return_value=lambda s: ["a"] * 5)
 
         audio_bytes = b"\x00\x01" * 200
         voice.synthesize_ids_to_raw = MagicMock(return_value=audio_bytes)
+
+        def fake_stream(phonemes_iter, break_bytes, silence_bytes, **kwargs):
+            for _ in phonemes_iter:
+                voice.synthesize_ids_to_raw(
+                    [1] + [10] * 48 + [2],
+                    speaker_embedding=kwargs.get("speaker_embedding"),
+                )
+                yield audio_bytes
+
+        voice._stream_phonemes_to_audio = fake_stream
 
         results = list(
             PiperVoice.synthesize_stream_raw(voice, "hello world test text here", speaker_embedding=None)
