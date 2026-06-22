@@ -19,6 +19,10 @@ train = [
     # uv.lock canonical values 参照、 floor は root と同値で pin。
     "scipy>=1.17.1",
     "librosa>=0.11.0",
+    # PR #222 (Zero-Shot TTS): extract_speaker_embedding.py / norm_audio /
+    # tools/cache_audio.py が `import soxr` を行う。 librosa>=0.11 経由で
+    # 推移的に提供されるが、 supply-chain hygiene として explicit floor を宣言。
+    "soxr>=0.5.0",
     "soundfile>=0.12",
     "pytorch-lightning>=2.4.0",
     "torchmetrics>=1.9.0",
