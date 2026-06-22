@@ -1019,7 +1019,6 @@ mod tests {
             noise_scale: 0.667,
             length_scale: 1.0,
             noise_w: 0.8,
-            speaker_embedding: None,
         };
         assert_eq!(request.phoneme_ids, ids);
         assert!(request.prosody_features.is_none());
@@ -1040,7 +1039,6 @@ mod tests {
             noise_scale: 0.5,
             length_scale: 1.2,
             noise_w: 0.6,
-            speaker_embedding: None,
         };
         assert_eq!(request.prosody_features.as_ref().unwrap().len(), 3);
         assert_eq!(request.prosody_features.as_ref().unwrap()[0], [-2, 1, 5]);
@@ -1059,7 +1057,6 @@ mod tests {
             noise_scale: 0.667,
             length_scale: 1.0,
             noise_w: 0.8,
-            speaker_embedding: None,
         };
         assert_eq!(request.language_id, Some(2));
         assert_eq!(request.speaker_id, Some(100));

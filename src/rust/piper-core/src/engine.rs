@@ -1270,6 +1270,7 @@ mod tests {
         // diagnosing "Required inputs missing" errors (Issue #426).
         let caps = ModelCapabilities {
             has_sid: true,
+            has_spk_emb: true,
             has_lid: true,
             has_prosody: true,
             has_duration_output: false,
