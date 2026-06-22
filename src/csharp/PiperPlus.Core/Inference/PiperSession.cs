@@ -347,11 +347,12 @@ public sealed class PiperSession
 
         // speaker_embedding (optional): [1, embedding_dim]
         OrtValue? speakerEmbTensor = null;
+        bool hasEmbedding = input.SpeakerEmbedding is not null && input.SpeakerEmbedding.Length > 0;
         if (_model.HasSpeakerEmbedding)
         {
-            if (input.SpeakerEmbedding is not null && input.SpeakerEmbedding.Length > 0)
+            if (hasEmbedding)
             {
-                int embDim = input.SpeakerEmbedding.Length;
+                int embDim = input.SpeakerEmbedding!.Length;
                 speakerEmbTensor = OrtValue.CreateTensorValueFromMemory(
                     input.SpeakerEmbedding, [1, embDim]);
                 inputNames.Add("speaker_embedding");
@@ -374,6 +375,18 @@ public sealed class PiperSession
                 inputNames.Add("speaker_embedding");
                 inputValues.Add(speakerEmbTensor);
             }
+        }
+
+        // speaker_embedding_mask (optional, Issue #426 dual-input path): [1, 1]
+        // PR #222 ZS exports may omit this; only feed when the model declares it.
+        // mask=1 → use embedding; mask=0 → fall back to sid (emb_g(sid)).
+        OrtValue? speakerEmbMaskTensor = null;
+        if (_model.HasSpeakerEmbeddingMask)
+        {
+            long[] maskValue = [hasEmbedding ? 1L : 0L];
+            speakerEmbMaskTensor = OrtValue.CreateTensorValueFromMemory(maskValue, [1, 1]);
+            inputNames.Add("speaker_embedding_mask");
+            inputValues.Add(speakerEmbMaskTensor);
         }
 
         try

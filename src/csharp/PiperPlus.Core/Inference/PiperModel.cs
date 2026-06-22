@@ -43,6 +43,7 @@ public sealed class PiperModel : IDisposable
         // Detect optional capabilities from tensor names.
         HasSpeakerId = _session.InputMetadata.ContainsKey("sid");
         HasSpeakerEmbedding = _session.InputMetadata.ContainsKey("speaker_embedding");
+        HasSpeakerEmbeddingMask = _session.InputMetadata.ContainsKey("speaker_embedding_mask");
         HasLanguageId = _session.InputMetadata.ContainsKey("lid");
         HasProsody = _session.InputMetadata.ContainsKey("prosody_features");
 
@@ -75,6 +76,14 @@ public sealed class PiperModel : IDisposable
     /// <c>speaker_embedding</c> takes priority.
     /// </summary>
     public bool HasSpeakerEmbedding { get; }
+
+    /// <summary>
+    /// <c>true</c> when the model accepts a <c>speaker_embedding_mask</c>
+    /// int64 input (Issue #426 dual-input path). PR #222 zero-shot exports
+    /// may omit the mask (newer single-input format), so this must be
+    /// checked separately from <see cref="HasSpeakerEmbedding"/>.
+    /// </summary>
+    public bool HasSpeakerEmbeddingMask { get; }
 
     /// <summary>
     /// <c>true</c> when the model accepts a <c>lid</c> (language-id) tensor,

@@ -811,9 +811,17 @@ impl OnnxEngine {
             None
         };
 
-        // 5. sid: int64 [1] (条件付き — speaker_embedding が無い場合のフォールバック)
+        // 5. sid: int64 [1] (条件付き — model が input として declare すれば feed)
+        //
+        // PR #222 で speaker_embedding 系の入力が複数パターンに分岐:
+        // - Issue #426 path: sid + speaker_embedding + speaker_embedding_mask
+        //   (mask=0 で sid fallback)
+        // - Zero-shot CSM path: speaker_embedding のみ (mask なし、sid なし)
+        // - Test fixture (sid + speaker_embedding, mask なし): 両 feed が必要
+        // 安全策として model が declare する input は全て feed する
+        // (`has_sid` ベース、 has_spk_emb 排他は廃止)。
         let sid_val = request.speaker_id.unwrap_or(0);
-        let sid_tensor = if !self.capabilities.has_spk_emb && self.capabilities.has_sid {
+        let sid_tensor = if self.capabilities.has_sid {
             Some(
                 Tensor::from_array(([1_usize], vec![sid_val].into_boxed_slice()))
                     .map_err(|e| PiperError::Inference(format!("sid tensor: {e}")))?,
