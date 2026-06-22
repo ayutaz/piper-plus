@@ -439,6 +439,12 @@ omit = [
     "*/piper_train/tools/convert_fp16.py",                 # (a) ONNX 変換 CLI
     "*/piper_train/tools/convert_nst_dictionary.py",       # (a) 辞書変換 CLI
     "*/piper_train/tools/add_prosody_features.py",         # (a) prosody 抽出 CLI
+    # PR #222 (Zero-Shot TTS) preprocess + extract scripts: actual model file
+    # + GPU/CPU + librosa/soxr resampling 必須で unit-test 不可能。 整合性は
+    # E2E test で別途担保 (test_zero_shot_e2e.py / Rust / Go / C# / C++ parallel)。
+    "*/piper_train/extract_speaker_embedding.py",
+    "*/piper_train/tools/batch_spectrograms.py",
+    "*/piper_train/tools/cache_audio.py",
     # ----- (d) Speaker encoder train/export scripts (model file + dataset 必須) -----
     "*/piper_train/speaker_encoder/__init__.py",
     "*/piper_train/speaker_encoder/encoder.py",            # ONNX/ckpt model file 必須

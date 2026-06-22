@@ -204,6 +204,12 @@ omit = [
     "*/piper_train/tools/convert_fp16.py",
     "*/piper_train/tools/convert_nst_dictionary.py",
     "*/piper_train/tools/add_prosody_features.py",
+    # PR #222 (Zero-Shot TTS) preprocess + extract scripts — actual model file
+    # + GPU/CPU + librosa/soxr resampling 必須で unit-test 不可能 (整合性は
+    # E2E test で別途担保)。
+    "*/piper_train/extract_speaker_embedding.py",
+    "*/piper_train/tools/batch_spectrograms.py",
+    "*/piper_train/tools/cache_audio.py",
     # ----- (d) Network / model file 必須 -----
     "*/piper_train/speaker_encoder/__init__.py",
     "*/piper_train/speaker_encoder/encoder.py",
