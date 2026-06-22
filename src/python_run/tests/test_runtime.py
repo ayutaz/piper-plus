@@ -78,9 +78,10 @@ class TestPiperConfig:
     def test_config_from_dict_inference_defaults(self):
         """When `inference` is missing, the documented defaults apply.
 
-        Pinned defaults: noise_scale=0.667, length_scale=1.0, noise_w=0.8.
-        These come from `from_dict()` directly \u2014 not the dict \u2014 so this
-        test fails if anyone changes the defaults without bumping the doc.
+        Pinned defaults (PR #222 / DR-008 v2 canonical): noise_scale=0.4,
+        length_scale=1.0, noise_w=0.5. These come from `from_dict()`
+        directly \u2014 not the dict \u2014 so this test fails if anyone changes
+        the defaults without bumping the doc.
         """
         from piper.config import PiperConfig
 
@@ -91,9 +92,9 @@ class TestPiperConfig:
             "phoneme_id_map": {"_": [0]},
             # No "inference" key at all.
         })
-        assert cfg.noise_scale == pytest.approx(0.667)
+        assert cfg.noise_scale == pytest.approx(0.4)
         assert cfg.length_scale == pytest.approx(1.0)
-        assert cfg.noise_w == pytest.approx(0.8)
+        assert cfg.noise_w == pytest.approx(0.5)
         # hop_size default
         assert cfg.hop_size == 256
 
