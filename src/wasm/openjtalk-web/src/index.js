@@ -683,9 +683,13 @@ export class PiperPlus {
     if (!speakerEmbedding || !(speakerEmbedding instanceof Float32Array)) {
       throw new Error("speakerEmbedding must be a Float32Array");
     }
-    if (speakerEmbedding.length !== 192) {
-      throw new Error(`speaker_embedding must be 192-dimensional, got ${speakerEmbedding.length}`);
+    if (speakerEmbedding.length === 0) {
+      throw new Error("speakerEmbedding must be non-empty");
     }
+    // PR #222 split-by-export-mode: 192 (CAM++ canonical) and 256
+    // (ECAPA-TDNN legacy) are both valid. ORT validates the actual shape
+    // against the model's declared input at inference time, so we don't
+    // hard-code a value here. See docs/spec/inference-input-contract.toml.
 
     const language = options.language || this._detectLanguage(text);
     // `let` (not `const`) because Strategy B (Dynamic Scales Adjustment) below
