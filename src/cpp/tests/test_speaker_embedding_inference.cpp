@@ -93,12 +93,13 @@ TEST_F(SpeakerEmbeddingInferenceTest, DetectsSpeakerEmbeddingInput) {
 
 TEST_F(SpeakerEmbeddingInferenceTest, DetectsSpeakerEmbeddingDim) {
     if (!fixture_found) return;
-    // build_fixture.py uses spk_emb_dim = 64 for size minimisation; the
-    // C++ session must read this from the ONNX input shape (not assume
-    // the ECAPA-TDNN canonical 256).
-    EXPECT_EQ(voice.session.speakerEmbeddingDim, 64)
+    // build_fixture.py uses spk_emb_dim = 192 (CAM++ canonical for
+    // SynthesizerTrn.spk_proj: nn.Linear(192, gin_channels)); the
+    // C++ session must read this from the ONNX input shape, NOT assume
+    // any hardcoded value.
+    EXPECT_EQ(voice.session.speakerEmbeddingDim, 192)
         << "speakerEmbeddingDim must come from the model's input shape; "
-           "a hard-coded 256 would fail this fixture.";
+           "a hard-coded value would fail this fixture.";
 }
 
 // ----------------------------------------------------------------------------
