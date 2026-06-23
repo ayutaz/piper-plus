@@ -239,12 +239,14 @@ describe("Speaker Encoder — mel parity (layer 1)", () => {
       );
 
       // Corner sanity (cheap absolute tolerance — the corners can be
-      // dominated by edge-of-spectrum log values).
+      // dominated by edge-of-spectrum log values). Frame-major layout:
+      // mel[frameIdx * N_MELS + melIdx]. Indices mirror Rust canonical
+      // (src/rust/piper-core/tests/test_speaker_encoder_golden.rs).
       const cornerJs = {
         top_left: mel[0],
-        top_right: mel[nFrames - 1],
-        bottom_left: mel[(N_MELS - 1) * nFrames],
-        bottom_right: mel[N_MELS * nFrames - 1],
+        top_right: mel[(nFrames - 1) * N_MELS],
+        bottom_left: mel[N_MELS - 1],
+        bottom_right: mel[nFrames * N_MELS - 1],
       };
       for (const k of Object.keys(cornerJs)) {
         assert.ok(

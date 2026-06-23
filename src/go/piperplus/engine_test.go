@@ -63,9 +63,9 @@ func TestOnnxEngine_Synthesize(t *testing.T) {
 		PhonemeIDs:  []int64{1, 10, 57, 14, 2}, // ^, a, n, o, $
 		SpeakerID:   0,
 		LanguageID:  0, // ja
-		NoiseScale:  0.667,
+		NoiseScale:  0.4,
 		LengthScale: 1.0,
-		NoiseW:      0.8,
+		NoiseW:      0.5,
 	}
 
 	result, err := engine.Synthesize(context.Background(), req)
@@ -140,9 +140,9 @@ func TestVoice_LoadAndSynthesize(t *testing.T) {
 		PhonemeIDs:  []int64{1, 10, 57, 14, 2},
 		SpeakerID:   0,
 		LanguageID:  0,
-		NoiseScale:  0.667,
+		NoiseScale:  0.4,
 		LengthScale: 1.0,
-		NoiseW:      0.8,
+		NoiseW:      0.5,
 	}
 
 	result, err := voice.SynthesizeFromIDs(context.Background(), req)
@@ -184,9 +184,9 @@ func TestVoice_Close(t *testing.T) {
 	// SynthesizeFromIDs after close should return ErrModelClosed.
 	req := &SynthesisRequest{
 		PhonemeIDs:  []int64{1, 10, 57, 14, 2},
-		NoiseScale:  0.667,
+		NoiseScale:  0.4,
 		LengthScale: 1.0,
-		NoiseW:      0.8,
+		NoiseW:      0.5,
 	}
 	_, err = voice.SynthesizeFromIDs(context.Background(), req)
 	if !errors.Is(err, ErrModelClosed) {
@@ -212,9 +212,9 @@ func TestSynthesisResult_WriteWAV(t *testing.T) {
 		PhonemeIDs:  []int64{1, 10, 57, 14, 2},
 		SpeakerID:   0,
 		LanguageID:  0,
-		NoiseScale:  0.667,
+		NoiseScale:  0.4,
 		LengthScale: 1.0,
-		NoiseW:      0.8,
+		NoiseW:      0.5,
 	}
 
 	result, err := engine.Synthesize(context.Background(), req)

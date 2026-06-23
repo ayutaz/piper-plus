@@ -37,7 +37,7 @@ constexpr float kPi = 3.14159265358979323846f;
 // Mel parameters — must match all runtimes (see
 // docs/spec/speaker-encoder-contract.md).
 constexpr int MEL_SAMPLE_RATE = 16000;
-constexpr std::size_t MEL_N_FFT = 512;
+constexpr std::size_t MEL_N_FFT = 400;
 constexpr std::size_t MEL_HOP_LENGTH = 160;
 constexpr std::size_t MEL_N_MELS = 80;
 constexpr float MEL_FMIN = 20.0f;

@@ -135,14 +135,34 @@ def main(argv: list[str] | None = None) -> int:
             (label, toml_val, actual, f"infer_onnx.py:{cli_flag} default")
         )
 
-    expectations.append(
-        (
-            "speaker_embedding.emb_dim",
-            str(spec["speaker_embedding"]["emb_dim"]),
-            grep_constant(ECAPA, "emb_dim: int") or "<not found>",
-            "ecapa_tdnn.py:ECAPA_TDNN(emb_dim=...)",
+    # PR #222 (Zero-Shot TTS): emb_dim is split by export mode.
+    # legacy_ecapa_tdnn=256 (ECAPA-TDNN), zero_shot_cam_plus=192 (CAM++).
+    # Validate the legacy ECAPA dim against ecapa_tdnn.py (CAM++ uses a
+    # different file and is validated by speaker-encoder-contract checks).
+    spk_emb_spec = spec["speaker_embedding"]
+    if "export_modes" in spk_emb_spec:
+        # New split-by-export-mode schema
+        legacy_dim = str(
+            spk_emb_spec["export_modes"]["legacy_ecapa_tdnn"]["emb_dim"]
         )
-    )
+        expectations.append(
+            (
+                "speaker_embedding.export_modes.legacy_ecapa_tdnn.emb_dim",
+                legacy_dim,
+                grep_constant(ECAPA, "emb_dim: int") or "<not found>",
+                "ecapa_tdnn.py:ECAPA_TDNN(emb_dim=...)",
+            )
+        )
+    else:
+        # Legacy flat schema (pre-PR-#222)
+        expectations.append(
+            (
+                "speaker_embedding.emb_dim",
+                str(spk_emb_spec["emb_dim"]),
+                grep_constant(ECAPA, "emb_dim: int") or "<not found>",
+                "ecapa_tdnn.py:ECAPA_TDNN(emb_dim=...)",
+            )
+        )
 
     failed: list[tuple[str, str, str, str]] = []
     print(f"Contract: {CONTRACT.relative_to(REPO_ROOT)}")

@@ -155,9 +155,9 @@ piper-plus -m model.onnx -t "Hello" --streaming | aplay -r 22050 -f S16_LE
 | `-s, --speaker` | `0` | Speaker ID for multi-speaker models |
 | `-f, --output-file` | | Output WAV path (`-` for stdout) |
 | `-d, --output-dir` | `.` | Output directory for generated files |
-| `--noise-scale` | `0.667` | Generation noise scale |
+| `--noise-scale` | `0.4` | Generation noise scale |
 | `--length-scale` | `1.0` | Speech rate (length scale) |
-| `--noise-w` | `0.8` | Duration predictor noise scale |
+| `--noise-w` | `0.5` | Duration predictor noise scale |
 | `--sentence-silence` | `0.2` | Silence between sentences (seconds) |
 | `--phoneme-silence` | | Per-phoneme silence override (`p:0.1,t:0.05` syntax) |
 | `--device` | `cpu` | Inference device (cpu, cuda, coreml, directml) |
@@ -284,9 +284,9 @@ piper-plus -m model.onnx -t "Hello" --streaming | aplay -r 22050 -f S16_LE
 |----------|---------|-------------|
 | `WithLanguage(lang string)` | `""` | Target language code (ja, en, zh, es, fr, pt, sv). |
 | `WithSpeakerID(id int64)` | `0` | Speaker ID for multi-speaker models. |
-| `WithNoiseScale(v float32)` | `0.667` | Generation noise scale (higher = more variation). |
+| `WithNoiseScale(v float32)` | `0.4` | Generation noise scale (higher = more variation). |
 | `WithLengthScale(v float32)` | `1.0` | Speech rate (< 1.0 = faster, > 1.0 = slower). |
-| `WithNoiseW(v float32)` | `0.8` | Duration predictor noise scale. |
+| `WithNoiseW(v float32)` | `0.5` | Duration predictor noise scale. |
 | `WithSentenceSilence(seconds float64)` | `0.2` | Silence between sentences in streaming mode. |
 
 ## GPU Support / GPUサポート
@@ -345,9 +345,9 @@ Synthesize text to WAV audio.
   "text": "Hello, world!",
   "language": "en",
   "speaker_id": 0,
-  "noise_scale": 0.667,
+  "noise_scale": 0.4,
   "length_scale": 1.0,
-  "noise_w": 0.8
+  "noise_w": 0.5
 }
 ```
 

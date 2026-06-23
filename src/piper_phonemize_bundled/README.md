@@ -1,5 +1,7 @@
 # piper-phonemize (Piper-Plus Edition)
 
+> **Deprecation notice**: This package bundles espeak-ng for phonemization. As of piper-plus v1.5+, phonemization has moved to `piper-plus-g2p` (located at `src/python/g2p/`), which is GPL-free and does not require espeak-ng. For new integrations, use `piper-plus-g2p`. This package remains available for backward compatibility with espeak-ng-based pipelines, and pre-built wheels are still published via the `build-phonemize-wheels.yml` CI workflow.
+
 Cross-platform Python package for text phonemization with bundled espeak-ng, designed for piper-plus.
 
 ## Features

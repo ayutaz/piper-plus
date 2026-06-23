@@ -279,7 +279,7 @@ def warmup_onnx_session(
         phoneme_ids[0, 0] = 1  # BOS
         phoneme_ids[0, -1] = 2  # EOS
         input_lengths = np.array([phoneme_length], dtype=np.int64)
-        scales = np.array([0.667, 1.0, 0.8], dtype=np.float32)
+        scales = np.array([0.4, 1.0, 0.5], dtype=np.float32)
 
         # Detect optional inputs dynamically
         input_names = {inp.name for inp in session.get_inputs()}
@@ -297,14 +297,22 @@ def warmup_onnx_session(
                 (1, phoneme_length, 3), dtype=np.int64
             )
         if "speaker_embedding" in input_names:
-            emb_dim = 256
+            # PR #222 / DR-008 canonical: CAM++ 192-dim default (fallback for
+            # symbolic / dynamic graphs). Real ONNX models declare emb_dim
+            # explicitly via session.get_inputs()[].shape[1] and will
+            # overwrite this. ECAPA-TDNN 256-dim legacy declares shape[1]=256
+            # in the graph.
+            emb_dim = 192
             for inp in session.get_inputs():
                 if inp.name == "speaker_embedding":
                     if len(inp.shape) >= 2 and isinstance(inp.shape[1], int):
                         emb_dim = inp.shape[1]
                     break
             inputs["speaker_embedding"] = np.zeros((1, emb_dim), dtype=np.float32)
-            inputs["speaker_embedding_mask"] = np.array([[0]], dtype=np.int64)
+            # zero-shot exports (e.g. v7 / Tsukuyomi FT) may omit
+            # speaker_embedding_mask — only feed it when the session declares it
+            if "speaker_embedding_mask" in input_names:
+                inputs["speaker_embedding_mask"] = np.array([[0]], dtype=np.int64)
 
         output_names = [o.name for o in session.get_outputs()]
         t0 = time.perf_counter()

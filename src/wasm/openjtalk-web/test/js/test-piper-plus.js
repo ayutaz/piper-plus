@@ -272,6 +272,11 @@ function createInitializedInstance(overrides = {}) {
   instance._ort = globalThis.ort;
   instance._initialized = true;
 
+  // Set capability flags based on inputNames (mirrors _init() logic)
+  const inputNames = session.inputNames || [];
+  instance._hasSpeakerEmbedding = inputNames.includes('speaker_embedding');
+  instance._hasProsodyFeatures = inputNames.includes('prosody_features');
+
   return instance;
 }
 
@@ -442,7 +447,7 @@ describe("SynthesizeOptions デフォルト値", { skip }, () => {
     assert.equal(detectLanguageFn.mock.callCount(), 1);
   });
 
-  it("noiseScale のデフォルトは 0.667", async () => {
+  it("noiseScale のデフォルトは 0.4", async () => {
     // Arrange
     let capturedScales = null;
     const instance = createInitializedInstance({
@@ -468,7 +473,7 @@ describe("SynthesizeOptions デフォルト値", { skip }, () => {
 
     // Assert
     assert.ok(capturedScales, "scales が session.run に渡されること");
-    assertCloseTo(capturedScales[0], 0.667, "noiseScale デフォルト");
+    assertCloseTo(capturedScales[0], 0.4, "noiseScale デフォルト");
   });
 
   it("lengthScale のデフォルトは 1.0", async () => {
@@ -500,7 +505,7 @@ describe("SynthesizeOptions デフォルト値", { skip }, () => {
     assertCloseTo(capturedScales[1], 1.0, "lengthScale デフォルト");
   });
 
-  it("noiseW のデフォルトは 0.8", async () => {
+  it("noiseW のデフォルトは 0.5", async () => {
     // Arrange
     let capturedScales = null;
     const instance = createInitializedInstance({
@@ -526,7 +531,7 @@ describe("SynthesizeOptions デフォルト値", { skip }, () => {
 
     // Assert
     assert.ok(capturedScales, "scales が session.run に渡されること");
-    assertCloseTo(capturedScales[2], 0.8, "noiseW デフォルト");
+    assertCloseTo(capturedScales[2], 0.5, "noiseW デフォルト");
   });
 });
 

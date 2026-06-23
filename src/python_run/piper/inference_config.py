@@ -14,11 +14,12 @@ class InferenceConfig:
 
     # Voice parameters
     speaker_id: int | None = None
+    speaker_embedding: list[float] | None = None
 
     # Synthesis parameters
-    noise_scale: float = 0.667
+    noise_scale: float = 0.4
     length_scale: float = 1.0
-    noise_w: float = 0.8
+    noise_w: float = 0.5
 
     # Audio parameters
     volume: float = 1.0
@@ -42,7 +43,9 @@ class InferenceConfig:
 
     def to_synthesize_args(self) -> dict:
         """Convert to arguments for synthesize methods."""
-        return {
+        import numpy as np
+
+        args: dict = {
             "speaker_id": self.speaker_id,
             "length_scale": self.length_scale,
             "noise_scale": self.noise_scale,
@@ -50,17 +53,31 @@ class InferenceConfig:
             "sentence_silence": self.sentence_silence,
             "volume": self.volume,
         }
+        if self.speaker_embedding is not None:
+            args["speaker_embedding"] = np.array(
+                self.speaker_embedding, dtype=np.float32
+            )
+        return args
 
     @classmethod
     def from_args(cls, args) -> "InferenceConfig":
         """Create from argparse arguments."""
+        # Load speaker embedding from file if --speaker-embedding was given
+        speaker_embedding: list[float] | None = None
+        speaker_embedding_path = getattr(args, "speaker_embedding", None)
+        if speaker_embedding_path is not None:
+            import numpy as np
+
+            raw = np.load(speaker_embedding_path)
+            speaker_embedding = raw.flatten().tolist()
+
         return cls(
             model_path=args.model,
             config_path=args.config,
             speaker_id=args.speaker,
-            noise_scale=args.noise_scale if args.noise_scale is not None else 0.667,
+            noise_scale=args.noise_scale if args.noise_scale is not None else 0.4,
             length_scale=args.length_scale if args.length_scale is not None else 1.0,
-            noise_w=args.noise_w if args.noise_w is not None else 0.8,
+            noise_w=args.noise_w if args.noise_w is not None else 0.5,
             volume=args.volume,
             sentence_silence=args.sentence_silence,
             output_format="raw" if args.output_raw else "wav",
@@ -70,4 +87,5 @@ class InferenceConfig:
             use_cuda=args.cuda,
             input_files=args.input_file or [],
             direct_text=args.text,
+            speaker_embedding=speaker_embedding,
         )

@@ -38,7 +38,7 @@ import numpy as np
 
 # Mel parameters -- must match all runtimes
 SR = 16000
-N_FFT = 512
+N_FFT = 400  # Kaldi frame_length=25ms at 16kHz = 400 samples
 HOP_LENGTH = 160
 N_MELS = 80
 FMIN = 20.0
@@ -125,7 +125,13 @@ def create_mel_filterbank() -> np.ndarray:
 
 
 def compute_mel_spectrogram(samples: np.ndarray) -> np.ndarray:
-    """Compute log mel spectrogram using manual DFT in float32."""
+    """Compute log mel spectrogram using manual DFT in float32.
+
+    Returns a flattened [n_frames * n_mels] array in frame-major order
+    (frame 0 mel 0, frame 0 mel 1, ..., frame 1 mel 0, ...).
+    This matches the CAM++ expected input layout [batch, T, 80].
+    Per-band mean subtraction (CMVN) is applied after computing the log mel.
+    """
     samples = np.asarray(samples, dtype=F32)
     mel_filters = create_mel_filterbank()
     window = hann_window(N_FFT)
@@ -135,7 +141,8 @@ def compute_mel_spectrogram(samples: np.ndarray) -> np.ndarray:
         n_frames = (len(samples) - N_FFT) // HOP_LENGTH + 1
 
     fft_bins = N_FFT // 2 + 1
-    mel_spec = np.zeros(N_MELS * n_frames, dtype=F32)
+    # Frame-major layout: mel_spec[frame_idx * N_MELS + mel_idx]
+    mel_spec = np.zeros(n_frames * N_MELS, dtype=F32)
 
     for frame_idx in range(n_frames):
         start = frame_idx * HOP_LENGTH
@@ -155,12 +162,21 @@ def compute_mel_spectrogram(samples: np.ndarray) -> np.ndarray:
                 imag += sample * np.sin(angle)
             power_spec[k] = real * real + imag * imag
 
-        # Apply mel filterbank
+        # Apply mel filterbank — store in frame-major order
         for mel_idx in range(N_MELS):
             energy = F32(0.0)
             for k_idx in range(fft_bins):
                 energy += mel_filters[mel_idx * fft_bins + k_idx] * power_spec[k_idx]
-            mel_spec[mel_idx * n_frames + frame_idx] = np.log(max(float(energy), 1e-10))
+            mel_spec[frame_idx * N_MELS + mel_idx] = np.log(max(float(energy), 1e-10))
+
+    # CMVN: subtract per-band mean across all frames
+    if n_frames > 0:
+        for mel_idx in range(N_MELS):
+            band_vals = mel_spec[
+                mel_idx::N_MELS
+            ]  # stride N_MELS to get all frames for mel_idx
+            mean = F32(np.mean(band_vals))
+            mel_spec[mel_idx::N_MELS] -= mean
 
     return mel_spec
 
@@ -409,10 +425,15 @@ def main() -> None:
             "expected_mel_checksum": checksum_floats(mel_440),
             "mel_sampled_every_10": to_list(mel_440_sampled),
             "mel_corner_values": {
+                # Frame-major layout: mel[frame_idx * N_MELS + mel_idx]
+                # top_left  = frame 0,          mel 0
+                # top_right = last frame,        mel 0
+                # bottom_left  = frame 0,        last mel
+                # bottom_right = last frame,     last mel
                 "top_left": float(mel_440[0]),
-                "top_right": float(mel_440[n_frames_440 - 1]),
-                "bottom_left": float(mel_440[(N_MELS - 1) * n_frames_440]),
-                "bottom_right": float(mel_440[N_MELS * n_frames_440 - 1]),
+                "top_right": float(mel_440[(n_frames_440 - 1) * N_MELS]),
+                "bottom_left": float(mel_440[N_MELS - 1]),
+                "bottom_right": float(mel_440[n_frames_440 * N_MELS - 1]),
             },
             "notes": "deterministic input for cross-runtime comparison",
         }
@@ -434,10 +455,11 @@ def main() -> None:
             "expected_mel_checksum": checksum_floats(mel_1k),
             "mel_sampled_every_10": to_list(mel_1k_sampled),
             "mel_corner_values": {
+                # Frame-major layout: mel[frame_idx * N_MELS + mel_idx]
                 "top_left": float(mel_1k[0]),
-                "top_right": float(mel_1k[n_frames_1k - 1]),
-                "bottom_left": float(mel_1k[(N_MELS - 1) * n_frames_1k]),
-                "bottom_right": float(mel_1k[N_MELS * n_frames_1k - 1]),
+                "top_right": float(mel_1k[(n_frames_1k - 1) * N_MELS]),
+                "bottom_left": float(mel_1k[N_MELS - 1]),
+                "bottom_right": float(mel_1k[n_frames_1k * N_MELS - 1]),
             },
             "notes": "mid-frequency test",
         }
@@ -463,10 +485,11 @@ def main() -> None:
             "expected_mel_checksum": checksum_floats(mel_multi),
             "mel_sampled_every_10": to_list(mel_multi_sampled),
             "mel_corner_values": {
+                # Frame-major layout: mel[frame_idx * N_MELS + mel_idx]
                 "top_left": float(mel_multi[0]),
-                "top_right": float(mel_multi[n_frames_multi - 1]),
-                "bottom_left": float(mel_multi[(N_MELS - 1) * n_frames_multi]),
-                "bottom_right": float(mel_multi[N_MELS * n_frames_multi - 1]),
+                "top_right": float(mel_multi[(n_frames_multi - 1) * N_MELS]),
+                "bottom_left": float(mel_multi[N_MELS - 1]),
+                "bottom_right": float(mel_multi[n_frames_multi * N_MELS - 1]),
             },
             "notes": "multi-frequency content exercises more mel bins",
         }

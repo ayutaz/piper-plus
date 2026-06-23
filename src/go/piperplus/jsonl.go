@@ -20,9 +20,10 @@ type JSONLInput struct {
 	Language string `json:"language,omitempty"`
 
 	// Shared options
-	SpeakerID  *int64 `json:"speaker_id,omitempty"`
-	LanguageID *int64 `json:"language_id,omitempty"`
-	OutputFile string `json:"output_file,omitempty"`
+	SpeakerID        *int64    `json:"speaker_id,omitempty"`
+	LanguageID       *int64    `json:"language_id,omitempty"`
+	OutputFile       string    `json:"output_file,omitempty"`
+	SpeakerEmbedding []float32 `json:"speaker_embedding,omitempty"`
 }
 
 // ParseJSONLLine parses a single JSONL line.
@@ -148,6 +149,9 @@ func (j *JSONLInput) ToSynthesisRequest(defaults SynthesisOptions) *SynthesisReq
 	}
 	if j.LanguageID != nil {
 		req.LanguageID = *j.LanguageID
+	}
+	if len(j.SpeakerEmbedding) > 0 {
+		req.SpeakerEmbedding = j.SpeakerEmbedding
 	}
 
 	return req

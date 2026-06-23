@@ -180,9 +180,15 @@ order = ["noise_scale", "length_scale", "noise_w"]
 
 # Default values (match piper_train.infer_onnx CLI defaults and the
 # `inference` block written into config.json by export_onnx.py).
-default_noise_scale = 0.667
+# v1.12.0 で全 runtime CLI を 0.4 / 1.0 / 0.5 に統一済 (CLAUDE.md
+# "Inference defaults"、 PR #222 / commit c644e9e2)。 Note: これは
+# Warmup scales (ORT 内部最適化、 ort-session-contract.toml) と同値だが
+# 意味的には別カテゴリ — Warmup は dummy run 用の "安定な" 値、 推論
+# default は audio quality (低 noise / 短 duration) と graph 安定性の
+# 折衷値として選定された結果、 たまたま同じ値に着地した。
+default_noise_scale = 0.4
 default_length_scale = 1.0
-default_noise_w = 0.8
+default_noise_w = 0.5
 
 # Acceptance ranges. Each runtime SHOULD validate at the API boundary
 # and reject out-of-range inputs with the prefixed error code.
@@ -259,7 +265,7 @@ codes = [
 ]
 
 # ===========================================================================
-# speaker_embedding — voice cloning input
+# speaker_embedding — voice cloning input (split by export mode)
 # ===========================================================================
 # Optional ONNX input `speaker_embedding: float32[1, emb_dim]`. Always
 # declared by export_onnx.py (forward-compat hook), but only meaningfully
@@ -267,14 +273,23 @@ codes = [
 # When `speaker_embedding_mask = 0` the model graph ignores this input
 # and falls back to speaker_id / lid conditioning.
 #
-# Embedding is L2-normalized and produced by the ECAPA-TDNN speaker
-# encoder (see docs/reference/speaker-encoder-contract.md).
+# emb_dim policy (split by export mode, PR #222 v2.0):
+#  - legacy_ecapa_tdnn (256): ECAPA-TDNN encoder, pre-v2 voice-cloning
+#    exports (6lang base + Tsukuyomi FT). Maintained for back-compat.
+#  - zero_shot_cam_plus (192): CAM++ encoder, v2 zero-shot canonical
+#    (PR #222). New v2 exports MUST use this dim.
+# Runtimes detect the active dim by reading
+# `session.get_inputs()['speaker_embedding'].shape[1]` dynamically — they
+# MUST NOT hard-code either value. See docs/reference/speaker-encoder-contract.md
+# and docs/spec/onnx-export-contract.toml.
 
 [speaker_embedding]
 dtype = "float32"
-shape = "(1, 256)"          # 1 = batch; 256 = ECAPA-TDNN emb_dim
-emb_dim = 256               # locked by ECAPA-TDNN architecture
-                            # (src/python/piper_train/speaker_encoder/ecapa_tdnn.py:227)
+# Shape is graph-declared; runtimes MUST read the active emb_dim from the
+# ONNX session input metadata. Both legacy_ecapa_tdnn (256) and
+# zero_shot_cam_plus (192) export modes are valid (see
+# [speaker_embedding.export_modes.*] subtables below).
+shape_template = "(1, emb_dim)"
 l2_normalized = true        # L2 norm == 1.0 ± 1e-3 expected
 range_per_value = "unbounded"  # post-L2-norm components are typically in [-0.3, 0.3]
 
@@ -285,10 +300,22 @@ mask_shape = "(1,)"
 mask_default = 0.0
 mask_enabled_value = 1.0
 
+[speaker_embedding.export_modes.legacy_ecapa_tdnn]
+emb_dim = 256               # ECAPA-TDNN architecture
+                            # (src/python/piper_train/speaker_encoder/ecapa_tdnn.py)
+encoder_kind = "ecapa-tdnn"
+description = "Legacy back-compat for pre-v2 voice-cloning exports (6lang base + Tsukuyomi FT)."
+
+[speaker_embedding.export_modes.zero_shot_cam_plus]
+emb_dim = 192               # CAM++ architecture (PR #222, v2 zero-shot canonical)
+                            # (src/python/piper_train/speaker_encoder/cam_plus.py)
+encoder_kind = "cam-plus"
+description = "v2 zero-shot canonical. New v2 exports use this dim."
+
 [speaker_embedding.error_codes]
 prefix = "piper-plus: speaker_embedding: "
 codes = [
-    "wrong-dim",                # dim != 256
+    "wrong-dim",                # dim != session.get_inputs()['speaker_embedding'].shape[1]
     "not-l2-normalized",        # |norm - 1| > 1e-3
     "wrong-dtype",
     "wrong-rank",

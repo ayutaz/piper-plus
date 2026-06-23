@@ -6,12 +6,13 @@
 //!
 //! # Mel spectrogram parameters (unified across all runtimes):
 //! - sample_rate: 16000
-//! - n_fft: 512
+//! - n_fft: 400  (Kaldi frame_length=25ms at 16kHz = 400 samples)
 //! - hop_length: 160
 //! - n_mels: 80
 //! - fmin: 20
 //! - fmax: 7600
 
+use std::borrow::Cow;
 use std::path::Path;
 
 use ort::session::Session;
@@ -22,7 +23,7 @@ use crate::error::PiperError;
 
 /// Mel spectrogram parameters — must match across all runtimes.
 const MEL_SAMPLE_RATE: u32 = 16000;
-const MEL_N_FFT: usize = 512;
+const MEL_N_FFT: usize = 400; // Kaldi frame_length=25ms at 16kHz = 400 samples
 const MEL_HOP_LENGTH: usize = 160;
 const MEL_N_MELS: usize = 80;
 const MEL_FMIN: f32 = 20.0;
@@ -88,21 +89,37 @@ impl SpeakerEncoder {
             ));
         }
 
-        // Create input tensor: [1, n_mels, n_frames]
+        // Create input tensor: [1, n_frames, n_mels] (frame-major, as expected by CAM++)
         let mel_tensor =
-            Tensor::from_array(([1_usize, MEL_N_MELS, n_frames], mel.into_boxed_slice()))
+            Tensor::from_array(([1_usize, n_frames, MEL_N_MELS], mel.into_boxed_slice()))
                 .map_err(|e| PiperError::Inference(format!("speaker encoder mel tensor: {e}")))?;
 
+        // Dynamically read input/output names before run() to avoid borrow conflicts
+        let input_name = self
+            .session
+            .inputs()
+            .iter()
+            .next()
+            .map(|i| i.name().to_string())
+            .unwrap_or_else(|| "feats".to_string());
+        let output_name = self
+            .session
+            .outputs()
+            .iter()
+            .next()
+            .map(|o| o.name().to_string())
+            .unwrap_or_else(|| "output".to_string());
+
         // Run inference
-        let inputs: Vec<(std::borrow::Cow<str>, ort::session::SessionInputValue<'_>)> =
-            vec![("input".into(), (&mel_tensor).into())];
+        let inputs: Vec<(Cow<str>, ort::session::SessionInputValue<'_>)> =
+            vec![(input_name.into(), (&mel_tensor).into())];
         let outputs = self
             .session
             .run(inputs)
             .map_err(|e| PiperError::Inference(format!("speaker encoder inference: {e}")))?;
 
         // Extract embedding from output
-        let (_shape, emb_data) = outputs[0]
+        let (_shape, emb_data) = outputs[&output_name as &str]
             .try_extract_tensor::<f32>()
             .map_err(|e| PiperError::Inference(format!("speaker encoder output: {e}")))?;
 
@@ -193,8 +210,10 @@ fn resample_linear(samples: &[f32], from_rate: u32, to_rate: u32) -> Vec<f32> {
 
 /// Compute a log mel spectrogram from audio samples at 16kHz.
 ///
-/// Returns a flattened [n_mels * n_frames] array in row-major order
-/// (mel bin 0 frame 0, mel bin 0 frame 1, ..., mel bin 1 frame 0, ...).
+/// Returns a flattened [n_frames * n_mels] array in frame-major order
+/// (frame 0 mel 0, frame 0 mel 1, ..., frame 1 mel 0, ...).
+/// This matches the CAM++ expected input layout [batch, T, 80].
+/// Per-band mean subtraction (CMVN) is applied after computing the log mel.
 fn compute_mel_spectrogram(samples: &[f32]) -> Vec<f32> {
     let mel_filters = create_mel_filterbank();
     let window = hann_window(MEL_N_FFT);
@@ -206,7 +225,8 @@ fn compute_mel_spectrogram(samples: &[f32]) -> Vec<f32> {
     };
 
     let fft_bins = MEL_N_FFT / 2 + 1;
-    let mut mel_spec = vec![0.0f32; MEL_N_MELS * n_frames];
+    // Frame-major layout: [n_frames * n_mels], index = frame_idx * MEL_N_MELS + mel_idx
+    let mut mel_spec = vec![0.0f32; n_frames * MEL_N_MELS];
 
     for frame_idx in 0..n_frames {
         let start = frame_idx * MEL_HOP_LENGTH;
@@ -230,14 +250,27 @@ fn compute_mel_spectrogram(samples: &[f32]) -> Vec<f32> {
             *power_spec_k = real * real + imag * imag;
         }
 
-        // Apply mel filterbank
+        // Apply mel filterbank and store in frame-major order
         for mel_idx in 0..MEL_N_MELS {
             let mut energy = 0.0f32;
             for k in 0..fft_bins {
                 energy += mel_filters[mel_idx * fft_bins + k] * power_spec[k];
             }
             // Log mel: log(max(energy, 1e-10))
-            mel_spec[mel_idx * n_frames + frame_idx] = (energy.max(1e-10)).ln();
+            mel_spec[frame_idx * MEL_N_MELS + mel_idx] = (energy.max(1e-10)).ln();
+        }
+    }
+
+    // CMVN: subtract per-band mean from each mel band
+    if n_frames > 0 {
+        for mel_idx in 0..MEL_N_MELS {
+            let mean: f32 = (0..n_frames)
+                .map(|f| mel_spec[f * MEL_N_MELS + mel_idx])
+                .sum::<f32>()
+                / n_frames as f32;
+            for frame_idx in 0..n_frames {
+                mel_spec[frame_idx * MEL_N_MELS + mel_idx] -= mean;
+            }
         }
     }
 

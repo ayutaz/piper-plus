@@ -48,16 +48,13 @@ def _make_utterance_with_prosody(tmp_path, speaker_id=0):
     torch.save(spectrogram, spec_path)
 
     phoneme_ids = np.array([1, 8, 5, 39, 25], dtype=np.int16)
-    prosody_features = np.array(
-        [
-            [-2, 1, 5],
-            [-1, 2, 5],
-            [0, 3, 5],
-            [1, 4, 5],
-            [2, 5, 5],
-        ],
-        dtype=np.int16,
-    )
+    prosody_features = [
+        {"a1": -2, "a2": 1, "a3": 5},
+        {"a1": -1, "a2": 2, "a3": 5},
+        {"a1": 0, "a2": 3, "a3": 5},
+        {"a1": 1, "a2": 4, "a3": 5},
+        {"a1": 2, "a2": 5, "a3": 5},
+    ]
 
     return Utterance(
         phoneme_ids=phoneme_ids,
@@ -217,6 +214,68 @@ def test_collate_non_multilanguage_with_language_id(tmp_path):
     # Other fields should still be populated
     assert batch.phoneme_ids.shape[0] == 2
     assert batch.speaker_ids is not None
+
+
+@pytest.mark.unit
+def test_dataset_accepts_well_formed_speaker_embedding_npy(tmp_path):
+    """Positive control: correctly-shaped [192] .npy loads as a float32 tensor."""
+    audio_norm = torch.randn(1, 8192)
+    spectrogram = torch.randn(80, 32)
+    audio_path = tmp_path / "audio_good_emb.pt"
+    spec_path = tmp_path / "spec_good_emb.pt"
+    torch.save(audio_norm, audio_path)
+    torch.save(spectrogram, spec_path)
+
+    emb_path = tmp_path / "good.npy"
+    np.save(emb_path, np.random.randn(192).astype(np.float32))
+
+    utt = Utterance(
+        phoneme_ids=np.array([1, 2, 3], dtype=np.int16),
+        audio_norm_path=audio_path,
+        audio_spec_path=spec_path,
+        speaker_id=0,
+        speaker_embedding_path=emb_path,
+    )
+    dataset = _make_dataset_with_utterances([utt])
+
+    result = dataset[0]
+
+    assert result.speaker_embedding is not None
+    assert result.speaker_embedding.shape == (192,)
+    assert result.speaker_embedding.dtype == torch.float32
+
+
+@pytest.mark.unit
+def test_dataset_rejects_malformed_speaker_embedding_npy(tmp_path):
+    """Malformed speaker embedding .npy (wrong shape) must raise early at __getitem__.
+
+    Bug: dataset.py loads speaker_embedding with np.load() without verifying
+    shape == (expected_dim,).  A [191] or [256] embedding therefore propagates
+    to UtteranceCollate where torch.stack fails deep in the stack with an
+    opaque shape mismatch.  __getitem__ should reject it up-front with a
+    ValueError mentioning the offending shape / expected dim (192).
+    """
+    audio_norm = torch.randn(1, 8192)
+    spectrogram = torch.randn(80, 32)
+    audio_path = tmp_path / "audio_bad_emb.pt"
+    spec_path = tmp_path / "spec_bad_emb.pt"
+    torch.save(audio_norm, audio_path)
+    torch.save(spectrogram, spec_path)
+
+    emb_path = tmp_path / "bad.npy"
+    np.save(emb_path, np.random.randn(191).astype(np.float32))
+
+    utt = Utterance(
+        phoneme_ids=np.array([1, 2, 3], dtype=np.int16),
+        audio_norm_path=audio_path,
+        audio_spec_path=spec_path,
+        speaker_id=0,
+        speaker_embedding_path=emb_path,
+    )
+    dataset = _make_dataset_with_utterances([utt])
+
+    with pytest.raises(ValueError, match=r"shape|192"):
+        dataset[0]
 
 
 @pytest.mark.unit

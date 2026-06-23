@@ -3276,6 +3276,7 @@ train = [
     { name = "scipy" },
     { name = "seaborn" },
     { name = "soundfile" },
+    { name = "soxr" },
     { name = "tensorboard" },
     { name = "torchmetrics" },
     { name = "tqdm" },
@@ -3293,6 +3294,7 @@ dev = [
     { name = "pytest" },
     { name = "pytest-timeout" },
     { name = "ruff" },
+    { name = "uvicorn" },
 ]
 
 [package.metadata]
@@ -3361,6 +3363,7 @@ requires-dist = [
     { name = "soundfile", marker = "extra == 'inference'", specifier = ">=0.14.0" },
     { name = "soundfile", marker = "extra == 'inference-gpu'", specifier = ">=0.14.0" },
     { name = "soundfile", marker = "extra == 'train'", specifier = ">=0.14.0" },
+    { name = "soxr", marker = "extra == 'train'", specifier = ">=0.5.0" },
     { name = "sphinx", marker = "extra == 'dev'", specifier = ">=4.0.0" },
     { name = "sphinx-rtd-theme", marker = "extra == 'dev'", specifier = ">=3.1.0" },
     { name = "tensorboard", specifier = ">=2.20.0" },
@@ -3394,6 +3397,7 @@ dev = [
     { name = "pytest", specifier = ">=9.0.3,<10" },
     { name = "pytest-timeout", specifier = ">=2.2.0" },
     { name = "ruff", specifier = "==0.15.15" },
+    { name = "uvicorn", specifier = ">=0.49.0" },
 ]
 
 [[package]]
@@ -3453,6 +3457,7 @@ train = [
     { name = "scipy" },
     { name = "seaborn" },
     { name = "soundfile" },
+    { name = "soxr" },
     { name = "tensorboard" },
     { name = "torchmetrics" },
     { name = "tqdm" },
@@ -3501,6 +3506,7 @@ requires-dist = [
     { name = "soundfile", marker = "extra == 'inference'", specifier = ">=0.12" },
     { name = "soundfile", marker = "extra == 'inference-gpu'", specifier = ">=0.12" },
     { name = "soundfile", marker = "extra == 'train'", specifier = ">=0.12" },
+    { name = "soxr", marker = "extra == 'train'", specifier = ">=0.5.0" },
     { name = "tensorboard", marker = "extra == 'train'", specifier = ">=2.20.0" },
     { name = "torchmetrics", marker = "extra == 'train'", specifier = ">=1.9.0" },
     { name = "tqdm", marker = "extra == 'train'", specifier = ">=4.66" },

@@ -3,9 +3,9 @@
     "sample_rate": 22050
   },
   "inference": {
-    "noise_scale": 0.667,
+    "noise_scale": 0.4,
     "length_scale": 1,
-    "noise_w": 0.8
+    "noise_scale_w": 0.5
   },
   "phoneme_id_map": {}
 }

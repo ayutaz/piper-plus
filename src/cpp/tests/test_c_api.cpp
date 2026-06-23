@@ -49,9 +49,9 @@ TEST(CApiDefaultOptions, HasExpectedDefaults) {
     PiperPlusSynthOptions opts = piper_plus_default_options();
     EXPECT_EQ(opts.speaker_id, 0);
     EXPECT_EQ(opts.language_id, -1);
-    EXPECT_FLOAT_EQ(opts.noise_scale, 0.667f);
+    EXPECT_FLOAT_EQ(opts.noise_scale, 0.4f);
     EXPECT_FLOAT_EQ(opts.length_scale, 1.0f);
-    EXPECT_FLOAT_EQ(opts.noise_w, 0.8f);
+    EXPECT_FLOAT_EQ(opts.noise_w, 0.5f);
     EXPECT_FLOAT_EQ(opts.sentence_silence_sec, 0.2f);
 }
 
@@ -273,7 +273,7 @@ TEST(CApiDefaultOptions, ReturnValueIsIndependentCopy) {
     opts1.noise_scale = 0.0f;
     PiperPlusSynthOptions opts2 = piper_plus_default_options();
     EXPECT_EQ(opts2.speaker_id, 0);
-    EXPECT_FLOAT_EQ(opts2.noise_scale, 0.667f);
+    EXPECT_FLOAT_EQ(opts2.noise_scale, 0.4f);
 }
 
 TEST(CApiStatusCodes, SpecificValuesMatchHeader) {
@@ -525,9 +525,9 @@ TEST(CApiZeroInit, DefaultOptionsNotZero) {
     EXPECT_NE(opts.noise_w, 0.0f);
 
     // 具体的なデフォルト値も検証
-    EXPECT_FLOAT_EQ(opts.noise_scale, 0.667f);
+    EXPECT_FLOAT_EQ(opts.noise_scale, 0.4f);
     EXPECT_FLOAT_EQ(opts.length_scale, 1.0f);
-    EXPECT_FLOAT_EQ(opts.noise_w, 0.8f);
+    EXPECT_FLOAT_EQ(opts.noise_w, 0.5f);
 }
 
 // ===== Phase 5: Status enum tests (M5-13) =====
@@ -1012,19 +1012,26 @@ TEST(CApiMemorySafety, FreeMultipleNullsAreSafe) {
 
 TEST(CApiShortTextRegression, NoiseWDefaultProtectsAgainstIssue356) {
     // Issue #356: noise_w defaulting too low caused front-edge audio
-    // artifacts on padded short text. The fix pins noise_w >= 0.4 (see
-    // docs/spec/short-text-contract.toml NOISE_W_MIN_RATIO=0.4) and the
-    // default at 0.8 stays well above the floor.
+    // artifacts on padded short text. The fix introduced a multiplier floor
+    // (docs/spec/short-text-contract.toml noise_w_min_ratio=0.4) that
+    // prevents short-text scaling from collapsing noise_w too far. The
+    // canonical default 0.5 (v1.12.0 全 runtime 統一; was 0.8 in v1.11)
+    // stays above that floor — effective short-text noise_w is
+    // 0.5 * max(0.4, ratio) >= 0.5 * 0.4 = 0.2 in worst case.
     PiperPlusSynthOptions opts = piper_plus_default_options();
-    EXPECT_GE(opts.noise_w, 0.4f * 1.0f);  // floor * length_scale
-    EXPECT_FLOAT_EQ(opts.noise_w, 0.8f);
+    EXPECT_GE(opts.noise_w, 0.4f);  // canonical default >= min_ratio floor
+    EXPECT_FLOAT_EQ(opts.noise_w, 0.5f);
 }
 
 TEST(CApiShortTextRegression, NoiseScaleDefaultProtectsAgainstIssue356) {
-    // Same regression: noise_scale floor 0.5 (NOISE_SCALE_MIN_RATIO).
+    // Same regression: noise_scale_min_ratio=0.5 is a MULTIPLIER floor, not
+    // an absolute value floor. The canonical default 0.4 (v1.12.0 全 runtime
+    // 統一; was 0.667 in v1.11) is below the multiplier floor, but the
+    // short-text formula `noise_scale * max(0.5, ratio)` ensures effective
+    // scale never collapses below 0.4 * 0.5 = 0.2, far above the Issue #356
+    // regression threshold (silent / front-edge artifact band).
     PiperPlusSynthOptions opts = piper_plus_default_options();
-    EXPECT_GE(opts.noise_scale, 0.5f * 1.0f);
-    EXPECT_FLOAT_EQ(opts.noise_scale, 0.667f);
+    EXPECT_FLOAT_EQ(opts.noise_scale, 0.4f);
 }
 
 // ===== Iterator state safety: synth_next without synth_start =====

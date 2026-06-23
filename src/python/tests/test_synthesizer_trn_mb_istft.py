@@ -74,10 +74,11 @@ def test_infer_returns_fullband_only():
     x_lengths = torch.LongTensor([10])
     sid = torch.LongTensor([0])
     lid = torch.LongTensor([0])
+    speaker_embeddings = torch.randn(1, 192)
 
     with torch.no_grad():
         o, attn, y_mask, latents, _durations = model.infer(
-            x, x_lengths, sid=sid, lid=lid
+            x, x_lengths, sid=sid, lid=lid, speaker_embeddings=speaker_embeddings
         )
     assert o.shape[1] == 1
 

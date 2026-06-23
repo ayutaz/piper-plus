@@ -1,0 +1,42 @@
+{
+  "audio": {
+    "sample_rate": 22050,
+    "quality": "x_low"
+  },
+  "espeak": {
+    "voice": "en-us"
+  },
+  "inference": {
+    "noise_scale": 0.4,
+    "length_scale": 1.0,
+    "noise_scale_w": 0.5
+  },
+  "phoneme_type": "espeak",
+  "phoneme_map": {},
+  "phoneme_id_map": {
+    "^": [1],
+    "a": [10],
+    "n": [57],
+    "o": [14],
+    "$": [2],
+    "_": [0],
+    " ": [3]
+  },
+  "num_symbols": 128,
+  "num_speakers": 2,
+  "gin_channels": 128,
+  "speaker_id_map": {
+    "speaker_0": 0,
+    "speaker_1": 1
+  },
+  "language": {
+    "code": "en_US",
+    "family": "en",
+    "region": "US",
+    "name_native": "English",
+    "name_english": "English",
+    "country_english": "United States"
+  },
+  "dataset": "zero-shot-test",
+  "piper_version": "1.0.0"
+}

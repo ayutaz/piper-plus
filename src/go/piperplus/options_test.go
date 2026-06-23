@@ -87,8 +87,8 @@ func TestValidate_EmptyEmbeddingSlice_OK(t *testing.T) {
 
 // TestValidateOptions_OK ensures SynthesisOptions.Validate is a stable
 // no-op for callers that wish to call it uniformly. The speaker_id ×
-// speaker_embedding check lives on SynthesisRequest because
-// SynthesisOptions does not carry an embedding field.
+// speaker_embedding check lives on SynthesisRequest because that is the
+// engine-facing canonical gate.
 func TestValidateOptions_OK(t *testing.T) {
 	opts := &SynthesisOptions{SpeakerID: 5}
 	if err := opts.Validate(); err != nil {
@@ -97,5 +97,47 @@ func TestValidateOptions_OK(t *testing.T) {
 	var nilOpts *SynthesisOptions
 	if err := nilOpts.Validate(); err != nil {
 		t.Fatalf("expected nil error from nil SynthesisOptions.Validate, got %v", err)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// WithSpeakerEmbedding
+// ---------------------------------------------------------------------------
+
+func TestWithSpeakerEmbedding(t *testing.T) {
+	emb := []float32{0.1, 0.2, 0.3}
+	var opts SynthesisOptions
+	WithSpeakerEmbedding(emb)(&opts)
+
+	if len(opts.SpeakerEmbedding) != len(emb) {
+		t.Fatalf("SpeakerEmbedding length: expected %d, got %d", len(emb), len(opts.SpeakerEmbedding))
+	}
+	for i, v := range emb {
+		if opts.SpeakerEmbedding[i] != v {
+			t.Errorf("SpeakerEmbedding[%d]: expected %v, got %v", i, v, opts.SpeakerEmbedding[i])
+		}
+	}
+}
+
+func TestWithSpeakerEmbedding_Nil(t *testing.T) {
+	var opts SynthesisOptions
+	WithSpeakerEmbedding(nil)(&opts)
+
+	if opts.SpeakerEmbedding != nil {
+		t.Errorf("SpeakerEmbedding: expected nil, got %v", opts.SpeakerEmbedding)
+	}
+}
+
+func TestWithSpeakerEmbedding_ApplySynthesisOptions(t *testing.T) {
+	emb := []float32{0.4, 0.5, 0.6}
+	so := applySynthesisOptions([]SynthesisOption{WithSpeakerEmbedding(emb)})
+
+	if len(so.SpeakerEmbedding) != len(emb) {
+		t.Fatalf("SpeakerEmbedding length: expected %d, got %d", len(emb), len(so.SpeakerEmbedding))
+	}
+	for i, v := range emb {
+		if so.SpeakerEmbedding[i] != v {
+			t.Errorf("SpeakerEmbedding[%d]: expected %v, got %v", i, v, so.SpeakerEmbedding[i])
+		}
 	}
 }

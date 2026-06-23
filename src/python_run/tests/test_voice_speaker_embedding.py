@@ -119,9 +119,13 @@ class TestSynthesizeAudioFeedsSpeakerEmbedding:
         # mask=0 → fall back to emb_g(sid) (vits/models.py:1015-1037).
         assert mask[0, 0] == 0
 
-    def test_dynamic_emb_dim_falls_back_to_256(self):
+    def test_dynamic_emb_dim_falls_back_to_192(self):
         """If the ONNX graph uses a dynamic axis for emb_dim, the runtime
-        must fall back to the ECAPA-TDNN canonical 256."""
+        must fall back to the CAM++ canonical 192 (PR #222 / DR-008).
+
+        ECAPA-TDNN 256-dim legacy exports still work because their graphs
+        declare shape[1]=256 explicitly (overrides this fallback).
+        """
         voice, session = _make_voice_with_inputs(
             [
                 ("input", ["batch", "seq"]),
@@ -133,7 +137,7 @@ class TestSynthesizeAudioFeedsSpeakerEmbedding:
         )
         self._run_synth(voice)
         feed = session.run.call_args[0][1]
-        assert feed["speaker_embedding"].shape == (1, 256)
+        assert feed["speaker_embedding"].shape == (1, 192)
 
     def test_speaker_embedding_with_prosody_and_lid(self):
         """All optional inputs coexist without the speaker_embedding feed
@@ -163,6 +167,89 @@ class TestSynthesizeAudioFeedsSpeakerEmbedding:
             "speaker_embedding_mask",
         ):
             assert name in feed, f"{name} missing from feed"
+
+
+class TestStreamRawThreadsSpeakerEmbedding:
+    """`synthesize_stream_raw` must thread `speaker_embedding` through
+    `_stream_phonemes_to_audio` to `synthesize_ids_to_raw`.
+
+    Regression for a NameError discovered during PR #222 local verification
+    on 2026-06-20: `_stream_phonemes_to_audio` referenced `speaker_embedding`
+    without declaring it in the signature, so `python -m piper
+    --speaker-embedding emb.npy` crashed with
+    ``NameError: name 'speaker_embedding' is not defined``.
+
+    Both the serial path (``parallelism <= 1 or len(sentences) <= 1``) and
+    the parallel pipeline path must propagate the embedding.
+    """
+
+    def _setup_voice(self, num_sentences: int = 1):
+        voice, session = _make_voice_with_inputs(
+            input_specs=[
+                ("input", ["batch", "seq"]),
+                ("input_lengths", ["batch"]),
+                ("scales", [3]),
+                ("speaker_embedding", ["batch", 192]),
+                ("speaker_embedding_mask", ["batch", 1]),
+            ]
+        )
+        voice._split_sentences = MagicMock(
+            return_value=["hi"] * num_sentences
+        )
+        voice._phonemize_one_factory = MagicMock(
+            return_value=lambda s: ["a"]
+        )
+        return voice, session
+
+    def test_serial_path_threads_speaker_embedding(self):
+        """parallelism<=1 path forwards the embedding to the ONNX feed."""
+        voice, session = self._setup_voice(num_sentences=1)
+        emb = np.full(192, 0.5, dtype=np.float32)
+
+        list(
+            voice.synthesize_stream_raw(
+                "hi",
+                speaker_embedding=emb,
+            )
+        )
+
+        feed = session.run.call_args[0][1]
+        assert "speaker_embedding" in feed
+        np.testing.assert_array_equal(
+            feed["speaker_embedding"][0],
+            emb,
+        )
+        # mask=1 indicates a real embedding was supplied
+        assert feed["speaker_embedding_mask"][0, 0] == 1
+
+    def test_parallel_path_threads_speaker_embedding(self):
+        """parallelism>1 + multi-sentence path forwards the embedding."""
+        import os
+        old = os.environ.get("PIPER_G2P_PARALLELISM")
+        os.environ["PIPER_G2P_PARALLELISM"] = "2"
+        try:
+            voice, session = self._setup_voice(num_sentences=3)
+            emb = np.full(192, 0.25, dtype=np.float32)
+
+            list(
+                voice.synthesize_stream_raw(
+                    "hi. hi. hi.",
+                    speaker_embedding=emb,
+                )
+            )
+
+            # Every per-sentence ORT call must receive the same embedding
+            assert session.run.call_count >= 3
+            for call in session.run.call_args_list:
+                feed = call[0][1]
+                np.testing.assert_array_equal(
+                    feed["speaker_embedding"][0], emb
+                )
+        finally:
+            if old is None:
+                del os.environ["PIPER_G2P_PARALLELISM"]
+            else:
+                os.environ["PIPER_G2P_PARALLELISM"] = old
 
 
 class TestWarmupFeedsSpeakerEmbedding:

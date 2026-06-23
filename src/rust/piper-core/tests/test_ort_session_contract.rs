@@ -119,9 +119,9 @@ fn test_warmup_scale_values() {
     let noise_scale = fixture["warmup"]["noise_scale"].as_f64().unwrap();
     let length_scale = fixture["warmup"]["length_scale"].as_f64().unwrap();
     let noise_w = fixture["warmup"]["noise_w"].as_f64().unwrap();
-    assert!((noise_scale - 0.667).abs() < 1e-9);
+    assert!((noise_scale - 0.4).abs() < 1e-9);
     assert!((length_scale - 1.0).abs() < 1e-9);
-    assert!((noise_w - 0.8).abs() < 1e-9);
+    assert!((noise_w - 0.5).abs() < 1e-9);
 }
 
 #[test]

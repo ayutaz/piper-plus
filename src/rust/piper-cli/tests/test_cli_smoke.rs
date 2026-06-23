@@ -120,7 +120,7 @@ fn help_advertises_default_noise_scale() {
         .arg("--help")
         .assert()
         .success()
-        .stdout(predicate::str::contains("0.667"));
+        .stdout(predicate::str::contains("0.4"));
 }
 
 #[test]

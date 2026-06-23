@@ -400,6 +400,14 @@ class TestSynthesizeWithTimingParameters:
         )
         voice.phonemize = MagicMock(return_value=[["a"]])
 
+        # Add 'sid' to the mock model's input names so the speaker_id path is taken.
+        # Zero-shot multi-speaker models expose 'speaker_embedding' instead of 'sid',
+        # so the runtime now requires the sid input node to exist before forwarding it.
+        sid_mock = MagicMock()
+        sid_mock.name = "sid"
+        existing_inputs = voice.session.get_inputs.return_value
+        voice.session.get_inputs.return_value = [*existing_inputs, sid_mock]
+
         _, _ = voice.synthesize_with_timing("a", speaker_id=2)
 
         call_args = voice.session.run.call_args
@@ -408,6 +416,111 @@ class TestSynthesizeWithTimingParameters:
         assert "sid" in feeds
         # shape is [1, 1]
         assert int(feeds["sid"][0][0]) == 2
+
+
+class TestSynthesizeWithTimingSpeakerEmbedding:
+    """Regression coverage: ``synthesize_with_timing()`` must accept and
+    forward a ``speaker_embedding`` kwarg, matching the contract already
+    fixed for ``synthesize_stream_raw`` in commit 5188b088.
+
+    Without this, zero-shot users calling the timing API
+    (``/api/phoneme-timing`` / library) get a ``TypeError`` from the public
+    method, or — once the kwarg is accepted — silently lose the embedding
+    because it is never threaded to ``_synthesize_ids_core``.
+    """
+
+    @staticmethod
+    def _patch_phonemize(voice: PiperVoice, sentences=None) -> None:
+        voice.phonemize = MagicMock(
+            return_value=sentences if sentences is not None else [["a", "k", "o"]]
+        )
+
+    def test_speaker_embedding_parameter_accepted(self):
+        """Public API: synthesize_with_timing() accepts speaker_embedding kwarg."""
+        voice = _make_mock_voice(
+            has_durations=True,
+            has_speaker_embedding=True,
+            speaker_embedding_dim=192,
+        )
+        self._patch_phonemize(voice)
+
+        emb = np.full(192, 0.5, dtype=np.float32)
+
+        # Should not raise TypeError about unexpected keyword argument
+        wav_bytes, _ = voice.synthesize_with_timing("hello", speaker_embedding=emb)
+
+        assert isinstance(wav_bytes, bytes)
+        assert len(wav_bytes) > 0
+
+    def test_speaker_embedding_threaded_to_core(self):
+        """speaker_embedding kwarg reaches _synthesize_ids_core feed."""
+        voice = _make_mock_voice(
+            has_durations=True,
+            has_speaker_embedding=True,
+            speaker_embedding_dim=192,
+        )
+        self._patch_phonemize(voice)
+
+        emb = (np.arange(192, dtype=np.float32) / 192.0).astype(np.float32)
+
+        # Wrap the bound method with a MagicMock that delegates to the real
+        # implementation so we capture call args while still producing output.
+        real_core = voice._synthesize_ids_core
+        spy = MagicMock(side_effect=real_core)
+        voice._synthesize_ids_core = spy
+
+        voice.synthesize_with_timing("hello", speaker_embedding=emb)
+
+        assert spy.call_count >= 1
+        kwargs = spy.call_args.kwargs
+        assert "speaker_embedding" in kwargs
+        assert kwargs["speaker_embedding"] is emb or np.array_equal(
+            kwargs["speaker_embedding"], emb
+        )
+
+    def test_speaker_embedding_threaded_per_sentence(self):
+        """speaker_embedding is forwarded on EVERY sentence, not just the first."""
+        voice = _make_mock_voice(
+            has_durations=True,
+            has_speaker_embedding=True,
+            speaker_embedding_dim=192,
+            phoneme_ids_len=5,
+        )
+        # Three sentences -> three _synthesize_ids_core calls
+        self._patch_phonemize(voice, sentences=[["a"], ["k"], ["o"]])
+
+        emb = np.full(192, 0.25, dtype=np.float32)
+
+        real_core = voice._synthesize_ids_core
+        spy = MagicMock(side_effect=real_core)
+        voice._synthesize_ids_core = spy
+
+        voice.synthesize_with_timing("A. B. C.", speaker_embedding=emb)
+
+        assert spy.call_count == 3
+        for call in spy.call_args_list:
+            assert "speaker_embedding" in call.kwargs
+            assert np.array_equal(call.kwargs["speaker_embedding"], emb)
+
+    def test_speaker_embedding_none_default_unchanged(self):
+        """Backward compat: omitting speaker_embedding still works (defaults None)."""
+        voice = _make_mock_voice(
+            has_durations=True,
+            has_speaker_embedding=True,
+            speaker_embedding_dim=192,
+        )
+        self._patch_phonemize(voice)
+
+        real_core = voice._synthesize_ids_core
+        spy = MagicMock(side_effect=real_core)
+        voice._synthesize_ids_core = spy
+
+        wav_bytes, _ = voice.synthesize_with_timing("hello")
+
+        assert isinstance(wav_bytes, bytes)
+        assert spy.call_count >= 1
+        # Either kwarg absent, or explicitly None
+        assert spy.call_args.kwargs.get("speaker_embedding", None) is None
 
 
 class TestSynthesizeCoreShortText:
@@ -499,7 +612,12 @@ class TestSpeakerEmbeddingDefaults:
         assert feeds["speaker_embedding_mask"].dtype == np.int64
 
     def test_synthesize_falls_back_to_default_dim_when_shape_unknown(self):
-        """When the ONNX input shape is symbolic, default to 256 dims."""
+        """When the ONNX input shape is symbolic, default to 192 dims (CAM++).
+
+        PR #222 / DR-008 canonical: zero_shot_cam_plus is 192-dim. ECAPA-TDNN
+        256-dim legacy exports still work because their ONNX graphs declare
+        shape[1]=256 explicitly (overrides this fallback at runtime).
+        """
         voice = _make_mock_voice(has_speaker_embedding=True)
         # Overwrite the speaker_embedding input to advertise a symbolic dim
         for inp in voice.session.get_inputs.return_value:
@@ -510,7 +628,7 @@ class TestSpeakerEmbeddingDefaults:
         voice._synthesize_ids_core([1, 0, 10, 0, 2])
 
         feeds = voice.session.run.call_args[0][1]
-        assert feeds["speaker_embedding"].shape == (1, 256)
+        assert feeds["speaker_embedding"].shape == (1, 192)
 
     def test_warmup_supplies_speaker_embedding_inputs(self):
         """_warmup_session feeds zero speaker_embedding + mask=0 when required."""

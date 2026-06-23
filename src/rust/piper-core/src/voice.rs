@@ -151,9 +151,9 @@ impl Default for SynthesisParams {
         Self {
             speaker_id: None,
             language_override: None,
-            noise_scale: 0.667,
+            noise_scale: 0.4,
             length_scale: 1.0,
-            noise_w: 0.8,
+            noise_w: 0.5,
             speaker_embedding: None,
         }
     }
@@ -469,11 +469,11 @@ impl PiperVoice {
             phoneme_ids: ids,
             prosody_features: prosody_tensor,
             speaker_id: params.speaker_id,
+            speaker_embedding: params.speaker_embedding.clone(),
             language_id,
             noise_scale: params.noise_scale,
             length_scale: params.length_scale,
             noise_w: params.noise_w,
-            speaker_embedding: params.speaker_embedding.clone(),
         };
 
         self.engine.synthesize(&request)
@@ -581,11 +581,13 @@ impl PiperVoice {
         text: &str,
         output: &Path,
         speaker_id: Option<i64>,
+        speaker_embedding: Option<Vec<f32>>,
     ) -> Result<SynthesisResult, PiperError> {
         let result = self.synthesize_with_params(
             text,
             &SynthesisParams {
                 speaker_id,
+                speaker_embedding,
                 ..Default::default()
             },
         )?;
@@ -1012,11 +1014,11 @@ mod tests {
             phoneme_ids: ids.clone(),
             prosody_features: None,
             speaker_id: Some(0),
+            speaker_embedding: None,
             language_id: None,
             noise_scale: 0.667,
             length_scale: 1.0,
             noise_w: 0.8,
-            speaker_embedding: None,
         };
         assert_eq!(request.phoneme_ids, ids);
         assert!(request.prosody_features.is_none());
@@ -1032,11 +1034,11 @@ mod tests {
             phoneme_ids: vec![1, 2, 3],
             prosody_features: Some(prosody_feats.clone()),
             speaker_id: Some(3),
+            speaker_embedding: None,
             language_id: Some(0),
             noise_scale: 0.5,
             length_scale: 1.2,
             noise_w: 0.6,
-            speaker_embedding: None,
         };
         assert_eq!(request.prosody_features.as_ref().unwrap().len(), 3);
         assert_eq!(request.prosody_features.as_ref().unwrap()[0], [-2, 1, 5]);
@@ -1050,11 +1052,11 @@ mod tests {
             phoneme_ids: vec![1, 5, 10, 20],
             prosody_features: None,
             speaker_id: Some(100),
+            speaker_embedding: None,
             language_id: Some(2), // zh
             noise_scale: 0.667,
             length_scale: 1.0,
             noise_w: 0.8,
-            speaker_embedding: None,
         };
         assert_eq!(request.language_id, Some(2));
         assert_eq!(request.speaker_id, Some(100));
@@ -1241,9 +1243,9 @@ mod tests {
         let params = SynthesisParams::default();
         assert!(params.speaker_id.is_none());
         assert!(params.language_override.is_none());
-        assert!((params.noise_scale - 0.667).abs() < 1e-6);
+        assert!((params.noise_scale - 0.4).abs() < 1e-6);
         assert!((params.length_scale - 1.0).abs() < 1e-6);
-        assert!((params.noise_w - 0.8).abs() < 1e-6);
+        assert!((params.noise_w - 0.5).abs() < 1e-6);
     }
 
     #[test]
@@ -1256,9 +1258,9 @@ mod tests {
         assert_eq!(params.speaker_id, Some(42));
         assert_eq!(params.language_override.as_deref(), Some("ja"));
         // Other fields should be default
-        assert!((params.noise_scale - 0.667).abs() < 1e-6);
+        assert!((params.noise_scale - 0.4).abs() < 1e-6);
         assert!((params.length_scale - 1.0).abs() < 1e-6);
-        assert!((params.noise_w - 0.8).abs() < 1e-6);
+        assert!((params.noise_w - 0.5).abs() < 1e-6);
     }
 
     #[test]

@@ -72,7 +72,9 @@ class TestProsodyExtraction:
         a2_values = [p.a2 for p in prosody_info if p is not None]
 
         # A2 should increment: 1, 2, 3, 4, 5 for 5 morae
-        assert len(a2_values) >= 5, f"Expected at least 5 A2 values, got {len(a2_values)}"
+        assert len(a2_values) >= 5, (
+            f"Expected at least 5 A2 values, got {len(a2_values)}"
+        )
 
         # Check that A2 starts at 1 and generally increases
         assert a2_values[0] == 1, f"First mora should have A2=1, got {a2_values[0]}"
@@ -109,7 +111,7 @@ class TestProsodyExtraction:
 
         # Check special tokens have None prosody
         special_tokens = {"^", "$", "?", "_", "#", "[", "]"}
-        for token, prosody in zip(tokens, prosody_info):
+        for token, prosody in zip(tokens, prosody_info, strict=False):
             if token in special_tokens:
                 assert prosody is None, (
                     f"Special token '{token}' should have None prosody, got {prosody}"
@@ -132,7 +134,9 @@ class TestProsodyExtraction:
         # A2 should reset to 1 at phrase boundaries
         # Check that 1 appears multiple times (indicating phrase starts)
         ones_count = sum(1 for v in a2_values if v == 1)
-        assert ones_count >= 1, f"Expected at least 1 phrase start (A2=1), got {ones_count}"
+        assert ones_count >= 1, (
+            f"Expected at least 1 phrase start (A2=1), got {ones_count}"
+        )
 
     @pytest.mark.unit
     @pytest.mark.japanese
@@ -198,7 +202,9 @@ class TestProsodyExtraction:
         # Pause token should have None prosody
         if "_" in tokens:
             pause_idx = tokens.index("_")
-            assert prosody_info[pause_idx] is None, "Pause token should have None prosody"
+            assert prosody_info[pause_idx] is None, (
+                "Pause token should have None prosody"
+            )
 
         # Lengths should match
         assert len(tokens) == len(prosody_info)
@@ -257,17 +263,16 @@ class TestProsodyExtraction:
         # Verify structure
         assert len(prosody_features) == len(tokens)
 
-        for i, (token, feat) in enumerate(zip(tokens, prosody_features)):
+        for _i, (token, feat) in enumerate(zip(tokens, prosody_features, strict=False)):
             if token in {"^", "$", "?", "_", "#", "[", "]"}:
                 assert feat is None, f"Special token {token} should have None"
-            else:
-                if feat is not None:
-                    assert "a1" in feat
-                    assert "a2" in feat
-                    assert "a3" in feat
-                    assert isinstance(feat["a1"], int)
-                    assert isinstance(feat["a2"], int)
-                    assert isinstance(feat["a3"], int)
+            elif feat is not None:
+                assert "a1" in feat
+                assert "a2" in feat
+                assert "a3" in feat
+                assert isinstance(feat["a1"], int)
+                assert isinstance(feat["a2"], int)
+                assert isinstance(feat["a3"], int)
 
     @pytest.mark.unit
     @pytest.mark.japanese
@@ -322,23 +327,20 @@ class TestDatasetProsodyIntegration:
 
     @pytest.mark.unit
     def test_prosody_features_to_tensor(self):
-        """Test conversion of prosody features numpy array to tensor."""
+        """Test conversion of prosody features list of dicts to tensor."""
         try:
             from piper_train.vits.dataset import PiperDataset
         except ImportError:
             pytest.skip("Dataset module not available")
 
-        import numpy as np
-
-        # Test data with mixed None and dict values (pre-converted to numpy)
-        # None entries are encoded as [0, 0, 0]
-        prosody_features = np.array([
-            [0, 0, 0],   # ^ (start) - was None
-            [-2, 1, 3],
-            [-1, 2, 3],
-            [0, 3, 3],
-            [0, 0, 0],   # $ (end) - was None
-        ], dtype=np.int16)
+        # Test data with mixed None and dict values (as stored in JSONL)
+        prosody_features = [
+            None,  # ^ (start) - no prosody info
+            {"a1": -2, "a2": 1, "a3": 3},
+            {"a1": -1, "a2": 2, "a3": 3},
+            {"a1": 0, "a2": 3, "a3": 3},
+            None,  # $ (end) - no prosody info
+        ]
 
         tensor = PiperDataset._prosody_features_to_tensor(prosody_features)
 
@@ -370,17 +372,17 @@ class TestDatasetProsodyIntegration:
             phoneme_ids=np.array([1, 2, 3], dtype=np.int16),
             audio_norm_path=Path("/tmp/test.pt"),
             audio_spec_path=Path("/tmp/spec.pt"),
-            prosody_features=np.array([
-                [0, 1, 2],
-                [1, 2, 2],
-                [0, 0, 0],  # was None, encoded as zeros
-            ], dtype=np.int16),
+            prosody_features=[
+                {"a1": 0, "a2": 1, "a3": 2},
+                {"a1": 1, "a2": 2, "a3": 2},
+                None,  # special token, no prosody info
+            ],
         )
 
         assert utt.prosody_features is not None
         assert len(utt.prosody_features) == 3
-        assert utt.prosody_features[0].tolist() == [0, 1, 2]
-        assert utt.prosody_features[2].tolist() == [0, 0, 0]
+        assert utt.prosody_features[0] == {"a1": 0, "a2": 1, "a3": 2}
+        assert utt.prosody_features[2] is None
 
     @pytest.mark.unit
     def test_batch_prosody_features_field(self):
@@ -489,3 +491,70 @@ class TestProsodyDatasetValidation:
         assert len(phoneme_ids) == len(prosody_features), (
             f"phoneme_ids ({len(phoneme_ids)}) != prosody_features ({len(prosody_features)})"
         )
+
+    @pytest.mark.unit
+    def test_validate_dataset_prosody_lengths(self):
+        """Test validation function for dataset prosody/phoneme_ids length matching."""
+        import json
+
+        # Create a test dataset with valid data
+        valid_data = [
+            {
+                "phoneme_ids": [1, 2, 3, 4, 5],
+                "prosody_features": [
+                    {"a1": 0, "a2": 0, "a3": 0},
+                    {"a1": -1, "a2": 1, "a3": 3},
+                    {"a1": 0, "a2": 2, "a3": 3},
+                    {"a1": 1, "a2": 3, "a3": 3},
+                    {"a1": 0, "a2": 0, "a3": 0},
+                ],
+                "text": "test",
+                "audio_spec_path": "/tmp/test.pt",
+            }
+        ]
+
+        # Create a test dataset with INVALID data (length mismatch)
+        invalid_data = [
+            {
+                "phoneme_ids": [1, 2, 3, 4, 5],  # 5 items
+                "prosody_features": [
+                    {"a1": 0, "a2": 0, "a3": 0},
+                    {"a1": -1, "a2": 1, "a3": 3},
+                    {"a1": 0, "a2": 2, "a3": 3},
+                ],  # Only 3 items - MISMATCH!
+                "text": "test",
+                "audio_spec_path": "/tmp/test.pt",
+            }
+        ]
+
+        def validate_dataset_prosody(dataset_lines):
+            """Validate that all prosody_features match phoneme_ids lengths."""
+            errors = []
+            for i, line in enumerate(dataset_lines):
+                data = json.loads(line) if isinstance(line, str) else line
+                pids = data.get("phoneme_ids", [])
+                pf = data.get("prosody_features", [])
+                if pf and len(pids) != len(pf):
+                    errors.append(
+                        {
+                            "line": i,
+                            "phoneme_ids_len": len(pids),
+                            "prosody_features_len": len(pf),
+                            "text": data.get("text", "")[:50],
+                        }
+                    )
+            return errors
+
+        # Valid data should have no errors
+        valid_errors = validate_dataset_prosody([json.dumps(d) for d in valid_data])
+        assert len(valid_errors) == 0, (
+            f"Valid data should have no errors: {valid_errors}"
+        )
+
+        # Invalid data should be detected
+        invalid_errors = validate_dataset_prosody([json.dumps(d) for d in invalid_data])
+        assert len(invalid_errors) == 1, (
+            f"Invalid data should have 1 error: {invalid_errors}"
+        )
+        assert invalid_errors[0]["phoneme_ids_len"] == 5
+        assert invalid_errors[0]["prosody_features_len"] == 3

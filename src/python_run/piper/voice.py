@@ -181,7 +181,7 @@ def _warmup_session(
         phoneme_ids[0, 0] = 1  # BOS
         phoneme_ids[0, -1] = 2  # EOS
         input_lengths = np.array([phoneme_length], dtype=np.int64)
-        scales = np.array([0.667, 1.0, 0.8], dtype=np.float32)
+        scales = np.array([0.4, 1.0, 0.5], dtype=np.float32)
 
         input_names = {inp.name for inp in session.get_inputs()}
         inputs = {
@@ -198,14 +198,20 @@ def _warmup_session(
                 (1, phoneme_length, 3), dtype=np.int64
             )
         if "speaker_embedding" in input_names:
-            emb_dim = 256
+            # PR #222 / DR-008 canonical: CAM++ 192-dim (fallback for tests
+            # / dynamic graphs). Real ONNX models declare emb_dim explicitly
+            # via session.get_inputs()[].shape[1] and will overwrite this
+            # below. ECAPA-TDNN 256-dim legacy exports still work because
+            # they declare shape[1]=256 in the graph.
+            emb_dim = 192
             for inp in session.get_inputs():
                 if inp.name == "speaker_embedding":
                     if len(inp.shape) >= 2 and isinstance(inp.shape[1], int):
                         emb_dim = inp.shape[1]
                     break
             inputs["speaker_embedding"] = np.zeros((1, emb_dim), dtype=np.float32)
-            inputs["speaker_embedding_mask"] = np.array([[0]], dtype=np.int64)
+            if "speaker_embedding_mask" in input_names:
+                inputs["speaker_embedding_mask"] = np.array([[0]], dtype=np.int64)
 
         output_names = [o.name for o in session.get_outputs()]
         for _ in range(runs):
@@ -713,6 +719,7 @@ class PiperVoice:
         sentence_silence: float = 0.0,
         volume: float = 1.0,
         language_id: int | None = None,
+        speaker_embedding: np.ndarray | None = None,
     ):
         """Synthesize WAV audio from text.
 
@@ -746,6 +753,7 @@ class PiperVoice:
             sentence_silence=sentence_silence,
             volume=volume,
             language_id=language_id,
+            speaker_embedding=speaker_embedding,
         ):
             wav_file.writeframes(audio_bytes)
 
@@ -759,6 +767,7 @@ class PiperVoice:
         sentence_silence: float = 0.0,
         volume: float = 1.0,
         language_id: int | None = None,
+        speaker_embedding: np.ndarray | None = None,
     ) -> Iterable[bytes]:
         """Synthesize raw audio per sentence from text.
 
@@ -818,6 +827,7 @@ class PiperVoice:
                 noise_w=noise_w,
                 volume=volume,
                 language_id=language_id,
+                speaker_embedding=speaker_embedding,
             )
             return
 
@@ -875,6 +885,7 @@ class PiperVoice:
                 noise_w=noise_w,
                 volume=volume,
                 language_id=language_id,
+                speaker_embedding=speaker_embedding,
             )
         finally:
             pool.shutdown(wait=False, cancel_futures=True)
@@ -891,6 +902,7 @@ class PiperVoice:
         noise_w: float | None,
         volume: float,
         language_id: int | None,
+        speaker_embedding: np.ndarray | None,
     ) -> Iterable[bytes]:
         """Run ORT inference per sentence and yield the wrapped audio chunk."""
         for phonemes in phonemes_iter:
@@ -903,6 +915,7 @@ class PiperVoice:
                 noise_w=noise_w,
                 volume=volume,
                 language_id=language_id,
+                speaker_embedding=speaker_embedding,
             )
             yield break_bytes + audio_bytes + break_bytes + silence_bytes
 
@@ -915,6 +928,7 @@ class PiperVoice:
         noise_w: float | None = None,
         volume: float = 1.0,
         language_id: int | None = None,
+        speaker_embedding: np.ndarray | None = None,
     ) -> tuple[bytes, "np.ndarray | None", list[int]]:
         """Core synthesis returning ``(audio_bytes, durations, original_phoneme_ids)``.
 
@@ -932,6 +946,8 @@ class PiperVoice:
             Saved as ``original_phoneme_ids`` before any padding is applied.
         speaker_id, length_scale, noise_scale, noise_w, volume, language_id
             See :meth:`synthesize_with_timing` for parameter descriptions.
+        speaker_embedding : np.ndarray or None, optional
+            Speaker embedding for zero-shot models. Shape ``(1, 192)`` float32.
 
         Returns
         -------
@@ -997,15 +1013,16 @@ class PiperVoice:
             # Default speaker
             speaker_id = 0
 
-        # Include sid only for multi-speaker models
-        if self.config.num_speakers > 1:
+        input_names = {inp.name for inp in self.session.get_inputs()}
+
+        # Include sid only for multi-speaker models that expose a sid input node
+        if self.config.num_speakers > 1 and "sid" in input_names:
             if speaker_id is None:
                 speaker_id = 0
             sid = np.expand_dims(np.array([speaker_id], dtype=np.int64), 0)
             args["sid"] = sid
 
         # Include lid for multilingual models
-        input_names = {inp.name for inp in self.session.get_inputs()}
         if "lid" in input_names:
             lid_value = language_id if language_id is not None else 0
             lid = np.array([lid_value], dtype=np.int64)
@@ -1017,21 +1034,40 @@ class PiperVoice:
             prosody = np.zeros((1, num_phonemes, 3), dtype=np.int64)
             args["prosody_features"] = prosody
 
-        # speaker_embedding / speaker_embedding_mask are always declared by
-        # export_onnx.py as a forward-compat hook, but the bundled checkpoints
-        # are not trained for zero-shot speaker transfer (spk_proj is lazy-
-        # initialised and never sees gradients). Feed zeros with mask=0 so the
-        # torch.where branch in models.py:VitsModel.infer falls back to the
-        # trained speaker_id / lid conditioning.
+        # speaker_embedding / speaker_embedding_mask are declared by
+        # export_onnx.py as a forward-compat hook for zero-shot speaker
+        # transfer. When a caller provides a ``speaker_embedding`` arg, feed
+        # it with mask=1 so the ``torch.where`` branch in
+        # models.py:VitsModel.infer routes through the zero-shot path.
+        # Otherwise feed zeros with mask=0 so it falls back to the trained
+        # speaker_id / lid conditioning (bundled checkpoints are not trained
+        # for zero-shot transfer — spk_proj is lazy-initialised and never
+        # sees gradients).
         if "speaker_embedding" in input_names:
-            emb_dim = 256
+            # PR #222 / DR-008 canonical: CAM++ 192-dim default for
+            # tests / dynamic graphs. Real ONNX models overwrite via
+            # session metadata; ECAPA-TDNN 256-dim legacy declares
+            # shape[1]=256 in graph.
+            emb_dim = 192
             for inp in self.session.get_inputs():
                 if inp.name == "speaker_embedding":
                     if len(inp.shape) >= 2 and isinstance(inp.shape[1], int):
                         emb_dim = inp.shape[1]
                     break
-            args["speaker_embedding"] = np.zeros((1, emb_dim), dtype=np.float32)
-            args["speaker_embedding_mask"] = np.array([[0]], dtype=np.int64)
+            if speaker_embedding is not None:
+                emb = np.array(speaker_embedding, dtype=np.float32).reshape(1, -1)
+                args["speaker_embedding"] = emb
+                if "speaker_embedding_mask" in input_names:
+                    args["speaker_embedding_mask"] = np.array([[1]], dtype=np.int64)
+            else:
+                _LOGGER.warning(
+                    "speaker_embedding input declared but none provided; "
+                    "feeding zero vector with mask=0 (model will fall back "
+                    "to speaker_id / lid conditioning)."
+                )
+                args["speaker_embedding"] = np.zeros((1, emb_dim), dtype=np.float32)
+                if "speaker_embedding_mask" in input_names:
+                    args["speaker_embedding_mask"] = np.array([[0]], dtype=np.int64)
 
         # Synthesize through Onnx
         output_names = [o.name for o in self.session.get_outputs()]
@@ -1092,6 +1128,7 @@ class PiperVoice:
         noise_w: float | None = None,
         volume: float = 1.0,
         language_id: int | None = None,
+        speaker_embedding: np.ndarray | None = None,
     ) -> bytes:
         """Synthesize raw audio from phoneme ids."""
         audio_bytes, _, _ = self._synthesize_ids_core(
@@ -1102,6 +1139,7 @@ class PiperVoice:
             noise_w=noise_w,
             volume=volume,
             language_id=language_id,
+            speaker_embedding=speaker_embedding,
         )
         return audio_bytes
 
@@ -1135,6 +1173,7 @@ class PiperVoice:
         sentence_silence: float = 0.0,
         volume: float = 1.0,
         language_id: int | None = None,
+        speaker_embedding: np.ndarray | None = None,
     ) -> tuple[bytes, TimingResult | None]:
         """Synthesize audio with phoneme timing information.
 
@@ -1221,6 +1260,7 @@ class PiperVoice:
                     noise_w=noise_w,
                     volume=volume,
                     language_id=language_id,
+                    speaker_embedding=speaker_embedding,
                 )
 
                 wf.writeframes(audio_bytes)

@@ -148,9 +148,9 @@ public class PiperModelTests
     {
         var input = new SynthesisInput(PhonemeIds: [10, 20, 30]);
 
-        Assert.Equal(0.667f, input.NoiseScale);
+        Assert.Equal(0.4f, input.NoiseScale);
         Assert.Equal(1.0f, input.LengthScale);
-        Assert.Equal(0.8f, input.NoiseW);
+        Assert.Equal(0.5f, input.NoiseW);
         Assert.Equal(0, input.SpeakerId);
         Assert.Null(input.ProsodyFeatures);
     }

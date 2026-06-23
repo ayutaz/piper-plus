@@ -19,6 +19,10 @@ train = [
     # uv.lock canonical values 参照、 floor は root と同値で pin。
     "scipy>=1.17.1",
     "librosa>=0.11.0",
+    # PR #222 (Zero-Shot TTS): extract_speaker_embedding.py / norm_audio /
+    # tools/cache_audio.py が `import soxr` を行う。 librosa>=0.11 経由で
+    # 推移的に提供されるが、 supply-chain hygiene として explicit floor を宣言。
+    "soxr>=0.5.0",
     "soundfile>=0.12",
     "pytorch-lightning>=2.4.0",
     "torchmetrics>=1.9.0",
@@ -200,6 +204,12 @@ omit = [
     "*/piper_train/tools/convert_fp16.py",
     "*/piper_train/tools/convert_nst_dictionary.py",
     "*/piper_train/tools/add_prosody_features.py",
+    # PR #222 (Zero-Shot TTS) preprocess + extract scripts — actual model file
+    # + GPU/CPU + librosa/soxr resampling 必須で unit-test 不可能 (整合性は
+    # E2E test で別途担保)。
+    "*/piper_train/extract_speaker_embedding.py",
+    "*/piper_train/tools/batch_spectrograms.py",
+    "*/piper_train/tools/cache_audio.py",
     # ----- (d) Network / model file 必須 -----
     "*/piper_train/speaker_encoder/__init__.py",
     "*/piper_train/speaker_encoder/encoder.py",

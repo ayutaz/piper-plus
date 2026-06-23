@@ -50,6 +50,13 @@ internal sealed class JsonlUtterance
     /// </summary>
     [JsonPropertyName("speaker")]
     public string? Speaker { get; set; }
+
+    /// <summary>
+    /// 192-dimensional speaker embedding for zero-shot TTS.
+    /// When present, takes priority over <see cref="SpeakerId"/>.
+    /// </summary>
+    [JsonPropertyName("speaker_embedding")]
+    public float[]? SpeakerEmbedding { get; set; }
 }
 
 /// <summary>
@@ -110,11 +117,17 @@ internal static class Program
             DefaultValueFactory = _ => 0,
         };
 
+        // --speaker-embedding
+        var speakerEmbeddingOption = new Option<string?>("--speaker-embedding")
+        {
+            Description = "Path to speaker embedding file (192 float32 values, raw binary or .npy) for zero-shot TTS",
+        };
+
         // --noise_scale / --noise-scale
         var noiseScaleOption = new Option<float>("--noise_scale", "--noise-scale")
         {
-            Description = "Generator noise scale (default: 0.667)",
-            DefaultValueFactory = _ => 0.667f,
+            Description = "Generator noise scale (default: 0.4)",
+            DefaultValueFactory = _ => 0.4f,
         };
 
         // --length_scale / --length-scale
@@ -127,8 +140,8 @@ internal static class Program
         // --noise_w / --noise-w
         var noiseWOption = new Option<float>("--noise_w", "--noise-w")
         {
-            Description = "Duration predictor noise (default: 0.8)",
-            DefaultValueFactory = _ => 0.8f,
+            Description = "Duration predictor noise (default: 0.5)",
+            DefaultValueFactory = _ => 0.5f,
         };
 
         // --sentence_silence / --sentence-silence
@@ -242,9 +255,6 @@ internal static class Program
         var referenceAudioOption = new Option<string?>("--reference-audio")
         { Description = "Reference audio file for voice cloning (WAV format)" };
 
-        var speakerEmbeddingOption = new Option<string?>("--speaker-embedding")
-        { Description = "Pre-computed speaker embedding file (raw binary float32)" };
-
         var speakerEncoderModelOption = new Option<string?>("--speaker-encoder-model")
         { Description = "Speaker encoder ONNX model path (required for --reference-audio)" };
 
@@ -256,6 +266,7 @@ internal static class Program
             outputDirOption,
             outputRawOption,
             speakerOption,
+            speakerEmbeddingOption,
             noiseScaleOption,
             lengthScaleOption,
             noiseWOption,
@@ -286,7 +297,6 @@ internal static class Program
 
             // Voice cloning options
             referenceAudioOption,
-            speakerEmbeddingOption,
             speakerEncoderModelOption,
         };
 
@@ -600,7 +610,8 @@ internal static class Program
 
                     if (!string.IsNullOrEmpty(speakerEmbeddingPath))
                     {
-                        // Direct embedding file (raw little-endian float32 binary).
+                        // Direct embedding file: raw little-endian float32 binary, or NumPy .npy.
+                        // LoadSpeakerEmbedding handles both formats and pads to the expected dim.
                         try
                         {
                             byte[] rawBytes = File.ReadAllBytes(speakerEmbeddingPath);
@@ -613,9 +624,13 @@ internal static class Program
                                 return Environment.ExitCode;
                             }
 
-                            speakerEmbedding = new float[rawBytes.Length / sizeof(float)];
-                            Buffer.BlockCopy(rawBytes, 0, speakerEmbedding, 0, rawBytes.Length);
-                            LogDebug(debug, quiet,
+                            speakerEmbedding = LoadSpeakerEmbedding(speakerEmbeddingPath);
+                            LogInfo(
+                                quiet,
+                                $"Loaded speaker embedding from {speakerEmbeddingPath} ({speakerEmbedding.Length} values)");
+                            LogDebug(
+                                debug,
+                                quiet,
                                 $"Loaded speaker embedding: {speakerEmbedding.Length} dims from {speakerEmbeddingPath}");
                         }
                         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -1347,6 +1362,9 @@ internal static class Program
                             // Resolve language_id from JSONL (overrides CLI default)
                             int uttLanguageId = utterance?.LanguageId ?? languageId;
 
+                            // Resolve speaker_embedding: JSONL > CLI default
+                            float[]? uttSpeakerEmbedding = utterance?.SpeakerEmbedding ?? speakerEmbedding;
+
                             // ---------------------------------------------------
                             // JSONL "text" field: phonemize inline
                             // ---------------------------------------------------
@@ -1440,7 +1458,7 @@ internal static class Program
                                     piperSession, phonemeIdsLong, prosodyFlat,
                                     uttSpeaker, uttLanguageId, noiseScale, lengthScale, noiseW,
                                     phonemeSilenceMap, config.PhonemeIdMap, sampleRate,
-                                    speakerEmbedding);
+                                    uttSpeakerEmbedding);
                             }
                             catch (Exception ex)
                             {
@@ -1912,6 +1930,66 @@ internal static class Program
         {
             Console.Error.WriteLine($"[DBG] {message}");
         }
+    }
+
+    // ----------------------------------------------------------------
+    // Speaker embedding I/O
+    // ----------------------------------------------------------------
+
+    /// <summary>
+    /// Load a speaker embedding from a raw binary file (192 float32 = 768 bytes)
+    /// or a NumPy .npy file (header + 192 float32).
+    /// </summary>
+    private static float[] LoadSpeakerEmbedding(string path)
+    {
+        const int expectedDim = 192;
+        byte[] bytes = File.ReadAllBytes(path);
+
+        float[] embedding;
+
+        // Detect NumPy .npy magic: \x93NUMPY
+        if (bytes.Length >= 10
+            && bytes[0] == 0x93 && bytes[1] == (byte)'N'
+            && bytes[2] == (byte)'U' && bytes[3] == (byte)'M'
+            && bytes[4] == (byte)'P' && bytes[5] == (byte)'Y')
+        {
+            // bytes[6] = major version; bytes[7] = minor version
+            // v1.0 (major=1): uint16 header_len at offset 8, data at offset 10 + headerLen
+            // v2.0 (major=2): uint32 header_len at offset 8, data at offset 12 + headerLen
+            int majorVersion = bytes[6];
+            int headerLen;
+            int dataOffset;
+            if (majorVersion >= 2)
+            {
+                headerLen = (int)BitConverter.ToUInt32(bytes, 8);
+                dataOffset = 12 + headerLen; // magic(6) + ver(2) + headerLen_uint32(4) + header
+            }
+            else
+            {
+                headerLen = BitConverter.ToUInt16(bytes, 8);
+                dataOffset = 10 + headerLen; // magic(6) + ver(2) + headerLen_uint16(2) + header
+            }
+
+            int numFloats = (bytes.Length - dataOffset) / sizeof(float);
+            embedding = new float[numFloats];
+            Buffer.BlockCopy(bytes, dataOffset, embedding, 0, numFloats * sizeof(float));
+        }
+        else
+        {
+            // Raw binary: expect 192 * 4 = 768 bytes
+            int numFloats = bytes.Length / sizeof(float);
+            embedding = new float[numFloats];
+            Buffer.BlockCopy(bytes, 0, embedding, 0, numFloats * sizeof(float));
+        }
+
+        if (embedding.Length != expectedDim)
+        {
+            var padded = new float[expectedDim];
+            Array.Copy(embedding, padded, Math.Min(embedding.Length, expectedDim));
+            return padded;
+        }
+
+        return embedding;
     }
 }
 

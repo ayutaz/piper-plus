@@ -111,29 +111,47 @@ class EMACallback(Callback):
         self.save_ema_weights_in_callback_state = save_ema_weights_in_callback_state
 
         self.ema_generator = None
+        self.ema_spk_proj = None
         self.ema_discriminator = None
+        self._needs_device_sync = False
 
     def on_fit_start(self, trainer, model):
         """Initialize EMA for generator and discriminator."""
         # Only apply EMA to generator (MB-iSTFT-VITS2 decoder)
-        self.ema_generator = ExponentialMovingAverage(
-            model.model_g.dec,  # MB-iSTFT decoder
-            decay=self.decay,
-        )
+        # Only initialize if not already loaded from checkpoint
+        if self.ema_generator is None:
+            self.ema_generator = ExponentialMovingAverage(
+                model.model_g.dec,  # MB-iSTFT decoder
+                decay=self.decay,
+            )
 
-        # Optionally also apply to discriminator
-        # self.ema_discriminator = ExponentialMovingAverage(
-        #     model.model_d,
-        #     decay=self.decay
-        # )
+        # Also track spk_proj for zero-shot stability
+        if self.ema_spk_proj is None and hasattr(model.model_g, "spk_proj"):
+            self.ema_spk_proj = ExponentialMovingAverage(
+                model.model_g.spk_proj,
+                decay=self.decay,
+            )
 
     def on_train_batch_end(self, trainer, model, outputs, batch, batch_idx):
         """Update EMA after each training step."""
+        # Bug 1 fix: sync shadow params to correct device after checkpoint resume
+        if self._needs_device_sync:
+            device = next(model.parameters()).device
+            if self.ema_generator is not None:
+                self.ema_generator.to(device)
+            if self.ema_spk_proj is not None:
+                self.ema_spk_proj.to(device)
+            if self.ema_discriminator is not None:
+                self.ema_discriminator.to(device)
+            self._needs_device_sync = False
+
         step = trainer.global_step
 
         if step >= self.start_step and step % self.apply_ema_every_n_steps == 0:
             if self.ema_generator is not None:
                 self.ema_generator.update()
+            if self.ema_spk_proj is not None:
+                self.ema_spk_proj.update()
             if self.ema_discriminator is not None:
                 self.ema_discriminator.update()
 
@@ -141,6 +159,8 @@ class EMACallback(Callback):
         """Apply EMA weights for validation."""
         if self.ema_generator is not None:
             self.ema_generator.apply_shadow()
+        if self.ema_spk_proj is not None:
+            self.ema_spk_proj.apply_shadow()
         if self.ema_discriminator is not None:
             self.ema_discriminator.apply_shadow()
 
@@ -148,6 +168,8 @@ class EMACallback(Callback):
         """Restore original weights after validation."""
         if self.ema_generator is not None:
             self.ema_generator.restore()
+        if self.ema_spk_proj is not None:
+            self.ema_spk_proj.restore()
         if self.ema_discriminator is not None:
             self.ema_discriminator.restore()
 
@@ -156,6 +178,9 @@ class EMACallback(Callback):
         if self.save_ema_weights_in_callback_state:
             checkpoint["ema_generator_state"] = (
                 self.ema_generator.state_dict() if self.ema_generator else None
+            )
+            checkpoint["ema_spk_proj_state"] = (
+                self.ema_spk_proj.state_dict() if self.ema_spk_proj else None
             )
             checkpoint["ema_discriminator_state"] = (
                 self.ema_discriminator.state_dict() if self.ema_discriminator else None
@@ -170,6 +195,14 @@ class EMACallback(Callback):
                 )
             self.ema_generator.load_state_dict(checkpoint["ema_generator_state"])
 
+        if checkpoint.get("ema_spk_proj_state"):
+            if self.ema_spk_proj is None and hasattr(model.model_g, "spk_proj"):
+                self.ema_spk_proj = ExponentialMovingAverage(
+                    model.model_g.spk_proj, decay=self.decay
+                )
+            if self.ema_spk_proj is not None:
+                self.ema_spk_proj.load_state_dict(checkpoint["ema_spk_proj_state"])
+
         if checkpoint.get("ema_discriminator_state"):
             if self.ema_discriminator is None:
                 self.ema_discriminator = ExponentialMovingAverage(
@@ -178,3 +211,6 @@ class EMACallback(Callback):
             self.ema_discriminator.load_state_dict(
                 checkpoint["ema_discriminator_state"]
             )
+
+        # Mark that shadow params may be on CPU and need to be moved to GPU
+        self._needs_device_sync = True

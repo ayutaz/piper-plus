@@ -58,9 +58,9 @@ import { CompositePhonemizer } from "./phonemizer/composite-phonemizer.js";
 // Constants
 // ---------------------------------------------------------------------------
 
-const DEFAULT_NOISE_SCALE = 0.667;
+const DEFAULT_NOISE_SCALE = 0.4;
 const DEFAULT_LENGTH_SCALE = 1.0;
-const DEFAULT_NOISE_W = 0.8;
+const DEFAULT_NOISE_W = 0.5;
 const DEFAULT_SAMPLE_RATE = 22050;
 
 // ORT session contract constants (keep in sync with other runtimes —
@@ -683,16 +683,37 @@ export class PiperPlus {
     if (!speakerEmbedding || !(speakerEmbedding instanceof Float32Array)) {
       throw new Error("speakerEmbedding must be a Float32Array");
     }
+    if (speakerEmbedding.length === 0) {
+      throw new Error("speakerEmbedding must be non-empty");
+    }
+    // PR #222 split-by-export-mode: 192 (CAM++ canonical) and 256
+    // (ECAPA-TDNN legacy) are both valid. ORT validates the actual shape
+    // against the model's declared input at inference time, so we don't
+    // hard-code a value here. See docs/spec/inference-input-contract.toml.
 
     const language = options.language || this._detectLanguage(text);
-    const noiseScale =
+    // `let` (not `const`) because Strategy B (Dynamic Scales Adjustment) below
+    // reassigns noiseScale / noiseW for short inputs.
+    let noiseScale =
       options.noiseScale ?? this._config.inference?.noise_scale ?? DEFAULT_NOISE_SCALE;
     const lengthScale =
       options.lengthScale ?? this._config.inference?.length_scale ?? DEFAULT_LENGTH_SCALE;
-    const noiseW = options.noiseW ?? this._config.inference?.noise_w ?? DEFAULT_NOISE_W;
+    let noiseW = options.noiseW ?? this._config.inference?.noise_w ?? DEFAULT_NOISE_W;
 
     // 1. Phonemize
-    const { phonemeIds, prosodyFeatures } = await this._textToPhonemeIds(text, language);
+    let { phonemeIds, prosodyFeatures } = await this._textToPhonemeIds(text, language);
+
+    // --- Strategy B: Dynamic Scales Adjustment for short inputs ---
+    const originalLength = phonemeIds.length;
+    const adjusted = adjustScalesForShortInput(originalLength, noiseScale, noiseW);
+    noiseScale = adjusted.noiseScale;
+    noiseW = adjusted.noiseW;
+
+    // --- Strategy A: Silence Padding for short inputs ---
+    const padResult = padPhonemeIds(phonemeIds, prosodyFeatures);
+    phonemeIds = padResult.phonemeIds;
+    prosodyFeatures = padResult.prosodyFeatures;
+    const wasPadded = padResult.wasPadded;
 
     // 2. ONNX inference with speaker embedding
     const inferResult = await this._infer(phonemeIds, prosodyFeatures, {
@@ -702,8 +723,13 @@ export class PiperPlus {
       language,
       speakerEmbedding,
     });
-    const audioData = inferResult.audio;
+    let audioData = inferResult.audio;
     const durations = inferResult.durations;
+
+    // --- Strategy A (post-step): Trim silence introduced by padding ---
+    if (wasPadded) {
+      audioData = trimSilence(audioData);
+    }
 
     // 3. Wrap result — include phoneme timing when the model supports it
     const sampleRate = this._config.audio?.sample_rate ?? DEFAULT_SAMPLE_RATE;
@@ -789,6 +815,7 @@ export class PiperPlus {
           lengthScale,
           noiseW,
           language,
+          speakerEmbedding: options.speakerEmbedding,
         });
         return inferResult.audio;
       },
@@ -885,6 +912,12 @@ export class PiperPlus {
       });
       this._modelUrl = modelUrl;
       this._session = await this._sessionManager.createSession(modelUrl);
+
+      // Detect model capabilities from ONNX input names so downstream code
+      // can opt the speaker_embedding / prosody_features tensors in or out.
+      const inputNames = this._session.inputNames || [];
+      this._hasSpeakerEmbedding = inputNames.includes("speaker_embedding");
+      this._hasProsodyFeatures = inputNames.includes("prosody_features");
 
       progress({ stage: "model", progress: 0.7, message: "Model loaded." });
 
@@ -1086,17 +1119,46 @@ export class PiperPlus {
       }
     }
 
-    // Attach speaker embedding for voice cloning
-    if (speakerEmbedding && speakerEmbedding.length > 0) {
+    // Attach speaker embedding for voice cloning.
+    // Guard speaker_embedding_mask behind the session's actual input names:
+    // older ONNX exports omit the mask tensor and ORT rejects unknown feeds
+    // (mirrors Python ort_utils / infer_onnx Bug B fix).
+    const sessionInputNames = new Set(this._session.inputNames || []);
+    const hasSpeakerEmbeddingMask = sessionInputNames.has("speaker_embedding_mask");
+    if (this._hasSpeakerEmbedding) {
+      // Zero-shot / voice-cloning model: speaker_embedding is a required input.
+      if (speakerEmbedding && speakerEmbedding.length > 0) {
+        feeds.speaker_embedding = new ort.Tensor("float32", speakerEmbedding, [
+          1,
+          speakerEmbedding.length,
+        ]);
+        if (hasSpeakerEmbeddingMask) {
+          feeds.speaker_embedding_mask = new ort.Tensor("int64", new BigInt64Array([1n]), [1]);
+        }
+      } else {
+        console.warn(
+          "[piper-plus] Model expects 'speaker_embedding' but none provided; using zero vector."
+        );
+        feeds.speaker_embedding = new ort.Tensor("float32", new Float32Array(192), [1, 192]);
+        if (hasSpeakerEmbeddingMask) {
+          feeds.speaker_embedding_mask = new ort.Tensor("int64", new BigInt64Array([0n]), [1]);
+        }
+      }
+    } else if (speakerEmbedding && speakerEmbedding.length > 0) {
+      // Non-zero-shot model: pass embedding only when explicitly provided
+      // (mirrors Python/Rust/Go/C# runtimes that allow optional speaker
+      // embedding override on models that happen to accept it).
       feeds.speaker_embedding = new ort.Tensor("float32", speakerEmbedding, [
         1,
         speakerEmbedding.length,
       ]);
-      feeds.speaker_embedding_mask = new ort.Tensor("int64", new BigInt64Array([1n]), [1]);
+      if (hasSpeakerEmbeddingMask) {
+        feeds.speaker_embedding_mask = new ort.Tensor("int64", new BigInt64Array([1n]), [1]);
+      }
     }
 
     // Attach prosody features when the model supports them
-    if (prosodyFeatures && this._config.prosody_id_map) {
+    if (prosodyFeatures && this._config.prosody_id_map && this._hasProsodyFeatures) {
       const flat = [];
       for (const [a1, a2, a3] of prosodyFeatures) {
         flat.push(BigInt(a1), BigInt(a2), BigInt(a3));

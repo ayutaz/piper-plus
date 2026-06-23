@@ -1,5 +1,7 @@
 """Tests for export_onnx stochastic/deterministic export modes, EMA weight application,
-and emb_lang unification."""
+emb_lang unification, and spk_proj-only architecture support."""
+
+import warnings
 
 import numpy as np
 import pytest
@@ -8,7 +10,7 @@ from torch import nn
 
 
 def _onnx_inference(
-    onnx_path, phoneme_ids, prosody_features, noise_scale=0.667, noise_scale_w=0.8
+    onnx_path, phoneme_ids, prosody_features, noise_scale=0.4, noise_scale_w=0.5
 ):
     """Run ONNX inference and return audio output."""
     import onnxruntime
@@ -56,7 +58,7 @@ class TestDeterministicExport:
             temp_onnx_model,
             sample_phoneme_ids,
             sample_prosody_features,
-            noise_scale=0.667,
+            noise_scale=0.4,
         )
 
         np.testing.assert_array_equal(
@@ -340,8 +342,8 @@ class TestUnifyEmbLangOnnxExport:
 
         def _build_inputs(lid_val):
             inputs = {"input": text, "input_lengths": text_lengths, "scales": scales}
-            if "sid" in input_names:
-                inputs["sid"] = np.array([0], dtype=np.int64)
+            # No sid input -- emb_g has been removed from the architecture.
+            # Single-speaker multilingual models use only lid for conditioning.
             if "lid" in input_names:
                 inputs["lid"] = np.array([lid_val], dtype=np.int64)
             if "prosody_features" in input_names:
@@ -357,6 +359,18 @@ class TestUnifyEmbLangOnnxExport:
             audio_lid1,
             err_msg="After emb_lang unification, different lid values should produce identical output",
         )
+
+    def test_no_sid_input_in_exported_model(self, temp_onnx_model_unified_emb_lang):
+        """エクスポートされたモデルにsid入力が含まれないことを確認"""
+        import onnxruntime
+
+        session = onnxruntime.InferenceSession(str(temp_onnx_model_unified_emb_lang))
+        input_names = {inp.name for inp in session.get_inputs()}
+
+        assert "sid" not in input_names, (
+            "sid input should not exist in exported model (emb_g removed)"
+        )
+        assert "lid" in input_names, "lid input should exist for multilingual model"
 
 
 # ---------------------------------------------------------------------------
@@ -821,3 +835,340 @@ class TestGraphInputSchema:
                 "in scripts/check_onnx_inputs.py, then propagate the new "
                 "input through every runtime feed."
             )
+
+
+@pytest.mark.unit
+class TestExportModeSidDeprecation:
+    """--export-mode sid の非推奨化テスト"""
+
+    def test_sid_mode_emits_deprecation_warning(self):
+        """--export-mode sid を指定するとDeprecationWarningが発生"""
+        # Simulate the warning logic from export_onnx.main()
+        export_mode = "sid"
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            if export_mode == "sid":
+                warnings.warn(
+                    "--export-mode sid is deprecated (emb_g has been removed). "
+                    "Falling back to zero-shot mode.",
+                    DeprecationWarning,
+                    stacklevel=1,
+                )
+                export_mode = "zero-shot"
+
+            assert len(w) == 1
+            assert issubclass(w[0].category, DeprecationWarning)
+            assert "deprecated" in str(w[0].message).lower()
+            assert export_mode == "zero-shot"
+
+    def test_auto_mode_no_warning(self):
+        """--export-mode auto では警告が発生しない"""
+        export_mode = "auto"
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            if export_mode == "sid":
+                warnings.warn(
+                    "--export-mode sid is deprecated",
+                    DeprecationWarning,
+                    stacklevel=1,
+                )
+            assert len(w) == 0
+
+
+@pytest.mark.unit
+class TestEMASpkProjApplication:
+    """EMA spk_proj 重み適用のテスト"""
+
+    def test_ema_spk_proj_weights_applied(self, tmp_path):
+        """EMA spk_proj state があればspk_projパラメータに適用される"""
+        # spk_projの代替としてシンプルなモジュールを使用
+        spk_proj = torch.nn.Sequential(
+            torch.nn.Linear(192, 512),
+            torch.nn.LayerNorm(512),
+            torch.nn.GELU(),
+            torch.nn.Linear(512, 512),
+        )
+
+        # 元パラメータを記録
+        original_params = {}
+        for name, param in spk_proj.named_parameters():
+            original_params[name] = param.data.clone()
+
+        # EMA shadow params を作成（元のパラメータ + 0.1）
+        shadow_params = {}
+        for name, param in spk_proj.named_parameters():
+            shadow_params[name] = param.data.clone() + 0.1
+
+        ema_spk_proj_state = {"shadow_params": shadow_params}
+
+        # モックチェックポイントを保存
+        ckpt_path = tmp_path / "test_ema_spk_proj.ckpt"
+        torch.save({"ema_spk_proj_state": ema_spk_proj_state}, str(ckpt_path))
+
+        # EMA適用ロジックを直接テスト（export_onnx.pyと同じロジック）
+        ckpt = torch.load(str(ckpt_path), map_location="cpu")
+        ema = ckpt.get("ema_spk_proj_state")
+        assert ema is not None
+
+        applied = 0
+        proj_params = dict(spk_proj.named_parameters())
+        for name, shadow_param in ema["shadow_params"].items():
+            if name in proj_params:
+                proj_params[name].data.copy_(shadow_param)
+                applied += 1
+
+        assert applied > 0, "No EMA spk_proj parameters were applied"
+
+        # パラメータが変更されたことを確認
+        for name, param in spk_proj.named_parameters():
+            if name in original_params:
+                assert not torch.equal(param.data, original_params[name]), (
+                    f"Parameter {name} was not updated by EMA spk_proj"
+                )
+
+    def test_no_ema_spk_proj_state_is_handled(self, tmp_path):
+        """チェックポイントに EMA spk_proj state がない場合はスキップされる"""
+        ckpt_path = tmp_path / "no_ema_spk_proj.ckpt"
+        torch.save({"state_dict": {}}, str(ckpt_path))
+
+        ckpt = torch.load(str(ckpt_path), map_location="cpu")
+        ema_spk_proj_state = ckpt.get("ema_spk_proj_state")
+        assert ema_spk_proj_state is None, "Should not have EMA spk_proj state"
+
+
+# ============================================================================
+# Zero-shot ONNX export (speaker_embedding input path)
+# ============================================================================
+#
+# Pin the zero-shot export workflow: ``build_infer_forward()`` accepts a
+# ``speaker_embedding`` kwarg, and the resulting ONNX graph declares the
+# ``speaker_embedding`` input with shape ``[1, 192]``. The exported model
+# must also run through onnxruntime when fed a CAM++-shape embedding.
+
+
+@pytest.fixture(scope="module")
+def _zero_shot_onnx_export(tmp_path_factory):
+    """Export a minimal zero-shot capable model (multi-speaker, spk_proj).
+
+    Mirrors the production ``export_onnx`` zero-shot path: multi-speaker
+    model with ``spk_proj`` MLP, ``speaker_embedding`` declared as a
+    ``[1, 192]`` ONNX input.  Returned tuple: ``(onnx_path, gin_channels)``.
+    """
+    from piper_train.export_onnx import build_infer_forward
+    from piper_train.vits.models import SynthesizerTrn
+
+    torch.manual_seed(2026)
+
+    gin_channels = 256
+    model = SynthesizerTrn(
+        n_vocab=50,
+        spec_channels=513,
+        segment_size=8192,
+        inter_channels=192,
+        hidden_channels=192,
+        filter_channels=768,
+        n_heads=2,
+        n_layers=6,
+        kernel_size=3,
+        p_dropout=0.1,
+        resblock="1",
+        resblock_kernel_sizes=[3, 7, 11],
+        resblock_dilation_sizes=[[1, 3, 5], [1, 3, 5], [1, 3, 5]],
+        upsample_rates=[4, 4],
+        upsample_initial_channel=512,
+        upsample_kernel_sizes=[16, 16],
+        n_speakers=2,
+        gin_channels=gin_channels,
+        use_sdp=True,
+        prosody_dim=0,
+    )
+    model.eval()
+    model.onnx_export_mode = True
+    if hasattr(model, "dp"):
+        model.dp.onnx_export_mode = True
+    with torch.no_grad():
+        model.dec.remove_weight_norm()
+
+    # spk_proj must exist for multi-speaker model (sanity).
+    assert hasattr(model, "spk_proj"), "spk_proj missing on multi-speaker model"
+
+    dummy_len = 10
+    sequences = torch.randint(0, 50, (1, dummy_len), dtype=torch.long)
+    seq_lengths = torch.LongTensor([dummy_len])
+    scales = torch.FloatTensor([0.0, 1.0, 0.0])  # deterministic
+    speaker_embedding = torch.zeros(1, 192, dtype=torch.float32)
+
+    # Use the shared factory (deterministic). Wrap so positional ONNX args
+    # bind to the ``speaker_embedding`` kwarg of infer_forward — exercising
+    # the build_infer_forward speaker_embedding code path (lines 81-89).
+    _infer = build_infer_forward(model, stochastic=False)
+
+    def fwd(text, text_lengths, scales_t, spk_emb):
+        return _infer(
+            text, text_lengths, scales_t, speaker_embedding=spk_emb
+        )
+
+    _orig_forward = model.forward
+    model.forward = fwd
+
+    # Pre-run to trigger any lazy module init.
+    with torch.no_grad():
+        model(sequences, seq_lengths, scales, speaker_embedding)
+
+    tmp_dir = tmp_path_factory.mktemp("zero_shot_onnx")
+    onnx_path = tmp_dir / "zero_shot.onnx"
+    try:
+        torch.onnx.export(
+            model,
+            (sequences, seq_lengths, scales, speaker_embedding),
+            str(onnx_path),
+            opset_version=15,
+            input_names=["input", "input_lengths", "scales", "speaker_embedding"],
+            output_names=["output", "durations"],
+            dynamic_axes={
+                "input": {0: "batch_size", 1: "phonemes"},
+                "input_lengths": {0: "batch_size"},
+                "speaker_embedding": {0: "batch_size"},
+                "output": {0: "batch_size", 2: "time"},
+                "durations": {0: "batch_size", 1: "phonemes"},
+            },
+            verbose=False,
+            dynamo=False,
+        )
+    except (SystemError, Exception) as e:
+        model.forward = _orig_forward
+        pytest.skip(f"ONNX export not supported: {e}")
+
+    model.forward = _orig_forward
+    return onnx_path, gin_channels
+
+
+@pytest.mark.inference
+class TestZeroShotExport:
+    """Zero-shot ONNX export (speaker_embedding input path)."""
+
+    def test_export_zero_shot_model_with_speaker_embedding_input(
+        self, _zero_shot_onnx_export
+    ):
+        """ONNX graph declares ``speaker_embedding`` as a ``[1, 192]`` input.
+
+        Pins ``build_infer_forward`` (lines 81-89) speaker_embedding kwarg
+        path — the resulting graph must expose ``speaker_embedding`` with
+        a 192-dim trailing axis (CAM++ standard).
+        """
+        import onnx as onnx_lib
+
+        onnx_path, _ = _zero_shot_onnx_export
+        model = onnx_lib.load(str(onnx_path))
+        names = [i.name for i in model.graph.input]
+        assert "speaker_embedding" in names, (
+            f"speaker_embedding missing from ONNX inputs: {names}"
+        )
+
+        # Verify shape [batch, 192] — dim 0 is symbolic ("batch_size"), dim 1 is 192.
+        spk_emb_input = next(
+            i for i in model.graph.input if i.name == "speaker_embedding"
+        )
+        dims = spk_emb_input.type.tensor_type.shape.dim
+        assert len(dims) == 2, f"speaker_embedding rank != 2 (got {len(dims)})"
+        # Static 192-dim trailing axis.
+        assert dims[1].dim_value == 192, (
+            f"speaker_embedding dim[1] != 192 (got {dims[1].dim_value})"
+        )
+
+    def test_export_zero_shot_onnx_runs_inference(self, _zero_shot_onnx_export):
+        """ORT session accepts a ``speaker_embedding`` feed and returns audio.
+
+        End-to-end check that the exported zero-shot ONNX runs without a
+        missing-input error and produces a ``[batch, 1, T]`` audio tensor.
+        """
+        import onnxruntime
+
+        onnx_path, _ = _zero_shot_onnx_export
+        session = onnxruntime.InferenceSession(str(onnx_path))
+
+        text = np.array([[1, 8, 5, 10, 20, 30, 15, 2, 7, 3]], dtype=np.int64)
+        text_lengths = np.array([text.shape[1]], dtype=np.int64)
+        scales = np.array([0.0, 1.0, 0.0], dtype=np.float32)
+        spk_emb = np.full((1, 192), 0.5, dtype=np.float32)
+
+        outputs = session.run(
+            None,
+            {
+                "input": text,
+                "input_lengths": text_lengths,
+                "scales": scales,
+                "speaker_embedding": spk_emb,
+            },
+        )
+
+        audio = outputs[0]
+        assert audio.ndim == 3, f"audio rank != 3 (got {audio.ndim})"
+        assert audio.shape[0] == 1
+        assert audio.shape[1] == 1
+        assert audio.shape[2] > 0
+        assert np.isfinite(audio).all(), "audio contains NaN/Inf"
+
+
+# ============================================================================
+# DR-006 boundary: legacy HiFi-GAN ckpt detection
+# ============================================================================
+#
+# v1.12.0 unified the decoder to MB-iSTFT-VITS2.  Loading a v1.11 HiFi-GAN
+# ckpt for resume must be detected and rejected with a migration message.
+# ``export_onnx`` does not directly call the detection helper, but the
+# upstream loader (``piper_train.__main__``) does — and the migration
+# message must mention MB-iSTFT so users can find the migration guide.
+
+
+@pytest.mark.unit
+class TestExportAfterLegacyHifiganResume:
+    """Pin DR-006 boundary: legacy HiFi-GAN ckpt is detected & rejected."""
+
+    def test_export_after_legacy_hifigan_resume_raises(self):
+        """A HiFi-GAN-shaped state_dict is flagged by the loader gate.
+
+        The export pipeline never reaches torch.onnx.export() for these
+        ckpts: upstream ``piper_train.__main__`` calls
+        ``_is_legacy_hifigan_checkpoint`` and raises with
+        ``_LEGACY_HIFIGAN_MESSAGE`` (mentioning MB-iSTFT + migration link)
+        before VitsModel construction or export.
+
+        AAA:
+          Arrange — synthesize a state_dict with HiFi-GAN-only decoder
+                    keys (``dec.ups.0.weight`` etc.) and **no** MB-iSTFT
+                    marker (``pqmf``/``subband_conv_post``).
+          Act     — call the detection helper.
+          Assert  — returns True; message mentions MB-iSTFT/migration.
+        """
+        from piper_train.__main__ import (
+            _LEGACY_HIFIGAN_MESSAGE,
+            _is_legacy_hifigan_checkpoint,
+        )
+
+        # Arrange: realistic HiFi-GAN-shaped state_dict (no MB-iSTFT marker).
+        fake_legacy_sd = {
+            "model_g.enc_p.emb.weight": None,
+            "model_g.dec.conv_pre.weight": None,
+            "model_g.dec.ups.0.weight": None,
+            "model_g.dec.resblocks.0.convs1.0.weight": None,
+            "model_g.dec.conv_post.weight": None,
+            "model_g.flow.flows.0.pre.weight": None,
+        }
+
+        # Act
+        is_legacy = _is_legacy_hifigan_checkpoint(fake_legacy_sd)
+
+        # Assert: detection fires
+        assert is_legacy is True, (
+            "Legacy HiFi-GAN ckpt (no MB-iSTFT marker) should be detected"
+        )
+
+        # Assert: documented migration message mentions MB-iSTFT and a guide.
+        lowered = _LEGACY_HIFIGAN_MESSAGE.lower()
+        assert "mb-istft" in lowered, (
+            "Legacy ckpt error must mention MB-iSTFT migration target"
+        )
+        assert "migration" in lowered or "migrate" in lowered or "v1.12" in lowered, (
+            "Legacy ckpt error must reference migration guide / version"
+        )

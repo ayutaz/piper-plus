@@ -335,8 +335,52 @@ def collect_skips(
     return kept, skipped
 
 
+def validate_speaker_embedding(path: Path, contract: dict) -> int:
+    """Validate a .npy speaker embedding against zero-shot model contract.
+
+    Returns the embedding dimension. Raises ValueError when:
+    * the file does not exist
+    * numpy is not available (the script otherwise stays stdlib-only, but
+      embedding validation inherently needs numpy to parse .npy)
+    * the array is not 1-D float32
+    * the dimension does not match `expected_embedding_dim` for any
+      `has_speaker_embedding = true` model in the contract
+    """
+    if not path.exists():
+        raise ValueError(f"speaker embedding file not found: {path}")
+    try:
+        import numpy as np
+    except ImportError as exc:  # pragma: no cover - environment-dependent
+        raise ValueError(
+            "numpy is required to validate --speaker-embedding .npy files"
+        ) from exc
+    arr = np.load(path)
+    if arr.ndim != 1:
+        raise ValueError(f"speaker embedding must be 1-D, got shape {arr.shape}")
+    if arr.dtype != np.float32:
+        raise ValueError(f"speaker embedding must be float32, got dtype {arr.dtype}")
+    models = contract.get("models", {})
+    expected_dims: set[int] = set()
+    for spec in models.values():
+        if not isinstance(spec, dict):
+            continue
+        if spec.get("has_speaker_embedding") and "expected_embedding_dim" in spec:
+            expected_dims.add(int(spec["expected_embedding_dim"]))
+    if expected_dims and int(arr.shape[0]) not in expected_dims:
+        raise ValueError(
+            f"speaker embedding dim {arr.shape[0]} does not match any "
+            f"contract `expected_embedding_dim` in {sorted(expected_dims)}"
+        )
+    return int(arr.shape[0])
+
+
 def cmd_compare(args: argparse.Namespace) -> int:
     contract = load_contract(args.contract)
+    if getattr(args, "speaker_embedding", None) is not None:
+        # Fail-fast: a missing or malformed embedding would silently fall
+        # back to speaker_id=0 in some runtimes, breaking zero-shot parity
+        # without surfacing the cause.
+        validate_speaker_embedding(args.speaker_embedding, contract)
     if args.inputs_json:
         raw = json.loads(args.inputs_json.read_text())
         inputs = {k: Path(v) for k, v in raw.items()}
@@ -375,6 +419,19 @@ def build_parser() -> argparse.ArgumentParser:
     c.add_argument("--contract", type=Path, default=CONTRACT_TOML)
     c.add_argument("--output", type=Path, default=None)
     c.add_argument("--fail-on-mismatch", action="store_true")
+    c.add_argument(
+        "--speaker-embedding",
+        type=Path,
+        default=None,
+        help=(
+            "Optional path to a .npy file containing a 1-D float32 speaker "
+            "embedding (expected dim per audio-parity-contract.toml's "
+            "[models.<name>] entry, typically 192 for CAM++). When supplied, "
+            "downstream runtime drivers should forward this tensor to each "
+            "runtime CLI's --speaker-embedding input so zero-shot parity is "
+            "verified across runtimes."
+        ),
+    )
     c.set_defaults(func=cmd_compare)
     return p
 

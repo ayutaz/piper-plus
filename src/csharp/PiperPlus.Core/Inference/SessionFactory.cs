@@ -293,7 +293,7 @@ public static class SessionFactory
             using var inputLengths = OrtValue.CreateTensorValueFromMemory(
                 lengths, [1]);
 
-            float[] scales = [0.667f, 1.0f, 0.8f];
+            float[] scales = [0.4f, 1.0f, 0.5f];
             using var scalesTensor = OrtValue.CreateTensorValueFromMemory(
                 scales, [3]);
 
@@ -332,14 +332,10 @@ public static class SessionFactory
             }
 
             // speaker_embedding: float32 [1, embDim] = zeros (no cloning during warmup)
-            // speaker_embedding_mask: int64 [1, 1] = 0
-            // ONNX Runtime requires ALL declared inputs, so both tensors must be
-            // provided when the model supports speaker_embedding.
             OrtValue? speakerEmbTensor = null;
-            OrtValue? speakerEmbMaskTensor = null;
             if (metadata.ContainsKey("speaker_embedding"))
             {
-                int embDim = 256; // ECAPA-TDNN default
+                int embDim = 192; // CAM++ default
                 if (metadata.TryGetValue("speaker_embedding", out NodeMetadata? embMeta)
                     && embMeta.Dimensions.Length >= 2 && embMeta.Dimensions[1] > 0)
                 {
@@ -350,11 +346,6 @@ public static class SessionFactory
                 speakerEmbTensor = OrtValue.CreateTensorValueFromMemory(zeroEmb, [1, embDim]);
                 inputNames.Add("speaker_embedding");
                 inputValues.Add(speakerEmbTensor);
-
-                long[] mask = [0];
-                speakerEmbMaskTensor = OrtValue.CreateTensorValueFromMemory(mask, [1, 1]);
-                inputNames.Add("speaker_embedding_mask");
-                inputValues.Add(speakerEmbMaskTensor);
             }
 
             string[] outputNames = session.OutputMetadata.ContainsKey("durations")
@@ -376,7 +367,6 @@ public static class SessionFactory
                 lidTensor?.Dispose();
                 prosodyTensor?.Dispose();
                 speakerEmbTensor?.Dispose();
-                speakerEmbMaskTensor?.Dispose();
             }
 
             sw.Stop();

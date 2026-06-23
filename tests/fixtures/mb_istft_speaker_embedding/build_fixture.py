@@ -40,7 +40,10 @@ def build_speaker_embedding_fixture(output_path: Path) -> Path:
     torch.manual_seed(42)
 
     gin_channels = 64
-    spk_emb_dim = 64  # smaller than canonical 256 to keep fixture light
+    # spk_proj expects canonical 192-dim CAM++ embeddings (see
+    # SynthesizerTrn.__init__: nn.Linear(192, gin_channels)). The dimension
+    # is fixed by the architecture, so the fixture must match.
+    spk_emb_dim = 192
 
     # Minimal MB-iSTFT-VITS2: small inter/hidden/filter dims, 2 upsample
     # stages, 1 layer encoder transformer.
@@ -81,7 +84,12 @@ def build_speaker_embedding_fixture(output_path: Path) -> Path:
     scales = torch.FloatTensor([0.0, 1.0, 0.8])
     sid = torch.LongTensor([0])
     spk_emb = torch.zeros(1, spk_emb_dim, dtype=torch.float32)
-    spk_mask = torch.zeros(1, 1, dtype=torch.int64)  # mask=0 → emb_g(sid) fallback
+    # speaker_embedding_mask is accepted for ONNX-input-schema compat with
+    # runtimes that still feed it (Issue #426). After PR #222 emb_g was
+    # removed and all speaker conditioning flows through spk_proj, so the
+    # mask is effectively unused — a zero embedding fed through spk_proj
+    # still produces a valid (deterministic) g vector.
+    spk_mask = torch.zeros(1, 1, dtype=torch.int64)
 
     def infer_forward(
         text, text_lengths, scales_t, sid_t, speaker_embedding, speaker_embedding_mask
@@ -92,12 +100,18 @@ def build_speaker_embedding_fixture(output_path: Path) -> Path:
         length_scale = scales_t[1]
         noise_scale_w = scales_t[2]
 
-        # Same as VitsModel.infer: torch.where on the mask selects sid vs
-        # external embedding for the global conditioning vector.
-        g_base = model.emb_g(sid_t).unsqueeze(-1)  # (batch, gin, 1)
-        g_se = speaker_embedding.unsqueeze(-1)
-        use_se = (speaker_embedding_mask >= 1).unsqueeze(-1).float()
-        g = torch.where(use_se >= 1, g_se, g_base)
+        # emb_g was removed in PR #222; all speaker conditioning now goes
+        # through spk_proj (2-layer MLP, 192 -> gin_channels). sid_t and
+        # speaker_embedding_mask are still declared as ONNX inputs (the
+        # runtimes -- Rust / C++ / C# / Python -- continue to feed them
+        # for the Issue #426 schema), but they no longer affect the output.
+        # We touch them in a value-preserving no-op so the tracer keeps
+        # them as graph inputs instead of pruning them.
+        g = model.spk_proj(speaker_embedding).unsqueeze(-1)  # (batch, gin, 1)
+        _noop = (sid_t.float().sum() * 0.0) + (
+            speaker_embedding_mask.float().sum() * 0.0
+        )
+        g = g + _noop
 
         x, m_p, logs_p, x_mask = model.enc_p(text, text_lengths, g=g)
         x_dp = model._prepare_prosody_input(x, x_mask, None)

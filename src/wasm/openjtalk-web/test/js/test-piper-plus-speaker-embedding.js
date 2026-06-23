@@ -71,6 +71,16 @@ function createMockInstance(overrides = {}) {
   };
 
   instance._session = {
+    // PR #222 split-by-export-mode: WASM gates speaker_embedding_mask
+    // feed on `inputNames.has("speaker_embedding_mask")`. Mock declares
+    // both inputs so the gate path is exercised by the test.
+    inputNames: [
+      "input",
+      "input_lengths",
+      "scales",
+      "speaker_embedding",
+      "speaker_embedding_mask",
+    ],
     run: async (feeds) => {
       capturedFeeds.push(feeds);
       return { output: { data: outputAudio, dims: [1, outputAudio.length] } };

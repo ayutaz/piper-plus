@@ -312,3 +312,89 @@ class TestNonStreamingWavOutput:
             assert wav_in.getframerate() == 16000
             assert wav_in.getnchannels() == 1
             assert wav_in.getsampwidth() == 2
+
+
+# ---------------------------------------------------------------------------
+# `/` route — speaker_embedding forwarding (zero-shot voice cloning)
+# ---------------------------------------------------------------------------
+
+
+class TestSynthesizeEndpointSpeakerEmbedding:
+    """`/` must forward per-request ``speaker_embedding`` to ``voice.synthesize``.
+
+    Mirrors the timing-endpoint contract: zero-shot callers POST a JSON body
+    containing a ``speaker_embedding`` vector; the server must pass it through
+    as a NumPy array so the underlying ONNX session can bind the
+    ``speaker_embedding`` input. Without this, every zero-shot request silently
+    falls back to the zero-vector default declared by ``voice.py`` (l.1056) —
+    i.e. the wrong speaker.
+    """
+
+    def test_root_endpoint_accepts_speaker_embedding_post_field(self):
+        import numpy as np
+
+        voice = _make_voice(language_id_map=None)
+        client = TestClient(create_app(voice, synthesize_args={}))
+
+        emb = [0.1] * 192
+        resp = client.post("/", json={"text": "hi", "speaker_embedding": emb})
+
+        assert resp.status_code == 200
+        assert voice.synthesize.called
+        _, kwargs = voice.synthesize.call_args
+        assert "speaker_embedding" in kwargs, (
+            "expected /` to forward speaker_embedding to voice.synthesize, "
+            f"got kwargs={list(kwargs)}"
+        )
+        forwarded = kwargs["speaker_embedding"]
+        assert isinstance(forwarded, np.ndarray), (
+            f"speaker_embedding should be np.ndarray, got {type(forwarded)}"
+        )
+        assert forwarded.shape[-1] == 192
+        np.testing.assert_allclose(forwarded.reshape(-1), emb)
+
+
+# ---------------------------------------------------------------------------
+# `main()` synthesize_args wiring — per-request override semantics
+# ---------------------------------------------------------------------------
+
+
+class TestHttpServerStartup:
+    """`main()` constructs ``synthesize_args`` once at startup; per-request
+    overrides (notably ``speaker_embedding`` for zero-shot) must take
+    precedence so a single server instance can serve many cloned voices."""
+
+    def test_synthesize_args_includes_speaker_embedding_support(self):
+        import numpy as np
+
+        voice = _make_voice(language_id_map=None)
+        # Simulate CLI-built synthesize_args (no per-request speaker_embedding
+        # at startup time — the request must inject it).
+        synthesize_args = {
+            "speaker_id": 0,
+            "length_scale": None,
+            "noise_scale": None,
+            "noise_w": None,
+            "sentence_silence": 0.0,
+        }
+        client = TestClient(create_app(voice, synthesize_args=synthesize_args))
+
+        per_request_emb = [0.5] * 192
+        resp = client.post(
+            "/", json={"text": "hello", "speaker_embedding": per_request_emb}
+        )
+
+        assert resp.status_code == 200
+        assert voice.synthesize.called
+        _, kwargs = voice.synthesize.call_args
+        # Per-request override must reach voice.synthesize — the CLI-time
+        # default of None (implicit) must not win over the request body.
+        assert kwargs.get("speaker_embedding") is not None, (
+            "per-request speaker_embedding must override the CLI-time default; "
+            f"got kwargs={list(kwargs)}"
+        )
+        forwarded = kwargs["speaker_embedding"]
+        if isinstance(forwarded, np.ndarray):
+            np.testing.assert_allclose(forwarded.reshape(-1), per_request_emb)
+        else:
+            assert list(forwarded) == per_request_emb

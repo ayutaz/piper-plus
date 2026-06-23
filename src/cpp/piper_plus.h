@@ -90,14 +90,14 @@ typedef struct PiperPlusConfig {
     int32_t     _reserved[7];     /* Must be zero */
 } PiperPlusConfig;
 
-/** @note Zero-init safe: noise_scale, length_scale, noise_w が 0.0 の場合は
- *        デフォルト値 (0.667, 1.0, 0.8) に自動置換されます。 */
+/** @note Zero-init safe: length_scale が 0.0 の場合のみデフォルト値 (1.0) に
+ *        自動置換されます。noise_scale=0 および noise_w=0 は deterministic 推論として有効です。 */
 typedef struct PiperPlusSynthOptions {
     int32_t speaker_id;                 /* Speaker index (default: 0) */
     int32_t language_id;                /* Language index (-1 = auto-detect, default: -1) */
-    float   noise_scale;                /* VITS noise_scale (default: 0.667) */
+    float   noise_scale;                /* VITS noise_scale (default: 0.4) */
     float   length_scale;               /* VITS length_scale (default: 1.0) */
-    float   noise_w;                    /* VITS noise_w (default: 0.8) */
+    float   noise_w;                    /* VITS noise_w (default: 0.5) */
     float   sentence_silence_sec;       /* Silence between sentences in sec (default: 0.2) */
     const float *speaker_embedding;     /* Voice cloning: float32 embedding (NULL = use speaker_id) */
     int32_t      speaker_embedding_dim; /* Number of elements in speaker_embedding (0 = disabled) */
