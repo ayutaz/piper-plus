@@ -46,6 +46,13 @@ public static class DictionaryManager
 
     private static readonly HttpClient S_httpClient = CreateHttpClient();
 
+    // Serializes concurrent EnsureDictionaryAsync calls so that parallel callers
+    // do not race on the download/extract path (which would corrupt sys.dic and
+    // other files due to overlapping FileStream writes). Process-lifetime,
+    // intentionally not disposed (Microsoft-recommended pattern for static
+    // SemaphoreSlim fields).
+    private static readonly SemaphoreSlim S_dictDownloadLock = new SemaphoreSlim(1, 1);
+
     private static HttpClient CreateHttpClient()
     {
         var client = new HttpClient
@@ -90,42 +97,64 @@ public static class DictionaryManager
     /// </exception>
     public static async Task<string> EnsureDictionaryAsync(CancellationToken ct = default)
     {
-        // 1. Try to find an existing dictionary
+        // 1. Lock-free fast path: if a dictionary is already present, return
+        //    immediately without acquiring the download lock. This keeps the
+        //    common "dict already exists" path contention-free for parallel
+        //    callers (e.g. SentenceParallelEncoder spawning N tasks).
         var existing = FindDictionary();
         if (existing is not null)
         {
             return existing;
         }
 
-        // 2. Check control flags
-        if (IsOfflineMode())
+        // 2. Serialize the slow path (download + extract). Multiple concurrent
+        //    callers must not race on the same archive/file writes — that was
+        //    the root cause of sys.dic corruption under 32-way parallel tests.
+        await S_dictDownloadLock.WaitAsync(ct).ConfigureAwait(false);
+        try
         {
-            throw new InvalidOperationException(
-                "OpenJTalk dictionary not found and offline mode is enabled (PIPER_OFFLINE_MODE=1). " +
-                "Please download the dictionary manually or set OPENJTALK_DICTIONARY_PATH.");
-        }
+            // 2a. Double-checked lookup inside the lock: another caller may
+            //     have completed the download while we were waiting.
+            existing = FindDictionary();
+            if (existing is not null)
+            {
+                return existing;
+            }
 
-        if (IsAutoDownloadDisabled())
+            // 2b. Check control flags
+            if (IsOfflineMode())
+            {
+                throw new InvalidOperationException(
+                    "OpenJTalk dictionary not found and offline mode is enabled (PIPER_OFFLINE_MODE=1). " +
+                    "Please download the dictionary manually or set OPENJTALK_DICTIONARY_PATH.");
+            }
+
+            if (IsAutoDownloadDisabled())
+            {
+                throw new InvalidOperationException(
+                    "OpenJTalk dictionary not found and auto-download is disabled (PIPER_AUTO_DOWNLOAD_DICT=0). " +
+                    "Please download the dictionary manually or set OPENJTALK_DICTIONARY_PATH.");
+            }
+
+            // 2c. Download to the data directory
+            var dataDir = GetDataDir();
+            var dictPath = Path.Join(dataDir, DictionaryDirName);
+
+            await DownloadAndExtractAsync(dataDir, ct).ConfigureAwait(false);
+
+            if (!IsValidDictionary(dictPath))
+            {
+                throw new InvalidOperationException(
+                    $"Dictionary download completed but validation failed. " +
+                    $"Expected directory with {string.Join(", ", RequiredFiles)} at: {dictPath}");
+            }
+
+            return dictPath;
+        }
+        finally
         {
-            throw new InvalidOperationException(
-                "OpenJTalk dictionary not found and auto-download is disabled (PIPER_AUTO_DOWNLOAD_DICT=0). " +
-                "Please download the dictionary manually or set OPENJTALK_DICTIONARY_PATH.");
+            S_dictDownloadLock.Release();
         }
-
-        // 3. Download to the data directory
-        var dataDir = GetDataDir();
-        var dictPath = Path.Join(dataDir, DictionaryDirName);
-
-        await DownloadAndExtractAsync(dataDir, ct).ConfigureAwait(false);
-
-        if (!IsValidDictionary(dictPath))
-        {
-            throw new InvalidOperationException(
-                $"Dictionary download completed but validation failed. " +
-                $"Expected directory with {string.Join(", ", RequiredFiles)} at: {dictPath}");
-        }
-
-        return dictPath;
     }
 
     /// <summary>

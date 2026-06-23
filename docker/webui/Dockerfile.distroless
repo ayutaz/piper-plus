@@ -52,7 +52,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # builder's site-packages (under /usr/local/lib/python3.13) is copied
 # verbatim into the distroless final stage, so upgrading here propagates
 # into the published image.
-RUN pip install --no-cache-dir --upgrade pip setuptools wheel
+RUN pip install --no-cache-dir --break-system-packages --ignore-installed --upgrade pip setuptools wheel
 
 # Pin uv. The canonical docker/webui/Dockerfile currently does an
 # unpinned `pip install uv`; pinning here is intentional drift to
