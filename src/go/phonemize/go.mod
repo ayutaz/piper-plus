@@ -2,4 +2,4 @@ module github.com/ayutaz/piper-plus/src/go/phonemize
 
 go 1.26
 
-require golang.org/x/text v0.37.0
+require golang.org/x/text v0.38.0
