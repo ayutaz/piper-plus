@@ -3106,7 +3106,7 @@ requires-dist = [
     { name = "pytest-rerunfailures", marker = "extra == 'test'", specifier = ">=14.0" },
     { name = "pytest-timeout", marker = "extra == 'test'", specifier = ">=2.0" },
     { name = "pytest-xdist", marker = "extra == 'test'", specifier = ">=3.5" },
-    { name = "uvicorn", extras = ["standard"], marker = "extra == 'http'", specifier = ">=0.46.0,<1" },
+    { name = "uvicorn", extras = ["standard"], marker = "extra == 'http'", specifier = ">=0.49.0,<1" },
 ]
 provides-extras = ["gpu", "http", "test"]
 
