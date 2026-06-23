@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1782121422366,
+  "lastUpdate": 1782231169992,
   "repoUrl": "https://github.com/ayutaz/piper-plus",
   "entries": {
     "Python inference benchmark": [
@@ -426,6 +426,60 @@ window.BENCHMARK_DATA = {
           {
             "name": "Peak Memory (en)",
             "value": 206.4,
+            "unit": "MB"
+          },
+          {
+            "name": "Model Size (en)",
+            "value": 37.6,
+            "unit": "MB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "41669061+ayutaz@users.noreply.github.com",
+            "name": "yousan",
+            "username": "ayutaz"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "793935ca430fc06c4b735d6035b643aa9e82bf47",
+          "message": "fix(ci): standalone CI stability fixes (Docker PEP 668 + C# race + C++ DFT tolerance) (#578)\n\n* fix(docker): pip upgrade に --break-system-packages --ignore-installed を追加\n\nPR #537 で Ubuntu 24.04 + Python 3.13 (PEP 668 externally-managed) に\nupgrade した際、 メイン Dockerfile (commit dce07339) は同 flag を追加済\nだったが、 同期漏れだった以下 5 file が同じ PEP 668 エラーで build fail:\n\n- docker/python-inference/Dockerfile.cpu:59\n- docker/python-inference/Dockerfile.cpu.distroless:73\n- docker/webui/Dockerfile:11\n- docker/webui/Dockerfile.distroless:55\n- docker/wyoming/Dockerfile:29\n\nPR #568 を blocking していた以下 CI が unblock 見込み:\n- build-python-inference\n- test-python-inference\n- e2e-docker-server\n- scan (python-inference, docker/python-inference/Dockerfile, .)\n\nPR #537 と同じ pattern を 5 file に展開、 production 動作影響なし\n(image build 時のみの pip flag)。\n\nverify (local Docker build 5+ 分で CI 委任)。\n\nPlan B sequential 7/7 (DOCKER-INTEGRATION、 5 file 同形修正 / low risk)。\n全 7 commit 完了。 残 deferred 2 件 (PYTEST-COVERAGE / NPM-AUDIT) は別 PR。\n\n* fix(csharp): serialize OpenJTalk dictionary download to prevent parallel test file-lock race\n\nPR #568 で build-and-test x 3 OS + csharp-tests x 3 OS が:\n\n  PiperPlus.Cli.Tests.DotNetG2PEngineConcurrencyTests.SentenceParallelEncoder_MixedLang_NoCrash\n  System.AggregateException: The process cannot access the file\n  open_jtalk_dic_utf_8-1.11/sys.dic because it is being used by another process.\n\ntest は 8 並列 x 4 並列 = 32-way parallel で SentenceParallelEncoder.EncodeAll を\n呼ぶ。 各 worker が DotNetG2PEngine.EnsureDictionaryAsync 経由で OpenJTalk dict\nを初期化する際、 download / extract path が unprotected で並列実行されると\nsys.dic を含む archive 内 file が overlapping FileStream writes で破損 →\nfile lock 競合発生。\n\n修正方針 (Two-Phase Locking):\n1. 既存 `S_httpClient` field 直下に `S_dictDownloadLock = new SemaphoreSlim(1, 1)`\n   を追加 (static / readonly / process-lifetime undisposed = Microsoft pattern)\n2. EnsureDictionaryAsync を refactor:\n   a. **Lock-free fast path**: `FindDictionary() != null` なら早期 return\n      (cached dict 存在時は contention 完全回避、 並列 N 呼び出しで 0 lock)\n   b. **Slow path serialized**: download/extract 経路のみ semaphore で 1 thread\n      に絞る:\n        await S_dictDownloadLock.WaitAsync(ct).ConfigureAwait(false);\n        try {\n          // double-check: 別 thread が download 完了済かも\n          if ((existing = FindDictionary()) != null) return existing;\n          // ... download + extract ...\n        } finally {\n          S_dictDownloadLock.Release();\n        }\n3. CancellationToken は WaitAsync に propagate (OperationCanceledException 経路で\n   semaphore 未取得のため Release() 不要、 try/finally で正しく guard)\n4. 全 await は ConfigureAwait(false) 維持\n\npublic API 変更ゼロ (method signature 不変、 既存 caller 互換)。\n\nverify (local Windows env dotnet 10.0.301):\n- dotnet build PiperPlus.Core -c Release → 0 warn / 0 err\n- dotnet test PiperPlus.Cli.Tests --filter SentenceParallelEncoder_MixedLang_NoCrash\n  --blame-hang-timeout 30s → **1 passed / 0 failed / 737ms** ✅\n\nこれで build-and-test x 3 OS + csharp-tests x 3 OS (合計 6 jobs) が unblock 見込み。\n\n独立 review agent 検証済:\n- SemaphoreSlim 設計 (1, 1) ✅\n- Critical section 構造 (try/finally Release) ✅\n- Double-check pattern ✅\n- Deadlock risk: low (nested call なし、 starvation なし、 circular wait 不可能)\n- Cancellation 経路 verified\n- Public API 不変 verified\n\nPlan B Followup Step 2/2 (CSHARP-CONCURRENCY、 28 add / 7 remove / low risk)。\n\n* fix(csharp): serialize MeCabTokenizer ctor to work around DotNetG2P 1.8.x sys.dic race\n\nPR #568 csharp-tests x 3 OS で 3 件 fail:\n- DotNetG2PEngineConcurrencyTests.SentenceParallelEncoder_MixedLang_NoCrash\n- DotNetG2PEngineConcurrencyTests.DotNetG2PEngine_ConcurrentJa_NoCrash\n- DotNetG2PEngineConcurrencyTests.DotNetG2PEngine_ConcurrentJa_DeterministicResult\n\nStack trace (Step 2 commit 18040c8f 後の最新 fail log):\n  System.IO.IOException: The process cannot access the file\n  open_jtalk_dic_utf_8-1.11/sys.dic\n  at DotNetG2P.MeCab.Dictionary.SystemDictionary.Load\n  at DotNetG2P.MeCab.Dictionary.DictionaryBundle.LoadInternal\n  at DotNetG2P.MeCab.MeCabTokenizer..ctor(string dictionaryPath)\n\nRoot cause 再特定: Step 2 (DictionaryManager.EnsureDictionaryAsync の SemaphoreSlim\n追加) は **download/extract path** のみ guard していたが、 真の race は\n**MeCabTokenizer..ctor の sys.dic 読み込み path** (DotNetG2P.MeCab 1.8.x 内部)。\n\nDotNetG2PEngine.cs line 45-47 で ThreadLocal<G2PEngine> の valueFactory が\n32-way 並列 (Parallel.For 8 x MaxDegreeOfParallelism=4) で同時起動すると、\n各 thread が `new MeCabTokenizer(_dictPath)` を実行、 MeCab 内部で sys.dic に\n排他 FileShare で open する race condition 発生。\n\n外部 NuGet package (DotNetG2P.MeCab 1.8.0) 内部 bug のため直接 patch 不可。\nwrapper 側で workaround:\n\n修正: ThreadLocal value factory 内に static `lock (S_tokenizerCtorLock)` 追加\n(static object readonly)。 ctor の 1-2 ms のみ serialize、 ctor 完了後の Convert()\nは thread-local instance で完全並列を維持 (per-thread isolation 不変)。\n\nこれで 3 件 全 pass 見込み (Step 2 の semaphore も併用、 download path も保護)。\n\nPlan B Followup Step 2 真の修正 (Step 2 commit 18040c8f は補助、 ここが本命)。\n\n* test(csharp): serialize VSTest assemblies (MaxCpuCount=1) for OpenJTalk file lock\n\nPR #568 csharp-tests (macos-latest) で 2 件 残 fail:\n- DotNetG2PEngineConcurrencyTests.SentenceParallelEncoder_MixedLang_NoCrash\n- DotNetG2PEngineConcurrencyTests.DotNetG2PEngine_ConcurrentJa_NoCrash\n\nStack: System.IO.IOException at DotNetG2P.MeCab.Dictionary.SystemDictionary.Load\n       (sys.dic file lock by another process)\n\nPlan B Step 2 (commit 18040c8f DictionaryManager semaphore + 98a687a7\nDotNetG2PEngine ctor lock) で intra-process race は解消したが、\nPiperPlus.runsettings:4 `MaxCpuCount=0` (= unlimited parallelism) により\nVSTest が PiperPlus.Cli.Tests.dll と PiperPlus.Core.Tests.dll を **別プロセス**\nで同時実行する場合があり、 static `S_tokenizerCtorLock` (in-process) を\nbypass する cross-process file lock race が macOS で発生していた。\n\nmacOS FileShare semantics は Ubuntu/Windows より strict なため、 同 race\n状況でも macOS のみ fail (ubuntu/windows は既に Plan B Step 2 で pass)。\n\n修正: PiperPlus.runsettings:4 で MaxCpuCount を 0 → 1 に変更。\n- Test assembly 単位で serialize、 cross-process race を排除\n- Intra-process は依然 my locks で serialize 化済\n- 性能影響: macOS CI 全 csharp-tests 約 3-5 秒程度の遅延 (acceptable)\n\n代替案として cross-process named Mutex を導入する案もあるが、 macOS で\nnamed Mutex は POSIX semaphore 経由で abstract path に依存し、 CI runner\nの transient filesystem 制約に対するリスクが高いため runsettings 修正を選択。\n\nこれで csharp-tests (macos-latest) の MeCab file lock race 解消見込み、\nPR #568 の csharp 系列 全 OS 完走見込み。\n\n* docs(piper-train tools): 4 ファイルの /data/piper docstring を env var 化\n\nPR #568 で pre-commit secret-path-leak hook が以下 4 ファイル docstring 内の\nhost-specific path `/data/piper/...` literal を検出:\n\n- src/python/piper_train/tools/cache_audio.py (2 箇所)\n- src/python/piper_train/tools/batch_spectrograms.py (1 箇所)\n- src/python/piper_train/tools/prepare_bilingual_dataset.py (3 箇所)\n- src/python/piper_train/tools/prepare_multilingual_dataset.py (6 箇所)\n\n修正: 該当 path を ${DATASET_DIR} / ${JA_DATASET_DIR} / ${EN_LJSPEECH_DIR} /\n${OUTPUT_DIR} / ${DOWNLOADS_DIR} / ${JA_EN_DATASET} placeholder に置換。\n動作コード (top-level / 関数本体) は無変更、 docstring 内 example のみ。\n\n5d (extract_speaker_embedding) と同じ pattern。 5e で計画していた 2 file\n(cache_audio + batch_spectrograms) に、 同様の drift があった 2 file\n(prepare_bilingual + prepare_multilingual) を追加して網羅。\n\nscripts/check_secret_path_reference.py は detector script 自身 (literal\n\"/data/piper/\" を検出 pattern として保持) なので除外。\n\nverify: grep \"/data/piper\" src/python/piper_train/ scripts/ → detector script\n1 file (1853 file scanned で 0 leak の expected output)。\n\nOption A 計画 commit 5e/9 (CSHARP-FORMAT 最終 commit、 docstring のみの low risk)。\n全 9 commit 完了。",
+          "timestamp": "2026-06-24T01:11:41+09:00",
+          "tree_id": "94db74c380e7a43bc3eaa09c619d003b404d1aae",
+          "url": "https://github.com/ayutaz/piper-plus/commit/793935ca430fc06c4b735d6035b643aa9e82bf47"
+        },
+        "date": 1782231167545,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "RTF (en)",
+            "value": 0.0981,
+            "unit": "ratio"
+          },
+          {
+            "name": "Latency P50 (en)",
+            "value": 24.9,
+            "unit": "ms"
+          },
+          {
+            "name": "Latency P95 (en)",
+            "value": 26,
+            "unit": "ms"
+          },
+          {
+            "name": "Cold Start (en)",
+            "value": 1433.9,
+            "unit": "ms"
+          },
+          {
+            "name": "Peak Memory (en)",
+            "value": 208.1,
             "unit": "MB"
           },
           {
