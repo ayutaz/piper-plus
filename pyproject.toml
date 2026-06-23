@@ -24,7 +24,7 @@ dependencies = [
     "librosa>=0.11.0",
     "cython>=3.2.5",
     "pyopenjtalk-plus>=0.4",
-    "wandb>=0.27.2",
+    "wandb>=0.28.0",
     "transformers>=4.50.0",
     # workspace member refs: `uv sync` でこれらが自動 install される (root は
     # `package = false` なのでこの dependencies は実 install でなく resolver
@@ -34,9 +34,9 @@ dependencies = [
     "piper-plus",
     "onnxscript>=0.7.0",
     # Issue #527 / DR-002: C++ canonical (cmake/OnnxRuntime.cmake) と統一
-    "onnxruntime>=1.26.0",
-    "ghapi>=1.0.13",
-    "onnx>=1.21.0",
+    "onnxruntime>=1.27.0",
+    "ghapi>=1.0.14",
+    "onnx>=1.22.0",
 ]
 
 [project.optional-dependencies]
@@ -53,11 +53,11 @@ preprocess = [
 ]
 
 inference = [
-    "onnxruntime>=1.26.0",
+    "onnxruntime>=1.27.0",
     "soundfile>=0.14.0",
     "pyopenjtalk-plus",
     "g2p-en>=2.1.0",
-    "fastapi>=0.136.3",
+    "fastapi>=0.138.0",
     "uvicorn>=0.49.0",
 ]
 
@@ -65,11 +65,11 @@ inference-gpu = [
     # Issue #527 follow-up: onnxruntime-gpu 1.26+ requires libcudart.so.13 (CUDA 13)
     # but DR-001 base image is CUDA 12.8.1. Cap to <1.26 until the CUDA 13 base
     # bump lands in a dedicated follow-up PR.
-    "onnxruntime-gpu>=1.20.1,<1.26",
+    "onnxruntime-gpu>=1.27.0,<1.28",
     "soundfile>=0.14.0",
     "pyopenjtalk-plus",
     "g2p-en>=2.1.0",
-    "fastapi>=0.136.3",
+    "fastapi>=0.138.0",
     "uvicorn>=0.49.0",
 ]
 
@@ -89,14 +89,14 @@ train = [
     "pytorch-lightning>=2.6.5",
     "torchmetrics>=1.9.0",
     "transformers>=4.50.0",
-    "onnx>=1.21.0",
-    "onnxruntime>=1.26.0",
+    "onnx>=1.22.0",
+    "onnxruntime>=1.27.0",
     "pyopenjtalk-plus",
     "mecab-python3>=1.0",
     "unidic-lite>=1.0",
     "g2p-en>=2.1.0",
     "tensorboard>=2.20.0",
-    "wandb>=0.27.2",
+    "wandb>=0.28.0",
     "tqdm>=4.68.1",
     "einops>=0.7",
     "numba>=0.61.0",
