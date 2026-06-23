@@ -189,7 +189,7 @@ jobs:
         workspaces: src/rust -> target
         key: coverage
     - name: Install cargo-llvm-cov
-      uses: taiki-e/install-action@v2.81.6
+      uses: taiki-e/install-action@v2.82.2
       with:
         tool: cargo-llvm-cov
     - name: Generate coverage (workspace, lcov)
@@ -216,7 +216,7 @@ jobs:
       # fail_ci_if_error は codecov-action 内部の挙動制御で、層が違う
       # ため両指定は二重防御として有効。明確性のため continue-on-error
       # に統一する (review #456 重複指摘への対応)。
-      uses: codecov/codecov-action@v5.5.4
+      uses: codecov/codecov-action@v5.5.5
       with:
         files: src/rust/lcov.info
         flags: rust

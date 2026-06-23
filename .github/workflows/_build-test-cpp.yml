@@ -356,7 +356,7 @@ jobs:
 
       - name: Upload coverage to Codecov (C++)
         if: matrix.os == 'ubuntu-24.04' && matrix.build-type == 'Debug'
-        uses: codecov/codecov-action@v5.5.4
+        uses: codecov/codecov-action@v5.5.5
         with:
           files: build/coverage.info.cleaned
           flags: cpp
