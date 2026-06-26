@@ -3,8 +3,6 @@ from __future__ import annotations
 
 import argparse
 import logging
-import pathlib
-import platform
 import warnings
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -21,12 +19,7 @@ if TYPE_CHECKING:
     from .vits.models import SynthesizerTrn
 
 
-# Allow Path objects in checkpoints (PyTorch 2.6+ weights_only=True)
-torch.serialization.add_safe_globals([pathlib.PosixPath, pathlib.WindowsPath])
-
-# Fix PosixPath instantiation error when loading Linux checkpoints on Windows
-if platform.system() == "Windows":
-    pathlib.PosixPath = pathlib.WindowsPath
+# PosixPath/safe_globals shim moved to piper_train._compat (eagerly loaded by package __init__).
 
 
 _LOGGER = logging.getLogger("piper_train.export_onnx")
