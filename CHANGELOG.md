@@ -63,7 +63,7 @@ Issue #527: Docker 全 image + CI workflow + ドキュメントを **Python 3.13
 
 ### Added
 
-- **`docs/reference/python-313/`**: Issue #527 設計ドキュメント群
+- **`docs/archive/python-313/`**: Issue #527 設計ドキュメント群
   (`requirements.md` / `specifications.md` / `milestones.md` /
   `open-questions.md` / `README.md`、 計 5 文書 約 3700 行)。
 - **`docs/migration/v1.12-to-v2.0.md`**: 本マイグレーションガイド。

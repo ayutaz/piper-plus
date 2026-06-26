@@ -1,5 +1,10 @@
 # Zero-Shot TTS 精度向上計画
 
+> **ステータス更新 (2026-06-26)**:
+> - **Tier 1 (未実装機能の修正): ✅ 完了** — v7 multi-6lang スクラッチ学習 (32 epoch 完走) で全 5 修正実装済 (5cdfafb / 34ad257 / 5e700d4 / ba71e16 / 95e74cb)。 SECS (zero-shot) 0.6622 → 0.6879 達成。 Tsukuyomi FT で SECS 0.7749 を確認。 詳細: [`multi-6lang-zero-shot-v7-training-results.md`](multi-6lang-zero-shot-v7-training-results.md)
+> - **Tier 2/3 (学習改善 / アーキ微調整): 🟡 active future work** — InfoNCE / R1 regularizer / データ拡充は引き続き計画段階。 CLAUDE.md L139 + [`docs/handoff/zero-shot-tts-handoff-2026-06-20.md`](../handoff/zero-shot-tts-handoff-2026-06-20.md) から参照中
+> - 「1. 重大発見: 未実装/不完全な機能」 セクションの記述は **当初調査時 (2026-03-31) の snapshot** で、 現在は v7 で fix 済の項目を含みます。 historical context として残しています
+
 > 調査日: 2026-03-31 (復元完了: 2026-04-01)
 > ブランチ: `feat/zero-shot-tts`
 > 制約: モデルサイズ (~74MB ONNX) 不変、推論速度低下なし

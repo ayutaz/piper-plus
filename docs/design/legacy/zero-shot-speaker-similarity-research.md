@@ -4,7 +4,7 @@
 
 現在のPiper Plus Zero-Shot TTSは20話者でVITS + CAM++ (192次元) アーキテクチャを使用。
 v8学習は話者再現に失敗（dataset.pyのspeaker_embeddings消失・CamPP入力名バグが原因）。
-v9再学習のための2件のバグ修正が完了し、v9コマンドが確定済み（v9-training-handoff.md参照）。
+v9再学習のための2件のバグ修正が完了し、v9コマンドが確定済み（legacy/v9-training-handoff.md参照）。
 さらなる話者再現精度向上のため、最新論文・OSS・コードベースを10エージェントで徹底調査した。
 
 **制約**: モデルサイズ ~74MB ONNX、CPU リアルタイム推論維持

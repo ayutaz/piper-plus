@@ -268,6 +268,8 @@ uv run python -m piper_train.infer_onnx --help
 
 ## トラブルシューティング
 
+> **Note (2026-06-26)**: 以下の章 (OpenJTalk 自動 DL / chcp 65001 文字化け / `OPENJTALK_DICTIONARY_PATH` 等) は [`troubleshooting.md`](troubleshooting.md) と一部内容が重複しています。 troubleshooting.md がより general な dispatcher で、 こちらは Windows 固有環境の補足です。 将来的に troubleshooting.md 側に Windows-specific セクションとして統合予定 (本 PR では deferred、 surgical extract が content judgment を伴うため別 PR で実施)。
+
 ### OpenJTalkが見つからない
 
 エラー: `OpenJTalk dictionary not found` または初回実行時に辞書の自動ダウンロードが失敗する場合

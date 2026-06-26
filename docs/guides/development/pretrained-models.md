@@ -21,6 +21,16 @@ Pre-trained models for multilingual TTS and fine-tuning are available on Hugging
 | 6-Language Base | JA/EN/ZH/ES/FR/PT | 571 | Multilingual pre-trained (508,187 utterances, VITS + Prosody). **75 epochs / ~282K gradient steps (2026-03-16)**, language-balanced sampling, WavLM-disabled (V100 friendly). Checkpoint `epoch=74-step=504712.ckpt`. | [HuggingFace](https://huggingface.co/ayousanz/piper-plus-base) |
 | 6-lang MB-iSTFT Base | JA/EN/ZH/ES/FR/PT | 571 | Multilingual pre-trained with MB-iSTFT decoder. **75 epochs (2026-04-16)**, scratch-trained. **2.21x faster CPU inference** vs HiFi-GAN. Issue #268. | [HuggingFace](https://huggingface.co/ayousanz/piper-plus-base) (MB-iSTFT variant: `multilingual-6lang-mb-istft-scratch-75epoch.onnx` / `*.ckpt` in the same repo) |
 
+**Zero-Shot TTS Models (PR #222, v7 multi-6lang scratch + Tsukuyomi FT):**
+
+| Model | Languages | Speakers | Description | Download |
+|---|---|---|---|---|
+| v7 Multi-6lang Zero-Shot | JA/EN/ZH/ES/FR/PT | 571 + zero-shot | Zero-shot TTS base, scratch-trained 32 epochs (V100 × 4, 12.5 days, 2026-05-08〜2026-05-20). CAM++ ECAPA-TDNN (192-dim) speaker embedding + Multi-scale FiLM + DINO self-distill. SECS (zero-shot) **0.6879** at epoch 32. ONNX 38.9 MB FP16. | [HuggingFace (private)](https://huggingface.co/ayousanz/piper-plus-zero-shot-multi-6lang-v7) |
+| Tsukuyomi Zero-Shot FT | JA/EN/ZH/ES/FR/PT | 1 (single-speaker FT) | Single-speaker fine-tune from v7 zero-shot base, 500 epochs (2026-05-21, 51 min on RTX 4070 Ti SUPER). Tsukuyomi-chan reproducibility SECS (CAM++) **0.7749**. ONNX 38.2 MB FP16. | [HuggingFace (private)](https://huggingface.co/ayousanz/piper-plus-zero-shot-tsukuyomi) |
+| CAM++ Speaker Encoder | — | — | Apache-2.0 licensed CAM++ ECAPA-TDNN ONNX (ModelScope iic mirror, Voice Cloning 用 speaker embedding 抽出器、 192-dim L2 normalized). | [HuggingFace (private)](https://huggingface.co/ayousanz/campplus-onnx) |
+
+> **Note**: zero-shot model repos are currently **private** during license review. Public listing planned post-v2.0.0 GA. Research details and training reproducibility: [`docs/design/multi-6lang-zero-shot-v7-training-results.md`](../../design/multi-6lang-zero-shot-v7-training-results.md), environment handoff: [`docs/handoff/zero-shot-tts-handoff-2026-06-20.md`](../../handoff/zero-shot-tts-handoff-2026-06-20.md).
+
 **Tsukuyomi-chan model:**
 
 **Windows (PowerShell):**

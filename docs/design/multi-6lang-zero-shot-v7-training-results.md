@@ -1,5 +1,7 @@
 # Multi-6lang Zero-Shot TTS スクラッチ学習 (v7) — 実施結果と根本原因の解析
 
+> **このドキュメントは v7 学習の report-card / 根本原因 analysis** です。 環境再構築 / 学習再開 / FT / 評価の手順は [`docs/handoff/zero-shot-tts-handoff-2026-06-20.md`](../handoff/zero-shot-tts-handoff-2026-06-20.md) (canonical handoff) を参照してください。 5-fix commit 表 / dataset 表 / ckpt 表 / GPU 推奨など overlap する内容がありますが、 本書は **何が起き何を学んだか**、 handoff は **どう手を動かすか** という棲み分けです。
+
 **期間**: 2026-05-08 ~ 2026-05-16 (8 日連続)
 **ブランチ**: `feat/zero-shot-tts` (commit `95e74cb` 時点)
 **データセット**: `dataset-multilingual-6lang-filtered-new` (571話者/6lang/497,519発話)
@@ -211,5 +213,5 @@ CLAUDE.md の基準値 (out-of-domain 0.55-0.70 = 良好) との比較で、
 ## 7. 参考ドキュメント
 
 - [`zero-shot-quality-improvement-plan.md`](zero-shot-quality-improvement-plan.md): Tier 1-4 改善ロードマップ
-- [`zero-shot-speaker-similarity-research.md`](zero-shot-speaker-similarity-research.md): 10 エージェント研究調査
-- [`v9-training-handoff.md`](v9-training-handoff.md): 旧 zero-shot 20speakers 学習引き継ぎ
+- [`legacy/zero-shot-speaker-similarity-research.md`](legacy/zero-shot-speaker-similarity-research.md): 10 エージェント研究調査 (v8/v9 era snapshot)
+- [`legacy/v9-training-handoff.md`](legacy/v9-training-handoff.md): 旧 zero-shot 20speakers 学習引き継ぎ

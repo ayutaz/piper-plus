@@ -38,9 +38,8 @@ piper-plus ドキュメント。利用ガイド・各ランタイム連携・仕
 
 ### 学習
 
-- [Training guide](guides/training/training-guide.md) — 学習全体ガイド
+- [Training guide](guides/training/training-guide.md) — 学習全体ガイド (canonical、 早見表 + 詳細を統合)
 - [WavLM discriminator](guides/training/wavlm-guide.md) — WavLM 音質向上ガイド
-- [Training overview (短縮版)](guides/training.md) — 早見表
 
 ### 推論・ビルド
 
@@ -98,9 +97,10 @@ piper-plus ドキュメント。利用ガイド・各ランタイム連携・仕
 
 ## Design Documents
 
-- [Zero-Shot Quality Improvement Plan](design/zero-shot-quality-improvement-plan.md) - Improvement roadmap for zero-shot speaker similarity
-- [Zero-Shot Speaker Similarity Research](design/zero-shot-speaker-similarity-research.md) - Research report: techniques and findings
-- [v9 Training Handoff](design/v9-training-handoff.md) - v9 re-training context, fixed bugs, and commands
+- [Zero-Shot Quality Improvement Plan](design/zero-shot-quality-improvement-plan.md) - Improvement roadmap for zero-shot speaker similarity (Phase 1 ✅ shipped via v7 multi-6lang)
+- [Multi-6lang Zero-Shot v7 Training Results](design/multi-6lang-zero-shot-v7-training-results.md) - Canonical v7 training results + 5 fix commit history
+- [Zero-Shot Speaker Similarity Research (legacy)](design/legacy/zero-shot-speaker-similarity-research.md) - v8/v9 era research snapshot (superseded by v7 multi-6lang)
+- [v9 Training Handoff (legacy)](design/legacy/v9-training-handoff.md) - v9 re-training context (superseded by v7 multi-6lang)
 
 ## Development
 

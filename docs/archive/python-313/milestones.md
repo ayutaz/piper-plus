@@ -486,7 +486,7 @@ PR 数: 1 (release prep PR)
 ```markdown
 ## Milestone
 M3: GPU Docker 統一 (CUDA 12.8 + Ubuntu 24.04 + Python 3.13)
-詳細: docs/reference/python-313/milestones.md#m3-gpu-docker-統一-cuda-128--ubuntu-2404--python-313
+詳細: docs/archive/python-313/milestones.md#m3-gpu-docker-統一-cuda-128--ubuntu-2404--python-313
 ```
 
 ### M-RULE-02: Exit Criteria の確認

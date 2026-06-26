@@ -185,6 +185,8 @@ echo "PID: $!"
 
 ### 学習済みモデル (6言語マルチリンガル)
 
+> 本表は agent context (ckpt path / 学習状態) を含み CLAUDE.md 内に保持しています。 user / 外部参照向けの HF 配布カタログ (ダウンロードリンク + zero-shot variants 含む) は [`docs/guides/development/pretrained-models.md`](docs/guides/development/pretrained-models.md) を参照してください (single source for the HF model list)。
+
 | モデル | 学習基盤 | 状態 | パス |
 |-------|--------|------|------|
 | **6lang base (HiFi-GAN)** | 75 epoch (v1.11 系) | 完了 (2026-03-16) | `/data/piper/output-multilingual-6lang/` |
@@ -441,7 +443,6 @@ B (FT) は A から `--devices 1`、`--base_lr 2e-5` (1/10 で catastrophic forg
 | Phoneme Timing 仕様 | `docs/spec/phoneme-timing-contract.toml` |
 | Audio Parity 仕様 | `docs/spec/audio-parity-contract.toml` |
 | ORT バージョン表 | `docs/reference/ort-versions.md` |
-| Branch protection 履歴 | `docs/reference/branch-protection-history.md` |
 | マイグレーションガイド | `docs/migration/v1.11-to-v1.12.md` |
 
 ### 各言語ランタイム

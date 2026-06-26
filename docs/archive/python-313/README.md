@@ -1,4 +1,6 @@
-# Default Python 3.11 → 3.13 移行
+# Default Python 3.11 → 3.13 移行 (実装完了済)
+
+> **ステータス: ✅ 実装完了 (2026-06-22)** — Issue [#527](https://github.com/ayutaz/piper-plus/issues/527) は closed、 [PR #569](https://github.com/ayutaz/piper-plus/pull/569) でマージ済。 Docker 全 image が `nvidia/cuda:12.8.1-cudnn-{devel,runtime}-ubuntu24.04` + Python 3.13 + torch 2.11.0+cu128 + TF32/bf16-mixed default に統一。 本フォルダは設計記録として archive 保管。 milestones.md / open-questions.md の進捗表は実装着手前の snapshot であり、 現在の repo 状態とは食い違いがある可能性があります (移行手順の参照は [`docs/migration/v1.12-to-v2.0.md`](../../migration/v1.12-to-v2.0.md) を使用してください)。
 
 Issue [#527](https://github.com/ayutaz/piper-plus/issues/527) — デフォルト Python interpreter を 3.11 から 3.13 に揃えるための調査・計画ドキュメント群。
 
@@ -704,7 +706,7 @@ Phase 1 / 2 は並列でも可だが、 PR review 衝突を避けるため順次
 -# Python 3.11 stays as-is — pyproject.toml allows 3.11+; bumping the
 -# interpreter is out of scope for a CVE-cleanup PR.
 -FROM python:3.11-slim-bookworm
-+# Python 3.13 default — see docs/reference/python-313/README.md
++# Python 3.13 default — see docs/archive/python-313/README.md
 +# (Issue #527 Phase 1).
 +FROM python:3.13-slim-trixie
 ```
@@ -897,7 +899,7 @@ Title: feat(docker): unify python-train/inference to CUDA 12.8 + Ubuntu 24.04 + 
 - nvidia/cuda 12.6.3-ubuntu22.04 → 12.8.1-ubuntu24.04 (OS EOL 2027→2029、 fully-aligned 戦略)
 - Python 3.11 (apt) → 3.13 (deadsnakes PPA)
 - torch 2.2.1+cu121 → 2.11.0+cu128 (RTX 5090 sm_120 起動条件)
-- Issue #527 Phase 3 (詳細: docs/reference/python-313/README.md)
+- Issue #527 Phase 3 (詳細: docs/archive/python-313/README.md)
 
 ## Type
 - [x] feat (infrastructure)
@@ -992,5 +994,5 @@ Title: feat(docker): unify python-train/inference to CUDA 12.8 + Ubuntu 24.04 + 
 - 2026-05-21 CUDA バージョン詳細追加
 - 2026-05-21 CUDA 12.8 最適化恩恵分析 (V100 想定)
 - 2026-05-21 新 GPU 移行 (T4/Ada 6000/RTX 5090) で評価全面改訂
-- 2026-05-21 dedicated folder 化 (`docs/reference/python-313/`)
+- 2026-05-21 dedicated folder 化 (`docs/archive/python-313/`)
 - 2026-05-21 **Fully-aligned 戦略へ転換** (CUDA 12.8 base image + Ubuntu 24.04 + Python 3.13 統一)
