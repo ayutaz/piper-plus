@@ -15,6 +15,11 @@ Issues addressed:
 
 This module has no public API; importing it for the side-effects is the
 contract.
+
+torch is imported lazily inside a `try`/`except ImportError` because
+:mod:`piper_train` is also imported by lightweight CI jobs that don't
+install torch (e.g. dataset / utility tests). The PosixPath alias
+itself only needs :mod:`pathlib` + :mod:`platform`, so it always runs.
 """
 
 from __future__ import annotations
@@ -22,9 +27,14 @@ from __future__ import annotations
 import pathlib
 import platform
 
-import torch
 
-torch.serialization.add_safe_globals([pathlib.PosixPath, pathlib.WindowsPath])
+try:
+    import torch as _torch
+except ImportError:  # pragma: no cover — torch-less CI matrices
+    _torch = None
+
+if _torch is not None:
+    _torch.serialization.add_safe_globals([pathlib.PosixPath, pathlib.WindowsPath])
 
 if platform.system() == "Windows":
     pathlib.PosixPath = pathlib.WindowsPath  # type: ignore[misc, assignment]

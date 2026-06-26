@@ -31,11 +31,14 @@ def test_piper_train_import_triggers_compat() -> None:
 
     Otherwise CLI entry points that only do `from piper_train import X`
     (not `from piper_train._compat ...`) will miss the PosixPath patch.
+
+    Skipped when torch isn't installed (some CI matrices import
+    piper_train for utility tests only — see _compat.py docstring).
     """
     import piper_train  # noqa: F401
 
     # _compat side-effect: pathlib classes registered as torch safe globals
-    import torch.serialization as ts
+    ts = pytest.importorskip("torch.serialization")
 
     # torch >= 2.11 exposes `get_safe_globals` as a stable public API;
     # earlier releases used the underscore-prefixed `_get_safe_globals`.
