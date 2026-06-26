@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1782232340287,
+  "lastUpdate": 1782483570963,
   "repoUrl": "https://github.com/ayutaz/piper-plus",
   "entries": {
     "Python inference benchmark": [
@@ -534,6 +534,60 @@ window.BENCHMARK_DATA = {
           {
             "name": "Peak Memory (en)",
             "value": 206.6,
+            "unit": "MB"
+          },
+          {
+            "name": "Model Size (en)",
+            "value": 37.6,
+            "unit": "MB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "41669061+ayutaz@users.noreply.github.com",
+            "name": "yousan",
+            "username": "ayutaz"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "06898542a7bd3b8288a676de741d53d348ef2b60",
+          "message": "fix(python): Windows native + cu128 auto-install + PosixPath shim consolidation (#581)\n\n* fix(python): Windows native + cu128 自動 install + PosixPath shim 共通化\n\nIssue #1 (pyproject.toml cu128 marker):\n- pytorch-cu128 source の marker を `sys_platform == 'linux'` から\n  `sys_platform != 'darwin'` に変更し、 Windows + GPU dev でも\n  `uv sync` だけで torch 2.11.0+cu128 が install されるよう修正。\n- macOS は CUDA 非対応のため引き続き除外 (PyPI fallback)。\n- 既存 Dependabot bump (coverage 7.14.2 / uvicorn 0.49.0) と互換、\n  uv.lock は darwin 分岐が追加されただけ。\n\nIssue #2 (PosixPath shim consolidation):\n- src/python/piper_train/_compat.py に PosixPath モンキーパッチ +\n  torch safe_globals 登録を集約し、 piper_train/__init__.py で\n  eager-load。 これまで export_onnx.py だけに patch があり、\n  infer / export_torchscript / clean_cached_audio 等の他 entry では\n  Windows 上で Linux 製 ckpt の torch.load が失敗していた症状を解消。\n- 旧 inline shim (export_onnx.py:24-29) と未使用 import (pathlib,\n  platform) を削除、 _compat への参照コメントに置換。\n\nRegression tests (再発防止):\n- src/python/tests/test_compat.py: 4 ケース\n  (module import / package import が compat を trigger /\n   Windows での PosixPath→WindowsPath alias / non-Windows no-op)。\n- src/python/tests/test_pyproject_torch_marker.py: 4 ケース\n  (torch + torchaudio × Linux-only 復活 guard + macOS 除外 guard)。\n\nDocs:\n- docs/migration/v1.12-to-v2.0.md \"Windows local dev\" セクションを\n  \"(修正済) / (透過対応済)\" に書き換え、 旧手動 workaround は\n  <details> 折り畳みで pre-v2.0 reference として保持。\n\n* fix(doc-audit): migration guide 編集に追随して audit snapshot を再生成\n\nPR #581 で docs/migration/v1.12-to-v2.0.md の \"Windows local dev\"\nセクションを書き換えた際、 code block の数や順序が変わったため\ntests/fixtures/doc_examples_audit/audit.json と drift。\ndoc-examples-gate が fail していたため snapshot を再生成。\n\n`python scripts/check_doc_examples.py audit --output tests/fixtures/doc_examples_audit/audit.json --generated-at 2026-05-19T00:00:00Z`\nで生成、 --check-snapshot で再確認済 (528 blocks: bash=232 python=38\nrust=12 csharp=6 go=5 wasm=11)。\n\n* fix(compat): _compat.py の torch import を lazy 化し torch-less CI matrix で破壊しないように\n\nPR #581 で eager `import torch` を _compat.py 冒頭に置いた結果、\ntorch 未 install な python-tests matrix (ubuntu/windows/macos × 3.11/3.12/3.13)\nが ModuleNotFoundError で collection 段階から fail していた。\n\n修正:\n- _compat.py: `import torch` を try/except ImportError でガードし、\n  torch がある時のみ add_safe_globals を呼ぶ。 PosixPath 置換は\n  pathlib + platform のみで完結するため torch 有無に依存しない。\n- test_compat.py: test_piper_train_import_triggers_compat を\n  pytest.importorskip(\"torch.serialization\") に変更し、 torch-less\n  環境では skip。\n- ruff format / ruff check 全 pass。\n\nlocal Windows: 7 passed / 1 skipped (非 Windows test の Windows skip)。\n\n* fix(pr-review): Copilot 3 件指摘を解消\n\n(1) docs/migration/v1.12-to-v2.0.md: \"v2.0.0 以降\" の wording を\n    修正。 v2.0.0 は 2026-05-25 既 release で本 PR は含まれないため\n    \"PR #581 で\" / \"PR #581 (v2.0.1 予定)\" 表現に書き換え (Issue 1 +\n    Issue 2 セクション)。\n\n(2) src/python/tests/test_compat.py: torch.serialization の\n    get_safe_globals 戻り値が version 間で list / dict / tuple\n    入り list と varied なため、 dict→values 正規化と\n    (callable, name_str) tuple 展開を追加。 regression test が\n    silent に文字列キーだけ集めて pass する偽 green を防止。\n\n(3) doc-examples-gate audit snapshot を migration guide 編集に\n    合わせ再生成。\n\nlocal 検証: test_compat.py 3 passed / 1 skipped、 ruff clean。\n\n* fix(rust-deps): quinn-proto を 0.11.14 → 0.11.15 に bump (RUSTSEC-2026-0185)\n\nRUSTSEC-2026-0185: quinn-proto < 0.11.15 で out-of-order stream\nfragment の Assembler に memory exhaustion 脆弱性 (CVSS 7.5、\ndenial-of-service)。 cargo-audit が dev branch ですでに red 状態。\n\nquinn-proto は workspace の transitive dep で `cargo tree -i\nquinn-proto --target all` が empty を返すため piper-plus からは\n実際には使用されていない (reqwest 0.12 の rustls-tls-native-roots\nfeature が path 上で持ち込んだ過去の lock 残骸)。 lock file の\npatch 版差し替えだけで cargo build 影響なし。\n\n`cargo update -p quinn-proto --precise 0.11.15` で実施、 local\n`cd src/rust && cargo audit` は exit 0 (warnings only: bincode /\nencoding の unmaintained は config で allowed)。\n\nPR #581 のスコープ外の dev-base 起因 fail だが、 本ブランチで\nbundle 修正することにした。\n\n* chore(docs): cleanup — archive completed milestone docs + consolidate redundant guides\n\n5 scout x 1 synthesis 構成の audit workflow で 12 件の plan items を抽出し、 本ブランチで全件対応。\n\nP0 (即実行、 confidence=high):\n- DELETE docs/superpowers/plans/2026-06-03-swedish-per-word-lid-parity.md\n  (Issue #539 → PR #545 で完了、 0 inbound ref、 canonical\n   replacement = docs/reference/swedish-lid/README.md)\n- DELETE docs/superpowers/ directory (空になったため)\n- ARCHIVE docs/design/v9-training-handoff.md → docs/design/legacy/\n  (自己宣言 obsolete、 v9 = 20-speaker scratch は v7 multi-6lang に置換済)\n\nP1 (推奨、 confidence=high):\n- ARCHIVE docs/reference/python-313/ (5 file) → docs/archive/python-313/\n  (Issue #527 closed 2026-06-22 + PR #569 merged、 完了 banner 追加)\n- DELETE docs/guides/training.md (84 行、 dual-maintenance liability、\n  内容は training-guide.md (975 行) と重複)\n- DELETE docs/guides/README.md (29 行、 docs/README.md Guides\n  section と重複した古い subset)\n\nP2 (品質改善、 confidence=medium):\n- windows-setup.md: TS section 冒頭に重複注記を追加 (full surgical\n  extract は content judgment が重く別 PR に defer)\n- v7 results doc 冒頭に handoff doc との棲み分け notice を追加\n  (full fold は別 PR、 cross-link で dedup の意図を明示)\n\nP3 (NEEDS-HUMAN-REVIEW → 採用判断、 confidence=medium):\n- DELETE docs/reference/branch-protection-history.md\n  (dev branch 実際は protection なし、 1 entry が pending placeholder\n   のまま放置、 3 inbound refs を一括更新)\n- ARCHIVE docs/design/zero-shot-speaker-similarity-research.md\n  → docs/design/legacy/ (v8/v9 era research snapshot、 v7 multi-6lang\n   results に置換済、 DINO/SEED/CFG メモは historical context として保持)\n- zero-shot-quality-improvement-plan.md: 冒頭に「Tier 1 ✅ 完了 (v7)、\n  Tier 2/3 active」 ステータス banner を追加 (Phase 1 = 過去 snapshot)\n- CLAUDE.md model 表は agent context canonical として維持 (refactor\n  しない)、 cross-link 注記のみ追加。 pretrained-models.md には\n  Zero-Shot v7 + Tsukuyomi FT + CAM++ Speaker Encoder の 3 行を\n  user 向けカタログとして追加\n\n副次更新:\n- 7 ファイルの inbound link を新 path に追従 (docs/README.md /\n  multi-6lang-zero-shot-v7-training-results.md / handoff /\n  CHANGELOG / migration guide / piper_train/__main__.py /\n  test_python313_migration.py / archive/python-313/ 内部 cross-refs)\n- audit.json snapshot 再生成 (528 blocks → 494 blocks に減少)\n\nlocal 検証: pytest 12 passed + 1 skipped (test_compat / test_pyproject_torch_marker / test_python313_migration)。\n\n* fix(docs): lychee + markdownlint 2 件解消 (docs cleanup の link drift)\n\n(1) docs/archive/python-313/requirements.md L362: ort-versions.md への\n    相対 path が python-313 archive 移動で壊れていた\n    (`../ort-versions.md` → `../../reference/ort-versions.md`)。\n\n(2) docs/design/legacy/v9-training-handoff.md L5: v7 results doc が\n    sibling から parent reference に変わった\n    (`multi-6lang-zero-shot-v7-training-results.md` → `../multi-...`)。\n\n(3) docs/design/zero-shot-quality-improvement-plan.md L4: MD032\n    blockquote 内 list の前に blank quote line を追加。\n\n* chore(docs): archive 削除、 history/issue へ pointer 化\n\nユーザー指示により docs/archive/python-313/ と docs/design/legacy/ を\n削除。 archive 自体の保管価値が薄く、 設計の根拠 / ADR / 実装履歴は\nIssue #527 + PR #569 と git log がより信頼できる canonical source\nであるため、 重複保管を解消。\n\n削除 (7 files):\n- docs/archive/python-313/README.md\n- docs/archive/python-313/requirements.md\n- docs/archive/python-313/specifications.md  (DR-001〜009 ADR)\n- docs/archive/python-313/milestones.md\n- docs/archive/python-313/open-questions.md\n- docs/design/legacy/v9-training-handoff.md\n- docs/design/legacy/zero-shot-speaker-similarity-research.md\n(親 dir docs/archive/ と docs/design/legacy/ も auto-removed)\n\ninbound ref 統合 (8 files):\n- CHANGELOG.md: archive 5 文書言及 → Issue #527 + PR #569 pointer\n- docs/migration/v1.12-to-v2.0.md L5/L339/L375: archive 言及を\n  Issue #527 + PR #569 pointer に書換、 関連リソース節も同様\n- docs/reference/README.md: Python 3.13 移行 row を削除\n- docs/README.md: legacy 2 行削除\n- docs/design/multi-6lang-zero-shot-v7-training-results.md:\n  legacy 2 行を git log pointer に書換\n- docs/handoff/zero-shot-tts-handoff-2026-06-20.md: legacy 2 行削除\n- src/python/piper_train/__main__.py: 内部 comment を\n  \"Issue #527 / DR-007 (PR #569)\" に書換\n- src/python/tests/test_python313_migration.py: assertion message\n  を \"Issue #527 / DR-008 (PR #569)\" に書換 (test 5 件 pass 確認)\n\naudit snapshot 再生成 (494 → 462 blocks)。 local pytest pass。",
+          "timestamp": "2026-06-26T23:18:21+09:00",
+          "tree_id": "7b103f9d253b0f94867948e4d038b1c72170a6e5",
+          "url": "https://github.com/ayutaz/piper-plus/commit/06898542a7bd3b8288a676de741d53d348ef2b60"
+        },
+        "date": 1782483569148,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "RTF (en)",
+            "value": 0.0984,
+            "unit": "ratio"
+          },
+          {
+            "name": "Latency P50 (en)",
+            "value": 24.9,
+            "unit": "ms"
+          },
+          {
+            "name": "Latency P95 (en)",
+            "value": 26.3,
+            "unit": "ms"
+          },
+          {
+            "name": "Cold Start (en)",
+            "value": 1359.5,
+            "unit": "ms"
+          },
+          {
+            "name": "Peak Memory (en)",
+            "value": 206.4,
             "unit": "MB"
           },
           {
