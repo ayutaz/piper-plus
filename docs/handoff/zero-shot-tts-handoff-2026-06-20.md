@@ -732,8 +732,6 @@ else:
 | **本書 (引き継ぎ)** | `docs/handoff/zero-shot-tts-handoff-2026-06-20.md` |
 | v7 詳細結果 | `docs/design/multi-6lang-zero-shot-v7-training-results.md` |
 | 品質改善プラン | `docs/design/zero-shot-quality-improvement-plan.md` |
-| v9 旧引き継ぎ (リベース前) | `docs/design/legacy/v9-training-handoff.md` |
-| 話者類似性研究 | `docs/design/legacy/zero-shot-speaker-similarity-research.md` |
 | プロジェクト全体 | `CLAUDE.md` |
 
 ---

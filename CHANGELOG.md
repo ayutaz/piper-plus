@@ -63,10 +63,7 @@ Issue #527: Docker 全 image + CI workflow + ドキュメントを **Python 3.13
 
 ### Added
 
-- **`docs/archive/python-313/`**: Issue #527 設計ドキュメント群
-  (`requirements.md` / `specifications.md` / `milestones.md` /
-  `open-questions.md` / `README.md`、 計 5 文書 約 3700 行)。
-- **`docs/migration/v1.12-to-v2.0.md`**: 本マイグレーションガイド。
+- **`docs/migration/v1.12-to-v2.0.md`**: v2.0.0 マイグレーションガイド (Issue #527 + Zero-Shot TTS 統合リリース)。 設計の根拠 / ADR / 未決事項 / 実装履歴は [Issue #527](https://github.com/ayutaz/piper-plus/issues/527) + [PR #569](https://github.com/ayutaz/piper-plus/pull/569) を canonical source とする。
 - **`torch.backends.cuda.matmul.allow_tf32 = True`** in
   [`src/python/piper_train/__main__.py`](src/python/piper_train/__main__.py)
   (DR-007、 Ada/Blackwell で TF32 Tensor Core 透過適用)。

@@ -99,8 +99,6 @@ piper-plus ドキュメント。利用ガイド・各ランタイム連携・仕
 
 - [Zero-Shot Quality Improvement Plan](design/zero-shot-quality-improvement-plan.md) - Improvement roadmap for zero-shot speaker similarity (Phase 1 ✅ shipped via v7 multi-6lang)
 - [Multi-6lang Zero-Shot v7 Training Results](design/multi-6lang-zero-shot-v7-training-results.md) - Canonical v7 training results + 5 fix commit history
-- [Zero-Shot Speaker Similarity Research (legacy)](design/legacy/zero-shot-speaker-similarity-research.md) - v8/v9 era research snapshot (superseded by v7 multi-6lang)
-- [v9 Training Handoff (legacy)](design/legacy/v9-training-handoff.md) - v9 re-training context (superseded by v7 multi-6lang)
 
 ## Development
 

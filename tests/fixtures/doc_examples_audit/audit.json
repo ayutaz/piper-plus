@@ -2,16 +2,16 @@
   "schema_version": 1,
   "generated_at": "2026-05-19T00:00:00Z",
   "totals": {
-    "executable": 224,
+    "executable": 221,
     "needs_placeholder": 6,
-    "skip_warranted": 264,
-    "total": 494
+    "skip_warranted": 235,
+    "total": 462
   },
   "by_language": {
     "bash": {
       "executable": 162,
       "needs_placeholder": 6,
-      "skip_warranted": 46
+      "skip_warranted": 44
     },
     "csharp": {
       "executable": 5,
@@ -24,7 +24,7 @@
       "skip_warranted": 0
     },
     "python": {
-      "executable": 32,
+      "executable": 29,
       "needs_placeholder": 0,
       "skip_warranted": 1
     },
@@ -36,7 +36,7 @@
     "unknown": {
       "executable": 0,
       "needs_placeholder": 0,
-      "skip_warranted": 217
+      "skip_warranted": 190
     },
     "wasm": {
       "executable": 10,
@@ -59,435 +59,6 @@
       ],
       "env_dependencies": [],
       "hash_sha1": "6223aedcf62870c02c940f7e5d89fe87aadbeb17"
-    },
-    {
-      "file": "docs/archive/python-313/README.md",
-      "line_start": 21,
-      "line_end": 33,
-      "language_raw": "text",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "2bc635ecf03cc1c98793c7cff9711cc8f4d2fb14"
-    },
-    {
-      "file": "docs/archive/python-313/README.md",
-      "line_start": 462,
-      "line_end": 465,
-      "language_raw": "python",
-      "language": "python",
-      "category": "executable",
-      "suggested_action": "execution_gate_candidate",
-      "placeholders_detected": [],
-      "directives_detected": [],
-      "env_dependencies": [],
-      "hash_sha1": "a7f7132ea86d070680c083aefb4da552227f1a51"
-    },
-    {
-      "file": "docs/archive/python-313/README.md",
-      "line_start": 489,
-      "line_end": 503,
-      "language_raw": "dockerfile",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "0f7e74596d729180630e874b0994a14f68acb8d2"
-    },
-    {
-      "file": "docs/archive/python-313/README.md",
-      "line_start": 660,
-      "line_end": 679,
-      "language_raw": "text",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "d503995118d3c0aac8d6c62970e4fb446bf2757e"
-    },
-    {
-      "file": "docs/archive/python-313/README.md",
-      "line_start": 689,
-      "line_end": 698,
-      "language_raw": "diff",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "0b573fd02c4d421dd90b0e01be2a2f2bb6ad8de9"
-    },
-    {
-      "file": "docs/archive/python-313/README.md",
-      "line_start": 702,
-      "line_end": 712,
-      "language_raw": "diff",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "855b3c9280ea747e163265c526de2d8ffda42f37"
-    },
-    {
-      "file": "docs/archive/python-313/README.md",
-      "line_start": 716,
-      "line_end": 724,
-      "language_raw": "diff",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "0cbf2c5a745ae0bab74d5325adc66de4e0080945"
-    },
-    {
-      "file": "docs/archive/python-313/README.md",
-      "line_start": 730,
-      "line_end": 745,
-      "language_raw": "diff",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "cc304408d61ae663839fdb758245f79bff23a202"
-    },
-    {
-      "file": "docs/archive/python-313/README.md",
-      "line_start": 749,
-      "line_end": 777,
-      "language_raw": "diff",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "c2200c99acf191b7bf2e5ceaace817d02c0e3ab8"
-    },
-    {
-      "file": "docs/archive/python-313/README.md",
-      "line_start": 781,
-      "line_end": 815,
-      "language_raw": "diff",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "1cd943d1f87aebb533d883c007de4fd49190e248"
-    },
-    {
-      "file": "docs/archive/python-313/README.md",
-      "line_start": 821,
-      "line_end": 831,
-      "language_raw": "diff",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "0b87f50aafff7d4e856a96dde322e027a4104d0f"
-    },
-    {
-      "file": "docs/archive/python-313/README.md",
-      "line_start": 835,
-      "line_end": 845,
-      "language_raw": "diff",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "3b984511d447ca0c114e2bad89f84af4c8d4aa53"
-    },
-    {
-      "file": "docs/archive/python-313/README.md",
-      "line_start": 871,
-      "line_end": 891,
-      "language_raw": "markdown",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "0de21fad4bfd93fa345be234f1798e27076a325d"
-    },
-    {
-      "file": "docs/archive/python-313/README.md",
-      "line_start": 895,
-      "line_end": 921,
-      "language_raw": "markdown",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "a5c09edb5f18c321e71737d39ab70120b63df30f"
-    },
-    {
-      "file": "docs/archive/python-313/milestones.md",
-      "line_start": 14,
-      "line_end": 24,
-      "language_raw": "text",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "14e535aa87cc7a4c4dc343e41722e12a01659854"
-    },
-    {
-      "file": "docs/archive/python-313/milestones.md",
-      "line_start": 385,
-      "line_end": 426,
-      "language_raw": "text",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "a78eb1ab87abf1b9c03966e21dd0660ddafe5909"
-    },
-    {
-      "file": "docs/archive/python-313/milestones.md",
-      "line_start": 486,
-      "line_end": 490,
-      "language_raw": "markdown",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "e6690baf11cb64dafb2988d80ef4eca9b9cedf05"
-    },
-    {
-      "file": "docs/archive/python-313/open-questions.md",
-      "line_start": 228,
-      "line_end": 269,
-      "language_raw": "markdown",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "17e4906aebec0d8500ea237bd8415bf1c8127806"
-    },
-    {
-      "file": "docs/archive/python-313/specifications.md",
-      "line_start": 155,
-      "line_end": 168,
-      "language_raw": "yaml",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "a159a8258ad2a944bc9798e2ae3f8acd7f967a76"
-    },
-    {
-      "file": "docs/archive/python-313/specifications.md",
-      "line_start": 172,
-      "line_end": 191,
-      "language_raw": "yaml",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "2756e60699e533165c303ba445f5e4c633b73eb6"
-    },
-    {
-      "file": "docs/archive/python-313/specifications.md",
-      "line_start": 195,
-      "line_end": 209,
-      "language_raw": "yaml",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "bc6186d8ec8142e4cc3ebcb24818273b208aa035"
-    },
-    {
-      "file": "docs/archive/python-313/specifications.md",
-      "line_start": 213,
-      "line_end": 236,
-      "language_raw": "yaml",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "eebfb0bd03cb99997951728ef2c696bb9f75d64a"
-    },
-    {
-      "file": "docs/archive/python-313/specifications.md",
-      "line_start": 240,
-      "line_end": 266,
-      "language_raw": "yaml",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "28d7ed7004e3ede60b32b4b2bd8d13ee95e9dbc1"
-    },
-    {
-      "file": "docs/archive/python-313/specifications.md",
-      "line_start": 308,
-      "line_end": 317,
-      "language_raw": "python",
-      "language": "python",
-      "category": "executable",
-      "suggested_action": "execution_gate_candidate",
-      "placeholders_detected": [],
-      "directives_detected": [],
-      "env_dependencies": [],
-      "hash_sha1": "683d8c181d4abb6cde17a0c4ba507fb8383b4581"
-    },
-    {
-      "file": "docs/archive/python-313/specifications.md",
-      "line_start": 343,
-      "line_end": 346,
-      "language_raw": "diff",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "1224550b973ed577715e62801e08fe7dc9c0a02e"
-    },
-    {
-      "file": "docs/archive/python-313/specifications.md",
-      "line_start": 348,
-      "line_end": 351,
-      "language_raw": "diff",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "7d28368b9c053ec289b0c23c42dea7b65944d988"
-    },
-    {
-      "file": "docs/archive/python-313/specifications.md",
-      "line_start": 786,
-      "line_end": 813,
-      "language_raw": "diff",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "6c3e362a2d50a1bec678e6ff628771e3166eba62"
-    },
-    {
-      "file": "docs/archive/python-313/specifications.md",
-      "line_start": 817,
-      "line_end": 822,
-      "language_raw": "diff",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "57401986b7ef2de9e88c314e184ca21f46858cc1"
-    },
-    {
-      "file": "docs/archive/python-313/specifications.md",
-      "line_start": 955,
-      "line_end": 960,
-      "language_raw": "python",
-      "language": "python",
-      "category": "executable",
-      "suggested_action": "execution_gate_candidate",
-      "placeholders_detected": [],
-      "directives_detected": [],
-      "env_dependencies": [],
-      "hash_sha1": "52d2bf0b495168cae75bdbb98510ade8976851a8"
     },
     {
       "file": "docs/benchmark-mos.md",
@@ -561,52 +132,6 @@
       "hash_sha1": "2120a3bd7543ea08915070a99717bd1b755f8230"
     },
     {
-      "file": "docs/design/legacy/v9-training-handoff.md",
-      "line_start": 41,
-      "line_end": 57,
-      "language_raw": "bash",
-      "language": "bash",
-      "category": "skip_warranted",
-      "suggested_action": "sandbox_cannot_satisfy_env_dep",
-      "placeholders_detected": [],
-      "directives_detected": [],
-      "env_dependencies": [
-        "/data/piper/"
-      ],
-      "hash_sha1": "c09d4223ae43dfc08fbaa332d13b5e7b88677950"
-    },
-    {
-      "file": "docs/design/legacy/v9-training-handoff.md",
-      "line_start": 128,
-      "line_end": 130,
-      "language_raw": "text",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "35ed332582d241ec42f6381c0bd111385cc570f6"
-    },
-    {
-      "file": "docs/design/legacy/v9-training-handoff.md",
-      "line_start": 144,
-      "line_end": 173,
-      "language_raw": "bash",
-      "language": "bash",
-      "category": "skip_warranted",
-      "suggested_action": "sandbox_cannot_satisfy_env_dep",
-      "placeholders_detected": [],
-      "directives_detected": [],
-      "env_dependencies": [
-        "/data/piper/",
-        "CUDA_VISIBLE_DEVICES"
-      ],
-      "hash_sha1": "1b889df0a71106cfc6f38215306c4f3b3ca0c2ce"
-    },
-    {
       "file": "docs/design/multi-6lang-zero-shot-v7-training-results.md",
       "line_start": 36,
       "line_end": 39,
@@ -638,8 +163,8 @@
     },
     {
       "file": "docs/design/zero-shot-quality-improvement-plan.md",
-      "line_start": 50,
-      "line_end": 62,
+      "line_start": 51,
+      "line_end": 63,
       "language_raw": "python",
       "language": "python",
       "category": "executable",
@@ -651,8 +176,8 @@
     },
     {
       "file": "docs/design/zero-shot-quality-improvement-plan.md",
-      "line_start": 85,
-      "line_end": 92,
+      "line_start": 86,
+      "line_end": 93,
       "language_raw": "python",
       "language": "python",
       "category": "executable",
@@ -664,8 +189,8 @@
     },
     {
       "file": "docs/design/zero-shot-quality-improvement-plan.md",
-      "line_start": 100,
-      "line_end": 104,
+      "line_start": 101,
+      "line_end": 105,
       "language_raw": "python",
       "language": "python",
       "category": "executable",
@@ -677,8 +202,8 @@
     },
     {
       "file": "docs/design/zero-shot-quality-improvement-plan.md",
-      "line_start": 240,
-      "line_end": 243,
+      "line_start": 241,
+      "line_end": 244,
       "language_raw": "text",
       "language": "unknown",
       "category": "skip_warranted",
@@ -692,8 +217,8 @@
     },
     {
       "file": "docs/design/zero-shot-quality-improvement-plan.md",
-      "line_start": 266,
-      "line_end": 269,
+      "line_start": 267,
+      "line_end": 270,
       "language_raw": "text",
       "language": "unknown",
       "category": "skip_warranted",
@@ -707,8 +232,8 @@
     },
     {
       "file": "docs/design/zero-shot-quality-improvement-plan.md",
-      "line_start": 279,
-      "line_end": 282,
+      "line_start": 280,
+      "line_end": 283,
       "language_raw": "text",
       "language": "unknown",
       "category": "skip_warranted",
@@ -5109,8 +4634,8 @@
     },
     {
       "file": "docs/handoff/zero-shot-tts-handoff-2026-06-20.md",
-      "line_start": 761,
-      "line_end": 844,
+      "line_start": 759,
+      "line_end": 842,
       "language_raw": "python",
       "language": "python",
       "category": "skip_warranted",

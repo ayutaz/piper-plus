@@ -213,5 +213,4 @@ CLAUDE.md の基準値 (out-of-domain 0.55-0.70 = 良好) との比較で、
 ## 7. 参考ドキュメント
 
 - [`zero-shot-quality-improvement-plan.md`](zero-shot-quality-improvement-plan.md): Tier 1-4 改善ロードマップ
-- [`legacy/zero-shot-speaker-similarity-research.md`](legacy/zero-shot-speaker-similarity-research.md): 10 エージェント研究調査 (v8/v9 era snapshot)
-- [`legacy/v9-training-handoff.md`](legacy/v9-training-handoff.md): 旧 zero-shot 20speakers 学習引き継ぎ
+- v8/v9 era の話者類似性研究 + 旧 zero-shot 20speakers 学習引き継ぎ は git history (`git log --until=2026-06-26 -- docs/design/`) を参照 (PR #581 で archive 削除)

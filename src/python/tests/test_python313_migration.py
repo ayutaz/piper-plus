@@ -187,7 +187,7 @@ def test_argparse_precision_default_is_bf16_mixed():
     assert args.precision == "bf16-mixed", (
         f"DR-008 violation: --precision default is {args.precision!r}, "
         "expected 'bf16-mixed' (Template A/B canonical). "
-        "See docs/archive/python-313/specifications.md."
+        "See Issue #527 / DR-008 (PR #569)."
     )
 
 
