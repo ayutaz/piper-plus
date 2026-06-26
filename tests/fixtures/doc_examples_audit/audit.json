@@ -1,45 +1,45 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-06-22T00:00:00Z",
+  "generated_at": "2026-05-19T00:00:00Z",
   "totals": {
-    "executable": 250,
+    "executable": 221,
     "needs_placeholder": 6,
-    "skip_warranted": 272,
-    "total": 528
+    "skip_warranted": 235,
+    "total": 462
   },
   "by_language": {
     "bash": {
-      "executable": 179,
+      "executable": 162,
       "needs_placeholder": 6,
-      "skip_warranted": 47
+      "skip_warranted": 44
     },
     "csharp": {
-      "executable": 6,
-      "needs_placeholder": 0,
-      "skip_warranted": 0
-    },
-    "go": {
       "executable": 5,
       "needs_placeholder": 0,
       "skip_warranted": 0
     },
+    "go": {
+      "executable": 4,
+      "needs_placeholder": 0,
+      "skip_warranted": 0
+    },
     "python": {
-      "executable": 37,
+      "executable": 29,
       "needs_placeholder": 0,
       "skip_warranted": 1
     },
     "rust": {
-      "executable": 12,
+      "executable": 11,
       "needs_placeholder": 0,
       "skip_warranted": 0
     },
     "unknown": {
       "executable": 0,
       "needs_placeholder": 0,
-      "skip_warranted": 224
+      "skip_warranted": 190
     },
     "wasm": {
-      "executable": 11,
+      "executable": 10,
       "needs_placeholder": 0,
       "skip_warranted": 0
     }
@@ -133,8 +133,8 @@
     },
     {
       "file": "docs/design/multi-6lang-zero-shot-v7-training-results.md",
-      "line_start": 34,
-      "line_end": 37,
+      "line_start": 36,
+      "line_end": 39,
       "language_raw": "text",
       "language": "unknown",
       "category": "skip_warranted",
@@ -148,8 +148,8 @@
     },
     {
       "file": "docs/design/multi-6lang-zero-shot-v7-training-results.md",
-      "line_start": 107,
-      "line_end": 135,
+      "line_start": 109,
+      "line_end": 137,
       "language_raw": "bash",
       "language": "bash",
       "category": "skip_warranted",
@@ -162,55 +162,9 @@
       "hash_sha1": "07f432b4fe96f257eb76713edeec543bfd69e1bc"
     },
     {
-      "file": "docs/design/v9-training-handoff.md",
-      "line_start": 41,
-      "line_end": 57,
-      "language_raw": "bash",
-      "language": "bash",
-      "category": "skip_warranted",
-      "suggested_action": "sandbox_cannot_satisfy_env_dep",
-      "placeholders_detected": [],
-      "directives_detected": [],
-      "env_dependencies": [
-        "/data/piper/"
-      ],
-      "hash_sha1": "c09d4223ae43dfc08fbaa332d13b5e7b88677950"
-    },
-    {
-      "file": "docs/design/v9-training-handoff.md",
-      "line_start": 128,
-      "line_end": 130,
-      "language_raw": "text",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "35ed332582d241ec42f6381c0bd111385cc570f6"
-    },
-    {
-      "file": "docs/design/v9-training-handoff.md",
-      "line_start": 144,
-      "line_end": 173,
-      "language_raw": "bash",
-      "language": "bash",
-      "category": "skip_warranted",
-      "suggested_action": "sandbox_cannot_satisfy_env_dep",
-      "placeholders_detected": [],
-      "directives_detected": [],
-      "env_dependencies": [
-        "/data/piper/",
-        "CUDA_VISIBLE_DEVICES"
-      ],
-      "hash_sha1": "1b889df0a71106cfc6f38215306c4f3b3ca0c2ce"
-    },
-    {
       "file": "docs/design/zero-shot-quality-improvement-plan.md",
-      "line_start": 45,
-      "line_end": 57,
+      "line_start": 51,
+      "line_end": 63,
       "language_raw": "python",
       "language": "python",
       "category": "executable",
@@ -222,8 +176,8 @@
     },
     {
       "file": "docs/design/zero-shot-quality-improvement-plan.md",
-      "line_start": 80,
-      "line_end": 87,
+      "line_start": 86,
+      "line_end": 93,
       "language_raw": "python",
       "language": "python",
       "category": "executable",
@@ -235,8 +189,8 @@
     },
     {
       "file": "docs/design/zero-shot-quality-improvement-plan.md",
-      "line_start": 95,
-      "line_end": 99,
+      "line_start": 101,
+      "line_end": 105,
       "language_raw": "python",
       "language": "python",
       "category": "executable",
@@ -248,8 +202,8 @@
     },
     {
       "file": "docs/design/zero-shot-quality-improvement-plan.md",
-      "line_start": 235,
-      "line_end": 238,
+      "line_start": 241,
+      "line_end": 244,
       "language_raw": "text",
       "language": "unknown",
       "category": "skip_warranted",
@@ -263,8 +217,8 @@
     },
     {
       "file": "docs/design/zero-shot-quality-improvement-plan.md",
-      "line_start": 261,
-      "line_end": 264,
+      "line_start": 267,
+      "line_end": 270,
       "language_raw": "text",
       "language": "unknown",
       "category": "skip_warranted",
@@ -278,8 +232,8 @@
     },
     {
       "file": "docs/design/zero-shot-quality-improvement-plan.md",
-      "line_start": 274,
-      "line_end": 277,
+      "line_start": 280,
+      "line_end": 283,
       "language_raw": "text",
       "language": "unknown",
       "category": "skip_warranted",
@@ -1689,8 +1643,8 @@
     },
     {
       "file": "docs/getting-started/windows-setup.md",
-      "line_start": 279,
-      "line_end": 304,
+      "line_start": 281,
+      "line_end": 306,
       "language_raw": "powershell",
       "language": "unknown",
       "category": "skip_warranted",
@@ -1704,8 +1658,8 @@
     },
     {
       "file": "docs/getting-started/windows-setup.md",
-      "line_start": 312,
-      "line_end": 329,
+      "line_start": 314,
+      "line_end": 331,
       "language_raw": "powershell",
       "language": "unknown",
       "category": "skip_warranted",
@@ -1719,8 +1673,8 @@
     },
     {
       "file": "docs/getting-started/windows-setup.md",
-      "line_start": 339,
-      "line_end": 342,
+      "line_start": 341,
+      "line_end": 344,
       "language_raw": "cmd",
       "language": "unknown",
       "category": "skip_warranted",
@@ -1734,8 +1688,8 @@
     },
     {
       "file": "docs/getting-started/windows-setup.md",
-      "line_start": 350,
-      "line_end": 357,
+      "line_start": 352,
+      "line_end": 359,
       "language_raw": "powershell",
       "language": "unknown",
       "category": "skip_warranted",
@@ -1749,8 +1703,8 @@
     },
     {
       "file": "docs/getting-started/windows-setup.md",
-      "line_start": 361,
-      "line_end": 364,
+      "line_start": 363,
+      "line_end": 366,
       "language_raw": "cmd",
       "language": "unknown",
       "category": "skip_warranted",
@@ -1764,8 +1718,8 @@
     },
     {
       "file": "docs/getting-started/windows-setup.md",
-      "line_start": 370,
-      "line_end": 394,
+      "line_start": 372,
+      "line_end": 396,
       "language_raw": "bat",
       "language": "unknown",
       "category": "skip_warranted",
@@ -1779,8 +1733,8 @@
     },
     {
       "file": "docs/getting-started/windows-setup.md",
-      "line_start": 398,
-      "line_end": 400,
+      "line_start": 400,
+      "line_end": 402,
       "language_raw": "cmd",
       "language": "unknown",
       "category": "skip_warranted",
@@ -1794,8 +1748,8 @@
     },
     {
       "file": "docs/getting-started/windows-setup.md",
-      "line_start": 404,
-      "line_end": 417,
+      "line_start": 406,
+      "line_end": 419,
       "language_raw": "powershell",
       "language": "unknown",
       "category": "skip_warranted",
@@ -1809,8 +1763,8 @@
     },
     {
       "file": "docs/getting-started/windows-setup.md",
-      "line_start": 425,
-      "line_end": 462,
+      "line_start": 427,
+      "line_end": 464,
       "language_raw": "powershell",
       "language": "unknown",
       "category": "skip_warranted",
@@ -1824,8 +1778,8 @@
     },
     {
       "file": "docs/getting-started/windows-setup.md",
-      "line_start": 479,
-      "line_end": 481,
+      "line_start": 481,
+      "line_end": 483,
       "language_raw": "powershell",
       "language": "unknown",
       "category": "skip_warranted",
@@ -1839,8 +1793,8 @@
     },
     {
       "file": "docs/getting-started/windows-setup.md",
-      "line_start": 486,
-      "line_end": 488,
+      "line_start": 488,
+      "line_end": 490,
       "language_raw": "powershell",
       "language": "unknown",
       "category": "skip_warranted",
@@ -1854,8 +1808,8 @@
     },
     {
       "file": "docs/getting-started/windows-setup.md",
-      "line_start": 505,
-      "line_end": 515,
+      "line_start": 507,
+      "line_end": 517,
       "language_raw": "powershell",
       "language": "unknown",
       "category": "skip_warranted",
@@ -1869,8 +1823,8 @@
     },
     {
       "file": "docs/getting-started/windows-setup.md",
-      "line_start": 526,
-      "line_end": 532,
+      "line_start": 528,
+      "line_end": 534,
       "language_raw": "powershell",
       "language": "unknown",
       "category": "skip_warranted",
@@ -1884,8 +1838,8 @@
     },
     {
       "file": "docs/getting-started/windows-setup.md",
-      "line_start": 536,
-      "line_end": 553,
+      "line_start": 538,
+      "line_end": 555,
       "language_raw": "powershell",
       "language": "unknown",
       "category": "skip_warranted",
@@ -2158,8 +2112,8 @@
     },
     {
       "file": "docs/guides/development/pretrained-models.md",
-      "line_start": 28,
-      "line_end": 32,
+      "line_start": 38,
+      "line_end": 42,
       "language_raw": "powershell",
       "language": "unknown",
       "category": "skip_warranted",
@@ -2173,8 +2127,8 @@
     },
     {
       "file": "docs/guides/development/pretrained-models.md",
-      "line_start": 36,
-      "line_end": 40,
+      "line_start": 46,
+      "line_end": 50,
       "language_raw": "bash",
       "language": "bash",
       "category": "executable",
@@ -3540,47 +3494,6 @@
       "hash_sha1": "f9d33228c4d9b89ac8006acc04e450b8a3338ef4"
     },
     {
-      "file": "docs/guides/training.md",
-      "line_start": 11,
-      "line_end": 21,
-      "language_raw": "bash",
-      "language": "bash",
-      "category": "executable",
-      "suggested_action": "execution_gate_candidate",
-      "placeholders_detected": [],
-      "directives_detected": [],
-      "env_dependencies": [],
-      "hash_sha1": "e36b82a6207696177a2af37d68e6a0c8ff495608"
-    },
-    {
-      "file": "docs/guides/training.md",
-      "line_start": 27,
-      "line_end": 37,
-      "language_raw": "bash",
-      "language": "bash",
-      "category": "executable",
-      "suggested_action": "execution_gate_candidate",
-      "placeholders_detected": [],
-      "directives_detected": [],
-      "env_dependencies": [],
-      "hash_sha1": "b8830606b5de24e386400a5a95688a2cf324bd63"
-    },
-    {
-      "file": "docs/guides/training.md",
-      "line_start": 60,
-      "line_end": 68,
-      "language_raw": "bash",
-      "language": "bash",
-      "category": "skip_warranted",
-      "suggested_action": "sandbox_cannot_satisfy_env_dep",
-      "placeholders_detected": [],
-      "directives_detected": [],
-      "env_dependencies": [
-        "CUDA_VISIBLE_DEVICES"
-      ],
-      "hash_sha1": "cc170e10ef490edb72e1f52432136257ab04cd0b"
-    },
-    {
       "file": "docs/guides/training/training-guide.md",
       "line_start": 57,
       "line_end": 59,
@@ -4721,8 +4634,8 @@
     },
     {
       "file": "docs/handoff/zero-shot-tts-handoff-2026-06-20.md",
-      "line_start": 761,
-      "line_end": 844,
+      "line_start": 759,
+      "line_end": 842,
       "language_raw": "python",
       "language": "python",
       "category": "skip_warranted",
@@ -4889,8 +4802,8 @@
     },
     {
       "file": "docs/migration/v1.12-to-v2.0.md",
-      "line_start": 118,
-      "line_end": 122,
+      "line_start": 123,
+      "line_end": 126,
       "language_raw": "powershell",
       "language": "unknown",
       "category": "skip_warranted",
@@ -4900,12 +4813,12 @@
         "unknown_language"
       ],
       "env_dependencies": [],
-      "hash_sha1": "8800d9cf62bb37b65fa13c78e52d3bd26b76eae6"
+      "hash_sha1": "842b0fac92bdc34e01d51be6673495ae654ea265"
     },
     {
       "file": "docs/migration/v1.12-to-v2.0.md",
-      "line_start": 130,
-      "line_end": 132,
+      "line_start": 136,
+      "line_end": 138,
       "language_raw": "text",
       "language": "unknown",
       "category": "skip_warranted",
@@ -4919,8 +4832,8 @@
     },
     {
       "file": "docs/migration/v1.12-to-v2.0.md",
-      "line_start": 138,
-      "line_end": 143,
+      "line_start": 147,
+      "line_end": 152,
       "language_raw": "python",
       "language": "python",
       "category": "executable",
@@ -4932,8 +4845,8 @@
     },
     {
       "file": "docs/migration/v1.12-to-v2.0.md",
-      "line_start": 185,
-      "line_end": 189,
+      "line_start": 194,
+      "line_end": 198,
       "language_raw": "sh",
       "language": "bash",
       "category": "needs_placeholder",
@@ -4947,8 +4860,8 @@
     },
     {
       "file": "docs/migration/v1.12-to-v2.0.md",
-      "line_start": 195,
-      "line_end": 202,
+      "line_start": 204,
+      "line_end": 211,
       "language_raw": "sh",
       "language": "bash",
       "category": "needs_placeholder",
@@ -4962,8 +4875,8 @@
     },
     {
       "file": "docs/migration/v1.12-to-v2.0.md",
-      "line_start": 224,
-      "line_end": 230,
+      "line_start": 233,
+      "line_end": 239,
       "language_raw": "dockerfile",
       "language": "unknown",
       "category": "skip_warranted",
@@ -4977,8 +4890,8 @@
     },
     {
       "file": "docs/migration/v1.12-to-v2.0.md",
-      "line_start": 240,
-      "line_end": 245,
+      "line_start": 249,
+      "line_end": 254,
       "language_raw": "python",
       "language": "python",
       "category": "executable",
@@ -4990,8 +4903,8 @@
     },
     {
       "file": "docs/migration/v1.12-to-v2.0.md",
-      "line_start": 257,
-      "line_end": 260,
+      "line_start": 266,
+      "line_end": 269,
       "language_raw": "python",
       "language": "python",
       "category": "executable",
@@ -5003,8 +4916,8 @@
     },
     {
       "file": "docs/migration/v1.12-to-v2.0.md",
-      "line_start": 275,
-      "line_end": 280,
+      "line_start": 284,
+      "line_end": 289,
       "language_raw": "diff",
       "language": "unknown",
       "category": "skip_warranted",
@@ -5018,8 +4931,8 @@
     },
     {
       "file": "docs/migration/v1.12-to-v2.0.md",
-      "line_start": 288,
-      "line_end": 293,
+      "line_start": 297,
+      "line_end": 302,
       "language_raw": "sh",
       "language": "bash",
       "category": "executable",
@@ -5031,8 +4944,8 @@
     },
     {
       "file": "docs/migration/v1.12-to-v2.0.md",
-      "line_start": 299,
-      "line_end": 303,
+      "line_start": 308,
+      "line_end": 312,
       "language_raw": "sh",
       "language": "bash",
       "category": "executable",
@@ -5044,8 +4957,8 @@
     },
     {
       "file": "docs/migration/v1.12-to-v2.0.md",
-      "line_start": 309,
-      "line_end": 312,
+      "line_start": 318,
+      "line_end": 321,
       "language_raw": "sh",
       "language": "bash",
       "category": "executable",
@@ -5054,75 +4967,6 @@
       "directives_detected": [],
       "env_dependencies": [],
       "hash_sha1": "6396361ad7a7a39080006b092591af4fed0e1483"
-    },
-    {
-      "file": "docs/reference/branch-protection-history.md",
-      "line_start": 50,
-      "line_end": 62,
-      "language_raw": "json",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "c6bc70b264ac465c07f2aa4bc7a43d3199b199d4"
-    },
-    {
-      "file": "docs/reference/branch-protection-history.md",
-      "line_start": 66,
-      "line_end": 79,
-      "language_raw": "json",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "88d4c0e4517a185000f59d590470aa1e2383673e"
-    },
-    {
-      "file": "docs/reference/branch-protection-history.md",
-      "line_start": 83,
-      "line_end": 91,
-      "language_raw": "bash",
-      "language": "bash",
-      "category": "executable",
-      "suggested_action": "execution_gate_candidate",
-      "placeholders_detected": [],
-      "directives_detected": [],
-      "env_dependencies": [],
-      "hash_sha1": "5e6615541236ed65359c00197c882f8756fddbad"
-    },
-    {
-      "file": "docs/reference/branch-protection-history.md",
-      "line_start": 95,
-      "line_end": 99,
-      "language_raw": "bash",
-      "language": "bash",
-      "category": "executable",
-      "suggested_action": "execution_gate_candidate",
-      "placeholders_detected": [],
-      "directives_detected": [],
-      "env_dependencies": [],
-      "hash_sha1": "2732eb89a63de31bebcbad0a2f8cada1213467e4"
-    },
-    {
-      "file": "docs/reference/branch-protection-history.md",
-      "line_start": 103,
-      "line_end": 110,
-      "language_raw": "bash",
-      "language": "bash",
-      "category": "executable",
-      "suggested_action": "execution_gate_candidate",
-      "placeholders_detected": [],
-      "directives_detected": [],
-      "env_dependencies": [],
-      "hash_sha1": "89b597a890e924c2c449ce4242e2b1bcf8443ad3"
     },
     {
       "file": "docs/reference/ios-shared-lib.md",
@@ -5533,435 +5377,6 @@
       "directives_detected": [],
       "env_dependencies": [],
       "hash_sha1": "ae040ba29e99f872f94902f34b73828966d93d70"
-    },
-    {
-      "file": "docs/reference/python-313/README.md",
-      "line_start": 19,
-      "line_end": 31,
-      "language_raw": "text",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "2bc635ecf03cc1c98793c7cff9711cc8f4d2fb14"
-    },
-    {
-      "file": "docs/reference/python-313/README.md",
-      "line_start": 460,
-      "line_end": 463,
-      "language_raw": "python",
-      "language": "python",
-      "category": "executable",
-      "suggested_action": "execution_gate_candidate",
-      "placeholders_detected": [],
-      "directives_detected": [],
-      "env_dependencies": [],
-      "hash_sha1": "a7f7132ea86d070680c083aefb4da552227f1a51"
-    },
-    {
-      "file": "docs/reference/python-313/README.md",
-      "line_start": 487,
-      "line_end": 501,
-      "language_raw": "dockerfile",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "0f7e74596d729180630e874b0994a14f68acb8d2"
-    },
-    {
-      "file": "docs/reference/python-313/README.md",
-      "line_start": 658,
-      "line_end": 677,
-      "language_raw": "text",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "d503995118d3c0aac8d6c62970e4fb446bf2757e"
-    },
-    {
-      "file": "docs/reference/python-313/README.md",
-      "line_start": 687,
-      "line_end": 696,
-      "language_raw": "diff",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "0b573fd02c4d421dd90b0e01be2a2f2bb6ad8de9"
-    },
-    {
-      "file": "docs/reference/python-313/README.md",
-      "line_start": 700,
-      "line_end": 710,
-      "language_raw": "diff",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "4f319e883241984a7c3019f328a4a7b7cc26d56b"
-    },
-    {
-      "file": "docs/reference/python-313/README.md",
-      "line_start": 714,
-      "line_end": 722,
-      "language_raw": "diff",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "0cbf2c5a745ae0bab74d5325adc66de4e0080945"
-    },
-    {
-      "file": "docs/reference/python-313/README.md",
-      "line_start": 728,
-      "line_end": 743,
-      "language_raw": "diff",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "cc304408d61ae663839fdb758245f79bff23a202"
-    },
-    {
-      "file": "docs/reference/python-313/README.md",
-      "line_start": 747,
-      "line_end": 775,
-      "language_raw": "diff",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "c2200c99acf191b7bf2e5ceaace817d02c0e3ab8"
-    },
-    {
-      "file": "docs/reference/python-313/README.md",
-      "line_start": 779,
-      "line_end": 813,
-      "language_raw": "diff",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "1cd943d1f87aebb533d883c007de4fd49190e248"
-    },
-    {
-      "file": "docs/reference/python-313/README.md",
-      "line_start": 819,
-      "line_end": 829,
-      "language_raw": "diff",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "0b87f50aafff7d4e856a96dde322e027a4104d0f"
-    },
-    {
-      "file": "docs/reference/python-313/README.md",
-      "line_start": 833,
-      "line_end": 843,
-      "language_raw": "diff",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "3b984511d447ca0c114e2bad89f84af4c8d4aa53"
-    },
-    {
-      "file": "docs/reference/python-313/README.md",
-      "line_start": 869,
-      "line_end": 889,
-      "language_raw": "markdown",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "0de21fad4bfd93fa345be234f1798e27076a325d"
-    },
-    {
-      "file": "docs/reference/python-313/README.md",
-      "line_start": 893,
-      "line_end": 919,
-      "language_raw": "markdown",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "34a749999f684e3699c7176796c96d12f89d213a"
-    },
-    {
-      "file": "docs/reference/python-313/milestones.md",
-      "line_start": 14,
-      "line_end": 24,
-      "language_raw": "text",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "14e535aa87cc7a4c4dc343e41722e12a01659854"
-    },
-    {
-      "file": "docs/reference/python-313/milestones.md",
-      "line_start": 385,
-      "line_end": 426,
-      "language_raw": "text",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "a78eb1ab87abf1b9c03966e21dd0660ddafe5909"
-    },
-    {
-      "file": "docs/reference/python-313/milestones.md",
-      "line_start": 486,
-      "line_end": 490,
-      "language_raw": "markdown",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "08e827efeb5ff6ec0588e86b292a98ef7a0ed05c"
-    },
-    {
-      "file": "docs/reference/python-313/open-questions.md",
-      "line_start": 228,
-      "line_end": 269,
-      "language_raw": "markdown",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "17e4906aebec0d8500ea237bd8415bf1c8127806"
-    },
-    {
-      "file": "docs/reference/python-313/specifications.md",
-      "line_start": 155,
-      "line_end": 168,
-      "language_raw": "yaml",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "a159a8258ad2a944bc9798e2ae3f8acd7f967a76"
-    },
-    {
-      "file": "docs/reference/python-313/specifications.md",
-      "line_start": 172,
-      "line_end": 191,
-      "language_raw": "yaml",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "2756e60699e533165c303ba445f5e4c633b73eb6"
-    },
-    {
-      "file": "docs/reference/python-313/specifications.md",
-      "line_start": 195,
-      "line_end": 209,
-      "language_raw": "yaml",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "bc6186d8ec8142e4cc3ebcb24818273b208aa035"
-    },
-    {
-      "file": "docs/reference/python-313/specifications.md",
-      "line_start": 213,
-      "line_end": 236,
-      "language_raw": "yaml",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "eebfb0bd03cb99997951728ef2c696bb9f75d64a"
-    },
-    {
-      "file": "docs/reference/python-313/specifications.md",
-      "line_start": 240,
-      "line_end": 266,
-      "language_raw": "yaml",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "28d7ed7004e3ede60b32b4b2bd8d13ee95e9dbc1"
-    },
-    {
-      "file": "docs/reference/python-313/specifications.md",
-      "line_start": 308,
-      "line_end": 317,
-      "language_raw": "python",
-      "language": "python",
-      "category": "executable",
-      "suggested_action": "execution_gate_candidate",
-      "placeholders_detected": [],
-      "directives_detected": [],
-      "env_dependencies": [],
-      "hash_sha1": "dd7639794f696f2e76a6d4a52632d9a0e0a53cdb"
-    },
-    {
-      "file": "docs/reference/python-313/specifications.md",
-      "line_start": 343,
-      "line_end": 346,
-      "language_raw": "diff",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "1224550b973ed577715e62801e08fe7dc9c0a02e"
-    },
-    {
-      "file": "docs/reference/python-313/specifications.md",
-      "line_start": 348,
-      "line_end": 351,
-      "language_raw": "diff",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "7d28368b9c053ec289b0c23c42dea7b65944d988"
-    },
-    {
-      "file": "docs/reference/python-313/specifications.md",
-      "line_start": 786,
-      "line_end": 813,
-      "language_raw": "diff",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "6c3e362a2d50a1bec678e6ff628771e3166eba62"
-    },
-    {
-      "file": "docs/reference/python-313/specifications.md",
-      "line_start": 817,
-      "line_end": 822,
-      "language_raw": "diff",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "57401986b7ef2de9e88c314e184ca21f46858cc1"
-    },
-    {
-      "file": "docs/reference/python-313/specifications.md",
-      "line_start": 955,
-      "line_end": 960,
-      "language_raw": "python",
-      "language": "python",
-      "category": "executable",
-      "suggested_action": "execution_gate_candidate",
-      "placeholders_detected": [],
-      "directives_detected": [],
-      "env_dependencies": [],
-      "hash_sha1": "52d2bf0b495168cae75bdbb98510ade8976851a8"
     },
     {
       "file": "docs/reference/speaker-encoder-contract.md",
@@ -7122,354 +6537,6 @@
       ],
       "env_dependencies": [],
       "hash_sha1": "f3f450f7d39e90322eaba777574de6071e983519"
-    },
-    {
-      "file": "docs/superpowers/plans/2026-06-03-swedish-per-word-lid-parity.md",
-      "line_start": 26,
-      "line_end": 42,
-      "language_raw": "text",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "80c37321a534a295221563f6d4f8abe5a5b89c17"
-    },
-    {
-      "file": "docs/superpowers/plans/2026-06-03-swedish-per-word-lid-parity.md",
-      "line_start": 50,
-      "line_end": 63,
-      "language_raw": "json",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "2cb8ce394d2a0234b2711889f3e1d6eb35fe0ed2"
-    },
-    {
-      "file": "docs/superpowers/plans/2026-06-03-swedish-per-word-lid-parity.md",
-      "line_start": 124,
-      "line_end": 172,
-      "language_raw": "python",
-      "language": "python",
-      "category": "executable",
-      "suggested_action": "execution_gate_candidate",
-      "placeholders_detected": [],
-      "directives_detected": [],
-      "env_dependencies": [],
-      "hash_sha1": "d8403c4f6878f4e3d3d1042cd78af86cffef6afc"
-    },
-    {
-      "file": "docs/superpowers/plans/2026-06-03-swedish-per-word-lid-parity.md",
-      "line_start": 185,
-      "line_end": 205,
-      "language_raw": "python",
-      "language": "python",
-      "category": "executable",
-      "suggested_action": "execution_gate_candidate",
-      "placeholders_detected": [],
-      "directives_detected": [],
-      "env_dependencies": [],
-      "hash_sha1": "c05061f647cfbd8eddde3f20e028dae7b75190e9"
-    },
-    {
-      "file": "docs/superpowers/plans/2026-06-03-swedish-per-word-lid-parity.md",
-      "line_start": 209,
-      "line_end": 215,
-      "language_raw": "python",
-      "language": "python",
-      "category": "executable",
-      "suggested_action": "execution_gate_candidate",
-      "placeholders_detected": [],
-      "directives_detected": [],
-      "env_dependencies": [],
-      "hash_sha1": "1bc2ced9416ad62c7458ebf1af63a20b8e6f0d37"
-    },
-    {
-      "file": "docs/superpowers/plans/2026-06-03-swedish-per-word-lid-parity.md",
-      "line_start": 219,
-      "line_end": 224,
-      "language_raw": "python",
-      "language": "python",
-      "category": "executable",
-      "suggested_action": "execution_gate_candidate",
-      "placeholders_detected": [],
-      "directives_detected": [],
-      "env_dependencies": [],
-      "hash_sha1": "456cb02c003f856b84388fa4a1e797979482b03d"
-    },
-    {
-      "file": "docs/superpowers/plans/2026-06-03-swedish-per-word-lid-parity.md",
-      "line_start": 228,
-      "line_end": 260,
-      "language_raw": "python",
-      "language": "python",
-      "category": "executable",
-      "suggested_action": "execution_gate_candidate",
-      "placeholders_detected": [],
-      "directives_detected": [],
-      "env_dependencies": [],
-      "hash_sha1": "484a58608ce27d2cd39ce5f0e1b1461412b8286e"
-    },
-    {
-      "file": "docs/superpowers/plans/2026-06-03-swedish-per-word-lid-parity.md",
-      "line_start": 274,
-      "line_end": 279,
-      "language_raw": "bash",
-      "language": "bash",
-      "category": "executable",
-      "suggested_action": "execution_gate_candidate",
-      "placeholders_detected": [],
-      "directives_detected": [],
-      "env_dependencies": [],
-      "hash_sha1": "9da9e0854f19b8df61e659f93a9d6231b9f7e15c"
-    },
-    {
-      "file": "docs/superpowers/plans/2026-06-03-swedish-per-word-lid-parity.md",
-      "line_start": 293,
-      "line_end": 296,
-      "language_raw": "bash",
-      "language": "bash",
-      "category": "executable",
-      "suggested_action": "execution_gate_candidate",
-      "placeholders_detected": [],
-      "directives_detected": [],
-      "env_dependencies": [],
-      "hash_sha1": "30eeef36cf7dd2f8ed76d4a7a524bdd0b4e9e1ec"
-    },
-    {
-      "file": "docs/superpowers/plans/2026-06-03-swedish-per-word-lid-parity.md",
-      "line_start": 308,
-      "line_end": 313,
-      "language_raw": "bash",
-      "language": "bash",
-      "category": "executable",
-      "suggested_action": "execution_gate_candidate",
-      "placeholders_detected": [],
-      "directives_detected": [],
-      "env_dependencies": [],
-      "hash_sha1": "767ca2a6a590ea49cda2f47f8cca5b3744780f38"
-    },
-    {
-      "file": "docs/superpowers/plans/2026-06-03-swedish-per-word-lid-parity.md",
-      "line_start": 331,
-      "line_end": 350,
-      "language_raw": "rust",
-      "language": "rust",
-      "category": "executable",
-      "suggested_action": "execution_gate_candidate",
-      "placeholders_detected": [],
-      "directives_detected": [],
-      "env_dependencies": [],
-      "hash_sha1": "0521fdc0c3637e689b50db9ca5877e5a63b2b9d0"
-    },
-    {
-      "file": "docs/superpowers/plans/2026-06-03-swedish-per-word-lid-parity.md",
-      "line_start": 367,
-      "line_end": 373,
-      "language_raw": "bash",
-      "language": "bash",
-      "category": "executable",
-      "suggested_action": "execution_gate_candidate",
-      "placeholders_detected": [],
-      "directives_detected": [],
-      "env_dependencies": [],
-      "hash_sha1": "b031929b68ed77c6a778518c9e90947b94e5574a"
-    },
-    {
-      "file": "docs/superpowers/plans/2026-06-03-swedish-per-word-lid-parity.md",
-      "line_start": 391,
-      "line_end": 406,
-      "language_raw": "go",
-      "language": "go",
-      "category": "executable",
-      "suggested_action": "execution_gate_candidate",
-      "placeholders_detected": [],
-      "directives_detected": [],
-      "env_dependencies": [],
-      "hash_sha1": "7b10ef06c465a60c300815421747e70889458055"
-    },
-    {
-      "file": "docs/superpowers/plans/2026-06-03-swedish-per-word-lid-parity.md",
-      "line_start": 418,
-      "line_end": 421,
-      "language_raw": "bash",
-      "language": "bash",
-      "category": "executable",
-      "suggested_action": "execution_gate_candidate",
-      "placeholders_detected": [],
-      "directives_detected": [],
-      "env_dependencies": [],
-      "hash_sha1": "f509a7c4687ab8b5e960ac5f2144dc65fe876ff7"
-    },
-    {
-      "file": "docs/superpowers/plans/2026-06-03-swedish-per-word-lid-parity.md",
-      "line_start": 439,
-      "line_end": 450,
-      "language_raw": "cpp",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "82abcd3e9e4508b502eab79cf2ccb80fecd34366"
-    },
-    {
-      "file": "docs/superpowers/plans/2026-06-03-swedish-per-word-lid-parity.md",
-      "line_start": 462,
-      "line_end": 465,
-      "language_raw": "bash",
-      "language": "bash",
-      "category": "executable",
-      "suggested_action": "execution_gate_candidate",
-      "placeholders_detected": [],
-      "directives_detected": [],
-      "env_dependencies": [],
-      "hash_sha1": "770d95f90a25e3d6bb5346836c95b47a3c05b5aa"
-    },
-    {
-      "file": "docs/superpowers/plans/2026-06-03-swedish-per-word-lid-parity.md",
-      "line_start": 483,
-      "line_end": 493,
-      "language_raw": "csharp",
-      "language": "csharp",
-      "category": "executable",
-      "suggested_action": "execution_gate_candidate",
-      "placeholders_detected": [],
-      "directives_detected": [],
-      "env_dependencies": [],
-      "hash_sha1": "51377990595dcdf0adde5315de71c784cd76795d"
-    },
-    {
-      "file": "docs/superpowers/plans/2026-06-03-swedish-per-word-lid-parity.md",
-      "line_start": 505,
-      "line_end": 511,
-      "language_raw": "bash",
-      "language": "bash",
-      "category": "executable",
-      "suggested_action": "execution_gate_candidate",
-      "placeholders_detected": [],
-      "directives_detected": [],
-      "env_dependencies": [],
-      "hash_sha1": "6683e7ddf4283e9697ca8cc555129d201c313c6d"
-    },
-    {
-      "file": "docs/superpowers/plans/2026-06-03-swedish-per-word-lid-parity.md",
-      "line_start": 529,
-      "line_end": 544,
-      "language_raw": "js",
-      "language": "wasm",
-      "category": "executable",
-      "suggested_action": "execution_gate_candidate",
-      "placeholders_detected": [],
-      "directives_detected": [],
-      "env_dependencies": [],
-      "hash_sha1": "84d292b0f0d760ee6aaa371bead8f810d5066da3"
-    },
-    {
-      "file": "docs/superpowers/plans/2026-06-03-swedish-per-word-lid-parity.md",
-      "line_start": 557,
-      "line_end": 560,
-      "language_raw": "bash",
-      "language": "bash",
-      "category": "executable",
-      "suggested_action": "execution_gate_candidate",
-      "placeholders_detected": [],
-      "directives_detected": [],
-      "env_dependencies": [],
-      "hash_sha1": "e07e9c535a4adcafb1c60c795613b4ee3274fcfd"
-    },
-    {
-      "file": "docs/superpowers/plans/2026-06-03-swedish-per-word-lid-parity.md",
-      "line_start": 575,
-      "line_end": 594,
-      "language_raw": "toml",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "1c076fe228ed6db106fe5ecbf29138c816d8a8ad"
-    },
-    {
-      "file": "docs/superpowers/plans/2026-06-03-swedish-per-word-lid-parity.md",
-      "line_start": 606,
-      "line_end": 610,
-      "language_raw": "bash",
-      "language": "bash",
-      "category": "executable",
-      "suggested_action": "execution_gate_candidate",
-      "placeholders_detected": [],
-      "directives_detected": [],
-      "env_dependencies": [],
-      "hash_sha1": "8c1d376358635368f3908b92909669a323cca24f"
-    },
-    {
-      "file": "docs/superpowers/plans/2026-06-03-swedish-per-word-lid-parity.md",
-      "line_start": 623,
-      "line_end": 641,
-      "language_raw": "json",
-      "language": "unknown",
-      "category": "skip_warranted",
-      "suggested_action": "route_via_language_alias_table",
-      "placeholders_detected": [],
-      "directives_detected": [
-        "unknown_language"
-      ],
-      "env_dependencies": [],
-      "hash_sha1": "d93364db9e6f985e179466e1ce1268fb6839a997"
-    },
-    {
-      "file": "docs/superpowers/plans/2026-06-03-swedish-per-word-lid-parity.md",
-      "line_start": 650,
-      "line_end": 657,
-      "language_raw": "bash",
-      "language": "bash",
-      "category": "executable",
-      "suggested_action": "execution_gate_candidate",
-      "placeholders_detected": [],
-      "directives_detected": [],
-      "env_dependencies": [],
-      "hash_sha1": "8064c1fddc7cb22246720d3b619a418e1600bdf1"
-    },
-    {
-      "file": "docs/superpowers/plans/2026-06-03-swedish-per-word-lid-parity.md",
-      "line_start": 665,
-      "line_end": 668,
-      "language_raw": "bash",
-      "language": "bash",
-      "category": "executable",
-      "suggested_action": "execution_gate_candidate",
-      "placeholders_detected": [],
-      "directives_detected": [],
-      "env_dependencies": [],
-      "hash_sha1": "5f9f54b365e2045e35976ad4058717502f4302aa"
-    },
-    {
-      "file": "docs/superpowers/plans/2026-06-03-swedish-per-word-lid-parity.md",
-      "line_start": 680,
-      "line_end": 683,
-      "language_raw": "bash",
-      "language": "bash",
-      "category": "executable",
-      "suggested_action": "execution_gate_candidate",
-      "placeholders_detected": [],
-      "directives_detected": [],
-      "env_dependencies": [],
-      "hash_sha1": "7f6e19f1c1c9f9650dbc885519558a5b5fbeddbe"
     }
   ]
 }

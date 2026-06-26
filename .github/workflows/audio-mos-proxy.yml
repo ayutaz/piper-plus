@@ -44,7 +44,7 @@ jobs:
     timeout-minutes: 25
     # informational tier: failures are reported in the sticky comment but do
     # not fail the PR. Promotion to blocker is a maintainer-gated change to
-    # this line plus an entry in branch-protection-history.md.
+    # this line.
     continue-on-error: true
     steps:
       - uses: actions/checkout@v6.0.3

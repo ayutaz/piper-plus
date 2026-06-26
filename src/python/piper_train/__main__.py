@@ -572,7 +572,7 @@ def main():
     # TF32 enable for Ampere+ (sm_80+: A100 / RTX 6000 Ada / RTX 5090). On
     # sm_75 (T4) and older, these settings are no-ops. Speeds up matmul and
     # conv by ~1.3-1.5x with negligible quality impact for TTS workloads.
-    # Issue #527 / DR-007: docs/reference/python-313/specifications.md
+    # Issue #527 / DR-007 (PR #569).
     torch.backends.cuda.matmul.allow_tf32 = True
     torch.backends.cudnn.allow_tf32 = True
     torch.manual_seed(args.seed)

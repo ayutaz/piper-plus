@@ -343,7 +343,7 @@ Simple example:
 
 ## Training
 
-For training and fine-tuning piper-plus models (basic setup, multi-speaker / multi-GPU, ONNX export, checkpoint management, voice evaluation), see **[Training Guide](docs/guides/training.md)**.
+For training and fine-tuning piper-plus models (basic setup, multi-speaker / multi-GPU, ONNX export, checkpoint management, voice evaluation), see **[Training Guide](docs/guides/training/training-guide.md)**.
 
 Production-grade pretraining and fine-tuning command templates (6-language pretraining, Tsukuyomi-chan fine-tuning) are in [CLAUDE.md](CLAUDE.md).
 
