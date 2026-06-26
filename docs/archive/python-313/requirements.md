@@ -359,7 +359,7 @@ DR-002 (決定事項) により、 root pyproject と member pyproject の floor
 | [`README.md`](README.md) | 実装計画 (Phase 0-4) + 影響範囲 + diff サンプル + rollback 手順 |
 | [Issue #527](https://github.com/ayutaz/piper-plus/issues/527) | GitHub Issue (本要求定義のトリガー) |
 | [`../../migration/v1.11-to-v1.12.md`](../../migration/v1.11-to-v1.12.md) | 前回の breaking change 移行ガイド (PR template の参考) |
-| [`../ort-versions.md`](../ort-versions.md) | ONNX Runtime version pin マトリクス (CUDA との関係) |
+| [`../../reference/ort-versions.md`](../../reference/ort-versions.md) | ONNX Runtime version pin マトリクス (CUDA との関係) |
 
 ---
 

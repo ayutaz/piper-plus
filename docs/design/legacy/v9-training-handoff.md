@@ -2,7 +2,7 @@
 
 > ⚠️ **本書は zero-shot 20speakers (v9) 用の旧引き継ぎドキュメント**。リベース前の
 > `Generator + Multi-scale FiLM` 構造を前提とした内容。dev リベース後の現状については
-> [`multi-6lang-zero-shot-v7-training-results.md`](multi-6lang-zero-shot-v7-training-results.md)
+> [`../multi-6lang-zero-shot-v7-training-results.md`](../multi-6lang-zero-shot-v7-training-results.md)
 > を参照。
 
 **作成日**: 2026-04-03
