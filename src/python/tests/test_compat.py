@@ -52,8 +52,30 @@ def test_piper_train_import_triggers_compat() -> None:
         "`_get_safe_globals`; torch internals have changed and this "
         "regression test must be updated to match."
     )
-    safe_globals = getter()
-    safe_names = {getattr(cls, "__name__", repr(cls)) for cls in safe_globals}
+    raw = getter()
+
+    # Normalize across torch versions: `get_safe_globals` has returned
+    # variously a list of classes, a list of (callable, name_str) tuples,
+    # and (in older releases) a dict keyed by class name. Iterating the
+    # raw value directly may yield dict keys (strings) instead of the
+    # registered classes, which would make `safe_names` silently full of
+    # garbage and let the regression assertions pass for the wrong reason.
+    if isinstance(raw, dict):
+        entries = list(raw.values())
+    else:
+        entries = list(raw)
+
+    def _entry_name(entry: object) -> str:
+        # tuple form: (callable, name_str) — prefer the explicit name
+        if isinstance(entry, tuple) and len(entry) >= 2 and isinstance(entry[1], str):
+            return entry[1]
+        if isinstance(entry, tuple) and entry:
+            entry = entry[0]
+        if isinstance(entry, str):
+            return entry
+        return getattr(entry, "__name__", repr(entry))
+
+    safe_names = {_entry_name(e) for e in entries}
     assert "PosixPath" in safe_names, (
         "pathlib.PosixPath must be in torch safe globals after `import piper_train`. "
         "Did piper_train/__init__.py stop importing _compat?"
