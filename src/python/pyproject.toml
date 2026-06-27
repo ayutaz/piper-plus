@@ -97,8 +97,14 @@ test = [
 #
 # Disable at runtime with PIPER_DISABLE_SUPER_MAS=1 (forces Cython). PyPI
 # distribution does not exist upstream — install is git-only.
+#
+# Pinned to a specific commit SHA (not HEAD) for reproducibility and
+# supply-chain hygiene: every training run that uses this extra resolves to
+# the exact kernel revision validated against the piper-plus dispatcher.
+# Bump the SHA deliberately after re-validating MAS path equivalence against
+# the Cython baseline (see test_super_mas_dispatch.py).
 super-mas = [
-    "super-monotonic-align @ git+https://github.com/supertone-inc/super-monotonic-align.git",
+    "super-monotonic-align @ git+https://github.com/supertone-inc/super-monotonic-align.git@9bb1cb3a6fbab27bbe6e566827b9548010c5dd51",
 ]
 
 [project.scripts]

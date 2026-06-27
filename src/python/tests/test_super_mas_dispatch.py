@@ -13,6 +13,8 @@ the optional dependency. The unit test scope is the dispatch logic.
 
 from __future__ import annotations
 
+import os
+import pathlib
 import subprocess
 import sys
 import textwrap
@@ -222,7 +224,18 @@ class TestEnvDisableImportTime:
     """
 
     def _run_import_check(self, env_value: str | None) -> dict:
-        """Run a subprocess that imports the module and reports state."""
+        """Run a subprocess that imports the module and reports state.
+
+        We inherit the *full* parent environment via ``os.environ.copy()`` so
+        that platform-specific magic variables (Windows ``SystemRoot``, Linux
+        ``LD_LIBRARY_PATH``, etc.) reach the child intact. A hand-built env
+        was used in an earlier draft but it (a) risked overriding Windows'
+        case-insensitive ``SystemRoot`` and (b) dropped the test session's
+        ``sys.path`` injection set by ``tests/conftest.py``, leaving the
+        subprocess unable to import ``piper_train`` outside an editable
+        install. PYTHONPATH is then prepended explicitly so the import works
+        regardless of how piper_train is installed.
+        """
         code = textwrap.dedent("""
             import json
             from piper_train.vits import monotonic_align as m
@@ -231,20 +244,16 @@ class TestEnvDisableImportTime:
                 "fn_is_none": m._super_mas_fn is None,
             }))
         """)
-        env = {"PYTHONIOENCODING": "utf-8", "SYSTEMROOT": ""}
-        # Inherit PATH and Python so the venv resolves; SystemRoot keeps
-        # Windows subprocess happy.
-        import os
-
-        env["PATH"] = os.environ.get("PATH", "")
-        # NOTE: Windows' magic variable is documented as "SystemRoot" (mixed
-        # case). ruff SIM112 prefers the upper-case form but Python's
-        # subprocess on Windows requires the actual name we read from
-        # os.environ, so we explicitly pass the case as-is.
-        sysroot = os.environ.get("SystemRoot")  # noqa: SIM112
-        if sysroot:
-            env["SystemRoot"] = sysroot  # noqa: SIM112
-        if env_value is not None:
+        env = os.environ.copy()
+        # Ensure src/python is on sys.path even if piper_train is not
+        # editable-installed (conftest.py only runs inside pytest, not in a
+        # fresh `python -c` subprocess).
+        src_python = str(pathlib.Path(__file__).resolve().parent.parent)
+        env["PYTHONPATH"] = src_python + os.pathsep + env.get("PYTHONPATH", "")
+        # Configure the toggle under test
+        if env_value is None:
+            env.pop("PIPER_DISABLE_SUPER_MAS", None)
+        else:
             env["PIPER_DISABLE_SUPER_MAS"] = env_value
 
         proc = subprocess.run(
