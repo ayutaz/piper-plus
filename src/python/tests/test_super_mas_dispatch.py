@@ -13,6 +13,9 @@ the optional dependency. The unit test scope is the dispatch logic.
 
 from __future__ import annotations
 
+import subprocess
+import sys
+import textwrap
 from unittest import mock
 
 import pytest
@@ -146,3 +149,135 @@ class TestSuperMASPathContract:
 
         assert captured["mask_dtype"] == torch.int32
         assert captured["value_dtype"] == torch.float32
+
+
+class TestPublicMaximumPathDispatch:
+    """Confirm ``maximum_path()`` actually routes through the Super-MAS path
+    when the predicate says so.
+
+    The individual helpers are covered above, but the integration point — the
+    ``if _use_super_mas(): return _maximum_path_super_mas(...)`` branch in the
+    public ``maximum_path()`` — is its own contract. We exercise it by
+    patching the predicate to return True and verifying the wrapper is the
+    one that produced the result (rather than falling through to Cython).
+    """
+
+    def test_dispatcher_invokes_super_mas_branch_when_predicate_true(self):
+        """When the predicate returns True, the wrapper is called once.
+
+        We do not need a real CUDA tensor — the predicate is the gate, and
+        we patch both it and the kernel. This isolates the wiring inside
+        ``maximum_path()`` from CUDA / Triton availability.
+        """
+        neg_cent = torch.randn(1, 8, 12)
+        mask = torch.ones(1, 8, 12)
+
+        sentinel = torch.zeros(1, 8, 12, dtype=torch.float32)
+        kernel_calls = []
+
+        def fake_kernel(value, attn_mask, dtype=torch.float32):
+            kernel_calls.append((value.shape, attn_mask.dtype))
+            return sentinel
+
+        with (
+            mock.patch.object(monotonic_align, "_use_super_mas", return_value=True),
+            mock.patch.object(monotonic_align, "_super_mas_fn", fake_kernel),
+        ):
+            out = monotonic_align.maximum_path(neg_cent, mask)
+
+        # Kernel was reached exactly once via the dispatcher branch
+        assert len(kernel_calls) == 1
+        # Output dtype matches caller's neg_cent dtype (Cython contract parity)
+        assert out.dtype == neg_cent.dtype
+        # Shape preserved
+        assert out.shape == neg_cent.shape
+
+    def test_dispatcher_skips_super_mas_branch_when_predicate_false(self):
+        """When the predicate returns False, the wrapper is never called."""
+        neg_cent = torch.randn(1, 8, 12)
+        mask = torch.ones(1, 8, 12)
+        kernel_calls = []
+
+        def fake_kernel(*args, **kwargs):
+            kernel_calls.append(args)
+            return torch.zeros_like(neg_cent)
+
+        with (
+            mock.patch.object(monotonic_align, "_use_super_mas", return_value=False),
+            mock.patch.object(monotonic_align, "_super_mas_fn", fake_kernel),
+        ):
+            out = monotonic_align.maximum_path(neg_cent, mask)
+
+        # Kernel was not reached — Cython branch handled it
+        assert len(kernel_calls) == 0
+        assert out.shape == neg_cent.shape
+
+
+class TestEnvDisableImportTime:
+    """Verify PIPER_DISABLE_SUPER_MAS=1 is honoured at import time.
+
+    The toggle is module-level (read once on import), so we re-import in a
+    fresh subprocess with the env var set. This is the only way to assert
+    the contract — patching the live module would test the wrong thing.
+    """
+
+    def _run_import_check(self, env_value: str | None) -> dict:
+        """Run a subprocess that imports the module and reports state."""
+        code = textwrap.dedent("""
+            import json
+            from piper_train.vits import monotonic_align as m
+            print(json.dumps({
+                "disabled": m._SUPER_MAS_DISABLED,
+                "fn_is_none": m._super_mas_fn is None,
+            }))
+        """)
+        env = {"PYTHONIOENCODING": "utf-8", "SYSTEMROOT": ""}
+        # Inherit PATH and Python so the venv resolves; SystemRoot keeps
+        # Windows subprocess happy.
+        import os
+
+        env["PATH"] = os.environ.get("PATH", "")
+        # NOTE: Windows' magic variable is documented as "SystemRoot" (mixed
+        # case). ruff SIM112 prefers the upper-case form but Python's
+        # subprocess on Windows requires the actual name we read from
+        # os.environ, so we explicitly pass the case as-is.
+        sysroot = os.environ.get("SystemRoot")  # noqa: SIM112
+        if sysroot:
+            env["SystemRoot"] = sysroot  # noqa: SIM112
+        if env_value is not None:
+            env["PIPER_DISABLE_SUPER_MAS"] = env_value
+
+        proc = subprocess.run(
+            [sys.executable, "-c", code],
+            capture_output=True,
+            text=True,
+            timeout=60,
+            env=env,
+            check=False,
+        )
+        assert proc.returncode == 0, (
+            f"subprocess failed:\nstdout={proc.stdout}\nstderr={proc.stderr}"
+        )
+        import json
+
+        return json.loads(proc.stdout.strip().splitlines()[-1])
+
+    def test_env_unset_does_not_force_disable(self):
+        """Without the env var, the disable flag is False."""
+        state = self._run_import_check(env_value=None)
+        assert state["disabled"] is False
+        # _super_mas_fn may or may not be None (depends on whether the
+        # optional package is installed) — we only assert the flag here.
+
+    @pytest.mark.parametrize("value", ["1", "true", "yes", "TRUE", "Yes"])
+    def test_env_truthy_disables_super_mas(self, value: str):
+        """Truthy env values force ``_super_mas_fn = None`` at import."""
+        state = self._run_import_check(env_value=value)
+        assert state["disabled"] is True
+        assert state["fn_is_none"] is True
+
+    @pytest.mark.parametrize("value", ["0", "false", "no", "", "anything-else"])
+    def test_env_non_truthy_does_not_disable(self, value: str):
+        """Non-truthy values leave the disable flag False."""
+        state = self._run_import_check(env_value=value)
+        assert state["disabled"] is False
