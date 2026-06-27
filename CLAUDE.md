@@ -331,6 +331,7 @@ B (FT) は A から `--devices 1`、`--base_lr 2e-5` (1/10 で catastrophic forg
 - **学習高速化** — Validation 頻度削減、DataLoader 最適化 (num_workers=2, pin_memory)、DDP `find_unused_parameters=True`。CLI: `--val-every-n-epochs`, `--limit-val-batches`, `--num-workers`, `--no-pin-memory`。
 - **WandB Audio Logging** (`vits/lightning.py:on_validation_epoch_end`) — Validation 時に音声サンプルアップロード。CLI: `--audio-log-epochs`, `--num-test-examples`。
 - **エネルギー VAD 高速キャッシュ** (`norm_audio/__init__.py`) — Silero ONNX VAD を numpy エネルギー VAD に置換、~25x 高速化 (~390ms → ~8ms/file)。
+- **Super-MAS Triton-GPU MAS accelerator** (`vits/monotonic_align/__init__.py`) — arXiv:2409.07704 (Park et al., 2024)。 CUDA tensor + `super_monotonic_align` package 利用可能時に Triton kernel に dispatch、 19-72x 高速化 (報告値)。 既存 Cython は CPU / package 未導入 / `PIPER_DISABLE_SUPER_MAS=1` 時のフォールバックとして温存。 推論経路への影響ゼロ (学習時 `SynthesizerTrn.forward` 内 1 箇所のみ呼び出し)。 Opt-in install: `pip install "piper-train[super-mas]"` (PyPI 非配布、 git+https のみ)。 algorithmic equivalence (upstream は bit-identical を明示保証しないが `max_neg_val` edge case 修正済)。
 
 ### ONNX エクスポート
 

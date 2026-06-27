@@ -89,6 +89,18 @@ test = [
     "psutil>=5.9",
 ]
 
+# Optional Triton-GPU MAS accelerator (arXiv:2409.07704). Training-only,
+# CUDA-only. The base Cython MAS remains the default fallback path so this
+# extra is strictly opt-in:
+#
+#     pip install "piper-train[super-mas]"
+#
+# Disable at runtime with PIPER_DISABLE_SUPER_MAS=1 (forces Cython). PyPI
+# distribution does not exist upstream — install is git-only.
+super-mas = [
+    "super-monotonic-align @ git+https://github.com/supertone-inc/super-monotonic-align.git",
+]
+
 [project.scripts]
 piper-train = "piper_train.__main__:main"
 
