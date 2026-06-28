@@ -38,6 +38,15 @@ jobs:
         with:
           python-version: '3.13'
 
+      - name: "Layer 0: README sdk_version <-> requirements.txt gradio sync"
+        # HF Spaces installs gradio twice during the Docker build:
+        # (1) gradio[oauth,mcp]==<sdk_version> from README frontmatter
+        # (2) gradio==<pin> from requirements.txt
+        # If those disagree, pip fails to resolve and the Space ends up in
+        # BUILD_ERROR with a misleading "cache miss" message. This gate
+        # catches the drift before deploy can produce a broken Space.
+        run: python scripts/check_hf_space_gradio_sync.py
+
       - name: Prepare HF Space deployment directory
         run: |
           mkdir -p hf-space-deploy/models

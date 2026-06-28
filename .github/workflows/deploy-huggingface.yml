@@ -45,6 +45,13 @@ jobs:
             echo "Automatic deployment triggered by push to dev branch"
           fi
 
+      - name: Pre-deploy gate -- README sdk_version <-> requirements.txt gradio sync
+        # Last-line defense before upload_folder runs. test-hf-space.yml also
+        # runs this gate on PRs, but a force-push to dev or a hand-edit on the
+        # web UI could still introduce drift -- fail fast here so we never
+        # push a known-broken bundle to the Space.
+        run: python3 scripts/check_hf_space_gradio_sync.py
+
       - name: Prepare Space files
         run: |
           # Create a temporary directory for the Space
