@@ -47,6 +47,15 @@ jobs:
         # catches the drift before deploy can produce a broken Space.
         run: python scripts/check_hf_space_gradio_sync.py
 
+      - name: "Layer 0.5: README frontmatter schema"
+        # Catches BUILD_ERROR / CONFIG_ERROR / NO_APP_FILE causes the
+        # gradio-sync gate does not touch: missing app_file, missing sdk,
+        # unparseable YAML, app_file pointing to a file that does not
+        # exist in the Space directory.
+        run: |
+          pip install --quiet pyyaml
+          python scripts/check_hf_space_frontmatter.py
+
       - name: Prepare HF Space deployment directory
         run: |
           mkdir -p hf-space-deploy/models
@@ -124,6 +133,12 @@ jobs:
           pip install -r hf-space-deploy/requirements.txt
           python3 -c "import nltk; nltk.download('averaged_perceptron_tagger_eng', quiet=True); nltk.download('cmudict', quiet=True)"
 
+      - name: "Layer 2.1: pip check (dependency resolution)"
+        # `pip install` only warns on unresolved transitive conflicts; the
+        # HF Space build sometimes hits an actual ResolutionImpossible later
+        # when fresh deps are added on top. `pip check` surfaces those now.
+        run: pip check
+
       - name: "Layer 2.5: Import validation (with external deps)"
         working-directory: hf-space-deploy
         run: |
@@ -198,18 +213,29 @@ jobs:
           print(f'OK EN: {len(phoneme_ids)} phoneme IDs')
           "
 
-      - name: "Layer 5: App module import test"
+      - name: "Layer 5: App module import + Gradio interface instantiation"
         working-directory: hf-space-deploy
         run: |
           python3 -c "
-          # Verify app.py can be imported without errors
-          # (download_models will run but models already exist or will be skipped)
+          # Verify app.py can be imported AND its Gradio Blocks tree can be
+          # constructed. Previously this only ran 'import app', which does
+          # NOT exercise create_interface() -- a gradio API breaking change
+          # (renamed kwarg, removed component) would slip past until the
+          # actual Space tried to launch and entered RUNTIME_ERROR. By
+          # building the interface here we catch that class of regression
+          # at PR review time.
           import app
           assert hasattr(app, 'create_interface'), 'Missing create_interface'
           assert hasattr(app, 'synthesize_speech'), 'Missing synthesize_speech'
           assert hasattr(app, 'MODELS'), 'Missing MODELS'
           assert len(app.MODELS) == 6, f'Expected 6 models, got {len(app.MODELS)}'
-          print('OK app.py imports passed, 6 language models configured (trained model covers 6 langs; code supports 7 incl. sv)')
+
+          # Build the interface (does NOT launch -- no port binding, no
+          # network). This still resolves every gr.Component / gr.Blocks
+          # constructor and surfaces incompatible kwargs as TypeError.
+          iface = app.create_interface()
+          assert iface is not None, 'create_interface() returned None'
+          print('OK app.py imports + create_interface() runs cleanly')
           "
 
       - name: Summary
