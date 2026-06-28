@@ -21,8 +21,9 @@ Usage:
     python scripts/check_hf_space_gradio_sync.py
 
 Exit codes:
-    0 -- versions match (or both fields absent in the same way)
-    1 -- versions disagree, or one of the files is missing/malformed
+    0 -- versions match exactly
+    1 -- versions disagree, or either file is missing / malformed /
+         contains an empty pin (HF Space cannot run without both values)
 """
 
 from __future__ import annotations
@@ -39,7 +40,9 @@ REQUIREMENTS = REPO_ROOT / "huggingface-space" / "requirements.txt"
 def _extract_frontmatter_sdk_version(readme_path: Path) -> str | None:
     """Return the ``sdk_version`` value from the README YAML frontmatter.
 
-    Returns None if no frontmatter / no ``sdk_version`` line.
+    Returns None if no frontmatter / no ``sdk_version`` line / the value is
+    empty (e.g. ``sdk_version:`` with nothing after the colon) so the caller
+    can treat all "value absent" cases uniformly as malformed.
     """
     if not readme_path.exists():
         return None
@@ -53,9 +56,8 @@ def _extract_frontmatter_sdk_version(readme_path: Path) -> str | None:
     for line in frontmatter.splitlines():
         line = line.strip()
         if line.startswith("sdk_version:"):
-            value = line.split(":", 1)[1].strip()
-            # strip optional quotes
-            return value.strip("\"'")
+            value = line.split(":", 1)[1].strip().strip("\"'")
+            return value or None
     return None
 
 
@@ -101,7 +103,7 @@ def main() -> int:
             "HF Space gradio version drift detected:\n"
             f"  {README.relative_to(REPO_ROOT)} sdk_version: {sdk_version}\n"
             f"  {REQUIREMENTS.relative_to(REPO_ROOT)} gradio==        {req_version}\n"
-            "  These MUST match. HF Spaces injects gradio[oauth,mcp]=={sdk_version} "
+            f"  These MUST match. HF Spaces injects gradio[oauth,mcp]=={sdk_version} "
             "into the pip install command alongside requirements.txt, and pip "
             "fails to resolve two different versions in one resolve pass "
             "(BUILD_ERROR with misleading 'cache miss' message)."

@@ -45,12 +45,17 @@ jobs:
             echo "Automatic deployment triggered by push to dev branch"
           fi
 
+      - name: Set up Python
+        uses: actions/setup-python@v6.2.0
+        with:
+          python-version: '3.13'
+
       - name: Pre-deploy gate -- README sdk_version <-> requirements.txt gradio sync
         # Last-line defense before upload_folder runs. test-hf-space.yml also
         # runs this gate on PRs, but a force-push to dev or a hand-edit on the
         # web UI could still introduce drift -- fail fast here so we never
         # push a known-broken bundle to the Space.
-        run: python3 scripts/check_hf_space_gradio_sync.py
+        run: python scripts/check_hf_space_gradio_sync.py
 
       - name: Prepare Space files
         run: |
@@ -112,11 +117,6 @@ jobs:
           echo ""
           echo "Directory structure:"
           tree -h hf-space-deploy 2>/dev/null || ls -lah hf-space-deploy/ 2>/dev/null || echo "Directory not found"
-
-      - name: Set up Python
-        uses: actions/setup-python@v6.2.0
-        with:
-          python-version: '3.13'
 
       - name: Generate MODEL_CARD.md + LICENSE_ATTRIBUTIONS.md (M3.2)
         # data-sources.yml を canonical source として model card + license
