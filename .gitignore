@@ -212,6 +212,9 @@ check_*.py
 !scripts/check_doc_examples.py
 # Swedish per-word LID sync gate (Issue #539)
 !scripts/check_swedish_lid_consistency.py
+# HF Space deploy hardening gates
+!scripts/check_hf_space_frontmatter.py
+!scripts/verify_hf_space_runtime.py
 create_comprehensive_*.py
 add_missing_*.py
 retrain_*.py

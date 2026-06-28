@@ -45,6 +45,22 @@ jobs:
             echo "Automatic deployment triggered by push to dev branch"
           fi
 
+      - name: Set up Python
+        uses: actions/setup-python@v6.2.0
+        with:
+          python-version: '3.13'
+
+      - name: Pre-deploy gate -- README frontmatter schema
+        # Last-line defense before the bundle is uploaded. test-hf-space.yml
+        # also runs this gate on PRs touching huggingface-space/**, but a
+        # force-push to dev or a hand-edit on the web UI could still
+        # introduce a malformed frontmatter; fail fast here so we never
+        # ship a Space that will get rejected by HF as BUILD_ERROR or
+        # NO_APP_FILE.
+        run: |
+          pip install --quiet pyyaml
+          python scripts/check_hf_space_frontmatter.py
+
       - name: Prepare Space files
         run: |
           # Create a temporary directory for the Space
@@ -207,6 +223,27 @@ jobs:
           )
           print("Successfully deployed to Hugging Face Spaces")
           PYEOF
+
+      - name: Post-deploy verification -- wait for HF Space to reach RUNNING
+        # upload_folder succeeds the moment HF accepts the file commit, but
+        # the actual Docker build / Gradio launch happens asynchronously
+        # afterwards. If that pass enters BUILD_ERROR / RUNTIME_ERROR /
+        # CONFIG_ERROR / NO_APP_FILE, the upload step shows green and the
+        # broken Space sits unnoticed (this is exactly the failure mode
+        # that hid the 2026-06 sdk_version drift for weeks before a user
+        # opened the demo).
+        #
+        # This step polls HfApi.get_space_runtime and fails the workflow
+        # if the Space does not reach RUNNING within ~10 min. We cap the
+        # poll at 600s so a genuinely slow build is surfaced as an alert
+        # rather than letting the job time out at the 30-min job limit.
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          python scripts/verify_hf_space_runtime.py \
+            --space-id ayousanz/piper-plus-demo \
+            --timeout-seconds 600 \
+            --poll-interval-seconds 20
 
       - name: Deploy summary
         run: |
