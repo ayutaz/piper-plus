@@ -3431,6 +3431,9 @@ inference-gpu = [
     { name = "soundfile" },
     { name = "uvicorn" },
 ]
+super-mas = [
+    { name = "super-monotonic-align" },
+]
 test = [
     { name = "coverage", extra = ["toml"] },
     { name = "mypy" },
@@ -3512,6 +3515,7 @@ requires-dist = [
     { name = "soundfile", marker = "extra == 'inference-gpu'", specifier = ">=0.12" },
     { name = "soundfile", marker = "extra == 'train'", specifier = ">=0.12" },
     { name = "soxr", marker = "extra == 'train'", specifier = ">=0.5.0" },
+    { name = "super-monotonic-align", marker = "extra == 'super-mas'", git = "https://github.com/supertone-inc/super-monotonic-align.git?rev=9bb1cb3a6fbab27bbe6e566827b9548010c5dd51" },
     { name = "tensorboard", marker = "extra == 'train'", specifier = ">=2.20.0" },
     { name = "torchmetrics", marker = "extra == 'train'", specifier = ">=1.9.0" },
     { name = "tqdm", marker = "extra == 'train'", specifier = ">=4.66" },
@@ -3523,7 +3527,7 @@ requires-dist = [
     { name = "uvicorn", marker = "extra == 'inference-gpu'", specifier = ">=0.46.0" },
     { name = "wandb", marker = "extra == 'train'", specifier = ">=0.26.1" },
 ]
-provides-extras = ["train", "inference", "inference-gpu", "test"]
+provides-extras = ["train", "inference", "inference-gpu", "test", "super-mas"]
 
 [[package]]
 name = "platformdirs"
@@ -4803,6 +4807,11 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/9b/da/279d12cab13f2affa9edd0ad4d5631573f4de07a020ad89a4ad0195f1d7c/SudachiPy-0.6.10-cp313-cp313t-macosx_10_13_universal2.whl", hash = "sha256:7455e5cbb4c2cf9294c82345c9d46b344774b4eb23eca917f305ed716d8d5168", size = 3033253, upload-time = "2025-01-10T07:15:06.674Z" },
     { url = "https://files.pythonhosted.org/packages/66/ed/36eabf79eb81c38d477b77a5ab8fd62c8a4814a82c845f079f0c3b78ff18/SudachiPy-0.6.10-cp313-cp313t-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:38d0de9e840ac8d199e714a40506792ea5237d0db0c966da16d51fbc74a508d6", size = 1730534, upload-time = "2025-01-10T07:15:09.348Z" },
 ]
+
+[[package]]
+name = "super-monotonic-align"
+version = "1.0.0"
+source = { git = "https://github.com/supertone-inc/super-monotonic-align.git?rev=9bb1cb3a6fbab27bbe6e566827b9548010c5dd51#9bb1cb3a6fbab27bbe6e566827b9548010c5dd51" }
 
 [[package]]
 name = "sympy"
