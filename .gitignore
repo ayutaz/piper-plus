@@ -216,6 +216,8 @@ check_*.py
 !scripts/check_hf_space_gradio_sync.py
 !scripts/check_hf_space_frontmatter.py
 !scripts/verify_hf_space_runtime.py
+# GitHub Pages post-deploy 404 detection gate
+!scripts/verify_pages_assets.py
 create_comprehensive_*.py
 add_missing_*.py
 retrain_*.py

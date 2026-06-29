@@ -246,10 +246,58 @@ jobs:
           # Create 404 page
           cp deploy/index.html deploy/404.html
 
+          # GitHub Pages defaults to running Jekyll when no .nojekyll marker
+          # is present. Jekyll silently filters out files / directories that
+          # begin with `_` and adds non-deterministic post-processing, which
+          # has bitten static-asset deploys before. We don't use Jekyll, so
+          # disable it explicitly.
+          touch deploy/.nojekyll
+
           # Add deployment info
           echo "Deployment: ${{ github.event.inputs.deploy_message || 'Automated deployment' }}" > deploy/deployment-info.txt
           echo "Commit: ${{ github.sha }}" >> deploy/deployment-info.txt
           echo "Date: $(date -u +"%Y-%m-%d %H:%M:%S UTC")" >> deploy/deployment-info.txt
+
+      - name: Pre-deploy gate -- required static assets are present
+        # Pages 404s are silent: deploy-pages always succeeds, the broken
+        # asset only manifests when a user opens the page (the 2026-06
+        # favicon.ico 404 sat unnoticed for weeks because of this). This
+        # gate fails the build BEFORE upload if any required file is
+        # missing from the deploy bundle.
+        run: |
+          REQUIRED=(
+            "deploy/index.html"
+            "deploy/404.html"
+            "deploy/.nojekyll"
+            "deploy/assets/favicon.svg"
+            "deploy/src/index.js"
+            "deploy/g2p/src/index.js"
+            "deploy/dist/rust-wasm/piper_plus_wasm.js"
+            "deploy/dist/rust-wasm/piper_plus_wasm_bg.wasm"
+          )
+          MISSING=0
+          for path in "${REQUIRED[@]}"; do
+            if [ ! -e "$path" ]; then
+              echo "MISSING: $path"
+              MISSING=$((MISSING + 1))
+            else
+              echo "OK: $path"
+            fi
+          done
+          # Every HTML must declare a favicon link so the browser does not
+          # auto-fetch /favicon.ico and 404 silently in the console.
+          for html in deploy/index.html deploy/404.html deploy/multilingual-demo/*.html; do
+            [ -f "$html" ] || continue
+            if ! grep -q '<link[^>]*rel="icon"' "$html"; then
+              echo "MISSING favicon <link>: $html"
+              MISSING=$((MISSING + 1))
+            fi
+          done
+          if [ "$MISSING" -gt 0 ]; then
+            echo "Pre-deploy gate FAILED: $MISSING missing required artifact(s)"
+            exit 1
+          fi
+          echo "Pre-deploy gate OK"
 
       - name: Validate import maps in deployed HTML
         run: |
@@ -331,3 +379,29 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4.0.5
+
+      - name: Checkout (for verify script)
+        uses: actions/checkout@v6.0.3
+        with:
+          # We only need scripts/verify_pages_assets.py; a shallow clone is
+          # cheaper than the deploy job's default treeless fetch.
+          sparse-checkout: |
+            scripts/verify_pages_assets.py
+          sparse-checkout-cone-mode: false
+
+      - uses: actions/setup-python@v6.2.0
+        with:
+          python-version: '3.13'
+
+      - name: Post-deploy verification -- assets are live and 200
+        # deploy-pages marks success the moment GitHub accepts the artifact,
+        # but the actual HTTP-served bundle can still be missing files
+        # (Issue: 2026-06 favicon.ico 404 sat in production for weeks
+        # before a user noticed). This step HEAD-probes the live origin and
+        # fails the deploy job if any required asset is non-2xx, turning
+        # silent 404 into a CI alarm bell.
+        run: |
+          python scripts/verify_pages_assets.py \
+            --base-url "${{ steps.deployment.outputs.page_url }}" \
+            --retries 6 \
+            --retry-delay-seconds 15
