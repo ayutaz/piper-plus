@@ -270,6 +270,7 @@ jobs:
             "deploy/404.html"
             "deploy/.nojekyll"
             "deploy/assets/favicon.svg"
+            "deploy/multilingual-demo/index.html"
             "deploy/src/index.js"
             "deploy/g2p/src/index.js"
             "deploy/dist/rust-wasm/piper_plus_wasm.js"
@@ -285,9 +286,19 @@ jobs:
             fi
           done
           # Every HTML must declare a favicon link so the browser does not
-          # auto-fetch /favicon.ico and 404 silently in the console.
-          for html in deploy/index.html deploy/404.html deploy/multilingual-demo/*.html; do
-            [ -f "$html" ] || continue
+          # auto-fetch /favicon.ico and 404 silently in the console. Use
+          # nullglob so an empty multilingual-demo/ directory becomes an
+          # empty array (zero iterations) rather than the literal pattern
+          # being silently skipped by [ -f ]; we then assert we actually
+          # checked the minimum expected count.
+          shopt -s nullglob
+          HTMLS=( deploy/index.html deploy/404.html deploy/multilingual-demo/*.html )
+          shopt -u nullglob
+          if [ "${#HTMLS[@]}" -lt 3 ]; then
+            echo "MISSING: expected >=3 deployable HTML files, found ${#HTMLS[@]}"
+            MISSING=$((MISSING + 1))
+          fi
+          for html in "${HTMLS[@]}"; do
             if ! grep -q '<link[^>]*rel="icon"' "$html"; then
               echo "MISSING favicon <link>: $html"
               MISSING=$((MISSING + 1))

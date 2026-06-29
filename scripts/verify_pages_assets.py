@@ -87,6 +87,10 @@ def verify(
 ) -> int:
     """Probe each path; return the number of non-2xx (3xx is also acceptable)."""
     base = base_url.rstrip("/")
+    # Materialize once: callers can pass any Iterable (including a one-shot
+    # generator). Re-evaluating len() on the original after the for loop
+    # would report 0 for generators and break the success summary.
+    paths = tuple(paths)
     failures: list[tuple[str, int]] = []
     for path in paths:
         url = f"{base}/{path}" if path else f"{base}/"
@@ -104,7 +108,7 @@ def verify(
         for url, status in failures:
             print(f"  - {status} {url}")
         return len(failures)
-    print(f"OK: all {len(list(paths))} assets returned 2xx/3xx")
+    print(f"OK: all {len(paths)} assets returned 2xx/3xx")
     return 0
 
 
