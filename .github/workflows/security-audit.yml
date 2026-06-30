@@ -101,14 +101,17 @@ jobs:
         run: pip install pip-audit
       - name: Audit root requirements
         # PR は warning、schedule/push は fail。
-        # IGNORE 一覧 (`--ignore-vuln`) は理由付きで `docs/spec/pip-audit-ignores.toml`
-        # に集中管理。 一行 = 一 advisory + justification + 再評価条件。
+        # IGNORE 一覧 (`--ignore-vuln`) は本コメントブロックが single source。
+        # 一 advisory = 一行 + justification + 解除条件 + tracking issue 番号 を
+        # 明記する。 解除手順 (latest 確認 + 削除) の詳細は各 tracking issue 側。
         # 現在 ignore 中:
         #   - GHSA-p4gq-832x-fm9v (nltk ≤ 3.9.4, CVE-2026-54293) — nltk.data.load()
         #     URL-encoded path traversal。 piper-plus は g2p-en / g2pk2 経由で
         #     hardcoded path (`"cmudict"` 等 library-internal) のみ呼び出すため
-        #     attacker-controlled URL 経路が存在せず実エクスプロイト不可。 upstream
-        #     stable fix リリース時に解除 (3.9.4 が現時点 latest)。
+        #     attacker-controlled URL 経路が存在せず実エクスプロイト不可。
+        #     解除条件: upstream stable fix リリース (3.9.4 が現時点 latest)
+        #     または g2p-en / g2pk2 を nltk 非依存実装に置換。
+        #     tracking: #588
         continue-on-error: ${{ github.event_name == 'pull_request' }}
         run: |
           pip-audit --requirement <(uv pip compile pyproject.toml 2>/dev/null) --strict --vulnerability-service osv \
@@ -122,7 +125,7 @@ jobs:
         # により発覚)。`--requirement requirements.txt` で配布対象の production
         # 依存だけを対象にする。dev / gpu / webui は optional extras で
         # 配布 wheel には含まれないため audit 対象外。
-        # `--ignore-vuln` 一覧は root 側 step のコメントに集約。
+        # `--ignore-vuln` 一覧は root 側 step のコメントブロックが single source。
         continue-on-error: ${{ github.event_name == 'pull_request' }}
         working-directory: src/python_run
         run: pip-audit --strict --vulnerability-service osv --requirement requirements.txt \
