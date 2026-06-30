@@ -198,6 +198,11 @@ def test_paths_filtered_missing_is_exempt(gate, tmp_path, capsys):
     assert "Paths-filtered spokes" in captured.out
     assert "PUA Consistency Gate" in captured.out
     assert "Missing spokes" not in captured.out
+    # The unqualified "All monitored spokes succeeded." line would contradict
+    # the Paths-filtered section above (Copilot review on PR #587). Use the
+    # qualified phrasing instead.
+    assert "All monitored spokes succeeded." not in captured.out
+    assert "All eligible spokes succeeded" in captured.out
 
 
 def test_paths_filtered_workflow_still_fails_when_run_cancelled(gate, tmp_path, capsys):

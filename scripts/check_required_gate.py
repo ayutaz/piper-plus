@@ -206,7 +206,15 @@ def format_diagnostic(
             lines.append(f"- `{name}`")
         lines.append("")
     if not missing and not bad:
-        lines.append("All monitored spokes succeeded.")
+        if exempt_missing:
+            # Don't emit the unqualified success line — it contradicts the
+            # Paths-filtered section above (Copilot review on PR #587).
+            lines.append(
+                "All eligible spokes succeeded "
+                "(paths-filtered spokes listed above did not run by design)."
+            )
+        else:
+            lines.append("All monitored spokes succeeded.")
     return "\n".join(lines).rstrip() + "\n"
 
 
