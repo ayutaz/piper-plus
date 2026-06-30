@@ -90,6 +90,7 @@ jobs:
             --head-sha "${HEAD_SHA}" \
             --repo "${GITHUB_REPOSITORY}" \
             --monitored "${MONITORED_WORKFLOWS}" \
+            --paths-filtered "Memory regression (per-language),PUA Consistency Gate" \
             --on-cancelled fail \
             --on-skipped fail \
             "${extra_args[@]}"
