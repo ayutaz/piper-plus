@@ -179,6 +179,7 @@ def format_diagnostic(
     missing: list[str],
     bad: list[tuple[str, str]],
     spokes: dict[str, SpokeRun],
+    exempt_missing: list[str] | None = None,
 ) -> str:
     lines = [
         STICKY_MARKER,
@@ -199,8 +200,21 @@ def format_diagnostic(
             suffix = f" — [run]({url})" if url else ""
             lines.append(f"- `{name}` → `{reason}`{suffix}")
         lines.append("")
+    if exempt_missing:
+        lines.append("**Paths-filtered spokes (intentionally not run on this push)**:")
+        for name in exempt_missing:
+            lines.append(f"- `{name}`")
+        lines.append("")
     if not missing and not bad:
-        lines.append("All monitored spokes succeeded.")
+        if exempt_missing:
+            # Don't emit the unqualified success line — it contradicts the
+            # Paths-filtered section above (Copilot review on PR #587).
+            lines.append(
+                "All eligible spokes succeeded "
+                "(paths-filtered spokes listed above did not run by design)."
+            )
+        else:
+            lines.append("All monitored spokes succeeded.")
     return "\n".join(lines).rstrip() + "\n"
 
 
@@ -261,6 +275,17 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--repo", default=os.environ.get("GITHUB_REPOSITORY", ""))
     p.add_argument("--on-cancelled", choices=["fail", "ignore"], default="fail")
     p.add_argument("--on-skipped", choices=["fail", "ignore"], default="fail")
+    p.add_argument(
+        "--paths-filtered",
+        default="",
+        help=(
+            "Comma-separated list of monitored workflow names that have paths "
+            "filters. If such a workflow is missing at head_sha (no run queued "
+            "because the push diff didn't match its paths filter), treat it as "
+            "OK instead of fail. The gate still fails if such a workflow DID "
+            "run and produced cancelled/skipped/failure."
+        ),
+    )
     p.add_argument("--post-pr-comment", type=int, default=None)
     p.add_argument(
         "--branch-for-supersede",
@@ -307,8 +332,11 @@ def run(args: argparse.Namespace) -> int:
         return 0
 
     spokes, missing = pick_latest_per_workflow(runs, monitored, args.head_sha)
+    paths_filtered = parse_monitored(args.paths_filtered) if args.paths_filtered else []
+    exempt_missing = [m for m in missing if m in paths_filtered]
+    missing = [m for m in missing if m not in paths_filtered]
     bad = classify(spokes, on_cancelled=args.on_cancelled, on_skipped=args.on_skipped)
-    body = format_diagnostic(args.head_sha, missing, bad, spokes)
+    body = format_diagnostic(args.head_sha, missing, bad, spokes, exempt_missing)
     print(body)
     if args.post_pr_comment and token and args.repo and args.runs_json is None:
         upsert_sticky_comment(args.repo, args.post_pr_comment, body, token)

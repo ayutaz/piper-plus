@@ -67,6 +67,7 @@ jobs:
     outputs:
       version: ${{ steps.resolve.outputs.version }}
       packages: ${{ steps.resolve.outputs.packages }}
+      skip_unpublished: ${{ steps.published_check.outputs.skip_unpublished || 'false' }}
     steps:
       - uses: actions/checkout@v6.0.3
 
@@ -92,10 +93,40 @@ jobs:
           echo "Will verify version: $VERSION"
           echo "Will verify packages: $PACKAGES"
 
+      - name: Check if VERSION is already published (schedule guard)
+        id: published_check
+        if: github.event_name == 'schedule'
+        run: |
+          VERSION="${{ steps.resolve.outputs.version }}"
+          # On scheduled runs we re-verify the LATEST published release. If
+          # VERSION in the repo has been bumped to a yet-to-be-published
+          # value (the usual state right after dev opens a new minor cycle),
+          # skip the PyPI verify job instead of failing with HTTP 404.
+          # The scope of this skip is intentionally PyPI-only — the other
+          # registries (npm/NuGet/crates/Maven) resolve their version from
+          # their own package files (package.json / *.csproj / Cargo.toml /
+          # gradle.properties) and diverge from VERSION (Copilot review on
+          # PR #587).
+          URL="https://pypi.org/pypi/piper-plus/${VERSION}/json"
+          HTTP=$(curl -sLo /dev/null -w "%{http_code}" "$URL")
+          # Distinguish 404 (truly unpublished) from 5xx / network errors so
+          # transient PyPI outages don't silently mask real verification
+          # signal (also Copilot review on PR #587).
+          if [ "$HTTP" = "404" ]; then
+            echo "::notice::piper-plus@${VERSION} not yet published on PyPI (HTTP 404). Scheduled verify will skip the PyPI job."
+            echo "skip_unpublished=true" >> "$GITHUB_OUTPUT"
+          elif [ "$HTTP" != "200" ]; then
+            echo "::warning::PyPI metadata fetch returned HTTP $HTTP for piper-plus@${VERSION} (transient error?). Proceeding with full verification — verify-pypi may fail."
+            echo "skip_unpublished=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "piper-plus@${VERSION} is published. Proceeding with full verification."
+            echo "skip_unpublished=false" >> "$GITHUB_OUTPUT"
+          fi
+
   verify-pypi:
     name: Verify PyPI piper-plus
     needs: gate
-    if: contains(needs.gate.outputs.packages, 'pypi')
+    if: contains(needs.gate.outputs.packages, 'pypi') && needs.gate.outputs.skip_unpublished != 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
