@@ -133,7 +133,7 @@ jobs:
 
       - name: Set up .NET
         if: matrix.runtime == 'csharp'
-        uses: actions/setup-dotnet@v5.3.0
+        uses: actions/setup-dotnet@v5.4.0
         with:
           dotnet-version: '10.0.x'
 

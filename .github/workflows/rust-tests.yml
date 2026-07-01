@@ -189,7 +189,7 @@ jobs:
         workspaces: src/rust -> target
         key: coverage
     - name: Install cargo-llvm-cov
-      uses: taiki-e/install-action@v2.82.2
+      uses: taiki-e/install-action@v2.82.7
       with:
         tool: cargo-llvm-cov
     - name: Generate coverage (workspace, lcov)
