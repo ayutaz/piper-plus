@@ -69,7 +69,7 @@ http = [
     # Issue #527 / DR-002: floor を root pyproject と統一 (<1 cap は PyPI 配布の
     # 保守的上限ポリシーとして維持)。 uv.lock は fastapi 0.136.1 / uvicorn 0.46.0。
     "fastapi>=0.136.1,<1",
-    "uvicorn[standard]>=0.46.0,<1",
+    "uvicorn[standard]>=0.49.0,<1",
 ]
 test = [
     # Issue #527 / DR-002: pytest floor を root / src/python と統一。
