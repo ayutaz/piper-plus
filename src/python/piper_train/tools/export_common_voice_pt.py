@@ -25,11 +25,15 @@ import argparse
 import csv
 import logging
 import subprocess
+import sys
 import tarfile
 from collections import defaultdict
 from pathlib import Path
 
 _LOGGER = logging.getLogger("export_common_voice_pt")
+
+# CV の validated.tsv は 128KB 超のフィールドを含むことがある (csv 既定上限で落ちる)
+csv.field_size_limit(sys.maxsize)
 
 
 def load_durations(tsv: Path) -> dict[str, float]:
