@@ -129,68 +129,74 @@ def load_ja_en_dataset(
 
 def parse_aishell3(
     base_dir: Path,
+    splits: tuple[str, ...] = ("train",),
 ) -> tuple[list[tuple[str, str, str, list[str]]], dict[str, int]]:
     """Parse AISHELL-3 dataset with pre-computed pinyin extraction.
+
+    splits: 読み込む split ("train", "test")。デフォルトは v7 互換の train のみ。
+    test も含めるとコーパス全 218 話者を利用できる (zero-shot 話者多様性向上)。
 
     Returns:
         (entries, speaker_counts)
         entries: list of (text, wav_path, speaker_id_str, pinyin_syllables) tuples
         speaker_counts: {speaker_id_str: utterance_count}
     """
-    content_path = base_dir / "train" / "content.txt"
-    wav_dir = base_dir / "train" / "wav"
-
-    if not content_path.exists():
-        _LOGGER.error("AISHELL-3 content.txt not found: %s", content_path)
-        return [], {}
-
     entries: list[tuple[str, str, str, list[str]]] = []
     speaker_counts: dict[str, int] = Counter()
     skipped = 0
 
-    with open(content_path, encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if not line or line.startswith("#"):
-                continue
+    for split in splits:
+        content_path = base_dir / split / "content.txt"
+        wav_dir = base_dir / split / "wav"
 
-            # Format: SSB00050001.wav\t广 guang3 州 zhou1 ...
-            parts = line.split("\t", maxsplit=1)
-            if len(parts) < 2:
-                skipped += 1
-                continue
+        if not content_path.exists():
+            _LOGGER.error("AISHELL-3 content.txt not found: %s", content_path)
+            continue
 
-            utterance_file = parts[0].strip()
-            pinyin_text = parts[1].strip()
+        with open(content_path, encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith("#"):
+                    continue
 
-            # Split: alternating characters and pinyin
-            tokens = pinyin_text.split()
-            chinese_chars = [tokens[i] for i in range(0, len(tokens), 2)]
-            pinyin_syllables = [tokens[i] for i in range(1, len(tokens), 2)]
-            text = "".join(chinese_chars)
+                # Format: SSB00050001.wav\t广 guang3 州 zhou1 ...
+                parts = line.split("\t", maxsplit=1)
+                if len(parts) < 2:
+                    skipped += 1
+                    continue
 
-            if not text or not pinyin_syllables:
-                skipped += 1
-                continue
+                utterance_file = parts[0].strip()
+                pinyin_text = parts[1].strip()
 
-            # Speaker ID from filename: SSB0005XXXX.wav -> SSB0005
-            utterance_id = utterance_file.replace(".wav", "")
-            speaker_id_str = utterance_id[:7]
+                # Split: alternating characters and pinyin
+                tokens = pinyin_text.split()
+                chinese_chars = [tokens[i] for i in range(0, len(tokens), 2)]
+                pinyin_syllables = [tokens[i] for i in range(1, len(tokens), 2)]
+                text = "".join(chinese_chars)
 
-            wav_path = wav_dir / speaker_id_str / utterance_file
-            if not wav_path.exists():
-                skipped += 1
-                continue
+                if not text or not pinyin_syllables:
+                    skipped += 1
+                    continue
 
-            entries.append((text, str(wav_path), speaker_id_str, pinyin_syllables))
-            speaker_counts[speaker_id_str] += 1
+                # Speaker ID from filename: SSB0005XXXX.wav -> SSB0005
+                utterance_id = utterance_file.replace(".wav", "")
+                speaker_id_str = utterance_id[:7]
+
+                wav_path = wav_dir / speaker_id_str / utterance_file
+                if not wav_path.exists():
+                    skipped += 1
+                    continue
+
+                entries.append((text, str(wav_path), speaker_id_str, pinyin_syllables))
+                speaker_counts[speaker_id_str] += 1
 
     _LOGGER.info(
-        "Parsed %d AISHELL-3 utterances (%d speakers, %d skipped) "
+        "Parsed %d AISHELL-3 utterances (%d speakers, %d skipped, splits=%s) "
         "[pinyin shortcut enabled]",
         len(entries),
         len(speaker_counts),
         skipped,
+        ",".join(splits),
     )
     return entries, dict(speaker_counts)
 
@@ -203,64 +209,72 @@ def parse_aishell3(
 def parse_cml_tts(
     base_dir: Path,
     language: str,
+    splits: tuple[str, ...] = ("train",),
 ) -> tuple[list[tuple[str, str, str]], dict[str, int]]:
     """Parse CML-TTS dataset (ES, FR, or PT).
+
+    splits: 読み込む split ("train", "dev", "test")。デフォルトは v7 互換の
+    train のみ。dev/test も含めるとコーパス全話者 (es 77 / fr 45 / pt 30) を
+    利用できる — v7 で話者数が es 63 / fr 28 / pt 8 に減っていたのは
+    train split のみ読んでいたのが原因。
 
     Returns:
         (entries, speaker_counts)
         entries: list of (text, wav_path, speaker_id_str) tuples
         speaker_counts: {client_id: utterance_count}
     """
-    train_csv = base_dir / "train.csv"
-    if not train_csv.exists():
-        _LOGGER.error("CML-TTS train.csv not found: %s", train_csv)
-        return [], {}
-
     entries: list[tuple[str, str, str]] = []
     speaker_counts: dict[str, int] = Counter()
     skipped = 0
 
-    with open(train_csv, encoding="utf-8") as f:
-        # Skip header line
-        header = f.readline()
-        if not header:
-            return [], {}
+    for split in splits:
+        split_csv = base_dir / f"{split}.csv"
+        if not split_csv.exists():
+            _LOGGER.error("CML-TTS %s.csv not found: %s", split, split_csv)
+            continue
 
-        for _line_no, line in enumerate(f, start=2):
-            line = line.strip()
-            if not line:
+        with open(split_csv, encoding="utf-8") as f:
+            # Skip header line
+            header = f.readline()
+            if not header:
                 continue
 
-            # Pipe-delimited:
-            # wav_filename|wav_filesize|transcript|transcript_wav2vec|
-            # levenshtein|duration|num_words|client_id
-            parts = line.split("|")
-            if len(parts) < 8:
-                skipped += 1
-                continue
+            for _line_no, line in enumerate(f, start=2):
+                line = line.strip()
+                if not line:
+                    continue
 
-            wav_filename = parts[0].strip()
-            transcript = parts[2].strip()
-            client_id = parts[7].strip()
+                # Pipe-delimited:
+                # wav_filename|wav_filesize|transcript|transcript_wav2vec|
+                # levenshtein|duration|num_words|client_id
+                parts = line.split("|")
+                if len(parts) < 8:
+                    skipped += 1
+                    continue
 
-            if not transcript:
-                skipped += 1
-                continue
+                wav_filename = parts[0].strip()
+                transcript = parts[2].strip()
+                client_id = parts[7].strip()
 
-            wav_path = base_dir / wav_filename
-            if not wav_path.exists():
-                skipped += 1
-                continue
+                if not transcript:
+                    skipped += 1
+                    continue
 
-            entries.append((transcript, str(wav_path), client_id))
-            speaker_counts[client_id] += 1
+                wav_path = base_dir / wav_filename
+                if not wav_path.exists():
+                    skipped += 1
+                    continue
+
+                entries.append((transcript, str(wav_path), client_id))
+                speaker_counts[client_id] += 1
 
     _LOGGER.info(
-        "Parsed %d %s utterances (%d speakers, %d skipped)",
+        "Parsed %d %s utterances (%d speakers, %d skipped, splits=%s)",
         len(entries),
         language.upper(),
         len(speaker_counts),
         skipped,
+        ",".join(splits),
     )
     return entries, dict(speaker_counts)
 
@@ -1224,7 +1238,25 @@ def main():
         action="store_true",
         help="Disable AISHELL-3 pinyin shortcut (use pypinyin instead)",
     )
+    parser.add_argument(
+        "--cml-splits",
+        default="train",
+        help="CML-TTS splits to read, comma-separated (default: train). "
+        "Use 'train,dev,test' for full corpus speakers "
+        "(es 77 / fr 45 / pt 30)",
+    )
+    parser.add_argument(
+        "--aishell3-splits",
+        default="train",
+        help="AISHELL-3 splits to read, comma-separated (default: train). "
+        "Use 'train,test' for full corpus speakers (218)",
+    )
     args = parser.parse_args()
+
+    cml_splits = tuple(s.strip() for s in args.cml_splits.split(",") if s.strip())
+    aishell3_splits = tuple(
+        s.strip() for s in args.aishell3_splits.split(",") if s.strip()
+    )
 
     # Check that at least one new language is provided
     new_langs = {
@@ -1300,7 +1332,9 @@ def main():
     if args.zh_aishell3:
         _LOGGER.info("=" * 60)
         _LOGGER.info("Processing ZH (AISHELL-3) from %s", args.zh_aishell3)
-        zh_entries, zh_speaker_counts = parse_aishell3(Path(args.zh_aishell3))
+        zh_entries, zh_speaker_counts = parse_aishell3(
+            Path(args.zh_aishell3), splits=aishell3_splits
+        )
         zh_utts, zh_speakers = process_new_language(
             zh_entries,
             zh_speaker_counts,
@@ -1326,7 +1360,9 @@ def main():
     if args.es_cml_tts:
         _LOGGER.info("=" * 60)
         _LOGGER.info("Processing ES (CML-TTS) from %s", args.es_cml_tts)
-        es_entries, es_speaker_counts = parse_cml_tts(Path(args.es_cml_tts), "es")
+        es_entries, es_speaker_counts = parse_cml_tts(
+            Path(args.es_cml_tts), "es", splits=cml_splits
+        )
         es_utts, es_speakers = process_new_language(
             es_entries,
             es_speaker_counts,
@@ -1351,7 +1387,9 @@ def main():
     if args.fr_cml_tts:
         _LOGGER.info("=" * 60)
         _LOGGER.info("Processing FR (CML-TTS) from %s", args.fr_cml_tts)
-        fr_entries, fr_speaker_counts = parse_cml_tts(Path(args.fr_cml_tts), "fr")
+        fr_entries, fr_speaker_counts = parse_cml_tts(
+            Path(args.fr_cml_tts), "fr", splits=cml_splits
+        )
         fr_utts, fr_speakers = process_new_language(
             fr_entries,
             fr_speaker_counts,
@@ -1376,7 +1414,9 @@ def main():
     if args.pt_cml_tts:
         _LOGGER.info("=" * 60)
         _LOGGER.info("Processing PT (CML-TTS) from %s", args.pt_cml_tts)
-        pt_entries, pt_speaker_counts = parse_cml_tts(Path(args.pt_cml_tts), "pt")
+        pt_entries, pt_speaker_counts = parse_cml_tts(
+            Path(args.pt_cml_tts), "pt", splits=cml_splits
+        )
         pt_utts, pt_speakers = process_new_language(
             pt_entries,
             pt_speaker_counts,
