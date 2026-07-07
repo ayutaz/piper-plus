@@ -28,6 +28,7 @@ import subprocess
 import sys
 import tarfile
 from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 _LOGGER = logging.getLogger("export_common_voice_pt")
@@ -84,6 +85,9 @@ def select_speakers(args, durations: dict[str, float]) -> dict[str, list[dict]]:
 
 
 def mp3_bytes_to_wav(raw: bytes, dst: Path) -> bool:
+    """既に変換済みならスキップ (再実行を高速化)。ffmpeg は GIL 外なのでスレッド並列可。"""
+    if dst.exists() and dst.stat().st_size > 44:
+        return True
     dst.parent.mkdir(parents=True, exist_ok=True)
     proc = subprocess.run(
         ["ffmpeg", "-hide_banner", "-loglevel", "error", "-i", "pipe:0",
@@ -105,32 +109,47 @@ def export(args, selected: dict[str, list[dict]]) -> None:
     tars = sorted(audio_root.rglob("*.tar"))
     _LOGGER.info("tar shards: %d、対象 clip: %d", len(tars), len(wanted))
 
+    def convert(job):
+        base, spk, row, raw = job
+        rel = Path("audios") / spk / (Path(base).stem + ".wav")
+        if not mp3_bytes_to_wav(raw, args.output_dir / rel):
+            return None
+        text = row["sentence"].replace("\n", " ").strip()
+        return (
+            f"{str(rel).replace(chr(92), '/')}|0|{text}|{text}|0|"
+            f"{row['_dur']:.2f}|{len(text.split())}|{spk}\n"
+        )
+
     n = 0
     csv_path = args.output_dir / "cv.csv"
-    with open(csv_path, "w", encoding="utf-8") as csv_f:
+    with open(csv_path, "w", encoding="utf-8") as csv_f, ThreadPoolExecutor(
+        max_workers=args.ffmpeg_workers
+    ) as pool:
         csv_f.write(
             "wav_filename|wav_filesize|transcript|transcript_wav2vec|"
             "levenshtein|duration|num_words|client_id\n"
         )
         for tar_path in tars:
             with tarfile.open(tar_path) as tf:
+                jobs = []
                 for member in tf:
                     base = Path(member.name).name
                     if base not in wanted:
                         continue
                     spk, row = wanted.pop(base)
-                    raw = tf.extractfile(member).read()
-                    rel = Path("audios") / spk / (Path(base).stem + ".wav")
-                    if not mp3_bytes_to_wav(raw, args.output_dir / rel):
-                        continue
-                    text = row["sentence"].replace("\n", " ").strip()
-                    csv_f.write(
-                        f"{str(rel).replace(chr(92), '/')}|0|{text}|{text}|0|"
-                        f"{row['_dur']:.2f}|{len(text.split())}|{spk}\n"
-                    )
-                    n += 1
-                    if n % 2000 == 0:
-                        _LOGGER.info("  %d clips 変換済み (残 %d)", n, len(wanted))
+                    jobs.append((base, spk, row, tf.extractfile(member).read()))
+                    if len(jobs) >= 512:
+                        for line in pool.map(convert, jobs):
+                            if line:
+                                csv_f.write(line)
+                                n += 1
+                        jobs = []
+                        if n % 2048 < 512:
+                            _LOGGER.info("  %d clips 変換済み (残 %d)", n, len(wanted))
+                for line in pool.map(convert, jobs):
+                    if line:
+                        csv_f.write(line)
+                        n += 1
     _LOGGER.info("=== 完了: %d clips -> %s ===", n, csv_path)
 
 
@@ -150,6 +169,7 @@ def main() -> None:
     )
     parser.add_argument("--min-clips", type=int, default=20)
     parser.add_argument("--cap", type=int, default=60)
+    parser.add_argument("--ffmpeg-workers", type=int, default=16)
     parser.add_argument("--min-dur", type=float, default=1.0)
     parser.add_argument("--max-dur", type=float, default=15.0)
     args = parser.parse_args()
