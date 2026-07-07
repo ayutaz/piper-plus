@@ -15,6 +15,7 @@ import argparse
 import csv
 import json
 import logging
+import os
 from collections import Counter
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from hashlib import sha256 as _sha256
@@ -228,12 +229,43 @@ def process_ja_dataset(
     )
 
     if need_caching:
+        # ja_fast_vad: moe-speech 等の整音済みクリップ用 energy VAD batch worker (EN と同型、~7.7x)
+        use_fast_vad = os.environ.get("PIPER_JA_FAST_VAD", "0") == "1"
         _LOGGER.info(
-            "Caching audio for %d JA utterances with %d workers...",
+            "Caching audio for %d JA utterances with %d workers (%s)...",
             len(need_caching),
             workers,
+            "energy VAD batch" if use_fast_vad else "Silero VAD",
         )
-        if workers > 1:
+        if workers > 1 and use_fast_vad:
+            # need_caching: [(wav_path_str, cache_dir_str, sample_rate), ...]
+            wavs = [item[0] for item in need_caching]
+            cache_dir_str = str(cache_dir)
+            batches = [
+                (wavs[i : i + _CACHE_BATCH_SIZE_FAST], cache_dir_str, sample_rate)
+                for i in range(0, len(wavs), _CACHE_BATCH_SIZE_FAST)
+            ]
+            with ProcessPoolExecutor(max_workers=workers) as executor:
+                futures = {
+                    executor.submit(_cache_audio_batch_worker_fast, b): i
+                    for i, b in enumerate(batches)
+                }
+                done = 0
+                for future in as_completed(futures):
+                    try:
+                        for wav_str, norm_str, spec_str in future.result():
+                            if norm_str is None:
+                                _LOGGER.warning(
+                                    "Audio cache failed for %s: %s", wav_str, spec_str
+                                )
+                                continue
+                            audio_map[wav_str] = (norm_str, spec_str)
+                            done += 1
+                    except Exception as e:
+                        _LOGGER.warning("Audio cache batch failed: %s", e)
+                    if done // 1000 != (done - _CACHE_BATCH_SIZE_FAST) // 1000:
+                        _LOGGER.info("Cached audio %d/%d", done, len(need_caching))
+        elif workers > 1:
             with ProcessPoolExecutor(max_workers=workers) as executor:
                 futures = {
                     executor.submit(_cache_audio_worker, a): i
