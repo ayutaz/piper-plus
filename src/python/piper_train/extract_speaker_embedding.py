@@ -713,9 +713,8 @@ def main() -> None:
     cuda_provider_options = {
         "arena_extend_strategy": "kSameAsRequested",
         "do_copy_in_default_stream": False,
-        # 初回に最適 conv kernel を選抜。以降の run() は 2-5x 高速化
-        "cudnn_conv_algo_search": "EXHAUSTIVE",
-        "cudnn_conv_use_max_workspace": "1",
+        # cudnn_conv_algo_search は EXHAUSTIVE だと session 作成で 15+ 分 hang するため
+        # デフォルト (HEURISTIC) のまま。可変長入力では EXHAUSTIVE は使えない
     }
 
     if "CUDAExecutionProvider" in onnxruntime.get_available_providers():
