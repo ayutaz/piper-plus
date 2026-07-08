@@ -505,7 +505,7 @@ def _phonemize_en_worker(args: tuple[str, str, str, int]) -> dict:
             else:
                 missing.append(ph)
 
-        phoneme_ids, prosody_features = phonemizer.post_process_ids(
+        phoneme_ids, prosody_features = _add_inter_phoneme_padding(
             phoneme_ids, prosody_features, id_map
         )
 
@@ -729,7 +729,7 @@ def process_en_dataset(
                                 prosody_features.append(None)
                     else:
                         missing_phonemes[ph] += 1
-                phoneme_ids, prosody_features = phonemizer.post_process_ids(
+                phoneme_ids, prosody_features = _add_inter_phoneme_padding(
                     phoneme_ids, prosody_features, bilingual_id_map
                 )
                 if len(phoneme_ids) == 0:
