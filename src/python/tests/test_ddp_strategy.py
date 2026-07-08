@@ -1,7 +1,7 @@
 """Tests for DDP strategy configuration.
 
-Verifies that static_graph is never set (GAN training has unused params each step),
-and that find_unused_parameters + gradient_as_bucket_view are always configured.
+Verifies that static_graph=True, find_unused_parameters=True, and
+gradient_as_bucket_view=True are always configured for multi-GPU runs.
 """
 
 import pytest
@@ -20,14 +20,29 @@ def _import_ddp_deps():
 
 
 @pytest.mark.unit
-def test_ddp_strategy_with_no_wavlm_has_no_static_graph():
-    """GAN training has unused params each step; static_graph must NOT be set."""
+def test_ddp_strategy_has_static_graph_true():
+    """static_graph=True を追加して all-reduce bucket 準備コストを削減する
+    (最適化 2/4)。 VITS の GAN 交互最適化は step ごとに unused-param 集合が
+    固定パターンなので safe に有効化できる。"""
     DDPStrategy, configure_ddp_strategy = _import_ddp_deps()
 
     strategy = configure_ddp_strategy(num_gpus=4, no_wavlm=True)
 
     assert isinstance(strategy, DDPStrategy)
-    assert "static_graph" not in strategy._ddp_kwargs
+    assert strategy._ddp_kwargs.get("static_graph") is True
+
+
+@pytest.mark.unit
+def test_ddp_strategy_static_graph_regardless_of_wavlm():
+    """WavLM の有無に関わらず static_graph=True が設定されること。"""
+    DDPStrategy, configure_ddp_strategy = _import_ddp_deps()
+
+    for no_wavlm in (True, False):
+        strategy = configure_ddp_strategy(num_gpus=2, no_wavlm=no_wavlm)
+        assert isinstance(strategy, DDPStrategy)
+        assert strategy._ddp_kwargs.get("static_graph") is True, (
+            f"static_graph must be True with no_wavlm={no_wavlm}"
+        )
 
 
 @pytest.mark.unit
