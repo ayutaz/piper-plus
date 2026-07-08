@@ -260,8 +260,11 @@ class _FbankDataset(torch.utils.data.Dataset):
     メインプロセスでONNX推論に個別に渡す（ゼロパディング回避）。
 
     PIPER_EMB_FIXED_FRAMES=N (default 0=off) で固定フレーム長にクロップ/pad する。
-    N=400 (4秒 @ 16kHz, 10ms hop) が VoxCeleb 系の標準値。長い発話は中央を crop、
-    短い発話は reflect pad (silence pad は CAM++ statistical pool を薄めるため回避)。
+    N=400 (4秒 @ 16kHz, 10ms hop) が VoxCeleb 系の標準値。**A' 案**:
+    - 発話 <= N frames: 全体を 1 chunk として reflect pad
+    - 発話 > N frames: 重複ありで N frames の chunks に分割 (hop=N//2 = 2秒)
+      → 全 chunk の embedding を後段で L2 正規化平均、話者情報の全体を保持
+    (A 案の中央 crop 単発は cosine 0.97 に劣化するため、A' で情報損失を防ぐ)
     """
 
     def __init__(
@@ -270,37 +273,47 @@ class _FbankDataset(torch.utils.data.Dataset):
         source_sr: int,
         target_sr: int = 16000,
         fixed_frames: int = 0,
+        chunk_hop_ratio: float = 0.5,
     ):
         self.items = items
         self.source_sr = source_sr
         self.target_sr = target_sr
         self.resampler = torchaudio.transforms.Resample(source_sr, target_sr)
         self.fixed_frames = fixed_frames
+        # chunk hop: fixed_frames の何分の何ずつずらして chunk を刻むか (0.5 = 50% overlap)
+        self.chunk_hop = max(1, int(fixed_frames * chunk_hop_ratio)) if fixed_frames > 0 else 0
 
     def __len__(self) -> int:
         return len(self.items)
 
-    def _crop_or_reflect_pad(self, fbank: torch.Tensor) -> torch.Tensor:
-        target = self.fixed_frames
+    def _reflect_pad_to(self, fbank: torch.Tensor, target: int) -> torch.Tensor:
         T = fbank.shape[0]
         if T == target:
             return fbank
         if T > target:
-            start = (T - target) // 2
-            return fbank[start : start + target]
-        # T < target: reflect padding (silence pad より pool 破損を避けられる)
-        # torch.nn.functional.pad expects [N,C,T] or [C,T], fbank shape is [T, mel]
-        # reflect pad 経由: [1, mel, T] にして反射補間
+            return fbank[:target]
         fb_t = fbank.transpose(0, 1).unsqueeze(0)  # [1, mel, T]
         pad_amount = target - T
-        # reflect pad requires pad < T; small T の場合は circular で対処
         if pad_amount < T:
             fb_padded = torch.nn.functional.pad(fb_t, (0, pad_amount), mode="reflect")
         else:
-            # 極端に短い発話は repeat
             repeat = (target // T) + 1
             fb_padded = fb_t.repeat(1, 1, repeat)[:, :, :target]
         return fb_padded.squeeze(0).transpose(0, 1)  # [target, mel]
+
+    def _to_chunks(self, fbank: torch.Tensor) -> torch.Tensor:
+        """全 fbank を [n_chunks, fixed_frames, mel] に分割 (overlap 50%、reflect pad)。"""
+        target = self.fixed_frames
+        T = fbank.shape[0]
+        if T <= target:
+            return self._reflect_pad_to(fbank, target).unsqueeze(0)  # [1, target, mel]
+        # T > target: 50% overlap で chunk 化
+        starts = list(range(0, T - target + 1, self.chunk_hop))
+        # 末尾の余り frames をカバー: 最後の start が T - target まで届かないなら追加
+        if starts[-1] + target < T:
+            starts.append(T - target)
+        chunks = torch.stack([fbank[s:s + target] for s in starts], dim=0)
+        return chunks  # [n_chunks, target, mel]
 
     def __getitem__(self, idx: int) -> tuple[int, torch.Tensor, str, bool]:
         entry_idx, pt_path, stem = self.items[idx]
@@ -321,12 +334,15 @@ class _FbankDataset(torch.utils.data.Dataset):
             )
             fbank = fbank - fbank.mean(dim=0, keepdim=True)
             if self.fixed_frames > 0:
-                fbank = self._crop_or_reflect_pad(fbank)
+                fbank = self._to_chunks(fbank)  # [n_chunks, target, mel]
             return (entry_idx, fbank, stem, True)
         except Exception as e:
             _LOGGER.warning("Worker failed to load %s: %s", pt_path, e)
-            zero_shape = self.fixed_frames if self.fixed_frames > 0 else 1
-            return (entry_idx, torch.zeros(zero_shape, 80), stem, False)
+            if self.fixed_frames > 0:
+                zero = torch.zeros(1, self.fixed_frames, 80)
+            else:
+                zero = torch.zeros(1, 80)
+            return (entry_idx, zero, stem, False)
 
 
 def _collate_fbanks(
@@ -342,6 +358,21 @@ def _collate_fbanks(
     indices, fbanks, stems, valids = zip(*batch, strict=False)
     fbank_list = [f.numpy().astype(np.float32) for f in fbanks]
     return (list(indices), fbank_list, list(stems), list(valids))
+
+
+def _collate_fbanks_chunked(
+    batch: list[tuple[int, torch.Tensor, str, bool]],
+) -> tuple[list[int], np.ndarray, list[int], list[str], list[bool]]:
+    """A'案: 各発話の chunks [n_chunks_i, T, mel] を batch flatten して [Σn, T, mel] に。
+
+    後段で chunks_per_utt を使って各発話ぶんの embedding を分離・平均する。
+    """
+    indices, fbank_chunks, stems, valids = zip(*batch, strict=False)
+    chunks_per_utt = [f.shape[0] for f in fbank_chunks]
+    # 各 chunk は同一 shape [T, mel] なので concat
+    flat = torch.cat([f for f in fbank_chunks], dim=0).numpy().astype(np.float32)
+    # 形状: [Σn_chunks, T, mel]
+    return (list(indices), flat, chunks_per_utt, list(stems), list(valids))
 
 
 def _collate_fbanks_padded(
@@ -528,10 +559,15 @@ def extract_per_utterance(
     dataset = _FbankDataset(
         items_to_extract, source_sr=source_sr, fixed_frames=fixed_frames
     )
-    # 固定長 or batch_infer なら padded collate、それ以外は list を保つ collate
-    _collate_choice = (
-        _collate_fbanks_padded if (use_batch_infer or fixed_frames > 0) else _collate_fbanks
-    )
+    # 固定長 A'案 (fixed_frames > 0): chunk 分割済みなので chunked collate
+    # batch_infer のみ: padded collate (zero pad で pool 破損リスクあり)
+    # それ以外: list を保つ per-utt collate
+    if fixed_frames > 0:
+        _collate_choice = _collate_fbanks_chunked
+    elif use_batch_infer:
+        _collate_choice = _collate_fbanks_padded
+    else:
+        _collate_choice = _collate_fbanks
     loader_kwargs: dict = {
         "batch_size": batch_size,
         "num_workers": num_workers,
@@ -550,7 +586,7 @@ def extract_per_utterance(
 
     mode_label = "per-utt"
     if fixed_frames > 0:
-        mode_label = f"fixed-frames-{fixed_frames} batch (A案)"
+        mode_label = f"chunked-{fixed_frames} (A'案 overlap 50%)"
     elif use_batch_infer:
         mode_label = "batch (pad, 精度リスクあり)"
     _LOGGER.info(
@@ -561,15 +597,53 @@ def extract_per_utterance(
         num_workers,
     )
 
-    if use_batch_infer or fixed_frames > 0:
+    if fixed_frames > 0:
+        # A'案: chunk 分割済み。全 chunks を batch 化して推論、utt 単位で L2 正規化平均
+        for batch_idx, (indices, flat, chunks_per_utt, stems, valids) in enumerate(loader):
+            if flat.shape[0] == 0:
+                fail += sum(1 for v in valids if not v)
+                continue
+            # 大きな batch を chunk_batch 単位でさらに分割 (GPU メモリ節約 + graph replay 対応)
+            chunk_batch = 128  # A100 なら 128 でも余裕
+            all_chunk_embs = []
+            for i in range(0, flat.shape[0], chunk_batch):
+                out = session.run(None, {input_name: flat[i:i + chunk_batch]})[0]
+                all_chunk_embs.append(out)
+            chunk_embs = np.concatenate(all_chunk_embs, axis=0)
+            # 発話ごとに切り出して平均 → L2 正規化
+            offset = 0
+            for j, n_chunks in enumerate(chunks_per_utt):
+                if not valids[j]:
+                    fail += 1
+                    offset += n_chunks
+                    continue
+                utt_chunks = chunk_embs[offset:offset + n_chunks]  # [n_chunks, 192]
+                offset += n_chunks
+                # 各 chunk を L2 正規化してから平均 → 再 L2 正規化
+                cnorms = np.linalg.norm(utt_chunks, axis=-1, keepdims=True)
+                cnorms = np.where(cnorms > 1e-8, cnorms, 1.0)
+                utt_chunks_normed = utt_chunks / cnorms
+                utt_emb = utt_chunks_normed.mean(axis=0)
+                enorm = np.linalg.norm(utt_emb)
+                if enorm > 1e-8:
+                    utt_emb = utt_emb / enorm
+                np.save(str(emb_dir / (stems[j] + ".npy")), utt_emb)
+                success += 1
+            if (batch_idx + 1) % 50 == 0:
+                _LOGGER.info(
+                    "Batch %d/%d (success=%d, fail=%d)",
+                    batch_idx + 1,
+                    total_batches,
+                    success,
+                    fail,
+                )
+    elif use_batch_infer:
         for batch_idx, (indices, padded, lengths, stems, valids) in enumerate(loader):
             valid_mask = np.array(valids, dtype=bool)
             if not valid_mask.any():
                 fail += int((~valid_mask).sum())
                 continue
-            # session.run は 1 バッチ 1 回
             embeddings = session.run(None, {input_name: padded})[0]
-            # embeddings shape: (B, 192) を仮定
             norms = np.linalg.norm(embeddings, axis=-1, keepdims=True)
             norms = np.where(norms > 1e-8, norms, 1.0)
             embeddings = embeddings / norms
