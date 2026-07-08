@@ -68,12 +68,18 @@ def configure_ddp_strategy(num_gpus, user_strategy=None, no_wavlm=False):
         _LOGGER.info(f"Using user-specified strategy: {user_strategy}")
         return user_strategy
     elif num_gpus >= 2:
+        # static_graph=True: DDP はイテレーション 1 で unused-param 集合を確定させ、
+        # 以降はその再構築をスキップする。 GAN 交互最適化で毎 step の unused set
+        # (G step / D step) が固定パターンなら safe に有効化でき、 all-reduce の
+        # bucket 準備コストが減って ~3-8% throughput 改善が期待できる。
         ddp_kwargs = {
             "find_unused_parameters": True,
             "gradient_as_bucket_view": True,
+            "static_graph": True,
         }
         _LOGGER.info(
-            "Using DDPStrategy with find_unused_parameters=True, gradient_as_bucket_view=True"
+            "Using DDPStrategy with find_unused_parameters=True, "
+            "gradient_as_bucket_view=True, static_graph=True"
         )
         return DDPStrategy(**ddp_kwargs)
     return None
