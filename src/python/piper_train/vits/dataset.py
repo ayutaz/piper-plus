@@ -462,6 +462,14 @@ class SpeakerBalancedBatchSampler:
         EN 話者数 >> JA 話者数の場合に JA 音質が劣化するのを防ぐ。
         例: 20 JA話者 + 310 EN話者 → 各バッチで JA 5話者 + EN 5話者 を保証
 
+    length_bucket (opt-in) の動作:
+        - True: 話者スロット内の indices を phoneme_length で pre-sort し、
+          samples_per_speaker 個ずつの隣接バケットを優先して割り当てる。
+          UtteranceCollate 側の padding 総量を減らして step 時間を短縮する狙い。
+          samples_per_speaker=4 の同一話者連続採取 contract は保持。
+          各エポックでバケット順序自体はランダムシャッフルされるため多様性を保つ。
+        - False (デフォルト): 話者スロット内でランダムシャッフル (従来動作)。
+
     DDP (Distributed Data Parallel) 対応:
     - torch.distributedが初期化されている場合、各GPUが異なるバッチを取得
     - 全GPUで同じseedを使用してバッチ生成順序を揃え、
@@ -473,6 +481,7 @@ class SpeakerBalancedBatchSampler:
         samples_per_speaker: 各話者からのサンプル数 (デフォルト: 4)
         drop_last: 最後の不完全バッチを捨てるか (デフォルト: True)
         language_group_balance: 言語グループ (JA/EN) を 50:50 でバランスするか (デフォルト: None=自動判定)
+        length_bucket: 話者スロット内で phoneme_length 昇順の bucketing を有効化 (デフォルト: False, opt-in)
 
     Example:
         batch_size=32, samples_per_speaker=4 の場合:
@@ -489,11 +498,25 @@ class SpeakerBalancedBatchSampler:
         samples_per_speaker: int = 4,
         drop_last: bool = True,
         language_group_balance: bool | None = None,
+        length_bucket: bool = False,
     ):
         # 話者ごとにインデックスをグループ化
         # Subsetの場合は元のデータセットのutterancesを参照
         self.speaker_to_indices: dict[int, list[int]] = defaultdict(list)
         speaker_to_language: dict[int, int] = {}
+        # length_bucket=True の場合の phoneme_length ルックアップ (index -> length)
+        # Subset の場合は subset_idx でキー付けする
+        speaker_to_lengths: dict[int, dict[int, int]] = defaultdict(dict)
+
+        def _phoneme_length(utt) -> int:
+            """utterance の phoneme_ids 長を取得 (numpy / list / tensor いずれも対応)"""
+            ids = utt.phoneme_ids
+            if ids is None:
+                return 0
+            try:
+                return len(ids)
+            except TypeError:
+                return int(getattr(ids, "shape", (0,))[0])
 
         # datasetがSubsetの場合の対応
         if hasattr(dataset, "indices") and hasattr(dataset, "dataset"):
@@ -504,6 +527,8 @@ class SpeakerBalancedBatchSampler:
                 utt = original_dataset.utterances[original_idx]
                 speaker_id = utt.speaker_id if utt.speaker_id is not None else 0
                 self.speaker_to_indices[speaker_id].append(subset_idx)
+                if length_bucket:
+                    speaker_to_lengths[speaker_id][subset_idx] = _phoneme_length(utt)
                 if speaker_id not in speaker_to_language:
                     speaker_to_language[speaker_id] = (
                         utt.language_id if utt.language_id is not None else 0
@@ -513,10 +538,18 @@ class SpeakerBalancedBatchSampler:
             for idx, utt in enumerate(dataset.utterances):
                 speaker_id = utt.speaker_id if utt.speaker_id is not None else 0
                 self.speaker_to_indices[speaker_id].append(idx)
+                if length_bucket:
+                    speaker_to_lengths[speaker_id][idx] = _phoneme_length(utt)
                 if speaker_id not in speaker_to_language:
                     speaker_to_language[speaker_id] = (
                         utt.language_id if utt.language_id is not None else 0
                     )
+
+        self.length_bucket = length_bucket
+        # speaker_id -> {index -> phoneme_length} (length_bucket=False の場合は空)
+        self._speaker_to_lengths: dict[int, dict[int, int]] = (
+            dict(speaker_to_lengths) if length_bucket else {}
+        )
 
         self.speakers = list(self.speaker_to_indices.keys())
         self.batch_size = batch_size
@@ -606,11 +639,36 @@ class SpeakerBalancedBatchSampler:
         # 各GPUは rank 番目のバッチのみを取得
         rng = random.Random(self.epoch)
 
-        # 各話者のインデックスをシャッフル
-        speaker_indices = {
-            spk: rng.sample(indices, len(indices))
-            for spk, indices in self.speaker_to_indices.items()
-        }
+        # 各話者のインデックスを準備
+        if self.length_bucket:
+            # length_bucket=True: 話者ごとに phoneme_length 昇順で sort し
+            # samples_per_speaker 個ずつのバケットを作り、バケット順序を shuffle。
+            # → 隣接 samples_per_speaker 個の phoneme_length が近くなるため
+            # UtteranceCollate の padding 総量が減る。
+            speaker_indices = {}
+            k = self.samples_per_speaker
+            for spk, indices in self.speaker_to_indices.items():
+                length_map = self._speaker_to_lengths.get(spk, {})
+                # 同一長の tie-breaker として index も key に含めて安定 sort
+                sorted_indices = sorted(
+                    indices, key=lambda i: (length_map.get(i, 0), i)
+                )
+                # k 個ずつバケットに分割 (端数は末尾バケットに残す)
+                buckets = [
+                    sorted_indices[i : i + k] for i in range(0, len(sorted_indices), k)
+                ]
+                # バケット単位でシャッフル (バケット内順序は保持)
+                rng.shuffle(buckets)
+                flat: list[int] = []
+                for b in buckets:
+                    flat.extend(b)
+                speaker_indices[spk] = flat
+        else:
+            # 従来動作: 話者ごとにインデックスを完全 shuffle
+            speaker_indices = {
+                spk: rng.sample(indices, len(indices))
+                for spk, indices in self.speaker_to_indices.items()
+            }
         speaker_pointers = dict.fromkeys(self.speakers, 0)
 
         # 全バッチを先に生成してから world_size の倍数に切り詰める
