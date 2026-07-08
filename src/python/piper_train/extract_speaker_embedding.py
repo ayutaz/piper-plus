@@ -258,18 +258,49 @@ class _FbankDataset(torch.utils.data.Dataset):
 
     各ワーカープロセスで独立にCPU前処理（torch.load → resample → fbank）を実行し、
     メインプロセスでONNX推論に個別に渡す（ゼロパディング回避）。
+
+    PIPER_EMB_FIXED_FRAMES=N (default 0=off) で固定フレーム長にクロップ/pad する。
+    N=400 (4秒 @ 16kHz, 10ms hop) が VoxCeleb 系の標準値。長い発話は中央を crop、
+    短い発話は reflect pad (silence pad は CAM++ statistical pool を薄めるため回避)。
     """
 
     def __init__(
-        self, items: list[tuple[int, Path, str]], source_sr: int, target_sr: int = 16000
+        self,
+        items: list[tuple[int, Path, str]],
+        source_sr: int,
+        target_sr: int = 16000,
+        fixed_frames: int = 0,
     ):
         self.items = items
         self.source_sr = source_sr
         self.target_sr = target_sr
         self.resampler = torchaudio.transforms.Resample(source_sr, target_sr)
+        self.fixed_frames = fixed_frames
 
     def __len__(self) -> int:
         return len(self.items)
+
+    def _crop_or_reflect_pad(self, fbank: torch.Tensor) -> torch.Tensor:
+        target = self.fixed_frames
+        T = fbank.shape[0]
+        if T == target:
+            return fbank
+        if T > target:
+            start = (T - target) // 2
+            return fbank[start : start + target]
+        # T < target: reflect padding (silence pad より pool 破損を避けられる)
+        # torch.nn.functional.pad expects [N,C,T] or [C,T], fbank shape is [T, mel]
+        # reflect pad 経由: [1, mel, T] にして反射補間
+        fb_t = fbank.transpose(0, 1).unsqueeze(0)  # [1, mel, T]
+        pad_amount = target - T
+        # reflect pad requires pad < T; small T の場合は circular で対処
+        if pad_amount < T:
+            fb_padded = torch.nn.functional.pad(fb_t, (0, pad_amount), mode="reflect")
+        else:
+            # 極端に短い発話は repeat
+            repeat = (target // T) + 1
+            fb_padded = fb_t.repeat(1, 1, repeat)[:, :, :target]
+        return fb_padded.squeeze(0).transpose(0, 1)  # [target, mel]
 
     def __getitem__(self, idx: int) -> tuple[int, torch.Tensor, str, bool]:
         entry_idx, pt_path, stem = self.items[idx]
@@ -289,10 +320,13 @@ class _FbankDataset(torch.utils.data.Dataset):
                 sample_frequency=self.target_sr,
             )
             fbank = fbank - fbank.mean(dim=0, keepdim=True)
+            if self.fixed_frames > 0:
+                fbank = self._crop_or_reflect_pad(fbank)
             return (entry_idx, fbank, stem, True)
         except Exception as e:
             _LOGGER.warning("Worker failed to load %s: %s", pt_path, e)
-            return (entry_idx, torch.zeros(1, 80), stem, False)
+            zero_shape = self.fixed_frames if self.fixed_frames > 0 else 1
+            return (entry_idx, torch.zeros(zero_shape, 80), stem, False)
 
 
 def _collate_fbanks(
@@ -475,19 +509,33 @@ def extract_per_utterance(
 
     # items を fbank 長 (audio_norm .pt サイズ) でソートしてバッチ内の pad 差を最小化
     # PIPER_EMB_BATCH_INFER=1 で真の GPU バッチ推論経路を有効化 (デフォルト: 個別推論)
+    # PIPER_EMB_FIXED_FRAMES=N (default 0=off) で固定フレーム長 crop + reflect pad に切替 (A案)
+    #   400 (4秒) が VoxCeleb 標準。GPU バッチ推論と組合わせて 5-10x speedup 見込み
+    # PIPER_EMB_LENGTH_SORT=1 で items を fbank 長順にソート (E1: bucket sort、可変長 batch の pad 差最小化)
     use_batch_infer = os.environ.get("PIPER_EMB_BATCH_INFER", "0") == "1"
-    if use_batch_infer:
+    fixed_frames = int(os.environ.get("PIPER_EMB_FIXED_FRAMES", "0"))
+    use_length_sort = os.environ.get("PIPER_EMB_LENGTH_SORT", "0") == "1" or fixed_frames > 0
+    if use_batch_infer or use_length_sort:
         items_to_extract.sort(key=lambda it: it[1].stat().st_size)
         _LOGGER.info(
-            "Sorted %d items by audio length for batch inference", len(items_to_extract)
+            "Sorted %d items by audio length (bucket=%s, fixed=%s)",
+            len(items_to_extract),
+            use_length_sort,
+            fixed_frames,
         )
 
     # Create dataset and dataloader
-    dataset = _FbankDataset(items_to_extract, source_sr=source_sr)
+    dataset = _FbankDataset(
+        items_to_extract, source_sr=source_sr, fixed_frames=fixed_frames
+    )
+    # 固定長 or batch_infer なら padded collate、それ以外は list を保つ collate
+    _collate_choice = (
+        _collate_fbanks_padded if (use_batch_infer or fixed_frames > 0) else _collate_fbanks
+    )
     loader_kwargs: dict = {
         "batch_size": batch_size,
         "num_workers": num_workers,
-        "collate_fn": _collate_fbanks_padded if use_batch_infer else _collate_fbanks,
+        "collate_fn": _collate_choice,
         "pin_memory": False,
     }
     if num_workers > 0:
@@ -500,15 +548,20 @@ def extract_per_utterance(
     success = 0
     total_batches = len(loader)
 
+    mode_label = "per-utt"
+    if fixed_frames > 0:
+        mode_label = f"fixed-frames-{fixed_frames} batch (A案)"
+    elif use_batch_infer:
+        mode_label = "batch (pad, 精度リスクあり)"
     _LOGGER.info(
         "Starting %s extraction: %d batches (batch_size=%d, workers=%d)",
-        "batch" if use_batch_infer else "per-utt",
+        mode_label,
         total_batches,
         batch_size,
         num_workers,
     )
 
-    if use_batch_infer:
+    if use_batch_infer or fixed_frames > 0:
         for batch_idx, (indices, padded, lengths, stems, valids) in enumerate(loader):
             valid_mask = np.array(valids, dtype=bool)
             if not valid_mask.any():
