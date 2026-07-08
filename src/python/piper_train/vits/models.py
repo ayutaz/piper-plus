@@ -454,13 +454,19 @@ class MultiPeriodDiscriminator(torch.nn.Module):
         y_d_gs = []
         fmap_rs = []
         fmap_gs = []
-        for _i, d in enumerate(self.discriminators):
-            y_d_r, fmap_r = d(y)
-            y_d_g, fmap_g = d(y_hat)
-            y_d_rs.append(y_d_r)
-            y_d_gs.append(y_d_g)
-            fmap_rs.append(fmap_r)
-            fmap_gs.append(fmap_g)
+        # Batch-concat optimization: y と y_hat を batch dim で結合 → 各 sub-discriminator
+        # を 1 度だけ forward → split。 Conv1d/Conv2d + LeakyReLU + spectral/weight_norm +
+        # reflect pad + view/flatten はいずれも batch dim を跨がないため完全等価。
+        # kernel launch 数を 12 → 6 に削減し、 GPU の launch overhead / stream serialization
+        # を軽減する (Ada 6000 / A100 で D backward の wall-time を短縮)。
+        b = y.shape[0]
+        x = torch.cat([y, y_hat], dim=0)
+        for d in self.discriminators:
+            y_d, fmap = d(x)
+            y_d_rs.append(y_d[:b])
+            y_d_gs.append(y_d[b:])
+            fmap_rs.append([f[:b] for f in fmap])
+            fmap_gs.append([f[b:] for f in fmap])
 
         return y_d_rs, y_d_gs, fmap_rs, fmap_gs
 
