@@ -440,6 +440,30 @@ def create_parser():
         help="Disable torch.compile() (recommended for T4 GPUs where compile overhead is large)",
     )
     parser.add_argument(
+        "--compile-mode",
+        type=str,
+        default="reduce-overhead",
+        choices=[
+            "default",
+            "reduce-overhead",
+            "max-autotune",
+            "max-autotune-no-cudagraphs",
+        ],
+        help="torch.compile() mode (default: reduce-overhead). "
+        "When --enable-length-bucketing fixes shapes per batch, prefer "
+        "'max-autotune' (CUDA Graph capture) or 'max-autotune-no-cudagraphs' "
+        "for kernel autotuning without CUDA Graph capture.",
+    )
+    parser.add_argument(
+        "--compile-dynamic",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Enable dynamic shape tracing for torch.compile() (default: True). "
+        "Set --no-compile-dynamic together with length bucketing "
+        "(fixed per-batch shapes) to allow CUDA Graph capture with "
+        "--compile-mode=max-autotune.",
+    )
+    parser.add_argument(
         "--gradient-clip-val",
         type=float,
         default=1.0,
@@ -736,16 +760,26 @@ def main():
     if getattr(args, "no_compile", False):
         args.compile = False
     if args.compile:
+        compile_mode = getattr(args, "compile_mode", "reduce-overhead")
+        compile_dynamic = getattr(args, "compile_dynamic", True)
         _LOGGER.info(
-            "Compiling model sub-modules with torch.compile(mode='reduce-overhead', dynamic=True)"
+            "Compiling model sub-modules with torch.compile(mode=%r, dynamic=%r)",
+            compile_mode,
+            compile_dynamic,
         )
+        # NOTE: dynamic=True disables CUDA Graph capture. When length bucketing
+        # (--enable-length-bucketing) fixes shapes within each batch, pass
+        # --no-compile-dynamic together with --compile-mode=max-autotune to enable
+        # CUDA Graph capture (biggest win for A100/H100). Use
+        # max-autotune-no-cudagraphs when kernel autotune is desired without
+        # graph capture (dynamic shapes still allowed).
         if hasattr(model, "model_g"):
             model.model_g = torch.compile(
-                model.model_g, mode="reduce-overhead", dynamic=True
+                model.model_g, mode=compile_mode, dynamic=compile_dynamic
             )
         if hasattr(model, "model_d"):
             model.model_d = torch.compile(
-                model.model_d, mode="reduce-overhead", dynamic=True
+                model.model_d, mode=compile_mode, dynamic=compile_dynamic
             )
 
     if args.resume_from_single_speaker_checkpoint:
