@@ -89,6 +89,15 @@ RUN uv pip install "/tmp/src/python/g2p"
 # Install piper_train with training extras
 RUN uv pip install "/tmp/src/python[train]"
 
+# Install optional Super-MAS Triton-GPU MAS accelerator (arXiv:2409.07704).
+# Training-only, CUDA-only kernel that reports 19-72x speedup vs Cython MAS.
+# Pulled from git (pinned SHA in pyproject.toml `[project.optional-dependencies]`
+# super-mas), so builder stage git is required. Import-safe on CPU-only hosts:
+# the dispatcher in `piper_train/vits/monotonic_align/__init__.py` falls back
+# to Cython whenever tensors are not CUDA. Disable at runtime with
+# `PIPER_DISABLE_SUPER_MAS=1`.
+RUN uv pip install "/tmp/src/python[super-mas]"
+
 # Runtime stage
 # Base: CUDA 12.8.1 + cuDNN 9 + Ubuntu 24.04 (matches builder stage、
 # Issue #527 / DR-001 Fully-aligned 戦略)
@@ -148,10 +157,14 @@ ENV NLTK_DATA=/usr/share/nltk_data
 RUN python -c "import nltk; nltk.download('averaged_perceptron_tagger', download_dir='/usr/share/nltk_data'); nltk.download('averaged_perceptron_tagger_eng', download_dir='/usr/share/nltk_data'); nltk.download('cmudict', download_dir='/usr/share/nltk_data')"
 
 # Run tests during build to verify the container is working
+# The super_monotonic_align import verifies the [super-mas] extra was installed
+# successfully; if this fails, MAS silently falls back to Cython (5-15% slower
+# per step on A100), so we make the miss visible at build time.
 RUN echo "=== Running build-time tests ===" && \
     python --version && \
     python -c "import torch; print(f'PyTorch: {torch.__version__}')" && \
     python -c "import pytorch_lightning; print(f'PyTorch Lightning: {pytorch_lightning.__version__}')" && \
+    python -c "import super_monotonic_align; print(f'Super-MAS: {super_monotonic_align.__file__}')" && \
     cd /opt/piper/src/python && python -c "import piper_train; print('piper_train accessible')" && \
     echo "=== Build-time tests passed ==="
 
