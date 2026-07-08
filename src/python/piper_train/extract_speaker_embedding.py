@@ -302,11 +302,36 @@ class _FbankDataset(torch.utils.data.Dataset):
         return fb_padded.squeeze(0).transpose(0, 1)  # [target, mel]
 
     def _to_chunks(self, fbank: torch.Tensor) -> torch.Tensor:
-        """全 fbank を [n_chunks, fixed_frames, mel] に分割 (overlap 50%、reflect pad)。"""
+        """全 fbank を [n_chunks, fixed_frames, mel] に分割 (overlap 50%、reflect pad)。
+
+        **A'' 案**: 2-4s 発話 (T < target で 1 chunk しか作れない) は精度落ちる (cosine 0.98)
+        ため、min_chunks=2 を強制。 T < target なら reflect pad で target まで拡張しつつ、
+        オリジナルの pad 位置をずらして 2 chunks 生成することで情報冗長性を確保。
+        """
         target = self.fixed_frames
         T = fbank.shape[0]
         if T <= target:
-            return self._reflect_pad_to(fbank, target).unsqueeze(0)  # [1, target, mel]
+            # T <= target: 情報が少ないので同じ fbank を先頭寄せ・末尾寄せの 2 chunk に
+            padded = self._reflect_pad_to(fbank, target)  # [target, mel]
+            if T <= target // 2:
+                # 極端に短い発話は 1 chunk で十分 (情報の冗長性を上げる意味がない)
+                return padded.unsqueeze(0)
+            # 2 chunk: (a) 先頭寄せ (original+reflect後半) (b) 末尾寄せ (reflect前半+original)
+            # padded の中で original が異なる位置を占める 2 バリアントを作る
+            # variant a: 先頭に original、末尾を reflect (現行 _reflect_pad_to の挙動)
+            variant_a = padded
+            # variant b: 末尾に original、先頭を reflect (T frames を末尾に配置)
+            fb_t = fbank.transpose(0, 1).unsqueeze(0)
+            pad_amount = target - T
+            if pad_amount < T:
+                b_padded = torch.nn.functional.pad(
+                    fb_t, (pad_amount, 0), mode="reflect"
+                )
+            else:
+                rep = (target // T) + 1
+                b_padded = fb_t.repeat(1, 1, rep)[:, :, -target:]
+            variant_b = b_padded.squeeze(0).transpose(0, 1)
+            return torch.stack([variant_a, variant_b], dim=0)  # [2, target, mel]
         # T > target: 50% overlap で chunk 化
         starts = list(range(0, T - target + 1, self.chunk_hop))
         # 末尾の余り frames をカバー: 最後の start が T - target まで届かないなら追加
