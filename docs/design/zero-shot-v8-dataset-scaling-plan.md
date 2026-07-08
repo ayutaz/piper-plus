@@ -110,7 +110,9 @@ A100 単一 GPU への移行に伴う **P0 最適化フラグ** をまとめて�
 --language-balanced-sampling                     # ja/en 話者比 >> pt 30 話者のため必須
 --num-workers 8                                  # A100 host は 32 vCPU、v7 の 2 では GPU 待ち
 --val-every-n-epochs 5                           # SCL/DINO 込み val は G+D full forward、頻度低下
---compile                                        # torch.compile (mode=reduce-overhead, dynamic=True)
+--compile --compile-mode reduce-overhead         # torch.compile (Plan A で mode/dynamic を CLI 化)
+--no-compile-dynamic                             # length_bucketing で shape 固定化 → CUDA Graph capture 有効化
+--enable-length-bucketing                        # 話者スロット内で phoneme_length ソート、padding 削減 (Plan A 実装 3/4)
 --no-wavlm                                       # v7 継承 (VRAM 節約 & WavLM 経路 P0 未実装)
 ```
 
@@ -153,6 +155,57 @@ A100 単一 GPU への移行に伴う **P0 最適化フラグ** をまとめて�
 - `num_workers` 自動調整 (PR #164 で削除) — shared memory 枯渇
 - V100 で `--precision 16-mixed` — backward 5x 遅い、必ず `32-true` (V100) / `bf16-mixed` (A100+)
 
+### 3.3 Plan A 実装完了 (2026-07-09)
+
+§3.2 の P0 最適化を土台に、 A100 単一 GPU での epoch 時間を追加で 20-35% 削減する
+「Plan A: コード側の低リスク throughput 最適化」 4 件を feature branch にランディング済み。
+すべて既存 API/学習契約を破壊せず、 CLI opt-in または DDP 内部フラグで有効化する形。
+
+| # | commit | 変更 | 対象ファイル | 期待効果 |
+|---|--------|------|-------------|---------|
+| 1/4 | [`161ed1b9`](https://github.com/ayutaz/piper-plus/commit/161ed1b9ff118f60addbfeb624b4018c52bf40de) | MPD の y/y_hat を batch dim で concat して 12→6 kernel launch | `src/python/piper_train/vits/models.py` (+13/-7)、 `src/python/tests/test_d_batch_concat.py` (+152 新規) | **D backward +5-10%** (launch overhead 削減、 allclose atol=1e-5 で等価性検証済) |
+| 2/4 | [`37ea0158`](https://github.com/ayutaz/piper-plus/commit/37ea015884d68729d33c92f651c0774e1e3245ff) | `DDPStrategy` に `static_graph=True` 追加 | `src/python/piper_train/__main__.py` (+7/-1)、 `src/python/tests/test_ddp_strategy.py` (+20/-5) | **multi-GPU throughput +5-8%** (VITS GAN 交互最適化の unused-param 集合が step ごとに固定 → iteration 1 の graph を再利用) |
+| 3/4 | [`1bfd64ac`](https://github.com/ayutaz/piper-plus/commit/1bfd64ac5c26c05baa7302ba274113013fd8365d) | `SpeakerBalancedBatchSampler` に length_bucket opt-in | `src/python/piper_train/vits/dataset.py` (+66/-2)、 `src/python/piper_train/__main__.py` (+12)、 `src/python/piper_train/vits/lightning.py` (+6/-1)、 `src/python/tests/test_length_bucketing.py` (+276 新規) | **step time -30-40% (padding 削減による 1.4-1.6x)**。 `samples_per_speaker=4` contract は保持、 intra-speaker length spread が半減することを test で保証。 CLI: `--enable-length-bucketing` |
+| 4/4 | [`fe65f60b`](https://github.com/ayutaz/piper-plus/commit/fe65f60b18402cc6d19158a9691de549f191f6af) | torch.compile mode/dynamic を CLI 化 | `src/python/piper_train/__main__.py` (+37/-3) | **compile 再チューン +5-10%** (length_bucketing で shape 固定 → `--compile-mode=max-autotune` + `--no-compile-dynamic` で CUDA Graph capture 可能化)。 default は既存挙動 `reduce-overhead` + `dynamic=True` を維持 |
+
+**Plan A の CLI 推奨組み合わせ** (§3.1 の学習コマンド末尾に反映済み):
+
+```
+--enable-length-bucketing        # 3/4: sampler 側の length bucketing 有効化
+--compile                        # 4/4: torch.compile を有効化
+--compile-mode reduce-overhead   # 4/4: default (安全側)。 shape が bucketing で完全固定なら max-autotune も可
+--no-compile-dynamic             # 4/4: bucketing 前提 → dynamic 追跡を切って CUDA Graph capture を許可
+```
+
+> **`--compile-mode=max-autotune` の判断:** length_bucketing で phoneme_length が
+> ソートされても、 batch 内で `max(len)` に padding される値は epoch を通じ複数 shape
+> が出る (bucket 境界ごとの max)。 CUDA Graph capture (max-autotune) は shape 固定を
+> 要求し、 mismatch のたびに recompile → 起動オーバーヘッド。 **v8 本走の初回は
+> reduce-overhead で運用**、 profile で shape 分布が数種に収束していることを確認して
+> から max-autotune を試す (別 PR)。
+
+**Plan A / B / C の想定 wall-clock 比較** (§4.3 のコスト表を更新):
+
+| Plan | 内容 | epoch 時間見込 | 本走 80ep 時間 | 本走 80ep コスト ($1.73/hr) |
+|------|------|--------------|--------------|-----------------------------|
+| baseline (P0 のみ、§3.1 の変更前 CLI 相当) | v7 flags + pin_memory + compile default | 1.5-1.7h | 5.0-5.7 日 | ~$208 |
+| **Plan A (今回、bucketing + D concat + static_graph + compile 再チューン)** | 上記 + Plan A 4 件 | **1.0-1.2h** | **3.3-4.0 日** | **~$137-166** |
+| Plan B (Plan A + WavLM cache / SDPA / SCL 見直し) | 未着手、 v8 完走後の別 PR | 0.9-1.1h | 3.0-3.7 日 | ~$125-153 |
+| Plan C (Plan B + kernel fusion / FlashAttention 派生) | 検討中 | 0.8-1.0h | 2.7-3.3 日 | ~$112-137 |
+
+Plan A 単独で **本走 3.3-4.0 日 / ~$137-166** に短縮、 前後 phase (DL/前処理/評価) を含めた
+end-to-end で **~5-6 日 / ~$194** の見込み (§4.3 更新表参照)。
+
+**未実装 (skip 理由あり):**
+
+- **tmpfs preload** — 前処理済み ~400GB tarball を tmpfs に展開する IO 高速化案。
+  vast.ai インスタンスの RAM (A100 SXM4 で ~128GB) では収まらず、 部分 preload の
+  benefit は SSD read cache (kernel が自動処理) と重複するため **skip**。 必要な場合は
+  vast.ai instance 起動時の onstart script で SSD → RAM cache 温めのみ実施 (数分)。
+- **nsys observation (Nsight Systems によるプロファイリング)** — kernel-level bottleneck
+  の実測。 実 GPU (A100) 上でしか意味を持たないため、 v8 本走開始時に取得 → Plan B 設計に
+  フィードバックする方針 (別作業)。 ローカルの CI/dev マシンでは skip。
+
 ## 4. vast.ai 実行計画
 
 | 項目 | 値 |
@@ -161,7 +214,7 @@ A100 単一 GPU への移行に伴う **P0 最適化フラグ** をまとめて�
 | 代替 (安価) | RTX 5090 32GB (~$0.44/hr、batch ~48、wall-clock ~2倍) |
 | 代替 (高速) | H100 SXM 80GB (~$2.2/hr、~2倍速) |
 | disk 内訳 | 生データ ~550GB (moe-plus zips ~350GB 含) + audio cache ~350GB + ckpt (947MB × 80) + margin → **≥ 1.5TB** |
-| epoch 時間見込み | ~1.3–1.7h/epoch (340k 発話、A100 80GB。v7 実績 V100×4 8h53m/500k から換算) |
+| epoch 時間見込み | baseline (P0 のみ) ~1.5–1.7h/ep / **Plan A 反映後 (§3.3) ~1.0–1.2h/ep** (340k 発話、A100 80GB。v7 実績 V100×4 8h53m/500k から換算) |
 
 単一 GPU 構成とし、v7 で「CUDA illegal access」偽装の真因だった DDP/NCCL 系障害
 (rank 間 NaN skip 不整合 → all_reduce mismatch → 30 分 timeout) のクラスを丸ごと回避する。
@@ -198,13 +251,17 @@ A100 単一 GPU への移行に伴う **P0 最適化フラグ** をまとめて�
 GPU $1.313/hr + disk 1.5TB × $0.20/GB/月 = +$0.417/hr → **$1.73/hr**)。帯域課金は
 DL 600GB + UL 500GB で ~$4 と無視できる。
 
+**Plan A (§3.3、2026-07-09 実装完了) 反映後の見込み** — bucketing + D concat +
+static_graph + compile 再チューン で epoch 時間 1.5-1.7h → **1.0-1.2h** に短縮:
+
 | フェーズ | 時間 | コスト ($1.73/hr、storage 込) |
 |---|---|---|
 | DL + 前処理 + embedding 抽出 (CV pt フィルタ含む) | ~1–1.5 日 | ~$42–62 |
-| smoke test (warm-start 1ep + 評価) | ~3h | ~$5 |
-| 本走 80 epoch (~1.5h/ep) | ~4.5–5 日 | ~$208 |
+| smoke test (warm-start 1ep + 評価) | ~2h | ~$4 |
+| 本走 80 epoch (**~1.1h/ep、Plan A**) | **~3.3–4.0 日** | **~$137–166** |
 | SECS 評価 + ONNX export + HF upload | ~4h | ~$7 |
-| **計** | **~6.5–7 日** | **~$265–285** |
+| **計 (Plan A、v8 想定)** | **~5–6 日** | **~$190–239 (中央値 ~$194)** |
+| 参考: baseline (Plan A 未反映) | ~6.5–7 日 | ~$265–285 |
 
 ### 4.4 障害耐性 (多層防御)
 
