@@ -302,6 +302,18 @@ def create_parser():
         "(this flag has no effect there).",
     )
     parser.add_argument(
+        "--enable-length-bucketing",
+        action="store_true",
+        default=False,
+        help="Enable phoneme-length bucketing inside each speaker slot of SpeakerBalancedBatchSampler "
+        "(opt-in, default: disabled). Utterances of the same speaker are pre-sorted by phoneme length "
+        "and grouped into buckets of samples_per_speaker. This reduces padding overhead in "
+        "UtteranceCollate and shortens per-step time on long-tailed length distributions. "
+        "The samples_per_speaker contract is preserved. Bucket order is shuffled every epoch to "
+        "maintain sampling diversity. Has no effect when SpeakerBalancedBatchSampler is not used "
+        "(single-speaker or --samples-per-speaker=0).",
+    )
+    parser.add_argument(
         "--precision",
         default="bf16-mixed",
         choices=("32-true", "16-mixed", "bf16-mixed"),

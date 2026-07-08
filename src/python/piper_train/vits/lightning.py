@@ -604,19 +604,24 @@ class VitsModel(pl.LightningModule):
             # CLI default is False (store_true); convert to None for auto-detection
             if language_group_balance is False:
                 language_group_balance = None
+            length_bucket = bool(
+                getattr(self.hparams, "enable_length_bucketing", False)
+            )
             self._train_batch_sampler = SpeakerBalancedBatchSampler(
                 self._train_dataset,
                 batch_size=self.hparams.batch_size,
                 samples_per_speaker=samples_per_speaker,
                 drop_last=True,
                 language_group_balance=language_group_balance,
+                length_bucket=length_bucket,
             )
             _LOGGER.info(
                 "Using SpeakerBalancedBatchSampler: batch_size=%d, samples_per_speaker=%d, "
-                "speakers_per_batch=%d",
+                "speakers_per_batch=%d, length_bucket=%s",
                 self.hparams.batch_size,
                 samples_per_speaker,
                 self.hparams.batch_size // samples_per_speaker,
+                length_bucket,
             )
             return DataLoader(
                 self._train_dataset,
