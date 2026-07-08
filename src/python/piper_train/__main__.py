@@ -559,6 +559,11 @@ def main():
     # Issue #527 / DR-007 (PR #569).
     torch.backends.cuda.matmul.allow_tf32 = True
     torch.backends.cudnn.allow_tf32 = True
+    # torch 2.x canonical TF32 dispatcher. Complements `matmul.allow_tf32`
+    # for matmul kernels that are chosen via the newer API (e.g. loss code
+    # under `autocast(enabled=False)`). No-op on sm_75 / CPU. "high" keeps
+    # TF32 for matmul while leaving reductions at FP32.
+    torch.set_float32_matmul_precision("high")
     torch.manual_seed(args.seed)
 
     # Multi-GPU configuration
