@@ -95,19 +95,63 @@ multi-speaker LJSpeech (`wavs/ + metadata.csv` 3 列 `filename|speaker|text`) �
 
 ### 3.1 学習コマンド (A100 80GB × 1 想定)
 
-Template A (CLAUDE.md) ベース + zero-shot 系フラグは v7 再開コマンド準拠。主な差分:
+Template A (CLAUDE.md) ベース + zero-shot 系フラグは v7 再開コマンド準拠。 v7 (V100×4、`32-true`) から
+A100 単一 GPU への移行に伴う **P0 最適化フラグ** をまとめて反映 (詳細は §3.2)。 主な差分:
 
 ```
 --accelerator gpu --devices 1 --precision bf16-mixed
 --batch-size 128 --samples-per-speaker 4        # 80GB、要 OOM 手前調整
---max_epochs 80 --checkpoint-epochs 1
+--max_epochs 80 --checkpoint-epochs 2 --save-top-k 5   # 全 keep は 75GB で disk full → rolling
 --base_lr 2e-4 --disable_auto_lr_scaling
 --lr-scheduler cosine --lr-warmup-epochs 5 --lr-min 1e-5
 --kl-annealing-epochs 10 --c-dino 0.5 --c-spk 1.0 --c-sub-stft 1.0
 --spk-emb-noise-sigma 0.05 --max-phoneme-ids 400
 --speaker-encoder-path <campplus.onnx>
---language-balanced-sampling                     # ja/en 話者比 >> pt 8 話者のため必須
+--language-balanced-sampling                     # ja/en 話者比 >> pt 30 話者のため必須
+--num-workers 8                                  # A100 host は 32 vCPU、v7 の 2 では GPU 待ち
+--val-every-n-epochs 5                           # SCL/DINO 込み val は G+D full forward、頻度低下
+--compile                                        # torch.compile (mode=reduce-overhead, dynamic=True)
+--no-wavlm                                       # v7 継承 (VRAM 節約 & WavLM 経路 P0 未実装)
 ```
+
+**削除したフラグ (v7 コマンドから)**:
+- `--no-pin-memory` — v7 は V100×4 で CPU RAM 節約用。 単一 A100 では pageable copy が
+  DMA を使えず 2-3x 遅くなるため **削除必須**
+- `--precision 32-true` → `--precision bf16-mixed` — A100 は BF16 native Tensor Core
+  (DR-008、Issue #527)
+- `--gradient-clip-val 0` — 既定 1.0 を使う。 v7 は NCCL sync mismatch 回避のため 0 で回したが、
+  単一 GPU では該当せず、 grad_clip=1.0 の安全網はコスト微小
+
+### 3.2 P0 最適化の根拠と期待効果
+
+2026-07-07 実施の高速化監査 (v7 CLI そのまま A100 実行 → 6-8h/epoch と想定)、 コード修正 2 件
++ CLI 変更で 3-4h/epoch へ短縮の見込み。 コード修正は既に main に commit 済み:
+
+| 最適化 | 変更点 | 期待効果 | 反映方法 |
+|---|---|---|---|
+| TF32 matmul (torch 2.x canonical) | `torch.set_float32_matmul_precision('high')` を `__main__.py` に追加 | +1-3% | commit `56116cca` |
+| mel debug print の GPU sync 削除 | `torch.min(y) < -1.0` / `torch.max(y) > 1.0` を `mel_processing.py` から削除 | +1-2% | commit `56116cca` |
+| Super-MAS Triton kernel を docker に取り込み | `docker/python-train/Dockerfile` に `[super-mas]` extra 追加 | MAS block +3-10% | commit `ddb76289` |
+| pin_memory 有効化 | `--no-pin-memory` を **付けない** | +5-10% (host→GPU DMA) | CLI 変更 |
+| checkpoint rolling window | `--save-top-k 5` + `--checkpoint-epochs 2` | disk full 回避 (75GB → 5GB) + 保存 sync 5-10s/epoch 節約 | CLI 変更 |
+| torch.compile | `--compile` | warmup 3-5 分後 +10-25% | CLI 変更 |
+| Validation 頻度削減 | `--val-every-n-epochs 5` | -3-5%/epoch | CLI 変更 |
+| DataLoader 並列度 | `--num-workers 8` | IO-bound 時 +5-15% | CLI 変更 |
+
+**未反映 (v8 完走後の別 PR、v9 で検討)**:
+
+- CAM++ SCL skip (`--speaker-encoder-path` を外す) — v8 は per-utterance embedding 100% 完備
+  のため無駄計算だが、 mel-domain SCL fallback との品質差を A/B したい (v7 は CAM++ SCL 採用)
+- WavLM feature の G/D 間キャッシュ + BF16 化 — 現行 `--no-wavlm` で回すため v8 では効果なし
+- SDPA (`F.scaled_dot_product_attention`) 置換 — attention は極小規模 (n_layers=6, n_heads=2)
+  で効果 3-8%、 relative bias 互換の検証が必要
+
+**過去に検証済で不採用**:
+
+- CAM++ `cudnn_conv_algo_search=EXHAUSTIVE` (revert `530d68ce`) — session 作成 15 分 hang
+- CAM++ 真の GPU batched inference default 化 (`320e9568` は opt-in 維持) — cosine 0.27 破損
+- `num_workers` 自動調整 (PR #164 で削除) — shared memory 枯渇
+- V100 で `--precision 16-mixed` — backward 5x 遅い、必ず `32-true` (V100) / `bf16-mixed` (A100+)
 
 ## 4. vast.ai 実行計画
 
