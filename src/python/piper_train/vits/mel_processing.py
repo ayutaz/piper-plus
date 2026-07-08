@@ -44,6 +44,14 @@ def spectrogram_torch(y, n_fft, sampling_rate, hop_size, win_size, center=False)
     # `.item()` → device sync on every call. norm_audio ensures inputs are
     # already in [-1, 1], so the guard added no safety while stalling the
     # training loop 2-4× per step.
+
+    # cuFFT does not support BFloat16 / FP16 (2026-07 confirmed on A100 SXM4,
+    # torch 2.11 + cu128). Under bf16-mixed autocast the generator output flows
+    # here in bf16 and torch.stft raises `cuFFT doesn't support tensor of
+    # type: BFloat16`. Upcast to fp32 for the STFT path; downstream mel loss
+    # is fp32 anyway.
+    if y.dtype in (torch.bfloat16, torch.float16):
+        y = y.float()
     global hann_window  # noqa: PLW0602
     dtype_device = str(y.dtype) + "_" + str(y.device)
     wnsize_dtype_device = str(win_size) + "_" + dtype_device
@@ -96,6 +104,11 @@ def mel_spectrogram_torch(
 ):
     # See spectrogram_torch: removed `torch.min(y) < -1.0` / `torch.max(y) > 1.0`
     # debug prints — they were device-synchronising and never fired in practice.
+
+    # cuFFT does not support BFloat16 / FP16 (see spectrogram_torch note).
+    # Upcast for STFT; downstream mel loss is fp32.
+    if y.dtype in (torch.bfloat16, torch.float16):
+        y = y.float()
     global mel_basis, hann_window  # noqa: PLW0602
     dtype_device = str(y.dtype) + "_" + str(y.device)
     fmax_dtype_device = str(fmax) + "_" + dtype_device
