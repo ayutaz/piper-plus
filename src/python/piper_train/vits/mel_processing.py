@@ -39,10 +39,11 @@ hann_window = {}
 
 
 def spectrogram_torch(y, n_fft, sampling_rate, hop_size, win_size, center=False):
-    if torch.min(y) < -1.0:
-        print("min value is ", torch.min(y))
-    if torch.max(y) > 1.0:
-        print("max value is ", torch.max(y))
+    # Note: previous versions had `if torch.min(y) < -1.0: print(...)` /
+    # `if torch.max(y) > 1.0: print(...)` here. `<` triggers an implicit
+    # `.item()` → device sync on every call. norm_audio ensures inputs are
+    # already in [-1, 1], so the guard added no safety while stalling the
+    # training loop 2-4× per step.
 
     # cuFFT does not support BFloat16 / FP16 (2026-07 confirmed on A100 SXM4,
     # torch 2.11 + cu128). Under bf16-mixed autocast the generator output flows
@@ -101,10 +102,8 @@ def spec_to_mel_torch(spec, n_fft, num_mels, sampling_rate, fmin, fmax):
 def mel_spectrogram_torch(
     y, n_fft, num_mels, sampling_rate, hop_size, win_size, fmin, fmax, center=False
 ):
-    if torch.min(y) < -1.0:
-        print("min value is ", torch.min(y))
-    if torch.max(y) > 1.0:
-        print("max value is ", torch.max(y))
+    # See spectrogram_torch: removed `torch.min(y) < -1.0` / `torch.max(y) > 1.0`
+    # debug prints — they were device-synchronising and never fired in practice.
 
     # cuFFT does not support BFloat16 / FP16 (see spectrogram_torch note).
     # Upcast for STFT; downstream mel loss is fp32.
