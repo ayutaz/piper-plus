@@ -328,11 +328,17 @@ class DiscriminatorP(torch.nn.Module):
         kernel_size: int = 5,
         stride: int = 3,
         use_spectral_norm: bool = False,
+        use_channels_last: bool = False,
     ):
         super().__init__()
         self.LRELU_SLOPE = 0.1
         self.period = period
         self.use_spectral_norm = use_spectral_norm
+        # T1 (channels_last): after the 1D→2D view() reshape, tag the tensor with
+        # torch.channels_last so subsequent Conv2d layers dispatch to nhwc
+        # Tensor Core kernels (A100/Ada 6000). Silent fallback on unsupported
+        # hardware (T4 sm_75). Default OFF; enabled via ``--channels-last`` CLI.
+        self.use_channels_last = use_channels_last
         norm_f = weight_norm if not use_spectral_norm else spectral_norm
         self.convs = nn.ModuleList(
             [
@@ -396,6 +402,13 @@ class DiscriminatorP(torch.nn.Module):
             t = t + n_pad
         x = x.view(b, c, t // self.period, self.period)
 
+        # T1 (channels_last): promote to nhwc layout post-view. Conv2d weights
+        # were converted to channels_last at construction time, so this
+        # activation format matches the kernel's expected layout. No-op on
+        # sm_75 / older hardware (PyTorch falls back to nchw kernels silently).
+        if self.use_channels_last:
+            x = x.contiguous(memory_format=torch.channels_last)
+
         for l in self.convs:  # noqa: E741
             x = l(x)
             x = F.leaky_relu(x, self.LRELU_SLOPE)
@@ -439,15 +452,30 @@ class DiscriminatorS(torch.nn.Module):
 
 
 class MultiPeriodDiscriminator(torch.nn.Module):
-    def __init__(self, use_spectral_norm=False):
+    def __init__(self, use_spectral_norm=False, use_channels_last: bool = False):
         super().__init__()
         periods = [2, 3, 5, 7, 11]
 
+        # DiscriminatorS uses Conv1d only (3D tensors) — channels_last has no 1D
+        # variant, so the flag is a no-op there. DiscriminatorP uses Conv2d
+        # after a 1D→2D reshape, which is where channels_last pays off.
+        self.use_channels_last = use_channels_last
         discs = [DiscriminatorS(use_spectral_norm=use_spectral_norm)]
         discs = discs + [
-            DiscriminatorP(i, use_spectral_norm=use_spectral_norm) for i in periods
+            DiscriminatorP(
+                i,
+                use_spectral_norm=use_spectral_norm,
+                use_channels_last=use_channels_last,
+            )
+            for i in periods
         ]
         self.discriminators = nn.ModuleList(discs)
+        if use_channels_last:
+            # Convert Conv2d weights (DiscriminatorP) to channels_last layout.
+            # Conv1d weights (DiscriminatorS) remain in contiguous memory_format
+            # because torch.channels_last is only defined for 4D tensors —
+            # PyTorch silently keeps 1D/3D params in the default layout.
+            self.to(memory_format=torch.channels_last)
 
     def forward(self, y, y_hat):
         y_d_rs = []
