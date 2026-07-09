@@ -108,7 +108,10 @@ ko は 3 ソースを合算するため、 ソースごとに異なる品質特�
    - `(A)/(B)` 表記は **発音形 (B) を採用** (dual-form 前提の学習ノイズを除去)
    - `b//` / `l//` / `o//` / `n//` / `u//` の ETRI ノイズタグを削除
    - `+` (反復) / `*` (強調) / stray `/` を削除
-   - raw PCM → 16kHz WAV 変換 (ETRI 提供スクリプト、 事前処理) は parse の前に完了
+   - **raw `.pcm` (16 kHz mono s16le) を直読** (§3.11 impl2、 commit `2aab2258`)。
+     従来必要だった ETRI PCM→WAV 事前変換 (~3-4h wall) は `norm_audio._read_pcm16_mono`
+     dispatcher (`.pcm` 拡張子で int16 → float32/32768 直変換) で不要化。
+     既に WAV 化済のユーザは `audio_ext=".wav"` を渡せば従来経路も維持
 5. **話者 ID の prefix**: sources 間でグローバルユニーク化のため
    `zeroth-<original_id>` / `kspon-<original_id>` / `cv-<original_id>` を parser 側で付与
 
@@ -768,6 +771,54 @@ extended form で pin 済のため、 追加コストは data pipeline 実行 + 
   → vast.ai instance に rsync (~10GB、 20-30 分)
 - Zeroth-Korean: openslr.org/40 の tar.gz を直 wget (認証不要)
 - CV ko: `export_common_voice_ko.py` + UTMOS tsv 作成 (~30 分)
+
+### 3.11 前処理高速化 4 施策実装完了 (2026-07-09 追加ランディング)
+
+§3.10 で 7-lang 化 (~420k utts / ~5,100 spk) を確定した後、 前処理 wall-clock が
+「12-18h (旧見積) / 10-14h (hf_transfer 単独反映)」で本走 launch までの待ち時間が
+本走コスト (12-15 日) に対して非線形に痛かったため、 **GPU 検証不要 (backend swap /
+CPU 読み方 / IO 経路の再設計のみ) の低リスク 4 施策** を feature branch にランディング。
+GPU resample 施策 (#3) は SNR / 22.05kHz 帯域維持の GPU 検証が必要なため今回 deferred。
+
+| # | 施策 | commit | 内容 | 期待効果 |
+|---|------|--------|------|---------|
+| impl1 (#1) | **hf_transfer + `HF_HUB_ENABLE_HF_TRANSFER=1`** | [`d4f90f19`](https://github.com/ayutaz/piper-plus/commit/d4f90f19) | `src/python/pyproject.toml` の train extras に `hf_transfer>=0.1.6` 追加、 `docker/python-train/Dockerfile` runtime stage に `ENV HF_HUB_ENABLE_HF_TRANSFER=1` 焼き込み、 handoff §2 に vast.ai bare-VM 用 export 手順を追記 | **raw DL 3-5h → 1-1.5h** (単スレッド hf_hub 40-80MB/s → Rust concurrent chunk 200-500MB/s、 3-5x)、 vast.ai の `inet_up ≥ 3Gbps` 帯域を使い切れるように |
+| impl2 (#2) | **KsponSpeech `.pcm` 直読 (WAV 変換省略)** | [`2aab2258`](https://github.com/ayutaz/piper-plus/commit/2aab2258) | `norm_audio._read_pcm16_mono` (int16 → float32/32768、 s16 PCM spec 準拠) + `_read_audio_any` dispatcher を新設、 全 4 `cache_norm_audio*` entry point + `parse_kspon_speech` default `audio_ext` を `.pcm` に flip、 `test_pcm_read.py` で normalisation / 空 file / 大文字 `.PCM` / WAV passthrough を pin | **ETRI PCM→WAV pre-pass 3-4h → ~0** (raw PCM は既に int16 s16le で soundfile 経由 WAV の decode round-trip と等価、 IO-bound で parallel VAD に融合)。§2.4 の ko 追加分の主要 lever |
+| impl3 (#4) | **parquet `audio.bytes` を FLAC 直保存 (double-decode 消去)** | [`7d2f70a0`](https://github.com/ayutaz/piper-plus/commit/7d2f70a0) | `export_libritts_r_from_parquet.py` / `export_cml_tts_from_parquet.py` に `--output-format {flac,wav}` (default flac) 追加、 FLAC magic (`fLaC`) 一致時は `write_bytes()` で zero-copy 保存 (旧: `sf.read` decode + `sf.write` WAV encode + downstream `sf.read` の 3 段 double-decode)、 duration は `sf.info()` headers-only 解析、 `prepare_bilingual_dataset.process_en_dataset` は `.flac` / `.wav` / 拡張子なし の 3 パターン受理で backward-compat | **LibriTTS-R export 30-60min → 5-10min (2-6x)**、 CML-TTS も 3 言語 (es/fr/pt) で同等 gain、 合計 **-50-100min** |
+| impl4 (#5) | **`prepare_moe_speech_plus.py --parallel` default ON + chunksize=8** | [`821c112b`](https://github.com/ayutaz/piper-plus/commit/821c112b) | `--parallel` を `argparse.BooleanOptionalAction / default=True` に flip、 `Pool.imap` chunksize 1 → 8 (imap は chunksize に依らず input 順序 preserve、 byte-for-byte parity 契約は保持)、 CI / 小規模 dataset は `--no-parallel` で opt-out | **moe-speech 選抜 30-45min → 3-5min (12-16x)**、 呼び出し側 (v8 手順書) を触らずに丸ごと吸収 |
+
+**未実装 (今回 deferred)**:
+
+- **#3 GPU resample (soxr → torchaudio/CUDA)** — 22.05kHz upsample / 24kHz→22.05kHz downsample を
+  GPU で実施すると parallel VAD 経路の CPU thrash を減らせる可能性があるが、
+  **SNR / high-freq band 損失の GPU 検証が必要** (soxr MQ vs torchaudio kaiser_best の
+  A/B と null-test) で v8 スケジュール外。 v9 で別 PR (GPU rented 時に実施)
+
+**累積 wall-clock 見積の更新** (§3.10 / §4.3 のフェーズ表を上書き):
+
+| 前処理カテゴリ | 旧見積 (2026-07-09 morning、 hf_transfer 未反映) | impl1-4 反映後 (今回) | 内訳 |
+|---|---|---|---|
+| 生データ DL | 3-5h | **1-1.5h** | impl1 hf_transfer 3-5x |
+| LibriTTS-R + CML-TTS export | 60-120min | **10-20min** | impl3 FLAC 直保存 |
+| moe-speech-plus 選抜 | 30-45min | **3-5min** | impl4 parallel default ON |
+| KsponSpeech PCM→WAV 事前変換 (ko、 7-lang のみ) | 3-4h | **0** (parallel VAD に融合) | impl2 `.pcm` 直読 |
+| prepare_multilingual_dataset (VAD / spec / soxr resample) | ~8h (P2 反映済) | ~5-6h (impl2 で ko WAV 変換分吸収済) | 変更なし |
+| CAM++ per-utt embedding 抽出 | 30-45min (P5 default 化後) | 30-45min | 変更なし |
+| **6-lang 計** | 12-15h | **6-9h** (**-40-50%**) | |
+| **7-lang 計 (+ko)** | 15-18h | **7-10h** (**-45-55%**) | ko 分は impl2 でほぼ吸収 |
+
+**累積効果**: 旧見積の 12-18h に対して **6-10h (中央値 8h)** に短縮。 §1 の 「話者多様性に予算を再配分」
+原則を運用面 (待ち時間) でも実現、 本走 launch までの iteration cadence を大幅改善。 §4.3 の
+フェーズ表の DL+前処理行を「~8-10h / ~$14-17」から **「~7-10h / ~$12-17」** に更新
+(下振れの短縮効果、 上振れは ko 追加分)。
+
+**検証**:
+
+- impl1: `test_hf_transfer_env.py` (train extras の hf_transfer floor / Dockerfile ENV / env propagation / import guard、 4 test)
+- impl2: `test_pcm_read.py` (normalisation contract + 空 file + `.PCM` case-insensitive + WAV passthrough) + `test_prepare_ko_datasets` の `.pcm` / `.wav` 両受理 (合計 38 test)
+- impl3: `test_export_flac_direct.py` (FLAC magic 判定 / byte-for-byte zero-copy / wav mode backward-compat / detect_container priority、 12 test)
+- impl4: `test_moe_speech_parallel.py` (default ON / `--no-parallel` opt-out / imap chunksize / byte-for-byte parity、 10 test)
+- backward-compat: 既存 WAV / `.spec.pt` / serial exec の regression suite は全て PASS 継続
 
 ## 5. 成功基準と評価
 
