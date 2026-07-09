@@ -701,6 +701,46 @@ v8 用に拡張し、**ja 未知話者の評価セットを新設** (moe-speech-
 - [ ] Common Voice pt の品質フィルタ通過率確認 (UTMOS + validated + ≥20 clips/spk で
   実際に何話者残るか。目標 +100〜300 話者)
 
+## 6.5 Korean (ko) 追加 — 2026-07-09 追加ランディング
+
+v8 のクリティカルパス (moe-speech-plus + LibriTTS-R + AISHELL-3 + CML-TTS の
+6-lang 学習) は不変のまま、 **同一 v8 run 内で ko=7 も学習** する副次拡張。
+G2P は 7 ランタイム全てで既に ready (`docs/spec/language-id-map-contract.toml:
+extended_language_id_map`)、 id_maps.py の `_KOREAN_PHONEMES` も組み込み済のため、
+今回追加した実装は **data pipeline (parser 3 種 + CV ko exporter)** に閉じている。
+
+| ソース | ライセンス | 想定 spk | 想定 utts | prepare 引数 |
+|---|---|---|---|---|
+| **Zeroth-Korean** | CC BY 4.0 (openslr.org/40) | ~181 | ~22k (train_data_01 のみ) | `--ko-zeroth <dir>` |
+| **KsponSpeech** | AI-Hub consent (research use、 商用非公開) | ~2,000 | cap=60/spk で ~120k | `--ko-ksponspeech <dir> --ko-kspon-cap 60` |
+| **Common Voice ko** | CC0 | ~50 (UTMOS≥2.5 + ≥20 clips) | ~3k | `--ko-cv <dir> --ko-cv-min-utmos 2.5` |
+| **計** | | **~2,200** | **~145k** | |
+
+**成果物**:
+
+- `parse_zeroth_korean` / `parse_kspon_speech` / `parse_common_voice_ko` を
+  `prepare_multilingual_dataset.py` に追加 (既存 `parse_aishell3` / `parse_cml_tts`
+  と同一シグネチャの `(entries, speaker_counts)` タプル返却)
+- `export_common_voice_ko.py` を追加 (`export_common_voice_pt.py` のミラー、
+  UTMOS tsv 追加サポート)
+- `LANGUAGE_ID_MAP` / `ALL_LANGUAGES` を 8-lang extended 形式に拡張 (ko=7)
+- 契約 `language-id-map-contract.toml` の python_train entry を
+  `extended_language_id_map` / `extended_languages` に切り替え
+- 全 mirror (Rust wasm / trained-form fixtures) は既存 8-lang 形式のまま無変更
+
+**注意**:
+
+- KsponSpeech は raw PCM 配布のため、 学習前に ETRI 提供 PCM→WAV スクリプトで
+  16kHz WAV に変換する必要がある (parse 側の `audio_ext` default は `.wav`)。
+  22.05kHz upsample は `cache_audio_parallel` (soxr MQ) で自動処理
+- 話者 id は sources 間でグローバルユニークにするため、 parser 側で
+  `zeroth-` / `kspon-` / `cv-` を prefix
+- `--ko-splits` で 3 sources 共通の split override が可能 (Zeroth: `train_data_01`、
+  KsponSpeech: `KsponSpeech_01`、 CV ko: `cv` が default)
+- 学習は 6-lang 版 (現行 v8 CLI) と同じで、 `--ko-*` を追加するだけで
+  自動的に 7-lang 化 (dataset label が `multilingual-7lang` に切替)。
+  emb_lang テーブルサイズは config.json の `num_languages` から自動決定
+
 ## 7. v9 拡張パス (gol-dataset、v8 の結果を見て判断)
 
 [`midralab/gol-dataset`](https://huggingface.co/datasets/midralab/gol-dataset):
