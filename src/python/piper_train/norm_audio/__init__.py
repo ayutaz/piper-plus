@@ -18,6 +18,35 @@ from .vad import SileroVoiceActivityDetector
 _DIR = Path(__file__).parent
 
 
+# ---------------------------------------------------------------------------
+# Parallel preprocessing defaults
+# ---------------------------------------------------------------------------
+
+# Cap default worker count so tools do not over-subscribe A100 hosts
+# (typically 64 vCPU). Using cpu_count() outright causes memory pressure
+# (each worker holds soxr / torch state) and NFS thrashing. Half-of-cpu
+# with an absolute ceiling of 32 tracks the empirical sweet spot observed
+# during v7 dataset preprocessing on 30-worker runs.
+_DEFAULT_NUM_PROCESSES_CEILING = 32
+
+
+def default_num_processes() -> int:
+    """Return the recommended default worker count for VAD/preprocess Pools.
+
+    Rationale: ``os.cpu_count()`` on modern A100 hosts is 64+, but per-worker
+    memory (soxr resampler + torch tensors) and NFS IOPS make full-fan-out
+    counterproductive past ~30 workers on shared filesystems. This helper
+    returns ``min(cpu_count // 2, 32)`` with a floor of 1, matching the
+    manually tuned ``--workers 30`` used in prepare_multilingual_dataset.py.
+
+    Tools should call this for their ``--num-processes`` / ``--workers``
+    default so a single knob governs safe fan-out across cache_audio.py,
+    prepare_multilingual_dataset.py, and prepare_bilingual_dataset.py.
+    """
+    cpu = os.cpu_count() or 1
+    return max(1, min(cpu // 2, _DEFAULT_NUM_PROCESSES_CEILING))
+
+
 def _atomic_torch_save(obj, path: Path) -> None:
     """Save a tensor to *path* atomically using a temp file + rename.
 
