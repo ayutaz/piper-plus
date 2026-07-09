@@ -119,6 +119,62 @@ def _atomic_npy_save(arr, path: Path) -> None:
         raise
 
 
+# ---------------------------------------------------------------------------
+# Headerless PCM support (KsponSpeech / AI-Hub raw distribution)
+# ---------------------------------------------------------------------------
+
+# KsponSpeech ships as raw headerless int16 mono @ 16 kHz. soundfile cannot
+# read it directly (no RIFF/FLAC header), so users used to run a 3-4 hour
+# PCM→WAV pre-conversion pass before the parallel VAD stage. Reading the PCM
+# directly saves that whole pass (v8 KO enablement, 2026-07-09).
+#
+# Spec pin: 16 kHz, mono, signed 16-bit little-endian ("s16le"). This is the
+# canonical KsponSpeech shape and is documented in the ETRI distribution
+# guide; other sample rates are out of scope for the .pcm dispatch — pass a
+# WAV/FLAC path for anything else.
+_PCM16_MONO_SAMPLE_RATE = 16000
+
+
+def _read_pcm16_mono(
+    path: Path, sample_rate: int = _PCM16_MONO_SAMPLE_RATE
+) -> np.ndarray:
+    """Read a headerless int16 mono PCM file and return float32 in [-1, 1].
+
+    Motivation: KsponSpeech (AI-Hub, ETRI) distributes ~969h of Korean speech
+    as raw 16 kHz mono s16le PCM with no RIFF header. soundfile refuses to
+    read it, so historically we ran an offline PCM→WAV pass (~3-4h wall clock
+    per full dataset) before the VAD/spectrogram pipeline could touch it.
+    Reading the PCM inline skips that entire pass.
+
+    Normalisation matches soundfile's default float32 read: divide by 32768
+    so the full negative range hits exactly -1.0 (per the s16 spec, positive
+    values only reach 32767/32768 ≈ 0.99997 which is the standard PCM
+    convention). ``sample_rate`` is currently descriptive only — the caller
+    is trusted to know the file is 16 kHz mono (KsponSpeech invariant). It is
+    accepted so callers can plumb through their config value for logging /
+    downstream resample without adding a second constant.
+    """
+    raw = np.fromfile(str(path), dtype=np.int16)
+    return raw.astype(np.float32) / 32768.0
+
+
+def _read_audio_any(
+    path: Path,
+    pcm_sample_rate: int = _PCM16_MONO_SAMPLE_RATE,
+) -> tuple[np.ndarray, int]:
+    """Read audio, dispatching to a PCM reader for headerless ``.pcm`` files.
+
+    Returns ``(audio_data, src_sr)`` matching the shape produced by
+    ``sf.read(..., dtype='float32', always_2d=False)`` so callers do not need
+    to branch. ``.pcm`` files are assumed to be 16 kHz mono int16 (KsponSpeech
+    spec); anything else routes through soundfile as before.
+    """
+    path = Path(path)
+    if path.suffix.lower() == ".pcm":
+        return _read_pcm16_mono(path, pcm_sample_rate), pcm_sample_rate
+    return sf.read(str(path), dtype="float32", always_2d=False)
+
+
 def _resolve_audio_norm_path(cache_dir: Path, cache_id: str) -> tuple[Path, Path]:
     """Return ``(read_path, write_path)`` for an audio_norm cache entry.
 
@@ -204,7 +260,7 @@ def cache_norm_audio_fast(
     audio_norm_tensor: torch.Tensor | None = None
 
     if ignore_cache or (not audio_norm_path.exists()):
-        audio_data, src_sr = sf.read(str(audio_path), dtype="float32", always_2d=False)
+        audio_data, src_sr = _read_audio_any(audio_path)
         if audio_data.ndim > 1:
             audio_data = audio_data.mean(axis=1)  # stereo → mono
 
@@ -282,7 +338,7 @@ def resample_only_no_vad(
     )
 
     if ignore_cache or not audio_norm_path.exists():
-        audio_data, src_sr = sf.read(str(audio_path), dtype="float32", always_2d=False)
+        audio_data, src_sr = _read_audio_any(audio_path)
         if audio_data.ndim > 1:
             audio_data = audio_data.mean(axis=1)
 
@@ -329,7 +385,7 @@ def cache_norm_audio_no_vad(
     audio_norm_tensor: torch.Tensor | None = None
 
     if ignore_cache or not audio_norm_path.exists():
-        audio_data, src_sr = sf.read(str(audio_path), dtype="float32", always_2d=False)
+        audio_data, src_sr = _read_audio_any(audio_path)
         if audio_data.ndim > 1:
             audio_data = audio_data.mean(axis=1)
 
@@ -395,7 +451,7 @@ def cache_norm_audio(
     audio_norm_tensor: torch.FloatTensor | None = None
     if ignore_cache or (not audio_norm_path.exists()):
         # Load audio once at native sample rate using soundfile (fast, no TorchCodec needed)
-        audio_data, src_sr = sf.read(str(audio_path), dtype="float32", always_2d=False)
+        audio_data, src_sr = _read_audio_any(audio_path)
         if audio_data.ndim == 1:
             waveform = torch.from_numpy(audio_data).unsqueeze(0)  # (1, samples)
         else:
