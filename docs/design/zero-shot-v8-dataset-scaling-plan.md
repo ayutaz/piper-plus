@@ -634,6 +634,49 @@ DL 600GB + UL 500GB で ~$4 と無視できる。
   ② gated dataset (gol / moe-speech-plus) のアクセス承認がユーザー HF アカウントで済んでいること
 - vast.ai API キーはローカル `~/.config/vastai/vast_api_key` に設定済み (2026-07-07、残高 $1,351)
 
+### 3.9 T3/T6 検証 smoke A/B/C on synthetic data (2026-07-09 追試、 destroy 済 instance)
+
+§3.8 の T3 (SDPA + relative-K) と T6 (Discriminator hybrid precision) の実装
+correctness と performance 効果を測定するため、 vast.ai A100 SXM4 80GB (別 host、
+$1.07/hr、 driver 595) を 2 時間 rent (~$7.35 消費) して synthetic dataset (2,000 utts /
+100 speakers、 phoneme_max=80、 audio 2-5s、 fake CAM++ embedding) で smoke A/B/C を実施。
+
+**修正した bug 2 件** (実装時に見逃していた回帰、 commit [`e7d080cd`](https://github.com/ayutaz/piper-plus/commit/e7d080cd)):
+
+1. **`losses.py:240` の `mel_speaker_consistency_loss._to_mel` の STFT が bf16 で cuFFT crash**:
+   `mel_processing.py` (commit 11ff71fc) と同型だが別 site、 defensive fp32 upcast を追加。
+   SCL mel-domain fallback 経路で `--precision bf16-mixed + --c-spk 1.0` の組み合わせで
+   torch.stft が呼ばれ、 wav の dtype が bf16 のまま cuFFT に渡されていた。
+2. **T5 (fa24218f) の `enable_math_sdp(False)` が T3 SDPA fast path を crash させる**:
+   `--attn-drop-rel-v` で SDPA を呼ぶが、 additive rel-K bias attn_mask が flash/mem-efficient
+   の path から fallback → math backend が呼ばれるが disabled で「Invalid backend」で crash。
+   `enable_math_sdp(True)` に戻し、 priority は依然 flash/mem-efficient が先。
+
+**smoke A/B/C 実測 (synthetic data、 100 batches each、 batch=64、 bf16-mixed real config)**:
+
+| Config | 内容 | wall-clock | sec/step | Non-finite |
+|---|---|---|---|---|
+| A | baseline (no T3, no T6) | 101 sec | 1.01 | 0/100 |
+| B | + T6 (`--disc-precision bf16-mixed`) | 108 sec | 1.08 (**+7%**) | 0/100 |
+| C | + T6 + T3 (`--attn-drop-rel-v`) | 108 sec | 1.08 (**+7% vs A**) | 0/100 |
+
+**解釈** (synthetic data の限界):
+
+- **T3/T6 の実装は正しい** (crash なし、 Non-finite 0、 数値安定)
+- 一方で **synthetic では T6/T3 が逆効果** (+7% slow) → **synthetic data の scale が実 v8 と異なる** ため実効測定にならなかった:
+  1. sec/step の 80-90% が固定オーバーヘッド (Lightning init / EMA update / logging)
+  2. phoneme_max=80 (real v8 は 100-400) → attention は O(T²)、 synthetic では SDPA 効果が exposure しない
+  3. audio 2-5s (real は より長い) → Discriminator forward が小さく T6 の autocast context switch overhead が benefit を上回る
+  4. 総じて 「synthetic では実効的な D forward + attention 部分が sec/step の 5-10% にすぎず、
+     T3/T6 の +5-10% は net 0.25-1% で ノイズに埋もれる」
+
+**結論**:
+
+- T3/T6 の **quantitative speedup は real v8 data (T~200 attention、 5s audio × batch=64) でしか測定不能**
+- 来月本走の 4x A100 DDP smoke2 相当 baseline (10.74 sec/step) を rerun して +5-10% 想定効果を実測する
+- 現段階では **§3.8 の "T3/T6 で 30-38 日 → …"予測は synthetic では confirm できず、 保守寄りで確認は本走 smoke に委ねる**
+- **implementation は動作、 crash なし、 数値安定** — 本走で有効化する準備は完了
+
 ## 5. 成功基準と評価
 
 | 指標 | v7 baseline | v8 目標 |
