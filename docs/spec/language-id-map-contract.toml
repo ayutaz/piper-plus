@@ -38,33 +38,41 @@
 forward_compat_policy = "strict"
 
 [canonical]
-# Canonical language -> language_id mapping. The 7-language form is the
-# code-side ground truth (sv has G2P + symbol coverage but no trained model
-# yet). The 6-language form (sv removed) is the *trained-model* subset
-# emitted into checkpoint config.json files.
+# Canonical language -> language_id mapping. Three forms coexist:
 #
-# All runtimes that hard-code or test against a literal mapping MUST use
-# either the 7-language form (training-side) or the 6-language form
-# (trained-model side). No other ordering is permitted.
+#   - 6-lang (trained_language_id_map): historical ckpt config.json contents
+#     (v1.11 / v7). No ko, no sv.
+#   - 7-lang (language_id_map): retained as a reference structure. Was the
+#     training-side ground truth up to v7 (sv G2P/symbol ready, no trained
+#     ckpt yet).
+#   - 8-lang (extended_language_id_map): current training side from v8
+#     onwards (adds ko=7). Also used by piper-wasm's sample multilingual
+#     config generator (`piper-wasm/src/lib.rs`) and the Python training
+#     canonical (`prepare_multilingual_dataset.py`).
+#
+# All runtimes that hard-code or test against a literal mapping MUST use one
+# of these forms exactly. No other ordering is permitted — ja..pt indexes are
+# identical across the three forms, `sv` and `ko` are the only appended
+# entries, in that order.
 
-# Training/dataset side (7 languages — includes sv).
+# 7-language reference form (kept for legacy comparison; identical to the
+# canonical prefix of the extended form).
 language_id_map = { ja = 0, en = 1, zh = 2, es = 3, fr = 4, pt = 5, sv = 6 }
 
 # Stable canonical ordering (sorted by language_id ascending).
 all_languages = ["ja", "en", "zh", "es", "fr", "pt", "sv"]
 
-# Trained-model side (6 languages — sv excluded; this is what current
-# checkpoint config.json language_id_map fields contain).
+# Trained-model side (6 languages — sv excluded; this is what pre-v8 ckpt
+# config.json language_id_map fields contain).
 trained_language_id_map = { ja = 0, en = 1, zh = 2, es = 3, fr = 4, pt = 5 }
 trained_languages = ["ja", "en", "zh", "es", "fr", "pt"]
 
-# Extended/future-model side (8 languages — adds ko=7). Used by piper-wasm's
-# sample multilingual config generator (`piper-wasm/src/lib.rs`) to project
-# the full 8-language phoneme inventory documented in
+# Training/dataset side from v8 onwards (8 languages — adds ko=7). Used by
+# piper-wasm's sample multilingual config generator (`piper-wasm/src/lib.rs`)
+# and by `prepare_multilingual_dataset.py:LANGUAGE_ID_MAP`.
+# The full 8-language phoneme inventory is documented in
 # `src/python/g2p/piper_plus_g2p/encode/id_maps.py:140` ("ja-en-zh-es-fr-pt-ko-sv").
-# IMPORTANT: ja..pt indexes match `language_id_map` (the 7-lang form) exactly;
-# `sv` and `ko` are the only added entries, in that order. Any future trained
-# model that includes ko MUST keep ko=7.
+# IMPORTANT: any future trained model that includes ko MUST keep ko=7.
 extended_language_id_map = { ja = 0, en = 1, zh = 2, es = 3, fr = 4, pt = 5, sv = 6, ko = 7 }
 extended_languages = ["ja", "en", "zh", "es", "fr", "pt", "sv", "ko"]
 
@@ -96,14 +104,14 @@ runtime = "python_train"
 path = "src/python/piper_train/tools/prepare_multilingual_dataset.py"
 kind = "python_dict_literal"
 symbol = "LANGUAGE_ID_MAP"
-expected = "language_id_map"  # 7-lang form (training side)
+expected = "extended_language_id_map"  # 8-lang form (v8: sv=6, ko=7)
 
 [[runtime_sources.entries]]
 runtime = "python_train"
 path = "src/python/piper_train/tools/prepare_multilingual_dataset.py"
 kind = "python_list_literal"
 symbol = "ALL_LANGUAGES"
-expected = "all_languages"
+expected = "extended_languages"
 
 [[runtime_sources.entries]]
 runtime = "python_runtime"

@@ -117,6 +117,72 @@ datasets:
       CML-TTS: A Multilingual Speech Corpus, freds0 et al.
       Distributed under CC BY 4.0.
 
+  - id: zeroth-korean
+    languages: [ko]
+    title: "Zeroth-Korean"
+    speakers: 181
+    utterances: 22263
+    license:
+      spdx: "CC-BY-4.0"
+      verified: false
+      url: "https://creativecommons.org/licenses/by/4.0/"
+    source:
+      url: "https://www.openslr.org/40/"
+      commit_or_version: "v1.0 (2017-05)"
+    attribution_required: true
+    attribution_text: |
+      Zeroth-Korean speech corpus, distributed by AtlasGuide / GoodPeopleTech.
+      Licensed under CC BY 4.0.
+    used_only_in:
+      - "multi-7lang-v8"
+      - "multilingual-7lang-v8"
+
+  - id: kspon-speech
+    languages: [ko]
+    title: "KsponSpeech"
+    speakers: 2000
+    utterances: 620000
+    license:
+      spdx: "OTHER"
+      verified: false
+      url: "https://aihub.or.kr/aihubdata/data/view.do?dataSetSn=123"
+      note: |
+        AI-Hub license — free for research after signing the ETRI/AI-Hub
+        consent form (Korean nationals or overseas researchers). NOT a
+        standard OSI license; downstream distribution is restricted.
+    source:
+      url: "https://aihub.or.kr/aihubdata/data/view.do?dataSetSn=123"
+      commit_or_version: "v1.0 (ETRI, 2019)"
+    attribution_required: true
+    attribution_text: |
+      KsponSpeech corpus, distributed by ETRI via AI-Hub (aihub.or.kr).
+      Use requires signing the AI-Hub consent form; downstream model
+      redistribution requires acknowledging KsponSpeech as a training
+      source and MUST NOT rehost the raw audio.
+    used_only_in:
+      - "multi-7lang-v8"
+      - "multilingual-7lang-v8"
+
+  - id: common-voice-ko
+    languages: [ko]
+    title: "Common Voice ko (v22)"
+    speakers: 50
+    utterances: 3000
+    license:
+      spdx: "CC0-1.0"
+      verified: true
+      url: "https://creativecommons.org/publicdomain/zero/1.0/"
+    source:
+      url: "https://commonvoice.mozilla.org/ko/datasets"
+      commit_or_version: "Common Voice Delta 22.0 (2026-01)"
+    attribution_required: false
+    attribution_text: |
+      Common Voice ko subset, distributed under CC0 1.0 by Mozilla and its
+      contributors. Attribution is not required but appreciated.
+    used_only_in:
+      - "multi-7lang-v8"
+      - "multilingual-7lang-v8"
+
   - id: tsukuyomi-chan-corpus
     languages: [ja]
     title: "つくよみちゃんコーパス"
