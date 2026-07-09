@@ -3,10 +3,20 @@
 
 OpenSLR 146 のミラー回線が実用に耐えないため (実測 0.1-0.4MB/s、2026-07-07)、
 HF parquet (~10MB/s+) を取得して prepare_multilingual_dataset.parse_cml_tts が
-期待する構造 (audios/<speaker>/<name>.wav + {train,dev,test}.csv 8列 pipe 区切り)
-に書き戻す。parquet カラムは 8 列 csv と 1:1 対応:
+期待する構造 (audios/<speaker>/<name>.{wav,flac} + {train,dev,test}.csv 8列 pipe
+区切り) に書き戻す。parquet カラムは 8 列 csv と 1:1 対応:
   audio / wav_filesize / text / transcript_wav2vec / levenshtein / duration /
   num_words / speaker_id
+
+Output format (2026-07-09 v8 #4 で FLAC 直保存モード追加):
+  * `--output-format flac` (default): parquet の audio.bytes が FLAC magic
+    (`fLaC`) を持つ場合 write_bytes() で `.flac` として直接保存し decode/encode
+    を丸ごと省略。 downstream (norm_audio) が再度 sf.read するため、 従来の
+    WAV 経由だと double-decode が発生していた。 wav_filename 列も対応する
+    拡張子で記録し、 parse_cml_tts の存在チェックが透過的に通る (soundfile
+    は FLAC/WAV 両対応)。
+  * `--output-format wav`: 従来通り (WAV bytes は zero-copy、 それ以外は
+    decode + wav 再 encode)。 backward compat 用。
 
 Usage:
   python -m piper_train.tools.export_cml_tts_from_parquet \
@@ -22,6 +32,7 @@ from pathlib import Path
 import pyarrow.parquet as pq
 import soundfile as sf
 
+
 _LOGGER = logging.getLogger("export_cml_tts_from_parquet")
 
 CSV_HEADER = (
@@ -29,23 +40,74 @@ CSV_HEADER = (
     "levenshtein|duration|num_words|client_id"
 )
 
+# Container magic bytes — 参考: WAV は RIFF ヘッダ (`RIFF....WAVE`)、 FLAC は
+# native stream marker `fLaC` (https://xiph.org/flac/format.html#stream)。
+_WAV_MAGIC = b"RIFF"
+_FLAC_MAGIC = b"fLaC"
 
-def write_audio(audio: dict, dst: Path) -> bool:
-    """HF Audio struct {bytes, path} を wav で書き出す。wav 以外はデコードして変換。"""
+
+def _detect_container(raw: bytes, src_name: str) -> str:
+    """audio bytes のコンテナを "wav" / "flac" / "other" で返す。 magic 優先、
+    fallback で path の拡張子を見る (HF Audio struct では path が空のときが
+    あるため magic を先に判定する)。"""
+    if raw[:4] == _WAV_MAGIC:
+        return "wav"
+    if raw[:4] == _FLAC_MAGIC:
+        return "flac"
+    if src_name.endswith(".wav"):
+        return "wav"
+    if src_name.endswith(".flac"):
+        return "flac"
+    return "other"
+
+
+def write_audio(
+    audio: dict, dst_dir: Path, base_stem: str, output_format: str
+) -> tuple[Path, int] | None:
+    """HF Audio struct {bytes, path} を書き出す。
+
+    output_format:
+      * "flac": FLAC bytes は write_bytes() で直接保存 (double-decode 排除)。
+        WAV bytes は decode + FLAC 再 encode (依然として 1 段変換が発生する
+        が、 downstream の decode + encode = 2 段の想定より軽い)。
+      * "wav": 既存挙動 (WAV は zero-copy、 それ以外は decode + wav 再 encode)。
+
+    Returns:
+      (書き出し先 Path, サイズ bytes) or None (失敗)。
+    """
     raw = audio.get("bytes")
     if raw is None:
-        return False
+        return None
     src_name = (audio.get("path") or "").lower()
-    dst.parent.mkdir(parents=True, exist_ok=True)
-    if src_name.endswith(".wav") or raw[:4] == b"RIFF":
+    container = _detect_container(raw, src_name)
+    dst_dir.mkdir(parents=True, exist_ok=True)
+
+    if output_format == "flac":
+        if container == "flac":
+            dst = dst_dir / f"{base_stem}.flac"
+            dst.write_bytes(raw)
+            return dst, len(raw)
+        # FLAC 以外 → decode + FLAC encode で downstream に .flac を提供。
+        try:
+            data, sr = sf.read(io.BytesIO(raw))
+        except (RuntimeError, sf.LibsndfileError):
+            return None
+        dst = dst_dir / f"{base_stem}.flac"
+        sf.write(dst, data, sr, format="FLAC")
+        return dst, dst.stat().st_size
+
+    # output_format == "wav": 既存挙動を保持。
+    if container == "wav":
+        dst = dst_dir / f"{base_stem}.wav"
         dst.write_bytes(raw)
-        return True
+        return dst, len(raw)
     try:
         data, sr = sf.read(io.BytesIO(raw))
     except (RuntimeError, sf.LibsndfileError):
-        return False
+        return None
+    dst = dst_dir / f"{base_stem}.wav"
     sf.write(dst, data, sr)
-    return True
+    return dst, dst.stat().st_size
 
 
 def sanitize(text: str) -> str:
@@ -77,23 +139,30 @@ def export_split(
                         continue
                     if (
                         args.max_utts_per_speaker
-                        and speaker_counts.get(speaker, 0)
-                        >= args.max_utts_per_speaker
+                        and speaker_counts.get(speaker, 0) >= args.max_utts_per_speaker
                     ):
                         skipped_cap += 1
                         continue
                     audio = cols["audio"][i]
-                    base = Path(audio.get("path") or f"{split}_{rows:08d}.wav").name
-                    if not base.endswith(".wav"):
-                        base = Path(base).stem + ".wav"
-                    rel = Path("audios") / speaker / base
-                    if not write_audio(audio, out_dir / rel):
+                    # 拡張子は write_audio 側 (output_format) が決めるため stem のみ渡す。
+                    src_base = Path(audio.get("path") or f"{split}_{rows:08d}").name
+                    base_stem = Path(src_base).stem
+                    dst_subdir = out_dir / "audios" / speaker
+                    written = write_audio(
+                        audio, dst_subdir, base_stem, args.output_format
+                    )
+                    if written is None:
                         continue
+                    dst_path, dst_size = written
+                    # csv の wav_filename 列は実際に書き出したファイル名を反映する。
+                    # parse_cml_tts は base_dir / wav_filename の存在確認で resolve する
+                    # ため、 拡張子が .flac のときも透過的に通る (soundfile が 両対応)。
+                    rel = Path("audios") / speaker / dst_path.name
                     csv_f.write(
                         "|".join(
                             (
                                 str(rel).replace("\\", "/"),
-                                str(cols["wav_filesize"][i]),
+                                str(dst_size),
                                 sanitize(str(cols["text"][i])),
                                 sanitize(str(cols["transcript_wav2vec"][i])),
                                 str(cols["levenshtein"][i]),
@@ -138,6 +207,17 @@ def main() -> None:
     )
     parser.add_argument("--min-dur", type=float, default=1.0)
     parser.add_argument("--max-dur", type=float, default=15.0)
+    parser.add_argument(
+        "--output-format",
+        choices=("flac", "wav"),
+        default="flac",
+        help=(
+            "音声書き出しフォーマット。 flac (default) は parquet の FLAC bytes を "
+            "そのまま write_bytes() で保存し decode/encode を skip する v8 高速化 "
+            "path (double-decode 排除)。 wav は decode + wav 再 encode の従来経路 "
+            "(backward compat)。 wav_filename csv 列は実際の拡張子を反映する。"
+        ),
+    )
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 

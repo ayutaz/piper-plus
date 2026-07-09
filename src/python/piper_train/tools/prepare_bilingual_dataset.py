@@ -680,11 +680,27 @@ def process_en_dataset(
         else:
             speaker_id = en_speaker_id_offset
 
-        # Handle both formats: with and without .wav extension
-        if filename.endswith(".wav"):
+        # Resolve audio path. metadata.csv は 3 パターンを受理する:
+        #   1. 拡張子なし (`utt_id`) — 従来の convert_libritts_r_to_ljspeech / 旧
+        #      export_libritts_r_from_parquet が出力してきた形式。
+        #   2. `.wav` 明示 — 従来経路 (LJSpeech-1.1 等)。
+        #   3. `.flac` 明示 — 2026-07-09 v8 #4 で追加した parquet FLAC 直保存
+        #      経路。 soundfile は WAV/FLAC 透過対応のため wav_path を
+        #      norm_audio に渡すだけで動作する。
+        # 拡張子なしの場合は `.wav` → `.flac` の順に fallback して 既存生成物
+        # との backward compat を保つ。
+        if filename.endswith((".wav", ".flac")):
             wav_path = wav_dir / filename
         else:
-            wav_path = wav_dir / f"{filename}.wav"
+            wav_candidate = wav_dir / f"{filename}.wav"
+            flac_candidate = wav_dir / f"{filename}.flac"
+            if wav_candidate.exists():
+                wav_path = wav_candidate
+            elif flac_candidate.exists():
+                wav_path = flac_candidate
+            else:
+                # どちらも無い → 既存挙動 (`.wav` で resolve、 存在チェックで skip)
+                wav_path = wav_candidate
 
         if not wav_path.exists():
             skipped_parse += 1
