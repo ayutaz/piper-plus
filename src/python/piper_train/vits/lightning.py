@@ -241,6 +241,11 @@ class VitsModel(pl.LightningModule):
         # D:G update ratio (D updates every step, G updates every d_update_interval steps)
         d_update_interval: int = 2,
         max_spec_length: int = 700,
+        # T1: channels_last memory format for Conv2d Discriminator (opt-in, default OFF).
+        # Targets NHWC Tensor Core kernels on A100 SXM4 / Ada 6000; silent
+        # fallback on sm_75 (T4) and older. Affects DiscriminatorP only —
+        # DiscriminatorS (Conv1d) and Generator (Conv1d-heavy) are untouched.
+        use_channels_last: bool = False,
         **kwargs,
     ):
         super().__init__()
@@ -280,8 +285,13 @@ class VitsModel(pl.LightningModule):
             prosody_dim=self.hparams.prosody_dim,
         )
         self.model_d = MultiPeriodDiscriminator(
-            use_spectral_norm=self.hparams.use_spectral_norm
+            use_spectral_norm=self.hparams.use_spectral_norm,
+            use_channels_last=self.hparams.use_channels_last,
         )
+        if self.hparams.use_channels_last:
+            _LOGGER.info(
+                "channels_last enabled for MultiPeriodDiscriminator (DiscriminatorP Conv2d weights → NHWC)"
+            )
 
         # DINO center buffer for zero-shot speaker embedding regularization
         use_zero_shot = self.hparams.use_zero_shot and self.hparams.num_speakers > 1

@@ -479,6 +479,21 @@ def create_parser():
         default=1.0,
         help="Gradient norm clipping value to prevent NaN explosion (default: 1.0). Set 0 to disable.",
     )
+    # T1: channels_last memory format for Conv2d Discriminator (opt-in).
+    # Targets ~-16% sec/step on A100 SXM4 by dispatching Conv2d layers of
+    # DiscriminatorP to NHWC Tensor Core kernels (nsys measured 12.8% nchw↔nhwc
+    # conversion + 8% conv overhead on v8 real-config traces). Safe rollout:
+    # default OFF, silent fallback on sm_75 (T4) and older via PyTorch's
+    # kernel dispatcher.
+    parser.add_argument(
+        "--channels-last",
+        action="store_true",
+        default=False,
+        help="Enable torch.channels_last memory format for MultiPeriodDiscriminator "
+        "(Conv2d layers in DiscriminatorP). Opt-in perf switch, targets NHWC Tensor "
+        "Core kernels on A100 SXM4 / Ada 6000 (~-16%% sec/step expected). Silent "
+        "fallback to nchw on sm_75 (T4) and older hardware.",
+    )
     parser.add_argument("--seed", type=int, default=1234)
     return parser
 
@@ -728,6 +743,17 @@ def main():
 
     if args.no_wavlm:
         dict_args["use_wavlm_discriminator"] = False
+
+    # T1: propagate CLI --channels-last (argparse hyphen→underscore) to the
+    # VitsModel constructor keyword ``use_channels_last``. argparse names the
+    # attribute ``channels_last``; the hparam is ``use_channels_last`` to match
+    # the MultiPeriodDiscriminator / DiscriminatorP kwargs.
+    dict_args["use_channels_last"] = getattr(args, "channels_last", False)
+    if dict_args["use_channels_last"]:
+        _LOGGER.info(
+            "channels_last memory format enabled (--channels-last): "
+            "DiscriminatorP Conv2d weights and activations use NHWC layout."
+        )
 
     # Warn about deprecated --spk-emb-dropout
     if getattr(args, "spk_emb_dropout", 0.0) != 0.0:
