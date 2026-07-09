@@ -818,20 +818,19 @@ class VitsModel(pl.LightningModule):
         self._y = None
         self._y_hat = None
 
-        # Periodic memory cleanup to prevent fragmentation
-        if batch_idx % MEMORY_CLEANUP_FREQUENCY == 0:
-            if torch.cuda.is_available():
-                torch.cuda.synchronize()  # Wait for GPU operations to complete
-                torch.cuda.empty_cache()
-                # Use info level only for first cleanup, then debug
-                if batch_idx == 0:
-                    _LOGGER.info(
-                        "D:G ratio = %d:1 | Memory cache clearing every %d iterations",
-                        d_update_interval,
-                        MEMORY_CLEANUP_FREQUENCY,
-                    )
-                else:
-                    _LOGGER.debug(f"Memory cache cleared at iteration {batch_idx}")
+        # NOTE (perf, 2026-07-09): 500-batch 周期の
+        # ``torch.cuda.synchronize() + torch.cuda.empty_cache()`` flush を撤去。
+        # T4/V100 (16GB) 時代に memory fragmentation 対策で入れたが、
+        #   * A100 SXM4 80GB / H100 等の現行 GPU では VRAM に十分な余裕がある
+        #   * ``PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True`` で caching
+        #     allocator が fragmentation を自律解消する
+        #   * ``synchronize()`` は全 outstanding CUDA op を待ち、続く
+        #     ``empty_cache()`` で allocator を丸ごと reset するため 500 batch
+        #     ごとに数百 ms 〜数秒の GPU 停止が発生し throughput を落とす
+        # 期待効果: +2-3% throughput (500 batch 毎の GPU 全停止除去)。
+        # 旧挙動を復旧する必要が出た場合は CLI ``--enable-legacy-flush`` を
+        # 追加して ``MEMORY_CLEANUP_FREQUENCY`` gated な flush を再有効化する
+        # (今のところ需要が確認されるまでは未実装)。
 
     def _log_with_batch_info(
         self, key: str, value, batch: Batch = None, batch_size: int = None
