@@ -324,6 +324,17 @@ def create_parser():
         "(single-speaker or --samples-per-speaker=0).",
     )
     parser.add_argument(
+        "--precomputed-mel",
+        action="store_true",
+        default=False,
+        help="Load precomputed linear spectrograms from ``{dataset_dir}/mel/*.mel.npy`` "
+        "instead of the legacy ``.spec.pt`` cache. Requires running "
+        "``python -m piper_train.tools.precompute_mel`` first. "
+        "Backward-compat: per-utterance fallback to ``audio_spec_path`` when a "
+        "``.mel.npy`` sibling is missing, so this flag is safe to pass even on "
+        "partially-precomputed datasets. Default: off.",
+    )
+    parser.add_argument(
         "--precision",
         default="bf16-mixed",
         choices=("32-true", "16-mixed", "bf16-mixed"),
