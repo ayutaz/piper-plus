@@ -235,6 +235,12 @@ def mel_speaker_consistency_loss(
 
     def _to_mel(wav: torch.Tensor) -> torch.Tensor:
         """wav [B, T] -> log-mel [B, n_mels, frames]"""
+        # cuFFT does not support BFloat16 / FP16 (same as mel_processing.py).
+        # Under bf16-mixed autocast the generator output arrives here in bf16
+        # and torch.stft raises. Upcast defensively; downstream mel/log ops
+        # keep fp32 throughput.
+        if wav.dtype in (torch.bfloat16, torch.float16):
+            wav = wav.float()
         pad = (n_fft - hop_length) // 2
         wav = torch.nn.functional.pad(wav, (pad, pad), mode="reflect")
         stft = torch.stft(

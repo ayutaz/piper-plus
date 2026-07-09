@@ -704,7 +704,14 @@ def main():
     # enable via hasattr guard so torch < 2.11 still imports cleanly.
     bcuda.enable_flash_sdp(True)
     bcuda.enable_mem_efficient_sdp(True)
-    bcuda.enable_math_sdp(False)  # priority down (naive fallback)
+    # Math backend must stay enabled — SDPA raises "Invalid backend" when
+    # flash/mem-efficient decline (e.g. additive attn_mask float32 or
+    # non-power-of-2 head_dim) and no fallback is available. Priority still
+    # favours flash/mem-efficient; math is only used when both decline.
+    # Observed 2026-07-09 on A100 SXM4 with T3 --attn-drop-rel-v: additive
+    # rel-K bias attn_mask forced math fallback, and disabling it crashed
+    # the whole attention path.
+    bcuda.enable_math_sdp(True)
     if hasattr(bcuda, "enable_cudnn_sdp"):
         bcuda.enable_cudnn_sdp(True)  # torch 2.11+ new backend
     _LOGGER.info(
